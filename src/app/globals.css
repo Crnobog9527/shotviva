@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+/* Design tokens are decided in T6 (DESIGN.md); these are neutral placeholders. */
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: system-ui, sans-serif;
+}
