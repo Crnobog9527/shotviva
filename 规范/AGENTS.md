@@ -1,0 +1,155 @@
+# Shotviva 开发规范（AGENTS.md）
+
+> 给所有写代码的 Agent 和人看的唯一执行规则 · v3 · 2026-11-05 按 `AUDIT2_fable.md` 和 Owner 拍板修订（v2：2026-11-04）
+> 仓库建好后放在仓库根目录，`规范/` 和 `seo资料/` 一起移进仓库纳入 git。
+
+## 1. 先读什么
+
+动手前按顺序读：
+
+1. `规范/ARCHITECTURE.md`：代码结构、模块边界、业务规则、v1 范围
+2. `seo资料/Shotviva建站规格v2.md`：页面、SEO、GEO 规则
+3. `seo资料/公开创作库seo方案.md`：/g、/tag、/gallery 的规则
+4. `规范/DESIGN.md`：UI 规范
+5. `规范/LAUNCH_CHECKLIST.md`：上线前逐条勾选
+6. `规范/COLLABORATION.md`：Claude 和 Codex 的分工、四种协作模式、任务卡和验收流程
+
+文件之间冲突时：SEO 问题以建站规格和创作库规格为准，代码结构和业务规则以 ARCHITECTURE.md 为准，拿不准就停下问 Owner。
+
+## 2. 技术栈（锁定，不许私自换）
+
+| 用途 | 选型 |
+|---|---|
+| 框架 | Next.js 16 App Router + React 19 + TypeScript strict |
+| 渲染 | 营销页、模板页、标签页一律 SSG / ISR，源码可见正文（建站规格 R5） |
+| 多语言 | next-intl，英文不带前缀，v1 只开 en |
+| 样式和组件 | Tailwind CSS v4 + shadcn/ui（new-york）；Magic UI 可选，只在 impeccable 设计方向需要时引入 |
+| 数据库和登录 | Supabase（Postgres + Auth），所有表开 RLS |
+| 存储 | Cloudflare R2（S3 协议） |
+| 支付 | Stripe Checkout（托管页）+ Waffo 托管结账页，v1 都接 |
+| 发信 | Resend，v1 只作为 Supabase Auth 的 SMTP，不写发信代码 |
+| 人机验证 | hCaptcha（经 Supabase Auth 校验） |
+| 限频 | Vercel Firewall 限频规则（Pro 自带，不另加服务） |
+| 监控和分析 | Sentry、PostHog（cookieless 模式） |
+| 部署 | Vercel Pro |
+| 包管理 | pnpm（版本写在 `packageManager` 字段） |
+
+参考 Graylum 代码时，一律看 `Crnobog9527/GraylumAI_vercel` 的 **staging 分支**，不看 main。
+
+## 3. 目录和边界
+
+按 ARCHITECTURE.md 第 1 节的 `core / modules / site / app` 四层放代码。硬规则：
+
+- `core` 不能 import `modules` 和 `site`；模块之间不能互相 import。用 ESLint `no-restricted-imports` 强制检查。
+- `app/` 下的路由文件只做组装：取数据、拼组件。业务逻辑放进 `core` 或 `modules`。
+- 品牌名、价格、免费额度等对外数字只从 `site.config.ts` 读。
+- 不写「以后可能用到」的代码，不建空目录。视频模块 v1 只有接口类型。
+- 做之前先看 ARCHITECTURE.md 第 13 节：不在 v1 范围里的功能不做。
+
+## 3.1 文件拆分（硬规则，CI 检查）
+
+| 对象 | 上限 | 超过怎么办 |
+|---|---|---|
+| 任何 `.ts` / `.tsx` 文件 | **300 行**（不含空行和注释） | 按职责拆成多个文件 |
+| 普通函数 | **60 行** | 抽子函数 |
+| React 组件 | **120 行**（JSX 行数多，单独放宽） | 抽子组件 |
+| 单个组件的 props | 8 个（审查时看，不进 CI） | 拆组件，或把相关参数合成一个对象 |
+| 单个 SQL 迁移文件 | 一件事 | 一个迁移只改一类东西，不混写 |
+
+拆分方式：
+
+- **一个文件只做一件事**：一个组件一个文件；数据请求、状态、界面分开放。
+- **组件按「容器 + 展示」拆**：容器负责取数据和处理事件，展示组件只接收 props 渲染。展示组件不准直接调接口。
+- **逻辑放进 hook 或纯函数**：组件里超过 10 行的计算或副作用，抽成 `use-xxx.ts` 或 `xxx.ts`。纯函数要能单独测试。
+- **一个功能一个文件夹**，结构统一：
+
+  ```
+  modules/image/workspace/
+    image-workspace.tsx        容器
+    upload-panel.tsx           展示
+    copy-fields.tsx            展示
+    use-generation-job.ts      状态与请求
+    generation-schema.ts       zod 校验
+    index.ts                   只导出对外用的东西
+  ```
+
+- **对外只通过 `index.ts` 暴露**，其他文件夹不准深层 import 别人的内部文件。
+- 路由文件（`page.tsx`、`route.ts`）不超过 80 行，只做组装和调用。
+- 项目是新建的，从底座拷文件时只拷 ARCHITECTURE.md 第 11 节列出的文件，拷进来就要符合本节规则。底座的超长文件不拷、不拆。
+
+自动检查（CI 失败级）：ESLint `max-lines`（300，跳过空行和注释）、`max-lines-per-function`（普通函数 60，`.tsx` 组件 120）、`complexity`（10）。生成的文件（数据库类型、迁移快照）加入忽略名单。
+
+## 4. TypeScript 和代码写法
+
+- `strict: true`，禁止 `any`；确实不知道类型时用 `unknown` 再收窄。
+- 所有外部输入都用 zod 校验：请求体、查询参数、回调内容、环境变量。
+- 环境变量统一在 `core/env.ts` 里用 zod 解析，其他地方不准直接读 `process.env`。
+- 密钥只能在服务端用。服务端模块顶部加 `import 'server-only'`。`NEXT_PUBLIC_` 开头的变量里不能放任何密钥。
+- 不准用 `console.log`，统一用 `core/logger`，它会自动打码邮箱、token、密钥。
+- 错误统一用错误码：`{ code: 'CREDITS_INSUFFICIENT', message }`，错误码列表放在 `core/errors.ts`。给用户看的提示和日志分开写。
+- 命名：文件用 kebab-case，组件用 PascalCase，函数和变量用 camelCase，数据库表和字段用 snake_case。
+- 注释写「为什么这样做」，不写「做了什么」。
+
+## 5. 数据库
+
+- 所有改动都写成迁移文件，放在 `supabase/migrations/`，文件名带序号，例如 `0007_generation_jobs.sql`。禁止在后台手改表结构。
+- 每张表必须开 RLS，并写清楚谁能读写。私有表（`template_prompts`、积分流水、订单）拒绝所有客户端访问。
+- **积分和订单只能通过 SQL 函数修改**，函数里完成余额判断、写流水和幂等检查。服务端用 service role 调用，前端不能调用。
+- 涉及钱的写操作必须有幂等键：生成任务按任务 id，支付回调按事件 id 和订单 id。
+- 种子数据里不准出现真实提示词，提示词从不进 git 的本地文件导入。
+
+## 6. 安全
+
+- 所有接口默认需要登录。公开接口要在路由文件顶部注释说明为什么公开。**唯一例外**：`/api/partner/*` 用伙伴密钥 + `X-Shotviva-Account` 鉴权，不走用户会话（ARCHITECTURE.md 第 14.3 节）；预览密钥在生产无效。
+- **任何 API 路由不得接收或返回图片字节**（Vercel 函数 4.5MB 上限）。上传走浏览器压缩 + 预签名直传 R2，出图结果写 R2 后只返回 key 或签名地址（ARCHITECTURE.md 第 8 节）。
+- 不开全站跨域：删除底座 `vercel.json` 里 `/api/*` 的 `Access-Control-Allow-Origin: *`。R2 桶的 CORS 只放行站点域名的 PUT。
+- 不准出现底座里那种调试接口和公开出图接口（`/api/debug/*`、`/api/v1`）。
+- 生成接口用 Vercel Firewall 按 IP 限频，再在代码里按账号限频；伙伴接口复用按账号限频。
+- 支付回调先验签，再按事件 id 去重；验签失败返回 400，临时故障返回 500 让对方重试。
+- 上传文件：浏览器端校验类型和大小（≤20MB）并压缩重编码（EXIF 随之丢失）；生成前服务端 HEAD 校验对象大小和类型。**服务端不转 HEIC**，`accept` 里不列 heic。
+- 创作库开放（第 8 周）前必须先上线内容审核，见 ARCHITECTURE.md 第 9 节。
+
+## 7. 测试
+
+用 Vitest。以下代码没有测试不许合并：
+
+1. 积分的预扣、确认、退回，包括并发连点和重复结算
+2. 支付回调（Stripe、Waffo 各一套）：重复事件、乱序事件、验签失败
+3. 生成任务：成功、失败、超时都能正确结算，失败一定退回积分
+4. `paid_until` 的叠加与到期：连续购买累加、到期后变回免费身份、水印规则随之切换
+5. 模块开关：关掉的模块路由返回 404、不进 sitemap
+6. 创作库的 noindex 和 sitemap 测试，在开放创作库的那个 PR 里补上
+7. 伙伴接口：code 用一次即废、重复 `Idempotency-Key` 不重复扣费、撤销后 401、`return_to` 非白名单拒绝
+8. 上传：HEAD 校验对 >20MB 和改后缀的对象返回 422 并删除对象
+
+涉及数据库函数的测试连本地 Supabase（`supabase start`）跑，不要用 mock 冒充数据库。CI 用 `supabase/setup-cli` action + `supabase start` 起库，第一个 PR（仓库骨架）就把 workflow 建好。
+
+## 8. Git 和发布
+
+- `main` 就是生产环境。不准直接推 main，所有改动走分支和 PR。
+- 分支命名：`feat/xxx`、`fix/xxx`、`chore/xxx`。
+- 提交信息用 Conventional Commits，英文写。
+- 每个 PR 必须通过 CI：lint、类型检查、测试、构建。PR 描述写清楚改了什么、怎么验证、是否涉及数据库迁移或支付。
+- Vercel 预览环境连测试用的 Supabase 项目、Stripe 测试模式、Waffo 沙盒，不碰生产数据。
+- 涉及支付、积分、登录的 PR，合并前要在预览环境用测试卡跑通一次，并把结果写进 PR。
+- 生产环境的数据库迁移、支付配置改动、密钥轮换，必须先经 Owner 同意。
+
+## 9. 页面和 SEO
+
+- 按建站规格 R1~R12、G1~G13 和创作库规格 U1~U12 执行，不在这里重复。
+- 新建任何可收录页面前，先确认它在主词表 `seo资料/Shotviva 页面与主词映射（美国口径）.csv` 里（主词表以这份 CSV 为唯一来源）；不在表里的页面一律 `noindex` 或不建。
+- SEO 页面内容按 ARCHITECTURE.md 第 12 节的固定结构写。
+- noindex 由全局配置统一控制，禁止逐页手写。
+
+## 10. 什么时候必须停下问 Owner
+
+- 要改技术栈，或要新增第三方服务
+- 要改价格、免费额度、对外数字
+- 要新增可收录的页面或标签
+- 发现规范之间互相冲突
+- 任何生产环境的不可逆操作
+
+## 11. 改规范
+
+- 规范只有总控能改（2026-11-05 的 v3 修订由 Owner 直接授权审计窗口执行，是一次性例外）。仓库建好后，规范改动单独开 PR，标题前缀 `[spec]`，不和代码改动混在一起。
+- 执行方发现规范有问题，在任务卡里提出来，不自己改。

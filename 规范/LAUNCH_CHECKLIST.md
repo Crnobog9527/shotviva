@@ -1,0 +1,121 @@
+# Shotviva 上线检查清单
+
+> v3 · 2026-11-05 按 `AUDIT2_fable.md` 和 Owner 拍板修订（v2：2026-11-04）· 第 1~9 节上线前逐条勾选，任何一条不过就不上线。第 10 节是推迟项，不卡上线。SEO 部分只列要点，细则见建站规格和创作库规格。
+
+## 1. 账号和服务
+
+- [ ] Vercel Pro 项目建好，绑定 shotviva.com，www 跳转到不带 www 的主域名
+- [ ] Supabase 生产项目（Pro）和预览用的测试项目分开
+- [ ] Supabase Auth 的 Site URL 和 Redirect URLs 配好，包含预览域名通配
+- [ ] Stripe：同一主体下新开的独立账户，开通卡、支付宝、微信支付；账单显示 SHOTVIVA。审核未通过也不影响上线（见第 5 节）
+- [ ] Waffo：申请加急，测试和生产密钥分开创建，回调格式选 Raw
+- [ ] Stripe 和 Waffo 的生产回调地址、签名密钥都已登记到环境变量
+- [ ] OpenAI：组织验证完成，有 GPT-Image-2.5 权限，设好每月消费上限
+- [ ] Resend：shotviva.com 的 SPF、DKIM、DMARC 都验证通过，已配成 Supabase Auth 的 SMTP
+- [ ] Cloudflare R2：生产桶和预览桶分开，都是私有桶；`inputs/` 前缀设好 7 天过期规则；CORS 只放行站点域名的 PUT 和 Content-Type
+- [ ] 伙伴密钥：预览和生产各一把，登记到环境变量；预览密钥在生产调用返回 401
+- [ ] hCaptcha：站点密钥建好，已在 Supabase Auth 里启用
+- [ ] Sentry、PostHog（cookieless 模式）已接入；Vercel Firewall 限频规则已配置
+- [ ] GitHub 私密仓库建好，main 分支开启保护，仓库设为 Template Repository
+
+## 2. 安全
+
+- [ ] 代码里没有调试接口、公开出图接口、全站跨域放行
+- [ ] 所有表都开了 RLS，`template_prompts` 客户端读不到（用匿名身份实测）
+- [ ] 前端打包产物里搜不到任何密钥和提示词正文
+- [ ] 生成接口有 IP 限频和账号限频
+- [ ] 上传的照片已清除 EXIF（用带 GPS 的 iPhone 照片实测，检查 R2 里的对象）
+- [ ] 没有任何 API 路由接收或返回图片字节（代码审查 + 直接 POST 一张图到 /api/generate 应 4xx）
+- [ ] 直传一个 25MB 文件和一个改后缀的文本文件到 R2 后调用生成，都返回 422 且对象被删除
+- [ ] 管理后台只有 `role = admin` 能进，普通账号访问返回 404
+
+## 3. 登录
+
+- [ ] 邮箱 + 密码注册，收到 Resend 发的验证邮件，点击后能登录
+- [ ] 未验证邮箱的账号不能生成
+- [ ] Google 登录可用，回跳地址正确
+- [ ] hCaptcha 在注册和登录时生效
+- [ ] 忘记密码流程可用
+
+## 4. 生成
+
+- [ ] 上架的 6~8 个模板，每个用真实菜品照片各跑 3 次，主体、餐具、摆盘不变
+- [ ] iPhone 相册直接选 HEIC 照片能上传（Safari 自动转 JPEG）；竖拍照片方向正确；20MB 照片能上传；Android HEIC 文件给出「请换 JPEG」提示
+- [ ] 手机 4G 下上传有 Compressing → Uploading（进度）→ Generating 三段状态；生成中切后台再回来能恢复结果
+- [ ] 连点 5 次生成，只扣对应次数，余额不会变成负数
+- [ ] 模拟出图失败和超时，积分自动退回
+- [ ] 每张图的实际成本已记录，定价有毛利
+
+## 5. 支付
+
+- [ ] 价格数字已定稿并填进 `site.config.ts`，首页、价格页、FAQ、结构化数据的数字完全一致；商品只有 `pass` 和 `pack` 两个
+- [ ] 已向 Stripe 确认 Managed Payments 下 Alipay / WeChat 可用；不可用的方式不在付款页显示
+- [ ] Stripe 测试模式：卡、支付宝、微信各付一次每种商品，都能到账
+- [ ] Waffo 沙盒：卡、支付宝各付一次每种商品，都能到账；付款页不显示微信
+- [ ] 只开 Waffo、只开 Stripe、两个都开三种开关状态下，付款页显示正确
+- [ ] 两条通道的回调各重发 3 次，积分只加一次；签名错误返回 400、不加积分
+- [ ] 买 `pass` 后 `credits` +30、`paid_until` +30 天；再买 `pack` 后 `paid_until` 在原基础上 +365 天，积分累加
+- [ ] `paid_until` 过期后自动变回免费身份：新作品下载带水印，旧作品仍私密
+- [ ] 免费作品下载带右下角「Made with Shotviva」水印，付费后同一作品下载无水印（R2 里只有一份文件）
+- [ ] 切到生产密钥后，对上线时实际开着的通道用真卡付一笔最小金额，确认到账后在后台退款
+
+## 6. 创作库（上线前 8 周闸门）
+
+- [ ] `gallery.enabled = false`：/gallery、/tag/*、/g/* 都返回 404
+- [ ] 免费用户生成前能看到公开展示的告知
+- [ ] 免费作品 `visibility = 'public'`，付费用户可改成私密
+- [ ] 公开数据里没有封装提示词
+
+## 7. SEO 和 GEO（要点）
+
+- [ ] Ctrl+U 查看源码：H1、直答块、模板名、FAQ、价格数字都在源码里
+- [ ] 每页 Title ≤ 60 字符、Description ≤ 155 字符，只有一个 H1
+- [ ] 每页 canonical 指向自己
+- [ ] robots.txt 放行 GPTBot、OAI-SearchBot、PerplexityBot、ClaudeBot、ChatGPT-User，没有 `Disallow: /`
+- [ ] sitemap index 拆分正确，提交到 GSC
+- [ ] JSON-LD：首页有 SoftwareApplication + Organization，带 FAQ 的页面有 FAQPage，内页有 BreadcrumbList
+- [ ] 首屏对比图没有懒加载，alt 符合规则；每页有 OG 图
+- [ ] 「我的作品」、后台、登录页都是 noindex
+- [ ] 移动端 LCP < 2.5s、CLS < 0.1、INP < 200ms
+- [ ] /llms.txt 已发布
+
+## 7.5 移动端应用壳（iOS Safari 真机 + Android Chrome 真机各一遍）
+
+- [ ] 应用页有底部 tab bar（Create / Photos / Account），营销页没有；工作台、生成中、结果页隐藏 tab bar 并有底部固定主按钮
+- [ ] 底部栏不被 iOS 地址栏顶出屏幕；键盘弹出时正在输入的字段可见
+- [ ] 付费墙、比例选择、模板预览在手机上是底部抽屉，可下拉关闭
+- [ ] 结果页 Share 弹出系统分享面板，能存相册、能发到已装的 WhatsApp / Instagram；微信内置浏览器里按钮显示为 Download 且能保存
+- [ ] 整页无横向滚动；没有 hover 才能触发的功能
+
+## 8. 法律页面
+
+- [ ] 服务条款、隐私政策、使用规范、退款政策：从 Graylum staging 改写成英文版
+- [ ] 条款写明：免费作品公开展示、生成内容的权利归属、用户授权我们展示免费作品
+- [ ] 隐私政策写明：上传的照片保留 7 天、成品保留到用户删除、用了哪些第三方服务、PostHog 不使用 Cookie、连接 Graylum 时共享哪些信息（账号 id、剩余张数）
+- [ ] 用户能在账号页自助删除账号，删除后 `inputs/` 和 `outputs/` 下该用户的对象、任务记录、伙伴关联一起删除
+- [ ] 页脚有官方站点声明、联系方式、主体信息（建站规格 G8）
+
+## 9. 运营和模板化
+
+- [ ] PostHog 事件名已定并能看到：`signup`、`upload`、`generate`、`paywall_view`、`checkout_start`、`purchase`
+- [ ] 出图失败、支付回调失败会在 Sentry 告警
+- [ ] 后台能新建、编辑、上下架模板和提示词
+- [ ] `admin_adjust_credits`、`admin_ban_user` 两个 SQL 函数可用，调用会写流水
+- [ ] 模板化验收：把 `site/` 换成一份示例配置、`modules.image = false`，`pnpm build` 能通过且 `/generate` 返回 404
+
+## 9.5 Graylum 连接器（Shotviva 侧）
+
+- [ ] 从 Graylum 预览环境点「连接 Shotviva」，未登录时先到 Shotviva 登录页，登录后一键授权，302 回到 Graylum 并显示已连接和剩余张数
+- [ ] Graylum 里用模板出一张图、用自由文字出一张图，Shotviva 各扣 1 张，「我的作品」里能看到，`source = 'graylum'`
+- [ ] 同一个 `Idempotency-Key` 重发请求，不重复扣费，返回同一个 job
+- [ ] 张数用完时返回 402 和 `top_up_url`，跳到 `/pricing?from=graylum`，付款后回到 Graylum
+- [ ] 在 Shotviva 账号页点「断开」后，Graylum 再调用返回 401
+- [ ] `return_to` 填非白名单域名时拒绝回跳
+- [ ] 用预览密钥调生产返回 401
+
+## 10. 推迟项（不卡上线，到时再勾）
+
+- [ ] 第 6~7 周：内容审核 + 作品审核后台页（创作库开放前必须完成）
+- [ ] 第 8 周开创作库时：noindex、sitemap 不含 /g 的测试和验收（创作库规格第 4 节）
+- [ ] 有付费会员后：会员到期提醒邮件、到期后保留 90 天和续费恢复
+- [ ] 有付费用户后：卡支付自动续费、自动故障切换

@@ -1,0 +1,27 @@
+# OS
+.DS_Store
+
+# env: only the example file is tracked
+.env*
+!.env.example
+
+# local-only data (seed prompts etc.)
+.local/
+
+# design drafts (T6) never go into git
+design/
+
+# deps / build
+node_modules/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# supabase local state
+supabase/.branches/
+supabase/.temp/
+
+# vercel
+.vercel/
