@@ -24,6 +24,7 @@
 | T12 | 模板需求墙（Wishlist） | 等 T8 | T1、T4、T8 |
 | T15 | 迁移基线与自动化 | **可派，T8 / T9 / T12 之前** | T14 |
 | T18 | 埋点与错误监控 | **可派，T8 / T9 之前** | — |
+| T19 | 法律页面 | **可派** | T5 |
 | T16 | 按分辨率扣费（模板三档积分 + 质量档） | **等 T15 合并；T8 / T9 之前** | T3、T4、T14、T15 |
 
 并行建议：T0 先做（半天到一天）；T0 合并后 T1 / T2 / T3 / T5 四张同时开；T6 和 T0 同时开（不碰代码）。
@@ -351,6 +352,26 @@
 - [ ] 单元测试：事件字典类型、属性里出现邮箱等字段时被拒绝
 
 **依赖**：无（T1 / T4 已合并）。Sentry DSN 未提供前，Sentry 部分在无 DSN 时自动关闭，不阻塞合并。
+
+## T19 法律页面（可派）
+
+**目标**：英文的服务条款 `/terms`、隐私政策 `/privacy`、退款政策 `/refund-policy`、使用规范 `/acceptable-use`，以及全站页脚的官方站点声明和主体信息。约半天到一天。**上线前须由 Owner 找懂美国法律的人审阅**，开发窗口写的是底稿，不是法律意见。
+
+**主体信息（Owner 2026-11-05 提供）**：Grayscale Luminary LLC，怀俄明州注册，地址 75 E 3rd St, Sheridan, WY 82801，联系邮箱 support@shotviva.com。写进 `site.config.ts` 的 `brand`（`legalName`、`address`、`contactEmail`），页面和页脚只从配置读。
+
+**范围**：`site/content/legal/*`（四页正文）、`app/(marketing)/terms|privacy|refund-policy|acceptable-use`、页脚组件里的法律链接和主体信息、`site.config.ts` 主体字段。四页 `noindex`（不在主词表 CSV 里，AGENTS §9）。不许动：业务逻辑。
+
+**依据与底稿**：
+- 退款规则 Owner 定为「和 Graylum 一致」：以 Graylum **staging** 分支 `apps/web/content/legal/refund-policy.html` 为底稿改写；Graylum 条款里凡是依赖 Graylum 独有功能（自助退款页、后台退款流程等）的承诺，Shotviva v1 没有对应功能的，改写成「发邮件到 support@shotviva.com，人工在 Stripe / Waffo 后台处理」（ARCHITECTURE §10），并在 PR 里逐条列出改了哪些。卡支付走 Stripe Managed Payments 时由 Link 作为商户记录方，退款条款要与之相符（ARCHITECTURE §6.3）。
+- 服务条款、隐私政策同样参考 Graylum staging `terms.html`、`privacy.html` 的结构，但内容按 Shotviva 事实写：免费作品公开展示并带水印、付费作品私密可商用（§6.2）；用户对上传内容负责、画风模板只用通用风格（§5）；上传照片保留 7 天、成品保留到用户删除（§8.3）；需求墙参考图规则（§15.5）；第三方服务清单（Supabase、Cloudflare R2、OpenAI、Stripe / Link、Waffo、PostHog、Sentry、Resend、Vercel）；PostHog 不使用 Cookie（§16）；连接 Graylum 时共享的信息（账号 id、剩余积分，§14）；账号删除（§13）。
+- LAUNCH §8 全部条目。
+
+**验收**：
+- [ ] 四页可访问、`noindex`，页脚每页可见并链接到四页，主体信息与配置一致
+- [ ] PR 正文附「与 Graylum 条款的差异清单」和「需要律师重点看的条款」清单
+- [ ] Owner 审阅通过（律师意见由 Owner 自行安排）
+
+**依赖**：T5（已合并）。
 
 ## Owner 侧关键路径（不是任务卡，但比代码慢）
 
