@@ -33,7 +33,7 @@
 - [ ] 管理后台只有 `role = admin` 能进，普通账号访问返回 404
 - [ ] 生产库 Supabase Advisor（Performance + Security）没有 WARN 级别的问题；转 Pro 之后打开 Leaked Password Protection
 
-- [ ] 出图供应商（ARCHITECTURE §3.3）：生产环境 `PROVIDER_SECRETS_KEY` 已设（和预览不同），后台已录入在用供应商并测试连接成功，出一张图后 `generation_jobs.provider` 正确
+- [ ] 出图供应商（ARCHITECTURE §3.3）：后台已录入在用供应商（密钥存 Supabase Vault）并测试连接成功，出一张图后 `generation_jobs.provider` 正确
 
 ## 3. 登录
 
