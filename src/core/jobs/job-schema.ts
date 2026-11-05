@@ -1,0 +1,70 @@
+import { z } from 'zod'
+
+// Mirrors public.generation_jobs (supabase/migrations/0022_generation_jobs.sql).
+export const JOB_MODULES = ['image', 'video'] as const
+export const JOB_SOURCES = ['web', 'graylum'] as const
+export const JOB_STATUSES = ['running', 'succeeded', 'failed'] as const
+export const JOB_VISIBILITIES = ['public', 'private'] as const
+
+export type JobModule = (typeof JOB_MODULES)[number]
+export type JobSource = (typeof JOB_SOURCES)[number]
+export type JobStatus = (typeof JOB_STATUSES)[number]
+export type JobVisibility = (typeof JOB_VISIBILITIES)[number]
+
+export type Job = {
+  id: string
+  userId: string
+  module: JobModule
+  templateId: string
+  inputs: Record<string, unknown>
+  provider: string | null
+  source: JobSource
+  idempotencyKey: string | null
+  status: JobStatus
+  visibility: JobVisibility
+  creditsCost: number
+  outputKey: string | null
+  errorCode: string | null
+  createdAt: Date
+  finishedAt: Date | null
+}
+
+const toDate = (value: string | null): Date | null => (value === null ? null : new Date(value))
+
+export const jobRowSchema = z
+  .object({
+    id: z.string(),
+    user_id: z.string(),
+    module: z.enum(JOB_MODULES),
+    template_id: z.string(),
+    inputs: z.record(z.string(), z.unknown()),
+    provider: z.string().nullable(),
+    source: z.enum(JOB_SOURCES),
+    idempotency_key: z.string().nullable(),
+    status: z.enum(JOB_STATUSES),
+    visibility: z.enum(JOB_VISIBILITIES),
+    credits_cost: z.number().int().positive(),
+    output_key: z.string().nullable(),
+    error_code: z.string().nullable(),
+    created_at: z.string(),
+    finished_at: z.string().nullable(),
+  })
+  .transform(
+    (row): Job => ({
+      id: row.id,
+      userId: row.user_id,
+      module: row.module,
+      templateId: row.template_id,
+      inputs: row.inputs,
+      provider: row.provider,
+      source: row.source,
+      idempotencyKey: row.idempotency_key,
+      status: row.status,
+      visibility: row.visibility,
+      creditsCost: row.credits_cost,
+      outputKey: row.output_key,
+      errorCode: row.error_code,
+      createdAt: new Date(row.created_at),
+      finishedAt: toDate(row.finished_at),
+    }),
+  )
