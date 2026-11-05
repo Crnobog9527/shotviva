@@ -3,34 +3,32 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { z } from 'zod'
 
-import type { ServerEnv } from '@/core/env'
 import { logger } from '@/core/logger'
 import {
   activateProvider,
   assertPublicBaseUrl,
-  decryptSecret,
-  encryptSecret,
+  deleteProvider,
   findProvider,
-  findProviderSecret,
+  findProviderRow,
   insertProvider,
-  lastFour,
   listProviders,
-  parseSecretsKey,
   ProviderSettingError,
+  readProviderKey,
+  setProviderKey,
   testConnection,
   updateProvider,
   type ConnectionResult,
   type HostResolver,
+  type ProviderWrite,
 } from '@/core/providers'
 
 import { providerIdSchema, saveProviderSchema } from './schema'
 
 // Business rules for /admin/providers. Callers pass a service-role client and the admin's id
-// after requireAdmin(). Keys go in encrypted and never come back out of this file in plaintext.
+// after requireAdmin(). Keys go straight into Vault and never come back to the browser.
 
 export type ProviderCommandDeps = {
   db: SupabaseClient
-  env: ServerEnv
   resolveHost?: HostResolver
   fetch?: typeof fetch
 }
@@ -38,21 +36,30 @@ export type ProviderCommandDeps = {
 function parseOrThrow<T>(schema: z.ZodType<T>, value: unknown): T {
   const result = schema.safeParse(value)
   if (result.success) return result.data
+  // Issue codes only: an invalid key must not end up in a log line.
   const detail = result.error.issues.map((issue) => `${issue.path.join('.') || 'input'}: ${issue.code}`).join('; ')
-  throw new ProviderSettingError('invalid_input', detail)
+  const keyIssue = result.error.issues.some((issue) => issue.path[0] === 'apiKey')
+  throw new ProviderSettingError(keyIssue ? 'api_key_invalid' : 'invalid_input', detail)
 }
 
-function encryptKey(apiKey: string | undefined, env: ServerEnv) {
-  if (!apiKey) return undefined
-  return { ciphertext: encryptSecret(apiKey, parseSecretsKey(env.PROVIDER_SECRETS_KEY)), last4: lastFour(apiKey) }
+// A new row is inserted first, then its key goes into Vault. If storing the key fails, the
+// keyless row is removed again so the list never shows a provider that cannot run.
+async function insertWithKey(db: SupabaseClient, write: ProviderWrite, apiKey: string): Promise<string> {
+  const id = await insertProvider(db, write)
+  try {
+    await setProviderKey(db, id, apiKey)
+  } catch (error) {
+    await deleteProvider(db, id).catch(() => undefined)
+    throw error
+  }
+  return id
 }
 
 // Insert or update. A new row needs a key; an edit with a blank key keeps the stored one.
 export async function saveProvider(deps: ProviderCommandDeps, adminId: string, input: unknown): Promise<string> {
   const parsed = parseOrThrow(saveProviderSchema, input)
   const baseUrl = await assertPublicBaseUrl(parsed.baseUrl, deps.resolveHost)
-  const key = encryptKey(parsed.apiKey, deps.env)
-  const write = {
+  const write: ProviderWrite = {
     module: parsed.module,
     adapter: parsed.adapter,
     label: parsed.label,
@@ -60,16 +67,16 @@ export async function saveProvider(deps: ProviderCommandDeps, adminId: string, i
     model: parsed.model,
     notes: parsed.notes ?? null,
     updatedBy: adminId,
-    key,
   }
   let id = parsed.id
   if (id) {
     await updateProvider(deps.db, id, write)
+    if (parsed.apiKey) await setProviderKey(deps.db, id, parsed.apiKey)
   } else {
-    if (!key) throw new ProviderSettingError('api_key_required', 'a new provider needs an API key')
-    id = await insertProvider(deps.db, { ...write, key })
+    if (!parsed.apiKey) throw new ProviderSettingError('api_key_required', 'a new provider needs an API key')
+    id = await insertWithKey(deps.db, write, parsed.apiKey)
   }
-  logger.info('admin.provider.saved', { adminId, providerId: id, isNew: !parsed.id, keyChanged: Boolean(key) })
+  logger.info('admin.provider.saved', { adminId, providerId: id, isNew: !parsed.id, keyChanged: Boolean(parsed.apiKey) })
   return id
 }
 
@@ -78,6 +85,8 @@ export async function activate(deps: ProviderCommandDeps, adminId: string, input
   const { id } = parseOrThrow(providerIdSchema, input)
   const target = await findProvider(deps.db, id)
   if (!target) throw new ProviderSettingError('not_found', `provider ${id} not found`)
+  // A keyless provider would fail every generation the moment it is switched on.
+  if (!target.apiKeyLast4) throw new ProviderSettingError('api_key_missing', `provider ${id} has no API key`)
   const previous = (await listProviders(deps.db)).find((p) => p.module === target.module && p.isActive)
   await activateProvider(deps.db, id)
   logger.info('admin.provider.activated', {
@@ -92,8 +101,9 @@ export async function activate(deps: ProviderCommandDeps, adminId: string, input
 // change after the row was saved.
 export async function testProvider(deps: ProviderCommandDeps, input: unknown): Promise<ConnectionResult> {
   const { id } = parseOrThrow(providerIdSchema, input)
-  const row = await findProviderSecret(deps.db, id)
-  const apiKey = decryptSecret(row.apiKeyCiphertext, parseSecretsKey(deps.env.PROVIDER_SECRETS_KEY))
+  const row = await findProviderRow(deps.db, id)
+  const apiKey = await readProviderKey(deps.db, id)
+  if (!apiKey) throw new ProviderSettingError('api_key_missing', `provider ${id} has no API key`)
   const baseUrl = await assertPublicBaseUrl(row.baseUrl, deps.resolveHost)
   const result = await testConnection({ baseUrl, apiKey }, deps.fetch)
   logger.info('admin.provider.tested', { providerId: id, ok: result.ok, status: result.status ?? null })

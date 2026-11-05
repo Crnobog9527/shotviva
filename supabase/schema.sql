@@ -358,6 +358,46 @@ $$;
 ALTER FUNCTION "public"."admin_search_users"("p_query" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_set_provider_key"("p_id" "uuid", "p_key" "text") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_secret uuid;
+  v_name text := 'shotviva.provider.' || p_id::text;
+begin
+  -- Printable ASCII without whitespace, 16-1024 characters: every supported provider key fits.
+  if p_key is not null and (char_length(p_key) not between 16 and 1024 or p_key !~ '^[!-~]+$') then
+    raise exception 'PROVIDER_KEY_INVALID' using errcode = '23514';
+  end if;
+
+  select vault_secret_id into v_secret from public.ai_providers where id = p_id for update;
+  if not found then
+    raise exception 'PROVIDER_NOT_FOUND';
+  end if;
+
+  if p_key is null then
+    delete from vault.secrets where id = v_secret or name = v_name;
+    update public.ai_providers set vault_secret_id = null, api_key_last4 = null where id = p_id;
+    return;
+  end if;
+
+  if v_secret is not null and exists (select 1 from vault.secrets where id = v_secret) then
+    perform vault.update_secret(v_secret, p_key);
+  else
+    -- A leftover secret under this name is replaced, never reused blindly.
+    delete from vault.secrets where name = v_name;
+    v_secret := vault.create_secret(p_key, v_name, 'Shotviva image provider API key');
+  end if;
+
+  update public.ai_providers set vault_secret_id = v_secret, api_key_last4 = right(p_key, 4) where id = p_id;
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."admin_set_provider_key"("p_id" "uuid", "p_key" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_unban_user"("p_user_id" "uuid", "p_reason" "text") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -586,6 +626,22 @@ $$;
 ALTER FUNCTION "public"."current_tier"("p_user_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."delete_provider_vault_secret"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if old.vault_secret_id is not null then
+    delete from vault.secrets where id = old.vault_secret_id;
+  end if;
+  return old;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."delete_provider_vault_secret"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."grant_credits"("p_user_id" "uuid", "p_amount" integer, "p_reason" "text", "p_idempotency_key" "text", "p_pool" "text") RETURNS "public"."credit_change"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -614,6 +670,34 @@ $$;
 
 
 ALTER FUNCTION "public"."handle_new_user"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."provider_api_key"("p_id" "uuid") RETURNS "text"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_secret uuid;
+  v_key text;
+begin
+  select vault_secret_id into v_secret from public.ai_providers where id = p_id;
+  if not found then
+    raise exception 'PROVIDER_NOT_FOUND';
+  end if;
+  if v_secret is null then
+    return null;
+  end if;
+
+  select decrypted_secret into v_key from vault.decrypted_secrets where id = v_secret;
+  if v_key is null then
+    raise exception 'PROVIDER_KEY_MISSING';
+  end if;
+  return v_key;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."provider_api_key"("p_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."refund_job"("p_job_id" "uuid", "p_error_code" "text") RETURNS "public"."generation_jobs"
@@ -900,17 +984,17 @@ CREATE TABLE IF NOT EXISTS "public"."ai_providers" (
     "label" "text" NOT NULL,
     "base_url" "text" DEFAULT 'https://api.openai.com/v1'::"text" NOT NULL,
     "model" "text" NOT NULL,
-    "api_key_ciphertext" "text" NOT NULL,
-    "api_key_last4" "text" NOT NULL,
+    "api_key_last4" "text",
     "is_active" boolean DEFAULT false NOT NULL,
     "notes" "text",
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_by" "uuid",
+    "vault_secret_id" "uuid",
     CONSTRAINT "ai_providers_adapter_check" CHECK (("adapter" = 'openai_images'::"text")),
-    CONSTRAINT "ai_providers_api_key_ciphertext_check" CHECK ((("char_length"("api_key_ciphertext") >= 1) AND ("char_length"("api_key_ciphertext") <= 2000))),
     CONSTRAINT "ai_providers_api_key_last4_check" CHECK ((("char_length"("api_key_last4") >= 1) AND ("char_length"("api_key_last4") <= 4))),
     CONSTRAINT "ai_providers_base_url_check" CHECK ((("base_url" ~ '^https://[^\s/?#@]+(/[^\s?#]*)?$'::"text") AND ("char_length"("base_url") <= 300))),
+    CONSTRAINT "ai_providers_key_pair" CHECK ((("vault_secret_id" IS NULL) = ("api_key_last4" IS NULL))),
     CONSTRAINT "ai_providers_label_check" CHECK ((("char_length"("label") >= 1) AND ("char_length"("label") <= 80))),
     CONSTRAINT "ai_providers_model_check" CHECK ((("char_length"("model") >= 1) AND ("char_length"("model") <= 120))),
     CONSTRAINT "ai_providers_module_check" CHECK (("module" = 'image'::"text")),
@@ -1197,6 +1281,10 @@ CREATE INDEX "templates_active_sort_idx" ON "public"."templates" USING "btree" (
 
 
 
+CREATE OR REPLACE TRIGGER "ai_providers_delete_vault_secret" AFTER DELETE ON "public"."ai_providers" FOR EACH ROW EXECUTE FUNCTION "public"."delete_provider_vault_secret"();
+
+
+
 CREATE OR REPLACE TRIGGER "ai_providers_set_updated_at" BEFORE UPDATE ON "public"."ai_providers" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
 
 
@@ -1367,6 +1455,11 @@ GRANT ALL ON FUNCTION "public"."admin_search_users"("p_query" "text") TO "servic
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_set_provider_key"("p_id" "uuid", "p_key" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_provider_key"("p_id" "uuid", "p_key" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_unban_user"("p_user_id" "uuid", "p_reason" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_unban_user"("p_user_id" "uuid", "p_reason" "text") TO "service_role";
 
@@ -1397,12 +1490,21 @@ GRANT ALL ON FUNCTION "public"."current_tier"("p_user_id" "uuid") TO "service_ro
 
 
 
+REVOKE ALL ON FUNCTION "public"."delete_provider_vault_secret"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."grant_credits"("p_user_id" "uuid", "p_amount" integer, "p_reason" "text", "p_idempotency_key" "text", "p_pool" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."grant_credits"("p_user_id" "uuid", "p_amount" integer, "p_reason" "text", "p_idempotency_key" "text", "p_pool" "text") TO "service_role";
 
 
 
 REVOKE ALL ON FUNCTION "public"."handle_new_user"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."provider_api_key"("p_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."provider_api_key"("p_id" "uuid") TO "service_role";
 
 
 

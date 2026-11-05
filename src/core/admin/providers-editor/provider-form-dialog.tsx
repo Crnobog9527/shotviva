@@ -88,7 +88,7 @@ export function ProviderFormDialog({ provider, pending, error, onCancel, onSubmi
           <Button variant="outline" onClick={onCancel} disabled={pending}>
             {COPY.cancel}
           </Button>
-          <Button disabled={pending || !canSave(form, provider === null)} onClick={() => onSubmit(form)}>
+          <Button disabled={pending || !canSave(form, provider === null || provider.apiKeyLast4 === null)} onClick={() => onSubmit(form)}>
             {COPY.save}
           </Button>
         </DialogFooter>
