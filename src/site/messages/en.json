@@ -49,7 +49,7 @@
       "FORBIDDEN": "You can't do that.",
       "NOT_FOUND": "Not found.",
       "INVALID_INPUT": "Please check the email and password.",
-      "CREDITS_INSUFFICIENT": "You're out of images.",
+      "CREDITS_INSUFFICIENT": "You're out of credits.",
       "AUTH_INVALID_CREDENTIALS": "Email or password is incorrect.",
       "AUTH_EMAIL_NOT_CONFIRMED": "Please confirm your email first. Open the link we sent you.",
       "AUTH_CAPTCHA_FAILED": "Verification failed. Please complete the check below.",
@@ -64,7 +64,7 @@
       "signOut": "Sign out",
       "dangerZone": "Delete account",
       "delete": "Delete my account",
-      "deleteWarning": "This permanently deletes your account, remaining images and all photos you made. It cannot be undone.",
+      "deleteWarning": "This permanently deletes your account, your remaining credits and every photo you made. It cannot be undone.",
       "deleteTypeLabel": "Type DELETE to confirm",
       "deleteConfirm": "Delete forever",
       "deleting": "Deleting…",
@@ -81,7 +81,7 @@
     },
     "account": {
       "title": "Graylum",
-      "connected": "Connected since {date, date, medium}. Graylum can make images with your credits.",
+      "connected": "Connected since {date, date, medium}. Graylum can make photos with your credits.",
       "notConnected": "Not connected.",
       "disconnect": "Disconnect Graylum"
     }

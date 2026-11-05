@@ -27,7 +27,7 @@ export function Field({ name, label, type, autoComplete, minLength }: FieldProps
         required
         minLength={minLength}
         autoComplete={autoComplete}
-        className="h-12 rounded-md border border-neutral-300 px-3 text-base font-normal"
+        className="h-12 rounded-md border border-input px-3 text-base font-normal"
       />
     </label>
   )
@@ -38,7 +38,7 @@ export function SubmitButton({ pending, children }: { pending: boolean; children
     <button
       type="submit"
       disabled={pending}
-      className="h-12 w-full rounded-md bg-neutral-900 text-base font-medium text-white disabled:opacity-60"
+      className="h-12 w-full rounded-md bg-primary text-base font-semibold text-primary-foreground disabled:opacity-60"
     >
       {children}
     </button>
@@ -52,7 +52,7 @@ export function CaptchaSlot({ mode, mount, needsTick }: CaptchaSlotProps) {
   if (mode !== 'checkbox') return null
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-sm text-neutral-600">{t(needsTick ? 'captcha.tick' : 'captcha.fallback')}</p>
+      <p className="text-sm text-muted-foreground">{t(needsTick ? 'captcha.tick' : 'captcha.fallback')}</p>
       <div ref={mount} />
     </div>
   )

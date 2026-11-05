@@ -15,6 +15,12 @@ describe('rateLimitVerdict', () => {
     expect(rateLimitVerdict(running, now)).toBe('too_many_running')
   })
 
+  it('takes the per-account limit when given one', () => {
+    const one = [{ status: 'running', created_at: ago(5000) }]
+    expect(rateLimitVerdict(one, now, 1)).toBe('too_many_running')
+    expect(rateLimitVerdict(one, now, 3)).toBe('ok')
+  })
+
   it('ignores running jobs whose function must already have died', () => {
     const stale = Array.from({ length: 5 }, () => ({ status: 'running', created_at: ago(RATE_LIMIT.RUNNING_STALE_MS + 1) }))
     expect(rateLimitVerdict(stale, now)).toBe('ok')

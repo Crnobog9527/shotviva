@@ -1,42 +1,71 @@
+import type { Metadata } from 'next'
+import Link from 'next/link'
 import { useTranslations } from 'next-intl'
-import { Suspense } from 'react'
+import { Suspense, type ReactNode } from 'react'
 
+import { AppPage, BalanceChip, balanceSentence, PAYWALL_HREF, TabRootHeader } from '@/core/app-shell'
 import { createServerSupabase, requireUser } from '@/core/auth'
 import { DeleteAccountPanel } from '@/core/auth/ui'
+import { readBalance, type Balance } from '@/core/billing'
 import { readLinkStatus } from '@/core/partner'
 import { GraylumConnection } from '@/core/partner/ui'
+import { buttonVariants } from '@/core/ui/button'
 
 import { signOutAction } from '../../auth/actions'
 import { disconnectGraylumAction } from './partner-actions'
 
-function AccountView({ email, graylumLinkedAt }: { email: string | null; graylumLinkedAt: Date | null }) {
+export const metadata: Metadata = { title: 'Account' }
+
+type ViewProps = { email: string | null; balance: Balance; graylumLinkedAt: Date | null }
+
+function Panel({ children }: { children: ReactNode }) {
+  return <section className="hairline-lit mx-4 mt-4 rounded-panel bg-card p-4">{children}</section>
+}
+
+function AccountView({ email, balance, graylumLinkedAt }: ViewProps) {
   const t = useTranslations('auth.account')
   return (
-    <section className="mx-auto flex w-full max-w-[720px] flex-col gap-6 px-4 py-8">
-      <h1 className="text-2xl font-semibold">{t('title')}</h1>
-      <p className="text-sm">{t('signedInAs', { email: email ?? '' })}</p>
-      <form action={signOutAction}>
-        <button type="submit" className="h-12 w-full rounded-md border border-neutral-300 text-base">
+    <>
+      <TabRootHeader title={t('title')} aside={<BalanceChip balance={balance} />} />
+      <p className="px-4 pt-3 text-caption text-muted-foreground">{t('signedInAs', { email: email ?? '' })}</p>
+      <Panel>
+        <h2 className="text-headline leading-[1.25] font-semibold">Credits</h2>
+        <p className="mt-2 text-body text-bone-dim">{balanceSentence(balance)}</p>
+        <Link href={PAYWALL_HREF} className="mt-1 inline-flex min-h-11 items-center gap-1 font-medium">
+          Get credits
+          <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 text-primary" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 6l6 6-6 6" />
+          </svg>
+        </Link>
+      </Panel>
+      <Panel>
+        <GraylumConnection linkedAt={graylumLinkedAt} disconnect={disconnectGraylumAction} />
+      </Panel>
+      <form action={signOutAction} className="mx-4 mt-6">
+        <button type="submit" className={buttonVariants({ variant: 'glass', size: 'touch', className: 'w-full' })}>
           {t('signOut')}
         </button>
       </form>
-      <GraylumConnection linkedAt={graylumLinkedAt} disconnect={disconnectGraylumAction} />
-      <h2 className="text-lg font-semibold">{t('dangerZone')}</h2>
-      <DeleteAccountPanel />
-    </section>
+      <div className="mx-4 mt-3">
+        <DeleteAccountPanel />
+      </div>
+    </>
   )
 }
 
 async function Account() {
   const user = await requireUser('/account')
-  const graylum = await readLinkStatus(await createServerSupabase(), user.id)
-  return <AccountView email={user.email} graylumLinkedAt={graylum.linkedAt} />
+  const supabase = await createServerSupabase()
+  const [graylum, balance] = await Promise.all([readLinkStatus(supabase, user.id), readBalance(supabase, user.id)])
+  return <AccountView email={user.email} balance={balance} graylumLinkedAt={graylum.linkedAt} />
 }
 
 export default function AccountPage() {
   return (
-    <Suspense>
-      <Account />
-    </Suspense>
+    <AppPage>
+      <Suspense fallback={<TabRootHeader title="Account" />}>
+        <Account />
+      </Suspense>
+    </AppPage>
   )
 }
