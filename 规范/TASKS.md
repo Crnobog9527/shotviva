@@ -19,6 +19,7 @@
 | T9 | 付费墙、/pricing、Stripe 结账与首付发放 | 等价格数字 | T2、T5、T6 |
 | T10 | 订阅续费、取消同步、Customer Portal | 等 T9；首个付费用户满 30 天前上线 | T9 |
 | T13 | Waffo 单笔兜底 | 等 T9 | T9 |
+| T14 | 积分双池与按作品判付费（改 T2 / T4） | **可派，T8 / T9 之前** | T2、T4 |
 | T11 | 首页与内页最终文案 | 等价格数字 | T5 |
 | T12 | 模板需求墙（Wishlist） | 等 T8 | T1、T4、T8 |
 
@@ -70,6 +71,8 @@
 ---
 
 ## T2 积分、付费身份与任务表
+
+> 已合并（PR #3）。其中「付费身份 = `paid_until`」和「1 credit = 1 image」已被 Owner 2026-11-05 傍晚的决定取代，修订由 T14 执行；本卡保留作历史。
 
 **目标**：`profiles.credits` / `paid_until` 两列的全部 SQL 函数和流水表，`generation_jobs` 表，带并发测试。
 
@@ -202,7 +205,7 @@
 
 ## T9 付费墙、/pricing、Stripe 结账与首付发放（等价格数字）
 
-**目标**：付费墙（两个商品 × 两组付款方式）、`/pricing`、Stripe Checkout Session 按付款方式路由（卡 = Managed Payments 订阅，钱包 = 单笔）、`checkout.session.completed` 回调 → `apply_purchase` + 写 `subscriptions` 镜像表。上线当天要有的部分。
+**目标**：付费墙（三个商品 × 两组付款方式，`pack` 全单笔）、`/pricing`、Stripe Checkout Session 按付款方式路由（卡 = Managed Payments 订阅，`pack` 和钱包 = 单笔）、`checkout.session.completed` 回调 → `apply_purchase` + 写 `subscriptions` 镜像表。上线当天要有的部分。
 
 **范围**：`core/billing/stripe/`、`app/api/webhooks/stripe`、`app/(marketing)/pricing`、付费墙组件、迁移编号段 `0080`～`0099`（`subscriptions` 表；以及把 T2 的 `products` 从 `pass`/`pack` 改成 `monthly`（30 张/30 天）/`yearly`（360 张/365 天）的迁移：改 check 约束和种子行）、`site/site.config.ts` 的商品 id 与积分（同步改 T5 的相关测试）。不许动：`_apply_credit_change` / `apply_purchase` 的逻辑、续费逻辑（T10）。（总控 2026-11-05 补：main 上已合并的代码仍是 `pass`/`pack`，由 T9 负责改名。）
 
@@ -223,6 +226,24 @@
 **验收**：LAUNCH §5 测试时钟续费一条、Portal 取消一条、`charge.refunded` 告警一条、账号页一条。
 
 **依赖**：T9。
+
+## T14 积分双池与按作品判付费（可派，排在 T8 / T9 之前）
+
+**目标**：把「付费身份 = `paid_until`」改成「按作品的 `credit_pool` 判付费」。约 1 天。
+
+**范围**：`supabase/migrations/` 编号段 `0140`～`0159`（`profiles.free_credits`、`generation_jobs.credit_pool`、流水表加 `pool`；改 `handle_new_user`、`reserve_credits`、`refund_job`、`admin_adjust_credits`、`grant_credits`（加 `pool`）、`apply_purchase`（商品天数为空时不碰 `paid_until`，`products.days` 改可空）；删或弃用 `is_paid`）、`core/auth/free-credits.ts`（注册赠送改为 `pool = 'free'`，总控 2026-11-05 补）、`core/billing/credits.ts`、`core/jobs/`（`reserve` 入参、`job-schema` 加 `creditPool`）、`core/storage/watermark.ts`（`shouldWatermark(creditPool)`）、`core/jobs/job-file.ts`（不再调 `isPaid`）、伙伴接口的 generate 走同一函数。不许动：支付通道、页面。
+
+**依据**：ARCHITECTURE §6.1 全文（两个池、「先付费池、后免费池、整单不拆」、`paid_until` 不参与权益、`admin_adjust_credits` 带 `pool`、流水记池）；§6.2「水印在下载路由加，按作品判」「免费作品……买了会员之后仍然是免费作品」「付费作品默认 private……可改公开」；§4 `credit_pool` 字段；§9 第 1、6 条；AGENTS §7 测试 1、4。
+
+**验收**：
+- [ ] 新用户 `free_credits = freeCredits`、`credits = 0`
+- [ ] 测试：free 3 / paid 0、cost 2 → 扣 free，`credit_pool = 'free'`，`visibility = 'public'`；free 3 / paid 30、cost 2 → 扣 paid，`'paid'`，`'private'`；free 1 / paid 1、cost 2 → 失败；退回退到原池
+- [ ] 下载路由：free 作品加水印，paid 作品不加；paid 作品可改 public 且仍不加水印；free 作品改 private 被拒
+- [ ] `admin_adjust_credits(user, amount, reason, pool)` 两个池都能调且写流水
+- [ ] 邮箱验证后的注册赠送进 `free_credits`，重复登录不重复发；`apply_purchase` 对天数为空的商品不改 `paid_until`（空的仍为空）
+- [ ] LAUNCH §5 的四条作品权益项（见该节）
+
+**依赖**：T2、T4（都已合并）。**T8 的余额显示和 T9 的付费墙文案依赖本卡的字段名，先合这张。**
 
 ## T13 Waffo 单笔兜底（等 T9）
 
