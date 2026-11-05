@@ -1,8 +1,7 @@
 import { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-// Default connection string printed by `supabase start`; CI overrides via SUPABASE_DB_URL.
-const DB_URL = process.env.SUPABASE_DB_URL ?? 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+import { DB_URL } from './supabase-env'
 
 describe('local supabase database', () => {
   const client = new Client({ connectionString: DB_URL })

@@ -1,0 +1,13 @@
+// Server-side entry. Client components live in core/auth/ui (import '@/core/auth/ui').
+export { getSessionUser, requireAdmin, requireUser } from './session'
+export { sanitizeNext } from './redirect-target'
+export type { Role, SessionUser } from './session-user'
+export { createServerSupabase } from './supabase-server'
+export { createAdminSupabase } from './supabase-admin'
+export { updateSession } from './update-session'
+export { handleAuthCallback } from './flows/callback'
+export { signInWithGoogle, signInWithPassword, signOut } from './flows/sign-in'
+export { requestPasswordReset, signUpWithPassword, updatePassword } from './flows/sign-up'
+export { IDLE, type FormState } from './flows/form-state'
+export { handleDeleteAccount } from './delete-account-route'
+export type { AccountStorage } from './account-deletion'

@@ -45,4 +45,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # Only the services DB tests need; later cards drop names from this list as they need them.
       - run: supabase start -x studio,imgproxy,edge-runtime,analytics,vector,inbucket,functions,realtime,storage
+      # DB tests that go through Auth/PostgREST need the local URL and keys (SUPABASE_API_URL, …).
+      - run: supabase status -o env | sed -E 's/^([A-Z_0-9]+)="?([^"]*)"?$/SUPABASE_\1=\2/' >> "$GITHUB_ENV"
       - run: pnpm test:db

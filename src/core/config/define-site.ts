@@ -7,6 +7,7 @@ export type SiteConfig = {
   brand: { name: string; domain: string; tagline: string }
   modules: Record<ModuleId, boolean>
   locales: { default: string; enabled: readonly string[] }
+  billing: { freeCredits: number }
 }
 
 export function defineSite<const T extends SiteConfig>(config: T): T {

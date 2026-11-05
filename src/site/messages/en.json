@@ -1,1 +1,74 @@
-{ "home": { "placeholder": "Coming soon." } }
+{
+  "home": {
+    "placeholder": "Coming soon."
+  },
+  "auth": {
+    "google": "Continue with Google",
+    "fields": {
+      "email": "Email",
+      "password": "Password",
+      "newPassword": "Password (at least {min} characters)"
+    },
+    "login": {
+      "title": "Sign in",
+      "submit": "Sign in",
+      "forgot": "Forgot password?",
+      "toSignup": "Create an account"
+    },
+    "signup": {
+      "title": "Create your account",
+      "freeImages": "Start with {count} free images.",
+      "submit": "Create account",
+      "toLogin": "Already have an account? Sign in",
+      "sentTitle": "Check your email",
+      "sent": "We sent a confirmation link. Open it to activate your account. If you already have an account with this email, just sign in."
+    },
+    "reset": {
+      "title": "Reset your password",
+      "submit": "Send reset link",
+      "toLogin": "Back to sign in",
+      "sent": "If an account exists for that email, a reset link is on its way."
+    },
+    "update": {
+      "title": "Choose a new password",
+      "submit": "Save password",
+      "done": "Password saved. Go to your account"
+    },
+    "captcha": {
+      "fallback": "Please complete the check below, then submit again.",
+      "tick": "Tick the box below to continue."
+    },
+    "notices": {
+      "unverified": "Please confirm your email first. Open the link we sent you.",
+      "link_expired": "That link has expired or was already used. Request a new one.",
+      "callback_failed": "We could not finish signing you in. If you just confirmed your email, sign in with your password.",
+      "oauth_failed": "Google sign-in did not finish. Please try again."
+    },
+    "errors": {
+      "UNAUTHORIZED": "Please sign in again.",
+      "FORBIDDEN": "You can't do that.",
+      "NOT_FOUND": "Not found.",
+      "INVALID_INPUT": "Please check the email and password.",
+      "CREDITS_INSUFFICIENT": "You're out of images.",
+      "AUTH_INVALID_CREDENTIALS": "Email or password is incorrect.",
+      "AUTH_EMAIL_NOT_CONFIRMED": "Please confirm your email first. Open the link we sent you.",
+      "AUTH_CAPTCHA_FAILED": "Verification failed. Please complete the check below.",
+      "AUTH_RATE_LIMITED": "Too many attempts. Please wait a minute and try again.",
+      "AUTH_WEAK_PASSWORD": "Please choose a stronger password.",
+      "INTERNAL": "Something went wrong. Please try again."
+    },
+    "account": {
+      "title": "Account",
+      "signedInAs": "Signed in as {email}",
+      "signOut": "Sign out",
+      "dangerZone": "Delete account",
+      "delete": "Delete my account",
+      "deleteWarning": "This permanently deletes your account, remaining images and all photos you made. It cannot be undone.",
+      "deleteTypeLabel": "Type DELETE to confirm",
+      "deleteConfirm": "Delete forever",
+      "deleting": "Deleting…",
+      "deleteFailed": "Deletion did not finish. Please try again.",
+      "cancel": "Cancel"
+    }
+  }
+}
