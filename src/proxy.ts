@@ -1,11 +1,11 @@
 import type { NextRequest } from 'next/server'
 
-import { updateSession } from '@/core/auth'
+import { proxyGate } from '@/core/auth'
 
-// Refreshes the Supabase session cookie before rendering; access control itself is
-// done by requireUser()/requireAdmin() in each page, not here.
+// Refreshes the Supabase session and answers /admin (404) and signed-in pages (307 to
+// login) with real statuses before rendering; pages still call requireUser()/requireAdmin().
 export async function proxy(request: NextRequest) {
-  return updateSession(request)
+  return proxyGate(request)
 }
 
 export const config = {
