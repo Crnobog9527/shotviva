@@ -127,7 +127,7 @@
 
 1. 积分的预扣、确认、退回，包括并发连点和重复结算；池的选择：有付费积分先扣付费池且整单不拆，付费池不够才扣免费池，作品 `credit_pool` 与实际扣的池一致，退回退到原池
 2. 支付回调（Stripe、Waffo 各一套）：重复事件、乱序事件、验签失败；Stripe 另加：同一 `invoice.paid` 重发只发一次积分、非 `subscription_cycle` 的发票不发、`subscription.deleted` 只改镜像表不动 `paid_until`、`charge.refunded` 只记录不扣积分
-3. 生成任务：成功、失败、超时都能正确结算，失败一定退回积分
+3. 生成任务：成功、失败、超时都能正确结算，失败一定退回积分；扣的数等于模板在所选分辨率的 `credits_cost`，非法分辨率 422；后台保存低于下限的 credit 数被拒绝
 4. `paid_until` 的叠加与到期：连续购买累加、订阅续费延到本期 `period_end`、续费失败不延；水印和可见性只看作品的 `credit_pool`，与 `paid_until` 无关（免费作品在用户付费后仍带水印）
 5. 模块开关：关掉的模块路由返回 404、不进 sitemap
 6. 创作库的 noindex 和 sitemap 测试，在开放创作库的那个 PR 里补上

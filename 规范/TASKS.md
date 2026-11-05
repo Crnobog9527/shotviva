@@ -15,14 +15,15 @@
 | T5 | 站点配置与 SEO 内容框架 | 可派 | T0 |
 | T6 | 设计方向（impeccable，手机稿） | 可派 | — |
 | T7 | Graylum 伙伴接口 | 可派 | T1、T2、T3、T4 |
-| T8 | 应用壳与工作台 UI | 等 T6 | T4、T6 |
-| T9 | 付费墙、/pricing、Stripe 结账与首付发放 | 等价格数字 | T2、T5、T6 |
+| T8 | 应用壳与工作台 UI | 等 T6、T16 | T4、T6、T16 |
+| T9 | 付费墙、/pricing、Stripe 结账与首付发放 | **价格已定稿，等 T15、T16 合并** | T2、T5、T6、T15、T16 |
 | T10 | 订阅续费、取消同步、Customer Portal | 等 T9；首个付费用户满 30 天前上线 | T9 |
 | T13 | Waffo 单笔兜底 | 等 T9 | T9 |
 | T14 | 积分双池与按作品判付费（改 T2 / T4） | **可派，T8 / T9 之前** | T2、T4 |
-| T11 | 首页与内页最终文案 | 等价格数字 | T5 |
+| T11 | 首页与内页最终文案 | 价格已定稿，可派 | T5 |
 | T12 | 模板需求墙（Wishlist） | 等 T8 | T1、T4、T8 |
 | T15 | 迁移基线与自动化 | **可派，T8 / T9 / T12 之前** | T14 |
+| T16 | 按分辨率扣费（模板三档积分 + 质量档） | **等 T15 合并；T8 / T9 之前** | T3、T4、T14、T15 |
 
 并行建议：T0 先做（半天到一天）；T0 合并后 T1 / T2 / T3 / T5 四张同时开；T6 和 T0 同时开（不碰代码）。
 
@@ -204,19 +205,19 @@
 
 ---
 
-## T9 付费墙、/pricing、Stripe 结账与首付发放（等价格数字）
+## T9 付费墙、/pricing、Stripe 结账与首付发放（价格已定稿；等 T15、T16 合并）
 
-**目标**：付费墙（三个商品 × 两组付款方式，`pack` 全单笔）、`/pricing`、Stripe Checkout Session 按付款方式路由（卡 = Managed Payments 订阅，`pack` 和钱包 = 单笔）、`checkout.session.completed` 回调 → `apply_purchase` + 写 `subscriptions` 镜像表。上线当天要有的部分。
+**目标**：付费墙（三档 × 月 / 年 + 三个积分包，两步选、两组付款方式）、`/pricing`、Stripe Checkout Session 按付款方式路由（卡 = Managed Payments 订阅，积分包和钱包 = 单笔）、`checkout.session.completed` 回调 → `apply_purchase` + 写 `subscriptions` 镜像表。上线当天要有的部分。
 
-**范围**：`core/billing/stripe/`、`app/api/webhooks/stripe`、`app/(marketing)/pricing`、付费墙组件、迁移编号段 `0080`～`0099`（`subscriptions` 表；以及把 T2 的 `products` 从 `pass`/`pack` 改成 `monthly`（30 张/30 天）/`yearly`（360 张/365 天）的迁移：改 check 约束和种子行）、`site/site.config.ts` 的商品 id 与积分（同步改 T5 的相关测试）。不许动：`_apply_credit_change` / `apply_purchase` 的逻辑、续费逻辑（T10）。（总控 2026-11-05 补：main 上已合并的代码仍是 `pass`/`pack`，由 T9 负责改名。）
+**范围**：`core/billing/stripe/`、`app/api/webhooks/stripe`、`app/(marketing)/pricing`、付费墙组件、迁移编号段 `0080`～`0099`（T15 PR #24 的规划；**T15 未合并前不写迁移**）：`subscriptions` 表；`products` 表改成 ARCHITECTURE §6.2 的 9 个商品（`starter_monthly` … `pack_l`：改 check 约束、替换种子行，积分包 `days` 为空），一次成型（AGENTS §5：先设计后迁移、一张卡一次成型，不准「先加再改」）；`site/site.config.ts` 的 9 个商品（id、`tier`、`interval`、积分、天数、价格，同步改 T5 的相关测试和 `SiteConfig` 类型）；Stripe Price 按 `lookup_key` 取（§6.2），不加 Price id 环境变量；PostHog `purchase` 参数按 §6.2。不许动：`_apply_credit_change` / `apply_purchase` 的逻辑、续费逻辑（T10）、模板扣费（T16）。（总控 2026-11-05 补：main 上已合并的代码仍是 `pass`/`pack`，由 T9 负责改名。）
 
-**依据**：ARCHITECTURE §6.2 商品表与「同一个商品挂 recurring 和 one-time 两个 Price」「分两段上线」；§6.3 Stripe 路由表（MP 不传 `payment_method_types`、微信 `client = 'web'`、税码 `txcd_10105001`、「审核没下来之前卡先走普通订阅」）、「要处理的 Stripe 事件」；§6.1 `apply_purchase(user, product_id, event_id)` 用 session id 当 `event_id`；DESIGN §4.5；AGENTS §6 回调验签、§7 测试 2。
+**依据**：ARCHITECTURE §6.2 商品表（9 个 id、价格、积分、天数）、「Stripe Product / Price 映射」（三档 Product 各 4 个 Price、积分包 one-time、`lookup_key` 约定）、「分两段上线」、PostHog 参数；§6.3 Stripe 路由表（MP 不传 `payment_method_types`、微信 `client = 'web'`、税码 `txcd_10105001`、「审核没下来之前卡先走普通订阅」）、「要处理的 Stripe 事件」；§6.1 `apply_purchase(user, product_id, event_id)` 用 session id 当 `event_id`；§2 配置示例；DESIGN §4.5（第一屏三档、第二屏月 / 年或 S / M / L、每屏最多三个选项）；建站规格 G3；AGENTS §6 回调验签、§7 测试 2。
 
 **预览环境的支付回调**（总控 2026-11-05）：预览地址每个 PR 不同，且开着 Vercel 部署保护，Stripe 的回调会被挡成 401。做法：本地开发用 `stripe listen` 转发；CI 用签名后的模拟回调测（AGENTS §7 测试 2）；在预览上端到端验收时，打开 Vercel「Protection Bypass for Automation」，Stripe 测试模式登记一个回调，网址 = 正在验收的 PR 的分支地址 + `/api/webhooks/stripe?x-vercel-protection-bypass=<绕行密钥>`，换 PR 验收时只改网址、签名密钥不变。成功页 / 取消页地址由代码按当前部署地址（`core/site-url`）生成。绕行密钥和签名密钥只放 Vercel 环境变量与 Stripe 后台，不进代码、不进 PR。
 
-**验收**：LAUNCH §5 前三条 + 回调重发三次只发一次 + 签名错误 400。
+**验收**：LAUNCH §5 的商品 / Price 一条、Stripe 卡与钱包两条 + 回调重发三次只发一次 + 签名错误 400；付费墙在 375px 上每屏不超过三个选项、不滚动能完成选择（Codex 验收）。
 
-**依赖**：T2、T5、T6、价格数字定稿。
+**依赖**：T2、T5、T6、T15（编号段）、T16（模板扣费字段）。
 
 ## T10 订阅续费、取消同步、Customer Portal（等 T9；首个付费用户满 30 天前上线）
 
@@ -250,13 +251,13 @@
 
 ## T13 Waffo 单笔兜底（等 T9）
 
-**目标**：Waffo 托管结账卖 `monthly` / `yearly` 的单笔形态，回调验签 + 事件 id 去重 + `apply_purchase`；环境变量切通道时付费墙全部走 Waffo、隐藏微信和「自动续费」文案。
+**目标**：Waffo 托管结账卖 9 个商品的单笔形态（会员按一期、积分包原样），`product_id → Waffo 商品 id` 映射放环境变量，回调验签 + 事件 id 去重 + `apply_purchase`；环境变量切通道时付费墙全部走 Waffo、隐藏微信和「自动续费」文案。
 
 **依据**：ARCHITECTURE §6.3「Waffo：保留，只做单笔兜底」四条；LAUNCH §5 Waffo 两条。开工先核实 Waffo 的回调地址是每笔订单单独传还是后台固定一个：单独传就按当前部署地址生成；固定的就照 T9 的预览回调做法（分支地址 + Vercel 绕行密钥）。**依赖**：T9。
 
-## T11 首页与内页最终文案（等价格数字）
+## T11 首页与内页最终文案（价格已定稿，可派）
 
-**依据**：ARCHITECTURE §12、§13；建站规格 §4、R10。**依赖**：T5、价格数字定稿。
+**依据**：ARCHITECTURE §12、§13；建站规格 §4、R10、G3（9 个商品的价格、"from 2 credits"、1K / 2K / 3K 作为可核验事实）。**依赖**：T5。
 
 ## T12 模板需求墙（Wishlist）（等 T8）
 
@@ -300,11 +301,39 @@
 
 **依赖**：T14（已合并）。执行期间不能有其他卡在写迁移。
 
+---
+
+## T16 按分辨率扣费（等 T15 合并；排在 T8 / T9 之前）
+
+**目标**：把「一个模板一个整数 credit」改成「模板质量档 × 用户选的分辨率（1K / 2K / 3K）」：模板表存三档积分和质量档，预扣在数据库里按分辨率取数，provider 按档出尺寸、按模板传 `quality`，后台能编辑三个数并校验下限。约 1 天。
+
+**范围**：
+- `supabase/migrations/` 编号段 **`0020`～`0039`**（T15 PR #24 规划的空闲段；**T15 未合并前不写迁移**，基线合并后编号必须高于 `0006`）：`templates.credits_cost` 改为 jsonb（三个键 `1k` / `2k` / `4k` 必填、正整数，check 约束），`templates.quality` 文本列（`high` / `medium`，默认 `high`）；`admin_upsert_template` 读写这两个字段；`reserve_credits(job_id, resolution)` 从 `templates.credits_cost ->> resolution` 取数（不再信任调用方传入的 cost），非法分辨率抛错；`freeform` 种子行三档都配。一张卡一次成型，不准先加列再改列。
+- `modules/image/provider/output-size.ts`：按 ARCHITECTURE §8.1 的三档（1K 1024²、2K 2048²、3K 2880²）× 比例出尺寸表，每档内任何比例的输出 token ≤ 该档正方形（用 OpenAI 官方 token 计算器公式验证，表和验证脚本一起提交）；`openai-image-provider.ts` 传模板的 `quality`，模型名继续从 `OPENAI_IMAGE_MODEL` 读。
+- `modules/image/credits-floor.ts`：质量档 × 分辨率的配置下限常量（ARCHITECTURE §6.1 的 `ceil(p95 成本 ÷ $0.06)`，初值 `high` 2 / 4 / 6、`medium` 1 / 2 / 3，LAUNCH §5 成本测量后更新），后台保存模板的服务端动作用它校验。
+- `core/jobs/`：`job-schema` 加 `resolution`（默认 `'1k'`），`POST /api/generate` 入参加 `resolution`；`generation_jobs.inputs.resolution` 落库；伙伴接口 `/api/partner/generate` 固定 `'1k'`，契约不改。
+- `app/(app)/admin/templates`：质量档下拉 + 三个 credit 输入框，低于下限时显示下限并拒绝保存。
+- `core/templates`：公开查询带出 `credits_cost` 三档和 `quality`，给 T8 的模板卡（"From 2 credits"）和工作台分辨率选择器用。
+不许动：支付通道、付费墙、工作台视觉（T8）。
+
+**依据**：ARCHITECTURE §5 字段定义与默认值表；§6.1「计价单位是 credit」「配置下限」两条；§4 `inputs.resolution`、`credits_cost` 取法、三步流程第 1～2 步；§8.1 三档像素定义与「同档任何比例 token ≤ 正方形」；§10 后台页功能；§3.2 模型名是配置项；AGENTS §5 迁移规则、§7 测试 3。
+
+**验收**：
+- [ ] 同一模板 1K / 2K / 3K 各生成一次，`generation_jobs.credits_cost` 分别等于后台配置的三个数，成品像素等于尺寸表
+- [ ] 测试：`reserve_credits` 对 `'8k'` 抛错且不扣；调用方传错 cost 不影响扣数；`medium` 模板 1K 扣 1
+- [ ] 尺寸表测试：所有比例 × 三档，边长为 16 的倍数、比例 ≤ 3:1、token 数 ≤ 该档正方形
+- [ ] 后台把 `high` 模板 1K 改成 1，保存被拒并提示下限 2；改成 3 保存成功
+- [ ] `freeform` 从伙伴接口出图扣 1K 档的数
+- [ ] `supabase/schema.sql` 快照更新，CI 的 schema 校验通过
+
+**依赖**：T3、T4、T14（都已合并）、T15（基线与编号）。
+
 ## Owner 侧关键路径（不是任务卡，但比代码慢）
 
 - 6～8 个模板的真实菜品照片 + 前后对比素材 + 提示词调优
 - Stripe 新账户申请；向 Stripe 确认 Managed Payments 下 Alipay / WeChat
 - Waffo 加急开通
-- OpenAI 组织验证 + GPT-Image-2.5 权限
+- OpenAI 组织验证 + GPT-Image 系列模型权限；决定 `OPENAI_IMAGE_MODEL` 默认用 2.5 还是 2.6（同价，2.6 更快，需比较效果）
+- 上线前成本测量：20 张真实照片实测输入图 token（LAUNCH §5，花费 < $5），据此定 `high` 1K 是 2 还是 3 credits
 - Resend 域名验证
-- 价格数字定稿（pricing-research 窗口）
+- ~~价格数字定稿（pricing-research 窗口）~~ 已定稿 2026-11-05（ARCHITECTURE §6.2）；Waffo 费率仍待向商务确认

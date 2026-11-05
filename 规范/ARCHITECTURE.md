@@ -57,16 +57,22 @@ src/
 
 ```ts
 export const site = defineSite({
-  brand: { name: 'Shotviva', domain: 'shotviva.com', tagline: 'AI food & product photo studio' },
+  brand: { name: 'Shotviva', domain: 'shotviva.com', tagline: 'AI food & product photo studio' },   // 建站规格 §1
   modules: { image: true, video: false },     // 关掉的模块：路由 404、不进 sitemap、不出现在导航和定价里
   locales: { default: 'en', enabled: ['en'] }, // next-intl，英文不带前缀
   billing: {
     currency: 'usd',
     freeCredits: 3,                               // 进 profiles.free_credits，只能生成免费作品（第 6.1 节）
-    products: [                                   // 结构已定（第 6.2 节），价格数字待定
-      { id: 'monthly', credits: 30, paidDays: 30, priceUsd: 0 /* 待定 */ },
-      { id: 'yearly', credits: 360, paidDays: 365, priceUsd: 0 /* 待定 */ },
-      { id: 'pack', credits: 0 /* 待定 */, paidDays: 0, priceUsd: 0 /* 待定 */ },   // 积分包：不改会员期，所有人可买
+    products: [                                   // 9 个商品，价格 Owner 2026-11-05 定稿（第 6.2 节）
+      { id: 'starter_monthly', tier: 'starter', interval: 'month', credits: 50,   paidDays: 30,   priceUsd: 19.9 },
+      { id: 'starter_yearly',  tier: 'starter', interval: 'year',  credits: 600,  paidDays: 365,  priceUsd: 139 },
+      { id: 'pro_monthly',     tier: 'pro',     interval: 'month', credits: 135,  paidDays: 30,   priceUsd: 49.9 },
+      { id: 'pro_yearly',      tier: 'pro',     interval: 'year',  credits: 1620, paidDays: 365,  priceUsd: 349 },
+      { id: 'max_monthly',     tier: 'max',     interval: 'month', credits: 280,  paidDays: 30,   priceUsd: 99 },
+      { id: 'max_yearly',      tier: 'max',     interval: 'year',  credits: 3360, paidDays: 365,  priceUsd: 699 },
+      { id: 'pack_s', tier: 'pack', interval: null, credits: 20,  paidDays: null, priceUsd: 9.9 },   // 积分包：不改会员期，所有人可买
+      { id: 'pack_m', tier: 'pack', interval: null, credits: 55,  paidDays: null, priceUsd: 24.9 },
+      { id: 'pack_l', tier: 'pack', interval: null, credits: 115, paidDays: null, priceUsd: 49.9 },
     ],
     channels: { primary: 'stripe', fallback: 'waffo' },   // 第 6.3 节：Waffo 只做单笔兜底
   },
@@ -79,7 +85,8 @@ export const site = defineSite({
 规则：
 
 - 品牌名、价格、免费额度、支持语言这些对外数字**只写在 `site.config.ts`**，页面、FAQ、结构化数据都从这里读（建站规格 G3）。
-- Stripe 和 Waffo 的价格 ID、产品 ID 放环境变量，不进 `site.config.ts`。
+- Stripe 的 Price 不进代码也不进 `site.config.ts`：按第 6.2 节的 `lookup_key` 约定在 Stripe 后台建好，服务端用 lookup key 取。Waffo 的商品 ID 映射放环境变量。
+- 分辨率档（1K / 2K / 3K）的像素定义和每档每模板的 credit 数不在这里：前者是 `modules/image` 的常量，后者在数据库 `templates.credits_cost`（第 5 节）。
 - 数据库只存订单、流水和用户数据，不存价格表。
 
 ## 3. 功能模块接口
@@ -106,7 +113,7 @@ interface GenerationProvider {
 
 ### 3.2 v1 范围
 
-- `image` 模块：只实现 GPT-Image-2.5 适配器（OpenAI 官方接口）。底座的 fal / KIE / WaveSpeed / Atlas 适配器不搬。
+- `image` 模块：只实现 OpenAI GPT-Image 适配器（官方 `/v1/images/edits`）。**模型名是配置项**：环境变量 `OPENAI_IMAGE_MODEL`，默认值由 Owner 定（代码里当前默认 `gpt-image-2.5-sunburst`；GPT Image 2.6 已于 2026-11-04 上线、同价、更快，是否切换由 Owner 比较效果后决定，不在规范里替 Owner 定）。底座的 fal / KIE / WaveSpeed / Atlas 适配器不搬。
 - `video` 模块：只有接口类型，`site.config.ts` 里是 `false`，不写任何视频页面。
 
 ## 4. 生成任务
@@ -119,22 +126,22 @@ interface GenerationProvider {
 | user_id | 用户 |
 | module | 'image' / 'video' |
 | template_id | 用的模板 |
-| inputs | 用户填的内容（文案、比例、输入图在 R2 的 key），**不含封装提示词** |
+| inputs | 用户填的内容（文案、比例、**分辨率 `resolution`：`'1k'` / `'2k'` / `'3k'`**、输入图在 R2 的 key），**不含封装提示词**。伙伴接口（第 14 节）v1 固定 `'1k'`，契约不加字段 |
 | provider | 实际调用的厂商 |
 | source | 'web' / 'graylum'，哪条入口发起的 |
 | idempotency_key | 可空，唯一索引。伙伴接口把调用方的 callId 放这里，重复请求返回同一个任务 |
 | status | running → succeeded / failed |
 | credit_pool | 'free' / 'paid'，本单从哪个池扣的（第 6.1 节）。决定水印、默认可见性、可商用 |
 | visibility | 'public' / 'private'，free 作品固定 public，paid 作品默认 private、本人可改（见第 9 节） |
-| credits_cost | 本次扣多少积分 |
+| credits_cost | 本次扣多少积分 = `templates.credits_cost[resolution]`，由 `reserve_credits` 在数据库里按模板和分辨率取，不信任调用方传入的数 |
 | output_key | 成品在 R2 的 key |
 | error_code | 失败原因 |
 | created_at / finished_at | |
 
 v1 只走同步路径，三步：
 
-1. 请求进来，先 HEAD 校验输入图对象（第 8 节），再**一条 SQL 原子预扣积分**：余额够才扣，不够直接失败。
-2. 同一个请求里从 R2 读输入图（1～2MB 的压缩图）调用 GPT-Image-2.5。Vercel 函数最长设为 300 秒。
+1. 请求进来，先校验 `resolution` 合法、HEAD 校验输入图对象（第 8 节），再**一条 SQL 原子预扣积分**：`reserve_credits(job_id, resolution)` 按模板在该分辨率的配置扣，余额够才扣，不够直接失败。
+2. 同一个请求里从 R2 读输入图（1～2MB 的压缩图）调用 OpenAI GPT-Image（模型按 `OPENAI_IMAGE_MODEL`，`quality` 按模板的质量档，`size` 按分辨率档 × 比例，见第 8.1 节）。Vercel 函数最长设为 300 秒。
 3. 成功就确认扣费、把成品写进 R2 `outputs/`，**只返回任务状态和 key，不返回图片字节**；失败或超时就自动退回积分。按任务 id 幂等，同一个任务只结算一次。
 
 v1 不写回调解析、定时轮询、超时清理这类定时任务。视频接入时再按同一张表加异步路径。
@@ -143,7 +150,7 @@ v1 不写回调解析、定时轮询、超时清理这类定时任务。视频�
 
 模板分两张表，核心提示词不进仓库、不进公开表：
 
-- `templates`（公开）：id、模块、名称、分类、封面前后对比图、字段定义（要几张图、要填哪些文案、可选比例）、消耗积分、排序、上下架状态、`visible_in`（`['web']` / `['partner']` / 两者，控制在哪些入口展示）。
+- `templates`（公开）：id、模块、名称、分类、封面前后对比图、字段定义（要几张图、要填哪些文案、可选比例）、**质量档 `quality`**（`'high'` / `'medium'`，送给模型的 `quality` 参数，默认 `'high'`）、**消耗积分 `credits_cost`**（jsonb，按分辨率三个档都必填：`{ "1k": 2, "2k": 4, "4k": 6 }`，正整数）、排序、上下架状态、`visible_in`（`['web']` / `['partner']` / 两者，控制在哪些入口展示）。
 - `template_prompts`（私有，只有服务端能读，RLS 拒绝所有客户端）：模板 id、提示词正文、版本号、模型参数。
 
 内置一条 `freeform` 模板：字段定义只有 `prompt`（加可选参考图），`template_prompts` 里的提示词是直通。它让「自由文字出图」和「模板出图」走同一条代码路径；`visible_in = ['partner']`，Shotviva 自己的前台不展示（DESIGN.md 禁止出现 prompt）。
@@ -161,7 +168,14 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 | Pets | Pet Studio | 宠物写真 |
 | Art Styles | Korean Manhwa | 照片转精致韩漫画风，构图和主体不变 |
 
-- 每个模板消耗多少 credit 由定价结果定，写在 `templates.credits_cost`（第 6.1 节），这里不写死。
+- 每个模板消耗多少 credit 按「质量档 × 用户选的分辨率」定，写在 `templates.credits_cost`，后台可改，不低于第 6.1 节的下限。默认值：
+
+| 模板质量档 | 1K | 2K | 3K |
+|---|---|---|---|
+| `high`（默认） | 2 | 4 | 6 |
+| `medium`（效果够用的模板，需逐个实测后才能降档） | 1 | 2 | 3 |
+
+- 分辨率由用户在工作台选，模板不限制档位；三个档位的像素定义见第 8.1 节。`freeform` 模板同样三档都配（默认同 `high`）。
 - **画风模板的版权规则**：模板名、说明、提示词里只能用通用风格描述（如 "Korean manhwa style"），不准出现具体作品、作者、角色、工作室或品牌的名字；示例图不能模仿可辨认的作品。
 - **海报类只做单张、短文字**：标题和价格由用户在工作台的文案字段里填。多行菜单、价格单这类需要逐行排版的物料不交给 AI 画字，放到物料期用代码排版做。
 - 模板质量由 Owner 调提示词时把关，不设统一的实测门槛（Owner 2026-11-05）。
@@ -179,25 +193,33 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 任何一次成功付款（首付、订阅续费、钱包单笔、Waffo 单笔、积分包）都走同一个 SQL 函数 `apply_purchase(user, product_id, event_id)`：`credits += 商品积分`；商品带天数的同时 `paid_until = max(paid_until, now()) + 天数`；积分包的天数为空，**不碰 `paid_until`**（不能写成「+0 天」，那会把空的 `paid_until` 写成 now()）。首付和单笔用 checkout session id 当 `event_id`，Waffo 用它的事件 id。
 - 订阅续费走 T10 新增的 `apply_subscription_renewal(user, product_id, invoice_id, period_end)`：`credits += 商品积分`，`paid_until = greatest(paid_until, period_end)`（直接对齐 Stripe 的本期结束日，不按天数累加，避免大小月漂移）；同样写流水、按 invoice id 幂等，内部复用 `_apply_credit_change`（总控 2026-11-05 补）。
 - 没用完的积分在续费时自然结转（积分不过期），不做「本期 / 结转」两本账。
-- **计价单位是 credit，不是「张」。** 每个模板消耗多少 credit 写在 `templates.credits_cost`，后台模板编辑页可改；会员每月发多少 credit、积分包多少 credit 写在 `site.config.ts`。前台后台都叫 credits，余额显示为 "30 credits + 3 free"。「重新生成」按模板再扣一次。
+- **计价单位是 credit，不是「张」。** 一次出图扣多少 = 模板在用户所选分辨率的配置值 `templates.credits_cost[resolution]`（第 5 节：`high` 模板默认 1K 2 / 2K 4 / 3K 6，`medium` 1 / 2 / 3），后台模板编辑页可改；会员每月发多少 credit、积分包多少 credit 写在 `site.config.ts`。前台后台都叫 credits，余额显示为 "30 credits + 3 free"。「重新生成」按同一模板、同一分辨率再扣一次。
+- **配置下限（Owner 2026-11-05 定的毛利口径）**：每个质量档 × 分辨率的 credit 数 ≥ `ceil(该档 p95 单次真实成本 ÷ $0.06)`，后台可以往上加价，不能低于下限。下限表是 `modules/image` 里的常量，后台保存模板时在服务端校验，低于下限拒绝保存。$0.06 的来历：最便宜的 credit 是 Max 年付 $0.208，扣最坏手续费（国际卡 + Managed Payments：2.9% + 3.5% + 1.5% + $0.30）和 3% 退款预留后，守 **60% 毛利**（不含注册赠送的 3 个免费 credit，按最坏情况：credits 全部用完）每 credit 的成本上限约 $0.060。成本依据：OpenAI 官方价（图像输入 $8/M、输出 $30/M token），high 质量正方形单张输出 1K $0.053、2K $0.107、3K $0.178，加输入图约 $0.012～$0.021、提示词约 $0.005、失败退回损耗 10%、R2 + Vercel 约 $0.002；输入图 token 上线前按 LAUNCH §5 实测后更新下限表（定稿全文见共享笔记 `pricing-final-2026-11-05.md`）。
 - 余额只能通过 SQL 函数改：发放（`grant_credits` 带 `pool` 参数，注册赠送和活动赠送用 `'free'`）、预扣、确认、退回、管理员调整（`admin_adjust_credits` 带 `pool` 参数）。前端和普通接口都不能直接写余额。
 - 每一笔变动都写进流水表，记录动的是哪个池，带幂等键。
 
-### 6.2 商品（结构已定，价格待定）
+### 6.2 商品（Owner 2026-11-05 定稿）
 
-**SKU 结构 Owner 2026-11-05 拍板（傍晚修订）：2 个会员商品 + 1 个积分包。**
+**三档会员 × 月付 / 年付 + 三个积分包，共 9 个商品。** 商品 id 固定如下（总控定），Stripe / Waffo 映射、PostHog 事件、付费墙和 `/pricing` 文案都按这些 id 写：
 
-| id | 付费积分 | 会员期 `paid_until` | 卡 / Apple Pay / Google Pay | 支付宝 / 微信 | 谁能买 |
-|---|---|---|---|---|---|
-| `monthly` | M（待定，随价格定） | +30 天 | Stripe **订阅**，自动续费，每期 +M | Stripe **单笔**，到期不自动续，再买一次 | 所有人 |
-| `yearly` | 12 × M，一次发完 | +365 天 | Stripe **订阅**，每年续费一次 | Stripe **单笔** | 所有人 |
-| `pack` | P（待定） | 不变 | Stripe Managed Payments **单笔** | Stripe **单笔** | **所有人，包括没买会员的**；每 credit 单价高于订阅 |
+| id | 档位 | 价格 | 付费积分 | 每 credit | 会员期 `paid_until` | 卡 / Apple Pay / Google Pay | 支付宝 / 微信 |
+|---|---|---|---|---|---|---|---|
+| `starter_monthly` | Starter | $19.90 / 月 | 50 / 月 | $0.398 | +30 天 | Stripe **订阅**，每期 +50 | Stripe **单笔**一期会员 |
+| `starter_yearly` | Starter | $139 / 年（合 $11.58/月） | 600，一次发完 | $0.232 | +365 天 | Stripe **订阅**，每年 +600 | Stripe **单笔** |
+| `pro_monthly` | Pro | $49.90 / 月 | 135 / 月 | $0.370 | +30 天 | 订阅 | 单笔 |
+| `pro_yearly` | Pro | $349 / 年（合 $29.08/月） | 1,620，一次发完 | $0.215 | +365 天 | 订阅 | 单笔 |
+| `max_monthly` | Max | $99 / 月 | 280 / 月 | $0.354 | +30 天 | 订阅 | 单笔 |
+| `max_yearly` | Max | $699 / 年（合 $58.25/月） | 3,360，一次发完 | $0.208 | +365 天 | 订阅 | 单笔 |
+| `pack_s` | 积分包 | $9.90 | 20 | $0.495 | 不变 | Stripe Managed Payments **单笔** | Stripe **单笔** |
+| `pack_m` | 积分包 | $24.90 | 55 | $0.453 | 不变 | 单笔 | 单笔 |
+| `pack_l` | 积分包 | $49.90 | 115 | $0.434 | 不变 | 单笔 | 单笔 |
 
-积分包不改会员期，但它发的是付费积分，用它生成的作品就是付费作品（无水印、私密、可商用），所以非会员买包也拿到完整权益——这正是「按作品判付费」要解决的事。
-
-- `monthly` / `yearly` 在 Stripe 里各是一个 Product（税码 `txcd_10105001`）挂两个 Price：recurring 和 one-time，价格相同；`pack` 只有 one-time Price。
-- 支付宝 / 微信在 Stripe 普通模式下不支持订阅，所以钱包用户买的是「一期会员」，`paid_until` 到了自己再买。这不是功能缺失，是 Stripe 的限制，付费墙文案要说清楚（"Renews automatically" vs "30 days, no auto-renew"）。
-- 价格数字由 pricing-research 定稿后填进 `site.config.ts`，并同步修改建站规格 G3；在此之前 `priceUsd` 留 0，付费墙和 `/pricing` 的数字从配置读。商品 id 固定为 `monthly` / `yearly` / `pack`，Stripe / Waffo 的商品映射、PostHog `purchase` 事件参数都按这三个 id 写。
+- 年付积分 = 12 × 月付积分，一次发完；年付折扣约 41%～42%。积分包每 credit 都高于所有订阅，**所有人可买，包括没买会员的**，所有通道都是单笔，不改 `paid_until`。注册赠送仍是 3 个免费 credit（`billing.freeCredits`），不计入毛利。
+- 积分包不改会员期，但它发的是付费积分，用它生成的作品就是付费作品（无水印、私密、可商用），所以非会员买包也拿到完整权益——这正是「按作品判付费」要解决的事。
+- 价格数字只写在 `site.config.ts`（第 2 节），付费墙、`/pricing`、FAQ、结构化数据都从配置读；建站规格 G3 同步。送 Stripe 时用整数分（`1990`）。
+- **Stripe Product / Price 映射**：Starter、Pro、Max 各一个 Product（税码 `txcd_10105001`），每个 Product 挂 4 个 Price：月付 recurring、月付 one-time、年付 recurring、年付 one-time（同 id 的 recurring 和 one-time 价格相同）；三个积分包各一个 Product，只有 one-time Price。Price 的 `lookup_key` 固定为 `<product_id>`（one-time）和 `<product_id>_recurring`（订阅），服务端按 lookup key 取 Price，不把 Price id 写进代码或配置；每个 Price 的 `metadata.product_id` 也写上，回调反查用。
+- 支付宝 / 微信在 Stripe 普通模式下不支持订阅，所以钱包用户买会员买的是「一期」（`starter_monthly` 的单笔形态 = 30 天 50 credits），`paid_until` 到了自己再买。这不是功能缺失，是 Stripe 的限制，付费墙文案要说清楚（"Renews automatically" vs "30 days, no auto-renew"）。
+- **PostHog `purchase` 事件参数**：`product_id`、`tier`（`starter` / `pro` / `max` / `pack`）、`interval`（`month` / `year` / 空）、`form`（`subscription` / `one_time`）、`channel`（`stripe` / `waffo`）、`method`（`card` / `alipay` / `wechat_pay`）、`amount_usd`、`credits`。`generate` 事件加 `resolution` 和 `credits_cost`。
 
 已经确定的规则：
 
@@ -208,6 +230,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 外部退款（Managed Payments 下 Link 客服 60 天内可以不经我们退款）：`charge.refunded` 只写记录 + Sentry 告警，Owner 手动 `admin_adjust_credits`。不写自动扣回。
 - 不做：首月优惠券、升级降级、按比例退款、宽限期、测试时钟自动化、到期提醒邮件。
 - **分两段上线**：上线当天必须有「订阅模式建结账 + 首付发放」（和单笔几乎相同）；续费、取消同步、Portal 链接在第一个付费用户满 30 天之前上线即可（TASKS T10）。
+- 账号页「Subscription」区块显示当前档位（Starter / Pro / Max）和月付 / 年付；镜像表 `subscriptions.product_id` 存 9 个 id 之一。
 - 卡、支付宝、微信都能付（第 6.3 节的路由）。
 - **水印在下载路由加，按作品判**：成品只存一份无水印原图；`core/storage` 的下载路由对 `credit_pool = 'free'` 的作品用 `sharp` 叠右下角「Made with Shotviva」后返回（约 50ms），`credit_pool = 'paid'` 的作品永不加水印。工作台预览和将来创作库展示同样走这个路由。
 - **免费作品**（免费积分生成）：`visibility = 'public'`，带水印，用户不能改私密，可以删除。买了会员之后它们**仍然**是免费作品——不会自动去水印、不会自动私密；想要无水印版就用付费积分再生成一张。
@@ -234,7 +257,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 **Waffo：保留，只做单笔兜底**（Owner 2026-11-05 确认不砍）：
 
 - 角色是 Stripe 账户本身没通过、或 Stripe 整体不可用时的收款兜底。Waffo 可以加急当天开通。
-- Waffo 上只卖 `monthly` / `yearly` 的**单笔**形态（+30 / +365 天），不做 Waffo 订阅；Waffo 不支持微信，付款页只显示卡和支付宝。
+- Waffo 上卖 9 个商品的**单笔**形态：六个会员商品按一期（月付 +30 天、年付 +365 天，积分同表）、三个积分包；不做 Waffo 订阅；Waffo 不支持微信，付款页只显示卡和支付宝。`product_id → Waffo 商品 id` 的映射放环境变量（一个 JSON 映射，九个 id 都要有，缺一个启动时报错）。
 - 通过环境变量指定当前用哪条通道：默认 Stripe；切到 Waffo 时付费墙全部方式都走 Waffo 单笔。**不做自动故障切换**，出问题时人工改开关。
 - 回调规则和 Stripe 相同：先验签，再按事件 id 去重，最后 `apply_purchase`。
 
@@ -256,7 +279,8 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 
 - Vercel 函数请求体和响应体上限都是 4.5MB。**任何 API 路由不得接收或返回图片字节**，只传 R2 key 或签名地址。
 - Vercel 上预编译的 `sharp` 不含 HEIF 解码器，**服务端不转 HEIC**。
-- GPT-Image 按像素看图，输出最大边 1536；长边 2048 以上的输入对出图零增益。
+- GPT-Image 按像素看图；长边 2048 以上的输入对出图零增益（LAUNCH §5 的成本测量若发现 1K high 单次 p95 成本 > $0.12，可把上传长边降到 1536）。
+- **输出分辨率三档（用户在工作台选，默认 1K）**：按正方形边长定义，1K = 1024²、2K = 2048²、3K = 2880²（标签叫 3K 而不是 4K：模型上限 2880 像素，叫 4K 会误导用户，Owner 2026-11-05 定）（模型上限）。非正方形比例的尺寸表放在 `modules/image/provider/output-size.ts`：边长取 16 的倍数、长短边比 ≤ 3:1，并且**同一档内任何比例的输出 token 数不超过该档正方形**（扣费表按每档最贵的正方形定，这样配置下限对所有比例都成立），用 OpenAI 官方 token 计算器的公式核对。
 
 ### 8.2 上传链路（支持 20MB 原图）
 
@@ -304,7 +328,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 
 v1 后台只做**两页**：
 
-1. **模板与提示词编辑**。因为 `template_prompts` 客户端读不到，必须有一个服务端页面来改。功能：新建模板、编辑公开信息和私有提示词、上下架、排序。
+1. **模板与提示词编辑**。因为 `template_prompts` 客户端读不到，必须有一个服务端页面来改。功能：新建模板、编辑公开信息（含质量档和 1K / 2K / 3K 三个 credit 数，低于第 6.1 节下限拒绝保存）和私有提示词、上下架、排序。
 2. **需求审核**（第 15 节）：待审需求列表（参考图 + 描述 + 用户）、通过 / 拒绝 / 下架、按票数排序、标记 shipped 并关联模板。
 
 其他运营操作 v1 都不做页面：
