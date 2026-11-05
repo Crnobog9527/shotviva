@@ -11,30 +11,36 @@ type Props = {
   page: ContentPage
   // Rendered above the H1 (breadcrumbs on inner pages).
   top?: ReactNode
-  // Rendered between the hero and the facts (the template grid on the home page).
-  afterHero?: ReactNode
+  // Used when the page sets no related heading of its own.
   relatedHeading: string
   // Hides links into switched-off modules (ARCHITECTURE §2: not in nav).
   isLinkEnabled?: (href: string) => boolean
 }
 
-// One renderer for every SEO page; the order follows ARCHITECTURE §13 / 建站规格 R10.
-export function ContentPageView({ page, top, afterHero, relatedHeading, isLinkEnabled }: Props) {
+export function PageHeader({ page }: { page: ContentPage }) {
+  return (
+    <header>
+      <h1>{page.h1}</h1>
+      {page.subtitle && <p>{page.subtitle}</p>}
+      <p>{page.answerBlock}</p>
+    </header>
+  )
+}
+
+// One renderer for every inner SEO page; the order follows ARCHITECTURE §13 / 建站规格 R10.
+export function ContentPageView({ page, top, relatedHeading, isLinkEnabled }: Props) {
   const enabled = isLinkEnabled ?? (() => true)
+  const headings = page.headings ?? {}
   return (
     <article className="mx-auto flex w-full max-w-3xl flex-col gap-8 p-4">
       {top}
-      <header>
-        <h1>{page.h1}</h1>
-        <p>{page.answerBlock}</p>
-      </header>
+      <PageHeader page={page} />
       <HeroSection hero={page.hero} showCta={enabled(page.hero.cta.href)} />
-      {afterHero}
-      <FactsSection facts={page.facts} />
-      <CostTableSection table={page.costTable} />
-      <FaqSection faq={page.faq} />
+      <FactsSection facts={page.facts} heading={headings.facts ?? 'Key facts'} />
+      <CostTableSection table={page.costTable} heading={headings.costTable ?? page.costTable.caption} />
+      <FaqSection faq={page.faq} heading={headings.faq} isLinkEnabled={enabled} />
       <RelatedLinks
-        heading={relatedHeading}
+        heading={headings.related ?? relatedHeading}
         links={page.related.filter((link) => enabled(link.href))}
       />
     </article>

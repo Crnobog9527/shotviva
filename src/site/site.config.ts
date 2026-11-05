@@ -4,7 +4,7 @@ export const site = defineSite({
   brand: {
     name: 'Shotviva',
     domain: 'shotviva.com',
-    tagline: 'AI food & product photo studio',
+    tagline: 'AI photo studio',
     // Owner 2026-11-05 (T19). Footer and legal pages read these, never a literal.
     legalName: 'Grayscale Luminary LLC',
     registeredIn: 'Wyoming, United States',
@@ -22,7 +22,8 @@ export const site = defineSite({
   locales: { default: 'en', enabled: ['en'] },
   billing: {
     currency: 'usd',
-    freeCredits: 3,
+    // = 3 free Standard images at 2 credits each; public copy says "3 free Standard images" (建站规格 G3).
+    freeCredits: 6,
     // Structure fixed by ARCHITECTURE §6.2; prices wait for pricing-research.
     products: [
       { id: 'pass', credits: 30, paidDays: 30, priceUsd: 0 },

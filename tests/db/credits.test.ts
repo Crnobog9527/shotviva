@@ -5,6 +5,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { adminAdjustCredits, applyPurchase, grantCredits, signupGrantKey } from '@/core/billing'
 
+import { site } from '@/site/site.config'
+
 import { connectAdmin, createUser, DAY_MS, ledgerOf, profileOf, serviceClient } from './helpers'
 
 const service = serviceClient()
@@ -29,15 +31,16 @@ describe('profiles copy (T1 owns it)', () => {
 describe('grant_credits', () => {
   it('grants the signup bonus into the free pool once per idempotency key', async () => {
     const userId = await createUser(db)
-    const input = { userId, amount: 3, reason: 'signup bonus', idempotencyKey: signupGrantKey(userId), pool: 'free' as const }
+    const amount = site.billing.freeCredits
+    const input = { userId, amount, reason: 'signup bonus', idempotencyKey: signupGrantKey(userId), pool: 'free' as const }
 
     const first = await grantCredits(service, input)
     const second = await grantCredits(service, input)
 
-    expect(first).toMatchObject({ applied: true, credits: 0, freeCredits: 3 })
-    expect(second).toMatchObject({ applied: false, credits: 0, freeCredits: 3 })
+    expect(first).toMatchObject({ applied: true, credits: 0, freeCredits: amount })
+    expect(second).toMatchObject({ applied: false, credits: 0, freeCredits: amount })
     expect(await ledgerOf(db, userId)).toEqual([
-      { kind: 'grant', pool: 'free', delta: 3, idempotency_key: `signup:${userId}` },
+      { kind: 'grant', pool: 'free', delta: amount, idempotency_key: `signup:${userId}` },
     ])
   })
 

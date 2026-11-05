@@ -1,48 +1,78 @@
-import { formatProductPrice, freeImagesLabel } from '@/core/config'
 import type { CostTable, Fact, HeroBlock } from '@/core/content'
 
 import { site } from '../site.config'
+import {
+  FromCredits,
+  freeImagesLabel,
+  languages,
+  packFrom,
+  photographerRate,
+  planFrom,
+  setCredits,
+  tierPixels,
+  uploadLimits,
+  usd,
+} from './offer'
 
-// Placeholder copy (final wording is T11). Every number is read from site.config (建站规格 G3).
-const LANGUAGE_NAMES: Record<string, string> = { en: 'English' }
+// Facts and the cost table shared by every page, so one number never has two versions
+// (建站规格 G3, G4). Numbers come from offer.ts, which reads site.config.
 
-export const PENDING = 'To be confirmed'
+const brand = site.brand.name
 
-export function paidOptionsLabel(): string {
-  return site.billing.products
-    .map((p) => `${p.id}: ${p.credits} images, ${p.paidDays} days, ${formatProductPrice(p)}`)
-    .join('; ')
+function paidValue(): string {
+  if (!planFrom) return 'Plans and credit packs: prices coming soon'
+  const packs = packFrom ? `; credit packs from ${usd(packFrom.priceUsd)}, one-time` : ''
+  return `Plans from ${usd(planFrom.priceUsd)} a month${packs}`
 }
 
-export function sharedFacts(): readonly [Fact, Fact, Fact, Fact] {
+export function sharedFacts(): readonly [Fact, Fact, Fact, ...Fact[]] {
   return [
-    { label: 'Free to start', value: freeImagesLabel(site) },
-    { label: 'Paid options (one-time, no subscription)', value: paidOptionsLabel() },
     {
-      label: 'Supported languages',
-      value: site.locales.enabled.map((code) => LANGUAGE_NAMES[code] ?? code).join(', '),
+      label: 'What stays the same',
+      value: 'The subject you shot: its shape, colors, label, plating or room layout',
     },
-    { label: 'DoorDash / Uber Eats / Grubhub photo sizes', value: PENDING },
+    { label: 'What the template changes', value: 'The light, the background, the scene or the art style' },
+    { label: 'Free to start', value: `${freeImagesLabel} when you sign up, given once` },
+    { label: 'Cost per photo', value: `${FromCredits} (Standard)` },
+    { label: 'Output sizes', value: tierPixels },
+    { label: 'Uploads', value: uploadLimits },
+    { label: 'Prices', value: paidValue() },
+    { label: 'Free vs paid photos', value: 'Free photos are public with a watermark; paid photos are private and watermark-free' },
+    { label: 'Prompts', value: 'None to write: you pick a template' },
+    { label: 'Languages', value: languages },
   ]
 }
 
 export function sharedCostTable(): CostTable {
-  const pass = site.billing.products.find((p) => p.id === 'pass')
+  const plans = planFrom ? `, plans from ${usd(planFrom.priceUsd)} a month` : ''
   return {
-    caption: `Hiring a photographer vs ${site.brand.name}`,
-    headers: { item: 'What you pay for', photographer: 'Photographer', site: site.brand.name },
+    caption: `Hiring a photographer vs shooting it yourself vs ${brand}`,
+    headers: { item: 'What you compare', photographer: 'Hire a photographer', diy: 'Shoot it yourself', site: brand },
     rows: [
-      { item: 'Free trial', photographer: 'None', site: freeImagesLabel(site) },
       {
-        item: 'One menu of dish photos',
-        photographer: PENDING,
-        site: pass ? formatProductPrice(pass) : PENDING,
+        item: 'Price',
+        photographer: `${photographerRate} in a US city, plus booking fees`,
+        diy: 'Your time, plus lights, a backdrop and props',
+        site: `${FromCredits} a photo${plans}`,
       },
-      { item: 'Turnaround', photographer: PENDING, site: PENDING },
+      { item: 'Free to try', photographer: 'No', diy: 'Only if you already own the gear', site: freeImagesLabel },
+      {
+        item: 'One product, three looks',
+        photographer: 'Three setups during a booked shoot',
+        diy: 'Three setups, then editing',
+        site: `One phone photo, three templates, from ${setCredits} credits`,
+      },
+      {
+        item: 'When you get the photos',
+        photographer: 'After the shoot and the editing',
+        diy: 'After setup and editing',
+        site: 'In the same visit',
+      },
     ],
   }
 }
 
+// Placeholder pair until T8 ships the real "one phone photo → full set" demo images.
 export function placeholderHero(caption: string): HeroBlock {
   return {
     before: {
