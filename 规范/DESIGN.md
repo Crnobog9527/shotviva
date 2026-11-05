@@ -19,7 +19,7 @@
 
 ## 1. 设计原则
 
-用户是不懂 AI 的餐饮老板，多数人用手机操作。所有设计决定按下面四条排优先级：
+用户是不懂 AI 的日常用户和小商家（网店和二手卖家、餐饮店、美妆品牌、房东、宠物主人，Owner 2026-11-05 改定，不再只针对餐饮），多数人用手机操作。所有设计决定按下面四条排优先级：
 
 1. **一眼看懂**：每个页面只有一个主要操作。产品界面（按钮、字段、标签、提示、错误信息）绝不出现 prompt、seed、guidance 这类词。营销页正文和 FAQ 可以用否定说法（"No prompts to write"、"Do I need to write a prompt? No."），这是卖点也是搜索词，但不得出现输入 prompt 的控件（总控 2026-11-05 裁定）。
 2. **先看效果再动手**：模板、首页、标签页都以「前后对比图」开场。
@@ -88,7 +88,7 @@ Owner 2026-11-05 改定：**深色系**（T6 深色方向「打烊后的街」�
 ### 4.2 模板卡片
 
 - 封面是对比图的「后」图，卡片上一个「Before / After」小切换看「前」图；不用悬停（手机没有悬停）。
-- 卡片上只写：模板名、适合什么（例如 "Menu & delivery apps"）、消耗多少 credits（"2 credits"）。
+- 卡片上只写：模板名、适合什么（例如 "Menu & delivery apps"）、消耗多少 credits——写 1K 档的数（"From 2 credits"），2K / 3K 的数在工作台选分辨率时才显示。
 
 ### 4.3 生成工作台
 
@@ -97,7 +97,8 @@ Owner 2026-11-05 改定：**深色系**（T6 深色方向「打烊后的街」�
 1. 上传区：大号按钮区，手机上点击调起相册 / 相机（两个入口："Take photo" 带 `capture`，"Choose from gallery" 不带）；桌面上同一块区域也接受拖拽。显示允许的格式和大小（JPG / PNG / WebP，up to 20MB）。
 2. 文案区：只出现模板需要的字段，每个字段带示例占位。
 3. 比例选择：用图标按钮，标注平台用途（例如 "DoorDash 16:9"）。
-4. 生成按钮：固定在底部拇指区、全宽，写清楚消耗，例如 "Generate · 2 credits"。按钮旁显示余额 "30 credits + 3 free"。
+3b. 分辨率选择：三张上下排列的选项卡，默认第一张。界面只显示 **Standard / HD / Max**（Owner 2026-11-05 定），每张写一行像素和用途，右侧写消耗：「Standard — 1024 px · Social & delivery apps · 2 credits」「HD — 2048 px · Websites & online stores · 4 credits」「Max — 2880 px · Print & zoom · 6 credits」（credits 数从该模板的 `credits_cost` 读，不写死）。内部代号 `1k` / `2k` / `3k` 只在代码和数据库里用，界面、营销页、FAQ 都不出现 1K / 2K / 3K，也不准用 "4K"、"Ultra HD"、"SD"。余额不够某一档时该档的 credits 变灰，主按钮变成 "Get credits · N needed" 并打开付费墙。
+4. 生成按钮：固定在底部拇指区、全宽，写清楚当前分辨率的消耗，例如 "Generate · 2 credits"，切换分辨率时按钮上的数字跟着变。按钮旁显示余额 "30 credits + 3 free"。
 5. 这一单将用免费积分时，按钮上方一行告知："This photo uses free credits: it's shown publicly with a watermark. Paid credits make it private and watermark-free." 将用付费积分时不显示。
 
 单位叫法：前台后台都叫 **credits**，不说「张」。余额分开显示付费和免费（"30 credits + 3 free"）。
@@ -112,9 +113,12 @@ Owner 2026-11-05 改定：**深色系**（T6 深色方向「打烊后的街」�
 ### 4.5 付费墙
 
 - 触发：免费额度用完，或免费用户想把作品设为私密。
-- 手机上是底部抽屉，桌面是居中弹窗（第 8.4 节）。里面**三个商品**：`monthly`、`yearly`、`pack`（ARCHITECTURE.md 第 6.2 节），价格数字从配置读。推荐项高亮。`pack` 标注 "One-time · no subscription"，并显示每 credit 单价以便和订阅对比。
-- 选了商品后是**两组付款方式**：「Card · Apple Pay · Google Pay」和「Alipay · WeChat Pay」。卡那组下面一行小字 "Renews automatically, cancel anytime"；钱包那组下面 "One-time payment, 30 days / 1 year, no auto-renew"。`pack` 在两组下都是单笔。走 Waffo 时全部单笔，微信不显示。
-- 账号页「Subscription」区块：当前商品、状态（Active / Cancels on … / Past due / Free）、下次续费日，一个「Manage subscription」按钮打开 Stripe Customer Portal；钱包用户显示 "Paid until …" 和「Renew」按钮。
+- 手机上是底部抽屉，桌面是居中弹窗（第 8.4 节）。9 个商品（ARCHITECTURE.md 第 6.2 节）分两步选，**每一屏最多三个选项**，手机一屏放得下，不滚动也能做决定：
+  1. **第一屏：选档位**。三张竖排卡片 Starter / Pro / Max，每张写月付价、每月 credits、每 credit 单价（"$19.90 / month · 50 credits · $0.40 per credit"），Pro 高亮为推荐。卡片下方一行次要入口 "Just need a few photos? Credit packs from $9.90 →"。价格数字全部从 `site.config.ts` 读。
+  2. **第二屏：选周期**。顶部分段控件 **Monthly / Yearly**（Yearly 段上标 "Save 40%"，折扣数从配置算），下面是所选档位的价格、credits 总数（年付写 "600 credits upfront"）和每 credit 单价；再往下是两组付款方式。从积分包入口进来的第二屏是 S / M / L 三项（"20 credits · $9.90" 并标 "One-time · no subscription"），再往下同样两组付款方式。
+- **两组付款方式**：「Card · Apple Pay · Google Pay」和「Alipay · WeChat Pay」。会员商品下，卡那组小字 "Renews automatically, cancel anytime"，钱包那组小字 "One-time payment, 30 days / 1 year, no auto-renew"；积分包在两组下都是单笔，小字只写 "One-time payment"。走 Waffo 时全部单笔，微信不显示。
+- `/pricing` 页用同一套信息，桌面三栏并排（Starter / Pro / Max，顶部 Monthly / Yearly 切换），积分包一行三项放在下面；手机上退化成和付费墙一样的竖排。
+- 账号页「Subscription」区块：当前档位和周期（"Pro · Yearly"）、状态（Active / Cancels on … / Past due / Free）、下次续费日，一个「Manage subscription」按钮打开 Stripe Customer Portal；钱包用户显示 "Paid until …" 和「Renew」按钮。
 - 付款方式图标：卡、支付宝、微信，按当前通道可用的方式显示（走 Waffo 时没有微信）。
 - 价格数字从 `site.config.ts` 或数据库读，禁止写死。
 
@@ -135,10 +139,10 @@ Owner 2026-11-05 改定：**深色系**（T6 深色方向「打烊后的街」�
 
 ## 5. 文案语气
 
-- 用简单英文，句子短，面向小餐馆老板，不写行业黑话。
+- 用简单英文，句子短，面向不懂 AI 的日常用户和小商家，不写行业黑话。
 - 用 "photo"，不用 "image generation"；用 "template"，不用 "prompt"。
 - 按钮写动作："Upload photo"、"Generate"、"Download"，不写 "Submit"、"OK"。
-- 每个页面都要出现三个卖点之一（建站规格第 0 节）：保留菜品和摆盘原样、不用写提示词、3 步出图。
+- 每个页面都要出现三个卖点之一（建站规格第 0 节）：照片主体保持原样、不用写提示词、3 步出图。
 
 ## 6. 可访问性和性能
 
