@@ -1,5 +1,6 @@
 import Link from 'next/link'
 
+import { AnnouncementBanner } from '@/core/announcements'
 import { SiteFooter } from '@/core/content'
 import { footerLinks } from '@/site/content'
 import { site } from '@/site/site.config'
@@ -8,6 +9,7 @@ import { site } from '@/site/site.config'
 export default function MarketingLayout({ children }: LayoutProps<'/'>) {
   return (
     <>
+      <AnnouncementBanner />
       <header className="mx-auto flex w-full max-w-3xl items-center justify-between p-4">
         <Link href="/">
           {site.brand.name} <span>{site.brand.tagline}</span>
