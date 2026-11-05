@@ -1,16 +1,18 @@
-import { freeImagesLabel, pricedProducts, type PostalAddress, type SiteConfig } from '../config'
+import { pricedProducts, type PostalAddress, type SiteConfig } from '../config'
 import type { FaqItem } from '../content/page-content'
 import { absoluteUrl, siteOrigin } from './site-url'
 
 // Schema.org builders (建站规格 R7). All numbers come from the site config (G3).
 type JsonLd = Record<string, unknown>
 
-function offers(site: SiteConfig): JsonLd[] {
+// The free offer's public wording belongs to the site (e.g. "3 free Standard images");
+// without one it falls back to the raw credit count.
+function offers(site: SiteConfig, freeOffer?: string): JsonLd[] {
   const currency = site.billing.currency.toUpperCase()
   const free = {
     '@type': 'Offer',
     name: 'Free',
-    description: freeImagesLabel(site),
+    description: freeOffer ?? `${site.billing.freeCredits} free credits`,
     price: '0',
     priceCurrency: currency,
   }
@@ -18,7 +20,7 @@ function offers(site: SiteConfig): JsonLd[] {
   const paid = pricedProducts(site).map((product) => ({
     '@type': 'Offer',
     name: product.id,
-    description: `${product.credits} images`,
+    description: `${product.credits} credits`,
     price: product.priceUsd.toFixed(2),
     priceCurrency: currency,
   }))
@@ -28,6 +30,7 @@ function offers(site: SiteConfig): JsonLd[] {
 export function softwareApplicationLd(
   site: SiteConfig,
   page: { path: string; title: string; description: string },
+  freeOffer?: string,
 ): JsonLd {
   return {
     '@context': 'https://schema.org',
@@ -38,7 +41,7 @@ export function softwareApplicationLd(
     applicationCategory: 'DesignApplication',
     operatingSystem: 'Web',
     brand: { '@type': 'Brand', name: site.brand.name },
-    offers: offers(site),
+    offers: offers(site, freeOffer),
   }
 }
 

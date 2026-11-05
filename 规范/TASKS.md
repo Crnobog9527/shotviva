@@ -25,6 +25,7 @@
 | T15 | 迁移基线与自动化 | **可派，T8 / T9 / T12 之前** | T14 |
 | T18 | 埋点与错误监控 | **可派，T8 / T9 之前** | — |
 | T19 | 法律页面 | **可派** | T5 |
+| T20 | 数据库收尾：用户总览视图、迁移只加不改检查、收回多余权限 | **可派** | T15 |
 | T16 | 按分辨率扣费（模板三档积分 + 质量档） | **等 T15 合并；T8 / T9 之前** | T3、T4、T14、T15 |
 
 并行建议：T0 先做（半天到一天）；T0 合并后 T1 / T2 / T3 / T5 四张同时开；T6 和 T0 同时开（不碰代码）。
@@ -201,6 +202,8 @@
 
 **依据**：DESIGN §4.3、§4.4、§8 全部；`MOBILE_UI_rules_fable.md` §1.8.1 Share 实现规则。
 
+**设计基准（Owner 2026-11-05）**：以 T6 定稿的 B 版 Darkroom（`design/comps-v3-b/` 与更新后的 `design/DESIGN.md`）为准。**范围补充**：生成可以在后台进行，Photos 页显示进行中的任务和进度，按 `current_tier` 的并发上限允许同时发起多张（Starter 1、Pro 3、Max 6），超过上限时按钮提示等待。
+
 **验收**：LAUNCH §7.5 五条 + DESIGN §8.7 真机清单（Codex 验收）。
 
 **依赖**：T4、T6。
@@ -216,6 +219,10 @@
 **依据**：ARCHITECTURE §6.2 商品表（9 个 id、价格、积分、天数）、「Stripe Product / Price 映射」（三档 Product 各 4 个 Price、积分包 one-time、`lookup_key` 约定）、「分两段上线」、PostHog 参数；§6.3 Stripe 路由表（MP 不传 `payment_method_types`、微信 `client = 'web'`、税码 `txcd_10105001`、「审核没下来之前卡先走普通订阅」）、「要处理的 Stripe 事件」；§6.1 `apply_purchase(user, product_id, event_id)` 用 session id 当 `event_id`；§2 配置示例；DESIGN §4.5（第一屏三档、第二屏月 / 年或 S / M / L、每屏最多三个选项）；建站规格 G3；AGENTS §6 回调验签、§7 测试 2。
 
 **预览环境的支付回调**（总控 2026-11-05）：预览地址每个 PR 不同，且开着 Vercel 部署保护，Stripe 的回调会被挡成 401。做法：本地开发用 `stripe listen` 转发；CI 用签名后的模拟回调测（AGENTS §7 测试 2）；在预览上端到端验收时，打开 Vercel「Protection Bypass for Automation」，Stripe 测试模式登记一个回调，网址 = 正在验收的 PR 的分支地址 + `/api/webhooks/stripe?x-vercel-protection-bypass=<绕行密钥>`，换 PR 验收时只改网址、签名密钥不变。成功页 / 取消页地址由代码按当前部署地址（`core/site-url`）生成。绕行密钥和签名密钥只放 Vercel 环境变量与 Stripe 后台，不进代码、不进 PR。
+
+**范围补充（总控 2026-11-05）**：不接微信支付，只有卡和支付宝（ARCHITECTURE §6.2 / §6.3、DESIGN §4.5）；付费墙档位卡三种材质色和年付节省金额按 DESIGN §4.5；同步把法律页面（`site/content/legal/`）里提到 WeChat Pay 的句子删掉。
+
+**范围补充 2（总控 2026-11-05）**：新增 SQL 函数 `current_tier(user_id)`（ARCHITECTURE §6.2「会员档位权益」），生成限频的并发上限按档位 1 / 3 / 6（没有档位为 1）；付费墙档位卡按 DESIGN §4.5 列权益，Coming soon 单独成组；不写「排队优先」。
 
 **验收**：LAUNCH §5 的商品 / Price 一条、Stripe 卡与钱包两条 + 回调重发三次只发一次 + 签名错误 400；付费墙在 375px 上每屏不超过三个选项、不滚动能完成选择（Codex 验收）。
 
@@ -277,6 +284,8 @@
 
 **验收**：LAUNCH §9.6 八条；删除账号时同时清 `requests/{user_id}/`（在 T1 的 `accountPrefixes` 里加这个前缀并补测试）。其中前五条要有 Vitest（连本地 Supabase）：门槛函数、RLS 可见性、投票切换、拒绝删图（mock R2 断言）、shipped 置顶查询。界面部分 Codex 真机验收。
 
+**范围补充（总控 2026-11-05）**：投票权重按 `current_tier`，Max 为 3，其余为 1（`votes_count` 存加权后的总数，取消投票按同样权重减）。
+
 **依赖**：T1、T4（上传链路）、T8（应用壳）。
 
 ---
@@ -328,6 +337,8 @@
 
 **范围补充 2（总控 2026-11-05）**：封面展示媒体支持静态图 / 动图 / 短视频（ARCHITECTURE §8.3 三条），`templates` 加 `cover_media_type`、`cover_video_url`、`cover_poster_url`（新迁移，按 AGENTS §5 一次成型），后台上传支持 GIF→动态 WebP、MP4 ≤15MB ≤15 秒 + 封面帧。验收加一条：后台给一个模板换成视频后，首页卡片显示封面帧、滑入视口后静音循环播放。
 
+**范围补充 3（总控 2026-11-05）**：输出尺寸支持 DESIGN §4.3 的 8 个比例（Original 按原图比例取最接近的模型支持尺寸，其余 16:9 / 4:5 / 1:1 / 9:16 / 3:2 / 4:3 / 2:3），尺寸表放 `modules/image/provider/output-size.ts`，每档清晰度内任何比例的输出 token ≤ 该档正方形。
+
 **验收**：
 - [ ] 同一模板 1K / 2K / 3K 各生成一次，`generation_jobs.credits_cost` 分别等于后台配置的三个数，成品像素等于尺寸表
 - [ ] 测试：`reserve_credits` 对 `'8k'` 抛错且不扣；调用方传错 cost 不影响扣数；`medium` 模板 1K 扣 1
@@ -375,10 +386,19 @@
 
 **依赖**：T5（已合并）。
 
+## T20 数据库收尾：用户总览视图、迁移只加不改的 CI 检查、收回多余权限（可派）
+
+**目标**：约半天。
+1. 迁移（编号段 `0040`～`0059`）：新建 `admin` schema（不加入 Data API 暴露列表）和视图 `admin.users_overview`（ARCHITECTURE §10 表里的字段，按 `auth.users.email` 可搜），`revoke all` 给 `anon` / `authenticated`，只给 `service_role`；同一迁移或另一迁移里对 `public.templates`、`public.profiles` 执行 `revoke all ... from anon, authenticated` 再按现有 RLS 需要重新授 `select`，消掉 `schema.sql` 里多余的 `REFERENCES / TRIGGER / TRUNCATE / MAINTAIN` 默认授权（T15 PR #24 的观察项）。重新生成 `supabase/schema.sql`。
+2. CI：新增一步，PR 里如果修改或删除了 `origin/main` 上已有的 `supabase/migrations/*.sql` 就失败；PR 标题带 `[baseline]` 时放行（AGENTS §5）。
+3. 测试：匿名和普通登录用户读 `admin.users_overview` 失败；`service_role` 能读且按邮箱筛出指定用户；`templates` / `profiles` 现有读写行为不变（已有 RLS 测试全过）。
+
+**依据**：ARCHITECTURE §10 运营表；AGENTS §5 新增两条。**依赖**：T15（已合并）。与 T16 并行时注意：两边都会改 `supabase/schema.sql`，后合并的一方 rebase 后重新生成快照，不手工合并。
+
 ## Owner 侧关键路径（不是任务卡，但比代码慢）
 
 - 第一批 10 个模板（6 类）的真实照片 + 前后对比素材 + 提示词调优
-- Stripe 新账户申请；向 Stripe 确认 Managed Payments 下 Alipay / WeChat
+- Stripe 新账户申请（卡 + 支付宝，不接微信支付）
 - Waffo 加急开通
 - OpenAI 组织验证 + GPT-Image 系列模型权限；决定 `OPENAI_IMAGE_MODEL` 默认用 2.5 还是 2.6（同价，2.6 更快，需比较效果）
 - 上线前成本测量：20 张真实照片实测输入图 token（LAUNCH §5，花费 < $5），据此定 `high` 1K 是 2 还是 3 credits
