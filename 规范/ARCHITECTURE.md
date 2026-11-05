@@ -319,7 +319,7 @@ Owner 2026-11-04 决定：**不在 flux-kontext-template 上原地改造**，新
 - **v1 不建 `/templates`**：上线只有 6~8 个模板，首页已全部展示，另建一页会和首页内容重复、抢同一个词（建站规格 R1）。
 - **建 `/templates` 的两个条件，同时满足才建**：① 模板数量达到 20 个以上；② 给它找到一个和首页不撞词、核实过美国搜索量和哥飞版 KD 的独立主词（如 `ai food photo templates` 这一类），并登记进主词表 CSV。建好后首页只放精选模板，`/templates` 放完整模板库和分类筛选；分类页以后按创作库标签页的规则接长尾词。
 - 「我的作品」页要有，`noindex`。
-- 账号页要有：已连接 Graylum / 断开（第 14 节）、**删除账号**（服务端路由：`auth.admin.deleteUser` + 按 `inputs/{user_id}/`、`outputs/{user_id}/` 前缀清 R2 + `generation_jobs` 级联），`noindex`。
+- 账号页要有：已连接 Graylum / 断开（第 14 节）、**删除账号**（服务端路由：`auth.admin.deleteUser` + 按 `inputs/{user_id}/`、`outputs/{user_id}/`、`requests/{user_id}/` 前缀清 R2 + `generation_jobs` 级联），`noindex`。
 - **Graylum 连接器的 Shotviva 侧随 v1 一起上线**（Owner 2026-11-05 拍板），见第 14 节。
 - 应用页用第 1 节的 `(app)` 应用壳，按 DESIGN.md 第 8 节先出手机稿。
 - **模板需求墙（Wishlist）随 v1 上线**（Owner 2026-11-05 决定），占应用壳第四个 tab，见第 15 节。
@@ -404,4 +404,4 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 
 ### 15.5 条款
 
-服务条款加一句：上传的参考图由上传者负责，我们可以不经说明下架。
+服务条款加一句：上传的参考图由上传者负责，我们可以不经说明下架。隐私政策写明：需求参考图保留到需求被拒、下架或账号删除为止；墙上只显示脱敏用户名。
