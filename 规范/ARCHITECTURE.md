@@ -128,7 +128,7 @@ interface GenerationProvider {
 | `label` | 后台显示名，如「OpenAI 官方」「某中转」 |
 | `base_url` | 接口根地址，默认 `https://api.openai.com/v1`；只允许 `https://`，拒绝 localhost、内网和保留地址 |
 | `model` | 模型名，如 `gpt-image-2.6` |
-| `api_key_ciphertext` | 密钥密文：服务端用环境变量 `PROVIDER_SECRETS_KEY`（32 字节，base64）做 AES-256-GCM 加密后存；明文只在服务端出图时解密使用 |
+| `vault_secret_id` | 密钥存在 **Supabase Vault**（`vault.secrets`，由 Supabase 在库内加密），表里只存它的 id。Owner 2026-11-06 改定，和 Graylum 一样；取代原先「应用用 `PROVIDER_SECRETS_KEY` 做 AES-256-GCM」的做法，不再需要任何应用侧加密密钥 |
 | `api_key_last4` | 密钥后 4 位，后台列表里显示用 |
 | `is_active` | 当前在用；同一个 `module` 最多一条为 `true`（部分唯一索引） |
 | `notes` | 备注 |
@@ -145,7 +145,15 @@ interface GenerationProvider {
 - 「设为当前使用」：弹窗确认「从 A 换到 B」，写一条日志（logger，不含密钥）。
 - 页面写明提醒：积分下限表（第 6.1 节）是按 GPT-Image high 质量的成本定的；换成更贵的模型前，先请总控更新下限。
 
-**安全**：密钥不进日志、不进 Sentry、不进 PostHog、不返回给浏览器；`PROVIDER_SECRETS_KEY` 只放 Vercel（Preview 和 Production 用不同的值）。换掉 `PROVIDER_SECRETS_KEY` 后，已存的密钥解不开，需要在后台重新填写。
+**密钥读写函数**（全部 `security definer`，只授权 `service_role`）：
+- `admin_set_provider_key(p_id, p_key)`：校验格式（可打印 ASCII、不含空白、16～1024 字符）。已有 Vault 记录就 `vault.update_secret`，没有就 `vault.create_secret`（名字 `shotviva.provider.<id>`）。同时写 `api_key_last4`。
+- `provider_api_key(p_id)`：从 `vault.decrypted_secrets` 读出明文，只在服务端出图和「测试连接」时调用，不缓存明文。
+- 删除供应商时，同一事务里删掉对应的 Vault 记录。
+
+**安全**：
+- 密钥不进日志、Sentry、PostHog，也不返回给浏览器。
+- 浏览器和 Data API 碰不到 `vault` schema。
+- 服务端缓存在用的供应商时，只缓存行（含 `vault_secret_id`），不缓存明文。
 
 ## 4. 生成任务
 
