@@ -28,7 +28,7 @@ beforeAll(async () => {
   owner = await createUser(db)
   stranger = await createUser(db)
   const service = serviceClient()
-  await grantCredits(service, { userId: owner, amount: 2, reason: 'rls test', idempotencyKey: randomUUID() })
+  await grantCredits(service, { userId: owner, amount: 2, reason: 'rls test', idempotencyKey: randomUUID(), pool: 'free' })
   await reserveJob(service, {
     jobId: randomUUID(),
     userId: owner,

@@ -3,9 +3,9 @@ export {
   adminAdjustCredits,
   applyPurchase,
   grantCredits,
-  isPaid,
   signupGrantKey,
   type CreditChange,
   type ProductId,
 } from './credits'
+export { CREDIT_POOLS, type CreditPool } from './pools'
 export { callRpc, type RpcClient, type RpcResult } from './rpc'

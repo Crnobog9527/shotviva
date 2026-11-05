@@ -9,10 +9,9 @@ async function region(image: Uint8Array, left: number, top: number) {
 }
 
 describe('watermark', () => {
-  it('applies only to public works of unpaid owners', () => {
-    expect(shouldWatermark('public', false)).toBe(true)
-    expect(shouldWatermark('public', true)).toBe(false)
-    expect(shouldWatermark('private', false)).toBe(false)
+  it('marks free works and never paid ones', () => {
+    expect(shouldWatermark('free')).toBe(true)
+    expect(shouldWatermark('paid')).toBe(false)
   })
 
   it('marks the bottom-right corner and returns a small JPEG of the same size', async () => {

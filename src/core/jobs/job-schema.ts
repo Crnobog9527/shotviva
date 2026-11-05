@@ -1,6 +1,8 @@
 import { z } from 'zod'
 
-// Mirrors public.generation_jobs (supabase/migrations/0022_generation_jobs.sql).
+import { CREDIT_POOLS, type CreditPool } from '../billing/pools'
+
+// Mirrors public.generation_jobs (supabase/migrations/0022_generation_jobs.sql, 0140_credit_pools.sql).
 export const JOB_MODULES = ['image', 'video'] as const
 export const JOB_SOURCES = ['web', 'graylum'] as const
 export const JOB_STATUSES = ['running', 'succeeded', 'failed'] as const
@@ -21,6 +23,8 @@ export type Job = {
   source: JobSource
   idempotencyKey: string | null
   status: JobStatus
+  // Pool the job was charged from; decides watermark and whether it may be private.
+  creditPool: CreditPool
   visibility: JobVisibility
   creditsCost: number
   outputKey: string | null
@@ -42,6 +46,7 @@ export const jobRowSchema = z
     source: z.enum(JOB_SOURCES),
     idempotency_key: z.string().nullable(),
     status: z.enum(JOB_STATUSES),
+    credit_pool: z.enum(CREDIT_POOLS),
     visibility: z.enum(JOB_VISIBILITIES),
     credits_cost: z.number().int().positive(),
     output_key: z.string().nullable(),
@@ -60,6 +65,7 @@ export const jobRowSchema = z
       source: row.source,
       idempotencyKey: row.idempotency_key,
       status: row.status,
+      creditPool: row.credit_pool,
       visibility: row.visibility,
       creditsCost: row.credits_cost,
       outputKey: row.output_key,

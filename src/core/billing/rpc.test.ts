@@ -14,6 +14,7 @@ describe('toRpcError', () => {
     ['IDEMPOTENCY_CONFLICT', 'CONFLICT'],
     ['PROFILE_NOT_FOUND', 'NOT_FOUND'],
     ['USER_BANNED', 'FORBIDDEN'],
+    ['FREE_WORK_PUBLIC', 'FORBIDDEN'],
     ['INVALID_INPUT', 'INVALID_INPUT'],
   ])('maps SQL exception %s to %s', (message, code) => {
     expect(toRpcError('fn', { message }).code).toBe(code)
@@ -29,12 +30,12 @@ describe('toRpcError', () => {
 describe('callRpc', () => {
   it('returns parsed data', async () => {
     const client = clientReturning({ data: true, error: null })
-    await expect(callRpc(client, 'is_paid', {}, z.boolean())).resolves.toBe(true)
+    await expect(callRpc(client, 'some_fn', {}, z.boolean())).resolves.toBe(true)
   })
 
   it('rejects data with an unexpected shape', async () => {
     const client = clientReturning({ data: 'yes', error: null })
-    await expect(callRpc(client, 'is_paid', {}, z.boolean())).rejects.toMatchObject({ code: 'INTERNAL' })
+    await expect(callRpc(client, 'some_fn', {}, z.boolean())).rejects.toMatchObject({ code: 'INTERNAL' })
   })
 
   it('throws the mapped AppError on rpc errors', async () => {

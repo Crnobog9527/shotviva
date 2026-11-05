@@ -25,7 +25,7 @@ export type GenerationRequest = {
   inputKey?: string | null
   copy?: Record<string, unknown>
   aspectRatio?: string
-  // Paid users only; reserve_credits forces free users' work public.
+  // Applies to paid works only; reserve_credits forces free works public.
   visibility?: JobVisibility | null
   // Partner callId (T7); a repeat returns the first job.
   idempotencyKey?: string | null

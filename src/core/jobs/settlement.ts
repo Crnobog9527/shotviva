@@ -4,7 +4,7 @@ import { z } from 'zod'
 
 import { callRpc, type RpcClient } from '@/core/billing'
 
-import { JOB_MODULES, JOB_SOURCES, JOB_VISIBILITIES, jobRowSchema, type Job } from './job-schema'
+import { JOB_MODULES, JOB_SOURCES, JOB_VISIBILITIES, jobRowSchema, type Job, type JobVisibility } from './job-schema'
 
 // Synchronous generation settlement (ARCHITECTURE §4): reserveJob before calling the
 // provider, then exactly one of confirmJob / refundJob. Each is idempotent by job id, so
@@ -21,7 +21,7 @@ const reserveSchema = z.object({
   provider: z.string().min(1).nullable().default(null),
   // Partner callId; a repeat with the same key returns the first job without charging.
   idempotencyKey: z.string().min(1).nullable().default(null),
-  // Ignored for free users, whose work is always public.
+  // Applies to paid works only (default private); free works are always public.
   visibility: z.enum(JOB_VISIBILITIES).nullable().default(null),
 })
 
@@ -70,6 +70,21 @@ export async function refundJob(
     client,
     'refund_job',
     { p_job_id: args.jobId, p_error_code: args.errorCode },
+    jobRowSchema,
+  )
+}
+
+// The owner's public/private toggle (ARCHITECTURE §6.2): paid works switch freely, a free work
+// cannot be made private (FORBIDDEN), and someone else's job is NOT_FOUND like a missing one.
+export async function setJobVisibility(
+  client: RpcClient,
+  input: { jobId: string; userId: string; visibility: JobVisibility },
+): Promise<Job> {
+  const args = z.object({ jobId: z.uuid(), userId: z.uuid(), visibility: z.enum(JOB_VISIBILITIES) }).parse(input)
+  return callRpc(
+    client,
+    'set_job_visibility',
+    { p_job_id: args.jobId, p_user_id: args.userId, p_visibility: args.visibility },
     jobRowSchema,
   )
 }

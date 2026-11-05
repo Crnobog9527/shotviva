@@ -6,6 +6,7 @@ import { exchangeLinkCode, issueLinkCode, type PartnerRouteDeps } from '@/core/p
 import type { ObjectStore } from '@/core/storage'
 
 import { createMemoryStore } from '../fakes/memory-store'
+import { setBalances, type TestProfile } from './helpers'
 import { serviceSupabase } from './supabase-env'
 
 // Shared set-up for the partner API DB tests (AGENTS §7 item 7): real local Supabase,
@@ -48,7 +49,7 @@ export function partnerRequest(path: string, options: RequestOptions = {}): Requ
   })
 }
 
-type Profile = { credits?: number; paidUntil?: Date | null }
+type Profile = TestProfile
 
 // Through the Auth admin API rather than a raw auth.users insert, so /link's display-name
 // lookup (auth.admin.getUserById) sees a real user.
@@ -58,11 +59,7 @@ export async function createUser(db: Client, profile: Profile = {}): Promise<str
     email_confirm: true,
   })
   if (error || !data.user) throw new Error(`createUser failed: ${error?.message}`)
-  await db.query('update public.profiles set credits = $2, paid_until = $3 where id = $1', [
-    data.user.id,
-    profile.credits ?? 0,
-    profile.paidUntil ?? null,
-  ])
+  await setBalances(db, data.user.id, profile)
   return data.user.id
 }
 
