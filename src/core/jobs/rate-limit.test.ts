@@ -1,0 +1,27 @@
+import { describe, expect, it } from 'vitest'
+
+import { RATE_LIMIT, rateLimitVerdict } from './rate-limit'
+
+const now = new Date('2026-11-05T12:00:00Z')
+const ago = (ms: number) => new Date(now.getTime() - ms).toISOString()
+
+describe('rateLimitVerdict', () => {
+  it('allows a quiet account', () => {
+    expect(rateLimitVerdict([{ status: 'succeeded', created_at: ago(1000) }], now)).toBe('ok')
+  })
+
+  it('caps jobs in flight', () => {
+    const running = Array.from({ length: RATE_LIMIT.MAX_RUNNING }, () => ({ status: 'running', created_at: ago(5000) }))
+    expect(rateLimitVerdict(running, now)).toBe('too_many_running')
+  })
+
+  it('ignores running jobs whose function must already have died', () => {
+    const stale = Array.from({ length: 5 }, () => ({ status: 'running', created_at: ago(RATE_LIMIT.RUNNING_STALE_MS + 1) }))
+    expect(rateLimitVerdict(stale, now)).toBe('ok')
+  })
+
+  it('caps jobs per window', () => {
+    const recent = Array.from({ length: RATE_LIMIT.MAX_PER_WINDOW }, () => ({ status: 'failed', created_at: ago(60_000) }))
+    expect(rateLimitVerdict(recent, now)).toBe('too_many_recent')
+  })
+})
