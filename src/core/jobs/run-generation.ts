@@ -45,7 +45,7 @@ async function prepare(deps: GenerationDeps, req: GenerationRequest) {
   })
   // Never touch (or delete) an object outside the caller's own inputs/ prefix.
   if (req.inputKey && !isOwnInputKey(req.userId, req.inputKey)) throw new AppError('INVALID_INPUT', 'Unknown upload')
-  await assertWithinRateLimit(deps.db, req.userId, deps.now?.() ?? new Date())
+  await assertWithinRateLimit(deps.db, req.userId, deps.now?.() ?? new Date(), req.jobId)
   const image = req.inputKey ? await loadInputImage(deps.store, req.inputKey) : null
   return { template, prompt, inputs, image }
 }

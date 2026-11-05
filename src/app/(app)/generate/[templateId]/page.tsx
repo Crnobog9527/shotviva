@@ -4,7 +4,7 @@ import { getTranslations } from 'next-intl/server'
 import { Suspense, type ReactNode } from 'react'
 
 import { AppPage, BalanceChip, FlowNav } from '@/core/app-shell'
-import { createServerSupabase, requireUser } from '@/core/auth'
+import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
 import { readBalance } from '@/core/billing'
 import { concurrencyLimit, listOwnJobs } from '@/core/jobs'
 import { listTemplates } from '@/core/templates'
@@ -25,7 +25,8 @@ async function Workspace({ params }: { params: Promise<{ templateId: string }> }
   if (!found) notFound()
   const [balance, limit, own] = await Promise.all([
     readBalance(supabase, user.id),
-    concurrencyLimit(supabase, user.id),
+    // current_tier() is service-role only; the user's own id comes from the session.
+    concurrencyLimit(createAdminSupabase(), user.id),
     listOwnJobs(supabase, user.id, new Date()),
   ])
   const template = toCatalogueTemplate(found)
