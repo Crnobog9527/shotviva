@@ -62,7 +62,7 @@ export const site = defineSite({
   locales: { default: 'en', enabled: ['en'] }, // next-intl，英文不带前缀
   billing: {
     currency: 'usd',
-    freeCredits: 3,                               // 进 profiles.free_credits，只能生成免费作品（第 6.1 节）
+    freeCredits: 6,                               // 进 profiles.free_credits，只能生成免费作品（第 6.1 节）；= 3 张 Standard 档标准模板图，对外说 "3 free Standard images"（Owner 2026-11-05）
     products: [                                   // 9 个商品，价格 Owner 2026-11-05 定稿（第 6.2 节）
       { id: 'starter_monthly', tier: 'starter', interval: 'month', credits: 50,   paidDays: 30,   priceUsd: 19.9 },
       { id: 'starter_yearly',  tier: 'starter', interval: 'year',  credits: 600,  paidDays: 365,  priceUsd: 139 },
@@ -390,7 +390,7 @@ Owner 2026-11-04 决定：**不在 flux-kontext-template 上原地改造**，新
 - 建站规格第 2~4 周的内页是内容任务：用第 12 节的结构填内容，不算新功能。
 - **模板库是首页的一块内容，不是首页的全部。** 首页从上到下：
   1. H1 + 直答块（以主词 `image to image ai` 开头，40~60 个英文词，建站规格 G1）
-  2. 上传入口 + 首屏前后对比图
+  2. 首屏生成器 + 前后对比图（Owner 2026-11-05）：首屏就能出图——上传照片 → 选模板（默认 Korean Manhwa）→ 可选「Anything to change?」→ "Generate · 2 credits"；结果直接显示在首屏对比图里。未登录时先弹出登录抽屉，登录后回到首页继续。生成器是客户端组件，首屏正文（H1、副标题、直答块）仍是服务端渲染、源码可见（建站规格 R5）
   3. 精选模板网格：按第 5 节的 6 个分类分组，每个分类一个 H3，每个模板的名称和用途说明都写在源码里（建站规格 §4 首页骨架 H2-2）
   4. 可核验事实块：免费额度、每张消耗、三档像素、上传限制、出图耗时（建站规格 G4 通用事实）
   5. 成本对比表：请摄影师 vs Shotviva
