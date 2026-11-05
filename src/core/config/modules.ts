@@ -4,7 +4,7 @@ import type { ModuleId, SiteConfig } from './define-site'
 
 // Public routes each module owns. A disabled module's routes 404 and never reach the sitemap.
 export const MODULE_ROUTES: Record<ModuleId, readonly string[]> = {
-  image: ['/generate'],
+  image: ['/generate', '/photos'],
   video: [],
 }
 
