@@ -4,7 +4,7 @@
  *   supabase start      # or `supabase db reset` after adding a migration
  *   pnpm db:schema
  *
- * The snapshot is the public schema exactly as the migrations leave it, plus the triggers
+ * The snapshot is the public and admin schemas exactly as the migrations leave them, plus the triggers
  * that public functions hang on tables outside public (e.g. on_auth_user_created on
  * auth.users), which a public-only dump would miss. CI rebuilds the database from the
  * migrations, reruns this and fails if the committed file differs, so regenerate and commit
@@ -47,10 +47,13 @@ function localDbUrl(): string {
   return line.slice('DB_URL='.length).replace(/^"|"$/g, '')
 }
 
-function publicSchemaDump(): string {
+// admin holds the Owner's support views (ARCHITECTURE §10); it is not exposed to the Data API.
+const SCHEMAS = ['public', 'admin']
+
+function schemaDump(): string {
   // pg_dump 17.6+ wraps dumps in \restrict lines carrying a random token; drop them so
   // the snapshot only changes when the schema does.
-  return cli(['db', 'dump', '--local', '--schema', 'public'])
+  return cli(['db', 'dump', '--local', '--schema', SCHEMAS.join(',')])
     .split('\n')
     .filter((line) => !/^\\(un)?restrict /.test(line))
     .join('\n')
@@ -72,7 +75,7 @@ async function foreignTriggers(): Promise<string[]> {
 
 async function main() {
   const triggers = await foreignTriggers()
-  const sections = [HEADER, publicSchemaDump()]
+  const sections = [HEADER, schemaDump()]
   if (triggers.length > 0) {
     sections.push(`-- Triggers on tables outside public that call public functions.\n\n${triggers.join('\n\n')}`)
   }
