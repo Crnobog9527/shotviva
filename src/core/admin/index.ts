@@ -31,7 +31,19 @@ export {
 } from './providers'
 export { PROVIDERS_COPY, ProvidersEditor } from './providers-editor'
 export { AdminPage, AdminShell, adminNavItems, EmptyState, SHELL_COPY, StatCard, type AdminNavItem } from './shell'
-export { ORDERS_COPY } from './orders'
+export {
+  listPurchases,
+  listSubscriptions,
+  loadRevenueStats,
+  ORDERS_COPY,
+  OrdersView,
+  purchaseSource,
+  stripeDashboardUrl,
+  usd,
+  type AdminPurchase,
+  type AdminSubscription,
+  type RevenueStats,
+} from './orders'
 export { listAnnouncements, saveAnnouncement, setAnnouncementActive } from './announcements'
 export { ANNOUNCEMENTS_COPY, AnnouncementsEditor, type AnnouncementAdminActions } from './announcements-editor'
 export { decodeCursor, encodeCursor, PAGE_SIZE, type Page } from './cursor'

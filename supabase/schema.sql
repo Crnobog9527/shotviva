@@ -340,6 +340,82 @@ $$;
 ALTER FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_revenue_stats"("p_days" integer) RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_tz constant text := 'Asia/Shanghai';
+  v_today timestamptz;
+  v_start timestamptz;
+  v_result jsonb;
+begin
+  if p_days is null or p_days < 7 or p_days > 90 then
+    raise exception 'INVALID_INPUT' using detail = 'p_days must be between 7 and 90';
+  end if;
+
+  v_today := date_trunc('day', now() at time zone v_tz) at time zone v_tz;
+  v_start := v_today - make_interval(days => p_days - 1);
+
+  with windows(key, since) as (
+    values ('today', v_today), ('7d', v_today - interval '6 days'), ('period', v_start)
+  ),
+  purchases as (
+    select l.created_at,
+           l.product_id,
+           case when l.idempotency_key ~ ':(cs|in)_' then 'stripe' else 'waffo' end as channel,
+           coalesce(p.price_usd, 0) as amount
+      from public.credit_ledger l
+      left join public.products p on p.id = l.product_id
+     where l.kind = 'purchase' and l.created_at >= v_start
+  )
+  select jsonb_build_object(
+           'timezone', v_tz,
+           'days', p_days,
+           'generated_at', now(),
+           'windows', (
+             select jsonb_agg(jsonb_build_object(
+                      'key', w.key,
+                      'since', w.since,
+                      'purchases', (select count(*) from purchases x where x.created_at >= w.since),
+                      'revenue_usd', (select coalesce(sum(x.amount), 0) from purchases x where x.created_at >= w.since)
+                    ) order by w.since desc)
+               from windows w
+           ),
+           'by_product', coalesce((
+             select jsonb_agg(jsonb_build_object(
+                      'product_id', g.product_id, 'channel', g.channel,
+                      'purchases', g.purchases, 'revenue_usd', g.revenue
+                    ) order by g.revenue desc, g.product_id, g.channel)
+               from (
+                 select coalesce(x.product_id, 'unknown') as product_id, x.channel,
+                        count(*) as purchases, sum(x.amount) as revenue
+                   from purchases x
+                  group by 1, 2
+               ) g
+           ), '[]'::jsonb),
+           'trend', (
+             select jsonb_agg(jsonb_build_object(
+                      'day', to_char(d.day at time zone v_tz, 'YYYY-MM-DD'),
+                      'revenue_usd', (select coalesce(sum(x.amount), 0) from purchases x
+                                       where x.created_at >= d.day and x.created_at < d.day + interval '1 day')
+                    ) order by d.day)
+               from generate_series(v_start, v_today, interval '1 day') as d(day)
+           ),
+           'subscriptions', coalesce((
+             select jsonb_object_agg(s.status, s.n)
+               from (select status, count(*) as n from public.subscriptions group by status) s
+           ), '{}'::jsonb)
+         )
+    into v_result;
+  return v_result;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_revenue_stats"("p_days" integer) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_search_users"("p_query" "text") RETURNS TABLE("id" "uuid", "email" "text", "created_at" timestamp with time zone, "provider" "text", "role" "text", "credits" integer, "free_credits" integer, "paid_until" timestamp with time zone, "generation_count" integer, "last_generation_at" timestamp with time zone, "banned_at" timestamp with time zone)
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
@@ -1241,6 +1317,10 @@ CREATE INDEX "credit_ledger_created_at_idx" ON "public"."credit_ledger" USING "b
 
 
 
+CREATE INDEX "credit_ledger_purchases_created_at_id_idx" ON "public"."credit_ledger" USING "btree" ("created_at" DESC, "id" DESC) WHERE ("kind" = 'purchase'::"text");
+
+
+
 CREATE INDEX "credit_ledger_user_id_created_at_idx" ON "public"."credit_ledger" USING "btree" ("user_id", "created_at" DESC);
 
 
@@ -1447,6 +1527,11 @@ GRANT ALL ON FUNCTION "public"."admin_dashboard_stats"("p_days" integer) TO "ser
 
 REVOKE ALL ON FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_revenue_stats"("p_days" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_revenue_stats"("p_days" integer) TO "service_role";
 
 
 

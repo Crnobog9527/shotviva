@@ -1,19 +1,36 @@
 import type { Metadata } from 'next'
 
-import { AdminPage, EmptyState, ORDERS_COPY } from '@/core/admin'
-import { requireAdmin } from '@/core/auth'
+import { AdminPage, DASHBOARD_DAYS, listPurchases, listSubscriptions, loadRevenueStats, ORDERS_COPY, OrdersView } from '@/core/admin'
+import { createAdminSupabase, requireAdmin } from '@/core/auth'
+import { serverEnv } from '@/core/env'
 
-// Placeholder until T9's orders / subscriptions tables are on main (T23 PR B fills it in).
-// Never shows sample numbers.
+// /admin/orders (ARCHITECTURE §10, Plan A): list-price revenue from admin_revenue_stats, the
+// purchase ledger and T9's subscription mirror. Stripe links use test paths outside production.
 export const instant = false
 
 export const metadata: Metadata = { title: ORDERS_COPY.title }
 
-export default async function AdminOrdersPage() {
+const cursorParam = (value: string | string[] | undefined) => (typeof value === 'string' ? value : null)
+
+export default async function AdminOrdersPage({ searchParams }: PageProps<'/admin/orders'>) {
   await requireAdmin()
+  const params = await searchParams
+  const cursors = { purchases: cursorParam(params.p), subscriptions: cursorParam(params.s) }
+  const db = createAdminSupabase()
+  const [stats, purchases, subscriptions] = await Promise.all([
+    loadRevenueStats(db, DASHBOARD_DAYS),
+    listPurchases(db, cursors.purchases),
+    listSubscriptions(db, cursors.subscriptions),
+  ])
   return (
     <AdminPage title={ORDERS_COPY.title}>
-      <EmptyState title={ORDERS_COPY.pendingTitle} body={ORDERS_COPY.pendingBody} />
+      <OrdersView
+        stats={stats}
+        purchases={purchases}
+        subscriptions={subscriptions}
+        cursors={cursors}
+        stripeLive={serverEnv().VERCEL_ENV === 'production'}
+      />
     </AdminPage>
   )
 }

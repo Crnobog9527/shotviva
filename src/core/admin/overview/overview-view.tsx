@@ -1,7 +1,9 @@
+import { usd } from '../orders/money'
+import type { RevenueStats } from '../orders/revenue'
 import { StatCard } from '../shell/admin-blocks'
 import { OVERVIEW_COPY as COPY } from './copy'
 import { successRate, type DashboardStats, type StatsWindow } from './stats'
-import { TrendChart } from './trend-chart'
+import { RevenueTrend, TrendChart } from './trend-chart'
 
 const number = new Intl.NumberFormat('zh-CN')
 const percent = new Intl.NumberFormat('zh-CN', { style: 'percent', maximumFractionDigits: 1 })
@@ -10,7 +12,8 @@ function windowTitle(window: StatsWindow, days: number) {
   return window.key === 'period' ? COPY.windows.period(days) : COPY.windows[window.key]
 }
 
-function WindowCards({ window, days }: { window: StatsWindow; days: number }) {
+function WindowCards({ window, days, revenue }: { window: StatsWindow; days: number; revenue: RevenueStats }) {
+  const money = revenue.windows.find((w) => w.key === window.key)
   const rate = successRate(window)
   const used = window.free_credits_used + window.paid_credits_used
   return (
@@ -30,21 +33,26 @@ function WindowCards({ window, days }: { window: StatsWindow; days: number }) {
           hint={COPY.cards.creditsHint(window.free_credits_used, window.paid_credits_used)}
         />
         <StatCard title={COPY.cards.newPaying} value={number.format(window.new_paying_users)} />
-        {/* Revenue comes from admin_revenue_stats with the orders page; never a made-up number. */}
-        <StatCard title={COPY.cards.revenue} value="—" hint={COPY.cards.revenuePending} />
+        {/* admin_revenue_stats: list price, the orders page has the detail. */}
+        <StatCard
+          title={COPY.cards.revenue}
+          value={money ? usd.format(money.revenue_usd) : '—'}
+          hint={money ? COPY.cards.revenueHint(money.purchases) : undefined}
+        />
       </div>
     </section>
   )
 }
 
-export function OverviewView({ stats }: { stats: DashboardStats }) {
+export function OverviewView({ stats, revenue }: { stats: DashboardStats; revenue: RevenueStats }) {
   return (
     <div className="grid gap-6">
       <p className="text-sm text-muted-foreground">{COPY.timezone}</p>
       {stats.windows.map((window) => (
-        <WindowCards key={window.key} window={window} days={stats.days} />
+        <WindowCards key={window.key} window={window} days={stats.days} revenue={revenue} />
       ))}
       <TrendChart trend={stats.trend} days={stats.days} />
+      <RevenueTrend trend={revenue.trend} days={revenue.days} />
     </div>
   )
 }

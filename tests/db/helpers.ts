@@ -134,3 +134,15 @@ export async function createPricedTemplate(
   )
   return id
 }
+
+// Local GoTrue times out under heavy load; retry Auth API calls a few times.
+export async function retryAuth<T>(work: () => Promise<T>, tries = 5): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await work()
+    } catch (error) {
+      if (attempt >= tries) throw error
+      await new Promise((resolve) => setTimeout(resolve, 1000 * attempt))
+    }
+  }
+}
