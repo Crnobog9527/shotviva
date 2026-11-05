@@ -27,10 +27,11 @@ export const site = defineSite({
     channels: { primary: 'stripe', fallback: 'waffo' },
   },
   partners: {
-    // Placeholders until the Owner confirms Graylum's real production / staging hosts.
     graylum: {
-      returnToHosts: ['graylum.com', 'staging.graylum.com'],
+      // Graylum production and staging (the domain bound to Graylum's staging Vercel project).
+      returnToHosts: ['graylum.com', 'auth-staging.graylum.com'],
       connectCallbackPath: '/api/connectors/shotviva/callback',
+      // Not confirmed yet: must be the host(s) Graylum serves reference images from.
       imageHosts: ['graylum.com', 'staging.graylum.com'],
     },
   },

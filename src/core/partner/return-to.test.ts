@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { allowlistedUrl, connectRedirectUrl, parseConnectRequest, pricingReturnTarget, topUpUrl } from './return-to'
 
 const config = {
-  returnToHosts: ['graylum.com', 'staging.graylum.com'],
+  returnToHosts: ['graylum.com', 'auth-staging.graylum.com'],
   connectCallbackPath: '/api/connectors/shotviva/callback' as const,
 }
 const CALLBACK = 'https://graylum.com/api/connectors/shotviva/callback'
@@ -11,7 +11,7 @@ const CALLBACK = 'https://graylum.com/api/connectors/shotviva/callback'
 describe('allowlistedUrl', () => {
   it.each([
     'https://graylum.com/chat/1',
-    'https://STAGING.graylum.com/x?y=1',
+    'https://AUTH-STAGING.graylum.com/x?y=1',
   ])('accepts %s', (url) => {
     expect(allowlistedUrl(url, config.returnToHosts)).not.toBeNull()
   })
@@ -21,6 +21,7 @@ describe('allowlistedUrl', () => {
     ['javascript scheme', 'javascript:alert(1)'],
     ['lookalike suffix', 'https://graylum.com.evil.example/'],
     ['unlisted subdomain', 'https://evil.graylum.com/'],
+    ['the old placeholder staging host', 'https://staging.graylum.com/'],
     ['credentials', 'https://graylum.com@evil.example/'],
     ['user info on the right host', 'https://u:p@graylum.com/'],
     ['explicit port', 'https://graylum.com:8443/'],
@@ -44,10 +45,10 @@ describe('parseConnectRequest', () => {
 
   it('accepts an allowlisted callback on the exact path', () => {
     const request = parseConnectRequest(
-      { state: 'abcdefgh12', return_to: 'https://staging.graylum.com/api/connectors/shotviva/callback' },
+      { state: 'abcdefgh12', return_to: 'https://auth-staging.graylum.com/api/connectors/shotviva/callback' },
       config,
     )
-    expect(request?.callback.hostname).toBe('staging.graylum.com')
+    expect(request?.callback.hostname).toBe('auth-staging.graylum.com')
   })
 
   it.each([
