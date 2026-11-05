@@ -326,6 +326,27 @@ $$;
 ALTER FUNCTION "public"."admin_dashboard_stats"("p_days" integer) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_list_template_requests"() RETURNS TABLE("id" "uuid", "email" "text", "description" "text", "image_keys" "text"[], "status" "text", "template_id" "text", "votes_count" integer, "created_at" timestamp with time zone)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select r.id, u.email::text, r.description, r.image_keys, r.status, r.template_id, r.votes_count, r.created_at
+    from unnest(array['pending', 'live', 'shipped', 'rejected']) as s(status)
+   cross join lateral (
+           select t.id, t.user_id, t.description, t.image_keys, t.status, t.template_id, t.votes_count, t.created_at
+             from public.template_requests t
+            where t.status = s.status
+            order by t.created_at desc
+            limit 500
+         ) r
+    left join auth.users u on u.id = r.user_id
+   order by r.created_at desc;
+$$;
+
+
+ALTER FUNCTION "public"."admin_list_template_requests"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) RETURNS "void"
     LANGUAGE "sql"
     SET "search_path" TO ''
@@ -338,6 +359,52 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_review_template_request"("p_request_id" "uuid", "p_status" "text", "p_template_id" "text" DEFAULT NULL::"text") RETURNS "text"[]
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_current text;
+  v_keys text[];
+begin
+  select r.status, r.image_keys into v_current, v_keys
+    from public.template_requests r
+   where r.id = p_request_id
+     for update;
+  if not found then
+    raise exception 'REQUEST_NOT_FOUND';
+  end if;
+
+  if not (
+       (v_current = 'pending' and p_status in ('live', 'rejected'))
+    or (v_current = 'live' and p_status in ('rejected', 'shipped'))
+  ) then
+    raise exception 'REQUEST_TRANSITION_INVALID'
+      using detail = v_current || ' -> ' || coalesce(p_status, 'null');
+  end if;
+
+  if p_status = 'shipped' then
+    perform 1 from public.templates t where t.id = p_template_id;
+    if not found then
+      raise exception 'TEMPLATE_NOT_FOUND';
+    end if;
+  end if;
+
+  update public.template_requests
+     set status = p_status,
+         template_id = case when p_status = 'shipped' then p_template_id end,
+         image_keys = case when p_status = 'rejected' then '{}'::text[] else image_keys end,
+         reviewed_at = now()
+   where id = p_request_id;
+
+  return case when p_status = 'rejected' then v_keys else '{}'::text[] end;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_review_template_request"("p_request_id" "uuid", "p_status" "text", "p_template_id" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_search_users"("p_query" "text") RETURNS TABLE("id" "uuid", "email" "text", "created_at" timestamp with time zone, "provider" "text", "role" "text", "credits" integer, "free_credits" integer, "paid_until" timestamp with time zone, "generation_count" integer, "last_generation_at" timestamp with time zone, "banned_at" timestamp with time zone)
@@ -590,6 +657,86 @@ $$;
 
 
 ALTER FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text") OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."template_requests" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "description" "text" NOT NULL,
+    "image_keys" "text"[] NOT NULL,
+    "status" "text" DEFAULT 'pending'::"text" NOT NULL,
+    "template_id" "text",
+    "votes_count" integer DEFAULT 0 NOT NULL,
+    "author_label" "text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "reviewed_at" timestamp with time zone,
+    CONSTRAINT "template_requests_author_label_check" CHECK (("author_label" ~ '^.\*\*\*$'::"text")),
+    CONSTRAINT "template_requests_description_check" CHECK ((("char_length"("btrim"("description")) >= 1) AND ("char_length"("btrim"("description")) <= 300))),
+    CONSTRAINT "template_requests_images" CHECK (
+CASE
+    WHEN ("status" = 'rejected'::"text") THEN ("cardinality"("image_keys") = 0)
+    ELSE (("cardinality"("image_keys") >= 1) AND ("cardinality"("image_keys") <= 3))
+END),
+    CONSTRAINT "template_requests_reviewed" CHECK ((("status" = 'pending'::"text") = ("reviewed_at" IS NULL))),
+    CONSTRAINT "template_requests_shipped_template" CHECK ((("status" = 'shipped'::"text") = ("template_id" IS NOT NULL))),
+    CONSTRAINT "template_requests_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'live'::"text", 'shipped'::"text", 'rejected'::"text"]))),
+    CONSTRAINT "template_requests_votes_count_check" CHECK (("votes_count" >= 0))
+);
+
+
+ALTER TABLE "public"."template_requests" OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."create_template_request"("p_user_id" "uuid", "p_description" "text", "p_image_keys" "text"[]) RETURNS "public"."template_requests"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_request public.template_requests;
+  v_name text;
+  v_key text;
+begin
+  perform 1 from public.profiles where id = p_user_id for update;
+  if not found then
+    raise exception 'PROFILE_NOT_FOUND';
+  end if;
+
+  if not public.wishlist_eligible(p_user_id) then
+    raise exception 'WISHLIST_NOT_ELIGIBLE';
+  end if;
+
+  if cardinality(coalesce(p_image_keys, '{}')) not between 1 and 3 then
+    raise exception 'INVALID_INPUT' using detail = '1 to 3 reference images';
+  end if;
+  foreach v_key in array p_image_keys loop
+    if v_key is null or v_key !~ ('^requests/' || p_user_id::text || '/[0-9a-f-]{36}\.jpg$') then
+      raise exception 'INVALID_INPUT' using detail = 'image key outside the author prefix';
+    end if;
+  end loop;
+
+  if (select count(*) from public.template_requests r
+       where r.user_id = p_user_id and r.created_at > now() - interval '24 hours') >= 5 then
+    raise exception 'RATE_LIMITED';
+  end if;
+
+  -- Display name first (Google sign-ups), else the email; only its first letter leaves here.
+  select coalesce(nullif(btrim(u.raw_user_meta_data ->> 'full_name'), ''),
+                  nullif(btrim(u.raw_user_meta_data ->> 'name'), ''),
+                  u.email,
+                  '?')
+    into v_name
+    from auth.users u
+   where u.id = p_user_id;
+
+  insert into public.template_requests (user_id, description, image_keys, author_label)
+  values (p_user_id, btrim(p_description), p_image_keys, upper(left(coalesce(v_name, '?'), 1)) || '***')
+  returning * into v_request;
+  return v_request;
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."create_template_request"("p_user_id" "uuid", "p_description" "text", "p_image_keys" "text"[]) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."current_tier"("p_user_id" "uuid") RETURNS "text"
@@ -906,6 +1053,82 @@ $$;
 ALTER FUNCTION "public"."settle_checkout"("p_user_id" "uuid", "p_product_id" "text", "p_session_id" "text", "p_subscription_id" "text", "p_subscription_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."template_request_votes_count"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if tg_op = 'INSERT' then
+    update public.template_requests set votes_count = votes_count + new.weight where id = new.request_id;
+  else
+    update public.template_requests set votes_count = votes_count - old.weight where id = old.request_id;
+  end if;
+  return null;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."template_request_votes_count"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."toggle_template_request_vote"("p_request_id" "uuid", "p_user_id" "uuid") RETURNS TABLE("voted" boolean, "votes_count" integer)
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_status text;
+  v_weight smallint;
+begin
+  if not public.wishlist_eligible(p_user_id) then
+    raise exception 'WISHLIST_NOT_ELIGIBLE';
+  end if;
+
+  select r.status into v_status from public.template_requests r where r.id = p_request_id for update;
+  if not found then
+    raise exception 'REQUEST_NOT_FOUND';
+  end if;
+  if v_status <> 'live' then
+    raise exception 'REQUEST_NOT_LIVE';
+  end if;
+
+  delete from public.template_request_votes v
+   where v.request_id = p_request_id and v.user_id = p_user_id;
+  if found then
+    voted := false;
+  else
+    v_weight := case when public.current_tier(p_user_id) = 'max' then 3 else 1 end;
+    insert into public.template_request_votes (request_id, user_id, weight)
+    values (p_request_id, p_user_id, v_weight);
+    voted := true;
+  end if;
+
+  select r.votes_count into votes_count from public.template_requests r where r.id = p_request_id;
+  return next;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."toggle_template_request_vote"("p_request_id" "uuid", "p_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."wishlist_eligible"("p_user_id" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select exists (
+           select 1 from public.generation_jobs j
+            where j.user_id = p_user_id and j.status = 'succeeded'
+         )
+     and exists (
+           select 1 from public.profiles p
+            where p.id = p_user_id and p.banned_at is null
+         );
+$$;
+
+
+ALTER FUNCTION "public"."wishlist_eligible"("p_user_id" "uuid") OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."profiles" (
     "id" "uuid" NOT NULL,
     "role" "text" DEFAULT 'user'::"text" NOT NULL,
@@ -1134,6 +1357,18 @@ CREATE TABLE IF NOT EXISTS "public"."template_prompts" (
 ALTER TABLE "public"."template_prompts" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."template_request_votes" (
+    "request_id" "uuid" NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "weight" smallint NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "template_request_votes_weight_check" CHECK (("weight" = ANY (ARRAY[1, 3])))
+);
+
+
+ALTER TABLE "public"."template_request_votes" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."templates" (
     "id" "text" NOT NULL,
     "module" "text" DEFAULT 'image'::"text" NOT NULL,
@@ -1228,6 +1463,16 @@ ALTER TABLE ONLY "public"."template_prompts"
 
 
 
+ALTER TABLE ONLY "public"."template_request_votes"
+    ADD CONSTRAINT "template_request_votes_pkey" PRIMARY KEY ("request_id", "user_id");
+
+
+
+ALTER TABLE ONLY "public"."template_requests"
+    ADD CONSTRAINT "template_requests_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."templates"
     ADD CONSTRAINT "templates_pkey" PRIMARY KEY ("id");
 
@@ -1277,6 +1522,22 @@ CREATE INDEX "subscriptions_user_id_idx" ON "public"."subscriptions" USING "btre
 
 
 
+CREATE INDEX "template_request_votes_user_id_idx" ON "public"."template_request_votes" USING "btree" ("user_id");
+
+
+
+CREATE INDEX "template_requests_status_created_at_idx" ON "public"."template_requests" USING "btree" ("status", "created_at" DESC);
+
+
+
+CREATE INDEX "template_requests_user_id_created_at_idx" ON "public"."template_requests" USING "btree" ("user_id", "created_at" DESC, "id" DESC);
+
+
+
+CREATE INDEX "template_requests_wall_idx" ON "public"."template_requests" USING "btree" ("status", "votes_count" DESC, "created_at" DESC, "id" DESC);
+
+
+
 CREATE INDEX "templates_active_sort_idx" ON "public"."templates" USING "btree" ("sort_order", "id") WHERE "is_active";
 
 
@@ -1294,6 +1555,10 @@ CREATE OR REPLACE TRIGGER "site_announcements_set_updated_at" BEFORE UPDATE ON "
 
 
 CREATE OR REPLACE TRIGGER "template_prompts_bump_version" BEFORE UPDATE ON "public"."template_prompts" FOR EACH ROW EXECUTE FUNCTION "public"."bump_template_prompt_version"();
+
+
+
+CREATE OR REPLACE TRIGGER "template_request_votes_count" AFTER INSERT OR DELETE ON "public"."template_request_votes" FOR EACH ROW EXECUTE FUNCTION "public"."template_request_votes_count"();
 
 
 
@@ -1356,6 +1621,26 @@ ALTER TABLE ONLY "public"."template_prompts"
 
 
 
+ALTER TABLE ONLY "public"."template_request_votes"
+    ADD CONSTRAINT "template_request_votes_request_id_fkey" FOREIGN KEY ("request_id") REFERENCES "public"."template_requests"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."template_request_votes"
+    ADD CONSTRAINT "template_request_votes_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."template_requests"
+    ADD CONSTRAINT "template_requests_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON DELETE RESTRICT;
+
+
+
+ALTER TABLE ONLY "public"."template_requests"
+    ADD CONSTRAINT "template_requests_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE "public"."admin_audit_log" ENABLE ROW LEVEL SECURITY;
 
 
@@ -1396,6 +1681,22 @@ ALTER TABLE "public"."subscriptions" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."template_prompts" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."template_request_votes" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "template_request_votes_select_own" ON "public"."template_request_votes" FOR SELECT TO "authenticated" USING ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
+
+
+
+ALTER TABLE "public"."template_requests" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "template_requests_select_visible" ON "public"."template_requests" FOR SELECT TO "authenticated" USING ((("status" = ANY (ARRAY['live'::"text", 'shipped'::"text"])) OR (( SELECT "auth"."uid"() AS "uid") = "user_id") OR (EXISTS ( SELECT 1
+   FROM "public"."profiles" "p"
+  WHERE (("p"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("p"."role" = 'admin'::"text"))))));
+
 
 
 ALTER TABLE "public"."templates" ENABLE ROW LEVEL SECURITY;
@@ -1445,8 +1746,18 @@ GRANT ALL ON FUNCTION "public"."admin_dashboard_stats"("p_days" integer) TO "ser
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_list_template_requests"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_list_template_requests"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_review_template_request"("p_request_id" "uuid", "p_status" "text", "p_template_id" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_review_template_request"("p_request_id" "uuid", "p_status" "text", "p_template_id" "text") TO "service_role";
 
 
 
@@ -1482,6 +1793,16 @@ GRANT SELECT ON TABLE "public"."generation_jobs" TO "authenticated";
 
 REVOKE ALL ON FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text") TO "service_role";
+
+
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."template_requests" TO "service_role";
+GRANT SELECT ON TABLE "public"."template_requests" TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."create_template_request"("p_user_id" "uuid", "p_description" "text", "p_image_keys" "text"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."create_template_request"("p_user_id" "uuid", "p_description" "text", "p_image_keys" "text"[]) TO "service_role";
 
 
 
@@ -1525,6 +1846,20 @@ GRANT ALL ON FUNCTION "public"."set_job_visibility"("p_job_id" "uuid", "p_user_i
 
 REVOKE ALL ON FUNCTION "public"."settle_checkout"("p_user_id" "uuid", "p_product_id" "text", "p_session_id" "text", "p_subscription_id" "text", "p_subscription_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."settle_checkout"("p_user_id" "uuid", "p_product_id" "text", "p_session_id" "text", "p_subscription_id" "text", "p_subscription_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."template_request_votes_count"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."toggle_template_request_vote"("p_request_id" "uuid", "p_user_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."toggle_template_request_vote"("p_request_id" "uuid", "p_user_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."wishlist_eligible"("p_user_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."wishlist_eligible"("p_user_id" "uuid") TO "service_role";
 
 
 
@@ -1602,6 +1937,11 @@ GRANT SELECT ON TABLE "public"."subscriptions" TO "service_role";
 
 
 GRANT ALL ON TABLE "public"."template_prompts" TO "service_role";
+
+
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."template_request_votes" TO "service_role";
+GRANT SELECT ON TABLE "public"."template_request_votes" TO "authenticated";
 
 
 
