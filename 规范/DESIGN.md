@@ -21,7 +21,7 @@
 
 用户是不懂 AI 的日常用户和小商家（网店和二手卖家、餐饮店、美妆品牌、房东、宠物主人，Owner 2026-11-05 改定，不再只针对餐饮），多数人用手机操作。所有设计决定按下面四条排优先级：
 
-1. **一眼看懂**：每个页面只有一个主要操作。产品界面（按钮、字段、标签、提示、错误信息）绝不出现 prompt、seed、guidance 这类词。营销页正文和 FAQ 可以用否定说法（"No prompts to write"、"Do I need to write a prompt? No."），这是卖点也是搜索词，但不得出现输入 prompt 的控件（总控 2026-11-05 裁定）。
+1. **一眼看懂**：每个页面只有一个主要操作。产品界面（按钮、字段、标签、提示、错误信息）绝不出现 prompt、seed、guidance 这类词。营销页正文和 FAQ 可以用否定说法（"No prompts to write"、"Do I need to write a prompt? No."），这是卖点也是搜索词。工作台有一个**可选**的补充输入框 "Anything to change? (optional)"（Owner 2026-11-05，见第 4.3 节），让用户描述想加、去掉或调整的元素；它不叫 prompt、不是必填，模板仍是主路径，不出现只靠文字出图的入口。
 2. **先看效果再动手**：模板、首页、标签页都以「前后对比图」开场。
 3. **三步出图**：选模板 → 上传照片和填文案 → 生成。多一步都要有理由。
 4. **手机是一个 app，不是缩小的网页**（Owner 2026-11-05）：登录后的页面按第 8 节的应用壳设计，先出 375px 手机稿；桌面是手机布局的放宽，不是另一套。任何页面 PR 的截图手机在前、桌面在后，没有手机截图的 UI PR 不合并。某个交互在手机上做不了（hover、拖拽、多列对比），以手机的做法为准改掉，不允许「手机上降级」。
@@ -88,6 +88,7 @@ Owner 2026-11-05 改定：**深色系**（T6 深色方向「打烊后的街」�
 ### 4.2 模板卡片
 
 - 封面是对比图的「后」图，卡片上一个「Before / After」小切换看「前」图；不用悬停（手机没有悬停）。
+- 点模板卡片先弹出**模板预览底部抽屉**（Owner 2026-11-05，参考 Lovart）：可拖动的「你的照片 vs 模板效果」前后对比、一句用途说明、"From N credits"、主按钮 "Use this template" 进入工作台。首页和 Create 页都用这个抽屉，不直接跳工作台。
 - 卡片上只写：模板名、适合什么（例如 "Menu & delivery apps"）、消耗多少 credits——写 1K 档的数（"From 2 credits"），2K / 3K 的数在工作台选分辨率时才显示。
 
 ### 4.3 生成工作台
@@ -96,6 +97,7 @@ Owner 2026-11-05 改定：**深色系**（T6 深色方向「打烊后的街」�
 
 1. 上传区：大号按钮区，手机上点击调起相册 / 相机（两个入口："Take photo" 带 `capture`，"Choose from gallery" 不带）；桌面上同一块区域也接受拖拽。显示允许的格式和大小（JPG / PNG / WebP，up to 20MB）。
 2. 文案区：只出现模板需要的字段，每个字段带示例占位。
+2b. 可选补充输入框：标签 "Anything to change? (optional)"，占位例如 "Add a sprig of mint, remove the napkin"，≤300 字符，可留空。界面不出现 prompt 一词。
 3. 比例选择：用图标按钮，标注平台用途（例如 "DoorDash 16:9"）。
 3b. 分辨率选择：三张上下排列的选项卡，默认第一张。界面只显示 **Standard / HD / Max**（Owner 2026-11-05 定），每张写一行像素和用途，右侧写消耗：「Standard — 1024 px · Social & delivery apps · 2 credits」「HD — 2048 px · Websites & online stores · 4 credits」「Max — 2880 px · Print & zoom · 6 credits」（credits 数从该模板的 `credits_cost` 读，不写死）。内部代号 `1k` / `2k` / `3k` 只在代码和数据库里用，界面、营销页、FAQ 都不出现 1K / 2K / 3K，也不准用 "4K"、"Ultra HD"、"SD"。余额不够某一档时该档的 credits 变灰，主按钮变成 "Get credits · N needed" 并打开付费墙。
 4. 生成按钮：固定在底部拇指区、全宽，写清楚当前分辨率的消耗，例如 "Generate · 2 credits"，切换分辨率时按钮上的数字跟着变。按钮旁显示余额 "30 credits + 3 free"。
