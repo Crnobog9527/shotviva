@@ -5,7 +5,7 @@ import { UpdatePasswordForm } from '@/core/auth/ui'
 
 import { updatePasswordAction } from '../../../auth/actions'
 
-// The recovery link signs the visitor in via /auth/callback before landing here.
+// The recovery link signs the visitor in via /auth/confirm before landing here.
 async function UpdatePassword() {
   await requireUser('/reset/update')
   return <UpdatePasswordForm action={updatePasswordAction} />

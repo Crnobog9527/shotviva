@@ -1,5 +1,5 @@
-// Public by necessity: Supabase sends email-confirmation, recovery and Google OAuth
-// links here before the visitor has a session.
+// Public by necessity: Google OAuth returns here before the visitor has a session, and
+// email links sent before /auth/confirm existed still point here.
 import type { NextRequest } from 'next/server'
 
 import { handleAuthCallback } from '@/core/auth'
