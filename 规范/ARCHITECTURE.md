@@ -113,8 +113,39 @@ interface GenerationProvider {
 
 ### 3.2 v1 范围
 
-- `image` 模块：只实现 OpenAI GPT-Image 适配器（官方 `/v1/images/edits`）。**模型名是配置项**：环境变量 `OPENAI_IMAGE_MODEL`，默认值由 Owner 定（代码里当前默认 `gpt-image-2.5-sunburst`；GPT Image 2.6 已于 2026-11-04 上线、同价、更快；Owner 2026-11-05 评估 2.6 对人物五官的保持很强，默认用哪个仍由 Owner 在环境变量里定）。底座的 fal / KIE / WaveSpeed / Atlas 适配器不搬。
+- `image` 模块：只实现 OpenAI Images 接口形态的适配器（`/v1/images/edits`、`/v1/images/generations`；官方地址或兼容这套接口的中转地址都能用）。**用哪个供应商、哪个模型，从 T17 起在后台配置**（第 3.3 节）；环境变量 `OPENAI_API_KEY` / `OPENAI_IMAGE_MODEL` 只在后台没有启用任何供应商时兜底。环境变量的说明（原文）：`OPENAI_IMAGE_MODEL`，默认值由 Owner 定（代码里当前默认 `gpt-image-2.5-sunburst`；GPT Image 2.6 已于 2026-11-04 上线、同价、更快；Owner 2026-11-05 评估 2.6 对人物五官的保持很强，默认用哪个仍由 Owner 在环境变量里定）。底座的 fal / KIE / WaveSpeed / Atlas 适配器不搬。
 - `video` 模块：只有接口类型，`site.config.ts` 里是 `false`，不写任何视频页面。
+
+### 3.3 出图供应商配置（后台，Owner 要求：随时换供应商和模型，不改代码、不重新部署）
+
+**表 `ai_providers`**（私有：开 RLS、拒绝所有客户端，只有服务端 service role 读写，和 `template_prompts` 一样）：
+
+| 字段 | 说明 |
+|---|---|
+| `id` | uuid |
+| `module` | `'image'`（以后视频再加） |
+| `adapter` | 用哪个代码适配器：v1 只有 `'openai_images'`。接一个接口形态不同的厂商（如 Gemini、Seedream）要写新适配器，是代码任务，不是后台操作 |
+| `label` | 后台显示名，如「OpenAI 官方」「某中转」 |
+| `base_url` | 接口根地址，默认 `https://api.openai.com/v1`；只允许 `https://`，拒绝 localhost、内网和保留地址 |
+| `model` | 模型名，如 `gpt-image-2.6` |
+| `api_key_ciphertext` | 密钥密文：服务端用环境变量 `PROVIDER_SECRETS_KEY`（32 字节，base64）做 AES-256-GCM 加密后存；明文只在服务端出图时解密使用 |
+| `api_key_last4` | 密钥后 4 位，后台列表里显示用 |
+| `is_active` | 当前在用；同一个 `module` 最多一条为 `true`（部分唯一索引） |
+| `notes` | 备注 |
+| `created_at` / `updated_at` / `updated_by` | 审计 |
+
+切换在用的供应商用 SQL 函数 `admin_activate_provider(p_id)`：同一事务里把同模块其他行设为 `false`、这一行设为 `true`。
+
+**出图时怎么选**：`core` 按模块取 `is_active` 那一行（服务端缓存，打 `providers` 标签，后台改动后立即失效），解密密钥，交给模块注册的适配器生成。后台没有启用的供应商时，用环境变量兜底。伙伴接口走同一条路径。`generation_jobs.provider` 写 `<供应商 id 或 env>/<模型名>`，以后按模型算成本用。从 T17 起，模板 `model_params` 里的 `model` 不再生效，模型只由在用的供应商决定，防止换供应商后个别模板还在调旧模型；`background` 等其他参数照旧。
+
+**后台页 `/admin/providers`**（中文界面）：
+- 列表：显示名、适配器、地址、模型、密钥后 4 位、是否在用、更新时间。
+- 新增 / 编辑：密钥框只写不读，留空表示不改；保存后浏览器拿不到明文。
+- 「测试连接」：用该行的地址和密钥请求 `GET {base_url}/models`，只看能否通过鉴权，不出图、不花钱。
+- 「设为当前使用」：弹窗确认「从 A 换到 B」，写一条日志（logger，不含密钥）。
+- 页面写明提醒：积分下限表（第 6.1 节）是按 GPT-Image high 质量的成本定的；换成更贵的模型前，先请总控更新下限。
+
+**安全**：密钥不进日志、不进 Sentry、不进 PostHog、不返回给浏览器；`PROVIDER_SECRETS_KEY` 只放 Vercel（Preview 和 Production 用不同的值）。换掉 `PROVIDER_SECRETS_KEY` 后，已存的密钥解不开，需要在后台重新填写。
 
 ## 4. 生成任务
 
@@ -127,7 +158,7 @@ interface GenerationProvider {
 | module | 'image' / 'video' |
 | template_id | 用的模板 |
 | inputs | 用户填的内容（文案、比例、**分辨率 `resolution`：`'1k'` / `'2k'` / `'3k'`**、可选补充说明 `note`（≤300 字符，工作台「Anything to change?」，服务端拼在模板提示词之后，作为用户内容存档）、输入图在 R2 的 key），**不含封装提示词**。伙伴接口（第 14 节）v1 固定 `'1k'`，契约不加字段 |
-| provider | 实际调用的厂商 |
+| provider | 实际调用的供应商和模型：`<ai_providers.id 或 env>/<模型名>`（第 3.3 节） |
 | source | 'web' / 'graylum'，哪条入口发起的 |
 | idempotency_key | 可空，唯一索引。伙伴接口把调用方的 callId 放这里，重复请求返回同一个任务 |
 | status | running → succeeded / failed |
@@ -353,10 +384,11 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 
 ## 10. 管理后台
 
-v1 后台只做**两页**：
+v1 后台只做**三页**：
 
 1. **模板与提示词编辑**。因为 `template_prompts` 客户端读不到，必须有一个服务端页面来改。功能：新建模板、编辑公开信息（含质量档和 1K / 2K / 3K 三个 credit 数，低于第 6.1 节下限拒绝保存）和私有提示词、上下架、排序。
 2. **需求审核**（第 15 节）：待审需求列表（参考图 + 描述 + 用户）、通过 / 拒绝 / 下架、按票数排序、标记 shipped 并关联模板。
+3. **出图供应商**（第 3.3 节，T17）：增改供应商、测试连接、切换当前使用。
 
 其他运营操作 v1 都不做页面：
 
@@ -422,7 +454,7 @@ Owner 2026-11-04 决定：**不在 flux-kontext-template 上原地改造**，新
 - 应用页用第 1 节的 `(app)` 应用壳，按 DESIGN.md 第 8 节先出手机稿。
 - **模板需求墙（Wishlist）随 v1 上线**（Owner 2026-11-05 决定），占应用壳第四个 tab，见第 15 节。
 
-v1 不做：积分引擎抽象层、积分过期和批次、订阅的宽限期 / 自动扣回 / 升级降级 / 优惠券 / 自写取消界面、Waffo 订阅、自动故障切换、自动退款、保留期定时任务、提醒邮件、内容审核、作品审核页、除模板页和需求审核页外的后台页、英文和简体中文以外的语言（`/ja`、`/id` 等，见建站规格 §6）、多行菜单 / 价格单的排版功能（单张促销海报模板要做，见第 5 节）、视频生成实现、服务端 HEIC 转码、原图存储、断点续传、PWA / 离线、需求墙的评论 / 通知 / 重复合并 / 分类筛选。
+v1 不做：积分引擎抽象层、积分过期和批次、订阅的宽限期 / 自动扣回 / 升级降级 / 优惠券 / 自写取消界面、Waffo 订阅、自动故障切换、自动退款、保留期定时任务、提醒邮件、内容审核、作品审核页、除模板页、需求审核页、出图供应商页外的后台页、英文和简体中文以外的语言（`/ja`、`/id` 等，见建站规格 §6）、多行菜单 / 价格单的排版功能（单张促销海报模板要做，见第 5 节）、视频生成实现、服务端 HEIC 转码、原图存储、断点续传、PWA / 离线、需求墙的评论 / 通知 / 重复合并 / 分类筛选。
 
 ## 14. 伙伴接口（Graylum 连接器）
 
@@ -490,11 +522,25 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 
 ### 15.3 数据
 
-- `template_requests`：`id`、`user_id`、`description`、`image_keys text[]`、`status`（pending / live / rejected / shipped）、`template_id`（可空）、`votes_count`、`created_at`、`reviewed_at`。
-- `template_request_votes`：`request_id`、`user_id`，联合唯一。
-- RLS：`live` / `shipped` 对所有登录用户可读；`pending` / `rejected` 只有本人和 admin；写只经服务端。
-- 投票用一个 SQL 函数：存在即删除并 `votes_count - 1`，不存在即插入并 `+ 1`，函数内检查门槛。
-- 发帖的服务端路由同样检查门槛，并按账号限频（复用现有限频）。
+（总控 2026-11-06 按 T12 的设计补全）
+
+- `template_requests`：`id`、`user_id`、`description`（≤300）、`image_keys text[]`、`status`（pending / live / rejected / shipped）、`template_id`（可空）、`votes_count`、`author_label`、`created_at`、`reviewed_at`。
+  - `author_label`：发帖时在 SQL 里生成，取显示名首字加 `***`，没有显示名就用邮箱首字。墙上只读这一列，任何查询都不碰 `auth.users`。
+  - 约束：
+    - `rejected` 时 `image_keys` 为空（参考图已删），其他状态 1～3 张；
+    - `shipped` ⇔ `template_id` 非空；
+    - `pending` ⇔ `reviewed_at` 为空；
+    - `shipped` 只能从 `live` 转过来。
+- `template_request_votes`：`request_id`、`user_id`、`weight smallint`，`(request_id, user_id)` 联合唯一。`weight` 是投票那一刻按 `current_tier()` 快照的票数（Max 为 3，其余为 1）；取消投票按快照的票数减，会员到期也不会让计数虚高。
+- `votes_count` 由 votes 表的 insert / delete 触发器维护，等于该需求所有 `weight` 之和。投票人删号、级联删票时，计数同步减。
+- RLS：`live` / `shipped` 对所有登录用户可读；`pending` / `rejected` 只有本人和 admin 可读；写只经服务端。
+- SQL 函数（全部只授权 `service_role`）：
+  - `wishlist_eligible(user)`：是否至少成功出过 1 张图；
+  - `create_template_request(user, description, keys)`：函数内检查门槛、封禁、按账号限频（24 小时内最多 5 条）；
+  - `toggle_template_request_vote(request, user)`：只限 `live`，有票删票，没票按快照 `weight` 插入，函数内检查门槛；
+  - `admin_review_template_request(request, status, template_id)`；
+  - `admin_list_template_requests()`：带邮箱，后台用。
+- 参考图：浏览器先走现有 `/api/uploads` 传到 `inputs/`（没发帖的 7 天后自动清）。发帖时服务端用 `sharp` 重新编码，去掉 EXIF / GPS 后写到 `requests/{user_id}/{uuid}.jpg`，因为墙上的图别人看得到。被拒、下架、删号时服务端删除。
 
 ### 15.4 不做
 
@@ -531,7 +577,7 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 |---|---|---|
 | `signup` | 服务端：邮箱验证完成 / 首次 Google 登录时（和注册赠送同一处） | `method`（`email` / `google`） |
 | `upload` | 浏览器：直传 R2 成功后 | `size_bucket`（`<1MB` / `1-5MB` / `>5MB`）、`compressed`（是否走了浏览器压缩） |
-| `generate` | 服务端：任务结算后（成功或失败都发） | `template_id`、`category`、`resolution`、`credits_cost`、`credit_pool`、`status`、`error_code`、`source`（`web` / `graylum`）、`duration_ms` |
+| `generate` | 服务端：任务结算后（成功或失败都发） | `template_id`、`category`、`resolution`、`credits_cost`、`credit_pool`、`status`、`error_code`、`source`（`web` / `graylum`）、`duration_ms`、`model`（实际调用的模型名，不含密钥和地址） |
 | `paywall_view` | 浏览器：付费墙打开 | `trigger`（`insufficient_credits` / `pricing_page` / `account` / `graylum`） |
 | `checkout_start` | 服务端：创建 Checkout Session 时 | `product_id`、`tier`、`interval`、`form`、`channel`、`method` |
 | `purchase` | 服务端：支付回调入账成功后 | 第 6.2 节 `purchase` 参数 |
@@ -557,6 +603,19 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 - **付款**：中文页付款方式写「支付宝」，英文页写 "Alipay"（DESIGN §4.5）；Stripe Checkout 托管页传 `locale`（`en` / `zh`）。
 - **法律页**：中文版是英文版的翻译，页首注明「本中文版本仅供参考，如与英文版本不一致，以英文版本为准」；律师审英文版。
 - **邮件**：见第 7 节，按 `user_metadata.locale` 发中文或英文。
-- **字体**：Geist / Instrument Serif 没有中文字形，中文用系统字体回退（DESIGN §3.2），不下载中文网页字体。
+- **字体：中文用小米 MiSans，照 Graylum 的做法移植**（Owner 2026-11-06；参考 `seo资料/全站中文字体.md`，以及 Graylum staging 分支的 `apps/web/public/fonts/misans/`、`src/components/misans-font.tsx`）：
+  - **文件**：官方未修改的静态 WOFF2 分包（简体中文 + 拉丁，400 / 500 / 600，约 168 个文件、5.8 MB），放在 `public/fonts/misans/`。
+    - 同目录保留 `manifest.json`（每个文件的来源、unicode-range、字节数、SHA-256）、汇总 CSS、`LICENSE.pdf`、`NOTICE.txt`、`README.md`。
+    - 文件名用内容哈希，不重新生成，也不重新子集化。
+  - **加载**：根布局挂一个客户端组件。hydration 后等两帧（两次 `requestAnimationFrame`），再往 `<head>` 插入 `<link rel="stylesheet" id="misans-font" href="/fonts/misans/misans-<hash>.css">`，用 id 防止重复插入。
+    - 汇总 CSS 里每个 `@font-face` 都带 `unicode-range` 和 `font-display: swap`。
+    - 首屏先用系统字体，浏览器只下载页面上实际用到的分包。
+    - 不 preload，不用 Google Fonts，也不用任何 CDN。
+  - **缓存**：只给 `/fonts/misans/*.woff2` 和 `*.css` 发 `Cache-Control: public, max-age=31536000, immutable`，NOTICE、PDF 不加。改字体必须换新哈希 URL。
+  - **路由**：中间件（`src/proxy.ts`）的 matcher 排除 `fonts/misans/`。这个目录不放私密文件。
+  - **署名（协议要求）**：营销页页脚写「本网站使用 MiSans 字体，版权归小米所有」（英文页写 "This site uses the MiSans font, © Xiaomi."），并链接 `/fonts/misans/LICENSE.pdf`。应用内页面不显示署名。
+  - **授权边界**：
+    - MiSans 只用于网页显示。服务端往图片上画字的地方（如水印 "Made with Shotviva"）不用 MiSans，以免变成「把字体嵌入导出文件」。
+    - 字体文件放在私有仓库，通过网站对外提供，和 Graylum 一样；律师审法律页时一并确认协议里的「再分发」条款（LAUNCH §8）。
 - **已知限制（写进 FAQ）**：中国大陆用户不开 VPN 用不了 Google 登录，用邮箱注册即可。
 

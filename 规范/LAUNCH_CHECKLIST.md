@@ -32,6 +32,8 @@
 - [ ] 直传一个 25MB 文件和一个改后缀的文本文件到 R2 后调用生成，都返回 422 且对象被删除
 - [ ] 管理后台只有 `role = admin` 能进，普通账号访问返回 404
 
+- [ ] 出图供应商（ARCHITECTURE §3.3）：生产环境 `PROVIDER_SECRETS_KEY` 已设（和预览不同），后台已录入在用供应商并测试连接成功，出一张图后 `generation_jobs.provider` 正确
+
 ## 3. 登录
 
 - [ ] 邮箱 + 密码注册，收到 Resend 发的验证邮件（发件人 support@shotviva.com），点击后能登录；Gmail、Outlook 各测一次，记录进收件箱还是垃圾箱
@@ -100,6 +102,7 @@
 - [ ] hreflang（`en` / `zh-Hans` / `x-default`）互指正确；`/zh` 独立 sitemap；不在中文主词表里的 `/zh` 页是 noindex
 - [ ] 中文法律页页首有「以英文版本为准」声明
 - [ ] 中文页在 375px 上没有溢出、截断或重叠
+- [ ] 中文页显示的是 MiSans：网络面板里只有同源 `/fonts/misans/` 的分包请求，没有任何外部字体主机；首屏不被字体阻塞；营销页页脚有 MiSans 署名和协议链接；`/fonts/misans/*.woff2` 带一年 immutable 缓存头
 
 ## 7.5 移动端应用壳（iOS Safari 真机 + Android Chrome 真机各一遍）
 
@@ -116,6 +119,7 @@
 - [ ] 隐私政策写明：上传的照片保留 7 天、成品保留到用户删除、用了哪些第三方服务、PostHog 不使用 Cookie、连接 Graylum 时共享哪些信息（账号 id、剩余张数）
 - [ ] 用户能在账号页自助删除账号，删除后 `inputs/` 和 `outputs/` 下该用户的对象、任务记录、伙伴关联一起删除
 - [ ] 页脚有官方站点声明、联系方式、主体信息（建站规格 G8）
+- [ ] 律师顺带确认：MiSans 字体文件通过网站对外提供，是否符合小米字体协议的「再分发」条款（ARCHITECTURE §17）
 
 ## 9. 运营和模板化
 
