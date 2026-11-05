@@ -36,8 +36,9 @@ export function toSaveInput(form: ProviderForm, provider: AdminProvider | null):
   }
 }
 
-// Save stays disabled until the required fields are filled; the server validates again.
-export function canSave(form: ProviderForm, isNew: boolean): boolean {
+// Save stays disabled until the required fields are filled; the server validates again. A key
+// is required for a new row and for a row that has none.
+export function canSave(form: ProviderForm, needsKey: boolean): boolean {
   const filled = [form.label, form.baseUrl, form.model].every((value) => value.trim() !== '')
-  return filled && (!isNew || form.apiKey.trim() !== '')
+  return filled && (!needsKey || form.apiKey.trim() !== '')
 }

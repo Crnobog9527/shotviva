@@ -9,9 +9,11 @@ export const PROVIDER_SETTING_REASONS = [
   'base_url_private',
   'base_url_unresolvable',
   'api_key_required',
+  // Not printable ASCII without whitespace, or outside 16–1024 characters.
+  'api_key_invalid',
+  // The row has no usable key in Vault (never set, cleared, or the Vault entry is gone).
+  'api_key_missing',
   'not_found',
-  'secrets_key_missing',
-  'secret_unreadable',
   // Anything unexpected; the details are logged, never shown.
   'internal',
 ] as const

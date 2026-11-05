@@ -1,10 +1,16 @@
 import { z } from 'zod'
 
+import { apiKeySchema } from '@/core/providers/keys'
 import { PROVIDER_ADAPTERS, PROVIDER_MODULES } from '@/core/providers/types'
 
 // Admin input for /admin/providers. Validated again on the server before anything is stored.
 
-const blankAsUndefined = (value: unknown) => (typeof value === 'string' && value.trim() === '' ? undefined : value)
+// Trims, and treats blank as absent. A pasted key often carries a trailing space or newline.
+const blankAsUndefined = (value: unknown) => {
+  if (typeof value !== 'string') return value
+  const trimmed = value.trim()
+  return trimmed === '' ? undefined : trimmed
+}
 
 export const saveProviderSchema = z.object({
   // Absent for a new row.
@@ -18,7 +24,7 @@ export const saveProviderSchema = z.object({
     .trim()
     .regex(/^[A-Za-z0-9._:/@+-]{1,120}$/),
   // Write-only: blank keeps the stored key (ARCHITECTURE §3.3).
-  apiKey: z.preprocess(blankAsUndefined, z.string().trim().regex(/^\S{8,500}$/).optional()),
+  apiKey: z.preprocess(blankAsUndefined, apiKeySchema.optional()),
   notes: z.preprocess(blankAsUndefined, z.string().trim().max(500).optional()),
 })
 

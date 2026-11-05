@@ -1,12 +1,7 @@
 import 'server-only'
 
 import { logger } from '@/core/logger'
-import {
-  ProviderSecretError,
-  ProviderSecretsKeyError,
-  ProviderSettingError,
-  type ProviderSettingReason,
-} from '@/core/providers'
+import { ProviderSettingError, type ProviderSettingReason } from '@/core/providers'
 
 import type { ProviderActionResult } from './types'
 
@@ -14,8 +9,6 @@ import type { ProviderActionResult } from './types'
 // logged and reported as 'internal'; no message text reaches the browser.
 export function reasonFor(error: unknown): ProviderSettingReason {
   if (error instanceof ProviderSettingError) return error.reason
-  if (error instanceof ProviderSecretError) return 'secret_unreadable'
-  if (error instanceof ProviderSecretsKeyError) return 'secrets_key_missing'
   logger.error('admin.provider.action_failed', { error })
   return 'internal'
 }
