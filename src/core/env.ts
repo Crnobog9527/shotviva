@@ -35,6 +35,15 @@ const serverEnvSchema = z.object({
   // value per Vercel environment: `sv_live_…` in production, `sv_test_…` everywhere else
   // (core/partner/partner-auth.ts rejects the wrong kind). Unset → every partner call is 401.
   GRAYLUM_PARTNER_KEY: optionalSecret,
+  // Stripe (T9, ARCHITECTURE §6.3). Test-mode keys everywhere but production; core/billing/stripe
+  // refuses a live key outside production. Optional at parse time, required on first use.
+  // Prices are found by lookup_key, so there are no Price id variables.
+  STRIPE_SECRET_KEY: z.preprocess(blankAsUnset, z.string().regex(/^(sk|rk)_(test|live)_/).optional()),
+  // Signing secret of the webhook endpoint registered for this environment (whsec_…).
+  STRIPE_WEBHOOK_SECRET: z.preprocess(blankAsUnset, z.string().startsWith('whsec_').optional()),
+  // Cards go through Managed Payments (Link is merchant of record). 'off' is the fallback until
+  // Stripe approves Managed Payments on the live account: cards then use a plain Checkout.
+  STRIPE_MANAGED_PAYMENTS: z.preprocess(blankAsUnset, z.enum(['on', 'off']).default('on')),
 }).extend(sentryBuildEnvSchema.shape)
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>
