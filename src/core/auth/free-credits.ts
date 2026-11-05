@@ -1,27 +1,14 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
-
+import { grantCredits, signupGrantKey, type RpcClient } from '../billing'
 import { logger } from '../logger'
 
 export type GrantCreditsInput = { userId: string; amount: number; reason: string; idempotencyKey: string }
 
-// Adapter over T2's grant_credits(user_id, amount, reason, idempotency_key) SQL function.
-// Kept as an interface so tests (and the period before T2 merges) can inject a fake.
-export type GrantCredits = (input: GrantCreditsInput) => Promise<void>
+// Injected so unit tests can assert the call without a database; production uses
+// billingGrant(), i.e. T2's grant_credits SQL function via core/billing.
+export type GrantCredits = (input: GrantCreditsInput) => Promise<unknown>
 
-export function supabaseGrantCredits(admin: SupabaseClient): GrantCredits {
-  return async ({ userId, amount, reason, idempotencyKey }) => {
-    const { error } = await admin.rpc('grant_credits', {
-      p_user_id: userId,
-      p_amount: amount,
-      p_reason: reason,
-      p_idempotency_key: idempotencyKey,
-    })
-    if (error) throw new Error(`grant_credits failed: ${error.code ?? 'unknown'}`)
-  }
-}
-
-export function signupGrantKey(userId: string): string {
-  return `signup:${userId}`
+export function billingGrant(admin: RpcClient): GrantCredits {
+  return (input) => grantCredits(admin, input)
 }
 
 // Called on every verified sign-in; the idempotency key makes all but the first a no-op,
