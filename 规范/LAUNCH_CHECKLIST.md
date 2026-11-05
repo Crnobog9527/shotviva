@@ -141,6 +141,8 @@
 
 ## 9.6 模板需求墙
 
+- [ ] 上线前一个小 PR：`site.config.ts` 的 `features.wishlist` 改为 `true`，删掉只在预览生效的 `FEATURE_WISHLIST_PREVIEW`（代码和 Vercel Preview 变量都删，T12 PR #73 的临时开关）
+
 - [ ] 没出过图的账号：能看墙，发帖和投票按钮灰掉；出过 1 张图后两者都可用
 - [ ] 提交需求后只有本人在 My requests 看到 Pending，墙上和其他账号都看不到
 - [ ] 后台通过后上墙；拒绝后本人看到 Rejected，R2 `requests/` 下该需求的参考图被删除
