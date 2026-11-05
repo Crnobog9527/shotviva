@@ -66,7 +66,12 @@ Owner 2026-11-05 定稿：**B 版「暗房」（Darkroom）**，取代此前的�
 ### 3.2 字体
 
 - B 版定稿：正文 **Geist**，数字和代码 **Geist Mono**，标题点缀 **Instrument Serif**（含斜体）。通过 `next/font` 自托管（字体文件见 `design/comps-v3-b/fonts/`），不走外链。
-- **简体中文**（Owner 2026-11-06，ARCHITECTURE §17）：三套字体都在后面接系统中文字体 `"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif`，不下载中文网页字体。Instrument Serif 只用于英文标题，`/zh` 页的标题用 Geist + 系统中文黑体加粗；中文不用斜体；中文正文行高不低于 1.6。组件不准给文字容器写死宽度，中英两种长度都要放得下。
+- **简体中文用小米 MiSans**（开源，免版税可商用；Owner 2026-11-06 定，照 Graylum 的做法）：
+  - 字重只用 400 / 500 / 600。
+  - 字体栈：英文字形仍由 Geist / Instrument Serif 负责，排在第一位；中文字形由 MiSans 负责，排在它们后面。完整写法 `Geist, 'MiSans', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif`（Instrument Serif 和 Geist Mono 同理，在后面接 MiSans 和系统字体）。
+  - 加载方式（ARCHITECTURE §17）：用官方分包 + `unicode-range`，页面上出现哪些字才下载哪些分包；hydration 之后再插入样式表，不挡首屏；不做 preload；不用任何外部字体主机。
+  - 繁体、日文、生僻字回退到系统字体。
+  - Instrument Serif 只用于英文标题；`/zh` 页的标题用 Geist + MiSans 600；中文不用斜体；中文正文行高不低于 1.6。组件不准给文字容器写死宽度，中英两种长度都要放得下。
 - 字号：正文 16px（手机上不许小于 16px，否则 iOS 输入框会自动放大页面），说明文字 14px，H1 手机 32px / 桌面 48px。
 
 ### 3.3 间距、圆角、阴影
