@@ -1,12 +1,15 @@
 import type { Metadata } from 'next'
 
+import { PaywallProvider, PricingPlans } from '@/core/billing/paywall'
 import { Breadcrumbs, FaqSection } from '@/core/content'
 import { JsonLdScript, breadcrumbListLd, faqPageLd, pageMetadata } from '@/core/seo'
 import { homePage, pricingPage, type PricingTable } from '@/site/content'
+import { isWishlistEnabled } from '@/core/wishlist'
 import { site } from '@/site/site.config'
 
-// Prices render from site.config through site/content; the paywall and checkout are T9.
-// Not in the keyword map CSV yet, so the indexing switch keeps it noindex.
+// Prices render from site.config (plans through core/billing/paywall, tables through
+// site/content) into the static HTML. Indexable: /pricing is in the keyword map CSV and in
+// site.indexing. Buying opens the same paywall as the app; signed-out buyers sign in first.
 export const metadata: Metadata = pageMetadata(site, pricingPage)
 
 const crumbs = [
@@ -45,26 +48,34 @@ function PriceTable({ table }: { table: PricingTable }) {
 
 export default function PricingPage() {
   const { tables } = pricingPage
+  const wishlistLive = isWishlistEnabled(site)
   return (
-    <article className="mx-auto flex w-full max-w-3xl flex-col gap-8 p-4">
+    <article className="mx-auto flex w-full max-w-5xl flex-col gap-8 py-4">
       <JsonLdScript data={[breadcrumbListLd(site, crumbs), faqPageLd(pricingPage.faq)]} />
-      <Breadcrumbs crumbs={crumbs} />
-      <header>
-        <h1>{pricingPage.h1}</h1>
-        <p>{pricingPage.intro}</p>
-      </header>
-      <PriceTable table={tables.plans} />
-      <PriceTable table={tables.packs} />
-      <PriceTable table={tables.photoCost} />
-      <section>
-        <h2>How you pay</h2>
-        <ul>
-          {pricingPage.payment.map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-        </ul>
-      </section>
-      <FaqSection faq={pricingPage.faq} heading="Pricing FAQ" />
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4">
+        <Breadcrumbs crumbs={crumbs} />
+        <header>
+          <h1>{pricingPage.h1}</h1>
+          <p>{pricingPage.intro}</p>
+        </header>
+      </div>
+      <PaywallProvider products={site.billing.products} wishlistLive={wishlistLive}>
+        <PricingPlans products={site.billing.products} wishlistLive={wishlistLive} />
+      </PaywallProvider>
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4">
+        <PriceTable table={tables.plans} />
+        <PriceTable table={tables.packs} />
+        <PriceTable table={tables.photoCost} />
+        <section>
+          <h2>How you pay</h2>
+          <ul>
+            {pricingPage.payment.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </section>
+        <FaqSection faq={pricingPage.faq} heading="Pricing FAQ" />
+      </div>
     </article>
   )
 }

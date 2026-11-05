@@ -56,6 +56,6 @@ export const site = defineSite({
   // three tabs and /wishlist 404s.
   features: { wishlist: false },
   indexing: {
-    indexablePaths: ['/', '/image-to-image-generator'],
+    indexablePaths: ['/', '/image-to-image-generator', '/pricing'],
   },
 })

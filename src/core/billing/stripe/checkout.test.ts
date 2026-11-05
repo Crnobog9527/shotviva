@@ -39,7 +39,7 @@ function fakeStripe(price: (key: string) => Stripe.Price = priceFor) {
 }
 
 function deps(stripe: StripeApi, overrides: Partial<CheckoutDeps> = {}): CheckoutDeps {
-  return { stripe, products: TEST_PRODUCTS, managedPayments: true, origin: 'https://pr-1.example.app', trackStart: vi.fn(), ...overrides }
+  return { stripe, products: TEST_PRODUCTS, managedPayments: true, origin: 'https://pr-1.example.app', returnToHosts: ['graylum.com'], trackStart: vi.fn(), ...overrides }
 }
 
 const sent = (create: ReturnType<typeof fakeStripe>['create']) => create.mock.calls[0]?.[0]
@@ -137,5 +137,18 @@ describe('createCheckout price checks', () => {
     await createCheckout(deps(stripe), input)
     expect(list).toHaveBeenCalledTimes(1)
     expect(list).toHaveBeenCalledWith({ lookup_keys: ['pack_l'], active: true, expand: ['data.product'] })
+  })
+})
+
+describe('success URL for a Graylum top-up (ARCHITECTURE §14.5)', () => {
+  it('carries an allowlisted return_to and drops any other', async () => {
+    const { stripe, create } = fakeStripe()
+    const body = { product_id: 'pack_s' as const, method: 'card' as const, locale: 'en' as const }
+    await createCheckout(deps(stripe), { userId: USER, body: { ...body, return_to: 'https://graylum.com/app?x=1' } })
+    await createCheckout(deps(stripe), { userId: USER, body: { ...body, return_to: 'https://evil.example/app' } })
+    expect(create.mock.calls[0]?.[0].success_url).toBe(
+      'https://pr-1.example.app/account?checkout=success&from=graylum&return_to=https%3A%2F%2Fgraylum.com%2Fapp%3Fx%3D1',
+    )
+    expect(create.mock.calls[1]?.[0].success_url).toBe('https://pr-1.example.app/account?checkout=success')
   })
 })

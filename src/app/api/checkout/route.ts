@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
       products: site.billing.products,
       managedPayments: managedPaymentsEnabled(),
       origin: appOrigin,
+      returnToHosts: site.partners.graylum.returnToHosts,
     }
     return jsonResponse(await createCheckout(deps, { userId: user.id, body: body.data }))
   } catch (error) {

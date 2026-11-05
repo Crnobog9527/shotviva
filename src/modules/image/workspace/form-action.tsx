@@ -1,8 +1,8 @@
-import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 
-import { ActionBar, ActionNotice, PAYWALL_HREF } from '@/core/app-shell'
+import { ActionBar, ActionNotice } from '@/core/app-shell'
+import { PaywallButton } from '@/core/billing/paywall'
 import type { Resolution } from '@/core/templates/output-options'
 import { buttonVariants } from '@/core/ui/button'
 
@@ -33,9 +33,9 @@ export function FormAction({ state, resolution, onGenerate }: { state: CtaState;
     <ActionBar>
       <Notice state={state} resolution={resolution} />
       {state.kind === 'get-credits' ? (
-        <Link href={PAYWALL_HREF} className={buttonVariants({ variant: 'cta-neutral', size: 'cta' })}>
+        <PaywallButton trigger="insufficient_credits" className={buttonVariants({ variant: 'cta-neutral', size: 'cta' })}>
           <span>{t.rich('getCreditsCta', { ...rich, count: state.needed })}</span>
-        </Link>
+        </PaywallButton>
       ) : state.kind === 'generate' ? (
         <button type="button" onClick={onGenerate} className={buttonVariants({ variant: 'cta', size: 'cta' })}>
           <span>{t.rich('generateCta', { cost: (chunks) => <span className="font-mono text-caption font-medium opacity-[.72]">{chunks}</span>, count: state.cost })}</span>
