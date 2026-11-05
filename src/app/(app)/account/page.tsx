@@ -1,16 +1,17 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
 import { Suspense, type ReactNode } from 'react'
 
-import { AppPage, BalanceChip, balanceSentence, PAYWALL_HREF, TabRootHeader } from '@/core/app-shell'
+import { AppPage, BalanceChip, balanceSentence, TabRootHeader } from '@/core/app-shell'
 import { createServerSupabase, requireUser } from '@/core/auth'
 import { DeleteAccountPanel } from '@/core/auth/ui'
 import { readBalance, type Balance } from '@/core/billing'
+import { CheckoutNotice, PaywallButton } from '@/core/billing/paywall'
 import { readLinkStatus } from '@/core/partner'
 import { GraylumConnection } from '@/core/partner/ui'
 import { buttonVariants } from '@/core/ui/button'
+import { site } from '@/site/site.config'
 
 import { signOutAction } from '../../auth/actions'
 import { disconnectGraylumAction } from './partner-actions'
@@ -36,15 +37,18 @@ function AccountView({ email, balance, graylumLinkedAt }: ViewProps) {
     <>
       <TabRootHeader title={t('title')} aside={<BalanceChip balance={balance} />} />
       <p className="px-4 pt-3 text-caption text-muted-foreground">{t('signedInAs', { email: email ?? '' })}</p>
+      <Suspense fallback={null}>
+        <CheckoutNotice returnToHosts={site.partners.graylum.returnToHosts} />
+      </Suspense>
       <Panel>
         <h2 className="text-headline leading-[1.25] font-semibold">{balanceT('panelTitle')}</h2>
         <p className="mt-2 text-body text-bone-dim">{balanceSentence(balance, balanceT)}</p>
-        <Link href={PAYWALL_HREF} className="mt-1 inline-flex min-h-11 items-center gap-1 font-medium">
+        <PaywallButton trigger="account" className="mt-1 inline-flex min-h-11 items-center gap-1 font-medium">
           {balanceT('getCredits')}
           <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 text-primary" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 6l6 6-6 6" />
           </svg>
-        </Link>
+        </PaywallButton>
       </Panel>
       <Panel>
         <GraylumConnection linkedAt={graylumLinkedAt} disconnect={disconnectGraylumAction} />
