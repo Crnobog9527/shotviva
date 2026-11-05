@@ -437,5 +437,5 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 
 - 开关在 `site.config.ts`：`features: { wishlist: boolean }`。和 `modules`、`gallery.enabled` 一样是建站时的配置，不是运行时后台开关——「关不关」是每个站建站时定一次的事，放配置最省（不用设置表、不用缓存、build 时就能裁掉）。
 - `features.wishlist = false` 时：tab bar 只渲染三项；`app/(app)/wishlist/*` 和 `app/api/wishlist/*` 返回 404；后台的需求审核页不出现在后台导航且直接 404；`template_requests` 两张表的迁移仍然跑（表空着无害，避免模板站的迁移序列分叉）。
-- 判断只在一处：`core/wishlist/index.ts` 导出 `isWishlistEnabled()` 读配置，路由、layout、后台导航都调它，不准各自读配置。
+- 判断只在一处：`core/wishlist/index.ts` 导出 `isWishlistEnabled(site: SiteConfig)`，**配置由调用方传入**（core 不能 import `site/`，写法同 `core/config` 的 `isModuleEnabled(site, id)`）；`features` 的类型加在 `core/config/define-site.ts`。路由、layout、后台导航都调它，不准各自读 `features.wishlist`（总控 2026-11-05 补）。
 - 以后真需要「上线后临时关掉」（例如垃圾内容太多）再加运行时开关，一个 `system_settings` 行，一小时的事；v1 不做。
