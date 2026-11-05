@@ -88,7 +88,7 @@ Owner 2026-11-05 改定：**深色系**（T6 深色方向「打烊后的街」�
 ### 4.2 模板卡片
 
 - 封面是对比图的「后」图，卡片上一个「Before / After」小切换看「前」图；不用悬停（手机没有悬停）。
-- 卡片上只写：模板名、适合什么（例如 "Menu & delivery apps"）、消耗多少 credits（"2 credits"）。
+- 卡片上只写：模板名、适合什么（例如 "Menu & delivery apps"）、消耗多少 credits——写 1K 档的数（"From 2 credits"），2K / 4K 的数在工作台选分辨率时才显示。
 
 ### 4.3 生成工作台
 
@@ -97,7 +97,8 @@ Owner 2026-11-05 改定：**深色系**（T6 深色方向「打烊后的街」�
 1. 上传区：大号按钮区，手机上点击调起相册 / 相机（两个入口："Take photo" 带 `capture`，"Choose from gallery" 不带）；桌面上同一块区域也接受拖拽。显示允许的格式和大小（JPG / PNG / WebP，up to 20MB）。
 2. 文案区：只出现模板需要的字段，每个字段带示例占位。
 3. 比例选择：用图标按钮，标注平台用途（例如 "DoorDash 16:9"）。
-4. 生成按钮：固定在底部拇指区、全宽，写清楚消耗，例如 "Generate · 2 credits"。按钮旁显示余额 "30 credits + 3 free"。
+3b. 分辨率选择：三段式分段控件 **1K / 2K / 4K**，默认 1K；每段下面一行小字写用途和消耗，例如 "1K · Social & delivery apps · 2 credits"、"2K · Web & small print · 4 credits"、"4K · Large print & zoom · 6 credits"（数字从该模板的 `credits_cost` 读，不写死）。余额不够某一档时该段灰掉并标 "Not enough credits"。
+4. 生成按钮：固定在底部拇指区、全宽，写清楚当前分辨率的消耗，例如 "Generate · 2 credits"，切换分辨率时按钮上的数字跟着变。按钮旁显示余额 "30 credits + 3 free"。
 5. 这一单将用免费积分时，按钮上方一行告知："This photo uses free credits: it's shown publicly with a watermark. Paid credits make it private and watermark-free." 将用付费积分时不显示。
 
 单位叫法：前台后台都叫 **credits**，不说「张」。余额分开显示付费和免费（"30 credits + 3 free"）。
@@ -112,9 +113,12 @@ Owner 2026-11-05 改定：**深色系**（T6 深色方向「打烊后的街」�
 ### 4.5 付费墙
 
 - 触发：免费额度用完，或免费用户想把作品设为私密。
-- 手机上是底部抽屉，桌面是居中弹窗（第 8.4 节）。里面**三个商品**：`monthly`、`yearly`、`pack`（ARCHITECTURE.md 第 6.2 节），价格数字从配置读。推荐项高亮。`pack` 标注 "One-time · no subscription"，并显示每 credit 单价以便和订阅对比。
-- 选了商品后是**两组付款方式**：「Card · Apple Pay · Google Pay」和「Alipay · WeChat Pay」。卡那组下面一行小字 "Renews automatically, cancel anytime"；钱包那组下面 "One-time payment, 30 days / 1 year, no auto-renew"。`pack` 在两组下都是单笔。走 Waffo 时全部单笔，微信不显示。
-- 账号页「Subscription」区块：当前商品、状态（Active / Cancels on … / Past due / Free）、下次续费日，一个「Manage subscription」按钮打开 Stripe Customer Portal；钱包用户显示 "Paid until …" 和「Renew」按钮。
+- 手机上是底部抽屉，桌面是居中弹窗（第 8.4 节）。9 个商品（ARCHITECTURE.md 第 6.2 节）分两步选，**每一屏最多三个选项**，手机一屏放得下，不滚动也能做决定：
+  1. **第一屏：选档位**。三张竖排卡片 Starter / Pro / Max，每张写月付价、每月 credits、每 credit 单价（"$19.90 / month · 50 credits · $0.40 per credit"），Pro 高亮为推荐。卡片下方一行次要入口 "Just need a few photos? Credit packs from $9.90 →"。价格数字全部从 `site.config.ts` 读。
+  2. **第二屏：选周期**。顶部分段控件 **Monthly / Yearly**（Yearly 段上标 "Save 40%"，折扣数从配置算），下面是所选档位的价格、credits 总数（年付写 "600 credits upfront"）和每 credit 单价；再往下是两组付款方式。从积分包入口进来的第二屏是 S / M / L 三项（"20 credits · $9.90" 并标 "One-time · no subscription"），再往下同样两组付款方式。
+- **两组付款方式**：「Card · Apple Pay · Google Pay」和「Alipay · WeChat Pay」。会员商品下，卡那组小字 "Renews automatically, cancel anytime"，钱包那组小字 "One-time payment, 30 days / 1 year, no auto-renew"；积分包在两组下都是单笔，小字只写 "One-time payment"。走 Waffo 时全部单笔，微信不显示。
+- `/pricing` 页用同一套信息，桌面三栏并排（Starter / Pro / Max，顶部 Monthly / Yearly 切换），积分包一行三项放在下面；手机上退化成和付费墙一样的竖排。
+- 账号页「Subscription」区块：当前档位和周期（"Pro · Yearly"）、状态（Active / Cancels on … / Past due / Free）、下次续费日，一个「Manage subscription」按钮打开 Stripe Customer Portal；钱包用户显示 "Paid until …" 和「Renew」按钮。
 - 付款方式图标：卡、支付宝、微信，按当前通道可用的方式显示（走 Waffo 时没有微信）。
 - 价格数字从 `site.config.ts` 或数据库读，禁止写死。
 

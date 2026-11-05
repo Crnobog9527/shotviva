@@ -12,7 +12,7 @@
 - [ ] Stripe：同一主体下新开的独立账户，开通卡、支付宝、微信支付；账单描述设为 SHOTVIVA（卡支付在 Managed Payments 下显示 `LINK.COM* SHOTVIVA`）。Managed Payments 资格审核已提交；审核没下来时卡走普通订阅兜底（ARCHITECTURE §6.3）。账户本身没通过时用 Waffo
 - [ ] Waffo：申请加急，测试和生产密钥分开创建，回调格式选 Raw
 - [ ] Stripe 和 Waffo 的生产回调地址、签名密钥都已登记到环境变量
-- [ ] OpenAI：组织验证完成，有 GPT-Image-2.5 权限，设好每月消费上限
+- [ ] OpenAI：组织验证完成，有 GPT-Image 系列模型权限（`OPENAI_IMAGE_MODEL` 指定的那个，默认由 Owner 定），设好每月消费上限
 - [ ] Resend：shotviva.com 的 SPF、DKIM、DMARC 都验证通过，已配成 Supabase Auth 的 SMTP
 - [ ] Cloudflare R2：生产桶和预览桶分开，都是私有桶；`inputs/` 前缀设好 7 天过期规则；CORS 只放行站点域名的 PUT 和 Content-Type
 - [ ] 伙伴密钥：预览和生产各一把，登记到环境变量；预览密钥在生产调用返回 401
@@ -50,12 +50,14 @@
 
 ## 5. 支付
 
-- [ ] 价格数字已定稿并填进 `site.config.ts`，首页、价格页、FAQ、结构化数据的数字完全一致；商品只有 `monthly`、`yearly`、`pack` 三个，前两个在 Stripe 里各挂 recurring 和 one-time 两个 Price，`pack` 只有 one-time，Product 税码 `txcd_10105001`
-- [ ] Stripe 测试模式·卡：`monthly` 和 `yearly` 各订阅一次（Managed Payments），结账页显示税，到账后付费池 `credits` +M / +12M、`paid_until` = 本期 `period_end`
-- [ ] Stripe 测试模式·钱包：支付宝、微信各单笔买一次 `monthly`，结账页无税，`paid_until` +30 天，付费墙写明不自动续费；再用卡（MP 单笔）和支付宝各买一次 `pack`，付费池 +P、`paid_until` 不变
-- [ ] 用 Stripe 测试时钟把一个 `monthly` 订阅推进到续费：`invoice.paid` 到账后付费池 +M、`paid_until` 延到新一期；再推进一次让续费失败，不发积分、`paid_until` 不延、账号页显示已过期，已有付费积分仍可用
+- [ ] 价格数字（ARCHITECTURE §6.2 的 9 个商品）已填进 `site.config.ts`，首页、价格页、FAQ、结构化数据的数字完全一致；Stripe 里 Starter / Pro / Max 各一个 Product（税码 `txcd_10105001`）挂 4 个 Price（月付 / 年付 × recurring / one-time），三个积分包各一个 one-time Price；每个 Price 的 `lookup_key` 和 `metadata.product_id` 按 §6.2 的约定填好，服务端按 lookup key 能取到全部 15 个 Price
+- [ ] 成本测量（**不是主体保持测试，不设质量门槛**）：用 20 张真实手机照片（长边 2048）对 `OPENAI_IMAGE_MODEL` 各跑一次 `/v1/images/edits`，读 `usage.input_tokens_details.image_tokens`，总花费 < $5；按 p95 算 1K high 单次成本，若 > $0.12 就把 `high` 的 1K 配置下限改为 3 credits，或把上传长边降到 1536；结果写进 `modules/image` 的下限表注释
+- [ ] 按分辨率扣费：同一模板分别以 1K / 2K / 4K 生成，扣的 credits 等于后台配置的三个数，成品像素等于该档尺寸表；后台把某档改成低于下限的数被拒绝保存
+- [ ] Stripe 测试模式·卡：`starter_monthly` 和 `pro_yearly` 各订阅一次（Managed Payments），结账页显示税，到账后付费池 `credits` +50 / +1,620、`paid_until` = 本期 `period_end`，`subscriptions.product_id` 正确
+- [ ] Stripe 测试模式·钱包：支付宝、微信各单笔买一次 `starter_monthly`，结账页无税，付费池 +50、`paid_until` +30 天，付费墙写明不自动续费；再用卡（MP 单笔）和支付宝各买一次 `pack_s`，付费池 +20、`paid_until` 不变
+- [ ] 用 Stripe 测试时钟把一个 `starter_monthly` 订阅推进到续费：`invoice.paid` 到账后付费池 +50、`paid_until` 延到新一期；再推进一次让续费失败，不发积分、`paid_until` 不延、账号页显示已过期，已有付费积分仍可用
 - [ ] 在 Customer Portal 取消订阅：镜像表 `cancel_at_period_end = true`，`paid_until` 不变，期末后不再续
-- [ ] Waffo 沙盒：卡、支付宝各单笔买一次每种商品，都能到账；付款页不显示微信、不显示「自动续费」
+- [ ] Waffo 沙盒：卡、支付宝各单笔买一次 `starter_monthly`（一期）和 `pack_s`，都能到账，积分和 `paid_until` 与 Stripe 单笔一致；9 个商品的 Waffo 映射都配了，缺一个启动报错；付款页不显示微信、不显示「自动续费」
 - [ ] 只开 Waffo、只开 Stripe 两种开关状态下，付款页显示正确
 - [ ] 两条通道的回调各重发 3 次，积分只加一次；签名错误返回 400、不加积分；`charge.refunded` 产生 Sentry 告警且不动积分
 - [ ] Stripe / Waffo 正式模式的回调只登记 `https://shotviva.com/...`；测试模式的预览回调（分支地址 + Vercel 绕行密钥）没有出现在正式模式里；绕行密钥不在代码和 PR 里
@@ -63,7 +65,7 @@
 - [ ] 新账号有 3 个免费积分、0 个付费积分；用免费积分生成的作品 `credit_pool = 'free'`、公开、下载带右下角「Made with Shotviva」水印、不能改私密、可以删除
 - [ ] 买任何商品后生成：优先扣付费池、整单不拆，作品 `credit_pool = 'paid'`、默认私密、下载无水印、可改公开；付费池用完后再生成又回到免费作品并弹付费墙
 - [ ] 付费后，之前的免费作品仍带水印、仍公开（R2 里每张只有一份文件）
-- [ ] 没买会员只买 `pack` 的账号，生成的作品同样是付费作品（无水印、私密）
+- [ ] 没买会员只买 `pack_s` 的账号，生成的作品同样是付费作品（无水印、私密）
 - [ ] 切到生产密钥后，对上线时实际开着的通道用真卡付一笔最小金额，确认到账后在后台退款
 
 ## 6. 创作库（上线前 8 周闸门）
