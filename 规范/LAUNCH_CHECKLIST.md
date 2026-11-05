@@ -153,6 +153,19 @@
 
 ## 10. 推迟项（不卡上线，到时再勾）
 
+- [ ] **建站工具包**（Owner 2026-11-06 定：上线并跑通第一笔真实付款后做）：
+  - 仓库设成 GitHub 模板仓库。
+  - 配置文件 `launch.yaml`，填品牌、域名、价格、地区和各平台令牌。
+  - `pnpm launch:bootstrap`：一条命令自动配好以下各项，最后列出剩下的手动步骤（Google OAuth 客户端、Stripe 激活、Google 品牌验证、律师审条款）：
+    - Supabase：建项目，用 `config.toml` 加 `supabase config push` 推送登录设置、邮件模板、SMTP、回调地址、hCaptcha；
+    - Vercel：建项目、设环境变量、绑域名；
+    - R2：建桶，配跨域和生命周期；
+    - Stripe：建商品、价格和回调；
+    - Resend：加域名，并把 DNS 记录写进 Vercel DNS；
+    - PostHog / Sentry 项目。
+  - `pnpm launch:doctor`：检查环境变量和外部服务是否连通、配置是否一致。
+  - 第一步先把 Shotviva 自己的 Supabase 登录配置和邮件模板改成 CI 推送，以后改模板不再手贴。
+
 - [ ] 第 6~7 周：内容审核 + 作品审核后台页（创作库开放前必须完成）
 - [ ] 第 8 周开创作库时：noindex、sitemap 不含 /g 的测试和验收（创作库规格第 4 节）
 - [ ] 有付费会员后：会员到期提醒邮件、到期后保留 90 天和续费恢复
