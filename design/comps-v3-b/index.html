@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Shotviva v3-b · 暗房</title>
+<link rel="stylesheet" href="css/studio.css">
+<style>
+  body { background: #070605; padding: 48px 40px 80px; font-family: var(--font-sans), "PingFang SC", sans-serif; }
+  body::after { display: none; }
+  header { max-width: 980px; }
+  header .eyebrow { margin-bottom: 14px; }
+  header h1 { font: 400 64px/.95 var(--font-display); letter-spacing: -0.02em; }
+  header h1 em { color: var(--primary); }
+  header p { margin-top: 18px; font: 400 15px/1.75 "PingFang SC", var(--font-sans); color: var(--bone-dim); max-width: 860px; }
+  .swatches { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
+  .sw { display: flex; align-items: center; gap: 8px; font: 400 11.5px/1 var(--font-mono); color: var(--muted-foreground); padding: 6px 10px 6px 6px; border-radius: 999px; background: rgba(242,236,227,.04); box-shadow: inset 0 0 0 1px var(--border); }
+  .sw i { width: 20px; height: 20px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
+  .board { display: flex; gap: 40px; margin-top: 48px; overflow-x: auto; padding-bottom: 20px; }
+  figure { margin: 0; flex: none; width: 391px; }
+  .phone { width: 391px; height: 828px; padding: 8px; border-radius: 58px; background: #1b1916; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.12), 0 40px 80px -30px rgba(0,0,0,.9); }
+  .phone iframe { display: block; width: 375px; height: 812px; border: 0; border-radius: 50px; background: #0B0A09; }
+  figcaption { margin-top: 18px; padding: 0 8px; }
+  figcaption b { display: flex; align-items: baseline; gap: 10px; font: 600 15px/1.3 "PingFang SC", var(--font-sans); }
+  figcaption b span { font: 400 11px/1 var(--font-mono); color: var(--primary); }
+  figcaption p { margin-top: 6px; font: 400 13px/1.65 "PingFang SC", var(--font-sans); color: var(--muted-foreground); }
+  figcaption nav { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  figcaption nav a { font: 500 12px/1 "PingFang SC", var(--font-sans); padding: 7px 10px; border-radius: 8px; background: rgba(242,236,227,.06); text-decoration: none; color: var(--bone-dim); }
+</style>
+</head>
+<body>
+<header>
+  <p class="eyebrow">Shotviva · mobile comps · v3-b</p>
+  <h1>Darkroom<em>.</em></h1>
+  <p>方向叫「暗房」：把 Shotviva 当成一间给小商家用的冲印暗房，而不是又一个霓虹 AI 工具。底色是偏暖的近黑，文字是相纸一样的骨白，全站只有一种强调色，就是暗房安全灯的朱红，只用在主按钮、进度和「AI 结果」这几处关键位置。字体用 Instrument Serif 做杂志感的大标题，Geist 做界面文字，Geist Mono 做胶片边缘那种帧号和参数标注（4:5 · AS SHOT、1024 px）。签名动作是「显影」：每张模板卡静止时就是左手机原图、右 AI 结果，中间一条亮线；生成中，灰阶的原图被一条安全灯扫描线逐行「显影」成成片。付费墙三档用材质区分：Starter 是哑光石墨，Pro 是带安全灯余温的暖色玻璃，Max 是缓慢流转的银盐铬边加珠光。</p>
+  <div class="swatches">
+    <span class="sw"><i style="background:#0B0A09"></i>#0B0A09 background</span>
+    <span class="sw"><i style="background:#141210"></i>#141210 card</span>
+    <span class="sw"><i style="background:#F2ECE3"></i>#F2ECE3 foreground</span>
+    <span class="sw"><i style="background:#A2988C"></i>#A2988C muted-fg</span>
+    <span class="sw"><i style="background:#FF5B2E"></i>#FF5B2E primary · safelight</span>
+    <span class="sw"><i style="background:linear-gradient(115deg,#F4EFE6,#B9C3CC,#E8DDF0,#A9B6C2)"></i>chrome · Max only</span>
+  </div>
+</header>
+
+<div class="board">
+  <figure>
+    <div class="phone"><iframe src="home.html?frame=1" title="Homepage" loading="lazy"></iframe></div>
+    <figcaption><b><span>01</span>营销首页 home.html</b>
+      <p>首屏就是取景器式的生成器：4:5 上传框带取景角标，上传后出现模板横条、可选输入框和「Generate · 2 credits」。生成器滑出视野时，底部浮出同一个主按钮。往下是「一张手机照 → 一整套拍摄」案例、三步、按分类的模板横条（卡片静止即对比）、事实表、免费说明、FAQ 和内链。</p>
+      <nav><a href="home.html?frame=1" target="_blank">打开</a><a href="home.html?frame=1&photo=1" target="_blank">已上传状态</a></nav></figcaption>
+  </figure>
+  <figure>
+    <div class="phone"><iframe src="create.html?frame=1" title="Create" loading="lazy"></iframe></div>
+    <figcaption><b><span>02</span>登录后首页 create.html</b>
+      <p>iOS 大标题「Create」用衬线体，右上是余额「6 free」。顶部一张会动的精选模板（Evening Glow 视频），分类 chips 吸顶可筛选，下面两列模板卡。点卡片从底部弹出预览，可拖动对比前后，一个「Use this template」。</p>
+      <nav><a href="create.html?frame=1" target="_blank">打开</a></nav></figcaption>
+  </figure>
+  <figure>
+    <div class="phone"><iframe src="workspace.html?frame=1" title="Workspace" loading="lazy"></iframe></div>
+    <figcaption><b><span>03</span>工作台 workspace.html</b>
+      <p>尺寸 8 选项按真实比例画出小框，分辨率三档带像素标尺。底部固定栏放免费额度公开水印提示和唯一主按钮；余额不够时主按钮变成骨白色「Get credits · N needed」进付费墙。生成中是「显影」动画加三步进度。</p>
+      <nav><a href="workspace.html?frame=1" target="_blank">已传图</a><a href="workspace.html?frame=1&state=empty" target="_blank">未传图</a><a href="workspace.html?frame=1&state=generating" target="_blank">生成中</a><a href="workspace.html?frame=1&balance=0" target="_blank">余额不足</a></nav></figcaption>
+  </figure>
+  <figure>
+    <div class="phone"><iframe src="paywall.html?frame=1" title="Paywall" loading="lazy"></iframe></div>
+    <figcaption><b><span>04</span>付费墙 paywall.html</b>
+      <p>iOS 式页面抽屉，背后工作台缩小变暗，可下拉关闭。三档：Starter 哑光石墨、Pro 深宝石蓝玻璃（推荐）、Max 黑金（金色流转边框）。年付默认选中，「SAVE 42%」挂在切换器上；只有年付卡片写每年省多少。每档按「包含上一档全部，再加…」列现有权益，未上线的权益单独一组灰字标 Coming soon。支付只有 Card 和 Alipay。</p>
+      <nav><a href="paywall.html?frame=1" target="_blank">年付</a><a href="paywall.html?frame=1&billing=m" target="_blank">月付</a></nav></figcaption>
+  </figure>
+  <figure>
+    <div class="phone"><iframe src="photos.html?frame=1" title="Photos" loading="lazy"></iframe></div>
+    <figcaption><b><span>05</span>作品 photos.html</b>
+      <p>新增：Photos tab 显示进行中的后台任务（灰阶原图上一条朱红扫描线 + 进度条，tab 角标显示进行中数量），用户可以离开，做完落到下面「Done」。已完成的作品标 Private 或 Public · watermark。</p>
+      <nav><a href="photos.html?frame=1" target="_blank">打开</a></nav></figcaption>
+  </figure>
+</div>
+</body>
+</html>

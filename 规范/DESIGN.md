@@ -46,31 +46,32 @@
 
 ### 3.1 颜色
 
-Owner 2026-11-05 改定：**深色系**（T6 深色方向「打烊后的街」，取代 2026-11-04 的「先走浅色」）。仍然不刻意贴合食物，界面本身要克制，把视觉重心让给用户的照片；整体要有高级感和原生 app 的手感。具体色值以 T6 定稿的 `design/DESIGN-dark.md` 和 `design/tokens/` 为准，定稿后填进下表。
+Owner 2026-11-05 定稿：**B 版「暗房」（Darkroom）**，取代此前的「打烊后的街」深色稿。界面克制，视觉重心让给用户的照片，有高级感和原生 app 的手感。**设计系统已入库，以仓库里的 `design/DESIGN.md`（组件、版式、命名规则）、`design/tokens/tokens.css`（全部变量）、`design/TOKENS.md`（变量说明和 T8 实现时要清理的问题）为准**，高保真稿是 `design/comps-v3-b/`（home / create / workspace / paywall / photos）。下表只列 shadcn 主变量，值以 `tokens.css` 为准，两处不一致时改本表。
 
 | 变量 | 用途 | 值 |
 |---|---|---|
-| `--background` / `--foreground` | 页面底色和正文 | 深色底 / 浅色字（待 T6 定稿） |
-| `--primary` | 主按钮、链接、选中态 | 待 impeccable 定 |
-| `--muted` | 次要底色、占位 | 待 impeccable 定 |
-| `--accent` | 标签、徽章 | 待 impeccable 定 |
-| `--destructive` | 删除、错误 | 红 |
-| `--success` | 生成成功、付款成功 | 绿（shadcn 默认没有，要补） |
+| `--background` / `--foreground` | 页面底色和正文 | `#0B0A09` / `#F2ECE3` |
+| `--primary` | 主按钮、链接、选中态（safelight 橙） | `#FF5B2E`，字色 `#1A0702` |
+| `--muted` | 次要底色、占位 | `#1C1916`，说明字 `#A2988C` |
+| `--accent` | 标签、徽章 | `#2A2420` |
+| `--destructive` | 删除、错误 | `#FF5A5A` |
+| `--success` | 生成成功、付款成功 | `#7FD6A0`（shadcn 默认没有，要补） |
+| 付费墙三档材质 | Starter 哑光石墨、Pro 深宝石蓝玻璃、Max 实色黑金 | 见 `design/DESIGN.md`「Tier materials」，T8 实现时收进 `:root` |
 
 要求：
 
 - v1 只做深色模式，变量结构按 shadcn 写好，以后要加浅色模式不用改组件。营销页和应用页同一套深色。
 - 正文与背景对比度至少 4.5:1，按钮文字至少 4.5:1（WCAG AA）。
 
-### 3.2 字体（待 impeccable 定）
+### 3.2 字体
 
-- 字体在用 `impeccable` 做设计方向时确定，通过 `next/font` 自托管，不走外链。
+- B 版定稿：正文 **Geist**，数字和代码 **Geist Mono**，标题点缀 **Instrument Serif**（含斜体）。通过 `next/font` 自托管（字体文件见 `design/comps-v3-b/fonts/`），不走外链。
 - 字号：正文 16px（手机上不许小于 16px，否则 iOS 输入框会自动放大页面），说明文字 14px，H1 手机 32px / 桌面 48px。
 
 ### 3.3 间距、圆角、阴影
 
 - 间距只用 Tailwind 的 4 倍数刻度。
-- 圆角：卡片 `--radius: 0.75rem`，按钮和输入框跟随 shadcn。
+- 圆角：`--radius` 取 `tokens.css` 的值（B 版 14px），按钮和输入框跟随 shadcn 的派生值。
 - 阴影只用两级：卡片悬停、弹窗。
 
 ## 4. 关键页面与组件
