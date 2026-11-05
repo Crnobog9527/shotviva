@@ -473,9 +473,12 @@
 6. **公告横幅**：
    - 迁移，编号段 `0160`～`0179`，本卡 [spec] 合并后再写：
      - `site_announcements` 表和 RLS；
-     - `admin_activate_announcement`，校验时间段不重叠；
-     - `admin_unban_user`；
-     - `admin_dashboard_stats`。
+     - `admin_activate_announcement`（启用即切换，自动停用时间段重叠的旧公告），以及 `tstzrange` 排他约束；
+     - `admin_unban_user`，同时给 `admin_audit_log.action` 加上 `unban_user`；
+     - `admin_dashboard_stats`（不含收入）；
+     - `admin_search_users`；
+     - 三个全局时间索引（ARCHITECTURE §10「后台数据访问补充」）。
+   - 收入函数 `admin_revenue_stats` 由订单页那个 PR 新建。
    - 后台页 `/admin/announcements`。
    - 前台横幅组件：
      - 放在营销页和应用页最顶部，按当前语言显示。
@@ -494,7 +497,7 @@
 **验收**：由 Codex 在预览站验收，截电脑 1280px 和手机 375px 的图：
 - 非管理员访问任何 `/admin/*` 都是 404。
 - 概览数字和直接查库的结果一致。
-- 调积分、封禁、解封都写了流水和审计日志。
+- 调积分写流水；封禁、解封写审计日志。
 - 公告：定时生效和到期正确；中英文切换正确；关闭后不再出现，换新公告后重新出现。
 
 **依赖**：T3、T17、T20（已合并）；订单页依赖 T9 后端。

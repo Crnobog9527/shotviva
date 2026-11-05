@@ -388,7 +388,7 @@ v1 后台（Owner 2026-11-06 扩充；T23 做外壳和运营页）：**一个后
 
 | 导航 | 路由 | 内容 |
 |---|---|---|
-| 概览 | `/admin` | 今日 / 近 7 天 / 近 30 天的注册数、出图数、出图成功率、消耗积分（免费 / 付费分开）、收入（T9 之后有数）、新增付费用户；近 30 天出图和收入趋势图。由一个 SQL 函数 `admin_dashboard_stats(p_days)` 一次算完 |
+| 概览 | `/admin` | 今日 / 近 7 天 / 近 30 天：注册数、出图数、出图成功率、消耗积分（免费 / 付费分开）、新增付费用户、收入；近 30 天出图和收入趋势图。非收入部分由 `admin_dashboard_stats(p_days)` 一次算完；收入由 `admin_revenue_stats(p_days)` 算（T9 之后才有） |
 | 用户 | `/admin/users` | 按邮箱搜（读 `admin.users_overview`，最多返回 50 条）。用户详情：积分两池、会员到期、最近出图、积分流水（分页）。操作：调积分（`admin_adjust_credits`，选池、填原因）、封禁 / 解封（`admin_ban_user` / `admin_unban_user`，填原因） |
 | 订单与收入 | `/admin/orders` | 付款记录（时间、用户邮箱、商品、金额、付款方式、渠道、状态）和订阅状态，按商品和渠道汇总收入；每行链接到 Stripe 后台对应记录。退款仍在 Stripe 后台操作。数据来自 T9 的表，T9 合并后才有 |
 | 出图记录 | `/admin/jobs` | 全部出图任务，按状态、模板、供应商 / 模型、来源（web / graylum）、日期筛选，游标分页；失败任务显示 `error_code`；按模型和清晰度统计次数和估算成本（成本单价表是代码常量，和积分下限放在同一处） |
@@ -416,6 +416,23 @@ v1 后台（Owner 2026-11-06 扩充；T23 做外壳和运营页）：**一个后
   - 后台页、结账页、工作台生成过程中不显示。
   - 不做弹窗，不做倒计时，不追踪点击。要看效果，用 PostHog 自带的 `$pageview` 来源。
 - **后台管理**：列表；新增 / 编辑（两种语言并排填写，可预览样式）；启用 / 停用；定时开始和结束。
+
+**后台数据访问补充**（总控 2026-11-06，按 T23 开工前提出的问题定）：
+
+- **用户搜索**：`admin` schema 不对 Data API 开放。所以新增函数 `admin_search_users(p_query text)`，只授权给 `service_role`。它从 `admin.users_overview` 按邮箱 `ilike` 查，最多返回 50 行。
+- **新增全局时间索引**，给概览统计和出图记录的全局分页用：
+  - `generation_jobs(created_at desc, id desc)`
+  - `credit_ledger(created_at)`
+  - `profiles(created_at)`
+- **审计**：
+  - `admin_audit_log.action` 的允许值加上 `unban_user`。
+  - 封禁和解封写审计日志。
+  - 调积分只写积分流水，流水里已有原因，不再另写审计日志。
+- **公告切换**：
+  - 「启用」就是切换：在同一个事务里自动停用和它时间段重叠的旧公告，确认框里写明会停用哪一条。
+  - 编辑一条已启用的公告，如果改完和别的已启用公告时间重叠，直接拒绝。
+  - 数据库用排他约束兜底：`exclude using gist (tstzrange(coalesce(starts_at,'-infinity'), coalesce(ends_at,'infinity')) with &&) where (is_active)`。
+- **收入**：`admin_dashboard_stats` 不含收入。收入单独用一个函数 `admin_revenue_stats(p_days)`，在 T9 的订单表合并后由订单页那个 PR 新建。概览页两个函数都调。这样两个函数各自一次写成，不需要用 `create or replace` 回头补字段。
 
 页面细节：
 
