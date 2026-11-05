@@ -561,15 +561,41 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 
 ## 17. 多语言：英文 + 简体中文（Owner 2026-11-06）
 
-**v1 上线就同时有英文和简体中文，全站覆盖**：应用界面、付费墙、邮件、首页和营销页、`/pricing`、法律页。
+**v1 上线只做英文和简体中文两种语言。中文只覆盖用户使用主路径上的核心页面**（Owner 2026-11-06 确认清单），其余页面上线时只有英文：
+
+| # | 中文页面 | 用途 | 收录 |
+|---|---|---|---|
+| 1 | `/zh` | 首页（含首屏生成器） | 收录，主词「ai改图」 |
+| 2 | `/zh/image-to-image-generator` | 图生图工具页 | 收录，主词「图生图」 |
+| 3 | `/zh/pricing` | 价格页（只写美元，不出现人民币） | 收录，主词「Shotviva 价格」 |
+| 4–7 | `/zh/signup`、`/zh/login`、`/zh/reset`、`/zh/reset/update` | 注册、登录、找回密码 | noindex |
+| 8–9 | `/zh/generate`、`/zh/generate/[templateId]` | 创作页、工作台 | noindex |
+| 10–11 | `/zh/photos`、`/zh/photos/[jobId]` | 我的作品、结果与分享 | noindex |
+| 12 | `/zh/account` | 账号 | noindex |
+| 13 | `/zh/wishlist` | 需求墙（开关打开时） | noindex |
+| 14 | `/zh/connect/graylum` | Graylum 连接授权 | noindex |
+
+不是独立页面但同样做中文：付费墙抽屉（写「支付宝」）、四封认证邮件、404 和错误页、页头页脚、语言切换器和「切换到中文」提示条、模板名称和说明。
+
+**上线时只有英文**：
+- 四个法律页。
+- 全部 SEO 内页和博客（`/commercial-photography`、`/ai-restaurant-menu` 等）。
+- 后台：本来就只有中文。
+
+SEO 内页的中文版不批量做。哪一页的英文版在 GSC 里出现中文查询的真实展示或点击，才单独提一张卡给它做中文版（建站规格 §6.1）。
+
+没有中文版的页面：
+- 不输出指向 `/zh` 的 hreflang；
+- 不显示「切换到中文」提示；
+- 语言切换器的「中文」指向 `/zh` 首页。
 
 - **地址**：英文不带前缀（`/pricing`），中文带 `/zh`（`/zh/pricing`）；slug 两种语言都用英文（建站规格 R4、§6）。`<html lang>`：`en` / `zh-Hans`。
 - **怎么选语言**：不做自动跳转，也不按 IP 判断（建站规格 §6）。浏览器首选语言是中文、又打开了英文页的访客，页面顶部出一条可关闭的「切换到中文」提示，点了才跳到对应的 `/zh` 页；语言切换器在页头 / 页脚，是真实的 `<a href>`。用户选过的语言存在 `NEXT_LOCALE` Cookie（功能性 Cookie，不用于统计，隐私政策写明），之后访问不再提示。登录后的应用页按 Cookie / 当前地址的语言显示。
-- **文字放哪**：界面文字 `site/messages/en.json` + `zh.json`（next-intl，组件里不准写死）；营销页、法律页正文按语言放 `site/content/`；模板名称和说明在 `templates.translations`（第 5 节）；数字、价格、日期用 next-intl 格式化。价格两种语言都是美元，口径与英文完全一致（建站规格 G3）。
+- **文字放哪**：界面文字 `site/messages/en.json` + `zh.json`（next-intl，组件里不准写死）；营销页正文按语言放 `site/content/`；模板名称和说明在 `templates.translations`（第 5 节）；数字、价格、日期用 next-intl 格式化。价格两种语言都是美元，口径与英文完全一致（建站规格 G3）。
 - **中文怎么写**：直答块、FAQ、页面标题按中文用户的真实问法重新写，不机器直译（建站规格 G13）；Owner 审阅后上线。
-- **SEO**：中文页只做 Google，不做百度（美国主体办不了 ICP 备案，Owner 2026-11-06）。`/zh` 下的可收录页面必须在中文口径主词表里（T22 产出），不在表里的 `/zh` 页 `noindex`；hreflang `en` / `zh-Hans` / `x-default`（指向英文）互指；每种语言独立 sitemap。
+- **SEO**：中文页只做 Google，不做百度（美国主体办不了 ICP 备案，Owner 2026-11-06）。`/zh` 下的可收录页面必须在中文口径主词表里（T22 产出），不在表里的 `/zh` 页 `noindex`；hreflang `en` / `zh-Hans` / `x-default`（指向英文）互指；每种语言独立 sitemap。中文 SEO 的写法规则见建站规格 §6.1。
 - **付款**：中文页付款方式写「支付宝」，英文页写 "Alipay"（DESIGN §4.5）；Stripe Checkout 托管页传 `locale`（`en` / `zh`）。
-- **法律页**：中文版是英文版的翻译，页首注明「本中文版本仅供参考，如与英文版本不一致，以英文版本为准」；律师审英文版。
+- **法律页**：上线时只有英文。以后要做中文版时，它是英文版的翻译，页首注明「本中文版本仅供参考，如与英文版本不一致，以英文版本为准」，律师审英文版。
 - **邮件**：见第 7 节，按 `user_metadata.locale` 发中文或英文。
 - **字体：中文用小米 MiSans，照 Graylum 的做法移植**（Owner 2026-11-06；参考 `seo资料/全站中文字体.md`，以及 Graylum staging 分支的 `apps/web/public/fonts/misans/`、`src/components/misans-font.tsx`）：
   - **文件**：官方未修改的静态 WOFF2 分包（简体中文 + 拉丁，400 / 500 / 600，约 168 个文件、5.8 MB），放在 `public/fonts/misans/`。
