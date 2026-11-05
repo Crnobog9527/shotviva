@@ -222,6 +222,12 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - `profiles.paid_until`（时间戳，可空）：只记录会员期，用于账号页显示（订阅状态、钱包一期会员的到期日）。不参与水印、私密、可商用的判断。
 - **扣费规则（`reserve_credits`）：先付费池、后免费池、整单不拆。** 付费池够就全扣付费池，作品 `credit_pool = 'paid'`；付费池不够但免费池够，全扣免费池，作品 `credit_pool = 'free'`；都不够就失败。不把一单拆到两个池里，所以没有「半付费作品」。付费用户剩下的免费积分留着，付费积分用完后才会用到，那时产出的是免费作品并触发付费墙。
 - 任何一次成功付款（首付、订阅续费、钱包单笔、Waffo 单笔、积分包）都走同一个 SQL 函数 `apply_purchase(user, product_id, event_id)`：`credits += 商品积分`；商品带天数的同时 `paid_until = max(paid_until, now()) + 天数`；积分包的天数为空，**不碰 `paid_until`**（不能写成「+0 天」，那会把空的 `paid_until` 写成 now()）。首付和单笔用 checkout session id 当 `event_id`，Waffo 用它的事件 id。
+- **结账入账走 `settle_checkout`**（T9，总控 2026-11-06 补；AGENTS §5.1 第 1 条：一个业务动作一个函数）。签名 `settle_checkout(user, product_id, session_id, subscription_id?, subscription_status?, current_period_end?, cancel_at_period_end?)`，只授权 `service_role`。它在一个事务里完成两件事：
+  1. 如果是订阅，先把 Stripe 上的当前状态写进镜像表 `subscriptions`。写入的状态由回调当场从 Stripe 取回，不用事件里带的旧数据。同一订阅 id 如果属于别的用户或别的商品，直接拒绝。
+  2. 再调用 `apply_purchase(user, product_id, session_id)`。
+
+  入账失败时，镜像表的写入一起回滚。同一 session 的重发和兄弟事件只入账一次。`checkout.session.completed` 和 `checkout.session.async_payment_succeeded` 都走它。
+- **首付的 `paid_until`**：首付走 `apply_purchase`，按商品天数累加（月付 +30 天，年付 +365 天），和 Stripe 本期结束日可能差一两天。从第一次续费起，由 `apply_subscription_renewal` 对齐 `period_end`，见下一条。
 - 订阅续费走 T10 新增的 `apply_subscription_renewal(user, product_id, invoice_id, period_end)`：`credits += 商品积分`，`paid_until = greatest(paid_until, period_end)`（直接对齐 Stripe 的本期结束日，不按天数累加，避免大小月漂移）；同样写流水、按 invoice id 幂等，内部复用 `_apply_credit_change`（总控 2026-11-05 补）。
 - 没用完的积分在续费时自然结转（积分不过期），不做「本期 / 结转」两本账。
 - **计价单位是 credit，不是「张」。**（唯一例外：新用户赠送对外说 "3 free Standard images"，即 6 个免费 credit，见建站规格 G3。） 一次出图扣多少 = 模板在用户所选分辨率的配置值 `templates.credits_cost[resolution]`（第 5 节：`high` 模板默认 1K 2 / 2K 4 / 3K 6，`medium` 1 / 2 / 3），后台模板编辑页可改；会员每月发多少 credit、积分包多少 credit 写在 `site.config.ts`。前台后台都叫 credits，余额显示为 "30 credits + 3 free"。「重新生成」按同一模板、同一分辨率再扣一次。
@@ -255,7 +261,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 已经确定的规则：
 
 - **订阅的状态只有 Stripe 一份真相**，Shotviva 存一张镜像表 `subscriptions`（`user_id`、`stripe_subscription_id`、`product_id`、`status`、`current_period_end`、`cancel_at_period_end`），由回调同步，账号页只读它。
-- 续费成功：`invoice.paid`（`billing_reason = subscription_cycle`）→ `apply_purchase`，`paid_until = 本期 period_end`。
+- 续费成功：`invoice.paid`（`billing_reason = subscription_cycle`）→ `apply_subscription_renewal`（T10），`paid_until = greatest(paid_until, 本期 period_end)`。
 - **续费失败：什么都不做。** 不再发积分，`paid_until` 到期后账号页显示会员已过期；已有的付费积分照常可用。Stripe 自己重试，哪天扣成功哪天再发。不写宽限期。
 - 取消：期末生效（Stripe 默认）。用户在 Stripe Customer Portal（Managed Payments 下是 Link 的客户门户）自己取消，账号页只放一个「Manage subscription」链接，不自己写取消界面。`customer.subscription.updated / deleted` 只更新镜像表。
 - 外部退款（Managed Payments 下 Link 客服 60 天内可以不经我们退款）：`charge.refunded` 只写记录 + Sentry 告警，Owner 手动 `admin_adjust_credits`。不写自动扣回。
@@ -270,7 +276,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 
 #### 会员档位权益（Owner 2026-11-05 定档位差异；上线范围由总控 2026-11-05 按「没做出来的不能写成现有功能」裁定）
 
-**当前档位**：`paid_until > now()` 时，取最近一次会员购买（订阅或钱包单期）的档位 `starter` / `pro` / `max`；只买过积分包或没付过费的账号没有档位，按 Starter 的生成限制处理（但用免费积分生成的仍是免费作品，规则不变）。档位只决定下表的「会员权益」，**不改变按作品判付费**（水印、私密、可商用仍只看作品用的是哪个池的积分，§6.1）。由 SQL 函数 `current_tier(user_id)` 统一给出，代码不各自判断。
+**当前档位**：`paid_until > now()` 时，取最近一次会员购买（订阅或钱包单期）的档位 `starter` / `pro` / `max`；只买过积分包或没付过费的账号没有档位，按 Starter 的生成限制处理（但用免费积分生成的仍是免费作品，规则不变）。档位只决定下表的「会员权益」，**不改变按作品判付费**（水印、私密、可商用仍只看作品用的是哪个池的积分，§6.1）。由 SQL 函数 `current_tier(user_id)`（实现：`paid_until > now()` 时，取付费池里最近一条带会员商品 id 的入账流水的档位；积分包和后台调积分不决定档位；返回 null 视同 Starter） 统一给出，代码不各自判断。
 
 | 权益 | Starter | Pro | Max | v1 状态 |
 |---|---|---|---|---|
@@ -296,7 +302,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - MP 商品必须设税码 `txcd_10105001`（AI 服务，个人用）。MP 价格不含税，税在结账时另加。
 - 顾客账单：卡支付显示 `LINK.COM* SHOTVIVA`，钱包支付显示 SHOTVIVA。MP 结账页不支持自定义域名。
 - 正式环境的 Managed Payments 要等 Stripe 资格审核。**审核没下来之前的兜底**：卡先不带 `managed_payments` 走普通订阅（Shotviva 当卖家），审核通过后翻开关。
-- 要处理的 Stripe 事件：`checkout.session.completed`（首付 / 单笔 → `apply_purchase`，写镜像表）、`invoice.paid`（只认 `subscription_cycle` → `apply_purchase`）、`customer.subscription.updated / deleted`（只更新镜像表）、`charge.refunded`（记录 + 告警）。其余事件忽略。
+- 要处理的 Stripe 事件：`checkout.session.completed` 和 `checkout.session.async_payment_succeeded`（首付 / 单笔 → `settle_checkout`：写镜像表 + `apply_purchase`，同一事务）、`invoice.paid`（只认 `subscription_cycle` → `apply_subscription_renewal`，T10）、`customer.subscription.updated / deleted`（只更新镜像表）、`charge.refunded`（记录 + 告警）。其余事件忽略。
 - Stripe 用与 Graylum 同一主体下**新开的独立账户**，避免两边回调互相收到对方的事件。
 
 **Waffo：保留，只做单笔兜底**（Owner 2026-11-05 确认不砍）：
