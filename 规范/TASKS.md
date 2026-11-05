@@ -16,8 +16,10 @@
 | T6 | 设计方向（impeccable，手机稿） | 可派 | — |
 | T7 | Graylum 伙伴接口 | 可派 | T1、T2、T3、T4 |
 | T8 | 应用壳与工作台 UI | 等 T6 | T4、T6 |
-| T9 | 付费墙、/pricing、Waffo 结账 | 等价格数字 | T2、T5、T6 |
-| T10 | Stripe 结账 | 等 Stripe 账户 + Managed Payments 核实 | T9 |
+| T9 | 付费墙、/pricing、Stripe 结账与首付发放 | 等价格数字 | T2、T5、T6 |
+| T10 | 订阅续费、取消同步、Customer Portal | 等 T9；首个付费用户满 30 天前上线 | T9 |
+| T13 | Waffo 单笔兜底 | 等 T9 | T9 |
+| T14 | 积分双池与按作品判付费（改 T2 / T4） | **可派，T8 / T9 之前** | T2、T4 |
 | T11 | 首页与内页最终文案 | 等价格数字 | T5 |
 | T12 | 模板需求墙（Wishlist） | 等 T8 | T1、T4、T8 |
 
@@ -69,6 +71,8 @@
 ---
 
 ## T2 积分、付费身份与任务表
+
+> 已合并（PR #3）。其中「付费身份 = `paid_until`」和「1 credit = 1 image」已被 Owner 2026-11-05 傍晚的决定取代，修订由 T14 执行；本卡保留作历史。
 
 **目标**：`profiles.credits` / `paid_until` 两列的全部 SQL 函数和流水表，`generation_jobs` 表，带并发测试。
 
@@ -156,7 +160,7 @@
 
 **范围**：设计产出物（变量表、三屏稿），不写业务代码。
 
-**依据**：DESIGN §0「三个关键屏先出 375px 手机稿，Owner 评审的就是手机稿」；§1 四条原则；§3.1「先走浅色系，不刻意贴合食物」；§8 应用壳全部（tab bar、流程页固定主按钮、底部抽屉、禁止清单）；§4.5 付费墙「两个选项：`pass`、`pack`」。
+**依据**：DESIGN §0「三个关键屏先出 375px 手机稿，Owner 评审的就是手机稿」；§1 四条原则；§3.1「先走浅色系，不刻意贴合食物」；§8 应用壳全部（tab bar、流程页固定主按钮、底部抽屉、禁止清单）；§4.5 付费墙「两个商品 `monthly` / `yearly` × 两组付款方式」。
 
 **验收**：
 - [ ] 工作台稿是流程页：顶栏返回 + 底部固定 Generate，无 tab bar
@@ -189,7 +193,7 @@
 
 ## T8 应用壳与工作台 UI（等 T6）
 
-**目标**：`(app)` layout（顶栏 + 四项 tab bar，Wishlist tab 先放占位页，内容在 T12）、Create / Photos / Account 三个 tab 页、工作台流程页、生成中 / 成功 / 失败三态、Share 按钮。
+**目标**：`(app)` layout（顶栏 + tab bar：Create / Photos / Account 三项，Wishlist 第四项由 `features.wishlist` 控制渲染，T8 先放占位页，内容在 T12）、三个 tab 页、工作台流程页、生成中 / 成功 / 失败三态、Share 按钮。
 
 **依据**：DESIGN §4.3、§4.4、§8 全部；`MOBILE_UI_rules_fable.md` §1.8.1 Share 实现规则。
 
@@ -199,15 +203,53 @@
 
 ---
 
-## T9 付费墙、/pricing、Waffo 结账（等价格数字）
+## T9 付费墙、/pricing、Stripe 结账与首付发放（等价格数字）
 
-**依据**：ARCHITECTURE §6.2 两个商品、§6.3「先接 Waffo」「回调先验签，再按事件 id 去重，最后在一个事务里写订单、发积分或会员期」；DESIGN §4.5；AGENTS §7 测试 2。
+**目标**：付费墙（三个商品 × 两组付款方式，`pack` 全单笔）、`/pricing`、Stripe Checkout Session 按付款方式路由（卡 = Managed Payments 订阅，`pack` 和钱包 = 单笔）、`checkout.session.completed` 回调 → `apply_purchase` + 写 `subscriptions` 镜像表。上线当天要有的部分。
+
+**范围**：`core/billing/stripe/`、`app/api/webhooks/stripe`、`app/(marketing)/pricing`、付费墙组件、迁移编号段 `0080`～`0099`（`subscriptions` 表；以及把 T2 的 `products` 从 `pass`/`pack` 改成 `monthly`（30 张/30 天）/`yearly`（360 张/365 天）的迁移：改 check 约束和种子行）、`site/site.config.ts` 的商品 id 与积分（同步改 T5 的相关测试）。不许动：`_apply_credit_change` / `apply_purchase` 的逻辑、续费逻辑（T10）。（总控 2026-11-05 补：main 上已合并的代码仍是 `pass`/`pack`，由 T9 负责改名。）
+
+**依据**：ARCHITECTURE §6.2 商品表与「同一个商品挂 recurring 和 one-time 两个 Price」「分两段上线」；§6.3 Stripe 路由表（MP 不传 `payment_method_types`、微信 `client = 'web'`、税码 `txcd_10105001`、「审核没下来之前卡先走普通订阅」）、「要处理的 Stripe 事件」；§6.1 `apply_purchase(user, product_id, event_id)` 用 session id 当 `event_id`；DESIGN §4.5；AGENTS §6 回调验签、§7 测试 2。
+
+**验收**：LAUNCH §5 前三条 + 回调重发三次只发一次 + 签名错误 400。
 
 **依赖**：T2、T5、T6、价格数字定稿。
 
-## T10 Stripe 结账（等 Stripe 账户 + Managed Payments 下 Alipay / WeChat 核实）
+## T10 订阅续费、取消同步、Customer Portal（等 T9；首个付费用户满 30 天前上线）
 
-**依据**：ARCHITECTURE §6.3；LAUNCH §5。**依赖**：T9。
+**目标**：`invoice.paid`（只认 `subscription_cycle`）→ `apply_subscription_renewal`（invoice id 幂等，`paid_until` 对齐 `period_end`）；`customer.subscription.updated / deleted` 更新镜像表；`charge.refunded` 记录 + Sentry 告警；账号页 Subscription 区块 + Customer Portal 链接。
+
+**范围补充**：迁移编号段 `0100`～`0119`，新增 SQL 函数 `apply_subscription_renewal`（ARCHITECTURE §6.1），测试连本地 Supabase：同一 invoice 重发只发一次、`paid_until` 对齐 `period_end` 且不回退。
+
+**依据**：ARCHITECTURE §6.2「续费失败：什么都不做」「取消：期末生效……不自己写取消界面」「外部退款……不写自动扣回」；DESIGN §4.5 账号页区块；AGENTS §7 测试 2（Stripe 另加四项）和 4。
+
+**验收**：LAUNCH §5 测试时钟续费一条、Portal 取消一条、`charge.refunded` 告警一条、账号页一条。
+
+**依赖**：T9。
+
+## T14 积分双池与按作品判付费（可派，排在 T8 / T9 之前）
+
+**目标**：把「付费身份 = `paid_until`」改成「按作品的 `credit_pool` 判付费」。约 1 天。
+
+**范围**：`supabase/migrations/` 编号段 `0140`～`0159`（`profiles.free_credits`、`generation_jobs.credit_pool`、流水表加 `pool`；改 `handle_new_user`、`reserve_credits`、`refund_job`、`admin_adjust_credits`、`grant_credits`（加 `pool`）、`apply_purchase`（商品天数为空时不碰 `paid_until`，`products.days` 改可空）；删或弃用 `is_paid`）、`core/auth/free-credits.ts`（注册赠送改为 `pool = 'free'`，总控 2026-11-05 补）、`core/billing/credits.ts`、`core/jobs/`（`reserve` 入参、`job-schema` 加 `creditPool`）、`core/storage/watermark.ts`（`shouldWatermark(creditPool)`）、`core/jobs/job-file.ts`（不再调 `isPaid`）、伙伴接口的 generate 走同一函数。不许动：支付通道、页面。
+
+**依据**：ARCHITECTURE §6.1 全文（两个池、「先付费池、后免费池、整单不拆」、`paid_until` 不参与权益、`admin_adjust_credits` 带 `pool`、流水记池）；§6.2「水印在下载路由加，按作品判」「免费作品……买了会员之后仍然是免费作品」「付费作品默认 private……可改公开」；§4 `credit_pool` 字段；§9 第 1、6 条；AGENTS §7 测试 1、4。
+
+**验收**：
+- [ ] 新用户 `free_credits = freeCredits`、`credits = 0`
+- [ ] 测试：free 3 / paid 0、cost 2 → 扣 free，`credit_pool = 'free'`，`visibility = 'public'`；free 3 / paid 30、cost 2 → 扣 paid，`'paid'`，`'private'`；free 1 / paid 1、cost 2 → 失败；退回退到原池
+- [ ] 下载路由：free 作品加水印，paid 作品不加；paid 作品可改 public 且仍不加水印；free 作品改 private 被拒
+- [ ] `admin_adjust_credits(user, amount, reason, pool)` 两个池都能调且写流水
+- [ ] 邮箱验证后的注册赠送进 `free_credits`，重复登录不重复发；`apply_purchase` 对天数为空的商品不改 `paid_until`（空的仍为空）
+- [ ] LAUNCH §5 的四条作品权益项（见该节）
+
+**依赖**：T2、T4（都已合并）。**T8 的余额显示和 T9 的付费墙文案依赖本卡的字段名，先合这张。**
+
+## T13 Waffo 单笔兜底（等 T9）
+
+**目标**：Waffo 托管结账卖 `monthly` / `yearly` 的单笔形态，回调验签 + 事件 id 去重 + `apply_purchase`；环境变量切通道时付费墙全部走 Waffo、隐藏微信和「自动续费」文案。
+
+**依据**：ARCHITECTURE §6.3「Waffo：保留，只做单笔兜底」四条；LAUNCH §5 Waffo 两条。**依赖**：T9。
 
 ## T11 首页与内页最终文案（等价格数字）
 
@@ -215,7 +257,7 @@
 
 ## T12 模板需求墙（Wishlist）（等 T8）
 
-**目标**：Wishlist tab（墙、发帖、My requests）、投票、后台需求审核页、shipped 闭环。约 3 天。
+**目标**：Wishlist tab（墙、发帖、My requests）、投票、后台需求审核页、shipped 闭环；整个功能受 `site.config.features.wishlist` 开关控制（ARCHITECTURE §15.6：关掉时 tab 不渲染、前台和后台路由 404、迁移仍跑、判断只在 `isWishlistEnabled(site)` 一处，配置由调用方传入，core 不 import site）。约 3 天。
 
 **范围**：`core/wishlist/`（总控 2026-11-05 定：需求墙跨模块，放 core）、`supabase/migrations/0060`～`0079`（编号段）、`app/(app)/wishlist/*`、`app/api/wishlist/*`、`app/(app)/admin/requests`。不许动：工作台、模板表结构。
 

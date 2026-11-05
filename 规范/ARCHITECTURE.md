@@ -51,7 +51,7 @@ src/
 
 - Shotviva 仓库本身设成 GitHub Template Repository。开新站时点 Use this template，`site/` 是唯一预期会改的代码目录。
 - 不做 monorepo，不做 npm 包。
-- 模板化的验收标准：把 `site/` 换成一份示例配置、`modules.image = false`，`pnpm build` 能通过，且 `/generate` 返回 404。不用「打开 video」做验收，video 模块 v1 没有 workspace。
+- 模板化的验收标准：把 `site/` 换成一份示例配置、`modules.image = false`、`features.wishlist = false`，`pnpm build` 能通过，且 `/generate`、`/wishlist` 都返回 404、tab bar 只剩三项。不用「打开 video」做验收，video 模块 v1 没有 workspace。
 
 ## 2. 站点配置 `site.config.ts`
 
@@ -62,15 +62,17 @@ export const site = defineSite({
   locales: { default: 'en', enabled: ['en'] }, // next-intl，英文不带前缀
   billing: {
     currency: 'usd',
-    freeCredits: 3,
+    freeCredits: 3,                               // 进 profiles.free_credits，只能生成免费作品（第 6.1 节）
     products: [                                   // 结构已定（第 6.2 节），价格数字待定
-      { id: 'pass', credits: 30, paidDays: 30, priceUsd: 0 /* 待定 */ },
-      { id: 'pack', credits: 120, paidDays: 365, priceUsd: 0 /* 待定 */ },
+      { id: 'monthly', credits: 30, paidDays: 30, priceUsd: 0 /* 待定 */ },
+      { id: 'yearly', credits: 360, paidDays: 365, priceUsd: 0 /* 待定 */ },
+      { id: 'pack', credits: 0 /* 待定 */, paidDays: 0, priceUsd: 0 /* 待定 */ },   // 积分包：不改会员期，所有人可买
     ],
-    channels: { primary: 'stripe', fallback: 'waffo' },
+    channels: { primary: 'stripe', fallback: 'waffo' },   // 第 6.3 节：Waffo 只做单笔兜底
   },
   partners: { graylum: { returnToHosts: ['graylum.com', 'staging.graylum.com'] } },  // 第 14 节
   gallery: { enabled: false },                 // 创作库规格 U9：上线前 8 周不开页面
+  features: { wishlist: true },                // 第 15.6 节：关掉 = tab 不显示、路由 404、后台页隐藏
 })
 ```
 
@@ -122,7 +124,8 @@ interface GenerationProvider {
 | source | 'web' / 'graylum'，哪条入口发起的 |
 | idempotency_key | 可空，唯一索引。伙伴接口把调用方的 callId 放这里，重复请求返回同一个任务 |
 | status | running → succeeded / failed |
-| visibility | 'public' / 'private'，免费用户固定 public，付费用户可改（见第 9 节） |
+| credit_pool | 'free' / 'paid'，本单从哪个池扣的（第 6.1 节）。决定水印、默认可见性、可商用 |
+| visibility | 'public' / 'private'，free 作品固定 public，paid 作品默认 private、本人可改（见第 9 节） |
 | credits_cost | 本次扣多少积分 |
 | output_key | 成品在 R2 的 key |
 | error_code | 失败原因 |
@@ -151,48 +154,77 @@ v1 上线 6~8 个调好的模板，之后每周加。提示词调到「餐具摆
 
 ## 6. 积分与付款
 
-### 6.1 积分模型（Owner 2026-11-05 拍板）
+### 6.1 积分模型（Owner 2026-11-05 拍板；傍晚修订为「按作品判付费」）
 
-两列解决，不做积分批次、不做过期：
+**权益跟着作品走，不跟着用户身份走**：一张图是用付费积分还是免费积分生成的，决定它是否带水印、是否私密、是否可商用。会员期 `paid_until` 不再决定任何权益。
 
-- `profiles.credits`（整数）：余额，**永不过期**。
-- `profiles.paid_until`（时间戳，可空）：付费身份窗口。**付费身份 = `paid_until > now()`**，决定私密、无水印、可商用。
-- 买任何商品：`credits += 商品积分`，`paid_until = max(paid_until, now()) + 商品天数`。
-- **1 credit = 1 image**，「重新生成」也算一张。前台英文一律说 "image"（"3 free images"、"uses 1 image"），后台和代码叫 credit。
-- 余额只能通过 SQL 函数改：发放、预扣、确认、退回、管理员调整。前端和普通接口都不能直接写余额。
-- 每一笔变动都写进流水表，带幂等键。
-- 每个模板的消耗积分写在模板里，不写死在代码里。
+- `profiles.free_credits`（整数）：注册赠送（`site.config.billing.freeCredits`），以后的活动赠送也进这里。只能生成**免费作品**。
+- `profiles.credits`（整数）：**付费积分**，来自订阅首付 / 续费、钱包一期会员、积分包、管理员补偿。**永不过期**。生成的是**付费作品**。
+- `profiles.paid_until`（时间戳，可空）：只记录会员期，用于账号页显示（订阅状态、钱包一期会员的到期日）。不参与水印、私密、可商用的判断。
+- **扣费规则（`reserve_credits`）：先付费池、后免费池、整单不拆。** 付费池够就全扣付费池，作品 `credit_pool = 'paid'`；付费池不够但免费池够，全扣免费池，作品 `credit_pool = 'free'`；都不够就失败。不把一单拆到两个池里，所以没有「半付费作品」。付费用户剩下的免费积分留着，付费积分用完后才会用到，那时产出的是免费作品并触发付费墙。
+- 任何一次成功付款（首付、订阅续费、钱包单笔、Waffo 单笔、积分包）都走同一个 SQL 函数 `apply_purchase(user, product_id, event_id)`：`credits += 商品积分`；商品带天数的同时 `paid_until = max(paid_until, now()) + 天数`；积分包的天数为空，**不碰 `paid_until`**（不能写成「+0 天」，那会把空的 `paid_until` 写成 now()）。首付和单笔用 checkout session id 当 `event_id`，Waffo 用它的事件 id。
+- 订阅续费走 T10 新增的 `apply_subscription_renewal(user, product_id, invoice_id, period_end)`：`credits += 商品积分`，`paid_until = greatest(paid_until, period_end)`（直接对齐 Stripe 的本期结束日，不按天数累加，避免大小月漂移）；同样写流水、按 invoice id 幂等，内部复用 `_apply_credit_change`（总控 2026-11-05 补）。
+- 没用完的积分在续费时自然结转（积分不过期），不做「本期 / 结转」两本账。
+- **计价单位是 credit，不是「张」。** 每个模板消耗多少 credit 写在 `templates.credits_cost`，后台模板编辑页可改；会员每月发多少 credit、积分包多少 credit 写在 `site.config.ts`。前台后台都叫 credits，余额显示为 "30 credits + 3 free"。「重新生成」按模板再扣一次。
+- 余额只能通过 SQL 函数改：发放（`grant_credits` 带 `pool` 参数，注册赠送和活动赠送用 `'free'`）、预扣、确认、退回、管理员调整（`admin_adjust_credits` 带 `pool` 参数）。前端和普通接口都不能直接写余额。
+- 每一笔变动都写进流水表，记录动的是哪个池，带幂等键。
 
 ### 6.2 商品（结构已定，价格待定）
 
-**SKU 结构 Owner 2026-11-05 拍板：2 个一次性商品。**
+**SKU 结构 Owner 2026-11-05 拍板（傍晚修订）：2 个会员商品 + 1 个积分包。**
 
-| id | 形态 | 积分 | 付费身份 |
-|---|---|---|---|
-| `pass` | 短期通行证 | 30（默认，随价格最终定） | +30 天 |
-| `pack` | 长期大包 | 120（默认，随价格最终定） | +365 天 |
+| id | 付费积分 | 会员期 `paid_until` | 卡 / Apple Pay / Google Pay | 支付宝 / 微信 | 谁能买 |
+|---|---|---|---|---|---|
+| `monthly` | M（待定，随价格定） | +30 天 | Stripe **订阅**，自动续费，每期 +M | Stripe **单笔**，到期不自动续，再买一次 | 所有人 |
+| `yearly` | 12 × M，一次发完 | +365 天 | Stripe **订阅**，每年续费一次 | Stripe **单笔** | 所有人 |
+| `pack` | P（待定） | 不变 | Stripe Managed Payments **单笔** | Stripe **单笔** | **所有人，包括没买会员的**；每 credit 单价高于订阅 |
 
-价格数字由 pricing-research 定稿后填进 `site.config.ts`，并同步修改建站规格 G3；在此之前 `priceUsd` 留 0，付费墙和 `/pricing` 的数字从配置读。商品 id 固定为 `pass` / `pack`，Stripe / Waffo 的商品映射、PostHog `purchase` 事件参数都按这两个 id 写。
+积分包不改会员期，但它发的是付费积分，用它生成的作品就是付费作品（无水印、私密、可商用），所以非会员买包也拿到完整权益——这正是「按作品判付费」要解决的事。
+
+- `monthly` / `yearly` 在 Stripe 里各是一个 Product（税码 `txcd_10105001`）挂两个 Price：recurring 和 one-time，价格相同；`pack` 只有 one-time Price。
+- 支付宝 / 微信在 Stripe 普通模式下不支持订阅，所以钱包用户买的是「一期会员」，`paid_until` 到了自己再买。这不是功能缺失，是 Stripe 的限制，付费墙文案要说清楚（"Renews automatically" vs "30 days, no auto-renew"）。
+- 价格数字由 pricing-research 定稿后填进 `site.config.ts`，并同步修改建站规格 G3；在此之前 `priceUsd` 留 0，付费墙和 `/pricing` 的数字从配置读。商品 id 固定为 `monthly` / `yearly` / `pack`，Stripe / Waffo 的商品映射、PostHog `purchase` 事件参数都按这三个 id 写。
 
 已经确定的规则：
 
-- v1 只有一次性付款，不自动续费。「会员期」就是 `paid_until`。
-- 卡、支付宝、微信都能付。
-- **水印在下载路由加**：成品只存一份无水印原图；`core/storage` 的下载路由按「`visibility = 'public'` 且当前非付费身份」用 `sharp` 叠右下角「Made with Shotviva」后返回（约 50ms），工作台预览和将来创作库展示同样走这个路由。付费后旧作品自动无水印，不重处理。
-- 付费作品默认私密、可商用。付费期内做的作品到期后仍保持私密，不会自动公开。
-- 卡支付的自动续费 v1 不做，等有付费用户再加。
-- 到期提醒邮件 v1 不做，第一个到期最早在上线 30 天后。
+- **订阅的状态只有 Stripe 一份真相**，Shotviva 存一张镜像表 `subscriptions`（`user_id`、`stripe_subscription_id`、`product_id`、`status`、`current_period_end`、`cancel_at_period_end`），由回调同步，账号页只读它。
+- 续费成功：`invoice.paid`（`billing_reason = subscription_cycle`）→ `apply_purchase`，`paid_until = 本期 period_end`。
+- **续费失败：什么都不做。** 不再发积分，`paid_until` 到期后账号页显示会员已过期；已有的付费积分照常可用。Stripe 自己重试，哪天扣成功哪天再发。不写宽限期。
+- 取消：期末生效（Stripe 默认）。用户在 Stripe Customer Portal（Managed Payments 下是 Link 的客户门户）自己取消，账号页只放一个「Manage subscription」链接，不自己写取消界面。`customer.subscription.updated / deleted` 只更新镜像表。
+- 外部退款（Managed Payments 下 Link 客服 60 天内可以不经我们退款）：`charge.refunded` 只写记录 + Sentry 告警，Owner 手动 `admin_adjust_credits`。不写自动扣回。
+- 不做：首月优惠券、升级降级、按比例退款、宽限期、测试时钟自动化、到期提醒邮件。
+- **分两段上线**：上线当天必须有「订阅模式建结账 + 首付发放」（和单笔几乎相同）；续费、取消同步、Portal 链接在第一个付费用户满 30 天之前上线即可（TASKS T10）。
+- 卡、支付宝、微信都能付（第 6.3 节的路由）。
+- **水印在下载路由加，按作品判**：成品只存一份无水印原图；`core/storage` 的下载路由对 `credit_pool = 'free'` 的作品用 `sharp` 叠右下角「Made with Shotviva」后返回（约 50ms），`credit_pool = 'paid'` 的作品永不加水印。工作台预览和将来创作库展示同样走这个路由。
+- **免费作品**（免费积分生成）：`visibility = 'public'`，带水印，用户不能改私密，可以删除。买了会员之后它们**仍然**是免费作品——不会自动去水印、不会自动私密；想要无水印版就用付费积分再生成一张。
+- **付费作品**（付费积分生成）：默认 `visibility = 'private'`、无水印、可商用，用户可以改公开（进创作库，仍无水印）。会员到期、积分用完都不影响已有付费作品。
+- 到期提醒邮件 v1 不做；Managed Payments 订阅的续费提醒由 Stripe / Link 自动发。
 
 ### 6.3 通道
 
-- Stripe 和 Waffo **v1 都要接**。原因：Stripe 新账户审核可能一天完成不了，Waffo 可以加急当天开通，上线当天可能只有 Waffo 能收款。
-- 通过环境变量指定当前用哪条通道：两条都开就 Stripe 优先、Waffo 兜底；只开一条就只显示那一条。**不做自动故障切换**，出问题时人工改开关。
-- Waffo 不支持微信支付，走 Waffo 时付款页只显示卡和支付宝。
-- 两条通道的回调规则相同：先验签，再按事件 id 去重，最后在一个数据库事务里写订单、发积分或会员期。
+**Stripe：一个账户，按付款方式路由**（照 Graylum staging `methodRouting.ts` 的做法，Graylum 2026-10-12 沙盒实测两种模式共用一个账户 PASS）：
+
+| 用户选的方式 | Checkout Session 怎么建 | 卖家 |
+|---|---|---|
+| 卡 / Apple Pay / Google Pay | `mode: 'subscription'`，`managed_payments: { enabled: true }`，不传 `payment_method_types`（MP 不允许） | Stripe（Link）当商户记录方，结账时另加税 |
+| 支付宝 | `mode: 'payment'`，`payment_method_types: ['alipay']` | Shotviva |
+| 微信 | `mode: 'payment'`，`payment_method_types: ['wechat_pay']`，`payment_method_options.wechat_pay.client = 'web'` | Shotviva |
+
+- 服务端只认用户选的方式，不按 IP 或浏览器语言强制。Managed Payments 的结账页不允许买家国家为中国，所以大陆用户自然选钱包。
+- MP 商品必须设税码 `txcd_10105001`（AI 服务，个人用）。MP 价格不含税，税在结账时另加。
+- 顾客账单：卡支付显示 `LINK.COM* SHOTVIVA`，钱包支付显示 SHOTVIVA。MP 结账页不支持自定义域名。
+- 正式环境的 Managed Payments 要等 Stripe 资格审核。**审核没下来之前的兜底**：卡先不带 `managed_payments` 走普通订阅（Shotviva 当卖家），审核通过后翻开关。
+- 要处理的 Stripe 事件：`checkout.session.completed`（首付 / 单笔 → `apply_purchase`，写镜像表）、`invoice.paid`（只认 `subscription_cycle` → `apply_purchase`）、`customer.subscription.updated / deleted`（只更新镜像表）、`charge.refunded`（记录 + 告警）。其余事件忽略。
 - Stripe 用与 Graylum 同一主体下**新开的独立账户**，避免两边回调互相收到对方的事件。
-- Stripe **开启 Managed Payments**（Owner 2026-11-05 确定）：多收 3.5%，由 Stripe 代算代缴美国销售税，和 Graylum staging 一致。**Managed Payments 下 Alipay / WeChat 是否可用尚未核实**，接 Stripe 之前先向 Stripe 确认一次。
-- **开发顺序：先接 Waffo，再接 Stripe。** Waffo 上线必有；Stripe 账户审核未通过不卡 Waffo 那张卡合并。
-- 做法参照 Graylum **staging 分支**的支付规则，但不复制它的代码：staging 的支付目录约 8900 行，而且还没上生产。
+
+**Waffo：保留，只做单笔兜底**（Owner 2026-11-05 确认不砍）：
+
+- 角色是 Stripe 账户本身没通过、或 Stripe 整体不可用时的收款兜底。Waffo 可以加急当天开通。
+- Waffo 上只卖 `monthly` / `yearly` 的**单笔**形态（+30 / +365 天），不做 Waffo 订阅；Waffo 不支持微信，付款页只显示卡和支付宝。
+- 通过环境变量指定当前用哪条通道：默认 Stripe；切到 Waffo 时付费墙全部方式都走 Waffo 单笔。**不做自动故障切换**，出问题时人工改开关。
+- 回调规则和 Stripe 相同：先验签，再按事件 id 去重，最后 `apply_purchase`。
+
+**开发顺序**：先 Stripe（T9 结账 + 首付、T10 续费），再 Waffo 兜底（T13）。做法参照 Graylum **staging 分支**的支付规则，但不复制它的代码：staging 的支付目录约 8900 行，带着首月优惠券、升级、宽限、测试时钟，Shotviva 一项都不要。
 
 ## 7. 登录
 
@@ -247,12 +279,12 @@ v1 上线 6~8 个调好的模板，之后每周加。提示词调到「餐具摆
 
 完全遵循创作库规格，另加下面几条（Owner 2026-11-04 确认）：
 
-1. **付费墙与 8 周闸门并存**：从上线第一天起，免费用户生成前就看到「作品将公开展示」的告知，免费用户的作品 `visibility = 'public'`。但前 8 周 `gallery.enabled = false`，不生成任何 /g、/tag、/gallery 页面。付费用户可以随时改成 `private`。
+1. **付费墙与 8 周闸门并存**：从上线第一天起，用免费积分生成前就看到「作品将公开展示」的告知，免费作品（`credit_pool = 'free'`）`visibility = 'public'`。但前 8 周 `gallery.enabled = false`，不生成任何 /g、/tag、/gallery 页面。付费作品默认 `private`，本人可以随时改公开或改回。
 2. **不另建作品表**：创作库规格第 3 节的 `ugc_works` 表不单独建。公开作品就是 `generation_jobs` 里 `status = 'succeeded' AND visibility = 'public'` 的记录。`indexable` 字段不要，作品页永远 noindex。
 3. **公开数据不含核心提示词**：只展示模板名和用户自己填的文案。「一键复用」= 同一模板 + 同样参数 + 换成复用者自己的照片。
 4. **标签选词看搜索意图**：标签主词必须是图片类或商用意图的词（如 `grilled salmon photo`、`cafe menu photos`），不收菜谱类意图的词。建站规格第 5 节「明确不做的词」不得进入标签白名单。每个标签上线前核实美国搜索量和哥飞版 KD，并检查前十名的页面类型。
 5. **审核放到第 6~7 周**：和作品审核后台页一起做，在第 8 周开放创作库之前完成。审核方案到时再定，要指定具体服务，不写「含人脸」这种无法验证的规则。
-6. 免费用户可以删除自己的作品（隐私法规要求），但不能设为私密。
+6. 免费作品可以被本人删除（隐私法规要求），但不能设为私密。
 
 ## 10. 管理后台
 
@@ -324,7 +356,7 @@ Owner 2026-11-04 决定：**不在 flux-kontext-template 上原地改造**，新
 - 应用页用第 1 节的 `(app)` 应用壳，按 DESIGN.md 第 8 节先出手机稿。
 - **模板需求墙（Wishlist）随 v1 上线**（Owner 2026-11-05 决定），占应用壳第四个 tab，见第 15 节。
 
-v1 不做：积分引擎抽象层、积分过期和批次、自动续费、自动故障切换、自动退款、保留期定时任务、提醒邮件、内容审核、作品审核页、除模板页和需求审核页外的后台页、多语言内容、海报排版功能、视频生成实现、服务端 HEIC 转码、原图存储、断点续传、PWA / 离线、需求墙的评论 / 通知 / 重复合并 / 分类筛选。
+v1 不做：积分引擎抽象层、积分过期和批次、订阅的宽限期 / 自动扣回 / 升级降级 / 优惠券 / 自写取消界面、Waffo 订阅、自动故障切换、自动退款、保留期定时任务、提醒邮件、内容审核、作品审核页、除模板页和需求审核页外的后台页、多语言内容、海报排版功能、视频生成实现、服务端 HEIC 转码、原图存储、断点续传、PWA / 离线、需求墙的评论 / 通知 / 重复合并 / 分类筛选。
 
 ## 14. 伙伴接口（Graylum 连接器）
 
@@ -357,7 +389,7 @@ Graylum 服务器 ──POST /api/partner/link { code }（Authorization: Bearer 
 | 路由 | 说明 |
 |---|---|
 | `POST /api/partner/link` | code 换 `{ account_id, display_name, credits_remaining }`，code 用过即废 |
-| `GET /api/partner/account` | `{ credits_remaining, paid_until, top_up_url }` |
+| `GET /api/partner/account` | `{ credits_remaining, free_credits_remaining, paid_until, top_up_url }`（两个池分开给，Graylum 据此提示这一单会不会是带水印的免费作品） |
 | `GET /api/partner/templates` | `templates` 里 `visible_in` 含 `partner` 的公开字段，含 `freeform` |
 | `POST /api/partner/generate` | **同步**。入参 `template_id`、`inputs`、可选 `image`（URL）；头 `Idempotency-Key`（Graylum 传 callId，落 `generation_jobs.idempotency_key`）。走第 4 节同一条预扣/确认/退回路径，`source = 'graylum'`。出参 `{ job_id, image_url（签名 7 天）, credits_charged, credits_remaining }` |
 | `GET /api/partner/jobs/{id}` | 状态 + 成功时的签名地址，给 Graylum 超时兜底用，只读 |
@@ -378,7 +410,7 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 
 ### 15.1 用户侧
 
-- 位置：`(app)` 壳第四个 tab **Wishlist**（DESIGN.md 第 8.2 节），`noindex`，只有登录用户可见。
+- 位置：`(app)` 壳第四个 tab **Wishlist**（DESIGN.md 第 8.2 节），`noindex`，只有登录用户可见。整个功能受 `site.config.features.wishlist` 控制（第 15.6 节）。
 - **门槛**：至少成功出过 1 张图（`generation_jobs` 有 `succeeded`）的账号才能发帖和投票。未达门槛的账号能看墙，按钮灰掉并提示先出一张图。
 - 发帖：自然语言描述（≤300 字）+ 参考图 1～3 张。不选分类、不写标题、不出现 prompt 一词。参考图复用第 8.2 节的上传链路（浏览器压缩 + 直传），存 R2 `requests/{user_id}/{uuid}.jpg`，不设过期；被拒或下架时服务端删除。
 - 状态机：`pending`（提交后，只有本人可见「审核中」）→ `live`（Owner 通过，上墙）→ `shipped`（模板做出来了，关联 `template_id`）；或 → `rejected`（本人在「My requests」里看到，不显示原因）；`live` 可被 Owner 下架回 `rejected`。
@@ -405,3 +437,12 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 ### 15.5 条款
 
 服务条款加一句：上传的参考图由上传者负责，我们可以不经说明下架。隐私政策写明：需求参考图保留到需求被拒、下架或账号删除为止；墙上只显示脱敏用户名。
+
+### 15.6 开关（Owner 2026-11-05 决定）
+
+需求墙是一个**可整体关闭的功能**，不是产品的固定部分：这个仓库当模板开视频站时，视频站不需要它。
+
+- 开关在 `site.config.ts`：`features: { wishlist: boolean }`。和 `modules`、`gallery.enabled` 一样是建站时的配置，不是运行时后台开关——「关不关」是每个站建站时定一次的事，放配置最省（不用设置表、不用缓存、build 时就能裁掉）。
+- `features.wishlist = false` 时：tab bar 只渲染三项；`app/(app)/wishlist/*` 和 `app/api/wishlist/*` 返回 404；后台的需求审核页不出现在后台导航且直接 404；`template_requests` 两张表的迁移仍然跑（表空着无害，避免模板站的迁移序列分叉）。
+- 判断只在一处：`core/wishlist/index.ts` 导出 `isWishlistEnabled(site: SiteConfig)`，**配置由调用方传入**（core 不能 import `site/`，写法同 `core/config` 的 `isModuleEnabled(site, id)`）；`features` 的类型加在 `core/config/define-site.ts`。路由、layout、后台导航都调它，不准各自读 `features.wishlist`（总控 2026-11-05 补）。
+- 以后真需要「上线后临时关掉」（例如垃圾内容太多）再加运行时开关，一个 `system_settings` 行，一小时的事；v1 不做。

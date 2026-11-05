@@ -7,7 +7,7 @@
 - [ ] Vercel Pro 项目建好，绑定 shotviva.com，www 跳转到不带 www 的主域名
 - [ ] Supabase 生产项目 `shotviva` 和预览用的测试项目 `shotviva-preview` 分开，都在美国西部一区（us-west-1）。生产项目先用免费计划（Owner 2026-11-05）：第一笔真实付款到账后立刻转进 Pro 组织（转移后地址和密钥不变）；在那之前留意免费项目一周无请求会暂停、没有每日备份
 - [ ] Supabase Auth 的 Site URL 和 Redirect URLs 配好，包含预览域名通配
-- [ ] Stripe：同一主体下新开的独立账户，开通卡、支付宝、微信支付；账单显示 SHOTVIVA。审核未通过也不影响上线（见第 5 节）
+- [ ] Stripe：同一主体下新开的独立账户，开通卡、支付宝、微信支付；账单描述设为 SHOTVIVA（卡支付在 Managed Payments 下显示 `LINK.COM* SHOTVIVA`）。Managed Payments 资格审核已提交；审核没下来时卡走普通订阅兜底（ARCHITECTURE §6.3）。账户本身没通过时用 Waffo
 - [ ] Waffo：申请加急，测试和生产密钥分开创建，回调格式选 Raw
 - [ ] Stripe 和 Waffo 的生产回调地址、签名密钥都已登记到环境变量
 - [ ] OpenAI：组织验证完成，有 GPT-Image-2.5 权限，设好每月消费上限
@@ -48,15 +48,19 @@
 
 ## 5. 支付
 
-- [ ] 价格数字已定稿并填进 `site.config.ts`，首页、价格页、FAQ、结构化数据的数字完全一致；商品只有 `pass` 和 `pack` 两个
-- [ ] 已向 Stripe 确认 Managed Payments 下 Alipay / WeChat 可用；不可用的方式不在付款页显示
-- [ ] Stripe 测试模式：卡、支付宝、微信各付一次每种商品，都能到账
-- [ ] Waffo 沙盒：卡、支付宝各付一次每种商品，都能到账；付款页不显示微信
-- [ ] 只开 Waffo、只开 Stripe、两个都开三种开关状态下，付款页显示正确
-- [ ] 两条通道的回调各重发 3 次，积分只加一次；签名错误返回 400、不加积分
-- [ ] 买 `pass` 后 `credits` +30、`paid_until` +30 天；再买 `pack` 后 `paid_until` 在原基础上 +365 天，积分累加
-- [ ] `paid_until` 过期后自动变回免费身份：新作品下载带水印，旧作品仍私密
-- [ ] 免费作品下载带右下角「Made with Shotviva」水印，付费后同一作品下载无水印（R2 里只有一份文件）
+- [ ] 价格数字已定稿并填进 `site.config.ts`，首页、价格页、FAQ、结构化数据的数字完全一致；商品只有 `monthly`、`yearly`、`pack` 三个，前两个在 Stripe 里各挂 recurring 和 one-time 两个 Price，`pack` 只有 one-time，Product 税码 `txcd_10105001`
+- [ ] Stripe 测试模式·卡：`monthly` 和 `yearly` 各订阅一次（Managed Payments），结账页显示税，到账后付费池 `credits` +M / +12M、`paid_until` = 本期 `period_end`
+- [ ] Stripe 测试模式·钱包：支付宝、微信各单笔买一次 `monthly`，结账页无税，`paid_until` +30 天，付费墙写明不自动续费；再用卡（MP 单笔）和支付宝各买一次 `pack`，付费池 +P、`paid_until` 不变
+- [ ] 用 Stripe 测试时钟把一个 `monthly` 订阅推进到续费：`invoice.paid` 到账后付费池 +M、`paid_until` 延到新一期；再推进一次让续费失败，不发积分、`paid_until` 不延、账号页显示已过期，已有付费积分仍可用
+- [ ] 在 Customer Portal 取消订阅：镜像表 `cancel_at_period_end = true`，`paid_until` 不变，期末后不再续
+- [ ] Waffo 沙盒：卡、支付宝各单笔买一次每种商品，都能到账；付款页不显示微信、不显示「自动续费」
+- [ ] 只开 Waffo、只开 Stripe 两种开关状态下，付款页显示正确
+- [ ] 两条通道的回调各重发 3 次，积分只加一次；签名错误返回 400、不加积分；`charge.refunded` 产生 Sentry 告警且不动积分
+- [ ] 账号页显示订阅状态和下次续费日，「Manage subscription」能打开 Stripe Customer Portal
+- [ ] 新账号有 3 个免费积分、0 个付费积分；用免费积分生成的作品 `credit_pool = 'free'`、公开、下载带右下角「Made with Shotviva」水印、不能改私密、可以删除
+- [ ] 买任何商品后生成：优先扣付费池、整单不拆，作品 `credit_pool = 'paid'`、默认私密、下载无水印、可改公开；付费池用完后再生成又回到免费作品并弹付费墙
+- [ ] 付费后，之前的免费作品仍带水印、仍公开（R2 里每张只有一份文件）
+- [ ] 没买会员只买 `pack` 的账号，生成的作品同样是付费作品（无水印、私密）
 - [ ] 切到生产密钥后，对上线时实际开着的通道用真卡付一笔最小金额，确认到账后在后台退款
 
 ## 6. 创作库（上线前 8 周闸门）
@@ -101,7 +105,7 @@
 - [ ] 出图失败、支付回调失败会在 Sentry 告警
 - [ ] 后台能新建、编辑、上下架模板和提示词
 - [ ] `admin_adjust_credits`、`admin_ban_user` 两个 SQL 函数可用，调用会写流水
-- [ ] 模板化验收：把 `site/` 换成一份示例配置、`modules.image = false`，`pnpm build` 能通过且 `/generate` 返回 404
+- [ ] 模板化验收：把 `site/` 换成一份示例配置、`modules.image = false`、`features.wishlist = false`，`pnpm build` 能通过，`/generate`、`/wishlist`、`/admin/requests` 都返回 404，tab bar 只剩三项
 
 ## 9.5 Graylum 连接器（Shotviva 侧）
 
