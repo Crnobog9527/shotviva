@@ -29,14 +29,14 @@ R12 监控节奏：上线当天 GSC 验证站点 + 提交 sitemap；上线满 2 
 
 ## 3. GEO 规则（13 条）
 SEO 争排名，GEO 争「被抄进答案」——每页都要有能整段摘走的句子和数字。
-G1 每页顶部写「直答块」：H1 下方 40~60 个英文词，以主词开头、自带完整信息、不需上下文。首页定稿（2026-11-05，59 词）："Image to image AI takes a photo you already have and gives it a new look while the subject stays as shot. With Shotviva you upload one phone photo, pick a template for food, products, rooms, pets or an art style, and download it in Standard, HD or Max. No prompts to write. You start with 3 free credits." 垂直页照此格式写，以该页主词开头。必须放正文最前、不许折叠。
+G1 每页顶部写「直答块」：H1 下方 40~60 个英文词，以主词开头、自带完整信息、不需上下文。首页定稿（2026-11-05，59 词）："Image to image AI takes a photo you already have and gives it a new look while the subject stays as shot. With Shotviva you upload one phone photo, pick a template for food, products, rooms, pets or an art style, and download it in Standard, HD or Max. No prompts to write. New users get 3 free Standard images." 垂直页照此格式写，以该页主词开头。必须放正文最前、不许折叠。
 G2 Title 带年份与限定词：AI 联网会自己组带年份的搜索词，Title 精确对上易被引用。所有工具页 Title 带 (2026)；垂直页另带 for Restaurants / for Etsy Sellers 这类人群限定，首页不带人群限定（首页是通用页）。
-G3 每个数字只能一套口径：免费额度（"3 free credits"，计价单位是 credit 不是「张」，因为不同模板消耗的 credit 不同）、价格（唯一来源是 site.config.ts；Owner 2026-11-05 定稿：Starter $19.90/月 50 credits 或 $139/年 600 credits，Pro $49.90/月 135 或 $349/年 1,620，Max $99/月 280 或 $699/年 3,360；积分包 $9.90/20、$24.90/55、$49.90/115；卡支付可订阅自动续费，钱包和积分包为单笔，见 规范/ARCHITECTURE.md §6.1、§6.2）、每张图消耗（按模板和清晰度：Standard / HD / Max 三档，即 1024 / 2048 / 2880 px，标准模板 2 / 4 / 6 credits，页面上写 "from 2 credits"；对外不写 1K / 2K / 3K，不写 4K）、支持语言数、出图耗时，全站（首页/价格页/FAQ/结构化数据/站外目录）完全一致；AI 交叉比对发现两套就不引用；改价一次改全站。
-G4 每页写死可核验事实，至少 3 条。全站通用的：免费额度（3 free credits）与价格档位；每张消耗（from 2 credits）；输出三档像素（Standard 1024 / HD 2048 / Max 2880 px）；上传限制（JPG / PNG / WebP，最大 20MB）；出图耗时（秒/张）；保留主体不变的技术说明。垂直页另加本行业的：餐饮页写 DoorDash/Uber Eats/Grubhub 菜单图推荐尺寸与比例，电商页写 Amazon / eBay / Etsy 主图要求，空间页写 Airbnb 封面图比例。
+G3 每个数字只能一套口径：免费额度（对外统一写 "3 free Standard images"，即注册送 6 个免费 credit = 3 张 Standard 档标准模板图，Owner 2026-11-05 定；其余计价仍用 credit，不说「张」）、价格（唯一来源是 site.config.ts；Owner 2026-11-05 定稿：Starter $19.90/月 50 credits 或 $139/年 600 credits，Pro $49.90/月 135 或 $349/年 1,620，Max $99/月 280 或 $699/年 3,360；积分包 $9.90/20、$24.90/55、$49.90/115；卡支付可订阅自动续费，钱包和积分包为单笔，见 规范/ARCHITECTURE.md §6.1、§6.2）、每张图消耗（按模板和清晰度：Standard / HD / Max 三档，即 1024 / 2048 / 2880 px，标准模板 2 / 4 / 6 credits，页面上写 "from 2 credits"；对外不写 1K / 2K / 3K，不写 4K）、支持语言数、出图耗时，全站（首页/价格页/FAQ/结构化数据/站外目录）完全一致；AI 交叉比对发现两套就不引用；改价一次改全站。
+G4 每页写死可核验事实，至少 3 条。全站通用的：免费额度（3 free Standard images）与价格档位；每张消耗（from 2 credits）；输出三档像素（Standard 1024 / HD 2048 / Max 2880 px）；上传限制（JPG / PNG / WebP，最大 20MB）；出图耗时（秒/张）；保留主体不变的技术说明。垂直页另加本行业的：餐饮页写 DoorDash/Uber Eats/Grubhub 菜单图推荐尺寸与比例，电商页写 Amazon / eBay / Etsy 主图要求，空间页写 Airbnb 封面图比例。
 G5 用 HTML 表格承载对比（成本、尺寸要求、模板分类），不用图片——AI 抽表格成功率显著高于段落。
 G6 FAQ 必须用用户原话。首页 5 句（通用，2026-11-05 定）：
 A What is image to image AI?
-B Is image to image AI free?（答：3 free credits，之后 from 2 credits a photo，价格从配置读）
+B Is image to image AI free?（答：new users get 3 free Standard images，之后 from 2 credits a photo，价格从配置读）
 C Does image to image AI keep my photo's subject the same?
 D How is image to image AI different from an AI image generator?（答案末尾链 /image-to-image-generator）
 E Can I use the photos commercially?（答：付费积分生成的作品无水印、可商用；免费作品公开带水印）
@@ -62,13 +62,13 @@ G13 多语言 GEO：/ja、/id 上线后直答块与 FAQ 必须母语写手重写
 
 **首页（第 1 周）**，主词 image to image ai（18,100，难度 36.8），2026-11-05 按通用定位重写，Owner 用哥飞 SEO agent 出初稿、audit-fable 窗口按产品事实修订：
 - Title（59 字符）："Image to Image AI: Restyle a Photo, Keep the Subject (2026)"；要带品牌时用 "Image to Image AI: New Look, Same Subject | Shotviva"（52 字符）。
-- Description（151 字符）："Image to image AI that turns a phone photo into a studio shot or a new art style. Pick a template, no prompts, the subject stays as shot. 3 free credits."
-- H1："Image to Image AI: Restyle a Photo, Keep the Subject"；副标题用 `<p>` 不用 H2："Shotviva: one phone photo in, a studio-quality photo out. No prompts to write."；直答块见 G1。
+- Description（151 字符）："Image to image AI that turns a phone photo into a studio shot or a new art style. Pick a template, no prompts, the subject stays as shot. 3 free images."
+- H1："Image to Image AI: Restyle a Photo, Keep the Subject"；副标题用 `<p>` 不用 H2："The AI photo studio that starts from your real photo. What you shot stays; the template changes the light, the scene or the art style."（Owner 2026-11-05 改定）；直答块见 G1。
 - H2 / H3 骨架（6 个 H2，顺序即 ARCHITECTURE §13 的首页区块顺序；H3 里的 credits 数和价格从 `site.config.ts` 读）：
   1. H2 "How Image to Image AI Works in 3 Steps"：H3 Upload One Photo / Pick a Template / Download in Standard, HD or Max（**不写 "original resolution"**，输出是三档像素，不是原图尺寸）。
   2. H2 "Img to Img Templates: No Prompts to Write"（承接副词 img to img）：模板网格按 ARCHITECTURE §5 的 6 个分类分组，每个分类一个 H3，**Art Styles 排第一**（Owner 2026-11-05：画风迁移是 image to image ai 主词的核心人群），之后是 Food & Drink / Products & Resale / Beauty & Skincare / Rooms & Spaces / Pets；首屏前后对比图默认显示画风示例，可切换 Products / Rooms / Pets，H3 下列该分类的模板名和一句用途；已有垂直页的分类在 H3 末尾链过去（Food → /ai-restaurant-menu、/ai-food-photography；Products → /commercial-photography；Rooms → /interior-photography、/architectural-photography）。**不按「anime / cartoon / portrait retouching」这类风格分组**：第一批只有一个画风模板，人像修图不做（ARCHITECTURE §5）。
   3. H2 "AI Image to Image: What Stays the Same"（承接同族写法 ai image to image，8,100/月、今年 3 月起从 2,900 涨到 14,800）：事实块，G4 的通用事实用表格写。
-  4. H2 "Free Image to Image AI: What You Get"（承接 image to image ai free，3,600/月）：H3 "3 Free Credits When You Sign Up"（**不是 "free images every day"**，免费额度只发一次）/ "Free Photos Are Public and Watermarked, Paid Photos Are Private"（按作品判付费，ARCHITECTURE §6.1）/ "Plans From $19.90 a Month" + 成本对比表（请摄影师 / 自己拍 / Shotviva）。
+  4. H2 "Free Image to Image AI: What You Get"（承接 image to image ai free，3,600/月）：H3 "3 Free Standard Images When You Sign Up"（**不是 "free images every day"**，免费额度只发一次）/ "Free Photos Are Public and Watermarked, Paid Photos Are Private"（按作品判付费，ARCHITECTURE §6.1）/ "Plans From $19.90 a Month" + 成本对比表（请摄影师 / 自己拍 / Shotviva）。
   5. H2 "Image to Image AI FAQ"：G6 首页 5 句。「vs AI image generator」做成 FAQ 的一问，不单独开 H2（避免首页去打 /image-to-image-generator 的词）。
   6. H2 "Image to Image AI for Food, Products, Rooms and More"：内链块，直链全部已上线内页和 /pricing（R8），每个链接一句话说明给谁用。
 - 淘汰："Image to Image AI for Restaurants & Small Shops"、"Built for Small Restaurants, Not Photographers" 那套 H1 / H2 全部作废；全站 H1、Title 里不再出现 Restaurants（垂直页除外）。
