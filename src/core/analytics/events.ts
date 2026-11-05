@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { CREDIT_POOLS } from '../billing/pools'
+import { PRODUCT_IDS } from '../config/define-site'
 import { findPii } from './pii'
 
 // The event dictionary of ARCHITECTURE §16.2. Names and properties are fixed; changing one
@@ -18,12 +19,11 @@ export const PRODUCT_TIERS = ['starter', 'pro', 'max', 'pack'] as const
 export const PRODUCT_INTERVALS = ['month', 'year'] as const
 export const CHECKOUT_FORMS = ['subscription', 'one_time'] as const
 export const PAYMENT_CHANNELS = ['stripe', 'waffo'] as const
-export const PAYMENT_METHODS = ['card', 'alipay', 'wechat_pay'] as const
+// No WeChat Pay (Owner 2026-11-05, ARCHITECTURE §6.2).
+export const PAYMENT_METHODS = ['card', 'alipay'] as const
 
 const checkoutProps = {
-  // A slug, not z.enum(PRODUCT_IDS): core/billing still has the pre-§6.2 ids until T9 lands
-  // the nine products; T9 tightens this to the catalog enum.
-  product_id: slug,
+  product_id: z.enum(PRODUCT_IDS),
   tier: z.enum(PRODUCT_TIERS),
   // ARCHITECTURE §6.2: empty for credit packs.
   interval: z.enum(PRODUCT_INTERVALS).nullable(),

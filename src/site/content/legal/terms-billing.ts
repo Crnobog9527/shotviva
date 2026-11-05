@@ -19,7 +19,7 @@ export const termsBillingSections: readonly LegalSection[] = [
       {
         list: [
           'Card, Apple Pay and Google Pay purchases may be sold to you by Link (part of Stripe) as the merchant of record. When checkout says so, Link is the seller of that purchase, Link’s terms also apply to it, Link calculates and collects the tax, and your statement shows Link’s name.',
-          'Other purchases, including Alipay and WeChat Pay payments and payments through Waffo, are sold by us unless the checkout page names another seller.',
+          'Other purchases, including Alipay payments and payments through Waffo, are sold by us unless the checkout page names another seller.',
         ],
       },
       'Credits are added to your account once the payment is confirmed. We may refuse or cancel an order that looks fraudulent or abusive, and we may correct pricing mistakes, even after an order is placed; if we cancel an order you paid for, we refund it.',
@@ -34,7 +34,7 @@ export const termsBillingSections: readonly LegalSection[] = [
       'Each successful payment, including each renewal, adds that plan’s credits to your account. A yearly plan adds the whole year’s credits at once.',
       'If a renewal payment fails, no credits are added. The payment provider may retry the charge; credits are added when a payment succeeds. Credits you already have stay on your account.',
       'You can cancel at any time with the "Manage subscription" link on your account page, which opens the billing portal of Stripe or Link. Cancelling stops future renewals; your current period runs to its end and is not refunded.',
-      'Membership plans paid with Alipay or WeChat Pay, or through Waffo, are a single payment for one period. They do not renew; buy again when you want more.',
+      'Membership plans paid with Alipay, or through Waffo, are a single payment for one period. They do not renew; buy again when you want more.',
       [
         'Cancel any subscription before you delete your account. If you deleted your account without cancelling, email ',
         emailLink,
