@@ -62,20 +62,22 @@ export type PartnerProfile = { credits: number; freeCredits: number; paidUntil: 
 
 const profileRow = z.object({
   credits: z.number().int(),
-  // Added by T14's two-pool migration; until then every credit is in `credits`.
-  free_credits: z.number().int().optional(),
+  free_credits: z.number().int(),
   paid_until: z.string().nullable(),
 })
 
-// Whole row on purpose: naming free_credits in the select would fail before T14's migration.
 export async function partnerProfile(db: SupabaseClient, userId: string): Promise<PartnerProfile> {
-  const { data, error } = await db.from('profiles').select('*').eq('id', userId).maybeSingle()
+  const { data, error } = await db
+    .from('profiles')
+    .select('credits, free_credits, paid_until')
+    .eq('id', userId)
+    .maybeSingle()
   if (error) throw new AppError('INTERNAL', `partner profile lookup failed: ${error.message}`)
   if (!data) throw new AppError('NOT_FOUND', 'Account not found')
   const row = profileRow.parse(data)
   return {
     credits: row.credits,
-    freeCredits: row.free_credits ?? 0,
+    freeCredits: row.free_credits,
     paidUntil: row.paid_until === null ? null : new Date(row.paid_until).toISOString(),
   }
 }

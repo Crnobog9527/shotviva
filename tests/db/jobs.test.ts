@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { confirmJob, refundJob, reserveJob, type ReserveJobInput } from '@/core/jobs'
 
-import { connectAdmin, createUser, DAY_MS, ledgerOf, profileOf, serviceClient } from './helpers'
+import { connectAdmin, createUser, ledgerOf, profileOf, serviceClient } from './helpers'
 
 const service = serviceClient()
 let db: Client
@@ -30,6 +30,7 @@ const job = (userId: string, overrides: Partial<ReserveJobInput> = {}): ReserveJ
   ...overrides,
 })
 
+// Pool selection, refunds per pool and the visibility toggle: credit-pools.test.ts.
 describe('reserve_credits', () => {
   it('lets only as many of 10 concurrent reserves through as the balance allows', async () => {
     const userId = await createUser(db, { credits: 3 })
@@ -67,15 +68,6 @@ describe('reserve_credits', () => {
       code: 'CREDITS_INSUFFICIENT',
     })
     expect((await profileOf(db, userId)).credits).toBe(1)
-  })
-
-  it('forces free users public and defaults paid users to private', async () => {
-    const free = await createUser(db, { credits: 1 })
-    const paid = await createUser(db, { credits: 2, paidUntil: new Date(Date.now() + DAY_MS) })
-
-    expect((await reserveJob(service, job(free, { visibility: 'private' }))).visibility).toBe('public')
-    expect((await reserveJob(service, job(paid))).visibility).toBe('private')
-    expect((await reserveJob(service, job(paid, { visibility: 'public' }))).visibility).toBe('public')
   })
 
   it('blocks banned users', async () => {

@@ -10,10 +10,11 @@ const WATERMARK = Buffer.from(WATERMARK_PNG_BASE64, 'base64')
 const MARK_WIDTH_RATIO = 0.32
 const MARGIN_RATIO = 0.025
 
-// Only free users' public works pass through here (ARCHITECTURE §6.2): the single stored
-// output stays clean, so a later purchase removes the mark without reprocessing anything.
-export function shouldWatermark(visibility: 'public' | 'private', ownerIsPaid: boolean): boolean {
-  return visibility === 'public' && !ownerIsPaid
+// Decided per work, never by the owner's membership (ARCHITECTURE §6.2): works charged to
+// the free pool are always marked, paid works never are, whatever their visibility or the
+// owner's paid_until. The single stored output stays clean either way.
+export function shouldWatermark(creditPool: 'free' | 'paid'): boolean {
+  return creditPool === 'free'
 }
 
 // Re-encoded as JPEG so the response stays far below Vercel's 4.5MB body limit, whatever

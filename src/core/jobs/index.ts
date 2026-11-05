@@ -9,7 +9,7 @@ export {
   type JobStatus,
   type JobVisibility,
 } from './job-schema'
-export { confirmJob, refundJob, reserveJob, type ReserveJobInput } from './settlement'
+export { confirmJob, refundJob, reserveJob, setJobVisibility, type ReserveJobInput } from './settlement'
 export { GenerationFailure } from './generation-failure'
 export { generateBodySchema, toGenerationRequest, type GenerationRequest } from './generation-request'
 export { resolveJobFile, type JobFile } from './job-file'

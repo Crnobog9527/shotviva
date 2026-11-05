@@ -13,7 +13,7 @@ export type RpcClient = {
   rpc(fn: string, args: Record<string, unknown>): PromiseLike<RpcResult>
 }
 
-// SQL functions raise these exception messages (supabase/migrations/0023–0026).
+// SQL functions raise these exception messages (supabase/migrations/0023–0026, 0141–0142).
 const SQL_ERROR_CODES: Record<string, ErrorCode> = {
   CREDITS_INSUFFICIENT: 'CREDITS_INSUFFICIENT',
   INVALID_INPUT: 'INVALID_INPUT',
@@ -23,6 +23,8 @@ const SQL_ERROR_CODES: Record<string, ErrorCode> = {
   IDEMPOTENCY_CONFLICT: 'CONFLICT',
   JOB_ALREADY_SETTLED: 'CONFLICT',
   USER_BANNED: 'FORBIDDEN',
+  // A free work cannot be made private (ARCHITECTURE §6.2).
+  FREE_WORK_PUBLIC: 'FORBIDDEN',
 }
 
 export function toRpcError(fn: string, error: { message: string; code?: string }): AppError {

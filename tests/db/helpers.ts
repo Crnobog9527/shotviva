@@ -71,24 +71,37 @@ export async function connectAdmin(): Promise<Client> {
   return client
 }
 
+// Balances to start a test user with: credits is the paid pool, freeCredits the free pool.
+export type TestProfile = { credits?: number; freeCredits?: number; paidUntil?: Date | null }
+
 // Inserting into auth.users fires the profiles trigger, like a real signup.
-export async function createUser(db: Client, profile: { credits?: number; paidUntil?: Date | null } = {}) {
+export async function createUser(db: Client, profile: TestProfile = {}) {
   const id = randomUUID()
   await db.query(
     "insert into auth.users (id, email, aud, role) values ($1, $2, 'authenticated', 'authenticated')",
     [id, `t2-${id}@example.test`],
   )
-  await db.query('update public.profiles set credits = $2, paid_until = $3 where id = $1', [
-    id,
-    profile.credits ?? 0,
-    profile.paidUntil ?? null,
-  ])
+  await setBalances(db, id, profile)
   return id
 }
 
+export async function setBalances(db: Client, id: string, profile: TestProfile) {
+  await db.query('update public.profiles set credits = $2, free_credits = $3, paid_until = $4 where id = $1', [
+    id,
+    profile.credits ?? 0,
+    profile.freeCredits ?? 0,
+    profile.paidUntil ?? null,
+  ])
+}
+
 export async function profileOf(db: Client, id: string) {
-  const { rows } = await db.query<{ credits: number; paid_until: Date | null; banned_at: Date | null }>(
-    'select credits, paid_until, banned_at from public.profiles where id = $1',
+  const { rows } = await db.query<{
+    credits: number
+    free_credits: number
+    paid_until: Date | null
+    banned_at: Date | null
+  }>(
+    'select credits, free_credits, paid_until, banned_at from public.profiles where id = $1',
     [id],
   )
   const row = rows[0]
@@ -97,8 +110,8 @@ export async function profileOf(db: Client, id: string) {
 }
 
 export async function ledgerOf(db: Client, id: string) {
-  const { rows } = await db.query<{ kind: string; delta: number; idempotency_key: string }>(
-    'select kind, delta, idempotency_key from public.credit_ledger where user_id = $1 order by id',
+  const { rows } = await db.query<{ kind: string; pool: string; delta: number; idempotency_key: string }>(
+    'select kind, pool, delta, idempotency_key from public.credit_ledger where user_id = $1 order by id',
     [id],
   )
   return rows

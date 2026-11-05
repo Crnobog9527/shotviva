@@ -2,10 +2,12 @@ import 'server-only'
 
 import { z } from 'zod'
 
+import { CREDIT_POOLS, type CreditPool } from './pools'
 import { callRpc, type RpcClient } from './rpc'
 
 // Thin service-role wrappers over the balance functions (ARCHITECTURE §6.1). All rules —
-// balance checks, idempotency, ledger rows — live in SQL; nothing here writes a balance.
+// pool choice, balance checks, idempotency, ledger rows — live in SQL; nothing here writes
+// a balance.
 
 export const PRODUCT_IDS = ['pass', 'pack'] as const
 export type ProductId = (typeof PRODUCT_IDS)[number]
@@ -13,20 +15,26 @@ export type ProductId = (typeof PRODUCT_IDS)[number]
 export type CreditChange = {
   // false when the idempotency key had already been applied (a safe replay).
   applied: boolean
-  balance: number
+  // Paid pool (profiles.credits).
+  credits: number
+  // Free pool (profiles.free_credits).
+  freeCredits: number
+  // Membership period, display only; it decides no entitlement.
   paidUntil: Date | null
 }
 
 const creditChangeSchema = z
   .object({
     applied: z.boolean(),
-    balance: z.number().int().nonnegative(),
+    credits: z.number().int().nonnegative(),
+    free_credits: z.number().int().nonnegative(),
     paid_until: z.string().nullable(),
   })
   .transform(
     (row): CreditChange => ({
       applied: row.applied,
-      balance: row.balance,
+      credits: row.credits,
+      freeCredits: row.free_credits,
       paidUntil: row.paid_until === null ? null : new Date(row.paid_until),
     }),
   )
@@ -34,6 +42,7 @@ const creditChangeSchema = z
 const userId = z.uuid()
 const key = z.string().min(1)
 const reason = z.string().min(1)
+const pool = z.enum(CREDIT_POOLS)
 
 export function signupGrantKey(id: string): string {
   return `signup:${id}`
@@ -41,10 +50,10 @@ export function signupGrantKey(id: string): string {
 
 export async function grantCredits(
   client: RpcClient,
-  input: { userId: string; amount: number; reason: string; idempotencyKey: string },
+  input: { userId: string; amount: number; reason: string; idempotencyKey: string; pool: CreditPool },
 ): Promise<CreditChange> {
   const args = z
-    .object({ userId, amount: z.number().int().positive(), reason, idempotencyKey: key })
+    .object({ userId, amount: z.number().int().positive(), reason, idempotencyKey: key, pool })
     .parse(input)
   return callRpc(
     client,
@@ -54,12 +63,14 @@ export async function grantCredits(
       p_amount: args.amount,
       p_reason: args.reason,
       p_idempotency_key: args.idempotencyKey,
+      p_pool: args.pool,
     },
     creditChangeSchema,
   )
 }
 
 // Called by the payment webhooks after signature check; eventId is the channel's event id.
+// Always credits the paid pool; only products with days move paid_until.
 export async function applyPurchase(
   client: RpcClient,
   input: { userId: string; productId: ProductId; eventId: string },
@@ -75,7 +86,7 @@ export async function applyPurchase(
 
 export async function adminAdjustCredits(
   client: RpcClient,
-  input: { userId: string; amount: number; reason: string; idempotencyKey?: string },
+  input: { userId: string; amount: number; reason: string; pool: CreditPool; idempotencyKey?: string },
 ): Promise<CreditChange> {
   const args = z
     .object({
@@ -85,6 +96,7 @@ export async function adminAdjustCredits(
         .int()
         .refine((n) => n !== 0),
       reason,
+      pool,
       idempotencyKey: key.optional(),
     })
     .parse(input)
@@ -95,13 +107,9 @@ export async function adminAdjustCredits(
       p_user_id: args.userId,
       p_amount: args.amount,
       p_reason: args.reason,
+      p_pool: args.pool,
       p_idempotency_key: args.idempotencyKey ?? null,
     },
     creditChangeSchema,
   )
-}
-
-// Paid status decides private works, no watermark and commercial use (ARCHITECTURE §6.1).
-export async function isPaid(client: RpcClient, id: string): Promise<boolean> {
-  return callRpc(client, 'is_paid', { p_user_id: userId.parse(id) }, z.boolean())
 }

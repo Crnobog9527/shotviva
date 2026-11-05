@@ -9,7 +9,7 @@ import { newInputKey } from '@/core/storage'
 import { jpeg } from '../fakes/images'
 import { createMemoryStore } from '../fakes/memory-store'
 import { fakeProvider, jobRow, seedTemplate, type FakeBehaviour } from './generation-fixtures'
-import { connectAdmin, createUser, DAY_MS, ledgerOf, profileOf } from './helpers'
+import { connectAdmin, createUser, DAY_MS, ledgerOf, profileOf, type TestProfile } from './helpers'
 import { serviceSupabase } from './supabase-env'
 
 // AGENTS §7 item 3: success, failure and timeout all settle correctly; failure always refunds.
@@ -27,7 +27,7 @@ afterAll(async () => {
   await db.end()
 })
 
-async function setup(behaviour: FakeBehaviour = 'ok', profile: { credits?: number; paidUntil?: Date | null } = { credits: 3 }) {
+async function setup(behaviour: FakeBehaviour = 'ok', profile: TestProfile = { credits: 3 }) {
   const userId = await createUser(db, profile)
   const r2 = createMemoryStore()
   const inputKey = newInputKey(userId, 'image/jpeg')
@@ -51,7 +51,13 @@ describe('runGeneration: success', () => {
     const { userId, r2, fake, deps, request } = await setup()
     const view = await runGeneration(deps, request())
 
-    expect(view).toMatchObject({ status: 'succeeded', credits_cost: 1, visibility: 'public', file_url: `/api/files/${view.id}` })
+    expect(view).toMatchObject({
+      status: 'succeeded',
+      credits_cost: 1,
+      credit_pool: 'paid',
+      visibility: 'private',
+      file_url: `/api/files/${view.id}`,
+    })
     expect(JSON.stringify(view).length).toBeLessThan(1000)
     expect(r2.objects.has(`outputs/${userId}/${view.id}.png`)).toBe(true)
     expect((await jobRow(db, view.id))?.output_key).toBe(`outputs/${userId}/${view.id}.png`)
@@ -63,9 +69,12 @@ describe('runGeneration: success', () => {
     expect(call?.aspectRatio).toBe('4:5')
   })
 
-  it('keeps paid users private by default', async () => {
-    const { deps, request } = await setup('ok', { credits: 1, paidUntil: new Date(Date.now() + DAY_MS) })
-    expect((await runGeneration(deps, request())).visibility).toBe('private')
+  it('makes a public free work from free credits, whatever the membership says', async () => {
+    const { deps, request } = await setup('ok', { freeCredits: 1, paidUntil: new Date(Date.now() + DAY_MS) })
+    expect(await runGeneration(deps, request({ visibility: 'private' }))).toMatchObject({
+      credit_pool: 'free',
+      visibility: 'public',
+    })
   })
 
   it('runs the provider once for repeated or concurrent requests with one job id', async () => {
@@ -129,8 +138,8 @@ describe('runGeneration: guards', () => {
     const { userId, deps, request } = await setup('ok', { credits: 5 })
     for (let i = 0; i < 2; i += 1) {
       await db.query(
-        `insert into public.generation_jobs (id, user_id, module, template_id, source, visibility, credits_cost)
-         values ($1, $2, 'image', $3, 'web', 'public', 1)`,
+        `insert into public.generation_jobs (id, user_id, module, template_id, source, credit_pool, visibility, credits_cost)
+         values ($1, $2, 'image', $3, 'web', 'free', 'public', 1)`,
         [randomUUID(), userId, templateId],
       )
     }
