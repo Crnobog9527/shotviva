@@ -48,3 +48,16 @@ export function sizeLabel(id: OutputAspect): string {
   if (!option) return 'Original'
   return option.ratio ? `${option.name} ${option.ratio}` : option.name
 }
+
+// Example for "Anything to change?", matched to the template's category so a handbag never gets
+// a food example (B comp workspace.html). Categories are admin text, so unknown ones fall back.
+const NOTE_EXAMPLES: Record<string, string> = {
+  'Food & Drink': 'e.g. Add a sprig of mint, remove the napkin',
+  'Products & Resale': 'e.g. Keep the chain gold, soften the shadow',
+  'Beauty & Skincare': 'e.g. Keep the label sharp, add a few water drops',
+  'Rooms & Spaces': 'e.g. Keep the sofa, warm up the lamp light',
+  Pets: 'e.g. Keep the collar, use a soft grey backdrop',
+  'Art Styles': 'e.g. Keep the glasses, softer line work',
+}
+
+export const notePlaceholder = (category: string) => NOTE_EXAMPLES[category] ?? 'e.g. Keep the colours, brighten the background'

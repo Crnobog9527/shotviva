@@ -14,7 +14,7 @@ const fieldClass =
   'w-full resize-none rounded-control border-0 bg-wash-faint p-4 text-body leading-[1.45] text-foreground shadow-[inset_0_0_0_1px_var(--input)] transition-shadow placeholder:text-muted-foreground focus:shadow-[inset_0_0_0_1.5px_var(--primary),0_0_0_4px_var(--safelight-halo)] focus:outline-none'
 
 // "Anything to change? (optional)" (DESIGN §4.3 step 2b): never called a prompt, ≤300 chars.
-export function NoteField({ value, onChange }: { value: string; onChange(next: string): void }) {
+export function NoteField({ value, placeholder, onChange }: { value: string; placeholder: string; onChange(next: string): void }) {
   return (
     <div>
       <label htmlFor="note" className="mb-2 flex items-baseline gap-2 text-label leading-[1.3] font-medium">
@@ -29,7 +29,7 @@ export function NoteField({ value, onChange }: { value: string; onChange(next: s
         onFocus={reveal}
         enterKeyHint="done"
         autoCapitalize="sentences"
-        placeholder="e.g. Add a sprig of mint, remove the napkin"
+        placeholder={placeholder}
         aria-describedby="note-count"
         className={`${fieldClass} min-h-[92px]`}
       />

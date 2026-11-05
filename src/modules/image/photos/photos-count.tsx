@@ -11,7 +11,8 @@ export function PhotosCount({ runningIds, done }: { runningIds: string[]; done: 
   }
   return (
     <span className="text-caption text-muted-foreground">
-      {ids.size} in progress · {done} done
+      {ids.size > 0 ? `${ids.size} in progress · ` : ''}
+      {done} done
     </span>
   )
 }

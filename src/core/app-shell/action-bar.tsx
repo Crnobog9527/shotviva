@@ -1,15 +1,28 @@
-import type { ReactNode } from 'react'
+'use client'
+
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { cn } from '../ui/cn'
 
 // The fixed bottom bar of flow pages: at most one notice line and the one primary (DESIGN
-// "Action Bar"). From md up it sits at the end of the content instead (§8.6). The spacer keeps
-// the last section clear of the bar on phones.
+// "Action Bar"). From md up it sits at the end of the content instead (§8.6). The spacer is
+// measured from the bar (notice lines and the home-indicator inset vary), so the last section
+// always scrolls clear of it on phones.
 export function ActionBar({ children, className }: { children: ReactNode; className?: string }) {
+  const bar = useRef<HTMLDivElement>(null)
+  const [height, setHeight] = useState(160)
+  useEffect(() => {
+    const element = bar.current
+    if (!element) return
+    const observer = new ResizeObserver(() => setHeight(element.offsetHeight + 16))
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
   return (
     <>
-      <div aria-hidden="true" className="h-40 md:hidden" />
+      <div aria-hidden="true" className="md:hidden" style={{ height }} />
       <div
+        ref={bar}
         className={cn(
           'action-material fixed inset-x-0 bottom-0 z-60 px-4 pt-3 pb-[calc(var(--sab)+12px)]',
           'md:static md:mt-8 md:bg-none md:px-4 md:pb-8 md:shadow-none md:backdrop-blur-none',

@@ -63,7 +63,7 @@
   /* Fixed chrome over scrolling content (tab bar, nav bar, action bar). */
   --bar-material: rgba(14, 12, 11, 0.78);
   --nav-top: rgba(11, 10, 9, 0.94);
-  --nav-bottom: rgba(11, 10, 9, 0.8);
+  --nav-bottom: rgba(11, 10, 9, 0.94);
   --action-top: rgba(16, 14, 12, 0.82);
   --action-bottom: rgba(16, 14, 12, 0.96);
   --scrim: rgba(5, 4, 3, 0.62);
@@ -255,7 +255,24 @@
   padding-top: var(--sat);
 }
 
-/* Developing scan line: sweeps while a photo develops; still under reduced motion. */
+/* Developing: the colour print is revealed above the safelight line; both read one registered
+   --left so they cannot drift apart. Held at 62% under reduced motion. */
+@property --left {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 62%;
+}
+@keyframes sv-develop {
+  from { --left: 78%; }
+  to { --left: 46%; }
+}
+@utility animate-develop {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: sv-develop 7s var(--ease) infinite alternate;
+  }
+}
+
+/* Developing scan line in Photos rows: sweeps while a photo develops; still under reduced motion. */
 @keyframes sv-scan {
   from { top: 8%; }
   to { top: 92%; }

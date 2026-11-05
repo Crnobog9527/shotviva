@@ -12,7 +12,7 @@ import { PhotoCard } from './photo-card'
 import { PhotoPickers } from './photo-pickers'
 import { CopyFields, NoteField } from './text-fields'
 import type { usePhoto } from './use-photo'
-import { SIZE_OPTIONS } from './workspace-options'
+import { notePlaceholder, SIZE_OPTIONS } from './workspace-options'
 
 export type FormValues = { aspect: OutputAspect; resolution: Resolution; note: string; copy: Record<string, string> }
 
@@ -31,7 +31,17 @@ export function WorkspaceForm({ template, balance, photo, values, onChange, form
   const size = SIZE_OPTIONS.find((option) => option.id === values.aspect)
   return (
     <>
-      <Section id="photo-h" title="Your photo">
+      <Section
+        id="photo-h"
+        title="Your photo"
+        aside={
+          photo.photo?.ratio ? (
+            <span className="text-caption text-muted-foreground">
+              <span className="font-mono">{photo.photo.ratio}</span> · as shot
+            </span>
+          ) : null
+        }
+      >
         {photo.photo ? (
           <PhotoCard photo={photo.photo} upload={photo.upload} onPick={photo.pick} />
         ) : (
@@ -44,7 +54,7 @@ export function WorkspaceForm({ template, balance, photo, values, onChange, form
         </div>
       ) : null}
       <div className="px-4 pt-6">
-        <NoteField value={values.note} onChange={(note) => onChange({ note })} />
+        <NoteField value={values.note} placeholder={notePlaceholder(template.category)} onChange={(note) => onChange({ note })} />
       </div>
       <Section
         id="size-h"

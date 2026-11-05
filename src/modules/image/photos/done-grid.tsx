@@ -19,7 +19,7 @@ export function DoneGrid({ items, now, anyRunning }: { items: PhotoItem[]; now: 
         {items.map((item) => (
           <li key={item.id}>
             <Link href={`/photos/${item.id}`} className="press block rounded-control">
-              <span className="hairline relative block aspect-[4/5] overflow-hidden rounded-control bg-card">
+              <span className="hairline relative block aspect-[4/5] overflow-hidden rounded-control bg-muted">
                 {item.fileUrl ? <img src={item.fileUrl} alt={`${item.templateName} photo`} loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover" /> : null}
                 <WorkTag pool={item.creditPool} visibility={item.visibility} className="absolute bottom-2 left-2" />
               </span>

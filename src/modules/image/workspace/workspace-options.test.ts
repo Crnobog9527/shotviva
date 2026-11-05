@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { OUTPUT_ASPECTS, RESOLUTIONS } from '@/core/templates'
 
-import { SIZE_OPTIONS, TIER_OPTIONS, sizeLabel, tierName } from './workspace-options'
+import { notePlaceholder, SIZE_OPTIONS, TIER_OPTIONS, sizeLabel, tierName } from './workspace-options'
 
 describe('workspace options', () => {
   it('offers exactly the eight output sizes, Original first', () => {
@@ -26,5 +26,9 @@ describe('workspace options', () => {
   it('labels sizes for meta lines', () => {
     expect(sizeLabel('16:9')).toBe('Banner 16:9')
     expect(sizeLabel('original')).toBe('Original')
+  })
+  it('matches the note example to the category, with a neutral fallback', () => {
+    expect(notePlaceholder('Food & Drink')).toMatch(/mint/)
+    expect(notePlaceholder('Something new')).toMatch(/brighten/)
   })
 })

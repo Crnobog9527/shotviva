@@ -42,7 +42,12 @@ export function DeleteAccountPanel() {
           type="button"
           disabled={!del.canConfirm}
           onClick={del.confirmDelete}
-          className={cn(buttonVariants({ variant: 'cta', size: 'cta' }), 'mt-6 bg-destructive text-background disabled:opacity-40')}
+          className={cn(
+            'mt-6',
+            del.canConfirm
+              ? cn(buttonVariants({ variant: 'cta', size: 'cta' }), 'bg-destructive text-background')
+              : buttonVariants({ variant: 'glass', size: 'cta', className: 'w-full rounded-tile text-cta text-muted-foreground' }),
+          )}
         >
           {del.status === 'deleting' ? t('deleting') : t('deleteConfirm')}
         </button>

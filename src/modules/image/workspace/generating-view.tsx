@@ -22,9 +22,14 @@ export function GeneratingView({ job }: { job: TrackedJob }) {
   return (
     <section aria-labelledby="gen-h" className="px-4 pt-2">
       <h2 id="gen-h" className="sr-only">Developing your photo</h2>
-      <div className="hairline relative aspect-[5/4] overflow-hidden rounded-panel bg-photo-ground">
-        {job.previewUrl ? <img src={job.previewUrl} alt="" className="absolute inset-0 size-full object-cover brightness-[.7] contrast-[.85] grayscale" /> : null}
-        <span aria-hidden="true" className="animate-scan absolute inset-x-0 top-[40%] h-0.5 bg-primary" />
+      <div className="hairline animate-develop relative aspect-[5/4] overflow-hidden rounded-panel bg-photo-ground">
+        {job.previewUrl ? (
+          <>
+            <img src={job.previewUrl} alt="" className="absolute inset-0 size-full object-cover brightness-[.7] contrast-[.85] grayscale" />
+            <img src={job.previewUrl} alt="" className="absolute inset-0 size-full object-cover [clip-path:inset(0_0_var(--left)_0)]" />
+          </>
+        ) : null}
+        <span aria-hidden="true" className="absolute inset-x-0 top-[calc(100%-var(--left))] -mt-px h-0.5 bg-primary" />
         <span className="absolute inset-x-4 top-4 z-2 flex justify-between">
           <Pill>Developing</Pill>
           <Pill>

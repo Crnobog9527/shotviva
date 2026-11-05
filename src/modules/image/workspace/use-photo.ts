@@ -2,9 +2,10 @@
 
 import { useCallback, useState } from 'react'
 
+import { naturalSize, nearestRatio } from './photo-ratio'
 import { useUpload, type UploadState } from './use-upload'
 
-export type PickedPhoto = { url: string; bytes: number }
+export type PickedPhoto = { url: string; bytes: number; ratio: string | null }
 export type PhotoStatus = 'none' | 'uploading' | 'ready' | 'error'
 
 // The workspace photo: uploads as soon as it is picked (Compressing → Uploading), so Generate
@@ -16,7 +17,12 @@ export function usePhoto() {
 
   const pick = useCallback(
     async (file: File) => {
-      setPhoto({ url: URL.createObjectURL(file), bytes: file.size })
+      const url = URL.createObjectURL(file)
+      setPhoto({ url, bytes: file.size, ratio: null })
+      // The ratio readout fills in once the browser has decoded the photo; upload does not wait.
+      void naturalSize(url)
+        .then(({ width, height }) => setPhoto((current) => (current?.url === url ? { ...current, ratio: nearestRatio(width, height) } : current)))
+        .catch(() => undefined)
       await upload(file)
     },
     [upload],
