@@ -151,7 +151,7 @@
 
 - 按建站规格 R1~R12、G1~G13 和创作库规格 U1~U12 执行，不在这里重复。
 - 新建任何可收录页面前，先确认它在对应语言的主词表里：英文页看 `seo资料/Shotviva 页面与主词映射（美国口径）.csv`，`/zh` 页看 `seo资料/Shotviva 页面与主词映射（中文口径）.csv`（T22 产出；每种语言以各自的 CSV 为唯一来源）；不在表里的页面一律 `noindex` 或不建。
-- **用户能看到的文字一律不写死在组件里**：界面文字走 next-intl 的 `site/messages/{en,zh}.json`，营销页 / 法律页正文按语言放在 `site/content/` 下；新增或修改界面文字的 PR 必须同时给出 en 和 zh（T21 合并后生效，ARCHITECTURE §17）。
+- **用户能看到的文字一律不写死在组件里**：界面文字走 next-intl 的 `site/messages/{en,zh}.json`，营销页 / 法律页正文按语言放在 `site/content/` 下（后台页面例外：只用中文，文案放在功能目录的 `copy.ts`，见 DESIGN §7）；新增或修改界面文字的 PR 必须同时给出 en 和 zh（T21 合并后生效，ARCHITECTURE §17）。
 - SEO 页面内容按 ARCHITECTURE.md 第 12 节的固定结构写。
 - noindex 由全局配置统一控制，禁止逐页手写。
 
