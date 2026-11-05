@@ -25,14 +25,18 @@ describe('signup credit grant (T1 -> T2 grant_credits)', () => {
 
   it('grants the free credits once, however many verified sign-ins follow', async () => {
     const id = await createUser(db)
-    for (let i = 0; i < 3; i += 1) await grantSignupCredits(billingGrant(admin), id, 3)
+    const firsts: boolean[] = []
+    for (let i = 0; i < 3; i += 1) firsts.push(await grantSignupCredits(billingGrant(admin), id, 3))
+    // Only the first reports applied, which is what fires the one `signup` event (T18).
+    expect(firsts).toEqual([true, false, false])
     expect(await profileOf(db, id)).toMatchObject({ credits: 0, free_credits: 3 })
     expect(await ledgerOf(db, id)).toEqual([{ kind: 'grant', pool: 'free', delta: 3, idempotency_key: `signup:${id}` }])
   })
 
   it('settles concurrent first sign-ins (callback + password) exactly once', async () => {
     const id = await createUser(db)
-    await Promise.all(Array.from({ length: 5 }, () => grantSignupCredits(billingGrant(admin), id, 3)))
+    const firsts = await Promise.all(Array.from({ length: 5 }, () => grantSignupCredits(billingGrant(admin), id, 3)))
+    expect(firsts.filter(Boolean)).toHaveLength(1)
     expect(await profileOf(db, id)).toMatchObject({ credits: 0, free_credits: 3 })
     expect(await ledgerOf(db, id)).toHaveLength(1)
   })

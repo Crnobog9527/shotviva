@@ -14,6 +14,12 @@ const publicEnvSchema = z.object({
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().default(''),
   // Empty means captcha is off (local dev); Supabase Auth enforces it when configured there.
   NEXT_PUBLIC_HCAPTCHA_SITEKEY: z.string().default(''),
+  // PostHog project key: public by design (it can only write events). Empty means analytics
+  // is off (local dev, CI); the host is the US ingestion host the /ingest rewrite targets.
+  NEXT_PUBLIC_POSTHOG_KEY: z.string().default(''),
+  NEXT_PUBLIC_POSTHOG_HOST: z.url().default('https://us.i.posthog.com'),
+  // Sentry DSN, public by design. Unset means Sentry stays off in browser, server and edge.
+  NEXT_PUBLIC_SENTRY_DSN: z.url().optional(),
 })
 
 export type PublicEnv = z.infer<typeof publicEnvSchema>
@@ -26,4 +32,7 @@ export const publicEnv: PublicEnv = publicEnvSchema.parse({
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   NEXT_PUBLIC_HCAPTCHA_SITEKEY: process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY,
+  NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
+  NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST || undefined,
+  NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN || undefined,
 })
