@@ -57,7 +57,7 @@ src/
 
 ```ts
 export const site = defineSite({
-  brand: { name: 'Shotviva', domain: 'shotviva.com', tagline: 'AI food & product photo studio' },   // 建站规格 §1
+  brand: { name: 'Shotviva', domain: 'shotviva.com', tagline: 'AI photo studio' },   // 建站规格 §1（Owner 2026-11-05 定）
   modules: { image: true, video: false },     // 关掉的模块：路由 404、不进 sitemap、不出现在导航和定价里
   locales: { default: 'en', enabled: ['en'] }, // next-intl，英文不带前缀
   billing: {
@@ -113,7 +113,7 @@ interface GenerationProvider {
 
 ### 3.2 v1 范围
 
-- `image` 模块：只实现 OpenAI GPT-Image 适配器（官方 `/v1/images/edits`）。**模型名是配置项**：环境变量 `OPENAI_IMAGE_MODEL`，默认值由 Owner 定（代码里当前默认 `gpt-image-2.5-sunburst`；GPT Image 2.6 已于 2026-11-04 上线、同价、更快，是否切换由 Owner 比较效果后决定，不在规范里替 Owner 定）。底座的 fal / KIE / WaveSpeed / Atlas 适配器不搬。
+- `image` 模块：只实现 OpenAI GPT-Image 适配器（官方 `/v1/images/edits`）。**模型名是配置项**：环境变量 `OPENAI_IMAGE_MODEL`，默认值由 Owner 定（代码里当前默认 `gpt-image-2.5-sunburst`；GPT Image 2.6 已于 2026-11-04 上线、同价、更快；Owner 2026-11-05 评估 2.6 对人物五官的保持很强，默认用哪个仍由 Owner 在环境变量里定）。底座的 fal / KIE / WaveSpeed / Atlas 适配器不搬。
 - `video` 模块：只有接口类型，`site.config.ts` 里是 `false`，不写任何视频页面。
 
 ## 4. 生成任务
@@ -379,8 +379,8 @@ Owner 2026-11-04 决定：**不在 flux-kontext-template 上原地改造**，新
 - **模板库是首页的一块内容，不是首页的全部。** 首页从上到下：
   1. H1 + 直答块（以主词 `image to image ai` 开头，40~60 个英文词，建站规格 G1）
   2. 上传入口 + 首屏前后对比图
-  3. 精选模板网格：每个模板的名称和用途说明都写在源码里
-  4. 可核验事实块：平台尺寸、免费张数、出图耗时
+  3. 精选模板网格：按第 5 节的 6 个分类分组，每个分类一个 H3，每个模板的名称和用途说明都写在源码里（建站规格 §4 首页骨架 H2-2）
+  4. 可核验事实块：免费额度、每张消耗、三档像素、上传限制、出图耗时（建站规格 G4 通用事实）
   5. 成本对比表：请摄影师 vs Shotviva
   6. FAQ 3~5 条
   7. 内链块：直链所有已上线的内页

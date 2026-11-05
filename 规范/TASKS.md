@@ -257,7 +257,7 @@
 
 ## T11 首页与内页最终文案（价格已定稿，可派）
 
-**依据**：ARCHITECTURE §12、§13；建站规格 §4、R10、G3（9 个商品的价格、"from 2 credits"、1K / 2K / 3K 作为可核验事实）。**依赖**：T5。
+**依据**：ARCHITECTURE §12、§13；建站规格 §4（首页 TDK 与 6 个 H2 骨架，2026-11-05 定稿）、R10、G1、G3、G4（可核验事实：9 个商品的价格、"from 2 credits"、Standard / HD / Max 三档像素，对外不写 1K / 2K / 3K）、G6（首页 5 句）。同时把 `site.config.ts` 的 `brand.tagline` 改成 "AI photo studio"（建站规格 §1）。**依赖**：T5。
 
 ## T12 模板需求墙（Wishlist）（等 T8）
 
@@ -330,7 +330,7 @@
 
 ## Owner 侧关键路径（不是任务卡，但比代码慢）
 
-- 6～8 个模板的真实菜品照片 + 前后对比素材 + 提示词调优
+- 第一批 10 个模板（6 类）的真实照片 + 前后对比素材 + 提示词调优
 - Stripe 新账户申请；向 Stripe 确认 Managed Payments 下 Alipay / WeChat
 - Waffo 加急开通
 - OpenAI 组织验证 + GPT-Image 系列模型权限；决定 `OPENAI_IMAGE_MODEL` 默认用 2.5 还是 2.6（同价，2.6 更快，需比较效果）
