@@ -12,8 +12,8 @@ export type ProviderAdapterId = (typeof PROVIDER_ADAPTERS)[number]
 
 export const DEFAULT_BASE_URL = 'https://api.openai.com/v1'
 
-// What an adapter needs to call its vendor. The key is plaintext: build it per request on the
-// server and never keep, log or return it.
+// What an adapter needs to call its vendor. The key is plaintext, read from Vault per request:
+// never keep, log or return it.
 export type ProviderConfig = { baseUrl: string; model: string; apiKey: string }
 
 export type ProviderAdapter = (config: ProviderConfig) => GenerationProvider
@@ -21,7 +21,7 @@ export type ProviderAdapter = (config: ProviderConfig) => GenerationProvider
 // Registered by the module that owns the adapters (modules/image); core cannot import modules.
 export type ProviderAdapters = Partial<Record<ProviderAdapterId, ProviderAdapter>>
 
-// A row as the admin page sees it: everything except the key ciphertext.
+// A row as the admin page sees it. The key itself stays in Vault; null last4 means no key.
 export type AdminProvider = {
   id: string
   module: ProviderModule
@@ -29,17 +29,17 @@ export type AdminProvider = {
   label: string
   baseUrl: string
   model: string
-  apiKeyLast4: string
+  apiKeyLast4: string | null
   isActive: boolean
   notes: string | null
   updatedAt: string
 }
 
-// The active row with its ciphertext, as generation needs it. Plain data so it can be cached.
+// The active row, as generation needs it. Plain data with no key, so it can be cached; the key
+// is read from Vault by id on each request.
 export type ActiveProviderRow = {
   id: string
   adapter: ProviderAdapterId
   baseUrl: string
   model: string
-  apiKeyCiphertext: string
 }

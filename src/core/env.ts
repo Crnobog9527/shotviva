@@ -27,10 +27,6 @@ const serverEnvSchema = z.object({
   // OpenAI image provider (modules/image/provider); the key is required on first use.
   OPENAI_API_KEY: optionalSecret,
   OPENAI_IMAGE_MODEL: z.preprocess(blankAsUnset, z.string().min(1).default('gpt-image-2.5-sunburst')),
-  // 32 random bytes, base64. Encrypts the API keys stored in ai_providers (ARCHITECTURE §3.3);
-  // a different value per Vercel environment. Its shape is checked where it is used
-  // (core/providers/secrets.ts), so a bad value breaks provider settings, not every route.
-  PROVIDER_SECRETS_KEY: optionalSecret,
   // Partner key Graylum sends as `Authorization: Bearer …` (ARCHITECTURE §14.3). A different
   // value per Vercel environment: `sv_live_…` in production, `sv_test_…` everywhere else
   // (core/partner/partner-auth.ts rejects the wrong kind). Unset → every partner call is 401.
