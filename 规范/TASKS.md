@@ -202,7 +202,7 @@
 
 **依据**：DESIGN §4.3、§4.4、§8 全部；`MOBILE_UI_rules_fable.md` §1.8.1 Share 实现规则。
 
-**设计基准（Owner 2026-11-05）**：以 T6 定稿的 B 版 Darkroom（`design/comps-v3-b/` 与更新后的 `design/DESIGN.md`）为准。**范围补充**：生成可以在后台进行，Photos 页显示进行中的任务和进度，按 `current_tier` 的并发上限允许同时发起多张（Starter 1、Pro 3、Max 6），超过上限时按钮提示等待。
+**设计基准（Owner 2026-11-05）**：以 T6 定稿的 B 版 Darkroom（`design/comps-v3-b/` 与更新后的 `design/DESIGN.md`）为准。设计系统已入库（`design/DESIGN.md`、`design/TOKENS.md`、`design/tokens/tokens.css`、`design/.impeccable/design.json`、`design/comps-v3-b/`、`design/assets/img|video/`）；变量照搬 `tokens.css` 进 `globals.css`；`design/TOKENS.md` 末尾的「实现时清理」清单（硬编码颜色改变量、三档材质收进 `:root`、12px 标签、超出两级的发光、非 4 倍数间距、支付宝官方图标）在本卡一并处理。首页「一张手机照 → 一整套」演示用 `design/assets/img/hero-set-*.webp`（v2）。模板样图（`*-before/after.webp`、`*-split.webp`、`*-anim.webp`、`video/*.mp4`）是示意素材，`.json` 附带文件里写了来源和许可，上线前 Owner 在后台替换；需要放进 `public/` 的只放首页演示用的那几张，模板封面走 T16 的公开桶。**范围补充**：生成可以在后台进行，Photos 页显示进行中的任务和进度，按 `current_tier` 的并发上限允许同时发起多张（Starter 1、Pro 3、Max 6），超过上限时按钮提示等待。
 
 **验收**：LAUNCH §7.5 五条 + DESIGN §8.7 真机清单（Codex 验收）。
 

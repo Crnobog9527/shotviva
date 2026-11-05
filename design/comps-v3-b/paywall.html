@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="robots" content="noindex">
+<title>Keep making photos · Shotviva</title>
+<link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/studio.css">
+<script src="js/studio.js"></script>
+<style>
+  html, body { background: #000; height: 100dvh; overflow: hidden; }
+  /* the workspace behind, pushed back like an iOS page sheet */
+  .behind { position: fixed; inset: 0; border: 0; width: 100%; height: 100%; transform-origin: 50% 0; transition: transform .45s var(--ease), border-radius .45s, filter .45s; background: var(--background); }
+  body.sheet-open .behind { transform: translateY(calc(var(--sat) * .5)) scale(.92); border-radius: 18px; filter: brightness(.55); pointer-events: none; }
+  .scrim { background: rgba(0,0,0,.25); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .reopen { position: fixed; z-index: 80; left: 16px; right: 16px; bottom: calc(var(--sab) + 92px); opacity: 0; pointer-events: none; transition: opacity .3s; }
+  body:not(.sheet-open) .reopen { opacity: 1; pointer-events: auto; }
+
+  .pw { height: calc(100dvh - var(--sat) - 10px); max-height: none; background: #12100E; }
+  .pw .sheet-body { flex: 1; padding-bottom: 20px; }
+  .pw-h { padding: 4px 4px 0; }
+  .pw-h h2 { font: 400 38px/1 var(--font-display); letter-spacing: -0.02em; margin: 6px 48px 0 0; }
+  .pw-h p { margin-top: 10px; font-size: 16px; color: var(--muted-foreground); line-height: 1.45; padding-right: 20px; }
+
+  /* billing toggle */
+  .seg { position: relative; display: grid; grid-template-columns: 1fr 1fr; margin: 16px 0 12px; padding: 4px; border-radius: 16px; background: rgba(242,236,227,.06); box-shadow: inset 0 0 0 1px var(--border); }
+  .seg button { position: relative; z-index: 1; min-height: 44px; border-radius: 12px; font: 600 16px/1 var(--font-sans); color: var(--bone-dim); display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: color .25s; }
+  .seg button[aria-pressed="true"] { color: var(--background); }
+  .seg .thumb { position: absolute; z-index: 0; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px); border-radius: 12px; background: var(--foreground); transition: transform .4s var(--spring); }
+  .seg[data-v="y"] .thumb { transform: translateX(100%); }
+  .seg .save { font: 700 13px/1 var(--font-sans); padding: 5px 7px; border-radius: 7px; background: var(--primary); color: var(--primary-foreground); letter-spacing: .01em; }
+
+  /* tiers */
+  .tiers { display: grid; gap: 10px; }
+  .tier { position: relative; display: block; cursor: pointer; border-radius: 22px; }
+  .tier input { position: absolute; opacity: 0; pointer-events: none; }
+  .tier .card { position: relative; display: block; padding: 14px 16px 13px; border-radius: 22px; overflow: hidden; transition: transform .25s var(--ease), box-shadow .25s; }
+  .tier .row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .tier .nm { font: 600 18px/1 var(--font-sans); letter-spacing: -0.015em; }
+  .tier .flag { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 999px; font: 600 14px/1 var(--font-sans); margin-left: 8px; vertical-align: 2px; height: 24px; }
+  .tier .check { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; box-shadow: inset 0 0 0 1.5px rgba(242,236,227,.3); transition: background .2s, box-shadow .2s; }
+  .tier .check .i { width: 13px; height: 13px; stroke-width: 3; opacity: 0; }
+  .tier input:checked + .card .check { background: var(--foreground); box-shadow: none; color: var(--background); }
+  .tier input:checked + .card .check .i { opacity: 1; }
+  .tier input:focus-visible + .card { outline: 2px solid var(--ring); outline-offset: 3px; }
+  .tier .price { display: flex; align-items: baseline; gap: 6px; margin-top: 10px; }
+  .tier .amt { font: 400 40px/.9 var(--font-display); letter-spacing: -0.02em; }
+  .tier .per { font-size: 14px; color: var(--muted-foreground); }
+  .tier .was { font: 400 14px/1 var(--font-mono); color: var(--muted-foreground); text-decoration: line-through; margin-left: 4px; }
+  .tier .facts { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; font-size: 14px; color: var(--bone-dim); }
+  .tier .facts .mono { font-size: 14px; color: var(--muted-foreground); }
+  .tier .saving { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; padding: 8px 10px 8px 12px; border-radius: 11px; font-size: 14px; }
+  .tier .saving b { font: 600 14px/1 var(--font-mono); }
+
+  .perks { display: grid; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(242,236,227,.08); }
+  .perks-h { font: 600 14px/1.3 var(--font-sans); color: var(--muted-foreground); }
+  .perk { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; line-height: 1.35; color: #D8D0C4; }
+  .perk .i { flex: none; width: 15px; height: 15px; margin-top: 2px; stroke-width: 2.5; fill: none; stroke: currentColor; color: var(--muted-foreground); }
+  .t-max .perk .i { color: #F2CF7A; }
+  .tier .saving[hidden] { display: none; }
+  .perks-h.soon-h { margin-top: 6px; }
+  .perk.soon { padding-left: 23px; font-size: 14px; color: var(--muted-foreground); }
+
+  /* Starter: matte graphite. Flat, quiet. */
+  .t-starter .card { background: #191715; box-shadow: inset 0 0 0 1px var(--border); }
+  .t-starter .saving { background: rgba(242,236,227,.05); color: var(--bone-dim); }
+  .t-starter input:checked + .card { box-shadow: inset 0 0 0 1.5px rgba(242,236,227,.7); }
+
+  /* Pro: sapphire glass. Cool, deep, clearly a step up from graphite. */
+  .t-pro .card { background: radial-gradient(120% 90% at 100% 0%, rgba(70,120,255,.32), transparent 60%), linear-gradient(180deg, #111A33, #0B1020);
+    box-shadow: inset 0 0 0 1px rgba(120,160,255,.40), inset 0 1px 0 rgba(190,210,255,.25), 0 20px 40px -24px rgba(60,100,255,.5); }
+  .t-pro .nm { color: #A9C2FF; }
+  .t-pro .flag { background: #5B86FF; color: #071027; }
+  .t-pro .saving { background: rgba(91,134,255,.16); color: #D3DFFF; }
+  .t-pro input:checked + .card { box-shadow: inset 0 0 0 1.5px #7EA0FF, inset 0 1px 0 rgba(190,210,255,.3), 0 24px 48px -22px rgba(60,100,255,.6); }
+  .t-pro input:checked + .card .check { background: #7EA0FF; color: #071027; }
+  .t-pro .perk .i { color: #A9C2FF; }
+
+  /* Max: black and gold foil. A gold rim that slowly turns, a warm sheen across a black card. */
+  @property --a { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+  .t-max .card { background: radial-gradient(120% 90% at 100% 0%, rgba(230,180,80,.22), transparent 60%), linear-gradient(160deg, #1C160C, #0C0A07 60%); padding: 15px 17px 14px; isolation: isolate; }
+  .t-max .card::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; padding: 1.5px;
+    background: conic-gradient(from var(--a), #F7DF9A, #8A6420, #FFE9B0, #C8962E, #6E4E14, #F2CF7A, #F7DF9A);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: turn 9s linear infinite; }
+  .t-max .card::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: inherit;
+    background: linear-gradient(115deg, transparent 30%, rgba(255,220,150,.05) 45%, rgba(255,235,190,.08) 50%, rgba(240,200,120,.04) 55%, transparent 70%); background-size: 250% 100%; animation: sheen 6s ease-in-out infinite; }
+  @keyframes turn { to { --a: 360deg; } }
+  @keyframes sheen { 0%, 100% { background-position: 110% 0; } 50% { background-position: -10% 0; } }
+  .t-max .nm, .t-max .amt { color: #F2CF7A; }
+  .t-max .flag { background: var(--chrome); color: #111; }
+  .t-max .saving { background: rgba(242,207,122,.12); color: #F7E3B0; box-shadow: inset 0 0 0 1px rgba(242,207,122,.26); }
+  .t-max input:checked + .card { box-shadow: 0 24px 50px -20px rgba(230,180,80,.42); }
+  .t-max input:checked + .card .check { background: #F2CF7A; color: #1A1206; }
+
+  /* packs */
+  .sub-h { display: flex; justify-content: space-between; align-items: baseline; margin: 24px 2px 10px; }
+  .sub-h h3 { font: 600 17px/1.2 var(--font-sans); }
+  .sub-h span { font-size: 14px; color: var(--muted-foreground); }
+  .packs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .pack { position: relative; cursor: pointer; }
+  .pack input { position: absolute; opacity: 0; pointer-events: none; }
+  .pack .card { display: block; padding: 12px 10px; border-radius: 16px; background: #191715; box-shadow: inset 0 0 0 1px var(--border); text-align: left; transition: box-shadow .2s; }
+  .pack .cr { font: 400 28px/1 var(--font-display); display: block; }
+  .pack .cr small { font: 400 14px/1 var(--font-sans); color: var(--muted-foreground); margin-left: 4px; }
+  .pack .usd { display: block; margin-top: 10px; font: 600 16px/1 var(--font-sans); }
+  .pack .each { display: block; margin-top: 6px; font: 400 14px/1 var(--font-sans); color: var(--muted-foreground); }
+  .pack input:checked + .card { box-shadow: inset 0 0 0 1.5px var(--foreground); background: #201D1A; }
+  .pack input:focus-visible + .card { outline: 2px solid var(--ring); outline-offset: 2px; }
+
+  /* payment */
+  .pays { display: grid; gap: 8px; }
+  .pay { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 0 14px; border-radius: 16px; background: #191715; box-shadow: inset 0 0 0 1px var(--border); cursor: pointer; }
+  .pay input { appearance: none; -webkit-appearance: none; margin: 0; width: 20px; height: 20px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px rgba(242,236,227,.35); flex: none; transition: box-shadow .2s; }
+  .pay input:checked { box-shadow: inset 0 0 0 6px var(--foreground); }
+  .pay .lbl { flex: 1; font: 500 16px/1.25 var(--font-sans); }
+  .pay .lbl small { display: block; font-size: 14px; color: var(--muted-foreground); font-weight: 400; margin-top: 3px; }
+  .pay .marks { display: flex; gap: 4px; color: var(--bone-dim); }
+  .pay .pm { width: 28px; height: 20px; }
+  .pay .marks span { height: 22px; padding: 0 6px; border-radius: 5px; display: inline-flex; align-items: center; font: 600 10px/1 var(--font-sans); background: rgba(242,236,227,.08); color: var(--bone-dim); }
+  .pay:has(input:checked) { box-shadow: inset 0 0 0 1.5px rgba(242,236,227,.6); }
+
+  /* sticky checkout */
+  .checkout { flex: none; padding: 12px var(--gutter) calc(var(--sab) + 10px); background: linear-gradient(rgba(18,16,14,.6), #12100E 30%); box-shadow: inset 0 1px 0 var(--border); }
+  .checkout .btn-primary { font-size: 16px; }
+  .checkout .fine { text-align: center; font: 400 14px/1.4 var(--font-sans); color: var(--muted-foreground); margin-top: 9px; }
+  .checkout.max .btn-primary { background: var(--chrome); color: #111; box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 16px 30px -16px rgba(0,0,0,.9); }
+  .checkout.plain .btn-primary { background: var(--foreground); color: var(--background); box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 16px 30px -16px rgba(0,0,0,.9); }
+</style>
+</head>
+<body class="sheet-open">
+<iframe class="behind" id="behind" title="Workspace (behind the sheet)" tabindex="-1" aria-hidden="true"></iframe>
+<div class="reopen"><button class="btn btn-ghost" type="button" id="reopen" style="width:100%;min-height:52px;background:#1d1a17">Show plans again</button></div>
+
+<div class="scrim" id="scrim" hidden></div>
+<section class="sheet pw" id="pw" role="dialog" aria-modal="true" aria-labelledby="pw-title" tabindex="-1" hidden>
+  <div class="sheet-grab" aria-hidden="true"></div>
+  <button class="sheet-x" type="button" data-close aria-label="Close"><span><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></span></button>
+  <div class="sheet-body">
+    <header class="pw-h">
+      <h2 id="pw-title">Keep making photos</h2>
+      <p>You've used your 6 free credits. Photos made with paid credits are private and watermark-free.</p>
+    </header>
+
+    <div class="seg" id="seg" data-v="y" role="group" aria-label="Billing">
+      <span class="thumb" aria-hidden="true"></span>
+      <button type="button" data-v="m" aria-pressed="false">Monthly</button>
+      <button type="button" data-v="y" aria-pressed="true">Yearly</button>
+    </div>
+
+    <div class="tiers" role="radiogroup" aria-label="Plans">
+      <label class="tier t-starter"><input type="radio" name="pick" value="starter"><span class="card">
+        <span class="row"><span><span class="nm">Starter</span></span><span class="check"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></span>
+        <span class="price"><span class="amt" data-p></span><span class="per">/mo</span><span class="was" data-was></span></span>
+        <span class="facts"><span data-cr></span><span class="mono" data-each></span></span>
+        <span class="saving" data-save></span>
+        <span class="perks"><span class="perks-h">Includes</span><span class="perk"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>No watermark, commercial use</span><span class="perk"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Private by default, all templates</span><span class="perk"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>1 photo generating at a time</span><span class="perk"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Email support, reply within 48h</span></span>
+      </span></label>
+
+      <label class="tier t-pro"><input type="radio" name="pick" value="pro" checked><span class="card">
+        <span class="row"><span><span class="nm">Pro</span><span class="flag">Recommended</span></span><span class="check"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></span>
+        <span class="price"><span class="amt" data-p></span><span class="per">/mo</span><span class="was" data-was></span></span>
+        <span class="facts"><span data-cr></span><span class="mono" data-each></span></span>
+        <span class="saving" data-save></span>
+        <span class="perks"><span class="perks-h">Everything in Starter, plus</span><span class="perk"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>3 photos generating at a time</span><span class="perk"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Priority email support, reply within 24h</span><span class="perks-h soon-h">Coming soon</span><span class="perk soon">Batch upload, up to 10 photos</span><span class="perk soon">Brand kit: your logo and fonts on posters</span></span>
+      </span></label>
+
+      <label class="tier t-max"><input type="radio" name="pick" value="max"><span class="card">
+        <span class="row"><span><span class="nm">Max</span><span class="flag">Best value per credit</span></span><span class="check"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></span>
+        <span class="price"><span class="amt" data-p></span><span class="per">/mo</span><span class="was" data-was></span></span>
+        <span class="facts"><span data-cr></span><span class="mono" data-each></span></span>
+        <span class="saving" data-save></span>
+        <span class="perks"><span class="perks-h">Everything in Pro, plus</span><span class="perk"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>6 photos generating at a time</span><span class="perk"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Priority support, same business day</span><span class="perks-h soon-h">Coming soon</span><span class="perk soon">Batch upload, up to 30 photos</span><span class="perk soon">Early access to new templates and features</span><span class="perk soon">Template requests count 3× on the Wishlist</span></span>
+      </span></label>
+    </div>
+
+    <div class="sub-h"><h3>Credit packs</h3><span>Buy credits once, no subscription</span></div>
+    <div class="packs" role="radiogroup" aria-label="Credit packs">
+      <label class="pack"><input type="radio" name="pick" value="p20"><span class="card"><span class="cr">20<small>credits</small></span><span class="usd">$9.90</span><span class="each">$0.50 each</span></span></label>
+      <label class="pack"><input type="radio" name="pick" value="p55"><span class="card"><span class="cr">55<small>credits</small></span><span class="usd">$24.90</span><span class="each">$0.45 each</span></span></label>
+      <label class="pack"><input type="radio" name="pick" value="p115"><span class="card"><span class="cr">115<small>credits</small></span><span class="usd">$49.90</span><span class="each">$0.43 each</span></span></label>
+    </div>
+
+    <div class="sub-h"><h3>Pay with</h3><span>All prices in USD</span></div>
+    <div class="pays" role="radiogroup" aria-label="Payment method">
+      <label class="pay"><input type="radio" name="pay" value="card" checked><span class="lbl">Card · Apple Pay · Google Pay<small>Plans renew automatically</small></span><span class="marks" aria-hidden="true"><svg class="pm" viewBox="0 0 28 20"><rect x=".75" y=".75" width="26.5" height="18.5" rx="3.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M1 6.5h26" stroke="currentColor" stroke-width="2.5"/><path d="M5 14h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span></label>
+      <label class="pay"><input type="radio" name="pay" value="alipay"><span class="lbl">Alipay<small>Pays once, no auto-renew</small></span><span class="marks" aria-hidden="true"><svg class="pm" viewBox="0 0 20 20"><rect width="20" height="20" rx="5" fill="#1677FF"/><path d="M5.2 7.2h9.6M10 4.6v2.6M6.6 9.8h6.8c-.6 2.6-2.6 4.6-5.6 5.6M8.2 10.6c.9 1.8 2.8 3.4 6.4 4.4" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/></svg></span></label>
+    </div>
+  </div>
+
+  <div class="checkout" id="checkout">
+    <button class="btn btn-primary" type="button" id="cta"></button>
+    <p class="fine" id="fine"></p>
+  </div>
+</section>
+
+<script>
+(function () {
+  const { makeSheet } = window.SV;
+  const framed = document.documentElement.classList.contains('framed');
+  document.getElementById('behind').src = 'workspace.html?balance=0' + (framed ? '&frame=2' : '');
+
+  const P = {
+    starter: { name: 'Starter', m: [19.90, 50], y: [139, 600, 11.58], save: '99.80' },
+    pro:     { name: 'Pro',     m: [49.90, 135], y: [349, 1620, 29.08], save: '249.80' },
+    max:     { name: 'Max',     m: [99, 280],   y: [699, 3360, 58.25], save: '489' },
+  };
+  const PK = { p20: [20, '9.90'], p55: [55, '24.90'], p115: [115, '49.90'] };
+  const money = n => '$' + (Number.isInteger(n) ? n : n.toFixed(2));
+  let v = 'y';
+
+  function paintTiers() {
+    document.querySelectorAll('.tier').forEach(el => {
+      const p = P[el.querySelector('input').value];
+      const [usd, cr, mo] = v === 'y' ? p.y : p.m;
+      el.querySelector('[data-p]').textContent = money(v === 'y' ? mo : usd);
+      el.querySelector('[data-was]').textContent = v === 'y' ? money(p.m[0]) : '';
+      el.querySelector('[data-cr]').textContent = v === 'y' ? `${cr.toLocaleString('en-US')} credits a year · ${money(usd)} billed yearly` : `${cr} credits a month`;
+      el.querySelector('[data-each]').textContent = '$' + (usd / cr).toFixed(2) + '/credit';
+      const s = el.querySelector('[data-save]');
+      s.hidden = v !== 'y';
+      s.innerHTML = v === 'y' ? `<span>You save vs monthly</span><b>$${p.save} a year</b>` : '';
+    });
+  }
+
+  const cta = document.getElementById('cta'), fine = document.getElementById('fine'), co = document.getElementById('checkout');
+  function paintCheckout() {
+    const pick = document.querySelector('input[name=pick]:checked').value;
+    const pay = document.querySelector('input[name=pay]:checked').value;
+    co.classList.toggle('max', pick === 'max');
+    co.classList.toggle('plain', pick === 'starter' || !!PK[pick]);
+    if (PK[pick]) {
+      const [cr, usd] = PK[pick];
+      cta.textContent = `Continue with ${cr} credits · $${usd}`;
+      fine.textContent = `One-time payment of $${usd} · USD`;
+      return;
+    }
+    const p = P[pick], price = v === 'y' ? money(p.y[0]) : money(p.m[0]);
+    cta.textContent = `Continue with ${p.name} · ${price}${v === 'y' ? '/yr' : '/mo'}`;
+    fine.textContent = pay === 'alipay'
+      ? `One-time payment for ${v === 'y' ? '1 year' : '30 days'} · no auto-renew · USD`
+      : `Renews ${v === 'y' ? 'yearly' : 'monthly'} at ${price} · cancel anytime · USD`;
+  }
+
+  const seg = document.getElementById('seg');
+  seg.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    v = b.dataset.v; seg.dataset.v = v;
+    seg.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+    paintTiers(); paintCheckout();
+  });
+  if (window.SV.q.get('billing') === 'm') seg.querySelector('[data-v=m]').click();
+  document.querySelectorAll('input[name=pick], input[name=pay]').forEach(i => i.addEventListener('change', paintCheckout));
+  paintTiers(); paintCheckout();
+
+  const sheet = makeSheet(document.getElementById('pw'), document.getElementById('scrim'), { onClose: () => document.body.classList.remove('sheet-open') });
+  const open = () => { document.body.classList.add('sheet-open'); sheet.open(); };
+  document.getElementById('reopen').addEventListener('click', open);
+  open();
+})();
+</script>
+</body>
+</html>

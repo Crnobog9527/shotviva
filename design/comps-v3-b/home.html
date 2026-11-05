@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B0A09">
+<title>Image to Image AI: Restyle a Photo, Keep the Subject · Shotviva</title>
+<meta name="description" content="Image to image AI for small businesses: upload one phone photo, pick a template, download in Standard, HD or Max. No prompts to write.">
+<link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/studio.css">
+<script src="js/studio.js"></script>
+<style>
+  /* ---------- app bar ---------- */
+  .appbar { position: sticky; top: 0; z-index: 50; padding: var(--sat) var(--gutter) 0;
+    background: linear-gradient(rgba(11,10,9,.92), rgba(11,10,9,.72)); backdrop-filter: blur(20px) saturate(1.3); -webkit-backdrop-filter: blur(20px) saturate(1.3); }
+  .appbar-row { height: 56px; display: flex; align-items: center; justify-content: space-between; }
+  .brand { display: flex; align-items: baseline; gap: 8px; text-decoration: none; min-height: 44px; align-items: center; }
+  .brand .word { font: 400 26px/1 var(--font-display); letter-spacing: -0.02em; }
+  .brand .word i { color: var(--primary); font-style: normal; }
+  .brand .tag { font: 400 14px/1.15 var(--font-sans); color: var(--muted-foreground); padding-left: 9px; border-left: 1px solid var(--border); white-space: nowrap; }
+  .appbar .btn-ghost { height: 36px; min-height: 36px; padding: 0 16px; border-radius: 999px; font-size: 14px; position: relative; }
+  .appbar .btn-ghost::before { content: ""; position: absolute; inset: -4px -2px; }
+
+  /* ---------- hero ---------- */
+  .hero { position: relative; padding: 18px var(--gutter) 0; }
+  .hero::before { content: ""; position: absolute; z-index: -1; left: -20%; right: -20%; top: -140px; height: 520px; pointer-events: none;
+    background: radial-gradient(50% 45% at 72% 30%, rgba(255,91,46,.20), transparent 70%), radial-gradient(40% 40% at 10% 60%, rgba(242,236,227,.05), transparent 70%); }
+  h1 { margin-top: 4px; }
+  h1 .k { display: block; font: 600 16px/1.2 var(--font-sans); letter-spacing: -0.005em; color: var(--bone-dim); margin-bottom: 8px; }
+  h1 .d { display: block; font: 400 32px/1 var(--font-display); letter-spacing: -0.02em; }
+  h1 .d em { font-style: italic; color: var(--foreground); }
+  .lede { margin-top: 12px; font-size: 16px; line-height: 1.5; color: var(--bone-dim); }
+  .answer { margin-top: 12px; font-size: 16px; line-height: 1.5; color: var(--bone-dim); }
+
+  /* ---------- generator ---------- */
+  .gen { margin: 18px calc(var(--gutter) - 6px) 0; padding: 12px; border-radius: 28px; position: relative;
+    background: linear-gradient(180deg, #181513, #121010); box-shadow: inset 0 0 0 1px var(--border), inset 0 1px 0 rgba(255,255,255,.05), 0 30px 60px -30px rgba(0,0,0,.8); }
+  .drop { position: relative; display: block; width: 100%; aspect-ratio: 4 / 5; border-radius: 18px; overflow: hidden; text-align: center;
+    background: radial-gradient(80% 60% at 50% 45%, rgba(242,236,227,.05), transparent), #0E0D0C; box-shadow: inset 0 0 0 1px var(--border); }
+  .drop .vf { position: absolute; inset: 14px; pointer-events: none; }
+  .drop .vf i { position: absolute; width: 22px; height: 22px; border-color: rgba(242,236,227,.55); border-style: solid; border-width: 0; }
+  .drop .vf i:nth-child(1) { top: 0; left: 0; border-top-width: 1.5px; border-left-width: 1.5px; border-top-left-radius: 8px; }
+  .drop .vf i:nth-child(2) { top: 0; right: 0; border-top-width: 1.5px; border-right-width: 1.5px; border-top-right-radius: 8px; }
+  .drop .vf i:nth-child(3) { bottom: 0; left: 0; border-bottom-width: 1.5px; border-left-width: 1.5px; border-bottom-left-radius: 8px; }
+  .drop .vf i:nth-child(4) { bottom: 0; right: 0; border-bottom-width: 1.5px; border-right-width: 1.5px; border-bottom-right-radius: 8px; }
+  .drop .hud { position: absolute; z-index: 3; left: 24px; top: 22px; font: 400 14px/1 var(--font-mono); color: rgba(255,255,255,.9); text-shadow: 0 1px 6px rgba(0,0,0,.45); }
+  /* at rest: the Pure White split, so a real photograph sits in the fold */
+  .drop .demo { position: absolute; inset: 0; }
+  .drop .demo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .drop .demo .a { clip-path: inset(0 0 0 50%); }
+  .drop .demo .seam { position: absolute; top: 0; bottom: 0; left: 50%; width: 1.5px; margin-left: -.75px; background: rgba(255,255,255,.95); box-shadow: 0 0 10px rgba(255,255,255,.5); }
+  .drop .demo .tag { position: absolute; z-index: 2; top: 54px; height: 26px; padding: 0 9px; border-radius: 8px; display: inline-flex; align-items: center; font: 600 14px/1 var(--font-sans); color: #fff; background: rgba(11,10,9,.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+  .drop .demo .tag.l { left: 14px; } .drop .demo .tag.r { right: 14px; background: var(--primary); color: var(--primary-foreground); }
+  .drop .demo .badge-illus { top: 14px; right: 14px; left: auto; bottom: auto; }
+  .drop .demo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 38%, rgba(11,10,9,.82) 78%); }
+  .drop .empty { position: absolute; z-index: 3; left: 0; right: 0; bottom: 22px; display: grid; justify-items: center; gap: 8px; }
+  .drop .shutter { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; margin-bottom: 4px;
+    box-shadow: inset 0 0 0 1.5px rgba(242,236,227,.7); }
+  .drop .shutter span { width: 50px; height: 50px; border-radius: 50%; display: grid; place-items: center; background: var(--foreground); color: var(--background); }
+  .drop .empty strong { font: 600 17px/1.2 var(--font-sans); color: #fff; }
+  .drop .empty small { font: 400 14px/1.3 var(--font-sans); color: rgba(242,236,227,.78); }
+  .drop .shot { position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .5s var(--ease); }
+  .drop .shot-tag { position: absolute; z-index: 2; left: 12px; bottom: 12px; opacity: 0; }
+  .drop .replace { position: absolute; right: 10px; bottom: 10px; opacity: 0; height: 44px; min-height: 44px; padding: 0 14px; border-radius: 12px; font-size: 14px;
+    background: rgba(11,10,9,.6); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+  .gen.has-photo .drop .empty, .gen.has-photo .drop .demo { display: none; }
+  .gen.has-photo .drop .shot, .gen.has-photo .drop .shot-tag, .gen.has-photo .drop .replace { opacity: 1; }
+  .gen.has-photo .drop .vf i { border-color: rgba(255,255,255,.85); }
+
+  .current { display: flex; align-items: center; gap: 12px; padding: 12px 4px 4px; }
+  .current .thumb { width: 44px; height: 55px; border-radius: 9px; object-fit: cover; box-shadow: inset 0 0 0 1px var(--border); }
+  .current .t { flex: 1; min-width: 0; }
+  .current .t small { display: block; font-size: 14px; color: var(--muted-foreground); }
+  .current .t b { display: block; font: 600 16px/1.2 var(--font-sans); margin-top: 2px; }
+  .picks { display: none; }
+  .gen.has-photo .current { display: none; }
+  .gen.has-photo .picks { display: block; }
+  .picks-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 4px 8px; font-size: 14px; color: var(--muted-foreground); }
+  .pick-rail { display: flex; gap: 10px; overflow-x: auto; margin: 0 -12px; padding: 2px 12px 4px; scrollbar-width: none; }
+  .pick-rail::-webkit-scrollbar { display: none; }
+  .pick { flex: 0 0 84px; text-align: center; font: 500 14px/1.25 var(--font-sans); color: var(--bone-dim); }
+  .pick img { width: 84px; height: 105px; object-fit: cover; border-radius: 12px; margin-bottom: 6px; box-shadow: inset 0 0 0 1px var(--border); transition: box-shadow .2s, transform .2s var(--ease); }
+  .pick[aria-pressed="true"] { color: var(--foreground); }
+  .pick[aria-pressed="true"] img { box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--primary); }
+  .gen .field { display: none; padding: 14px 4px 0; }
+  .gen.has-photo .field { display: block; }
+  .gen-cta { padding: 14px 0 0; }
+  .gen-meta { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 12px 0 4px; font-size: 14px; color: var(--bone-dim); }
+  .gen-meta .i { width: 16px; height: 16px; color: var(--primary); }
+
+  /* ---------- sections ---------- */
+  section.block { padding: 72px var(--gutter) 0; }
+  h2.h2 { font: 400 36px/1 var(--font-display); letter-spacing: -0.02em; }
+  h2.hot em { font-style: italic; color: var(--primary); }
+  .intro { margin-top: 12px; font-size: 16px; color: var(--bone-dim); }
+
+  /* ---------- the shoot (demo) ---------- */
+  .shoot { margin-top: 24px; }
+  .src { display: flex; gap: 14px; align-items: center; }
+  .phone { position: relative; flex: 0 0 112px; padding: 5px; border-radius: 22px; background: #1E1B19; box-shadow: inset 0 0 0 1px rgba(255,255,255,.1), 0 16px 30px -12px rgba(0,0,0,.8); transform: rotate(-3deg); }
+  .phone img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 17px; }
+  .phone::before { content: ""; position: absolute; top: 9px; left: 50%; width: 30px; height: 8px; margin-left: -15px; border-radius: 6px; background: #000; z-index: 2; }
+  .src-meta .file { font: 500 14px/1.3 var(--font-mono); color: var(--foreground); }
+  .src-meta p { font-size: 14px; color: var(--muted-foreground); margin-top: 4px; line-height: 1.4; }
+  .src-meta .pill { margin-top: 10px; height: 26px; }
+  .develop { display: flex; align-items: center; gap: 10px; margin: 18px 0 14px; padding-left: 56px; }
+  .develop .line { width: 1.5px; height: 40px; background: linear-gradient(var(--border), var(--primary)); margin-left: -1px; }
+  .develop span { font: 500 14px/1.3 var(--font-sans); color: var(--primary); }
+  .outs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .outs li { position: relative; border-radius: 18px; overflow: hidden; aspect-ratio: 4 / 5; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
+  .outs li.big { grid-column: 1 / -1; aspect-ratio: 1 / 1; }
+  .outs img { width: 100%; height: 100%; object-fit: cover; }
+  .outs .cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 30px 12px 12px; background: linear-gradient(transparent, rgba(11,10,9,.85)); }
+  .outs .cap b { display: block; font: 600 16px/1.2 var(--font-sans); color: #fff; }
+  .outs .cap small { display: block; font-size: 14px; color: rgba(242,236,227,.8); margin-top: 3px; }
+  .outs .big .badge-illus { top: 10px; left: 10px; bottom: auto; }
+  .outs .soon { display: grid; place-content: center; justify-items: center; gap: 6px; text-align: center; padding: 14px;
+    background: repeating-linear-gradient(135deg, rgba(242,236,227,.035) 0 8px, transparent 8px 16px), var(--card);
+    box-shadow: inset 0 0 0 1px rgba(242,236,227,.14); }
+  .outs .soon b { font: 600 16px/1.2 var(--font-sans); }
+  .outs .soon small { font: 500 14px/1 var(--font-sans); color: var(--muted-foreground); padding: 6px 9px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--border); margin-top: 4px; }
+  .bill { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; border-radius: 20px; overflow: hidden; box-shadow: inset 0 0 0 1px var(--border); }
+  .bill > div { padding: 16px 14px; }
+  .bill .them { background: var(--card); }
+  .bill .us { background: linear-gradient(160deg, rgba(255,91,46,.18), rgba(255,91,46,.04)); box-shadow: inset 1px 0 0 rgba(255,91,46,.3); }
+  .bill .who { font: 600 14px/1 var(--font-sans); color: var(--muted-foreground); }
+  .bill .us .who { color: var(--primary); }
+  .bill .amt { font: 400 38px/1 var(--font-display); margin-top: 10px; letter-spacing: -0.02em; }
+  .bill .them .amt { color: var(--bone-dim); font-style: italic; }
+  .bill small { display: block; margin-top: 6px; font-size: 14px; line-height: 1.35; color: var(--muted-foreground); }
+  .bill-line { margin-top: 12px; font-size: 14px; color: var(--muted-foreground); }
+
+  /* ---------- steps ---------- */
+  .steps { list-style: none; margin: 26px 0 0; padding: 0; position: relative; }
+  .steps::before { content: ""; position: absolute; left: 19px; top: 20px; bottom: 30px; width: 1px; background: linear-gradient(var(--primary), var(--border)); }
+  .steps li { position: relative; display: grid; grid-template-columns: 40px 1fr; gap: 14px; padding-bottom: 26px; }
+  .steps .num { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--background);
+    box-shadow: inset 0 0 0 1px rgba(255,91,46,.5); font: 400 22px/1 var(--font-display); color: var(--primary); position: relative; }
+  .steps h3 { font: 600 17px/1.25 var(--font-sans); letter-spacing: -0.015em; padding-top: 9px; }
+  .steps p { margin-top: 5px; font-size: 16px; color: var(--muted-foreground); }
+  .sizes { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+
+  /* ---------- templates ---------- */
+  .cat { margin-top: 36px; }
+  .cat-head { padding: 0 var(--gutter); margin-bottom: 14px; }
+  .cat-head h3 { display: flex; align-items: baseline; justify-content: space-between; font: 600 19px/1.2 var(--font-sans); letter-spacing: -0.02em; }
+  .cat-head p { margin-top: 5px; font-size: 16px; color: var(--muted-foreground); }
+  .cat-head p b { color: var(--foreground); font-weight: 500; }
+  .tpl-wrap { padding-top: 72px; }
+  .tpl-wrap > .hd { padding: 0 var(--gutter); }
+
+  /* ---------- tables ---------- */
+  .facts { width: 100%; margin-top: 22px; border-collapse: separate; border-spacing: 0; border-radius: 20px; overflow: hidden; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
+  .facts th, .facts td { text-align: left; vertical-align: top; padding: 14px 14px; border-top: 1px solid var(--hairline); }
+  .facts tr:first-child th, .facts tr:first-child td { border-top: 0; }
+  .facts th { width: 42%; font: 500 14px/1.4 var(--font-sans); color: var(--muted-foreground); padding-top: 15px; }
+  .facts td { font-size: 16px; line-height: 1.4; }
+  .facts tr.key td { font: 400 21px/1.15 var(--font-display); }
+
+  .free { display: grid; gap: 10px; margin-top: 22px; }
+  .free article { padding: 18px 16px; border-radius: 20px; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
+  .free h3 { font: 600 17px/1.25 var(--font-sans); letter-spacing: -0.015em; }
+  .free p { margin-top: 6px; font-size: 16px; color: var(--muted-foreground); }
+  .free .wm { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+  .free .wm figure { margin: 0; position: relative; border-radius: 12px; overflow: hidden; aspect-ratio: 1; }
+  .free .wm img { width: 100%; height: 100%; object-fit: cover; }
+  .free .wm figcaption { position: absolute; left: 6px; bottom: 6px; }
+  .free .wm .mark { position: absolute; inset: 0; display: grid; place-items: center; font: 400 italic 22px/1 var(--font-display); color: rgba(255,255,255,.55); transform: rotate(-18deg); letter-spacing: .02em; text-shadow: 0 1px 6px rgba(0,0,0,.4); }
+
+  .cost-wrap { margin-top: 10px; padding: 18px 12px 8px; border-radius: 20px; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
+  .cost-wrap > h3 { padding: 0 4px; font: 600 17px/1.25 var(--font-sans); letter-spacing: -0.015em; }
+  .cost-table { width: 100%; margin-top: 10px; border-collapse: separate; border-spacing: 0; font-size: 14px; line-height: 1.35; }
+  .cost-table th, .cost-table td { padding: 12px 6px; text-align: left; vertical-align: top; border-top: 1px solid var(--hairline); }
+  .cost-table thead th { font: 600 14px/1.3 var(--font-sans); color: var(--muted-foreground); border-top: 0; }
+  .cost-table tbody th { font-weight: 500; color: var(--bone-dim); width: 22%; }
+  .cost-table .sv { background: rgba(255,91,46,.09); color: var(--foreground); }
+  .cost-table thead .sv { color: var(--primary); border-radius: 12px 12px 0 0; }
+  .cost-table tbody tr:last-child .sv { border-radius: 0 0 12px 12px; }
+  .cost-table td:not(.sv) { color: var(--muted-foreground); }
+
+  /* ---------- FAQ ---------- */
+  .faq { margin-top: 18px; }
+  .faq details { border-top: 1px solid var(--border); }
+  .faq details:last-child { border-bottom: 1px solid var(--border); }
+  .faq summary { list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 60px; padding: 14px 0; cursor: pointer; font: 600 16px/1.35 var(--font-sans); letter-spacing: -0.01em; }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary .pm { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: rgba(242,236,227,.06); transition: transform .3s var(--ease), background .2s; }
+  .faq details[open] summary .pm { transform: rotate(45deg); background: var(--primary); color: var(--primary-foreground); }
+  .faq summary .pm .i { width: 14px; height: 14px; stroke-width: 2.2; }
+  .faq details p { padding: 0 36px 18px 0; font-size: 16px; color: var(--bone-dim); }
+
+  .links { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 8px; }
+  .links a { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 60px; padding: 12px 16px; border-radius: 18px; text-decoration: none;
+    background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
+  .links a b { display: block; font: 600 16px/1.25 var(--font-sans); }
+  .links a small { display: block; font: 400 14px/1.3 var(--font-sans); color: var(--muted-foreground); margin-top: 3px; }
+  .links a .go { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: rgba(242,236,227,.06); flex: none; }
+  .links .i { width: 16px; height: 16px; }
+
+  footer { margin-top: 80px; padding: 28px var(--gutter) calc(var(--sab) + 28px); border-top: 1px solid var(--border); }
+  footer .word { font: 400 40px/1 var(--font-display); letter-spacing: -0.02em; }
+  footer p { margin-top: 10px; font-size: 14px; color: var(--muted-foreground); max-width: 30ch; }
+  footer nav { display: flex; gap: 4px 18px; flex-wrap: wrap; margin-top: 14px; }
+  footer nav a { font-size: 14px; color: var(--bone-dim); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+  .note { margin-top: 14px; padding: 0 var(--gutter); font: 400 14px/1.4 var(--font-sans); color: var(--muted-foreground); }
+
+
+  .solo { display: grid; grid-template-columns: 156px 1fr; gap: 16px; align-items: end; padding: 0 var(--gutter); }
+  .solo-meta { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding-bottom: 4px; }
+  .solo-meta b { font: 400 26px/1.05 var(--font-display); letter-spacing: -0.01em; margin-top: 6px; }
+  .solo-meta .use { font-size: 14px; color: var(--muted-foreground); }
+  .solo-meta .cost { font: 500 14px/1 var(--font-mono); color: var(--bone-dim); padding: 4px 6px; border-radius: 6px; background: rgba(242,236,227,.06); margin-top: 4px; }
+  .solo-meta .btn { margin-top: 14px; height: 40px; min-height: 44px; padding: 0 18px; border-radius: 999px; font-size: 14px; }
+
+  /* floating primary: same action as the generator's, shown only while it is off-screen */
+  .dock { position: fixed; z-index: 70; left: 12px; right: 12px; bottom: calc(var(--sab) + 12px); transform: translateY(calc(100% + var(--sab) + 40px)); visibility: hidden; transition: transform .45s var(--ease), visibility 0s .45s; }
+  .dock.show { transform: none; visibility: visible; transition: transform .45s var(--ease), visibility 0s; }
+  .dock .btn-primary { box-shadow: inset 0 1px 0 rgba(255,255,255,.38), 0 18px 40px -10px rgba(0,0,0,.95), 0 0 0 1px rgba(255,120,80,.4); }
+
+  /* sign-up sheet */
+  .signup h2 { font: 400 32px/1.05 var(--font-display); margin: 2px 48px 8px 0; }
+  .signup .gift { display: flex; gap: 12px; align-items: center; padding: 14px; border-radius: 16px; margin: 16px 0; background: linear-gradient(120deg, rgba(255,91,46,.16), rgba(255,91,46,.04)); box-shadow: inset 0 0 0 1px rgba(255,91,46,.28); }
+  .signup .gift .ico { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--primary); color: var(--primary-foreground); flex: none; }
+  .signup .gift b { display: block; font-size: 16px; }
+  .signup .gift span { font-size: 14px; color: var(--muted-foreground); }
+  .signup .alt { display: grid; gap: 8px; margin-top: 10px; }
+  .signup .alt .btn { width: 100%; min-height: 50px; }
+  .signup .fine { text-align: center; font-size: 14px; color: var(--muted-foreground); margin-top: 12px; }
+</style>
+</head>
+<body>
+
+<header class="appbar">
+  <div class="appbar-row">
+    <a class="brand" href="home.html" aria-label="Shotviva, AI photo studio">
+      <span class="word">Shotviva<i>.</i></span><span class="tag">AI photo studio</span>
+    </a>
+    <a class="btn btn-ghost" href="create.html">Log in</a>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <h1><span class="k">Image to Image AI:</span> <span class="d">Restyle a Photo, <em>Keep the Subject</em></span></h1>
+    <p class="lede">The AI photo studio that starts from your real photo. What you shot stays; the template changes the light, the scene or the art style.</p>
+    <p class="answer">Image to image AI takes a photo you already have and gives it a new look while the subject stays as shot. With Shotviva you upload one phone photo, pick a template for food, products, rooms, pets or an art style, and download it in Standard, HD or Max. No prompts to write. New users get 3 free Standard images.</p>
+
+    <!-- HOMEPAGE GENERATOR -->
+    <section class="gen" id="gen" aria-label="Try Shotviva on a photo">
+      <button class="drop" type="button" id="drop" aria-label="Upload photo">
+        <span class="demo">
+          <img src="../assets/img/pure-white-before.webp" alt="">
+          <img class="a" src="../assets/img/pure-white-after.webp" alt="Pure White example, illustrative: a phone photo of a woven tote on the left, the AI result on the right">
+          <span class="seam" aria-hidden="true"></span>
+          <span class="tag l" aria-hidden="true">Phone</span><span class="tag r" aria-hidden="true">AI</span>
+          <span class="badge-illus">Illustrative example</span>
+        </span>
+        <span class="vf" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <span class="hud" aria-hidden="true">4:5</span>
+        <span class="empty">
+          <span class="shutter" aria-hidden="true"><span><svg class="i" viewBox="0 0 24 24" style="width:24px;height:24px"><path d="M12 5v14M5 12h14"/></svg></span></span>
+          <strong>Add your phone photo</strong>
+          <small>JPG, PNG or WebP · up to 20MB</small>
+        </span>
+        <img class="shot" src="../assets/img/pure-white-before.webp" alt="Your uploaded photo (illustrative example)">
+        <span class="badge-illus shot-tag">Your photo · illustrative</span>
+      </button>
+
+      <div class="current">
+        <img class="thumb" src="../assets/img/pure-white-after.webp" alt="" id="cur-thumb">
+        <div class="t"><small>Template</small><b id="cur-name">Pure White</b></div>
+        <a class="link" href="#templates" style="font-size:14px;white-space:nowrap">See all templates <svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a>
+      </div>
+
+      <div class="picks">
+        <div class="picks-head"><span>Template</span><a class="link" href="#templates" style="font-size:14px">See all templates <svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a></div>
+        <div class="pick-rail" id="pick-rail" role="group" aria-label="Templates"></div>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="gen-note">Anything to change? <span class="opt">(optional)</span></label>
+        <textarea class="textarea" id="gen-note" maxlength="300" rows="2" placeholder="e.g. a little warmer, no shadow under the bag"></textarea>
+      </div>
+
+      <div class="gen-cta">
+        <button class="btn btn-primary" type="button" id="gen-btn">
+          <svg class="i" viewBox="0 0 24 24"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6H8l1.5-2h5L16 6h1.5A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.5"/></svg>
+          <span id="gen-label">Upload photo</span>
+        </button>
+      </div>
+      <p class="gen-meta"><svg class="i" viewBox="0 0 24 24"><path d="M4 11h16v9H4zM3 7h18v4H3zM12 7v13M12 7S10.5 3 8 3.8C6 4.4 7 7 12 7zm0 0s1.5-4 4-3.2C18 4.4 17 7 12 7z"/></svg>3 free Standard images for new users</p>
+    </section>
+  </section>
+
+  <!-- FIRST DEMO MODULE -->
+  <section class="block" id="shoot" aria-labelledby="shoot-h">
+    <h2 class="h2 hot" id="shoot-h">One phone photo → <em>a full shoot</em></h2>
+    <p class="intro">Shot on a phone on a kitchen counter. Three deliverables, and the same tote in every one: the weave, the stitching, the chain.</p>
+
+    <div class="shoot">
+      <figure class="src" style="margin:0">
+        <div class="phone"><img src="../assets/img/hero-set-phone.webp" alt="Phone snapshot of a woven leather tote on a cluttered kitchen counter (illustrative example)"></div>
+        <figcaption class="src-meta">
+          <span class="file">IMG_2047.HEIC</span>
+          <p>As shot on a phone. Window light, a busy counter, keys and a mug in frame.</p>
+          <span class="pill">Illustrative example</span>
+        </figcaption>
+      </figure>
+      <div class="develop" aria-hidden="true"><span class="line"></span><span>Three templates, same tote</span></div>
+      <ol class="outs">
+        <li class="big">
+          <img src="../assets/img/hero-set-listing.webp" alt="The same tote as a white-background marketplace listing (illustrative example)" style="object-position:50% 72%">
+          <span class="badge-illus">Illustrative example</span>
+          <span class="cap"><b>Marketplace listing</b><small>Pure White template</small></span>
+        </li>
+        <li><img src="../assets/img/hero-set-lifestyle.webp" alt="The same tote on a café chair by a window in warm morning light (illustrative example)"><span class="cap"><b>Lifestyle scene</b><small>Lifestyle Table</small></span></li>
+        <li><img src="../assets/img/hero-set-promo.webp" alt="The same tote on a promo poster headed New Season Tote (illustrative example)"><span class="cap"><b>Promo poster</b><small>Promo Poster</small></span></li>
+      </ol>
+      <div class="bill">
+        <div class="them"><span class="who">Photographer</span><p class="amt">A full shoot</p><small>Booking, studio, styling and retouching</small></div>
+        <div class="us"><span class="who">Shotviva</span><p class="amt">6 credits</p><small>Three Standard images, from the photo you already took</small></div>
+      </div>
+      <p class="bill-line">What a photographer would bill as a full shoot, made from the photo you already took.</p>
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="how-h">
+        <h2 class="h2" id="how-h">How Image to Image AI Works in 3 Steps</h2>
+    <ol class="steps">
+      <li><span class="num">1</span><div><h3>Upload One Photo</h3><p>Any phone photo of your product, dish, room or pet. JPG, PNG or WebP.</p></div></li>
+      <li><span class="num">2</span><div><h3>Pick a Template</h3><p>Each template sets the light, scene or art style. Nothing to write.</p></div></li>
+      <li><span class="num">3</span><div><h3>Download in Standard, HD or Max</h3><p>Pick the size you need when you make it.</p>
+        <div class="sizes"><span class="pill">Standard 1024</span><span class="pill">HD 2048</span><span class="pill">Max 2880</span></div></div></li>
+    </ol>
+  </section>
+
+  <section class="tpl-wrap" id="templates" aria-labelledby="tpl-h">
+    <div class="hd">
+            <h2 class="h2" id="tpl-h">Img to Img Templates: No Prompts to Write</h2>
+      <p class="intro">Every card shows the phone photo on the left and the AI result on the right. Tap one to compare.</p>
+    </div>
+    <div id="cats"></div>
+    <p class="note">All template images are illustrative examples.</p>
+  </section>
+
+  <section class="block" aria-labelledby="same-h">
+        <h2 class="h2" id="same-h">AI Image to Image: What Stays the Same</h2>
+    <table class="facts">
+      <tbody>
+        <tr class="key"><th scope="row">What stays the same</th><td>The subject, as you shot it</td></tr>
+        <tr class="key"><th scope="row">What changes</th><td>Light, background, scene or art style</td></tr>
+        <tr><th scope="row">Free for new users</th><td>3 Standard images</td></tr>
+        <tr><th scope="row">Cost per photo</th><td>From 2 credits</td></tr>
+        <tr><th scope="row">Output sizes</th><td>Standard 1024, HD 2048, Max 2880 px</td></tr>
+        <tr><th scope="row">Your photo</th><td>JPG, PNG or WebP, up to 20MB</td></tr>
+        <tr><th scope="row">Time per photo</th><td>Usually 20–40 seconds</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="block" aria-labelledby="free-h">
+        <h2 class="h2" id="free-h">Free Image to Image AI: What You Get</h2>
+    <div class="free">
+      <article>
+        <h3>3 Free Standard Images When You Sign Up</h3>
+        <p>New accounts start with 3 free Standard images. No card needed to try any template.</p>
+      </article>
+      <article>
+        <h3>Free Photos Are Public and Watermarked, Paid Photos Are Private</h3>
+        <p>Photos made with free credits are shown publicly with a watermark. Photos made with paid credits stay private and watermark-free.</p>
+        <div class="wm">
+          <figure><img src="../assets/img/spa-podium-after.webp" alt="Free photo with a Shotviva watermark (illustrative example)"><span class="mark" aria-hidden="true">shotviva</span><figcaption class="pill" style="height:26px;background:rgba(11,10,9,.72);color:#fff">Free · public</figcaption></figure>
+          <figure><img src="../assets/img/spa-podium-after.webp" alt="Paid photo with no watermark (illustrative example)"><figcaption class="pill" style="height:26px;background:var(--primary);color:var(--primary-foreground)">Paid · private</figcaption></figure>
+        </div>
+      </article>
+      <article>
+        <h3>Plans From $19.90 a Month</h3>
+        <p>Starter is 50 credits a month. Yearly plans cost less per month, and one-time credit packs need no subscription.</p>
+      </article>
+    </div>
+    <div class="cost-wrap">
+      <h3>What a set of photos costs</h3>
+      <table class="cost-table">
+        <thead><tr><th scope="col"><span class="sr-only">Compare</span></th><th scope="col">Photographer</th><th scope="col">Do it yourself</th><th scope="col" class="sv">Shotviva</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Cost</th><td>Per-shoot quote</td><td>Props, lights, editing apps</td><td class="sv">From 2 credits a photo</td></tr>
+          <tr><th scope="row">Time</th><td>Days to book and deliver</td><td>Hours per product</td><td class="sv">20–40 seconds</td></tr>
+          <tr><th scope="row">Your subject</th><td>Reshot</td><td>As shot, plain look</td><td class="sv">As shot, new look</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="faq-h">
+        <h2 class="h2" id="faq-h">Image to Image AI FAQ</h2>
+    <div class="faq">
+      <details open><summary>What is image to image AI?<span class="pm" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></summary>
+        <p>It starts from a photo you already have and changes its look (the light, background, scene or art style) while the subject stays as you shot it.</p></details>
+      <details><summary>Is image to image AI free?<span class="pm" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></summary>
+        <p>New users get 3 free Standard images. Free photos are public and watermarked. After that, each photo costs credits, from 2 credits.</p></details>
+      <details><summary>Does image to image AI keep my photo's subject the same?<span class="pm" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></summary>
+        <p>Yes. Templates keep your product, dish, room or pet as shot. Only the light, background, scene or style changes.</p></details>
+      <details><summary>How is image to image AI different from an AI image generator?<span class="pm" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></summary>
+        <p>A generator invents a picture from a description. Image to image AI starts from your real photo, so what customers see is what you actually sell.</p></details>
+      <details><summary>Can I use the photos commercially?<span class="pm" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></summary>
+        <p>Yes. Photos made with paid credits are private, watermark-free and yours to use in listings, menus, ads and social posts.</p></details>
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="more-h">
+        <h2 class="h2" id="more-h">Image to Image AI for Food, Products, Rooms and More</h2>
+    <ul class="links">
+      <li><a href="/ai-restaurant-menu"><span><b>AI restaurant menu photos</b><small>/ai-restaurant-menu</small></span><span class="go"><svg class="i" viewBox="0 0 24 24"><path d="M7 17L17 7M9 7h8v8"/></svg></span></a></li>
+      <li><a href="/commercial-photography"><span><b>Commercial product photography</b><small>/commercial-photography</small></span><span class="go"><svg class="i" viewBox="0 0 24 24"><path d="M7 17L17 7M9 7h8v8"/></svg></span></a></li>
+      <li><a href="/image-to-image-generator"><span><b>Image to image generator</b><small>/image-to-image-generator</small></span><span class="go"><svg class="i" viewBox="0 0 24 24"><path d="M7 17L17 7M9 7h8v8"/></svg></span></a></li>
+      <li><a href="/pricing"><span><b>Pricing</b><small>/pricing</small></span><span class="go"><svg class="i" viewBox="0 0 24 24"><path d="M7 17L17 7M9 7h8v8"/></svg></span></a></li>
+    </ul>
+  </section>
+</main>
+
+<footer>
+  <p class="word">Shotviva<span style="color:var(--primary)">.</span></p>
+  <p>AI photo studio. shotviva.com is the only official Shotviva website.</p>
+  <nav aria-label="Legal"><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="/acceptable-use">Acceptable use</a></nav>
+</footer>
+
+<div class="dock" id="dock" aria-hidden="true"><a class="btn btn-primary" href="#gen" tabindex="-1">
+  <svg class="i" viewBox="0 0 24 24"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6H8l1.5-2h5L16 6h1.5A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.5"/></svg><span id="dock-label">Upload photo</span></a></div>
+
+<!-- sign-up prompt (bottom sheet) -->
+<div class="scrim" id="su-scrim" hidden></div>
+<section class="sheet signup" id="su" role="dialog" aria-modal="true" aria-labelledby="su-h" tabindex="-1" hidden>
+  <div class="sheet-grab" aria-hidden="true"></div>
+  <button class="sheet-x" type="button" data-close aria-label="Close"><span><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></span></button>
+  <div class="sheet-body">
+    <h2 id="su-h">Make a free account to develop it</h2>
+    <p class="muted" style="font-size:16px">Your photo and template stay as you set them.</p>
+    <div class="gift"><span class="ico"><svg class="i" viewBox="0 0 24 24"><path d="M4 11h16v9H4zM3 7h18v4H3zM12 7v13M12 7S10.5 3 8 3.8C6 4.4 7 7 12 7zm0 0s1.5-4 4-3.2C18 4.4 17 7 12 7z"/></svg></span>
+      <div><b>3 free Standard images</b><span>Shown publicly with a watermark</span></div></div>
+    <a class="btn btn-primary" href="create.html">Continue with Google</a>
+    <div class="alt"><a class="btn btn-ghost" href="create.html">Continue with Apple</a><a class="btn btn-ghost" href="create.html">Continue with email</a></div>
+    <p class="fine">By continuing you agree to the Terms and Privacy Policy.</p>
+  </div>
+</section>
+
+<script>
+(function () {
+  const { T, CATS, card, previewSheet, makeSheet } = window.SV;
+  // Template groups, in the brief's order
+  const intros = {
+    art: '<b>Your phone photo → a drawn look</b>, with the face and pose kept.',
+    food: '<b>Your phone photo of a dish → menu</b>, delivery-app and promo shots.',
+    products: '<b>Your phone photo of a product → clean listings</b> and styled shop scenes.',
+    beauty: '<b>Your phone photo of a bottle or jar → a polished beauty set.</b>',
+    rooms: '<b>Your phone photo of a room → bright listing light</b> or a warm evening.',
+    pets: '<b>Your phone photo of a pet → a studio portrait.</b>',
+  };
+  const solo = t => `<div class="solo"><button class="tpl" type="button" data-tpl="${t.id}" aria-haspopup="dialog">${window.SV.media(t)}</button>
+    <div class="solo-meta"><b>${t.name}</b><span class="use">${t.use}</span><span class="cost">from 2 credits</span>
+      <button class="btn btn-ghost" type="button" data-tpl-open="${t.id}">Preview</button></div></div>`;
+  document.getElementById('cats').innerHTML = CATS.map(c => {
+    const list = T.filter(t => t.cat === c.id);
+    return `<div class="cat"><div class="cat-head"><h3>${c.name}</h3><p>${intros[c.id]}</p></div>
+      ${list.length === 1 ? solo(list[0]) : `<ul class="rail">${list.map(t => `<li>${card(t)}</li>`).join('')}</ul>`}</div>`;
+  }).join('');
+
+  // generator
+  const gen = document.getElementById('gen'), label = document.getElementById('gen-label'), btn = document.getElementById('gen-btn');
+  const rail = document.getElementById('pick-rail');
+  let tpl = T[0];
+  const picks = ['pure-white', 'lifestyle-table', 'spa-podium', 'delivery-photo', 'bright-listing', 'promo-poster'].map(id => T.find(t => t.id === id));
+  function renderPicks() {
+    rail.innerHTML = picks.map(t => `<button class="pick" type="button" data-id="${t.id}" aria-pressed="${t.id === tpl.id}"><img src="../assets/img/${t.id}-after.webp" alt="">${t.name}</button>`).join('');
+  }
+  function setTpl(t) {
+    tpl = t;
+    if (!picks.includes(t)) picks.unshift(t), picks.pop();
+    document.getElementById('cur-name').textContent = t.name;
+    document.getElementById('cur-thumb').src = `../assets/img/${t.id}-after.webp`;
+    renderPicks();
+  }
+  rail.addEventListener('click', e => { const b = e.target.closest('.pick'); if (b) setTpl(T.find(t => t.id === b.dataset.id)); });
+  function addPhoto() {
+    gen.classList.add('has-photo');
+    label.innerHTML = 'Generate <span class="cost">· 2 credits</span>'; document.getElementById('dock-label').textContent = 'Generate · 2 credits';
+    document.getElementById('drop').setAttribute('aria-label', 'Your photo. Tap to replace');
+    renderPicks();
+  }
+  document.getElementById('drop').addEventListener('click', addPhoto);
+  const su = makeSheet(document.getElementById('su'), document.getElementById('su-scrim'));
+  btn.addEventListener('click', () => gen.classList.contains('has-photo') ? su.open() : addPhoto());
+  if (window.SV.q.get('photo') === '1') addPhoto();
+
+  // dock: the same primary, shown only once the whole generator card has left the viewport
+  // (so it can never sit on top of the generator) and hidden again near the footer
+  const dock = document.getElementById('dock');
+  const vis = { gen: true, foot: false };
+  const sync = () => dock.classList.toggle('show', !vis.gen && !vis.foot);
+  new IntersectionObserver(([e]) => { vis.gen = e.isIntersecting; sync(); }).observe(gen);
+  new IntersectionObserver(([e]) => { vis.foot = e.isIntersecting; sync(); }).observe(document.querySelector('footer'));
+  dock.querySelector('a').addEventListener('click', e => { e.preventDefault(); gen.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+
+  // template previews
+  const show = previewSheet(t => { setTpl(t); gen.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  document.addEventListener('click', e => { const c = e.target.closest('.tpl, [data-tpl-open]'); if (c) show(c.dataset.tpl || c.dataset.tplOpen); });
+})();
+</script>
+</body>
+</html>

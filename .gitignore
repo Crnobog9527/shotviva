@@ -8,8 +8,22 @@
 # local-only data (seed prompts etc.)
 .local/
 
-# design drafts (T6) never go into git
-design/
+# design: only the final B (Darkroom) system and its assets are tracked (T6 manifest,
+# 2026-11-05); drafts, other comps, archives, sources and briefs stay local
+design/*
+!design/DESIGN.md
+!design/PRODUCT.md
+!design/TOKENS.md
+!design/tokens/
+!design/.impeccable/
+design/.impeccable/*
+!design/.impeccable/design.json
+!design/comps-v3-b/
+design/comps-v3-b/shots/
+!design/assets/
+design/assets/*
+!design/assets/img/
+!design/assets/video/
 
 # deps / build
 node_modules/
