@@ -8,7 +8,8 @@ import { ProviderError } from '@/core/jobs'
 
 import { png } from '../fakes/images'
 
-// A published web template with a wrapped prompt, the way an admin would set one up.
+// A published web template with a wrapped prompt, the way an admin would set one up. Priced
+// as a medium template (1 / 2 / 3), so Standard costs 1.
 export async function seedTemplate(db: Client, options: { visibleIn?: string[]; images?: { min: number; max: number } } = {}) {
   const id = `t4-${randomUUID().slice(0, 8)}`
   const fields = {
@@ -17,8 +18,8 @@ export async function seedTemplate(db: Client, options: { visibleIn?: string[]; 
     aspectRatios: ['4:5', '1:1'],
   }
   await db.query(
-    `insert into public.templates (id, name, category, fields, credits_cost, is_active, visible_in)
-     values ($1, 'T4 test', 'test', $2, 1, true, $3)`,
+    `insert into public.templates (id, name, category, fields, quality, credits_cost, is_active, visible_in)
+     values ($1, 'T4 test', 'test', $2, 'medium', '{"1k": 1, "2k": 2, "3k": 3}', true, $3)`,
     [id, JSON.stringify(fields), options.visibleIn ?? ['web']],
   )
   await db.query('insert into public.template_prompts (template_id, body) values ($1, $2)', [
@@ -34,7 +35,14 @@ export type FakeBehaviour = 'ok' | 'reject' | 'fail' | 'hang'
 export function fakeProvider(behaviour: FakeBehaviour = 'ok') {
   const calls: Omit<ProviderInput, 'signal'>[] = []
   const generate = vi.fn(async (input: ProviderInput) => {
-    calls.push({ prompt: input.prompt, images: input.images, aspectRatio: input.aspectRatio, params: input.params })
+    calls.push({
+      prompt: input.prompt,
+      images: input.images,
+      aspectRatio: input.aspectRatio,
+      resolution: input.resolution,
+      quality: input.quality,
+      params: input.params,
+    })
     if (behaviour === 'reject') throw new ProviderError('content_rejected', 'moderation_blocked')
     if (behaviour === 'fail') throw new ProviderError('failed', 'openai 503')
     if (behaviour === 'hang') return new Promise<never>(() => {})

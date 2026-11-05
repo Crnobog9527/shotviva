@@ -21,6 +21,9 @@ const serverEnvSchema = z.object({
   R2_ACCESS_KEY_ID: optionalSecret,
   R2_SECRET_ACCESS_KEY: optionalSecret,
   R2_BUCKET: optionalSecret,
+  // Public assets bucket for template covers only (ARCHITECTURE §8.3: shotviva-assets, preview
+  // shotviva-assets-preview), same account and keys. Required by the admin cover upload.
+  R2_PUBLIC_BUCKET: optionalSecret,
   // OpenAI image provider (modules/image/provider); the key is required on first use.
   OPENAI_API_KEY: optionalSecret,
   OPENAI_IMAGE_MODEL: z.preprocess(blankAsUnset, z.string().min(1).default('gpt-image-2.5-sunburst')),

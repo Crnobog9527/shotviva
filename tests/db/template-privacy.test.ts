@@ -18,7 +18,16 @@ const fields = { images: { min: 1, max: 1 }, copy: [], aspectRatios: ['1:1'] }
 
 async function seed(id: string, isActive: boolean) {
   const { error } = await serviceClient().rpc('admin_upsert_template', {
-    p_template: { id, name: id, category: 'test', fields, visible_in: ['web'], is_active: isActive },
+    p_template: {
+      id,
+      name: id,
+      category: 'test',
+      fields,
+      quality: 'medium',
+      credits_cost: { '1k': 1, '2k': 2, '3k': 3 },
+      visible_in: ['web'],
+      is_active: isActive,
+    },
     p_prompt: { body: FAKE_BODY, model_params: {} },
   })
   if (error) throw new Error(error.message)
@@ -66,6 +75,17 @@ describe('template privacy', () => {
     expect(ids).toContain(WEB_LIVE)
     expect(ids).not.toContain('freeform')
     expect(ids).not.toContain(WEB_DRAFT)
+  })
+
+  it('the public catalogue carries quality, the three prices and the cover media fields', async () => {
+    const live = (await listTemplates(anonClient(), 'web')).find((template) => template.id === WEB_LIVE)
+    expect(live).toMatchObject({
+      quality: 'medium',
+      creditsCost: { '1k': 1, '2k': 2, '3k': 3 },
+      coverMediaType: 'image',
+      coverVideoUrl: null,
+      coverPosterUrl: null,
+    })
   })
 
   it('partner list includes the built-in freeform template', async () => {

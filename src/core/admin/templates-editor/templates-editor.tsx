@@ -4,6 +4,7 @@ import { useState } from 'react'
 
 import { Button } from '@/core/ui/button'
 import { Input } from '@/core/ui/input'
+import type { CreditsFloor } from '@/core/templates/pricing'
 
 import type { AdminTemplate, TemplateAdminActions } from '../templates/types'
 
@@ -13,14 +14,19 @@ import { TemplatesTable } from './templates-table'
 import { UnpublishDialog } from './unpublish-dialog'
 import { useTemplateActions } from './use-template-actions'
 
-type Props = { templates: AdminTemplate[]; actions: TemplateAdminActions }
+type Props = { templates: AdminTemplate[]; floor: CreditsFloor; actions: TemplateAdminActions }
 
-export function TemplatesEditor({ templates, actions }: Props) {
+export function TemplatesEditor({ templates, floor, actions }: Props) {
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState<EditTarget | null>(null)
   const [unpublishing, setUnpublishing] = useState<AdminTemplate | null>(null)
   const { pending, error, notice, run, clearError } = useTemplateActions()
   const visible = templates.filter((template) => matchesSearch(template, query))
+  // After a cover upload the page refreshes; show the dialog the fresh row, not the snapshot.
+  const target: EditTarget | null =
+    editing?.mode === 'edit'
+      ? { mode: 'edit', template: templates.find((t) => t.id === editing.template.id) ?? editing.template }
+      : editing
 
   const openEditor = (target: EditTarget) => {
     clearError()
@@ -62,10 +68,12 @@ export function TemplatesEditor({ templates, actions }: Props) {
         onToggle={toggle}
         onMove={move}
       />
-      {editing ? (
+      {target ? (
         <TemplateFormDialog
-          key={editing.mode === 'edit' ? editing.template.id : 'new'}
-          target={editing}
+          key={target.mode === 'edit' ? target.template.id : 'new'}
+          target={target}
+          floor={floor}
+          coverActions={actions}
           pending={pending}
           error={error}
           onCancel={() => setEditing(null)}

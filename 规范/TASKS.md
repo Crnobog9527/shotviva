@@ -27,6 +27,8 @@
 | T19 | 法律页面 | **可派** | T5 |
 | T20 | 数据库收尾：用户总览视图、迁移只加不改检查、收回多余权限 | **可派** | T15 |
 | T16 | 按分辨率扣费（模板三档积分 + 质量档） | **等 T15 合并；T8 / T9 之前** | T3、T4、T14、T15 |
+| T21 | 简体中文全站（路由、语言提示、中文文案、中文邮件、模板中文名） | 等 T8 合并 | T8、T11、T19 |
+| T22 | 中文关键词研究与中文口径主词表（不写代码） | **可派** | — |
 
 并行建议：T0 先做（半天到一天）；T0 合并后 T1 / T2 / T3 / T5 四张同时开；T6 和 T0 同时开（不碰代码）。
 
@@ -202,11 +204,13 @@
 
 **依据**：DESIGN §4.3、§4.4、§8 全部；`MOBILE_UI_rules_fable.md` §1.8.1 Share 实现规则。
 
-**设计基准（Owner 2026-11-05）**：以 T6 定稿的 B 版 Darkroom（`design/comps-v3-b/` 与更新后的 `design/DESIGN.md`）为准。**范围补充**：生成可以在后台进行，Photos 页显示进行中的任务和进度，按 `current_tier` 的并发上限允许同时发起多张（Starter 1、Pro 3、Max 6），超过上限时按钮提示等待。
+**设计基准（Owner 2026-11-05）**：以 T6 定稿的 B 版 Darkroom（`design/comps-v3-b/` 与更新后的 `design/DESIGN.md`）为准。设计系统已入库（`design/DESIGN.md`、`design/TOKENS.md`、`design/tokens/tokens.css`、`design/.impeccable/design.json`、`design/comps-v3-b/`、`design/assets/img|video/`）；变量照搬 `tokens.css` 进 `globals.css`；`design/TOKENS.md` 末尾的「实现时清理」清单（硬编码颜色改变量、三档材质收进 `:root`、12px 标签、超出两级的发光、非 4 倍数间距、支付宝官方图标）在本卡一并处理。首页「一张手机照 → 一整套」演示用 `design/assets/img/hero-set-*.webp`（v2）。模板样图（`*-before/after.webp`、`*-split.webp`、`*-anim.webp`、`video/*.mp4`）是示意素材，`.json` 附带文件里写了来源和许可，上线前 Owner 在后台替换；需要放进 `public/` 的只放首页演示用的那几张，模板封面走 T16 的公开桶。**范围补充**：生成可以在后台进行，Photos 页显示进行中的任务和进度，按 `current_tier` 的并发上限允许同时发起多张（Starter 1、Pro 3、Max 6），超过上限时按钮提示等待。
 
 **验收**：LAUNCH §7.5 五条 + DESIGN §8.7 真机清单（Codex 验收）。
 
 **依赖**：T4、T6。
+
+**范围补充 2（总控 2026-11-06）**：上线要同时支持简体中文（ARCHITECTURE §17）。本卡新增和改动的界面文字全部走 next-intl（`site/messages/en.json`），不写死；不加 `zh.json`、不做语言路由（T21 做）；字体栈接系统中文字体回退，文字容器不写死宽度（DESIGN §3.2）。
 
 ---
 
@@ -321,7 +325,7 @@
 **目标**：把「一个模板一个整数 credit」改成「模板质量档 × 用户选的分辨率（1K / 2K / 3K）」：模板表存三档积分和质量档，预扣在数据库里按分辨率取数，provider 按档出尺寸、按模板传 `quality`，后台能编辑三个数并校验下限。约 1 天。
 
 **范围**：
-- `supabase/migrations/` 编号段 **`0020`～`0039`**（T15 PR #24 规划的空闲段；**T15 未合并前不写迁移**，基线合并后编号必须高于 `0006`）：`templates.credits_cost` 改为 jsonb（三个键 `1k` / `2k` / `4k` 必填、正整数，check 约束），`templates.quality` 文本列（`high` / `medium`，默认 `high`）；`admin_upsert_template` 读写这两个字段；`reserve_credits(job_id, resolution)` 从 `templates.credits_cost ->> resolution` 取数（不再信任调用方传入的 cost），非法分辨率抛错；`freeform` 种子行三档都配。一张卡一次成型，不准先加列再改列。
+- `supabase/migrations/` 编号段 **`0020`～`0039`**（T15 PR #24 规划的空闲段；**T15 未合并前不写迁移**，基线合并后编号必须高于 `0006`）：`templates.credits_cost` 改为 jsonb（三个键 `1k` / `2k` / `3k` 必填、正整数，check 约束），`templates.quality` 文本列（`high` / `medium`，默认 `high`）；`admin_upsert_template` 读写这两个字段；`reserve_credits(job_id, resolution)` 从 `templates.credits_cost ->> resolution` 取数（不再信任调用方传入的 cost），非法分辨率抛错；`freeform` 种子行三档都配。一张卡一次成型，不准先加列再改列。
 - `modules/image/provider/output-size.ts`：按 ARCHITECTURE §8.1 的三档（1K 1024²、2K 2048²、3K 2880²）× 比例出尺寸表，每档内任何比例的输出 token ≤ 该档正方形（用 OpenAI 官方 token 计算器公式验证，表和验证脚本一起提交）；`openai-image-provider.ts` 传模板的 `quality`，模型名继续从 `OPENAI_IMAGE_MODEL` 读。
 - `modules/image/credits-floor.ts`：质量档 × 分辨率的配置下限常量（ARCHITECTURE §6.1 的 `ceil(p95 成本 ÷ $0.06)`，初值 `high` 2 / 4 / 6、`medium` 1 / 2 / 3，LAUNCH §5 成本测量后更新），后台保存模板的服务端动作用它校验。
 - `core/jobs/`：`job-schema` 加 `resolution`（默认 `'1k'`），`POST /api/generate` 入参加 `resolution`；`generation_jobs.inputs.resolution` 落库；伙伴接口 `/api/partner/generate` 固定 `'1k'`，契约不改。
@@ -394,6 +398,23 @@
 3. 测试：匿名和普通登录用户读 `admin.users_overview` 失败；`service_role` 能读且按邮箱筛出指定用户；`templates` / `profiles` 现有读写行为不变（已有 RLS 测试全过）。
 
 **依据**：ARCHITECTURE §10 运营表；AGENTS §5 新增两条。**依赖**：T15（已合并）。与 T16 并行时注意：两边都会改 `supabase/schema.sql`，后合并的一方 rebase 后重新生成快照，不手工合并。
+
+## T21 简体中文全站（等 T8 合并）
+
+**目标**：上线时全站有简体中文版（ARCHITECTURE §17）。
+1. 路由：next-intl 开 `zh`，英文不带前缀、中文 `/zh`；中间件只认地址和 `NEXT_LOCALE` Cookie，不按浏览器语言或 IP 自动跳转；浏览器语言为中文的访客在英文页看到可关闭的「切换到中文」提示；页头 / 页脚语言切换器（真实 `<a href>`）。`<html lang>`、hreflang（`en` / `zh-Hans` / `x-default`）、每种语言独立 sitemap；`/zh` 页默认 noindex，T22 的中文主词表合并后，表里的页面放开收录。
+2. 文案：`site/messages/zh.json` 补齐全部界面文字；首页、`/image-to-image-generator`、`/pricing` 等营销页的中文正文放 `site/content/`（直答块、FAQ、Title、Description 按中文真实问法写，不机器直译，建站规格 G13；收录页的主词以 T22 为准）；四个法律页中文版加「以英文版本为准」声明；付费墙「支付宝」；Stripe Checkout 传 `locale`。
+3. 模板：迁移（编号段 `0120`～`0139`，先合并本卡的 [spec] 定义再写）给 `templates` 加 `translations jsonb not null default '{}'`（ARCHITECTURE §5 结构，check 约束只允许已启用语言的键）；`admin_upsert_template` 读写它；公开查询按当前语言取名称和说明，缺项回退英文；后台模板编辑页加中文名称 / 说明 / 字段标签输入。
+4. 邮件：注册时把当前语言写进 `user_metadata.locale`；`supabase/templates/*.html` 四个模板加中文分支（ARCHITECTURE §7）；本地 Supabase + Mailpit 验证中英两种；PR 里给 Owner 写好重新粘贴的步骤。
+5. 埋点：PostHog 事件带 `locale`（ARCHITECTURE §16）。
+
+**不许动**：价格和积分规则、提示词（始终英文）、付费墙结构（T9）。**依据**：ARCHITECTURE §5、§7、§16、§17；建站规格 §6、G3、G13、R4；DESIGN §3.2、§4.5；LAUNCH §7.6。**验收**：LAUNCH §7.6 全部条目（Codex 验收，中文页 375px 和 1280px 截图）。**依赖**：T8（界面组件稳定后再加语言）、T11、T19。
+
+## T22 中文关键词研究与中文口径主词表（可派，不写代码）
+
+**目标**：产出 `seo资料/Shotviva 页面与主词映射（中文口径）.csv`，结构与美国口径 CSV 一致：每个英文页面对应的 `/zh` 页的中文主词、Google 中文月搜索量、难度、搜索意图、建议的中文 Title / H1。只研究 Google（简体中文用户：中国大陆翻墙用户、新加坡、马来西亚、海外华人），不做百度。用哥飞 SEO 工具箱和 Ahrefs 查真实数据，数字只来自工具结果；查不到的写「查不到」。另附一份「中文用户的真实问法」清单（≥20 条，供 T21 写直答块和 FAQ）。
+
+**交付**：一个 [spec] PR（只含 CSV 和一页研究说明），Owner 审阅后合并。**依赖**：无，可与 T8 并行。
 
 ## Owner 侧关键路径（不是任务卡，但比代码慢）
 

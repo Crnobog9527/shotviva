@@ -1,24 +1,43 @@
 'use server'
 
-import { refresh } from 'next/cache'
+import { refresh, revalidatePath, updateTag } from 'next/cache'
 
 import {
+  applyCover,
+  createCoverUpload,
   reorderTemplates,
   runAdminAction,
+  runAdminQuery,
   saveTemplate,
   setTemplateActive,
   type ActionResult,
+  type ActionValue,
+  type ApplyCoverRequest,
+  type CoverTicket,
+  type CoverUploadRequest,
   type SaveTemplatePayload,
 } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
+import { publicEnv } from '@/core/public-env'
+import { r2PublicStore, r2Store } from '@/core/storage'
+import { TEMPLATES_CACHE_TAG } from '@/core/templates'
+import { CREDITS_FLOOR } from '@/modules/image'
 
 // Server actions are public endpoints, so each one re-checks the admin role itself.
+
+// Prices and covers show on the home page and template pages: expire them now so the next
+// visitor sees the change without a redeploy (ARCHITECTURE §8.3).
+function catalogueChanged() {
+  updateTag(TEMPLATES_CACHE_TAG)
+  revalidatePath('/')
+  refresh()
+}
 
 export async function saveTemplateAction(payload: SaveTemplatePayload): Promise<ActionResult> {
   const admin = await requireAdmin()
   return runAdminAction(async () => {
-    await saveTemplate(createAdminSupabase(), admin.id, payload)
-    refresh()
+    await saveTemplate(createAdminSupabase(), admin.id, payload, CREDITS_FLOOR)
+    catalogueChanged()
   })
 }
 
@@ -26,7 +45,7 @@ export async function setTemplateActiveAction(input: unknown): Promise<ActionRes
   const admin = await requireAdmin()
   return runAdminAction(async () => {
     await setTemplateActive(createAdminSupabase(), admin.id, input)
-    refresh()
+    catalogueChanged()
   })
 }
 
@@ -34,6 +53,27 @@ export async function reorderTemplatesAction(ids: unknown): Promise<ActionResult
   const admin = await requireAdmin()
   return runAdminAction(async () => {
     await reorderTemplates(createAdminSupabase(), admin.id, ids)
-    refresh()
+    catalogueChanged()
+  })
+}
+
+// Step 1 of a cover upload: a presigned PUT into the private bucket's uploads-admin/ prefix.
+export async function requestCoverUploadAction(input: CoverUploadRequest): Promise<ActionValue<CoverTicket>> {
+  await requireAdmin()
+  return runAdminQuery(() => createCoverUpload(r2Store(), input))
+}
+
+// Step 2: convert the staged file, publish it to the public bucket, point the template at it.
+export async function applyCoverAction(input: ApplyCoverRequest): Promise<ActionResult> {
+  await requireAdmin()
+  return runAdminAction(async () => {
+    const deps = {
+      db: createAdminSupabase(),
+      uploads: r2Store(),
+      assets: r2PublicStore(),
+      assetsBaseUrl: publicEnv.NEXT_PUBLIC_ASSETS_BASE_URL,
+    }
+    await applyCover(deps, input)
+    catalogueChanged()
   })
 }

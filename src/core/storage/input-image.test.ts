@@ -34,6 +34,8 @@ describe('loadInputImage (HEAD + byte checks, AGENTS §7 item 8)', () => {
     const meta = await sharp(image.bytes).metadata()
     expect(meta).toMatchObject({ format: 'jpeg', width: 2048, height: 1536 })
     expect(meta.exif).toBeUndefined()
+    // Reported for 'original' outputs, which follow the photo's ratio.
+    expect(image).toMatchObject({ width: 2048, height: 1536 })
   })
 
   it('accepts a PNG upload and keeps small images at their size', async () => {

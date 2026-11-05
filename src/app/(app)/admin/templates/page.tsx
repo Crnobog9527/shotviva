@@ -2,8 +2,15 @@ import type { Metadata } from 'next'
 
 import { listAdminTemplates, TemplatesEditor } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
+import { CREDITS_FLOOR } from '@/modules/image'
 
-import { reorderTemplatesAction, saveTemplateAction, setTemplateActiveAction } from './actions'
+import {
+  applyCoverAction,
+  reorderTemplatesAction,
+  requestCoverUploadAction,
+  saveTemplateAction,
+  setTemplateActiveAction,
+} from './actions'
 
 // Admin-only, request-time page. The proxy (core/auth proxyGate) answers non-admins with a real
 // 404 before rendering; requireAdmin() here stays as the authoritative check. noindex comes from
@@ -20,10 +27,13 @@ export default async function AdminTemplatesPage() {
       <h1 className="text-xl font-semibold">模板与提示词</h1>
       <TemplatesEditor
         templates={templates}
+        floor={CREDITS_FLOOR}
         actions={{
           save: saveTemplateAction,
           setActive: setTemplateActiveAction,
           reorder: reorderTemplatesAction,
+          requestCoverUpload: requestCoverUploadAction,
+          applyCover: applyCoverAction,
         }}
       />
     </div>

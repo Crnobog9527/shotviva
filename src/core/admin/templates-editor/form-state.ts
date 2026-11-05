@@ -1,3 +1,6 @@
+import { RESOLUTIONS, type Resolution } from '@/core/templates/output-options'
+import type { CreditsFloor, TemplateQuality } from '@/core/templates/pricing'
+
 import type { AdminTemplate, SaveTemplatePayload } from '../templates/types'
 
 export type TemplateFormValues = {
@@ -5,9 +8,9 @@ export type TemplateFormValues = {
   module: 'image' | 'video'
   name: string
   category: string
-  creditsCost: string
-  coverBeforeUrl: string
-  coverAfterUrl: string
+  quality: TemplateQuality
+  // One text box per resolution; parsed on save.
+  credits: Record<Resolution, string>
   visibleWeb: boolean
   visiblePartner: boolean
   fieldsJson: string
@@ -29,9 +32,8 @@ export function emptyFormValues(): TemplateFormValues {
     module: 'image',
     name: '',
     category: '',
-    creditsCost: '1',
-    coverBeforeUrl: '',
-    coverAfterUrl: '',
+    quality: 'high',
+    credits: { '1k': '2', '2k': '4', '3k': '6' },
     visibleWeb: true,
     visiblePartner: false,
     fieldsJson: pretty(DEFAULT_FIELDS),
@@ -46,9 +48,12 @@ export function toFormValues(template: AdminTemplate): TemplateFormValues {
     module: template.module,
     name: template.name,
     category: template.category,
-    creditsCost: String(template.creditsCost),
-    coverBeforeUrl: template.coverBeforeUrl ?? '',
-    coverAfterUrl: template.coverAfterUrl ?? '',
+    quality: template.quality,
+    credits: {
+      '1k': String(template.creditsCost['1k']),
+      '2k': String(template.creditsCost['2k']),
+      '3k': String(template.creditsCost['3k']),
+    },
     visibleWeb: template.visibleIn.includes('web'),
     visiblePartner: template.visibleIn.includes('partner'),
     fieldsJson: pretty(template.fields),
@@ -67,8 +72,28 @@ function parseJson(text: string, label: string): { ok: true; value: unknown } | 
   }
 }
 
-// Only shapes the payload; the server validates every field again with zod.
-export function buildPayload(values: TemplateFormValues, isNew: boolean): BuildResult {
+export const TIER_LABEL: Record<Resolution, string> = { '1k': 'Standard', '2k': 'HD', '3k': 'Max' }
+
+// Resolutions whose number is missing or under the floor for the chosen quality. The server
+// runs the same check (ARCHITECTURE §6.1); this only saves a round trip.
+export function creditProblems(values: TemplateFormValues, floor: CreditsFloor): Partial<Record<Resolution, string>> {
+  const problems: Partial<Record<Resolution, string>> = {}
+  for (const resolution of RESOLUTIONS) {
+    const text = values.credits[resolution].trim()
+    const value = Number(text)
+    const min = floor[values.quality][resolution]
+    if (!/^\d+$/.test(text)) problems[resolution] = '请填正整数'
+    else if (value < min) problems[resolution] = `不能低于下限 ${min}`
+  }
+  return problems
+}
+
+// Only shapes the payload; the server validates every field again with zod and the floor.
+export function buildPayload(values: TemplateFormValues, isNew: boolean, floor: CreditsFloor): BuildResult {
+  const low = Object.entries(creditProblems(values, floor))
+  if (low.length > 0) {
+    return { ok: false, message: low.map(([r, m]) => `${TIER_LABEL[r as Resolution]}：${m}`).join('；') }
+  }
   const fields = parseJson(values.fieldsJson, '字段定义')
   if (!fields.ok) return fields
   const modelParams = parseJson(values.modelParamsJson, '模型参数')
@@ -84,9 +109,12 @@ export function buildPayload(values: TemplateFormValues, isNew: boolean): BuildR
         module: values.module,
         name: values.name,
         category: values.category,
-        creditsCost: Number(values.creditsCost),
-        coverBeforeUrl: values.coverBeforeUrl.trim(),
-        coverAfterUrl: values.coverAfterUrl.trim(),
+        quality: values.quality,
+        creditsCost: {
+          '1k': Number(values.credits['1k']),
+          '2k': Number(values.credits['2k']),
+          '3k': Number(values.credits['3k']),
+        },
         visibleIn,
         fields: fields.value,
       },

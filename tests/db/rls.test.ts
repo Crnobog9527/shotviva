@@ -33,8 +33,8 @@ beforeAll(async () => {
     jobId: randomUUID(),
     userId: owner,
     module: 'image',
+    // freeform Standard costs 2, which the 2 free credits cover.
     templateId: 'freeform',
-    creditsCost: 1,
     source: 'web',
   })
 })

@@ -4,12 +4,15 @@ import { Checkbox } from '@/core/ui/checkbox'
 import { Input } from '@/core/ui/input'
 import { Label } from '@/core/ui/label'
 import { Textarea } from '@/core/ui/textarea'
+import type { CreditsFloor } from '@/core/templates/pricing'
 
 import type { TemplateFormValues } from './form-state'
+import { TemplatePriceFields } from './template-price-fields'
 
 type Props = {
   values: TemplateFormValues
   isNew: boolean
+  floor: CreditsFloor
   onChange: (patch: Partial<TemplateFormValues>) => void
 }
 
@@ -33,7 +36,7 @@ function TextField(props: {
   )
 }
 
-export function TemplatePublicFields({ values, isNew, onChange }: Props) {
+export function TemplatePublicFields({ values, isNew, floor, onChange }: Props) {
   return (
     <fieldset className="grid gap-3">
       <legend className="mb-1 text-sm font-semibold">公开信息</legend>
@@ -43,13 +46,8 @@ export function TemplatePublicFields({ values, isNew, onChange }: Props) {
         <TextField id="name" label="名称" value={values.name} onChange={(name) => onChange({ name })} />
         <TextField id="category" label="分类" value={values.category}
           onChange={(category) => onChange({ category })} />
-        <TextField id="creditsCost" label="消耗积分" value={values.creditsCost}
-          onChange={(creditsCost) => onChange({ creditsCost })} />
-        <TextField id="coverBeforeUrl" label="封面：原图 URL" value={values.coverBeforeUrl}
-          onChange={(coverBeforeUrl) => onChange({ coverBeforeUrl })} />
-        <TextField id="coverAfterUrl" label="封面：成品 URL" value={values.coverAfterUrl}
-          onChange={(coverAfterUrl) => onChange({ coverAfterUrl })} />
       </div>
+      <TemplatePriceFields values={values} floor={floor} onChange={onChange} />
       <div className="flex items-center gap-6 text-sm">
         <span>展示入口</span>
         <label className="flex items-center gap-2">
@@ -64,7 +62,7 @@ export function TemplatePublicFields({ values, isNew, onChange }: Props) {
         </label>
       </div>
       <div className="grid gap-1.5">
-        <Label htmlFor="tpl-fieldsJson">字段定义（JSON：images / copy / aspectRatios）</Label>
+        <Label htmlFor="tpl-fieldsJson">字段定义（JSON：images / copy / aspectRatios；aspectRatios 只对伙伴接口生效，站内固定 8 个尺寸）</Label>
         <Textarea id="tpl-fieldsJson" className="min-h-32 font-mono text-xs" value={values.fieldsJson}
           onChange={(event) => onChange({ fieldsJson: event.target.value })} />
       </div>

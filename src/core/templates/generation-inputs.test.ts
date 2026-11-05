@@ -17,7 +17,22 @@ describe('validateGenerationInputs', () => {
     expect(validateGenerationInputs(fields, { copy: { dish: '  Ramen ' }, imageCount: 1 })).toEqual({
       copy: { dish: 'Ramen', note: '' },
       aspectRatio: '4:5',
+      note: '',
     })
+  })
+
+  it('takes the entry point\'s size list over the template\'s, default first', () => {
+    const web = ['original', '16:9', '1:1'] as const
+    expect(validateGenerationInputs(fields, { copy: { dish: 'a' }, imageCount: 1, aspects: web }).aspectRatio).toBe('original')
+    expect(validateGenerationInputs(fields, { copy: { dish: 'a' }, imageCount: 1, aspects: web, aspectRatio: '16:9' }).aspectRatio).toBe('16:9')
+    expect(() => validateGenerationInputs(fields, { copy: { dish: 'a' }, imageCount: 1, aspects: web, aspectRatio: '4:5' })).toThrow()
+  })
+
+  it('trims the note and caps it at 300 characters', () => {
+    expect(validateGenerationInputs(fields, { copy: { dish: 'a' }, imageCount: 1, note: '  more mint ' }).note).toBe('more mint')
+    expect(() => validateGenerationInputs(fields, { copy: { dish: 'a' }, imageCount: 1, note: 'x'.repeat(301) })).toThrow(
+      expect.objectContaining({ code: 'INVALID_INPUT' }),
+    )
   })
 
   it.each([
@@ -36,6 +51,11 @@ describe('validateGenerationInputs', () => {
 describe('renderPrompt', () => {
   it('substitutes copy and aspect ratio and blanks unknown placeholders', () => {
     const body = 'Studio shot of {{ dish }}. {{note}} Ratio {{aspect_ratio}}. {{secret}}'
-    expect(renderPrompt(body, { copy: { dish: 'Ramen', note: '' }, aspectRatio: '1:1' })).toBe('Studio shot of Ramen.  Ratio 1:1.')
+    expect(renderPrompt(body, { copy: { dish: 'Ramen', note: '' }, aspectRatio: '1:1', note: '' })).toBe('Studio shot of Ramen.  Ratio 1:1.')
+  })
+
+  it('appends the user note after the rendered template', () => {
+    const inputs = { copy: { dish: 'Ramen', note: '' }, aspectRatio: '1:1', note: 'Add a sprig of mint' }
+    expect(renderPrompt('Studio shot of {{dish}}.', inputs)).toBe('Studio shot of Ramen.\n\nAdd a sprig of mint')
   })
 })

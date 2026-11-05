@@ -7,7 +7,7 @@ import type { GenerationProvider } from '@/core/jobs'
 import { createOpenAIImageProvider } from './openai-image-provider'
 
 export { createOpenAIImageProvider, type OpenAIImageConfig } from './openai-image-provider'
-export { outputSizeFor } from './output-size'
+export { OUTPUT_SIZES, formatSize, outputSize, type OutputSize } from './output-size'
 
 // The image module's provider (ARCHITECTURE §3.2: GPT-Image-2.5 only in v1).
 export function openaiImageProvider(): GenerationProvider {

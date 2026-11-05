@@ -14,6 +14,12 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 
+CREATE SCHEMA IF NOT EXISTS "admin";
+
+
+ALTER SCHEMA "admin" OWNER TO "postgres";
+
+
 CREATE SCHEMA IF NOT EXISTS "public";
 
 
@@ -173,7 +179,7 @@ declare
 begin
   insert into public.templates as t (
     id, module, name, category, cover_before_url, cover_after_url,
-    fields, credits_cost, sort_order, is_active, visible_in
+    fields, quality, credits_cost, sort_order, is_active, visible_in
   ) values (
     v_id,
     coalesce(p_template ->> 'module', 'image'),
@@ -182,7 +188,9 @@ begin
     nullif(p_template ->> 'cover_before_url', ''),
     nullif(p_template ->> 'cover_after_url', ''),
     coalesce(p_template -> 'fields', '{}'::jsonb),
-    coalesce((p_template ->> 'credits_cost')::integer, 1),
+    coalesce(p_template ->> 'quality', 'high'),
+    -- Required: a template without its three prices must not save at some default.
+    p_template -> 'credits_cost',
     -- New templates go to the end unless a position is given.
     coalesce(
       (p_template ->> 'sort_order')::integer,
@@ -195,9 +203,11 @@ begin
     module = excluded.module,
     name = excluded.name,
     category = excluded.category,
-    cover_before_url = excluded.cover_before_url,
-    cover_after_url = excluded.cover_after_url,
+    -- Only when the payload carries them: the editor leaves covers to the upload.
+    cover_before_url = case when p_template ? 'cover_before_url' then excluded.cover_before_url else t.cover_before_url end,
+    cover_after_url = case when p_template ? 'cover_after_url' then excluded.cover_after_url else t.cover_after_url end,
     fields = excluded.fields,
+    quality = excluded.quality,
     credits_cost = excluded.credits_cost,
     sort_order = coalesce((p_template ->> 'sort_order')::integer, t.sort_order),
     is_active = coalesce((p_template ->> 'is_active')::boolean, t.is_active),
@@ -411,9 +421,11 @@ declare
   v_profile public.profiles;
   v_job public.generation_jobs;
   v_pool text;
+  v_resolution text := coalesce(p_inputs ->> 'resolution', '1k');
+  v_cost integer;
 begin
-  if p_credits_cost is null or p_credits_cost <= 0 then
-    raise exception 'INVALID_INPUT' using detail = 'credits_cost must be positive';
+  if v_resolution not in ('1k', '2k', '3k') then
+    raise exception 'INVALID_INPUT' using detail = 'resolution must be 1k, 2k or 3k';
   end if;
 
   -- Lock the profile first so concurrent reserves for one user run one at a time: the pool
@@ -443,16 +455,23 @@ begin
     raise exception 'USER_BANNED';
   end if;
 
-  if v_profile.credits >= p_credits_cost then
+  select (t.credits_cost ->> v_resolution)::integer into v_cost
+    from public.templates t
+   where t.id = p_template_id;
+  if not found then
+    raise exception 'TEMPLATE_NOT_FOUND';
+  end if;
+
+  if v_profile.credits >= v_cost then
     v_pool := 'paid';
-  elsif v_profile.free_credits >= p_credits_cost then
+  elsif v_profile.free_credits >= v_cost then
     v_pool := 'free';
   else
     raise exception 'CREDITS_INSUFFICIENT';
   end if;
 
   perform public._apply_credit_change(
-    p_user_id, v_pool, 'reserve', -p_credits_cost, 'generation reserve',
+    p_user_id, v_pool, 'reserve', -v_cost, 'generation reserve',
     'job:' || p_job_id::text || ':reserve', p_job_id
   );
 
@@ -460,12 +479,14 @@ begin
     (id, user_id, module, template_id, inputs, provider, source, idempotency_key,
      credit_pool, visibility, credits_cost)
   values
-    (p_job_id, p_user_id, p_module, p_template_id, coalesce(p_inputs, '{}'::jsonb), p_provider, p_source,
+    (p_job_id, p_user_id, p_module, p_template_id,
+     coalesce(p_inputs, '{}'::jsonb) || jsonb_build_object('resolution', v_resolution),
+     p_provider, p_source,
      p_idempotency_key,
      v_pool,
      -- Free works are always public (ARCHITECTURE §9); paid works default to private.
      case when v_pool = 'paid' then coalesce(p_visibility, 'private') else 'public' end,
-     p_credits_cost)
+     v_cost)
   returning * into v_job;
 
   return v_job;
@@ -520,6 +541,52 @@ $$;
 
 
 ALTER FUNCTION "public"."set_updated_at"() OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."profiles" (
+    "id" "uuid" NOT NULL,
+    "role" "text" DEFAULT 'user'::"text" NOT NULL,
+    "credits" integer DEFAULT 0 NOT NULL,
+    "paid_until" timestamp with time zone,
+    "signup_ip" "inet",
+    "banned_at" timestamp with time zone,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "free_credits" integer DEFAULT 0 NOT NULL,
+    CONSTRAINT "profiles_credits_check" CHECK (("credits" >= 0)),
+    CONSTRAINT "profiles_free_credits_check" CHECK (("free_credits" >= 0)),
+    CONSTRAINT "profiles_role_check" CHECK (("role" = ANY (ARRAY['user'::"text", 'admin'::"text"])))
+);
+
+
+ALTER TABLE "public"."profiles" OWNER TO "postgres";
+
+
+CREATE OR REPLACE VIEW "admin"."users_overview" AS
+ SELECT "u"."id",
+    ("u"."email")::"text" AS "email",
+    "u"."created_at",
+    COALESCE(( SELECT "string_agg"("provider"."value", ', '::"text" ORDER BY "provider"."value") AS "string_agg"
+           FROM "jsonb_array_elements_text"(COALESCE(("u"."raw_app_meta_data" -> 'providers'::"text"), '[]'::"jsonb")) "provider"("value")), ("u"."raw_app_meta_data" ->> 'provider'::"text")) AS "provider",
+    "p"."role",
+    "p"."credits",
+    "p"."free_credits",
+    "p"."paid_until",
+    COALESCE("j"."generation_count", 0) AS "generation_count",
+    "j"."last_generation_at",
+    "p"."banned_at"
+   FROM (("auth"."users" "u"
+     LEFT JOIN "public"."profiles" "p" ON (("p"."id" = "u"."id")))
+     LEFT JOIN LATERAL ( SELECT ("count"(*))::integer AS "generation_count",
+            "max"("g"."created_at") AS "last_generation_at"
+           FROM "public"."generation_jobs" "g"
+          WHERE ("g"."user_id" = "u"."id")) "j" ON (true));
+
+
+ALTER VIEW "admin"."users_overview" OWNER TO "postgres";
+
+
+COMMENT ON VIEW "admin"."users_overview" IS 'Owner support view (ARCHITECTURE §10): search by email; credits = paid pool, free_credits = free pool.';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
@@ -616,24 +683,6 @@ CREATE TABLE IF NOT EXISTS "public"."products" (
 ALTER TABLE "public"."products" OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."profiles" (
-    "id" "uuid" NOT NULL,
-    "role" "text" DEFAULT 'user'::"text" NOT NULL,
-    "credits" integer DEFAULT 0 NOT NULL,
-    "paid_until" timestamp with time zone,
-    "signup_ip" "inet",
-    "banned_at" timestamp with time zone,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "free_credits" integer DEFAULT 0 NOT NULL,
-    CONSTRAINT "profiles_credits_check" CHECK (("credits" >= 0)),
-    CONSTRAINT "profiles_free_credits_check" CHECK (("free_credits" >= 0)),
-    CONSTRAINT "profiles_role_check" CHECK (("role" = ANY (ARRAY['user'::"text", 'admin'::"text"])))
-);
-
-
-ALTER TABLE "public"."profiles" OWNER TO "postgres";
-
-
 CREATE TABLE IF NOT EXISTS "public"."template_prompts" (
     "template_id" "text" NOT NULL,
     "body" "text" NOT NULL,
@@ -657,18 +706,25 @@ CREATE TABLE IF NOT EXISTS "public"."templates" (
     "cover_before_url" "text",
     "cover_after_url" "text",
     "fields" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
-    "credits_cost" integer DEFAULT 1 NOT NULL,
+    "credits_cost" "jsonb" DEFAULT '{"1k": 2, "2k": 4, "3k": 6}'::"jsonb" NOT NULL,
     "sort_order" integer DEFAULT 0 NOT NULL,
     "is_active" boolean DEFAULT false NOT NULL,
     "visible_in" "text"[] DEFAULT ARRAY['web'::"text"] NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "quality" "text" DEFAULT 'high'::"text" NOT NULL,
+    "cover_media_type" "text" DEFAULT 'image'::"text" NOT NULL,
+    "cover_video_url" "text",
+    "cover_poster_url" "text",
     CONSTRAINT "templates_category_check" CHECK ((("char_length"("category") >= 1) AND ("char_length"("category") <= 60))),
-    CONSTRAINT "templates_credits_cost_check" CHECK (("credits_cost" > 0)),
+    CONSTRAINT "templates_cover_media_type_check" CHECK (("cover_media_type" = ANY (ARRAY['image'::"text", 'animated'::"text", 'video'::"text"]))),
+    CONSTRAINT "templates_cover_motion_complete" CHECK ((("cover_media_type" = 'image'::"text") OR (("cover_video_url" IS NOT NULL) AND ("cover_poster_url" IS NOT NULL)))),
+    CONSTRAINT "templates_credits_cost_check" CHECK ((("jsonb_typeof"("credits_cost") = 'object'::"text") AND ("credits_cost" ?& ARRAY['1k'::"text", '2k'::"text", '3k'::"text"]) AND (((("credits_cost" - '1k'::"text") - '2k'::"text") - '3k'::"text") = '{}'::"jsonb") AND ("jsonb_typeof"(("credits_cost" -> '1k'::"text")) = 'number'::"text") AND (("credits_cost" ->> '1k'::"text") ~ '^[1-9][0-9]{0,2}$'::"text") AND ("jsonb_typeof"(("credits_cost" -> '2k'::"text")) = 'number'::"text") AND (("credits_cost" ->> '2k'::"text") ~ '^[1-9][0-9]{0,2}$'::"text") AND ("jsonb_typeof"(("credits_cost" -> '3k'::"text")) = 'number'::"text") AND (("credits_cost" ->> '3k'::"text") ~ '^[1-9][0-9]{0,2}$'::"text"))),
     CONSTRAINT "templates_fields_check" CHECK (("jsonb_typeof"("fields") = 'object'::"text")),
     CONSTRAINT "templates_id_check" CHECK ((("id" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text") AND ("char_length"("id") <= 64))),
     CONSTRAINT "templates_module_check" CHECK (("module" = ANY (ARRAY['image'::"text", 'video'::"text"]))),
     CONSTRAINT "templates_name_check" CHECK ((("char_length"("name") >= 1) AND ("char_length"("name") <= 120))),
+    CONSTRAINT "templates_quality_check" CHECK (("quality" = ANY (ARRAY['high'::"text", 'medium'::"text"]))),
     CONSTRAINT "templates_visible_in_check" CHECK ((("cardinality"("visible_in") > 0) AND ("visible_in" <@ ARRAY['web'::"text", 'partner'::"text"])))
 );
 
@@ -828,6 +884,10 @@ CREATE POLICY "templates_select_active" ON "public"."templates" FOR SELECT TO "a
 
 
 
+GRANT USAGE ON SCHEMA "admin" TO "service_role";
+
+
+
 GRANT USAGE ON SCHEMA "public" TO "postgres";
 GRANT USAGE ON SCHEMA "public" TO "anon";
 GRANT USAGE ON SCHEMA "public" TO "authenticated";
@@ -898,6 +958,19 @@ GRANT ALL ON FUNCTION "public"."set_job_visibility"("p_job_id" "uuid", "p_user_i
 
 
 
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."profiles" TO "service_role";
+GRANT SELECT ON TABLE "public"."profiles" TO "authenticated";
+
+
+
+GRANT UPDATE("signup_ip") ON TABLE "public"."profiles" TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "admin"."users_overview" TO "service_role";
+
+
+
 GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."admin_audit_log" TO "service_role";
 
 
@@ -946,23 +1019,13 @@ GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."products" T
 
 
 
-GRANT REFERENCES,TRIGGER,MAINTAIN ON TABLE "public"."profiles" TO "anon";
-GRANT SELECT,REFERENCES,TRIGGER,MAINTAIN ON TABLE "public"."profiles" TO "authenticated";
-GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."profiles" TO "service_role";
-
-
-
-GRANT UPDATE("signup_ip") ON TABLE "public"."profiles" TO "service_role";
-
-
-
 GRANT ALL ON TABLE "public"."template_prompts" TO "service_role";
 
 
 
-GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."templates" TO "anon";
-GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."templates" TO "authenticated";
 GRANT ALL ON TABLE "public"."templates" TO "service_role";
+GRANT SELECT ON TABLE "public"."templates" TO "anon";
+GRANT SELECT ON TABLE "public"."templates" TO "authenticated";
 
 
 

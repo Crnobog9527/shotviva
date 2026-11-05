@@ -5,13 +5,16 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { confirmJob, refundJob, reserveJob, type ReserveJobInput } from '@/core/jobs'
 
-import { connectAdmin, createUser, ledgerOf, profileOf, serviceClient } from './helpers'
+import { connectAdmin, createPricedTemplate, createUser, ledgerOf, profileOf, serviceClient } from './helpers'
 
 const service = serviceClient()
 let db: Client
+// Priced 1 / 2 / 3: '1k' costs 1, '2k' costs 2.
+let templateId: string
 
 beforeAll(async () => {
   db = await connectAdmin()
+  templateId = await createPricedTemplate(db)
 })
 
 afterAll(async () => {
@@ -22,10 +25,9 @@ const job = (userId: string, overrides: Partial<ReserveJobInput> = {}): ReserveJ
   jobId: randomUUID(),
   userId,
   module: 'image',
-  templateId: 'freeform',
-  creditsCost: 1,
+  templateId,
   source: 'web',
-  inputs: { aspect: '1:1' },
+  inputs: { aspect_ratio: '1:1', resolution: '1k' },
   provider: 'openai',
   ...overrides,
 })
@@ -64,7 +66,7 @@ describe('reserve_credits', () => {
 
   it('fails without charging when the balance is short', async () => {
     const userId = await createUser(db, { credits: 1 })
-    await expect(reserveJob(service, job(userId, { creditsCost: 2 }))).rejects.toMatchObject({
+    await expect(reserveJob(service, job(userId, { inputs: { resolution: '2k' } }))).rejects.toMatchObject({
       code: 'CREDITS_INSUFFICIENT',
     })
     expect((await profileOf(db, userId)).credits).toBe(1)
@@ -94,7 +96,7 @@ describe('confirm_job and refund_job', () => {
 
   it('refunds once even when called repeatedly and concurrently', async () => {
     const userId = await createUser(db, { credits: 2 })
-    const { id } = await reserveJob(service, job(userId, { creditsCost: 2 }))
+    const { id } = await reserveJob(service, job(userId, { inputs: { resolution: '2k' } }))
     const refunded = await Promise.all(
       Array.from({ length: 5 }, () => refundJob(service, { jobId: id, errorCode: 'PROVIDER_TIMEOUT' })),
     )

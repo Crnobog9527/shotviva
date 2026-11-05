@@ -49,7 +49,8 @@ describe('POST /api/partner/generate: success', () => {
     const response = await generate(freeform, 'call-1')
     expect(response.status).toBe(200)
     const body = await response.json()
-    expect(body).toMatchObject({ status: 'succeeded', credits_charged: 1, credits_remaining: 2, free_credits_remaining: 0 })
+    // Partner jobs are Standard: freeform's '1k' price (2), whatever the caller sends (T16).
+    expect(body).toMatchObject({ status: 'succeeded', credits_charged: 2, credits_remaining: 1, free_credits_remaining: 0 })
     expect(body.image_url).toBe(`memory://get/outputs/${userId}/${body.job_id}.png?expires=604800`)
     const { rows } = await db.query('select source, idempotency_key, status from public.generation_jobs where id = $1', [body.job_id])
     expect(rows[0]).toEqual({ source: 'graylum', idempotency_key: 'call-1', status: 'succeeded' })
@@ -71,7 +72,7 @@ describe('POST /api/partner/generate: Idempotency-Key', () => {
     const again = await (await generate(freeform, 'call-x')).json()
     expect(again.job_id).toBe(first.job_id)
     expect(fake.generate).toHaveBeenCalledTimes(1)
-    expect((await profileOf(db, userId)).credits).toBe(2)
+    expect((await profileOf(db, userId)).credits).toBe(1)
     expect(await jobCount(db, userId)).toBe(1)
   })
 
@@ -82,7 +83,7 @@ describe('POST /api/partner/generate: Idempotency-Key', () => {
     expect(new Set(bodies.map((b) => b.job_id)).size).toBe(1)
     expect(responses.map((r) => r.status).sort()).toContain(200)
     expect(fake.generate).toHaveBeenCalledTimes(1)
-    expect((await profileOf(db, userId)).credits).toBe(2)
+    expect((await profileOf(db, userId)).credits).toBe(1)
   })
 
   it('is required', async () => {
