@@ -1,4 +1,4 @@
-import { freeImagesLabel, pricedProducts, type SiteConfig } from '../config'
+import { freeImagesLabel, pricedProducts, type PostalAddress, type SiteConfig } from '../config'
 import type { FaqItem } from '../content/page-content'
 import { absoluteUrl, siteOrigin } from './site-url'
 
@@ -42,14 +42,27 @@ export function softwareApplicationLd(
   }
 }
 
+function postalAddressLd(address: PostalAddress): JsonLd {
+  return {
+    '@type': 'PostalAddress',
+    streetAddress: address.street,
+    addressLocality: address.locality,
+    addressRegion: address.region,
+    postalCode: address.postalCode,
+    addressCountry: address.country,
+  }
+}
+
 export function organizationLd(site: SiteConfig): JsonLd {
   return {
     '@context': 'https://schema.org',
     '@type': 'Organization',
     name: site.brand.name,
+    legalName: site.brand.legalName,
     url: `${siteOrigin(site)}/`,
     logo: absoluteUrl(site, site.brand.logoPath),
     email: site.brand.contactEmail,
+    address: postalAddressLd(site.brand.address),
     sameAs: [...site.brand.sameAs],
   }
 }
