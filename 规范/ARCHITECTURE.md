@@ -59,7 +59,7 @@ src/
 export const site = defineSite({
   brand: { name: 'Shotviva', domain: 'shotviva.com', tagline: 'AI photo studio' },   // 建站规格 §1（Owner 2026-11-05 定）
   modules: { image: true, video: false },     // 关掉的模块：路由 404、不进 sitemap、不出现在导航和定价里
-  locales: { default: 'en', enabled: ['en'] }, // next-intl，英文不带前缀
+  locales: { default: 'en', enabled: ['en', 'zh'] }, // next-intl：英文不带前缀，简体中文 /zh（Owner 2026-11-06，见第 17 节）
   billing: {
     currency: 'usd',
     freeCredits: 6,                               // 进 profiles.free_credits，只能生成免费作品（第 6.1 节）；= 3 张 Standard 档标准模板图，对外说 "3 free Standard images"（Owner 2026-11-05）
@@ -150,7 +150,7 @@ v1 不写回调解析、定时轮询、超时清理这类定时任务。视频�
 
 模板分两张表，核心提示词不进仓库、不进公开表：
 
-- `templates`（公开）：id、模块、名称、分类、封面前后对比图、字段定义（要几张图、要填哪些文案、可选比例）、**质量档 `quality`**（`'high'` / `'medium'`，送给模型的 `quality` 参数，默认 `'high'`）、**消耗积分 `credits_cost`**（jsonb，按分辨率三个档都必填：`{ "1k": 2, "2k": 4, "3k": 6 }`，正整数）、排序、上下架状态、`visible_in`（`['web']` / `['partner']` / 两者，控制在哪些入口展示）。
+- `templates`（公开）：id、模块、名称、分类、封面前后对比图、字段定义（要几张图、要填哪些文案、可选比例）、**质量档 `quality`**（`'high'` / `'medium'`，送给模型的 `quality` 参数，默认 `'high'`）、**消耗积分 `credits_cost`**（jsonb，按分辨率三个档都必填：`{ "1k": 2, "2k": 4, "3k": 6 }`，正整数）、排序、上下架状态、`visible_in`（`['web']` / `['partner']` / 两者，控制在哪些入口展示）、**展示文字的其他语言版本 `translations`**（jsonb，默认 `{}`；结构 `{ "zh": { "name": "…", "description": "…", "fields": { "<字段 key>": { "label": "…", "placeholder": "…" } } } }`；英文仍是 `name` 等原字段；某语言缺某项时回退英文；后台模板编辑页可填中文；提示词不翻译，始终英文，Owner 2026-11-06）。
 - `template_prompts`（私有，只有服务端能读，RLS 拒绝所有客户端）：模板 id、提示词正文、版本号、模型参数。
 
 内置一条 `freeform` 模板：字段定义只有 `prompt`（加可选参考图），`template_prompts` 里的提示词是直通。它让「自由文字出图」和「模板出图」走同一条代码路径；`visible_in = ['partner']`，Shotviva 自己的前台不展示（DESIGN.md 禁止出现 prompt）。
@@ -285,6 +285,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - hCaptcha 交给 Supabase Auth 自带的人机验证校验。前端**只做隐形验证**，失败时降级为显式 checkbox；不抄 Graylum 的「隐形 + 弹窗」两套。
 - 防刷免费额度：只靠邮箱验证 + hCaptcha。要加 IP 限制就在发放免费额度的 SQL 函数里查 `profiles.signup_ip` 24 小时内是否已发过，一行；不引设备指纹库。
 - 验证邮件、重置密码邮件由 Supabase Auth 发，SMTP 配成 Resend，发件人 `Shotviva <support@shotviva.com>`（Owner 2026-11-05 由 `noreply@` 改来：Resend 提示 no-reply 发件人影响送达，且用户回信能直接进飞书的 support 邮箱）。**v1 不写任何发信代码**，只改 Supabase 的邮件模板。
+- 邮件按用户语言发（Owner 2026-11-06）：注册时把当前页面语言写进 `user_metadata.locale`（`'en'` / `'zh'`，`signUp` 的 `options.data`）；四个模板正文用 `{{ if eq .Data.locale "zh" }}…{{ else }}…{{ end }}` 放中英两版；邮件标题如果 Supabase 支持同样的条件写法就中英分开，不支持就保持英文（T21 在本地 Supabase 实测后定）；没有 `locale` 的老账号和 Google 登录账号发英文。
 - 管理员身份存在数据库 `profiles.role`，不用环境变量里的邮箱列表。
 
 ## 8. 上传、存储与保留期
@@ -421,7 +422,7 @@ Owner 2026-11-04 决定：**不在 flux-kontext-template 上原地改造**，新
 - 应用页用第 1 节的 `(app)` 应用壳，按 DESIGN.md 第 8 节先出手机稿。
 - **模板需求墙（Wishlist）随 v1 上线**（Owner 2026-11-05 决定），占应用壳第四个 tab，见第 15 节。
 
-v1 不做：积分引擎抽象层、积分过期和批次、订阅的宽限期 / 自动扣回 / 升级降级 / 优惠券 / 自写取消界面、Waffo 订阅、自动故障切换、自动退款、保留期定时任务、提醒邮件、内容审核、作品审核页、除模板页和需求审核页外的后台页、多语言内容、多行菜单 / 价格单的排版功能（单张促销海报模板要做，见第 5 节）、视频生成实现、服务端 HEIC 转码、原图存储、断点续传、PWA / 离线、需求墙的评论 / 通知 / 重复合并 / 分类筛选。
+v1 不做：积分引擎抽象层、积分过期和批次、订阅的宽限期 / 自动扣回 / 升级降级 / 优惠券 / 自写取消界面、Waffo 订阅、自动故障切换、自动退款、保留期定时任务、提醒邮件、内容审核、作品审核页、除模板页和需求审核页外的后台页、英文和简体中文以外的语言（`/ja`、`/id` 等，见建站规格 §6）、多行菜单 / 价格单的排版功能（单张促销海报模板要做，见第 5 节）、视频生成实现、服务端 HEIC 转码、原图存储、断点续传、PWA / 离线、需求墙的评论 / 通知 / 重复合并 / 分类筛选。
 
 ## 14. 伙伴接口（Graylum 连接器）
 
@@ -536,11 +537,26 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 | `purchase` | 服务端：支付回调入账成功后 | 第 6.2 节 `purchase` 参数 |
 | `$pageview` | 浏览器：自动 | — |
 
-钱和积分相关的事件（`signup`、`generate`、`checkout_start`、`purchase`）一律服务端发，保证不被广告拦截漏掉；发送失败只记日志，不影响业务。
+所有事件都带 `locale`（`en` / `zh`，浏览器端注册为公共属性，服务端发时从请求或 `user_metadata.locale` 取；Owner 2026-11-06）。钱和积分相关的事件（`signup`、`generate`、`checkout_start`、`purchase`）一律服务端发，保证不被广告拦截漏掉；发送失败只记日志，不影响业务。
 
 ### 16.3 Sentry
 
 - 前后端都接 `@sentry/nextjs`；`NEXT_PUBLIC_SENTRY_DSN` 公开，`SENTRY_AUTH_TOKEN`（上传源码映射）放 Vercel 加密变量。
 - 必须告警的：出图失败率异常、支付回调验签失败或处理失败、`charge.refunded`、退回积分失败（第 4 节 refund 失败会让积分卡在预扣状态）。
 - 上报前去掉邮箱、令牌、提示词（复用 `core/logger` 的打码规则）。
+
+## 17. 多语言：英文 + 简体中文（Owner 2026-11-06）
+
+**v1 上线就同时有英文和简体中文，全站覆盖**：应用界面、付费墙、邮件、首页和营销页、`/pricing`、法律页。
+
+- **地址**：英文不带前缀（`/pricing`），中文带 `/zh`（`/zh/pricing`）；slug 两种语言都用英文（建站规格 R4、§6）。`<html lang>`：`en` / `zh-Hans`。
+- **怎么选语言**：不做自动跳转，也不按 IP 判断（建站规格 §6）。浏览器首选语言是中文、又打开了英文页的访客，页面顶部出一条可关闭的「切换到中文」提示，点了才跳到对应的 `/zh` 页；语言切换器在页头 / 页脚，是真实的 `<a href>`。用户选过的语言存在 `NEXT_LOCALE` Cookie（功能性 Cookie，不用于统计，隐私政策写明），之后访问不再提示。登录后的应用页按 Cookie / 当前地址的语言显示。
+- **文字放哪**：界面文字 `site/messages/en.json` + `zh.json`（next-intl，组件里不准写死）；营销页、法律页正文按语言放 `site/content/`；模板名称和说明在 `templates.translations`（第 5 节）；数字、价格、日期用 next-intl 格式化。价格两种语言都是美元，口径与英文完全一致（建站规格 G3）。
+- **中文怎么写**：直答块、FAQ、页面标题按中文用户的真实问法重新写，不机器直译（建站规格 G13）；Owner 审阅后上线。
+- **SEO**：中文页只做 Google，不做百度（美国主体办不了 ICP 备案，Owner 2026-11-06）。`/zh` 下的可收录页面必须在中文口径主词表里（T22 产出），不在表里的 `/zh` 页 `noindex`；hreflang `en` / `zh-Hans` / `x-default`（指向英文）互指；每种语言独立 sitemap。
+- **付款**：中文页付款方式写「支付宝」，英文页写 "Alipay"（DESIGN §4.5）；Stripe Checkout 托管页传 `locale`（`en` / `zh`）。
+- **法律页**：中文版是英文版的翻译，页首注明「本中文版本仅供参考，如与英文版本不一致，以英文版本为准」；律师审英文版。
+- **邮件**：见第 7 节，按 `user_metadata.locale` 发中文或英文。
+- **字体**：Geist / Instrument Serif 没有中文字形，中文用系统字体回退（DESIGN §3.2），不下载中文网页字体。
+- **已知限制（写进 FAQ）**：中国大陆用户不开 VPN 用不了 Google 登录，用邮箱注册即可。
 
