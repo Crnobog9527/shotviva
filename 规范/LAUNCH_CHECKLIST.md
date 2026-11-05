@@ -5,7 +5,7 @@
 ## 1. 账号和服务
 
 - [ ] Vercel Pro 项目建好，绑定 shotviva.com，www 跳转到不带 www 的主域名
-- [ ] Supabase 生产项目（Pro）和预览用的测试项目分开
+- [ ] Supabase 生产项目 `shotviva` 和预览用的测试项目 `shotviva-preview` 分开，都在美国西部一区（us-west-1）。生产项目先用免费计划（Owner 2026-11-05）：第一笔真实付款到账后立刻转进 Pro 组织（转移后地址和密钥不变）；在那之前留意免费项目一周无请求会暂停、没有每日备份
 - [ ] Supabase Auth 的 Site URL 和 Redirect URLs 配好，包含预览域名通配
 - [ ] Stripe：同一主体下新开的独立账户，开通卡、支付宝、微信支付；账单显示 SHOTVIVA。审核未通过也不影响上线（见第 5 节）
 - [ ] Waffo：申请加急，测试和生产密钥分开创建，回调格式选 Raw
