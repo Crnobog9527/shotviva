@@ -15,7 +15,7 @@ import type { ProviderActionResult } from './types'
 export function reasonFor(error: unknown): ProviderSettingReason {
   if (error instanceof ProviderSettingError) return error.reason
   if (error instanceof ProviderSecretError) return 'secret_unreadable'
-  if (error instanceof ProviderSecretsKeyError) return 'secrets_key_missing'
+  if (error instanceof ProviderSecretsKeyError) return error.problem === 'missing' ? 'secrets_key_missing' : 'secrets_key_invalid'
   logger.error('admin.provider.action_failed', { error })
   return 'internal'
 }

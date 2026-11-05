@@ -44,16 +44,40 @@ describe('provider secrets (AES-256-GCM)', () => {
     expect(() => decryptSecret(`v2.${iv}.${tag}.${body}`, key)).toThrow(ProviderSecretError)
   })
 
-  it('requires a 32-byte base64 PROVIDER_SECRETS_KEY and never echoes it', () => {
-    expect(() => parseSecretsKey(undefined)).toThrow(ProviderSecretsKeyError)
-    const short = randomBytes(16).toString('base64')
-    expect(() => parseSecretsKey(short)).toThrow(/32 bytes/)
-    expect(() => parseSecretsKey(short)).not.toThrow(short)
-    expect(() => parseSecretsKey('not base64 at all!')).toThrow(ProviderSecretsKeyError)
-  })
-
   it('shows only the last four characters of a real key', () => {
     expect(lastFour('sk-proj-abcdefgh1234')).toBe('1234')
     expect(lastFour('short')).toBe('t')
+  })
+})
+
+describe('PROVIDER_SECRETS_KEY', () => {
+  it('accepts a key with a trailing newline or surrounding spaces, as pasted into Vercel', () => {
+    const clean = parseSecretsKey(KEY_B64)
+    expect(parseSecretsKey(`${KEY_B64}\n`).equals(clean)).toBe(true)
+    expect(parseSecretsKey(`${KEY_B64}\r\n`).equals(clean)).toBe(true)
+    expect(parseSecretsKey(`  ${KEY_B64}  `).equals(clean)).toBe(true)
+    const stored = encryptSecret(SECRET, parseSecretsKey(`${KEY_B64}\n`))
+    expect(decryptSecret(stored, clean)).toBe(SECRET)
+  })
+
+  it('tells an unset key apart from a malformed one, without echoing the value', () => {
+    for (const unset of [undefined, '', '   ', '\n']) {
+      expect(() => parseSecretsKey(unset)).toThrow(expect.objectContaining({ problem: 'missing' }))
+    }
+    const short = randomBytes(16).toString('base64')
+    const long = randomBytes(48).toString('base64')
+    for (const bad of [short, long, 'not base64 at all!', `${KEY_B64.slice(0, 20)} ${KEY_B64.slice(20)}`]) {
+      const error = (() => {
+        try {
+          parseSecretsKey(bad)
+        } catch (caught) {
+          return caught
+        }
+      })()
+      expect(error).toBeInstanceOf(ProviderSecretsKeyError)
+      expect(error).toMatchObject({ problem: 'malformed' })
+      expect(String((error as Error).message)).toMatch(/32 bytes/)
+      expect(String((error as Error).message)).not.toContain(bad)
+    }
   })
 })

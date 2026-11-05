@@ -11,6 +11,7 @@ export const PROVIDER_SETTING_REASONS = [
   'api_key_required',
   'not_found',
   'secrets_key_missing',
+  'secrets_key_invalid',
   'secret_unreadable',
   // Anything unexpected; the details are logged, never shown.
   'internal',

@@ -26,11 +26,20 @@ export class ProviderSecretError extends AppError {
   }
 }
 
-// PROVIDER_SECRETS_KEY is unset or malformed: an Owner setup step, not a user error.
+// PROVIDER_SECRETS_KEY is unset or malformed: an Owner setup step, not a user error. `problem`
+// tells the admin page which of the two to show; the value itself is never in the error.
 export class ProviderSecretsKeyError extends AppError {
-  constructor(message: string) {
-    super('INTERNAL', message)
+  readonly problem: 'missing' | 'malformed'
+
+  constructor(problem: 'missing' | 'malformed') {
+    super(
+      'INTERNAL',
+      problem === 'missing'
+        ? 'PROVIDER_SECRETS_KEY is not configured'
+        : 'PROVIDER_SECRETS_KEY must be 32 bytes, base64-encoded',
+    )
     this.name = 'ProviderSecretsKeyError'
+    this.problem = problem
   }
 }
 
@@ -40,11 +49,13 @@ const secretsKeySchema = z
   .transform((value) => Buffer.from(value, 'base64'))
   .refine((key) => key.length === 32)
 
-// Parses PROVIDER_SECRETS_KEY. Never echoes the value in the error.
+// Parses PROVIDER_SECRETS_KEY. Surrounding whitespace is dropped first: a value pasted into the
+// Vercel dashboard often carries a trailing newline or space. Never echoes the value.
 export function parseSecretsKey(value: string | undefined): Buffer {
-  if (!value) throw new ProviderSecretsKeyError('PROVIDER_SECRETS_KEY is not configured')
-  const parsed = secretsKeySchema.safeParse(value)
-  if (!parsed.success) throw new ProviderSecretsKeyError('PROVIDER_SECRETS_KEY must be 32 bytes, base64-encoded')
+  const trimmed = value?.trim()
+  if (!trimmed) throw new ProviderSecretsKeyError('missing')
+  const parsed = secretsKeySchema.safeParse(trimmed)
+  if (!parsed.success) throw new ProviderSecretsKeyError('malformed')
   return parsed.data
 }
 
