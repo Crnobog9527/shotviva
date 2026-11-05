@@ -1,0 +1,26 @@
+{
+  "$comment": "Format example only. Copy to .local/prompts.json (gitignored) and replace with real templates. Every value below is fake.",
+  "templates": [
+    {
+      "id": "example-burger-hero",
+      "module": "image",
+      "name": "Example burger hero",
+      "category": "burgers",
+      "coverBeforeUrl": "https://example.com/covers/example-burger-before.jpg",
+      "coverAfterUrl": "https://example.com/covers/example-burger-after.jpg",
+      "fields": {
+        "images": { "min": 1, "max": 1 },
+        "copy": [{ "key": "headline", "label": "Headline", "required": false, "maxLength": 40 }],
+        "aspectRatios": ["1:1", "4:5"]
+      },
+      "creditsCost": 1,
+      "sortOrder": 10,
+      "isActive": false,
+      "visibleIn": ["web", "partner"],
+      "prompt": {
+        "body": "FAKE PROMPT. Replace with the tuned prompt in .local/prompts.json; never commit real prompts.",
+        "modelParams": { "quality": "high" }
+      }
+    }
+  ]
+}
