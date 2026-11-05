@@ -284,7 +284,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - Supabase Auth：邮箱 + 密码注册，点验证邮件完成激活；另加 Google 登录。
 - hCaptcha 交给 Supabase Auth 自带的人机验证校验。前端**只做隐形验证**，失败时降级为显式 checkbox；不抄 Graylum 的「隐形 + 弹窗」两套。
 - 防刷免费额度：只靠邮箱验证 + hCaptcha。要加 IP 限制就在发放免费额度的 SQL 函数里查 `profiles.signup_ip` 24 小时内是否已发过，一行；不引设备指纹库。
-- 验证邮件、重置密码邮件由 Supabase Auth 发，SMTP 配成 Resend，发件地址 `noreply@shotviva.com`。**v1 不写任何发信代码**，只改 Supabase 的邮件模板。
+- 验证邮件、重置密码邮件由 Supabase Auth 发，SMTP 配成 Resend，发件人 `Shotviva <support@shotviva.com>`（Owner 2026-11-05 由 `noreply@` 改来：Resend 提示 no-reply 发件人影响送达，且用户回信能直接进飞书的 support 邮箱）。**v1 不写任何发信代码**，只改 Supabase 的邮件模板。
 - 管理员身份存在数据库 `profiles.role`，不用环境变量里的邮箱列表。
 
 ## 8. 上传、存储与保留期
