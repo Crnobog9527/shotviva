@@ -8,15 +8,16 @@ import { reserveJob } from '@/core/jobs'
 
 import { anonClient, connectAdmin, createUser, serviceClient } from './helpers'
 
-const PRIVATE_TABLES = ['credit_ledger', 'products', 'admin_audit_log']
+const PRIVATE_TABLES = ['credit_ledger', 'products', 'admin_audit_log', 'subscriptions']
 const SERVICE_FUNCTIONS: Array<[string, Record<string, unknown>]> = [
   ['grant_credits', { p_user_id: randomUUID(), p_amount: 1, p_reason: 'x', p_idempotency_key: 'x' }],
   ['admin_adjust_credits', { p_user_id: randomUUID(), p_amount: 1, p_reason: 'x' }],
-  ['apply_purchase', { p_user_id: randomUUID(), p_product_id: 'pass', p_event_id: 'x' }],
+  ['apply_purchase', { p_user_id: randomUUID(), p_product_id: 'starter_monthly', p_event_id: 'x' }],
   ['confirm_job', { p_job_id: randomUUID(), p_output_key: 'x' }],
   ['refund_job', { p_job_id: randomUUID(), p_error_code: 'x' }],
   ['admin_ban_user', { p_user_id: randomUUID(), p_reason: 'x' }],
   ['is_paid', { p_user_id: randomUUID() }],
+  ['current_tier', { p_user_id: randomUUID() }],
 ]
 
 let db: Client

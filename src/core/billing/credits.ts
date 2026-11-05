@@ -2,15 +2,13 @@ import 'server-only'
 
 import { z } from 'zod'
 
+import { PRODUCT_IDS, type ProductId } from '../config'
 import { CREDIT_POOLS, type CreditPool } from './pools'
 import { callRpc, type RpcClient } from './rpc'
 
 // Thin service-role wrappers over the balance functions (ARCHITECTURE §6.1). All rules —
 // pool choice, balance checks, idempotency, ledger rows — live in SQL; nothing here writes
 // a balance.
-
-export const PRODUCT_IDS = ['pass', 'pack'] as const
-export type ProductId = (typeof PRODUCT_IDS)[number]
 
 export type CreditChange = {
   // false when the idempotency key had already been applied (a safe replay).

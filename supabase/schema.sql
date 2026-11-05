@@ -365,6 +365,40 @@ $$;
 ALTER FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."current_tier"("p_user_id" "uuid") RETURNS "text"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_paid_until timestamptz;
+  v_product_id text;
+begin
+  select paid_until into v_paid_until from public.profiles where id = p_user_id;
+  if v_paid_until is null or v_paid_until <= now() then
+    return null;
+  end if;
+
+  select product_id into v_product_id
+    from public.credit_ledger
+   where user_id = p_user_id
+     and pool = 'paid'
+     and delta > 0
+     and product_id is not null
+     and product_id not like 'pack_%'
+   order by created_at desc, id desc
+   limit 1;
+
+  if v_product_id is null then
+    return null;
+  end if;
+  return split_part(v_product_id, '_', 1);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."current_tier"("p_user_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."grant_credits"("p_user_id" "uuid", "p_amount" integer, "p_reason" "text", "p_idempotency_key" "text", "p_pool" "text") RETURNS "public"."credit_change"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -726,12 +760,30 @@ CREATE TABLE IF NOT EXISTS "public"."products" (
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     CONSTRAINT "products_credits_check" CHECK (("credits" > 0)),
     CONSTRAINT "products_days_check" CHECK (("days" > 0)),
-    CONSTRAINT "products_id_check" CHECK (("id" = ANY (ARRAY['pass'::"text", 'pack'::"text"]))),
+    CONSTRAINT "products_id_check" CHECK (("id" = ANY (ARRAY['starter_monthly'::"text", 'starter_yearly'::"text", 'pro_monthly'::"text", 'pro_yearly'::"text", 'max_monthly'::"text", 'max_yearly'::"text", 'pack_s'::"text", 'pack_m'::"text", 'pack_l'::"text"]))),
     CONSTRAINT "products_price_usd_check" CHECK (("price_usd" >= (0)::numeric))
 );
 
 
 ALTER TABLE "public"."products" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."subscriptions" (
+    "stripe_subscription_id" "text" NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "product_id" "text" NOT NULL,
+    "status" "text" NOT NULL,
+    "current_period_end" timestamp with time zone NOT NULL,
+    "cancel_at_period_end" boolean DEFAULT false NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "subscriptions_product_id_check" CHECK (("product_id" !~~ 'pack_%'::"text")),
+    CONSTRAINT "subscriptions_status_check" CHECK (("status" = ANY (ARRAY['incomplete'::"text", 'incomplete_expired'::"text", 'trialing'::"text", 'active'::"text", 'past_due'::"text", 'canceled'::"text", 'unpaid'::"text", 'paused'::"text"]))),
+    CONSTRAINT "subscriptions_stripe_subscription_id_check" CHECK (("stripe_subscription_id" ~~ 'sub_%'::"text"))
+);
+
+
+ALTER TABLE "public"."subscriptions" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."template_prompts" (
@@ -823,6 +875,11 @@ ALTER TABLE ONLY "public"."profiles"
 
 
 
+ALTER TABLE ONLY "public"."subscriptions"
+    ADD CONSTRAINT "subscriptions_pkey" PRIMARY KEY ("stripe_subscription_id");
+
+
+
 ALTER TABLE ONLY "public"."template_prompts"
     ADD CONSTRAINT "template_prompts_pkey" PRIMARY KEY ("template_id");
 
@@ -854,6 +911,10 @@ CREATE UNIQUE INDEX "generation_jobs_user_idempotency_key_idx" ON "public"."gene
 
 
 CREATE UNIQUE INDEX "partner_links_partner_link_code_idx" ON "public"."partner_links" USING "btree" ("partner", "link_code") WHERE ("link_code" IS NOT NULL);
+
+
+
+CREATE INDEX "subscriptions_user_id_idx" ON "public"."subscriptions" USING "btree" ("user_id");
 
 
 
@@ -908,6 +969,16 @@ ALTER TABLE ONLY "public"."profiles"
 
 
 
+ALTER TABLE ONLY "public"."subscriptions"
+    ADD CONSTRAINT "subscriptions_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id");
+
+
+
+ALTER TABLE ONLY "public"."subscriptions"
+    ADD CONSTRAINT "subscriptions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."template_prompts"
     ADD CONSTRAINT "template_prompts_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON DELETE CASCADE;
 
@@ -944,6 +1015,9 @@ ALTER TABLE "public"."profiles" ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "profiles_select_own" ON "public"."profiles" FOR SELECT TO "authenticated" USING ((( SELECT "auth"."uid"() AS "uid") = "id"));
 
+
+
+ALTER TABLE "public"."subscriptions" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."template_prompts" ENABLE ROW LEVEL SECURITY;
@@ -1008,6 +1082,11 @@ GRANT SELECT ON TABLE "public"."generation_jobs" TO "authenticated";
 
 REVOKE ALL ON FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."current_tier"("p_user_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."current_tier"("p_user_id" "uuid") TO "service_role";
 
 
 
@@ -1097,6 +1176,10 @@ GRANT SELECT("created_at") ON TABLE "public"."partner_links" TO "authenticated";
 
 
 GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."products" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."subscriptions" TO "service_role";
 
 
 

@@ -37,7 +37,7 @@ describe('json-ld', () => {
     const offers = softwareApplicationLd(site, page).offers as { name: string; price: string }[]
     expect(offers.map((o) => [o.name, o.price])).toEqual([
       ['Free', '0'],
-      ['pack', '49.00'],
+      ['pack_s', '49.00'],
     ])
   })
 

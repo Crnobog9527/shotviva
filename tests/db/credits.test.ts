@@ -111,14 +111,14 @@ describe('apply_purchase and paid_until', () => {
   it('applies one event id only once, into the paid pool', async () => {
     const userId = await createUser(db, { freeCredits: 3 })
     const eventId = `evt_${randomUUID()}`
-    const first = await applyPurchase(service, { userId, productId: 'pass', eventId })
-    const second = await applyPurchase(service, { userId, productId: 'pass', eventId })
+    const first = await applyPurchase(service, { userId, productId: 'starter_monthly', eventId })
+    const second = await applyPurchase(service, { userId, productId: 'starter_monthly', eventId })
 
-    expect(first).toMatchObject({ applied: true, credits: 30, freeCredits: 3 })
-    expect(second).toMatchObject({ applied: false, credits: 30, freeCredits: 3 })
+    expect(first).toMatchObject({ applied: true, credits: 50, freeCredits: 3 })
+    expect(second).toMatchObject({ applied: false, credits: 50, freeCredits: 3 })
     expect(second.paidUntil?.getTime()).toBe(first.paidUntil?.getTime())
     expect(await ledgerOf(db, userId)).toEqual([
-      { kind: 'purchase', pool: 'paid', delta: 30, idempotency_key: `purchase:${eventId}` },
+      { kind: 'purchase', pool: 'paid', delta: 50, idempotency_key: `purchase:${eventId}` },
     ])
   })
 
@@ -126,33 +126,33 @@ describe('apply_purchase and paid_until', () => {
     const userId = await createUser(db)
     const other = await createUser(db)
     const eventId = `evt_${randomUUID()}`
-    await applyPurchase(service, { userId, productId: 'pass', eventId })
-    await expect(applyPurchase(service, { userId, productId: 'pack', eventId })).rejects.toMatchObject({
+    await applyPurchase(service, { userId, productId: 'starter_monthly', eventId })
+    await expect(applyPurchase(service, { userId, productId: 'pack_s', eventId })).rejects.toMatchObject({
       code: 'CONFLICT',
     })
-    await expect(applyPurchase(service, { userId: other, productId: 'pass', eventId })).rejects.toMatchObject({
+    await expect(applyPurchase(service, { userId: other, productId: 'starter_monthly', eventId })).rejects.toMatchObject({
       code: 'CONFLICT',
     })
   })
 
   it('stacks consecutive memberships onto the remaining window', async () => {
     const userId = await createUser(db, { credits: 1 })
-    await applyPurchase(service, { userId, productId: 'pass', eventId: `evt_${randomUUID()}` })
-    const second = await applyPurchase(service, { userId, productId: 'pass', eventId: `evt_${randomUUID()}` })
-    expect(second.credits).toBe(61)
+    await applyPurchase(service, { userId, productId: 'starter_monthly', eventId: `evt_${randomUUID()}` })
+    const second = await applyPurchase(service, { userId, productId: 'starter_monthly', eventId: `evt_${randomUUID()}` })
+    expect(second.credits).toBe(101)
     expect(daysFromNow(second.paidUntil)).toBeCloseTo(60, 2)
   })
 
   it('restarts the window from now when the previous one expired', async () => {
     const userId = await createUser(db, { paidUntil: new Date(Date.now() - 10 * DAY_MS) })
-    const result = await applyPurchase(service, { userId, productId: 'pass', eventId: `evt_${randomUUID()}` })
+    const result = await applyPurchase(service, { userId, productId: 'starter_monthly', eventId: `evt_${randomUUID()}` })
     expect(daysFromNow(result.paidUntil)).toBeCloseTo(30, 2)
   })
 
   it('a pack (days null) adds paid credits and leaves an empty paid_until empty', async () => {
     const userId = await createUser(db)
-    const result = await applyPurchase(service, { userId, productId: 'pack', eventId: `evt_${randomUUID()}` })
-    expect(result).toMatchObject({ applied: true, credits: 120, freeCredits: 0, paidUntil: null })
+    const result = await applyPurchase(service, { userId, productId: 'pack_s', eventId: `evt_${randomUUID()}` })
+    expect(result).toMatchObject({ applied: true, credits: 20, freeCredits: 0, paidUntil: null })
     expect((await profileOf(db, userId)).paid_until).toBeNull()
     const { rows } = await db.query('select paid_until_after from public.credit_ledger where user_id = $1', [userId])
     expect(rows).toEqual([{ paid_until_after: null }])
@@ -161,7 +161,7 @@ describe('apply_purchase and paid_until', () => {
   it('a pack leaves a running membership exactly where it was', async () => {
     const paidUntil = new Date(Date.now() + 5 * DAY_MS)
     const userId = await createUser(db, { paidUntil })
-    const result = await applyPurchase(service, { userId, productId: 'pack', eventId: `evt_${randomUUID()}` })
+    const result = await applyPurchase(service, { userId, productId: 'pack_s', eventId: `evt_${randomUUID()}` })
     expect(result.paidUntil?.getTime()).toBe(paidUntil.getTime())
   })
 
@@ -170,11 +170,13 @@ describe('apply_purchase and paid_until', () => {
     expect(error).not.toBeNull()
   })
 
-  it('reads credits and days from the products table', async () => {
-    const { rows } = await db.query('select id, credits, days, price_usd from public.products order by id')
-    expect(rows).toEqual([
-      { id: 'pack', credits: 120, days: null, price_usd: '0.00' },
-      { id: 'pass', credits: 30, days: 30, price_usd: '0.00' },
-    ])
+  it('reads credits and days from the products table, equal to site.config', async () => {
+    const { rows } = await db.query<{ id: string; credits: number; days: number | null; price_usd: string }>(
+      'select id, credits, days, price_usd from public.products order by id',
+    )
+    const expected = [...site.billing.products]
+      .map((p) => ({ id: p.id, credits: p.credits, days: p.paidDays, price_usd: p.priceUsd.toFixed(2) }))
+      .sort((a, b) => a.id.localeCompare(b.id))
+    expect(rows).toEqual(expected)
   })
 })
