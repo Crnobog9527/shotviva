@@ -105,7 +105,7 @@ Owner 2026-11-05 改定：**深色系**（T6 深色方向「打烊后的街」�
 4. 生成按钮：固定在底部拇指区、全宽，写清楚当前分辨率的消耗，例如 "Generate · 2 credits"，切换分辨率时按钮上的数字跟着变。按钮旁显示余额 "30 credits + 3 free"。
 5. 这一单将用免费积分时，按钮上方一行告知："This photo uses free credits: it's shown publicly with a watermark. Paid credits make it private and watermark-free." 将用付费积分时不显示。
 
-单位叫法：前台后台都叫 **credits**，不说「张」。余额分开显示付费和免费（"30 credits + 3 free"）。
+单位叫法：价格、扣费、余额一律叫 **credits**，不说「张」；余额分开显示付费和免费（"30 credits + 6 free"）。**唯一例外**：新用户赠送对外写成 "3 free Standard images"（= 6 个免费 credit，Owner 2026-11-05），只用于营销页、注册提示和 FAQ 讲赠送的那一句。
 
 ### 4.4 生成中、成功、失败
 
