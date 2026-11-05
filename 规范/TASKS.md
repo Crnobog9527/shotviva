@@ -29,6 +29,7 @@
 | T16 | 按分辨率扣费（模板三档积分 + 质量档） | **等 T15 合并；T8 / T9 之前** | T3、T4、T14、T15 |
 | T21 | 简体中文全站（路由、语言提示、中文文案、中文邮件、模板中文名） | 等 T8 合并 | T8、T11、T19 |
 | T22 | 中文关键词研究与中文口径主词表（不写代码） | **可派** | — |
+| T17 | 出图供应商后台配置（换供应商 / 模型不改代码） | **可派**（与 T8 并行；T8 先合并时 rebase） | T3、T4、T16 |
 
 并行建议：T0 先做（半天到一天）；T0 合并后 T1 / T2 / T3 / T5 四张同时开；T6 和 T0 同时开（不碰代码）。
 
@@ -416,6 +417,26 @@
 **目标**：产出 `seo资料/Shotviva 页面与主词映射（中文口径）.csv`，结构与美国口径 CSV 一致：每个英文页面对应的 `/zh` 页的中文主词、Google 中文月搜索量、难度、搜索意图、建议的中文 Title / H1。只研究 Google（简体中文用户：中国大陆翻墙用户、新加坡、马来西亚、海外华人），不做百度。用哥飞 SEO 工具箱和 Ahrefs 查真实数据，数字只来自工具结果；查不到的写「查不到」。另附一份「中文用户的真实问法」清单（≥20 条，供 T21 写直答块和 FAQ）。
 
 **交付**：一个 [spec] PR（只含 CSV 和一页研究说明），Owner 审阅后合并。**依赖**：无，可与 T8 并行。
+
+## T17 出图供应商后台配置（可派）
+
+**目标**：Owner 在后台增改出图供应商（地址、模型、密钥），测试连接，一键切换当前使用的供应商；换供应商、换模型都不改代码、不重新部署（ARCHITECTURE §3.3）。
+
+**范围**：
+- 迁移（编号段 `0140`～`0159`，本卡 [spec] 合并后再写）：表 `ai_providers`（字段、RLS 拒绝客户端、`module` 上 `is_active` 的部分唯一索引、`base_url` 只允许 https 的 check）+ 函数 `admin_activate_provider(p_id)`（service role 调用，同一事务切换）；重新生成 `supabase/schema.sql`。
+- `core`：取在用供应商（缓存 + `providers` 标签失效）、AES-256-GCM 加解密（`PROVIDER_SECRETS_KEY` 进 `core/env.ts`，server-only）、`base_url` 校验（https，拒绝 localhost、内网、保留地址）、没有在用供应商时用环境变量兜底；`run-generation` 改为按在用供应商构造适配器，`generation_jobs.provider` 写 `<id 或 env>/<模型>`；模板 `model_params.model` 不再生效。
+- `modules/image`：`openai_images` 适配器从配置读 `baseUrl` / `model` / `apiKey`（现有代码已支持 `baseUrl`）。
+- 后台 `/admin/providers`：列表、新增 / 编辑（密钥只写不读）、测试连接（`GET {base_url}/models`）、设为当前使用（确认弹窗）、积分下限提醒。界面文字走 next-intl（`en.json`，后台用中文文案时同样放 messages）。
+- 埋点：`generate` 事件加 `model`（ARCHITECTURE §16.2）。
+- `.env.example` 加 `PROVIDER_SECRETS_KEY`；PR 里写 Owner 步骤：生成密钥、填进 Vercel（Preview 和 Production 用不同的值）、在后台录入第一条供应商并测试。
+
+**不许动**：积分下限表和价格、模板扣费逻辑、提示词内容、T8 的界面组件（只在后台页面内工作）。
+
+**测试**（本地 Supabase，不 mock 数据库）：客户端读 `ai_providers` 被拒绝；`admin_activate_provider` 切换后同模块只有一条在用；加解密往返正确，换密钥后解不开时报明确的错误；`base_url` 是 http、localhost、内网地址时拒绝保存；出图时用在用供应商的地址、模型、密钥（假 fetch 断言请求）；没有在用供应商时走环境变量；模板 `model_params.model` 被忽略；后台接口返回里没有密钥明文。
+
+**验收**：Codex 在预览站用两条供应商（如官方 + 中转，或同一官方地址配两个模型）各出一张图，确认 `generation_jobs.provider` 跟着切换；测试连接对错误密钥显示失败；后台任何地方看不到密钥明文。
+
+**依赖**：T3、T4、T16（都已合并）。和 T8 并行：T8 可能改 `core/jobs` 里的并发上限，后合并的一方 rebase。
 
 ## Owner 侧关键路径（不是任务卡，但比代码慢）
 
