@@ -15,11 +15,27 @@ export type SiteProduct = {
   priceUsd: number
 }
 
+// Postal address of the legal entity, as printed in the footer and the legal pages.
+export type PostalAddress = {
+  street: string
+  locality: string
+  // State or province code, e.g. 'WY'.
+  region: string
+  postalCode: string
+  country: string
+}
+
 export type SiteBrand = {
   name: string
   domain: string
   tagline: string
-  // Entity facts for GEO trust signals (建站规格 G8).
+  // The company that operates the site and is the party to its legal terms (LAUNCH §8).
+  legalName: string
+  // Where the company is registered, e.g. 'Wyoming, United States'.
+  registeredIn: string
+  address: PostalAddress
+  // Entity facts for GEO trust signals (建站规格 G8). Also the address for support,
+  // refunds and privacy requests on the legal pages.
   contactEmail: string
   launchYear: number
   countries: readonly string[]

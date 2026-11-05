@@ -6,11 +6,14 @@ import { ProviderError } from './provider'
 export class GenerationFailure extends AppError {
   readonly jobId: string
   readonly refunded: boolean
+  // The error_code stored on the job (PROVIDER_TIMEOUT…), for analytics; not sent to clients.
+  readonly jobCode: string | null
 
-  constructor(source: AppError, jobId: string, refunded: boolean) {
+  constructor(source: AppError, jobId: string, refunded: boolean, jobCode: string | null = null) {
     super(source.code, source.message, { cause: source })
     this.jobId = jobId
     this.refunded = refunded
+    this.jobCode = jobCode
   }
 
   override toBody(): ErrorBody & { job_id: string; refunded: boolean } {

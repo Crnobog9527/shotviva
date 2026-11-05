@@ -23,3 +23,4 @@ export const pageGates = [homePage, ...contentPages].map(pageGate)
 export function isLinkEnabled(href: string): boolean {
   return isGateOpen(site, href, pageGates)
 }
+export { acceptableUsePage, footerLinks, legalPages, privacyPage, refundPolicyPage, termsPage } from './legal'

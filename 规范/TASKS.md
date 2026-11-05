@@ -23,6 +23,8 @@
 | T11 | 首页与内页最终文案 | 价格已定稿，可派 | T5 |
 | T12 | 模板需求墙（Wishlist） | 等 T8 | T1、T4、T8 |
 | T15 | 迁移基线与自动化 | **可派，T8 / T9 / T12 之前** | T14 |
+| T18 | 埋点与错误监控 | **可派，T8 / T9 之前** | — |
+| T19 | 法律页面 | **可派** | T5 |
 | T16 | 按分辨率扣费（模板三档积分 + 质量档） | **等 T15 合并；T8 / T9 之前** | T3、T4、T14、T15 |
 
 并行建议：T0 先做（半天到一天）；T0 合并后 T1 / T2 / T3 / T5 四张同时开；T6 和 T0 同时开（不碰代码）。
@@ -257,7 +259,9 @@
 
 ## T11 首页与内页最终文案（价格已定稿，可派）
 
-**依据**：ARCHITECTURE §12、§13；建站规格 §4（首页 TDK 与 6 个 H2 骨架，2026-11-05 定稿）、R10、G1、G3、G4（可核验事实：9 个商品的价格、"from 2 credits"、Standard / HD / Max 三档像素，对外不写 1K / 2K / 3K）、G6（首页 5 句）。同时把 `site.config.ts` 的 `brand.tagline` 改成 "AI photo studio"（建站规格 §1）。**依赖**：T5。
+**依据**：ARCHITECTURE §12、§13；建站规格 §4（首页 TDK 与 6 个 H2 骨架，2026-11-05 定稿）、R10、G1、G3、G4（可核验事实：9 个商品的价格、"from 2 credits"、Standard / HD / Max 三档像素，对外不写 1K / 2K / 3K）、G6（首页 5 句）。同时把 `site.config.ts` 的 `brand.tagline` 改成 "AI photo studio"（建站规格 §1）。**范围补充（总控 2026-11-05）**：`site.config.ts` 的 `billing.freeCredits` 从 3 改为 6，全站免费额度文案改成 "3 free Standard images"（建站规格 G1 / G3 / G4 / FAQ B / 首页 H3 / Description），并同步改 T1 / T5 / T14 里引用免费额度的测试。首页首屏生成器的界面由 T8 实现（复用工作台组件）。
+
+**依赖**：T5。
 
 ## T12 模板需求墙（Wishlist）（等 T8）
 
@@ -333,6 +337,43 @@
 - [ ] `supabase/schema.sql` 快照更新，CI 的 schema 校验通过
 
 **依赖**：T3、T4、T14（都已合并）、T15（基线与编号）。
+
+## T18 埋点与错误监控（可派，排在 T8 / T9 之前）
+
+**目标**：`core/analytics/` 统一埋点和错误上报，接好 PostHog（无 Cookie、同域代理）和 Sentry；给已合并的接口补上服务端事件。约半天。
+
+**范围**：`core/analytics/`（`track()`、`identify()`、`captureError()`，浏览器和服务端两套实现，同一事件字典的 zod 类型）、`app/` 根布局接入 PostHog Provider、`next.config.ts` 的 `/ingest` 改写、`@sentry/nextjs` 配置；在已合并代码里补事件：T1 注册（`signup`）、T4 生成结算（`generate`，web 和伙伴接口都发）、T4 上传（`upload`）。`paywall_view` / `checkout_start` / `purchase` 由 T8 / T9 调用本模块，本卡只提供类型和函数。不许动：业务逻辑和扣费规则。
+
+**依据**：ARCHITECTURE §16 全文（PostHog 配置、事件字典、禁止发个人信息、Sentry 告警清单）；AGENTS §4（env 用 zod、`core/logger` 打码）；LAUNCH §9 事件和告警两条。
+
+**验收**：
+- [ ] 预览站打开首页，PostHog 后台 Live events 看到 `$pageview`，浏览器里没有 PostHog 写的 Cookie 和本地存储
+- [ ] 注册、上传、生成各做一次，看到 `signup` / `upload` / `generate`，属性齐全且不含邮箱、文案、提示词、图片地址
+- [ ] 广告拦截插件开着时事件仍能通过 `/ingest` 送达
+- [ ] 故意让一次生成失败，Sentry 收到告警，内容不含用户邮箱和提示词
+- [ ] 单元测试：事件字典类型、属性里出现邮箱等字段时被拒绝
+
+**依赖**：无（T1 / T4 已合并）。Sentry DSN 未提供前，Sentry 部分在无 DSN 时自动关闭，不阻塞合并。
+
+## T19 法律页面（可派）
+
+**目标**：英文的服务条款 `/terms`、隐私政策 `/privacy`、退款政策 `/refund-policy`、使用规范 `/acceptable-use`，以及全站页脚的官方站点声明和主体信息。约半天到一天。**上线前须由 Owner 找懂美国法律的人审阅**，开发窗口写的是底稿，不是法律意见。
+
+**主体信息（Owner 2026-11-05 提供）**：Grayscale Luminary LLC，怀俄明州注册，地址 75 E 3rd St, Sheridan, WY 82801，联系邮箱 support@shotviva.com。写进 `site.config.ts` 的 `brand`（`legalName`、`address`、`contactEmail`），页面和页脚只从配置读。
+
+**范围**：`site/content/legal/*`（四页正文）、`app/(marketing)/terms|privacy|refund-policy|acceptable-use`、页脚组件里的法律链接和主体信息、`site.config.ts` 主体字段。四页 `noindex`（不在主词表 CSV 里，AGENTS §9）。不许动：业务逻辑。
+
+**依据与底稿**：
+- 退款规则 Owner 定为「和 Graylum 一致」：以 Graylum **staging** 分支 `apps/web/content/legal/refund-policy.html` 为底稿改写；Graylum 条款里凡是依赖 Graylum 独有功能（自助退款页、后台退款流程等）的承诺，Shotviva v1 没有对应功能的，改写成「发邮件到 support@shotviva.com，人工在 Stripe / Waffo 后台处理」（ARCHITECTURE §10），并在 PR 里逐条列出改了哪些。卡支付走 Stripe Managed Payments 时由 Link 作为商户记录方，退款条款要与之相符（ARCHITECTURE §6.3）。
+- 服务条款、隐私政策同样参考 Graylum staging `terms.html`、`privacy.html` 的结构，但内容按 Shotviva 事实写：免费作品公开展示并带水印、付费作品私密可商用（§6.2）；用户对上传内容负责、画风模板只用通用风格（§5）；上传照片保留 7 天、成品保留到用户删除（§8.3）；需求墙参考图规则（§15.5）；第三方服务清单（Supabase、Cloudflare R2、OpenAI、Stripe / Link、Waffo、PostHog、Sentry、Resend、Vercel）；PostHog 不使用 Cookie（§16）；连接 Graylum 时共享的信息（账号 id、剩余积分，§14）；账号删除（§13）。
+- LAUNCH §8 全部条目。
+
+**验收**：
+- [ ] 四页可访问、`noindex`，页脚每页可见并链接到四页，主体信息与配置一致
+- [ ] PR 正文附「与 Graylum 条款的差异清单」和「需要律师重点看的条款」清单
+- [ ] Owner 审阅通过（律师意见由 Owner 自行安排）
+
+**依赖**：T5（已合并）。
 
 ## Owner 侧关键路径（不是任务卡，但比代码慢）
 

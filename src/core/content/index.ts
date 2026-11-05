@@ -20,3 +20,14 @@ export { TemplateGrid } from './blocks/template-grid'
 export { Breadcrumbs } from './blocks/breadcrumbs'
 export { FactsSection } from './blocks/facts-section'
 export { FaqSection } from './blocks/faq-section'
+export { SiteFooter, type FooterLink } from './blocks/site-footer'
+export {
+  defineLegalPage,
+  formatLegalDate,
+  type LegalBlock,
+  type LegalLink,
+  type LegalPage,
+  type LegalSection,
+  type LegalText,
+} from './legal/legal-page'
+export { LegalPageView } from './legal/legal-page-view'

@@ -1,6 +1,8 @@
 import 'server-only'
 import { z } from 'zod'
 
+import { sentryBuildEnvSchema } from './build-env'
+
 // `KEY=` lines in .env files arrive as '' — treat them as unset rather than invalid.
 const blankAsUnset = (value: unknown) => (value === '' ? undefined : value)
 const optionalSecret = z.preprocess(blankAsUnset, z.string().min(1).optional())
@@ -26,7 +28,7 @@ const serverEnvSchema = z.object({
   // value per Vercel environment: `sv_live_…` in production, `sv_test_…` everywhere else
   // (core/partner/partner-auth.ts rejects the wrong kind). Unset → every partner call is 401.
   GRAYLUM_PARTNER_KEY: optionalSecret,
-})
+}).extend(sentryBuildEnvSchema.shape)
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>
 

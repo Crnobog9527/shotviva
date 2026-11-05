@@ -2,6 +2,7 @@ import 'server-only'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+import { captureError } from '../analytics'
 import { logger } from '../logger'
 import type { ObjectStore } from '../storage'
 import { classifyFailure, GenerationFailure, type FailureStage } from './generation-failure'
@@ -45,6 +46,7 @@ async function refundSafely(db: SupabaseClient, jobId: string, errorCode: string
   } catch (error) {
     // Leaves the job 'running' with credits held; v1 has no sweeper, so this must be loud.
     logger.error('refund failed; credits still reserved', { jobId, errorCode, error })
+    captureError(error, { alert: 'credit_refund_failed', level: 'fatal', fields: { jobId, errorCode } })
     return false
   }
 }
@@ -71,7 +73,12 @@ export async function settleGeneration(
     const failure = classifyFailure(stage, error)
     // `error` is redacted by the logger and adapters never put prompts in messages.
     logger.error('generation failed', { jobId: job.id, stage, jobCode: failure.jobCode, error })
+    // A declined photo or text is the user's input, not an outage; it stays out of the
+    // failure-rate alert and is still counted in the `generate` event's error_code.
+    if (failure.jobCode !== 'CONTENT_REJECTED') {
+      captureError(error, { alert: 'generation_failed', fields: { jobId: job.id, stage, jobCode: failure.jobCode, source: job.source } })
+    }
     const refunded = await refundSafely(deps.db, job.id, failure.jobCode)
-    throw new GenerationFailure(failure.error, job.id, refunded)
+    throw new GenerationFailure(failure.error, job.id, refunded, failure.jobCode)
   }
 }
