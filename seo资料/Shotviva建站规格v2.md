@@ -3,14 +3,14 @@
 > 交给 Claude Code 的唯一执行依据 · 2026-11-04 定稿 · 数据口径：Google Ads 规划师美国月搜索量 + 哥飞版 KD（进前十口径）
 
 ## 0. 一句话定位
-通用的傻瓜式 AI 图片工具（Owner 2026-11-05 改定，不再「首期只做餐饮」）：上传手机实拍图 + 选模板 + 填文案，出影棚级成品图或换画风。服务小商家、网店和二手卖家、房东、宠物主人等日常用户；餐饮是分类之一，不是全部。不做聊天框；首页是工具落地页，模板库是首屏之后的一块内容（见 R6、R10，2026-11-05 修订，原文「首页就是模板库」与 R6 矛盾）。
-三个卖点必须在每个页面出现：照片主体保持原样不变；不需要写提示词；3 步出图。
+面向中小商家（首期只做餐饮）的傻瓜式 AI 图片工具：上传手机实拍图 + 选模板 + 填文案，出影棚级成品图。不做聊天框；首页是工具落地页，模板库是首屏之后的一块内容（见 R6、R10，2026-11-05 修订，原文「首页就是模板库」与 R6 矛盾）。
+三个卖点必须在每个页面出现：保留主体/餐具/摆盘原样不变；不需要写提示词；3 步出图。
 
 ## 1. 域名与品牌（已定稿，不再讨论）
 - 唯一域名：shotviva.com（已注册）。不使用 .ai，不做 301 跳转。
 - 商标：USPTO 已查，无 shotviva 冲突。
 - 品牌写法全站统一 Shotviva（Logo、Title 后缀、structured data 的 brand 字段、社交账号）。
-- shotviva 与图片无字面关联，Logo 旁必须常驻 tagline："AI photo studio"（2026-11-05 改定，原为 "AI food & product photo studio"）；每个页面副标题也带一句功能说明。
+- shotviva 与食物/图片无字面关联，Logo 旁必须常驻 tagline："AI food & product photo studio"；每个页面副标题也带一句功能说明。
 - 首页 footer 固定一行站方声明（唯一官方站点），并占用 X / Instagram / Product Hunt / LinkedIn 的 shotviva 账号名。
 
 ## 2. SEO 硬规则（12 条，违反任意一条视为不合格交付）
@@ -29,7 +29,7 @@ R12 监控节奏：上线当天 GSC 验证站点 + 提交 sitemap；上线满 2 
 
 ## 3. GEO 规则（13 条）
 SEO 争排名，GEO 争「被抄进答案」——每页都要有能整段摘走的句子和数字。
-G1 每页顶部写「直答块」：H1 下方 40~60 个英文词，以主词开头、自带完整信息、不需上下文。例 "Image to image AI turns a phone photo into a studio-quality picture. With Shotviva you pick a template, upload your photo and add a line of text if the template asks for it. Your subject stays exactly as shot; only the light, scene or art style changes. No prompts to write. You start with 3 free credits." 必须放正文最前、不许折叠。
+G1 每页顶部写「直答块」：H1 下方 40~60 个英文词，以主词开头、自带完整信息、不需上下文。例 "Shotviva is an AI image to image tool that turns phone photos of dishes into studio-quality food photos. Upload a photo, pick a template, add your text — no prompts, no photographer. Free for the first 3 images." 必须放正文最前、不许折叠。
 G2 Title 带年份与限定词：AI 联网会自己组带年份的搜索词，Title 精确对上易被引用。所有工具页 Title 带 (2026) 或 for Restaurants 这类限定。
 G3 每个数字只能一套口径：免费额度（"3 free credits"，计价单位是 credit 不是「张」，因为不同模板消耗的 credit 不同）、价格（唯一来源是 site.config.ts；商品为 `monthly` / `yearly` 会员和 `pack` 积分包，卡支付可订阅自动续费，钱包和积分包为单笔，具体价格待定，见 规范/ARCHITECTURE.md §6.1、§6.2）、支持语言数、出图耗时，全站（首页/价格页/FAQ/结构化数据/站外目录）完全一致；AI 交叉比对发现两套就不引用；改价一次改全站。
 G4 每页写死可核验事实，至少 3 条：DoorDash/Uber Eats/Grubhub 菜单图推荐尺寸与比例；免费额度与价格档位；支持语言；出图耗时（秒/张）；保留主体不变的技术说明。
