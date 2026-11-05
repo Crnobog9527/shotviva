@@ -67,6 +67,8 @@ export default defineConfig([
     'build/**',
     'coverage/**',
     'next-env.d.ts',
+    // Static design comps (T6): reference HTML/JS, not app code.
+    'design/**',
     // Generated files are exempt from size rules (AGENTS §3.1).
     'src/**/*.generated.ts',
     'src/**/database.types.ts',
