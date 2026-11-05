@@ -2,10 +2,12 @@
 
 import { useCallback, useState } from 'react'
 
+import { track } from '@/core/analytics/browser'
+
 import { compressImage } from './compress-image'
 import { putWithProgress } from './put-with-progress'
 import { requestTicket } from './request-ticket'
-import { UploadError, uploadPhoto, type UploadErrorCode, type UploadPhase } from './upload-photo'
+import { UploadError, uploadPhoto, type UploadDeps, type UploadErrorCode, type UploadPhase } from './upload-photo'
 
 export type UploadState =
   | { phase: 'idle' }
@@ -13,7 +15,12 @@ export type UploadState =
   | { phase: 'done'; inputKey: string }
   | { phase: 'error'; code: UploadErrorCode; message: string }
 
-const deps = { compress: compressImage, requestTicket, put: putWithProgress }
+const deps: UploadDeps = {
+  compress: compressImage,
+  requestTicket,
+  put: putWithProgress,
+  track: (props) => track('upload', props),
+}
 
 // Upload half of DESIGN §4.4 (Compressing → Uploading with progress); the Generating phase
 // belongs to the generation hook. A failed upload restarts from scratch (§8.2: no resume).

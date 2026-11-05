@@ -4,9 +4,10 @@ import { billingGrant, grantSignupCredits, type GrantCredits } from './free-cred
 
 describe('grantSignupCredits', () => {
   it('grants the configured amount once per user via the signup idempotency key', async () => {
-    const grant = vi.fn<GrantCredits>().mockResolvedValue(undefined)
-    await grantSignupCredits(grant, 'u1', 3)
-    await grantSignupCredits(grant, 'u1', 3)
+    const grant = vi.fn<GrantCredits>().mockResolvedValueOnce({ applied: true }).mockResolvedValue({ applied: false })
+    // Only the call that applied reports a first sign-in (drives the `signup` event).
+    await expect(grantSignupCredits(grant, 'u1', 3)).resolves.toBe(true)
+    await expect(grantSignupCredits(grant, 'u1', 3)).resolves.toBe(false)
     expect(grant).toHaveBeenCalledWith({ userId: 'u1', amount: 3, reason: 'signup', idempotencyKey: 'signup:u1', pool: 'free' })
     // Both calls carry the same key; grant_credits (T2) settles the second as a no-op.
     expect(new Set(grant.mock.calls.map(([input]) => input.idempotencyKey)).size).toBe(1)
@@ -16,7 +17,7 @@ describe('grantSignupCredits', () => {
     const grant = vi.fn<GrantCredits>().mockRejectedValue(new Error('db down'))
     await grantSignupCredits(grant, 'u1', 0)
     expect(grant).not.toHaveBeenCalled()
-    await expect(grantSignupCredits(grant, 'u1', 3)).resolves.toBeUndefined()
+    await expect(grantSignupCredits(grant, 'u1', 3)).resolves.toBe(false)
   })
 })
 

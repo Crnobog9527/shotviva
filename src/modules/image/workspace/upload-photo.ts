@@ -1,3 +1,4 @@
+import { uploadSizeBucket, type EventProps } from '@/core/analytics/events'
 import { isUploadContentType, MAX_UPLOAD_BYTES, type UploadContentType } from '@/core/storage/rules'
 
 export type UploadPhase = 'compressing' | 'uploading'
@@ -18,6 +19,8 @@ export type UploadDeps = {
   compress(file: Blob): Promise<Blob>
   requestTicket(contentType: UploadContentType, size: number): Promise<Ticket>
   put(url: string, body: Blob, headers: Record<string, string>, onProgress: (fraction: number) => void): Promise<void>
+  // The `upload` event (ARCHITECTURE §16.2), sent once the object is in R2.
+  track(props: EventProps<'upload'>): void
 }
 
 export type UploadCallbacks = { onPhase(phase: UploadPhase): void; onProgress(fraction: number): void }
@@ -49,5 +52,7 @@ export async function uploadPhoto(file: Blob, deps: UploadDeps, callbacks: Uploa
     throw new UploadError('UPLOAD_FAILED', 'Upload failed; check your connection and try again')
   }
   callbacks.onProgress(1)
+  // Bucketed size of the picked photo, not the re-encoded one: that is what users bring.
+  deps.track({ size_bucket: uploadSizeBucket(file.size), compressed: compressed !== null })
   return ticket.input_key
 }

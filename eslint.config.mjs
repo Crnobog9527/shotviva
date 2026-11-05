@@ -41,6 +41,18 @@ const layerZones = [
   },
 ]
 
+// ARCHITECTURE §16: pages and routes call track()/captureError(); only core/analytics
+// talks to the SDKs (re-allowed for that folder below).
+const analyticsSdkImport = {
+  group: ['posthog-js', 'posthog-js/**', 'posthog-node', '@sentry/*', '@sentry/*/**'],
+  message: "Use '@/core/analytics' (server) or '@/core/analytics/browser'; SDKs stay inside core/analytics.",
+}
+
+const coreUpwardImport = {
+  group: ['@/modules', '@/modules/**', '@/site', '@/site/**', '@/app', '@/app/**'],
+  message: 'core must not import modules, site or app; use the module registry.',
+}
+
 const deepModuleImport = {
   group: ['@/modules/*/**'],
   message: "Import a module through its index.ts ('@/modules/<id>'), not its internals.",
@@ -74,7 +86,7 @@ export default defineConfig([
           message: 'Read environment variables through core/env.ts or core/public-env.ts.',
         },
       ],
-      'no-restricted-imports': ['error', { patterns: [deepModuleImport] }],
+      'no-restricted-imports': ['error', { patterns: [deepModuleImport, analyticsSdkImport] }],
       'import/no-restricted-paths': ['error', { zones: [...layerZones, ...crossModuleZones] }],
     },
   },
@@ -87,19 +99,11 @@ export default defineConfig([
   },
   {
     files: ['src/core/**/*.{ts,tsx}'],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: ['@/modules', '@/modules/**', '@/site', '@/site/**', '@/app', '@/app/**'],
-              message: 'core must not import modules, site or app; use the module registry.',
-            },
-          ],
-        },
-      ],
-    },
+    rules: { 'no-restricted-imports': ['error', { patterns: [coreUpwardImport, analyticsSdkImport] }] },
+  },
+  {
+    files: ['src/core/analytics/**/*.{ts,tsx}'],
+    rules: { 'no-restricted-imports': ['error', { patterns: [coreUpwardImport] }] },
   },
   {
     files: ['src/modules/**/*.{ts,tsx}'],
@@ -113,6 +117,7 @@ export default defineConfig([
               group: ['@/modules', '@/modules/**', '@/site', '@/site/**', '@/app', '@/app/**'],
               message: 'modules may only import core, never other modules, site or app.',
             },
+            analyticsSdkImport,
           ],
         },
       ],
@@ -129,6 +134,7 @@ export default defineConfig([
               group: ['@/modules', '@/modules/**', '@/app', '@/app/**'],
               message: 'site may only import core.',
             },
+            analyticsSdkImport,
           ],
         },
       ],
