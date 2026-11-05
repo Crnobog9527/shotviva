@@ -330,7 +330,7 @@
 
 ## Owner 侧关键路径（不是任务卡，但比代码慢）
 
-- 6～8 个模板的真实菜品照片 + 前后对比素材 + 提示词调优
+- 第一批 10 个模板（6 类）的真实照片 + 前后对比素材 + 提示词调优
 - Stripe 新账户申请；向 Stripe 确认 Managed Payments 下 Alipay / WeChat
 - Waffo 加急开通
 - OpenAI 组织验证 + GPT-Image 系列模型权限；决定 `OPENAI_IMAGE_MODEL` 默认用 2.5 还是 2.6（同价，2.6 更快，需比较效果）
