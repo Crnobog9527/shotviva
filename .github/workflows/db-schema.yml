@@ -21,16 +21,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: pnpm
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         with:
           # pg_dump output depends on the CLI's Postgres image; scripts/db-schema.ts says to
-          # regenerate locally with this same version.
-          version: 2.107.0
+          # regenerate locally with this same version. An exact v2 release, not the floating
+          # v2.stable tag, so a new stable can't change the dump between two runs.
+          version: 2.122.1
       - run: pnpm install --frozen-lockfile
       - run: supabase start -x studio,imgproxy,edge-runtime,analytics,vector,inbucket,functions,realtime,storage
       - run: pnpm db:schema

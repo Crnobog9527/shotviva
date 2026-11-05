@@ -41,7 +41,8 @@ jobs:
           cache: pnpm
       - uses: supabase/setup-cli@v3
         with:
-          version: v2.stable
+          # Same CLI as db-schema.yml and the supabase-remote action.
+          version: 2.122.1
       - run: pnpm install --frozen-lockfile
       # Only the services DB tests need; later cards drop names from this list as they need them.
       - run: supabase start -x studio,imgproxy,edge-runtime,analytics,vector,inbucket,functions,realtime,storage
