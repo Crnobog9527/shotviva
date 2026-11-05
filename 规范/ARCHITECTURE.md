@@ -150,7 +150,7 @@ v1 不写回调解析、定时轮询、超时清理这类定时任务。视频�
 
 模板分两张表，核心提示词不进仓库、不进公开表：
 
-- `templates`（公开）：id、模块、名称、分类、封面前后对比图、字段定义（要几张图、要填哪些文案、可选比例）、**质量档 `quality`**（`'high'` / `'medium'`，送给模型的 `quality` 参数，默认 `'high'`）、**消耗积分 `credits_cost`**（jsonb，按分辨率三个档都必填：`{ "1k": 2, "2k": 4, "4k": 6 }`，正整数）、排序、上下架状态、`visible_in`（`['web']` / `['partner']` / 两者，控制在哪些入口展示）。
+- `templates`（公开）：id、模块、名称、分类、封面前后对比图、字段定义（要几张图、要填哪些文案、可选比例）、**质量档 `quality`**（`'high'` / `'medium'`，送给模型的 `quality` 参数，默认 `'high'`）、**消耗积分 `credits_cost`**（jsonb，按分辨率三个档都必填：`{ "1k": 2, "2k": 4, "3k": 6 }`，正整数）、排序、上下架状态、`visible_in`（`['web']` / `['partner']` / 两者，控制在哪些入口展示）。
 - `template_prompts`（私有，只有服务端能读，RLS 拒绝所有客户端）：模板 id、提示词正文、版本号、模型参数。
 
 内置一条 `freeform` 模板：字段定义只有 `prompt`（加可选参考图），`template_prompts` 里的提示词是直通。它让「自由文字出图」和「模板出图」走同一条代码路径；`visible_in = ['partner']`，Shotviva 自己的前台不展示（DESIGN.md 禁止出现 prompt）。
