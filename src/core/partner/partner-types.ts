@@ -53,6 +53,12 @@ export const idempotencyKeySchema = z
 // Where to send the user after a top-up. Must be https on an allowlisted Graylum host.
 const returnTo = z.url().max(2048)
 
+// Two balances (ARCHITECTURE §6.1): paid credits are spent first and make paid works (private,
+// no watermark); free credits (signup gift) are spent only when paid ones cannot cover the
+// whole job and make free works (public, watermarked). One job never mixes the two.
+const paidCredits = z.number().int().nonnegative()
+const freeCredits = z.number().int().nonnegative()
+
 export const PARTNER_JOB_STATUSES = ['running', 'succeeded', 'failed'] as const
 export type PartnerJobStatus = (typeof PARTNER_JOB_STATUSES)[number]
 
@@ -65,7 +71,8 @@ export const linkResponseSchema = z.object({
   account_id: z.uuid(),
   // Masked email (e.g. "j***@gmail.com"), for "Connected as …".
   display_name: z.string(),
-  credits_remaining: z.number().int().nonnegative(),
+  credits_remaining: paidCredits,
+  free_credits_remaining: freeCredits,
 })
 
 // ---------------------------------------------------------------- GET /api/partner/account
@@ -73,8 +80,10 @@ export const linkResponseSchema = z.object({
 export const accountQuerySchema = z.object({ return_to: returnTo.optional() })
 
 export const accountResponseSchema = z.object({
-  credits_remaining: z.number().int().nonnegative(),
-  // ISO timestamp; paid (private, no watermark) while in the future. null = free.
+  credits_remaining: paidCredits,
+  // When credits_remaining cannot cover a template, the next job uses these and is a free work.
+  free_credits_remaining: freeCredits,
+  // ISO timestamp of the membership period, for display only; it decides no entitlement.
   paid_until: z.string().nullable(),
   top_up_url: z.url(),
 })
@@ -129,7 +138,8 @@ export const generateResponseSchema = z.object({
   // Signed, valid 7 days. null while running.
   image_url: z.url().nullable(),
   credits_charged: z.number().int().nonnegative(),
-  credits_remaining: z.number().int().nonnegative(),
+  credits_remaining: paidCredits,
+  free_credits_remaining: freeCredits,
 })
 
 // ---------------------------------------------------------------- GET /api/partner/jobs/{id}

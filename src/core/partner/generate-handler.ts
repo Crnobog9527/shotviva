@@ -57,6 +57,7 @@ export async function handleGenerate(request: Request, deps: PartnerGenerateRout
       image_url: imageUrl,
       credits_charged: outcome.creditsCost,
       credits_remaining: profile.credits,
+      free_credits_remaining: profile.freeCredits,
     }
     return partnerJson(response, running ? 202 : 200)
   } catch (error) {

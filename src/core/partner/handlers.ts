@@ -48,7 +48,12 @@ export async function handleLink(request: Request, deps: PartnerRouteDeps): Prom
     if (!body.success) throw invalid('code is required')
     const userId = await exchangeLinkCode(deps.db, body.data.code, deps.now?.())
     const [displayName, profile] = await Promise.all([partnerDisplayName(deps.db, userId), partnerProfile(deps.db, userId)])
-    const response: LinkResponse = { account_id: userId, display_name: displayName, credits_remaining: profile.credits }
+    const response: LinkResponse = {
+      account_id: userId,
+      display_name: displayName,
+      credits_remaining: profile.credits,
+      free_credits_remaining: profile.freeCredits,
+    }
     return partnerJson(response)
   } catch (error) {
     return partnerErrorResponse(error, { route: 'partner-link' })
@@ -64,6 +69,7 @@ export async function handleAccount(request: Request, deps: PartnerRouteDeps): P
     const profile = await partnerProfile(deps.db, userId)
     const response: AccountResponse = {
       credits_remaining: profile.credits,
+      free_credits_remaining: profile.freeCredits,
       paid_until: profile.paidUntil,
       top_up_url: topUpUrl(deps.origin, returnTo),
     }

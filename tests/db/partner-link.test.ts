@@ -31,7 +31,12 @@ describe('POST /api/partner/link', () => {
 
     const response = await link(code)
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ account_id: userId, display_name: 't***@example.test', credits_remaining: 3 })
+    expect(await response.json()).toEqual({
+      account_id: userId,
+      display_name: 't***@example.test',
+      credits_remaining: 3,
+      free_credits_remaining: 0,
+    })
     expect(await linkRow(db, userId)).toMatchObject({ link_code: null, revoked_at: null })
   })
 
@@ -77,7 +82,7 @@ describe('GET /api/partner/account and revocation', () => {
     const response = await account(userId, '?return_to=https%3A%2F%2Fgraylum.com%2Fchat%2F7')
     expect(response.status).toBe(200)
     const body = await response.json()
-    expect(body).toMatchObject({ credits_remaining: 5, paid_until: '2030-01-01T00:00:00.000Z' })
+    expect(body).toMatchObject({ credits_remaining: 5, free_credits_remaining: 0, paid_until: '2030-01-01T00:00:00.000Z' })
     const topUp = new URL(body.top_up_url)
     expect(topUp.searchParams.get('from')).toBe('graylum')
     expect(topUp.searchParams.get('return_to')).toBe('https://graylum.com/chat/7')

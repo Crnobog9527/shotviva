@@ -1,6 +1,7 @@
 import 'server-only'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { z } from 'zod'
 
 import { AppError } from '../errors'
 import type { Job } from '../jobs'
@@ -57,17 +58,26 @@ export function toPartnerTemplate(template: Template): PartnerTemplate {
   }
 }
 
-export type PartnerProfile = { credits: number; paidUntil: string | null }
+export type PartnerProfile = { credits: number; freeCredits: number; paidUntil: string | null }
 
+const profileRow = z.object({
+  credits: z.number().int(),
+  // Added by T14's two-pool migration; until then every credit is in `credits`.
+  free_credits: z.number().int().optional(),
+  paid_until: z.string().nullable(),
+})
+
+// Whole row on purpose: naming free_credits in the select would fail before T14's migration.
 export async function partnerProfile(db: SupabaseClient, userId: string): Promise<PartnerProfile> {
-  const { data, error } = await db
-    .from('profiles')
-    .select('credits, paid_until')
-    .eq('id', userId)
-    .maybeSingle<{ credits: number; paid_until: string | null }>()
+  const { data, error } = await db.from('profiles').select('*').eq('id', userId).maybeSingle()
   if (error) throw new AppError('INTERNAL', `partner profile lookup failed: ${error.message}`)
   if (!data) throw new AppError('NOT_FOUND', 'Account not found')
-  return { credits: data.credits, paidUntil: data.paid_until === null ? null : new Date(data.paid_until).toISOString() }
+  const row = profileRow.parse(data)
+  return {
+    credits: row.credits,
+    freeCredits: row.free_credits ?? 0,
+    paidUntil: row.paid_until === null ? null : new Date(row.paid_until).toISOString(),
+  }
 }
 
 // "Connected as j***@gmail.com" without handing Graylum the full address.

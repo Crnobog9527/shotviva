@@ -49,7 +49,7 @@ describe('POST /api/partner/generate: success', () => {
     const response = await generate(freeform, 'call-1')
     expect(response.status).toBe(200)
     const body = await response.json()
-    expect(body).toMatchObject({ status: 'succeeded', credits_charged: 1, credits_remaining: 2 })
+    expect(body).toMatchObject({ status: 'succeeded', credits_charged: 1, credits_remaining: 2, free_credits_remaining: 0 })
     expect(body.image_url).toBe(`memory://get/outputs/${userId}/${body.job_id}.png?expires=604800`)
     const { rows } = await db.query('select source, idempotency_key, status from public.generation_jobs where id = $1', [body.job_id])
     expect(rows[0]).toEqual({ source: 'graylum', idempotency_key: 'call-1', status: 'succeeded' })

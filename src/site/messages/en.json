@@ -75,13 +75,13 @@
   "partner": {
     "connect": {
       "title": "Connect Graylum",
-      "explain": "Graylum will use your Shotviva image balance when it makes images for you. You can disconnect it any time from your account page.",
-      "allow": "Allow Graylum to use your images",
+      "explain": "Graylum will use your Shotviva credits when it makes images for you. You can disconnect it any time from your account page.",
+      "allow": "Allow Graylum to use your credits",
       "invalid": "This connect link is not valid. Go back to Graylum and try again."
     },
     "account": {
       "title": "Graylum",
-      "connected": "Connected since {date, date, medium}. Graylum can make images with your balance.",
+      "connected": "Connected since {date, date, medium}. Graylum can make images with your credits.",
       "notConnected": "Not connected.",
       "disconnect": "Disconnect Graylum"
     }
