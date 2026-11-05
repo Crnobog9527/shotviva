@@ -108,6 +108,54 @@ $$;
 ALTER FUNCTION "public"."_apply_credit_change"("p_user_id" "uuid", "p_pool" "text", "p_kind" "text", "p_delta" integer, "p_reason" "text", "p_idempotency_key" "text", "p_job_id" "uuid", "p_product_id" "text", "p_paid_days" integer) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_activate_announcement"("p_id" "uuid", "p_active" boolean, "p_actor" "uuid") RETURNS "uuid"[]
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_row public.site_announcements;
+  v_window tstzrange;
+  v_stopped uuid[];
+begin
+  if p_active is null then
+    raise exception 'INVALID_INPUT' using detail = 'active is required';
+  end if;
+
+  -- Serialises two switches: each would otherwise scan for overlaps before the other commits.
+  -- Plain reads (the banner) are not blocked.
+  lock table public.site_announcements in share row exclusive mode;
+
+  select * into v_row from public.site_announcements where id = p_id;
+  if not found then
+    raise exception 'ANNOUNCEMENT_NOT_FOUND';
+  end if;
+
+  if not p_active then
+    update public.site_announcements set is_active = false, updated_by = p_actor where id = p_id and is_active;
+    return '{}'::uuid[];
+  end if;
+
+  v_window := tstzrange(coalesce(v_row.starts_at, '-infinity'::timestamptz), coalesce(v_row.ends_at, 'infinity'::timestamptz));
+
+  with stopped as (
+    update public.site_announcements a
+       set is_active = false, updated_by = p_actor
+     where a.is_active
+       and a.id <> p_id
+       and tstzrange(coalesce(a.starts_at, '-infinity'::timestamptz), coalesce(a.ends_at, 'infinity'::timestamptz)) && v_window
+    returning a.id
+  )
+  select coalesce(array_agg(id order by id), '{}'::uuid[]) into v_stopped from stopped;
+
+  update public.site_announcements set is_active = true, updated_by = p_actor where id = p_id and not is_active;
+  return v_stopped;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_activate_announcement"("p_id" "uuid", "p_active" boolean, "p_actor" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_activate_provider"("p_id" "uuid") RETURNS "void"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -177,6 +225,105 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_ban_user"("p_user_id" "uuid", "p_reason" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_dashboard_stats"("p_days" integer) RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_tz constant text := 'Asia/Shanghai';
+  v_today timestamptz;
+  v_start timestamptz;
+  v_result jsonb;
+begin
+  if p_days is null or p_days < 7 or p_days > 90 then
+    raise exception 'INVALID_INPUT' using detail = 'p_days must be between 7 and 90';
+  end if;
+
+  v_today := date_trunc('day', now() at time zone v_tz) at time zone v_tz;
+  v_start := v_today - make_interval(days => p_days - 1);
+
+  with windows(key, since) as (
+    values ('today', v_today), ('7d', v_today - interval '6 days'), ('period', v_start)
+  ),
+  jobs as (
+    select g.created_at,
+           g.status,
+           -- generation_jobs.provider is '<source>/<model>'; older rows hold a bare name.
+           case when position('/' in g.provider) > 0
+                then substr(g.provider, position('/' in g.provider) + 1)
+                else coalesce(g.provider, 'unknown') end as model,
+           coalesce(g.inputs ->> 'resolution', '1k') as resolution
+      from public.generation_jobs g
+     where g.created_at >= v_start
+  ),
+  -- Net credits spent on generation: reserves minus refunds, per pool.
+  spend as (
+    select l.created_at, l.pool, -l.delta as used
+      from public.credit_ledger l
+     where l.created_at >= v_start and l.kind in ('reserve', 'refund')
+  ),
+  -- A paying user is new on the day of their first purchase ever.
+  first_purchases as (
+    select l.user_id, min(l.created_at) as first_at
+      from public.credit_ledger l
+     where l.created_at >= v_start
+       and l.kind = 'purchase'
+       and not exists (
+         select 1 from public.credit_ledger e
+          where e.user_id = l.user_id and e.kind = 'purchase' and e.created_at < v_start
+       )
+     group by l.user_id
+  ),
+  window_stats as (
+    select jsonb_agg(jsonb_build_object(
+             'key', w.key,
+             'since', w.since,
+             'signups', (select count(*) from public.profiles p where p.created_at >= w.since),
+             'jobs', (select count(*) from jobs j where j.created_at >= w.since),
+             'succeeded', (select count(*) from jobs j where j.created_at >= w.since and j.status = 'succeeded'),
+             'failed', (select count(*) from jobs j where j.created_at >= w.since and j.status = 'failed'),
+             'free_credits_used', (select coalesce(sum(s.used), 0) from spend s where s.created_at >= w.since and s.pool = 'free'),
+             'paid_credits_used', (select coalesce(sum(s.used), 0) from spend s where s.created_at >= w.since and s.pool = 'paid'),
+             'new_paying_users', (select count(*) from first_purchases f where f.first_at >= w.since)
+           ) order by w.since desc) as value
+      from windows w
+  ),
+  trend as (
+    select jsonb_agg(jsonb_build_object(
+             'day', to_char(d.day at time zone v_tz, 'YYYY-MM-DD'),
+             'jobs', (select count(*) from jobs j where j.created_at >= d.day and j.created_at < d.day + interval '1 day'),
+             'succeeded', (select count(*) from jobs j
+                            where j.created_at >= d.day and j.created_at < d.day + interval '1 day' and j.status = 'succeeded')
+           ) order by d.day) as value
+      from generate_series(v_start, v_today, interval '1 day') as d(day)
+  ),
+  by_model as (
+    select jsonb_agg(jsonb_build_object(
+             'model', m.model, 'resolution', m.resolution, 'jobs', m.jobs, 'succeeded', m.succeeded
+           ) order by m.jobs desc, m.model, m.resolution) as value
+      from (
+        select j.model, j.resolution, count(*) as jobs, count(*) filter (where j.status = 'succeeded') as succeeded
+          from jobs j
+         group by j.model, j.resolution
+      ) m
+  )
+  select jsonb_build_object(
+           'timezone', v_tz,
+           'days', p_days,
+           'generated_at', now(),
+           'windows', (select value from window_stats),
+           'trend', coalesce((select value from trend), '[]'::jsonb),
+           'by_model', coalesce((select value from by_model), '[]'::jsonb)
+         )
+    into v_result;
+  return v_result;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_dashboard_stats"("p_days" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_list_template_requests"() RETURNS TABLE("id" "uuid", "email" "text", "description" "text", "image_keys" "text"[], "status" "text", "template_id" "text", "votes_count" integer, "created_at" timestamp with time zone)
@@ -260,6 +407,24 @@ $$;
 ALTER FUNCTION "public"."admin_review_template_request"("p_request_id" "uuid", "p_status" "text", "p_template_id" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_search_users"("p_query" "text") RETURNS TABLE("id" "uuid", "email" "text", "created_at" timestamp with time zone, "provider" "text", "role" "text", "credits" integer, "free_credits" integer, "paid_until" timestamp with time zone, "generation_count" integer, "last_generation_at" timestamp with time zone, "banned_at" timestamp with time zone)
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select o.id, o.email, o.created_at, o.provider, o.role, o.credits, o.free_credits, o.paid_until,
+         o.generation_count, o.last_generation_at, o.banned_at
+    from admin.users_overview o
+   -- The query is a literal substring: % and _ typed by the admin match themselves.
+   where length(btrim(coalesce(p_query, ''))) > 0
+     and o.email ilike '%' || replace(replace(replace(btrim(p_query), '\', '\\'), '%', '\%'), '_', '\_') || '%'
+   order by o.created_at desc, o.id desc
+   limit 50
+$$;
+
+
+ALTER FUNCTION "public"."admin_search_users"("p_query" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_set_provider_key"("p_id" "uuid", "p_key" "text") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -298,6 +463,28 @@ $_$;
 
 
 ALTER FUNCTION "public"."admin_set_provider_key"("p_id" "uuid", "p_key" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_unban_user"("p_user_id" "uuid", "p_reason" "text") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if p_reason is null or length(btrim(p_reason)) = 0 then
+    raise exception 'INVALID_INPUT' using detail = 'reason is required';
+  end if;
+
+  update public.profiles set banned_at = null where id = p_user_id;
+  if not found then
+    raise exception 'PROFILE_NOT_FOUND';
+  end if;
+
+  insert into public.admin_audit_log (action, user_id, reason) values ('unban_user', p_user_id, p_reason);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_unban_user"("p_user_id" "uuid", "p_reason" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_upsert_template"("p_template" "jsonb", "p_prompt" "jsonb") RETURNS "void"
@@ -994,7 +1181,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "user_id" "uuid" NOT NULL,
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = 'ban_user'::"text")),
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text"]))),
     CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0))
 );
 
@@ -1108,6 +1295,33 @@ CREATE TABLE IF NOT EXISTS "public"."products" (
 
 
 ALTER TABLE "public"."products" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."site_announcements" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "message_en" "text" NOT NULL,
+    "message_zh" "text" NOT NULL,
+    "link_url" "text",
+    "link_label_en" "text",
+    "link_label_zh" "text",
+    "tone" "text" DEFAULT 'info'::"text" NOT NULL,
+    "starts_at" timestamp with time zone,
+    "ends_at" timestamp with time zone,
+    "is_active" boolean DEFAULT false NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_by" "uuid",
+    CONSTRAINT "site_announcements_link_label_en_check" CHECK ((("link_label_en" IS NULL) OR (("char_length"("link_label_en") >= 1) AND ("char_length"("link_label_en") <= 40)))),
+    CONSTRAINT "site_announcements_link_label_zh_check" CHECK ((("link_label_zh" IS NULL) OR (("char_length"("link_label_zh") >= 1) AND ("char_length"("link_label_zh") <= 40)))),
+    CONSTRAINT "site_announcements_link_url_check" CHECK ((("link_url" IS NULL) OR (("char_length"("link_url") <= 500) AND (("link_url" ~ '^/([^/\s]\S*)?$'::"text") OR ("link_url" ~ '^https://[^\s/?#@]+([/?#]\S*)?$'::"text"))))),
+    CONSTRAINT "site_announcements_message_en_check" CHECK ((("char_length"("message_en") >= 1) AND ("char_length"("message_en") <= 140))),
+    CONSTRAINT "site_announcements_message_zh_check" CHECK ((("char_length"("message_zh") >= 1) AND ("char_length"("message_zh") <= 140))),
+    CONSTRAINT "site_announcements_tone_check" CHECK (("tone" = ANY (ARRAY['info'::"text", 'promo'::"text"]))),
+    CONSTRAINT "site_announcements_window_order" CHECK ((("starts_at" IS NULL) OR ("ends_at" IS NULL) OR ("starts_at" < "ends_at")))
+);
+
+
+ALTER TABLE "public"."site_announcements" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."subscriptions" (
@@ -1229,6 +1443,16 @@ ALTER TABLE ONLY "public"."profiles"
 
 
 
+ALTER TABLE ONLY "public"."site_announcements"
+    ADD CONSTRAINT "site_announcements_active_no_overlap" EXCLUDE USING "gist" ("tstzrange"(COALESCE("starts_at", '-infinity'::timestamp with time zone), COALESCE("ends_at", 'infinity'::timestamp with time zone)) WITH &&) WHERE ("is_active");
+
+
+
+ALTER TABLE ONLY "public"."site_announcements"
+    ADD CONSTRAINT "site_announcements_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."subscriptions"
     ADD CONSTRAINT "subscriptions_pkey" PRIMARY KEY ("stripe_subscription_id");
 
@@ -1258,7 +1482,15 @@ CREATE UNIQUE INDEX "ai_providers_one_active_per_module" ON "public"."ai_provide
 
 
 
+CREATE INDEX "credit_ledger_created_at_idx" ON "public"."credit_ledger" USING "btree" ("created_at");
+
+
+
 CREATE INDEX "credit_ledger_user_id_created_at_idx" ON "public"."credit_ledger" USING "btree" ("user_id", "created_at" DESC);
+
+
+
+CREATE INDEX "generation_jobs_created_at_id_idx" ON "public"."generation_jobs" USING "btree" ("created_at" DESC, "id" DESC);
 
 
 
@@ -1275,6 +1507,14 @@ CREATE UNIQUE INDEX "generation_jobs_user_idempotency_key_idx" ON "public"."gene
 
 
 CREATE UNIQUE INDEX "partner_links_partner_link_code_idx" ON "public"."partner_links" USING "btree" ("partner", "link_code") WHERE ("link_code" IS NOT NULL);
+
+
+
+CREATE INDEX "profiles_created_at_idx" ON "public"."profiles" USING "btree" ("created_at");
+
+
+
+CREATE INDEX "site_announcements_created_at_id_idx" ON "public"."site_announcements" USING "btree" ("created_at" DESC, "id" DESC);
 
 
 
@@ -1307,6 +1547,10 @@ CREATE OR REPLACE TRIGGER "ai_providers_delete_vault_secret" AFTER DELETE ON "pu
 
 
 CREATE OR REPLACE TRIGGER "ai_providers_set_updated_at" BEFORE UPDATE ON "public"."ai_providers" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
+
+
+
+CREATE OR REPLACE TRIGGER "site_announcements_set_updated_at" BEFORE UPDATE ON "public"."site_announcements" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
 
 
 
@@ -1354,6 +1598,11 @@ ALTER TABLE ONLY "public"."partner_links"
 
 ALTER TABLE ONLY "public"."profiles"
     ADD CONSTRAINT "profiles_id_fkey" FOREIGN KEY ("id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."site_announcements"
+    ADD CONSTRAINT "site_announcements_updated_by_fkey" FOREIGN KEY ("updated_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
 
 
@@ -1425,6 +1674,9 @@ CREATE POLICY "profiles_select_own" ON "public"."profiles" FOR SELECT TO "authen
 
 
 
+ALTER TABLE "public"."site_announcements" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."subscriptions" ENABLE ROW LEVEL SECURITY;
 
 
@@ -1469,6 +1721,11 @@ REVOKE ALL ON FUNCTION "public"."_apply_credit_change"("p_user_id" "uuid", "p_po
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_activate_announcement"("p_id" "uuid", "p_active" boolean, "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_activate_announcement"("p_id" "uuid", "p_active" boolean, "p_actor" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_activate_provider"("p_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_activate_provider"("p_id" "uuid") TO "service_role";
 
@@ -1481,6 +1738,11 @@ GRANT ALL ON FUNCTION "public"."admin_adjust_credits"("p_user_id" "uuid", "p_amo
 
 REVOKE ALL ON FUNCTION "public"."admin_ban_user"("p_user_id" "uuid", "p_reason" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_ban_user"("p_user_id" "uuid", "p_reason" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_dashboard_stats"("p_days" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_dashboard_stats"("p_days" integer) TO "service_role";
 
 
 
@@ -1499,8 +1761,18 @@ GRANT ALL ON FUNCTION "public"."admin_review_template_request"("p_request_id" "u
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_search_users"("p_query" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_search_users"("p_query" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_set_provider_key"("p_id" "uuid", "p_key" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_set_provider_key"("p_id" "uuid", "p_key" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_unban_user"("p_user_id" "uuid", "p_reason" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_unban_user"("p_user_id" "uuid", "p_reason" "text") TO "service_role";
 
 
 
@@ -1653,6 +1925,10 @@ GRANT SELECT("created_at") ON TABLE "public"."partner_links" TO "authenticated";
 
 
 GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."products" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."site_announcements" TO "service_role";
 
 
 

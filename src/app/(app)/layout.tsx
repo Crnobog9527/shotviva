@@ -3,13 +3,14 @@ import { useTranslations } from 'next-intl'
 import { Suspense } from 'react'
 
 import { AnalyticsIdentify } from '@/core/analytics/browser'
+import { AnnouncementBanner } from '@/core/announcements'
 import { AppFrame, TabBar, type TabItem } from '@/core/app-shell'
 import { getSessionUser } from '@/core/auth'
 import { PaywallProvider } from '@/core/billing/paywall'
 import { isModuleEnabled } from '@/core/config'
 import { appShellMetadata } from '@/core/seo'
 import { isWishlistEnabled } from '@/core/wishlist'
-import { GenerationRunner, PhotosTabBadge } from '@/modules/image'
+import { GenerationRunner, HideWhileGenerating, PhotosTabBadge } from '@/modules/image'
 import { site } from '@/site/site.config'
 
 // Every logged-in page is noindex through this one layout, never per page (AGENTS §9).
@@ -38,6 +39,10 @@ export default function AppLayout({ children }: LayoutProps<'/'>) {
   const tabs = useTabs()
   return (
     <AppFrame>
+      {/* Hidden on /admin by the banner itself, and while a generation runs (ARCHITECTURE §10). */}
+      <HideWhileGenerating>
+        <AnnouncementBanner />
+      </HideWhileGenerating>
       <PaywallProvider products={site.billing.products} wishlistLive={isWishlistEnabled(site)}>
         <Suspense fallback={null}>
           <Identity />
