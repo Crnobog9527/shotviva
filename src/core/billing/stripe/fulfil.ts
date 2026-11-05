@@ -1,24 +1,24 @@
 import 'server-only'
 
-import type { SupabaseClient } from '@supabase/supabase-js'
 import type Stripe from 'stripe'
 import { z } from 'zod'
 
 import { trackPurchase } from '../../analytics/funnel'
 import type { SiteProduct } from '../../config'
 import { AppError } from '../../errors'
-import { applyPurchase } from '../credits'
+import type { RpcClient } from '../rpc'
 import { CHECKOUT_METHODS, lookupKey, type CheckoutMethod } from './catalog'
 import type { StripeApi } from './client'
-import { mirrorSubscription } from './subscription-mirror'
+import { settleCheckout, subscriptionState } from './settle'
 
 // First payment and one-time purchases (ARCHITECTURE §6.1, §6.3): a paid Checkout Session
-// becomes exactly one apply_purchase, keyed by the session id, so redelivered events, the
-// completed + async_payment_succeeded pair, and any retry settle once.
+// becomes exactly one settle_checkout (mirror + apply_purchase), keyed by the session id, so
+// redelivered events, the completed + async_payment_succeeded pair, and any retry settle once.
 
 export type FulfilDeps = {
   stripe: StripeApi
-  db: SupabaseClient
+  // Service-role client: settle_checkout is not callable by the client roles.
+  db: RpcClient
   products: readonly SiteProduct[]
   trackBuy?: typeof trackPurchase
 }
@@ -88,14 +88,11 @@ export async function fulfilCheckoutSession(deps: FulfilDeps, sessionId: string)
   })
   if (session.payment_status === 'unpaid') return 'unpaid'
   const purchase = readPurchase(session, deps.products)
-  // Mirror first: if the grant then fails, the retry repeats both and the grant still lands once.
-  if (purchase.subscription) {
-    await mirrorSubscription(deps.db, purchase.subscription, { userId: purchase.userId, productId: purchase.product.id })
-  }
-  const change = await applyPurchase(deps.db, {
+  const change = await settleCheckout(deps.db, {
     userId: purchase.userId,
     productId: purchase.product.id,
-    eventId: session.id,
+    sessionId: session.id,
+    subscription: purchase.subscription ? subscriptionState(purchase.subscription) : null,
   })
   if (!change.applied) return 'replayed'
   track(deps, session, purchase)

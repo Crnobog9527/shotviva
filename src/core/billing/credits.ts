@@ -21,7 +21,7 @@ export type CreditChange = {
   paidUntil: Date | null
 }
 
-const creditChangeSchema = z
+export const creditChangeSchema = z
   .object({
     applied: z.boolean(),
     credits: z.number().int().nonnegative(),

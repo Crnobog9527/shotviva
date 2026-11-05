@@ -18,6 +18,7 @@ const SERVICE_FUNCTIONS: Array<[string, Record<string, unknown>]> = [
   ['admin_ban_user', { p_user_id: randomUUID(), p_reason: 'x' }],
   ['is_paid', { p_user_id: randomUUID() }],
   ['current_tier', { p_user_id: randomUUID() }],
+  ['settle_checkout', { p_user_id: randomUUID(), p_product_id: 'pack_s', p_session_id: 'cs_x' }],
 ]
 
 let db: Client

@@ -3,6 +3,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { handleStripeWebhook } from '@/core/billing/stripe'
 
+import { serviceSupabase } from './supabase-env'
+
 import { connectAdmin, createUser, DAY_MS, ledgerOf, profileOf } from './helpers'
 import { checkoutSession, eventFor, signed, stripeHarness, subscriptionObject } from './stripe-fixtures'
 
@@ -210,5 +212,32 @@ describe('refusals and failures', () => {
     const result = await deliver({ ...eventFor('invoice.paid', 'in_1'), data: { object: { id: 'in_1', object: 'invoice' } } })
     expect(result).toEqual({ status: 200, body: { received: true } })
     expect(h.retrieve).not.toHaveBeenCalled()
+  })
+})
+
+describe('settle_checkout', () => {
+  it('refuses a subscription id already mirrored for another user, granting nothing', async () => {
+    const owner = await createUser(db)
+    const intruder = await createUser(db)
+    const subscription = subscriptionObject({ periodEndDays: 30 })
+    const first = stage(checkoutSession({ userId: owner, productId: 'pro_monthly', method: 'card', subscription }))
+    await deliver(eventFor(COMPLETED, first.id))
+
+    const second = stage(checkoutSession({ userId: intruder, productId: 'pro_monthly', method: 'card', subscription }))
+    expect((await deliver(eventFor(COMPLETED, second.id))).status).toBe(500)
+    expect(await ledgerOf(db, intruder)).toEqual([])
+    expect(await mirrorOf(owner)).toHaveLength(1)
+  })
+
+  it('is the only writer: the service role cannot write subscriptions directly', async () => {
+    const userId = await createUser(db)
+    const { error } = await serviceSupabase().from('subscriptions').insert({
+      stripe_subscription_id: 'sub_direct',
+      user_id: userId,
+      product_id: 'starter_monthly',
+      status: 'active',
+      current_period_end: new Date().toISOString(),
+    })
+    expect(error?.message).toMatch(/permission denied/)
   })
 })

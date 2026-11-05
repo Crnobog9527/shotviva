@@ -2,7 +2,8 @@
 -- webhook copies its current state here (first payment in T9, renewals and cancellation in
 -- T10) and the account page only reads it. One row per Stripe subscription.
 -- Private like orders (AGENTS §5): no client role can read or write it; the server reads it
--- with the service role.
+-- with the service role and writes it only through SQL functions (settle_checkout here, the
+-- renewal / cancellation functions in T10).
 create table public.subscriptions (
   stripe_subscription_id text primary key check (stripe_subscription_id like 'sub_%'),
   user_id uuid not null references public.profiles (id) on delete cascade,
@@ -23,6 +24,7 @@ create index subscriptions_user_id_idx on public.subscriptions (user_id);
 alter table public.subscriptions enable row level security;
 
 revoke all on public.subscriptions from anon, authenticated;
--- The webhook upserts by stripe_subscription_id; nothing deletes (a cancelled subscription
--- keeps its row with status 'canceled').
-grant select, insert, update on public.subscriptions to service_role;
+-- Reads by user_id (account page) and the profiles cascade use subscriptions_user_id_idx.
+-- Nothing deletes a row: a cancelled subscription keeps it with status 'canceled'.
+revoke all on public.subscriptions from service_role;
+grant select on public.subscriptions to service_role;

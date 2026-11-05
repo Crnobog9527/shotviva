@@ -600,6 +600,41 @@ $$;
 ALTER FUNCTION "public"."set_updated_at"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."settle_checkout"("p_user_id" "uuid", "p_product_id" "text", "p_session_id" "text", "p_subscription_id" "text" DEFAULT NULL::"text", "p_subscription_status" "text" DEFAULT NULL::"text", "p_current_period_end" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_cancel_at_period_end" boolean DEFAULT NULL::boolean) RETURNS "public"."credit_change"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if p_subscription_id is not null then
+    if p_subscription_status is null or p_current_period_end is null or p_cancel_at_period_end is null then
+      raise exception 'INVALID_INPUT' using detail = 'subscription fields are all required';
+    end if;
+    -- Upsert by the primary key; a subscription id already mirrored for another user or
+    -- product updates nothing and is refused.
+    insert into public.subscriptions
+      (stripe_subscription_id, user_id, product_id, status, current_period_end, cancel_at_period_end)
+    values
+      (p_subscription_id, p_user_id, p_product_id, p_subscription_status, p_current_period_end, p_cancel_at_period_end)
+    on conflict (stripe_subscription_id) do update
+       set status = excluded.status,
+           current_period_end = excluded.current_period_end,
+           cancel_at_period_end = excluded.cancel_at_period_end,
+           updated_at = now()
+     where public.subscriptions.user_id = excluded.user_id
+       and public.subscriptions.product_id = excluded.product_id;
+    if not found then
+      raise exception 'IDEMPOTENCY_CONFLICT' using detail = 'subscription belongs to another user or product';
+    end if;
+  end if;
+
+  return public.apply_purchase(p_user_id, p_product_id, p_session_id);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."settle_checkout"("p_user_id" "uuid", "p_product_id" "text", "p_session_id" "text", "p_subscription_id" "text", "p_subscription_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."profiles" (
     "id" "uuid" NOT NULL,
     "role" "text" DEFAULT 'user'::"text" NOT NULL,
@@ -1114,6 +1149,11 @@ GRANT ALL ON FUNCTION "public"."set_job_visibility"("p_job_id" "uuid", "p_user_i
 
 
 
+REVOKE ALL ON FUNCTION "public"."settle_checkout"("p_user_id" "uuid", "p_product_id" "text", "p_session_id" "text", "p_subscription_id" "text", "p_subscription_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."settle_checkout"("p_user_id" "uuid", "p_product_id" "text", "p_session_id" "text", "p_subscription_id" "text", "p_subscription_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) TO "service_role";
+
+
+
 GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."profiles" TO "service_role";
 GRANT SELECT ON TABLE "public"."profiles" TO "authenticated";
 
@@ -1179,7 +1219,7 @@ GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."products" T
 
 
 
-GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."subscriptions" TO "service_role";
+GRANT SELECT ON TABLE "public"."subscriptions" TO "service_role";
 
 
 

@@ -8,8 +8,9 @@ import { fulfilCheckoutSession, type FulfilDeps } from './fulfil'
 
 // POST /api/webhooks/stripe (ARCHITECTURE §6.3, AGENTS §6): verify the signature first (bad
 // signature → 400, nothing applied), then settle; a processing failure → 500 so Stripe retries.
-// Dedupe: apply_purchase is idempotent by checkout session id (§6.1), so every redelivery,
-// retry or sibling event of one session grants once; the mirror upsert is idempotent too.
+// Dedupe: settle_checkout grants through apply_purchase keyed by the checkout session id
+// (§6.1), so every redelivery, retry or sibling event of one session grants once, and its
+// mirror upsert writes the state just retrieved from Stripe.
 // T10 adds invoice.paid, customer.subscription.updated / deleted and charge.refunded here.
 
 // async_payment_succeeded: a delayed method (if Stripe ever treats Alipay as one) completes the
