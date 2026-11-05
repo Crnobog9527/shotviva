@@ -7,6 +7,8 @@
 - [ ] Vercel Pro 项目建好，绑定 shotviva.com，www 跳转到不带 www 的主域名
 - [ ] Supabase 生产项目 `shotviva` 和预览用的测试项目 `shotviva-preview` 分开，都在美国西部一区（us-west-1）。生产项目先用免费计划（Owner 2026-11-05）：第一笔真实付款到账后立刻转进 Pro 组织（转移后地址和密钥不变）；在那之前留意免费项目一周无请求会暂停、没有每日备份
 - [ ] Supabase Auth 的 Site URL 和 Redirect URLs 配好，包含预览域名通配
+- [ ] GitHub 仓库密钥已配好：Supabase 访问令牌、预览库数据库密码、生产库数据库密码；`production` environment 设为必须 Owner 批准
+- [ ] 生产库的全部迁移由「生产迁移」工作流执行（Owner 批准记录可查），`supabase migration list` 与仓库完全一致；没有任何手动执行过的 SQL
 - [ ] Stripe：同一主体下新开的独立账户，开通卡、支付宝、微信支付；账单描述设为 SHOTVIVA（卡支付在 Managed Payments 下显示 `LINK.COM* SHOTVIVA`）。Managed Payments 资格审核已提交；审核没下来时卡走普通订阅兜底（ARCHITECTURE §6.3）。账户本身没通过时用 Waffo
 - [ ] Waffo：申请加急，测试和生产密钥分开创建，回调格式选 Raw
 - [ ] Stripe 和 Waffo 的生产回调地址、签名密钥都已登记到环境变量
