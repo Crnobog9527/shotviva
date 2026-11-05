@@ -38,7 +38,7 @@ async function resolveOutcome(request: NextRequest, jar: CookieToSet[], flow: Ca
   const { data } = await supabase.auth.getUser()
   if (!data.user) return { kind: 'no_session', flow } satisfies CallbackOutcome
   const verified = isEmailVerified(data.user)
-  if (verified) await onVerifiedSignIn(data.user.id, freeCredits)
+  if (verified) await onVerifiedSignIn(data.user.id, freeCredits, flow === 'oauth' ? 'google' : 'email')
   return { kind: 'signed_in', verified, userId: data.user.id, flow } satisfies CallbackOutcome
 }
 

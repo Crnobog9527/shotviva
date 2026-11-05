@@ -28,3 +28,11 @@ describe('storage and provider keys', () => {
     expect(env.OPENAI_IMAGE_MODEL).toBe('gpt-image-2.5-sunburst')
   })
 })
+
+describe('Sentry build keys', () => {
+  it('are optional and treat blanks as unset', () => {
+    const env = parseServerEnv({ SENTRY_AUTH_TOKEN: '', SENTRY_ORG: 'graylum', SENTRY_PROJECT: 'shotviva-preview' })
+    expect(env.SENTRY_AUTH_TOKEN).toBeUndefined()
+    expect(env).toMatchObject({ SENTRY_ORG: 'graylum', SENTRY_PROJECT: 'shotviva-preview' })
+  })
+})

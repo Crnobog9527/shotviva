@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto'
 
 import type { Client } from 'pg'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+
+import type { ServerTrack } from '@/core/analytics'
 
 import { GenerationFailure, runGeneration, type GenerationRequest } from '@/core/jobs'
 import { newInputKey } from '@/core/storage'
@@ -98,7 +100,7 @@ describe('runGeneration: failures refund', () => {
     const error = await runGeneration(deps, request()).catch((e: unknown) => e)
     expect(error).toBeInstanceOf(GenerationFailure)
     const failure = error as GenerationFailure
-    expect(failure).toMatchObject({ code, refunded: true })
+    expect(failure).toMatchObject({ code, refunded: true, jobCode })
     expect(await jobRow(db, failure.jobId)).toMatchObject({ status: 'failed', error_code: jobCode, output_key: null })
     expect((await profileOf(db, userId)).credits).toBe(3)
     expect((await ledgerOf(db, userId)).map((row) => row.kind)).toEqual(['reserve', 'refund'])
@@ -145,5 +147,51 @@ describe('runGeneration: guards', () => {
     }
     await expect(runGeneration(deps, request())).rejects.toMatchObject({ code: 'RATE_LIMITED', status: 429 })
     expect((await profileOf(db, userId)).credits).toBe(5)
+  })
+})
+
+// T18: one `generate` event per settled job (ARCHITECTURE §16.2), success or failure, and
+// never for a replay. Nothing in it may carry the user's copy or the prompt.
+describe('runGeneration: generate event', () => {
+  it('reports a success with the dictionary properties only', async () => {
+    const { userId, deps, request } = await setup()
+    const track = vi.fn<ServerTrack>()
+    const jobId = randomUUID()
+    await runGeneration({ ...deps, track }, request({ jobId }))
+    await runGeneration({ ...deps, track }, request({ jobId }))
+
+    expect(track).toHaveBeenCalledOnce()
+    const [event, props, ctx] = track.mock.calls[0] ?? []
+    expect(event).toBe('generate')
+    expect(ctx).toEqual({ distinctId: userId })
+    expect(props).toMatchObject({
+      template_id: templateId,
+      category: 'test',
+      resolution: '1k',
+      credits_cost: 1,
+      credit_pool: 'paid',
+      status: 'succeeded',
+      error_code: null,
+      source: 'web',
+    })
+    expect(JSON.stringify(props)).not.toMatch(/ramen|WRAPPED|inputs\//)
+  })
+
+  it('reports a timeout as failed with the stored error code', async () => {
+    const { deps, request } = await setup('hang')
+    const track = vi.fn<ServerTrack>()
+    await expect(runGeneration({ ...deps, track }, request())).rejects.toBeInstanceOf(GenerationFailure)
+    expect(track).toHaveBeenCalledWith(
+      'generate',
+      expect.objectContaining({ status: 'failed', error_code: 'PROVIDER_TIMEOUT' }),
+      expect.anything(),
+    )
+  })
+
+  it('sends nothing when the request is refused before credits are reserved', async () => {
+    const { deps, request } = await setup('ok', { credits: 0 })
+    const track = vi.fn<ServerTrack>()
+    await expect(runGeneration({ ...deps, track }, request())).rejects.toThrow()
+    expect(track).not.toHaveBeenCalled()
   })
 })

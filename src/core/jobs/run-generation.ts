@@ -2,9 +2,11 @@ import 'server-only'
 
 import { randomUUID } from 'node:crypto'
 
+import type { ServerTrack } from '../analytics'
 import { AppError } from '../errors'
 import { isOwnInputKey, loadInputImage, outputKeyFor } from '../storage'
 import { loadGenerationTemplate, renderPrompt, validateGenerationInputs, type TemplateSurface } from '../templates'
+import { settleTracked } from './generation-analytics'
 import type { GenerationRequest } from './generation-request'
 import { findOwnJob } from './job-lookup'
 import type { JobSource } from './job-schema'
@@ -13,7 +15,8 @@ import { assertWithinRateLimit } from './rate-limit'
 import { settleGeneration, type SettleDeps } from './settle-generation'
 import { reserveJob } from './settlement'
 
-export type GenerationDeps = SettleDeps & { now?: () => Date }
+// `track` is injectable so tests can assert the `generate` event without PostHog.
+export type GenerationDeps = SettleDeps & { now?: () => Date; track?: ServerTrack }
 
 const SURFACE: Record<JobSource, TemplateSurface> = { web: 'web', graylum: 'partner' }
 
@@ -74,5 +77,6 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
     aspectRatio: inputs.aspectRatio,
     params: prompt.modelParams,
   }
-  return toJobView(await settleGeneration(deps, job, call, outputKeyFor(req.userId, job.id)))
+  const settle = () => settleGeneration(deps, job, call, outputKeyFor(req.userId, job.id))
+  return toJobView(await settleTracked(job, template.category, settle, { track: deps.track }))
 }
