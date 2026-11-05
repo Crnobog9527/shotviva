@@ -5,9 +5,10 @@ import { ProviderError, type GenerationProvider, type ProviderInput, type Provid
 import { toProviderError } from './openai-errors'
 import { formatSize, outputSize } from './output-size'
 
-// GPT-Image-2.5 via OpenAI's Images API: /v1/images/edits when the template takes a photo
-// (the normal case: keep the dish, change the scene), /v1/images/generations otherwise.
-// Plain fetch instead of the SDK so tests inject a fake and nothing reaches the network.
+// The 'openai_images' adapter (ARCHITECTURE §3.2–3.3): OpenAI's Images API shape, at the official
+// address or any relay that speaks it. /images/edits when the template takes a photo (the normal
+// case: keep the dish, change the scene), /images/generations otherwise. Plain fetch instead of
+// the SDK so tests inject a fake and nothing reaches the network.
 
 export type OpenAIImageConfig = {
   apiKey: string
@@ -16,10 +17,11 @@ export type OpenAIImageConfig = {
   baseUrl?: string
 }
 
-// Keys template_prompts.model_params may set; anything else is ignored. `quality` is not one of
-// them: it comes from the template's quality tier, which the template's price is floored on.
+// Keys template_prompts.model_params may set; anything else is ignored. Not `model`: since T17
+// the model is the active provider's alone, so no template keeps calling an old one after a
+// switch. Not `quality` either: it comes from the template's quality tier, which its price is
+// floored on.
 const paramsSchema = z.object({
-  model: z.string().regex(/^gpt-image-[\w.-]+$/).optional(),
   background: z.enum(['auto', 'opaque', 'transparent']).optional(),
 })
 
@@ -28,7 +30,7 @@ const responseSchema = z.object({ data: z.array(z.object({ b64_json: z.string().
 function buildRequest(config: OpenAIImageConfig, input: ProviderInput): { path: string; init: RequestInit } {
   const params = paramsSchema.catch({}).parse(input.params)
   const fields: Record<string, string> = {
-    model: params.model ?? config.model,
+    model: config.model,
     prompt: input.prompt,
     size: formatSize(outputSize(input.resolution, input.aspectRatio, input.images[0])),
     quality: input.quality,

@@ -12,6 +12,7 @@ const generate = {
   error_code: 'PROVIDER_TIMEOUT',
   source: 'graylum',
   duration_ms: 31_250,
+  model: 'gpt-image-2.6',
 } as const
 
 const checkout = {

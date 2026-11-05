@@ -108,6 +108,29 @@ $$;
 ALTER FUNCTION "public"."_apply_credit_change"("p_user_id" "uuid", "p_pool" "text", "p_kind" "text", "p_delta" integer, "p_reason" "text", "p_idempotency_key" "text", "p_job_id" "uuid", "p_product_id" "text", "p_paid_days" integer) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_activate_provider"("p_id" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_module text;
+begin
+  select module into v_module from public.ai_providers where id = p_id;
+  if not found then
+    raise exception 'PROVIDER_NOT_FOUND';
+  end if;
+
+  perform 1 from public.ai_providers where module = v_module order by id for update;
+
+  update public.ai_providers set is_active = false where module = v_module and is_active and id <> p_id;
+  update public.ai_providers set is_active = true where id = p_id and not is_active;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_activate_provider"("p_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_adjust_credits"("p_user_id" "uuid", "p_amount" integer, "p_reason" "text", "p_pool" "text", "p_idempotency_key" "text" DEFAULT NULL::"text") RETURNS "public"."credit_change"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -614,6 +637,34 @@ ALTER TABLE "public"."admin_audit_log" ALTER COLUMN "id" ADD GENERATED ALWAYS AS
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."ai_providers" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "module" "text" DEFAULT 'image'::"text" NOT NULL,
+    "adapter" "text" NOT NULL,
+    "label" "text" NOT NULL,
+    "base_url" "text" DEFAULT 'https://api.openai.com/v1'::"text" NOT NULL,
+    "model" "text" NOT NULL,
+    "api_key_ciphertext" "text" NOT NULL,
+    "api_key_last4" "text" NOT NULL,
+    "is_active" boolean DEFAULT false NOT NULL,
+    "notes" "text",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_by" "uuid",
+    CONSTRAINT "ai_providers_adapter_check" CHECK (("adapter" = 'openai_images'::"text")),
+    CONSTRAINT "ai_providers_api_key_ciphertext_check" CHECK ((("char_length"("api_key_ciphertext") >= 1) AND ("char_length"("api_key_ciphertext") <= 2000))),
+    CONSTRAINT "ai_providers_api_key_last4_check" CHECK ((("char_length"("api_key_last4") >= 1) AND ("char_length"("api_key_last4") <= 4))),
+    CONSTRAINT "ai_providers_base_url_check" CHECK ((("base_url" ~ '^https://[^\s/?#@]+(/[^\s?#]*)?$'::"text") AND ("char_length"("base_url") <= 300))),
+    CONSTRAINT "ai_providers_label_check" CHECK ((("char_length"("label") >= 1) AND ("char_length"("label") <= 80))),
+    CONSTRAINT "ai_providers_model_check" CHECK ((("char_length"("model") >= 1) AND ("char_length"("model") <= 120))),
+    CONSTRAINT "ai_providers_module_check" CHECK (("module" = 'image'::"text")),
+    CONSTRAINT "ai_providers_notes_check" CHECK ((("notes" IS NULL) OR ("char_length"("notes") <= 500)))
+);
+
+
+ALTER TABLE "public"."ai_providers" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."credit_ledger" (
     "id" bigint NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -737,6 +788,11 @@ ALTER TABLE ONLY "public"."admin_audit_log"
 
 
 
+ALTER TABLE ONLY "public"."ai_providers"
+    ADD CONSTRAINT "ai_providers_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."credit_ledger"
     ADD CONSTRAINT "credit_ledger_idempotency_key_key" UNIQUE ("idempotency_key");
 
@@ -777,6 +833,10 @@ ALTER TABLE ONLY "public"."templates"
 
 
 
+CREATE UNIQUE INDEX "ai_providers_one_active_per_module" ON "public"."ai_providers" USING "btree" ("module") WHERE "is_active";
+
+
+
 CREATE INDEX "credit_ledger_user_id_created_at_idx" ON "public"."credit_ledger" USING "btree" ("user_id", "created_at" DESC);
 
 
@@ -801,6 +861,10 @@ CREATE INDEX "templates_active_sort_idx" ON "public"."templates" USING "btree" (
 
 
 
+CREATE OR REPLACE TRIGGER "ai_providers_set_updated_at" BEFORE UPDATE ON "public"."ai_providers" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
+
+
+
 CREATE OR REPLACE TRIGGER "template_prompts_bump_version" BEFORE UPDATE ON "public"."template_prompts" FOR EACH ROW EXECUTE FUNCTION "public"."bump_template_prompt_version"();
 
 
@@ -811,6 +875,11 @@ CREATE OR REPLACE TRIGGER "templates_set_updated_at" BEFORE UPDATE ON "public"."
 
 ALTER TABLE ONLY "public"."admin_audit_log"
     ADD CONSTRAINT "admin_audit_log_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."ai_providers"
+    ADD CONSTRAINT "ai_providers_updated_by_fkey" FOREIGN KEY ("updated_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
 
 
@@ -845,6 +914,9 @@ ALTER TABLE ONLY "public"."template_prompts"
 
 
 ALTER TABLE "public"."admin_audit_log" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."ai_providers" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."credit_ledger" ENABLE ROW LEVEL SECURITY;
@@ -896,6 +968,11 @@ GRANT USAGE ON SCHEMA "public" TO "service_role";
 
 
 REVOKE ALL ON FUNCTION "public"."_apply_credit_change"("p_user_id" "uuid", "p_pool" "text", "p_kind" "text", "p_delta" integer, "p_reason" "text", "p_idempotency_key" "text", "p_job_id" "uuid", "p_product_id" "text", "p_paid_days" integer) FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_activate_provider"("p_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_activate_provider"("p_id" "uuid") TO "service_role";
 
 
 
@@ -978,6 +1055,10 @@ GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."admin_audit
 GRANT UPDATE ON SEQUENCE "public"."admin_audit_log_id_seq" TO "anon";
 GRANT UPDATE ON SEQUENCE "public"."admin_audit_log_id_seq" TO "authenticated";
 GRANT UPDATE ON SEQUENCE "public"."admin_audit_log_id_seq" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."ai_providers" TO "service_role";
 
 
 
