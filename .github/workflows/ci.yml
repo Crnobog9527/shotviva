@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
@@ -34,14 +34,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: pnpm
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         with:
-          version: 2.107.0
+          version: v2.stable
       - run: pnpm install --frozen-lockfile
       # Only the services DB tests need; later cards drop names from this list as they need them.
       - run: supabase start -x studio,imgproxy,edge-runtime,analytics,vector,inbucket,functions,realtime,storage
