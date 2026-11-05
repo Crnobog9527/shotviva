@@ -1,7 +1,7 @@
 import { logger } from '../logger'
 
-// Storage seen by account deletion. The real R2 implementation arrives with core/storage (T4);
-// tests inject a fake and assert the prefixes.
+// Storage seen by account deletion. Production passes core/storage's R2 store; tests inject
+// a fake and assert the prefixes.
 export type AccountStorage = { deletePrefix(prefix: string): Promise<void> }
 
 export type AuthAdmin = { deleteUser(userId: string): Promise<{ error: { message: string } | null }> }
@@ -23,10 +23,4 @@ export async function deleteAccount(userId: string, deps: AccountDeletionDeps): 
   const { error } = await deps.authAdmin.deleteUser(userId)
   if (error) throw new Error(`auth deleteUser failed: ${error.message}`)
   logger.info('account deleted', { userId })
-}
-
-// Until T4 ships uploads there is nothing under either prefix, so this is truthful;
-// T4 replaces it with the R2 client in delete-account-route.ts.
-export const noUploadsYetStorage: AccountStorage = {
-  async deletePrefix() {},
 }

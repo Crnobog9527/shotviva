@@ -13,6 +13,15 @@ export const ERROR_CODES = [
   'AUTH_WEAK_PASSWORD',
   // Idempotency key reused for a different request, or a job settled the other way.
   'CONFLICT',
+  // Per-account generation limit (core/jobs/rate-limit.ts).
+  'RATE_LIMITED',
+  // Upload checks (ARCHITECTURE §8.2): over 20MB, or not a JPEG/PNG/WebP we can decode.
+  'IMAGE_TOO_LARGE',
+  'IMAGE_UNSUPPORTED',
+  // The provider's own safety refusal; credits are refunded.
+  'CONTENT_REJECTED',
+  // Provider error, timeout or output write failure; credits are refunded.
+  'GENERATION_FAILED',
   'INTERNAL',
 ] as const
 
@@ -30,6 +39,11 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   AUTH_RATE_LIMITED: 429,
   AUTH_WEAK_PASSWORD: 422,
   CONFLICT: 409,
+  RATE_LIMITED: 429,
+  IMAGE_TOO_LARGE: 422,
+  IMAGE_UNSUPPORTED: 422,
+  CONTENT_REJECTED: 422,
+  GENERATION_FAILED: 502,
   INTERNAL: 500,
 }
 

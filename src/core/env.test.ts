@@ -18,3 +18,13 @@ describe('service keys', () => {
     expect(parseServerEnv({}).SUPABASE_SERVICE_ROLE_KEY).toBeUndefined()
   })
 })
+
+describe('storage and provider keys', () => {
+  it('treat blank values as unset and default the image model', () => {
+    const env = parseServerEnv({ R2_BUCKET: '', OPENAI_API_KEY: '', OPENAI_IMAGE_MODEL: '', VERCEL_ENV: '' })
+    expect(env.R2_BUCKET).toBeUndefined()
+    expect(env.OPENAI_API_KEY).toBeUndefined()
+    expect(env.VERCEL_ENV).toBeUndefined()
+    expect(env.OPENAI_IMAGE_MODEL).toBe('gpt-image-2.5-sunburst')
+  })
+})
