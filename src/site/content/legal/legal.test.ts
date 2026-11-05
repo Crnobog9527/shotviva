@@ -1,0 +1,78 @@
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
+
+import { describe, expect, it } from 'vitest'
+
+import type { LegalBlock, LegalLink, LegalPage } from '@/core/content'
+import { NOINDEX, pageMetadata, pageSitemapUrls } from '@/core/seo'
+
+import { site } from '../../site.config'
+import { pageGates } from '../index'
+import { footerLinks, legalPages } from './index'
+
+const PATHS = ['/terms', '/privacy', '/refund-policy', '/acceptable-use']
+
+function blockLinks(block: LegalBlock): LegalLink[] {
+  if (typeof block === 'string') return []
+  if (Array.isArray(block)) return block.filter((part): part is LegalLink => typeof part !== 'string')
+  if ('list' in block) return block.list.flatMap((item) => blockLinks(item))
+  return []
+}
+
+function pageLinks(page: LegalPage): LegalLink[] {
+  return [...page.intro, ...page.sections.flatMap((s) => s.blocks)].flatMap(blockLinks)
+}
+
+describe('legal pages (T19)', () => {
+  it('has the four pages, all linked from the footer', () => {
+    expect(legalPages.map((p) => p.path)).toEqual(PATHS)
+    expect(footerLinks.map((l) => l.href)).toEqual(PATHS)
+  })
+
+  it.each(PATHS)('%s is noindex through the global switch and stays out of the sitemap', (path) => {
+    const page = legalPages.find((p) => p.path === path)!
+    expect(site.indexing.indexablePaths).not.toContain(path)
+    expect(pageMetadata(site, page).robots).toEqual(NOINDEX)
+    expect(pageSitemapUrls(site, pageGates).some((url) => url.endsWith(path))).toBe(false)
+  })
+
+  it('uses unique section anchors on every page', () => {
+    for (const page of legalPages) {
+      const ids = page.sections.map((s) => s.id)
+      expect(new Set(ids).size).toBe(ids.length)
+    }
+  })
+
+  it('links only to pages that exist, our own email or https', () => {
+    const known = new Set([...PATHS, '/pricing'])
+    for (const link of legalPages.flatMap(pageLinks)) {
+      if (link.href.startsWith('/')) expect(known).toContain(link.href)
+      else if (link.href.startsWith('mailto:')) expect(link.href).toBe(`mailto:${site.brand.contactEmail}`)
+      else expect(link.href).toMatch(/^https:\/\//)
+    }
+  })
+
+  it('ends every page with the entity contact details from site.config', () => {
+    for (const page of legalPages) {
+      const contact = page.sections.at(-1)!
+      expect(contact.id).toBe('contact')
+      const text = JSON.stringify(contact.blocks)
+      expect(text).toContain(site.brand.legalName)
+      expect(text).toContain(site.brand.address.street)
+      expect(text).toContain(site.brand.contactEmail)
+    }
+  })
+
+  // Pages read the entity from config; a literal would go stale when a site swaps site/.
+  it('never hard-codes entity facts or Graylum contact details in the text files', () => {
+    const dir = join(process.cwd(), 'src', 'site', 'content', 'legal')
+    const files = readdirSync(dir).filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+    const { brand } = site
+    for (const file of files) {
+      const source = readFileSync(join(dir, file), 'utf8')
+      for (const literal of [brand.legalName, brand.contactEmail, brand.address.street, 'graylum.com']) {
+        expect(source, `${file} contains "${literal}"`).not.toContain(literal)
+      }
+    }
+  })
+})

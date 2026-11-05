@@ -5,7 +5,11 @@ export const site = defineSite({
     name: 'Shotviva',
     domain: 'shotviva.com',
     tagline: 'AI food & product photo studio',
-    contactEmail: 'hello@shotviva.com',
+    // Owner 2026-11-05 (T19). Footer and legal pages read these, never a literal.
+    legalName: 'Grayscale Luminary LLC',
+    registeredIn: 'Wyoming, United States',
+    address: { street: '75 E 3rd St', locality: 'Sheridan', region: 'WY', postalCode: '82801', country: 'United States' },
+    contactEmail: 'support@shotviva.com',
     launchYear: 2026,
     countries: ['United States'],
     // Placeholder until T6 ships a real logo asset.

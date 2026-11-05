@@ -42,7 +42,12 @@ describe('json-ld', () => {
   })
 
   it('builds organization and breadcrumbs from config', () => {
-    expect(organizationLd(site)).toMatchObject({ name: 'Example', url: 'https://example.com/' })
+    expect(organizationLd(site)).toMatchObject({
+      name: 'Example',
+      legalName: 'Example LLC',
+      url: 'https://example.com/',
+      address: { '@type': 'PostalAddress', addressLocality: 'Springfield', postalCode: '62701' },
+    })
     const crumbs = breadcrumbListLd(site, [
       { name: 'Home', path: '/' },
       { name: 'Page', path: '/x' },
