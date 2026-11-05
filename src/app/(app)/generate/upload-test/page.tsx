@@ -3,7 +3,7 @@ import { Suspense } from 'react'
 
 import { createServerSupabase, requireUser } from '@/core/auth'
 import { serverEnv } from '@/core/env'
-import { listTemplates } from '@/core/templates'
+import { listTemplates, OUTPUT_ASPECTS } from '@/core/templates'
 import { UploadTestPanel } from '@/modules/image'
 
 // TEMPORARY T4 validation harness for Codex (upload → generate → download on real phones).
@@ -15,7 +15,8 @@ async function Harness() {
   const options = templates.map((template) => ({
     id: template.id,
     name: template.name,
-    aspectRatios: template.fields.aspectRatios,
+    // The web offers the eight output sizes whatever the template lists (DESIGN §4.3).
+    aspectRatios: [...OUTPUT_ASPECTS],
     copyKeys: template.fields.copy.map((field) => field.key),
   }))
   return <UploadTestPanel templates={options} />

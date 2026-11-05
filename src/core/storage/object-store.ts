@@ -11,7 +11,8 @@ export type ObjectStore = {
   // null when the object does not exist.
   head(key: string): Promise<ObjectHead | null>
   get(key: string): Promise<Uint8Array>
-  put(key: string, body: Uint8Array, contentType: string): Promise<void>
+  // cacheControl: only for content-hashed public files (template covers), which never change.
+  put(key: string, body: Uint8Array, contentType: string, options?: { cacheControl?: string }): Promise<void>
   delete(key: string): Promise<void>
   deletePrefix(prefix: string): Promise<void>
 }

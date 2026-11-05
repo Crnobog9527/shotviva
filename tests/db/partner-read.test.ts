@@ -58,7 +58,7 @@ describe('GET /api/partner/jobs/{id}', () => {
 
     const own = await handleJob(partnerRequest(`/api/partner/jobs/${created.job_id}`, { account: owner }), deps, created.job_id)
     expect(own.status).toBe(200)
-    expect(await own.json()).toMatchObject({ job_id: created.job_id, status: 'succeeded', credits_charged: 1, error: null })
+    expect(await own.json()).toMatchObject({ job_id: created.job_id, status: 'succeeded', credits_charged: 2, error: null })
 
     const foreign = await handleJob(partnerRequest('/x', { account: other }), deps, created.job_id)
     expect(foreign.status).toBe(404)

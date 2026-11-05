@@ -5,7 +5,15 @@ import { randomUUID } from 'node:crypto'
 import type { ServerTrack } from '../analytics'
 import { AppError } from '../errors'
 import { isOwnInputKey, loadInputImage, outputKeyFor } from '../storage'
-import { loadGenerationTemplate, renderPrompt, validateGenerationInputs, type TemplateSurface } from '../templates'
+import {
+  DEFAULT_RESOLUTION,
+  loadGenerationTemplate,
+  OUTPUT_ASPECTS,
+  renderPrompt,
+  validateGenerationInputs,
+  type Resolution,
+  type TemplateSurface,
+} from '../templates'
 import { settleTracked } from './generation-analytics'
 import type { GenerationRequest } from './generation-request'
 import { findOwnJob } from './job-lookup'
@@ -20,6 +28,10 @@ export type GenerationDeps = SettleDeps & { now?: () => Date; track?: ServerTrac
 
 const SURFACE: Record<JobSource, TemplateSurface> = { web: 'web', graylum: 'partner' }
 
+// The web offers the eight output sizes; the partner route keeps each template's own ratios
+// (undefined → template.fields.aspectRatios), as its published contract says.
+const ASPECTS: Record<JobSource, readonly string[] | undefined> = { web: OUTPUT_ASPECTS, graylum: undefined }
+
 // Everything that can be rejected without touching credits: template, fields, key
 // ownership, rate limit, then the stored upload itself (HEAD + bytes; bad ones are deleted).
 async function prepare(deps: GenerationDeps, req: GenerationRequest) {
@@ -27,13 +39,31 @@ async function prepare(deps: GenerationDeps, req: GenerationRequest) {
   const inputs = validateGenerationInputs(template.fields, {
     copy: req.copy,
     aspectRatio: req.aspectRatio,
+    note: req.note,
     imageCount: req.inputKey ? 1 : 0,
+    aspects: ASPECTS[req.source],
   })
   // Never touch (or delete) an object outside the caller's own inputs/ prefix.
   if (req.inputKey && !isOwnInputKey(req.userId, req.inputKey)) throw new AppError('INVALID_INPUT', 'Unknown upload')
   await assertWithinRateLimit(deps.db, req.userId, deps.now?.() ?? new Date())
   const image = req.inputKey ? await loadInputImage(deps.store, req.inputKey) : null
   return { template, prompt, inputs, image }
+}
+
+type Prepared = Awaited<ReturnType<typeof prepare>>
+
+// User content only; the wrapped prompt stays in template_prompts (ARCHITECTURE §4).
+// reserve_credits charges templates.credits_cost[resolution] from this very object.
+function jobInputs(req: GenerationRequest, { inputs, prompt }: Prepared, resolution: Resolution, attemptId: string) {
+  return {
+    copy: inputs.copy,
+    aspect_ratio: inputs.aspectRatio,
+    resolution,
+    ...(inputs.note ? { note: inputs.note } : {}),
+    input_key: req.inputKey ?? null,
+    prompt_version: prompt.version,
+    attempt_id: attemptId,
+  }
 }
 
 // Synchronous generation (ARCHITECTURE §4) shared by the web route and, later, the partner
@@ -44,9 +74,11 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
     const existing = await findOwnJob(deps.db, req.userId, req.jobId)
     if (existing) return toJobView(existing)
   }
-  const { template, prompt, inputs, image } = await prepare(deps, req)
+  const prepared = await prepare(deps, req)
+  const { template, prompt, inputs, image } = prepared
 
   const jobId = req.jobId ?? randomUUID()
+  const resolution = req.resolution ?? DEFAULT_RESOLUTION
   // Marks which request created the row: two concurrent requests with one job id both get
   // the row back from reserve_credits (charged once), but only the creator calls the provider.
   const attemptId = randomUUID()
@@ -55,19 +87,11 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
     userId: req.userId,
     module: template.module,
     templateId: template.id,
-    creditsCost: template.creditsCost,
     source: req.source,
     provider: deps.provider.id,
     idempotencyKey: req.idempotencyKey ?? null,
     visibility: req.visibility ?? null,
-    // User content only; the wrapped prompt stays in template_prompts (ARCHITECTURE §4).
-    inputs: {
-      copy: inputs.copy,
-      aspect_ratio: inputs.aspectRatio,
-      input_key: req.inputKey ?? null,
-      prompt_version: prompt.version,
-      attempt_id: attemptId,
-    },
+    inputs: jobInputs(req, prepared, resolution, attemptId),
   })
   if (job.inputs.attempt_id !== attemptId) return toJobView(job)
 
@@ -75,6 +99,8 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
     prompt: renderPrompt(prompt.body, inputs),
     images: image ? [image] : [],
     aspectRatio: inputs.aspectRatio,
+    resolution,
+    quality: template.quality,
     params: prompt.modelParams,
   }
   const settle = () => settleGeneration(deps, job, call, outputKeyFor(req.userId, job.id))

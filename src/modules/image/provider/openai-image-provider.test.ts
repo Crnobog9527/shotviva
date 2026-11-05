@@ -11,6 +11,8 @@ const input = (overrides: Partial<ProviderInput> = {}): ProviderInput => ({
   prompt: PROMPT,
   images: [{ bytes: new Uint8Array([0xff, 0xd8, 0xff]), contentType: 'image/jpeg' }],
   aspectRatio: '4:5',
+  resolution: '1k',
+  quality: 'high',
   params: {},
   signal: new AbortController().signal,
   ...overrides,
@@ -25,7 +27,7 @@ function provider(fetchImpl: typeof fetch) {
 describe('openai image provider', () => {
   it('sends a multipart edit with the photo and returns the PNG', async () => {
     const fetchImpl = vi.fn(async () => json({ data: [{ b64_json: PNG_B64 }] }))
-    const output = await provider(fetchImpl).generate(input({ params: { quality: 'high', model: 'gpt-image-2.5-flare', foo: 1 } }))
+    const output = await provider(fetchImpl).generate(input({ params: { model: 'gpt-image-2.5-flare', foo: 1 } }))
     expect(output.contentType).toBe('image/png')
     expect([...output.bytes]).toEqual([0x89, 0x50, 0x4e, 0x47])
 
@@ -34,7 +36,7 @@ describe('openai image provider', () => {
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer sk-test')
     const form = init.body as FormData
     expect(form.get('model')).toBe('gpt-image-2.5-flare')
-    expect(form.get('size')).toBe('1232x1536')
+    expect(form.get('size')).toBe('912x1136')
     expect(form.get('quality')).toBe('high')
     expect(form.get('output_format')).toBe('png')
     expect(form.get('foo')).toBeNull()
@@ -46,7 +48,23 @@ describe('openai image provider', () => {
     await provider(fetchImpl).generate(input({ images: [] }))
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toBe('https://api.openai.com/v1/images/generations')
-    expect(JSON.parse(init.body as string)).toMatchObject({ model: 'gpt-image-2.5-sunburst', n: 1, size: '1232x1536' })
+    expect(JSON.parse(init.body as string)).toMatchObject({ model: 'gpt-image-2.5-sunburst', n: 1, size: '912x1136' })
+  })
+
+  it('sends the template quality, not model_params, and sizes by tier × ratio', async () => {
+    const fetchImpl = vi.fn(async () => json({ data: [{ b64_json: PNG_B64 }] }))
+    await provider(fetchImpl).generate(input({ quality: 'medium', resolution: '3k', aspectRatio: '16:9', params: { quality: 'low' } }))
+    const form = (fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body as FormData
+    expect(form.get('quality')).toBe('medium')
+    expect(form.get('size')).toBe('3840x2160')
+  })
+
+  it("follows the photo's own ratio for 'original'", async () => {
+    const fetchImpl = vi.fn(async () => json({ data: [{ b64_json: PNG_B64 }] }))
+    const photo = { bytes: new Uint8Array([0xff, 0xd8, 0xff]), contentType: 'image/jpeg', width: 2048, height: 1536 }
+    await provider(fetchImpl).generate(input({ aspectRatio: 'original', resolution: '2k', images: [photo] }))
+    const form = (fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body as FormData
+    expect(form.get('size')).toBe('2352x1760')
   })
 
   it('maps a safety refusal to content_rejected and other errors to failed, without the prompt', async () => {

@@ -7,7 +7,8 @@ import { callRpc, type RpcClient } from '@/core/billing'
 import { JOB_MODULES, JOB_SOURCES, JOB_VISIBILITIES, jobRowSchema, type Job, type JobVisibility } from './job-schema'
 
 // Synchronous generation settlement (ARCHITECTURE §4): reserveJob before calling the
-// provider, then exactly one of confirmJob / refundJob. Each is idempotent by job id, so
+// provider, then exactly one of confirmJob / refundJob. The charge is decided in the database
+// from the template and inputs.resolution, never by the caller. Each is idempotent by job id, so
 // retrying any step after a network error is safe.
 
 const reserveSchema = z.object({
@@ -15,7 +16,6 @@ const reserveSchema = z.object({
   userId: z.uuid(),
   module: z.enum(JOB_MODULES),
   templateId: z.string().min(1),
-  creditsCost: z.number().int().positive(),
   source: z.enum(JOB_SOURCES),
   inputs: z.record(z.string(), z.unknown()).default({}),
   provider: z.string().min(1).nullable().default(null),
@@ -37,7 +37,8 @@ export async function reserveJob(client: RpcClient, input: ReserveJobInput): Pro
       p_user_id: args.userId,
       p_module: args.module,
       p_template_id: args.templateId,
-      p_credits_cost: args.creditsCost,
+      // Ignored since T16: reserve_credits reads templates.credits_cost[inputs.resolution].
+      p_credits_cost: null,
       p_source: args.source,
       p_inputs: args.inputs,
       p_provider: args.provider,

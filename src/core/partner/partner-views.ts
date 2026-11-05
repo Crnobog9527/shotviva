@@ -44,7 +44,8 @@ export function toPartnerTemplate(template: Template): PartnerTemplate {
     category: template.category,
     cover_before_url: template.coverBeforeUrl || null,
     cover_after_url: template.coverAfterUrl || null,
-    credits_cost: template.creditsCost,
+    // Partner jobs are always Standard ('1k'), so that is the one price the contract shows.
+    credits_cost: template.creditsCost['1k'],
     fields: {
       images: template.fields.images,
       copy: template.fields.copy.map((field) => ({

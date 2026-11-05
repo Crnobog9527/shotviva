@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { NOTE_MAX_LENGTH, OUTPUT_ASPECTS, RESOLUTIONS, type Resolution } from '../templates/output-options'
 import { JOB_VISIBILITIES, type JobSource, type JobVisibility } from './job-schema'
 
 // Body of POST /api/generate. job_id is optional and client-made so a retried or
@@ -11,7 +12,17 @@ export const generateBodySchema = z.object({
   inputs: z
     .object({
       copy: z.record(z.string(), z.unknown()).optional(),
-      aspect_ratio: z.string().max(8).optional(),
+      // One of the eight output sizes (DESIGN §4.3); omitted means 'original'.
+      aspect_ratio: z.enum(OUTPUT_ASPECTS).optional(),
+      // Standard / HD / Max; omitted means '1k'. Anything else is a 422.
+      resolution: z.enum(RESOLUTIONS).optional(),
+      // "Anything to change? (optional)"; blank is the same as absent.
+      note: z
+        .string()
+        .trim()
+        .max(NOTE_MAX_LENGTH)
+        .transform((note) => note || undefined)
+        .optional(),
     })
     .default({}),
   visibility: z.enum(JOB_VISIBILITIES).optional(),
@@ -25,6 +36,9 @@ export type GenerationRequest = {
   inputKey?: string | null
   copy?: Record<string, unknown>
   aspectRatio?: string
+  // Web only: the partner route is fixed at '1k' with no note (ARCHITECTURE §14.6).
+  resolution?: Resolution
+  note?: string
   // Applies to paid works only; reserve_credits forces free works public.
   visibility?: JobVisibility | null
   // Partner callId (T7); a repeat returns the first job.
@@ -40,6 +54,8 @@ export function toGenerationRequest(userId: string, body: z.infer<typeof generat
     inputKey: body.input_key ?? null,
     copy: body.inputs.copy,
     aspectRatio: body.inputs.aspect_ratio,
+    resolution: body.inputs.resolution,
+    note: body.inputs.note,
     visibility: body.visibility ?? null,
   }
 }

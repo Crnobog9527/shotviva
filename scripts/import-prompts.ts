@@ -7,6 +7,7 @@
  * Needs NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (e.g. from .env.local).
  * Format: scripts/prompts.example.json. Real prompts never go into git (AGENTS §5).
  * Re-running is safe: rows are upserted by id; omitted sortOrder / isActive keep stored values.
+ * Prices below the floor table (modules/image/credits-floor.ts) are refused, as in the admin page.
  */
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -15,7 +16,9 @@ import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { toUpsertArgs } from '../src/core/admin/templates/rpc-payload'
+import { creditsBelowFloor } from '../src/core/templates/pricing'
 import { templateWithPromptSchema } from '../src/core/templates/schema'
+import { CREDITS_FLOOR } from '../src/modules/image/credits-floor'
 
 const fileSchema = z.object({ templates: z.array(templateWithPromptSchema).min(1) })
 
@@ -29,6 +32,13 @@ function readTemplates(path: string) {
   if (!parsed.success) {
     const detail = parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`)
     throw new Error(`Invalid ${path}:\n  ${detail.join('\n  ')}`)
+  }
+  for (const template of parsed.data.templates) {
+    const low = creditsBelowFloor(template.quality, template.creditsCost, CREDITS_FLOOR)
+    if (low.length > 0) {
+      const detail = low.map((v) => `${v.resolution} ${v.given} < floor ${v.floor}`).join(', ')
+      throw new Error(`${template.id}: credits below the floor (${detail})`)
+    }
   }
   return parsed.data.templates
 }

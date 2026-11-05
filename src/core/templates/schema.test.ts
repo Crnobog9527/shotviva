@@ -7,13 +7,25 @@ const base = {
   name: 'Pizza top-down',
   category: 'pizza',
   visibleIn: ['web'],
+  creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
   fields: { images: { min: 1, max: 1 }, aspectRatios: ['1:1'] },
 }
 
 describe('template schema', () => {
   it('accepts a minimal template and fills defaults', () => {
     const parsed = templateInputSchema.parse(base)
-    expect(parsed).toMatchObject({ module: 'image', creditsCost: 1, fields: { copy: [] } })
+    expect(parsed).toMatchObject({ module: 'image', quality: 'high', fields: { copy: [] } })
+  })
+
+  it('requires all three per-resolution prices as positive integers, nothing else', () => {
+    const cost = (creditsCost: unknown) => templateInputSchema.safeParse({ ...base, creditsCost }).success
+    expect(cost({ '1k': 1, '2k': 2, '3k': 3 })).toBe(true)
+    expect(cost(2)).toBe(false)
+    expect(cost({ '1k': 1, '2k': 2 })).toBe(false)
+    expect(cost({ '1k': 1, '2k': 2, '3k': 3, '4k': 4 })).toBe(false)
+    expect(cost({ '1k': 0, '2k': 2, '3k': 3 })).toBe(false)
+    expect(cost({ '1k': 1.5, '2k': 2, '3k': 3 })).toBe(false)
+    expect(templateInputSchema.safeParse({ ...base, quality: 'low' }).success).toBe(false)
   })
 
   it('rejects bad ids, empty surfaces and unknown surfaces', () => {

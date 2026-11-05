@@ -47,6 +47,12 @@ function Result({ fileUrl }: { fileUrl: string }) {
   )
 }
 
+const RESOLUTION_OPTIONS = [
+  { id: '1k', label: 'Standard' },
+  { id: '2k', label: 'HD' },
+  { id: '3k', label: 'Max' },
+]
+
 const NO_TEMPLATE: TestTemplate = { id: '', name: '', aspectRatios: ['1:1'], copyKeys: [] }
 
 function CopyInputs({ keys, copy, onChange }: { keys: string[]; copy: Record<string, string>; onChange(next: Record<string, string>): void }) {
@@ -64,12 +70,13 @@ export function UploadTestPanel({ templates }: { templates: TestTemplate[] }) {
   const template = templates.find((item) => item.id === templateId) ?? NO_TEMPLATE
   const [aspect, setAspect] = useState(template.aspectRatios[0] as string)
   const [copy, setCopy] = useState<Record<string, string>>({})
+  const [resolution, setResolution] = useState('1k')
 
   async function run(retry: boolean) {
     const key = retry ? inputKey : file && (await send(file))
     if (!key) return
     setInputKey(key)
-    await generate({ template_id: templateId, input_key: key, inputs: { copy, aspect_ratio: aspect } })
+    await generate({ template_id: templateId, input_key: key, inputs: { copy, aspect_ratio: aspect, resolution } })
   }
 
   const fileUrl = generation.phase === 'succeeded' ? generation.job.file_url : null
@@ -79,6 +86,7 @@ export function UploadTestPanel({ templates }: { templates: TestTemplate[] }) {
       <input type="file" accept={UPLOAD_ACCEPT} onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
       <Options values={templates.map((t) => ({ id: t.id, label: t.name }))} value={templateId} onChange={setTemplateId} />
       <Options values={template.aspectRatios.map((r) => ({ id: r, label: r }))} value={aspect} onChange={setAspect} />
+      <Options values={RESOLUTION_OPTIONS} value={resolution} onChange={setResolution} />
       <CopyInputs keys={template.copyKeys} copy={copy} onChange={setCopy} />
       <button type="button" disabled={!file || !templateId} onClick={() => run(false)}>Generate</button>
       <button type="button" disabled={!inputKey} onClick={() => run(true)}>Retry with same photo</button>

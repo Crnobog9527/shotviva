@@ -79,8 +79,10 @@ export function createR2Store(client: S3Like, bucket: string, presign: Presign =
       if (!result.Body) throw new Error('R2 get returned no body')
       return result.Body.transformToByteArray()
     },
-    async put(key, body, contentType) {
-      await client.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ContentType: contentType }))
+    async put(key, body, contentType, options) {
+      await client.send(
+        new PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ContentType: contentType, CacheControl: options?.cacheControl }),
+      )
     },
     async delete(key) {
       await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
@@ -90,17 +92,32 @@ export function createR2Store(client: S3Like, bucket: string, presign: Presign =
 }
 
 let cached: ObjectStore | undefined
+let cachedPublic: ObjectStore | undefined
+
+function r2Credentials() {
+  const { R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY } = serverEnv()
+  if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY) return null
+  return { accountId: R2_ACCOUNT_ID, accessKeyId: R2_ACCESS_KEY_ID, secretAccessKey: R2_SECRET_ACCESS_KEY }
+}
 
 // The configured bucket. Throws INTERNAL (not a silent no-op) when R2 is not set up, so
 // e.g. account deletion fails loudly instead of leaving photos behind.
 export function r2Store(): ObjectStore {
   if (cached) return cached
-  const env = serverEnv()
-  const { R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET } = env
-  if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET) {
-    throw new AppError('INTERNAL', 'R2 storage is not configured')
-  }
-  const client = createR2Client({ accountId: R2_ACCOUNT_ID, accessKeyId: R2_ACCESS_KEY_ID, secretAccessKey: R2_SECRET_ACCESS_KEY })
-  cached = createR2Store(client, R2_BUCKET)
+  const credentials = r2Credentials()
+  const { R2_BUCKET } = serverEnv()
+  if (!credentials || !R2_BUCKET) throw new AppError('INTERNAL', 'R2 storage is not configured')
+  cached = createR2Store(createR2Client(credentials), R2_BUCKET)
   return cached
+}
+
+// The public assets bucket (template covers only; ARCHITECTURE §8.3). Nothing user-owned is
+// ever written here: only core/admin/covers calls it, and only under covers/.
+export function r2PublicStore(): ObjectStore {
+  if (cachedPublic) return cachedPublic
+  const credentials = r2Credentials()
+  const { R2_PUBLIC_BUCKET } = serverEnv()
+  if (!credentials || !R2_PUBLIC_BUCKET) throw new AppError('INTERNAL', 'R2 public assets bucket is not configured')
+  cachedPublic = createR2Store(createR2Client(credentials), R2_PUBLIC_BUCKET)
+  return cachedPublic
 }
