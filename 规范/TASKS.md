@@ -405,8 +405,9 @@
 1. 路由：next-intl 开 `zh`，英文不带前缀、中文 `/zh`；中间件只认地址和 `NEXT_LOCALE` Cookie，不按浏览器语言或 IP 自动跳转；浏览器语言为中文的访客在英文页看到可关闭的「切换到中文」提示；页头 / 页脚语言切换器（真实 `<a href>`）。`<html lang>`、hreflang（`en` / `zh-Hans` / `x-default`）、每种语言独立 sitemap；`/zh` 页默认 noindex，T22 的中文主词表合并后，表里的页面放开收录。
 2. 文案：`site/messages/zh.json` 补齐全部界面文字；首页、`/image-to-image-generator`、`/pricing` 等营销页的中文正文放 `site/content/`（直答块、FAQ、Title、Description 按中文真实问法写，不机器直译，建站规格 G13；收录页的主词以 T22 为准）；四个法律页中文版加「以英文版本为准」声明；付费墙「支付宝」；Stripe Checkout 传 `locale`。
 3. 模板：迁移（编号段 `0120`～`0139`，先合并本卡的 [spec] 定义再写）给 `templates` 加 `translations jsonb not null default '{}'`（ARCHITECTURE §5 结构，check 约束只允许已启用语言的键）；`admin_upsert_template` 读写它；公开查询按当前语言取名称和说明，缺项回退英文；后台模板编辑页加中文名称 / 说明 / 字段标签输入。
-4. 邮件：注册时把当前语言写进 `user_metadata.locale`；`supabase/templates/*.html` 四个模板加中文分支（ARCHITECTURE §7）；本地 Supabase + Mailpit 验证中英两种；PR 里给 Owner 写好重新粘贴的步骤。
-5. 埋点：PostHog 事件带 `locale`（ARCHITECTURE §16）。
+4. 字体：按 ARCHITECTURE §17「字体」一条移植 MiSans。分包文件从 Graylum staging 分支 `apps/web/public/fonts/misans/` 原样复制（含 manifest、LICENSE、NOTICE），用 `manifest.json` 的 SHA-256 逐个校验。另外要做的：加载组件、immutable 缓存头、中间件排除、字体栈、页脚署名。英文页面不应因此多下载中文分包（用浏览器网络面板确认）。
+5. 邮件：注册时把当前语言写进 `user_metadata.locale`；`supabase/templates/*.html` 四个模板加中文分支（ARCHITECTURE §7）；本地 Supabase + Mailpit 验证中英两种；PR 里给 Owner 写好重新粘贴的步骤。
+6. 埋点：PostHog 事件带 `locale`（ARCHITECTURE §16）。
 
 **不许动**：价格和积分规则、提示词（始终英文）、付费墙结构（T9）。**依据**：ARCHITECTURE §5、§7、§16、§17；建站规格 §6、G3、G13、R4；DESIGN §3.2、§4.5；LAUNCH §7.6。**验收**：LAUNCH §7.6 全部条目（Codex 验收，中文页 375px 和 1280px 截图）。**依赖**：T8（界面组件稳定后再加语言）、T11、T19。
 

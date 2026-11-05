@@ -18,7 +18,7 @@ export function GoogleButton({ action, next }: { action: FormAction; next: strin
       <button
         type="submit"
         disabled={pending}
-        className="h-12 w-full rounded-md border border-neutral-300 text-base font-medium disabled:opacity-60"
+        className="h-12 w-full rounded-md border border-input text-base font-medium disabled:opacity-60"
       >
         {t('google')}
       </button>

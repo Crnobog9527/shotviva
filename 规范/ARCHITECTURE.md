@@ -490,11 +490,25 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 
 ### 15.3 数据
 
-- `template_requests`：`id`、`user_id`、`description`、`image_keys text[]`、`status`（pending / live / rejected / shipped）、`template_id`（可空）、`votes_count`、`created_at`、`reviewed_at`。
-- `template_request_votes`：`request_id`、`user_id`，联合唯一。
-- RLS：`live` / `shipped` 对所有登录用户可读；`pending` / `rejected` 只有本人和 admin；写只经服务端。
-- 投票用一个 SQL 函数：存在即删除并 `votes_count - 1`，不存在即插入并 `+ 1`，函数内检查门槛。
-- 发帖的服务端路由同样检查门槛，并按账号限频（复用现有限频）。
+（总控 2026-11-06 按 T12 的设计补全）
+
+- `template_requests`：`id`、`user_id`、`description`（≤300）、`image_keys text[]`、`status`（pending / live / rejected / shipped）、`template_id`（可空）、`votes_count`、`author_label`、`created_at`、`reviewed_at`。
+  - `author_label`：发帖时在 SQL 里生成，取显示名首字加 `***`，没有显示名就用邮箱首字。墙上只读这一列，任何查询都不碰 `auth.users`。
+  - 约束：
+    - `rejected` 时 `image_keys` 为空（参考图已删），其他状态 1～3 张；
+    - `shipped` ⇔ `template_id` 非空；
+    - `pending` ⇔ `reviewed_at` 为空；
+    - `shipped` 只能从 `live` 转过来。
+- `template_request_votes`：`request_id`、`user_id`、`weight smallint`，`(request_id, user_id)` 联合唯一。`weight` 是投票那一刻按 `current_tier()` 快照的票数（Max 为 3，其余为 1）；取消投票按快照的票数减，会员到期也不会让计数虚高。
+- `votes_count` 由 votes 表的 insert / delete 触发器维护，等于该需求所有 `weight` 之和。投票人删号、级联删票时，计数同步减。
+- RLS：`live` / `shipped` 对所有登录用户可读；`pending` / `rejected` 只有本人和 admin 可读；写只经服务端。
+- SQL 函数（全部只授权 `service_role`）：
+  - `wishlist_eligible(user)`：是否至少成功出过 1 张图；
+  - `create_template_request(user, description, keys)`：函数内检查门槛、封禁、按账号限频（24 小时内最多 5 条）；
+  - `toggle_template_request_vote(request, user)`：只限 `live`，有票删票，没票按快照 `weight` 插入，函数内检查门槛；
+  - `admin_review_template_request(request, status, template_id)`；
+  - `admin_list_template_requests()`：带邮箱，后台用。
+- 参考图：浏览器先走现有 `/api/uploads` 传到 `inputs/`（没发帖的 7 天后自动清）。发帖时服务端用 `sharp` 重新编码，去掉 EXIF / GPS 后写到 `requests/{user_id}/{uuid}.jpg`，因为墙上的图别人看得到。被拒、下架、删号时服务端删除。
 
 ### 15.4 不做
 
@@ -557,6 +571,19 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 - **付款**：中文页付款方式写「支付宝」，英文页写 "Alipay"（DESIGN §4.5）；Stripe Checkout 托管页传 `locale`（`en` / `zh`）。
 - **法律页**：中文版是英文版的翻译，页首注明「本中文版本仅供参考，如与英文版本不一致，以英文版本为准」；律师审英文版。
 - **邮件**：见第 7 节，按 `user_metadata.locale` 发中文或英文。
-- **字体**：Geist / Instrument Serif 没有中文字形，中文用系统字体回退（DESIGN §3.2），不下载中文网页字体。
+- **字体：中文用小米 MiSans，照 Graylum 的做法移植**（Owner 2026-11-06；参考 `seo资料/全站中文字体.md`，以及 Graylum staging 分支的 `apps/web/public/fonts/misans/`、`src/components/misans-font.tsx`）：
+  - **文件**：官方未修改的静态 WOFF2 分包（简体中文 + 拉丁，400 / 500 / 600，约 168 个文件、5.8 MB），放在 `public/fonts/misans/`。
+    - 同目录保留 `manifest.json`（每个文件的来源、unicode-range、字节数、SHA-256）、汇总 CSS、`LICENSE.pdf`、`NOTICE.txt`、`README.md`。
+    - 文件名用内容哈希，不重新生成，也不重新子集化。
+  - **加载**：根布局挂一个客户端组件。hydration 后等两帧（两次 `requestAnimationFrame`），再往 `<head>` 插入 `<link rel="stylesheet" id="misans-font" href="/fonts/misans/misans-<hash>.css">`，用 id 防止重复插入。
+    - 汇总 CSS 里每个 `@font-face` 都带 `unicode-range` 和 `font-display: swap`。
+    - 首屏先用系统字体，浏览器只下载页面上实际用到的分包。
+    - 不 preload，不用 Google Fonts，也不用任何 CDN。
+  - **缓存**：只给 `/fonts/misans/*.woff2` 和 `*.css` 发 `Cache-Control: public, max-age=31536000, immutable`，NOTICE、PDF 不加。改字体必须换新哈希 URL。
+  - **路由**：中间件（`src/proxy.ts`）的 matcher 排除 `fonts/misans/`。这个目录不放私密文件。
+  - **署名（协议要求）**：营销页页脚写「本网站使用 MiSans 字体，版权归小米所有」（英文页写 "This site uses the MiSans font, © Xiaomi."），并链接 `/fonts/misans/LICENSE.pdf`。应用内页面不显示署名。
+  - **授权边界**：
+    - MiSans 只用于网页显示。服务端往图片上画字的地方（如水印 "Made with Shotviva"）不用 MiSans，以免变成「把字体嵌入导出文件」。
+    - 字体文件放在私有仓库，通过网站对外提供，和 Graylum 一样；律师审法律页时一并确认协议里的「再分发」条款（LAUNCH §8）。
 - **已知限制（写进 FAQ）**：中国大陆用户不开 VPN 用不了 Google 登录，用邮箱注册即可。
 
