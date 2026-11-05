@@ -7,7 +7,7 @@ import { serverEnv } from '@/core/env'
 import { partnerErrorResponse, type PartnerGenerateRouteDeps, type PartnerRouteDeps } from '@/core/partner'
 import { appOrigin } from '@/core/site-url'
 import { r2Store } from '@/core/storage'
-import { openaiImageProvider } from '@/modules/image'
+import { imageProvider } from '@/modules/image'
 import { site } from '@/site/site.config'
 
 // Wiring for /api/partner/*: service-role db (no user session on these routes, ARCHITECTURE
@@ -22,15 +22,16 @@ function partnerDeps(): PartnerRouteDeps {
   }
 }
 
-function partnerGenerateDeps(): PartnerGenerateRouteDeps {
-  return { ...partnerDeps(), provider: openaiImageProvider() }
+// Same provider resolution as /api/generate: the active row, else the env fallback.
+async function partnerGenerateDeps(): Promise<PartnerGenerateRouteDeps> {
+  return { ...partnerDeps(), provider: await imageProvider() }
 }
 
 // A missing secret throws while wiring; answer that in the partner error shape too.
-function withDeps<D>(make: () => D, route: string, run: (deps: D) => Promise<NextResponse>): Promise<NextResponse> | NextResponse {
+async function withDeps<D>(make: () => D | Promise<D>, route: string, run: (deps: D) => Promise<NextResponse>): Promise<NextResponse> {
   let deps: D
   try {
-    deps = make()
+    deps = await make()
   } catch (error) {
     return partnerErrorResponse(error, { route })
   }

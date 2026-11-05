@@ -12,7 +12,7 @@ const job: Job = {
   module: 'image',
   templateId: 'ramen-studio',
   inputs: { copy: { dish: 'tonkotsu ramen' }, input_key: 'inputs/u/k.jpg', resolution: '2k' },
-  provider: 'openai',
+  provider: 'env/gpt-image-2.6',
   source: 'web',
   idempotencyKey: null,
   status: 'running',
@@ -38,7 +38,12 @@ describe('generateEventProps', () => {
       error_code: null,
       source: 'web',
       duration_ms: 1235,
+      model: 'gpt-image-2.6',
     })
+  })
+
+  it('reports no model for a job written before T17', () => {
+    expect(generateEventProps({ ...job, provider: 'openai-image' }, 'food', { status: 'succeeded' }, 0).model).toBeNull()
   })
 
   it('treats a job without a resolution (pre-T16) as 1K', () => {
