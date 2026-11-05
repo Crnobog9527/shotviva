@@ -17,9 +17,14 @@ create policy "profiles_select_own" on public.profiles
   for select to authenticated
   using ((select auth.uid()) = id);
 
--- Grants are explicit: newer Supabase stacks no longer grant table access by default.
-revoke all on public.profiles from anon, authenticated;
+revoke insert, update, delete, truncate on public.profiles from anon, authenticated;
+
+-- Current Supabase projects no longer grant table privileges to the API roles by default,
+-- so each one is spelled out. Signed-in users read (RLS limits it to their own row); the
+-- service role may only fill signup_ip (ARCHITECTURE §7). Credits, role and paid_until change
+-- solely through security-definer functions, which run as the table owner.
 grant select on public.profiles to authenticated, service_role;
+grant update (signup_ip) on public.profiles to service_role;
 
 create function public.handle_new_user()
 returns trigger
