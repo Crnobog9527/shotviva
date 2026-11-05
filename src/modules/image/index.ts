@@ -2,6 +2,7 @@
 // and are only bundled for the browser when a client component imports them.
 export { createOpenAIImageProvider, IMAGE_ADAPTERS, imageProvider, outputSize, OUTPUT_SIZES } from './provider'
 export { CREDITS_FLOOR } from './credits-floor'
+export { GENERATION_COST_USD } from './generation-cost'
 export { useUpload, type UploadState } from './workspace/use-upload'
 export { checkPickedFile, uploadPhoto, UploadError, type UploadDeps, type UploadErrorCode } from './workspace/upload-photo'
 export { targetSize } from './workspace/compress-image'
@@ -15,6 +16,7 @@ export { ImageWorkspace, type WorkspaceProps } from './workspace/image-workspace
 export { WorkspaceHead } from './workspace/workspace-head'
 export { GenerationRunner } from './generation/generation-runner'
 export { GeneratingPill } from './generation/generating-pill'
+export { HideWhileGenerating } from './generation/hide-while-generating'
 export { PhotosTabBadge } from './generation/photos-tab-badge'
 export { RunningList } from './photos/running-list'
 export { DoneGrid } from './photos/done-grid'
