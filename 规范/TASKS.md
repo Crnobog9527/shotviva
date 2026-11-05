@@ -247,7 +247,7 @@
 
 ## T10 订阅续费、取消同步、Customer Portal（等 T9；首个付费用户满 30 天前上线）
 
-**目标**：`invoice.paid`（只认 `subscription_cycle`）→ `apply_subscription_renewal`（invoice id 幂等，`paid_until` 对齐 `period_end`）；`customer.subscription.updated / deleted` 更新镜像表；`charge.refunded` 记录 + Sentry 告警；账号页 Subscription 区块 + Customer Portal 链接。
+**目标**：`invoice.paid`（只认 `subscription_cycle`）→ `apply_subscription_renewal`（invoice id 幂等，`paid_until` 对齐 `period_end`）；`customer.subscription.updated / deleted` 更新镜像表；`charge.refunded` 和 `charge.dispute.created` 记录 + Sentry 告警；账号页 Subscription 区块 + Customer Portal 链接。
 
 **范围补充**：迁移编号段 `0100`～`0119`，新增 SQL 函数 `apply_subscription_renewal`（ARCHITECTURE §6.1），测试连本地 Supabase：同一 invoice 重发只发一次、`paid_until` 对齐 `period_end` 且不回退。
 
