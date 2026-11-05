@@ -5,22 +5,16 @@ export { testConnection, type ConnectionResult } from './connection-test'
 export {
   activateProvider,
   findProvider,
-  findProviderSecret,
+  deleteProvider,
+  findProviderRow,
   insertProvider,
   listProviders,
   loadActiveProviderRow,
   updateProvider,
   type ProviderWrite,
 } from './repository'
-export { resolveProvider } from './resolve'
-export {
-  decryptSecret,
-  encryptSecret,
-  lastFour,
-  parseSecretsKey,
-  ProviderSecretError,
-  ProviderSecretsKeyError,
-} from './secrets'
+export { apiKeySchema, readProviderKey, setProviderKey } from './keys'
+export { resolveProvider, type ReadProviderKey } from './resolve'
 export { PROVIDER_SETTING_REASONS, ProviderSettingError, type ProviderSettingReason } from './setting-error'
 export {
   DEFAULT_BASE_URL,
