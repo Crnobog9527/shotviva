@@ -6,6 +6,7 @@
 第2周,/ai-restaurant-menu,ai restaurant menu,260,45.8 中等,工具页+菜单模板+尺寸事实,出图可用，FAQ覆盖菜单尺寸问法
 第2周,/commercial-photography,commercial photography,3600,34.3 容易,替代方案页+成本对比,3张前后对比图+成本表
 第2周,/image-to-image-generator,image to image generator,2900,34.4 容易,工具页，隔离首页主词,不与首页抢词
+第1周,/pricing,shotviva pricing,查不到（新品牌词，未花积分查）,查不到,价格页：品牌导航词，不靠搜索量,价格数字全部从 site.config.ts 读（G3），源码可见；与首页、FAQ、结构化数据同一套口径
 第3周,/interior-photography,interior photography,590,33.1 容易,空间模板页（盘面最弱）,6个空间模板可用
 第3周,/architectural-photography,architectural photography,3600,40.3 中等,店铺外观/空间纵深,与interior互链
 第4周,/ai-food-photography,ai food photography 词族,50,42.6 中等,餐饮垂直落地页+词族聚合（不再是 GEO 核心页）,覆盖族内5个写法，FAQ放垂直页用户原话；首页 Food & Drink 分类直链
