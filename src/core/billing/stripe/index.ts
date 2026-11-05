@@ -14,7 +14,15 @@ export {
   type CheckoutRoute,
   type DesiredPrice,
 } from './catalog'
-export { CHECKOUT_LOCALES, CHECKOUT_RETURN, checkoutBodySchema, createCheckout, type CheckoutBody, type CheckoutDeps } from './checkout'
+export {
+  CHECKOUT_LOCALES,
+  CHECKOUT_RETURN,
+  checkoutBodySchema,
+  createCheckout,
+  successPath,
+  type CheckoutBody,
+  type CheckoutDeps,
+} from './checkout'
 export { managedPaymentsEnabled, stripeClient, stripeWebhookSecret, type StripeApi } from './client'
 export { fulfilCheckoutSession, type FulfilDeps, type FulfilOutcome } from './fulfil'
 export { handleStripeWebhook, type WebhookDeps, type WebhookResult } from './webhook'
