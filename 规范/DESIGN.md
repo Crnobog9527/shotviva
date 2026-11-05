@@ -120,6 +120,17 @@ Owner 2026-11-04 确定：**先走浅色系，不刻意贴合食物。** 界面�
 
 每个列表都要有空状态：一句话说明 + 一个按钮（例如「我的作品」为空 → "Create your first photo"）。404 页给出首页和模板库入口。
 
+### 4.7 模板需求墙（Wishlist tab）
+
+规则见 ARCHITECTURE.md 第 15 节，这里只写界面。
+
+- **墙页**（tab 根页）：顶栏标题 "Wishlist" + 右侧「My requests」入口；底部固定主按钮 "Request a template"（未达门槛时灰掉，下方一行 "Create one photo first to join"）。卡片列表按票数倒序：参考图（多张时横滑）、描述、脱敏用户名、右下角 "I want this too" 按钮 + 计数，已投票为选中态。`shipped` 卡片置顶，顶部一条 "Shipped →" 带模板名，点击进该模板的工作台。
+- **发帖**（流程页，隐藏 tab bar）：上传区（1～3 张，复用工作台的上传按钮区和三段状态）→ 一个多行文本框（占位 "Describe the look you want, e.g. a dark moody poster for our weekend brunch menu"，计数 ≤300）→ 底部固定 "Submit"。提交成功后回墙页并 toast "Sent for review"。
+- **My requests**（流程页）：本人需求列表，每条带状态标签 Pending / Live / Shipped / Rejected，Rejected 不显示原因。
+- 空状态：墙空时显示 "Tell us what template you need" + 发帖按钮；My requests 空时 "You haven't requested anything yet"。
+- 参考图点击全屏查看，长按不承担功能（第 8.3 节）。
+- 后台需求审核页豁免 impeccable，按第 7 节用 shadcn 基础组件、中文。
+
 ## 5. 文案语气
 
 - 用简单英文，句子短，面向小餐馆老板，不写行业黑话。
@@ -153,13 +164,13 @@ Owner 2026-11-04 确定：**先走浅色系，不刻意贴合食物。** 界面�
 | 类型 | 页面 | 壳 |
 |---|---|---|
 | **营销页**（走 SEO） | 首页、`/image-to-image-generator`、`/pricing`、模板页、博客 | 普通网页：顶部简洁导航 + 可滚动正文 + 页脚，按建站规格的结构 |
-| **应用页**（登录后） | 工作台、我的作品、账号、付费墙 | **app 壳**：固定顶栏 + 固定底部栏，内容区独立滚动，没有页脚、没有营销导航、没有 SEO 正文 |
+| **应用页**（登录后） | 工作台、需求墙、我的作品、账号、付费墙 | **app 壳**：固定顶栏 + 固定底部栏，内容区独立滚动，没有页脚、没有营销导航、没有 SEO 正文 |
 
 营销页点「Upload photo」进入应用壳，之后到出图完成不再看到营销元素。两套壳是 `app/(marketing)` 和 `app/(app)` 两个 layout（ARCHITECTURE.md 第 1 节）。
 
 ### 8.2 应用壳结构
 
-- 底部 tab bar 固定三项：**Create**（模板选择）/ **Photos**（我的作品）/ **Account**。图标 + 文字，高 56px + 底部安全区。不做汉堡菜单、侧边抽屉。
+- 底部 tab bar 固定四项：**Create**（模板选择）/ **Wishlist**（模板需求墙，ARCHITECTURE.md 第 15 节）/ **Photos**（我的作品）/ **Account**。图标 + 文字，高 56px + 底部安全区。不做汉堡菜单、侧边抽屉。
 - **流程页隐藏 tab bar**：从 Create 选了模板后进入工作台，工作台、生成中、结果页都是全屏流程页——顶栏左侧「返回」，底部换成固定主操作栏，和原生 app 从 tab 根页推入详情页一样。
 - 顶栏只放：返回或标题、右侧最多一个动作（例如剩余张数）。不放 logo 大图、不放导航链接。
 - 主操作永远在底部拇指区，永远全宽、高 48～56px，永远只有一个。
