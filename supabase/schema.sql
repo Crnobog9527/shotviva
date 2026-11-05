@@ -14,6 +14,12 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 
+CREATE SCHEMA IF NOT EXISTS "admin";
+
+
+ALTER SCHEMA "admin" OWNER TO "postgres";
+
+
 CREATE SCHEMA IF NOT EXISTS "public";
 
 
@@ -522,6 +528,52 @@ $$;
 ALTER FUNCTION "public"."set_updated_at"() OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."profiles" (
+    "id" "uuid" NOT NULL,
+    "role" "text" DEFAULT 'user'::"text" NOT NULL,
+    "credits" integer DEFAULT 0 NOT NULL,
+    "paid_until" timestamp with time zone,
+    "signup_ip" "inet",
+    "banned_at" timestamp with time zone,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "free_credits" integer DEFAULT 0 NOT NULL,
+    CONSTRAINT "profiles_credits_check" CHECK (("credits" >= 0)),
+    CONSTRAINT "profiles_free_credits_check" CHECK (("free_credits" >= 0)),
+    CONSTRAINT "profiles_role_check" CHECK (("role" = ANY (ARRAY['user'::"text", 'admin'::"text"])))
+);
+
+
+ALTER TABLE "public"."profiles" OWNER TO "postgres";
+
+
+CREATE OR REPLACE VIEW "admin"."users_overview" AS
+ SELECT "u"."id",
+    ("u"."email")::"text" AS "email",
+    "u"."created_at",
+    COALESCE(( SELECT "string_agg"("provider"."value", ', '::"text" ORDER BY "provider"."value") AS "string_agg"
+           FROM "jsonb_array_elements_text"(COALESCE(("u"."raw_app_meta_data" -> 'providers'::"text"), '[]'::"jsonb")) "provider"("value")), ("u"."raw_app_meta_data" ->> 'provider'::"text")) AS "provider",
+    "p"."role",
+    "p"."credits",
+    "p"."free_credits",
+    "p"."paid_until",
+    COALESCE("j"."generation_count", 0) AS "generation_count",
+    "j"."last_generation_at",
+    "p"."banned_at"
+   FROM (("auth"."users" "u"
+     LEFT JOIN "public"."profiles" "p" ON (("p"."id" = "u"."id")))
+     LEFT JOIN LATERAL ( SELECT ("count"(*))::integer AS "generation_count",
+            "max"("g"."created_at") AS "last_generation_at"
+           FROM "public"."generation_jobs" "g"
+          WHERE ("g"."user_id" = "u"."id")) "j" ON (true));
+
+
+ALTER VIEW "admin"."users_overview" OWNER TO "postgres";
+
+
+COMMENT ON VIEW "admin"."users_overview" IS 'Owner support view (ARCHITECTURE §10): search by email; credits = paid pool, free_credits = free pool.';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "id" bigint NOT NULL,
     "action" "text" NOT NULL,
@@ -614,24 +666,6 @@ CREATE TABLE IF NOT EXISTS "public"."products" (
 
 
 ALTER TABLE "public"."products" OWNER TO "postgres";
-
-
-CREATE TABLE IF NOT EXISTS "public"."profiles" (
-    "id" "uuid" NOT NULL,
-    "role" "text" DEFAULT 'user'::"text" NOT NULL,
-    "credits" integer DEFAULT 0 NOT NULL,
-    "paid_until" timestamp with time zone,
-    "signup_ip" "inet",
-    "banned_at" timestamp with time zone,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "free_credits" integer DEFAULT 0 NOT NULL,
-    CONSTRAINT "profiles_credits_check" CHECK (("credits" >= 0)),
-    CONSTRAINT "profiles_free_credits_check" CHECK (("free_credits" >= 0)),
-    CONSTRAINT "profiles_role_check" CHECK (("role" = ANY (ARRAY['user'::"text", 'admin'::"text"])))
-);
-
-
-ALTER TABLE "public"."profiles" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."template_prompts" (
@@ -828,6 +862,10 @@ CREATE POLICY "templates_select_active" ON "public"."templates" FOR SELECT TO "a
 
 
 
+GRANT USAGE ON SCHEMA "admin" TO "service_role";
+
+
+
 GRANT USAGE ON SCHEMA "public" TO "postgres";
 GRANT USAGE ON SCHEMA "public" TO "anon";
 GRANT USAGE ON SCHEMA "public" TO "authenticated";
@@ -898,6 +936,19 @@ GRANT ALL ON FUNCTION "public"."set_job_visibility"("p_job_id" "uuid", "p_user_i
 
 
 
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."profiles" TO "service_role";
+GRANT SELECT ON TABLE "public"."profiles" TO "authenticated";
+
+
+
+GRANT UPDATE("signup_ip") ON TABLE "public"."profiles" TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "admin"."users_overview" TO "service_role";
+
+
+
 GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."admin_audit_log" TO "service_role";
 
 
@@ -946,23 +997,13 @@ GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."products" T
 
 
 
-GRANT REFERENCES,TRIGGER,MAINTAIN ON TABLE "public"."profiles" TO "anon";
-GRANT SELECT,REFERENCES,TRIGGER,MAINTAIN ON TABLE "public"."profiles" TO "authenticated";
-GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."profiles" TO "service_role";
-
-
-
-GRANT UPDATE("signup_ip") ON TABLE "public"."profiles" TO "service_role";
-
-
-
 GRANT ALL ON TABLE "public"."template_prompts" TO "service_role";
 
 
 
-GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."templates" TO "anon";
-GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."templates" TO "authenticated";
 GRANT ALL ON TABLE "public"."templates" TO "service_role";
+GRANT SELECT ON TABLE "public"."templates" TO "anon";
+GRANT SELECT ON TABLE "public"."templates" TO "authenticated";
 
 
 
