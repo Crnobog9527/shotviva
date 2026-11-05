@@ -1,4 +1,6 @@
 /* eslint-disable @next/next/no-img-element -- auth-gated download route, not a static asset */
+import { useTranslations } from 'next-intl'
+
 import { cn } from '@/core/ui/cn'
 
 import type { CreditPool } from '@/core/billing/pools'
@@ -14,12 +16,14 @@ export function ResultPhoto({ src, alt, pool, visibility }: { src: string; alt: 
   )
 }
 
-export function workTagLabel(pool: CreditPool, visibility: 'public' | 'private'): string {
-  if (pool === 'free') return 'Public · watermark'
-  return visibility === 'private' ? 'Private' : 'Public'
+// Message key under app.work: free works are public with a watermark; paid ones private or public.
+export function workTagKey(pool: CreditPool, visibility: 'public' | 'private'): 'freePublic' | 'private' | 'public' {
+  if (pool === 'free') return 'freePublic'
+  return visibility === 'private' ? 'private' : 'public'
 }
 
 export function WorkTag({ pool, visibility, className }: { pool: CreditPool; visibility: 'public' | 'private'; className?: string }) {
+  const t = useTranslations('app.work')
   return (
     <span
       className={cn(
@@ -28,7 +32,7 @@ export function WorkTag({ pool, visibility, className }: { pool: CreditPool; vis
         className,
       )}
     >
-      {workTagLabel(pool, visibility)}
+      {t(workTagKey(pool, visibility))}
     </span>
   )
 }

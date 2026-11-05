@@ -1,6 +1,8 @@
 'use client'
 
 /* eslint-disable @next/next/no-img-element -- template covers and local photo previews */
+import { useTranslations } from 'next-intl'
+
 import { estimatedProgress, percent } from '../generation/progress'
 import { useNow } from '../workspace/use-now'
 import { runningMeta, type PhotoItem } from './photo-item'
@@ -9,26 +11,28 @@ import { useRunningItems, type RunningRow } from './use-running-items'
 // "In progress" (B comp photos.html): a developing tray per job, greyed thumbnail under the
 // scan line, settings, an estimated bar and a safelight state dot. Hidden when empty.
 export function RunningList({ server, covers }: { server: PhotoItem[]; covers: Record<string, string | null> }) {
+  const t = useTranslations('app.photos')
   const rows = useRunningItems(server, covers)
   const now = useNow()
   if (rows.length === 0) return null
   return (
     <section aria-labelledby="run-h">
       <div className="mx-4 mt-6 mb-3 flex items-baseline justify-between gap-3">
-        <h2 id="run-h" className="text-headline leading-[1.2] font-semibold tracking-[-0.01em]">In progress</h2>
-        <span className="text-caption text-muted-foreground">Usually 20–40 seconds each</span>
+        <h2 id="run-h" className="text-headline leading-[1.2] font-semibold tracking-[-0.01em]">{t('inProgress')}</h2>
+        <span className="text-caption text-muted-foreground">{t('usually')}</span>
       </div>
       <ul aria-live="polite" className="grid gap-3 px-4">
         {rows.map((row) => (
           <RunningRowView key={row.id} row={row} progress={estimatedProgress(now - row.startedAt)} />
         ))}
       </ul>
-      <p className="mx-4 mt-3 text-caption text-muted-foreground">You can close the app. Finished photos land here.</p>
+      <p className="mx-4 mt-3 text-caption text-muted-foreground">{t('closeApp')}</p>
     </section>
   )
 }
 
 function RunningRowView({ row, progress }: { row: RunningRow; progress: number }) {
+  const t = useTranslations('app')
   const thumb = row.previewUrl ?? row.cover
   return (
     <li className="hairline grid grid-cols-[76px_1fr] items-center gap-4 rounded-media bg-card p-3">
@@ -38,10 +42,10 @@ function RunningRowView({ row, progress }: { row: RunningRow; progress: number }
       </span>
       <span className="min-w-0">
         <b className="block text-body font-semibold">{row.templateName}</b>
-        <span className="mt-1 block text-caption leading-[1.3] text-muted-foreground">{runningMeta(row)}</span>
+        <span className="mt-1 block text-caption leading-[1.3] text-muted-foreground">{runningMeta(row, t)}</span>
         <span
           role="progressbar"
-          aria-label={`Generating ${row.templateName}`}
+          aria-label={t('photos.generatingAria', { name: row.templateName })}
           aria-valuenow={percent(progress)}
           aria-valuemin={0}
           aria-valuemax={100}
@@ -51,7 +55,7 @@ function RunningRowView({ row, progress }: { row: RunningRow; progress: number }
         </span>
         <span className="mt-2 flex items-center gap-2 text-caption">
           <span aria-hidden="true" className="size-2 rounded-full bg-primary" />
-          Generating
+          {t('photos.generating')}
         </span>
       </span>
     </li>

@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useEffect, useRef, useState } from 'react'
 
 import { categoriesOf, isMotion, type CatalogueTemplate } from './catalogue-template'
@@ -11,6 +12,7 @@ import { TemplateCard } from './template-card'
 // Create's catalogue (B comp create.html): the featured video card, a sticky chip bar, the
 // two-column grid, and the preview sheet every card opens (DESIGN §4.2).
 export function TemplateCatalogue({ templates }: { templates: CatalogueTemplate[] }) {
+  const t = useTranslations('app.create')
   const [category, setCategory] = useState(ALL)
   const [openId, setOpenId] = useState<string | null>(null)
   const featured = templates.find((t) => isMotion(t) && t.cover.type === 'video')
@@ -19,7 +21,7 @@ export function TemplateCatalogue({ templates }: { templates: CatalogueTemplate[
   const { sentinel, stuck } = useStuck()
 
   if (templates.length === 0) {
-    return <p className="px-4 pt-6 text-body text-muted-foreground">Templates are on their way. Check back soon.</p>
+    return <p className="px-4 pt-6 text-body text-muted-foreground">{t('empty')}</p>
   }
   return (
     <>
@@ -28,7 +30,7 @@ export function TemplateCatalogue({ templates }: { templates: CatalogueTemplate[
       <div data-stuck={stuck || undefined} className="nav-material sticky top-0 z-40 py-2 data-[stuck]:pt-[calc(var(--sat)+8px)]">
         <CategoryChips categories={categoriesOf(templates)} value={category} onChange={setCategory} />
       </div>
-      <h2 className="sr-only">Templates</h2>
+      <h2 className="sr-only">{t('templates')}</h2>
       <ul className="mt-2 grid grid-cols-2 gap-x-3 gap-y-5 px-4 md:grid-cols-3">
         {shown.map((template, index) => (
           <li key={template.id}>
@@ -36,7 +38,7 @@ export function TemplateCatalogue({ templates }: { templates: CatalogueTemplate[
           </li>
         ))}
       </ul>
-      <p className="px-4 pt-4 pb-2 text-caption leading-[1.4] text-muted-foreground">Template images are illustrative examples.</p>
+      <p className="px-4 pt-4 pb-2 text-caption leading-[1.4] text-muted-foreground">{t('illustrative')}</p>
       <PreviewSheet template={open} onClose={() => setOpenId(null)} />
     </>
   )

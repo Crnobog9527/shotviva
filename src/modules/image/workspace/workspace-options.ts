@@ -1,20 +1,11 @@
-import type { OutputAspect, Resolution } from '@/core/templates'
+import type { Translate } from '@/core/translate'
+import type { OutputAspect, Resolution } from '@/core/templates/output-options'
 
 // The eight sizes and three resolutions as the workspace shows them (DESIGN §4.3). Internal
-// ids (1k / 2k / 3k) never reach the screen; neither do "4K", "Ultra HD" or "SD".
+// ids (1k / 2k / 3k) never reach the screen; neither do "4K", "Ultra HD" or "SD". Names and use
+// lines live in site/messages (app.sizes, app.tiers); this file holds ids, order and geometry.
 
-export type SizeOption = { id: OutputAspect; name: string; ratio: string | null; glyph: { w: number; h: number; dashed: boolean } }
-
-const SIZE_NAMES: Record<OutputAspect, string> = {
-  original: 'Original',
-  '16:9': 'Banner',
-  '4:5': 'Post',
-  '1:1': 'Listing',
-  '9:16': 'Story',
-  '3:2': 'Rental',
-  '4:3': 'Website',
-  '2:3': 'Pin',
-}
+export type SizeOption = { id: OutputAspect; ratio: string | null; glyph: { w: number; h: number; dashed: boolean } }
 
 const SIZE_ORDER: readonly OutputAspect[] = ['original', '16:9', '4:5', '1:1', '9:16', '3:2', '4:3', '2:3']
 
@@ -28,36 +19,29 @@ function glyphFor(id: OutputAspect): SizeOption['glyph'] {
 
 export const SIZE_OPTIONS: readonly SizeOption[] = SIZE_ORDER.map((id) => ({
   id,
-  name: SIZE_NAMES[id],
   ratio: id === 'original' ? null : id,
   glyph: glyphFor(id),
 }))
 
-export type TierOption = { id: Resolution; name: string; px: number; use: string }
+export type TierOption = { id: Resolution; px: number }
 
 export const TIER_OPTIONS: readonly TierOption[] = [
-  { id: '1k', name: 'Standard', px: 1024, use: 'Social & delivery apps' },
-  { id: '2k', name: 'HD', px: 2048, use: 'Websites & online stores' },
-  { id: '3k', name: 'Max', px: 2880, use: 'Print & zoom' },
+  { id: '1k', px: 1024 },
+  { id: '2k', px: 2048 },
+  { id: '3k', px: 2880 },
 ]
 
-export const tierName = (id: Resolution) => TIER_OPTIONS.find((tier) => tier.id === id)?.name ?? 'Standard'
+export const tierPx = (id: Resolution) => TIER_OPTIONS.find((tier) => tier.id === id)?.px ?? 1024
 
-export function sizeLabel(id: OutputAspect): string {
-  const option = SIZE_OPTIONS.find((size) => size.id === id)
-  if (!option) return 'Original'
-  return option.ratio ? `${option.name} ${option.ratio}` : option.name
+// `t` scoped to `app`: "Standard", "Banner 16:9", "Original".
+export const tierName = (id: Resolution, t: Translate) => t(`tiers.${id}.name`)
+
+export function sizeLabel(id: OutputAspect, t: Translate): string {
+  const name = t(`sizes.${id}`)
+  return id === 'original' ? name : `${name} ${id}`
 }
 
 // Example for "Anything to change?", matched to the template's category so a handbag never gets
 // a food example (B comp workspace.html). Categories are admin text, so unknown ones fall back.
-const NOTE_EXAMPLES: Record<string, string> = {
-  'Food & Drink': 'e.g. Add a sprig of mint, remove the napkin',
-  'Products & Resale': 'e.g. Keep the chain gold, soften the shadow',
-  'Beauty & Skincare': 'e.g. Keep the label sharp, add a few water drops',
-  'Rooms & Spaces': 'e.g. Keep the sofa, warm up the lamp light',
-  Pets: 'e.g. Keep the collar, use a soft grey backdrop',
-  'Art Styles': 'e.g. Keep the glasses, softer line work',
-}
-
-export const notePlaceholder = (category: string) => NOTE_EXAMPLES[category] ?? 'e.g. Keep the colours, brighten the background'
+// `t` scoped to app.workspace.notePlaceholder.
+export const notePlaceholder = (category: string, t: Translate) => (t.has(category) ? t(category) : t('fallback'))

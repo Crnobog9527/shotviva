@@ -12,7 +12,6 @@ import { FormAction } from './form-action'
 import { GeneratingView } from './generating-view'
 import { FailureView, SuccessView } from './settled-views'
 import { missingRequiredCopy } from './text-fields'
-import { UPLOAD_FORMATS } from './upload-formats'
 import { usePhoto } from './use-photo'
 import { WorkspaceForm, type FormValues } from './workspace-form'
 
@@ -80,7 +79,6 @@ export function ImageWorkspace({ template, balance, concurrency, shareText }: Wo
         photo={photo}
         values={values}
         onChange={(next) => setValues((current) => ({ ...current, ...next }))}
-        formats={UPLOAD_FORMATS}
       />
       <FormAction state={state} resolution={values.resolution} onGenerate={generate} />
     </>

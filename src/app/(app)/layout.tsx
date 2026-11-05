@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { useTranslations } from 'next-intl'
 import { Suspense } from 'react'
 
 import { AnalyticsIdentify } from '@/core/analytics/browser'
@@ -21,17 +22,19 @@ async function Identity() {
   return user ? <AnalyticsIdentify userId={user.id} /> : null
 }
 
-function tabs(): TabItem[] {
+function useTabs(): TabItem[] {
+  const t = useTranslations('app.tabs')
   const image = isModuleEnabled(site, 'image')
   return [
-    ...(image ? [{ href: '/generate', label: 'Create', icon: 'create' } as const] : []),
-    ...(isWishlistEnabled(site) ? [{ href: '/wishlist', label: 'Wishlist', icon: 'wishlist' } as const] : []),
-    ...(image ? [{ href: '/photos', label: 'Photos', icon: 'photos', badge: <PhotosTabBadge /> } as const] : []),
-    { href: '/account', label: 'Account', icon: 'account' },
+    ...(image ? [{ href: '/generate', label: t('create'), icon: 'create' } as const] : []),
+    ...(isWishlistEnabled(site) ? [{ href: '/wishlist', label: t('wishlist'), icon: 'wishlist' } as const] : []),
+    ...(image ? [{ href: '/photos', label: t('photos'), icon: 'photos', badge: <PhotosTabBadge /> } as const] : []),
+    { href: '/account', label: t('account'), icon: 'account' },
   ]
 }
 
 export default function AppLayout({ children }: LayoutProps<'/'>) {
+  const tabs = useTabs()
   return (
     <AppFrame>
       <Suspense fallback={null}>
@@ -39,7 +42,7 @@ export default function AppLayout({ children }: LayoutProps<'/'>) {
       </Suspense>
       {/* usePathname decides tab root vs flow page; on dynamic routes that is request data. */}
       <Suspense fallback={null}>
-        <TabBar items={tabs()} brand={site.brand.name} />
+        <TabBar items={tabs} brand={site.brand.name} />
       </Suspense>
       <main className="flex flex-1 flex-col">{children}</main>
       <GenerationRunner />

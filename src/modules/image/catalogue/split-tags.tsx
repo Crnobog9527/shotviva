@@ -1,8 +1,11 @@
+import { useTranslations } from 'next-intl'
+
 import { cn } from '@/core/ui/cn'
 
 // "Phone" / "AI" on every split, the same two words on cards, previews and the generator
 // (The Always-Visible Split Rule). Hidden from readers: the image alt already says it.
 export function SplitTags({ hidden = false, size = 'card' }: { hidden?: boolean; size?: 'card' | 'large' }) {
+  const t = useTranslations('app.template')
   const base = cn(
     'absolute z-2 inline-flex items-center text-caption leading-none font-semibold transition-opacity duration-300',
     size === 'card' ? 'bottom-2 h-6 rounded-tag px-2' : 'top-3 h-7 rounded-tag px-3',
@@ -11,10 +14,10 @@ export function SplitTags({ hidden = false, size = 'card' }: { hidden?: boolean;
   return (
     <>
       <span aria-hidden="true" className={cn(base, 'frost left-2 text-photo-ink', size === 'large' && 'left-3')}>
-        Phone
+        {t('phone')}
       </span>
       <span aria-hidden="true" className={cn(base, 'right-2 bg-[var(--safelight-tag)] text-primary-foreground', size === 'large' && 'right-3 bg-primary')}>
-        AI
+        {t('ai')}
       </span>
     </>
   )
@@ -32,9 +35,10 @@ export function Seam() {
 
 // 26px frosted badge, top left, on motion cards only (never on still cards, DESIGN §4.2).
 export function MotionBadge({ type }: { type: 'animated' | 'video' }) {
+  const t = useTranslations('app.template')
   return (
     <span
-      aria-label={type === 'video' ? 'Video template' : 'Animated template'}
+      aria-label={t(type === 'video' ? 'videoTemplate' : 'animatedTemplate')}
       className="frost absolute top-2 left-2 z-2 grid size-[26px] place-items-center rounded-tag text-photo-ink"
     >
       <svg viewBox="0 0 24 24" aria-hidden="true" className="size-[13px]" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">

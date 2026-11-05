@@ -1,20 +1,21 @@
 import { describe, expect, it } from 'vitest'
 
+import { echoTranslate } from '../echo-translate'
 import { canRetry, failureReason, refundLine } from './error-copy'
 
+const t = echoTranslate(['PROVIDER_TIMEOUT', 'RATE_LIMITED'])
+
 describe('failure copy', () => {
-  it('explains the reason and the refund', () => {
-    const failure = { code: 'PROVIDER_TIMEOUT', message: '', refunded: true }
-    expect(failureReason(failure)).toMatch(/too long/)
-    expect(refundLine(failure)).toBe('Your credits were refunded.')
-    expect(refundLine({ ...failure, refunded: null })).toBe('No credits were used.')
+  it('picks the reason by code and falls back for unknown codes', () => {
+    expect(failureReason({ code: 'PROVIDER_TIMEOUT', message: '', refunded: true }, t)).toBe('PROVIDER_TIMEOUT')
+    expect(failureReason({ code: 'WHATEVER', message: '', refunded: null }, t)).toBe('fallback')
   })
 
-  it('passes the rate-limit sentence through and falls back for unknown codes', () => {
-    expect(failureReason({ code: 'RATE_LIMITED', message: 'Wait for one of your photos to finish', refunded: null })).toBe(
-      'Wait for one of your photos to finish.',
-    )
-    expect(failureReason({ code: 'WHATEVER', message: '', refunded: null })).toMatch(/Something went wrong/)
+  it('says whether the credits came back', () => {
+    const failure = { code: 'GENERATION_FAILED', message: '', refunded: true }
+    expect(refundLine(failure, t)).toBe('refunded')
+    expect(refundLine({ ...failure, refunded: false }, t)).toBe('onHold')
+    expect(refundLine({ ...failure, refunded: null }, t)).toBe('notCharged')
   })
 
   it('offers Retry only when the same photo can work', () => {

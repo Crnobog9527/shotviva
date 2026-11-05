@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { categoriesOf, fromCreditsLabel, isMotion, type CatalogueTemplate } from './catalogue-template'
+import { cardPrice, categoriesOf, isMotion, type CatalogueTemplate } from './catalogue-template'
 
 const tpl = (id: string, category: string, cover: Partial<CatalogueTemplate['cover']> = {}): CatalogueTemplate => ({
   id,
@@ -17,8 +17,8 @@ describe('catalogue helpers', () => {
   })
 
   it('prices the card at the Standard tier', () => {
-    expect(fromCreditsLabel(tpl('a', 'x'))).toBe('from 2 credits')
-    expect(fromCreditsLabel({ ...tpl('a', 'x'), creditsCost: { '1k': 1, '2k': 2, '3k': 3 } })).toBe('from 1 credit')
+    expect(cardPrice(tpl('a', 'x'))).toBe(2)
+    expect(cardPrice({ ...tpl('a', 'x'), creditsCost: { '1k': 1, '2k': 2, '3k': 3 } })).toBe(1)
   })
 
   it('treats a card as motion only with its file and poster', () => {

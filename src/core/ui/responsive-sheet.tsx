@@ -1,6 +1,7 @@
 "use client"
 
 import { XIcon } from "lucide-react"
+import { useTranslations } from "next-intl"
 import { Dialog as DialogPrimitive } from "radix-ui"
 import type { ReactNode } from "react"
 
@@ -47,8 +48,9 @@ type CloseComponent = typeof DialogPrimitive.Close | typeof DrawerClose
 // 44px close target with a 30px bone disc, top right. vaul keeps its own dialog context, so
 // each variant closes with its own Close.
 function SheetClose({ Close }: { Close: CloseComponent }) {
+  const t = useTranslations("app.sheet")
   return (
-    <Close aria-label="Close" className="absolute top-3 right-3 grid size-11 place-items-center rounded-full text-bone-dim">
+    <Close aria-label={t("close")} className="absolute top-3 right-3 grid size-11 place-items-center rounded-full text-bone-dim">
       <span className="grid size-[30px] place-items-center rounded-full bg-wash-strong">
         <XIcon className="size-4" strokeWidth={2.2} aria-hidden="true" />
       </span>

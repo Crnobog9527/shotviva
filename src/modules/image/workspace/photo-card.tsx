@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 /* eslint-disable @next/next/no-img-element -- local object URL of the picked photo */
 import { useRef } from 'react'
 
@@ -12,11 +13,12 @@ import { megabytes, type PickedPhoto } from './use-photo'
 // The picked photo (DESIGN "Upload Zone", §4.4): a 4:5 thumbnail with the upload's visible
 // stage, Compressing → Uploading with a bar → Uploaded, and a ghost "Replace photo".
 export function PhotoCard({ photo, upload, onPick }: { photo: PickedPhoto; upload: UploadState; onPick(file: File): void }) {
+  const t = useTranslations('app.workspace')
   const input = useRef<HTMLInputElement>(null)
   return (
     <div className="hairline-lit flex items-center gap-4 rounded-panel bg-card p-3">
       <div className="relative aspect-[4/5] w-24 flex-none overflow-hidden rounded-inner bg-muted">
-        <img src={photo.url} alt="Your photo" className="size-full object-cover" />
+        <img src={photo.url} alt={t('photoAlt')} className="size-full object-cover" />
       </div>
       <div className="min-w-0 flex-1" aria-live="polite">
         <UploadStage upload={upload} />
@@ -29,7 +31,7 @@ export function PhotoCard({ photo, upload, onPick }: { photo: PickedPhoto; uploa
           <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
             <path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4" />
           </svg>
-          {upload.phase === 'error' ? 'Choose another photo' : 'Replace photo'}
+          {t(upload.phase === 'error' ? 'chooseAnother' : 'replace')}
         </button>
         <input
           ref={input}
@@ -48,25 +50,26 @@ export function PhotoCard({ photo, upload, onPick }: { photo: PickedPhoto; uploa
 }
 
 function UploadStage({ upload }: { upload: UploadState }) {
+  const t = useTranslations('app')
   if (upload.phase === 'done') {
     return (
       <span className="inline-flex items-center gap-2 text-body leading-none font-semibold">
         <Tick />
-        Uploaded
+        {t('workspace.uploaded')}
       </span>
     )
   }
   if (upload.phase === 'error') {
-    return <p role="alert" className="text-caption leading-[1.4] text-destructive">{upload.message}</p>
+    return <p role="alert" className="text-caption leading-[1.4] text-destructive">{t(`errors.${upload.code}`)}</p>
   }
   const uploading = upload.phase === 'uploading'
   const fraction = uploading ? upload.progress : 0
   return (
     <>
-      <span className="text-body leading-none font-semibold">{uploading ? 'Uploading' : 'Compressing'}</span>
+      <span className="text-body leading-none font-semibold">{t(uploading ? 'workspace.uploading' : 'workspace.compressing')}</span>
       <span
         role="progressbar"
-        aria-label={uploading ? 'Uploading your photo' : 'Compressing your photo'}
+        aria-label={t(uploading ? 'workspace.uploadingAria' : 'workspace.compressingAria')}
         aria-valuenow={percent(fraction)}
         aria-valuemin={0}
         aria-valuemax={100}

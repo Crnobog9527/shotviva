@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { OUTPUT_ASPECTS, RESOLUTIONS } from '@/core/templates'
 
+import { echoTranslate } from '../echo-translate'
 import { notePlaceholder, SIZE_OPTIONS, TIER_OPTIONS, sizeLabel, tierName } from './workspace-options'
 
 describe('workspace options', () => {
@@ -11,24 +12,23 @@ describe('workspace options', () => {
   })
 
   it('draws each ratio glyph at its own proportion inside the tile box', () => {
-    const banner = SIZE_OPTIONS.find((size) => size.id === '16:9')
-    expect(banner?.glyph).toEqual({ w: 34, h: 19, dashed: false })
-    const story = SIZE_OPTIONS.find((size) => size.id === '9:16')
-    expect(story?.glyph.h).toBe(30)
+    expect(SIZE_OPTIONS.find((size) => size.id === '16:9')?.glyph).toEqual({ w: 34, h: 19, dashed: false })
+    expect(SIZE_OPTIONS.find((size) => size.id === '9:16')?.glyph.h).toBe(30)
   })
 
-  it('names the resolutions Standard / HD / Max, never 1K / 2K / 3K', () => {
-    expect(TIER_OPTIONS.map((tier) => tier.id)).toEqual([...RESOLUTIONS])
-    expect(TIER_OPTIONS.map((tier) => tier.name)).toEqual(['Standard', 'HD', 'Max'])
-    expect(tierName('3k')).toBe('Max')
+  it('keeps the three resolutions in order with their pixel edge', () => {
+    expect(TIER_OPTIONS.map((tier) => [tier.id, tier.px])).toEqual(RESOLUTIONS.map((id, i) => [id, [1024, 2048, 2880][i]]))
   })
 
-  it('labels sizes for meta lines', () => {
-    expect(sizeLabel('16:9')).toBe('Banner 16:9')
-    expect(sizeLabel('original')).toBe('Original')
+  it('reads names from the messages', () => {
+    const t = echoTranslate()
+    expect(tierName('3k', t)).toBe('tiers.3k.name')
+    expect(sizeLabel('16:9', t)).toBe('sizes.16:9 16:9')
+    expect(sizeLabel('original', t)).toBe('sizes.original')
   })
-  it('matches the note example to the category, with a neutral fallback', () => {
-    expect(notePlaceholder('Food & Drink')).toMatch(/mint/)
-    expect(notePlaceholder('Something new')).toMatch(/brighten/)
+
+  it('matches the note example to the category, with a fallback', () => {
+    expect(notePlaceholder('Pets', echoTranslate(['Pets']))).toBe('Pets')
+    expect(notePlaceholder('Something new', echoTranslate(['Pets']))).toBe('fallback')
   })
 })

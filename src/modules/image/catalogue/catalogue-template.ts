@@ -41,9 +41,8 @@ export function categoriesOf(templates: readonly CatalogueTemplate[]): string[] 
   return [...new Set(templates.map((template) => template.category))]
 }
 
-// The card's one price: the Standard ('1k') number (DESIGN §4.2).
-export const creditsLabel = (n: number) => `${n} ${n === 1 ? 'credit' : 'credits'}`
-export const fromCreditsLabel = (template: CatalogueTemplate) => `from ${creditsLabel(template.creditsCost['1k'])}`
+// The card's one price is the Standard ('1k') number (DESIGN §4.2).
+export const cardPrice = (template: CatalogueTemplate) => template.creditsCost['1k']
 
 // A motion card plays only with both its file and its poster (the table check guarantees it).
 export function isMotion(template: CatalogueTemplate): boolean {

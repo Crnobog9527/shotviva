@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
-import { Suspense } from 'react'
+import { useTranslations } from 'next-intl'
+import { getTranslations } from 'next-intl/server'
+import { Suspense, type ReactNode } from 'react'
 
 import { AppPage, BalanceChip, TabRootHeader } from '@/core/app-shell'
 import { createServerSupabase, requireUser } from '@/core/auth'
@@ -7,10 +9,14 @@ import { readBalance } from '@/core/billing'
 import { listTemplates } from '@/core/templates'
 import { GeneratingPill, TemplateCatalogue, toCatalogueTemplate } from '@/modules/image'
 
-export const metadata: Metadata = { title: 'Create' }
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getTranslations('app.create'))('metaTitle') }
+}
 
-const TITLE = 'Create'
-const LEDE = 'Pick a look. Your photo stays as shot.'
+function Header({ aside }: { aside?: ReactNode }) {
+  const t = useTranslations('app.create')
+  return <TabRootHeader title={t('title')} lede={t('lede')} aside={aside} />
+}
 
 // Create tab (DESIGN §8.2, B comp create.html): the template catalogue with the balance chip.
 async function Create() {
@@ -19,9 +25,7 @@ async function Create() {
   const [templates, balance] = await Promise.all([listTemplates(supabase, 'web'), readBalance(supabase, user.id)])
   return (
     <>
-      <TabRootHeader
-        title={TITLE}
-        lede={LEDE}
+      <Header
         aside={
           <>
             <GeneratingPill />
@@ -37,7 +41,7 @@ async function Create() {
 export default function CreatePage() {
   return (
     <AppPage>
-      <Suspense fallback={<TabRootHeader title={TITLE} lede={LEDE} />}>
+      <Suspense fallback={<Header />}>
         <Create />
       </Suspense>
     </AppPage>

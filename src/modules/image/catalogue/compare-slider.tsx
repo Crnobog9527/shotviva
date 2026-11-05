@@ -1,6 +1,7 @@
 'use client'
 
 /* eslint-disable @next/next/no-img-element -- covers and local previews, not static assets */
+import { useTranslations } from 'next-intl'
 import { useState, type CSSProperties } from 'react'
 
 import { cn } from '@/core/ui/cn'
@@ -14,12 +15,13 @@ type Props = { before: string; after: string; afterAlt: string; badge?: string; 
 // drag, tap-to-jump and keyboard control.
 export function CompareSlider({ before, after, afterAlt, badge, className }: Props) {
   const [x, setX] = useState(50)
+  const t = useTranslations('app.template')
   return (
     <div
       style={{ '--x': `${x}%` } as CSSProperties}
       className={cn('relative aspect-[4/5] touch-pan-y overflow-hidden rounded-media bg-muted select-none', className)}
     >
-      <img src={before} alt="Phone photo" className="pointer-events-none absolute inset-0 size-full object-cover" />
+      <img src={before} alt={t('phonePhotoAlt')} className="pointer-events-none absolute inset-0 size-full object-cover" />
       <img src={after} alt={afterAlt} className="pointer-events-none absolute inset-0 size-full object-cover [clip-path:inset(0_0_0_var(--x))]" />
       <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-[var(--x)] z-2 -ml-px w-0.5 bg-photo-ink">
         <span className="frost absolute top-1/2 left-1/2 grid size-10 -translate-1/2 place-items-center rounded-full shadow-[inset_0_0_0_1.5px_var(--photo-ink)]">
@@ -36,7 +38,7 @@ export function CompareSlider({ before, after, afterAlt, badge, className }: Pro
         max={100}
         value={x}
         onChange={(event) => setX(Number(event.target.value))}
-        aria-label="Compare phone photo and AI result"
+        aria-label={t('compareAria')}
         className="absolute inset-0 z-4 m-0 size-full cursor-ew-resize opacity-0"
       />
     </div>

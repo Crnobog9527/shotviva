@@ -1,6 +1,7 @@
 import type { CreditPool } from '@/core/billing/pools'
 import type { Job, JobVisibility } from '@/core/jobs'
 import { OUTPUT_ASPECTS, RESOLUTIONS, type OutputAspect, type Resolution } from '@/core/templates/output-options'
+import type { Translate } from '@/core/translate'
 
 import { sizeLabel, tierName } from '../workspace/workspace-options'
 
@@ -25,12 +26,13 @@ export type TemplateLookup = Map<string, { name: string; cover: string | null }>
 const pick = <T extends string>(allowed: readonly T[], value: unknown, fallback: T): T =>
   allowed.includes(value as T) ? (value as T) : fallback
 
-export function toPhotoItem(job: Job, templates: TemplateLookup, fileUrl: string | null): PhotoItem {
+// fallbackName names a job whose template is gone or partner-only (app.photos.fallbackName).
+export function toPhotoItem(job: Job, templates: TemplateLookup, fileUrl: string | null, fallbackName = ''): PhotoItem {
   const template = templates.get(job.templateId)
   return {
     id: job.id,
     templateId: job.templateId,
-    templateName: template?.name ?? 'Photo',
+    templateName: template?.name ?? fallbackName,
     cover: template?.cover ?? null,
     aspect: pick(OUTPUT_ASPECTS, job.inputs.aspect_ratio, 'original'),
     resolution: pick(RESOLUTIONS, job.inputs.resolution, '1k'),
@@ -45,16 +47,22 @@ export function toPhotoItem(job: Job, templates: TemplateLookup, fileUrl: string
 const DAY_MS = 24 * 60 * 60 * 1000
 const dayKey = (date: Date) => Math.floor(date.getTime() / DAY_MS)
 
-// "Today · Banner 16:9 · HD" (B comp photos.html). Days are counted in UTC on the server.
-export function doneMeta(item: Pick<PhotoItem, 'createdAt' | 'aspect' | 'resolution'>, now: Date): string {
+// "Today · Banner 16:9 · HD" (B comp photos.html). Days are counted in UTC on the server; older
+// dates come from formatDay (the locale's short month and day). `t` is scoped to `app`.
+export function doneMeta(
+  item: Pick<PhotoItem, 'createdAt' | 'aspect' | 'resolution'>,
+  now: Date,
+  t: Translate,
+  formatDay: (date: Date) => string,
+): string {
   const created = new Date(item.createdAt)
   const days = dayKey(now) - dayKey(created)
-  const when = days <= 0 ? 'Today' : days === 1 ? 'Yesterday' : created.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
-  return `${when} · ${sizeLabel(item.aspect)} · ${tierName(item.resolution)}`
+  const when = days <= 0 ? t('photos.today') : days === 1 ? t('photos.yesterday') : formatDay(created)
+  return `${when} · ${sizeLabel(item.aspect, t)} · ${tierName(item.resolution, t)}`
 }
 
 // "1:1 · Standard · 2 credits" for a photo still developing.
-export function runningMeta(item: Pick<PhotoItem, 'aspect' | 'resolution' | 'credits'>): string {
-  const size = item.aspect === 'original' ? 'Original' : item.aspect
-  return `${size} · ${tierName(item.resolution)} · ${item.credits} ${item.credits === 1 ? 'credit' : 'credits'}`
+export function runningMeta(item: Pick<PhotoItem, 'aspect' | 'resolution' | 'credits'>, t: Translate): string {
+  const size = item.aspect === 'original' ? t('sizes.original') : item.aspect
+  return `${size} · ${tierName(item.resolution, t)} · ${t('credits', { count: item.credits })}`
 }

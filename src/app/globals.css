@@ -158,9 +158,11 @@
 /* Fonts come from next/font (src/app/fonts.ts); Tailwind emits these on :root, so
    font-sans / font-mono / font-display and var(--font-*) all resolve to the self-hosted files. */
 @theme {
-  --font-sans: var(--font-geist), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-display: var(--font-instrument-serif), "Times New Roman", serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  /* Simplified Chinese falls back to the system fonts, never a downloaded CJK web font
+     (DESIGN §3.2, ARCHITECTURE §17). */
+  --font-sans: var(--font-geist), -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --font-display: var(--font-instrument-serif), "Times New Roman", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", monospace;
 }
 
 @layer base {

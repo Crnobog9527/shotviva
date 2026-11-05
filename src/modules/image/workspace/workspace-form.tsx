@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 
 import { balanceSentence } from '@/core/app-shell/balance-copy'
@@ -22,22 +23,24 @@ type Props = {
   photo: ReturnType<typeof usePhoto>
   values: FormValues
   onChange(next: Partial<FormValues>): void
-  formats: string
 }
 
 // One column, one scroll, no wizard (DESIGN §4.3): photo → text the template needs → the
 // optional note → size → resolution, then the balance line above the fixed action bar.
-export function WorkspaceForm({ template, balance, photo, values, onChange, formats }: Props) {
+export function WorkspaceForm({ template, balance, photo, values, onChange }: Props) {
+  const t = useTranslations('app')
+  const balanceT = useTranslations('app.balance')
+  const noteT = useTranslations('app.workspace.notePlaceholder')
   const size = SIZE_OPTIONS.find((option) => option.id === values.aspect)
   return (
     <>
       <Section
         id="photo-h"
-        title="Your photo"
+        title={t('workspace.yourPhoto')}
         aside={
           photo.photo?.ratio ? (
             <span className="text-caption text-muted-foreground">
-              <span className="font-mono">{photo.photo.ratio}</span> · as shot
+              <span className="font-mono">{photo.photo.ratio}</span> · {t('sizes.asShot')}
             </span>
           ) : null
         }
@@ -45,7 +48,7 @@ export function WorkspaceForm({ template, balance, photo, values, onChange, form
         {photo.photo ? (
           <PhotoCard photo={photo.photo} upload={photo.upload} onPick={photo.pick} />
         ) : (
-          <PhotoPickers onPick={photo.pick} formats={formats} />
+          <PhotoPickers onPick={photo.pick} />
         )}
       </Section>
       {template.copyFields.length > 0 ? (
@@ -54,21 +57,21 @@ export function WorkspaceForm({ template, balance, photo, values, onChange, form
         </div>
       ) : null}
       <div className="px-4 pt-6">
-        <NoteField value={values.note} placeholder={notePlaceholder(template.category)} onChange={(note) => onChange({ note })} />
+        <NoteField value={values.note} placeholder={notePlaceholder(template.category, noteT)} onChange={(note) => onChange({ note })} />
       </div>
       <Section
         id="size-h"
-        title="Size"
+        title={t('workspace.size')}
         aside={
           <span className="text-caption text-muted-foreground">
-            {size?.name}
+            {size ? t(`sizes.${size.id}`) : null}
             {size?.ratio ? <span className="font-mono"> · {size.ratio}</span> : null}
           </span>
         }
       >
         <SizePicker value={values.aspect} onChange={(aspect) => onChange({ aspect })} />
       </Section>
-      <Section id="res-h" title="Resolution">
+      <Section id="res-h" title={t('workspace.resolution')}>
         <ResolutionPicker value={values.resolution} costs={template.creditsCost} balance={balance} onChange={(resolution) => onChange({ resolution })} />
       </Section>
       <p className="flex items-center gap-2 px-4 pt-5 text-caption text-muted-foreground">
@@ -76,7 +79,7 @@ export function WorkspaceForm({ template, balance, photo, values, onChange, form
           <circle cx="12" cy="12" r="8.5" />
           <path d="M12 8v4.5M12 16h.01" />
         </svg>
-        {balanceSentence(balance)}
+        {balanceSentence(balance, balanceT)}
       </p>
     </>
   )

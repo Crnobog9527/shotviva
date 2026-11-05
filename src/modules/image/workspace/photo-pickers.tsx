@@ -1,14 +1,19 @@
 'use client'
 
+import { useFormatter, useTranslations } from 'next-intl'
 import { useRef, type DragEvent } from 'react'
 
 import { UPLOAD_ACCEPT } from '@/core/storage/rules'
 import { cn } from '@/core/ui/cn'
 
+import { UPLOAD_FORMAT_NAMES, UPLOAD_MAX_MB } from './upload-formats'
+
 // Upload zone, empty (DESIGN §4.3 step 1, "Upload Zone"): a 16:9 hatched recess that also
 // takes a dropped file on desktop, then two entries. "Take photo" opens the camera (capture),
 // "Choose from gallery" the library (no capture). No HEIC in accept: iOS converts to JPEG.
-export function PhotoPickers({ onPick, formats }: { onPick(file: File): void; formats: string }) {
+export function PhotoPickers({ onPick }: { onPick(file: File): void }) {
+  const t = useTranslations('app.workspace')
+  const formats = t('formats', { formats: useFormatter().list(UPLOAD_FORMAT_NAMES, { type: 'disjunction' }), mb: UPLOAD_MAX_MB })
   const camera = useRef<HTMLInputElement>(null)
   const gallery = useRef<HTMLInputElement>(null)
   const onDrop = (event: DragEvent) => {
@@ -28,12 +33,12 @@ export function PhotoPickers({ onPick, formats }: { onPick(file: File): void; fo
         onDrop={onDrop}
         className="grid aspect-video place-content-center md:aspect-[5/2] justify-items-center gap-2 rounded-button bg-[repeating-linear-gradient(135deg,var(--hatch)_0_8px,transparent_8px_16px),var(--recess)] text-center shadow-[inset_0_0_0_1px_var(--recess-edge)]"
       >
-        <b className="text-body leading-[1.2] font-semibold">Add the photo you shot</b>
+        <b className="text-body leading-[1.2] font-semibold">{t('addPhoto')}</b>
         <span className="text-caption text-muted-foreground">{formats}</span>
       </div>
       <div className="mt-3 grid gap-2">
-        <PickButton label="Take photo" icon="camera" filled onClick={() => camera.current?.click()} />
-        <PickButton label="Choose from gallery" icon="gallery" onClick={() => gallery.current?.click()} />
+        <PickButton label={t('takePhoto')} icon="camera" filled onClick={() => camera.current?.click()} />
+        <PickButton label={t('chooseGallery')} icon="gallery" onClick={() => gallery.current?.click()} />
       </div>
       <input ref={camera} type="file" accept={UPLOAD_ACCEPT} capture="environment" hidden onChange={(e) => take(e.currentTarget)} />
       <input ref={gallery} type="file" accept={UPLOAD_ACCEPT} hidden onChange={(e) => take(e.currentTarget)} />

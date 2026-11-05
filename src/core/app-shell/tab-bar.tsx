@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 
 import { cn } from '../ui/cn'
@@ -18,10 +19,11 @@ const isRoot = (pathname: string, items: readonly TabItem[]) =>
 // columns. AppFrame reserves room for it through data-tabbar.
 export function TabBar({ items, brand }: { items: readonly TabItem[]; brand: string }) {
   const pathname = usePathname()
+  const t = useTranslations('app.tabs')
   if (!isRoot(pathname, items)) return null
   return (
     <nav
-      aria-label="Main"
+      aria-label={t('label')}
       data-tabbar=""
       className={cn(
         'bar-material fixed inset-x-0 bottom-0 z-60 grid px-2 pt-1 pb-[calc(var(--sab)+4px)]',

@@ -85,5 +85,200 @@
       "notConnected": "Not connected.",
       "disconnect": "Disconnect Graylum"
     }
+  },
+  "app": {
+    "tabs": {
+      "label": "Main",
+      "create": "Create",
+      "wishlist": "Wishlist",
+      "photos": "Photos",
+      "account": "Account"
+    },
+    "sheet": {
+      "close": "Close"
+    },
+    "credits": "{count, plural, one {# credit} other {# credits}}",
+    "balance": {
+      "chipBoth": "{paid} + {free} free",
+      "chipFree": "{free} free",
+      "chipPaid": "{count, plural, one {# credit} other {# credits}}",
+      "chipAria": "Balance: {label}. Get credits",
+      "none": "You have 0 credits left.",
+      "both": "You have {paid, plural, one {# credit} other {# credits}} and {free, plural, one {# free credit} other {# free credits}}.",
+      "free": "You have {free, plural, one {# free credit} other {# free credits}}.",
+      "paid": "You have {paid, plural, one {# credit} other {# credits}}.",
+      "getCredits": "Get credits",
+      "panelTitle": "Credits"
+    },
+    "create": {
+      "title": "Create",
+      "lede": "Pick a look. Your photo stays as shot.",
+      "metaTitle": "Create",
+      "empty": "Templates are on their way. Check back soon.",
+      "templates": "Templates",
+      "filter": "Filter templates",
+      "all": "All",
+      "illustrative": "Template images are illustrative examples."
+    },
+    "template": {
+      "fromCredits": "from {count, plural, one {# credit} other {# credits}}",
+      "cardAlt": "{name} template example: phone photo on the left, AI result on the right",
+      "phone": "Phone",
+      "ai": "AI",
+      "videoTemplate": "Video template",
+      "animatedTemplate": "Animated template",
+      "example": "Illustrative example",
+      "featureAria": "{name}, video template, {category}. Preview",
+      "featureMeta": "{category} · video",
+      "preview": "Preview",
+      "compareAria": "Compare phone photo and AI result",
+      "phonePhotoAlt": "Phone photo",
+      "resultAlt": "{name} result",
+      "loopAria": "{name} example: phone photo changing into the AI result",
+      "animationAlt": "{name} example animation",
+      "hintCompare": "Drag across the photo to compare.",
+      "hintMotion": "Your photo plays the same change as this short loop.",
+      "use": "Use this template"
+    },
+    "tiers": {
+      "1k": {
+        "name": "Standard",
+        "use": "Social & delivery apps"
+      },
+      "2k": {
+        "name": "HD",
+        "use": "Websites & online stores"
+      },
+      "3k": {
+        "name": "Max",
+        "use": "Print & zoom"
+      },
+      "notEnough": "(not enough credits)"
+    },
+    "sizes": {
+      "original": "Original",
+      "16:9": "Banner",
+      "4:5": "Post",
+      "1:1": "Listing",
+      "9:16": "Story",
+      "3:2": "Rental",
+      "4:3": "Website",
+      "2:3": "Pin",
+      "asShot": "as shot"
+    },
+    "workspace": {
+      "back": "Create",
+      "yourPhoto": "Your photo",
+      "size": "Size",
+      "resolution": "Resolution",
+      "addPhoto": "Add the photo you shot",
+      "formats": "{formats} · up to {mb}MB",
+      "takePhoto": "Take photo",
+      "chooseGallery": "Choose from gallery",
+      "photoAlt": "Your photo",
+      "uploaded": "Uploaded",
+      "uploading": "Uploading",
+      "compressing": "Compressing",
+      "uploadingAria": "Uploading your photo",
+      "compressingAria": "Compressing your photo",
+      "replace": "Replace photo",
+      "chooseAnother": "Choose another photo",
+      "noteLabel": "Anything to change?",
+      "optional": "(optional)",
+      "notePlaceholder": {
+        "Food & Drink": "e.g. Add a sprig of mint, remove the napkin",
+        "Products & Resale": "e.g. Keep the chain gold, soften the shadow",
+        "Beauty & Skincare": "e.g. Keep the label sharp, add a few water drops",
+        "Rooms & Spaces": "e.g. Keep the sofa, warm up the lamp light",
+        "Pets": "e.g. Keep the collar, use a soft grey backdrop",
+        "Art Styles": "e.g. Keep the glasses, softer line work",
+        "fallback": "e.g. Keep the colours, brighten the background"
+      },
+      "generate": "Generate",
+      "getCredits": "Get credits",
+      "needed": "needed",
+      "wait": "Wait for a photo to finish",
+      "needPhoto": "Add your photo to start",
+      "uploadingCta": "Uploading your photo…",
+      "needCopy": "Fill in the text above",
+      "freeNotice": "This photo uses free credits: it's shown publicly with a watermark.",
+      "freeNoticeKey": "Paid credits make it private and watermark-free.",
+      "needsCredits": "{tier} needs {count, plural, one {# credit} other {# credits}}.",
+      "needsCreditsKey": "Paid credits make photos private and watermark-free.",
+      "waitNotice": "You can develop {count, plural, one {# photo} other {# photos}} at a time. The next one starts when one lands in Photos.",
+      "developingTitle": "Developing your photo",
+      "developing": "Developing",
+      "generating": "Generating",
+      "leave": "Usually 20–40 seconds. You can leave this page. It lands in Photos when it's done.",
+      "backToCreate": "Back to Create",
+      "readyTitle": "Your photo is ready",
+      "beforeAfter": "Before and after",
+      "makeAnother": "Make another",
+      "seeInPhotos": "See in Photos",
+      "resultAlt": "Your photo restyled with {name}",
+      "failTitle": "This photo didn't develop",
+      "retry": "Retry",
+      "useAnother": "Use another photo"
+    },
+    "errors": {
+      "CONTENT_REJECTED": "The photo or your note didn't pass the safety check. Try another photo or change the note.",
+      "GENERATION_FAILED": "The studio couldn't finish this photo. It usually works on a second try.",
+      "PROVIDER_FAILED": "The studio couldn't finish this photo. It usually works on a second try.",
+      "PROVIDER_TIMEOUT": "This photo took too long to develop. It usually works on a second try.",
+      "OUTPUT_WRITE_FAILED": "We couldn't save the finished photo. Please try again.",
+      "CREDITS_INSUFFICIENT": "You don't have enough credits for this resolution.",
+      "RATE_LIMITED": "Wait for one of your photos to finish, then try again.",
+      "IMAGE_TOO_LARGE": "This photo is larger than 20MB. Please pick a smaller one.",
+      "IMAGE_UNSUPPORTED": "Please use a JPG, PNG or WebP photo.",
+      "UPLOAD_FAILED": "Upload failed. Check your connection and try again.",
+      "INVALID_INPUT": "Something in the form needs another look. Check the photo and fields, then try again.",
+      "UNAUTHORIZED": "Please sign in again.",
+      "fallback": "Something went wrong. Please try again.",
+      "refunded": "Your credits were refunded.",
+      "onHold": "Your credits are on hold. We'll return them, or contact support.",
+      "notCharged": "No credits were used."
+    },
+    "photos": {
+      "title": "Photos",
+      "metaTitle": "Photos",
+      "inProgress": "In progress",
+      "usually": "Usually 20–40 seconds each",
+      "closeApp": "You can close the app. Finished photos land here.",
+      "generating": "Generating",
+      "generatingAria": "Generating {name}",
+      "done": "Done",
+      "newest": "Newest first",
+      "count": "{running, plural, =0 {} other {# in progress · }}{done} done",
+      "footnote": "Photos made with free credits are public with a watermark. Photos made with paid credits are private and watermark-free.",
+      "photoAlt": "{name} photo",
+      "empty": "No photos yet. Pick a template, add a phone photo, and it lands here.",
+      "emptyCta": "Create your first photo",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "fallbackName": "Photo",
+      "badgeAria": "{count} in progress",
+      "pill": "{count, plural, one {Generating…} other {Generating #…}}"
+    },
+    "work": {
+      "freePublic": "Public · watermark",
+      "private": "Private",
+      "public": "Public"
+    },
+    "result": {
+      "back": "Photos",
+      "share": "Share",
+      "download": "Download",
+      "longPress": "Long-press to save",
+      "makeAnotherWith": "Make another with {name}",
+      "shareText": "Made with {brand} {url}"
+    },
+    "wishlist": {
+      "title": "Wishlist",
+      "placeholder": "Template requests open here soon."
+    },
+    "account": {
+      "metaTitle": "Account"
+    },
+    "creditsUnit": "{count, plural, one {credit} other {credits}}"
   }
 }

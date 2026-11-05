@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation'
-import { Suspense } from 'react'
+import { useTranslations } from 'next-intl'
+import { getTranslations } from 'next-intl/server'
+import { Suspense, type ReactNode } from 'react'
 
 import { AppPage, BalanceChip, FlowNav } from '@/core/app-shell'
 import { createServerSupabase, requireUser } from '@/core/auth'
@@ -9,7 +11,10 @@ import { listTemplates } from '@/core/templates'
 import { ImageWorkspace, toCatalogueTemplate, WorkspaceHead } from '@/modules/image'
 import { site } from '@/site/site.config'
 
-const BACK = { href: '/generate', label: 'Create' }
+function Nav({ title, aside }: { title: string; aside?: ReactNode }) {
+  const t = useTranslations('app.workspace')
+  return <FlowNav back={{ href: '/generate', label: t('back') }} title={title} aside={aside} />
+}
 
 // The workspace, a flow page: no tab bar, back to Create, one fixed primary (DESIGN §8.2).
 async function Workspace({ params }: { params: Promise<{ templateId: string }> }) {
@@ -24,15 +29,16 @@ async function Workspace({ params }: { params: Promise<{ templateId: string }> }
     listOwnJobs(supabase, user.id, new Date()),
   ])
   const template = toCatalogueTemplate(found)
+  const t = await getTranslations('app.result')
   return (
     <>
-      <FlowNav back={BACK} title={template.name} aside={<BalanceChip balance={balance} />} />
+      <Nav title={template.name} aside={<BalanceChip balance={balance} />} />
       <WorkspaceHead template={template} />
       <ImageWorkspace
         template={template}
         balance={balance}
         concurrency={{ limit, runningIds: own.running.map((job) => job.id) }}
-        shareText={`Made with ${site.brand.name} https://${site.brand.domain}/?utm_source=share&utm_medium=web_share`}
+        shareText={t('shareText', { brand: site.brand.name, url: `https://${site.brand.domain}/?utm_source=share&utm_medium=web_share` })}
       />
     </>
   )
@@ -41,7 +47,7 @@ async function Workspace({ params }: { params: Promise<{ templateId: string }> }
 export default function WorkspacePage({ params }: PageProps<'/generate/[templateId]'>) {
   return (
     <AppPage>
-      <Suspense fallback={<FlowNav back={BACK} title="" />}>
+      <Suspense fallback={<Nav title="" />}>
         <Workspace params={params} />
       </Suspense>
     </AppPage>

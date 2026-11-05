@@ -1,4 +1,6 @@
 import { notFound } from 'next/navigation'
+import { useTranslations } from 'next-intl'
+import { getTranslations } from 'next-intl/server'
 import { Suspense } from 'react'
 
 import { AppPage, FlowNav } from '@/core/app-shell'
@@ -8,7 +10,10 @@ import { listTemplates } from '@/core/templates'
 import { ResultView, toPhotoItem } from '@/modules/image'
 import { site } from '@/site/site.config'
 
-const BACK = { href: '/photos', label: 'Photos' }
+function Nav({ title }: { title: string }) {
+  const t = useTranslations('app.result')
+  return <FlowNav back={{ href: '/photos', label: t('back') }} title={title} />
+}
 
 // One finished photo, a flow page pushed from Photos: full-width result and Share.
 async function Result({ params }: { params: Promise<{ jobId: string }> }) {
@@ -18,12 +23,16 @@ async function Result({ params }: { params: Promise<{ jobId: string }> }) {
   const job = await findOwnJob(supabase, user.id, jobId)
   if (!job || job.status !== 'succeeded') notFound()
   const templates = await listTemplates(supabase, 'web')
-  const lookup = new Map(templates.map((t) => [t.id, { name: t.name, cover: t.coverAfterUrl }]))
-  const item = toPhotoItem(job, lookup, fileUrlFor(job.id))
+  const t = await getTranslations('app')
+  const lookup = new Map(templates.map((tpl) => [tpl.id, { name: tpl.name, cover: tpl.coverAfterUrl }]))
+  const item = toPhotoItem(job, lookup, fileUrlFor(job.id), t('photos.fallbackName'))
   return (
     <>
-      <FlowNav back={BACK} title={item.templateName} />
-      <ResultView item={item} shareText={`Made with ${site.brand.name} https://${site.brand.domain}/?utm_source=share&utm_medium=web_share`} />
+      <Nav title={item.templateName} />
+      <ResultView
+        item={item}
+        shareText={t('result.shareText', { brand: site.brand.name, url: `https://${site.brand.domain}/?utm_source=share&utm_medium=web_share` })}
+      />
     </>
   )
 }
@@ -31,7 +40,7 @@ async function Result({ params }: { params: Promise<{ jobId: string }> }) {
 export default function ResultPage({ params }: PageProps<'/photos/[jobId]'>) {
   return (
     <AppPage>
-      <Suspense fallback={<FlowNav back={BACK} title="" />}>
+      <Suspense fallback={<Nav title="" />}>
         <Result params={params} />
       </Suspense>
     </AppPage>
