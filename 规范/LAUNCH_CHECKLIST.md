@@ -103,7 +103,7 @@
 - [ ] 出图失败、支付回调失败会在 Sentry 告警
 - [ ] 后台能新建、编辑、上下架模板和提示词
 - [ ] `admin_adjust_credits`、`admin_ban_user` 两个 SQL 函数可用，调用会写流水
-- [ ] 模板化验收：把 `site/` 换成一份示例配置、`modules.image = false`，`pnpm build` 能通过且 `/generate` 返回 404
+- [ ] 模板化验收：把 `site/` 换成一份示例配置、`modules.image = false`、`features.wishlist = false`，`pnpm build` 能通过，`/generate`、`/wishlist`、`/admin/requests` 都返回 404，tab bar 只剩三项
 
 ## 9.5 Graylum 连接器（Shotviva 侧）
 
