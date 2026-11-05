@@ -118,3 +118,19 @@ export async function ledgerOf(db: Client, id: string) {
 }
 
 export const DAY_MS = 24 * 60 * 60 * 1000
+
+// A published template with an explicit per-resolution price, for tests that need a specific
+// charge (reserve_credits reads the price from the template, never from the caller).
+export async function createPricedTemplate(
+  db: Client,
+  cost: { '1k': number; '2k': number; '3k': number } = { '1k': 1, '2k': 2, '3k': 3 },
+  quality: 'high' | 'medium' = 'medium',
+) {
+  const id = `t16-${randomUUID().slice(0, 8)}`
+  await db.query(
+    `insert into public.templates (id, name, category, fields, quality, credits_cost, is_active, visible_in)
+     values ($1, 'T16 priced', 'test', $2, $3, $4, true, array['web', 'partner'])`,
+    [id, JSON.stringify({ images: { min: 0, max: 1 }, copy: [], aspectRatios: ['1:1'] }), quality, JSON.stringify(cost)],
+  )
+  return id
+}

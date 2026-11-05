@@ -20,6 +20,12 @@ const publicEnvSchema = z.object({
   NEXT_PUBLIC_POSTHOG_HOST: z.url().default('https://us.i.posthog.com'),
   // Sentry DSN, public by design. Unset means Sentry stays off in browser, server and edge.
   NEXT_PUBLIC_SENTRY_DSN: z.url().optional(),
+  // Public origin of the assets bucket (assets.shotviva.com in production, the bucket's r2.dev
+  // URL in preview), no trailing slash. Cover URLs are this + '/covers/…' (ARCHITECTURE §8.3).
+  NEXT_PUBLIC_ASSETS_BASE_URL: z
+    .url()
+    .transform((url) => url.replace(/\/+$/, ''))
+    .optional(),
 })
 
 export type PublicEnv = z.infer<typeof publicEnvSchema>
@@ -35,4 +41,5 @@ export const publicEnv: PublicEnv = publicEnvSchema.parse({
   NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
   NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST || undefined,
   NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN || undefined,
+  NEXT_PUBLIC_ASSETS_BASE_URL: process.env.NEXT_PUBLIC_ASSETS_BASE_URL || undefined,
 })

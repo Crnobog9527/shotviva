@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { ProviderError, type GenerationProvider, type ProviderInput, type ProviderOutput } from '@/core/jobs'
 
 import { toProviderError } from './openai-errors'
-import { outputSizeFor } from './output-size'
+import { formatSize, outputSize } from './output-size'
 
 // GPT-Image-2.5 via OpenAI's Images API: /v1/images/edits when the template takes a photo
 // (the normal case: keep the dish, change the scene), /v1/images/generations otherwise.
@@ -16,10 +16,10 @@ export type OpenAIImageConfig = {
   baseUrl?: string
 }
 
-// Keys template_prompts.model_params may set; anything else is ignored.
+// Keys template_prompts.model_params may set; anything else is ignored. `quality` is not one of
+// them: it comes from the template's quality tier, which the template's price is floored on.
 const paramsSchema = z.object({
   model: z.string().regex(/^gpt-image-[\w.-]+$/).optional(),
-  quality: z.enum(['auto', 'low', 'medium', 'high', 'xhigh', 'max']).optional(),
   background: z.enum(['auto', 'opaque', 'transparent']).optional(),
 })
 
@@ -30,10 +30,10 @@ function buildRequest(config: OpenAIImageConfig, input: ProviderInput): { path: 
   const fields: Record<string, string> = {
     model: params.model ?? config.model,
     prompt: input.prompt,
-    size: outputSizeFor(input.aspectRatio),
+    size: formatSize(outputSize(input.resolution, input.aspectRatio, input.images[0])),
+    quality: input.quality,
     n: '1',
     output_format: 'png',
-    ...(params.quality ? { quality: params.quality } : {}),
     ...(params.background ? { background: params.background } : {}),
   }
   const headers = { Authorization: `Bearer ${config.apiKey}` }

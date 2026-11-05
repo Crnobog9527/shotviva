@@ -13,7 +13,10 @@ vi.mock('./actions', () => ({
   saveTemplateAction: vi.fn(),
   setTemplateActiveAction: vi.fn(),
   reorderTemplatesAction: vi.fn(),
+  requestCoverUploadAction: vi.fn(),
+  applyCoverAction: vi.fn(),
 }))
+vi.mock('@/modules/image', () => ({ CREDITS_FLOOR: {} }))
 
 const { default: AdminTemplatesPage } = await import('./page')
 

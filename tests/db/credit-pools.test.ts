@@ -5,16 +5,19 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { refundJob, reserveJob, setJobVisibility, type ReserveJobInput } from '@/core/jobs'
 
-import { anonClient, connectAdmin, createUser, DAY_MS, ledgerOf, profileOf, serviceClient } from './helpers'
+import { anonClient, connectAdmin, createPricedTemplate, createUser, DAY_MS, ledgerOf, profileOf, serviceClient } from './helpers'
 
 // T14 (ARCHITECTURE §6.1, AGENTS §7 item 1): paid pool first, then free, one pool per job,
 // never split; the job records the pool; refunds go back to it. paid_until plays no part.
 
 const service = serviceClient()
 let db: Client
+// Priced 1 / 2 / 3; jobs default to '2k' (cost 2).
+let templateId: string
 
 beforeAll(async () => {
   db = await connectAdmin()
+  templateId = await createPricedTemplate(db)
 })
 
 afterAll(async () => {
@@ -25,9 +28,9 @@ const job = (userId: string, overrides: Partial<ReserveJobInput> = {}): ReserveJ
   jobId: randomUUID(),
   userId,
   module: 'image',
-  templateId: 'freeform',
-  creditsCost: 2,
+  templateId,
   source: 'web',
+  inputs: { resolution: '2k' },
   provider: 'openai',
   ...overrides,
 })
@@ -94,7 +97,7 @@ describe('reserve_credits pool choice', () => {
   it('keeps both pools non-negative under 10 concurrent reserves', async () => {
     const userId = await createUser(db, { credits: 3, freeCredits: 2 })
     const results = await Promise.allSettled(
-      Array.from({ length: 10 }, () => reserveJob(service, job(userId, { creditsCost: 1 }))),
+      Array.from({ length: 10 }, () => reserveJob(service, job(userId, { inputs: { resolution: '1k' } }))),
     )
     const pools = results.flatMap((r) => (r.status === 'fulfilled' ? [r.value.creditPool] : []))
     expect(pools.filter((p) => p === 'paid')).toHaveLength(3)

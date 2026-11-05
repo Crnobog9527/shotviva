@@ -3,6 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { listAdminTemplates, reorderTemplates, saveTemplate, setTemplateActive } from '@/core/admin'
 
+import { CREDITS_FLOOR } from '@/modules/image/credits-floor'
+
 import { connectAdmin } from './helpers'
 import { serviceSupabase as serviceClient } from './supabase-env'
 
@@ -15,7 +17,8 @@ const template = (id: string, name = id) => ({
   id,
   name,
   category: 'test',
-  creditsCost: 1,
+  quality: 'high',
+  creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
   visibleIn: ['web'],
   fields: { images: { min: 1, max: 1 }, copy: [], aspectRatios: ['1:1'] },
 })
@@ -35,8 +38,8 @@ describe('admin template commands', () => {
   })
 
   it('creates templates unpublished, at the end of the list, with prompt v1', async () => {
-    await saveTemplate(client, ADMIN_ID, { isNew: true, template: { ...template(A), isActive: true }, prompt: prompt('one') })
-    await saveTemplate(client, ADMIN_ID, { isNew: true, template: template(B), prompt: prompt('one') })
+    await saveTemplate(client, ADMIN_ID, { isNew: true, template: { ...template(A), isActive: true }, prompt: prompt('one') }, CREDITS_FLOOR)
+    await saveTemplate(client, ADMIN_ID, { isNew: true, template: template(B), prompt: prompt('one') }, CREDITS_FLOOR)
     const rows = await listAdminTemplates(client)
     const a = rows.find((row) => row.id === A)
     expect(a).toMatchObject({ isActive: false, prompt: { body: 'one', version: 1 } })
@@ -46,18 +49,18 @@ describe('admin template commands', () => {
 
   it('rejects a duplicate id on create and an unknown id on edit', async () => {
     await expect(
-      saveTemplate(client, ADMIN_ID, { isNew: true, template: template(A), prompt: prompt('x') }),
+      saveTemplate(client, ADMIN_ID, { isNew: true, template: template(A), prompt: prompt('x') }, CREDITS_FLOOR),
     ).rejects.toMatchObject({ code: 'INVALID_INPUT' })
     await expect(
-      saveTemplate(client, ADMIN_ID, { isNew: false, template: template('test-admin-missing'), prompt: prompt('x') }),
+      saveTemplate(client, ADMIN_ID, { isNew: false, template: template('test-admin-missing'), prompt: prompt('x') }, CREDITS_FLOOR),
     ).rejects.toMatchObject({ code: 'NOT_FOUND' })
   })
 
   it('edits public info and bumps the prompt version only when the prompt changes', async () => {
-    await saveTemplate(client, ADMIN_ID, { isNew: false, template: template(A, 'Renamed'), prompt: prompt('one') })
+    await saveTemplate(client, ADMIN_ID, { isNew: false, template: template(A, 'Renamed'), prompt: prompt('one') }, CREDITS_FLOOR)
     let a = (await listAdminTemplates(client)).find((row) => row.id === A)
     expect(a).toMatchObject({ name: 'Renamed', prompt: { version: 1 } })
-    await saveTemplate(client, ADMIN_ID, { isNew: false, template: template(A, 'Renamed'), prompt: prompt('two') })
+    await saveTemplate(client, ADMIN_ID, { isNew: false, template: template(A, 'Renamed'), prompt: prompt('two') }, CREDITS_FLOOR)
     a = (await listAdminTemplates(client)).find((row) => row.id === A)
     expect(a?.prompt).toMatchObject({ body: 'two', version: 2 })
   })
@@ -73,7 +76,7 @@ describe('admin template commands', () => {
 
   it('keeps the stored status when an edit omits it', async () => {
     await setTemplateActive(client, ADMIN_ID, { id: B, active: true })
-    await saveTemplate(client, ADMIN_ID, { isNew: false, template: template(B, 'B2'), prompt: prompt('one') })
+    await saveTemplate(client, ADMIN_ID, { isNew: false, template: template(B, 'B2'), prompt: prompt('one') }, CREDITS_FLOOR)
     expect((await listAdminTemplates(client)).find((row) => row.id === B)?.isActive).toBe(true)
   })
 

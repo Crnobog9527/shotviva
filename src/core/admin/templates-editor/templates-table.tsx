@@ -31,7 +31,7 @@ export function TemplatesTable({ templates, canReorder, pending, onEdit, onToggl
           <TableHead>名称 / ID</TableHead>
           <TableHead>分类</TableHead>
           <TableHead>展示入口</TableHead>
-          <TableHead>积分</TableHead>
+          <TableHead>积分（Standard / HD / Max）</TableHead>
           <TableHead>提示词版本</TableHead>
           <TableHead>上架</TableHead>
           <TableHead className="text-right">操作</TableHead>
@@ -76,7 +76,10 @@ export function TemplatesTable({ templates, canReorder, pending, onEdit, onToggl
                 ))}
               </div>
             </TableCell>
-            <TableCell>{template.creditsCost}</TableCell>
+            <TableCell>
+              {`${template.creditsCost['1k']} / ${template.creditsCost['2k']} / ${template.creditsCost['3k']}`}
+              <span className="text-muted-foreground block text-xs">{template.quality}</span>
+            </TableCell>
             <TableCell>{template.prompt ? `v${template.prompt.version}` : '缺失'}</TableCell>
             <TableCell>
               <Switch

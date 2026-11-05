@@ -35,8 +35,8 @@ beforeAll(async () => {
       jobId: randomUUID(),
       userId: user,
       module: 'image',
+      // freeform at Standard: reserve_credits charges its '1k' price, 2 (T16).
       templateId: 'freeform',
-      creditsCost: 1,
       source: 'web',
     })
   }
@@ -99,8 +99,8 @@ describe('admin.users_overview', () => {
       generation_count: 2,
       banned_at: null,
     })
-    // Two 1-credit reservations against 7 paid + 3 free.
-    expect(row.credits + row.free_credits).toBe(8)
+    // Two 2-credit reservations against 7 paid + 3 free.
+    expect(row.credits + row.free_credits).toBe(6)
     expect(row.paid_until).toEqual(new Date('2027-01-01T00:00:00Z'))
     expect(row.created_at).toBeInstanceOf(Date)
     expect(row.last_generation_at).toBeInstanceOf(Date)

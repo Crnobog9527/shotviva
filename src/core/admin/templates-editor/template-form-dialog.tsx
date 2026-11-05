@@ -4,10 +4,12 @@ import { useState } from 'react'
 
 import { Button } from '@/core/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/core/ui/dialog'
+import type { CreditsFloor } from '@/core/templates/pricing'
 
-import type { AdminTemplate, SaveTemplatePayload } from '../templates/types'
+import type { AdminTemplate, SaveTemplatePayload, TemplateAdminActions } from '../templates/types'
 
 import { buildPayload, emptyFormValues, toFormValues } from './form-state'
+import { TemplateCoverFields } from './template-cover-fields'
 import { TemplatePromptFields } from './template-prompt-fields'
 import { TemplatePublicFields } from './template-public-fields'
 
@@ -15,6 +17,8 @@ export type EditTarget = { mode: 'new' } | { mode: 'edit'; template: AdminTempla
 
 type Props = {
   target: EditTarget
+  floor: CreditsFloor
+  coverActions: Pick<TemplateAdminActions, 'requestCoverUpload' | 'applyCover'>
   pending: boolean
   error: string | null
   onCancel: () => void
@@ -22,7 +26,7 @@ type Props = {
 }
 
 // Mounted fresh per target (keyed by the container), so initial state comes straight from props.
-export function TemplateFormDialog({ target, pending, error, onCancel, onSubmit }: Props) {
+export function TemplateFormDialog({ target, floor, coverActions, pending, error, onCancel, onSubmit }: Props) {
   const isNew = target.mode === 'new'
   const [values, setValues] = useState(() =>
     target.mode === 'edit' ? toFormValues(target.template) : emptyFormValues(),
@@ -31,7 +35,7 @@ export function TemplateFormDialog({ target, pending, error, onCancel, onSubmit 
   const onChange = (patch: Partial<typeof values>) => setValues((prev) => ({ ...prev, ...patch }))
 
   const submit = () => {
-    const result = buildPayload(values, isNew)
+    const result = buildPayload(values, isNew, floor)
     if (!result.ok) {
       setLocalError(result.message)
       return
@@ -47,7 +51,12 @@ export function TemplateFormDialog({ target, pending, error, onCancel, onSubmit 
         <DialogHeader>
           <DialogTitle>{isNew ? '新建模板' : `编辑「${target.template.name}」`}</DialogTitle>
         </DialogHeader>
-        <TemplatePublicFields values={values} isNew={isNew} onChange={onChange} />
+        <TemplatePublicFields values={values} isNew={isNew} floor={floor} onChange={onChange} />
+        {target.mode === 'edit' ? (
+          <TemplateCoverFields template={target.template} actions={coverActions} />
+        ) : (
+          <p className="text-muted-foreground text-xs">保存模板后再打开编辑，即可上传封面。</p>
+        )}
         <TemplatePromptFields
           values={values}
           version={target.mode === 'edit' ? (target.template.prompt?.version ?? null) : null}

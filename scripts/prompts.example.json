@@ -13,13 +13,14 @@
         "copy": [{ "key": "headline", "label": "Headline", "required": false, "maxLength": 40 }],
         "aspectRatios": ["1:1", "4:5"]
       },
-      "creditsCost": 1,
+      "quality": "high",
+      "creditsCost": { "1k": 2, "2k": 4, "3k": 6 },
       "sortOrder": 10,
       "isActive": false,
       "visibleIn": ["web", "partner"],
       "prompt": {
         "body": "FAKE PROMPT. Replace with the tuned prompt in .local/prompts.json; never commit real prompts.",
-        "modelParams": { "quality": "high" }
+        "modelParams": {}
       }
     }
   ]

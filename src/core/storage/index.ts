@@ -4,6 +4,6 @@ export { createUpload, uploadRequestSchema, type UploadTicket } from './create-u
 export { loadInputImage, normalizeInputImage, type InputImage } from './input-image'
 export { isOwnInputKey, newInputKey, outputKeyFor } from './keys'
 export type { ObjectHead, ObjectStore, PresignGetOptions } from './object-store'
-export { createR2Client, createR2Store, r2Store } from './r2-store'
+export { createR2Client, createR2Store, r2PublicStore, r2Store } from './r2-store'
 export { sniffImageType, type SniffedType } from './sniff'
 export { applyWatermark, shouldWatermark } from './watermark'

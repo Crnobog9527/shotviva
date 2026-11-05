@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { creditsCostSchema, TEMPLATE_QUALITIES } from './pricing'
+
 // Template shapes shared by the admin page, the import script and (later) generation.
 // No `server-only` here: scripts/import-prompts.ts validates with the same schema.
 
@@ -7,6 +9,10 @@ export const TEMPLATE_SURFACES = ['web', 'partner'] as const
 export type TemplateSurface = (typeof TEMPLATE_SURFACES)[number]
 
 export const TEMPLATE_MODULES = ['image', 'video'] as const
+
+// How a template card shows itself (ARCHITECTURE §8.3): still before/after, animated WebP, MP4.
+export const COVER_MEDIA_TYPES = ['image', 'animated', 'video'] as const
+export type CoverMediaType = (typeof COVER_MEDIA_TYPES)[number]
 
 const slug = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'lowercase letters, digits and dashes')
 
@@ -36,7 +42,8 @@ export type TemplateFields = z.infer<typeof templateFieldsSchema>
 
 const optionalUrl = z.union([z.url(), z.literal('')]).optional()
 
-// Public, catalogue-facing part of a template (the `templates` row).
+// Public, catalogue-facing part of a template (the `templates` row). Covers are optional and
+// left out by the editor (the cover upload writes them); an omitted cover keeps the stored one.
 export const templateInputSchema = z.object({
   id: slug.max(64),
   module: z.enum(TEMPLATE_MODULES).default('image'),
@@ -45,7 +52,9 @@ export const templateInputSchema = z.object({
   coverBeforeUrl: optionalUrl,
   coverAfterUrl: optionalUrl,
   fields: templateFieldsSchema,
-  creditsCost: z.number().int().min(1).max(100).default(1),
+  quality: z.enum(TEMPLATE_QUALITIES).default('high'),
+  // Per-resolution price; the admin save also checks it against the floor (modules/image).
+  creditsCost: creditsCostSchema,
   sortOrder: z.number().int().optional(),
   isActive: z.boolean().optional(),
   visibleIn: z

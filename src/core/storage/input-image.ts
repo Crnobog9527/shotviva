@@ -8,7 +8,8 @@ import type { ObjectStore } from './object-store'
 import { INPUT_JPEG_QUALITY, INPUT_LONG_EDGE, isUploadContentType, MAX_UPLOAD_BYTES } from './rules'
 import { sniffImageType } from './sniff'
 
-export type InputImage = { bytes: Uint8Array; contentType: 'image/jpeg' }
+// width / height are the normalized image's, so 'original' outputs follow the photo's ratio.
+export type InputImage = { bytes: Uint8Array; contentType: 'image/jpeg'; width: number; height: number }
 
 // Well above 2048² and any phone camera, well below what would exhaust function memory.
 const MAX_INPUT_PIXELS = 120_000_000
@@ -50,7 +51,9 @@ export async function loadInputImage(store: ObjectStore, key: string): Promise<I
   if (!sniffed || !isUploadContentType(sniffed)) throw await reject(store, key, 'IMAGE_UNSUPPORTED', `magic:${sniffed}`)
 
   try {
-    return { bytes: await normalizeInputImage(bytes), contentType: 'image/jpeg' }
+    const normalized = await normalizeInputImage(bytes)
+    const { width, height } = await sharp(normalized).metadata()
+    return { bytes: normalized, contentType: 'image/jpeg', width, height }
   } catch {
     throw await reject(store, key, 'IMAGE_UNSUPPORTED', 'decode')
   }

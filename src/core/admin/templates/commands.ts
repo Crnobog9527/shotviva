@@ -5,7 +5,7 @@ import { z } from 'zod'
 
 import { AppError } from '@/core/errors'
 import { logger } from '@/core/logger'
-import { promptInputSchema, templateInputSchema } from '@/core/templates'
+import { creditsBelowFloor, promptInputSchema, templateInputSchema, type CreditsFloor } from '@/core/templates'
 
 import * as repo from './repository'
 import type { SaveTemplatePayload } from './types'
@@ -24,13 +24,27 @@ function parseOrThrow<T>(schema: z.ZodType<T>, value: unknown, what: string): T 
   return result.data
 }
 
+const TIER_LABEL = { '1k': 'Standard', '2k': 'HD', '3k': 'Max' } as const
+
+// ARCHITECTURE §6.1: prices may go up, never below the floor for the template's quality tier.
+function assertAboveFloor(template: z.infer<typeof templateInputSchema>, floor: CreditsFloor): void {
+  const low = creditsBelowFloor(template.quality, template.creditsCost, floor)
+  if (low.length === 0) return
+  const detail = low.map((v) => `${TIER_LABEL[v.resolution]} 不能低于 ${v.floor}（填了 ${v.given}）`).join('；')
+  throw new AppError('INVALID_INPUT', `积分低于下限：${detail}`)
+}
+
+// `floor` is the image module's floor table (modules/image/credits-floor.ts); core cannot
+// import a module, so the server action passes it in.
 export async function saveTemplate(
   client: SupabaseClient,
   adminId: string,
   payload: SaveTemplatePayload,
+  floor: CreditsFloor,
 ): Promise<void> {
   const template = parseOrThrow(templateInputSchema, payload.template, 'template')
   const prompt = parseOrThrow(promptInputSchema, payload.prompt, 'prompt')
+  assertAboveFloor(template, floor)
   const exists = await repo.templateExists(client, template.id)
   if (payload.isNew && exists) {
     throw new AppError('INVALID_INPUT', `id "${template.id}" is already taken`)
