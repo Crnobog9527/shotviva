@@ -361,9 +361,10 @@ v1 后台只做**两页**：
 
 | 需要 | v1 怎么做 |
 |---|---|
-| 查用户、看积分流水、看订单、看失败任务 | Supabase 后台直接查表 |
+| 查用户、看积分流水、看订单、看失败任务 | Supabase 后台打开视图 `admin.users_overview`（按邮箱搜索，一行看全：邮箱、注册时间、登录方式、角色、付费 / 免费积分、会员到期、出图次数、最近出图、是否封禁；Owner 2026-11-05），细节再查对应表。视图放在不对外暴露的 `admin` schema，只有 `postgres` / `service_role` 可读，客户端和 Data API 都访问不到；邮箱实时从 `auth.users` 读，不复制 |
 | 手动调积分 | 在 Supabase SQL 编辑器调用 `admin_adjust_credits(user_id, amount, reason)`，函数写流水 |
 | 封禁用户 | 调用 `admin_ban_user(user_id, reason)` |
+| 设为管理员 | 在 Supabase Studio 把该用户 `profiles.role` 改为 `admin`（运营数据修改，不是迁移，AGENTS §5 允许） |
 | 退款 | 在 Stripe 或 Waffo 后台操作 |
 | 作品审核页 | 第 6~7 周和审核功能一起做 |
 

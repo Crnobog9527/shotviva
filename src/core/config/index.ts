@@ -10,5 +10,5 @@ export type {
   SiteProduct,
 } from './define-site'
 export { MODULE_ROUTES, isModuleEnabled, isPathEnabled, moduleForPath, requireModule } from './modules'
-export { PRICE_PENDING, formatProductPrice, freeImagesLabel, pricedProducts } from './price'
+export { PRICE_PENDING, formatProductPrice, pricedProducts } from './price'
 export { addressLines, formatAddress } from './brand'

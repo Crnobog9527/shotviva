@@ -17,7 +17,7 @@
     },
     "signup": {
       "title": "Create your account",
-      "freeImages": "Start with {count} free images.",
+      "freeImages": "Start with {count} free Standard images.",
       "submit": "Create account",
       "toLogin": "Already have an account? Sign in",
       "sentTitle": "Check your email",
