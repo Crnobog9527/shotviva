@@ -407,5 +407,8 @@
     "compactMonth": "{count, plural, one {# credit} other {# credits}} a month · {price} per credit",
     "comingSoonList": "<b>Coming soon:</b> {items}",
     "perCreditShort": "{price} each"
+  },
+  "announcement": {
+    "dismiss": "Dismiss announcement"
   }
 }
