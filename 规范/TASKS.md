@@ -228,6 +228,17 @@
 
 **范围补充 2（总控 2026-11-05）**：新增 SQL 函数 `current_tier(user_id)`（ARCHITECTURE §6.2「会员档位权益」），生成限频的并发上限按档位 1 / 3 / 6（没有档位为 1）；付费墙档位卡按 DESIGN §4.5 列权益，Coming soon 单独成组；不写「排队优先」。
 
+**范围补充 3（总控 2026-11-06）**：Owner 已建好 Stripe 账户的沙盒（测试环境），**未提交激活**。本卡：
+- 定 Stripe 环境变量名，写进 `core/env.ts` 和 `.env.example`（密钥只在服务端）。
+- 写幂等脚本 `scripts/stripe-setup.ts`：用环境变量里的密钥，按 ARCHITECTURE §6.2 建好 9 个商品的 Product 和 15 个 Price（`lookup_key`、`metadata.product_id`、税码 `txcd_10105001`）。已存在的跳过，价格对不上时报错、不覆盖。
+- PR 里给 Owner 写清步骤：
+  1. 在本机带测试密钥跑一次脚本。
+  2. 打开测试环境的 Alipay。
+  3. 把密钥填进 Vercel Preview。
+  4. 预览部署后登记 Webhook。
+
+  上线时换正式密钥再跑一次。密钥不进聊天、PR、日志。
+
 **验收**：LAUNCH §5 的商品 / Price 一条、Stripe 卡与钱包两条 + 回调重发三次只发一次 + 签名错误 400；付费墙在 375px 上每屏不超过三个选项、不滚动能完成选择（Codex 验收）。
 
 **依赖**：T2、T5、T6、T15（编号段）、T16（模板扣费字段）。
