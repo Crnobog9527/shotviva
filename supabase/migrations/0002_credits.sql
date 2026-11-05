@@ -1,16 +1,56 @@
--- T14: balance functions with two pools (ARCHITECTURE §6.1). Replaces 0023 / 0025.
--- Signatures change (a pool argument, a wider return type), so the old ones are dropped
--- rather than replaced; reserve_credits / refund_job are recreated in 0142.
---
--- is_paid() is dropped: paid_until no longer decides watermark, visibility or commercial
--- use (each work's credit_pool does), and nothing else read it.
+-- Baseline (T15): credits, ledger and products (ARCHITECTURE §6.1, §6.2, AGENTS §5).
+-- Balances change only through the functions below; only service_role may call the public
+-- ones, the browser and the anon/authenticated roles never touch balances.
 
-drop function public.apply_purchase(uuid, text, text);
-drop function public.grant_credits(uuid, integer, text, text);
-drop function public.admin_adjust_credits(uuid, integer, text, text);
-drop function public.is_paid(uuid);
-drop function public._apply_credit_change(uuid, text, integer, text, text, uuid, text, integer);
-drop type public.credit_change;
+-- Every change to profiles.credits / free_credits / paid_until is recorded here. The unique
+-- idempotency key is what makes grants, reserves, refunds and purchases settle at most once.
+-- pool is which pool the row moved; balance_after is that pool's balance after the change.
+-- Private: no client role can read or write it.
+create table public.credit_ledger (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  kind text not null check (kind in ('grant', 'reserve', 'refund', 'purchase', 'admin_adjust')),
+  delta integer not null check (delta <> 0),
+  balance_after integer not null check (balance_after >= 0),
+  paid_until_after timestamptz,
+  reason text not null check (length(reason) > 0),
+  idempotency_key text not null unique,
+  job_id uuid,
+  product_id text,
+  created_at timestamptz not null default now(),
+  -- No default: every writer must say which pool it moved.
+  pool text not null check (pool in ('free', 'paid'))
+);
+
+create index credit_ledger_user_id_created_at_idx on public.credit_ledger (user_id, created_at desc);
+
+alter table public.credit_ledger enable row level security;
+
+revoke all on public.credit_ledger from anon, authenticated;
+-- Server-side reads only (support, debugging); writes go through SQL functions.
+grant select on public.credit_ledger to service_role;
+
+-- One-time SKUs. Only what apply_purchase needs to settle a purchase lives here; public
+-- prices are read from site.config.ts. A product with days extends paid_until; a pack
+-- (days null) only adds paid credits. price_usd stays 0 until pricing is final.
+create table public.products (
+  id text primary key check (id in ('pass', 'pack')),
+  credits integer not null check (credits > 0),
+  days integer check (days > 0),
+  price_usd numeric(10, 2) not null default 0 check (price_usd >= 0),
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+alter table public.products enable row level security;
+
+revoke all on public.products from anon, authenticated;
+-- Server-side reads only (support, debugging); writes go through SQL functions.
+grant select on public.products to service_role;
+
+insert into public.products (id, credits, days, price_usd) values
+  ('pass', 30, 30, 0),
+  ('pack', 120, null, 0);
 
 -- Both balances after a change, so callers never need a second read.
 create type public.credit_change as (
@@ -102,8 +142,8 @@ $$;
 revoke execute on function public._apply_credit_change(uuid, text, text, integer, text, text, uuid, text, integer)
   from public, anon, authenticated, service_role;
 
--- One-off grants. The signup bonus (T1, key 'signup:{user_id}') and promos use 'free';
--- the pool is required so a grant can never land in the wrong pool by default.
+-- One-off grants. The signup bonus (key 'signup:{user_id}') and promos use 'free'; the pool
+-- is required so a grant can never land in the wrong pool by default.
 create function public.grant_credits(
   p_user_id uuid,
   p_amount integer,
