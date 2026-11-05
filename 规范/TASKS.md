@@ -212,6 +212,8 @@
 
 **依据**：ARCHITECTURE §6.2 商品表与「同一个商品挂 recurring 和 one-time 两个 Price」「分两段上线」；§6.3 Stripe 路由表（MP 不传 `payment_method_types`、微信 `client = 'web'`、税码 `txcd_10105001`、「审核没下来之前卡先走普通订阅」）、「要处理的 Stripe 事件」；§6.1 `apply_purchase(user, product_id, event_id)` 用 session id 当 `event_id`；DESIGN §4.5；AGENTS §6 回调验签、§7 测试 2。
 
+**预览环境的支付回调**（总控 2026-11-05）：预览地址每个 PR 不同，且开着 Vercel 部署保护，Stripe 的回调会被挡成 401。做法：本地开发用 `stripe listen` 转发；CI 用签名后的模拟回调测（AGENTS §7 测试 2）；在预览上端到端验收时，打开 Vercel「Protection Bypass for Automation」，Stripe 测试模式登记一个回调，网址 = 正在验收的 PR 的分支地址 + `/api/webhooks/stripe?x-vercel-protection-bypass=<绕行密钥>`，换 PR 验收时只改网址、签名密钥不变。成功页 / 取消页地址由代码按当前部署地址（`core/site-url`）生成。绕行密钥和签名密钥只放 Vercel 环境变量与 Stripe 后台，不进代码、不进 PR。
+
 **验收**：LAUNCH §5 前三条 + 回调重发三次只发一次 + 签名错误 400。
 
 **依赖**：T2、T5、T6、价格数字定稿。
@@ -250,7 +252,7 @@
 
 **目标**：Waffo 托管结账卖 `monthly` / `yearly` 的单笔形态，回调验签 + 事件 id 去重 + `apply_purchase`；环境变量切通道时付费墙全部走 Waffo、隐藏微信和「自动续费」文案。
 
-**依据**：ARCHITECTURE §6.3「Waffo：保留，只做单笔兜底」四条；LAUNCH §5 Waffo 两条。**依赖**：T9。
+**依据**：ARCHITECTURE §6.3「Waffo：保留，只做单笔兜底」四条；LAUNCH §5 Waffo 两条。开工先核实 Waffo 的回调地址是每笔订单单独传还是后台固定一个：单独传就按当前部署地址生成；固定的就照 T9 的预览回调做法（分支地址 + Vercel 绕行密钥）。**依赖**：T9。
 
 ## T11 首页与内页最终文案（等价格数字）
 

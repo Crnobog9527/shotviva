@@ -58,6 +58,7 @@
 - [ ] Waffo 沙盒：卡、支付宝各单笔买一次每种商品，都能到账；付款页不显示微信、不显示「自动续费」
 - [ ] 只开 Waffo、只开 Stripe 两种开关状态下，付款页显示正确
 - [ ] 两条通道的回调各重发 3 次，积分只加一次；签名错误返回 400、不加积分；`charge.refunded` 产生 Sentry 告警且不动积分
+- [ ] Stripe / Waffo 正式模式的回调只登记 `https://shotviva.com/...`；测试模式的预览回调（分支地址 + Vercel 绕行密钥）没有出现在正式模式里；绕行密钥不在代码和 PR 里
 - [ ] 账号页显示订阅状态和下次续费日，「Manage subscription」能打开 Stripe Customer Portal
 - [ ] 新账号有 3 个免费积分、0 个付费积分；用免费积分生成的作品 `credit_pool = 'free'`、公开、下载带右下角「Made with Shotviva」水印、不能改私密、可以删除
 - [ ] 买任何商品后生成：优先扣付费池、整单不拆，作品 `credit_pool = 'paid'`、默认私密、下载无水印、可改公开；付费池用完后再生成又回到免费作品并弹付费墙
