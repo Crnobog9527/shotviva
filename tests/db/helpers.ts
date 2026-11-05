@@ -1,0 +1,107 @@
+import { execSync } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
+
+import { Client } from 'pg'
+
+import type { RpcClient } from '@/core/billing'
+
+type LocalSupabase = { dbUrl: string; apiUrl: string; serviceRoleKey: string; anonKey: string }
+
+// Explicit env wins (CI or a non-default local stack); otherwise ask the CLI for the
+// running local stack's values, so `pnpm test:db` works right after `supabase start`.
+function readStatus(): Record<string, string> {
+  const output = execSync('supabase status -o env', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+  return Object.fromEntries(
+    output
+      .split('\n')
+      .map((line) => line.match(/^([A-Z_]+)="?(.*?)"?$/))
+      .filter((match): match is RegExpMatchArray => match !== null)
+      .map((match) => [match[1], match[2]]),
+  )
+}
+
+let cached: LocalSupabase | undefined
+
+export function localSupabase(): LocalSupabase {
+  if (cached) return cached
+  const env = process.env
+  const status = env.SUPABASE_SERVICE_ROLE_KEY ? {} : readStatus()
+  const pick = (envKey: string, statusKey: string) => {
+    const value = env[envKey] ?? status[statusKey]
+    if (!value) throw new Error(`Missing ${envKey}; run supabase start`)
+    return value
+  }
+  cached = {
+    dbUrl: pick('SUPABASE_DB_URL', 'DB_URL'),
+    apiUrl: pick('SUPABASE_URL', 'API_URL'),
+    serviceRoleKey: pick('SUPABASE_SERVICE_ROLE_KEY', 'SERVICE_ROLE_KEY'),
+    anonKey: pick('SUPABASE_ANON_KEY', 'ANON_KEY'),
+  }
+  return cached
+}
+
+// Real PostgREST calls, so grants and RLS are exercised exactly as the app will hit them.
+export function restClient(key: string): RpcClient & { select(table: string): Promise<Response> } {
+  const { apiUrl } = localSupabase()
+  const headers = { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }
+  return {
+    async rpc(fn, args) {
+      const response = await fetch(`${apiUrl}/rest/v1/rpc/${fn}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(args),
+      })
+      const body: unknown = await response.json()
+      if (response.ok) return { data: body, error: null }
+      const error = body as { message?: string; code?: string }
+      return { data: null, error: { message: error.message ?? 'unknown', code: error.code } }
+    },
+    select(table) {
+      return fetch(`${apiUrl}/rest/v1/${table}?select=*`, { headers })
+    },
+  }
+}
+
+export const serviceClient = () => restClient(localSupabase().serviceRoleKey)
+export const anonClient = () => restClient(localSupabase().anonKey)
+
+export async function connectAdmin(): Promise<Client> {
+  const client = new Client({ connectionString: localSupabase().dbUrl })
+  await client.connect()
+  return client
+}
+
+// Inserting into auth.users fires the profiles trigger, like a real signup.
+export async function createUser(db: Client, profile: { credits?: number; paidUntil?: Date | null } = {}) {
+  const id = randomUUID()
+  await db.query(
+    "insert into auth.users (id, email, aud, role) values ($1, $2, 'authenticated', 'authenticated')",
+    [id, `t2-${id}@example.test`],
+  )
+  await db.query('update public.profiles set credits = $2, paid_until = $3 where id = $1', [
+    id,
+    profile.credits ?? 0,
+    profile.paidUntil ?? null,
+  ])
+  return id
+}
+
+export async function profileOf(db: Client, id: string) {
+  const { rows } = await db.query<{ credits: number; paid_until: Date | null; banned_at: Date | null }>(
+    'select credits, paid_until, banned_at from public.profiles where id = $1',
+    [id],
+  )
+  const row = rows[0]
+  if (!row) throw new Error(`no profile ${id}`)
+  return row
+}
+
+export async function ledgerOf(db: Client, id: string) {
+  const { rows } = await db.query<{ kind: string; delta: number; idempotency_key: string }>(
+    'select kind, delta, idempotency_key from public.credit_ledger where user_id = $1 order by id',
+    [id],
+  )
+  return rows
+}
+
+export const DAY_MS = 24 * 60 * 60 * 1000
