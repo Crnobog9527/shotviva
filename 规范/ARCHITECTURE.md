@@ -57,7 +57,7 @@ src/
 
 ```ts
 export const site = defineSite({
-  brand: { name: 'Shotviva', domain: 'shotviva.com', tagline: 'AI food & product photo studio' },   // 建站规格 §1
+  brand: { name: 'Shotviva', domain: 'shotviva.com', tagline: 'AI photo studio' },   // 建站规格 §1（Owner 2026-11-05 定）
   modules: { image: true, video: false },     // 关掉的模块：路由 404、不进 sitemap、不出现在导航和定价里
   locales: { default: 'en', enabled: ['en'] }, // next-intl，英文不带前缀
   billing: {
@@ -113,7 +113,7 @@ interface GenerationProvider {
 
 ### 3.2 v1 范围
 
-- `image` 模块：只实现 OpenAI GPT-Image 适配器（官方 `/v1/images/edits`）。**模型名是配置项**：环境变量 `OPENAI_IMAGE_MODEL`，默认值由 Owner 定（代码里当前默认 `gpt-image-2.5-sunburst`；GPT Image 2.6 已于 2026-11-04 上线、同价、更快，是否切换由 Owner 比较效果后决定，不在规范里替 Owner 定）。底座的 fal / KIE / WaveSpeed / Atlas 适配器不搬。
+- `image` 模块：只实现 OpenAI GPT-Image 适配器（官方 `/v1/images/edits`）。**模型名是配置项**：环境变量 `OPENAI_IMAGE_MODEL`，默认值由 Owner 定（代码里当前默认 `gpt-image-2.5-sunburst`；GPT Image 2.6 已于 2026-11-04 上线、同价、更快；Owner 2026-11-05 评估 2.6 对人物五官的保持很强，默认用哪个仍由 Owner 在环境变量里定）。底座的 fal / KIE / WaveSpeed / Atlas 适配器不搬。
 - `video` 模块：只有接口类型，`site.config.ts` 里是 `false`，不写任何视频页面。
 
 ## 4. 生成任务

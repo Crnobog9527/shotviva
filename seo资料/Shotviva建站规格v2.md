@@ -10,7 +10,7 @@
 - 唯一域名：shotviva.com（已注册）。不使用 .ai，不做 301 跳转。
 - 商标：USPTO 已查，无 shotviva 冲突。
 - 品牌写法全站统一 Shotviva（Logo、Title 后缀、structured data 的 brand 字段、社交账号）。
-- shotviva 与食物/图片无字面关联，Logo 旁必须常驻 tagline："AI food & product photo studio"；每个页面副标题也带一句功能说明。
+- shotviva 与图片无字面关联，Logo 旁必须常驻 tagline："AI photo studio"（Owner 2026-11-05 定，改为通用写法；原 "AI food & product photo studio" 作废）；每个页面副标题也带一句功能说明。
 - 首页 footer 固定一行站方声明（唯一官方站点），并占用 X / Instagram / Product Hunt / LinkedIn 的 shotviva 账号名。
 
 ## 2. SEO 硬规则（12 条，违反任意一条视为不合格交付）
