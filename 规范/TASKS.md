@@ -257,7 +257,7 @@
 
 ## T11 首页与内页最终文案（价格已定稿，可派）
 
-**依据**：ARCHITECTURE §12、§13；建站规格 §4、R10、G3（9 个商品的价格、"from 2 credits"、1K / 2K / 3K 作为可核验事实）。**依赖**：T5。
+**依据**：ARCHITECTURE §12、§13；建站规格 §4（首页 TDK 与 6 个 H2 骨架，2026-11-05 定稿）、R10、G1、G3、G4（可核验事实：9 个商品的价格、"from 2 credits"、Standard / HD / Max 三档像素，对外不写 1K / 2K / 3K）、G6（首页 5 句）。同时把 `site.config.ts` 的 `brand.tagline` 改成 "AI photo studio"（建站规格 §1）。**依赖**：T5。
 
 ## T12 模板需求墙（Wishlist）（等 T8）
 
