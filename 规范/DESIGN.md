@@ -112,7 +112,9 @@ Owner 2026-11-04 确定：**先走浅色系，不刻意贴合食物。** 界面�
 ### 4.5 付费墙
 
 - 触发：免费额度用完，或免费用户想把作品设为私密。
-- 手机上是底部抽屉，桌面是居中弹窗（第 8.4 节）。里面**两个选项**：短期通行证 `pass`、长期大包 `pack`（ARCHITECTURE.md 第 6.2 节），价格数字从配置读。推荐项高亮。
+- 手机上是底部抽屉，桌面是居中弹窗（第 8.4 节）。里面**两个商品**：`monthly`、`yearly`（ARCHITECTURE.md 第 6.2 节），价格数字从配置读。推荐项高亮。
+- 选了商品后是**两组付款方式**：「Card · Apple Pay · Google Pay」和「Alipay · WeChat Pay」。卡那组下面一行小字 "Renews automatically, cancel anytime"；钱包那组下面 "One-time payment, 30 days / 1 year, no auto-renew"。走 Waffo 时两组都是单笔，微信不显示。
+- 账号页「Subscription」区块：当前商品、状态（Active / Cancels on … / Past due / Free）、下次续费日，一个「Manage subscription」按钮打开 Stripe Customer Portal；钱包用户显示 "Paid until …" 和「Renew」按钮。
 - 付款方式图标：卡、支付宝、微信，按当前通道可用的方式显示（走 Waffo 时没有微信）。
 - 价格数字从 `site.config.ts` 或数据库读，禁止写死。
 

@@ -64,10 +64,10 @@ export const site = defineSite({
     currency: 'usd',
     freeCredits: 3,
     products: [                                   // 结构已定（第 6.2 节），价格数字待定
-      { id: 'pass', credits: 30, paidDays: 30, priceUsd: 0 /* 待定 */ },
-      { id: 'pack', credits: 120, paidDays: 365, priceUsd: 0 /* 待定 */ },
+      { id: 'monthly', credits: 30, paidDays: 30, priceUsd: 0 /* 待定 */ },
+      { id: 'yearly', credits: 360, paidDays: 365, priceUsd: 0 /* 待定 */ },
     ],
-    channels: { primary: 'stripe', fallback: 'waffo' },
+    channels: { primary: 'stripe', fallback: 'waffo' },   // 第 6.3 节：Waffo 只做单笔兜底
   },
   partners: { graylum: { returnToHosts: ['graylum.com', 'staging.graylum.com'] } },  // 第 14 节
   gallery: { enabled: false },                 // 创作库规格 U9：上线前 8 周不开页面
@@ -157,7 +157,9 @@ v1 上线 6~8 个调好的模板，之后每周加。提示词调到「餐具摆
 
 - `profiles.credits`（整数）：余额，**永不过期**。
 - `profiles.paid_until`（时间戳，可空）：付费身份窗口。**付费身份 = `paid_until > now()`**，决定私密、无水印、可商用。
-- 买任何商品：`credits += 商品积分`，`paid_until = max(paid_until, now()) + 商品天数`。
+- 首付、钱包单笔、Waffo 单笔都走 SQL 函数 `apply_purchase(user, product_id, event_id)`：`credits += 商品积分`，`paid_until = max(paid_until, now()) + 商品天数`。首付和单笔用 checkout session id 当 `event_id`，Waffo 用它的事件 id。
+- 订阅续费走 T10 新增的 `apply_subscription_renewal(user, product_id, invoice_id, period_end)`：`credits += 商品积分`，`paid_until = greatest(paid_until, period_end)`（直接对齐 Stripe 的本期结束日，不按天数累加，避免大小月漂移）；同样写流水、按 invoice id 幂等，内部复用 `_apply_credit_change`（总控 2026-11-05 补）。
+- 没用完的张数在续费时自然结转（积分不过期），不做「本期 / 结转」两本账。
 - **1 credit = 1 image**，「重新生成」也算一张。前台英文一律说 "image"（"3 free images"、"uses 1 image"），后台和代码叫 credit。
 - 余额只能通过 SQL 函数改：发放、预扣、确认、退回、管理员调整。前端和普通接口都不能直接写余额。
 - 每一笔变动都写进流水表，带幂等键。
@@ -165,34 +167,56 @@ v1 上线 6~8 个调好的模板，之后每周加。提示词调到「餐具摆
 
 ### 6.2 商品（结构已定，价格待定）
 
-**SKU 结构 Owner 2026-11-05 拍板：2 个一次性商品。**
+**SKU 结构 Owner 2026-11-05 拍板（下午修订，取代上午的「2 个一次性商品」）：2 个会员商品，每个有两种付款形态。**
 
-| id | 形态 | 积分 | 付费身份 |
-|---|---|---|---|
-| `pass` | 短期通行证 | 30（默认，随价格最终定） | +30 天 |
-| `pack` | 长期大包 | 120（默认，随价格最终定） | +365 天 |
+| id | 积分 | 付费身份 | 卡 / Apple Pay / Google Pay | 支付宝 / 微信 |
+|---|---|---|---|---|
+| `monthly` | 30（默认，随价格最终定） | +30 天 | Stripe **订阅**，自动续费，每期 +30 | Stripe **单笔**，到期不自动续，再买一次 |
+| `yearly` | 360，一次发完 | +365 天 | Stripe **订阅**，每年续费一次 +360 | Stripe **单笔** |
 
-价格数字由 pricing-research 定稿后填进 `site.config.ts`，并同步修改建站规格 G3；在此之前 `priceUsd` 留 0，付费墙和 `/pricing` 的数字从配置读。商品 id 固定为 `pass` / `pack`，Stripe / Waffo 的商品映射、PostHog `purchase` 事件参数都按这两个 id 写。
+- 同一个商品在 Stripe 里是一个 Product（税码 `txcd_10105001`）挂两个 Price：recurring 和 one-time，价格相同。
+- 支付宝 / 微信在 Stripe 普通模式下不支持订阅，所以钱包用户买的是「一期会员」，`paid_until` 到了自己再买。这不是功能缺失，是 Stripe 的限制，付费墙文案要说清楚（"Renews automatically" vs "30 days, no auto-renew"）。
+- 价格数字由 pricing-research 定稿后填进 `site.config.ts`，并同步修改建站规格 G3；在此之前 `priceUsd` 留 0，付费墙和 `/pricing` 的数字从配置读。商品 id 固定为 `monthly` / `yearly`，Stripe / Waffo 的商品映射、PostHog `purchase` 事件参数都按这两个 id 写。
 
 已经确定的规则：
 
-- v1 只有一次性付款，不自动续费。「会员期」就是 `paid_until`。
-- 卡、支付宝、微信都能付。
+- **订阅的状态只有 Stripe 一份真相**，Shotviva 存一张镜像表 `subscriptions`（`user_id`、`stripe_subscription_id`、`product_id`、`status`、`current_period_end`、`cancel_at_period_end`），由回调同步，账号页只读它。
+- 续费成功：`invoice.paid`（`billing_reason = subscription_cycle`）→ `apply_purchase`，`paid_until = 本期 period_end`。
+- **续费失败：什么都不做。** `paid_until` 到期自然变回免费身份；Stripe 自己重试，哪天扣成功哪天再延。不写宽限期。
+- 取消：期末生效（Stripe 默认）。用户在 Stripe Customer Portal（Managed Payments 下是 Link 的客户门户）自己取消，账号页只放一个「Manage subscription」链接，不自己写取消界面。`customer.subscription.updated / deleted` 只更新镜像表。
+- 外部退款（Managed Payments 下 Link 客服 60 天内可以不经我们退款）：`charge.refunded` 只写记录 + Sentry 告警，Owner 手动 `admin_adjust_credits`。不写自动扣回。
+- 不做：首月优惠券、升级降级、按比例退款、宽限期、测试时钟自动化、到期提醒邮件。
+- **分两段上线**：上线当天必须有「订阅模式建结账 + 首付发放」（和单笔几乎相同）；续费、取消同步、Portal 链接在第一个付费用户满 30 天之前上线即可（TASKS T10）。
+- 卡、支付宝、微信都能付（第 6.3 节的路由）。
 - **水印在下载路由加**：成品只存一份无水印原图；`core/storage` 的下载路由按「`visibility = 'public'` 且当前非付费身份」用 `sharp` 叠右下角「Made with Shotviva」后返回（约 50ms），工作台预览和将来创作库展示同样走这个路由。付费后旧作品自动无水印，不重处理。
 - 付费作品默认私密、可商用。付费期内做的作品到期后仍保持私密，不会自动公开。
-- 卡支付的自动续费 v1 不做，等有付费用户再加。
-- 到期提醒邮件 v1 不做，第一个到期最早在上线 30 天后。
+- 到期提醒邮件 v1 不做；Managed Payments 订阅的续费提醒由 Stripe / Link 自动发。
 
 ### 6.3 通道
 
-- Stripe 和 Waffo **v1 都要接**。原因：Stripe 新账户审核可能一天完成不了，Waffo 可以加急当天开通，上线当天可能只有 Waffo 能收款。
-- 通过环境变量指定当前用哪条通道：两条都开就 Stripe 优先、Waffo 兜底；只开一条就只显示那一条。**不做自动故障切换**，出问题时人工改开关。
-- Waffo 不支持微信支付，走 Waffo 时付款页只显示卡和支付宝。
-- 两条通道的回调规则相同：先验签，再按事件 id 去重，最后在一个数据库事务里写订单、发积分或会员期。
+**Stripe：一个账户，按付款方式路由**（照 Graylum staging `methodRouting.ts` 的做法，Graylum 2026-10-12 沙盒实测两种模式共用一个账户 PASS）：
+
+| 用户选的方式 | Checkout Session 怎么建 | 卖家 |
+|---|---|---|
+| 卡 / Apple Pay / Google Pay | `mode: 'subscription'`，`managed_payments: { enabled: true }`，不传 `payment_method_types`（MP 不允许） | Stripe（Link）当商户记录方，结账时另加税 |
+| 支付宝 | `mode: 'payment'`，`payment_method_types: ['alipay']` | Shotviva |
+| 微信 | `mode: 'payment'`，`payment_method_types: ['wechat_pay']`，`payment_method_options.wechat_pay.client = 'web'` | Shotviva |
+
+- 服务端只认用户选的方式，不按 IP 或浏览器语言强制。Managed Payments 的结账页不允许买家国家为中国，所以大陆用户自然选钱包。
+- MP 商品必须设税码 `txcd_10105001`（AI 服务，个人用）。MP 价格不含税，税在结账时另加。
+- 顾客账单：卡支付显示 `LINK.COM* SHOTVIVA`，钱包支付显示 SHOTVIVA。MP 结账页不支持自定义域名。
+- 正式环境的 Managed Payments 要等 Stripe 资格审核。**审核没下来之前的兜底**：卡先不带 `managed_payments` 走普通订阅（Shotviva 当卖家），审核通过后翻开关。
+- 要处理的 Stripe 事件：`checkout.session.completed`（首付 / 单笔 → `apply_purchase`，写镜像表）、`invoice.paid`（只认 `subscription_cycle` → `apply_purchase`）、`customer.subscription.updated / deleted`（只更新镜像表）、`charge.refunded`（记录 + 告警）。其余事件忽略。
 - Stripe 用与 Graylum 同一主体下**新开的独立账户**，避免两边回调互相收到对方的事件。
-- Stripe **开启 Managed Payments**（Owner 2026-11-05 确定）：多收 3.5%，由 Stripe 代算代缴美国销售税，和 Graylum staging 一致。**Managed Payments 下 Alipay / WeChat 是否可用尚未核实**，接 Stripe 之前先向 Stripe 确认一次。
-- **开发顺序：先接 Waffo，再接 Stripe。** Waffo 上线必有；Stripe 账户审核未通过不卡 Waffo 那张卡合并。
-- 做法参照 Graylum **staging 分支**的支付规则，但不复制它的代码：staging 的支付目录约 8900 行，而且还没上生产。
+
+**Waffo：保留，只做单笔兜底**（Owner 2026-11-05 确认不砍）：
+
+- 角色是 Stripe 账户本身没通过、或 Stripe 整体不可用时的收款兜底。Waffo 可以加急当天开通。
+- Waffo 上只卖 `monthly` / `yearly` 的**单笔**形态（+30 / +365 天），不做 Waffo 订阅；Waffo 不支持微信，付款页只显示卡和支付宝。
+- 通过环境变量指定当前用哪条通道：默认 Stripe；切到 Waffo 时付费墙全部方式都走 Waffo 单笔。**不做自动故障切换**，出问题时人工改开关。
+- 回调规则和 Stripe 相同：先验签，再按事件 id 去重，最后 `apply_purchase`。
+
+**开发顺序**：先 Stripe（T9 结账 + 首付、T10 续费），再 Waffo 兜底（T13）。做法参照 Graylum **staging 分支**的支付规则，但不复制它的代码：staging 的支付目录约 8900 行，带着首月优惠券、升级、宽限、测试时钟，Shotviva 一项都不要。
 
 ## 7. 登录
 
@@ -324,7 +348,7 @@ Owner 2026-11-04 决定：**不在 flux-kontext-template 上原地改造**，新
 - 应用页用第 1 节的 `(app)` 应用壳，按 DESIGN.md 第 8 节先出手机稿。
 - **模板需求墙（Wishlist）随 v1 上线**（Owner 2026-11-05 决定），占应用壳第四个 tab，见第 15 节。
 
-v1 不做：积分引擎抽象层、积分过期和批次、自动续费、自动故障切换、自动退款、保留期定时任务、提醒邮件、内容审核、作品审核页、除模板页和需求审核页外的后台页、多语言内容、海报排版功能、视频生成实现、服务端 HEIC 转码、原图存储、断点续传、PWA / 离线、需求墙的评论 / 通知 / 重复合并 / 分类筛选。
+v1 不做：积分引擎抽象层、积分过期和批次、订阅的宽限期 / 自动扣回 / 升级降级 / 优惠券 / 自写取消界面、Waffo 订阅、自动故障切换、自动退款、保留期定时任务、提醒邮件、内容审核、作品审核页、除模板页和需求审核页外的后台页、多语言内容、海报排版功能、视频生成实现、服务端 HEIC 转码、原图存储、断点续传、PWA / 离线、需求墙的评论 / 通知 / 重复合并 / 分类筛选。
 
 ## 14. 伙伴接口（Graylum 连接器）
 

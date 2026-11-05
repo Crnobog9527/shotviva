@@ -16,8 +16,9 @@
 | T6 | 设计方向（impeccable，手机稿） | 可派 | — |
 | T7 | Graylum 伙伴接口 | 可派 | T1、T2、T3、T4 |
 | T8 | 应用壳与工作台 UI | 等 T6 | T4、T6 |
-| T9 | 付费墙、/pricing、Waffo 结账 | 等价格数字 | T2、T5、T6 |
-| T10 | Stripe 结账 | 等 Stripe 账户 + Managed Payments 核实 | T9 |
+| T9 | 付费墙、/pricing、Stripe 结账与首付发放 | 等价格数字 | T2、T5、T6 |
+| T10 | 订阅续费、取消同步、Customer Portal | 等 T9；首个付费用户满 30 天前上线 | T9 |
+| T13 | Waffo 单笔兜底 | 等 T9 | T9 |
 | T11 | 首页与内页最终文案 | 等价格数字 | T5 |
 | T12 | 模板需求墙（Wishlist） | 等 T8 | T1、T4、T8 |
 
@@ -156,7 +157,7 @@
 
 **范围**：设计产出物（变量表、三屏稿），不写业务代码。
 
-**依据**：DESIGN §0「三个关键屏先出 375px 手机稿，Owner 评审的就是手机稿」；§1 四条原则；§3.1「先走浅色系，不刻意贴合食物」；§8 应用壳全部（tab bar、流程页固定主按钮、底部抽屉、禁止清单）；§4.5 付费墙「两个选项：`pass`、`pack`」。
+**依据**：DESIGN §0「三个关键屏先出 375px 手机稿，Owner 评审的就是手机稿」；§1 四条原则；§3.1「先走浅色系，不刻意贴合食物」；§8 应用壳全部（tab bar、流程页固定主按钮、底部抽屉、禁止清单）；§4.5 付费墙「两个商品 `monthly` / `yearly` × 两组付款方式」。
 
 **验收**：
 - [ ] 工作台稿是流程页：顶栏返回 + 底部固定 Generate，无 tab bar
@@ -199,15 +200,35 @@
 
 ---
 
-## T9 付费墙、/pricing、Waffo 结账（等价格数字）
+## T9 付费墙、/pricing、Stripe 结账与首付发放（等价格数字）
 
-**依据**：ARCHITECTURE §6.2 两个商品、§6.3「先接 Waffo」「回调先验签，再按事件 id 去重，最后在一个事务里写订单、发积分或会员期」；DESIGN §4.5；AGENTS §7 测试 2。
+**目标**：付费墙（两个商品 × 两组付款方式）、`/pricing`、Stripe Checkout Session 按付款方式路由（卡 = Managed Payments 订阅，钱包 = 单笔）、`checkout.session.completed` 回调 → `apply_purchase` + 写 `subscriptions` 镜像表。上线当天要有的部分。
+
+**范围**：`core/billing/stripe/`、`app/api/webhooks/stripe`、`app/(marketing)/pricing`、付费墙组件、迁移编号段 `0080`～`0099`（`subscriptions` 表；以及把 T2 的 `products` 从 `pass`/`pack` 改成 `monthly`（30 张/30 天）/`yearly`（360 张/365 天）的迁移：改 check 约束和种子行）、`site/site.config.ts` 的商品 id 与积分（同步改 T5 的相关测试）。不许动：`_apply_credit_change` / `apply_purchase` 的逻辑、续费逻辑（T10）。（总控 2026-11-05 补：main 上已合并的代码仍是 `pass`/`pack`，由 T9 负责改名。）
+
+**依据**：ARCHITECTURE §6.2 商品表与「同一个商品挂 recurring 和 one-time 两个 Price」「分两段上线」；§6.3 Stripe 路由表（MP 不传 `payment_method_types`、微信 `client = 'web'`、税码 `txcd_10105001`、「审核没下来之前卡先走普通订阅」）、「要处理的 Stripe 事件」；§6.1 `apply_purchase(user, product_id, event_id)` 用 session id 当 `event_id`；DESIGN §4.5；AGENTS §6 回调验签、§7 测试 2。
+
+**验收**：LAUNCH §5 前三条 + 回调重发三次只发一次 + 签名错误 400。
 
 **依赖**：T2、T5、T6、价格数字定稿。
 
-## T10 Stripe 结账（等 Stripe 账户 + Managed Payments 下 Alipay / WeChat 核实）
+## T10 订阅续费、取消同步、Customer Portal（等 T9；首个付费用户满 30 天前上线）
 
-**依据**：ARCHITECTURE §6.3；LAUNCH §5。**依赖**：T9。
+**目标**：`invoice.paid`（只认 `subscription_cycle`）→ `apply_subscription_renewal`（invoice id 幂等，`paid_until` 对齐 `period_end`）；`customer.subscription.updated / deleted` 更新镜像表；`charge.refunded` 记录 + Sentry 告警；账号页 Subscription 区块 + Customer Portal 链接。
+
+**范围补充**：迁移编号段 `0100`～`0119`，新增 SQL 函数 `apply_subscription_renewal`（ARCHITECTURE §6.1），测试连本地 Supabase：同一 invoice 重发只发一次、`paid_until` 对齐 `period_end` 且不回退。
+
+**依据**：ARCHITECTURE §6.2「续费失败：什么都不做」「取消：期末生效……不自己写取消界面」「外部退款……不写自动扣回」；DESIGN §4.5 账号页区块；AGENTS §7 测试 2（Stripe 另加四项）和 4。
+
+**验收**：LAUNCH §5 测试时钟续费一条、Portal 取消一条、`charge.refunded` 告警一条、账号页一条。
+
+**依赖**：T9。
+
+## T13 Waffo 单笔兜底（等 T9）
+
+**目标**：Waffo 托管结账卖 `monthly` / `yearly` 的单笔形态，回调验签 + 事件 id 去重 + `apply_purchase`；环境变量切通道时付费墙全部走 Waffo、隐藏微信和「自动续费」文案。
+
+**依据**：ARCHITECTURE §6.3「Waffo：保留，只做单笔兜底」四条；LAUNCH §5 Waffo 两条。**依赖**：T9。
 
 ## T11 首页与内页最终文案（等价格数字）
 
