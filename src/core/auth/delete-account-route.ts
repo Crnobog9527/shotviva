@@ -4,7 +4,7 @@ import { z } from 'zod'
 
 import { AppError, toAppError } from '../errors'
 import { logger } from '../logger'
-import { publicEnv } from '../public-env'
+import { appOrigin } from '../site-url'
 import { deleteAccount, noUploadsYetStorage, type AccountStorage } from './account-deletion'
 import { getSessionUser } from './session'
 import { createAdminSupabase } from './supabase-admin'
@@ -16,7 +16,7 @@ const bodySchema = z.object({ confirm: z.literal('DELETE') })
 // subdomain or a form on another origin from triggering an irreversible delete.
 function assertSameOrigin(request: NextRequest) {
   const origin = request.headers.get('origin')
-  if (origin !== new URL(publicEnv.NEXT_PUBLIC_SITE_URL).origin) throw new AppError('FORBIDDEN', 'Bad origin')
+  if (origin !== appOrigin) throw new AppError('FORBIDDEN', 'Bad origin')
 }
 
 async function run(request: NextRequest, storage: AccountStorage) {

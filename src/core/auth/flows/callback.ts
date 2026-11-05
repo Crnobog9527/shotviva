@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 import { logger } from '../../logger'
 import { publicEnv } from '../../public-env'
+import { appOrigin } from '../../site-url'
 import { onVerifiedSignIn } from '../first-sign-in'
 import { isEmailVerified } from '../session-user'
 import { parseFlow, type CallbackFlow } from './callback-url'
@@ -47,7 +48,7 @@ export async function handleAuthCallback(request: NextRequest, options: { freeCr
   const flow = parseFlow(request.nextUrl.searchParams.get('flow'))
   const outcome = await resolveOutcome(request, jar, flow, options.freeCredits)
   const target = callbackTarget(outcome, request.nextUrl.searchParams.get('next'))
-  const response = NextResponse.redirect(new URL(target, publicEnv.NEXT_PUBLIC_SITE_URL))
+  const response = NextResponse.redirect(new URL(target, appOrigin))
   jar.forEach(({ name, value, options: cookieOptions }) => response.cookies.set(name, value, cookieOptions))
   return response
 }
