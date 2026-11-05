@@ -1,12 +1,15 @@
 import { useTranslations } from 'next-intl'
 import { Suspense } from 'react'
 
-import { requireUser } from '@/core/auth'
+import { createServerSupabase, requireUser } from '@/core/auth'
 import { DeleteAccountPanel } from '@/core/auth/ui'
+import { readLinkStatus } from '@/core/partner'
+import { GraylumConnection } from '@/core/partner/ui'
 
 import { signOutAction } from '../../auth/actions'
+import { disconnectGraylumAction } from './partner-actions'
 
-function AccountView({ email }: { email: string | null }) {
+function AccountView({ email, graylumLinkedAt }: { email: string | null; graylumLinkedAt: Date | null }) {
   const t = useTranslations('auth.account')
   return (
     <section className="mx-auto flex w-full max-w-[720px] flex-col gap-6 px-4 py-8">
@@ -17,6 +20,7 @@ function AccountView({ email }: { email: string | null }) {
           {t('signOut')}
         </button>
       </form>
+      <GraylumConnection linkedAt={graylumLinkedAt} disconnect={disconnectGraylumAction} />
       <h2 className="text-lg font-semibold">{t('dangerZone')}</h2>
       <DeleteAccountPanel />
     </section>
@@ -25,7 +29,8 @@ function AccountView({ email }: { email: string | null }) {
 
 async function Account() {
   const user = await requireUser('/account')
-  return <AccountView email={user.email} />
+  const graylum = await readLinkStatus(await createServerSupabase(), user.id)
+  return <AccountView email={user.email} graylumLinkedAt={graylum.linkedAt} />
 }
 
 export default function AccountPage() {

@@ -1,0 +1,60 @@
+import 'server-only'
+
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { NextResponse, type NextRequest } from 'next/server'
+
+import { assertSameOrigin, loginPath, type SessionUser } from '../auth'
+import type { PartnerSiteConfig } from '../config'
+import { logger } from '../logger'
+import { issueLinkCode } from './link-code'
+import { connectRedirectUrl, parseConnectRequest } from './return-to'
+
+export const CONNECT_PAGE_PATH = '/connect/graylum'
+
+export function connectPagePath(params: { state?: string | null; return_to?: string | null }): string {
+  const query = new URLSearchParams()
+  if (params.state) query.set('state', params.state)
+  if (params.return_to) query.set('return_to', params.return_to)
+  const search = query.toString()
+  return search ? `${CONNECT_PAGE_PATH}?${search}` : CONNECT_PAGE_PATH
+}
+
+export type ConnectAuthorizeDeps = {
+  db: () => SupabaseClient
+  user: () => Promise<SessionUser | null>
+  config: PartnerSiteConfig
+}
+
+const plain = (body: string, status: number) =>
+  new NextResponse(body, { status, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } })
+
+const field = (form: FormData, name: string) => {
+  const value = form.get(name)
+  return typeof value === 'string' ? value : null
+}
+
+// The "Allow" button's form POST (ARCHITECTURE §14.2): mint the one-time code and 302 back
+// to Graylum's allowlisted callback with the original state. A plain form POST plus a real
+// 302 keeps the hop visible and works without client JavaScript.
+export async function handleConnectAuthorize(request: NextRequest, deps: ConnectAuthorizeDeps): Promise<NextResponse> {
+  try {
+    assertSameOrigin(request)
+  } catch {
+    return plain('Bad origin', 403)
+  }
+  const form = await request.formData().catch(() => new FormData())
+  const params = { state: field(form, 'state'), return_to: field(form, 'return_to') }
+  const connect = parseConnectRequest(params, deps.config)
+  if (!connect) return plain('This connect link is not valid. Go back to Graylum and try again.', 400)
+
+  const user = await deps.user()
+  // The session expired between showing the page and the click: sign in, then start over.
+  if (!user || !user.emailVerified) return NextResponse.redirect(new URL(loginPath(connectPagePath(params)), request.url), 303)
+  try {
+    const code = await issueLinkCode(deps.db(), user.id)
+    return NextResponse.redirect(connectRedirectUrl(connect, code), 302)
+  } catch (error) {
+    logger.error('connect authorize failed', { error })
+    return plain('Something went wrong. Please try again.', 500)
+  }
+}

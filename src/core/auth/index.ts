@@ -1,6 +1,6 @@
 // Server-side entry. Client components live in core/auth/ui (import '@/core/auth/ui').
 export { getSessionUser, requireAdmin, requireUser } from './session'
-export { sanitizeNext } from './redirect-target'
+export { loginPath, sanitizeNext } from './redirect-target'
 export type { Role, SessionUser } from './session-user'
 export { createServerSupabase } from './supabase-server'
 export { createAdminSupabase } from './supabase-admin'

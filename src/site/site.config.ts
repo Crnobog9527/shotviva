@@ -26,7 +26,14 @@ export const site = defineSite({
     ],
     channels: { primary: 'stripe', fallback: 'waffo' },
   },
-  partners: { graylum: { returnToHosts: ['graylum.com', 'staging.graylum.com'] } },
+  partners: {
+    // Placeholders until the Owner confirms Graylum's real production / staging hosts.
+    graylum: {
+      returnToHosts: ['graylum.com', 'staging.graylum.com'],
+      connectCallbackPath: '/api/connectors/shotviva/callback',
+      imageHosts: ['graylum.com', 'staging.graylum.com'],
+    },
+  },
   // 创作库规格 U9: no gallery pages for the first 8 weeks.
   gallery: { enabled: false },
   indexing: {
