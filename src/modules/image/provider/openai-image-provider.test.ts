@@ -27,7 +27,7 @@ function provider(fetchImpl: typeof fetch) {
 describe('openai image provider', () => {
   it('sends a multipart edit with the photo and returns the PNG', async () => {
     const fetchImpl = vi.fn(async () => json({ data: [{ b64_json: PNG_B64 }] }))
-    const output = await provider(fetchImpl).generate(input({ params: { model: 'gpt-image-2.5-flare', foo: 1 } }))
+    const output = await provider(fetchImpl).generate(input({ params: { foo: 1 } }))
     expect(output.contentType).toBe('image/png')
     expect([...output.bytes]).toEqual([0x89, 0x50, 0x4e, 0x47])
 
@@ -35,7 +35,7 @@ describe('openai image provider', () => {
     expect(url).toBe('https://api.openai.com/v1/images/edits')
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer sk-test')
     const form = init.body as FormData
-    expect(form.get('model')).toBe('gpt-image-2.5-flare')
+    expect(form.get('model')).toBe('gpt-image-2.5-sunburst')
     expect(form.get('size')).toBe('912x1136')
     expect(form.get('quality')).toBe('high')
     expect(form.get('output_format')).toBe('png')
@@ -89,5 +89,18 @@ describe('openai image provider', () => {
     const pending = provider(hang as typeof fetch).generate(input({ signal: controller.signal }))
     controller.abort()
     await expect(pending).rejects.toMatchObject({ kind: 'timeout' })
+  })
+})
+
+describe('openai image provider config (T17)', () => {
+  it("ignores a template's model_params.model and calls the configured base URL (T17)", async () => {
+    const fetchImpl = vi.fn(async () => json({ data: [{ b64_json: PNG_B64 }] }))
+    const relay = createOpenAIImageProvider({ apiKey: 'sk-relay', model: 'gpt-image-2.6', baseUrl: 'https://relay.example.com/v1', fetch: fetchImpl })
+    await relay.generate(input({ params: { model: 'gpt-image-2.5-flare', background: 'opaque' } }))
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('https://relay.example.com/v1/images/edits')
+    const form = init.body as FormData
+    expect(form.get('model')).toBe('gpt-image-2.6')
+    expect(form.get('background')).toBe('opaque')
   })
 })

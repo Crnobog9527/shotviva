@@ -87,6 +87,21 @@ food photography 8,100（难度 65.6，前十 6 席 google 自己，全年 -50%�
 ## 6. 多语言架构（第一天留好，后期改等于重构）
 子目录 + 英文 slug：/{lang}/{english-slug}，例 /ja/interior-photography、/id/ai-restaurant-menu。slug 用英文的理由：主词全是英文关键词，模板与组件可跨语言复用；将来某语言要做本地词，只在该语言下用本地 slug，不影响其他语言。hreflang 全语言互指（含自身），x-default 指向英文版。每种语言独立 sitemap 挂在根 sitemap index 下。语言切换器必须是真实 <a href>，不许 JS 跳转。语言前缀不做自动跳转（IP 自动跳语言会让爬虫反复重定向）。语言优先级（依据 foodshot.ai 真实地区分布）：en（美国 16.3%）→ ja（4%）→ id（4%）→ pt-BR（3.6%）。**v1 上线英文 + 简体中文 `/zh`**（Owner 2026-11-06 改定，取代「v1 只上英文」；细则见 ARCHITECTURE §17）：中文只做 Google，不做百度；`/zh` 下的可收录页面以中文口径主词表 `seo资料/Shotviva 页面与主词映射（中文口径）.csv` 为准（T22 产出），不在表里的 `/zh` 页 noindex；hreflang 用 `zh-Hans`；浏览器语言是中文的访客只弹「切换到中文」提示，不自动跳转。/ja、/id 仍推到付费验证通过之后，其余等 GSC 数据。
 
+### 6.1 简体中文 SEO 规则（Owner 2026-11-06）
+
+1. **上线只有英文和简体中文两种语言。** 中文收录页只有 `/zh`、`/zh/image-to-image-generator`、`/zh/pricing` 三个（ARCHITECTURE §17）。依据：新站不要在短时间内大批量生成多语言页面。
+2. **不批量做中文 SEO 页。** 某个英文内页在 GSC 里出现中文查询的真实展示或点击，才给它单独做中文版，并补进中文口径主词表。
+3. **一个页面只写一种语言**，不做中英混排。品牌名 Shotviva、「AI」这类通用缩写除外。
+4. **canonical 指向自己**：每个 `/zh` 页的 canonical 是它自己的 `/zh` 地址，不指向英文页。hreflang `en` / `zh-Hans` / `x-default`（指向英文）互指，只在两种语言都有的页面上输出。全站网址统一不带结尾斜杠（R4）。
+5. **选词不靠翻译。** 先用中文想「中国用户、跨境卖家会怎么搜」，再用三步核对：
+   - 看 Google 搜索框下拉推荐；
+   - 看做得久的大站用什么中文词；
+   - 故意输错，看 Google 纠正成什么。
+   不拿英文 Title 机翻。
+6. **用大陆电商圈的说法**：抠图、去背、商品图、白底图、主图、详情页、SKU 这类词直接用，不写书面翻译腔。
+7. **关键短语要连着写。** Google 的中文分词不精确，主词在 Title、H1、首段里要整串出现。例如「AI 商品图生成」不能拆成「AI 帮你的商品图生成」。
+8. **价格页只写美元**，不出现人民币，也不换算。
+
 ## 7. 技术栈
 以 规范/ARCHITECTURE.md 和 规范/AGENTS.md 第 2 节为准：Next.js App Router + next-intl，营销页 SSG/ISR，部署在 Vercel；数据库存模板、生成任务、订单和积分流水，SEO 页面内容按 ARCHITECTURE §12 的固定结构静态生成。
 

@@ -45,6 +45,8 @@ export const eventSchemas = {
     error_code: errorCode.nullable(),
     source: z.enum(['web', 'graylum']),
     duration_ms: z.number().int().nonnegative(),
+    // Model name only (ARCHITECTURE §16.2); null for jobs written before T17.
+    model: z.string().min(1).max(120).nullable(),
   }),
   paywall_view: z.strictObject({ trigger: z.enum(PAYWALL_TRIGGERS) }),
   checkout_start: z.strictObject(checkoutProps),

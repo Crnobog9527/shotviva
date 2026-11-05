@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { track as defaultTrack, type EventProps, type ServerTrack } from '../analytics'
 import { GenerationFailure } from './generation-failure'
 import type { Job } from './job-schema'
+import { modelFromTag } from './provider-tag'
 
 // Pre-T16 jobs carry no resolution and every one of them is generated at 1K.
 const resolution = z.enum(['1k', '2k', '3k']).catch('1k')
@@ -22,6 +23,8 @@ export function generateEventProps(job: Job, category: string, outcome: Outcome,
     error_code: outcome.status === 'failed' ? outcome.errorCode : null,
     source: job.source,
     duration_ms: Math.max(0, Math.round(durationMs)),
+    // The model only: the provider id and its address stay out of analytics (§16.2).
+    model: modelFromTag(job.provider),
   }
 }
 
