@@ -88,7 +88,7 @@ Owner 2026-11-04 确定：**先走浅色系，不刻意贴合食物。** 界面�
 ### 4.2 模板卡片
 
 - 封面是对比图的「后」图，卡片上一个「Before / After」小切换看「前」图；不用悬停（手机没有悬停）。
-- 卡片上只写：模板名、适合什么（例如 "Menu & delivery apps"）、消耗几张（"1 image"）。
+- 卡片上只写：模板名、适合什么（例如 "Menu & delivery apps"）、消耗多少 credits（"2 credits"）。
 
 ### 4.3 生成工作台
 
@@ -97,10 +97,10 @@ Owner 2026-11-04 确定：**先走浅色系，不刻意贴合食物。** 界面�
 1. 上传区：大号按钮区，手机上点击调起相册 / 相机（两个入口："Take photo" 带 `capture`，"Choose from gallery" 不带）；桌面上同一块区域也接受拖拽。显示允许的格式和大小（JPG / PNG / WebP，up to 20MB）。
 2. 文案区：只出现模板需要的字段，每个字段带示例占位。
 3. 比例选择：用图标按钮，标注平台用途（例如 "DoorDash 16:9"）。
-4. 生成按钮：固定在底部拇指区、全宽，写清楚消耗，例如 "Generate · uses 1 image"。
-5. 免费用户在按钮上方看到一行告知："Free creations are shown in the public gallery. Upgrade to keep them private."
+4. 生成按钮：固定在底部拇指区、全宽，写清楚消耗，例如 "Generate · 2 credits"。按钮旁显示余额 "30 credits + 3 free"。
+5. 这一单将用免费积分时，按钮上方一行告知："This photo uses free credits: it's shown publicly with a watermark. Paid credits make it private and watermark-free." 将用付费积分时不显示。
 
-单位叫法：**1 credit = 1 image**，前台英文一律 "image"（"3 free images"、"uses 1 image"），后台和代码叫 credit。
+单位叫法：前台后台都叫 **credits**，不说「张」。余额分开显示付费和免费（"30 credits + 3 free"）。
 
 ### 4.4 生成中、成功、失败
 
@@ -112,8 +112,8 @@ Owner 2026-11-04 确定：**先走浅色系，不刻意贴合食物。** 界面�
 ### 4.5 付费墙
 
 - 触发：免费额度用完，或免费用户想把作品设为私密。
-- 手机上是底部抽屉，桌面是居中弹窗（第 8.4 节）。里面**两个商品**：`monthly`、`yearly`（ARCHITECTURE.md 第 6.2 节），价格数字从配置读。推荐项高亮。
-- 选了商品后是**两组付款方式**：「Card · Apple Pay · Google Pay」和「Alipay · WeChat Pay」。卡那组下面一行小字 "Renews automatically, cancel anytime"；钱包那组下面 "One-time payment, 30 days / 1 year, no auto-renew"。走 Waffo 时两组都是单笔，微信不显示。
+- 手机上是底部抽屉，桌面是居中弹窗（第 8.4 节）。里面**三个商品**：`monthly`、`yearly`、`pack`（ARCHITECTURE.md 第 6.2 节），价格数字从配置读。推荐项高亮。`pack` 标注 "One-time · no subscription"，并显示每 credit 单价以便和订阅对比。
+- 选了商品后是**两组付款方式**：「Card · Apple Pay · Google Pay」和「Alipay · WeChat Pay」。卡那组下面一行小字 "Renews automatically, cancel anytime"；钱包那组下面 "One-time payment, 30 days / 1 year, no auto-renew"。`pack` 在两组下都是单笔。走 Waffo 时全部单笔，微信不显示。
 - 账号页「Subscription」区块：当前商品、状态（Active / Cancels on … / Past due / Free）、下次续费日，一个「Manage subscription」按钮打开 Stripe Customer Portal；钱包用户显示 "Paid until …" 和「Renew」按钮。
 - 付款方式图标：卡、支付宝、微信，按当前通道可用的方式显示（走 Waffo 时没有微信）。
 - 价格数字从 `site.config.ts` 或数据库读，禁止写死。

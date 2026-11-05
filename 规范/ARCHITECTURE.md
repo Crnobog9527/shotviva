@@ -62,10 +62,11 @@ export const site = defineSite({
   locales: { default: 'en', enabled: ['en'] }, // next-intl，英文不带前缀
   billing: {
     currency: 'usd',
-    freeCredits: 3,
+    freeCredits: 3,                               // 进 profiles.free_credits，只能生成免费作品（第 6.1 节）
     products: [                                   // 结构已定（第 6.2 节），价格数字待定
       { id: 'monthly', credits: 30, paidDays: 30, priceUsd: 0 /* 待定 */ },
       { id: 'yearly', credits: 360, paidDays: 365, priceUsd: 0 /* 待定 */ },
+      { id: 'pack', credits: 0 /* 待定 */, paidDays: 0, priceUsd: 0 /* 待定 */ },   // 积分包：不改会员期，所有人可买
     ],
     channels: { primary: 'stripe', fallback: 'waffo' },   // 第 6.3 节：Waffo 只做单笔兜底
   },
@@ -123,7 +124,8 @@ interface GenerationProvider {
 | source | 'web' / 'graylum'，哪条入口发起的 |
 | idempotency_key | 可空，唯一索引。伙伴接口把调用方的 callId 放这里，重复请求返回同一个任务 |
 | status | running → succeeded / failed |
-| visibility | 'public' / 'private'，免费用户固定 public，付费用户可改（见第 9 节） |
+| credit_pool | 'free' / 'paid'，本单从哪个池扣的（第 6.1 节）。决定水印、默认可见性、可商用 |
+| visibility | 'public' / 'private'，free 作品固定 public，paid 作品默认 private、本人可改（见第 9 节） |
 | credits_cost | 本次扣多少积分 |
 | output_key | 成品在 R2 的 key |
 | error_code | 失败原因 |
@@ -152,45 +154,50 @@ v1 上线 6~8 个调好的模板，之后每周加。提示词调到「餐具摆
 
 ## 6. 积分与付款
 
-### 6.1 积分模型（Owner 2026-11-05 拍板）
+### 6.1 积分模型（Owner 2026-11-05 拍板；傍晚修订为「按作品判付费」）
 
-两列解决，不做积分批次、不做过期：
+**权益跟着作品走，不跟着用户身份走**：一张图是用付费积分还是免费积分生成的，决定它是否带水印、是否私密、是否可商用。会员期 `paid_until` 不再决定任何权益。
 
-- `profiles.credits`（整数）：余额，**永不过期**。
-- `profiles.paid_until`（时间戳，可空）：付费身份窗口。**付费身份 = `paid_until > now()`**，决定私密、无水印、可商用。
-- 首付、钱包单笔、Waffo 单笔都走 SQL 函数 `apply_purchase(user, product_id, event_id)`：`credits += 商品积分`，`paid_until = max(paid_until, now()) + 商品天数`。首付和单笔用 checkout session id 当 `event_id`，Waffo 用它的事件 id。
+- `profiles.free_credits`（整数）：注册赠送（`site.config.billing.freeCredits`），以后的活动赠送也进这里。只能生成**免费作品**。
+- `profiles.credits`（整数）：**付费积分**，来自订阅首付 / 续费、钱包一期会员、积分包、管理员补偿。**永不过期**。生成的是**付费作品**。
+- `profiles.paid_until`（时间戳，可空）：只记录会员期，用于账号页显示（订阅状态、钱包一期会员的到期日）。不参与水印、私密、可商用的判断。
+- **扣费规则（`reserve_credits`）：先付费池、后免费池、整单不拆。** 付费池够就全扣付费池，作品 `credit_pool = 'paid'`；付费池不够但免费池够，全扣免费池，作品 `credit_pool = 'free'`；都不够就失败。不把一单拆到两个池里，所以没有「半付费作品」。付费用户剩下的免费积分留着，付费积分用完后才会用到，那时产出的是免费作品并触发付费墙。
+- 任何一次成功付款（首付、订阅续费、钱包单笔、Waffo 单笔、积分包）都走同一个 SQL 函数 `apply_purchase(user, product_id, event_id)`：`credits += 商品积分`；商品带天数的同时 `paid_until = max(paid_until, now()) + 天数`，积分包不带天数。首付和单笔用 checkout session id 当 `event_id`，Waffo 用它的事件 id。
 - 订阅续费走 T10 新增的 `apply_subscription_renewal(user, product_id, invoice_id, period_end)`：`credits += 商品积分`，`paid_until = greatest(paid_until, period_end)`（直接对齐 Stripe 的本期结束日，不按天数累加，避免大小月漂移）；同样写流水、按 invoice id 幂等，内部复用 `_apply_credit_change`（总控 2026-11-05 补）。
-- 没用完的张数在续费时自然结转（积分不过期），不做「本期 / 结转」两本账。
-- **1 credit = 1 image**，「重新生成」也算一张。前台英文一律说 "image"（"3 free images"、"uses 1 image"），后台和代码叫 credit。
-- 余额只能通过 SQL 函数改：发放、预扣、确认、退回、管理员调整。前端和普通接口都不能直接写余额。
-- 每一笔变动都写进流水表，带幂等键。
-- 每个模板的消耗积分写在模板里，不写死在代码里。
+- 没用完的积分在续费时自然结转（积分不过期），不做「本期 / 结转」两本账。
+- **计价单位是 credit，不是「张」。** 每个模板消耗多少 credit 写在 `templates.credits_cost`，后台模板编辑页可改；会员每月发多少 credit、积分包多少 credit 写在 `site.config.ts`。前台后台都叫 credits，余额显示为 "30 credits + 3 free"。「重新生成」按模板再扣一次。
+- 余额只能通过 SQL 函数改：发放、预扣、确认、退回、管理员调整（`admin_adjust_credits` 带 `pool` 参数）。前端和普通接口都不能直接写余额。
+- 每一笔变动都写进流水表，记录动的是哪个池，带幂等键。
 
 ### 6.2 商品（结构已定，价格待定）
 
-**SKU 结构 Owner 2026-11-05 拍板（下午修订，取代上午的「2 个一次性商品」）：2 个会员商品，每个有两种付款形态。**
+**SKU 结构 Owner 2026-11-05 拍板（傍晚修订）：2 个会员商品 + 1 个积分包。**
 
-| id | 积分 | 付费身份 | 卡 / Apple Pay / Google Pay | 支付宝 / 微信 |
-|---|---|---|---|---|
-| `monthly` | 30（默认，随价格最终定） | +30 天 | Stripe **订阅**，自动续费，每期 +30 | Stripe **单笔**，到期不自动续，再买一次 |
-| `yearly` | 360，一次发完 | +365 天 | Stripe **订阅**，每年续费一次 +360 | Stripe **单笔** |
+| id | 付费积分 | 会员期 `paid_until` | 卡 / Apple Pay / Google Pay | 支付宝 / 微信 | 谁能买 |
+|---|---|---|---|---|---|
+| `monthly` | M（待定，随价格定） | +30 天 | Stripe **订阅**，自动续费，每期 +M | Stripe **单笔**，到期不自动续，再买一次 | 所有人 |
+| `yearly` | 12 × M，一次发完 | +365 天 | Stripe **订阅**，每年续费一次 | Stripe **单笔** | 所有人 |
+| `pack` | P（待定） | 不变 | Stripe Managed Payments **单笔** | Stripe **单笔** | **所有人，包括没买会员的**；每 credit 单价高于订阅 |
 
-- 同一个商品在 Stripe 里是一个 Product（税码 `txcd_10105001`）挂两个 Price：recurring 和 one-time，价格相同。
+积分包不改会员期，但它发的是付费积分，用它生成的作品就是付费作品（无水印、私密、可商用），所以非会员买包也拿到完整权益——这正是「按作品判付费」要解决的事。
+
+- `monthly` / `yearly` 在 Stripe 里各是一个 Product（税码 `txcd_10105001`）挂两个 Price：recurring 和 one-time，价格相同；`pack` 只有 one-time Price。
 - 支付宝 / 微信在 Stripe 普通模式下不支持订阅，所以钱包用户买的是「一期会员」，`paid_until` 到了自己再买。这不是功能缺失，是 Stripe 的限制，付费墙文案要说清楚（"Renews automatically" vs "30 days, no auto-renew"）。
-- 价格数字由 pricing-research 定稿后填进 `site.config.ts`，并同步修改建站规格 G3；在此之前 `priceUsd` 留 0，付费墙和 `/pricing` 的数字从配置读。商品 id 固定为 `monthly` / `yearly`，Stripe / Waffo 的商品映射、PostHog `purchase` 事件参数都按这两个 id 写。
+- 价格数字由 pricing-research 定稿后填进 `site.config.ts`，并同步修改建站规格 G3；在此之前 `priceUsd` 留 0，付费墙和 `/pricing` 的数字从配置读。商品 id 固定为 `monthly` / `yearly` / `pack`，Stripe / Waffo 的商品映射、PostHog `purchase` 事件参数都按这两个 id 写。
 
 已经确定的规则：
 
 - **订阅的状态只有 Stripe 一份真相**，Shotviva 存一张镜像表 `subscriptions`（`user_id`、`stripe_subscription_id`、`product_id`、`status`、`current_period_end`、`cancel_at_period_end`），由回调同步，账号页只读它。
 - 续费成功：`invoice.paid`（`billing_reason = subscription_cycle`）→ `apply_purchase`，`paid_until = 本期 period_end`。
-- **续费失败：什么都不做。** `paid_until` 到期自然变回免费身份；Stripe 自己重试，哪天扣成功哪天再延。不写宽限期。
+- **续费失败：什么都不做。** 不再发积分，`paid_until` 到期后账号页显示会员已过期；已有的付费积分照常可用。Stripe 自己重试，哪天扣成功哪天再发。不写宽限期。
 - 取消：期末生效（Stripe 默认）。用户在 Stripe Customer Portal（Managed Payments 下是 Link 的客户门户）自己取消，账号页只放一个「Manage subscription」链接，不自己写取消界面。`customer.subscription.updated / deleted` 只更新镜像表。
 - 外部退款（Managed Payments 下 Link 客服 60 天内可以不经我们退款）：`charge.refunded` 只写记录 + Sentry 告警，Owner 手动 `admin_adjust_credits`。不写自动扣回。
 - 不做：首月优惠券、升级降级、按比例退款、宽限期、测试时钟自动化、到期提醒邮件。
 - **分两段上线**：上线当天必须有「订阅模式建结账 + 首付发放」（和单笔几乎相同）；续费、取消同步、Portal 链接在第一个付费用户满 30 天之前上线即可（TASKS T10）。
 - 卡、支付宝、微信都能付（第 6.3 节的路由）。
-- **水印在下载路由加**：成品只存一份无水印原图；`core/storage` 的下载路由按「`visibility = 'public'` 且当前非付费身份」用 `sharp` 叠右下角「Made with Shotviva」后返回（约 50ms），工作台预览和将来创作库展示同样走这个路由。付费后旧作品自动无水印，不重处理。
-- 付费作品默认私密、可商用。付费期内做的作品到期后仍保持私密，不会自动公开。
+- **水印在下载路由加，按作品判**：成品只存一份无水印原图；`core/storage` 的下载路由对 `credit_pool = 'free'` 的作品用 `sharp` 叠右下角「Made with Shotviva」后返回（约 50ms），`credit_pool = 'paid'` 的作品永不加水印。工作台预览和将来创作库展示同样走这个路由。
+- **免费作品**（免费积分生成）：`visibility = 'public'`，带水印，用户不能改私密，可以删除。买了会员之后它们**仍然**是免费作品——不会自动去水印、不会自动私密；想要无水印版就用付费积分再生成一张。
+- **付费作品**（付费积分生成）：默认 `visibility = 'private'`、无水印、可商用，用户可以改公开（进创作库，仍无水印）。会员到期、积分用完都不影响已有付费作品。
 - 到期提醒邮件 v1 不做；Managed Payments 订阅的续费提醒由 Stripe / Link 自动发。
 
 ### 6.3 通道
@@ -272,12 +279,12 @@ v1 上线 6~8 个调好的模板，之后每周加。提示词调到「餐具摆
 
 完全遵循创作库规格，另加下面几条（Owner 2026-11-04 确认）：
 
-1. **付费墙与 8 周闸门并存**：从上线第一天起，免费用户生成前就看到「作品将公开展示」的告知，免费用户的作品 `visibility = 'public'`。但前 8 周 `gallery.enabled = false`，不生成任何 /g、/tag、/gallery 页面。付费用户可以随时改成 `private`。
+1. **付费墙与 8 周闸门并存**：从上线第一天起，用免费积分生成前就看到「作品将公开展示」的告知，免费作品（`credit_pool = 'free'`）`visibility = 'public'`。但前 8 周 `gallery.enabled = false`，不生成任何 /g、/tag、/gallery 页面。付费作品默认 `private`，本人可以随时改公开或改回。
 2. **不另建作品表**：创作库规格第 3 节的 `ugc_works` 表不单独建。公开作品就是 `generation_jobs` 里 `status = 'succeeded' AND visibility = 'public'` 的记录。`indexable` 字段不要，作品页永远 noindex。
 3. **公开数据不含核心提示词**：只展示模板名和用户自己填的文案。「一键复用」= 同一模板 + 同样参数 + 换成复用者自己的照片。
 4. **标签选词看搜索意图**：标签主词必须是图片类或商用意图的词（如 `grilled salmon photo`、`cafe menu photos`），不收菜谱类意图的词。建站规格第 5 节「明确不做的词」不得进入标签白名单。每个标签上线前核实美国搜索量和哥飞版 KD，并检查前十名的页面类型。
 5. **审核放到第 6~7 周**：和作品审核后台页一起做，在第 8 周开放创作库之前完成。审核方案到时再定，要指定具体服务，不写「含人脸」这种无法验证的规则。
-6. 免费用户可以删除自己的作品（隐私法规要求），但不能设为私密。
+6. 免费作品可以被本人删除（隐私法规要求），但不能设为私密。
 
 ## 10. 管理后台
 
