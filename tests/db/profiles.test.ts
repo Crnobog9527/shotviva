@@ -4,10 +4,11 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { ANON_KEY, API_URL, DB_URL, SERVICE_ROLE_KEY } from './supabase-env'
+import { localSupabase } from './helpers'
 
 // Real local Supabase (Auth + PostgREST + Postgres), never a mock (AGENTS §7).
 const options = { auth: { persistSession: false, autoRefreshToken: false } }
+const { apiUrl: API_URL, anonKey: ANON_KEY, serviceRoleKey: SERVICE_ROLE_KEY, dbUrl: DB_URL } = localSupabase()
 const admin = createClient(API_URL, SERVICE_ROLE_KEY, options)
 const db = new Client({ connectionString: DB_URL })
 const PASSWORD = `pw-${randomUUID()}`

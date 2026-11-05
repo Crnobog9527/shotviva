@@ -1,7 +1,9 @@
 import { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { DB_URL } from './supabase-env'
+import { localSupabase } from './helpers'
+
+const DB_URL = localSupabase().dbUrl
 
 describe('local supabase database', () => {
   const client = new Client({ connectionString: DB_URL })
