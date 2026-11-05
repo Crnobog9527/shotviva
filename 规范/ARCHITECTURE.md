@@ -316,6 +316,10 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 桶名 `shotviva-assets`（预览用 `shotviva-assets-preview`），只放模板封面前后图，前缀 `covers/{template_id}/before-{hash}.webp`、`after-{hash}.webp`；文件名带内容哈希，换图就是新文件，不用清缓存。
 - 公开读：生产绑定自定义域名 `assets.shotviva.com`（走 Cloudflare CDN）；预览可以用 R2 自带的开发地址。公开地址的前缀放环境变量 `NEXT_PUBLIC_ASSETS_BASE_URL`，`templates.cover_before_url` / `cover_after_url` 存完整地址。
 - 写入只走后台：后台模板编辑页「上传前图 / 上传后图」→ 服务端校验（JPEG / PNG / WebP，≤20MB）→ `sharp` 转 WebP（长边 1600、质量 82）→ 写公开桶 → 更新模板行。和用户照片一样，图片字节不经 API 路由请求体（第 8.1 节）：浏览器先直传到私有桶的 `uploads-admin/` 临时前缀（7 天过期），服务端再读出处理后写公开桶。
+- **展示媒体支持三种**（Owner 2026-11-05，参考 Lovart）：静态图、动图、短视频。`templates` 增加 `cover_media_type`（`'image'` / `'animated'` / `'video'`）、`cover_video_url`、`cover_poster_url`（视频和动图的封面帧，静态图时为空）；前后对比图字段照旧，用于静态图模板和预览抽屉里的拖动对比。
+  - 动图一律存动态 WebP：后台上传 GIF 也收，服务端转成动态 WebP（GIF 体积通常大 5～10 倍，拖慢首屏）。
+  - 视频存 MP4（H.264）原文件，≤15MB、≤15 秒，服务端只做类型和大小校验，不转码；必须有封面帧：后台单独上传，或上传时浏览器从第一帧截图生成。
+  - 同样按内容哈希命名，放 `covers/{template_id}/`。
 - 用户照片和成品绝不进公开桶；公开桶里没有任何用户数据。
 - 换图后首页和模板页通过按需重新生成（ISR revalidate）立即更新，不用重新部署。
 

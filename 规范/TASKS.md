@@ -322,6 +322,8 @@
 
 **范围补充（总控 2026-11-05）**：后台模板编辑页加「上传前图 / 上传后图」，按 ARCHITECTURE §8.3「模板封面另用一个公开桶」实现（私有桶 `uploads-admin/` 中转 → `sharp` 转 WebP → 公开桶 `covers/` → 更新 `cover_before_url` / `cover_after_url` → revalidate 首页和模板页）；新环境变量 `R2_PUBLIC_BUCKET`、`NEXT_PUBLIC_ASSETS_BASE_URL` 写进 `core/env.ts` / `core/public-env.ts` 和 `.env.example`。验收加一条：后台换图后首页无需重新部署即显示新图，公开桶里只有 `covers/`。
 
+**范围补充 2（总控 2026-11-05）**：封面展示媒体支持静态图 / 动图 / 短视频（ARCHITECTURE §8.3 三条），`templates` 加 `cover_media_type`、`cover_video_url`、`cover_poster_url`（新迁移，按 AGENTS §5 一次成型），后台上传支持 GIF→动态 WebP、MP4 ≤15MB ≤15 秒 + 封面帧。验收加一条：后台给一个模板换成视频后，首页卡片显示封面帧、滑入视口后静音循环播放。
+
 **验收**：
 - [ ] 同一模板 1K / 2K / 3K 各生成一次，`generation_jobs.credits_cost` 分别等于后台配置的三个数，成品像素等于尺寸表
 - [ ] 测试：`reserve_credits` 对 `'8k'` 抛错且不扣；调用方传错 cost 不影响扣数；`medium` 模板 1K 扣 1
