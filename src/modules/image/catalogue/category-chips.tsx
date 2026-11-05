@@ -25,7 +25,7 @@ export function CategoryChips({ categories, value, onChange }: { categories: str
               event.currentTarget.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
             }}
             className={cn(
-              "relative h-9 min-w-11 flex-none rounded-full px-4 text-caption leading-none font-medium transition-colors before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']",
+              "relative min-h-9 min-w-11 flex-none rounded-full px-4 py-2 whitespace-nowrap text-caption leading-none font-medium transition-colors before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']",
               pressed ? 'bg-foreground text-background' : 'hairline bg-wash text-bone-dim',
             )}
           >

@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from 'next-intl'
 /* eslint-disable @next/next/no-img-element -- local object URL of the picked photo */
 import Link from 'next/link'
 import type { ReactNode } from 'react'
@@ -20,6 +20,7 @@ export function GeneratingView({ job }: { job: TrackedJob }) {
   const now = useNow()
   const fraction = estimatedProgress(now - job.startedAt)
   const t = useTranslations('app')
+  const format = useFormatter()
   return (
     <section aria-labelledby="gen-h" className="px-4 pt-2">
       <h2 id="gen-h" className="sr-only">{t('workspace.developingTitle')}</h2>
@@ -34,7 +35,7 @@ export function GeneratingView({ job }: { job: TrackedJob }) {
         <span className="absolute inset-x-4 top-4 z-2 flex justify-between">
           <Pill>{t('workspace.developing')}</Pill>
           <Pill>
-            {tierName(job.resolution, t)} · <span className="font-mono">{tierPx(job.resolution)}</span>
+            {t.rich('workspace.developingSize', { tier: tierName(job.resolution, t), px: tierPx(job.resolution), mono: (chunks) => <span className="font-mono">{chunks}</span> })}
           </Pill>
         </span>
       </div>
@@ -49,7 +50,7 @@ export function GeneratingView({ job }: { job: TrackedJob }) {
           <span role="progressbar" aria-label={t('workspace.generating')} aria-valuenow={percent(fraction)} aria-valuemin={0} aria-valuemax={100} className="ml-1 h-1 flex-1 overflow-hidden rounded-full bg-wash-strong">
             <span className="block h-full rounded-full bg-primary transition-[width] duration-1000" style={{ width: `${percent(fraction)}%` }} />
           </span>
-          <span className="font-mono text-caption leading-none text-muted-foreground">{percent(fraction)}%</span>
+          <span className="font-mono text-caption leading-none text-muted-foreground">{format.number(fraction, { style: 'percent', maximumFractionDigits: 0 })}</span>
         </li>
       </ol>
       <p className="mt-4 text-caption text-bone-dim">{t('workspace.leave')}</p>
@@ -72,5 +73,5 @@ function Stage({ label, done }: { label: string; done: boolean }) {
 }
 
 function Pill({ children }: { children: ReactNode }) {
-  return <span className="frost inline-flex h-7 items-center gap-1 rounded-full px-3 text-caption leading-none font-medium text-photo-ink">{children}</span>
+  return <span className="frost inline-flex min-h-7 items-center gap-1 rounded-full px-3 text-caption leading-none font-medium text-photo-ink">{children}</span>
 }

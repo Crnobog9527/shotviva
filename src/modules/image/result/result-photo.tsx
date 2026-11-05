@@ -27,7 +27,7 @@ export function WorkTag({ pool, visibility, className }: { pool: CreditPool; vis
   return (
     <span
       className={cn(
-        'inline-flex h-[26px] items-center rounded-full px-2 text-caption leading-none font-semibold',
+        'inline-flex min-h-[26px] items-center rounded-full px-2 py-1 text-caption leading-none font-semibold',
         pool === 'paid' ? 'bg-foreground text-background' : 'frost text-foreground',
         className,
       )}

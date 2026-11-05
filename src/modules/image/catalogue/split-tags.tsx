@@ -8,7 +8,7 @@ export function SplitTags({ hidden = false, size = 'card' }: { hidden?: boolean;
   const t = useTranslations('app.template')
   const base = cn(
     'absolute z-2 inline-flex items-center text-caption leading-none font-semibold transition-opacity duration-300',
-    size === 'card' ? 'bottom-2 h-6 rounded-tag px-2' : 'top-3 h-7 rounded-tag px-3',
+    size === 'card' ? 'bottom-2 min-h-6 rounded-tag px-2 py-1' : 'top-3 min-h-7 rounded-tag px-3 py-1',
     hidden && 'opacity-0',
   )
   return (

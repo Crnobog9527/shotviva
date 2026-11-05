@@ -48,7 +48,7 @@ function TabLink({ item, current }: { item: TabItem; current: boolean }) {
       href={item.href}
       aria-current={current ? 'page' : undefined}
       className={cn(
-        'press relative flex min-h-[50px] flex-col items-center justify-center gap-1 text-caption leading-none font-medium',
+        'press relative flex min-h-[50px] min-w-0 flex-col items-center justify-center gap-1 px-1 text-center text-caption leading-tight font-medium break-words',
         'md:min-h-11 md:flex-row md:gap-2 md:rounded-full md:px-4',
         current ? 'text-foreground md:bg-wash' : 'text-muted-foreground',
       )}

@@ -32,7 +32,7 @@ export function FeatureCard({ template, onOpen }: { template: CatalogueTemplate;
           <b className="block font-display text-[30px] leading-none font-normal text-photo-ink">{template.name}</b>
           <small className="mt-1 block text-caption text-photo-ink/80">{t('featureMeta', { category: template.category })}</small>
         </span>
-        <span className="inline-flex h-9 flex-none items-center rounded-full bg-photo-ink px-4 text-caption leading-none font-semibold text-background">{t('preview')}</span>
+        <span className="inline-flex min-h-9 flex-none items-center rounded-full bg-photo-ink px-4 py-2 text-caption leading-none font-semibold text-background">{t('preview')}</span>
       </span>
     </button>
   )

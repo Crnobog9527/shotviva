@@ -68,7 +68,7 @@ function PickButton({ label, icon, filled, onClick }: { label: string; icon: key
       type="button"
       onClick={onClick}
       className={cn(
-        'press inline-flex min-h-12 items-center justify-center gap-2 rounded-button px-3 text-body font-semibold whitespace-nowrap',
+        'press inline-flex min-h-12 items-center justify-center gap-2 rounded-button px-3 py-2 text-center text-body leading-tight font-semibold',
         filled ? 'bg-foreground text-background' : 'hairline bg-wash text-foreground',
       )}
     >

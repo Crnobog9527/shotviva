@@ -58,11 +58,11 @@ export function doneMeta(
   const created = new Date(item.createdAt)
   const days = dayKey(now) - dayKey(created)
   const when = days <= 0 ? t('photos.today') : days === 1 ? t('photos.yesterday') : formatDay(created)
-  return `${when} · ${sizeLabel(item.aspect, t)} · ${tierName(item.resolution, t)}`
+  return t('photos.doneMeta', { when, size: sizeLabel(item.aspect, t), tier: tierName(item.resolution, t) })
 }
 
 // "1:1 · Standard · 2 credits" for a photo still developing.
 export function runningMeta(item: Pick<PhotoItem, 'aspect' | 'resolution' | 'credits'>, t: Translate): string {
   const size = item.aspect === 'original' ? t('sizes.original') : item.aspect
-  return `${size} · ${tierName(item.resolution, t)} · ${t('credits', { count: item.credits })}`
+  return t('photos.runningMeta', { size, tier: tierName(item.resolution, t), count: item.credits })
 }

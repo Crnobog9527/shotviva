@@ -36,9 +36,9 @@ describe('photo items', () => {
     const t = echoTranslate()
     const item = { createdAt: job.createdAt.toISOString(), aspect: '16:9' as const, resolution: '2k' as const, credits: 4 }
     const day = () => 'Nov 5'
-    expect(doneMeta(item, new Date('2026-11-05T20:00:00Z'), t, day)).toBe('photos.today · sizes.16:9 16:9 · tiers.2k.name')
-    expect(doneMeta(item, new Date('2026-11-06T01:00:00Z'), t, day)).toMatch(/^photos.yesterday/)
-    expect(doneMeta(item, new Date('2026-11-09T01:00:00Z'), t, day)).toMatch(/^Nov 5 · /)
-    expect(runningMeta({ ...item, aspect: '1:1' }, t)).toBe('1:1 · tiers.2k.name · credits {"count":4}')
+    expect(doneMeta(item, new Date('2026-11-05T20:00:00Z'), t, day)).toMatch(/^photos.doneMeta \{"when":"photos.today"/)
+    expect(doneMeta(item, new Date('2026-11-06T01:00:00Z'), t, day)).toMatch(/"when":"photos.yesterday"/)
+    expect(doneMeta(item, new Date('2026-11-09T01:00:00Z'), t, day)).toMatch(/"when":"Nov 5"/)
+    expect(runningMeta({ ...item, aspect: '1:1' }, t)).toBe('photos.runningMeta {"size":"1:1","tier":"tiers.2k.name","count":4}')
   })
 })

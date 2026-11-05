@@ -20,9 +20,10 @@ const buttonCva = cva(
         link: "text-primary underline-offset-4 hover:underline",
         // App shell (DESIGN "Buttons"): the one safelight primary per screen, its neutral bone
         // twin for buying ("Get credits"), and the bone-wash ghost for everything else.
-        cta: "w-full press rounded-tile bg-primary text-cta font-semibold tracking-[-0.01em] text-primary-foreground shadow-raised",
-        "cta-neutral": "w-full press rounded-tile bg-foreground text-cta font-semibold tracking-[-0.01em] text-background shadow-raised",
-        glass: "press hairline rounded-button bg-wash text-label font-semibold tracking-[-0.01em] text-foreground",
+        // Wrap rather than overflow: labels change length between languages.
+        cta: "w-full whitespace-normal text-center leading-tight press rounded-tile bg-primary text-cta font-semibold tracking-[-0.01em] text-primary-foreground shadow-raised",
+        "cta-neutral": "w-full whitespace-normal text-center leading-tight press rounded-tile bg-foreground text-cta font-semibold tracking-[-0.01em] text-background shadow-raised",
+        glass: "whitespace-normal text-center leading-tight press hairline rounded-button bg-wash text-label font-semibold tracking-[-0.01em] text-foreground",
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",
@@ -33,8 +34,8 @@ const buttonCva = cva(
         "icon-xs": "size-6 rounded-md [&_svg:not([class*='size-'])]:size-3",
         "icon-sm": "size-8",
         "icon-lg": "size-10",
-        cta: "h-14 px-4",
-        touch: "min-h-11 px-4",
+        cta: "min-h-14 px-4 py-2",
+        touch: "min-h-11 px-4 py-2",
       },
     },
     defaultVariants: {

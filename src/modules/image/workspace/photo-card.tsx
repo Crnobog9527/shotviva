@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from 'next-intl'
 /* eslint-disable @next/next/no-img-element -- local object URL of the picked photo */
 import { useRef } from 'react'
 
@@ -8,30 +8,32 @@ import { UPLOAD_ACCEPT } from '@/core/storage/rules'
 
 import { percent } from '../generation/progress'
 import type { UploadState } from './use-upload'
-import { megabytes, type PickedPhoto } from './use-photo'
+import type { PickedPhoto } from './use-photo'
 
 // The picked photo (DESIGN "Upload Zone", §4.4): a 4:5 thumbnail with the upload's visible
 // stage, Compressing → Uploading with a bar → Uploaded, and a ghost "Replace photo".
 export function PhotoCard({ photo, upload, onPick }: { photo: PickedPhoto; upload: UploadState; onPick(file: File): void }) {
-  const t = useTranslations('app.workspace')
+  const t = useTranslations('app')
+  const format = useFormatter()
+  const size = format.number(photo.bytes / 1024 / 1024, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
   const input = useRef<HTMLInputElement>(null)
   return (
     <div className="hairline-lit flex items-center gap-4 rounded-panel bg-card p-3">
       <div className="relative aspect-[4/5] w-24 flex-none overflow-hidden rounded-inner bg-muted">
-        <img src={photo.url} alt={t('photoAlt')} className="size-full object-cover" />
+        <img src={photo.url} alt={t('workspace.photoAlt')} className="size-full object-cover" />
       </div>
       <div className="min-w-0 flex-1" aria-live="polite">
         <UploadStage upload={upload} />
-        <p className="mt-2 font-mono text-caption leading-[1.4] text-muted-foreground">{megabytes(photo.bytes)}</p>
+        <p className="mt-2 font-mono text-caption leading-[1.4] text-muted-foreground">{t('units.megabytes', { size })}</p>
         <button
           type="button"
           onClick={() => input.current?.click()}
-          className="press hairline relative mt-2 inline-flex h-9 items-center gap-2 rounded-full bg-wash px-4 text-caption font-semibold before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']"
+          className="press hairline relative mt-2 inline-flex min-h-9 items-center gap-2 rounded-full bg-wash px-4 text-caption font-semibold before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']"
         >
           <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
             <path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4" />
           </svg>
-          {t(upload.phase === 'error' ? 'chooseAnother' : 'replace')}
+          {t(upload.phase === 'error' ? 'workspace.chooseAnother' : 'workspace.replace')}
         </button>
         <input
           ref={input}

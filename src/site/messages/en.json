@@ -164,7 +164,8 @@
       "3:2": "Rental",
       "4:3": "Website",
       "2:3": "Pin",
-      "asShot": "as shot"
+      "asShot": "as shot",
+      "withRatio": "{name} {ratio}"
     },
     "workspace": {
       "back": "Create",
@@ -194,17 +195,10 @@
         "Art Styles": "e.g. Keep the glasses, softer line work",
         "fallback": "e.g. Keep the colours, brighten the background"
       },
-      "generate": "Generate",
-      "getCredits": "Get credits",
-      "needed": "needed",
       "wait": "Wait for a photo to finish",
       "needPhoto": "Add your photo to start",
       "uploadingCta": "Uploading your photo…",
       "needCopy": "Fill in the text above",
-      "freeNotice": "This photo uses free credits: it's shown publicly with a watermark.",
-      "freeNoticeKey": "Paid credits make it private and watermark-free.",
-      "needsCredits": "{tier} needs {count, plural, one {# credit} other {# credits}}.",
-      "needsCreditsKey": "Paid credits make photos private and watermark-free.",
       "waitNotice": "You can develop {count, plural, one {# photo} other {# photos}} at a time. The next one starts when one lands in Photos.",
       "developingTitle": "Developing your photo",
       "developing": "Developing",
@@ -218,7 +212,13 @@
       "resultAlt": "Your photo restyled with {name}",
       "failTitle": "This photo didn't develop",
       "retry": "Retry",
-      "useAnother": "Use another photo"
+      "useAnother": "Use another photo",
+      "generateCta": "Generate <cost>· {count, plural, one {# credit} other {# credits}}</cost>",
+      "getCreditsCta": "Get credits <cost>· <mono>{count, number}</mono> needed</cost>",
+      "freeNotice": "This photo uses free credits: it's shown publicly with a watermark. <b>Paid credits make it private and watermark-free.</b>",
+      "needsCredits": "{tier} needs {count, plural, one {# credit} other {# credits}}. <b>Paid credits make photos private and watermark-free.</b>",
+      "counter": "{count, number} / {max, number}",
+      "developingSize": "{tier} · <mono>{px, number, ::group-off}</mono>"
     },
     "errors": {
       "CONTENT_REJECTED": "The photo or your note didn't pass the safety check. Try another photo or change the note.",
@@ -257,7 +257,9 @@
       "yesterday": "Yesterday",
       "fallbackName": "Photo",
       "badgeAria": "{count} in progress",
-      "pill": "{count, plural, one {Generating…} other {Generating #…}}"
+      "pill": "{count, plural, one {Generating…} other {Generating #…}}",
+      "doneMeta": "{when} · {size} · {tier}",
+      "runningMeta": "{size} · {tier} · {count, plural, one {# credit} other {# credits}}"
     },
     "work": {
       "freePublic": "Public · watermark",
@@ -279,6 +281,11 @@
     "account": {
       "metaTitle": "Account"
     },
-    "creditsUnit": "{count, plural, one {credit} other {credits}}"
+    "creditsUnit": "{count, plural, one {credit} other {credits}}",
+    "units": {
+      "px": "{px, number, ::group-off} px",
+      "megabytes": "{size} MB",
+      "percent": "{value, number, ::percent}"
+    }
   }
 }

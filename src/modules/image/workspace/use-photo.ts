@@ -42,6 +42,3 @@ function statusOf(photo: PickedPhoto | null, state: UploadState): PhotoStatus {
   if (state.phase === 'compressing' || state.phase === 'uploading') return 'uploading'
   return photo ? 'uploading' : 'none'
 }
-
-// "3.2 MB"
-export const megabytes = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`

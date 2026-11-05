@@ -23,7 +23,7 @@ describe('workspace options', () => {
   it('reads names from the messages', () => {
     const t = echoTranslate()
     expect(tierName('3k', t)).toBe('tiers.3k.name')
-    expect(sizeLabel('16:9', t)).toBe('sizes.16:9 16:9')
+    expect(sizeLabel('16:9', t)).toBe('sizes.withRatio {"name":"sizes.16:9","ratio":"16:9"}')
     expect(sizeLabel('original', t)).toBe('sizes.original')
   })
 

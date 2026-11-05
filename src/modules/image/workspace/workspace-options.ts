@@ -38,7 +38,7 @@ export const tierName = (id: Resolution, t: Translate) => t(`tiers.${id}.name`)
 
 export function sizeLabel(id: OutputAspect, t: Translate): string {
   const name = t(`sizes.${id}`)
-  return id === 'original' ? name : `${name} ${id}`
+  return id === 'original' ? name : t('sizes.withRatio', { name, ratio: id })
 }
 
 // Example for "Anything to change?", matched to the template's category so a handbag never gets

@@ -14,7 +14,7 @@ export function ResultView({ item, shareText }: { item: PhotoItem; shareText: st
   const t = useTranslations('app')
   const fileUrl = item.fileUrl as string
   return (
-    <section aria-label={`${item.templateName} photo`} className="px-4 pt-2">
+    <section aria-label={t('photos.photoAlt', { name: item.templateName })} className="px-4 pt-2">
       <ResultPhoto src={fileUrl} alt={t('workspace.resultAlt', { name: item.templateName })} pool={item.creditPool} visibility={item.visibility} />
       <div className="mt-4 flex">
         <Link href={`/generate/${item.templateId}`} className={buttonVariants({ variant: 'glass', size: 'touch', className: 'flex-1' })}>

@@ -36,7 +36,7 @@ export function NoteField({ value, placeholder, onChange }: { value: string; pla
         className={`${fieldClass} min-h-[92px]`}
       />
       <p id="note-count" className="mt-2 text-right font-mono text-caption leading-none text-muted-foreground">
-        {value.length} / {NOTE_MAX_LENGTH}
+        {t('counter', { count: value.length, max: NOTE_MAX_LENGTH })}
       </p>
     </div>
   )
