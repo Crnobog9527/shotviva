@@ -1,0 +1,18 @@
+import { Suspense } from 'react'
+
+import { ResetRequestForm } from '@/core/auth/ui'
+
+import { resetRequestAction } from '../../auth/actions'
+
+async function Reset({ searchParams }: PageProps<'/reset'>) {
+  const { error } = await searchParams
+  return <ResetRequestForm action={resetRequestAction} linkExpired={error === 'link_expired'} />
+}
+
+export default function ResetPage(props: PageProps<'/reset'>) {
+  return (
+    <Suspense>
+      <Reset {...props} />
+    </Suspense>
+  )
+}
