@@ -32,6 +32,8 @@
 - [ ] 直传一个 25MB 文件和一个改后缀的文本文件到 R2 后调用生成，都返回 422 且对象被删除
 - [ ] 管理后台只有 `role = admin` 能进，普通账号访问返回 404
 
+- [ ] 出图供应商（ARCHITECTURE §3.3）：生产环境 `PROVIDER_SECRETS_KEY` 已设（和预览不同），后台已录入在用供应商并测试连接成功，出一张图后 `generation_jobs.provider` 正确
+
 ## 3. 登录
 
 - [ ] 邮箱 + 密码注册，收到 Resend 发的验证邮件（发件人 support@shotviva.com），点击后能登录；Gmail、Outlook 各测一次，记录进收件箱还是垃圾箱
