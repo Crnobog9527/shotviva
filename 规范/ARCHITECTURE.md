@@ -162,11 +162,11 @@ v1 上线 6~8 个调好的模板，之后每周加。提示词调到「餐具摆
 - `profiles.credits`（整数）：**付费积分**，来自订阅首付 / 续费、钱包一期会员、积分包、管理员补偿。**永不过期**。生成的是**付费作品**。
 - `profiles.paid_until`（时间戳，可空）：只记录会员期，用于账号页显示（订阅状态、钱包一期会员的到期日）。不参与水印、私密、可商用的判断。
 - **扣费规则（`reserve_credits`）：先付费池、后免费池、整单不拆。** 付费池够就全扣付费池，作品 `credit_pool = 'paid'`；付费池不够但免费池够，全扣免费池，作品 `credit_pool = 'free'`；都不够就失败。不把一单拆到两个池里，所以没有「半付费作品」。付费用户剩下的免费积分留着，付费积分用完后才会用到，那时产出的是免费作品并触发付费墙。
-- 任何一次成功付款（首付、订阅续费、钱包单笔、Waffo 单笔、积分包）都走同一个 SQL 函数 `apply_purchase(user, product_id, event_id)`：`credits += 商品积分`；商品带天数的同时 `paid_until = max(paid_until, now()) + 天数`，积分包不带天数。首付和单笔用 checkout session id 当 `event_id`，Waffo 用它的事件 id。
+- 任何一次成功付款（首付、订阅续费、钱包单笔、Waffo 单笔、积分包）都走同一个 SQL 函数 `apply_purchase(user, product_id, event_id)`：`credits += 商品积分`；商品带天数的同时 `paid_until = max(paid_until, now()) + 天数`；积分包的天数为空，**不碰 `paid_until`**（不能写成「+0 天」，那会把空的 `paid_until` 写成 now()）。首付和单笔用 checkout session id 当 `event_id`，Waffo 用它的事件 id。
 - 订阅续费走 T10 新增的 `apply_subscription_renewal(user, product_id, invoice_id, period_end)`：`credits += 商品积分`，`paid_until = greatest(paid_until, period_end)`（直接对齐 Stripe 的本期结束日，不按天数累加，避免大小月漂移）；同样写流水、按 invoice id 幂等，内部复用 `_apply_credit_change`（总控 2026-11-05 补）。
 - 没用完的积分在续费时自然结转（积分不过期），不做「本期 / 结转」两本账。
 - **计价单位是 credit，不是「张」。** 每个模板消耗多少 credit 写在 `templates.credits_cost`，后台模板编辑页可改；会员每月发多少 credit、积分包多少 credit 写在 `site.config.ts`。前台后台都叫 credits，余额显示为 "30 credits + 3 free"。「重新生成」按模板再扣一次。
-- 余额只能通过 SQL 函数改：发放、预扣、确认、退回、管理员调整（`admin_adjust_credits` 带 `pool` 参数）。前端和普通接口都不能直接写余额。
+- 余额只能通过 SQL 函数改：发放（`grant_credits` 带 `pool` 参数，注册赠送和活动赠送用 `'free'`）、预扣、确认、退回、管理员调整（`admin_adjust_credits` 带 `pool` 参数）。前端和普通接口都不能直接写余额。
 - 每一笔变动都写进流水表，记录动的是哪个池，带幂等键。
 
 ### 6.2 商品（结构已定，价格待定）
@@ -183,7 +183,7 @@ v1 上线 6~8 个调好的模板，之后每周加。提示词调到「餐具摆
 
 - `monthly` / `yearly` 在 Stripe 里各是一个 Product（税码 `txcd_10105001`）挂两个 Price：recurring 和 one-time，价格相同；`pack` 只有 one-time Price。
 - 支付宝 / 微信在 Stripe 普通模式下不支持订阅，所以钱包用户买的是「一期会员」，`paid_until` 到了自己再买。这不是功能缺失，是 Stripe 的限制，付费墙文案要说清楚（"Renews automatically" vs "30 days, no auto-renew"）。
-- 价格数字由 pricing-research 定稿后填进 `site.config.ts`，并同步修改建站规格 G3；在此之前 `priceUsd` 留 0，付费墙和 `/pricing` 的数字从配置读。商品 id 固定为 `monthly` / `yearly` / `pack`，Stripe / Waffo 的商品映射、PostHog `purchase` 事件参数都按这两个 id 写。
+- 价格数字由 pricing-research 定稿后填进 `site.config.ts`，并同步修改建站规格 G3；在此之前 `priceUsd` 留 0，付费墙和 `/pricing` 的数字从配置读。商品 id 固定为 `monthly` / `yearly` / `pack`，Stripe / Waffo 的商品映射、PostHog `purchase` 事件参数都按这三个 id 写。
 
 已经确定的规则：
 
@@ -389,7 +389,7 @@ Graylum 服务器 ──POST /api/partner/link { code }（Authorization: Bearer 
 | 路由 | 说明 |
 |---|---|
 | `POST /api/partner/link` | code 换 `{ account_id, display_name, credits_remaining }`，code 用过即废 |
-| `GET /api/partner/account` | `{ credits_remaining, paid_until, top_up_url }` |
+| `GET /api/partner/account` | `{ credits_remaining, free_credits_remaining, paid_until, top_up_url }`（两个池分开给，Graylum 据此提示这一单会不会是带水印的免费作品） |
 | `GET /api/partner/templates` | `templates` 里 `visible_in` 含 `partner` 的公开字段，含 `freeform` |
 | `POST /api/partner/generate` | **同步**。入参 `template_id`、`inputs`、可选 `image`（URL）；头 `Idempotency-Key`（Graylum 传 callId，落 `generation_jobs.idempotency_key`）。走第 4 节同一条预扣/确认/退回路径，`source = 'graylum'`。出参 `{ job_id, image_url（签名 7 天）, credits_charged, credits_remaining }` |
 | `GET /api/partner/jobs/{id}` | 状态 + 成功时的签名地址，给 Graylum 超时兜底用，只读 |
