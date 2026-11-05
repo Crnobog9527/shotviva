@@ -6,6 +6,8 @@ export const ERROR_CODES = [
   'NOT_FOUND',
   'INVALID_INPUT',
   'CREDITS_INSUFFICIENT',
+  // Idempotency key reused for a different request, or a job settled the other way.
+  'CONFLICT',
   'INTERNAL',
 ] as const
 
@@ -17,6 +19,7 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   NOT_FOUND: 404,
   INVALID_INPUT: 422,
   CREDITS_INSUFFICIENT: 402,
+  CONFLICT: 409,
   INTERNAL: 500,
 }
 
