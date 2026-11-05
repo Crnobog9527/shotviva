@@ -6,6 +6,8 @@ import type { UploadContentType } from './rules'
 // ending in their id, so account deletion can clear it by prefix (core/auth).
 //   inputs/{user_id}/{uuid}.{ext}     compressed upload, 7-day bucket lifecycle
 //   outputs/{user_id}/{job_id}.png    the single unwatermarked result, kept
+//   requests/{user_id}/{uuid}.jpg     wishlist reference image, re-encoded; kept until the
+//                                     request is rejected or taken down (ARCHITECTURE §15.1)
 
 const EXTENSION: Record<UploadContentType, string> = {
   'image/jpeg': 'jpg',
@@ -18,6 +20,10 @@ const INPUT_KEY = new RegExp(`^inputs/(${UUID})/${UUID}\\.(jpg|png|webp)$`)
 
 export function newInputKey(userId: string, contentType: UploadContentType): string {
   return `inputs/${userId}/${randomUUID()}.${EXTENSION[contentType]}`
+}
+
+export function newRequestImageKey(userId: string): string {
+  return `requests/${userId}/${randomUUID()}.jpg`
 }
 
 export function outputKeyFor(userId: string, jobId: string): string {
