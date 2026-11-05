@@ -190,7 +190,7 @@
 
 ## T8 应用壳与工作台 UI（等 T6）
 
-**目标**：`(app)` layout（顶栏 + 四项 tab bar，Wishlist tab 先放占位页，内容在 T12）、Create / Photos / Account 三个 tab 页、工作台流程页、生成中 / 成功 / 失败三态、Share 按钮。
+**目标**：`(app)` layout（顶栏 + tab bar：Create / Photos / Account 三项，Wishlist 第四项由 `features.wishlist` 控制渲染，T8 先放占位页，内容在 T12）、三个 tab 页、工作台流程页、生成中 / 成功 / 失败三态、Share 按钮。
 
 **依据**：DESIGN §4.3、§4.4、§8 全部；`MOBILE_UI_rules_fable.md` §1.8.1 Share 实现规则。
 
@@ -236,7 +236,7 @@
 
 ## T12 模板需求墙（Wishlist）（等 T8）
 
-**目标**：Wishlist tab（墙、发帖、My requests）、投票、后台需求审核页、shipped 闭环。约 3 天。
+**目标**：Wishlist tab（墙、发帖、My requests）、投票、后台需求审核页、shipped 闭环；整个功能受 `site.config.features.wishlist` 开关控制（ARCHITECTURE §15.6：关掉时 tab 不渲染、前台和后台路由 404、迁移仍跑、判断只在 `isWishlistEnabled(site)` 一处，配置由调用方传入，core 不 import site）。约 3 天。
 
 **范围**：`core/wishlist/`（总控 2026-11-05 定：需求墙跨模块，放 core）、`supabase/migrations/0060`～`0079`（编号段）、`app/(app)/wishlist/*`、`app/api/wishlist/*`、`app/(app)/admin/requests`。不许动：工作台、模板表结构。
 

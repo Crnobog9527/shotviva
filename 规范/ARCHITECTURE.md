@@ -51,7 +51,7 @@ src/
 
 - Shotviva 仓库本身设成 GitHub Template Repository。开新站时点 Use this template，`site/` 是唯一预期会改的代码目录。
 - 不做 monorepo，不做 npm 包。
-- 模板化的验收标准：把 `site/` 换成一份示例配置、`modules.image = false`，`pnpm build` 能通过，且 `/generate` 返回 404。不用「打开 video」做验收，video 模块 v1 没有 workspace。
+- 模板化的验收标准：把 `site/` 换成一份示例配置、`modules.image = false`、`features.wishlist = false`，`pnpm build` 能通过，且 `/generate`、`/wishlist` 都返回 404、tab bar 只剩三项。不用「打开 video」做验收，video 模块 v1 没有 workspace。
 
 ## 2. 站点配置 `site.config.ts`
 
@@ -71,6 +71,7 @@ export const site = defineSite({
   },
   partners: { graylum: { returnToHosts: ['graylum.com', 'staging.graylum.com'] } },  // 第 14 节
   gallery: { enabled: false },                 // 创作库规格 U9：上线前 8 周不开页面
+  features: { wishlist: true },                // 第 15.6 节：关掉 = tab 不显示、路由 404、后台页隐藏
 })
 ```
 
@@ -402,7 +403,7 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 
 ### 15.1 用户侧
 
-- 位置：`(app)` 壳第四个 tab **Wishlist**（DESIGN.md 第 8.2 节），`noindex`，只有登录用户可见。
+- 位置：`(app)` 壳第四个 tab **Wishlist**（DESIGN.md 第 8.2 节），`noindex`，只有登录用户可见。整个功能受 `site.config.features.wishlist` 控制（第 15.6 节）。
 - **门槛**：至少成功出过 1 张图（`generation_jobs` 有 `succeeded`）的账号才能发帖和投票。未达门槛的账号能看墙，按钮灰掉并提示先出一张图。
 - 发帖：自然语言描述（≤300 字）+ 参考图 1～3 张。不选分类、不写标题、不出现 prompt 一词。参考图复用第 8.2 节的上传链路（浏览器压缩 + 直传），存 R2 `requests/{user_id}/{uuid}.jpg`，不设过期；被拒或下架时服务端删除。
 - 状态机：`pending`（提交后，只有本人可见「审核中」）→ `live`（Owner 通过，上墙）→ `shipped`（模板做出来了，关联 `template_id`）；或 → `rejected`（本人在「My requests」里看到，不显示原因）；`live` 可被 Owner 下架回 `rejected`。
@@ -429,3 +430,12 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 ### 15.5 条款
 
 服务条款加一句：上传的参考图由上传者负责，我们可以不经说明下架。隐私政策写明：需求参考图保留到需求被拒、下架或账号删除为止；墙上只显示脱敏用户名。
+
+### 15.6 开关（Owner 2026-11-05 决定）
+
+需求墙是一个**可整体关闭的功能**，不是产品的固定部分：这个仓库当模板开视频站时，视频站不需要它。
+
+- 开关在 `site.config.ts`：`features: { wishlist: boolean }`。和 `modules`、`gallery.enabled` 一样是建站时的配置，不是运行时后台开关——「关不关」是每个站建站时定一次的事，放配置最省（不用设置表、不用缓存、build 时就能裁掉）。
+- `features.wishlist = false` 时：tab bar 只渲染三项；`app/(app)/wishlist/*` 和 `app/api/wishlist/*` 返回 404；后台的需求审核页不出现在后台导航且直接 404；`template_requests` 两张表的迁移仍然跑（表空着无害，避免模板站的迁移序列分叉）。
+- 判断只在一处：`core/wishlist/index.ts` 导出 `isWishlistEnabled(site: SiteConfig)`，**配置由调用方传入**（core 不能 import `site/`，写法同 `core/config` 的 `isModuleEnabled(site, id)`）；`features` 的类型加在 `core/config/define-site.ts`。路由、layout、后台导航都调它，不准各自读 `features.wishlist`（总控 2026-11-05 补）。
+- 以后真需要「上线后临时关掉」（例如垃圾内容太多）再加运行时开关，一个 `system_settings` 行，一小时的事；v1 不做。
