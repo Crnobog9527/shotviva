@@ -7,3 +7,13 @@ describe('cn', () => {
     expect(cn('p-2 text-sm', false && 'hidden', 'p-4')).toBe('text-sm p-4')
   })
 })
+
+describe('cn with the Darkroom theme', () => {
+  it('keeps a named font size next to a text colour', () => {
+    expect(cn('text-sm text-foreground', 'text-caption')).toBe('text-foreground text-caption')
+  })
+
+  it('lets a named radius replace a default one', () => {
+    expect(cn('rounded-md', 'rounded-tile')).toBe('rounded-tile')
+  })
+})

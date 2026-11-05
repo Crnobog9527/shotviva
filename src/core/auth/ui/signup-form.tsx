@@ -22,7 +22,7 @@ export function SignupForm({ action, googleAction, next, freeImages }: Props) {
   }
   return (
     <AuthCard title={t('signup.title')}>
-      <p className="text-sm text-neutral-600">{t('signup.freeImages', { count: freeImages })}</p>
+      <p className="text-sm text-muted-foreground">{t('signup.freeImages', { count: freeImages })}</p>
       <GoogleButton action={googleAction} next={next} />
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <Field name="email" type="email" label={t('fields.email')} autoComplete="email" />

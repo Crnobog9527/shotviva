@@ -11,7 +11,7 @@ export function ConnectView({ valid, state, returnTo }: { valid: boolean; state:
           <p className="text-sm">{t('explain')}</p>
           <input type="hidden" name="state" value={state ?? ''} />
           {returnTo ? <input type="hidden" name="return_to" value={returnTo} /> : null}
-          <button type="submit" className="h-12 w-full rounded-md bg-neutral-900 text-base font-medium text-white">
+          <button type="submit" className="h-12 w-full rounded-md bg-primary text-base font-semibold text-primary-foreground">
             {t('allow')}
           </button>
         </form>
