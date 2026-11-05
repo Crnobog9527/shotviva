@@ -97,7 +97,7 @@ Owner 2026-11-05 改定：**深色系**（T6 深色方向「打烊后的街」�
 1. 上传区：大号按钮区，手机上点击调起相册 / 相机（两个入口："Take photo" 带 `capture`，"Choose from gallery" 不带）；桌面上同一块区域也接受拖拽。显示允许的格式和大小（JPG / PNG / WebP，up to 20MB）。
 2. 文案区：只出现模板需要的字段，每个字段带示例占位。
 3. 比例选择：用图标按钮，标注平台用途（例如 "DoorDash 16:9"）。
-3b. 分辨率选择：三段式分段控件 **1K / 2K / 3K**，默认 1K；每段下面一行小字写用途和消耗，例如 "1K · Social & delivery apps · 2 credits"、"2K · Web & small print · 4 credits"、"3K · Large print & zoom · 6 credits"（数字从该模板的 `credits_cost` 读，不写死）。余额不够某一档时该段灰掉并标 "Not enough credits"。
+3b. 分辨率选择：三张上下排列的选项卡，默认第一张。界面只显示 **Standard / HD / Max**（Owner 2026-11-05 定），每张写一行像素和用途，右侧写消耗：「Standard — 1024 px · Social & delivery apps · 2 credits」「HD — 2048 px · Websites & online stores · 4 credits」「Max — 2880 px · Print & zoom · 6 credits」（credits 数从该模板的 `credits_cost` 读，不写死）。内部代号 `1k` / `2k` / `3k` 只在代码和数据库里用，界面、营销页、FAQ 都不出现 1K / 2K / 3K，也不准用 "4K"、"Ultra HD"、"SD"。余额不够某一档时该档的 credits 变灰，主按钮变成 "Get credits · N needed" 并打开付费墙。
 4. 生成按钮：固定在底部拇指区、全宽，写清楚当前分辨率的消耗，例如 "Generate · 2 credits"，切换分辨率时按钮上的数字跟着变。按钮旁显示余额 "30 credits + 3 free"。
 5. 这一单将用免费积分时，按钮上方一行告知："This photo uses free credits: it's shown publicly with a watermark. Paid credits make it private and watermark-free." 将用付费积分时不显示。
 
