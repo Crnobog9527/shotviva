@@ -23,8 +23,8 @@ export function testSite(overrides: Partial<SiteConfig> = {}): SiteConfig {
         currency: 'usd',
         freeCredits: 3,
         products: [
-          { id: 'pass', credits: 30, paidDays: 30, priceUsd: 0 },
-          { id: 'pack', credits: 120, paidDays: 365, priceUsd: 49 },
+          { id: 'starter_monthly', tier: 'starter', interval: 'month', credits: 30, paidDays: 30, priceUsd: 0 },
+          { id: 'pack_s', tier: 'pack', interval: null, credits: 120, paidDays: null, priceUsd: 49 },
         ],
         channels: { primary: 'stripe', fallback: 'waffo' },
       },

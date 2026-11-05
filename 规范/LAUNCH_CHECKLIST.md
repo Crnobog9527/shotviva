@@ -58,7 +58,7 @@
 - [ ] 价格数字（ARCHITECTURE §6.2 的 9 个商品）已填进 `site.config.ts`，首页、价格页、FAQ、结构化数据的数字完全一致；Stripe 里 Starter / Pro / Max 各一个 Product（税码 `txcd_10105001`）挂 4 个 Price（月付 / 年付 × recurring / one-time），三个积分包各一个 one-time Price；每个 Price 的 `lookup_key` 和 `metadata.product_id` 按 §6.2 的约定填好，服务端按 lookup key 能取到全部 15 个 Price
 - [ ] 成本测量（**不是主体保持测试，不设质量门槛**）：用 20 张真实手机照片（长边 2048）对 `OPENAI_IMAGE_MODEL` 各跑一次 `/v1/images/edits`，读 `usage.input_tokens_details.image_tokens`，总花费 < $5；按 p95 算 1K high 单次成本，若 > $0.12 就把 `high` 的 1K 配置下限改为 3 credits，或把上传长边降到 1536；结果写进 `modules/image` 的下限表注释
 - [ ] 按分辨率扣费：同一模板分别以 1K / 2K / 3K 生成，扣的 credits 等于后台配置的三个数，成品像素等于该档尺寸表；后台把某档改成低于下限的数被拒绝保存
-- [ ] Stripe 测试模式·卡：`starter_monthly` 和 `pro_yearly` 各订阅一次（Managed Payments），结账页显示税，到账后付费池 `credits` +50 / +1,620、`paid_until` = 本期 `period_end`，`subscriptions.product_id` 正确
+- [ ] Stripe 测试模式·卡：`starter_monthly` 和 `pro_yearly` 各订阅一次（Managed Payments），结账页显示税，到账后付费池 `credits` +50 / +1,620，`paid_until` = 付款时间 +30 / +365 天（首付按天数累加；从首次续费起对齐 `period_end`，T10），`subscriptions.product_id` 正确
 - [ ] Stripe 测试模式·钱包：支付宝单笔买一次 `starter_monthly`，结账页无税，付费池 +50、`paid_until` +30 天，付费墙写明不自动续费；再用卡（MP 单笔）和支付宝各买一次 `pack_s`，付费池 +20、`paid_until` 不变
 - [ ] 用 Stripe 测试时钟把一个 `starter_monthly` 订阅推进到续费：`invoice.paid` 到账后付费池 +50、`paid_until` 延到新一期；再推进一次让续费失败，不发积分、`paid_until` 不延、账号页显示已过期，已有付费积分仍可用
 - [ ] 在 Customer Portal 取消订阅：镜像表 `cancel_at_period_end = true`，`paid_until` 不变，期末后不再续

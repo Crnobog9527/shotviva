@@ -36,3 +36,18 @@ describe('Sentry build keys', () => {
     expect(env).toMatchObject({ SENTRY_ORG: 'graylum', SENTRY_PROJECT: 'shotviva-preview' })
   })
 })
+
+describe('Stripe keys', () => {
+  it('are optional, treat blanks as unset and default Managed Payments on', () => {
+    const env = parseServerEnv({ STRIPE_SECRET_KEY: '', STRIPE_WEBHOOK_SECRET: '', STRIPE_MANAGED_PAYMENTS: '' })
+    expect(env.STRIPE_SECRET_KEY).toBeUndefined()
+    expect(env.STRIPE_WEBHOOK_SECRET).toBeUndefined()
+    expect(env.STRIPE_MANAGED_PAYMENTS).toBe('on')
+  })
+
+  it('refuse a value that is not a Stripe key, naming only the key', () => {
+    expect(() => parseServerEnv({ STRIPE_SECRET_KEY: 'pk_test_123' })).toThrow(/STRIPE_SECRET_KEY/)
+    expect(() => parseServerEnv({ STRIPE_SECRET_KEY: 'pk_test_123' })).not.toThrow(/pk_test_123/)
+    expect(() => parseServerEnv({ STRIPE_WEBHOOK_SECRET: 'secret' })).toThrow(/STRIPE_WEBHOOK_SECRET/)
+  })
+})

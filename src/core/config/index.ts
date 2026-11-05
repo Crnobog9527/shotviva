@@ -1,10 +1,15 @@
-export { defineSite } from './define-site'
+export { MEMBERSHIP_TIERS, PRODUCT_IDS, defineSite } from './define-site'
 export type {
+  MembershipProduct,
+  MembershipTier,
   ModuleId,
+  PackProduct,
   PartnerSiteConfig,
   PaymentChannel,
   PostalAddress,
   ProductId,
+  ProductInterval,
+  ProductTier,
   SiteBrand,
   SiteConfig,
   SiteProduct,
