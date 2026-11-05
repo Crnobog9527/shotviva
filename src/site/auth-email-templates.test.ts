@@ -32,10 +32,10 @@ describe.each(Object.entries(TEMPLATES))('supabase/templates/%s.html', (name, ty
     expect(html).toContain('>{{ $link }}</a>')
   })
 
-  it('carries the support address and company line and nothing that tracks or needs images', () => {
-    const { address, contactEmail, legalName } = site.brand
+  it('carries the support address and copyright line and nothing that tracks or needs images', () => {
+    const { contactEmail, name: brandName } = site.brand
     expect(html).toContain(`mailto:${contactEmail}`)
-    expect(html).toContain(`${legalName}, ${address.street}, ${address.locality}, ${address.region} ${address.postalCode}`)
+    expect(html).toContain(`Copyright &copy; 2026 ${brandName}. All rights reserved.`)
     expect(html).not.toMatch(/<img|<script|<link|url\(/i)
   })
 
