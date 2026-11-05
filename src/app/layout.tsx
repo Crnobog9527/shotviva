@@ -1,15 +1,13 @@
 import type { Metadata } from 'next'
 import { NextIntlClientProvider } from 'next-intl'
 
+import { rootMetadata } from '@/core/seo'
 import { site } from '@/site/site.config'
 
 import './globals.css'
 
-export const metadata: Metadata = {
-  title: site.brand.name,
-  // Indexing is opened deliberately per page in T5; the scaffold stays out of search.
-  robots: { index: false, follow: false },
-}
+// Default robots is noindex; only paths in site.indexing opt in (core/seo/indexing.ts).
+export const metadata: Metadata = rootMetadata(site)
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
