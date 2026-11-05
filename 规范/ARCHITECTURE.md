@@ -202,7 +202,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 
 **三档会员 × 月付 / 年付 + 三个积分包，共 9 个商品。** 商品 id 固定如下（总控定），Stripe / Waffo 映射、PostHog 事件、付费墙和 `/pricing` 文案都按这些 id 写：
 
-| id | 档位 | 价格 | 付费积分 | 每 credit | 会员期 `paid_until` | 卡 / Apple Pay / Google Pay | 支付宝 / 微信 |
+| id | 档位 | 价格 | 付费积分 | 每 credit | 会员期 `paid_until` | 卡 / Apple Pay / Google Pay | 支付宝 |
 |---|---|---|---|---|---|---|---|
 | `starter_monthly` | Starter | $19.90 / 月 | 50 / 月 | $0.398 | +30 天 | Stripe **订阅**，每期 +50 | Stripe **单笔**一期会员 |
 | `starter_yearly` | Starter | $139 / 年（合 $11.58/月） | 600，一次发完 | $0.232 | +365 天 | Stripe **订阅**，每年 +600 | Stripe **单笔** |
@@ -218,8 +218,8 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 积分包不改会员期，但它发的是付费积分，用它生成的作品就是付费作品（无水印、私密、可商用），所以非会员买包也拿到完整权益——这正是「按作品判付费」要解决的事。
 - 价格数字只写在 `site.config.ts`（第 2 节），付费墙、`/pricing`、FAQ、结构化数据都从配置读；建站规格 G3 同步。送 Stripe 时用整数分（`1990`）。
 - **Stripe Product / Price 映射**：Starter、Pro、Max 各一个 Product（税码 `txcd_10105001`），每个 Product 挂 4 个 Price：月付 recurring、月付 one-time、年付 recurring、年付 one-time（同 id 的 recurring 和 one-time 价格相同）；三个积分包各一个 Product，只有 one-time Price。Price 的 `lookup_key` 固定为 `<product_id>`（one-time）和 `<product_id>_recurring`（订阅），服务端按 lookup key 取 Price，不把 Price id 写进代码或配置；每个 Price 的 `metadata.product_id` 也写上，回调反查用。
-- 支付宝 / 微信在 Stripe 普通模式下不支持订阅，所以钱包用户买会员买的是「一期」（`starter_monthly` 的单笔形态 = 30 天 50 credits），`paid_until` 到了自己再买。这不是功能缺失，是 Stripe 的限制，付费墙文案要说清楚（"Renews automatically" vs "30 days, no auto-renew"）。
-- **PostHog `purchase` 事件参数**：`product_id`、`tier`（`starter` / `pro` / `max` / `pack`）、`interval`（`month` / `year` / 空）、`form`（`subscription` / `one_time`）、`channel`（`stripe` / `waffo`）、`method`（`card` / `alipay` / `wechat_pay`）、`amount_usd`、`credits`。`generate` 事件加 `resolution` 和 `credits_cost`。
+- **不接微信支付**（Owner 2026-11-05 定，只保留卡和支付宝）。支付宝在 Stripe 普通模式下不支持订阅，所以钱包用户买会员买的是「一期」（`starter_monthly` 的单笔形态 = 30 天 50 credits），`paid_until` 到了自己再买。这不是功能缺失，是 Stripe 的限制，付费墙文案要说清楚（"Renews automatically" vs "30 days, no auto-renew"）。
+- **PostHog `purchase` 事件参数**：`product_id`、`tier`（`starter` / `pro` / `max` / `pack`）、`interval`（`month` / `year` / 空）、`form`（`subscription` / `one_time`）、`channel`（`stripe` / `waffo`）、`method`（`card` / `alipay`）、`amount_usd`、`credits`。`generate` 事件加 `resolution` 和 `credits_cost`。
 
 已经确定的规则：
 
@@ -231,7 +231,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 不做：首月优惠券、升级降级、按比例退款、宽限期、测试时钟自动化、到期提醒邮件。
 - **分两段上线**：上线当天必须有「订阅模式建结账 + 首付发放」（和单笔几乎相同）；续费、取消同步、Portal 链接在第一个付费用户满 30 天之前上线即可（TASKS T10）。
 - 账号页「Subscription」区块显示当前档位（Starter / Pro / Max）和月付 / 年付；镜像表 `subscriptions.product_id` 存 9 个 id 之一。
-- 卡、支付宝、微信都能付（第 6.3 节的路由）。
+- 卡和支付宝能付（第 6.3 节的路由），不接微信支付。
 - **水印在下载路由加，按作品判**：成品只存一份无水印原图；`core/storage` 的下载路由对 `credit_pool = 'free'` 的作品用 `sharp` 叠右下角「Made with Shotviva」后返回（约 50ms），`credit_pool = 'paid'` 的作品永不加水印。工作台预览和将来创作库展示同样走这个路由。
 - **免费作品**（免费积分生成）：`visibility = 'public'`，带水印，用户不能改私密，可以删除。买了会员之后它们**仍然**是免费作品——不会自动去水印、不会自动私密；想要无水印版就用付费积分再生成一张。
 - **付费作品**（付费积分生成）：默认 `visibility = 'private'`、无水印、可商用，用户可以改公开（进创作库，仍无水印）。会员到期、积分用完都不影响已有付费作品。
@@ -245,7 +245,6 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 |---|---|---|
 | 卡 / Apple Pay / Google Pay | `mode: 'subscription'`，`managed_payments: { enabled: true }`，不传 `payment_method_types`（MP 不允许） | Stripe（Link）当商户记录方，结账时另加税 |
 | 支付宝 | `mode: 'payment'`，`payment_method_types: ['alipay']` | Shotviva |
-| 微信 | `mode: 'payment'`，`payment_method_types: ['wechat_pay']`，`payment_method_options.wechat_pay.client = 'web'` | Shotviva |
 
 - 服务端只认用户选的方式，不按 IP 或浏览器语言强制。Managed Payments 的结账页不允许买家国家为中国，所以大陆用户自然选钱包。
 - MP 商品必须设税码 `txcd_10105001`（AI 服务，个人用）。MP 价格不含税，税在结账时另加。
@@ -390,7 +389,7 @@ Owner 2026-11-04 决定：**不在 flux-kontext-template 上原地改造**，新
 - 建站规格第 2~4 周的内页是内容任务：用第 12 节的结构填内容，不算新功能。
 - **模板库是首页的一块内容，不是首页的全部。** 首页从上到下：
   1. H1 + 直答块（以主词 `image to image ai` 开头，40~60 个英文词，建站规格 G1）
-  2. 首屏生成器 + 前后对比图（Owner 2026-11-05）：首屏就能出图——上传照片 → 选模板（默认 Korean Manhwa）→ 可选「Anything to change?」→ "Generate · 2 credits"；结果直接显示在首屏对比图里。未登录时先弹出登录抽屉，登录后回到首页继续。生成器是客户端组件，首屏正文（H1、副标题、直答块）仍是服务端渲染、源码可见（建站规格 R5）
+  2. 首屏生成器 + 前后对比图（Owner 2026-11-05）：首屏就能出图——上传照片 → 选模板（默认模板与首屏演示一致，暂定 Pure White，Owner 可在后台改）→ 可选「Anything to change?」→ "Generate · 2 credits"；结果直接显示在首屏对比图里。未登录时先弹出登录抽屉，登录后回到首页继续。生成器是客户端组件，首屏正文（H1、副标题、直答块）仍是服务端渲染、源码可见（建站规格 R5）。首屏下方的第一组演示是「一张手机照片 → 一整套图」（Owner 2026-11-05）：同一件商品从随手拍的杂乱桌面照 → 白底主图 / 生活场景 / 促销海报，并写一句「请摄影师拍这一套要 $___」（金额从配置读）；不再用画风迁移做首屏默认演示
   3. 精选模板网格：按第 5 节的 6 个分类分组，每个分类一个 H3，每个模板的名称和用途说明都写在源码里（建站规格 §4 首页骨架 H2-2）
   4. 可核验事实块：免费额度、每张消耗、三档像素、上传限制、出图耗时（建站规格 G4 通用事实）
   5. 成本对比表：请摄影师 vs Shotviva

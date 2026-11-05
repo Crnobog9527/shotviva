@@ -9,7 +9,7 @@
 - [ ] Supabase Auth 的 Site URL 和 Redirect URLs 配好，包含预览域名通配
 - [ ] GitHub 仓库密钥已配好：Supabase 访问令牌、预览库数据库密码、生产库数据库密码；`production` environment 设为必须 Owner 批准
 - [ ] 生产库的全部迁移由「生产迁移」工作流执行（Owner 批准记录可查），`supabase migration list` 与仓库完全一致；没有任何手动执行过的 SQL
-- [ ] Stripe：同一主体下新开的独立账户，开通卡、支付宝、微信支付；账单描述设为 SHOTVIVA（卡支付在 Managed Payments 下显示 `LINK.COM* SHOTVIVA`）。Managed Payments 资格审核已提交；审核没下来时卡走普通订阅兜底（ARCHITECTURE §6.3）。账户本身没通过时用 Waffo
+- [ ] Stripe：同一主体下新开的独立账户，开通卡和支付宝（不接微信支付）；账单描述设为 SHOTVIVA（卡支付在 Managed Payments 下显示 `LINK.COM* SHOTVIVA`）。Managed Payments 资格审核已提交；审核没下来时卡走普通订阅兜底（ARCHITECTURE §6.3）。账户本身没通过时用 Waffo
 - [ ] Waffo：申请加急，测试和生产密钥分开创建，回调格式选 Raw
 - [ ] Stripe 和 Waffo 的生产回调地址、签名密钥都已登记到环境变量
 - [ ] OpenAI：组织验证完成，有 GPT-Image 系列模型权限（`OPENAI_IMAGE_MODEL` 指定的那个，默认由 Owner 定），设好每月消费上限
@@ -55,7 +55,7 @@
 - [ ] 成本测量（**不是主体保持测试，不设质量门槛**）：用 20 张真实手机照片（长边 2048）对 `OPENAI_IMAGE_MODEL` 各跑一次 `/v1/images/edits`，读 `usage.input_tokens_details.image_tokens`，总花费 < $5；按 p95 算 1K high 单次成本，若 > $0.12 就把 `high` 的 1K 配置下限改为 3 credits，或把上传长边降到 1536；结果写进 `modules/image` 的下限表注释
 - [ ] 按分辨率扣费：同一模板分别以 1K / 2K / 3K 生成，扣的 credits 等于后台配置的三个数，成品像素等于该档尺寸表；后台把某档改成低于下限的数被拒绝保存
 - [ ] Stripe 测试模式·卡：`starter_monthly` 和 `pro_yearly` 各订阅一次（Managed Payments），结账页显示税，到账后付费池 `credits` +50 / +1,620、`paid_until` = 本期 `period_end`，`subscriptions.product_id` 正确
-- [ ] Stripe 测试模式·钱包：支付宝、微信各单笔买一次 `starter_monthly`，结账页无税，付费池 +50、`paid_until` +30 天，付费墙写明不自动续费；再用卡（MP 单笔）和支付宝各买一次 `pack_s`，付费池 +20、`paid_until` 不变
+- [ ] Stripe 测试模式·钱包：支付宝单笔买一次 `starter_monthly`，结账页无税，付费池 +50、`paid_until` +30 天，付费墙写明不自动续费；再用卡（MP 单笔）和支付宝各买一次 `pack_s`，付费池 +20、`paid_until` 不变
 - [ ] 用 Stripe 测试时钟把一个 `starter_monthly` 订阅推进到续费：`invoice.paid` 到账后付费池 +50、`paid_until` 延到新一期；再推进一次让续费失败，不发积分、`paid_until` 不延、账号页显示已过期，已有付费积分仍可用
 - [ ] 在 Customer Portal 取消订阅：镜像表 `cancel_at_period_end = true`，`paid_until` 不变，期末后不再续
 - [ ] Waffo 沙盒：卡、支付宝各单笔买一次 `starter_monthly`（一期）和 `pack_s`，都能到账，积分和 `paid_until` 与 Stripe 单笔一致；9 个商品的 Waffo 映射都配了，缺一个启动报错；付款页不显示微信、不显示「自动续费」
