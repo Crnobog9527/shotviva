@@ -10,6 +10,7 @@ export function RelatedLinks({ heading, links }: { heading: string; links: reado
         {links.map((link) => (
           <li key={link.href}>
             <Link href={link.href}>{link.anchor}</Link>
+            {link.note && <p>{link.note}</p>}
           </li>
         ))}
       </ul>

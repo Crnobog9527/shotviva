@@ -25,6 +25,7 @@
 | T15 | 迁移基线与自动化 | **可派，T8 / T9 / T12 之前** | T14 |
 | T18 | 埋点与错误监控 | **可派，T8 / T9 之前** | — |
 | T19 | 法律页面 | **可派** | T5 |
+| T20 | 数据库收尾：用户总览视图、迁移只加不改检查、收回多余权限 | **可派** | T15 |
 | T16 | 按分辨率扣费（模板三档积分 + 质量档） | **等 T15 合并；T8 / T9 之前** | T3、T4、T14、T15 |
 
 并行建议：T0 先做（半天到一天）；T0 合并后 T1 / T2 / T3 / T5 四张同时开；T6 和 T0 同时开（不碰代码）。
@@ -201,6 +202,8 @@
 
 **依据**：DESIGN §4.3、§4.4、§8 全部；`MOBILE_UI_rules_fable.md` §1.8.1 Share 实现规则。
 
+**设计基准（Owner 2026-11-05）**：以 T6 定稿的 B 版 Darkroom（`design/comps-v3-b/` 与更新后的 `design/DESIGN.md`）为准。**范围补充**：生成可以在后台进行，Photos 页显示进行中的任务和进度，按 `current_tier` 的并发上限允许同时发起多张（Starter 1、Pro 3、Max 6），超过上限时按钮提示等待。
+
 **验收**：LAUNCH §7.5 五条 + DESIGN §8.7 真机清单（Codex 验收）。
 
 **依赖**：T4、T6。
@@ -218,6 +221,8 @@
 **预览环境的支付回调**（总控 2026-11-05）：预览地址每个 PR 不同，且开着 Vercel 部署保护，Stripe 的回调会被挡成 401。做法：本地开发用 `stripe listen` 转发；CI 用签名后的模拟回调测（AGENTS §7 测试 2）；在预览上端到端验收时，打开 Vercel「Protection Bypass for Automation」，Stripe 测试模式登记一个回调，网址 = 正在验收的 PR 的分支地址 + `/api/webhooks/stripe?x-vercel-protection-bypass=<绕行密钥>`，换 PR 验收时只改网址、签名密钥不变。成功页 / 取消页地址由代码按当前部署地址（`core/site-url`）生成。绕行密钥和签名密钥只放 Vercel 环境变量与 Stripe 后台，不进代码、不进 PR。
 
 **范围补充（总控 2026-11-05）**：不接微信支付，只有卡和支付宝（ARCHITECTURE §6.2 / §6.3、DESIGN §4.5）；付费墙档位卡三种材质色和年付节省金额按 DESIGN §4.5；同步把法律页面（`site/content/legal/`）里提到 WeChat Pay 的句子删掉。
+
+**范围补充 2（总控 2026-11-05）**：新增 SQL 函数 `current_tier(user_id)`（ARCHITECTURE §6.2「会员档位权益」），生成限频的并发上限按档位 1 / 3 / 6（没有档位为 1）；付费墙档位卡按 DESIGN §4.5 列权益，Coming soon 单独成组；不写「排队优先」。
 
 **验收**：LAUNCH §5 的商品 / Price 一条、Stripe 卡与钱包两条 + 回调重发三次只发一次 + 签名错误 400；付费墙在 375px 上每屏不超过三个选项、不滚动能完成选择（Codex 验收）。
 
@@ -278,6 +283,8 @@
 - AGENTS §5「每张表必须开 RLS」；§6「所有接口默认需要登录」。
 
 **验收**：LAUNCH §9.6 八条；删除账号时同时清 `requests/{user_id}/`（在 T1 的 `accountPrefixes` 里加这个前缀并补测试）。其中前五条要有 Vitest（连本地 Supabase）：门槛函数、RLS 可见性、投票切换、拒绝删图（mock R2 断言）、shipped 置顶查询。界面部分 Codex 真机验收。
+
+**范围补充（总控 2026-11-05）**：投票权重按 `current_tier`，Max 为 3，其余为 1（`votes_count` 存加权后的总数，取消投票按同样权重减）。
 
 **依赖**：T1、T4（上传链路）、T8（应用壳）。
 
@@ -378,6 +385,15 @@
 - [ ] Owner 审阅通过（律师意见由 Owner 自行安排）
 
 **依赖**：T5（已合并）。
+
+## T20 数据库收尾：用户总览视图、迁移只加不改的 CI 检查、收回多余权限（可派）
+
+**目标**：约半天。
+1. 迁移（编号段 `0040`～`0059`）：新建 `admin` schema（不加入 Data API 暴露列表）和视图 `admin.users_overview`（ARCHITECTURE §10 表里的字段，按 `auth.users.email` 可搜），`revoke all` 给 `anon` / `authenticated`，只给 `service_role`；同一迁移或另一迁移里对 `public.templates`、`public.profiles` 执行 `revoke all ... from anon, authenticated` 再按现有 RLS 需要重新授 `select`，消掉 `schema.sql` 里多余的 `REFERENCES / TRIGGER / TRUNCATE / MAINTAIN` 默认授权（T15 PR #24 的观察项）。重新生成 `supabase/schema.sql`。
+2. CI：新增一步，PR 里如果修改或删除了 `origin/main` 上已有的 `supabase/migrations/*.sql` 就失败；PR 标题带 `[baseline]` 时放行（AGENTS §5）。
+3. 测试：匿名和普通登录用户读 `admin.users_overview` 失败；`service_role` 能读且按邮箱筛出指定用户；`templates` / `profiles` 现有读写行为不变（已有 RLS 测试全过）。
+
+**依据**：ARCHITECTURE §10 运营表；AGENTS §5 新增两条。**依赖**：T15（已合并）。与 T16 并行时注意：两边都会改 `supabase/schema.sql`，后合并的一方 rebase 后重新生成快照，不手工合并。
 
 ## Owner 侧关键路径（不是任务卡，但比代码慢）
 

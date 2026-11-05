@@ -8,15 +8,19 @@ export {
   type CostTable,
   type Fact,
   type FaqItem,
+  type HeadedText,
   type HeroBlock,
   type HomePage,
   type ImageRef,
   type RelatedLink,
+  type SectionHeadings,
   type TemplateCard,
+  type TemplateCategory,
 } from './page-content'
 export { LIMITS, countWords, validateContentPage } from './validate-page'
 export { ContentPageView } from './content-page-view'
-export { TemplateGrid } from './blocks/template-grid'
+export { HomePageView } from './home-page-view'
+export { CostTableView } from './blocks/cost-table-section'
 export { Breadcrumbs } from './blocks/breadcrumbs'
 export { FactsSection } from './blocks/facts-section'
 export { FaqSection } from './blocks/faq-section'

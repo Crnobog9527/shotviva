@@ -41,6 +41,13 @@ describe('json-ld', () => {
     ])
   })
 
+  it('uses the site wording for the free offer and counts paid offers in credits', () => {
+    const offers = softwareApplicationLd(site, page, '3 free Standard images').offers as { description: string }[]
+    expect(offers.map((o) => o.description)).toEqual(['3 free Standard images', '120 credits'])
+    const fallback = softwareApplicationLd(site, page).offers as { description: string }[]
+    expect(fallback[0]?.description).toBe(`${site.billing.freeCredits} free credits`)
+  })
+
   it('builds organization and breadcrumbs from config', () => {
     expect(organizationLd(site)).toMatchObject({
       name: 'Example',
