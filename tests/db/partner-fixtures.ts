@@ -19,7 +19,7 @@ export const productionEnv = { GRAYLUM_PARTNER_KEY: PRODUCTION_KEY, VERCEL_ENV: 
 
 export const ORIGIN = 'https://shotviva.test'
 export const partnerConfig = {
-  returnToHosts: ['graylum.com', 'staging.graylum.com'],
+  returnToHosts: ['graylum.com', 'auth-staging.graylum.com'],
   connectCallbackPath: '/api/connectors/shotviva/callback' as const,
   imageHosts: ['img.graylum.com'],
 }

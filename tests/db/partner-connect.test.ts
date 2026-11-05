@@ -24,7 +24,7 @@ afterAll(async () => {
 
 // appOrigin with no Vercel env (tests) is the local dev origin.
 const APP = 'http://localhost:3000'
-const CALLBACK = 'https://staging.graylum.com/api/connectors/shotviva/callback'
+const CALLBACK = 'https://auth-staging.graylum.com/api/connectors/shotviva/callback'
 
 function post(fields: Record<string, string>, origin = APP) {
   const form = new FormData()
