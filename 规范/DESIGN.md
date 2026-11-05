@@ -88,7 +88,7 @@ Owner 2026-11-05 改定：**深色系**（T6 深色方向「打烊后的街」�
 ### 4.2 模板卡片
 
 - 封面是对比图的「后」图，卡片上一个「Before / After」小切换看「前」图；不用悬停（手机没有悬停）。
-- 卡片上只写：模板名、适合什么（例如 "Menu & delivery apps"）、消耗多少 credits——写 1K 档的数（"From 2 credits"），2K / 4K 的数在工作台选分辨率时才显示。
+- 卡片上只写：模板名、适合什么（例如 "Menu & delivery apps"）、消耗多少 credits——写 1K 档的数（"From 2 credits"），2K / 3K 的数在工作台选分辨率时才显示。
 
 ### 4.3 生成工作台
 
@@ -97,7 +97,7 @@ Owner 2026-11-05 改定：**深色系**（T6 深色方向「打烊后的街」�
 1. 上传区：大号按钮区，手机上点击调起相册 / 相机（两个入口："Take photo" 带 `capture`，"Choose from gallery" 不带）；桌面上同一块区域也接受拖拽。显示允许的格式和大小（JPG / PNG / WebP，up to 20MB）。
 2. 文案区：只出现模板需要的字段，每个字段带示例占位。
 3. 比例选择：用图标按钮，标注平台用途（例如 "DoorDash 16:9"）。
-3b. 分辨率选择：三段式分段控件 **1K / 2K / 4K**，默认 1K；每段下面一行小字写用途和消耗，例如 "1K · Social & delivery apps · 2 credits"、"2K · Web & small print · 4 credits"、"4K · Large print & zoom · 6 credits"（数字从该模板的 `credits_cost` 读，不写死）。余额不够某一档时该段灰掉并标 "Not enough credits"。
+3b. 分辨率选择：三段式分段控件 **1K / 2K / 3K**，默认 1K；每段下面一行小字写用途和消耗，例如 "1K · Social & delivery apps · 2 credits"、"2K · Web & small print · 4 credits"、"3K · Large print & zoom · 6 credits"（数字从该模板的 `credits_cost` 读，不写死）。余额不够某一档时该段灰掉并标 "Not enough credits"。
 4. 生成按钮：固定在底部拇指区、全宽，写清楚当前分辨率的消耗，例如 "Generate · 2 credits"，切换分辨率时按钮上的数字跟着变。按钮旁显示余额 "30 credits + 3 free"。
 5. 这一单将用免费积分时，按钮上方一行告知："This photo uses free credits: it's shown publicly with a watermark. Paid credits make it private and watermark-free." 将用付费积分时不显示。
 

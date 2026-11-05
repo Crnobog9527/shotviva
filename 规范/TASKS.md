@@ -257,7 +257,7 @@
 
 ## T11 首页与内页最终文案（价格已定稿，可派）
 
-**依据**：ARCHITECTURE §12、§13；建站规格 §4、R10、G3（9 个商品的价格、"from 2 credits"、1K / 2K / 4K 作为可核验事实）。**依赖**：T5。
+**依据**：ARCHITECTURE §12、§13；建站规格 §4、R10、G3（9 个商品的价格、"from 2 credits"、1K / 2K / 3K 作为可核验事实）。**依赖**：T5。
 
 ## T12 模板需求墙（Wishlist）（等 T8）
 
@@ -305,11 +305,11 @@
 
 ## T16 按分辨率扣费（等 T15 合并；排在 T8 / T9 之前）
 
-**目标**：把「一个模板一个整数 credit」改成「模板质量档 × 用户选的分辨率（1K / 2K / 4K）」：模板表存三档积分和质量档，预扣在数据库里按分辨率取数，provider 按档出尺寸、按模板传 `quality`，后台能编辑三个数并校验下限。约 1 天。
+**目标**：把「一个模板一个整数 credit」改成「模板质量档 × 用户选的分辨率（1K / 2K / 3K）」：模板表存三档积分和质量档，预扣在数据库里按分辨率取数，provider 按档出尺寸、按模板传 `quality`，后台能编辑三个数并校验下限。约 1 天。
 
 **范围**：
 - `supabase/migrations/` 编号段 **`0020`～`0039`**（T15 PR #24 规划的空闲段；**T15 未合并前不写迁移**，基线合并后编号必须高于 `0006`）：`templates.credits_cost` 改为 jsonb（三个键 `1k` / `2k` / `4k` 必填、正整数，check 约束），`templates.quality` 文本列（`high` / `medium`，默认 `high`）；`admin_upsert_template` 读写这两个字段；`reserve_credits(job_id, resolution)` 从 `templates.credits_cost ->> resolution` 取数（不再信任调用方传入的 cost），非法分辨率抛错；`freeform` 种子行三档都配。一张卡一次成型，不准先加列再改列。
-- `modules/image/provider/output-size.ts`：按 ARCHITECTURE §8.1 的三档（1K 1024²、2K 2048²、4K 2880²）× 比例出尺寸表，每档内任何比例的输出 token ≤ 该档正方形（用 OpenAI 官方 token 计算器公式验证，表和验证脚本一起提交）；`openai-image-provider.ts` 传模板的 `quality`，模型名继续从 `OPENAI_IMAGE_MODEL` 读。
+- `modules/image/provider/output-size.ts`：按 ARCHITECTURE §8.1 的三档（1K 1024²、2K 2048²、3K 2880²）× 比例出尺寸表，每档内任何比例的输出 token ≤ 该档正方形（用 OpenAI 官方 token 计算器公式验证，表和验证脚本一起提交）；`openai-image-provider.ts` 传模板的 `quality`，模型名继续从 `OPENAI_IMAGE_MODEL` 读。
 - `modules/image/credits-floor.ts`：质量档 × 分辨率的配置下限常量（ARCHITECTURE §6.1 的 `ceil(p95 成本 ÷ $0.06)`，初值 `high` 2 / 4 / 6、`medium` 1 / 2 / 3，LAUNCH §5 成本测量后更新），后台保存模板的服务端动作用它校验。
 - `core/jobs/`：`job-schema` 加 `resolution`（默认 `'1k'`），`POST /api/generate` 入参加 `resolution`；`generation_jobs.inputs.resolution` 落库；伙伴接口 `/api/partner/generate` 固定 `'1k'`，契约不改。
 - `app/(app)/admin/templates`：质量档下拉 + 三个 credit 输入框，低于下限时显示下限并拒绝保存。
@@ -319,7 +319,7 @@
 **依据**：ARCHITECTURE §5 字段定义与默认值表；§6.1「计价单位是 credit」「配置下限」两条；§4 `inputs.resolution`、`credits_cost` 取法、三步流程第 1～2 步；§8.1 三档像素定义与「同档任何比例 token ≤ 正方形」；§10 后台页功能；§3.2 模型名是配置项；AGENTS §5 迁移规则、§7 测试 3。
 
 **验收**：
-- [ ] 同一模板 1K / 2K / 4K 各生成一次，`generation_jobs.credits_cost` 分别等于后台配置的三个数，成品像素等于尺寸表
+- [ ] 同一模板 1K / 2K / 3K 各生成一次，`generation_jobs.credits_cost` 分别等于后台配置的三个数，成品像素等于尺寸表
 - [ ] 测试：`reserve_credits` 对 `'8k'` 抛错且不扣；调用方传错 cost 不影响扣数；`medium` 模板 1K 扣 1
 - [ ] 尺寸表测试：所有比例 × 三档，边长为 16 的倍数、比例 ≤ 3:1、token 数 ≤ 该档正方形
 - [ ] 后台把 `high` 模板 1K 改成 1，保存被拒并提示下限 2；改成 3 保存成功

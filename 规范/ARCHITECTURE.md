@@ -86,7 +86,7 @@ export const site = defineSite({
 
 - 品牌名、价格、免费额度、支持语言这些对外数字**只写在 `site.config.ts`**，页面、FAQ、结构化数据都从这里读（建站规格 G3）。
 - Stripe 的 Price 不进代码也不进 `site.config.ts`：按第 6.2 节的 `lookup_key` 约定在 Stripe 后台建好，服务端用 lookup key 取。Waffo 的商品 ID 映射放环境变量。
-- 分辨率档（1K / 2K / 4K）的像素定义和每档每模板的 credit 数不在这里：前者是 `modules/image` 的常量，后者在数据库 `templates.credits_cost`（第 5 节）。
+- 分辨率档（1K / 2K / 3K）的像素定义和每档每模板的 credit 数不在这里：前者是 `modules/image` 的常量，后者在数据库 `templates.credits_cost`（第 5 节）。
 - 数据库只存订单、流水和用户数据，不存价格表。
 
 ## 3. 功能模块接口
@@ -126,7 +126,7 @@ interface GenerationProvider {
 | user_id | 用户 |
 | module | 'image' / 'video' |
 | template_id | 用的模板 |
-| inputs | 用户填的内容（文案、比例、**分辨率 `resolution`：`'1k'` / `'2k'` / `'4k'`**、输入图在 R2 的 key），**不含封装提示词**。伙伴接口（第 14 节）v1 固定 `'1k'`，契约不加字段 |
+| inputs | 用户填的内容（文案、比例、**分辨率 `resolution`：`'1k'` / `'2k'` / `'3k'`**、输入图在 R2 的 key），**不含封装提示词**。伙伴接口（第 14 节）v1 固定 `'1k'`，契约不加字段 |
 | provider | 实际调用的厂商 |
 | source | 'web' / 'graylum'，哪条入口发起的 |
 | idempotency_key | 可空，唯一索引。伙伴接口把调用方的 callId 放这里，重复请求返回同一个任务 |
@@ -170,7 +170,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 
 - 每个模板消耗多少 credit 按「质量档 × 用户选的分辨率」定，写在 `templates.credits_cost`，后台可改，不低于第 6.1 节的下限。默认值：
 
-| 模板质量档 | 1K | 2K | 4K |
+| 模板质量档 | 1K | 2K | 3K |
 |---|---|---|---|
 | `high`（默认） | 2 | 4 | 6 |
 | `medium`（效果够用的模板，需逐个实测后才能降档） | 1 | 2 | 3 |
@@ -193,8 +193,8 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 任何一次成功付款（首付、订阅续费、钱包单笔、Waffo 单笔、积分包）都走同一个 SQL 函数 `apply_purchase(user, product_id, event_id)`：`credits += 商品积分`；商品带天数的同时 `paid_until = max(paid_until, now()) + 天数`；积分包的天数为空，**不碰 `paid_until`**（不能写成「+0 天」，那会把空的 `paid_until` 写成 now()）。首付和单笔用 checkout session id 当 `event_id`，Waffo 用它的事件 id。
 - 订阅续费走 T10 新增的 `apply_subscription_renewal(user, product_id, invoice_id, period_end)`：`credits += 商品积分`，`paid_until = greatest(paid_until, period_end)`（直接对齐 Stripe 的本期结束日，不按天数累加，避免大小月漂移）；同样写流水、按 invoice id 幂等，内部复用 `_apply_credit_change`（总控 2026-11-05 补）。
 - 没用完的积分在续费时自然结转（积分不过期），不做「本期 / 结转」两本账。
-- **计价单位是 credit，不是「张」。** 一次出图扣多少 = 模板在用户所选分辨率的配置值 `templates.credits_cost[resolution]`（第 5 节：`high` 模板默认 1K 2 / 2K 4 / 4K 6，`medium` 1 / 2 / 3），后台模板编辑页可改；会员每月发多少 credit、积分包多少 credit 写在 `site.config.ts`。前台后台都叫 credits，余额显示为 "30 credits + 3 free"。「重新生成」按同一模板、同一分辨率再扣一次。
-- **配置下限（Owner 2026-11-05 定的毛利口径）**：每个质量档 × 分辨率的 credit 数 ≥ `ceil(该档 p95 单次真实成本 ÷ $0.06)`，后台可以往上加价，不能低于下限。下限表是 `modules/image` 里的常量，后台保存模板时在服务端校验，低于下限拒绝保存。$0.06 的来历：最便宜的 credit 是 Max 年付 $0.208，扣最坏手续费（国际卡 + Managed Payments：2.9% + 3.5% + 1.5% + $0.30）和 3% 退款预留后，守 **60% 毛利**（不含注册赠送的 3 个免费 credit，按最坏情况：credits 全部用完）每 credit 的成本上限约 $0.060。成本依据：OpenAI 官方价（图像输入 $8/M、输出 $30/M token），high 质量正方形单张输出 1K $0.053、2K $0.107、4K $0.178，加输入图约 $0.012～$0.021、提示词约 $0.005、失败退回损耗 10%、R2 + Vercel 约 $0.002；输入图 token 上线前按 LAUNCH §5 实测后更新下限表（定稿全文见共享笔记 `pricing-final-2026-11-05.md`）。
+- **计价单位是 credit，不是「张」。** 一次出图扣多少 = 模板在用户所选分辨率的配置值 `templates.credits_cost[resolution]`（第 5 节：`high` 模板默认 1K 2 / 2K 4 / 3K 6，`medium` 1 / 2 / 3），后台模板编辑页可改；会员每月发多少 credit、积分包多少 credit 写在 `site.config.ts`。前台后台都叫 credits，余额显示为 "30 credits + 3 free"。「重新生成」按同一模板、同一分辨率再扣一次。
+- **配置下限（Owner 2026-11-05 定的毛利口径）**：每个质量档 × 分辨率的 credit 数 ≥ `ceil(该档 p95 单次真实成本 ÷ $0.06)`，后台可以往上加价，不能低于下限。下限表是 `modules/image` 里的常量，后台保存模板时在服务端校验，低于下限拒绝保存。$0.06 的来历：最便宜的 credit 是 Max 年付 $0.208，扣最坏手续费（国际卡 + Managed Payments：2.9% + 3.5% + 1.5% + $0.30）和 3% 退款预留后，守 **60% 毛利**（不含注册赠送的 3 个免费 credit，按最坏情况：credits 全部用完）每 credit 的成本上限约 $0.060。成本依据：OpenAI 官方价（图像输入 $8/M、输出 $30/M token），high 质量正方形单张输出 1K $0.053、2K $0.107、3K $0.178，加输入图约 $0.012～$0.021、提示词约 $0.005、失败退回损耗 10%、R2 + Vercel 约 $0.002；输入图 token 上线前按 LAUNCH §5 实测后更新下限表（定稿全文见共享笔记 `pricing-final-2026-11-05.md`）。
 - 余额只能通过 SQL 函数改：发放（`grant_credits` 带 `pool` 参数，注册赠送和活动赠送用 `'free'`）、预扣、确认、退回、管理员调整（`admin_adjust_credits` 带 `pool` 参数）。前端和普通接口都不能直接写余额。
 - 每一笔变动都写进流水表，记录动的是哪个池，带幂等键。
 
@@ -280,7 +280,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - Vercel 函数请求体和响应体上限都是 4.5MB。**任何 API 路由不得接收或返回图片字节**，只传 R2 key 或签名地址。
 - Vercel 上预编译的 `sharp` 不含 HEIF 解码器，**服务端不转 HEIC**。
 - GPT-Image 按像素看图；长边 2048 以上的输入对出图零增益（LAUNCH §5 的成本测量若发现 1K high 单次 p95 成本 > $0.12，可把上传长边降到 1536）。
-- **输出分辨率三档（用户在工作台选，默认 1K）**：按正方形边长定义，1K = 1024²、2K = 2048²、4K = 2880²（模型上限）。非正方形比例的尺寸表放在 `modules/image/provider/output-size.ts`：边长取 16 的倍数、长短边比 ≤ 3:1，并且**同一档内任何比例的输出 token 数不超过该档正方形**（扣费表按每档最贵的正方形定，这样配置下限对所有比例都成立），用 OpenAI 官方 token 计算器的公式核对。
+- **输出分辨率三档（用户在工作台选，默认 1K）**：按正方形边长定义，1K = 1024²、2K = 2048²、3K = 2880²（标签叫 3K 而不是 4K：模型上限 2880 像素，叫 4K 会误导用户，Owner 2026-11-05 定）（模型上限）。非正方形比例的尺寸表放在 `modules/image/provider/output-size.ts`：边长取 16 的倍数、长短边比 ≤ 3:1，并且**同一档内任何比例的输出 token 数不超过该档正方形**（扣费表按每档最贵的正方形定，这样配置下限对所有比例都成立），用 OpenAI 官方 token 计算器的公式核对。
 
 ### 8.2 上传链路（支持 20MB 原图）
 
@@ -328,7 +328,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 
 v1 后台只做**两页**：
 
-1. **模板与提示词编辑**。因为 `template_prompts` 客户端读不到，必须有一个服务端页面来改。功能：新建模板、编辑公开信息（含质量档和 1K / 2K / 4K 三个 credit 数，低于第 6.1 节下限拒绝保存）和私有提示词、上下架、排序。
+1. **模板与提示词编辑**。因为 `template_prompts` 客户端读不到，必须有一个服务端页面来改。功能：新建模板、编辑公开信息（含质量档和 1K / 2K / 3K 三个 credit 数，低于第 6.1 节下限拒绝保存）和私有提示词、上下架、排序。
 2. **需求审核**（第 15 节）：待审需求列表（参考图 + 描述 + 用户）、通过 / 拒绝 / 下架、按票数排序、标记 shipped 并关联模板。
 
 其他运营操作 v1 都不做页面：
