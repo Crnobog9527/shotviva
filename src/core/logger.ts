@@ -3,8 +3,8 @@ type Fields = Record<string, unknown>
 
 const SENSITIVE_KEY = /pass(word)?|secret|token|api[-_]?key|authorization|cookie|signature/i
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g
-// Bearer headers, JWTs, and common provider key prefixes (Stripe, OpenAI, etc.).
-const TOKEN = /\b(Bearer\s+[\w.~+/-]+=*|eyJ[\w-]+\.[\w-]+\.[\w-]+|(sk|pk|rk|whsec)_[A-Za-z0-9_]{8,})/g
+// Bearer headers, JWTs, and common provider key prefixes (Stripe, OpenAI, our sv_ partner keys, etc.).
+const TOKEN = /\b(Bearer\s+[\w.~+/-]+=*|eyJ[\w-]+\.[\w-]+\.[\w-]+|(sk|pk|rk|whsec|sv)_[A-Za-z0-9_]{8,})/g
 
 const MAX_DEPTH = 5
 

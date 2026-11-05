@@ -13,7 +13,7 @@ export { confirmJob, refundJob, reserveJob, type ReserveJobInput } from './settl
 export { GenerationFailure } from './generation-failure'
 export { generateBodySchema, toGenerationRequest, type GenerationRequest } from './generation-request'
 export { resolveJobFile, type JobFile } from './job-file'
-export { findOwnJob } from './job-lookup'
+export { findJobByIdempotencyKey, findOwnJob } from './job-lookup'
 export { fileUrlFor, toJobView, type JobView } from './job-view'
 export {
   ProviderError,

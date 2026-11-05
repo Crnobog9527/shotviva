@@ -13,6 +13,9 @@ describe('gateFor', () => {
     ['/account', 'signed_in'],
     ['/reset/update', 'signed_in'],
     ['/reset', null],
+    ['/connect/graylum', 'signed_in'],
+    ['/connect/graylum/', 'signed_in'],
+    ['/connect/graylum/authorize', null],
     ['/', null],
   ])('%s -> %s', (path, gate) => {
     expect(gateFor(path)).toBe(gate)

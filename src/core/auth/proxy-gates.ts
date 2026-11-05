@@ -9,7 +9,9 @@ import { hasSessionCookie, proxySupabase, updateSession } from './update-session
 // static shell has gone out. These gates answer with a real status before rendering;
 // requireUser()/requireAdmin() in pages and actions stay as the authoritative check.
 const ADMIN = /^\/admin(\/|$)/
-const SIGNED_IN = /^\/(account|reset\/update)(\/|$)/
+// /connect/graylum is gated as a page only: its form POST (…/authorize) handles a lost
+// session itself, since a 307 here would replay the POST against the login page.
+const SIGNED_IN = /^\/(account|reset\/update)(\/|$)|^\/connect\/graylum\/?$/
 
 export type Gate = 'admin' | 'signed_in' | null
 

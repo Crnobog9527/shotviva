@@ -20,3 +20,16 @@ export async function findOwnJob(client: SupabaseClient, userId: string, jobId: 
   if (error) throw new AppError('INTERNAL', `findOwnJob failed: ${error.message}`)
   return data === null ? null : jobRowSchema.parse(data)
 }
+
+// Partner replays (ARCHITECTURE §14.4): the caller's callId finds the job it already started.
+// Scoped by owner like the unique index, so one account's key never reaches another's job.
+export async function findJobByIdempotencyKey(client: SupabaseClient, userId: string, key: string): Promise<Job | null> {
+  const { data, error } = await client
+    .from('generation_jobs')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('idempotency_key', key)
+    .maybeSingle()
+  if (error) throw new AppError('INTERNAL', `findJobByIdempotencyKey failed: ${error.message}`)
+  return data === null ? null : jobRowSchema.parse(data)
+}

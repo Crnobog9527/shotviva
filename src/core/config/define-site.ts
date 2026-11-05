@@ -27,6 +27,16 @@ export type SiteBrand = {
   sameAs: readonly string[]
 }
 
+// Graylum connector (ARCHITECTURE §14). Hosts are exact, lowercase, https-only matches.
+export type PartnerSiteConfig = {
+  // Where the connect flow and top-ups may send the user back to.
+  returnToHosts: readonly string[]
+  // Path of Graylum's connect callback; the one-time code is only ever sent there.
+  connectCallbackPath: `/${string}`
+  // Hosts the optional `image` URL of POST /api/partner/generate may point at (anti-SSRF).
+  imageHosts: readonly string[]
+}
+
 export type SiteConfig = {
   brand: SiteBrand
   modules: Record<ModuleId, boolean>
@@ -38,7 +48,7 @@ export type SiteConfig = {
     // Which channel the UI prefers; the live on/off switch per channel is an env var (ARCHITECTURE §6.3).
     channels: { primary: PaymentChannel; fallback: PaymentChannel | null }
   }
-  partners: { graylum: { returnToHosts: readonly string[] } }
+  partners: { graylum: PartnerSiteConfig }
   gallery: { enabled: boolean }
   indexing: {
     // The only paths allowed into search. Every entry must exist in the keyword map CSV

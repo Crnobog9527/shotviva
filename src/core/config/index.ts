@@ -1,6 +1,7 @@
 export { defineSite } from './define-site'
 export type {
   ModuleId,
+  PartnerSiteConfig,
   PaymentChannel,
   ProductId,
   SiteBrand,

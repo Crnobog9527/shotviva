@@ -25,7 +25,7 @@ export function testSite(overrides: Partial<SiteConfig> = {}): SiteConfig {
         ],
         channels: { primary: 'stripe', fallback: 'waffo' },
       },
-      partners: { graylum: { returnToHosts: [] } },
+      partners: { graylum: { returnToHosts: [], connectCallbackPath: '/callback', imageHosts: [] } },
       gallery: { enabled: false },
       indexing: { indexablePaths: ['/', '/image-to-image-generator', '/generate'] },
     }),
