@@ -31,6 +31,7 @@
 - [ ] 没有任何 API 路由接收或返回图片字节（代码审查 + 直接 POST 一张图到 /api/generate 应 4xx）
 - [ ] 直传一个 25MB 文件和一个改后缀的文本文件到 R2 后调用生成，都返回 422 且对象被删除
 - [ ] 管理后台只有 `role = admin` 能进，普通账号访问返回 404
+- [ ] 生产库 Supabase Advisor（Performance + Security）没有 WARN 级别的问题；转 Pro 之后打开 Leaked Password Protection
 
 ## 3. 登录
 
