@@ -55,7 +55,8 @@
       "AUTH_CAPTCHA_FAILED": "Verification failed. Please complete the check below.",
       "AUTH_RATE_LIMITED": "Too many attempts. Please wait a minute and try again.",
       "AUTH_WEAK_PASSWORD": "Please choose a stronger password.",
-      "INTERNAL": "Something went wrong. Please try again."
+      "INTERNAL": "Something went wrong. Please try again.",
+      "CONFLICT": "That request was already handled."
     },
     "account": {
       "title": "Account",

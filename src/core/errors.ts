@@ -11,6 +11,8 @@ export const ERROR_CODES = [
   'AUTH_CAPTCHA_FAILED',
   'AUTH_RATE_LIMITED',
   'AUTH_WEAK_PASSWORD',
+  // Idempotency key reused for a different request, or a job settled the other way.
+  'CONFLICT',
   'INTERNAL',
 ] as const
 
@@ -27,6 +29,7 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   AUTH_CAPTCHA_FAILED: 422,
   AUTH_RATE_LIMITED: 429,
   AUTH_WEAK_PASSWORD: 422,
+  CONFLICT: 409,
   INTERNAL: 500,
 }
 
