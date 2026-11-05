@@ -33,6 +33,8 @@
 - [ ] 管理后台只有 `role = admin` 能进，普通账号访问返回 404
 - [ ] 生产库 Supabase Advisor（Performance + Security）没有 WARN 级别的问题；转 Pro 之后打开 Leaked Password Protection
 
+- [ ] 出图供应商（ARCHITECTURE §3.3）：生产环境 `PROVIDER_SECRETS_KEY` 已设（和预览不同），后台已录入在用供应商并测试连接成功，出一张图后 `generation_jobs.provider` 正确
+
 ## 3. 登录
 
 - [ ] 邮箱 + 密码注册，收到 Resend 发的验证邮件（发件人 support@shotviva.com），点击后能登录；Gmail、Outlook 各测一次，记录进收件箱还是垃圾箱
@@ -93,13 +95,12 @@
 
 ## 7.6 简体中文（Owner 2026-11-06，ARCHITECTURE §17）
 
-- [ ] 每个英文页都有对应的 `/zh` 页，语言切换器是真实链接，切换后停在对应页面
+- [ ] ARCHITECTURE §17 清单里的 14 个页面都有 `/zh` 版，语言切换器是真实链接，切换后停在对应页面；法律页和 SEO 内页没有 `/zh` 版，切换器指向 `/zh` 首页，也不输出 `/zh` hreflang
 - [ ] 浏览器语言为中文时，英文页出「切换到中文」提示；不自动跳转；选过一次后不再提示
 - [ ] 应用界面、付费墙（「支付宝」）、错误提示、空状态没有漏翻的英文；Stripe 托管结账页显示中文
 - [ ] 中文邮箱注册收到中文验证邮件，重置密码邮件也是中文
 - [ ] 模板名称和说明在 `/zh` 下显示中文；缺翻译的回退英文而不是空白
-- [ ] hreflang（`en` / `zh-Hans` / `x-default`）互指正确；`/zh` 独立 sitemap；不在中文主词表里的 `/zh` 页是 noindex
-- [ ] 中文法律页页首有「以英文版本为准」声明
+- [ ] hreflang（`en` / `zh-Hans` / `x-default`）互指正确；`/zh` 独立 sitemap 只列 3 个收录页；其余 `/zh` 页是 noindex；每个 `/zh` 页 canonical 指向自己；中文页没有中英混排（建站规格 §6.1）
 - [ ] 中文页在 375px 上没有溢出、截断或重叠
 - [ ] 中文页显示的是 MiSans：网络面板里只有同源 `/fonts/misans/` 的分包请求，没有任何外部字体主机；首屏不被字体阻塞；营销页页脚有 MiSans 署名和协议链接；`/fonts/misans/*.woff2` 带一年 immutable 缓存头
 
