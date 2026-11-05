@@ -4,20 +4,14 @@ import { z } from 'zod'
 
 import { AppError, toAppError } from '../errors'
 import { logger } from '../logger'
-import { appOrigin } from '../site-url'
-import { deleteAccount, noUploadsYetStorage, type AccountStorage } from './account-deletion'
+import { accountStorage, r2Store } from '../storage'
+import { deleteAccount, type AccountStorage } from './account-deletion'
+import { assertSameOrigin } from './api-guards'
 import { getSessionUser } from './session'
 import { createAdminSupabase } from './supabase-admin'
 import { createServerSupabase } from './supabase-server'
 
 const bodySchema = z.object({ confirm: z.literal('DELETE') })
-
-// Session cookies are SameSite=Lax already; the Origin check also stops a same-site
-// subdomain or a form on another origin from triggering an irreversible delete.
-function assertSameOrigin(request: NextRequest) {
-  const origin = request.headers.get('origin')
-  if (origin !== appOrigin) throw new AppError('FORBIDDEN', 'Bad origin')
-}
 
 async function run(request: NextRequest, storage: AccountStorage) {
   assertSameOrigin(request)
@@ -36,7 +30,9 @@ async function run(request: NextRequest, storage: AccountStorage) {
   await supabase.auth.signOut({ scope: 'local' })
 }
 
-export async function handleDeleteAccount(request: NextRequest, storage: AccountStorage = noUploadsYetStorage) {
+// R2 is resolved lazily: a missing R2 config fails the request (500) before anything is
+// deleted, rather than deleting the account and leaving its photos behind.
+export async function handleDeleteAccount(request: NextRequest, storage: AccountStorage = accountStorage(r2Store)) {
   try {
     await run(request, storage)
     return NextResponse.json({ ok: true })
