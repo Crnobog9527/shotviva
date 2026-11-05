@@ -66,6 +66,9 @@ export type SiteConfig = {
   }
   partners: { graylum: PartnerSiteConfig }
   gallery: { enabled: boolean }
+  // Build-time feature switches (ARCHITECTURE §15.6). Read through each feature's own helper
+  // (e.g. core/wishlist isWishlistEnabled), never directly.
+  features: { wishlist: boolean }
   indexing: {
     // The only paths allowed into search. Every entry must exist in the keyword map CSV
     // (AGENTS §9); everything else renders noindex.

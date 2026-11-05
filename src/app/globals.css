@@ -1,28 +1,100 @@
 @import "tailwindcss";
 
-/* Design tokens are decided in T6 (DESIGN.md); these are neutral placeholders.
-   Names follow shadcn/ui so its base components (used by the admin page, DESIGN §7) render;
-   T6 replaces the values, not the names. */
+/* "Darkroom" design tokens (DESIGN §3, design/tokens/tokens.css, Owner 2026-11-05).
+   Warm black ground, bone type, one safelight. shadcn/ui variable names, so the shadcn base
+   components (admin page) pick them up unchanged. Every literal colour of the app lives here:
+   components use these variables, never a hex or rgba of their own (DESIGN §2). */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --radius: 0.625rem;
+  color-scheme: dark;
+  --background: #0B0A09;
+  --foreground: #F2ECE3;
+  --card: #141210;
+  --card-foreground: #F2ECE3;
+  --popover: #181513;
+  --popover-foreground: #F2ECE3;
+  --primary: #FF5B2E;            /* safelight */
+  --primary-foreground: #1A0702;
+  --secondary: #211D1A;
+  --secondary-foreground: #F2ECE3;
+  --muted: #1C1916;
+  --muted-foreground: #A2988C;
+  --accent: #2A2420;
+  --accent-foreground: #F2ECE3;
+  --destructive: #FF5A5A;
+  --border: rgba(242, 236, 227, 0.09);
+  --input: rgba(242, 236, 227, 0.16);
+  --ring: #FF5B2E;
+  --success: #7FD6A0;
+  --radius: 14px;
+
+  /* material extras (self-built, not shadcn) */
+  --bone-dim: rgba(242, 236, 227, 0.62);
+  --hairline: rgba(242, 236, 227, 0.06);
+  --safelight-glow: rgba(255, 91, 46, 0.32);
+  --chrome: linear-gradient(115deg, #FFE9B0 0%, #E2B65A 22%, #FFF1C9 40%, #F2CF7A 52%, #B8862E 70%, #F7DF9A 88%, #FFE9B0 100%); /* Max gold foil */
+
+  /* Bone washes: the comps' many "bone at N%" fills, named once (TOKENS.md clean-up). */
+  --wash-faint: rgba(242, 236, 227, 0.04);   /* textarea, preview price cells */
+  --wash: rgba(242, 236, 227, 0.06);         /* ghost buttons, chips, pills, cost plates */
+  --wash-strong: rgba(242, 236, 227, 0.08);  /* progress tracks, close disc */
+  --grab: rgba(242, 236, 227, 0.24);         /* sheet grab bar */
+  --glyph: rgba(242, 236, 227, 0.5);         /* size-tile ratio glyphs */
+  --hatch: rgba(242, 236, 227, 0.03);        /* empty upload recess stripes */
+  --recess: #0E0D0C;                         /* empty upload recess ground */
+  --recess-edge: rgba(242, 236, 227, 0.12);
+
+  /* Safelight tints (selected choices, focus halo) and the success tint. */
+  --safelight-wash: rgba(255, 91, 46, 0.12);
+  --safelight-wash-end: rgba(255, 91, 46, 0.03);
+  --safelight-halo: rgba(255, 91, 46, 0.14);
+  --safelight-tint: rgba(255, 91, 46, 0.16);
+  --safelight-tag: rgba(255, 91, 46, 0.88);
+  --success-tint: rgba(127, 214, 160, 0.16);
+  --coin-light: #FF8A63;                     /* balance coin highlight */
+  --coin-dark: #C93A14;                      /* balance coin shade */
+
+  /* On-photo material: labels and seams that sit on top of an image. */
+  --photo-ink: #FFFFFF;
+  --frost: rgba(11, 10, 9, 0.6);
+  --frost-light: rgba(11, 10, 9, 0.55);
+  --photo-fade: rgba(11, 10, 9, 0.85);
+  --photo-ground: #000000;
+
+  /* Fixed chrome over scrolling content (tab bar, nav bar, action bar). */
+  --bar-material: rgba(14, 12, 11, 0.78);
+  --nav-top: rgba(11, 10, 9, 0.94);
+  --nav-bottom: rgba(11, 10, 9, 0.94);
+  --action-top: rgba(16, 14, 12, 0.82);
+  --action-bottom: rgba(16, 14, 12, 0.96);
+  --scrim: rgba(5, 4, 3, 0.62);
+
+  /* The two drop levels allowed (DESIGN Elevation): Raised (primary) and Sheet. No other glows. */
+  --shadow-raised: inset 0 1px 0 rgba(255, 255, 255, 0.38), inset 0 -2px 0 rgba(0, 0, 0, 0.12), 0 16px 30px -16px rgba(0, 0, 0, 0.9);
+  --shadow-sheet: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 -30px 60px -20px rgba(0, 0, 0, 0.7);
+  --edge-highlight: rgba(255, 255, 255, 0.035);
+
+  /* Paywall tier materials (DESIGN "Tier materials"), moved out of paywall.html into :root so
+     T9's drawer reads them like every other token. */
+  --paywall-sheet: #12100E;
+  --paywall-behind: #000000;
+  --tier-graphite: #191715;
+  --tier-sapphire-top: #111A33;
+  --tier-sapphire-deep: #0B1020;
+  --tier-sapphire-ink: #A9C2FF;
+  --tier-sapphire-rim: #7EA0FF;
+  --tier-sapphire-flag: #5B86FF;
+  --tier-sapphire-flag-ink: #071027;
+  --tier-sapphire-light: rgba(70, 120, 255, 0.32);
+  --tier-max-top: #1C160C;
+  --tier-max-deep: #0C0A07;
+  --tier-max-gold: #F2CF7A;
+  --tier-perk: #D8D0C4;
+
+  --gutter: 16px;
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --spring: cubic-bezier(.32, 1.25, .4, 1);
 }
 
 @theme inline {
@@ -44,20 +116,187 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-bone-dim: var(--bone-dim);
+  --color-hairline: var(--hairline);
+  --color-wash-faint: var(--wash-faint);
+  --color-wash: var(--wash);
+  --color-wash-strong: var(--wash-strong);
+  --color-frost: var(--frost);
+  --color-photo-ink: var(--photo-ink);
+  --color-photo-ground: var(--photo-ground);
+  --color-safelight-tint: var(--safelight-tint);
+  --color-success-tint: var(--success-tint);
+
+  /* Type scale (DESIGN Typography). 14px is the floor for any visible text. */
+  --text-caption: 14px;
+  --text-label: 15px;
+  --text-body: 16px;
+  --text-cta: 16.5px;
+  --text-headline: 17px;
+  --text-h1: 32px;
+  --text-title: 36px;
+  --text-large-title: 52px;
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  /* Named corners (DESIGN Shapes), nested so inner radii are smaller than outer. */
+  --radius-tag: 8px;
+  --radius-inner: 12px;
+  --radius-button: 14px;
+  --radius-control: 16px;
+  --radius-tile: 18px;
+  --radius-media: 20px;
+  --radius-panel: 22px;
+  --radius-sheet: 30px;
+
+  --ease-house: var(--ease);
+}
+
+/* Fonts come from next/font (src/app/fonts.ts); Tailwind emits these on :root, so
+   font-sans / font-mono / font-display and var(--font-*) all resolve to the self-hosted files. */
+@theme {
+  /* Simplified Chinese falls back to the system fonts, never a downloaded CJK web font
+     (DESIGN §3.2, ARCHITECTURE §17). */
+  --font-sans: var(--font-geist), -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --font-display: var(--font-instrument-serif), "Times New Roman", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", monospace;
 }
 
 @layer base {
   * {
     border-color: var(--color-border);
   }
+  html {
+    -webkit-text-size-adjust: 100%;
+    background: var(--background);
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font: 400 16px/1.5 var(--font-sans);
+    letter-spacing: -0.006em;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    overflow-x: hidden;
+  }
+  /* Film grain: one static layer over everything, never animated (The Static Grain Rule). */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 200;
+    opacity: 0.07;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: system-ui, sans-serif;
+/* The one edge: an inset 1px bone hairline (The Inset Hairline Rule). */
+@utility hairline {
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+@utility hairline-lit {
+  box-shadow: inset 0 0 0 1px var(--border), inset 0 1px 0 var(--edge-highlight);
+}
+/* Chosen workspace choice: a 1.5px safelight rim over a faint safelight wash. */
+@utility chosen {
+  background: linear-gradient(180deg, var(--safelight-wash), var(--safelight-wash-end));
+  box-shadow: inset 0 0 0 1.5px var(--primary);
+}
+/* Press feedback on every tappable surface: scale, never hover-only. */
+@utility press {
+  transition: transform 180ms var(--ease);
+  &:active {
+    transform: scale(0.975);
+  }
+}
+@utility shadow-raised {
+  box-shadow: var(--shadow-raised);
+}
+@utility shadow-sheet {
+  box-shadow: var(--shadow-sheet);
+}
+/* Frosted material for small labels on photos and fixed chrome. */
+@utility frost {
+  background: var(--frost);
+  @apply backdrop-blur-[8px];
+}
+@utility bar-material {
+  background: var(--bar-material);
+  @apply backdrop-blur-[24px] backdrop-saturate-[1.4];
+  box-shadow: inset 0 1px 0 var(--border);
+}
+@utility action-material {
+  background: linear-gradient(var(--action-top), var(--action-bottom));
+  @apply backdrop-blur-[24px] backdrop-saturate-[1.3];
+  box-shadow: inset 0 1px 0 var(--border);
+}
+@utility nav-material {
+  background: linear-gradient(var(--nav-top), var(--nav-bottom));
+  @apply backdrop-blur-[20px];
+}
+/* Horizontal rails (filter chips): scroll without a visible bar. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+@utility pb-safe {
+  padding-bottom: var(--sab);
+}
+@utility pt-safe {
+  padding-top: var(--sat);
+}
+
+/* Developing: the colour print is revealed above the safelight line; both read one registered
+   --left so they cannot drift apart. Held at 62% under reduced motion. */
+@property --left {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 62%;
+}
+@keyframes sv-develop {
+  from { --left: 78%; }
+  to { --left: 46%; }
+}
+@utility animate-develop {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: sv-develop 7s var(--ease) infinite alternate;
+  }
+}
+
+/* Developing scan line in Photos rows: sweeps while a photo develops; still under reduced motion. */
+@keyframes sv-scan {
+  from { top: 8%; }
+  to { top: 92%; }
+}
+@keyframes sv-pulse {
+  50% { transform: scale(0.55); opacity: 0.5; }
+}
+@utility animate-scan {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: sv-scan 2.4s cubic-bezier(.65, 0, .35, 1) infinite alternate;
+  }
+}
+@utility animate-dot {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: sv-pulse 1.4s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }
