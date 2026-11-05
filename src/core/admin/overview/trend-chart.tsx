@@ -1,3 +1,5 @@
+import { usd } from '../orders/money'
+import type { RevenueStats } from '../orders/revenue'
 import { OVERVIEW_COPY as COPY } from './copy'
 import type { DashboardStats } from './stats'
 
@@ -27,7 +29,30 @@ export function TrendChart({ trend, days }: { trend: DashboardStats['trend']; da
         <span>{trend[0]?.day}</span>
         <span>{trend.at(-1)?.day}</span>
       </div>
-      <p className="text-xs text-muted-foreground">{COPY.trend.revenue}</p>
+    </section>
+  )
+}
+
+// Daily list-price revenue, same plain bars.
+export function RevenueTrend({ trend, days }: { trend: RevenueStats['trend']; days: number }) {
+  const max = Math.max(1, ...trend.map((day) => day.revenue_usd))
+  return (
+    <section className="grid gap-3 rounded-lg border border-border bg-card p-4">
+      <h2 className="font-semibold">{COPY.trend.revenueTitle(days)}</h2>
+      <ol className="flex h-32 items-end gap-0.5" aria-label={COPY.trend.revenueTitle(days)}>
+        {trend.map((day) => {
+          const label = COPY.trend.revenueDay(day.day, usd.format(day.revenue_usd))
+          return (
+            <li key={day.day} className="flex h-full flex-1 flex-col justify-end" title={label} aria-label={label}>
+              <div className="rounded-t-sm bg-success" style={{ height: `${(day.revenue_usd / max) * 100}%` }} />
+            </li>
+          )
+        })}
+      </ol>
+      <div className="flex justify-between font-mono text-xs text-muted-foreground">
+        <span>{trend[0]?.day}</span>
+        <span>{trend.at(-1)?.day}</span>
+      </div>
     </section>
   )
 }

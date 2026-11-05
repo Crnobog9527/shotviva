@@ -4,7 +4,9 @@ import { z } from 'zod'
 // page of PAGE_SIZE. Opaque to the browser; anything that does not parse means "first page".
 export const PAGE_SIZE = 30
 
-const cursorSchema = z.object({ c: z.string().min(1), i: z.union([z.uuid(), z.string().regex(/^\d+$/)]) })
+// Ids are uuids, bigints or provider ids like 'sub_…': only characters safe inside a PostgREST
+// filter are accepted.
+const cursorSchema = z.object({ c: z.string().regex(/^\d{4}-\d{2}-\d{2}[T ][\d:.]+([+-]\d{2}(:?\d{2})?|Z)?$/), i: z.string().regex(/^[A-Za-z0-9_-]{1,255}$/) })
 export type TimeCursor = z.infer<typeof cursorSchema>
 
 export function encodeCursor(row: { created_at: string; id: string | number }): string {
@@ -21,11 +23,11 @@ export function decodeCursor(raw: string | null | undefined): TimeCursor | null 
   }
 }
 
-// PostgREST `or` filter for rows after the cursor in (created_at desc, id desc) order.
+// PostgREST `or` filter for rows after the cursor in (created_at desc, <id> desc) order.
 // Timestamps are double-quoted because they carry ':' and '+'.
-export function afterCursor(cursor: TimeCursor): string {
+export function afterCursor(cursor: TimeCursor, idColumn = 'id'): string {
   const c = `"${cursor.c}"`
-  return `created_at.lt.${c},and(created_at.eq.${c},id.lt.${cursor.i})`
+  return `created_at.lt.${c},and(created_at.eq.${c},${idColumn}.lt.${cursor.i})`
 }
 
 export type Page<T> = { items: T[]; nextCursor: string | null }

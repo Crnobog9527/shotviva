@@ -5,7 +5,7 @@ import { NextRequest } from 'next/server'
 import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { connectAdmin, localSupabase } from './helpers'
+import { connectAdmin, localSupabase, retryAuth } from './helpers'
 import { serviceSupabase } from './supabase-env'
 
 // T23: every /admin/* route is a 404 for anyone but a verified admin, checked with real
@@ -17,22 +17,10 @@ let adminPaths: string[]
 let db: Client
 const cookies: Record<'user' | 'admin', string> = { user: '', admin: '' }
 
-// GoTrue times out under heavy local load; retry the auth calls a few times.
-async function retry<T>(work: () => Promise<T>, tries = 4): Promise<T> {
-  for (let attempt = 1; ; attempt++) {
-    try {
-      return await work()
-    } catch (error) {
-      if (attempt >= tries) throw error
-      await new Promise((resolve) => setTimeout(resolve, 1000 * attempt))
-    }
-  }
-}
-
 async function signedInCookie(role: 'user' | 'admin'): Promise<string> {
   const email = `t23-${role}-${randomUUID()}@example.test`
   const password = `pw-${randomUUID()}`
-  const user = await retry(async () => {
+  const user = await retryAuth(async () => {
     const { data, error } = await serviceSupabase().auth.admin.createUser({ email, password, email_confirm: true })
     if (error || !data.user) throw error ?? new Error('createUser failed')
     return data.user
@@ -49,7 +37,7 @@ async function signedInCookie(role: 'user' | 'admin'): Promise<string> {
       },
     },
   })
-  await retry(async () => {
+  await retryAuth(async () => {
     const signIn = await client.auth.signInWithPassword({ email, password })
     if (signIn.error) throw signIn.error
   })
