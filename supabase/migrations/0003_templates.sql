@@ -11,7 +11,7 @@ create table public.templates (
   cover_after_url text,
   -- Field definitions (images, copy fields, aspect ratios); shape is validated in core/templates.
   fields jsonb not null default '{}'::jsonb check (jsonb_typeof(fields) = 'object'),
-  credits_cost integer not null default 2 check (credits_cost > 0),
+  credits_cost integer not null default 1 check (credits_cost > 0),
   sort_order integer not null default 0,
   is_active boolean not null default false,
   -- Which entry points list the template: Shotviva's own site ('web') and/or partners ('partner').
