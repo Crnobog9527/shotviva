@@ -5,6 +5,8 @@ import { z } from 'zod'
 // in the codebase may read process.env directly (enforced by ESLint).
 const serverEnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  // Optional at parse time so `next build` runs without secrets; createAdminSupabase() requires it.
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
 })
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>
