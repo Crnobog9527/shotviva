@@ -222,6 +222,12 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - `profiles.paid_until`（时间戳，可空）：只记录会员期，用于账号页显示（订阅状态、钱包一期会员的到期日）。不参与水印、私密、可商用的判断。
 - **扣费规则（`reserve_credits`）：先付费池、后免费池、整单不拆。** 付费池够就全扣付费池，作品 `credit_pool = 'paid'`；付费池不够但免费池够，全扣免费池，作品 `credit_pool = 'free'`；都不够就失败。不把一单拆到两个池里，所以没有「半付费作品」。付费用户剩下的免费积分留着，付费积分用完后才会用到，那时产出的是免费作品并触发付费墙。
 - 任何一次成功付款（首付、订阅续费、钱包单笔、Waffo 单笔、积分包）都走同一个 SQL 函数 `apply_purchase(user, product_id, event_id)`：`credits += 商品积分`；商品带天数的同时 `paid_until = max(paid_until, now()) + 天数`；积分包的天数为空，**不碰 `paid_until`**（不能写成「+0 天」，那会把空的 `paid_until` 写成 now()）。首付和单笔用 checkout session id 当 `event_id`，Waffo 用它的事件 id。
+- **结账入账走 `settle_checkout`**（T9，总控 2026-11-06 补；AGENTS §5.1 第 1 条：一个业务动作一个函数）。签名 `settle_checkout(user, product_id, session_id, subscription_id?, subscription_status?, current_period_end?, cancel_at_period_end?)`，只授权 `service_role`。它在一个事务里完成两件事：
+  1. 如果是订阅，先把 Stripe 上的当前状态写进镜像表 `subscriptions`。写入的状态由回调当场从 Stripe 取回，不用事件里带的旧数据。同一订阅 id 如果属于别的用户或别的商品，直接拒绝。
+  2. 再调用 `apply_purchase(user, product_id, session_id)`。
+
+  入账失败时，镜像表的写入一起回滚。同一 session 的重发和兄弟事件只入账一次。`checkout.session.completed` 和 `checkout.session.async_payment_succeeded` 都走它。
+- **首付的 `paid_until`**：首付走 `apply_purchase`，按商品天数累加（月付 +30 天，年付 +365 天），和 Stripe 本期结束日可能差一两天。从第一次续费起，由 `apply_subscription_renewal` 对齐 `period_end`，见下一条。
 - 订阅续费走 T10 新增的 `apply_subscription_renewal(user, product_id, invoice_id, period_end)`：`credits += 商品积分`，`paid_until = greatest(paid_until, period_end)`（直接对齐 Stripe 的本期结束日，不按天数累加，避免大小月漂移）；同样写流水、按 invoice id 幂等，内部复用 `_apply_credit_change`（总控 2026-11-05 补）。
 - 没用完的积分在续费时自然结转（积分不过期），不做「本期 / 结转」两本账。
 - **计价单位是 credit，不是「张」。**（唯一例外：新用户赠送对外说 "3 free Standard images"，即 6 个免费 credit，见建站规格 G3。） 一次出图扣多少 = 模板在用户所选分辨率的配置值 `templates.credits_cost[resolution]`（第 5 节：`high` 模板默认 1K 2 / 2K 4 / 3K 6，`medium` 1 / 2 / 3），后台模板编辑页可改；会员每月发多少 credit、积分包多少 credit 写在 `site.config.ts`。前台后台都叫 credits，余额显示为 "30 credits + 3 free"。「重新生成」按同一模板、同一分辨率再扣一次。
@@ -255,7 +261,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 已经确定的规则：
 
 - **订阅的状态只有 Stripe 一份真相**，Shotviva 存一张镜像表 `subscriptions`（`user_id`、`stripe_subscription_id`、`product_id`、`status`、`current_period_end`、`cancel_at_period_end`），由回调同步，账号页只读它。
-- 续费成功：`invoice.paid`（`billing_reason = subscription_cycle`）→ `apply_purchase`，`paid_until = 本期 period_end`。
+- 续费成功：`invoice.paid`（`billing_reason = subscription_cycle`）→ `apply_subscription_renewal`（T10），`paid_until = greatest(paid_until, 本期 period_end)`。
 - **续费失败：什么都不做。** 不再发积分，`paid_until` 到期后账号页显示会员已过期；已有的付费积分照常可用。Stripe 自己重试，哪天扣成功哪天再发。不写宽限期。
 - 取消：期末生效（Stripe 默认）。用户在 Stripe Customer Portal（Managed Payments 下是 Link 的客户门户）自己取消，账号页只放一个「Manage subscription」链接，不自己写取消界面。`customer.subscription.updated / deleted` 只更新镜像表。
 - 外部退款（Managed Payments 下 Link 客服 60 天内可以不经我们退款）：`charge.refunded` 只写记录 + Sentry 告警，Owner 手动 `admin_adjust_credits`。不写自动扣回。
@@ -270,7 +276,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 
 #### 会员档位权益（Owner 2026-11-05 定档位差异；上线范围由总控 2026-11-05 按「没做出来的不能写成现有功能」裁定）
 
-**当前档位**：`paid_until > now()` 时，取最近一次会员购买（订阅或钱包单期）的档位 `starter` / `pro` / `max`；只买过积分包或没付过费的账号没有档位，按 Starter 的生成限制处理（但用免费积分生成的仍是免费作品，规则不变）。档位只决定下表的「会员权益」，**不改变按作品判付费**（水印、私密、可商用仍只看作品用的是哪个池的积分，§6.1）。由 SQL 函数 `current_tier(user_id)` 统一给出，代码不各自判断。
+**当前档位**：`paid_until > now()` 时，取最近一次会员购买（订阅或钱包单期）的档位 `starter` / `pro` / `max`；只买过积分包或没付过费的账号没有档位，按 Starter 的生成限制处理（但用免费积分生成的仍是免费作品，规则不变）。档位只决定下表的「会员权益」，**不改变按作品判付费**（水印、私密、可商用仍只看作品用的是哪个池的积分，§6.1）。由 SQL 函数 `current_tier(user_id)`（实现：`paid_until > now()` 时，取付费池里最近一条带会员商品 id 的入账流水的档位；积分包和后台调积分不决定档位；返回 null 视同 Starter） 统一给出，代码不各自判断。
 
 | 权益 | Starter | Pro | Max | v1 状态 |
 |---|---|---|---|---|
@@ -296,7 +302,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - MP 商品必须设税码 `txcd_10105001`（AI 服务，个人用）。MP 价格不含税，税在结账时另加。
 - 顾客账单：卡支付显示 `LINK.COM* SHOTVIVA`，钱包支付显示 SHOTVIVA。MP 结账页不支持自定义域名。
 - 正式环境的 Managed Payments 要等 Stripe 资格审核。**审核没下来之前的兜底**：卡先不带 `managed_payments` 走普通订阅（Shotviva 当卖家），审核通过后翻开关。
-- 要处理的 Stripe 事件：`checkout.session.completed`（首付 / 单笔 → `apply_purchase`，写镜像表）、`invoice.paid`（只认 `subscription_cycle` → `apply_purchase`）、`customer.subscription.updated / deleted`（只更新镜像表）、`charge.refunded`（记录 + 告警）。其余事件忽略。
+- 要处理的 Stripe 事件：`checkout.session.completed` 和 `checkout.session.async_payment_succeeded`（首付 / 单笔 → `settle_checkout`：写镜像表 + `apply_purchase`，同一事务）、`invoice.paid`（只认 `subscription_cycle` → `apply_subscription_renewal`，T10）、`customer.subscription.updated / deleted`（只更新镜像表）、`charge.refunded`（记录 + 告警）。其余事件忽略。
 - Stripe 用与 Graylum 同一主体下**新开的独立账户**，避免两边回调互相收到对方的事件。
 
 **Waffo：保留，只做单笔兜底**（Owner 2026-11-05 确认不砍）：
@@ -384,22 +390,63 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 
 ## 10. 管理后台
 
-v1 后台只做**三页**：
+v1 后台（Owner 2026-11-06 扩充；T23 做外壳和运营页）：**一个后台外壳**（左侧导航、中文、`/admin` 是概览首页），下挂下面这些页面。**只做本站已有的功能，不照搬 Graylum 后台**：Graylum 的工单、创始会员、导师、技能、发布监控等本站没有，不做。
+
+| 导航 | 路由 | 内容 |
+|---|---|---|
+| 概览 | `/admin` | 今日 / 近 7 天 / 近 30 天：注册数、出图数、出图成功率、消耗积分（免费 / 付费分开）、新增付费用户、收入；近 30 天出图和收入趋势图。非收入部分由 `admin_dashboard_stats(p_days)` 一次算完；收入由 `admin_revenue_stats(p_days)` 算（T9 之后才有） |
+| 用户 | `/admin/users` | 按邮箱搜（读 `admin.users_overview`，最多返回 50 条）。用户详情：积分两池、会员到期、最近出图、积分流水（分页）。操作：调积分（`admin_adjust_credits`，选池、填原因）、封禁 / 解封（`admin_ban_user` / `admin_unban_user`，填原因） |
+| 订单与收入 | `/admin/orders` | 付款记录（时间、用户邮箱、商品、金额、付款方式、渠道、状态）和订阅状态，按商品和渠道汇总收入；每行链接到 Stripe 后台对应记录。退款仍在 Stripe 后台操作。数据来自 T9 的表，T9 合并后才有 |
+| 出图记录 | `/admin/jobs` | 全部出图任务，按状态、模板、供应商 / 模型、来源（web / graylum）、日期筛选，游标分页；失败任务显示 `error_code`；按模型和清晰度统计次数和估算成本（成本单价表是代码常量，和积分下限放在同一处） |
+| 模板 | `/admin/templates` | 见下面第 1 条 |
+| 出图供应商 | `/admin/providers` | 见下面第 3 条 |
+| 需求审核 | `/admin/requests` | 见下面第 2 条；`features.wishlist` 关掉时不出现在导航 |
+| 公告横幅 | `/admin/announcements` | 全站顶部的公告 / 促销条，见下面「公告横幅」一段 |
+
+**公告横幅**（Owner 2026-11-06 要求）：
+
+- **数据**：表 `site_announcements`，字段：
+  - `id`
+  - `message_en`、`message_zh`：两种语言都必填，每条 ≤140 字
+  - `link_url`：可空，只允许站内路径或 https
+  - `link_label_en` / `link_label_zh`：可空
+  - `tone`：`info` / `promo` 两种样式
+  - `starts_at` / `ends_at`：可空，空表示不限
+  - `is_active`
+  - `created_at` / `updated_at` / `updated_by`
+- **生效规则**：同一时间最多一条生效，即 `is_active` 为真且当前时间在起止范围内。保存时校验时间段不重叠，`admin_activate_announcement` 在一个事务里完成切换。
+- **读取**：RLS 拒绝所有客户端读取。前台由服务端读出当前生效的那一条，走缓存，打 `announcements` 标签；后台改动后标签立即失效。
+- **前台显示**：
+  - 营销页和应用页最顶部显示一条横幅，按当前语言显示文字和链接。
+  - 用户可以关闭。关闭状态按公告 id 记在浏览器本地，换了新公告会重新出现。
+  - 后台页、结账页、工作台生成过程中不显示。
+  - 不做弹窗，不做倒计时，不追踪点击。要看效果，用 PostHog 自带的 `$pageview` 来源。
+- **后台管理**：列表；新增 / 编辑（两种语言并排填写，可预览样式）；启用 / 停用；定时开始和结束。
+
+**后台数据访问补充**（总控 2026-11-06，按 T23 开工前提出的问题定）：
+
+- **用户搜索**：`admin` schema 不对 Data API 开放。所以新增函数 `admin_search_users(p_query text)`，只授权给 `service_role`。它从 `admin.users_overview` 按邮箱 `ilike` 查，最多返回 50 行。
+- **新增全局时间索引**，给概览统计和出图记录的全局分页用：
+  - `generation_jobs(created_at desc, id desc)`
+  - `credit_ledger(created_at)`
+  - `profiles(created_at)`
+- **审计**：
+  - `admin_audit_log.action` 的允许值加上 `unban_user`。
+  - 封禁和解封写审计日志。
+  - 调积分只写积分流水，流水里已有原因，不再另写审计日志。
+- **公告切换**：
+  - 「启用」就是切换：在同一个事务里自动停用和它时间段重叠的旧公告，确认框里写明会停用哪一条。
+  - 编辑一条已启用的公告，如果改完和别的已启用公告时间重叠，直接拒绝。
+  - 数据库用排他约束兜底：`exclude using gist (tstzrange(coalesce(starts_at,'-infinity'), coalesce(ends_at,'infinity')) with &&) where (is_active)`。
+- **收入**：`admin_dashboard_stats` 不含收入。收入单独用一个函数 `admin_revenue_stats(p_days)`，在 T9 的订单表合并后由订单页那个 PR 新建。概览页两个函数都调。这样两个函数各自一次写成，不需要用 `create or replace` 回头补字段。
+
+页面细节：
 
 1. **模板与提示词编辑**。因为 `template_prompts` 客户端读不到，必须有一个服务端页面来改。功能：新建模板、编辑公开信息（含质量档和 1K / 2K / 3K 三个 credit 数，低于第 6.1 节下限拒绝保存）和私有提示词、上下架、排序。
 2. **需求审核**（第 15 节）：待审需求列表（参考图 + 描述 + 用户）、通过 / 拒绝 / 下架、按票数排序、标记 shipped 并关联模板。
 3. **出图供应商**（第 3.3 节，T17）：增改供应商、测试连接、切换当前使用。
 
-其他运营操作 v1 都不做页面：
-
-| 需要 | v1 怎么做 |
-|---|---|
-| 查用户、看积分流水、看订单、看失败任务 | Supabase 后台打开视图 `admin.users_overview`（按邮箱搜索，一行看全：邮箱、注册时间、登录方式、角色、付费 / 免费积分、会员到期、出图次数、最近出图、是否封禁；Owner 2026-11-05），细节再查对应表。视图放在不对外暴露的 `admin` schema，只有 `postgres` / `service_role` 可读，客户端和 Data API 都访问不到；邮箱实时从 `auth.users` 读，不复制 |
-| 手动调积分 | 在 Supabase SQL 编辑器调用 `admin_adjust_credits(user_id, amount, reason)`，函数写流水 |
-| 封禁用户 | 调用 `admin_ban_user(user_id, reason)` |
-| 设为管理员 | 在 Supabase Studio 把该用户 `profiles.role` 改为 `admin`（运营数据修改，不是迁移，AGENTS §5 允许） |
-| 退款 | 在 Stripe 或 Waffo 后台操作 |
-| 作品审核页 | 第 6~7 周和审核功能一起做 |
+**仍然不做页面、留在 Supabase / Stripe 后台的运营操作**：设为管理员（在 Studio 改 `profiles.role`）、退款（在 Stripe / Waffo 后台）、作品审核页（第 6~7 周和审核功能一起做）。
 
 后台路由 `noindex`，只允许 `role = admin` 的账号访问。
 
@@ -454,7 +501,7 @@ Owner 2026-11-04 决定：**不在 flux-kontext-template 上原地改造**，新
 - 应用页用第 1 节的 `(app)` 应用壳，按 DESIGN.md 第 8 节先出手机稿。
 - **模板需求墙（Wishlist）随 v1 上线**（Owner 2026-11-05 决定），占应用壳第四个 tab，见第 15 节。
 
-v1 不做：积分引擎抽象层、积分过期和批次、订阅的宽限期 / 自动扣回 / 升级降级 / 优惠券 / 自写取消界面、Waffo 订阅、自动故障切换、自动退款、保留期定时任务、提醒邮件、内容审核、作品审核页、除模板页、需求审核页、出图供应商页外的后台页、英文和简体中文以外的语言（`/ja`、`/id` 等，见建站规格 §6）、多行菜单 / 价格单的排版功能（单张促销海报模板要做，见第 5 节）、视频生成实现、服务端 HEIC 转码、原图存储、断点续传、PWA / 离线、需求墙的评论 / 通知 / 重复合并 / 分类筛选。
+v1 不做：积分引擎抽象层、积分过期和批次、订阅的宽限期 / 自动扣回 / 升级降级 / 优惠券 / 自写取消界面、Waffo 订阅、自动故障切换、自动退款、保留期定时任务、提醒邮件、内容审核、作品审核页、第 10 节表格以外的后台页、英文和简体中文以外的语言（`/ja`、`/id` 等，见建站规格 §6）、多行菜单 / 价格单的排版功能（单张促销海报模板要做，见第 5 节）、视频生成实现、服务端 HEIC 转码、原图存储、断点续传、PWA / 离线、需求墙的评论 / 通知 / 重复合并 / 分类筛选。
 
 ## 14. 伙伴接口（Graylum 连接器）
 
