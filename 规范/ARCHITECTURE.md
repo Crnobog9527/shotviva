@@ -496,3 +496,36 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 - `features.wishlist = false` 时：tab bar 只渲染三项；`app/(app)/wishlist/*` 和 `app/api/wishlist/*` 返回 404；后台的需求审核页不出现在后台导航且直接 404；`template_requests` 两张表的迁移仍然跑（表空着无害，避免模板站的迁移序列分叉）。
 - 判断只在一处：`core/wishlist/index.ts` 导出 `isWishlistEnabled(site: SiteConfig)`，**配置由调用方传入**（core 不能 import `site/`，写法同 `core/config` 的 `isModuleEnabled(site, id)`）；`features` 的类型加在 `core/config/define-site.ts`。路由、layout、后台导航都调它，不准各自读 `features.wishlist`（总控 2026-11-05 补）。
 - 以后真需要「上线后临时关掉」（例如垃圾内容太多）再加运行时开关，一个 `system_settings` 行，一小时的事；v1 不做。
+
+## 16. 埋点与错误监控（Owner 2026-11-05）
+
+只用两家：PostHog（美国区，项目 712352）做产品和流量分析，Sentry 做错误告警。代码统一放 `core/analytics/`，页面和接口只调用 `track()` / `captureError()`，不准各自直接引 SDK。
+
+### 16.1 PostHog 配置
+
+- 无 Cookie：浏览器端 `persistence: 'memory'`，不写 Cookie、不写本地存储，所以不弹 Cookie 同意框。登录后用 Supabase 用户 id `identify`，未登录只按会话统计。
+- 不开录屏（Session Replay），上线后看漏斗需要时再由 Owner 决定开启（届时要遮挡图片和输入框、改隐私政策）。自动记录点击、热力图、Web Vitals 打开（PostHog 后台已开）。
+- 走同域代理：`/ingest/*` 改写到 `us.i.posthog.com`，减少广告拦截造成的丢数。
+- 公开变量：`NEXT_PUBLIC_POSTHOG_KEY`、`NEXT_PUBLIC_POSTHOG_HOST`（已在 Vercel 三个环境配好）；服务端用同一个项目密钥发事件。
+- 不发任何个人信息：事件属性里不准出现邮箱、文案原文、补充说明 `note`、图片地址、提示词。
+
+### 16.2 事件字典（名字和属性固定，改动走 [spec] PR）
+
+| 事件 | 在哪发 | 属性 |
+|---|---|---|
+| `signup` | 服务端：邮箱验证完成 / 首次 Google 登录时（和注册赠送同一处） | `method`（`email` / `google`） |
+| `upload` | 浏览器：直传 R2 成功后 | `size_bucket`（`<1MB` / `1-5MB` / `>5MB`）、`compressed`（是否走了浏览器压缩） |
+| `generate` | 服务端：任务结算后（成功或失败都发） | `template_id`、`category`、`resolution`、`credits_cost`、`credit_pool`、`status`、`error_code`、`source`（`web` / `graylum`）、`duration_ms` |
+| `paywall_view` | 浏览器：付费墙打开 | `trigger`（`insufficient_credits` / `pricing_page` / `account` / `graylum`） |
+| `checkout_start` | 服务端：创建 Checkout Session 时 | `product_id`、`tier`、`interval`、`form`、`channel`、`method` |
+| `purchase` | 服务端：支付回调入账成功后 | 第 6.2 节 `purchase` 参数 |
+| `$pageview` | 浏览器：自动 | — |
+
+钱和积分相关的事件（`signup`、`generate`、`checkout_start`、`purchase`）一律服务端发，保证不被广告拦截漏掉；发送失败只记日志，不影响业务。
+
+### 16.3 Sentry
+
+- 前后端都接 `@sentry/nextjs`；`NEXT_PUBLIC_SENTRY_DSN` 公开，`SENTRY_AUTH_TOKEN`（上传源码映射）放 Vercel 加密变量。
+- 必须告警的：出图失败率异常、支付回调验签失败或处理失败、`charge.refunded`、退回积分失败（第 4 节 refund 失败会让积分卡在预扣状态）。
+- 上报前去掉邮箱、令牌、提示词（复用 `core/logger` 的打码规则）。
+

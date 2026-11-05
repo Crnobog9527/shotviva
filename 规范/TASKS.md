@@ -23,6 +23,7 @@
 | T11 | 首页与内页最终文案 | 价格已定稿，可派 | T5 |
 | T12 | 模板需求墙（Wishlist） | 等 T8 | T1、T4、T8 |
 | T15 | 迁移基线与自动化 | **可派，T8 / T9 / T12 之前** | T14 |
+| T18 | 埋点与错误监控 | **可派，T8 / T9 之前** | — |
 | T16 | 按分辨率扣费（模板三档积分 + 质量档） | **等 T15 合并；T8 / T9 之前** | T3、T4、T14、T15 |
 
 并行建议：T0 先做（半天到一天）；T0 合并后 T1 / T2 / T3 / T5 四张同时开；T6 和 T0 同时开（不碰代码）。
@@ -333,6 +334,23 @@
 - [ ] `supabase/schema.sql` 快照更新，CI 的 schema 校验通过
 
 **依赖**：T3、T4、T14（都已合并）、T15（基线与编号）。
+
+## T18 埋点与错误监控（可派，排在 T8 / T9 之前）
+
+**目标**：`core/analytics/` 统一埋点和错误上报，接好 PostHog（无 Cookie、同域代理）和 Sentry；给已合并的接口补上服务端事件。约半天。
+
+**范围**：`core/analytics/`（`track()`、`identify()`、`captureError()`，浏览器和服务端两套实现，同一事件字典的 zod 类型）、`app/` 根布局接入 PostHog Provider、`next.config.ts` 的 `/ingest` 改写、`@sentry/nextjs` 配置；在已合并代码里补事件：T1 注册（`signup`）、T4 生成结算（`generate`，web 和伙伴接口都发）、T4 上传（`upload`）。`paywall_view` / `checkout_start` / `purchase` 由 T8 / T9 调用本模块，本卡只提供类型和函数。不许动：业务逻辑和扣费规则。
+
+**依据**：ARCHITECTURE §16 全文（PostHog 配置、事件字典、禁止发个人信息、Sentry 告警清单）；AGENTS §4（env 用 zod、`core/logger` 打码）；LAUNCH §9 事件和告警两条。
+
+**验收**：
+- [ ] 预览站打开首页，PostHog 后台 Live events 看到 `$pageview`，浏览器里没有 PostHog 写的 Cookie 和本地存储
+- [ ] 注册、上传、生成各做一次，看到 `signup` / `upload` / `generate`，属性齐全且不含邮箱、文案、提示词、图片地址
+- [ ] 广告拦截插件开着时事件仍能通过 `/ingest` 送达
+- [ ] 故意让一次生成失败，Sentry 收到告警，内容不含用户邮箱和提示词
+- [ ] 单元测试：事件字典类型、属性里出现邮箱等字段时被拒绝
+
+**依赖**：无（T1 / T4 已合并）。Sentry DSN 未提供前，Sentry 部分在无 DSN 时自动关闭，不阻塞合并。
 
 ## Owner 侧关键路径（不是任务卡，但比代码慢）
 
