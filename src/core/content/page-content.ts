@@ -22,19 +22,24 @@ export type HeroBlock = {
 // Block ②: verifiable facts, at least three (建站规格 G4).
 export type Fact = { label: string; value: string }
 
-// Block ③: photographer vs this site, as a real HTML table (建站规格 G5).
-export type CostRow = { item: string; photographer: string; site: string }
+// Block ③: photographer vs this site, as a real HTML table (建站规格 G5). The optional
+// `diy` column is "shoot it yourself" (建站规格 §4 home H2-4).
+export type CostRow = { item: string; photographer: string; diy?: string; site: string }
 export type CostTable = {
   caption: string
-  headers: { item: string; photographer: string; site: string }
+  headers: { item: string; photographer: string; diy?: string; site: string }
   rows: readonly [CostRow, ...CostRow[]]
 }
 
-// Block ④: 3–5 questions in the user's own words.
-export type FaqItem = { question: string; answer: string }
+// Block ④: 3–5 questions in the user's own words. `link` renders after the answer text
+// (e.g. FAQ D on the home page points to /image-to-image-generator, 建站规格 G6).
+export type FaqItem = { question: string; answer: string; link?: { href: `/${string}`; anchor: string } }
 
-// Block ⑤: 2–3 related pages.
-export type RelatedLink = { href: `/${string}`; anchor: string }
+// Block ⑤: 2–3 related pages. `note` says in one line who the page is for (建站规格 §4 H2-6).
+export type RelatedLink = { href: `/${string}`; anchor: string; note?: string }
+
+// Section headings a page may set; blocks fall back to generic ones.
+export type SectionHeadings = { facts?: string; costTable?: string; faq?: string; related?: string }
 
 type AtLeast3<T> = readonly [T, T, T, ...T[]]
 type Between3And5<T> = readonly [T, T, T] | readonly [T, T, T, T] | readonly [T, T, T, T, T]
@@ -47,6 +52,8 @@ export type ContentPage = {
   title: string
   description: string
   h1: string
+  // Plain <p> right under the H1, never an H2 (建站规格 §4).
+  subtitle?: string
   // Direct answer under the H1: 40–60 words, starts with the keyword (建站规格 G1).
   answerBlock: string
   // Breadcrumb / nav label.
@@ -56,16 +63,37 @@ export type ContentPage = {
   costTable: CostTable
   faq: Between3And5<FaqItem>
   related: Between2And3<RelatedLink>
+  headings?: SectionHeadings
   // Pages that only make sense with a module on disappear with it.
   module?: ModuleId
 }
 
 export type TemplateCard = { name: string; use: string }
 
-// The home page is the same structure plus the featured-template grid (ARCHITECTURE §13).
+// One H3 per category, with a short intro and links to its live inner pages (建站规格 §4 H2-2).
+export type TemplateCategory = {
+  name: string
+  intro: string
+  templates: readonly [TemplateCard, ...TemplateCard[]]
+  links?: readonly RelatedLink[]
+}
+
+export type HeadedText = { heading: string; text: string }
+
+// The home page is the same structure plus the 3-step block, the grouped template grid and
+// the free-offer section (ARCHITECTURE §13, 建站规格 §4 six-H2 skeleton).
 export type HomePage = ContentPage & {
   slug: ''
-  templateGrid: { heading: string; templates: readonly [TemplateCard, ...TemplateCard[]] }
+  subtitle: string
+  // One line under the hero pair: "one phone photo, a full set" (ARCHITECTURE §13 item 2).
+  demoNote: string
+  steps: { heading: string; items: readonly [HeadedText, HeadedText, HeadedText] }
+  templateGrid: { heading: string; intro: string; categories: readonly [TemplateCategory, ...TemplateCategory[]] }
+  // Intro paragraph above the facts table.
+  factsIntro: string
+  // H2-4: free credits, free vs paid works, then plans + the cost table.
+  freeOffer: { heading: string; points: readonly [HeadedText, HeadedText]; plans: HeadedText }
+  headings: Required<SectionHeadings>
 }
 
 export function defineContentPage<const T extends ContentPage>(page: T): T {

@@ -11,8 +11,3 @@ export function formatProductPrice(product: SiteProduct): string {
 export function pricedProducts(site: SiteConfig): readonly SiteProduct[] {
   return site.billing.products.filter((product) => product.priceUsd > 0)
 }
-
-export function freeImagesLabel(site: SiteConfig): string {
-  const n = site.billing.freeCredits
-  return `${n} free ${n === 1 ? 'image' : 'images'}`
-}

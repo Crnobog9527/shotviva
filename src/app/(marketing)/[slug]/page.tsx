@@ -10,7 +10,7 @@ import {
   pageMetadata,
   softwareApplicationLd,
 } from '@/core/seo'
-import { contentPages, findContentPage, homePage, isLinkEnabled } from '@/site/content'
+import { contentPages, findContentPage, freeImagesLabel, homePage, isLinkEnabled } from '@/site/content'
 import { site } from '@/site/site.config'
 
 // Every inner SEO page renders through this one route (ARCHITECTURE §12).
@@ -49,7 +49,7 @@ export default async function ContentRoute({ params }: PageProps<'/[slug]'>) {
   ]
   const meta = { path, title: page.title, description: page.description }
   const ld = [breadcrumbListLd(site, crumbs), faqPageLd(page.faq)]
-  if (page.module) ld.push(softwareApplicationLd(site, meta))
+  if (page.module) ld.push(softwareApplicationLd(site, meta, freeImagesLabel))
   return (
     <>
       <JsonLdScript data={ld} />
