@@ -52,6 +52,8 @@ Stripe 官方文档 Managed Payments「Payment method availability」表列出�
 
 ### A2 · Node 版本：本地和 CI 跑 24，Vercel 会跑 26
 
+> **总控注（2026-11-05）**：Owner 决定统一到 **Node 26**（不是下面建议的 24），chore 卡已按 26 派出；若 `sharp` 等原生依赖在 26 上 CI 不过，再退回 24。另：T4 已用 `@aws-sdk/client-s3` 连 R2 且测试通过，v1 保留，不换 aws4fetch。
+
 `package.json` 写的是 `"engines": { "node": ">=24" }`。Vercel 文档明确：开区间（如 `>=22.0.0`）映射到**最新 26.x**，而 Vercel 自 2026 年起新项目默认 26.x。`.nvmrc` 和 CI 是 24。结果是本地测过的二进制依赖（将来的 `sharp`）在线上跑另一个 Node 大版本。
 
 **改法**：`"node": "24.x"`，和 `.nvmrc` 一致。Node 24 是当前 LTS，维护到 2028-04，Vercel 支持。等 Node 26 在 Vercel 上跑满几个月、`sharp` 等预编译包都稳定了，再一起升到 26（改三处：`.nvmrc`、`engines`、CI 自动跟 `.nvmrc`）。

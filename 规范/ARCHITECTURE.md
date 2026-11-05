@@ -157,7 +157,8 @@ v1 上线 6~8 个调好的模板，之后每周加。提示词调到「餐具摆
 
 - `profiles.credits`（整数）：余额，**永不过期**。
 - `profiles.paid_until`（时间戳，可空）：付费身份窗口。**付费身份 = `paid_until > now()`**，决定私密、无水印、可商用。
-- 任何一次成功付款（首付、订阅续费、钱包单笔、Waffo 单笔）都走同一个 SQL 函数 `apply_purchase(user, product_id, event_id)`：`credits += 商品积分`，`paid_until = max(paid_until, now()) + 商品天数`。订阅续费把 Stripe 的 invoice id 当 `event_id`，首付和单笔用 checkout session id，Waffo 用它的事件 id。
+- 首付、钱包单笔、Waffo 单笔都走 SQL 函数 `apply_purchase(user, product_id, event_id)`：`credits += 商品积分`，`paid_until = max(paid_until, now()) + 商品天数`。首付和单笔用 checkout session id 当 `event_id`，Waffo 用它的事件 id。
+- 订阅续费走 T10 新增的 `apply_subscription_renewal(user, product_id, invoice_id, period_end)`：`credits += 商品积分`，`paid_until = greatest(paid_until, period_end)`（直接对齐 Stripe 的本期结束日，不按天数累加，避免大小月漂移）；同样写流水、按 invoice id 幂等，内部复用 `_apply_credit_change`（总控 2026-11-05 补）。
 - 没用完的张数在续费时自然结转（积分不过期），不做「本期 / 结转」两本账。
 - **1 credit = 1 image**，「重新生成」也算一张。前台英文一律说 "image"（"3 free images"、"uses 1 image"），后台和代码叫 credit。
 - 余额只能通过 SQL 函数改：发放、预扣、确认、退回、管理员调整。前端和普通接口都不能直接写余额。

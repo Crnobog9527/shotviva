@@ -204,7 +204,7 @@
 
 **目标**：付费墙（两个商品 × 两组付款方式）、`/pricing`、Stripe Checkout Session 按付款方式路由（卡 = Managed Payments 订阅，钱包 = 单笔）、`checkout.session.completed` 回调 → `apply_purchase` + 写 `subscriptions` 镜像表。上线当天要有的部分。
 
-**范围**：`core/billing/stripe/`、`app/api/webhooks/stripe`、`app/(marketing)/pricing`、付费墙组件、`subscriptions` 表迁移。不许动：积分 SQL 函数（T2 已定）、续费逻辑（T10）。
+**范围**：`core/billing/stripe/`、`app/api/webhooks/stripe`、`app/(marketing)/pricing`、付费墙组件、迁移编号段 `0080`～`0099`（`subscriptions` 表；以及把 T2 的 `products` 从 `pass`/`pack` 改成 `monthly`（30 张/30 天）/`yearly`（360 张/365 天）的迁移：改 check 约束和种子行）、`site/site.config.ts` 的商品 id 与积分（同步改 T5 的相关测试）。不许动：`_apply_credit_change` / `apply_purchase` 的逻辑、续费逻辑（T10）。（总控 2026-11-05 补：main 上已合并的代码仍是 `pass`/`pack`，由 T9 负责改名。）
 
 **依据**：ARCHITECTURE §6.2 商品表与「同一个商品挂 recurring 和 one-time 两个 Price」「分两段上线」；§6.3 Stripe 路由表（MP 不传 `payment_method_types`、微信 `client = 'web'`、税码 `txcd_10105001`、「审核没下来之前卡先走普通订阅」）、「要处理的 Stripe 事件」；§6.1 `apply_purchase(user, product_id, event_id)` 用 session id 当 `event_id`；DESIGN §4.5；AGENTS §6 回调验签、§7 测试 2。
 
@@ -214,7 +214,9 @@
 
 ## T10 订阅续费、取消同步、Customer Portal（等 T9；首个付费用户满 30 天前上线）
 
-**目标**：`invoice.paid`（只认 `subscription_cycle`）→ `apply_purchase`（invoice id 当 `event_id`）并把 `paid_until` 延到 `period_end`；`customer.subscription.updated / deleted` 更新镜像表；`charge.refunded` 记录 + Sentry 告警；账号页 Subscription 区块 + Customer Portal 链接。
+**目标**：`invoice.paid`（只认 `subscription_cycle`）→ `apply_subscription_renewal`（invoice id 幂等，`paid_until` 对齐 `period_end`）；`customer.subscription.updated / deleted` 更新镜像表；`charge.refunded` 记录 + Sentry 告警；账号页 Subscription 区块 + Customer Portal 链接。
+
+**范围补充**：迁移编号段 `0100`～`0119`，新增 SQL 函数 `apply_subscription_renewal`（ARCHITECTURE §6.1），测试连本地 Supabase：同一 invoice 重发只发一次、`paid_until` 对齐 `period_end` 且不回退。
 
 **依据**：ARCHITECTURE §6.2「续费失败：什么都不做」「取消：期末生效……不自己写取消界面」「外部退款……不写自动扣回」；DESIGN §4.5 账号页区块；AGENTS §7 测试 2（Stripe 另加四项）和 4。
 
