@@ -5,6 +5,7 @@ import { Suspense } from 'react'
 import { AnalyticsIdentify } from '@/core/analytics/browser'
 import { AppFrame, TabBar, type TabItem } from '@/core/app-shell'
 import { getSessionUser } from '@/core/auth'
+import { PaywallProvider } from '@/core/billing/paywall'
 import { isModuleEnabled } from '@/core/config'
 import { appShellMetadata } from '@/core/seo'
 import { isWishlistEnabled } from '@/core/wishlist'
@@ -37,15 +38,17 @@ export default function AppLayout({ children }: LayoutProps<'/'>) {
   const tabs = useTabs()
   return (
     <AppFrame>
-      <Suspense fallback={null}>
-        <Identity />
-      </Suspense>
-      {/* usePathname decides tab root vs flow page; on dynamic routes that is request data. */}
-      <Suspense fallback={null}>
-        <TabBar items={tabs} brand={site.brand.name} />
-      </Suspense>
-      <main className="flex flex-1 flex-col">{children}</main>
-      <GenerationRunner />
+      <PaywallProvider products={site.billing.products} wishlistLive={isWishlistEnabled(site)}>
+        <Suspense fallback={null}>
+          <Identity />
+        </Suspense>
+        {/* usePathname decides tab root vs flow page; on dynamic routes that is request data. */}
+        <Suspense fallback={null}>
+          <TabBar items={tabs} brand={site.brand.name} />
+        </Suspense>
+        <main className="flex flex-1 flex-col">{children}</main>
+        <GenerationRunner />
+      </PaywallProvider>
     </AppFrame>
   )
 }

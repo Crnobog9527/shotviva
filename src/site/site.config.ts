@@ -24,10 +24,20 @@ export const site = defineSite({
     currency: 'usd',
     // = 3 free Standard images at 2 credits each; public copy says "3 free Standard images" (建站规格 G3).
     freeCredits: 6,
-    // Structure fixed by ARCHITECTURE §6.2; prices wait for pricing-research.
+    // The nine products, prices final (Owner 2026-11-05, ARCHITECTURE §6.2). Credits and days
+    // also live in the products table for apply_purchase; tests/db/stripe-catalog.test.ts keeps
+    // them equal. Stripe Prices are looked up by lookup_key, never stored here.
     products: [
-      { id: 'pass', credits: 30, paidDays: 30, priceUsd: 0 },
-      { id: 'pack', credits: 120, paidDays: 365, priceUsd: 0 },
+      { id: 'starter_monthly', tier: 'starter', interval: 'month', credits: 50, paidDays: 30, priceUsd: 19.9 },
+      { id: 'starter_yearly', tier: 'starter', interval: 'year', credits: 600, paidDays: 365, priceUsd: 139 },
+      { id: 'pro_monthly', tier: 'pro', interval: 'month', credits: 135, paidDays: 30, priceUsd: 49.9 },
+      { id: 'pro_yearly', tier: 'pro', interval: 'year', credits: 1620, paidDays: 365, priceUsd: 349 },
+      { id: 'max_monthly', tier: 'max', interval: 'month', credits: 280, paidDays: 30, priceUsd: 99 },
+      { id: 'max_yearly', tier: 'max', interval: 'year', credits: 3360, paidDays: 365, priceUsd: 699 },
+      // Packs: anyone can buy them, they never change paid_until.
+      { id: 'pack_s', tier: 'pack', interval: null, credits: 20, paidDays: null, priceUsd: 9.9 },
+      { id: 'pack_m', tier: 'pack', interval: null, credits: 55, paidDays: null, priceUsd: 24.9 },
+      { id: 'pack_l', tier: 'pack', interval: null, credits: 115, paidDays: null, priceUsd: 49.9 },
     ],
     channels: { primary: 'stripe', fallback: 'waffo' },
   },
@@ -46,6 +56,6 @@ export const site = defineSite({
   // three tabs and /wishlist 404s.
   features: { wishlist: false },
   indexing: {
-    indexablePaths: ['/', '/image-to-image-generator'],
+    indexablePaths: ['/', '/image-to-image-generator', '/pricing'],
   },
 })

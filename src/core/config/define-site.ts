@@ -3,17 +3,40 @@
 export type ModuleId = 'image' | 'video'
 
 // Product ids are fixed: Stripe/Waffo mappings and analytics key on them (ARCHITECTURE §6.2).
-export type ProductId = 'pass' | 'pack'
+// Memberships are '<tier>_<monthly|yearly>'; current_tier() (SQL) relies on that shape.
+export const PRODUCT_IDS = [
+  'starter_monthly',
+  'starter_yearly',
+  'pro_monthly',
+  'pro_yearly',
+  'max_monthly',
+  'max_yearly',
+  'pack_s',
+  'pack_m',
+  'pack_l',
+] as const
+export type ProductId = (typeof PRODUCT_IDS)[number]
+
+export const MEMBERSHIP_TIERS = ['starter', 'pro', 'max'] as const
+export type MembershipTier = (typeof MEMBERSHIP_TIERS)[number]
+// 'pack' is the tier of the three credit packs (PostHog `tier`, §6.2).
+export type ProductTier = MembershipTier | 'pack'
+export type ProductInterval = 'month' | 'year'
 
 export type PaymentChannel = 'stripe' | 'waffo'
 
-export type SiteProduct = {
+type ProductBase = {
   id: ProductId
+  // Paid credits granted per purchase (yearly: all twelve months at once).
   credits: number
-  paidDays: number
   // 0 means "not decided yet"; pages must show a placeholder, never "$0".
   priceUsd: number
 }
+
+// A membership extends paid_until; a pack only adds paid credits (§6.1).
+export type MembershipProduct = ProductBase & { tier: MembershipTier; interval: ProductInterval; paidDays: number }
+export type PackProduct = ProductBase & { tier: 'pack'; interval: null; paidDays: null }
+export type SiteProduct = MembershipProduct | PackProduct
 
 // Postal address of the legal entity, as printed in the footer and the legal pages.
 export type PostalAddress = {

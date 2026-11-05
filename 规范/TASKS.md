@@ -450,6 +450,30 @@
 
 **依赖**：T3、T4、T16（都已合并）。和 T8 并行：T8 可能改 `core/jobs` 里的并发上限，后合并的一方 rebase。
 
+## T17b 供应商密钥改存 Supabase Vault（可派，接 T17）
+
+**目标**：照 Graylum 的做法，把出图供应商的 API 密钥改存进 Supabase Vault（ARCHITECTURE §3.3），去掉 `PROVIDER_SECRETS_KEY`。原因：验收时应用侧加密密钥配置出错，后台保存不了；Vault 由 Supabase 在库内加密，不需要另配密钥。
+
+**范围**：
+- 新迁移（编号接 T17 段 `0141`～`0159`；本卡 [spec] 合并后再写）：
+  - `ai_providers` 加 `vault_secret_id uuid`，删 `api_key_ciphertext`（表里没有数据，按 AGENTS §5 用 `alter`）。
+  - 新增 `admin_set_provider_key`、`provider_api_key`。
+  - 删除供应商时同时删掉 Vault 记录。
+  - 重新生成 `schema.sql`。
+- 代码：
+  - 删掉 `core/providers/secrets.ts` 的 AES 加解密和 `PROVIDER_SECRETS_KEY`（同时从 `core/env.ts`、`.env.example` 删）。
+  - 保存走 `admin_set_provider_key`，出图和测试连接走 `provider_api_key`。
+  - 后台「新增 / 编辑」的报错改成对应的原因码。
+- 测试（本地 Supabase）：
+  - 存、换、清空密钥都正确；
+  - 客户端读不到 `vault`；
+  - `provider_api_key` 只有 service role 能调；
+  - 删除供应商后 Vault 记录也没了；
+  - 列表接口不返回明文。
+
+**Owner 步骤**：合并后在 Vercel 删掉两个 `PROVIDER_SECRETS_KEY`（Preview、Production），在后台重新添加供应商。
+
+**依赖**：T17（已合并）。
 ## T23 后台外壳与运营页（可派）
 
 **目标**：把后台从零散的几页变成完整的运营后台（ARCHITECTURE §10、DESIGN §7），只做本站已有的功能。

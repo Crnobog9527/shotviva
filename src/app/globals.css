@@ -89,6 +89,13 @@
   --tier-max-deep: #0C0A07;
   --tier-max-gold: #F2CF7A;
   --tier-perk: #D8D0C4;
+  --tier-sapphire-edge: rgba(120, 160, 255, 0.40);
+  --tier-sapphire-gloss: rgba(190, 210, 255, 0.25);
+  --tier-sapphire-plate: rgba(91, 134, 255, 0.16);
+  --tier-max-glow: rgba(230, 180, 80, 0.22);
+  --tier-max-sheen: rgba(255, 235, 190, 0.08);
+  --tier-max-plate: rgba(242, 207, 122, 0.12);
+  --tier-max-ink: #1A1206;
 
   --gutter: 16px;
   --sat: env(safe-area-inset-top, 0px);
@@ -299,4 +306,81 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
+}
+
+/* Paywall tier materials (DESIGN §4.5, comps-v3-b/paywall.html): Starter matte graphite,
+   Pro sapphire glass (recommended), Max black and gold foil with a slowly turning rim and a
+   warm sheen. A card is `tier-card` + data-tier; data-selected marks the chosen one. The gold
+   motion only runs without reduced motion. */
+@property --tier-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes sv-tier-turn {
+  to { --tier-angle: 360deg; }
+}
+@keyframes sv-tier-sheen {
+  0%, 100% { background-position: 110% 0; }
+  50% { background-position: -10% 0; }
+}
+@layer components {
+  .tier-card {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border-radius: var(--radius-panel);
+    transition: box-shadow 250ms var(--ease);
+  }
+  .tier-card[data-tier="starter"] {
+    background: var(--tier-graphite);
+    box-shadow: inset 0 0 0 1px var(--border);
+  }
+  .tier-card[data-tier="starter"][data-selected="true"] {
+    box-shadow: inset 0 0 0 1.5px var(--bone-dim);
+  }
+  .tier-card[data-tier="pro"] {
+    background:
+      radial-gradient(120% 90% at 100% 0%, var(--tier-sapphire-light), transparent 60%),
+      linear-gradient(180deg, var(--tier-sapphire-top), var(--tier-sapphire-deep));
+    box-shadow: inset 0 0 0 1px var(--tier-sapphire-edge), inset 0 1px 0 var(--tier-sapphire-gloss);
+  }
+  .tier-card[data-tier="pro"][data-selected="true"] {
+    box-shadow: inset 0 0 0 1.5px var(--tier-sapphire-rim), inset 0 1px 0 var(--tier-sapphire-gloss);
+  }
+  .tier-card[data-tier="max"] {
+    background:
+      radial-gradient(120% 90% at 100% 0%, var(--tier-max-glow), transparent 60%),
+      linear-gradient(160deg, var(--tier-max-top), var(--tier-max-deep) 60%);
+  }
+  .tier-card[data-tier="max"]::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: conic-gradient(from var(--tier-angle), #F7DF9A, #8A6420, #FFE9B0, #C8962E, #6E4E14, #F2CF7A, #F7DF9A);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+  .tier-card[data-tier="max"]::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    border-radius: inherit;
+    background: linear-gradient(115deg, transparent 30%, var(--tier-max-sheen) 50%, transparent 70%);
+    background-size: 250% 100%;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .tier-card[data-tier="max"]::before { animation: sv-tier-turn 9s linear infinite; }
+    .tier-card[data-tier="max"]::after { animation: sv-tier-sheen 6s ease-in-out infinite; }
+  }
+  /* Accent ink per material: tier name, flag, saving plate, perk ticks, selected check. */
+  .tier-card[data-tier="starter"] { --tier-ink: var(--foreground); --tier-flag: var(--wash-strong); --tier-flag-ink: var(--foreground); --tier-plate: var(--wash); --tier-check: var(--foreground); --tier-check-ink: var(--background); }
+  .tier-card[data-tier="pro"] { --tier-ink: var(--tier-sapphire-ink); --tier-flag: var(--tier-sapphire-flag); --tier-flag-ink: var(--tier-sapphire-flag-ink); --tier-plate: var(--tier-sapphire-plate); --tier-check: var(--tier-sapphire-rim); --tier-check-ink: var(--tier-sapphire-flag-ink); }
+  .tier-card[data-tier="max"] { --tier-ink: var(--tier-max-gold); --tier-flag: var(--chrome); --tier-flag-ink: var(--tier-max-ink); --tier-plate: var(--tier-max-plate); --tier-check: var(--tier-max-gold); --tier-check-ink: var(--tier-max-ink); }
 }

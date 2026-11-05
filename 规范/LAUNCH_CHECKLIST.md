@@ -33,7 +33,7 @@
 - [ ] 管理后台只有 `role = admin` 能进，普通账号访问返回 404
 - [ ] 生产库 Supabase Advisor（Performance + Security）没有 WARN 级别的问题；转 Pro 之后打开 Leaked Password Protection
 
-- [ ] 出图供应商（ARCHITECTURE §3.3）：生产环境 `PROVIDER_SECRETS_KEY` 已设（和预览不同），后台已录入在用供应商并测试连接成功，出一张图后 `generation_jobs.provider` 正确
+- [ ] 出图供应商（ARCHITECTURE §3.3）：后台已录入在用供应商（密钥存 Supabase Vault）并测试连接成功，出一张图后 `generation_jobs.provider` 正确
 
 ## 3. 登录
 
@@ -58,7 +58,7 @@
 - [ ] 价格数字（ARCHITECTURE §6.2 的 9 个商品）已填进 `site.config.ts`，首页、价格页、FAQ、结构化数据的数字完全一致；Stripe 里 Starter / Pro / Max 各一个 Product（税码 `txcd_10105001`）挂 4 个 Price（月付 / 年付 × recurring / one-time），三个积分包各一个 one-time Price；每个 Price 的 `lookup_key` 和 `metadata.product_id` 按 §6.2 的约定填好，服务端按 lookup key 能取到全部 15 个 Price
 - [ ] 成本测量（**不是主体保持测试，不设质量门槛**）：用 20 张真实手机照片（长边 2048）对 `OPENAI_IMAGE_MODEL` 各跑一次 `/v1/images/edits`，读 `usage.input_tokens_details.image_tokens`，总花费 < $5；按 p95 算 1K high 单次成本，若 > $0.12 就把 `high` 的 1K 配置下限改为 3 credits，或把上传长边降到 1536；结果写进 `modules/image` 的下限表注释
 - [ ] 按分辨率扣费：同一模板分别以 1K / 2K / 3K 生成，扣的 credits 等于后台配置的三个数，成品像素等于该档尺寸表；后台把某档改成低于下限的数被拒绝保存
-- [ ] Stripe 测试模式·卡：`starter_monthly` 和 `pro_yearly` 各订阅一次（Managed Payments），结账页显示税，到账后付费池 `credits` +50 / +1,620、`paid_until` = 本期 `period_end`，`subscriptions.product_id` 正确
+- [ ] Stripe 测试模式·卡：`starter_monthly` 和 `pro_yearly` 各订阅一次（Managed Payments），结账页显示税，到账后付费池 `credits` +50 / +1,620，`paid_until` = 付款时间 +30 / +365 天（首付按天数累加；从首次续费起对齐 `period_end`，T10），`subscriptions.product_id` 正确
 - [ ] Stripe 测试模式·钱包：支付宝单笔买一次 `starter_monthly`，结账页无税，付费池 +50、`paid_until` +30 天，付费墙写明不自动续费；再用卡（MP 单笔）和支付宝各买一次 `pack_s`，付费池 +20、`paid_until` 不变
 - [ ] 用 Stripe 测试时钟把一个 `starter_monthly` 订阅推进到续费：`invoice.paid` 到账后付费池 +50、`paid_until` 延到新一期；再推进一次让续费失败，不发积分、`paid_until` 不延、账号页显示已过期，已有付费积分仍可用
 - [ ] 在 Customer Portal 取消订阅：镜像表 `cancel_at_period_end = true`，`paid_until` 不变，期末后不再续
@@ -152,6 +152,19 @@
 - [ ] 删除账号后 `requests/{user_id}/` 下的参考图一并删除
 
 ## 10. 推迟项（不卡上线，到时再勾）
+
+- [ ] **建站工具包**（Owner 2026-11-06 定：上线并跑通第一笔真实付款后做）：
+  - 仓库设成 GitHub 模板仓库。
+  - 配置文件 `launch.yaml`，填品牌、域名、价格、地区和各平台令牌。
+  - `pnpm launch:bootstrap`：一条命令自动配好以下各项，最后列出剩下的手动步骤（Google OAuth 客户端、Stripe 激活、Google 品牌验证、律师审条款）：
+    - Supabase：建项目，用 `config.toml` 加 `supabase config push` 推送登录设置、邮件模板、SMTP、回调地址、hCaptcha；
+    - Vercel：建项目、设环境变量、绑域名；
+    - R2：建桶，配跨域和生命周期；
+    - Stripe：建商品、价格和回调；
+    - Resend：加域名，并把 DNS 记录写进 Vercel DNS；
+    - PostHog / Sentry 项目。
+  - `pnpm launch:doctor`：检查环境变量和外部服务是否连通、配置是否一致。
+  - 第一步先把 Shotviva 自己的 Supabase 登录配置和邮件模板改成 CI 推送，以后改模板不再手贴。
 
 - [ ] 第 6~7 周：内容审核 + 作品审核后台页（创作库开放前必须完成）
 - [ ] 第 8 周开创作库时：noindex、sitemap 不含 /g 的测试和验收（创作库规格第 4 节）
