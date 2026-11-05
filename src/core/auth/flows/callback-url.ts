@@ -12,6 +12,15 @@ export function callbackUrl(next: string, flow: CallbackFlow = 'email'): string 
   return url.toString()
 }
 
+// `emailRedirectTo` / `redirectTo` for every auth email. The templates read it as
+// {{ .RedirectTo }} and append `&token_hash=…&type=…`, so the URL must always carry a query
+// string: `next` is always set, which guarantees one.
+export function confirmUrl(next: string, origin: string = appOrigin): string {
+  const url = new URL('/auth/confirm', origin)
+  url.searchParams.set('next', sanitizeNext(next))
+  return url.toString()
+}
+
 export function parseFlow(value: string | null): CallbackFlow {
   return value === 'oauth' || value === 'recovery' ? value : 'email'
 }
