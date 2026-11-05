@@ -2,6 +2,8 @@ import { withSentryConfig } from '@sentry/nextjs/config'
 import type { NextConfig } from 'next'
 import createNextIntlPlugin from 'next-intl/plugin'
 
+import { parseSentryBuildEnv } from './src/core/build-env'
+
 const withNextIntl = createNextIntlPlugin('./src/site/i18n/request.ts')
 
 // PostHog US cloud behind our own origin (ARCHITECTURE §16.1), so ad blockers that block
@@ -32,15 +34,15 @@ const nextConfig: NextConfig = {
   },
 }
 
-// Build-time only. Without SENTRY_AUTH_TOKEN (local, CI, until the Owner adds it in Vercel)
-// source maps are simply not uploaded; the runtime SDK is configured in src/core/analytics.
-const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN || undefined
+// Build-time only (src/core/build-env.ts). Without SENTRY_AUTH_TOKEN (local, CI) source maps
+// are simply not uploaded; the runtime SDK is configured in src/core/analytics.
+const sentryBuild = parseSentryBuildEnv(process.env)
 
 export default withSentryConfig(withNextIntl(nextConfig), {
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
-  authToken: sentryAuthToken,
-  sourcemaps: { disable: !sentryAuthToken, deleteSourcemapsAfterUpload: true },
+  org: sentryBuild.SENTRY_ORG,
+  project: sentryBuild.SENTRY_PROJECT,
+  authToken: sentryBuild.SENTRY_AUTH_TOKEN,
+  sourcemaps: { disable: !sentryBuild.SENTRY_AUTH_TOKEN, deleteSourcemapsAfterUpload: true },
   silent: !process.env.CI,
   telemetry: false,
 })
