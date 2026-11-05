@@ -276,7 +276,53 @@
     },
     "wishlist": {
       "title": "Wishlist",
-      "placeholder": "Template requests open here soon."
+      "myRequests": "My requests",
+      "request": "Request a template",
+      "needPhoto": "Create one photo first to join",
+      "empty": "Tell us what template you need",
+      "wantThis": "I want this too",
+      "wantThisAria": "I want this too, {count, plural, one {# vote} other {# votes}}",
+      "by": "Requested by {name}",
+      "shipped": "Shipped",
+      "imageAlt": "Reference photo {index} of {count}",
+      "showMore": "Show more",
+      "loading": "Loading…",
+      "loadFailed": "Couldn't load more. Try again.",
+      "sent": "Sent for review",
+      "voteErrors": {
+        "CONFLICT": "This request is no longer on the wall.",
+        "FORBIDDEN": "Create one photo first to join",
+        "generic": "Couldn't save your vote. Try again."
+      },
+      "new": {
+        "title": "Request a template",
+        "photosHeading": "Reference photos",
+        "photosHint": "Add {min} to {max} photos of the look you want.",
+        "addAnother": "Add another photo",
+        "remove": "Remove this photo",
+        "describe": "Describe the look you want",
+        "placeholder": "Describe the look you want, e.g. a dark moody poster for our weekend brunch menu",
+        "counter": "{count}/{max}",
+        "submit": "Submit",
+        "submitting": "Sending…",
+        "errors": {
+          "FORBIDDEN": "Create one photo first to join",
+          "RATE_LIMITED": "You've sent 5 requests today. Try again tomorrow.",
+          "INVALID_INPUT": "Add 1 to 3 photos and a short description.",
+          "generic": "Couldn't send your request. Try again."
+        }
+      },
+      "mine": {
+        "title": "My requests",
+        "empty": "You haven't requested anything yet",
+        "votes": "{count, plural, one {# vote} other {# votes}}",
+        "status": {
+          "pending": "Pending",
+          "live": "Live",
+          "shipped": "Shipped",
+          "rejected": "Rejected"
+        }
+      }
     },
     "account": {
       "metaTitle": "Account"
@@ -361,5 +407,8 @@
     "compactMonth": "{count, plural, one {# credit} other {# credits}} a month · {price} per credit",
     "comingSoonList": "<b>Coming soon:</b> {items}",
     "perCreditShort": "{price} each"
+  },
+  "announcement": {
+    "dismiss": "Dismiss announcement"
   }
 }

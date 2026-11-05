@@ -22,10 +22,10 @@ function deps(overrides: Partial<{ storageError: Error; authError: string }> = {
 }
 
 describe('deleteAccount', () => {
-  it('clears both R2 prefixes, then deletes the auth user', async () => {
+  it('clears every R2 prefix, wishlist images included, then deletes the auth user', async () => {
     const { value, calls } = deps()
     await deleteAccount('u1', value)
-    expect(calls).toEqual(['r2:inputs/u1/', 'r2:outputs/u1/', 'auth:u1'])
+    expect(calls).toEqual(['r2:inputs/u1/', 'r2:outputs/u1/', 'r2:requests/u1/', 'auth:u1'])
   })
 
   it('keeps the account when R2 fails, so the user can retry', async () => {
@@ -41,6 +41,6 @@ describe('deleteAccount', () => {
 
   it('scopes prefixes to the user id with a trailing slash', () => {
     // Without the slash, deleting "u1" would also match "u10…".
-    expect(accountPrefixes('u1')).toEqual(['inputs/u1/', 'outputs/u1/'])
+    expect(accountPrefixes('u1')).toEqual(['inputs/u1/', 'outputs/u1/', 'requests/u1/'])
   })
 })

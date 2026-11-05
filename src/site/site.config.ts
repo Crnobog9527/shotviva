@@ -52,8 +52,9 @@ export const site = defineSite({
   },
   // 创作库规格 U9: no gallery pages for the first 8 weeks.
   gallery: { enabled: false },
-  // Template wishlist (ARCHITECTURE §15). Off until T12 ships the wall: when off the tab bar has
-  // three tabs and /wishlist 404s.
+  // Template wishlist (ARCHITECTURE §15). When off, the tab bar has three tabs and /wishlist,
+  // /api/wishlist and /admin/requests 404 (§15.6). Preview deployments can switch it on with
+  // FEATURE_WISHLIST_PREVIEW=on for validation; production always follows this value.
   features: { wishlist: false },
   indexing: {
     indexablePaths: ['/', '/image-to-image-generator', '/pricing'],

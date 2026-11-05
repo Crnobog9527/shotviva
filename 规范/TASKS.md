@@ -249,7 +249,19 @@
 
 **目标**：`invoice.paid`（只认 `subscription_cycle`）→ `apply_subscription_renewal`（invoice id 幂等，`paid_until` 对齐 `period_end`）；`customer.subscription.updated / deleted` 更新镜像表；`charge.refunded` 和 `charge.dispute.created` 记录 + Sentry 告警；账号页 Subscription 区块 + Customer Portal 链接。
 
-**范围补充**：迁移编号段 `0100`～`0119`，新增 SQL 函数 `apply_subscription_renewal`（ARCHITECTURE §6.1），测试连本地 Supabase：同一 invoice 重发只发一次、`paid_until` 对齐 `period_end` 且不回退。
+**范围补充**：迁移编号段 `0100`～`0119`，新增 SQL 函数 `apply_subscription_renewal`（ARCHITECTURE §6.1）；**付款记录表 `payments`**（总控 2026-11-06 补，供后台「订单与收入」显示真实数据）：
+- 每次成功付款一行，字段：
+  - 用户、商品；
+  - Stripe 的 session / invoice / charge id；
+  - 实付金额（`amount_total`，含税）、币种、税额；
+  - 付款方式（`card` / `alipay`）；
+  - 渠道（stripe / waffo）；
+  - 状态（`paid` / `refunded` / `partially_refunded` / `disputed`）；
+  - 时间。
+- 写入：由 `settle_checkout`（首付、单笔）和 `apply_subscription_renewal`（续费）在同一事务里写入。
+- 状态更新：`charge.refunded`、`charge.dispute.created` 更新状态，只记录，不扣积分。
+- 金额和付款方式由回调从 Stripe 取回后传入，不信任客户端。
+- 本卡合并后，T23 的订单页改读这张表（另开一个小 PR），测试连本地 Supabase：同一 invoice 重发只发一次、`paid_until` 对齐 `period_end` 且不回退。
 
 **依据**：ARCHITECTURE §6.2「续费失败：什么都不做」「取消：期末生效……不自己写取消界面」「外部退款……不写自动扣回」；DESIGN §4.5 账号页区块；AGENTS §7 测试 2（Stripe 另加四项）和 4。
 
