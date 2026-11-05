@@ -1,0 +1,27 @@
+# TEMPORARY (to be reverted): proves the repository secrets can link shotviva-preview and
+# read its migration history from CI. Read-only: link + migration list, nothing is applied.
+name: TMP preview link check
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  link:
+    name: link preview with repo secrets (read-only)
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_PREVIEW_DB_PASSWORD }}
+      SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PREVIEW_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/supabase-remote
+        with:
+          token-source: repository secret SUPABASE_ACCESS_TOKEN
+          password-source: repository secret SUPABASE_PREVIEW_DB_PASSWORD
+          ref-source: repository variable SUPABASE_PREVIEW_PROJECT_REF
+      - name: Read remote migration history
+        run: supabase migration list --linked
