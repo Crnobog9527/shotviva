@@ -31,7 +31,7 @@ R12 监控节奏：上线当天 GSC 验证站点 + 提交 sitemap；上线满 2 
 SEO 争排名，GEO 争「被抄进答案」——每页都要有能整段摘走的句子和数字。
 G1 每页顶部写「直答块」：H1 下方 40~60 个英文词，以主词开头、自带完整信息、不需上下文。例 "Shotviva is an AI image to image tool that turns phone photos of dishes into studio-quality food photos. Upload a photo, pick a template, add your text — no prompts, no photographer. Free for the first 3 images." 必须放正文最前、不许折叠。
 G2 Title 带年份与限定词：AI 联网会自己组带年份的搜索词，Title 精确对上易被引用。所有工具页 Title 带 (2026) 或 for Restaurants 这类限定。
-G3 每个数字只能一套口径：免费 3 张、价格（唯一来源是 site.config.ts；v1 只有一次性付款、不自动续费，具体价格待定，见 规范/ARCHITECTURE.md §6.2）、支持语言数、出图耗时，全站（首页/价格页/FAQ/结构化数据/站外目录）完全一致；AI 交叉比对发现两套就不引用；改价一次改全站。
+G3 每个数字只能一套口径：免费额度（"3 free credits"，计价单位是 credit 不是「张」，因为不同模板消耗的 credit 不同）、价格（唯一来源是 site.config.ts；商品为 `monthly` / `yearly` 会员和 `pack` 积分包，卡支付可订阅自动续费，钱包和积分包为单笔，具体价格待定，见 规范/ARCHITECTURE.md §6.1、§6.2）、支持语言数、出图耗时，全站（首页/价格页/FAQ/结构化数据/站外目录）完全一致；AI 交叉比对发现两套就不引用；改价一次改全站。
 G4 每页写死可核验事实，至少 3 条：DoorDash/Uber Eats/Grubhub 菜单图推荐尺寸与比例；免费额度与价格档位；支持语言；出图耗时（秒/张）；保留主体不变的技术说明。
 G5 用 HTML 表格承载对比（成本、尺寸要求、模板分类），不用图片——AI 抽表格成功率显著高于段落。
 G6 FAQ 必须用用户原话，8 句每句都有承接页：
