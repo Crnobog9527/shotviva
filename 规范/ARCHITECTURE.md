@@ -57,7 +57,7 @@ src/
 
 ```ts
 export const site = defineSite({
-  brand: { name: 'Shotviva', domain: 'shotviva.com', tagline: 'AI photo studio' },   // 建站规格 §1（Owner 2026-11-05 改定）
+  brand: { name: 'Shotviva', domain: 'shotviva.com', tagline: 'AI food & product photo studio' },   // 建站规格 §1
   modules: { image: true, video: false },     // 关掉的模块：路由 404、不进 sitemap、不出现在导航和定价里
   locales: { default: 'en', enabled: ['en'] }, // next-intl，英文不带前缀
   billing: {
