@@ -1,5 +1,5 @@
--- Partner connections (ARCHITECTURE §14.2). One row per user and partner. The row's user_id
--- is the account_id Graylum stores; Graylum never holds a Shotviva token.
+-- Baseline (T15): partner connections (ARCHITECTURE §14.2). One row per user and partner.
+-- The row's user_id is the account_id Graylum stores; Graylum never holds a Shotviva token.
 --
 -- Lifecycle:
 --   authorize  → link_code = sha256(code), code_expires_at = now() + 10 min

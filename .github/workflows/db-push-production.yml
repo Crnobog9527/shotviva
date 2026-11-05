@@ -1,0 +1,45 @@
+# Applies merged migrations to the production database. Manual only, from main, and bound
+# to the `production` environment, whose required reviewer (the Owner) must approve each run
+# on GitHub before the job starts (AGENTS §5, LAUNCH_CHECKLIST §1). The approval record is
+# the audit trail of what ran on production and when.
+#
+# The production password and project ref live only on the `production` environment, not
+# on the repository, so no other workflow can reach production and an environment that was
+# never set up (no reviewer, no secrets) fails at "Check configuration" without touching it.
+name: DB push (production)
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: db-push-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  push:
+    name: supabase db push → production
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_PRODUCTION_DB_PASSWORD }}
+      SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PRODUCTION_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/supabase-remote
+        with:
+          token-source: secret SUPABASE_ACCESS_TOKEN
+          password-source: production environment secret SUPABASE_PRODUCTION_DB_PASSWORD
+          ref-source: production environment variable SUPABASE_PRODUCTION_PROJECT_REF
+      - name: History before
+        run: supabase migration list --linked
+      - name: Pending migrations
+        run: supabase db push --dry-run
+      - name: Apply
+        run: supabase db push --yes
+      - name: Verify history matches the repo
+        run: scripts/check-migration-drift.sh --linked

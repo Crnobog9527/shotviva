@@ -1,0 +1,44 @@
+# supabase/schema.sql must be exactly what the migrations produce (AGENTS §5). Builds a
+# fresh local database from supabase/migrations, regenerates the snapshot and fails if the
+# committed file differs. Kept out of ci.yml so the migration tooling lives in its own files.
+name: DB schema snapshot
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: db-schema-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  schema:
+    name: schema.sql matches migrations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: supabase/setup-cli@v1
+        with:
+          # pg_dump output depends on the CLI's Postgres image; scripts/db-schema.ts says to
+          # regenerate locally with this same version.
+          version: 2.107.0
+      - run: pnpm install --frozen-lockfile
+      - run: supabase start -x studio,imgproxy,edge-runtime,analytics,vector,inbucket,functions,realtime,storage
+      - run: pnpm db:schema
+      - name: Compare with the committed snapshot
+        run: |
+          if [ -n "$(git status --porcelain -- supabase/schema.sql)" ]; then
+            git --no-pager diff -- supabase/schema.sql
+            echo "::error file=supabase/schema.sql::schema.sql is out of date with supabase/migrations. Run \`supabase db reset && pnpm db:schema\` and commit the result."
+            exit 1
+          fi
+          echo "schema.sql matches the migrations."

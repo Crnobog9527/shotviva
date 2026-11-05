@@ -1,0 +1,42 @@
+# Applies merged migrations to the preview database (shotviva-preview). The only way
+# migrations reach preview: nobody runs SQL there by hand (AGENTS §5). `supabase db push`
+# refuses when the remote history has versions the repo lacks, so drift stops the push
+# instead of being papered over.
+name: DB push (preview)
+
+on:
+  push:
+    branches: [main]
+  # Rerun after fixing a failed push (e.g. secrets were missing).
+  workflow_dispatch:
+
+# One push at a time, never cancelled half-way.
+concurrency:
+  group: db-push-preview
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  push:
+    name: supabase db push → preview
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_PREVIEW_DB_PASSWORD }}
+      SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PREVIEW_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/supabase-remote
+        with:
+          token-source: repository secret SUPABASE_ACCESS_TOKEN
+          password-source: repository secret SUPABASE_PREVIEW_DB_PASSWORD
+          ref-source: repository variable SUPABASE_PREVIEW_PROJECT_REF
+      - name: Pending migrations
+        run: supabase db push --dry-run
+      - name: Apply
+        run: supabase db push --yes
+      - name: Verify history matches the repo
+        run: scripts/check-migration-drift.sh --linked
