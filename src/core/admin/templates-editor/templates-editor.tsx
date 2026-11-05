@@ -1,0 +1,88 @@
+'use client'
+
+import { useState } from 'react'
+
+import { Button } from '@/core/ui/button'
+import { Input } from '@/core/ui/input'
+
+import type { AdminTemplate, TemplateAdminActions } from '../templates/types'
+
+import { matchesSearch, moveId } from './form-state'
+import { TemplateFormDialog, type EditTarget } from './template-form-dialog'
+import { TemplatesTable } from './templates-table'
+import { UnpublishDialog } from './unpublish-dialog'
+import { useTemplateActions } from './use-template-actions'
+
+type Props = { templates: AdminTemplate[]; actions: TemplateAdminActions }
+
+export function TemplatesEditor({ templates, actions }: Props) {
+  const [query, setQuery] = useState('')
+  const [editing, setEditing] = useState<EditTarget | null>(null)
+  const [unpublishing, setUnpublishing] = useState<AdminTemplate | null>(null)
+  const { pending, error, notice, run, clearError } = useTemplateActions()
+  const visible = templates.filter((template) => matchesSearch(template, query))
+
+  const openEditor = (target: EditTarget) => {
+    clearError()
+    setEditing(target)
+  }
+  const toggle = (template: AdminTemplate, active: boolean) => {
+    if (!active) return setUnpublishing(template)
+    run(() => actions.setActive({ id: template.id, active: true }), `已上架「${template.name}」`)
+  }
+  const move = (index: number, direction: -1 | 1) => {
+    const ids = moveId(templates.map((template) => template.id), index, direction)
+    if (ids) run(() => actions.reorder(ids), '排序已保存')
+  }
+
+  return (
+    <div className="grid gap-4">
+      <div className="flex items-center gap-3">
+        <Input
+          className="max-w-xs"
+          placeholder="搜索 ID / 名称 / 分类"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+        <Button className="ml-auto" onClick={() => openEditor({ mode: 'new' })}>
+          新建模板
+        </Button>
+      </div>
+      {notice ? <p className="text-sm text-emerald-700">{notice}</p> : null}
+      {error && !editing ? (
+        <p role="alert" className="text-destructive text-sm">
+          {error}
+        </p>
+      ) : null}
+      <TemplatesTable
+        templates={visible}
+        canReorder={query.trim() === ''}
+        pending={pending}
+        onEdit={(template) => openEditor({ mode: 'edit', template })}
+        onToggle={toggle}
+        onMove={move}
+      />
+      {editing ? (
+        <TemplateFormDialog
+          key={editing.mode === 'edit' ? editing.template.id : 'new'}
+          target={editing}
+          pending={pending}
+          error={error}
+          onCancel={() => setEditing(null)}
+          onSubmit={(payload) => run(() => actions.save(payload), '已保存', () => setEditing(null))}
+        />
+      ) : null}
+      <UnpublishDialog
+        template={unpublishing}
+        pending={pending}
+        onCancel={() => setUnpublishing(null)}
+        onConfirm={(reason) => {
+          const target = unpublishing
+          if (!target) return
+          setUnpublishing(null)
+          run(() => actions.setActive({ id: target.id, active: false, reason }), `已下架「${target.name}」`)
+        }}
+      />
+    </div>
+  )
+}

@@ -1,0 +1,37 @@
+import { notFound } from 'next/navigation'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const requireAdmin = vi.fn()
+const listAdminTemplates = vi.fn()
+
+vi.mock('@/core/auth', () => ({ requireAdmin: () => requireAdmin(), createAdminSupabase: () => ({}) }))
+vi.mock('@/core/admin', () => ({
+  listAdminTemplates: (client: unknown) => listAdminTemplates(client),
+  TemplatesEditor: () => null,
+}))
+vi.mock('./actions', () => ({
+  saveTemplateAction: vi.fn(),
+  setTemplateActiveAction: vi.fn(),
+  reorderTemplatesAction: vi.fn(),
+}))
+
+const { default: AdminTemplatesPage } = await import('./page')
+
+describe('admin templates page', () => {
+  beforeEach(() => {
+    requireAdmin.mockReset()
+    listAdminTemplates.mockReset().mockResolvedValue([])
+  })
+
+  it('404s non-admins before loading any template or prompt', async () => {
+    requireAdmin.mockImplementation(() => notFound())
+    await expect(AdminTemplatesPage()).rejects.toMatchObject({ digest: expect.stringMatching(/404/) })
+    expect(listAdminTemplates).not.toHaveBeenCalled()
+  })
+
+  it('loads templates for admins', async () => {
+    requireAdmin.mockResolvedValue({ id: 'admin', email: null })
+    await AdminTemplatesPage()
+    expect(listAdminTemplates).toHaveBeenCalledOnce()
+  })
+})

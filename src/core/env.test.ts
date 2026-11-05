@@ -12,3 +12,9 @@ describe('parseServerEnv', () => {
     expect(() => parseServerEnv({ NODE_ENV: 'staging-secret' })).not.toThrow(/staging-secret/)
   })
 })
+
+describe('service keys', () => {
+  it('are optional at parse time', () => {
+    expect(parseServerEnv({}).SUPABASE_SERVICE_ROLE_KEY).toBeUndefined()
+  })
+})
