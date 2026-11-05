@@ -56,7 +56,7 @@ G9 站外要有独立来源（每月 3~5 个，持续不像一次砸完）：Red
 G10 robots 与 AI 抓取：robots.txt 放行上述五个爬虫，不要因怕被白嫖而屏蔽 AI 爬虫（GEO 是本站流量大头）；可选 /llms.txt 列主要页面与一句话说明。
 G11 服务端渲染 + 语义化 HTML：AI 抓取不看 JS 渲染后的 DOM，直答块/事实块/FAQ 必须在源码里；FAQ 用 <h3>+<p>，不用 <div> 拼。
 G12 每周自测 SOP：每周一把 G6 首页 5 句 + 垂直页八句原话丢进开联网的 ChatGPT（另加 Perplexity 抽查 2 句），记录①提没提 ②排第几 ③引用哪个页面 ④截图存档。连续 4 周不提 → 检查承接页是否上线、直答块是否在源码；提到但引用竞品 → 抄它的页面结构、补它有你没有的事实块。
-G13 多语言 GEO：/ja、/id 上线后直答块与 FAQ 必须母语写手重写，不许机器直译（日语/印尼语问法与英文差异大，直译的句子 AI 不引用）。
+G13 多语言 GEO：/zh（v1）和以后的 /ja、/id，直答块与 FAQ 必须按该语言的真实问法用母语重写，不许机器直译（日语/印尼语问法与英文差异大，直译的句子 AI 不引用）。
 
 ## 4. 页面与主词映射（一页一主词）
 
@@ -85,7 +85,7 @@ G13 多语言 GEO：/ja、/id 上线后直答块与 FAQ 必须母语写手重写
 food photography 8,100（难度 65.6，前十 6 席 google 自己，全年 -50%）；ai flyer generator 5,400（难度 67.1，前十 7 席 google 自己，最弱占位 DR 83）；flyer maker / poster maker 18,100（预筛 49/62，adobe、canva、postermywall 主场）；menu design 8,100（广告竞争 100/100，-30%）；restaurant menu template 1,900（预筛 42，从 1,900 掉到 880）；product photography 6,600（同名域名占第 3）；ai image editor / ai photo editor（ezmaker.ai 领地，难度 70.8/72.2）；ai menu 4,400（难度 57.8，前九 8 席大媒体）；ai food images 720（难度 57.3，前十含卫报、Pinterest、Pexels）；virtual staging 4,400（同名域名 + 6 席 google 自己，持续下滑）。
 
 ## 6. 多语言架构（第一天留好，后期改等于重构）
-子目录 + 英文 slug：/{lang}/{english-slug}，例 /ja/interior-photography、/id/ai-restaurant-menu。slug 用英文的理由：主词全是英文关键词，模板与组件可跨语言复用；将来某语言要做本地词，只在该语言下用本地 slug，不影响其他语言。hreflang 全语言互指（含自身），x-default 指向英文版。每种语言独立 sitemap 挂在根 sitemap index 下。语言切换器必须是真实 <a href>，不许 JS 跳转。语言前缀不做自动跳转（IP 自动跳语言会让爬虫反复重定向）。语言优先级（依据 foodshot.ai 真实地区分布）：en（美国 16.3%）→ ja（4%）→ id（4%）→ pt-BR（3.6%）。**v1 只上英文**（2026-11-05 修订，与 ARCHITECTURE §13 一致）：next-intl 从第一天带前缀能力，但 /ja、/id 的内容推到付费验证通过之后，先 /ja /id，其余等 GSC 数据。
+子目录 + 英文 slug：/{lang}/{english-slug}，例 /ja/interior-photography、/id/ai-restaurant-menu。slug 用英文的理由：主词全是英文关键词，模板与组件可跨语言复用；将来某语言要做本地词，只在该语言下用本地 slug，不影响其他语言。hreflang 全语言互指（含自身），x-default 指向英文版。每种语言独立 sitemap 挂在根 sitemap index 下。语言切换器必须是真实 <a href>，不许 JS 跳转。语言前缀不做自动跳转（IP 自动跳语言会让爬虫反复重定向）。语言优先级（依据 foodshot.ai 真实地区分布）：en（美国 16.3%）→ ja（4%）→ id（4%）→ pt-BR（3.6%）。**v1 上线英文 + 简体中文 `/zh`**（Owner 2026-11-06 改定，取代「v1 只上英文」；细则见 ARCHITECTURE §17）：中文只做 Google，不做百度；`/zh` 下的可收录页面以中文口径主词表 `seo资料/Shotviva 页面与主词映射（中文口径）.csv` 为准（T22 产出），不在表里的 `/zh` 页 noindex；hreflang 用 `zh-Hans`；浏览器语言是中文的访客只弹「切换到中文」提示，不自动跳转。/ja、/id 仍推到付费验证通过之后，其余等 GSC 数据。
 
 ## 7. 技术栈
 以 规范/ARCHITECTURE.md 和 规范/AGENTS.md 第 2 节为准：Next.js App Router + next-intl，营销页 SSG/ISR，部署在 Vercel；数据库存模板、生成任务、订单和积分流水，SEO 页面内容按 ARCHITECTURE §12 的固定结构静态生成。

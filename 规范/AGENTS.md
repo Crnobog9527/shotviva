@@ -22,7 +22,7 @@
 |---|---|
 | 框架 | Next.js 16 App Router + React 19 + TypeScript strict |
 | 渲染 | 营销页、模板页、标签页一律 SSG / ISR，源码可见正文（建站规格 R5） |
-| 多语言 | next-intl，英文不带前缀，v1 只开 en |
+| 多语言 | next-intl：英文 `en`（默认，不带前缀）+ 简体中文 `zh`（前缀 `/zh`），**v1 上线两种都要有**（Owner 2026-11-06），规则见 ARCHITECTURE §17 |
 | 样式和组件 | Tailwind CSS v4 + shadcn/ui（new-york）；Magic UI 可选，只在 impeccable 设计方向需要时引入 |
 | 数据库和登录 | Supabase（Postgres + Auth），所有表开 RLS |
 | 存储 | Cloudflare R2（S3 协议） |
@@ -150,7 +150,8 @@
 ## 9. 页面和 SEO
 
 - 按建站规格 R1~R12、G1~G13 和创作库规格 U1~U12 执行，不在这里重复。
-- 新建任何可收录页面前，先确认它在主词表 `seo资料/Shotviva 页面与主词映射（美国口径）.csv` 里（主词表以这份 CSV 为唯一来源）；不在表里的页面一律 `noindex` 或不建。
+- 新建任何可收录页面前，先确认它在对应语言的主词表里：英文页看 `seo资料/Shotviva 页面与主词映射（美国口径）.csv`，`/zh` 页看 `seo资料/Shotviva 页面与主词映射（中文口径）.csv`（T22 产出；每种语言以各自的 CSV 为唯一来源）；不在表里的页面一律 `noindex` 或不建。
+- **用户能看到的文字一律不写死在组件里**：界面文字走 next-intl 的 `site/messages/{en,zh}.json`，营销页 / 法律页正文按语言放在 `site/content/` 下；新增或修改界面文字的 PR 必须同时给出 en 和 zh（T21 合并后生效，ARCHITECTURE §17）。
 - SEO 页面内容按 ARCHITECTURE.md 第 12 节的固定结构写。
 - noindex 由全局配置统一控制，禁止逐页手写。
 
