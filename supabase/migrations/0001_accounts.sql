@@ -1,5 +1,8 @@
--- Owned by T1 (auth & account). T2 carries this copy until T1 merges; whichever
--- lands second rebases and keeps a single 0001_profiles.sql.
+-- Baseline (T15): accounts. One profile row per auth user, created by trigger.
+--   profiles.credits       paid credits (purchases, admin compensation); make paid works
+--   profiles.free_credits  signup / promo gifts; only make free works
+--   profiles.paid_until    membership period, display only; decides no entitlement
+-- Column order is part of the row type that functions return, so free_credits stays last.
 create table public.profiles (
   id uuid primary key references auth.users on delete cascade,
   role text not null default 'user' check (role in ('user', 'admin')),
@@ -7,7 +10,8 @@ create table public.profiles (
   paid_until timestamptz,
   signup_ip inet,
   banned_at timestamptz,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  free_credits integer not null default 0 check (free_credits >= 0)
 );
 
 alter table public.profiles enable row level security;
@@ -26,6 +30,8 @@ revoke insert, update, delete, truncate on public.profiles from anon, authentica
 grant select on public.profiles to authenticated, service_role;
 grant update (signup_ip) on public.profiles to service_role;
 
+-- The signup bonus is granted by the app (core/auth/free-credits.ts) through grant_credits,
+-- so the trigger only creates the empty row.
 create function public.handle_new_user()
 returns trigger
 language plpgsql

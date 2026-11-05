@@ -1,13 +1,59 @@
--- T14: generation settlement with two pools (ARCHITECTURE §4, §6.1, §6.2). Replaces
--- reserve_credits / refund_job from 0024 (same signatures; they now return credit_pool)
--- and adds set_job_visibility. confirm_job moves no credits and is unchanged.
+-- Baseline (T15): generation jobs and their settlement (ARCHITECTURE §4, §6.1, §6.2, §9).
+-- One row per generation; video will reuse the table. Reserve up front, then exactly one of
+-- confirm or refund. Every function is idempotent by job id.
+
+create table public.generation_jobs (
+  id uuid primary key,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  module text not null check (module in ('image', 'video')),
+  -- Restrict deletes: a template that has jobs is unpublished, never removed.
+  template_id text not null references public.templates (id) on delete restrict,
+  inputs jsonb not null default '{}'::jsonb,
+  provider text,
+  source text not null check (source in ('web', 'graylum')),
+  idempotency_key text,
+  status text not null default 'running' check (status in ('running', 'succeeded', 'failed')),
+  visibility text not null check (visibility in ('public', 'private')),
+  credits_cost integer not null check (credits_cost > 0),
+  output_key text,
+  error_code text,
+  created_at timestamptz not null default now(),
+  finished_at timestamptz,
+  -- Which pool paid for the work. It alone decides watermark, default visibility and
+  -- commercial use. Last column: the row type is what the job functions return.
+  credit_pool text not null check (credit_pool in ('free', 'paid')),
+  check ((status = 'running') = (finished_at is null)),
+  check (status <> 'succeeded' or output_key is not null),
+  -- A free work is always public.
+  constraint generation_jobs_free_work_public check (credit_pool = 'paid' or visibility = 'public')
+);
+
+-- Scoped per user so one partner's callId can never resolve to another user's job.
+create unique index generation_jobs_user_idempotency_key_idx
+  on public.generation_jobs (user_id, idempotency_key)
+  where idempotency_key is not null;
+
+create index generation_jobs_user_id_created_at_idx on public.generation_jobs (user_id, created_at desc);
+
+create index generation_jobs_template_id_idx on public.generation_jobs (template_id);
+
+alter table public.generation_jobs enable row level security;
+
+-- "My works" reads its own jobs; status changes only happen in the job functions.
+create policy "generation_jobs_select_own" on public.generation_jobs
+  for select to authenticated
+  using ((select auth.uid()) = user_id);
+
+-- Grants are explicit: newer Supabase stacks no longer grant table access by default.
+revoke all on public.generation_jobs from anon, authenticated;
+grant select on public.generation_jobs to authenticated, service_role;
 
 -- Paid pool first, then the free pool, whole order from one pool, never split:
 --   paid credits cover the cost -> charge paid, credit_pool 'paid', visibility p_visibility
 --                                  (default 'private')
 --   else free credits cover it  -> charge free, credit_pool 'free', visibility forced 'public'
 --   else                        -> CREDITS_INSUFFICIENT, nothing charged
-create or replace function public.reserve_credits(
+create function public.reserve_credits(
   p_job_id uuid,
   p_user_id uuid,
   p_module text,
@@ -89,8 +135,40 @@ begin
 end;
 $$;
 
+-- Moves no credits: the reserve already charged the pool.
+create function public.confirm_job(p_job_id uuid, p_output_key text)
+returns public.generation_jobs
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_job public.generation_jobs;
+begin
+  select * into v_job from public.generation_jobs where id = p_job_id for update;
+  if not found then
+    raise exception 'JOB_NOT_FOUND';
+  end if;
+  if v_job.status = 'succeeded' then
+    return v_job;
+  end if;
+  if v_job.status = 'failed' then
+    raise exception 'JOB_ALREADY_SETTLED';
+  end if;
+  if p_output_key is null or length(p_output_key) = 0 then
+    raise exception 'INVALID_INPUT' using detail = 'output_key is required';
+  end if;
+
+  update public.generation_jobs
+     set status = 'succeeded', output_key = p_output_key, finished_at = now()
+   where id = p_job_id
+  returning * into v_job;
+  return v_job;
+end;
+$$;
+
 -- Refunds go back to the pool the job was charged from.
-create or replace function public.refund_job(p_job_id uuid, p_error_code text)
+create function public.refund_job(p_job_id uuid, p_error_code text)
 returns public.generation_jobs
 language plpgsql
 security definer
@@ -163,5 +241,13 @@ begin
 end;
 $$;
 
+revoke execute on function public.reserve_credits(uuid, uuid, text, text, integer, text, jsonb, text, text, text)
+  from public, anon, authenticated;
+revoke execute on function public.confirm_job(uuid, text) from public, anon, authenticated;
+revoke execute on function public.refund_job(uuid, text) from public, anon, authenticated;
 revoke execute on function public.set_job_visibility(uuid, uuid, text) from public, anon, authenticated;
+grant execute on function public.reserve_credits(uuid, uuid, text, text, integer, text, jsonb, text, text, text)
+  to service_role;
+grant execute on function public.confirm_job(uuid, text) to service_role;
+grant execute on function public.refund_job(uuid, text) to service_role;
 grant execute on function public.set_job_visibility(uuid, uuid, text) to service_role;
