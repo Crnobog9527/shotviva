@@ -311,6 +311,14 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 桶 CORS 必须允许站点域名的 `PUT` 和 `Content-Type` 头。
 - 所有读取走 `core/storage` 的下载路由（鉴权 + 第 6.2 节的水印规则）或短期签名 GET；伙伴接口返回的签名地址 7 天有效。
 
+**模板封面另用一个公开桶**（Owner 2026-11-05：模板示例图由 Owner 在后台自己上传替换）：
+
+- 桶名 `shotviva-assets`（预览用 `shotviva-assets-preview`），只放模板封面前后图，前缀 `covers/{template_id}/before-{hash}.webp`、`after-{hash}.webp`；文件名带内容哈希，换图就是新文件，不用清缓存。
+- 公开读：生产绑定自定义域名 `assets.shotviva.com`（走 Cloudflare CDN）；预览可以用 R2 自带的开发地址。公开地址的前缀放环境变量 `NEXT_PUBLIC_ASSETS_BASE_URL`，`templates.cover_before_url` / `cover_after_url` 存完整地址。
+- 写入只走后台：后台模板编辑页「上传前图 / 上传后图」→ 服务端校验（JPEG / PNG / WebP，≤20MB）→ `sharp` 转 WebP（长边 1600、质量 82）→ 写公开桶 → 更新模板行。和用户照片一样，图片字节不经 API 路由请求体（第 8.1 节）：浏览器先直传到私有桶的 `uploads-admin/` 临时前缀（7 天过期），服务端再读出处理后写公开桶。
+- 用户照片和成品绝不进公开桶；公开桶里没有任何用户数据。
+- 换图后首页和模板页通过按需重新生成（ISR revalidate）立即更新，不用重新部署。
+
 会员到期后保留 90 天、续费恢复、删除前提醒，这些等有付费用户后再做。隐私政策 v1 写「上传的照片保留 7 天，成品保留到你删除为止」。
 
 ## 9. 公开创作库
