@@ -8,7 +8,7 @@ import { NOINDEX, pageMetadata, pageSitemapUrls } from '@/core/seo'
 
 import { site } from '../../site.config'
 import { pageGates } from '../index'
-import { footerLinks, legalPages } from './index'
+import { footerLinks, legalPages, termsPage } from './index'
 
 const PATHS = ['/terms', '/privacy', '/refund-policy', '/acceptable-use']
 
@@ -61,6 +61,16 @@ describe('legal pages (T19)', () => {
       expect(text).toContain(site.brand.address.street)
       expect(text).toContain(site.brand.contactEmail)
     }
+  })
+
+  // Owner 2026-11-05: free-credit display, likeness and IP responsibility must stand out.
+  it('gives the free-work, likeness and IP rules their own Terms section, cited by Indemnity', () => {
+    const section = (id: string) => JSON.stringify(termsPage.sections.find((s) => s.id === id)?.blocks)
+    const responsibility = section('responsibility')
+    expect(responsibility).toContain('This photo uses free credits')
+    expect(responsibility).toMatch(/parent or legal guardian/)
+    expect(responsibility).toMatch(/copyright, trademark or other intellectual property/)
+    expect(section('indemnity')).toContain('Free works, likeness and your responsibility')
   })
 
   // Pages read the entity from config; a literal would go stale when a site swaps site/.

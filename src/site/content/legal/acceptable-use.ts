@@ -29,7 +29,7 @@ export const acceptableUsePage = defineLegalPage({
         {
           list: [
             'Upload only photos you took yourself, or photos you have permission to use and edit.',
-            'If a photo shows a recognizable person, you must have their permission to upload and edit it. Do not upload photos of other people taken without their knowledge.',
+            'If a photo shows a recognizable person, you must have their permission to upload and edit it; for a person under 18, you need the permission of their parent or legal guardian. Do not upload photos of other people taken without their knowledge.',
             'Do not upload photos that show someone else’s logo, brand, artwork or other protected work unless you have the right to use it.',
             'Do not upload documents such as IDs, passports, bank cards or medical records.',
           ],

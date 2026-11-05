@@ -101,6 +101,20 @@ export const termsServiceSections: readonly [LegalSection, ...LegalSection[]] = 
     ],
   },
   {
+    id: 'responsibility',
+    heading: 'Free works, likeness and your responsibility',
+    blocks: [
+      'Please read this section carefully. It explains what you agree to when you use free credits, and who is responsible for the people and the material in your photos.',
+      {
+        list: [
+          'Public display is the condition of free credits. When you create an image with free credits, you agree that it is public and that we may show it publicly on the Service, together with its template name, for example in the public gallery and as an example of a template. This is the condition for using free credits. Before you create an image with free credits, the Service tells you so: "This photo uses free credits: it’s shown publicly with a watermark. Paid credits make it private and watermark-free." If you do not want an image shown publicly, create it with paid credits. You can still delete a free work at any time.',
+          'Photos of people. If a photo or reference image you upload shows a real person, you must have that person’s permission before you upload it, and for a person under 18, the permission of their parent or legal guardian. You alone are responsible for any claim that comes from creating an image from that photo or from showing the image publicly, including claims about a person’s likeness, image or right of publicity, privacy or reputation, and you will indemnify us for such claims as described in "Indemnity" below.',
+          'Intellectual property. If the material you provide (photos, reference images or text), or an image created from it, infringes someone else’s copyright, trademark or other intellectual property, the user who created that image is responsible for it and will indemnify us as described in "Indemnity" below. We may remove such images without notice, and we handle complaints about them as described in "Copyright complaints" below.',
+        ],
+      },
+    ],
+  },
+  {
     id: 'our-ip',
     heading: 'Templates and our intellectual property',
     blocks: [

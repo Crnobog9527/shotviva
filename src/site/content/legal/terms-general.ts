@@ -66,7 +66,9 @@ export const termsGeneralSections: readonly LegalSection[] = [
     id: 'indemnity',
     heading: 'Indemnity',
     blocks: [
-      `You agree to defend and indemnify ${entity.company} and its members, managers, employees and agents against any third-party claim, and the losses, damages and reasonable legal fees that come from it, arising from Your Content, your use of Outputs, or your breach of these Terms or of anyone’s rights. We will tell you about such a claim and may choose to take over its defense, in which case you agree to cooperate with us.`,
+      `You agree to defend and indemnify ${entity.company} and its members, managers, employees and agents against any third-party claim, and the losses, damages and reasonable legal fees that come from it, arising from Your Content, your use of Outputs, or your breach of these Terms or of anyone’s rights.`,
+      'This includes every claim described in "Free works, likeness and your responsibility" above: claims about the likeness, image, publicity, privacy or reputation of a person shown in a photo or reference image you uploaded, including claims caused by our public display of a free work made from it, and claims that material you provided, or an image created from it, infringes copyright, trademark or other intellectual property.',
+      'We will tell you about such a claim and may choose to take over its defense, in which case you agree to cooperate with us.',
     ],
   },
   {
