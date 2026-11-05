@@ -43,7 +43,7 @@ describe('POST /api/account/delete', () => {
     const storage = fakeStorage()
     const response = await handleDeleteAccount(request({ confirm: 'DELETE' }), storage)
     expect(response.status).toBe(200)
-    expect(storage.deletePrefix.mock.calls.map(([prefix]) => prefix)).toEqual(['inputs/u1/', 'outputs/u1/'])
+    expect(storage.deletePrefix.mock.calls.map(([prefix]) => prefix)).toEqual(['inputs/u1/', 'outputs/u1/', 'requests/u1/'])
     expect(mocks.deleteUser).toHaveBeenCalledWith('u1')
     expect(mocks.signOut).toHaveBeenCalledWith({ scope: 'local' })
   })

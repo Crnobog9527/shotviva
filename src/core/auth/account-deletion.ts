@@ -8,9 +8,10 @@ export type AuthAdmin = { deleteUser(userId: string): Promise<{ error: { message
 
 export type AccountDeletionDeps = { storage: AccountStorage; authAdmin: AuthAdmin }
 
-// Key layout fixed by ARCHITECTURE §8.2 / T4: inputs/{user_id}/…, outputs/{user_id}/….
+// Key layout fixed by ARCHITECTURE §8.2 / T4: inputs/{user_id}/…, outputs/{user_id}/…, plus
+// the wishlist's reference images requests/{user_id}/… (§15.1, T12).
 export function accountPrefixes(userId: string): string[] {
-  return [`inputs/${userId}/`, `outputs/${userId}/`]
+  return [`inputs/${userId}/`, `outputs/${userId}/`, `requests/${userId}/`]
 }
 
 // Files go first: if R2 fails the account still exists and the user can retry, whereas the

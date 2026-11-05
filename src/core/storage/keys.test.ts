@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { isOwnInputKey, newInputKey, outputKeyFor } from './keys'
+import { isOwnInputKey, newInputKey, newRequestImageKey, outputKeyFor } from './keys'
 
 const USER = '0b6f3f0e-5d1c-4c47-9a49-6a3f6f8d2e11'
 const OTHER = '7d1e2c3b-0000-4000-8000-000000000000'
@@ -10,6 +10,7 @@ describe('storage keys', () => {
     expect(newInputKey(USER, 'image/jpeg')).toMatch(new RegExp(`^inputs/${USER}/[0-9a-f-]{36}\\.jpg$`))
     expect(newInputKey(USER, 'image/webp')).toMatch(/\.webp$/)
     expect(outputKeyFor(USER, 'job-1')).toBe(`outputs/${USER}/job-1.png`)
+    expect(newRequestImageKey(USER)).toMatch(new RegExp(`^requests/${USER}/[0-9a-f-]{36}\\.jpg$`))
   })
 
   it('accepts only the caller’s own server-shaped input keys', () => {
