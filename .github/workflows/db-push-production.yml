@@ -37,9 +37,11 @@ jobs:
           ref-source: production environment variable SUPABASE_PRODUCTION_PROJECT_REF
       - name: History before
         run: supabase migration list --linked
+      # --include-all: cards own numbering ranges (TASKS), so a lower-numbered migration can
+      # merge after a higher one. Versions on the database but not in the repo still abort.
       - name: Pending migrations
-        run: supabase db push --dry-run
+        run: supabase db push --include-all --dry-run
       - name: Apply
-        run: supabase db push --yes
+        run: supabase db push --include-all --yes
       - name: Verify history matches the repo
         run: scripts/check-migration-drift.sh --linked
