@@ -6,10 +6,11 @@ import { site } from '@/site/site.config'
 
 import { WAFFO_STORE, orderCompleted, paymentId, refundSucceeded, signWaffo, waffoKeys } from '../fakes/waffo'
 import { connectAdmin, createUser, DAY_MS, ledgerOf, profileOf } from './helpers'
-import { serviceSupabase } from './supabase-env'
+import { anonSupabase, serviceSupabase } from './supabase-env'
 
 // AGENTS §7 test 2 (Waffo): duplicate and out-of-order events, bad signature → 400, credits
-// granted once. Real local Supabase (apply_purchase), real RSA signatures.
+// granted once, one payments row per order. Real local Supabase (settle_waffo_order), real RSA
+// signatures.
 
 let db: Client
 let deps: WaffoWebhookDeps
@@ -31,6 +32,14 @@ beforeEach(() => {
 })
 
 const daysFromNow = (date: Date | null) => ((date?.getTime() ?? 0) - Date.now()) / DAY_MS
+
+async function paymentsOf(userId: string) {
+  const { rows } = await db.query(
+    'select product_id, channel, waffo_order_id, stripe_session_id, amount_total, amount_tax, currency, method, status from public.payments where user_id = $1 order by id',
+    [userId],
+  )
+  return rows
+}
 
 function deliver(event: unknown, privateKey = keys.privateKey) {
   const body = JSON.stringify(event)
@@ -65,6 +74,20 @@ describe('order.completed', () => {
     expect(await ledgerOf(db, userId)).toEqual([
       { kind: 'purchase', pool: 'paid', delta: 50, idempotency_key: `purchase:${event.eventId}` },
     ])
+    // T10's payments row, written in the same transaction (channel waffo, Waffo order id).
+    expect(await paymentsOf(userId)).toEqual([
+      {
+        product_id: 'starter_monthly',
+        channel: 'waffo',
+        waffo_order_id: event.data.orderId,
+        stripe_session_id: null,
+        amount_total: 2149,
+        amount_tax: 159,
+        currency: 'usd',
+        method: 'card',
+        status: 'paid',
+      },
+    ])
   })
 
   it('a yearly membership is +365 days with the whole year’s credits', async () => {
@@ -95,6 +118,7 @@ describe('order.completed', () => {
     expect(outcomes).toEqual(['applied', 'replayed', 'replayed'])
     expect((await profileOf(db, userId)).credits).toBe(20)
     expect(await ledgerOf(db, userId)).toHaveLength(1)
+    expect(await paymentsOf(userId)).toHaveLength(1)
     expect(trackBuy).toHaveBeenCalledTimes(1)
   })
 
@@ -112,6 +136,32 @@ describe('order.completed', () => {
     expect(profile.credits).toBe(100)
     expect(daysFromNow(profile.paid_until)).toBeCloseTo(60, 2)
     expect(await ledgerOf(db, userId)).toHaveLength(2)
+    expect(await paymentsOf(userId)).toHaveLength(2)
+  })
+
+  it('a second payment row for the same Waffo order rolls its grant back (500), keeping one of each', async () => {
+    const userId = await createUser(db)
+    const first = orderCompleted({ userId, productId: 'pack_s' })
+    const twin = { ...orderCompleted({ userId, productId: 'pack_s' }), data: { ...first.data, paymentId: 'PAY_twin' } }
+    await deliver(first)
+    expect((await deliver(twin)).status).toBe(500)
+    expect((await profileOf(db, userId)).credits).toBe(20)
+    expect(await ledgerOf(db, userId)).toHaveLength(1)
+    expect(await paymentsOf(userId)).toHaveLength(1)
+  })
+
+  it('settle_waffo_order is service-role only, and payments stays unwritable directly', async () => {
+    const userId = await createUser(db)
+    const anon = await anonSupabase().rpc('settle_waffo_order', {
+      p_user_id: userId, p_product_id: 'pack_s', p_payment_id: 'PAY_anon', p_order_id: 'ORD_anon',
+      p_amount_total: 990, p_currency: 'usd', p_amount_tax: 0, p_method: 'card',
+    })
+    expect(anon.error).not.toBeNull()
+    const direct = await serviceSupabase().from('payments').insert({
+      user_id: userId, product_id: 'pack_s', channel: 'waffo', waffo_order_id: 'ORD_direct', amount_total: 990, currency: 'usd', method: 'card',
+    })
+    expect(direct.error?.message).toMatch(/permission denied/)
+    expect(await ledgerOf(db, userId)).toEqual([])
   })
 
   it('answers 500 for an order without our metadata, granting nothing to anyone', async () => {

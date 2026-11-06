@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { TEST_PRODUCTS } from '../stripe/test-products'
+import { chargedMethod, paymentFacts, readWaffoOrder, toCents } from './payment-facts'
 import { WAFFO_SIGNATURE_WINDOW_MS, handleWaffoWebhook, verifyWaffoEvent, type WaffoWebhookDeps } from './webhook'
 import { WAFFO_STORE, orderCompleted, refundSucceeded, signWaffo, waffoKeys } from '../../../../tests/fakes/waffo'
 
-// Signature and routing rules; the grant itself runs against real Supabase in
+// Signature and routing rules, and the arguments handed to settle_waffo_order; the grant itself runs against real Supabase in
 // tests/db/waffo-webhook.test.ts.
 
 const USER = '00000000-0000-4000-8000-000000000001'
@@ -82,7 +83,16 @@ describe('handleWaffoWebhook', () => {
   it('grants an order through apply_purchase keyed by the event id', async () => {
     const event = orderCompleted({ userId: USER, productId: 'pack_s', method: 'alipay' })
     expect(await deliver(event)).toEqual({ status: 200, body: { received: true, outcome: 'applied' } })
-    expect(rpc).toHaveBeenCalledWith('apply_purchase', { p_user_id: USER, p_product_id: 'pack_s', p_event_id: event.eventId })
+    expect(rpc).toHaveBeenCalledWith('settle_waffo_order', {
+      p_user_id: USER,
+      p_product_id: 'pack_s',
+      p_payment_id: event.eventId,
+      p_order_id: event.data.orderId,
+      p_amount_total: 2149,
+      p_currency: 'usd',
+      p_amount_tax: 159,
+      p_method: 'alipay',
+    })
     expect(deps.trackBuy).toHaveBeenCalledWith(USER, expect.objectContaining({ channel: 'waffo', form: 'one_time', method: 'alipay', amount_usd: 19.9 }))
   })
 
@@ -101,5 +111,26 @@ describe('handleWaffoWebhook', () => {
   it('answers 500 when the database fails, so the retry can grant', async () => {
     rpc.mockResolvedValueOnce({ data: null, error: { message: 'connection reset' } })
     expect((await deliver(orderCompleted({ userId: USER, productId: 'pack_s' }))).status).toBe(500)
+  })
+})
+
+describe('paymentFacts', () => {
+  const pack = TEST_PRODUCTS.find((p) => p.id === 'pack_s')!
+  const order = (data: Record<string, unknown>) => readWaffoOrder('PAY_1', { orderId: 'ORD_1', orderMetadata: { user_id: USER, product_id: 'pack_s' }, ...data })
+
+  it('records what Waffo charged, tax included, in cents', () => {
+    expect(paymentFacts(order({ chargedAmount: '10.79', currency: 'USD', listPrice: { total: '10.79', subtotal: '9.90', taxAmount: '0.89' } }), pack))
+      .toEqual({ orderId: 'ORD_1', amountTotal: 1079, amountTax: 89, currency: 'usd', method: 'card', subtotalUsd: 9.9 })
+  })
+
+  it('falls back to the list total, then to the site price, never refusing a paid order', () => {
+    expect(paymentFacts(order({ listPrice: { total: '9.9' } }), pack)).toMatchObject({ amountTotal: 990, amountTax: 0, subtotalUsd: 9.9 })
+    expect(paymentFacts(order({}), pack)).toMatchObject({ amountTotal: 990, amountTax: 0, currency: 'usd' })
+  })
+
+  it('reads the wallet from the brand: Alipay is alipay, cards and anything else are card', () => {
+    expect(chargedMethod({ paymentMethod: 'ewallet', paymentMethodBrand: 'alipayhk' })).toBe('alipay')
+    expect(chargedMethod({ paymentMethod: 'card', paymentMethodBrand: 'visa' })).toBe('card')
+    expect(toCents('1234.5')).toBe(123450)
   })
 })

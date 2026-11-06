@@ -11,7 +11,8 @@ export {
   type WaffoMode,
   type WaffoWebhookConfig,
 } from './config'
-export { chargedMethod, fulfilWaffoOrder, type WaffoFulfilDeps, type WaffoFulfilOutcome } from './fulfil'
+export { fulfilWaffoOrder, settleWaffoOrder, type WaffoFulfilDeps, type WaffoFulfilOutcome } from './fulfil'
+export { chargedMethod, paymentFacts, readWaffoOrder, toCents, type WaffoOrder, type WaffoPaymentFacts } from './payment-facts'
 export {
   WAFFO_SIGNATURE_WINDOW_MS,
   handleWaffoWebhook,
