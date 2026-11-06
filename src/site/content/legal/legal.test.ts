@@ -3,7 +3,7 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import type { LegalBlock, LegalLink, LegalPage } from '@/core/content'
+import type { LegalBlock, LegalLink, LegalPage, LegalSection } from '@/core/content'
 import { NOINDEX, pageMetadata, pageSitemapUrls } from '@/core/seo'
 
 import { site } from '../../site.config'
@@ -59,7 +59,8 @@ describe('legal pages (T19)', () => {
   // (legal.html, T45).
   it('ends every page with the entity contact details from site.config', () => {
     for (const page of legalPages) {
-      const contact = page.sections.filter((section) => !section.plain).at(-1)!
+      const sections: readonly LegalSection[] = page.sections
+      const contact = sections.filter((section) => !section.plain).at(-1)!
       expect(contact.id).toBe('contact')
       const text = JSON.stringify(contact.blocks)
       expect(text).toContain(site.brand.legalName)
