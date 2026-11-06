@@ -44,7 +44,7 @@ async function Account() {
   ])
   const purchases = paymentChoices(payments, site.billing.products, t as unknown as Translate, { money: formatMoney(locale) })
   const data = { email: user.email ?? null, balance, giftRefused, subscription, purchases, morePurchases: payments.length >= PICKER_LIMIT, helpUnread, graylum }
-  return <AccountView data={data} actions={actions} products={site.billing.products} returnToHosts={site.partners.graylum.returnToHosts} />
+  return <AccountView data={data} actions={actions} products={site.billing.products} />
 }
 
 export default function AccountPage() {

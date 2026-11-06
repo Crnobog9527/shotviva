@@ -1,8 +1,6 @@
 import { useTranslations } from 'next-intl'
-import { Suspense } from 'react'
 
 import type { Balance } from '../../billing'
-import { CheckoutNotice } from '../../billing/paywall'
 import { PlanCard, type SubscriptionSummary } from '../../billing/subscription'
 import type { SiteProduct } from '../../config'
 import { TabRootHeader } from '../../app-shell'
@@ -40,8 +38,6 @@ type Props = {
   data: AccountData
   actions: AccountActions
   products: readonly SiteProduct[]
-  // Graylum hosts the checkout notice may send a top-up buyer back to (site.config).
-  returnToHosts: readonly string[]
 }
 
 export function AccountHeader({ email }: { email?: string | null }) {
@@ -54,14 +50,11 @@ export function AccountHeader({ email }: { email?: string | null }) {
   return <TabRootHeader title={t('title')} aside={who} />
 }
 
-export function AccountView({ data, actions, products, returnToHosts }: Props) {
+export function AccountView({ data, actions, products }: Props) {
   const t = useTranslations('app.account')
   return (
     <>
       <AccountHeader email={data.email} />
-      <Suspense fallback={null}>
-        <CheckoutNotice returnToHosts={returnToHosts} />
-      </Suspense>
       <Group title={t('plan.title')}>
         <PlanCard summary={data.subscription} products={products} paid={data.balance.paid} manage={actions.manageSubscription} />
       </Group>

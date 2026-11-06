@@ -19,6 +19,7 @@ const creditBuys: CreditBuysBlock = {
 // 能为企业安排的事，不是现成功能（Owner 2026-11-06：还没有后台和代码），所以不写 SLA、单点登录、团队账号。
 const business: BusinessBlock = {
   heading: '企业合作',
+  tag: '按需定制',
   who: '适合品牌、电商卖家、餐饮连锁和代运营公司这类需要大批量出图的团队。告诉我们你需要什么，我们来为你安排：',
   items: [
     { title: '批量价格和发票付款', detail: '按每月出图量给更低的单张价，可签年度合同、按发票付款。' },
