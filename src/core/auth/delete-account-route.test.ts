@@ -34,7 +34,7 @@ function fakeStorage() {
 describe('POST /api/account/delete', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.getSessionUser.mockResolvedValue({ id: 'u1', email: null, role: 'user', emailVerified: true })
+    mocks.getSessionUser.mockResolvedValue({ id: 'u1', email: null, role: 'user', emailVerified: true, banned: false })
     mocks.deleteUser.mockResolvedValue({ error: null })
     mocks.signOut.mockResolvedValue({ error: null })
   })

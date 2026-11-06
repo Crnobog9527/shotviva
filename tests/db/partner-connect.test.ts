@@ -32,7 +32,7 @@ function post(fields: Record<string, string>, origin = APP) {
   return new NextRequest(`${APP}/connect/graylum/authorize`, { method: 'POST', headers: { origin }, body: form })
 }
 
-const sessionOf = (id: string, emailVerified = true): SessionUser => ({ id, email: null, role: 'user', emailVerified })
+const sessionOf = (id: string, emailVerified = true): SessionUser => ({ id, email: null, role: 'user', emailVerified, banned: false })
 const deps = (user: SessionUser | null) => ({ db: serviceSupabase, user: async () => user, config: partnerConfig })
 
 describe('connect authorize', () => {

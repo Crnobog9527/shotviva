@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server'
 
 import { errorResponse, jsonResponse } from '@/core/api-response'
-import { assertSameOrigin, requireApiUser } from '@/core/auth'
+import { assertSameOrigin, requireApiBuyer } from '@/core/auth'
 import {
   checkoutBodySchema,
   createCheckout,
@@ -15,12 +15,13 @@ import { appOrigin } from '@/core/site-url'
 import { site } from '@/site/site.config'
 
 // Starts a hosted checkout for one product and payment method; answers { url } to redirect to.
-// Signed-in, same-origin only. PAYMENT_CHANNEL picks Stripe (routing per payment method lives
+// Signed-in, same-origin, not banned (403, before the channel switch so it covers both
+// channels; ARCHITECTURE §7). PAYMENT_CHANNEL picks Stripe (routing per payment method lives
 // in core/billing/stripe) or Waffo (always one-time, ARCHITECTURE §6.3).
 export async function POST(request: NextRequest) {
   try {
     assertSameOrigin(request)
-    const user = await requireApiUser()
+    const user = await requireApiBuyer()
     const body = checkoutBodySchema.safeParse(await request.json().catch(() => null))
     if (!body.success) throw new AppError('INVALID_INPUT', 'product_id and method are required')
     const start = paymentChannel() === 'waffo' ? startWaffo : startStripe

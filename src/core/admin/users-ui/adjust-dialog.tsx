@@ -13,16 +13,26 @@ const COPY = USERS_COPY.actions
 
 export type AdjustInput = { pool: 'free' | 'paid'; amount: number; reason: string; idempotencyKey: string }
 
-type Props = { pending: boolean; error: string | null; onCancel: () => void; onConfirm: (input: AdjustInput) => void }
+export type PoolBalances = { free: number; paid: number }
 
-// One idempotency key per opened dialog: a double click is still one adjustment.
-export function AdjustDialog({ pending, error, onCancel, onConfirm }: Props) {
+type Props = {
+  balances: PoolBalances
+  pending: boolean
+  error: string | null
+  onCancel: () => void
+  onConfirm: (input: AdjustInput) => void
+}
+
+// One idempotency key per opened dialog: a double click is still one adjustment. The preview
+// shows the pool after the change (borrowed from Graylum's admin) so a typo is caught here.
+export function AdjustDialog({ balances, pending, error, onCancel, onConfirm }: Props) {
   const [key] = useState(() => crypto.randomUUID())
   const [pool, setPool] = useState<'free' | 'paid'>('free')
   const [amount, setAmount] = useState('')
   const [reason, setReason] = useState('')
   const value = Number(amount)
-  const valid = Number.isInteger(value) && value !== 0 && reason.trim().length > 0
+  const after = balances[pool] + (Number.isInteger(value) ? value : 0)
+  const valid = Number.isInteger(value) && value !== 0 && reason.trim().length > 0 && after >= 0
   return (
     <Dialog open onOpenChange={(open) => !open && onCancel()}>
       <DialogContent>
@@ -42,6 +52,9 @@ export function AdjustDialog({ pending, error, onCancel, onConfirm }: Props) {
             <span className="font-medium">{COPY.amount}</span>
             <Input type="number" step={1} inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} />
           </label>
+          <p className={after < 0 ? 'text-destructive' : 'text-muted-foreground'}>
+            {COPY.preview(balances[pool], after)}
+          </p>
           <label className="grid gap-1">
             <span className="font-medium">{COPY.reason}</span>
             <Textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />

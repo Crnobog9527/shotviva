@@ -4,17 +4,18 @@ import { Badge } from '@/core/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/core/ui/table'
 
 import { EmptyState } from '../shell/admin-blocks'
+import { JobActions, type JobSupportActions } from '../support-ui'
 import { formatBeijing } from '../shell/format'
 import { JOBS_COPY as COPY } from './copy'
 import type { AdminJob } from './repository'
 
-const COLUMNS = ['createdAt', 'user', 'template', 'status', 'model', 'resolution', 'credits', 'source', 'duration', 'error'] as const
+const COLUMNS = ['createdAt', 'user', 'template', 'status', 'model', 'resolution', 'credits', 'source', 'duration', 'error', 'actions'] as const
 
 const seconds = (ms: number | null) => (ms === null ? '' : `${(ms / 1000).toFixed(1)}s`)
 
 const statusVariant = { running: 'secondary', succeeded: 'default', failed: 'destructive' } as const
 
-export function JobsTable({ jobs }: { jobs: AdminJob[] }) {
+export function JobsTable({ jobs, actions }: { jobs: AdminJob[]; actions: JobSupportActions }) {
   if (jobs.length === 0) return <EmptyState title={COPY.empty} />
   return (
     <Table>
@@ -46,6 +47,9 @@ export function JobsTable({ jobs }: { jobs: AdminJob[] }) {
             <TableCell className="text-xs">{COPY.sources[job.source]}</TableCell>
             <TableCell className="font-mono text-xs">{seconds(job.durationMs)}</TableCell>
             <TableCell className="font-mono text-xs text-destructive">{job.errorCode ?? ''}</TableCell>
+            <TableCell>
+              <JobActions job={job} actions={actions} />
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>
