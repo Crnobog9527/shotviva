@@ -17,6 +17,8 @@ export const EDIT_TEMPLATE_COPY = {
   classifier: '判断指令',
   classifierHint: '模型按 JSON 返回 scope（object / background / style / subject / global）、confidence、keep（最多 8 个英文短语）、change（一句英文）。指令里请说明每种范围的意思。',
   constraints: '约束段落（可以留空，留空就不加）',
+  reframe: '换尺寸时的段落（可以留空）',
+  reframeHint: '用户编辑时选了和原作品不同的尺寸，就把这段加在用户原话后面，例如「把画面延展到新画幅，主体位置和大小不变」。',
   save: '保存',
   saved: '已保存',
   version: (v: number) => `当前 v${v}`,

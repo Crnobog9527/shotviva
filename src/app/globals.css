@@ -42,6 +42,8 @@
   --wash-strong: rgba(242, 236, 227, 0.08);  /* progress tracks, close disc */
   --grab: rgba(242, 236, 227, 0.24);         /* sheet grab bar */
   --glyph: rgba(242, 236, 227, 0.5);         /* size-tile ratio glyphs */
+  --hatch: rgba(242, 236, 227, 0.03);        /* empty photo slots: diagonal stripes */
+  --recess-edge: rgba(242, 236, 227, 0.12);  /* edge of a hatched slot */
 
   /* Safelight tints (selected choices, focus halo) and the success tint. */
   --safelight-wash: rgba(255, 91, 46, 0.12);
@@ -338,20 +340,50 @@ html:lang(zh-Hans) :is(em, i, .italic) {
   padding-top: var(--sat);
 }
 
-/* Developing: the colour print is revealed above the safelight line; both read one registered
-   --left so they cannot drift apart. Held at 62% under reduced motion. */
-@property --left {
+/* Developing (B comp workspace.html / photo.html, round 14): the way a print comes up in the
+   developer. The photo starts as a dim negative; a blurred print fades over it; then the sharp
+   print clears from the top down through a soft edge (a mask on a registered --p, not a line).
+   8s loop while the photo develops. Under reduced motion it holds still: blur over the negative,
+   the sharp print faint on top. */
+@property --p {
   syntax: "<percentage>";
-  inherits: true;
-  initial-value: 62%;
+  inherits: false;
+  initial-value: -30%;
 }
-@keyframes sv-develop {
-  from { --left: 78%; }
-  to { --left: 46%; }
+@keyframes sv-dev-blur {
+  0% { opacity: 0; }
+  18%, 100% { opacity: 1; }
 }
-@utility animate-develop {
+@keyframes sv-dev-neg {
+  0%, 22% { opacity: 1; }
+  40%, 100% { opacity: 0; }
+}
+@keyframes sv-dev-clear {
+  0%, 22% { --p: -30%; }
+  92%, 100% { --p: 140%; }
+}
+@utility dev-neg {
+  filter: grayscale(1) contrast(.85) brightness(.7);
   @media (prefers-reduced-motion: no-preference) {
-    animation: sv-develop 7s var(--ease) infinite alternate;
+    animation: sv-dev-neg 8s var(--ease) infinite;
+  }
+}
+@utility dev-blur {
+  filter: blur(22px) saturate(.85);
+  transform: scale(1.08);
+  @media (prefers-reduced-motion: no-preference) {
+    opacity: 0;
+    animation: sv-dev-blur 8s var(--ease) infinite;
+  }
+}
+@utility dev-clear {
+  @media (prefers-reduced-motion: no-preference) {
+    -webkit-mask-image: linear-gradient(180deg, #000 calc(var(--p) - 28%), rgba(0, 0, 0, .55) calc(var(--p) - 10%), transparent var(--p));
+    mask-image: linear-gradient(180deg, #000 calc(var(--p) - 28%), rgba(0, 0, 0, .55) calc(var(--p) - 10%), transparent var(--p));
+    animation: sv-dev-clear 8s cubic-bezier(.3, 0, .2, 1) infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    opacity: .35;
   }
 }
 

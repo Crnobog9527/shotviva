@@ -60,7 +60,7 @@ describe('copy with the catalog in site.config', () => {
 describe('how long a photo takes', () => {
   it('says "about N seconds" everywhere, with N from site.config', () => {
     const n = String(site.marketing.photoSecondsApprox)
-    const hints = [en, zh].flatMap((m) => [m.app.workspace.leave, m.app.workspace.batchLeave, m.app.photos.usually, m.app.photos.empty])
+    const hints = [en, zh].flatMap((m) => [m.app.workspace.leave, m.app.workspace.batch.leave, m.app.photos.usually, m.app.photos.empty])
     for (const hint of hints) {
       expect(hint).toContain(n)
       expect(hint).not.toMatch(/\d\s*[–-]\s*\d|Standard|HD|Max|标准|高清|超清/)

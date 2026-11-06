@@ -38,7 +38,8 @@ export function ImageWorkspace({ shareText, ...input }: WorkspaceProps) {
     setWorkspaceJobs(template.id, [])
   }
 
-  if (jobIds.length > 1) return <Settled><BatchProgressView ids={jobIds} onRetry={retry} onMakeMore={() => backToForm(true)} /></Settled>
+  if (jobIds.length > 1) return <BatchProgressView ids={jobIds} limit={concurrency.limit} onRetry={retry} onMakeMore={() => backToForm(true)} />
+  if (single && (single.status === 'queued' || single.status === 'running')) return <GeneratingView job={single} />
   if (single) return <Settled><SingleJobView job={single} shareText={shareText} onRetry={() => retry(single.id)} onBack={backToForm} /></Settled>
   return (
     <div className="lg:grid lg:grid-cols-[minmax(380px,440px)_minmax(0,1fr)] lg:items-start lg:gap-x-12 lg:px-(--gutter)">
@@ -49,6 +50,7 @@ export function ImageWorkspace({ shareText, ...input }: WorkspaceProps) {
           resolution={draft.values.resolution}
           batch={draft.photos.batchMax > 1}
           addFirst={draft.missingPhoto ? template.creditsCost[draft.values.resolution] : null}
+          limit={concurrency.limit}
           onGenerate={generate}
         />
       </div>
@@ -57,16 +59,16 @@ export function ImageWorkspace({ shareText, ...input }: WorkspaceProps) {
   )
 }
 
-// Developing, done and failed keep their phone column, centred on wider screens.
+// Done and failed keep their phone column, centred on wider screens; developing (one photo or a
+// batch) uses the page's two columns with the tray.
 function Settled({ children }: { children: ReactNode }) {
   return <div className="md:mx-auto md:max-w-[720px]">{children}</div>
 }
 
 type SingleProps = { job: TrackedJob; shareText: string; onRetry(): void; onBack(clearPhotos: boolean): void }
 
-// One photo: developing (or waiting for a slot), then done or failed (DESIGN §4.4).
+// One photo, settled: done or failed (DESIGN §4.4).
 function SingleJobView({ job, shareText, onRetry, onBack }: SingleProps) {
   if (job.status === 'succeeded') return <SuccessView job={job} shareText={shareText} onAgain={() => onBack(false)} />
-  if (job.status === 'failed') return <FailureView job={job} onRetry={onRetry} onNewPhoto={() => onBack(true)} />
-  return <GeneratingView job={job} />
+  return <FailureView job={job} onRetry={onRetry} onNewPhoto={() => onBack(true)} />
 }

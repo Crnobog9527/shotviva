@@ -63,7 +63,11 @@ async function prepare(deps: EditDeps, req: EditRequest) {
   const limits = await accountLimits(deps.db, req.userId)
   await assertWithinRateLimit(deps.db, req.userId, deps.now?.() ?? new Date(), limits, { jobId: req.jobId })
   const image = await loadOutputImage(deps.store, source.outputKey)
-  return { instruction: instruction.data, source, template, prompt, params: params.data, image }
+  // The size asked for (T47: the panel offers the eight), else the work's own; another size
+  // than the work's ends the prompt with the reframe paragraph.
+  const aspect = req.aspect ?? sourceAspect(source)
+  const reframed = aspect !== sourceAspect(source)
+  return { instruction: instruction.data, source, template, prompt, params: params.data, image, aspect, reframed }
 }
 
 type Prepared = Awaited<ReturnType<typeof prepare>>
@@ -78,7 +82,7 @@ function jobInputs(p: Prepared, decision: EditClassification, resolution: Resolu
     confidence: decision.confidence,
     keep: decision.keep,
     change: decision.change,
-    aspect_ratio: sourceAspect(p.source),
+    aspect_ratio: p.aspect,
     resolution,
     input_key: null,
     prompt_version: p.prompt.version,
@@ -123,9 +127,9 @@ export async function runEdit(deps: EditDeps, req: EditRequest): Promise<JobView
   if (job.inputs.attempt_id !== attemptId) return toJobView(job)
 
   const call = {
-    prompt: composeEditPrompt(prepared.prompt.body, prepared.params, decision.scope, prepared.instruction, decision.keep),
+    prompt: composeEditPrompt(prepared.prompt.body, prepared.params, decision.scope, prepared.instruction, decision.keep, prepared.reframed),
     images: [prepared.image],
-    aspectRatio: sourceAspect(prepared.source),
+    aspectRatio: prepared.aspect,
     resolution,
     quality: prepared.template.quality,
     params: prepared.params.input_fidelity ? { input_fidelity: prepared.params.input_fidelity } : {},

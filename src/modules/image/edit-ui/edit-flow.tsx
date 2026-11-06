@@ -29,7 +29,7 @@ export function EditFlow({ source, balance, creditsCost, concurrency, children }
   const t = useTranslations('app.edit')
   const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [draft, setDraft] = useState<EditDraft>({ text: '', resolution: source.resolution })
+  const [draft, setDraft] = useState<EditDraft>({ text: '', resolution: source.resolution, aspect: source.aspect })
   const [jobId, setJobId] = useState<string | null>(null)
   const job = useJob(jobId)
 
@@ -44,11 +44,11 @@ export function EditFlow({ source, balance, creditsCost, concurrency, children }
         templateId: EDIT_TEMPLATE_ID,
         templateName: t('titleEdited', { name: source.name }),
         resolution: next.resolution,
-        aspect: source.aspect,
+        aspect: next.aspect,
         credits: creditsCost[next.resolution],
         inputKey: null,
         previewUrl: source.fileUrl,
-        body: { source_job_id: source.id, instruction: next.text, resolution: next.resolution },
+        body: { source_job_id: source.id, instruction: next.text, resolution: next.resolution, aspect_ratio: next.aspect },
       },
       concurrency,
     )

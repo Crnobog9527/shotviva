@@ -25,20 +25,30 @@ export const TEST_EDIT_PARAMS = {
     global: 'C-GLOBAL',
     fallback: 'C-FALLBACK',
   },
+  reframe: 'C-REFRAME',
 }
 export const TEST_WRAPPER = 'WRAPPER-EDIT'
 
 type Saved = { isActive: boolean; body: string; params: unknown }
 
 // Publishes the seeded `edit` template with the markers above; restore() puts the seed back.
+// Test files run in parallel and more than one publishes the built-in edit template; one file's
+// restore would unpublish it under another mid-run. A session advisory lock held on the file's
+// own connection from publish to restore runs those files one after another.
+const EDIT_TEMPLATE_LOCK = 4_710_047
+
 export async function publishEditTemplate(db: Client): Promise<() => Promise<void>> {
+  await db.query('select pg_advisory_lock($1)', [EDIT_TEMPLATE_LOCK])
   const { rows } = await db.query<{ is_active: boolean; body: string; model_params: unknown }>(
     `select t.is_active, p.body, p.model_params from public.templates t
        join public.template_prompts p on p.template_id = t.id where t.id = 'edit'`,
   )
   const saved: Saved = { isActive: rows[0]!.is_active, body: rows[0]!.body, params: rows[0]!.model_params }
   await setEditTemplate(db, true, TEST_WRAPPER, TEST_EDIT_PARAMS)
-  return () => setEditTemplate(db, saved.isActive, saved.body, saved.params)
+  return async () => {
+    await setEditTemplate(db, saved.isActive, saved.body, saved.params)
+    await db.query('select pg_advisory_unlock($1)', [EDIT_TEMPLATE_LOCK])
+  }
 }
 
 export async function setEditTemplate(db: Client, active: boolean, body: string, params: unknown) {
@@ -89,7 +99,7 @@ export async function editSetup(db: Client, templateId: string, { classifier = {
     classifierTimeoutMs: 50,
     track,
   }
-  const edit = (instruction = 'Put it on a beach', extra: { jobId?: string; resolution?: '2k' } = {}) =>
+  const edit = (instruction = 'Put it on a beach', extra: { jobId?: string; resolution?: '2k'; aspect?: '16:9' | '4:5' } = {}) =>
     runEdit(deps, { userId, sourceJobId: sourceId, instruction, ...extra })
   return { userId, sourceId, r2, fake, decision, deps, track, edit }
 }
