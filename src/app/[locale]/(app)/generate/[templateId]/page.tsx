@@ -6,8 +6,9 @@ import { Suspense, type ReactNode } from 'react'
 import { AppPage, BalanceChip, FlowNav } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
 import { currentTier, limitsFor, readBalance } from '@/core/billing'
+import { currentLocale } from '@/core/i18n/server'
 import { listOwnJobs } from '@/core/jobs'
-import { listTemplates } from '@/core/templates'
+import { listTemplatesIn } from '@/core/templates'
 import { ImageWorkspace, toCatalogueTemplate, WorkspaceHead } from '@/modules/image'
 import { site } from '@/site/site.config'
 
@@ -21,7 +22,7 @@ async function Workspace({ params }: { params: Promise<{ templateId: string }> }
   const { templateId } = await params
   const user = await requireUser(`/generate/${templateId}`)
   const supabase = await createServerSupabase()
-  const found = (await listTemplates(supabase, 'web')).find((template) => template.id === templateId)
+  const found = (await listTemplatesIn(supabase, await currentLocale())).find((template) => template.id === templateId)
   if (!found) notFound()
   const [balance, tier, own] = await Promise.all([
     readBalance(supabase, user.id),

@@ -6,9 +6,11 @@ export type CatalogueTemplate = {
   id: string
   name: string
   category: string
+  // The translated one-liner (templates.translations), when the page's language has one.
+  description: string | null
   creditsCost: CreditsCost
   // Text the template asks for (a headline, a price); most templates have none (DESIGN §4.3).
-  copyFields: { key: string; label: string; required: boolean; maxLength: number }[]
+  copyFields: { key: string; label: string; placeholder?: string; required: boolean; maxLength: number }[]
   cover: {
     type: CoverMediaType
     before: string | null
@@ -19,13 +21,21 @@ export type CatalogueTemplate = {
   }
 }
 
-export function toCatalogueTemplate(template: Template): CatalogueTemplate {
+// Pass a template already through localizeTemplate (core/templates) for the page's language.
+export function toCatalogueTemplate(template: Template & { description?: string | null }): CatalogueTemplate {
   return {
     id: template.id,
     name: template.name,
     category: template.category,
+    description: template.description ?? null,
     creditsCost: template.creditsCost,
-    copyFields: template.fields.copy.map(({ key, label, required, maxLength }) => ({ key, label, required, maxLength })),
+    copyFields: template.fields.copy.map(({ key, label, placeholder, required, maxLength }) => ({
+      key,
+      label,
+      ...(placeholder ? { placeholder } : {}),
+      required,
+      maxLength,
+    })),
     cover: {
       type: template.coverMediaType,
       before: template.coverBeforeUrl,

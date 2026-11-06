@@ -6,7 +6,8 @@ import { Suspense, type ReactNode } from 'react'
 import { AppPage, BalanceChip, TabRootHeader } from '@/core/app-shell'
 import { createServerSupabase, requireUser } from '@/core/auth'
 import { readBalance } from '@/core/billing'
-import { listTemplates } from '@/core/templates'
+import { currentLocale } from '@/core/i18n/server'
+import { listTemplatesIn } from '@/core/templates'
 import { GeneratingPill, TemplateCatalogue, toCatalogueTemplate } from '@/modules/image'
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -22,7 +23,7 @@ function Header({ aside }: { aside?: ReactNode }) {
 async function Create() {
   const user = await requireUser('/generate')
   const supabase = await createServerSupabase()
-  const [templates, balance] = await Promise.all([listTemplates(supabase, 'web'), readBalance(supabase, user.id)])
+  const [templates, balance] = await Promise.all([listTemplatesIn(supabase, await currentLocale()), readBalance(supabase, user.id)])
   return (
     <>
       <Header

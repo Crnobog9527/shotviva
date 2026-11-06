@@ -147,6 +147,14 @@
       "hintMotion": "Your photo plays the same change as this short loop.",
       "use": "Use this template"
     },
+    "categories": {
+      "Art Styles": "Art Styles",
+      "Food & Drink": "Food & Drink",
+      "Products & Resale": "Products & Resale",
+      "Beauty & Skincare": "Beauty & Skincare",
+      "Rooms & Spaces": "Rooms & Spaces",
+      "Pets": "Pets"
+    },
     "tiers": {
       "1k": {
         "name": "Standard",
