@@ -19,6 +19,7 @@ const template: AdminTemplate = {
   id: 'burger-hero',
   module: 'image',
   name: 'Burger hero',
+  description: 'Stacked burger, studio light',
   category: 'burgers',
   coverBeforeUrl: null,
   coverAfterUrl: null,
@@ -46,6 +47,7 @@ describe('template form state', () => {
         isNew: false,
         template: expect.objectContaining({
           id: 'burger-hero',
+          description: 'Stacked burger, studio light',
           visibleIn: ['web', 'partner'],
           quality: 'high',
           creditsCost: { '1k': 3, '2k': 4, '3k': 6 },
@@ -99,5 +101,14 @@ describe('Chinese text in the editor (templates.translations)', () => {
     }
     expect(toTranslations(zh, ['headline', 'price'])).toEqual({ zh: { name: '促销海报', fields: { headline: { label: '标题' } } } })
     expect(toTranslations({ name: '', description: '', fields: {} }, ['headline'])).toEqual({})
+  })
+})
+
+describe('the English description (T52)', () => {
+  it('starts blank and is always sent, so clearing it clears the stored text', () => {
+    expect(emptyFormValues().description).toBe('')
+    expect(toFormValues({ ...template, description: null }).description).toBe('')
+    const cleared = buildPayload({ ...toFormValues(template), description: '' }, false, FLOOR)
+    expect(cleared).toMatchObject({ ok: true, payload: { template: { description: '' } } })
   })
 })

@@ -53,6 +53,9 @@ const optionalText = (max: number) =>
     .optional()
     .transform((text) => text || undefined)
 
+// templates.description (T52, ARCHITECTURE §5), also the table check.
+export const TEMPLATE_DESCRIPTION_MAX = 160
+
 // templates.translations (ARCHITECTURE §5): display text per extra language, English stays in
 // `name` / `fields`. Keys are the enabled languages only (the table check says the same).
 export const templateTranslationSchema = z.object({
@@ -78,6 +81,15 @@ export const templateInputSchema = z.object({
   id: slug.max(64),
   module: z.enum(TEMPLATE_MODULES).default('image'),
   name: z.string().trim().min(1).max(120),
+  // English one-liner (T52). The editor always sends it (blank clears it, to null); the prompt
+  // import script sends none, so a re-import keeps it.
+  description: z
+    .string()
+    .trim()
+    .max(TEMPLATE_DESCRIPTION_MAX)
+    .nullable()
+    .optional()
+    .transform((text) => (text === undefined ? undefined : text || null)),
   category: z.string().trim().min(1).max(60),
   coverBeforeUrl: optionalUrl,
   coverAfterUrl: optionalUrl,

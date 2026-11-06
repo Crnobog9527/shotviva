@@ -17,7 +17,7 @@ export type {
   TemplateTranslation,
   TemplateTranslations,
 } from './schema'
-export { templateTranslationsSchema } from './schema'
+export { TEMPLATE_DESCRIPTION_MAX, templateTranslationsSchema } from './schema'
 export { localizeTemplate, type LocalizedTemplate } from './localize'
 export {
   DEFAULT_RESOLUTION,

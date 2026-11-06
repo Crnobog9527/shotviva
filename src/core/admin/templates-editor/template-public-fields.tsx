@@ -5,7 +5,9 @@ import { Input } from '@/core/ui/input'
 import { Label } from '@/core/ui/label'
 import { Textarea } from '@/core/ui/textarea'
 import type { CreditsFloor } from '@/core/templates/pricing'
+import { TEMPLATE_DESCRIPTION_MAX } from '@/core/templates/schema'
 
+import { publicCopy } from './copy'
 import type { TemplateFormValues } from './form-state'
 import { TemplatePriceFields } from './template-price-fields'
 
@@ -36,6 +38,22 @@ function TextField(props: {
   )
 }
 
+// templates.description (T52): the English one-liner, under the English name, with a counter.
+function DescriptionField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <div className="grid gap-1.5">
+      <div className="flex items-baseline justify-between gap-3">
+        <Label htmlFor="tpl-description">{publicCopy.description}</Label>
+        <span className="text-muted-foreground font-mono text-xs" aria-live="polite">
+          {value.length} / {TEMPLATE_DESCRIPTION_MAX}
+        </span>
+      </div>
+      <Input id="tpl-description" value={value} maxLength={TEMPLATE_DESCRIPTION_MAX} onChange={(event) => onChange(event.target.value)} />
+      <p className="text-muted-foreground text-xs">{publicCopy.descriptionHint}</p>
+    </div>
+  )
+}
+
 export function TemplatePublicFields({ values, isNew, floor, onChange }: Props) {
   return (
     <fieldset className="grid gap-3">
@@ -43,10 +61,11 @@ export function TemplatePublicFields({ values, isNew, floor, onChange }: Props) 
       <div className="grid grid-cols-2 gap-3">
         <TextField id="id" label="ID（小写字母、数字、短横线，创建后不可改）" value={values.id}
           disabled={!isNew} onChange={(id) => onChange({ id })} />
-        <TextField id="name" label="名称" value={values.name} onChange={(name) => onChange({ name })} />
+        <TextField id="name" label={publicCopy.name} value={values.name} onChange={(name) => onChange({ name })} />
         <TextField id="category" label="分类" value={values.category}
           onChange={(category) => onChange({ category })} />
       </div>
+      <DescriptionField value={values.description} onChange={(description) => onChange({ description })} />
       <TemplatePriceFields values={values} floor={floor} onChange={onChange} />
       <div className="flex items-center gap-6 text-sm">
         <span>展示入口</span>
