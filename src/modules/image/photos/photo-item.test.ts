@@ -23,6 +23,7 @@ const job: Job = {
   errorCode: null,
   createdAt: new Date('2026-11-05T09:00:00Z'),
   finishedAt: null,
+  deletedAt: null,
 }
 
 describe('photo items', () => {

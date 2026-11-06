@@ -138,6 +138,7 @@ export async function listWorkOptions(client: SupabaseClient, userId: string): P
     .select('id, template_id, created_at, templates(name)')
     .eq('user_id', userId)
     .eq('status', 'succeeded')
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .limit(PICKER_LIMIT)
   if (error) readFailed('listWorkOptions', error)

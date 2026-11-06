@@ -22,6 +22,7 @@ const base: Job = {
   errorCode: null,
   createdAt: new Date('2026-11-06T10:00:00Z'),
   finishedAt: new Date('2026-11-06T10:00:30Z'),
+  deletedAt: null,
 }
 const edit: Job = { ...base, id: 'e1', templateId: 'edit', parentJobId: 'src', inputs: { ...base.inputs, instruction: 'Put it on a café chair' } }
 const templates = new Map([['pure-white', { name: 'Pure White', cover: null }]])

@@ -3,6 +3,7 @@ import 'server-only'
 import { z } from 'zod'
 
 import { AppError } from '../errors'
+import { logger } from '../logger'
 import { copyBackKeptInputs, inputPreviewKeyFor, type ObjectStore } from '../storage'
 import { EDIT_TEMPLATE_ID } from '../templates/edit-params'
 import type { Job } from './job-schema'
@@ -41,6 +42,11 @@ export function workFileKeys(job: Pick<Job, 'id' | 'userId' | 'outputKey' | 'inp
   return [...(job.outputKey ? [job.outputKey] : []), inputPreviewKeyFor(job.userId, job.id), ...keptInputsOf(job)]
 }
 
-export async function deleteWorkFiles(store: ObjectStore, job: Pick<Job, 'id' | 'userId' | 'outputKey' | 'inputs'>): Promise<void> {
-  for (const key of workFileKeys(job)) await store.delete(key)
+// Best effort: every key is tried; a failure is logged and counted, never thrown, because the
+// work is already deleted in the database by then (T41). Returns how many could not be deleted.
+export async function deleteWorkFiles(store: ObjectStore, job: Pick<Job, 'id' | 'userId' | 'outputKey' | 'inputs'>): Promise<number> {
+  const results = await Promise.allSettled(workFileKeys(job).map((key) => store.delete(key)))
+  const failed = results.filter((result) => result.status === 'rejected')
+  if (failed.length > 0) logger.error('work files not deleted', { jobId: job.id, failed: failed.length, error: failed[0]?.reason })
+  return failed.length
 }

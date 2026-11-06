@@ -342,7 +342,9 @@
       "doneMeta": "{when} · {size} · {tier}",
       "runningMeta": "{size} · {tier} · {count} 积分",
       "waiting": "排队中，等空位",
-      "makeAgain": "再做一张"
+      "makeAgain": "再做一张",
+      "deleted": "已删除这张作品。",
+      "deletedClose": "关闭"
     },
     "work": {
       "freePublic": "公开 · 带水印",
@@ -397,6 +399,16 @@
         "originalEdited": "你改的那张照片",
         "originalDeleted": "早于原图保留功能",
         "made": "生成时间"
+      },
+      "delete": {
+        "open": "删除",
+        "title": "删除这张作品？",
+        "body": "删除后无法恢复，花掉的积分不退。",
+        "confirm": "删除作品",
+        "deleting": "正在删除…",
+        "cancel": "取消",
+        "running": "这张还在生成中，生成完再删除。",
+        "failed": "没能删除这张作品，请稍后再试。"
       }
     },
     "wishlist": {
@@ -612,7 +624,8 @@
       "changeRequest": "改一下要求",
       "titleEdited": "{name}（修改版）",
       "yourChange": "你的修改",
-      "editedFromLabel": "修改自"
+      "editedFromLabel": "修改自",
+      "sourceDeleted": "原作品已删除"
     }
   },
   "paywall": {

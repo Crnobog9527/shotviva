@@ -15,6 +15,7 @@ export const JOBS_COPY = {
     dates: '日期按北京时间',
   },
   status: { running: '进行中', succeeded: '成功', failed: '失败' },
+  deletedByUser: '用户已删除',
   sources: { web: '网站', graylum: 'Graylum' },
   pools: { free: '免费', paid: '付费' },
   columns: {

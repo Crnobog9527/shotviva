@@ -30,6 +30,7 @@ export const SUPPORT_COPY = {
     inputExpired: '已过期：这是原图随作品保留之前的老作品，上传的原图 7 天后已自动删除。',
     noInput: '这一单没有上传图片。',
     noOutput: '这一单没有成品。',
+    deleted: '已删除：用户删除了这张作品，文件已一并删除。',
     close: '关闭',
   },
   pools: { free: '免费', paid: '付费' },

@@ -342,7 +342,9 @@
       "doneMeta": "{when} · {size} · {tier}",
       "runningMeta": "{size} · {tier} · {count, plural, one {# credit} other {# credits}}",
       "waiting": "Waiting for a free slot",
-      "makeAgain": "Make again"
+      "makeAgain": "Make again",
+      "deleted": "Photo deleted.",
+      "deletedClose": "Close"
     },
     "work": {
       "freePublic": "Public · watermark",
@@ -397,6 +399,16 @@
         "originalEdited": "The photo you edited",
         "originalDeleted": "Made before originals were kept",
         "made": "Made"
+      },
+      "delete": {
+        "open": "Delete",
+        "title": "Delete this photo?",
+        "body": "This can't be undone. Credits spent aren't refunded.",
+        "confirm": "Delete photo",
+        "deleting": "Deleting…",
+        "cancel": "Cancel",
+        "running": "This photo is still developing. Delete it once it's done.",
+        "failed": "Couldn't delete the photo. Please try again."
       }
     },
     "wishlist": {
@@ -612,7 +624,8 @@
       "changeRequest": "Change the request",
       "titleEdited": "{name} (edit)",
       "yourChange": "Your change",
-      "editedFromLabel": "Edited from"
+      "editedFromLabel": "Edited from",
+      "sourceDeleted": "Original deleted"
     }
   },
   "paywall": {
