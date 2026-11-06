@@ -10,7 +10,7 @@ import { listTemplates } from '@/core/templates'
 import { CREDITS_FLOOR, runEdit, type EditDeps } from '@/modules/image'
 
 import { createMemoryStore } from '../fakes/memory-store'
-import { fakeDecider, finishedWork, publishEditTemplate, setEditTemplate, TEST_EDIT_PARAMS, TEST_WRAPPER, type DeciderBehaviour } from './edit-fixtures'
+import { fakeClassifier, finishedWork, publishEditTemplate, setEditTemplate, TEST_EDIT_PARAMS, TEST_WRAPPER, type ClassifierBehaviour } from './edit-fixtures'
 import { fakeProvider, seedTemplate, type FakeBehaviour } from './generation-fixtures'
 import { connectAdmin, createUser, profileOf, type TestProfile } from './helpers'
 import { anonSupabase, serviceSupabase } from './supabase-env'
@@ -33,23 +33,23 @@ afterAll(async () => {
   await db.end()
 })
 
-type Options = { decider?: DeciderBehaviour | null; provider?: FakeBehaviour; profile?: TestProfile }
+type Options = { classifier?: ClassifierBehaviour | null; provider?: FakeBehaviour; profile?: TestProfile }
 
 // A user with one finished 4:5 work (Standard, 1 credit) and `profile` credits left after it.
-async function setup({ decider = { background: 0.9 }, provider = 'ok', profile = { credits: 10 } }: Options = {}) {
+async function setup({ classifier = {}, provider = 'ok', profile = { credits: 10 } }: Options = {}) {
   const userId = await createUser(db, { credits: (profile.credits ?? 0) + 1, freeCredits: profile.freeCredits })
   const r2 = createMemoryStore()
   const sourceId = await finishedWork(userId, r2.store, templateId, (key, body) => r2.upload(key, body, 'image/jpeg'))
   const fake = fakeProvider(provider)
-  const decision = decider === null ? null : fakeDecider(decider)
+  const decision = classifier === null ? null : fakeClassifier(classifier)
   const track = vi.fn<ServerTrack>()
   const deps: EditDeps = {
     db: serviceSupabase(),
     store: r2.store,
     provider: fake.provider,
-    decider: decision?.decider ?? null,
+    classifier: decision?.classifier ?? null,
     providerTimeoutMs: 200,
-    decisionTimeoutMs: 50,
+    classifierTimeoutMs: 50,
     track,
   }
   const edit = (instruction = 'Put it on a beach', extra: { jobId?: string; resolution?: '2k' } = {}) =>
@@ -77,29 +77,30 @@ describe('runEdit: one ordinary generation on the edit template', () => {
     const row = await editRow(view.id)
     expect(row.parent_job_id).toBe(sourceId)
     expect(row.inputs).toMatchObject({ instruction: 'Put it on a beach', edit_scope: 'background', aspect_ratio: '4:5', resolution: '1k' })
-    expect(row.inputs.edit_probabilities).toMatchObject({ background: 0.9, object: null })
+    expect(row.inputs).toMatchObject({ confidence: 0.9, keep: ['amber bottle'], change: 'beach background' })
     // The wrapper and paragraphs stay in template_prompts.
-    expect(JSON.stringify(row.inputs)).not.toMatch(/WRAPPER|C-[A-Z]|Q-[A-Z]/)
+    expect(JSON.stringify(row.inputs)).not.toMatch(/WRAPPER|C-[A-Z]|CLASSIFIER/)
 
     const [call] = fake.calls
-    expect(call?.prompt).toBe(`${TEST_WRAPPER}\n\nC-BACKGROUND\n\nPut it on a beach`)
+    expect(call?.prompt).toBe(`${TEST_WRAPPER}\n\nC-BACKGROUND Keep unchanged: amber bottle.\n\nPut it on a beach`)
     expect(call?.images).toHaveLength(1)
     expect(call?.aspectRatio).toBe('4:5')
     expect(call?.params).toEqual({ input_fidelity: 'high' })
 
-    const asked = decision?.decide.mock.calls[0]?.[0]
+    const asked = decision?.classify.mock.calls[0]?.[0]
     expect(asked?.instruction).toBe('Put it on a beach')
-    expect(asked?.questions.map((q) => q.text)).toEqual(Object.values(TEST_EDIT_PARAMS.questions))
+    expect(asked?.instructions).toBe(TEST_EDIT_PARAMS.classifier)
     expect(asked?.imageDataUrl).toMatch(/^data:image\/jpeg;base64,/)
 
     expect(track).toHaveBeenCalledWith('generate', expect.objectContaining({ template_id: 'edit', category: 'edit', edit_scope: 'background' }), expect.anything())
   })
 
   it('keeps Chinese words untranslated and charges the chosen tier', async () => {
-    const { fake, edit } = await setup({ decider: { object: 0.8 } })
-    const view = await edit('沙发换成蓝色', { resolution: '2k' })
+    const { fake, edit } = await setup({ classifier: { scope: 'subject', confidence: 0.8 } })
+    const view = await edit('把模特换成男生', { resolution: '2k' })
     expect(view.credits_cost).toBe(4)
-    expect(fake.calls[0]?.prompt).toBe(`${TEST_WRAPPER}\n\nC-OBJECT\n\n沙发换成蓝色`)
+    // A subject swap gets no keep list.
+    expect(fake.calls[0]?.prompt).toBe(`${TEST_WRAPPER}\n\nC-SUBJECT\n\n把模特换成男生`)
     expect(fake.calls[0]?.resolution).toBe('2k')
   })
 
@@ -121,27 +122,28 @@ describe('runEdit: one ordinary generation on the edit template', () => {
   })
 })
 
-describe('runEdit: the decision never blocks the edit', () => {
+describe('runEdit: the classifier never blocks the edit', () => {
   it.each([
     ['times out', 'hang' as const],
     ['fails', 'fail' as const],
-  ])('uses the fallback paragraph when the decision %s', async (_, behaviour) => {
-    const { fake, edit } = await setup({ decider: behaviour })
+  ])('uses the fallback paragraph when the classifier %s', async (_, behaviour) => {
+    const { fake, edit } = await setup({ classifier: behaviour })
     const view = await edit()
     expect(view.status).toBe('succeeded')
     const row = await editRow(view.id)
-    expect(row.inputs).toMatchObject({ edit_scope: 'fallback', edit_probabilities: null })
+    expect(row.inputs).toMatchObject({ edit_scope: 'fallback', confidence: null, keep: [], change: null })
     expect(fake.calls[0]?.prompt).toBe(`${TEST_WRAPPER}\n\nC-FALLBACK\n\nPut it on a beach`)
   })
 
-  it('uses the fallback below 0.5 and keeps the probabilities for tuning', async () => {
-    const { edit } = await setup({ decider: { object: 0.49, style: 0.3 } })
+  it('uses the fallback below 0.5, without the keep list, and records the answer for tuning', async () => {
+    const { fake, edit } = await setup({ classifier: { scope: 'object', confidence: 0.49 } })
     const row = await editRow((await edit()).id)
-    expect(row.inputs).toMatchObject({ edit_scope: 'fallback', edit_probabilities: { object: 0.49, style: 0.3 } })
+    expect(row.inputs).toMatchObject({ edit_scope: 'fallback', confidence: 0.49, keep: ['amber bottle'] })
+    expect(fake.calls[0]?.prompt).toBe(`${TEST_WRAPPER}\n\nC-FALLBACK\n\nPut it on a beach`)
   })
 
   it('uses the fallback with no decision provider switched on', async () => {
-    const { edit } = await setup({ decider: null })
+    const { edit } = await setup({ classifier: null })
     expect((await editRow((await edit()).id)).inputs.edit_scope).toBe('fallback')
   })
 })
@@ -163,7 +165,7 @@ describe('runEdit: only your own finished work, refunded like any generation', (
   it.each([['empty', '   '], ['too long', 'x'.repeat(501)]])('refuses an %s instruction before anything else', async (_, instruction) => {
     const { userId, fake, decision, edit } = await setup()
     await expect(edit(instruction)).rejects.toMatchObject({ code: 'INVALID_INPUT' })
-    expect(decision?.decide).not.toHaveBeenCalled()
+    expect(decision?.classify).not.toHaveBeenCalled()
     expect(fake.generate).not.toHaveBeenCalled()
     expect((await profileOf(db, userId)).credits).toBe(10)
   })
@@ -255,10 +257,10 @@ describe('/admin/templates/edit', () => {
     await saveEditTemplate(serviceSupabase(), adminId, input({ creditsCost: { '1k': 2, '2k': 4, '3k': 6 } }), CREDITS_FLOOR)
   })
 
-  it('refuses a price under the floor and a missing question', async () => {
+  it('refuses a price under the floor and missing classifier instructions', async () => {
     const adminId = await createUser(db)
     await expect(saveEditTemplate(serviceSupabase(), adminId, input({ creditsCost: { '1k': 1, '2k': 1, '3k': 1 } }), CREDITS_FLOOR)).rejects.toMatchObject({ code: 'INVALID_INPUT' })
-    const params = { ...TEST_EDIT_PARAMS, questions: { ...TEST_EDIT_PARAMS.questions, subject: '' } }
+    const params = { ...TEST_EDIT_PARAMS, classifier: '' }
     await expect(saveEditTemplate(serviceSupabase(), adminId, input({ params }), CREDITS_FLOOR)).rejects.toMatchObject({ code: 'INVALID_INPUT' })
   })
 })

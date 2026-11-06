@@ -10,12 +10,11 @@ type Props<S extends string> = {
   idPrefix: string
   scopes: readonly S[]
   values: Record<S, string>
-  invalid?: readonly S[]
   onChange: (scope: S, value: string) => void
 }
 
-// One labelled text box per range: used for the five questions and the six paragraphs.
-export function ScopeTextFields<S extends keyof typeof COPY.scopes>({ legend, idPrefix, scopes, values, invalid = [], onChange }: Props<S>) {
+// One labelled text box per range, for the six constraint paragraphs.
+export function ScopeTextFields<S extends keyof typeof COPY.scopes>({ legend, idPrefix, scopes, values, onChange }: Props<S>) {
   return (
     <fieldset className="grid gap-3 rounded-md border border-dashed p-3">
       <legend className="px-1 text-sm font-semibold">{legend}</legend>
@@ -25,7 +24,6 @@ export function ScopeTextFields<S extends keyof typeof COPY.scopes>({ legend, id
           <Textarea
             id={`${idPrefix}-${scope}`}
             className="min-h-20 font-mono text-xs"
-            aria-invalid={invalid.includes(scope) ? true : undefined}
             value={values[scope]}
             onChange={(event) => onChange(scope, event.target.value)}
           />

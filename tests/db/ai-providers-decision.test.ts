@@ -11,7 +11,7 @@ import { publicHost } from './provider-fixtures'
 import { serviceSupabase } from './supabase-env'
 
 // T30: the 'decision' module (ARCHITECTURE §3.3, §5.2) sits beside 'image' in ai_providers. It
-// runs only the openai_decisions adapter and has its own active row. The only file that switches
+// runs only the openai_responses adapter and has its own active row. The only file that switches
 // decision rows, so it can run beside ai-providers.test.ts (which switches image rows).
 
 const PREFIX = 'T30 decision'
@@ -25,7 +25,7 @@ const save = (input: Record<string, unknown>) =>
   saveProvider(deps(), adminId, {
     label: `${PREFIX} ${randomUUID().slice(0, 6)}`,
     module: 'decision',
-    adapter: 'openai_decisions',
+    adapter: 'openai_responses',
     baseUrl: 'https://api.openai.com/v1',
     model: 'gpt-6-luna',
     apiKey: KEY,
@@ -72,6 +72,6 @@ describe('decision providers', () => {
       (module) => loadActiveProviderRow(serviceSupabase(), module),
       (id) => readProviderKey(serviceSupabase(), id),
     )
-    expect(credentials).toMatchObject({ tag: `${second}/gpt-6-luna`, adapter: 'openai_decisions', config: { apiKey: KEY } })
+    expect(credentials).toMatchObject({ tag: `${second}/gpt-6-luna`, adapter: 'openai_responses', config: { apiKey: KEY } })
   })
 })

@@ -17,10 +17,10 @@ import {
 } from '@/core/jobs'
 import { logger } from '@/core/logger'
 import { loadOutputImage, outputKeyFor } from '@/core/storage'
-import { DECIDED_SCOPES, DEFAULT_RESOLUTION, editParamsSchema, instructionSchema, loadEditTemplate, RESOLUTIONS, type Resolution } from '@/core/templates'
+import { DEFAULT_RESOLUTION, editParamsSchema, instructionSchema, loadEditTemplate, RESOLUTIONS, type Resolution } from '@/core/templates'
 
-import type { ScopeDecider } from './decision'
-import { decideScope, type ScopeDecision } from './decide-scope'
+import type { ScopeClassifier } from './classifier'
+import { classifyEditScope, type EditClassification } from './classify-scope'
 import { composeEditPrompt } from './compose-prompt'
 import { decisionPreview } from './decision-preview'
 import type { EditRequest } from './edit-request'
@@ -29,10 +29,10 @@ import type { EditRequest } from './edit-request'
 // input is the caller's own finished work, read server-side from R2. Charging, refunds, the
 // watermark rule and the `generate` event are exactly those of a template generation.
 export type EditDeps = SettleDeps & {
-  decider: ScopeDecider | null
+  classifier: ScopeClassifier | null
   now?: () => Date
   track?: ServerTrack
-  decisionTimeoutMs?: number
+  classifierTimeoutMs?: number
 }
 
 // A fixed width:height ratio is kept as asked; 'original' (or a pre-T16 job) follows the pixels.
@@ -65,12 +65,16 @@ async function prepare(deps: EditDeps, req: EditRequest) {
 
 type Prepared = Awaited<ReturnType<typeof prepare>>
 
-// User content and the decision only; the wrapper and paragraphs stay in template_prompts.
-function jobInputs(p: Prepared, decision: ScopeDecision, resolution: Resolution, attemptId: string) {
+// User content and the classifier's answer only (ARCHITECTURE §5.2); the wrapper, classifier
+// instructions and paragraphs stay in template_prompts. The classifier's tokens are not user
+// content: they go to provider_usage once T33's settle path lands.
+function jobInputs(p: Prepared, decision: EditClassification, resolution: Resolution, attemptId: string) {
   return {
     instruction: p.instruction,
     edit_scope: decision.scope,
-    edit_probabilities: decision.probabilities,
+    confidence: decision.confidence,
+    keep: decision.keep,
+    change: decision.change,
     aspect_ratio: sourceAspect(p.source),
     resolution,
     input_key: null,
@@ -79,10 +83,9 @@ function jobInputs(p: Prepared, decision: ScopeDecision, resolution: Resolution,
   }
 }
 
-async function decide(deps: EditDeps, p: Prepared): Promise<ScopeDecision> {
-  const questions = DECIDED_SCOPES.map((scope) => ({ scope, text: p.params.questions[scope] }))
+async function classify(deps: EditDeps, p: Prepared): Promise<EditClassification> {
   const imageDataUrl = await decisionPreview(p.image.bytes)
-  return decideScope(deps.decider, { imageDataUrl, instruction: p.instruction, questions }, deps.decisionTimeoutMs)
+  return classifyEditScope(deps.classifier, { imageDataUrl, instruction: p.instruction, instructions: p.params.classifier }, deps.classifierTimeoutMs)
 }
 
 export async function runEdit(deps: EditDeps, req: EditRequest): Promise<JobView> {
@@ -91,7 +94,7 @@ export async function runEdit(deps: EditDeps, req: EditRequest): Promise<JobView
     if (existing) return toJobView(existing)
   }
   const prepared = await prepare(deps, req)
-  const decision = await decide(deps, prepared)
+  const decision = await classify(deps, prepared)
   const resolution = req.resolution ?? sourceResolution(prepared.source)
   const attemptId = randomUUID()
   const job = await reserveJob(deps.db, {
@@ -108,7 +111,7 @@ export async function runEdit(deps: EditDeps, req: EditRequest): Promise<JobView
   if (job.inputs.attempt_id !== attemptId) return toJobView(job)
 
   const call = {
-    prompt: composeEditPrompt(prepared.prompt.body, prepared.params, decision.scope, prepared.instruction),
+    prompt: composeEditPrompt(prepared.prompt.body, prepared.params, decision.scope, prepared.instruction, decision.keep),
     images: [prepared.image],
     aspectRatio: sourceAspect(prepared.source),
     resolution,

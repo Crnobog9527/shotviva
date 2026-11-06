@@ -1,10 +1,10 @@
 import 'server-only'
 
 // Photo editing, server side (ARCHITECTURE §5.2, T30).
-export { decideScope, DECISION_TIMEOUT_MS, pickScope, SCOPE_THRESHOLD, type ScopeDecision } from './decide-scope'
-export type { DecisionInput, ScopeDecider, ScopeProbabilities, ScopeQuestion } from './decision'
-export { editDecider } from './decision-provider'
+export type { ClassifierAnswer, ClassifierInput, ClassifierUsage, ScopeClassifier } from './classifier'
+export { CLASSIFIER_ADAPTERS, editScopeClassifier } from './classifier-provider'
+export { classifyEditScope, CLASSIFIER_TIMEOUT_MS, CONFIDENCE_THRESHOLD, type EditClassification } from './classify-scope'
 export { composeEditPrompt } from './compose-prompt'
-export { createOpenAIDecisions, type OpenAIDecisionsConfig } from './openai-decisions'
+export { createOpenAIResponsesClassifier, KEEP_MAX, type OpenAIResponsesConfig } from './openai-responses'
 export { editBodySchema, toEditRequest, type EditRequest } from './edit-request'
 export { runEdit, type EditDeps } from './run-edit'

@@ -2,15 +2,14 @@ import { describe, expect, it } from 'vitest'
 
 import { editParamsSchema, instructionSchema } from './edit-params'
 
-const questions = { object: 'a', background: 'b', style: 'c', subject: 'd', overall: 'e' }
-const constraints = { object: '', background: '', style: '', subject: '', overall: '', fallback: '' }
+const constraints = { object: '', background: '', style: '', subject: '', global: '', fallback: '' }
 
 describe('edit template params', () => {
-  it('needs all five questions and all six paragraphs (which may be empty)', () => {
-    expect(editParamsSchema.safeParse({ questions, constraints }).success).toBe(true)
-    expect(editParamsSchema.safeParse({ questions: { ...questions, overall: ' ' }, constraints }).success).toBe(false)
+  it('needs the classifier text and all six paragraphs (which may be empty)', () => {
+    expect(editParamsSchema.safeParse({ classifier: 'c', constraints }).success).toBe(true)
+    expect(editParamsSchema.safeParse({ classifier: ' ', constraints }).success).toBe(false)
     const five = Object.fromEntries(Object.entries(constraints).filter(([scope]) => scope !== 'fallback'))
-    expect(editParamsSchema.safeParse({ questions, constraints: five }).success).toBe(false)
+    expect(editParamsSchema.safeParse({ classifier: 'c', constraints: five }).success).toBe(false)
   })
 
   it('takes 1–500 characters of instruction after trimming', () => {

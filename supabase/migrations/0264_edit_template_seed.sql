@@ -3,7 +3,7 @@
 -- below the floor). It starts unpublished: editing stays off until the Owner has written the
 -- real texts in /admin/templates/edit and switched it on.
 --
--- The wrapper, the five decision questions and the six constraint paragraphs are core prompts
+-- The wrapper, the classifier instructions and the six constraint paragraphs are core prompts
 -- and never enter git (AGENTS §5): what is seeded here is placeholders only, in the shape the
 -- code reads (core/templates/edit-params.ts). `on conflict do nothing` so a re-run never
 -- overwrites what the Owner wrote.
@@ -22,15 +22,9 @@ values (
   'PLACEHOLDER: set the edit wrapper in /admin/templates/edit.',
   jsonb_build_object(
     'input_fidelity', 'high',
-    'questions', jsonb_build_object(
-      'object', 'PLACEHOLDER: set in /admin/templates/edit.',
-      'background', 'PLACEHOLDER: set in /admin/templates/edit.',
-      'style', 'PLACEHOLDER: set in /admin/templates/edit.',
-      'subject', 'PLACEHOLDER: set in /admin/templates/edit.',
-      'overall', 'PLACEHOLDER: set in /admin/templates/edit.'
-    ),
+    'classifier', 'PLACEHOLDER: set in /admin/templates/edit.',
     'constraints', jsonb_build_object(
-      'object', '', 'background', '', 'style', '', 'subject', '', 'overall', '', 'fallback', ''
+      'object', '', 'background', '', 'style', '', 'subject', '', 'global', '', 'fallback', ''
     )
   )
 )

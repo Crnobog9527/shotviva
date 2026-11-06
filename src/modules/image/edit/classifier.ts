@@ -1,0 +1,35 @@
+import type { DecidedScope } from '@/core/templates'
+
+// The classifier step of a photo edit (ARCHITECTURE §5.2): what range the user's words change,
+// and which visible elements must stay. Adapters implement ScopeClassifier and are picked by the
+// active 'decision' provider's adapter (classifier-provider.ts), so the edit path never knows
+// which model runs. The instructions come from the `edit` template and are never logged.
+
+export type ClassifierInput = {
+  // A small JPEG data URL of the source work; sent at low detail.
+  imageDataUrl: string
+  // What the user typed, unchanged and untranslated.
+  instruction: string
+  // The classifier's own instructions from the edit template.
+  instructions: string
+  signal: AbortSignal
+}
+
+export type ClassifierUsage = { inputTokens: number; outputTokens: number }
+
+export type ClassifierAnswer = {
+  scope: DecidedScope
+  // 0–1, how sure the model is of `scope`.
+  confidence: number
+  // Up to 8 short English noun phrases of visible elements that must stay.
+  keep: string[]
+  // One short English line summing up the change.
+  change: string
+  usage: ClassifierUsage | null
+}
+
+export type ScopeClassifier = {
+  // `<ai_providers.id>/<model>`, like generation_jobs.provider.
+  tag: string
+  classify(input: ClassifierInput): Promise<ClassifierAnswer>
+}

@@ -34,7 +34,7 @@ describe('provider form state', () => {
 
   it('adds a new row to the section it was opened from, with that module adapter (T30)', () => {
     const form = { ...formFor(null, 'decision'), label: 'OpenAI', model: 'gpt-6-luna', apiKey: 'sk-new-key-1234' }
-    expect(toSaveInput(form, null)).toMatchObject({ module: 'decision', adapter: 'openai_decisions' })
+    expect(toSaveInput(form, null)).toMatchObject({ module: 'decision', adapter: 'openai_responses' })
     expect(toSaveInput(formFor(provider), provider)).toMatchObject({ module: 'image', adapter: 'openai_images' })
   })
 })

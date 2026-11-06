@@ -37,6 +37,7 @@ export {
   editParamsSchema,
   INSTRUCTION_MAX_LENGTH,
   instructionSchema,
+  KEEP_LIST_SCOPES,
   type DecidedScope,
   type EditParams,
   type EditScope,

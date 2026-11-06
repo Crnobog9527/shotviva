@@ -16,7 +16,7 @@ export const PROVIDERS_COPY = {
     },
     decision: {
       title: '判断（作品编辑）',
-      notice: '作品编辑先用它判断用户这句话要改的范围，再加对应的约束段落。只配 OpenAI 官方地址（中转站多半没有 /v1/decisions）。判断题和约束段落在「模板与提示词 → 作品编辑」里改。',
+      notice: '作品编辑先用它判断用户这句话要改的范围和要保留的元素，再加对应的约束段落。第一版用 OpenAI 官方地址、模型 gpt-6-luna。判断指令和约束段落在「模板与提示词 → 作品编辑」里改。',
       none: '当前没有启用的判断供应商：所有作品编辑都用「兜底」约束段落。',
       modelHint: '例如 gpt-6-luna',
     },
@@ -33,7 +33,7 @@ export const PROVIDERS_COPY = {
     updatedAt: '更新时间',
     actions: '操作',
   },
-  adapters: { openai_images: 'OpenAI Images 接口', openai_decisions: 'OpenAI Decisions 接口' } satisfies Record<ProviderAdapterId, string>,
+  adapters: { openai_images: 'OpenAI Images 接口', openai_responses: 'OpenAI Responses 接口' } satisfies Record<ProviderAdapterId, string>,
   active: '当前使用',
   inactive: '未使用',
   keyMasked: (last4: string | null) => (last4 ? `••••${last4}` : '未设置'),
@@ -50,7 +50,7 @@ export const PROVIDERS_COPY = {
     adapter: '适配器',
     adapterHint: {
       openai_images: 'OpenAI Images 接口形态（官方地址或兼容这套接口的中转）。接口不同的厂商要写新适配器，不是后台操作。',
-      openai_decisions: 'OpenAI 官方 POST /v1/decisions（判断题，返回概率）。地址请填 https://api.openai.com/v1。',
+      openai_responses: 'OpenAI Responses API（结构化 JSON 输出，推理用最低档）。地址请填 https://api.openai.com/v1。',
     } satisfies Record<ProviderAdapterId, string>,
     baseUrl: '接口根地址',
     baseUrlHint: '只允许 https://，例如 https://api.openai.com/v1',
