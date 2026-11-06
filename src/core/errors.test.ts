@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { AppError, toAppError } from './errors'
+import { AppError, TierRequiredError, toAppError } from './errors'
 
 describe('AppError', () => {
   it('maps codes to HTTP status and a client body', () => {
@@ -18,5 +18,11 @@ describe('AppError', () => {
   it('passes AppError through unchanged', () => {
     const original = new AppError('NOT_FOUND', 'Missing')
     expect(toAppError(original)).toBe(original)
+  })
+
+  it('TIER_REQUIRED is a 403 that names the tier to open the paywall on', () => {
+    const error = new TierRequiredError('pro', 'Batch upload is on Pro')
+    expect(error.status).toBe(403)
+    expect(error.toBody()).toEqual({ code: 'TIER_REQUIRED', message: 'Batch upload is on Pro', required_tier: 'pro' })
   })
 })
