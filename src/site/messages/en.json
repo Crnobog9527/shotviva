@@ -629,6 +629,10 @@
     }
   },
   "footer": {
+    "legalNav": "Legal",
+    "official": "{name} — {tagline}. {domain} is the only official {name} site.",
+    "launched": "Launched {year}. Serving {countries}. Contact: <mail>{email}</mail>",
+    "copyright": "© {year} {name}",
     "language": "Language"
   },
   "notFound": {
@@ -636,5 +640,27 @@
     "body": "The link may be old or mistyped. Start again from the home page or pick a template.",
     "home": "Home",
     "templates": "Browse templates"
+  },
+  "marketing": {
+    "nav": {
+      "label": "Main",
+      "pricing": "Pricing",
+      "tagline": "AI photo studio"
+    },
+    "hero": {
+      "label": "Before and after",
+      "before": "Before",
+      "after": "After"
+    },
+    "breadcrumb": "Breadcrumb",
+    "facts": "Key facts",
+    "faq": "Frequently asked questions",
+    "related": "Related",
+    "templateLine": "<b>{name}</b>: {use}"
+  },
+  "pageError": {
+    "title": "Something went wrong",
+    "body": "This page did not load. Try again in a moment.",
+    "retry": "Try again"
   }
 }

@@ -70,8 +70,8 @@ describe('createCheckout routing', () => {
       locale: 'zh',
       metadata: { user_id: USER, product_id: 'starter_monthly', method: 'card' },
       subscription_data: { metadata: { user_id: USER, product_id: 'starter_monthly', method: 'card' } },
-      success_url: 'https://pr-1.example.app/account?checkout=success',
-      cancel_url: 'https://pr-1.example.app/pricing?checkout=cancelled',
+      success_url: 'https://pr-1.example.app/zh/account?checkout=success',
+      cancel_url: 'https://pr-1.example.app/zh/pricing?checkout=cancelled',
     })
     expect(params).not.toHaveProperty('payment_method_types')
     expect(params).not.toHaveProperty('allowed_payment_method_types')

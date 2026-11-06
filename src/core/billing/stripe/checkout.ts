@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { trackCheckoutStart } from '../../analytics/funnel'
 import { PRODUCT_IDS, type SiteProduct } from '../../config'
 import { AppError } from '../../errors'
+import { localizePath } from '../../i18n/paths'
 import { allowlistedUrl } from '../../partner/return-to'
 import { CHECKOUT_METHODS, checkoutRoute, type CheckoutMethod, type CheckoutRoute } from './catalog'
 import type { StripeApi } from './client'
@@ -79,8 +80,9 @@ function sessionParams(
     client_reference_id: metadata.user_id,
     metadata,
     locale: input.locale,
-    success_url: `${input.origin}${input.successPath}`,
-    cancel_url: `${input.origin}${CHECKOUT_RETURN.cancel}`,
+    // Back to the account / pricing page in the language the buyer checked out in.
+    success_url: `${input.origin}${localizePath(input.successPath, input.locale)}`,
+    cancel_url: `${input.origin}${localizePath(CHECKOUT_RETURN.cancel, input.locale)}`,
     ...methodParams(route),
     ...(route.mode === 'subscription' ? { subscription_data: { metadata } } : { payment_intent_data: { metadata } }),
   }

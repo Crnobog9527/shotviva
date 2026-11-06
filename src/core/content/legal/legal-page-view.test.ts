@@ -52,11 +52,19 @@ describe('SiteFooter', () => {
   it('shows the official-site statement, contact, copyright and the legal links, not the operating entity', () => {
     const { brand } = testSite()
     const links = [{ href: '/terms', label: 'Terms' }] as const
-    const messages = { footer: { language: 'Language' } }
+    const messages = {
+      footer: {
+        legalNav: 'Legal',
+        official: '{name} — {tagline}. {domain} is the only official {name} site.',
+        launched: 'Launched {year}. Serving {countries}. Contact: <mail>{email}</mail>',
+        copyright: '© {year} {name}',
+        language: 'Language',
+      },
+    }
     const provider: ComponentProps<typeof NextIntlClientProvider> = {
       locale: 'en',
       messages,
-      children: createElement(SiteFooter, { brand, links }),
+      children: createElement(SiteFooter, { brand, links, countries: 'United States' }),
     }
     const html = renderToStaticMarkup(createElement(NextIntlClientProvider, provider))
     expect(html).toContain('example.com is the only official Example site.')
@@ -64,7 +72,7 @@ describe('SiteFooter', () => {
     expect(html).not.toContain('operated by')
     expect(html).not.toContain('Example LLC')
     expect(html).not.toContain('1 Main St')
-    expect(html).toContain('href="mailto:hi@example.com"')
+    expect(html).toContain('Launched 2026. Serving United States. Contact: <a href="mailto:hi@example.com"')
     expect(html).toContain('href="/terms"')
     // The MiSans attribution moved to the Terms page (ARCHITECTURE §17).
     expect(html).not.toContain('MiSans')

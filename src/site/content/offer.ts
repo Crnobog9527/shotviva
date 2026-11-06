@@ -50,7 +50,7 @@ export const languages = site.locales.enabled.map((code) => LANGUAGE_NAMES[code]
 // Market rate for hiring a product photographer, used in the cost tables. Not our price, so it
 // is not in site.config. Source: Snappr product photography rates, Philadelphia, 2026
 // (snappr.com/how-much-does-a-photographer-cost/product/philadelphia-pa): $139–$300 an hour.
-const PHOTOGRAPHER_HOURLY_USD = { low: 139, high: 300 } as const
+export const PHOTOGRAPHER_HOURLY_USD = { low: 139, high: 300 } as const
 export const photographerRate = `$${PHOTOGRAPHER_HOURLY_USD.low}–$${PHOTOGRAPHER_HOURLY_USD.high} an hour`
 
 // --- Plans and packs. Product ids are fixed by ARCHITECTURE §6.2. Until T9 puts the nine

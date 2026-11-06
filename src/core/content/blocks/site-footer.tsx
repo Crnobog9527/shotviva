@@ -8,16 +8,25 @@ export type FooterLink = { href: `/${string}`; label: string }
 
 // Every marketing page carries the official-site statement, contact email, copyright and the
 // legal links. The operating entity and address live on the legal pages and in the Organization
-// JSON-LD, not here (DESIGN §6.9 item 5, 建站规格 G8; Owner 2026-11-06). Facts come from the config.
+// JSON-LD, not here (DESIGN §6.9 item 5, 建站规格 G8; Owner 2026-11-06). Facts come from the
+// config, the words around them from messages; `countries` is already in the page's language.
 // The MiSans attribution is on the Terms page, not here (ARCHITECTURE §17).
-type Props = { brand: SiteBrand; links: readonly FooterLink[]; languageSwitch?: ReactNode }
+type Props = {
+  brand: SiteBrand
+  links: readonly FooterLink[]
+  countries: string
+  languageSwitch?: ReactNode
+}
 
-export function SiteFooter({ brand, links, languageSwitch }: Props) {
+const linkClass = 'underline underline-offset-4 hover:text-foreground'
+
+export function SiteFooter({ brand, links, countries, languageSwitch }: Props) {
   const t = useTranslations('footer')
+  const name = brand.name
   return (
     <footer className="mt-16 border-t border-border">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 px-4 py-8 text-sm text-muted-foreground">
-        <nav aria-label="Legal">
+        <nav aria-label={t('legalNav')}>
           <ul className="flex flex-wrap gap-x-6">
             {links.map((link) => (
               <li key={link.href}>
@@ -31,18 +40,20 @@ export function SiteFooter({ brand, links, languageSwitch }: Props) {
             ))}
           </ul>
         </nav>
+        <p>{t('official', { name, tagline: brand.tagline, domain: brand.domain })}</p>
         <p>
-          {brand.name} — {brand.tagline}. {brand.domain} is the only official {brand.name} site.
+          {t.rich('launched', {
+            year: String(brand.launchYear),
+            countries,
+            email: brand.contactEmail,
+            mail: (chunks) => (
+              <a href={`mailto:${brand.contactEmail}`} className={linkClass}>
+                {chunks}
+              </a>
+            ),
+          })}
         </p>
-        <p>
-          Launched {brand.launchYear}. Serving {brand.countries.join(', ')}. Contact:{' '}
-          <a href={`mailto:${brand.contactEmail}`} className="underline underline-offset-4 hover:text-foreground">
-            {brand.contactEmail}
-          </a>
-        </p>
-        <p>
-          © {brand.launchYear} {brand.name}
-        </p>
+        <p>{t('copyright', { year: String(brand.launchYear), name })}</p>
         {languageSwitch ? (
           <p>
             <span className="sr-only">{t('language')}</span>

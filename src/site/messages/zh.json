@@ -1,4 +1,546 @@
 {
+  "home": {
+    "placeholder": "即将上线。"
+  },
+  "auth": {
+    "google": "使用 Google 账号继续",
+    "fields": {
+      "email": "邮箱",
+      "password": "密码",
+      "newPassword": "密码（至少 {min} 位）"
+    },
+    "login": {
+      "title": "登录",
+      "submit": "登录",
+      "forgot": "忘记密码？",
+      "toSignup": "注册新账号"
+    },
+    "signup": {
+      "title": "注册账号",
+      "freeImages": "注册即送 {count} 张标准清晰度的免费图。",
+      "submit": "注册",
+      "toLogin": "已有账号？去登录",
+      "sentTitle": "请查收邮件",
+      "sent": "我们发了一封确认邮件，点开里面的链接就能激活账号。如果这个邮箱已经注册过，直接登录即可。"
+    },
+    "reset": {
+      "title": "重置密码",
+      "submit": "发送重置链接",
+      "toLogin": "返回登录",
+      "sent": "如果这个邮箱注册过账号，重置链接已经发出，请查收。"
+    },
+    "update": {
+      "title": "设置新密码",
+      "submit": "保存密码",
+      "done": "密码已保存，去我的账号"
+    },
+    "captcha": {
+      "fallback": "请完成下方的验证，再提交一次。",
+      "tick": "请勾选下方的方框后继续。"
+    },
+    "notices": {
+      "unverified": "请先确认邮箱：打开我们发给你的邮件，点里面的链接。",
+      "link_expired": "这个链接已过期或已经用过了，请重新获取。",
+      "callback_failed": "登录没能完成。如果你刚确认完邮箱，请用密码登录。",
+      "oauth_failed": "Google 登录没有完成，请再试一次。"
+    },
+    "errors": {
+      "UNAUTHORIZED": "请重新登录。",
+      "FORBIDDEN": "你没有权限进行这个操作。",
+      "NOT_FOUND": "没有找到。",
+      "INVALID_INPUT": "请检查邮箱和密码。",
+      "CREDITS_INSUFFICIENT": "积分不够了。",
+      "AUTH_INVALID_CREDENTIALS": "邮箱或密码不正确。",
+      "AUTH_EMAIL_NOT_CONFIRMED": "请先确认邮箱：打开我们发给你的邮件，点里面的链接。",
+      "AUTH_CAPTCHA_FAILED": "验证没有通过，请完成下方的验证。",
+      "AUTH_RATE_LIMITED": "尝试次数太多，请等一分钟再试。",
+      "AUTH_WEAK_PASSWORD": "密码太简单了，请换一个更安全的。",
+      "INTERNAL": "出了点问题，请再试一次。",
+      "CONFLICT": "这个请求已经处理过了。"
+    },
+    "account": {
+      "title": "我的",
+      "signedInAs": "当前登录：{email}",
+      "signOut": "退出登录",
+      "dangerZone": "注销账号",
+      "delete": "注销我的账号",
+      "deleteWarning": "注销后，你的账号、剩余积分和所有作品都会被永久删除，无法恢复。",
+      "deleteTypeLabel": "输入 DELETE 确认",
+      "deleteConfirm": "永久注销",
+      "deleting": "正在注销…",
+      "deleteFailed": "注销没有完成，请再试一次。",
+      "cancel": "取消"
+    }
+  },
+  "partner": {
+    "connect": {
+      "title": "连接 Graylum",
+      "explain": "Graylum 帮你出图时会使用你的 Shotviva 积分。你随时可以在「我的」页面断开连接。",
+      "allow": "允许 Graylum 使用我的积分",
+      "invalid": "这个连接链接无效，请回到 Graylum 重新发起。"
+    },
+    "account": {
+      "title": "Graylum",
+      "description": "用你的 Shotviva 积分在 Graylum 里出图。",
+      "connected": "{date, date, medium} 起已连接。Graylum 可以用你的积分出图。",
+      "notConnected": "未连接。要连接，请从 Graylum 发起，并允许它使用你的积分。",
+      "disconnect": "断开 Graylum"
+    },
+    "integrations": {
+      "title": "连接的应用",
+      "enabled": "已启用",
+      "notEnabled": "未启用"
+    }
+  },
+  "app": {
+    "tabs": {
+      "label": "主导航",
+      "create": "创作",
+      "wishlist": "许愿墙",
+      "photos": "作品",
+      "account": "我的"
+    },
+    "sheet": {
+      "close": "关闭"
+    },
+    "credits": "{count} 积分",
+    "balance": {
+      "chipBoth": "{paid} + {free} 免费",
+      "chipFree": "{free} 免费",
+      "chipPaid": "{count} 积分",
+      "chipAria": "余额：{label}。获取积分",
+      "none": "你还剩 0 积分。",
+      "both": "你有 {paid} 积分，另有 {free} 免费积分。",
+      "free": "你有 {free} 免费积分。",
+      "paid": "你有 {paid} 积分。",
+      "getCredits": "获取积分",
+      "panelTitle": "积分",
+      "signupGiftRefused": "这个账号没有拿到注册赠送的免费积分：同一网络下的另一个账号在你注册前 24 小时内已经领取过。你仍然可以购买积分。"
+    },
+    "create": {
+      "title": "创作",
+      "lede": "选一个风格，照片主体保持原样。",
+      "metaTitle": "创作",
+      "empty": "模板马上就到，请稍后再来看看。",
+      "templates": "模板",
+      "filter": "筛选模板",
+      "all": "全部",
+      "illustrative": "模板图片仅为效果示例。"
+    },
+    "template": {
+      "fromCredits": "{count} 积分起",
+      "cardAlt": "{name} 模板示例：左边是手机原图，右边是 AI 出图",
+      "phone": "原图",
+      "ai": "AI",
+      "videoTemplate": "视频模板",
+      "animatedTemplate": "动态模板",
+      "example": "效果示例",
+      "featureAria": "{name}，视频模板，{category}。预览",
+      "featureMeta": "{category} · 视频",
+      "preview": "预览",
+      "compareAria": "对比手机原图和 AI 出图",
+      "phonePhotoAlt": "手机原图",
+      "resultAlt": "{name} 出图效果",
+      "loopAria": "{name} 示例：手机原图变成 AI 出图的过程",
+      "animationAlt": "{name} 示例动画",
+      "hintCompare": "在图片上左右拖动，对比前后效果。",
+      "hintMotion": "你的照片会按这段短动画的方式变化。",
+      "use": "用这个模板"
+    },
+    "tiers": {
+      "1k": {
+        "name": "标准",
+        "use": "社交媒体、外卖平台"
+      },
+      "2k": {
+        "name": "高清",
+        "use": "官网、网店"
+      },
+      "3k": {
+        "name": "超清",
+        "use": "印刷、放大查看"
+      },
+      "notEnough": "（积分不够）"
+    },
+    "sizes": {
+      "original": "原图比例",
+      "16:9": "横幅",
+      "4:5": "帖子",
+      "1:1": "商品主图",
+      "9:16": "竖屏",
+      "3:2": "房源",
+      "4:3": "网站",
+      "2:3": "长图",
+      "asShot": "同原图",
+      "withRatio": "{name} {ratio}"
+    },
+    "workspace": {
+      "back": "创作",
+      "yourPhoto": "你的照片",
+      "size": "尺寸",
+      "resolution": "清晰度",
+      "addPhoto": "添加你拍的照片",
+      "formats": "{formats} · 最大 {mb}MB",
+      "takePhoto": "拍照",
+      "chooseGallery": "从相册选择",
+      "photoAlt": "你的照片",
+      "uploaded": "已上传",
+      "uploading": "上传中",
+      "compressing": "压缩中",
+      "uploadingAria": "正在上传你的照片",
+      "compressingAria": "正在压缩你的照片",
+      "replace": "更换照片",
+      "chooseAnother": "换一张照片",
+      "noteLabel": "还有想改的地方吗？",
+      "optional": "（选填）",
+      "notePlaceholder": {
+        "Food & Drink": "例如：加一小枝薄荷，去掉餐巾",
+        "Products & Resale": "例如：链子保持金色，阴影柔和一点",
+        "Beauty & Skincare": "例如：标签保持清晰，加几滴水珠",
+        "Rooms & Spaces": "例如：沙发不动，台灯的光暖一点",
+        "Pets": "例如：项圈保留，用柔和的灰色背景",
+        "Art Styles": "例如：眼镜保留，线条柔和一点",
+        "fallback": "例如：颜色不变，背景提亮"
+      },
+      "wait": "请等一张作品完成",
+      "needPhoto": "先添加照片",
+      "uploadingCta": "照片上传中…",
+      "needCopy": "请填写上面的文字",
+      "waitNotice": "你最多可以同时生成 {count} 张。等一张出现在「作品」里，下一张就会开始。",
+      "developingTitle": "正在生成你的照片",
+      "developing": "生成中",
+      "generating": "生成中",
+      "leave": "一般需要 20–40 秒。可以离开这个页面，完成后会出现在「作品」里。",
+      "backToCreate": "返回创作",
+      "readyTitle": "照片生成好了",
+      "beforeAfter": "前后对比",
+      "makeAnother": "再做一张",
+      "seeInPhotos": "去作品里看",
+      "resultAlt": "用 {name} 模板改出的照片",
+      "failTitle": "这张照片没有生成成功",
+      "retry": "重试",
+      "useAnother": "换一张照片",
+      "generateCta": "生成 <cost>· {count} 积分</cost>",
+      "getCreditsCta": "获取积分 <cost>· 需要 <mono>{count, number}</mono></cost>",
+      "freeNotice": "这张图用的是免费积分：会公开展示，并带水印。<b>用付费积分生成的图是私密的，没有水印。</b>",
+      "needsCredits": "{tier}需要 {count} 积分。<b>用付费积分生成的图是私密的，没有水印。</b>",
+      "counter": "{count, number} / {max, number}",
+      "developingSize": "{tier} · <mono>{px, number, ::group-off}</mono>",
+      "yourPhotos": "你的照片",
+      "addPhotos": "添加你拍的照片",
+      "chooseGalleryMany": "从相册选多张",
+      "addMore": "再加几张",
+      "batchFull": "已经 {max, number} 张了，一批最多就这么多。",
+      "photoN": "第 {index, number} 张",
+      "removePhoto": "删除第 {index, number} 张",
+      "waitingUpload": "等待中",
+      "batchOnTier": "已保留第一张。批量上传（一次最多 {count, number} 张）是{tier}的权益。",
+      "batchKept": "已保留前 {max, number} 张，一批最多 {max, number} 张。",
+      "seeTier": "看看{tier} · 一次 {count, number} 张",
+      "needPhotos": "先添加照片",
+      "uploadingManyCta": "照片上传中…",
+      "generateBatchCta": "生成 {count, number} 张 <cost>· {total, plural, other {# 积分}}</cost>",
+      "batchNeedsPaid": "批量生成只用付费积分：{count, number} 张需要 {total, plural, other {# 积分}}。<b>这批图全部私密、无水印。</b>",
+      "waiting": "等待中",
+      "waitingSlot": "排队中，等空位",
+      "statusDone": "已完成",
+      "batchTitle": "正在生成 {count, number} 张",
+      "batchSettledTitle": "{count, number} 张已生成",
+      "batchSummary": "{count, number} 张已完成 {done, number} 张{failed, plural, =0 {} other {，# 张没有生成成功}}",
+      "batchLeave": "每张一般需要 20–40 秒。可以离开这个页面，每张生成好后会出现在「作品」里。",
+      "makeMore": "再做一批",
+      "getTier": "开通{tier}"
+    },
+    "errors": {
+      "CONTENT_REJECTED": "照片或补充说明没有通过安全审核。请换一张照片，或改一下说明。",
+      "GENERATION_FAILED": "这张照片没能生成，通常再试一次就好。",
+      "PROVIDER_FAILED": "这张照片没能生成，通常再试一次就好。",
+      "PROVIDER_TIMEOUT": "这张照片生成太久超时了，通常再试一次就好。",
+      "OUTPUT_WRITE_FAILED": "生成好的照片没能保存，请再试一次。",
+      "CREDITS_INSUFFICIENT": "积分不够生成这个清晰度。",
+      "RATE_LIMITED": "请等一张照片完成后再试。",
+      "IMAGE_TOO_LARGE": "这张照片超过 20MB，请换一张小一点的。",
+      "IMAGE_UNSUPPORTED": "请上传 JPG、PNG 或 WebP 格式的照片。",
+      "UPLOAD_FAILED": "上传失败，请检查网络后重试。",
+      "INVALID_INPUT": "表单里有内容需要再检查一下，请核对照片和填写的内容后重试。",
+      "UNAUTHORIZED": "请重新登录。",
+      "fallback": "出了点问题，请再试一次。",
+      "refunded": "积分已退回。",
+      "onHold": "你的积分暂时冻结中，我们会退回给你，也可以联系客服。",
+      "notCharged": "没有扣积分。",
+      "TIER_REQUIRED": "这需要{tier}套餐。"
+    },
+    "photos": {
+      "title": "作品",
+      "metaTitle": "作品",
+      "inProgress": "生成中",
+      "usually": "每张一般需要 20–40 秒",
+      "closeApp": "可以关掉页面，生成好的照片会出现在这里。",
+      "generating": "生成中",
+      "generatingAria": "正在生成 {name}",
+      "done": "已完成",
+      "newest": "最新的在前",
+      "count": "{running, plural, =0 {} other {# 张生成中 · }}{done} 张已完成",
+      "footnote": "用免费积分生成的图会公开并带水印；用付费积分生成的图是私密的，没有水印。",
+      "photoAlt": "{name} 作品",
+      "empty": "还没有作品。选一个模板，加一张手机照片，生成的图就会出现在这里。",
+      "emptyCta": "做第一张图",
+      "today": "今天",
+      "yesterday": "昨天",
+      "fallbackName": "照片",
+      "badgeAria": "{count} 张生成中",
+      "pill": "{count, plural, =1 {生成中…} other {# 张生成中…}}",
+      "doneMeta": "{when} · {size} · {tier}",
+      "runningMeta": "{size} · {tier} · {count} 积分",
+      "waiting": "排队中，等空位"
+    },
+    "work": {
+      "freePublic": "公开 · 带水印",
+      "private": "私密",
+      "public": "公开"
+    },
+    "result": {
+      "back": "作品",
+      "share": "分享",
+      "download": "下载",
+      "longPress": "长按保存",
+      "showTransparency": "显示透明区域",
+      "makeAnotherWith": "用 {name} 再做一张",
+      "shareText": "用 {brand} 制作 {url}"
+    },
+    "wishlist": {
+      "title": "许愿墙",
+      "myRequests": "我的许愿",
+      "request": "许愿一个模板",
+      "needPhoto": "先做一张图才能参与",
+      "empty": "告诉我们你需要什么模板",
+      "wantThis": "我也想要",
+      "wantThisAria": "我也想要，{count} 票",
+      "by": "{name} 许愿",
+      "shipped": "已上线",
+      "imageAlt": "参考图 {index} / {count}",
+      "showMore": "查看更多",
+      "loading": "加载中…",
+      "loadFailed": "没能加载更多，请重试。",
+      "sent": "已提交审核",
+      "voteErrors": {
+        "CONFLICT": "这个许愿已经不在墙上了。",
+        "FORBIDDEN": "先做一张图才能参与",
+        "generic": "投票没能保存，请重试。"
+      },
+      "new": {
+        "title": "许愿一个模板",
+        "photosHeading": "参考图",
+        "photosHint": "添加 {min} 到 {max} 张你想要的效果图。",
+        "addAnother": "再加一张",
+        "remove": "删除这张",
+        "describe": "描述你想要的效果",
+        "placeholder": "描述你想要的效果，例如：给周末早午餐菜单做一张暗调氛围海报",
+        "counter": "{count}/{max}",
+        "submit": "提交",
+        "submitting": "提交中…",
+        "errors": {
+          "FORBIDDEN": "先做一张图才能参与",
+          "RATE_LIMITED": "你今天已经许了 5 个愿，明天再来吧。",
+          "INVALID_INPUT": "请添加 1 到 3 张图，并写一句简短的描述。",
+          "generic": "没能提交，请重试。"
+        }
+      },
+      "mine": {
+        "title": "我的许愿",
+        "empty": "你还没有许过愿",
+        "votes": "{count} 票",
+        "status": {
+          "pending": "审核中",
+          "live": "展示中",
+          "shipped": "已上线",
+          "rejected": "未通过"
+        }
+      }
+    },
+    "account": {
+      "metaTitle": "我的"
+    },
+    "creditsUnit": "{count, plural, other {积分}}",
+    "units": {
+      "px": "{px, number, ::group-off} px",
+      "megabytes": "{size} MB",
+      "percent": "{value, number, ::percent}"
+    },
+    "subscription": {
+      "title": "会员",
+      "plan": "{tier} · {interval, select, year {按年} other {按月}}",
+      "active": "生效中",
+      "renewsOn": "{date, date, medium} 自动续费",
+      "cancelsOn": "{date, date, medium} 到期取消",
+      "cancelsDetail": "到期前会员照常有效，到期后不再续费。积分不受影响。",
+      "pastDue": "扣款失败",
+      "pastDueDetail": "上一次扣款没有成功，请在「管理订阅」里更新银行卡。",
+      "pastDueExpired": "上一次扣款没有成功，会员已结束。积分仍可正常使用。",
+      "paused": "已暂停",
+      "manage": "管理订阅",
+      "paidUntil": "已付费至 {date, date, medium}",
+      "noAutoRenew": "不自动续费，随时可以再续一期。",
+      "renew": "续费",
+      "expired": "已到期",
+      "expiredDetail": "会员已于 {date, date, medium} 到期。积分仍可正常使用。",
+      "free": "免费用户",
+      "freeDetail": "还没有开通会员。",
+      "seePlans": "查看套餐"
+    },
+    "support": {
+      "title": "帮助与反馈",
+      "entryHint": "有问题、遇到故障或有想法，都可以在这里告诉我们。",
+      "newReply": "有新回复",
+      "replyTime": "我们会在这里回复，一般在 {hours} 小时内。会员按套餐享受更快的回复。",
+      "newTicket": "新建工单",
+      "mine": "我的工单",
+      "empty": "还没有工单。",
+      "opened": "{date, date, medium} 提交",
+      "status": {
+        "open": "已提交",
+        "replied": "已回复",
+        "closed": "已关闭"
+      },
+      "types": {
+        "feedback": "意见反馈",
+        "image_issue": "出图问题",
+        "billing": "付款与账单",
+        "refund": "申请退款",
+        "account": "账号问题",
+        "other": "其他"
+      },
+      "tiers": {
+        "starter": "入门版",
+        "pro": "专业版",
+        "max": "旗舰版"
+      },
+      "product": {
+        "plan": "{tier} · {interval, select, year {按年} other {按月}}",
+        "pack": "积分包 · {credits} 积分",
+        "option": "{product} · {amount} · {date, date, medium}"
+      },
+      "new": {
+        "title": "新建工单",
+        "typeLabel": "关于什么？",
+        "bodyLabel": "内容",
+        "placeholder": "说说发生了什么，或者你希望我们做什么。",
+        "counter": "{count}/{max}",
+        "paymentLabel": "哪一笔付款？",
+        "paymentOptional": "付款记录（选填）",
+        "noPayments": "这个账号还没有付款记录。",
+        "workLabel": "相关作品（选填）",
+        "workOption": "{template} · {date, date, medium}",
+        "none": "不选",
+        "choose": "请选择",
+        "submit": "发送",
+        "submitting": "发送中…",
+        "errors": {
+          "RATE_LIMITED": "24 小时内你已经提交了 5 个工单，请稍后再试。",
+          "INVALID_INPUT": "请选择类型，并写下不超过 2,000 字的内容。申请退款需要选择对应的付款记录。",
+          "NOT_FOUND": "这笔付款或这件作品不在你的账号里。",
+          "generic": "没能发送，请再试一次。"
+        }
+      },
+      "thread": {
+        "you": "你",
+        "team": "{brand} 客服",
+        "sent": "收到了，谢谢。",
+        "addLabel": "补充内容",
+        "add": "发送",
+        "adding": "发送中…",
+        "closedNote": "这个工单已关闭。在这里写下内容会重新打开它。",
+        "errors": {
+          "INVALID_INPUT": "请写下不超过 2,000 字的内容。",
+          "NOT_FOUND": "这个工单已经不存在了。",
+          "generic": "没能发送，请再试一次。"
+        }
+      },
+      "showMore": "查看更多",
+      "loading": "加载中…",
+      "loadFailed": "没能加载更多，请重试。"
+    }
+  },
+  "paywall": {
+    "title": "继续出图",
+    "intro": "用付费积分生成的图是私密的，没有水印。",
+    "introNeedsCredits": "这张图需要的积分比你现有的多。",
+    "billingLabel": "付费周期",
+    "monthly": "按月",
+    "yearly": "按年",
+    "savePct": "最多省 {pct}%",
+    "plansLabel": "套餐",
+    "tiers": {
+      "starter": "入门版",
+      "pro": "专业版",
+      "max": "旗舰版"
+    },
+    "recommended": "推荐",
+    "bestValue": "最划算",
+    "perMonth": "<amt>{price}</amt><per>/月</per>",
+    "wasMonthly": "按月价 {price}",
+    "creditsMonth": "每月 {count} 积分",
+    "creditsYear": "一次到账 {count} 积分 · 按年付 {price}",
+    "perCredit": "每积分 {price}",
+    "saving": "比按月付每年省 <b>{amount}</b>",
+    "perkHeadings": {
+      "includes": "包含",
+      "plusStarter": "入门版全部权益，另加",
+      "plusPro": "专业版全部权益，另加"
+    },
+    "comingSoon": "即将上线",
+    "perks": {
+      "noWatermark": "无水印，可商用",
+      "privateAllTemplates": "默认私密，全部模板可用",
+      "concurrency": "最多同时生成 {count} 张",
+      "support48h": "邮件客服，{hours} 小时内回复",
+      "support24h": "优先邮件客服，{hours} 小时内回复",
+      "batch": "批量上传，一次最多 {count} 张",
+      "brandKit": "品牌套件：海报上用你的 logo 和字体",
+      "earlyAccess": "新功能抢先用",
+      "wishlistVotes": "你在许愿墙上的模板许愿按 {weight} 倍计票"
+    },
+    "packsLink": "只需要几张？积分包 {price} 起",
+    "continueTier": "选择{tier}，继续",
+    "back": "返回套餐",
+    "periodTitle": "{tier}",
+    "periodIntro": "选择付款方式。银行卡订阅随时可以取消，已有积分不受影响。",
+    "periodIntroOnce": "选择付款方式。所有方式都是一次性付款，已有积分不受影响。",
+    "packsTitle": "积分包",
+    "packsIntro": "一次性购买积分，不是订阅，积分永不过期。",
+    "packsLabel": "积分包",
+    "packCredits": "<n>{count}</n> <u>积分</u>",
+    "oneTimeNoSub": "一次性付款 · 不订阅",
+    "payWith": "付款方式",
+    "payLabel": "付款方式",
+    "pricesInUsd": "所有价格均以美元计",
+    "card": "银行卡 · Apple Pay · Google Pay",
+    "alipay": "支付宝",
+    "cardOnly": "银行卡",
+    "cardRenews": "自动续费，随时可取消",
+    "walletOnce": "一次性付款，{period, select, year {1 年} other {30 天}}，不自动续费",
+    "oneTime": "一次性付款",
+    "planOnce": "一次性付款，{period, select, year {1 年} other {30 天}}",
+    "ctaPlan": "去付款 · {price}{period, select, year {/年} other {/月}}",
+    "ctaPack": "去付款 · {price}",
+    "finePlanCard": "按{period, select, year {年} other {月}}以 {price} 自动续费 · 随时可取消 · 美元",
+    "finePlanWallet": "一次性支付 {period, select, year {1 年} other {30 天}} · 不自动续费 · 美元",
+    "finePlanOnce": "一次性支付 {period, select, year {1 年} other {30 天}} · 美元",
+    "finePack": "一次性支付 {price} · 美元",
+    "redirecting": "正在打开安全付款页…",
+    "error": "付款页没能打开，请稍后再试。",
+    "choose": "选择{tier}",
+    "buyPack": "购买 {count} 积分",
+    "thanks": "感谢购买！积分一分钟内到账，没看到的话请刷新页面。",
+    "backToPartner": "返回 Graylum",
+    "compactYear": "一次到账 {count} 积分 · 每年省 <b>{amount}</b>",
+    "compactMonth": "每月 {count} 积分 · 每积分 {price}",
+    "comingSoonList": "<b>即将上线：</b>{items}",
+    "perCreditShort": "每个 {price}"
+  },
+  "announcement": {
+    "dismiss": "关闭公告"
+  },
   "locale": {
     "switcher": {
       "label": "语言",
@@ -17,6 +559,38 @@
     }
   },
   "footer": {
+    "legalNav": "法律条款",
+    "official": "{name}：{tagline}。{domain} 是 {name} 唯一的官方网站。",
+    "launched": "{year} 年上线，服务地区：{countries}。联系邮箱：<mail>{email}</mail>",
+    "copyright": "© {year} {name}",
     "language": "语言"
+  },
+  "notFound": {
+    "title": "页面不存在",
+    "body": "链接可能已过期或输错了。回到首页，或者挑一个模板开始。",
+    "home": "回首页",
+    "templates": "看看模板"
+  },
+  "marketing": {
+    "nav": {
+      "label": "主导航",
+      "pricing": "价格",
+      "tagline": "AI 影棚"
+    },
+    "hero": {
+      "label": "前后对比",
+      "before": "原图",
+      "after": "效果"
+    },
+    "breadcrumb": "面包屑导航",
+    "facts": "关键信息",
+    "faq": "常见问题",
+    "related": "相关页面",
+    "templateLine": "<b>{name}</b>：{use}"
+  },
+  "pageError": {
+    "title": "出了点问题",
+    "body": "页面没能加载出来，请稍后再试。",
+    "retry": "重试"
   }
 }
