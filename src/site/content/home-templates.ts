@@ -8,7 +8,7 @@ import type { LocalizedTemplate } from '@/core/templates'
 // most recently published.
 export const FALLBACK_COUNT = 6
 
-type Live = Pick<LocalizedTemplate, 'id' | 'name' | 'description' | 'category' | 'coverBeforeUrl' | 'coverAfterUrl' | 'featuredRank' | 'createdAt'>
+type Live = Pick<LocalizedTemplate, 'id' | 'name' | 'description' | 'category' | 'coverBeforeUrl' | 'coverAfterUrl' | 'featuredRank' | 'createdAt' | 'creditsCost'>
 
 export function featuredTemplates<T extends Live>(live: readonly T[]): T[] {
   const ranked = live.filter((template) => template.featuredRank !== null).sort((a, b) => (a.featuredRank ?? 0) - (b.featuredRank ?? 0))
@@ -34,7 +34,7 @@ function grouped(copy: readonly CategoryCopy[], featured: readonly Live[]): Grou
 }
 
 function toCategory({ copy, raw, templates }: Group): TemplateCategory {
-  const [first, ...rest] = templates.map((template) => ({ id: template.id, name: template.name, use: template.description ?? '' }))
+  const [first, ...rest] = templates.map((template) => ({ id: template.id, name: template.name, use: template.description ?? '', credits: template.creditsCost['1k'] }))
   return {
     name: copy?.name ?? raw,
     intro: copy?.intro ?? '',
@@ -64,7 +64,7 @@ export function tryTemplates(copy: readonly CategoryCopy[], live: readonly Live[
     .flatMap((group) => group.templates)
     .flatMap((template) =>
       template.coverBeforeUrl && template.coverAfterUrl
-        ? [{ id: template.id, name: template.name, use: template.description ?? '', before: template.coverBeforeUrl, after: template.coverAfterUrl }]
+        ? [{ id: template.id, name: template.name, use: template.description ?? '', credits: template.creditsCost['1k'], before: template.coverBeforeUrl, after: template.coverAfterUrl }]
         : [],
     )
 }

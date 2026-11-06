@@ -2,6 +2,7 @@ import { defineContentPage } from '@/core/content'
 
 import { site } from '../../../site.config'
 import { pairImage, SIZE_COUNT } from '../../landing-shared'
+import { zhPricingRelated } from '../shared'
 import { photoSeconds, SET_PHOTOS } from '../../offer'
 import { productBills } from '../home'
 import { zhFreeImages, zhFromCredits, zhPlansSentence, zhTierList, zhTierPixels, zhUploadLimits } from '../offer'
@@ -60,6 +61,7 @@ export const zhImageToImageGenerator = defineContentPage({
     { href: '/', anchor: 'AI改图', note: '全部模板，按餐饮、商品、美妆、房间、宠物和画风分类。' },
     { href: '/commercial-photography', anchor: '商业产品摄影', note: '网店和卖家不请摄影师，也能做出影棚级商品图。' },
     { href: '/ai-restaurant-menu', anchor: 'AI菜单配图', note: '餐厅用手机拍菜，直接做成菜单和外卖平台的图。' },
+    zhPricingRelated(brand),
   ],
   headings: {
     facts: 'AI图生图：你只需要准备这些',

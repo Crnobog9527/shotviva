@@ -24,11 +24,13 @@ describe('landing pages', () => {
     expect(site.indexing.zhIndexablePaths).not.toContain('/ai-restaurant-menu')
   })
 
-  it('links back home with the R8 anchor and keeps 2–3 related pages', () => {
+  it('links back home with the R8 anchor, 2–3 related pages, then Pricing (gap audit B10)', () => {
     for (const page of [...contentPagesIn('en'), ...contentPagesIn('zh')]) {
-      expect(page.related.length).toBeGreaterThanOrEqual(2)
-      expect(page.related.length).toBeLessThanOrEqual(3)
-      expect(page.related.some((link) => link.href === '/')).toBe(true)
+      const inner = page.related.slice(0, -1)
+      expect(inner.length).toBeGreaterThanOrEqual(2)
+      expect(inner.length).toBeLessThanOrEqual(3)
+      expect(inner.some((link) => link.href === '/')).toBe(true)
+      expect(page.related.at(-1)?.href).toBe('/pricing')
     }
   })
 

@@ -14,10 +14,8 @@ type Props = {
   page: ContentPage
   // Hides links into switched-off modules (ARCHITECTURE §2: not in nav).
   isLinkEnabled: (href: string) => boolean
-  // The featured templates in this page's categories, with their covers (T53), and the card
-  // price ("from 2 credits").
+  // The featured templates in this page's categories, with their covers and prices (T53).
   templates: FeaturedSections
-  price: string
   // The first-screen generator (modules/image), opening on the page's template.
   generator: ReactNode
 }
@@ -26,7 +24,7 @@ type Props = {
 // 建站规格 R10): hero + direct answer + generator → the optional "full shoot" demo → the page's
 // template categories → facts → the two bills → FAQ → related pages. No visible breadcrumbs
 // (DESIGN §8); the BreadcrumbList JSON-LD stays.
-export function ContentPageView({ page, isLinkEnabled, templates, price, generator }: Props) {
+export function ContentPageView({ page, isLinkEnabled, templates, generator }: Props) {
   const t = useTranslations('marketing')
   const headings = page.headings ?? {}
   const { landing } = page
@@ -34,7 +32,7 @@ export function ContentPageView({ page, isLinkEnabled, templates, price, generat
     <article className="mk-home mk-w">
       <HomeHero page={page} generator={generator} />
       {landing.shoot ? <ShootSection shoot={landing.shoot} /> : null}
-      {landing.templates ? <TemplateGrid grid={{ ...landing.templates, price }} sections={templates} isLinkEnabled={isLinkEnabled} /> : null}
+      {landing.templates ? <TemplateGrid grid={landing.templates} sections={templates} isLinkEnabled={isLinkEnabled} /> : null}
       <FactCards facts={page.facts} heading={headings.facts ?? t('facts')} note={landing.factsNote} />
       <CostBillsSection bills={page.costBills} />
       <FaqSection faq={page.faq} heading={headings.faq} isLinkEnabled={isLinkEnabled} variant="accordion" />

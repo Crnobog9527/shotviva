@@ -3,6 +3,7 @@ import { defineContentPage } from '@/core/content'
 import { site } from '../../site.config'
 import { productBills, shoot } from '../home'
 import { CATEGORY, homeImage } from '../landing-shared'
+import { pricingRelated } from '../shared'
 import { dayRateUsd, freeImagesLabel, fromCredits, OUTPUT_TIERS, packshotUsd, plansSentence, SET_PHOTOS, styledShotUsd, tierList, usdRange } from '../offer'
 import { PLATFORM_SPECS, px } from '../platform-specs'
 
@@ -76,6 +77,7 @@ export const commercialPhotography = defineContentPage({
     { href: '/', anchor: 'AI image to image', note: 'The studio: templates for food, products, rooms, pets and art styles.' },
     { href: '/image-to-image-generator', anchor: 'Image to image generator', note: 'For anyone who wants to see how image to image works on a photo.' },
     { href: '/ai-restaurant-menu', anchor: 'AI restaurant menu photos', note: 'For restaurants that need menu and delivery-app photos from a phone shot.' },
+    pricingRelated(),
   ],
   headings: {
     facts: 'Marketplace Photo Rules Your Shots Will Meet',

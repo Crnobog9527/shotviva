@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 import { site } from '../site.config'
 import { contentPages, homePage, pricingPage } from './index'
+import { fillCredits } from './credits'
 import { freeImagesLabel, fromCredits, tierList, tierPixels, uploadLimits } from './offer'
 
 const allPages = [homePage, ...contentPages]
@@ -68,7 +69,8 @@ describe('public numbers', () => {
   it('counts the 6 free credits as "3 free Standard images" (建站规格 G3)', () => {
     expect(site.billing.freeCredits).toBe(6)
     expect(freeImagesLabel).toBe('3 free Standard images')
-    expect(fromCredits).toBe('from 2 credits')
+    // Filled from the catalogue at render time (credits.test.ts).
+    expect(fillCredits(fromCredits, 2)).toBe('from 2 credits')
     expect(tierList).toBe('Standard, HD or Max')
     expect(tierPixels).toBe('Standard 1024 px, HD 2048 px, Max 2880 px')
     expect(uploadLimits).toBe('JPG, PNG or WebP, up to 20MB')

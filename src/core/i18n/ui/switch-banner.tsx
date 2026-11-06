@@ -1,5 +1,6 @@
 'use client'
 
+import { X } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
@@ -10,13 +11,15 @@ import { usePathname } from '../navigation'
 // 「切换到中文」(ARCHITECTURE §17): on an English page that has a Chinese version, for a
 // visitor whose first browser language is Chinese and who has not chosen yet. Decided in the
 // browser after hydration, so pages stay static and nothing redirects. Either button stores
-// the choice; it never shows again after that.
-export function SwitchBanner({ translatedPaths }: { translatedPaths: readonly string[] }) {
+// the choice; it never shows again after that. `site` (the 404 pages, gap audit B13): the
+// address has no page in any language, so the bar offers the Chinese home instead.
+export function SwitchBanner({ translatedPaths, site = false }: { translatedPaths: readonly string[]; site?: boolean }) {
   const locale = useLocale()
   const path = usePathname()
   const t = useTranslations('locale.banner')
   const [visible, setVisible] = useState(false)
-  const eligible = locale === 'en' && matchesPaths(path, translatedPaths)
+  const eligible = locale === 'en' && (site || matchesPaths(path, translatedPaths))
+  const target = site ? '/' : path
 
   useEffect(() => {
     // Browser-only facts, read once after hydration; the server render never shows the banner.
@@ -25,23 +28,27 @@ export function SwitchBanner({ translatedPaths }: { translatedPaths: readonly st
   }, [eligible])
 
   if (!visible) return null
+  // The comp's .lang-bar (comps-v3-b css/marketing.css): 44px, bone 6% with a hairline under it,
+  // and a round 36px × whose hit area is 44px. Copy and the one-year choice cookie stay ours.
   return (
-    <div lang="zh-Hans" className="font-cjk-system flex w-full items-center gap-3 bg-muted px-4 py-2 text-sm leading-relaxed text-foreground">
-      <p className="min-w-0 flex-1 text-center">
-        {t('text')}{' '}
-        <a
-          href={localizePath(path, 'zh')}
-          hrefLang="zh-Hans"
-          onClick={(event) => {
-            rememberLocale('zh')
-            // Keep the query (e.g. `next` on /login) on the way to the Chinese twin.
-            if (window.location.search) event.currentTarget.search = window.location.search
-          }}
-          className="font-semibold whitespace-nowrap underline underline-offset-2"
-        >
-          {t('switch')}
-        </a>
-      </p>
+    <div
+      role="status"
+      lang="zh-Hans"
+      className="font-cjk-system flex min-h-11 w-full items-center justify-center gap-3 bg-wash px-4 py-2 text-[14px] leading-[1.3] text-bone-dim shadow-[inset_0_-1px_0_var(--border)]"
+    >
+      <span className="min-w-0">{site ? t('textSite') : t('text')}</span>
+      <a
+        href={localizePath(target, 'zh')}
+        hrefLang="zh-Hans"
+        onClick={(event) => {
+          rememberLocale('zh')
+          // Keep the query (e.g. `next` on /login) on the way to the Chinese twin.
+          if (window.location.search) event.currentTarget.search = window.location.search
+        }}
+        className="-my-2.5 py-2.5 font-medium whitespace-nowrap text-foreground underline underline-offset-[3px]"
+      >
+        {t('switch')}
+      </a>
       <button
         type="button"
         aria-label={t('dismiss')}
@@ -49,9 +56,9 @@ export function SwitchBanner({ translatedPaths }: { translatedPaths: readonly st
           rememberLocale('en')
           setVisible(false)
         }}
-        className="-my-1 -mr-2 flex size-8 shrink-0 items-center justify-center rounded-full opacity-80 hover:opacity-100"
+        className="relative -my-1 -mr-2 ml-1 grid size-9 shrink-0 cursor-pointer place-items-center rounded-full text-muted-foreground transition-colors before:absolute before:-inset-1 before:content-[''] hover:bg-wash-strong hover:text-foreground"
       >
-        <span aria-hidden>×</span>
+        <X aria-hidden className="size-4" strokeWidth={2.2} />
       </button>
     </div>
   )

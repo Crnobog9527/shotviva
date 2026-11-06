@@ -12,12 +12,19 @@ export type TemplateLookup = Readonly<Record<string, TemplateMedia>>
 // The featured templates grouped for the page, and their covers (site/content/home-templates).
 export type FeaturedSections = { categories: readonly TemplateCategory[]; media: TemplateLookup }
 
-// Heading, intro and price from the page's copy; the categories with their featured templates
-// from the database (T53). The landing pages show a subset with their own heading; no `note`.
-type Grid = Pick<HomePage['templateGrid'], 'heading' | 'intro' | 'price' | 'note'>
-type Props = { grid: Pick<Grid, 'heading' | 'intro' | 'price'> & Partial<Pick<Grid, 'note'>>; sections: FeaturedSections; isLinkEnabled: (href: string) => boolean }
+// Heading and intro from the page's copy; the categories with their featured templates from the
+// database (T53), each card at its own Standard price (建站规格 G4). The landing pages show a
+// subset with their own heading; no `note`.
+type Grid = Pick<HomePage['templateGrid'], 'heading' | 'intro' | 'note'>
+type Props = { grid: Pick<Grid, 'heading' | 'intro'> & Partial<Pick<Grid, 'note'>>; sections: FeaturedSections; isLinkEnabled: (href: string) => boolean }
 
 const CARD_SIZES = '(min-width: 1024px) 552px, (min-width: 768px) 50vw, 100vw'
+
+// "from 1 credit": the template's own Standard price.
+function Cost({ card }: { card: TemplateCard }) {
+  const t = useTranslations('app.template')
+  return <span className="mk-cost">{t('fromCredits', { count: card.credits })}</span>
+}
 
 function images(card: TemplateCard, media: TemplateMedia, t: ReturnType<typeof useTranslations>): { before: ImageRef; after: ImageRef } | null {
   if (!media.before || !media.after) return null
@@ -37,41 +44,42 @@ const blankPair = (
   </span>
 )
 
-function Meta({ card, price }: { card: TemplateCard; price: string }) {
+function Meta({ card }: { card: TemplateCard }) {
   return (
     <span className="mk-tpl-meta">
       <b>{card.name}</b>
       <span className="mk-use">{card.use}</span>
-      <span className="mk-cost">{price}</span>
+      <Cost card={card} />
     </span>
   )
 }
 
 // One card: the pair, then name, use and price, all in the HTML (建站规格 R5). A live template
-// is a button that picks it into the generator (DESIGN §6.9 item 2: no confirm step).
-function PairCard({ card, media, price }: { card: TemplateCard; media: TemplateMedia; price: string }) {
+// is a button that picks it into the generator (DESIGN §6.9 item 2: no confirm step). `size`:
+// 'lg' in a single-template row (home.html solo(): 20px corners, labels on top).
+function PairCard({ card, media, size = 'card' }: { card: TemplateCard; media: TemplateMedia; size?: 'lg' | 'card' }) {
   const t = useTranslations('marketing.home')
   const pictures = images(card, media, t)
-  const pair = pictures ? <PhotoPair {...pictures} sizes={CARD_SIZES} /> : blankPair
+  const pair = pictures ? <PhotoPair {...pictures} size={size} sizes={CARD_SIZES} /> : blankPair
   if (!media.live) {
     return (
       <div className="mk-tpl">
         {pair}
-        <Meta card={card} price={price} />
+        <Meta card={card} />
       </div>
     )
   }
   return (
     <button type="button" className="mk-tpl" data-pick-template={card.id} aria-label={t('pickAria', { name: card.name, use: card.use })}>
       {pair}
-      <Meta card={card} price={price} />
+      <Meta card={card} />
     </button>
   )
 }
 
 // A category with one template: the sample on the left, the words beside it. Art Styles keeps
 // the draggable compare; the others are a pair.
-function Solo({ card, media, price, art }: { card: TemplateCard; media: TemplateMedia; price: string; art: boolean }) {
+function Solo({ card, media, art }: { card: TemplateCard; media: TemplateMedia; art: boolean }) {
   const t = useTranslations('marketing.home')
   const pictures = images(card, media, t)
   return (
@@ -79,12 +87,12 @@ function Solo({ card, media, price, art }: { card: TemplateCard; media: Template
       {art && pictures ? (
         <CompareSlider {...pictures} label={t('compareLabel', { name: card.name })} sizes="(min-width: 1024px) 420px, 100vw" />
       ) : (
-        <PairCard card={card} media={media} price={price} />
+        <PairCard card={card} media={media} size="lg" />
       )}
       <div className="mk-solo-meta">
         <b>{card.name}</b>
         <span className="mk-use">{art && pictures ? t('withDragHint', { use: card.use }) : card.use}</span>
-        <span className="mk-cost">{price}</span>
+        <Cost card={card} />
         {media.live ? (
           <button type="button" className="mk-ghost-pill" data-preview-template={card.id}>
             {t('preview')}
@@ -95,7 +103,7 @@ function Solo({ card, media, price, art }: { card: TemplateCard; media: Template
   )
 }
 
-function Category({ category, ...rest }: { category: TemplateCategory; media: TemplateLookup; price: string; isLinkEnabled: (href: string) => boolean }) {
+function Category({ category, ...rest }: { category: TemplateCategory; media: TemplateLookup; isLinkEnabled: (href: string) => boolean }) {
   const links = (category.links ?? []).filter((link) => rest.isLinkEnabled(link.href))
   const [first] = category.templates
   const mediaOf = (card: TemplateCard): TemplateMedia => rest.media[card.id] ?? { before: null, after: null, live: false }
@@ -114,12 +122,12 @@ function Category({ category, ...rest }: { category: TemplateCategory; media: Te
         </p>
       </div>
       {category.templates.length === 1 ? (
-        <Solo card={first} media={mediaOf(first)} price={rest.price} art={category.drag === true} />
+        <Solo card={first} media={mediaOf(first)} art={category.drag === true} />
       ) : (
         <ul className="mk-tgrid" data-count={category.templates.length}>
           {category.templates.map((card) => (
             <li key={card.id}>
-              <PairCard card={card} media={mediaOf(card)} price={rest.price} />
+              <PairCard card={card} media={mediaOf(card)} />
             </li>
           ))}
         </ul>
@@ -142,7 +150,7 @@ export function TemplateGrid({ grid, sections, isLinkEnabled }: Props) {
         <p className="mk-intro">{grid.intro}</p>
       </div>
       {categories.map((category) => (
-        <Category key={category.name} category={category} media={media} price={grid.price} isLinkEnabled={isLinkEnabled} />
+        <Category key={category.name} category={category} media={media} isLinkEnabled={isLinkEnabled} />
       ))}
       {grid.note ? <p className="mk-note">{grid.note}</p> : null}
     </section>

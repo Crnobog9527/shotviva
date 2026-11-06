@@ -3,7 +3,7 @@ import { Suspense } from 'react'
 
 import { SiteFooter } from '@/core/content'
 import type { Locale } from '@/core/i18n'
-import { FooterLocales, FooterLocalesFallback, Link, LocaleMenu } from '@/core/i18n/ui'
+import { FooterLocales, FooterLocalesFallback, Link, LocaleMenu, NavLink } from '@/core/i18n/ui'
 import { footerLinksIn } from '@/site/content'
 import { site } from '@/site/site.config'
 
@@ -33,9 +33,18 @@ export async function MarketingHeader({ locale }: { locale: Locale }) {
           <Link href="/#templates" className="mk-nl">
             {t('templates')}
           </Link>
-          <Link href="/pricing" className="mk-nl">
-            {t('pricing')}
-          </Link>
+          {/* aria-current on /pricing; until the path resolves, the plain link. */}
+          <Suspense
+            fallback={
+              <Link href="/pricing" className="mk-nl">
+                {t('pricing')}
+              </Link>
+            }
+          >
+            <NavLink href="/pricing" className="mk-nl">
+              {t('pricing')}
+            </NavLink>
+          </Suspense>
           {/* usePathname() is request data on dynamic routes; nothing shows until it resolves. */}
           <Suspense fallback={<span className="size-11" />}>
             <LocaleMenu translatedPaths={zhPaths} />

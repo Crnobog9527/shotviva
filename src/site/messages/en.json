@@ -588,7 +588,6 @@
       "plan": {
         "title": "Plan",
         "perPeriod": "<mono>{credits, plural, one {# credit} other {# credits}}</mono> a {interval, select, year {year} other {month}} · <mono>{price}</mono>/{interval, select, year {yr} other {mo}}",
-        "perPeriodMethod": "<mono>{credits, plural, one {# credit} other {# credits}}</mono> a {interval, select, year {year} other {month}} · <mono>{price}</mono>/{interval, select, year {yr} other {mo}} · {method}",
         "member": "Member",
         "noPlan": "No plan",
         "manage": "Manage subscription",
@@ -613,7 +612,6 @@
         "opensStripeBottom": "secure billing page",
         "walletAlipayWhy": "One {interval, select, year {year} other {month}}, paid with <b>{method}</b>. It doesn't renew by itself: renew before {date, date, medium} to keep the plan, or let it end and your credits still work.",
         "alipay": "Alipay",
-        "card": "Card",
         "renewPrice": "Renew <cost>· {price}</cost>",
         "endedPlain": "Your plan ended.",
         "endedTier": "Your {tier} plan ended.",
@@ -921,6 +919,7 @@
     },
     "banner": {
       "text": "这个页面有中文版。",
+      "textSite": "Shotviva 有简体中文版。",
       "switch": "切换到中文",
       "dismiss": "关闭，继续看英文版"
     },
@@ -992,8 +991,8 @@
     "pages": {
       "terms": "Terms",
       "privacy": "Privacy",
-      "refunds": "Refunds",
-      "acceptableUse": "Acceptable use"
+      "refunds": "Refund Policy",
+      "acceptableUse": "Acceptable Use"
     },
     "lastUpdated": "Last updated <date></date>",
     "contents": "Contents",

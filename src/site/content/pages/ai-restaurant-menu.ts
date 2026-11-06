@@ -2,6 +2,7 @@ import { defineContentPage, type CostBills } from '@/core/content'
 
 import { site } from '../../site.config'
 import { CATEGORY, pairImage, sizeCountWord } from '../landing-shared'
+import { pricingRelated } from '../shared'
 import {
   foodHalfDayUsd,
   freeImagesLabel,
@@ -114,6 +115,7 @@ export const aiRestaurantMenu = defineContentPage({
     { href: '/', anchor: 'AI image to image', note: 'The studio: templates for food, products, rooms, pets and art styles.' },
     { href: '/commercial-photography', anchor: 'Commercial product photography', note: 'For shops and sellers who need studio product shots without a photographer.' },
     { href: '/image-to-image-generator', anchor: 'Image to image generator', note: 'For anyone who wants to see how image to image works on a photo.' },
+    pricingRelated(),
   ],
   headings: {
     facts: 'Menu and Delivery-App Photo Sizes',

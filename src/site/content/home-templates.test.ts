@@ -8,7 +8,7 @@ import { templateCategories } from './template-categories'
 import { zhTemplateCategories } from './zh/template-categories'
 
 let day = 0
-const live = (id: string, category: string, extra: { rank?: number; covers?: boolean; description?: string } = {}) => ({
+const live = (id: string, category: string, extra: { rank?: number; covers?: boolean; description?: string; credits?: number } = {}) => ({
   id,
   name: `Name ${id}`,
   description: extra.description ?? `Use of ${id}`,
@@ -17,6 +17,7 @@ const live = (id: string, category: string, extra: { rank?: number; covers?: boo
   coverAfterUrl: extra.covers === false ? null : `https://shotviva.com/assets/covers/${id}/a.webp`,
   featuredRank: extra.rank ?? null,
   createdAt: `2026-11-${String(++day).padStart(2, '0')}T00:00:00Z`,
+  creditsCost: { '1k': extra.credits ?? 2, '2k': 4, '3k': 6 },
 })
 
 // T53, ARCHITECTURE §12 home item 3.
@@ -32,11 +33,12 @@ describe('featured templates from the database', () => {
   })
 
   it('groups under the §5 categories in §5 order, hides empty ones, keeps unknown ones after', () => {
-    const rows = [live('pet', 'Pets', { rank: 1 }), live('art', 'Art Styles', { rank: 2 }), live('odd', 'products', { rank: 3 }), live('dish', 'Food & Drink', { rank: 4 })]
+    const rows = [live('pet', 'Pets', { rank: 1 }), live('art', 'Art Styles', { rank: 2, credits: 1 }), live('odd', 'products', { rank: 3 }), live('dish', 'Food & Drink', { rank: 4 })]
     const { categories, media, defaultId } = featuredSections(templateCategories, rows)
     expect(categories.map((c) => c.name)).toEqual(['Art Styles', 'Food & Drink', 'Pets', 'products'])
     expect(categories[0]?.drag).toBe(true)
-    expect(categories[0]?.templates).toEqual([{ id: 'art', name: 'Name art', use: 'Use of art' }])
+    // Each card carries its own Standard price (建站规格 G4).
+    expect(categories[0]?.templates).toEqual([{ id: 'art', name: 'Name art', use: 'Use of art', credits: 1 }])
     expect(media.pet).toEqual({ before: 'https://shotviva.com/assets/covers/pet/b.webp', after: 'https://shotviva.com/assets/covers/pet/a.webp', live: true })
     expect(defaultId).toBe('pet')
   })
