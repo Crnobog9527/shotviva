@@ -1,14 +1,17 @@
 /**
- * Creates the Stripe catalog for the nine products (ARCHITECTURE §6.2): 6 Products with tax code
- * txcd_10105001 and 15 Prices with lookup_key and metadata.product_id. Idempotent:
+ * Keeps the Stripe catalog equal to site.config's nine products (ARCHITECTURE §6.2): 6 Products
+ * with tax code txcd_10105001 and 15 Prices with lookup_key and metadata.product_id. Idempotent.
+ * Without --apply it only prints the plan (dry run); with --apply it writes:
  *
- *   STRIPE_SECRET_KEY=sk_test_… pnpm tsx scripts/stripe-setup.ts          # sandbox
- *   STRIPE_SECRET_KEY=sk_live_… pnpm tsx scripts/stripe-setup.ts --live   # at launch
+ *   pnpm tsx --env-file=.env.local scripts/stripe-setup.ts                  # dry run
+ *   pnpm tsx --env-file=.env.local scripts/stripe-setup.ts --apply          # sandbox
+ *   pnpm tsx --env-file=.env.local scripts/stripe-setup.ts --apply --live   # live account
  *
- * What exists and matches is skipped; what is missing is created. If anything that exists
- * disagrees with site.config (amount, interval, product, tax code, metadata), the run stops
- * before writing anything and lists every mismatch: nothing is ever overwritten.
- * The key is read from the environment only and never printed.
+ * What exists and matches is skipped; what is missing is created. A Price whose only difference
+ * is the amount (a price change) is replaced: a new Price takes over its lookup key
+ * (transfer_lookup_key) and the old Price is archived; subscriptions already on the old Price
+ * keep it. Any other disagreement (interval, product, tax code, metadata, archived) stops the
+ * run before anything is written and lists every mismatch. The key is never printed.
  */
 import Stripe from 'stripe'
 import { z } from 'zod'
@@ -20,6 +23,8 @@ import {
   type DesiredProduct,
   type ExistingPrice,
   type ExistingProduct,
+  type PriceReplacement,
+  type SetupPlan,
 } from '../src/core/billing/stripe/setup-plan'
 import { site } from '../src/site/site.config'
 
@@ -37,6 +42,7 @@ if (live && !process.argv.includes('--live')) {
   process.exit(1)
 }
 
+const apply = process.argv.includes('--apply')
 const stripe = new Stripe(key, { maxNetworkRetries: 2 })
 const products = site.billing.products
 
@@ -84,8 +90,8 @@ async function createProduct(product: DesiredProduct): Promise<void> {
   console.log(`created Product ${product.id}`)
 }
 
-async function createPrice(price: DesiredPrice): Promise<void> {
-  await stripe.prices.create({
+async function createPrice(price: DesiredPrice, transferLookupKey = false): Promise<string> {
+  const created = await stripe.prices.create({
     product: price.stripeProduct,
     currency: 'usd',
     unit_amount: price.unitAmount,
@@ -94,12 +100,33 @@ async function createPrice(price: DesiredPrice): Promise<void> {
     lookup_key: price.lookupKey,
     metadata: { product_id: price.productId },
     ...(price.recurring ? { recurring: { interval: price.recurring } } : {}),
+    ...(transferLookupKey ? { transfer_lookup_key: true } : {}),
   })
-  console.log(`created Price ${price.lookupKey}`)
+  console.log(`created Price ${price.lookupKey} (${created.id})`)
+  return created.id
+}
+
+// New Price first (it takes the lookup key in the same call), then the old one is archived, so
+// checkout never finds the key empty. A rerun after a crash between the two finds the key
+// already on the right amount and does nothing.
+async function replacePrice(change: PriceReplacement): Promise<void> {
+  await createPrice(change.price, true)
+  await stripe.prices.update(change.oldId, { active: false })
+  console.log(`archived Price ${change.oldId} (was ${change.oldAmount} cents)`)
+}
+
+function printPlan(plan: SetupPlan): void {
+  for (const product of plan.createProducts) console.log(`  + Product ${product.id}`)
+  for (const price of plan.createPrices) console.log(`  + Price ${price.lookupKey}: ${price.unitAmount} cents`)
+  for (const change of plan.replacePrices) {
+    console.log(`  ~ Price ${change.price.lookupKey}: ${change.oldAmount} → ${change.price.unitAmount} cents (new Price, ${change.oldId} archived)`)
+  }
+  const writes = plan.createProducts.length + plan.createPrices.length + plan.replacePrices.length
+  console.log(writes === 0 ? 'Nothing to do: everything is in place.' : `${writes} change(s) planned.`)
 }
 
 async function main(): Promise<void> {
-  console.log(`Stripe ${live ? 'LIVE' : 'test'} account`)
+  console.log(`Stripe ${live ? 'LIVE' : 'test'} account${apply ? '' : ' (dry run)'}`)
   const plan0 = planSetup({ products, brand: site.brand.name, existingProducts: new Map(), existingPrices: new Map() })
   const productIds = plan0.createProducts.map((p) => p.id)
   const existingProducts = new Map<string, ExistingProduct>()
@@ -115,10 +142,17 @@ async function main(): Promise<void> {
     for (const line of plan.mismatches) console.error(`  - ${line}`)
     process.exit(1)
   }
+  printPlan(plan)
+  if (!apply) {
+    console.log('Dry run: nothing was written. Re-run with --apply to make these changes.')
+    return
+  }
   for (const product of plan.createProducts) await createProduct(product)
   for (const price of plan.createPrices) await createPrice(price)
+  for (const change of plan.replacePrices) await replacePrice(change)
   console.log(
     `Done: ${plan.createProducts.length} Products and ${plan.createPrices.length} Prices created, ` +
+      `${plan.replacePrices.length} Prices replaced, ` +
       `${plan.existingProducts} Products and ${plan.existingPrices} Prices already in place.`,
   )
 }

@@ -105,7 +105,7 @@ describe('checkout.session.completed', () => {
     ])
     expect(await mirrorOf(userId)).toHaveLength(1)
     // T10: one payments row per settled session, however often it is delivered.
-    expect(await paymentsOf(db, userId)).toEqual([expect.objectContaining({ stripe_session_id: session.id, amount_total: 34900 })])
+    expect(await paymentsOf(db, userId)).toEqual([expect.objectContaining({ stripe_session_id: session.id, amount_total: 47900 })])
     expect(h.trackBuy).toHaveBeenCalledTimes(1)
   })
 
