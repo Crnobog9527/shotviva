@@ -9,6 +9,7 @@ import { footerLinksIn } from '@/site/content'
 import { site } from '@/site/site.config'
 
 import './marketing.css'
+import './legal.css'
 
 const zhPaths = site.locales.zhPaths
 

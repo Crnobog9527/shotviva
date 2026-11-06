@@ -775,5 +775,17 @@
     "title": "Something went wrong",
     "body": "This page did not load. Try again in a moment.",
     "retry": "Try again"
+  },
+  "legal": {
+    "pagesLabel": "Legal pages",
+    "pages": {
+      "terms": "Terms",
+      "privacy": "Privacy",
+      "refunds": "Refunds",
+      "acceptableUse": "Acceptable use"
+    },
+    "lastUpdated": "Last updated <date></date>",
+    "contents": "Contents",
+    "questions": "Questions about this page: <mail></mail>"
   }
 }
