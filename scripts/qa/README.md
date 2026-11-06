@@ -1,0 +1,111 @@
+# QA personas and one-click login (T24)
+
+Two local scripts for browser validation on the preview site. One sets up five fixed test
+identities. The other prints a one-time sign-in link for any of them, so nobody has to type an
+email, solve the hCaptcha or go through Google to switch accounts.
+
+They only ever run against the preview Supabase project `shotviva-preview`
+(`pnzkiqvktkzznfbyhphe`). The default site is the validation preview
+`https://shotviva-git-validation-preview-simons-projects-bfe3e99f.vercel.app`.
+
+## Setup (Owner, once)
+
+1. Supabase → project **shotviva-preview** → **Settings → API Keys**. Copy the
+   **service_role** key (legacy tab), or create a **secret** key (`sb_secret_…`).
+2. Put it in `.env.local` at the repo root, and nowhere else:
+
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=https://pnzkiqvktkzznfbyhphe.supabase.co
+   SUPABASE_SERVICE_ROLE_KEY=<the preview service-role key>
+   # The preview R2 bucket, the same values as the Vercel Preview environment:
+   R2_ACCOUNT_ID=…
+   R2_ACCESS_KEY_ID=…
+   R2_SECRET_ACCESS_KEY=…
+   R2_BUCKET=…
+   ```
+
+   `.env.local` is gitignored. Never commit it, paste it or send it anywhere.
+3. Run `pnpm qa:accounts`. The first run prints one SQL line for `qa-admin`'s admin role.
+   Run it once in Supabase → **SQL Editor** on the preview project. `qa-admin` is never
+   recreated, so you only do this once.
+
+## Personas
+
+`pnpm qa:accounts` creates any that are missing and resets the rest to this state. Running it
+twice in a row changes nothing the second time.
+
+| Persona | Email | Starting state |
+|---|---|---|
+| `qa-admin` | qa-admin@shotviva.com | `role = admin` (Owner step above), 6 free + 200 paid credits |
+| `qa-creator` | qa-creator@shotviva.com | 6 free + 100 paid credits, one succeeded private work (placeholder image) on Photos |
+| `qa-fresh` | qa-fresh@shotviva.com | Deleted and recreated every run: no credits, no works, no ledger. Its first sign-in grants the 6 signup credits through the real first-sign-in path |
+| `qa-max` | qa-max@shotviva.com | Max tier from a `max_yearly` purchase (paid until a year after the first run), 6 free + 3360 paid credits |
+| `qa-free` | qa-free@shotviva.com | Signup credits only: 6 free, 0 paid, no tier |
+
+How it gets there:
+
+- Users come from the Supabase Admin API: email already confirmed, no password. No email is
+  sent.
+- Credits and tier change only through the existing SQL functions, so every change is in the
+  credit ledger:
+  - `grant_credits`, with the app's own signup key, so a later first sign-in grants nothing twice.
+  - `apply_purchase('max_yearly')`, with the fixed event id `qa-max:max_yearly`.
+  - `admin_adjust_credits` to reset a pool back to its target. Its key is derived from the
+    persona's latest ledger row, so it only writes when the balance actually moved.
+- `qa-creator`'s work goes through `reserve_credits` and then `confirm_job`, with a job id
+  derived from the user id. The placeholder PNG goes to `outputs/<user id>/<job id>.png` in R2.
+- Banned personas are unbanned with `admin_unban_user`.
+- A persona that drifted past a reset is deleted and recreated, R2 files first, the same way
+  account deletion works. That means `qa-free` after it bought anything, or `qa-max` when it's
+  no longer on Max.
+- The `qa-max` purchase appears in the preview admin orders and revenue as one `max_yearly` order.
+
+The script ends with a table of each persona's role, tier, balances, works, ledger rows and
+what this run did (`created`, `recreated`, `reset` or `unchanged`).
+
+## Signing in
+
+```bash
+pnpm qa:login qa-max
+```
+
+```bash
+pnpm qa:login qa-admin --next /admin
+```
+
+This prints `<site>/auth/confirm?token_hash=…&type=magiclink&next=…`. The link goes through the
+site's normal email-link landing. Opening it signs that browser window in as the persona and
+lands on `next` (default `/account`).
+
+- **The link is a credential.** Open it once, in that persona's own window. Never paste it into
+  a PR, an issue or a chat.
+- Each run makes a new link. A link works once, and it expires with the project's email-link
+  lifetime (1 hour by default).
+- `QA_SITE_URL` points the link at another preview deployment (`https://….vercel.app`) or a
+  local `next dev`. The production domain is refused.
+
+## For Codex (paste-ready)
+
+> Before validating, run `pnpm qa:accounts` (from the repo root, which has the preview
+> `.env.local`). For each browser window, run `pnpm qa:login <persona>` (add
+> `--next /path` to land on a specific page) and open the printed link in that window only.
+> Personas: `qa-admin`, `qa-creator`, `qa-fresh`, `qa-max`, `qa-free`. Never paste the links
+> anywhere; each works once. The window must already be through Vercel's deployment
+> protection.
+
+## Guards
+
+- `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are read from `.env.local` only.
+  A different value exported in the shell is refused.
+- The project ref must be `pnzkiqvktkzznfbyhphe`. `QA_EXTRA_SUPABASE_REFS` (comma separated)
+  can add others, for example `local` for a `supabase start` stack. Refs listed in
+  `PRODUCTION_REFS` (`target.ts`) are always refused, and so is anything that isn't a
+  `<ref>.supabase.co` URL.
+- A JWT service key must carry `role: service_role` and the same `ref` as the URL.
+- The service key is never printed.
+
+## Local run (developers)
+
+Point `.env.local` at a local stack with `QA_EXTRA_SUPABASE_REFS=local` and
+`QA_SITE_URL=http://localhost:3000`. Without R2 settings on a local stack, the placeholder
+upload is skipped and the run says so.
