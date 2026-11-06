@@ -1,9 +1,11 @@
 import { defineSite } from '@/core/config'
 
+import { SITE_DOMAIN } from './domain'
+
 export const site = defineSite({
   brand: {
     name: 'Shotviva',
-    domain: 'shotviva.com',
+    domain: SITE_DOMAIN,
     tagline: 'AI photo studio',
     // Owner 2026-11-05 (T19). Footer and legal pages read these, never a literal.
     legalName: 'Grayscale Luminary LLC',
@@ -58,5 +60,7 @@ export const site = defineSite({
   features: { wishlist: false },
   indexing: {
     indexablePaths: ['/', '/image-to-image-generator', '/pricing'],
+    // The Vercel project's production address (ARCHITECTURE §12.0).
+    canonicalRedirectHosts: ['shotviva.vercel.app'],
   },
 })

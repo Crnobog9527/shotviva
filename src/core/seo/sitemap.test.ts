@@ -1,8 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { isIndexable } from './indexing'
 import { pageSitemapUrls, sitemapIndexXml, urlsetXml } from './sitemap'
 import { testSite, withImageOff } from './test-site'
+
+// These cases describe the open site (SITE_INDEXING=on in production); the closed, pre-launch
+// state is covered in prelaunch.test.ts.
+vi.mock('./indexing-now', () => ({ indexingOpenNow: () => true }))
 
 describe('sitemap', () => {
   it('lists only configured indexable paths, no trailing slash except root', () => {

@@ -15,7 +15,8 @@
     "db:schema": "tsx scripts/db-schema.ts",
     "import:prompts": "tsx --env-file-if-exists=.env.local scripts/import-prompts.ts",
     "qa:accounts": "tsx --env-file=.env.local scripts/qa/accounts.ts",
-    "qa:login": "tsx --env-file=.env.local scripts/qa/login.ts"
+    "qa:login": "tsx --env-file=.env.local scripts/qa/login.ts",
+    "seo:check": "tsx scripts/seo-check.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1162.0",
