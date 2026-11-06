@@ -12,6 +12,8 @@ export const site = defineSite({
     registeredIn: 'Wyoming, United States',
     address: { street: '75 E 3rd St', locality: 'Sheridan', region: 'WY', postalCode: '82801', country: 'United States' },
     contactEmail: 'support@shotviva.com',
+    // Owner 2026-11-07 (spec #175): auth emails come from mail@, an alias of support@.
+    authEmail: 'mail@shotviva.com',
     launchYear: 2026,
     countries: ['United States'],
     // Placeholder until T6 ships a real logo asset.

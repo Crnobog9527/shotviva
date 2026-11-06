@@ -32,9 +32,13 @@ describe.each(Object.entries(TEMPLATES))('supabase/templates/%s.html', (name, ty
     expect(html).toContain('>{{ $link }}</a>')
   })
 
-  it('carries the support address and copyright line and nothing that tracks or needs images', () => {
+  it('says not to reply, links the support address, and carries the copyright line, with nothing that tracks or needs images', () => {
     const { contactEmail, name: brandName } = site.brand
-    expect(html).toContain(`mailto:${contactEmail}`)
+    // Owner 2026-11-07: auth emails come from mail@ (spec #175); replies belong at support@.
+    expect(html).toContain("This is an automated email, please don't reply. Need help? Contact {{ end }}")
+    expect(html).toContain('这是系统自动发送的邮件，请勿直接回复。如需帮助，请联系 {{ else }}')
+    expect(html).toContain(`<a href="mailto:${contactEmail}" style="color:#6b6b66;text-decoration:underline;">${contactEmail}</a></td>`)
+    expect(html).not.toContain('Questions? Email')
     expect(html).toContain(`Copyright &copy; 2026 ${brandName}. All rights reserved.`)
     expect(html).not.toMatch(/<img|<script|<link|url\(/i)
   })
@@ -43,7 +47,8 @@ describe.each(Object.entries(TEMPLATES))('supabase/templates/%s.html', (name, ty
     expect(html).toContain('{{- $zh := eq .Data.locale "zh" -}}')
     expect(html).toContain('<html lang="{{ if $zh }}zh-Hans{{ else }}en{{ end }}">')
     const branches = html.match(/\{\{ if \$zh \}\}([^{]*)\{\{ else \}\}/g) ?? []
-    expect(branches.length).toBeGreaterThanOrEqual(10)
+    // 9 since the no-reply footer line (one branch, no trailing full-stop branch), 2026-11-07.
+    expect(branches.length).toBeGreaterThanOrEqual(9)
     // Every text cell between tags is a language branch: no bare English sentence is left.
     const bare = [...html.matchAll(/>([^<>{}]*[A-Za-z]{3,}[^<>{}]*)</g)].map((m) => m[1]?.trim()).filter((text) => text && text !== 'Shotviva' && !text.includes('@'))
     expect(bare).toEqual([])

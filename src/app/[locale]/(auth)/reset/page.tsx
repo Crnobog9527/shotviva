@@ -7,7 +7,7 @@ import { ResetRequestForm } from '@/core/auth/ui'
 
 import { resetRequestAction } from '@/app/auth/actions'
 
-import { sender } from '../arrived'
+import { sender } from '../sender'
 
 // Sign-in pages are noindex like the rest of the app (建站规格 R6), in both languages, and carry
 // no hreflang (ARCHITECTURE §17); the root template adds " | Shotviva" to the title.

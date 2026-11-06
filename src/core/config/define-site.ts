@@ -62,6 +62,9 @@ export type SiteBrand = {
   // Entity facts for GEO trust signals (建站规格 G8). Also the address for support,
   // refunds and privacy requests on the legal pages.
   contactEmail: string
+  // The From address of the auth emails (Supabase Auth over Resend, ARCHITECTURE §7). Only the
+  // check-your-email views name it; contact links keep contactEmail.
+  authEmail: string
   launchYear: number
   countries: readonly string[]
   logoPath: string

@@ -19,7 +19,7 @@ type Props = {
   next?: string
   // The way back ("Use a different email", "Back to log in").
   back: ReactNode
-  // Shotviva <support@shotviva.com>, from site.config through the page.
+  // Shotviva <mail@shotviva.com> (site.brand.authEmail), from site.config through the page.
   sender: string
   // One more line under the actions (sign-up: "Already have an account? Log in or reset …").
   aside?: ReactNode
