@@ -1,4 +1,5 @@
 export { Link } from './localized-link'
+export { FooterLocales, FooterLocalesFallback } from './footer-locales'
 export { LocaleMenu } from './locale-menu'
 export { LocaleSwitcher, LocaleSwitcherFallback } from './locale-switcher'
 export { SwitchBanner } from './switch-banner'

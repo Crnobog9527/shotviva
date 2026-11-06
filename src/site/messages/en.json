@@ -1,6 +1,34 @@
 {
   "home": {
-    "placeholder": "Coming soon."
+    "placeholder": "Coming soon.",
+    "generator": {
+      "label": "Try it on your photo",
+      "addPhoto": "Add your phone photo",
+      "replace": "Replace",
+      "replaceAria": "Your photo. Replace it",
+      "template": "Template",
+      "size": "Size",
+      "seeAll": "See all templates",
+      "changeTemplate": "Template: {name}. Change template",
+      "changeSize": "Size: {name}. Change size",
+      "notePlaceholder": "Anything to change? (optional)",
+      "uploadPhoto": "Upload photo",
+      "dockGenerate": "Generate",
+      "needsCopy": "Add the text in the workspace",
+      "noTemplates": "Templates are on the way",
+      "gift": "{images} for new users",
+      "pickerTitle": "Pick a template",
+      "pickerText": "Each one keeps your subject as shot and changes the light, the scene or the style.",
+      "pickTemplate": "Pick {name}",
+      "signup": {
+        "title": "Make a free account to develop it",
+        "text": "Your photo and template stay as you set them.",
+        "giftNote": "Shown publicly with a watermark",
+        "email": "Continue with email",
+        "login": "I have an account · Log in",
+        "fine": "By continuing you agree to the <terms>Terms</terms> and the <privacy>Privacy Policy</privacy>."
+      }
+    }
   },
   "auth": {
     "google": "Continue with Google",
@@ -638,8 +666,6 @@
   },
   "footer": {
     "legalNav": "Legal",
-    "official": "{name} — {tagline}. {domain} is the only official {name} site.",
-    "launched": "Launched {year}. Serving {countries}. Contact: <mail>{email}</mail>",
     "copyright": "© {year} {name}",
     "language": "Language"
   },
@@ -653,7 +679,10 @@
     "nav": {
       "label": "Main",
       "pricing": "Pricing",
-      "tagline": "AI photo studio"
+      "tagline": "AI photo studio",
+      "templates": "Templates",
+      "login": "Log in",
+      "startFree": "Start free"
     },
     "hero": {
       "label": "Before and after",
@@ -664,7 +693,21 @@
     "facts": "Key facts",
     "faq": "Frequently asked questions",
     "related": "Related",
-    "templateLine": "<b>{name}</b>: {use}"
+    "home": {
+      "phone": "Phone",
+      "ai": "AI",
+      "illustrative": "Illustrative example",
+      "beforeAlt": "{name} template example: the phone photo before (illustrative example)",
+      "afterAlt": "{name} template example: the AI result, {use} (illustrative example)",
+      "pickAria": "{name}. {use} Pick this template",
+      "compareLabel": "Compare the phone photo and the {name} result",
+      "withDragHint": "{use} Drag the handle to compare.",
+      "preview": "Preview",
+      "freeTag": "Free · public",
+      "paidTag": "Paid · private",
+      "freeSampleAlt": "A free photo with the watermark (illustrative example)",
+      "paidSampleAlt": "The same photo made with paid credits, no watermark (illustrative example)"
+    }
   },
   "pageError": {
     "title": "Something went wrong",

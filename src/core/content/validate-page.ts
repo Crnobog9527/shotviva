@@ -1,6 +1,9 @@
 import type { Locale } from '../i18n/locales'
 import type { PageBasics } from './page-content'
 
+// The fields the TDK / G1 rules read; the home page has no cost table but is checked the same.
+type Checked = Pick<PageBasics, 'title' | 'description' | 'answerBlock' | 'keyword' | 'h1'>
+
 // Rules the type system cannot express (建站规格 R3, G1). Returns problems, empty when valid.
 export const LIMITS = {
   titleMax: 60,
@@ -52,7 +55,7 @@ function titleTooLong(title: string, zh: boolean): boolean {
   return zh && title.replace(BRAND_SUFFIX, '').length > ZH_LIMITS.titleMax
 }
 
-function lengthProblems(page: PageBasics, locale: Locale): string[] {
+function lengthProblems(page: Checked, locale: Locale): string[] {
   const problems: string[] = []
   const zh = locale === 'zh'
   const descriptionMax = zh ? ZH_LIMITS.descriptionMax : LIMITS.descriptionMax
@@ -64,7 +67,7 @@ function lengthProblems(page: PageBasics, locale: Locale): string[] {
   return problems
 }
 
-export function validateContentPage(page: PageBasics, locale: Locale = 'en'): string[] {
+export function validateContentPage(page: Checked, locale: Locale = 'en'): string[] {
   const problems = lengthProblems(page, locale)
   if (!startsWithKeyword(page.answerBlock, page.keyword)) {
     problems.push('answer block must start with the keyword')

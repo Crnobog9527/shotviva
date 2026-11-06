@@ -17,6 +17,7 @@ export function findContentPage(slug: string): ContentPage | undefined {
 export { homePage }
 export { pricingFaq, pricingPage, pricingPayment, type PricingTable } from './pricing'
 export { freeImagesLabel, freeStandardImages } from './offer'
+export { homeTemplates } from './home-templates'
 
 // Module ownership of each page, fed to the indexing switch, sitemap and llms.txt.
 export const pageGates = [homePage, ...contentPages].map(pageGate)
@@ -27,7 +28,6 @@ export function isLinkEnabled(href: string): boolean {
 export { acceptableUsePage, footerLinks, legalPages, privacyPage, refundPolicyPage, termsPage } from './legal'
 export {
   contentPagesIn,
-  countriesIn,
   findContentPageIn,
   footerLinksIn,
   homePageIn,

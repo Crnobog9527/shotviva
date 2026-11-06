@@ -2,13 +2,11 @@ import type { PaymentChannel } from '@/core/config'
 import type { ContentPage, FaqItem, FooterLink, HomePage } from '@/core/content'
 import type { Locale } from '@/core/i18n'
 
-import { site } from '../site.config'
 import { homePage } from './home'
 import { footerLinks } from './legal'
 import { imageToImageGenerator } from './pages/image-to-image-generator'
 import { pricingPage, type PricingContent } from './pricing'
 import { zhHomePage } from './zh/home'
-import { zhCountries } from './zh/offer'
 import { zhImageToImageGenerator } from './zh/pages/image-to-image-generator'
 import { zhPricingPage } from './zh/pricing'
 
@@ -51,8 +49,4 @@ export function findContentPageIn(slug: string, locale: Locale): ContentPage | u
 export function footerLinksIn(locale: Locale): readonly FooterLink[] {
   if (locale === 'en') return footerLinks
   return footerLinks.map((link) => ({ ...link, label: ZH_LEGAL_LABELS[link.href] ?? link.label }))
-}
-
-export function countriesIn(locale: Locale): string {
-  return locale === 'zh' ? zhCountries : site.brand.countries.join(', ')
 }

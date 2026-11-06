@@ -1,4 +1,4 @@
-import { defineHomePage, type HeadedText, type HomePage } from '@/core/content'
+import { defineHomePage, type CostBills, type HeadedText, type HomePage, type ImageRef, type ShootDemo } from '@/core/content'
 
 import { site } from '../site.config'
 import { templateCategories } from './featured-templates'
@@ -7,17 +7,28 @@ import {
   fromCredits,
   freeImagesLabel,
   freeStandardImages,
-  photographerRate,
+  packshotFromUsd,
+  photoSecondsRange,
+  photosLeftInPlan,
   planFrom,
   plansSentence,
+  quoteUsd,
+  retouchUsd,
+  setCostUsd,
+  setCredits,
+  setRetouchUsd,
+  setShotsUsd,
+  SET_PHOTOS,
+  styledShotUsd,
   tierList,
   tierPixels,
   uploadLimits,
   usd,
+  usdRange,
   yearlySaving,
   OUTPUT_TIERS,
 } from './offer'
-import { placeholderHero, sharedCostTable, sharedFacts } from './shared'
+import { sharedFacts } from './shared'
 
 // Final home copy (T11). TDK, H1, subtitle, direct answer and the six H2s are fixed by
 // 建站规格 §4 and G1; the nine FAQ questions and how their answers are written by G6 (T35):
@@ -32,6 +43,66 @@ function plansText(): HeadedText {
   return {
     heading,
     text: `${plansSentence()}${yearly} Paid credits never expire, and every photo you make with them is private and watermark-free. Here is how that compares with a photographer or doing it yourself.`,
+  }
+}
+
+// The illustrative tote set (design/assets/img/hero-set-*.webp, ARCHITECTURE §13 item 2): one
+// phone snapshot and three results from it. All 1080×1350.
+const photo = (file: string, alt: string): ImageRef => ({ src: `/home/${file}.webp`, alt, width: 1080, height: 1350 })
+const phoneShot = photo('hero-set-phone', 'Phone snapshot of a woven leather tote on a busy kitchen counter, window light (illustrative example)')
+const listingShot = photo('hero-set-listing', 'The same woven leather tote as a white-background listing photo, soft studio light (illustrative example)')
+
+const shoot: ShootDemo = {
+  heading: { lead: 'One phone photo → ', emphasis: 'a full shoot' },
+  intro: 'Shot on a phone on a kitchen counter. Three deliverables, and the same tote in every one: the weave, the stitching, the chain.',
+  phone: { image: phoneShot, file: 'IMG_2047.jpg', caption: 'As shot on a phone. Window light, a busy counter, keys and a mug in frame.' },
+  arrow: 'Three templates, same tote',
+  results: [
+    { image: listingShot, title: 'Marketplace listing', template: 'Pure White template' },
+    {
+      image: photo('hero-set-lifestyle', 'The same tote on a café chair by a window, warm morning light (illustrative example)'),
+      title: 'Lifestyle scene',
+      template: 'Lifestyle Table',
+    },
+    {
+      image: photo('hero-set-promo', 'The same tote on a promo poster headed New Season Tote, bright studio light (illustrative example)'),
+      title: 'Promo poster',
+      template: 'Promo Poster',
+    },
+  ],
+  bill: {
+    photographer: { who: 'Photographer', amount: 'A full shoot', note: 'Booking, studio, styling and retouching' },
+    site: { who: brand, amount: `${setCredits} credits`, note: `${SET_PHOTOS} ${OUTPUT_TIERS[0].name} images, from the photo you already took` },
+    line: 'What a photographer would bill as a full shoot, made from the photo you already took.',
+  },
+}
+
+// Two bills for the same job (DESIGN §6.9 item 6): every figure from site.config via offer.ts.
+function costBills(): CostBills {
+  const plan = planFrom ? usd(planFrom.priceUsd) : ''
+  return {
+    heading: `What ${SET_PHOTOS} Product Photos Cost: Photographer vs ${brand}`,
+    intro: `One product, ${SET_PHOTOS} styled photos, retouched and ready to post. The same job, two bills.`,
+    photographer: {
+      title: "A photographer's quote",
+      total: { amount: usdRange(quoteUsd), when: 'delivered in days' },
+      lines: [
+        { label: `${SET_PHOTOS} styled shots, ${usdRange(styledShotUsd)} each`, value: usdRange(setShotsUsd) },
+        { label: `Retouching, ${usdRange(retouchUsd)} an image`, value: usdRange(setRetouchUsd) },
+        { label: 'Booking, shoot, edits', value: 'days' },
+      ],
+      fine: `Typical published 2026 US studio rates; plain-white packshots start around ${usd(packshotFromUsd)} a photo. Your quotes will vary.`,
+    },
+    site: {
+      title: brand,
+      total: { prefix: 'from', amount: plan, suffix: '/month', when: `${photoSecondsRange} seconds a photo` },
+      lines: [
+        { label: `Starter plan, ${planFrom?.credits ?? ''} credits a month`, value: plan },
+        { label: `These ${SET_PHOTOS} photos, ${standard.name}`, value: `${setCredits} credits ≈ ${setCostUsd ?? ''}` },
+        { label: 'Left for the rest of the month', value: `${photosLeftInPlan ?? ''} more photos` },
+      ],
+      fine: `Styling and retouching are in the template, and your subject stays as you shot it. Start with ${freeImagesLabel}, no card needed.`,
+    },
   }
 }
 
@@ -66,12 +137,19 @@ export const homePage = defineHomePage({
   subtitle:
     'The AI photo studio that starts from your real photo. What you shot stays; the template changes the light, the scene or the art style.',
   answerBlock: `Image to image AI takes a photo you already have and gives it a new look while the subject stays as shot. With ${brand} you upload one phone photo, pick a template for food, products, rooms, pets or an art style, and download it in ${tierList}. No prompts to write. New users get ${freeImagesLabel}.`,
-  hero: placeholderHero('Same photo, same subject: the template changed only the light and the background.'),
-  demoNote: `One phone photo can become a full set: a white-background listing photo, a lifestyle scene and a promo poster, each with the same product. Hiring a photographer for a set like this often costs ${photographerRate}.`,
+  hero: {
+    before: phoneShot,
+    after: listingShot,
+    caption: 'Your phone photo → Pure White template: same tote, only the light and background changed · Illustrative example',
+    cta: { label: 'Upload photo', href: '/generate' },
+  },
+  shoot,
   steps,
   templateGrid: {
     heading: 'Img to Img Templates: No Prompts to Write',
     intro: `Every template starts from your phone photo and ends with a finished picture. Pick one and ${brand} does the rest. Templates cost ${fromCredits} a photo.`,
+    note: 'All template images are illustrative examples.',
+    price: fromCredits,
     categories: templateCategories,
   },
   facts: sharedFacts(),
@@ -89,8 +167,9 @@ export const homePage = defineHomePage({
       },
     ],
     plans: plansText(),
+    sample: { src: '/home/templates/spa-podium-after.webp', alt: '', width: 900, height: 1125 },
   },
-  costTable: sharedCostTable(),
+  costBills: costBills(),
   faq: [
     // A: the fixed first sentence names the brand and the keyword together (建站规格 G6).
     {
@@ -158,7 +237,6 @@ export const homePage = defineHomePage({
   ],
   headings: {
     facts: 'AI Image to Image: What Stays the Same',
-    costTable: `Hiring a Photographer vs ${brand}`,
     faq: 'Image to Image AI FAQ',
     related: 'Image to Image AI for Food, Products, Rooms and More',
   },

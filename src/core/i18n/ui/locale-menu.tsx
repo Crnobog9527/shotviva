@@ -42,15 +42,18 @@ export function LocaleMenu({ translatedPaths, className }: Props) {
   const path = usePathname()
   const ref = useCloseOnOutside()
   return (
-    <details ref={ref} className={cn('relative', className)}>
+    <details ref={ref} className={cn('group relative', className)}>
       <summary
         aria-label={t('label')}
         title={t('label')}
-        className="flex size-11 cursor-pointer list-none items-center justify-center rounded-full hover:bg-wash [&::-webkit-details-marker]:hidden"
+        className="grid size-11 cursor-pointer list-none place-items-center [&::-webkit-details-marker]:hidden"
       >
-        <Globe aria-hidden className="size-5" />
+        {/* 36px disc in a 44px hit area; solid bone while the menu is open (v3-b comp). */}
+        <span className="grid size-9 place-items-center rounded-full bg-wash text-bone-dim hairline transition-colors duration-200 hover:bg-wash-strong hover:text-foreground group-open:bg-foreground group-open:text-background group-open:shadow-none">
+          <Globe aria-hidden className="size-[18px]" strokeWidth={1.8} />
+        </span>
       </summary>
-      <ul className="absolute right-0 z-50 mt-1 min-w-40 rounded-control bg-card p-1 shadow-lg hairline">
+      <ul className="absolute top-[calc(100%+4px)] right-0 z-60 min-w-[196px] rounded-control bg-popover p-1.5 shadow-[inset_0_0_0_1px_var(--border),0_24px_48px_-16px_rgba(0,0,0,.7)]">
         {LOCALES.map((locale) => (
           <li key={locale}>
             <a
@@ -63,12 +66,12 @@ export function LocaleMenu({ translatedPaths, className }: Props) {
                 keepQuery(event.currentTarget)
               }}
               className={cn(
-                'flex min-h-11 items-center gap-2 rounded-button px-3 text-body hover:bg-wash',
+                'flex min-h-11 items-center justify-between gap-3 rounded-[10px] pr-2.5 pl-3 text-[15px] font-medium hover:bg-wash',
                 locale === 'zh' && current === 'en' && 'font-cjk-system',
               )}
             >
-              <Check aria-hidden className={cn('size-4', locale !== current && 'invisible')} />
               {t(locale)}
+              <Check aria-hidden strokeWidth={2.4} className={cn('size-4 text-primary', locale !== current && 'invisible')} />
             </a>
           </li>
         ))}

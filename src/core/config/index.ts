@@ -1,5 +1,6 @@
 export { MEMBERSHIP_TIERS, PRODUCT_IDS, defineSite } from './define-site'
 export type {
+  MarketingNumbers,
   MembershipProduct,
   MembershipTier,
   ModuleId,
@@ -13,6 +14,7 @@ export type {
   SiteBrand,
   SiteConfig,
   SiteProduct,
+  UsdRange,
 } from './define-site'
 export { MODULE_ROUTES, isModuleEnabled, isPathEnabled, moduleForPath, requireModule } from './modules'
 export { PRICE_PENDING, formatProductPrice, pricedProducts } from './price'

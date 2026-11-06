@@ -39,9 +39,6 @@ export const zhUploadLimits = `${formats.slice(0, -1).join('、')} 或 ${formats
 const LANGUAGE_NAMES: Record<string, string> = { en: '英文', zh: '简体中文' }
 export const zhLanguages = site.locales.enabled.map((code) => LANGUAGE_NAMES[code] ?? code).join('、')
 
-const COUNTRY_NAMES: Record<string, string> = { 'United States': '美国' }
-export const zhCountries = site.brand.countries.map((name) => COUNTRY_NAMES[name] ?? name).join('、')
-
 // Same market rate as offer.ts (Snappr, US city, 2026), in dollars like every other figure.
 export const zhPhotographerRate = `美国城市每小时 ${usd(PHOTOGRAPHER_HOURLY_USD.low)}–${usd(PHOTOGRAPHER_HOURLY_USD.high)}`
 
