@@ -4,7 +4,8 @@ import { createContext, useContext, useMemo, useState, type ReactNode } from "re
 
 import { trackPaywallView } from "../../analytics/browser"
 import type { EventProps } from "../../analytics/events"
-import type { SiteProduct } from "../../config"
+import type { PaymentChannel, SiteProduct } from "../../config"
+import { PaymentChannelContext } from "./channel-context"
 import { PaywallSheet } from "./paywall-sheet"
 import { usePaywallState, type PaywallOpenOptions } from "./use-paywall-state"
 
@@ -16,8 +17,10 @@ const PaywallContext = createContext<PaywallApi | null>(null)
 
 // One paywall per page tree: the app shell and /pricing mount this, and every entry point
 // ("Get credits", the balance chip, a plan on /pricing) opens the same sheet. Products come in
-// as props: core never imports the site config.
-export function PaywallProvider({ products, wishlistLive, children }: { products: readonly SiteProduct[]; wishlistLive: boolean; children: ReactNode }) {
+// as props: core never imports the site config. `channel` is the server's PAYMENT_CHANNEL.
+type ProviderProps = { products: readonly SiteProduct[]; wishlistLive: boolean; channel: PaymentChannel; children: ReactNode }
+
+export function PaywallProvider({ products, wishlistLive, channel, children }: ProviderProps) {
   const [open, setOpen] = useState(false)
   const [trigger, setTrigger] = useState<PaywallTrigger>("account")
   const state = usePaywallState()
@@ -34,10 +37,12 @@ export function PaywallProvider({ products, wishlistLive, children }: { products
     [reset],
   )
   return (
-    <PaywallContext.Provider value={api}>
-      {children}
-      <PaywallSheet open={open} onOpenChange={setOpen} trigger={trigger} products={products} wishlistLive={wishlistLive} state={state} />
-    </PaywallContext.Provider>
+    <PaymentChannelContext.Provider value={channel}>
+      <PaywallContext.Provider value={api}>
+        {children}
+        <PaywallSheet open={open} onOpenChange={setOpen} trigger={trigger} products={products} wishlistLive={wishlistLive} state={state} />
+      </PaywallContext.Provider>
+    </PaymentChannelContext.Provider>
   )
 }
 

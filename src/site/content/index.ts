@@ -15,7 +15,7 @@ export function findContentPage(slug: string): ContentPage | undefined {
 }
 
 export { homePage }
-export { pricingPage, type PricingTable } from './pricing'
+export { pricingFaq, pricingPage, pricingPayment, type PricingTable } from './pricing'
 export { freeImagesLabel, freeStandardImages } from './offer'
 
 // Module ownership of each page, fed to the indexing switch, sitemap and llms.txt.

@@ -4,16 +4,26 @@ import { useTranslations } from "next-intl"
 
 import { cn } from "../../ui/cn"
 import { CHECKOUT_METHODS, type CheckoutMethod } from "../stripe/catalog"
+import { methodLabel, methodNote } from "./copy"
 import type { Period } from "./offer"
+import { usePaymentChannel } from "./channel-context"
 
 type Props = { method: CheckoutMethod; onChange(method: CheckoutMethod): void; kind: "plan" | "pack"; period: Period }
 
 // The two payment groups (DESIGN §4.5): card with Apple Pay and Google Pay, and Alipay. For a
-// plan the card renews and Alipay buys one period; for a pack both are one-time.
+// plan the card renews and Alipay buys one period; for a pack both are one-time. On Waffo
+// (ARCHITECTURE §6.3) both are one-time and nothing mentions renewing (copy.ts).
 export function PayMethods({ method, onChange, kind, period }: Props) {
   const t = useTranslations("paywall")
-  const note = (m: CheckoutMethod) =>
-    kind === "pack" ? t("oneTime") : m === "card" ? t("cardRenews") : t("walletOnce", { period })
+  const channel = usePaymentChannel()
+  const label = (m: CheckoutMethod) => {
+    const msg = methodLabel(channel, m)
+    return t(msg.key, msg.values)
+  }
+  const note = (m: CheckoutMethod) => {
+    const msg = methodNote(channel, { kind, method: m, period })
+    return t(msg.key, msg.values)
+  }
   return (
     <>
       <div className="mt-6 mb-2.5 flex items-baseline justify-between px-0.5">
@@ -38,7 +48,7 @@ export function PayMethods({ method, onChange, kind, period }: Props) {
               className="size-5 flex-none appearance-none rounded-full shadow-[inset_0_0_0_1.5px_var(--input)] checked:shadow-[inset_0_0_0_6px_var(--foreground)]"
             />
             <span className="flex-1 text-body leading-tight font-medium">
-              {t(m)}
+              {label(m)}
               <small className="mt-0.5 block text-caption font-normal text-muted-foreground">{note(m)}</small>
             </span>
             <MethodMark method={m} />
