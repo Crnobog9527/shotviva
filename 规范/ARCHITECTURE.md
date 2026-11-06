@@ -482,6 +482,14 @@ v1 后台（Owner 2026-11-06 扩充；T23 做外壳和运营页）：**一个后
 - **可疑注册**：`admin_signup_ip_clusters(p_days)` 列出近 24 小时或 7 天内同一 IP 注册 ≥3 个账号的情况，可以逐个封禁。
 - **按 Stripe id 重放入账**（T26）：后台输入 `cs_…` 后，从 Stripe 取回 session，确认已付款，预览将入账的内容，Owner 确认后走和回调同一个 `settle_checkout`（同一个幂等键，回调和重放谁先到都只入账一次）。输入 `sub_…` 则调用 `sync_subscription`。每次重放写审计日志 `replay_checkout`。Waffo 的重放等 T13。
 - **概览「待处理」条**（T26）：`admin_todo_counts()` 一次返回卡住的任务、近 1 小时和 24 小时失败率、待审需求、待处理的退款和争议、最近一次入账时间，以及当前在用的供应商和模型，每项都有索引支撑。
+- **T25 / T26 的审计写入与同 IP 规则的实现**（总控 2026-11-06 补）：
+  - `admin_view_work(p_job_id)`：一次往返内写一行 `view_work` 审计（`user_id` 为作品主人，`target_id` 为 job id，原因固定为「客服查看作品」，不要求 Owner 每次填写），并返回签地址需要的 `user_id`、`status`、`output_key`、`input_key`、`created_at`。
+  - `admin_log_replay(p_user_id, p_target_id, p_reason)`：只能写 `replay_checkout`。重放时先调 `settle_checkout`（它本身是幂等的），再调这个函数写审计，一共两次调用；审计写入失败只记日志。这是 AGENTS §5.1 第 1 条的例外，只用于后台重放。
+  - 同 IP 限制写在 `grant_credits` 里，只对幂等键 `signup:<本人 id>` 的注册赠送生效，签名不变：
+    - 判断依据是本账号的注册时间：同一个 `signup_ip` 上，如果有别的账号在本账号注册前 24 小时内（含之后）拿过注册赠送，本账号就不发赠送、不写流水，返回 `applied = false`。以后再登录也不会补发。
+    - 按 IP 加 advisory lock，防止两个账号同时验证、都拿到赠送。
+    - PostHog 的 `signup` 事件改为在首次写入 `signup_ip` 时发送，这样被限制的账号也会计入。
+    - 被限制的账号在账号页显示一句说明，中英文都要有。
 - **站内工单**（T27，Owner 2026-11-06 定，详细设计见 `docs/proposals/admin-roadmap.md` A8，本节是规范口径）：
   - **用户侧入口**：账号页的「Help & feedback」和页脚的「Contact」。付费墙、`/pricing`、订阅区块里不放任何退款入口。
   - **提交工单**：
