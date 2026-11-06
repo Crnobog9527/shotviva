@@ -2,13 +2,15 @@ import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
 import Link from 'next/link'
 
+import { site } from '@/site/site.config'
+
 import { fontVariables } from './fonts'
 import './globals.css'
 
 // An address that matches no route at all has no [locale] root layout to render in, so Next
 // serves this document on its own (experimental.globalNotFound). /zh addresses never get here:
 // the proxy answers them first, so it is English. next/link: there is no locale context.
-export const metadata: Metadata = { title: 'Page not found', robots: { index: false, follow: false } }
+export const metadata: Metadata = { title: `Page not found | ${site.brand.name}`, robots: { index: false, follow: false } }
 
 export default async function GlobalNotFound() {
   const t = await getTranslations({ locale: 'en', namespace: 'notFound' })

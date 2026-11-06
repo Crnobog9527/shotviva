@@ -13,7 +13,7 @@ export const imageToImageGenerator = defineContentPage({
   keyword: 'image to image generator',
   label: 'Image to image generator',
   module: 'image',
-  title: 'Image to Image Generator: Templates, No Prompts (2026)',
+  title: `Image to Image Generator: No Prompts (2026) | ${brand}`,
   description: `Image to image generator with templates for food, products, rooms, pets and art styles. Upload a photo, no prompts. ${freeImagesLabel}.`,
   h1: 'Image to Image Generator With Ready-Made Templates',
   subtitle: 'Start from your own photo, not a blank text box. The subject stays as shot.',

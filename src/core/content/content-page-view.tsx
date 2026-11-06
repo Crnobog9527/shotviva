@@ -6,7 +6,7 @@ import { FactsSection } from './blocks/facts-section'
 import { FaqSection } from './blocks/faq-section'
 import { HeroSection } from './blocks/hero-section'
 import { RelatedLinks } from './blocks/related-links'
-import type { ContentPage } from './page-content'
+import type { ContentPage, PageBasics } from './page-content'
 
 type Props = {
   page: ContentPage
@@ -16,7 +16,7 @@ type Props = {
   isLinkEnabled?: (href: string) => boolean
 }
 
-export function PageHeader({ page }: { page: ContentPage }) {
+export function PageHeader({ page }: { page: PageBasics }) {
   return (
     <header>
       <h1>{page.h1}</h1>

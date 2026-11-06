@@ -31,9 +31,18 @@ export type CostTable = {
   rows: readonly [CostRow, ...CostRow[]]
 }
 
-// Block ④: 3–5 questions in the user's own words. `link` renders after the answer text
-// (e.g. FAQ D on the home page points to /image-to-image-generator, 建站规格 G6).
-export type FaqItem = { question: string; answer: string; link?: { href: `/${string}`; anchor: string } }
+// Block ④: 3–5 questions in the user's own words (the home page has nine, 建站规格 G6). `link`
+// renders after the answer text (e.g. FAQ D on the home page points to
+// /image-to-image-generator). `table` renders right after the answer as a real <table> (G5);
+// the FAQPage structured data carries only the question and the answer text.
+export type FaqTableRow = readonly [label: string, ...cells: string[]]
+export type FaqTable = { caption: string; headers: FaqTableRow; rows: readonly [FaqTableRow, ...FaqTableRow[]] }
+export type FaqItem = {
+  question: string
+  answer: string
+  link?: { href: `/${string}`; anchor: string }
+  table?: FaqTable
+}
 
 // Block ⑤: 2–3 related pages. `note` says in one line who the page is for (建站规格 §4 H2-6).
 export type RelatedLink = { href: `/${string}`; anchor: string; note?: string }
@@ -45,7 +54,9 @@ type AtLeast3<T> = readonly [T, T, T, ...T[]]
 type Between3And5<T> = readonly [T, T, T] | readonly [T, T, T, T] | readonly [T, T, T, T, T]
 type Between2And3<T> = readonly [T, T] | readonly [T, T, T]
 
-export type ContentPage = {
+// Everything a page has besides its FAQ, which differs in length between the home page and
+// the inner pages.
+export type PageBasics = {
   // URL segment; the home page uses '' and lives at '/'.
   slug: string
   keyword: string
@@ -61,12 +72,17 @@ export type ContentPage = {
   hero: HeroBlock
   facts: AtLeast3<Fact>
   costTable: CostTable
-  faq: Between3And5<FaqItem>
   related: Between2And3<RelatedLink>
   headings?: SectionHeadings
   // Pages that only make sense with a module on disappear with it.
   module?: ModuleId
 }
+
+export type ContentPage = PageBasics & { faq: Between3And5<FaqItem> }
+
+// The home FAQ is exactly the nine questions of 建站规格 G6, in order A–I.
+type Nine<T> = readonly [T, T, T, T, T, T, T, T, T]
+export type HomeFaq = Nine<FaqItem>
 
 export type TemplateCard = { name: string; use: string }
 
@@ -82,8 +98,9 @@ export type HeadedText = { heading: string; text: string }
 
 // The home page is the same structure plus the 3-step block, the grouped template grid and
 // the free-offer section (ARCHITECTURE §13, 建站规格 §4 six-H2 skeleton).
-export type HomePage = ContentPage & {
+export type HomePage = PageBasics & {
   slug: ''
+  faq: HomeFaq
   subtitle: string
   // One line under the hero pair: "one phone photo, a full set" (ARCHITECTURE §13 item 2).
   demoNote: string
@@ -108,6 +125,6 @@ export function pagePath(page: Pick<ContentPage, 'slug'>): `/${string}` {
   return `/${page.slug}`
 }
 
-export function pageGate(page: ContentPage): { path: `/${string}`; module?: ModuleId } {
+export function pageGate(page: Pick<PageBasics, 'slug' | 'module'>): { path: `/${string}`; module?: ModuleId } {
   return page.module ? { path: pagePath(page), module: page.module } : { path: pagePath(page) }
 }
