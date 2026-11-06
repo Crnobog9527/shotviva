@@ -199,7 +199,7 @@
     },
     "account": {
       "title": "Graylum",
-      "description": "用你的 Shotviva 积分在 Graylum 里出图。",
+      "description": "不懂运营也能做好自媒体。Graylum 像专业运营一样陪你定方向、出内容、看数据复盘，告诉你下一步做什么。连接后，配图直接用 Shotviva 积分生成。",
       "connected": "<b>{date, date, medium}</b> 起已连接。Graylum 可以用你的积分出图。",
       "notConnected": "未连接。要连接，请从 Graylum 发起，并允许它使用你的积分。",
       "disconnect": "断开 Graylum"
