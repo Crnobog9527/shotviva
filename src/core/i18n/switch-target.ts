@@ -12,3 +12,10 @@ export function switchHref(path: string, locale: Locale, translatedPaths: readon
   const target = otherLocale(locale)
   return localizePath(matchesPaths(path, translatedPaths) ? path : '/', target)
 }
+
+// One language's version of the current page, for the globe menu: the page itself when it
+// exists in that language, otherwise that language's home (ARCHITECTURE §17).
+export function hrefIn(locale: Locale, path: string, translatedPaths: readonly string[]): string {
+  if (locale === DEFAULT_LOCALE) return path
+  return localizePath(matchesPaths(path, translatedPaths) ? path : '/', locale)
+}

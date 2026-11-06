@@ -97,5 +97,9 @@ describe('MiSans attribution (ARCHITECTURE §17, DESIGN §6.9)', () => {
     const text = JSON.stringify(notices?.blocks)
     expect(text).toContain('This site uses the MiSans font, © Xiaomi.')
     expect(notices?.blocks.flatMap(blockLinks).map((link) => link.href)).toContain('/fonts/misans/LICENSE.pdf')
+    // The self-hosted Latin fonts, as their OFL files state them.
+    expect(text).toContain('Copyright 2024 The Geist Project Authors')
+    expect(text).toContain('Copyright 2022 The Instrument Serif Project Authors')
+    expect(text).toContain('SIL Open Font License, Version 1.1')
   })
 })

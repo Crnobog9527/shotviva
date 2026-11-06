@@ -7,17 +7,9 @@ import { rememberLocale } from '../locale-cookie'
 import { isLocale } from '../locales'
 import { usePathname } from '../navigation'
 import { otherLocale, switchHref } from '../switch-target'
+import { keepQuery } from './keep-query'
 
 type Props = { translatedPaths: readonly string[]; className?: string }
-
-// The same page in the other language keeps its query (Graylum's state and return_to on
-// /connect/graylum, `next` on /login). Added at click time: the rendered href stays the clean
-// page address for crawlers, and static pages never read search params while rendering.
-function keepQuery(link: HTMLAnchorElement): void {
-  const { search } = window.location
-  const samePage = link.pathname !== '/' && link.pathname !== '/zh'
-  if (search && samePage && !link.search) link.search = search
-}
 
 // Header / footer language switch (建站规格 §6): a real <a href>, never a JS redirect, so
 // crawlers follow it and it works without hydration. The click also stores the choice.

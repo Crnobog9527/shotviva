@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { localeOfPath, localeOfReferer, localizePath, matchesPaths, splitLocale } from './paths'
-import { otherLocale, switchHref } from './switch-target'
+import { hrefIn, otherLocale, switchHref } from './switch-target'
 
 const zhPaths = ['/', '/pricing', '/generate', '/generate/[templateId]', '/reset/update']
 
@@ -62,5 +62,15 @@ describe('switchHref (LAUNCH §7.6)', () => {
   it('has exactly two languages', () => {
     expect(otherLocale('en')).toBe('zh')
     expect(otherLocale('zh')).toBe('en')
+  })
+})
+
+describe('globe menu targets (DESIGN §6.9 item 4)', () => {
+  it('offers the same page in each language, the Chinese home for English-only pages', () => {
+    expect(hrefIn('en', '/pricing', zhPaths)).toBe('/pricing')
+    expect(hrefIn('zh', '/pricing', zhPaths)).toBe('/zh/pricing')
+    expect(hrefIn('zh', '/generate/pure-white', zhPaths)).toBe('/zh/generate/pure-white')
+    expect(hrefIn('zh', '/terms', zhPaths)).toBe('/zh')
+    expect(hrefIn('en', '/terms', zhPaths)).toBe('/terms')
   })
 })

@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 
 import { AnnouncementBanner } from '@/core/announcements'
 import { SiteFooter } from '@/core/content'
-import { Link, LocaleSwitcher, LocaleSwitcherFallback, SwitchBanner } from '@/core/i18n/ui'
+import { Link, LocaleMenu, LocaleSwitcher, LocaleSwitcherFallback, SwitchBanner } from '@/core/i18n/ui'
 import { footerLinks } from '@/site/content'
 import { site } from '@/site/site.config'
 
@@ -18,7 +18,8 @@ function Switcher({ className }: { className?: string }) {
 }
 
 // Placeholder marketing shell (T6 designs it): nav + content + footer (ARCHITECTURE §1).
-// The language switch sits in the header and the footer (ARCHITECTURE §17).
+// Language: the globe menu in the top nav after Pricing, visible on phones too, and the text
+// switch in the footer (DESIGN §6.9 item 4, ARCHITECTURE §17).
 export default function MarketingLayout({ children }: LayoutProps<'/[locale]'>) {
   return (
     <>
@@ -30,9 +31,14 @@ export default function MarketingLayout({ children }: LayoutProps<'/[locale]'>) 
         <Link href="/">
           {site.brand.name} <span>{site.brand.tagline}</span>
         </Link>
-        <nav className="flex items-center gap-4">
-          <Link href="/pricing">Pricing</Link>
-          <Switcher />
+        <nav className="flex items-center gap-2">
+          <Link href="/pricing" className="inline-flex min-h-11 items-center px-2">
+            Pricing
+          </Link>
+          {/* usePathname() is request data on dynamic routes; nothing shows until it resolves. */}
+          <Suspense fallback={<span className="size-11" />}>
+            <LocaleMenu translatedPaths={zhPaths} />
+          </Suspense>
         </nav>
       </header>
       <main className="flex flex-1 flex-col">{children}</main>
