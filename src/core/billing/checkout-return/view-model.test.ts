@@ -18,6 +18,7 @@ const settled = (overrides: Partial<CheckoutFacts> = {}): CheckoutFacts => ({
   card: { brand: 'visa', last4: '4242' },
   receiptUrl: 'https://pay.stripe.com/receipts/x',
   recurring: true,
+  paymentKey: 'cs_test_1',
   renewsAt: '2026-12-06T00:00:00.000Z',
   ...overrides,
 })

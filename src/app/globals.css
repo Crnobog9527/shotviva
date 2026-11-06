@@ -2,6 +2,7 @@
 /* Tier and pack materials for the paywall and /pricing (T37). */
 @import "../core/billing/paywall/tiers.css";
 @import "../core/content/blocks/business-slip.css";
+@import "../core/billing/checkout-return/celebration/celebration.css";
 /* The living background (T54): inlined here so it adds no render-blocking request. */
 @import "../core/ui/living-background.css";
 
