@@ -11,7 +11,12 @@ export function RevenueCards({ stats }: { stats: RevenueStats }) {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
       {stats.windows.map((window) => (
-        <StatCard key={window.key} title={`${title(window, stats.days)} · ${COPY.revenue}`} value={usd.format(window.revenue_usd)} hint={COPY.purchases(window.purchases)} />
+        <StatCard
+          key={window.key}
+          title={`${title(window, stats.days)} · ${COPY.revenue}`}
+          value={usd.format(window.revenue_usd)}
+          hint={COPY.purchases(window.purchases)}
+        />
       ))}
     </div>
   )

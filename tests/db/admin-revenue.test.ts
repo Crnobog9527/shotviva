@@ -8,11 +8,12 @@ import { listPurchases, loadRevenueStats, type RevenueStats } from '@/core/admin
 import { connectAdmin, retryAuth } from './helpers'
 import { anonSupabase, serviceSupabase } from './supabase-env'
 
-// T23 PR B: admin_revenue_stats (Plan A: list price from the ledger) against direct SQL in one
+// admin_revenue_stats (source: payments since 0168, net of tax and refunds) against direct SQL in one
 // repeatable-read snapshot, and the purchase list through the real T9 settle path.
 
 let db: Client
 let buyer: string
+let renewalInvoice: string
 const service = serviceSupabase()
 
 beforeAll(async () => {
@@ -26,6 +27,28 @@ beforeAll(async () => {
   // Real settle paths: Stripe checkout (cs_) and a Waffo-style event id.
   await db.query("select public.apply_purchase($1, 'pack_s', $2)", [buyer, `cs_test_${randomUUID().slice(0, 8)}`])
   await db.query("select public.apply_purchase($1, 'starter_monthly', $2)", [buyer, `waffo-${randomUUID().slice(0, 8)}`])
+  // T10: payments rows come from settle_checkout (first payment / one-off) and
+  // apply_subscription_renewal (renewals), as the webhook writes them.
+  const id = randomUUID().replaceAll('-', '').slice(0, 16)
+  await db.query(
+    `select public.settle_checkout($1, 'pack_m', $2, p_amount_total => 2490, p_currency => 'usd', p_amount_tax => 0,
+       p_method => 'alipay', p_charge_id => $3)`,
+    [buyer, `cs_test_${id}`, `py_${id}`],
+  )
+  renewalInvoice = `in_${id}`
+  await db.query(
+    `select public.apply_subscription_renewal($1, 'pro_monthly', $2, now() + interval '30 days', 5427, 'usd', 437, 'card', $3)`,
+    [buyer, renewalInvoice, `ch_${id}`],
+  )
+  await db.query("select public.record_payment_issue($1, 'refunded', 1000)", [`ch_${id}`])
+  // Rows no T10 function writes yet: a Waffo payment (T13) and a non-USD one. Inserted as the
+  // database owner, test data only.
+  await db.query(
+    `insert into public.payments (user_id, product_id, channel, waffo_order_id, stripe_session_id, amount_total, currency, method)
+     values ($1, 'starter_monthly', 'waffo', $2, null, 1990, 'usd', 'card'),
+            ($1, 'pack_s', 'stripe', null, $3, 1500, 'eur', 'card')`,
+    [buyer, `wf-${id}`, `cs_test_eur_${id}`],
+  )
 }, 120_000)
 
 afterAll(async () => {
@@ -40,9 +63,9 @@ const DIRECT = `
     union all select 'period', today - interval '29 days' from b
   )
   select w.key,
-    (select count(*) from public.credit_ledger where kind = 'purchase' and created_at >= w.since)::int as purchases,
-    (select coalesce(sum(p.price_usd), 0) from public.credit_ledger l left join public.products p on p.id = l.product_id
-      where l.kind = 'purchase' and l.created_at >= w.since)::numeric as revenue_usd
+    (select count(*) from public.payments where created_at >= w.since)::int as purchases,
+    (select coalesce(sum(amount_total - amount_tax - amount_refunded), 0) / 100.0 from public.payments
+      where created_at >= w.since and currency = 'usd')::numeric as revenue_usd
   from w`
 
 async function snapshot(): Promise<{ stats: RevenueStats; direct: { key: string; purchases: number; revenue_usd: string }[] }> {
@@ -58,7 +81,7 @@ async function snapshot(): Promise<{ stats: RevenueStats; direct: { key: string;
 }
 
 describe('admin_revenue_stats', () => {
-  it('matches direct list-price sums for today, 7 and 30 days', async () => {
+  it('matches direct net sums over payments for today, 7 and 30 days', async () => {
     const { stats, direct } = await snapshot()
     for (const row of direct) {
       const window = stats.windows.find((w) => w.key === row.key)!
@@ -67,11 +90,21 @@ describe('admin_revenue_stats', () => {
     }
   })
 
+  it('counts this buyer net of tax and refunds, and leaves the non-USD payment out of revenue', async () => {
+    const { rows } = await db.query<{ net: string }>(
+      "select sum(amount_total - amount_tax - amount_refunded) filter (where currency = 'usd') as net from public.payments where user_id = $1",
+      [buyer],
+    )
+    // pack_m 2490 + pro_monthly (5427 − 437 tax − 1000 refunded) + Waffo 1990 = 8470 cents.
+    expect(Number(rows[0]!.net)).toBe(8470)
+  })
+
   it('splits by product and channel, and the trend adds up to the period', async () => {
     const { stats } = await snapshot()
     expect(stats.by_product).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ product_id: 'pack_s', channel: 'stripe' }),
+        expect.objectContaining({ product_id: 'pack_m', channel: 'stripe' }),
+        expect.objectContaining({ product_id: 'pro_monthly', channel: 'stripe' }),
         expect.objectContaining({ product_id: 'starter_monthly', channel: 'waffo' }),
       ]),
     )
@@ -87,15 +120,33 @@ describe('admin_revenue_stats', () => {
   })
 })
 
-describe('purchase list', () => {
-  it('lists purchases newest first with list price, channel and the buyer email', async () => {
+describe('purchase list (payments)', () => {
+  it('lists payments newest first with what was charged, method, status and the buyer email', async () => {
     const page = await listPurchases(service)
     const mine = page.items.filter((row) => row.userId === buyer)
-    expect(mine.map((row) => [row.productId, row.channel, row.form])).toEqual([
-      ['starter_monthly', 'waffo', 'waffo'],
-      ['pack_s', 'stripe', 'checkout'],
+    expect(mine.map((row) => [row.productId, row.channel, row.form, row.method, row.status])).toEqual([
+      ['pack_s', 'stripe', 'checkout', 'card', 'paid'],
+      ['starter_monthly', 'waffo', 'waffo', 'card', 'paid'],
+      ['pro_monthly', 'stripe', 'renewal', 'card', 'partially_refunded'],
+      ['pack_m', 'stripe', 'checkout', 'alipay', 'paid'],
     ])
-    expect(mine[1]?.listPriceUsd).toBe(9.9)
+    expect(mine[1]).toMatchObject({ providerId: expect.stringMatching(/^wf-/) })
+    expect(mine[0]).toMatchObject({ currency: 'eur', amountTotal: 1500 })
+    expect(mine[2]).toMatchObject({ amountTotal: 5427, amountTax: 437, amountRefunded: 1000, currency: 'usd', providerId: expect.stringMatching(/^ch_/) })
+    expect(mine[3]).toMatchObject({ amountTotal: 2490, amountTax: 0, providerId: expect.stringMatching(/^py_/) })
     expect(mine[0]?.email).toMatch(/@example\.test$/)
+  })
+
+  it('pages with the keyset cursor, without repeats', async () => {
+    const first = await listPurchases(service)
+    const ids = new Set(first.items.map((row) => row.id))
+    if (!first.nextCursor) return
+    const second = await listPurchases(service, first.nextCursor)
+    expect(second.items.some((row) => ids.has(row.id))).toBe(false)
+  })
+
+  it('a renewal payment links its charge; the invoice is on the row', async () => {
+    const { rows } = await db.query('select stripe_invoice_id, stripe_session_id from public.payments where stripe_invoice_id = $1', [renewalInvoice])
+    expect(rows).toEqual([{ stripe_invoice_id: renewalInvoice, stripe_session_id: null }])
   })
 })
