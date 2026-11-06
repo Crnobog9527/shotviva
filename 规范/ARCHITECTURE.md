@@ -301,12 +301,33 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 |---|---|---|---|---|
 | 无水印、可商用、默认私密、全部模板（付费积分生成的作品） | ✓ | ✓ | ✓ | **上线**（已有，§6.1） |
 | 同时进行的生成数 | 1 | 3 | 6 | **上线**：按 `current_tier` 设并发上限（替换现有固定的 `MAX_RUNNING`），没有档位的账号为 1；界面允许生成在后台进行、在 Photos 页看进度 |
-| 邮件客服响应时间 | 48 小时 | 24 小时优先 | 同一个工作日 | **上线**：这是 Owner 对客服时效的承诺，不需要代码；Owner 需能兑现 |
+| 客服响应时间（站内工单和邮件） | 48 小时 | 48 小时 | 24 小时 | **上线**：Owner 本人回复兑现（Owner 2026-11-06 定：Starter、Pro 48 小时，Max 24 小时）。后台工单列表按「到期时间」排序、标超时，概览「待处理」计超时工单（T27b） |
 | 需求墙投票权重 | 1× | 1× | 3× | 随 T12 上线；T12 合并前在付费墙标 Coming soon |
-| 批量上传（Pro 10 张、Max 30 张） | — | 10 | 30 | **Coming soon** |
-| 品牌套件（存 logo 和字体，海报自动套用） | — | ✓ | ✓ | **Coming soon** |
-| 新功能和新模板抢先用 | — | — | ✓ | **Coming soon** |
+| 批量上传（Pro 10 张、Max 30 张） | — | 10 | 30 | **Coming soon**，T28 做完后上线，Pro 和 Max 同时开（Owner 2026-11-06） |
+| 新功能抢先用 | — | — | ✓ | **Coming soon**：权限接口和后台先做好（T29），有新功能要「只给 Max」时再在后台打开；「新模板抢先」删掉（Owner 2026-11-06） |
+| 品牌套件（存 logo 和字体，海报自动套用） | — | ✓ | ✓ | **Coming soon**，做法未定，Owner 想清楚前不开发、不删（Owner 2026-11-06） |
 | 生成排队优先 | — | 快速队列 | 最优先 | **不写进付费墙**：v1 是同步出图，没有排队，写了就是虚假承诺；以后改成异步队列时再加 |
+
+**档位限制只有一张表**（Owner 2026-11-06 定，T28 落地）：所有按档位变的数字放在 `core/billing/tier-limits.ts` 的 `TIER_LIMITS` 里，付费墙文案和服务端校验都从这里读，保证页面写的就是代码限的。没有档位按 Starter。
+
+| 字段 | Starter | Pro | Max | 说明 |
+|---|---|---|---|---|
+| `concurrency` | 1 | 3 | 6 | 同时进行的生成数（已上线） |
+| `perWindow` | 20 | 40 | 80 | 10 分钟窗口内最多发起的生成数，替换现在固定的 20；否则 Max 批量 30 张第 21 张会被拦 |
+| `batchMax` | 1 | 10 | 30 | 一次最多选几张照片批量生成 |
+| `supportHours` | 48 | 48 | 24 | 工单时效（小时） |
+
+- 需求墙 3 倍票的权重写在 SQL（`toggle_template_request_vote`），不读这张表，由 db 测试保证一致。
+- 档位不够时服务端抛 `TIER_REQUIRED`（`core/errors.ts`，403，带 `required_tier`），前端打开付费墙并预选所需档位；`paywall_view` 的 `trigger` 记 `tier_required`（§16.2）。
+
+**批量上传的语义**（Owner 2026-11-06）：同一模板、同一尺寸和清晰度、同一补充说明，一次选 N 张照片，出 N 张图。每张是一个独立任务：独立扣费、独立成败、失败独立退回。整批只用付费积分，付费池不够就不让批量（不拿免费积分凑，免得一批里混着带水印的）。浏览器按并发上限排队发 `/api/generate`；服务端没有「批量」对象，靠 `perWindow`、并发上限和余额兜底，不新建表、不加 `batch_id`。第一版不做「全部打包下载」。伙伴接口不做批量。
+
+**新功能抢先用**（Owner 2026-11-06，T29）：
+- 代码里有一张功能注册表 `FEATURES`（`core/features/registry.ts`，每项一个 key 和中文名）。新功能要受档位限制时，先在注册表加 key，再在服务端入口调 `requireFeature(userId, key)`，界面用 `featureOpen(tier, key)` 决定显示还是上锁。
+- 谁能用由表 `feature_access` 决定：`key text primary key`（必须是注册表里的 key）、`min_tier text null`（`pro` / `max`，null 表示所有人可用）、`open_to_all_at timestamptz null`（到这个时间后所有人可用，可空）、`updated_at`、`updated_by`。没有行就是所有人可用。RLS 打开不建策略，只经 `service_role` 读写；读取按 `features` 缓存标签缓存，后台保存时失效。
+- 判定 `featureOpen`：没有行、或 `min_tier` 为空、或已过 `open_to_all_at`、或用户档位 ≥ `min_tier` 就开放；档位顺序 starter < pro < max，没有档位按 Starter。
+- 后台「功能权限」页（`/admin/features`）：列出注册表里所有功能，每项可选「所有人 / Pro 起 / 仅 Max」和「哪天起对所有人开放」，保存写 `feature_access`。注册表为空时显示「暂时没有可设置的功能」。
+- 这张表是 §15.6「不做后台开关」的例外，只管档位门槛，不管功能开不开（功能开关仍在 `site.config` 的 `features`）。
 
 ### 6.3 通道
 
@@ -698,8 +719,8 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 |---|---|---|
 | `signup` | 服务端：邮箱验证完成 / 首次 Google 登录时（和注册赠送同一处） | `method`（`email` / `google`） |
 | `upload` | 浏览器：直传 R2 成功后 | `size_bucket`（`<1MB` / `1-5MB` / `>5MB`）、`compressed`（是否走了浏览器压缩） |
-| `generate` | 服务端：任务结算后（成功或失败都发） | `template_id`、`category`、`resolution`、`credits_cost`、`credit_pool`、`status`、`error_code`、`source`（`web` / `graylum`）、`duration_ms`、`model`（实际调用的模型名，不含密钥和地址） |
-| `paywall_view` | 浏览器：付费墙打开 | `trigger`（`insufficient_credits` / `pricing_page` / `account` / `graylum`） |
+| `generate` | 服务端：任务结算后（成功或失败都发） | `template_id`、`category`、`resolution`、`credits_cost`、`credit_pool`、`status`、`error_code`、`source`（`web` / `graylum`）、`duration_ms`、`model`（实际调用的模型名，不含密钥和地址）、`batch_size`（单张为 1，T28 起） |
+| `paywall_view` | 浏览器：付费墙打开 | `trigger`（`insufficient_credits` / `pricing_page` / `account` / `graylum` / `tier_required`） |
 | `checkout_start` | 服务端：创建 Checkout Session 时 | `product_id`、`tier`、`interval`、`form`、`channel`、`method` |
 | `purchase` | 服务端：支付回调入账成功后 | 第 6.2 节 `purchase` 参数 |
 | `$pageview` | 浏览器：自动 | — |

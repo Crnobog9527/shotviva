@@ -642,6 +642,37 @@
 
 **依赖**：T10、T23（已合并）；T21（中文文案，按合并先后协调）。
 
+## T27b 工单按档位时效排序（接 T27，同一窗口做）
+
+**目标**：让 Owner 兑现「Starter 48 小时、Pro 24 小时、Max 当个工作日」。
+**范围**：`TIER_SUPPORT_REPLY_HOURS` 改为 Starter 48、Pro 48、Max 24；`admin_list_tickets` 每行返回用户当前档位和 `due_at`（最后一条用户消息时间 + 档位时效小时数）；后台列表默认按 `due_at` 升序，超时标红；`admin_todo_counts` 加「已超时工单」一项。迁移编号沿用 `0220`～`0239`。
+**依据**：ARCHITECTURE §6.2「会员档位权益」、§10「站内工单」。
+**测试**：三档的 `due_at` 计算；没有档位按 48 小时；超时计数。
+
+## T28 批量上传（可派）
+
+**目标**：Pro 一次 10 张、Max 一次 30 张，按 ARCHITECTURE §6.2「批量上传的语义」。
+**范围**：
+- 整理 `TIER_LIMITS` 一张表（§6.2），付费墙权益文案从这里读；`perWindow` 按档位替换固定的 20；新增 `TIER_REQUIRED` 错误码和付费墙预选档位。
+- 工作台相册多选（相机入口不变），Pro / Max 以外只取第一张并提示；逐张压缩上传、可取消单张；`job-store` 加排队状态和调度器，按并发上限发请求，刷新后能续跑。
+- 发起前预检整批费用 ≤ 付费池，不够时按钮变「Get credits · N needed」。
+- 生成中改成列表视图（每张一行：缩略图、状态、失败原因、Retry）；`generate` 事件加 `batch_size`。
+- 文案中英文都要有；先过一遍 impeccable，手机稿优先。
+- 不加迁移（不建表、不加 `batch_id`）。
+**测试**：调度器（并发槽位、一张失败不挡后面、刷新恢复）；`perWindow` 按档位的 db 测试；余额预检；Starter 多选只取一张。
+**依赖**：T21（中文文案，按合并先后协调）。
+
+## T29 新功能档位权限（可派）
+
+**目标**：ARCHITECTURE §6.2「新功能抢先用」：权限接口和后台先做好，现在注册表可以是空的。
+**范围**：
+- 迁移（编号段 `0240`～`0259`，本卡 [spec] 已合并）：`feature_access` 表、RLS（打开、不建策略）、`admin_set_feature_access(key, min_tier, open_to_all_at)` 函数（写 `updated_by`）。
+- `core/features`：注册表、`featureOpen` 纯函数、`requireFeature(userId, key)`（档位不够抛 `TIER_REQUIRED`）、带缓存标签的读取。
+- 后台「功能权限」页 `/admin/features` 和导航项（中文，`copy.ts`）。
+- 付费墙 Max 权益文案改成 "Early access to new features"（中英文）。
+**测试**：`featureOpen` 各种组合（无行、min_tier 空、到期开放、档位不足 / 足够、无档位）；`requireFeature` 抛错；未知 key 不能写入；保存后缓存失效。
+**依赖**：T23（后台外壳，已合并）。
+
 ## Owner 侧关键路径（不是任务卡，但比代码慢）
 
 - 第一批 10 个模板（6 类）的真实照片 + 前后对比素材 + 提示词调优
