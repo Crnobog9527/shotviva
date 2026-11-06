@@ -32,6 +32,10 @@ export type AdminTicketRow = {
   createdAt: string
   lastMessageAt: string
   preview: string | null
+  // The author's tier now (null: none) and when the Owner's reply is due (T27b).
+  tier: 'starter' | 'pro' | 'max' | null
+  dueAt: string
+  overdue: boolean
 }
 
 export type AdminPayment = {

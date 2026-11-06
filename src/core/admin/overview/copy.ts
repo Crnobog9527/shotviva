@@ -24,6 +24,7 @@ export const OVERVIEW_COPY = {
   todo: {
     title: '待处理',
     tickets: '待处理工单',
+    overdueTickets: '已超时工单',
     stuck: '卡住的任务',
     fail1h: '近 1 小时失败率',
     fail24h: '近 24 小时失败率',

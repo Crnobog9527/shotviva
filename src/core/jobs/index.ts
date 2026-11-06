@@ -14,6 +14,7 @@ export { jobCostUsd } from './job-cost'
 export { GenerationFailure } from './generation-failure'
 export { generateBodySchema, toGenerationRequest, type GenerationRequest } from './generation-request'
 export { resolveJobFile, type JobFile } from './job-file'
+export { hasInputPreview, originalUrlFor, resolveJobOriginal } from './job-original'
 export { findJobByIdempotencyKey, findOwnJob } from './job-lookup'
 export { fileUrlFor, toJobView, type JobView } from './job-view'
 export {

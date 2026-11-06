@@ -551,7 +551,7 @@ $$;
 ALTER FUNCTION "public"."admin_list_template_requests"() OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."admin_list_tickets"("p_status" "text", "p_type" "text", "p_cursor_at" timestamp with time zone, "p_cursor_id" "uuid", "p_limit" integer) RETURNS TABLE("id" "uuid", "user_id" "uuid", "email" "text", "type" "text", "status" "text", "payment_id" bigint, "job_id" "uuid", "refund_decision" "text", "created_at" timestamp with time zone, "last_message_at" timestamp with time zone, "preview" "text")
+CREATE OR REPLACE FUNCTION "public"."admin_list_tickets"("p_status" "text", "p_type" "text", "p_cursor_at" timestamp with time zone, "p_cursor_id" "uuid", "p_limit" integer) RETURNS TABLE("id" "uuid", "user_id" "uuid", "email" "text", "type" "text", "status" "text", "payment_id" bigint, "job_id" "uuid", "refund_decision" "text", "created_at" timestamp with time zone, "last_message_at" timestamp with time zone, "preview" "text", "tier" "text", "due_at" timestamp with time zone)
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
@@ -568,25 +568,42 @@ begin
 
   if p_status = 'open' then
     return query
-      select t.id, t.user_id, u.email::text, t.type, t.status, t.payment_id, t.job_id, t.refund_decision,
-             t.created_at, t.last_message_at, f.preview
-        from public.support_tickets t
-        left join auth.users u on u.id = t.user_id
+      with open_rows as (
+        select t.id, t.user_id, t.type, t.status, t.payment_id, t.job_id, t.refund_decision,
+               t.created_at, t.last_message_at, d.tier,
+               coalesce(d.last_user_at, t.created_at) + make_interval(hours => public.support_reply_hours(d.tier)) as due_at
+          from public.support_tickets t
+          cross join lateral (
+            select public.current_tier(t.user_id) as tier,
+                   (select max(m.created_at) from public.support_ticket_messages m
+                     where m.ticket_id = t.id and m.author = 'user') as last_user_at
+          ) d
+         where t.status = 'open'
+           and (p_type is null or t.type = p_type)
+      )
+      select r.id, r.user_id, u.email::text, r.type, r.status, r.payment_id, r.job_id, r.refund_decision,
+             r.created_at, r.last_message_at, f.preview, r.tier, r.due_at
+        from open_rows r
+        left join auth.users u on u.id = r.user_id
         left join lateral (
           select left(m.body, 140) as preview from public.support_ticket_messages m
-           where m.ticket_id = t.id order by m.created_at limit 1
+           where m.ticket_id = r.id order by m.created_at limit 1
         ) f on true
-       where t.status = 'open'
-         and (p_type is null or t.type = p_type)
-         and (p_cursor_at is null or (t.last_message_at, t.id) < (p_cursor_at, p_cursor_id))
-       order by t.last_message_at desc, t.id desc
+       where p_cursor_at is null or (r.due_at, r.id) > (p_cursor_at, p_cursor_id)
+       order by r.due_at, r.id
        limit p_limit;
   else
     return query
       select t.id, t.user_id, u.email::text, t.type, t.status, t.payment_id, t.job_id, t.refund_decision,
-             t.created_at, t.last_message_at, f.preview
+             t.created_at, t.last_message_at, f.preview, d.tier,
+             coalesce(d.last_user_at, t.created_at) + make_interval(hours => public.support_reply_hours(d.tier))
         from public.support_tickets t
         left join auth.users u on u.id = t.user_id
+        cross join lateral (
+          select public.current_tier(t.user_id) as tier,
+                 (select max(m.created_at) from public.support_ticket_messages m
+                   where m.ticket_id = t.id and m.author = 'user') as last_user_at
+        ) d
         left join lateral (
           select left(m.body, 140) as preview from public.support_ticket_messages m
            where m.ticket_id = t.id order by m.created_at limit 1
@@ -1088,7 +1105,15 @@ CREATE OR REPLACE FUNCTION "public"."admin_todo_counts"() RETURNS "jsonb"
       select jsonb_build_object('label', label, 'model', model)
         from public.ai_providers where module = 'image' and is_active),
     'open_tickets', (
-      select count(*) from public.support_tickets where status = 'open')
+      select count(*) from public.support_tickets where status = 'open'),
+    'overdue_tickets', (
+      select count(*) from public.support_tickets t
+       where t.status = 'open'
+         and coalesce(
+               (select max(m.created_at) from public.support_ticket_messages m
+                 where m.ticket_id = t.id and m.author = 'user'),
+               t.created_at)
+             + make_interval(hours => public.support_reply_hours(public.current_tier(t.user_id))) < now())
   )
 $$;
 
@@ -2003,6 +2028,17 @@ $$;
 
 
 ALTER FUNCTION "public"."settle_waffo_order"("p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."support_reply_hours"("p_tier" "text") RETURNS integer
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
+    AS $$
+  select case p_tier when 'max' then 24 else 48 end;
+$$;
+
+
+ALTER FUNCTION "public"."support_reply_hours"("p_tier" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."sync_subscription"("p_subscription_id" "text", "p_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) RETURNS boolean
@@ -3144,6 +3180,11 @@ GRANT ALL ON FUNCTION "public"."settle_checkout"("p_user_id" "uuid", "p_product_
 
 REVOKE ALL ON FUNCTION "public"."settle_waffo_order"("p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."settle_waffo_order"("p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."support_reply_hours"("p_tier" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."support_reply_hours"("p_tier" "text") TO "service_role";
 
 
 

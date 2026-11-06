@@ -21,3 +21,7 @@ export const INPUT_LONG_EDGE = 2048
 export const INPUT_JPEG_QUALITY = 0.85
 
 export const UPLOAD_URL_TTL_SECONDS = 60
+
+// Long edge of the preview kept with each result once the upload itself is deleted
+// (ARCHITECTURE §8 「原图小图」); the photo page states it in its facts.
+export const INPUT_PREVIEW_PX = 768

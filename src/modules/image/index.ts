@@ -23,5 +23,6 @@ export { DoneGrid } from './photos/done-grid'
 export { PhotosCount } from './photos/photos-count'
 export { toPhotoItem, type PhotoItem, type TemplateLookup } from './photos/photo-item'
 export { ResultView } from './result/result-view'
+export { toPhotoDetail, type PhotoDetail } from './detail/photo-detail'
 // Wishlist post form (T12): one upload field, same zone and stages as the workspace.
 export { PhotoSlot, type PhotoSlotProps } from './workspace/photo-slot'
