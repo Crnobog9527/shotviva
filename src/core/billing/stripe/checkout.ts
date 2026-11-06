@@ -54,6 +54,17 @@ export function successPath(returnTo: string | undefined, hosts: readonly string
 
 type Metadata = { user_id: string; product_id: string; method: CheckoutMethod }
 
+type MethodParams = Pick<Stripe.Checkout.SessionCreateParams, 'managed_payments' | 'allowed_payment_method_types'>
+
+// A typed literal, not a spread into the params: a parameter Stripe removes from the SDK types
+// (as payment_method_types was in 2026-09-30.endive) then fails the type check instead of
+// reaching Stripe as a 400.
+function methodParams(route: CheckoutRoute): MethodParams {
+  if (route.managedPayments) return { managed_payments: { enabled: true } }
+  const params: MethodParams = { allowed_payment_method_types: route.allowedMethods ?? ['card'] }
+  return params
+}
+
 function sessionParams(
   route: CheckoutRoute,
   priceId: string,
@@ -68,11 +79,17 @@ function sessionParams(
     locale: input.locale,
     success_url: `${input.origin}${input.successPath}`,
     cancel_url: `${input.origin}${CHECKOUT_RETURN.cancel}`,
-    ...(route.managedPayments
-      ? { managed_payments: { enabled: true } }
-      : { payment_method_types: route.paymentMethodTypes ?? ['card'] }),
+    ...methodParams(route),
     ...(route.mode === 'subscription' ? { subscription_data: { metadata } } : { payment_intent_data: { metadata } }),
   }
+}
+
+// allowed_payment_method_types filters silently: a method that is off in the Dashboard leaves
+// the buyer on a checkout page that cannot take their payment. Refuse instead of redirecting.
+function assertMethodOffered(route: CheckoutRoute, session: Pick<Stripe.Checkout.Session, 'id' | 'payment_method_types'>) {
+  const required = route.allowedMethods?.[0]
+  if (!required || session.payment_method_types?.includes(required)) return
+  throw new AppError('INTERNAL', `Checkout session ${session.id} does not offer ${required}; turn it on in Stripe Settings → Payment methods`)
 }
 
 export async function createCheckout(
@@ -93,6 +110,7 @@ export async function createCheckout(
     }),
   )
   if (!session.url) throw new AppError('INTERNAL', 'Stripe returned a session without a URL')
+  assertMethodOffered(route, session)
   ;(deps.trackStart ?? trackCheckoutStart)(input.userId, {
     product_id: product.id,
     tier: product.tier,
