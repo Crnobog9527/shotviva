@@ -3,7 +3,7 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import type { LegalBlock, LegalLink, LegalPage } from '@/core/content'
+import type { LegalBlock, LegalLink, LegalPage, LegalSection } from '@/core/content'
 import { NOINDEX, pageMetadata, pageSitemapUrls } from '@/core/seo'
 
 import { site } from '../../site.config'
@@ -55,9 +55,12 @@ describe('legal pages (T19)', () => {
     }
   })
 
+  // The last numbered section; the Terms then close with the unnumbered Third-party notices
+  // (legal.html, T45).
   it('ends every page with the entity contact details from site.config', () => {
     for (const page of legalPages) {
-      const contact = page.sections.at(-1)!
+      const sections: readonly LegalSection[] = page.sections
+      const contact = sections.filter((section) => !section.plain).at(-1)!
       expect(contact.id).toBe('contact')
       const text = JSON.stringify(contact.blocks)
       expect(text).toContain(site.brand.legalName)
@@ -93,6 +96,8 @@ describe('legal pages (T19)', () => {
 describe('MiSans attribution (ARCHITECTURE §17, DESIGN §6.9)', () => {
   it('sits in the Terms page under Third-party notices and links the licence', () => {
     const notices = termsPage.sections.find((section) => section.id === 'third-party-notices')
+    expect(termsPage.sections.at(-1)).toBe(notices)
+    expect(notices?.plain).toBe(true)
     expect(notices?.heading).toBe('Third-party notices')
     const text = JSON.stringify(notices?.blocks)
     expect(text).toContain('This site uses the MiSans font, © Xiaomi.')

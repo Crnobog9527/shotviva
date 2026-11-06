@@ -1,13 +1,9 @@
 import type { Metadata } from 'next'
 
-import { LegalPageView } from '@/core/content'
-import { pageMetadata } from '@/core/seo'
-import { acceptableUsePage } from '@/site/content'
-import { site } from '@/site/site.config'
+import { LegalRoute, legalMetadata } from '../legal-route'
 
-// Not in the keyword map CSV, so the global indexing switch renders it noindex (AGENTS §9).
-export const metadata: Metadata = pageMetadata(site, acceptableUsePage)
+export const metadata: Metadata = legalMetadata('acceptableUse')
 
 export default function AcceptableUsePage() {
-  return <LegalPageView page={acceptableUsePage} />
+  return <LegalRoute which="acceptableUse" />
 }

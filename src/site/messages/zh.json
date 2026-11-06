@@ -469,8 +469,6 @@
       "metaTitle": "我的",
       "plan": {
         "title": "会员",
-        "renews": "<b>{date, date, medium}</b> 自动续费",
-        "ends": "<b>{date, date, medium}</b> 到期",
         "perPeriod": "每{interval, select, year {年} other {月}} <mono>{credits}</mono> 积分 · <mono>{price}</mono>/{interval, select, year {年} other {月}}",
         "member": "会员",
         "noPlan": "未开通会员",
@@ -478,27 +476,42 @@
         "cancelledWhy": "<b>已取消续费。</b>{date, date, medium} 前会员和积分照常可用，之后不再扣款。到期前随时可以恢复订阅，会员不会中断。",
         "resubscribe": "恢复订阅",
         "ended": "{date, date, medium} 已到期",
-        "expiredWhy": "{paid, plural, =0 {会员已到期。做过的作品都还在「作品」里。} other {会员已到期。剩下的 <b># 积分</b>仍可使用，做过的作品都还在「作品」里。}}",
         "choosePlan": "选择套餐",
         "buyCredits": "购买积分",
         "paymentFailed": "扣款失败",
         "pastDueWhy": "上一次扣款没有成功。Stripe 会在接下来几天自动重试；更新银行卡后会员照常继续，本期积分也会发放。",
         "pastDueEndedWhy": "上一次扣款没有成功，会员已结束。请更新银行卡：扣款成功后会员会重新生效。积分仍可正常使用。",
         "updatePayment": "更新付款方式",
-        "opensStripe": "将打开 Stripe 的安全账单页面。",
         "walletWhy": "这是一次性付款，不会自动续费：{date, date, medium} 前续费可以保留会员；不续费的话，积分仍可使用。",
         "renew": "续费",
         "paused": "已暂停",
         "pausedWhy": "订阅已暂停。恢复之前不会扣款，也不会发放积分。",
-        "freeWhy": "还没有开通会员。用付费积分做的作品是私密的，没有水印。"
+        "freeWhy": "还没有开通会员。用付费积分做的作品是私密的，没有水印。",
+        "since": "加入于",
+        "renewsPlain": "{date, date, medium} 自动续费",
+        "endsPlain": "{date, date, medium} 到期",
+        "opensStripeTop": "将打开 Stripe 的",
+        "opensStripeBottom": "安全账单页面",
+        "walletAlipayWhy": "一次性购买一{interval, select, year {年} other {个月}}，用<b>{method}</b>付款，不会自动续费：{date, date, medium} 前续费可以保留会员；不续费的话，积分仍可使用。",
+        "alipay": "支付宝",
+        "renewPrice": "续费 <cost>· {price}</cost>",
+        "endedPlain": "会员已到期。",
+        "endedTier": "你的{tier}会员已到期。",
+        "expiredRest": "{paid, plural, =0 {做过的作品都还在「作品」里。} other {剩下的 <b># 积分</b>仍可使用，做过的作品都还在「作品」里。}}"
       },
       "credits": {
         "title": "积分",
         "paid": "付费",
         "free": "免费",
+        "buy": "购买积分",
+        "paidOf": "本{interval, select, year {年} other {月}}共 {total} · 私密、无水印",
         "paidUse": "私密、无水印",
+        "freeOf": "共 {total} · 公开、带水印",
         "freeUse": "公开、带水印",
-        "buy": "购买积分"
+        "paidRingOf": "付费积分剩余 {count}，共 {total}",
+        "paidRing": "付费积分剩余 {count}",
+        "freeRingOf": "免费积分剩余 {count}，共 {total}",
+        "freeRing": "免费积分剩余 {count}"
       },
       "settings": {
         "title": "设置",
@@ -524,6 +537,13 @@
       "session": {
         "title": "登录",
         "deleteNote": "注销会删除你的作品和剩余积分。订阅会先被取消。"
+      },
+      "strip": {
+        "heading": "本月 · {count} 张作品",
+        "photos": "作品",
+        "label": "本月的作品",
+        "open": "打开作品",
+        "more": "「作品」里还有 {count} 张"
       }
     },
     "creditsUnit": "{count, plural, other {积分}}",
@@ -800,5 +820,17 @@
     "body": "页面没能加载出来。你的照片和积分都安全，请稍后再试；如果一直这样，请写信到 {email}。",
     "retry": "重试",
     "home": "回首页"
+  },
+  "legal": {
+    "pagesLabel": "法律文件",
+    "pages": {
+      "terms": "服务条款",
+      "privacy": "隐私政策",
+      "refunds": "退款政策",
+      "acceptableUse": "使用规范"
+    },
+    "lastUpdated": "最后更新：<date></date>",
+    "contents": "目录",
+    "questions": "对本页有疑问，请发邮件到 <mail></mail>"
   }
 }

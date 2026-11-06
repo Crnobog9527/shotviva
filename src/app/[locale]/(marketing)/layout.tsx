@@ -6,6 +6,7 @@ import { SwitchBanner } from '@/core/i18n/ui'
 import { site } from '@/site/site.config'
 
 import { MarketingFooter, MarketingHeader } from '../marketing-chrome'
+import './legal.css'
 
 // Marketing shell (DESIGN §6.9 items 4–5): the 「切换到中文」 suggestion and the site
 // announcement over the top bar, the page, the footer (ARCHITECTURE §10, §17).
