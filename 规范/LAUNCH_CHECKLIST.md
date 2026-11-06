@@ -174,3 +174,18 @@
 - [ ] 第 8 周开创作库时：noindex、sitemap 不含 /g 的测试和验收（创作库规格第 4 节）
 - [ ] 有付费会员后：会员到期提醒邮件、到期后保留 90 天和续费恢复
 - [ ] 有付费用户后：卡支付自动续费、自动故障切换
+
+## 预上线（支付审核期，ARCHITECTURE §12.0）
+
+- [ ] 生产 `SITE_INDEXING` 未设或为 `off`；`curl -sI https://shotviva.com/` 带 `x-robots-tag: noindex, nofollow`
+- [ ] `robots.txt` 里 AI 爬虫全部 Disallow，没有 Sitemap 行；`/sitemap.xml`、`/llms.txt` 返回 404
+- [ ] `www.shotviva.com` 和 `shotviva.vercel.app` 308 跳到 `https://shotviva.com`
+- [ ] 无痕窗口能匿名打开首页、`/pricing`、`/terms`、`/privacy`、`/refund-policy`（给支付审核员）
+- [ ] Deployment Protection 保持 Standard，不关闭
+- [ ] 绑域名时没有删改飞书 MX、SPF 和 Resend 的 DNS 记录
+
+## 开放收录那天
+
+- [ ] Production 把 `SITE_INDEXING` 改成 `on` 并重新部署；`curl` 确认页面变 `index, follow`、AI 爬虫按 R11 放行、sitemap 和 llms.txt 可访问
+- [ ] GSC 和 Bing 提交 `sitemap.xml`（和 `sitemap-zh.xml`）
+- [ ] 合并把 `seo:check` 期望值改成 `open` 的 PR
