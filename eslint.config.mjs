@@ -87,6 +87,13 @@ export default defineConfig([
           selector: "MemberExpression[object.name='process'][property.name='env']",
           message: 'Read environment variables through core/env.ts or core/public-env.ts.',
         },
+        {
+          // PostgREST answers HEAD without Content-Length and closes the connection; Kong
+          // reuses it for the next request, and a POST/PATCH on it fails with a 502
+          // ("invalid response was received from the upstream server"). Select a row instead.
+          selector: "Property[key.name='head'][value.value=true]",
+          message: "Don't send HEAD to PostgREST (`head: true`); select a column with .limit(1) instead.",
+        },
       ],
       'no-restricted-imports': ['error', { patterns: [deepModuleImport, analyticsSdkImport] }],
       'import/no-restricted-paths': ['error', { zones: [...layerZones, ...crossModuleZones] }],

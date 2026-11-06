@@ -332,6 +332,27 @@
       "px": "{px, number, ::group-off} px",
       "megabytes": "{size} MB",
       "percent": "{value, number, ::percent}"
+    },
+    "subscription": {
+      "title": "Subscription",
+      "plan": "{tier} · {interval, select, year {Yearly} other {Monthly}}",
+      "active": "Active",
+      "renewsOn": "Renews on {date, date, medium}",
+      "cancelsOn": "Cancels on {date, date, medium}",
+      "cancelsDetail": "Your plan stays active until then and will not renew. Your credits stay.",
+      "pastDue": "Past due",
+      "pastDueDetail": "Your last payment did not go through. Update your card in Manage subscription.",
+      "pastDueExpired": "Your last payment did not go through, so your membership has ended. Your credits still work.",
+      "paused": "Paused",
+      "manage": "Manage subscription",
+      "paidUntil": "Paid until {date, date, medium}",
+      "noAutoRenew": "No auto-renew. Renew any time to add another period.",
+      "renew": "Renew",
+      "expired": "Expired",
+      "expiredDetail": "Your membership ended on {date, date, medium}. Your credits still work.",
+      "free": "Free",
+      "freeDetail": "No membership yet.",
+      "seePlans": "See plans"
     }
   },
   "paywall": {

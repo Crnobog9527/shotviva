@@ -11,6 +11,8 @@ export const ALERTS = [
   'payment_webhook_signature',
   'payment_webhook_failed',
   'charge_refunded',
+  // charge.dispute.created (T10, ARCHITECTURE §6.3): recorded, credits not clawed back.
+  'charge_disputed',
 ] as const
 
 export type AlertKind = (typeof ALERTS)[number]
