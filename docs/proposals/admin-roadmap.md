@@ -220,7 +220,7 @@
     - `id`、`user_id`、`type`（`feedback` / `image_issue` / `billing` / `refund` / `account` / `other`）、`status`（`open` / `replied` / `closed`）；
     - `payment_id`（可空；`refund` 时必填，并且必须是本人的付款）、`job_id`（可空，必须是本人的作品）；
     - `refund_decision`（可空，`approved` / `rejected`）、`refund_amount_cents`（可空）；
-    - `created_at`、`last_message_at`、`closed_at`。
+    - `created_at`、`last_message_at`、`user_seen_at`（见下面「通知」）、`closed_at`。
   - `support_ticket_messages`：`id`、`ticket_id`、`author`（`user` / `admin`）、`body`（≤2000）、`created_at`。
   - 索引：
     - `support_tickets(user_id, created_at desc, id desc)`：给「我的工单」用；
@@ -232,12 +232,19 @@
     - `admin_reply_ticket(ticket, body, close)`；
     - `admin_decide_refund(ticket, decision, amount_cents)`：写审计；
     - `admin_list_tickets(status, type, cursor)`：游标分页，带邮箱；
-    - `refund_eligibility(payment_id)`：一次返回三项检查和建议金额。
+    - `refund_eligibility(payment_id)`：一次返回三项检查和建议金额；
+    - `mark_ticket_seen(ticket, user)`：用户打开工单时清掉「有新回复」。
   - 删号时工单级联删除（隐私政策要写明工单内容保留到删号为止）。
 - **后台**：新导航「工单」，默认显示待处理，按类型筛选。详情页显示消息往来，加上 A2 的用户信息摘要，退款类型再加上面的退款面板。A6 的「待处理」条加工单数。
 - **大小**：L。用户侧表单和「我的工单」、后台列表和详情、退款面板、两张表和 6 个函数，还有中英文文案。
-- **前提**（第 5 节第 7、8 问）：
-  - 通知方式要先定：v1 规范不写发信代码，Owner 不会立刻知道有新工单，用户也不会收到回复邮件；
+- **通知**（Owner 2026-11-06 定：不发邮件）：
+  - **Owner**：新工单和用户的补充只在后台提醒。导航「工单」旁边显示待处理数，A6 的「待处理」条里也有。Owner 每天看一次后台。
+  - **用户**：Owner 回复后，用户下次打开网站时，账号 tab 和「我的工单」上出现一个小红点，并显示「有新回复」；打开工单后小红点消失。
+    - 为此 `support_tickets` 加一列 `user_seen_at`。未读的判断：最后一条消息是 Owner 发的，且晚于 `user_seen_at`。用户打开工单时，由 `mark_ticket_seen(ticket, user)` 更新这一列。
+    - 小红点只在页面加载时查一次（走 `support_tickets(user_id, …)` 索引，最多看最近几张），不轮询，不用 Realtime（§5.1 第 8 条）。
+  - **对用户说明预期**：提交成功页和「我的工单」顶部写一句「我们会在这里回复你，通常 48 小时内；会员按档位更快」。时效数字从会员权益表读，不在组件里写死。
+  - 用户留下的工单内容不要求带邮箱：工单关联账号，Owner 在后台能看到邮箱，需要时可以从 support@ 主动写信。
+- **前提**（第 5 节第 8 问）：
   - 退款政策里「从账号邮箱发邮件申请，网站上没有退款按钮」要改成「在网站上提交工单，也可以发邮件」；
   - 隐私政策要加工单内容的保留期。
 - **不做**：
@@ -418,10 +425,7 @@
 4. **B7 的付款通道开关**：同意把 §6.3「通过环境变量指定当前用哪条通道」改成后台开关吗？环境变量可以留作兜底。
 5. **封禁的范围**：现在封禁只拦出图（`reserve_credits`，Graylum 那边的出图也因此被拦）和需求墙。被封的用户还能登录、能付款，Graylum 连接也不会断开。要不要同时拦结账、自动断开 Graylum 连接？（建议拦结账，免得被封的人付款后再来要退款。）
 6. **B6 的外键**：同意把 `admin_audit_log.user_id` 改成可空、外键改成 `on delete set null` 吗？这会改 T23 已合并的表。
-7. **A8 的通知方式**：选哪一种？
-   - **a. 不发邮件（最省事，符合 v1 不写发信代码的规则）**：新工单只在后台计数提醒，Owner 每天看一次；回复只显示在用户的「我的工单」里。缺点是用户不知道已经回复了，要自己回来看。
-   - **b. 只发通知邮件（建议）**：用已经配好的 Resend 发两种固定内容的邮件，不带正文，只带链接：新工单提醒 Owner（发到 support@）；Owner 回复后提醒用户「你的工单有新回复」。这要改 §7「v1 不写任何发信代码」。
-   - **c. 回复全文走邮件**：用户直接在邮箱里来回。等于又回到邮件客服，不建议。
+7. ~~A8 的通知方式~~ **已定（Owner 2026-11-06）：不发邮件**，§7「v1 不写任何发信代码」不变。做法见 A8「通知」一条。
 8. **退款政策改写**：同意把「从账号邮箱发邮件申请，网站上没有退款按钮」改成「在网站的 Help & feedback 里提交退款申请，也可以发邮件」吗？审核规则（7 天内、首次购买、付款后没有用过积分、6% 手续费）不变。
 
 ---
