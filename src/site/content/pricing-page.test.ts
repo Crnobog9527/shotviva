@@ -1,5 +1,5 @@
 import { NextIntlClientProvider } from 'next-intl'
-import { createElement } from 'react'
+import { createElement, type ComponentProps } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
@@ -50,8 +50,11 @@ describe('/pricing page copy', () => {
 
 // DESIGN §4.5 and Stripe's merchant review: the renewal terms are on the page before purchase.
 describe('/pricing "Pay with"', () => {
-  const render = (channel: 'stripe' | 'waffo') =>
-    renderToStaticMarkup(createElement(NextIntlClientProvider, { locale: 'en', messages, children: createElement(PricingPayWith, { channel }) }))
+  // The provider's props typed in full, as home-faq.test.ts does: children is a required prop.
+  const render = (channel: 'stripe' | 'waffo') => {
+    const provider: ComponentProps<typeof NextIntlClientProvider> = { locale: 'en', messages, children: createElement(PricingPayWith, { channel }) }
+    return renderToStaticMarkup(createElement(NextIntlClientProvider, provider))
+  }
 
   it('Stripe: card renews and can be cancelled, Alipay pays once, packs are one-time', () => {
     const html = render('stripe')
