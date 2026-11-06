@@ -4,15 +4,13 @@ import { site } from '../../site.config'
 import {
   SET_PHOTOS,
   creditFrom,
-  packshotFromUsd,
+  packshotUsd,
   photoSecondsRange,
   photosLeftInPlan,
   planFrom,
   quoteUsd,
-  retouchUsd,
   setCostUsd,
   setCredits,
-  setRetouchUsd,
   setShotsUsd,
   styledShotUsd,
   usd,
@@ -80,14 +78,13 @@ function costBills(): CostBills {
       total: { amount: usdRange(quoteUsd), when: '几天后交图' },
       lines: [
         { label: `${SET_PHOTOS} 张造型图，每张 ${usdRange(styledShotUsd)}`, value: usdRange(setShotsUsd) },
-        { label: `精修，每张 ${usdRange(retouchUsd)}`, value: usdRange(setRetouchUsd) },
         { label: '预约、拍摄、修图', value: '几天' },
       ],
-      fine: `按 2026 年美国影棚公开报价估算；纯白底图大约每张 ${usd(packshotFromUsd)} 起。实际报价因人而异。`,
+      fine: `美国 2026 年公开的单张价格：造型产品图 ${usdRange(styledShotUsd)}（Shopify，2026 年 1 月）；纯白底产品图 ${usdRange(packshotUsd)}（工作室价目表）。很多工作室另收预约或布景费。实际报价因人而异。`,
     },
     site: {
       title: brand,
-      total: { amount: plan, suffix: '/月起', when: `每张 ${photoSecondsRange} 秒` },
+      total: { amount: plan, suffix: '/月起', when: `${standard.name}画质每张 ${photoSecondsRange} 秒` },
       lines: [
         { label: `入门版，每月 ${planFrom?.credits ?? ''} 积分`, value: plan },
         { label: `这 ${SET_PHOTOS} 张，${standard.name}`, value: `${setCredits} 积分 ≈ ${setCostUsd ?? ''}` },

@@ -32,15 +32,19 @@ describe('copy with the catalog in site.config', () => {
   })
 
   it('fills both home bills from config: the photographer rates and the Starter plan (DESIGN §6.9 item 6)', () => {
-    // 3 × $89–$300 styled shots + 3 × $10–$30 retouching.
-    expect(usdRange(quoteUsd)).toBe('$297–$990')
+    // 3 × $50–$350 styled shots; retouching is in the shot price, never a line of its own.
+    expect(usdRange(quoteUsd)).toBe('$150–$1,050')
     // 6 credits at Starter's $0.40 a credit, and (50 − 6) ÷ 2 Standard photos left.
     expect(setCostUsd).toBe('$2.40')
     expect(photosLeftInPlan).toBe(22)
     const bills = homePage.costBills
-    expect(bills.photographer.total.amount).toBe('$297–$990')
+    expect(bills.photographer.total.amount).toBe('$150–$1,050')
+    expect(bills.photographer.lines.map((line) => line.label).join(' ')).not.toMatch(/retouch/i)
+    expect(bills.photographer.fine).toContain('$50–$350 (Shopify, Jan 2026)')
+    expect(bills.photographer.fine).toContain('$15–$90')
+    expect(bills.photographer.fine).not.toMatch(/ASMP|association/i)
     expect(bills.site.total.amount).toBe('$19.90')
     expect(bills.site.lines.map((line) => line.value)).toEqual(['$19.90', '6 credits ≈ $2.40', '22 more photos'])
-    expect(bills.site.total.when).toBe('20–40 seconds a photo')
+    expect(bills.site.total.when).toBe('20–40 seconds a photo at Standard')
   })
 })

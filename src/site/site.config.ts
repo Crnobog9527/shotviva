@@ -93,11 +93,13 @@ export const site = defineSite({
     // seo资料/Shotviva 页面与主词映射（中文口径）.csv: the three indexable /zh pages.
     zhIndexablePaths: ['/', '/image-to-image-generator', '/pricing'],
   },
-  // The home page's two bills (DESIGN §6.9 item 6, design/SITE-PLAN.md): typical published
-  // 2026 US studio rates, not quotes. Owner confirms before launch; the seconds wait for the
-  // LAUNCH §5 measurement.
+  // The home page's two bills (DESIGN §6.9 item 6), Owner 2026-11-06: styled product photos
+  // $50–$350 per image (Shopify, "Product photography pricing", Jan 2026); white-background
+  // packshots $15–$90 (ProShot Media, ProductPhotography.com, soona, Lars Miller Media price
+  // pages, read 2026-11-06). Seconds are Standard (preview jobs measured 19–33 s); LAUNCH §5
+  // measures again before launch.
   marketing: {
-    photographer: { styledShotUsd: { low: 89, high: 300 }, retouchUsd: { low: 10, high: 30 }, packshotFromUsd: 15 },
+    photographer: { styledShotUsd: { low: 50, high: 350 }, packshotUsd: { low: 15, high: 90 } },
     photoSeconds: { low: 20, high: 40 },
   },
 })
