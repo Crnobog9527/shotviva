@@ -41,9 +41,6 @@
   --wash-strong: rgba(242, 236, 227, 0.08);  /* progress tracks, close disc */
   --grab: rgba(242, 236, 227, 0.24);         /* sheet grab bar */
   --glyph: rgba(242, 236, 227, 0.5);         /* size-tile ratio glyphs */
-  --hatch: rgba(242, 236, 227, 0.03);        /* empty upload recess stripes */
-  --recess: #0E0D0C;                         /* empty upload recess ground */
-  --recess-edge: rgba(242, 236, 227, 0.12);
 
   /* Safelight tints (selected choices, focus halo) and the success tint. */
   --safelight-wash: rgba(255, 91, 46, 0.12);
@@ -108,6 +105,15 @@
   --sab: env(safe-area-inset-bottom, 0px);
   --ease: cubic-bezier(.2, .8, .2, 1);
   --spring: cubic-bezier(.32, 1.25, .4, 1);
+}
+
+/* Side gutters widen with the screen (DESKTOP-NOTES: 16 / 32 / 40); app pages put their content
+   in a 1120px column between them (DESIGN §6.9 item 7). */
+@media (min-width: 768px) {
+  :root { --gutter: 32px; }
+}
+@media (min-width: 1024px) {
+  :root { --gutter: 40px; }
 }
 
 @theme inline {
@@ -281,6 +287,28 @@ html:lang(zh-Hans) :is(em, i, .italic) {
   background-color: var(--checker-light);
   background-image: conic-gradient(var(--checker-dark) 0 25%, transparent 0 50%, var(--checker-dark) 0 75%, transparent 0);
   background-size: 16px 16px;
+}
+/* The empty upload zone's viewfinder: four 18×1.5px bone-dim corner brackets inset 12px
+   (B comp app.css .empty .frame::before). */
+@utility viewfinder {
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 12px;
+    pointer-events: none;
+    --vf: linear-gradient(var(--bone-dim), var(--bone-dim));
+    background:
+      var(--vf) top left / 18px 1.5px no-repeat, var(--vf) top left / 1.5px 18px no-repeat,
+      var(--vf) top right / 18px 1.5px no-repeat, var(--vf) top right / 1.5px 18px no-repeat,
+      var(--vf) bottom left / 18px 1.5px no-repeat, var(--vf) bottom left / 1.5px 18px no-repeat,
+      var(--vf) bottom right / 18px 1.5px no-repeat, var(--vf) bottom right / 1.5px 18px no-repeat;
+  }
+}
+/* The app's content column: 1120px between the gutters, centred (DESIGN §6.9 item 7). */
+@utility content-column {
+  width: 100%;
+  max-width: calc(1120px + 2 * var(--gutter));
+  margin-inline: auto;
 }
 /* Horizontal rails (filter chips): scroll without a visible bar. */
 @utility no-scrollbar {

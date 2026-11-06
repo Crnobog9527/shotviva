@@ -4,9 +4,10 @@ import { getTranslations } from 'next-intl/server'
 import { Suspense, type ReactNode } from 'react'
 
 import { AppPage, BalanceChip, TabRootHeader } from '@/core/app-shell'
-import { createServerSupabase, requireUser } from '@/core/auth'
-import { readBalance } from '@/core/billing'
+import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
+import { currentTier, limitsFor, readBalance } from '@/core/billing'
 import { currentLocale } from '@/core/i18n/server'
+import { listRunningJobIds } from '@/core/jobs'
 import { listTemplatesIn } from '@/core/templates'
 import { GeneratingPill, TemplateCatalogue, toCatalogueTemplate } from '@/modules/image'
 
@@ -20,10 +21,18 @@ function Header({ aside }: { aside?: ReactNode }) {
 }
 
 // Create tab (DESIGN §8.2, B comp create.html): the template catalogue with the balance chip.
+// A card opens the creation dialog right here (T38), so the page also reads what the form
+// needs: the tier (batch size) and the photos already developing (concurrency).
 async function Create() {
   const user = await requireUser('/generate')
   const supabase = await createServerSupabase()
-  const [templates, balance] = await Promise.all([listTemplatesIn(supabase, await currentLocale()), readBalance(supabase, user.id)])
+  const [templates, balance, tier, runningIds] = await Promise.all([
+    listTemplatesIn(supabase, await currentLocale()),
+    readBalance(supabase, user.id),
+    // current_tier() is service-role only; the user's own id comes from the session.
+    currentTier(createAdminSupabase(), user.id),
+    listRunningJobIds(supabase, user.id, new Date()),
+  ])
   return (
     <>
       <Header
@@ -34,14 +43,17 @@ async function Create() {
           </>
         }
       />
-      <TemplateCatalogue templates={templates.map(toCatalogueTemplate)} />
+      <TemplateCatalogue
+        templates={templates.map(toCatalogueTemplate)}
+        create={{ balance, tier, concurrency: { limit: limitsFor(tier).concurrency, runningIds } }}
+      />
     </>
   )
 }
 
 export default function CreatePage() {
   return (
-    <AppPage>
+    <AppPage wide>
       <Suspense fallback={<Header />}>
         <Create />
       </Suspense>

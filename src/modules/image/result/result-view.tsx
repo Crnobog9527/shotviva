@@ -35,7 +35,7 @@ export function ResultView({ item, detail, shareText, edit, parent, change }: Pr
   return (
     <section
       aria-label={t('photos.photoAlt', { name: item.templateName })}
-      className="px-4 pt-2 md:mx-auto md:max-w-[520px] md:px-0 lg:grid lg:max-w-none lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start lg:gap-x-12 lg:px-4 lg:pt-6"
+      className="px-4 pt-2 md:mx-auto md:max-w-[520px] md:px-0 lg:grid lg:max-w-none lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start lg:gap-x-12 lg:px-(--gutter) lg:pt-6"
     >
       <div className="lg:sticky lg:top-[132px]">
         <DetailPhoto

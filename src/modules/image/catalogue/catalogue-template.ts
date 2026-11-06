@@ -58,3 +58,13 @@ export const cardPrice = (template: CatalogueTemplate) => template.creditsCost['
 export function isMotion(template: CatalogueTemplate): boolean {
   return template.cover.type !== 'image' && template.cover.motion !== null && template.cover.poster !== null
 }
+
+// Art Styles is the one category that keeps the drag compare (DESIGN §6.9 item 1). Categories
+// are data; this is the stored (English) name of the first one in the catalogue.
+export const ART_STYLES = 'Art Styles'
+export const isArtStyle = (template: CatalogueTemplate) => template.category === ART_STYLES
+
+// Both stills present: the card can show the side-by-side pair (or the compare).
+export function hasStills(template: CatalogueTemplate): boolean {
+  return template.cover.before !== null && template.cover.after !== null
+}

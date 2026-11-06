@@ -154,27 +154,24 @@
       "templates": "模板",
       "filter": "筛选模板",
       "all": "全部",
-      "illustrative": "模板图片仅为效果示例。"
+      "illustrative": "每张卡片左边是手机原图，右边是 AI 出图。模板图片仅为效果示例。"
     },
     "template": {
       "fromCredits": "{count} 积分起",
       "cardAlt": "{name} 模板示例：左边是手机原图，右边是 AI 出图",
       "phone": "原图",
       "ai": "AI",
-      "videoTemplate": "视频模板",
-      "animatedTemplate": "动态模板",
       "example": "效果示例",
-      "featureAria": "{name}，视频模板，{category}。预览",
+      "featureAria": "{name}，视频模板，{category}。做一张",
       "featureMeta": "{category} · 视频",
-      "preview": "预览",
       "compareAria": "对比手机原图和 AI 出图",
       "phonePhotoAlt": "手机原图",
       "resultAlt": "{name} 出图效果",
       "loopAria": "{name} 示例：手机原图变成 AI 出图的过程",
-      "animationAlt": "{name} 示例动画",
       "hintCompare": "在图片上左右拖动，对比前后效果。",
-      "hintMotion": "你的照片会按这段短动画的方式变化。",
-      "use": "用这个模板"
+      "makeOne": "做一张",
+      "animatedMeta": "{category} · 动图",
+      "hintPair": "左边是手机原图，右边是 AI 出图。"
     },
     "categories": {
       "Art Styles": "画风",
@@ -286,7 +283,11 @@
       "batchSummary": "{count, number} 张已完成 {done, number} 张{failed, plural, =0 {} other {，# 张没有生成成功}}",
       "batchLeave": "每张一般需要 20–40 秒。可以离开这个页面，每张生成好后会出现在「作品」里。",
       "makeMore": "再做一批",
-      "getTier": "开通{tier}"
+      "getTier": "开通{tier}",
+      "stageLabel": "预览",
+      "stageYours": "你的照片",
+      "stageYoursCaption": "这是你拍的原图。模板会保留主体，只换光线和背景。",
+      "stageSampleCaption": "模板示例：左边是手机原图，右边是 AI 出图。"
     },
     "errors": {
       "CONTENT_REJECTED": "照片或补充说明没有通过安全审核。请换一张照片，或改一下说明。",
@@ -330,7 +331,8 @@
       "pill": "{count, plural, =1 {生成中…} other {# 张生成中…}}",
       "doneMeta": "{when} · {size} · {tier}",
       "runningMeta": "{size} · {tier} · {count} 积分",
-      "waiting": "排队中，等空位"
+      "waiting": "排队中，等空位",
+      "makeAgain": "再做一张"
     },
     "work": {
       "freePublic": "公开 · 带水印",

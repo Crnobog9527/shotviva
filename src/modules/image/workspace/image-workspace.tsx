@@ -1,86 +1,59 @@
 'use client'
 
-import { useState } from 'react'
+import type { ReactNode } from 'react'
 
-import type { Balance } from '@/core/billing/pools'
-import { limitsFor } from '@/core/billing/tier-limits'
-import type { MembershipTier } from '@/core/config'
-
-import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import type { TrackedJob } from '../generation/job-model'
-import { enqueueJobs, retryJob, setWorkspaceJobs } from '../generation/job-store'
-import { useJob, useJobs, useWorkspaceJobs } from '../generation/use-jobs'
+import { retryJob, setWorkspaceJobs } from '../generation/job-store'
+import { useJob, useWorkspaceJobs } from '../generation/use-jobs'
 import { BatchProgressView } from './batch-progress-view'
-import { startInputs } from './batch-request'
-import { ctaState } from './cta-state'
 import { FormAction } from './form-action'
 import { GeneratingView } from './generating-view'
 import { FailureView, SuccessView } from './settled-views'
-import { missingRequiredCopy } from './text-fields'
-import { usePhotoBatch } from './use-photo-batch'
-import { WorkspaceForm, type FormValues } from './workspace-form'
+import { useWorkspaceDraft, type DraftInput } from './use-workspace-draft'
+import { WorkspaceForm } from './workspace-form'
+import { WorkspaceStage } from './workspace-stage'
 
-export type WorkspaceProps = {
-  template: CatalogueTemplate
-  balance: Balance
-  // current_tier() from the server: decides batchMax (TIER_LIMITS); null is Starter.
-  tier: MembershipTier | null
-  // From the server: the account's concurrency (TIER_LIMITS) and the jobs running at render
-  // time, so photos started in another tab count too.
-  concurrency: { limit: number; runningIds: string[] }
-  shareText: string
-}
+export type WorkspaceProps = DraftInput & { shareText: string }
 
-const DEFAULTS: FormValues = { aspect: 'original', resolution: '1k', note: '', copy: {} }
-
-// The workspace flow (DESIGN §4.3–4.4): form → developing → done or failed. One photo keeps the
-// single-photo views; a batch (T28, Pro and Max) develops as a list. The jobs live in the
-// generation store, so leaving this page does not stop them; Photos shows them. Which jobs this
-// workspace shows lives there too, so a browser refresh comes back to the same developing view
-// or result rather than the form.
-export function ImageWorkspace({ template, balance, tier, concurrency, shareText }: WorkspaceProps) {
-  const photos = usePhotoBatch(limitsFor(tier).batchMax)
-  const [values, setValues] = useState(DEFAULTS)
+// The workspace page, the full-page form of the creation dialog (T38, DESIGN §6.9 item 2): form
+// → developing → done or failed. One photo keeps the single-photo views; a batch (T28, Pro and
+// Max) develops as a list. The jobs live in the generation store, so leaving this page does not
+// stop them; Photos shows them. Which jobs this workspace shows lives there too, so a browser
+// refresh, or Generate in the dialog, lands on the developing view or result, not the form.
+// From lg up the form is the left column and the stage the right (B comp workspace.html).
+export function ImageWorkspace({ shareText, ...input }: WorkspaceProps) {
+  const { template, tier, balance, concurrency } = input
+  const draft = useWorkspaceDraft(input)
   const jobIds = useWorkspaceJobs(template.id)
   const single = useJob(jobIds.length === 1 ? (jobIds[0] ?? null) : null)
-  const running = useRunningCount(concurrency.runningIds)
-  const { summary } = photos
-  const state = ctaState({
-    balance,
-    cost: template.creditsCost[values.resolution],
-    running,
-    limit: concurrency.limit,
-    photo: summary.photo,
-    count: summary.planned,
-    copyMissing: missingRequiredCopy(template.copyFields, values.copy),
-  })
 
   const generate = () => {
-    setWorkspaceJobs(template.id, enqueueJobs(startInputs(template, values, summary.ready), concurrency.limit))
+    draft.start()
     window.scrollTo({ top: 0 })
   }
   // retryJob puts the new job where the failed one was in this workspace's list.
   const retry = (id: string) => void retryJob(id, concurrency.limit)
   const backToForm = (clearPhotos: boolean) => {
-    if (clearPhotos) photos.clear()
+    if (clearPhotos) draft.photos.clear()
     setWorkspaceJobs(template.id, [])
   }
 
-  if (jobIds.length > 1) return <BatchProgressView ids={jobIds} onRetry={retry} onMakeMore={() => backToForm(true)} />
-  if (single) return <SingleJobView job={single} shareText={shareText} onRetry={() => retry(single.id)} onBack={backToForm} />
+  if (jobIds.length > 1) return <Settled><BatchProgressView ids={jobIds} onRetry={retry} onMakeMore={() => backToForm(true)} /></Settled>
+  if (single) return <Settled><SingleJobView job={single} shareText={shareText} onRetry={() => retry(single.id)} onBack={backToForm} /></Settled>
   return (
-    <>
-      <WorkspaceForm
-        template={template}
-        balance={balance}
-        tier={tier}
-        photos={photos}
-        values={values}
-        onChange={(next) => setValues((current) => ({ ...current, ...next }))}
-      />
-      <FormAction state={state} resolution={values.resolution} batch={photos.batchMax > 1} onGenerate={generate} />
-    </>
+    <div className="lg:grid lg:grid-cols-[minmax(380px,440px)_minmax(0,1fr)] lg:items-start lg:gap-x-12 lg:px-(--gutter)">
+      <div className="min-w-0 px-(--gutter) lg:px-0">
+        <WorkspaceForm template={template} balance={balance} tier={tier} photos={draft.photos} values={draft.values} onChange={draft.change} />
+        <FormAction state={draft.state} resolution={draft.values.resolution} batch={draft.photos.batchMax > 1} onGenerate={generate} />
+      </div>
+      <WorkspaceStage template={template} photo={draft.photos.photos[0] ?? null} />
+    </div>
   )
+}
+
+// Developing, done and failed keep their phone column, centred on wider screens.
+function Settled({ children }: { children: ReactNode }) {
+  return <div className="md:mx-auto md:max-w-[720px]">{children}</div>
 }
 
 type SingleProps = { job: TrackedJob; shareText: string; onRetry(): void; onBack(clearPhotos: boolean): void }
@@ -90,15 +63,4 @@ function SingleJobView({ job, shareText, onRetry, onBack }: SingleProps) {
   if (job.status === 'succeeded') return <SuccessView job={job} shareText={shareText} onAgain={() => onBack(false)} />
   if (job.status === 'failed') return <FailureView job={job} onRetry={onRetry} onNewPhoto={() => onBack(true)} />
   return <GeneratingView job={job} />
-}
-
-// Running photos for the concurrency check: the server's list at render plus this tab's own.
-// A job this tab saw settle may still be in the server's (older) list, so it is taken out.
-function useRunningCount(serverIds: string[]): number {
-  const ids = new Set(serverIds)
-  for (const job of useJobs()) {
-    if (job.status === 'running') ids.add(job.id)
-    else ids.delete(job.id)
-  }
-  return ids.size
 }

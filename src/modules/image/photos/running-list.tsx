@@ -17,16 +17,16 @@ export function RunningList({ server, covers }: { server: PhotoItem[]; covers: R
   if (rows.length === 0) return null
   return (
     <section aria-labelledby="run-h">
-      <div className="mx-4 mt-6 mb-3 flex items-baseline justify-between gap-3">
+      <div className="mx-(--gutter) mt-6 mb-3 flex items-baseline justify-between gap-3 md:mt-8">
         <h2 id="run-h" className="text-headline leading-[1.2] font-semibold tracking-[-0.01em]">{t('inProgress')}</h2>
         <span className="text-caption text-muted-foreground">{t('usually')}</span>
       </div>
-      <ul aria-live="polite" className="grid gap-3 px-4">
+      <ul aria-live="polite" className="grid gap-3 px-(--gutter) md:grid-cols-2">
         {rows.map((row) => (
           <RunningRowView key={row.id} row={row} progress={row.queued ? 0 : estimatedProgress(now - row.startedAt)} />
         ))}
       </ul>
-      <p className="mx-4 mt-3 text-caption text-muted-foreground">{t('closeApp')}</p>
+      <p className="mx-(--gutter) mt-3 text-caption text-muted-foreground">{t('closeApp')}</p>
     </section>
   )
 }

@@ -5,13 +5,28 @@ import { useEffect, useState, type ReactNode } from 'react'
 
 import { cn } from '../ui/cn'
 
+type Props = {
+  back: { href: string; label: string }
+  title: string
+  aside?: ReactNode
+  // The photo page keeps the top tab bar from md up (T38), so its nav sticks below it.
+  underTabBar?: boolean
+}
+
 // Flow pages (workspace, result) replace the tab bar with a sticky nav row: a back link with a
 // safelight chevron, the page title fading in after 60px of scroll, one item on the right.
-export function FlowNav({ back, title, aside }: { back: { href: string; label: string }; title: string; aside?: ReactNode }) {
+// From md up the row is 60px and lines up with the content column (B comp workspace.html).
+export function FlowNav({ back, title, aside, underTabBar = false }: Props) {
   const scrolled = useScrolledPast(60)
   return (
-    <header className={cn('nav-material sticky top-0 z-50 px-1 pt-[var(--sat)]', scrolled && 'shadow-[inset_0_-1px_0_var(--border)]')}>
-      <div className="grid h-13 grid-cols-[1fr_auto_1fr] items-center">
+    <header
+      className={cn(
+        'nav-material sticky top-0 z-50 px-1 pt-[var(--sat)] md:px-[calc(var(--gutter)-12px)]',
+        underTabBar && 'md:top-14',
+        scrolled && 'shadow-[inset_0_-1px_0_var(--border)]',
+      )}
+    >
+      <div className="grid h-13 grid-cols-[1fr_auto_1fr] items-center md:h-15">
         <Link href={back.href} className="press inline-flex min-h-11 items-center gap-1 justify-self-start pr-3 pl-1 text-body font-medium">
           <svg viewBox="0 0 24 24" aria-hidden="true" className="size-6 text-primary" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
             <path d="M15 5l-7 7 7 7" />

@@ -36,14 +36,14 @@ async function Photos() {
     <>
       <Header aside={<PhotosCount runningIds={running.map((item) => item.id)} done={done.length} />} />
       <RunningList server={running} covers={covers} />
-      <DoneGrid items={done} now={now} anyRunning={running.length > 0} />
+      <DoneGrid items={done} now={now} anyRunning={running.length > 0} liveTemplates={templates.map((template) => template.id)} />
     </>
   )
 }
 
 export default function PhotosPage() {
   return (
-    <AppPage>
+    <AppPage wide>
       <Suspense fallback={<Header />}>
         <Photos />
       </Suspense>
