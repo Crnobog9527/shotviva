@@ -5,8 +5,7 @@ import { Suspense } from 'react'
 
 import { AppPage, FlowNav } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
-import { BASE_SUPPORT_REPLY_HOURS } from '@/core/billing'
-import { loadMyThread, markTicketSeen } from '@/core/support'
+import { loadMyThread, markTicketSeen, ReplyTime } from '@/core/support'
 import { AddMessageForm, ThreadView } from '@/core/support/ui'
 import { site } from '@/site/site.config'
 
@@ -16,12 +15,12 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('app.support'))('title') }
 }
 
-// "Thanks, we've got it" after sending, with the reply time from the tier benefits.
-async function SentNotice() {
+// "Thanks, we've got it" after sending, with the reply time for the user's tier.
+async function SentNotice({ userId }: { userId: string }) {
   const t = await getTranslations('app.support')
   return (
     <p role="status" className="hairline-lit rounded-panel bg-card p-4 text-body">
-      {t('thread.sent')} {t('replyTime', { hours: BASE_SUPPORT_REPLY_HOURS })}
+      {t('thread.sent')} <ReplyTime userId={userId} />
     </p>
   )
 }
@@ -44,7 +43,7 @@ async function Thread({ params, searchParams }: PageProps<'/account/help/[id]'>)
       <ThreadView
         thread={thread}
         brand={site.brand.name}
-        notice={sent === '1' ? <SentNotice /> : undefined}
+        notice={sent === '1' ? <SentNotice userId={user.id} /> : undefined}
         form={<AddMessageForm send={addMessageAction.bind(null, thread.id)} closed={thread.status === 'closed'} />}
       />
     </>
