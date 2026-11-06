@@ -26,17 +26,18 @@ export function PayMethods({ method, onChange, kind, period }: Props) {
   }
   return (
     <>
-      <div className="mt-6 mb-2.5 flex items-baseline justify-between px-0.5">
+      <div className="mt-6 mb-2 flex items-baseline justify-between gap-3 px-0.5">
         <h3 className="text-headline font-semibold">{t("payWith")}</h3>
         <span className="text-caption text-muted-foreground">{t("pricesInUsd")}</span>
       </div>
-      <div role="radiogroup" aria-label={t("payLabel")} className="grid gap-2">
+      <div role="radiogroup" aria-label={t("payLabel")} className="grid gap-2 md:grid-cols-2">
         {CHECKOUT_METHODS.map((m) => (
           <label
             key={m}
             className={cn(
-              "flex min-h-14 cursor-pointer items-center gap-3 rounded-control bg-[var(--tier-graphite)] px-3.5",
-              method === m ? "shadow-[inset_0_0_0_1.5px_var(--bone-dim)]" : "hairline",
+              "flex min-h-14 cursor-pointer items-center gap-3 rounded-control bg-[var(--tier-graphite)] px-3 py-2 transition-shadow",
+              method === m ? "shadow-[inset_0_0_0_1.5px_var(--bone-dim)]" : "shadow-[inset_0_0_0_1px_var(--border)] hover:shadow-[inset_0_0_0_1px_var(--input)]",
+              "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring",
             )}
           >
             <input
@@ -60,7 +61,7 @@ export function PayMethods({ method, onChange, kind, period }: Props) {
 }
 
 // Neutral marks only: no third-party logo files are bundled.
-function MethodMark({ method }: { method: CheckoutMethod }) {
+export function MethodMark({ method }: { method: CheckoutMethod }) {
   if (method === "card") {
     return (
       <svg viewBox="0 0 28 20" aria-hidden="true" className="h-5 w-7 text-bone-dim" fill="none" stroke="currentColor">

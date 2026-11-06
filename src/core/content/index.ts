@@ -28,6 +28,10 @@ export { CostTableView } from './blocks/cost-table-section'
 export { Breadcrumbs } from './blocks/breadcrumbs'
 export { FactsSection } from './blocks/facts-section'
 export { FaqSection } from './blocks/faq-section'
+export { BusinessSection, type BusinessBlock } from './blocks/business-section'
+export { businessMailto } from './blocks/business-mailto'
+export { CreditBuys, type CreditBuysBlock } from './blocks/credit-buys'
+export { PricingHero, type PricingHeroText } from './blocks/pricing-hero'
 export { SiteFooter, type FooterLink } from './blocks/site-footer'
 export {
   defineLegalPage,

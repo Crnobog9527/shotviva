@@ -1,26 +1,13 @@
 import type { PaymentChannel } from '@/core/config'
-import type { FaqItem } from '@/core/content'
+import type { BusinessBlock, CreditBuysBlock, FaqItem } from '@/core/content'
 
 import { site } from '../site.config'
-import {
-  OUTPUT_TIERS,
-  PACKS,
-  PLAN_TIERS,
-  creditsOf,
-  freeImagesLabel,
-  packFrom,
-  perCredit,
-  planFrom,
-  priceOf,
-  usd,
-  yearlySaving,
-} from './offer'
+import { OUTPUT_TIERS, freeImagesLabel, fromCredits, packFrom, planFrom, tierList, usd, yearlySaving } from './offer'
 
-// Final /pricing copy (T11). Every number is read from site.config through offer.ts; until
-// T9 adds the nine products the cells show PRICE_PENDING. Checkout is T9.
+// Final /pricing copy (T11, laid out as comps-v3-b pricing.html in T37). Every number is read
+// from site.config through offer.ts; the plan and pack cards themselves render from the
+// products in core/billing/paywall.
 const brand = site.brand.name
-
-type Table = { caption: string; headers: readonly string[]; rows: readonly (readonly string[])[] }
 
 // One shape for /pricing in every language (zh/pricing.ts is the Chinese one).
 export type PricingContent = {
@@ -28,40 +15,55 @@ export type PricingContent = {
   label: string
   title: string
   description: string
+  // The whole H1 (the keyword first, 建站规格 R3); `h1Em` is its italic tail, empty in Chinese
+  // (DESIGN §3.2: no italics in Chinese).
   h1: string
+  h1Em: string
   intro: string
-  tables: { plans: Table; packs: Table; photoCost: Table }
-  headings: { payment: string; faq: string }
-  payment: readonly string[]
+  gift: string
+  creditBuys: CreditBuysBlock
+  business: BusinessBlock
+  headings: { faq: string }
   faq: readonly FaqItem[]
-  // The same blocks when the paywall runs on Waffo (PAYMENT_CHANNEL=waffo, ARCHITECTURE §6.3):
-  // every purchase is one-time, so nothing about renewing or cancelling.
-  oneTime: { payment: readonly string[]; faq: readonly FaqItem[] }
+  // The FAQ when the paywall runs on Waffo (PAYMENT_CHANNEL=waffo, ARCHITECTURE §6.3): every
+  // purchase is one-time, so nothing about renewing or cancelling.
+  oneTime: { faq: readonly FaqItem[] }
 }
 
-const plansTable: Table = {
-  caption: 'Monthly and yearly plans',
-  headers: ['Plan', 'Monthly', 'Credits a month', 'Yearly', 'Credits a year, upfront', 'Per credit, yearly'],
-  rows: PLAN_TIERS.map((tier) => [
-    tier.name,
-    priceOf(tier.monthly),
-    creditsOf(tier.monthly),
-    priceOf(tier.yearly),
-    creditsOf(tier.yearly),
-    perCredit(tier.yearly),
-  ]),
+// The business inquiry subject is English on every language, so the Owner can filter on it
+// (DESIGN §6.9 item 8).
+export const BUSINESS_MAIL_SUBJECT = `Business inquiry — ${brand}`
+
+const pixels = OUTPUT_TIERS.map((tier) => tier.px)
+
+const creditBuys: CreditBuysBlock = {
+  heading: 'What a credit buys',
+  tiers: OUTPUT_TIERS.map((tier) => ({ name: tier.name, credits: tier.credits })),
+  unit: 'credits',
+  note: `Per photo on most templates, at ${pixels.slice(0, -1).join(', ')} or ${pixels.at(-1)} px. Every size and shape costs the same at a given resolution.`,
 }
 
-const packsTable: Table = {
-  caption: 'One-time credit packs, for anyone',
-  headers: ['Pack', 'Price', 'Credits', 'Per credit'],
-  rows: PACKS.map((pack) => [pack.name, priceOf(pack.id), creditsOf(pack.id), perCredit(pack.id)]),
-}
-
-const photoCostTable: Table = {
-  caption: 'What one photo costs on most templates',
-  headers: ['Size', 'Pixels', 'Good for', 'Credits'],
-  rows: OUTPUT_TIERS.map((tier) => [tier.name, `${tier.px} px`, tier.use, String(tier.credits)]),
+// Things we arrange on request, not features: none of them has a back office or code yet
+// (Owner 2026-11-06), so nothing here promises an SLA, SSO or team seats.
+const business: BusinessBlock = {
+  heading: 'For business',
+  who: 'For brands, e-commerce sellers, restaurant groups and agencies that need photos at volume. Tell us what you need and we set it up for you:',
+  items: [
+    { title: 'Volume pricing and invoicing', detail: 'Annual contracts, priced for your volume and billed by invoice.' },
+    { title: 'Custom templates', detail: 'Built to your brand guide, product line and marketplace specs: one consistent look across the catalog.' },
+    { title: 'Higher throughput, bigger batches', detail: 'Whole catalogs at once, not one photo at a time.' },
+    { title: 'API access', detail: `${brand} inside your product system or store.` },
+    { title: 'Privacy and data terms', detail: 'Your work stays private; a DPA on request.' },
+    { title: 'A dedicated contact', detail: 'One person for onboarding and priority help.' },
+  ],
+  cta: 'Contact us',
+  aside: ['Or write to ', ' with your volume and platforms.'],
+  prompts: [
+    'Company:',
+    'Monthly photo volume:',
+    'Platforms (marketplaces, delivery apps, your site):',
+    'What you would like us to set up (templates, API, invoicing):',
+  ],
 }
 
 const titlePrice = planFrom ? `Plans From ${usd(planFrom.priceUsd)} a Month` : 'Plans and Credit Packs'
@@ -103,33 +105,18 @@ export const pricingPage: PricingContent = {
   label: 'Pricing',
   title: `${brand} Pricing: ${titlePrice}`,
   description: `${brand} pricing: Starter, Pro and Max plans, monthly or yearly, plus one-time credit packs. New users get ${freeImagesLabel}. Credits never expire.`,
-  h1: `${brand} Pricing`,
-  intro: `Every new account gets ${freeImagesLabel}. After that you pay in credits: a photo costs a few credits, depending on the template and the size you pick. Choose a plan, or buy a pack when you only need a few photos.${yearly}${packs}`,
-  tables: { plans: plansTable, packs: packsTable, photoCost: photoCostTable },
-  headings: { payment: 'How you pay', faq: 'Pricing FAQ' },
-  payment: [
-    'Card, Apple Pay or Google Pay: plans renew automatically, and you can cancel any time. Cancelling stops the next renewal; your credits stay.',
-    'Alipay: a one-time payment for one month or one year of a plan, with no auto-renewal.',
-    'Credit packs are always a one-time payment and can be bought without a plan.',
-  ],
+  h1: `${brand} Pricing: pay monthly, pay yearly, or buy credits once`,
+  h1Em: 'or buy credits once',
+  intro: `Every photo made with paid credits is private and watermark-free. A photo costs ${fromCredits}, depending on the template and whether you pick ${tierList}.${yearly}${packs}`,
+  gift: `New users get ${freeImagesLabel}. No card needed.`,
+  creditBuys,
+  business,
+  headings: { faq: 'Pricing FAQ' },
   faq,
-  oneTime: {
-    payment: [
-      'Card or Alipay: a one-time payment for one month or one year of a plan. When it ends, buy again if you want more.',
-      'Credit packs are always a one-time payment and can be bought without a plan.',
-    ],
-    faq: oneTimeFaq,
-  },
+  oneTime: { faq: oneTimeFaq },
 }
 
-// The /pricing payment lines and FAQ for the live channel, in English (localized.ts has every
-// language).
-export function pricingPayment(channel: PaymentChannel): readonly string[] {
-  return channel === 'waffo' ? pricingPage.oneTime.payment : pricingPage.payment
-}
-
+// The /pricing FAQ for the live channel, in English (localized.ts has every language).
 export function pricingFaq(channel: PaymentChannel): readonly FaqItem[] {
   return channel === 'waffo' ? pricingPage.oneTime.faq : pricingPage.faq
 }
-
-export type PricingTable = Table

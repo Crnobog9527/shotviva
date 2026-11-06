@@ -1,17 +1,18 @@
 import type { Metadata } from 'next'
 
-import { PaywallProvider, PricingPlans } from '@/core/billing/paywall'
+import { PaywallProvider, PricingPayWith, PricingPlans } from '@/core/billing/paywall'
 import { paymentChannel } from '@/core/billing/waffo'
-import { Breadcrumbs, FaqSection } from '@/core/content'
+import { BusinessSection, CreditBuys, FaqSection, PricingHero } from '@/core/content'
 import { localizePath } from '@/core/i18n'
 import { currentLocale } from '@/core/i18n/server'
 import { JsonLdScript, breadcrumbListLd, faqPageLd, pageMetadata } from '@/core/seo'
-import { homePageIn, pricingCopyIn, pricingPageIn, type PricingTable } from '@/site/content'
+import { BUSINESS_MAIL_SUBJECT, homePageIn, pricingFaqIn, pricingPageIn } from '@/site/content'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { site } from '@/site/site.config'
 
-// Prices render from site.config (plans through core/billing/paywall, tables through
-// site/content) into the static HTML, in US dollars in both languages (建站规格 §6.1).
+// /pricing as comps-v3-b pricing.html (T37): hero, the plans and packs (core/billing/paywall,
+// prices from site.config), "For business", what a credit buys, how to pay, then the FAQ.
+// Everything renders into the static HTML, in US dollars in both languages (建站规格 §6.1, R5).
 // Indexable: /pricing and /zh/pricing are in their keyword map CSVs and in site.indexing.
 // Buying opens the same paywall as the app; signed-out buyers sign in first.
 // PAYMENT_CHANNEL is read when the page renders (at build): switching channel is an env change
@@ -21,75 +22,38 @@ export async function generateMetadata(): Promise<Metadata> {
   return pageMetadata(site, pricingPageIn(locale), locale)
 }
 
-function PriceTable({ table }: { table: PricingTable }) {
-  return (
-    <section>
-      <h2>{table.caption}</h2>
-      {/* Six columns do not fit 375px in either language: the table scrolls, cells never touch. */}
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-left text-sm [&_td]:px-2 [&_td]:py-1 [&_th]:px-2 [&_th]:py-1 [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
-          <thead>
-            <tr>
-              {table.headers.map((header) => (
-                <th key={header} scope="col">
-                  {header}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {table.rows.map(([name, ...cells]) => (
-              <tr key={name}>
-                <th scope="row">{name}</th>
-                {cells.map((cell, i) => (
-                  <td key={table.headers[i + 1]}>{cell}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  )
-}
+const faqStyle =
+  'mt-12 max-w-3xl [&_h2]:font-display [&_h2]:text-h1 [&_h2]:leading-none [&_h3]:mt-6 [&_h3]:text-headline [&_h3]:font-semibold [&_p]:mt-2 [&_p]:text-bone-dim [&_table]:mt-3 [&_table]:text-caption'
 
 export default async function PricingPage() {
   const locale = await currentLocale()
   const page = pricingPageIn(locale)
-  const { tables } = page
   const wishlistLive = isWishlistEnabled(site)
   const channel = paymentChannel()
-  const { payment, faq } = pricingCopyIn(locale, channel)
+  const faq = pricingFaqIn(locale, channel)
+  const path = localizePath(page.path, locale)
   const crumbs = [
-    { name: homePageIn(locale).label, path: '/' },
-    { name: page.label, path: page.path },
+    { name: homePageIn(locale).label, path: localizePath('/', locale) },
+    { name: page.label, path },
   ]
-  const ldCrumbs = crumbs.map((crumb) => ({ ...crumb, path: localizePath(crumb.path, locale) }))
   return (
-    <article className="mx-auto flex w-full max-w-5xl flex-col gap-8 py-4">
-      <JsonLdScript data={[breadcrumbListLd(site, ldCrumbs), faqPageLd(faq)]} />
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4">
-        <Breadcrumbs crumbs={crumbs} />
-        <header>
-          <h1>{page.h1}</h1>
-          <p>{page.intro}</p>
-        </header>
-      </div>
+    <article className="mx-auto w-full max-w-[1120px] px-4 pb-16 md:px-8 lg:px-10">
+      <JsonLdScript data={[breadcrumbListLd(site, crumbs), faqPageLd(faq)]} />
+      <PricingHero text={page} />
       <PaywallProvider products={site.billing.products} wishlistLive={wishlistLive} channel={channel}>
         <PricingPlans products={site.billing.products} wishlistLive={wishlistLive} />
       </PaywallProvider>
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4">
-        <PriceTable table={tables.plans} />
-        <PriceTable table={tables.packs} />
-        <PriceTable table={tables.photoCost} />
-        <section>
-          <h2>{page.headings.payment}</h2>
-          <ul>
-            {payment.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-        </section>
+      <BusinessSection
+        block={page.business}
+        email={site.brand.contactEmail}
+        subject={BUSINESS_MAIL_SUBJECT}
+        page={path === '/zh/pricing' ? '/zh/pricing' : '/pricing'}
+      />
+      <div className="mt-6 grid gap-6 md:mt-8 md:grid-cols-2 md:items-start md:gap-8">
+        <CreditBuys block={page.creditBuys} />
+        <PricingPayWith channel={channel} />
+      </div>
+      <div className={faqStyle}>
         <FaqSection faq={faq} heading={page.headings.faq} />
       </div>
     </article>

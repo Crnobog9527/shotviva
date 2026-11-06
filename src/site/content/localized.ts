@@ -36,10 +36,10 @@ const ZH_LEGAL_LABELS: Record<string, string> = {
 
 export const homePageIn = (locale: Locale): HomePage => HOME[locale]
 export const pricingPageIn = (locale: Locale): PricingContent => PRICING[locale]
-// /pricing's payment lines and FAQ for the live channel (Waffo is all one-time).
-export function pricingCopyIn(locale: Locale, channel: PaymentChannel): { payment: readonly string[]; faq: readonly FaqItem[] } {
+// /pricing's FAQ for the live channel (Waffo is all one-time).
+export function pricingFaqIn(locale: Locale, channel: PaymentChannel): readonly FaqItem[] {
   const page = PRICING[locale]
-  return channel === 'waffo' ? page.oneTime : { payment: page.payment, faq: page.faq }
+  return channel === 'waffo' ? page.oneTime.faq : page.faq
 }
 
 export const contentPagesIn = (locale: Locale): readonly ContentPage[] => INNER[locale]

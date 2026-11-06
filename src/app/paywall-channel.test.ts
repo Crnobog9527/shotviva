@@ -1,10 +1,10 @@
 import { createTranslator } from 'next-intl'
 import { describe, expect, it } from 'vitest'
 
-import { methodLabel, methodNote, periodIntro, planFinePrint, type PaywallMessage } from '@/core/billing/paywall'
+import { methodLabel, methodNote, planFinePrint, pricingMethodNote, type PaywallMessage } from '@/core/billing/paywall'
 import { CHECKOUT_METHODS } from '@/core/billing/stripe'
 import type { PaymentChannel } from '@/core/config'
-import { pricingFaq, pricingPayment } from '@/site/content'
+import { pricingFaq } from '@/site/content'
 import messages from '@/site/messages/en.json'
 
 // T13 / ARCHITECTURE §6.3: with PAYMENT_CHANNEL=waffo every purchase is one-time, so the paywall
@@ -20,9 +20,9 @@ const RENEWAL = /renew|cancel|recurr|automatic/i
 const PERIODS = ['month', 'year'] as const
 
 function paywallLines(channel: PaymentChannel): string[] {
-  const lines = [say(periodIntro(channel))]
+  const lines: string[] = []
   for (const method of CHECKOUT_METHODS) {
-    lines.push(say(methodLabel(channel, method)))
+    lines.push(say(methodLabel(channel, method)), say(pricingMethodNote(channel, method)))
     for (const period of PERIODS) {
       for (const kind of ['plan', 'pack'] as const) lines.push(say(methodNote(channel, { kind, method, period })))
       lines.push(say(planFinePrint(channel, { method, period, price: '$19.90' })))
@@ -49,15 +49,15 @@ describe('payment copy by channel', () => {
     expect(say(methodNote('stripe', { kind: 'plan', method: 'card', period: 'month' }))).toBe('Renews automatically, cancel anytime')
     expect(say(planFinePrint('stripe', { method: 'card', period: 'year', price: '$191' }))).toBe('Renews yearly at $191 · cancel anytime · USD')
     expect(say(planFinePrint('stripe', { method: 'alipay', period: 'month', price: '$19.90' }))).toMatch(/^One-time payment for 30 days/)
-    expect(say(periodIntro('stripe'))).toMatch(/cancel a card plan/)
+    expect(say(pricingMethodNote('stripe', 'card'))).toBe('Plans renew automatically, cancel anytime')
+    expect(say(pricingMethodNote('stripe', 'alipay'))).toBe('One-time payment for 30 days or 1 year, no auto-renew')
   })
 
   it('/pricing: Waffo drops the renewal lines and the cancel question; Stripe keeps them', () => {
-    const waffo = [...pricingPayment('waffo'), ...pricingFaq('waffo').flatMap((item) => [item.question, item.answer])]
+    const waffo = [...CHECKOUT_METHODS.map((m) => say(pricingMethodNote('waffo', m))), ...pricingFaq('waffo').flatMap((item) => [item.question, item.answer])]
     for (const line of waffo) expect(line).not.toMatch(RENEWAL)
     expect(pricingFaq('waffo').length).toBeGreaterThan(0)
 
-    expect(pricingPayment('stripe').join(' ')).toMatch(/renew automatically/)
     expect(pricingFaq('stripe').map((item) => item.question)).toContain('How do I cancel my plan?')
   })
 })

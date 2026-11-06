@@ -23,6 +23,7 @@ export const CHECKOUT_FORMS = ['subscription', 'one_time'] as const
 export const PAYMENT_CHANNELS = ['stripe', 'waffo'] as const
 // No WeChat Pay (Owner 2026-11-05, ARCHITECTURE §6.2).
 export const PAYMENT_METHODS = ['card', 'alipay'] as const
+export const CONTACT_SALES_PAGES = ['/pricing', '/zh/pricing'] as const
 
 const checkoutProps = {
   product_id: z.enum(PRODUCT_IDS),
@@ -55,6 +56,8 @@ export const eventSchemas = {
     batch_size: z.number().int().min(1).max(MAX_BATCH_SIZE),
   }),
   paywall_view: z.strictObject({ trigger: z.enum(PAYWALL_TRIGGERS) }),
+  // The pricing page's "For business" Contact us (DESIGN §6.9 item 8, T37).
+  contact_sales_click: z.strictObject({ page: z.enum(CONTACT_SALES_PAGES) }),
   checkout_start: z.strictObject(checkoutProps),
   purchase: z.strictObject({
     ...checkoutProps,
@@ -68,7 +71,7 @@ export type EventProps<E extends EventName> = z.infer<(typeof eventSchemas)[E]>
 
 // §16.2: money and credit events go out from the server so ad blockers cannot drop them.
 export const SERVER_EVENTS = ['signup', 'generate', 'checkout_start', 'purchase'] as const
-export const BROWSER_EVENTS = ['upload', 'paywall_view'] as const
+export const BROWSER_EVENTS = ['upload', 'paywall_view', 'contact_sales_click'] as const
 export type ServerEventName = (typeof SERVER_EVENTS)[number]
 export type BrowserEventName = (typeof BROWSER_EVENTS)[number]
 

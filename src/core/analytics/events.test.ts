@@ -31,13 +31,14 @@ const valid: { [E in EventName]: unknown } = {
   upload: { size_bucket: '1-5MB', compressed: true },
   generate,
   paywall_view: { trigger: 'insufficient_credits' },
+  contact_sales_click: { page: '/zh/pricing' },
   checkout_start: checkout,
   purchase: { ...checkout, product_id: 'pack_s', tier: 'pack', interval: null, form: 'one_time', amount_usd: 9.9, credits: 20 },
 }
 
 describe('event dictionary (ARCHITECTURE §16.2)', () => {
-  it('covers exactly the six named events', () => {
-    expect(Object.keys(eventSchemas).sort()).toEqual(['checkout_start', 'generate', 'paywall_view', 'purchase', 'signup', 'upload'])
+  it('covers exactly the seven named events', () => {
+    expect(Object.keys(eventSchemas).sort()).toEqual(['checkout_start', 'contact_sales_click', 'generate', 'paywall_view', 'purchase', 'signup', 'upload'])
   })
 
   it.each(Object.entries(valid))('accepts a well-formed %s', (event, props) => {
@@ -52,6 +53,8 @@ describe('event dictionary (ARCHITECTURE §16.2)', () => {
     expect(validateEvent('generate', { ...generate, batch_size: 31 }).ok).toBe(false)
     expect(validateEvent('paywall_view', { trigger: 'tier_required' }).ok).toBe(true)
     expect(validateEvent('purchase', checkout).ok).toBe(false)
+    expect(validateEvent('contact_sales_click', { page: '/pricing' }).ok).toBe(true)
+    expect(validateEvent('contact_sales_click', { page: '/account' }).ok).toBe(false)
   })
 })
 

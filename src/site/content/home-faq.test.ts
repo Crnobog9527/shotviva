@@ -3,6 +3,7 @@ import { createElement, type ComponentProps } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
+import { perCreditUsd } from '@/core/billing/paywall'
 import { FaqSection, type FaqItem } from '@/core/content'
 import type { Locale } from '@/core/i18n'
 import { TranslatedPathsProvider } from '@/core/i18n/ui'
@@ -11,8 +12,7 @@ import { faqPageLd } from '@/core/seo'
 import { loadMessages } from '../i18n/messages'
 import { site } from '../site.config'
 import { homePage } from './home'
-import { creditFrom, freeImagesLabel, fromCredits, perCredit, planFrom, tierList, tierPixels, usd } from './offer'
-import { pricingPage } from './pricing'
+import { creditFrom, freeImagesLabel, fromCredits, perCredit, planFrom, product, tierList, tierPixels, usd } from './offer'
 import { zhHomePage } from './zh/home'
 import { zhFreeImages, zhFromCredits, zhTierPixels } from './zh/offer'
 
@@ -74,7 +74,6 @@ describe('home FAQ, English (建站规格 G6)', () => {
     expect(b).toContain(`${usd(planFrom?.priceUsd ?? 0)} a month for ${planFrom?.credits} credits`)
     expect(b).toContain(`as little as ${creditFrom}`)
     expect(creditFrom).toBe(perCredit('max_yearly'))
-    expect(JSON.stringify(pricingPage.tables)).toContain(creditFrom)
     expect(byLetter(faq, 'A').answer).toContain(tierList)
     expect(byLetter(faq, 'G').answer).toContain(`PNG in 3 sizes: ${tierPixels}`)
     expect(byLetter(faq, 'I').answer).toContain(freeImagesLabel)
@@ -150,5 +149,12 @@ describe('home FAQ, Chinese (建站规格 G6, G13)', () => {
     expect(html).toContain('<caption>AI改图和 AI 生图对比</caption>')
     expect(html).toContain('href="/zh/image-to-image-generator"')
     expect(html).toContain('去描述它。<a href="/zh/image-to-image-generator"')
+  })
+})
+
+describe('home FAQ and /pricing agree', () => {
+  it('quotes the same lowest per-credit price that the /pricing Max card prints', () => {
+    const maxYearly = product('max_yearly')
+    expect(maxYearly && usd(perCreditUsd(maxYearly))).toBe(creditFrom)
   })
 })
