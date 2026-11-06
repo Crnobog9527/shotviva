@@ -135,6 +135,8 @@ interface GenerationProvider {
 | `notes` | 备注 |
 | `created_at` / `updated_at` / `updated_by` | 审计 |
 
+**删除供应商**（Owner 2026-11-06）：后台供应商列表每行有「删除」，二次确认后调用 `admin_delete_provider(p_id)`：在用的那一行不能删（先把另一条设为在用，或先停用再删）；删除时连同它在 Vault 里的密钥一起删掉，在同一个事务里完成。出图记录里的 `provider` 是文字快照，删除不影响历史记录和成本。迁移编号段 `0300`～`0319`。
+
 切换在用的供应商用 SQL 函数 `admin_activate_provider(p_id)`：同一事务里把同模块其他行设为 `false`、这一行设为 `true`。
 
 **出图时怎么选**：`core` 按模块取 `is_active` 那一行（服务端缓存，打 `providers` 标签，后台改动后立即失效），解密密钥，交给模块注册的适配器生成。后台没有启用的供应商时，用环境变量兜底。伙伴接口走同一条路径。`generation_jobs.provider` 写 `<供应商 id 或 env>/<模型名>`，以后按模型算成本用。从 T17 起，模板 `model_params` 里的 `model` 不再生效，模型只由在用的供应商决定，防止换供应商后个别模板还在调旧模型；`background` 等其他参数照旧。
