@@ -10,7 +10,9 @@ import { PhotoPair } from './photo-pair'
 export type TemplateMedia = { before: string; after: string; live: boolean }
 export type TemplateLookup = Readonly<Record<string, TemplateMedia>>
 
-type Props = { grid: HomePage['templateGrid']; media: TemplateLookup; isLinkEnabled: (href: string) => boolean }
+// The landing pages show a subset of the categories with their own heading; no `note` there.
+type Grid = Pick<HomePage['templateGrid'], 'heading' | 'intro' | 'price' | 'categories'> & { note?: string }
+type Props = { grid: Grid; media: TemplateLookup; isLinkEnabled: (href: string) => boolean }
 
 const CARD_SIZES = '(min-width: 1024px) 552px, (min-width: 768px) 50vw, 100vw'
 
@@ -78,7 +80,7 @@ function Solo({ card, media, price, art }: { card: TemplateCard; media: Template
   )
 }
 
-function Category({ category, index, ...rest }: { category: TemplateCategory; index: number; media: TemplateLookup; price: string; isLinkEnabled: (href: string) => boolean }) {
+function Category({ category, ...rest }: { category: TemplateCategory; media: TemplateLookup; price: string; isLinkEnabled: (href: string) => boolean }) {
   const links = (category.links ?? []).filter((link) => rest.isLinkEnabled(link.href))
   const [first] = category.templates
   const mediaOf = (card: TemplateCard): TemplateMedia => rest.media[card.id] ?? { before: '', after: '', live: false }
@@ -97,7 +99,7 @@ function Category({ category, index, ...rest }: { category: TemplateCategory; in
         </p>
       </div>
       {category.templates.length === 1 ? (
-        <Solo card={first} media={mediaOf(first)} price={rest.price} art={index === 0} />
+        <Solo card={first} media={mediaOf(first)} price={rest.price} art={category.drag === true} />
       ) : (
         <ul className="mk-tgrid" data-count={category.templates.length}>
           {category.templates.map((card) => (
@@ -122,10 +124,10 @@ export function TemplateGrid({ grid, media, isLinkEnabled }: Props) {
         </h2>
         <p className="mk-intro">{grid.intro}</p>
       </div>
-      {grid.categories.map((category, index) => (
-        <Category key={category.name} category={category} index={index} media={media} price={grid.price} isLinkEnabled={isLinkEnabled} />
+      {grid.categories.map((category) => (
+        <Category key={category.name} category={category} media={media} price={grid.price} isLinkEnabled={isLinkEnabled} />
       ))}
-      <p className="mk-note">{grid.note}</p>
+      {grid.note ? <p className="mk-note">{grid.note}</p> : null}
     </section>
   )
 }

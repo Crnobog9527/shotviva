@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B0A09">
+<meta name="robots" content="noindex">
+<title>Page not found · Shotviva</title>
+<link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/studio.css">
+<link rel="stylesheet" href="css/marketing.css">
+<script src="js/studio.js"></script>
+<script src="js/marketing.js"></script>
+<style>
+  /* The site 404 (DESIGN §4.6: the way to the home page and to the templates) and the site error page.
+       ?v=404 (default) | error
+     Marketing shell. No glyph: the serif title carries it; under it, the three templates people come for, so the page still gives them something to do. */
+  h1, h2 { text-wrap: balance; } p { text-wrap: pretty; }
+  .appbar { position: sticky; top: 0; z-index: 50; padding: var(--sat) var(--gutter) 0;
+    background: linear-gradient(color-mix(in srgb, var(--background) 92%, transparent), color-mix(in srgb, var(--background) 72%, transparent)); backdrop-filter: blur(20px) saturate(1.3); -webkit-backdrop-filter: blur(20px) saturate(1.3); }
+  .appbar-row { height: 56px; display: flex; align-items: center; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 8px; text-decoration: none; min-height: 44px; }
+  .brand .word { font: 400 24px/1 var(--font-display); letter-spacing: -0.02em; }
+  .brand .word i { color: var(--primary); font-style: normal; }
+  .brand .tag { font: 400 14px/1.15 var(--font-sans); color: var(--muted-foreground); padding-left: 8px; border-left: 1px solid var(--border); white-space: nowrap; }
+
+  .nf { padding: 48px var(--gutter) 0; }
+  .code { font: 400 14px/1 var(--font-mono); color: var(--muted-foreground); }
+  .nf h1 { margin-top: 12px; font: 400 40px/1 var(--font-display); letter-spacing: -0.025em; }
+  .nf h1 em { font-style: italic; color: var(--primary); }
+  .nf .lede { margin-top: 12px; max-width: 44ch; font-size: 16px; line-height: 1.5; color: var(--bone-dim); }
+  .nf .acts { display: grid; gap: 8px; margin-top: 24px; }
+  .nf .acts .btn-ghost { min-height: 52px; border-radius: 16px; font-size: 16px; }
+  .view { display: none; } .view.on { display: block; }
+
+  /* three templates to leave by: the same card as the home grid */
+  .pick { margin-top: 48px; }
+  .pick h2 { font: 600 17px/1.2 var(--font-sans); letter-spacing: -0.01em; }
+  .pick .grid { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 12px; }
+  .pick .tpl { text-decoration: none; }
+
+  @media (min-width: 768px) {
+    .appbar-row { height: 64px; }
+    .nf { padding-top: 80px; }
+    .nf h1 { font-size: 52px; }
+    .nf .acts { grid-template-columns: auto auto; justify-content: start; }
+    .nf .acts .btn-primary { width: auto; min-width: 220px; padding: 0 28px; }
+    .nf .acts .btn-ghost { width: auto; min-width: 180px; padding: 0 24px; }
+    .pick .grid { grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  }
+  @media (min-width: 1024px) { .nf { padding-top: 96px; } .nf h1 { font-size: 56px; } }
+</style>
+</head>
+<body>
+
+<header class="appbar">
+  <div class="appbar-row w">
+    <a class="brand" href="home.html" aria-label="Shotviva, AI photo studio">
+      <span class="word">Shotviva<i>.</i></span><span class="tag">AI photo studio</span>
+    </a>
+    <nav class="nav-links" aria-label="Site">
+      <a class="nl" href="home.html#templates">Templates</a>
+      <a class="nl" href="pricing.html">Pricing</a>
+      <div class="lang-menu">
+        <button class="globe" type="button" aria-label="Language / 语言" aria-haspopup="menu" aria-expanded="false" data-lang-btn><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.6 3.6 5.4 3.6 8.5s-1 5.9-3.6 8.5M12 3.5c-2.6 2.6-3.6 5.4-3.6 8.5s1 5.9 3.6 8.5"/></svg></button>
+        <ul role="menu" aria-label="Language" hidden>
+          <li><a role="menuitemradio" aria-checked="true" href="/">English<svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></a></li>
+          <li><a role="menuitemradio" aria-checked="false" href="/zh" lang="zh-CN" hreflang="zh-CN">简体中文<svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></a></li>
+        </ul>
+      </div>
+      <a class="btn btn-ghost btn-pill" href="auth.html">Log in</a>
+      <a class="btn btn-primary btn-sm" href="auth.html?v=signup">Start free</a>
+    </nav>
+  </div>
+</header>
+
+<main class="nf w">
+
+  <section class="view" data-v="404">
+    <p class="code">404</p>
+    <h1>Nothing developed <em>here.</em></h1>
+    <p class="lede">The page you're after doesn't exist, or it moved. The home page and the templates are still where they were.</p>
+    <div class="acts">
+      <a class="btn btn-primary" href="home.html">Go to the home page</a>
+      <a class="btn btn-ghost" href="home.html#templates">Browse templates</a>
+    </div>
+  </section>
+
+  <section class="view" data-v="error">
+    <p class="code">500</p>
+    <h1>Something went wrong <em>on our side.</em></h1>
+    <p class="lede">The page couldn't load. Your photos and credits are safe. Try again in a moment, and if it keeps happening, write to support@shotviva.com.</p>
+    <div class="acts">
+      <button class="btn btn-primary" type="button">Try again</button>
+      <a class="btn btn-ghost" href="home.html">Go to the home page</a>
+    </div>
+  </section>
+
+  <section class="pick" aria-labelledby="pick-h">
+    <h2 id="pick-h">Three templates to try instead</h2>
+    <div class="grid" id="pick"></div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="w">
+    <p class="word">Shotviva<i>.</i></p>
+    <div class="foot-main">
+      <a class="mail" href="mailto:support@shotviva.com">support@shotviva.com</a>
+      <span class="copy">© 2026 Shotviva</span>
+    </div>
+    <div class="foot-fine">
+      <nav aria-label="Legal"><a href="legal.html">Terms</a><span aria-hidden="true">·</span><a href="legal.html?page=privacy">Privacy</a><span aria-hidden="true">·</span><a href="legal.html?page=refunds">Refunds</a><span aria-hidden="true">·</span><a href="legal.html?page=acceptable-use">Acceptable use</a></nav>
+      <nav class="lang" aria-label="Language"><span aria-current="true">English</span><span aria-hidden="true">·</span><a href="/zh" lang="zh-CN" hreflang="zh-CN">简体中文</a></nav>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  const q = window.SV.q;
+  const v = q.get('v') === 'error' ? 'error' : '404';
+  document.querySelector(`.view[data-v="${v}"]`).classList.add('on');
+  document.title = (v === 'error' ? 'Something went wrong' : 'Page not found') + ' · Shotviva';
+  const T = window.SV.T, { pair } = window.MK;
+  /* three templates, picked at random on every load (the build picks from the live, web-visible templates; art styles stay out because their card is the drag compare) */
+  const pool = T.filter(t => t.cat !== 'art').sort(() => Math.random() - .5).slice(0, 3);
+  document.getElementById('pick').innerHTML = pool.map(t => {
+    return `<a class="tpl" href="home.html?open=${t.id}" aria-label="${t.name}, ${t.use}">${pair(t)}<span class="tpl-meta"><span class="name">${t.name}</span><span class="use">${t.use}</span><span class="cost">from 2 credits</span></span></a>`; }).join('');
+})();
+</script>
+</body>
+</html>

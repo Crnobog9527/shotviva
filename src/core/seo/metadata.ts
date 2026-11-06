@@ -33,8 +33,12 @@ export type PageMetaInput = { path: string; title: string; description: string; 
 
 // hreflang en / zh-Hans / x-default (→ English) only where both versions exist
 // (建站规格 §6.1 rule 4); English-only pages carry no alternates at all.
+// hreflang only between pages indexable in both languages (ARCHITECTURE §17): a noindex /zh page
+// (every SEO inner page but the generator, the app pages) gets none, though the language
+// switch still points at it.
 function languageAlternates(site: SiteConfig, input: PageMetaInput): Record<string, string> | undefined {
   if (!hasTranslation(site, input.path, [input])) return undefined
+  if (!site.indexing.zhIndexablePaths.includes(input.path as `/${string}`)) return undefined
   const english = absoluteUrl(site, input.path)
   return {
     [hreflang('en')]: english,

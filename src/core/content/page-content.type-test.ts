@@ -6,6 +6,7 @@ const img = { src: '/a.svg', alt: 'a', width: 1, height: 1 }
 const fact = { label: 'l', value: 'v' }
 const faq = { question: 'q', answer: 'a' }
 const link = { href: '/x', anchor: 'x' } as const
+const line = { label: 'l', value: 'v' }
 
 const complete = {
   slug: 'x',
@@ -17,11 +18,13 @@ const complete = {
   label: 'x',
   hero: { before: img, after: img, caption: 'c', cta: { label: 'go', href: '/' } },
   facts: [fact, fact, fact],
-  costTable: {
-    caption: 'c',
-    headers: { item: 'i', photographer: 'p', site: 's' },
-    rows: [{ item: 'i', photographer: 'p', site: 's' }],
+  costBills: {
+    heading: 'h',
+    intro: 'i',
+    photographer: { title: 't', total: { amount: 'a', when: 'w' }, lines: [line, line], fine: 'f' },
+    site: { title: 't', total: { amount: 'a', when: 'w' }, lines: [line, line], fine: 'f' },
   },
+  landing: { generatorTemplate: 'x', factsNote: 'n' },
   faq: [faq, faq, faq],
   related: [link, link],
 } satisfies ContentPage
@@ -39,8 +42,8 @@ declare const noFacts: Omit<Complete, 'facts'>
 // @ts-expect-error block ② (facts) is required
 defineContentPage(noFacts)
 
-declare const noCost: Omit<Complete, 'costTable'>
-// @ts-expect-error block ③ (cost table) is required
+declare const noCost: Omit<Complete, 'costBills'>
+// @ts-expect-error block ③ (the two bills) is required
 defineContentPage(noCost)
 
 declare const noFaq: Omit<Complete, 'faq'>

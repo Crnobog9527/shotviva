@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B0A09">
+<meta name="robots" content="noindex">
+<title>Terms of Service · Shotviva</title>
+<link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/studio.css">
+<link rel="stylesheet" href="css/marketing.css">
+<script src="js/studio.js"></script>
+<script src="js/marketing.js"></script>
+<style>
+  /* The reading layout for the four legal pages (T19): /terms (default), ?page=privacy | refunds | acceptable-use.
+     Read mode: a 68ch measure, 17px body, serif section titles, a contents list that is a plain list on the phone and a
+     sticky column from 1024. The Terms page ends with "Third-party notices" (ARCHITECTURE §17: the MiSans line lives here,
+     not in the footer). The words are SAMPLE COPY so the layout can be judged with real-length text; T19 owns the text and
+     the Owner's lawyer reviews it. Nothing here is a legal statement. */
+  h1, h2, h3 { text-wrap: balance; } p { text-wrap: pretty; }
+  .appbar { position: sticky; top: 0; z-index: 50; padding: var(--sat) var(--gutter) 0;
+    background: linear-gradient(color-mix(in srgb, var(--background) 92%, transparent), color-mix(in srgb, var(--background) 72%, transparent)); backdrop-filter: blur(20px) saturate(1.3); -webkit-backdrop-filter: blur(20px) saturate(1.3); }
+  .appbar-row { height: 56px; display: flex; align-items: center; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 8px; text-decoration: none; min-height: 44px; }
+  .brand .word { font: 400 24px/1 var(--font-display); letter-spacing: -0.02em; }
+  .brand .word i { color: var(--primary); font-style: normal; }
+  .brand .tag { font: 400 14px/1.15 var(--font-sans); color: var(--muted-foreground); padding-left: 8px; border-left: 1px solid var(--border); white-space: nowrap; }
+
+  /* the four pages, as a row of links under the title: the reader can see this is one of four */
+  .doc { padding: 32px var(--gutter) 0; }
+  .doc-h h1 { font: 400 40px/1 var(--font-display); letter-spacing: -0.025em; }
+  .doc-h .upd { margin-top: 12px; font-size: 15px; color: var(--muted-foreground); }
+  .doc-h .upd b { color: var(--bone-dim); font-weight: 500; }
+  .set { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px; }
+  .set a { display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; border-radius: 999px; font: 500 14px/1 var(--font-sans); color: var(--bone-dim); background: var(--bone-6); text-decoration: none; position: relative; }
+  .set a::before { content: ""; position: absolute; inset: -4px 0; }
+  .set a[aria-current="page"] { background: var(--foreground); color: var(--background); }
+
+  /* contents: a plain list on the phone */
+  .toc { margin-top: 28px; padding: 4px 16px; border-radius: 18px; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
+  .toc summary { list-style: none; display: flex; align-items: center; justify-content: space-between; min-height: 48px; font: 600 16px/1.2 var(--font-sans); cursor: pointer; }
+  .toc summary::-webkit-details-marker { display: none; }
+  .toc summary .i { width: 18px; height: 18px; transition: transform .2s var(--ease); }
+  .toc[open] summary .i { transform: rotate(180deg); }
+  .toc ol { margin: 0; padding: 0 0 12px; list-style: none; counter-reset: toc; }
+  .toc li { counter-increment: toc; }
+  .toc a { display: flex; gap: 10px; min-height: 40px; align-items: center; font-size: 15px; color: var(--bone-dim); text-decoration: none; }
+  .toc a::before { content: counter(toc); font: 400 13px/1 var(--font-mono); color: var(--muted-foreground); width: 20px; }
+  .toc li.plain a::before { content: ""; }
+  .toc a[aria-current="true"] { color: var(--foreground); }
+
+  /* the article: a reading measure, 17px, the serif for section titles, counters on the clauses the reader will cite */
+  article { margin-top: 32px; max-width: 68ch; font-size: 17px; line-height: 1.65; counter-reset: sec; }
+  article .intro { color: var(--bone-dim); }
+  article .intro strong { color: var(--foreground); font-weight: 500; }
+  article section { margin-top: 40px; padding-top: 28px; border-top: 1px solid var(--hairline); scroll-margin-top: 80px; }
+  article section.n { counter-increment: sec; }
+  article h2 { font: 400 28px/1.15 var(--font-display); letter-spacing: -0.02em; display: flex; gap: 14px; align-items: baseline; }
+  article section.n h2::before { content: counter(sec); font: 400 14px/1 var(--font-mono); color: var(--muted-foreground); flex: none; min-width: 20px; }
+  article h3 { margin-top: 24px; font: 600 17px/1.3 var(--font-sans); letter-spacing: -0.01em; }
+  article p { margin-top: 14px; }
+  article h2 + p { margin-top: 16px; }
+  article ul, article ol { margin: 14px 0 0; padding-left: 22px; }
+  article li { margin-top: 8px; padding-left: 4px; }
+  article li::marker { color: var(--muted-foreground); }
+  article a { color: var(--foreground); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, var(--foreground) 40%, transparent); }
+  article strong { font-weight: 500; }
+  article .note { margin-top: 16px; padding: 14px 16px; border-radius: 14px; background: var(--bone-4); box-shadow: inset 0 0 0 1px var(--border); font-size: 15px; line-height: 1.55; color: var(--bone-dim); }
+  article table { width: 100%; margin-top: 16px; border-collapse: collapse; font-size: 15px; line-height: 1.45; }
+  article th, article td { padding: 10px 12px 10px 0; text-align: left; vertical-align: top; border-bottom: 1px solid var(--hairline); }
+  article th { font-weight: 500; color: var(--muted-foreground); }
+  /* third-party notices: the one section the licence asks for */
+  .notices dl { margin: 16px 0 0; display: grid; gap: 0; }
+  .notices dl div { display: grid; gap: 2px; padding: 12px 0; border-top: 1px solid var(--hairline); }
+  .notices dt { font-weight: 500; }
+  .notices dd { margin: 0; font-size: 15px; color: var(--bone-dim); }
+  .end { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--hairline); font-size: 15px; color: var(--muted-foreground); }
+
+  ::selection { background: color-mix(in srgb, var(--primary) 38%, transparent); color: var(--foreground); }
+
+  @media (min-width: 768px) {
+    .appbar-row { height: 64px; }
+    .doc { padding-top: 56px; }
+    .doc-h h1 { font-size: 52px; }
+  }
+  @media (min-width: 1024px) {
+    .doc { display: grid; grid-template-columns: 240px minmax(0, 1fr); column-gap: 64px; }
+    .doc-h { grid-column: 1 / -1; }
+    .toc { grid-column: 1; grid-row: 2; align-self: start; position: sticky; top: 88px; margin-top: 40px; padding: 8px 4px; background: none; box-shadow: none; }
+    .toc summary { pointer-events: none; min-height: 32px; font-size: 14px; color: var(--muted-foreground); }
+    .toc summary .i { display: none; }
+    .toc a { min-height: 36px; }
+    article { grid-column: 2; grid-row: 2; margin-top: 40px; }
+  }
+  @media (hover: hover) {
+    .toc a:hover, .set a:not([aria-current="page"]):hover { color: var(--foreground); }
+    .set a:not([aria-current="page"]):hover { background: var(--bone-8); }
+    article a:hover { text-decoration-color: currentColor; }
+  }
+</style>
+</head>
+<body>
+
+<header class="appbar">
+  <div class="appbar-row w">
+    <a class="brand" href="home.html" aria-label="Shotviva, AI photo studio">
+      <span class="word">Shotviva<i>.</i></span><span class="tag">AI photo studio</span>
+    </a>
+    <nav class="nav-links" aria-label="Site">
+      <a class="nl" href="home.html#templates">Templates</a>
+      <a class="nl" href="pricing.html">Pricing</a>
+      <div class="lang-menu">
+        <button class="globe" type="button" aria-label="Language / 语言" aria-haspopup="menu" aria-expanded="false" data-lang-btn><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.6 3.6 5.4 3.6 8.5s-1 5.9-3.6 8.5M12 3.5c-2.6 2.6-3.6 5.4-3.6 8.5s1 5.9 3.6 8.5"/></svg></button>
+        <ul role="menu" aria-label="Language" hidden>
+          <li><a role="menuitemradio" aria-checked="true" href="/terms">English<svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></a></li>
+          <li><a role="menuitemradio" aria-checked="false" href="/zh/terms" lang="zh-CN" hreflang="zh-CN">简体中文<svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></a></li>
+        </ul>
+      </div>
+      <a class="btn btn-ghost btn-pill" href="auth.html">Log in</a>
+      <a class="btn btn-primary btn-sm" href="auth.html?v=signup">Start free</a>
+    </nav>
+  </div>
+</header>
+
+<main class="doc w">
+  <div class="doc-h">
+    <h1 data-title>Terms of Service</h1>
+    <p class="upd">Last updated <b data-upd>6 November 2026</b> · Applies to shotviva.com and the Shotviva app</p>
+    <nav class="set" aria-label="Legal pages">
+      <a href="legal.html" data-page="terms">Terms</a>
+      <a href="legal.html?page=privacy" data-page="privacy">Privacy</a>
+      <a href="legal.html?page=refunds" data-page="refunds">Refunds</a>
+      <a href="legal.html?page=acceptable-use" data-page="acceptable-use">Acceptable use</a>
+    </nav>
+  </div>
+
+  <details class="toc" open>
+    <summary>Contents<svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></summary>
+    <ol id="toc"></ol>
+  </details>
+
+  <article id="art"></article>
+</main>
+
+<footer>
+  <div class="w">
+    <p class="word">Shotviva<i>.</i></p>
+    <div class="foot-main">
+      <a class="mail" href="mailto:support@shotviva.com">support@shotviva.com</a>
+      <span class="copy">© 2026 Shotviva</span>
+    </div>
+    <div class="foot-fine">
+      <nav aria-label="Legal"><a href="legal.html">Terms</a><span aria-hidden="true">·</span><a href="legal.html?page=privacy">Privacy</a><span aria-hidden="true">·</span><a href="legal.html?page=refunds">Refunds</a><span aria-hidden="true">·</span><a href="legal.html?page=acceptable-use">Acceptable use</a></nav>
+      <nav class="lang" aria-label="Language"><span aria-current="true">English</span><span aria-hidden="true">·</span><a href="/zh/terms" lang="zh-CN" hreflang="zh-CN">简体中文</a></nav>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  /* SAMPLE COPY. Real-length sentences so the measure, rhythm and counters can be judged; T19 writes the actual text. */
+  const P = `<p>`;
+  const TERMS = {
+    title: 'Terms of Service', upd: '6 November 2026',
+    intro: `<p class="intro"><strong>In short:</strong> Shotviva turns a photo you already have into a new one. You keep the rights to what you upload and to the paid photos you make. Free photos are public and carry a watermark. Credits are the unit for everything you pay for. We can close accounts that break the acceptable-use rules. Questions go to support@shotviva.com.</p>`,
+    secs: [
+      ['Who we are', `${P}Shotviva is operated by Grayscale Luminary LLC, a Wyoming company. When these terms say "we" or "us", that is who they mean. The company's registered address is in the footer of the Privacy page, and the fastest way to reach a person is support@shotviva.com.</p>${P}By making an account or using the site you agree to these terms, the <a href="legal.html?page=privacy">Privacy Policy</a>, the <a href="legal.html?page=refunds">Refund Policy</a> and the <a href="legal.html?page=acceptable-use">Acceptable Use Policy</a>. If you use Shotviva for a company, you confirm you may bind that company.</p>`],
+      ['Your account', `${P}You need an account to make photos. Sign up with an email address and a password, or with Google. You are responsible for what happens under your account, so keep the password to yourself and tell us if you think someone else has it.</p>${P}One person, one account. We may limit the free images to one account per household network. You can delete your account at any time from the Account page; everything you made is removed within 30 days.</p>`],
+      ['Free photos and paid photos', `${P}A new account comes with three free Standard images. Photos made with free credits are <strong>shown publicly</strong> on the site and carry a small "Made with Shotviva" watermark. Photos made with paid credits are private by default, carry no watermark, and you may use them commercially.</p><div class="note">Free credits never expire on their own, but they are used before paid credits, and a photo made partly with free credits counts as a free photo.</div>`],
+      ['Credits, plans and payments', `${P}Everything you make costs credits. The price in credits is shown before you confirm; it depends on the output quality and size you pick. If a generation fails, the credits come back.</p>${P}Plans renew automatically every month or every year until you cancel, which you can do from the Account page at any time; you keep what you paid for until the end of the period. Credit packs are a one-time payment and never renew. Card payments are processed by Stripe; Alipay payments by Stripe or Waffo. Yearly plans give you the whole year's credits at once.</p><table><tr><th>Plan</th><th>Credits</th><th>Renews</th></tr><tr><td>Starter, Pro, Max monthly</td><td>Each month</td><td>Monthly, until cancelled</td></tr><tr><td>Starter, Pro, Max yearly</td><td>All at once</td><td>Yearly, until cancelled</td></tr><tr><td>Credit packs</td><td>At purchase</td><td>Never</td></tr></table>`],
+      ['What you upload', `${P}You must own the photos you upload or have permission to use them. Don't upload photos of other people without their consent, photos of children, or anything listed in the Acceptable Use Policy. You give us the licence we need to process your photos and show your free photos on the site; nothing more.</p>${P}A photo you use for a work is kept with that work and deleted when you delete the work or your account. An upload you never use is deleted after 7 days.</p>`],
+      ['Templates and results', `${P}Templates describe a general look, such as a white background or an evening room. They are not based on any named artist, brand or person. Results are produced by an AI model and will vary; we don't promise a particular outcome, and a result you don't like is not a fault in the service. The Refund Policy says what we do refund.</p>`],
+      ['Template requests', `${P}If you ask for a template on the Wishlist, the description and any reference photo you attach may be shown to other users and used to design the template. Don't attach photos you don't have the right to share.</p>`],
+      ['Connecting other apps', `${P}You can let Graylum make photos with your Shotviva credits. When you do, we share your account id and remaining balance with Graylum, and every photo it makes is charged like one made here. Disconnect at any time from the Account page.</p>`],
+      ['Ending or suspending accounts', `${P}We can suspend an account that breaks these terms or the Acceptable Use Policy. A suspended account can still log in, download its photos and delete itself, but can't make new photos or buy credits. We'll tell you why unless the law says we can't.</p>`],
+      ['Liability', `${P}Shotviva is provided as it is. To the extent the law allows, we are not liable for indirect losses, and our total liability for any claim is limited to what you paid us in the 12 months before the claim. Nothing in these terms limits liability that can't be limited by law.</p>`],
+      ['Changes to these terms', `${P}We may update these terms. If a change matters, we'll show a notice on the site or email you before it applies. The date at the top is the date of the current version.</p>`],
+      ['Contact', `${P}Write to <a href="mailto:support@shotviva.com">support@shotviva.com</a>.</p>`],
+    ],
+    notices: true,
+  };
+  const OTHER = {
+    privacy: { title: 'Privacy Policy', upd: '6 November 2026', intro: `<p class="intro"><strong>In short:</strong> we keep your email, your photos for as long as the service needs them, and anonymous usage data without cookies. We never sell any of it.</p>`,
+      secs: [['What we collect', `${P}Your email address, the photos you upload and make, your plan and credit balance, and payment records held by Stripe or Waffo. We don't see card numbers.</p>`], ['How long we keep it', `${P}Photos used for a work, and the work itself, until you delete them; unused uploads for 7 days; account records until the account is deleted.</p>`], ['Services we use', `${P}Supabase, Cloudflare R2, OpenAI, Stripe and Link, Waffo, PostHog, Sentry, Resend and Vercel. Each handles only what its part of the service needs.</p>`], ['Cookies', `${P}One functional cookie remembers your language. Usage statistics run without cookies.</p>`], ['Your rights', `${P}Export or delete your data from the Account page, or write to support@shotviva.com.</p>`], ['Contact', `${P}support@shotviva.com · Grayscale Luminary LLC, 75 E 3rd St, Sheridan, WY 82801.</p>`]] },
+    refunds: { title: 'Refund Policy', upd: '6 November 2026', intro: `<p class="intro"><strong>In short:</strong> failed generations are refunded in credits automatically. Unused plans and packs can be refunded within 14 days of purchase. Credits already spent are not.</p>`,
+      secs: [['Failed generations', `${P}If a photo fails to generate, the credits return to your balance on their own. You don't need to ask.</p>`], ['Plans and packs', `${P}Write to support@shotviva.com within 14 days of a purchase you haven't used. Refunds go back to the original payment method and take 5 to 10 business days to show.</p>`], ['What we don\'t refund', `${P}Credits already spent, and results you simply don't like; try another template or size instead, and tell us so we can improve it.</p>`], ['How to ask', `${P}Email support@shotviva.com from the address on your account with the date and amount of the payment.</p>`]] },
+    'acceptable-use': { title: 'Acceptable Use Policy', upd: '6 November 2026', intro: `<p class="intro"><strong>In short:</strong> make photos of your own things and your own work. No people without consent, no minors, no deception, no illegal content.</p>`,
+      secs: [['Allowed', `${P}Products, rooms, food, places and objects you own or are allowed to photograph; your own portraits and those of people who agreed.</p>`], ['Not allowed', `<ul><li>Photos of people without their consent, and any photo of a minor.</li><li>Sexual content, violence, or anything illegal where you are.</li><li>Results presented as genuine photographs where that would deceive someone.</li><li>Trademarks, logos or copyrighted work you don't have the right to use.</li></ul>`], ['What happens', `${P}We may remove content and suspend accounts that break these rules. Suspended accounts keep access to their own photos.</p>`]] },
+  };
+  const page = new URLSearchParams(location.search).get('page');
+  const D = OTHER[page] || TERMS;
+  document.title = D.title + ' · Shotviva';
+  document.querySelector('[data-title]').textContent = D.title;
+  document.querySelector('[data-upd]').textContent = D.upd;
+  document.querySelector(`.set [data-page="${OTHER[page] ? page : 'terms'}"]`).setAttribute('aria-current', 'page');
+  const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  let html = D.intro, toc = '';
+  D.secs.forEach(([h, body]) => { const id = slug(h); html += `<section class="n" id="${id}"><h2>${h}</h2>${body}</section>`; toc += `<li><a href="#${id}">${h}</a></li>`; });
+  if (D.notices) {
+    html += `<section class="notices" id="third-party-notices"><h2>Third-party notices</h2><p>Software and fonts from others that this site includes.</p><dl>
+      <div><dt>MiSans</dt><dd>This site uses the MiSans font, © Xiaomi. <a href="/fonts/misans/LICENSE.pdf">Licence (PDF)</a>.</dd></div>
+      <div><dt>Geist and Geist Mono</dt><dd>Copyright 2024 The Geist Project Authors. SIL Open Font License 1.1.</dd></div>
+      <div><dt>Instrument Serif</dt><dd>SIL Open Font License 1.1.</dd></div>
+    </dl></section>`;
+    toc += `<li class="plain"><a href="#third-party-notices">Third-party notices</a></li>`;
+  }
+  html += `<p class="end">Questions about this page: <a href="mailto:support@shotviva.com">support@shotviva.com</a></p>`;
+  document.getElementById('art').innerHTML = html;
+  document.getElementById('toc').innerHTML = toc;
+  /* the contents list follows the reader */
+  const links = [...document.querySelectorAll('#toc a')];
+  const secs = links.map(a => document.querySelector(a.getAttribute('href')));
+  const io = new IntersectionObserver(es => { es.forEach(e => { if (e.isIntersecting) { links.forEach(a => a.removeAttribute('aria-current')); links[secs.indexOf(e.target)].setAttribute('aria-current', 'true'); } }); }, { rootMargin: '-20% 0px -70% 0px' });
+  secs.forEach(s => io.observe(s));
+  if (!matchMedia('(min-width: 1024px)').matches) document.querySelector('.toc').open = false;
+})();
+</script>
+</body>
+</html>

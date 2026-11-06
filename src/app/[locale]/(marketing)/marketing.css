@@ -609,3 +609,7 @@
   }
   @keyframes mk-rise { from { transform: translateY(16px); } to { transform: none; } }
 }
+
+@layer components {
+  .mk-facts-note { margin-top: 12px; font-size: 14px; line-height: 1.4; color: var(--muted-foreground); }
+}

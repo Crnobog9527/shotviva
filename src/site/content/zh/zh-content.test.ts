@@ -6,6 +6,8 @@ import { describe, expect, it } from 'vitest'
 import { validateContentPage } from '@/core/content'
 
 import { zhHomePage } from './home'
+import { zhAiRestaurantMenu } from './pages/ai-restaurant-menu'
+import { zhCommercialPhotography } from './pages/commercial-photography'
 import { zhImageToImageGenerator } from './pages/image-to-image-generator'
 import { zhPricingPage } from './pricing'
 
@@ -29,7 +31,7 @@ function strings(value: unknown): string[] {
   // (建站规格 R4); `file` is the demo photo's camera file name (IMG_2047.jpg), shown as is.
   if (value && typeof value === 'object') {
     return Object.entries(value)
-      .filter(([key]) => !['slug', 'href', 'path', 'module', 'src', 'id', 'file'].includes(key))
+      .filter(([key]) => !['slug', 'href', 'path', 'module', 'src', 'id', 'file', 'generatorTemplate', 'keyword'].includes(key))
       .flatMap(([, inner]) => strings(inner))
   }
   return []
@@ -37,9 +39,16 @@ function strings(value: unknown): string[] {
 
 // Latin words allowed on a Chinese page (建站规格 §6.1 rule 3): the brand, AI, payment, phone,
 // browser and file-format names, units, and API (the For business plate, T37). Image paths and alt text of the shared placeholders are skipped.
-// Shopify: the cited source in the home bill's fine print.
-const LATIN_OK = new Set(['Shotviva', 'Shopify', 'AI', 'Apple', 'Pay', 'Google', 'iPhone', 'Safari', 'Chrome', 'JPG', 'PNG', 'WebP', 'MB', 'px', 'shotviva', 'API'])
-const PAGES = { '/zh': zhHomePage, '/zh/image-to-image-generator': zhImageToImageGenerator, '/zh/pricing': zhPricingPage }
+// Proper nouns the landing pages cite (T44): the platforms whose photo rules they quote and the
+// price guides behind the bills.
+const LATIN_OK = new Set(['Shotviva', 'Shopify', 'Amazon', 'Etsy', 'DoorDash', 'Uber', 'Eats', 'Grubhub', 'PricingLink', 'Jobbers', 'FoodShot', 'AI', 'Apple', 'Pay', 'Google', 'iPhone', 'Safari', 'Chrome', 'JPG', 'PNG', 'WebP', 'MB', 'px', 'shotviva', 'API'])
+const PAGES = {
+  '/zh': zhHomePage,
+  '/zh/image-to-image-generator': zhImageToImageGenerator,
+  '/zh/commercial-photography': zhCommercialPhotography,
+  '/zh/ai-restaurant-menu': zhAiRestaurantMenu,
+  '/zh/pricing': zhPricingPage,
+}
 
 describe('/zh marketing copy (建站规格 §6.1, G13)', () => {
   it('passes the TDK / direct-answer rules, measured in Chinese', () => {

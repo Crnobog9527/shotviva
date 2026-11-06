@@ -28,4 +28,12 @@ describe('composeEditPrompt', () => {
     expect(composeEditPrompt('WRAPPER', params, 'style', 'Make it moody')).toBe('WRAPPER\n\nMake it moody')
     expect(composeEditPrompt('W', params, 'object', 'x', [])).toBe('W\n\nC-OBJECT\n\nx')
   })
+
+  // T47: another size than the work's adds the reframe paragraph last; the same size never does.
+  it('ends with the reframe paragraph when the size changes', () => {
+    const withReframe = { ...params, reframe: 'C-REFRAME' }
+    expect(composeEditPrompt('W', withReframe, 'subject', 'x', [], true)).toBe('W\n\nC-SUBJECT\n\nx\n\nC-REFRAME')
+    expect(composeEditPrompt('W', withReframe, 'subject', 'x', [], false)).toBe('W\n\nC-SUBJECT\n\nx')
+    expect(composeEditPrompt('W', params, 'subject', 'x', [], true)).toBe('W\n\nC-SUBJECT\n\nx')
+  })
 })

@@ -11,12 +11,15 @@ type Props = {
   aside?: ReactNode
   // The photo page keeps the top tab bar from md up (T38), so its nav sticks below it.
   underTabBar?: boolean
+  // Pages with no large title of their own (wishlist flow pages) show the title from the start,
+  // as the page's h1, instead of fading it in on scroll.
+  pinnedTitle?: boolean
 }
 
 // Flow pages (workspace, result) replace the tab bar with a sticky nav row: a back link with a
 // safelight chevron, the page title fading in after 60px of scroll, one item on the right.
 // From md up the row is 60px and lines up with the content column (B comp workspace.html).
-export function FlowNav({ back, title, aside, underTabBar = false }: Props) {
+export function FlowNav({ back, title, aside, underTabBar = false, pinnedTitle = false }: Props) {
   const scrolled = useScrolledPast(60)
   return (
     <header
@@ -33,9 +36,13 @@ export function FlowNav({ back, title, aside, underTabBar = false }: Props) {
           </svg>
           {back.label}
         </Link>
-        <span aria-hidden="true" className={cn('truncate text-label font-semibold transition-opacity', scrolled ? 'opacity-100' : 'opacity-0')}>
-          {title}
-        </span>
+        {pinnedTitle ? (
+          <h1 className="truncate text-label font-semibold">{title}</h1>
+        ) : (
+          <span aria-hidden="true" className={cn('truncate text-label font-semibold transition-opacity', scrolled ? 'opacity-100' : 'opacity-0')}>
+            {title}
+          </span>
+        )}
         <div className="mr-2 flex items-center gap-2 justify-self-end">{aside}</div>
       </div>
     </header>

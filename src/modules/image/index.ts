@@ -34,8 +34,10 @@ export { DeletedToast } from './photos/deleted-toast'
 export { toPhotoDetail, type PhotoDetail } from './detail/photo-detail'
 export { EditFlow, EditTrigger, type EditSource } from './edit-ui'
 // Wishlist post form (T12): one upload field, same zone and stages as the workspace.
-export { PhotoSlot, type PhotoSlotProps } from './workspace/photo-slot'
+export { PhotoTile, type PhotoTileProps } from './workspace/photo-tile'
 // Home first-screen generator (T36): same pipeline as the workspace (DESIGN §6.9 item 9).
 export { HomeGenerator, type HomeGeneratorProps } from './home/home-generator'
+export { HomeDraftNote } from './home/home-draft-note'
 export type { HomeViewer } from './home/home-cta'
 export type { SampleLookup } from './home/home-samples'
+export { UPLOAD_FORMAT_NAMES, UPLOAD_MAX_MB } from './workspace/upload-formats'

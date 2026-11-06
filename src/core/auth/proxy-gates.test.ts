@@ -11,6 +11,7 @@ describe('gateFor', () => {
     ['/admin/templates', 'admin'],
     ['/administrator', null],
     ['/account', 'signed_in'],
+    ['/checkout', 'signed_in'],
     ['/reset/update', 'signed_in'],
     ['/reset', null],
     ['/generate', 'signed_in'],

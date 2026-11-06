@@ -26,6 +26,16 @@
   .plan .st { font-size: 14px; color: var(--muted-foreground); }
   .plan .st b { color: var(--foreground); font-weight: 500; }
   .plan .btn { justify-self: start; }
+  /* subscription states (?sub=active | cancelled | expired | past_due | wallet): the status sits where "Renews" was; a line explains; one button does the one thing to do */
+  .plan .flag, .pass .flag { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 8px; font: 500 14px/1 var(--font-sans); background: var(--bone-8); color: var(--bone-dim); }
+  .plan .flag.bad, .pass .flag.bad { background: color-mix(in srgb, var(--destructive) 14%, transparent); color: var(--destructive); }
+  .plan .flag::before, .pass .flag::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .plan .why, .pass .why { font-size: 15px; line-height: 1.5; color: var(--bone-dim); text-wrap: pretty; max-width: 52ch; }
+  .plan .why b, .pass .why b { color: var(--foreground); font-weight: 500; }
+  .plan .acts, .pass .acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .plan .btn-primary, .pass .btn-primary { width: auto; min-height: 44px; padding: 0 20px; border-radius: 999px; font-size: 15px; }
+  .plan .btn-primary .i, .pass .btn-primary .i { width: 16px; height: 16px; }
+  .plan.t-none { background: var(--card); }
   .bal2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .bal2 .panel { padding: 12px 16px; border-radius: 16px; }
   .bal2 .n { font: 400 32px/1 var(--font-display); letter-spacing: -0.02em; }
@@ -67,9 +77,73 @@
   .integ .body b { color: var(--foreground); font-weight: 500; }
   .integ .illus { margin-left: 8px; padding: 2px 8px; border-radius: 6px; font: 500 14px/1.3 var(--font-sans); color: var(--muted-foreground); background: var(--bone-6); vertical-align: 1px; }
   .integ summary:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; border-radius: 10px; }
+  /* Owner 11-06 night: livelier, more artful. The plan is a membership pass in the tier's material with the word mark debossed;
+     the credits are two dials; under them a strip of this month's photos with sprocket holes, into Photos. */
+  .pass { position: relative; overflow: hidden; padding: 18px 18px 16px; border-radius: 22px; min-height: 196px; display: grid; grid-template-rows: auto 1fr auto; gap: 14px;
+    background: linear-gradient(135deg, #22201C, #141210 60%); box-shadow: inset 0 0 0 1px var(--border), inset 0 1px 0 rgba(255,255,255,.06), 0 30px 60px -36px rgba(0,0,0,.9); }
+  .pass::before { content: "Shotviva."; position: absolute; right: -6px; bottom: -22px; font: 400 96px/1 var(--font-display); letter-spacing: -0.04em; color: transparent; pointer-events: none;
+    -webkit-text-stroke: 1px rgba(242,236,227,.12); }
+  .pass::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(115deg, transparent 35%, rgba(255,255,255,.06) 50%, transparent 65%); background-size: 240% 100%; animation: pass-sheen 7s ease-in-out infinite; }
+  @keyframes pass-sheen { 0%, 60% { background-position: 120% 0; } 100% { background-position: -120% 0; } }
+  .pass > * { position: relative; z-index: 1; }
+  .pass .hd { display: flex; align-items: center; justify-content: space-between; gap: 12px; font: 500 12px/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted-foreground); }
+  .pass .hd .flag { text-transform: none; letter-spacing: 0; }
+  .pass .mid { align-self: center; }
+  .pass .nm { font: 400 44px/1 var(--font-display); letter-spacing: -0.03em; }
+  .pass .st { margin-top: 6px; font-size: 14px; color: var(--muted-foreground); }
+  .pass .st b { color: var(--foreground); font-weight: 500; }
+  .pass .why { margin-top: 8px; }
+  .pass .ft { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px 16px; }
+  .pass .since { font: 500 12px/1.4 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted-foreground); }
+  .pass .since b { display: block; font: 400 15px/1.3 var(--font-sans); letter-spacing: 0; text-transform: none; color: var(--bone-dim); }
+  .pass.t-pro { background: radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--sapphire-flag) 32%, transparent), transparent 60%), linear-gradient(180deg, var(--sapphire-top), var(--sapphire-deep)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sapphire-rim) 40%, transparent), inset 0 1px 0 rgba(255,255,255,.08); }
+  .pass.t-pro .nm { color: var(--sapphire-ink); }
+  .pass.t-pro::before { -webkit-text-stroke-color: rgba(169,194,255,.16); }
+  .pass.t-max { background: radial-gradient(120% 80% at 100% 0%, color-mix(in srgb, var(--max-gold) 22%, transparent), transparent 60%), linear-gradient(180deg, var(--max-black-top), var(--max-black-deep)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--max-gold) 45%, transparent), inset 0 1px 0 rgba(255,255,255,.08); }
+  .pass.t-max .nm { background: var(--chrome); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .pass.t-max::before { -webkit-text-stroke-color: rgba(242,207,122,.18); }
+  .pass.t-none { background: var(--card); }
+  .pass.t-none::before { -webkit-text-stroke-color: rgba(242,236,227,.08); }
+  /* dials */
+  .dials { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .dial { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 18px; }
+  .dial .ring { --v: 76; width: 64px; height: 64px; border-radius: 50%; flex: none; display: grid; place-items: center;
+    background: conic-gradient(var(--c, var(--primary)) calc(var(--v) * 1%), var(--bone-8) 0); -webkit-mask: radial-gradient(circle, transparent 23px, #000 24px); mask: radial-gradient(circle, transparent 23px, #000 24px); }
+  .dial .ring { animation: dial 1.2s var(--ease) both; }
+  @property --v { syntax: "<number>"; inherits: false; initial-value: 0; }
+  @keyframes dial { from { --v: 0; } }
+  .dial .t .n { font: 400 32px/1 var(--font-display); letter-spacing: -0.02em; }
+  .dial .t .n small { font: 400 13px/1 var(--font-mono); color: var(--muted-foreground); margin-left: 5px; }
+  .dial .t .l { margin-top: 4px; font-size: 13px; line-height: 1.3; color: var(--muted-foreground); }
+  .dial.free .ring { --c: var(--bone-dim); }
+  /* the filmstrip */
+  .strip { position: relative; margin-top: 12px; padding: 10px 0; border-radius: 14px; background: #0A0908; overflow: hidden; }
+  .strip::before, .strip::after { content: ""; position: absolute; left: 0; right: 0; height: 6px; pointer-events: none;
+    background: repeating-linear-gradient(90deg, transparent 0 8px, var(--bone-8) 8px 14px, transparent 14px 20px); }
+  .strip::before { top: 2px; } .strip::after { bottom: 2px; }
+  .strip ul { display: flex; gap: 4px; margin: 0; padding: 0 10px; list-style: none; overflow-x: auto; scrollbar-width: none; }
+  .strip ul::-webkit-scrollbar { display: none; }
+  .strip li { flex: 0 0 auto; width: 72px; aspect-ratio: 4 / 5; border-radius: 3px; overflow: hidden; background: var(--muted); }
+  .strip img { width: 100%; height: 100%; object-fit: cover; }
+  .strip .more { display: grid; place-items: center; font: 500 13px/1 var(--font-mono); color: var(--bone-dim); background: var(--bone-6); text-decoration: none; }
+  .strip-h { display: flex; align-items: baseline; justify-content: space-between; margin-top: 16px; }
+  .strip-h span { font-size: 14px; color: var(--muted-foreground); }
+  @media (min-width: 768px) {
+    .pass { min-height: 220px; padding: 22px 24px 20px; }
+    .pass .nm { font-size: 52px; }
+    .pass::before { font-size: 140px; bottom: -34px; }
+    .dial { padding: 14px 16px; }
+    .strip li { width: 88px; }
+    .two { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; align-items: start; margin-top: 8px; }
+    .two .grp { margin-top: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) { .pass::after, .dial .ring { animation: none; } }
   @media (min-width: 768px) {
     .top { padding-top: 32px; }
     .top, .grp { max-width: 720px; margin-inline: auto; }
+    .top, .two { max-width: calc(var(--content) + 2 * var(--gutter)); }
+    .two .grp { max-width: none; margin-inline: var(--gutter); }
+    .two + .grp, .two ~ .grp { margin-inline: var(--gutter) auto; }
     .grp { padding: 0; }
     .plan { padding: 20px 24px; }
     .plan .row { align-items: center; }
@@ -83,23 +157,28 @@
 </header>
 
 <main class="w">
+  <div class="two">
   <section class="grp" aria-labelledby="plan-h">
     <h2 id="plan-h">Plan</h2>
-    <div class="panel plan t-starter">
-      <div class="row"><span class="nm">Starter</span><span class="st">Renews <b>6 Dec 2026</b></span></div>
-      <p class="st"><span class="mono">50 credits</span> a month · <span class="mono">$19.90</span>/mo</p>
-      <a class="btn btn-ghost btn-pill" href="#">Manage subscription</a>
-    </div>
+    <div class="pass t-starter" id="plan"></div>
   </section>
 
   <section class="grp" aria-labelledby="cr-h">
     <h2 id="cr-h">Credits</h2>
-    <div class="bal2">
-      <div class="panel"><p class="n">38<small>paid</small></p><p class="l">Private, no watermark</p></div>
-      <div class="panel"><p class="n">3<small>free</small></p><p class="l">Public, watermarked</p></div>
+    <div class="dials">
+      <div class="panel dial paid"><span class="ring" style="--v:76" role="img" aria-label="38 of 50 paid credits left"></span><div class="t"><p class="n">38<small>paid</small></p><p class="l">of 50 this month · private, no watermark</p></div></div>
+      <div class="panel dial free"><span class="ring" style="--v:50" role="img" aria-label="3 of 6 free credits left"></span><div class="t"><p class="n">3<small>free</small></p><p class="l">of 6 · public, watermarked</p></div></div>
     </div>
     <a class="link fine" href="paywall.html">Buy credits <svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a>
+    <div class="strip-h"><span>This month · 12 photos</span><a class="link" href="photos.html" style="min-height:32px;font-size:14px">Photos <svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a></div>
+    <div class="strip" aria-label="Your recent photos">
+      <ul>
+        <li><img src="../assets/img/pure-white-after.webp" alt=""></li><li><img src="../assets/img/lifestyle-table-after.webp" alt=""></li><li><img src="../assets/img/spa-podium-after.webp" alt=""></li><li><img src="../assets/img/delivery-photo-after.webp" alt=""></li><li><img src="../assets/img/dark-dining-after.webp" alt=""></li><li><img src="../assets/img/promo-poster-after.webp" alt=""></li><li><img src="../assets/img/bright-listing-after.webp" alt=""></li>
+        <li><a class="more" href="photos.html">+5</a></li>
+      </ul>
+    </div>
   </section>
+  </div>
 
   <section class="grp" aria-labelledby="set-h">
     <h2 id="set-h">Settings</h2>
@@ -166,6 +245,28 @@
   }));
   if (q.get('lang') === 'open') setTimeout(sheet.open, 60);
   if (q.get('integ') === 'open') document.getElementById('integ-graylum').open = true;
+  /* the plan card by subscription state (copies of what the subscriptions mirror table + site.config give the build) */
+  const EXT = '<svg class="i" viewBox="0 0 24 24"><path d="M7 17L17 7M9 7h8v8"/></svg>';
+  const SUB = {
+    active: { cls: 't-starter', html: `<div class="hd"><span>Member</span><span>Renews 6 Dec 2026</span></div>
+      <div class="mid"><p class="nm">Starter</p><p class="st"><span class="mono">50 credits</span> a month · <span class="mono">$19.90</span>/mo · Visa ···· 4242</p></div>
+      <div class="ft"><span class="since">Since<b>Nov 2026 · mei@example.com</b></span><div class="acts"><a class="btn btn-ghost btn-pill" href="#">Manage subscription</a></div></div>`, paid: 38 },
+    cancelled: { cls: 't-starter', html: `<div class="hd"><span>Member</span><span>Ends 6 Dec 2026</span></div>
+      <div class="mid"><p class="nm">Starter</p><p class="why"><b>Cancelled.</b> You keep the plan and your credits until 6 Dec; nothing more is charged. Resubscribe any time before then to carry on without a gap.</p></div>
+      <div class="ft"><span class="since">Since<b>Nov 2026</b></span><div class="acts"><a class="btn btn-primary" href="#">Resubscribe</a><a class="btn btn-ghost btn-pill" href="#">Manage subscription</a></div></div>`, paid: 38 },
+    expired: { cls: 't-none', html: `<div class="hd"><span>Member</span><span class="flag">Ended 6 Nov 2026</span></div>
+      <div class="mid"><p class="nm">No plan</p><p class="why">Your Starter plan ended. The <b>12 credits</b> you have left still work, and anything you made is still in Photos.</p></div>
+      <div class="ft"><span class="since">Since<b>Nov 2026</b></span><div class="acts"><a class="btn btn-primary" href="paywall.html">Choose a plan</a><a class="btn btn-ghost btn-pill" href="paywall.html">Buy credits</a></div></div>`, paid: 12 },
+    past_due: { cls: 't-starter', html: `<div class="hd"><span>Member</span><span class="flag bad">Payment failed</span></div>
+      <div class="mid"><p class="nm">Starter</p><p class="why">We couldn't charge <b>Visa ···· 4242</b> on 6 Nov. We'll try again over the next few days; update the card and the plan carries on, with this month's credits.</p></div>
+      <div class="ft"><span class="since">Opens Stripe's<b>secure billing page</b></span><div class="acts"><a class="btn btn-primary" href="#" rel="noopener">Update payment method ${EXT}</a><a class="btn btn-ghost btn-pill" href="#">Manage subscription</a></div></div>`, paid: 2 },
+    wallet: { cls: 't-pro', html: `<div class="hd"><span>Member</span><span>Ends 6 Dec 2026</span></div>
+      <div class="mid"><p class="nm">Pro</p><p class="why">One month, paid with <b>Alipay</b>. It doesn't renew by itself: renew before 6 Dec to keep the plan, or let it end and your credits still work.</p></div>
+      <div class="ft"><span class="since">Since<b>Nov 2026</b></span><div class="acts"><a class="btn btn-primary" href="paywall.html">Renew <span class="cost">· $49.90</span></a></div></div>`, paid: 118 },
+  };
+  const sub = SUB[q.get('sub')] || SUB.active, plan = document.getElementById('plan');
+  plan.className = 'pass ' + sub.cls; plan.innerHTML = sub.html;
+  const d = document.querySelector('.dial.paid'); d.querySelector('.n').firstChild.textContent = sub.paid; d.querySelector('.ring').style.setProperty('--v', Math.round(sub.paid / (sub.cls === 't-pro' ? 135 : 50) * 100)); d.querySelector('.l').textContent = `of ${sub.cls === 't-pro' ? 135 : 50} this month · private, no watermark`;
   reveal([...document.querySelectorAll('.grp')]);
 })();
 </script>

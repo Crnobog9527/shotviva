@@ -22,15 +22,6 @@ export type HeroBlock = {
 // Block ②: verifiable facts, at least three (建站规格 G4).
 export type Fact = { label: string; value: string }
 
-// Block ③: photographer vs this site, as a real HTML table (建站规格 G5). The optional
-// `diy` column is "shoot it yourself" (建站规格 §4 home H2-4).
-export type CostRow = { item: string; photographer: string; diy?: string; site: string }
-export type CostTable = {
-  caption: string
-  headers: { item: string; photographer: string; diy?: string; site: string }
-  rows: readonly [CostRow, ...CostRow[]]
-}
-
 // Block ④: 3–5 questions in the user's own words (the home page has nine, 建站规格 G6). `link`
 // renders after the answer text (e.g. FAQ D on the home page points to
 // /image-to-image-generator). `table` renders right after the answer as a real <table> (G5);
@@ -48,7 +39,7 @@ export type FaqItem = {
 export type RelatedLink = { href: `/${string}`; anchor: string; note?: string }
 
 // Section headings a page may set; blocks fall back to generic ones.
-export type SectionHeadings = { facts?: string; costTable?: string; faq?: string; related?: string }
+export type SectionHeadings = { facts?: string; faq?: string; related?: string }
 
 type AtLeast3<T> = readonly [T, T, T, ...T[]]
 type Between3And5<T> = readonly [T, T, T] | readonly [T, T, T, T] | readonly [T, T, T, T, T]
@@ -71,14 +62,25 @@ export type PageBasics = {
   label: string
   hero: HeroBlock
   facts: AtLeast3<Fact>
-  costTable: CostTable
   related: Between2And3<RelatedLink>
   headings?: SectionHeadings
   // Pages that only make sense with a module on disappear with it.
   module?: ModuleId
 }
 
-export type ContentPage = PageBasics & { faq: Between3And5<FaqItem> }
+// What an SEO landing page adds to the basics (design/comps-v3-b/landing.html, T44): the
+// generator under the hero opens on `generatorTemplate`; the template section shows only the
+// page's categories; the "full shoot" demo is optional; `factsNote` says where the fact
+// numbers come from (G4: verifiable).
+export type LandingParts = {
+  generatorTemplate: string
+  factsNote: string
+  templates?: { heading: string; intro: string; categories: readonly [TemplateCategory, ...TemplateCategory[]] }
+  shoot?: ShootDemo
+}
+
+// Block ③ on every page is the two bills (DESIGN §6.9 item 6), so a page without them fails tsc.
+export type ContentPage = PageBasics & { faq: Between3And5<FaqItem>; costBills: CostBills; landing: LandingParts }
 
 // The home FAQ is exactly the nine questions of 建站规格 G6, in order A–I.
 type Nine<T> = readonly [T, T, T, T, T, T, T, T, T]
@@ -90,8 +92,10 @@ export type HomeFaq = Nine<FaqItem>
 export type TemplateCard = { id: string; name: string; use: string }
 
 // One H3 per category, with a short intro and links to its live inner pages (建站规格 §4 H2-2).
+// `drag`: the category whose single template keeps the draggable compare (Art Styles).
 export type TemplateCategory = {
   name: string
+  drag?: boolean
   intro: string
   templates: readonly [TemplateCard, ...TemplateCard[]]
   links?: readonly RelatedLink[]
@@ -124,7 +128,10 @@ export type CostBills = { heading: string; intro: string; photographer: Bill; si
 // the free-offer section (ARCHITECTURE §13, 建站规格 §4 six-H2 skeleton). Its cost block is
 // the two bills instead of a table (the signed-off v3-b comp), so a home without them still
 // fails `tsc`.
-export type HomePage = Omit<PageBasics, 'costTable'> & {
+// Its related block links every live inner page and /pricing (建站规格 §4 H2-6, R8), so it
+// may hold more than the inner pages' three.
+export type HomePage = Omit<PageBasics, 'related'> & {
+  related: readonly [RelatedLink, RelatedLink, ...RelatedLink[]]
   slug: ''
   faq: HomeFaq
   subtitle: string
@@ -145,7 +152,7 @@ export type HomePage = Omit<PageBasics, 'costTable'> & {
   // H2-4: free credits, free vs paid works, then plans.
   // `sample`: one photo shown twice, free with the watermark and paid without.
   freeOffer: { heading: string; points: readonly [HeadedText, HeadedText]; plans: HeadedText; sample?: ImageRef }
-  headings: Required<Omit<SectionHeadings, 'costTable'>>
+  headings: Required<SectionHeadings>
 }
 
 export function defineContentPage<const T extends ContentPage>(page: T): T {

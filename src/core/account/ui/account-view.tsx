@@ -1,21 +1,22 @@
 import { useTranslations } from 'next-intl'
-import { Suspense } from 'react'
 
 import type { Balance } from '../../billing'
-import { CheckoutNotice } from '../../billing/paywall'
-import { PlanCard, type SubscriptionSummary } from '../../billing/subscription'
+import { PlanCard, planAllowance, type LastMembership, type SubscriptionSummary } from '../../billing/subscription'
 import type { SiteProduct } from '../../config'
 import { TabRootHeader } from '../../app-shell'
+import { fileUrlFor, type MonthWorks } from '../../jobs'
 import type { LinkStatus } from '../../partner'
 import { IntegrationsPanel } from '../../partner/ui'
-import { CreditsCells } from './credits-cells'
+import { CreditDials } from './credit-dials'
+import { FilmStrip } from './film-strip'
 import { Group } from './rows'
 import { SessionRows } from './session-rows'
 import { SettingsRows } from './settings-rows'
 import type { PurchaseLine } from './sheet-rows'
 
-// /account (comps-v3-b/account.html, SIGN-OFF row 08): the plan, the balance, then plain rows.
-// Everything is read by app/ in one parallel round; the server actions come from app/ too.
+// /account (comps-v3-b/account.html, SIGN-OFF row 08, T39 + T48): the membership pass, the
+// credit dials and this month's film strip (side by side from md), then plain rows. Everything
+// is read by app/ in one parallel round; the server actions come from app/ too.
 
 export type AccountData = {
   email: string | null
@@ -23,6 +24,10 @@ export type AccountData = {
   // Same-IP rule (ARCHITECTURE §7): this account got no signup gift.
   giftRefused: boolean
   subscription: SubscriptionSummary
+  // When the account was made, and the newest membership purchase (from the payments list).
+  since: Date | null
+  lastMembership: LastMembership | null
+  works: MonthWorks
   purchases: readonly PurchaseLine[]
   // The payments read hit its page size, so the row says "20+".
   morePurchases: boolean
@@ -36,13 +41,15 @@ export type AccountActions = {
   signOut: () => Promise<void>
 }
 
-type Props = {
-  data: AccountData
-  actions: AccountActions
+// What the page needs from site.config (core never imports site/).
+export type AccountSite = {
   products: readonly SiteProduct[]
-  // Graylum hosts the checkout notice may send a top-up buyer back to (site.config).
-  returnToHosts: readonly string[]
+  brand: string
+  // The signup gift, the free dial's "of 6".
+  freeCredits: number
 }
+
+type Props = { data: AccountData; actions: AccountActions; site: AccountSite }
 
 export function AccountHeader({ email }: { email?: string | null }) {
   const t = useTranslations('auth.account')
@@ -54,20 +61,25 @@ export function AccountHeader({ email }: { email?: string | null }) {
   return <TabRootHeader title={t('title')} aside={who} />
 }
 
-export function AccountView({ data, actions, products, returnToHosts }: Props) {
+// The pass and the credits share a row from md (3 : 2), as in the comp.
+const pair = 'md:mx-0 md:mt-0 md:max-w-none'
+
+export function AccountView({ data, actions, site }: Props) {
   const t = useTranslations('app.account')
+  const facts = { since: data.since, email: data.email, brand: site.brand, last: data.lastMembership }
+  const allowance = planAllowance(data.subscription, data.lastMembership, site.products)
   return (
     <>
       <AccountHeader email={data.email} />
-      <Suspense fallback={null}>
-        <CheckoutNotice returnToHosts={returnToHosts} />
-      </Suspense>
-      <Group title={t('plan.title')}>
-        <PlanCard summary={data.subscription} products={products} paid={data.balance.paid} manage={actions.manageSubscription} />
-      </Group>
-      <Group title={t('credits.title')}>
-        <CreditsCells balance={data.balance} giftRefused={data.giftRefused} />
-      </Group>
+      <div className="md:mx-(--gutter) md:mt-6 md:grid md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] md:items-start md:gap-4">
+        <Group title={t('plan.title')} className={pair}>
+          <PlanCard summary={data.subscription} products={site.products} paid={data.balance.paid} manage={actions.manageSubscription} facts={facts} />
+        </Group>
+        <Group title={t('credits.title')} className={pair}>
+          <CreditDials balance={data.balance} giftRefused={data.giftRefused} allowance={allowance} freeGift={site.freeCredits} />
+          <FilmStrip ids={data.works.ids} count={data.works.count} fileUrl={fileUrlFor} />
+        </Group>
+      </div>
       <Group title={t('settings.title')}>
         <SettingsRows email={data.email} purchases={data.purchases} morePurchases={data.morePurchases} helpUnread={data.helpUnread} />
       </Group>

@@ -7,59 +7,64 @@ import { ActionBar } from '@/core/app-shell'
 import { buttonVariants } from '@/core/ui/button'
 
 import type { TrackedJob } from '../generation/job-model'
-import { isActive } from '../generation/scheduler'
 import { useJobs } from '../generation/use-jobs'
+import { BatchDone } from './batch-done'
 import { BatchJobRow } from './batch-job-row'
+import { batchTally, trayPhoto, type BatchTally } from './batch-tally'
+import { DevelopTray, StageLayout, TRAY_SIZE } from './develop-tray'
 import { useNow } from './use-now'
+import { tierName, tierPx } from './workspace-options'
 
-type Props = { ids: readonly string[]; onRetry(id: string): void; onMakeMore(): void }
+type Props = { ids: readonly string[]; limit: number; onRetry(id: string): void; onMakeMore(): void }
 
-// "Developing" for a batch (T28, DESIGN §4.4): one panel, a row per photo in pick order, each
-// with its own state. Leaving is fine: the queue lives in the generation store. Once every
-// photo has settled the one primary is See in Photos.
-export function BatchProgressView({ ids, onRetry, onMakeMore }: Props) {
-  const t = useTranslations('app.workspace')
-  const now = useNow()
+// A batch after Generate (T28, B comp workspace.html?batch): while it develops, the summary,
+// one row per photo in pick order and the tray developing the photo in flight; once every photo
+// has settled, what was saved (BatchDone). Leaving is fine: the queue lives in the generation
+// store.
+export function BatchProgressView({ ids, limit, onRetry, onMakeMore }: Props) {
   const byId = new Map(useJobs().map((job) => [job.id, job]))
   const jobs = ids.map((id) => byId.get(id)).filter((job): job is TrackedJob => job !== undefined)
-  const settled = !jobs.some(isActive)
-  const done = jobs.filter((job) => job.status === 'succeeded').length
-  const failed = jobs.filter((job) => job.status === 'failed').length
+  const tally = batchTally(jobs)
   return (
-    <section aria-labelledby="batch-h" className="px-4 pt-2">
-      <div className="mb-3 flex items-baseline justify-between gap-3">
-        <h2 id="batch-h" className="text-headline leading-[1.2] font-semibold tracking-[-0.01em]">
-          {t(settled ? 'batchSettledTitle' : 'batchTitle', { count: jobs.length })}
-        </h2>
-        <span aria-live="polite" className="text-caption text-muted-foreground">
-          {t('batchSummary', { done, failed, count: jobs.length })}
-        </span>
-      </div>
-      <ul className="hairline rounded-tile bg-card px-3 [&>li+li]:border-t [&>li+li]:border-hairline">
+    <StageLayout labelledBy="batch-h" tray={<BatchTray jobs={jobs} tally={tally} />}>
+      {tally.settled ? <BatchDone jobs={jobs} tally={tally} onRetry={onRetry} onMakeMore={onMakeMore} /> : <Running jobs={jobs} tally={tally} limit={limit} onRetry={onRetry} />}
+    </StageLayout>
+  )
+}
+
+// The tray develops the photo in flight ("Developing 4 of 6"); settled, it shows the first
+// saved result ("5 of 6 done").
+function BatchTray({ jobs, tally }: { jobs: TrackedJob[]; tally: BatchTally }) {
+  const t = useTranslations('app')
+  const first = jobs[0]
+  const hud = tally.settled
+    ? t('workspace.batch.hudDone', { done: tally.done, count: tally.count })
+    : t(tally.current ? 'workspace.batch.hudDeveloping' : 'workspace.waiting', { index: tally.current ?? 0, count: tally.count })
+  const size = first ? t.rich('workspace.developingSize', { tier: tierName(first.resolution, t), px: tierPx(first.resolution), mono: (chunks) => <span className="font-mono">{chunks}</span> }) : null
+  return <DevelopTray src={trayPhoto(jobs, tally)} developing={tally.current !== null} hud={[<span key="hud" className="tabular-nums">{hud}</span>, size]} className={TRAY_SIZE} />
+}
+
+function Running({ jobs, tally, limit, onRetry }: { jobs: TrackedJob[]; tally: BatchTally; limit: number; onRetry(id: string): void }) {
+  const t = useTranslations('app.workspace')
+  const now = useNow()
+  return (
+    <>
+      <h2 id="batch-h" className="sr-only">{t('batchTitle', { count: tally.count })}</h2>
+      <p aria-live="polite" className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-caption text-muted-foreground">
+        <b className="font-medium text-foreground">{t('batch.sum', { done: tally.done, count: tally.count })}</b>
+        <span>{t('batch.counts', { developing: tally.developing, queued: tally.queued, failed: tally.failed })}</span>
+      </p>
+      <ol className="hairline rounded-tile bg-card px-3 py-1 [&>li+li]:border-t [&>li+li]:border-hairline">
         {jobs.map((job, index) => (
           <BatchJobRow key={job.id} job={job} index={index + 1} now={now} onRetry={() => onRetry(job.id)} />
         ))}
-      </ul>
-      {settled ? (
-        <div className="mt-4 flex">
-          <button type="button" onClick={onMakeMore} className={buttonVariants({ variant: 'glass', size: 'touch', className: 'flex-1' })}>
-            {t('makeMore')}
-          </button>
-        </div>
-      ) : (
-        <p className="mt-4 text-caption text-bone-dim">{t('batchLeave')}</p>
-      )}
-      <ActionBar>
-        {settled ? (
-          <Link href="/photos" className={buttonVariants({ variant: 'cta', size: 'cta' })}>
-            {t('seeInPhotos')}
-          </Link>
-        ) : (
-          <Link href="/generate" className={buttonVariants({ variant: 'glass', size: 'cta', className: 'w-full rounded-control' })}>
-            {t('backToCreate')}
-          </Link>
-        )}
+      </ol>
+      <p className="mt-3 text-caption text-bone-dim">{t('batch.leave', { count: limit })}</p>
+      <ActionBar className="md:px-0">
+        <Link href="/generate" className={buttonVariants({ variant: 'glass', size: 'cta', className: 'w-full rounded-control' })}>
+          {t('backToCreate')}
+        </Link>
       </ActionBar>
-    </section>
+    </>
   )
 }

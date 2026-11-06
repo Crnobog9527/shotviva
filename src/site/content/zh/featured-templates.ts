@@ -7,6 +7,7 @@ import type { TemplateCategory } from '@/core/content'
 export const zhTemplateCategories: readonly [TemplateCategory, ...TemplateCategory[]] = [
   {
     name: '画风',
+    drag: true,
     intro: '照片转动漫、转插画都行，姿势、构图和主体都不变。',
     templates: [{ id: 'korean-manhwa', name: '韩漫画风', use: '用干净的韩漫画风重画你的照片，姿势和取景保持原样。' }],
   },

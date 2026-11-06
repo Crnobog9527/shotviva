@@ -1,0 +1,63 @@
+/* Site announcement (T23 table, T44 look; design/comps-v3-b/css/studio.css `.ann`). Two tones from
+   site_announcements.tone: "info" is quiet (bone 6% ground, no motion, the link a grey pill);
+   "promo" is the band for offers (warm safelight ground, a breathing glow, a light sweep every
+   6 s, a tag that wiggles, a solid pill). Text and link come from the table; the admin never
+   touches the motion. All motion stops under prefers-reduced-motion. */
+@layer components {
+  .sv-ann {
+    position: relative; z-index: 51; display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 44px;
+    padding: calc(var(--sat) + 8px) var(--gutter) 8px; overflow: hidden; font: 400 14px/1.4 var(--font-sans); color: var(--foreground);
+    background: var(--wash); box-shadow: inset 0 -1px 0 var(--border);
+  }
+  .sv-ann[hidden] { display: none; }
+  .sv-ann > svg { flex: none; width: 18px; height: 18px; color: var(--bone-dim); }
+  .sv-ann p { max-width: 72ch; text-wrap: pretty; overflow-wrap: anywhere; }
+  .sv-ann-pill {
+    display: inline-flex; align-items: center; gap: 4px; min-height: 32px; margin-left: 6px; padding: 0 10px; border-radius: 999px; vertical-align: middle;
+    font: 600 14px/1 var(--font-sans); color: var(--foreground); background: var(--wash-strong); text-decoration: none; white-space: nowrap;
+  }
+  .sv-ann-pill svg { width: 14px; height: 14px; }
+  .sv-ann-x { flex: none; width: 32px; height: 32px; margin: -6px -8px -6px 0; border-radius: 50%; display: grid; place-items: center; color: var(--bone-dim); }
+  .sv-ann-x::before { content: ""; position: absolute; width: 44px; height: 44px; }
+  .sv-ann-x svg { width: 16px; height: 16px; }
+
+  /* the promo band */
+  .sv-ann.sv-promo {
+    min-height: 52px; gap: 12px;
+    background: linear-gradient(90deg,
+      color-mix(in srgb, var(--primary) 16%, var(--background)) 0%,
+      color-mix(in srgb, var(--primary) 27%, var(--background)) 35%,
+      color-mix(in srgb, var(--primary) 21%, var(--background)) 65%,
+      color-mix(in srgb, var(--primary) 16%, var(--background)) 100%);
+    box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--primary) 45%, transparent), inset 0 1px 0 var(--wash);
+  }
+  .sv-ann.sv-promo::before {
+    content: ""; position: absolute; z-index: 0; left: -20%; top: 50%; width: 520px; height: 300px; transform: translateY(-50%); pointer-events: none;
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--primary) 42%, transparent), transparent 70%); opacity: .8;
+  }
+  .sv-ann.sv-promo::after {
+    content: ""; position: absolute; z-index: 0; top: -40%; bottom: -40%; left: -30%; width: 22%; transform: skewX(-18deg); pointer-events: none; display: none;
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--foreground) 22%, transparent) 45%, color-mix(in srgb, var(--foreground) 34%, transparent) 50%, color-mix(in srgb, var(--foreground) 22%, transparent) 55%, transparent);
+  }
+  .sv-ann.sv-promo > * { position: relative; z-index: 1; }
+  .sv-ann.sv-promo > svg { width: 22px; height: 22px; color: var(--primary); transform-origin: 50% 90%; }
+  .sv-ann.sv-promo p { font-size: 15px; }
+  .sv-ann.sv-promo .sv-ann-pill { height: 32px; padding: 0 12px 0 14px; color: var(--primary-foreground); background: var(--primary); box-shadow: var(--shadow-raised); }
+  .sv-ann.sv-promo .sv-ann-x { color: color-mix(in srgb, var(--primary) 25%, var(--foreground)); }
+  @media (prefers-reduced-motion: no-preference) {
+    .sv-ann.sv-promo::before { animation: sv-ann-glow 3.2s ease-in-out infinite; }
+    .sv-ann.sv-promo::after { display: block; animation: sv-ann-sweep 6s cubic-bezier(.4, 0, .2, 1) infinite; }
+    .sv-ann.sv-promo > svg { animation: sv-ann-wiggle 5s ease-in-out infinite; }
+  }
+  @keyframes sv-ann-sweep { 0%, 55% { left: -30%; } 100% { left: 130%; } }
+  @keyframes sv-ann-glow { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+  @keyframes sv-ann-wiggle { 0%, 70%, 100% { transform: rotate(0); } 74% { transform: rotate(-14deg); } 78% { transform: rotate(12deg); } 82% { transform: rotate(-9deg); } 86% { transform: rotate(6deg); } 90% { transform: rotate(0); } }
+  @media (min-width: 768px) {
+    .sv-ann { font-size: 15px; }
+    .sv-ann.sv-promo p { font-size: 16px; }
+  }
+  @media (hover: hover) {
+    .sv-ann-x:hover { background: var(--wash-strong); color: var(--foreground); }
+    .sv-ann.sv-promo .sv-ann-pill:hover { filter: brightness(1.06); }
+  }
+}

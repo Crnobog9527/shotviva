@@ -30,7 +30,7 @@ const APP = join(process.cwd(), 'src', 'app', '[locale]')
 // an inner SEO page rendered by (marketing)/[slug].
 function routeExists(path: string): boolean {
   const dir = path === '/' ? '' : path
-  const files = ['(marketing)', '(app)'].flatMap((group) => ['page.tsx', 'route.ts'].map((f) => join(APP, group, dir, f)))
+  const files = ['(marketing)', '(auth)', '(app)'].flatMap((group) => ['page.tsx', 'route.ts'].map((f) => join(APP, group, dir, f)))
   return files.some((file) => existsSync(file)) || contentPages.some((page) => `/${page.slug}` === path)
 }
 
@@ -44,8 +44,10 @@ describe('locales in site.config (ARCHITECTURE §17)', () => {
     for (const path of site.locales.zhPaths) expect(routeExists(path), path).toBe(true)
   })
 
-  it('keeps legal pages and SEO inner pages English-only', () => {
-    for (const path of ['/terms', '/privacy', '/refund-policy', '/acceptable-use', '/ai-restaurant-menu', '/admin']) {
+  // Every SEO inner page has a Chinese version (ARCHITECTURE §17, T44); the legal pages get
+  // theirs with T45; the admin stays Chinese-only and unprefixed.
+  it('keeps the legal pages and the admin out of /zh for now', () => {
+    for (const path of ['/terms', '/privacy', '/refund-policy', '/acceptable-use', '/admin']) {
       expect(site.locales.zhPaths).not.toContain(path)
     }
   })

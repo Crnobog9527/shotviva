@@ -1,48 +1,43 @@
 import { useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 
-import { CostTableSection } from './blocks/cost-table-section'
-import { FactsSection } from './blocks/facts-section'
+import { CostBillsSection } from './blocks/cost-bills'
 import { FaqSection } from './blocks/faq-section'
-import { HeroSection } from './blocks/hero-section'
+import { HomeHero } from './blocks/home-hero'
+import { FactCards } from './blocks/home-sections'
 import { RelatedLinks } from './blocks/related-links'
-import type { ContentPage, PageBasics } from './page-content'
+import { ShootSection } from './blocks/shoot-section'
+import { TemplateGrid, type TemplateLookup } from './blocks/template-grid'
+import type { ContentPage } from './page-content'
 
 type Props = {
   page: ContentPage
-  // Rendered above the H1 (breadcrumbs on inner pages).
-  top?: ReactNode
   // Hides links into switched-off modules (ARCHITECTURE §2: not in nav).
-  isLinkEnabled?: (href: string) => boolean
+  isLinkEnabled: (href: string) => boolean
+  // Each featured template's pair and whether it is live, and the card price ("from 2 credits").
+  templates: TemplateLookup
+  price: string
+  // The first-screen generator (modules/image), opening on the page's template.
+  generator: ReactNode
 }
 
-export function PageHeader({ page }: { page: PageBasics }) {
-  return (
-    <header>
-      <h1>{page.h1}</h1>
-      {page.subtitle && <p>{page.subtitle}</p>}
-      <p>{page.answerBlock}</p>
-    </header>
-  )
-}
-
-// One renderer for every inner SEO page; the order follows ARCHITECTURE §13 / 建站规格 R10.
-export function ContentPageView({ page, top, isLinkEnabled }: Props) {
+// One skeleton for every SEO landing page (design/comps-v3-b/landing.html, ARCHITECTURE §12,
+// 建站规格 R10): hero + direct answer + generator → the optional "full shoot" demo → the page's
+// template categories → facts → the two bills → FAQ → related pages. No visible breadcrumbs
+// (DESIGN §8); the BreadcrumbList JSON-LD stays.
+export function ContentPageView({ page, isLinkEnabled, templates, price, generator }: Props) {
   const t = useTranslations('marketing')
-  const enabled = isLinkEnabled ?? (() => true)
   const headings = page.headings ?? {}
+  const { landing } = page
   return (
-    <article className="mx-auto flex w-full max-w-3xl flex-col gap-8 p-4">
-      {top}
-      <PageHeader page={page} />
-      <HeroSection hero={page.hero} showCta={enabled(page.hero.cta.href)} />
-      <FactsSection facts={page.facts} heading={headings.facts ?? t('facts')} />
-      <CostTableSection table={page.costTable} heading={headings.costTable ?? page.costTable.caption} />
-      <FaqSection faq={page.faq} heading={headings.faq} isLinkEnabled={enabled} />
-      <RelatedLinks
-        heading={headings.related ?? t('related')}
-        links={page.related.filter((link) => enabled(link.href))}
-      />
+    <article className="mk-home mk-w">
+      <HomeHero page={page} generator={generator} />
+      {landing.shoot ? <ShootSection shoot={landing.shoot} /> : null}
+      {landing.templates ? <TemplateGrid grid={{ ...landing.templates, price }} media={templates} isLinkEnabled={isLinkEnabled} /> : null}
+      <FactCards facts={page.facts} heading={headings.facts ?? t('facts')} note={landing.factsNote} />
+      <CostBillsSection bills={page.costBills} />
+      <FaqSection faq={page.faq} heading={headings.faq} isLinkEnabled={isLinkEnabled} variant="accordion" />
+      <RelatedLinks heading={headings.related ?? t('related')} links={page.related.filter((link) => isLinkEnabled(link.href))} variant="cards" />
     </article>
   )
 }

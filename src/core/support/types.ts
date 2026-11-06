@@ -19,7 +19,7 @@ export type TicketMessage = { id: string; author: 'user' | 'admin'; body: string
 export type TicketThread = TicketSummary & { messages: TicketMessage[] }
 
 // What the submit form offers to attach: the author's own payments and works.
-export type PaymentOption = { id: string; productId: string; amountTotal: number; currency: string; createdAt: string }
+export type PaymentOption = { id: string; productId: string; amountTotal: number; currency: string; method: 'card' | 'alipay'; createdAt: string }
 export type WorkOption = { id: string; templateName: string; createdAt: string }
 
 export type AdminTicketRow = {

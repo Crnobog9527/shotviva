@@ -24,7 +24,7 @@ type Props = {
 }
 
 // /admin/templates/edit (ARCHITECTURE §5.2): switch, price, wrapper, the classifier instructions
-// and the six paragraphs of the built-in edit template, saved together.
+// the six paragraphs and the reframe paragraph of the built-in edit template, saved together.
 export function EditTemplateEditor({ settings, floor, save }: Props) {
   const [form, setForm] = useState(() => formFor(settings))
   const { pending, error, notice, run } = useTemplateActions()
@@ -40,6 +40,11 @@ export function EditTemplateEditor({ settings, floor, save }: Props) {
       </div>
       <ScopeTextFields legend={COPY.constraints} idPrefix="edit-constraint" scopes={EDIT_SCOPES} values={form.constraints}
         onChange={(scope, value) => patch({ constraints: { ...form.constraints, [scope]: value } })} />
+      <div className="grid gap-1.5 rounded-md border border-dashed p-3">
+        <Label htmlFor="edit-reframe">{COPY.reframe}</Label>
+        <Textarea id="edit-reframe" className="min-h-20 font-mono text-xs" value={form.reframe} onChange={(event) => patch({ reframe: event.target.value })} />
+        <p className="text-muted-foreground text-xs">{COPY.reframeHint}</p>
+      </div>
       {notice ? <p className="text-sm text-emerald-700">{notice}</p> : null}
       {error ? <p role="alert" className="text-destructive text-sm">{error}</p> : null}
       <div className="flex">

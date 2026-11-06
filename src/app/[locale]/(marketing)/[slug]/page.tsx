@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
-import { Breadcrumbs, ContentPageView, pageGate, pagePath, type ContentPage } from '@/core/content'
+import { ContentPageView, pageGate, pagePath, type ContentPage } from '@/core/content'
 import { isLocale, localizePath, type Locale } from '@/core/i18n'
 import { currentLocale } from '@/core/i18n/server'
 import {
@@ -12,15 +12,20 @@ import {
   pageMetadata,
   softwareApplicationLd,
 } from '@/core/seo'
-import { contentPagesIn, findContentPageIn, freeImagesLabel, homePageIn, isLinkEnabled } from '@/site/content'
+import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
+import { toCatalogueTemplate } from '@/modules/image'
+import { contentPagesIn, findContentPageIn, freeImagesLabel, homePageIn, homeTemplates, isLinkEnabled } from '@/site/content'
 import { zhFreeImages } from '@/site/content/zh/offer'
 import { site } from '@/site/site.config'
 
+import { HomeGeneratorSlot } from '../home-generator-slot'
+
 // Every inner SEO page renders through this one route (ARCHITECTURE §12), in each language
 // that has a text for it (site/content/localized.ts; Chinese only for the zh keyword map).
-// Fully static output: unknown slugs resolve before streaming, so they get a real 404
-// instead of a streamed soft 404.
-export const ensureStatic = 'navigation'
+// The App Shell is static: unknown slugs resolve before streaming, so they get a real 404
+// instead of a streamed soft 404. Only the generator's visitor half (the session) streams in
+// at request time, behind its Suspense boundary.
+export const ensureStatic = 'shell'
 
 const isEnabled = (page: ContentPage) => isGateOpen(site, pagePath(page), [pageGate(page)])
 
@@ -57,10 +62,17 @@ export default async function ContentRoute({ params }: PageProps<'/[locale]/[slu
   const ldCrumbs = crumbs.map((crumb) => ({ ...crumb, path: localizePath(crumb.path, locale) }))
   const ld = [breadcrumbListLd(site, ldCrumbs), faqPageLd(page.faq)]
   if (page.module) ld.push(softwareApplicationLd(site, meta, locale === 'zh' ? zhFreeImages : freeImagesLabel))
+  const home = homePageIn(locale)
+  const catalogue = (await cachedWebCatalogue(locale)).map(toCatalogueTemplate)
+  const templates = homeTemplates(home, catalogue, page.landing.generatorTemplate)
+  const free = locale === 'zh' ? zhFreeImages : freeImagesLabel
+  const generator = (
+    <HomeGeneratorSlot templates={catalogue} samples={templates.samples} defaultId={templates.defaultId} homePath={localizePath(path, locale)} freeImages={free} />
+  )
   return (
     <>
       <JsonLdScript data={ld} />
-      <ContentPageView page={page} top={<Breadcrumbs crumbs={crumbs} />} isLinkEnabled={isLinkEnabled} />
+      <ContentPageView page={page} isLinkEnabled={isLinkEnabled} templates={templates.cards} price={home.templateGrid.price} generator={generator} />
     </>
   )
 }

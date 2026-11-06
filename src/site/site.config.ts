@@ -29,6 +29,9 @@ export const site = defineSite({
     zhPaths: [
       '/',
       '/image-to-image-generator',
+      // SEO inner pages (T44): Chinese versions exist, noindex, no hreflang (ARCHITECTURE §17).
+      '/commercial-photography',
+      '/ai-restaurant-menu',
       '/pricing',
       '/signup',
       '/login',
@@ -48,6 +51,8 @@ export const site = defineSite({
       '/wishlist/mine',
       '/connect/graylum',
       '/connect/graylum/authorize',
+      // The checkout return page (T43, noindex like every app page).
+      '/checkout',
     ],
   },
   billing: {
@@ -87,7 +92,8 @@ export const site = defineSite({
   // FEATURE_WISHLIST_PREVIEW=on for validation; production always follows this value.
   features: { wishlist: false },
   indexing: {
-    indexablePaths: ['/', '/image-to-image-generator', '/pricing'],
+    // The two T44 landing pages are in the keyword map CSV (第一批 第 2 周).
+    indexablePaths: ['/', '/image-to-image-generator', '/commercial-photography', '/ai-restaurant-menu', '/pricing'],
     // The Vercel project's production address (ARCHITECTURE §12.0).
     canonicalRedirectHosts: ['shotviva.vercel.app'],
     // seo资料/Shotviva 页面与主词映射（中文口径）.csv: the three indexable /zh pages.
@@ -97,9 +103,17 @@ export const site = defineSite({
   // $50–$350 per image (Shopify, "Product photography pricing", Jan 2026); white-background
   // packshots $15–$90 (ProShot Media, ProductPhotography.com, soona, Lars Miller Media price
   // pages, read 2026-11-06). Develop time is one round figure, "about 60 seconds", for every
-  // quality (Owner 2026-11-06; preview measured 19–48 s across qualities).
+  // quality (Owner 2026-11-06; preview measured 19–48 s across qualities). T44, sources read
+  // 2026-11-06 (side-session-notes landing-fact-sources): a studio day $500–$3,000 (Shopify,
+  // Jan 2026); a US half-day food shoot $400–$2,500 (PricingLink Apr 2025, Jobbers, FoodShot
+  // Mar 2026), food stylist extra.
   marketing: {
-    photographer: { styledShotUsd: { low: 50, high: 350 }, packshotUsd: { low: 15, high: 90 } },
+    photographer: {
+      styledShotUsd: { low: 50, high: 350 },
+      packshotUsd: { low: 15, high: 90 },
+      dayRateUsd: { low: 500, high: 3000 },
+      foodHalfDayUsd: { low: 400, high: 2500 },
+    },
     photoSecondsApprox: 60,
   },
 })
