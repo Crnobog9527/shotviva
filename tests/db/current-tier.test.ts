@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { adminAdjustCredits, applyPurchase, currentTier } from '@/core/billing'
 import type { ProductId } from '@/core/config'
-import { concurrencyLimit } from '@/core/jobs'
+import { accountLimits } from '@/core/jobs'
 
 import { connectAdmin, createUser, DAY_MS, serviceClient, setBalances } from './helpers'
 
@@ -87,7 +87,7 @@ describe('current_tier', () => {
   })
 })
 
-describe('concurrencyLimit follows current_tier (1 / 3 / 6, none = 1)', () => {
+describe('accountLimits follows current_tier (concurrency 1 / 3 / 6, none = Starter)', () => {
   it.each([
     [null, 1],
     ['pack_s', 1],
@@ -97,13 +97,13 @@ describe('concurrencyLimit follows current_tier (1 / 3 / 6, none = 1)', () => {
   ] as const)('after %s: %i at once', async (productId, limit) => {
     const userId = await createUser(db)
     if (productId) await buy(userId, productId)
-    expect(await concurrencyLimit(service, userId)).toBe(limit)
+    expect((await accountLimits(service, userId)).concurrency).toBe(limit)
   })
 
   it('drops back to 1 when the membership expires', async () => {
     const userId = await createUser(db)
     await buy(userId, 'max_monthly')
     await setBalances(db, userId, { credits: 280, paidUntil: new Date(Date.now() - DAY_MS) })
-    expect(await concurrencyLimit(service, userId)).toBe(1)
+    expect(await accountLimits(service, userId)).toMatchObject({ concurrency: 1, perWindow: 20, batchMax: 1 })
   })
 })

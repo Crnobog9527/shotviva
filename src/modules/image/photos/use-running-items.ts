@@ -5,10 +5,11 @@ import { useEffect } from 'react'
 
 import { readJob } from '../generation/job-api'
 import type { TrackedJob } from '../generation/job-model'
+import { isActive } from '../generation/scheduler'
 import { useJobs } from '../generation/use-jobs'
 import type { PhotoItem } from './photo-item'
 
-export type RunningRow = PhotoItem & { previewUrl?: string; startedAt: number }
+export type RunningRow = PhotoItem & { previewUrl?: string; startedAt: number; queued?: boolean }
 
 const POLL_MS = 3000
 
@@ -20,12 +21,13 @@ const fromTracked = (job: TrackedJob, cover: string | null): RunningRow => ({
   aspect: job.aspect,
   resolution: job.resolution,
   credits: job.credits,
-  createdAt: new Date(job.startedAt).toISOString(),
+  createdAt: new Date(job.startedAt || job.queuedAt).toISOString(),
   creditPool: job.creditPool ?? 'free',
   visibility: 'public',
   fileUrl: null,
   previewUrl: job.previewUrl,
   startedAt: job.startedAt,
+  queued: job.status === 'queued',
 })
 
 // In progress = what the server had running at render, plus this tab's own jobs it may not
@@ -39,7 +41,8 @@ export function useRunningItems(server: PhotoItem[], covers: Record<string, stri
     .filter((item) => tracked.get(item.id)?.status !== 'succeeded' && tracked.get(item.id)?.status !== 'failed')
     .map((item) => ({ ...item, previewUrl: tracked.get(item.id)?.previewUrl, startedAt: Date.parse(item.createdAt) }))
   const known = new Set(server.map((item) => item.id))
-  jobs.filter((job) => job.status === 'running' && !known.has(job.id)).forEach((job) => rows.unshift(fromTracked(job, covers[job.templateId] ?? null)))
+  // Queued batch photos (T28) show here too, waiting for a slot.
+  jobs.filter((job) => isActive(job) && !known.has(job.id)).forEach((job) => rows.unshift(fromTracked(job, covers[job.templateId] ?? null)))
 
   const untracked = server.filter((item) => !tracked.has(item.id)).map((item) => item.id).join(',')
   useEffect(() => {

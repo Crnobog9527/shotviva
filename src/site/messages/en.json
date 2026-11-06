@@ -219,7 +219,31 @@
       "freeNotice": "This photo uses free credits: it's shown publicly with a watermark. <b>Paid credits make it private and watermark-free.</b>",
       "needsCredits": "{tier} needs {count, plural, one {# credit} other {# credits}}. <b>Paid credits make photos private and watermark-free.</b>",
       "counter": "{count, number} / {max, number}",
-      "developingSize": "{tier} · <mono>{px, number, ::group-off}</mono>"
+      "developingSize": "{tier} · <mono>{px, number, ::group-off}</mono>",
+      "yourPhotos": "Your photos",
+      "addPhotos": "Add the photos you shot",
+      "chooseGalleryMany": "Choose photos from gallery",
+      "addMore": "Add more photos",
+      "batchFull": "That's {max, number}, the most one batch holds.",
+      "photoN": "Photo {index, number}",
+      "removePhoto": "Remove photo {index, number}",
+      "waitingUpload": "Waiting",
+      "batchOnTier": "We kept your first photo. Batch upload, up to {count, number} at once, comes with {tier}.",
+      "batchKept": "We kept the first {max, number}. One batch holds up to {max, number} photos.",
+      "seeTier": "See {tier} · {count, number} photos",
+      "needPhotos": "Add your photos to start",
+      "uploadingManyCta": "Uploading your photos…",
+      "generateBatchCta": "Generate {count, number} photos <cost>· {total, plural, one {# credit} other {# credits}}</cost>",
+      "batchNeedsPaid": "A batch uses paid credits only: {count, number} photos need {total, plural, one {# credit} other {# credits}}. <b>Every photo in it is private and watermark-free.</b>",
+      "waiting": "Waiting",
+      "waitingSlot": "Waiting for a free slot",
+      "statusDone": "Done",
+      "batchTitle": "Developing {count, number} photos",
+      "batchSettledTitle": "{count, number} photos developed",
+      "batchSummary": "{done, number} of {count, number} done{failed, plural, =0 {} other { · # didn't develop}}",
+      "batchLeave": "Usually 20–40 seconds each. You can leave this page; each photo lands in Photos when it's done.",
+      "makeMore": "Make another batch",
+      "getTier": "Get {tier}"
     },
     "errors": {
       "CONTENT_REJECTED": "The photo or your note didn't pass the safety check. Try another photo or change the note.",
@@ -237,7 +261,8 @@
       "fallback": "Something went wrong. Please try again.",
       "refunded": "Your credits were refunded.",
       "onHold": "Your credits are on hold. We'll return them, or contact support.",
-      "notCharged": "No credits were used."
+      "notCharged": "No credits were used.",
+      "TIER_REQUIRED": "This needs the {tier} plan."
     },
     "photos": {
       "title": "Photos",
@@ -260,7 +285,8 @@
       "badgeAria": "{count} in progress",
       "pill": "{count, plural, one {Generating…} other {Generating #…}}",
       "doneMeta": "{when} · {size} · {tier}",
-      "runningMeta": "{size} · {tier} · {count, plural, one {# credit} other {# credits}}"
+      "runningMeta": "{size} · {tier} · {count, plural, one {# credit} other {# credits}}",
+      "waiting": "Waiting for a free slot"
     },
     "work": {
       "freePublic": "Public · watermark",
