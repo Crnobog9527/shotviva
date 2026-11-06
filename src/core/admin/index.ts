@@ -52,12 +52,18 @@ export {
   banUser,
   ledgerPage,
   loadUser,
+  loadUserExtras,
+  lookupHref,
+  lookupUser,
+  listSignupClusters,
+  parseClusterWindow,
   recentJobs,
   searchUsers,
   unbanUser,
   type AdminUserRow,
   type LedgerEntry,
   type UserDetail,
+  type UserExtras,
   type UserJob,
 } from './users'
 export {
@@ -81,4 +87,15 @@ export {
   type ModelUsage,
   type StatsWindow,
 } from './overview'
-export { USERS_COPY, UserDetailView, UsersSearch, type UserAdminActions } from './users-ui'
+export { SuspiciousView, USERS_COPY, UserDetailView, UsersSearch, type UserAdminActions } from './users-ui'
+export {
+  compensateJob,
+  listStuckJobs,
+  refundStuckJobs,
+  viewWork,
+  type Compensation,
+  type RefundOutcome,
+  type StuckJob,
+  type WorkLinks,
+} from './support'
+export { JobActions, StuckJobsPanel, SUPPORT_COPY, type JobSupportActions, type RefundStuck } from './support-ui'

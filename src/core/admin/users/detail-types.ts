@@ -1,0 +1,42 @@
+// Shapes of the T25 user detail blocks (ARCHITECTURE §10「用户详情补全」). Money is in the
+// currency's minor unit, as Stripe and payments store it.
+
+export type UserPayment = {
+  id: string
+  createdAt: string
+  productId: string
+  channel: 'stripe' | 'waffo'
+  providerId: string | null
+  chargeId: string | null
+  amountTotal: number
+  amountTax: number
+  amountRefunded: number
+  currency: string
+  method: string
+  status: string
+}
+
+export type UserSubscription = {
+  // current_tier(): 'pro' | 'max' | … or null when the membership period is over.
+  tier: string | null
+  subscriptions: { id: string; productId: string; status: string; periodEnd: string; cancelAtPeriodEnd: boolean }[]
+}
+
+export type GraylumLink = { connected: boolean; linkedAt: string | null; revokedAt: string | null }
+
+export type SameIpAccount = { id: string; createdAt: string; freeCredits: number; bannedAt: string | null }
+
+export type UserRequest = { id: string; createdAt: string; status: string; description: string; votes: number }
+
+export type UserExtras = {
+  signupIp: string | null
+  payments: UserPayment[]
+  subscription: UserSubscription
+  graylum: GraylumLink | null
+  sameIp: SameIpAccount[]
+  requests: UserRequest[]
+}
+
+export const DETAIL_ROWS = 10
+// Same-IP accounts shown on the detail page; a bigger cluster belongs in 「可疑注册」.
+export const SAME_IP_ROWS = 20

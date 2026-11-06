@@ -20,7 +20,7 @@ const request = (body: unknown, origin = ORIGIN) =>
 
 describe('POST /api/uploads', () => {
   beforeEach(() => {
-    mocks.getSessionUser.mockResolvedValue({ id: '0b6f3f0e-5d1c-4c47-9a49-6a3f6f8d2e11', email: null, role: 'user', emailVerified: true })
+    mocks.getSessionUser.mockResolvedValue({ id: '0b6f3f0e-5d1c-4c47-9a49-6a3f6f8d2e11', email: null, role: 'user', emailVerified: true, banned: false })
   })
 
   it('returns a presigned PUT and never takes image bytes', async () => {
@@ -34,7 +34,7 @@ describe('POST /api/uploads', () => {
     expect((await POST(request({ content_type: 'image/jpeg', size: 1 }, 'https://evil.example'))).status).toBe(403)
     mocks.getSessionUser.mockResolvedValueOnce(null)
     expect((await POST(request({ content_type: 'image/jpeg', size: 1 }))).status).toBe(401)
-    mocks.getSessionUser.mockResolvedValueOnce({ id: 'x', email: null, role: 'user', emailVerified: false })
+    mocks.getSessionUser.mockResolvedValueOnce({ id: 'x', email: null, role: 'user', emailVerified: false, banned: false })
     expect((await POST(request({ content_type: 'image/jpeg', size: 1 }))).status).toBe(403)
   })
 

@@ -4,7 +4,7 @@ import { getTranslations } from 'next-intl/server'
 import { Suspense, type ReactNode } from 'react'
 
 import { AppPage, BalanceChip, balanceSentence, TabRootHeader } from '@/core/app-shell'
-import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
+import { createAdminSupabase, createServerSupabase, requireUser, signupGiftRefused } from '@/core/auth'
 import { DeleteAccountPanel } from '@/core/auth/ui'
 import { readBalance, type Balance } from '@/core/billing'
 import { CheckoutNotice, PaywallButton } from '@/core/billing/paywall'
@@ -30,6 +30,8 @@ type ViewProps = {
   graylumLinkedAt: Date | null
   subscription: SubscriptionSummary
   helpUnread: boolean
+  // Same-IP rule (ARCHITECTURE §7): this account got no signup gift.
+  giftRefused: boolean
 }
 
 function Panel({ children }: { children: ReactNode }) {
@@ -40,7 +42,7 @@ function AccountHeader() {
   return <TabRootHeader title={useTranslations('auth.account')('title')} />
 }
 
-function AccountView({ email, balance, graylumLinkedAt, subscription, helpUnread }: ViewProps) {
+function AccountView({ email, balance, graylumLinkedAt, subscription, helpUnread, giftRefused }: ViewProps) {
   const t = useTranslations('auth.account')
   const balanceT = useTranslations('app.balance')
   return (
@@ -53,6 +55,7 @@ function AccountView({ email, balance, graylumLinkedAt, subscription, helpUnread
       <Panel>
         <h2 className="text-headline leading-[1.25] font-semibold">{balanceT('panelTitle')}</h2>
         <p className="mt-2 text-body text-bone-dim">{balanceSentence(balance, balanceT)}</p>
+        {giftRefused ? <p className="mt-2 text-caption text-muted-foreground">{balanceT('signupGiftRefused')}</p> : null}
         <PaywallButton trigger="account" className="mt-1 inline-flex min-h-11 items-center gap-1 font-medium">
           {balanceT('getCredits')}
           <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 text-primary" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -84,10 +87,12 @@ function AccountView({ email, balance, graylumLinkedAt, subscription, helpUnread
 async function Account() {
   const user = await requireUser('/account')
   const supabase = await createServerSupabase()
-  const [graylum, balance, subscription, helpUnread] = await Promise.all([
+  const admin = createAdminSupabase()
+  const [graylum, balance, subscription, giftRefused, helpUnread] = await Promise.all([
     readLinkStatus(supabase, user.id),
     readBalance(supabase, user.id),
-    readSubscriptionSummary(createAdminSupabase(), user.id, site.billing.products),
+    readSubscriptionSummary(admin, user.id, site.billing.products),
+    signupGiftRefused(admin, user.id, site.billing.freeCredits),
     hasUnreadReply(supabase, user.id),
   ])
   return (
@@ -97,6 +102,7 @@ async function Account() {
       graylumLinkedAt={graylum.linkedAt}
       subscription={subscription}
       helpUnread={helpUnread}
+      giftRefused={giftRefused}
     />
   )
 }

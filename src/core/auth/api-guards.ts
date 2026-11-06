@@ -22,3 +22,11 @@ export async function requireApiUser(): Promise<SessionUser> {
   if (!user.emailVerified) throw new AppError('FORBIDDEN', 'Verify your email first')
   return user
 }
+
+// Checkout counterpart of reserve_credits' USER_BANNED: a banned account cannot pay either
+// (ARCHITECTURE §7). The flag rides on the session's profile read, so no extra round trip.
+export async function requireApiBuyer(): Promise<SessionUser> {
+  const user = await requireApiUser()
+  if (user.banned) throw new AppError('FORBIDDEN', 'This account is suspended')
+  return user
+}

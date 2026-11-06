@@ -54,6 +54,7 @@ export const privacyCollectSections: readonly [LegalSection, ...LegalSection[]] 
           'To answer your messages, and to comply with the law and enforce our terms.',
         ],
       },
+      'When it is needed to answer a support request or to keep the Service safe, our support staff may look at the photos you uploaded and the images you created. Every such view is recorded.',
       `We do not sell your personal information, we do not share it for targeted advertising, and we do not use your photos or works to train AI models.`,
       'If you are in the European Economic Area, the United Kingdom or Switzerland: we process your information to perform our contract with you (running the Service and taking payments), for our legitimate interests (security, fraud prevention, analytics and improving the Service), to comply with legal obligations (such as keeping tax records), and with your consent where we ask for it.',
     ],
