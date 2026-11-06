@@ -39,8 +39,9 @@ export function workChoices(options: readonly WorkOption[], t: Translate): Choic
 }
 
 // Stripe-style smallest units: two decimals except zero-decimal currencies, which the payments
-// table never holds in v1 (prices are in USD), so cents / 100 is enough here.
+// table never holds in v1 (prices are in USD), so cents / 100 is enough here. "$24.90" in both
+// languages, never "US$24.90" (建站规格 G3).
 export function formatMoney(locale: string) {
   return (cents: number, currency: string) =>
-    new Intl.NumberFormat(locale, { style: 'currency', currency: currency.toUpperCase() }).format(cents / 100)
+    new Intl.NumberFormat(locale, { style: 'currency', currency: currency.toUpperCase(), currencyDisplay: 'narrowSymbol' }).format(cents / 100)
 }

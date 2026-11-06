@@ -4,9 +4,9 @@ import NextLink from 'next/link'
 import { useLocale } from 'next-intl'
 import type { ComponentProps } from 'react'
 
-import { DEFAULT_LOCALE } from '../locales'
+import { DEFAULT_LOCALE, isLocale } from '../locales'
 import { Link as IntlLink } from '../navigation'
-import { matchesPaths } from '../paths'
+import { localizePath, matchesPaths } from '../paths'
 import { useTranslatedPaths } from './translated-paths'
 
 type Props = ComponentProps<typeof IntlLink>
@@ -24,5 +24,10 @@ export function Link({ locale, href, ...rest }: Props) {
   const paths = useTranslatedPaths()
   const englishOnly = !locale && current !== DEFAULT_LOCALE && !matchesPaths(hrefPath(href), paths)
   if (englishOnly) return <NextLink href={href} {...rest} />
+  // next-intl writes `/#templates` as `/zh/#templates`; the home page's anchors and queries keep
+  // the no-trailing-slash rule (建站规格 R4): `/zh#templates`.
+  if (!locale && isLocale(current) && current !== DEFAULT_LOCALE && typeof href === 'string' && /^\/[#?]/.test(href)) {
+    return <NextLink href={localizePath(href, current)} {...rest} />
+  }
   return <IntlLink href={href} locale={locale} {...rest} />
 }

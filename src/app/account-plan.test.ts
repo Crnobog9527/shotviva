@@ -99,8 +99,11 @@ describe('account Plan card', () => {
   })
 
   it('speaks Chinese on /zh', async () => {
-    // Prices stay in USD in both languages (ARCHITECTURE §17); zh formats them as US$.
-    expect((await render(summarize([row({})], days(30)), 'zh')).text).toContain('每月 50 积分 · US$19.90 /月')
+    // Prices stay in USD in both languages, written "$19.90" like the page copy (ARCHITECTURE §17,
+    // 建站规格 G3), never "US$19.90".
+    const zh = (await render(summarize([row({})], days(30)), 'zh')).text
+    expect(zh).toContain('每月 50 积分 · $19.90 /月')
+    expect(zh).not.toContain('US$')
     expect(buttons((await render(summarize([row({ status: 'past_due' })], days(2)), 'zh')).html)).toEqual(['更新付款方式', '管理订阅'])
     expect((await render(summarize([], days(25), 'pro'), 'zh')).text).toContain('专业版')
   })
