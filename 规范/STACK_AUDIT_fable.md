@@ -37,7 +37,7 @@ Stripe 官方文档 Managed Payments「Payment method availability」表列出�
 
 这和 ARCHITECTURE §6.2「卡、支付宝、微信都能付」字面冲突，但**不需要二选一**。Owner 指出 Graylum 已经解决了这个问题，我读了 staging 的实现（`packages/api/src/services/payments/methodRouting.ts`、`stripeCheckoutIntent.ts`、`docs/launch/evidence/stripe-managed-payments-20261012/README.md`）：
 
-- **同一个 Stripe 账户，按付款方式路由，不是按浏览器语言或 IP。** `card`（国际卡 / Apple Pay / Google Pay）建 Checkout Session 时带 `managed_payments: { enabled: true }`；`wechat_pay` / `alipay` 建普通单笔 Session，`payment_method_types: ['alipay']` 或 `['wechat_pay']`（微信加 `payment_method_options.wechat_pay.client = 'web'`）；`card_cn`（大陆卡订阅）走普通 Stripe 不开 MP。Graylum 文档原话：「服务端只认用户选的方式，不用 IP 强制」——前端把方式列出来让用户自己选，大陆用户自然选微信/支付宝。
+- **同一个 Stripe 账户，按付款方式路由，不是按浏览器语言或 IP。** `card`（国际卡 / Apple Pay / Google Pay）建 Checkout Session 时带 `managed_payments: { enabled: true }`；`wechat_pay` / `alipay` 建普通单笔 Session，`payment_method_types: ['alipay']` 或 `['wechat_pay']`（Graylum 当时的写法；Shotviva 用的 Stripe API 2026-09-30 已删除该参数，改用 `allowed_payment_method_types`，见 ARCHITECTURE §6.3）（微信加 `payment_method_options.wechat_pay.client = 'web'`）；`card_cn`（大陆卡订阅）走普通 Stripe 不开 MP。Graylum 文档原话：「服务端只认用户选的方式，不用 IP 强制」——前端把方式列出来让用户自己选，大陆用户自然选微信/支付宝。
 - Graylum 2026-10-12 在 Stripe 沙盒实测：**MP 订阅和微信/支付宝单笔共用一个账户 PASS**；MP 结账页选国家为中国时 Stripe 报 "China is not currently supported"，所以大陆用户不能走 MP，这正是分流的原因。Owner 已为「微信/支付宝单笔由 Graylum 当卖家」咨询过税务。
 - MP 要求每个商品带 AI 服务税码 `txcd_10105001`（Graylum 常量 `MANAGED_PAYMENTS_TAX_CODE`），Shotviva 的 `pass` / `pack` 同样要设。
 - 正式环境的 MP 要等 Stripe 资格审核，测试模式里是即用的。
