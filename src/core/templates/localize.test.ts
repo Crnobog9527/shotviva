@@ -8,6 +8,7 @@ const base: Template = {
   id: 'promo-poster',
   module: 'image',
   name: 'Promo Poster',
+  description: null,
   category: 'Food & Drink',
   coverBeforeUrl: null,
   coverAfterUrl: null,
@@ -57,6 +58,26 @@ describe('localizeTemplate (ARCHITECTURE §5, LAUNCH §7.6 #5)', () => {
   })
 })
 
+describe('the English description (T52)', () => {
+  const described = { ...base, description: 'Headline and price on one photo' }
+
+  it('shows on English pages, never the Chinese one', () => {
+    const both = { ...described, translations: { zh: { description: '一张图加标题和价格' } } }
+    expect(localizeTemplate(both, 'en').description).toBe('Headline and price on one photo')
+    expect(localizeTemplate(both, 'zh').description).toBe('一张图加标题和价格')
+  })
+
+  it('stands in on Chinese pages when the Chinese one is missing', () => {
+    expect(localizeTemplate(described, 'zh').description).toBe('Headline and price on one photo')
+    expect(localizeTemplate({ ...described, translations: { zh: { name: '促销海报' } } }, 'zh').description).toBe('Headline and price on one photo')
+  })
+
+  it('leaves nothing when neither is filled in', () => {
+    expect(localizeTemplate(base, 'en').description).toBeNull()
+    expect(localizeTemplate(base, 'zh').description).toBeNull()
+  })
+})
+
 describe('translations input', () => {
   const input = { id: 'x', name: 'X', category: 'Pets', fields: base.fields, creditsCost: base.creditsCost, visibleIn: ['web'] }
 
@@ -68,5 +89,13 @@ describe('translations input', () => {
 
   it('leaves translations out when the caller sends none (the prompt import)', () => {
     expect(templateInputSchema.parse(input).translations).toBeUndefined()
+  })
+
+  it('trims the English description, turns blank into null, and caps it at 160', () => {
+    expect(templateInputSchema.parse({ ...input, description: '  One line  ' }).description).toBe('One line')
+    expect(templateInputSchema.parse({ ...input, description: '   ' }).description).toBeNull()
+    expect(templateInputSchema.parse(input).description).toBeUndefined()
+    expect(templateInputSchema.safeParse({ ...input, description: 'x'.repeat(160) }).success).toBe(true)
+    expect(templateInputSchema.safeParse({ ...input, description: 'x'.repeat(161) }).success).toBe(false)
   })
 })

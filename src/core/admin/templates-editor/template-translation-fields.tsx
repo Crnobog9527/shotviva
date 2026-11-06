@@ -40,7 +40,7 @@ export function TemplateTranslationFields({ values, onChange }: Props) {
       <div className="grid grid-cols-2 gap-3">
         <ZhInput id="tpl-zh-name" label={zhCopy.name} value={zh.name} placeholder={values.name}
           onChange={(name) => set({ name })} />
-        <ZhInput id="tpl-zh-description" label={zhCopy.description} value={zh.description}
+        <ZhInput id="tpl-zh-description" label={zhCopy.description} value={zh.description} placeholder={values.description}
           onChange={(description) => set({ description })} />
       </div>
       {fields.length === 0 ? <p className="text-muted-foreground text-xs">{zhCopy.noFields}</p> : null}

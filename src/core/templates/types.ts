@@ -5,6 +5,8 @@ export type Template = {
   id: string
   module: 'image' | 'video'
   name: string
+  // English one-line description (T52); null when not filled in. Read through localizeTemplate.
+  description: string | null
   category: string
   coverBeforeUrl: string | null
   coverAfterUrl: string | null
@@ -30,6 +32,7 @@ export type TemplateRow = {
   id: string
   module: 'image' | 'video'
   name: string
+  description: string | null
   category: string
   cover_before_url: string | null
   cover_after_url: string | null
@@ -49,13 +52,14 @@ export type TemplateRow = {
 }
 
 export const TEMPLATE_COLUMNS =
-  'id, module, name, category, cover_before_url, cover_after_url, cover_media_type, cover_video_url, cover_poster_url, fields, quality, credits_cost, sort_order, is_active, visible_in, translations, created_at, updated_at'
+  'id, module, name, description, category, cover_before_url, cover_after_url, cover_media_type, cover_video_url, cover_poster_url, fields, quality, credits_cost, sort_order, is_active, visible_in, translations, created_at, updated_at'
 
 export function toTemplate(row: TemplateRow): Template {
   return {
     id: row.id,
     module: row.module,
     name: row.name,
+    description: row.description ?? null,
     category: row.category,
     coverBeforeUrl: row.cover_before_url,
     coverAfterUrl: row.cover_after_url,
