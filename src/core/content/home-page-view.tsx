@@ -1,30 +1,39 @@
-import { FactsSection } from './blocks/facts-section'
+import type { ReactNode } from 'react'
+
+import { CostBillsSection } from './blocks/cost-bills'
 import { FaqSection } from './blocks/faq-section'
-import { HeroSection } from './blocks/hero-section'
-import { FreeOfferSection, StepsSection } from './blocks/home-sections'
+import { HomeHero } from './blocks/home-hero'
+import { FreeOfferSection, HomeFacts, StepsSection } from './blocks/home-sections'
 import { RelatedLinks } from './blocks/related-links'
-import { TemplateGrid } from './blocks/template-grid'
-import { PageHeader } from './content-page-view'
+import { ShootSection } from './blocks/shoot-section'
+import { TemplateGrid, type TemplateLookup } from './blocks/template-grid'
 import type { HomePage } from './page-content'
 
-type Props = { page: HomePage; isLinkEnabled: (href: string) => boolean }
+type Props = {
+  page: HomePage
+  brand: string
+  isLinkEnabled: (href: string) => boolean
+  // Each featured template's pair and whether it is live (pickable).
+  templates: TemplateLookup
+  // The first-screen generator (modules/image, client), slotted under the hero pair.
+  generator: ReactNode
+}
 
-// Home block order is fixed (ARCHITECTURE §13, DESIGN §4.1.1): H1 + answer → hero → six H2s
-// in the 建站规格 §4 order. The first-screen generator (T8) slots in next to the hero.
-export function HomePageView({ page, isLinkEnabled }: Props) {
+// Home block order is fixed (ARCHITECTURE §13, 建站规格 §4): H1 + answer → hero + generator →
+// the "full shoot" demo → the six H2s in order, with the two bills (block ③) after the free
+// offer, as in the signed-off v3-b comp (design/comps-v3-b/home.html).
+export function HomePageView({ page, brand, isLinkEnabled, templates, generator }: Props) {
   return (
-    <article className="mx-auto flex w-full max-w-3xl flex-col gap-8 p-4">
-      <PageHeader page={page} />
-      <div>
-        <HeroSection hero={page.hero} showCta={isLinkEnabled(page.hero.cta.href)} />
-        <p>{page.demoNote}</p>
-      </div>
+    <article className="mk-home mk-w">
+      <HomeHero page={page} generator={generator} />
+      <ShootSection shoot={page.shoot} />
       <StepsSection steps={page.steps} />
-      <TemplateGrid grid={page.templateGrid} isLinkEnabled={isLinkEnabled} />
-      <FactsSection facts={page.facts} heading={page.headings.facts} intro={page.factsIntro} />
-      <FreeOfferSection offer={page.freeOffer} costTable={page.costTable} />
-      <FaqSection faq={page.faq} heading={page.headings.faq} isLinkEnabled={isLinkEnabled} />
-      <RelatedLinks heading={page.headings.related} links={page.related.filter((link) => isLinkEnabled(link.href))} />
+      <TemplateGrid grid={page.templateGrid} media={templates} isLinkEnabled={isLinkEnabled} />
+      <HomeFacts facts={page.facts} heading={page.headings.facts} intro={page.factsIntro} />
+      <FreeOfferSection offer={page.freeOffer} brand={brand} />
+      <CostBillsSection bills={page.costBills} />
+      <FaqSection faq={page.faq} heading={page.headings.faq} isLinkEnabled={isLinkEnabled} variant="accordion" />
+      <RelatedLinks heading={page.headings.related} links={page.related.filter((link) => isLinkEnabled(link.href))} variant="cards" />
     </article>
   )
 }

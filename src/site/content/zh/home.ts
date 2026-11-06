@@ -1,20 +1,35 @@
-import { defineHomePage, type HeadedText, type HomePage } from '@/core/content'
+import { defineHomePage, type CostBills, type HeadedText, type HomePage, type ImageRef, type ShootDemo } from '@/core/content'
 
 import { site } from '../../site.config'
-import { creditFrom, planFrom, usd } from '../offer'
+import {
+  SET_PHOTOS,
+  creditFrom,
+  packshotFromUsd,
+  photoSecondsRange,
+  photosLeftInPlan,
+  planFrom,
+  quoteUsd,
+  retouchUsd,
+  setCostUsd,
+  setCredits,
+  setRetouchUsd,
+  setShotsUsd,
+  styledShotUsd,
+  usd,
+  usdRange,
+} from '../offer'
 import { zhTemplateCategories } from './featured-templates'
 import {
   ZH_TIERS,
   zhFreeImages,
   zhFromCredits,
-  zhPhotographerRate,
   zhPlansSentence,
   zhTierList,
   zhTierPixels,
   zhUploadLimits,
   zhYearlySaving,
 } from './offer'
-import { zhPlaceholderHero, zhSharedCostTable, zhSharedFacts } from './shared'
+import { zhSharedFacts } from './shared'
 
 // /zh home (T21). Keyword 「AI改图」 from the Chinese keyword map; Title and H1 start with it,
 // written as one unbroken string (建站规格 §6.1 rule 7). The direct answer says plainly what
@@ -29,6 +44,57 @@ function plansText(): HeadedText {
   return {
     heading,
     text: `${zhPlansSentence()}${yearly}付费积分永不过期，用它生成的每张图都私密、无水印。下面和请摄影师、自己拍对比一下。`,
+  }
+}
+
+// The same illustrative tote set as the English home (public/home/hero-set-*.webp).
+const photo = (file: string, alt: string): ImageRef => ({ src: `/home/${file}.webp`, alt, width: 1080, height: 1350 })
+const phoneShot = photo('hero-set-phone', '手机随手拍：厨房台面上的一只编织皮托特包，窗边自然光（示意图）')
+const listingShot = photo('hero-set-listing', '同一只编织皮托特包的白底商品图，柔和影棚光（示意图）')
+
+const shoot: ShootDemo = {
+  heading: { lead: '一张手机照片 → ', emphasis: '一整套图' },
+  intro: '在厨房台面上用手机随手拍了一张。做出三张成品图，每张里都是同一只包：编织纹路、缝线、链条都没变。',
+  phone: { image: phoneShot, file: 'IMG_2047.jpg', caption: '手机原图：窗边光线，台面很乱，钥匙和杯子都入镜了。' },
+  arrow: '三个模板，同一只包',
+  results: [
+    { image: listingShot, title: '电商主图', template: '纯白底图模板' },
+    { image: photo('hero-set-lifestyle', '同一只包放在窗边的咖啡馆椅子上，早晨暖光（示意图）'), title: '生活场景图', template: '生活场景模板' },
+    { image: photo('hero-set-promo', '同一只包做成新品促销海报，明亮影棚光（示意图）'), title: '促销海报', template: '促销海报模板' },
+  ],
+  bill: {
+    photographer: { who: '摄影师', amount: '一整场拍摄', note: '预约、影棚、造型和精修' },
+    site: { who: brand, amount: `${setCredits} 积分`, note: `${SET_PHOTOS} 张${ZH_TIERS[0]?.name ?? ''}图，用你已经拍好的照片` },
+    line: '请摄影师要按一整场拍摄收费的东西，用你已经拍好的照片就能做出来。',
+  },
+}
+
+// Same two bills as the English home, same figures from site.config, in dollars (§6.1 rule 8).
+function costBills(): CostBills {
+  const plan = planFrom ? usd(planFrom.priceUsd) : ''
+  return {
+    heading: `${SET_PHOTOS} 张商品图要花多少钱：请摄影师和用 ${brand} 对比`,
+    intro: `一个商品，${SET_PHOTOS} 张造型图，精修好、可以直接发。同样的活，两张账单。`,
+    photographer: {
+      title: '摄影师报价',
+      total: { amount: usdRange(quoteUsd), when: '几天后交图' },
+      lines: [
+        { label: `${SET_PHOTOS} 张造型图，每张 ${usdRange(styledShotUsd)}`, value: usdRange(setShotsUsd) },
+        { label: `精修，每张 ${usdRange(retouchUsd)}`, value: usdRange(setRetouchUsd) },
+        { label: '预约、拍摄、修图', value: '几天' },
+      ],
+      fine: `按 2026 年美国影棚公开报价估算；纯白底图大约每张 ${usd(packshotFromUsd)} 起。实际报价因人而异。`,
+    },
+    site: {
+      title: brand,
+      total: { amount: plan, suffix: '/月起', when: `每张 ${photoSecondsRange} 秒` },
+      lines: [
+        { label: `入门版，每月 ${planFrom?.credits ?? ''} 积分`, value: plan },
+        { label: `这 ${SET_PHOTOS} 张，${standard.name}`, value: `${setCredits} 积分 ≈ ${setCostUsd ?? ''}` },
+        { label: '这个月还能再做', value: `${photosLeftInPlan ?? ''} 张` },
+      ],
+      fine: `造型和精修都在模板里，主体保持你拍的样子。先用 ${zhFreeImages}试试，不用绑卡。`,
+    },
   }
 }
 
@@ -59,12 +125,19 @@ export const zhHomePage = defineHomePage({
   h1: 'AI改图：上传一张照片，主体不变，换光线、场景或画风',
   subtitle: '从你拍的真实照片出发的 AI 影棚。你拍的东西不变，模板只换光线、场景或画风。',
   answerBlock: `AI改图就是拿一张你已经拍好的照片，换一种光线、场景或画风，照片里的主体保持原样。在 ${brand} 上传一张手机照片，选一个餐饮、商品、美妆、房间、宠物或画风模板，就能下载${zhTierList}的成图。改什么由模板决定，不用写提示词。新用户送 ${zhFreeImages}。`,
-  hero: zhPlaceholderHero('同一张照片、同一个主体：模板只换了光线和背景。'),
-  demoNote: `一张手机照片就能做出一整套图：白底主图、生活场景图和促销海报，用的都是同一个商品。请摄影师拍这样一套，价格通常是${zhPhotographerRate}。`,
+  hero: {
+    before: phoneShot,
+    after: listingShot,
+    caption: '你的手机照片 → 纯白底图模板：还是这只包，只换了光线和背景 · 示意图',
+    cta: { label: '上传照片', href: '/generate' },
+  },
+  shoot,
   steps,
   templateGrid: {
     heading: 'AI改图模板：不用写提示词',
     intro: `每个模板都从你的手机照片开始，到一张成品图结束。选一个，剩下的交给 ${brand}。每张${zhFromCredits}。`,
+    note: '模板图片均为示意图。',
+    price: zhFromCredits,
     categories: zhTemplateCategories,
   },
   facts: zhSharedFacts(),
@@ -82,8 +155,9 @@ export const zhHomePage = defineHomePage({
       },
     ],
     plans: plansText(),
+    sample: { src: '/home/templates/spa-podium-after.webp', alt: '', width: 900, height: 1125 },
   },
-  costTable: zhSharedCostTable(),
+  costBills: costBills(),
   faq: [
     // A–I follow 建站规格 G6 in order, asked the way Chinese users ask (G13, 中文用户真实问法).
     // A's first sentence is the Chinese form of G6's fixed sentence: brand and keyword together.
@@ -143,7 +217,6 @@ export const zhHomePage = defineHomePage({
   ],
   headings: {
     facts: 'AI改图：哪些保持不变',
-    costTable: `请摄影师和用 ${brand} 的对比`,
     faq: 'AI改图常见问题',
     related: 'AI改图：餐饮、商品、房间等场景',
   },

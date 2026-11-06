@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { homePage } from './home'
-import { perCredit, plansSentence, yearlySaving } from './offer'
+import { perCredit, photosLeftInPlan, plansSentence, quoteUsd, setCostUsd, usdRange, yearlySaving } from './offer'
 import { pricingPage } from './pricing'
 
 // The copy fills in from the nine products in site.config (ARCHITECTURE §6.2) without anyone
@@ -26,5 +26,18 @@ describe('copy with the catalog in site.config', () => {
     expect(pricingPage.tables.packs.rows[0]).toEqual(['Small pack', '$9.90', '20', '$0.50'])
     expect(perCredit('starter_monthly')).toBe('$0.40')
     expect(pricingPage.intro).toContain('Yearly plans save up to 40%.')
+  })
+
+  it('fills both home bills from config: the photographer rates and the Starter plan (DESIGN §6.9 item 6)', () => {
+    // 3 × $89–$300 styled shots + 3 × $10–$30 retouching.
+    expect(usdRange(quoteUsd)).toBe('$297–$990')
+    // 6 credits at Starter's $0.40 a credit, and (50 − 6) ÷ 2 Standard photos left.
+    expect(setCostUsd).toBe('$2.40')
+    expect(photosLeftInPlan).toBe(22)
+    const bills = homePage.costBills
+    expect(bills.photographer.total.amount).toBe('$297–$990')
+    expect(bills.site.total.amount).toBe('$19.90')
+    expect(bills.site.lines.map((line) => line.value)).toEqual(['$19.90', '6 credits ≈ $2.40', '22 more photos'])
+    expect(bills.site.total.when).toBe('20–40 seconds a photo')
   })
 })

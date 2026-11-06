@@ -35,8 +35,8 @@ const A_FIRST_SENTENCE =
 const firstSentence = (text: string) => text.split(/(?<=[.。])\s*/)[0] ?? text
 const byLetter = (faq: readonly FaqItem[], letter: string) => faq['ABCDEFGHI'.indexOf(letter)] as FaqItem
 
-async function render(faq: readonly FaqItem[], locale: Locale) {
-  const section = createElement(FaqSection, { faq, heading: 'FAQ' })
+async function render(faq: readonly FaqItem[], locale: Locale, variant: 'list' | 'accordion' = 'list') {
+  const section = createElement(FaqSection, { faq, heading: 'FAQ', variant })
   const paths: ComponentProps<typeof TranslatedPathsProvider> = { paths: site.locales.zhPaths, children: section }
   const provider: ComponentProps<typeof NextIntlClientProvider> = {
     locale,
@@ -114,6 +114,21 @@ describe('home FAQ, English (建站规格 G6)', () => {
       faq.map((item) => [item.question, item.answer]),
     )
     expect(JSON.stringify(ld)).not.toContain('Starts from')
+  })
+})
+
+describe('home FAQ accordion (T36)', () => {
+  it('keeps every question and answer in the HTML as an accordion, the first one open (G11, T36)', async () => {
+    const faq: readonly FaqItem[] = homePage.faq
+    const html = decode(await render(faq, 'en', 'accordion'))
+    expect(html.match(/<details/g)).toHaveLength(9)
+    expect(html.match(/<details open="">/g)).toHaveLength(1)
+    for (const item of faq) {
+      expect(html).toContain(`<h3>${item.question}</h3>`)
+      expect(html).toContain(`<p>${item.answer}`)
+    }
+    expect(html.indexOf('<details open="">')).toBeLessThan(html.indexOf(byLetter(faq, 'A').question))
+    expect(html).toContain('<caption>Image to image AI vs an AI image generator</caption>')
   })
 })
 

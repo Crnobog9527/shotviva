@@ -49,31 +49,24 @@ describe('LegalPageView', () => {
 })
 
 describe('SiteFooter', () => {
-  it('shows the official-site statement, contact, copyright and the legal links, not the operating entity', () => {
+  it('carries only the contact email, the copyright and the legal links (建站规格 G8)', () => {
     const { brand } = testSite()
     const links = [{ href: '/terms', label: 'Terms' }] as const
-    const messages = {
-      footer: {
-        legalNav: 'Legal',
-        official: '{name} — {tagline}. {domain} is the only official {name} site.',
-        launched: 'Launched {year}. Serving {countries}. Contact: <mail>{email}</mail>',
-        copyright: '© {year} {name}',
-        language: 'Language',
-      },
-    }
+    const messages = { footer: { legalNav: 'Legal', copyright: '© {year} {name}', language: 'Language' } }
     const provider: ComponentProps<typeof NextIntlClientProvider> = {
       locale: 'en',
       messages,
-      children: createElement(SiteFooter, { brand, links, countries: 'United States' }),
+      children: createElement(SiteFooter, { brand, links }),
     }
     const html = renderToStaticMarkup(createElement(NextIntlClientProvider, provider))
-    expect(html).toContain('example.com is the only official Example site.')
-    expect(html).toContain('© 2026 Example</p>')
+    expect(html).toContain('href="mailto:hi@example.com"')
+    expect(html).toContain('© 2026 Example</span>')
+    expect(html).toContain('href="/terms"')
+    expect(html).not.toContain('official')
+    expect(html).not.toContain('Launched')
     expect(html).not.toContain('operated by')
     expect(html).not.toContain('Example LLC')
     expect(html).not.toContain('1 Main St')
-    expect(html).toContain('Launched 2026. Serving United States. Contact: <a href="mailto:hi@example.com"')
-    expect(html).toContain('href="/terms"')
     // The MiSans attribution moved to the Terms page (ARCHITECTURE §17).
     expect(html).not.toContain('MiSans')
   })

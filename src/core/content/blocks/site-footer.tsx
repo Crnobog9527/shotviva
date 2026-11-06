@@ -6,60 +6,47 @@ import { Link } from '../../i18n/ui'
 
 export type FooterLink = { href: `/${string}`; label: string }
 
-// Every marketing page carries the official-site statement, contact email, copyright and the
-// legal links. The operating entity and address live on the legal pages and in the Organization
-// JSON-LD, not here (DESIGN §6.9 item 5, 建站规格 G8; Owner 2026-11-06). Facts come from the
-// config, the words around them from messages; `countries` is already in the page's language.
-// The MiSans attribution is on the Terms page, not here (ARCHITECTURE §17).
+// Every marketing page: the wordmark, the contact email and the copyright, then the legal links
+// and the text language switch (DESIGN §6.9 item 5, 建站规格 G8: the footer carries only the
+// contact email and the copyright). The operating entity, address, launch year and countries
+// live on the legal pages and in the Organization JSON-LD. The MiSans attribution is on the
+// Terms page (ARCHITECTURE §17).
 type Props = {
   brand: SiteBrand
   links: readonly FooterLink[]
-  countries: string
   languageSwitch?: ReactNode
 }
 
-const linkClass = 'underline underline-offset-4 hover:text-foreground'
-
-export function SiteFooter({ brand, links, countries, languageSwitch }: Props) {
+export function SiteFooter({ brand, links, languageSwitch }: Props) {
   const t = useTranslations('footer')
-  const name = brand.name
   return (
-    <footer className="mt-16 border-t border-border">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 px-4 py-8 text-sm text-muted-foreground">
-        <nav aria-label={t('legalNav')}>
-          <ul className="flex flex-wrap gap-x-6">
-            {links.map((link) => (
-              <li key={link.href}>
-                <Link
-                  href={link.href}
-                  className="inline-flex min-h-11 items-center underline-offset-4 hover:text-foreground hover:underline"
-                >
-                  {link.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
-        <p>{t('official', { name, tagline: brand.tagline, domain: brand.domain })}</p>
-        <p>
-          {t.rich('launched', {
-            year: String(brand.launchYear),
-            countries,
-            email: brand.contactEmail,
-            mail: (chunks) => (
-              <a href={`mailto:${brand.contactEmail}`} className={linkClass}>
-                {chunks}
-              </a>
-            ),
-          })}
+    <footer className="mk-footer">
+      <div className="mk-w">
+        <p className="mk-foot-word" aria-hidden>
+          {brand.name}
+          <i>.</i>
         </p>
-        <p>{t('copyright', { year: String(brand.launchYear), name })}</p>
-        {languageSwitch ? (
-          <p>
-            <span className="sr-only">{t('language')}</span>
-            {languageSwitch}
-          </p>
-        ) : null}
+        <div className="mk-foot-main">
+          <a className="mk-mail" href={`mailto:${brand.contactEmail}`}>
+            {brand.contactEmail}
+          </a>
+          <span className="mk-copy">{t('copyright', { year: String(brand.launchYear), name: brand.name })}</span>
+        </div>
+        <div className="mk-foot-fine">
+          <nav aria-label={t('legalNav')}>
+            {links.map((link, i) => (
+              <span key={link.href} className="mk-foot-item">
+                {i > 0 ? <span aria-hidden>·</span> : null}
+                <Link href={link.href}>{link.label}</Link>
+              </span>
+            ))}
+          </nav>
+          {languageSwitch ? (
+            <nav className="mk-foot-lang" aria-label={t('language')}>
+              {languageSwitch}
+            </nav>
+          ) : null}
+        </div>
       </div>
     </footer>
   )

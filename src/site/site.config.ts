@@ -93,4 +93,11 @@ export const site = defineSite({
     // seo资料/Shotviva 页面与主词映射（中文口径）.csv: the three indexable /zh pages.
     zhIndexablePaths: ['/', '/image-to-image-generator', '/pricing'],
   },
+  // The home page's two bills (DESIGN §6.9 item 6, design/SITE-PLAN.md): typical published
+  // 2026 US studio rates, not quotes. Owner confirms before launch; the seconds wait for the
+  // LAUNCH §5 measurement.
+  marketing: {
+    photographer: { styledShotUsd: { low: 89, high: 300 }, retouchUsd: { low: 10, high: 30 }, packshotFromUsd: 15 },
+    photoSeconds: { low: 20, high: 40 },
+  },
 })

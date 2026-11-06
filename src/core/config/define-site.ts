@@ -112,6 +112,24 @@ export type SiteConfig = {
     // (AGENTS §9, 建站规格 §6.1) and in locales.zhPaths. Every other /zh page is noindex.
     zhIndexablePaths: readonly `/${string}`[]
   }
+  // Numbers the marketing pages quote that are not our prices (DESIGN §6.9 item 6, G3): a
+  // photographer's typical published rates and how long a photo takes. Owner confirms them
+  // before launch; the sources are in design/SITE-PLAN.md.
+  marketing: MarketingNumbers
+}
+
+export type UsdRange = { low: number; high: number }
+
+export type MarketingNumbers = {
+  photographer: {
+    // One styled product shot, and retouching per image, typical 2026 US studio rates.
+    styledShotUsd: UsdRange
+    retouchUsd: UsdRange
+    // Where plain white packshots start.
+    packshotFromUsd: number
+  }
+  // Seconds one photo usually takes to develop (LAUNCH §5 measures it).
+  photoSeconds: UsdRange
 }
 
 export function defineSite<const T extends SiteConfig>(config: T): T {
