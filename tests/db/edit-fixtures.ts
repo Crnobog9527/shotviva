@@ -1,12 +1,15 @@
 import type { Client } from 'pg'
 import { vi } from 'vitest'
 
+import type { ServerTrack } from '@/core/analytics'
 import { runGeneration } from '@/core/jobs'
 import { newInputKey, type ObjectStore } from '@/core/storage'
-import type { ClassifierAnswer, ScopeClassifier } from '@/modules/image'
+import { runEdit, type ClassifierAnswer, type EditDeps, type ScopeClassifier } from '@/modules/image'
 
 import { jpeg } from '../fakes/images'
-import { fakeProvider } from './generation-fixtures'
+import { createMemoryStore } from '../fakes/memory-store'
+import { fakeProvider, type FakeBehaviour } from './generation-fixtures'
+import { createUser, type TestProfile } from './helpers'
 import { serviceSupabase } from './supabase-env'
 
 // T30 fixtures. The texts below are test markers, not prompts: the real wrapper, classifier
@@ -52,7 +55,8 @@ export function fakeClassifier(behaviour: ClassifierBehaviour) {
     if (behaviour === 'fail') throw new Error('openai responses 503')
     return { scope: 'background', confidence: 0.9, keep: ['amber bottle'], change: 'beach background', usage: { inputTokens: 800, outputTokens: 30 }, ...behaviour }
   })
-  return { classifier: { tag: 'fake/luna', classify } satisfies ScopeClassifier, classify }
+  const classifier: ScopeClassifier = { tag: 'fake/luna', classify }
+  return { classifier, classify }
 }
 
 // A finished 4:5 work by `userId`, made the ordinary way, to edit.
@@ -64,4 +68,36 @@ export async function finishedWork(userId: string, store: ObjectStore, templateI
     { userId, source: 'web', templateId, inputKey, aspectRatio: '4:5' },
   )
   return view.id
+}
+
+export type EditOptions = { classifier?: ClassifierBehaviour | null; provider?: FakeBehaviour; profile?: TestProfile }
+
+// A user with one finished 4:5 work (Standard, 1 credit) and `profile` credits left after it.
+export async function editSetup(db: Client, templateId: string, { classifier = {}, provider = 'ok', profile = { credits: 10 } }: EditOptions = {}) {
+  const userId = await createUser(db, { credits: (profile.credits ?? 0) + 1, freeCredits: profile.freeCredits })
+  const r2 = createMemoryStore()
+  const sourceId = await finishedWork(userId, r2.store, templateId, (key, body) => r2.upload(key, body, 'image/jpeg'))
+  const fake = fakeProvider(provider)
+  const decision = classifier === null ? null : fakeClassifier(classifier)
+  const track = vi.fn<ServerTrack>()
+  const deps: EditDeps = {
+    db: serviceSupabase(),
+    store: r2.store,
+    provider: fake.provider,
+    classifier: decision?.classifier ?? null,
+    providerTimeoutMs: 200,
+    classifierTimeoutMs: 50,
+    track,
+  }
+  const edit = (instruction = 'Put it on a beach', extra: { jobId?: string; resolution?: '2k' } = {}) =>
+    runEdit(deps, { userId, sourceJobId: sourceId, instruction, ...extra })
+  return { userId, sourceId, r2, fake, decision, deps, track, edit }
+}
+
+export async function editJobRow(db: Client, jobId: string) {
+  const { rows } = await db.query<{ template_id: string; parent_job_id: string | null; inputs: Record<string, unknown>; credits_cost: number }>(
+    'select template_id, parent_job_id, inputs, credits_cost from public.generation_jobs where id = $1',
+    [jobId],
+  )
+  return rows[0]!
 }

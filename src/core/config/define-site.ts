@@ -96,6 +96,9 @@ export type SiteConfig = {
     // The only paths allowed into search. Every entry must exist in the keyword map CSV
     // (AGENTS §9); everything else renders noindex.
     indexablePaths: readonly `/${string}`[]
+    // Production hosts that 308 to brand.domain once the deployment is configured for it
+    // (ARCHITECTURE §12.0, core/seo canonicalHostRedirect).
+    canonicalRedirectHosts: readonly string[]
   }
 }
 

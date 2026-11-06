@@ -20,7 +20,7 @@ export async function editScopeClassifier(): Promise<ScopeClassifier | null> {
     if (!credentials) return null
     const build = CLASSIFIER_ADAPTERS[credentials.adapter]
     if (!build) throw new Error(`adapter ${credentials.adapter} is not a classifier`)
-    return build(credentials.config, credentials.tag)
+    return { ...build(credentials.config, credentials.tag), prices: credentials.prices }
   } catch (error) {
     logger.error('edit classifier unavailable; edits use the fallback', { error })
     return null

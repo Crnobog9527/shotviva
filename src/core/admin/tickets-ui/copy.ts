@@ -16,7 +16,11 @@ export const TICKETS_COPY = {
     account: '账号问题',
     other: '其他',
   },
-  columns: { lastMessageAt: '最近消息', email: '用户', type: '类型', status: '状态', preview: '内容' },
+  columns: { dueAt: '回复到期', lastMessageAt: '最近消息', email: '用户', tier: '档位', type: '类型', status: '状态', preview: '内容' },
+  tiers: { starter: 'Starter', pro: 'Pro', max: 'Max', none: '无档位' },
+  overdue: '已超时',
+  sortHint: (h: { starter: number; pro: number; max: number; base: number }) =>
+    `待处理按回复到期时间排序，最急的在前（从用户最后一条消息算起：Starter ${h.starter} 小时、Pro ${h.pro} 小时、Max ${h.max} 小时，无档位 ${h.base} 小时）。`,
   decisions: { approved: '已同意退款', rejected: '已拒绝退款' },
   thread: { user: '用户', admin: '我们', heading: '消息往来' },
   user: {

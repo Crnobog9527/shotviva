@@ -7,7 +7,8 @@ import { GENERATION_COST_USD } from '@/modules/image'
 import { compensateJobAction, refundStuckAction, viewWorkAction } from './actions'
 
 // /admin/jobs (ARCHITECTURE §10): every generation job, filtered and keyset-paged, plus the
-// per-model / resolution counts from admin_dashboard_stats with an estimated cost; stuck jobs
+// per-model / resolution counts and real cost from admin_dashboard_stats (T33; the constant
+// only estimates pre-T33 jobs); stuck jobs
 // (T25) on top, with view / compensate on each row.
 export const instant = false
 

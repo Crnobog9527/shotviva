@@ -6,8 +6,7 @@ import { Suspense } from 'react'
 
 import { AppPage, FlowNav } from '@/core/app-shell'
 import { createServerSupabase, requireUser } from '@/core/auth'
-import { BASE_SUPPORT_REPLY_HOURS } from '@/core/billing'
-import { listMyTickets } from '@/core/support'
+import { listMyTickets, ReplyTime } from '@/core/support'
 import { TicketsList } from '@/core/support/ui'
 import { buttonVariants } from '@/core/ui/button'
 
@@ -18,7 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 // Help & feedback, a flow page under Account (noindex through the app layout). The reply time
-// comes from the tier benefits (core/billing), never written here.
+// comes from the user's tier and the tier benefits (core/billing), never written here.
 function Head() {
   const t = useTranslations('app.support')
   const account = useTranslations('auth.account')
@@ -26,7 +25,23 @@ function Head() {
     <>
       <FlowNav back={{ href: '/account', label: account('title') }} title={t('title')} />
       <h1 className="px-4 pt-2 font-display text-h1 leading-tight">{t('title')}</h1>
-      <p className="px-4 pt-2 text-body text-bone-dim">{t('replyTime', { hours: BASE_SUPPORT_REPLY_HOURS })}</p>
+    </>
+  )
+}
+
+async function Reply() {
+  const user = await requireUser('/account/help')
+  return (
+    <p className="px-4 pt-2 text-body text-bone-dim">
+      <ReplyTime userId={user.id} />
+    </p>
+  )
+}
+
+function NewTicket() {
+  const t = useTranslations('app.support')
+  return (
+    <>
       <div className="px-4 pt-4">
         <Link href="/account/help/new" className={buttonVariants({ variant: 'cta', size: 'touch' })}>
           {t('newTicket')}
@@ -47,6 +62,10 @@ export default function HelpPage() {
   return (
     <AppPage>
       <Head />
+      <Suspense>
+        <Reply />
+      </Suspense>
+      <NewTicket />
       <div className="px-4 pb-16">
         <Suspense>
           <Tickets />

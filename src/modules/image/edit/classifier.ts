@@ -1,3 +1,4 @@
+import type { ProviderPrices } from '@/core/jobs'
 import type { DecidedScope } from '@/core/templates'
 
 // The classifier step of a photo edit (ARCHITECTURE §5.2): what range the user's words change,
@@ -31,5 +32,7 @@ export type ClassifierAnswer = {
 export type ScopeClassifier = {
   // `<ai_providers.id>/<model>`, like generation_jobs.provider.
   tag: string
+  // The decision row's per-million prices (T33), to cost the step; null when not known.
+  prices?: ProviderPrices | null
   classify(input: ClassifierInput): Promise<ClassifierAnswer>
 }

@@ -81,9 +81,15 @@
     },
     "account": {
       "title": "Graylum",
+      "description": "Make photos in Graylum with your Shotviva credits.",
       "connected": "Connected since {date, date, medium}. Graylum can make photos with your credits.",
-      "notConnected": "Not connected.",
+      "notConnected": "Not connected. To connect, start from Graylum and allow it to use your credits.",
       "disconnect": "Disconnect Graylum"
+    },
+    "integrations": {
+      "title": "Integrations",
+      "enabled": "Enabled",
+      "notEnabled": "Not enabled"
     }
   },
   "app": {
@@ -300,7 +306,46 @@
       "longPress": "Long-press to save",
       "showTransparency": "Show transparency",
       "makeAnotherWith": "Make another with {name}",
-      "shareText": "Made with {brand} {url}"
+      "shareText": "Made with {brand} {url}",
+      "makeAgain": "Make again",
+      "tierPx": "{tier} · {px}",
+      "when": {
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "meta": "{day} {time}",
+        "made": "{day}, {time}"
+      },
+      "views": {
+        "label": "View",
+        "result": "Result",
+        "onWhite": "On white",
+        "transparent": "Transparent",
+        "original": "Original"
+      },
+      "originalAlt": "The photo you uploaded for {name}",
+      "originalDeleted": "Original deleted",
+      "originalDeletedBody": "Per our privacy rules, the photo you uploaded is no longer kept. The result stays.",
+      "yourNote": "Your note",
+      "showMore": "Show more",
+      "showLess": "Show less",
+      "facts": {
+        "label": "Details",
+        "template": "Template",
+        "size": "Size",
+        "resolution": "Resolution",
+        "resolutionValue": "{tier} · {px} px",
+        "format": "Format",
+        "formatPng": "PNG, transparent background",
+        "credits": "Credits",
+        "visibility": "Visibility",
+        "visibilityFree": "Public, with watermark",
+        "visibilityPrivate": "Private",
+        "visibilityPublic": "Public",
+        "original": "Original",
+        "originalKept": "Kept, {px} px preview",
+        "originalDeleted": "Deleted per our privacy rules",
+        "made": "Made"
+      }
     },
     "wishlist": {
       "title": "Wishlist",
@@ -386,7 +431,8 @@
       "title": "Help & feedback",
       "entryHint": "Questions, problems or ideas: write to us here.",
       "newReply": "New reply",
-      "replyTime": "We reply here, usually within {hours} hours. Members get faster replies by plan.",
+      "replyTime": "We reply here, usually within {hours} hours.",
+      "replyTimeMax": "Max members get a reply within {hours} hours.",
       "newTicket": "New request",
       "mine": "My tickets",
       "empty": "No tickets yet.",

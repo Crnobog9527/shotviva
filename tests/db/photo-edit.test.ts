@@ -1,18 +1,26 @@
 import { randomUUID } from 'node:crypto'
 
 import type { Client } from 'pg'
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import type { ServerTrack } from '@/core/analytics'
 import { listAdminTemplates, loadEditTemplateSettings, saveEditTemplate } from '@/core/admin'
-import { GenerationFailure, reserveJob } from '@/core/jobs'
+import { GenerationFailure, ProviderError, reserveJob, type GenerationProvider, type ProviderPrices } from '@/core/jobs'
 import { listTemplates } from '@/core/templates'
-import { CREDITS_FLOOR, runEdit, type EditDeps } from '@/modules/image'
+import { CREDITS_FLOOR, runEdit } from '@/modules/image'
 
-import { createMemoryStore } from '../fakes/memory-store'
-import { fakeClassifier, finishedWork, publishEditTemplate, setEditTemplate, TEST_EDIT_PARAMS, TEST_WRAPPER, type ClassifierBehaviour } from './edit-fixtures'
-import { fakeProvider, seedTemplate, type FakeBehaviour } from './generation-fixtures'
-import { connectAdmin, createUser, profileOf, type TestProfile } from './helpers'
+import { png } from '../fakes/images'
+import {
+  editJobRow,
+  editSetup,
+  publishEditTemplate,
+  setEditTemplate,
+  TEST_EDIT_PARAMS,
+  TEST_WRAPPER,
+  type ClassifierBehaviour,
+  type EditOptions,
+} from './edit-fixtures'
+import { seedTemplate } from './generation-fixtures'
+import { connectAdmin, createUser, profileOf } from './helpers'
 import { anonSupabase, serviceSupabase } from './supabase-env'
 
 // T30 (ARCHITECTURE §5.2): an edit is an ordinary generation on the built-in `edit` template.
@@ -33,37 +41,8 @@ afterAll(async () => {
   await db.end()
 })
 
-type Options = { classifier?: ClassifierBehaviour | null; provider?: FakeBehaviour; profile?: TestProfile }
-
-// A user with one finished 4:5 work (Standard, 1 credit) and `profile` credits left after it.
-async function setup({ classifier = {}, provider = 'ok', profile = { credits: 10 } }: Options = {}) {
-  const userId = await createUser(db, { credits: (profile.credits ?? 0) + 1, freeCredits: profile.freeCredits })
-  const r2 = createMemoryStore()
-  const sourceId = await finishedWork(userId, r2.store, templateId, (key, body) => r2.upload(key, body, 'image/jpeg'))
-  const fake = fakeProvider(provider)
-  const decision = classifier === null ? null : fakeClassifier(classifier)
-  const track = vi.fn<ServerTrack>()
-  const deps: EditDeps = {
-    db: serviceSupabase(),
-    store: r2.store,
-    provider: fake.provider,
-    classifier: decision?.classifier ?? null,
-    providerTimeoutMs: 200,
-    classifierTimeoutMs: 50,
-    track,
-  }
-  const edit = (instruction = 'Put it on a beach', extra: { jobId?: string; resolution?: '2k' } = {}) =>
-    runEdit(deps, { userId, sourceJobId: sourceId, instruction, ...extra })
-  return { userId, sourceId, r2, fake, decision, deps, track, edit }
-}
-
-async function editRow(jobId: string) {
-  const { rows } = await db.query<{ template_id: string; parent_job_id: string | null; inputs: Record<string, unknown>; credits_cost: number }>(
-    'select template_id, parent_job_id, inputs, credits_cost from public.generation_jobs where id = $1',
-    [jobId],
-  )
-  return rows[0]!
-}
+const setup = (options?: EditOptions) => editSetup(db, templateId, options)
+const editRow = (jobId: string) => editJobRow(db, jobId)
 
 describe('runEdit: one ordinary generation on the edit template', () => {
   it('charges the edit price, links the parent and sends wrapper + paragraph + the words as typed', async () => {
@@ -145,6 +124,47 @@ describe('runEdit: the classifier never blocks the edit', () => {
   it('uses the fallback with no decision provider switched on', async () => {
     const { edit } = await setup({ classifier: null })
     expect((await editRow((await edit()).id)).inputs.edit_scope).toBe('fallback')
+  })
+})
+
+describe("runEdit: the decision step's tokens are costed with the image call (T33)", () => {
+  const IMAGE_PRICES = { inputTextPerM: 5, inputImagePerM: 8, outputPerM: 30 }
+  const IMAGE_USAGE = { input_text_tokens: 1000, input_image_tokens: 2000, output_tokens: 4000 }
+  const LUNA: ProviderPrices = { inputTextPerM: 0.1, inputImagePerM: null, outputPerM: 0.5 }
+  // fakeClassifier reports 800 input and 30 output tokens.
+  const USAGE = { ...IMAGE_USAGE, decision_input_tokens: 800, decision_output_tokens: 30 }
+  // $0.141 for the image call, plus 800 × $0.10 + 30 × $0.50 per million.
+  const COST = '0.141095'
+
+  const billed = (fail: boolean): GenerationProvider => ({
+    id: 'fake-openai',
+    prices: IMAGE_PRICES,
+    generate: async () => {
+      if (fail) throw new ProviderError('failed', 'openai returned no image', { usage: IMAGE_USAGE })
+      return { bytes: await png(64, 80), contentType: 'image/png' as const, usage: IMAGE_USAGE }
+    },
+  })
+
+  async function costOfEdit(classifier: ClassifierBehaviour, decisionPrices: ProviderPrices | null = LUNA, fail = false) {
+    const { deps, decision, edit } = await setup({ classifier })
+    deps.provider = billed(fail)
+    if (decision) decision.classifier.prices = decisionPrices
+    const view = await edit().catch((error: GenerationFailure) => ({ id: error.jobId }))
+    const { rows } = await db.query('select status, provider_usage, cost_usd from public.generation_jobs where id = $1', [view.id])
+    return rows[0]
+  }
+
+  it('adds the decision tokens to provider_usage and prices them at the decision row', async () => {
+    expect(await costOfEdit({})).toEqual({ status: 'succeeded', provider_usage: USAGE, cost_usd: COST })
+  })
+
+  it('records them on a refunded edit too', async () => {
+    expect(await costOfEdit({}, LUNA, true)).toEqual({ status: 'failed', provider_usage: USAGE, cost_usd: COST })
+  })
+
+  it('leaves the cost empty while the decision row has no prices, and costs a failed classifier as no step', async () => {
+    expect(await costOfEdit({}, null)).toMatchObject({ provider_usage: USAGE, cost_usd: null })
+    expect(await costOfEdit('fail')).toMatchObject({ provider_usage: IMAGE_USAGE, cost_usd: '0.141000' })
   })
 })
 

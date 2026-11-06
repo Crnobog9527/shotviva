@@ -5,7 +5,7 @@ import { cacheLife, cacheTag } from 'next/cache'
 import { createAdminSupabase } from '../auth/supabase-admin'
 import { serverEnv } from '../env'
 import { AppError } from '../errors'
-import { providerTag, type GenerationProvider } from '../jobs'
+import { providerTag, type GenerationProvider, type ProviderPrices } from '../jobs'
 import { readProviderKey } from './keys'
 import { loadActiveProviderRow } from './repository'
 import { resolveProvider, type ReadProviderKey } from './resolve'
@@ -35,7 +35,7 @@ export async function activeProvider(
   return resolveProvider(module, await loadRow(module), serverEnv(), adapters, readKey)
 }
 
-export type ProviderCredentials = { tag: string; adapter: ProviderAdapterId; config: ProviderConfig }
+export type ProviderCredentials = { tag: string; adapter: ProviderAdapterId; config: ProviderConfig; prices: ProviderPrices }
 
 // For a module that is not a GenerationProvider and has no env fallback ('decision', T30): the
 // active row with its key, or null when none is switched on. The module builds its own adapter.
@@ -48,5 +48,5 @@ export async function activeCredentials(
   if (!row) return null
   const apiKey = await readKey(row.id)
   if (!apiKey) throw new AppError('INTERNAL', `active ${module} provider ${row.id} has no API key`)
-  return { tag: providerTag(row.id, row.model), adapter: row.adapter, config: { baseUrl: row.baseUrl, model: row.model, apiKey } }
+  return { tag: providerTag(row.id, row.model), adapter: row.adapter, config: { baseUrl: row.baseUrl, model: row.model, apiKey }, prices: row.prices }
 }

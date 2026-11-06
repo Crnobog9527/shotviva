@@ -124,14 +124,14 @@ interface GenerationProvider {
 |---|---|
 | `id` | uuid |
 | `module` | `'image'`；`'decision'`（作品编辑判断改动范围用，T30，§5.2）；以后视频再加 |
-| `adapter` | 用哪个代码适配器：`'openai_images'`；`'openai_decisions'`（OpenAI 官方 `POST /v1/decisions`，只配官方地址，中转站多半没有这个接口）。接一个接口形态不同的厂商（如 Gemini、Seedream）要写新适配器，是代码任务，不是后台操作 |
+| `adapter` | 用哪个代码适配器：`'openai_images'`；`'openai_responses'`（OpenAI 官方 Responses API，作品编辑判断用，第一版模型 `gpt-6-luna`，Owner 2026-11-06）。接一个接口形态不同的厂商（如 Gemini、Seedream）要写新适配器，是代码任务，不是后台操作 |
 | `label` | 后台显示名，如「OpenAI 官方」「某中转」 |
 | `base_url` | 接口根地址，默认 `https://api.openai.com/v1`；只允许 `https://`，拒绝 localhost、内网和保留地址 |
 | `model` | 模型名，如 `gpt-image-2.6` |
 | `vault_secret_id` | 密钥存在 **Supabase Vault**（`vault.secrets`，由 Supabase 在库内加密），表里只存它的 id。Owner 2026-11-06 改定，和 Graylum 一样；取代原先「应用用 `PROVIDER_SECRETS_KEY` 做 AES-256-GCM」的做法，不再需要任何应用侧加密密钥 |
 | `api_key_last4` | 密钥后 4 位，后台列表里显示用 |
 | `is_active` | 当前在用；同一个 `module` 最多一条为 `true`（部分唯一索引） |
-| `price_input_text_per_m` / `price_input_image_per_m` / `price_output_per_m` | 美元 / 百万 token 的单价，后台填（按 OpenAI 价目页）；用来把每单用量算成 `cost_usd`。`decision` 供应商只填输入单价（T33） |
+| `price_input_text_per_m` / `price_input_image_per_m` / `price_output_per_m` | 美元 / 百万 token 的单价，后台填（按 OpenAI 价目页）；用来把每单用量算成 `cost_usd`。`decision` 供应商同样填输入和输出单价（T33） |
 | `notes` | 备注 |
 | `created_at` / `updated_at` / `updated_by` | 审计 |
 
@@ -206,9 +206,9 @@ v1 不写回调解析、定时轮询、超时清理这类定时任务。视频�
 
 - **入口和界面**：作品详情页「Edit」按钮，打开编辑面板（手机底部弹出，电脑和创作面板同一个组件，设计由 T6 出稿）：一个输入框（标签 "What would you like to change?"，1～500 字符，任何语言）、清晰度（默认和原作品同一档）、本次花费；比例固定和原作品一样。只能编辑自己的、成功的作品；免费作品也能编辑。
 - **一单 = 一次普通出图**：走内置模板 `edit`（`visible_in` 为空，不在目录里出现），`reserve_credits` 照常预扣，扣 `templates.credits_cost[resolution]`，默认和标准模板同价 2 / 4 / 6（Owner 2026-11-06，后台可改，不低于下限）；先付费池后免费池、按作品判水印的规则不变。新作品是一张独立作品，`parent_job_id` 指向原作品；原作品不动。编辑出来的作品可以再编辑。
-- **第一步：判断范围**（`ai_providers` 里 `module = 'decision'` 的在用供应商，OpenAI Decisions API）：把原作品（低清晰度）和用户原话送进去，问一组**判断题**（predicate，返回概率，不用选项题：社区实测选项题有偏向、受选项顺序影响），每题对应一种范围：只改某个物件或细节 / 换背景或场景 / 换风格、光线或色调 / 换主体（人、产品本身）/ 整体重做。题目文字放在 `template_prompts` 里 `edit` 模板的参数中，后台可改，不进仓库。取概率最高且 ≥ 0.5 的一种；都低于 0.5、调用失败或超过 3 秒，用「兜底」。
-- **第二步：出图**：`/v1/images/edits`，输入图是原作品在 R2 的无水印原图（服务端直接读，不经用户上传），提示词 = `edit` 模板的封装提示词 + 该范围的约束段落 + 用户原话（原文，不翻译）。约束段落一共六段（五种范围 + 兜底），也放在 `edit` 模板的参数里，Owner 在后台调，**不进仓库**。约束的意思举例：只改物件时「只改用户说的那个东西，其余所有元素保持一致」；换背景时「保留产品的形状、颜色、logo 和文字，背景按要求换」；换主体时「不要保留原主体」。模型支持时带 `input_fidelity: 'high'`（参数也在 `template_prompts`）。
-- **存档**：`generation_jobs.inputs` 记 `instruction`（用户原话）、`edit_scope`（判出的范围或 `fallback`）和各题概率，供 Owner 调约束时看；不存封装提示词。
+- **第一步：判断范围**（`ai_providers` 里 `module = 'decision'` 的在用供应商；Owner 2026-11-06 定用 **GPT-6 Luna**（OpenAI Responses API，便宜、和出图同一个账户），不用 Decisions API，因为它写不出要保留的元素清单）：把原作品（低清晰度）、用户原话和判断指令送进去，用结构化输出拿回 `{ scope, confidence, keep, change }`：`scope` 是五种范围之一（只改某个物件或细节 `object` / 换背景或场景 `background` / 换风格、光线或色调 `style` / 换主体 `subject` / 整体重做 `global`），`confidence` 0～1，`keep` 是图里必须保持不变的具体元素（最多 8 个英文短语），`change` 是一句英文概括。推理用模型允许的最低档，3 秒超时。`confidence` ≥ 0.5 才采用；否则、调用失败或超时，用「兜底」。判断指令放在 `template_prompts` 里 `edit` 模板的参数中，后台可改，不进仓库。判断这一步做成统一接口，按在用供应商的 `adapter` 选实现，以后换模型（例如 Claude Haiku）只加适配器、在后台切换。
+- **第二步：出图**：`/v1/images/edits`，输入图是原作品在 R2 的无水印原图（服务端直接读，不经用户上传），提示词 = `edit` 模板的封装提示词 + 该范围的约束段落（`object` 和 `background` 两种范围把 `keep` 清单写进去，例如「Keep unchanged: …」；`subject` 和 `global` 不写）+ 用户原话（原文，不翻译）。约束段落一共六段（五种范围 + 兜底），也放在 `edit` 模板的参数里，Owner 在后台调，**不进仓库**。约束的意思举例：只改物件时「只改用户说的那个东西，其余所有元素保持一致」；换背景时「保留产品的形状、颜色、logo 和文字，背景按要求换」；换主体时「不要保留原主体」。模型支持时带 `input_fidelity: 'high'`（参数也在 `template_prompts`）。
+- **存档**：`generation_jobs.inputs` 记 `instruction`（用户原话）、`edit_scope`（判出的范围或 `fallback`）、`confidence`、`keep`、`change`，供 Owner 调约束时看；不存封装提示词。判断这一步的 token 记进 `provider_usage.decision_input_tokens` / `decision_output_tokens`，按判断供应商的输入、输出单价算进这一单的 `cost_usd`（§10.0）。
 - **不做**（第一版）：圈选区域（涂抹蒙版，第二版）；伙伴接口的编辑；批量编辑；翻译用户原话。
 - **效果检查**：开发窗口在 PR 里贴中英文各 10 句典型说法的前后对比（例如「沙发换成蓝色」「背景换成海边」「把模特换成男生」「更亮一点」），供 Owner 看效果。这不是通过门槛：效果由 Owner 在后台调约束段落。
 
@@ -420,6 +420,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 
 - `inputs/` 前缀：压缩后的输入图，7 天后自动删除。没发起生成的上传对象同样 7 天清掉。
 - `outputs/` 前缀：成品，只存一份无水印原图，一律保留，直到用户删除。
+- **原图小图**（Owner 2026-11-06，T32）：出图成功结算时，服务端用 `sharp` 把这次的输入图（多图模板取第一张）转成长边 768、质量 80 的 WebP，去掉 EXIF / GPS，写到 `outputs/{user_id}/{job_id}-input.webp`，和成品一起保留、一起删除（删号按 `outputs/{user_id}/` 前缀清，已覆盖）。全尺寸输入图仍 7 天删除。写小图失败只记日志，不影响结算。作品编辑（§5.2）的输入是上一张作品，不另存小图，详情页直接链到原作品。
 - 桶 CORS 必须允许站点域名的 `PUT`、`GET` 和 `Content-Type` 头。`GET` 给分享按钮用：付费作品 `/api/files/:id` 302 到签名地址，浏览器要跨域读出图片才能交给系统分享面板（T31）。
 - 所有读取走 `core/storage` 的下载路由（鉴权 + 第 6.2 节的水印规则）或短期签名 GET；伙伴接口返回的签名地址 7 天有效。
 
@@ -435,7 +436,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 用户照片和成品绝不进公开桶；公开桶里没有任何用户数据。
 - 换图后首页和模板页通过按需重新生成（ISR revalidate）立即更新，不用重新部署。
 
-会员到期后保留 90 天、续费恢复、删除前提醒，这些等有付费用户后再做。隐私政策 v1 写「上传的照片保留 7 天，成品保留到你删除为止」。
+会员到期后保留 90 天、续费恢复、删除前提醒，这些等有付费用户后再做。隐私政策写「上传的照片原文件保留 7 天；我们为每张作品另存一张缩小的原图预览，方便你在作品详情里对照，它和作品一起保留到你删除为止」（Owner 2026-11-06 改，T32）。
 
 ## 9. 公开创作库
 
@@ -590,6 +591,21 @@ Owner 2026-11-04 决定：**不在 flux-kontext-template 上原地改造**，新
 
 ## 12. SEO 页面内容格式
 
+### 12.0 预上线收录开关（Owner 2026-11-06：绑域名过支付审核，但上线前不被任何搜索或 AI 引擎收录）
+
+- **一个开关**：服务端环境变量 `SITE_INDEXING`（`on` / `off`，默认 `off`；其他值启动报错）。只有 `SITE_INDEXING=on` 且 `VERCEL_ENV=production` 时才算「开放收录」；预览和本地怎么设都是关闭。
+- **关闭时**：
+  - `core/seo/indexing.ts` 对所有路径（英文和 `/zh`）都判不可收录，全站页面 `noindex, nofollow`（仍然只在这一处控制，AGENTS §9）。
+  - 每个响应都带 `X-Robots-Tag: noindex, nofollow`，包括图片、JS、字体、robots、`/api/*`、404 和跳转（非 HTML 资源只能靠响应头）。
+  - `robots.txt` 对 `*` 放行（Googlebot 和 Bingbot 必须能抓到页面才看得到 noindex；被 Disallow 的页面看不到 noindex，地址仍可能因外链进索引），对 AI 爬虫（GPTBot、OAI-SearchBot、ChatGPT-User、ClaudeBot、Claude-SearchBot、Claude-User、PerplexityBot、Perplexity-User、Google-Extended、CCBot、Applebot-Extended、Meta-ExternalAgent、Bytespider、Amazonbot）一律 `Disallow: /`；不写 Sitemap 和 Host 行。
+  - `sitemap.xml`、`sitemap-pages.xml`、`sitemap-zh.xml`、`llms.txt` 返回 404。
+  - 不提交 GSC / Bing sitemap、不用 IndexNow、不登记目录站。GSC 可以用 DNS TXT 先验证。
+- **打开后**：恢复建站规格 R11 / G10 的规则（放行五个 AI 爬虫、发布 sitemap 和 llms.txt）。
+- **非正式域名永远不收录**：host 不是 `shotviva.com` 的请求（`*.vercel.app`、预览地址）无论开关如何都带 `X-Robots-Tag: noindex, nofollow`；生产的 `shotviva.vercel.app` 308 跳到 `https://shotviva.com`。canonical 仍取自 `site.brand.domain`，不随环境变量变。
+- **防误开**：单元测试覆盖默认关闭、预览下 `on` 仍关闭、非法值报错；`pnpm seo:check <url> --expect=closed|open` 在 GitHub Actions 每天对生产地址跑一次，期望值由上线 PR 从 `closed` 改成 `open`。
+- `NEXT_PUBLIC_SITE_URL` 只在 Production 范围设为 `https://shotviva.com`（构建时写入，改完要重新部署）；不能设到 Preview。
+- 不加 `trailingSlash: true`（建站规格 R4，且会弄坏 PostHog 代理）。
+
 建站规格 R10 要求每个 SEO 页有五块内容。为了换站时只改 `site/`，内容统一存成固定结构：
 
 - 一页一个文件：`site/content/pages/<slug>.ts`
@@ -617,7 +633,7 @@ Owner 2026-11-04 决定：**不在 flux-kontext-template 上原地改造**，新
 - **v1 不建 `/templates`**：上线只有 6~8 个模板，首页已全部展示，另建一页会和首页内容重复、抢同一个词（建站规格 R1）。
 - **建 `/templates` 的两个条件，同时满足才建**：① 模板数量达到 20 个以上；② 给它找到一个和首页不撞词、核实过美国搜索量和哥飞版 KD 的独立主词（如 `ai food photo templates` 这一类），并登记进主词表 CSV。建好后首页只放精选模板，`/templates` 放完整模板库和分类筛选；分类页以后按创作库标签页的规则接长尾词。
 - 「我的作品」页要有，`noindex`。
-- 账号页要有：已连接 Graylum / 断开（第 14 节）、**删除账号**（服务端路由：`auth.admin.deleteUser` + 按 `inputs/{user_id}/`、`outputs/{user_id}/`、`requests/{user_id}/` 前缀清 R2 + `generation_jobs` 级联），`noindex`。
+- 账号页要有：「Integrations / 集成」区块（Owner 2026-11-06，T34）：列出可连接的外部产品，现在只有 Graylum 一行，显示状态「Enabled / 已启用」或「Not enabled / 未启用」，点进去是连接 / 断开（第 14 节）；以后加别的集成就在这里加一行，不在账号页单独放；**删除账号**（服务端路由：`auth.admin.deleteUser` + 按 `inputs/{user_id}/`、`outputs/{user_id}/`、`requests/{user_id}/` 前缀清 R2 + `generation_jobs` 级联），`noindex`。
 - **Graylum 连接器的 Shotviva 侧随 v1 一起上线**（Owner 2026-11-05 拍板），见第 14 节。
 - 应用页用第 1 节的 `(app)` 应用壳，按 DESIGN.md 第 8 节先出手机稿。
 - **模板需求墙（Wishlist）随 v1 上线**（Owner 2026-11-05 决定），占应用壳第四个 tab，见第 15 节。
@@ -749,6 +765,7 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 | `paywall_view` | 浏览器：付费墙打开 | `trigger`（`insufficient_credits` / `pricing_page` / `account` / `graylum` / `tier_required`） |
 | `checkout_start` | 服务端：创建 Checkout Session 时 | `product_id`、`tier`、`interval`、`form`、`channel`、`method` |
 | `purchase` | 服务端：支付回调入账成功后 | 第 6.2 节 `purchase` 参数 |
+| `contact_sales_click` | 浏览器：定价页「For business」的 Contact us 按钮（DESIGN §6.9 第 8 条） | `page`（`/pricing` 或 `/zh/pricing`） |
 | `$pageview` | 浏览器：自动 | — |
 
 所有事件都带 `locale`（`en` / `zh`，浏览器端注册为公共属性，服务端发时从请求或 `user_metadata.locale` 取；Owner 2026-11-06）。钱和积分相关的事件（`signup`、`generate`、`checkout_start`、`purchase`）一律服务端发，保证不被广告拦截漏掉；发送失败只记日志，不影响业务。

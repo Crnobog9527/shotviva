@@ -12,6 +12,7 @@ import {
   settleGeneration,
   settleTracked,
   toJobView,
+  type DecisionCost,
   type Job,
   type JobView,
   type SettleDeps,
@@ -69,7 +70,7 @@ type Prepared = Awaited<ReturnType<typeof prepare>>
 
 // User content and the classifier's answer only (ARCHITECTURE §5.2); the wrapper, classifier
 // instructions and paragraphs stay in template_prompts. The classifier's tokens are not user
-// content: they go to provider_usage once T33's settle path lands.
+// content: they go to provider_usage and cost_usd with the image call's (decisionCost).
 function jobInputs(p: Prepared, decision: EditClassification, resolution: Resolution, attemptId: string) {
   return {
     instruction: p.instruction,
@@ -82,6 +83,15 @@ function jobInputs(p: Prepared, decision: EditClassification, resolution: Resolu
     input_key: null,
     prompt_version: p.prompt.version,
     attempt_id: attemptId,
+  }
+}
+
+// The decision step's tokens priced at the decision row's rates (T33); none when it never answered.
+function decisionCost(classifier: ScopeClassifier | null, decision: EditClassification): DecisionCost | undefined {
+  if (!decision.usage) return undefined
+  return {
+    usage: { decision_input_tokens: decision.usage.inputTokens, decision_output_tokens: decision.usage.outputTokens },
+    prices: classifier?.prices ?? null,
   }
 }
 
@@ -120,6 +130,6 @@ export async function runEdit(deps: EditDeps, req: EditRequest): Promise<JobView
     quality: prepared.template.quality,
     params: prepared.params.input_fidelity ? { input_fidelity: prepared.params.input_fidelity } : {},
   }
-  const settle = () => settleGeneration(deps, job, call, outputKeyFor(req.userId, job.id))
+  const settle = () => settleGeneration(deps, job, call, outputKeyFor(req.userId, job.id), decisionCost(deps.classifier, decision))
   return toJobView(await settleTracked(job, prepared.template.category, settle, { track: deps.track }))
 }

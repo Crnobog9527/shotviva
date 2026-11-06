@@ -4,13 +4,26 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { AppError } from '../errors'
+import type { ProviderPrices } from '../jobs'
 import { ProviderSettingError } from './setting-error'
 import { PROVIDER_ADAPTERS, PROVIDER_MODULES, type ActiveProviderRow, type AdminProvider, type ProviderModule } from './types'
 
 // Data access for public.ai_providers. Service-role client only: the table refuses every
 // client role (ARCHITECTURE §3.3). Keys are not here: they live in Vault (keys.ts).
 
-const LIST_COLUMNS = 'id, module, adapter, label, base_url, model, api_key_last4, is_active, notes, updated_at'
+const PRICE_COLUMNS = 'price_input_text_per_m, price_input_image_per_m, price_output_per_m'
+
+const LIST_COLUMNS = `id, module, adapter, label, base_url, model, api_key_last4, is_active, notes, updated_at, ${PRICE_COLUMNS}`
+
+// numeric comes back from PostgREST as a JSON number; null when not filled in.
+const price = z.coerce.number().nonnegative().nullable()
+const priceColumns = { price_input_text_per_m: price, price_input_image_per_m: price, price_output_per_m: price }
+
+type PriceRow = { price_input_text_per_m: number | null; price_input_image_per_m: number | null; price_output_per_m: number | null }
+
+function toPrices(row: PriceRow): ProviderPrices {
+  return { inputTextPerM: row.price_input_text_per_m, inputImagePerM: row.price_input_image_per_m, outputPerM: row.price_output_per_m }
+}
 
 const listRowSchema = z.object({
   id: z.uuid(),
@@ -23,15 +36,17 @@ const listRowSchema = z.object({
   is_active: z.boolean(),
   notes: z.string().nullable(),
   updated_at: z.string(),
+  ...priceColumns,
 })
 
-const ROW_COLUMNS = 'id, adapter, base_url, model'
+const ROW_COLUMNS = `id, adapter, base_url, model, ${PRICE_COLUMNS}`
 
 const rowSchema = z.object({
   id: z.uuid(),
   adapter: z.enum(PROVIDER_ADAPTERS),
   base_url: z.string(),
   model: z.string(),
+  ...priceColumns,
 })
 
 function fail(what: string, error: { message: string }): never {
@@ -49,12 +64,13 @@ function toAdminProvider(row: z.infer<typeof listRowSchema>): AdminProvider {
     apiKeyLast4: row.api_key_last4,
     isActive: row.is_active,
     notes: row.notes,
+    prices: toPrices(row),
     updatedAt: row.updated_at,
   }
 }
 
 function toActiveRow(row: z.infer<typeof rowSchema>): ActiveProviderRow {
-  return { id: row.id, adapter: row.adapter, baseUrl: row.base_url, model: row.model }
+  return { id: row.id, adapter: row.adapter, baseUrl: row.base_url, model: row.model, prices: toPrices(row) }
 }
 
 export async function listProviders(db: SupabaseClient): Promise<AdminProvider[]> {
@@ -95,6 +111,7 @@ export type ProviderWrite = {
   baseUrl: string
   model: string
   notes: string | null
+  prices: ProviderPrices
   updatedBy: string
 }
 
@@ -106,6 +123,9 @@ function toColumns(write: ProviderWrite) {
     base_url: write.baseUrl,
     model: write.model,
     notes: write.notes,
+    price_input_text_per_m: write.prices.inputTextPerM,
+    price_input_image_per_m: write.prices.inputImagePerM,
+    price_output_per_m: write.prices.outputPerM,
     updated_by: write.updatedBy,
   }
 }

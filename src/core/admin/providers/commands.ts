@@ -66,6 +66,7 @@ export async function saveProvider(deps: ProviderCommandDeps, adminId: string, i
     baseUrl,
     model: parsed.model,
     notes: parsed.notes ?? null,
+    prices: { inputTextPerM: parsed.priceInputTextPerM, inputImagePerM: parsed.priceInputImagePerM, outputPerM: parsed.priceOutputPerM },
     updatedBy: adminId,
   }
   let id = parsed.id

@@ -20,7 +20,8 @@ function recordingAdapters() {
   return { adapters, configs }
 }
 
-const row = { id: ROW_ID, adapter: 'openai_images' as const, baseUrl: 'https://relay.example.com/v1', model: 'gpt-image-2.6' }
+const PRICES = { inputTextPerM: 5, inputImagePerM: 8, outputPerM: 30 }
+const row = { id: ROW_ID, adapter: 'openai_images' as const, baseUrl: 'https://relay.example.com/v1', model: 'gpt-image-2.6', prices: PRICES }
 
 describe('resolveProvider', () => {
   it("builds the adapter from the active row and its Vault key, and tags jobs <id>/<model>", async () => {
@@ -29,6 +30,8 @@ describe('resolveProvider', () => {
     const env = parseServerEnv({ OPENAI_API_KEY: 'sk-env-should-not-be-used' })
     const provider = await resolveProvider('image', row, env, adapters, readKey)
     expect(provider.id).toBe(`${ROW_ID}/gpt-image-2.6`)
+    // The row's prices travel with the provider so settlement can cost the job (T33).
+    expect(provider.prices).toEqual(PRICES)
     expect(readKey).toHaveBeenCalledWith(ROW_ID)
     expect(configs).toEqual([{ baseUrl: 'https://relay.example.com/v1', model: 'gpt-image-2.6', apiKey: RELAY_KEY }])
   })
@@ -39,6 +42,7 @@ describe('resolveProvider', () => {
     const env = parseServerEnv({ OPENAI_API_KEY: 'sk-env-0123456789', OPENAI_IMAGE_MODEL: 'gpt-image-2.5-sunburst' })
     const provider = await resolveProvider('image', null, env, adapters, readKey)
     expect(provider.id).toBe('env/gpt-image-2.5-sunburst')
+    expect(provider.prices).toBeNull()
     expect(readKey).not.toHaveBeenCalled()
     expect(configs).toEqual([{ baseUrl: 'https://api.openai.com/v1', model: 'gpt-image-2.5-sunburst', apiKey: 'sk-env-0123456789' }])
   })
