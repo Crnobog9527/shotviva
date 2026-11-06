@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto'
 import type { ServerTrack } from '../analytics'
 import { tierForBatch, type TierLimits } from '../billing/tier-limits'
 import { AppError, TierRequiredError } from '../errors'
-import { isOwnInputKey, loadInputImage, outputKeyFor } from '../storage'
+import { isOwnInputKey, loadInputImage, outputKeyFor, writeInputPreview } from '../storage'
 import {
   DEFAULT_RESOLUTION,
   loadGenerationTemplate,
@@ -118,5 +118,9 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
     params: prompt.modelParams,
   }
   const settle = () => settleGeneration(deps, job, call, outputKeyFor(req.userId, job.id))
-  return toJobView(await settleTracked(job, template.category, settle, { track: deps.track, batchSize: req.batchSize ?? 1 }))
+  const settled = await settleTracked(job, template.category, settle, { track: deps.track, batchSize: req.batchSize ?? 1 })
+  // Only once the result is confirmed (a failed job has no photo page). Edits (T30) settle
+  // elsewhere and get no preview: their source is the work they were edited from.
+  if (image) await writeInputPreview(deps.store, { userId: req.userId, jobId: job.id, bytes: image.bytes })
+  return toJobView(settled)
 }
