@@ -6,7 +6,7 @@ import { Suspense, type ReactNode } from 'react'
 import { AppPage, TabRootHeader } from '@/core/app-shell'
 import { createServerSupabase, requireUser } from '@/core/auth'
 import { fileUrlFor, listOwnJobs } from '@/core/jobs'
-import { EDIT_TEMPLATE_ID, listTemplates } from '@/core/templates'
+import { listTemplates } from '@/core/templates'
 import { DoneGrid, PhotosCount, RunningList, toPhotoItem, type TemplateLookup } from '@/modules/image'
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -23,11 +23,8 @@ async function Photos() {
   const supabase = await createServerSupabase()
   const now = new Date()
   const [own, templates] = await Promise.all([listOwnJobs(supabase, user.id, now), listTemplates(supabase, 'web')])
-  const tp = await getTranslations('app.photos')
-  const fallback = tp('fallbackName')
+  const fallback = (await getTranslations('app.photos'))('fallbackName')
   const lookup: TemplateLookup = new Map(templates.map((t) => [t.id, { name: t.name, cover: t.coverAfterUrl ?? t.coverPosterUrl }]))
-  // Edits run on the built-in `edit` template, which is in no catalogue (ARCHITECTURE §5.2).
-  lookup.set(EDIT_TEMPLATE_ID, { name: tp('editedName'), cover: null })
   const running = own.running.map((job) => toPhotoItem(job, lookup, null, fallback))
   const done = own.done.map((job) => toPhotoItem(job, lookup, fileUrlFor(job.id), fallback))
   const covers = Object.fromEntries([...lookup].map(([id, t]) => [id, t.cover]))
