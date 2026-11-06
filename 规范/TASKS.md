@@ -722,6 +722,33 @@
 **测试**：结构化数据和页面文字一致；9 个问题都是 `<h3>`；答案在服务端 HTML 里；数字和价格页一致。
 **依赖**：T21 三个 PR 合并后做。
 
+## T36 首页改版（按定稿 v3-b，可派）
+
+**目标**：首页按 `design/comps-v3-b/home.html` 实现（375 / 1280 / 1440 三档，`DESKTOP-NOTES.md`、`SIGN-OFF.md` 第 01 行）。
+**范围**：
+- 首屏左右两栏 + 生成栏。生成栏真的能出图（DESIGN §6.9 第 9 条）：已登录走和工作台同一条出图路径并跳到工作台生成中视图；未登录弹注册 / 登录并保留选择；积分不够打开付费墙。
+- 模板区（并排对比卡、模板选择对话框、悬停擦除）、对比表 / 账单卡（数字从 `site.config` 读）、相关链接卡（只渲染已存在的页面）、FAQ 手风琴（答案在服务端 HTML 里，`home-faq.test.ts` 必须继续通过）、导航（地球语言切换已在主线，对齐样式即可）、页脚。
+- 中英文都要；动效在「减少动态效果」下关闭；LCP 图片预加载。
+**依赖**：T21 / T35（已合并）。和 T37 共用 `tiers` 相关组件时按合并先后协调。
+
+## T37 定价页和付费墙改版（按定稿 v3-b，可派）
+
+**目标**：`pricing.html`、`paywall.html`（`SIGN-OFF.md` 第 02、03 行）。
+**范围**：三档卡（Max 金、Pro 蓝宝石、流光动效）、月付 / 年付切换和「Save up to 40%」、积分包三档、「For business」板（DESIGN §6.9 第 8 条，`contact_sales_click` 事件）、电脑端付费墙居中对话框（920px）、手机底部抽屉；权益文字只从 `TIER_LIMITS` 和配置读。中英文。
+**依赖**：T36 并行，共用组件谁后合并谁 rebase。
+
+## T38 应用的电脑端布局（按定稿 v3-b，可派）
+
+**目标**：`create.html`、`workspace.html`、`photos.html`（`SIGN-OFF.md` 第 04～06 行，DESIGN §6.9 第 2、3、7 条）。
+**范围**：≥768 底部 tab 变固定顶栏；点模板直接弹出创作对话框（手机底部抽屉，电脑 1040px 两栏），工作台是同一表单的整页形态（一份表单源）；模板缩略图悬停擦除；Photos 网格和并排对比卡；作品详情页已由 T32 / T30 做完，只对齐顶栏。中英文。
+**依赖**：T28（批量上传）和 T32 / T30（详情页）已合并，在其上改，不要回退它们的功能。
+
+## T39 账号页改版（按定稿 v3-b，可派）
+
+**目标**：`account.html`（`SIGN-OFF.md` 第 08 行，含 `?sub=cancelled|expired|past_due|wallet` 四种订阅状态）。
+**范围**：Plan 卡、Credits 两格、Settings 行（Email / Language / Purchases / Support）、Integrations 区块（T34 已做，只对齐样式；Shopify 行是示意，不实现）、Sign out / Delete account；订阅状态读 T10 的镜像表和 `paid_until`；Manage subscription / Update payment method 走 Stripe Customer Portal。中英文。
+**依赖**：T10、T34、T21（已合并）。
+
 ## Owner 侧关键路径（不是任务卡，但比代码慢）
 
 - 第一批 10 个模板（6 类）的真实照片 + 前后对比素材 + 提示词调优
