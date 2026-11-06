@@ -24,16 +24,17 @@ export function Pass({ state, tier, brand, head, foot, children }: PassProps) {
       <span aria-hidden="true" className="pass-mark">
         {brand}.
       </span>
-      <div className="flex items-center justify-between gap-3 font-mono text-caption leading-none tracking-[0.06em] text-muted-foreground uppercase">{head}</div>
+      <div className="pass-caps flex items-center justify-between gap-3 font-mono text-caption leading-none tracking-[0.06em] text-muted-foreground uppercase">{head}</div>
       <div className="self-center">{children}</div>
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2.5">{foot}</div>
     </div>
   )
 }
 
-// The status on the right of the top line, in plain case (the line itself is mono capitals).
+// The status on the right of the top line ("RENEWS 6 DEC 2026"), in the line's mono capitals;
+// a Flag there keeps its own plain case.
 export function Status({ children }: { children: ReactNode }) {
-  return <span className="text-right font-sans tracking-normal normal-case">{children}</span>
+  return <span className="text-right">{children}</span>
 }
 
 export function PassName({ children }: { children: ReactNode }) {
@@ -47,7 +48,7 @@ export function Muted({ children }: { children: ReactNode }) {
 // "Since / Nov 2026": a small capital label over a plain value, bottom left of the pass.
 export function Since({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <span className="font-mono text-caption leading-[1.4] tracking-[0.06em] text-muted-foreground uppercase">
+    <span className="pass-caps font-mono text-caption leading-[1.4] tracking-[0.06em] text-muted-foreground uppercase">
       {label}
       <b className="block font-sans text-label leading-[1.3] font-normal tracking-normal text-bone-dim normal-case">{children}</b>
     </span>

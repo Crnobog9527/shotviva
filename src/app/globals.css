@@ -459,8 +459,9 @@ html:lang(zh-Hans) :is(em, i, .italic) {
   .credit-ring {
     --ring-v: 0;
     background: conic-gradient(var(--ring-c, var(--primary)) calc(var(--ring-v) * 1%), var(--wash-strong) 0);
-    -webkit-mask: radial-gradient(circle, transparent 23px, #000 24px);
-    mask: radial-gradient(circle, transparent 23px, #000 24px);
+    /* A ring an eighth of its size thick, at any size. */
+    -webkit-mask: radial-gradient(circle closest-side, transparent 72%, #000 73%);
+    mask: radial-gradient(circle closest-side, transparent 72%, #000 73%);
   }
   .film-strip { background: var(--film); }
   .film-strip::before,
@@ -479,4 +480,12 @@ html:lang(zh-Hans) :is(em, i, .italic) {
     .member-pass::after { animation: sv-pass-sheen 7s ease-in-out infinite; }
     .credit-ring { animation: sv-ring-fill 1.2s var(--ease) both; }
   }
+}
+
+/* The pass's small mono capitals are a Latin device: Chinese reads them plain and unspaced
+   (DESIGN §3.2), and "Stripe" keeps its case. Unlayered, so it wins over the utilities. */
+html:lang(zh-Hans) .member-pass .pass-caps {
+  font-family: var(--font-sans);
+  letter-spacing: 0;
+  text-transform: none;
 }

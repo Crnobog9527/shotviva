@@ -23,19 +23,19 @@ export function ringValue(count: number, of: number | null): number {
 function Dial({ kind, count, of, label, ringLabel }: DialProps) {
   const t = useTranslations('app.account.credits')
   return (
-    <div data-dial={kind} className="hairline-lit flex items-center gap-3 rounded-tile bg-card p-3 md:px-4 md:py-3.5">
+    <div data-dial={kind} className="hairline-lit flex items-center gap-2.5 rounded-tile bg-card p-3 md:gap-3 md:px-4 md:py-3.5">
       <span
         role="img"
         aria-label={ringLabel}
-        className={cn('credit-ring size-16 shrink-0 rounded-full', kind === 'free' && '[--ring-c:var(--bone-dim)]')}
+        className={cn('credit-ring size-13 shrink-0 rounded-full md:size-16', kind === 'free' && '[--ring-c:var(--bone-dim)]')}
         style={{ '--ring-v': ringValue(count, of) } as CSSProperties}
       />
       <div className="min-w-0">
-        <p className="font-display text-h1 leading-none tracking-[-0.02em]">
+        <p className="font-display text-h1 leading-none tracking-[-0.02em] whitespace-nowrap">
           {count}
           <small className="ml-1.5 font-mono text-caption tracking-normal text-muted-foreground">{t(kind)}</small>
         </p>
-        <p className="mt-1 text-caption leading-[1.3] text-muted-foreground">{label}</p>
+        <p className="mt-1 text-caption leading-[1.3] text-muted-foreground hyphens-auto">{label}</p>
       </div>
     </div>
   )
