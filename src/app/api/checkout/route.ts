@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server'
 
 import { errorResponse, jsonResponse } from '@/core/api-response'
-import { assertSameOrigin, requireApiBuyer } from '@/core/auth'
+import { assertSameOrigin, createAdminSupabase, requireApiBuyer } from '@/core/auth'
 import {
   checkoutBodySchema,
   createCheckout,
@@ -9,6 +9,7 @@ import {
   stripeClient,
   type CheckoutBody,
 } from '@/core/billing/stripe'
+import { assertCanBuy } from '@/core/billing/subscription'
 import { createWaffoCheckout, paymentChannel, waffoClient, waffoConfig } from '@/core/billing/waffo'
 import { AppError } from '@/core/errors'
 import { appOrigin } from '@/core/site-url'
@@ -16,14 +17,18 @@ import { site } from '@/site/site.config'
 
 // Starts a hosted checkout for one product and payment method; answers { url } to redirect to.
 // Signed-in, same-origin, not banned (403, before the channel switch so it covers both
-// channels; ARCHITECTURE §7). PAYMENT_CHANNEL picks Stripe (routing per payment method lives
-// in core/billing/stripe) or Waffo (always one-time, ARCHITECTURE §6.3).
+// channels; ARCHITECTURE §7), and no membership while a subscription runs (409
+// SUBSCRIPTION_EXISTS). PAYMENT_CHANNEL picks Stripe (routing per payment method lives
+// in core/billing/stripe) or Waffo (card memberships recurring, the rest one-time, ARCHITECTURE §6.3).
 export async function POST(request: NextRequest) {
   try {
     assertSameOrigin(request)
     const user = await requireApiBuyer()
     const body = checkoutBodySchema.safeParse(await request.json().catch(() => null))
     if (!body.success) throw new AppError('INVALID_INPUT', 'product_id and method are required')
+    // One running subscription per account: a membership while one is live answers 409.
+    const product = site.billing.products.find((p) => p.id === body.data.product_id)
+    if (product) await assertCanBuy(createAdminSupabase(), user.id, product)
     const start = paymentChannel() === 'waffo' ? startWaffo : startStripe
     return jsonResponse(await start(user.id, body.data))
   } catch (error) {

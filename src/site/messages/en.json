@@ -898,7 +898,9 @@
     "payNoteWallet": "One-time payment for 30 days or 1 year, no auto-renew",
     "payNotePacks": "Credit packs are always a one-time payment.",
     "cancelled": "<b>Checkout cancelled.</b> Nothing was charged.",
-    "cancelledClose": "Dismiss"
+    "cancelledClose": "Dismiss",
+    "alreadySubscribed": "You already have a plan running. Change or cancel it in Account first.",
+    "goToAccount": "Go to Account"
   },
   "announcement": {
     "dismiss": "Dismiss announcement"

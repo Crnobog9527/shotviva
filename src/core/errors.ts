@@ -30,6 +30,9 @@ export const ERROR_CODES = [
   // Account deletion: Stripe would not cancel a live subscription, so nothing was deleted
   // (ARCHITECTURE §13).
   'SUBSCRIPTION_CANCEL_FAILED',
+  // A membership checkout while a subscription (Stripe or Waffo) is still running: v1 has no
+  // upgrades or second subscriptions (ARCHITECTURE §6.2); manage or cancel it in Account.
+  'SUBSCRIPTION_EXISTS',
   'INTERNAL',
 ] as const
 
@@ -54,6 +57,7 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   CONTENT_REJECTED: 422,
   GENERATION_FAILED: 502,
   SUBSCRIPTION_CANCEL_FAILED: 502,
+  SUBSCRIPTION_EXISTS: 409,
   INTERNAL: 500,
 }
 
