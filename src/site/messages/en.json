@@ -82,7 +82,7 @@
     "account": {
       "title": "Graylum",
       "description": "Make photos in Graylum with your Shotviva credits.",
-      "connected": "Connected since {date, date, medium}. Graylum can make photos with your credits.",
+      "connected": "Connected since <b>{date, date, medium}</b>. Graylum can make photos with your credits.",
       "notConnected": "Not connected. To connect, start from Graylum and allow it to use your credits.",
       "disconnect": "Disconnect Graylum"
     },
@@ -408,7 +408,63 @@
       }
     },
     "account": {
-      "metaTitle": "Account"
+      "metaTitle": "Account",
+      "plan": {
+        "title": "Plan",
+        "renews": "Renews <b>{date, date, medium}</b>",
+        "ends": "Ends <b>{date, date, medium}</b>",
+        "perPeriod": "<mono>{credits, plural, one {# credit} other {# credits}}</mono> a {interval, select, year {year} other {month}} · <mono>{price}</mono>/{interval, select, year {yr} other {mo}}",
+        "member": "Member",
+        "noPlan": "No plan",
+        "manage": "Manage subscription",
+        "cancelledWhy": "<b>Cancelled.</b> You keep the plan and your credits until {date, date, medium}; nothing more is charged. Resubscribe any time before then to carry on without a gap.",
+        "resubscribe": "Resubscribe",
+        "ended": "Ended {date, date, medium}",
+        "expiredWhy": "{paid, plural, =0 {Your plan ended. Anything you made is still in Photos.} one {Your plan ended. The <b>1 credit</b> you have left still works, and anything you made is still in Photos.} other {Your plan ended. The <b># credits</b> you have left still work, and anything you made is still in Photos.}}",
+        "choosePlan": "Choose a plan",
+        "buyCredits": "Buy credits",
+        "paymentFailed": "Payment failed",
+        "pastDueWhy": "We couldn't take your last payment. Stripe will try again over the next few days; update the card and the plan carries on, with this period's credits.",
+        "pastDueEndedWhy": "We couldn't take your last payment, so your plan has ended. Update the card: once a payment goes through, the plan starts again. Your credits still work.",
+        "updatePayment": "Update payment method",
+        "opensStripe": "Opens Stripe's secure billing page.",
+        "walletWhy": "Paid once, so it doesn't renew by itself: renew before {date, date, medium} to keep the plan, or let it end and your credits still work.",
+        "renew": "Renew",
+        "paused": "Paused",
+        "pausedWhy": "Your subscription is paused. Nothing is charged and no credits are added until it resumes.",
+        "freeWhy": "No plan yet. Photos made with paid credits are private, with no watermark."
+      },
+      "credits": {
+        "title": "Credits",
+        "paid": "paid",
+        "free": "free",
+        "paidUse": "Private, no watermark",
+        "freeUse": "Public, watermarked",
+        "buy": "Buy credits"
+      },
+      "settings": {
+        "title": "Settings",
+        "email": "Email",
+        "language": "Language",
+        "purchases": "Purchases",
+        "purchasesNone": "None",
+        "purchasesMany": "{count}+",
+        "support": "Support",
+        "openTicket": "Open a ticket"
+      },
+      "language": {
+        "title": "Language",
+        "lead": "Changes the language of the app. Your photos and credits stay the same."
+      },
+      "purchases": {
+        "title": "Purchases",
+        "lead": "Your recent payments, newest first.",
+        "empty": "No purchases yet."
+      },
+      "session": {
+        "title": "Session",
+        "deleteNote": "Deleting removes your photos and remaining credits. If you have a subscription, cancel it in Manage subscription first."
+      }
     },
     "creditsUnit": "{count, plural, one {credit} other {credits}}",
     "units": {
@@ -416,30 +472,8 @@
       "megabytes": "{size} MB",
       "percent": "{value, number, ::percent}"
     },
-    "subscription": {
-      "title": "Subscription",
-      "plan": "{tier} · {interval, select, year {Yearly} other {Monthly}}",
-      "active": "Active",
-      "renewsOn": "Renews on {date, date, medium}",
-      "cancelsOn": "Cancels on {date, date, medium}",
-      "cancelsDetail": "Your plan stays active until then and will not renew. Your credits stay.",
-      "pastDue": "Past due",
-      "pastDueDetail": "Your last payment did not go through. Update your card in Manage subscription.",
-      "pastDueExpired": "Your last payment did not go through, so your membership has ended. Your credits still work.",
-      "paused": "Paused",
-      "manage": "Manage subscription",
-      "paidUntil": "Paid until {date, date, medium}",
-      "noAutoRenew": "No auto-renew. Renew any time to add another period.",
-      "renew": "Renew",
-      "expired": "Expired",
-      "expiredDetail": "Your membership ended on {date, date, medium}. Your credits still work.",
-      "free": "Free",
-      "freeDetail": "No membership yet.",
-      "seePlans": "See plans"
-    },
     "support": {
       "title": "Help & feedback",
-      "entryHint": "Questions, problems or ideas: write to us here.",
       "newReply": "New reply",
       "replyTime": "We reply here, usually within {hours} hours.",
       "replyTimeMax": "Max members get a reply within {hours} hours.",
@@ -634,6 +668,10 @@
       "text": "这个页面有中文版。",
       "switch": "切换到中文",
       "dismiss": "关闭，继续看英文版"
+    },
+    "inCurrent": {
+      "en": "English",
+      "zh": "Simplified Chinese"
     }
   },
   "footer": {

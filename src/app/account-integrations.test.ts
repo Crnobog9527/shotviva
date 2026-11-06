@@ -27,6 +27,7 @@ function render(graylum: LinkStatus) {
   return renderToStaticMarkup(createElement(Intl, { locale: 'en', messages, timeZone: 'UTC' }, panel))
 }
 
+const text = (html: string) => html.replace(/<[^>]+>/g, '')
 const badge = (html: string) => html.match(/data-status="([^"]+)"[^>]*>([^<]+)</)?.slice(1)
 const status = async (row: Row) => render(await readLinkStatus(clientWith(row), 'user-1'))
 
@@ -44,7 +45,7 @@ describe('IntegrationsPanel', () => {
   it('shows Enabled and the disconnect action for an active link', async () => {
     const html = await status({ linked_at: LINKED, revoked_at: null })
     expect(badge(html)).toEqual(['enabled', 'Enabled'])
-    expect(html).toContain('Connected since Nov 1, 2026.')
+    expect(text(html)).toContain('Connected since Nov 1, 2026.')
     expect(html).toContain('>Disconnect Graylum</button>')
   })
 
