@@ -124,14 +124,17 @@ describe('account Plan card without a card subscription', () => {
   })
 
   it('speaks Chinese on /zh', async () => {
-    // Prices stay in USD in both languages (ARCHITECTURE §17); zh formats them as US$.
-    expect((await render(summarize([row({})], days(30)), 'zh')).text).toContain('每月 50 积分 · US$19.90 /月')
+    // Prices stay in USD in both languages, written "$19.90" like the page copy (ARCHITECTURE §17,
+    // 建站规格 G3), never "US$19.90".
+    const zh = (await render(summarize([row({})], days(30)), 'zh')).text
+    expect(zh).toContain('每月 50 积分 · $19.90 /月')
+    expect(zh).not.toContain('US$')
     expect(buttons((await render(summarize([row({ status: 'past_due' })], days(2)), 'zh')).html)).toEqual(['更新付款方式', '管理订阅'])
     expect((await render(summarize([], days(25), 'pro'), 'zh')).text).toContain('专业版')
     const last = lastMembership([{ productId: 'pro_monthly', method: 'alipay' }], site.billing.products)
     const wallet = await render(summarize([], days(25), 'pro'), 'zh', 0, last)
     expect(wallet.text).toContain('一次性购买一个月，用 支付宝 付款，不会自动续费')
-    expect(buttons(wallet.html)).toEqual(['续费 · US$49.90'])
+    expect(buttons(wallet.html)).toEqual(['续费 · $49.90'])
     expect((await render(summarize([row({})], days(30)), 'zh')).text).toContain('加入于 2026年11月 · mei@example.test')
   })
 })
