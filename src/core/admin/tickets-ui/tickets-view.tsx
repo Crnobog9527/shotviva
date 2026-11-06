@@ -1,0 +1,115 @@
+import Link from 'next/link'
+
+import type { AdminListFilter, AdminTicketRow, Page } from '@/core/support'
+import { TICKET_STATUSES, TICKET_TYPES } from '@/core/support/rules'
+import { Badge } from '@/core/ui/badge'
+import { cn } from '@/core/ui/cn'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/core/ui/table'
+
+import { EmptyState } from '../shell/admin-blocks'
+import { formatBeijing } from '../shell/format'
+import { TICKETS_COPY as COPY } from './copy'
+
+type Props = { filter: AdminListFilter; page: Page<AdminTicketRow>; paged: boolean }
+
+// /admin/tickets: open tickets by default, most recently active first; filter by status and type.
+export function TicketsView({ filter, page, paged }: Props) {
+  return (
+    <div className="grid gap-4">
+      <Filters filter={filter} />
+      {page.items.length === 0 ? <EmptyState title={COPY.empty} /> : <TicketsTable rows={page.items} />}
+      <div className="flex gap-4 text-sm">
+        {paged ? (
+          <Link href={ticketsHref(filter)} className="text-primary hover:underline">
+            {COPY.firstPage}
+          </Link>
+        ) : null}
+        {page.nextCursor ? (
+          <Link href={ticketsHref(filter, page.nextCursor)} className="text-primary hover:underline">
+            {COPY.nextPage}
+          </Link>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+export function ticketsHref(filter: AdminListFilter, cursor?: string): string {
+  const params = new URLSearchParams()
+  if (filter.status !== 'open') params.set('status', filter.status)
+  if (filter.type) params.set('type', filter.type)
+  if (cursor) params.set('cursor', cursor)
+  const query = params.toString()
+  return query ? `/admin/tickets?${query}` : '/admin/tickets'
+}
+
+function Chip({ href, current, label }: { href: string; current: boolean; label: string }) {
+  return (
+    <Link
+      href={href}
+      aria-current={current ? 'page' : undefined}
+      className={cn(
+        'inline-flex min-h-9 items-center rounded-md px-3 text-sm',
+        current ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+      )}
+    >
+      {label}
+    </Link>
+  )
+}
+
+function Filters({ filter }: { filter: AdminListFilter }) {
+  const statuses = [...TICKET_STATUSES, 'all'] as const
+  return (
+    <div className="grid gap-2">
+      <div className="flex flex-wrap items-center gap-1">
+        <span className="mr-2 text-sm text-muted-foreground">{COPY.filters.status}</span>
+        {statuses.map((status) => (
+          <Chip key={status} href={ticketsHref({ ...filter, status })} current={filter.status === status}
+            label={status === 'all' ? COPY.filters.all : COPY.statuses[status]} />
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-1">
+        <span className="mr-2 text-sm text-muted-foreground">{COPY.filters.type}</span>
+        <Chip href={ticketsHref({ ...filter, type: undefined })} current={!filter.type} label={COPY.filters.allTypes} />
+        {TICKET_TYPES.map((type) => (
+          <Chip key={type} href={ticketsHref({ ...filter, type })} current={filter.type === type} label={COPY.types[type]} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const COLUMNS = ['lastMessageAt', 'email', 'type', 'status', 'preview'] as const
+
+function TicketsTable({ rows }: { rows: AdminTicketRow[] }) {
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          {COLUMNS.map((column) => (
+            <TableHead key={column}>{COPY.columns[column]}</TableHead>
+          ))}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((row) => (
+          <TableRow key={row.id}>
+            <TableCell className="font-mono text-xs whitespace-nowrap">{formatBeijing(row.lastMessageAt)}</TableCell>
+            <TableCell className="text-sm">{row.email ?? row.userId.slice(0, 8)}</TableCell>
+            <TableCell className="text-sm whitespace-nowrap">{COPY.types[row.type]}</TableCell>
+            <TableCell className="whitespace-nowrap">
+              <Badge variant={row.status === 'open' ? 'default' : 'secondary'}>{COPY.statuses[row.status]}</Badge>
+              {row.refundDecision ? <span className="ml-2 text-xs text-muted-foreground">{COPY.decisions[row.refundDecision]}</span> : null}
+            </TableCell>
+            <TableCell className="max-w-md">
+              <Link href={`/admin/tickets/${row.id}`} className="line-clamp-2 text-sm text-primary hover:underline">
+                {row.preview ?? '—'}
+              </Link>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  )
+}

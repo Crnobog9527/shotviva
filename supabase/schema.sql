@@ -107,6 +107,53 @@ $$;
 
 ALTER FUNCTION "public"."_apply_credit_change"("p_user_id" "uuid", "p_pool" "text", "p_kind" "text", "p_delta" integer, "p_reason" "text", "p_idempotency_key" "text", "p_job_id" "uuid", "p_product_id" "text", "p_paid_days" integer) OWNER TO "postgres";
 
+SET default_tablespace = '';
+
+SET default_table_access_method = "heap";
+
+
+CREATE TABLE IF NOT EXISTS "public"."support_ticket_messages" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "ticket_id" "uuid" NOT NULL,
+    "author" "text" NOT NULL,
+    "body" "text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "support_ticket_messages_author_check" CHECK (("author" = ANY (ARRAY['user'::"text", 'admin'::"text"]))),
+    CONSTRAINT "support_ticket_messages_body_check" CHECK ((("char_length"("btrim"("body")) >= 1) AND ("char_length"("btrim"("body")) <= 2000)))
+);
+
+
+ALTER TABLE "public"."support_ticket_messages" OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."add_ticket_message"("p_ticket_id" "uuid", "p_user_id" "uuid", "p_body" "text") RETURNS "public"."support_ticket_messages"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_message public.support_ticket_messages;
+begin
+  if p_body is null or char_length(btrim(p_body)) not between 1 and 2000 then
+    raise exception 'INVALID_INPUT' using detail = 'body must be 1 to 2000 characters';
+  end if;
+
+  update public.support_tickets
+     set status = 'open', closed_at = null, last_message_at = now(), user_seen_at = now()
+   where id = p_ticket_id and user_id = p_user_id;
+  if not found then
+    raise exception 'TICKET_NOT_FOUND';
+  end if;
+
+  insert into public.support_ticket_messages (ticket_id, author, body)
+  values (p_ticket_id, 'user', btrim(p_body))
+  returning * into v_message;
+  return v_message;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."add_ticket_message"("p_ticket_id" "uuid", "p_user_id" "uuid", "p_body" "text") OWNER TO "postgres";
+
 
 CREATE OR REPLACE FUNCTION "public"."admin_activate_announcement"("p_id" "uuid", "p_active" boolean, "p_actor" "uuid") RETURNS "uuid"[]
     LANGUAGE "plpgsql"
@@ -331,6 +378,93 @@ $$;
 ALTER FUNCTION "public"."admin_dashboard_stats"("p_days" integer) OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."support_tickets" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "type" "text" NOT NULL,
+    "status" "text" DEFAULT 'open'::"text" NOT NULL,
+    "payment_id" bigint,
+    "job_id" "uuid",
+    "refund_decision" "text",
+    "refund_amount_cents" integer,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "last_message_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "user_seen_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "closed_at" timestamp with time zone,
+    CONSTRAINT "support_tickets_closed" CHECK ((("status" = 'closed'::"text") = ("closed_at" IS NOT NULL))),
+    CONSTRAINT "support_tickets_decision_amount" CHECK ((("refund_decision" = 'approved'::"text") = ("refund_amount_cents" IS NOT NULL))),
+    CONSTRAINT "support_tickets_decision_type" CHECK ((("refund_decision" IS NULL) OR ("type" = 'refund'::"text"))),
+    CONSTRAINT "support_tickets_job_type" CHECK ((("job_id" IS NULL) OR ("type" = 'image_issue'::"text"))),
+    CONSTRAINT "support_tickets_payment_type" CHECK ((("payment_id" IS NULL) OR ("type" = ANY (ARRAY['billing'::"text", 'refund'::"text"])))),
+    CONSTRAINT "support_tickets_refund_amount_cents_check" CHECK (("refund_amount_cents" > 0)),
+    CONSTRAINT "support_tickets_refund_decision_check" CHECK (("refund_decision" = ANY (ARRAY['approved'::"text", 'rejected'::"text"]))),
+    CONSTRAINT "support_tickets_refund_payment" CHECK ((("type" <> 'refund'::"text") OR ("payment_id" IS NOT NULL))),
+    CONSTRAINT "support_tickets_status_check" CHECK (("status" = ANY (ARRAY['open'::"text", 'replied'::"text", 'closed'::"text"]))),
+    CONSTRAINT "support_tickets_type_check" CHECK (("type" = ANY (ARRAY['feedback'::"text", 'image_issue'::"text", 'billing'::"text", 'refund'::"text", 'account'::"text", 'other'::"text"])))
+);
+
+
+ALTER TABLE "public"."support_tickets" OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_decide_refund"("p_ticket_id" "uuid", "p_decision" "text", "p_amount_cents" integer, "p_body" "text") RETURNS "public"."support_tickets"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_ticket public.support_tickets;
+  v_left integer;
+  v_body text := btrim(coalesce(p_body, ''));
+begin
+  if p_decision is null or p_decision not in ('approved', 'rejected') then
+    raise exception 'INVALID_INPUT' using detail = 'decision must be approved or rejected';
+  end if;
+  if char_length(v_body) not between 1 and 2000 then
+    raise exception 'INVALID_INPUT' using detail = 'a decision needs a reply of 1 to 2000 characters';
+  end if;
+
+  select * into v_ticket from public.support_tickets t where t.id = p_ticket_id for update;
+  if not found then
+    raise exception 'TICKET_NOT_FOUND';
+  end if;
+  if v_ticket.type <> 'refund' then
+    raise exception 'INVALID_INPUT' using detail = 'not a refund ticket';
+  end if;
+
+  select p.amount_total - p.amount_refunded into v_left from public.payments p where p.id = v_ticket.payment_id;
+  if p_decision = 'approved' and (p_amount_cents is null or p_amount_cents not between 1 and v_left) then
+    raise exception 'INVALID_INPUT' using detail = 'amount must be between 1 and the unrefunded total';
+  end if;
+  if p_decision = 'rejected' and p_amount_cents is not null then
+    raise exception 'INVALID_INPUT' using detail = 'a rejection takes no amount';
+  end if;
+
+  update public.support_tickets
+     set refund_decision = p_decision,
+         refund_amount_cents = p_amount_cents,
+         status = 'replied',
+         closed_at = null,
+         last_message_at = now()
+   where id = p_ticket_id
+  returning * into v_ticket;
+
+  insert into public.support_ticket_messages (ticket_id, author, body) values (p_ticket_id, 'admin', v_body);
+
+  insert into public.admin_audit_log (action, user_id, target_id, reason)
+  values (
+    'decide_refund',
+    v_ticket.user_id,
+    p_ticket_id::text,
+    format('退款工单：%s%s', p_decision, case when p_amount_cents is null then '' else ' ' || p_amount_cents end)
+  );
+  return v_ticket;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_decide_refund"("p_ticket_id" "uuid", "p_decision" "text", "p_amount_cents" integer, "p_body" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_list_template_requests"() RETURNS TABLE("id" "uuid", "email" "text", "description" "text", "image_keys" "text"[], "status" "text", "template_id" "text", "votes_count" integer, "created_at" timestamp with time zone)
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -350,6 +484,59 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_list_template_requests"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_list_tickets"("p_status" "text", "p_type" "text", "p_cursor_at" timestamp with time zone, "p_cursor_id" "uuid", "p_limit" integer) RETURNS TABLE("id" "uuid", "user_id" "uuid", "email" "text", "type" "text", "status" "text", "payment_id" bigint, "job_id" "uuid", "refund_decision" "text", "created_at" timestamp with time zone, "last_message_at" timestamp with time zone, "preview" "text")
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if p_status is not null and p_status not in ('open', 'replied', 'closed') then
+    raise exception 'INVALID_INPUT' using detail = 'unknown status';
+  end if;
+  if p_type is not null and p_type not in ('feedback', 'image_issue', 'billing', 'refund', 'account', 'other') then
+    raise exception 'INVALID_INPUT' using detail = 'unknown ticket type';
+  end if;
+  if p_limit is null or p_limit not between 1 and 101 then
+    raise exception 'INVALID_INPUT' using detail = 'p_limit must be between 1 and 101';
+  end if;
+
+  if p_status = 'open' then
+    return query
+      select t.id, t.user_id, u.email::text, t.type, t.status, t.payment_id, t.job_id, t.refund_decision,
+             t.created_at, t.last_message_at, f.preview
+        from public.support_tickets t
+        left join auth.users u on u.id = t.user_id
+        left join lateral (
+          select left(m.body, 140) as preview from public.support_ticket_messages m
+           where m.ticket_id = t.id order by m.created_at limit 1
+        ) f on true
+       where t.status = 'open'
+         and (p_type is null or t.type = p_type)
+         and (p_cursor_at is null or (t.last_message_at, t.id) < (p_cursor_at, p_cursor_id))
+       order by t.last_message_at desc, t.id desc
+       limit p_limit;
+  else
+    return query
+      select t.id, t.user_id, u.email::text, t.type, t.status, t.payment_id, t.job_id, t.refund_decision,
+             t.created_at, t.last_message_at, f.preview
+        from public.support_tickets t
+        left join auth.users u on u.id = t.user_id
+        left join lateral (
+          select left(m.body, 140) as preview from public.support_ticket_messages m
+           where m.ticket_id = t.id order by m.created_at limit 1
+        ) f on true
+       where (p_status is null or t.status = p_status)
+         and (p_type is null or t.type = p_type)
+         and (p_cursor_at is null or (t.last_message_at, t.id) < (p_cursor_at, p_cursor_id))
+       order by t.last_message_at desc, t.id desc
+       limit p_limit;
+  end if;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_list_tickets"("p_status" "text", "p_type" "text", "p_cursor_at" timestamp with time zone, "p_cursor_id" "uuid", "p_limit" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_log_replay"("p_user_id" "uuid", "p_target_id" "text", "p_reason" "text") RETURNS "void"
@@ -446,6 +633,42 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_reply_ticket"("p_ticket_id" "uuid", "p_body" "text", "p_close" boolean) RETURNS "public"."support_tickets"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_body text := nullif(btrim(coalesce(p_body, '')), '');
+  v_ticket public.support_tickets;
+begin
+  if v_body is null and not coalesce(p_close, false) then
+    raise exception 'INVALID_INPUT' using detail = 'a reply needs a message';
+  end if;
+  if char_length(v_body) > 2000 then
+    raise exception 'INVALID_INPUT' using detail = 'body must be at most 2000 characters';
+  end if;
+
+  update public.support_tickets
+     set status = case when p_close then 'closed' else 'replied' end,
+         closed_at = case when p_close then coalesce(closed_at, now()) end,
+         last_message_at = case when v_body is null then last_message_at else now() end
+   where id = p_ticket_id
+  returning * into v_ticket;
+  if not found then
+    raise exception 'TICKET_NOT_FOUND';
+  end if;
+
+  if v_body is not null then
+    insert into public.support_ticket_messages (ticket_id, author, body) values (p_ticket_id, 'admin', v_body);
+  end if;
+  return v_ticket;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_reply_ticket"("p_ticket_id" "uuid", "p_body" "text", "p_close" boolean) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_revenue_stats"("p_days" integer) RETURNS "jsonb"
@@ -728,7 +951,9 @@ CREATE OR REPLACE FUNCTION "public"."admin_todo_counts"() RETURNS "jsonb"
        where kind = 'purchase' order by created_at desc, id desc limit 1),
     'provider', (
       select jsonb_build_object('label', label, 'model', model)
-        from public.ai_providers where module = 'image' and is_active)
+        from public.ai_providers where module = 'image' and is_active),
+    'open_tickets', (
+      select count(*) from public.support_tickets where status = 'open')
   )
 $$;
 
@@ -944,10 +1169,6 @@ $$;
 
 ALTER FUNCTION "public"."bump_template_prompt_version"() OWNER TO "postgres";
 
-SET default_tablespace = '';
-
-SET default_table_access_method = "heap";
-
 
 CREATE TABLE IF NOT EXISTS "public"."generation_jobs" (
     "id" "uuid" NOT NULL,
@@ -1012,6 +1233,65 @@ $$;
 
 
 ALTER FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."create_support_ticket"("p_user_id" "uuid", "p_type" "text", "p_body" "text", "p_payment_id" bigint, "p_job_id" "uuid") RETURNS "public"."support_tickets"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_ticket public.support_tickets;
+begin
+  perform 1 from public.profiles where id = p_user_id for update;
+  if not found then
+    raise exception 'PROFILE_NOT_FOUND';
+  end if;
+
+  if p_type is null or p_type not in ('feedback', 'image_issue', 'billing', 'refund', 'account', 'other') then
+    raise exception 'INVALID_INPUT' using detail = 'unknown ticket type';
+  end if;
+  if p_body is null or char_length(btrim(p_body)) not between 1 and 2000 then
+    raise exception 'INVALID_INPUT' using detail = 'body must be 1 to 2000 characters';
+  end if;
+  if p_type = 'refund' and p_payment_id is null then
+    raise exception 'INVALID_INPUT' using detail = 'a refund request needs a payment';
+  end if;
+  if p_payment_id is not null and p_type not in ('billing', 'refund') then
+    raise exception 'INVALID_INPUT' using detail = 'only billing and refund tickets take a payment';
+  end if;
+  if p_job_id is not null and p_type <> 'image_issue' then
+    raise exception 'INVALID_INPUT' using detail = 'only image issues take a work';
+  end if;
+
+  -- Someone else's id reads the same as a missing one, so nothing leaks about other accounts.
+  if p_payment_id is not null and not exists (
+    select 1 from public.payments p where p.id = p_payment_id and p.user_id = p_user_id
+  ) then
+    raise exception 'PAYMENT_NOT_FOUND';
+  end if;
+  if p_job_id is not null and not exists (
+    select 1 from public.generation_jobs j where j.id = p_job_id and j.user_id = p_user_id
+  ) then
+    raise exception 'JOB_NOT_FOUND';
+  end if;
+
+  if (select count(*) from public.support_tickets t
+       where t.user_id = p_user_id and t.created_at > now() - interval '24 hours') >= 5 then
+    raise exception 'RATE_LIMITED';
+  end if;
+
+  insert into public.support_tickets (user_id, type, payment_id, job_id)
+  values (p_user_id, p_type, p_payment_id, p_job_id)
+  returning * into v_ticket;
+
+  insert into public.support_ticket_messages (ticket_id, author, body)
+  values (v_ticket.id, 'user', btrim(p_body));
+  return v_ticket;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."create_support_ticket"("p_user_id" "uuid", "p_type" "text", "p_body" "text", "p_payment_id" bigint, "p_job_id" "uuid") OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."template_requests" (
@@ -1195,6 +1475,19 @@ $$;
 ALTER FUNCTION "public"."handle_new_user"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."mark_ticket_seen"("p_ticket_id" "uuid", "p_user_id" "uuid") RETURNS "void"
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  update public.support_tickets
+     set user_seen_at = now()
+   where id = p_ticket_id and user_id = p_user_id and last_message_at > user_seen_at;
+$$;
+
+
+ALTER FUNCTION "public"."mark_ticket_seen"("p_ticket_id" "uuid", "p_user_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."provider_api_key"("p_id" "uuid") RETURNS "text"
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -1272,6 +1565,41 @@ $$;
 
 
 ALTER FUNCTION "public"."record_payment_issue"("p_charge_id" "text", "p_kind" "text", "p_amount_refunded" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."refund_eligibility"("p_payment_id" bigint, "p_asked_at" timestamp with time zone) RETURNS TABLE("first_purchase" boolean, "within_7_days" boolean, "no_credits_used" boolean, "suggested_cents" integer)
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_payment public.payments;
+begin
+  select * into v_payment from public.payments p where p.id = p_payment_id;
+  if not found then
+    raise exception 'PAYMENT_NOT_FOUND';
+  end if;
+
+  first_purchase := not exists (
+    select 1 from public.payments q
+     where q.user_id = v_payment.user_id
+       and q.id < v_payment.id
+       and (q.product_id like 'pack\_%') = (v_payment.product_id like 'pack\_%')
+  );
+  within_7_days := coalesce(p_asked_at, now()) - v_payment.created_at <= interval '7 days';
+  no_credits_used := not exists (
+    select 1 from public.credit_ledger l
+     where l.user_id = v_payment.user_id and l.kind = 'reserve' and l.created_at > v_payment.created_at
+  );
+  suggested_cents := greatest(0, least(
+    round((v_payment.amount_total - v_payment.amount_tax) * 0.94)::integer + v_payment.amount_tax,
+    v_payment.amount_total - v_payment.amount_refunded
+  ));
+  return next;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."refund_eligibility"("p_payment_id" bigint, "p_asked_at" timestamp with time zone) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."refund_job"("p_job_id" "uuid", "p_error_code" "text") RETURNS "public"."generation_jobs"
@@ -2043,6 +2371,16 @@ ALTER TABLE ONLY "public"."subscriptions"
 
 
 
+ALTER TABLE ONLY "public"."support_ticket_messages"
+    ADD CONSTRAINT "support_ticket_messages_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."support_tickets"
+    ADD CONSTRAINT "support_tickets_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."template_prompts"
     ADD CONSTRAINT "template_prompts_pkey" PRIMARY KEY ("template_id");
 
@@ -2132,6 +2470,18 @@ CREATE INDEX "site_announcements_created_at_id_idx" ON "public"."site_announceme
 
 
 CREATE INDEX "subscriptions_user_id_idx" ON "public"."subscriptions" USING "btree" ("user_id");
+
+
+
+CREATE INDEX "support_ticket_messages_ticket_id_created_at_idx" ON "public"."support_ticket_messages" USING "btree" ("ticket_id", "created_at");
+
+
+
+CREATE INDEX "support_tickets_open_last_message_idx" ON "public"."support_tickets" USING "btree" ("last_message_at" DESC, "id" DESC) WHERE ("status" = 'open'::"text");
+
+
+
+CREATE INDEX "support_tickets_user_id_created_at_idx" ON "public"."support_tickets" USING "btree" ("user_id", "created_at" DESC, "id" DESC);
 
 
 
@@ -2244,6 +2594,26 @@ ALTER TABLE ONLY "public"."subscriptions"
 
 
 
+ALTER TABLE ONLY "public"."support_ticket_messages"
+    ADD CONSTRAINT "support_ticket_messages_ticket_id_fkey" FOREIGN KEY ("ticket_id") REFERENCES "public"."support_tickets"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."support_tickets"
+    ADD CONSTRAINT "support_tickets_job_id_fkey" FOREIGN KEY ("job_id") REFERENCES "public"."generation_jobs"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."support_tickets"
+    ADD CONSTRAINT "support_tickets_payment_id_fkey" FOREIGN KEY ("payment_id") REFERENCES "public"."payments"("id");
+
+
+
+ALTER TABLE ONLY "public"."support_tickets"
+    ADD CONSTRAINT "support_tickets_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."template_prompts"
     ADD CONSTRAINT "template_prompts_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON DELETE CASCADE;
 
@@ -2314,6 +2684,22 @@ ALTER TABLE "public"."site_announcements" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."subscriptions" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."support_ticket_messages" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "support_ticket_messages_select_own" ON "public"."support_ticket_messages" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM "public"."support_tickets" "t"
+  WHERE (("t"."id" = "support_ticket_messages"."ticket_id") AND ("t"."user_id" = ( SELECT "auth"."uid"() AS "uid"))))));
+
+
+
+ALTER TABLE "public"."support_tickets" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "support_tickets_select_own" ON "public"."support_tickets" FOR SELECT TO "authenticated" USING ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
+
+
+
 ALTER TABLE "public"."template_prompts" ENABLE ROW LEVEL SECURITY;
 
 
@@ -2355,6 +2741,16 @@ REVOKE ALL ON FUNCTION "public"."_apply_credit_change"("p_user_id" "uuid", "p_po
 
 
 
+GRANT SELECT ON TABLE "public"."support_ticket_messages" TO "authenticated";
+GRANT SELECT ON TABLE "public"."support_ticket_messages" TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."add_ticket_message"("p_ticket_id" "uuid", "p_user_id" "uuid", "p_body" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."add_ticket_message"("p_ticket_id" "uuid", "p_user_id" "uuid", "p_body" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_activate_announcement"("p_id" "uuid", "p_active" boolean, "p_actor" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_activate_announcement"("p_id" "uuid", "p_active" boolean, "p_actor" "uuid") TO "service_role";
 
@@ -2380,8 +2776,23 @@ GRANT ALL ON FUNCTION "public"."admin_dashboard_stats"("p_days" integer) TO "ser
 
 
 
+GRANT SELECT ON TABLE "public"."support_tickets" TO "authenticated";
+GRANT SELECT ON TABLE "public"."support_tickets" TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_decide_refund"("p_ticket_id" "uuid", "p_decision" "text", "p_amount_cents" integer, "p_body" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_decide_refund"("p_ticket_id" "uuid", "p_decision" "text", "p_amount_cents" integer, "p_body" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_list_template_requests"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_list_template_requests"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_list_tickets"("p_status" "text", "p_type" "text", "p_cursor_at" timestamp with time zone, "p_cursor_id" "uuid", "p_limit" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_list_tickets"("p_status" "text", "p_type" "text", "p_cursor_at" timestamp with time zone, "p_cursor_id" "uuid", "p_limit" integer) TO "service_role";
 
 
 
@@ -2397,6 +2808,11 @@ GRANT ALL ON FUNCTION "public"."admin_lookup"("p_query" "text") TO "service_role
 
 REVOKE ALL ON FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_reply_ticket"("p_ticket_id" "uuid", "p_body" "text", "p_close" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_reply_ticket"("p_ticket_id" "uuid", "p_body" "text", "p_close" boolean) TO "service_role";
 
 
 
@@ -2470,6 +2886,11 @@ GRANT ALL ON FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "
 
 
 
+REVOKE ALL ON FUNCTION "public"."create_support_ticket"("p_user_id" "uuid", "p_type" "text", "p_body" "text", "p_payment_id" bigint, "p_job_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."create_support_ticket"("p_user_id" "uuid", "p_type" "text", "p_body" "text", "p_payment_id" bigint, "p_job_id" "uuid") TO "service_role";
+
+
+
 GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."template_requests" TO "service_role";
 GRANT SELECT ON TABLE "public"."template_requests" TO "authenticated";
 
@@ -2498,6 +2919,11 @@ REVOKE ALL ON FUNCTION "public"."handle_new_user"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "public"."mark_ticket_seen"("p_ticket_id" "uuid", "p_user_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."mark_ticket_seen"("p_ticket_id" "uuid", "p_user_id" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."provider_api_key"("p_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."provider_api_key"("p_id" "uuid") TO "service_role";
 
@@ -2505,6 +2931,11 @@ GRANT ALL ON FUNCTION "public"."provider_api_key"("p_id" "uuid") TO "service_rol
 
 REVOKE ALL ON FUNCTION "public"."record_payment_issue"("p_charge_id" "text", "p_kind" "text", "p_amount_refunded" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."record_payment_issue"("p_charge_id" "text", "p_kind" "text", "p_amount_refunded" integer) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."refund_eligibility"("p_payment_id" bigint, "p_asked_at" timestamp with time zone) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."refund_eligibility"("p_payment_id" bigint, "p_asked_at" timestamp with time zone) TO "service_role";
 
 
 
