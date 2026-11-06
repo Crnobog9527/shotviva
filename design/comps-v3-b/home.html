@@ -9,253 +9,358 @@
 <link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="css/studio.css">
+<link rel="stylesheet" href="css/marketing.css">
 <script src="js/studio.js"></script>
+<script src="js/marketing.js"></script>
 <style>
+  h1, h2, h3 { text-wrap: balance; }
+  p { text-wrap: pretty; }
+
   /* ---------- app bar ---------- */
   .appbar { position: sticky; top: 0; z-index: 50; padding: var(--sat) var(--gutter) 0;
-    background: linear-gradient(rgba(11,10,9,.92), rgba(11,10,9,.72)); backdrop-filter: blur(20px) saturate(1.3); -webkit-backdrop-filter: blur(20px) saturate(1.3); }
+    background: linear-gradient(color-mix(in srgb, var(--background) 92%, transparent), color-mix(in srgb, var(--background) 72%, transparent)); backdrop-filter: blur(20px) saturate(1.3); -webkit-backdrop-filter: blur(20px) saturate(1.3); }
   .appbar-row { height: 56px; display: flex; align-items: center; justify-content: space-between; }
-  .brand { display: flex; align-items: baseline; gap: 8px; text-decoration: none; min-height: 44px; align-items: center; }
-  .brand .word { font: 400 26px/1 var(--font-display); letter-spacing: -0.02em; }
+  .brand { display: flex; align-items: center; gap: 8px; text-decoration: none; min-height: 44px; }
+  .brand .word { font: 400 24px/1 var(--font-display); letter-spacing: -0.02em; }
   .brand .word i { color: var(--primary); font-style: normal; }
-  .brand .tag { font: 400 14px/1.15 var(--font-sans); color: var(--muted-foreground); padding-left: 9px; border-left: 1px solid var(--border); white-space: nowrap; }
-  .appbar .btn-ghost { height: 36px; min-height: 36px; padding: 0 16px; border-radius: 999px; font-size: 14px; position: relative; }
-  .appbar .btn-ghost::before { content: ""; position: absolute; inset: -4px -2px; }
+  .brand .tag { font: 400 14px/1.15 var(--font-sans); color: var(--muted-foreground); padding-left: 8px; border-left: 1px solid var(--border); white-space: nowrap; }
 
   /* ---------- hero ---------- */
-  .hero { position: relative; padding: 18px var(--gutter) 0; }
-  .hero::before { content: ""; position: absolute; z-index: -1; left: -20%; right: -20%; top: -140px; height: 520px; pointer-events: none;
-    background: radial-gradient(50% 45% at 72% 30%, rgba(255,91,46,.20), transparent 70%), radial-gradient(40% 40% at 10% 60%, rgba(242,236,227,.05), transparent 70%); }
+  .hero { position: relative; padding: 16px var(--gutter) 0; }
   h1 { margin-top: 4px; }
-  h1 .k { display: block; font: 600 16px/1.2 var(--font-sans); letter-spacing: -0.005em; color: var(--bone-dim); margin-bottom: 8px; }
   h1 .d { display: block; font: 400 32px/1 var(--font-display); letter-spacing: -0.02em; }
   h1 .d em { font-style: italic; color: var(--foreground); }
   .lede { margin-top: 12px; font-size: 16px; line-height: 1.5; color: var(--bone-dim); }
   .answer { margin-top: 12px; font-size: 16px; line-height: 1.5; color: var(--bone-dim); }
+  /* the hero pair: your phone photo → the Pure White result, in one frame */
+  .hero-pair { margin-top: 20px; }
+  .hero-pair .cap { margin-top: 10px; font-size: 14px; color: var(--muted-foreground); }
 
-  /* ---------- generator ---------- */
-  .gen { margin: 18px calc(var(--gutter) - 6px) 0; padding: 12px; border-radius: 28px; position: relative;
-    background: linear-gradient(180deg, #181513, #121010); box-shadow: inset 0 0 0 1px var(--border), inset 0 1px 0 rgba(255,255,255,.05), 0 30px 60px -30px rgba(0,0,0,.8); }
+  /* ---------- generator card (phone and tablet): the approved stacked card ---------- */
+  .gen { margin: 16px calc(var(--gutter) - 6px) 0; padding: 12px; border-radius: 30px; position: relative;
+    background: linear-gradient(180deg, var(--popover), var(--card)); box-shadow: inset 0 0 0 1px var(--border), inset 0 1px 0 color-mix(in srgb, var(--foreground) 5%, transparent), 0 30px 60px -30px rgba(0,0,0,.8); }
   .drop { position: relative; display: block; width: 100%; aspect-ratio: 4 / 5; border-radius: 18px; overflow: hidden; text-align: center;
-    background: radial-gradient(80% 60% at 50% 45%, rgba(242,236,227,.05), transparent), #0E0D0C; box-shadow: inset 0 0 0 1px var(--border); }
-  .drop .vf { position: absolute; inset: 14px; pointer-events: none; }
-  .drop .vf i { position: absolute; width: 22px; height: 22px; border-color: rgba(242,236,227,.55); border-style: solid; border-width: 0; }
+    background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--foreground) 3%, transparent) 0 8px, transparent 8px 16px), var(--background); box-shadow: inset 0 0 0 1px var(--border); }
+  .drop .vf { position: absolute; inset: 12px; pointer-events: none; z-index: 2; }
+  .drop .vf i { position: absolute; width: 22px; height: 22px; border-color: color-mix(in srgb, var(--foreground) 55%, transparent); border-style: solid; border-width: 0; }
   .drop .vf i:nth-child(1) { top: 0; left: 0; border-top-width: 1.5px; border-left-width: 1.5px; border-top-left-radius: 8px; }
   .drop .vf i:nth-child(2) { top: 0; right: 0; border-top-width: 1.5px; border-right-width: 1.5px; border-top-right-radius: 8px; }
   .drop .vf i:nth-child(3) { bottom: 0; left: 0; border-bottom-width: 1.5px; border-left-width: 1.5px; border-bottom-left-radius: 8px; }
   .drop .vf i:nth-child(4) { bottom: 0; right: 0; border-bottom-width: 1.5px; border-right-width: 1.5px; border-bottom-right-radius: 8px; }
-  .drop .hud { position: absolute; z-index: 3; left: 24px; top: 22px; font: 400 14px/1 var(--font-mono); color: rgba(255,255,255,.9); text-shadow: 0 1px 6px rgba(0,0,0,.45); }
-  /* at rest: the Pure White split, so a real photograph sits in the fold */
-  .drop .demo { position: absolute; inset: 0; }
-  .drop .demo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-  .drop .demo .a { clip-path: inset(0 0 0 50%); }
-  .drop .demo .seam { position: absolute; top: 0; bottom: 0; left: 50%; width: 1.5px; margin-left: -.75px; background: rgba(255,255,255,.95); box-shadow: 0 0 10px rgba(255,255,255,.5); }
-  .drop .demo .tag { position: absolute; z-index: 2; top: 54px; height: 26px; padding: 0 9px; border-radius: 8px; display: inline-flex; align-items: center; font: 600 14px/1 var(--font-sans); color: #fff; background: rgba(11,10,9,.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
-  .drop .demo .tag.l { left: 14px; } .drop .demo .tag.r { right: 14px; background: var(--primary); color: var(--primary-foreground); }
-  .drop .demo .badge-illus { top: 14px; right: 14px; left: auto; bottom: auto; }
-  .drop .demo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 38%, rgba(11,10,9,.82) 78%); }
-  .drop .empty { position: absolute; z-index: 3; left: 0; right: 0; bottom: 22px; display: grid; justify-items: center; gap: 8px; }
+  .drop .hud { position: absolute; z-index: 3; left: 24px; top: 24px; height: 26px; display: inline-flex; align-items: center; font: 400 14px/1 var(--font-mono); color: var(--foreground); }
+  .drop .empty { position: absolute; z-index: 3; left: 0; right: 0; top: 50%; transform: translateY(-50%); display: grid; justify-items: center; gap: 8px; padding: 0 16px; }
   .drop .shutter { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; margin-bottom: 4px;
-    box-shadow: inset 0 0 0 1.5px rgba(242,236,227,.7); }
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--foreground) 7%, transparent); }
   .drop .shutter span { width: 50px; height: 50px; border-radius: 50%; display: grid; place-items: center; background: var(--foreground); color: var(--background); }
-  .drop .empty strong { font: 600 17px/1.2 var(--font-sans); color: #fff; }
-  .drop .empty small { font: 400 14px/1.3 var(--font-sans); color: rgba(242,236,227,.78); }
-  .drop .shot { position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .5s var(--ease); }
-  .drop .shot-tag { position: absolute; z-index: 2; left: 12px; bottom: 12px; opacity: 0; }
-  .drop .replace { position: absolute; right: 10px; bottom: 10px; opacity: 0; height: 44px; min-height: 44px; padding: 0 14px; border-radius: 12px; font-size: 14px;
-    background: rgba(11,10,9,.6); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
-  .gen.has-photo .drop .empty, .gen.has-photo .drop .demo { display: none; }
-  .gen.has-photo .drop .shot, .gen.has-photo .drop .shot-tag, .gen.has-photo .drop .replace { opacity: 1; }
-  .gen.has-photo .drop .vf i { border-color: rgba(255,255,255,.85); }
+  .drop .empty strong { font: 600 17px/1.2 var(--font-sans); color: var(--foreground); }
+  .drop .empty small { font: 400 14px/1.3 var(--font-sans); color: color-mix(in srgb, var(--foreground) 78%, transparent); }
+  .drop .shot { position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; object-fit: cover; display: none; }
+  .drop .shot-tag { position: absolute; z-index: 2; left: 12px; bottom: 12px; display: none; }
+  .drop .replace { position: absolute; z-index: 3; right: 12px; bottom: 12px; display: none; height: 44px; min-height: 44px; padding: 0 12px; border-radius: 12px; font-size: 14px;
+    background: color-mix(in srgb, var(--background) 6%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+  .gen.has-photo .drop .empty { display: none; }
+  .gen.has-photo .drop .shot { display: block; }
+  .gen.has-photo .drop .shot-tag, .gen.has-photo .drop .replace { display: inline-flex; }
+  .gen.has-photo .drop .vf i { border-color: color-mix(in srgb, var(--foreground) 85%, transparent); }
 
   .current { display: flex; align-items: center; gap: 12px; padding: 12px 4px 4px; }
-  .current .thumb { width: 44px; height: 55px; border-radius: 9px; object-fit: cover; box-shadow: inset 0 0 0 1px var(--border); }
+  .current .thumb { width: 44px; height: 55px; border-radius: 8px; object-fit: cover; box-shadow: inset 0 0 0 1px var(--border); }
   .current .t { flex: 1; min-width: 0; }
   .current .t small { display: block; font-size: 14px; color: var(--muted-foreground); }
   .current .t b { display: block; font: 600 16px/1.2 var(--font-sans); margin-top: 2px; }
+  .current .link, .picks-head .link { font-size: 14px; white-space: nowrap; }
   .picks { display: none; }
   .gen.has-photo .current { display: none; }
   .gen.has-photo .picks { display: block; }
-  .picks-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 4px 8px; font-size: 14px; color: var(--muted-foreground); }
-  .pick-rail { display: flex; gap: 10px; overflow-x: auto; margin: 0 -12px; padding: 2px 12px 4px; scrollbar-width: none; }
+  .picks-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 4px 8px; font-size: 14px; color: var(--muted-foreground); }
+  .pick-rail { display: flex; gap: 8px; overflow-x: auto; margin: 0 -12px; padding: 2px 12px 4px; scrollbar-width: none; }
   .pick-rail::-webkit-scrollbar { display: none; }
   .pick { flex: 0 0 84px; text-align: center; font: 500 14px/1.25 var(--font-sans); color: var(--bone-dim); }
   .pick img { width: 84px; height: 105px; object-fit: cover; border-radius: 12px; margin-bottom: 6px; box-shadow: inset 0 0 0 1px var(--border); transition: box-shadow .2s, transform .2s var(--ease); }
   .pick[aria-pressed="true"] { color: var(--foreground); }
   .pick[aria-pressed="true"] img { box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--primary); }
-  .gen .field { display: none; padding: 14px 4px 0; }
+  .gen .field { display: none; padding: 12px 4px 0; }
   .gen.has-photo .field { display: block; }
-  .gen-cta { padding: 14px 0 0; }
-  .gen-meta { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 12px 0 4px; font-size: 14px; color: var(--bone-dim); }
+  .gen-cta { padding: 12px 0 0; }
+  .gen-meta { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 0 4px; font-size: 14px; color: var(--bone-dim); }
   .gen-meta .i { width: 16px; height: 16px; color: var(--primary); }
 
   /* ---------- sections ---------- */
   section.block { padding: 72px var(--gutter) 0; }
   h2.h2 { font: 400 36px/1 var(--font-display); letter-spacing: -0.02em; }
-  h2.hot em { font-style: italic; color: var(--primary); }
+  h2.hot em { font-style: normal; color: var(--primary); }
   .intro { margin-top: 12px; font-size: 16px; color: var(--bone-dim); }
 
-  /* ---------- the shoot (demo) ---------- */
+  /* ---------- the shoot (demo): phone photo → three results, the phone as large as a result ---------- */
   .shoot { margin-top: 24px; }
-  .src { display: flex; gap: 14px; align-items: center; }
-  .phone { position: relative; flex: 0 0 112px; padding: 5px; border-radius: 22px; background: #1E1B19; box-shadow: inset 0 0 0 1px rgba(255,255,255,.1), 0 16px 30px -12px rgba(0,0,0,.8); transform: rotate(-3deg); }
-  .phone img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 17px; }
-  .phone::before { content: ""; position: absolute; top: 9px; left: 50%; width: 30px; height: 8px; margin-left: -15px; border-radius: 6px; background: #000; z-index: 2; }
-  .src-meta .file { font: 500 14px/1.3 var(--font-mono); color: var(--foreground); }
-  .src-meta p { font-size: 14px; color: var(--muted-foreground); margin-top: 4px; line-height: 1.4; }
-  .src-meta .pill { margin-top: 10px; height: 26px; }
-  .develop { display: flex; align-items: center; gap: 10px; margin: 18px 0 14px; padding-left: 56px; }
-  .develop .line { width: 1.5px; height: 40px; background: linear-gradient(var(--border), var(--primary)); margin-left: -1px; }
-  .develop span { font: 500 14px/1.3 var(--font-sans); color: var(--primary); }
-  .outs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .outs li { position: relative; border-radius: 18px; overflow: hidden; aspect-ratio: 4 / 5; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
-  .outs li.big { grid-column: 1 / -1; aspect-ratio: 1 / 1; }
+  .shoot-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .src { display: contents; }
+  .phone { position: relative; grid-column: 1; grid-row: 1; padding: 4px; border-radius: 22px; background: var(--secondary); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--foreground) 100%, transparent), 0 16px 30px -12px rgba(0,0,0,.8); overflow: hidden; }
+  .phone img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 18px; }
+  .phone::before { content: ""; position: absolute; top: 8px; left: 50%; width: 30px; height: 8px; margin-left: -15px; border-radius: 6px; background: var(--background); z-index: 2; }
+  .phone .file { position: absolute; z-index: 2; left: 12px; bottom: 12px; height: 26px; padding: 0 8px; border-radius: 8px; display: inline-flex; align-items: center; font: 500 14px/1 var(--font-mono); color: var(--foreground); background: var(--photo-scrim); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  .src-meta { grid-column: 2; grid-row: 1; align-self: center; }
+  .src-meta p { font-size: 14px; color: var(--muted-foreground); line-height: 1.4; }
+  .src-meta .pill { margin-top: 8px; height: 26px; }
+  .develop { grid-column: 1 / -1; grid-row: 2; display: flex; align-items: center; gap: 8px; padding: 4px 0 4px 8px; }
+  .develop .line { width: 1.5px; height: 40px; background: linear-gradient(var(--border), var(--primary)); }
+  .develop .arrow { display: none; }
+  .develop span.lbl { font: 500 14px/1.3 var(--font-sans); color: var(--primary); }
+  .outs { display: contents; list-style: none; margin: 0; padding: 0; }
+  .outs li { position: relative; border-radius: 18px; overflow: hidden; aspect-ratio: 4 / 5; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); grid-row: 3; }
+  .outs li:first-child { grid-row: 3; grid-column: 1 / -1; aspect-ratio: 1 / 1; }
+  .outs li:nth-child(2) { grid-row: 4; } .outs li:nth-child(3) { grid-row: 4; }
   .outs img { width: 100%; height: 100%; object-fit: cover; }
-  .outs .cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 30px 12px 12px; background: linear-gradient(transparent, rgba(11,10,9,.85)); }
-  .outs .cap b { display: block; font: 600 16px/1.2 var(--font-sans); color: #fff; }
-  .outs .cap small { display: block; font-size: 14px; color: rgba(242,236,227,.8); margin-top: 3px; }
-  .outs .big .badge-illus { top: 10px; left: 10px; bottom: auto; }
-  .outs .soon { display: grid; place-content: center; justify-items: center; gap: 6px; text-align: center; padding: 14px;
-    background: repeating-linear-gradient(135deg, rgba(242,236,227,.035) 0 8px, transparent 8px 16px), var(--card);
-    box-shadow: inset 0 0 0 1px rgba(242,236,227,.14); }
-  .outs .soon b { font: 600 16px/1.2 var(--font-sans); }
-  .outs .soon small { font: 500 14px/1 var(--font-sans); color: var(--muted-foreground); padding: 6px 9px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--border); margin-top: 4px; }
-  .bill { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; border-radius: 20px; overflow: hidden; box-shadow: inset 0 0 0 1px var(--border); }
-  .bill > div { padding: 16px 14px; }
+  .outs .cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 48px 12px 12px; background: linear-gradient(transparent, color-mix(in srgb, var(--background) 90%, transparent) 62%); }
+  .outs .cap b { display: block; font: 600 16px/1.2 var(--font-sans); color: var(--foreground); }
+  .outs .cap small { display: block; font-size: 14px; color: var(--bone-dim); margin-top: 2px; }
+  .outs li:first-child .badge-illus { top: 12px; left: 12px; bottom: auto; }
+  .bill { grid-column: 1 / -1; grid-row: 5; margin-top: 4px; display: grid; grid-template-columns: 1fr 1fr; border-radius: 20px; overflow: hidden; box-shadow: inset 0 0 0 1px var(--border); }
+  .bill-line { grid-column: 1 / -1; grid-row: 6; }
+  .bill > div { padding: 16px; }
   .bill .them { background: var(--card); }
-  .bill .us { background: linear-gradient(160deg, rgba(255,91,46,.18), rgba(255,91,46,.04)); box-shadow: inset 1px 0 0 rgba(255,91,46,.3); }
+  .bill .us { background: linear-gradient(160deg, color-mix(in srgb, var(--primary) 18%, transparent), color-mix(in srgb, var(--primary) 4%, transparent)); box-shadow: inset 1px 0 0 color-mix(in srgb, var(--primary) 3%, transparent); }
   .bill .who { font: 600 14px/1 var(--font-sans); color: var(--muted-foreground); }
   .bill .us .who { color: var(--primary); }
-  .bill .amt { font: 400 38px/1 var(--font-display); margin-top: 10px; letter-spacing: -0.02em; }
-  .bill .them .amt { color: var(--bone-dim); font-style: italic; }
-  .bill small { display: block; margin-top: 6px; font-size: 14px; line-height: 1.35; color: var(--muted-foreground); }
+  .bill .amt { font: 400 36px/1 var(--font-display); margin-top: 8px; letter-spacing: -0.02em; }
+  .bill .them .amt { color: var(--bone-dim); }
+  .bill small { display: block; margin-top: 8px; font-size: 14px; line-height: 1.35; color: var(--muted-foreground); }
   .bill-line { margin-top: 12px; font-size: 14px; color: var(--muted-foreground); }
 
   /* ---------- steps ---------- */
-  .steps { list-style: none; margin: 26px 0 0; padding: 0; position: relative; }
-  .steps::before { content: ""; position: absolute; left: 19px; top: 20px; bottom: 30px; width: 1px; background: linear-gradient(var(--primary), var(--border)); }
-  .steps li { position: relative; display: grid; grid-template-columns: 40px 1fr; gap: 14px; padding-bottom: 26px; }
+  .steps { list-style: none; margin: 24px 0 0; padding: 0; position: relative; }
+  .steps::before { content: ""; position: absolute; left: 19px; top: 20px; bottom: 32px; width: 1px; background: linear-gradient(var(--primary), var(--border)); }
+  .steps li { position: relative; display: grid; grid-template-columns: 40px 1fr; gap: 16px; padding-bottom: 24px; }
   .steps .num { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--background);
-    box-shadow: inset 0 0 0 1px rgba(255,91,46,.5); font: 400 22px/1 var(--font-display); color: var(--primary); position: relative; }
-  .steps h3 { font: 600 17px/1.25 var(--font-sans); letter-spacing: -0.015em; padding-top: 9px; }
-  .steps p { margin-top: 5px; font-size: 16px; color: var(--muted-foreground); }
-  .sizes { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 5%, transparent); font: 400 24px/1 var(--font-display); color: var(--primary); position: relative; }
+  .steps h3 { font: 600 17px/1.25 var(--font-sans); letter-spacing: -0.015em; padding-top: 8px; }
+  .steps p { margin-top: 4px; font-size: 16px; color: var(--muted-foreground); }
+  .sizes { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 
-  /* ---------- templates ---------- */
-  .cat { margin-top: 36px; }
-  .cat-head { padding: 0 var(--gutter); margin-bottom: 14px; }
-  .cat-head h3 { display: flex; align-items: baseline; justify-content: space-between; font: 600 19px/1.2 var(--font-sans); letter-spacing: -0.02em; }
-  .cat-head p { margin-top: 5px; font-size: 16px; color: var(--muted-foreground); }
+  /* ---------- templates: pair cards, one per row on the phone, two per row from 768 ---------- */
+  .cat { margin-top: 36px; padding: 0 var(--gutter); }
+  .cat-head { margin-bottom: 12px; }
+  .cat-head h3 { font: 600 17px/1.25 var(--font-sans); letter-spacing: -0.015em; }
+  .cat-head p { margin-top: 4px; font-size: 16px; color: var(--muted-foreground); }
   .cat-head p b { color: var(--foreground); font-weight: 500; }
   .tpl-wrap { padding-top: 72px; }
   .tpl-wrap > .hd { padding: 0 var(--gutter); }
+  .note { margin-top: 16px; padding: 0 var(--gutter); font: 400 14px/1.4 var(--font-sans); color: var(--muted-foreground); }
+  .tgrid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr; gap: 20px 16px; }
+  .tgrid .tpl-meta .use { white-space: normal; }
+  /* single-template categories: the sample on the left, the words on the right (stacked on the phone) */
+  .solo { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: center; }
+  .solo .tpl { border-radius: 20px; }
+  .solo-meta { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding-bottom: 4px; }
+  .solo-meta b { font: 400 24px/1.05 var(--font-display); letter-spacing: -0.01em; margin-top: 4px; }
+  .solo-meta .use { font-size: 14px; color: var(--muted-foreground); }
+  .solo-meta .cost { font: 500 14px/1 var(--font-mono); color: var(--bone-dim); padding: 4px 6px; border-radius: 6px; background: var(--bone-6); margin-top: 4px; }
+  .solo-meta .btn { margin-top: 12px; }
+  .solo .compare { width: 100%; }
 
   /* ---------- tables ---------- */
-  .facts { width: 100%; margin-top: 22px; border-collapse: separate; border-spacing: 0; border-radius: 20px; overflow: hidden; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
-  .facts th, .facts td { text-align: left; vertical-align: top; padding: 14px 14px; border-top: 1px solid var(--hairline); }
+  .facts { width: 100%; margin-top: 24px; border-collapse: separate; border-spacing: 0; border-radius: 20px; overflow: hidden; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
+  .facts th, .facts td { text-align: left; vertical-align: top; padding: 12px 16px; border-top: 1px solid var(--hairline); }
   .facts tr:first-child th, .facts tr:first-child td { border-top: 0; }
-  .facts th { width: 42%; font: 500 14px/1.4 var(--font-sans); color: var(--muted-foreground); padding-top: 15px; }
+  .facts th { width: 42%; font: 500 14px/1.4 var(--font-sans); color: var(--muted-foreground); padding-top: 14px; }
   .facts td { font-size: 16px; line-height: 1.4; }
-  .facts tr.key td { font: 400 21px/1.15 var(--font-display); }
+  .facts tr.key td { font: 400 24px/1.1 var(--font-display); }
 
-  .free { display: grid; gap: 10px; margin-top: 22px; }
-  .free article { padding: 18px 16px; border-radius: 20px; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
+  .free { display: grid; gap: 8px; margin-top: 24px; }
+  .free article { padding: 16px; border-radius: 20px; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
   .free h3 { font: 600 17px/1.25 var(--font-sans); letter-spacing: -0.015em; }
-  .free p { margin-top: 6px; font-size: 16px; color: var(--muted-foreground); }
-  .free .wm { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+  .free p { margin-top: 8px; font-size: 16px; color: var(--muted-foreground); }
+  .free .wm { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
   .free .wm figure { margin: 0; position: relative; border-radius: 12px; overflow: hidden; aspect-ratio: 1; }
   .free .wm img { width: 100%; height: 100%; object-fit: cover; }
-  .free .wm figcaption { position: absolute; left: 6px; bottom: 6px; }
-  .free .wm .mark { position: absolute; inset: 0; display: grid; place-items: center; font: 400 italic 22px/1 var(--font-display); color: rgba(255,255,255,.55); transform: rotate(-18deg); letter-spacing: .02em; text-shadow: 0 1px 6px rgba(0,0,0,.4); }
+  .free .wm figcaption { position: absolute; left: 8px; bottom: 8px; height: 26px; }
+  .free .wm .free-tag { background: color-mix(in srgb, var(--background) 72%, transparent); color: var(--foreground); }
+  .free .wm .paid-tag { background: var(--primary); color: var(--primary-foreground); }
+  .free .wm .mark { position: absolute; inset: 0; display: grid; place-items: center; font: 400 italic 24px/1 var(--font-display); color: color-mix(in srgb, var(--foreground) 55%, transparent); transform: rotate(-18deg); letter-spacing: .02em; }
 
-  .cost-wrap { margin-top: 10px; padding: 18px 12px 8px; border-radius: 20px; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
-  .cost-wrap > h3 { padding: 0 4px; font: 600 17px/1.25 var(--font-sans); letter-spacing: -0.015em; }
-  .cost-table { width: 100%; margin-top: 10px; border-collapse: separate; border-spacing: 0; font-size: 14px; line-height: 1.35; }
-  .cost-table th, .cost-table td { padding: 12px 6px; text-align: left; vertical-align: top; border-top: 1px solid var(--hairline); }
-  .cost-table thead th { font: 600 14px/1.3 var(--font-sans); color: var(--muted-foreground); border-top: 0; }
-  .cost-table tbody th { font-weight: 500; color: var(--bone-dim); width: 22%; }
-  .cost-table .sv { background: rgba(255,91,46,.09); color: var(--foreground); }
-  .cost-table thead .sv { color: var(--primary); border-radius: 12px 12px 0 0; }
-  .cost-table tbody tr:last-child .sv { border-radius: 0 0 12px 12px; }
-  .cost-table td:not(.sv) { color: var(--muted-foreground); }
+  /* what 3 photos cost: two bills side by side, the photographer's quote and ours; the totals are the loud line */
+  .bills { display: grid; gap: 12px; margin-top: 24px; }
+  .bill-card { padding: 20px 16px 16px; border-radius: 20px; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
+  .bill-card.us { background: color-mix(in srgb, var(--primary) 9%, var(--card)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 32%, transparent); }
+  .bill-card h3 { font: 600 17px/1.25 var(--font-sans); letter-spacing: -0.015em; color: var(--bone-dim); }
+  .bill-card.us h3 { color: var(--primary); }
+  .bill-card .total { margin-top: 10px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+  .bill-card .total .n { font: 400 40px/1 var(--font-display); letter-spacing: -0.02em; color: var(--foreground); font-variant-numeric: tabular-nums; }
+  .bill-card .total .from { font-size: 20px; color: var(--bone-dim); margin-right: 6px; }
+  .bill-card .total small { font-size: 20px; color: var(--bone-dim); margin-left: 2px; }
+  .bill-card .total .when { font-size: 16px; color: var(--bone-dim); }
+  .lines { list-style: none; margin: 16px 0 0; padding: 0; }
+  .lines li { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 10px 0; border-top: 1px solid var(--hairline); font-size: 15px; line-height: 1.35; color: var(--muted-foreground); }
+  .lines .n { font: 500 14px/1.3 var(--font-mono); color: var(--foreground); white-space: nowrap; }
+  .bill-card.them .lines .n { color: var(--bone-dim); }
+  .bill-card .fine { margin-top: 12px; font-size: 14px; line-height: 1.4; color: var(--muted-foreground); }
+  .bill-card.us .fine { color: var(--bone-dim); }
+  @media (min-width: 768px) {
+    .bills { grid-template-columns: 1fr 1fr; gap: 16px; }
+    .bill-card { padding: 24px 24px 20px; }
+    .bill-card .total .n { font-size: 52px; }
+  }
 
   /* ---------- FAQ ---------- */
-  .faq { margin-top: 18px; }
+  .faq { margin-top: 16px; }
   .faq details { border-top: 1px solid var(--border); }
   .faq details:last-child { border-bottom: 1px solid var(--border); }
-  .faq summary { list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 60px; padding: 14px 0; cursor: pointer; font: 600 16px/1.35 var(--font-sans); letter-spacing: -0.01em; }
+  .faq summary { list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 60px; padding: 12px 0; cursor: pointer; font: 600 16px/1.35 var(--font-sans); letter-spacing: -0.01em; }
   .faq summary::-webkit-details-marker { display: none; }
-  .faq summary .pm { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: rgba(242,236,227,.06); transition: transform .3s var(--ease), background .2s; }
+  .faq summary .pm { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--bone-6); transition: transform .3s var(--ease), background .2s; }
   .faq details[open] summary .pm { transform: rotate(45deg); background: var(--primary); color: var(--primary-foreground); }
   .faq summary .pm .i { width: 14px; height: 14px; stroke-width: 2.2; }
-  .faq details p { padding: 0 36px 18px 0; font-size: 16px; color: var(--bone-dim); }
+  .faq details p { padding: 0 40px 16px 0; font-size: 16px; color: var(--bone-dim); }
+  .faq .cmp { width: 100%; margin: 0 0 16px; border-collapse: collapse; font-size: 15px; line-height: 1.35; }
+  .faq .cmp th, .faq .cmp td { padding: 10px 12px 10px 0; text-align: left; vertical-align: top; border-top: 1px solid var(--hairline); }
+  .faq .cmp thead th { font: 600 14px/1.3 var(--font-sans); color: var(--muted-foreground); border-top: 0; padding-top: 0; }
+  .faq .cmp tbody th { font: 500 14px/1.35 var(--font-sans); color: var(--muted-foreground); width: 26%; }
+  .faq .cmp td { color: var(--bone-dim); }
+  .faq .cmp td:first-of-type { color: var(--foreground); }
+  .faq details p .link { font-size: 15px; }
 
-  .links { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 8px; }
+  .links { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 8px; }
   .links a { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 60px; padding: 12px 16px; border-radius: 18px; text-decoration: none;
     background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
   .links a b { display: block; font: 600 16px/1.25 var(--font-sans); }
-  .links a small { display: block; font: 400 14px/1.3 var(--font-sans); color: var(--muted-foreground); margin-top: 3px; }
-  .links a .go { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: rgba(242,236,227,.06); flex: none; }
+  .links a small { display: block; font: 400 14px/1.3 var(--font-sans); color: var(--muted-foreground); margin-top: 2px; }
+  .links a .go { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--bone-6); flex: none; }
   .links .i { width: 16px; height: 16px; }
-
-  footer { margin-top: 80px; padding: 28px var(--gutter) calc(var(--sab) + 28px); border-top: 1px solid var(--border); }
-  footer .word { font: 400 40px/1 var(--font-display); letter-spacing: -0.02em; }
-  footer p { margin-top: 10px; font-size: 14px; color: var(--muted-foreground); max-width: 30ch; }
-  footer nav { display: flex; gap: 4px 18px; flex-wrap: wrap; margin-top: 14px; }
-  footer nav a { font-size: 14px; color: var(--bone-dim); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
-  .note { margin-top: 14px; padding: 0 var(--gutter); font: 400 14px/1.4 var(--font-sans); color: var(--muted-foreground); }
-
-
-  .solo { display: grid; grid-template-columns: 156px 1fr; gap: 16px; align-items: end; padding: 0 var(--gutter); }
-  .solo-meta { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding-bottom: 4px; }
-  .solo-meta b { font: 400 26px/1.05 var(--font-display); letter-spacing: -0.01em; margin-top: 6px; }
-  .solo-meta .use { font-size: 14px; color: var(--muted-foreground); }
-  .solo-meta .cost { font: 500 14px/1 var(--font-mono); color: var(--bone-dim); padding: 4px 6px; border-radius: 6px; background: rgba(242,236,227,.06); margin-top: 4px; }
-  .solo-meta .btn { margin-top: 14px; height: 40px; min-height: 44px; padding: 0 18px; border-radius: 999px; font-size: 14px; }
+  /* the code renders only links to pages that exist; ?links=live shows the block as it ships before the two landing pages exist */
+  [data-links="live"] .links li[data-future] { display: none; }
 
   /* floating primary: same action as the generator's, shown only while it is off-screen */
   .dock { position: fixed; z-index: 70; left: 12px; right: 12px; bottom: calc(var(--sab) + 12px); transform: translateY(calc(100% + var(--sab) + 40px)); visibility: hidden; transition: transform .45s var(--ease), visibility 0s .45s; }
   .dock.show { transform: none; visibility: visible; transition: transform .45s var(--ease), visibility 0s; }
-  .dock .btn-primary { box-shadow: inset 0 1px 0 rgba(255,255,255,.38), 0 18px 40px -10px rgba(0,0,0,.95), 0 0 0 1px rgba(255,120,80,.4); }
+  .dock .btn-primary { box-shadow: inset 0 1px 0 color-mix(in srgb, var(--foreground) 38%, transparent), inset 0 -2px 0 rgba(0,0,0,.12), 0 16px 30px -16px rgba(0,0,0,.9); }
 
   /* sign-up sheet */
-  .signup h2 { font: 400 32px/1.05 var(--font-display); margin: 2px 48px 8px 0; }
-  .signup .gift { display: flex; gap: 12px; align-items: center; padding: 14px; border-radius: 16px; margin: 16px 0; background: linear-gradient(120deg, rgba(255,91,46,.16), rgba(255,91,46,.04)); box-shadow: inset 0 0 0 1px rgba(255,91,46,.28); }
+  .signup { --dialog-w: 440px; }
+  .signup .sheet-title { margin-bottom: 8px; }
+  .signup .gift { display: flex; gap: 12px; align-items: center; padding: 12px; border-radius: 16px; margin: 16px 0; background: linear-gradient(120deg, color-mix(in srgb, var(--primary) 16%, transparent), color-mix(in srgb, var(--primary) 4%, transparent)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 28%, transparent); }
   .signup .gift .ico { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--primary); color: var(--primary-foreground); flex: none; }
   .signup .gift b { display: block; font-size: 16px; }
   .signup .gift span { font-size: 14px; color: var(--muted-foreground); }
-  .signup .alt { display: grid; gap: 8px; margin-top: 10px; }
-  .signup .alt .btn { width: 100%; min-height: 50px; }
+  .signup .alt { display: grid; gap: 8px; margin-top: 8px; }
+  .signup .alt .btn { width: 100%; min-height: 48px; }
   .signup .fine { text-align: center; font-size: 14px; color: var(--muted-foreground); margin-top: 12px; }
+
+  @media (hover: hover) {
+    .faq summary:hover .pm, .links a:hover .go { background: var(--bone-8); }
+    .links a:hover, .drop:hover { box-shadow: inset 0 0 0 1px var(--input); }
+    .pick:hover img { box-shadow: inset 0 0 0 1px var(--input); }
+  }
+  /* ======================= tablet (768–1023): single column, the card generator stays ======================= */
+  @media (min-width: 768px) {
+    .appbar-row { height: 64px; }
+    .hero { padding-top: 40px; }
+    .hero h1, .lede, .answer, .hero-pair { max-width: 640px; }
+    h1 .d { font-size: 36px; }
+    .gen { max-width: 480px; margin: 24px 0 0; }
+    .shoot-row { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .phone { grid-column: 1; grid-row: 1; }
+    .src-meta { grid-column: 2 / -1; grid-row: 1; }
+    .develop { grid-row: 2; }
+    .outs li, .outs li:first-child, .outs li:nth-child(2), .outs li:nth-child(3) { grid-row: 3; grid-column: auto; aspect-ratio: 4 / 5; }
+    .shoot-row .bill { grid-row: 4; } .shoot-row .bill-line { grid-row: 5; }
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+    .steps::before { display: none; }
+    .steps li { padding-bottom: 0; }
+    .free { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .links { grid-template-columns: 1fr 1fr; }
+    .tgrid { grid-template-columns: 1fr 1fr; gap: 24px 16px; }
+    .solo { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
+    .solo.art { grid-template-columns: 360px minmax(0, 1fr); }
+    .cat-head { display: flex; align-items: baseline; gap: 16px; }
+    .cat-head p { margin-top: 0; }
+    .dock { left: auto; right: var(--gutter); width: 320px; bottom: 24px; }
+  }
+  /* ======================= desktop (≥1024): hero row 1 text | pair, row 2 the bench ======================= */
+  @media (min-width: 1024px) {
+    .hero { padding-top: 48px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 48px; align-items: center; }
+    .hero-copy { grid-column: 1; grid-row: 1; }
+    .hero h1, .lede, .answer { max-width: none; }
+    .hero-pair { grid-column: 2; grid-row: 1; margin: 0; max-width: none; }
+    .gen { display: none; }
+    section.block, .tpl-wrap > .hd { display: grid; grid-template-columns: 352px minmax(0, 1fr); column-gap: 48px; }
+    section.block > h2 { grid-column: 1; grid-row: 1 / span 3; position: sticky; top: 88px; align-self: start; }
+    section.block > :not(h2) { grid-column: 2; }
+    section.block > .intro, .tpl-wrap > .hd .intro { margin-top: 0; }
+    .steps, .facts, .free, .faq, .links { margin-top: 0; }
+    .steps { gap: 32px; }
+    /* the shoot spans the content width: phone photo as large as a result card, the arrow between */
+    #shoot > h2 { grid-row: 1; position: static; }
+    #shoot > .shoot { grid-column: 1 / -1; margin-top: 32px; }
+    .shoot-row { grid-template-columns: minmax(0, 1fr) 128px repeat(3, minmax(0, 1fr)); grid-template-rows: auto auto; gap: 12px 16px; align-items: start; }
+    .phone { grid-column: 1; grid-row: 1; }
+    .src-meta { grid-column: 1; grid-row: 2; align-self: start; padding: 0 4px; }
+    .develop { grid-column: 2; grid-row: 1; align-self: center; flex-direction: column; justify-content: center; gap: 8px; padding: 0; text-align: center; }
+    .develop .line { display: none; }
+    .develop .arrow { display: block; width: 40px; height: 40px; color: var(--primary); }
+    .outs li, .outs li:first-child, .outs li:nth-child(2), .outs li:nth-child(3) { grid-row: 1; }
+    /* the bill sits under the three results, on their columns */
+    .shoot-row { grid-template-rows: auto auto auto; }
+    .shoot-row .bill { grid-column: 3 / -1; grid-row: 2; margin-top: 12px; }
+    .shoot-row .bill-line { grid-column: 3 / -1; grid-row: 3; margin-top: 0; }
+    .cat { margin-top: 48px; }
+    .cat-head { margin-bottom: 16px; }
+    /* a category with three templates gets three columns, so no card sits alone on a second row */
+    .tgrid[data-count="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    /* the one draggable compare gets room: 420px wide, the words centred beside it */
+    .solo.art { grid-template-columns: 420px minmax(0, 1fr); gap: 40px; }
+    /* the cost section follows the shoot: title and intro on one row, the two bills span the width */
+    #cost > h2 { grid-row: 1; position: static; }
+    #cost > .intro { grid-column: 2; grid-row: 1; align-self: end; margin: 0 0 6px; }
+    #cost > .bills { grid-column: 1 / -1; margin-top: 32px; }
+  }
 </style>
 </head>
 <body>
 
 <header class="appbar">
-  <div class="appbar-row">
+  <div class="appbar-row w">
     <a class="brand" href="home.html" aria-label="Shotviva, AI photo studio">
       <span class="word">Shotviva<i>.</i></span><span class="tag">AI photo studio</span>
     </a>
-    <a class="btn btn-ghost" href="create.html">Log in</a>
+    <nav class="nav-links" aria-label="Site">
+      <a class="nl" href="home.html#templates">Templates</a>
+      <a class="nl" href="pricing.html">Pricing</a>
+      <div class="lang-menu">
+        <button class="globe" type="button" aria-label="Language / 语言" aria-haspopup="menu" aria-expanded="false" data-lang-btn><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.6 3.6 5.4 3.6 8.5s-1 5.9-3.6 8.5M12 3.5c-2.6 2.6-3.6 5.4-3.6 8.5s1 5.9 3.6 8.5"/></svg></button>
+        <ul role="menu" aria-label="Language" hidden>
+          <li><a role="menuitemradio" aria-checked="true" href="/">English<svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></a></li>
+          <li><a role="menuitemradio" aria-checked="false" href="/zh" lang="zh-CN" hreflang="zh-CN">简体中文<svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></a></li>
+        </ul>
+      </div>
+      <a class="btn btn-ghost btn-pill" href="create.html">Log in</a>
+      <button class="btn btn-primary btn-sm" type="button" data-signup>Start free</button>
+    </nav>
   </div>
 </header>
 
-<main>
+<main class="w">
   <section class="hero">
-    <h1><span class="k">Image to Image AI:</span> <span class="d">Restyle a Photo, <em>Keep the Subject</em></span></h1>
-    <p class="lede">The AI photo studio that starts from your real photo. What you shot stays; the template changes the light, the scene or the art style.</p>
-    <p class="answer">Image to image AI takes a photo you already have and gives it a new look while the subject stays as shot. With Shotviva you upload one phone photo, pick a template for food, products, rooms, pets or an art style, and download it in Standard, HD or Max. No prompts to write. New users get 3 free Standard images.</p>
+    <div class="hero-copy">
+      <h1><span class="d">Image to Image AI: Restyle a Photo, <em>Keep the Subject</em></span></h1>
+      <p class="lede">The AI photo studio that starts from your real photo. What you shot stays; the template changes the light, the scene or the art style.</p>
+      <p class="answer">Image to image AI takes a photo you already have and gives it a new look while the subject stays as shot. With Shotviva you upload one phone photo, pick a template for food, products, rooms, pets or an art style, and download it in Standard, HD or Max. No prompts to write. New users get 3 free Standard images.</p>
+    </div>
 
-    <!-- HOMEPAGE GENERATOR -->
+    <!-- the hero pair: the phone photo and the Pure White result, side by side in one frame -->
+    <figure class="hero-pair" style="margin-inline:0">
+      <span class="pair lg">
+        <img class="b" src="../assets/img/hero-set-phone.webp" alt="Phone snapshot of a woven leather tote on a kitchen counter (illustrative example)" width="1080" height="1350">
+        <img class="a" src="../assets/img/hero-set-listing.webp" alt="The same tote as a white-background Pure White listing photo (illustrative example)" width="1080" height="1350" style="object-position:50% 72%">
+        <span class="hl" aria-hidden="true"></span>
+        <span class="tag l" aria-hidden="true">Phone</span><span class="tag r" aria-hidden="true">AI</span>
+        <span class="badge-illus">Illustrative example</span>
+      </span>
+      <figcaption class="cap">Your phone photo → Pure White template · Illustrative example</figcaption>
+    </figure>
+
+    <!-- HOMEPAGE GENERATOR, phone and tablet: the stacked card -->
     <section class="gen" id="gen" aria-label="Try Shotviva on a photo">
       <button class="drop" type="button" id="drop" aria-label="Upload photo">
-        <span class="demo">
-          <img src="../assets/img/pure-white-before.webp" alt="">
-          <img class="a" src="../assets/img/pure-white-after.webp" alt="Pure White example, illustrative: a phone photo of a woven tote on the left, the AI result on the right">
-          <span class="seam" aria-hidden="true"></span>
-          <span class="tag l" aria-hidden="true">Phone</span><span class="tag r" aria-hidden="true">AI</span>
-          <span class="badge-illus">Illustrative example</span>
-        </span>
         <span class="vf" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
         <span class="hud" aria-hidden="true">4:5</span>
         <span class="empty">
@@ -270,11 +375,11 @@
       <div class="current">
         <img class="thumb" src="../assets/img/pure-white-after.webp" alt="" id="cur-thumb">
         <div class="t"><small>Template</small><b id="cur-name">Pure White</b></div>
-        <a class="link" href="#templates" style="font-size:14px;white-space:nowrap">See all templates <svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a>
+        <a class="link" href="#templates">See all templates <svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a>
       </div>
 
       <div class="picks">
-        <div class="picks-head"><span>Template</span><a class="link" href="#templates" style="font-size:14px">See all templates <svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a></div>
+        <div class="picks-head"><span>Template</span><a class="link" href="#templates">See all templates <svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a></div>
         <div class="pick-rail" id="pick-rail" role="group" aria-label="Templates"></div>
       </div>
 
@@ -291,42 +396,70 @@
       </div>
       <p class="gen-meta"><svg class="i" viewBox="0 0 24 24"><path d="M4 11h16v9H4zM3 7h18v4H3zM12 7v13M12 7S10.5 3 8 3.8C6 4.4 7 7 12 7zm0 0s1.5-4 4-3.2C18 4.4 17 7 12 7z"/></svg>3 free Standard images for new users</p>
     </section>
+
+    <!-- HOMEPAGE GENERATOR, desktop: the bench. One bar; it never grows. -->
+    <div class="bench-wrap" id="bench-wrap">
+      <section class="bench" id="bench" aria-label="Try Shotviva on a photo">
+        <button class="tile" type="button" id="tile" aria-label="Add your phone photo">
+          <span class="vf" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+          <svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          <img class="shot" src="../assets/img/pure-white-before.webp" alt="">
+          <span class="replace" aria-hidden="true">Replace</span>
+        </button>
+        <button class="bchip" type="button" id="tchip" aria-haspopup="dialog" aria-label="Template: Pure White. Change template">
+          <img class="thumb" src="../assets/img/pure-white-after.webp" alt="" id="tchip-thumb"><span class="k">Template</span><span id="tchip-name">Pure White</span>
+          <svg class="i chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <button class="bchip" type="button" id="schip" aria-haspopup="listbox" aria-label="Size: Original. Change size">
+          <span class="glyph" aria-hidden="true"><i></i></span><span class="k">Size</span><span>Original</span>
+          <svg class="i chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <input class="bench-note" type="text" id="bench-note" maxlength="300" placeholder="Anything to change? (optional)" aria-label="Anything to change? (optional)" autocomplete="off">
+        <button class="btn btn-primary" type="button" id="bench-go">
+          <svg class="i" viewBox="0 0 24 24"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6H8l1.5-2h5L16 6h1.5A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.5"/></svg>
+          Generate <span class="cost">· 2 credits</span>
+        </button>
+      </section>
+      <p class="bench-gift"><svg class="i" viewBox="0 0 24 24"><path d="M4 11h16v9H4zM3 7h18v4H3zM12 7v13M12 7S10.5 3 8 3.8C6 4.4 7 7 12 7zm0 0s1.5-4 4-3.2C18 4.4 17 7 12 7z"/></svg>3 free Standard images for new users</p>
+    </div>
   </section>
 
   <!-- FIRST DEMO MODULE -->
-  <section class="block" id="shoot" aria-labelledby="shoot-h">
+  <section class="block" id="shoot" aria-labelledby="shoot-h" data-reveal>
     <h2 class="h2 hot" id="shoot-h">One phone photo → <em>a full shoot</em></h2>
     <p class="intro">Shot on a phone on a kitchen counter. Three deliverables, and the same tote in every one: the weave, the stitching, the chain.</p>
 
     <div class="shoot">
-      <figure class="src" style="margin:0">
-        <div class="phone"><img src="../assets/img/hero-set-phone.webp" alt="Phone snapshot of a woven leather tote on a cluttered kitchen counter (illustrative example)"></div>
-        <figcaption class="src-meta">
-          <span class="file">IMG_2047.HEIC</span>
-          <p>As shot on a phone. Window light, a busy counter, keys and a mug in frame.</p>
-          <span class="pill">Illustrative example</span>
-        </figcaption>
-      </figure>
-      <div class="develop" aria-hidden="true"><span class="line"></span><span>Three templates, same tote</span></div>
-      <ol class="outs">
-        <li class="big">
-          <img src="../assets/img/hero-set-listing.webp" alt="The same tote as a white-background marketplace listing (illustrative example)" style="object-position:50% 72%">
-          <span class="badge-illus">Illustrative example</span>
-          <span class="cap"><b>Marketplace listing</b><small>Pure White template</small></span>
-        </li>
-        <li><img src="../assets/img/hero-set-lifestyle.webp" alt="The same tote on a café chair by a window in warm morning light (illustrative example)"><span class="cap"><b>Lifestyle scene</b><small>Lifestyle Table</small></span></li>
-        <li><img src="../assets/img/hero-set-promo.webp" alt="The same tote on a promo poster headed New Season Tote (illustrative example)"><span class="cap"><b>Promo poster</b><small>Promo Poster</small></span></li>
-      </ol>
-      <div class="bill">
-        <div class="them"><span class="who">Photographer</span><p class="amt">A full shoot</p><small>Booking, studio, styling and retouching</small></div>
-        <div class="us"><span class="who">Shotviva</span><p class="amt">6 credits</p><small>Three Standard images, from the photo you already took</small></div>
+      <div class="shoot-row">
+        <figure class="src">
+          <div class="phone card-hover"><img class="zoom" src="../assets/img/hero-set-phone.webp" alt="Phone snapshot of a woven leather tote on a cluttered kitchen counter (illustrative example)"><span class="file" aria-hidden="true">IMG_2047.jpg</span></div>
+          <figcaption class="src-meta">
+            <span class="sr-only">IMG_2047.jpg. </span>
+            <p>As shot on a phone. Window light, a busy counter, keys and a mug in frame.</p>
+            <span class="pill">Illustrative example</span>
+          </figcaption>
+        </figure>
+        <div class="develop" aria-hidden="true"><span class="line"></span><svg class="arrow" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h31M26 11l9 9-9 9"/></svg><span class="lbl">Three templates, same tote</span></div>
+        <ol class="outs">
+          <li class="card-hover">
+            <img class="zoom" src="../assets/img/hero-set-listing.webp" alt="The same tote as a white-background marketplace listing (illustrative example)" style="object-position:50% 72%">
+            <span class="badge-illus">Illustrative example</span>
+            <span class="cap"><b>Marketplace listing</b><small>Pure White template</small></span>
+          </li>
+          <li class="card-hover"><img class="zoom" src="../assets/img/hero-set-lifestyle.webp" alt="The same tote on a café chair by a window in warm morning light (illustrative example)"><span class="cap"><b>Lifestyle scene</b><small>Lifestyle Table</small></span></li>
+          <li class="card-hover"><img class="zoom" src="../assets/img/hero-set-promo.webp" alt="The same tote on a promo poster headed New Season Tote (illustrative example)"><span class="cap"><b>Promo poster</b><small>Promo Poster</small></span></li>
+        </ol>
+        <div class="bill">
+          <div class="them"><span class="who">Photographer</span><p class="amt">A full shoot</p><small>Booking, studio, styling and retouching</small></div>
+          <div class="us"><span class="who">Shotviva</span><p class="amt">6 credits</p><small>Three Standard images, from the photo you already took</small></div>
+        </div>
+        <p class="bill-line">What a photographer would bill as a full shoot, made from the photo you already took.</p>
       </div>
-      <p class="bill-line">What a photographer would bill as a full shoot, made from the photo you already took.</p>
     </div>
   </section>
 
-  <section class="block" aria-labelledby="how-h">
-        <h2 class="h2" id="how-h">How Image to Image AI Works in 3 Steps</h2>
+  <section class="block" aria-labelledby="how-h" data-reveal>
+    <h2 class="h2" id="how-h">How Image to Image AI Works in 3 Steps</h2>
     <ol class="steps">
       <li><span class="num">1</span><div><h3>Upload One Photo</h3><p>Any phone photo of your product, dish, room or pet. JPG, PNG or WebP.</p></div></li>
       <li><span class="num">2</span><div><h3>Pick a Template</h3><p>Each template sets the light, scene or art style. Nothing to write.</p></div></li>
@@ -336,16 +469,16 @@
   </section>
 
   <section class="tpl-wrap" id="templates" aria-labelledby="tpl-h">
-    <div class="hd">
-            <h2 class="h2" id="tpl-h">Img to Img Templates: No Prompts to Write</h2>
-      <p class="intro">Every card shows the phone photo on the left and the AI result on the right. Tap one to compare.</p>
+    <div class="hd" data-reveal>
+      <h2 class="h2" id="tpl-h">Img to Img Templates: No Prompts to Write</h2>
+      <p class="intro">Every card shows the phone photo on the left and the AI result on the right.</p>
     </div>
     <div id="cats"></div>
     <p class="note">All template images are illustrative examples.</p>
   </section>
 
-  <section class="block" aria-labelledby="same-h">
-        <h2 class="h2" id="same-h">AI Image to Image: What Stays the Same</h2>
+  <section class="block" aria-labelledby="same-h" data-reveal>
+    <h2 class="h2" id="same-h">AI Image to Image: What Stays the Same</h2>
     <table class="facts">
       <tbody>
         <tr class="key"><th scope="row">What stays the same</th><td>The subject, as you shot it</td></tr>
@@ -359,9 +492,9 @@
     </table>
   </section>
 
-  <section class="block" aria-labelledby="free-h">
-        <h2 class="h2" id="free-h">Free Image to Image AI: What You Get</h2>
-    <div class="free">
+  <section class="block" aria-labelledby="free-h" data-reveal>
+    <h2 class="h2" id="free-h">Free Image to Image AI: What You Get</h2>
+    <div class="free" data-reveal-group>
       <article>
         <h3>3 Free Standard Images When You Sign Up</h3>
         <p>New accounts start with 3 free Standard images. No card needed to try any template.</p>
@@ -370,8 +503,8 @@
         <h3>Free Photos Are Public and Watermarked, Paid Photos Are Private</h3>
         <p>Photos made with free credits are shown publicly with a watermark. Photos made with paid credits stay private and watermark-free.</p>
         <div class="wm">
-          <figure><img src="../assets/img/spa-podium-after.webp" alt="Free photo with a Shotviva watermark (illustrative example)"><span class="mark" aria-hidden="true">shotviva</span><figcaption class="pill" style="height:26px;background:rgba(11,10,9,.72);color:#fff">Free · public</figcaption></figure>
-          <figure><img src="../assets/img/spa-podium-after.webp" alt="Paid photo with no watermark (illustrative example)"><figcaption class="pill" style="height:26px;background:var(--primary);color:var(--primary-foreground)">Paid · private</figcaption></figure>
+          <figure><img src="../assets/img/spa-podium-after.webp" alt="Free photo with a Shotviva watermark (illustrative example)"><span class="mark" aria-hidden="true">shotviva</span><figcaption class="pill free-tag">Free · public</figcaption></figure>
+          <figure><img src="../assets/img/spa-podium-after.webp" alt="Paid photo with no watermark (illustrative example)"><figcaption class="pill paid-tag">Paid · private</figcaption></figure>
         </div>
       </article>
       <article>
@@ -379,62 +512,101 @@
         <p>Starter is 50 credits a month. Yearly plans cost less per month, and one-time credit packs need no subscription.</p>
       </article>
     </div>
-    <div class="cost-wrap">
-      <h3>What a set of photos costs</h3>
-      <table class="cost-table">
-        <thead><tr><th scope="col"><span class="sr-only">Compare</span></th><th scope="col">Photographer</th><th scope="col">Do it yourself</th><th scope="col" class="sv">Shotviva</th></tr></thead>
-        <tbody>
-          <tr><th scope="row">Cost</th><td>Per-shoot quote</td><td>Props, lights, editing apps</td><td class="sv">From 2 credits a photo</td></tr>
-          <tr><th scope="row">Time</th><td>Days to book and deliver</td><td>Hours per product</td><td class="sv">20–40 seconds</td></tr>
-          <tr><th scope="row">Your subject</th><td>Reshot</td><td>As shot, plain look</td><td class="sv">As shot, new look</td></tr>
-        </tbody>
-      </table>
+  </section>
+
+  <section class="block" id="cost" aria-labelledby="cost-h" data-reveal>
+    <h2 class="h2" id="cost-h">What 3 Product Photos Cost: Photographer vs Shotviva</h2>
+    <p class="intro">One product, three styled photos, retouched and ready to post. The same job, two bills.</p>
+    <div class="bills" data-reveal-group>
+      <article class="bill-card them">
+        <h3>A photographer's quote</h3>
+        <p class="total"><span class="n">$297–$990</span><span class="when">delivered in days</span></p>
+        <ul class="lines">
+          <li><span>3 styled shots, $89–$300 each</span><span class="n">$267–$900</span></li>
+          <li><span>Retouching, $10–$30 an image</span><span class="n">$30–$90</span></li>
+          <li><span>Booking, shoot, edits</span><span class="n">days</span></li>
+        </ul>
+        <p class="fine">Typical published 2026 US studio rates; plain-white packshots start around $15 a photo. Your quotes will vary.</p>
+      </article>
+      <article class="bill-card us">
+        <h3>Shotviva</h3>
+        <p class="total"><span class="n"><span class="from">from</span>$19.90<small>/month</small></span><span class="when">20–40 seconds a photo</span></p>
+        <ul class="lines">
+          <li><span>Starter plan, 50 credits a month</span><span class="n">$19.90</span></li>
+          <li><span>These 3 photos, Standard</span><span class="n">6 credits ≈ $2.40</span></li>
+          <li><span>Left for the rest of the month</span><span class="n">22 more photos</span></li>
+        </ul>
+        <p class="fine">Styling and retouching are in the template, and your subject stays as you shot it. Start with 3 free Standard photos, no card needed.</p>
+      </article>
     </div>
   </section>
 
-  <section class="block" aria-labelledby="faq-h">
-        <h2 class="h2" id="faq-h">Image to Image AI FAQ</h2>
+  <section class="block" aria-labelledby="faq-h" data-reveal>
+    <h2 class="h2" id="faq-h">Image to Image AI FAQ</h2>
     <div class="faq">
       <details open><summary>What is image to image AI?<span class="pm" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></summary>
-        <p>It starts from a photo you already have and changes its look (the light, background, scene or art style) while the subject stays as you shot it.</p></details>
+        <p>Shotviva is an image to image AI tool that gives a photo you already have a new look while the subject stays as shot — in 3 steps: upload one phone photo, pick a template, choose Standard, HD or Max. Templates cover food, products, rooms, pets and art styles; nothing to write.</p></details>
       <details><summary>Is image to image AI free?<span class="pm" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></summary>
-        <p>New users get 3 free Standard images. Free photos are public and watermarked. After that, each photo costs credits, from 2 credits.</p></details>
+        <p>New users get 3 free Standard images, no card needed. Free photos are public with a watermark. After that a photo costs from 2 credits: plans start at $19.90 a month for 50 credits, or buy a credit pack from $9.90.</p></details>
       <details><summary>Does image to image AI keep my photo's subject the same?<span class="pm" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></summary>
-        <p>Yes. Templates keep your product, dish, room or pet as shot. Only the light, background, scene or style changes.</p></details>
+        <p>Yes. Shotviva templates keep your product, dish, room or pet as you shot it and change only the light, background, scene or art style. If something is off, open the photo, press Edit and say what to change, from 2 credits.</p></details>
       <details><summary>How is image to image AI different from an AI image generator?<span class="pm" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></summary>
-        <p>A generator invents a picture from a description. Image to image AI starts from your real photo, so what customers see is what you actually sell.</p></details>
+        <p>An AI image generator invents a picture from a description. Image to image AI starts from your real photo, so the result shows what you actually sell.</p>
+        <table class="cmp"><thead><tr><th scope="col"><span class="sr-only">Compare</span></th><th scope="col">Image to image AI</th><th scope="col">AI image generator</th></tr></thead><tbody>
+          <tr><th scope="row">Starts from</th><td>Your photo</td><td>A text description</td></tr>
+          <tr><th scope="row">Your subject</th><td>Kept as shot</td><td>Invented each time</td></tr>
+          <tr><th scope="row">What you write</th><td>Nothing; pick a template</td><td>A description, every time</td></tr>
+          <tr><th scope="row">Good for</th><td>Product, menu, listing and pet photos</td><td>Concept art, illustration</td></tr>
+        </tbody></table>
+        <p><a class="link" href="/image-to-image-generator">More about image to image generators <svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a></p></details>
       <details><summary>Can I use the photos commercially?<span class="pm" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></summary>
-        <p>Yes. Photos made with paid credits are private, watermark-free and yours to use in listings, menus, ads and social posts.</p></details>
+        <p>Yes. Photos made with paid credits are private, watermark-free and yours to use in listings, menus, ads and social posts. Photos made with the 3 free Standard images are public with a watermark.</p></details>
+      <details><summary>Do I need to write prompts?<span class="pm" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></summary>
+        <p>No. You pick a template, and the template carries the light, scene and styling. There is one optional line, "Anything to change?", for a note like "keep the chain gold".</p></details>
+      <details><summary>What sizes and formats can I export?<span class="pm" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></summary>
+        <p>Three resolutions, delivered as PNG: Standard 1024 px, HD 2048 px and Max 2880 px on the long side. Eight sizes: Original, Banner 16:9, Post 4:5, Listing 1:1, Story 9:16, Rental 3:2, Website 4:3 and Pin 2:3. Uploads can be JPG, PNG or WebP up to 20 MB.</p></details>
+      <details><summary>Can I use Shotviva on my phone?<span class="pm" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></summary>
+        <p>Yes, in the browser on iPhone Safari or Android Chrome; there is no app to install. Take a photo with the camera or choose one from your gallery, then save or share the result from Photos.</p></details>
+      <details><summary>What is Shotviva?<span class="pm" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></summary>
+        <p>Shotviva is an AI photo studio for small businesses: an image to image AI that turns one phone photo of your product, dish, room or pet into a finished photo in a chosen look. You pick a template instead of describing a picture, the subject stays exactly as you shot it, and the result downloads in Standard, HD or Max as PNG. Unlike an AI image generator, it never invents your product; unlike a photographer, it takes 20–40 seconds and starts at 2 credits. New users get 3 free Standard images.</p></details>
     </div>
   </section>
 
-  <section class="block" aria-labelledby="more-h">
-        <h2 class="h2" id="more-h">Image to Image AI for Food, Products, Rooms and More</h2>
-    <ul class="links">
-      <li><a href="/ai-restaurant-menu"><span><b>AI restaurant menu photos</b><small>/ai-restaurant-menu</small></span><span class="go"><svg class="i" viewBox="0 0 24 24"><path d="M7 17L17 7M9 7h8v8"/></svg></span></a></li>
-      <li><a href="/commercial-photography"><span><b>Commercial product photography</b><small>/commercial-photography</small></span><span class="go"><svg class="i" viewBox="0 0 24 24"><path d="M7 17L17 7M9 7h8v8"/></svg></span></a></li>
-      <li><a href="/image-to-image-generator"><span><b>Image to image generator</b><small>/image-to-image-generator</small></span><span class="go"><svg class="i" viewBox="0 0 24 24"><path d="M7 17L17 7M9 7h8v8"/></svg></span></a></li>
-      <li><a href="/pricing"><span><b>Pricing</b><small>/pricing</small></span><span class="go"><svg class="i" viewBox="0 0 24 24"><path d="M7 17L17 7M9 7h8v8"/></svg></span></a></li>
+  <section class="block" aria-labelledby="more-h" data-reveal>
+    <h2 class="h2" id="more-h">Image to Image AI for Food, Products, Rooms and More</h2>
+    <ul class="links" data-reveal-group>
+      <li data-future><a href="/ai-restaurant-menu"><span><b>AI restaurant menu photos</b><small>Menu and delivery-app photos from a phone shot</small></span><span class="go"><svg class="i" viewBox="0 0 24 24"><path d="M7 17L17 7M9 7h8v8"/></svg></span></a></li>
+      <li data-future><a href="/commercial-photography"><span><b>Commercial product photography</b><small>Studio product shots without a photographer</small></span><span class="go"><svg class="i" viewBox="0 0 24 24"><path d="M7 17L17 7M9 7h8v8"/></svg></span></a></li>
+      <li><a href="/image-to-image-generator"><span><b>Image to image generator</b><small>How image to image works on your photo</small></span><span class="go"><svg class="i" viewBox="0 0 24 24"><path d="M7 17L17 7M9 7h8v8"/></svg></span></a></li>
+      <li><a href="pricing.html"><span><b>Pricing</b><small>Plans from $19.90/month, 3 free images</small></span><span class="go"><svg class="i" viewBox="0 0 24 24"><path d="M7 17L17 7M9 7h8v8"/></svg></span></a></li>
     </ul>
   </section>
 </main>
 
 <footer>
-  <p class="word">Shotviva<span style="color:var(--primary)">.</span></p>
-  <p>AI photo studio. shotviva.com is the only official Shotviva website.</p>
-  <nav aria-label="Legal"><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="/acceptable-use">Acceptable use</a></nav>
+  <div class="w">
+    <p class="word">Shotviva<i>.</i></p>
+    <div class="foot-main">
+      <a class="mail" href="mailto:support@shotviva.com">support@shotviva.com</a>
+      <span class="copy">© 2026 Shotviva</span>
+    </div>
+    <div class="foot-fine">
+      <nav aria-label="Legal"><a href="/terms">Terms</a><span aria-hidden="true">·</span><a href="/privacy">Privacy</a><span aria-hidden="true">·</span><a href="/refunds">Refunds</a><span aria-hidden="true">·</span><a href="/acceptable-use">Acceptable use</a></nav>
+      <nav class="lang" aria-label="Language"><span aria-current="true">English</span><span aria-hidden="true">·</span><a href="/zh" lang="zh-CN" hreflang="zh-CN">简体中文</a></nav>
+    </div>
+  </div>
 </footer>
 
 <div class="dock" id="dock" aria-hidden="true"><a class="btn btn-primary" href="#gen" tabindex="-1">
   <svg class="i" viewBox="0 0 24 24"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6H8l1.5-2h5L16 6h1.5A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.5"/></svg><span id="dock-label">Upload photo</span></a></div>
 
-<!-- sign-up prompt (bottom sheet) -->
+<!-- sign-up prompt (bottom sheet on phone, centred dialog from 768 up) -->
 <div class="scrim" id="su-scrim" hidden></div>
 <section class="sheet signup" id="su" role="dialog" aria-modal="true" aria-labelledby="su-h" tabindex="-1" hidden>
   <div class="sheet-grab" aria-hidden="true"></div>
   <button class="sheet-x" type="button" data-close aria-label="Close"><span><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></span></button>
   <div class="sheet-body">
-    <h2 id="su-h">Make a free account to develop it</h2>
+    <h2 id="su-h" class="sheet-title">Make a free account to develop it</h2>
     <p class="muted" style="font-size:16px">Your photo and template stay as you set them.</p>
     <div class="gift"><span class="ico"><svg class="i" viewBox="0 0 24 24"><path d="M4 11h16v9H4zM3 7h18v4H3zM12 7v13M12 7S10.5 3 8 3.8C6 4.4 7 7 12 7zm0 0s1.5-4 4-3.2C18 4.4 17 7 12 7z"/></svg></span>
       <div><b>3 free Standard images</b><span>Shown publicly with a watermark</span></div></div>
@@ -446,8 +618,10 @@
 
 <script>
 (function () {
-  const { T, CATS, card, previewSheet, makeSheet } = window.SV;
-  // Template groups, in the brief's order
+  const { T, CATS, bindCompare } = window.SV;
+  const { pair, pairCard, compare, picker, signup } = window.MK;
+  const IMG = '../assets/img/';
+  // Template groups, in the brief's order. Art Styles keeps the one draggable compare; every other card is a pair.
   const intros = {
     art: '<b>Your phone photo → a drawn look</b>, with the face and pose kept.',
     food: '<b>Your phone photo of a dish → menu</b>, delivery-app and promo shots.',
@@ -456,54 +630,76 @@
     rooms: '<b>Your phone photo of a room → bright listing light</b> or a warm evening.',
     pets: '<b>Your phone photo of a pet → a studio portrait.</b>',
   };
-  const solo = t => `<div class="solo"><button class="tpl" type="button" data-tpl="${t.id}" aria-haspopup="dialog">${window.SV.media(t)}</button>
-    <div class="solo-meta"><b>${t.name}</b><span class="use">${t.use}</span><span class="cost">from 2 credits</span>
-      <button class="btn btn-ghost" type="button" data-tpl-open="${t.id}">Preview</button></div></div>`;
+  const solo = t => `<div class="solo ${t.cat === 'art' ? 'art' : ''}" data-reveal-group>
+      ${t.cat === 'art' ? `<div class="sample">${compare(t)}</div>` : `<button class="tpl" type="button" data-pick="${t.id}" aria-label="${t.name}, ${t.use}. Pick this template">${pair(t, 'lg', { noType: true })}</button>`}
+      <div class="solo-meta"><b>${t.name}</b><span class="use">${t.use}${t.cat === 'art' ? ' · Drag the handle to compare' : ''}</span><span class="cost">from 2 credits</span>
+        <button class="btn btn-ghost btn-pill" type="button" data-preview="${t.id}">Preview</button></div></div>`;
   document.getElementById('cats').innerHTML = CATS.map(c => {
     const list = T.filter(t => t.cat === c.id);
-    return `<div class="cat"><div class="cat-head"><h3>${c.name}</h3><p>${intros[c.id]}</p></div>
-      ${list.length === 1 ? solo(list[0]) : `<ul class="rail">${list.map(t => `<li>${card(t)}</li>`).join('')}</ul>`}</div>`;
+    return `<div class="cat" data-reveal><div class="cat-head"><h3>${c.name}</h3><p>${intros[c.id]}</p></div>
+      ${list.length === 1 ? solo(list[0]) : `<ul class="tgrid" data-count="${list.length}" data-reveal-group>${list.map(t => `<li>${pairCard(t)}</li>`).join('')}</ul>`}</div>`;
   }).join('');
+  bindCompare(document.getElementById('cats'));
+  window.MK.reveal(document.getElementById('cats'));
+  if (new URLSearchParams(location.search).get('links') === 'live') document.body.dataset.links = 'live';
+  if (new URLSearchParams(location.search).get('faq') === 'all') document.querySelectorAll('.faq details').forEach(d => { d.open = true; });   // review: every answer open
 
-  // generator
+  // one template state for both generators (the phone card and the desktop bench)
   const gen = document.getElementById('gen'), label = document.getElementById('gen-label'), btn = document.getElementById('gen-btn');
+  const bench = document.getElementById('bench'), tile = document.getElementById('tile');
   const rail = document.getElementById('pick-rail');
   let tpl = T[0];
   const picks = ['pure-white', 'lifestyle-table', 'spa-podium', 'delivery-photo', 'bright-listing', 'promo-poster'].map(id => T.find(t => t.id === id));
   function renderPicks() {
-    rail.innerHTML = picks.map(t => `<button class="pick" type="button" data-id="${t.id}" aria-pressed="${t.id === tpl.id}"><img src="../assets/img/${t.id}-after.webp" alt="">${t.name}</button>`).join('');
+    rail.innerHTML = picks.map(t => `<button class="pick" type="button" data-id="${t.id}" aria-pressed="${t.id === tpl.id}"><img src="${IMG}${t.id}-after.webp" alt="">${t.name}</button>`).join('');
   }
   function setTpl(t) {
     tpl = t;
     if (!picks.includes(t)) picks.unshift(t), picks.pop();
     document.getElementById('cur-name').textContent = t.name;
-    document.getElementById('cur-thumb').src = `../assets/img/${t.id}-after.webp`;
+    document.getElementById('cur-thumb').src = `${IMG}${t.id}-after.webp`;
+    document.getElementById('tchip-name').textContent = t.name;
+    document.getElementById('tchip-thumb').src = `${IMG}${t.id}-after.webp`;
+    document.getElementById('tchip').setAttribute('aria-label', `Template: ${t.name}. Change template`);
     renderPicks();
   }
   rail.addEventListener('click', e => { const b = e.target.closest('.pick'); if (b) setTpl(T.find(t => t.id === b.dataset.id)); });
+  let hasPhoto = false;
   function addPhoto() {
-    gen.classList.add('has-photo');
+    hasPhoto = true;
+    gen.classList.add('has-photo'); bench.classList.add('has-photo');
     label.innerHTML = 'Generate <span class="cost">· 2 credits</span>'; document.getElementById('dock-label').textContent = 'Generate · 2 credits';
     document.getElementById('drop').setAttribute('aria-label', 'Your photo. Tap to replace');
+    tile.setAttribute('aria-label', 'Your photo. Replace');
     renderPicks();
   }
   document.getElementById('drop').addEventListener('click', addPhoto);
-  const su = makeSheet(document.getElementById('su'), document.getElementById('su-scrim'));
-  btn.addEventListener('click', () => gen.classList.contains('has-photo') ? su.open() : addPhoto());
+  tile.addEventListener('click', addPhoto);
+  const su = signup();
+  btn.addEventListener('click', () => hasPhoto ? su.open() : addPhoto());
+  document.getElementById('bench-go').addEventListener('click', () => hasPhoto ? su.open() : addPhoto());
   if (window.SV.q.get('photo') === '1') addPhoto();
 
-  // dock: the same primary, shown only once the whole generator card has left the viewport
-  // (so it can never sit on top of the generator) and hidden again near the footer
-  const dock = document.getElementById('dock');
-  const vis = { gen: true, foot: false };
-  const sync = () => dock.classList.toggle('show', !vis.gen && !vis.foot);
-  new IntersectionObserver(([e]) => { vis.gen = e.isIntersecting; sync(); }).observe(gen);
-  new IntersectionObserver(([e]) => { vis.foot = e.isIntersecting; sync(); }).observe(document.querySelector('footer'));
-  dock.querySelector('a').addEventListener('click', e => { e.preventDefault(); gen.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+  // the picker: the bench's Template chip, the Preview buttons, and every card (which picks directly and brings the generator back)
+  const generator = () => (getComputedStyle(gen).display === 'none' ? bench : gen);
+  const bring = () => generator().scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const open = picker(t => { setTpl(t); bring(); });
+  document.getElementById('tchip').addEventListener('click', () => open(tpl.id));
+  document.addEventListener('click', e => {
+    const p = e.target.closest('[data-preview]'); if (p) return open(p.dataset.preview);
+    const c = e.target.closest('[data-pick]'); if (c) { setTpl(T.find(t => t.id === c.dataset.pick)); bring(); }
+  });
+  if (window.SV.q.get('preview')) setTimeout(() => open(window.SV.q.get('preview')), 300);
+  if (window.SV.q.get('picker') === '1') setTimeout(() => open(tpl.id), 300);
 
-  // template previews
-  const show = previewSheet(t => { setTpl(t); gen.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
-  document.addEventListener('click', e => { const c = e.target.closest('.tpl, [data-tpl-open]'); if (c) show(c.dataset.tpl || c.dataset.tplOpen); });
+  // dock: the same primary, shown only once the visible generator has left the viewport, hidden again near the footer
+  const dock = document.getElementById('dock');
+  const vis = new Map([[gen, true], [document.getElementById('bench-wrap'), true]]); let foot = false;
+  const sync = () => dock.classList.toggle('show', ![...vis.values()].some(Boolean) && !foot);
+  new IntersectionObserver(es => { es.forEach(e => vis.set(e.target, e.isIntersecting)); sync(); }).observe(gen);
+  new IntersectionObserver(es => { es.forEach(e => vis.set(e.target, e.isIntersecting)); sync(); }).observe(document.getElementById('bench-wrap'));
+  new IntersectionObserver(([e]) => { foot = e.isIntersecting; sync(); }).observe(document.querySelector('footer'));
+  dock.querySelector('a').addEventListener('click', e => { e.preventDefault(); bring(); });
 })();
 </script>
 </body>
