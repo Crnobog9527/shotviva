@@ -14,8 +14,8 @@ describe('submit form pickers', () => {
   it('words each payment by product, amount charged and date', () => {
     const [plan, pack] = paymentChoices(
       [
-        { id: '7', productId: 'pro_yearly', amountTotal: 34900, currency: 'usd', createdAt: '2026-11-01T12:00:00Z' },
-        { id: '8', productId: 'pack_m', amountTotal: 2490, currency: 'usd', createdAt: '2026-11-02T12:00:00Z' },
+        { id: '7', productId: 'pro_yearly', amountTotal: 34900, currency: 'usd', method: 'card', createdAt: '2026-11-01T12:00:00Z' },
+        { id: '8', productId: 'pack_m', amountTotal: 2490, currency: 'usd', method: 'card', createdAt: '2026-11-02T12:00:00Z' },
       ],
       site.billing.products,
       t,

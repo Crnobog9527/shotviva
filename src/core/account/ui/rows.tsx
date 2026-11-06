@@ -7,10 +7,15 @@ import { cn } from '../../ui/cn'
 // rows of the Settings and Session panels, hairlines between them, value and safelight chevron
 // on the right.
 
-export function Group({ title, hideTitle = false, children }: { title: string; hideTitle?: boolean; children: ReactNode }) {
+// Groups below the top pair keep the 720px reading width on desktop, left-aligned under it.
+export const groupClass = 'mx-(--gutter) mt-6 md:max-w-[720px]'
+
+type GroupProps = { title: string; hideTitle?: boolean; className?: string; children: ReactNode }
+
+export function Group({ title, hideTitle = false, className, children }: GroupProps) {
   const id = useId()
   return (
-    <section aria-labelledby={id} className="mx-4 mt-6">
+    <section aria-labelledby={id} className={cn(groupClass, className)}>
       <h2 id={id} className={cn('mb-2 text-headline leading-[1.2] font-semibold tracking-[-0.01em]', hideTitle && 'sr-only')}>
         {title}
       </h2>

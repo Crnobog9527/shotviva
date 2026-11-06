@@ -16,7 +16,7 @@ export function IntegrationsPanel({ graylum, disconnect }: Props) {
   const graylumT = useTranslations('partner.account')
   const id = useId()
   return (
-    <section aria-labelledby={id} className="mx-4 mt-6">
+    <section aria-labelledby={id} className="mx-(--gutter) mt-6 md:max-w-[720px]">
       <h2 id={id} className="mb-2 text-headline leading-[1.2] font-semibold tracking-[-0.01em]">{t('title')}</h2>
       <ul className="hairline-lit divide-y divide-hairline rounded-panel bg-card px-4">
         <li>
