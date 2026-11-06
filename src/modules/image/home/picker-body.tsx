@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl'
 
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
+import { GroundedImg } from '../result/grounded-img'
 import { categoriesOf } from '../catalogue/catalogue-template'
 import { useCategoryLabel } from '../catalogue/category-label'
 import type { TemplateSample } from './home-samples'
@@ -27,8 +28,8 @@ export function PickerSample({ selected, sampleOf }: Pick<Props, 'selected' | 's
         <span className="mk-pair mk-pair-lg mk-pair-static">
           {/* eslint-disable-next-line @next/next/no-img-element -- admin cover or bundled sample */}
           <img className="mk-b" src={sample.before} alt="" />
-          {/* eslint-disable-next-line @next/next/no-img-element -- admin cover or bundled sample */}
-          <img className="mk-a" src={sample.after} alt={t('cardAlt', { name: selected.name })} />
+          {/* White behind the result: a transparent cut-out cover reads as white. */}
+          <GroundedImg className="mk-a" ground="white" src={sample.after} alt={t('cardAlt', { name: selected.name })} />
           <span className="mk-hl" aria-hidden />
           <span className="mk-tag mk-tag-l" aria-hidden>
             {t('phone')}
@@ -62,8 +63,7 @@ export function PickerList({ templates, selected, onSelect, thumbOf }: Omit<Prop
               const thumb = thumbOf(template)
               return (
                 <button key={template.id} type="button" role="radio" aria-checked={template.id === selected.id} className="mk-pk-row" onClick={() => onSelect(template.id)}>
-                  {/* eslint-disable-next-line @next/next/no-img-element -- admin cover or bundled sample */}
-                  {thumb ? <img className="mk-pk-th" src={thumb} alt="" /> : <span className="mk-pk-th" aria-hidden />}
+                  {thumb ? <GroundedImg className="mk-pk-th" ground="white" src={thumb} alt="" /> : <span className="mk-pk-th" aria-hidden />}
                   <span className="mk-pk-t">
                     <b>{template.name}</b>
                     {template.description ? <small>{template.description}</small> : null}

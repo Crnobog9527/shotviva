@@ -2,6 +2,7 @@ import Image from 'next/image'
 import { useTranslations } from 'next-intl'
 
 import { cn } from '../../ui/cn'
+import { WhiteGroundImage } from '../../ui/white-ground-image'
 import type { ImageRef } from '../page-content'
 
 type Props = {
@@ -19,6 +20,7 @@ type Props = {
 // The side-by-side pair (DESIGN §6.9 item 1): the phone photo on the left, the AI result on the
 // right, one frame with a hairline between. On the right plate the phone photo sits under the
 // result so the hover wipe (marketing.css) can develop one into the other; nothing depends on it.
+// The result has white behind it: a transparent cut-out cover reads as white, not as that photo.
 export function PhotoPair({ before, after, size = 'card', preload = false, sizes, className }: Props) {
   const t = useTranslations('marketing.home')
   const loading = preload ? undefined : 'lazy'
@@ -29,7 +31,7 @@ export function PhotoPair({ before, after, size = 'card', preload = false, sizes
       </span>
       <span className="mk-pane">
         <Image className="mk-ph" src={before.src} alt="" aria-hidden width={before.width} height={before.height} sizes={sizes} loading="lazy" />
-        <Image className="mk-a" src={after.src} alt={after.alt} width={after.width} height={after.height} sizes={sizes} preload={preload} loading={loading} />
+        <WhiteGroundImage className="mk-a" src={after.src} alt={after.alt} width={after.width} height={after.height} sizes={sizes} preload={preload} loading={loading} />
         <span className="mk-ws" aria-hidden />
       </span>
       <span className="mk-hl" aria-hidden />
