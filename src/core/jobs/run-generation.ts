@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto'
 import type { ServerTrack } from '../analytics'
 import { tierForBatch, type TierLimits } from '../billing/tier-limits'
 import { AppError, TierRequiredError } from '../errors'
-import { isOwnInputKey, loadInputImage, outputKeyFor } from '../storage'
+import { isOwnInputKey, loadInputImage, outputKeyFor, writeInputPreview } from '../storage'
 import {
   DEFAULT_RESOLUTION,
   loadGenerationTemplate,
@@ -18,7 +18,7 @@ import {
 import { settleTracked } from './generation-analytics'
 import type { GenerationRequest } from './generation-request'
 import { findOwnJob } from './job-lookup'
-import type { JobSource } from './job-schema'
+import type { Job, JobSource } from './job-schema'
 import { toJobView, type JobView } from './job-view'
 import { accountLimits } from './account-limits'
 import { assertWithinRateLimit } from './rate-limit'
@@ -80,6 +80,12 @@ function jobInputs(req: GenerationRequest, { inputs, prompt }: Prepared, resolut
   }
 }
 
+// ARCHITECTURE §8 「原图小图」 (T32), only once the result is confirmed: a failed job has no
+// photo page. Edits (T30) settle elsewhere and get none; their source is the work they edited.
+async function keepInputPreview(deps: GenerationDeps, job: Job, image: Prepared['image']) {
+  if (image) await writeInputPreview(deps.store, { userId: job.userId, jobId: job.id, bytes: image.bytes })
+}
+
 // Synchronous generation (ARCHITECTURE §4) shared by the web route and, later, the partner
 // route. Returns the settled job; failures after reservation throw GenerationFailure with
 // the credits already refunded. The response never carries image bytes.
@@ -118,5 +124,7 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
     params: prompt.modelParams,
   }
   const settle = () => settleGeneration(deps, job, call, outputKeyFor(req.userId, job.id))
-  return toJobView(await settleTracked(job, template.category, settle, { track: deps.track, batchSize: req.batchSize ?? 1 }))
+  const settled = await settleTracked(job, template.category, settle, { track: deps.track, batchSize: req.batchSize ?? 1 })
+  await keepInputPreview(deps, settled, image)
+  return toJobView(settled)
 }
