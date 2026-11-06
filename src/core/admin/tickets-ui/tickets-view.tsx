@@ -1,6 +1,6 @@
 import Link from 'next/link'
 
-import { BASE_SUPPORT_REPLY_HOURS, TIER_SUPPORT_REPLY_HOURS } from '@/core/billing'
+import { BASE_SUPPORT_REPLY_HOURS, TIER_LIMITS } from '@/core/billing'
 import type { AdminListFilter, AdminTicketRow, Page } from '@/core/support'
 import { TICKET_STATUSES, TICKET_TYPES } from '@/core/support/rules'
 import { Badge } from '@/core/ui/badge'
@@ -18,7 +18,12 @@ export function TicketsView({ filter, page, paged }: Props) {
   return (
     <div className="grid gap-4">
       <Filters filter={filter} />
-      {filter.status === 'open' ? <p className="text-xs text-muted-foreground">{COPY.sortHint({ ...TIER_SUPPORT_REPLY_HOURS, base: BASE_SUPPORT_REPLY_HOURS })}</p> : null}
+      {filter.status === 'open' ? <p className="text-xs text-muted-foreground">{COPY.sortHint({
+            starter: TIER_LIMITS.starter.supportHours,
+            pro: TIER_LIMITS.pro.supportHours,
+            max: TIER_LIMITS.max.supportHours,
+            base: BASE_SUPPORT_REPLY_HOURS,
+          })}</p> : null}
       {page.items.length === 0 ? <EmptyState title={COPY.empty} /> : <TicketsTable rows={page.items} />}
       <div className="flex gap-4 text-sm">
         {paged ? (

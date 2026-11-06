@@ -4,7 +4,7 @@ import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { loadTodoCounts } from '@/core/admin'
-import { applyPurchase, BASE_SUPPORT_REPLY_HOURS, TIER_SUPPORT_REPLY_HOURS } from '@/core/billing'
+import { applyPurchase, BASE_SUPPORT_REPLY_HOURS, TIER_LIMITS } from '@/core/billing'
 import { addTicketMessage, listAdminTickets, replyTicket } from '@/core/support'
 
 import { connectAdmin, createUser, serviceClient } from './helpers'
@@ -12,7 +12,7 @@ import { ticket } from './support-fixtures'
 import { serviceSupabase } from './supabase-env'
 
 // T27b (TASKS T27b 测试): due_at per tier, no tier at 48 hours, the order of the open list and
-// the overdue count, plus SQL's support_reply_hours matching TIER_SUPPORT_REPLY_HOURS.
+// the overdue count, plus SQL's support_reply_hours matching TIER_LIMITS.supportHours.
 
 const HOUR = 3_600_000
 let db: Client
@@ -45,13 +45,13 @@ async function openRow(ticketId: string) {
 }
 
 describe('support_reply_hours', () => {
-  it('matches TIER_SUPPORT_REPLY_HOURS, and no tier is the base time', async () => {
+  it('matches TIER_LIMITS.supportHours, and no tier is the base time', async () => {
     for (const tier of ['starter', 'pro', 'max', null] as const) {
       const { data, error } = await serviceSupabase().rpc('support_reply_hours', { p_tier: tier })
       expect(error).toBeNull()
-      expect(data).toBe(tier ? TIER_SUPPORT_REPLY_HOURS[tier] : BASE_SUPPORT_REPLY_HOURS)
+      expect(data).toBe(tier ? TIER_LIMITS[tier].supportHours : BASE_SUPPORT_REPLY_HOURS)
     }
-    expect(TIER_SUPPORT_REPLY_HOURS).toEqual({ starter: 48, pro: 48, max: 24 })
+    expect([TIER_LIMITS.starter, TIER_LIMITS.pro, TIER_LIMITS.max].map((limits) => limits.supportHours)).toEqual([48, 48, 24])
   })
 })
 

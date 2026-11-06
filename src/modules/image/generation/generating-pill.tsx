@@ -3,12 +3,14 @@
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 
+import { isActive } from './scheduler'
 import { useJobs } from './use-jobs'
 
 // "Generating…" in the top bar until this tab's jobs settle (DESIGN §4.4), linking to Photos.
 export function GeneratingPill() {
   const t = useTranslations('app.photos')
-  const running = useJobs().filter((job) => job.status === 'running').length
+  // Queued batch photos count: they are on their way (T28).
+  const running = useJobs().filter(isActive).length
   if (running === 0) return null
   return (
     <Link

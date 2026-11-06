@@ -3,7 +3,8 @@ import 'server-only'
 import { randomUUID } from 'node:crypto'
 
 import type { ServerTrack } from '../analytics'
-import { AppError } from '../errors'
+import { tierForBatch, type TierLimits } from '../billing/tier-limits'
+import { AppError, TierRequiredError } from '../errors'
 import { isOwnInputKey, loadInputImage, outputKeyFor } from '../storage'
 import {
   DEFAULT_RESOLUTION,
@@ -19,6 +20,7 @@ import type { GenerationRequest } from './generation-request'
 import { findOwnJob } from './job-lookup'
 import type { JobSource } from './job-schema'
 import { toJobView, type JobView } from './job-view'
+import { accountLimits } from './account-limits'
 import { assertWithinRateLimit } from './rate-limit'
 import { settleGeneration, type SettleDeps } from './settle-generation'
 import { reserveJob } from './settlement'
@@ -32,8 +34,18 @@ const SURFACE: Record<JobSource, TemplateSurface> = { web: 'web', graylum: 'part
 // (undefined → template.fields.aspectRatios), as its published contract says.
 const ASPECTS: Record<JobSource, readonly string[] | undefined> = { web: OUTPUT_ASPECTS, graylum: undefined }
 
+// A batch bigger than the tier holds (Starter 1, Pro 10, Max 30) is refused per photo; the
+// browser only offers batchMax, so this is someone bypassing the picker or a tier that lapsed
+// mid-batch. Credits, perWindow and concurrency still bound everything else (§6.2).
+function assertBatchAllowed(limits: TierLimits, batchSize: number) {
+  if (batchSize <= limits.batchMax) return
+  const required = tierForBatch(batchSize) ?? 'max'
+  throw new TierRequiredError(required, `A batch of ${batchSize} photos needs a higher plan`)
+}
+
 // Everything that can be rejected without touching credits: template, fields, key
-// ownership, rate limit, then the stored upload itself (HEAD + bytes; bad ones are deleted).
+// ownership, tier limits (batch size, rate limit), then the stored upload itself (HEAD +
+// bytes; bad ones are deleted).
 async function prepare(deps: GenerationDeps, req: GenerationRequest) {
   const { template, prompt } = await loadGenerationTemplate(deps.db, req.templateId, SURFACE[req.source])
   const inputs = validateGenerationInputs(template.fields, {
@@ -45,7 +57,9 @@ async function prepare(deps: GenerationDeps, req: GenerationRequest) {
   })
   // Never touch (or delete) an object outside the caller's own inputs/ prefix.
   if (req.inputKey && !isOwnInputKey(req.userId, req.inputKey)) throw new AppError('INVALID_INPUT', 'Unknown upload')
-  await assertWithinRateLimit(deps.db, req.userId, deps.now?.() ?? new Date(), req.jobId)
+  const limits = await accountLimits(deps.db, req.userId)
+  assertBatchAllowed(limits, req.batchSize ?? 1)
+  await assertWithinRateLimit(deps.db, req.userId, deps.now?.() ?? new Date(), limits, req.jobId)
   const image = req.inputKey ? await loadInputImage(deps.store, req.inputKey) : null
   return { template, prompt, inputs, image }
 }
@@ -104,5 +118,5 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
     params: prompt.modelParams,
   }
   const settle = () => settleGeneration(deps, job, call, outputKeyFor(req.userId, job.id))
-  return toJobView(await settleTracked(job, template.category, settle, { track: deps.track }))
+  return toJobView(await settleTracked(job, template.category, settle, { track: deps.track, batchSize: req.batchSize ?? 1 }))
 }

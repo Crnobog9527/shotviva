@@ -131,6 +131,7 @@ interface GenerationProvider {
 | `vault_secret_id` | 密钥存在 **Supabase Vault**（`vault.secrets`，由 Supabase 在库内加密），表里只存它的 id。Owner 2026-11-06 改定，和 Graylum 一样；取代原先「应用用 `PROVIDER_SECRETS_KEY` 做 AES-256-GCM」的做法，不再需要任何应用侧加密密钥 |
 | `api_key_last4` | 密钥后 4 位，后台列表里显示用 |
 | `is_active` | 当前在用；同一个 `module` 最多一条为 `true`（部分唯一索引） |
+| `price_input_text_per_m` / `price_input_image_per_m` / `price_output_per_m` | 美元 / 百万 token 的单价，后台填（按 OpenAI 价目页）；用来把每单用量算成 `cost_usd`。`decision` 供应商只填输入单价（T33） |
 | `notes` | 备注 |
 | `created_at` / `updated_at` / `updated_by` | 审计 |
 
@@ -168,6 +169,8 @@ interface GenerationProvider {
 | parent_job_id | 作品编辑时，被编辑的那张作品的 id（同一用户的成功作品）；模板出图为空。外键 `on delete set null`（T30） |
 | inputs | 用户填的内容（文案、比例、**分辨率 `resolution`：`'1k'` / `'2k'` / `'3k'`**、可选补充说明 `note`（≤300 字符，工作台「Anything to change?」，服务端拼在模板提示词之后，作为用户内容存档）、输入图在 R2 的 key），**不含封装提示词**。伙伴接口（第 14 节）v1 固定 `'1k'`，契约不加字段 |
 | provider | 实际调用的供应商和模型：`<ai_providers.id 或 env>/<模型名>`（第 3.3 节） |
+| provider_usage | 供应商返回的用量（jsonb）：出图的 `input_text_tokens`、`input_image_tokens`、`output_tokens`；作品编辑另记判断那一步的 `decision_input_tokens`。供应商没返回就为空（T33） |
+| cost_usd | 这一单的真实成本（`numeric(10,6)`）= 用量 × 结算时在用供应商的单价快照；以后改单价不影响历史。没有用量或单价没填就为空，后台标「无法计算」（T33） |
 | source | 'web' / 'graylum'，哪条入口发起的 |
 | idempotency_key | 可空，唯一索引。伙伴接口把调用方的 callId 放这里，重复请求返回同一个任务 |
 | status | running → succeeded / failed |
@@ -417,7 +420,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 
 - `inputs/` 前缀：压缩后的输入图，7 天后自动删除。没发起生成的上传对象同样 7 天清掉。
 - `outputs/` 前缀：成品，只存一份无水印原图，一律保留，直到用户删除。
-- 桶 CORS 必须允许站点域名的 `PUT` 和 `Content-Type` 头。
+- 桶 CORS 必须允许站点域名的 `PUT`、`GET` 和 `Content-Type` 头。`GET` 给分享按钮用：付费作品 `/api/files/:id` 302 到签名地址，浏览器要跨域读出图片才能交给系统分享面板（T31）。
 - 所有读取走 `core/storage` 的下载路由（鉴权 + 第 6.2 节的水印规则）或短期签名 GET；伙伴接口返回的签名地址 7 天有效。
 
 **模板封面另用一个公开桶**（Owner 2026-11-05：模板示例图由 Owner 在后台自己上传替换）：
@@ -447,6 +450,15 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 
 ## 10. 管理后台
 
+### 10.0 真实出图成本（Owner 2026-11-06，T33）
+
+后台的成本一律用供应商回传的真实用量算，不再用固定单价估算。
+
+- **每单成本**：出图（`/v1/images/edits` / `generations`）返回的 `usage` 写进 `generation_jobs.provider_usage`，结算时乘在用供应商的三项单价得到 `cost_usd`，和结算在同一次调用里写入（`confirm_job` / 失败退回的函数多收两个参数，不另开往返）。失败的任务只要供应商回了用量也记成本（供应商照样收钱）。作品编辑把判断那一步的输入 token 也算进这一单。
+- **后台显示**：出图记录每单显示成本；概览按天、按模型汇总真实成本和单张平均成本；单价没填的供应商在后台供应商页标红提示。
+- **和 OpenAI 实际账单对账**：后台「成本对账」页（`/admin/costs`）按天列出近 30 天 OpenAI 实际扣费（OpenAI Costs API `GET /v1/organization/costs`，按 `api_key_id` 或项目筛选，和发票对得上）和我们逐单加总的 `cost_usd`，并显示差额。需要 Owner 在 OpenAI 组织设置里建一把**管理员密钥（Admin key）**，和出图密钥分开，存进 Supabase Vault（和 §3.3 同一做法，后台填、只显示后 4 位）；没填时这一页只显示我们自己的合计并提示去填。读取在打开页面时进行、缓存 1 小时，不写定时任务。对账只读，不改任何数据。
+- 供应商是 OpenRouter 这类会在响应里直接给出费用的中转时，以响应里的费用为准（适配器负责换算），单价字段可以不填。目前预览和生产都用 OpenAI 官方接口。
+
 v1 后台（Owner 2026-11-06 扩充；T23 做外壳和运营页）：**一个后台外壳**（左侧导航、中文、`/admin` 是概览首页），下挂下面这些页面。**只做本站已有的功能，不照搬 Graylum 后台**：Graylum 的工单、创始会员、导师、技能、发布监控等本站没有，不做。
 
 | 导航 | 路由 | 内容 |
@@ -454,7 +466,7 @@ v1 后台（Owner 2026-11-06 扩充；T23 做外壳和运营页）：**一个后
 | 概览 | `/admin` | 今日 / 近 7 天 / 近 30 天：注册数、出图数、出图成功率、消耗积分（免费 / 付费分开）、新增付费用户、收入；近 30 天出图和收入趋势图。非收入部分由 `admin_dashboard_stats(p_days)` 一次算完；收入由 `admin_revenue_stats(p_days)` 算（T9 之后才有） |
 | 用户 | `/admin/users` | 按邮箱搜（读 `admin.users_overview`，最多返回 50 条）。用户详情：积分两池、会员到期、最近出图、积分流水（分页）。操作：调积分（`admin_adjust_credits`，选池、填原因）、封禁 / 解封（`admin_ban_user` / `admin_unban_user`，填原因） |
 | 订单与收入 | `/admin/orders` | 付款记录（时间、用户邮箱、商品、金额、付款方式、渠道、状态）和订阅状态，按商品和渠道汇总收入；每行链接到 Stripe 后台对应记录。退款仍在 Stripe 后台操作。数据来自 T9 的表，T9 合并后才有 |
-| 出图记录 | `/admin/jobs` | 全部出图任务，按状态、模板、供应商 / 模型、来源（web / graylum）、日期筛选，游标分页；失败任务显示 `error_code`；按模型和清晰度统计次数和估算成本（成本单价表是代码常量，和积分下限放在同一处） |
+| 出图记录 | `/admin/jobs` | 全部出图任务，按状态、模板、供应商 / 模型、来源（web / graylum）、日期筛选，游标分页；失败任务显示 `error_code`；每单显示真实成本 `cost_usd`；按模型和清晰度统计次数和真实成本合计（T33 起；T33 之前的老任务没有用量，按旧的代码常量估算并标「估算」） |
 | 模板 | `/admin/templates` | 见下面第 1 条 |
 | 出图供应商 | `/admin/providers` | 见下面第 3 条 |
 | 需求审核 | `/admin/requests` | 见下面第 2 条；`features.wishlist` 关掉时不出现在导航 |

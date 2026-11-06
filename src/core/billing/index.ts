@@ -10,10 +10,11 @@ export { readBalance } from './balance'
 export { callRpc, type RpcClient, type RpcResult } from './rpc'
 export {
   BASE_SUPPORT_REPLY_HOURS,
-  NO_TIER_CONCURRENCY,
-  TIER_CONCURRENCY,
-  TIER_SUPPORT_REPLY_HOURS,
-  concurrencyFor,
-  supportHoursFor,
+  MAX_BATCH_SIZE,
+  TIER_LIMITS,
+  batchUpgrade,
   currentTier,
+  limitsFor,
+  tierForBatch,
+  type TierLimits,
 } from './tier'
