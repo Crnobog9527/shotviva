@@ -129,9 +129,10 @@ const jobRow = z.object({
   credits_cost: z.number(),
   credit_pool: z.enum(['free', 'paid']),
   error_code: z.string().nullable(),
+  deleted_at: z.string().nullable().optional(),
 })
 
-const JOB_COLUMNS = 'id, created_at, template_id, status, credits_cost, credit_pool, error_code'
+const JOB_COLUMNS = 'id, created_at, template_id, status, credits_cost, credit_pool, error_code, deleted_at'
 
 const toUserJob = (row: z.infer<typeof jobRow>): UserJob => ({
   id: row.id,
@@ -141,6 +142,7 @@ const toUserJob = (row: z.infer<typeof jobRow>): UserJob => ({
   creditsCost: row.credits_cost,
   creditPool: row.credit_pool,
   errorCode: row.error_code,
+  deletedByUser: Boolean(row.deleted_at),
 })
 
 // The job a lookup landed on (?job=), by primary key, and only if it belongs to this user.

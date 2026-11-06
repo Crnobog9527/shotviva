@@ -1,6 +1,7 @@
 import 'server-only'
 
 import {
+  CopyObjectCommand,
   DeleteObjectCommand,
   DeleteObjectsCommand,
   GetObjectCommand,
@@ -51,6 +52,11 @@ async function deleteAllUnder(client: S3Like, bucket: string, prefix: string) {
   } while (token)
 }
 
+// CopySource is "bucket/key", URL-encoded per path segment (S3 decodes it once).
+export function copySource(bucket: string, key: string): string {
+  return `${bucket}/${key.split('/').map(encodeURIComponent).join('/')}`
+}
+
 export function createR2Store(client: S3Like, bucket: string, presign: Presign = getSignedUrl): ObjectStore {
   return {
     presignPut: (key, contentType, expiresIn) =>
@@ -83,6 +89,9 @@ export function createR2Store(client: S3Like, bucket: string, presign: Presign =
       await client.send(
         new PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ContentType: contentType, CacheControl: options?.cacheControl }),
       )
+    },
+    async copy(sourceKey, destinationKey) {
+      await client.send(new CopyObjectCommand({ Bucket: bucket, Key: destinationKey, CopySource: copySource(bucket, sourceKey) }))
     },
     async delete(key) {
       await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))

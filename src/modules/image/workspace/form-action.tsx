@@ -32,16 +32,21 @@ const monoCost = (chunks: ReactNode) => <span className="font-mono text-caption 
 // dialog under its scrolling form.
 const PAGE = 'md:px-0 lg:sticky lg:bottom-0 lg:z-10 lg:mt-4 lg:bg-[linear-gradient(transparent,var(--background)_16px)] lg:pt-6 lg:pb-6'
 
-type Props = { state: CtaState; resolution: Resolution; batch: boolean; onGenerate(): void; placement?: 'page' | 'sheet' }
+// addFirst: Make again without its photo (T40) says what it will cost once the photo is in.
+type Props = { state: CtaState; resolution: Resolution; batch: boolean; onGenerate(): void; placement?: 'page' | 'sheet'; addFirst?: number | null }
 
 // The creation form's bottom bar: one notice line at most, then the one primary (DESIGN §4.3
 // steps 4–5). The free-credit notice shows only when this photo would use free credits; a
 // batch (T28) says how many photos and that it is paid credits only.
-export function FormAction({ state, resolution, batch, onGenerate, placement = 'page' }: Props) {
+export function FormAction({ state, resolution, batch, onGenerate, placement = 'page', addFirst = null }: Props) {
   const t = useTranslations('app.workspace')
   return (
     <ActionBar inline={placement === 'sheet'} className={placement === 'page' ? PAGE : undefined}>
-      <Notice state={state} resolution={resolution} />
+      {state.kind === 'need-photo' && addFirst !== null ? (
+        <ActionNotice>{t.rich('again.addFirst', { ...rich, count: addFirst })}</ActionNotice>
+      ) : (
+        <Notice state={state} resolution={resolution} />
+      )}
       {state.kind === 'get-credits' ? (
         <PaywallButton trigger="insufficient_credits" className={buttonVariants({ variant: 'cta-neutral', size: 'cta' })}>
           <span>{t.rich('getCreditsCta', { ...rich, count: state.needed })}</span>

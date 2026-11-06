@@ -15,6 +15,8 @@ export { UploadTestPanel, type TestTemplate } from './workspace/dev/upload-test-
 export { TemplateCatalogue } from './catalogue/template-catalogue'
 export { toCatalogueTemplate, type CatalogueTemplate } from './catalogue/catalogue-template'
 export { ImageWorkspace, type WorkspaceProps } from './workspace/image-workspace'
+// Make again (T40): server only; reads the work and copies its kept photos back.
+export { loadAgain } from './again/load-again'
 export { WorkspaceHead } from './workspace/workspace-head'
 export { GenerationRunner } from './generation/generation-runner'
 export { GeneratingPill } from './generation/generating-pill'
@@ -26,6 +28,9 @@ export { PhotosCount } from './photos/photos-count'
 export { toPhotoItem, type PhotoItem, type TemplateLookup } from './photos/photo-item'
 export { editDisplay, editOriginal } from './photos/edit-display'
 export { ResultView } from './result/result-view'
+// Deleting a work (T41): the photo page's last action, and Photos' toast after it.
+export { DeleteWork, type DeleteWorkAction } from './result/delete-work'
+export { DeletedToast } from './photos/deleted-toast'
 export { toPhotoDetail, type PhotoDetail } from './detail/photo-detail'
 export { EditFlow, EditTrigger, type EditSource } from './edit-ui'
 // Wishlist post form (T12): one upload field, same zone and stages as the workspace.

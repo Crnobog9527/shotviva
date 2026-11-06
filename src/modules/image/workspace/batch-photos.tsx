@@ -7,7 +7,7 @@ import { useRef } from 'react'
 import { UPLOAD_ACCEPT } from '@/core/storage/rules'
 
 import type { BatchPhoto } from './photo-batch'
-import { UploadStage } from './photo-card'
+import { PhotoSize, UploadStage } from './photo-card'
 import { ICONS } from './photo-pickers'
 
 type Props = { photos: readonly BatchPhoto[]; max: number; onAdd(files: File[]): void; onRemove(id: string): void }
@@ -68,8 +68,8 @@ function BatchPhotoRow({ photo, index, onRemove }: { photo: BatchPhoto; index: n
         <img src={photo.url} alt={t('workspace.photoN', { index })} className="size-full object-cover" />
       </span>
       <div className="min-w-0 flex-1">
-        <UploadStage upload={photo.upload} />
-        <p className="mt-1.5 font-mono text-caption leading-[1.4] text-muted-foreground">{t('units.megabytes', { size })}</p>
+        <UploadStage upload={photo.upload} kept={photo.keptFrom !== undefined} />
+        <PhotoSize size={t('units.megabytes', { size })} keptFrom={photo.keptFrom} className="mt-1.5" />
       </div>
       <button
         type="button"

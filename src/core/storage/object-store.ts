@@ -13,6 +13,8 @@ export type ObjectStore = {
   get(key: string): Promise<Uint8Array>
   // cacheControl: only for content-hashed public files (template covers), which never change.
   put(key: string, body: Uint8Array, contentType: string, options?: { cacheControl?: string }): Promise<void>
+  // Server-side copy inside the bucket: the bytes never pass through our function (§8.3, T40).
+  copy(sourceKey: string, destinationKey: string): Promise<void>
   delete(key: string): Promise<void>
   deletePrefix(prefix: string): Promise<void>
 }

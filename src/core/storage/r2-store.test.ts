@@ -1,4 +1,4 @@
-import { DeleteObjectsCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand } from '@aws-sdk/client-s3'
+import { CopyObjectCommand, DeleteObjectsCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand } from '@aws-sdk/client-s3'
 import { describe, expect, it, vi } from 'vitest'
 
 import { createR2Store } from './r2-store'
@@ -42,5 +42,13 @@ describe('createR2Store', () => {
     const [, command, options] = presign.mock.calls[0] as unknown as [unknown, PutObjectCommand, { expiresIn: number }]
     expect(command.input).toMatchObject({ Bucket: 'bucket', Key: 'inputs/u/a.jpg', ContentType: 'image/jpeg' })
     expect(options.expiresIn).toBe(60)
+  })
+
+  it('copies inside the bucket with an encoded CopySource', async () => {
+    const send = vi.fn(async () => ({}))
+    await createR2Store({ send } as never, 'bucket').copy('inputs/u/a b.jpg', 'outputs/u/j-in-1.jpg')
+    const [command] = send.mock.calls[0] as unknown as [CopyObjectCommand]
+    expect(command).toBeInstanceOf(CopyObjectCommand)
+    expect(command.input).toMatchObject({ Bucket: 'bucket', Key: 'outputs/u/j-in-1.jpg', CopySource: 'bucket/inputs/u/a%20b.jpg' })
   })
 })

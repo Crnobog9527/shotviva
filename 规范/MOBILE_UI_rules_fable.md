@@ -108,7 +108,7 @@ DESIGN.md §1.4 现在只有一句「先按 375px 宽设计，再适配桌面」
 
 ### 1.9 状态反馈
 
-- 上传分三段可见状态：**Compressing → Uploading（进度条）→ Generating（预计 20–40 秒）**，每段都有文字，不准只转圈。
+- 上传分三段可见状态：**Compressing → Uploading（进度条）→ Generating（一般 60 秒左右，见 DESIGN「生成中」）**，每段都有文字，不准只转圈。
 - 生成中允许切走，回来自动恢复；顶栏显示「Generating…」小标记直到完成。
 - 网络失败给「Retry」按钮，不要让用户重新选图。
 

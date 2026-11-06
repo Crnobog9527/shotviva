@@ -7,7 +7,7 @@ import { jobRowSchema, type Job } from './job-schema'
 import { isLiveRunning, RATE_LIMIT } from './rate-limit'
 
 // What Photos shows, newest first, read with the user's own session (RLS
-// generation_jobs_select_own). Failed jobs are refunded and left out; a 'running' row older
+// generation_jobs_select_own, which also hides works the user deleted, T41). Failed jobs are refunded and left out; a 'running' row older
 // than the function limit died with its function and is left out too (v1 has no sweeper).
 export type OwnJobs = { running: Job[]; done: Job[] }
 
@@ -21,6 +21,7 @@ export async function listOwnJobs(client: SupabaseClient, userId: string, now: D
     .select('*')
     .eq('user_id', userId)
     .in('status', ['running', 'succeeded'])
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .limit(PHOTOS_LIMIT)
   if (error) throw new AppError('INTERNAL', `listOwnJobs failed: ${error.message}`)

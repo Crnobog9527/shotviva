@@ -244,7 +244,7 @@
       "developingTitle": "Developing your photo",
       "developing": "Developing",
       "generating": "Generating",
-      "leave": "Usually 20–40 seconds. You can leave this page. It lands in Photos when it's done.",
+      "leave": "Usually about 60 seconds. You can leave this page. It lands in Photos when it's done.",
       "backToCreate": "Back to Create",
       "readyTitle": "Your photo is ready",
       "beforeAfter": "Before and after",
@@ -281,13 +281,23 @@
       "batchTitle": "Developing {count, number} photos",
       "batchSettledTitle": "{count, number} photos developed",
       "batchSummary": "{done, number} of {count, number} done{failed, plural, =0 {} other { · # didn't develop}}",
-      "batchLeave": "Usually 20–40 seconds each. You can leave this page; each photo lands in Photos when it's done.",
+      "batchLeave": "Usually about 60 seconds each. You can leave this page; each photo lands in Photos when it's done.",
       "makeMore": "Make another batch",
       "getTier": "Get {tier}",
       "stageLabel": "Preview",
       "stageYours": "Your photo",
       "stageYoursCaption": "Your photo, as shot. The template keeps it and changes the light and background.",
-      "stageSampleCaption": "Template example: the phone photo on the left, the AI result on the right."
+      "stageSampleCaption": "Template example: the phone photo on the left, the AI result on the right.",
+      "again": {
+        "note": "<b>Making again:</b> {summary}, from <day></day>.",
+        "noteKept": "note kept",
+        "kept": "Original photo, kept with the work",
+        "keptFrom": "From <day></day> · {size}",
+        "missingTitle": "The original photo isn't available",
+        "missingOld": "This work was made before we started keeping originals. Add the same photo again and everything else is as it was.",
+        "missingFailed": "We couldn't bring back the original just now. Add the same photo again and everything else is as it was.",
+        "addFirst": "Add the photo first. <b>Then it costs {count} credits, like any photo.</b>"
+      }
     },
     "errors": {
       "CONTENT_REJECTED": "The photo or your note didn't pass the safety check. Try another photo or change the note.",
@@ -312,7 +322,7 @@
       "title": "Photos",
       "metaTitle": "Photos",
       "inProgress": "In progress",
-      "usually": "Usually 20–40 seconds each",
+      "usually": "Usually about 60 seconds each",
       "closeApp": "You can close the app. Finished photos land here.",
       "generating": "Generating",
       "generatingAria": "Generating {name}",
@@ -332,7 +342,9 @@
       "doneMeta": "{when} · {size} · {tier}",
       "runningMeta": "{size} · {tier} · {count, plural, one {# credit} other {# credits}}",
       "waiting": "Waiting for a free slot",
-      "makeAgain": "Make again"
+      "makeAgain": "Make again",
+      "deleted": "Photo deleted.",
+      "deletedClose": "Close"
     },
     "work": {
       "freePublic": "Public · watermark",
@@ -363,8 +375,8 @@
         "original": "Original"
       },
       "originalAlt": "The photo you uploaded for {name}",
-      "originalDeleted": "Original deleted",
-      "originalDeletedBody": "Per our privacy rules, the photo you uploaded is no longer kept. The result stays.",
+      "originalDeleted": "Original not available",
+      "originalDeletedBody": "This photo was made before originals were kept with each work. The result stays.",
       "yourNote": "Your note",
       "showMore": "Show more",
       "showLess": "Show less",
@@ -382,10 +394,21 @@
         "visibilityPrivate": "Private",
         "visibilityPublic": "Public",
         "original": "Original",
+        "originalWithWork": "Kept with this photo",
         "originalKept": "Kept, {px} px preview",
         "originalEdited": "The photo you edited",
-        "originalDeleted": "Deleted per our privacy rules",
+        "originalDeleted": "Made before originals were kept",
         "made": "Made"
+      },
+      "delete": {
+        "open": "Delete",
+        "title": "Delete this photo?",
+        "body": "This can't be undone. Credits spent aren't refunded.",
+        "confirm": "Delete photo",
+        "deleting": "Deleting…",
+        "cancel": "Cancel",
+        "running": "This photo is still developing. Delete it once it's done.",
+        "failed": "Couldn't delete the photo. Please try again."
       }
     },
     "wishlist": {
@@ -601,7 +624,8 @@
       "changeRequest": "Change the request",
       "titleEdited": "{name} (edit)",
       "yourChange": "Your change",
-      "editedFromLabel": "Edited from"
+      "editedFromLabel": "Edited from",
+      "sourceDeleted": "Original deleted"
     }
   },
   "paywall": {

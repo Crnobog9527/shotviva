@@ -19,12 +19,13 @@ describe('toPhotoDetail', () => {
       prompt: 'WRAPPED studio shot of {{dish}}',
     }
     const detail = toPhotoDetail({ inputs }, '/api/files/j/original')
-    expect(detail).toEqual({ note: 'Keep the chain gold\nsoften the shadow', original: { kind: 'preview', url: '/api/files/j/original' } })
+    expect(detail).toEqual({ note: 'Keep the chain gold\nsoften the shadow', original: { kind: 'preview', url: '/api/files/j/original' }, keptWithWork: false })
     expect(JSON.stringify(detail)).not.toMatch(/WRAPPED|prompt/i)
   })
 
   it('has no note when none was written, and a deleted original without a preview', () => {
-    expect(toPhotoDetail({ inputs: { note: '   ' } }, null)).toEqual({ note: null, original: { kind: 'deleted' } })
+    expect(toPhotoDetail({ inputs: { note: '   ' } }, null)).toEqual({ note: null, original: { kind: 'deleted' }, keptWithWork: false })
+    expect(toPhotoDetail({ inputs: {} }, '/api/files/j/original', true).keptWithWork).toBe(true)
     expect(noteOf({})).toBeNull()
     expect(noteOf({ note: 42 })).toBeNull()
   })

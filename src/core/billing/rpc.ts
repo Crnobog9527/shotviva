@@ -25,6 +25,8 @@ const SQL_ERROR_CODES: Record<string, ErrorCode> = {
   PRODUCT_NOT_FOUND: 'NOT_FOUND',
   IDEMPOTENCY_CONFLICT: 'CONFLICT',
   JOB_ALREADY_SETTLED: 'CONFLICT',
+  // A work still generating cannot be deleted (T41).
+  JOB_RUNNING: 'CONFLICT',
   USER_BANNED: 'FORBIDDEN',
   // A free work cannot be made private (ARCHITECTURE §6.2).
   FREE_WORK_PUBLIC: 'FORBIDDEN',

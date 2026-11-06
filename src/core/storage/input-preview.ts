@@ -7,8 +7,8 @@ import { inputPreviewKeyFor } from './keys'
 import type { ObjectStore } from './object-store'
 import { INPUT_PREVIEW_PX } from './rules'
 
-// ARCHITECTURE §8 「原图小图」 (T32): the full upload is deleted after 7 days, so the photo page
-// keeps this small copy to show what the result was made from, for as long as the result.
+// ARCHITECTURE §8 「原图小图」 (T32): a light copy the photo page shows next to the result, so it
+// never loads the full upload kept for Make again (T40), and works made before T40 still have one.
 const INPUT_PREVIEW_QUALITY = 80
 
 // sharp drops all metadata unless asked to keep it, so EXIF and GPS never reach the copy;

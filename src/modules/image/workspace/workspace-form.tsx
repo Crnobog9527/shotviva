@@ -9,6 +9,9 @@ import type { OutputAspect, Resolution } from '@/core/templates'
 
 import type { MembershipTier } from '@/core/config'
 
+import { AgainNote } from '../again/again-note'
+import type { AgainStart } from '../again/again-start'
+import { MissingPhoto } from '../again/missing-photo'
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import { BatchHint } from './batch-hint'
 import { BatchPhotos } from './batch-photos'
@@ -28,21 +31,24 @@ type Props = {
   photos: PhotoBatch
   values: FormValues
   onChange(next: Partial<FormValues>): void
+  // Opened with Make again (T40): the note on top, and the photo slot when the photo is missing.
+  again?: AgainStart | null
 }
 
 // One column, one scroll, no wizard (DESIGN §4.3): photo → text the template needs → the
 // optional note → size → resolution, then the balance line above the action bar. The one form
 // source (T38): the workspace page and the creation dialog both render it, and their frames
 // set the side padding.
-export function WorkspaceForm({ template, balance, tier, photos, values, onChange }: Props) {
+export function WorkspaceForm({ template, balance, tier, photos, values, onChange, again }: Props) {
   const t = useTranslations('app')
   const balanceT = useTranslations('app.balance')
   const noteT = useTranslations('app.workspace.notePlaceholder')
   const size = SIZE_OPTIONS.find((option) => option.id === values.aspect)
   return (
     <>
+      {again ? <AgainNote again={again} template={template} /> : null}
       <Section id="photo-h" title={t(photos.batchMax > 1 ? 'workspace.yourPhotos' : 'workspace.yourPhoto')} aside={<PhotoAside photos={photos} />}>
-        <PhotoField photos={photos} />
+        <PhotoField photos={photos} missing={again?.missing ?? null} />
         <BatchHint tier={tier} dropped={photos.dropped} />
       </Section>
       {template.copyFields.length > 0 ? (
@@ -79,9 +85,11 @@ export function WorkspaceForm({ template, balance, tier, photos, values, onChang
   )
 }
 
-// Single-photo tiers keep the one-photo card with Replace; Pro and Max get the batch list.
-function PhotoField({ photos }: { photos: PhotoBatch }) {
+// Single-photo tiers keep the one-photo card with Replace; Pro and Max get the batch list. Make
+// again without its photo asks for it again in the empty slot.
+function PhotoField({ photos, missing }: { photos: PhotoBatch; missing: 'old' | 'failed' | null }) {
   const [first] = photos.photos
+  if (!first && missing) return <MissingPhoto reason={missing} multiple={photos.batchMax > 1} onPick={photos.add} />
   if (photos.batchMax <= 1) {
     return first ? <PhotoCard photo={first} upload={first.upload} onPick={(file) => photos.add([file])} /> : <PhotoPickers onPick={photos.add} />
   }

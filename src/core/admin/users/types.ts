@@ -32,6 +32,8 @@ export type UserJob = {
   creditsCost: number
   creditPool: 'free' | 'paid'
   errorCode: string | null
+  // The user deleted this work (T41).
+  deletedByUser: boolean
 }
 
 export type UserDetail = {

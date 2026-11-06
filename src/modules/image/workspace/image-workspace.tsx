@@ -43,8 +43,14 @@ export function ImageWorkspace({ shareText, ...input }: WorkspaceProps) {
   return (
     <div className="lg:grid lg:grid-cols-[minmax(380px,440px)_minmax(0,1fr)] lg:items-start lg:gap-x-12 lg:px-(--gutter)">
       <div className="min-w-0 px-(--gutter) lg:px-0">
-        <WorkspaceForm template={template} balance={balance} tier={tier} photos={draft.photos} values={draft.values} onChange={draft.change} />
-        <FormAction state={draft.state} resolution={draft.values.resolution} batch={draft.photos.batchMax > 1} onGenerate={generate} />
+        <WorkspaceForm template={template} balance={balance} tier={tier} photos={draft.photos} values={draft.values} onChange={draft.change} again={input.again} />
+        <FormAction
+          state={draft.state}
+          resolution={draft.values.resolution}
+          batch={draft.photos.batchMax > 1}
+          addFirst={draft.missingPhoto ? template.creditsCost[draft.values.resolution] : null}
+          onGenerate={generate}
+        />
       </div>
       <WorkspaceStage template={template} photo={draft.photos.photos[0] ?? null} />
     </div>

@@ -1229,7 +1229,7 @@ $$;
 ALTER FUNCTION "public"."admin_upsert_template"("p_template" "jsonb", "p_prompt" "jsonb") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."admin_view_work"("p_job_id" "uuid") RETURNS TABLE("user_id" "uuid", "status" "text", "output_key" "text", "input_key" "text", "created_at" timestamp with time zone)
+CREATE OR REPLACE FUNCTION "public"."admin_view_work"("p_job_id" "uuid") RETURNS TABLE("user_id" "uuid", "status" "text", "output_key" "text", "input_key" "text", "created_at" timestamp with time zone, "deleted_at" timestamp with time zone)
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
@@ -1244,7 +1244,8 @@ begin
   insert into public.admin_audit_log (action, user_id, target_id, reason)
   values ('view_work', v_job.user_id, p_job_id::text, '客服查看作品');
 
-  return query select v_job.user_id, v_job.status, v_job.output_key, v_job.inputs ->> 'input_key', v_job.created_at;
+  return query select v_job.user_id, v_job.status, v_job.output_key,
+    coalesce(v_job.inputs -> 'kept_inputs' ->> 0, v_job.inputs ->> 'input_key'), v_job.created_at, v_job.deleted_at;
 end;
 $$;
 
@@ -1379,6 +1380,7 @@ CREATE TABLE IF NOT EXISTS "public"."generation_jobs" (
     "parent_job_id" "uuid",
     "provider_usage" "jsonb",
     "cost_usd" numeric(10,6),
+    "deleted_at" timestamp with time zone,
     CONSTRAINT "generation_jobs_check" CHECK ((("status" = 'running'::"text") = ("finished_at" IS NULL))),
     CONSTRAINT "generation_jobs_check1" CHECK ((("status" <> 'succeeded'::"text") OR ("output_key" IS NOT NULL))),
     CONSTRAINT "generation_jobs_cost_usd_nonnegative" CHECK ((("cost_usd" IS NULL) OR ("cost_usd" >= (0)::numeric))),
@@ -1396,18 +1398,24 @@ CREATE TABLE IF NOT EXISTS "public"."generation_jobs" (
 ALTER TABLE "public"."generation_jobs" OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text", "p_provider_usage" "jsonb" DEFAULT NULL::"jsonb", "p_cost_usd" numeric DEFAULT NULL::numeric) RETURNS "public"."generation_jobs"
+COMMENT ON COLUMN "public"."generation_jobs"."deleted_at" IS 'When the owner deleted this work (T41). Set only by delete_own_job; user-facing reads skip it.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text", "p_provider_usage" "jsonb" DEFAULT NULL::"jsonb", "p_cost_usd" numeric DEFAULT NULL::numeric, "p_kept_inputs" "text"[] DEFAULT NULL::"text"[]) RETURNS "public"."generation_jobs"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
 declare
   v_job public.generation_jobs;
+  v_prefix text;
+  v_kept text[];
 begin
   select * into v_job from public.generation_jobs where id = p_job_id for update;
   if not found then
     raise exception 'JOB_NOT_FOUND';
   end if;
-  -- A repeat keeps the first settlement, usage and cost included.
+  -- A repeat keeps the first settlement, usage, cost and kept inputs included.
   if v_job.status = 'succeeded' then
     return v_job;
   end if;
@@ -1418,9 +1426,15 @@ begin
     raise exception 'INVALID_INPUT' using detail = 'output_key is required';
   end if;
 
+  v_prefix := 'outputs/' || v_job.user_id::text || '/' || v_job.id::text || '-in-';
+  select array_agg(k order by n) into v_kept
+    from unnest(coalesce(p_kept_inputs, '{}'::text[])) with ordinality as t(k, n)
+   where n <= 30 and k is not null and left(k, length(v_prefix)) = v_prefix and k not like '%/../%';
+
   update public.generation_jobs
      set status = 'succeeded', output_key = p_output_key, finished_at = now(),
-         provider_usage = p_provider_usage, cost_usd = p_cost_usd
+         provider_usage = p_provider_usage, cost_usd = p_cost_usd,
+         inputs = case when v_kept is null then inputs else inputs || jsonb_build_object('kept_inputs', to_jsonb(v_kept)) end
    where id = p_job_id
   returning * into v_job;
   return v_job;
@@ -1428,7 +1442,7 @@ end;
 $$;
 
 
-ALTER FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric) OWNER TO "postgres";
+ALTER FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric, "p_kept_inputs" "text"[]) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."create_support_ticket"("p_user_id" "uuid", "p_type" "text", "p_body" "text", "p_payment_id" bigint, "p_job_id" "uuid") RETURNS "public"."support_tickets"
@@ -1602,6 +1616,38 @@ $$;
 
 
 ALTER FUNCTION "public"."current_tier"("p_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."delete_own_job"("p_job_id" "uuid", "p_user_id" "uuid") RETURNS "public"."generation_jobs"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_job public.generation_jobs;
+begin
+  select * into v_job from public.generation_jobs
+   where id = p_job_id and user_id = p_user_id
+     for update;
+  if not found then
+    raise exception 'JOB_NOT_FOUND';
+  end if;
+  if v_job.deleted_at is not null then
+    return v_job;
+  end if;
+  if v_job.status = 'running' then
+    raise exception 'JOB_RUNNING';
+  end if;
+
+  update public.generation_jobs
+     set deleted_at = now(), inputs = inputs - 'note' - 'copy' - 'instruction'
+   where id = p_job_id
+  returning * into v_job;
+  return v_job;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."delete_own_job"("p_job_id" "uuid", "p_user_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."delete_provider_vault_secret"() RETURNS "trigger"
@@ -1898,10 +1944,10 @@ begin
     raise exception 'USER_BANNED';
   end if;
 
-  -- Someone else's work, a failed or running one, or a missing one all look the same.
+  -- Someone else's work, a failed, running or deleted one, or a missing one all look the same.
   if p_parent_job_id is not null then
     perform 1 from public.generation_jobs
-     where id = p_parent_job_id and user_id = p_user_id and status = 'succeeded';
+     where id = p_parent_job_id and user_id = p_user_id and status = 'succeeded' and deleted_at is null;
     if not found then
       raise exception 'PARENT_JOB_NOT_FOUND';
     end if;
@@ -1962,7 +2008,7 @@ begin
   end if;
 
   select * into v_job from public.generation_jobs
-   where id = p_job_id and user_id = p_user_id
+   where id = p_job_id and user_id = p_user_id and deleted_at is null
      for update;
   if not found then
     raise exception 'JOB_NOT_FOUND';
@@ -2904,7 +2950,7 @@ ALTER TABLE "public"."feature_access" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."generation_jobs" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "generation_jobs_select_own" ON "public"."generation_jobs" FOR SELECT TO "authenticated" USING ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
+CREATE POLICY "generation_jobs_select_own" ON "public"."generation_jobs" FOR SELECT TO "authenticated" USING (((( SELECT "auth"."uid"() AS "uid") = "user_id") AND ("deleted_at" IS NULL)));
 
 
 
@@ -3156,8 +3202,8 @@ GRANT SELECT ON TABLE "public"."generation_jobs" TO "authenticated";
 
 
 
-REVOKE ALL ON FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric) FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric) TO "service_role";
+REVOKE ALL ON FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric, "p_kept_inputs" "text"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric, "p_kept_inputs" "text"[]) TO "service_role";
 
 
 
@@ -3178,6 +3224,11 @@ GRANT ALL ON FUNCTION "public"."create_template_request"("p_user_id" "uuid", "p_
 
 REVOKE ALL ON FUNCTION "public"."current_tier"("p_user_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."current_tier"("p_user_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."delete_own_job"("p_job_id" "uuid", "p_user_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."delete_own_job"("p_job_id" "uuid", "p_user_id" "uuid") TO "service_role";
 
 
 

@@ -112,6 +112,7 @@ describe('view work', () => {
       output: `memory://get/${outputKey}?expires=300`,
       input: `memory://get/${inputKey}?expires=300`,
       inputExpired: false,
+      deleted: false,
     })
     expect(await auditOf(user)).toEqual([{ action: 'view_work', target_id: jobId }])
   })

@@ -16,7 +16,7 @@ import { beijingDayStart, type JobFilters } from './filters'
 // 「无法计算」 (usage, no price) from a pre-T33 job (neither).
 
 const COLUMNS =
-  'id, created_at, finished_at, user_id, template_id, status, source, provider, credit_pool, credits_cost, error_code, resolution:inputs->>resolution, cost_usd, provider_usage'
+  'id, created_at, finished_at, user_id, template_id, status, source, provider, credit_pool, credits_cost, error_code, resolution:inputs->>resolution, cost_usd, provider_usage, deleted_at'
 
 const rowSchema = z.object({
   id: z.uuid(),
@@ -33,6 +33,8 @@ const rowSchema = z.object({
   resolution: z.string().nullable(),
   cost_usd: z.coerce.number().nullable(),
   provider_usage: z.record(z.string(), z.unknown()).nullable(),
+  // Absent before T41's migration.
+  deleted_at: z.string().nullable().optional(),
 })
 
 export type AdminJob = {
@@ -50,6 +52,8 @@ export type AdminJob = {
   errorCode: string | null
   costUsd: number | null
   hasUsage: boolean
+  // The user deleted this work (T41): the row stays for the ledger and costs, the files are gone.
+  deletedByUser: boolean
 }
 
 function toJob(row: z.infer<typeof rowSchema>): AdminJob {
@@ -69,6 +73,7 @@ function toJob(row: z.infer<typeof rowSchema>): AdminJob {
     errorCode: row.error_code,
     costUsd: row.cost_usd,
     hasUsage: row.provider_usage !== null,
+    deletedByUser: Boolean(row.deleted_at),
   }
 }
 

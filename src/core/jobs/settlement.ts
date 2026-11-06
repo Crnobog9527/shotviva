@@ -67,12 +67,22 @@ const costSchema = {
   costUsd: z.number().nonnegative().nullable().default(null),
 }
 
-export async function confirmJob(client: RpcClient, input: { jobId: string; outputKey: string } & JobCost): Promise<Job> {
-  const args = z.object({ jobId: z.uuid(), outputKey: z.string().min(1), ...costSchema }).parse(input)
+// keptInputs: the job's uploads, already copied next to the result (T40); recorded as
+// inputs.kept_inputs in this same call. confirm_job drops any key outside the job's own slot.
+export async function confirmJob(client: RpcClient, input: { jobId: string; outputKey: string; keptInputs?: string[] } & JobCost): Promise<Job> {
+  const args = z
+    .object({ jobId: z.uuid(), outputKey: z.string().min(1), keptInputs: z.array(z.string().min(1)).max(30).default([]), ...costSchema })
+    .parse(input)
   return callRpc(
     client,
     'confirm_job',
-    { p_job_id: args.jobId, p_output_key: args.outputKey, p_provider_usage: args.usage, p_cost_usd: args.costUsd },
+    {
+      p_job_id: args.jobId,
+      p_output_key: args.outputKey,
+      p_provider_usage: args.usage,
+      p_cost_usd: args.costUsd,
+      p_kept_inputs: args.keptInputs.length > 0 ? args.keptInputs : null,
+    },
     jobRowSchema,
   )
 }
@@ -85,6 +95,14 @@ export async function refundJob(client: RpcClient, input: { jobId: string; error
     { p_job_id: args.jobId, p_error_code: args.errorCode, p_provider_usage: args.usage, p_cost_usd: args.costUsd },
     jobRowSchema,
   )
+}
+
+// The owner deletes a finished work (T41, ARCHITECTURE §6.2「删除作品」): soft delete, credits stay
+// spent. Someone else's job is NOT_FOUND like a missing one; a running one is CONFLICT; a repeat
+// returns the already deleted row.
+export async function deleteOwnJob(client: RpcClient, input: { jobId: string; userId: string }): Promise<Job> {
+  const args = z.object({ jobId: z.uuid(), userId: z.uuid() }).parse(input)
+  return callRpc(client, 'delete_own_job', { p_job_id: args.jobId, p_user_id: args.userId }, jobRowSchema)
 }
 
 // The owner's public/private toggle (ARCHITECTURE §6.2): paid works switch freely, a free work

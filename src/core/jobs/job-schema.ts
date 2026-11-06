@@ -33,6 +33,8 @@ export type Job = {
   errorCode: string | null
   createdAt: Date
   finishedAt: Date | null
+  // When the owner deleted the work (T41); user-facing reads never return such a row.
+  deletedAt: Date | null
 }
 
 const toDate = (value: string | null): Date | null => (value === null ? null : new Date(value))
@@ -57,6 +59,8 @@ export const jobRowSchema = z
     error_code: z.string().nullable(),
     created_at: z.string(),
     finished_at: z.string().nullable(),
+    // Absent on rows read before T41's migration.
+    deleted_at: z.string().nullable().optional(),
   })
   .transform(
     (row): Job => ({
@@ -77,5 +81,6 @@ export const jobRowSchema = z
       errorCode: row.error_code,
       createdAt: new Date(row.created_at),
       finishedAt: toDate(row.finished_at),
+      deletedAt: toDate(row.deleted_at ?? null),
     }),
   )

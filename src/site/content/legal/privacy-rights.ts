@@ -11,9 +11,9 @@ export const privacyRightsSections: readonly [LegalSection, ...LegalSection[]] =
     blocks: [
       {
         list: [
-          'Uploaded photos: the original file is deleted automatically 7 days after upload, whether or not you created an image from it.',
-          'Previews of uploaded photos: for each image you create, we keep a small copy of the photo it was made from (768 pixels on its longest side, without camera details or GPS location), so you can compare the two on the photo page. It is kept with that image until you delete the image or your account.',
-          'Your works (created images): kept until you delete them or delete your account.',
+          'Uploaded photos you create an image from: kept with that image, so you can make it again at any time, until you delete the image or your account. We also keep a small copy (768 pixels on its longest side, without camera details or GPS location) to show next to the image on the photo page, for the same time.',
+          'Uploaded photos you do not create an image from: deleted automatically 7 days after upload.',
+          'Your works (created images): kept until you delete them or delete your account. When you delete a work, its image files (the image, its small copy and the photos it was made from) and the text you typed for it are deleted right away. We keep a short record of the job (template, size, credits used and dates) for your credit history and our accounts until you delete your account.',
           'Wishlist reference images: kept until the request is rejected or removed, or until you delete your account.',
           'Account details, credit records and your list of works: kept while your account exists.',
           'Help & feedback tickets (your messages and our replies): kept until you delete your account.',

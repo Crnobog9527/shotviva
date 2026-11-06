@@ -116,7 +116,7 @@ Owner 2026-11-05 定稿：**B 版「暗房」（Darkroom）**，取代此前的�
 ### 4.4 生成中、成功、失败
 
 - 上传分三段可见状态：**Compressing → Uploading（进度条）→ Generating**，每段都有文字，不准只转圈。
-- 生成中：进度卡显示预计耗时（例如 "Usually 20–40 seconds"）。可以离开页面，回来自动恢复；顶栏显示「Generating…」小标记直到完成，结果也在「我的作品」里。
+- 生成中：进度卡显示预计耗时，一律写「Usually about 60 seconds」/「一般 60 秒左右」。**出图时长全站只用这一个模糊说法**（Owner 2026-11-06）：不写区间、不按清晰度分开写，首页账单、FAQ、SEO 页同样如此，免得供应商波动时变成没兑现的承诺。可以离开页面，回来自动恢复；顶栏显示「Generating…」小标记直到完成，结果也在「我的作品」里。
 - 成功：大图全宽预览（按生成比例，不裁切）+ 「Share」+ 「再生成一张」+ 前后对比。**Share 优先走 Web Share API**（`navigator.share({ files })`）：iOS / Android 弹系统分享面板，可存相册、发 WhatsApp / Instagram / X 等已装 app，不需要任何权限；`navigator.canShare` 不支持时（微信等内置浏览器、桌面）按钮改成 "Download" 走 `<a download>`，图下一行小字 "Long-press to save"。实现规则见 `MOBILE_UI_rules_fable.md` §1.8.1。
 - 失败：说明原因、告知「额度已退回」、给出 "Retry"（不用重新选图）和「换一张照片」。
 

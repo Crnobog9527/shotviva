@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import type { Balance } from '@/core/billing/pools'
 import { limitsFor } from '@/core/billing/tier-limits'
 import type { MembershipTier } from '@/core/config'
 
+import type { AgainStart } from '../again/again-start'
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import { enqueueJobs, setWorkspaceJobs } from '../generation/job-store'
 import { useJobs } from '../generation/use-jobs'
@@ -23,6 +24,9 @@ export type DraftInput = {
   // From the server: the account's concurrency (TIER_LIMITS) and the jobs running at render
   // time, so photos started in another tab count too.
   concurrency: { limit: number; runningIds: string[] }
+  // Make again from a finished work (T40, workspace page only): its settings, and its photos
+  // when they were kept with it.
+  again?: AgainStart | null
 }
 
 const DEFAULTS: FormValues = { aspect: 'original', resolution: '1k', note: '', copy: {} }
@@ -31,9 +35,10 @@ const DEFAULTS: FormValues = { aspect: 'original', resolution: '1k', note: '', c
 // dialog Create opens and the workspace page. Photos upload as they are picked; start() queues
 // one job per ready photo in the generation store and makes them this template's workspace
 // jobs, so the workspace page shows them developing (and after a refresh).
-export function useWorkspaceDraft({ template, balance, tier, concurrency }: DraftInput) {
-  const photos = usePhotoBatch(limitsFor(tier).batchMax)
-  const [values, setValues] = useState(DEFAULTS)
+export function useWorkspaceDraft({ template, balance, tier, concurrency, again = null }: DraftInput) {
+  const photos = usePhotoBatch(limitsFor(tier).batchMax, again ? { photos: again.photos, madeAt: again.madeAt } : undefined)
+  const [values, setValues] = useState(again?.values ?? DEFAULTS)
+  useAgainOpensForm(template.id, again?.jobId)
   const running = useRunningCount(concurrency.runningIds)
   const { summary } = photos
   const state = ctaState({
@@ -46,11 +51,22 @@ export function useWorkspaceDraft({ template, balance, tier, concurrency }: Draf
     copyMissing: missingRequiredCopy(template.copyFields, values.copy),
   })
   const change = (next: Partial<FormValues>) => setValues((current) => ({ ...current, ...next }))
-  const start = () => setWorkspaceJobs(template.id, enqueueJobs(startInputs(template, values, summary.ready), concurrency.limit))
-  return { photos, values, change, state, start }
+  const start = () => {
+    setWorkspaceJobs(template.id, enqueueJobs(startInputs(template, values, summary.ready), concurrency.limit))
+    // A reload now comes back to these jobs, not to Make again's form (and copies nothing again).
+    if (again) window.history.replaceState(null, '', window.location.pathname)
+  }
+  return { photos, values, change, state, start, missingPhoto: again?.missing != null }
 }
 
 export type WorkspaceDraft = ReturnType<typeof useWorkspaceDraft>
+
+// Make again opens on the form even when this workspace was last showing a result or a batch.
+function useAgainOpensForm(templateId: string, jobId: string | undefined) {
+  useEffect(() => {
+    if (jobId) setWorkspaceJobs(templateId, [])
+  }, [templateId, jobId])
+}
 
 // Running photos for the concurrency check: the server's list at render plus this tab's own.
 // A job this tab saw settle may still be in the server's (older) list, so it is taken out.

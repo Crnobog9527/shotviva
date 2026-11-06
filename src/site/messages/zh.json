@@ -244,7 +244,7 @@
       "developingTitle": "正在生成你的照片",
       "developing": "生成中",
       "generating": "生成中",
-      "leave": "一般需要 20–40 秒。可以离开这个页面，完成后会出现在「作品」里。",
+      "leave": "一般 60 秒左右。可以离开这个页面，完成后会出现在「作品」里。",
       "backToCreate": "返回创作",
       "readyTitle": "照片生成好了",
       "beforeAfter": "前后对比",
@@ -281,13 +281,23 @@
       "batchTitle": "正在生成 {count, number} 张",
       "batchSettledTitle": "{count, number} 张已生成",
       "batchSummary": "{count, number} 张已完成 {done, number} 张{failed, plural, =0 {} other {，# 张没有生成成功}}",
-      "batchLeave": "每张一般需要 20–40 秒。可以离开这个页面，每张生成好后会出现在「作品」里。",
+      "batchLeave": "每张 60 秒左右。可以离开这个页面，每张生成好后会出现在「作品」里。",
       "makeMore": "再做一批",
       "getTier": "开通{tier}",
       "stageLabel": "预览",
       "stageYours": "你的照片",
       "stageYoursCaption": "这是你拍的原图。模板会保留主体，只换光线和背景。",
-      "stageSampleCaption": "模板示例：左边是手机原图，右边是 AI 出图。"
+      "stageSampleCaption": "模板示例：左边是手机原图，右边是 AI 出图。",
+      "again": {
+        "note": "<b>再做一张：</b>{summary}，沿用 <day></day> 那张的设置。",
+        "noteKept": "保留补充说明",
+        "kept": "原图，随作品保留",
+        "keptFrom": "<day></day> · {size}",
+        "missingTitle": "原图不可用",
+        "missingOld": "这张作品是在我们开始保留原图之前做的。把同一张照片再加一次，其余设置都和原来一样。",
+        "missingFailed": "暂时没能取回原图。把同一张照片再加一次，其余设置都和原来一样。",
+        "addFirst": "先添加照片。<b>之后和其他照片一样，扣 {count} 积分。</b>"
+      }
     },
     "errors": {
       "CONTENT_REJECTED": "照片或补充说明没有通过安全审核。请换一张照片，或改一下说明。",
@@ -312,7 +322,7 @@
       "title": "作品",
       "metaTitle": "作品",
       "inProgress": "生成中",
-      "usually": "每张一般需要 20–40 秒",
+      "usually": "每张 60 秒左右",
       "closeApp": "可以关掉页面，生成好的照片会出现在这里。",
       "generating": "生成中",
       "generatingAria": "正在生成 {name}",
@@ -332,7 +342,9 @@
       "doneMeta": "{when} · {size} · {tier}",
       "runningMeta": "{size} · {tier} · {count} 积分",
       "waiting": "排队中，等空位",
-      "makeAgain": "再做一张"
+      "makeAgain": "再做一张",
+      "deleted": "已删除这张作品。",
+      "deletedClose": "关闭"
     },
     "work": {
       "freePublic": "公开 · 带水印",
@@ -363,8 +375,8 @@
         "original": "原图"
       },
       "originalAlt": "你为 {name} 上传的照片",
-      "originalDeleted": "原图已删除",
-      "originalDeletedBody": "按隐私规则，你上传的照片已不再保留，生成的图片不受影响。",
+      "originalDeleted": "原图不可用",
+      "originalDeletedBody": "这张作品是在开始随作品保留原图之前做的，生成的图片不受影响。",
       "yourNote": "你的补充说明",
       "showMore": "展开",
       "showLess": "收起",
@@ -382,10 +394,21 @@
         "visibilityPrivate": "私密",
         "visibilityPublic": "公开",
         "original": "原图",
+        "originalWithWork": "随这张作品保留",
         "originalKept": "已保留，{px} px 预览",
         "originalEdited": "你改的那张照片",
-        "originalDeleted": "已按隐私规则删除",
+        "originalDeleted": "早于原图保留功能",
         "made": "生成时间"
+      },
+      "delete": {
+        "open": "删除",
+        "title": "删除这张作品？",
+        "body": "删除后无法恢复，花掉的积分不退。",
+        "confirm": "删除作品",
+        "deleting": "正在删除…",
+        "cancel": "取消",
+        "running": "这张还在生成中，生成完再删除。",
+        "failed": "没能删除这张作品，请稍后再试。"
       }
     },
     "wishlist": {
@@ -601,7 +624,8 @@
       "changeRequest": "改一下要求",
       "titleEdited": "{name}（修改版）",
       "yourChange": "你的修改",
-      "editedFromLabel": "修改自"
+      "editedFromLabel": "修改自",
+      "sourceDeleted": "原作品已删除"
     }
   },
   "paywall": {

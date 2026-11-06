@@ -24,6 +24,7 @@ const job: Job = {
   errorCode: null,
   createdAt: new Date(),
   finishedAt: null,
+  deletedAt: null,
 }
 
 describe('generateEventProps', () => {
