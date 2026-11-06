@@ -13,6 +13,7 @@ import { anonSupabase, serviceSupabase } from './supabase-env'
 
 let db: Client
 let buyer: string
+let renewalInvoice: string
 const service = serviceSupabase()
 
 beforeAll(async () => {
@@ -26,6 +27,20 @@ beforeAll(async () => {
   // Real settle paths: Stripe checkout (cs_) and a Waffo-style event id.
   await db.query("select public.apply_purchase($1, 'pack_s', $2)", [buyer, `cs_test_${randomUUID().slice(0, 8)}`])
   await db.query("select public.apply_purchase($1, 'starter_monthly', $2)", [buyer, `waffo-${randomUUID().slice(0, 8)}`])
+  // T10: payments rows come from settle_checkout (first payment / one-off) and
+  // apply_subscription_renewal (renewals), as the webhook writes them.
+  const id = randomUUID().replaceAll('-', '').slice(0, 16)
+  await db.query(
+    `select public.settle_checkout($1, 'pack_m', $2, p_amount_total => 2490, p_currency => 'usd', p_amount_tax => 0,
+       p_method => 'alipay', p_charge_id => $3)`,
+    [buyer, `cs_test_${id}`, `py_${id}`],
+  )
+  renewalInvoice = `in_${id}`
+  await db.query(
+    `select public.apply_subscription_renewal($1, 'pro_monthly', $2, now() + interval '30 days', 5427, 'usd', 437, 'card', $3)`,
+    [buyer, renewalInvoice, `ch_${id}`],
+  )
+  await db.query("select public.record_payment_issue($1, 'refunded', 1000)", [`ch_${id}`])
 }, 120_000)
 
 afterAll(async () => {
@@ -87,15 +102,29 @@ describe('admin_revenue_stats', () => {
   })
 })
 
-describe('purchase list', () => {
-  it('lists purchases newest first with list price, channel and the buyer email', async () => {
+describe('purchase list (payments)', () => {
+  it('lists payments newest first with what was charged, method, status and the buyer email', async () => {
     const page = await listPurchases(service)
     const mine = page.items.filter((row) => row.userId === buyer)
-    expect(mine.map((row) => [row.productId, row.channel, row.form])).toEqual([
-      ['starter_monthly', 'waffo', 'waffo'],
-      ['pack_s', 'stripe', 'checkout'],
+    expect(mine.map((row) => [row.productId, row.channel, row.form, row.method, row.status])).toEqual([
+      ['pro_monthly', 'stripe', 'renewal', 'card', 'partially_refunded'],
+      ['pack_m', 'stripe', 'checkout', 'alipay', 'paid'],
     ])
-    expect(mine[1]?.listPriceUsd).toBe(9.9)
+    expect(mine[0]).toMatchObject({ amountTotal: 5427, amountTax: 437, amountRefunded: 1000, currency: 'usd', providerId: expect.stringMatching(/^ch_/) })
+    expect(mine[1]).toMatchObject({ amountTotal: 2490, amountTax: 0, providerId: expect.stringMatching(/^py_/) })
     expect(mine[0]?.email).toMatch(/@example\.test$/)
+  })
+
+  it('pages with the keyset cursor, without repeats', async () => {
+    const first = await listPurchases(service)
+    const ids = new Set(first.items.map((row) => row.id))
+    if (!first.nextCursor) return
+    const second = await listPurchases(service, first.nextCursor)
+    expect(second.items.some((row) => ids.has(row.id))).toBe(false)
+  })
+
+  it('a renewal payment links its charge; the invoice is on the row', async () => {
+    const { rows } = await db.query('select stripe_invoice_id, stripe_session_id from public.payments where stripe_invoice_id = $1', [renewalInvoice])
+    expect(rows).toEqual([{ stripe_invoice_id: renewalInvoice, stripe_session_id: null }])
   })
 })
