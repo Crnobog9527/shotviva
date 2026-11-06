@@ -50,12 +50,6 @@ export const uploadLimits = `${formats.slice(0, -1).join(', ')} or ${formats.at(
 const LANGUAGE_NAMES: Record<string, string> = { en: 'English', zh: 'Simplified Chinese' }
 export const languages = site.locales.enabled.map((code) => LANGUAGE_NAMES[code] ?? code).join(', ')
 
-// Market rate for hiring a product photographer, used in the cost tables. Not our price, so it
-// is not in site.config. Source: Snappr product photography rates, Philadelphia, 2026
-// (snappr.com/how-much-does-a-photographer-cost/product/philadelphia-pa): $139–$300 an hour.
-export const PHOTOGRAPHER_HOURLY_USD = { low: 139, high: 300 } as const
-export const photographerRate = `$${PHOTOGRAPHER_HOURLY_USD.low}–$${PHOTOGRAPHER_HOURLY_USD.high} an hour`
-
 // --- Plans and packs. Product ids are fixed by ARCHITECTURE §6.2. Until T9 puts the nine
 // products into site.config, lookups return nothing and the copy says PRICE_PENDING. ---
 
@@ -152,6 +146,8 @@ export const usdRange = (range: UsdRange) => `${usd(range.low)}–${usd(range.hi
 
 export const styledShotUsd = photographer.styledShotUsd
 export const packshotUsd = photographer.packshotUsd
+export const dayRateUsd = photographer.dayRateUsd
+export const foodHalfDayUsd = photographer.foodHalfDayUsd
 // Three styled shots, the whole quote: $150–$1,050 (retouching is in the shot price).
 export const setShotsUsd = times(styledShotUsd, SET_PHOTOS)
 export const quoteUsd: UsdRange = setShotsUsd
@@ -161,12 +157,25 @@ export const photoSeconds = photoSecondsApprox
 
 // The set's credits at the cheapest plan's credit price, rounded the way /pricing shows it:
 // 6 × $0.40 = "$2.40". Undefined until the plans are priced.
-function setUsd(): string | undefined {
-  if (!planFrom) return undefined
-  const credit = Math.round((planFrom.priceUsd / planFrom.credits) * 100 + 1e-9) / 100
-  return usd(Math.round(credit * setCredits * 100) / 100)
-}
 export const setCostUsd = setUsd()
 
 // Standard photos the rest of that plan's month still makes: (50 − 6) ÷ 2 = 22.
 export const photosLeftInPlan = planFrom ? Math.floor((planFrom.credits - setCredits) / STANDARD.credits) : undefined
+
+function setUsd(): string | undefined {
+  return creditsUsd(setCredits)
+}
+
+// --- /ai-restaurant-menu's bill: a menu of ten dishes at Standard. ---
+export const MENU_DISHES = 10
+export const menuCredits = STANDARD.credits * MENU_DISHES
+
+function creditsUsd(credits: number): string | undefined {
+  if (!planFrom) return undefined
+  const credit = Math.round((planFrom.priceUsd / planFrom.credits) * 100 + 1e-9) / 100
+  return usd(Math.round(credit * credits * 100) / 100)
+}
+// 20 × $0.40 = "$8"
+export const menuCostUsd = creditsUsd(menuCredits)
+// (50 − 20) ÷ 2 = 15
+export const photosLeftAfterMenu = planFrom ? Math.floor((planFrom.credits - menuCredits) / STANDARD.credits) : undefined

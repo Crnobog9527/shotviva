@@ -10,7 +10,8 @@ const bundled = (id: string) => ({ before: `/home/templates/${id}-before.webp`, 
 // The generator opens on the same template as the hero pair (ARCHITECTURE §13 item 2).
 const DEFAULT_TEMPLATE = 'pure-white'
 
-export function homeTemplates(page: HomePage, live: readonly LiveTemplate[]) {
+// `opensOn`: the template the generator opens on (the landing pages pick their own).
+export function homeTemplates(page: HomePage, live: readonly LiveTemplate[], opensOn: string = DEFAULT_TEMPLATE) {
   const byId = new Map(live.map((template) => [template.id, template]))
   const ids = page.templateGrid.categories.flatMap((category) => category.templates.map((card) => card.id))
   const samples = Object.fromEntries(ids.map((id) => [id, bundled(id)]))
@@ -20,7 +21,7 @@ export function homeTemplates(page: HomePage, live: readonly LiveTemplate[]) {
     const covers = found?.cover.before && found.cover.after ? { before: found.cover.before, after: found.cover.after } : bundled(id)
     cards[id] = { ...covers, live: Boolean(found) }
   }
-  const defaultId = byId.has(DEFAULT_TEMPLATE) ? DEFAULT_TEMPLATE : (live[0]?.id ?? null)
+  const defaultId = byId.has(opensOn) ? opensOn : (live[0]?.id ?? null)
   return { samples, cards, defaultId }
 }
 

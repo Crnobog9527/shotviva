@@ -4,11 +4,13 @@ import { isGateOpen } from '@/core/seo'
 import { site } from '../site.config'
 
 import { homePage } from './home'
+import { aiRestaurantMenu } from './pages/ai-restaurant-menu'
+import { commercialPhotography } from './pages/commercial-photography'
 import { imageToImageGenerator } from './pages/image-to-image-generator'
 
 // Registry of inner SEO pages rendered by app/(marketing)/[slug]. Add one file per page
 // under pages/ and list it here; the URL must already be in the keyword map CSV (AGENTS §9).
-export const contentPages: readonly ContentPage[] = [imageToImageGenerator]
+export const contentPages: readonly ContentPage[] = [imageToImageGenerator, commercialPhotography, aiRestaurantMenu]
 
 export function findContentPage(slug: string): ContentPage | undefined {
   return contentPages.find((page) => page.slug === slug)

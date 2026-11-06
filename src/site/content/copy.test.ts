@@ -76,7 +76,8 @@ describe('public numbers', () => {
   it('keeps the TDK limits on /pricing and audiences out of general Titles and H1s', () => {
     expect(pricingPage.title.length).toBeLessThanOrEqual(60)
     expect(pricingPage.description.length).toBeLessThanOrEqual(155)
-    for (const page of allPages) expect(`${page.title} ${page.h1}`).not.toMatch(/restaurant/i)
+    // Vertical pages (建站规格 §4: /ai-restaurant-menu) may name their audience; general pages may not.
+    for (const page of allPages.filter((p) => !p.keyword.includes('restaurant'))) expect(`${page.title} ${page.h1}`).not.toMatch(/restaurant/i)
   })
 
   it('never says 1K / 2K / 3K / 4K or hard-codes a price in page copy (G3)', () => {

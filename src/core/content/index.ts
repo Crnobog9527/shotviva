@@ -8,8 +8,6 @@ export {
   type BillTotal,
   type ContentPage,
   type CostBills,
-  type CostRow,
-  type CostTable,
   type Fact,
   type FaqItem,
   type FaqTable,
@@ -19,6 +17,7 @@ export {
   type HomeFaq,
   type HomePage,
   type ImageRef,
+  type LandingParts,
   type PageBasics,
   type RelatedLink,
   type SectionHeadings,
@@ -31,8 +30,6 @@ export { LIMITS, countWords, validateContentPage } from './validate-page'
 export { ContentPageView } from './content-page-view'
 export { HomePageView } from './home-page-view'
 export type { TemplateLookup, TemplateMedia } from './blocks/template-grid'
-export { CostTableView } from './blocks/cost-table-section'
-export { Breadcrumbs } from './blocks/breadcrumbs'
 export { FactsSection } from './blocks/facts-section'
 export { FaqSection } from './blocks/faq-section'
 export { BusinessSection, type BusinessBlock } from './blocks/business-section'
