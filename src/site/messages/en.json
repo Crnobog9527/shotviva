@@ -588,6 +588,7 @@
       "plan": {
         "title": "Plan",
         "perPeriod": "<mono>{credits, plural, one {# credit} other {# credits}}</mono> a {interval, select, year {year} other {month}} · <mono>{price}</mono>/{interval, select, year {yr} other {mo}}",
+        "perPeriodMethod": "<mono>{credits, plural, one {# credit} other {# credits}}</mono> a {interval, select, year {year} other {month}} · <mono>{price}</mono>/{interval, select, year {yr} other {mo}} · {method}",
         "member": "Member",
         "noPlan": "No plan",
         "manage": "Manage subscription",
@@ -612,6 +613,7 @@
         "opensStripeBottom": "secure billing page",
         "walletAlipayWhy": "One {interval, select, year {year} other {month}}, paid with <b>{method}</b>. It doesn't renew by itself: renew before {date, date, medium} to keep the plan, or let it end and your credits still work.",
         "alipay": "Alipay",
+        "card": "Card",
         "renewPrice": "Renew <cost>· {price}</cost>",
         "endedPlain": "Your plan ended.",
         "endedTier": "Your {tier} plan ended.",

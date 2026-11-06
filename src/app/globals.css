@@ -54,8 +54,7 @@
   --safelight-tint: rgba(255, 91, 46, 0.16);
   --safelight-tag: rgba(255, 91, 46, 0.88);
   --success-tint: rgba(127, 214, 160, 0.16);
-  --coin-light: #FF8A63;                     /* balance coin highlight */
-  --coin-dark: #C93A14;                      /* balance coin shade */
+  --coin-gloss: rgba(255, 255, 255, 0.35);   /* balance coin's 1px top highlight */
   --safelight-warm: #FFB08F;                 /* the living background's second, warmer pool */
   --ground-top: #0E0C0A;                     /* the top of the room: app pages' ground (DESKTOP-NOTES item 6) */
 
