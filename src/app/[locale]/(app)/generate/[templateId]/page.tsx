@@ -9,7 +9,8 @@ import { currentTier, limitsFor, readBalance } from '@/core/billing'
 import { currentLocale } from '@/core/i18n/server'
 import { listOwnJobs } from '@/core/jobs'
 import { listTemplatesIn } from '@/core/templates'
-import { ImageWorkspace, toCatalogueTemplate, WorkspaceHead } from '@/modules/image'
+import { r2Store } from '@/core/storage'
+import { ImageWorkspace, loadAgain, toCatalogueTemplate, WorkspaceHead } from '@/modules/image'
 import { site } from '@/site/site.config'
 
 function Nav({ title, aside }: { title: string; aside?: ReactNode }) {
@@ -17,20 +18,25 @@ function Nav({ title, aside }: { title: string; aside?: ReactNode }) {
   return <FlowNav back={{ href: '/generate', label: t('back') }} title={title} aside={aside} />
 }
 
+type RouteProps = { params: Promise<{ templateId: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }
+
 // The workspace, a flow page: no tab bar, back to Create, one fixed primary (DESIGN §8.2).
-async function Workspace({ params }: { params: Promise<{ templateId: string }> }) {
-  const { templateId } = await params
+// ?again=<jobId> is Make again from a finished work (T40): its settings and kept photos.
+async function Workspace({ params, searchParams }: RouteProps) {
+  const [{ templateId }, query] = await Promise.all([params, searchParams])
   const user = await requireUser(`/generate/${templateId}`)
   const supabase = await createServerSupabase()
   const found = (await listTemplatesIn(supabase, await currentLocale())).find((template) => template.id === templateId)
   if (!found) notFound()
-  const [balance, tier, own] = await Promise.all([
+  const template = toCatalogueTemplate(found)
+  const againId = typeof query.again === 'string' ? query.again : undefined
+  const [balance, tier, own, again] = await Promise.all([
     readBalance(supabase, user.id),
     // current_tier() is service-role only; the user's own id comes from the session.
     currentTier(createAdminSupabase(), user.id),
     listOwnJobs(supabase, user.id, new Date()),
+    loadAgain({ db: supabase, store: r2Store }, { userId: user.id, jobId: againId, template }),
   ])
-  const template = toCatalogueTemplate(found)
   const t = await getTranslations('app.result')
   return (
     <>
@@ -41,17 +47,18 @@ async function Workspace({ params }: { params: Promise<{ templateId: string }> }
         balance={balance}
         tier={tier}
         concurrency={{ limit: limitsFor(tier).concurrency, runningIds: own.running.map((job) => job.id) }}
+        again={again}
         shareText={t('shareText', { brand: site.brand.name, url: `https://${site.brand.domain}/?utm_source=share&utm_medium=web_share` })}
       />
     </>
   )
 }
 
-export default function WorkspacePage({ params }: PageProps<'/[locale]/generate/[templateId]'>) {
+export default function WorkspacePage({ params, searchParams }: PageProps<'/[locale]/generate/[templateId]'>) {
   return (
     <AppPage wide>
       <Suspense fallback={<Nav title="" />}>
-        <Workspace params={params} />
+        <Workspace params={params} searchParams={searchParams} />
       </Suspense>
     </AppPage>
   )

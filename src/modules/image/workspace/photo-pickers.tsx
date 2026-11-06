@@ -16,17 +16,10 @@ import { UPLOAD_FORMAT_NAMES, UPLOAD_MAX_MB } from './upload-formats'
 export function PhotoPickers({ onPick, multiple = false }: { onPick(files: File[]): void; multiple?: boolean }) {
   const t = useTranslations('app.workspace')
   const formats = t('formats', { formats: useFormatter().list(UPLOAD_FORMAT_NAMES, { type: 'disjunction' }), mb: UPLOAD_MAX_MB })
-  const camera = useRef<HTMLInputElement>(null)
-  const gallery = useRef<HTMLInputElement>(null)
   const onDrop = (event: DragEvent) => {
     event.preventDefault()
     const files = Array.from(event.dataTransfer.files)
     if (files.length) onPick(files)
-  }
-  const take = (input: HTMLInputElement | null) => {
-    const files = Array.from(input?.files ?? [])
-    if (files.length) onPick(files)
-    if (input) input.value = ''
   }
   return (
     <div className="hairline-lit rounded-panel bg-card p-3">
@@ -38,11 +31,27 @@ export function PhotoPickers({ onPick, multiple = false }: { onPick(files: File[
         <b className="text-body leading-[1.2] font-semibold">{t(multiple ? 'addPhotos' : 'addPhoto')}</b>
         <span className="text-caption text-muted-foreground">{formats}</span>
       </div>
-      {/* Both quiet: the one primary is Generate (B comp, round 2); side by side from md up. */}
-      <div className="mt-3 grid gap-2 md:grid-cols-2">
-        <PickButton label={t('takePhoto')} icon="camera" onClick={() => camera.current?.click()} />
-        <PickButton label={t(multiple ? 'chooseGalleryMany' : 'chooseGallery')} icon="gallery" onClick={() => gallery.current?.click()} />
-      </div>
+      <PickButtons onPick={onPick} multiple={multiple} className="mt-3" />
+    </div>
+  )
+}
+
+// "Take photo" and "Choose from gallery" with their hidden file inputs. Both quiet: the one
+// primary is Generate (B comp, round 2); side by side from md up. Also Make again's "original
+// isn't available" panel (T40).
+export function PickButtons({ onPick, multiple = false, className = '' }: { onPick(files: File[]): void; multiple?: boolean; className?: string }) {
+  const t = useTranslations('app.workspace')
+  const camera = useRef<HTMLInputElement>(null)
+  const gallery = useRef<HTMLInputElement>(null)
+  const take = (input: HTMLInputElement | null) => {
+    const files = Array.from(input?.files ?? [])
+    if (files.length) onPick(files)
+    if (input) input.value = ''
+  }
+  return (
+    <div className={`grid gap-2 md:grid-cols-2 ${className}`}>
+      <PickButton label={t('takePhoto')} icon="camera" onClick={() => camera.current?.click()} />
+      <PickButton label={t(multiple ? 'chooseGalleryMany' : 'chooseGallery')} icon="gallery" onClick={() => gallery.current?.click()} />
       <input ref={camera} type="file" accept={UPLOAD_ACCEPT} capture="environment" hidden onChange={(e) => take(e.currentTarget)} />
       <input ref={gallery} type="file" accept={UPLOAD_ACCEPT} multiple={multiple} hidden onChange={(e) => take(e.currentTarget)} />
     </div>

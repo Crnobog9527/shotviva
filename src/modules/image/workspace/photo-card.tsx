@@ -6,13 +6,17 @@ import { useRef } from 'react'
 
 import { UPLOAD_ACCEPT } from '@/core/storage/rules'
 
+import { ShortDay } from '../again/short-day'
 import { percent } from '../generation/progress'
 import type { UploadState } from './use-upload'
 import type { PickedPhoto } from './use-photo'
 
 // The picked photo (DESIGN "Upload Zone", §4.4): a 4:5 thumbnail with the upload's visible
-// stage, Compressing → Uploading with a bar → Uploaded, and a ghost "Replace photo".
-export function PhotoCard({ photo, upload, onPick }: { photo: PickedPhoto; upload: UploadState; onPick(file: File): void }) {
+// stage, Compressing → Uploading with a bar → Uploaded, and a ghost "Replace photo". A photo kept
+// from an earlier work (Make again, T40) says so, and when that work was made.
+type CardPhoto = PickedPhoto & { keptFrom?: string }
+
+export function PhotoCard({ photo, upload, onPick }: { photo: CardPhoto; upload: UploadState; onPick(file: File): void }) {
   const t = useTranslations('app')
   const format = useFormatter()
   const size = format.number(photo.bytes / 1024 / 1024, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
@@ -23,8 +27,8 @@ export function PhotoCard({ photo, upload, onPick }: { photo: PickedPhoto; uploa
         <img src={photo.url} alt={t('workspace.photoAlt')} className="size-full object-cover" />
       </div>
       <div className="min-w-0 flex-1" aria-live="polite">
-        <UploadStage upload={upload} />
-        <p className="mt-2 font-mono text-caption leading-[1.4] text-muted-foreground">{t('units.megabytes', { size })}</p>
+        <UploadStage upload={upload} kept={photo.keptFrom !== undefined} />
+        <PhotoSize size={t('units.megabytes', { size })} keptFrom={photo.keptFrom} className="mt-2" />
         <button
           type="button"
           onClick={() => input.current?.click()}
@@ -51,16 +55,19 @@ export function PhotoCard({ photo, upload, onPick }: { photo: PickedPhoto; uploa
   )
 }
 
-export function UploadStage({ upload }: { upload: UploadState }) {
+// "0.9 MB", or "From 28 Oct · 0.9 MB" for a kept photo.
+export function PhotoSize({ size, keptFrom, className }: { size: string; keptFrom?: string; className: string }) {
+  const t = useTranslations('app.workspace.again')
+  return (
+    <p className={`font-mono text-caption leading-[1.4] text-muted-foreground ${className}`}>
+      {keptFrom ? t.rich('keptFrom', { size, day: () => <ShortDay iso={keptFrom} /> }) : size}
+    </p>
+  )
+}
+
+export function UploadStage({ upload, kept }: { upload: UploadState; kept?: boolean }) {
   const t = useTranslations('app')
-  if (upload.phase === 'done') {
-    return (
-      <span className="inline-flex items-center gap-2 text-body leading-none font-semibold">
-        <Tick />
-        {t('workspace.uploaded')}
-      </span>
-    )
-  }
+  if (upload.phase === 'done') return <Uploaded kept={kept === true} />
   if (upload.phase === 'error') {
     return <p role="alert" className="text-caption leading-[1.4] text-destructive">{t(`errors.${upload.code}`)}</p>
   }
@@ -80,6 +87,17 @@ export function UploadStage({ upload }: { upload: UploadState }) {
         <span className="block h-full rounded-full bg-primary transition-[width]" style={{ width: `${uploading ? percent(fraction) : upload.phase === 'idle' ? 0 : 8}%` }} />
       </span>
     </>
+  )
+}
+
+// "Uploaded", or for a photo kept from an earlier work "Original photo, kept with the work".
+function Uploaded({ kept }: { kept: boolean }) {
+  const t = useTranslations('app.workspace')
+  return (
+    <span className="inline-flex items-start gap-2 text-body leading-[1.2] font-semibold">
+      <Tick />
+      {t(kept ? 'again.kept' : 'uploaded')}
+    </span>
   )
 }
 

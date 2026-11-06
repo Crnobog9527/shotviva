@@ -1,0 +1,49 @@
+import type { AgainPhoto } from '@/core/jobs'
+import { NOTE_MAX_LENGTH, OUTPUT_ASPECTS, RESOLUTIONS, type OutputAspect, type Resolution } from '@/core/templates/output-options'
+
+import type { CatalogueTemplate } from '../catalogue/catalogue-template'
+import type { FormValues } from '../workspace/workspace-form'
+
+// Make again (T40, T6 workspace.html?again=1|expired): the workspace opened from a finished work
+// with that work's settings, and its photos when they were kept with it. Plain data, so the
+// server page can hand it to the client workspace.
+export type AgainStart = {
+  jobId: string
+  values: FormValues
+  madeAt: string
+  photos: AgainPhoto[]
+  // Why there are no photos: made before originals were kept (or the settle copy failed), or
+  // the copy back just now failed. null when the photos are there.
+  missing: 'old' | 'failed' | null
+}
+
+const DEFAULTS: FormValues = { aspect: 'original', resolution: '1k', note: '', copy: {} }
+
+const isAspect = (value: unknown): value is OutputAspect => (OUTPUT_ASPECTS as readonly unknown[]).includes(value)
+const isResolution = (value: unknown): value is Resolution => (RESOLUTIONS as readonly unknown[]).includes(value)
+
+function copyOf(raw: unknown, template: CatalogueTemplate): Record<string, string> {
+  if (typeof raw !== 'object' || raw === null) return {}
+  const values = raw as Record<string, unknown>
+  return Object.fromEntries(
+    template.copyFields.flatMap((field) => {
+      const value = values[field.key]
+      return typeof value === 'string' ? [[field.key, value.slice(0, field.maxLength)]] : []
+    }),
+  )
+}
+
+// The old work's form, read back from its stored inputs and checked against what the template
+// offers today (a size or resolution it no longer has falls back to the default). Only fields
+// the user filled in are read; nothing of ours is in inputs (ARCHITECTURE §4).
+export function againValues(inputs: Record<string, unknown>, template: CatalogueTemplate): FormValues {
+  const resolution = isResolution(inputs.resolution) && inputs.resolution in template.creditsCost ? inputs.resolution : DEFAULTS.resolution
+  return {
+    aspect: isAspect(inputs.aspect_ratio) ? inputs.aspect_ratio : DEFAULTS.aspect,
+    resolution,
+    note: typeof inputs.note === 'string' ? inputs.note.slice(0, NOTE_MAX_LENGTH) : '',
+    copy: copyOf(inputs.copy, template),
+  }
+}
+
+export const WORKSPACE_DEFAULTS = DEFAULTS

@@ -6,6 +6,7 @@ type Entry = { body: Uint8Array; contentType: string | null }
 export function createMemoryStore() {
   const objects = new Map<string, Entry>()
   const failPut = { next: false }
+  const failCopy = { next: false }
   const store: ObjectStore = {
     presignPut: async (key, contentType, expires) => `memory://put/${key}?type=${contentType}&expires=${expires}`,
     presignGet: async (key, { expiresInSeconds, downloadName }) =>
@@ -26,6 +27,15 @@ export function createMemoryStore() {
       }
       objects.set(key, { body, contentType })
     },
+    copy: async (sourceKey, destinationKey) => {
+      if (failCopy.next) {
+        failCopy.next = false
+        throw new Error('simulated R2 copy failure')
+      }
+      const entry = objects.get(sourceKey)
+      if (!entry) throw new Error(`NoSuchKey ${sourceKey}`)
+      objects.set(destinationKey, { ...entry })
+    },
     delete: async (key) => {
       objects.delete(key)
     },
@@ -35,5 +45,5 @@ export function createMemoryStore() {
   }
   // Simulates a browser PUT straight to the bucket (whatever bytes and type it claims).
   const upload = (key: string, body: Uint8Array, contentType: string | null) => objects.set(key, { body, contentType })
-  return { store, objects, upload, failPut }
+  return { store, objects, upload, failPut, failCopy }
 }

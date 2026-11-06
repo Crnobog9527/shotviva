@@ -4,7 +4,8 @@ import type { UploadState } from './use-upload'
 // and no tier, up to the tier's batchMax (Pro 10, Max 30) otherwise. Each uploads on its own
 // (Compressing → Uploading → Uploaded) and becomes its own job. Pure, so it can be tested.
 
-export type BatchPhoto = { id: string; url: string; bytes: number; ratio: string | null; upload: UploadState }
+// keptFrom: a photo kept with an earlier work (Make again, T40), already uploaded; when it was made.
+export type BatchPhoto = { id: string; url: string; bytes: number; ratio: string | null; upload: UploadState; keptFrom?: string }
 
 // Photos compressing or uploading at once: enough to keep a phone busy without three dozen
 // canvases and PUTs fighting over memory and bandwidth.

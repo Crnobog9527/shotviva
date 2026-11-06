@@ -83,8 +83,9 @@ function jobInputs(req: GenerationRequest, { inputs, prompt }: Prepared, resolut
   }
 }
 
-// ARCHITECTURE §8 「原图小图」 (T32), only once the result is confirmed: a failed job has no
-// photo page. Edits (T30) settle elsewhere and get none; their source is the work they edited.
+// ARCHITECTURE §8 「原图小图」 (T32), only once the result is confirmed: a failed job has no photo
+// page. Edits (T30) settle elsewhere and get none; their source is the work they edited. (The
+// upload itself is copied next to the result during settle, T40.)
 async function keepInputPreview(deps: GenerationDeps, job: Job, image: Prepared['image']) {
   if (image) await writeInputPreview(deps.store, { userId: job.userId, jobId: job.id, bytes: image.bytes })
 }
@@ -126,7 +127,7 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
     quality: template.quality,
     params: prompt.modelParams,
   }
-  const settle = () => settleGeneration(deps, job, call, outputKeyFor(req.userId, job.id))
+  const settle = () => settleGeneration(deps, job, call, outputKeyFor(req.userId, job.id), { inputKeys: req.inputKey ? [req.inputKey] : [] })
   const settled = await settleTracked(job, template.category, settle, {
     track: deps.track,
     batchSize: req.batchSize ?? 1,

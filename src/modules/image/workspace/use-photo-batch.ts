@@ -7,7 +7,8 @@ import { naturalSize, nearestRatio } from './photo-ratio'
 import { isAbort, UploadError, uploadPhoto } from './upload-photo'
 import { uploadDeps, type UploadState } from './use-upload'
 
-type Entry = BatchPhoto & { file: File }
+// file is null for a kept photo (Make again, T40): it is already in R2, so nothing uploads.
+type Entry = BatchPhoto & { file: File | null }
 
 function failed(error: unknown): UploadState {
   const known = error instanceof UploadError
@@ -23,7 +24,7 @@ function useBatchUploads(entries: Entry[], patch: (id: string, change: Partial<E
     const running = controllers.current
     for (const id of uploadsToStart(entries)) {
       const entry = entries.find((candidate) => candidate.id === id)
-      if (!entry || running.has(id)) continue
+      if (!entry?.file || running.has(id)) continue
       const controller = new AbortController()
       running.set(id, controller)
       patch(id, { upload: { phase: 'compressing', progress: 0 } })
@@ -47,13 +48,15 @@ function useBatchUploads(entries: Entry[], patch: (id: string, change: Partial<E
 // The workspace's photos (T28): up to `batchMax`, each uploading on its own, three at a time,
 // each cancellable. With batchMax 1 (Starter, no tier) a new pick replaces the photo, as the
 // single-photo workspace always did. `dropped` is how many of the last pick did not fit.
-export function usePhotoBatch(batchMax: number) {
-  const [entries, setEntries] = useState<Entry[]>([])
+// `kept` starts the list with photos kept from an earlier work (Make again), ready to generate.
+export function usePhotoBatch(batchMax: number, kept?: KeptStart) {
+  const [entries, setEntries] = useState<Entry[]>(() => keptEntries(kept, batchMax))
   const [dropped, setDropped] = useState(0)
   const patch = useCallback((id: string, change: Partial<Entry>) => {
     setEntries((list) => list.map((entry) => (entry.id === id ? { ...entry, ...change } : entry)))
   }, [])
   const cancel = useBatchUploads(entries, patch)
+  useKeptRatios(entries, patch)
 
   const add = (files: readonly File[]) => {
     const replacing = batchMax <= 1
@@ -67,7 +70,7 @@ export function usePhotoBatch(batchMax: number) {
   const remove = (id: string) => {
     cancel(id)
     const gone = entries.find((entry) => entry.id === id)
-    if (gone) URL.revokeObjectURL(gone.url)
+    if (gone?.file) URL.revokeObjectURL(gone.url)
     setEntries((list) => list.filter((entry) => entry.id !== id))
     setDropped(0)
   }
@@ -83,6 +86,35 @@ export function usePhotoBatch(batchMax: number) {
 }
 
 export type PhotoBatch = ReturnType<typeof usePhotoBatch>
+
+export type KeptStart = { photos: readonly { inputKey: string; bytes: number; url: string }[]; madeAt: string }
+
+// Ids are positional so the server render and hydration agree.
+function keptEntries(kept: KeptStart | undefined, batchMax: number): Entry[] {
+  return (kept?.photos ?? []).slice(0, batchMax).map((photo, index) => ({
+    id: `kept-${index}`,
+    file: null,
+    url: photo.url,
+    bytes: photo.bytes,
+    ratio: null,
+    upload: { phase: 'done', inputKey: photo.inputKey },
+    keptFrom: kept?.madeAt,
+  }))
+}
+
+// The "4:5 · as shot" readout for kept photos, once the browser has their size.
+function useKeptRatios(entries: Entry[], patch: (id: string, change: Partial<Entry>) => void) {
+  const asked = useRef(new Set<string>())
+  useEffect(() => {
+    for (const entry of entries) {
+      if (!entry.keptFrom || entry.ratio || asked.current.has(entry.id)) continue
+      asked.current.add(entry.id)
+      void naturalSize(entry.url)
+        .then(({ width, height }) => patch(entry.id, { ratio: nearestRatio(width, height) }))
+        .catch(() => undefined)
+    }
+  }, [entries, patch])
+}
 
 function newEntry(file: File, patch: (id: string, change: Partial<Entry>) => void): Entry {
   const id = crypto.randomUUID()
