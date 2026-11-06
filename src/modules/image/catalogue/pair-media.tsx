@@ -2,6 +2,7 @@
    bucket (ARCHITECTURE §8.3, long edge 1600); the image optimizer would only re-encode them. */
 import { cn } from '@/core/ui/cn'
 
+import { GroundedImg } from '../result/grounded-img'
 import { ExampleBadge, SplitTags } from './split-tags'
 
 // Where "Illustrative example" sits. On the phone the feature's right plate has no room beside
@@ -38,7 +39,8 @@ export function PairMedia({ before, after, alt, eager = false, video, size = 'ca
       </span>
       <span className="relative overflow-hidden">
         <img src={before} alt="" loading={loading} decoding="async" className={cn(plate, 'saturate-[.85]')} />
-        <img data-wipe="ai" src={after} alt={alt} loading={loading} decoding="async" className={cn(plate, 'z-1')} />
+        {/* White behind the result: a transparent cut-out cover reads as white, not as the phone photo underneath. */}
+        <GroundedImg data-wipe="ai" ground="white" src={after} alt={alt} loading={loading} decoding="async" className={cn(plate, 'z-1')} />
         {video ? <video data-wipe="video" data-src={video} muted playsInline preload="none" aria-hidden="true" className="absolute inset-0 z-2 size-full object-cover opacity-0" /> : null}
         <span data-wipe="seam" aria-hidden="true" className="absolute inset-y-0 left-0 z-3 -ml-px w-0.5 bg-primary opacity-0" />
       </span>
