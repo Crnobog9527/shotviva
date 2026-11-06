@@ -38,6 +38,12 @@ describe('auth messages', () => {
     expect(t.zh('reset.sent', { email: 'mei@example.com', hours: EMAIL_LINK_HOURS, addr: (c: string) => c })).toContain('1 小时内有效')
   })
 
+  it('has one line for a verification that did not complete, and no checkbox wording', () => {
+    expect(t.en('captcha.failed')).toBe("Verification didn't complete. Please try again.")
+    expect(t.zh('captcha.failed')).toBe('验证没有完成，请再试一次。')
+    for (const messages of [en.auth, zh.auth]) expect(JSON.stringify(messages)).not.toMatch(/check below|tick|勾选|下方的验证/i)
+  })
+
   it('offers no Apple sign-in and never says prompt', () => {
     for (const messages of [en.auth, zh.auth]) {
       const text = JSON.stringify(messages)

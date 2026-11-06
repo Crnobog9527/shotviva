@@ -92,10 +92,9 @@
   .au-notice svg { width: 18px; height: 18px; color: var(--destructive); margin-top: 2px; }
   .au-notice a, .au-notice button { color: var(--foreground); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
 
-  /* hCaptcha: the invisible path is one line of attribution; the fallback is hCaptcha's own checkbox */
+  /* hCaptcha: invisible only, so the page carries just this line of attribution (ARCHITECTURE §7) */
   .au-hc-line { margin-top: 16px; font-size: 14px; line-height: 1.5; color: var(--muted-foreground); text-align: center; }
   .au-hc-line a { color: var(--bone-dim); text-decoration: none; }
-  .au-hc { display: grid; gap: 8px; }
 
   .au-swap { margin-top: 20px; font-size: 15px; line-height: 1.5; color: var(--bone-dim); text-align: center; }
   .au-swap a { color: var(--foreground); font-weight: 500; text-decoration: none; padding: 10px 0; margin: -10px 0; }
