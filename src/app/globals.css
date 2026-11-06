@@ -396,6 +396,55 @@ html:lang(zh-Hans) :is(em, i, .italic) {
   }
 }
 
+/* Desktop dialogs open and close the way the comp's sheets do (comps-v3-b css/studio.css .sheet
+   from 768px): scale .98 to 1 with a fade over 250ms; the scrim fades with them. Radix sets
+   data-state and waits for the closing animation. Nothing moves under reduced motion. */
+@keyframes sv-dialog-in {
+  from { opacity: 0; scale: 0.98; }
+}
+@keyframes sv-dialog-out {
+  to { opacity: 0; scale: 0.98; }
+}
+@keyframes sv-scrim-in {
+  from { opacity: 0; }
+}
+@keyframes sv-scrim-out {
+  to { opacity: 0; }
+}
+@utility dialog-motion {
+  @media (prefers-reduced-motion: no-preference) {
+    &[data-state="open"] { animation: sv-dialog-in 250ms var(--ease); }
+    &[data-state="closed"] { animation: sv-dialog-out 200ms var(--ease); }
+  }
+}
+@utility scrim-motion {
+  @media (prefers-reduced-motion: no-preference) {
+    &[data-state="open"] { animation: sv-scrim-in 250ms var(--ease); }
+    &[data-state="closed"] { animation: sv-scrim-out 200ms var(--ease); }
+  }
+}
+
+/* While the paywall is up (core/ui/use-push-back), the app page behind it steps back like an iOS
+   page card on phones: scale .92, 18px corners, brightness .55, 450ms (comps-v3-b paywall.html
+   .behind). From md up it only dims. Under reduced motion it dims without moving. */
+[data-app-ground] {
+  transform-origin: 50% 0;
+  transition: transform 450ms var(--ease), border-radius 450ms, filter 450ms;
+}
+@media (max-width: 767px) and (prefers-reduced-motion: no-preference) {
+  html[data-pushed-back] [data-app-ground] {
+    transform: translateY(calc(var(--sat) * 0.5)) scale(0.92);
+    border-radius: 18px;
+    overflow: hidden;
+  }
+}
+html[data-pushed-back] [data-app-ground] {
+  filter: brightness(0.55);
+}
+@media (min-width: 768px) {
+  html[data-pushed-back] [data-app-ground] { filter: brightness(0.45); }
+}
+
 /* One-shot entry fade (core/ui/reveal.ts): hidden only once the hook has tagged the element, so
    server-rendered markup is never invisible before it runs; shown at once under reduced motion. */
 @media (prefers-reduced-motion: no-preference) {

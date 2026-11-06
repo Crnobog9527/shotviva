@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl"
 
 import type { SiteProduct } from "../../config"
 import { ResponsiveSheet } from "../../ui/responsive-sheet"
+import { usePushBack } from "../../ui/use-push-back"
 import { BillingToggle } from "./billing-toggle"
 import { packOffers, tierOffers, yearlySavingPct } from "./offer"
 import { PayMethods } from "./pay-methods"
@@ -32,6 +33,8 @@ export function PaywallSheet({ open, onOpenChange, trigger, products, wishlistLi
   const packs = packOffers(products)
   const { choice, update } = state
   const resolved = resolvePick(choice.pick, choice.period, offers, packs)
+  // The page behind steps back on phones and dims on desktop (paywall.html .behind).
+  usePushBack(open)
   return (
     <ResponsiveSheet
       wide

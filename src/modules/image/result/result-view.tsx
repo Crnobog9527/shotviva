@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 
 import { EDIT_TEMPLATE_ID } from '@/core/templates/edit-params'
 import { buttonVariants } from '@/core/ui/button'
+import { cn } from '@/core/ui/cn'
 
 import { DetailHead } from '../detail/detail-head'
 import { DetailPhoto } from '../detail/detail-photo'
@@ -12,6 +13,7 @@ import { PhotoFacts } from '../detail/photo-facts'
 import type { PhotoDetail } from '../detail/photo-detail'
 import type { PhotoItem } from '../photos/photo-item'
 import { tierName, tierPx } from '../workspace/workspace-options'
+import { SIDE_BY_SIDE } from './action-styles'
 import { EditedFrom, EditedFromDeleted, YourChange, type EditParent } from './edited-from'
 import { ShareButton } from './share-button'
 
@@ -31,11 +33,20 @@ type Props = {
 }
 
 // A finished photo opened from Photos (T6 photo.html; DESIGN §4.4): the result with its views,
-// then name, meta, Share as the one primary, Edit, Make again, what an edit came from, the
+// then name, meta, Share as the one primary (Download · px from lg), Edit and Make again side by side, what an edit came from, the
 // user's note and the facts. Two columns from lg, the photo sticky on the left.
 export function ResultView({ item, detail, shareText, edit, parent, parentDeleted = false, change, remove }: Props) {
   const t = useTranslations('app')
   const fileUrl = item.fileUrl as string
+  // An edit has no template page to go back to. No prefetch: opening the workspace copies the
+  // kept photo back to a fresh upload (T40).
+  const again =
+    item.templateId === EDIT_TEMPLATE_ID ? null : (
+      <Link href={`/generate/${item.templateId}?again=${item.id}`} prefetch={false} className={buttonVariants({ variant: 'glass', size: 'touch', className: SIDE_BY_SIDE })}>
+        <AgainIcon />
+        {t('result.makeAgain')}
+      </Link>
+    )
   return (
     <section
       aria-label={t('photos.photoAlt', { name: item.templateName })}
@@ -53,16 +64,9 @@ export function ResultView({ item, detail, shareText, edit, parent, parentDelete
       <div className="pt-4 lg:pt-0">
         <DetailHead item={item} />
         <div className="mt-4 grid gap-2">
-          <ShareButton fileUrl={fileUrl} name={`shotviva-${item.templateId}`} shareText={shareText} />
-          {edit}
-          {/* An edit has no template page to go back to. No prefetch: opening the workspace copies
-              the kept photo back to a fresh upload (T40). */}
-          {item.templateId === EDIT_TEMPLATE_ID ? null : (
-            <Link href={`/generate/${item.templateId}?again=${item.id}`} prefetch={false} className={buttonVariants({ variant: 'glass', size: 'touch', className: 'min-h-12 gap-1.5' })}>
-              <AgainIcon />
-              {t('result.makeAgain')}
-            </Link>
-          )}
+          <ShareButton fileUrl={fileUrl} name={`shotviva-${item.templateId}`} shareText={shareText} px={tierPx(item.resolution)} />
+          {/* Edit and Make again side by side (B comp photo.html .acts .two); alone, full width. */}
+          <QuietActions edit={edit} again={again} />
           {remove}
         </div>
         {parent ? <EditedFrom parent={parent} /> : parentDeleted ? <EditedFromDeleted /> : null}
@@ -71,6 +75,16 @@ export function ResultView({ item, detail, shareText, edit, parent, parentDelete
         <PhotoFacts item={item} original={detail.original} keptWithWork={detail.keptWithWork} />
       </div>
     </section>
+  )
+}
+
+function QuietActions({ edit, again }: { edit: ReactNode; again: ReactNode }) {
+  if (!edit && !again) return null
+  return (
+    <div className={cn('grid gap-2', edit && again ? 'grid-cols-2' : null)}>
+      {edit}
+      {again}
+    </div>
   )
 }
 

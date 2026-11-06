@@ -1,9 +1,9 @@
 import { notFound } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
-import { Suspense } from 'react'
+import { Suspense, type ReactNode } from 'react'
 
-import { AppPage, FlowNav } from '@/core/app-shell'
+import { AppPage, BalanceChip, FlowNav } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
 import { currentTier, limitsFor, readBalance } from '@/core/billing'
 import { currentLocale } from '@/core/i18n/server'
@@ -15,9 +15,10 @@ import { site } from '@/site/site.config'
 
 import { deleteWorkAction } from './actions'
 
-function Nav({ title }: { title: string }) {
+// The balance on the right (B comp photo.html .nav .bal): an edit or Make again spends from it.
+function Nav({ title, aside }: { title: string; aside?: ReactNode }) {
   const t = useTranslations('app.result')
-  return <FlowNav back={{ href: '/photos', label: t('back') }} title={title} underTabBar />
+  return <FlowNav back={{ href: '/photos', label: t('back') }} title={title} aside={aside} underTabBar />
 }
 
 // Everything the page reads besides the job, in one round: templates, the upload preview's HEAD
@@ -67,7 +68,7 @@ async function Result({ params }: { params: Promise<{ jobId: string }> }) {
   )
   return (
     <>
-      <Nav title={item.templateName} />
+      <Nav title={item.templateName} aside={<BalanceChip balance={balance} />} />
       {offer ? (
         <EditFlow
           source={{ id: job.id, fileUrl: item.fileUrl as string, name: item.templateName, aspect: item.aspect, resolution: item.resolution }}

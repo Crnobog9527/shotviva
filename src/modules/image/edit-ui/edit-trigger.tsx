@@ -4,16 +4,17 @@ import { useTranslations } from 'next-intl'
 
 import { buttonVariants } from '@/core/ui/button'
 
+import { SIDE_BY_SIDE } from '../result/action-styles'
 import { useOpenEdit } from './edit-flow'
 
-// "Edit" on a finished photo (T6 comp: the second button, under Share). Renders nothing when
+// "Edit" on a finished photo (T6 comp photo.html: beside Make again, under Share). Renders nothing when
 // editing is off, since then there is no EditFlow around it.
 export function EditTrigger() {
   const open = useOpenEdit()
   const t = useTranslations('app.edit')
   if (!open) return null
   return (
-    <button type="button" onClick={open} className={buttonVariants({ variant: 'glass', size: 'touch', className: 'min-h-12 gap-1.5' })}>
+    <button type="button" onClick={open} className={buttonVariants({ variant: 'glass', size: 'touch', className: SIDE_BY_SIDE })}>
       <EditIcon />
       {t('open')}
     </button>
