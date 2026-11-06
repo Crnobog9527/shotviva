@@ -19,14 +19,14 @@ export function IntegrationRow({ name, description, enabled, children }: Props) 
         <span
           data-status={enabled ? 'enabled' : 'not-enabled'}
           className={cn(
-            'col-start-2 row-span-2 row-start-1 inline-flex h-7 items-center rounded-full px-2.5 text-caption leading-none font-semibold',
+            'col-start-2 row-start-1 inline-flex h-7 md:row-span-2 items-center rounded-full px-2.5 text-caption leading-none font-semibold',
             enabled ? 'bg-success-tint text-success' : 'bg-wash text-muted-foreground',
           )}
         >
           {enabled ? t('enabled') : t('notEnabled')}
         </span>
-        <ChevronRight aria-hidden strokeWidth={1.75} className="col-start-3 row-span-2 row-start-1 size-[18px] text-primary transition-transform duration-200 group-open:rotate-90 motion-reduce:transition-none" />
-        <small className="col-start-1 row-start-2 text-caption leading-[1.35] text-muted-foreground">{description}</small>
+        <ChevronRight aria-hidden strokeWidth={1.75} className="col-start-3 row-start-1 size-[18px] md:row-span-2 text-primary transition-transform duration-200 group-open:rotate-90 motion-reduce:transition-none" />
+        <small className="col-span-3 col-start-1 row-start-2 text-pretty text-caption md:col-span-1 leading-[1.35] text-muted-foreground">{description}</small>
       </summary>
       <div className="pb-4">{children}</div>
     </details>
