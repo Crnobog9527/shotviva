@@ -83,7 +83,7 @@ export const zhCommercialPhotography = defineContentPage({
     related: `${brand} 的其他页面`,
   },
   landing: {
-    generatorTemplate: 'pure-white',
+    generatorTemplate: 'white-background',
     factsNote: '以上来自各平台自己的帮助页面（Amazon、Etsy、Shopify），2026 年 11 月核对。平台规则会变，上架前请再确认。',
     shoot,
     templates: {

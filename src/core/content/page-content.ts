@@ -86,7 +86,7 @@ export type ContentPage = PageBasics & { faq: Between3And5<FaqItem>; costBills: 
 type Nine<T> = readonly [T, T, T, T, T, T, T, T, T]
 export type HomeFaq = Nine<FaqItem>
 
-// `id` is the template's id in the templates table (the comps' slugs, e.g. 'pure-white'): a card
+// `id` is the template's id in the templates table (the comps' slugs, e.g. 'white-background'): a card
 // whose template is live picks it into the home generator; the others still show its name and
 // use (建站规格 R5) with the bundled illustrative pair.
 export type TemplateCard = { id: string; name: string; use: string }
