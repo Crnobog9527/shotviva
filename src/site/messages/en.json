@@ -81,9 +81,15 @@
     },
     "account": {
       "title": "Graylum",
+      "description": "Make photos in Graylum with your Shotviva credits.",
       "connected": "Connected since {date, date, medium}. Graylum can make photos with your credits.",
-      "notConnected": "Not connected.",
+      "notConnected": "Not connected. To connect, start from Graylum and allow it to use your credits.",
       "disconnect": "Disconnect Graylum"
+    },
+    "integrations": {
+      "title": "Integrations",
+      "enabled": "Enabled",
+      "notEnabled": "Not enabled"
     }
   },
   "app": {
