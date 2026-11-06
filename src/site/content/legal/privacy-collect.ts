@@ -32,7 +32,7 @@ export const privacyCollectSections: readonly [LegalSection, ...LegalSection[]] 
         list: [
           'Technical data such as your IP address, browser and device type, and the pages you visit, in our server logs.',
           'The IP address you signed up from, kept on your account to stop people from collecting free credits with many accounts.',
-          'Signals from our bot check (hCaptcha) when you sign up or sign in.',
+          'Signals from our bot check (hCaptcha) when you sign up, sign in or reset your password.',
           'Usage analytics and error reports, described in "Analytics, cookies and error reports" below.',
         ],
       },

@@ -43,7 +43,7 @@ export const termsServiceSections: readonly [LegalSection, ...LegalSection[]] = 
     id: 'accounts',
     heading: 'Your account',
     blocks: [
-      'You sign up with an email address and password, which you confirm by email, or with your Google account. We use a bot check (hCaptcha) at sign-up and sign-in.',
+      'You sign up with an email address and password, which you confirm by email, or with your Google account. We use a bot check (hCaptcha) at sign-up, sign-in and password reset.',
       'Give us accurate information, keep your password secret, and tell us right away if you think someone else has used your account. You are responsible for everything done through your account.',
       'One person may have one account. Accounts may not be shared, sold or transferred.',
     ],

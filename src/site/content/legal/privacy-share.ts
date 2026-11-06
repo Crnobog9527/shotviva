@@ -15,7 +15,7 @@ const providers = [
   'Sentry: error reports, with email addresses and access tokens removed before they are sent.',
   'Resend: delivers account emails such as email confirmation and password reset.',
   'Vercel: hosts the website and runs our servers.',
-  'hCaptcha: bot checks at sign-up and sign-in.',
+  'hCaptcha: bot protection on sign-up, sign-in and password reset. It processes device and interaction data under hCaptcha’s own privacy policy.',
   'Google: sign-in, if you choose "Continue with Google".',
 ] as const
 

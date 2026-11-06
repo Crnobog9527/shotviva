@@ -12,7 +12,6 @@ import type { FieldError, FieldName } from './validate'
 // app/[locale]/(auth)/auth.css.
 
 const HCAPTCHA_PRIVACY = 'https://www.hcaptcha.com/privacy'
-const HCAPTCHA_TERMS = 'https://www.hcaptcha.com/terms'
 
 export function Heading({ title, children }: { title: string; children?: ReactNode }) {
   return (
@@ -147,18 +146,19 @@ export function CaptchaFailed({ show }: { show: boolean }) {
   )
 }
 
-// hCaptcha asks for this line wherever its invisible check runs.
+// "hCaptcha" in the disclosure links to its privacy policy in a new tab (Owner 2026-11-07).
+export const hcaptchaLink = (chunks: ReactNode) => (
+  <a href={HCAPTCHA_PRIVACY} target="_blank" rel="noopener noreferrer">
+    {chunks}
+  </a>
+)
+
+// Invisible hCaptcha must be disclosed where it runs. Sign-up says it inside its consent sentence;
+// forms without one (login, reset, resend) carry this one line of the same quiet fine print.
 export function CaptchaLine({ enabled }: { enabled: boolean }) {
   const t = useTranslations('auth.captcha')
   if (!enabled) return null
-  return (
-    <p className="au-hc-line">
-      {t.rich('line', {
-        privacy: (chunks) => <a href={HCAPTCHA_PRIVACY}>{chunks}</a>,
-        terms: (chunks) => <a href={HCAPTCHA_TERMS}>{chunks}</a>,
-      })}
-    </p>
-  )
+  return <p className="au-fine">{t.rich('line', { hcaptcha: hcaptchaLink })}</p>
 }
 
 export function Divider() {
