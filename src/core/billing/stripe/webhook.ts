@@ -5,17 +5,31 @@ import type Stripe from 'stripe'
 import { captureAlert, captureError } from '../../analytics/capture-error'
 import { logger } from '../../logger'
 import { fulfilCheckoutSession, type FulfilDeps } from './fulfil'
+import { recordDispute, recordRefund } from './payment-issues'
+import { renewFromInvoice } from './renewal'
+import { syncSubscription } from './subscription-sync'
 
 // POST /api/webhooks/stripe (ARCHITECTURE §6.3, AGENTS §6): verify the signature first (bad
-// signature → 400, nothing applied), then settle; a processing failure → 500 so Stripe retries.
-// Dedupe: settle_checkout grants through apply_purchase keyed by the checkout session id
-// (§6.1), so every redelivery, retry or sibling event of one session grants once, and its
-// mirror upsert writes the state just retrieved from Stripe.
-// T10 adds invoice.paid, customer.subscription.updated / deleted and charge.refunded here.
+// signature → 400, nothing applied), then handle; a processing failure → 500 so Stripe retries.
+// Every handler re-reads its object from Stripe (the event body is only a notification), so
+// redelivered and out-of-order events act on Stripe's current state, and each write is keyed so
+// a replay changes nothing: settle_checkout by session id, apply_subscription_renewal by invoice
+// id, sync_subscription and record_payment_issue write absolute state.
 
-// async_payment_succeeded: a delayed method (if Stripe ever treats Alipay as one) completes the
-// session unpaid and confirms later; both events settle the same session id.
-const SESSION_EVENTS = new Set<string>(['checkout.session.completed', 'checkout.session.async_payment_succeeded'])
+type Handler = (deps: FulfilDeps, objectId: string) => Promise<string>
+
+// The seven events the Stripe endpoint subscribes to. Anything else answers 200 untouched.
+// async_payment_succeeded: a delayed method completes the session unpaid and confirms later;
+// both session events settle the same session id.
+const HANDLERS: Record<string, Handler> = {
+  'checkout.session.completed': fulfilCheckoutSession,
+  'checkout.session.async_payment_succeeded': fulfilCheckoutSession,
+  'invoice.paid': renewFromInvoice,
+  'customer.subscription.updated': syncSubscription,
+  'customer.subscription.deleted': syncSubscription,
+  'charge.refunded': recordRefund,
+  'charge.dispute.created': recordDispute,
+}
 
 export type WebhookDeps = FulfilDeps & { webhookSecret: string }
 
@@ -39,19 +53,18 @@ export async function handleStripeWebhook(
     captureAlert('payment_webhook_signature', 'Stripe webhook signature rejected')
     return { status: 400, body: { code: 'INVALID_SIGNATURE' } }
   }
-  if (!SESSION_EVENTS.has(event.type)) return { status: 200, body: { received: true } }
+  const handler = HANDLERS[event.type]
+  if (!handler) return { status: 200, body: { received: true } }
 
-  const session = event.data.object as Stripe.Checkout.Session
+  const objectId = (event.data.object as { id: string }).id
+  const fields = { event_id: event.id, event_type: event.type, object_id: objectId }
   try {
-    const outcome = await fulfilCheckoutSession(deps, session.id)
-    logger.info('stripe checkout settled', { event_id: event.id, type: event.type, session_id: session.id, outcome })
+    const outcome = await handler(deps, objectId)
+    logger.info('stripe webhook handled', { ...fields, outcome })
     return { status: 200, body: { received: true, outcome } }
   } catch (error) {
-    logger.error('stripe webhook failed', { event_id: event.id, type: event.type, session_id: session.id, error })
-    captureError(error, {
-      alert: 'payment_webhook_failed',
-      fields: { event_id: event.id, event_type: event.type, session_id: session.id },
-    })
+    logger.error('stripe webhook failed', { ...fields, error })
+    captureError(error, { alert: 'payment_webhook_failed', fields })
     return { status: 500, body: { code: 'WEBHOOK_FAILED' } }
   }
 }

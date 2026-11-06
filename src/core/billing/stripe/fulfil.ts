@@ -9,6 +9,7 @@ import { AppError } from '../../errors'
 import type { RpcClient } from '../rpc'
 import { CHECKOUT_METHODS, lookupKey, type CheckoutMethod } from './catalog'
 import type { StripeApi } from './client'
+import { SESSION_EXPAND, sessionFacts } from './payment-facts'
 import { settleCheckout, subscriptionState } from './settle'
 
 // First payment and one-time purchases (ARCHITECTURE §6.1, §6.3): a paid Checkout Session
@@ -83,9 +84,7 @@ function track(deps: FulfilDeps, session: Stripe.Checkout.Session, purchase: Ses
 export async function fulfilCheckoutSession(deps: FulfilDeps, sessionId: string): Promise<FulfilOutcome> {
   // Re-read from Stripe: the event body is only a notification, and the expanded subscription
   // is its state now, whatever order the events arrived in.
-  const session = await deps.stripe.checkout.sessions.retrieve(sessionId, {
-    expand: ['line_items.data.price', 'subscription'],
-  })
+  const session = await deps.stripe.checkout.sessions.retrieve(sessionId, { expand: SESSION_EXPAND })
   if (session.payment_status === 'unpaid') return 'unpaid'
   const purchase = readPurchase(session, deps.products)
   const change = await settleCheckout(deps.db, {
@@ -93,6 +92,7 @@ export async function fulfilCheckoutSession(deps: FulfilDeps, sessionId: string)
     productId: purchase.product.id,
     sessionId: session.id,
     subscription: purchase.subscription ? subscriptionState(purchase.subscription) : null,
+    payment: await sessionFacts(deps.stripe, session, purchase.method),
   })
   if (!change.applied) return 'replayed'
   track(deps, session, purchase)

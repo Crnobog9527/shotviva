@@ -11,6 +11,12 @@ export type StripeApi = {
   webhooks: Pick<Stripe['webhooks'], 'constructEvent'>
   checkout: { sessions: Pick<Stripe['checkout']['sessions'], 'create' | 'retrieve'> }
   prices: Pick<Stripe['prices'], 'list'>
+  // T10: renewals, mirror sync, refunds / disputes and the Customer Portal.
+  invoices: Pick<Stripe['invoices'], 'retrieve'>
+  subscriptions: Pick<Stripe['subscriptions'], 'retrieve'>
+  charges: Pick<Stripe['charges'], 'retrieve'>
+  disputes: Pick<Stripe['disputes'], 'retrieve'>
+  billingPortal: { sessions: Pick<Stripe['billingPortal']['sessions'], 'create'> }
 }
 
 let cached: Stripe | undefined
