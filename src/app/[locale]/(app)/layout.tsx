@@ -12,6 +12,7 @@ import { paymentChannel } from '@/core/billing/waffo'
 import { isModuleEnabled } from '@/core/config'
 import { appShellMetadata } from '@/core/seo'
 import { SupportTabBadge } from '@/core/support'
+import { LivingBackground } from '@/core/ui/living-background'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { GenerationRunner, HideWhileGenerating, PhotosTabBadge } from '@/modules/image'
 import { site } from '@/site/site.config'
@@ -81,6 +82,8 @@ export default function AppLayout({ children }: LayoutProps<'/[locale]'>) {
           <main className="flex flex-1 flex-col">{children}</main>
           <GenerationRunner />
         </BrandProvider>
+        {/* DESIGN §5 「全站流动背景」 (T54); it renders nothing on /admin. */}
+        <LivingBackground />
       </PaywallProvider>
     </AppFrame>
   )
