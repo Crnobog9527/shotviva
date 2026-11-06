@@ -116,5 +116,8 @@
   .lbg { display: none; }
 }
 
-/* While it is mounted it carries the grain; the static overlay of globals.css steps aside. */
-html[data-living-bg] body::after { display: none; }
+/* Admin pages (inside the app layout) get none of it: the plane is hidden there. */
+html:has([data-admin-shell]) .lbg { display: none; }
+
+/* While it shows it carries the grain; the static overlay of globals.css steps aside. */
+html[data-living-bg]:not(:has([data-admin-shell])) body::after { display: none; }

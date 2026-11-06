@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
-import { usePathname } from '../i18n/navigation'
 import { markHydrated } from './reveal'
 import './living-background.css'
 
@@ -13,11 +12,10 @@ const POINTER = '(hover: hover) and (pointer: fine)'
 // The site's living background, Bold preset (DESIGN §5 「全站流动背景」, T54): grain, two drifting
 // safelight pools that follow the scroll, a pool that follows the pointer, and a breathing
 // vignette, on one fixed plane under all content (living-background.css). Mounted by the
-// marketing and app layouts, never on /admin. It waits two frames after hydration so it can't
+// marketing and app layouts; on admin pages it is hidden (living-background.css). It waits two frames after hydration so it can't
 // hold up the first paint, never mounts under reduced motion (the static ground and grain stay),
 // has no pointer layer on touch screens, and pauses while the tab is hidden.
 export function LivingBackground() {
-  const pathname = usePathname()
   const [mount, setMount] = useState<{ pointer: boolean } | null>(null)
   useEffect(() => {
     markHydrated()
@@ -31,7 +29,7 @@ export function LivingBackground() {
       cancelAnimationFrame(second)
     }
   }, [])
-  if (!mount || pathname.startsWith('/admin')) return null
+  if (!mount) return null
   return createPortal(<Layers pointer={mount.pointer} />, document.body)
 }
 

@@ -20,11 +20,12 @@ describe('living background', () => {
     expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{\s*\.lbg \{ display: none; \}/)
   })
 
-  it('is mounted by the marketing and app layouts only, and skips /admin', () => {
+  it('is mounted by the marketing and app layouts only, and hidden on admin pages', () => {
     expect(readFileSync('src/app/[locale]/(marketing)/layout.tsx', 'utf8')).toContain('<LivingBackground />')
     expect(readFileSync('src/app/[locale]/(app)/layout.tsx', 'utf8')).toContain('<LivingBackground />')
     expect(readFileSync('src/app/[locale]/(app)/admin/layout.tsx', 'utf8')).not.toContain('LivingBackground')
-    expect(readFileSync('src/core/ui/living-background.tsx', 'utf8')).toContain("pathname.startsWith('/admin')")
+    expect(readFileSync('src/core/admin/shell/admin-shell.tsx', 'utf8')).toContain('data-admin-shell')
+    expect(css).toContain('html:has([data-admin-shell]) .lbg { display: none; }')
   })
 })
 
