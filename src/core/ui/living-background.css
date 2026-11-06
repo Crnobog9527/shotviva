@@ -1,0 +1,120 @@
+/* The living background, Bold preset (DESIGN §5 「全站流动背景」, design/comps-v3-b/demo-background.html,
+   DESKTOP-NOTES round 14 item 2). Five layers on one fixed, negative-z plane between the page
+   ground (on <html>) and every piece of content, so no text, photo or panel ever sits under a
+   light. Only transform and opacity change; the per-frame work is the compositor's. */
+
+.lbg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+}
+.lbg > * {
+  position: absolute;
+  opacity: 0;
+  transition: opacity 1.2s;
+}
+/* Fades in once mounted (after first paint), never popping over the static ground. */
+.lbg[data-on] > * { opacity: 1; }
+
+/* grain: the static noise, stepped through 8 offsets at 8 fps (a projector's flicker) */
+.lbg .lbg-grain {
+  inset: -80px;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: lbg-grain 1s steps(8) infinite;
+}
+.lbg[data-on] .lbg-grain { opacity: 0.08; }
+@keyframes lbg-grain {
+  0%, 100% { transform: translate(0, 0); }
+  12.5% { transform: translate(-40px, 25px); }
+  25% { transform: translate(30px, -50px); }
+  37.5% { transform: translate(-70px, -10px); }
+  50% { transform: translate(55px, 40px); }
+  62.5% { transform: translate(-25px, 65px); }
+  75% { transform: translate(80px, -30px); }
+  87.5% { transform: translate(-60px, -60px); }
+}
+
+/* drift + scroll: two safelight pools drifting on 42 s and 57 s loops, inside a wrapper that
+   follows the page at a tenth of its speed and brightens a little while the page moves */
+.lbg .lbg-pools {
+  inset: 0;
+  will-change: transform;
+  transform: translate3d(0, calc(var(--sy, 0px) * -0.1), 0);
+  transition: opacity 1.2s, filter 0.6s;
+}
+.lbg[data-scrolling] .lbg-pools { filter: brightness(1.5); }
+.lbg .lbg-pool {
+  position: absolute;
+  border-radius: 50%;
+  will-change: transform;
+  transition: translate 1.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.lbg .lbg-pool.a {
+  left: -30%;
+  top: -20%;
+  width: 1100px;
+  height: 1100px;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--primary) 12%, transparent), transparent 70%);
+  translate: calc(var(--lx, 0) * 4vw) calc(var(--ly, 0) * 3vh);
+  animation: lbg-drift-a 42s ease-in-out infinite;
+}
+.lbg .lbg-pool.b {
+  right: -35%;
+  top: 30%;
+  width: 1300px;
+  height: 1300px;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--safelight-warm) 8%, transparent), transparent 70%);
+  translate: calc(var(--lx, 0) * -3vw) calc(var(--ly, 0) * -2vh);
+  animation: lbg-drift-b 57s ease-in-out infinite;
+}
+@keyframes lbg-drift-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(18vw, 12vh) scale(1.12); }
+  66% { transform: translate(8vw, 28vh) scale(0.95); }
+}
+@keyframes lbg-drift-b {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  40% { transform: translate(-16vw, -14vh) scale(1.08); }
+  70% { transform: translate(-6vw, 10vh) scale(1.15); }
+}
+
+/* pointer: a smaller pool a beat behind the pointer (pointer devices only; the element is not
+   rendered on touch screens) */
+.lbg .lbg-cursor {
+  left: 0;
+  top: 0;
+  width: 720px;
+  height: 720px;
+  margin: -360px 0 0 -360px;
+  border-radius: 50%;
+  will-change: transform;
+  transform: translate3d(var(--px, 50vw), var(--py, 40vh), 0);
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--primary) 13%, transparent), transparent 70%);
+}
+
+/* breathe: the darkroom's walls, an edge vignette on a 10 s cycle */
+.lbg .lbg-vig {
+  inset: 0;
+  background: radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+}
+.lbg[data-on] .lbg-vig { animation: lbg-breathe 10s ease-in-out infinite; }
+@keyframes lbg-breathe {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+/* the tab is hidden: nothing runs */
+.lbg[data-paused] *,
+.lbg[data-paused] { animation-play-state: paused !important; }
+
+/* The component never mounts under reduced motion; this holds if the setting changes later. */
+@media (prefers-reduced-motion: reduce) {
+  .lbg { display: none; }
+}
+
+/* While it is mounted it carries the grain; the static overlay of globals.css steps aside. */
+html[data-living-bg] body::after { display: none; }

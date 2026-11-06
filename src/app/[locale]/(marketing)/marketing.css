@@ -16,7 +16,8 @@
   }
 
   /* ---------- ground and width ---------- */
-  body:has(.mk-appbar) {
+  /* On <html>, under the living background (core/ui/living-background), not on body. */
+  html:has(.mk-appbar) {
     background: linear-gradient(180deg, var(--mk-ground-top) 0, var(--background) 40vh) no-repeat, var(--background);
   }
   .mk-w { width: 100%; max-width: calc(var(--mk-content) + 2 * var(--gutter)); margin-inline: auto; }
