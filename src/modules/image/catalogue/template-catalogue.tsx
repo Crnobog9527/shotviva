@@ -37,7 +37,7 @@ export function TemplateCatalogue({ templates, create }: Props) {
         </Reveal>
       ) : null}
       <div ref={sentinel} aria-hidden="true" className="mt-4 h-px md:mt-6" />
-      <div data-stuck={stuck || undefined} className="nav-material sticky top-0 z-40 py-2 data-[stuck]:pt-[calc(var(--sat)+8px)] md:top-14 md:data-[stuck]:pt-2">
+      <div data-stuck={stuck || undefined} className="sticky top-0 z-40 py-2 data-[stuck]:nav-material data-[stuck]:pt-[calc(var(--sat)+8px)] md:top-14 md:data-[stuck]:pt-2">
         <CategoryChips categories={categoriesOf(templates)} value={category} onChange={setCategory} />
       </div>
       <h2 className="sr-only">{t('templates')}</h2>
@@ -54,8 +54,9 @@ export function TemplateCatalogue({ templates, create }: Props) {
   )
 }
 
-// True once the chip bar has stuck to the top: only then does it pad for the top safe area, so a
-// notched phone shows no empty band above the chips at rest.
+// True once the chip bar has stuck to the top: only then does it pad for the top safe area and
+// take its bar material, so at rest there is no band over the ground (or the living background,
+// T54) and a notched phone shows no empty strip above the chips.
 function useStuck() {
   const sentinel = useRef<HTMLDivElement>(null)
   const [stuck, setStuck] = useState(false)
