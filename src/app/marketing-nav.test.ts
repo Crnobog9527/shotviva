@@ -1,5 +1,5 @@
 import { NextIntlClientProvider } from 'next-intl'
-import { createElement, type FunctionComponent, type ReactElement } from 'react'
+import { createElement, type ComponentProps, type FunctionComponent, type ReactElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -14,7 +14,9 @@ vi.mock('@/core/i18n/navigation', async (original) => ({ ...(await original()), 
 const Intl = NextIntlClientProvider as unknown as FunctionComponent<{ locale: string; messages: unknown; timeZone: string }>
 
 async function render(element: ReactElement, locale: 'en' | 'zh' = 'en') {
-  const inner = createElement(TranslatedPathsProvider, { paths: ['/', '/pricing'], children: element })
+  // Typed props object (as home-faq.test.ts): the provider requires children.
+  const paths: ComponentProps<typeof TranslatedPathsProvider> = { paths: ['/', '/pricing'], children: element }
+  const inner = createElement(TranslatedPathsProvider, paths)
   return renderToStaticMarkup(createElement(Intl, { locale, messages: await loadMessages(locale), timeZone: 'UTC' }, inner))
 }
 
