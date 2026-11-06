@@ -465,8 +465,6 @@
       "metaTitle": "Account",
       "plan": {
         "title": "Plan",
-        "renews": "Renews <b>{date, date, medium}</b>",
-        "ends": "Ends <b>{date, date, medium}</b>",
         "perPeriod": "<mono>{credits, plural, one {# credit} other {# credits}}</mono> a {interval, select, year {year} other {month}} · <mono>{price}</mono>/{interval, select, year {yr} other {mo}}",
         "member": "Member",
         "noPlan": "No plan",
@@ -474,27 +472,42 @@
         "cancelledWhy": "<b>Cancelled.</b> You keep the plan and your credits until {date, date, medium}; nothing more is charged. Resubscribe any time before then to carry on without a gap.",
         "resubscribe": "Resubscribe",
         "ended": "Ended {date, date, medium}",
-        "expiredWhy": "{paid, plural, =0 {Your plan ended. Anything you made is still in Photos.} one {Your plan ended. The <b>1 credit</b> you have left still works, and anything you made is still in Photos.} other {Your plan ended. The <b># credits</b> you have left still work, and anything you made is still in Photos.}}",
         "choosePlan": "Choose a plan",
         "buyCredits": "Buy credits",
         "paymentFailed": "Payment failed",
         "pastDueWhy": "We couldn't take your last payment. Stripe will try again over the next few days; update the card and the plan carries on, with this period's credits.",
         "pastDueEndedWhy": "We couldn't take your last payment, so your plan has ended. Update the card: once a payment goes through, the plan starts again. Your credits still work.",
         "updatePayment": "Update payment method",
-        "opensStripe": "Opens Stripe's secure billing page.",
         "walletWhy": "Paid once, so it doesn't renew by itself: renew before {date, date, medium} to keep the plan, or let it end and your credits still work.",
         "renew": "Renew",
         "paused": "Paused",
         "pausedWhy": "Your subscription is paused. Nothing is charged and no credits are added until it resumes.",
-        "freeWhy": "No plan yet. Photos made with paid credits are private, with no watermark."
+        "freeWhy": "No plan yet. Photos made with paid credits are private, with no watermark.",
+        "since": "Since",
+        "renewsPlain": "Renews {date, date, medium}",
+        "endsPlain": "Ends {date, date, medium}",
+        "opensStripeTop": "Opens Stripe's",
+        "opensStripeBottom": "secure billing page",
+        "walletAlipayWhy": "One {interval, select, year {year} other {month}}, paid with <b>{method}</b>. It doesn't renew by itself: renew before {date, date, medium} to keep the plan, or let it end and your credits still work.",
+        "alipay": "Alipay",
+        "renewPrice": "Renew <cost>· {price}</cost>",
+        "endedPlain": "Your plan ended.",
+        "endedTier": "Your {tier} plan ended.",
+        "expiredRest": "{paid, plural, =0 {Anything you made is still in Photos.} one {The <b>1 credit</b> you have left still works, and anything you made is still in Photos.} other {The <b># credits</b> you have left still work, and anything you made is still in Photos.}}"
       },
       "credits": {
         "title": "Credits",
         "paid": "paid",
         "free": "free",
-        "paidUse": "Private, no watermark",
-        "freeUse": "Public, watermarked",
-        "buy": "Buy credits"
+        "buy": "Buy credits",
+        "paidOf": "of {total} this {interval, select, year {year} other {month}} · private, no watermark",
+        "paidUse": "private, no watermark",
+        "freeOf": "of {total} · public, watermarked",
+        "freeUse": "public, watermarked",
+        "paidRingOf": "{count} of {total} paid credits left",
+        "paidRing": "{count, plural, one {# paid credit} other {# paid credits}} left",
+        "freeRingOf": "{count} of {total} free credits left",
+        "freeRing": "{count, plural, one {# free credit} other {# free credits}} left"
       },
       "settings": {
         "title": "Settings",
@@ -518,6 +531,13 @@
       "session": {
         "title": "Session",
         "deleteNote": "Deleting removes your photos and remaining credits. Subscriptions are cancelled first."
+      },
+      "strip": {
+        "heading": "This month · {count, plural, one {# photo} other {# photos}}",
+        "photos": "Photos",
+        "label": "Your photos this month",
+        "open": "Open photo",
+        "more": "{count, plural, one {# more photo} other {# more photos}} in Photos"
       }
     },
     "creditsUnit": "{count, plural, one {credit} other {credits}}",
@@ -808,5 +828,17 @@
     "title": "Something went wrong",
     "body": "This page did not load. Try again in a moment.",
     "retry": "Try again"
+  },
+  "legal": {
+    "pagesLabel": "Legal pages",
+    "pages": {
+      "terms": "Terms",
+      "privacy": "Privacy",
+      "refunds": "Refunds",
+      "acceptableUse": "Acceptable use"
+    },
+    "lastUpdated": "Last updated <date></date>",
+    "contents": "Contents",
+    "questions": "Questions about this page: <mail></mail>"
   }
 }
