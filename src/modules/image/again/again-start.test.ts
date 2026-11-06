@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
-import { againValues } from './again-start'
+import { againValues, makeAgainHref } from './again-start'
 
 const template = {
   id: 'pure-white',
@@ -22,5 +22,12 @@ describe('againValues', () => {
       note: '',
       copy: {},
     })
+  })
+})
+
+describe('makeAgainHref', () => {
+  it('opens the template workspace from the work, as the photo page and the Photos grid both link it', () => {
+    expect(makeAgainHref('pure-white', '5c0d9a8e-1111-4222-8333-444455556666')).toBe('/generate/pure-white?again=5c0d9a8e-1111-4222-8333-444455556666')
+    expect(makeAgainHref('a b', 'x&y')).toBe('/generate/a%20b?again=x%26y')
   })
 })

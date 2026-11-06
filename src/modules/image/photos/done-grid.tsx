@@ -1,6 +1,7 @@
 import { Link } from '@/core/i18n/ui'
 import { useFormatter, useTranslations } from 'next-intl'
 
+import { makeAgainHref } from '../again/again-start'
 import { GroundedImg } from '../result/grounded-img'
 import { WorkTag } from '../result/work-tag'
 import { PhotosEmpty } from './photos-empty'
@@ -32,7 +33,7 @@ export function DoneGrid({ items, now, anyRunning, liveTemplates }: { items: Pho
               <b className="mt-2 block text-body font-semibold">{item.templateName}</b>
               <small className="mt-1 block text-caption leading-[1.35] text-muted-foreground">{doneMeta(item, now, t, day)}</small>
             </Link>
-            {liveTemplates.includes(item.templateId) ? <MakeAgain templateId={item.templateId} /> : null}
+            {liveTemplates.includes(item.templateId) ? <MakeAgain templateId={item.templateId} jobId={item.id} /> : null}
           </li>
         ))}
       </ul>
@@ -41,11 +42,13 @@ export function DoneGrid({ items, now, anyRunning, liveTemplates }: { items: Pho
   )
 }
 
-// "Make again ›": the template's workspace page, the full-page form (DESIGN §6.9 item 2).
-function MakeAgain({ templateId }: { templateId: string }) {
+// "Make again ›": the template's workspace page, the full-page form (DESIGN §6.9 item 2), opened
+// from this work like the photo page's Make again: its settings and its kept photo (T40). No
+// prefetch: opening it copies the kept photo back to a fresh upload.
+function MakeAgain({ templateId, jobId }: { templateId: string; jobId: string }) {
   const t = useTranslations('app.photos')
   return (
-    <Link href={`/generate/${templateId}`} className="mt-1 inline-flex min-h-9 items-center gap-0.5 self-start text-caption font-medium text-foreground hover:underline hover:underline-offset-3">
+    <Link href={makeAgainHref(templateId, jobId)} prefetch={false} className="mt-1 inline-flex min-h-9 items-center gap-0.5 self-start text-caption font-medium text-foreground hover:underline hover:underline-offset-3">
       {t('makeAgain')}
       <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 text-primary" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
         <path d="M9 6l6 6-6 6" />
