@@ -20,9 +20,11 @@ const input = (overrides: Partial<ProviderInput> = {}): ProviderInput => ({
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
 
-function provider(fetchImpl: typeof fetch) {
-  return createOpenAIImageProvider({ apiKey: 'sk-test', model: 'gpt-image-2.5-sunburst', fetch: fetchImpl })
+function provider(fetchImpl: typeof fetch, model = 'gpt-image-2.5-sunburst') {
+  return createOpenAIImageProvider({ apiKey: 'sk-test', model, fetch: fetchImpl })
 }
+
+const bodies = (fetchImpl: ReturnType<typeof vi.fn>) => fetchImpl.mock.calls.map((call) => (call as unknown as [string, RequestInit])[1].body)
 
 describe('openai image provider', () => {
   it('sends a multipart edit with the photo and returns the PNG', async () => {
@@ -106,15 +108,45 @@ describe('openai image provider config (T17)', () => {
 })
 
 describe('openai image provider: photo edits (T30)', () => {
-  it('sends input_fidelity on an edit only when the template sets it (T30)', async () => {
+  it('sends input_fidelity on an edit only when the template sets it and the model takes it (T30)', async () => {
     const fetchImpl = vi.fn(async () => json({ data: [{ b64_json: PNG_B64 }] }))
-    await provider(fetchImpl).generate(input({ params: { input_fidelity: 'high' } }))
-    await provider(fetchImpl).generate(input())
-    await provider(fetchImpl).generate(input({ images: [], params: { input_fidelity: 'high' } }))
-    const sent = fetchImpl.mock.calls.map((call) => (call as unknown as [string, RequestInit])[1].body)
+    await provider(fetchImpl, 'gpt-image-1.5').generate(input({ params: { input_fidelity: 'high' } }))
+    await provider(fetchImpl, 'gpt-image-1.5').generate(input())
+    await provider(fetchImpl, 'gpt-image-1.5').generate(input({ images: [], params: { input_fidelity: 'high' } }))
+    await provider(fetchImpl, 'gpt-image-2.6').generate(input({ params: { input_fidelity: 'high' } }))
+    const sent = bodies(fetchImpl)
     expect((sent[0] as FormData).get('input_fidelity')).toBe('high')
     expect((sent[1] as FormData).get('input_fidelity')).toBeNull()
     expect(JSON.parse(sent[2] as string)).not.toHaveProperty('input_fidelity')
+    // gpt-image-2 and later reject the field (400 invalid_input_fidelity_model).
+    expect((sent[3] as FormData).get('input_fidelity')).toBeNull()
+    expect(fetchImpl).toHaveBeenCalledTimes(4)
+  })
+
+  const refused = () => json({ error: { code: 'invalid_input_fidelity_model', type: 'image_generation_user_error', message: 'SECRET' } }, 400)
+
+  it('retries once without input_fidelity when the model refuses it, and returns that image', async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValueOnce(refused()).mockResolvedValueOnce(json({ data: [{ b64_json: PNG_B64 }] }))
+    const output = await provider(fetchImpl, 'gpt-image-1.5').generate(input({ params: { input_fidelity: 'high' } }))
+    expect([...output.bytes]).toEqual([0x89, 0x50, 0x4e, 0x47])
+    const sent = bodies(fetchImpl)
+    expect((sent[0] as FormData).get('input_fidelity')).toBe('high')
+    expect((sent[1] as FormData).get('input_fidelity')).toBeNull()
+    expect((sent[1] as FormData).get('prompt')).toBe(PROMPT)
+  })
+
+  it('fails with the second answer when the retry fails too, and retries nothing else', async () => {
+    const twice = vi.fn<typeof fetch>().mockResolvedValueOnce(refused()).mockResolvedValueOnce(json({ error: { code: null, type: 'server_error' } }, 500))
+    await expect(provider(twice, 'gpt-image-1.5').generate(input({ params: { input_fidelity: 'high' } }))).rejects.toMatchObject({
+      kind: 'failed',
+      message: 'openai 500 code=- type=server_error',
+    })
+    expect(twice).toHaveBeenCalledTimes(2)
+
+    // Without input_fidelity in the request, the same 400 is just a failure.
+    const once = vi.fn<typeof fetch>().mockResolvedValue(refused())
+    await expect(provider(once).generate(input())).rejects.toMatchObject({ kind: 'failed', message: 'openai 400 code=invalid_input_fidelity_model type=image_generation_user_error' })
+    expect(once).toHaveBeenCalledTimes(1)
   })
 })
 

@@ -2,7 +2,10 @@ import { z } from 'zod'
 
 import { ProviderError, type GenerationProvider, type ProviderInput, type ProviderOutput } from '@/core/jobs'
 
-import { toProviderError } from './openai-errors'
+import { logger } from '@/core/logger'
+
+import { FIDELITY_REJECTED_CODE, fidelityFor } from './input-fidelity'
+import { failureToProviderError, readOpenAIFailure } from './openai-errors'
 import { parseOpenAIUsage } from './openai-usage'
 import { formatSize, outputSize } from './output-size'
 
@@ -24,15 +27,16 @@ export type OpenAIImageConfig = {
 // floored on.
 const paramsSchema = z.object({
   background: z.enum(['auto', 'opaque', 'transparent']).optional(),
-  // How closely an edit keeps the input photo (T30, ARCHITECTURE §5.2). /images/edits only, and
-  // only when the template sets it, since not every model accepts it.
+  // How closely an edit keeps the input photo (T30, ARCHITECTURE §5.2). /images/edits only, when
+  // the template sets it and the model accepts it (input-fidelity.ts).
   input_fidelity: z.enum(['high', 'low']).optional(),
 })
 
+type Params = z.infer<typeof paramsSchema>
+
 const responseSchema = z.object({ data: z.array(z.object({ b64_json: z.string().min(1) })).min(1) })
 
-function buildRequest(config: OpenAIImageConfig, input: ProviderInput): { path: string; init: RequestInit } {
-  const params = paramsSchema.catch({}).parse(input.params)
+function buildRequest(config: OpenAIImageConfig, input: ProviderInput, params: Params): { path: string; init: RequestInit } {
   const fields: Record<string, string> = {
     model: config.model,
     prompt: input.prompt,
@@ -59,8 +63,8 @@ function buildRequest(config: OpenAIImageConfig, input: ProviderInput): { path: 
   return { path: '/images/edits', init: { method: 'POST', headers, body: form } }
 }
 
-async function send(config: OpenAIImageConfig, input: ProviderInput): Promise<Response> {
-  const { path, init } = buildRequest(config, input)
+async function send(config: OpenAIImageConfig, input: ProviderInput, params: Params): Promise<Response> {
+  const { path, init } = buildRequest(config, input, params)
   try {
     return await (config.fetch ?? fetch)(`${config.baseUrl ?? 'https://api.openai.com/v1'}${path}`, {
       ...init,
@@ -72,12 +76,27 @@ async function send(config: OpenAIImageConfig, input: ProviderInput): Promise<Re
   }
 }
 
+// Sends the request; if the model still refuses input_fidelity (a relay's model name we do not
+// know, or a model that changed), sends it once more without, under the same deadline. The job is
+// settled only on the final answer, so the user is charged or refunded once.
+async function sendWithFallback(config: OpenAIImageConfig, input: ProviderInput): Promise<Response> {
+  const parsed = paramsSchema.catch({}).parse(input.params)
+  const params = { ...parsed, input_fidelity: fidelityFor(config.model, parsed.input_fidelity) }
+  const response = await send(config, input, params)
+  if (response.ok) return response
+  const failure = await readOpenAIFailure(response)
+  if (!(params.input_fidelity && failure.status === 400 && failure.code === FIDELITY_REJECTED_CODE)) throw failureToProviderError(failure)
+  logger.warn('model refused input_fidelity; retrying without it', { model: config.model })
+  const retry = await send(config, input, { ...params, input_fidelity: undefined })
+  if (!retry.ok) throw failureToProviderError(await readOpenAIFailure(retry))
+  return retry
+}
+
 export function createOpenAIImageProvider(config: OpenAIImageConfig): GenerationProvider {
   return {
     id: 'openai-image',
     async generate(input): Promise<ProviderOutput> {
-      const response = await send(config, input)
-      if (!response.ok) throw await toProviderError(response)
+      const response = await sendWithFallback(config, input)
       const body: unknown = await response.json().catch(() => null)
       // A 200 without an image is still billed for what it used (T33).
       const usage = parseOpenAIUsage(body)
