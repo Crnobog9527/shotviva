@@ -56,8 +56,24 @@ describe('connect authorize', () => {
       post({ state: 'graylum-state-2', return_to: 'https://evil.example/api/connectors/shotviva/callback' }),
       deps(sessionOf(userId)),
     )
-    expect(response.status).toBe(400)
-    expect(response.headers.get('location')).toBeNull()
+    // Back to the connect page's "not valid" state (B comp connect.html ?v=error), nothing echoed.
+    expect(response.status).toBe(303)
+    expect(response.headers.get('location')).toBe(`${APP}/connect/graylum?error=invalid`)
+    expect(await linkRow(db, userId)).toBeNull()
+  })
+
+  it('keeps the language of the page that posted when sending back an invalid link', async () => {
+    const userId = await createUser(db)
+    const response = await handleConnectAuthorize(post({ state: 'short' }), { ...deps(sessionOf(userId)), locale: 'zh' })
+    expect(response.headers.get('location')).toBe(`${APP}/zh/connect/graylum?error=invalid`)
+  })
+
+  it('sends a failure to mint the code back to the page as "something went wrong"', async () => {
+    const userId = await createUser(db)
+    const broken = () => ({ from: () => { throw new Error('database down') } }) as unknown as ReturnType<typeof serviceSupabase>
+    const response = await handleConnectAuthorize(post({ state: 'graylum-state-5' }), { ...deps(sessionOf(userId)), db: broken })
+    expect(response.status).toBe(303)
+    expect(response.headers.get('location')).toBe(`${APP}/connect/graylum?error=failed`)
     expect(await linkRow(db, userId)).toBeNull()
   })
 

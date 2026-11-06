@@ -50,8 +50,10 @@ export async function signInWithGoogle(form: FormData): Promise<FormState> {
   redirect(data.url)
 }
 
-export async function signOut(): Promise<never> {
+// `then`: where to land afterwards, a same-site path (sanitised; the home page otherwise), e.g.
+// the login page on the way back to /connect/graylum ("Not you?").
+export async function signOut(then?: string): Promise<never> {
   const supabase = await createServerSupabase()
   await supabase.auth.signOut()
-  redirect(await localized('/'))
+  redirect(await localized(then ? sanitizeNext(then) : '/'))
 }

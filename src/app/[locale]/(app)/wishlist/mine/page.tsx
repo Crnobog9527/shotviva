@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
+import { connection } from 'next/server'
 import { Suspense } from 'react'
 
 import { AppPage, FlowNav } from '@/core/app-shell'
@@ -15,27 +16,23 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('app.wishlist.mine'))('title') }
 }
 
-function Head() {
+function Nav() {
   const t = useTranslations('app.wishlist')
-  return (
-    <>
-      <FlowNav back={{ href: '/wishlist', label: t('title') }} title={t('mine.title')} />
-      <h1 className="px-4 pt-2 font-display text-h1 leading-tight">{t('mine.title')}</h1>
-    </>
-  )
+  return <FlowNav back={{ href: '/wishlist', label: t('title') }} title={t('mine.title')} pinnedTitle />
 }
 
-// My requests, a flow page (DESIGN §4.7): no tab bar, back to the wall.
+// My requests (B comp wishlist.html ?v=mine), a flow page: no tab bar, back to the wall.
 async function Mine() {
   const user = await requireUser('/wishlist/mine')
+  await connection()
   const first = await listMyRequests(await createServerSupabase(), r2Store(), user.id)
-  return <MyRequestsView first={first} loadMore={loadMyRequestsPage} />
+  return <MyRequestsView first={first} now={new Date().toISOString()} loadMore={loadMyRequestsPage} />
 }
 
 export default function MyRequestsPage() {
   return (
-    <AppPage>
-      <Head />
+    <AppPage wide>
+      <Nav />
       <Suspense>
         <Mine />
       </Suspense>
