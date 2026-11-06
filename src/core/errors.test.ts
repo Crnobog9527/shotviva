@@ -20,9 +20,9 @@ describe('AppError', () => {
     expect(toAppError(original)).toBe(original)
   })
 
-  it('a tier error is a 403 that names the tier the paywall should preselect', () => {
-    const error = new TierRequiredError('max')
+  it('TIER_REQUIRED is a 403 that names the tier to open the paywall on', () => {
+    const error = new TierRequiredError('pro', 'Batch upload is on Pro')
     expect(error.status).toBe(403)
-    expect(error.toBody()).toEqual({ code: 'TIER_REQUIRED', message: error.message, required_tier: 'max' })
+    expect(error.toBody()).toEqual({ code: 'TIER_REQUIRED', message: 'Batch upload is on Pro', required_tier: 'pro' })
   })
 })

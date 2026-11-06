@@ -1,14 +1,15 @@
 import { z } from 'zod'
 
 import type { MembershipTier } from '../config'
-import type { RequiredTier } from '../errors'
 
 // The rule for one feature_access row (ARCHITECTURE §6.2). Pure, so the admin page, server
 // gates and tests share it. No server-only import: a page may lock a button with it.
 
-export const FEATURE_MIN_TIERS = ['pro', 'max'] as const satisfies readonly RequiredTier[]
+// The lowest tier a gated feature can ask for; Starter is everyone who has a tier, so it never gates.
+export const FEATURE_MIN_TIERS = ['pro', 'max'] as const satisfies readonly MembershipTier[]
+export type FeatureMinTier = (typeof FEATURE_MIN_TIERS)[number]
 
-export type FeatureAccess = { key: string; minTier: RequiredTier | null; openToAllAt: string | null }
+export type FeatureAccess = { key: string; minTier: FeatureMinTier | null; openToAllAt: string | null }
 
 export const featureAccessRowSchema = z
   .object({ key: z.string(), min_tier: z.enum(FEATURE_MIN_TIERS).nullable(), open_to_all_at: z.string().nullable() })
@@ -22,7 +23,7 @@ export function missingTier(
   tier: MembershipTier | null,
   access: FeatureAccess | null | undefined,
   now: Date | number,
-): RequiredTier | null {
+): FeatureMinTier | null {
   if (!access?.minTier) return null
   if (access.openToAllAt !== null && Date.parse(access.openToAllAt) <= new Date(now).getTime()) return null
   return RANK[tier ?? 'starter'] >= RANK[access.minTier] ? null : access.minTier

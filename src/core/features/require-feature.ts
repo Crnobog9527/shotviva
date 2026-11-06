@@ -34,5 +34,5 @@ export async function requireFeature(userId: string, key: string, deps: Partial<
   // Open even to an account with no tier: open to everyone.
   if (missingTier(null, access, at) === null) return
   const missing = missingTier(await tierOf(userId), access, at)
-  if (missing) throw new TierRequiredError(missing)
+  if (missing) throw new TierRequiredError(missing, `feature ${key} needs ${missing}`)
 }

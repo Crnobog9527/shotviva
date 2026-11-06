@@ -1,3 +1,5 @@
+import type { MembershipTier } from './config'
+
 // Single source of error codes. User-facing copy lives in the UI layer, not here,
 // so log messages and what the user sees can evolve independently.
 export const ERROR_CODES = [
@@ -15,7 +17,8 @@ export const ERROR_CODES = [
   'CONFLICT',
   // Per-account generation limit (core/jobs/rate-limit.ts).
   'RATE_LIMITED',
-  // Membership tier below what the action needs (ARCHITECTURE §6.2); body carries required_tier.
+  // The membership tier is too low for this (a batch bigger than the tier allows, a Max-only
+  // feature); the body names required_tier so the paywall can open on it (ARCHITECTURE §6.2).
   'TIER_REQUIRED',
   // Upload checks (ARCHITECTURE §8.2): over 20MB, or not a JPEG/PNG/WebP we can decode.
   'IMAGE_TOO_LARGE',
@@ -50,9 +53,7 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   INTERNAL: 500,
 }
 
-export type RequiredTier = 'pro' | 'max'
-
-export type ErrorBody = { code: ErrorCode; message: string; required_tier?: RequiredTier }
+export type ErrorBody = { code: ErrorCode; message: string }
 
 export class AppError extends Error {
   readonly code: ErrorCode
@@ -72,17 +73,15 @@ export class AppError extends Error {
   }
 }
 
-// The paywall opens with this tier preselected (ARCHITECTURE §6.2).
 export class TierRequiredError extends AppError {
-  constructor(
-    readonly requiredTier: RequiredTier,
-    message = 'A higher membership tier is required',
-  ) {
+  readonly requiredTier: MembershipTier
+
+  constructor(requiredTier: MembershipTier, message: string) {
     super('TIER_REQUIRED', message)
-    this.name = 'TierRequiredError'
+    this.requiredTier = requiredTier
   }
 
-  override toBody(): ErrorBody {
+  override toBody(): ErrorBody & { required_tier: MembershipTier } {
     return { ...super.toBody(), required_tier: this.requiredTier }
   }
 }
