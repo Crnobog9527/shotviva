@@ -288,6 +288,7 @@
       "today": "今天",
       "yesterday": "昨天",
       "fallbackName": "照片",
+      "editedName": "改过的照片",
       "badgeAria": "{count} 张生成中",
       "pill": "{count, plural, =1 {生成中…} other {# 张生成中…}}",
       "doneMeta": "{when} · {size} · {tier}",
@@ -343,6 +344,7 @@
         "visibilityPublic": "公开",
         "original": "原图",
         "originalKept": "已保留，{px} px 预览",
+        "originalEdited": "你改的那张照片",
         "originalDeleted": "已按隐私规则删除",
         "made": "生成时间"
       }
@@ -499,6 +501,34 @@
       "showMore": "查看更多",
       "loading": "加载中…",
       "loadFailed": "没能加载更多，请重试。"
+    },
+    "edit": {
+      "open": "修改",
+      "title": "修改这张照片",
+      "meta": "{name} · {size} · {tier}",
+      "thisPhoto": "这张照片",
+      "hint": "说要改哪里，其他地方保持不变。",
+      "label": "想改哪里？",
+      "placeholder": "比如：把沙发换成蓝色、放到海边、去掉价签",
+      "counter": "{count} / {max}",
+      "required": "先说说要改哪里。",
+      "examples": "示例",
+      "tries": {
+        "beach": "放到海边",
+        "background": "背景换成浅蓝色",
+        "brighter": "调亮一点"
+      },
+      "size": "尺寸",
+      "sizeFixed": "和原图一样。构图不变，只改你说的地方。",
+      "noticeEmpty": "用任何语言写下要改的地方。<b>原图会保留。</b>",
+      "noticeReady": "会生成一张新照片，原图仍在作品里。",
+      "noticeFree": "会生成一张新照片，原图仍在作品里。<b>使用免费积分：公开并带水印。</b>",
+      "failTitle": "修改失败",
+      "failUntouched": "原图没有变。",
+      "changeRequest": "改一下要求",
+      "titleEdited": "{name}（修改版）",
+      "yourChange": "你的修改",
+      "editedFromLabel": "修改自"
     }
   },
   "paywall": {
