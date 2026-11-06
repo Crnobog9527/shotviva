@@ -96,7 +96,8 @@ describe('createCheckout routing', () => {
       line_items: [{ price: 'price_pro_yearly' }],
       payment_intent_data: { metadata: { product_id: 'pro_yearly', method: 'alipay' } },
     })
-    expect(params).not.toHaveProperty('managed_payments')
+    // Said out loud: the Dashboard's "Managed Payments by default" must not pull Alipay into MP.
+    expect(params).toMatchObject({ managed_payments: { enabled: false } })
     expect(params).not.toHaveProperty('payment_method_types')
     expect(d.trackStart).toHaveBeenCalledWith(USER, expect.objectContaining({ form: 'one_time', method: 'alipay', interval: 'year' }), 'en')
   })
@@ -113,9 +114,29 @@ describe('createCheckout routing', () => {
       userId: USER,
       body: { product_id: 'max_monthly', method: 'card', locale: 'en' },
     })
-    expect(sent(create)).toMatchObject({ mode: 'subscription', allowed_payment_method_types: ['card'] })
-    expect(sent(create)).not.toHaveProperty('managed_payments')
+    expect(sent(create)).toMatchObject({ mode: 'subscription', allowed_payment_method_types: ['card'], managed_payments: { enabled: false } })
     expect(sent(create)).not.toHaveProperty('payment_method_types')
+  })
+})
+
+// Every route states Managed Payments explicitly (control 2026-11-07: the live Dashboard has
+// "Managed Payments enabled by default for all Checkout Sessions" on, and MP takes no Alipay).
+describe('Managed Payments is explicit on every route', () => {
+  it.each([
+    ['card membership, MP on', 'pro_monthly', 'card', true, { mode: 'subscription', managed_payments: { enabled: true } }, null],
+    ['card pack, MP on', 'pack_m', 'card', true, { mode: 'payment', managed_payments: { enabled: true } }, null],
+    ['Alipay period, MP on', 'starter_monthly', 'alipay', true, { mode: 'payment', managed_payments: { enabled: false } }, ['alipay']],
+    ['Alipay pack, MP on', 'pack_l', 'alipay', true, { mode: 'payment', managed_payments: { enabled: false } }, ['alipay']],
+    ['card membership, MP off', 'max_yearly', 'card', false, { mode: 'subscription', managed_payments: { enabled: false } }, ['card']],
+    ['card pack, MP off', 'pack_s', 'card', false, { mode: 'payment', managed_payments: { enabled: false } }, ['card']],
+    ['Alipay period, MP off', 'pro_yearly', 'alipay', false, { mode: 'payment', managed_payments: { enabled: false } }, ['alipay']],
+  ] as const)('%s', async (_, productId, method, managedPayments, expected, methods) => {
+    const { stripe, create } = fakeStripe()
+    await createCheckout(deps(stripe, { managedPayments }), { userId: USER, body: { product_id: productId, method, locale: 'en' } })
+    const params = sent(create)
+    expect(params).toMatchObject(expected)
+    if (methods) expect(params?.allowed_payment_method_types).toEqual(methods)
+    else expect(params).not.toHaveProperty('allowed_payment_method_types')
   })
 })
 
