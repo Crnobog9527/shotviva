@@ -23,7 +23,7 @@ R6 索引管理：每页 canonical 自指；sitemap.xml 拆 index（sitemap-page
 R7 结构化数据（JSON-LD 四类必做）：SoftwareApplication（首页+所有工具页：name / applicationCategory / operatingSystem: Web / offers 价格+币种）；FAQPage（所有带 FAQ 页，问题用真实问法）；Organization（首页：name / url / logo / sameAs）；BreadcrumbList（所有内页）。可选 HowTo、ImageObject（对比图带 caption）。
 R8 内链规则：任何页面从首页出发 ≤3 次点击；内页指回首页锚文本只用「AI image to image」或「img to img」；同族互链（interior↔architectural、restaurant-flyer↔restaurant-poster、工具页↔模板分类、首页模板分类块的每个分类↔对应垂直页）；博客每篇至少链回一个工具页且锚文本用该页主词；首页必须直链所有已上线的内页。
 R9 图片 SEO：WebP/AVIF + CDN；首屏对比图不许 lazy load（LCP 要素）；alt 写「场景+主体+光线」，例 "AI food photo of grilled salmon on ceramic plate, studio lighting"，不许 image1、不许堆词；每张对比图配一行可见 caption（说明改了什么）。
-R10 内容模块（每页五块，缺一不算完成）：① 首屏 1 张前后对比图 + 一句直答（G1）+ 试用入口 ② 可核验事实块（平台尺寸/免费张数/价格/支持语言）③ 成本对比表（请摄影师 vs 本站，全站一套价格）④ FAQ 3~5 条用真实问法 ⑤ 族内互链块 2~3 个相关页。
+R10 内容模块（每页五块，缺一不算完成）：① 首屏 1 张前后对比图 + 一句直答（G1）+ 试用入口 ② 可核验事实块（平台尺寸/免费张数/价格/支持语言）③ 成本对比表（请摄影师 vs 本站，全站一套价格）④ FAQ 3~5 条用真实问法（首页例外，见 G6，上限 8 条） ⑤ 族内互链块 2~3 个相关页。
 R11 技术底座：Next.js App Router + next-intl，SSG/ISR。robots.txt 显式放行 GPTBot、OAI-SearchBot、PerplexityBot、ClaudeBot、ChatGPT-User，不许 Disallow: /。移动端 LCP <2.5s、CLS <0.1、INP <200ms。
 R12 监控节奏：上线当天 GSC 验证站点 + 提交 sitemap；上线满 2 周起每两周看一次 img to img（难度 14.3，首页的副词，不单独建页，靠首页文案和内页回链锚文本带动）是否先出排名、首页均排是否进前 20；每月看 AI 引荐来源与首页模板区点击率。判定线：上线 8 周后首页有排名（前 20）但首页→模板（点开任一模板进入工作台）点击率 <5%，才考虑换首页主词，此前不许动。另看一条「付费链路」指标（2026-11-05 补）：首页→垂直页（/ai-restaurant-menu、/commercial-photography、/interior-photography）的点击占比，低于 5% 先改首页的用例 / 内链块（§4 首页骨架的最后一个 H2），不改首页主词——通用定位下这是唯一能判断「泛流量有没有漏到付费页」的指标。
 
@@ -34,12 +34,21 @@ G2 Title 带年份与限定词：AI 联网会自己组带年份的搜索词，Ti
 G3 每个数字只能一套口径：免费额度（对外统一写 "3 free Standard images"，即注册送 6 个免费 credit = 3 张 Standard 档标准模板图，Owner 2026-11-05 定；其余计价仍用 credit，不说「张」）、价格（唯一来源是 site.config.ts；Owner 2026-11-05 定稿：Starter $19.90/月 50 credits 或 $191/年 600 credits，Pro $49.90/月 135 或 $479/年 1,620，Max $99/月 280 或 $713/年 3,360（年付 Owner 2026-11-06 改价：Starter / Pro 8 折，Max 6 折，取整）；积分包 $9.90/20、$24.90/55、$49.90/115；卡支付可订阅自动续费，钱包和积分包为单笔，见 规范/ARCHITECTURE.md §6.1、§6.2）、每张图消耗（按模板和清晰度：Standard / HD / Max 三档，即 1024 / 2048 / 2880 px，标准模板 2 / 4 / 6 credits，页面上写 "from 2 credits"；对外不写 1K / 2K / 3K，不写 4K）、支持语言数、出图耗时，全站（首页/价格页/FAQ/结构化数据/站外目录）完全一致；AI 交叉比对发现两套就不引用；改价一次改全站。
 G4 每页写死可核验事实，至少 3 条。全站通用的：免费额度（3 free Standard images）与价格档位；每张消耗（from 2 credits）；输出三档像素（Standard 1024 / HD 2048 / Max 2880 px）；上传限制（JPG / PNG / WebP，最大 20MB）；出图耗时（秒/张）；保留主体不变的技术说明。垂直页另加本行业的：餐饮页写 DoorDash/Uber Eats/Grubhub 菜单图推荐尺寸与比例，电商页写 Amazon / eBay / Etsy 主图要求，空间页写 Airbnb 封面图比例。
 G5 用 HTML 表格承载对比（成本、尺寸要求、模板分类），不用图片——AI 抽表格成功率显著高于段落。
-G6 FAQ 必须用用户原话。首页 5 句（通用，2026-11-05 定）：
+G6 FAQ 必须用用户原话。首页 8 句（通用；2026-11-05 定前 5 句，2026-11-06 Owner 按 GEO 审查加 F～H 并改写答案；首页 FAQ 以 8 句为上限，加第 9 句前要答得上「会被搜吗、和本页主词有关吗」）：
 A What is image to image AI?
-B Is image to image AI free?（答：new users get 3 free Standard images，之后 from 2 credits a photo，价格从配置读）
+B Is image to image AI free?（答：new users get 3 free Standard images，之后 from 2 credits a photo，套餐和每 credit 价格从配置读）
 C Does image to image AI keep my photo's subject the same?
-D How is image to image AI different from an AI image generator?（答案末尾链 /image-to-image-generator）
-E Can I use the photos commercially?（答：付费积分生成的作品无水印、可商用；免费作品公开带水印）
+D How is image to image AI different from an AI image generator?（答案末尾链 /image-to-image-generator；答案后紧跟一张 4 行对比表：起点 / 主体 / 适合 / 风险）
+E Can I use the photos commercially?（答：付费积分生成的作品无水印、可商用，举菜单、外卖平台、电商平台、广告等用途；免费作品带水印、不是私密的）
+F Do I need to write prompts?（答：不用；选模板、填文字即可，想调整时可以用大白话说一句；答案末尾链 /image-to-image-generator）
+G What sizes and formats can I export?（答：PNG，Standard / HD / Max 三档，即 1024 / 2048 / 2880 px，比例按模板；付费作品全尺寸无水印。不写 JPG、不写 1080×1080 这类我们不出的尺寸）
+H Can I use Shotviva on my phone?（答：可以，直接在手机浏览器里用，iPhone 的 Safari、Android 的 Chrome 都行，不用装 App；用相机拍或从相册选，出图后保存或分享。不承诺「添加到主屏幕」之类没做的功能）
+
+首页 FAQ 的写法（2026-11-06 GEO 审查，Owner 同意）：
+- 每个答案第一句写出实体名（Shotviva 或 Image to image AI），不用 It、Yes、Photos 开头；AI 单独摘走任何一条都能看懂。
+- 能放数字的都放数字（3 free Standard images、from 2 credits、套餐起价、3 步、三档尺寸），数字一律从 `site.config` 和代码常量读，不手写；出图秒数等上线前实测（LAUNCH §5）后再写。
+- 不承诺还不存在的页面或功能：公开作品展示上线前，免费作品写「带水印、不是私密的」，不写「可以在作品墙看到」；「食物份量保证不变」这类绝对承诺不写。
+- 新版首页设计里 FAQ 是手风琴，答案必须写在服务端返回的 HTML 里（`<details>` 或默认展开再用样式收起），不能点击后才加载（G11）。
 垂直页 8 句（餐饮线，原文保留），每句都有承接页：
 1 how can I make my restaurant food photos look professional without hiring a photographer
 2 is there an AI that turns phone photos into studio product photos
