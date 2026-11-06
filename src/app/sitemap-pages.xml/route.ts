@@ -4,6 +4,6 @@ import { site } from '@/site/site.config'
 
 // Indexable pages only; paths of disabled modules are dropped (AGENTS §7 item 5). 404 while the
 // pre-launch switch is closed (ARCHITECTURE §12.0).
-export function GET() {
-  return closedSeoFileResponse() ?? xmlResponse(urlsetXml(pageSitemapUrls(site, pageGates)))
+export async function GET() {
+  return (await closedSeoFileResponse()) ?? xmlResponse(urlsetXml(pageSitemapUrls(site, pageGates)))
 }

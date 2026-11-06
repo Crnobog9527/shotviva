@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { connection } from 'next/server'
+import { describe, expect, it, vi } from 'vitest'
 
 import { parseServerEnv } from '../env'
 import { canonicalHostRedirect } from './canonical-host'
@@ -12,7 +13,10 @@ import { robotsRules } from './robots'
 import { pageSitemapUrls } from './sitemap'
 import { testSite } from './test-site'
 
-// ARCHITECTURE §12.0. No mock here: the test process has no SITE_INDEXING and no VERCEL_ENV,
+// Request-time marker only; outside Next it has no request to wait for.
+vi.mock('next/server', async (importOriginal) => ({ ...(await importOriginal<object>()), connection: vi.fn(async () => {}) }))
+
+// ARCHITECTURE §12.0. No switch mock here: the test process has no SITE_INDEXING and no VERCEL_ENV,
 // which is exactly the default every deployment starts from.
 const site = testSite()
 
@@ -66,8 +70,10 @@ describe('closed site (the default)', () => {
     expect(robots.host).toBeUndefined()
   })
 
-  it('answers sitemap and llms.txt routes with a noindex 404', async () => {
-    const response = closedSeoFileResponse()
+  it('answers sitemap and llms.txt routes with a noindex 404 at request time', async () => {
+    const response = await closedSeoFileResponse()
+    // Not prerendered: Vercel served a prerendered /sitemap.xml 404 as a static 200.
+    expect(connection).toHaveBeenCalled()
     expect(response?.status).toBe(404)
     expect(response?.headers.get('X-Robots-Tag')).toBe('noindex, nofollow')
     expect(await response?.text()).toBe('Not Found')
