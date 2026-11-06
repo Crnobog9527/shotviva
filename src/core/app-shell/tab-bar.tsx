@@ -21,6 +21,10 @@ type Props = {
   // Pages below a tab that keep the bar from md up (the photo page, T38); phones keep the
   // flow-page rule and show no bar there.
   desktopUnder?: readonly `/${string}/`[]
+  // Pages that are not a tab but sit in the full shell like one: the bar on phones and the top
+  // bar from md, with no tab marked current (the checkout return page, comps-v3-b
+  // checkout.html, gap audit C1).
+  shellPages?: readonly `/${string}`[]
   admin?: AdminEntry
 }
 
@@ -30,10 +34,10 @@ type Props = {
 // the current one a bone pill with a safelight glyph, after the wordmark at the far left and
 // before the Admin entry at the right end (spec #199). AppFrame reserves the phone bar's room
 // through data-tabbar.
-export function TabBar({ items, desktopUnder = [], admin }: Props) {
+export function TabBar({ items, desktopUnder = [], shellPages = [], admin }: Props) {
   const pathname = usePathname()
   const t = useTranslations('app.tabs')
-  const root = isRoot(pathname, items)
+  const root = isRoot(pathname, items) || shellPages.some((page) => pathname === page || pathname === `${page}/`)
   if (!root && !desktopUnder.some((prefix) => pathname.startsWith(prefix))) return null
   return (
     <nav

@@ -37,7 +37,8 @@ async function adminEntry(): Promise<AdminEntry | undefined> {
 }
 
 async function Tabs({ items }: { items: TabItem[] }) {
-  return <TabBar items={items} desktopUnder={['/photos/']} admin={await adminEntry()} />
+  // /checkout (the payment return page) wears the shell like a tab root (gap audit C1).
+  return <TabBar items={items} desktopUnder={['/photos/']} shellPages={['/checkout']} admin={await adminEntry()} />
 }
 
 function useTabs(): TabItem[] {
