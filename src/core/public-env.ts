@@ -20,8 +20,10 @@ const publicEnvSchema = z.object({
   NEXT_PUBLIC_POSTHOG_HOST: z.url().default('https://us.i.posthog.com'),
   // Sentry DSN, public by design. Unset means Sentry stays off in browser, server and edge.
   NEXT_PUBLIC_SENTRY_DSN: z.url().optional(),
-  // Public origin of the assets bucket (assets.shotviva.com in production, the bucket's r2.dev
-  // URL in preview), no trailing slash. Cover URLs are this + '/covers/…' (ARCHITECTURE §8.3).
+  // Where covers are read from, no trailing slash. Cover URLs are this + '/covers/…'
+  // (ARCHITECTURE §8.3「公开读」): production https://shotviva.com/assets, the site's own path,
+  // rewritten to the public bucket (R2_PUBLIC_ORIGIN, next.config.ts); preview may use the
+  // bucket's r2.dev URL directly.
   NEXT_PUBLIC_ASSETS_BASE_URL: z
     .url()
     .transform((url) => url.replace(/\/+$/, ''))
