@@ -216,7 +216,8 @@
       "create": "Create",
       "wishlist": "Wishlist",
       "photos": "Photos",
-      "account": "Account"
+      "account": "Account",
+      "home": "{brand} home page"
     },
     "sheet": {
       "close": "Close"

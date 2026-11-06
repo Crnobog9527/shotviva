@@ -216,7 +216,8 @@
       "create": "创作",
       "wishlist": "许愿墙",
       "photos": "作品",
-      "account": "我的"
+      "account": "我的",
+      "home": "{brand} 首页"
     },
     "sheet": {
       "close": "关闭"
