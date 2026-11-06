@@ -5,6 +5,7 @@ import { forwardRef } from 'react'
 
 import { NOTE_MAX_LENGTH } from '@/core/templates/output-options'
 
+import { GroundedImg } from '../result/grounded-img'
 import { sizeLabel } from '../workspace/workspace-options'
 import { HomeCtaButton } from './home-cta-button'
 import { ChevronIcon, GiftIcon, PlusIcon } from './home-icons'
@@ -45,8 +46,7 @@ export const HomeBench = forwardRef<HTMLDivElement, Props>(function HomeBench({ 
           </span>
         </button>
         <button type="button" className="mk-bchip" onClick={onOpenPicker} aria-haspopup="dialog" aria-label={t('changeTemplate', { name })} disabled={!template}>
-          {/* eslint-disable-next-line @next/next/no-img-element -- admin cover or bundled sample, already sized */}
-          {thumb ? <img className="mk-thumb" src={thumb} alt="" /> : <span className="mk-thumb" aria-hidden />}
+          {thumb ? <GroundedImg className="mk-thumb" ground="white" src={thumb} alt="" /> : <span className="mk-thumb" aria-hidden />}
           <span className="mk-k">{t('template')}</span>
           <span className="mk-chip-name">{name}</span>
           <ChevronIcon />
