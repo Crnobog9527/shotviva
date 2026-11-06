@@ -256,14 +256,14 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
   入账失败时，镜像表的写入一起回滚。同一 session 的重发和兄弟事件只入账一次。`checkout.session.completed` 和 `checkout.session.async_payment_succeeded` 都走它。
 - **付款记录与续费函数**（T10，总控 2026-11-06 按 T10 开工前的问题定）：
   - **表 `payments`**（私有，只授权 service role）：每次成功付款一行。
-    - 字段：`user_id`、`product_id`、`channel`（`stripe` / `waffo`）、`stripe_session_id` / `stripe_invoice_id` / `stripe_charge_id`（各自可空且唯一）、`waffo_order_id`（可空、唯一）、`amount_total`（实付，含税，单位为分，int）、`currency`、`amount_tax`（分）、`method`（`card` / `alipay`）、`status`（`paid` / `refunded` / `partially_refunded` / `disputed`）、`amount_refunded`（分，默认 0）、`created_at`。
-    - 约束：Stripe 行至少有 session 或 invoice 之一；Waffo 行必须有 `waffo_order_id`。
+    - 字段：`user_id`、`product_id`、`channel`（`stripe` / `waffo`）、`stripe_session_id` / `stripe_invoice_id` / `stripe_charge_id`（各自可空且唯一）、`waffo_order_id`（可空，**不唯一**，有索引：一张 Waffo 订阅订单每期都有一笔扣款）、`waffo_payment_id`（Waffo 的 `PAY_` 扣款号，可空、唯一；T50）、`amount_total`（实付，含税，单位为分，int）、`currency`、`amount_tax`（分）、`method`（`card` / `alipay`）、`status`（`paid` / `refunded` / `partially_refunded` / `disputed`）、`amount_refunded`（分，默认 0）、`created_at`。
+    - 约束：Stripe 行至少有 session 或 invoice 之一；Waffo 行必须有 `waffo_order_id` 和 `waffo_payment_id`（T50 之前的老行可以没有 `waffo_payment_id`）。
     - 不回填 T10 上线前的历史付款。
   - **`settle_checkout` 改签名**：新增参数 `p_amount_total`、`p_currency`、`p_amount_tax`、`p_method`、`p_invoice_id`（可空）、`p_charge_id`（可空），在同一事务里写 `payments`。参数变了无法 `create or replace`，按 AGENTS §5「签名必须变」的例外，由新迁移删掉旧的 7 参数版本后重建，PR 写明原因；调用方同步改。
   - **`apply_subscription_renewal`**：参数为 `(user, product_id, invoice_id, period_end, amount_total, currency, amount_tax, method, charge_id)`。内部用 `_apply_credit_change`（kind `purchase`，幂等键 `renewal:<invoice_id>`），`paid_until = greatest(paid_until, period_end)`，同一事务写 `payments`。
   - **`sync_subscription(sub_id, status, current_period_end, cancel_at_period_end)`**：供 `customer.subscription.updated / deleted` 使用，只更新已有的镜像行，不新建（没有首付记录的订阅不插入）。
   - **`record_payment_issue(charge_id, kind, amount_refunded)`**：`kind` 为 `refunded` / `disputed`，按 charge id 更新 `payments.status` 和 `amount_refunded`（全退为 `refunded`，部分退为 `partially_refunded`，争议为 `disputed`），不动积分。charge 不在表里时不写行，只发 Sentry 告警，回 200。
-  - **`settle_waffo_order(user, product_id, payment_id, order_id, amount_total, currency, amount_tax, method)`**（T13，总控 2026-11-06 补）：在同一事务里完成两步。先调用 `apply_purchase(user, product_id, payment_id)`，用 Waffo 的 payment id 做幂等键；入账生效时再插入一行 `payments`，其中 `channel = 'waffo'`，`waffo_order_id` 取 Waffo 订单号，金额和税额取自 `order.completed` 事件，单位换算为分。重复事件不写第二行。
+  - **`settle_waffo_order(user, product_id, payment_id, order_id, amount_total, currency, amount_tax, method)`**（T13，总控 2026-11-06 补）：在同一事务里完成两步。先调用 `apply_purchase(user, product_id, payment_id)`，用 Waffo 的 payment id 做幂等键；入账生效时再插入一行 `payments`，其中 `channel = 'waffo'`，`waffo_order_id` 取 Waffo 订单号，金额和税额取自 `order.completed` 事件，单位换算为分。重复事件不写第二行。**T50 起**：签名不变，同时写 `waffo_payment_id`；单笔和订阅的每一期扣款（含首付）都走它，幂等键是 `PAY_` 扣款号，所以续费不会重复入账，续费失败没有扣款事件、不入账。
   - 以上函数都只授权 `service_role`。
 - **首付的 `paid_until`**：首付走 `apply_purchase`，按商品天数累加（月付 +30 天，年付 +365 天），和 Stripe 本期结束日可能差一两天。从第一次续费起，由 `apply_subscription_renewal` 对齐 `period_end`，见下一条。
 - 订阅续费走 T10 新增的 `apply_subscription_renewal(user, product_id, invoice_id, period_end)`：`credits += 商品积分`，`paid_until = greatest(paid_until, period_end)`（直接对齐 Stripe 的本期结束日，不按天数累加，避免大小月漂移）；同样写流水、按 invoice id 幂等，内部复用 `_apply_credit_change`（总控 2026-11-05 补）。
@@ -299,6 +299,12 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 已经确定的规则：
 
 - **订阅的状态只有 Stripe 一份真相**，Shotviva 存一张镜像表 `subscriptions`（`user_id`、`stripe_subscription_id`、`product_id`、`status`、`current_period_end`、`cancel_at_period_end`），由回调同步，账号页只读它。
+- **Waffo 卡订阅也进这张表**（T50，总控 2026-11-06 按 Waffo 文档定）：
+  - 表结构：新增 `id`（bigint identity）做主键；`stripe_subscription_id` 改为可空、唯一；新增 `provider`（`'stripe'` / `'waffo'`，默认 `'stripe'`）、`waffo_order_id`（`ORD_` 订阅订单号，可空、唯一）、`last_event_at`。约束：stripe 行必须有 `stripe_subscription_id`，waffo 行必须有 `waffo_order_id`。`status` 取值不变。
+  - Waffo 状态映射：`activated` / `renewed` / `recovered` / `uncanceled` → `active`；`canceling` → `active` + `cancel_at_period_end = true`；`past_due` → `past_due`；`canceled` / `expired` → `canceled`（终态，之后的事件不再改它）。
+  - 写入只走 `sync_waffo_subscription(user, order_id, product_id, status, current_period_end, cancel_at_period_end, event_at) → boolean`：按 `waffo_order_id` 插入或更新；订单属于别的用户或别的商品时拒绝；`event_at` 早于 `last_event_at` 的旧事件忽略。
+  - 积分和 `paid_until` 只由扣款事件（`payment_succeeded`，经 `settle_waffo_order`）发放，每期按 `apply_purchase` 的 +30 / +365 天；订阅状态事件本身不发积分。
+  - 取消：账号页「Cancel subscription」调 Waffo `subscription-order/cancel-order`，成功后调 `sync_waffo_subscription` 写 `cancel_at_period_end`；Waffo 回调随后再确认一次。
 - 续费成功：`invoice.paid`（`billing_reason = subscription_cycle`）→ `apply_subscription_renewal`（T10），`paid_until = greatest(paid_until, 本期 period_end)`。
 - **续费失败：什么都不做。** 不再发积分，`paid_until` 到期后账号页显示会员已过期；已有的付费积分照常可用。Stripe 自己重试，哪天扣成功哪天再发。不写宽限期。
 - 取消：期末生效（Stripe 默认）。用户在 Stripe Customer Portal（Managed Payments 下是 Link 的客户门户）自己取消，账号页只放一个「Manage subscription」链接，不自己写取消界面。`customer.subscription.updated / deleted` 只更新镜像表。
