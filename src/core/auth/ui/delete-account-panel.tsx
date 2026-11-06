@@ -33,7 +33,7 @@ export function DeleteAccountPanel({ className, children }: { className?: string
         </label>
         {del.status === 'failed' ? (
           <p role="alert" className="mt-3 text-caption text-destructive">
-            {t('deleteFailed')}
+            {del.failure === 'subscription' ? t('deleteSubscriptionFailed') : t('deleteFailed')}
           </p>
         ) : null}
         <button

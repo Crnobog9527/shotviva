@@ -64,11 +64,12 @@
       "signOut": "Sign out",
       "dangerZone": "Delete account",
       "delete": "Delete my account",
-      "deleteWarning": "This permanently deletes your account, your remaining credits and every photo you made. It cannot be undone.",
+      "deleteWarning": "This permanently deletes your account, your remaining credits and every photo you made. Subscriptions are cancelled first. It cannot be undone.",
       "deleteTypeLabel": "Type DELETE to confirm",
       "deleteConfirm": "Delete forever",
       "deleting": "Deleting…",
       "deleteFailed": "Deletion did not finish. Please try again.",
+      "deleteSubscriptionFailed": "We couldn't cancel your subscription, so nothing was deleted. Please try again later, or contact support.",
       "cancel": "Cancel"
     }
   },
@@ -463,7 +464,7 @@
       },
       "session": {
         "title": "Session",
-        "deleteNote": "Deleting removes your photos and remaining credits. If you have a subscription, cancel it in Manage subscription first."
+        "deleteNote": "Deleting removes your photos and remaining credits. Subscriptions are cancelled first."
       }
     },
     "creditsUnit": "{count, plural, one {credit} other {credits}}",

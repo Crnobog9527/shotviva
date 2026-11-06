@@ -5,7 +5,7 @@ import { cn } from '../../ui/cn'
 import { Chevron, RowsPanel, rowClass } from './rows'
 
 // Sign out and Delete account as the last two rows, Delete in red, with one line on what
-// deleting removes. Deleting does not touch Stripe, so a subscriber is told to cancel first.
+// deleting removes. Live subscriptions are cancelled before anything is deleted (§13).
 export function SessionRows({ signOut }: { signOut: () => Promise<void> }) {
   const t = useTranslations('auth.account')
   const note = useTranslations('app.account.session')
