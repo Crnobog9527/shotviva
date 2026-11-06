@@ -33,8 +33,9 @@ let restore: () => Promise<void>
 beforeAll(async () => {
   db = await connectAdmin()
   templateId = await seedTemplate(db)
+  // Waits while another file holds the edit template (edit-fixtures), hence the long timeout.
   restore = await publishEditTemplate(db)
-})
+}, 120_000)
 
 afterAll(async () => {
   await restore()
