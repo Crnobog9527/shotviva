@@ -40,7 +40,7 @@ beforeEach(() => {
 })
 
 const deliver = (event: unknown) => handleStripeWebhook(h.deps, signed(event))
-const PRICE: Partial<Record<ProductId, number>> = { starter_monthly: 1990, pro_monthly: 4990, max_yearly: 69900 }
+const PRICE: Partial<Record<ProductId, number>> = { starter_monthly: 1990, pro_monthly: 4990, max_yearly: 71300 }
 
 // A card subscription whose first payment has settled (T9 path), as the renewals build on it.
 async function subscribe(userId: string, productId: ProductId, periodEndDays = 30) {
@@ -204,7 +204,7 @@ describe('invoice.paid (subscription_cycle) → apply_subscription_renewal', () 
   it('a yearly renewal grants the year and runs paid_until to its end', async () => {
     const userId = await createUser(db)
     const { subscription } = await subscribe(userId, 'max_yearly', 365)
-    const renewal = renewalInvoice(subscription, { amountPaid: 69900, tax: 0, periodEndDays: 730 })
+    const renewal = renewalInvoice(subscription, { amountPaid: 71300, tax: 0, periodEndDays: 730 })
     await deliver(eventFor('invoice.paid', renewal.id))
     const profile = await profileOf(db, userId)
     expect(profile.credits).toBe(3360 * 2)
