@@ -14,9 +14,9 @@ concurrency:
 permissions:
   contents: read
 
-# Both job names are required checks on main. A docs/spec-only PR (规范/, seo资料/, docs/,
-# design/, *.md) still runs both jobs, but each stops after the change detection step and
-# reports success in seconds (.github/actions/changes). Every other step is gated on it.
+# Both job names are required checks on main. A docs/spec-only PR or push to main (规范/,
+# seo资料/, docs/, design/, *.md) still runs both jobs, but each stops after the change detection
+# step and reports success in seconds (.github/actions/changes). Every other step is gated on it.
 jobs:
   checks:
     name: lint · typecheck · test · build
