@@ -148,7 +148,6 @@ export const homePage = defineHomePage({
     heading: 'Img to Img Templates: No Prompts to Write',
     intro: `Every template starts from your phone photo and ends with a finished picture. Pick one and ${brand} does the rest. Templates cost ${fromCredits} a photo.`,
     note: 'All template images are illustrative examples.',
-    price: fromCredits,
     categories: templateCategories,
   },
   facts: sharedFacts(),

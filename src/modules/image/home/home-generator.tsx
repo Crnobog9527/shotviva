@@ -94,7 +94,7 @@ export function HomeGenerator({ templates, defaultId, viewer, googleAction, home
         thumbOf={thumbFor}
       />
       {viewer ? null : <SignupSheet open={signUp} onOpenChange={setSignUp} googleAction={googleAction} next={homePath} gift={freeImages} />}
-      <HomeDock watch={watch} label={state.photo.url ? t('dockGenerate') : t('uploadPhoto')} onClick={bring} />
+      <HomeDock watch={watch} hasPhoto={state.photo.url !== null} cost={state.template?.creditsCost['1k'] ?? null} onClick={bring} />
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { defineContentPage, type CostBills } from '@/core/content'
 
 import { site } from '../../../site.config'
 import { CATEGORY, pairImage, SIZE_COUNT } from '../../landing-shared'
+import { zhPricingRelated } from '../shared'
 import { foodHalfDayUsd, MENU_DISHES, menuCostUsd, menuCredits, photoSeconds, photosLeftAfterMenu, planFrom, usd, usdRange } from '../../offer'
 import { PLATFORM_SPECS, px } from '../../platform-specs'
 import { ZH_TIERS, zhFreeImages, zhFromCredits, zhTierList } from '../offer'
@@ -98,6 +99,7 @@ export const zhAiRestaurantMenu = defineContentPage({
     { href: '/', anchor: 'AI改图', note: '全部模板，按餐饮、商品、美妆、房间、宠物和画风分类。' },
     { href: '/commercial-photography', anchor: '商业产品摄影', note: '网店和卖家不请摄影师，也能做出影棚级商品图。' },
     { href: '/image-to-image-generator', anchor: '图生图在线工具', note: '想看看图生图对一张照片能做什么。' },
+    zhPricingRelated(brand),
   ],
   headings: {
     facts: '菜单和外卖平台的图片尺寸',

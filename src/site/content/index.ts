@@ -20,6 +20,7 @@ export { homePage }
 export { BUSINESS_MAIL_SUBJECT, pricingFaq, pricingPage } from './pricing'
 export { freeImagesLabel, freeStandardImages } from './offer'
 export { featuredSections, featuredTemplates, tryTemplates } from './home-templates'
+export { fillCredits, startingCredits } from './credits'
 
 // Module ownership of each page, fed to the indexing switch, sitemap and llms.txt.
 export const pageGates = [homePage, ...contentPages].map(pageGate)

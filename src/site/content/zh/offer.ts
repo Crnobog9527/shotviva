@@ -15,16 +15,14 @@ export const ZH_TIERS = OUTPUT_TIERS.map((tier, i) => ({
   use: (['社交媒体和外卖平台', '官网和网店', '印刷和放大查看'] as const)[i] ?? tier.use,
 }))
 
-const [STANDARD] = ZH_TIERS
-
 // 「标准、高清或超清」
 export const zhTierList = `${ZH_TIERS.slice(0, -1).map((t) => t.name).join('、')}或${ZH_TIERS.at(-1)?.name}`
 
 // 「标准 1024 px、高清 2048 px、超清 2880 px」
 export const zhTierPixels = ZH_TIERS.map((tier) => `${tier.name} ${tier.px} px`).join('、')
 
-// 「2 积分起」
-export const zhFromCredits = `${STANDARD?.credits ?? 2} 积分起`
+// 「N 积分起」: filled when the page renders, like fromCredits (../credits).
+export const zhFromCredits = '⟦积分起价⟧'
 
 // 「3 张免费标准图」: the only place the site counts in images instead of credits.
 export const zhFreeImages = `${freeStandardImages} 张免费标准图`

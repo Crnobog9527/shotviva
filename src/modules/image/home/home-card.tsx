@@ -8,6 +8,7 @@ import { NOTE_MAX_LENGTH } from '@/core/templates/output-options'
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import { GroundedImg } from '../result/grounded-img'
 import { UPLOAD_FORMAT_NAMES, UPLOAD_MAX_MB } from '../workspace/upload-formats'
+import { notePlaceholder } from '../workspace/workspace-options'
 import { HomeCtaButton } from './home-cta-button'
 import { ArrowIcon, GiftIcon, PlusIcon } from './home-icons'
 import type { HomeGeneratorState } from './use-home-generator'
@@ -77,6 +78,23 @@ function Rail({ state, thumbOf }: Pick<Props, 'state' | 'thumbOf'>) {
   )
 }
 
+// The note, with the workspace's example for the template's category as its placeholder
+// (home.html #gen-note).
+function NoteBox({ state }: { state: HomeGeneratorState }) {
+  const t = useTranslations('app.workspace.notePlaceholder')
+  const category = state.template ? state.template.category : ''
+  return (
+    <textarea
+      className="mk-textarea"
+      maxLength={NOTE_MAX_LENGTH}
+      rows={2}
+      placeholder={notePlaceholder(category, t)}
+      value={state.note}
+      onChange={(event) => state.setNote(event.target.value)}
+    />
+  )
+}
+
 // The phone and tablet generator (<1024, v3-b comp "stacked card"). Before a photo: the well and
 // the current template; with a photo: the template rail and the note. One primary.
 export const HomeCard = forwardRef<HTMLElement, Props>(function HomeCard({ state, thumbOf, gift, onPickPhoto, onOpenPicker, onSignUp }, ref) {
@@ -109,7 +127,7 @@ export const HomeCard = forwardRef<HTMLElement, Props>(function HomeCard({ state
             <span className="mk-field-label">
               {app('workspace.noteLabel')} <span className="text-muted-foreground">{app('workspace.optional')}</span>
             </span>
-            <textarea className="mk-textarea" maxLength={NOTE_MAX_LENGTH} rows={2} value={state.note} onChange={(event) => state.setNote(event.target.value)} />
+            <NoteBox state={state} />
           </label>
         </>
       ) : (

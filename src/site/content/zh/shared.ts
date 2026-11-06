@@ -1,4 +1,4 @@
-import type { Fact } from '@/core/content'
+import type { Fact, RelatedLink } from '@/core/content'
 
 import { packFrom, planFrom, usd } from '../offer'
 import {
@@ -31,4 +31,10 @@ export function zhSharedFacts(): readonly [Fact, Fact, Fact, ...Fact[]] {
     { label: '提示词', value: '不用写，选模板就行' },
     { label: '界面语言', value: zhLanguages },
   ]
+}
+
+// 落地页「更多」的最后一张价格卡（差距审计 B10）。
+export function zhPricingRelated(brand: string): RelatedLink {
+  const note = planFrom ? `套餐每月 ${usd(planFrom.priceUsd)} 起，注册先送 ${zhFreeImages}。` : '月付、年付套餐和一次性积分包。'
+  return { href: '/pricing', anchor: `${brand} 价格`, note }
 }

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import en from '../messages/en.json'
 import zh from '../messages/zh.json'
 import { site } from '../site.config'
+import { fillCredits } from './credits'
 import { homePage } from './home'
 import { perCredit, photosLeftInPlan, plansSentence, quoteUsd, setCostUsd, usdRange, yearlySaving } from './offer'
 import { pricingPage } from './pricing'
@@ -22,7 +23,7 @@ describe('copy with the catalog in site.config', () => {
 
   it('fills the /pricing title, lede and credit costs from config', () => {
     expect(pricingPage.title).toBe('Shotviva Pricing: Plans From $19.90 a Month')
-    expect(pricingPage.intro).toContain('A photo costs from 2 credits')
+    expect(fillCredits(pricingPage.intro, 1)).toContain('A photo costs from 1 credit,')
     expect(pricingPage.intro).toContain('Yearly plans save up to 40%.')
     expect(pricingPage.intro).toContain('Credit packs start at $9.90.')
     expect(pricingPage.gift).toBe('New users get 3 free Standard images. No card needed.')

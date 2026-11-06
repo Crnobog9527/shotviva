@@ -44,6 +44,8 @@ export type SectionHeadings = { facts?: string; faq?: string; related?: string }
 type AtLeast3<T> = readonly [T, T, T, ...T[]]
 type Between3And5<T> = readonly [T, T, T] | readonly [T, T, T, T] | readonly [T, T, T, T, T]
 type Between2And3<T> = readonly [T, T] | readonly [T, T, T]
+// 2–3 inner pages, then optionally /pricing (gap audit B10, landing.html "more").
+type RelatedBlock<T> = Between2And3<T> | readonly [T, T, T, T]
 
 // Everything a page has besides its FAQ, which differs in length between the home page and
 // the inner pages.
@@ -62,7 +64,7 @@ export type PageBasics = {
   label: string
   hero: HeroBlock
   facts: AtLeast3<Fact>
-  related: Between2And3<RelatedLink>
+  related: RelatedBlock<RelatedLink>
   headings?: SectionHeadings
   // Pages that only make sense with a module on disappear with it.
   module?: ModuleId
@@ -86,8 +88,9 @@ type Nine<T> = readonly [T, T, T, T, T, T, T, T, T]
 export type HomeFaq = Nine<FaqItem>
 
 // One featured template as a card (T53): `id` is its id in the templates table, picked into the
-// home generator; name and use (its description) in the page's language (建站规格 R5).
-export type TemplateCard = { id: string; name: string; use: string }
+// home generator; name and use (its description) in the page's language (建站规格 R5);
+// `credits`: its own Standard (1K) price, shown as "from N credits" (建站规格 G4).
+export type TemplateCard = { id: string; name: string; use: string; credits: number }
 
 // The copy of one ARCHITECTURE §5 category, in §5 order: `key` is the value stored in
 // templates.category; `drag`: the category whose single template keeps the draggable compare
@@ -145,8 +148,6 @@ export type HomePage = Omit<PageBasics, 'related'> & {
     intro: string
     // "All template images are illustrative examples." under the grid.
     note: string
-    // The price on every card: "from 2 credits".
-    price: string
     // The six §5 categories' copy; which templates show is chosen in admin (featured_rank).
     categories: readonly [CategoryCopy, ...CategoryCopy[]]
   }

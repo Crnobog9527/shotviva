@@ -3,6 +3,7 @@ import { defineContentPage } from '@/core/content'
 import { site } from '../../site.config'
 import { productBills } from '../home'
 import { pairImage, sizeCountWord } from '../landing-shared'
+import { pricingRelated } from '../shared'
 import { freeImagesLabel, fromCredits, photoSeconds, plansSentence, SET_PHOTOS, tierList, tierPixels, uploadLimits } from '../offer'
 
 // Final SEO copy (T11): Title, H1, answer and FAQ own "image to image generator" so the home
@@ -69,6 +70,7 @@ export const imageToImageGenerator = defineContentPage({
     { href: '/', anchor: 'AI image to image', note: 'The studio: templates for food, products, rooms, pets and art styles.' },
     { href: '/commercial-photography', anchor: 'Commercial product photography', note: 'For shops and sellers who need studio product shots without a photographer.' },
     { href: '/ai-restaurant-menu', anchor: 'AI restaurant menu photos', note: 'For restaurants that need menu and delivery-app photos from a phone shot.' },
+    pricingRelated(),
   ],
   headings: {
     facts: 'What an Image to Image Generator Needs From You',

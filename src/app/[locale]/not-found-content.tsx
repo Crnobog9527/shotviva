@@ -8,5 +8,5 @@ import { homePageIn, tryTemplates } from '@/site/content'
 export async function NotFoundContent({ locale }: { locale: Locale }) {
   const page = homePageIn(locale)
   const live = await cachedWebCatalogue(locale)
-  return <NotFoundView templates={<TryTemplates templates={tryTemplates(page.templateGrid.categories, live)} price={page.templateGrid.price} />} />
+  return <NotFoundView templates={<TryTemplates templates={tryTemplates(page.templateGrid.categories, live)} />} />
 }

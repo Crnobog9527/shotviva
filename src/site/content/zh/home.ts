@@ -136,7 +136,6 @@ export const zhHomePage = defineHomePage({
     heading: 'AI改图模板：不用写提示词',
     intro: `每个模板都从你的手机照片开始，到一张成品图结束。选一个，剩下的交给 ${brand}。每张${zhFromCredits}。`,
     note: '模板图片均为示意图。',
-    price: zhFromCredits,
     categories: zhTemplateCategories,
   },
   facts: zhSharedFacts(),
