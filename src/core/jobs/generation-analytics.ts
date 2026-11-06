@@ -12,7 +12,7 @@ const resolution = z.enum(['1k', '2k', '3k']).catch('1k')
 
 type Outcome = { status: 'succeeded' } | { status: 'failed'; errorCode: string | null }
 
-export function generateEventProps(job: Job, category: string, outcome: Outcome, durationMs: number): EventProps<'generate'> {
+export function generateEventProps(job: Job, category: string, outcome: Outcome, durationMs: number, batchSize = 1): EventProps<'generate'> {
   return {
     template_id: job.templateId,
     category,
@@ -25,6 +25,8 @@ export function generateEventProps(job: Job, category: string, outcome: Outcome,
     duration_ms: Math.max(0, Math.round(durationMs)),
     // The model only: the provider id and its address stay out of analytics (§16.2).
     model: modelFromTag(job.provider),
+    // 1 for a single photo and every partner job (T28).
+    batch_size: batchSize,
   }
 }
 
@@ -35,18 +37,18 @@ export async function settleTracked<T>(
   job: Job,
   category: string,
   settle: () => Promise<T>,
-  options: { track?: ServerTrack; now?: () => number } = {},
+  options: { track?: ServerTrack; now?: () => number; batchSize?: number } = {},
 ): Promise<T> {
   const track = options.track ?? defaultTrack
   const now = options.now ?? Date.now
   const started = now()
   try {
     const settled = await settle()
-    track('generate', generateEventProps(job, category, { status: 'succeeded' }, now() - started), { distinctId: job.userId })
+    track('generate', generateEventProps(job, category, { status: 'succeeded' }, now() - started, options.batchSize), { distinctId: job.userId })
     return settled
   } catch (error) {
     const errorCode = error instanceof GenerationFailure ? error.jobCode : null
-    track('generate', generateEventProps(job, category, { status: 'failed', errorCode }, now() - started), { distinctId: job.userId })
+    track('generate', generateEventProps(job, category, { status: 'failed', errorCode }, now() - started, options.batchSize), { distinctId: job.userId })
     throw error
   }
 }

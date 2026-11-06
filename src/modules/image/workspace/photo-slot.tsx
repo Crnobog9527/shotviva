@@ -18,5 +18,5 @@ export type PhotoSlotProps = {
 export function PhotoSlot({ onKeyChange }: PhotoSlotProps) {
   const photo = usePhoto()
   useEffect(() => onKeyChange?.(photo.inputKey), [photo.inputKey, onKeyChange])
-  return photo.photo ? <PhotoCard photo={photo.photo} upload={photo.upload} onPick={photo.pick} /> : <PhotoPickers onPick={photo.pick} />
+  return photo.photo ? <PhotoCard photo={photo.photo} upload={photo.upload} onPick={photo.pick} /> : <PhotoPickers onPick={(files) => files[0] && void photo.pick(files[0])} />
 }

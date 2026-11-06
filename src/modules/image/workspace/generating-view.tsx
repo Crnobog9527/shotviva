@@ -16,9 +16,11 @@ import { tierName, tierPx } from './workspace-options'
 
 // "Developing" (DESIGN §4.4, "Progress Card"): the photo as a greyed negative under a moving
 // safelight scan line, then the three stages with a bar and a percentage. Leaving is fine.
+// A photo still queued (the account's other photos hold every slot) waits at 0%.
 export function GeneratingView({ job }: { job: TrackedJob }) {
   const now = useNow()
-  const fraction = estimatedProgress(now - job.startedAt)
+  const waiting = job.status === 'queued'
+  const fraction = waiting ? 0 : estimatedProgress(now - job.startedAt)
   const t = useTranslations('app')
   const format = useFormatter()
   return (
@@ -33,7 +35,7 @@ export function GeneratingView({ job }: { job: TrackedJob }) {
         ) : null}
         <span aria-hidden="true" className="absolute inset-x-0 top-[calc(100%-var(--left))] -mt-px h-0.5 bg-primary" />
         <span className="absolute inset-x-4 top-4 z-2 flex justify-between">
-          <Pill>{t('workspace.developing')}</Pill>
+          <Pill>{t(waiting ? 'workspace.waiting' : 'workspace.developing')}</Pill>
           <Pill>
             {t.rich('workspace.developingSize', { tier: tierName(job.resolution, t), px: tierPx(job.resolution), mono: (chunks) => <span className="font-mono">{chunks}</span> })}
           </Pill>
@@ -46,7 +48,7 @@ export function GeneratingView({ job }: { job: TrackedJob }) {
           <span aria-hidden="true" className="grid size-[22px] flex-none place-items-center rounded-full bg-safelight-tint">
             <span className="animate-dot size-2 rounded-full bg-primary" />
           </span>
-          {t('workspace.generating')}
+          {t(waiting ? 'workspace.waitingSlot' : 'workspace.generating')}
           <span role="progressbar" aria-label={t('workspace.generating')} aria-valuenow={percent(fraction)} aria-valuemin={0} aria-valuemax={100} className="ml-1 h-1 flex-1 overflow-hidden rounded-full bg-wash-strong">
             <span className="block h-full rounded-full bg-primary transition-[width] duration-1000" style={{ width: `${percent(fraction)}%` }} />
           </span>

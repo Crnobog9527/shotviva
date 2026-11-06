@@ -5,8 +5,8 @@ import { Suspense, type ReactNode } from 'react'
 
 import { AppPage, BalanceChip, FlowNav } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
-import { readBalance } from '@/core/billing'
-import { concurrencyLimit, listOwnJobs } from '@/core/jobs'
+import { currentTier, limitsFor, readBalance } from '@/core/billing'
+import { listOwnJobs } from '@/core/jobs'
 import { listTemplates } from '@/core/templates'
 import { ImageWorkspace, toCatalogueTemplate, WorkspaceHead } from '@/modules/image'
 import { site } from '@/site/site.config'
@@ -23,10 +23,10 @@ async function Workspace({ params }: { params: Promise<{ templateId: string }> }
   const supabase = await createServerSupabase()
   const found = (await listTemplates(supabase, 'web')).find((template) => template.id === templateId)
   if (!found) notFound()
-  const [balance, limit, own] = await Promise.all([
+  const [balance, tier, own] = await Promise.all([
     readBalance(supabase, user.id),
     // current_tier() is service-role only; the user's own id comes from the session.
-    concurrencyLimit(createAdminSupabase(), user.id),
+    currentTier(createAdminSupabase(), user.id),
     listOwnJobs(supabase, user.id, new Date()),
   ])
   const template = toCatalogueTemplate(found)
@@ -38,7 +38,8 @@ async function Workspace({ params }: { params: Promise<{ templateId: string }> }
       <ImageWorkspace
         template={template}
         balance={balance}
-        concurrency={{ limit, runningIds: own.running.map((job) => job.id) }}
+        tier={tier}
+        concurrency={{ limit: limitsFor(tier).concurrency, runningIds: own.running.map((job) => job.id) }}
         shareText={t('shareText', { brand: site.brand.name, url: `https://${site.brand.domain}/?utm_source=share&utm_medium=web_share` })}
       />
     </>

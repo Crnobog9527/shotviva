@@ -22,7 +22,7 @@ describe('paywall messages (en)', () => {
     expect(t('perks.concurrency', { count: 1 })).toBe('1 photo generating at a time')
     expect(t('perks.concurrency', { count: 6 })).toBe('6 photos generating at a time')
     expect(t('perks.earlyAccess')).toBe('Early access to new features')
-    // Hours come from TIER_SUPPORT_REPLY_HOURS through the perk values (48 / 48 / 24).
+    // Hours come from TIER_LIMITS.supportHours through the perk values (48 / 48 / 24).
     const support = (tier: 'starter' | 'max') => {
       const perk = tierPerks(tier, { wishlistLive: false }).live.find((p) => p.key.startsWith('support'))
       return perk ? t(`perks.${perk.key}`, perk.values) : null
