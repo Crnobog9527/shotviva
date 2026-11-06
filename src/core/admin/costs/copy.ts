@@ -11,7 +11,7 @@ export const COSTS_COPY = {
     difference: '差额（OpenAI − 我们）',
     oursHint: (uncosted: number, noUsage: number) => {
       const parts = []
-      if (uncosted > 0) parts.push(`${uncosted} 单单价没填、算不出`)
+      if (uncosted > 0) parts.push(`${uncosted} 单没有单价（后台没填、价目表也没有）、算不出`)
       if (noUsage > 0) parts.push(`${noUsage} 单没有用量（T33 之前的老任务或超时）`)
       return parts.length ? `不含：${parts.join('；')}` : '每单都有成本'
     },
