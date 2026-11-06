@@ -352,6 +352,25 @@ $$;
 ALTER FUNCTION "public"."admin_list_template_requests"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_log_replay"("p_user_id" "uuid", "p_target_id" "text", "p_reason" "text") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if p_user_id is null or p_target_id is null or p_target_id !~ '^(cs|sub)_'
+     or p_reason is null or length(btrim(p_reason)) = 0 then
+    raise exception 'INVALID_INPUT' using detail = 'user, a cs_/sub_ target and a reason are required';
+  end if;
+
+  insert into public.admin_audit_log (action, user_id, target_id, reason)
+  values ('replay_checkout', p_user_id, p_target_id, p_reason);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_log_replay"("p_user_id" "uuid", "p_target_id" "text", "p_reason" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_lookup"("p_query" "text") RETURNS TABLE("kind" "text", "user_id" "uuid", "job_id" "uuid")
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -657,6 +676,38 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_signup_ip_clusters"("p_days" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_todo_counts"() RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select jsonb_build_object(
+    'stuck_jobs', (
+      select count(*) from public.generation_jobs
+       where status = 'running' and created_at < now() - interval '10 minutes'),
+    'jobs_1h', (
+      select jsonb_build_object('total', count(*), 'failed', count(*) filter (where status = 'failed'))
+        from public.generation_jobs where created_at >= now() - interval '1 hour'),
+    'jobs_24h', (
+      select jsonb_build_object('total', count(*), 'failed', count(*) filter (where status = 'failed'))
+        from public.generation_jobs where created_at >= now() - interval '24 hours'),
+    'pending_requests', (
+      select count(*) from public.template_requests where status = 'pending'),
+    'payment_issues', (
+      select count(*) from public.payments
+       where status <> 'paid' and created_at >= now() - interval '60 days'),
+    'last_purchase_at', (
+      select created_at from public.credit_ledger
+       where kind = 'purchase' order by created_at desc, id desc limit 1),
+    'provider', (
+      select jsonb_build_object('label', label, 'model', model)
+        from public.ai_providers where module = 'image' and is_active)
+  )
+$$;
+
+
+ALTER FUNCTION "public"."admin_todo_counts"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_unban_user"("p_user_id" "uuid", "p_reason" "text") RETURNS "void"
@@ -2011,6 +2062,10 @@ CREATE INDEX "payments_created_at_id_idx" ON "public"."payments" USING "btree" (
 
 
 
+CREATE INDEX "payments_issues_created_at_idx" ON "public"."payments" USING "btree" ("created_at") WHERE ("status" <> 'paid'::"text");
+
+
+
 CREATE INDEX "payments_user_id_created_at_idx" ON "public"."payments" USING "btree" ("user_id", "created_at" DESC);
 
 
@@ -2277,6 +2332,11 @@ GRANT ALL ON FUNCTION "public"."admin_list_template_requests"() TO "service_role
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_log_replay"("p_user_id" "uuid", "p_target_id" "text", "p_reason" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_log_replay"("p_user_id" "uuid", "p_target_id" "text", "p_reason" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_lookup"("p_query" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_lookup"("p_query" "text") TO "service_role";
 
@@ -2309,6 +2369,11 @@ GRANT ALL ON FUNCTION "public"."admin_set_provider_key"("p_id" "uuid", "p_key" "
 
 REVOKE ALL ON FUNCTION "public"."admin_signup_ip_clusters"("p_days" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_signup_ip_clusters"("p_days" integer) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_todo_counts"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_todo_counts"() TO "service_role";
 
 
 
