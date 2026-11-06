@@ -33,12 +33,21 @@ describe('provider form state', () => {
     expect(toSaveInput(form, null)).not.toHaveProperty('id')
   })
 
+  it('adds a new row to the section it was opened from, with that module adapter (T30)', () => {
+    const form = { ...formFor(null, 'decision'), label: 'OpenAI', model: 'gpt-6-luna', apiKey: 'sk-new-key-1234' }
+    expect(toSaveInput(form, null)).toMatchObject({ module: 'decision', adapter: 'openai_responses' })
+    expect(toSaveInput(formFor(provider), provider)).toMatchObject({ module: 'image', adapter: 'openai_images' })
+  })
+
   it('round-trips the three prices and flags a provider with one missing (T33)', () => {
     const form = formFor(provider)
     expect(form).toMatchObject({ priceInputTextPerM: '5', priceInputImagePerM: '8', priceOutputPerM: '30' })
     expect(toSaveInput(form, provider)).toMatchObject({ priceInputTextPerM: '5', priceOutputPerM: '30' })
     expect(missingPrices(provider.prices)).toBe(false)
     expect(missingPrices({ ...provider.prices, outputPerM: null })).toBe(true)
+    // A decision row (T30) needs no image price.
+    expect(missingPrices({ ...provider.prices, inputImagePerM: null }, 'decision')).toBe(false)
+    expect(missingPrices({ ...provider.prices, outputPerM: null }, 'decision')).toBe(true)
   })
 
   it('keeps Save disabled while a price is not a non-negative number; blank is allowed', () => {

@@ -58,3 +58,12 @@ export async function loadInputImage(store: ObjectStore, key: string): Promise<I
     throw await reject(store, key, 'IMAGE_UNSUPPORTED', 'decode')
   }
 }
+
+// The clean original of a finished work, as the photo an edit starts from (ARCHITECTURE §5.2).
+// Read server-side from outputs/, which only our own pipeline writes, so the upload gate above
+// does not apply; it gets the same normalisation so the provider sees the usual input.
+export async function loadOutputImage(store: ObjectStore, key: string): Promise<InputImage> {
+  const normalized = await normalizeInputImage(await store.get(key))
+  const { width, height } = await sharp(normalized).metadata()
+  return { bytes: normalized, contentType: 'image/jpeg', width, height }
+}

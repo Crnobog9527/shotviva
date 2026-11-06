@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 import { apiKeySchema } from '@/core/providers/keys'
-import { PROVIDER_ADAPTERS, PROVIDER_MODULES } from '@/core/providers/types'
+import { MODULE_ADAPTER, PROVIDER_ADAPTERS, PROVIDER_MODULES } from '@/core/providers/types'
 
 // Admin input for /admin/providers. Validated again on the server before anything is stored.
 
@@ -37,6 +37,8 @@ export const saveProviderSchema = z.object({
   priceInputImagePerM: pricePerM,
   priceOutputPerM: pricePerM,
 })
+  // Each module has one adapter (the table check agrees); a mismatched pair is refused.
+  .refine((input) => input.adapter === MODULE_ADAPTER[input.module], { path: ['adapter'] })
 
 export type SaveProviderInput = z.input<typeof saveProviderSchema>
 

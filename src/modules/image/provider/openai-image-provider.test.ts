@@ -105,6 +105,19 @@ describe('openai image provider config (T17)', () => {
   })
 })
 
+describe('openai image provider: photo edits (T30)', () => {
+  it('sends input_fidelity on an edit only when the template sets it (T30)', async () => {
+    const fetchImpl = vi.fn(async () => json({ data: [{ b64_json: PNG_B64 }] }))
+    await provider(fetchImpl).generate(input({ params: { input_fidelity: 'high' } }))
+    await provider(fetchImpl).generate(input())
+    await provider(fetchImpl).generate(input({ images: [], params: { input_fidelity: 'high' } }))
+    const sent = fetchImpl.mock.calls.map((call) => (call as unknown as [string, RequestInit])[1].body)
+    expect((sent[0] as FormData).get('input_fidelity')).toBe('high')
+    expect((sent[1] as FormData).get('input_fidelity')).toBeNull()
+    expect(JSON.parse(sent[2] as string)).not.toHaveProperty('input_fidelity')
+  })
+})
+
 describe('openai image provider usage (T33)', () => {
   const usage = { input_tokens: 1600, input_tokens_details: { text_tokens: 100, image_tokens: 1500 }, output_tokens: 4160, total_tokens: 5760 }
 

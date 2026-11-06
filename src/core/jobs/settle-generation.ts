@@ -8,7 +8,7 @@ import type { ObjectStore } from '../storage'
 import { classifyFailure, GenerationFailure, type FailureStage } from './generation-failure'
 import { jobCostUsd } from './job-cost'
 import type { Job } from './job-schema'
-import { ProviderError, type GenerationProvider, type ProviderInput, type ProviderUsage } from './provider'
+import { ProviderError, type GenerationProvider, type ProviderInput, type ProviderPrices, type ProviderUsage } from './provider'
 import { confirmJob, refundJob, type JobCost } from './settlement'
 
 // Vercel stops the function at maxDuration (300s). The provider gets less than that so a
@@ -52,9 +52,18 @@ async function refundSafely(db: SupabaseClient, jobId: string, errorCode: string
   }
 }
 
-// Usage and cost go into the same confirm / refund call that settles the job (T33).
-function costOf(provider: GenerationProvider, usage: ProviderUsage | null): JobCost {
-  return { usage, costUsd: jobCostUsd(usage, provider.prices) }
+// A step billed before the image call: the photo-edit decision (T30). Its tokens join the job's
+// usage and are priced at that step's own provider (jobCostUsd's third argument).
+export type DecisionCost = {
+  usage: Required<Pick<ProviderUsage, 'decision_input_tokens' | 'decision_output_tokens'>>
+  prices: ProviderPrices | null
+}
+
+// Usage and cost go into the same confirm / refund call that settles the job (T33). With a
+// decision step but no image usage the tokens are still recorded; the cost is then null.
+function costOf(provider: GenerationProvider, usage: ProviderUsage | null, decision?: DecisionCost): JobCost {
+  const all = decision ? { ...usage, ...decision.usage } : usage
+  return { usage: all, costUsd: jobCostUsd(all, provider.prices, decision?.prices) }
 }
 
 // Steps 2–3 of ARCHITECTURE §4 for a freshly reserved job: provider → write output → confirm.
@@ -65,6 +74,7 @@ export async function settleGeneration(
   job: Job,
   call: Omit<ProviderInput, 'signal'>,
   outputKey: string,
+  decision?: DecisionCost,
 ): Promise<Job> {
   let stage: FailureStage = 'provider'
   let usage: ProviderUsage | null = null
@@ -77,7 +87,7 @@ export async function settleGeneration(
     stage = 'store_output'
     await deps.store.put(outputKey, output.bytes, output.contentType)
     stage = 'confirm'
-    return await confirmJob(deps.db, { jobId: job.id, outputKey, ...costOf(deps.provider, usage) })
+    return await confirmJob(deps.db, { jobId: job.id, outputKey, ...costOf(deps.provider, usage, decision) })
   } catch (error) {
     if (error instanceof ProviderError && error.usage) usage = error.usage
     const failure = classifyFailure(stage, error)
@@ -88,7 +98,7 @@ export async function settleGeneration(
     if (failure.jobCode !== 'CONTENT_REJECTED') {
       captureError(error, { alert: 'generation_failed', fields: { jobId: job.id, stage, jobCode: failure.jobCode, source: job.source } })
     }
-    const refunded = await refundSafely(deps.db, job.id, failure.jobCode, costOf(deps.provider, usage))
+    const refunded = await refundSafely(deps.db, job.id, failure.jobCode, costOf(deps.provider, usage, decision))
     throw new GenerationFailure(failure.error, job.id, refunded, failure.jobCode)
   }
 }

@@ -13,6 +13,7 @@ const generate = {
   source: 'graylum',
   duration_ms: 31_250,
   model: 'gpt-image-2.6',
+  edit_scope: null,
   batch_size: 1,
 } as const
 
@@ -59,6 +60,7 @@ describe('no personal data in events (ARCHITECTURE §16.1)', () => {
     ['an email field', { method: 'email', email: 'a@b.co' }],
     ['user copy', { ...generate, copy: 'tonkotsu ramen' }],
     ['the optional note', { ...generate, note: 'make it brighter' }],
+    ['an edit instruction', { ...generate, edit_scope: 'background', instruction: 'Put it on a beach' }],
     ['a prompt', { ...generate, prompt: 'WRAPPED studio shot' }],
     ['an image URL', { ...generate, image_url: 'https://r2.example/outputs/u/j.png' }],
   ])('refuses %s, naming the key but never echoing the value', (_, props) => {

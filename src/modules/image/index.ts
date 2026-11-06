@@ -2,6 +2,8 @@
 // and are only bundled for the browser when a client component imports them.
 export { createOpenAIImageProvider, IMAGE_ADAPTERS, imageProvider, outputSize, OUTPUT_SIZES } from './provider'
 export { CREDITS_FLOOR } from './credits-floor'
+// Photo editing (T30), server only like the provider.
+export { editBodySchema, editScopeClassifier, runEdit, toEditRequest, type ClassifierAnswer, type EditDeps, type ScopeClassifier } from './edit'
 export { GENERATION_COST_USD } from './generation-cost'
 export { useUpload, type UploadState } from './workspace/use-upload'
 export { checkPickedFile, uploadPhoto, UploadError, type UploadDeps, type UploadErrorCode } from './workspace/upload-photo'

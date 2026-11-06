@@ -1,10 +1,13 @@
 import type { ProviderPrices } from '@/core/jobs'
+import { MODULE_ADAPTER, type ProviderModule } from '@/core/providers/types'
 
 import type { AdminProvider, SaveProviderInput } from '../providers/types'
 
 // The provider form's local state. The key field always starts blank: the browser never has
 // the stored key, and blank means "keep it" on an edit.
 export type ProviderForm = {
+  // Fixed per row: a new one takes the section it was added from.
+  module: ProviderModule
   label: string
   baseUrl: string
   model: string
@@ -20,6 +23,7 @@ export const PRICE_FIELDS = ['priceInputTextPerM', 'priceInputImagePerM', 'price
 export type PriceField = (typeof PRICE_FIELDS)[number]
 
 export const DEFAULT_FORM: ProviderForm = {
+  module: 'image',
   label: '',
   baseUrl: 'https://api.openai.com/v1',
   model: '',
@@ -32,9 +36,10 @@ export const DEFAULT_FORM: ProviderForm = {
 
 const priceText = (value: number | null) => (value === null ? '' : String(value))
 
-export function formFor(provider: AdminProvider | null): ProviderForm {
-  if (!provider) return DEFAULT_FORM
+export function formFor(provider: AdminProvider | null, module: ProviderModule = 'image'): ProviderForm {
+  if (!provider) return { ...DEFAULT_FORM, module }
   return {
+    module: provider.module,
     label: provider.label,
     baseUrl: provider.baseUrl,
     model: provider.model,
@@ -46,9 +51,18 @@ export function formFor(provider: AdminProvider | null): ProviderForm {
   }
 }
 
-// A provider without all three prices cannot cost its jobs; the list flags it (T33).
-export function missingPrices(prices: ProviderPrices): boolean {
-  return prices.inputTextPerM === null || prices.inputImagePerM === null || prices.outputPerM === null
+// The prices each module's jobs are costed with. The decision step (T30) is billed as input and
+// output tokens only: its preview image counts as input tokens, so it has no image price.
+export const MODULE_PRICE_FIELDS: Record<ProviderModule, readonly PriceField[]> = {
+  image: PRICE_FIELDS,
+  decision: ['priceInputTextPerM', 'priceOutputPerM'],
+}
+
+const PRICE_OF = { priceInputTextPerM: 'inputTextPerM', priceInputImagePerM: 'inputImagePerM', priceOutputPerM: 'outputPerM' } as const
+
+// A provider without the prices its module needs cannot cost its jobs; the list flags it (T33).
+export function missingPrices(prices: ProviderPrices, module: ProviderModule = 'image'): boolean {
+  return MODULE_PRICE_FIELDS[module].some((field) => prices[PRICE_OF[field]] === null)
 }
 
 // Blank or a non-negative decimal; anything else keeps Save disabled.
@@ -57,8 +71,8 @@ const PRICE_PATTERN = /^\s*(\d+(\.\d+)?)?\s*$/
 export function toSaveInput(form: ProviderForm, provider: AdminProvider | null): SaveProviderInput {
   return {
     ...(provider ? { id: provider.id } : {}),
-    module: 'image',
-    adapter: 'openai_images',
+    module: form.module,
+    adapter: MODULE_ADAPTER[form.module],
     label: form.label,
     baseUrl: form.baseUrl,
     model: form.model,

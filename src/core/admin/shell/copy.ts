@@ -13,7 +13,7 @@ export const SHELL_COPY = {
     jobs: '出图记录',
     costs: '成本对账',
     templates: '模板',
-    providers: '出图供应商',
+    providers: 'AI 供应商',
     requests: '需求审核',
     announcements: '公告横幅',
     features: '功能权限',

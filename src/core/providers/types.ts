@@ -2,13 +2,20 @@ import type { GenerationProvider, ProviderPrices } from '../jobs'
 
 // Provider settings (ARCHITECTURE §3.3). Mirrors the checks on public.ai_providers.
 
-export const PROVIDER_MODULES = ['image'] as const
+// 'decision' classifies what an edit instruction changes (ARCHITECTURE §5.2, T30).
+export const PROVIDER_MODULES = ['image', 'decision'] as const
 export type ProviderModule = (typeof PROVIDER_MODULES)[number]
 
 // Code adapters a row can name. A vendor with a different API shape is a new adapter (code),
 // not an admin setting.
-export const PROVIDER_ADAPTERS = ['openai_images'] as const
+export const PROVIDER_ADAPTERS = ['openai_images', 'openai_responses'] as const
 export type ProviderAdapterId = (typeof PROVIDER_ADAPTERS)[number]
+
+// Each module has exactly one adapter so far; the table check pairs them the same way.
+export const MODULE_ADAPTER: Record<ProviderModule, ProviderAdapterId> = {
+  image: 'openai_images',
+  decision: 'openai_responses',
+}
 
 export const DEFAULT_BASE_URL = 'https://api.openai.com/v1'
 
