@@ -14,7 +14,7 @@ export function PhotosEmpty() {
   const developing = useJobs().some((job) => job.status === 'running')
   if (developing) return null
   return (
-    <div className="mx-4 mt-10 grid justify-items-start gap-4">
+    <div className="mx-(--gutter) mt-10 grid justify-items-start gap-4">
       <p className="text-body text-bone-dim">{t('empty')}</p>
       <Link href="/generate" className={buttonVariants({ variant: 'cta', size: 'cta' })}>
         {t('emptyCta')}

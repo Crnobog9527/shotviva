@@ -125,27 +125,24 @@
       "templates": "Templates",
       "filter": "Filter templates",
       "all": "All",
-      "illustrative": "Template images are illustrative examples."
+      "illustrative": "Every card shows the phone photo on the left and the AI result on the right. Template images are illustrative examples."
     },
     "template": {
       "fromCredits": "from {count, plural, one {# credit} other {# credits}}",
       "cardAlt": "{name} template example: phone photo on the left, AI result on the right",
       "phone": "Phone",
       "ai": "AI",
-      "videoTemplate": "Video template",
-      "animatedTemplate": "Animated template",
       "example": "Illustrative example",
-      "featureAria": "{name}, video template, {category}. Preview",
+      "featureAria": "{name}, video template, {category}. Make one",
       "featureMeta": "{category} · video",
-      "preview": "Preview",
       "compareAria": "Compare phone photo and AI result",
       "phonePhotoAlt": "Phone photo",
       "resultAlt": "{name} result",
       "loopAria": "{name} example: phone photo changing into the AI result",
-      "animationAlt": "{name} example animation",
       "hintCompare": "Drag across the photo to compare.",
-      "hintMotion": "Your photo plays the same change as this short loop.",
-      "use": "Use this template"
+      "makeOne": "Make one",
+      "animatedMeta": "{category} · animated",
+      "hintPair": "Phone photo on the left, the AI result on the right."
     },
     "categories": {
       "Art Styles": "Art Styles",
@@ -257,7 +254,11 @@
       "batchSummary": "{done, number} of {count, number} done{failed, plural, =0 {} other { · # didn't develop}}",
       "batchLeave": "Usually 20–40 seconds each. You can leave this page; each photo lands in Photos when it's done.",
       "makeMore": "Make another batch",
-      "getTier": "Get {tier}"
+      "getTier": "Get {tier}",
+      "stageLabel": "Preview",
+      "stageYours": "Your photo",
+      "stageYoursCaption": "Your photo, as shot. The template keeps it and changes the light and background.",
+      "stageSampleCaption": "Template example: the phone photo on the left, the AI result on the right."
     },
     "errors": {
       "CONTENT_REJECTED": "The photo or your note didn't pass the safety check. Try another photo or change the note.",
@@ -301,7 +302,8 @@
       "pill": "{count, plural, one {Generating…} other {Generating #…}}",
       "doneMeta": "{when} · {size} · {tier}",
       "runningMeta": "{size} · {tier} · {count, plural, one {# credit} other {# credits}}",
-      "waiting": "Waiting for a free slot"
+      "waiting": "Waiting for a free slot",
+      "makeAgain": "Make again"
     },
     "work": {
       "freePublic": "Public · watermark",

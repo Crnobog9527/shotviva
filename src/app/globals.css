@@ -108,6 +108,15 @@
   --spring: cubic-bezier(.32, 1.25, .4, 1);
 }
 
+/* Side gutters widen with the screen (DESKTOP-NOTES: 16 / 32 / 40); app pages put their content
+   in a 1120px column between them (DESIGN §6.9 item 7). */
+@media (min-width: 768px) {
+  :root { --gutter: 32px; }
+}
+@media (min-width: 1024px) {
+  :root { --gutter: 40px; }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -279,6 +288,12 @@ html:lang(zh-Hans) :is(em, i, .italic) {
   background-color: var(--checker-light);
   background-image: conic-gradient(var(--checker-dark) 0 25%, transparent 0 50%, var(--checker-dark) 0 75%, transparent 0);
   background-size: 16px 16px;
+}
+/* The app's content column: 1120px between the gutters, centred (DESIGN §6.9 item 7). */
+@utility content-column {
+  width: 100%;
+  max-width: calc(1120px + 2 * var(--gutter));
+  margin-inline: auto;
 }
 /* Horizontal rails (filter chips): scroll without a visible bar. */
 @utility no-scrollbar {

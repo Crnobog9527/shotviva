@@ -16,7 +16,8 @@ import { GenerationRunner, HideWhileGenerating, PhotosTabBadge } from '@/modules
 import { site } from '@/site/site.config'
 
 // Every logged-in page is noindex through this one layout, never per page (AGENTS §9).
-// The app shell (DESIGN §8): tab bar on tab roots, generation that outlives the workspace.
+// The app shell (DESIGN §8): tab bar on tab roots (and over the photo page from md up, T38),
+// generation that outlives the workspace.
 // Every page inside still calls requireUser() itself.
 export const metadata: Metadata = appShellMetadata()
 
@@ -61,7 +62,7 @@ export default function AppLayout({ children }: LayoutProps<'/[locale]'>) {
         </Suspense>
         {/* usePathname decides tab root vs flow page; on dynamic routes that is request data. */}
         <Suspense fallback={null}>
-          <TabBar items={tabs} brand={site.brand.name} />
+          <TabBar items={tabs} desktopUnder={['/photos/']} />
         </Suspense>
         <main className="flex flex-1 flex-col">{children}</main>
         <GenerationRunner />

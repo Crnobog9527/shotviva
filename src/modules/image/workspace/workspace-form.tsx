@@ -31,7 +31,9 @@ type Props = {
 }
 
 // One column, one scroll, no wizard (DESIGN §4.3): photo → text the template needs → the
-// optional note → size → resolution, then the balance line above the fixed action bar.
+// optional note → size → resolution, then the balance line above the action bar. The one form
+// source (T38): the workspace page and the creation dialog both render it, and their frames
+// set the side padding.
 export function WorkspaceForm({ template, balance, tier, photos, values, onChange }: Props) {
   const t = useTranslations('app')
   const balanceT = useTranslations('app.balance')
@@ -44,11 +46,11 @@ export function WorkspaceForm({ template, balance, tier, photos, values, onChang
         <BatchHint tier={tier} dropped={photos.dropped} />
       </Section>
       {template.copyFields.length > 0 ? (
-        <div className="px-4 pt-6">
+        <div className="pt-6">
           <CopyFields fields={template.copyFields} values={values.copy} onChange={(copy) => onChange({ copy })} />
         </div>
       ) : null}
-      <div className="px-4 pt-6">
+      <div className="pt-6">
         <NoteField value={values.note} placeholder={notePlaceholder(template.category, noteT)} onChange={(note) => onChange({ note })} />
       </div>
       <Section
@@ -66,7 +68,7 @@ export function WorkspaceForm({ template, balance, tier, photos, values, onChang
       <Section id="res-h" title={t('workspace.resolution')}>
         <ResolutionPicker value={values.resolution} costs={template.creditsCost} balance={balance} onChange={(resolution) => onChange({ resolution })} />
       </Section>
-      <p className="flex items-center gap-2 px-4 pt-5 text-caption text-muted-foreground">
+      <p className="flex items-center gap-2 pt-5 text-caption text-muted-foreground">
         <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 flex-none text-primary" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round">
           <circle cx="12" cy="12" r="8.5" />
           <path d="M12 8v4.5M12 16h.01" />
@@ -104,7 +106,7 @@ function PhotoAside({ photos }: { photos: PhotoBatch }) {
 
 function Section({ id, title, aside, children }: { id: string; title: string; aside?: ReactNode; children: ReactNode }) {
   return (
-    <section aria-labelledby={id} className="px-4 pt-6">
+    <section aria-labelledby={id} className="pt-6">
       <div className="mb-3 flex items-baseline justify-between gap-3">
         <h2 id={id} className="text-headline leading-[1.2] font-semibold tracking-[-0.01em]">
           {title}

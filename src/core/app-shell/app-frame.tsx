@@ -12,8 +12,9 @@ export function AppFrame({ children }: { children: ReactNode }) {
   )
 }
 
-// App pages are a phone column; on desktop the column widens to 720px and centres (§8.6).
-// `wide` lets a two-column page (the photo page from lg) use the full content width.
+// App pages are a phone column that widens to 720px on desktop (§8.6). `wide` pages (Create,
+// Photos, the workspace and the photo page) use the 1120px content column instead, with the
+// grids and two-column layouts the v3-b desktop comps draw (§6.9 item 7).
 export function AppPage({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
-  return <div className={cn('mx-auto w-full max-w-[720px] pb-6', wide && 'lg:max-w-[1200px]')}>{children}</div>
+  return <div className={cn('w-full pb-6', wide ? 'content-column' : 'mx-auto max-w-[720px]')}>{children}</div>
 }

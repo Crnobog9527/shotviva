@@ -27,13 +27,20 @@ const rich = {
 
 const monoCost = (chunks: ReactNode) => <span className="font-mono text-caption font-medium opacity-[.72]">{chunks}</span>
 
-// The workspace's bottom bar: one notice line at most, then the one primary (DESIGN §4.3
+// Where the bar sits: the workspace page (fixed on phones, the end of the form below lg, sticky
+// at the bottom of the form column from lg, B comp workspace.html) or pinned in the creation
+// dialog under its scrolling form.
+const PAGE = 'md:px-0 lg:sticky lg:bottom-0 lg:z-10 lg:mt-4 lg:bg-[linear-gradient(transparent,var(--background)_16px)] lg:pt-6 lg:pb-6'
+
+type Props = { state: CtaState; resolution: Resolution; batch: boolean; onGenerate(): void; placement?: 'page' | 'sheet' }
+
+// The creation form's bottom bar: one notice line at most, then the one primary (DESIGN §4.3
 // steps 4–5). The free-credit notice shows only when this photo would use free credits; a
 // batch (T28) says how many photos and that it is paid credits only.
-export function FormAction({ state, resolution, batch, onGenerate }: { state: CtaState; resolution: Resolution; batch: boolean; onGenerate(): void }) {
+export function FormAction({ state, resolution, batch, onGenerate, placement = 'page' }: Props) {
   const t = useTranslations('app.workspace')
   return (
-    <ActionBar>
+    <ActionBar inline={placement === 'sheet'} className={placement === 'page' ? PAGE : undefined}>
       <Notice state={state} resolution={resolution} />
       {state.kind === 'get-credits' ? (
         <PaywallButton trigger="insufficient_credits" className={buttonVariants({ variant: 'cta-neutral', size: 'cta' })}>
