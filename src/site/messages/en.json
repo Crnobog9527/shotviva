@@ -706,6 +706,39 @@
       "yourChange": "Your change",
       "editedFromLabel": "Edited from",
       "sourceDeleted": "Original deleted"
+    },
+    "checkout": {
+      "metaTitle": "Payment",
+      "titlePlan": "You're on {tier}",
+      "titlePack": "{count, plural, one {# credit} other {# credits}} added",
+      "subPlan": "{count, plural, one {# credit is} other {# credits are}} in your account. Make something.",
+      "subPack": "They're in your account now. Make something.",
+      "added": "Added",
+      "balance": "Balance",
+      "unit": "credits",
+      "renews": "Renews",
+      "renewsValue": "{date, date, medium} · {price}",
+      "paid": "Paid",
+      "paidCard": "{amount} · {brand} ···· {last4}",
+      "paidMethod": "{amount} · {method, select, alipay {Alipay} other {Card}}",
+      "start": "Start creating",
+      "receipt": "Receipt",
+      "manage": "Manage in Account",
+      "backToPartner": "Back to Graylum",
+      "fineMonthly": "Renews automatically. Cancel anytime from Account.",
+      "fineYearly": "A year of credits, all in your account now. Renews automatically; cancel anytime from Account.",
+      "finePeriod": "One-time payment for {period, select, year {1 year} other {30 days}}. Nothing renews; renew from Account when it ends.",
+      "finePack": "One-time payment. Nothing renews.",
+      "titlePending": "Confirming your payment",
+      "subPendingAlipay": "Alipay is still confirming it. This usually takes under a minute. Your credits appear as soon as it clears; you can leave this page.",
+      "subPending": "Your payment went through and we're adding your credits. This usually takes a few seconds; you can leave this page.",
+      "order": "Order",
+      "amount": "Amount",
+      "orderPlan": "{tier} · {period, select, year {1 year} other {1 month}} · {count, plural, one {# credit} other {# credits}}",
+      "orderPack": "{count, plural, one {# credit} other {# credits}}",
+      "checkAgain": "Check again",
+      "backToCreate": "Back to Create",
+      "finePending": "If nothing shows in Account after 10 minutes, write to {email} with the time of payment."
     }
   },
   "paywall": {
@@ -768,8 +801,6 @@
     "redirecting": "Opening secure checkout…",
     "error": "Checkout did not open. Please try again in a moment.",
     "choose": "Choose {tier}",
-    "thanks": "Thanks for your purchase. Your credits arrive within a minute; refresh if you don't see them yet.",
-    "backToPartner": "Back to Graylum",
     "perCreditShort": "{price} / credit",
     "savingLabel": "You save<vs> vs monthly</vs>",
     "savingAmount": "{amount} a year",
@@ -780,7 +811,9 @@
     "payNoteCard": "Plans renew automatically, cancel anytime",
     "payNoteWallet": "One-time payment for 30 days or 1 year, no auto-renew",
     "payNoteOnce": "One-time payment for 30 days or 1 year",
-    "payNotePacks": "Credit packs are always a one-time payment."
+    "payNotePacks": "Credit packs are always a one-time payment.",
+    "cancelled": "<b>Checkout cancelled.</b> Nothing was charged.",
+    "cancelledClose": "Dismiss"
   },
   "announcement": {
     "dismiss": "Dismiss announcement"

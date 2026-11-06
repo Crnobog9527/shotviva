@@ -706,6 +706,39 @@
       "yourChange": "你的修改",
       "editedFromLabel": "修改自",
       "sourceDeleted": "原作品已删除"
+    },
+    "checkout": {
+      "metaTitle": "付款结果",
+      "titlePlan": "你已开通{tier}",
+      "titlePack": "已到账 {count} 积分",
+      "subPlan": "{count} 积分已到账，去做张图吧。",
+      "subPack": "积分已经在你的账号里了，去做张图吧。",
+      "added": "本次到账",
+      "balance": "当前余额",
+      "unit": "积分",
+      "renews": "下次续费",
+      "renewsValue": "{date, date, medium} · {price}",
+      "paid": "已支付",
+      "paidCard": "{amount} · {brand} ···· {last4}",
+      "paidMethod": "{amount} · {method, select, alipay {支付宝} other {银行卡}}",
+      "start": "开始创作",
+      "receipt": "收据",
+      "manage": "在「我的」里管理",
+      "backToPartner": "返回 Graylum",
+      "fineMonthly": "自动续费，随时可以在「我的」里取消。",
+      "fineYearly": "一年的积分已经全部到账。自动续费，随时可以在「我的」里取消。",
+      "finePeriod": "一次性支付 {period, select, year {1 年} other {30 天}}，不会自动续费；到期后可以在「我的」里续费。",
+      "finePack": "一次性付款，不会续费。",
+      "titlePending": "正在确认付款",
+      "subPendingAlipay": "支付宝还在确认这笔付款，通常不到一分钟。确认后积分会自动到账，你可以先离开这个页面。",
+      "subPending": "付款已成功，正在为你加积分，通常几秒钟就好。你可以先离开这个页面。",
+      "order": "订单",
+      "amount": "金额",
+      "orderPlan": "{tier} · {period, select, year {1 年} other {1 个月}} · {count} 积分",
+      "orderPack": "{count} 积分",
+      "checkAgain": "再查一次",
+      "backToCreate": "返回创作",
+      "finePending": "如果 10 分钟后「我的」里还没有显示，请写信到 {email}，附上付款时间。"
     }
   },
   "paywall": {
@@ -768,8 +801,6 @@
     "redirecting": "正在打开安全付款页…",
     "error": "付款页没能打开，请稍后再试。",
     "choose": "选择{tier}",
-    "thanks": "感谢购买！积分一分钟内到账，没看到的话请刷新页面。",
-    "backToPartner": "返回 Graylum",
     "perCreditShort": "每积分 {price}",
     "savingLabel": "<vs>比按月付</vs>每年省",
     "savingAmount": "{amount}",
@@ -780,7 +811,9 @@
     "payNoteCard": "套餐自动续费，随时可取消",
     "payNoteWallet": "一次性支付 30 天或 1 年，不自动续费",
     "payNoteOnce": "一次性支付 30 天或 1 年",
-    "payNotePacks": "积分包一律一次性付款。"
+    "payNotePacks": "积分包一律一次性付款。",
+    "cancelled": "<b>已取消付款。</b>没有扣款。",
+    "cancelledClose": "关闭"
   },
   "announcement": {
     "dismiss": "关闭公告"

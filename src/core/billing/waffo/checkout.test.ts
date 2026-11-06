@@ -45,7 +45,7 @@ describe('createWaffoCheckout', () => {
       productId: 'PROD_startermonthly',
       currency: 'USD',
       priceSnapshot: { amount: '19.90', taxIncluded: false, taxCategory: 'saas' },
-      successUrl: 'https://shotviva-git-validation-preview.vercel.app/account?checkout=success',
+      successUrl: 'https://shotviva-git-validation-preview.vercel.app/checkout?channel=waffo&p=starter_monthly',
       expiresInSeconds: WAFFO_SESSION_TTL_SECONDS,
       metadata: { user_id: USER, product_id: 'starter_monthly', method: 'card', locale: 'en' },
       orderMerchantExternalId: 'order-ref-1',
@@ -75,7 +75,7 @@ describe('createWaffoCheckout', () => {
     await createWaffoCheckout(deps, { userId: USER, body: { ...body('pack_s'), return_to: 'https://graylum.ai/app' } })
     await createWaffoCheckout(deps, { userId: USER, body: { ...body('pack_s'), return_to: 'https://evil.example/app' } })
     expect(create.mock.calls[0]?.[0].successUrl).toContain('from=graylum&return_to=https%3A%2F%2Fgraylum.ai%2Fapp')
-    expect(create.mock.calls[1]?.[0].successUrl).toBe('https://shotviva-git-validation-preview.vercel.app/account?checkout=success')
+    expect(create.mock.calls[1]?.[0].successUrl).toBe('https://shotviva-git-validation-preview.vercel.app/checkout?channel=waffo&p=pack_s')
   })
 
   it('refuses a session URL that is not on a Waffo host', async () => {

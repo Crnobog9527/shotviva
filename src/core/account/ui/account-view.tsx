@@ -1,8 +1,6 @@
 import { useTranslations } from 'next-intl'
-import { Suspense } from 'react'
 
 import type { Balance } from '../../billing'
-import { CheckoutNotice } from '../../billing/paywall'
 import { PlanCard, planAllowance, type LastMembership, type SubscriptionSummary } from '../../billing/subscription'
 import type { SiteProduct } from '../../config'
 import { TabRootHeader } from '../../app-shell'
@@ -49,8 +47,6 @@ export type AccountSite = {
   brand: string
   // The signup gift, the free dial's "of 6".
   freeCredits: number
-  // Graylum hosts the checkout notice may send a top-up buyer back to.
-  returnToHosts: readonly string[]
 }
 
 type Props = { data: AccountData; actions: AccountActions; site: AccountSite }
@@ -75,9 +71,6 @@ export function AccountView({ data, actions, site }: Props) {
   return (
     <>
       <AccountHeader email={data.email} />
-      <Suspense fallback={null}>
-        <CheckoutNotice returnToHosts={site.returnToHosts} />
-      </Suspense>
       <div className="md:mx-(--gutter) md:mt-6 md:grid md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] md:items-start md:gap-4">
         <Group title={t('plan.title')} className={pair}>
           <PlanCard summary={data.subscription} products={site.products} paid={data.balance.paid} manage={actions.manageSubscription} facts={facts} />

@@ -70,8 +70,8 @@ describe('createCheckout routing', () => {
       locale: 'zh',
       metadata: { user_id: USER, product_id: 'starter_monthly', method: 'card' },
       subscription_data: { metadata: { user_id: USER, product_id: 'starter_monthly', method: 'card' } },
-      success_url: 'https://pr-1.example.app/zh/account?checkout=success',
-      cancel_url: 'https://pr-1.example.app/zh/pricing?checkout=cancelled',
+      success_url: 'https://pr-1.example.app/zh/checkout?session_id={CHECKOUT_SESSION_ID}',
+      cancel_url: 'https://pr-1.example.app/zh/pricing?checkout=cancel',
     })
     expect(params).not.toHaveProperty('payment_method_types')
     expect(params).not.toHaveProperty('allowed_payment_method_types')
@@ -175,8 +175,8 @@ describe('success URL for a Graylum top-up (ARCHITECTURE §14.5)', () => {
     await createCheckout(deps(stripe), { userId: USER, body: { ...body, return_to: 'https://graylum.com/app?x=1' } })
     await createCheckout(deps(stripe), { userId: USER, body: { ...body, return_to: 'https://evil.example/app' } })
     expect(create.mock.calls[0]?.[0].success_url).toBe(
-      'https://pr-1.example.app/account?checkout=success&from=graylum&return_to=https%3A%2F%2Fgraylum.com%2Fapp%3Fx%3D1',
+      'https://pr-1.example.app/checkout?session_id={CHECKOUT_SESSION_ID}&from=graylum&return_to=https%3A%2F%2Fgraylum.com%2Fapp%3Fx%3D1',
     )
-    expect(create.mock.calls[1]?.[0].success_url).toBe('https://pr-1.example.app/account?checkout=success')
+    expect(create.mock.calls[1]?.[0].success_url).toBe('https://pr-1.example.app/checkout?session_id={CHECKOUT_SESSION_ID}')
   })
 })
