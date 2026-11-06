@@ -5,7 +5,11 @@ import { cn } from '../../ui/cn'
 // The return page's shared pieces (comps-v3-b checkout.html): the plate on its safelight glow,
 // the glyph, the receipt rows. Presentational only.
 
-export function ReturnPlate({ pending, children }: { pending: boolean; children: ReactNode }) {
+// `material`: the paywall's tier material on the plate (Pro sapphire, Max black and gold, T55),
+// the same on every visit; the celebration only animates it the first time (celebration.css).
+type PlateProps = { pending: boolean; material?: 'pro' | 'max' | null; children: ReactNode }
+
+export function ReturnPlate({ pending, material = null, children }: PlateProps) {
   return (
     <div
       data-state={pending ? 'pending' : 'success'}
@@ -15,7 +19,7 @@ export function ReturnPlate({ pending, children }: { pending: boolean; children:
         aria-hidden="true"
         className="pointer-events-none absolute top-[36%] left-1/2 h-[520px] w-[min(900px,140vw)] -translate-1/2 bg-[radial-gradient(closest-side,color-mix(in_srgb,var(--primary)_16%,transparent),transparent_70%)]"
       />
-      <section className="return-plate relative z-[1] w-full max-w-[440px] md:max-w-[480px] md:rounded-panel md:bg-card md:p-8 md:shadow-[inset_0_0_0_1px_var(--border),inset_0_1px_0_rgba(255,255,255,.035),0_40px_80px_-40px_rgba(0,0,0,.9)]">
+      <section data-return-plate="" data-material={material ?? undefined} className="return-plate relative z-[1] w-full max-w-[440px] md:max-w-[480px] md:rounded-panel md:bg-card md:p-8 md:shadow-[inset_0_0_0_1px_var(--border),inset_0_1px_0_rgba(255,255,255,.035),0_40px_80px_-40px_rgba(0,0,0,.9)]">
         {children}
       </section>
     </div>
@@ -26,6 +30,7 @@ export function Glyph({ pending }: { pending: boolean }) {
   return (
     <div
       aria-hidden="true"
+      data-glyph=""
       className={cn(
         'mb-5 grid size-14 place-items-center rounded-[18px]',
         pending
@@ -65,10 +70,13 @@ export function Row({ label, children }: { label: string; children: ReactNode })
 }
 
 // "+135 credits" / "138 credits": the number in the display face, the unit small in mono.
-export function Credits({ count, unit, added = false }: { count: string; unit: string; added?: boolean }) {
+// `added` carries the number the celebration counts up to (T55).
+export function Credits({ count, unit, added }: { count: string; unit: string; added?: number }) {
   return (
     <span className="font-display text-2xl leading-none tracking-[-0.01em]">
-      <span className={added ? 'text-success' : undefined}>{count}</span>
+      <span className={added !== undefined ? 'text-success' : undefined} data-celebrate-added={added}>
+        {count}
+      </span>
       <small className="ml-1.5 font-mono text-caption text-muted-foreground">{unit}</small>
     </span>
   )
