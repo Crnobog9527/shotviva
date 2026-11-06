@@ -1,7 +1,8 @@
-// Account page Subscription block and the Customer Portal link (T10, DESIGN §4.5,
-// ARCHITECTURE §6.2). Readers and the Portal are server-only; the panel is a server component.
+// Account page Plan card, the Customer Portal link and the cancel-before-delete step (T10, T39,
+// DESIGN §4.5, ARCHITECTURE §6.2 / §13). Readers, the Portal and cancelling are server-only;
+// the card is a server component.
 export { cancelAllSubscriptions } from './cancel-all'
 export { createPortalUrl } from './portal'
 export { readSubscriptionSummary } from './read-summary'
-export { SubscriptionPanel } from './subscription-panel'
+export { PlanCard } from './plan-card'
 export { summarizeSubscription, type MirrorRow, type SubscriptionState, type SubscriptionSummary } from './summary'
