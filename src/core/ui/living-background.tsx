@@ -3,29 +3,22 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
-import './living-background.css'
 
 const REDUCED = '(prefers-reduced-motion: reduce)'
 const POINTER = '(hover: hover) and (pointer: fine)'
 
 // The site's living background, Bold preset (DESIGN §5 「全站流动背景」, T54): grain, two drifting
 // safelight pools that follow the scroll, a pool that follows the pointer, and a breathing
-// vignette, on one fixed plane under all content (living-background.css). Mounted by the
-// marketing and app layouts; on admin pages it is hidden (living-background.css). It waits two frames after hydration so it can't
-// hold up the first paint, never mounts under reduced motion (the static ground and grain stay),
-// has no pointer layer on touch screens, and pauses while the tab is hidden.
+// vignette, on one fixed plane under all content (living-background.css, inlined in globals.css).
+// Mounted by the marketing and app layouts; hidden on admin pages. It mounts only once the page
+// has loaded and the browser is idle, so it can't hold up the first screen; it never mounts
+// under reduced motion (the static ground and grain stay), has no pointer layer on touch screens,
+// and pauses while the tab is hidden.
 export function LivingBackground() {
   const [mount, setMount] = useState<{ pointer: boolean } | null>(null)
   useEffect(() => {
     if (window.matchMedia(REDUCED).matches) return
-    let second = 0
-    const first = requestAnimationFrame(() => {
-      second = requestAnimationFrame(() => setMount({ pointer: window.matchMedia(POINTER).matches }))
-    })
-    return () => {
-      cancelAnimationFrame(first)
-      cancelAnimationFrame(second)
-    }
+    return whenSettled(() => setMount({ pointer: window.matchMedia(POINTER).matches }))
   }, [])
   if (!mount) return null
   return createPortal(<Layers pointer={mount.pointer} />, document.body)
@@ -58,6 +51,25 @@ function Layers({ pointer }: { pointer: boolean }) {
       <div className="lbg-grain" />
     </div>
   )
+}
+
+// Runs `then` once the page has loaded and the browser is idle, so none of the background's work
+// competes with the first screen (its largest paint, hydration). Returns a cancel.
+function whenSettled(then: () => void): () => void {
+  let idle = 0
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const schedule = () => {
+    // Safari has no requestIdleCallback.
+    if (typeof window.requestIdleCallback === 'function') idle = window.requestIdleCallback(then, { timeout: 2000 })
+    else timer = setTimeout(then, 200)
+  }
+  if (document.readyState === 'complete') schedule()
+  else window.addEventListener('load', schedule, { once: true })
+  return () => {
+    window.removeEventListener('load', schedule)
+    if (idle) window.cancelIdleCallback(idle)
+    clearTimeout(timer)
+  }
 }
 
 // One passive listener: the pools get the scroll offset, and data-scrolling while it moves.
