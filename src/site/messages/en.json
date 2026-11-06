@@ -199,7 +199,7 @@
     },
     "account": {
       "title": "Graylum",
-      "description": "Make photos in Graylum with your Shotviva credits.",
+      "description": "Your AI social media coach. Find your angle, create posts, and learn from your numbers, with a clear next step every time. Connect to create images with your Shotviva credits.",
       "connected": "Connected since <b>{date, date, medium}</b>. Graylum can make photos with your credits.",
       "notConnected": "Not connected. To connect, start from Graylum and allow it to use your credits.",
       "disconnect": "Disconnect Graylum"

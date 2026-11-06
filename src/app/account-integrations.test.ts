@@ -39,7 +39,7 @@ describe('IntegrationsPanel', () => {
     expect(html).toContain('>Integrations</h2>')
     expect(html).toMatch(/<li><details[^>]*><summary/)
     expect(html).toContain('Graylum')
-    expect(html).toContain('Make photos in Graylum with your Shotviva credits.')
+    expect(html).toContain('Your AI social media coach. Find your angle, create posts, and learn from your numbers, with a clear next step every time. Connect to create images with your Shotviva credits.')
   })
 
   it('shows Enabled and the disconnect action for an active link', async () => {
