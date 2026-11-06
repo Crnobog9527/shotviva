@@ -85,14 +85,15 @@
       "gift": "{count, plural, one {# free Standard image} other {# free Standard images}}",
       "giftNote": "Shown publicly with a watermark",
       "submit": "Create account",
-      "exists": "There's already an account for <addr>{email}</addr>. <login>Log in</login> instead, or <reset>reset the password</reset>.",
       "fine": "By continuing you agree to the <terms>Terms</terms> and <privacy>Privacy Policy</privacy>.",
       "toLogin": "Already have an account? <link>Log in</link>"
     },
     "verify": {
       "title": "Check your email",
       "text": "We sent a verification link to <addr>{email}</addr>. Open it to finish making your account.",
-      "different": "Use a different email"
+      "textSignup": "We sent a verification link to <addr>{email}</addr> if it's new to Shotviva. Open it to finish making your account.",
+      "different": "Use a different email",
+      "haveAccount": "Already have an account? <login>Log in</login> or <reset>reset your password</reset>."
     },
     "resend": {
       "again": "Send the email again",

@@ -21,13 +21,15 @@ type Props = {
   back: ReactNode
   // Shotviva <support@shotviva.com>, from site.config through the page.
   sender: string
+  // One more line under the actions (sign-up: "Already have an account? Log in or reset …").
+  aside?: ReactNode
   // Arrived here right after a send (the login page's "Send it again").
   coolingDown?: boolean
 }
 
 // "Check your email" after a sign-up or a reset request (design/comps-v3-b/auth.html
 // `?v=verify|reset-sent`): one glyph, the title, one line, resend with a 60-second wait.
-export function CheckEmail({ title, text, email, resendAction, next, back, sender, coolingDown = false }: Props) {
+export function CheckEmail({ title, text, email, resendAction, next, back, sender, aside, coolingDown = false }: Props) {
   const t = useTranslations('auth')
   const form = useAuthForm(resendAction, { captcha: true, validate: validateEmail })
   const cooldown = useCooldown()
@@ -60,6 +62,7 @@ export function CheckEmail({ title, text, email, resendAction, next, back, sende
         </button>
         {back}
       </form>
+      {aside ? <p className="au-swap">{aside}</p> : null}
       <p className="au-from">{t.rich('resend.from', { sender, b: (chunks) => <b>{chunks}</b> })}</p>
     </section>
   )

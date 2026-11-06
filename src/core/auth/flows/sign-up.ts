@@ -9,18 +9,13 @@ import { confirmUrl } from './callback-url'
 import { failed, type FormState } from './form-state'
 import { formFields, newPasswordSchema, resendSchema, resetRequestSchema, signUpSchema } from './schemas'
 
-type SignUpResult = { data: { user: { identities?: unknown[] } | null }; error: { code?: string; status?: number } | null }
+// A registered address gets the same "check your email" answer as a new one (no email
+// enumeration, control 2026-11-06): with confirmations on Supabase answers with a user that has
+// no identities and sends nothing; with them off it says `user_already_exists`, treated the same.
+const REGISTERED = new Set(['user_already_exists', 'email_exists'])
 
-// With confirmations on, Supabase answers a sign-up for a registered address with a user that
-// has no identities and sends nothing; with them off it says `user_already_exists`. Either way
-// the page says so and offers Log in or a reset (design/comps-v3-b/auth.html `?err=exists`).
-export function alreadyRegistered({ data, error }: SignUpResult): boolean {
-  if (error) return error.code === 'user_already_exists' || error.code === 'email_exists'
-  return Array.isArray(data.user?.identities) && data.user.identities.length === 0
-}
-
-// The verification link lands on `next` (the home draft, the Graylum connect page), else the
-// account page of the form's language.
+// The verification link lands on `next` (the home draft, the Graylum connect page) when it is a
+// same-site path that passes sanitizeNext, else the account page of the form's language.
 export async function signUpWithPassword(form: FormData): Promise<FormState> {
   const parsed = signUpSchema.safeParse(formFields(form))
   if (!parsed.success) return failed('INVALID_INPUT')
@@ -30,15 +25,14 @@ export async function signUpWithPassword(form: FormData): Promise<FormState> {
   const locale = await currentLocale()
   // user_metadata.locale picks the language of every auth email this account gets
   // (ARCHITECTURE §7: `{{ if eq .Data.locale "zh" }}` in supabase/templates/*.html).
-  const result = await supabase.auth.signUp({
+  const { error } = await supabase.auth.signUp({
     email,
     password,
     options: { captchaToken, data: { locale }, emailRedirectTo: confirmUrl(nextIn(next, locale)) },
   })
-  if (alreadyRegistered(result)) return { status: 'exists' }
-  if (result.error) {
-    const code = classifyAuthError(result.error)
-    if (code === 'INTERNAL') logger.warn('sign-up failed', { code: result.error.code })
+  if (error && !REGISTERED.has(error.code ?? '')) {
+    const code = classifyAuthError(error)
+    if (code === 'INTERNAL') logger.warn('sign-up failed', { code: error.code })
     return failed(code)
   }
   return { status: 'sent' }

@@ -85,14 +85,15 @@
       "gift": "{count, plural, other {# 张标准清晰度免费图}}",
       "giftNote": "会公开展示，并带水印",
       "submit": "注册",
-      "exists": "<addr>{email}</addr> 已经注册过了。可以直接<login>登录</login>，或者<reset>重设密码</reset>。",
       "fine": "继续即表示你同意<terms>服务条款</terms>和<privacy>隐私政策</privacy>。",
       "toLogin": "已经有账号？<link>登录</link>"
     },
     "verify": {
       "title": "请查收邮件",
       "text": "验证链接已经发到 <addr>{email}</addr>，打开它就能完成注册。",
-      "different": "换一个邮箱"
+      "textSignup": "如果 <addr>{email}</addr> 还没注册过 Shotviva，验证链接已经发过去了，打开它就能完成注册。",
+      "different": "换一个邮箱",
+      "haveAccount": "已经有账号？<login>登录</login>或<reset>重设密码</reset>。"
     },
     "resend": {
       "again": "再发一次邮件",

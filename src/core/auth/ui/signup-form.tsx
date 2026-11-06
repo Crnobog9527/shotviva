@@ -26,7 +26,8 @@ type Props = {
 
 const addr = (chunks: ReactNode) => <span className="au-addr">{chunks}</span>
 
-// /signup (design/comps-v3-b/auth.html `?v=signup|verify`, `?err=exists|weak`).
+// /signup (design/comps-v3-b/auth.html `?v=signup|verify`, `?err=weak`; a registered address gets the same
+// neutral "check your email" view, never `?err=exists`: control 2026-11-06).
 export function SignupForm({ action, googleAction, resendAction, next, freeImages, arrived, sender }: Props) {
   const t = useTranslations('auth')
   const form = useAuthForm(action, { captcha: true, validate: validateSignup })
@@ -38,11 +39,15 @@ export function SignupForm({ action, googleAction, resendAction, next, freeImage
     return (
       <CheckEmail
         title={t('verify.title')}
-        text={t.rich('verify.text', { email: sentTo, addr })}
+        text={t.rich('verify.textSignup', { email: sentTo, addr })}
         email={sentTo}
         resendAction={resendAction}
         next={next}
         sender={sender}
+        aside={t.rich('verify.haveAccount', {
+          login: (chunks) => <Link href={`/login?next=${encodeURIComponent(next)}`}>{chunks}</Link>,
+          reset: (chunks) => <Link href="/reset">{chunks}</Link>,
+        })}
         back={
           <button type="button" className="au-btn au-quiet" onClick={() => setSetAside(form.state)}>
             {t('verify.different')}
@@ -66,7 +71,7 @@ export function SignupForm({ action, googleAction, resendAction, next, freeImage
           <span>{t('signup.giftNote')}</span>
         </span>
       </div>
-      <SignupNotice form={form} next={next} />
+      <SignupNotice form={form} />
       <GoogleButton action={googleAction} next={next} appearance="auth" />
       <Divider />
       <form onSubmit={form.onSubmit} noValidate className="au-form">
@@ -104,19 +109,7 @@ export function SignupForm({ action, googleAction, resendAction, next, freeImage
   )
 }
 
-function SignupNotice({ form, next }: { form: AuthForm; next: string }) {
+function SignupNotice({ form }: { form: AuthForm }) {
   const t = useTranslations('auth')
-  if (form.state.status === 'exists') {
-    return (
-      <Notice>
-        {t.rich('signup.exists', {
-          email: form.email,
-          addr,
-          login: (chunks) => <Link href={`/login?next=${encodeURIComponent(next)}`}>{chunks}</Link>,
-          reset: (chunks) => <Link href="/reset">{chunks}</Link>,
-        })}
-      </Notice>
-    )
-  }
   return form.state.status === 'error' ? <Notice>{t(`errors.${form.state.code}`)}</Notice> : null
 }

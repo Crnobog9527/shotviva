@@ -9,7 +9,7 @@ vi.mock('../../i18n/server', () => ({
 }))
 vi.mock('../supabase-server', () => ({ createServerSupabase: async () => ({ auth: mocks }) }))
 
-const { alreadyRegistered, resendSignupEmail, signUpWithPassword, updatePassword } = await import('./sign-up')
+const { resendSignupEmail, signUpWithPassword, updatePassword } = await import('./sign-up')
 
 const form = (fields: Record<string, string>) => {
   const data = new FormData()
@@ -20,15 +20,6 @@ const form = (fields: Record<string, string>) => {
 const redirectOf = (call: unknown[]) => new URL((call[0] as { options: { emailRedirectTo: string } }).options.emailRedirectTo)
 
 beforeEach(() => vi.clearAllMocks())
-
-describe('alreadyRegistered', () => {
-  it('reads both of Supabase’s answers for a registered address', () => {
-    expect(alreadyRegistered({ data: { user: { identities: [] } }, error: null })).toBe(true)
-    expect(alreadyRegistered({ data: { user: null }, error: { code: 'user_already_exists' } })).toBe(true)
-    expect(alreadyRegistered({ data: { user: { identities: [{}] } }, error: null })).toBe(false)
-    expect(alreadyRegistered({ data: { user: null }, error: { code: 'weak_password' } })).toBe(false)
-  })
-})
 
 describe('signUpWithPassword', () => {
   it('sends the verification link back to `next` and stores the page language', async () => {
@@ -41,15 +32,29 @@ describe('signUpWithPassword', () => {
     expect(redirectOf(call).searchParams.get('next')).toBe('/zh/connect/graylum?state=s')
   })
 
-  it('falls back to the account page of the form’s language', async () => {
+  it.each([
+    'https://evil.example/',
+    '//evil.example/account',
+    '/\\evil.example',
+    'javascript:alert(1)',
+    '/.//evil.example',
+    'evil.example/account',
+])('sends a hostile next (%s) to the account page of the form’s language', async (next) => {
     mocks.signUp.mockResolvedValue({ data: { user: { identities: [{}] } }, error: null })
-    await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x', next: 'https://evil.example/' }))
-    expect(redirectOf(mocks.signUp.mock.calls[0]!).searchParams.get('next')).toBe('/zh/account')
+    await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x', next }))
+    const target = redirectOf(mocks.signUp.mock.calls[0]!)
+    expect(target.origin).toBe('http://localhost:3000')
+    expect(target.searchParams.get('next')).toBe('/zh/account')
   })
 
-  it('says the address is taken (?err=exists) and maps other failures', async () => {
+  it('answers a registered address exactly like a new one (no enumeration)', async () => {
     mocks.signUp.mockResolvedValueOnce({ data: { user: { identities: [] } }, error: null })
-    expect(await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x' }))).toEqual({ status: 'exists' })
+    expect(await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x' }))).toEqual({ status: 'sent' })
+    mocks.signUp.mockResolvedValueOnce({ data: { user: null }, error: { code: 'user_already_exists', status: 422 } })
+    expect(await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x' }))).toEqual({ status: 'sent' })
+  })
+
+  it('maps other failures', async () => {
     mocks.signUp.mockResolvedValueOnce({ data: { user: null }, error: { code: 'weak_password' } })
     expect(await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x' }))).toEqual({ status: 'error', code: 'AUTH_WEAK_PASSWORD' })
     expect(await signUpWithPassword(form({ email: 'mei@example.com', password: 'short' }))).toEqual({ status: 'error', code: 'INVALID_INPUT' })
