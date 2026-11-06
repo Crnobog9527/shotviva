@@ -785,3 +785,35 @@
 - 隐私政策和账号页里「删除作品」的说法和实际行为一致。
 
 **验收**：删除后 Photos、详情、文件地址、Make again、编辑入口都拿不到这张作品，R2 文件已删除；积分流水和成本统计不变；别人的作品删不了；生成中的删不了；单测和数据库测试覆盖；交互验收交给 Codex。
+
+## T42 登录 / 注册 / 找回密码页按定稿重做（可派）
+
+`auth.html`：`/login`、`/signup`、`/reset`、`/reset/update`，以及验证邮件已发送、链接过期、各种错误和 hCaptcha 状态、`?next=` 回跳（含 Graylum）。只有邮箱 + 密码和 Google，没有 Apple。**共同要求**：照 `design/comps-v3-b/` 里对应的稿做（变体见 `SIGN-OFF.md`），中英两版一起交付（ARCHITECTURE §17「全站中文化」，表外中文页 `noindex`）；文字进 messages / content，不写死；单测覆盖；交互验收交给 Codex；收尾停掉并删除本地 Docker。
+
+## T43 结账返回页和定价页 For business 修订（可派）
+
+`checkout.html`（成功 / 处理中，9 个商品各自的文案，收据链 Stripe 托管收据）；取消回到定价页弹 toast（`pricing.html?checkout=cancel`）；定价页 For business 换成「订单纸」样式（`pricing.html`）。**共同要求**：照 `design/comps-v3-b/` 里对应的稿做（变体见 `SIGN-OFF.md`），中英两版一起交付（ARCHITECTURE §17「全站中文化」，表外中文页 `noindex`）；文字进 messages / content，不写死；单测覆盖；交互验收交给 Codex；收尾停掉并删除本地 Docker。
+
+## T44 404 / 空状态、公告条样式、SEO 落地页（可派）
+
+`404.html`、`empty.html`（一个 `.state` 组件覆盖 Photos、需求墙、My requests、购买记录、404、错误、离线）；公告条两种样式 `tone = info | promo` 按 `home.html?announce=…`，字段来自 `site_announcements`；SEO 落地页骨架 `landing.html`：`/image-to-image-generator` 按稿改版，`/commercial-photography`、`/ai-restaurant-menu` 两页的事实块数字由本卡核实出处后再上（ARCHITECTURE §12）。**共同要求**：照 `design/comps-v3-b/` 里对应的稿做（变体见 `SIGN-OFF.md`），中英两版一起交付（ARCHITECTURE §17「全站中文化」，表外中文页 `noindex`）；文字进 messages / content，不写死；单测覆盖；交互验收交给 Codex；收尾停掉并删除本地 Docker。
+
+## T45 法律四页按定稿版式 + 中文版（可派）
+
+`legal.html`：`/terms`、`/privacy`、`/refund-policy`、`/acceptable-use` 的版式；正文以现有英文为准（含 T40 / T41 的照片保留和删除作品说法、MiSans 署名），新增 `/zh/...` 四页为翻译，页首写「本中文版本仅供参考，如与英文版本不一致，以英文版本为准」，`noindex`。**共同要求**：照 `design/comps-v3-b/` 里对应的稿做（变体见 `SIGN-OFF.md`），中英两版一起交付（ARCHITECTURE §17「全站中文化」，表外中文页 `noindex`）；文字进 messages / content，不写死；单测覆盖；交互验收交给 Codex；收尾停掉并删除本地 Docker。
+
+## T46 需求墙和 Graylum 连接页按定稿重做（可派）
+
+`wishlist.html`（墙、门槛态、投票、已上线置顶、发帖页、My requests 四种状态）；`connect.html`（授权、完成、已连接、出错，回跳白名单和一次性 code 的出错文案，ARCHITECTURE §14.2）。**共同要求**：照 `design/comps-v3-b/` 里对应的稿做（变体见 `SIGN-OFF.md`），中英两版一起交付（ARCHITECTURE §17「全站中文化」，表外中文页 `noindex`）；文字进 messages / content，不写死；单测覆盖；交互验收交给 Codex；收尾停掉并删除本地 Docker。
+
+## T47 应用页修订：显影动画、批量三态、Make again、编辑尺寸格（可派）
+
+`workspace.html`：生成中从扫描线改成显影式；批量上传三态（按 ARCHITECTURE §6.2 语义，Coming soon 开关不变）；Make again 的照片格显示「随作品保留的原图」（`?again=1`），老作品走 `?again=expired`；`photo.html?edit=…`：编辑面板加 8 个尺寸格。**共同要求**：照 `design/comps-v3-b/` 里对应的稿做（变体见 `SIGN-OFF.md`），中英两版一起交付（ARCHITECTURE §17「全站中文化」，表外中文页 `noindex`）；文字进 messages / content，不写死；单测覆盖；交互验收交给 Codex；收尾停掉并删除本地 Docker。
+
+## T48 账号页修订：会员卡、用量仪表、胶卷条（可派）
+
+`account.html`：会员卡、积分仪表、最近作品胶卷条；订阅五种状态 `?sub=active|cancelled|expired|past_due|wallet`（已取消显示结束日期和 Resubscribe，到期显示 Choose a plan，续费失败链到 Stripe Customer Portal，支付宝单期显示 Renew）；Shopify 那一行只是示意，不做。**共同要求**：照 `design/comps-v3-b/` 里对应的稿做（变体见 `SIGN-OFF.md`），中英两版一起交付（ARCHITECTURE §17「全站中文化」，表外中文页 `noindex`）；文字进 messages / content，不写死；单测覆盖；交互验收交给 Codex；收尾停掉并删除本地 Docker。
+
+## T49 中文版对齐审计和补齐（可派）
+
+Owner 2026-11-06 发现中文页有功能缺失。逐页对比现有英文页和 `/zh` 页（营销页和登录后的应用页、付费墙、邮件、错误页），列出中文版缺少的区块、按钮、状态和没翻译的文字，并补齐；把审计表写进 PR 正文。新页面由各自的卡负责中文，本卡只管已经上线的页面。**共同要求**：照 `design/comps-v3-b/` 里对应的稿做（变体见 `SIGN-OFF.md`），中英两版一起交付（ARCHITECTURE §17「全站中文化」，表外中文页 `noindex`）；文字进 messages / content，不写死；单测覆盖；交互验收交给 Codex；收尾停掉并删除本地 Docker。
