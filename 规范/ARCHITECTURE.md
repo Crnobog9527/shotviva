@@ -505,8 +505,8 @@ v1 后台（Owner 2026-11-06 扩充；T23 做外壳和运营页）：**一个后
     - 隐私政策加一句：工单内容保留到删号为止。
 - **收入口径**（T10 后续，总控 2026-11-06）：
   - `admin_revenue_stats` 改为读 `payments`。函数签名不变，用 `create or replace` 修改；这是「一次写成」的例外，原因是 T23 写这个函数时数据源还不存在。
-  - 收入按净额计：`amount_total − amount_tax − amount_refunded`。只汇总 `currency = 'usd'` 的行，另外返回非美元付款的笔数。
-  - 卡片结账时如果发生了 Adaptive Pricing 币种转换，回调记录换算前的美元金额和税。
+  - 收入按净额计：`amount_total − amount_tax − amount_refunded`，只汇总 `currency = 'usd'` 的行，返回结构不变。
+  - Adaptive Pricing 下买家看到的本币金额只在 Stripe 的 `presentment_details` 里；session、charge、invoice 上的 `amount` 和 `currency` 仍是我们定价用的美元，`payments` 直接记这些值即可。
 - P1 和 P2 项（模板表现、毛利、真实 token 用量、失败分析、审计日志查看页、运行时开关、Graylum 统计、代删账号、作品审核队列、CSV 导出等）上线后按提案排期，不在 v1 范围。
 
 **仍然不做页面、留在 Supabase / Stripe 后台的运营操作**：设为管理员（在 Studio 改 `profiles.role`）、退款（在 Stripe / Waffo 后台）、作品审核页（第 6~7 周和审核功能一起做）。
