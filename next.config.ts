@@ -4,6 +4,7 @@ import createNextIntlPlugin from 'next-intl/plugin'
 
 import { parseSentryBuildEnv } from './src/core/build-env'
 import { indexingOpen, parseIndexingEnv, xRobotsTagRules } from './src/core/seo/indexing-env'
+import { assetsHeaders, assetsRemotePatterns, assetsRewrites, readAssetsEnv } from './src/core/storage/assets-env'
 import { SITE_DOMAIN } from './src/site/domain'
 
 const withNextIntl = createNextIntlPlugin('./src/site/i18n/request.ts')
@@ -18,12 +19,18 @@ const POSTHOG_ASSETS = 'https://us-assets.i.posthog.com'
 // still on every host but the canonical domain (*.vercel.app, previews).
 const indexingIsOpen = indexingOpen(parseIndexingEnv(process.env))
 
+// Template covers on the site's own /assets (ARCHITECTURE §8.3, T51): a rewrite to the public
+// bucket's r2.dev origin, read at build; without R2_PUBLIC_ORIGIN there is no rewrite and the
+// build still succeeds. next/image may load covers from the configured base.
+const assets = readAssetsEnv(process.env)
+
 const nextConfig: NextConfig = {
   cacheComponents: true,
   // Pages live under app/[locale]; an address matching no route at all has no root layout,
   // so app/global-not-found.tsx renders it (ARCHITECTURE §17).
   experimental: { globalNotFound: true },
   partialPrefetching: true,
+  images: { remotePatterns: assetsRemotePatterns(assets.NEXT_PUBLIC_ASSETS_BASE_URL) },
   poweredByHeader: false,
   // PostHog's API paths end in a slash (/i/v0/e/); a trailing-slash redirect would break them.
   skipTrailingSlashRedirect: true,
@@ -33,6 +40,7 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       ...xRobotsTagRules(indexingIsOpen, SITE_DOMAIN),
+      ...assetsHeaders(),
       {
         source: '/fonts/misans/:asset(.+\\.(?:woff2|css))',
         headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
@@ -41,6 +49,7 @@ const nextConfig: NextConfig = {
   },
   async rewrites() {
     return [
+      ...assetsRewrites(assets.R2_PUBLIC_ORIGIN),
       { source: '/ingest/static/:path*', destination: `${POSTHOG_ASSETS}/static/:path*` },
       { source: '/ingest/array/:path*', destination: `${POSTHOG_ASSETS}/array/:path*` },
       { source: '/ingest/:path*', destination: `${POSTHOG_INGEST}/:path*` },

@@ -3,6 +3,7 @@ import { z } from 'zod'
 
 import { sentryBuildEnvSchema } from './build-env'
 import { indexingEnvSchema } from './seo/indexing-env'
+import { assetsEnvShape, checkAssetsEnv } from './storage/assets-env'
 import { checkWaffoEnv, waffoEnvShape } from './waffo-env'
 
 // `KEY=` lines in .env files arrive as '' — treat them as unset rather than invalid.
@@ -26,6 +27,9 @@ const serverEnvSchema = z.object({
   // Public assets bucket for template covers only (ARCHITECTURE §8.3: shotviva-assets, preview
   // shotviva-assets-preview), same account and keys. Required by the admin cover upload.
   R2_PUBLIC_BUCKET: optionalSecret,
+  // R2_PUBLIC_ORIGIN (the bucket's r2.dev origin, behind the site's /assets rewrite) and the cover
+  // base URL; the origin is required when the base is the site's own /assets (T51).
+  ...assetsEnvShape,
   // OpenAI image provider (modules/image/provider); the key is required on first use.
   OPENAI_API_KEY: optionalSecret,
   OPENAI_IMAGE_MODEL: z.preprocess(blankAsUnset, z.string().min(1).default('gpt-image-2.5-sunburst')),
@@ -51,6 +55,7 @@ const serverEnvSchema = z.object({
   // SITE_INDEXING: the pre-launch indexing switch (ARCHITECTURE §12.0), default off.
   .extend(indexingEnvSchema.shape)
   .superRefine(checkWaffoEnv)
+  .superRefine(checkAssetsEnv)
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>
 
