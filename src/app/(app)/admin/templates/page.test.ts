@@ -8,6 +8,7 @@ vi.mock('@/core/auth', () => ({ requireAdmin: () => requireAdmin(), createAdminS
 vi.mock('@/core/admin', () => ({
   listAdminTemplates: (client: unknown) => listAdminTemplates(client),
   TemplatesEditor: () => null,
+  AdminPage: () => null,
 }))
 vi.mock('./actions', () => ({
   saveTemplateAction: vi.fn(),

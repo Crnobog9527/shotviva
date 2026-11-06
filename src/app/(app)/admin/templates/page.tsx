@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 
-import { listAdminTemplates, TemplatesEditor } from '@/core/admin'
+import { AdminPage, listAdminTemplates, TemplatesEditor } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { CREDITS_FLOOR } from '@/modules/image'
 
@@ -23,8 +23,7 @@ export default async function AdminTemplatesPage() {
   await requireAdmin()
   const templates = await listAdminTemplates(createAdminSupabase())
   return (
-    <div className="mx-auto grid w-full max-w-6xl gap-6 p-6">
-      <h1 className="text-xl font-semibold">模板与提示词</h1>
+    <AdminPage title={'模板与提示词'}>
       <TemplatesEditor
         templates={templates}
         floor={CREDITS_FLOOR}
@@ -36,6 +35,6 @@ export default async function AdminTemplatesPage() {
           applyCover: applyCoverAction,
         }}
       />
-    </div>
+    </AdminPage>
   )
 }

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 
-import { PROVIDERS_COPY, ProvidersEditor } from '@/core/admin'
+import { AdminPage, PROVIDERS_COPY, ProvidersEditor } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { listProviders } from '@/core/providers'
 
@@ -17,12 +17,11 @@ export default async function AdminProvidersPage() {
   await requireAdmin()
   const providers = await listProviders(createAdminSupabase())
   return (
-    <div className="mx-auto grid w-full max-w-6xl gap-6 p-6">
-      <h1 className="text-xl font-semibold">{PROVIDERS_COPY.title}</h1>
+    <AdminPage title={PROVIDERS_COPY.title}>
       <ProvidersEditor
         providers={providers}
         actions={{ save: saveProviderAction, activate: activateProviderAction, test: testProviderAction }}
       />
-    </div>
+    </AdminPage>
   )
 }

@@ -17,6 +17,7 @@ vi.mock('@/core/wishlist', () => ({
 }))
 vi.mock('@/core/wishlist/admin-ui', () => ({ RequestsReview: () => null, REQUESTS_COPY: { title: '需求审核' } }))
 vi.mock('./actions', () => ({ reviewRequestAction: vi.fn() }))
+vi.mock('@/core/admin', () => ({ AdminPage: () => null }))
 
 const { default: AdminRequestsPage } = await import('./page')
 

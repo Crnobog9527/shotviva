@@ -4,7 +4,9 @@ import type { ReactNode } from 'react'
 
 export function AdminPage({ title, actions, children }: { title: string; actions?: ReactNode; children: ReactNode }) {
   return (
-    <div className="mx-auto grid w-full max-w-6xl gap-6 p-4 md:p-6">
+    // Left-aligned next to the sidebar with the shell's gutter; capped so tables stay readable
+    // on very wide screens instead of floating in the middle.
+    <div className="grid w-full max-w-7xl gap-6 px-4 py-6 md:px-6 lg:px-8">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-semibold">{title}</h1>
         {actions ? <div className="ml-auto flex flex-wrap gap-2">{actions}</div> : null}
