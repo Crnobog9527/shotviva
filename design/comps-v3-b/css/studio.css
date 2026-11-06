@@ -268,3 +268,65 @@ h1, h2, h3, p { margin: 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
 }
+
+/* ---------- toast: from the top (DESIGN §8.4), never over the bottom action bar; one line, one optional action, closes itself ---------- */
+.toast { position: fixed; z-index: 120; left: 50%; top: calc(var(--sat) + 12px); transform: translate(-50%, -12px); width: min(calc(100vw - 2 * var(--gutter)), 480px);
+  display: flex; align-items: center; gap: 10px; padding: 12px 12px 12px 14px; border-radius: 16px; opacity: 0; pointer-events: none;
+  background: var(--popover); color: var(--foreground); font: 400 15px/1.4 var(--font-sans);
+  box-shadow: inset 0 0 0 1px var(--border), inset 0 1px 0 rgba(255,255,255,.06), 0 24px 48px -16px rgba(0,0,0,.8);
+  transition: opacity .25s var(--ease), transform .35s var(--ease); }
+.toast.open { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.toast > .i { width: 18px; height: 18px; flex: none; color: var(--bone-dim); }
+.toast p { flex: 1; min-width: 0; }
+.toast p b { font-weight: 500; }
+.toast .x { flex: none; width: 36px; height: 36px; margin: -6px -4px -6px 0; border-radius: 50%; display: grid; place-items: center; color: var(--bone-dim); }
+.toast .x .i { width: 16px; height: 16px; stroke-width: 2.2; }
+@media (hover: hover) { .toast .x:hover { background: var(--bone-8); color: var(--foreground); } }
+
+/* ---------- site announcement (T23): one line at the very top of either shell, closable (closed state per id in localStorage).
+   Two tones, matching site_announcements.tone (T23): "info" is quiet: bone 6% ground, no motion. "promo" is the band the Owner
+   will use for the yearly discount: a warm safelight ground, a light sweep that crosses every 6 s, a tag that wiggles, and a
+   small pill from link_url + link_label. Not shown in the admin, during checkout, or while a photo is generating.
+   Text and link come from the table in the current language; the admin never touches the animation. ---------- */
+.ann { position: relative; z-index: 51; display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 44px; padding: 8px var(--gutter); padding-top: calc(var(--sat) + 8px); overflow: hidden;
+  font: 400 14px/1.4 var(--font-sans); color: var(--foreground); background: var(--bone-6); box-shadow: inset 0 -1px 0 var(--border); }
+.ann > .i { width: 18px; height: 18px; flex: none; color: var(--bone-dim); stroke-width: 2; }
+.ann p { max-width: 72ch; text-wrap: pretty; }
+.ann p b { font-weight: 600; }
+.ann a { color: var(--foreground); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
+.ann .x { flex: none; width: 32px; height: 32px; margin: -6px -8px -6px 0; border-radius: 50%; display: grid; place-items: center; color: var(--bone-dim); }
+.ann .x .i { width: 16px; height: 16px; stroke-width: 2.2; }
+.ann.info > .i { color: var(--bone-dim); }
+.ann.info .pill { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; margin-left: 6px; padding: 0 10px; border-radius: 999px; vertical-align: middle; font: 600 14px/1 var(--font-sans); color: var(--foreground); background: var(--bone-8); text-decoration: none; white-space: nowrap; }
+.ann.info .pill .i { width: 14px; height: 14px; stroke-width: 2.4; }
+/* the promo band */
+.ann.promo { min-height: 52px; gap: 12px; color: var(--foreground);
+  background: linear-gradient(90deg, #2B1108 0%, #4A1C0B 35%, #3A1609 65%, #2B1108 100%);
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--primary) 45%, transparent), inset 0 1px 0 rgba(255,255,255,.06); }
+.ann.promo::before { content: ""; position: absolute; z-index: 0; left: -20%; top: 50%; width: 520px; height: 300px; transform: translateY(-50%); pointer-events: none;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--primary) 42%, transparent), transparent 70%); animation: ann-glow 3.2s ease-in-out infinite; }
+.ann.promo::after { content: ""; position: absolute; z-index: 0; top: -40%; bottom: -40%; left: -30%; width: 22%; transform: skewX(-18deg); pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255,236,220,.22) 45%, rgba(255,236,220,.34) 50%, rgba(255,236,220,.22) 55%, transparent); animation: ann-sweep 6s cubic-bezier(.4, 0, .2, 1) infinite; }
+.ann.promo > * { position: relative; z-index: 1; }
+.ann.promo > .i { width: 22px; height: 22px; color: var(--primary); stroke-width: 1.9; filter: drop-shadow(0 0 8px color-mix(in srgb, var(--primary) 70%, transparent)); transform-origin: 50% 90%; animation: ann-wiggle 5s ease-in-out infinite; }
+.ann.promo p { font-size: 15px; }
+.ann.promo p b { color: #FFD9C7; }
+.ann.promo .pill { display: inline-flex; align-items: center; gap: 4px; height: 32px; margin-left: 6px; padding: 0 12px 0 14px; border-radius: 999px; vertical-align: middle; position: relative; overflow: hidden;
+  font: 600 14px/1 var(--font-sans); color: var(--primary-foreground); background: var(--primary); text-decoration: none; white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.38), inset 0 -2px 0 rgba(0,0,0,.12), 0 8px 20px -8px color-mix(in srgb, var(--primary) 80%, transparent); }
+.ann.promo .pill::before { content: ""; position: absolute; inset: -4px; }
+.ann.promo .pill .i { width: 14px; height: 14px; stroke-width: 2.4; color: inherit; }
+.ann.promo .x { color: #FFD9C7; }
+@keyframes ann-sweep { 0%, 55% { left: -30%; } 100% { left: 130%; } }
+@keyframes ann-glow { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+@keyframes ann-wiggle { 0%, 70%, 100% { transform: rotate(0); } 74% { transform: rotate(-14deg); } 78% { transform: rotate(12deg); } 82% { transform: rotate(-9deg); } 86% { transform: rotate(6deg); } 90% { transform: rotate(0); } }
+html.framed .has-bar .tabbar { padding-top: 0; }
+@media (min-width: 768px) {
+  .ann { font-size: 15px; }
+  .ann.promo p { font-size: 16px; }
+  body.app.has-ann .ann { position: fixed; top: 0; left: 0; right: 0; }      /* the app shell's chrome is fixed, so the bar is too */
+  body.app.has-ann .tabbar { top: var(--ann-h, 44px); }
+  body.app.has-ann { padding-top: calc(56px + var(--ann-h, 44px)); }
+}
+@media (hover: hover) { .ann .x:hover { background: var(--bone-8); color: var(--foreground); } .ann.promo .pill:hover { filter: brightness(1.06); } }
+@media (prefers-reduced-motion: reduce) { .ann.promo::before, .ann.promo::after, .ann.info > .i { animation: none; } .ann.promo::after { display: none; } }

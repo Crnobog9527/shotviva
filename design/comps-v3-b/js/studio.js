@@ -224,12 +224,16 @@
 
   /* ---------- the creation form: one source for the dialog (create.html) and the page (workspace.html) ---------- */
   const SIZES = [['Original', 'as shot', 0, 0], ['Banner', '16:9', 16, 9], ['Post', '4:5', 4, 5], ['Listing', '1:1', 1, 1], ['Story', '9:16', 9, 16], ['Rental', '3:2', 3, 2], ['Website', '4:3', 4, 3], ['Pin', '2:3', 2, 3]];
-  function formHTML(t, p) {
-    const sizes = SIZES.map(([n, r, w, h], i) => {
+  /* the eight size tiles; `current` is the checked one (the creation form checks Original, the edit form checks the photo's own size) */
+  function sizesHTML(p, current = 'Original') {
+    return SIZES.map(([n, r, w, h]) => {
       let gw = 22, gh = 28;
       if (w) { const s = Math.min(34 / w, 30 / h); gw = Math.round(w * s); gh = Math.round(h * s); }
-      return `<label class="opt"><input type="radio" name="${p}-size" value="${n}" ${i ? '' : 'checked'}><span class="size-tile"><span class="glyph"><i class="${w ? '' : 'orig'}" style="width:${gw}px;height:${gh}px"></i></span><b>${n}</b><small>${r}</small></span></label>`;
+      return `<label class="opt"><input type="radio" name="${p}-size" value="${n}" ${n === current ? 'checked' : ''}><span class="size-tile"><span class="glyph"><i class="${w ? '' : 'orig'}" style="width:${gw}px;height:${gh}px"></i></span><b>${n}</b><small>${r}</small></span></label>`;
     }).join('');
+  }
+  function formHTML(t, p) {
+    const sizes = sizesHTML(p, 'Original');
     return `<div class="form" data-show="empty ready">
       <section class="sec" aria-labelledby="${p}-ph">
         <div class="sec-h"><h2 id="${p}-ph">Your photo</h2><span class="meas">4:5 · as shot</span></div>
@@ -364,8 +368,9 @@
         <div class="tries" aria-label="Examples">${tries}</div>
       </section>
       <section class="sec" aria-labelledby="${p}-sz">
-        <div class="sec-h"><h2 id="${p}-sz">Size</h2><span class="meas">${ph.size}</span></div>
-        <p class="fixed">Same as the original. The framing stays; only what you ask for changes.</p>
+        <div class="sec-h"><h2 id="${p}-sz">Size</h2><span class="meas" data-sz-now>${ph.size}</span></div>
+        <div class="sizes" role="radiogroup" aria-labelledby="${p}-sz">${sizesHTML(p, ph.sizeName || 'Post')}</div>
+        <p class="fixed" data-sz-note>Same size as this photo. Pick another and the picture is extended to fit; the subject stays where it is.</p>
       </section>
       <section class="sec" aria-labelledby="${p}-rs">
         <div class="sec-h"><h2 id="${p}-rs">Resolution</h2><span class="meas">${ph.resName}</span></div>
@@ -376,6 +381,11 @@
   }
   /* The field is required: the primary stays dim until there is text; pressing it empty only points at the field. */
   function bindEditForm(root, p, o = {}) {
+    const szNow = root.querySelector('[data-sz-now]'), szNote = root.querySelector('[data-sz-note]'), szOwn = root.querySelector(`input[name="${p}-size"]:checked`)?.value;
+    root.querySelectorAll(`input[name="${p}-size"]`).forEach(r => r.addEventListener('change', e => {
+      const s = SIZES.find(x => x[0] === e.target.value); szNow.textContent = e.target.value === szOwn ? `${s[0]} ${s[1]}` : `${s[0]} ${s[1]} · from ${szOwn}`;
+      szNote.textContent = e.target.value === szOwn ? 'Same size as this photo. Pick another and the picture is extended to fit; the subject stays where it is.' : `The ${s[1]} frame is filled in around your subject; nothing already in the photo is cropped away.`;
+    }));
     const bal = o.balance ?? 6;
     const cta = root.querySelector('[data-cta]'), notice = root.querySelector('[data-notice] span'), foot = root.querySelector('[data-foot]');
     const field = root.querySelector(`#${p}-change`), cnt = root.querySelector('[data-cnt]'), req = root.querySelector('[data-req]');
@@ -522,7 +532,36 @@
     els.forEach(el => io.observe(el));
   }
 
-  window.SV = { T, CATS, ICON, SIZES, catName, typeHint, card, media, pair, compare, pairCard, makeSheet, previewSheet, bindCompare, formHTML, barHTML, bindForm, createDialog, editFormHTML, bindEditForm, editDialog, hoverPlay, reveal, q, frame };
+  /* site announcement, from site_announcements (T23): tone = info | promo, text, optional link_url + link_label. ?announce=info|promo draws it for review. */
+  function announce(tone, text, link) {
+    const bar = document.createElement('div');
+    bar.className = 'ann ' + (tone === 'promo' ? 'promo' : 'info'); bar.setAttribute('role', 'status');
+    bar.innerHTML = (tone === 'promo'
+      ? '<svg class="i" viewBox="0 0 24 24"><path d="M3.5 12.5V5a1.5 1.5 0 0 1 1.5-1.5h7.5l8 8-9 9z"/><circle cx="8" cy="8" r="1.4"/></svg>'
+      : '<svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/></svg>') +
+      `<p>${text}${link ? ` <a class="pill" href="${link.url}">${link.label}<svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a>` : ''}</p><button class="x" type="button" aria-label="Dismiss"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`;
+    const appbar = document.querySelector('.appbar');
+    document.body.classList.add('has-ann', 'has-bar');
+    if (appbar) {
+      appbar.parentNode.insertBefore(bar, appbar);
+      const onScroll = () => appbar.classList.toggle('stuck', scrollY > bar.offsetHeight - 1);
+      addEventListener('scroll', onScroll, { passive: true });
+      bar.querySelector('.x').addEventListener('click', () => { bar.remove(); document.body.classList.remove('has-ann', 'has-bar'); appbar.classList.remove('stuck'); removeEventListener('scroll', onScroll); });
+    } else {
+      document.body.prepend(bar);
+      const size = () => document.body.style.setProperty('--ann-h', bar.offsetHeight + 'px');
+      size(); addEventListener('resize', size);
+      bar.querySelector('.x').addEventListener('click', () => { bar.remove(); document.body.classList.remove('has-ann', 'has-bar'); document.body.style.removeProperty('--ann-h'); });
+    }
+    return bar;
+  }
+  const ANN = {   /* sample rows of site_announcements */
+    promo: { text: 'Yearly plans are <b>up to 40% off</b>: Pro from $39.92 a month, a year of credits up front.', link: { url: 'pricing.html', label: 'See plans' } },
+    info: { text: 'Photos are taking longer than usual while our image provider recovers. Credits for any failed photo are refunded automatically.', link: { url: 'photos.html', label: 'Your photos' } },
+  };
+  if (ANN[q.get('announce')]) document.addEventListener('DOMContentLoaded', () => announce(q.get('announce'), ANN[q.get('announce')].text, ANN[q.get('announce')].link));
+
+  window.SV = { announce, sizesHTML, T, CATS, ICON, SIZES, catName, typeHint, card, media, pair, compare, pairCard, makeSheet, previewSheet, bindCompare, formHTML, barHTML, bindForm, createDialog, editFormHTML, bindEditForm, editDialog, hoverPlay, reveal, q, frame };
 })();
 
 // Quiet Loop: muted, looping, inline, no controls. The file loads after page load and only once the

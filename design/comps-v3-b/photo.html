@@ -15,7 +15,7 @@
   /* /photos/[jobId]: the result is the hero; the original upload and what the user wrote sit behind a view toggle and a
      details block (T32). The Edit button opens SV.editDialog (ARCHITECTURE §5.2).
      ?t=<template> ?state=done|generating|failed ?edited=1 ?edit=empty|typing|low ?balance=<n>
-     ?note=none|short|long ?png=1 (transparent-PNG result, on white / checkerboard) ?orig=expired (original deleted) ?view=original|checker */
+     ?note=none|short|long ?png=1 (transparent-PNG result, on white / checkerboard) ?orig=expired (original not available: a work made before originals were kept, T40) ?view=original|checker */
   .nav { position: sticky; top: 0; z-index: 50; padding: var(--sat) 8px 0;
     background: linear-gradient(color-mix(in srgb, var(--background) 94%, transparent), color-mix(in srgb, var(--background) 80%, transparent)); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
   .nav-row { height: 52px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
@@ -30,12 +30,19 @@
   .dev { position: relative; aspect-ratio: 4 / 5; border-radius: 22px; overflow: hidden; background: var(--background); box-shadow: inset 0 0 0 1px var(--border); }
   .dev img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   .dev .neg { filter: grayscale(1) contrast(.85) brightness(.7); }
-  [data-state="generating"] .dev .pos { clip-path: inset(0 0 var(--left, 62%) 0); }
-  .dev .scan { position: absolute; left: 0; right: 0; top: calc(100% - var(--left, 62%)); height: 2px; margin-top: -1px; background: var(--primary); }
   @property --left { syntax: "<percentage>"; inherits: true; initial-value: 62%; }
-  /* the page's one authored moment: the safelight scan develops the edit while it generates */
-  [data-state="generating"] .dev { animation: lefts 7s var(--ease) infinite alternate; }
-  @keyframes lefts { from { --left: 78%; } to { --left: 46%; } }
+  /* generating: the way an image comes up in the developer. The uploaded photo dims; a blurred version of the result fades over it;
+     then the sharp result clears from the top down through a soft edge (a mask, not a line). Loops while the comp waits. */
+  @property --p { syntax: "<percentage>"; inherits: false; initial-value: -30%; }
+  .dev .blur { filter: blur(22px) saturate(.85); transform: scale(1.08); opacity: 0; }
+  [data-state="generating"] .dev .blur { animation: dev-blur 8s var(--ease) infinite; }
+  [data-state="generating"] .dev .pos { --p: -30%; animation: dev-clear 8s cubic-bezier(.3, 0, .2, 1) infinite;
+    -webkit-mask-image: linear-gradient(180deg, #000 calc(var(--p) - 28%), rgba(0,0,0,.55) calc(var(--p) - 10%), transparent var(--p)); mask-image: linear-gradient(180deg, #000 calc(var(--p) - 28%), rgba(0,0,0,.55) calc(var(--p) - 10%), transparent var(--p)); }
+  [data-state="generating"] .dev .neg { animation: dev-neg 8s var(--ease) infinite; }
+  @keyframes dev-blur { 0% { opacity: 0; } 18% { opacity: 1; } 100% { opacity: 1; } }
+  @keyframes dev-neg { 0% { opacity: 1; filter: grayscale(1) contrast(.85) brightness(.7); } 22% { opacity: 1; } 40% { opacity: 0; } 100% { opacity: 0; } }
+  @keyframes dev-clear { 0%, 22% { --p: -30%; } 92% { --p: 140%; } 100% { --p: 140%; } }
+  @media (prefers-reduced-motion: reduce) { [data-state="generating"] .dev .blur, [data-state="generating"] .dev .pos, [data-state="generating"] .dev .neg { animation: none; } [data-state="generating"] .dev .blur { opacity: 1; } [data-state="generating"] .dev .pos { -webkit-mask-image: none; mask-image: none; opacity: .35; } }
   .dev .hud { position: absolute; left: 12px; right: 12px; top: 12px; display: flex; justify-content: space-between; z-index: 2; }
   .dev .badge-illus { left: 12px; bottom: 12px; }
   .stage-cap { margin-top: 12px; font-size: 14px; color: var(--muted-foreground); }
@@ -151,11 +158,11 @@
     <div class="stage">
       <div class="dev" id="dev">
         <img class="neg" src="../assets/img/hero-set-listing.webp" alt="" data-show="generating failed">
+        <img class="blur" src="../assets/img/hero-set-listing.webp" alt="" aria-hidden="true" data-show="generating">
         <img class="pos" src="../assets/img/hero-set-listing.webp" alt="Pure White photo of a leather tote (illustrative example)" data-show="generating done">
         <img class="orig" src="../assets/img/pure-white-before.webp" alt="The photo you uploaded (illustrative example)" data-show="done">
-        <div class="gone" data-show="done"><svg class="i" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M3.5 15l4.5-4.5 4.5 4.5 2.5-2.5 5.5 5.5"/><circle cx="15.5" cy="9" r="1.5"/><path d="M4 4l16 16"/></svg><b>Original deleted</b><span>Per our privacy rules, the photo you uploaded is no longer kept. The result stays.</span></div>
-        <span class="scan" aria-hidden="true" data-show="generating"></span>
-        <span class="hud">
+        <div class="gone" data-show="done"><svg class="i" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M3.5 15l4.5-4.5 4.5 4.5 2.5-2.5 5.5 5.5"/><circle cx="15.5" cy="9" r="1.5"/><path d="M4 4l16 16"/></svg><b>Original not available</b><span>This work was made before originals were kept with the work. The result stays.</span></div>
+                <span class="hud">
           <span class="pill on-photo vis-pill" data-show="done" id="vis-pill">Public · watermark</span>
           <span class="pill on-photo" data-show="generating">Developing</span>
           <span class="pill on-photo" data-show="failed">Not developed</span>
@@ -216,7 +223,7 @@
         <div id="f-format-row" hidden><dt>Format</dt><dd id="f-format">PNG, transparent background</dd></div>
         <div><dt>Credits</dt><dd class="mono">2 credits</dd></div>
         <div><dt>Visibility</dt><dd id="f-vis">Public, with watermark</dd></div>
-        <div><dt>Original</dt><dd id="f-orig">Kept, <span class="mono">768 px</span> preview</dd></div>
+        <div><dt>Original</dt><dd id="f-orig">Kept with this photo</dd></div>
         <div><dt>Made</dt><dd id="f-made">Today, 14:05</dd></div>
       </dl>
       <p class="note" data-show="done">Edits make a new photo, with the same size and framing. The original stays in Photos.</p>
@@ -261,15 +268,15 @@
   document.querySelector('.nav-title').textContent = t.name;
   document.title = t.name + ' · Photos · Shotviva';
   document.getElementById('f-tpl').textContent = t.name;
-  document.getElementById('again').href = 'workspace.html?t=' + t.id + (frame() ? '&frame=1' : '');
+  document.getElementById('again').href = 'workspace.html?t=' + t.id + (expired ? '&again=expired' : '&again=1') + (frame() ? '&frame=1' : '');
   document.getElementById('bal-t').textContent = bal + ' free';
 
   const pos = document.querySelector('.dev .pos'), neg = document.querySelector('.dev .neg'), orig = document.querySelector('.dev .orig');
-  pos.src = src; pos.alt = `${t.name} photo of a leather tote (illustrative example)`;
+  document.querySelector('.dev .blur').src = src; pos.src = src; pos.alt = `${t.name} photo of a leather tote (illustrative example)`;
   neg.src = original;
   orig.src = isEditJob ? original : upload;      // an edit's "original" is the photo it was edited from
   if (png) { document.getElementById('dev').classList.add('png'); document.getElementById('f-format-row').hidden = false; }
-  if (expired) document.getElementById('f-orig').textContent = 'Deleted per our privacy rules';
+  if (expired) document.getElementById('f-orig').textContent = 'Not available (made before originals were kept)';
   document.getElementById('from').href = 'photo.html?t=' + t.id + (frame() ? '&frame=1' : '');
   document.getElementById('from-img').src = original;
   document.getElementById('from-meta').textContent = t.name + ' · today';

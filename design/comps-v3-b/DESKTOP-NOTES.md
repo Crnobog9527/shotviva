@@ -130,3 +130,69 @@
 ## 第八轮：定价页「For business」（总控 11-06 晚，DESIGN §6.9 第 8 条）
 
 - 位置：积分包之后、「What a credit buys / Pay with」之前（定价页没有 FAQ）。`.biz` 宽幅板：`--card` 底加顶部骨白 4% 渐变、1px 描边、圆角 22；标题 Instrument Serif 32「For business」，一句对象说明（≤60ch）「…Tell us what you need and we set it up for you:」；六项细线列表（粗体一句 + 14px Ash 一句），顺序按规范：Volume pricing and invoicing / Custom templates / Higher throughput, bigger batches / API access / Privacy and data terms / A dedicated contact；手机单列、≥768 两列、≥1024 三列。按钮只有一个幽灵「Contact us」（邮件图标安全灯色），`mailto:support@shotviva.com?subject=Business inquiry — Shotviva&body=Company / Monthly photo volume / Platforms / What you would like us to set up`，旁边一句「Or write to support@shotviva.com with your volume and platforms.」（不写回复时效，避免 SLA 式承诺）。没有价格、没有 SLA / SSO / 席位承诺；与消费者三档材质区分，比 Max 安静。`?lang=zh` 提示条不受影响。
+
+## 第九轮：P0 第二批（Owner 11-06 夜签收前八张后）
+
+- **登录 / 注册 / 重设 `auth.html`**：按 ARCHITECTURE §7 做邮箱 + 密码 + 验证邮件 + Google（SITE-PLAN 里早先写的「魔法链接」是错的，已改）。营销壳裁到字标 + Pricing + 地球；手机整页一列，768 起 440px 卡 + 安全灯。字段：52px 高、16px、骨白 4% 底、hairline 描边、安全灯焦点环；错误态 `aria-invalid` 红框 + 14px 红字带图标；表单级提示是红 10% 底的一块板，句子里直接给出路（重设链接 / 转登录 / 重发）。密码框内 Show / Hide（40px 热区）。Google 幽灵在上、「or with email」分隔、主按钮一个。hCaptcha：隐形时只有一行 14px 归属（hCaptcha 要求隐藏徽标时注明），`?captcha=1` 显示复选框占位（真实是第三方 iframe）。`?next=photo` 带缩略图提示照片和模板已保留（首页生成器未登录跳来）。verify / reset-sent / updated / expired 四个消息视图：56px 图标盘 + 衬线标题 + 一句 + 一个动作，重发按钮 60 秒倒计时写在按钮上；reset-sent 不确认邮箱是否存在。顺手：home / pricing 导航「Log in」指到 `auth.html`，注册弹窗「Continue with email」指到 `auth.html?v=signup`，**删掉「Continue with Apple」**（规范只有 Google）。
+- **结账返回 `checkout.html`**：应用壳无页脚，`.rc` 收据板四行（dt Ash 15 / dd 16，数字 Instrument Serif 24 + mono「credits」，Added 行绿色）；九个商品 id 的文案表在页内（site.config 的副本）；年付脚注说明一年积分一次到账。pending（支付宝异步）时钟图标 2.4 秒一转，只有幽灵「Check again」。取消：`pricing.html?checkout=cancel` 顶部 toast（`studio.css` 新增 `.toast`：弹出层底、hairline、从顶部落下、10 秒自动收、× 可关）。
+- **404 / 空状态**：`404.html` 营销壳，mono「404」（状态码是真实编号）+ 衬线 52/56「Nothing developed here.」+ 两个按钮 + 三张模板卡（`MK.pair` 包成链接到 `home.html?open=<id>`）；`empty.html` 应用壳，`.state` 组件（72×90 空取景框 + 粗体一句 + 说明 ≤34ch + 一个按钮；err 变体红框）。Photos 空态让第一行卡片虚影透出来（手机两张、桌面三张），板叠在上面，表示「这里以后是你的照片」。七个变体的按钮：只有 Photos 空和 Wishlist 墙空用实心主按钮（它是该页唯一动作），其余幽灵。
+- **法务 `legal.html`**：阅读版式：68ch、17/1.65、章节 Instrument Serif 28 + mono 编号（条款编号承载引用信息，不是装饰）、`In short` 摘要段、`.note` 注释块、三列表格；目录手机 `<details>` 卡、1024 起左列 240px 吸顶、IntersectionObserver 高亮当前章；四页胶囊切换；Terms 末尾 Third-party notices（MiSans © Xiaomi + LICENSE.pdf、Geist / Instrument Serif OFL）。**正文是样稿**（真实长度的句子用来检验版式），T19 写真文、律师审；样稿里的数字（7 天、30 天、14 天、12 个月）都是 T19 底稿里已有或 ARCHITECTURE 写明的，不是新承诺。
+- **公告条**：`SV.announce()` + `.ann`。营销壳插在 `.appbar` 之前，复用中文提示条的 `has-bar` / `stuck` 机制（framed 时安全区由公告条承担）；应用壳 768 起公告条和顶栏都固定，`--ann-h` 由 JS 量出来推顶栏和内容。info 骨白 6%、warning 安全灯 12% + 安全灯图标；文字 ≤72ch，手机 14px 两三行不挤页头。
+- **截图**：`.impeccable/review/v3b-r3/e-auth-*`（13 张）、`e-checkout-*`（6）、`e-pricing-cancel-*`（2）、`e-empty-*`（10）、`e-404-*`（4）、`e-legal-*`（5）、`e-ann-*`（5）。看板加第 09–13 行。
+- **给总控 / Owner 的开口点**：① 注册弹窗删 Apple 需要知会；② 法务样稿不是文字定稿；③ 404 页「Nothing developed here.」是暗房双关，中文版另写；④ 公告条关闭状态按公告 id 存 localStorage，换新公告重新出现（T23 已这样定）。
+
+## 第十轮：P1（总控 11-06 夜认可 P0 两处裁定后）
+
+- **`/templates` 不画**：ARCHITECTURE §13 明写 v1 不建（模板不到 20 个、没有独立主词），SITE-PLAN 里的 P1 条目划掉。
+- **SEO 落地页 `landing.html`**：用 python 从 `home.html` 生成（去掉「3 步」和「What stays the same」两块，其余结构原样），页首一段 `PAGES` 内容表（三页的 title / H1 / lede / 直答块 / 首屏对比图 / 事实块 3 条 / 成本账单 / FAQ 5 条 / 互链 4 卡 / 模板分类 / 是否保留 shoot 示范），加载后替换进 DOM；构建时是服务端渲染。`CATS` 按页过滤（`window.LP.cats`），生成栏默认模板按页（`LP.tpl`），模板区标题按页（`tplH`）。三页的直答块都以主词开头、40–60 词；Title 带 (2026)；回首页锚文本「AI image to image」（R8）。**内容任务要核实**：Amazon 1,000 px / 纯白、Etsy 2,000 px、Shopify 2048、餐饮半天 $400–$1,500（SITE-PLAN 已有来源）、外卖平台图片尺寸（稿里避开了具体数字，只写「横幅 16:9」）。
+- **需求墙 `wishlist.html`**：三个视图一个文件；`body` 的状态类起名 `is-wall / is-flow`（第一版叫 `wall` 和 `.wall` 网格撞了名，桌面整页被切成三列，已修）。卡片 `.req.panel`：参考图轨道（第二张露 14% 提示可滑；右上角 mono 张数）、描述 16px、脚行「脱敏名 · 时间」+ 投票胶囊（40px，`aria-pressed`；按下安全灯 16% 底 + 实心心形；门槛未达 `aria-disabled` 半透明）；`shipped` 卡 success 描边 + 顶部一条链接行。主按钮：手机固定在 tab bar 之上（`bottom: sab + 60px`），门槛未达时半透明 + 下面一行说明；桌面回到标题下。发帖流程页：`.nav` 返回栏（流程页无 tab bar）、三格取景框（空 / 已传带 × / 多余格虚），文本框 140px + 计数，Submit 固定底部（<10 字 `aria-disabled`），提交跳回墙 `?sent=1` 出 toast。My requests：`.mr.panel` 行 64×80 缩略图 + 两行省略描述 + 状态标（圆点 + 字：Pending 骨白 / Live 安全灯 / Shipped success / Rejected Ash）+ 票数 mono。
+- **Graylum 连接 `connect.html`**：和登录页同一张居中卡（480）；两枚字标 + 三点连线（允许态第三点安全灯，成功态三点 success）；「会得到什么」三条 hairline 列表；余额胶囊复用 `.bal`；主按钮一个；取消是安静链接回 Graylum。error 态去掉顶栏邮箱（可能根本没登录）。`auth.html` 加 `?next=graylum` 提示条（`.kept.gl`）。
+- **截图**：`f-lp-*`（三页 375 整页、1280、1440 整页）、`g-wish-*`（墙 375 / 门槛 / 1280 / 1440 整页、发帖空 / 已填 / 1280、My requests 375 / 1440、已提交 toast）、`g-connect-*`（允许 375 / 1280 / 1440、done、already、error 1280）、`g-auth-graylum-375`。看板第 14–16 行。
+
+## 第十一轮：账号页订阅状态变体（总控 11-06 夜）
+
+- `account.html?sub=`：Plan 卡由 JS 按状态渲染（构建时来自 `subscriptions` 镜像表 + site.config）。结构统一：档位名 + 右侧状态（文字「Renews / Ends <日期>」或 `.flag` 小标）、一句 `.why` 说明（≤52ch，Bone Dim，关键名词骨白）、`.acts` 一排按钮。账号页本来没有实心主按钮，所以在需要用户做一件事的状态里允许一枚胶囊形主按钮（44px、圆角 999）。
+  - active：Renews 6 Dec 2026；行里加了付款方式「Visa ···· 4242」；Manage subscription 幽灵。
+  - cancelled：Ends 6 Dec 2026；「Cancelled. You keep the plan and your credits until 6 Dec; nothing more is charged.」；主按钮 Resubscribe + Manage subscription。
+  - expired：档位名换成「No plan」，`.flag`「Ended 6 Nov 2026」；说明余额仍可用、作品还在；主按钮 Choose a plan + Buy credits；余额示例 12 paid。
+  - past_due：`.flag.bad`（destructive 14% 底、红字、圆点）「Payment failed」；说明哪张卡哪天失败、会重试、换卡后继续；主按钮「Update payment method ↗」（Stripe Customer Portal，下面一行小字说明外跳）+ Manage subscription。
+  - wallet（支付宝单期）：Pro，Ends 6 Dec 2026；「One month, paid with Alipay. It doesn't renew by itself…」；主按钮「Renew · $49.90」（价格 mono，来自 site.config）。
+- 截图 `h-acct-*`（五态 375、past_due 1280、cancelled / expired 1440）；看板第 08 行加了四个入口，1440 框改成续费失败态。
+
+## 第十二轮：连接页换真实图标（Owner 11-06 夜）
+
+- Graylum 图标：Owner 给的 `graylum-logo-v4-03-horizon-guide`（1024 PNG + SVG），缩到 256 存为 `assets/img/graylum-mark.png`（SVG 并存，构建用矢量），`.json` 注明是真品牌资产不是示意图。`connect.html` 三个视图的左侧 `.mark.gl` 和 `auth.html?next=graylum` 提示条的 36px 小图都换成它。
+- Shotviva 图标：还没设计，`connect.html` 右侧 `.mark.sv` 仍是字标首字母「S.」的占位，CSS 里和看板第 16 行都标了 PLACEHOLDER；图标出来后换成同尺寸 `<img>`。给 Owner 的 ChatGPT 图标提示词见本轮回复（暗房世界：暖黑底、骨白、一盏安全灯，题材是「一张照片在显影」）。
+
+## 第十三轮：Owner 11-06 夜六条
+
+1. **需求墙便签化**（`wishlist.html`）：手机两列（`repeat(2, minmax(0,1fr))`，卡片与正文都要 `min-width: 0` 否则图片轨道把列撑爆，已踩坑）、768 三列、1024 四列。卡片是贴墙的照片便签：`.req::before` 胶带（64×20，骨白 22–34%，奇偶卡左右反歪）、`li` 以 `--r`（六种角度循环）+ `--wind`（滚动）× `--k`（每卡风感系数）合成旋转，`transform-origin` 在胶带处；描述 Instrument Serif 斜体 17 / 19，四行省略；SHIPPED 是 success 描边斜章。动效：`pointerenter` 加 `.blow` 播 1.4 秒的 `gust`（+5° / −3° / +1.5° 回落）；滚动按速度写 `--wind`（±6° 夹住），停 120ms 归零，过渡 0.9 秒；`prefers-reduced-motion` 全停。`body` 状态类改名 `is-wall / is-flow`（原名和 `.wall` 网格撞了）。
+2. **公告条 info → 促销带**（`studio.css` `.ann.info`，`studio.js` `announce(kind, text, cta)`）：暖安全灯渐变 + 左侧呼吸光晕（`::before`）+ 每 6 秒一道斜光扫（`::after`，skew −18°）+ 价签图标 5 秒抖一次 + 文内 `<b>` 浅橙 + `.pill` 实心胶囊 CTA。warning 原样。减少动态：光扫隐藏、光晕和抖动停。示例文案「Yearly plans are up to 40% off: Pro from $39.92 a month, a year of credits up front. See plans ›」，数字来自 site.config。
+3. **404 / 500 的三张模板**：原稿写死三张；改为每次加载随机抽三张（排除画风迁移，因其卡片是拖动对比）。构建时从上架且 `visible_in` 含 web 的模板里抽，可按请求做种子。
+4. **结算庆祝 demo**（`demo-celebrate.html`，不进正式稿）：方案见看板 17 行。设计原则：六档递进，每档在上一档上加一层；材质沿用付费墙（Pro 蓝宝石、Max 黑金 + 金箔 chrome）；所有粒子由一个 canvas 引擎画（paper / foil / disc / spark / ember 五种）；总时长 Pack 1 秒、Starter 2.5 秒、Pro 3.5 秒、Max 7 秒（含余烬）；减少动态只剩卡片淡入。设计钩子报了「彩色发光阴影」（Pro / Max 卡片的蓝 / 金投影和促销条胶囊的安全灯投影）：这是付费墙已定的档位材质和「Light Not Shadow」的发光逻辑，有意为之，未写 ignore 规则（demo 文件）。
+5. **全站背景 demo**（`demo-background.html`，不进正式稿）：五层（颗粒呼吸 / 安全灯漂移 / 漏光 / 滚动跟随 / 晕影呼吸）+ 三预设。性能：全部 fixed 层 transform / opacity，颗粒层 `steps(8)` 每秒 8 帧，光池 `will-change: transform`；滚动跟随是唯一的 JS（一个 passive scroll 写 `--sy` + 一个 class）。建议上线用 Alive（颗粒 + 漂移 + 滚动 + 晕影），漏光太抢，留作活动页。
+6. **Shotviva 图标**：Owner 否了 ChatGPT 的「渐变相纸」三版（普通、没记忆点）。新提示词改为三个有形象的概念（夹子上的照片 / 显影夹夹起的相纸 / 由胶片卷成的 S），禁止渐变相纸和相机。见本轮回复。
+
+## 第十四轮：Owner 11-06 夜七条
+
+1. **公告条与后台**：动效是 `kind`（info = 促销带 / warning = 安静）的样式，文字和 CTA 来自公告表；后台改文字不需要重做动效。建议公告表加 `kind` 与可选 `cta_label / cta_url` 两列（报总控）。
+2. **demo 修正**：`demo-celebrate` 积分包三档原来没动静，是 `classList.add('in', '')` 空字符串抛错中断了（已修，`tier` 为空不加）。`demo-background` 去掉漏光层，加「跟随指针」层：一个 720px 的小光池用 rAF lerp 追着指针（追上即停），两个大光池按指针位置向它倾斜 ±3–4vw（`--lx/--ly`），滚动中亮度 1.5×；预设改为 Quiet（颗粒 + 漂移）/ Alive（+ 滚动 + 指针）/ Bold（+ 晕影呼吸）。
+3. **定价页 For business**：「订单纸」材质，见看板 04 行。
+4. **账号页**：会员卡 + 仪表 + 胶卷条，见看板 08 行。踩坑：旧的 `.top, .grp { max-width: 720px; margin-inline: auto }` 把两栏挤歪，现在 `.top` 与 `.two` 用 1120 全宽，`.two` 内分组不限宽，其余分组 `margin-inline: var(--gutter) auto` 靠左。
+5. **编辑框比例**：`studio.js` 抽出 `sizesHTML(p, current)` 给创作表单和编辑表单共用；编辑表单默认选中照片自己的尺寸（`ph.sizeName`，缺省 Post），换尺寸时 `[data-sz-now]` 写「Banner 16:9 · from Post」、说明行写「画面延展到新比例，主体不裁」。原图保留问题见本轮回复（编辑的输入是成品 PNG 不是上传原图，7 天规则影响的是「再做一张」）。
+6. **生成动画**：workspace / photo 删掉 `.scan`、`clip-path` 和 `lefts` 关键帧；新加 `.blur` 图层（结果的模糊版，blur 22px、scale 1.08）和 `@property --p` 驱动的 mask 显影（`dev-clear` 8 秒循环：22% 前停在 −30%，到 92% 走到 140%），`.neg` 在 22–40% 之间淡出。两页的 JS 给 `.blur` 和 `.pos` 同一个 src。模板卡的悬停擦除（phone → AI 的 seam）没动，那是模板示意不是用户的图，要不要一起换等 Owner 说。
+7. **批量上传**：workspace.html 内联实现（CSS `.tray / .rows / .grid-done`，JS 在 bindForm 之后按 `?batch` 改写三个状态），没有动 `formHTML`；正式实现由 T28 按这版稿做，后端语义按 ARCHITECTURE §6.2。创作弹窗（create.html 的 Lovart 弹窗）暂未加批量入口：弹窗只负责选模板和上传第一张，多选后进工作台的 tray；这一点写进了给总控的消息。
+- 截图：`i-cel-packl / packm-1280`、`i-bg-bold-1440`、`j-ws-gen-a/b-1280`、`j-ws-gen-375`、`j-photo-edit-375/1280`、`k-ws-batch-*`、`k-pricing-biz-1440`、`h-acct-*`（重截）、`a-pricing-*-full`（重截）。看板加第 18 行。
+
+## 第十五轮：总控三答（11-06 夜）
+
+- **公告条**：按 `site_announcements` 已有字段重画，`tone` = info | promo（没有 warning）。`.ann.info` 安静（骨白 6% 底、无动效、`link_label` 是灰胶囊）、`.ann.promo` 是促销带；`SV.announce(tone, text, link)`，`link = { url, label }` 对应 `link_url` / `link_label_*`。`?announce=info|promo`。看板 13 行改了。
+- **再做一张、原图已删**：`workspace.html?again=expired`（照片页 `?orig=expired` 的 Make again 链到它）。`.panel.empty.gone`：56px 斜纹空位 + 标题 + 两行说明 + 拍照 / 相册；表单顶上 `.again-note` 写预填的模板 / 尺寸 / 清晰度 / 日期；尺寸和说明预填；主按钮 `aria-disabled` 直到加照片，提示行「Add the photo first. Then it costs 2 credits, like any photo.」。Owner 若改规则为保留原图，这个态永不出现，稿留着无害。
+- **弹窗批量**：总控已写进 DESIGN §6.9 第 2 条（PR #147），按我画的：弹窗只选模板 + 第一张，多选进工作台 tray；创作面板是客户端弹窗不是拦截路由。
+- 截图：`e-ann-home-info-375`、`e-ann-home-promo-375 / -1440`、`e-ann-create-info-1280`、`k-ws-again-375 / -1280`。
+
+## 第十六轮：原图随作品保留（Owner 定，规范 #149 / T40）
+
+- `workspace.html?again=1`：常规 Make again，预填 + 原图已在照片格（「Original photo, kept with the work」）；`?again=expired` 保留，只给 T40 前的老作品和复制失败，文案改成「This work was made before we started keeping originals」。照片页 Make again 默认链 `?again=1`，`?orig=expired` 才链 expired；事实表「Original」行改「Kept with this photo」，Original 视图的空态改「Original not available · made before originals were kept」。
+- 法务样稿两处「7 天删上传」改为「用于作品的照片随作品保留，删作品或删号才删；没用的上传 7 天后删」。
+- 截图：`k-ws-again-ok-375 / -1280`、`k-ws-again-375`（重截）。
