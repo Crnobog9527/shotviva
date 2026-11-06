@@ -166,6 +166,35 @@ Owner 2026-11-05 定稿：**B 版「暗房」（Darkroom）**，取代此前的�
 - 尊重系统「减少动态效果」设置。
 - 每个 UI PR 除 375px / 1280px 截图外，再由验收方在 iOS Safari 真机过一遍第 8.7 节的清单。
 
+## 6.9 电脑稿与 Owner 2026-11-06 的修改（优先于本文件其他地方冲突的说法）
+
+依据 T6 的电脑稿（`design/comps-v3-b/desktop-board.html`、`DESKTOP-NOTES.md`）和 Owner 审稿意见。T6 终审后，以电脑稿为准实现。
+
+1. **模板卡的对比方式**：
+   - 画风迁移（Art Styles）类保留中间可拖动的对比遮罩。
+   - 其他类一律左右并排两张图：左边是手机实拍原图，右边是 AI 成品。
+   - 首页画风迁移的首图保留遮罩，去掉左上角的播放按钮。
+2. **点模板直接进入制作**：去掉「确认使用这个模板吗」这一步。点模板弹出制作面板（Lovart 式）：左边是样图，右边是工作台。
+   - 电脑上，从模板网格点开是弹窗。
+   - 手机上、从 Photos 的「再做一张」进入、或直接打开链接时，是同一个面板的整页形态（Next 的拦截路由）。
+   - 原来的模板预览抽屉不再使用。
+3. **模板缩略图的变化动效**：登录后的模板页上，缩略图平时静止；电脑上鼠标悬停时播放「实拍 → 成品」的擦除动画（CSS clip-path 循环），手机上滑入视口时播放一次，「减少动态效果」打开时不播。这只是装饰，不承载任何功能。
+4. **营销页顶部导航**：Templates / Pricing / Log in / Start free。v1 没有 `/templates` 页面（ARCHITECTURE §13），「Templates」链到首页的模板区 `/#templates`。
+5. **页脚**：
+   - 主行：`support@shotviva.com` 和 `© 2026 Shotviva AI`。
+   - 下面一行浅色小字：`Operated by Grayscale Luminary LLC · 75 E 3rd St, Sheridan, WY`，加四个法律页链接。这一行满足建站规格 G8 和 LAUNCH §8，主体信息从 `site.config` 读。
+   - MiSans 的署名不放页脚，改放在条款页的「Third-party notices」一节（ARCHITECTURE §17）。
+6. **首页「What a set of photos costs」**：做详细的金额和时间对比，一边是请摄影师（价格、天数），一边是 Shotviva（credits、秒数）。
+   - 摄影师报价取有来源的行业区间，来源写进 notes。
+   - 上线前由 Owner 确认这些数字。
+   - 所有数字从 `site.config` 读（G3 单一口径）。
+   - 「Save up to 41%」按三档年付的实际节省取最低值，由配置计算得出，不写死。
+7. **电脑端布局**（替代第 8.6 节的「最宽 720px」）：
+   - 内容最宽 1120px，居中。
+   - 电脑端 H1 为 36px（替代第 3.2 节的 48px）。
+   - 应用顶栏的链接和底部 tab bar 一致（Create / Wishlist / Photos / Account，Wishlist 随开关显示），右侧显示余额。
+   - 营销页和应用页的具体布局以电脑稿为准。
+
 ## 7. 管理后台
 
 - 页面清单见 ARCHITECTURE.md 第 10 节（Owner 2026-11-06 扩充）。

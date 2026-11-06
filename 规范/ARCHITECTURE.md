@@ -244,6 +244,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
   - **`apply_subscription_renewal`**：参数为 `(user, product_id, invoice_id, period_end, amount_total, currency, amount_tax, method, charge_id)`。内部用 `_apply_credit_change`（kind `purchase`，幂等键 `renewal:<invoice_id>`），`paid_until = greatest(paid_until, period_end)`，同一事务写 `payments`。
   - **`sync_subscription(sub_id, status, current_period_end, cancel_at_period_end)`**：供 `customer.subscription.updated / deleted` 使用，只更新已有的镜像行，不新建（没有首付记录的订阅不插入）。
   - **`record_payment_issue(charge_id, kind, amount_refunded)`**：`kind` 为 `refunded` / `disputed`，按 charge id 更新 `payments.status` 和 `amount_refunded`（全退为 `refunded`，部分退为 `partially_refunded`，争议为 `disputed`），不动积分。charge 不在表里时不写行，只发 Sentry 告警，回 200。
+  - **`settle_waffo_order(user, product_id, payment_id, order_id, amount_total, currency, amount_tax, method)`**（T13，总控 2026-11-06 补）：在同一事务里完成两步。先调用 `apply_purchase(user, product_id, payment_id)`，用 Waffo 的 payment id 做幂等键；入账生效时再插入一行 `payments`，其中 `channel = 'waffo'`，`waffo_order_id` 取 Waffo 订单号，金额和税额取自 `order.completed` 事件，单位换算为分。重复事件不写第二行。
   - 以上函数都只授权 `service_role`。
 - **首付的 `paid_until`**：首付走 `apply_purchase`，按商品天数累加（月付 +30 天，年付 +365 天），和 Stripe 本期结束日可能差一两天。从第一次续费起，由 `apply_subscription_renewal` 对齐 `period_end`，见下一条。
 - 订阅续费走 T10 新增的 `apply_subscription_renewal(user, product_id, invoice_id, period_end)`：`credits += 商品积分`，`paid_until = greatest(paid_until, period_end)`（直接对齐 Stripe 的本期结束日，不按天数累加，避免大小月漂移）；同样写流水、按 invoice id 幂等，内部复用 `_apply_credit_change`（总控 2026-11-05 补）。
@@ -338,7 +339,8 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 
 - Supabase Auth：邮箱 + 密码注册，点验证邮件完成激活；另加 Google 登录。
 - hCaptcha 交给 Supabase Auth 自带的人机验证校验。前端**只做隐形验证**，失败时降级为显式 checkbox；不抄 Graylum 的「隐形 + 弹窗」两套。
-- 防刷免费额度：只靠邮箱验证 + hCaptcha。要加 IP 限制就在发放免费额度的 SQL 函数里查 `profiles.signup_ip` 24 小时内是否已发过，一行；不引设备指纹库。
+- 防刷免费额度：邮箱验证 + hCaptcha + **同 IP 限制**（Owner 2026-11-06 定：上线就开）。发放注册赠送的 SQL 函数检查同一个 `signup_ip` 24 小时内是否已经给别的账号发过；发过就不再发。后注册的账号照常能注册、能付费，只是没有免费额度，账号页显示一句说明。不引入设备指纹库。
+- **封禁的范围**（Owner 2026-11-06 定）：被封禁（`banned_at` 不为空）的账号不能出图、不能用需求墙、**不能创建结账**（`/api/checkout` 返回 403）；封禁时在同一事务里**断开 Graylum 连接**（`partner_links` 置为断开）。账号仍可以登录、查看和下载自己的作品、删号。
 - 验证邮件、重置密码邮件由 Supabase Auth 发，SMTP 配成 Resend，发件人 `Shotviva <support@shotviva.com>`（Owner 2026-11-05 由 `noreply@` 改来：Resend 提示 no-reply 发件人影响送达，且用户回信能直接进飞书的 support 邮箱）。**v1 不写任何发信代码**，只改 Supabase 的邮件模板。
 - 邮件按用户语言发（Owner 2026-11-06）：注册时把当前页面语言写进 `user_metadata.locale`（`'en'` / `'zh'`，`signUp` 的 `options.data`）；四个模板正文用 `{{ if eq .Data.locale "zh" }}…{{ else }}…{{ end }}` 放中英两版；邮件标题如果 Supabase 支持同样的条件写法就中英分开，不支持就保持英文（T21 在本地 Supabase 实测后定）；没有 `locale` 的老账号和 Google 登录账号发英文。
 - 管理员身份存在数据库 `profiles.role`，不用环境变量里的邮箱列表。
@@ -463,6 +465,25 @@ v1 后台（Owner 2026-11-06 扩充；T23 做外壳和运营页）：**一个后
 1. **模板与提示词编辑**。因为 `template_prompts` 客户端读不到，必须有一个服务端页面来改。功能：新建模板、编辑公开信息（含质量档和 1K / 2K / 3K 三个 credit 数，低于第 6.1 节下限拒绝保存）和私有提示词、上下架、排序。
 2. **需求审核**（第 15 节）：待审需求列表（参考图 + 描述 + 用户）、通过 / 拒绝 / 下架、按票数排序、标记 shipped 并关联模板。
 3. **出图供应商**（第 3.3 节，T17）：增改供应商、测试连接、切换当前使用。
+
+**客服与付款补救（T25、T26，Owner 2026-11-06 采纳 `docs/proposals/admin-roadmap.md` 的 P0 部分）**：
+- **万能查找**：`admin_lookup(p_query)`。按输入格式分流：邮箱子串、用户 id 或 job id（uuid）、`cs_` / `in_` / `ch_` / `sub_` / Waffo 订单号；返回 `{kind, user_id, job_id}`，跳到用户详情。
+- **用户详情补全**，在详情页新增五块，每块一个查询：
+  - 最近 10 笔付款（`payments`，新索引 `payments(user_id, created_at desc)`）；
+  - 订阅和当前档位；
+  - Graylum 连接；
+  - 同 IP 的其他账号（新索引 `profiles(signup_ip, created_at)`）；
+  - 本人的需求。
+
+  调积分时预览调整后的余额。
+- **后台查看作品**：服务端签发 5 分钟有效的 R2 读取地址。成品看无水印原图；输入图超过 7 天已删除时，显示「已过期」。每次查看写一条审计日志 `view_work`（`admin_audit_log` 的 `action` 允许值加上 `view_work`，并新增 `target_id`）。隐私政策同步加一句：客服和安全需要时，我们可能查看你上传的照片和生成的图片，每次查看都有记录（Owner 2026-11-06 同意）。
+- **卡住任务和单张补偿**：
+  - 「卡住的任务」视图：`status = 'running'` 且创建超过 10 分钟，新建部分索引 `generation_jobs(created_at) where status = 'running'`。可单个或全部退回，调用已有的 `refund_job`。
+  - 「补偿这一单」：调用 `admin_adjust_credits`，幂等键 `comp:<job_id>`，退回原来扣的积分池，同一单只能补一次。
+- **可疑注册**：`admin_signup_ip_clusters(p_days)` 列出近 24 小时或 7 天内同一 IP 注册 ≥3 个账号的情况，可以逐个封禁。
+- **按 Stripe id 重放入账**（T26）：后台输入 `cs_…` 后，从 Stripe 取回 session，确认已付款，预览将入账的内容，Owner 确认后走和回调同一个 `settle_checkout`（同一个幂等键，回调和重放谁先到都只入账一次）。输入 `sub_…` 则调用 `sync_subscription`。每次重放写审计日志 `replay_checkout`。Waffo 的重放等 T13。
+- **概览「待处理」条**（T26）：`admin_todo_counts()` 一次返回卡住的任务、近 1 小时和 24 小时失败率、待审需求、待处理的退款和争议、最近一次入账时间，以及当前在用的供应商和模型，每项都有索引支撑。
+- P1 和 P2 项（模板表现、毛利、真实 token 用量、失败分析、审计日志查看页、运行时开关、Graylum 统计、代删账号、作品审核队列、CSV 导出等）上线后按提案排期，不在 v1 范围。
 
 **仍然不做页面、留在 Supabase / Stripe 后台的运营操作**：设为管理员（在 Studio 改 `profiles.role`）、退款（在 Stripe / Waffo 后台）、作品审核页（第 6~7 周和审核功能一起做）。
 
@@ -704,7 +725,7 @@ SEO 内页的中文版不批量做。哪一页的英文版在 GSC 里出现中�
     - 不 preload，不用 Google Fonts，也不用任何 CDN。
   - **缓存**：只给 `/fonts/misans/*.woff2` 和 `*.css` 发 `Cache-Control: public, max-age=31536000, immutable`，NOTICE、PDF 不加。改字体必须换新哈希 URL。
   - **路由**：中间件（`src/proxy.ts`）的 matcher 排除 `fonts/misans/`。这个目录不放私密文件。
-  - **署名（协议要求）**：营销页页脚写「本网站使用 MiSans 字体，版权归小米所有」（英文页写 "This site uses the MiSans font, © Xiaomi."），并链接 `/fonts/misans/LICENSE.pdf`。应用内页面不显示署名。
+  - **署名（协议要求）**：写在条款页的「Third-party notices」一节：「本网站使用 MiSans 字体，版权归小米所有」（英文写 "This site uses the MiSans font, © Xiaomi."），并链接 `/fonts/misans/LICENSE.pdf`。页脚不放（Owner 2026-11-06，DESIGN §6.9）。
   - **授权边界**：
     - MiSans 只用于网页显示。服务端往图片上画字的地方（如水印 "Made with Shotviva"）不用 MiSans，以免变成「把字体嵌入导出文件」。
     - 字体文件放在私有仓库，通过网站对外提供，和 Graylum 一样；律师审法律页时一并确认协议里的「再分发」条款（LAUNCH §8）。
