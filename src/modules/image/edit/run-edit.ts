@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto'
 import type { ServerTrack } from '@/core/analytics'
 import { AppError } from '@/core/errors'
 import {
+  accountLimits,
   assertWithinRateLimit,
   findOwnJob,
   reserveJob,
@@ -58,7 +59,8 @@ async function prepare(deps: EditDeps, req: EditRequest) {
     logger.error('edit template params are incomplete', { issues: params.error.issues.map((issue) => issue.path.join('.')) })
     throw new AppError('NOT_FOUND', 'Editing is not available')
   }
-  await assertWithinRateLimit(deps.db, req.userId, deps.now?.() ?? new Date(), req.jobId)
+  const limits = await accountLimits(deps.db, req.userId)
+  await assertWithinRateLimit(deps.db, req.userId, deps.now?.() ?? new Date(), limits, req.jobId)
   const image = await loadOutputImage(deps.store, source.outputKey)
   return { instruction: instruction.data, source, template, prompt, params: params.data, image }
 }

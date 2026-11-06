@@ -15,7 +15,7 @@ export type UploadState =
   | { phase: 'done'; inputKey: string }
   | { phase: 'error'; code: UploadErrorCode; message: string }
 
-const deps: UploadDeps = {
+export const uploadDeps: UploadDeps = {
   compress: compressImage,
   requestTicket,
   put: putWithProgress,
@@ -29,7 +29,7 @@ export function useUpload() {
 
   const upload = useCallback(async (file: File): Promise<string | null> => {
     try {
-      const inputKey = await uploadPhoto(file, deps, {
+      const inputKey = await uploadPhoto(file, uploadDeps, {
         onPhase: (phase) => setState({ phase, progress: 0 }),
         onProgress: (progress) => setState({ phase: 'uploading', progress }),
       })

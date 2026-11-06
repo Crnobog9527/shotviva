@@ -14,6 +14,7 @@ const generate = {
   duration_ms: 31_250,
   model: 'gpt-image-2.6',
   edit_scope: null,
+  batch_size: 1,
 } as const
 
 const checkout = {
@@ -47,6 +48,9 @@ describe('event dictionary (ARCHITECTURE §16.2)', () => {
     expect(validateEvent('signup', { method: 'email', plan: 'pro' }).ok).toBe(false)
     expect(validateEvent('signup', { method: 'github' }).ok).toBe(false)
     expect(validateEvent('generate', { ...generate, duration_ms: undefined }).ok).toBe(false)
+    expect(validateEvent('generate', { ...generate, batch_size: 30 }).ok).toBe(true)
+    expect(validateEvent('generate', { ...generate, batch_size: 31 }).ok).toBe(false)
+    expect(validateEvent('paywall_view', { trigger: 'tier_required' }).ok).toBe(true)
     expect(validateEvent('purchase', checkout).ok).toBe(false)
   })
 })

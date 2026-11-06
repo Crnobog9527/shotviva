@@ -26,4 +26,11 @@ describe('watermark', () => {
     expect((await region(marked, 0, 0)).equals(await region(originalJpeg, 0, 0))).toBe(true)
     expect((await region(marked, 1536 - 400, 1152 - 70)).equals(await region(originalJpeg, 1536 - 400, 1152 - 70))).toBe(false)
   })
+
+  it('puts a transparent PNG on white, not black', async () => {
+    const cutOut = await sharp({ create: { width: 600, height: 400, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).png().toBuffer()
+    const marked = await applyWatermark(new Uint8Array(cutOut))
+    const [r, g, b] = await region(marked, 0, 0)
+    expect(Math.min(r, g, b)).toBeGreaterThan(245)
+  })
 })

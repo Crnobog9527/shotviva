@@ -41,7 +41,12 @@ describe('generateEventProps', () => {
       duration_ms: 1235,
       model: 'gpt-image-2.6',
       edit_scope: null,
+      batch_size: 1,
     })
+  })
+
+  it('carries the batch size, 1 when there is no batch', () => {
+    expect(generateEventProps(job, 'food', { status: 'succeeded' }, 0, 30).batch_size).toBe(30)
   })
 
   it('reports the judged range of a photo edit, and nothing it does not know', () => {

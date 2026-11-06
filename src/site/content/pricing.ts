@@ -48,7 +48,7 @@ const photoCostTable: Table = {
 }
 
 const titlePrice = planFrom ? `Plans From ${usd(planFrom.priceUsd)} a Month` : 'Plans and Credit Packs'
-const yearly = yearlySaving ? ` Yearly plans save ${yearlySaving}% or more.` : ''
+const yearly = yearlySaving ? ` Yearly plans save up to ${yearlySaving}%.` : ''
 const packs = packFrom ? ` Credit packs start at ${usd(packFrom.priceUsd)}.` : ''
 
 export const pricingPage = {

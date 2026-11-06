@@ -12,6 +12,8 @@ const job: TrackedJob = {
   aspect: 'original',
   credits: 2,
   inputKey: 'inputs/u/a.jpg',
+  batchSize: 1,
+  queuedAt: 1_000,
   startedAt: 1_000,
   status: 'running',
   fileUrl: null,
@@ -45,6 +47,21 @@ describe('job model', () => {
   it('keeps whether credits came back from an error body', () => {
     expect(applyError(job, { code: 'GENERATION_FAILED', message: 'x', refunded: true }).failure).toEqual({ code: 'GENERATION_FAILED', message: 'x', refunded: true })
     expect(applyError(job, { code: 'RATE_LIMITED' }).failure?.refunded).toBeNull()
+  })
+
+  it('keeps the tier a TIER_REQUIRED answer names, for the paywall', () => {
+    expect(applyError(job, { code: 'TIER_REQUIRED', required_tier: 'max' }).failure?.requiredTier).toBe('max')
+  })
+
+  it('restores a job saved before T28 (no queue fields) for polling only', () => {
+    const old = { ...job, batchSize: undefined, queuedAt: undefined }
+    expect(restore(JSON.stringify([old]), 2_000)[0]).toMatchObject({ status: 'running', batchSize: 1, queuedAt: 1_000 })
+  })
+
+  it('drops a queued job left for more than an hour', () => {
+    const waiting = { ...job, status: 'queued' as const, startedAt: 0, body: undefined }
+    expect(restore(serialize([waiting]), 1_000 + 30 * 60_000)).toHaveLength(1)
+    expect(restore(serialize([waiting]), 1_000 + 61 * 60_000)).toEqual([])
   })
 
   it('persists running jobs without the tab-only preview and drops stale ones', () => {
