@@ -32,45 +32,105 @@
   },
   "auth": {
     "google": "Continue with Google",
+    "or": "or with email",
+    "show": "Show",
+    "hide": "Hide",
     "fields": {
       "email": "Email",
       "password": "Password",
-      "newPassword": "Password (at least {min} characters)"
+      "newPassword": "New password",
+      "confirmPassword": "Confirm new password"
+    },
+    "placeholders": {
+      "email": "you@company.com",
+      "password": "Your password",
+      "choose": "Choose a password",
+      "chooseNew": "Choose a new password",
+      "again": "Type it again"
+    },
+    "hints": {
+      "verifyEmail": "We'll send a link to verify it.",
+      "passwordMin": "{min} characters or more."
+    },
+    "fieldErrors": {
+      "loginEmail": "Enter the email you signed up with.",
+      "email": "That doesn't look like an email address.",
+      "passwordMissing": "Enter your password.",
+      "passwordShort": "Too short. Use {min} characters or more.",
+      "passwordWeak": "Choose a stronger password.",
+      "mismatch": "The two passwords don't match."
+    },
+    "arrived": {
+      "home": {
+        "title": "Your photo and template are kept.",
+        "login": "Log in and they'll be waiting on the home page.",
+        "signup": "Verify your email and they'll be waiting on the home page."
+      },
+      "graylum": {
+        "title": "Connecting Graylum.",
+        "login": "Log in, then allow Graylum to use your credits.",
+        "signup": "Make your account, then allow Graylum to use your credits."
+      }
     },
     "login": {
-      "title": "Sign in",
-      "submit": "Sign in",
+      "title": "Log in",
+      "submit": "Log in",
       "forgot": "Forgot password?",
-      "toSignup": "Create an account"
+      "toSignup": "New to Shotviva? <link>Create a free account</link>",
+      "creds": "That email and password don't match. <reset>Reset your password</reset> if you've forgotten it.",
+      "unverified": "Verify your email first. We sent the link to <addr>{email}</addr>. <resend>Send it again</resend>."
     },
     "signup": {
       "title": "Create your account",
-      "freeImages": "Start with {count} free Standard images.",
+      "gift": "{count, plural, one {# free Standard image} other {# free Standard images}}",
+      "giftNote": "Shown publicly with a watermark",
       "submit": "Create account",
-      "toLogin": "Already have an account? Sign in",
-      "sentTitle": "Check your email",
-      "sent": "We sent a confirmation link. Open it to activate your account. If you already have an account with this email, just sign in."
+      "fine": "By continuing you agree to the <terms>Terms</terms> and <privacy>Privacy Policy</privacy>.",
+      "toLogin": "Already have an account? <link>Log in</link>"
+    },
+    "verify": {
+      "title": "Check your email",
+      "text": "We sent a verification link to <addr>{email}</addr>. Open it to finish making your account.",
+      "textSignup": "We sent a verification link to <addr>{email}</addr> if it's new to Shotviva. Open it to finish making your account.",
+      "different": "Use a different email",
+      "haveAccount": "Already have an account? <login>Log in</login> or <reset>reset your password</reset>."
+    },
+    "resend": {
+      "again": "Send the email again",
+      "wait": "Sent again · wait {seconds}s",
+      "from": "It comes from <b>{sender}</b>. Not there after a minute? Check spam or promotions."
     },
     "reset": {
       "title": "Reset your password",
+      "sub": "Enter your email and we'll send a link to set a new one.",
       "submit": "Send reset link",
-      "toLogin": "Back to sign in",
-      "sent": "If an account exists for that email, a reset link is on its way."
+      "back": "Back to log in",
+      "sentTitle": "Check your email",
+      "sent": "If <addr>{email}</addr> has an account, a reset link is on its way. It works for {hours, plural, one {one hour} other {# hours}}."
+    },
+    "expired": {
+      "title": "This link has expired",
+      "text": "Reset links work for {hours, plural, one {one hour} other {# hours}} and only once. Ask for a new one and use it straight away.",
+      "newLink": "Send a new link"
     },
     "update": {
-      "title": "Choose a new password",
+      "title": "Set a new password",
+      "for": "For <addr>{email}</addr>.",
       "submit": "Save password",
-      "done": "Password saved. Go to your account"
+      "doneTitle": "Password saved",
+      "done": "You're logged in on this device. Other devices will ask for the new password.",
+      "continue": "Continue to Shotviva"
     },
     "captcha": {
+      "line": "Protected by hCaptcha · <privacy>Privacy</privacy> · <terms>Terms</terms>",
       "fallback": "Please complete the check below, then submit again.",
       "tick": "Tick the box below to continue."
     },
     "notices": {
-      "unverified": "Please confirm your email first. Open the link we sent you.",
-      "link_expired": "That link has expired or was already used. Request a new one.",
-      "callback_failed": "We could not finish signing you in. If you just confirmed your email, sign in with your password.",
-      "oauth_failed": "Google sign-in did not finish. Please try again."
+      "unverified": "Verify your email first. Open the link we sent you.",
+      "link_expired": "That link has expired or was already used. Log in below; if your email still needs verifying, we'll offer to send a new link.",
+      "callback_failed": "We couldn't finish logging you in. If you just verified your email, log in with your password.",
+      "oauth_failed": "Google sign-in didn't finish. Please try again."
     },
     "errors": {
       "UNAUTHORIZED": "Please sign in again.",
@@ -646,6 +706,39 @@
       "yourChange": "Your change",
       "editedFromLabel": "Edited from",
       "sourceDeleted": "Original deleted"
+    },
+    "checkout": {
+      "metaTitle": "Payment",
+      "titlePlan": "You're on {tier}",
+      "titlePack": "{count, plural, one {# credit} other {# credits}} added",
+      "subPlan": "{count, plural, one {# credit is} other {# credits are}} in your account. Make something.",
+      "subPack": "They're in your account now. Make something.",
+      "added": "Added",
+      "balance": "Balance",
+      "unit": "credits",
+      "renews": "Renews",
+      "renewsValue": "{date, date, medium} · {price}",
+      "paid": "Paid",
+      "paidCard": "{amount} · {brand} ···· {last4}",
+      "paidMethod": "{amount} · {method, select, alipay {Alipay} other {Card}}",
+      "start": "Start creating",
+      "receipt": "Receipt",
+      "manage": "Manage in Account",
+      "backToPartner": "Back to Graylum",
+      "fineMonthly": "Renews automatically. Cancel anytime from Account.",
+      "fineYearly": "A year of credits, all in your account now. Renews automatically; cancel anytime from Account.",
+      "finePeriod": "One-time payment for {period, select, year {1 year} other {30 days}}. Nothing renews; renew from Account when it ends.",
+      "finePack": "One-time payment. Nothing renews.",
+      "titlePending": "Confirming your payment",
+      "subPendingAlipay": "Alipay is still confirming it. This usually takes under a minute. Your credits appear as soon as it clears; you can leave this page.",
+      "subPending": "Your payment went through and we're adding your credits. This usually takes a few seconds; you can leave this page.",
+      "order": "Order",
+      "amount": "Amount",
+      "orderPlan": "{tier} · {period, select, year {1 year} other {1 month}} · {count, plural, one {# credit} other {# credits}}",
+      "orderPack": "{count, plural, one {# credit} other {# credits}}",
+      "checkAgain": "Check again",
+      "backToCreate": "Back to Create",
+      "finePending": "If nothing shows in Account after 10 minutes, write to {email} with the time of payment."
     }
   },
   "paywall": {
@@ -708,8 +801,6 @@
     "redirecting": "Opening secure checkout…",
     "error": "Checkout did not open. Please try again in a moment.",
     "choose": "Choose {tier}",
-    "thanks": "Thanks for your purchase. Your credits arrive within a minute; refresh if you don't see them yet.",
-    "backToPartner": "Back to Graylum",
     "perCreditShort": "{price} / credit",
     "savingLabel": "You save<vs> vs monthly</vs>",
     "savingAmount": "{amount} a year",
@@ -720,7 +811,9 @@
     "payNoteCard": "Plans renew automatically, cancel anytime",
     "payNoteWallet": "One-time payment for 30 days or 1 year, no auto-renew",
     "payNoteOnce": "One-time payment for 30 days or 1 year",
-    "payNotePacks": "Credit packs are always a one-time payment."
+    "payNotePacks": "Credit packs are always a one-time payment.",
+    "cancelled": "<b>Checkout cancelled.</b> Nothing was charged.",
+    "cancelledClose": "Dismiss"
   },
   "announcement": {
     "dismiss": "Dismiss announcement"
@@ -795,5 +888,17 @@
     "title": "Something went wrong",
     "body": "This page did not load. Try again in a moment.",
     "retry": "Try again"
+  },
+  "legal": {
+    "pagesLabel": "Legal pages",
+    "pages": {
+      "terms": "Terms",
+      "privacy": "Privacy",
+      "refunds": "Refunds",
+      "acceptableUse": "Acceptable use"
+    },
+    "lastUpdated": "Last updated <date></date>",
+    "contents": "Contents",
+    "questions": "Questions about this page: <mail></mail>"
   }
 }

@@ -8,7 +8,7 @@ import { trackCheckoutStart } from '../../analytics/funnel'
 import type { ProductId, SiteProduct } from '../../config'
 import { AppError } from '../../errors'
 import { localizePath } from '../../i18n/paths'
-import { successPath, type CheckoutBody } from '../stripe/checkout'
+import { CHECKOUT_RETURN, successPath, type CheckoutBody } from '../stripe/checkout'
 import type { WaffoApi, WaffoSessionRequest } from './client'
 
 // Waffo hosted checkout for one product, always a one-time payment (ARCHITECTURE §6.3): a
@@ -59,8 +59,8 @@ export function waffoSessionRequest(
     // product priced differently in the dashboard cannot charge another amount. Tax is added
     // on top at checkout, as with Stripe Managed Payments.
     priceSnapshot: { amount: product.priceUsd.toFixed(2), taxIncluded: false, taxCategory: 'saas' },
-    // Back to the account page in the language the buyer checked out in.
-    successUrl: `${deps.origin}${localizePath(successPath(body.return_to, deps.returnToHosts), body.locale)}`,
+    // Back to the return page in the language the buyer checked out in.
+    successUrl: `${deps.origin}${localizePath(successPath(CHECKOUT_RETURN.waffo(product.id), body.return_to, deps.returnToHosts), body.locale)}`,
     expiresInSeconds: WAFFO_SESSION_TTL_SECONDS,
     metadata: { user_id: input.userId, product_id: product.id, method: body.method, locale: body.locale },
     orderMerchantExternalId: input.orderRef,

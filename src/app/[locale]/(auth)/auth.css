@@ -1,0 +1,138 @@
+/* Sign-in pages (/login, /signup, /reset, /reset/update): the signed-off v3-b comp
+   design/comps-v3-b/auth.html, ported class for class with an `au-` prefix. One column; on the
+   phone the form is the page, from 768px it sits on a plate under one safelight. Colours come from
+   the tokens in globals.css only; the entry rise stops under prefers-reduced-motion. */
+
+@layer components {
+  /* the bar keeps Pricing on phones too (the comp's `.nav-links .nl`) */
+  .au-nl {
+    display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 999px;
+    font: 500 15px/1 var(--font-sans); color: var(--bone-dim); text-decoration: none; transition: color .18s, background-color .18s;
+  }
+
+  .au-main { position: relative; display: flex; flex: 1; flex-direction: column; padding: 24px var(--gutter) 0; overflow-x: clip; }
+  .au-main::before {
+    content: ""; position: absolute; z-index: 0; left: 50%; top: 40%; width: min(900px, 140vw); height: 520px; transform: translate(-50%, -50%); pointer-events: none;
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--primary) 18%, transparent), transparent 70%);
+  }
+  .au-plate { position: relative; z-index: 1; }
+  body:has(.au-main) .mk-footer { margin-top: 48px; }
+
+  .au-plate h1, .au-plate h2 { text-wrap: balance; }
+  .au-plate p { text-wrap: pretty; }
+  .au-title { font: 400 32px/1.05 var(--font-display); letter-spacing: -0.02em; }
+  .au-sub { margin-top: 8px; font-size: 16px; line-height: 1.5; color: var(--bone-dim); }
+  .au-addr { color: var(--foreground); font-weight: 500; overflow-wrap: anywhere; }
+
+  /* what the visitor brought: the home draft, or the Graylum connection */
+  .au-kept {
+    display: flex; align-items: center; gap: 10px; margin-top: 16px; padding: 8px 12px 8px 8px; border-radius: 14px;
+    background: var(--wash); box-shadow: inset 0 0 0 1px var(--border); font-size: 14px; line-height: 1.35; color: var(--bone-dim);
+  }
+  .au-kept img { width: 36px; height: 36px; border-radius: 9px; object-fit: cover; flex: none; }
+  .au-kept b { display: block; color: var(--foreground); font-weight: 500; }
+
+  /* the free gift (sign-up only) */
+  .au-gift {
+    display: flex; gap: 12px; align-items: center; padding: 12px; border-radius: 16px; margin-top: 20px; font-size: 16px; line-height: 1.5;
+    background: linear-gradient(120deg, color-mix(in srgb, var(--primary) 16%, transparent), color-mix(in srgb, var(--primary) 4%, transparent));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 28%, transparent);
+  }
+  .au-gift-ico { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--primary); color: var(--primary-foreground); flex: none; }
+  .au-gift b { display: block; font-size: 16px; }
+  .au-gift span span { font-size: 14px; color: var(--muted-foreground); }
+
+  /* buttons */
+  .au-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 52px; padding: 0 16px; border-radius: 16px;
+    font: 600 16px/1.2 var(--font-sans); letter-spacing: -0.01em; text-align: center; text-decoration: none; color: var(--foreground);
+    transition: transform .18s var(--ease), background-color .2s, box-shadow .2s; user-select: none;
+  }
+  .au-btn:active { transform: scale(.975); }
+  .au-btn:disabled, .au-btn[aria-disabled="true"] { opacity: .55; pointer-events: none; }
+  .au-primary { min-height: 56px; border-radius: 18px; background: var(--primary); color: var(--primary-foreground); box-shadow: var(--shadow-raised); }
+  .au-ghost { background: var(--wash); box-shadow: inset 0 0 0 1px var(--border); }
+  .au-quiet { min-height: 44px; }
+  .au-google { margin-top: 20px; }
+  .au-google svg { width: 20px; height: 20px; flex: none; }
+  .au-or { display: flex; align-items: center; gap: 12px; margin: 20px 0 4px; font-size: 14px; color: var(--muted-foreground); }
+  .au-or::before, .au-or::after { content: ""; flex: 1; height: 1px; background: var(--hairline); }
+  .au-form { display: grid; gap: 16px; margin-top: 12px; }
+  .au-form-gap { margin-top: 20px; }
+  .au-form .au-primary { margin-top: 8px; }
+
+  /* fields: 16px type (no iOS zoom), 52px tall, bone fill, hairline inset; the ring is the safelight */
+  .au-field { display: grid; gap: 8px; }
+  .au-lab { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font: 500 15px/1.3 var(--font-sans); }
+  .au-lab a { font-weight: 400; font-size: 14px; color: var(--bone-dim); text-decoration: none; padding: 10px 0; margin: -10px 0; }
+  .au-ctl { position: relative; }
+  .au-input {
+    width: 100%; height: 52px; padding: 0 14px; border: 0; border-radius: 14px; font: 400 16px/1 var(--font-sans); color: var(--foreground);
+    background: var(--wash-faint); box-shadow: inset 0 0 0 1px var(--input); transition: box-shadow .2s; -webkit-appearance: none; appearance: none;
+  }
+  .au-input::placeholder { color: var(--muted-foreground); }
+  .au-input:focus { outline: none; box-shadow: inset 0 0 0 1.5px var(--primary), 0 0 0 4px color-mix(in srgb, var(--primary) 14%, transparent); }
+  .au-input[aria-invalid="true"] { box-shadow: inset 0 0 0 1.5px var(--destructive); }
+  .au-input[aria-invalid="true"]:focus { box-shadow: inset 0 0 0 1.5px var(--destructive), 0 0 0 4px color-mix(in srgb, var(--destructive) 14%, transparent); }
+  .au-pw .au-input { padding-right: 76px; }
+  .au-eye {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%); min-height: 40px; padding: 0 10px; border-radius: 10px;
+    font: 500 14px/1 var(--font-sans); color: var(--bone-dim);
+  }
+  .au-hint { font-size: 14px; line-height: 1.4; color: var(--muted-foreground); }
+  .au-err { display: flex; align-items: flex-start; gap: 6px; font-size: 14px; line-height: 1.4; color: var(--destructive); }
+  .au-err svg, .au-notice svg { flex: none; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
+  .au-err svg { width: 16px; height: 16px; margin-top: 1px; }
+
+  /* the form-level notice: the problem and the way out, on one quiet plate */
+  .au-notice {
+    display: flex; gap: 10px; align-items: flex-start; margin-top: 20px; padding: 12px 14px; border-radius: 14px; font-size: 15px; line-height: 1.45;
+    background: color-mix(in srgb, var(--destructive) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--destructive) 34%, transparent);
+  }
+  .au-notice svg { width: 18px; height: 18px; color: var(--destructive); margin-top: 2px; }
+  .au-notice a, .au-notice button { color: var(--foreground); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
+
+  /* hCaptcha: the invisible path is one line of attribution; the fallback is hCaptcha's own checkbox */
+  .au-hc-line { margin-top: 16px; font-size: 14px; line-height: 1.5; color: var(--muted-foreground); text-align: center; }
+  .au-hc-line a { color: var(--bone-dim); text-decoration: none; }
+  .au-hc { display: grid; gap: 8px; }
+
+  .au-swap { margin-top: 20px; font-size: 15px; line-height: 1.5; color: var(--bone-dim); text-align: center; }
+  .au-swap a { color: var(--foreground); font-weight: 500; text-decoration: none; padding: 10px 0; margin: -10px 0; }
+  .au-fine { margin-top: 16px; font-size: 14px; line-height: 1.5; color: var(--muted-foreground); text-align: center; }
+  .au-fine a { color: var(--bone-dim); text-decoration: none; }
+
+  /* the message views (check your email / saved / expired): one glyph, the title, one line, the way on */
+  .au-glyph {
+    width: 56px; height: 56px; border-radius: 18px; display: grid; place-items: center; margin-bottom: 20px;
+    background: var(--wash); box-shadow: inset 0 0 0 1px var(--border); color: var(--foreground);
+  }
+  .au-glyph svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .au-glyph-ok {
+    background: color-mix(in srgb, var(--success) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 40%, transparent); color: var(--success);
+  }
+  .au-acts { display: grid; gap: 8px; margin-top: 24px; }
+  .au-from { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--hairline); font-size: 14px; line-height: 1.5; color: var(--muted-foreground); }
+  .au-from b { color: var(--bone-dim); font-weight: 500; overflow-wrap: anywhere; }
+
+  @media (min-width: 768px) {
+    .au-main { min-height: calc(100dvh - 64px - 180px); display: grid; place-items: center; padding: 40px var(--gutter); }
+    .au-main::before { top: 50%; width: 1100px; height: 640px; }
+    .au-plate {
+      width: 440px; padding: 32px; border-radius: 22px; background: var(--card);
+      box-shadow: inset 0 0 0 1px var(--border), inset 0 1px 0 var(--edge-highlight), 0 40px 80px -40px rgba(0, 0, 0, .9);
+    }
+    .au-title { font-size: 36px; }
+    body:has(.au-main) .mk-footer { margin-top: 0; }
+  }
+  @media (min-width: 1024px) { .au-title { font-size: 40px; } }
+  @media (hover: hover) {
+    .au-nl:hover { color: var(--foreground); background: var(--wash); }
+    .au-swap a:hover, .au-lab a:hover, .au-fine a:hover, .au-hc-line a:hover { color: var(--foreground); text-decoration: underline; text-underline-offset: 3px; }
+    .au-eye:hover { color: var(--foreground); background: var(--wash-strong); }
+    .au-primary:hover { filter: brightness(1.06); }
+    .au-ghost:hover { background: var(--wash-strong); box-shadow: inset 0 0 0 1px var(--input); }
+  }
+  @media (prefers-reduced-motion: no-preference) { .au-plate { animation: au-rise .5s var(--ease) both; } }
+  @keyframes au-rise { from { opacity: 0; transform: translateY(10px); } }
+}

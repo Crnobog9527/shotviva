@@ -45,6 +45,7 @@ export {
   formatLegalDate,
   type LegalBlock,
   type LegalLink,
+  type LegalNavItem,
   type LegalPage,
   type LegalSection,
   type LegalText,

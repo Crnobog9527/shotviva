@@ -11,11 +11,13 @@ const sections: readonly [LegalSection, ...LegalSection[]] = [
   ...termsServiceSections,
   ...termsBillingSections,
   ...termsGeneralSections,
+  contactSection('these Terms'),
   // The MiSans licence asks for attribution; it lives here, not in the footer (ARCHITECTURE §17,
   // DESIGN §6.9).
   {
     id: 'third-party-notices',
     heading: 'Third-party notices',
+    plain: true,
     blocks: [
       ['This site uses the MiSans font, © Xiaomi. ', { href: '/fonts/misans/LICENSE.pdf', label: 'Read the MiSans font licence' }, '.'],
       // Self-hosted Latin fonts (src/app/fonts/OFL-*.txt), all under the SIL Open Font License 1.1.
@@ -35,7 +37,6 @@ const sections: readonly [LegalSection, ...LegalSection[]] = [
       ],
     ],
   },
-  contactSection('these Terms'),
 ]
 
 export const termsPage = defineLegalPage({

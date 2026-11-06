@@ -39,7 +39,7 @@ describe('matchesPaths', () => {
     expect(matchesPaths('/', zhPaths)).toBe(true)
     expect(matchesPaths('/generate/pure-white', zhPaths)).toBe(true)
     expect(matchesPaths('/generate/pure-white/extra', zhPaths)).toBe(false)
-    expect(matchesPaths('/pricing?checkout=cancelled', zhPaths)).toBe(true)
+    expect(matchesPaths('/pricing?checkout=cancel', zhPaths)).toBe(true)
     expect(matchesPaths('/reset', zhPaths)).toBe(false)
     expect(matchesPaths('/terms', zhPaths)).toBe(false)
     expect(matchesPaths('/pricingx', zhPaths)).toBe(false)

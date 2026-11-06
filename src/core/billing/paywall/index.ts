@@ -1,6 +1,5 @@
 // The paywall drawer and its pieces (T9 PR 2, DESIGN §4.5). Client components; products are
 // passed in by app/ from site.config.
-export { CheckoutNotice } from './checkout-notice'
 export { methodLabel, methodNote, planFinePrint, pricingMethodNote, type PaywallMessage } from './copy'
 export { PaywallButton } from './paywall-button'
 export { PricingPlans } from './pricing-plans'

@@ -32,44 +32,104 @@
   },
   "auth": {
     "google": "使用 Google 账号继续",
+    "or": "或用邮箱",
+    "show": "显示",
+    "hide": "隐藏",
     "fields": {
       "email": "邮箱",
       "password": "密码",
-      "newPassword": "密码（至少 {min} 位）"
+      "newPassword": "新密码",
+      "confirmPassword": "确认新密码"
+    },
+    "placeholders": {
+      "email": "你的邮箱地址",
+      "password": "你的密码",
+      "choose": "设置一个密码",
+      "chooseNew": "设置新密码",
+      "again": "再输一次"
+    },
+    "hints": {
+      "verifyEmail": "我们会发一个链接来验证这个邮箱。",
+      "passwordMin": "至少 {min} 位。"
+    },
+    "fieldErrors": {
+      "loginEmail": "请输入你注册时用的邮箱。",
+      "email": "这看起来不是邮箱地址。",
+      "passwordMissing": "请输入密码。",
+      "passwordShort": "太短了，至少要 {min} 位。",
+      "passwordWeak": "请换一个更安全的密码。",
+      "mismatch": "两次输入的密码不一样。"
+    },
+    "arrived": {
+      "home": {
+        "title": "你的照片和模板都保留着。",
+        "login": "登录后回到首页，它们都还在。",
+        "signup": "验证邮箱后回到首页，它们都还在。"
+      },
+      "graylum": {
+        "title": "正在连接 Graylum。",
+        "login": "登录后，允许 Graylum 使用你的积分。",
+        "signup": "注册完账号后，允许 Graylum 使用你的积分。"
+      }
     },
     "login": {
       "title": "登录",
       "submit": "登录",
       "forgot": "忘记密码？",
-      "toSignup": "注册新账号"
+      "toSignup": "第一次用 Shotviva？<link>免费注册</link>",
+      "creds": "邮箱和密码对不上。忘了密码的话，可以<reset>重设密码</reset>。",
+      "unverified": "请先验证邮箱。验证链接已经发到 <addr>{email}</addr>。<resend>再发一次</resend>。"
     },
     "signup": {
       "title": "注册账号",
-      "freeImages": "注册即送 {count} 张标准清晰度的免费图。",
+      "gift": "{count, plural, other {# 张标准清晰度免费图}}",
+      "giftNote": "会公开展示，并带水印",
       "submit": "注册",
-      "toLogin": "已有账号？去登录",
-      "sentTitle": "请查收邮件",
-      "sent": "我们发了一封确认邮件，点开里面的链接就能激活账号。如果这个邮箱已经注册过，直接登录即可。"
+      "fine": "继续即表示你同意<terms>服务条款</terms>和<privacy>隐私政策</privacy>。",
+      "toLogin": "已经有账号？<link>登录</link>"
+    },
+    "verify": {
+      "title": "请查收邮件",
+      "text": "验证链接已经发到 <addr>{email}</addr>，打开它就能完成注册。",
+      "textSignup": "如果 <addr>{email}</addr> 还没注册过 Shotviva，验证链接已经发过去了，打开它就能完成注册。",
+      "different": "换一个邮箱",
+      "haveAccount": "已经有账号？<login>登录</login>或<reset>重设密码</reset>。"
+    },
+    "resend": {
+      "again": "再发一次邮件",
+      "wait": "已重新发送 · {seconds} 秒后可再发",
+      "from": "发件人是 <b>{sender}</b>。过了一分钟还没收到？看看垃圾邮件或推广邮件。"
     },
     "reset": {
-      "title": "重置密码",
-      "submit": "发送重置链接",
-      "toLogin": "返回登录",
-      "sent": "如果这个邮箱注册过账号，重置链接已经发出，请查收。"
+      "title": "重设密码",
+      "sub": "输入你的邮箱，我们会发一个设置新密码的链接。",
+      "submit": "发送重设链接",
+      "back": "返回登录",
+      "sentTitle": "请查收邮件",
+      "sent": "如果 <addr>{email}</addr> 注册过账号，重设链接已经在路上了，{hours} 小时内有效。"
+    },
+    "expired": {
+      "title": "这个链接已经失效",
+      "text": "重设链接 {hours} 小时内有效，而且只能用一次。请重新获取一个，收到后尽快使用。",
+      "newLink": "重新发送链接"
     },
     "update": {
       "title": "设置新密码",
+      "for": "账号：<addr>{email}</addr>",
       "submit": "保存密码",
-      "done": "密码已保存，去我的账号"
+      "doneTitle": "密码已保存",
+      "done": "这台设备已经登录。其他设备会要求你输入新密码。",
+      "continue": "进入 Shotviva"
     },
     "captcha": {
+      "line": "由 hCaptcha 提供人机验证 · <privacy>隐私</privacy> · <terms>条款</terms>",
       "fallback": "请完成下方的验证，再提交一次。",
       "tick": "请勾选下方的方框后继续。"
     },
     "notices": {
-      "unverified": "请先确认邮箱：打开我们发给你的邮件，点里面的链接。",
-      "link_expired": "这个链接已过期或已经用过了，请重新获取。",
-      "callback_failed": "登录没能完成。如果你刚确认完邮箱，请用密码登录。",
+      "unverified": "请先验证邮箱：打开我们发给你的邮件，点里面的链接。",
+      "link_expired": "这个链接已经失效或已经用过了。请在下面登录；如果邮箱还没验证，我们会帮你重新发链接。",
+      "callback_failed": "登录没能完成。如果你刚验证完邮箱，请用密码登录。",
       "oauth_failed": "Google 登录没有完成，请再试一次。"
     },
     "errors": {
@@ -646,6 +706,39 @@
       "yourChange": "你的修改",
       "editedFromLabel": "修改自",
       "sourceDeleted": "原作品已删除"
+    },
+    "checkout": {
+      "metaTitle": "付款结果",
+      "titlePlan": "你已开通{tier}",
+      "titlePack": "已到账 {count} 积分",
+      "subPlan": "{count} 积分已到账，去做张图吧。",
+      "subPack": "积分已经在你的账号里了，去做张图吧。",
+      "added": "本次到账",
+      "balance": "当前余额",
+      "unit": "积分",
+      "renews": "下次续费",
+      "renewsValue": "{date, date, medium} · {price}",
+      "paid": "已支付",
+      "paidCard": "{amount} · {brand} ···· {last4}",
+      "paidMethod": "{amount} · {method, select, alipay {支付宝} other {银行卡}}",
+      "start": "开始创作",
+      "receipt": "收据",
+      "manage": "在「我的」里管理",
+      "backToPartner": "返回 Graylum",
+      "fineMonthly": "自动续费，随时可以在「我的」里取消。",
+      "fineYearly": "一年的积分已经全部到账。自动续费，随时可以在「我的」里取消。",
+      "finePeriod": "一次性支付 {period, select, year {1 年} other {30 天}}，不会自动续费；到期后可以在「我的」里续费。",
+      "finePack": "一次性付款，不会续费。",
+      "titlePending": "正在确认付款",
+      "subPendingAlipay": "支付宝还在确认这笔付款，通常不到一分钟。确认后积分会自动到账，你可以先离开这个页面。",
+      "subPending": "付款已成功，正在为你加积分，通常几秒钟就好。你可以先离开这个页面。",
+      "order": "订单",
+      "amount": "金额",
+      "orderPlan": "{tier} · {period, select, year {1 年} other {1 个月}} · {count} 积分",
+      "orderPack": "{count} 积分",
+      "checkAgain": "再查一次",
+      "backToCreate": "返回创作",
+      "finePending": "如果 10 分钟后「我的」里还没有显示，请写信到 {email}，附上付款时间。"
     }
   },
   "paywall": {
@@ -708,8 +801,6 @@
     "redirecting": "正在打开安全付款页…",
     "error": "付款页没能打开，请稍后再试。",
     "choose": "选择{tier}",
-    "thanks": "感谢购买！积分一分钟内到账，没看到的话请刷新页面。",
-    "backToPartner": "返回 Graylum",
     "perCreditShort": "每积分 {price}",
     "savingLabel": "<vs>比按月付</vs>每年省",
     "savingAmount": "{amount}",
@@ -720,7 +811,9 @@
     "payNoteCard": "套餐自动续费，随时可取消",
     "payNoteWallet": "一次性支付 30 天或 1 年，不自动续费",
     "payNoteOnce": "一次性支付 30 天或 1 年",
-    "payNotePacks": "积分包一律一次性付款。"
+    "payNotePacks": "积分包一律一次性付款。",
+    "cancelled": "<b>已取消付款。</b>没有扣款。",
+    "cancelledClose": "关闭"
   },
   "announcement": {
     "dismiss": "关闭公告"
@@ -795,5 +888,17 @@
     "title": "出了点问题",
     "body": "页面没能加载出来，请稍后再试。",
     "retry": "重试"
+  },
+  "legal": {
+    "pagesLabel": "法律文件",
+    "pages": {
+      "terms": "服务条款",
+      "privacy": "隐私政策",
+      "refunds": "退款政策",
+      "acceptableUse": "使用规范"
+    },
+    "lastUpdated": "最后更新：<date></date>",
+    "contents": "目录",
+    "questions": "对本页有疑问，请发邮件到 <mail></mail>"
   }
 }

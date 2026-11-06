@@ -12,10 +12,11 @@ import { forwardRequest, hasSessionCookie, proxySupabase, updateSession, withCoo
 // static shell has gone out. These gates answer with a real status before rendering;
 // requireUser()/requireAdmin() in pages and actions stay as the authoritative check.
 const ADMIN = /^\/admin(\/|$)/
-// The app shell (Create, Photos, Wishlist, Account) is signed-in only (DESIGN §8.1).
+// The app shell (Create, Photos, Wishlist, Account, the checkout return) is signed-in only
+// (DESIGN §8.1).
 // /connect/graylum is gated as a page only: its form POST (…/authorize) handles a lost
 // session itself, since a 307 here would replay the POST against the login page.
-const SIGNED_IN = /^\/(account|generate|photos|wishlist|reset\/update)(\/|$)|^\/connect\/graylum\/?$/
+const SIGNED_IN = /^\/(account|checkout|generate|photos|wishlist|reset\/update)(\/|$)|^\/connect\/graylum\/?$/
 // Development-only harnesses (the T4 upload test): a real 404 everywhere else, in any language.
 const DEV_ONLY = /^\/generate\/upload-test\/?$/
 // Route handlers and files outside the locale tree: session refresh only, no locale routing.

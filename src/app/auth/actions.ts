@@ -4,6 +4,7 @@
 // (free credits) into core/auth, which may not import site/ itself.
 import {
   requestPasswordReset,
+  resendSignupEmail,
   signInWithGoogle,
   signInWithPassword,
   signOut,
@@ -23,6 +24,10 @@ export async function googleAction(_: FormState, form: FormData) {
 
 export async function signupAction(_: FormState, form: FormData) {
   return signUpWithPassword(form)
+}
+
+export async function resendSignupAction(_: FormState, form: FormData) {
+  return resendSignupEmail(form)
 }
 
 export async function resetRequestAction(_: FormState, form: FormData) {

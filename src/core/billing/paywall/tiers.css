@@ -225,3 +225,20 @@
     .pack-shell:hover .pack-card[data-tone]:not([data-selected="true"]) { box-shadow: inset 0 0 0 1px var(--pack-ring); }
   }
 }
+
+/* The checkout-cancel toast drops in from the top (T43); the return page's pending clock turns. */
+@keyframes sv-toast-in {
+  from { opacity: 0; transform: translate(-50%, -12px); }
+}
+@keyframes sv-return-tick {
+  to { transform: rotate(360deg); }
+}
+@layer components {
+  @media (prefers-reduced-motion: no-preference) {
+    .return-tick { animation: sv-return-tick 2.4s var(--ease) infinite; transform-origin: 12px 12px; }
+    .return-plate { animation: sv-return-rise 500ms var(--ease) both; }
+  }
+}
+@keyframes sv-return-rise {
+  from { opacity: 0; transform: translateY(10px); }
+}
