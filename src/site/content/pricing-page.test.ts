@@ -51,7 +51,7 @@ describe('/pricing page copy', () => {
 // DESIGN §4.5 and Stripe's merchant review: the renewal terms are on the page before purchase.
 describe('/pricing "Pay with"', () => {
   const render = (channel: 'stripe' | 'waffo') =>
-    renderToStaticMarkup(createElement(NextIntlClientProvider, { locale: 'en', messages }, createElement(PricingPayWith, { channel })))
+    renderToStaticMarkup(createElement(NextIntlClientProvider, { locale: 'en', messages, children: createElement(PricingPayWith, { channel }) }))
 
   it('Stripe: card renews and can be cancelled, Alipay pays once, packs are one-time', () => {
     const html = render('stripe')
