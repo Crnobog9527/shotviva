@@ -14,6 +14,7 @@ export const SHELL_COPY = {
     providers: '出图供应商',
     requests: '需求审核',
     announcements: '公告横幅',
+    features: '功能权限',
   },
 } as const
 

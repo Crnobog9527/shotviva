@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { AppError, toAppError } from './errors'
+import { AppError, TierRequiredError, toAppError } from './errors'
 
 describe('AppError', () => {
   it('maps codes to HTTP status and a client body', () => {
@@ -18,5 +18,11 @@ describe('AppError', () => {
   it('passes AppError through unchanged', () => {
     const original = new AppError('NOT_FOUND', 'Missing')
     expect(toAppError(original)).toBe(original)
+  })
+
+  it('a tier error is a 403 that names the tier the paywall should preselect', () => {
+    const error = new TierRequiredError('max')
+    expect(error.status).toBe(403)
+    expect(error.toBody()).toEqual({ code: 'TIER_REQUIRED', message: error.message, required_tier: 'max' })
   })
 })

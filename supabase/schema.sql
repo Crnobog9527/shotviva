@@ -589,6 +589,32 @@ $$;
 ALTER FUNCTION "public"."admin_search_users"("p_query" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_set_feature_access"("p_key" "text", "p_min_tier" "text", "p_open_to_all_at" timestamp with time zone, "p_actor" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if p_actor is null then
+    raise exception 'INVALID_INPUT' using detail = 'actor is required';
+  end if;
+  if p_min_tier is not null and p_min_tier not in ('pro', 'max') then
+    raise exception 'INVALID_INPUT' using detail = 'min_tier must be pro or max';
+  end if;
+
+  insert into public.feature_access (key, min_tier, open_to_all_at, updated_at, updated_by)
+  values (p_key, p_min_tier, p_open_to_all_at, now(), p_actor)
+  on conflict (key) do update
+    set min_tier = excluded.min_tier,
+        open_to_all_at = excluded.open_to_all_at,
+        updated_at = excluded.updated_at,
+        updated_by = excluded.updated_by;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_set_feature_access"("p_key" "text", "p_min_tier" "text", "p_open_to_all_at" timestamp with time zone, "p_actor" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_set_provider_key"("p_id" "uuid", "p_key" "text") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -1732,6 +1758,20 @@ ALTER TABLE "public"."credit_ledger" ALTER COLUMN "id" ADD GENERATED ALWAYS AS I
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."feature_access" (
+    "key" "text" NOT NULL,
+    "min_tier" "text",
+    "open_to_all_at" timestamp with time zone,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_by" "uuid",
+    CONSTRAINT "feature_access_key_check" CHECK (("key" ~ '^[a-z][a-z0-9_]{0,39}$'::"text")),
+    CONSTRAINT "feature_access_min_tier_check" CHECK (("min_tier" = ANY (ARRAY['pro'::"text", 'max'::"text"])))
+);
+
+
+ALTER TABLE "public"."feature_access" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."partner_links" (
     "user_id" "uuid" NOT NULL,
     "partner" "text" NOT NULL,
@@ -1935,6 +1975,11 @@ ALTER TABLE ONLY "public"."credit_ledger"
 
 ALTER TABLE ONLY "public"."credit_ledger"
     ADD CONSTRAINT "credit_ledger_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."feature_access"
+    ADD CONSTRAINT "feature_access_pkey" PRIMARY KEY ("key");
 
 
 
@@ -2149,6 +2194,11 @@ ALTER TABLE ONLY "public"."credit_ledger"
 
 
 
+ALTER TABLE ONLY "public"."feature_access"
+    ADD CONSTRAINT "feature_access_updated_by_fkey" FOREIGN KEY ("updated_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
 ALTER TABLE ONLY "public"."generation_jobs"
     ADD CONSTRAINT "generation_jobs_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON DELETE RESTRICT;
 
@@ -2226,6 +2276,9 @@ ALTER TABLE "public"."ai_providers" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."credit_ledger" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."feature_access" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."generation_jobs" ENABLE ROW LEVEL SECURITY;
@@ -2359,6 +2412,11 @@ GRANT ALL ON FUNCTION "public"."admin_review_template_request"("p_request_id" "u
 
 REVOKE ALL ON FUNCTION "public"."admin_search_users"("p_query" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_search_users"("p_query" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_set_feature_access"("p_key" "text", "p_min_tier" "text", "p_open_to_all_at" timestamp with time zone, "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_feature_access"("p_key" "text", "p_min_tier" "text", "p_open_to_all_at" timestamp with time zone, "p_actor" "uuid") TO "service_role";
 
 
 
@@ -2528,6 +2586,10 @@ GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."credit_ledg
 GRANT UPDATE ON SEQUENCE "public"."credit_ledger_id_seq" TO "anon";
 GRANT UPDATE ON SEQUENCE "public"."credit_ledger_id_seq" TO "authenticated";
 GRANT UPDATE ON SEQUENCE "public"."credit_ledger_id_seq" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."feature_access" TO "service_role";
 
 
 

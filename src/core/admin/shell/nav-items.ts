@@ -2,7 +2,7 @@ import { SHELL_COPY, type AdminNavKey } from './copy'
 
 export type AdminNavItem = { key: AdminNavKey; href: `/admin${string}`; label: string }
 
-// Order fixed by T23 / ARCHITECTURE §10.
+// Order fixed by T23 / ARCHITECTURE §10; later pages append.
 const ITEMS: readonly { key: AdminNavKey; href: `/admin${string}` }[] = [
   { key: 'overview', href: '/admin' },
   { key: 'users', href: '/admin/users' },
@@ -12,6 +12,8 @@ const ITEMS: readonly { key: AdminNavKey; href: `/admin${string}` }[] = [
   { key: 'providers', href: '/admin/providers' },
   { key: 'requests', href: '/admin/requests' },
   { key: 'announcements', href: '/admin/announcements' },
+  // T29 (ARCHITECTURE §6.2 新功能抢先用).
+  { key: 'features', href: '/admin/features' },
 ]
 
 // The review entry only exists while the wishlist does (ARCHITECTURE §15.6).

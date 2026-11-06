@@ -15,6 +15,8 @@ export const ERROR_CODES = [
   'CONFLICT',
   // Per-account generation limit (core/jobs/rate-limit.ts).
   'RATE_LIMITED',
+  // Membership tier below what the action needs (ARCHITECTURE §6.2); body carries required_tier.
+  'TIER_REQUIRED',
   // Upload checks (ARCHITECTURE §8.2): over 20MB, or not a JPEG/PNG/WebP we can decode.
   'IMAGE_TOO_LARGE',
   'IMAGE_UNSUPPORTED',
@@ -40,6 +42,7 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   AUTH_WEAK_PASSWORD: 422,
   CONFLICT: 409,
   RATE_LIMITED: 429,
+  TIER_REQUIRED: 403,
   IMAGE_TOO_LARGE: 422,
   IMAGE_UNSUPPORTED: 422,
   CONTENT_REJECTED: 422,
@@ -47,7 +50,9 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   INTERNAL: 500,
 }
 
-export type ErrorBody = { code: ErrorCode; message: string }
+export type RequiredTier = 'pro' | 'max'
+
+export type ErrorBody = { code: ErrorCode; message: string; required_tier?: RequiredTier }
 
 export class AppError extends Error {
   readonly code: ErrorCode
@@ -64,6 +69,21 @@ export class AppError extends Error {
 
   toBody(): ErrorBody {
     return { code: this.code, message: this.message }
+  }
+}
+
+// The paywall opens with this tier preselected (ARCHITECTURE §6.2).
+export class TierRequiredError extends AppError {
+  constructor(
+    readonly requiredTier: RequiredTier,
+    message = 'A higher membership tier is required',
+  ) {
+    super('TIER_REQUIRED', message)
+    this.name = 'TierRequiredError'
+  }
+
+  override toBody(): ErrorBody {
+    return { ...super.toBody(), required_tier: this.requiredTier }
   }
 }
 
