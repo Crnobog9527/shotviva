@@ -46,6 +46,9 @@ export type AdminPayment = {
   stripeInvoiceId: string | null
   stripeChargeId: string | null
   waffoOrderId: string | null
+  // The charge (PAY_…) a Waffo refund is made on; a subscription order has one per period (T50).
+  // Null on rows written before T50.
+  waffoPaymentId: string | null
   amountTotal: number
   amountTax: number
   amountRefunded: number

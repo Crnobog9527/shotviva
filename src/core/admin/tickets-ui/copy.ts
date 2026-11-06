@@ -55,6 +55,9 @@ export const TICKETS_COPY = {
     createdAt: '付款时间',
     openInStripe: '到 Stripe 后台退款 →',
     waffoHint: (id: string) => `到 Waffo 后台按订单号 ${id} 搜索并退款`,
+    // T50：订阅订单每期一笔扣款，退款要退到具体那一笔。
+    waffoChargeHint: (payment: string, order: string) => `到 Waffo 后台按扣款号 ${payment}（订单 ${order}）找到这笔扣款并退款`,
+    waffoSubscriptionNote: '退款不会停止 Waffo 订阅；要停止续费，请同时在 Waffo 后台取消这个订阅。',
     missing: '这笔付款已不存在。',
   },
   refund: {

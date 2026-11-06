@@ -110,6 +110,7 @@ const paymentRow = z.object({
   stripe_invoice_id: z.string().nullable(),
   stripe_charge_id: z.string().nullable(),
   waffo_order_id: z.string().nullable(),
+  waffo_payment_id: z.string().nullable(),
   amount_total: z.number(),
   amount_tax: z.number(),
   amount_refunded: z.number(),
@@ -120,7 +121,7 @@ const paymentRow = z.object({
 })
 
 const PAYMENT_COLUMNS =
-  'id, product_id, channel, stripe_session_id, stripe_invoice_id, stripe_charge_id, waffo_order_id, amount_total, amount_tax, amount_refunded, currency, method, status, created_at'
+  'id, product_id, channel, stripe_session_id, stripe_invoice_id, stripe_charge_id, waffo_order_id, waffo_payment_id, amount_total, amount_tax, amount_refunded, currency, method, status, created_at'
 
 function toPayment(row: z.infer<typeof paymentRow>): AdminPayment {
   return {
@@ -131,6 +132,7 @@ function toPayment(row: z.infer<typeof paymentRow>): AdminPayment {
     stripeInvoiceId: row.stripe_invoice_id,
     stripeChargeId: row.stripe_charge_id,
     waffoOrderId: row.waffo_order_id,
+    waffoPaymentId: row.waffo_payment_id,
     amountTotal: row.amount_total,
     amountTax: row.amount_tax,
     amountRefunded: row.amount_refunded,
