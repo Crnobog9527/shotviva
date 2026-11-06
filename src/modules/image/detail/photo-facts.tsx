@@ -22,6 +22,11 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
+function originalFact(original: OriginalSource, f: (key: 'originalKept' | 'originalEdited' | 'originalDeleted', values?: { px: number }) => string) {
+  if (original.kind === 'preview') return f('originalKept', { px: INPUT_PREVIEW_PX })
+  return f(original.kind === 'source' ? 'originalEdited' : 'originalDeleted')
+}
+
 // The facts table (T6 photo.html, T32): what was made, how, for how much, and whether the
 // upload's preview is still kept. Sizes and counts in mono, words in the sans.
 export function PhotoFacts({ item, original }: { item: PhotoItem; original: OriginalSource }) {
@@ -36,7 +41,7 @@ export function PhotoFacts({ item, original }: { item: PhotoItem; original: Orig
       {item.fileUrl ? <FormatRow fileUrl={item.fileUrl} className={ROW} /> : null}
       <Row label={f('credits')}>{mono(t('credits', { count: item.credits }))}</Row>
       <Row label={f('visibility')}>{f(VISIBILITY[workTagKey(item.creditPool, item.visibility)])}</Row>
-      <Row label={f('original')}>{original.kind === 'preview' ? f('originalKept', { px: INPUT_PREVIEW_PX }) : f('originalDeleted')}</Row>
+      <Row label={f('original')}>{originalFact(original, f)}</Row>
       <Row label={f('made')}>
         <PhotoWhen iso={item.createdAt} variant="made" />
       </Row>

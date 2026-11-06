@@ -2,7 +2,8 @@ import type { Job } from '@/core/jobs'
 import type { Translate } from '@/core/translate'
 
 // What the photo page shows beyond the result itself (T32): the user's upload and their note.
-export type OriginalSource = { kind: 'preview'; url: string } | { kind: 'deleted' }
+// An edit (T30) has no upload: its "Original" is the work it was edited from ('source').
+export type OriginalSource = { kind: 'preview'; url: string } | { kind: 'source'; url: string } | { kind: 'deleted' }
 export type PhotoDetail = { note: string | null; original: OriginalSource }
 
 // Only what the user typed into "Anything to change?", exactly as typed. The wrapper prompt is

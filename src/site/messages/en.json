@@ -288,6 +288,7 @@
       "today": "Today",
       "yesterday": "Yesterday",
       "fallbackName": "Photo",
+      "editedName": "Edited photo",
       "badgeAria": "{count} in progress",
       "pill": "{count, plural, one {Generating…} other {Generating #…}}",
       "doneMeta": "{when} · {size} · {tier}",
@@ -343,6 +344,7 @@
         "visibilityPublic": "Public",
         "original": "Original",
         "originalKept": "Kept, {px} px preview",
+        "originalEdited": "The photo you edited",
         "originalDeleted": "Deleted per our privacy rules",
         "made": "Made"
       }
@@ -499,6 +501,34 @@
       "showMore": "Show more",
       "loading": "Loading…",
       "loadFailed": "Couldn't load more. Try again."
+    },
+    "edit": {
+      "open": "Edit",
+      "title": "Edit this photo",
+      "meta": "{name} · {size} · {tier}",
+      "thisPhoto": "This photo",
+      "hint": "Say what to change. Everything else stays as it is.",
+      "label": "What would you like to change?",
+      "placeholder": "e.g. Make the sofa blue, put it on a beach, remove the price tag",
+      "counter": "{count} / {max}",
+      "required": "Say what to change first.",
+      "examples": "Examples",
+      "tries": {
+        "beach": "Put it on a beach",
+        "background": "Make the background pale blue",
+        "brighter": "Make it brighter"
+      },
+      "size": "Size",
+      "sizeFixed": "Same as the original. The framing stays; only what you ask for changes.",
+      "noticeEmpty": "Write what to change, in any language. <b>The original is kept.</b>",
+      "noticeReady": "Makes a new photo; the original stays in Photos.",
+      "noticeFree": "Makes a new photo; the original stays in Photos. <b>Uses free credits: public with a watermark.</b>",
+      "failTitle": "The edit failed",
+      "failUntouched": "The original is untouched.",
+      "changeRequest": "Change the request",
+      "titleEdited": "{name} (edit)",
+      "yourChange": "Your change",
+      "editedFromLabel": "Edited from"
     }
   },
   "paywall": {

@@ -3,7 +3,7 @@ import type { MembershipTier } from '@/core/config'
 import type { JobView } from '@/core/jobs'
 import type { OutputAspect, Resolution } from '@/core/templates'
 
-import type { GenerateBody } from './job-api'
+import type { JobBody } from './job-api'
 
 // A generation this browser started, tracked across pages until it settles (DESIGN §4.4:
 // leave the workspace, the job keeps going and lands in Photos). A batch (ARCHITECTURE §6.2
@@ -33,7 +33,7 @@ export type TrackedJob = {
   retryAt?: number
   status: JobStatus
   // The request, so a reload can send it again under the same id and Retry can repeat it.
-  body?: GenerateBody
+  body?: JobBody
   fileUrl: string | null
   creditPool: CreditPool | null
   failure: JobFailure | null
