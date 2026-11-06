@@ -67,7 +67,9 @@ export {
   type UserJob,
 } from './users'
 export {
-  estimateCosts,
+  costSummary,
+  legacyEstimate,
+  modelCosts,
   filtersHref,
   JOBS_COPY,
   JobsView,
@@ -75,7 +77,9 @@ export {
   listTemplateOptions,
   parseJobFilters,
   type AdminJob,
+  type CostSummary,
   type JobFilters,
+  type UnitCost,
 } from './jobs'
 export {
   DASHBOARD_DAYS,
@@ -111,3 +115,16 @@ export {
   type FeatureSetting,
 } from './features'
 export { FEATURES_COPY, FeaturesEditor, type FeatureAdminActions } from './features-editor'
+export {
+  clearCostSettings,
+  COSTS_CACHE_TAG,
+  COSTS_COPY,
+  COSTS_DAYS,
+  CostsView,
+  loadAdminKeyStatus,
+  loadBilled,
+  loadOurDailyCosts,
+  saveCostSettings,
+  type CostKeyActions,
+  type CostSettingsInput,
+} from './costs'

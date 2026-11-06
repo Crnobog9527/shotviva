@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import type { AdminProvider } from '../providers/types'
 
 import { PROVIDERS_COPY as COPY } from './copy'
+import { PricesCell } from './prices-cell'
 
 type Props = {
   providers: AdminProvider[]
@@ -22,7 +23,7 @@ type Props = {
 // UTC and fixed, so the server render and the browser agree.
 const formatUpdatedAt = (iso: string) => `${new Date(iso).toISOString().slice(0, 16).replace('T', ' ')} UTC`
 
-const COLUMNS = ['label', 'adapter', 'baseUrl', 'model', 'key', 'status', 'updatedAt'] as const
+const COLUMNS = ['label', 'adapter', 'baseUrl', 'model', 'key', 'prices', 'status', 'updatedAt'] as const
 
 export function ProvidersTable({ providers, testResults, testing, pending, onEdit, onTest, onActivate }: Props) {
   if (providers.length === 0) return <p className="text-muted-foreground py-8 text-center text-sm">{COPY.empty}</p>
@@ -49,6 +50,9 @@ export function ProvidersTable({ providers, testResults, testing, pending, onEdi
               <TableCell className="font-mono text-xs">{provider.baseUrl}</TableCell>
               <TableCell className="font-mono text-xs">{provider.model}</TableCell>
               <TableCell className="font-mono text-xs">{COPY.keyMasked(provider.apiKeyLast4)}</TableCell>
+              <TableCell>
+                <PricesCell prices={provider.prices} />
+              </TableCell>
               <TableCell>
                 <Badge variant={provider.isActive ? 'default' : 'secondary'}>{provider.isActive ? COPY.active : COPY.inactive}</Badge>
               </TableCell>

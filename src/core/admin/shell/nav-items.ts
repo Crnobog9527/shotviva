@@ -10,6 +10,8 @@ const ITEMS: readonly { key: AdminNavKey; href: `/admin${string}` }[] = [
   { key: 'tickets', href: '/admin/tickets' },
   { key: 'orders', href: '/admin/orders' },
   { key: 'jobs', href: '/admin/jobs' },
+  // T33 (ARCHITECTURE §10.0), next to the jobs whose cost it reconciles.
+  { key: 'costs', href: '/admin/costs' },
   { key: 'templates', href: '/admin/templates' },
   { key: 'providers', href: '/admin/providers' },
   { key: 'requests', href: '/admin/requests' },

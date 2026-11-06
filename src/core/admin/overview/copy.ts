@@ -34,5 +34,16 @@ export const OVERVIEW_COPY = {
     noProvider: '没有在用的供应商',
     never: '还没有',
   },
+  cost: {
+    title: '出图成本',
+    note: '供应商回传的用量 × 结算时的单价；T33 之前的老任务按旧单价估算并单独标出。',
+    reconcile: '和 OpenAI 账单对账 →',
+    perImage: (amount: string) => `单张平均 ${amount}`,
+    estimated: (amount: string) => `含估算 ${amount}`,
+    uncosted: (n: number) => `${n} 单无法计算`,
+    trendTitle: (days: number) => `近 ${days} 天每日成本`,
+    trendDay: (day: string, real: string, estimated: string | null) =>
+      estimated ? `${day}：真实 ${real}，老任务估算 ${estimated}` : `${day}：${real}`,
+  },
   error: '统计读取失败，请稍后刷新。',
 } as const

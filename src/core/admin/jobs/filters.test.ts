@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 
-import { estimateCosts } from './cost'
 import { beijingDayStart, filtersHref, parseJobFilters } from './filters'
 
 describe('job filters', () => {
@@ -24,18 +23,5 @@ describe('job filters', () => {
   it('builds page links that keep the filters', () => {
     expect(filtersHref({ status: 'failed', cursor: 'old' }, 'next')).toBe('/admin/jobs?status=failed&cursor=next')
     expect(filtersHref({}, null)).toBe('/admin/jobs')
-  })
-
-  it('estimates cost from succeeded images only, unknown resolutions left out', () => {
-    const { rows, total } = estimateCosts(
-      [
-        { model: 'gpt-image-2', resolution: '2k', jobs: 10, succeeded: 8 },
-        { model: 'x', resolution: '8k', jobs: 1, succeeded: 1 },
-      ],
-      { '2k': 0.1 },
-    )
-    expect(rows[0]?.cost).toBeCloseTo(0.8)
-    expect(rows[1]?.cost).toBeNull()
-    expect(total).toBeCloseTo(0.8)
   })
 })

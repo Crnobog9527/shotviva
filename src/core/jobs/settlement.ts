@@ -4,6 +4,7 @@ import { z } from 'zod'
 
 import { callRpc, type RpcClient } from '@/core/billing'
 
+import type { ProviderUsage } from './provider'
 import { JOB_MODULES, JOB_SOURCES, JOB_VISIBILITIES, jobRowSchema, type Job, type JobVisibility } from './job-schema'
 
 // Synchronous generation settlement (ARCHITECTURE §4): reserveJob before calling the
@@ -49,28 +50,36 @@ export async function reserveJob(client: RpcClient, input: ReserveJobInput): Pro
   )
 }
 
-export async function confirmJob(
-  client: RpcClient,
-  input: { jobId: string; outputKey: string },
-): Promise<Job> {
-  const args = z.object({ jobId: z.uuid(), outputKey: z.string().min(1) }).parse(input)
+// What the provider reported using and the cost worked out from it (T33); both optional, and
+// written in the same call that settles the job.
+export type JobCost = { usage?: ProviderUsage | null; costUsd?: number | null }
+
+const tokens = z.number().int().nonnegative().optional()
+const costSchema = {
+  usage: z
+    .object({ input_text_tokens: tokens, input_image_tokens: tokens, output_tokens: tokens, decision_input_tokens: tokens, decision_output_tokens: tokens })
+    .strict()
+    .nullable()
+    .default(null),
+  costUsd: z.number().nonnegative().nullable().default(null),
+}
+
+export async function confirmJob(client: RpcClient, input: { jobId: string; outputKey: string } & JobCost): Promise<Job> {
+  const args = z.object({ jobId: z.uuid(), outputKey: z.string().min(1), ...costSchema }).parse(input)
   return callRpc(
     client,
     'confirm_job',
-    { p_job_id: args.jobId, p_output_key: args.outputKey },
+    { p_job_id: args.jobId, p_output_key: args.outputKey, p_provider_usage: args.usage, p_cost_usd: args.costUsd },
     jobRowSchema,
   )
 }
 
-export async function refundJob(
-  client: RpcClient,
-  input: { jobId: string; errorCode: string },
-): Promise<Job> {
-  const args = z.object({ jobId: z.uuid(), errorCode: z.string().min(1) }).parse(input)
+export async function refundJob(client: RpcClient, input: { jobId: string; errorCode: string } & JobCost): Promise<Job> {
+  const args = z.object({ jobId: z.uuid(), errorCode: z.string().min(1), ...costSchema }).parse(input)
   return callRpc(
     client,
     'refund_job',
-    { p_job_id: args.jobId, p_error_code: args.errorCode },
+    { p_job_id: args.jobId, p_error_code: args.errorCode, p_provider_usage: args.usage, p_cost_usd: args.costUsd },
     jobRowSchema,
   )
 }

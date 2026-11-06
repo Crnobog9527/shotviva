@@ -25,7 +25,7 @@ export function JobsView({ filters, page, templates, usage, unitCost, support }:
     <div className="grid gap-6">
       <StuckJobsPanel jobs={support.stuck} refund={support.refundStuck} />
       <JobsFilters filters={filters} templates={templates} />
-      <JobsTable jobs={page.items} actions={support.actions} />
+      <JobsTable jobs={page.items} actions={support.actions} unitCost={unitCost} />
       <div className="flex gap-4 text-sm">
         {filters.cursor ? (
           <Link href={filtersHref(filters, null)} className="text-primary hover:underline">
