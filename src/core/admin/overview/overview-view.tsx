@@ -1,7 +1,9 @@
+import type { UnitCost } from '../jobs/cost'
 import { usd } from '../orders/money'
 import type { RevenueStats } from '../orders/revenue'
 import { StatCard } from '../shell/admin-blocks'
 import { OVERVIEW_COPY as COPY } from './copy'
+import { CostSection } from './cost-section'
 import { successRate, type DashboardStats, type StatsWindow } from './stats'
 import type { TodoCounts } from './todo'
 import { TodoStrip } from './todo-strip'
@@ -46,9 +48,15 @@ function WindowCards({ window, days, revenue }: { window: StatsWindow; days: num
   )
 }
 
-type Props = { stats: DashboardStats; revenue: RevenueStats; todo: { counts: TodoCounts; wishlist: boolean } }
+type Props = {
+  stats: DashboardStats
+  revenue: RevenueStats
+  todo: { counts: TodoCounts; wishlist: boolean }
+  // Old per-image constant for pre-T33 jobs (modules/image GENERATION_COST_USD).
+  unitCost: UnitCost
+}
 
-export function OverviewView({ stats, revenue, todo }: Props) {
+export function OverviewView({ stats, revenue, todo, unitCost }: Props) {
   return (
     <div className="grid gap-6">
       <TodoStrip todo={todo.counts} wishlist={todo.wishlist} />
@@ -58,6 +66,7 @@ export function OverviewView({ stats, revenue, todo }: Props) {
       ))}
       <TrendChart trend={stats.trend} days={stats.days} />
       <RevenueTrend trend={revenue.trend} days={revenue.days} />
+      <CostSection stats={stats} unitCost={unitCost} />
     </div>
   )
 }

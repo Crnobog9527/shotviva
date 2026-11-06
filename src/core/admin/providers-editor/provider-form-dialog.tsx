@@ -12,6 +12,7 @@ import type { AdminProvider } from '../providers/types'
 
 import { PROVIDERS_COPY } from './copy'
 import { canSave, formFor, type ProviderForm } from './form-state'
+import { PriceFields } from './price-fields'
 
 type Props = {
   // null for a new provider.
@@ -75,6 +76,7 @@ export function ProviderFormDialog({ provider, pending, error, onCancel, onSubmi
           >
             <Input id="provider-apiKey" type="password" autoComplete="new-password" className="font-mono" value={form.apiKey} onChange={set('apiKey')} />
           </Field>
+          <PriceFields form={form} onChange={(field, value) => setForm((prev) => ({ ...prev, [field]: value }))} />
           <Field id="notes" label={COPY.notes}>
             <Textarea id="provider-notes" maxLength={500} value={form.notes} onChange={set('notes')} />
           </Field>

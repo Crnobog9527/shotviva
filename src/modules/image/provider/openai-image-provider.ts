@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { ProviderError, type GenerationProvider, type ProviderInput, type ProviderOutput } from '@/core/jobs'
 
 import { toProviderError } from './openai-errors'
+import { parseOpenAIUsage } from './openai-usage'
 import { formatSize, outputSize } from './output-size'
 
 // The 'openai_images' adapter (ARCHITECTURE §3.2–3.3): OpenAI's Images API shape, at the official
@@ -73,11 +74,12 @@ export function createOpenAIImageProvider(config: OpenAIImageConfig): Generation
     async generate(input): Promise<ProviderOutput> {
       const response = await send(config, input)
       if (!response.ok) throw await toProviderError(response)
-      const parsed = responseSchema.safeParse(await response.json().catch(() => null))
-      if (!parsed.success) throw new ProviderError('failed', 'openai returned no image')
-      const first = parsed.data.data[0]
-      if (!first) throw new ProviderError('failed', 'openai returned no image')
-      return { bytes: new Uint8Array(Buffer.from(first.b64_json, 'base64')), contentType: 'image/png' }
+      const body: unknown = await response.json().catch(() => null)
+      // A 200 without an image is still billed for what it used (T33).
+      const usage = parseOpenAIUsage(body)
+      const first = responseSchema.safeParse(body).data?.data[0]
+      if (!first) throw new ProviderError('failed', 'openai returned no image', { usage })
+      return { bytes: new Uint8Array(Buffer.from(first.b64_json, 'base64')), contentType: 'image/png', usage }
     },
   }
 }

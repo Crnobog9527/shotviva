@@ -12,6 +12,13 @@ const blankAsUndefined = (value: unknown) => {
   return trimmed === '' ? undefined : trimmed
 }
 
+// US dollars per million tokens (T33). Blank means "not filled in" and is stored as null; the
+// page flags it. numeric(12, 6) in ai_providers.
+const pricePerM = z.preprocess(
+  (value) => blankAsUndefined(value) ?? null,
+  z.coerce.number().finite().nonnegative().max(999_999).nullable(),
+)
+
 export const saveProviderSchema = z.object({
   // Absent for a new row.
   id: z.uuid().optional(),
@@ -26,6 +33,9 @@ export const saveProviderSchema = z.object({
   // Write-only: blank keeps the stored key (ARCHITECTURE §3.3).
   apiKey: z.preprocess(blankAsUndefined, apiKeySchema.optional()),
   notes: z.preprocess(blankAsUndefined, z.string().trim().max(500).optional()),
+  priceInputTextPerM: pricePerM,
+  priceInputImagePerM: pricePerM,
+  priceOutputPerM: pricePerM,
 })
 
 export type SaveProviderInput = z.input<typeof saveProviderSchema>
