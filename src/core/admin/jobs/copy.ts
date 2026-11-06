@@ -34,7 +34,7 @@ export const JOBS_COPY = {
   cost: {
     estimate: (amount: string) => `估算 ${amount}`,
     uncosted: '无法计算',
-    uncostedHint: '供应商回了用量，但当时的单价没填全',
+    uncostedHint: '供应商回了用量，但当时后台没填单价、价目表里也没有这个模型',
     estimateHint: 'T33 之前的任务没有用量，按旧的每张单价估算',
   },
   empty: '没有符合条件的出图任务。',

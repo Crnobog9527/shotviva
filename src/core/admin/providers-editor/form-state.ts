@@ -1,4 +1,5 @@
 import type { ProviderPrices } from '@/core/jobs'
+import { effectivePrices, officialPrice } from '@/core/jobs/model-prices'
 import { MODULE_ADAPTER, type ProviderModule } from '@/core/providers/types'
 
 import type { AdminProvider, SaveProviderInput } from '../providers/types'
@@ -38,7 +39,7 @@ const priceText = (value: number | null) => (value === null ? '' : String(value)
 
 export function formFor(provider: AdminProvider | null, module: ProviderModule = 'image'): ProviderForm {
   if (!provider) return { ...DEFAULT_FORM, module }
-  return {
+  return fillOfficial({
     module: provider.module,
     label: provider.label,
     baseUrl: provider.baseUrl,
@@ -48,7 +49,7 @@ export function formFor(provider: AdminProvider | null, module: ProviderModule =
     priceInputTextPerM: priceText(provider.prices.inputTextPerM),
     priceInputImagePerM: priceText(provider.prices.inputImagePerM),
     priceOutputPerM: priceText(provider.prices.outputPerM),
-  }
+  })
 }
 
 // The prices each module's jobs are costed with. The decision step (T30) is billed as input and
@@ -60,9 +61,69 @@ export const MODULE_PRICE_FIELDS: Record<ProviderModule, readonly PriceField[]> 
 
 const PRICE_OF = { priceInputTextPerM: 'inputTextPerM', priceInputImagePerM: 'inputImagePerM', priceOutputPerM: 'outputPerM' } as const
 
-// A provider without the prices its module needs cannot cost its jobs; the list flags it (T33).
-export function missingPrices(prices: ProviderPrices, module: ProviderModule = 'image'): boolean {
-  return MODULE_PRICE_FIELDS[module].some((field) => prices[PRICE_OF[field]] === null)
+// A provider without the prices its module needs, in its row or in the price table for its
+// model, cannot cost its jobs; the list flags it (T33, §10.0).
+export function missingPrices(prices: ProviderPrices, module: ProviderModule = 'image', model = ''): boolean {
+  const effective = effectivePrices(model, prices)
+  return MODULE_PRICE_FIELDS[module].some((field) => (effective?.[PRICE_OF[field]] ?? null) === null)
+}
+
+// Fields the row leaves empty that the price table fills; the list says so.
+export function pricesFromTable(prices: ProviderPrices, module: ProviderModule, model: string): string | null {
+  const entry = officialPrice(model)
+  if (!entry) return null
+  const filled = MODULE_PRICE_FIELDS[module].some((field) => prices[PRICE_OF[field]] === null && entry.prices[PRICE_OF[field]] !== null)
+  return filled ? entry.asOf : null
+}
+
+// The official price (MODEL_PRICES) for this form's model, as the form's text; '' where none.
+function officialText(module: ProviderModule, model: string): Partial<Record<PriceField, string>> {
+  const official = officialPrice(model)?.prices
+  if (!official) return {}
+  return Object.fromEntries(MODULE_PRICE_FIELDS[module].map((field) => [field, priceText(official[PRICE_OF[field]])]))
+}
+
+// Opening a row whose prices are blank: pre-fill them from the price table (§10.0).
+function fillOfficial(form: ProviderForm): ProviderForm {
+  const official = officialText(form.module, form.model)
+  const filled = { ...form }
+  for (const field of MODULE_PRICE_FIELDS[form.module]) {
+    if (filled[field].trim() === '' && official[field]) filled[field] = official[field]
+  }
+  return filled
+}
+
+// Typing a model name: a price field that is blank or still shows the previous model's official
+// price follows the new model's (blank when the table has none). One the Owner typed stays.
+export function withModel(form: ProviderForm, model: string): ProviderForm {
+  const before = officialText(form.module, form.model)
+  const after = officialText(form.module, model)
+  const next = { ...form, model }
+  for (const field of MODULE_PRICE_FIELDS[form.module]) {
+    const value = form[field].trim()
+    if (value === '' || value === before[field]) next[field] = after[field] ?? ''
+  }
+  return next
+}
+
+export type PriceOrigin =
+  | { kind: 'official'; asOf: string }
+  | { kind: 'edited'; asOf: string }
+  | { kind: 'none' }
+  | null
+
+// What the price fields show against the table: the official price, an override of it, or a
+// model the table does not know. null before a model is typed.
+export function priceOrigin(form: ProviderForm): PriceOrigin {
+  if (form.model.trim() === '') return null
+  const entry = officialPrice(form.model)
+  if (!entry) return { kind: 'none' }
+  const official = officialText(form.module, form.model)
+  const same = MODULE_PRICE_FIELDS[form.module].every((field) => {
+    const typed = form[field].trim()
+    return typed === '' || Number(typed) === Number(official[field])
+  })
+  return { kind: same ? 'official' : 'edited', asOf: entry.asOf }
 }
 
 // Blank or a non-negative decimal; anything else keeps Save disabled.

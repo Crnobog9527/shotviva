@@ -51,7 +51,7 @@ export function ProvidersTable({ providers, testResults, testing, pending, onEdi
               <TableCell className="font-mono text-xs">{provider.model}</TableCell>
               <TableCell className="font-mono text-xs">{COPY.keyMasked(provider.apiKeyLast4)}</TableCell>
               <TableCell>
-                <PricesCell prices={provider.prices} module={provider.module} />
+                <PricesCell prices={provider.prices} module={provider.module} model={provider.model} />
               </TableCell>
               <TableCell>
                 <Badge variant={provider.isActive ? 'default' : 'secondary'}>{provider.isActive ? COPY.active : COPY.inactive}</Badge>
