@@ -634,7 +634,7 @@ Owner 2026-11-04 决定：**不在 flux-kontext-template 上原地改造**，新
 - **v1 不建 `/templates`**：上线只有 6~8 个模板，首页已全部展示，另建一页会和首页内容重复、抢同一个词（建站规格 R1）。
 - **建 `/templates` 的两个条件，同时满足才建**：① 模板数量达到 20 个以上；② 给它找到一个和首页不撞词、核实过美国搜索量和哥飞版 KD 的独立主词（如 `ai food photo templates` 这一类），并登记进主词表 CSV。建好后首页只放精选模板，`/templates` 放完整模板库和分类筛选；分类页以后按创作库标签页的规则接长尾词。
 - 「我的作品」页要有，`noindex`。
-- 账号页要有：「Integrations / 集成」区块（Owner 2026-11-06，T34）：列出可连接的外部产品，现在只有 Graylum 一行，显示状态「Enabled / 已启用」或「Not enabled / 未启用」，点进去是连接 / 断开（第 14 节）；以后加别的集成就在这里加一行，不在账号页单独放；**删除账号**（服务端路由：`auth.admin.deleteUser` + 按 `inputs/{user_id}/`、`outputs/{user_id}/`、`requests/{user_id}/` 前缀清 R2 + `generation_jobs` 级联），`noindex`。
+- 账号页要有：「Integrations / 集成」区块（Owner 2026-11-06，T34）：列出可连接的外部产品，现在只有 Graylum 一行，显示状态「Enabled / 已启用」或「Not enabled / 未启用」，点进去是连接 / 断开（第 14 节）；以后加别的集成就在这里加一行，不在账号页单独放；**删除账号**（服务端路由：**先在 Stripe 立即取消这个用户所有未结束的订阅**（`subscriptions.cancel`，不按比例退款；任何一个取消失败就整件事停下、不删号，提示用户稍后再试或联系客服，Owner 2026-11-06 发现删号后 Stripe 仍会续费扣款），再 `auth.admin.deleteUser` + 按 `inputs/{user_id}/`、`outputs/{user_id}/`、`requests/{user_id}/` 前缀清 R2 + `generation_jobs` 级联；Waffo 没有订阅，不用处理），`noindex`。
 - **Graylum 连接器的 Shotviva 侧随 v1 一起上线**（Owner 2026-11-05 拍板），见第 14 节。
 - 应用页用第 1 节的 `(app)` 应用壳，按 DESIGN.md 第 8 节先出手机稿。
 - **模板需求墙（Wishlist）随 v1 上线**（Owner 2026-11-05 决定），占应用壳第四个 tab，见第 15 节。
