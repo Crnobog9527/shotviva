@@ -795,5 +795,17 @@
     "title": "出了点问题",
     "body": "页面没能加载出来，请稍后再试。",
     "retry": "重试"
+  },
+  "legal": {
+    "pagesLabel": "法律文件",
+    "pages": {
+      "terms": "服务条款",
+      "privacy": "隐私政策",
+      "refunds": "退款政策",
+      "acceptableUse": "使用规范"
+    },
+    "lastUpdated": "最后更新：<date></date>",
+    "contents": "目录",
+    "questions": "对本页有疑问，请发邮件到 <mail></mail>"
   }
 }

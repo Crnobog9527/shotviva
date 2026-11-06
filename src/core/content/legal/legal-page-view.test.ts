@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 import { testSite } from '../../seo/test-site'
 import { SiteFooter } from '../blocks/site-footer'
-import { defineLegalPage, formatLegalDate } from './legal-page'
+import { defineLegalPage, formatLegalDate, type LegalPage } from './legal-page'
 import { LegalPageView } from './legal-page-view'
 
 const page = defineLegalPage({
@@ -29,22 +29,50 @@ const page = defineLegalPage({
   ],
 })
 
-describe('LegalPageView', () => {
-  it('renders headings, a table of contents, links, lists and the address as HTML', () => {
-    const html = renderToStaticMarkup(createElement(LegalPageView, { page }))
-    expect(html).toContain('<h1')
-    expect(html).toContain('<time dateTime="2026-11-05">November 5, 2026</time>')
+const legal = {
+  pagesLabel: 'Legal pages',
+  lastUpdated: 'Last updated <date></date>',
+  contents: 'Contents',
+  questions: 'Questions about this page: <mail></mail>',
+}
+const nav = [
+  { href: '/terms', label: 'Terms', current: true },
+  { href: '/privacy', label: 'Privacy', current: false },
+]
+
+function render(input: LegalPage = page) {
+  const provider: ComponentProps<typeof NextIntlClientProvider> = {
+    locale: 'en',
+    messages: { legal },
+    children: createElement(LegalPageView, { page: input, nav, email: 'hi@example.com' }),
+  }
+  return renderToStaticMarkup(createElement(NextIntlClientProvider, provider))
+}
+
+describe('LegalPageView (legal.html, T45)', () => {
+  it('renders the title, the date, the four-page pills, the contents and the numbered text as HTML', () => {
+    const html = render()
+    expect(html).toContain('<h1>Terms of Service</h1>')
+    expect(html).toContain('Last updated <time dateTime="2026-11-05">5 November 2026</time>')
+    expect(html).toMatch(/<a[^>]*aria-current="page"[^>]*href="\/terms"|<a[^>]*href="\/terms"[^>]*aria-current="page"/)
     expect(html).toContain('href="#credits"')
-    expect(html).toContain('id="credits"')
-    expect(html).toContain('>1. Credits</h2>')
+    expect(html).toContain('<section id="credits" aria-labelledby="credits-heading" class="n">')
+    expect(html).toContain('<h2 id="credits-heading">Credits</h2>')
     expect(html).toContain('href="/refund-policy"')
     expect(html).toContain('href="mailto:hi@example.com"')
     expect(html).toContain('<li>One</li>')
-    expect(html).toMatch(/<address[^>]*>.*Example LLC.*1 Main St.*<\/address>/)
+    expect(html).toMatch(/<address>.*Example LLC.*1 Main St.*<\/address>/)
+    expect(html).toContain('Questions about this page: <a href="mailto:hi@example.com">hi@example.com</a>')
+  })
+
+  it('leaves a plain section out of the numbering', () => {
+    const html = render({ ...page, sections: [...page.sections, { id: 'third-party-notices', heading: 'Third-party notices', plain: true, blocks: ['MiSans'] }] })
+    expect(html).toContain('<section id="third-party-notices" aria-labelledby="third-party-notices-heading">')
+    expect(html).toContain('<li class="plain"><a href="#third-party-notices">')
   })
 
   it('formats the date in UTC regardless of the machine time zone', () => {
-    expect(formatLegalDate('2026-01-01')).toBe('January 1, 2026')
+    expect(formatLegalDate('2026-01-01')).toBe('1 January 2026')
   })
 })
 
