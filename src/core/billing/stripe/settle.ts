@@ -7,9 +7,11 @@ import type { ProductId } from '../../config'
 import { AppError } from '../../errors'
 import { creditChangeSchema, type CreditChange } from '../credits'
 import { callRpc, type RpcClient } from '../rpc'
+import type { PaymentFacts } from './payment-facts'
 
-// settle_checkout (0083): the subscription mirror and the grant in one call and one
-// transaction (AGENTS §5.1). Keyed by the session id, so a replay grants nothing.
+// settle_checkout (0083, payments row since 0101): the subscription mirror, the grant and the
+// payment record in one call and one transaction (AGENTS §5.1). Keyed by the session id, so a
+// replay grants and records nothing.
 
 export type SubscriptionState = {
   id: string
@@ -34,10 +36,17 @@ const inputSchema = z.object({ userId: z.uuid(), productId: z.string().min(1), s
 
 export async function settleCheckout(
   client: RpcClient,
-  input: { userId: string; productId: ProductId; sessionId: string; subscription: SubscriptionState | null },
+  input: {
+    userId: string
+    productId: ProductId
+    sessionId: string
+    subscription: SubscriptionState | null
+    payment: PaymentFacts
+  },
 ): Promise<CreditChange> {
   const args = inputSchema.parse(input)
   const sub = input.subscription
+  const pay = input.payment
   return callRpc(
     client,
     'settle_checkout',
@@ -45,6 +54,12 @@ export async function settleCheckout(
       p_user_id: args.userId,
       p_product_id: args.productId,
       p_session_id: args.sessionId,
+      p_amount_total: pay.amountTotal,
+      p_amount_tax: pay.amountTax,
+      p_currency: pay.currency,
+      p_method: pay.method,
+      p_invoice_id: pay.invoiceId,
+      p_charge_id: pay.chargeId,
       p_subscription_id: sub?.id ?? null,
       p_subscription_status: sub?.status ?? null,
       p_current_period_end: sub?.currentPeriodEnd.toISOString() ?? null,
