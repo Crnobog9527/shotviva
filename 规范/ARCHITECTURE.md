@@ -135,6 +135,8 @@ interface GenerationProvider {
 | `notes` | 备注 |
 | `created_at` / `updated_at` / `updated_by` | 审计 |
 
+**删除供应商**（Owner 2026-11-06）：后台供应商列表每行有「删除」，二次确认后调用 `admin_delete_provider(p_id)`：在用的那一行不能删（先把另一条设为在用，或先停用再删）；删除时连同它在 Vault 里的密钥一起删掉，在同一个事务里完成。出图记录里的 `provider` 是文字快照，删除不影响历史记录和成本。迁移编号段 `0300`～`0319`。
+
 切换在用的供应商用 SQL 函数 `admin_activate_provider(p_id)`：同一事务里把同模块其他行设为 `false`、这一行设为 `true`。
 
 **出图时怎么选**：`core` 按模块取 `is_active` 那一行（服务端缓存，打 `providers` 标签，后台改动后立即失效），解密密钥，交给模块注册的适配器生成。后台没有启用的供应商时，用环境变量兜底。伙伴接口走同一条路径。`generation_jobs.provider` 写 `<供应商 id 或 env>/<模型名>`，以后按模型算成本用。从 T17 起，模板 `model_params` 里的 `model` 不再生效，模型只由在用的供应商决定，防止换供应商后个别模板还在调旧模型；`background` 等其他参数照旧。
@@ -634,7 +636,7 @@ Owner 2026-11-04 决定：**不在 flux-kontext-template 上原地改造**，新
 - **v1 不建 `/templates`**：上线只有 6~8 个模板，首页已全部展示，另建一页会和首页内容重复、抢同一个词（建站规格 R1）。
 - **建 `/templates` 的两个条件，同时满足才建**：① 模板数量达到 20 个以上；② 给它找到一个和首页不撞词、核实过美国搜索量和哥飞版 KD 的独立主词（如 `ai food photo templates` 这一类），并登记进主词表 CSV。建好后首页只放精选模板，`/templates` 放完整模板库和分类筛选；分类页以后按创作库标签页的规则接长尾词。
 - 「我的作品」页要有，`noindex`。
-- 账号页要有：「Integrations / 集成」区块（Owner 2026-11-06，T34）：列出可连接的外部产品，现在只有 Graylum 一行，显示状态「Enabled / 已启用」或「Not enabled / 未启用」，点进去是连接 / 断开（第 14 节）；以后加别的集成就在这里加一行，不在账号页单独放；**删除账号**（服务端路由：`auth.admin.deleteUser` + 按 `inputs/{user_id}/`、`outputs/{user_id}/`、`requests/{user_id}/` 前缀清 R2 + `generation_jobs` 级联），`noindex`。
+- 账号页要有：「Integrations / 集成」区块（Owner 2026-11-06，T34）：列出可连接的外部产品，现在只有 Graylum 一行，显示状态「Enabled / 已启用」或「Not enabled / 未启用」，点进去是连接 / 断开（第 14 节）；以后加别的集成就在这里加一行，不在账号页单独放；**删除账号**（服务端路由：**先在 Stripe 立即取消这个用户所有未结束的订阅**（`subscriptions.cancel`，不按比例退款；任何一个取消失败就整件事停下、不删号，提示用户稍后再试或联系客服，Owner 2026-11-06 发现删号后 Stripe 仍会续费扣款），再 `auth.admin.deleteUser` + 按 `inputs/{user_id}/`、`outputs/{user_id}/`、`requests/{user_id}/` 前缀清 R2 + `generation_jobs` 级联；Waffo 没有订阅，不用处理），`noindex`。
 - **Graylum 连接器的 Shotviva 侧随 v1 一起上线**（Owner 2026-11-05 拍板），见第 14 节。
 - 应用页用第 1 节的 `(app)` 应用壳，按 DESIGN.md 第 8 节先出手机稿。
 - **模板需求墙（Wishlist）随 v1 上线**（Owner 2026-11-05 决定），占应用壳第四个 tab，见第 15 节。

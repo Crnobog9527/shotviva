@@ -1,42 +1,34 @@
+import { ChevronRight } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 
-import { Badge } from '../../ui/badge'
+import { cn } from '../../ui/cn'
 
 type Props = { name: string; description: string; enabled: boolean; children: ReactNode }
 
 // One external product in the account page's Integrations list (ARCHITECTURE §13). The row is a
-// native <details>, so it opens with a tap or the keyboard without client JS; the product's own
+// native <details>, so it opens with a tap or the keyboard without client JS: name and one line
+// on the left, the status pill and a safelight chevron on the right; the product's own
 // connect / disconnect block is the expanded content.
 export function IntegrationRow({ name, description, enabled, children }: Props) {
   const t = useTranslations('partner.integrations')
   return (
     <details className="group">
-      <summary className="press flex min-h-11 cursor-pointer list-none items-center gap-3 [&::-webkit-details-marker]:hidden">
-        <span className="grid min-w-0 flex-1 gap-1">
-          <span className="flex flex-wrap items-center gap-2 text-headline leading-[1.25] font-semibold">
-            {name}
-            <StatusBadge enabled={enabled} label={enabled ? t('enabled') : t('notEnabled')} />
-          </span>
-          <span className="text-body text-bone-dim">{description}</span>
+      <summary className="grid min-h-16 cursor-pointer list-none grid-cols-[1fr_auto_auto] items-center gap-x-3 gap-y-1 py-3 focus-visible:rounded-[10px] focus-visible:outline-offset-[-2px] [&::-webkit-details-marker]:hidden">
+        <b className="col-start-1 row-start-1 text-body leading-[1.3] font-semibold">{name}</b>
+        <span
+          data-status={enabled ? 'enabled' : 'not-enabled'}
+          className={cn(
+            'col-start-2 row-span-2 row-start-1 inline-flex h-7 items-center rounded-full px-2.5 text-caption leading-none font-semibold',
+            enabled ? 'bg-success-tint text-success' : 'bg-wash text-muted-foreground',
+          )}
+        >
+          {enabled ? t('enabled') : t('notEnabled')}
         </span>
-        <svg viewBox="0 0 24 24" aria-hidden="true" className="size-5 shrink-0 text-primary transition-transform group-open:rotate-90" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M9 6l6 6-6 6" />
-        </svg>
+        <ChevronRight aria-hidden strokeWidth={1.75} className="col-start-3 row-span-2 row-start-1 size-[18px] text-primary transition-transform duration-200 group-open:rotate-90 motion-reduce:transition-none" />
+        <small className="col-start-1 row-start-2 text-caption leading-[1.35] text-muted-foreground">{description}</small>
       </summary>
-      <div className="pt-3">{children}</div>
+      <div className="pb-4">{children}</div>
     </details>
-  )
-}
-
-function StatusBadge({ enabled, label }: { enabled: boolean; label: string }) {
-  return enabled ? (
-    <Badge data-status="enabled" className="bg-success-tint text-success">
-      {label}
-    </Badge>
-  ) : (
-    <Badge data-status="not-enabled" variant="outline" className="text-muted-foreground">
-      {label}
-    </Badge>
   )
 }
