@@ -9,7 +9,7 @@
 ## 1. 域名与品牌（已定稿，不再讨论）
 - 唯一域名：shotviva.com（已注册）。不使用 .ai，不做 301 跳转。
 - 商标：USPTO 已查，无 shotviva 冲突。
-- 品牌写法全站统一 Shotviva（Logo、Title 后缀、structured data 的 brand 字段、社交账号）。
+- 品牌写法全站统一 Shotviva，一个字不差（Logo、Title 后缀、页脚版权 `© 2026 Shotviva`、structured data 的 `name` / `brand`、`og:site_name`、社交账号；不写 Shotviva AI）。Title 后缀：首页以外的页面在 ≤60 字符内以 ` | Shotviva` 结尾；首页 Title 保持主词写法，等 GSC 里含 shotviva 的查询开始有曝光（通常上线后 4～8 周）再考虑加品牌后缀（Owner 2026-11-06，哥飞 GEO 建议）。X、Instagram、Product Hunt、LinkedIn 的 `shotviva` 账号由 Owner 尽快占住，填进 `site.config` 的 `sameAs`。
 - shotviva 与图片无字面关联，Logo 旁必须常驻 tagline："AI photo studio"（Owner 2026-11-05 定，改为通用写法；原 "AI food & product photo studio" 作废）；每个页面副标题也带一句功能说明。
 - 首页 footer 固定一行站方声明（唯一官方站点），并占用 X / Instagram / Product Hunt / LinkedIn 的 shotviva 账号名。
 
@@ -34,8 +34,8 @@ G2 Title 带年份与限定词：AI 联网会自己组带年份的搜索词，Ti
 G3 每个数字只能一套口径：免费额度（对外统一写 "3 free Standard images"，即注册送 6 个免费 credit = 3 张 Standard 档标准模板图，Owner 2026-11-05 定；其余计价仍用 credit，不说「张」）、价格（唯一来源是 site.config.ts；Owner 2026-11-05 定稿：Starter $19.90/月 50 credits 或 $191/年 600 credits，Pro $49.90/月 135 或 $479/年 1,620，Max $99/月 280 或 $713/年 3,360（年付 Owner 2026-11-06 改价：Starter / Pro 8 折，Max 6 折，取整）；积分包 $9.90/20、$24.90/55、$49.90/115；卡支付可订阅自动续费，钱包和积分包为单笔，见 规范/ARCHITECTURE.md §6.1、§6.2）、每张图消耗（按模板和清晰度：Standard / HD / Max 三档，即 1024 / 2048 / 2880 px，标准模板 2 / 4 / 6 credits，页面上写 "from 2 credits"；对外不写 1K / 2K / 3K，不写 4K）、支持语言数、出图耗时，全站（首页/价格页/FAQ/结构化数据/站外目录）完全一致；AI 交叉比对发现两套就不引用；改价一次改全站。
 G4 每页写死可核验事实，至少 3 条。全站通用的：免费额度（3 free Standard images）与价格档位；每张消耗（from 2 credits）；输出三档像素（Standard 1024 / HD 2048 / Max 2880 px）；上传限制（JPG / PNG / WebP，最大 20MB）；出图耗时（秒/张）；保留主体不变的技术说明。垂直页另加本行业的：餐饮页写 DoorDash/Uber Eats/Grubhub 菜单图推荐尺寸与比例，电商页写 Amazon / eBay / Etsy 主图要求，空间页写 Airbnb 封面图比例。
 G5 用 HTML 表格承载对比（成本、尺寸要求、模板分类），不用图片——AI 抽表格成功率显著高于段落。
-G6 FAQ 必须用用户原话。首页 8 句（通用；2026-11-05 定前 5 句，2026-11-06 Owner 按 GEO 审查加 F～H 并改写答案；首页 FAQ 以 8 句为上限，加第 9 句前要答得上「会被搜吗、和本页主词有关吗」）：
-A What is image to image AI?
+G6 FAQ 必须用用户原话。首页 9 句（通用；2026-11-05 定前 5 句，2026-11-06 Owner 按 GEO 审查加 F～I 并改写答案；首页 FAQ 以 9 句为上限，再加之前要答得上「会被搜吗、和本页主词有关吗」）。H2 保持 "Image to Image AI FAQ"，不改成品牌名：
+A What is image to image AI?（问题文字不动；答案首句固定为："Shotviva is an image to image AI tool that gives a photo you already have a new look while the subject stays as shot — in 3 steps: upload one phone photo, pick a template, choose Standard, HD or Max." 一句同时给出品牌实体和主词）
 B Is image to image AI free?（答：new users get 3 free Standard images，之后 from 2 credits a photo，套餐和每 credit 价格从配置读）
 C Does image to image AI keep my photo's subject the same?
 D How is image to image AI different from an AI image generator?（答案末尾链 /image-to-image-generator；答案后紧跟一张 4 行对比表：起点 / 主体 / 适合 / 风险）
@@ -43,6 +43,7 @@ E Can I use the photos commercially?（答：付费积分生成的作品无水�
 F Do I need to write prompts?（答：不用；选模板、填文字即可，想调整时可以用大白话说一句；答案末尾链 /image-to-image-generator）
 G What sizes and formats can I export?（答：PNG，Standard / HD / Max 三档，即 1024 / 2048 / 2880 px，比例按模板；付费作品全尺寸无水印。不写 JPG、不写 1080×1080 这类我们不出的尺寸）
 H Can I use Shotviva on my phone?（答：可以，直接在手机浏览器里用，iPhone 的 Safari、Android 的 Chrome 都行，不用装 App；用相机拍或从相册选，出图后保存或分享。不承诺「添加到主屏幕」之类没做的功能）
+I What is Shotviva?（放最后一位，问题里不带 AI；答案写它是什么、做什么、和同类工具的区别。它是品牌问句，价值低于前面几条，不占主词位置）
 
 首页 FAQ 的写法（2026-11-06 GEO 审查，Owner 同意）：
 - 每个答案第一句写出实体名（Shotviva 或 Image to image AI），不用 It、Yes、Photos 开头；AI 单独摘走任何一条都能看懂。
