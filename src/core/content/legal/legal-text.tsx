@@ -1,22 +1,21 @@
-import Link from 'next/link'
+import { Link } from '@/core/i18n/ui'
 
 import type { LegalBlock, LegalLink, LegalText } from './legal-page'
 
-const linkClass = 'underline underline-offset-4 hover:text-foreground'
-
-// Files such as /fonts/misans/LICENSE.pdf are plain downloads, not pages for the router.
+// Files such as /fonts/misans/LICENSE.pdf are plain downloads, not pages for the router. Pages go
+// through the site's Link, which adds /zh on a Chinese page.
 const isFile = (href: string) => /\.[a-z0-9]+$/i.test(href)
 
 function InlineLink({ link }: { link: LegalLink }) {
   if (link.href.startsWith('/') && !isFile(link.href)) {
     return (
-      <Link href={link.href} className={linkClass}>
+      <Link href={link.href}>
         {link.label}
       </Link>
     )
   }
   return (
-    <a href={link.href} className={linkClass}>
+    <a href={link.href}>
       {link.label}
     </a>
   )
@@ -44,7 +43,7 @@ export function LegalBlockView({ block }: { block: LegalBlock }) {
   }
   if ('list' in block) {
     return (
-      <ul className="flex list-disc flex-col gap-2 pl-6">
+      <ul>
         {block.list.map((item, i) => (
           <li key={i}>
             <LegalInline text={item} />
@@ -54,9 +53,9 @@ export function LegalBlockView({ block }: { block: LegalBlock }) {
     )
   }
   return (
-    <address className="not-italic">
+    <address>
       {block.lines.map((line) => (
-        <span key={line} className="block">
+        <span key={line}>
           {line}
         </span>
       ))}
