@@ -5,7 +5,7 @@
       "id": "example-burger-hero",
       "module": "image",
       "name": "Example burger hero",
-      "category": "burgers",
+      "category": "Food & Drink",
       "coverBeforeUrl": "https://example.com/covers/example-burger-before.jpg",
       "coverAfterUrl": "https://example.com/covers/example-burger-after.jpg",
       "fields": {

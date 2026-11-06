@@ -8,7 +8,7 @@ type LiveTemplate = { id: string; cover: { before: string | null; after: string 
 const bundled = (id: string) => ({ before: `/home/templates/${id}-before.webp`, after: `/home/templates/${id}-after.webp` })
 
 // The generator opens on the same template as the hero pair (ARCHITECTURE §13 item 2).
-const DEFAULT_TEMPLATE = 'pure-white'
+const DEFAULT_TEMPLATE = 'white-background'
 
 // `opensOn`: the template the generator opens on (the landing pages pick their own).
 export function homeTemplates(page: HomePage, live: readonly LiveTemplate[], opensOn: string = DEFAULT_TEMPLATE) {

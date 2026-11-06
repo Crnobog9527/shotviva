@@ -24,7 +24,7 @@ export const zhTemplateCategories: readonly [TemplateCategory, ...TemplateCatego
     name: '商品与二手',
     intro: '商品随便放在桌上拍，就能出能上架的图，标签、颜色和形状都不变。',
     templates: [
-      { id: 'pure-white', name: '纯白底图', use: '网店和二手平台用的白底主图。' },
+      { id: 'white-background', name: '纯白底图', use: '网店和二手平台用的白底主图。' },
       { id: 'lifestyle-table', name: '生活场景', use: '把商品放进布置好的桌面场景，适合发社交媒体。' },
     ],
   },
