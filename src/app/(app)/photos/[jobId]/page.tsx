@@ -4,11 +4,12 @@ import { getTranslations } from 'next-intl/server'
 import { Suspense } from 'react'
 
 import { AppPage, FlowNav } from '@/core/app-shell'
-import { createServerSupabase, requireUser } from '@/core/auth'
-import { fileUrlFor, findOwnJob, hasInputPreview, originalUrlFor } from '@/core/jobs'
+import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
+import { currentTier, limitsFor, readBalance } from '@/core/billing'
+import { fileUrlFor, findOwnJob, hasInputPreview, originalUrlFor, type Job } from '@/core/jobs'
 import { r2Store } from '@/core/storage'
-import { listTemplates } from '@/core/templates'
-import { ResultView, toPhotoDetail, toPhotoItem } from '@/modules/image'
+import { EDIT_TEMPLATE_ID, listTemplates, loadEditOffer } from '@/core/templates'
+import { EditFlow, EditTrigger, editDisplay, editOriginal, ResultView, toPhotoDetail } from '@/modules/image'
 import { site } from '@/site/site.config'
 
 function Nav({ title }: { title: string }) {
@@ -16,26 +17,62 @@ function Nav({ title }: { title: string }) {
   return <FlowNav back={{ href: '/photos', label: t('back') }} title={title} />
 }
 
+// Everything the page reads besides the job, in one round: templates, the upload preview's HEAD
+// (T32), and for editing (T30) the source work, the edit offer, balance and tier.
+async function loadAround(supabase: Awaited<ReturnType<typeof createServerSupabase>>, userId: string, job: Job) {
+  const [templates, kept, parent, offer, balance, tier] = await Promise.all([
+    listTemplates(supabase, 'web'),
+    // An edit has no upload of its own (T30).
+    job.templateId === EDIT_TEMPLATE_ID ? false : hasInputPreview(r2Store(), job),
+    job.parentJobId ? findOwnJob(supabase, userId, job.parentJobId) : null,
+    loadEditOffer(supabase),
+    readBalance(supabase, userId),
+    // current_tier() is service-role only; the user's own id comes from the session.
+    currentTier(createAdminSupabase(), userId),
+  ])
+  return { templates, kept, parent, offer, balance, tier }
+}
+
 // One finished photo, a flow page pushed from Photos: the result, the upload's preview and the
-// user's note (T32), Share. The preview's existence is one R2 HEAD, run alongside the templates.
+// user's note (T32), Share, and Edit when editing is on (ARCHITECTURE §5.2). An edit shows the
+// work it came from and the words it used.
 async function Result({ params }: { params: Promise<{ jobId: string }> }) {
   const { jobId } = await params
   const user = await requireUser(`/photos/${jobId}`)
   const supabase = await createServerSupabase()
   const job = await findOwnJob(supabase, user.id, jobId)
   if (!job || job.status !== 'succeeded') notFound()
-  const [templates, kept] = await Promise.all([listTemplates(supabase, 'web'), hasInputPreview(r2Store(), job)])
+  const { templates, kept, parent, offer, balance, tier } = await loadAround(supabase, user.id, job)
   const t = await getTranslations('app')
   const lookup = new Map(templates.map((tpl) => [tpl.id, { name: tpl.name, cover: tpl.coverAfterUrl }]))
-  const item = toPhotoItem(job, lookup, fileUrlFor(job.id), t('photos.fallbackName'))
+  const names = { fallback: t('photos.fallbackName'), edited: t('photos.editedName'), titleEdited: (name: string) => t('edit.titleEdited', { name }) }
+  const { item, source, change } = editDisplay(job, parent, lookup, names, fileUrlFor)
+  const detail = toPhotoDetail(job, kept ? originalUrlFor(job.id) : null)
+  const view = (
+    <ResultView
+      item={item}
+      detail={job.templateId === EDIT_TEMPLATE_ID ? { ...detail, original: editOriginal(source) } : detail}
+      edit={offer ? <EditTrigger /> : null}
+      parent={source ? { id: source.id, fileUrl: source.fileUrl as string, name: source.templateName } : null}
+      change={change}
+      shareText={t('result.shareText', { brand: site.brand.name, url: `https://${site.brand.domain}/?utm_source=share&utm_medium=web_share` })}
+    />
+  )
   return (
     <>
       <Nav title={item.templateName} />
-      <ResultView
-        item={item}
-        detail={toPhotoDetail(job, kept ? originalUrlFor(job.id) : null)}
-        shareText={t('result.shareText', { brand: site.brand.name, url: `https://${site.brand.domain}/?utm_source=share&utm_medium=web_share` })}
-      />
+      {offer ? (
+        <EditFlow
+          source={{ id: job.id, fileUrl: item.fileUrl as string, name: item.templateName, aspect: item.aspect, resolution: item.resolution }}
+          balance={balance}
+          creditsCost={offer.creditsCost}
+          concurrency={limitsFor(tier).concurrency}
+        >
+          {view}
+        </EditFlow>
+      ) : (
+        view
+      )}
     </>
   )
 }

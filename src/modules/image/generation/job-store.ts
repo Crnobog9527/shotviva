@@ -1,6 +1,6 @@
 'use client'
 
-import { readJob, submitJob, type GenerateBody, type SubmitOutcome } from './job-api'
+import { readJob, submitJob, type JobBody, type SubmitOutcome } from './job-api'
 import { applyError, applyView, type TrackedJob } from './job-model'
 import { markSent, nextToSend, requeue } from './scheduler'
 import { loadState, saveState, type WorkspaceViews } from './store-persistence'
@@ -74,7 +74,7 @@ export function subscribe(listener: () => void): () => void {
 
 export type StartInput = Pick<TrackedJob, 'templateId' | 'templateName' | 'resolution' | 'aspect' | 'credits' | 'inputKey'> & {
   previewUrl?: string
-  body: GenerateBody
+  body: JobBody
 }
 
 function queued(input: StartInput, batchSize: number, queuedAt: number): TrackedJob {

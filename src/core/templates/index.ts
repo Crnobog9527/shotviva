@@ -30,6 +30,7 @@ export { TEMPLATE_COLUMNS, toTemplate } from './types'
 export type { Template, TemplateRow } from './types'
 export { TEMPLATES_CACHE_TAG } from './cache'
 export { loadEditTemplate, loadGenerationTemplate, type GenerationTemplate } from './generation-template'
+export { loadEditOffer } from './edit-offer'
 export {
   DECIDED_SCOPES,
   EDIT_SCOPES,

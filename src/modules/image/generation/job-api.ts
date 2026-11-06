@@ -10,14 +10,21 @@ export type GenerateBody = {
   batch_size?: number
 }
 
+// A photo edit (ARCHITECTURE §5.2): goes to /api/edit, settles and polls like any job.
+export type EditBody = { source_job_id: string; instruction: string; resolution: string; batch_size?: number }
+
+export type JobBody = GenerateBody | EditBody
+
+const isEdit = (body: JobBody): body is EditBody => 'source_job_id' in body
+
 export type SubmitOutcome = { kind: 'view'; view: JobView } | { kind: 'error'; body: ErrorBodyLike } | { kind: 'lost' }
 
 // POST /api/generate with a client-made job id, so a retried or backgrounded request finds the
 // same job instead of charging twice. A network drop (iOS suspending the tab) is "lost": the
 // server job carries on and polling picks the result up.
-export async function submitJob(jobId: string, body: GenerateBody): Promise<SubmitOutcome> {
+export async function submitJob(jobId: string, body: JobBody): Promise<SubmitOutcome> {
   try {
-    const response = await fetch('/api/generate', {
+    const response = await fetch(isEdit(body) ? '/api/edit' : '/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...body, job_id: jobId }),
