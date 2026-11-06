@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { TEST_PRODUCTS } from '../stripe/test-products'
 import { packOffers, perCreditUsd, perMonthUsd, tierOffers, usdFormat, yearlySavingPct, yearlySavingUsd } from './offer'
-import { TIER_SUPPORT_REPLY_HOURS } from '../tier-limits'
+import { TIER_LIMITS } from '../tier-limits'
 import { tierPerks } from './perks'
 
 const offers = tierOffers(TEST_PRODUCTS)
@@ -55,10 +55,22 @@ describe('tier perks (ARCHITECTURE §6.2 会员档位权益)', () => {
     expect([count('starter'), count('pro'), count('max')]).toEqual([1, 3, 6])
   })
 
+  it('reads every number from TIER_LIMITS: batch 10 / 30 live on Pro and Max, support 48 / 48 / 24 hours', () => {
+    const value = (tier: 'starter' | 'pro' | 'max', key: string) => tierPerks(tier, { wishlistLive: false }).live.find((p) => p.key === key)?.values
+    expect(value('pro', 'batch')).toEqual({ count: TIER_LIMITS.pro.batchMax })
+    expect(value('max', 'batch')).toEqual({ count: TIER_LIMITS.max.batchMax })
+    expect([value('pro', 'batch')?.count, value('max', 'batch')?.count]).toEqual([10, 30])
+    expect(value('starter', 'support48h')).toEqual({ hours: 48 })
+    expect(value('max', 'support24h')).toEqual({ hours: 24 })
+    // Pro's support time equals Starter's, so "Everything in Starter, plus" adds no support line.
+    expect(tierPerks('pro', { wishlistLive: false }).live.map((p) => p.key)).toEqual(['concurrency', 'batch'])
+    expect(tierPerks('starter', { wishlistLive: false }).live.map((p) => p.key)).not.toContain('batch')
+  })
+
   it('keeps unbuilt perks in Coming soon and never lists queue priority', () => {
     const pro = tierPerks('pro', { wishlistLive: false })
-    expect(pro.soon.map((p) => p.key)).toEqual(['batch', 'brandKit'])
-    expect(tierPerks('max', { wishlistLive: true }).soon.map((p) => p.key)).toEqual(['batch', 'earlyAccess'])
+    expect(pro.soon.map((p) => p.key)).toEqual(['brandKit'])
+    expect(tierPerks('max', { wishlistLive: true }).soon.map((p) => p.key)).toEqual(['earlyAccess', 'brandKit'])
     const all = (['starter', 'pro', 'max'] as const).flatMap((tier) => {
       const perks = tierPerks(tier, { wishlistLive: true })
       return [...perks.live, ...perks.soon].map((p) => p.key)
@@ -66,9 +78,9 @@ describe('tier perks (ARCHITECTURE §6.2 会员档位权益)', () => {
     expect(all.some((key) => /queue|priority/i.test(key))).toBe(false)
     // Support replies (ARCHITECTURE §6.2): Starter and Pro 48 hours, Max 24 hours.
     expect(tierPerks('starter', { wishlistLive: false }).live.map((p) => p.key)).toContain('support48h')
-    expect(pro.live.map((p) => p.key)).toEqual(['concurrency'])
-    expect(tierPerks('max', { wishlistLive: false }).live.map((p) => p.key)).toEqual(['concurrency', 'support24h'])
-    expect(TIER_SUPPORT_REPLY_HOURS).toEqual({ starter: 48, pro: 48, max: 24 })
+    expect(pro.live.map((p) => p.key)).toEqual(['concurrency', 'batch'])
+    expect(tierPerks('max', { wishlistLive: false }).live.map((p) => p.key)).toEqual(['concurrency', 'batch', 'support24h'])
+    expect([TIER_LIMITS.starter.supportHours, TIER_LIMITS.pro.supportHours, TIER_LIMITS.max.supportHours]).toEqual([48, 48, 24])
   })
 
   it('moves the 3× wishlist vote from Coming soon to live once the wishlist is on', () => {

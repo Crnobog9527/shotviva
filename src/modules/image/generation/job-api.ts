@@ -6,6 +6,8 @@ export type GenerateBody = {
   template_id: string
   input_key: string | null
   inputs: { copy: Record<string, string>; aspect_ratio: string; resolution: string; note?: string }
+  // Photos in the workspace batch (T28); 1 for a single photo.
+  batch_size?: number
 }
 
 export type SubmitOutcome = { kind: 'view'; view: JobView } | { kind: 'error'; body: ErrorBodyLike } | { kind: 'lost' }

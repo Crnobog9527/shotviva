@@ -9,21 +9,23 @@ import { cn } from '@/core/ui/cn'
 import { UPLOAD_FORMAT_NAMES, UPLOAD_MAX_MB } from './upload-formats'
 
 // Upload zone, empty (DESIGN §4.3 step 1, "Upload Zone"): a 16:9 hatched recess that also
-// takes a dropped file on desktop, then two entries. "Take photo" opens the camera (capture),
+// takes dropped files on desktop, then two entries. "Take photo" opens the camera (capture),
 // "Choose from gallery" the library (no capture). No HEIC in accept: iOS converts to JPEG.
-export function PhotoPickers({ onPick }: { onPick(file: File): void }) {
+// `multiple` (Pro and Max, T28) lets the gallery pick a batch; the camera always takes one.
+// Every picked file goes to onPick; the caller decides how many fit.
+export function PhotoPickers({ onPick, multiple = false }: { onPick(files: File[]): void; multiple?: boolean }) {
   const t = useTranslations('app.workspace')
   const formats = t('formats', { formats: useFormatter().list(UPLOAD_FORMAT_NAMES, { type: 'disjunction' }), mb: UPLOAD_MAX_MB })
   const camera = useRef<HTMLInputElement>(null)
   const gallery = useRef<HTMLInputElement>(null)
   const onDrop = (event: DragEvent) => {
     event.preventDefault()
-    const file = event.dataTransfer.files[0]
-    if (file) onPick(file)
+    const files = Array.from(event.dataTransfer.files)
+    if (files.length) onPick(files)
   }
   const take = (input: HTMLInputElement | null) => {
-    const file = input?.files?.[0]
-    if (file) onPick(file)
+    const files = Array.from(input?.files ?? [])
+    if (files.length) onPick(files)
     if (input) input.value = ''
   }
   return (
@@ -33,20 +35,20 @@ export function PhotoPickers({ onPick }: { onPick(file: File): void }) {
         onDrop={onDrop}
         className="grid aspect-video place-content-center md:aspect-[5/2] justify-items-center gap-2 rounded-button bg-[repeating-linear-gradient(135deg,var(--hatch)_0_8px,transparent_8px_16px),var(--recess)] text-center shadow-[inset_0_0_0_1px_var(--recess-edge)]"
       >
-        <b className="text-body leading-[1.2] font-semibold">{t('addPhoto')}</b>
+        <b className="text-body leading-[1.2] font-semibold">{t(multiple ? 'addPhotos' : 'addPhoto')}</b>
         <span className="text-caption text-muted-foreground">{formats}</span>
       </div>
       <div className="mt-3 grid gap-2">
         <PickButton label={t('takePhoto')} icon="camera" filled onClick={() => camera.current?.click()} />
-        <PickButton label={t('chooseGallery')} icon="gallery" onClick={() => gallery.current?.click()} />
+        <PickButton label={t(multiple ? 'chooseGalleryMany' : 'chooseGallery')} icon="gallery" onClick={() => gallery.current?.click()} />
       </div>
       <input ref={camera} type="file" accept={UPLOAD_ACCEPT} capture="environment" hidden onChange={(e) => take(e.currentTarget)} />
-      <input ref={gallery} type="file" accept={UPLOAD_ACCEPT} hidden onChange={(e) => take(e.currentTarget)} />
+      <input ref={gallery} type="file" accept={UPLOAD_ACCEPT} multiple={multiple} hidden onChange={(e) => take(e.currentTarget)} />
     </div>
   )
 }
 
-const ICONS = {
+export const ICONS = {
   camera: (
     <>
       <path d="M4 8.5A2.5 2.5 0 0 1 6.5 6H8l1.5-2h5L16 6h1.5A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z" />

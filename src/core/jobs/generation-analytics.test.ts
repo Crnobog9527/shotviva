@@ -39,7 +39,12 @@ describe('generateEventProps', () => {
       source: 'web',
       duration_ms: 1235,
       model: 'gpt-image-2.6',
+      batch_size: 1,
     })
+  })
+
+  it('carries the batch size, 1 when there is no batch', () => {
+    expect(generateEventProps(job, 'food', { status: 'succeeded' }, 0, 30).batch_size).toBe(30)
   })
 
   it('reports no model for a job written before T17', () => {

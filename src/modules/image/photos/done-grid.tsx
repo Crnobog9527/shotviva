@@ -1,8 +1,8 @@
-/* eslint-disable @next/next/no-img-element -- auth-gated download route, not a static asset */
 import Link from 'next/link'
 import { useFormatter, useTranslations } from 'next-intl'
 
-import { WorkTag } from '../result/result-photo'
+import { GroundedImg } from '../result/grounded-img'
+import { WorkTag } from '../result/work-tag'
 import { PhotosEmpty } from './photos-empty'
 import { doneMeta, type PhotoItem } from './photo-item'
 
@@ -24,7 +24,7 @@ export function DoneGrid({ items, now, anyRunning }: { items: PhotoItem[]; now: 
           <li key={item.id}>
             <Link href={`/photos/${item.id}`} className="press block rounded-control">
               <span className="hairline relative block aspect-[4/5] overflow-hidden rounded-control bg-muted">
-                {item.fileUrl ? <img src={item.fileUrl} alt={t('photos.photoAlt', { name: item.templateName })} loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover" /> : null}
+                {item.fileUrl ? <GroundedImg ground="white" src={item.fileUrl} alt={t('photos.photoAlt', { name: item.templateName })} loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover" /> : null}
                 <WorkTag pool={item.creditPool} visibility={item.visibility} className="absolute bottom-2 left-2" />
               </span>
               <b className="mt-2 block text-body font-semibold">{item.templateName}</b>
