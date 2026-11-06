@@ -35,7 +35,7 @@ export function SiteFooter({ brand, links }: { brand: SiteBrand; links: readonly
           </a>
         </p>
         <p>
-          © {brand.launchYear} {brand.copyrightName}
+          © {brand.launchYear} {brand.name}
         </p>
       </div>
     </footer>

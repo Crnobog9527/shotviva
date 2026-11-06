@@ -53,7 +53,7 @@ describe('SiteFooter', () => {
     const links = [{ href: '/terms', label: 'Terms' }] as const
     const html = renderToStaticMarkup(createElement(SiteFooter, { brand, links }))
     expect(html).toContain('example.com is the only official Example site.')
-    expect(html).toContain('© 2026 Example AI')
+    expect(html).toContain('© 2026 Example</p>')
     expect(html).not.toContain('operated by')
     expect(html).not.toContain('Example LLC')
     expect(html).not.toContain('1 Main St')

@@ -50,8 +50,6 @@ export type PostalAddress = {
 
 export type SiteBrand = {
   name: string
-  // The name in the footer's copyright line (DESIGN §6.9: "© 2026 Shotviva AI").
-  copyrightName: string
   domain: string
   tagline: string
   // The company that operates the site and is the party to its legal terms (LAUNCH §8).
