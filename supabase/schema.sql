@@ -382,13 +382,14 @@ begin
     values ('today', v_today), ('7d', v_today - interval '6 days'), ('period', v_start)
   ),
   purchases as (
-    select l.created_at,
-           l.product_id,
-           case when l.idempotency_key ~ ':(cs|in)_' then 'stripe' else 'waffo' end as channel,
-           coalesce(p.price_usd, 0) as amount
-      from public.credit_ledger l
-      left join public.products p on p.id = l.product_id
-     where l.kind = 'purchase' and l.created_at >= v_start
+    select pm.created_at,
+           pm.product_id,
+           pm.channel,
+           case when pm.currency = 'usd'
+                then (pm.amount_total - pm.amount_tax - pm.amount_refunded) / 100.0
+                else 0 end as amount
+      from public.payments pm
+     where pm.created_at >= v_start
   )
   select jsonb_build_object(
            'timezone', v_tz,
@@ -1836,6 +1837,10 @@ CREATE UNIQUE INDEX "generation_jobs_user_idempotency_key_idx" ON "public"."gene
 
 
 CREATE UNIQUE INDEX "partner_links_partner_link_code_idx" ON "public"."partner_links" USING "btree" ("partner", "link_code") WHERE ("link_code" IS NOT NULL);
+
+
+
+CREATE INDEX "payments_created_at_id_idx" ON "public"."payments" USING "btree" ("created_at" DESC, "id" DESC);
 
 
 
