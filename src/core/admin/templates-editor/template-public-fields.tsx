@@ -7,6 +7,7 @@ import { Textarea } from '@/core/ui/textarea'
 import type { CreditsFloor } from '@/core/templates/pricing'
 import { TEMPLATE_DESCRIPTION_MAX } from '@/core/templates/schema'
 
+import { CategoryField } from './category-field'
 import { publicCopy } from './copy'
 import type { TemplateFormValues } from './form-state'
 import { TemplatePriceFields } from './template-price-fields'
@@ -62,8 +63,7 @@ export function TemplatePublicFields({ values, isNew, floor, onChange }: Props) 
         <TextField id="id" label="ID（小写字母、数字、短横线，创建后不可改）" value={values.id}
           disabled={!isNew} onChange={(id) => onChange({ id })} />
         <TextField id="name" label={publicCopy.name} value={values.name} onChange={(name) => onChange({ name })} />
-        <TextField id="category" label="分类" value={values.category}
-          onChange={(category) => onChange({ category })} />
+        <CategoryField value={values.category} onChange={(category) => onChange({ category })} />
       </div>
       <DescriptionField value={values.description} onChange={(description) => onChange({ description })} />
       <TemplatePriceFields values={values} floor={floor} onChange={onChange} />

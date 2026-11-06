@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
+import { TEMPLATE_CATEGORIES } from '@/core/templates/categories'
+
 import { FALLBACK_COUNT, featuredSections, featuredTemplates, tryTemplates } from './home-templates'
 import { CATEGORY } from './landing-shared'
 import { templateCategories } from './template-categories'
@@ -55,5 +57,7 @@ describe('featured templates from the database', () => {
     const keys = templateCategories.map((c) => c.key)
     for (const key of Object.values(CATEGORY)) expect(keys).toContain(key)
     expect(zhTemplateCategories.map((c) => c.key)).toEqual(keys)
+    // The same six the admin picks from (core/templates/categories), in §5 page order.
+    expect([...keys].sort()).toEqual([...TEMPLATE_CATEGORIES].sort())
   })
 })

@@ -23,7 +23,7 @@ export const commercialPhotography = defineContentPage({
   description: `Commercial photography from one phone photo: listing shots, lifestyle scenes and promo posters, styled and retouched by a template. ${freeImagesLabel}.`,
   h1: 'Commercial Photography From a Phone Photo, No Studio Booked',
   subtitle: 'Listing shots, lifestyle scenes and promo posters from the product photo you already took.',
-  answerBlock: `Commercial photography for a small brand usually means a studio day, a photographer and a retoucher. ${brand} does the same job from one phone photo: upload it, pick a template such as Pure White or Lifestyle Table, and download a styled, retouched product shot in ${tierList}. New users get ${freeImagesLabel}.`,
+  answerBlock: `Commercial photography for a small brand usually means a studio day, a photographer and a retoucher. ${brand} does the same job from one phone photo: upload it, pick a template such as White Background or Lifestyle Table, and download a styled, retouched product shot in ${tierList}. New users get ${freeImagesLabel}.`,
   hero: {
     before: homeImage('hero-set-phone', 'Phone snapshot of a woven leather tote on a busy kitchen counter, window light (illustrative example)'),
     after: homeImage('hero-set-lifestyle', 'The same tote on a café chair by a window in warm morning light, Lifestyle Table template (illustrative example)'),
@@ -33,7 +33,7 @@ export const commercialPhotography = defineContentPage({
   facts: [
     {
       label: `Amazon: Pure White Main Image, ${px(amazon.zoomPx)} px for Zoom`,
-      value: `Amazon wants the main image on pure white and ${px(amazon.minPx)} to ${px(amazon.maxPx)} px on the longest side; over ${px(amazon.zoomPx)} px lets shoppers zoom. Pure White at ${hd.name} is ${px(hd.px)} px.`,
+      value: `Amazon wants the main image on pure white and ${px(amazon.minPx)} to ${px(amazon.maxPx)} px on the longest side; over ${px(amazon.zoomPx)} px lets shoppers zoom. White Background at ${hd.name} is ${px(hd.px)} px.`,
     },
     {
       label: `Etsy and Shopify: ${px(etsy.minPx)} px and Up`,
