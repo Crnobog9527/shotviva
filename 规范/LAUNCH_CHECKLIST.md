@@ -189,3 +189,8 @@
 - [ ] Production 把 `SITE_INDEXING` 改成 `on` 并重新部署；`curl` 确认页面变 `index, follow`、AI 爬虫按 R11 放行、sitemap 和 llms.txt 可访问
 - [ ] GSC 和 Bing 提交 `sitemap.xml`（和 `sitemap-zh.xml`）
 - [ ] 合并把 `seo:check` 期望值改成 `open` 的 PR
+
+## 上线后再做
+
+- [ ] 申请「Sign in with ChatGPT」（目前只对选定合作方开放，通过 OpenAI 对接人进候补名单）；拿到 `oaiapp_` 客户端编号后再加按钮（Owner 2026-11-06）
+- [ ] 「用 Apple 登录」暂不做（Owner 2026-11-06）：要开发者年费、每 6 个月续密钥、登记私密转发邮件域名；上线后看 iPhone 注册流失再定

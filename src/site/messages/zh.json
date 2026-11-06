@@ -1,6 +1,34 @@
 {
   "home": {
-    "placeholder": "即将上线。"
+    "placeholder": "即将上线。",
+    "generator": {
+      "label": "用你的照片试一下",
+      "addPhoto": "添加你的手机照片",
+      "replace": "更换",
+      "replaceAria": "你的照片，点击更换",
+      "template": "模板",
+      "size": "尺寸",
+      "seeAll": "查看全部模板",
+      "changeTemplate": "模板：{name}，点击更换",
+      "changeSize": "尺寸：{name}，点击更换",
+      "notePlaceholder": "有什么想改的？（选填）",
+      "uploadPhoto": "上传照片",
+      "dockGenerate": "生成",
+      "needsCopy": "去工作台填写文字",
+      "noTemplates": "模板即将上线",
+      "gift": "新用户送 {images}",
+      "pickerTitle": "选一个模板",
+      "pickerText": "每个模板都保留你拍的主体，只换光线、场景或画风。",
+      "pickTemplate": "选用{name}",
+      "signup": {
+        "title": "注册一个免费账号来出图",
+        "text": "你选好的照片和模板都会保留。",
+        "giftNote": "公开展示，带水印",
+        "email": "用邮箱继续",
+        "login": "已有账号，去登录",
+        "fine": "继续即表示你同意<terms>服务条款</terms>和<privacy>隐私政策</privacy>。"
+      }
+    }
   },
   "auth": {
     "google": "使用 Google 账号继续",
@@ -64,11 +92,12 @@
       "signOut": "退出登录",
       "dangerZone": "注销账号",
       "delete": "注销我的账号",
-      "deleteWarning": "注销后，你的账号、剩余积分和所有作品都会被永久删除，无法恢复。",
+      "deleteWarning": "注销后，你的账号、剩余积分和所有作品都会被永久删除。订阅会先被取消。注销后无法恢复。",
       "deleteTypeLabel": "输入 DELETE 确认",
       "deleteConfirm": "永久注销",
       "deleting": "正在注销…",
       "deleteFailed": "注销没有完成，请再试一次。",
+      "deleteSubscriptionFailed": "没能取消你的订阅，所以什么都没有删除。请稍后再试，或联系客服。",
       "cancel": "取消"
     }
   },
@@ -82,7 +111,7 @@
     "account": {
       "title": "Graylum",
       "description": "用你的 Shotviva 积分在 Graylum 里出图。",
-      "connected": "{date, date, medium} 起已连接。Graylum 可以用你的积分出图。",
+      "connected": "<b>{date, date, medium}</b> 起已连接。Graylum 可以用你的积分出图。",
       "notConnected": "未连接。要连接，请从 Graylum 发起，并允许它使用你的积分。",
       "disconnect": "断开 Graylum"
     },
@@ -125,27 +154,24 @@
       "templates": "模板",
       "filter": "筛选模板",
       "all": "全部",
-      "illustrative": "模板图片仅为效果示例。"
+      "illustrative": "每张卡片左边是手机原图，右边是 AI 出图。模板图片仅为效果示例。"
     },
     "template": {
       "fromCredits": "{count} 积分起",
       "cardAlt": "{name} 模板示例：左边是手机原图，右边是 AI 出图",
       "phone": "原图",
       "ai": "AI",
-      "videoTemplate": "视频模板",
-      "animatedTemplate": "动态模板",
       "example": "效果示例",
-      "featureAria": "{name}，视频模板，{category}。预览",
+      "featureAria": "{name}，视频模板，{category}。做一张",
       "featureMeta": "{category} · 视频",
-      "preview": "预览",
       "compareAria": "对比手机原图和 AI 出图",
       "phonePhotoAlt": "手机原图",
       "resultAlt": "{name} 出图效果",
       "loopAria": "{name} 示例：手机原图变成 AI 出图的过程",
-      "animationAlt": "{name} 示例动画",
       "hintCompare": "在图片上左右拖动，对比前后效果。",
-      "hintMotion": "你的照片会按这段短动画的方式变化。",
-      "use": "用这个模板"
+      "makeOne": "做一张",
+      "animatedMeta": "{category} · 动图",
+      "hintPair": "左边是手机原图，右边是 AI 出图。"
     },
     "categories": {
       "Art Styles": "画风",
@@ -257,7 +283,11 @@
       "batchSummary": "{count, number} 张已完成 {done, number} 张{failed, plural, =0 {} other {，# 张没有生成成功}}",
       "batchLeave": "每张一般需要 20–40 秒。可以离开这个页面，每张生成好后会出现在「作品」里。",
       "makeMore": "再做一批",
-      "getTier": "开通{tier}"
+      "getTier": "开通{tier}",
+      "stageLabel": "预览",
+      "stageYours": "你的照片",
+      "stageYoursCaption": "这是你拍的原图。模板会保留主体，只换光线和背景。",
+      "stageSampleCaption": "模板示例：左边是手机原图，右边是 AI 出图。"
     },
     "errors": {
       "CONTENT_REJECTED": "照片或补充说明没有通过安全审核。请换一张照片，或改一下说明。",
@@ -301,7 +331,8 @@
       "pill": "{count, plural, =1 {生成中…} other {# 张生成中…}}",
       "doneMeta": "{when} · {size} · {tier}",
       "runningMeta": "{size} · {tier} · {count} 积分",
-      "waiting": "排队中，等空位"
+      "waiting": "排队中，等空位",
+      "makeAgain": "再做一张"
     },
     "work": {
       "freePublic": "公开 · 带水印",
@@ -408,7 +439,63 @@
       }
     },
     "account": {
-      "metaTitle": "我的"
+      "metaTitle": "我的",
+      "plan": {
+        "title": "会员",
+        "renews": "<b>{date, date, medium}</b> 自动续费",
+        "ends": "<b>{date, date, medium}</b> 到期",
+        "perPeriod": "每{interval, select, year {年} other {月}} <mono>{credits}</mono> 积分 · <mono>{price}</mono>/{interval, select, year {年} other {月}}",
+        "member": "会员",
+        "noPlan": "未开通会员",
+        "manage": "管理订阅",
+        "cancelledWhy": "<b>已取消续费。</b>{date, date, medium} 前会员和积分照常可用，之后不再扣款。到期前随时可以恢复订阅，会员不会中断。",
+        "resubscribe": "恢复订阅",
+        "ended": "{date, date, medium} 已到期",
+        "expiredWhy": "{paid, plural, =0 {会员已到期。做过的作品都还在「作品」里。} other {会员已到期。剩下的 <b># 积分</b>仍可使用，做过的作品都还在「作品」里。}}",
+        "choosePlan": "选择套餐",
+        "buyCredits": "购买积分",
+        "paymentFailed": "扣款失败",
+        "pastDueWhy": "上一次扣款没有成功。Stripe 会在接下来几天自动重试；更新银行卡后会员照常继续，本期积分也会发放。",
+        "pastDueEndedWhy": "上一次扣款没有成功，会员已结束。请更新银行卡：扣款成功后会员会重新生效。积分仍可正常使用。",
+        "updatePayment": "更新付款方式",
+        "opensStripe": "将打开 Stripe 的安全账单页面。",
+        "walletWhy": "这是一次性付款，不会自动续费：{date, date, medium} 前续费可以保留会员；不续费的话，积分仍可使用。",
+        "renew": "续费",
+        "paused": "已暂停",
+        "pausedWhy": "订阅已暂停。恢复之前不会扣款，也不会发放积分。",
+        "freeWhy": "还没有开通会员。用付费积分做的作品是私密的，没有水印。"
+      },
+      "credits": {
+        "title": "积分",
+        "paid": "付费",
+        "free": "免费",
+        "paidUse": "私密、无水印",
+        "freeUse": "公开、带水印",
+        "buy": "购买积分"
+      },
+      "settings": {
+        "title": "设置",
+        "email": "邮箱",
+        "language": "语言",
+        "purchases": "购买记录",
+        "purchasesNone": "暂无",
+        "purchasesMany": "{count}+",
+        "support": "客服",
+        "openTicket": "提交工单"
+      },
+      "language": {
+        "title": "语言",
+        "lead": "切换应用的显示语言。你的作品和积分不受影响。"
+      },
+      "purchases": {
+        "title": "购买记录",
+        "lead": "最近的付款，最新的在前。",
+        "empty": "还没有购买记录。"
+      },
+      "session": {
+        "title": "登录",
+        "deleteNote": "注销会删除你的作品和剩余积分。订阅会先被取消。"
+      }
     },
     "creditsUnit": "{count, plural, other {积分}}",
     "units": {
@@ -416,30 +503,8 @@
       "megabytes": "{size} MB",
       "percent": "{value, number, ::percent}"
     },
-    "subscription": {
-      "title": "会员",
-      "plan": "{tier} · {interval, select, year {按年} other {按月}}",
-      "active": "生效中",
-      "renewsOn": "{date, date, medium} 自动续费",
-      "cancelsOn": "{date, date, medium} 到期取消",
-      "cancelsDetail": "到期前会员照常有效，到期后不再续费。积分不受影响。",
-      "pastDue": "扣款失败",
-      "pastDueDetail": "上一次扣款没有成功，请在「管理订阅」里更新银行卡。",
-      "pastDueExpired": "上一次扣款没有成功，会员已结束。积分仍可正常使用。",
-      "paused": "已暂停",
-      "manage": "管理订阅",
-      "paidUntil": "已付费至 {date, date, medium}",
-      "noAutoRenew": "不自动续费，随时可以再续一期。",
-      "renew": "续费",
-      "expired": "已到期",
-      "expiredDetail": "会员已于 {date, date, medium} 到期。积分仍可正常使用。",
-      "free": "免费用户",
-      "freeDetail": "还没有开通会员。",
-      "seePlans": "查看套餐"
-    },
     "support": {
       "title": "帮助与反馈",
-      "entryHint": "有问题、遇到故障或有想法，都可以在这里告诉我们。",
       "newReply": "有新回复",
       "replyTime": "我们会在这里回复，一般在 {hours} 小时内。",
       "replyTimeMax": "旗舰版会员 {hours} 小时内回复。",
@@ -546,7 +611,7 @@
     "billingLabel": "付费周期",
     "monthly": "按月",
     "yearly": "按年",
-    "savePct": "最多省 {pct}%",
+    "savePct": "最多省 <b>{pct}%</b>",
     "plansLabel": "套餐",
     "tiers": {
       "starter": "入门版",
@@ -560,7 +625,6 @@
     "creditsMonth": "每月 {count} 积分",
     "creditsYear": "一次到账 {count} 积分 · 按年付 {price}",
     "perCredit": "每积分 {price}",
-    "saving": "比按月付每年省 <b>{amount}</b>",
     "perkHeadings": {
       "includes": "包含",
       "plusStarter": "入门版全部权益，另加",
@@ -578,17 +642,9 @@
       "earlyAccess": "新功能抢先用",
       "wishlistVotes": "你在许愿墙上的模板许愿按 {weight} 倍计票"
     },
-    "packsLink": "只需要几张？积分包 {price} 起",
-    "continueTier": "选择{tier}，继续",
-    "back": "返回套餐",
-    "periodTitle": "{tier}",
-    "periodIntro": "选择付款方式。银行卡订阅随时可以取消，已有积分不受影响。",
-    "periodIntroOnce": "选择付款方式。所有方式都是一次性付款，已有积分不受影响。",
     "packsTitle": "积分包",
-    "packsIntro": "一次性购买积分，不是订阅，积分永不过期。",
     "packsLabel": "积分包",
     "packCredits": "<n>{count}</n> <u>积分</u>",
-    "oneTimeNoSub": "一次性付款 · 不订阅",
     "payWith": "付款方式",
     "payLabel": "付款方式",
     "pricesInUsd": "所有价格均以美元计",
@@ -599,8 +655,8 @@
     "walletOnce": "一次性付款，{period, select, year {1 年} other {30 天}}，不自动续费",
     "oneTime": "一次性付款",
     "planOnce": "一次性付款，{period, select, year {1 年} other {30 天}}",
-    "ctaPlan": "去付款 · {price}{period, select, year {/年} other {/月}}",
-    "ctaPack": "去付款 · {price}",
+    "ctaPlan": "继续购买{tier} · {price}{period, select, year {/年} other {/月}}",
+    "ctaPack": "继续购买 {count} 积分 · {price}",
     "finePlanCard": "按{period, select, year {年} other {月}}以 {price} 自动续费 · 随时可取消 · 美元",
     "finePlanWallet": "一次性支付 {period, select, year {1 年} other {30 天}} · 不自动续费 · 美元",
     "finePlanOnce": "一次性支付 {period, select, year {1 年} other {30 天}} · 美元",
@@ -608,13 +664,19 @@
     "redirecting": "正在打开安全付款页…",
     "error": "付款页没能打开，请稍后再试。",
     "choose": "选择{tier}",
-    "buyPack": "购买 {count} 积分",
     "thanks": "感谢购买！积分一分钟内到账，没看到的话请刷新页面。",
     "backToPartner": "返回 Graylum",
-    "compactYear": "一次到账 {count} 积分 · 每年省 <b>{amount}</b>",
-    "compactMonth": "每月 {count} 积分 · 每积分 {price}",
-    "comingSoonList": "<b>即将上线：</b>{items}",
-    "perCreditShort": "每个 {price}"
+    "perCreditShort": "每积分 {price}",
+    "savingLabel": "<vs>比按月付</vs>每年省",
+    "savingAmount": "{amount}",
+    "mostPopular": "最受欢迎",
+    "packsNote": "一次性买积分，不用订阅",
+    "buy": "购买",
+    "buyPackLabel": "用 {price} 购买 {count} 积分",
+    "payNoteCard": "套餐自动续费，随时可取消",
+    "payNoteWallet": "一次性支付 30 天或 1 年，不自动续费",
+    "payNoteOnce": "一次性支付 30 天或 1 年",
+    "payNotePacks": "积分包一律一次性付款。"
   },
   "announcement": {
     "dismiss": "关闭公告"
@@ -634,12 +696,14 @@
       "text": "这个页面有中文版。",
       "switch": "切换到中文",
       "dismiss": "关闭，继续看英文版"
+    },
+    "inCurrent": {
+      "en": "英文",
+      "zh": "简体中文"
     }
   },
   "footer": {
     "legalNav": "法律条款",
-    "official": "{name}：{tagline}。{domain} 是 {name} 唯一的官方网站。",
-    "launched": "{year} 年上线，服务地区：{countries}。联系邮箱：<mail>{email}</mail>",
     "copyright": "© {year} {name}",
     "language": "语言"
   },
@@ -653,7 +717,10 @@
     "nav": {
       "label": "主导航",
       "pricing": "价格",
-      "tagline": "AI 影棚"
+      "tagline": "AI 影棚",
+      "templates": "模板",
+      "login": "登录",
+      "startFree": "免费开始"
     },
     "hero": {
       "label": "前后对比",
@@ -664,7 +731,21 @@
     "facts": "关键信息",
     "faq": "常见问题",
     "related": "相关页面",
-    "templateLine": "<b>{name}</b>：{use}"
+    "home": {
+      "phone": "原图",
+      "ai": "AI",
+      "illustrative": "示意图",
+      "beforeAlt": "{name}模板示例：手机原图（示意图）",
+      "afterAlt": "{name}模板示例：AI 成图，{use}（示意图）",
+      "pickAria": "{name}。{use}选用这个模板",
+      "compareLabel": "对比手机原图和{name}效果",
+      "withDragHint": "{use}拖动中间的把手对比。",
+      "preview": "预览",
+      "freeTag": "免费 · 公开",
+      "paidTag": "付费 · 私密",
+      "freeSampleAlt": "带水印的免费图（示意图）",
+      "paidSampleAlt": "同一张图用付费积分生成，没有水印（示意图）"
+    }
   },
   "pageError": {
     "title": "出了点问题",

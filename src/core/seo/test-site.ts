@@ -36,6 +36,10 @@ export function testSite(overrides: Partial<SiteConfig> = {}): SiteConfig {
         zhIndexablePaths: ['/'],
         canonicalRedirectHosts: ['example.vercel.app'],
       },
+      marketing: {
+        photographer: { styledShotUsd: { low: 89, high: 300 }, retouchUsd: { low: 10, high: 30 }, packshotFromUsd: 15 },
+        photoSeconds: { low: 20, high: 40 },
+      },
     }),
     ...overrides,
   }

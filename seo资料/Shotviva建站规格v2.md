@@ -9,7 +9,7 @@
 ## 1. 域名与品牌（已定稿，不再讨论）
 - 唯一域名：shotviva.com（已注册）。不使用 .ai，不做 301 跳转。
 - 商标：USPTO 已查，无 shotviva 冲突。
-- 品牌写法全站统一 Shotviva，一个字不差（Logo、Title 后缀、页脚版权 `© 2026 Shotviva`、structured data 的 `name` / `brand`、`og:site_name`、社交账号；不写 Shotviva AI）。Title 后缀：首页以外的页面在 ≤60 字符内以 ` | Shotviva` 结尾；首页 Title 保持主词写法，等 GSC 里含 shotviva 的查询开始有曝光（通常上线后 4～8 周）再考虑加品牌后缀（Owner 2026-11-06，哥飞 GEO 建议）。X、Instagram、Product Hunt、LinkedIn 的 `shotviva` 账号由 Owner 尽快占住，填进 `site.config` 的 `sameAs`。
+- 品牌写法全站统一 Shotviva，一个字不差（Logo、Title 后缀、页脚版权 `© 2026 Shotviva`、structured data 的 `name` / `brand`、`og:site_name`、社交账号；不写 Shotviva AI）。Title 后缀：首页以外的页面在 ≤60 字符内以 ` | Shotviva` 结尾（品牌在一个标题里只出现一次：主词本身以 Shotviva 开头的页面，如 /pricing「Shotviva Pricing…」、/zh/pricing「Shotviva 价格…」，保留开头、不再加后缀）；首页 Title 保持主词写法，等 GSC 里含 shotviva 的查询开始有曝光（通常上线后 4～8 周）再考虑加品牌后缀（Owner 2026-11-06，哥飞 GEO 建议）。X、Instagram、Product Hunt、LinkedIn 的 `shotviva` 账号由 Owner 尽快占住，填进 `site.config` 的 `sameAs`。
 - shotviva 与图片无字面关联，Logo 旁必须常驻 tagline："AI photo studio"（Owner 2026-11-05 定，改为通用写法；原 "AI food & product photo studio" 作废）；每个页面副标题也带一句功能说明。
 - 首页 footer 固定一行站方声明（唯一官方站点），并占用 X / Instagram / Product Hunt / LinkedIn 的 shotviva 账号名。
 

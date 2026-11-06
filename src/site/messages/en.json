@@ -1,6 +1,34 @@
 {
   "home": {
-    "placeholder": "Coming soon."
+    "placeholder": "Coming soon.",
+    "generator": {
+      "label": "Try it on your photo",
+      "addPhoto": "Add your phone photo",
+      "replace": "Replace",
+      "replaceAria": "Your photo. Replace it",
+      "template": "Template",
+      "size": "Size",
+      "seeAll": "See all templates",
+      "changeTemplate": "Template: {name}. Change template",
+      "changeSize": "Size: {name}. Change size",
+      "notePlaceholder": "Anything to change? (optional)",
+      "uploadPhoto": "Upload photo",
+      "dockGenerate": "Generate",
+      "needsCopy": "Add the text in the workspace",
+      "noTemplates": "Templates are on the way",
+      "gift": "{images} for new users",
+      "pickerTitle": "Pick a template",
+      "pickerText": "Each one keeps your subject as shot and changes the light, the scene or the style.",
+      "pickTemplate": "Pick {name}",
+      "signup": {
+        "title": "Make a free account to develop it",
+        "text": "Your photo and template stay as you set them.",
+        "giftNote": "Shown publicly with a watermark",
+        "email": "Continue with email",
+        "login": "I have an account · Log in",
+        "fine": "By continuing you agree to the <terms>Terms</terms> and the <privacy>Privacy Policy</privacy>."
+      }
+    }
   },
   "auth": {
     "google": "Continue with Google",
@@ -64,11 +92,12 @@
       "signOut": "Sign out",
       "dangerZone": "Delete account",
       "delete": "Delete my account",
-      "deleteWarning": "This permanently deletes your account, your remaining credits and every photo you made. It cannot be undone.",
+      "deleteWarning": "This permanently deletes your account, your remaining credits and every photo you made. Subscriptions are cancelled first. It cannot be undone.",
       "deleteTypeLabel": "Type DELETE to confirm",
       "deleteConfirm": "Delete forever",
       "deleting": "Deleting…",
       "deleteFailed": "Deletion did not finish. Please try again.",
+      "deleteSubscriptionFailed": "We couldn't cancel your subscription, so nothing was deleted. Please try again later, or contact support.",
       "cancel": "Cancel"
     }
   },
@@ -82,7 +111,7 @@
     "account": {
       "title": "Graylum",
       "description": "Make photos in Graylum with your Shotviva credits.",
-      "connected": "Connected since {date, date, medium}. Graylum can make photos with your credits.",
+      "connected": "Connected since <b>{date, date, medium}</b>. Graylum can make photos with your credits.",
       "notConnected": "Not connected. To connect, start from Graylum and allow it to use your credits.",
       "disconnect": "Disconnect Graylum"
     },
@@ -125,27 +154,24 @@
       "templates": "Templates",
       "filter": "Filter templates",
       "all": "All",
-      "illustrative": "Template images are illustrative examples."
+      "illustrative": "Every card shows the phone photo on the left and the AI result on the right. Template images are illustrative examples."
     },
     "template": {
       "fromCredits": "from {count, plural, one {# credit} other {# credits}}",
       "cardAlt": "{name} template example: phone photo on the left, AI result on the right",
       "phone": "Phone",
       "ai": "AI",
-      "videoTemplate": "Video template",
-      "animatedTemplate": "Animated template",
       "example": "Illustrative example",
-      "featureAria": "{name}, video template, {category}. Preview",
+      "featureAria": "{name}, video template, {category}. Make one",
       "featureMeta": "{category} · video",
-      "preview": "Preview",
       "compareAria": "Compare phone photo and AI result",
       "phonePhotoAlt": "Phone photo",
       "resultAlt": "{name} result",
       "loopAria": "{name} example: phone photo changing into the AI result",
-      "animationAlt": "{name} example animation",
       "hintCompare": "Drag across the photo to compare.",
-      "hintMotion": "Your photo plays the same change as this short loop.",
-      "use": "Use this template"
+      "makeOne": "Make one",
+      "animatedMeta": "{category} · animated",
+      "hintPair": "Phone photo on the left, the AI result on the right."
     },
     "categories": {
       "Art Styles": "Art Styles",
@@ -257,7 +283,11 @@
       "batchSummary": "{done, number} of {count, number} done{failed, plural, =0 {} other { · # didn't develop}}",
       "batchLeave": "Usually 20–40 seconds each. You can leave this page; each photo lands in Photos when it's done.",
       "makeMore": "Make another batch",
-      "getTier": "Get {tier}"
+      "getTier": "Get {tier}",
+      "stageLabel": "Preview",
+      "stageYours": "Your photo",
+      "stageYoursCaption": "Your photo, as shot. The template keeps it and changes the light and background.",
+      "stageSampleCaption": "Template example: the phone photo on the left, the AI result on the right."
     },
     "errors": {
       "CONTENT_REJECTED": "The photo or your note didn't pass the safety check. Try another photo or change the note.",
@@ -301,7 +331,8 @@
       "pill": "{count, plural, one {Generating…} other {Generating #…}}",
       "doneMeta": "{when} · {size} · {tier}",
       "runningMeta": "{size} · {tier} · {count, plural, one {# credit} other {# credits}}",
-      "waiting": "Waiting for a free slot"
+      "waiting": "Waiting for a free slot",
+      "makeAgain": "Make again"
     },
     "work": {
       "freePublic": "Public · watermark",
@@ -408,7 +439,63 @@
       }
     },
     "account": {
-      "metaTitle": "Account"
+      "metaTitle": "Account",
+      "plan": {
+        "title": "Plan",
+        "renews": "Renews <b>{date, date, medium}</b>",
+        "ends": "Ends <b>{date, date, medium}</b>",
+        "perPeriod": "<mono>{credits, plural, one {# credit} other {# credits}}</mono> a {interval, select, year {year} other {month}} · <mono>{price}</mono>/{interval, select, year {yr} other {mo}}",
+        "member": "Member",
+        "noPlan": "No plan",
+        "manage": "Manage subscription",
+        "cancelledWhy": "<b>Cancelled.</b> You keep the plan and your credits until {date, date, medium}; nothing more is charged. Resubscribe any time before then to carry on without a gap.",
+        "resubscribe": "Resubscribe",
+        "ended": "Ended {date, date, medium}",
+        "expiredWhy": "{paid, plural, =0 {Your plan ended. Anything you made is still in Photos.} one {Your plan ended. The <b>1 credit</b> you have left still works, and anything you made is still in Photos.} other {Your plan ended. The <b># credits</b> you have left still work, and anything you made is still in Photos.}}",
+        "choosePlan": "Choose a plan",
+        "buyCredits": "Buy credits",
+        "paymentFailed": "Payment failed",
+        "pastDueWhy": "We couldn't take your last payment. Stripe will try again over the next few days; update the card and the plan carries on, with this period's credits.",
+        "pastDueEndedWhy": "We couldn't take your last payment, so your plan has ended. Update the card: once a payment goes through, the plan starts again. Your credits still work.",
+        "updatePayment": "Update payment method",
+        "opensStripe": "Opens Stripe's secure billing page.",
+        "walletWhy": "Paid once, so it doesn't renew by itself: renew before {date, date, medium} to keep the plan, or let it end and your credits still work.",
+        "renew": "Renew",
+        "paused": "Paused",
+        "pausedWhy": "Your subscription is paused. Nothing is charged and no credits are added until it resumes.",
+        "freeWhy": "No plan yet. Photos made with paid credits are private, with no watermark."
+      },
+      "credits": {
+        "title": "Credits",
+        "paid": "paid",
+        "free": "free",
+        "paidUse": "Private, no watermark",
+        "freeUse": "Public, watermarked",
+        "buy": "Buy credits"
+      },
+      "settings": {
+        "title": "Settings",
+        "email": "Email",
+        "language": "Language",
+        "purchases": "Purchases",
+        "purchasesNone": "None",
+        "purchasesMany": "{count}+",
+        "support": "Support",
+        "openTicket": "Open a ticket"
+      },
+      "language": {
+        "title": "Language",
+        "lead": "Changes the language of the app. Your photos and credits stay the same."
+      },
+      "purchases": {
+        "title": "Purchases",
+        "lead": "Your recent payments, newest first.",
+        "empty": "No purchases yet."
+      },
+      "session": {
+        "title": "Session",
+        "deleteNote": "Deleting removes your photos and remaining credits. Subscriptions are cancelled first."
+      }
     },
     "creditsUnit": "{count, plural, one {credit} other {credits}}",
     "units": {
@@ -416,30 +503,8 @@
       "megabytes": "{size} MB",
       "percent": "{value, number, ::percent}"
     },
-    "subscription": {
-      "title": "Subscription",
-      "plan": "{tier} · {interval, select, year {Yearly} other {Monthly}}",
-      "active": "Active",
-      "renewsOn": "Renews on {date, date, medium}",
-      "cancelsOn": "Cancels on {date, date, medium}",
-      "cancelsDetail": "Your plan stays active until then and will not renew. Your credits stay.",
-      "pastDue": "Past due",
-      "pastDueDetail": "Your last payment did not go through. Update your card in Manage subscription.",
-      "pastDueExpired": "Your last payment did not go through, so your membership has ended. Your credits still work.",
-      "paused": "Paused",
-      "manage": "Manage subscription",
-      "paidUntil": "Paid until {date, date, medium}",
-      "noAutoRenew": "No auto-renew. Renew any time to add another period.",
-      "renew": "Renew",
-      "expired": "Expired",
-      "expiredDetail": "Your membership ended on {date, date, medium}. Your credits still work.",
-      "free": "Free",
-      "freeDetail": "No membership yet.",
-      "seePlans": "See plans"
-    },
     "support": {
       "title": "Help & feedback",
-      "entryHint": "Questions, problems or ideas: write to us here.",
       "newReply": "New reply",
       "replyTime": "We reply here, usually within {hours} hours.",
       "replyTimeMax": "Max members get a reply within {hours} hours.",
@@ -546,7 +611,7 @@
     "billingLabel": "Billing period",
     "monthly": "Monthly",
     "yearly": "Yearly",
-    "savePct": "Save up to {pct}%",
+    "savePct": "Save up to <b>{pct}%</b>",
     "plansLabel": "Plans",
     "tiers": {
       "starter": "Starter",
@@ -555,12 +620,11 @@
     },
     "recommended": "Recommended",
     "bestValue": "Best value",
-    "perMonth": "<amt>{price}</amt><per>/month</per>",
+    "perMonth": "<amt>{price}</amt><per>/mo</per>",
     "wasMonthly": "Monthly price {price}",
     "creditsMonth": "{count, plural, one {# credit} other {# credits}} a month",
     "creditsYear": "{count, plural, one {# credit} other {# credits}} upfront · {price} billed yearly",
-    "perCredit": "{price} per credit",
-    "saving": "Save <b>{amount}</b> a year vs monthly",
+    "perCredit": "{price}/credit",
     "perkHeadings": {
       "includes": "Includes",
       "plusStarter": "Everything in Starter, plus",
@@ -578,17 +642,9 @@
       "earlyAccess": "Early access to new features",
       "wishlistVotes": "Your template requests count {weight}× on the Wishlist"
     },
-    "packsLink": "Just need a few photos? Credit packs from {price}",
-    "continueTier": "Continue with {tier}",
-    "back": "Back to plans",
-    "periodTitle": "{tier} plan",
-    "periodIntro": "Pick how you pay. You can cancel a card plan any time; your credits stay.",
-    "periodIntroOnce": "Pick how you pay. Every option is a one-time payment; your credits stay.",
     "packsTitle": "Credit packs",
-    "packsIntro": "Buy credits once. No subscription, and they never expire.",
     "packsLabel": "Credit packs",
     "packCredits": "{count, plural, one {<n>#</n> <u>credit</u>} other {<n>#</n> <u>credits</u>}}",
-    "oneTimeNoSub": "One-time · no subscription",
     "payWith": "Pay with",
     "payLabel": "Payment method",
     "pricesInUsd": "All prices in USD",
@@ -599,8 +655,8 @@
     "walletOnce": "One-time payment, {period, select, year {1 year} other {30 days}}, no auto-renew",
     "oneTime": "One-time payment",
     "planOnce": "One-time payment, {period, select, year {1 year} other {30 days}}",
-    "ctaPlan": "Continue to payment · {price}{period, select, year {/yr} other {/mo}}",
-    "ctaPack": "Continue to payment · {price}",
+    "ctaPlan": "Continue with {tier} · {price}{period, select, year {/yr} other {/mo}}",
+    "ctaPack": "Continue with {count, plural, one {# credit} other {# credits}} · {price}",
     "finePlanCard": "Renews {period, select, year {yearly} other {monthly}} at {price} · cancel anytime · USD",
     "finePlanWallet": "One-time payment for {period, select, year {1 year} other {30 days}} · no auto-renew · USD",
     "finePlanOnce": "One-time payment for {period, select, year {1 year} other {30 days}} · USD",
@@ -608,13 +664,19 @@
     "redirecting": "Opening secure checkout…",
     "error": "Checkout did not open. Please try again in a moment.",
     "choose": "Choose {tier}",
-    "buyPack": "Buy {count, plural, one {# credit} other {# credits}}",
     "thanks": "Thanks for your purchase. Your credits arrive within a minute; refresh if you don't see them yet.",
     "backToPartner": "Back to Graylum",
-    "compactYear": "{count, plural, one {# credit} other {# credits}} upfront · save <b>{amount}</b> a year",
-    "compactMonth": "{count, plural, one {# credit} other {# credits}} a month · {price} per credit",
-    "comingSoonList": "<b>Coming soon:</b> {items}",
-    "perCreditShort": "{price} each"
+    "perCreditShort": "{price} / credit",
+    "savingLabel": "You save<vs> vs monthly</vs>",
+    "savingAmount": "{amount} a year",
+    "mostPopular": "Most popular",
+    "packsNote": "Buy credits once, no subscription",
+    "buy": "Buy",
+    "buyPackLabel": "Buy {count, plural, one {# credit} other {# credits}} for {price}",
+    "payNoteCard": "Plans renew automatically, cancel anytime",
+    "payNoteWallet": "One-time payment for 30 days or 1 year, no auto-renew",
+    "payNoteOnce": "One-time payment for 30 days or 1 year",
+    "payNotePacks": "Credit packs are always a one-time payment."
   },
   "announcement": {
     "dismiss": "Dismiss announcement"
@@ -634,12 +696,14 @@
       "text": "这个页面有中文版。",
       "switch": "切换到中文",
       "dismiss": "关闭，继续看英文版"
+    },
+    "inCurrent": {
+      "en": "English",
+      "zh": "Simplified Chinese"
     }
   },
   "footer": {
     "legalNav": "Legal",
-    "official": "{name} — {tagline}. {domain} is the only official {name} site.",
-    "launched": "Launched {year}. Serving {countries}. Contact: <mail>{email}</mail>",
     "copyright": "© {year} {name}",
     "language": "Language"
   },
@@ -653,7 +717,10 @@
     "nav": {
       "label": "Main",
       "pricing": "Pricing",
-      "tagline": "AI photo studio"
+      "tagline": "AI photo studio",
+      "templates": "Templates",
+      "login": "Log in",
+      "startFree": "Start free"
     },
     "hero": {
       "label": "Before and after",
@@ -664,7 +731,21 @@
     "facts": "Key facts",
     "faq": "Frequently asked questions",
     "related": "Related",
-    "templateLine": "<b>{name}</b>: {use}"
+    "home": {
+      "phone": "Phone",
+      "ai": "AI",
+      "illustrative": "Illustrative example",
+      "beforeAlt": "{name} template example: the phone photo before (illustrative example)",
+      "afterAlt": "{name} template example: the AI result, {use} (illustrative example)",
+      "pickAria": "{name}. {use} Pick this template",
+      "compareLabel": "Compare the phone photo and the {name} result",
+      "withDragHint": "{use} Drag the handle to compare.",
+      "preview": "Preview",
+      "freeTag": "Free · public",
+      "paidTag": "Paid · private",
+      "freeSampleAlt": "A free photo with the watermark (illustrative example)",
+      "paidSampleAlt": "The same photo made with paid credits, no watermark (illustrative example)"
+    }
   },
   "pageError": {
     "title": "Something went wrong",

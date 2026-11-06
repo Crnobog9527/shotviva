@@ -49,7 +49,7 @@ async function Workspace({ params }: { params: Promise<{ templateId: string }> }
 
 export default function WorkspacePage({ params }: PageProps<'/[locale]/generate/[templateId]'>) {
   return (
-    <AppPage>
+    <AppPage wide>
       <Suspense fallback={<Nav title="" />}>
         <Workspace params={params} />
       </Suspense>

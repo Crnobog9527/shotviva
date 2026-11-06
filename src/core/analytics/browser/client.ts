@@ -38,6 +38,10 @@ export function trackPaywallView(trigger: EventProps<'paywall_view'>['trigger'])
   track('paywall_view', { trigger })
 }
 
+export function trackContactSales(page: EventProps<'contact_sales_click'>['page']): void {
+  track('contact_sales_click', { page })
+}
+
 // The Supabase user id, nothing else: no email or name as person properties (§16.1).
 export function identify(userId: string): void {
   if (enabled() && posthog.get_distinct_id() !== userId) posthog.identify(userId)

@@ -4,6 +4,7 @@ export { assertPublicBaseUrl, isBlockedAddress, parseBaseUrl, type HostResolver 
 export { testConnection, type ConnectionResult } from './connection-test'
 export {
   activateProvider,
+  adminDeleteProvider,
   findProvider,
   deleteProvider,
   findProviderRow,

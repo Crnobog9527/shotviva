@@ -6,6 +6,7 @@ import type { z } from 'zod'
 import { logger } from '@/core/logger'
 import {
   activateProvider,
+  adminDeleteProvider,
   assertPublicBaseUrl,
   deleteProvider,
   findProvider,
@@ -96,6 +97,17 @@ export async function activate(deps: ProviderCommandDeps, adminId: string, input
     from: previous ? { id: previous.id, model: previous.model } : 'env',
     to: { id: target.id, model: target.model },
   })
+}
+
+// Deletes a row that is not in use, with its Vault key (§3.3). The SQL function is the authority
+// on "in use"; the early check only spares a round trip. Jobs keep their provider text.
+export async function removeProvider(deps: ProviderCommandDeps, adminId: string, input: unknown): Promise<void> {
+  const { id } = parseOrThrow(providerIdSchema, input)
+  const target = await findProvider(deps.db, id)
+  if (!target) throw new ProviderSettingError('not_found', `provider ${id} not found`)
+  if (target.isActive) throw new ProviderSettingError('provider_active', `provider ${id} is in use`)
+  await adminDeleteProvider(deps.db, id)
+  logger.info('admin.provider.deleted', { adminId, providerId: id, module: target.module, model: target.model })
 }
 
 // GET {base_url}/models with the row's stored key. Re-checks the host first, since DNS can

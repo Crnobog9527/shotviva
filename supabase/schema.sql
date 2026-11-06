@@ -530,6 +530,32 @@ $$;
 ALTER FUNCTION "public"."admin_decide_refund"("p_ticket_id" "uuid", "p_decision" "text", "p_amount_cents" integer, "p_body" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_delete_provider"("p_id" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_active boolean;
+begin
+  -- Row lock: a concurrent switch to this row waits for the delete, or the delete sees it active.
+  select is_active into v_active from public.ai_providers where id = p_id for update;
+  if not found then
+    raise exception 'PROVIDER_NOT_FOUND';
+  end if;
+  -- The module would silently fall back (env, or none for decision): switch first.
+  if v_active then
+    raise exception 'PROVIDER_ACTIVE' using errcode = '55000';
+  end if;
+
+  delete from public.ai_providers where id = p_id;
+  delete from vault.secrets where name = 'shotviva.provider.' || p_id::text;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_delete_provider"("p_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_list_template_requests"() RETURNS TABLE("id" "uuid", "email" "text", "description" "text", "image_keys" "text"[], "status" "text", "template_id" "text", "votes_count" integer, "created_at" timestamp with time zone)
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -3012,6 +3038,11 @@ GRANT SELECT ON TABLE "public"."support_tickets" TO "service_role";
 
 REVOKE ALL ON FUNCTION "public"."admin_decide_refund"("p_ticket_id" "uuid", "p_decision" "text", "p_amount_cents" integer, "p_body" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_decide_refund"("p_ticket_id" "uuid", "p_decision" "text", "p_amount_cents" integer, "p_body" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_delete_provider"("p_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_delete_provider"("p_id" "uuid") TO "service_role";
 
 
 

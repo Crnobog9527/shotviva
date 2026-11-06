@@ -27,6 +27,23 @@ export function packOffers(products: readonly SiteProduct[]): PackProduct[] {
     .sort((a, b) => a.priceUsd - b.priceUsd)
 }
 
+export type PackTone = 'graphite' | 'sapphire' | 'gold'
+export type PackLook = { tone: PackTone; flag: 'mostPopular' | 'bestValue' | null }
+
+// The packs' materials (comps-v3-b): the smallest graphite, the middle one sapphire and "Most
+// popular", the largest gold. "Best value" goes on the largest only while it really has the
+// lowest price per credit in the config. Fewer than three packs: all graphite, no flags.
+export function packLooks(packs: readonly PackProduct[]): PackLook[] {
+  if (packs.length !== 3) return packs.map(() => ({ tone: 'graphite', flag: null }))
+  const cheapest = Math.min(...packs.map(perCreditUsd))
+  const largest = packs[2]
+  return [
+    { tone: 'graphite', flag: null },
+    { tone: 'sapphire', flag: 'mostPopular' },
+    { tone: 'gold', flag: largest && perCreditUsd(largest) === cheapest ? 'bestValue' : null },
+  ]
+}
+
 export function productFor(offer: TierOffer, period: Period): MembershipProduct {
   return period === 'year' ? offer.yearly : offer.monthly
 }

@@ -1,40 +1,36 @@
-import type { FaqItem } from '@/core/content'
+import type { BusinessBlock, CreditBuysBlock, FaqItem } from '@/core/content'
 
 import { site } from '../../site.config'
-import { PACKS, PLAN_TIERS, creditsOf, perCredit, priceOf } from '../offer'
-import type { PricingContent, PricingTable } from '../pricing'
-import { ZH_TIERS, zhFreeImages, zhPackFrom, zhPlanFrom, zhYearlySaving } from './offer'
+import type { PricingContent } from '../pricing'
+import { ZH_TIERS, zhFreeImages, zhFromCredits, zhPackFrom, zhTierList, zhYearlySaving } from './offer'
 
-// /zh/pricing (T21). Keyword 「Shotviva 价格」; every figure from site.config through offer.ts,
-// in US dollars only, never converted to RMB (建站规格 §6.1 rule 8, G3).
+// /zh/pricing (T21, laid out as comps-v3-b pricing.html in T37). Keyword 「Shotviva 价格」;
+// every figure from site.config through offer.ts, in US dollars only, never converted to RMB
+// (建站规格 §6.1 rule 8, G3).
 const brand = site.brand.name
 
-const PLAN_NAMES: Record<string, string> = { Starter: '入门版', Pro: '专业版', Max: '旗舰版' }
-const PACK_NAMES: Record<string, string> = { pack_s: '小包', pack_m: '中包', pack_l: '大包' }
-
-const plansTable: PricingTable = {
-  caption: '按月和按年的套餐',
-  headers: ['套餐', '按月', '每月积分', '按年', '每年积分（一次到账）', '按年时每积分'],
-  rows: PLAN_TIERS.map((tier) => [
-    PLAN_NAMES[tier.name] ?? tier.name,
-    priceOf(tier.monthly),
-    creditsOf(tier.monthly),
-    priceOf(tier.yearly),
-    creditsOf(tier.yearly),
-    perCredit(tier.yearly),
-  ]),
+const creditBuys: CreditBuysBlock = {
+  heading: '一个积分能买什么',
+  tiers: ZH_TIERS.map((tier) => ({ name: tier.name, credits: tier.credits })),
+  unit: '积分',
+  note: `大多数模板每张图的消耗，分别对应 ${ZH_TIERS.map((tier) => tier.px).join('、')} px。同一清晰度下，任何尺寸和比例的价格都一样。`,
 }
 
-const packsTable: PricingTable = {
-  caption: '一次性积分包，人人可买',
-  headers: ['积分包', '价格', '积分', '每积分'],
-  rows: PACKS.map((pack) => [PACK_NAMES[pack.id] ?? pack.name, priceOf(pack.id), creditsOf(pack.id), perCredit(pack.id)]),
-}
-
-const photoCostTable: PricingTable = {
-  caption: '大多数模板每张图消耗多少',
-  headers: ['清晰度', '像素', '适合', '积分'],
-  rows: ZH_TIERS.map((tier) => [tier.name, `${tier.px} px`, tier.use, String(tier.credits)]),
+// 能为企业安排的事，不是现成功能（Owner 2026-11-06：还没有后台和代码），所以不写 SLA、单点登录、团队账号。
+const business: BusinessBlock = {
+  heading: '企业合作',
+  who: '适合品牌、电商卖家、餐饮连锁和代运营公司这类需要大批量出图的团队。告诉我们你需要什么，我们来为你安排：',
+  items: [
+    { title: '批量价格和发票付款', detail: '按每月出图量给更低的单张价，可签年度合同、按发票付款。' },
+    { title: '专属模板', detail: '按你的品牌规范、产品线和平台规格定制，整个商品目录风格统一。' },
+    { title: '更大的并发和批量', detail: '一次处理整个商品目录，不用一张一张来。' },
+    { title: 'API 接入', detail: `把 ${brand} 接进你的商品系统或店铺，自动出图。` },
+    { title: '隐私和数据条款', detail: '作品保持私密，需要时可以签数据处理协议。' },
+    { title: '专人对接', detail: '一位专人负责上手培训和优先支持。' },
+  ],
+  cta: '联系我们',
+  aside: ['也可以直接写信到 ', '，附上每月出图量和使用的平台。'],
+  prompts: ['公司名称：', '每月大概出图量：', '用在哪些平台（电商平台、外卖平台、自己的网站）：', '想定制什么（模板、API、发票付款）：'],
 }
 
 const yearly = zhYearlySaving ? `${zhYearlySaving}。` : ''
@@ -75,18 +71,13 @@ export const zhPricingPage: PricingContent = {
   label: '价格',
   title: `${brand} 价格：积分和套餐，美元计价（2026）`,
   description: `${brand} 价格：入门版、专业版、旗舰版套餐，按月或按年付，另有一次性积分包。新用户送 ${zhFreeImages}，积分永不过期。`,
-  h1: `${brand} 价格与积分`,
-  intro: `每个新账号送 ${zhFreeImages}。之后按积分付费：一张图消耗几个积分，取决于模板和你选的清晰度。可以选套餐（${zhPlanFrom}），只需要几张图时也可以买积分包（${zhPackFrom}）。${yearly}所有价格以美元计。`,
-  tables: { plans: plansTable, packs: packsTable, photoCost: photoCostTable },
-  headings: { payment: '怎么付款', faq: '价格常见问题' },
-  payment: [
-    '银行卡、Apple Pay 或 Google Pay：套餐自动续费，随时可以取消。取消后只是不再续费，积分会保留。',
-    '支付宝：一次性支付一个月或一年的套餐，不自动续费。',
-    '积分包一律一次性付款，不开套餐也能买。',
-  ],
+  h1: `${brand} 价格：按月付、按年付，或一次性买积分`,
+  h1Em: '',
+  intro: `用付费积分生成的图私密、无水印。一张图 ${zhFromCredits}，取决于模板和你选的${zhTierList}。${yearly}积分包 ${zhPackFrom}。所有价格以美元计。`,
+  gift: `新用户送 ${zhFreeImages}，不用绑卡。`,
+  creditBuys,
+  business,
+  headings: { faq: '价格常见问题' },
   faq,
-  oneTime: {
-    payment: ['银行卡或支付宝：一次性支付一个月或一年的套餐，到期后想继续用再买一次。', '积分包一律一次性付款，不开套餐也能买。'],
-    faq: oneTimeFaq,
-  },
+  oneTime: { faq: oneTimeFaq },
 }

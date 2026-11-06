@@ -15,7 +15,7 @@ import { site } from '@/site/site.config'
 
 function Nav({ title }: { title: string }) {
   const t = useTranslations('app.result')
-  return <FlowNav back={{ href: '/photos', label: t('back') }} title={title} />
+  return <FlowNav back={{ href: '/photos', label: t('back') }} title={title} underTabBar />
 }
 
 // Everything the page reads besides the job, in one round: templates, the upload preview's HEAD

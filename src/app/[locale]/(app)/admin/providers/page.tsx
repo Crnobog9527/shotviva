@@ -4,7 +4,7 @@ import { PROVIDERS_COPY, ProvidersEditor } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { listProviders } from '@/core/providers'
 
-import { activateProviderAction, saveProviderAction, testProviderAction } from './actions'
+import { activateProviderAction, deleteProviderAction, saveProviderAction, testProviderAction } from './actions'
 
 // Admin-only, request-time page (ARCHITECTURE §3.3, §10). The proxy answers non-admins with a
 // 404 first; requireAdmin() stays the authoritative check. The listing never carries key
@@ -21,7 +21,7 @@ export default async function AdminProvidersPage() {
       <h1 className="text-xl font-semibold">{PROVIDERS_COPY.title}</h1>
       <ProvidersEditor
         providers={providers}
-        actions={{ save: saveProviderAction, activate: activateProviderAction, test: testProviderAction }}
+        actions={{ save: saveProviderAction, activate: activateProviderAction, test: testProviderAction, remove: deleteProviderAction }}
       />
     </div>
   )

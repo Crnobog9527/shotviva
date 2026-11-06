@@ -411,7 +411,7 @@
 
 **依据与底稿**：
 - 退款规则 Owner 定为「和 Graylum 一致」：以 Graylum **staging** 分支 `apps/web/content/legal/refund-policy.html` 为底稿改写；Graylum 条款里凡是依赖 Graylum 独有功能（自助退款页、后台退款流程等）的承诺，Shotviva v1 没有对应功能的，改写成「发邮件到 support@shotviva.com，人工在 Stripe / Waffo 后台处理」（ARCHITECTURE §10），并在 PR 里逐条列出改了哪些。卡支付走 Stripe Managed Payments 时由 Link 作为商户记录方，退款条款要与之相符（ARCHITECTURE §6.3）。
-- 服务条款、隐私政策同样参考 Graylum staging `terms.html`、`privacy.html` 的结构，但内容按 Shotviva 事实写：免费作品公开展示并带水印、付费作品私密可商用（§6.2）；用户对上传内容负责、画风模板只用通用风格（§5）；上传照片保留 7 天、成品保留到用户删除（§8.3）；需求墙参考图规则（§15.5）；第三方服务清单（Supabase、Cloudflare R2、OpenAI、Stripe / Link、Waffo、PostHog、Sentry、Resend、Vercel）；PostHog 不使用 Cookie（§16）；连接 Graylum 时共享的信息（账号 id、剩余积分，§14）；账号删除（§13）。
+- 服务条款、隐私政策同样参考 Graylum staging `terms.html`、`privacy.html` 的结构，但内容按 Shotviva 事实写：免费作品公开展示并带水印、付费作品私密可商用（§6.2）；用户对上传内容负责、画风模板只用通用风格（§5）；用来生成的照片随作品保留、没用的上传 7 天删除，成品保留到用户删除（§8.3）；需求墙参考图规则（§15.5）；第三方服务清单（Supabase、Cloudflare R2、OpenAI、Stripe / Link、Waffo、PostHog、Sentry、Resend、Vercel）；PostHog 不使用 Cookie（§16）；连接 Graylum 时共享的信息（账号 id、剩余积分，§14）；账号删除（§13）。
 - LAUNCH §8 全部条目。
 
 **验收**：
@@ -722,6 +722,33 @@
 **测试**：结构化数据和页面文字一致；9 个问题都是 `<h3>`；答案在服务端 HTML 里；数字和价格页一致。
 **依赖**：T21 三个 PR 合并后做。
 
+## T36 首页改版（按定稿 v3-b，可派）
+
+**目标**：首页按 `design/comps-v3-b/home.html` 实现（375 / 1280 / 1440 三档，`DESKTOP-NOTES.md`、`SIGN-OFF.md` 第 01 行）。
+**范围**：
+- 首屏左右两栏 + 生成栏。生成栏真的能出图（DESIGN §6.9 第 9 条）：已登录走和工作台同一条出图路径并跳到工作台生成中视图；未登录弹注册 / 登录并保留选择；积分不够打开付费墙。
+- 模板区（并排对比卡、模板选择对话框、悬停擦除）、对比表 / 账单卡（数字从 `site.config` 读）、相关链接卡（只渲染已存在的页面）、FAQ 手风琴（答案在服务端 HTML 里，`home-faq.test.ts` 必须继续通过）、导航（地球语言切换已在主线，对齐样式即可）、页脚。
+- 中英文都要；动效在「减少动态效果」下关闭；LCP 图片预加载。
+**依赖**：T21 / T35（已合并）。和 T37 共用 `tiers` 相关组件时按合并先后协调。
+
+## T37 定价页和付费墙改版（按定稿 v3-b，可派）
+
+**目标**：`pricing.html`、`paywall.html`（`SIGN-OFF.md` 第 02、03 行）。
+**范围**：三档卡（Max 金、Pro 蓝宝石、流光动效）、月付 / 年付切换和「Save up to 40%」、积分包三档、「For business」板（DESIGN §6.9 第 8 条，`contact_sales_click` 事件）、电脑端付费墙居中对话框（920px）、手机底部抽屉；权益文字只从 `TIER_LIMITS` 和配置读。中英文。
+**依赖**：T36 并行，共用组件谁后合并谁 rebase。
+
+## T38 应用的电脑端布局（按定稿 v3-b，可派）
+
+**目标**：`create.html`、`workspace.html`、`photos.html`（`SIGN-OFF.md` 第 04～06 行，DESIGN §6.9 第 2、3、7 条）。
+**范围**：≥768 底部 tab 变固定顶栏；点模板直接弹出创作对话框（手机底部抽屉，电脑 1040px 两栏），工作台是同一表单的整页形态（一份表单源）；模板缩略图悬停擦除；Photos 网格和并排对比卡；作品详情页已由 T32 / T30 做完，只对齐顶栏。中英文。
+**依赖**：T28（批量上传）和 T32 / T30（详情页）已合并，在其上改，不要回退它们的功能。
+
+## T39 账号页改版（按定稿 v3-b，可派）
+
+**目标**：`account.html`（`SIGN-OFF.md` 第 08 行，含 `?sub=cancelled|expired|past_due|wallet` 四种订阅状态）。
+**范围**：Plan 卡、Credits 两格、Settings 行（Email / Language / Purchases / Support）、Integrations 区块（T34 已做，只对齐样式；Shopify 行是示意，不实现）、Sign out / Delete account；订阅状态读 T10 的镜像表和 `paid_until`；Manage subscription / Update payment method 走 Stripe Customer Portal。中英文。
+**依赖**：T10、T34、T21（已合并）。
+
 ## Owner 侧关键路径（不是任务卡，但比代码慢）
 
 - 第一批 10 个模板（6 类）的真实照片 + 前后对比素材 + 提示词调优
@@ -731,3 +758,17 @@
 - 上线前成本测量：20 张真实照片实测输入图 token（LAUNCH §5，花费 < $5），据此定 `high` 1K 是 2 还是 3 credits
 - Resend 域名验证
 - ~~价格数字定稿（pricing-research 窗口）~~ 已定稿 2026-11-05（ARCHITECTURE §6.2）；Waffo 费率仍待向商务确认
+
+## T40 输入图随作品保留，Make again 随时可用（可派）
+
+**目标**：Owner 2026-11-06 定：作品用的原图跟作品一起保留，保证 Make again 任何时候都能直接用（ARCHITECTURE §8.3「输入图随作品保留」）。
+
+**范围**：
+- 结算时把这次的全部输入图用 R2 服务端复制写到 `outputs/{user_id}/{job_id}-in-{n}.jpg`，把这些 key 记在任务上（优先放进现有字段；确实要加列时迁移编号段 `0320`～`0339`）。复制失败只记日志，不影响结算和扣费。
+- Make again：作品有保存的输入图时，服务端把它复制成新的 `inputs/{user_id}/{uuid}.jpg`，工作台按旧作品预填模板、尺寸、清晰度、补充说明和照片，直接可以生成，生成链路不变。没有保存的输入图时（T40 之前的老作品、复制失败），走 T6 稿的「原图已删，请再加一次照片」状态（`workspace.html?again=expired`）。
+- 删除作品时一起删这些输入图；删号按 `outputs/{user_id}/` 前缀已覆盖，确认一下。
+- 768 原图小图（T32）照旧，详情页继续用它。
+- 隐私政策中英文改成 §8.3 末尾那句。后台查看作品的「已过期」只对老作品出现。
+- `inputs/` 的 7 天生命周期规则不动。
+
+**验收**：新作品过 7 天后 Make again 仍然直接带着照片；删作品后输入图副本也没了；老作品走重新上传状态；复制失败不影响结算；单测和数据库测试覆盖；交互验收交给 Codex。

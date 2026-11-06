@@ -41,7 +41,7 @@ export function stripeHarness() {
     checkout: { sessions: { retrieve: sessions.retrieve, create: vi.fn() } },
     prices: { list: vi.fn() },
     invoices: { retrieve: invoices.retrieve },
-    subscriptions: { retrieve: subscriptions.retrieve },
+    subscriptions: { retrieve: subscriptions.retrieve, cancel: vi.fn() },
     charges: { retrieve: charges.retrieve },
     disputes: { retrieve: disputes.retrieve },
     billingPortal: { sessions: { create: vi.fn() } },

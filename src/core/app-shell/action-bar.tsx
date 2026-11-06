@@ -7,8 +7,26 @@ import { cn } from '../ui/cn'
 // The fixed bottom bar of flow pages: at most one notice line and the one primary (DESIGN
 // "Action Bar"). From md up it sits at the end of the content instead (§8.6). The spacer is
 // measured from the bar (notice lines and the home-indicator inset vary), so the last section
-// always scrolls clear of it on phones.
-export function ActionBar({ children, className }: { children: ReactNode; className?: string }) {
+// always scrolls clear of it on phones. `inline` is the bar pinned under a sheet's scrolling
+// body (the creation dialog, T38): no spacer, never fixed, the body fading out above it.
+export function ActionBar({ children, className, inline = false }: { children: ReactNode; className?: string; inline?: boolean }) {
+  if (inline) {
+    return (
+      <div
+        className={cn(
+          'relative flex-none bg-popover px-4 pt-3 pb-[calc(var(--sab)+8px)] shadow-[inset_0_1px_0_var(--border)] md:px-6 md:pt-4 md:pb-6',
+          "before:pointer-events-none before:absolute before:inset-x-0 before:bottom-full before:h-5 before:bg-[linear-gradient(transparent,var(--popover))] before:content-['']",
+          className,
+        )}
+      >
+        {children}
+      </div>
+    )
+  }
+  return <FixedBar className={className}>{children}</FixedBar>
+}
+
+function FixedBar({ children, className }: { children: ReactNode; className?: string }) {
   const bar = useRef<HTMLDivElement>(null)
   const [height, setHeight] = useState(160)
   useEffect(() => {

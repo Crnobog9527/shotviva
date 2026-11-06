@@ -3,38 +3,49 @@
 import { useTranslations } from 'next-intl'
 import { useRef } from 'react'
 
-import type { CatalogueTemplate } from './catalogue-template'
+import { LoopPlate } from './card-media'
+import { hasStills, type CatalogueTemplate } from './catalogue-template'
 import { useCategoryLabel } from './category-label'
-import { MotionBadge } from './split-tags'
-import { useQuietLoop } from './use-motion'
+import { PairMedia } from './pair-media'
+import { useHoverWipe } from './use-hover-wipe'
 
-// The 16:10 featured card at the top of Create: the first video template, playing its loop
-// while in view, with its name over a dark fade and a "Preview" pill.
+// The featured card at the top of Create (B comp create.html .feature): the first video
+// template as the same live pair as every card, 8:5 on phones and 8:3 from md up, its loop
+// playing on the right plate on hover (once in view on touch). Its name sits over a dark fade
+// with a frosted "Make one" pill: a tap opens the creation dialog.
 export function FeatureCard({ template, onOpen }: { template: CatalogueTemplate; onOpen(id: string): void }) {
   const t = useTranslations('app.template')
   const label = useCategoryLabel()
-  const ref = useRef<HTMLVideoElement>(null)
-  useQuietLoop(ref, template.cover.motion ?? '')
+  const ref = useRef<HTMLButtonElement>(null)
+  useHoverWipe(ref)
+  const { before, after, motion } = template.cover
+  const alt = t('cardAlt', { name: template.name })
   return (
     <button
+      ref={ref}
       type="button"
       aria-haspopup="dialog"
       aria-label={t('featureAria', { name: template.name, category: label(template.category) })}
       onClick={() => onOpen(template.id)}
-      className="press hairline relative mx-4 mt-4 block aspect-[16/10] w-[calc(100%-32px)] overflow-hidden rounded-panel bg-card text-left"
+      className="group hairline relative mt-4 block w-full overflow-hidden rounded-panel bg-card text-left transition-shadow hover:shadow-[inset_0_0_0_1px_var(--input)] md:mt-6"
     >
-      <video ref={ref} poster={template.cover.poster ?? undefined} muted loop playsInline preload="none" aria-hidden="true" className="absolute inset-0 size-full object-cover" />
-      <span aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(180deg,transparent_40%,var(--photo-fade))]" />
-      <MotionBadge type="video" />
-      <span className="frost absolute top-3 right-3 z-2 inline-flex h-[26px] items-center rounded-tag px-2 text-caption leading-none font-medium text-photo-ink">
-        {t('example')}
-      </span>
-      <span className="absolute inset-x-4 bottom-4 z-2 flex items-end justify-between gap-3">
+      {hasStills(template) ? (
+        <PairMedia before={before as string} after={after as string} alt={alt} eager video={motion ?? undefined} size="feature" badge className="rounded-panel md:aspect-[8/3]" />
+      ) : (
+        <LoopPlate template={template} alt={alt} className="rounded-panel md:aspect-[8/3]" />
+      )}
+      <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 z-5 h-[56%] bg-[linear-gradient(180deg,transparent,var(--photo-fade))]" />
+      <span className="absolute inset-x-4 bottom-4 z-6 flex items-end justify-between gap-3 md:inset-x-6 md:bottom-6">
         <span>
-          <b className="block font-display text-[30px] leading-none font-normal text-photo-ink">{template.name}</b>
-          <small className="mt-1 block text-caption text-photo-ink/80">{t('featureMeta', { category: label(template.category) })}</small>
+          <b className="block font-display text-h1 leading-none font-normal tracking-[-0.02em] text-photo-ink">{template.name}</b>
+          <small className="mt-1 block text-caption text-bone-dim">{t('featureMeta', { category: label(template.category) })}</small>
         </span>
-        <span className="inline-flex min-h-9 flex-none items-center rounded-full bg-photo-ink px-4 py-2 text-caption leading-none font-semibold text-background">{t('preview')}</span>
+        <span className="frost inline-flex min-h-9 flex-none items-center gap-0.5 rounded-full px-3.5 text-caption leading-none font-semibold text-photo-ink shadow-[inset_0_0_0_1px_var(--input)]">
+          {t('makeOne')}
+          <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 text-primary" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 6l6 6-6 6" />
+          </svg>
+        </span>
       </span>
     </button>
   )

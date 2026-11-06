@@ -1,4 +1,4 @@
-import { PRICE_PENDING, pricedProducts, type SiteProduct } from '@/core/config'
+import { PRICE_PENDING, pricedProducts, type SiteProduct, type UsdRange } from '@/core/config'
 import { MAX_UPLOAD_BYTES, UPLOAD_CONTENT_TYPES } from '@/core/storage/rules'
 
 import { site } from '../site.config'
@@ -30,8 +30,11 @@ export const tierPixels = OUTPUT_TIERS.map((tier) => `${tier.name} ${tier.px} px
 export const fromCredits = `from ${STANDARD.credits} credits`
 export const FromCredits = `From ${STANDARD.credits} credits`
 
+// "One product, three styled photos": the home demo and the two bills (DESIGN §6.9 item 6).
+export const SET_PHOTOS = 3
+
 // Credits for one photo in each of three templates at Standard: "6"
-export const setCredits = STANDARD.credits * 3
+export const setCredits = STANDARD.credits * SET_PHOTOS
 
 // The signup gift is counted in Standard images: 6 free credits = 3 Standard images (G3).
 export const freeStandardImages = Math.floor(site.billing.freeCredits / STANDARD.credits)
@@ -120,9 +123,52 @@ function yearlySavingPct(): number | undefined {
 
 export const yearlySaving = yearlySavingPct()
 
+// The lowest price of one credit across every plan and pack, e.g. "$0.21" (Max yearly), for
+// the home FAQ (建站规格 G6 B). From the same rounding as perCredit.
+function lowestCreditPrice(): string | undefined {
+  const ids = [...PLAN_TIERS.flatMap((tier) => [tier.monthly, tier.yearly]), ...PACKS.map((pack) => pack.id)]
+  const prices = ids.filter((id) => product(id)).map((id) => perCredit(id))
+  return prices.sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)))[0]
+}
+
+export const creditFrom = lowestCreditPrice()
+
 // One sentence on paid options, used by the home page, the generator page and FAQ answers.
 export function plansSentence(): string {
   if (!planFrom) return 'Paid plans and one-time credit packs are coming soon.'
   const packs = packFrom ? `, or buy a one-time credit pack from ${usd(packFrom.priceUsd)}` : ''
   return `Plans start at ${usd(planFrom.priceUsd)} a month for ${planFrom.credits} credits${packs}.`
 }
+
+// --- The home page's two bills (DESIGN §6.9 item 6). The photographer's rates and the seconds
+// a photo takes live in site.config.marketing; everything here is arithmetic on them. ---
+
+const { photographer, photoSeconds } = site.marketing
+
+const times = (range: UsdRange, n: number): UsdRange => ({ low: range.low * n, high: range.high * n })
+
+// "$89–$300"
+export const usdRange = (range: UsdRange) => `${usd(range.low)}–${usd(range.high)}`
+
+export const styledShotUsd = photographer.styledShotUsd
+export const retouchUsd = photographer.retouchUsd
+export const packshotFromUsd = photographer.packshotFromUsd
+// Three styled shots, three retouches, and the quote they add up to: $297–$990.
+export const setShotsUsd = times(styledShotUsd, SET_PHOTOS)
+export const setRetouchUsd = times(retouchUsd, SET_PHOTOS)
+export const quoteUsd: UsdRange = { low: setShotsUsd.low + setRetouchUsd.low, high: setShotsUsd.high + setRetouchUsd.high }
+
+// "20–40"
+export const photoSecondsRange = `${photoSeconds.low}–${photoSeconds.high}`
+
+// The set's credits at the cheapest plan's credit price, rounded the way /pricing shows it:
+// 6 × $0.40 = "$2.40". Undefined until the plans are priced.
+function setUsd(): string | undefined {
+  if (!planFrom) return undefined
+  const credit = Math.round((planFrom.priceUsd / planFrom.credits) * 100 + 1e-9) / 100
+  return usd(Math.round(credit * setCredits * 100) / 100)
+}
+export const setCostUsd = setUsd()
+
+// Standard photos the rest of that plan's month still makes: (50 − 6) ÷ 2 = 22.
+export const photosLeftInPlan = planFrom ? Math.floor((planFrom.credits - setCredits) / STANDARD.credits) : undefined

@@ -4,11 +4,11 @@ import { useFormatter, useTranslations } from 'next-intl'
 import { useRef, type DragEvent } from 'react'
 
 import { UPLOAD_ACCEPT } from '@/core/storage/rules'
-import { cn } from '@/core/ui/cn'
 
 import { UPLOAD_FORMAT_NAMES, UPLOAD_MAX_MB } from './upload-formats'
 
-// Upload zone, empty (DESIGN §4.3 step 1, "Upload Zone"): a 16:9 hatched recess that also
+// Upload zone, empty (DESIGN §4.3 step 1, "Upload Zone"): a 16:9 viewfinder frame (B comp app.css
+// .empty .frame, four corner brackets) that also
 // takes dropped files on desktop, then two entries. "Take photo" opens the camera (capture),
 // "Choose from gallery" the library (no capture). No HEIC in accept: iOS converts to JPEG.
 // `multiple` (Pro and Max, T28) lets the gallery pick a batch; the camera always takes one.
@@ -33,13 +33,14 @@ export function PhotoPickers({ onPick, multiple = false }: { onPick(files: File[
       <div
         onDragOver={(event) => event.preventDefault()}
         onDrop={onDrop}
-        className="grid aspect-video place-content-center md:aspect-[5/2] justify-items-center gap-2 rounded-button bg-[repeating-linear-gradient(135deg,var(--hatch)_0_8px,transparent_8px_16px),var(--recess)] text-center shadow-[inset_0_0_0_1px_var(--recess-edge)]"
+        className="viewfinder relative grid aspect-video place-content-center justify-items-center gap-2 rounded-button bg-background p-4 text-center shadow-[inset_0_0_0_1px_var(--input)]"
       >
         <b className="text-body leading-[1.2] font-semibold">{t(multiple ? 'addPhotos' : 'addPhoto')}</b>
         <span className="text-caption text-muted-foreground">{formats}</span>
       </div>
-      <div className="mt-3 grid gap-2">
-        <PickButton label={t('takePhoto')} icon="camera" filled onClick={() => camera.current?.click()} />
+      {/* Both quiet: the one primary is Generate (B comp, round 2); side by side from md up. */}
+      <div className="mt-3 grid gap-2 md:grid-cols-2">
+        <PickButton label={t('takePhoto')} icon="camera" onClick={() => camera.current?.click()} />
         <PickButton label={t(multiple ? 'chooseGalleryMany' : 'chooseGallery')} icon="gallery" onClick={() => gallery.current?.click()} />
       </div>
       <input ref={camera} type="file" accept={UPLOAD_ACCEPT} capture="environment" hidden onChange={(e) => take(e.currentTarget)} />
@@ -64,15 +65,12 @@ export const ICONS = {
   ),
 }
 
-function PickButton({ label, icon, filled, onClick }: { label: string; icon: keyof typeof ICONS; filled?: boolean; onClick(): void }) {
+function PickButton({ label, icon, onClick }: { label: string; icon: keyof typeof ICONS; onClick(): void }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={cn(
-        'press inline-flex min-h-12 items-center justify-center gap-2 rounded-button px-3 py-2 text-center text-body leading-tight font-semibold',
-        filled ? 'bg-foreground text-background' : 'hairline bg-wash text-foreground',
-      )}
+      className="press hairline inline-flex min-h-12 items-center justify-center gap-2 rounded-button bg-wash px-3 py-2 text-center text-body leading-tight font-semibold text-foreground md:hover:bg-wash-strong"
     >
       <svg viewBox="0 0 24 24" aria-hidden="true" className="size-[18px]" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
         {ICONS[icon]}

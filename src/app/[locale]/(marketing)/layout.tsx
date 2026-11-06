@@ -4,24 +4,18 @@ import { Suspense } from 'react'
 import { AnnouncementBanner } from '@/core/announcements'
 import { SiteFooter } from '@/core/content'
 import { currentLocale } from '@/core/i18n/server'
-import { Link, LocaleMenu, LocaleSwitcher, LocaleSwitcherFallback, SwitchBanner } from '@/core/i18n/ui'
-import { countriesIn, footerLinksIn } from '@/site/content'
+import { FooterLocales, FooterLocalesFallback, Link, LocaleMenu, SwitchBanner } from '@/core/i18n/ui'
+import { footerLinksIn } from '@/site/content'
 import { site } from '@/site/site.config'
+
+import './marketing.css'
 
 const zhPaths = site.locales.zhPaths
 
-// usePathname() is request data on dynamic routes; the fallback still links to the other home.
-function Switcher({ className }: { className?: string }) {
-  return (
-    <Suspense fallback={<LocaleSwitcherFallback className={className} />}>
-      <LocaleSwitcher translatedPaths={zhPaths} className={className} />
-    </Suspense>
-  )
-}
-
-// Placeholder marketing shell (T6 designs it): nav + content + footer (ARCHITECTURE §1).
-// Language: the globe menu in the top nav after Pricing, visible on phones too, and the text
-// switch in the footer (DESIGN §6.9 item 4, ARCHITECTURE §17).
+// Marketing shell (DESIGN §6.9 items 4–5, design/comps-v3-b/home.html): wordmark, then
+// Templates (the home template section; v1 has no /templates page) · Pricing · the globe ·
+// Log in · Start free; phones keep the globe and Log in. Footer: contact, copyright, legal links
+// and the text language switch (ARCHITECTURE §17).
 export default async function MarketingLayout({ children }: LayoutProps<'/[locale]'>) {
   const locale = await currentLocale()
   const t = await getTranslations('marketing.nav')
@@ -31,26 +25,44 @@ export default async function MarketingLayout({ children }: LayoutProps<'/[local
         <SwitchBanner translatedPaths={zhPaths} />
       </Suspense>
       <AnnouncementBanner />
-      <header className="mx-auto flex w-full max-w-3xl items-center justify-between gap-4 p-4">
-        <Link href="/">
-          {site.brand.name} <span>{t('tagline')}</span>
-        </Link>
-        <nav aria-label={t('label')} className="flex items-center gap-2">
-          <Link href="/pricing" className="inline-flex min-h-11 items-center px-2">
-            {t('pricing')}
+      <header className="mk-appbar">
+        <div className="mk-w mk-appbar-row">
+          <Link href="/" className="mk-brand" aria-label={`${site.brand.name}, ${t('tagline')}`}>
+            <span className="mk-word">
+              {site.brand.name}
+              <i>.</i>
+            </span>
+            <span className="mk-brand-tag">{t('tagline')}</span>
           </Link>
-          {/* usePathname() is request data on dynamic routes; nothing shows until it resolves. */}
-          <Suspense fallback={<span className="size-11" />}>
-            <LocaleMenu translatedPaths={zhPaths} />
-          </Suspense>
-        </nav>
+          <nav aria-label={t('label')} className="mk-nav">
+            <Link href="/#templates" className="mk-nl">
+              {t('templates')}
+            </Link>
+            <Link href="/pricing" className="mk-nl">
+              {t('pricing')}
+            </Link>
+            {/* usePathname() is request data on dynamic routes; nothing shows until it resolves. */}
+            <Suspense fallback={<span className="size-11" />}>
+              <LocaleMenu translatedPaths={zhPaths} />
+            </Suspense>
+            <Link href="/login" className="mk-ghost-pill mk-login">
+              {t('login')}
+            </Link>
+            <Link href="/signup" className="mk-start">
+              {t('startFree')}
+            </Link>
+          </nav>
+        </div>
       </header>
       <main className="flex flex-1 flex-col">{children}</main>
       <SiteFooter
-        brand={{ ...site.brand, tagline: t('tagline') }}
+        brand={site.brand}
         links={footerLinksIn(locale)}
-        countries={countriesIn(locale)}
-        languageSwitch={<Switcher />}
+        languageSwitch={
+          <Suspense fallback={<FooterLocalesFallback />}>
+            <FooterLocales translatedPaths={zhPaths} />
+          </Suspense>
+        }
       />
     </>
   )

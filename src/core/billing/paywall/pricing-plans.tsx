@@ -7,48 +7,51 @@ import type { PackProduct, SiteProduct } from "../../config"
 import { buttonVariants } from "../../ui/button"
 import { cn } from "../../ui/cn"
 import { BillingToggle } from "./billing-toggle"
-import { packOffers, perCreditUsd, tierOffers, yearlySavingPct, type Period } from "./offer"
+import { packLooks, packOffers, tierOffers, yearlySavingPct, type Period } from "./offer"
+import { PackCard } from "./pack-card"
 import { usePaywall, type PaywallTrigger } from "./paywall-context"
 import { tierPerks } from "./perks"
 import { TierCard } from "./tier-card"
-import { PackCredits } from "./pack-credits"
 import { useMoney } from "./use-money"
 
-// /pricing (DESIGN §4.5): the paywall's information laid out flat, three tiers side by side
-// from md up, the packs in one row below; on phones it stacks like the paywall. Every button
-// opens the same paywall at its second step. Prices render on the server (initial Yearly).
+const ghost = "w-full min-h-12 rounded-control"
+
+// /pricing (DESIGN §4.5, comps-v3-b pricing.html): the paywall's cards laid out flat, three
+// tiers side by side from md up, the packs in a row of three below; on phones they stack.
+// Only Pro's "Choose Pro" is a solid primary; Starter and Max are ghost buttons (Max's in
+// gold). Every button opens the same paywall with that plan or pack picked. Prices render on
+// the server (Yearly first), so they are in the static HTML (建站规格 R5).
 export function PricingPlans({ products, wishlistLive }: { products: readonly SiteProduct[]; wishlistLive: boolean }) {
   const t = useTranslations("paywall")
   const paywall = usePaywall()
   const [period, setPeriod] = useState<Period>("year")
   const offers = tierOffers(products)
   return (
-    <section aria-label={t("plansLabel")} className="mx-auto w-full max-w-5xl px-4">
-      <div className="mx-auto max-w-sm">
-        <BillingToggle period={period} onChange={setPeriod} savePct={period === "year" ? yearlySavingPct(offers) : null} />
-      </div>
-      <div className="grid gap-3 md:grid-cols-3">
+    <section aria-label={t("plansLabel")}>
+      <BillingToggle period={period} onChange={setPeriod} savePct={yearlySavingPct(offers)} className="mt-6 md:mt-8 md:w-[400px]" />
+      <div className="mt-3 grid gap-2 md:mt-8 md:grid-cols-3 md:gap-4">
         {offers.map((offer) => (
-          <TierCard
-            key={offer.tier}
-            offer={offer}
-            period={period}
-            selected={offer.tier === "pro"}
-            perks={tierPerks(offer.tier, { wishlistLive })}
-            footer={
-              <button
-                type="button"
-                onClick={() => paywall.open(pricingTrigger(), { step: "period", tier: offer.tier, period })}
-                className={buttonVariants({
-                  variant: "cta-neutral",
-                  size: "touch",
-                  className: cn("mt-4 w-full rounded-button", offer.tier === "max" && "bg-[image:var(--chrome)] text-[var(--tier-max-ink)]"),
-                })}
-              >
-                {t("choose", { tier: t(`tiers.${offer.tier}`) })}
-              </button>
-            }
-          />
+          <div key={offer.tier} data-tier={offer.tier} className="tier-shell">
+            <TierCard
+              offer={offer}
+              period={period}
+              selected={false}
+              perks={tierPerks(offer.tier, { wishlistLive })}
+              footer={
+                <button
+                  type="button"
+                  onClick={() => paywall.open(pricingTrigger(), { tier: offer.tier, period })}
+                  className={
+                    offer.tier === "pro"
+                      ? buttonVariants({ variant: "cta", size: "touch", className: "min-h-12 rounded-control" })
+                      : buttonVariants({ variant: "glass", size: "touch", className: cn(ghost, "text-[var(--tier-ghost-ink)]") })
+                  }
+                >
+                  {t("choose", { tier: t(`tiers.${offer.tier}`) })}
+                </button>
+              }
+            />
+          </div>
         ))}
       </div>
       <PackRow packs={packOffers(products)} onPick={(packId) => paywall.open(pricingTrigger(), { step: "packs", packId })} />
@@ -65,19 +68,31 @@ function pricingTrigger(): PaywallTrigger {
 function PackRow({ packs, onPick }: { packs: PackProduct[]; onPick(id: PackProduct["id"]): void }) {
   const t = useTranslations("paywall")
   const money = useMoney()
+  const looks = packLooks(packs)
   return (
     <>
-      <div className="mt-8 mb-3 flex flex-wrap items-baseline justify-between gap-2 px-0.5">
+      <div className="mt-6 mb-2 flex flex-wrap items-baseline justify-between gap-x-3 px-0.5 md:mt-8">
         <h2 className="text-headline font-semibold">{t("packsTitle")}</h2>
-        <span className="text-caption text-muted-foreground">{t("oneTimeNoSub")}</span>
+        <span className="text-caption text-muted-foreground">{t("packsNote")}</span>
       </div>
-      <div className="grid grid-cols-3 gap-2">
-        {packs.map((pack) => (
-          <button key={pack.id} type="button" onClick={() => onPick(pack.id)} className="press hairline rounded-control bg-[var(--tier-graphite)] px-2.5 py-3 text-left">
-            <PackCredits count={pack.credits} />
-            <span className="mt-2.5 block text-body font-semibold">{money(pack.priceUsd)}</span>
-            <span className="mt-1.5 block text-caption text-muted-foreground">{t("perCreditShort", { price: money(perCreditUsd(pack)) })}</span>
-          </button>
+      <div className="grid gap-2 md:grid-cols-3 md:gap-4">
+        {packs.map((pack, i) => (
+          <div key={pack.id} className="pack-shell">
+            <PackCard
+              pack={pack}
+              look={looks[i] ?? { tone: "graphite", flag: null }}
+              action={
+                <button
+                  type="button"
+                  onClick={() => onPick(pack.id)}
+                  aria-label={t("buyPackLabel", { count: pack.credits, price: money(pack.priceUsd) })}
+                  className={buttonVariants({ variant: "glass", size: "touch", className: "w-full rounded-full" })}
+                >
+                  {t("buy")}
+                </button>
+              }
+            />
+          </div>
         ))}
       </div>
     </>

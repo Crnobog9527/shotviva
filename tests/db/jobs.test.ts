@@ -3,9 +3,10 @@ import { randomUUID } from 'node:crypto'
 import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { confirmJob, refundJob, reserveJob, type ReserveJobInput } from '@/core/jobs'
+import { confirmJob, listRunningJobIds, refundJob, reserveJob, type ReserveJobInput } from '@/core/jobs'
 
 import { connectAdmin, createPricedTemplate, createUser, ledgerOf, profileOf, serviceClient } from './helpers'
+import { serviceSupabase } from './supabase-env'
 
 const service = serviceClient()
 let db: Client
@@ -137,5 +138,21 @@ describe('confirm_job and refund_job', () => {
     const { rows } = await db.query('select 1 from public.generation_jobs where id = $1', [id])
     expect(rows).toHaveLength(0)
     expect(await ledgerOf(db, userId)).toHaveLength(0)
+  })
+})
+
+// The creation dialog's concurrency check on Create (T38): only this user's photos really in
+// flight, not finished ones, not a 'running' row its function outlived, not someone else's.
+describe('listRunningJobIds', () => {
+  it('lists the fresh running jobs of one user', async () => {
+    const userId = await createUser(db, { credits: 10 })
+    const otherId = await createUser(db, { credits: 10 })
+    const fresh = await reserveJob(service, job(userId))
+    const stale = await reserveJob(service, job(userId))
+    const done = await reserveJob(service, job(userId))
+    await reserveJob(service, job(otherId))
+    await confirmJob(service, { jobId: done.id, outputKey: `outputs/${done.id}.png` })
+    await db.query("update public.generation_jobs set created_at = now() - interval '7 minutes' where id = $1", [stale.id])
+    expect(await listRunningJobIds(serviceSupabase(), userId, new Date())).toEqual([fresh.id])
   })
 })

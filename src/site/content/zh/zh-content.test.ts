@@ -25,18 +25,19 @@ function zhKeywords(): Map<string, string> {
 function strings(value: unknown): string[] {
   if (typeof value === 'string') return [value]
   if (Array.isArray(value)) return value.flatMap(strings)
-  // Addresses and ids are not copy: slugs, hrefs and module ids stay English (建站规格 R4).
+  // Addresses and ids are not copy: slugs, hrefs, module and template ids stay English
+  // (建站规格 R4); `file` is the demo photo's camera file name (IMG_2047.jpg), shown as is.
   if (value && typeof value === 'object') {
     return Object.entries(value)
-      .filter(([key]) => !['slug', 'href', 'path', 'module', 'src'].includes(key))
+      .filter(([key]) => !['slug', 'href', 'path', 'module', 'src', 'id', 'file'].includes(key))
       .flatMap(([, inner]) => strings(inner))
   }
   return []
 }
 
-// Latin words allowed on a Chinese page (建站规格 §6.1 rule 3): the brand, AI, payment and
-// file-format names, units. Image paths and alt text of the shared placeholders are skipped.
-const LATIN_OK = new Set(['Shotviva', 'AI', 'Apple', 'Pay', 'Google', 'JPG', 'PNG', 'WebP', 'MB', 'px', 'shotviva'])
+// Latin words allowed on a Chinese page (建站规格 §6.1 rule 3): the brand, AI, payment, phone,
+// browser and file-format names, units, and API (the For business plate, T37). Image paths and alt text of the shared placeholders are skipped.
+const LATIN_OK = new Set(['Shotviva', 'AI', 'Apple', 'Pay', 'Google', 'iPhone', 'Safari', 'Chrome', 'JPG', 'PNG', 'WebP', 'MB', 'px', 'shotviva', 'API'])
 const PAGES = { '/zh': zhHomePage, '/zh/image-to-image-generator': zhImageToImageGenerator, '/zh/pricing': zhPricingPage }
 
 describe('/zh marketing copy (建站规格 §6.1, G13)', () => {

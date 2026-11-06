@@ -9,6 +9,7 @@ export type ProviderAdminActions = {
   save: (input: SaveProviderInput) => Promise<ProviderActionResult<string>>
   activate: (input: { id: string }) => Promise<ProviderActionResult>
   test: (input: { id: string }) => Promise<ProviderActionResult<ConnectionResult>>
+  remove: (input: { id: string }) => Promise<ProviderActionResult>
 }
 
 export type { AdminProvider, ConnectionResult, ProviderAdapterId, ProviderSettingReason, SaveProviderInput }

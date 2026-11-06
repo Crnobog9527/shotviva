@@ -15,7 +15,7 @@ export const zhImageToImageGenerator = defineContentPage({
   keyword: '图生图',
   label: '图生图',
   module: 'image',
-  title: '图生图在线工具：上传照片选模板，不写提示词（2026）',
+  title: `图生图在线工具：上传照片选模板，不写提示词（2026） | ${site.brand.name}`,
   description: `图生图在线工具：不用装软件、不用写提示词，上传一张照片选个模板就出图，主体保持原样。新用户送 ${zhFreeImages}。`,
   h1: '图生图：上传一张照片，选个模板就出图',
   subtitle: '从你自己的照片出发，而不是一个空白的输入框。主体保持原样。',

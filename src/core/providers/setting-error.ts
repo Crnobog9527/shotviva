@@ -14,6 +14,8 @@ export const PROVIDER_SETTING_REASONS = [
   // The row has no usable key in Vault (never set, cleared, or the Vault entry is gone).
   'api_key_missing',
   'not_found',
+  // Deleting the row in use (ARCHITECTURE §3.3): switch to another one first.
+  'provider_active',
   // Anything unexpected; the details are logged, never shown.
   'internal',
 ] as const

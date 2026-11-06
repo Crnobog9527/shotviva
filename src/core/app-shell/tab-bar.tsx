@@ -13,31 +13,38 @@ export type TabItem = { href: `/${string}`; label: string; icon: TabIcon; badge?
 const isRoot = (pathname: string, items: readonly TabItem[]) =>
   items.some((item) => pathname === item.href || pathname === `${item.href}/`)
 
-// The app shell's tabs (DESIGN §8.2): fixed at the bottom on phones, 50px rows plus the safe
-// area, only on tab roots; flow pages (workspace, result) push in without it. From md up the
-// same items become the right-hand links of a sticky top bar (§8.6). Three or four equal
-// columns. AppFrame reserves room for it through data-tabbar.
-export function TabBar({ items, brand }: { items: readonly TabItem[]; brand: string }) {
+type Props = {
+  items: readonly TabItem[]
+  // Pages below a tab that keep the bar from md up (the photo page, T38); phones keep the
+  // flow-page rule and show no bar there.
+  desktopUnder?: readonly `/${string}/`[]
+}
+
+// The app shell's tabs (DESIGN §8.2, §6.9 item 7): fixed at the bottom on phones, 50px rows
+// plus the safe area, only on tab roots; flow pages (workspace, result) push in without it.
+// From md up the same items become a 56px top bar, links left-aligned in the content column,
+// the current one a bone pill with a safelight glyph. AppFrame reserves the phone bar's room
+// through data-tabbar.
+export function TabBar({ items, desktopUnder = [] }: Props) {
   const pathname = usePathname()
   const t = useTranslations('app.tabs')
-  if (!isRoot(pathname, items)) return null
+  const root = isRoot(pathname, items)
+  if (!root && !desktopUnder.some((prefix) => pathname.startsWith(prefix))) return null
   return (
     <nav
       aria-label={t('label')}
-      data-tabbar=""
+      data-tabbar={root ? '' : undefined}
       className={cn(
-        'bar-material fixed inset-x-0 bottom-0 z-60 grid px-2 pt-1 pb-[calc(var(--sab)+4px)]',
-        items.length === 4 ? 'grid-cols-4' : 'grid-cols-3',
-        'md:sticky md:top-0 md:bottom-auto md:flex md:h-16 md:items-center md:justify-end md:gap-2 md:px-6 md:pb-0 md:shadow-[inset_0_-1px_0_var(--border)]',
+        'bar-material fixed inset-x-0 bottom-0 z-60 px-2 pt-1 pb-[calc(var(--sab)+4px)]',
+        'md:sticky md:top-0 md:bottom-auto md:h-14 md:p-0 md:shadow-[inset_0_-1px_0_var(--border)]',
+        !root && 'max-md:hidden',
       )}
     >
-      <span className="mr-auto hidden font-display text-[28px] leading-none md:block">
-        {brand}
-        <span className="text-primary">.</span>
-      </span>
-      {items.map((item) => (
-        <TabLink key={item.href} item={item} current={pathname.startsWith(item.href)} />
-      ))}
+      <div className={cn('grid md:content-column md:flex md:h-full md:items-center md:gap-1 md:px-(--gutter)', items.length === 4 ? 'grid-cols-4' : 'grid-cols-3')}>
+        {items.map((item) => (
+          <TabLink key={item.href} item={item} current={pathname.startsWith(item.href)} />
+        ))}
+      </div>
     </nav>
   )
 }
@@ -49,8 +56,8 @@ function TabLink({ item, current }: { item: TabItem; current: boolean }) {
       aria-current={current ? 'page' : undefined}
       className={cn(
         'press relative flex min-h-[50px] min-w-0 flex-col items-center justify-center gap-1 px-1 text-center text-caption leading-tight font-medium break-words',
-        'md:min-h-11 md:flex-row md:gap-2 md:rounded-full md:px-4',
-        current ? 'text-foreground md:bg-wash' : 'text-muted-foreground',
+        'md:min-h-10 md:flex-row md:gap-2 md:rounded-full md:px-3.5 md:text-label md:leading-none',
+        current ? 'text-foreground md:bg-wash' : 'text-muted-foreground md:hover:text-foreground',
       )}
     >
       <TabGlyph icon={item.icon} className={cn('size-6 md:size-5', current && 'text-primary')} />
