@@ -2,6 +2,7 @@ import 'server-only'
 
 import { after } from 'next/server'
 
+import type { Locale } from '../i18n/locales'
 import { logger } from '../logger'
 import { publicEnv } from '../public-env'
 import { validateEvent, type EventProps, type ServerEventName } from './events'
@@ -24,7 +25,9 @@ export type ServerTrackerDeps = {
   now?: () => Date
 }
 
-export type TrackContext = { distinctId: string }
+// `locale` rides on every event (ARCHITECTURE §16.2): the page's language for request-driven
+// events, the buyer's checkout language for webhooks.
+export type TrackContext = { distinctId: string; locale: Locale }
 
 export type ServerTrack = <E extends ServerEventName>(event: E, props: EventProps<E>, ctx: TrackContext) => void
 
@@ -65,7 +68,7 @@ export function createServerTracker(deps: ServerTrackerDeps): ServerTrack {
       api_key: deps.key,
       event,
       distinct_id: ctx.distinctId,
-      properties: { ...checked.props, $lib: 'shotviva-server' },
+      properties: { ...checked.props, locale: ctx.locale, $lib: 'shotviva-server' },
       timestamp: (deps.now?.() ?? new Date()).toISOString(),
     }
     ;(deps.schedule ?? scheduleAfterResponse)(() => send(deps, body, event))

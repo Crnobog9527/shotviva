@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 
+import { localeOfPath, localizePath } from '../../i18n/paths'
+
 export type DeleteStatus = 'idle' | 'confirming' | 'deleting' | 'failed'
 
 // Calls the server route; on success the session is already gone, so a full page load
@@ -20,8 +22,8 @@ export function useDeleteAccount(endpoint = '/api/account/delete') {
       })
       if (!response.ok) return setStatus('failed')
       // A hard navigation drops every client cache that still holds account data.
-      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      window.location.assign('/')
+      // The home page of the language the account page was in (/zh from /zh/account).
+      window.location.assign(localizePath('/', localeOfPath(window.location.pathname)))
     } catch {
       setStatus('failed')
     }

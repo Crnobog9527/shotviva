@@ -11,6 +11,13 @@ const sections: readonly [LegalSection, ...LegalSection[]] = [
   ...termsServiceSections,
   ...termsBillingSections,
   ...termsGeneralSections,
+  // The MiSans licence asks for attribution; it lives here, not in the footer (ARCHITECTURE §17,
+  // DESIGN §6.9).
+  {
+    id: 'third-party-notices',
+    heading: 'Third-party notices',
+    blocks: [['This site uses the MiSans font, © Xiaomi. ', { href: '/fonts/misans/LICENSE.pdf', label: 'Read the MiSans font licence' }, '.']],
+  },
   contactSection('these Terms'),
 ]
 

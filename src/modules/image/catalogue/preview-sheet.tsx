@@ -1,7 +1,7 @@
 'use client'
 
 /* eslint-disable @next/next/no-img-element -- covers on the public assets bucket */
-import Link from 'next/link'
+import { Link } from '@/core/i18n/ui'
 import { useTranslations } from 'next-intl'
 import { useRef } from 'react'
 

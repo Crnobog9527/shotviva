@@ -123,3 +123,21 @@ describe('canonical host redirect', () => {
     expect(canonicalHostRedirect({ ...bound, host: null }, '/')).toBeNull()
   })
 })
+
+describe('the switch closes Chinese too (ARCHITECTURE §12.0, §17)', () => {
+  it('keeps every /zh page out of the index while closed', async () => {
+    const { isIndexableIn, zhIndexablePaths } = await import('./indexing')
+    const { zhSitemapUrls } = await import('./sitemap')
+    expect(indexingOpenNow()).toBe(false)
+    // '/' is in the test site's zhIndexablePaths and has a Chinese version.
+    expect(isIndexableIn(site, 'zh', '/')).toBe(false)
+    expect(isIndexableIn(site, 'en', '/')).toBe(false)
+    expect(pageMetadata(site, { path: '/', title: 'T', description: 'D' }, 'zh').robots).toEqual(NOINDEX)
+    expect(zhIndexablePaths(site)).toEqual([])
+    expect(zhSitemapUrls(site)).toEqual([])
+  })
+
+  it('answers the Chinese sitemap with a 404 while closed', () => {
+    expect(closedSeoFileResponse()?.status).toBe(404)
+  })
+})

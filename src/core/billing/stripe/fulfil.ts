@@ -66,6 +66,7 @@ export function readPurchase(session: Stripe.Checkout.Session, products: readonl
   return { userId: owner.user_id, product, method: owner.method, subscription }
 }
 
+// The webhook has no page: the language is the one the Checkout Session was opened in.
 function track(deps: FulfilDeps, session: Stripe.Checkout.Session, purchase: SessionPurchase): void {
   const { product } = purchase
   ;(deps.trackBuy ?? trackPurchase)(purchase.userId, {
@@ -78,7 +79,7 @@ function track(deps: FulfilDeps, session: Stripe.Checkout.Session, purchase: Ses
     // Before tax: Managed Payments adds tax on top and keeps it.
     amount_usd: (session.amount_subtotal ?? Math.round(product.priceUsd * 100)) / 100,
     credits: product.credits,
-  })
+  }, session.locale === 'zh' ? 'zh' : 'en')
 }
 
 export async function fulfilCheckoutSession(deps: FulfilDeps, sessionId: string): Promise<FulfilOutcome> {

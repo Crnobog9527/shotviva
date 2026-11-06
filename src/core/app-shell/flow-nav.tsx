@@ -1,6 +1,6 @@
 'use client'
 
-import Link from 'next/link'
+import { Link } from '../i18n/ui'
 import { useEffect, useState, type ReactNode } from 'react'
 
 import { cn } from '../ui/cn'

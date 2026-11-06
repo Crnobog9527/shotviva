@@ -44,7 +44,7 @@ const FORMAT_NAMES: Record<string, string> = { 'image/jpeg': 'JPG', 'image/png':
 const formats = UPLOAD_CONTENT_TYPES.map((type) => FORMAT_NAMES[type] ?? type)
 export const uploadLimits = `${formats.slice(0, -1).join(', ')} or ${formats.at(-1)}, up to ${MAX_UPLOAD_BYTES / 1024 / 1024}MB`
 
-const LANGUAGE_NAMES: Record<string, string> = { en: 'English' }
+const LANGUAGE_NAMES: Record<string, string> = { en: 'English', zh: 'Simplified Chinese' }
 export const languages = site.locales.enabled.map((code) => LANGUAGE_NAMES[code] ?? code).join(', ')
 
 // Market rate for hiring a product photographer, used in the cost tables. Not our price, so it

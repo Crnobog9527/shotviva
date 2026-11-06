@@ -127,7 +127,11 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
     params: prompt.modelParams,
   }
   const settle = () => settleGeneration(deps, job, call, outputKeyFor(req.userId, job.id))
-  const settled = await settleTracked(job, template.category, settle, { track: deps.track, batchSize: req.batchSize ?? 1 })
+  const settled = await settleTracked(job, template.category, settle, {
+    track: deps.track,
+    batchSize: req.batchSize ?? 1,
+    locale: req.locale,
+  })
   await keepInputPreview(deps, settled, image)
   return toJobView(settled)
 }

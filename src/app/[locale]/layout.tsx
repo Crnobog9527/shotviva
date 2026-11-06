@@ -1,0 +1,45 @@
+import type { Metadata, Viewport } from 'next'
+import { NextIntlClientProvider } from 'next-intl'
+import { locale as rootLocale } from 'next/root-params'
+
+import { htmlLang, isLocale } from '@/core/i18n'
+import { TranslatedPathsProvider } from '@/core/i18n/ui'
+import { rootMetadata } from '@/core/seo'
+import { MiSansFont } from '@/core/ui/misans-font'
+import { site } from '@/site/site.config'
+
+import { fontVariables } from '../fonts'
+import '../globals.css'
+
+// Default robots is noindex; only paths in site.indexing opt in (core/seo/indexing.ts).
+export const metadata: Metadata = rootMetadata(site)
+
+// viewport-fit=cover so fixed bars can pad with env(safe-area-inset-*) (DESIGN §8.5).
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#0B0A09',
+  colorScheme: 'dark',
+}
+
+// One tree for both languages (ARCHITECTURE §17): `en` is served unprefixed by the proxy's
+// locale router, `zh` under /zh. The proxy never forwards any other first segment here.
+export function generateStaticParams() {
+  return site.locales.enabled.map((locale) => ({ locale }))
+}
+
+
+export default async function RootLayout({ children }: LayoutProps<'/[locale]'>) {
+  const locale = await rootLocale()
+  return (
+    <html lang={htmlLang(isLocale(locale) ? locale : site.locales.default)} className={`${fontVariables} h-full antialiased`}>
+      <body className="flex min-h-full flex-col">
+        <NextIntlClientProvider>
+          <TranslatedPathsProvider paths={site.locales.zhPaths}>{children}</TranslatedPathsProvider>
+        </NextIntlClientProvider>
+        <MiSansFont />
+      </body>
+    </html>
+  )
+}

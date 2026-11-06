@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { localized } from '../../i18n/server'
 import { logger } from '../../logger'
 import { DEFAULT_AFTER_LOGIN } from '../redirect-target'
 import { createServerSupabase } from '../supabase-server'
@@ -19,7 +20,7 @@ export async function signUpWithPassword(form: FormData): Promise<FormState> {
   const { error } = await supabase.auth.signUp({
     email,
     password,
-    options: { captchaToken, emailRedirectTo: confirmUrl(DEFAULT_AFTER_LOGIN) },
+    options: { captchaToken, emailRedirectTo: confirmUrl(await localized(DEFAULT_AFTER_LOGIN)) },
   })
   if (error) {
     const code = classifyAuthError(error)
@@ -37,7 +38,7 @@ export async function requestPasswordReset(form: FormData): Promise<FormState> {
   const supabase = await createServerSupabase()
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     captchaToken,
-    redirectTo: confirmUrl('/reset/update'),
+    redirectTo: confirmUrl(await localized('/reset/update')),
   })
   const code = error ? classifyAuthError(error) : null
   // Only captcha and rate limits are shown; anything else still says "sent" to avoid enumeration.

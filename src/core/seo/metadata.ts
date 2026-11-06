@@ -1,7 +1,9 @@
 import type { Metadata } from 'next'
 
 import type { ModuleId, SiteConfig } from '../config'
-import { INDEX, NOINDEX, isIndexable } from './indexing'
+import { DEFAULT_LOCALE, hreflang, type Locale } from '../i18n/locales'
+import { localizePath } from '../i18n/paths'
+import { INDEX, NOINDEX, hasTranslation, isIndexableIn } from './indexing'
 import { absoluteUrl, siteOrigin } from './site-url'
 
 // Root default: nothing is indexable unless a page opts in through pageMetadata.
@@ -21,19 +23,34 @@ export function appShellMetadata(): Metadata {
 
 export type PageMetaInput = { path: string; title: string; description: string; module?: ModuleId }
 
-export function pageMetadata(site: SiteConfig, input: PageMetaInput): Metadata {
-  const url = absoluteUrl(site, input.path)
+// hreflang en / zh-Hans / x-default (→ English) only where both versions exist
+// (建站规格 §6.1 rule 4); English-only pages carry no alternates at all.
+function languageAlternates(site: SiteConfig, input: PageMetaInput): Record<string, string> | undefined {
+  if (!hasTranslation(site, input.path, [input])) return undefined
+  const english = absoluteUrl(site, input.path)
+  return {
+    [hreflang('en')]: english,
+    [hreflang('zh')]: absoluteUrl(site, localizePath(input.path, 'zh')),
+    'x-default': english,
+  }
+}
+
+// `path` is the logical path; the canonical is the page's own address in `locale` (a /zh page
+// never canonicalises to its English twin, 建站规格 §6.1 rule 4).
+export function pageMetadata(site: SiteConfig, input: PageMetaInput, locale: Locale = DEFAULT_LOCALE): Metadata {
+  const url = absoluteUrl(site, localizePath(input.path, locale))
   return {
     title: { absolute: input.title },
     description: input.description,
-    alternates: { canonical: url },
-    robots: isIndexable(site, input.path, [input]) ? INDEX : NOINDEX,
+    alternates: { canonical: url, languages: languageAlternates(site, input) },
+    robots: isIndexableIn(site, locale, input.path, [input]) ? INDEX : NOINDEX,
     openGraph: {
       type: 'website',
       siteName: site.brand.name,
       title: input.title,
       description: input.description,
       url,
+      locale: locale === 'zh' ? 'zh_CN' : 'en_US',
     },
     twitter: { card: 'summary_large_image', title: input.title, description: input.description },
   }

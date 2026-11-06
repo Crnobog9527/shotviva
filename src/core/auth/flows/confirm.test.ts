@@ -61,7 +61,7 @@ describe('GET /auth/confirm: signup links', () => {
     expect(response.status).toBe(307)
     expect(target(response)).toBe('/account')
     expect(response.headers.get('set-cookie')).toContain('sb-access-token=session')
-    expect(mocks.onVerifiedSignIn).toHaveBeenCalledExactlyOnceWith('u1', 3, 'email')
+    expect(mocks.onVerifiedSignIn).toHaveBeenCalledExactlyOnceWith('u1', 3, 'email', 'en')
   })
 
   it('keeps a safe next path and drops an off-site one', async () => {

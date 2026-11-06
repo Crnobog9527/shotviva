@@ -17,7 +17,7 @@ async function resolveOutcome(request: NextRequest, jar: CookieToSet[], freeCred
     logger.warn('auth email link verification failed', { code: error.code, type: confirm.type })
     return { kind: 'error', error: verifyError(error), flow: confirm.flow }
   }
-  return landOnSession(supabase, confirm.flow, freeCredits)
+  return landOnSession(supabase, confirm.flow, freeCredits, params.get('next'))
 }
 
 // Landing for every auth email link (signup, recovery, email change, magic link). The link

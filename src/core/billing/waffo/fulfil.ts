@@ -48,7 +48,8 @@ export async function settleWaffoOrder(
   )
 }
 
-function track(deps: WaffoFulfilDeps, userId: string, product: SiteProduct, facts: WaffoPaymentFacts): void {
+// The page language the checkout was opened in, carried in the order metadata.
+function track(deps: WaffoFulfilDeps, userId: string, product: SiteProduct, facts: WaffoPaymentFacts, locale: 'en' | 'zh'): void {
   ;(deps.trackBuy ?? trackPurchase)(userId, {
     product_id: product.id,
     tier: product.tier,
@@ -58,7 +59,7 @@ function track(deps: WaffoFulfilDeps, userId: string, product: SiteProduct, fact
     method: facts.method,
     amount_usd: facts.subtotalUsd,
     credits: product.credits,
-  })
+  }, locale)
 }
 
 export async function fulfilWaffoOrder(
@@ -67,12 +68,12 @@ export async function fulfilWaffoOrder(
 ): Promise<WaffoFulfilOutcome> {
   const order = readWaffoOrder(event.eventId, event.data)
   if (order.paymentStatus !== undefined && order.paymentStatus !== 'succeeded') return 'unpaid'
-  const { user_id: userId, product_id: productId } = order.orderMetadata
+  const { user_id: userId, product_id: productId, locale } = order.orderMetadata
   const product = deps.products.find((p) => p.id === productId)
   if (!product) throw new AppError('INVALID_INPUT', `waffo order ${event.eventId}: unknown product`)
   const facts = paymentFacts(order, product)
   const change = await settleWaffoOrder(deps.db, { userId, productId, paymentId: event.eventId, facts })
   if (!change.applied) return 'replayed'
-  track(deps, userId, product, facts)
+  track(deps, userId, product, facts, locale)
   return 'applied'
 }

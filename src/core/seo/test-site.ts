@@ -18,7 +18,7 @@ export function testSite(overrides: Partial<SiteConfig> = {}): SiteConfig {
         sameAs: [],
       },
       modules: { image: true, video: false },
-      locales: { default: 'en', enabled: ['en'] },
+      locales: { default: 'en', enabled: ['en', 'zh'], zhPaths: ['/', '/pricing', '/generate'] },
       billing: {
         currency: 'usd',
         freeCredits: 3,
@@ -31,7 +31,11 @@ export function testSite(overrides: Partial<SiteConfig> = {}): SiteConfig {
       partners: { graylum: { returnToHosts: [], connectCallbackPath: '/callback', imageHosts: [] } },
       gallery: { enabled: false },
       features: { wishlist: false },
-      indexing: { indexablePaths: ['/', '/image-to-image-generator', '/generate'], canonicalRedirectHosts: ['example.vercel.app'] },
+      indexing: {
+        indexablePaths: ['/', '/image-to-image-generator', '/generate'],
+        zhIndexablePaths: ['/'],
+        canonicalRedirectHosts: ['example.vercel.app'],
+      },
     }),
     ...overrides,
   }

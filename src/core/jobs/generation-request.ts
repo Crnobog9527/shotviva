@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 import { MAX_BATCH_SIZE } from '../billing/tier-limits'
-
+import type { Locale } from '../i18n/locales'
 import { NOTE_MAX_LENGTH, OUTPUT_ASPECTS, RESOLUTIONS, type Resolution } from '../templates/output-options'
 import { JOB_VISIBILITIES, type JobSource, type JobVisibility } from './job-schema'
 
@@ -50,6 +50,8 @@ export type GenerationRequest = {
   idempotencyKey?: string | null
   // Web batches only; absent is a single photo (the partner route has no batches, §14.1).
   batchSize?: number
+  // Language of the page that asked, for the `generate` event only (ARCHITECTURE §16.2).
+  locale?: Locale
 }
 
 export function toGenerationRequest(userId: string, body: z.infer<typeof generateBodySchema>): GenerationRequest {

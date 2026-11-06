@@ -610,5 +610,26 @@
   },
   "announcement": {
     "dismiss": "Dismiss announcement"
+  },
+  "locale": {
+    "switcher": {
+      "label": "Language",
+      "en": "English",
+      "zh": "中文"
+    },
+    "banner": {
+      "text": "这个页面有中文版。",
+      "switch": "切换到中文",
+      "dismiss": "关闭，继续看英文版"
+    }
+  },
+  "footer": {
+    "language": "Language"
+  },
+  "notFound": {
+    "title": "This page does not exist",
+    "body": "The link may be old or mistyped. Start again from the home page or pick a template.",
+    "home": "Home",
+    "templates": "Browse templates"
   }
 }

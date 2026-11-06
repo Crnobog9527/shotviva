@@ -1,5 +1,7 @@
 import type { CaptureResult, PostHogConfig } from 'posthog-js'
 
+import { localeOfPath } from '../../i18n/paths'
+
 // ARCHITECTURE §16.1. Kept as a pure object so a unit test can pin every privacy setting.
 export const INGEST_PATH = '/ingest'
 
@@ -36,6 +38,13 @@ export function scrubCapture(capture: CaptureResult | null): CaptureResult | nul
   return { ...capture, properties }
 }
 
+// Every browser event carries the language of the page it happened on (ARCHITECTURE §16.2),
+// read at capture time so a client-side hop between /zh and English pages stays right.
+export function withLocale(capture: CaptureResult | null, pathname: string): CaptureResult | null {
+  if (!capture) return capture
+  return { ...capture, properties: { ...capture.properties, locale: localeOfPath(pathname) } }
+}
+
 export function posthogConfig(): Partial<PostHogConfig> {
   return {
     // Same-origin proxy (next.config.ts rewrites) so ad blockers do not drop events.
@@ -56,6 +65,6 @@ export function posthogConfig(): Partial<PostHogConfig> {
     disable_product_tours: true,
     disable_conversations: true,
     disable_web_experiments: true,
-    before_send: scrubCapture,
+    before_send: (capture) => withLocale(scrubCapture(capture), window.location.pathname),
   }
 }
