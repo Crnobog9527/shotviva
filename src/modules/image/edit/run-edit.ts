@@ -61,7 +61,7 @@ async function prepare(deps: EditDeps, req: EditRequest) {
     throw new AppError('NOT_FOUND', 'Editing is not available')
   }
   const limits = await accountLimits(deps.db, req.userId)
-  await assertWithinRateLimit(deps.db, req.userId, deps.now?.() ?? new Date(), limits, req.jobId)
+  await assertWithinRateLimit(deps.db, req.userId, deps.now?.() ?? new Date(), limits, { jobId: req.jobId })
   const image = await loadOutputImage(deps.store, source.outputKey)
   return { instruction: instruction.data, source, template, prompt, params: params.data, image }
 }
