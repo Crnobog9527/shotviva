@@ -647,6 +647,67 @@ $$;
 ALTER FUNCTION "public"."apply_purchase"("p_user_id" "uuid", "p_product_id" "text", "p_event_id" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."apply_subscription_renewal"("p_user_id" "uuid", "p_product_id" "text", "p_invoice_id" "text", "p_period_end" timestamp with time zone, "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_charge_id" "text" DEFAULT NULL::"text") RETURNS "public"."credit_change"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_product public.products;
+  v_change public.credit_change;
+  v_key text := 'renewal:' || p_invoice_id;
+begin
+  if p_invoice_id is null or p_invoice_id not like 'in\_%' then
+    raise exception 'INVALID_INPUT' using detail = 'invoice id is required';
+  end if;
+  if p_period_end is null then
+    raise exception 'INVALID_INPUT' using detail = 'period end is required';
+  end if;
+  if p_amount_total is null or p_amount_tax is null or p_currency is null or p_method is null then
+    raise exception 'INVALID_INPUT' using detail = 'payment fields are all required';
+  end if;
+
+  -- Only memberships renew; packs are always one-time.
+  select * into v_product from public.products
+   where id = p_product_id and active and days is not null;
+  if not found then
+    raise exception 'PRODUCT_NOT_FOUND';
+  end if;
+
+  -- No days here: paid_until is set below from the period end, not by adding days.
+  v_change := public._apply_credit_change(
+    p_user_id, 'paid', 'purchase', v_product.credits, 'renewal ' || v_product.id,
+    v_key, null, v_product.id, null
+  );
+  if not v_change.applied then
+    return v_change;
+  end if;
+
+  update public.profiles
+     set paid_until = greatest(paid_until, p_period_end)
+   where id = p_user_id
+  returning paid_until into v_change.paid_until;
+
+  -- The row was inserted just above in this transaction; record where paid_until landed, as
+  -- membership purchases do.
+  update public.credit_ledger
+     set paid_until_after = v_change.paid_until
+   where idempotency_key = v_key;
+
+  insert into public.payments
+    (user_id, product_id, channel, stripe_invoice_id, stripe_charge_id,
+     amount_total, amount_tax, currency, method)
+  values
+    (p_user_id, p_product_id, 'stripe', p_invoice_id, p_charge_id,
+     p_amount_total, p_amount_tax, lower(p_currency), p_method);
+
+  return v_change;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."apply_subscription_renewal"("p_user_id" "uuid", "p_product_id" "text", "p_invoice_id" "text", "p_period_end" timestamp with time zone, "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_charge_id" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."bump_template_prompt_version"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -923,6 +984,57 @@ $$;
 ALTER FUNCTION "public"."provider_api_key"("p_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."record_payment_issue"("p_charge_id" "text", "p_kind" "text", "p_amount_refunded" integer DEFAULT NULL::integer) RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_payment public.payments;
+begin
+  if p_charge_id is null or p_kind is null or p_kind not in ('refunded', 'disputed') then
+    raise exception 'INVALID_INPUT' using detail = 'charge id and kind (refunded / disputed) are required';
+  end if;
+  if p_kind = 'refunded' and (p_amount_refunded is null or p_amount_refunded < 0) then
+    raise exception 'INVALID_INPUT' using detail = 'refund needs the refunded amount';
+  end if;
+
+  if p_kind = 'refunded' then
+    update public.payments
+       set amount_refunded = least(amount_total, greatest(amount_refunded, p_amount_refunded)),
+           status = case
+             when status = 'disputed' then status
+             when least(amount_total, greatest(amount_refunded, p_amount_refunded)) >= amount_total then 'refunded'
+             when greatest(amount_refunded, p_amount_refunded) > 0 then 'partially_refunded'
+             else status
+           end
+     where stripe_charge_id = p_charge_id
+    returning * into v_payment;
+  else
+    update public.payments
+       set status = 'disputed'
+     where stripe_charge_id = p_charge_id
+    returning * into v_payment;
+  end if;
+
+  if not found then
+    return null;
+  end if;
+
+  return jsonb_build_object(
+    'user_id', v_payment.user_id,
+    'product_id', v_payment.product_id,
+    'status', v_payment.status,
+    'amount_total', v_payment.amount_total,
+    'amount_refunded', v_payment.amount_refunded,
+    'currency', v_payment.currency
+  );
+end;
+$$;
+
+
+ALTER FUNCTION "public"."record_payment_issue"("p_charge_id" "text", "p_kind" "text", "p_amount_refunded" integer) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."refund_job"("p_job_id" "uuid", "p_error_code" "text") RETURNS "public"."generation_jobs"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -1094,17 +1206,21 @@ $$;
 ALTER FUNCTION "public"."set_updated_at"() OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."settle_checkout"("p_user_id" "uuid", "p_product_id" "text", "p_session_id" "text", "p_subscription_id" "text" DEFAULT NULL::"text", "p_subscription_status" "text" DEFAULT NULL::"text", "p_current_period_end" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_cancel_at_period_end" boolean DEFAULT NULL::boolean) RETURNS "public"."credit_change"
+CREATE OR REPLACE FUNCTION "public"."settle_checkout"("p_user_id" "uuid", "p_product_id" "text", "p_session_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_invoice_id" "text" DEFAULT NULL::"text", "p_charge_id" "text" DEFAULT NULL::"text", "p_subscription_id" "text" DEFAULT NULL::"text", "p_subscription_status" "text" DEFAULT NULL::"text", "p_current_period_end" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_cancel_at_period_end" boolean DEFAULT NULL::boolean) RETURNS "public"."credit_change"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
+declare
+  v_change public.credit_change;
 begin
+  if p_amount_total is null or p_amount_tax is null or p_currency is null or p_method is null then
+    raise exception 'INVALID_INPUT' using detail = 'payment fields are all required';
+  end if;
+
   if p_subscription_id is not null then
     if p_subscription_status is null or p_current_period_end is null or p_cancel_at_period_end is null then
       raise exception 'INVALID_INPUT' using detail = 'subscription fields are all required';
     end if;
-    -- Upsert by the primary key; a subscription id already mirrored for another user or
-    -- product updates nothing and is refused.
     insert into public.subscriptions
       (stripe_subscription_id, user_id, product_id, status, current_period_end, cancel_at_period_end)
     values
@@ -1121,12 +1237,46 @@ begin
     end if;
   end if;
 
-  return public.apply_purchase(p_user_id, p_product_id, p_session_id);
+  v_change := public.apply_purchase(p_user_id, p_product_id, p_session_id);
+
+  if v_change.applied then
+    insert into public.payments
+      (user_id, product_id, channel, stripe_session_id, stripe_invoice_id, stripe_charge_id,
+       amount_total, amount_tax, currency, method)
+    values
+      (p_user_id, p_product_id, 'stripe', p_session_id, p_invoice_id, p_charge_id,
+       p_amount_total, p_amount_tax, lower(p_currency), p_method);
+  end if;
+
+  return v_change;
 end;
 $$;
 
 
-ALTER FUNCTION "public"."settle_checkout"("p_user_id" "uuid", "p_product_id" "text", "p_session_id" "text", "p_subscription_id" "text", "p_subscription_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) OWNER TO "postgres";
+ALTER FUNCTION "public"."settle_checkout"("p_user_id" "uuid", "p_product_id" "text", "p_session_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_invoice_id" "text", "p_charge_id" "text", "p_subscription_id" "text", "p_subscription_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."sync_subscription"("p_subscription_id" "text", "p_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if p_subscription_id is null or p_status is null or p_current_period_end is null or p_cancel_at_period_end is null then
+    raise exception 'INVALID_INPUT' using detail = 'subscription fields are all required';
+  end if;
+
+  update public.subscriptions
+     set status = p_status,
+         current_period_end = p_current_period_end,
+         cancel_at_period_end = p_cancel_at_period_end,
+         updated_at = now()
+   where stripe_subscription_id = p_subscription_id;
+  return found;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."sync_subscription"("p_subscription_id" "text", "p_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."template_request_votes_count"() RETURNS "trigger"
@@ -1356,6 +1506,52 @@ CREATE TABLE IF NOT EXISTS "public"."partner_links" (
 ALTER TABLE "public"."partner_links" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."payments" (
+    "id" bigint NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "product_id" "text" NOT NULL,
+    "channel" "text" NOT NULL,
+    "stripe_session_id" "text",
+    "stripe_invoice_id" "text",
+    "stripe_charge_id" "text",
+    "waffo_order_id" "text",
+    "amount_total" integer NOT NULL,
+    "amount_tax" integer DEFAULT 0 NOT NULL,
+    "amount_refunded" integer DEFAULT 0 NOT NULL,
+    "currency" "text" NOT NULL,
+    "method" "text" NOT NULL,
+    "status" "text" DEFAULT 'paid'::"text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "payments_amount_total_check" CHECK (("amount_total" >= 0)),
+    CONSTRAINT "payments_channel_check" CHECK (("channel" = ANY (ARRAY['stripe'::"text", 'waffo'::"text"]))),
+    CONSTRAINT "payments_check" CHECK ((("amount_tax" >= 0) AND ("amount_tax" <= "amount_total"))),
+    CONSTRAINT "payments_check1" CHECK ((("amount_refunded" >= 0) AND ("amount_refunded" <= "amount_total"))),
+    CONSTRAINT "payments_currency_check" CHECK (("currency" ~ '^[a-z]{3}$'::"text")),
+    CONSTRAINT "payments_method_check" CHECK (("method" = ANY (ARRAY['card'::"text", 'alipay'::"text"]))),
+    CONSTRAINT "payments_status_check" CHECK (("status" = ANY (ARRAY['paid'::"text", 'refunded'::"text", 'partially_refunded'::"text", 'disputed'::"text"]))),
+    CONSTRAINT "payments_stripe_charge_id_check" CHECK (("stripe_charge_id" ~ '^(ch|py)_'::"text")),
+    CONSTRAINT "payments_stripe_ids_check" CHECK ((("channel" <> 'stripe'::"text") OR ("stripe_session_id" IS NOT NULL) OR ("stripe_invoice_id" IS NOT NULL))),
+    CONSTRAINT "payments_stripe_invoice_id_check" CHECK (("stripe_invoice_id" ~~ 'in\_%'::"text")),
+    CONSTRAINT "payments_stripe_session_id_check" CHECK (("stripe_session_id" ~~ 'cs\_%'::"text")),
+    CONSTRAINT "payments_waffo_ids_check" CHECK ((("channel" <> 'waffo'::"text") OR ("waffo_order_id" IS NOT NULL))),
+    CONSTRAINT "payments_waffo_order_id_check" CHECK (("length"("waffo_order_id") > 0))
+);
+
+
+ALTER TABLE "public"."payments" OWNER TO "postgres";
+
+
+ALTER TABLE "public"."payments" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."payments_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."products" (
     "id" "text" NOT NULL,
     "credits" integer NOT NULL,
@@ -1509,6 +1705,31 @@ ALTER TABLE ONLY "public"."partner_links"
 
 
 
+ALTER TABLE ONLY "public"."payments"
+    ADD CONSTRAINT "payments_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."payments"
+    ADD CONSTRAINT "payments_stripe_charge_id_key" UNIQUE ("stripe_charge_id");
+
+
+
+ALTER TABLE ONLY "public"."payments"
+    ADD CONSTRAINT "payments_stripe_invoice_id_key" UNIQUE ("stripe_invoice_id");
+
+
+
+ALTER TABLE ONLY "public"."payments"
+    ADD CONSTRAINT "payments_stripe_session_id_key" UNIQUE ("stripe_session_id");
+
+
+
+ALTER TABLE ONLY "public"."payments"
+    ADD CONSTRAINT "payments_waffo_order_id_key" UNIQUE ("waffo_order_id");
+
+
+
 ALTER TABLE ONLY "public"."products"
     ADD CONSTRAINT "products_pkey" PRIMARY KEY ("id");
 
@@ -1587,6 +1808,10 @@ CREATE UNIQUE INDEX "generation_jobs_user_idempotency_key_idx" ON "public"."gene
 
 
 CREATE UNIQUE INDEX "partner_links_partner_link_code_idx" ON "public"."partner_links" USING "btree" ("partner", "link_code") WHERE ("link_code" IS NOT NULL);
+
+
+
+CREATE INDEX "payments_user_id_idx" ON "public"."payments" USING "btree" ("user_id");
 
 
 
@@ -1676,6 +1901,16 @@ ALTER TABLE ONLY "public"."partner_links"
 
 
 
+ALTER TABLE ONLY "public"."payments"
+    ADD CONSTRAINT "payments_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id");
+
+
+
+ALTER TABLE ONLY "public"."payments"
+    ADD CONSTRAINT "payments_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."profiles"
     ADD CONSTRAINT "profiles_id_fkey" FOREIGN KEY ("id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
@@ -1742,6 +1977,9 @@ ALTER TABLE "public"."partner_links" ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "partner_links_select_own" ON "public"."partner_links" FOR SELECT TO "authenticated" USING ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
 
+
+
+ALTER TABLE "public"."payments" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."products" ENABLE ROW LEVEL SECURITY;
@@ -1871,6 +2109,11 @@ GRANT ALL ON FUNCTION "public"."apply_purchase"("p_user_id" "uuid", "p_product_i
 
 
 
+REVOKE ALL ON FUNCTION "public"."apply_subscription_renewal"("p_user_id" "uuid", "p_product_id" "text", "p_invoice_id" "text", "p_period_end" timestamp with time zone, "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_charge_id" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."apply_subscription_renewal"("p_user_id" "uuid", "p_product_id" "text", "p_invoice_id" "text", "p_period_end" timestamp with time zone, "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_charge_id" "text") TO "service_role";
+
+
+
 GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."generation_jobs" TO "service_role";
 GRANT SELECT ON TABLE "public"."generation_jobs" TO "authenticated";
 
@@ -1914,6 +2157,11 @@ GRANT ALL ON FUNCTION "public"."provider_api_key"("p_id" "uuid") TO "service_rol
 
 
 
+REVOKE ALL ON FUNCTION "public"."record_payment_issue"("p_charge_id" "text", "p_kind" "text", "p_amount_refunded" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."record_payment_issue"("p_charge_id" "text", "p_kind" "text", "p_amount_refunded" integer) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."refund_job"("p_job_id" "uuid", "p_error_code" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."refund_job"("p_job_id" "uuid", "p_error_code" "text") TO "service_role";
 
@@ -1929,8 +2177,13 @@ GRANT ALL ON FUNCTION "public"."set_job_visibility"("p_job_id" "uuid", "p_user_i
 
 
 
-REVOKE ALL ON FUNCTION "public"."settle_checkout"("p_user_id" "uuid", "p_product_id" "text", "p_session_id" "text", "p_subscription_id" "text", "p_subscription_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."settle_checkout"("p_user_id" "uuid", "p_product_id" "text", "p_session_id" "text", "p_subscription_id" "text", "p_subscription_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) TO "service_role";
+REVOKE ALL ON FUNCTION "public"."settle_checkout"("p_user_id" "uuid", "p_product_id" "text", "p_session_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_invoice_id" "text", "p_charge_id" "text", "p_subscription_id" "text", "p_subscription_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."settle_checkout"("p_user_id" "uuid", "p_product_id" "text", "p_session_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_invoice_id" "text", "p_charge_id" "text", "p_subscription_id" "text", "p_subscription_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."sync_subscription"("p_subscription_id" "text", "p_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."sync_subscription"("p_subscription_id" "text", "p_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) TO "service_role";
 
 
 
@@ -2006,6 +2259,16 @@ GRANT SELECT("revoked_at") ON TABLE "public"."partner_links" TO "authenticated";
 
 
 GRANT SELECT("created_at") ON TABLE "public"."partner_links" TO "authenticated";
+
+
+
+GRANT SELECT ON TABLE "public"."payments" TO "service_role";
+
+
+
+GRANT UPDATE ON SEQUENCE "public"."payments_id_seq" TO "anon";
+GRANT UPDATE ON SEQUENCE "public"."payments_id_seq" TO "authenticated";
+GRANT UPDATE ON SEQUENCE "public"."payments_id_seq" TO "service_role";
 
 
 
