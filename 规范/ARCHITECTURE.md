@@ -591,6 +591,21 @@ Owner 2026-11-04 决定：**不在 flux-kontext-template 上原地改造**，新
 
 ## 12. SEO 页面内容格式
 
+### 12.0 预上线收录开关（Owner 2026-11-06：绑域名过支付审核，但上线前不被任何搜索或 AI 引擎收录）
+
+- **一个开关**：服务端环境变量 `SITE_INDEXING`（`on` / `off`，默认 `off`；其他值启动报错）。只有 `SITE_INDEXING=on` 且 `VERCEL_ENV=production` 时才算「开放收录」；预览和本地怎么设都是关闭。
+- **关闭时**：
+  - `core/seo/indexing.ts` 对所有路径（英文和 `/zh`）都判不可收录，全站页面 `noindex, nofollow`（仍然只在这一处控制，AGENTS §9）。
+  - 每个响应都带 `X-Robots-Tag: noindex, nofollow`，包括图片、JS、字体、robots、`/api/*`、404 和跳转（非 HTML 资源只能靠响应头）。
+  - `robots.txt` 对 `*` 放行（Googlebot 和 Bingbot 必须能抓到页面才看得到 noindex；被 Disallow 的页面看不到 noindex，地址仍可能因外链进索引），对 AI 爬虫（GPTBot、OAI-SearchBot、ChatGPT-User、ClaudeBot、Claude-SearchBot、Claude-User、PerplexityBot、Perplexity-User、Google-Extended、CCBot、Applebot-Extended、Meta-ExternalAgent、Bytespider、Amazonbot）一律 `Disallow: /`；不写 Sitemap 和 Host 行。
+  - `sitemap.xml`、`sitemap-pages.xml`、`sitemap-zh.xml`、`llms.txt` 返回 404。
+  - 不提交 GSC / Bing sitemap、不用 IndexNow、不登记目录站。GSC 可以用 DNS TXT 先验证。
+- **打开后**：恢复建站规格 R11 / G10 的规则（放行五个 AI 爬虫、发布 sitemap 和 llms.txt）。
+- **非正式域名永远不收录**：host 不是 `shotviva.com` 的请求（`*.vercel.app`、预览地址）无论开关如何都带 `X-Robots-Tag: noindex, nofollow`；生产的 `shotviva.vercel.app` 308 跳到 `https://shotviva.com`。canonical 仍取自 `site.brand.domain`，不随环境变量变。
+- **防误开**：单元测试覆盖默认关闭、预览下 `on` 仍关闭、非法值报错；`pnpm seo:check <url> --expect=closed|open` 在 GitHub Actions 每天对生产地址跑一次，期望值由上线 PR 从 `closed` 改成 `open`。
+- `NEXT_PUBLIC_SITE_URL` 只在 Production 范围设为 `https://shotviva.com`（构建时写入，改完要重新部署）；不能设到 Preview。
+- 不加 `trailingSlash: true`（建站规格 R4，且会弄坏 PostHog 代理）。
+
 建站规格 R10 要求每个 SEO 页有五块内容。为了换站时只改 `site/`，内容统一存成固定结构：
 
 - 一页一个文件：`site/content/pages/<slug>.ts`
