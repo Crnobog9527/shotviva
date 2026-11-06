@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { NextIntlClientProvider } from 'next-intl'
+import { setRequestLocale } from 'next-intl/server'
 
 import { TranslatedPathsProvider } from '@/core/i18n/ui'
 import { loadMessages } from '@/site/i18n/messages'
@@ -16,6 +17,9 @@ import './globals.css'
 export const metadata: Metadata = { title: `Page not found | ${site.brand.name}`, robots: { index: false, follow: false } }
 
 export default async function GlobalNotFound() {
+  // No [locale] segment here: pin the request locale so server components read 'en' without
+  // touching request headers (which would stop the page from prerendering).
+  setRequestLocale('en')
   return (
     <html lang="en" className={`${fontVariables} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
