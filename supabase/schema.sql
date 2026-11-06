@@ -2107,9 +2107,9 @@ begin
 
   if v_change.applied then
     insert into public.payments
-      (user_id, product_id, channel, waffo_order_id, amount_total, amount_tax, currency, method)
+      (user_id, product_id, channel, waffo_order_id, waffo_payment_id, amount_total, amount_tax, currency, method)
     values
-      (p_user_id, p_product_id, 'waffo', p_order_id, p_amount_total, p_amount_tax, lower(p_currency), p_method);
+      (p_user_id, p_product_id, 'waffo', p_order_id, p_payment_id, p_amount_total, p_amount_tax, lower(p_currency), p_method);
   end if;
 
   return v_change;
@@ -2152,6 +2152,56 @@ $$;
 
 
 ALTER FUNCTION "public"."sync_subscription"("p_subscription_id" "text", "p_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."sync_waffo_subscription"("p_user_id" "uuid", "p_order_id" "text", "p_product_id" "text", "p_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean, "p_event_at" timestamp with time zone) RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_row public.subscriptions;
+begin
+  if p_user_id is null or p_order_id is null or p_product_id is null or p_status is null
+     or p_cancel_at_period_end is null or p_event_at is null then
+    raise exception 'INVALID_INPUT' using detail = 'subscription fields are all required';
+  end if;
+  if p_status not in ('active', 'past_due', 'canceled') then
+    raise exception 'INVALID_INPUT' using detail = 'unknown waffo mirror status';
+  end if;
+
+  select * into v_row from public.subscriptions where waffo_order_id = p_order_id for update;
+
+  if not found then
+    if p_current_period_end is null then
+      raise exception 'INVALID_INPUT' using detail = 'a new waffo subscription needs its period end';
+    end if;
+    insert into public.subscriptions
+      (provider, waffo_order_id, user_id, product_id, status, current_period_end, cancel_at_period_end, last_event_at)
+    values
+      ('waffo', p_order_id, p_user_id, p_product_id, p_status, p_current_period_end, p_cancel_at_period_end, p_event_at);
+    return true;
+  end if;
+
+  if v_row.user_id <> p_user_id or v_row.product_id <> p_product_id then
+    raise exception 'IDEMPOTENCY_CONFLICT' using detail = 'subscription belongs to another user or product';
+  end if;
+  if v_row.status = 'canceled' or (v_row.last_event_at is not null and p_event_at < v_row.last_event_at) then
+    return false;
+  end if;
+
+  update public.subscriptions
+     set status = p_status,
+         current_period_end = coalesce(p_current_period_end, current_period_end),
+         cancel_at_period_end = p_cancel_at_period_end,
+         last_event_at = p_event_at,
+         updated_at = now()
+   where id = v_row.id;
+  return true;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."sync_waffo_subscription"("p_user_id" "uuid", "p_order_id" "text", "p_product_id" "text", "p_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean, "p_event_at" timestamp with time zone) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."template_request_votes_count"() RETURNS "trigger"
@@ -2418,6 +2468,7 @@ CREATE TABLE IF NOT EXISTS "public"."payments" (
     "method" "text" NOT NULL,
     "status" "text" DEFAULT 'paid'::"text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "waffo_payment_id" "text",
     CONSTRAINT "payments_amount_total_check" CHECK (("amount_total" >= 0)),
     CONSTRAINT "payments_channel_check" CHECK (("channel" = ANY (ARRAY['stripe'::"text", 'waffo'::"text"]))),
     CONSTRAINT "payments_check" CHECK ((("amount_tax" >= 0) AND ("amount_tax" <= "amount_total"))),
@@ -2430,7 +2481,8 @@ CREATE TABLE IF NOT EXISTS "public"."payments" (
     CONSTRAINT "payments_stripe_invoice_id_check" CHECK (("stripe_invoice_id" ~~ 'in\_%'::"text")),
     CONSTRAINT "payments_stripe_session_id_check" CHECK (("stripe_session_id" ~~ 'cs\_%'::"text")),
     CONSTRAINT "payments_waffo_ids_check" CHECK ((("channel" <> 'waffo'::"text") OR ("waffo_order_id" IS NOT NULL))),
-    CONSTRAINT "payments_waffo_order_id_check" CHECK (("length"("waffo_order_id") > 0))
+    CONSTRAINT "payments_waffo_order_id_check" CHECK (("length"("waffo_order_id") > 0)),
+    CONSTRAINT "payments_waffo_payment_id_check" CHECK (("waffo_payment_id" ~ '^PAY_'::"text"))
 );
 
 
@@ -2493,7 +2545,7 @@ ALTER TABLE "public"."site_announcements" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."subscriptions" (
-    "stripe_subscription_id" "text" NOT NULL,
+    "stripe_subscription_id" "text",
     "user_id" "uuid" NOT NULL,
     "product_id" "text" NOT NULL,
     "status" "text" NOT NULL,
@@ -2501,13 +2553,31 @@ CREATE TABLE IF NOT EXISTS "public"."subscriptions" (
     "cancel_at_period_end" boolean DEFAULT false NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "id" bigint NOT NULL,
+    "provider" "text" DEFAULT 'stripe'::"text" NOT NULL,
+    "waffo_order_id" "text",
+    "last_event_at" timestamp with time zone,
     CONSTRAINT "subscriptions_product_id_check" CHECK (("product_id" !~~ 'pack_%'::"text")),
+    CONSTRAINT "subscriptions_provider_check" CHECK (("provider" = ANY (ARRAY['stripe'::"text", 'waffo'::"text"]))),
+    CONSTRAINT "subscriptions_provider_ids_check" CHECK (((("provider" = 'stripe'::"text") AND ("stripe_subscription_id" IS NOT NULL) AND ("waffo_order_id" IS NULL)) OR (("provider" = 'waffo'::"text") AND ("waffo_order_id" IS NOT NULL) AND ("stripe_subscription_id" IS NULL)))),
     CONSTRAINT "subscriptions_status_check" CHECK (("status" = ANY (ARRAY['incomplete'::"text", 'incomplete_expired'::"text", 'trialing'::"text", 'active'::"text", 'past_due'::"text", 'canceled'::"text", 'unpaid'::"text", 'paused'::"text"]))),
-    CONSTRAINT "subscriptions_stripe_subscription_id_check" CHECK (("stripe_subscription_id" ~~ 'sub_%'::"text"))
+    CONSTRAINT "subscriptions_stripe_subscription_id_check" CHECK (("stripe_subscription_id" ~~ 'sub_%'::"text")),
+    CONSTRAINT "subscriptions_waffo_order_id_check" CHECK (("waffo_order_id" ~ '^ORD_'::"text"))
 );
 
 
 ALTER TABLE "public"."subscriptions" OWNER TO "postgres";
+
+
+ALTER TABLE "public"."subscriptions" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."subscriptions_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."template_prompts" (
@@ -2629,7 +2699,12 @@ ALTER TABLE ONLY "public"."payments"
 
 
 ALTER TABLE ONLY "public"."payments"
-    ADD CONSTRAINT "payments_waffo_order_id_key" UNIQUE ("waffo_order_id");
+    ADD CONSTRAINT "payments_waffo_payment_id_key" UNIQUE ("waffo_payment_id");
+
+
+
+ALTER TABLE "public"."payments"
+    ADD CONSTRAINT "payments_waffo_payment_ids_check" CHECK ((("channel" <> 'waffo'::"text") OR ("waffo_payment_id" IS NOT NULL))) NOT VALID;
 
 
 
@@ -2654,7 +2729,17 @@ ALTER TABLE ONLY "public"."site_announcements"
 
 
 ALTER TABLE ONLY "public"."subscriptions"
-    ADD CONSTRAINT "subscriptions_pkey" PRIMARY KEY ("stripe_subscription_id");
+    ADD CONSTRAINT "subscriptions_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."subscriptions"
+    ADD CONSTRAINT "subscriptions_stripe_subscription_id_key" UNIQUE ("stripe_subscription_id");
+
+
+
+ALTER TABLE ONLY "public"."subscriptions"
+    ADD CONSTRAINT "subscriptions_waffo_order_id_key" UNIQUE ("waffo_order_id");
 
 
 
@@ -2745,6 +2830,10 @@ CREATE INDEX "payments_user_id_created_at_idx" ON "public"."payments" USING "btr
 
 
 CREATE INDEX "payments_user_id_idx" ON "public"."payments" USING "btree" ("user_id");
+
+
+
+CREATE INDEX "payments_waffo_order_id_idx" ON "public"."payments" USING "btree" ("waffo_order_id") WHERE ("waffo_order_id" IS NOT NULL);
 
 
 
@@ -3305,6 +3394,11 @@ GRANT ALL ON FUNCTION "public"."sync_subscription"("p_subscription_id" "text", "
 
 
 
+REVOKE ALL ON FUNCTION "public"."sync_waffo_subscription"("p_user_id" "uuid", "p_order_id" "text", "p_product_id" "text", "p_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean, "p_event_at" timestamp with time zone) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."sync_waffo_subscription"("p_user_id" "uuid", "p_order_id" "text", "p_product_id" "text", "p_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean, "p_event_at" timestamp with time zone) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."template_request_votes_count"() FROM PUBLIC;
 
 
@@ -3403,6 +3497,12 @@ GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public
 
 
 GRANT SELECT ON TABLE "public"."subscriptions" TO "service_role";
+
+
+
+GRANT UPDATE ON SEQUENCE "public"."subscriptions_id_seq" TO "anon";
+GRANT UPDATE ON SEQUENCE "public"."subscriptions_id_seq" TO "authenticated";
+GRANT UPDATE ON SEQUENCE "public"."subscriptions_id_seq" TO "service_role";
 
 
 

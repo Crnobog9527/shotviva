@@ -37,10 +37,10 @@ const ZH_LEGAL_LABELS: Record<string, string> = {
 
 export const homePageIn = (locale: Locale): HomePage => HOME[locale]
 export const pricingPageIn = (locale: Locale): PricingContent => PRICING[locale]
-// /pricing's FAQ for the live channel (Waffo is all one-time).
+// /pricing's FAQ for the live channel (on Waffo a card plan is cancelled from the account page).
 export function pricingFaqIn(locale: Locale, channel: PaymentChannel): readonly FaqItem[] {
   const page = PRICING[locale]
-  return channel === 'waffo' ? page.oneTime.faq : page.faq
+  return channel === 'waffo' ? page.waffo.faq : page.faq
 }
 
 export const contentPagesIn = (locale: Locale): readonly ContentPage[] => INNER[locale]

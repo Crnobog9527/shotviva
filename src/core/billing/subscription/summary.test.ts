@@ -11,7 +11,9 @@ const products = TEST_PRODUCTS
 
 function row(patch: Partial<MirrorRow> = {}): MirrorRow {
   return {
+    provider: 'stripe',
     stripeSubscriptionId: 'sub_1',
+    waffoOrderId: null,
     productId: 'pro_yearly',
     status: 'active',
     currentPeriodEnd: days(300),
@@ -27,12 +29,18 @@ describe('summarizeSubscription', () => {
   it('an active card subscription: tier, period and renewal date', () => {
     expect(summarize([row()], days(300))).toEqual({
       kind: 'subscription',
+      provider: 'stripe',
       tier: 'pro',
       interval: 'year',
       state: 'active',
       periodEnd: days(300),
       expired: false,
     })
+  })
+
+  it('a Waffo card subscription says so, so the card offers our Cancel button (T50)', () => {
+    expect(summarize([row({ provider: 'waffo', stripeSubscriptionId: null, waffoOrderId: 'ORD_1' })], days(300))).toMatchObject({ kind: 'subscription', provider: 'waffo', state: 'active' })
+    expect(summarize([row({ provider: 'waffo', stripeSubscriptionId: null, waffoOrderId: 'ORD_1', cancelAtPeriodEnd: true })], days(300))).toMatchObject({ provider: 'waffo', state: 'cancels' })
   })
 
   it('cancelled in the Portal: cancels at period end', () => {

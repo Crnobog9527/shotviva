@@ -56,16 +56,13 @@ const faq: readonly FaqItem[] = [
   },
 ]
 
-// Waffo channel: every purchase is one-time (ARCHITECTURE §6.3), so no cancel question and no
-// renewal wording.
+// Waffo 通道（T50）：银行卡套餐同样自动续费，只是取消按钮在「我的」页面上，不经过 Stripe。
 const CANCEL_QUESTION = '怎么取消套餐？'
-const oneTimeFaq = faq
-  .filter((item) => item.question !== CANCEL_QUESTION)
-  .map((item) => {
-    if (item.question === '积分会过期吗？') return { ...item, answer: '不会。付费积分永不过期，没用完的积分会一直留在你的账号里。' }
-    if (item.question === '能用支付宝付款吗？') return { ...item, answer: '可以。所有套餐和积分包都是一次性付款，到期不会自动扣款。价格同样以美元计。' }
-    return item
-  })
+const waffoFaq = faq.map((item) =>
+  item.question === CANCEL_QUESTION
+    ? { ...item, answer: '打开「我的」页面，点「取消订阅」。套餐会在已付费周期结束时到期，积分留在你的账号里。' }
+    : item,
+)
 
 export const zhPricingPage: PricingContent = {
   path: '/pricing',
@@ -80,5 +77,5 @@ export const zhPricingPage: PricingContent = {
   business,
   headings: { faq: '价格常见问题' },
   faq,
-  oneTime: { faq: oneTimeFaq },
+  waffo: { faq: waffoFaq },
 }

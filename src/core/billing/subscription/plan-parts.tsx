@@ -90,6 +90,9 @@ const pill = 'press inline-flex items-center justify-center gap-1.5 rounded-full
 const ghost = cn(pill, 'relative h-9 bg-wash px-4 text-caption shadow-[inset_0_0_0_1px_var(--border)] before:absolute before:-inset-x-0.5 before:-inset-y-1')
 const primary = cn(pill, 'min-h-11 bg-primary px-5 text-label text-primary-foreground')
 
+// The pass's two button faces, for actions built elsewhere (the Waffo cancel, T50).
+export const passButton = (main: boolean) => (main ? primary : ghost)
+
 // Every Stripe-side action (cancel, resume, change card, invoices) is one Customer Portal
 // session, created by the server action app/ passes in (ARCHITECTURE §6.2).
 export function PortalButton({ manage, main = false, external = false, children }: { manage: () => Promise<void>; main?: boolean; external?: boolean; children: ReactNode }) {

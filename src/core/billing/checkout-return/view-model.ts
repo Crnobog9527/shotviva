@@ -12,7 +12,7 @@ export type Money = { minor: number; currency: string }
 type Order = { kind: 'plan' | 'pack'; tier: MembershipTier | null; interval: ProductInterval | null; credits: number }
 
 // Which closing line: a card plan that renews (monthly / yearly, where the year's credits are
-// all in now), one paid period that does not renew (Alipay, Waffo), or a pack.
+// all in now), one paid period that does not renew (Alipay), or a pack.
 export type FineKey = 'fineMonthly' | 'fineYearly' | 'finePeriod' | 'finePack'
 
 export type SuccessView = Order & {
@@ -55,7 +55,7 @@ export function returnView(facts: CheckoutFacts, product: SiteProduct, balance: 
     renews,
     paid: facts.amount ? { ...facts.amount, method: facts.method, card: facts.card } : null,
     receiptUrl: facts.receiptUrl,
-    fine: fineKey(order, renews !== null),
+    fine: fineKey(order, facts.recurring),
   }
 }
 

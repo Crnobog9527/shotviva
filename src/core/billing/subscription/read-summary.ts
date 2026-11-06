@@ -13,14 +13,16 @@ import { summarizeSubscription, type MirrorRow, type SubscriptionSummary } from 
 // handful of rows at most (one per subscription ever started), so no page is needed.
 
 const rowSchema = z.object({
-  stripe_subscription_id: z.string(),
+  provider: z.enum(['stripe', 'waffo']),
+  stripe_subscription_id: z.string().nullable(),
+  waffo_order_id: z.string().nullable(),
   product_id: z.string(),
   status: z.string(),
   current_period_end: z.string(),
   cancel_at_period_end: z.boolean(),
 })
 
-const MIRROR_COLUMNS = 'stripe_subscription_id, product_id, status, current_period_end, cancel_at_period_end'
+const MIRROR_COLUMNS = 'provider, stripe_subscription_id, waffo_order_id, product_id, status, current_period_end, cancel_at_period_end'
 
 export async function readMirrorRows(admin: SupabaseClient, userId: string): Promise<MirrorRow[]> {
   const { data, error } = await admin.from('subscriptions').select(MIRROR_COLUMNS).eq('user_id', userId).limit(20)
@@ -29,7 +31,9 @@ export async function readMirrorRows(admin: SupabaseClient, userId: string): Pro
     .array(rowSchema)
     .parse(data ?? [])
     .map((row) => ({
+      provider: row.provider,
       stripeSubscriptionId: row.stripe_subscription_id,
+      waffoOrderId: row.waffo_order_id,
       productId: row.product_id,
       status: row.status,
       currentPeriodEnd: new Date(row.current_period_end),

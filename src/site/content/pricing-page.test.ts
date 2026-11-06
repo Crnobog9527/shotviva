@@ -73,9 +73,11 @@ describe('/pricing "Pay with"', () => {
     expect(html).toContain('All prices in USD')
   })
 
-  it('Waffo: every line is one-time, nothing renews', () => {
+  it('Waffo: the same terms (card plans renew since T50), the card group labelled "Card"', () => {
     const html = render('waffo')
-    expect(html).not.toMatch(/renew automatically|cancel anytime/i)
-    expect(html).toContain('One-time payment for 30 days or 1 year')
+    expect(html).toContain('Plans renew automatically, cancel anytime')
+    expect(html).toContain('One-time payment for 30 days or 1 year, no auto-renew')
+    expect(html).toContain('>Card<')
+    expect(html).not.toContain('Apple Pay')
   })
 })

@@ -6,11 +6,13 @@ import { usdFormat } from '../paywall/offer'
 import type { LastMembership } from './membership-facts'
 import { Acts, Flag, Muted, Pass, PassName, PaywallPill, PortalButton, richTags, Since, Status, Why } from './plan-parts'
 import type { SubscriptionSummary } from './summary'
+import { WaffoCancelButton, type CancelWaffoAction } from './waffo-cancel'
 
 // Account page membership pass (comps-v3-b/account.html with ?sub=active|cancelled|expired|
 // past_due|wallet, DESIGN §4.5): what the subscriptions mirror and paid_until say, worded as
-// what happens next, with one button for the one thing to do. Card subscriptions go to the
-// Stripe Customer Portal; one-period (Alipay / Waffo) members renew through the paywall.
+// what happens next, with one button for the one thing to do. Stripe card subscriptions go to
+// the Customer Portal; Waffo card subscriptions get our own Cancel button (T50); one-period
+// (Alipay) members renew through the paywall.
 
 export type PassFacts = {
   // When the account was made ("Since Nov 2026").
@@ -28,11 +30,13 @@ type Props = {
   // Paid credits left: the expired card says they still work.
   paid: number
   manage: () => Promise<void>
+  // Cancels the signed-in user's Waffo card subscription at period end (T50).
+  cancelWaffo: CancelWaffoAction
   facts: PassFacts
 }
 
 type Subscribed = Extract<SubscriptionSummary, { kind: 'subscription' }>
-type Ctx = { manage: Props['manage']; facts: PassFacts; products: Props['products']; paid: number }
+type Ctx = { manage: Props['manage']; cancelWaffo: CancelWaffoAction; facts: PassFacts; products: Props['products']; paid: number }
 
 function useNames() {
   const tiers = useTranslations('paywall.tiers')
@@ -93,7 +97,31 @@ function SubscribedPass({ summary, ctx }: { summary: Subscribed; ctx: Ctx }) {
   return pass('active', <Status>{t('renewsPlain', { date })}</Status>, <PerPeriod summary={summary} products={ctx.products} />, foot)
 }
 
-// Alipay / Waffo: one period paid once. The newest membership purchase says which period and
+// A Waffo card subscription (T50): the same states, but Waffo has no portal of ours. Active and
+// past due offer "Cancel subscription"; a cancelled one simply runs to its end (Waffo cannot be
+// resumed from here). Waffo retries a failed renewal once; a second failure ends the plan.
+function WaffoPass({ summary, ctx }: { summary: Subscribed; ctx: Ctx }) {
+  const t = useTranslations('app.account.plan')
+  const name = useNames().tier(summary.tier)
+  const date = summary.periodEnd
+  const cancel = <WaffoCancelButton action={ctx.cancelWaffo} tierName={name} periodEnd={date} />
+  const pass = (state: string, status: ReactNode, body: ReactNode, foot: ReactNode) => (
+    <Pass state={state} tier={summary.tier} brand={ctx.facts.brand} head={<><span>{t('member')}</span>{status}</>} foot={foot}>
+      <PassName>{name}</PassName>
+      {body}
+    </Pass>
+  )
+  if (summary.state === 'cancels') {
+    return pass('cancelled', <Status>{t('endsPlain', { date })}</Status>, <Why>{t.rich('waffoCancelledWhy', { ...richTags, date })}</Why>, <SinceFoot facts={ctx.facts}>{null}</SinceFoot>)
+  }
+  if (summary.state === 'past_due') {
+    const why = summary.expired ? t('waffoPastDueEndedWhy') : t('waffoPastDueWhy')
+    return pass('past_due', <Flag bad>{t('paymentFailed')}</Flag>, <Why>{why}</Why>, <SinceFoot facts={ctx.facts}>{cancel}</SinceFoot>)
+  }
+  return pass('active', <Status>{t('renewsPlain', { date })}</Status>, <PerPeriod summary={summary} products={ctx.products} />, <SinceFoot facts={ctx.facts} withEmail>{cancel}</SinceFoot>)
+}
+
+// Alipay (Stripe or Waffo): one period paid once. The newest membership purchase says which period and
 // how it was paid when it is the tier the account has now.
 function WalletPass({ summary, ctx }: { summary: Extract<SubscriptionSummary, { kind: 'paid_until' }>; ctx: Ctx }) {
   const t = useTranslations('app.account.plan')
@@ -134,9 +162,9 @@ function NoPlanPass({ summary, ctx }: { summary: Extract<SubscriptionSummary, { 
   )
 }
 
-export function PlanCard({ summary, products, paid, manage, facts }: Props) {
-  const ctx: Ctx = { manage, facts, products, paid }
-  if (summary.kind === 'subscription') return <SubscribedPass summary={summary} ctx={ctx} />
+export function PlanCard({ summary, products, paid, manage, cancelWaffo, facts }: Props) {
+  const ctx: Ctx = { manage, cancelWaffo, facts, products, paid }
+  if (summary.kind === 'subscription') return summary.provider === 'waffo' ? <WaffoPass summary={summary} ctx={ctx} /> : <SubscribedPass summary={summary} ctx={ctx} />
   if (summary.kind === 'paid_until') return <WalletPass summary={summary} ctx={ctx} />
   return <NoPlanPass summary={summary} ctx={ctx} />
 }

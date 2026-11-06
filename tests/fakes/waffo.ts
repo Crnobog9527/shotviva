@@ -68,3 +68,44 @@ export function refundSucceeded(paymentOf: string) {
     data: { orderId: 'ORD_x', paymentId: paymentOf, refundStatus: 'succeeded', orderMetadata: {} },
   }
 }
+
+// subscription.payment_succeeded (T50): a card subscription's charge, first or renewal. Same
+// payment fields as order.completed; eventId is the payment id.
+export function subscriptionPaid(input: OrderInput & { orderId?: string; periodNumber?: number }) {
+  const event = orderCompleted(input)
+  // A pure payment event: no orderStatus or period on it.
+  const data: Record<string, unknown> = { ...event.data, orderId: input.orderId ?? event.data.orderId, periodNumber: input.periodNumber ?? 1 }
+  delete data.orderStatus
+  return { ...event, eventType: 'subscription.payment_succeeded', data }
+}
+
+// subscription.activated / renewed / canceling / past_due / canceled …: no payment fields; the
+// order, its status and the current period.
+export function subscriptionState(input: {
+  userId: string
+  productId: string
+  orderId: string
+  eventType: string
+  orderStatus: string
+  currentPeriodEnd?: string
+  timestamp?: string
+}) {
+  const timestamp = input.timestamp ?? new Date().toISOString()
+  return {
+    id: input.orderId,
+    timestamp,
+    eventType: input.eventType,
+    eventId: `${input.orderId}-${timestamp}`,
+    storeId: WAFFO_STORE,
+    storeName: 'Shotviva test',
+    mode: 'test',
+    data: {
+      orderId: input.orderId,
+      orderStatus: input.orderStatus,
+      currency: 'USD',
+      orderMetadata: { user_id: input.userId, product_id: input.productId, method: 'card' },
+      billingPeriod: input.productId.endsWith('yearly') ? 'yearly' : 'monthly',
+      ...(input.currentPeriodEnd ? { currentPeriodEnd: input.currentPeriodEnd } : {}),
+    },
+  }
+}

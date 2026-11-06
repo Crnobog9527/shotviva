@@ -1,10 +1,15 @@
 import type { MembershipTier, ProductInterval, SiteProduct } from '../../config'
 
-// What the account page's Subscription block shows (DESIGN §4.5), from the mirror (Stripe's
-// state, ARCHITECTURE §6.2), paid_until and current_tier. Pure, so every state is unit-tested.
+// What the account page's Subscription block shows (DESIGN §4.5), from the mirror (Stripe's or
+// Waffo's state, ARCHITECTURE §6.2 / §6.3), paid_until and current_tier. Pure, so every state is unit-tested.
+
+// Who bills it: Stripe (Portal) or Waffo (our own Cancel button, T50).
+export type SubscriptionProvider = 'stripe' | 'waffo'
 
 export type MirrorRow = {
-  stripeSubscriptionId: string
+  provider: SubscriptionProvider
+  stripeSubscriptionId: string | null
+  waffoOrderId: string | null
   productId: string
   status: string
   currentPeriodEnd: Date
@@ -14,9 +19,11 @@ export type MirrorRow = {
 export type SubscriptionState = 'active' | 'cancels' | 'past_due' | 'paused'
 
 export type SubscriptionSummary =
-  // A card subscription that is still Stripe's to renew. "Manage subscription" opens the Portal.
+  // A card subscription still to be renewed. On Stripe "Manage subscription" opens the Portal; on
+  // Waffo the card offers "Cancel subscription" (T50).
   | {
       kind: 'subscription'
+      provider: SubscriptionProvider
       tier: MembershipTier
       interval: ProductInterval
       state: SubscriptionState
@@ -57,7 +64,7 @@ function liveSubscription(input: Input): SubscriptionSummary | null {
     if (!live || !product || product.tier === 'pack') continue
     const state = live === 'active' && row.cancelAtPeriodEnd ? 'cancels' : live
     const expired = input.paidUntil === null || input.paidUntil <= input.now
-    return { kind: 'subscription', tier: product.tier, interval: product.interval, state, periodEnd: row.currentPeriodEnd, expired }
+    return { kind: 'subscription', provider: row.provider, tier: product.tier, interval: product.interval, state, periodEnd: row.currentPeriodEnd, expired }
   }
   return null
 }

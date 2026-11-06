@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest'
 
 import { PRODUCT_IDS } from './config/define-site'
 import { parseServerEnv } from './env'
+import { MEMBERSHIP_PRODUCT_IDS } from './waffo-env'
 
 // ARCHITECTURE §6.3: the nine Waffo product ids live in one JSON variable, and a missing one is
 // an error at start-up, not at the first checkout of that product.
 
 const MAP = Object.fromEntries(PRODUCT_IDS.map((id) => [id, `PROD_${id.replace('_', '')}`]))
+const SUBS = Object.fromEntries(MEMBERSHIP_PRODUCT_IDS.map((id) => [id, `PROD_sub${id.replace('_', '')}`]))
 const WAFFO = {
   PAYMENT_CHANNEL: 'waffo',
   WAFFO_MERCHANT_ID: 'MER_abc123',
@@ -14,6 +16,7 @@ const WAFFO = {
   WAFFO_PRIVATE_KEY: '-----BEGIN PRIVATE KEY-----\\nabc\\n-----END PRIVATE KEY-----',
   WAFFO_WEBHOOK_PUBLIC_KEY: '-----BEGIN PUBLIC KEY-----\\nabc\\n-----END PUBLIC KEY-----',
   WAFFO_PRODUCT_IDS: JSON.stringify(MAP),
+  WAFFO_SUBSCRIPTION_PRODUCT_IDS: JSON.stringify(SUBS),
 }
 
 const failure = (env: Record<string, string | undefined>) => {
@@ -36,6 +39,14 @@ describe('Waffo environment', () => {
     const env = parseServerEnv(WAFFO)
     expect(env.PAYMENT_CHANNEL).toBe('waffo')
     expect(env.WAFFO_PRODUCT_IDS).toEqual(MAP)
+    expect(env.WAFFO_SUBSCRIPTION_PRODUCT_IDS).toEqual(SUBS)
+  })
+
+  it('needs all six membership subscription products for card checkouts (T50), and no packs', () => {
+    const five = Object.fromEntries(Object.entries(SUBS).filter(([id]) => id !== 'max_yearly'))
+    expect(failure({ ...WAFFO, WAFFO_SUBSCRIPTION_PRODUCT_IDS: JSON.stringify(five) })).toMatch(/WAFFO_SUBSCRIPTION_PRODUCT_IDS\.max_yearly/)
+    expect(failure({ ...WAFFO, WAFFO_SUBSCRIPTION_PRODUCT_IDS: JSON.stringify({ ...SUBS, pack_s: 'PROD_x' }) })).toMatch(/WAFFO_SUBSCRIPTION_PRODUCT_IDS/)
+    expect(failure({ ...WAFFO, WAFFO_SUBSCRIPTION_PRODUCT_IDS: undefined })).toMatch(/WAFFO_SUBSCRIPTION_PRODUCT_IDS/)
   })
 
   it('refuses a product map missing one of the nine ids, naming it', () => {
@@ -57,6 +68,7 @@ describe('Waffo environment', () => {
     expect(message).toMatch(/WAFFO_STORE_ID/)
     expect(message).toMatch(/WAFFO_WEBHOOK_PUBLIC_KEY/)
     expect(message).toMatch(/WAFFO_PRODUCT_IDS/)
+    expect(message).toMatch(/WAFFO_SUBSCRIPTION_PRODUCT_IDS/)
     expect(message).not.toMatch(/secret-value/)
   })
 

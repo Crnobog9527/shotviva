@@ -23,7 +23,9 @@ export async function lookupUser(db: SupabaseClient, query: string): Promise<Loo
   if (q.length === 0) return null
   const { data, error } = await db.rpc('admin_lookup', { p_query: q })
   if (error) throw new AppError('INTERNAL', 'admin lookup failed', { cause: new Error(error.message) })
-  const row = rowSchema.array().max(1).parse(data)[0]
+  // A Waffo subscription order (ORD_…) matches one payments row per charge (T50), all the same
+  // user; every other kind of query matches at most one row.
+  const row = rowSchema.array().parse(data)[0]
   return row ? { kind: row.kind, userId: row.user_id, jobId: row.job_id } : null
 }
 

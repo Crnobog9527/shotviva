@@ -15,7 +15,7 @@ import { site } from '@/site/site.config'
 
 import { signOutAction } from '@/app/auth/actions'
 import { disconnectGraylumAction } from './partner-actions'
-import { manageSubscriptionAction } from './subscription-actions'
+import { cancelWaffoSubscriptionAction, manageSubscriptionAction } from './subscription-actions'
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('app.account'))('metaTitle') }
@@ -29,6 +29,7 @@ const accountSite = {
 
 const actions = {
   manageSubscription: manageSubscriptionAction,
+  cancelWaffoSubscription: cancelWaffoSubscriptionAction,
   disconnectGraylum: disconnectGraylumAction,
   signOut: signOutAction,
 }
