@@ -134,18 +134,16 @@ export function SubmitButton({ pending, children }: { pending: boolean; children
   )
 }
 
-// hCaptcha's own checkbox, shown only when the invisible check could not decide. Takes plain
-// values (not the form) so the callback ref stays a prop of its own.
-type CaptchaSlotProps = { mode: string; mount: (element: HTMLDivElement | null) => void; needsTick: boolean }
-
-export function CaptchaSlot({ mode, mount, needsTick }: CaptchaSlotProps) {
+// The one line under a form when the invisible check did not complete (closed, expired or
+// failed); the next submit asks hCaptcha again (ARCHITECTURE §7).
+export function CaptchaFailed({ show }: { show: boolean }) {
   const t = useTranslations('auth.captcha')
-  if (mode !== 'checkbox') return null
+  if (!show) return null
   return (
-    <div className="au-hc">
-      <p className="au-hint">{t(needsTick ? 'tick' : 'fallback')}</p>
-      <div ref={mount} />
-    </div>
+    <p role="alert" className="au-err">
+      <AlertIcon />
+      {t('failed')}
+    </p>
   )
 }
 

@@ -123,8 +123,7 @@
     },
     "captcha": {
       "line": "由 hCaptcha 提供人机验证 · <privacy>隐私</privacy> · <terms>条款</terms>",
-      "fallback": "请完成下方的验证，再提交一次。",
-      "tick": "请勾选下方的方框后继续。"
+      "failed": "验证没有完成，请再试一次。"
     },
     "notices": {
       "unverified": "请先验证邮箱：打开我们发给你的邮件，点里面的链接。",
@@ -140,7 +139,7 @@
       "CREDITS_INSUFFICIENT": "积分不够了。",
       "AUTH_INVALID_CREDENTIALS": "邮箱或密码不正确。",
       "AUTH_EMAIL_NOT_CONFIRMED": "请先确认邮箱：打开我们发给你的邮件，点里面的链接。",
-      "AUTH_CAPTCHA_FAILED": "验证没有通过，请完成下方的验证。",
+      "AUTH_CAPTCHA_FAILED": "验证没有完成，请再试一次。",
       "AUTH_RATE_LIMITED": "尝试次数太多，请等一分钟再试。",
       "AUTH_WEAK_PASSWORD": "密码太简单了，请换一个更安全的。",
       "INTERNAL": "出了点问题，请再试一次。",

@@ -3,7 +3,7 @@
 import { useTranslations } from 'next-intl'
 import { useEffect, type ReactNode } from 'react'
 
-import { CaptchaSlot, Notice } from './form-parts'
+import { CaptchaFailed, Notice } from './form-parts'
 import { MailGlyph } from './icons'
 import { useAuthForm, type FormAction } from './use-auth-form'
 import { useCooldown } from './use-cooldown'
@@ -52,14 +52,14 @@ export function CheckEmail({ title, text, email, resendAction, next, back, sende
         {title}
       </h1>
       <p className="au-sub">{text}</p>
-      {form.state.status === 'error' ? <Notice>{t(`errors.${form.state.code}`)}</Notice> : null}
+      {form.errorCode ? <Notice>{t(`errors.${form.errorCode}`)}</Notice> : null}
       <form onSubmit={form.onSubmit} className="au-acts">
         <input type="hidden" name="email" value={email} />
         {next ? <input type="hidden" name="next" value={next} /> : null}
-        <CaptchaSlot mode={form.captcha.mode} mount={form.captcha.mountCheckbox} needsTick={form.needsTick} />
         <button type="submit" className="au-btn au-ghost" disabled={form.pending || waiting}>
           {waiting ? t('resend.wait', { seconds: cooldown.left }) : t('resend.again')}
         </button>
+        <CaptchaFailed show={form.captchaFailed} />
         {back}
       </form>
       {aside ? <p className="au-swap">{aside}</p> : null}

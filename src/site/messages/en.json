@@ -123,8 +123,7 @@
     },
     "captcha": {
       "line": "Protected by hCaptcha · <privacy>Privacy</privacy> · <terms>Terms</terms>",
-      "fallback": "Please complete the check below, then submit again.",
-      "tick": "Tick the box below to continue."
+      "failed": "Verification didn't complete. Please try again."
     },
     "notices": {
       "unverified": "Verify your email first. Open the link we sent you.",
@@ -140,7 +139,7 @@
       "CREDITS_INSUFFICIENT": "You're out of credits.",
       "AUTH_INVALID_CREDENTIALS": "Email or password is incorrect.",
       "AUTH_EMAIL_NOT_CONFIRMED": "Please confirm your email first. Open the link we sent you.",
-      "AUTH_CAPTCHA_FAILED": "Verification failed. Please complete the check below.",
+      "AUTH_CAPTCHA_FAILED": "Verification didn't complete. Please try again.",
       "AUTH_RATE_LIMITED": "Too many attempts. Please wait a minute and try again.",
       "AUTH_WEAK_PASSWORD": "Please choose a stronger password.",
       "INTERNAL": "Something went wrong. Please try again.",
