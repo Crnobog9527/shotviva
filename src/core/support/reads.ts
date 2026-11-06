@@ -101,6 +101,7 @@ const paymentRow = z.object({
   product_id: z.string(),
   amount_total: z.number(),
   currency: z.string(),
+  method: z.enum(['card', 'alipay']),
   created_at: z.string(),
 })
 
@@ -109,7 +110,7 @@ const paymentRow = z.object({
 export async function listPaymentOptions(db: SupabaseClient, userId: string): Promise<PaymentOption[]> {
   const { data, error } = await db
     .from('payments')
-    .select('id, product_id, amount_total, currency, created_at')
+    .select('id, product_id, amount_total, currency, method, created_at')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(PICKER_LIMIT)
@@ -119,6 +120,7 @@ export async function listPaymentOptions(db: SupabaseClient, userId: string): Pr
     productId: row.product_id,
     amountTotal: row.amount_total,
     currency: row.currency,
+    method: row.method,
     createdAt: row.created_at,
   }))
 }
