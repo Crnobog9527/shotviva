@@ -9,6 +9,13 @@ import { termsPage } from './terms'
 // map CSV, so the global indexing switch renders all of them noindex (AGENTS §9).
 export const legalPages = [termsPage, privacyPage, refundPolicyPage, acceptableUsePage] as const
 
-export const footerLinks: readonly FooterLink[] = legalPages.map((page) => ({ href: page.path, label: page.label }))
+// "Contact" opens Help & feedback (T27): signed out, the login page brings the visitor back to
+// it. The email address stays in the footer's operator line.
+export const contactLink: FooterLink = { href: '/account/help', label: 'Contact' }
+
+export const footerLinks: readonly FooterLink[] = [
+  ...legalPages.map((page) => ({ href: page.path, label: page.label })),
+  contactLink,
+]
 
 export { acceptableUsePage, privacyPage, refundPolicyPage, termsPage }

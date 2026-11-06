@@ -7,7 +7,7 @@ import { site } from '../../site.config'
 // email themselves; they read them here, from site.config (T19).
 const { brand } = site
 
-export const LAST_UPDATED = '2026-11-05'
+export const LAST_UPDATED = '2026-11-06'
 
 export const entity = {
   site: brand.name,
@@ -24,6 +24,9 @@ export const legalLinks = {
   refunds: { href: '/refund-policy', label: 'Refund Policy' },
   acceptableUse: { href: '/acceptable-use', label: 'Acceptable Use Policy' },
 } as const satisfies Record<string, LegalLink & { href: `/${string}` }>
+
+// Help & feedback (T27), where signed-in users write to us, refund requests included.
+export const helpLink: LegalLink = { href: '/account/help', label: 'Help & feedback' }
 
 export const pricingLink: LegalLink = { href: '/pricing', label: 'pricing page' }
 

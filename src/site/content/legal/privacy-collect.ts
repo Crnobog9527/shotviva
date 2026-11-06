@@ -17,7 +17,7 @@ export const privacyCollectSections: readonly [LegalSection, ...LegalSection[]] 
           'Text you enter for a template, such as a title, a price or a note about what to change.',
           'The images the Service creates for you (your works), and whether each one is public or private.',
           'Template requests: the description and reference images you post on the Wishlist, and your votes.',
-          'Messages you send us, for example by email for support or refunds.',
+          'Messages you send us, through Help & feedback on your account page or by email, for example for support or refunds, and our replies.',
         ],
       },
       'Information from purchases:',

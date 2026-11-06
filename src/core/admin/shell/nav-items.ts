@@ -1,11 +1,13 @@
 import { SHELL_COPY, type AdminNavKey } from './copy'
 
-export type AdminNavItem = { key: AdminNavKey; href: `/admin${string}`; label: string }
+// count: a to-do number shown beside the label (open tickets), hidden at 0.
+export type AdminNavItem = { key: AdminNavKey; href: `/admin${string}`; label: string; count?: number }
 
 // Order fixed by T23 / ARCHITECTURE §10.
 const ITEMS: readonly { key: AdminNavKey; href: `/admin${string}` }[] = [
   { key: 'overview', href: '/admin' },
   { key: 'users', href: '/admin/users' },
+  { key: 'tickets', href: '/admin/tickets' },
   { key: 'orders', href: '/admin/orders' },
   { key: 'jobs', href: '/admin/jobs' },
   { key: 'templates', href: '/admin/templates' },
@@ -14,11 +16,13 @@ const ITEMS: readonly { key: AdminNavKey; href: `/admin${string}` }[] = [
   { key: 'announcements', href: '/admin/announcements' },
 ]
 
-// The review entry only exists while the wishlist does (ARCHITECTURE §15.6).
-export function adminNavItems(flags: { wishlist: boolean }): AdminNavItem[] {
+// The review entry only exists while the wishlist does (ARCHITECTURE §15.6). Tickets carry the
+// open count (ARCHITECTURE §10 「站内工单」).
+export function adminNavItems(flags: { wishlist: boolean }, counts: { tickets?: number } = {}): AdminNavItem[] {
   return ITEMS.filter((item) => item.key !== 'requests' || flags.wishlist).map((item) => ({
     ...item,
     label: SHELL_COPY.nav[item.key],
+    ...(item.key === 'tickets' && counts.tickets ? { count: counts.tickets } : {}),
   }))
 }
 

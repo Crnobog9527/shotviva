@@ -8,6 +8,7 @@ export const SHELL_COPY = {
   nav: {
     overview: '概览',
     users: '用户',
+    tickets: '工单',
     orders: '订单与收入',
     jobs: '出图记录',
     templates: '模板',
