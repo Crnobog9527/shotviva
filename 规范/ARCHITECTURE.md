@@ -724,7 +724,7 @@ SEO 内页的中文版不批量做。哪一页的英文版在 GSC 里出现中�
     - 不 preload，不用 Google Fonts，也不用任何 CDN。
   - **缓存**：只给 `/fonts/misans/*.woff2` 和 `*.css` 发 `Cache-Control: public, max-age=31536000, immutable`，NOTICE、PDF 不加。改字体必须换新哈希 URL。
   - **路由**：中间件（`src/proxy.ts`）的 matcher 排除 `fonts/misans/`。这个目录不放私密文件。
-  - **署名（协议要求）**：营销页页脚写「本网站使用 MiSans 字体，版权归小米所有」（英文页写 "This site uses the MiSans font, © Xiaomi."），并链接 `/fonts/misans/LICENSE.pdf`。应用内页面不显示署名。
+  - **署名（协议要求）**：写在条款页的「Third-party notices」一节：「本网站使用 MiSans 字体，版权归小米所有」（英文写 "This site uses the MiSans font, © Xiaomi."），并链接 `/fonts/misans/LICENSE.pdf`。页脚不放（Owner 2026-11-06，DESIGN §6.9）。
   - **授权边界**：
     - MiSans 只用于网页显示。服务端往图片上画字的地方（如水印 "Made with Shotviva"）不用 MiSans，以免变成「把字体嵌入导出文件」。
     - 字体文件放在私有仓库，通过网站对外提供，和 Graylum 一样；律师审法律页时一并确认协议里的「再分发」条款（LAUNCH §8）。
