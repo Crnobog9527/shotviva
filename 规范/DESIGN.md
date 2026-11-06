@@ -182,7 +182,7 @@ Owner 2026-11-05 定稿：**B 版「暗房」（Darkroom）**，取代此前的�
 4. **营销页顶部导航**：Templates / Pricing / Log in / Start free。v1 没有 `/templates` 页面（ARCHITECTURE §13），「Templates」链到首页的模板区 `/#templates`。
 5. **页脚**：
    - 主行：`support@shotviva.com` 和 `© 2026 Shotviva AI`。
-   - 下面一行浅色小字：`Operated by Grayscale Luminary LLC · 75 E 3rd St, Sheridan, WY`，加四个法律页链接。这一行满足建站规格 G8 和 LAUNCH §8，主体信息从 `site.config` 读。
+   - 下面一行：四个法律页链接。页脚**不写**运营主体和地址（Owner 2026-11-06：美国法律不要求放在页脚）；主体名称和地址写在条款 / 隐私政策的联系方式一节和首页 Organization 结构化数据里，都从 `site.config` 读，满足建站规格 G8、加州 B&P §17538 的卖家信息披露和 Stripe 审核。
    - MiSans 的署名不放页脚，改放在条款页的「Third-party notices」一节（ARCHITECTURE §17）。
 6. **首页「What a set of photos costs」**：做详细的金额和时间对比，一边是请摄影师（价格、天数），一边是 Shotviva（credits、秒数）。
    - 摄影师报价取有来源的行业区间，来源写进 notes。
