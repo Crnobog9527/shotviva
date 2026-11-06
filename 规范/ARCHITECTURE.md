@@ -123,8 +123,8 @@ interface GenerationProvider {
 | 字段 | 说明 |
 |---|---|
 | `id` | uuid |
-| `module` | `'image'`（以后视频再加） |
-| `adapter` | 用哪个代码适配器：v1 只有 `'openai_images'`。接一个接口形态不同的厂商（如 Gemini、Seedream）要写新适配器，是代码任务，不是后台操作 |
+| `module` | `'image'`；`'decision'`（作品编辑判断改动范围用，T30，§5.2）；以后视频再加 |
+| `adapter` | 用哪个代码适配器：`'openai_images'`；`'openai_decisions'`（OpenAI 官方 `POST /v1/decisions`，只配官方地址，中转站多半没有这个接口）。接一个接口形态不同的厂商（如 Gemini、Seedream）要写新适配器，是代码任务，不是后台操作 |
 | `label` | 后台显示名，如「OpenAI 官方」「某中转」 |
 | `base_url` | 接口根地址，默认 `https://api.openai.com/v1`；只允许 `https://`，拒绝 localhost、内网和保留地址 |
 | `model` | 模型名，如 `gpt-image-2.6` |
@@ -164,7 +164,8 @@ interface GenerationProvider {
 | id | uuid |
 | user_id | 用户 |
 | module | 'image' / 'video' |
-| template_id | 用的模板 |
+| template_id | 用的模板（作品编辑用内置模板 `edit`，§5.2） |
+| parent_job_id | 作品编辑时，被编辑的那张作品的 id（同一用户的成功作品）；模板出图为空。外键 `on delete set null`（T30） |
 | inputs | 用户填的内容（文案、比例、**分辨率 `resolution`：`'1k'` / `'2k'` / `'3k'`**、可选补充说明 `note`（≤300 字符，工作台「Anything to change?」，服务端拼在模板提示词之后，作为用户内容存档）、输入图在 R2 的 key），**不含封装提示词**。伙伴接口（第 14 节）v1 固定 `'1k'`，契约不加字段 |
 | provider | 实际调用的供应商和模型：`<ai_providers.id 或 env>/<模型名>`（第 3.3 节） |
 | source | 'web' / 'graylum'，哪条入口发起的 |
@@ -195,6 +196,18 @@ v1 不写回调解析、定时轮询、超时清理这类定时任务。视频�
 内置一条 `freeform` 模板：字段定义只有 `prompt`（加可选参考图），`template_prompts` 里的提示词是直通。它让「自由文字出图」和「模板出图」走同一条代码路径；`visible_in = ['partner']`，Shotviva 自己的前台不展示（DESIGN.md 禁止出现 prompt）。
 
 仓库里只放模板的字段结构和种子数据格式。种子提示词放在不进 git 的本地文件里，用脚本导入数据库。
+
+### 5.2 作品编辑（Owner 2026-11-06，T30）
+
+用户在自己的作品详情页点「Edit」，写一句想改哪里，把这张作品当参考图再出一张。用户不会写提示词，没说出口的「其他地方别动」由我们补；但不能对每张图都硬塞「主体保持不变」，那会挡住用户真想做的大改动。所以先判断这句话要改的范围，再按范围加约束。
+
+- **入口和界面**：作品详情页「Edit」按钮，打开编辑面板（手机底部弹出，电脑和创作面板同一个组件，设计由 T6 出稿）：一个输入框（标签 "What would you like to change?"，1～500 字符，任何语言）、清晰度（默认和原作品同一档）、本次花费；比例固定和原作品一样。只能编辑自己的、成功的作品；免费作品也能编辑。
+- **一单 = 一次普通出图**：走内置模板 `edit`（`visible_in` 为空，不在目录里出现），`reserve_credits` 照常预扣，扣 `templates.credits_cost[resolution]`，默认和标准模板同价 2 / 4 / 6（Owner 2026-11-06，后台可改，不低于下限）；先付费池后免费池、按作品判水印的规则不变。新作品是一张独立作品，`parent_job_id` 指向原作品；原作品不动。编辑出来的作品可以再编辑。
+- **第一步：判断范围**（`ai_providers` 里 `module = 'decision'` 的在用供应商，OpenAI Decisions API）：把原作品（低清晰度）和用户原话送进去，问一组**判断题**（predicate，返回概率，不用选项题：社区实测选项题有偏向、受选项顺序影响），每题对应一种范围：只改某个物件或细节 / 换背景或场景 / 换风格、光线或色调 / 换主体（人、产品本身）/ 整体重做。题目文字放在 `template_prompts` 里 `edit` 模板的参数中，后台可改，不进仓库。取概率最高且 ≥ 0.5 的一种；都低于 0.5、调用失败或超过 3 秒，用「兜底」。
+- **第二步：出图**：`/v1/images/edits`，输入图是原作品在 R2 的无水印原图（服务端直接读，不经用户上传），提示词 = `edit` 模板的封装提示词 + 该范围的约束段落 + 用户原话（原文，不翻译）。约束段落一共六段（五种范围 + 兜底），也放在 `edit` 模板的参数里，Owner 在后台调，**不进仓库**。约束的意思举例：只改物件时「只改用户说的那个东西，其余所有元素保持一致」；换背景时「保留产品的形状、颜色、logo 和文字，背景按要求换」；换主体时「不要保留原主体」。模型支持时带 `input_fidelity: 'high'`（参数也在 `template_prompts`）。
+- **存档**：`generation_jobs.inputs` 记 `instruction`（用户原话）、`edit_scope`（判出的范围或 `fallback`）和各题概率，供 Owner 调约束时看；不存封装提示词。
+- **不做**（第一版）：圈选区域（涂抹蒙版，第二版）；伙伴接口的编辑；批量编辑；翻译用户原话。
+- **效果检查**：开发窗口在 PR 里贴中英文各 10 句典型说法的前后对比（例如「沙发换成蓝色」「背景换成海边」「把模特换成男生」「更亮一点」），供 Owner 看效果。这不是通过门槛：效果由 Owner 在后台调约束段落。
 
 v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板是数据，以后在后台随时加，不改代码）：
 
@@ -328,6 +341,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 判定 `featureOpen`：没有行、或 `min_tier` 为空、或已过 `open_to_all_at`、或用户档位 ≥ `min_tier` 就开放；档位顺序 starter < pro < max，没有档位按 Starter。
 - 后台「功能权限」页（`/admin/features`）：列出注册表里所有功能，每项可选「所有人 / Pro 起 / 仅 Max」和「哪天起对所有人开放」，保存写 `feature_access`。注册表为空时显示「暂时没有可设置的功能」。
 - 这张表是 §15.6「不做后台开关」的例外，只管档位门槛，不管功能开不开（功能开关仍在 `site.config` 的 `features`）。
+- 保存函数签名是 `admin_set_feature_access(p_key, p_min_tier, p_open_to_all_at, p_actor)`：服务端用 service role 调用时拿不到 `auth.uid()`，所以由服务端传管理员 id 写进 `updated_by`（和 `admin_activate_announcement` 同一做法，T29）。
 
 ### 6.3 通道
 
@@ -719,7 +733,7 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 |---|---|---|
 | `signup` | 服务端：邮箱验证完成 / 首次 Google 登录时（和注册赠送同一处） | `method`（`email` / `google`） |
 | `upload` | 浏览器：直传 R2 成功后 | `size_bucket`（`<1MB` / `1-5MB` / `>5MB`）、`compressed`（是否走了浏览器压缩） |
-| `generate` | 服务端：任务结算后（成功或失败都发） | `template_id`、`category`、`resolution`、`credits_cost`、`credit_pool`、`status`、`error_code`、`source`（`web` / `graylum`）、`duration_ms`、`model`（实际调用的模型名，不含密钥和地址）、`batch_size`（单张为 1，T28 起） |
+| `generate` | 服务端：任务结算后（成功或失败都发） | `template_id`、`category`、`resolution`、`credits_cost`、`credit_pool`、`status`、`error_code`、`source`（`web` / `graylum`）、`duration_ms`、`model`（实际调用的模型名，不含密钥和地址）、`batch_size`（单张为 1，T28 起）、`edit_scope`（作品编辑时的范围或 `fallback`，模板出图为空，T30 起） |
 | `paywall_view` | 浏览器：付费墙打开 | `trigger`（`insufficient_credits` / `pricing_page` / `account` / `graylum` / `tier_required`） |
 | `checkout_start` | 服务端：创建 Checkout Session 时 | `product_id`、`tier`、`interval`、`form`、`channel`、`method` |
 | `purchase` | 服务端：支付回调入账成功后 | 第 6.2 节 `purchase` 参数 |
