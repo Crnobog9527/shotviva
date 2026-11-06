@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
+import type { ContentPage } from '@/core/content'
+
 import { site } from '../site.config'
 import { contentPagesIn } from './localized'
 import { menuCostUsd, photosLeftAfterMenu } from './offer'
@@ -31,7 +33,7 @@ describe('landing pages', () => {
   })
 
   it('quotes the platforms\' published figures from platform-specs.ts, with a source note', () => {
-    const facts = (page: typeof commercialPhotography) => page.facts.map((fact) => `${fact.label} ${fact.value}`).join(' ')
+    const facts = (page: ContentPage) => page.facts.map((fact) => `${fact.label} ${fact.value}`).join(' ')
     expect(facts(commercialPhotography)).toContain(`${PLATFORM_SPECS.amazon.zoomPx.toLocaleString('en-US')} px`)
     expect(facts(commercialPhotography)).toContain('2,000 px')
     expect(facts(commercialPhotography)).toContain('2,048 × 2,048 px')
