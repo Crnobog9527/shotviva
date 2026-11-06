@@ -798,9 +798,9 @@
 
 `404.html`、`empty.html`（一个 `.state` 组件覆盖 Photos、需求墙、My requests、购买记录、404、错误、离线）；公告条两种样式 `tone = info | promo` 按 `home.html?announce=…`，字段来自 `site_announcements`；SEO 落地页骨架 `landing.html`：`/image-to-image-generator` 按稿改版，`/commercial-photography`、`/ai-restaurant-menu` 两页的事实块数字由本卡核实出处后再上（ARCHITECTURE §12）。**共同要求**：照 `design/comps-v3-b/` 里对应的稿做（变体见 `SIGN-OFF.md`），中英两版一起交付（ARCHITECTURE §17「全站中文化」，表外中文页 `noindex`）；文字进 messages / content，不写死；单测覆盖；交互验收交给 Codex；收尾停掉并删除本地 Docker。
 
-## T45 法律四页按定稿版式 + 中文版（可派）
+## T45 法律四页按定稿版式（只有英文，可派）
 
-`legal.html`：`/terms`、`/privacy`、`/refund-policy`、`/acceptable-use` 的版式；正文以现有英文为准（含 T40 / T41 的照片保留和删除作品说法、MiSans 署名），新增 `/zh/...` 四页为翻译，页首写「本中文版本仅供参考，如与英文版本不一致，以英文版本为准」，`noindex`。**共同要求**：照 `design/comps-v3-b/` 里对应的稿做（变体见 `SIGN-OFF.md`），中英两版一起交付（ARCHITECTURE §17「全站中文化」，表外中文页 `noindex`）；文字进 messages / content，不写死；单测覆盖；交互验收交给 Codex；收尾停掉并删除本地 Docker。
+`legal.html`：`/terms`、`/privacy`、`/refund-policy`、`/acceptable-use` 的版式；正文以现有英文为准（含 T40 / T41 的照片保留和删除作品说法、MiSans 署名），不做中文版（Owner 2026-11-06 晚）：中文页里的法律链接指向英文页，法律页上的语言切换「中文」指向 `/zh` 首页。**共同要求**：照 `design/comps-v3-b/` 里对应的稿做（变体见 `SIGN-OFF.md`），中英两版一起交付（ARCHITECTURE §17「全站中文化」，表外中文页 `noindex`）；文字进 messages / content，不写死；单测覆盖；交互验收交给 Codex；收尾停掉并删除本地 Docker。
 
 ## T46 需求墙和 Graylum 连接页按定稿重做（可派）
 
