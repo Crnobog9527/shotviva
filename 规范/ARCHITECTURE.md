@@ -398,7 +398,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 照 Graylum staging：
 
 - Supabase Auth：邮箱 + 密码注册，点验证邮件完成激活；另加 Google 登录。
-- hCaptcha 交给 Supabase Auth 自带的人机验证校验。前端**只做隐形验证**，失败时降级为显式 checkbox；不抄 Graylum 的「隐形 + 弹窗」两套。
+- hCaptcha 交给 Supabase Auth 自带的人机验证校验。前端**只做隐形验证**：页面上不放任何验证控件，用户点提交按钮时才调用 hCaptcha，需要挑战时由 hCaptcha 自己弹出验证窗口（Owner 2026-11-07：不再降级为页面内的显式 checkbox）。验证失败或被关掉时，表单下方给一句提示，再点一次按钮重新弹出；表单附近保留「Protected by hCaptcha · Privacy · Terms」一行小字（隐形模式的披露要求）。hCaptcha 的语言跟随页面语言。
 - 防刷免费额度：邮箱验证 + hCaptcha + **同 IP 限制**（Owner 2026-11-06 定：上线就开）。发放注册赠送的 SQL 函数检查同一个 `signup_ip` 24 小时内是否已经给别的账号发过；发过就不再发。后注册的账号照常能注册、能付费，只是没有免费额度，账号页显示一句说明。不引入设备指纹库。
 - **封禁的范围**（Owner 2026-11-06 定）：被封禁（`banned_at` 不为空）的账号不能出图、不能用需求墙、**不能创建结账**（`/api/checkout` 返回 403）；封禁时在同一事务里**断开 Graylum 连接**（`partner_links` 置为断开）。账号仍可以登录、查看和下载自己的作品、删号。
 - 验证邮件、重置密码邮件由 Supabase Auth 发，SMTP 配成 Resend，发件人 `Shotviva <mail@shotviva.com>`（Owner 2026-11-07 由 `support@` 改为 `mail@`；回信进飞书邮箱，`mail@` 设为 `support@` 的别名；网站和法律页上的联系邮箱仍是 `support@`。更早 2026-11-05 由 `noreply@` 改来：Resend 提示 no-reply 发件人影响送达，且用户回信能直接进飞书的 support 邮箱）。**v1 不写任何发信代码**，只改 Supabase 的邮件模板。
