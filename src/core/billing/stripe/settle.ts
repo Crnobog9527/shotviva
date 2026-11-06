@@ -21,14 +21,19 @@ export type SubscriptionState = {
 }
 
 // Recent API versions keep the period on the item; a subscription here has exactly one.
+// A cancellation can arrive two ways: cancel_at_period_end, or (flexible billing mode, which
+// the Customer Portal uses) cancel_at set to a moment inside the current period with
+// cancel_at_period_end still false. Both mean "no more renewals"; the plan then ends at
+// cancel_at. A cancel_at beyond this period is a later end, so this period still renews.
 export function subscriptionState(sub: Stripe.Subscription): SubscriptionState {
   const periodEnd = sub.items.data[0]?.current_period_end
   if (typeof periodEnd !== 'number') throw new AppError('INTERNAL', `subscription ${sub.id} has no period end`)
+  const endsAt = sub.cancel_at !== null && sub.cancel_at !== undefined && sub.cancel_at <= periodEnd ? sub.cancel_at : null
   return {
     id: sub.id,
     status: sub.status,
-    currentPeriodEnd: new Date(periodEnd * 1000),
-    cancelAtPeriodEnd: sub.cancel_at_period_end,
+    currentPeriodEnd: new Date((endsAt ?? periodEnd) * 1000),
+    cancelAtPeriodEnd: sub.cancel_at_period_end || endsAt !== null,
   }
 }
 

@@ -55,10 +55,19 @@ type Input = {
   now: Date
 }
 
+// A subscription that may still bill or renew: not canceled, never incomplete.
+export const isLiveStatus = (status: string): boolean => LIVE[status] !== undefined
+
+// Which row the card shows when there are several (a second subscription bought before T52's
+// checkout guard, or a cancelled one next to a new one): the one that will renew, else the
+// newest by period end.
+function shownFirst(rows: readonly MirrorRow[]): MirrorRow[] {
+  const renewing = (row: MirrorRow) => (LIVE[row.status] === 'active' && !row.cancelAtPeriodEnd ? 0 : 1)
+  return [...rows].sort((a, b) => renewing(a) - renewing(b) || b.currentPeriodEnd.getTime() - a.currentPeriodEnd.getTime())
+}
+
 function liveSubscription(input: Input): SubscriptionSummary | null {
-  // Newest first: a buyer who cancelled and subscribed again sees the new one.
-  const sorted = [...input.rows].sort((a, b) => b.currentPeriodEnd.getTime() - a.currentPeriodEnd.getTime())
-  for (const row of sorted) {
+  for (const row of shownFirst(input.rows)) {
     const live = LIVE[row.status]
     const product = input.products.find((p) => p.id === row.productId)
     if (!live || !product || product.tier === 'pack') continue

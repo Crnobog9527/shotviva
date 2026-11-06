@@ -235,6 +235,16 @@ describe('customer.subscription.updated / deleted → mirror only', () => {
     expect(await profileOf(db, userId)).toEqual(before)
   })
 
+  it('a Portal cancellation in flexible billing mode (cancel_at = period end, flag false) also mirrors as cancelling', async () => {
+    const userId = await createUser(db)
+    const { subscription } = await subscribe(userId, 'pro_monthly')
+    const periodEnd = subscription.items.data[0]?.current_period_end ?? 0
+    h.subscriptions.set(subscription.id, { ...subscription, cancel_at: periodEnd, cancel_at_period_end: false })
+
+    expect((await deliver(eventFor('customer.subscription.updated', subscription.id))).body.outcome).toBe('synced')
+    expect(await mirrorOf(db, userId)).toEqual([expect.objectContaining({ status: 'active', cancel_at_period_end: true })])
+  })
+
   it('deleted marks the mirror canceled and changes nothing else', async () => {
     const userId = await createUser(db)
     const { subscription } = await subscribe(userId, 'starter_monthly')

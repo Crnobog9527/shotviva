@@ -898,7 +898,9 @@
     "payNoteWallet": "一次性支付 30 天或 1 年，不自动续费",
     "payNotePacks": "积分包一律一次性付款。",
     "cancelled": "<b>已取消付款。</b>没有扣款。",
-    "cancelledClose": "关闭"
+    "cancelledClose": "关闭",
+    "alreadySubscribed": "你已经有一个正在生效的套餐，请先到「我的」里更改或取消。",
+    "goToAccount": "去「我的」"
   },
   "announcement": {
     "dismiss": "关闭公告"
