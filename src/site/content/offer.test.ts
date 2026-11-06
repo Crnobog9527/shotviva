@@ -12,8 +12,8 @@ describe('copy with the catalog in site.config', () => {
     expect(plansSentence()).toBe(
       'Plans start at $19.90 a month for 50 credits, or buy a one-time credit pack from $9.90.',
     )
-    // Largest yearly saving, rounded down: Max 39.98% (DESIGN §6.9).
-    expect(yearlySaving).toBe(39)
+    // Largest yearly saving, rounded: Max 39.98% → 40 (DESIGN §6.9).
+    expect(yearlySaving).toBe(40)
   })
 
   it('fills the /pricing tables and title from config', () => {
@@ -25,6 +25,6 @@ describe('copy with the catalog in site.config', () => {
     ])
     expect(pricingPage.tables.packs.rows[0]).toEqual(['Small pack', '$9.90', '20', '$0.50'])
     expect(perCredit('starter_monthly')).toBe('$0.40')
-    expect(pricingPage.intro).toContain('Yearly plans save up to 39%.')
+    expect(pricingPage.intro).toContain('Yearly plans save up to 40%.')
   })
 })

@@ -17,10 +17,10 @@ describe('paywall numbers (DESIGN §4.5, all from the config)', () => {
     expect(packOffers(TEST_PRODUCTS).map((p) => p.id)).toEqual(['pack_s', 'pack_m', 'pack_l'])
   })
 
-  it('saves $47.80 / $119.80 / $475 a year; "up to" is the largest saving, rounded down', () => {
+  it('saves $47.80 / $119.80 / $475 a year; "up to" is the largest saving, rounded to a whole percent', () => {
     expect(offers.map(yearlySavingUsd)).toEqual([47.8, 119.8, 475])
-    // Max: 1 − 713 / 1188 = 39.98%, never shown as more than it is.
-    expect(yearlySavingPct(offers)).toBe(39)
+    // Max: 1 − 713 / 1188 = 39.98% → 40% (DESIGN §6.9: rounded to the nearest whole percent).
+    expect(yearlySavingPct(offers)).toBe(40)
   })
 
   it('spreads the yearly price over twelve months', () => {

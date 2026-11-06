@@ -46,8 +46,8 @@ export function yearlySavingUsd(offer: TierOffer): number {
   return (cents(offer.monthly.priceUsd) * 12 - cents(offer.yearly.priceUsd)) / 100
 }
 
-// The largest saving across the tiers, rounded down, for "Save up to 40%" on the Yearly
-// segment (DESIGN §6.9, Owner 2026-11-06: never more than the real saving).
+// The largest saving across the tiers, rounded to the nearest whole percent, for "Save up to
+// 40%" on the Yearly segment (DESIGN §6.9; control 2026-11-06: Max's 39.98% reads 40%).
 export function yearlySavingPct(offers: readonly TierOffer[]): number | null {
   if (offers.length === 0) return null
   return Math.max(...offers.map(savingPct))
@@ -55,8 +55,8 @@ export function yearlySavingPct(offers: readonly TierOffer[]): number | null {
 
 function savingPct(offer: TierOffer): number {
   const monthlyYear = cents(offer.monthly.priceUsd) * 12
-  // Whole percent, rounded down in integer maths so float error cannot round 20% to 19%.
-  return Math.floor(((monthlyYear - cents(offer.yearly.priceUsd)) * 100) / monthlyYear)
+  // Whole percent, from integer cents so float error cannot move a .5 boundary.
+  return Math.round(((monthlyYear - cents(offer.yearly.priceUsd)) * 100) / monthlyYear)
 }
 
 // Whole dollars without decimals ("$191"), the rest with two ("$19.90").
