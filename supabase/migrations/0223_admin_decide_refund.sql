@@ -2,9 +2,12 @@
 -- the decision, the reply and an audit row in one transaction. It never moves money: the Owner
 -- refunds in the Stripe / Waffo dashboard, and record_payment_issue (T10) picks the refund up.
 --
--- The audit log's allowed actions are written as the full set the admin cards need, so T25
--- (view_work, replay_checkout) and T27 (decide_refund) give the same constraint whichever
--- migration runs last (control 2026-11-06).
+-- The audit block below is written identically by T25 (view_work, replay_checkout) and T27
+-- (decide_refund), so the order the two cards land in does not matter (control 2026-11-06):
+-- target_id (ARCHITECTURE §10) is text because replays store cs_… / sub_… ids; here it is the
+-- ticket id.
+
+alter table public.admin_audit_log add column if not exists target_id text check (length(target_id) > 0);
 
 alter table public.admin_audit_log
   drop constraint admin_audit_log_action_check,
@@ -65,12 +68,12 @@ begin
 
   insert into public.support_ticket_messages (ticket_id, author, body) values (p_ticket_id, 'admin', v_body);
 
-  insert into public.admin_audit_log (action, user_id, reason)
+  insert into public.admin_audit_log (action, user_id, target_id, reason)
   values (
     'decide_refund',
     v_ticket.user_id,
-    format('ticket %s payment %s: %s%s', p_ticket_id, v_ticket.payment_id, p_decision,
-           case when p_amount_cents is null then '' else ' ' || p_amount_cents || ' cents' end)
+    p_ticket_id::text,
+    format('退款工单：%s%s', p_decision, case when p_amount_cents is null then '' else ' ' || p_amount_cents end)
   );
   return v_ticket;
 end;

@@ -445,12 +445,12 @@ begin
 
   insert into public.support_ticket_messages (ticket_id, author, body) values (p_ticket_id, 'admin', v_body);
 
-  insert into public.admin_audit_log (action, user_id, reason)
+  insert into public.admin_audit_log (action, user_id, target_id, reason)
   values (
     'decide_refund',
     v_ticket.user_id,
-    format('ticket %s payment %s: %s%s', p_ticket_id, v_ticket.payment_id, p_decision,
-           case when p_amount_cents is null then '' else ' ' || p_amount_cents || ' cents' end)
+    p_ticket_id::text,
+    format('退款工单：%s%s', p_decision, case when p_amount_cents is null then '' else ' ' || p_amount_cents end)
   );
   return v_ticket;
 end;
@@ -1761,8 +1761,10 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "user_id" "uuid" NOT NULL,
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "target_id" "text",
     CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text"]))),
-    CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0))
+    CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
+    CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );
 
 

@@ -74,12 +74,11 @@ describe('admin_decide_refund', () => {
     await decideRefund(serviceSupabase(), { ticketId: id, decision: 'approved', amountCents: 1991, body: 'Approved, refunding $19.91' })
 
     expect(await ticketRow(db, id)).toMatchObject({ status: 'replied', refund_decision: 'approved', refund_amount_cents: 1991 })
-    const { rows } = await db.query<{ reason: string }>(
-      "select reason from public.admin_audit_log where action = 'decide_refund' and user_id = $1",
+    const { rows } = await db.query<{ reason: string; target_id: string }>(
+      "select reason, target_id from public.admin_audit_log where action = 'decide_refund' and user_id = $1",
       [user],
     )
-    expect(rows).toHaveLength(1)
-    expect(rows[0]!.reason).toContain(id)
+    expect(rows).toEqual([{ reason: '退款工单：approved 1991', target_id: id }])
     const loaded = await loadAdminTicket(serviceSupabase(), id)
     expect(loaded?.messages.map((m) => m.author)).toEqual(['user', 'admin'])
     expect(loaded?.eligibility?.suggestedCents).toBe(1983)
