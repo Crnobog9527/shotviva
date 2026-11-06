@@ -17,7 +17,8 @@ import type { ObjectStore } from '@/core/storage'
 export const VIEW_LINK_SECONDS = 300
 export const INPUT_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000
 
-export type WorkLinks = { output: string | null; input: string | null; inputExpired: boolean }
+// deleted: the user deleted the work (T41); its files are gone, so nothing is signed.
+export type WorkLinks = { output: string | null; input: string | null; inputExpired: boolean; deleted: boolean }
 
 // A set-returning function: PostgREST answers with its one row in an array.
 const viewSchema = z
@@ -28,6 +29,7 @@ const viewSchema = z
       output_key: z.string().nullable(),
       input_key: z.string().nullable(),
       created_at: z.string(),
+      deleted_at: z.string().nullable(),
     }),
   )
   .length(1)
@@ -52,9 +54,11 @@ export async function viewWork({ db, store, now = new Date() }: Deps, jobId: unk
   const id = z.uuid().safeParse(jobId)
   if (!id.success) throw new AppError('INVALID_INPUT', '任务 id 不对。')
   const job = await callRpc(db, 'admin_view_work', { p_job_id: id.data }, viewSchema)
+  // The view is still logged by admin_view_work; a deleted work only says so.
+  if (job.deleted_at) return { output: null, input: null, inputExpired: false, deleted: true }
   const [output, input] = await Promise.all([
     job.status === 'succeeded' && job.output_key ? store.presignGet(job.output_key, { expiresInSeconds: VIEW_LINK_SECONDS }) : null,
     inputLink(store, job.input_key, job.created_at, now),
   ])
-  return { output, ...input }
+  return { output, ...input, deleted: false }
 }

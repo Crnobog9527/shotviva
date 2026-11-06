@@ -76,6 +76,7 @@ export const USERS_COPY = {
   pools: { free: '免费', paid: '付费' },
   kinds: { grant: '赠送', reserve: '出图预扣', refund: '退回', purchase: '购买', admin_adjust: '后台调整' } as Record<string, string>,
   jobStatus: { running: '进行中', succeeded: '成功', failed: '失败' },
+  jobDeletedByUser: '用户已删除',
   actions: {
     adjust: '调整积分',
     ban: '封禁',

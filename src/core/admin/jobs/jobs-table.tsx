@@ -62,6 +62,7 @@ export function JobsTable({ jobs, actions, unitCost }: Props) {
             <TableCell className="font-mono text-xs">{job.templateId}</TableCell>
             <TableCell>
               <Badge variant={statusVariant[job.status]}>{COPY.status[job.status]}</Badge>
+              {job.deletedByUser ? <span className="ml-1 text-xs whitespace-nowrap text-muted-foreground">{COPY.deletedByUser}</span> : null}
             </TableCell>
             <TableCell className="font-mono text-xs">{job.model}</TableCell>
             <TableCell className="font-mono text-xs uppercase">{job.resolution}</TableCell>

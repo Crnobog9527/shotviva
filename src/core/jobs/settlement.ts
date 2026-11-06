@@ -97,6 +97,14 @@ export async function refundJob(client: RpcClient, input: { jobId: string; error
   )
 }
 
+// The owner deletes a finished work (T41, ARCHITECTURE §6.2「删除作品」): soft delete, credits stay
+// spent. Someone else's job is NOT_FOUND like a missing one; a running one is CONFLICT; a repeat
+// returns the already deleted row.
+export async function deleteOwnJob(client: RpcClient, input: { jobId: string; userId: string }): Promise<Job> {
+  const args = z.object({ jobId: z.uuid(), userId: z.uuid() }).parse(input)
+  return callRpc(client, 'delete_own_job', { p_job_id: args.jobId, p_user_id: args.userId }, jobRowSchema)
+}
+
 // The owner's public/private toggle (ARCHITECTURE §6.2): paid works switch freely, a free work
 // cannot be made private (FORBIDDEN), and someone else's job is NOT_FOUND like a missing one.
 export async function setJobVisibility(

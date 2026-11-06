@@ -12,7 +12,7 @@ import { PhotoFacts } from '../detail/photo-facts'
 import type { PhotoDetail } from '../detail/photo-detail'
 import type { PhotoItem } from '../photos/photo-item'
 import { tierName, tierPx } from '../workspace/workspace-options'
-import { EditedFrom, YourChange, type EditParent } from './edited-from'
+import { EditedFrom, EditedFromDeleted, YourChange, type EditParent } from './edited-from'
 import { ShareButton } from './share-button'
 
 type Props = {
@@ -23,13 +23,17 @@ type Props = {
   edit?: ReactNode
   // For an edit: the work it was made from (when it still exists) and the words it was asked with.
   parent?: EditParent | null
+  // An edit whose source work the user deleted (T41): "Edited from" says so, with no link.
+  parentDeleted?: boolean
   change?: string | null
+  // "Delete" (T41): the last action, quiet and in the danger colour.
+  remove?: ReactNode
 }
 
 // A finished photo opened from Photos (T6 photo.html; DESIGN §4.4): the result with its views,
 // then name, meta, Share as the one primary, Edit, Make again, what an edit came from, the
 // user's note and the facts. Two columns from lg, the photo sticky on the left.
-export function ResultView({ item, detail, shareText, edit, parent, change }: Props) {
+export function ResultView({ item, detail, shareText, edit, parent, parentDeleted = false, change, remove }: Props) {
   const t = useTranslations('app')
   const fileUrl = item.fileUrl as string
   return (
@@ -59,8 +63,9 @@ export function ResultView({ item, detail, shareText, edit, parent, change }: Pr
               {t('result.makeAgain')}
             </Link>
           )}
+          {remove}
         </div>
-        {parent ? <EditedFrom parent={parent} /> : null}
+        {parent ? <EditedFrom parent={parent} /> : parentDeleted ? <EditedFromDeleted /> : null}
         {change ? <YourChange text={change} /> : null}
         {detail.note ? <NoteQuote note={detail.note} /> : null}
         <PhotoFacts item={item} original={detail.original} keptWithWork={detail.keptWithWork} />

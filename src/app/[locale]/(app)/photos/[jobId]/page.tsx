@@ -10,8 +10,10 @@ import { currentLocale } from '@/core/i18n/server'
 import { fileUrlFor, findOwnJob, hasInputPreview, keptInputsOf, originalUrlFor, type Job } from '@/core/jobs'
 import { r2Store } from '@/core/storage'
 import { EDIT_TEMPLATE_ID, listTemplatesIn, loadEditOffer } from '@/core/templates'
-import { EditFlow, EditTrigger, editDisplay, editOriginal, ResultView, toPhotoDetail } from '@/modules/image'
+import { DeleteWork, EditFlow, EditTrigger, editDisplay, editOriginal, ResultView, toPhotoDetail } from '@/modules/image'
 import { site } from '@/site/site.config'
+
+import { deleteWorkAction } from './actions'
 
 function Nav({ title }: { title: string }) {
   const t = useTranslations('app.result')
@@ -56,6 +58,9 @@ async function Result({ params }: { params: Promise<{ jobId: string }> }) {
       detail={job.templateId === EDIT_TEMPLATE_ID ? { ...detail, original: editOriginal(source) } : detail}
       edit={offer ? <EditTrigger /> : null}
       parent={source ? { id: source.id, fileUrl: source.fileUrl as string, name: source.templateName } : null}
+      // findOwnJob leaves out a deleted work (T41), so a parent id with no parent row means deleted.
+      parentDeleted={job.parentJobId !== null && parent === null}
+      remove={<DeleteWork action={deleteWorkAction.bind(null, job.id)} />}
       change={change}
       shareText={t('result.shareText', { brand: site.brand.name, url: `https://${site.brand.domain}/?utm_source=share&utm_medium=web_share` })}
     />

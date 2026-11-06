@@ -8,7 +8,7 @@ import { createServerSupabase, requireUser } from '@/core/auth'
 import { fileUrlFor, listOwnJobs } from '@/core/jobs'
 import { currentLocale } from '@/core/i18n/server'
 import { EDIT_TEMPLATE_ID, listTemplatesIn } from '@/core/templates'
-import { DoneGrid, PhotosCount, RunningList, toPhotoItem, type TemplateLookup } from '@/modules/image'
+import { DeletedToast, DoneGrid, PhotosCount, RunningList, toPhotoItem, type TemplateLookup } from '@/modules/image'
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('app.photos'))('metaTitle') }
@@ -41,11 +41,19 @@ async function Photos() {
   )
 }
 
-export default function PhotosPage() {
+// ?deleted=1: back from deleting a work (T41).
+async function Deleted({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  return (await searchParams).deleted === '1' ? <DeletedToast /> : null
+}
+
+export default function PhotosPage({ searchParams }: PageProps<'/[locale]/photos'>) {
   return (
     <AppPage wide>
       <Suspense fallback={<Header />}>
         <Photos />
+      </Suspense>
+      <Suspense>
+        <Deleted searchParams={searchParams} />
       </Suspense>
     </AppPage>
   )

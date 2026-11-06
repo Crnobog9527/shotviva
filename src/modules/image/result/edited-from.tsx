@@ -22,6 +22,20 @@ export function EditedFrom({ parent }: { parent: EditParent }) {
   )
 }
 
+// "Edited from" when that work was deleted (T41): the same card, no link, no thumbnail.
+export function EditedFromDeleted() {
+  const t = useTranslations('app.edit')
+  return (
+    <div className="hairline mt-3 flex min-h-[71px] items-center gap-3 rounded-panel bg-card px-3 py-2">
+      <span aria-hidden="true" className="h-[55px] w-11 flex-none rounded-md bg-[repeating-linear-gradient(135deg,var(--hatch)_0_4px,transparent_4px_8px)] shadow-[inset_0_0_0_1px_var(--recess-edge)]" />
+      <span className="grid flex-1 gap-0.5">
+        <span className="text-caption text-muted-foreground">{t('editedFromLabel')}</span>
+        <span className="text-body font-medium text-muted-foreground">{t('sourceDeleted')}</span>
+      </span>
+    </div>
+  )
+}
+
 // "Your change": the words the edit was asked with, as typed (the user's own, not a prompt). It
 // takes the place of "Your note", which an edit never has, in the same card.
 export function YourChange({ text }: { text: string }) {

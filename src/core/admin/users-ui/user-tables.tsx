@@ -30,7 +30,10 @@ export function UserJobsTable({ jobs, actions, highlight }: { jobs: UserJob[]; a
           <TableRow key={job.id} data-state={job.id === highlight ? 'selected' : undefined}>
             <TableCell className="font-mono text-xs whitespace-nowrap">{formatBeijing(job.createdAt)}</TableCell>
             <TableCell className="font-mono text-xs">{job.templateId}</TableCell>
-            <TableCell>{COPY.jobStatus[job.status]}</TableCell>
+            <TableCell>
+              {COPY.jobStatus[job.status]}
+              {job.deletedByUser ? <span className="ml-1 text-xs whitespace-nowrap text-muted-foreground">{COPY.jobDeletedByUser}</span> : null}
+            </TableCell>
             <TableCell className="font-mono">{job.creditsCost}</TableCell>
             <TableCell>{COPY.pools[job.creditPool]}</TableCell>
             <TableCell className="font-mono text-xs">{job.errorCode ?? ''}</TableCell>

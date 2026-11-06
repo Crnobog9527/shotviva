@@ -35,6 +35,12 @@ describe('photo page messages (en)', () => {
     expect(again.markup('addFirst', { b, count: 2 })).toBe('Add the photo first. [Then it costs 2 credits, like any photo.]')
   })
 
+  it('says deleting cannot be undone and keeps the credits spent (T41)', () => {
+    expect(result.delete.body).toBe("This can't be undone. Credits spent aren't refunded.")
+    expect(messages.app.photos.deleted).toBe('Photo deleted.')
+    expect(messages.app.edit.sourceDeleted).toBe('Original deleted')
+  })
+
   it('never says "prompt" anywhere on the page', () => {
     expect(JSON.stringify(result)).not.toMatch(/prompt/i)
   })
