@@ -46,7 +46,7 @@ function DesktopSheet({ open, onOpenChange, title, description, hint, sample, fo
             <p className="mt-2 text-caption text-muted-foreground">{hint}</p>
           </div>
           <div className="flex min-h-0 flex-col">
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pt-3 pb-4 [&>section:first-child]:pr-14">{form}</div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pt-3 pb-4 [&>section:first-child>div:first-child]:pr-14">{form}</div>
             {bar}
           </div>
           <CloseButton Close={DialogPrimitive.Close} className="top-4 right-4" />

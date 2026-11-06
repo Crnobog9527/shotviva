@@ -58,6 +58,7 @@ function ArtCard({ template, onOpen }: Props) {
         after={template.cover.after as string}
         afterAlt={t('resultAlt', { name: template.name })}
         onTap={() => onOpen(template.id)}
+        tagsAt="bottom"
         className="hairline rounded-control md:aspect-auto md:min-h-[280px] md:flex-1"
       />
       <button type="button" aria-haspopup="dialog" onClick={() => onOpen(template.id)} className="press block w-full rounded-inner text-left">

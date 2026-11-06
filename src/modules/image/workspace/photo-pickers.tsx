@@ -7,7 +7,8 @@ import { UPLOAD_ACCEPT } from '@/core/storage/rules'
 
 import { UPLOAD_FORMAT_NAMES, UPLOAD_MAX_MB } from './upload-formats'
 
-// Upload zone, empty (DESIGN §4.3 step 1, "Upload Zone"): a 16:9 hatched recess that also
+// Upload zone, empty (DESIGN §4.3 step 1, "Upload Zone"): a 16:9 viewfinder frame (B comp app.css
+// .empty .frame, four corner brackets) that also
 // takes dropped files on desktop, then two entries. "Take photo" opens the camera (capture),
 // "Choose from gallery" the library (no capture). No HEIC in accept: iOS converts to JPEG.
 // `multiple` (Pro and Max, T28) lets the gallery pick a batch; the camera always takes one.
@@ -32,7 +33,7 @@ export function PhotoPickers({ onPick, multiple = false }: { onPick(files: File[
       <div
         onDragOver={(event) => event.preventDefault()}
         onDrop={onDrop}
-        className="grid aspect-video place-content-center md:aspect-[5/2] justify-items-center gap-2 rounded-button bg-[repeating-linear-gradient(135deg,var(--hatch)_0_8px,transparent_8px_16px),var(--recess)] text-center shadow-[inset_0_0_0_1px_var(--recess-edge)]"
+        className="viewfinder relative grid aspect-video place-content-center justify-items-center gap-2 rounded-button bg-background p-4 text-center shadow-[inset_0_0_0_1px_var(--input)]"
       >
         <b className="text-body leading-[1.2] font-semibold">{t(multiple ? 'addPhotos' : 'addPhoto')}</b>
         <span className="text-caption text-muted-foreground">{formats}</span>

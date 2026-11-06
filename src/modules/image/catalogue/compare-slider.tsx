@@ -18,13 +18,15 @@ type Props = {
   className?: string
   // On a template card a tap opens the creation dialog and only a drag compares (T38).
   onTap?(): void
+  // The Art Styles grid card puts Phone / AI on the bottom corners (B comp app.css .tpl.art).
+  tagsAt?: 'top' | 'bottom'
 }
 
 // Compare slider (DESIGN "Compare Slider", §8.3): the after plate clipped at the handle, a 2px
 // white seam and a 40px frosted knob. A transparent full-surface range input gives one-finger
 // drag, tap-to-jump and keyboard control. afterGround gives the after plate an opaque backdrop
 // inside its clip, so a transparent result never lets the before photo show through.
-export function CompareSlider({ before, after, afterAlt, afterGround, badge, className, onTap }: Props) {
+export function CompareSlider({ before, after, afterAlt, afterGround, badge, className, onTap, tagsAt = 'top' }: Props) {
   const [x, setX] = useState(50)
   const t = useTranslations('app.template')
   const tap = useTap(x, setX, onTap)
@@ -42,7 +44,7 @@ export function CompareSlider({ before, after, afterAlt, afterGround, badge, cla
           </svg>
         </span>
       </span>
-      <SplitTags size="large" />
+      <SplitTags size={tagsAt === 'top' ? 'large' : 'pair'} />
       {badge ? <span className="frost absolute bottom-3 left-3 z-3 inline-flex h-[26px] items-center rounded-tag px-2 text-caption leading-none font-medium text-photo-ink">{badge}</span> : null}
       <input
         type="range"
