@@ -631,3 +631,8 @@
   @media (min-width: 768px) { .mk-open { margin-left: 8px; } .mk-acct { margin-left: 6px; } }
   @media (hover: hover) { .mk-acct:hover { background: var(--wash-strong); color: var(--foreground); } .mk-open:hover { filter: brightness(1.04); } }
 }
+
+/* A featured template whose covers are not uploaded yet (T53): the pair's frame, hatched. */
+@layer components {
+  .mk-pair-blank .mk-pane { background: repeating-linear-gradient(135deg, var(--hatch) 0 8px, transparent 8px 16px), var(--recess); }
+}

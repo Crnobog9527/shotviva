@@ -958,6 +958,40 @@ $$;
 ALTER FUNCTION "public"."admin_set_feature_access"("p_key" "text", "p_min_tier" "text", "p_open_to_all_at" timestamp with time zone, "p_actor" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_set_featured_templates"("p_ids" "text"[]) RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_ids text[] := coalesce(p_ids, '{}');
+begin
+  if cardinality(v_ids) > 12 then
+    raise exception 'at most 12 featured templates' using errcode = '22023';
+  end if;
+  if cardinality(v_ids) <> (select count(distinct id) from unnest(v_ids) as u(id)) then
+    raise exception 'featured templates must not repeat' using errcode = '22023';
+  end if;
+  if exists (
+    select 1 from unnest(v_ids) as u(id)
+    where not exists (
+      select 1 from public.templates t where t.id = u.id and t.is_active and 'web' = any (t.visible_in)
+    )
+  ) then
+    raise exception 'only published web templates can be featured' using errcode = '22023';
+  end if;
+
+  update public.templates set featured_rank = null where featured_rank is not null;
+  update public.templates t
+  set featured_rank = o.position
+  from unnest(v_ids) with ordinality as o(id, position)
+  where t.id = o.id;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_set_featured_templates"("p_ids" "text"[]) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_set_openai_admin_key"("p_key" "text") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -1178,7 +1212,7 @@ declare
 begin
   insert into public.templates as t (
     id, module, name, category, cover_before_url, cover_after_url,
-    fields, quality, credits_cost, sort_order, is_active, visible_in, translations, description
+    fields, quality, credits_cost, sort_order, is_active, visible_in, translations, description, featured_rank
   ) values (
     v_id,
     coalesce(p_template ->> 'module', 'image'),
@@ -1198,7 +1232,8 @@ begin
     coalesce((p_template ->> 'is_active')::boolean, false),
     array(select jsonb_array_elements_text(coalesce(p_template -> 'visible_in', '["web"]'::jsonb))),
     coalesce(p_template -> 'translations', '{}'::jsonb),
-    nullif(btrim(p_template ->> 'description'), '')
+    nullif(btrim(p_template ->> 'description'), ''),
+    (p_template ->> 'featured_rank')::smallint
   )
   on conflict (id) do update set
     module = excluded.module,
@@ -1215,7 +1250,12 @@ begin
     visible_in = excluded.visible_in,
     -- The editor always sends the whole object; the prompt import script does not, and keeps it.
     translations = case when p_template ? 'translations' then excluded.translations else t.translations end,
-    description = case when p_template ? 'description' then excluded.description else t.description end;
+    description = case when p_template ? 'description' then excluded.description else t.description end,
+    featured_rank = case
+      when p_template ? 'featured_rank' then excluded.featured_rank
+      when coalesce((p_template ->> 'is_active')::boolean, t.is_active) and 'web' = any (excluded.visible_in) then t.featured_rank
+      else null
+    end;
 
   if p_prompt is not null then
     insert into public.template_prompts (template_id, body, model_params)
@@ -2629,11 +2669,14 @@ CREATE TABLE IF NOT EXISTS "public"."templates" (
     "cover_poster_url" "text",
     "translations" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
     "description" "text",
+    "featured_rank" smallint,
     CONSTRAINT "templates_category_check" CHECK ((("char_length"("category") >= 1) AND ("char_length"("category") <= 60))),
     CONSTRAINT "templates_cover_media_type_check" CHECK (("cover_media_type" = ANY (ARRAY['image'::"text", 'animated'::"text", 'video'::"text"]))),
     CONSTRAINT "templates_cover_motion_complete" CHECK ((("cover_media_type" = 'image'::"text") OR (("cover_video_url" IS NOT NULL) AND ("cover_poster_url" IS NOT NULL)))),
     CONSTRAINT "templates_credits_cost_check" CHECK ((("jsonb_typeof"("credits_cost") = 'object'::"text") AND ("credits_cost" ?& ARRAY['1k'::"text", '2k'::"text", '3k'::"text"]) AND (((("credits_cost" - '1k'::"text") - '2k'::"text") - '3k'::"text") = '{}'::"jsonb") AND ("jsonb_typeof"(("credits_cost" -> '1k'::"text")) = 'number'::"text") AND (("credits_cost" ->> '1k'::"text") ~ '^[1-9][0-9]{0,2}$'::"text") AND ("jsonb_typeof"(("credits_cost" -> '2k'::"text")) = 'number'::"text") AND (("credits_cost" ->> '2k'::"text") ~ '^[1-9][0-9]{0,2}$'::"text") AND ("jsonb_typeof"(("credits_cost" -> '3k'::"text")) = 'number'::"text") AND (("credits_cost" ->> '3k'::"text") ~ '^[1-9][0-9]{0,2}$'::"text"))),
     CONSTRAINT "templates_description_check" CHECK ((("description" IS NULL) OR (("char_length"("description") >= 1) AND ("char_length"("description") <= 160)))),
+    CONSTRAINT "templates_featured_live_check" CHECK ((("featured_rank" IS NULL) OR ("is_active" AND ('web'::"text" = ANY ("visible_in"))))),
+    CONSTRAINT "templates_featured_rank_check" CHECK ((("featured_rank" IS NULL) OR (("featured_rank" >= 1) AND ("featured_rank" <= 12)))),
     CONSTRAINT "templates_fields_check" CHECK (("jsonb_typeof"("fields") = 'object'::"text")),
     CONSTRAINT "templates_id_check" CHECK ((("id" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text") AND ("char_length"("id") <= 64))),
     CONSTRAINT "templates_module_check" CHECK (("module" = ANY (ARRAY['image'::"text", 'video'::"text"]))),
@@ -2886,6 +2929,10 @@ CREATE INDEX "template_requests_wall_idx" ON "public"."template_requests" USING 
 
 
 CREATE INDEX "templates_active_sort_idx" ON "public"."templates" USING "btree" ("sort_order", "id") WHERE "is_active";
+
+
+
+CREATE UNIQUE INDEX "templates_featured_rank_key" ON "public"."templates" USING "btree" ("featured_rank") WHERE ("featured_rank" IS NOT NULL);
 
 
 
@@ -3237,6 +3284,11 @@ GRANT ALL ON FUNCTION "public"."admin_search_users"("p_query" "text") TO "servic
 
 REVOKE ALL ON FUNCTION "public"."admin_set_feature_access"("p_key" "text", "p_min_tier" "text", "p_open_to_all_at" timestamp with time zone, "p_actor" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_set_feature_access"("p_key" "text", "p_min_tier" "text", "p_open_to_all_at" timestamp with time zone, "p_actor" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_set_featured_templates"("p_ids" "text"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_featured_templates"("p_ids" "text"[]) TO "service_role";
 
 
 

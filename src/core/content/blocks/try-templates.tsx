@@ -36,6 +36,8 @@ export function TryTemplates({ templates, price }: { templates: readonly TryTemp
   const t = useTranslations('notFound')
   const home = useTranslations('marketing.home')
   const picked = pickThree(templates, useSeed())
+  // No featured template with covers yet: the 404 keeps just its message and the way home.
+  if (picked.length === 0) return null
   return (
     <section className="mt-12" aria-labelledby="try-h">
       <h2 id="try-h" className="text-headline leading-[1.2] font-semibold tracking-[-0.01em]">

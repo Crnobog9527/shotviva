@@ -49,7 +49,7 @@ describe('home page skeleton', () => {
     expect(homePage.freeOffer.points[0].heading).toBe('3 Free Standard Images When You Sign Up')
   })
 
-  it('groups the first 10 templates into the 6 categories, Art Styles first (ARCHITECTURE §5)', () => {
+  it('carries the copy of the 6 §5 categories, Art Styles first; templates come from admin (T53)', () => {
     const { categories } = homePage.templateGrid
     expect(categories.map((c) => c.name)).toEqual([
       'Art Styles',
@@ -59,7 +59,8 @@ describe('home page skeleton', () => {
       'Rooms & Spaces',
       'Pets',
     ])
-    expect(categories.flatMap((c) => c.templates).length).toBe(10)
+    expect(categories.map((c) => c.key)).toEqual(categories.map((c) => c.name))
+    expect(categories.filter((c) => c.drag).map((c) => c.name)).toEqual(['Art Styles'])
   })
 })
 
@@ -83,7 +84,7 @@ describe('public numbers', () => {
   it('never says 1K / 2K / 3K / 4K or hard-codes a price in page copy (G3)', () => {
     const dir = join(process.cwd(), 'src', 'site', 'content')
     // offer.ts is the one place numbers are read and is left out on purpose.
-    const files = ['home.ts', 'shared.ts', 'pricing.ts', 'featured-templates.ts', ...readdirSync(join(dir, 'pages')).map((f) => `pages/${f}`)]
+    const files = ['home.ts', 'shared.ts', 'pricing.ts', 'template-categories.ts', ...readdirSync(join(dir, 'pages')).map((f) => `pages/${f}`)]
     for (const file of files) {
       const source = readFileSync(join(dir, file), 'utf8')
       expect(source, file).not.toMatch(/\$\d/)

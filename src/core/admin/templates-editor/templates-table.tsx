@@ -6,6 +6,7 @@ import { Switch } from '@/core/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/core/ui/table'
 
 import type { AdminTemplate } from '../templates/types'
+import { canFeature } from './featured-state'
 
 const SURFACE_LABEL = { web: '站内', partner: '伙伴' } as const
 
@@ -17,9 +18,12 @@ type Props = {
   onEdit: (template: AdminTemplate) => void
   onToggle: (template: AdminTemplate, active: boolean) => void
   onMove: (index: number, direction: -1 | 1) => void
+  // 首页精选 (T53): whether the list is full, and the switch handler.
+  featuredFull: boolean
+  onFeature: (template: AdminTemplate, on: boolean) => void
 }
 
-export function TemplatesTable({ templates, canReorder, pending, onEdit, onToggle, onMove }: Props) {
+export function TemplatesTable({ templates, canReorder, pending, onEdit, onToggle, onMove, featuredFull, onFeature }: Props) {
   if (templates.length === 0) {
     return <p className="text-muted-foreground py-8 text-center text-sm">没有匹配的模板</p>
   }
@@ -34,6 +38,7 @@ export function TemplatesTable({ templates, canReorder, pending, onEdit, onToggl
           <TableHead>积分（Standard / HD / Max）</TableHead>
           <TableHead>提示词版本</TableHead>
           <TableHead>上架</TableHead>
+          <TableHead>首页精选</TableHead>
           <TableHead className="text-right">操作</TableHead>
         </TableRow>
       </TableHeader>
@@ -89,6 +94,9 @@ export function TemplatesTable({ templates, canReorder, pending, onEdit, onToggl
                 onCheckedChange={(checked) => onToggle(template, checked)}
               />
             </TableCell>
+            <TableCell>
+              <FeaturedSwitch template={template} full={featuredFull} pending={pending} onFeature={onFeature} />
+            </TableCell>
             <TableCell className="text-right">
               <Button variant="outline" size="sm" disabled={pending} onClick={() => onEdit(template)}>
                 编辑
@@ -98,5 +106,20 @@ export function TemplatesTable({ templates, canReorder, pending, onEdit, onToggl
         ))}
       </TableBody>
     </Table>
+  )
+}
+
+// Off and disabled while the template is unpublished or partner-only, or the list is full.
+function FeaturedSwitch({ template, full, pending, onFeature }: { template: AdminTemplate; full: boolean; pending: boolean; onFeature: Props['onFeature'] }) {
+  const on = template.featuredRank !== null
+  const blocked = !on && (!canFeature(template) || full)
+  return (
+    <Switch
+      checked={on}
+      disabled={pending || blocked}
+      title={blocked ? (canFeature(template) ? '最多 12 个' : '只有已上架、站内可见的模板能上首页') : undefined}
+      aria-label={`${on ? '移出' : '加入'}首页精选 ${template.name}`}
+      onCheckedChange={(checked) => onFeature(template, checked)}
+    />
   )
 }

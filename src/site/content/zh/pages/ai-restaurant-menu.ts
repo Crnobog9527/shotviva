@@ -1,10 +1,9 @@
 import { defineContentPage, type CostBills } from '@/core/content'
 
 import { site } from '../../../site.config'
-import { pairImage, pickCategories, SIZE_COUNT } from '../../landing-shared'
+import { CATEGORY, pairImage, SIZE_COUNT } from '../../landing-shared'
 import { foodHalfDayUsd, MENU_DISHES, menuCostUsd, menuCredits, photoSeconds, photosLeftAfterMenu, planFrom, usd, usdRange } from '../../offer'
 import { PLATFORM_SPECS, px } from '../../platform-specs'
-import { zhTemplateCategories } from '../featured-templates'
 import { ZH_TIERS, zhFreeImages, zhFromCredits, zhTierList } from '../offer'
 
 // /zh/ai-restaurant-menu (T44, ARCHITECTURE §17): noindex (中文口径主词表: 「暂不建」, keyword
@@ -53,8 +52,8 @@ export const zhAiRestaurantMenu = defineContentPage({
   subtitle: '你店里本来就在卖的菜，在出菜口用手机拍一张，就能做成菜单、外卖和促销图。',
   answerBlock: `AI菜单配图是从你已经拍好的菜品照片出发，做成菜单图、外卖平台图或促销图，盘里的菜保持原样。在 ${brand} 上传一张手机照片，选「外卖菜单」「暗调氛围」或「促销海报」模板，就能下载${zhTierList}的成图。新用户送 ${zhFreeImages}。`,
   hero: {
-    before: pairImage('delivery-photo-before', '手机随手拍：后厨出菜口上的一盘菜，顶灯偏硬（示意图）'),
-    after: pairImage('delivery-photo-after', '同一盘菜做成明亮的外卖平台图，柔和日光，外卖菜单模板（示意图）'),
+    before: pairImage('example-dish-before', '手机随手拍：后厨出菜口上的一盘菜，顶灯偏硬（示意图）'),
+    after: pairImage('example-dish-after', '同一盘菜做成明亮的外卖平台图，柔和日光，外卖菜单模板（示意图）'),
     caption: '你的手机照片 → 外卖菜单模板：还是这盘菜，光线更亮 · 示意图',
     cta: { label: '上传照片', href: '/generate' },
   },
@@ -106,12 +105,11 @@ export const zhAiRestaurantMenu = defineContentPage({
     related: `${brand} 的其他页面`,
   },
   landing: {
-    generatorTemplate: 'delivery-photo',
     factsNote: '以上来自各外卖平台自己的商家帮助页面（DoorDash、Uber Eats、Grubhub），2026 年 11 月核对。平台规则会变，上传前请再确认。',
     templates: {
-      heading: '菜单配图模板：外卖菜单、暗调氛围、促销海报',
+      heading: '菜单配图模板：外卖平台、菜单和海报',
       intro: `每个模板都从你的菜品手机照片开始，到一张能上菜单的图结束，${zhFromCredits}。`,
-      categories: pickCategories(zhTemplateCategories, ['food']),
+      categoryKeys: [CATEGORY.food],
     },
   },
 })

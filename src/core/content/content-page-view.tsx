@@ -7,15 +7,16 @@ import { HomeHero } from './blocks/home-hero'
 import { FactCards } from './blocks/home-sections'
 import { RelatedLinks } from './blocks/related-links'
 import { ShootSection } from './blocks/shoot-section'
-import { TemplateGrid, type TemplateLookup } from './blocks/template-grid'
+import { TemplateGrid, type FeaturedSections } from './blocks/template-grid'
 import type { ContentPage } from './page-content'
 
 type Props = {
   page: ContentPage
   // Hides links into switched-off modules (ARCHITECTURE §2: not in nav).
   isLinkEnabled: (href: string) => boolean
-  // Each featured template's pair and whether it is live, and the card price ("from 2 credits").
-  templates: TemplateLookup
+  // The featured templates in this page's categories, with their covers (T53), and the card
+  // price ("from 2 credits").
+  templates: FeaturedSections
   price: string
   // The first-screen generator (modules/image), opening on the page's template.
   generator: ReactNode
@@ -33,7 +34,7 @@ export function ContentPageView({ page, isLinkEnabled, templates, price, generat
     <article className="mk-home mk-w">
       <HomeHero page={page} generator={generator} />
       {landing.shoot ? <ShootSection shoot={landing.shoot} /> : null}
-      {landing.templates ? <TemplateGrid grid={{ ...landing.templates, price }} media={templates} isLinkEnabled={isLinkEnabled} /> : null}
+      {landing.templates ? <TemplateGrid grid={{ ...landing.templates, price }} sections={templates} isLinkEnabled={isLinkEnabled} /> : null}
       <FactCards facts={page.facts} heading={headings.facts ?? t('facts')} note={landing.factsNote} />
       <CostBillsSection bills={page.costBills} />
       <FaqSection faq={page.faq} heading={headings.faq} isLinkEnabled={isLinkEnabled} variant="accordion" />

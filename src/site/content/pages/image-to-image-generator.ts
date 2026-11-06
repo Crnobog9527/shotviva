@@ -21,8 +21,8 @@ export const imageToImageGenerator = defineContentPage({
   subtitle: 'Start from your own photo, not a blank text box. The subject stays as shot.',
   answerBlock: `Image to image generator tools make a new picture from a photo you upload. The ${brand} generator works with templates: pick one for food, products, beauty, rooms, pets or an art style, and it sets the light, the scene or the style for you. The subject stays as shot, and new users get ${freeImagesLabel}.`,
   hero: {
-    before: pairImage('spa-podium-before', 'Phone photo of a skincare jar on a bathroom shelf, flat indoor light (illustrative example)'),
-    after: pairImage('spa-podium-after', 'The same skincare jar on a stone podium in soft spa light, Spa Podium template (illustrative example)'),
+    before: pairImage('example-skincare-before', 'Phone photo of a skincare jar on a bathroom shelf, flat indoor light (illustrative example)'),
+    after: pairImage('example-skincare-after', 'The same skincare jar on a stone podium in soft spa light, Spa Podium template (illustrative example)'),
     caption: 'Your phone photo → Spa Podium template: same jar, a new set and light · Illustrative example',
     cta: { label: 'Upload photo', href: '/generate' },
   },
@@ -76,7 +76,6 @@ export const imageToImageGenerator = defineContentPage({
     related: `More From ${brand}`,
   },
   landing: {
-    generatorTemplate: 'spa-podium',
     factsNote: `These are ${brand}'s own limits and sizes, the same on every page of this site.`,
   },
 })

@@ -29,6 +29,7 @@ const base: Template = {
   isActive: true,
   visibleIn: ['web'],
   translations: {},
+  featuredRank: null,
   createdAt: '2026-11-06T00:00:00Z',
   updatedAt: '2026-11-06T00:00:00Z',
 }
