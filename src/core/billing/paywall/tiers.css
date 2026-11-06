@@ -1,0 +1,227 @@
+/* Tier and credit-pack materials for the paywall and /pricing (DESIGN §4.5, comps-v3-b
+   tiers.css; T37). Starter matte graphite, Pro sapphire glass (recommended), Max black and
+   gold foil with a slowly turning rim, a faint glow and an idle sheen. Packs: the smallest in
+   graphite, the middle tinted sapphire, the largest tinted gold.
+
+   Markup: `.tier-shell` (glow, hover target; the label on the paywall) holds one `.tier-card`
+   with data-tier and data-selected. `.pack-card` has data-tone and data-selected.
+
+   Motion is decoration only and runs only without reduced motion: the gold rim turns (9s),
+   Max idles a low sheen (6s), Pro sweeps once when it first paints, and on hover-capable
+   pointers Pro and Max sweep again, and every card lifts 2px. */
+
+@property --tier-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes sv-tier-turn {
+  to { --tier-angle: 360deg; }
+}
+@keyframes sv-tier-sheen {
+  0% { transform: translateX(-80%) skewX(-12deg); opacity: 0; }
+  15%, 85% { opacity: 1; }
+  100% { transform: translateX(260%) skewX(-12deg); opacity: 0; }
+}
+/* The same sweep under a second name, so switching to it on hover restarts the animation. */
+@keyframes sv-tier-sheen-again {
+  0% { transform: translateX(-80%) skewX(-12deg); opacity: 0; }
+  15%, 85% { opacity: 1; }
+  100% { transform: translateX(260%) skewX(-12deg); opacity: 0; }
+}
+@keyframes sv-tier-sheen-idle {
+  0% { transform: translateX(-80%) skewX(-12deg); opacity: 0; }
+  8%, 42% { opacity: 1; }
+  50%, 100% { transform: translateX(260%) skewX(-12deg); opacity: 0; }
+}
+
+@keyframes sv-tier-fade {
+  from { opacity: 0; }
+}
+
+@layer components {
+  .tier-shell {
+    position: relative;
+    display: block;
+    isolation: isolate;
+    border-radius: var(--radius-panel);
+  }
+  /* Max's warm glow sits behind the card; kept inside 12px on phones so 375 never scrolls sideways. */
+  .tier-shell[data-tier="max"]::before {
+    content: "";
+    position: absolute;
+    z-index: -2;
+    inset: -12px;
+    border-radius: 30px;
+    pointer-events: none;
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--tier-max-gold) 13%, transparent), transparent);
+    filter: blur(22px);
+  }
+  @media (min-width: 768px) {
+    .tier-shell[data-tier="max"]::before { inset: -20px; }
+  }
+
+  .tier-card {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border-radius: var(--radius-panel);
+    transition: box-shadow 250ms var(--ease), transform 300ms var(--ease);
+  }
+  /* The sheen: one soft band of light, under the text. */
+  .tier-card::after {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    top: -40%;
+    bottom: -40%;
+    left: -30%;
+    width: 60%;
+    pointer-events: none;
+    opacity: 0;
+    background: linear-gradient(100deg, transparent 30%, var(--tier-sheen, transparent) 50%, transparent 70%);
+    transform: translateX(-80%) skewX(-12deg);
+  }
+
+  .tier-card[data-tier="starter"] {
+    background: var(--tier-graphite);
+    box-shadow: inset 0 0 0 1px var(--border);
+  }
+  .tier-card[data-tier="starter"][data-selected="true"] {
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--foreground) 70%, transparent);
+  }
+  .tier-card[data-tier="pro"] {
+    --tier-sheen: color-mix(in srgb, var(--tier-sapphire-ink) 14%, transparent);
+    background:
+      radial-gradient(120% 90% at 100% 0%, var(--tier-sapphire-light), transparent 60%),
+      linear-gradient(180deg, var(--tier-sapphire-top), var(--tier-sapphire-deep));
+    box-shadow: inset 0 0 0 1px var(--tier-sapphire-edge), inset 0 1px 0 var(--tier-sapphire-gloss);
+  }
+  .tier-card[data-tier="pro"][data-selected="true"] {
+    box-shadow: inset 0 0 0 1.5px var(--tier-sapphire-rim), inset 0 1px 0 var(--tier-sapphire-gloss);
+  }
+  .tier-card[data-tier="max"] {
+    --tier-sheen: color-mix(in srgb, var(--tier-max-gold) 5%, transparent);
+    background:
+      radial-gradient(120% 90% at 100% 0%, var(--tier-max-glow), transparent 60%),
+      linear-gradient(160deg, var(--tier-max-top), var(--tier-max-deep) 60%);
+  }
+  /* The gold rim: a conic gradient masked to a 1.5px ring (2px when chosen). */
+  .tier-card[data-tier="max"]::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: conic-gradient(from var(--tier-angle), #F7DF9A, #8A6420, #FFE9B0, #C8962E, #6E4E14, #F2CF7A, #F7DF9A);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+  .tier-card[data-tier="max"][data-selected="true"]::before { padding: 2px; }
+  /* The Max name in gold foil (#B8862E, the darkest stop, is about 5.6:1 on the black). */
+  .tier-card[data-tier="max"] .tier-name {
+    background: var(--chrome);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Accent ink per material: tier name, flag, saving plate, perk ticks, selected check. */
+  .tier-card[data-tier="starter"] { --tier-ink: var(--foreground); --tier-flag: var(--wash-strong); --tier-flag-ink: var(--foreground); --tier-plate: var(--wash); --tier-plate-ink: var(--bone-dim); --tier-tick: var(--muted-foreground); --tier-check: var(--foreground); --tier-check-ink: var(--background); --tier-ghost-ink: var(--foreground); }
+  .tier-card[data-tier="pro"] { --tier-ink: var(--tier-sapphire-ink); --tier-flag: var(--tier-sapphire-flag); --tier-flag-ink: var(--tier-sapphire-flag-ink); --tier-plate: var(--tier-sapphire-plate); --tier-plate-ink: var(--tier-sapphire-ink); --tier-tick: var(--tier-sapphire-rim); --tier-check: var(--tier-sapphire-rim); --tier-check-ink: var(--tier-sapphire-flag-ink); --tier-ghost-ink: var(--foreground); }
+  .tier-card[data-tier="max"] { --tier-ink: var(--tier-max-gold); --tier-flag: var(--chrome); --tier-flag-ink: var(--tier-max-ink); --tier-plate: var(--tier-max-plate); --tier-plate-ink: var(--tier-max-gold); --tier-tick: var(--tier-max-gold); --tier-check: var(--tier-max-gold); --tier-check-ink: var(--tier-max-ink); --tier-ghost-ink: var(--tier-max-gold); }
+  .tier-card[data-tier="max"] .tier-plate { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tier-max-gold) 26%, transparent); }
+
+  /* Credit packs. Phone: one row each (credits and flag left, price and per-credit right). From
+     768: three columns, the flag on a fixed 34px row so the numbers line up across the cards. */
+  .pack-card {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "cr usd" "flag each" "act act";
+    align-items: center;
+    column-gap: 12px;
+    height: 100%;
+    padding: 12px 14px;
+    border-radius: var(--radius-control);
+    overflow: hidden;
+    background: var(--tier-graphite);
+    box-shadow: inset 0 0 0 1px var(--border);
+    transition: box-shadow 180ms var(--ease), transform 300ms var(--ease);
+    --pack-ink: var(--foreground);
+    --pack-each: var(--muted-foreground);
+    --pack-ring: var(--foreground);
+  }
+  .pack-card .pack-cr { grid-area: cr; display: flex; align-items: baseline; color: var(--pack-ink); }
+  .pack-card .pack-flag { grid-area: flag; justify-self: start; margin-top: 8px; }
+  .pack-card .pack-usd { grid-area: usd; justify-self: end; }
+  .pack-card .pack-each { grid-area: each; justify-self: end; margin-top: 8px; white-space: nowrap; color: var(--pack-each); }
+  .pack-card .pack-act { grid-area: act; margin-top: 12px; }
+  .pack-card[data-selected="true"] { box-shadow: inset 0 0 0 1.5px var(--pack-ring); }
+  .pack-card[data-tone="sapphire"] {
+    --pack-ink: var(--tier-sapphire-ink);
+    --pack-each: var(--tier-sapphire-ink);
+    --pack-ring: var(--tier-sapphire-rim);
+    --tier-flag: var(--tier-sapphire-flag);
+    --tier-flag-ink: var(--tier-sapphire-flag-ink);
+    background:
+      radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--tier-sapphire-flag) 22%, transparent), transparent 60%),
+      linear-gradient(180deg, color-mix(in srgb, var(--tier-sapphire-top) 55%, var(--tier-graphite)), var(--tier-graphite));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tier-sapphire-rim) 34%, transparent);
+  }
+  .pack-card[data-tone="gold"] {
+    --pack-ink: var(--tier-max-gold);
+    --pack-each: var(--tier-max-gold);
+    --pack-ring: var(--tier-max-gold);
+    --tier-flag: var(--chrome);
+    --tier-flag-ink: var(--tier-max-ink);
+    background:
+      radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--tier-max-gold) 16%, transparent), transparent 60%),
+      linear-gradient(160deg, color-mix(in srgb, var(--tier-max-top) 70%, var(--tier-graphite)), var(--tier-max-deep));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tier-max-gold) 34%, transparent);
+  }
+  .pack-card[data-tone][data-selected="true"] { box-shadow: inset 0 0 0 1.5px var(--pack-ring); }
+  @media (min-width: 768px) {
+    .pack-card {
+      grid-template-columns: 1fr;
+      grid-template-rows: 34px auto auto auto auto;
+      grid-template-areas: "flag" "cr" "usd" "each" "act";
+      align-content: start;
+      align-items: start;
+      padding: 16px;
+    }
+    .pack-card .pack-flag { margin-top: 0; }
+    .pack-card .pack-usd { justify-self: start; margin-top: 12px; }
+    .pack-card .pack-each { justify-self: start; margin-top: 6px; }
+    .pack-card .pack-act { margin-top: 16px; }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    /* The prices and credits fade in when the Monthly / Yearly toggle swaps them (the block is
+       keyed on the period). */
+    .tier-swap { animation: sv-tier-fade 200ms var(--ease); }
+    .tier-card[data-tier="max"]::before { animation: sv-tier-turn 9s linear infinite; }
+    .tier-card[data-tier="max"]::after { animation: sv-tier-sheen-idle 6s var(--ease) infinite; }
+    .tier-card[data-tier="pro"]::after { animation: sv-tier-sheen 1.6s var(--ease) 420ms 1; }
+  }
+  /* Pointer feedback (hover-capable devices only): a 2px lift, a brighter rim, one more sweep. */
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .tier-shell:hover .tier-card,
+    .pack-shell:hover .pack-card { transform: translateY(-2px); }
+    .tier-shell:hover .tier-card[data-tier="pro"]::after { animation: sv-tier-sheen-again 1.6s var(--ease) 1; }
+    .tier-shell:hover .tier-card[data-tier="max"]::after {
+      --tier-sheen: color-mix(in srgb, var(--tier-max-gold) 12%, transparent);
+      animation: sv-tier-sheen-again 1.6s var(--ease) 1;
+    }
+  }
+  @media (hover: hover) {
+    .tier-shell:hover .tier-card[data-tier="starter"]:not([data-selected="true"]),
+    .pack-shell:hover .pack-card:not([data-tone]):not([data-selected="true"]) { box-shadow: inset 0 0 0 1px var(--input); }
+    .tier-shell:hover .tier-card[data-tier="pro"]:not([data-selected="true"]) {
+      box-shadow: inset 0 0 0 1px var(--tier-sapphire-rim), inset 0 1px 0 var(--tier-sapphire-gloss);
+    }
+    .pack-shell:hover .pack-card[data-tone]:not([data-selected="true"]) { box-shadow: inset 0 0 0 1px var(--pack-ring); }
+  }
+}

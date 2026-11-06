@@ -15,7 +15,7 @@ export function findContentPage(slug: string): ContentPage | undefined {
 }
 
 export { homePage }
-export { pricingFaq, pricingPage, pricingPayment, type PricingTable } from './pricing'
+export { BUSINESS_MAIL_SUBJECT, pricingFaq, pricingPage } from './pricing'
 export { freeImagesLabel, freeStandardImages } from './offer'
 export { homeTemplates } from './home-templates'
 
@@ -31,7 +31,7 @@ export {
   findContentPageIn,
   footerLinksIn,
   homePageIn,
-  pricingCopyIn,
+  pricingFaqIn,
   pricingPageIn,
 } from './localized'
 export type { PricingContent } from './pricing'

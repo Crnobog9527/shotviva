@@ -6,28 +6,33 @@ import { buttonVariants } from "../../ui/button"
 import { cn } from "../../ui/cn"
 import type { CheckoutStatus } from "./use-checkout"
 
-type Props = { label: string; fine: string; gold?: boolean; status: CheckoutStatus; onClick(): void }
+// The button follows the pick (comps-v3-b paywall.html): safelight for Pro, gold foil for Max,
+// bone for Starter and the packs.
+export type CheckoutTone = "primary" | "gold" | "bone"
 
-// Sticky bottom of the sheet: the one primary (bone; gold foil for Max) and its fine print.
-export function CheckoutBar({ label, fine, gold = false, status, onClick }: Props) {
+type Props = { label: string; fine: string; tone: CheckoutTone; status: CheckoutStatus; onClick(): void }
+
+// The sheet's footer, outside its scroll area so it never moves: the one primary and its fine
+// print. Stacked on phones; from md the fine print sits left and the button right.
+export function CheckoutBar({ label, fine, tone, status, onClick }: Props) {
   const t = useTranslations("paywall")
   const pending = status === "pending"
   return (
-    <div className="sticky bottom-0 -mx-4 mt-5 bg-[linear-gradient(transparent,var(--popover)_30%)] px-4 pt-3 pb-1">
+    <div className="flex-none bg-popover px-4 pt-3 pb-[calc(var(--sab)+8px)] shadow-[inset_0_1px_0_var(--border)] md:grid md:grid-cols-[1fr_auto] md:items-center md:gap-x-6 md:rounded-b-panel md:px-7 md:pb-4">
       <button
         type="button"
         onClick={onClick}
         disabled={pending}
         aria-busy={pending}
         className={buttonVariants({
-          variant: "cta-neutral",
+          variant: tone === "primary" ? "cta" : "cta-neutral",
           size: "cta",
-          className: cn(gold && "bg-[image:var(--chrome)] text-[var(--tier-max-ink)]"),
+          className: cn("md:col-start-2 md:row-start-1 md:w-auto md:min-w-80", tone === "gold" && "bg-[image:var(--chrome)] text-[var(--tier-max-ink)]"),
         })}
       >
         {pending ? t("redirecting") : label}
       </button>
-      <p className="mt-2 text-center text-caption leading-[1.4] text-muted-foreground" aria-live="polite">
+      <p className="mt-2 text-center text-caption leading-[1.4] text-muted-foreground md:col-start-1 md:row-start-1 md:mt-0 md:text-left" aria-live="polite">
         {status === "error" ? <span className="text-destructive">{t("error")}</span> : fine}
       </p>
     </div>

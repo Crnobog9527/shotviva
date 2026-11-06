@@ -36,8 +36,8 @@ function strings(value: unknown): string[] {
 }
 
 // Latin words allowed on a Chinese page (建站规格 §6.1 rule 3): the brand, AI, payment, phone,
-// browser and file-format names, units. Image paths and alt text of the shared placeholders are skipped.
-const LATIN_OK = new Set(['Shotviva', 'AI', 'Apple', 'Pay', 'Google', 'iPhone', 'Safari', 'Chrome', 'JPG', 'PNG', 'WebP', 'MB', 'px', 'shotviva'])
+// browser and file-format names, units, and API (the For business plate, T37). Image paths and alt text of the shared placeholders are skipped.
+const LATIN_OK = new Set(['Shotviva', 'AI', 'Apple', 'Pay', 'Google', 'iPhone', 'Safari', 'Chrome', 'JPG', 'PNG', 'WebP', 'MB', 'px', 'shotviva', 'API'])
 const PAGES = { '/zh': zhHomePage, '/zh/image-to-image-generator': zhImageToImageGenerator, '/zh/pricing': zhPricingPage }
 
 describe('/zh marketing copy (建站规格 §6.1, G13)', () => {

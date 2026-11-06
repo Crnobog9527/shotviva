@@ -16,16 +16,19 @@ describe('copy with the catalog in site.config', () => {
     expect(yearlySaving).toBe(40)
   })
 
-  it('fills the /pricing tables and title from config', () => {
+  it('fills the /pricing title, lede and credit costs from config', () => {
     expect(pricingPage.title).toBe('Shotviva Pricing: Plans From $19.90 a Month')
-    expect(pricingPage.tables.plans.rows).toEqual([
-      ['Starter', '$19.90', '50', '$191', '600', '$0.32'],
-      ['Pro', '$49.90', '135', '$479', '1,620', '$0.30'],
-      ['Max', '$99', '280', '$713', '3,360', '$0.21'],
-    ])
-    expect(pricingPage.tables.packs.rows[0]).toEqual(['Small pack', '$9.90', '20', '$0.50'])
-    expect(perCredit('starter_monthly')).toBe('$0.40')
+    expect(pricingPage.intro).toContain('A photo costs from 2 credits')
     expect(pricingPage.intro).toContain('Yearly plans save up to 40%.')
+    expect(pricingPage.intro).toContain('Credit packs start at $9.90.')
+    expect(pricingPage.gift).toBe('New users get 3 free Standard images. No card needed.')
+    expect(pricingPage.creditBuys.tiers).toEqual([
+      { name: 'Standard', credits: 2 },
+      { name: 'HD', credits: 4 },
+      { name: 'Max', credits: 6 },
+    ])
+    expect(pricingPage.creditBuys.note).toContain('1024, 2048 or 2880 px')
+    expect(perCredit('starter_monthly')).toBe('$0.40')
   })
 
   it('fills both home bills from config: the photographer rates and the Starter plan (DESIGN §6.9 item 6)', () => {

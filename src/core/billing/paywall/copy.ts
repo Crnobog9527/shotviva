@@ -33,6 +33,9 @@ export function planFinePrint(
     : { key: "finePlanWallet", values: { period: input.period } }
 }
 
-export function periodIntro(channel: PaymentChannel): PaywallMessage {
-  return { key: channel === "waffo" ? "periodIntroOnce" : "periodIntro" }
+// /pricing's "Pay with" rows cover plans and packs at once (comps-v3-b pricing.html). On Waffo
+// nothing renews, so neither row may say so.
+export function pricingMethodNote(channel: PaymentChannel, method: CheckoutMethod): PaywallMessage {
+  if (channel === "waffo") return { key: "payNoteOnce" }
+  return { key: method === "card" ? "payNoteCard" : "payNoteWallet" }
 }

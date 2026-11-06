@@ -4,13 +4,13 @@ import { useTranslations } from "next-intl"
 
 import type { SiteProduct } from "../../config"
 import { ResponsiveSheet } from "../../ui/responsive-sheet"
-import { usePaymentChannel } from "./channel-context"
-import { periodIntro } from "./copy"
-import { packOffers, tierOffers } from "./offer"
+import { BillingToggle } from "./billing-toggle"
+import { packOffers, tierOffers, yearlySavingPct } from "./offer"
+import { PayMethods } from "./pay-methods"
+import { PaywallCheckout } from "./paywall-checkout"
 import type { PaywallTrigger } from "./paywall-context"
-import { PackStep } from "./pack-step"
-import { PeriodStep } from "./period-step"
-import { TierStep } from "./tier-step"
+import { PackPicker, TierPicker } from "./paywall-pickers"
+import { resolvePick } from "./pick"
 import type { PaywallState } from "./use-paywall-state"
 
 type Props = {
@@ -22,31 +22,36 @@ type Props = {
   state: PaywallState
 }
 
-// The paywall (DESIGN §4.5): a bottom drawer on phones, a centred dialog from md up
-// (ResponsiveSheet). Step one picks a tier or the packs; step two picks the period or the pack
-// and the payment method, then goes to the hosted checkout (Stripe or Waffo).
+// The paywall (comps-v3-b paywall.html, signed off 2026-11-06): one screen, a full-height
+// bottom drawer on phones and a centred 920px dialog from md (ResponsiveSheet `wide`). Monthly /
+// Yearly beside the title; the three tiers; the three packs; the payment method; and the
+// checkout bar fixed at the bottom, which goes to the hosted checkout (Stripe or Waffo).
 export function PaywallSheet({ open, onOpenChange, trigger, products, wishlistLive, state }: Props) {
   const t = useTranslations("paywall")
-  const channel = usePaymentChannel()
   const offers = tierOffers(products)
   const packs = packOffers(products)
-  const { choice } = state
-  const offer = offers.find((o) => o.tier === choice.tier) ?? offers[0]
-  const heading =
-    choice.step === "period" && offer
-      ? { title: t("periodTitle", { tier: t(`tiers.${offer.tier}`) }), description: t(periodIntro(channel).key) }
-      : choice.step === "packs"
-        ? { title: t("packsTitle"), description: t("packsIntro") }
-        : { title: t("title"), description: t(trigger === "insufficient_credits" ? "introNeedsCredits" : "intro") }
+  const { choice, update } = state
+  const resolved = resolvePick(choice.pick, choice.period, offers, packs)
   return (
-    <ResponsiveSheet open={open} onOpenChange={onOpenChange} title={heading.title} description={heading.description}>
-      {choice.step === "tiers" || !offer ? (
-        <TierStep offers={offers} packFrom={packs[0]} wishlistLive={wishlistLive} state={state} />
-      ) : choice.step === "period" ? (
-        <PeriodStep offer={offer} offers={offers} state={state} />
-      ) : (
-        <PackStep packs={packs} state={state} />
-      )}
+    <ResponsiveSheet
+      wide
+      open={open}
+      onOpenChange={onOpenChange}
+      title={t("title")}
+      description={t(trigger === "insufficient_credits" ? "introNeedsCredits" : "intro")}
+      aside={
+        <BillingToggle
+          period={choice.period}
+          onChange={(period) => update({ period })}
+          savePct={yearlySavingPct(offers)}
+          className="mt-4 md:mt-1 md:w-[400px] md:flex-none"
+        />
+      }
+      footer={resolved ? <PaywallCheckout resolved={resolved} choice={choice} /> : null}
+    >
+      <TierPicker offers={offers} wishlistLive={wishlistLive} state={state} />
+      <PackPicker packs={packs} state={state} />
+      <PayMethods method={choice.method} onChange={(method) => update({ method })} kind={resolved?.kind ?? "plan"} period={choice.period} />
     </ResponsiveSheet>
   )
 }
