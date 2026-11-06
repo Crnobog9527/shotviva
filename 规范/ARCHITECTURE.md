@@ -65,11 +65,11 @@ export const site = defineSite({
     freeCredits: 6,                               // 进 profiles.free_credits，只能生成免费作品（第 6.1 节）；= 3 张 Standard 档标准模板图，对外说 "3 free Standard images"（Owner 2026-11-05）
     products: [                                   // 9 个商品，价格 Owner 2026-11-05 定稿（第 6.2 节）
       { id: 'starter_monthly', tier: 'starter', interval: 'month', credits: 50,   paidDays: 30,   priceUsd: 19.9 },
-      { id: 'starter_yearly',  tier: 'starter', interval: 'year',  credits: 600,  paidDays: 365,  priceUsd: 139 },
+      { id: 'starter_yearly',  tier: 'starter', interval: 'year',  credits: 600,  paidDays: 365,  priceUsd: 191 },
       { id: 'pro_monthly',     tier: 'pro',     interval: 'month', credits: 135,  paidDays: 30,   priceUsd: 49.9 },
-      { id: 'pro_yearly',      tier: 'pro',     interval: 'year',  credits: 1620, paidDays: 365,  priceUsd: 349 },
+      { id: 'pro_yearly',      tier: 'pro',     interval: 'year',  credits: 1620, paidDays: 365,  priceUsd: 479 },
       { id: 'max_monthly',     tier: 'max',     interval: 'month', credits: 280,  paidDays: 30,   priceUsd: 99 },
-      { id: 'max_yearly',      tier: 'max',     interval: 'year',  credits: 3360, paidDays: 365,  priceUsd: 699 },
+      { id: 'max_yearly',      tier: 'max',     interval: 'year',  credits: 3360, paidDays: 365,  priceUsd: 713 },
       { id: 'pack_s', tier: 'pack', interval: null, credits: 20,  paidDays: null, priceUsd: 9.9 },   // 积分包：不改会员期，所有人可买
       { id: 'pack_m', tier: 'pack', interval: null, credits: 55,  paidDays: null, priceUsd: 24.9 },
       { id: 'pack_l', tier: 'pack', interval: null, credits: 115, paidDays: null, priceUsd: 49.9 },
@@ -250,7 +250,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 订阅续费走 T10 新增的 `apply_subscription_renewal(user, product_id, invoice_id, period_end)`：`credits += 商品积分`，`paid_until = greatest(paid_until, period_end)`（直接对齐 Stripe 的本期结束日，不按天数累加，避免大小月漂移）；同样写流水、按 invoice id 幂等，内部复用 `_apply_credit_change`（总控 2026-11-05 补）。
 - 没用完的积分在续费时自然结转（积分不过期），不做「本期 / 结转」两本账。
 - **计价单位是 credit，不是「张」。**（唯一例外：新用户赠送对外说 "3 free Standard images"，即 6 个免费 credit，见建站规格 G3。） 一次出图扣多少 = 模板在用户所选分辨率的配置值 `templates.credits_cost[resolution]`（第 5 节：`high` 模板默认 1K 2 / 2K 4 / 3K 6，`medium` 1 / 2 / 3），后台模板编辑页可改；会员每月发多少 credit、积分包多少 credit 写在 `site.config.ts`。前台后台都叫 credits，余额显示为 "30 credits + 3 free"。「重新生成」按同一模板、同一分辨率再扣一次。
-- **配置下限（Owner 2026-11-05 定的毛利口径）**：每个质量档 × 分辨率的 credit 数 ≥ `ceil(该档 p95 单次真实成本 ÷ $0.06)`，后台可以往上加价，不能低于下限。下限表是 `modules/image` 里的常量，后台保存模板时在服务端校验，低于下限拒绝保存。$0.06 的来历：最便宜的 credit 是 Max 年付 $0.208，扣最坏手续费（国际卡 + Managed Payments：2.9% + 3.5% + 1.5% + $0.30）和 3% 退款预留后，守 **60% 毛利**（不含注册赠送的 3 个免费 credit，按最坏情况：credits 全部用完）每 credit 的成本上限约 $0.060。成本依据：OpenAI 官方价（图像输入 $8/M、输出 $30/M token），high 质量正方形单张输出 1K $0.053、2K $0.107、3K $0.178，加输入图约 $0.012～$0.021、提示词约 $0.005、失败退回损耗 10%、R2 + Vercel 约 $0.002；输入图 token 上线前按 LAUNCH §5 实测后更新下限表（定稿全文见共享笔记 `pricing-final-2026-11-05.md`）。
+- **配置下限（Owner 2026-11-05 定的毛利口径）**：每个质量档 × 分辨率的 credit 数 ≥ `ceil(该档 p95 单次真实成本 ÷ $0.06)`，后台可以往上加价，不能低于下限。下限表是 `modules/image` 里的常量，后台保存模板时在服务端校验，低于下限拒绝保存。$0.06 的来历：最便宜的 credit 是 Max 年付（定下限时 $0.208；2026-11-06 改价后 $0.212，下限按 $0.208 算更保守，不变），扣最坏手续费（国际卡 + Managed Payments：2.9% + 3.5% + 1.5% + $0.30）和 3% 退款预留后，守 **60% 毛利**（不含注册赠送的 3 个免费 credit，按最坏情况：credits 全部用完）每 credit 的成本上限约 $0.060。成本依据：OpenAI 官方价（图像输入 $8/M、输出 $30/M token），high 质量正方形单张输出 1K $0.053、2K $0.107、3K $0.178，加输入图约 $0.012～$0.021、提示词约 $0.005、失败退回损耗 10%、R2 + Vercel 约 $0.002；输入图 token 上线前按 LAUNCH §5 实测后更新下限表（定稿全文见共享笔记 `pricing-final-2026-11-05.md`）。
 - 余额只能通过 SQL 函数改：发放（`grant_credits` 带 `pool` 参数，注册赠送和活动赠送用 `'free'`）、预扣、确认、退回、管理员调整（`admin_adjust_credits` 带 `pool` 参数）。前端和普通接口都不能直接写余额。
 - 每一笔变动都写进流水表，记录动的是哪个池，带幂等键。
 
@@ -261,16 +261,16 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 | id | 档位 | 价格 | 付费积分 | 每 credit | 会员期 `paid_until` | 卡 / Apple Pay / Google Pay | 支付宝 |
 |---|---|---|---|---|---|---|---|
 | `starter_monthly` | Starter | $19.90 / 月 | 50 / 月 | $0.398 | +30 天 | Stripe **订阅**，每期 +50 | Stripe **单笔**一期会员 |
-| `starter_yearly` | Starter | $139 / 年（合 $11.58/月） | 600，一次发完 | $0.232 | +365 天 | Stripe **订阅**，每年 +600 | Stripe **单笔** |
+| `starter_yearly` | Starter | $191 / 年（合 $15.92/月） | 600，一次发完 | $0.318 | +365 天 | Stripe **订阅**，每年 +600 | Stripe **单笔** |
 | `pro_monthly` | Pro | $49.90 / 月 | 135 / 月 | $0.370 | +30 天 | 订阅 | 单笔 |
-| `pro_yearly` | Pro | $349 / 年（合 $29.08/月） | 1,620，一次发完 | $0.215 | +365 天 | 订阅 | 单笔 |
+| `pro_yearly` | Pro | $479 / 年（合 $39.92/月） | 1,620，一次发完 | $0.296 | +365 天 | 订阅 | 单笔 |
 | `max_monthly` | Max | $99 / 月 | 280 / 月 | $0.354 | +30 天 | 订阅 | 单笔 |
-| `max_yearly` | Max | $699 / 年（合 $58.25/月） | 3,360，一次发完 | $0.208 | +365 天 | 订阅 | 单笔 |
+| `max_yearly` | Max | $713 / 年（合 $59.42/月） | 3,360，一次发完 | $0.212 | +365 天 | 订阅 | 单笔 |
 | `pack_s` | 积分包 | $9.90 | 20 | $0.495 | 不变 | Stripe Managed Payments **单笔** | Stripe **单笔** |
 | `pack_m` | 积分包 | $24.90 | 55 | $0.453 | 不变 | 单笔 | 单笔 |
 | `pack_l` | 积分包 | $49.90 | 115 | $0.434 | 不变 | 单笔 | 单笔 |
 
-- 年付积分 = 12 × 月付积分，一次发完；年付折扣约 41%～42%。积分包每 credit 都高于所有订阅，**所有人可买，包括没买会员的**，所有通道都是单笔，不改 `paid_until`。注册赠送仍是 3 个免费 credit（`billing.freeCredits`），不计入毛利。
+- 年付积分 = 12 × 月付积分，一次发完。**年付折扣（Owner 2026-11-06 改价）**：Starter、Pro 按月价 × 12 打 8 折，Max 打 6 折，金额取整到美元：$191（省 20%）、$479（省 20%）、$713（省 40%）。年付最多省 40%，不得超过。改价在 Stripe 上是新建 Price 并用 `transfer_lookup_key` 接过 lookup key（Price 金额不可改），旧 Price 归档；Waffo 商品价格同步改。积分包每 credit 都高于所有订阅，**所有人可买，包括没买会员的**，所有通道都是单笔，不改 `paid_until`。注册赠送仍是 3 个免费 credit（`billing.freeCredits`），不计入毛利。
 - 积分包不改会员期，但它发的是付费积分，用它生成的作品就是付费作品（无水印、私密、可商用），所以非会员买包也拿到完整权益——这正是「按作品判付费」要解决的事。
 - 价格数字只写在 `site.config.ts`（第 2 节），付费墙、`/pricing`、FAQ、结构化数据都从配置读；建站规格 G3 同步。送 Stripe 时用整数分（`1990`）。
 - **Stripe Product / Price 映射**：Starter、Pro、Max 各一个 Product（税码 `txcd_10105001`），每个 Product 挂 4 个 Price：月付 recurring、月付 one-time、年付 recurring、年付 one-time（同 id 的 recurring 和 one-time 价格相同）；三个积分包各一个 Product，只有 one-time Price。Price 的 `lookup_key` 固定为 `<product_id>`（one-time）和 `<product_id>_recurring`（订阅），服务端按 lookup key 取 Price，不把 Price id 写进代码或配置；每个 Price 的 `metadata.product_id` 也写上，回调反查用。
@@ -301,12 +301,33 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 |---|---|---|---|---|
 | 无水印、可商用、默认私密、全部模板（付费积分生成的作品） | ✓ | ✓ | ✓ | **上线**（已有，§6.1） |
 | 同时进行的生成数 | 1 | 3 | 6 | **上线**：按 `current_tier` 设并发上限（替换现有固定的 `MAX_RUNNING`），没有档位的账号为 1；界面允许生成在后台进行、在 Photos 页看进度 |
-| 邮件客服响应时间 | 48 小时 | 24 小时优先 | 同一个工作日 | **上线**：这是 Owner 对客服时效的承诺，不需要代码；Owner 需能兑现 |
+| 客服响应时间（站内工单和邮件） | 48 小时 | 48 小时 | 24 小时 | **上线**：Owner 本人回复兑现（Owner 2026-11-06 定：Starter、Pro 48 小时，Max 24 小时）。后台工单列表按「到期时间」排序、标超时，概览「待处理」计超时工单（T27b） |
 | 需求墙投票权重 | 1× | 1× | 3× | 随 T12 上线；T12 合并前在付费墙标 Coming soon |
-| 批量上传（Pro 10 张、Max 30 张） | — | 10 | 30 | **Coming soon** |
-| 品牌套件（存 logo 和字体，海报自动套用） | — | ✓ | ✓ | **Coming soon** |
-| 新功能和新模板抢先用 | — | — | ✓ | **Coming soon** |
+| 批量上传（Pro 10 张、Max 30 张） | — | 10 | 30 | **Coming soon**，T28 做完后上线，Pro 和 Max 同时开（Owner 2026-11-06） |
+| 新功能抢先用 | — | — | ✓ | **Coming soon**：权限接口和后台先做好（T29），有新功能要「只给 Max」时再在后台打开；「新模板抢先」删掉（Owner 2026-11-06） |
+| 品牌套件（存 logo 和字体，海报自动套用） | — | ✓ | ✓ | **Coming soon**，做法未定，Owner 想清楚前不开发、不删（Owner 2026-11-06） |
 | 生成排队优先 | — | 快速队列 | 最优先 | **不写进付费墙**：v1 是同步出图，没有排队，写了就是虚假承诺；以后改成异步队列时再加 |
+
+**档位限制只有一张表**（Owner 2026-11-06 定，T28 落地）：所有按档位变的数字放在 `core/billing/tier-limits.ts` 的 `TIER_LIMITS` 里，付费墙文案和服务端校验都从这里读，保证页面写的就是代码限的。没有档位按 Starter。
+
+| 字段 | Starter | Pro | Max | 说明 |
+|---|---|---|---|---|
+| `concurrency` | 1 | 3 | 6 | 同时进行的生成数（已上线） |
+| `perWindow` | 20 | 40 | 80 | 10 分钟窗口内最多发起的生成数，替换现在固定的 20；否则 Max 批量 30 张第 21 张会被拦 |
+| `batchMax` | 1 | 10 | 30 | 一次最多选几张照片批量生成 |
+| `supportHours` | 48 | 48 | 24 | 工单时效（小时） |
+
+- 需求墙 3 倍票的权重写在 SQL（`toggle_template_request_vote`），不读这张表，由 db 测试保证一致。
+- 档位不够时服务端抛 `TIER_REQUIRED`（`core/errors.ts`，403，带 `required_tier`），前端打开付费墙并预选所需档位；`paywall_view` 的 `trigger` 记 `tier_required`（§16.2）。
+
+**批量上传的语义**（Owner 2026-11-06）：同一模板、同一尺寸和清晰度、同一补充说明，一次选 N 张照片，出 N 张图。每张是一个独立任务：独立扣费、独立成败、失败独立退回。整批只用付费积分，付费池不够就不让批量（不拿免费积分凑，免得一批里混着带水印的）。浏览器按并发上限排队发 `/api/generate`；服务端没有「批量」对象，靠 `perWindow`、并发上限和余额兜底，不新建表、不加 `batch_id`。第一版不做「全部打包下载」。伙伴接口不做批量。
+
+**新功能抢先用**（Owner 2026-11-06，T29）：
+- 代码里有一张功能注册表 `FEATURES`（`core/features/registry.ts`，每项一个 key 和中文名）。新功能要受档位限制时，先在注册表加 key，再在服务端入口调 `requireFeature(userId, key)`，界面用 `featureOpen(tier, key)` 决定显示还是上锁。
+- 谁能用由表 `feature_access` 决定：`key text primary key`（必须是注册表里的 key）、`min_tier text null`（`pro` / `max`，null 表示所有人可用）、`open_to_all_at timestamptz null`（到这个时间后所有人可用，可空）、`updated_at`、`updated_by`。没有行就是所有人可用。RLS 打开不建策略，只经 `service_role` 读写；读取按 `features` 缓存标签缓存，后台保存时失效。
+- 判定 `featureOpen`：没有行、或 `min_tier` 为空、或已过 `open_to_all_at`、或用户档位 ≥ `min_tier` 就开放；档位顺序 starter < pro < max，没有档位按 Starter。
+- 后台「功能权限」页（`/admin/features`）：列出注册表里所有功能，每项可选「所有人 / Pro 起 / 仅 Max」和「哪天起对所有人开放」，保存写 `feature_access`。注册表为空时显示「暂时没有可设置的功能」。
+- 这张表是 §15.6「不做后台开关」的例外，只管档位门槛，不管功能开不开（功能开关仍在 `site.config` 的 `features`）。
 
 ### 6.3 通道
 
@@ -314,8 +335,10 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 
 | 用户选的方式 | Checkout Session 怎么建 | 卖家 |
 |---|---|---|
-| 卡 / Apple Pay / Google Pay | `mode: 'subscription'`，`managed_payments: { enabled: true }`，不传 `payment_method_types`（MP 不允许） | Stripe（Link）当商户记录方，结账时另加税 |
-| 支付宝 | `mode: 'payment'`，`payment_method_types: ['alipay']` | Shotviva |
+| 卡 / Apple Pay / Google Pay | `mode: 'subscription'`，`managed_payments: { enabled: true }`，不传 `allowed_payment_method_types`（MP 自己决定付款方式） | Stripe（Link）当商户记录方，结账时另加税 |
+| 支付宝 | `mode: 'payment'`，`allowed_payment_method_types: ['alipay']`（在 Dashboard 已开启的动态付款方式里过滤；Dashboard 没开支付宝时拒绝跳转） | Shotviva |
+
+> Stripe API 2026-09-30（stripe@23）起，Checkout Session 不再接受 `payment_method_types`，传了会 400；按方式限定一律用 `allowed_payment_method_types`。审核下来之前不走 MP 的卡路由传 `['card']`。（T9 修复，2026-11-06）
 
 - 服务端只认用户选的方式，不按 IP 或浏览器语言强制。Managed Payments 的结账页不允许买家国家为中国，所以大陆用户自然选钱包。
 - MP 商品必须设税码 `txcd_10105001`（AI 服务，个人用）。MP 价格不含税，税在结账时另加。
@@ -696,8 +719,8 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 |---|---|---|
 | `signup` | 服务端：邮箱验证完成 / 首次 Google 登录时（和注册赠送同一处） | `method`（`email` / `google`） |
 | `upload` | 浏览器：直传 R2 成功后 | `size_bucket`（`<1MB` / `1-5MB` / `>5MB`）、`compressed`（是否走了浏览器压缩） |
-| `generate` | 服务端：任务结算后（成功或失败都发） | `template_id`、`category`、`resolution`、`credits_cost`、`credit_pool`、`status`、`error_code`、`source`（`web` / `graylum`）、`duration_ms`、`model`（实际调用的模型名，不含密钥和地址） |
-| `paywall_view` | 浏览器：付费墙打开 | `trigger`（`insufficient_credits` / `pricing_page` / `account` / `graylum`） |
+| `generate` | 服务端：任务结算后（成功或失败都发） | `template_id`、`category`、`resolution`、`credits_cost`、`credit_pool`、`status`、`error_code`、`source`（`web` / `graylum`）、`duration_ms`、`model`（实际调用的模型名，不含密钥和地址）、`batch_size`（单张为 1，T28 起） |
+| `paywall_view` | 浏览器：付费墙打开 | `trigger`（`insufficient_credits` / `pricing_page` / `account` / `graylum` / `tier_required`） |
 | `checkout_start` | 服务端：创建 Checkout Session 时 | `product_id`、`tier`、`interval`、`form`、`channel`、`method` |
 | `purchase` | 服务端：支付回调入账成功后 | 第 6.2 节 `purchase` 参数 |
 | `$pageview` | 浏览器：自动 | — |

@@ -42,9 +42,13 @@ export type CheckoutRoute = {
   mode: 'subscription' | 'payment'
   form: CheckoutForm
   lookupKey: string
-  // Managed Payments decides the methods itself and rejects payment_method_types.
+  // Managed Payments decides the methods itself; nothing else is sent with it.
   managedPayments: boolean
-  paymentMethodTypes: ['card'] | ['alipay'] | null
+  // Otherwise the one method this route sells through, sent as allowed_payment_method_types:
+  // since API 2026-09-30.endive (stripe@23) Checkout no longer takes payment_method_types and
+  // filters the account's dynamic payment methods instead. The method must be on in the
+  // Dashboard (Settings → Payment methods), or Stripe silently drops it.
+  allowedMethods: ['card'] | ['alipay'] | null
 }
 
 // §6.3: a card buys a membership as a subscription and a pack as a one-time payment, through
@@ -57,7 +61,7 @@ export function checkoutRoute(product: SiteProduct, method: CheckoutMethod, mana
       form: 'one_time',
       lookupKey: lookupKey(product.id, 'one_time'),
       managedPayments: false,
-      paymentMethodTypes: ['alipay'],
+      allowedMethods: ['alipay'],
     }
   }
   const form: CheckoutForm = product.tier === 'pack' ? 'one_time' : 'subscription'
@@ -66,7 +70,7 @@ export function checkoutRoute(product: SiteProduct, method: CheckoutMethod, mana
     form,
     lookupKey: lookupKey(product.id, form),
     managedPayments,
-    paymentMethodTypes: managedPayments ? null : ['card'],
+    allowedMethods: managedPayments ? null : ['card'],
   }
 }
 

@@ -4,13 +4,13 @@ import { checkoutRoute, desiredPrices, lookupKey, stripeProductId } from './cata
 import { TEST_PRODUCTS, testProduct as product } from './test-products'
 
 describe('checkoutRoute (ARCHITECTURE §6.3)', () => {
-  it('sells a membership by card as a Managed Payments subscription without payment_method_types', () => {
+  it('sells a membership by card as a Managed Payments subscription with no method list', () => {
     expect(checkoutRoute(product('starter_monthly'), 'card', true)).toEqual({
       mode: 'subscription',
       form: 'subscription',
       lookupKey: 'starter_monthly_recurring',
       managedPayments: true,
-      paymentMethodTypes: null,
+      allowedMethods: null,
     })
   })
 
@@ -20,7 +20,7 @@ describe('checkoutRoute (ARCHITECTURE §6.3)', () => {
       form: 'one_time',
       lookupKey: 'pack_s',
       managedPayments: true,
-      paymentMethodTypes: null,
+      allowedMethods: null,
     })
   })
 
@@ -30,7 +30,7 @@ describe('checkoutRoute (ARCHITECTURE §6.3)', () => {
       form: 'one_time',
       lookupKey: 'pro_yearly',
       managedPayments: false,
-      paymentMethodTypes: ['alipay'],
+      allowedMethods: ['alipay'],
     })
   })
 
@@ -38,7 +38,7 @@ describe('checkoutRoute (ARCHITECTURE §6.3)', () => {
     expect(checkoutRoute(product('max_monthly'), 'card', false)).toMatchObject({
       mode: 'subscription',
       managedPayments: false,
-      paymentMethodTypes: ['card'],
+      allowedMethods: ['card'],
     })
   })
 })

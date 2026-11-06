@@ -226,7 +226,7 @@
 
 **范围**：`core/billing/stripe/`、`app/api/webhooks/stripe`、`app/(marketing)/pricing`、付费墙组件、迁移编号段 `0080`～`0099`（T15 PR #24 的规划；**T15 未合并前不写迁移**）：`subscriptions` 表；`products` 表改成 ARCHITECTURE §6.2 的 9 个商品（`starter_monthly` … `pack_l`：改 check 约束、替换种子行，积分包 `days` 为空），一次成型（AGENTS §5：先设计后迁移、一张卡一次成型，不准「先加再改」）；`site/site.config.ts` 的 9 个商品（id、`tier`、`interval`、积分、天数、价格，同步改 T5 的相关测试和 `SiteConfig` 类型）；Stripe Price 按 `lookup_key` 取（§6.2），不加 Price id 环境变量；PostHog `purchase` 参数按 §6.2。不许动：`_apply_credit_change` / `apply_purchase` 的逻辑、续费逻辑（T10）、模板扣费（T16）。（总控 2026-11-05 补：main 上已合并的代码仍是 `pass`/`pack`，由 T9 负责改名。）
 
-**依据**：ARCHITECTURE §6.2 商品表（9 个 id、价格、积分、天数）、「Stripe Product / Price 映射」（三档 Product 各 4 个 Price、积分包 one-time、`lookup_key` 约定）、「分两段上线」、PostHog 参数；§6.3 Stripe 路由表（MP 不传 `payment_method_types`、微信 `client = 'web'`、税码 `txcd_10105001`、「审核没下来之前卡先走普通订阅」）、「要处理的 Stripe 事件」；§6.1 `apply_purchase(user, product_id, event_id)` 用 session id 当 `event_id`；§2 配置示例；DESIGN §4.5（第一屏三档、第二屏月 / 年或 S / M / L、每屏最多三个选项）；建站规格 G3；AGENTS §6 回调验签、§7 测试 2。
+**依据**：ARCHITECTURE §6.2 商品表（9 个 id、价格、积分、天数）、「Stripe Product / Price 映射」（三档 Product 各 4 个 Price、积分包 one-time、`lookup_key` 约定）、「分两段上线」、PostHog 参数；§6.3 Stripe 路由表（MP 不传 `allowed_payment_method_types`；非 MP 路由用 `allowed_payment_method_types`，不用已删除的 `payment_method_types`、微信 `client = 'web'`、税码 `txcd_10105001`、「审核没下来之前卡先走普通订阅」）、「要处理的 Stripe 事件」；§6.1 `apply_purchase(user, product_id, event_id)` 用 session id 当 `event_id`；§2 配置示例；DESIGN §4.5（第一屏三档、第二屏月 / 年或 S / M / L、每屏最多三个选项）；建站规格 G3；AGENTS §6 回调验签、§7 测试 2。
 
 **预览环境的支付回调**（总控 2026-11-05）：预览地址每个 PR 不同，且开着 Vercel 部署保护，Stripe 的回调会被挡成 401。做法：本地开发用 `stripe listen` 转发；CI 用签名后的模拟回调测（AGENTS §7 测试 2）；在预览上端到端验收时，打开 Vercel「Protection Bypass for Automation」，Stripe 测试模式登记一个回调，网址 = 正在验收的 PR 的分支地址 + `/api/webhooks/stripe?x-vercel-protection-bypass=<绕行密钥>`，换 PR 验收时只改网址、签名密钥不变。成功页 / 取消页地址由代码按当前部署地址（`core/site-url`）生成。绕行密钥和签名密钥只放 Vercel 环境变量与 Stripe 后台，不进代码、不进 PR。
 
@@ -436,7 +436,7 @@
 1. 路由：next-intl 开 `zh`，英文不带前缀、中文 `/zh`；中间件只认地址和 `NEXT_LOCALE` Cookie，不按浏览器语言或 IP 自动跳转；浏览器语言为中文的访客在英文页看到可关闭的「切换到中文」提示；页头 / 页脚语言切换器（真实 `<a href>`）。`<html lang>`、hreflang（`en` / `zh-Hans` / `x-default`）、每种语言独立 sitemap；`/zh` 页默认 noindex，T22 的中文主词表合并后，表里的页面放开收录。
 2. 文案：`site/messages/zh.json` 补齐全部界面文字；`/zh`、`/zh/image-to-image-generator`、`/zh/pricing` 三个收录页的中文正文放 `site/content/`。直答块、FAQ、Title、Description 按中文真实问法写，不机器直译，遵守建站规格 G13 和 §6.1；主词以 T22 为准。没有中文版的页面按 ARCHITECTURE §17 处理：不输出 `/zh` hreflang，不弹提示条，切换器指向 `/zh` 首页。法律页不做中文；付费墙「支付宝」；Stripe Checkout 传 `locale`。
 3. 模板：迁移（编号段 `0120`～`0139`，先合并本卡的 [spec] 定义再写）给 `templates` 加 `translations jsonb not null default '{}'`（ARCHITECTURE §5 结构，check 约束只允许已启用语言的键）；`admin_upsert_template` 读写它；公开查询按当前语言取名称和说明，缺项回退英文；后台模板编辑页加中文名称 / 说明 / 字段标签输入。
-4. 字体：按 ARCHITECTURE §17「字体」一条移植 MiSans。分包文件从 Graylum staging 分支 `apps/web/public/fonts/misans/` 原样复制（含 manifest、LICENSE、NOTICE），用 `manifest.json` 的 SHA-256 逐个校验。另外要做的：加载组件、immutable 缓存头、中间件排除、字体栈、页脚署名。英文页面不应因此多下载中文分包（用浏览器网络面板确认）。
+4. 字体：按 ARCHITECTURE §17「字体」一条移植 MiSans。分包文件从 Graylum staging 分支 `apps/web/public/fonts/misans/` 原样复制（含 manifest、LICENSE、NOTICE），用 `manifest.json` 的 SHA-256 逐个校验。另外要做的：加载组件、immutable 缓存头、中间件排除、字体栈、署名（按 ARCHITECTURE §17 和 DESIGN §6.9：放在条款页「Third-party notices」一节并链接 LICENSE，不放页脚）。英文页面不应因此多下载中文分包（用浏览器网络面板确认）。
 5. 邮件：注册时把当前语言写进 `user_metadata.locale`；`supabase/templates/*.html` 四个模板加中文分支（ARCHITECTURE §7）；本地 Supabase + Mailpit 验证中英两种；PR 里给 Owner 写好重新粘贴的步骤。
 6. 埋点：PostHog 事件带 `locale`（ARCHITECTURE §16）。
 
@@ -641,6 +641,37 @@
 - 删号时工单一起删除。
 
 **依赖**：T10、T23（已合并）；T21（中文文案，按合并先后协调）。
+
+## T27b 工单按档位时效排序（接 T27，同一窗口做）
+
+**目标**：让 Owner 兑现「Starter 48 小时、Pro 24 小时、Max 当个工作日」。
+**范围**：`TIER_SUPPORT_REPLY_HOURS` 改为 Starter 48、Pro 48、Max 24；`admin_list_tickets` 每行返回用户当前档位和 `due_at`（最后一条用户消息时间 + 档位时效小时数）；后台列表默认按 `due_at` 升序，超时标红；`admin_todo_counts` 加「已超时工单」一项。迁移编号沿用 `0220`～`0239`。
+**依据**：ARCHITECTURE §6.2「会员档位权益」、§10「站内工单」。
+**测试**：三档的 `due_at` 计算；没有档位按 48 小时；超时计数。
+
+## T28 批量上传（可派）
+
+**目标**：Pro 一次 10 张、Max 一次 30 张，按 ARCHITECTURE §6.2「批量上传的语义」。
+**范围**：
+- 整理 `TIER_LIMITS` 一张表（§6.2），付费墙权益文案从这里读；`perWindow` 按档位替换固定的 20；新增 `TIER_REQUIRED` 错误码和付费墙预选档位。
+- 工作台相册多选（相机入口不变），Pro / Max 以外只取第一张并提示；逐张压缩上传、可取消单张；`job-store` 加排队状态和调度器，按并发上限发请求，刷新后能续跑。
+- 发起前预检整批费用 ≤ 付费池，不够时按钮变「Get credits · N needed」。
+- 生成中改成列表视图（每张一行：缩略图、状态、失败原因、Retry）；`generate` 事件加 `batch_size`。
+- 文案中英文都要有；先过一遍 impeccable，手机稿优先。
+- 不加迁移（不建表、不加 `batch_id`）。
+**测试**：调度器（并发槽位、一张失败不挡后面、刷新恢复）；`perWindow` 按档位的 db 测试；余额预检；Starter 多选只取一张。
+**依赖**：T21（中文文案，按合并先后协调）。
+
+## T29 新功能档位权限（可派）
+
+**目标**：ARCHITECTURE §6.2「新功能抢先用」：权限接口和后台先做好，现在注册表可以是空的。
+**范围**：
+- 迁移（编号段 `0240`～`0259`，本卡 [spec] 已合并）：`feature_access` 表、RLS（打开、不建策略）、`admin_set_feature_access(key, min_tier, open_to_all_at)` 函数（写 `updated_by`）。
+- `core/features`：注册表、`featureOpen` 纯函数、`requireFeature(userId, key)`（档位不够抛 `TIER_REQUIRED`）、带缓存标签的读取。
+- 后台「功能权限」页 `/admin/features` 和导航项（中文，`copy.ts`）。
+- 付费墙 Max 权益文案改成 "Early access to new features"（中英文）。
+**测试**：`featureOpen` 各种组合（无行、min_tier 空、到期开放、档位不足 / 足够、无档位）；`requireFeature` 抛错；未知 key 不能写入；保存后缓存失效。
+**依赖**：T23（后台外壳，已合并）。
 
 ## Owner 侧关键路径（不是任务卡，但比代码慢）
 
