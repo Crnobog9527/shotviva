@@ -94,8 +94,11 @@ export async function listPurchases(db: SupabaseClient, cursor?: string | null):
 }
 
 const subscriptionRow = z.object({
-  id: z.string(),
+  id: z.number(),
   created_at: z.string(),
+  provider: z.enum(['stripe', 'waffo']),
+  stripe_subscription_id: z.string().nullable(),
+  waffo_order_id: z.string().nullable(),
   user_id: z.uuid(),
   product_id: z.string(),
   status: z.string(),
@@ -105,6 +108,9 @@ const subscriptionRow = z.object({
 
 export type AdminSubscription = {
   id: string
+  // Stripe (sub_…, links to the Dashboard) or Waffo (ORD_…, T50).
+  provider: 'stripe' | 'waffo'
+  externalId: string
   userId: string
   email: string | null
   productId: string
@@ -113,22 +119,24 @@ export type AdminSubscription = {
   cancelAtPeriodEnd: boolean
 }
 
-// One row per subscriber; newest first, keyset on (created_at, stripe_subscription_id).
+// One row per subscriber, Stripe and Waffo; newest first, keyset on (created_at, id).
 export async function listSubscriptions(db: SupabaseClient, cursor?: string | null): Promise<Page<AdminSubscription>> {
   let query = db
     .from('subscriptions')
-    .select('id:stripe_subscription_id, created_at, user_id, product_id, status, current_period_end, cancel_at_period_end')
+    .select('id, created_at, provider, stripe_subscription_id, waffo_order_id, user_id, product_id, status, current_period_end, cancel_at_period_end')
     .order('created_at', { ascending: false })
-    .order('stripe_subscription_id', { ascending: false })
+    .order('id', { ascending: false })
     .limit(PAGE_SIZE + 1)
   const after = decodeCursor(cursor)
-  if (after) query = query.or(afterCursor(after, 'stripe_subscription_id'))
+  if (after) query = query.or(afterCursor(after))
   const { data, error } = await query
   if (error) fail('subscriptions', error)
   const rows = subscriptionRow.array().parse(data)
   const emails = await emailsFor(db, rows.slice(0, PAGE_SIZE).map((row) => row.user_id))
   return toPage(rows, (row) => ({
-    id: row.id,
+    id: String(row.id),
+    provider: row.provider,
+    externalId: row.stripe_subscription_id ?? row.waffo_order_id ?? '',
     userId: row.user_id,
     email: emails.get(row.user_id) ?? null,
     productId: row.product_id,

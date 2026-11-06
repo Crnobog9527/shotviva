@@ -48,9 +48,13 @@ export function SubscriptionsTable({ subscriptions, counts, stripeLive }: Props)
                 <TableCell className="font-mono text-xs whitespace-nowrap">{formatBeijing(row.currentPeriodEnd)}</TableCell>
                 <TableCell className="text-xs">{row.cancelAtPeriodEnd ? COPY.yes : COPY.no}</TableCell>
                 <TableCell>
-                  <a href={stripeDashboardUrl(row.id, stripeLive)} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">
-                    {COPY.openInStripe}
-                  </a>
+                  {row.provider === 'stripe' ? (
+                    <a href={stripeDashboardUrl(row.externalId, stripeLive)} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">
+                      {COPY.openInStripe}
+                    </a>
+                  ) : (
+                    <span className="font-mono text-xs text-muted-foreground">Waffo · {row.externalId}</span>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
