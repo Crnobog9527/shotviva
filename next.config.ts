@@ -3,6 +3,8 @@ import type { NextConfig } from 'next'
 import createNextIntlPlugin from 'next-intl/plugin'
 
 import { parseSentryBuildEnv } from './src/core/build-env'
+import { indexingOpen, parseIndexingEnv, xRobotsTagRules } from './src/core/seo/indexing-env'
+import { SITE_DOMAIN } from './src/site/domain'
 
 const withNextIntl = createNextIntlPlugin('./src/site/i18n/request.ts')
 
@@ -11,12 +13,20 @@ const withNextIntl = createNextIntlPlugin('./src/site/i18n/request.ts')
 const POSTHOG_INGEST = 'https://us.i.posthog.com'
 const POSTHOG_ASSETS = 'https://us-assets.i.posthog.com'
 
+// Pre-launch indexing switch (ARCHITECTURE §12.0), read at build: an invalid SITE_INDEXING fails
+// the build, and changing it needs a redeploy. Closed → X-Robots-Tag on every response; open →
+// still on every host but the canonical domain (*.vercel.app, previews).
+const indexingIsOpen = indexingOpen(parseIndexingEnv(process.env))
+
 const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   poweredByHeader: false,
   // PostHog's API paths end in a slash (/i/v0/e/); a trailing-slash redirect would break them.
   skipTrailingSlashRedirect: true,
+  async headers() {
+    return xRobotsTagRules(indexingIsOpen, SITE_DOMAIN)
+  },
   async rewrites() {
     return [
       { source: '/ingest/static/:path*', destination: `${POSTHOG_ASSETS}/static/:path*` },
