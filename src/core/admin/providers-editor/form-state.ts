@@ -51,9 +51,18 @@ export function formFor(provider: AdminProvider | null, module: ProviderModule =
   }
 }
 
-// A provider without all three prices cannot cost its jobs; the list flags it (T33).
-export function missingPrices(prices: ProviderPrices): boolean {
-  return prices.inputTextPerM === null || prices.inputImagePerM === null || prices.outputPerM === null
+// The prices each module's jobs are costed with. The decision step (T30) is billed as input and
+// output tokens only: its preview image counts as input tokens, so it has no image price.
+export const MODULE_PRICE_FIELDS: Record<ProviderModule, readonly PriceField[]> = {
+  image: PRICE_FIELDS,
+  decision: ['priceInputTextPerM', 'priceOutputPerM'],
+}
+
+const PRICE_OF = { priceInputTextPerM: 'inputTextPerM', priceInputImagePerM: 'inputImagePerM', priceOutputPerM: 'outputPerM' } as const
+
+// A provider without the prices its module needs cannot cost its jobs; the list flags it (T33).
+export function missingPrices(prices: ProviderPrices, module: ProviderModule = 'image'): boolean {
+  return MODULE_PRICE_FIELDS[module].some((field) => prices[PRICE_OF[field]] === null)
 }
 
 // Blank or a non-negative decimal; anything else keeps Save disabled.

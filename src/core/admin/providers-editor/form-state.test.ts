@@ -45,6 +45,9 @@ describe('provider form state', () => {
     expect(toSaveInput(form, provider)).toMatchObject({ priceInputTextPerM: '5', priceOutputPerM: '30' })
     expect(missingPrices(provider.prices)).toBe(false)
     expect(missingPrices({ ...provider.prices, outputPerM: null })).toBe(true)
+    // A decision row (T30) needs no image price.
+    expect(missingPrices({ ...provider.prices, inputImagePerM: null }, 'decision')).toBe(false)
+    expect(missingPrices({ ...provider.prices, outputPerM: null }, 'decision')).toBe(true)
   })
 
   it('keeps Save disabled while a price is not a non-negative number; blank is allowed', () => {
