@@ -21,13 +21,13 @@ type Props = {
 // Switching changes which vendor and model every next generation calls, so it is confirmed with
 // both names on screen (ARCHITECTURE §3.3).
 export function ActivateDialog({ target, current, pending, onCancel, onConfirm }: Props) {
-  const module = target?.module ?? 'image'
-  const from = current ? `${current.label} · ${current.model}` : COPY.fromNone[module]
+  const kind = target?.module ?? 'image'
+  const from = current ? `${current.label} · ${current.model}` : COPY.fromNone[kind]
   return (
     <Dialog open={target !== null} onOpenChange={(open) => !open && onCancel()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{COPY.title(module)}</DialogTitle>
+          <DialogTitle>{COPY.title(kind)}</DialogTitle>
           <DialogDescription>
             {target ? COPY.body(from, target.label, target.model) : null}
           </DialogDescription>

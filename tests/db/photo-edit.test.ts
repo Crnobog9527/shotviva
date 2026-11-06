@@ -4,14 +4,16 @@ import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import type { ServerTrack } from '@/core/analytics'
+import { listAdminTemplates, loadEditTemplateSettings, saveEditTemplate } from '@/core/admin'
 import { GenerationFailure, reserveJob } from '@/core/jobs'
-import { runEdit, type EditDeps } from '@/modules/image'
+import { listTemplates } from '@/core/templates'
+import { CREDITS_FLOOR, runEdit, type EditDeps } from '@/modules/image'
 
 import { createMemoryStore } from '../fakes/memory-store'
 import { fakeDecider, finishedWork, publishEditTemplate, setEditTemplate, TEST_EDIT_PARAMS, TEST_WRAPPER, type DeciderBehaviour } from './edit-fixtures'
 import { fakeProvider, seedTemplate, type FakeBehaviour } from './generation-fixtures'
 import { connectAdmin, createUser, profileOf, type TestProfile } from './helpers'
-import { serviceSupabase } from './supabase-env'
+import { anonSupabase, serviceSupabase } from './supabase-env'
 
 // T30 (ARCHITECTURE §5.2): an edit is an ordinary generation on the built-in `edit` template.
 // Real local Supabase for reserve/confirm/refund and the parent check; fake R2, fake OpenAI.
@@ -226,5 +228,37 @@ describe('deleting', () => {
     await db.query('delete from auth.users where id = $1', [userId])
     const { rows } = await db.query('select id from public.generation_jobs where user_id = $1', [userId])
     expect(rows).toHaveLength(0)
+  })
+})
+
+// Runs in this file, not its own, because it rewrites the one `edit` row the tests above use.
+describe('/admin/templates/edit', () => {
+  const input = (overrides: Record<string, unknown> = {}) => ({
+    isActive: true,
+    creditsCost: { '1k': 3, '2k': 5, '3k': 7 },
+    wrapper: TEST_WRAPPER,
+    params: TEST_EDIT_PARAMS,
+    ...overrides,
+  })
+
+  it('saves price, texts and switch, and keeps the template on no surface', async () => {
+    const adminId = await createUser(db)
+    await saveEditTemplate(serviceSupabase(), adminId, input(), CREDITS_FLOOR)
+    const settings = await loadEditTemplateSettings(serviceSupabase())
+    expect(settings).toMatchObject({ isActive: true, creditsCost: { '1k': 3, '2k': 5, '3k': 7 }, wrapper: TEST_WRAPPER, params: TEST_EDIT_PARAMS })
+    const { rows } = await db.query<{ visible_in: string[] }>("select visible_in from public.templates where id = 'edit'")
+    expect(rows[0]?.visible_in).toEqual([])
+    // Published, yet in no catalogue and not in the ordinary template editor.
+    expect((await listTemplates(anonSupabase(), 'web')).map((t) => t.id)).not.toContain('edit')
+    expect((await listTemplates(anonSupabase(), 'partner')).map((t) => t.id)).not.toContain('edit')
+    expect((await listAdminTemplates(serviceSupabase())).map((t) => t.id)).not.toContain('edit')
+    await saveEditTemplate(serviceSupabase(), adminId, input({ creditsCost: { '1k': 2, '2k': 4, '3k': 6 } }), CREDITS_FLOOR)
+  })
+
+  it('refuses a price under the floor and a missing question', async () => {
+    const adminId = await createUser(db)
+    await expect(saveEditTemplate(serviceSupabase(), adminId, input({ creditsCost: { '1k': 1, '2k': 1, '3k': 1 } }), CREDITS_FLOOR)).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    const params = { ...TEST_EDIT_PARAMS, questions: { ...TEST_EDIT_PARAMS.questions, subject: '' } }
+    await expect(saveEditTemplate(serviceSupabase(), adminId, input({ params }), CREDITS_FLOOR)).rejects.toMatchObject({ code: 'INVALID_INPUT' })
   })
 })

@@ -57,7 +57,7 @@ describe('openai decisions adapter', () => {
 
   it('throws with the status only, never the body', async () => {
     const fetchImpl = vi.fn(async () => json({ error: { message: 'echo: 背景换成海边' } }, 429))
-    const error = await decisions(fetchImpl).decide(input).catch((e: unknown) => e as Error)
+    const error = (await decisions(fetchImpl).decide(input).catch((e: unknown) => e)) as Error
     expect(error.message).toBe('openai decisions 429')
   })
 

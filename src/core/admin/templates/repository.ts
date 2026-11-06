@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { AppError } from '@/core/errors'
 import {
+  EDIT_TEMPLATE_ID,
   TEMPLATE_COLUMNS,
   toTemplate,
   type PromptInput,
@@ -23,6 +24,9 @@ export async function listAdminTemplates(client: SupabaseClient): Promise<AdminT
   const { data, error } = await client
     .from('templates')
     .select(`${TEMPLATE_COLUMNS}, template_prompts(body, version, model_params)`)
+    // The built-in edit template has its own page (/admin/templates/edit): this editor's form
+    // would refuse its empty visible_in, and its params are not free-form JSON.
+    .neq('id', EDIT_TEMPLATE_ID)
     .order('sort_order', { ascending: true })
     .order('id', { ascending: true })
     .returns<AdminRow[]>()

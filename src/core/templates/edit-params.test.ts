@@ -9,7 +9,7 @@ describe('edit template params', () => {
   it('needs all five questions and all six paragraphs (which may be empty)', () => {
     expect(editParamsSchema.safeParse({ questions, constraints }).success).toBe(true)
     expect(editParamsSchema.safeParse({ questions: { ...questions, overall: ' ' }, constraints }).success).toBe(false)
-    const { fallback: _, ...five } = constraints
+    const five = Object.fromEntries(Object.entries(constraints).filter(([scope]) => scope !== 'fallback'))
     expect(editParamsSchema.safeParse({ questions, constraints: five }).success).toBe(false)
   })
 
