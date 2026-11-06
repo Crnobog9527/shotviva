@@ -10,6 +10,7 @@ import { PaywallProvider } from '@/core/billing/paywall'
 import { paymentChannel } from '@/core/billing/waffo'
 import { isModuleEnabled } from '@/core/config'
 import { appShellMetadata } from '@/core/seo'
+import { SupportTabBadge } from '@/core/support'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { GenerationRunner, HideWhileGenerating, PhotosTabBadge } from '@/modules/image'
 import { site } from '@/site/site.config'
@@ -32,7 +33,17 @@ function useTabs(): TabItem[] {
     ...(image ? [{ href: '/generate', label: t('create'), icon: 'create' } as const] : []),
     ...(isWishlistEnabled(site) ? [{ href: '/wishlist', label: t('wishlist'), icon: 'wishlist' } as const] : []),
     ...(image ? [{ href: '/photos', label: t('photos'), icon: 'photos', badge: <PhotosTabBadge /> } as const] : []),
-    { href: '/account', label: t('account'), icon: 'account' },
+    // The "new reply" dot, read once per page load (ARCHITECTURE §10 「站内工单」).
+    {
+      href: '/account',
+      label: t('account'),
+      icon: 'account',
+      badge: (
+        <Suspense fallback={null}>
+          <SupportTabBadge />
+        </Suspense>
+      ),
+    },
   ]
 }
 

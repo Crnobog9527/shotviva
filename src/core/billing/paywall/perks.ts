@@ -1,5 +1,5 @@
 import type { MembershipTier } from '../../config'
-import { TIER_CONCURRENCY } from '../tier-limits'
+import { TIER_CONCURRENCY, TIER_SUPPORT_REPLY_HOURS } from '../tier-limits'
 
 // Tier perks as ARCHITECTURE §6.2 "会员档位权益" lists them. Only what is live may read as a
 // current feature; the rest is its own "Coming soon" group (DESIGN §4.5). Queue priority is
@@ -13,14 +13,14 @@ export function tierPerks(tier: MembershipTier, options: { wishlistLive: boolean
   if (tier === 'starter') {
     return {
       heading: 'includes',
-      live: [{ key: 'noWatermark' }, { key: 'privateAllTemplates' }, concurrency('starter'), { key: 'support48h' }],
+      live: [{ key: 'noWatermark' }, { key: 'privateAllTemplates' }, concurrency('starter'), { key: 'support48h', values: { hours: TIER_SUPPORT_REPLY_HOURS.starter } }],
       soon: [],
     }
   }
   if (tier === 'pro') {
     return {
       heading: 'plusStarter',
-      live: [concurrency('pro'), { key: 'support24h' }],
+      live: [concurrency('pro'), { key: 'support24h', values: { hours: TIER_SUPPORT_REPLY_HOURS.pro } }],
       soon: [{ key: 'batch', values: { count: 10 } }, { key: 'brandKit' }],
     }
   }

@@ -25,6 +25,9 @@ export const legalLinks = {
   acceptableUse: { href: '/acceptable-use', label: 'Acceptable Use Policy' },
 } as const satisfies Record<string, LegalLink & { href: `/${string}` }>
 
+// Help & feedback (T27), where signed-in users write to us, refund requests included.
+export const helpLink: LegalLink = { href: '/account/help', label: 'Help & feedback' }
+
 export const pricingLink: LegalLink = { href: '/pricing', label: 'pricing page' }
 
 // Who we are, in one sentence; opens every page.

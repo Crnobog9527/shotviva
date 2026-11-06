@@ -11,6 +11,8 @@ import { CheckoutNotice, PaywallButton } from '@/core/billing/paywall'
 import { readSubscriptionSummary, SubscriptionPanel, type SubscriptionSummary } from '@/core/billing/subscription'
 import { readLinkStatus } from '@/core/partner'
 import { GraylumConnection } from '@/core/partner/ui'
+import { hasUnreadReply } from '@/core/support'
+import { HelpEntry } from '@/core/support/ui'
 import { buttonVariants } from '@/core/ui/button'
 import { site } from '@/site/site.config'
 
@@ -27,6 +29,7 @@ type ViewProps = {
   balance: Balance
   graylumLinkedAt: Date | null
   subscription: SubscriptionSummary
+  helpUnread: boolean
   // Same-IP rule (ARCHITECTURE §7): this account got no signup gift.
   giftRefused: boolean
 }
@@ -39,7 +42,7 @@ function AccountHeader() {
   return <TabRootHeader title={useTranslations('auth.account')('title')} />
 }
 
-function AccountView({ email, balance, graylumLinkedAt, subscription, giftRefused }: ViewProps) {
+function AccountView({ email, balance, graylumLinkedAt, subscription, helpUnread, giftRefused }: ViewProps) {
   const t = useTranslations('auth.account')
   const balanceT = useTranslations('app.balance')
   return (
@@ -66,6 +69,9 @@ function AccountView({ email, balance, graylumLinkedAt, subscription, giftRefuse
       <Panel>
         <GraylumConnection linkedAt={graylumLinkedAt} disconnect={disconnectGraylumAction} />
       </Panel>
+      <Panel>
+        <HelpEntry unread={helpUnread} />
+      </Panel>
       <form action={signOutAction} className="mx-4 mt-6">
         <button type="submit" className={buttonVariants({ variant: 'glass', size: 'touch', className: 'w-full' })}>
           {t('signOut')}
@@ -82,11 +88,12 @@ async function Account() {
   const user = await requireUser('/account')
   const supabase = await createServerSupabase()
   const admin = createAdminSupabase()
-  const [graylum, balance, subscription, giftRefused] = await Promise.all([
+  const [graylum, balance, subscription, giftRefused, helpUnread] = await Promise.all([
     readLinkStatus(supabase, user.id),
     readBalance(supabase, user.id),
     readSubscriptionSummary(admin, user.id, site.billing.products),
     signupGiftRefused(admin, user.id, site.billing.freeCredits),
+    hasUnreadReply(supabase, user.id),
   ])
   return (
     <AccountView
@@ -94,6 +101,7 @@ async function Account() {
       balance={balance}
       graylumLinkedAt={graylum.linkedAt}
       subscription={subscription}
+      helpUnread={helpUnread}
       giftRefused={giftRefused}
     />
   )

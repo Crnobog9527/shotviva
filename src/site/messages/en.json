@@ -354,6 +354,78 @@
       "free": "Free",
       "freeDetail": "No membership yet.",
       "seePlans": "See plans"
+    },
+    "support": {
+      "title": "Help & feedback",
+      "entryHint": "Questions, problems or ideas: write to us here.",
+      "newReply": "New reply",
+      "replyTime": "We reply here, usually within {hours} hours. Members get faster replies by plan.",
+      "newTicket": "New request",
+      "mine": "My tickets",
+      "empty": "No tickets yet.",
+      "opened": "Opened {date, date, medium}",
+      "status": {
+        "open": "Submitted",
+        "replied": "Replied",
+        "closed": "Closed"
+      },
+      "types": {
+        "feedback": "Feedback",
+        "image_issue": "Image issue",
+        "billing": "Billing",
+        "refund": "Refund request",
+        "account": "Account",
+        "other": "Other"
+      },
+      "tiers": {
+        "starter": "Starter",
+        "pro": "Pro",
+        "max": "Max"
+      },
+      "product": {
+        "plan": "{tier} · {interval, select, year {Yearly} other {Monthly}}",
+        "pack": "Credit pack · {credits} credits",
+        "option": "{product} · {amount} · {date, date, medium}"
+      },
+      "new": {
+        "title": "New request",
+        "typeLabel": "What is it about?",
+        "bodyLabel": "Message",
+        "placeholder": "Tell us what happened, or what you'd like to see.",
+        "counter": "{count}/{max}",
+        "paymentLabel": "Which payment?",
+        "paymentOptional": "Payment (optional)",
+        "noPayments": "There are no payments on this account yet.",
+        "workLabel": "Work (optional)",
+        "workOption": "{template} · {date, date, medium}",
+        "none": "None",
+        "choose": "Choose one",
+        "submit": "Send",
+        "submitting": "Sending…",
+        "errors": {
+          "RATE_LIMITED": "You've sent 5 tickets in the last 24 hours. Please try again later.",
+          "INVALID_INPUT": "Choose a type and write a message of up to 2,000 characters. A refund request needs a payment.",
+          "NOT_FOUND": "That payment or work isn't on your account.",
+          "generic": "Couldn't send your message. Please try again."
+        }
+      },
+      "thread": {
+        "you": "You",
+        "team": "{brand} support",
+        "sent": "Thanks, we've got it.",
+        "addLabel": "Add to this ticket",
+        "add": "Send",
+        "adding": "Sending…",
+        "closedNote": "This ticket is closed. Writing here opens it again.",
+        "errors": {
+          "INVALID_INPUT": "Write a message of up to 2,000 characters.",
+          "NOT_FOUND": "This ticket no longer exists.",
+          "generic": "Couldn't send your message. Please try again."
+        }
+      },
+      "showMore": "Show more",
+      "loading": "Loading…",
+      "loadFailed": "Couldn't load more. Try again."
     }
   },
   "paywall": {
@@ -388,8 +460,8 @@
       "noWatermark": "No watermark, commercial use",
       "privateAllTemplates": "Private by default, all templates",
       "concurrency": "{count, plural, one {# photo} other {# photos}} generating at a time",
-      "support48h": "Email support, reply within 48 hours",
-      "support24h": "Priority email support, reply within 24 hours",
+      "support48h": "Email support, reply within {hours} hours",
+      "support24h": "Priority email support, reply within {hours} hours",
       "supportSameDay": "Priority support, reply the same business day",
       "batch": "Batch upload, up to {count} photos",
       "brandKit": "Brand kit: your logo and fonts on posters",
