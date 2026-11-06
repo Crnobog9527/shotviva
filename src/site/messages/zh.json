@@ -86,6 +86,7 @@
       "giftNote": "会公开展示，并带水印",
       "submit": "注册",
       "fine": "继续即表示你同意<terms>服务条款</terms>和<privacy>隐私政策</privacy>。",
+      "fineCaptcha": "继续即表示你同意<terms>服务条款</terms>和<privacy>隐私政策</privacy>，本页由 <hcaptcha>hCaptcha</hcaptcha> 提供人机验证。",
       "toLogin": "已经有账号？<link>登录</link>"
     },
     "verify": {
@@ -122,7 +123,7 @@
       "continue": "进入 Shotviva"
     },
     "captcha": {
-      "line": "由 hCaptcha 提供人机验证 · <privacy>隐私</privacy> · <terms>条款</terms>",
+      "line": "本页由 <hcaptcha>hCaptcha</hcaptcha> 提供人机验证。",
       "failed": "验证没有完成，请再试一次。"
     },
     "notices": {

@@ -44,6 +44,15 @@ describe('auth messages', () => {
     for (const messages of [en.auth, zh.auth]) expect(JSON.stringify(messages)).not.toMatch(/check below|tick|勾选|下方的验证/i)
   })
 
+  it('discloses hCaptcha inside the consent sentence, or in one short line (Owner 2026-11-07)', () => {
+    const plain = (chunks: string) => chunks
+    const tags = { terms: plain, privacy: plain, hcaptcha: plain }
+    expect(t.en('signup.fineCaptcha', tags)).toBe('By continuing you agree to the Terms and Privacy Policy. This page is protected by hCaptcha.')
+    expect(t.zh('signup.fineCaptcha', tags)).toBe('继续即表示你同意服务条款和隐私政策，本页由 hCaptcha 提供人机验证。')
+    expect(t.en('captcha.line', tags)).toBe('Protected by hCaptcha.')
+    expect(t.zh('captcha.line', tags)).toBe('本页由 hCaptcha 提供人机验证。')
+  })
+
   it('offers no Apple sign-in and never says prompt', () => {
     for (const messages of [en.auth, zh.auth]) {
       const text = JSON.stringify(messages)

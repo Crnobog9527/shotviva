@@ -86,6 +86,7 @@
       "giftNote": "Shown publicly with a watermark",
       "submit": "Create account",
       "fine": "By continuing you agree to the <terms>Terms</terms> and <privacy>Privacy Policy</privacy>.",
+      "fineCaptcha": "By continuing you agree to the <terms>Terms</terms> and <privacy>Privacy Policy</privacy>. This page is protected by <hcaptcha>hCaptcha</hcaptcha>.",
       "toLogin": "Already have an account? <link>Log in</link>"
     },
     "verify": {
@@ -122,7 +123,7 @@
       "continue": "Continue to Shotviva"
     },
     "captcha": {
-      "line": "Protected by hCaptcha · <privacy>Privacy</privacy> · <terms>Terms</terms>",
+      "line": "Protected by <hcaptcha>hCaptcha</hcaptcha>.",
       "failed": "Verification didn't complete. Please try again."
     },
     "notices": {
