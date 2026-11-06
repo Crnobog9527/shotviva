@@ -29,7 +29,7 @@ export const templateCategories: readonly [TemplateCategory, ...TemplateCategory
     name: 'Products & Resale',
     intro: 'Shoot a product on any table and get a store-ready photo. The label, color and shape stay the same.',
     templates: [
-      { id: 'pure-white', name: 'Pure White', use: 'A white-background main photo for online stores and resale listings.' },
+      { id: 'white-background', name: 'White Background', use: 'A white-background main photo for online stores and resale listings.' },
       { id: 'lifestyle-table', name: 'Lifestyle Table', use: 'Your product on a styled table, ready for social posts.' },
     ],
   },
