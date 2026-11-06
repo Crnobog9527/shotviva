@@ -14,7 +14,7 @@ import {
 } from '@/core/seo'
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
 import { toCatalogueTemplate } from '@/modules/image'
-import { contentPagesIn, findContentPageIn, freeImagesLabel, homePageIn, homeTemplates, isLinkEnabled } from '@/site/content'
+import { contentPagesIn, featuredSections, findContentPageIn, freeImagesLabel, homePageIn, isLinkEnabled } from '@/site/content'
 import { zhFreeImages } from '@/site/content/zh/offer'
 import { site } from '@/site/site.config'
 
@@ -63,16 +63,18 @@ export default async function ContentRoute({ params }: PageProps<'/[locale]/[slu
   const ld = [breadcrumbListLd(site, ldCrumbs), faqPageLd(page.faq)]
   if (page.module) ld.push(softwareApplicationLd(site, meta, locale === 'zh' ? zhFreeImages : freeImagesLabel))
   const home = homePageIn(locale)
-  const catalogue = (await cachedWebCatalogue(locale)).map(toCatalogueTemplate)
-  const templates = homeTemplates(home, catalogue, page.landing.generatorTemplate)
+  const live = await cachedWebCatalogue(locale)
+  const catalogue = live.map(toCatalogueTemplate)
+  // The page's own categories' featured templates; the generator opens on the first of them.
+  const { defaultId, ...sections } = featuredSections(home.templateGrid.categories, live, page.landing.templates?.categoryKeys)
   const free = locale === 'zh' ? zhFreeImages : freeImagesLabel
   const generator = (
-    <HomeGeneratorSlot templates={catalogue} samples={templates.samples} defaultId={templates.defaultId} homePath={localizePath(path, locale)} freeImages={free} />
+    <HomeGeneratorSlot templates={catalogue} defaultId={defaultId} homePath={localizePath(path, locale)} freeImages={free} />
   )
   return (
     <>
       <JsonLdScript data={ld} />
-      <ContentPageView page={page} isLinkEnabled={isLinkEnabled} templates={templates.cards} price={home.templateGrid.price} generator={generator} />
+      <ContentPageView page={page} isLinkEnabled={isLinkEnabled} templates={sections} price={home.templateGrid.price} generator={generator} />
     </>
   )
 }

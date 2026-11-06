@@ -8,6 +8,8 @@ import type { CreditsFloor } from '@/core/templates/pricing'
 
 import type { AdminTemplate, TemplateAdminActions } from '../templates/types'
 
+import { FeaturedPanel } from './featured-panel'
+import { FEATURED_LIMIT, featuredIds, toggleFeatured } from './featured-state'
 import { matchesSearch, moveId } from './form-state'
 import { TemplateFormDialog, type EditTarget } from './template-form-dialog'
 import { TemplatesTable } from './templates-table'
@@ -36,6 +38,12 @@ export function TemplatesEditor({ templates, floor, actions }: Props) {
     if (!active) return setUnpublishing(template)
     run(() => actions.setActive({ id: template.id, active: true }), `已上架「${template.name}」`)
   }
+  const featured = featuredIds(templates)
+  const setFeatured = (ids: string[]) => run(() => actions.setFeatured(ids), '首页精选已保存')
+  const feature = (template: AdminTemplate, on: boolean) => {
+    const ids = toggleFeatured(featured, template, on)
+    if (ids) setFeatured(ids)
+  }
   const move = (index: number, direction: -1 | 1) => {
     const ids = moveId(templates.map((template) => template.id), index, direction)
     if (ids) run(() => actions.reorder(ids), '排序已保存')
@@ -60,8 +68,11 @@ export function TemplatesEditor({ templates, floor, actions }: Props) {
           {error}
         </p>
       ) : null}
+      <FeaturedPanel ids={featured} templates={templates} pending={pending} onChange={setFeatured} />
       <TemplatesTable
         templates={visible}
+        featuredFull={featured.length >= FEATURED_LIMIT}
+        onFeature={feature}
         canReorder={query.trim() === ''}
         pending={pending}
         onEdit={(template) => openEditor({ mode: 'edit', template })}

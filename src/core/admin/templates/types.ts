@@ -29,6 +29,8 @@ export type TemplateAdminActions = {
   save: (payload: SaveTemplatePayload) => Promise<ActionResult>
   setActive: (input: { id: string; active: boolean; reason?: string }) => Promise<ActionResult>
   reorder: (ids: string[]) => Promise<ActionResult>
+  // The home featured list in display order (T53).
+  setFeatured: (ids: string[]) => Promise<ActionResult>
   requestCoverUpload: (input: CoverUploadRequest) => Promise<ActionValue<CoverTicket>>
   applyCover: (input: ApplyCoverRequest) => Promise<ActionResult>
 }

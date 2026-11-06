@@ -24,7 +24,7 @@ const complete = {
     photographer: { title: 't', total: { amount: 'a', when: 'w' }, lines: [line, line], fine: 'f' },
     site: { title: 't', total: { amount: 'a', when: 'w' }, lines: [line, line], fine: 'f' },
   },
-  landing: { generatorTemplate: 'x', factsNote: 'n' },
+  landing: { factsNote: 'n' },
   faq: [faq, faq, faq],
   related: [link, link],
 } satisfies ContentPage

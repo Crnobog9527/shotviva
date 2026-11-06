@@ -16,7 +16,7 @@ import {
   usd,
   usdRange,
 } from '../offer'
-import { zhTemplateCategories } from './featured-templates'
+import { zhTemplateCategories } from './template-categories'
 import {
   ZH_TIERS,
   zhFreeImages,
@@ -154,7 +154,7 @@ export const zhHomePage = defineHomePage({
       },
     ],
     plans: plansText(),
-    sample: { src: '/home/templates/spa-podium-after.webp', alt: '', width: 900, height: 1125 },
+    sample: { src: '/home/example-skincare-after.webp', alt: '', width: 900, height: 1125 },
   },
   costBills: productBills(
     `${SET_PHOTOS} 张商品图要花多少钱：请摄影师和用 ${brand} 对比`,

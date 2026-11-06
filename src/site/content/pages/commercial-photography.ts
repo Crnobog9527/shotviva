@@ -1,9 +1,8 @@
 import { defineContentPage } from '@/core/content'
 
 import { site } from '../../site.config'
-import { templateCategories } from '../featured-templates'
 import { productBills, shoot } from '../home'
-import { homeImage, pickCategories } from '../landing-shared'
+import { CATEGORY, homeImage } from '../landing-shared'
 import { dayRateUsd, freeImagesLabel, fromCredits, OUTPUT_TIERS, packshotUsd, plansSentence, SET_PHOTOS, styledShotUsd, tierList, usdRange } from '../offer'
 import { PLATFORM_SPECS, px } from '../platform-specs'
 
@@ -84,13 +83,12 @@ export const commercialPhotography = defineContentPage({
     related: `More From ${brand}`,
   },
   landing: {
-    generatorTemplate: 'white-background',
     factsNote: 'From the platforms\' own help pages (Amazon, Etsy, Shopify), checked November 2026. Platforms change their rules; check before you list.',
     shoot,
     templates: {
       heading: 'Product Photo Templates: Listings, Scenes and Posters',
       intro: `Every template starts from your phone photo of the product and ends with a finished shot, ${fromCredits}.`,
-      categories: pickCategories(templateCategories, ['products', 'beauty']),
+      categoryKeys: [CATEGORY.products, CATEGORY.beauty],
     },
   },
 })

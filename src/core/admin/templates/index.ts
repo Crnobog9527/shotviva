@@ -1,4 +1,4 @@
-export { reorderTemplates, saveTemplate, setTemplateActive } from './commands'
+export { FEATURED_MAX, reorderTemplates, saveTemplate, setFeaturedTemplates, setTemplateActive } from './commands'
 export { listAdminTemplates } from './repository'
 export { runAdminAction, runAdminQuery } from './run-action'
 export type {

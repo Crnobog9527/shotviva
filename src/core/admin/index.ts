@@ -5,6 +5,7 @@ export {
   runAdminAction,
   runAdminQuery,
   saveTemplate,
+  setFeaturedTemplates,
   setTemplateActive,
 } from './templates'
 export type {
