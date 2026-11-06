@@ -134,7 +134,7 @@ describe('account Plan card without a card subscription', () => {
     const last = lastMembership([{ productId: 'pro_monthly', method: 'alipay' }], site.billing.products)
     const wallet = await render(summarize([], days(25), 'pro'), 'zh', 0, last)
     expect(wallet.text).toContain('一次性购买一个月，用 支付宝 付款，不会自动续费')
-    expect(buttons(wallet.html)).toEqual(['续费 · US$49.90'])
+    expect(buttons(wallet.html)).toEqual(['续费 · $49.90'])
     expect((await render(summarize([row({})], days(30)), 'zh')).text).toContain('加入于 2026年11月 · mei@example.test')
   })
 })
