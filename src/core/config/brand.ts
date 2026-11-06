@@ -4,7 +4,3 @@ import type { PostalAddress } from './define-site'
 export function addressLines(address: PostalAddress): [string, string, string] {
   return [address.street, `${address.locality}, ${address.region} ${address.postalCode}`, address.country]
 }
-
-export function formatAddress(address: PostalAddress): string {
-  return addressLines(address).join(', ')
-}
