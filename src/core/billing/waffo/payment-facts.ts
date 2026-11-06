@@ -1,0 +1,80 @@
+import { z } from 'zod'
+
+import { PRODUCT_IDS, type SiteProduct } from '../../config'
+import { AppError } from '../../errors'
+import type { CheckoutMethod } from '../stripe/catalog'
+
+// What a signed order.completed says was bought and paid (docs.waffo.ai "Webhooks", data
+// fields). Who and what come from the order metadata our checkout set with the API key; the
+// amounts are Waffo's display strings ("21.49"), turned into cents for payments (T10).
+
+function fromJson(value: unknown): unknown {
+  if (typeof value !== 'string') return value
+  try {
+    return JSON.parse(value)
+  } catch {
+    return value
+  }
+}
+
+// orderMetadata is documented as an object; accept a JSON string too rather than drop a payment.
+const metadataSchema = z.preprocess(fromJson, z.object({ user_id: z.uuid(), product_id: z.enum(PRODUCT_IDS) }))
+const money = z.string().regex(/^\d{1,7}(\.\d{1,2})?$/)
+
+const orderSchema = z.object({
+  orderId: z.string().min(1),
+  orderMetadata: metadataSchema,
+  currency: z.string().regex(/^[A-Za-z]{3}$/).optional(),
+  paymentStatus: z.string().optional(),
+  paymentMethod: z.string().optional(),
+  paymentMethodBrand: z.string().optional(),
+  // What the channel actually took, tax included; omitted when the channel reported none.
+  chargedAmount: money.optional(),
+  listPrice: z.object({ total: money.optional(), subtotal: money.optional(), taxAmount: money.optional() }).optional(),
+})
+export type WaffoOrder = z.infer<typeof orderSchema>
+
+export type WaffoPaymentFacts = {
+  orderId: string
+  amountTotal: number
+  amountTax: number
+  currency: string
+  method: CheckoutMethod
+  // Before tax, for the PostHog purchase event (same basis as Stripe's).
+  subtotalUsd: number
+}
+
+export function readWaffoOrder(eventId: string, data: unknown): WaffoOrder {
+  const order = orderSchema.safeParse(data)
+  if (!order.success) throw new AppError('INVALID_INPUT', `waffo order ${eventId}: metadata`)
+  return order.data
+}
+
+export function toCents(amount: string): number {
+  const [whole = '0', fraction = ''] = amount.split('.')
+  return Number(whole) * 100 + Number(fraction.padEnd(2, '0'))
+}
+
+// The method Waffo actually charged, not the one picked on the paywall.
+export function chargedMethod(order: Pick<WaffoOrder, 'paymentMethod' | 'paymentMethodBrand'>): CheckoutMethod {
+  const brand = `${order.paymentMethod ?? ''} ${order.paymentMethodBrand ?? ''}`.toLowerCase()
+  return brand.includes('alipay') ? 'alipay' : 'card'
+}
+
+// A paid order is never refused for a missing amount: the site price stands in for it.
+export function paymentFacts(order: WaffoOrder, product: SiteProduct): WaffoPaymentFacts {
+  const list = order.listPrice
+  const fallback = Math.round(product.priceUsd * 100)
+  const total = order.chargedAmount ?? list?.total
+  const amountTotal = total ? toCents(total) : fallback
+  const amountTax = Math.min(list?.taxAmount ? toCents(list.taxAmount) : 0, amountTotal)
+  const subtotal = list?.subtotal ? toCents(list.subtotal) : amountTotal - amountTax
+  return {
+    orderId: order.orderId,
+    amountTotal,
+    amountTax,
+    currency: (order.currency ?? 'usd').toLowerCase(),
+    method: chargedMethod(order),
+    subtotalUsd: subtotal / 100,
+  }
+}

@@ -1256,6 +1256,34 @@ $$;
 ALTER FUNCTION "public"."settle_checkout"("p_user_id" "uuid", "p_product_id" "text", "p_session_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_invoice_id" "text", "p_charge_id" "text", "p_subscription_id" "text", "p_subscription_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."settle_waffo_order"("p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") RETURNS "public"."credit_change"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_change public.credit_change;
+begin
+  if p_order_id is null or p_amount_total is null or p_amount_tax is null or p_currency is null or p_method is null then
+    raise exception 'INVALID_INPUT' using detail = 'payment fields are all required';
+  end if;
+
+  v_change := public.apply_purchase(p_user_id, p_product_id, p_payment_id);
+
+  if v_change.applied then
+    insert into public.payments
+      (user_id, product_id, channel, waffo_order_id, amount_total, amount_tax, currency, method)
+    values
+      (p_user_id, p_product_id, 'waffo', p_order_id, p_amount_total, p_amount_tax, lower(p_currency), p_method);
+  end if;
+
+  return v_change;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."settle_waffo_order"("p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."sync_subscription"("p_subscription_id" "text", "p_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -2179,6 +2207,11 @@ GRANT ALL ON FUNCTION "public"."set_job_visibility"("p_job_id" "uuid", "p_user_i
 
 REVOKE ALL ON FUNCTION "public"."settle_checkout"("p_user_id" "uuid", "p_product_id" "text", "p_session_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_invoice_id" "text", "p_charge_id" "text", "p_subscription_id" "text", "p_subscription_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."settle_checkout"("p_user_id" "uuid", "p_product_id" "text", "p_session_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_invoice_id" "text", "p_charge_id" "text", "p_subscription_id" "text", "p_subscription_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."settle_waffo_order"("p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."settle_waffo_order"("p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") TO "service_role";
 
 
 
