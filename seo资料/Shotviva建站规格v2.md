@@ -51,7 +51,7 @@ E Can I use the photos commercially?（答：付费积分生成的作品无水�
 8 how to take better food photos with my iPhone
 分配：1/2/4 → /ai-food-photography 与 /commercial-photography；3 → /ai-restaurant-menu；6/8 → 博客；5 → 物料期 /restaurant-flyer；7 → 菜单页。首页不再承接这 8 句中的任何一句（原来由首页兼顾的 2 改由 /commercial-photography 承接）。
 G7 榜单与对比页（AI 回答推荐类问题的主要来源）必做三篇：best AI food photography tools 2026；Shotviva vs hiring a photographer（成本对比）；foodshot.ai alternatives / ezmaker.ai alternatives。规矩：真实列出竞品并给客观描述，纯自夸的榜单 AI 不引用。排期：Shotviva vs hiring a photographer 并入 /commercial-photography 的成本对比，不另建页；另外两篇作为博客排在第 3 周，URL 已登记在主词表 CSV，搜索量核实后再建。
-G8 实体信息写全：每页页脚或 About 说明是谁做的、何时上线、服务哪些国家、联系方式（AI 判断可信度会看实体是否明确）。
+G8 实体信息写全：说明是谁做的、何时上线、服务哪些国家、联系方式（AI 判断可信度会看实体是否明确）。放在法律页的联系方式一节和 Organization 结构化数据里；页脚只放联系邮箱和版权（Owner 2026-11-06）。
 G9 站外要有独立来源（每月 3~5 个，持续不像一次砸完）：Reddit r/smallbusiness / r/Etsy / r/Flipping / r/restaurateur / r/Chefit / r/airbnb_hosts（回答问题不发广告，按分类分散）；Product Hunt 上线页；AI 工具目录（There's An AI For That、Futurepedia 等）；1~2 篇第三方评测或访谈。
 G10 robots 与 AI 抓取：robots.txt 放行上述五个爬虫，不要因怕被白嫖而屏蔽 AI 爬虫（GEO 是本站流量大头）；可选 /llms.txt 列主要页面与一句话说明。
 G11 服务端渲染 + 语义化 HTML：AI 抓取不看 JS 渲染后的 DOM，直答块/事实块/FAQ 必须在源码里；FAQ 用 <h3>+<p>，不用 <div> 拼。
