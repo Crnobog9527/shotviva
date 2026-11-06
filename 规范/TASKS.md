@@ -411,7 +411,7 @@
 
 **依据与底稿**：
 - 退款规则 Owner 定为「和 Graylum 一致」：以 Graylum **staging** 分支 `apps/web/content/legal/refund-policy.html` 为底稿改写；Graylum 条款里凡是依赖 Graylum 独有功能（自助退款页、后台退款流程等）的承诺，Shotviva v1 没有对应功能的，改写成「发邮件到 support@shotviva.com，人工在 Stripe / Waffo 后台处理」（ARCHITECTURE §10），并在 PR 里逐条列出改了哪些。卡支付走 Stripe Managed Payments 时由 Link 作为商户记录方，退款条款要与之相符（ARCHITECTURE §6.3）。
-- 服务条款、隐私政策同样参考 Graylum staging `terms.html`、`privacy.html` 的结构，但内容按 Shotviva 事实写：免费作品公开展示并带水印、付费作品私密可商用（§6.2）；用户对上传内容负责、画风模板只用通用风格（§5）；上传照片保留 7 天、成品保留到用户删除（§8.3）；需求墙参考图规则（§15.5）；第三方服务清单（Supabase、Cloudflare R2、OpenAI、Stripe / Link、Waffo、PostHog、Sentry、Resend、Vercel）；PostHog 不使用 Cookie（§16）；连接 Graylum 时共享的信息（账号 id、剩余积分，§14）；账号删除（§13）。
+- 服务条款、隐私政策同样参考 Graylum staging `terms.html`、`privacy.html` 的结构，但内容按 Shotviva 事实写：免费作品公开展示并带水印、付费作品私密可商用（§6.2）；用户对上传内容负责、画风模板只用通用风格（§5）；用来生成的照片随作品保留、没用的上传 7 天删除，成品保留到用户删除（§8.3）；需求墙参考图规则（§15.5）；第三方服务清单（Supabase、Cloudflare R2、OpenAI、Stripe / Link、Waffo、PostHog、Sentry、Resend、Vercel）；PostHog 不使用 Cookie（§16）；连接 Graylum 时共享的信息（账号 id、剩余积分，§14）；账号删除（§13）。
 - LAUNCH §8 全部条目。
 
 **验收**：
@@ -758,3 +758,17 @@
 - 上线前成本测量：20 张真实照片实测输入图 token（LAUNCH §5，花费 < $5），据此定 `high` 1K 是 2 还是 3 credits
 - Resend 域名验证
 - ~~价格数字定稿（pricing-research 窗口）~~ 已定稿 2026-11-05（ARCHITECTURE §6.2）；Waffo 费率仍待向商务确认
+
+## T40 输入图随作品保留，Make again 随时可用（可派）
+
+**目标**：Owner 2026-11-06 定：作品用的原图跟作品一起保留，保证 Make again 任何时候都能直接用（ARCHITECTURE §8.3「输入图随作品保留」）。
+
+**范围**：
+- 结算时把这次的全部输入图用 R2 服务端复制写到 `outputs/{user_id}/{job_id}-in-{n}.jpg`，把这些 key 记在任务上（优先放进现有字段；确实要加列时迁移编号段 `0320`～`0339`）。复制失败只记日志，不影响结算和扣费。
+- Make again：作品有保存的输入图时，服务端把它复制成新的 `inputs/{user_id}/{uuid}.jpg`，工作台按旧作品预填模板、尺寸、清晰度、补充说明和照片，直接可以生成，生成链路不变。没有保存的输入图时（T40 之前的老作品、复制失败），走 T6 稿的「原图已删，请再加一次照片」状态（`workspace.html?again=expired`）。
+- 删除作品时一起删这些输入图；删号按 `outputs/{user_id}/` 前缀已覆盖，确认一下。
+- 768 原图小图（T32）照旧，详情页继续用它。
+- 隐私政策中英文改成 §8.3 末尾那句。后台查看作品的「已过期」只对老作品出现。
+- `inputs/` 的 7 天生命周期规则不动。
+
+**验收**：新作品过 7 天后 Make again 仍然直接带着照片；删作品后输入图副本也没了；老作品走重新上传状态；复制失败不影响结算；单测和数据库测试覆盖；交互验收交给 Codex。
