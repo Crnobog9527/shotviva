@@ -14,6 +14,7 @@ describe('admin nav', () => {
       'providers',
       'requests',
       'announcements',
+      'features',
     ])
     expect(adminNavItems({ wishlist: false }).map((item) => item.key)).not.toContain('requests')
   })
