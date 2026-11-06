@@ -298,6 +298,7 @@
       "share": "Share",
       "download": "Download",
       "longPress": "Long-press to save",
+      "showTransparency": "Show transparency",
       "makeAnotherWith": "Make another with {name}",
       "shareText": "Made with {brand} {url}"
     },
