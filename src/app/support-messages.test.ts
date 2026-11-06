@@ -31,3 +31,10 @@ describe('submit form pickers', () => {
     ])
   })
 })
+
+describe('reply time copy (T27b)', () => {
+  it('promises only what the tier gets', () => {
+    expect(t('replyTime', { hours: 48 })).toBe('We reply here, usually within 48 hours.')
+    expect(t('replyTimeMax', { hours: 24 })).toBe('Max members get a reply within 24 hours.')
+  })
+})

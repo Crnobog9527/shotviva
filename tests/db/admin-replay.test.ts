@@ -121,6 +121,7 @@ describe('admin_todo_counts', () => {
       pendingRequests: expect.any(Number),
       paymentIssues: expect.any(Number),
       openTickets: expect.any(Number),
+      overdueTickets: expect.any(Number),
     })
     // A disputed payment shows up (other files may add their own in parallel).
     const userId = await createUser(db)
