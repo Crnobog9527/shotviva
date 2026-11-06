@@ -3,6 +3,7 @@
 // the card is a server component.
 export { cancelAllSubscriptions } from './cancel-all'
 export { createPortalUrl } from './portal'
-export { readSubscriptionSummary } from './read-summary'
+export { lastMembership, planAllowance, type Allowance, type LastMembership, type PaymentFact } from './membership-facts'
+export { readMemberSince, readSubscriptionSummary } from './read-summary'
 export { PlanCard } from './plan-card'
 export { summarizeSubscription, type MirrorRow, type SubscriptionState, type SubscriptionSummary } from './summary'

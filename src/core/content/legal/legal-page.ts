@@ -19,6 +19,8 @@ export type LegalSection = {
   id: string
   heading: string
   blocks: readonly [LegalBlock, ...LegalBlock[]]
+  // Not counted in the numbering (legal.html: "Third-party notices" closes the Terms unnumbered).
+  plain?: true
 }
 
 export type LegalPage = {
@@ -38,12 +40,16 @@ export function defineLegalPage<const T extends LegalPage>(page: T): T {
   return page
 }
 
-// "November 5, 2026". Pinned to UTC so the build machine's time zone never shifts the day.
+// "6 November 2026", as legal.html. The pages are English only (ARCHITECTURE §17). Pinned to UTC
+// so the build machine's time zone never shifts the day.
 export function formatLegalDate(iso: string): string {
-  return new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-US', {
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', {
     timeZone: 'UTC',
     year: 'numeric',
     month: 'long',
     day: 'numeric',
   })
 }
+
+// The four pages as the row of links under the title (legal.html .set).
+export type LegalNavItem = { href: string; label: string; current: boolean }
