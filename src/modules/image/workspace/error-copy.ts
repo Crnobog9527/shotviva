@@ -22,3 +22,25 @@ export function refundLine(failure: JobFailure, t: Translate): string {
 // TIER_REQUIRED would only fail again; it gets the plan's paywall instead.
 export const canRetry = (failure: JobFailure) =>
   !['CONTENT_REJECTED', 'IMAGE_TOO_LARGE', 'IMAGE_UNSUPPORTED', 'CREDITS_INSUFFICIENT', 'TIER_REQUIRED'].includes(failure.code)
+
+// Failures that say nothing beyond "try again": the settled panel's own line covers them, so
+// only a reason the user can act on (a rejected photo, a full queue) is shown next to it.
+const GENERIC_FAILURES = new Set(['INTERNAL', 'GENERATION_FAILED', 'PROVIDER_FAILED', 'PROVIDER_TIMEOUT', 'OUTPUT_WRITE_FAILED'])
+
+export function specificReason(failure: JobFailure, t: Translate, values?: Record<string, string>): string | null {
+  if (GENERIC_FAILURES.has(failure.code) || !t.has(failure.code)) return null
+  return t(failure.code, values)
+}
+
+// Where the credits of a failed photo stand, for a select in the copy: refunded, on hold
+// (the refund failed), or never charged.
+export const refundState = (failure: JobFailure) => (failure.refunded === true ? 'refunded' : failure.refunded === false ? 'hold' : 'none')
+
+const UNKNOWN_FAILURE: JobFailure = { code: 'INTERNAL', message: '', refunded: null }
+
+// A failed job as the settled views read it: its failure (a generic one if none was stored), and
+// whether Retry can resend it (`resendable`: the workspace needs the uploaded photo still there).
+export function readFailure(failure: JobFailure | null, resendable = true): { failure: JobFailure; retry: boolean } {
+  const read = failure ?? UNKNOWN_FAILURE
+  return { failure: read, retry: canRetry(read) && resendable }
+}

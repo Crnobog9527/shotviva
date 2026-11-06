@@ -37,8 +37,8 @@ function DesktopSheet({ open, onOpenChange, title, description, hint, sample, fo
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-90 bg-[var(--scrim)] backdrop-blur-[2px]" />
-        <DialogPrimitive.Content className="shadow-sheet fixed top-1/2 left-1/2 z-100 grid h-[min(calc(100dvh-64px),880px)] w-[min(1040px,calc(100%-32px))] -translate-1/2 grid-cols-[46fr_54fr] overflow-hidden rounded-panel bg-popover outline-none">
+        <DialogPrimitive.Overlay className="scrim-motion fixed inset-0 z-90 bg-[var(--scrim)] backdrop-blur-[2px]" />
+        <DialogPrimitive.Content className="dialog-motion shadow-sheet fixed top-1/2 left-1/2 z-100 grid h-[min(calc(100dvh-64px),880px)] w-[min(1040px,calc(100%-32px))] -translate-1/2 grid-cols-[46fr_54fr] overflow-hidden rounded-panel bg-popover outline-none">
           <div className="no-scrollbar flex min-h-0 flex-col justify-center overflow-y-auto bg-card p-6 shadow-[inset_-1px_0_0_var(--border)]">
             {sample}
             <DialogPrimitive.Title className="pt-5 font-display text-h1 leading-[1.05] tracking-[-0.02em]">{title}</DialogPrimitive.Title>

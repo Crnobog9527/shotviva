@@ -10,8 +10,7 @@ import type { CreditsCost } from '@/core/templates/pricing'
 
 import { retryJob, startJob } from '../generation/job-store'
 import { useJob } from '../generation/use-jobs'
-import { GeneratingView } from '../workspace/generating-view'
-import { EditFailure } from './edit-failure'
+import { EditDeveloping, EditFailure } from './edit-states'
 import { EditPanel } from './edit-panel'
 import type { EditDraft, EditSource } from './edit-source'
 
@@ -60,9 +59,9 @@ export function EditFlow({ source, balance, creditsCost, concurrency, children }
     setOpen(true)
   }
 
-  if (job && (job.status === 'queued' || job.status === 'running')) return <GeneratingView job={job} />
+  if (job && (job.status === 'queued' || job.status === 'running')) return <EditDeveloping job={job} source={source} />
   if (job?.status === 'failed') {
-    return <EditFailure job={job} onRetry={() => setJobId(retryJob(job.id, concurrency))} onChange={changeRequest} />
+    return <EditFailure job={job} source={source} onRetry={() => setJobId(retryJob(job.id, concurrency))} onChange={changeRequest} />
   }
   return (
     <OpenEdit.Provider value={() => setOpen(true)}>

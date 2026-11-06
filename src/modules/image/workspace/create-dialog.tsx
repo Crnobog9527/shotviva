@@ -1,6 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
+import { useState } from 'react'
 
 import { limitsFor } from '@/core/billing/tier-limits'
 import { useRouter } from '@/core/i18n'
@@ -24,11 +25,16 @@ type Props = CreateContext & { template: CatalogueTemplate | null; onClose(): vo
 // page, which shows it developing; the jobs run in the app-wide generation store, so the move
 // does not interrupt them.
 export function CreateDialog({ template, onClose, ...context }: Props) {
+  // The last template stays mounted while the dialog closes, so its closing motion can play.
+  const [shown, setShown] = useState(template)
+  if (template && template !== shown) setShown(template)
   // A new template starts a new draft: the body remounts per template.
-  return template ? <CreateBody key={template.id} template={template} onClose={onClose} {...context} /> : null
+  return shown ? <CreateBody key={shown.id} template={shown} open={template !== null} onClose={onClose} {...context} /> : null
 }
 
-function CreateBody({ template, onClose, ...context }: CreateContext & { template: CatalogueTemplate; onClose(): void }) {
+type BodyProps = CreateContext & { template: CatalogueTemplate; open: boolean; onClose(): void }
+
+function CreateBody({ template, open, onClose, ...context }: BodyProps) {
   const t = useTranslations('app.template')
   const label = useCategoryLabel()
   const router = useRouter()
@@ -42,8 +48,8 @@ function CreateBody({ template, onClose, ...context }: CreateContext & { templat
   }
   return (
     <CreateSheet
-      open
-      onOpenChange={(open) => !open && onClose()}
+      open={open}
+      onOpenChange={(next) => !next && onClose()}
       title={template.name}
       description={[label(template.category), template.description].filter(Boolean).join(' · ')}
       hint={t(tall ? 'hintCompare' : 'hintPair')}
