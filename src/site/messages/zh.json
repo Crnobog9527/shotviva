@@ -104,9 +104,38 @@
   "partner": {
     "connect": {
       "title": "连接 Graylum",
-      "explain": "Graylum 帮你出图时会使用你的 Shotviva 积分。你随时可以在「我的」页面断开连接。",
-      "allow": "允许 Graylum 使用我的积分",
-      "invalid": "这个连接链接无效，请回到 Graylum 重新发起。"
+      "allow": {
+        "title": "要让 Graylum 用你的 Shotviva 积分出图吗？",
+        "signedIn": "你当前登录的是 <b>{email}</b>。Graylum 想使用这个账号。",
+        "makeTitle": "在 Graylum 里直接出图",
+        "makeLine": "每张都从这个账号扣积分，价格和在这里一样。",
+        "balanceTitle": "查看你的余额",
+        "balanceLine": "Graylum 只拿到你的账号 ID 和剩余积分，别的都拿不到，也拿不到密码。",
+        "disconnectTitle": "随时可以断开",
+        "disconnectLine": "在「账号 → 连接的应用」里断开。已经做好的图仍留在你的作品里。",
+        "cta": "允许 Graylum",
+        "cancel": "取消并返回 Graylum",
+        "notYou": "不是你？<link>换一个账号登录</link>。"
+      },
+      "done": {
+        "title": "已连接",
+        "line": "正在返回 Graylum。如果几秒后没有反应，请<link>打开 Graylum</link>。"
+      },
+      "already": {
+        "title": "Graylum 已经连接",
+        "line": "这个账号自 {date, date, medium} 起已连接。返回 Graylum 会重新连接，不会有任何变化。",
+        "back": "返回 Graylum",
+        "manage": "在账号里管理"
+      },
+      "error": {
+        "invalidTitle": "这个连接链接无效",
+        "invalidLine": "它可能已过期、已经用过，或者不是从 Graylum 发出的。请回到 Graylum，重新点「连接 Shotviva」。",
+        "failedTitle": "出了点问题",
+        "failedLine": "暂时没能连接 Graylum。请回到 Graylum，重新点「连接 Shotviva」。",
+        "back": "返回 Graylum",
+        "toShotviva": "去 Shotviva",
+        "fine": "没有连接任何账号，也没有扣任何积分。"
+      }
     },
     "account": {
       "title": "Graylum",
@@ -297,6 +326,11 @@
         "missingOld": "这张作品是在我们开始保留原图之前做的。把同一张照片再加一次，其余设置都和原来一样。",
         "missingFailed": "暂时没能取回原图。把同一张照片再加一次，其余设置都和原来一样。",
         "addFirst": "先添加照片。<b>之后和其他照片一样，扣 {count} 积分。</b>"
+      },
+      "tile": {
+        "add": "添加照片",
+        "remove": "删除照片",
+        "failed": "没能上传，删掉后换一张试试。"
       }
     },
     "errors": {
@@ -419,13 +453,12 @@
       "empty": "告诉我们你需要什么模板",
       "wantThis": "我也想要",
       "wantThisAria": "我也想要，{count} 票",
-      "by": "{name} 许愿",
       "shipped": "已上线",
       "imageAlt": "参考图 {index} / {count}",
       "showMore": "查看更多",
       "loading": "加载中…",
       "loadFailed": "没能加载更多，请重试。",
-      "sent": "已提交审核",
+      "sent": "<b>已提交审核。</b>通过后会出现在墙上。",
       "voteErrors": {
         "CONFLICT": "这个许愿已经不在墙上了。",
         "FORBIDDEN": "先做一张图才能参与",
@@ -433,11 +466,8 @@
       },
       "new": {
         "title": "许愿一个模板",
-        "photosHeading": "参考图",
-        "photosHint": "添加 {min} 到 {max} 张你想要的效果图。",
-        "addAnother": "再加一张",
-        "remove": "删除这张",
-        "describe": "描述你想要的效果",
+        "photosHint": "{formats} · 每张不超过 {mb} MB · {min} 到 {max} 张",
+        "describe": "想要的效果",
         "placeholder": "描述你想要的效果，例如：给周末早午餐菜单做一张暗调氛围海报",
         "counter": "{count}/{max}",
         "submit": "提交",
@@ -447,7 +477,12 @@
           "RATE_LIMITED": "你今天已经许了 5 个愿，明天再来吧。",
           "INVALID_INPUT": "请添加 1 到 3 张图，并写一句简短的描述。",
           "generic": "没能提交，请重试。"
-        }
+        },
+        "heading": "想要什么样的效果？",
+        "why": "描述你想要的效果，并配一张参考图：可以是那种风格的照片，也可以是你自己的菜品或商品。",
+        "photosLabel": "参考图，最多 {max} 张",
+        "upTo": "最多 {count} 张",
+        "left": "还能加 {count} 张"
       },
       "mine": {
         "title": "我的许愿",
@@ -458,8 +493,16 @@
           "live": "展示中",
           "shipped": "已上线",
           "rejected": "未通过"
-        }
-      }
+        },
+        "emptyLine": "去墙上投票，或者许一个我们还没有的效果。",
+        "toWall": "去许愿墙"
+      },
+      "lede": "说出你需要的模板，票数最多的先做。",
+      "byline": "{name} · {when}",
+      "nowTemplate": "已做成 <b>{name}</b> 模板",
+      "votesAria": "{count} 票",
+      "dismiss": "关闭",
+      "emptyLine": "描述你想要的效果，再配一张参考图。票数最多的先做。"
     },
     "account": {
       "metaTitle": "我的",

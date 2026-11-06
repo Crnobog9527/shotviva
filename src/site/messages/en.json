@@ -104,9 +104,38 @@
   "partner": {
     "connect": {
       "title": "Connect Graylum",
-      "explain": "Graylum will use your Shotviva credits when it makes images for you. You can disconnect it any time from your account page.",
-      "allow": "Allow Graylum to use your credits",
-      "invalid": "This connect link is not valid. Go back to Graylum and try again."
+      "allow": {
+        "title": "Let Graylum make photos with your Shotviva credits?",
+        "signedIn": "You're logged in as <b>{email}</b>. Graylum would like to use this account.",
+        "makeTitle": "Make photos from inside Graylum",
+        "makeLine": "Each one is charged to this account, at the same credit price as here.",
+        "balanceTitle": "See your balance",
+        "balanceLine": "Graylum gets your account id and how many credits are left. Nothing else, and no password.",
+        "disconnectTitle": "Disconnect any time",
+        "disconnectLine": "From Account → Integrations. Photos already made stay in your Photos.",
+        "cta": "Allow Graylum",
+        "cancel": "Cancel and go back to Graylum",
+        "notYou": "Not you? <link>Log in with a different account</link>."
+      },
+      "done": {
+        "title": "Connected",
+        "line": "Taking you back to Graylum. If nothing happens in a few seconds, <link>open Graylum</link>."
+      },
+      "already": {
+        "title": "Graylum is already connected",
+        "line": "This account has been connected since {date, date, medium}. Going back to Graylum will reconnect it with no change.",
+        "back": "Back to Graylum",
+        "manage": "Manage in Account"
+      },
+      "error": {
+        "invalidTitle": "This connection link isn't valid",
+        "invalidLine": "It may have expired, been used already, or come from somewhere other than Graylum. Start again from Graylum's \"Connect Shotviva\" button.",
+        "failedTitle": "Something went wrong",
+        "failedLine": "We couldn't connect Graylum just now. Start again from Graylum's \"Connect Shotviva\" button.",
+        "back": "Back to Graylum",
+        "toShotviva": "Go to Shotviva",
+        "fine": "Nothing was connected and nothing was charged."
+      }
     },
     "account": {
       "title": "Graylum",
@@ -297,6 +326,11 @@
         "missingOld": "This work was made before we started keeping originals. Add the same photo again and everything else is as it was.",
         "missingFailed": "We couldn't bring back the original just now. Add the same photo again and everything else is as it was.",
         "addFirst": "Add the photo first. <b>Then it costs {count} credits, like any photo.</b>"
+      },
+      "tile": {
+        "add": "Add a photo",
+        "remove": "Remove photo",
+        "failed": "Couldn't upload. Remove it and try another."
       }
     },
     "errors": {
@@ -419,13 +453,12 @@
       "empty": "Tell us what template you need",
       "wantThis": "I want this too",
       "wantThisAria": "I want this too, {count, plural, one {# vote} other {# votes}}",
-      "by": "Requested by {name}",
       "shipped": "Shipped",
       "imageAlt": "Reference photo {index} of {count}",
       "showMore": "Show more",
       "loading": "Loading…",
       "loadFailed": "Couldn't load more. Try again.",
-      "sent": "Sent for review",
+      "sent": "<b>Sent for review.</b> It shows on the wall once approved.",
       "voteErrors": {
         "CONFLICT": "This request is no longer on the wall.",
         "FORBIDDEN": "Create one photo first to join",
@@ -433,11 +466,8 @@
       },
       "new": {
         "title": "Request a template",
-        "photosHeading": "Reference photos",
-        "photosHint": "Add {min} to {max} photos of the look you want.",
-        "addAnother": "Add another photo",
-        "remove": "Remove this photo",
-        "describe": "Describe the look you want",
+        "photosHint": "{formats} · up to {mb} MB each · {min} to {max} photos",
+        "describe": "The look",
         "placeholder": "Describe the look you want, e.g. a dark moody poster for our weekend brunch menu",
         "counter": "{count}/{max}",
         "submit": "Submit",
@@ -447,7 +477,12 @@
           "RATE_LIMITED": "You've sent 5 requests today. Try again tomorrow.",
           "INVALID_INPUT": "Add 1 to 3 photos and a short description.",
           "generic": "Couldn't send your request. Try again."
-        }
+        },
+        "heading": "What should it look like?",
+        "why": "Describe the look you want and add a reference photo: a photo in that style, or your own dish or product.",
+        "photosLabel": "Reference photos, up to {max}",
+        "upTo": "up to {count}",
+        "left": "{count} left"
       },
       "mine": {
         "title": "My requests",
@@ -458,8 +493,16 @@
           "live": "Live",
           "shipped": "Shipped",
           "rejected": "Rejected"
-        }
-      }
+        },
+        "emptyLine": "Vote on the wall, or ask for a look we don't have.",
+        "toWall": "Go to the wall"
+      },
+      "lede": "Ask for the template you need. The ones with the most votes get made first.",
+      "byline": "{name} · {when}",
+      "nowTemplate": "Now the <b>{name}</b> template",
+      "votesAria": "{count, plural, one {# vote} other {# votes}}",
+      "dismiss": "Dismiss",
+      "emptyLine": "Describe the look and add a reference photo. Requests with the most votes get made first."
     },
     "account": {
       "metaTitle": "Account",
