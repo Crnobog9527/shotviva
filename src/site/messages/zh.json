@@ -947,7 +947,9 @@
       "tagline": "AI 影棚",
       "templates": "模板",
       "login": "登录",
-      "startFree": "免费开始"
+      "startFree": "免费开始",
+      "openApp": "进入应用",
+      "account": "账号"
     },
     "hero": {
       "label": "前后对比",

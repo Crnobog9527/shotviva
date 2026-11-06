@@ -48,6 +48,7 @@ export {
   type LegalText,
 } from './legal/legal-page'
 export { LegalPageView } from './legal/legal-page-view'
+export { NavAccount } from './blocks/nav-account'
 export { NotFoundView } from './blocks/not-found-view'
 export { PROBLEM_GHOST, PROBLEM_PRIMARY, ProblemView } from './blocks/problem-view'
 export { TryTemplates, type TryTemplate } from './blocks/try-templates'
