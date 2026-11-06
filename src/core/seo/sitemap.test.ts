@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { isIndexable } from './indexing'
-import { pageSitemapUrls, sitemapIndexXml, urlsetXml } from './sitemap'
+import { pageSitemapUrls, sitemapIndexXml, urlsetXml, zhSitemapUrls } from './sitemap'
 import { testSite, withImageOff } from './test-site'
 
 // These cases describe the open site (SITE_INDEXING=on in production); the closed, pre-launch
@@ -28,6 +28,15 @@ describe('sitemap', () => {
     const xml = sitemapIndexXml(testSite())
     expect(xml).toContain('<sitemapindex')
     expect(xml).toContain('<loc>https://example.com/sitemap-pages.xml</loc>')
+    expect(xml).toContain('<loc>https://example.com/sitemap-zh.xml</loc>')
+  })
+
+  it('lists only indexable, translated /zh pages in the Chinese sitemap', () => {
+    expect(zhSitemapUrls(testSite())).toEqual(['https://example.com/zh'])
+    const site = testSite()
+    // A path in zhIndexablePaths without a Chinese version never reaches the sitemap.
+    const listed = { ...site, indexing: { ...site.indexing, zhIndexablePaths: ['/', '/terms'] as const } }
+    expect(zhSitemapUrls(listed)).toEqual(['https://example.com/zh'])
   })
 })
 

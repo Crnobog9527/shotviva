@@ -96,7 +96,7 @@ describe('order.completed', () => {
     const profile = await profileOf(db, userId)
     expect(profile.credits).toBe(1620)
     expect(daysFromNow(profile.paid_until)).toBeCloseTo(365, 2)
-    expect(trackBuy).toHaveBeenCalledWith(userId, expect.objectContaining({ product_id: 'pro_yearly', channel: 'waffo', method: 'alipay', form: 'one_time' }))
+    expect(trackBuy).toHaveBeenCalledWith(userId, expect.objectContaining({ product_id: 'pro_yearly', channel: 'waffo', method: 'alipay', form: 'one_time' }), 'en')
   })
 
   it('a pack adds paid credits and leaves paid_until alone', async () => {

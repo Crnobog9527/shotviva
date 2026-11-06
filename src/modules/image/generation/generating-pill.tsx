@@ -1,6 +1,6 @@
 'use client'
 
-import Link from 'next/link'
+import { Link } from '@/core/i18n/ui'
 import { useTranslations } from 'next-intl'
 
 import { isActive } from './scheduler'

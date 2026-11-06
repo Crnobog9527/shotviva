@@ -44,9 +44,10 @@ describe('legal pages (T19)', () => {
     }
   })
 
-  it('links only to pages that exist, our own email or https', () => {
+  it('links only to pages that exist, files in public/, our own email or https', () => {
     // '/account/help' is Help & feedback (T27), where the refund policy sends signed-in users.
-    const known = new Set([...PATHS, '/pricing', '/account/help'])
+    // The MiSans licence ships in public/fonts/misans/ (Third-party notices on the Terms page).
+    const known = new Set([...PATHS, '/pricing', '/account/help', '/fonts/misans/LICENSE.pdf'])
     for (const link of legalPages.flatMap(pageLinks)) {
       if (link.href.startsWith('/')) expect(known).toContain(link.href)
       else if (link.href.startsWith('mailto:')) expect(link.href).toBe(`mailto:${site.brand.contactEmail}`)
@@ -86,5 +87,19 @@ describe('legal pages (T19)', () => {
         expect(source, `${file} contains "${literal}"`).not.toContain(literal)
       }
     }
+  })
+})
+
+describe('MiSans attribution (ARCHITECTURE §17, DESIGN §6.9)', () => {
+  it('sits in the Terms page under Third-party notices and links the licence', () => {
+    const notices = termsPage.sections.find((section) => section.id === 'third-party-notices')
+    expect(notices?.heading).toBe('Third-party notices')
+    const text = JSON.stringify(notices?.blocks)
+    expect(text).toContain('This site uses the MiSans font, © Xiaomi.')
+    expect(notices?.blocks.flatMap(blockLinks).map((link) => link.href)).toContain('/fonts/misans/LICENSE.pdf')
+    // The self-hosted Latin fonts, as their OFL files state them.
+    expect(text).toContain('Copyright 2024 The Geist Project Authors')
+    expect(text).toContain('Copyright 2022 The Instrument Serif Project Authors')
+    expect(text).toContain('SIL Open Font License, Version 1.1')
   })
 })

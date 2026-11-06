@@ -1,4 +1,5 @@
-import { createElement } from 'react'
+import { NextIntlClientProvider } from 'next-intl'
+import { createElement, type ComponentProps } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
@@ -51,7 +52,13 @@ describe('SiteFooter', () => {
   it('shows the official-site statement, contact, copyright and the legal links, not the operating entity', () => {
     const { brand } = testSite()
     const links = [{ href: '/terms', label: 'Terms' }] as const
-    const html = renderToStaticMarkup(createElement(SiteFooter, { brand, links }))
+    const messages = { footer: { language: 'Language' } }
+    const provider: ComponentProps<typeof NextIntlClientProvider> = {
+      locale: 'en',
+      messages,
+      children: createElement(SiteFooter, { brand, links }),
+    }
+    const html = renderToStaticMarkup(createElement(NextIntlClientProvider, provider))
     expect(html).toContain('example.com is the only official Example site.')
     expect(html).toContain('© 2026 Example</p>')
     expect(html).not.toContain('operated by')
@@ -59,5 +66,7 @@ describe('SiteFooter', () => {
     expect(html).not.toContain('1 Main St')
     expect(html).toContain('href="mailto:hi@example.com"')
     expect(html).toContain('href="/terms"')
+    // The MiSans attribution moved to the Terms page (ARCHITECTURE §17).
+    expect(html).not.toContain('MiSans')
   })
 })

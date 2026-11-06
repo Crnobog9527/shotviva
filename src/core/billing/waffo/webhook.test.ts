@@ -93,7 +93,7 @@ describe('handleWaffoWebhook', () => {
       p_amount_tax: 159,
       p_method: 'alipay',
     })
-    expect(deps.trackBuy).toHaveBeenCalledWith(USER, expect.objectContaining({ channel: 'waffo', form: 'one_time', method: 'alipay', amount_usd: 19.9 }))
+    expect(deps.trackBuy).toHaveBeenCalledWith(USER, expect.objectContaining({ channel: 'waffo', form: 'one_time', method: 'alipay', amount_usd: 19.9 }), 'en')
   })
 
   it('records a refund without touching credits, and ignores other events', async () => {

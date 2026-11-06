@@ -1,5 +1,5 @@
 import Image from 'next/image'
-import Link from 'next/link'
+import { Link } from '../../i18n/ui'
 
 import type { HeroBlock, ImageRef } from '../page-content'
 

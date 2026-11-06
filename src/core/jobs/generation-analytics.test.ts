@@ -72,11 +72,11 @@ describe('settleTracked', () => {
 
   it('sends one succeeded event per settled job', async () => {
     const track = vi.fn<ServerTrack>()
-    await expect(settleTracked(job, 'food', async () => 'done', { track, now: clock() })).resolves.toBe('done')
+    await expect(settleTracked(job, 'food', async () => 'done', { track, now: clock(), locale: 'zh' })).resolves.toBe('done')
     expect(track).toHaveBeenCalledExactlyOnceWith(
       'generate',
       expect.objectContaining({ status: 'succeeded', duration_ms: 500 }),
-      { distinctId: job.userId },
+      { distinctId: job.userId, locale: 'zh' },
     )
   })
 
@@ -86,6 +86,8 @@ describe('settleTracked', () => {
     await expect(settleTracked(job, 'food', () => Promise.reject(failure), { track })).rejects.toBe(failure)
     expect(track).toHaveBeenCalledWith('generate', expect.objectContaining({ status: 'failed', error_code: 'PROVIDER_TIMEOUT' }), {
       distinctId: job.userId,
+      // No page language known (e.g. a partner call): English.
+      locale: 'en',
     })
   })
 })

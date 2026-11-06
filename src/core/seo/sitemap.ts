@@ -1,10 +1,10 @@
 import type { SiteConfig } from '../config'
-import { indexablePaths, type PageGate } from './indexing'
+import { indexablePaths, zhIndexablePaths, type PageGate } from './indexing'
 import { absoluteUrl, siteOrigin } from './site-url'
 
-// Sitemap index + child sitemaps (建站规格 R6). Only `pages` exists in v1; templates,
-// blog and locale sitemaps are added here when those pages exist.
-export const SITEMAP_NAMES = ['sitemap-pages'] as const
+// Sitemap index + child sitemaps (建站规格 R6): English pages, and one sitemap per extra
+// language (§6). Templates and blog sitemaps are added here when those pages exist.
+export const SITEMAP_NAMES = ['sitemap-pages', 'sitemap-zh'] as const
 
 function escapeXml(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -25,6 +25,11 @@ export function sitemapIndexXml(site: SiteConfig): string {
 
 export function pageSitemapUrls(site: SiteConfig, gates: readonly PageGate[] = []): string[] {
   return indexablePaths(site, gates).map((path) => absoluteUrl(site, path))
+}
+
+// Only the /zh pages of the Chinese keyword map (LAUNCH §7.6: three in v1).
+export function zhSitemapUrls(site: SiteConfig, gates: readonly PageGate[] = []): string[] {
+  return zhIndexablePaths(site, gates).map((path) => absoluteUrl(site, path))
 }
 
 export function urlsetXml(urls: readonly string[]): string {

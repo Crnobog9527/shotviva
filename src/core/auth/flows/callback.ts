@@ -20,7 +20,7 @@ async function resolveOutcome(request: NextRequest, jar: CookieToSet[], flow: Ca
       return { kind: 'error', error: flow === 'oauth' ? 'oauth_failed' : 'callback_failed', flow } satisfies CallbackOutcome
     }
   }
-  return landOnSession(supabase, flow, freeCredits)
+  return landOnSession(supabase, flow, freeCredits, params.get('next'))
 }
 
 // Landing for Google OAuth. Email links now go to /auth/confirm; this still accepts the old

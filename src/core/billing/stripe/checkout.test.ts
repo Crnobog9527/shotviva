@@ -82,7 +82,7 @@ describe('createCheckout routing', () => {
       form: 'subscription',
       channel: 'stripe',
       method: 'card',
-    })
+    }, 'zh')
   })
 
   it('opens Alipay as a one-time payment for one period, Shotviva as seller', async () => {
@@ -98,7 +98,7 @@ describe('createCheckout routing', () => {
     })
     expect(params).not.toHaveProperty('managed_payments')
     expect(params).not.toHaveProperty('payment_method_types')
-    expect(d.trackStart).toHaveBeenCalledWith(USER, expect.objectContaining({ form: 'one_time', method: 'alipay', interval: 'year' }))
+    expect(d.trackStart).toHaveBeenCalledWith(USER, expect.objectContaining({ form: 'one_time', method: 'alipay', interval: 'year' }), 'en')
   })
 
   it('sells a pack by card as a Managed Payments one-time payment', async () => {

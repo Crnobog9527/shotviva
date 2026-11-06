@@ -51,7 +51,8 @@ beforeAll(async () => {
   const { apiUrl, anonKey } = localSupabase()
   process.env.NEXT_PUBLIC_SUPABASE_URL = apiUrl
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = anonKey
-  proxyGate = (await import('@/core/auth')).proxyGate
+  const { proxyGate: gate, forwardRequest } = await import('@/core/auth/proxy')
+  proxyGate = (request) => gate(request, { translatedPaths: [], forward: forwardRequest })
   const { adminNavItems } = await import('@/core/admin')
   const nav = adminNavItems({ wishlist: true }).map((item) => item.href)
   adminPaths = [...nav, `/admin/users/${randomUUID()}`, '/admin/jobs?status=failed', '/admin/announcements?cursor=x', '/admin/']

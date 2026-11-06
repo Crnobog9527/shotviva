@@ -1,6 +1,6 @@
 'use client'
 
-import Link from 'next/link'
+import { Link } from '../../i18n/ui'
 import { useTranslations } from 'next-intl'
 
 import { buttonVariants } from '../../ui/button'

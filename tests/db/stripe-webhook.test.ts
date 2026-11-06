@@ -87,7 +87,7 @@ describe('checkout.session.completed', () => {
       method: 'card',
       amount_usd: 19.9,
       credits: 50,
-    })
+    }, 'en')
   })
 
   it('the same event delivered three times grants once and tracks once', async () => {
@@ -157,7 +157,7 @@ describe('checkout.session.completed', () => {
     expect(profile.credits).toBe(50)
     expect(daysFromNow(profile.paid_until)).toBeCloseTo(30, 2)
     expect(await mirrorOf(userId)).toEqual([])
-    expect(h.trackBuy).toHaveBeenCalledWith(userId, expect.objectContaining({ form: 'one_time', method: 'alipay' }))
+    expect(h.trackBuy).toHaveBeenCalledWith(userId, expect.objectContaining({ form: 'one_time', method: 'alipay' }), 'en')
   })
 
   it('a pack adds paid credits and leaves paid_until alone', async () => {

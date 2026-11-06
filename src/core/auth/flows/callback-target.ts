@@ -1,3 +1,4 @@
+import { localeOfPath, localizePath } from '../../i18n/paths'
 import { sanitizeNext } from '../redirect-target'
 import type { CallbackFlow } from './callback-url'
 
@@ -10,16 +11,19 @@ export type CallbackOutcome =
   | { kind: 'signed_in'; verified: boolean; userId: string; flow: CallbackFlow }
   | { kind: 'no_session'; flow: CallbackFlow }
 
-// Where the browser goes after /auth/callback. Pure so every branch is unit-tested.
+// Where the browser goes after /auth/callback. Pure so every branch is unit-tested. The
+// landing has no language of its own: it stays in the language `next` was written in
+// (`/zh/account` → the Chinese login and reset pages).
 export function callbackTarget(outcome: CallbackOutcome, nextParam: string | null): string {
   const next = sanitizeNext(nextParam)
+  const page = (path: string) => localizePath(path, localeOfPath(next))
   if (outcome.kind === 'error') {
-    if (outcome.flow === 'recovery') return '/reset?error=link_expired'
-    return `/login?error=${outcome.error}&next=${encodeURIComponent(next)}`
+    if (outcome.flow === 'recovery') return page('/reset?error=link_expired')
+    return page(`/login?error=${outcome.error}&next=${encodeURIComponent(next)}`)
   }
-  if (outcome.kind === 'no_session') return `/login?next=${encodeURIComponent(next)}`
-  if (outcome.flow === 'recovery') return '/reset/update'
-  if (!outcome.verified) return '/login?error=unverified'
+  if (outcome.kind === 'no_session') return page(`/login?next=${encodeURIComponent(next)}`)
+  if (outcome.flow === 'recovery') return page('/reset/update')
+  if (!outcome.verified) return page('/login?error=unverified')
   return next
 }
 

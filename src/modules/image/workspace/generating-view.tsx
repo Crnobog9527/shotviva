@@ -2,7 +2,7 @@
 
 import { useFormatter, useTranslations } from 'next-intl'
 /* eslint-disable @next/next/no-img-element -- local object URL of the picked photo */
-import Link from 'next/link'
+import { Link } from '@/core/i18n/ui'
 import type { ReactNode } from 'react'
 
 import { ActionBar } from '@/core/app-shell'

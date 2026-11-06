@@ -21,7 +21,35 @@ export const site = defineSite({
   },
   // A disabled module 404s, leaves the sitemap, nav and pricing (ARCHITECTURE §2).
   modules: { image: true, video: false },
-  locales: { default: 'en', enabled: ['en'] },
+  // English + Simplified Chinese (Owner 2026-11-06). Chinese covers only the 14 core-path
+  // pages of ARCHITECTURE §17; the wishlist and Graylum connect pages count with their steps.
+  locales: {
+    default: 'en',
+    enabled: ['en', 'zh'],
+    zhPaths: [
+      '/',
+      '/image-to-image-generator',
+      '/pricing',
+      '/signup',
+      '/login',
+      '/reset',
+      '/reset/update',
+      '/generate',
+      '/generate/[templateId]',
+      '/photos',
+      '/photos/[jobId]',
+      '/account',
+      // Help & feedback (T27) belongs to the account page.
+      '/account/help',
+      '/account/help/new',
+      '/account/help/[id]',
+      '/wishlist',
+      '/wishlist/new',
+      '/wishlist/mine',
+      '/connect/graylum',
+      '/connect/graylum/authorize',
+    ],
+  },
   billing: {
     currency: 'usd',
     // = 3 free Standard images at 2 credits each; public copy says "3 free Standard images" (建站规格 G3).
@@ -62,5 +90,7 @@ export const site = defineSite({
     indexablePaths: ['/', '/image-to-image-generator', '/pricing'],
     // The Vercel project's production address (ARCHITECTURE §12.0).
     canonicalRedirectHosts: ['shotviva.vercel.app'],
+    // seo资料/Shotviva 页面与主词映射（中文口径）.csv: the three indexable /zh pages.
+    zhIndexablePaths: ['/', '/image-to-image-generator', '/pricing'],
   },
 })

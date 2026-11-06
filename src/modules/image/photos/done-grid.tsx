@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import { Link } from '@/core/i18n/ui'
 import { useFormatter, useTranslations } from 'next-intl'
 
 import { GroundedImg } from '../result/grounded-img'

@@ -60,7 +60,7 @@ export function waffoSessionRequest(
     priceSnapshot: { amount: product.priceUsd.toFixed(2), taxIncluded: false, taxCategory: 'saas' },
     successUrl: `${deps.origin}${successPath(body.return_to, deps.returnToHosts)}`,
     expiresInSeconds: WAFFO_SESSION_TTL_SECONDS,
-    metadata: { user_id: input.userId, product_id: product.id, method: body.method },
+    metadata: { user_id: input.userId, product_id: product.id, method: body.method, locale: body.locale },
     orderMerchantExternalId: input.orderRef,
     language: body.locale === 'zh' ? 'zh-Hans' : 'en',
   }
@@ -86,6 +86,6 @@ export async function createWaffoCheckout(
     form: 'one_time',
     channel: 'waffo',
     method: input.body.method,
-  })
+  }, input.body.locale)
   return { url }
 }

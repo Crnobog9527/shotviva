@@ -1,0 +1,22 @@
+{
+  "locale": {
+    "switcher": {
+      "label": "语言",
+      "en": "English",
+      "zh": "中文"
+    },
+    "menu": {
+      "label": "Language / 语言",
+      "en": "English",
+      "zh": "简体中文"
+    },
+    "banner": {
+      "text": "这个页面有中文版。",
+      "switch": "切换到中文",
+      "dismiss": "关闭，继续看英文版"
+    }
+  },
+  "footer": {
+    "language": "语言"
+  }
+}

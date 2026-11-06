@@ -36,6 +36,32 @@ describe('metadata', () => {
   })
 })
 
+describe('metadata in two languages (建站规格 §6.1, LAUNCH §7.6)', () => {
+  it('gives every /zh page its own canonical and hreflang en / zh-Hans / x-default', () => {
+    const zh = pageMetadata(site, page, 'zh')
+    expect(zh.alternates?.canonical).toBe('https://example.com/zh')
+    const languages = {
+      en: 'https://example.com/',
+      'zh-Hans': 'https://example.com/zh',
+      'x-default': 'https://example.com/',
+    }
+    expect(zh.alternates?.languages).toEqual(languages)
+    expect(pageMetadata(site, page).alternates?.languages).toEqual(languages)
+  })
+
+  it('indexes only the Chinese keyword map pages under /zh', () => {
+    expect(pageMetadata(site, page, 'zh').robots).toEqual({ index: true, follow: true })
+    // /generate is indexable in English and translated, but not in zhIndexablePaths.
+    expect(pageMetadata(site, { ...page, path: '/generate' }, 'zh').robots).toEqual({ index: false, follow: false })
+  })
+
+  it('emits no hreflang on an English-only page', () => {
+    const terms = pageMetadata(site, { ...page, path: '/terms' })
+    expect(terms.alternates?.languages).toBeUndefined()
+    expect(terms.alternates?.canonical).toBe('https://example.com/terms')
+  })
+})
+
 describe('json-ld', () => {
   it('publishes the free offer and only decided prices', () => {
     const offers = softwareApplicationLd(site, page).offers as { name: string; price: string }[]

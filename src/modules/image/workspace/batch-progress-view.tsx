@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import Link from 'next/link'
+import { Link } from '@/core/i18n/ui'
 
 import { ActionBar } from '@/core/app-shell'
 import { buttonVariants } from '@/core/ui/button'

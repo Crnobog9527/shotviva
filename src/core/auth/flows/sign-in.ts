@@ -1,10 +1,11 @@
 import 'server-only'
 import { redirect } from 'next/navigation'
 
+import { currentLocale, localized } from '../../i18n/server'
 import { logger } from '../../logger'
 import { onVerifiedSignIn } from '../first-sign-in'
 import { sanitizeNext } from '../redirect-target'
-import { isEmailVerified } from '../session-user'
+import { isEmailVerified, metadataLocale } from '../session-user'
 import { createServerSupabase } from '../supabase-server'
 import { classifyAuthError } from './classify-auth-error'
 import { callbackUrl } from './callback-url'
@@ -31,7 +32,7 @@ export async function signInWithPassword(form: FormData, options: SignInOptions)
     await supabase.auth.signOut({ scope: 'local' })
     return failed('AUTH_EMAIL_NOT_CONFIRMED')
   }
-  await onVerifiedSignIn(data.user.id, options.freeCredits, 'email')
+  await onVerifiedSignIn(data.user.id, options.freeCredits, 'email', metadataLocale(data.user) ?? (await currentLocale()))
   redirect(sanitizeNext(fields.next))
 }
 
@@ -52,5 +53,5 @@ export async function signInWithGoogle(form: FormData): Promise<FormState> {
 export async function signOut(): Promise<never> {
   const supabase = await createServerSupabase()
   await supabase.auth.signOut()
-  redirect('/')
+  redirect(await localized('/'))
 }

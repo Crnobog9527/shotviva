@@ -1,10 +1,10 @@
 'use client'
 
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 
+import { usePathname } from '../i18n/navigation'
+import { Link } from '../i18n/ui'
 import { cn } from '../ui/cn'
 import { TabGlyph, type TabIcon } from './tab-icons'
 

@@ -170,11 +170,30 @@
 /* Fonts come from next/font (src/app/fonts.ts); Tailwind emits these on :root, so
    font-sans / font-mono / font-display and var(--font-*) all resolve to the self-hosted files. */
 @theme {
-  /* Simplified Chinese falls back to the system fonts, never a downloaded CJK web font
-     (DESIGN §3.2, ARCHITECTURE §17). */
-  --font-sans: var(--font-geist), -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
-  --font-display: var(--font-instrument-serif), "Times New Roman", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", monospace;
+  /* Latin glyphs stay Geist / Instrument Serif / Geist Mono; Simplified Chinese glyphs come
+     from MiSans (public/fonts/misans/, attached after hydration by core/ui/misans-font.tsx),
+     then the system CJK fonts (DESIGN §3.2, ARCHITECTURE §17). */
+  --font-sans: var(--font-geist), "MiSans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: var(--font-instrument-serif), "MiSans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Times New Roman", serif;
+  --font-mono: var(--font-geist-mono), "MiSans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+/* Chinese pages (DESIGN §3.2): headings in Geist + MiSans instead of Instrument Serif, no
+   italics, body line height at least 1.6. */
+html:lang(zh-Hans) {
+  --font-display: var(--font-sans);
+}
+html:lang(zh-Hans) body {
+  line-height: 1.6;
+}
+html:lang(zh-Hans) :is(em, i, .italic) {
+  font-style: normal;
+}
+
+/* Chinese words on an English page (the switcher's 中文, the switch banner) use the system
+   CJK fonts, so an English page never downloads a MiSans subset (ARCHITECTURE §17). */
+@utility font-cjk-system {
+  font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
 }
 
 @layer base {

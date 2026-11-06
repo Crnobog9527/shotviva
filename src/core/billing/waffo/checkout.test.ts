@@ -47,7 +47,7 @@ describe('createWaffoCheckout', () => {
       priceSnapshot: { amount: '19.90', taxIncluded: false, taxCategory: 'saas' },
       successUrl: 'https://shotviva-git-validation-preview.vercel.app/account?checkout=success',
       expiresInSeconds: WAFFO_SESSION_TTL_SECONDS,
-      metadata: { user_id: USER, product_id: 'starter_monthly', method: 'card' },
+      metadata: { user_id: USER, product_id: 'starter_monthly', method: 'card', locale: 'en' },
       orderMerchantExternalId: 'order-ref-1',
       language: 'en',
     })
@@ -58,7 +58,7 @@ describe('createWaffoCheckout', () => {
       form: 'one_time',
       channel: 'waffo',
       method: 'card',
-    })
+    }, 'en')
   })
 
   it('never asks Waffo for a subscription, a trial or a payment-method list (no WeChat to hide)', async () => {

@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import { Link } from '@/core/i18n/ui'
 import { useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 

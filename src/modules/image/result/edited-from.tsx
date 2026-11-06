@@ -1,5 +1,5 @@
 /* eslint-disable @next/next/no-img-element -- auth-gated download route, not a static asset */
-import Link from 'next/link'
+import { Link } from '@/core/i18n/ui'
 import { useTranslations } from 'next-intl'
 
 export type EditParent = { id: string; fileUrl: string; name: string }
