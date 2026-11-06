@@ -9,8 +9,9 @@ import { creditChangeSchema, type CreditChange } from '../credits'
 import { callRpc, type RpcClient } from '../rpc'
 import { paymentFacts, readWaffoOrder, type WaffoPaymentFacts } from './payment-facts'
 
-// A verified order.completed becomes exactly one settle_waffo_order (0200): apply_purchase keyed
-// by Waffo's event id (the payment id, `PAY_…`) plus the payments row (T10, channel 'waffo'), in
+// A verified order.completed or subscription.payment_succeeded becomes exactly one
+// settle_waffo_order (0200, 0360): apply_purchase keyed by Waffo's event id (the payment id,
+// `PAY_…`) plus the payments row (T10, channel 'waffo', one row per charge), in
 // one transaction, so every redelivery grants once and records once. The same apply_purchase as
 // every Stripe purchase: the credit logic is not forked. The ledger key `purchase:PAY_…` is what
 // admin_revenue_stats reads as the Waffo channel.
@@ -48,23 +49,30 @@ export async function settleWaffoOrder(
   )
 }
 
+// One-time orders (order.completed) or a card subscription's charges (subscription.payment_succeeded).
+export type WaffoChargeForm = 'one_time' | 'subscription'
+
 // The page language the checkout was opened in, carried in the order metadata.
-function track(deps: WaffoFulfilDeps, userId: string, product: SiteProduct, facts: WaffoPaymentFacts, locale: 'en' | 'zh'): void {
+function track(deps: WaffoFulfilDeps, userId: string, product: SiteProduct, facts: WaffoPaymentFacts, meta: { locale: 'en' | 'zh'; form: WaffoChargeForm }): void {
   ;(deps.trackBuy ?? trackPurchase)(userId, {
     product_id: product.id,
     tier: product.tier,
     interval: product.interval,
-    form: 'one_time',
+    form: meta.form,
     channel: 'waffo',
     method: facts.method,
     amount_usd: facts.subtotalUsd,
     credits: product.credits,
-  }, locale)
+  }, meta.locale)
 }
 
+// Every successful Waffo charge grants once: a one-time order, a subscription's first payment and
+// each renewal (T50) alike, keyed by the payment id (the eventId of both events). A failed
+// renewal sends no payment event, so it grants nothing and paid_until stays.
 export async function fulfilWaffoOrder(
   deps: WaffoFulfilDeps,
   event: { eventId: string; data: unknown },
+  form: WaffoChargeForm = 'one_time',
 ): Promise<WaffoFulfilOutcome> {
   const order = readWaffoOrder(event.eventId, event.data)
   if (order.paymentStatus !== undefined && order.paymentStatus !== 'succeeded') return 'unpaid'
@@ -74,6 +82,6 @@ export async function fulfilWaffoOrder(
   const facts = paymentFacts(order, product)
   const change = await settleWaffoOrder(deps.db, { userId, productId, paymentId: event.eventId, facts })
   if (!change.applied) return 'replayed'
-  track(deps, userId, product, facts, locale)
+  track(deps, userId, product, facts, { locale, form })
   return 'applied'
 }

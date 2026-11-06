@@ -8,10 +8,31 @@ import { cancelAllSubscriptions } from './cancel-all'
 // ARCHITECTURE §13: before an account is deleted, every subscription Stripe may still bill is
 // cancelled at once without proration; one that will not cancel stops the deletion.
 
-type Row = { stripe_subscription_id: string; product_id: string; status: string; current_period_end: string; cancel_at_period_end: boolean }
+type Row = {
+  provider: 'stripe' | 'waffo'
+  stripe_subscription_id: string | null
+  waffo_order_id: string | null
+  product_id: string
+  status: string
+  current_period_end: string
+  cancel_at_period_end: boolean
+}
+
+const waffoRow = (orderId: string, status: string, cancelAtPeriodEnd = false): Row => ({
+  provider: 'waffo',
+  stripe_subscription_id: null,
+  waffo_order_id: orderId,
+  product_id: 'pro_monthly',
+  status,
+  current_period_end: '2026-12-06T00:00:00Z',
+  cancel_at_period_end: cancelAtPeriodEnd,
+})
+const noWaffo = () => ({ cancelSubscription: vi.fn(async () => Promise.reject(new Error('waffo not expected'))) })
 
 const row = (id: string, status: string): Row => ({
+  provider: 'stripe',
   stripe_subscription_id: id,
+  waffo_order_id: null,
   product_id: 'pro_monthly',
   status,
   current_period_end: '2026-12-06T00:00:00Z',
@@ -44,7 +65,7 @@ function stripeFake(statuses: Record<string, Stripe.Subscription.Status>, failin
 describe('cancelAllSubscriptions', () => {
   it('cancels every live subscription at once, without proration', async () => {
     const stripe = stripeFake({ sub_a: 'active', sub_b: 'past_due' })
-    const count = await cancelAllSubscriptions({ admin: adminWith([row('sub_a', 'active'), row('sub_b', 'past_due')]), stripe: () => stripe.api }, 'u1')
+    const count = await cancelAllSubscriptions({ admin: adminWith([row('sub_a', 'active'), row('sub_b', 'past_due')]), stripe: () => stripe.api, waffo: noWaffo }, 'u1')
     expect(count).toBe(2)
     expect(stripe.cancel.mock.calls).toEqual([
       ['sub_a', { prorate: false, invoice_now: false }],
@@ -56,20 +77,20 @@ describe('cancelAllSubscriptions', () => {
   it('skips subscriptions that already ended and never builds a Stripe client for none', async () => {
     const factory = vi.fn()
     const rows = [row('sub_old', 'canceled'), row('sub_never', 'incomplete_expired')]
-    expect(await cancelAllSubscriptions({ admin: adminWith(rows), stripe: factory }, 'u1')).toBe(0)
-    expect(await cancelAllSubscriptions({ admin: adminWith([]), stripe: factory }, 'u1')).toBe(0)
+    expect(await cancelAllSubscriptions({ admin: adminWith(rows), stripe: factory, waffo: noWaffo }, 'u1')).toBe(0)
+    expect(await cancelAllSubscriptions({ admin: adminWith([]), stripe: factory, waffo: noWaffo }, 'u1')).toBe(0)
     expect(factory).not.toHaveBeenCalled()
   })
 
   it('treats a subscription Stripe already cancelled (mirror behind) as done', async () => {
     const stripe = stripeFake({ sub_a: 'canceled' }, ['sub_a'])
-    await expect(cancelAllSubscriptions({ admin: adminWith([row('sub_a', 'active')]), stripe: () => stripe.api }, 'u1')).resolves.toBe(1)
+    await expect(cancelAllSubscriptions({ admin: adminWith([row('sub_a', 'active')]), stripe: () => stripe.api, waffo: noWaffo }, 'u1')).resolves.toBe(1)
     expect(stripe.retrieve).toHaveBeenCalledWith('sub_a')
   })
 
   it('throws SUBSCRIPTION_CANCEL_FAILED when Stripe will not cancel a live one', async () => {
     const stripe = stripeFake({ sub_a: 'active', sub_b: 'active' }, ['sub_a'])
-    const run = cancelAllSubscriptions({ admin: adminWith([row('sub_a', 'active'), row('sub_b', 'active')]), stripe: () => stripe.api }, 'u1')
+    const run = cancelAllSubscriptions({ admin: adminWith([row('sub_a', 'active'), row('sub_b', 'active')]), stripe: () => stripe.api, waffo: noWaffo }, 'u1')
     await expect(run).rejects.toMatchObject({ code: 'SUBSCRIPTION_CANCEL_FAILED', status: 502 })
     // Stops at the first failure.
     expect(stripe.cancel).toHaveBeenCalledTimes(1)
@@ -77,13 +98,27 @@ describe('cancelAllSubscriptions', () => {
 
   it('treats a subscription Stripe does not have (404) as nothing left to bill', async () => {
     const stripe = stripeFake({}, ['sub_gone'])
-    await expect(cancelAllSubscriptions({ admin: adminWith([row('sub_gone', 'active')]), stripe: () => stripe.api }, 'u1')).resolves.toBe(1)
+    await expect(cancelAllSubscriptions({ admin: adminWith([row('sub_gone', 'active')]), stripe: () => stripe.api, waffo: noWaffo }, 'u1')).resolves.toBe(1)
   })
 
   it('stops when Stripe cannot even be asked what state it is in', async () => {
     const stripe = stripeFake({}, ['sub_unreachable'])
-    await expect(cancelAllSubscriptions({ admin: adminWith([row('sub_unreachable', 'active')]), stripe: () => stripe.api }, 'u1')).rejects.toMatchObject({
+    await expect(cancelAllSubscriptions({ admin: adminWith([row('sub_unreachable', 'active')]), stripe: () => stripe.api, waffo: noWaffo }, 'u1')).rejects.toMatchObject({
       code: 'SUBSCRIPTION_CANCEL_FAILED',
     })
+  })
+
+  it('cancels a Waffo card subscription through cancel-order, and skips one already cancelling (T50)', async () => {
+    const stripe = stripeFake({ sub_a: 'active' })
+    const cancelSubscription = vi.fn(async (orderId: string) => ({ orderId, status: 'canceling' }))
+    const rows = [row('sub_a', 'active'), waffoRow('ORD_live', 'active'), waffoRow('ORD_going', 'active', true), waffoRow('ORD_done', 'canceled')]
+    expect(await cancelAllSubscriptions({ admin: adminWith(rows), stripe: () => stripe.api, waffo: () => ({ cancelSubscription }) }, 'u1')).toBe(2)
+    expect(cancelSubscription.mock.calls.map((call) => call[0])).toEqual(['ORD_live'])
+    expect(stripe.cancel).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops the deletion when Waffo refuses the cancel', async () => {
+    const cancelSubscription = vi.fn(async () => Promise.reject(new Error('waffo 500')))
+    await expect(cancelAllSubscriptions({ admin: adminWith([waffoRow('ORD_live', 'past_due')]), stripe: () => stripeFake({}).api, waffo: () => ({ cancelSubscription }) }, 'u1')).rejects.toMatchObject({ code: 'SUBSCRIPTION_CANCEL_FAILED' })
   })
 })

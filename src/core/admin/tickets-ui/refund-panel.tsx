@@ -24,7 +24,16 @@ function ProviderLink({ payment, stripeLive }: { payment: AdminPayment; stripeLi
       </a>
     )
   }
-  return payment.waffoOrderId ? <p className="text-sm text-muted-foreground">{COPY.payment.waffoHint(payment.waffoOrderId)}</p> : null
+  if (!payment.waffoOrderId) return null
+  // A Waffo card membership is a subscription (T50): refund the one charge, and the refund alone
+  // does not stop the renewals (docs.waffo.ai, Subscriptions → Cancel).
+  const subscription = payment.method === 'card' && !payment.productId.startsWith('pack_')
+  return (
+    <div className="grid gap-1 text-sm text-muted-foreground">
+      <p>{payment.waffoPaymentId ? COPY.payment.waffoChargeHint(payment.waffoPaymentId, payment.waffoOrderId) : COPY.payment.waffoHint(payment.waffoOrderId)}</p>
+      {subscription ? <p>{COPY.payment.waffoSubscriptionNote}</p> : null}
+    </div>
+  )
 }
 
 export function PaymentFacts({ payment, stripeLive }: { payment: AdminPayment; stripeLive: boolean }) {

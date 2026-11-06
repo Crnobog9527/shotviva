@@ -32,7 +32,7 @@ beforeAll(async () => {
             ($1, 'pro_monthly', 'stripe', null, $4, null, 1290, 100, 'usd', 'card')`,
     [user, ids.session, ids.charge, ids.invoice],
   )
-  await db.query(`insert into public.payments (user_id, product_id, channel, waffo_order_id, amount_total, currency, method) values ($1, 'pack_m', 'waffo', $2, 2490, 'usd', 'alipay')`, [user, ids.waffo])
+  await db.query(`insert into public.payments (user_id, product_id, channel, waffo_order_id, waffo_payment_id, amount_total, currency, method) values ($1, 'pack_m', 'waffo', $2, $3, 2490, 'usd', 'alipay')`, [user, ids.waffo, `PAY_${uid().replace(/[^A-Za-z0-9]/g, '')}`])
   await db.query(
     `insert into public.subscriptions (stripe_subscription_id, user_id, product_id, status, current_period_end) values ($1, $2, 'pro_monthly', 'active', now() + interval '20 days')`,
     [ids.sub, user],

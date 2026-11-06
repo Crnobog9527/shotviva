@@ -12,7 +12,6 @@ import type { FieldError, FieldName } from './validate'
 // app/[locale]/(auth)/auth.css.
 
 const HCAPTCHA_PRIVACY = 'https://www.hcaptcha.com/privacy'
-const HCAPTCHA_TERMS = 'https://www.hcaptcha.com/terms'
 
 export function Heading({ title, children }: { title: string; children?: ReactNode }) {
   return (
@@ -134,33 +133,32 @@ export function SubmitButton({ pending, children }: { pending: boolean; children
   )
 }
 
-// hCaptcha's own checkbox, shown only when the invisible check could not decide. Takes plain
-// values (not the form) so the callback ref stays a prop of its own.
-type CaptchaSlotProps = { mode: string; mount: (element: HTMLDivElement | null) => void; needsTick: boolean }
-
-export function CaptchaSlot({ mode, mount, needsTick }: CaptchaSlotProps) {
+// The one line under a form when the invisible check did not complete (closed, expired or
+// failed); the next submit asks hCaptcha again (ARCHITECTURE §7).
+export function CaptchaFailed({ show }: { show: boolean }) {
   const t = useTranslations('auth.captcha')
-  if (mode !== 'checkbox') return null
+  if (!show) return null
   return (
-    <div className="au-hc">
-      <p className="au-hint">{t(needsTick ? 'tick' : 'fallback')}</p>
-      <div ref={mount} />
-    </div>
+    <p role="alert" className="au-err">
+      <AlertIcon />
+      {t('failed')}
+    </p>
   )
 }
 
-// hCaptcha asks for this line wherever its invisible check runs.
+// "hCaptcha" in the disclosure links to its privacy policy in a new tab (Owner 2026-11-07).
+export const hcaptchaLink = (chunks: ReactNode) => (
+  <a href={HCAPTCHA_PRIVACY} target="_blank" rel="noopener noreferrer">
+    {chunks}
+  </a>
+)
+
+// Invisible hCaptcha must be disclosed where it runs. Sign-up says it inside its consent sentence;
+// forms without one (login, reset, resend) carry this one line of the same quiet fine print.
 export function CaptchaLine({ enabled }: { enabled: boolean }) {
   const t = useTranslations('auth.captcha')
   if (!enabled) return null
-  return (
-    <p className="au-hc-line">
-      {t.rich('line', {
-        privacy: (chunks) => <a href={HCAPTCHA_PRIVACY}>{chunks}</a>,
-        terms: (chunks) => <a href={HCAPTCHA_TERMS}>{chunks}</a>,
-      })}
-    </p>
-  )
+  return <p className="au-fine">{t.rich('line', { hcaptcha: hcaptchaLink })}</p>
 }
 
 export function Divider() {

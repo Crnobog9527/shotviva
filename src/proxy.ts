@@ -32,6 +32,7 @@ export async function proxy(request: NextRequest) {
 
 // /ingest is the PostHog proxy (next.config.ts rewrites): no session work for analytics beacons.
 // fonts/misans/ holds public, content-addressed font files only (ARCHITECTURE §17).
+// assets/ is the template-cover rewrite to the public bucket (ARCHITECTURE §8.3, T51).
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|ingest/|fonts/misans/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)'],
+  matcher: ['/((?!_next/static|_next/image|ingest/|assets/|fonts/misans/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)'],
 }

@@ -44,10 +44,10 @@ beforeAll(async () => {
   // Rows no T10 function writes yet: a Waffo payment (T13) and a non-USD one. Inserted as the
   // database owner, test data only.
   await db.query(
-    `insert into public.payments (user_id, product_id, channel, waffo_order_id, stripe_session_id, amount_total, currency, method)
-     values ($1, 'starter_monthly', 'waffo', $2, null, 1990, 'usd', 'card'),
-            ($1, 'pack_s', 'stripe', null, $3, 1500, 'eur', 'card')`,
-    [buyer, `wf-${id}`, `cs_test_eur_${id}`],
+    `insert into public.payments (user_id, product_id, channel, waffo_order_id, waffo_payment_id, stripe_session_id, amount_total, currency, method)
+     values ($1, 'starter_monthly', 'waffo', $2, $4, null, 1990, 'usd', 'card'),
+            ($1, 'pack_s', 'stripe', null, null, $3, 1500, 'eur', 'card')`,
+    [buyer, `wf-${id}`, `cs_test_eur_${id}`, `PAY_${id.replace(/[^A-Za-z0-9]/g, '')}`],
   )
 }, 120_000)
 

@@ -196,6 +196,7 @@ v1 不写回调解析、定时轮询、超时清理这类定时任务。视频�
 模板分两张表，核心提示词不进仓库、不进公开表：
 
 - `templates`（公开）：id、模块、名称、分类、封面前后对比图、字段定义（要几张图、要填哪些文案、可选比例）、**质量档 `quality`**（`'high'` / `'medium'`，送给模型的 `quality` 参数，默认 `'high'`）、**消耗积分 `credits_cost`**（jsonb，按分辨率三个档都必填：`{ "1k": 2, "2k": 4, "3k": 6 }`，正整数）、排序、上下架状态、`visible_in`（`['web']` / `['partner']` / 两者，控制在哪些入口展示）、**展示文字的其他语言版本 `translations`**（jsonb，默认 `{}`；结构 `{ "zh": { "name": "…", "description": "…", "fields": { "<字段 key>": { "label": "…", "placeholder": "…" } } } }`；英文仍是 `name` 等原字段；某语言缺某项时回退英文；后台模板编辑页可填中文；提示词不翻译，始终英文，Owner 2026-11-06）。
+  - **英文说明**（Owner 2026-11-07 补）：`templates` 加 `description`（可空，≤160 字），后台模板编辑页在英文名称下面加「英文说明」输入框，和「中文说明」并排。凡是显示模板说明的地方（模板卡、创作弹窗、工作台标题下、落地页模板列表），英文页显示 `description`，中文页显示 `translations.zh.description`，中文缺失时回退英文说明；两者都空就不显示。说明不自动翻译。迁移编号段 `0380`～`0399`（T52）。
 - `template_prompts`（私有，只有服务端能读，RLS 拒绝所有客户端）：模板 id、提示词正文、版本号、模型参数。
 
 内置一条 `freeform` 模板：字段定义只有 `prompt`（加可选参考图），`template_prompts` 里的提示词是直通。它让「自由文字出图」和「模板出图」走同一条代码路径；`visible_in = ['partner']`，Shotviva 自己的前台不展示（DESIGN.md 禁止出现 prompt）。
@@ -256,14 +257,14 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
   入账失败时，镜像表的写入一起回滚。同一 session 的重发和兄弟事件只入账一次。`checkout.session.completed` 和 `checkout.session.async_payment_succeeded` 都走它。
 - **付款记录与续费函数**（T10，总控 2026-11-06 按 T10 开工前的问题定）：
   - **表 `payments`**（私有，只授权 service role）：每次成功付款一行。
-    - 字段：`user_id`、`product_id`、`channel`（`stripe` / `waffo`）、`stripe_session_id` / `stripe_invoice_id` / `stripe_charge_id`（各自可空且唯一）、`waffo_order_id`（可空、唯一）、`amount_total`（实付，含税，单位为分，int）、`currency`、`amount_tax`（分）、`method`（`card` / `alipay`）、`status`（`paid` / `refunded` / `partially_refunded` / `disputed`）、`amount_refunded`（分，默认 0）、`created_at`。
-    - 约束：Stripe 行至少有 session 或 invoice 之一；Waffo 行必须有 `waffo_order_id`。
+    - 字段：`user_id`、`product_id`、`channel`（`stripe` / `waffo`）、`stripe_session_id` / `stripe_invoice_id` / `stripe_charge_id`（各自可空且唯一）、`waffo_order_id`（可空，**不唯一**，有索引：一张 Waffo 订阅订单每期都有一笔扣款）、`waffo_payment_id`（Waffo 的 `PAY_` 扣款号，可空、唯一；T50）、`amount_total`（实付，含税，单位为分，int）、`currency`、`amount_tax`（分）、`method`（`card` / `alipay`）、`status`（`paid` / `refunded` / `partially_refunded` / `disputed`）、`amount_refunded`（分，默认 0）、`created_at`。
+    - 约束：Stripe 行至少有 session 或 invoice 之一；Waffo 行必须有 `waffo_order_id` 和 `waffo_payment_id`（T50 之前的老行可以没有 `waffo_payment_id`）。
     - 不回填 T10 上线前的历史付款。
   - **`settle_checkout` 改签名**：新增参数 `p_amount_total`、`p_currency`、`p_amount_tax`、`p_method`、`p_invoice_id`（可空）、`p_charge_id`（可空），在同一事务里写 `payments`。参数变了无法 `create or replace`，按 AGENTS §5「签名必须变」的例外，由新迁移删掉旧的 7 参数版本后重建，PR 写明原因；调用方同步改。
   - **`apply_subscription_renewal`**：参数为 `(user, product_id, invoice_id, period_end, amount_total, currency, amount_tax, method, charge_id)`。内部用 `_apply_credit_change`（kind `purchase`，幂等键 `renewal:<invoice_id>`），`paid_until = greatest(paid_until, period_end)`，同一事务写 `payments`。
   - **`sync_subscription(sub_id, status, current_period_end, cancel_at_period_end)`**：供 `customer.subscription.updated / deleted` 使用，只更新已有的镜像行，不新建（没有首付记录的订阅不插入）。
   - **`record_payment_issue(charge_id, kind, amount_refunded)`**：`kind` 为 `refunded` / `disputed`，按 charge id 更新 `payments.status` 和 `amount_refunded`（全退为 `refunded`，部分退为 `partially_refunded`，争议为 `disputed`），不动积分。charge 不在表里时不写行，只发 Sentry 告警，回 200。
-  - **`settle_waffo_order(user, product_id, payment_id, order_id, amount_total, currency, amount_tax, method)`**（T13，总控 2026-11-06 补）：在同一事务里完成两步。先调用 `apply_purchase(user, product_id, payment_id)`，用 Waffo 的 payment id 做幂等键；入账生效时再插入一行 `payments`，其中 `channel = 'waffo'`，`waffo_order_id` 取 Waffo 订单号，金额和税额取自 `order.completed` 事件，单位换算为分。重复事件不写第二行。
+  - **`settle_waffo_order(user, product_id, payment_id, order_id, amount_total, currency, amount_tax, method)`**（T13，总控 2026-11-06 补）：在同一事务里完成两步。先调用 `apply_purchase(user, product_id, payment_id)`，用 Waffo 的 payment id 做幂等键；入账生效时再插入一行 `payments`，其中 `channel = 'waffo'`，`waffo_order_id` 取 Waffo 订单号，金额和税额取自 `order.completed` 事件，单位换算为分。重复事件不写第二行。**T50 起**：签名不变，同时写 `waffo_payment_id`；单笔和订阅的每一期扣款（含首付）都走它，幂等键是 `PAY_` 扣款号，所以续费不会重复入账，续费失败没有扣款事件、不入账。
   - 以上函数都只授权 `service_role`。
 - **首付的 `paid_until`**：首付走 `apply_purchase`，按商品天数累加（月付 +30 天，年付 +365 天），和 Stripe 本期结束日可能差一两天。从第一次续费起，由 `apply_subscription_renewal` 对齐 `period_end`，见下一条。
 - 订阅续费走 T10 新增的 `apply_subscription_renewal(user, product_id, invoice_id, period_end)`：`credits += 商品积分`，`paid_until = greatest(paid_until, period_end)`（直接对齐 Stripe 的本期结束日，不按天数累加，避免大小月漂移）；同样写流水、按 invoice id 幂等，内部复用 `_apply_credit_change`（总控 2026-11-05 补）。
@@ -299,6 +300,12 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 已经确定的规则：
 
 - **订阅的状态只有 Stripe 一份真相**，Shotviva 存一张镜像表 `subscriptions`（`user_id`、`stripe_subscription_id`、`product_id`、`status`、`current_period_end`、`cancel_at_period_end`），由回调同步，账号页只读它。
+- **Waffo 卡订阅也进这张表**（T50，总控 2026-11-06 按 Waffo 文档定）：
+  - 表结构：新增 `id`（bigint identity）做主键；`stripe_subscription_id` 改为可空、唯一；新增 `provider`（`'stripe'` / `'waffo'`，默认 `'stripe'`）、`waffo_order_id`（`ORD_` 订阅订单号，可空、唯一）、`last_event_at`。约束：stripe 行必须有 `stripe_subscription_id`，waffo 行必须有 `waffo_order_id`。`status` 取值不变。
+  - Waffo 状态映射：`activated` / `renewed` / `recovered` / `uncanceled` → `active`；`canceling` → `active` + `cancel_at_period_end = true`；`past_due` → `past_due`；`canceled` / `expired` → `canceled`（终态，之后的事件不再改它）。
+  - 写入只走 `sync_waffo_subscription(user, order_id, product_id, status, current_period_end, cancel_at_period_end, event_at) → boolean`：按 `waffo_order_id` 插入或更新；订单属于别的用户或别的商品时拒绝；`event_at` 早于 `last_event_at` 的旧事件忽略。
+  - 积分和 `paid_until` 只由扣款事件（`payment_succeeded`，经 `settle_waffo_order`）发放，每期按 `apply_purchase` 的 +30 / +365 天；订阅状态事件本身不发积分。
+  - 取消：账号页「Cancel subscription」调 Waffo `subscription-order/cancel-order`，成功后调 `sync_waffo_subscription` 写 `cancel_at_period_end`；Waffo 回调随后再确认一次。
 - 续费成功：`invoice.paid`（`billing_reason = subscription_cycle`）→ `apply_subscription_renewal`（T10），`paid_until = greatest(paid_until, 本期 period_end)`。
 - **续费失败：什么都不做。** 不再发积分，`paid_until` 到期后账号页显示会员已过期；已有的付费积分照常可用。Stripe 自己重试，哪天扣成功哪天再发。不写宽限期。
 - 取消：期末生效（Stripe 默认）。用户在 Stripe Customer Portal（Managed Payments 下是 Link 的客户门户）自己取消，账号页只放一个「Manage subscription」链接，不自己写取消界面。`customer.subscription.updated / deleted` 只更新镜像表。
@@ -392,10 +399,10 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 照 Graylum staging：
 
 - Supabase Auth：邮箱 + 密码注册，点验证邮件完成激活；另加 Google 登录。
-- hCaptcha 交给 Supabase Auth 自带的人机验证校验。前端**只做隐形验证**，失败时降级为显式 checkbox；不抄 Graylum 的「隐形 + 弹窗」两套。
+- hCaptcha 交给 Supabase Auth 自带的人机验证校验。前端**只做隐形验证**：页面上不放任何验证控件，用户点提交按钮时才调用 hCaptcha，需要挑战时由 hCaptcha 自己弹出验证窗口（Owner 2026-11-07：不再降级为页面内的显式 checkbox）。验证失败或被关掉时，表单下方给一句提示，再点一次按钮重新弹出；hCaptcha 的告知并进表单下方的条款那句（Owner 2026-11-07）：「继续即表示你同意服务条款和隐私政策，本页由 hCaptcha 提供人机验证。」，hCaptcha 链到它的隐私说明；没有条款句的表单（登录、找回密码、重发）只放一句同样样式的「本页由 hCaptcha 提供人机验证。」；隐私政策的第三方服务里列出 hCaptcha。hCaptcha 的语言跟随页面语言。
 - 防刷免费额度：邮箱验证 + hCaptcha + **同 IP 限制**（Owner 2026-11-06 定：上线就开）。发放注册赠送的 SQL 函数检查同一个 `signup_ip` 24 小时内是否已经给别的账号发过；发过就不再发。后注册的账号照常能注册、能付费，只是没有免费额度，账号页显示一句说明。不引入设备指纹库。
 - **封禁的范围**（Owner 2026-11-06 定）：被封禁（`banned_at` 不为空）的账号不能出图、不能用需求墙、**不能创建结账**（`/api/checkout` 返回 403）；封禁时在同一事务里**断开 Graylum 连接**（`partner_links` 置为断开）。账号仍可以登录、查看和下载自己的作品、删号。
-- 验证邮件、重置密码邮件由 Supabase Auth 发，SMTP 配成 Resend，发件人 `Shotviva <support@shotviva.com>`（Owner 2026-11-05 由 `noreply@` 改来：Resend 提示 no-reply 发件人影响送达，且用户回信能直接进飞书的 support 邮箱）。**v1 不写任何发信代码**，只改 Supabase 的邮件模板。
+- 验证邮件、重置密码邮件由 Supabase Auth 发，SMTP 配成 Resend，发件人 `Shotviva <mail@shotviva.com>`（Owner 2026-11-07 由 `support@` 改为 `mail@`；回信进飞书邮箱，`mail@` 设为 `support@` 的别名；网站和法律页上的联系邮箱仍是 `support@`。更早 2026-11-05 由 `noreply@` 改来：Resend 提示 no-reply 发件人影响送达，且用户回信能直接进飞书的 support 邮箱）。**v1 不写任何发信代码**，只改 Supabase 的邮件模板。
 - 邮件按用户语言发（Owner 2026-11-06）：注册时把当前页面语言写进 `user_metadata.locale`（`'en'` / `'zh'`，`signUp` 的 `options.data`）；四个模板正文用 `{{ if eq .Data.locale "zh" }}…{{ else }}…{{ end }}` 放中英两版；邮件标题如果 Supabase 支持同样的条件写法就中英分开，不支持就保持英文（T21 在本地 Supabase 实测后定）；没有 `locale` 的老账号和 Google 登录账号发英文。
 - 管理员身份存在数据库 `profiles.role`，不用环境变量里的邮箱列表。
 
@@ -442,7 +449,8 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 **模板封面另用一个公开桶**（Owner 2026-11-05：模板示例图由 Owner 在后台自己上传替换）：
 
 - 桶名 `shotviva-assets`（预览用 `shotviva-assets-preview`），只放模板封面前后图，前缀 `covers/{template_id}/before-{hash}.webp`、`after-{hash}.webp`；文件名带内容哈希，换图就是新文件，不用清缓存。
-- 公开读：生产绑定自定义域名 `assets.shotviva.com`（走 Cloudflare CDN）；预览可以用 R2 自带的开发地址。公开地址的前缀放环境变量 `NEXT_PUBLIC_ASSETS_BASE_URL`，`templates.cover_before_url` / `cover_after_url` 存完整地址。
+- 公开读（Owner 2026-11-07 改）：shotviva.com 的 DNS 在 Vercel，R2 绑不了自定义域名，所以**生产走本站同源路径**：`https://shotviva.com/assets/covers/...` 由 Next 的 rewrite 转到公开桶的 r2.dev 地址（服务端变量 `R2_PUBLIC_ORIGIN`，构建时读取），`/assets/*` 返回 `Cache-Control: public, max-age=31536000, immutable`（文件名带内容哈希），让 Vercel 的 CDN 缓存，r2.dev 本身几乎不被直接访问。生产 `NEXT_PUBLIC_ASSETS_BASE_URL = https://shotviva.com/assets`；预览可以直接填 r2.dev 地址。以后 DNS 迁到 Cloudflare 再绑 `assets.shotviva.com`，只改这两个变量，不改代码（T51）。
+- 公开地址的前缀放环境变量 `NEXT_PUBLIC_ASSETS_BASE_URL`，`templates.cover_before_url` / `cover_after_url` 存完整地址。
 - 写入只走后台：后台模板编辑页「上传前图 / 上传后图」→ 服务端校验（JPEG / PNG / WebP，≤20MB）→ `sharp` 转 WebP（长边 1600、质量 82）→ 写公开桶 → 更新模板行。和用户照片一样，图片字节不经 API 路由请求体（第 8.1 节）：浏览器先直传到私有桶的 `uploads-admin/` 临时前缀（7 天过期），服务端再读出处理后写公开桶。
 - **展示媒体支持三种**（Owner 2026-11-05，参考 Lovart）：静态图、动图、短视频。`templates` 增加 `cover_media_type`（`'image'` / `'animated'` / `'video'`）、`cover_video_url`、`cover_poster_url`（视频和动图的封面帧，静态图时为空）；前后对比图字段照旧，用于静态图模板和预览抽屉里的拖动对比。
   - 动图一律存动态 WebP：后台上传 GIF 也收，服务端转成动态 WebP（GIF 体积通常大 5～10 倍，拖慢首屏）。
@@ -587,6 +595,8 @@ v1 后台（Owner 2026-11-06 扩充；T23 做外壳和运营页）：**一个后
 **仍然不做页面、留在 Supabase / Stripe 后台的运营操作**：设为管理员（在 Studio 改 `profiles.role`）、退款（在 Stripe / Waffo 后台）、作品审核页（第 6~7 周和审核功能一起做）。
 
 后台路由 `noindex`，只允许 `role = admin` 的账号访问。
+
+**前台的后台入口**（Owner 2026-11-07）：管理员登录后，在账号页（「账号」分组最上面一行「管理后台 / Admin」）和电脑端应用顶栏最右侧（和其他标签同样式；手机底部标签栏不加，DESIGN §8.2）各有一个「Admin / 管理后台」入口，链到 `/admin`。入口由服务端按 `profiles.role = 'admin'` 决定是否渲染，普通用户的页面和打包代码里都不出现这个入口；入口本身不是权限控制，`/admin` 的访问检查照旧。
 
 可参考 Graylum staging 的 `admin/prompts`（提示词增删改、批量上下架）和 `AdminGuard`，只借逻辑，按 AGENTS.md 的拆分规则重写。不引入后台框架或后台模板项目。
 

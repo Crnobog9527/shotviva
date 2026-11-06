@@ -43,6 +43,7 @@ const FROM_APP: Record<ErrorCode, PartnerErrorCode> = {
   GENERATION_FAILED: 'generation_failed',
   // Account deletion only; no partner route deletes accounts.
   SUBSCRIPTION_CANCEL_FAILED: 'internal',
+  SUBSCRIPTION_EXISTS: 'internal',
   INTERNAL: 'internal',
 }
 

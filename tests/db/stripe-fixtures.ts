@@ -87,6 +87,8 @@ function price(productId: ProductId, form: 'subscription' | 'one_time', metadata
 type SubscriptionInput = {
   periodEndDays: number
   cancelAtPeriodEnd?: boolean
+  // Flexible billing mode's way to cancel (the Customer Portal): a unix time, not the flag.
+  cancelAt?: number | null
   status?: Stripe.Subscription.Status
   // Renewal tests: who and what (T9 puts these in subscription_data.metadata at checkout).
   userId?: string
@@ -106,6 +108,7 @@ export function subscriptionObject(input: SubscriptionInput) {
     customer: `cus_${uid()}`,
     status: input.status ?? 'active',
     cancel_at_period_end: input.cancelAtPeriodEnd ?? false,
+    cancel_at: input.cancelAt ?? null,
     metadata: input.userId ? { user_id: input.userId, product_id: input.productId, method: 'card' } : {},
     items: { object: 'list', data: [item] },
   } as unknown as Stripe.Subscription

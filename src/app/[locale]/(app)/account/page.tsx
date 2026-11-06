@@ -15,7 +15,7 @@ import { site } from '@/site/site.config'
 
 import { signOutAction } from '@/app/auth/actions'
 import { disconnectGraylumAction } from './partner-actions'
-import { manageSubscriptionAction } from './subscription-actions'
+import { cancelWaffoSubscriptionAction, manageSubscriptionAction } from './subscription-actions'
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('app.account'))('metaTitle') }
@@ -29,6 +29,7 @@ const accountSite = {
 
 const actions = {
   manageSubscription: manageSubscriptionAction,
+  cancelWaffoSubscription: cancelWaffoSubscriptionAction,
   disconnectGraylum: disconnectGraylumAction,
   signOut: signOutAction,
 }
@@ -54,7 +55,7 @@ async function Account() {
   const purchases = paymentChoices(payments, site.billing.products, t as unknown as Translate, { money: formatMoney(locale) })
   const last = lastMembership(payments, site.billing.products)
   const more = payments.length >= PICKER_LIMIT
-  const data = { email: user.email ?? null, balance, giftRefused, subscription, since, lastMembership: last, works, purchases, morePurchases: more, helpUnread, graylum }
+  const data = { email: user.email ?? null, balance, giftRefused, subscription, since, lastMembership: last, works, purchases, morePurchases: more, helpUnread, graylum, admin: user.role === 'admin' }
   return <AccountView data={data} actions={actions} site={accountSite} />
 }
 

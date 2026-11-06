@@ -15,6 +15,7 @@ export function toUpsertArgs(template: TemplateInput, prompt: PromptInput) {
       credits_cost: template.creditsCost,
       visible_in: template.visibleIn,
       ...(template.translations === undefined ? {} : { translations: template.translations }),
+      ...(template.description === undefined ? {} : { description: template.description }),
       ...(template.coverBeforeUrl === undefined ? {} : { cover_before_url: template.coverBeforeUrl }),
       ...(template.coverAfterUrl === undefined ? {} : { cover_after_url: template.coverAfterUrl }),
       ...(template.sortOrder === undefined ? {} : { sort_order: template.sortOrder }),

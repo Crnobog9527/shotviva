@@ -63,7 +63,8 @@ export async function userPayments(db: SupabaseClient, userId: string): Promise<
 }
 
 const subscriptionRow = z.object({
-  stripe_subscription_id: z.string(),
+  stripe_subscription_id: z.string().nullable(),
+  waffo_order_id: z.string().nullable(),
   product_id: z.string(),
   status: z.string(),
   current_period_end: z.string(),
@@ -74,7 +75,7 @@ export async function userSubscription(db: SupabaseClient, userId: string): Prom
   const [subs, tier] = await Promise.all([
     db
       .from('subscriptions')
-      .select('stripe_subscription_id, product_id, status, current_period_end, cancel_at_period_end')
+      .select('stripe_subscription_id, waffo_order_id, product_id, status, current_period_end, cancel_at_period_end')
       .eq('user_id', userId)
       .order('current_period_end', { ascending: false })
       .limit(3),
@@ -85,7 +86,8 @@ export async function userSubscription(db: SupabaseClient, userId: string): Prom
   return {
     tier: z.string().nullable().parse(tier.data),
     subscriptions: subscriptionRow.array().parse(subs.data).map((row) => ({
-      id: row.stripe_subscription_id,
+      // sub_… (Stripe) or ORD_… (Waffo, T50).
+      id: row.stripe_subscription_id ?? row.waffo_order_id ?? '',
       productId: row.product_id,
       status: row.status,
       periodEnd: row.current_period_end,

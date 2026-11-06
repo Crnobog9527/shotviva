@@ -181,7 +181,7 @@ Owner 2026-11-05 定稿：**B 版「暗房」（Darkroom）**，取代此前的�
    - 批量（T28）在弹窗里只选模板和第一张照片；要多选时进整页工作台，在底部照片托盘里加（T6 稿 `workspace.html` 的批量三态）。
    - 原来的模板预览抽屉不再使用。
 3. **模板缩略图的变化动效**：登录后的模板页上，缩略图平时静止；电脑上鼠标悬停时播放「实拍 → 成品」的擦除动画（CSS clip-path 循环），手机上滑入视口时播放一次，「减少动态效果」打开时不播。这只是装饰，不承载任何功能。
-4. **营销页顶部导航**：Templates / Pricing / Log in / Start free。v1 没有 `/templates` 页面（ARCHITECTURE §13），「Templates」链到首页的模板区 `/#templates`。
+4. **营销页顶部导航**：Templates / Pricing / Log in / Start free。**已登录时**（Owner 2026-11-07 发现营销页总显示 Log in，像是掉了登录）：Log in / Start free 换成一个主按钮「Open app / 进入应用」（链到 `/generate`）和账号图标（链到 `/account`）；营销页本身仍然静态缓存，登录状态放在一个按请求渲染的小块里（Suspense 动态洞），未登录时的样子不变。已登录访问 `/login`、`/signup` 直接跳到 `next` 或 `/generate`，不再显示表单。后台的「回到网站」链到 `/generate`。v1 没有 `/templates` 页面（ARCHITECTURE §13），「Templates」链到首页的模板区 `/#templates`。
    - **语言切换（Owner 2026-11-06）**：导航里 Pricing 和 Log in 之间放一个小地球图标按钮（无文字，`aria-label` 写 "Language / 语言"），点开是两项菜单「English」「简体中文」，当前语言打勾；切换后进入对应语言的同一页（没有中文版的页面去中文首页）。手机上地球图标留在顶栏，不收进菜单。页脚保留文字版切换。浏览器语言是中文时仍是可关闭的提示条，不自动跳转（ARCHITECTURE §17）。应用里在账号页放「Language」一行。
 5. **页脚**：
    - 主行：`support@shotviva.com` 和 `© 2026 Shotviva`（品牌名一个字不差，不写 Shotviva AI；Owner 2026-11-06，建站规格 §1）。

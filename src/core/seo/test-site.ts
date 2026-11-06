@@ -12,6 +12,7 @@ export function testSite(overrides: Partial<SiteConfig> = {}): SiteConfig {
         registeredIn: 'Illinois, United States',
         address: { street: '1 Main St', locality: 'Springfield', region: 'IL', postalCode: '62701', country: 'United States' },
         contactEmail: 'hi@example.com',
+        authEmail: 'mail@example.com',
         launchYear: 2026,
         countries: ['United States'],
         logoPath: '/logo.png',

@@ -86,6 +86,7 @@
       "giftNote": "Shown publicly with a watermark",
       "submit": "Create account",
       "fine": "By continuing you agree to the <terms>Terms</terms> and <privacy>Privacy Policy</privacy>.",
+      "fineCaptcha": "By continuing you agree to the <terms>Terms</terms> and <privacy>Privacy Policy</privacy>. This page is protected by <hcaptcha>hCaptcha</hcaptcha>.",
       "toLogin": "Already have an account? <link>Log in</link>"
     },
     "verify": {
@@ -122,9 +123,8 @@
       "continue": "Continue to Shotviva"
     },
     "captcha": {
-      "line": "Protected by hCaptcha · <privacy>Privacy</privacy> · <terms>Terms</terms>",
-      "fallback": "Please complete the check below, then submit again.",
-      "tick": "Tick the box below to continue."
+      "line": "Protected by <hcaptcha>hCaptcha</hcaptcha>.",
+      "failed": "Verification didn't complete. Please try again."
     },
     "notices": {
       "unverified": "Verify your email first. Open the link we sent you.",
@@ -140,7 +140,7 @@
       "CREDITS_INSUFFICIENT": "You're out of credits.",
       "AUTH_INVALID_CREDENTIALS": "Email or password is incorrect.",
       "AUTH_EMAIL_NOT_CONFIRMED": "Please confirm your email first. Open the link we sent you.",
-      "AUTH_CAPTCHA_FAILED": "Verification failed. Please complete the check below.",
+      "AUTH_CAPTCHA_FAILED": "Verification didn't complete. Please try again.",
       "AUTH_RATE_LIMITED": "Too many attempts. Please wait a minute and try again.",
       "AUTH_WEAK_PASSWORD": "Please choose a stronger password.",
       "INTERNAL": "Something went wrong. Please try again.",
@@ -614,7 +614,17 @@
         "renewPrice": "Renew <cost>· {price}</cost>",
         "endedPlain": "Your plan ended.",
         "endedTier": "Your {tier} plan ended.",
-        "expiredRest": "{paid, plural, =0 {Anything you made is still in Photos.} one {The <b>1 credit</b> you have left still works, and anything you made is still in Photos.} other {The <b># credits</b> you have left still work, and anything you made is still in Photos.}}"
+        "expiredRest": "{paid, plural, =0 {Anything you made is still in Photos.} one {The <b>1 credit</b> you have left still works, and anything you made is still in Photos.} other {The <b># credits</b> you have left still work, and anything you made is still in Photos.}}",
+        "cancelSubscription": "Cancel subscription",
+        "cancelTitle": "Cancel your subscription?",
+        "cancelBody": "You keep {tier} and your credits until {date, date, medium}. After that nothing more is charged, and paid credits you haven't used still work.",
+        "cancelKeep": "Keep subscription",
+        "cancelConfirm": "Cancel subscription",
+        "cancelPending": "Cancelling…",
+        "cancelFailed": "That didn't go through. Please try again in a moment.",
+        "waffoCancelledWhy": "<b>Cancelled.</b> You keep the plan and your credits until {date, date, medium}; nothing more is charged.",
+        "waffoPastDueWhy": "We couldn't take your last payment. The card is tried once more, usually the next day; if that fails too, the plan ends. Your credits still work.",
+        "waffoPastDueEndedWhy": "We couldn't take your last payment, so your plan has ended. Your credits still work; choose a plan again whenever you like."
       },
       "credits": {
         "title": "Credits",
@@ -869,12 +879,10 @@
     "cardRenews": "Renews automatically, cancel anytime",
     "walletOnce": "One-time payment, {period, select, year {1 year} other {30 days}}, no auto-renew",
     "oneTime": "One-time payment",
-    "planOnce": "One-time payment, {period, select, year {1 year} other {30 days}}",
     "ctaPlan": "Continue with {tier} · {price}{period, select, year {/yr} other {/mo}}",
     "ctaPack": "Continue with {count, plural, one {# credit} other {# credits}} · {price}",
     "finePlanCard": "Renews {period, select, year {yearly} other {monthly}} at {price} · cancel anytime · USD",
     "finePlanWallet": "One-time payment for {period, select, year {1 year} other {30 days}} · no auto-renew · USD",
-    "finePlanOnce": "One-time payment for {period, select, year {1 year} other {30 days}} · USD",
     "finePack": "One-time payment of {price} · USD",
     "redirecting": "Opening secure checkout…",
     "error": "Checkout did not open. Please try again in a moment.",
@@ -888,10 +896,11 @@
     "buyPackLabel": "Buy {count, plural, one {# credit} other {# credits}} for {price}",
     "payNoteCard": "Plans renew automatically, cancel anytime",
     "payNoteWallet": "One-time payment for 30 days or 1 year, no auto-renew",
-    "payNoteOnce": "One-time payment for 30 days or 1 year",
     "payNotePacks": "Credit packs are always a one-time payment.",
     "cancelled": "<b>Checkout cancelled.</b> Nothing was charged.",
-    "cancelledClose": "Dismiss"
+    "cancelledClose": "Dismiss",
+    "alreadySubscribed": "You already have a plan running. Change or cancel it in Account first.",
+    "goToAccount": "Go to Account"
   },
   "announcement": {
     "dismiss": "Dismiss announcement"
@@ -984,5 +993,8 @@
     "lastUpdated": "Last updated <date></date>",
     "contents": "Contents",
     "questions": "Questions about this page: <mail></mail>"
+  },
+  "adminEntry": {
+    "label": "Admin"
   }
 }

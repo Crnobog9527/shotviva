@@ -7,6 +7,8 @@ export type TemplateFormValues = {
   id: string
   module: 'image' | 'video'
   name: string
+  // English one-liner (T52); blank saves as none.
+  description: string
   category: string
   quality: TemplateQuality
   // One text box per resolution; parsed on save.
@@ -37,6 +39,7 @@ export function emptyFormValues(): TemplateFormValues {
     id: '',
     module: 'image',
     name: '',
+    description: '',
     category: '',
     quality: 'high',
     credits: { '1k': '2', '2k': '4', '3k': '6' },
@@ -96,6 +99,7 @@ export function toFormValues(template: AdminTemplate): TemplateFormValues {
     id: template.id,
     module: template.module,
     name: template.name,
+    description: template.description ?? '',
     category: template.category,
     quality: template.quality,
     credits: {
@@ -158,6 +162,8 @@ export function buildPayload(values: TemplateFormValues, isNew: boolean, floor: 
         id: values.id.trim(),
         module: values.module,
         name: values.name,
+        // Always sent, so clearing the box clears the stored text (the server trims; blank is null).
+        description: values.description,
         category: values.category,
         quality: values.quality,
         creditsCost: {

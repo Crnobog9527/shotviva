@@ -86,6 +86,7 @@
       "giftNote": "会公开展示，并带水印",
       "submit": "注册",
       "fine": "继续即表示你同意<terms>服务条款</terms>和<privacy>隐私政策</privacy>。",
+      "fineCaptcha": "继续即表示你同意<terms>服务条款</terms>和<privacy>隐私政策</privacy>，本页由 <hcaptcha>hCaptcha</hcaptcha> 提供人机验证。",
       "toLogin": "已经有账号？<link>登录</link>"
     },
     "verify": {
@@ -122,9 +123,8 @@
       "continue": "进入 Shotviva"
     },
     "captcha": {
-      "line": "由 hCaptcha 提供人机验证 · <privacy>隐私</privacy> · <terms>条款</terms>",
-      "fallback": "请完成下方的验证，再提交一次。",
-      "tick": "请勾选下方的方框后继续。"
+      "line": "本页由 <hcaptcha>hCaptcha</hcaptcha> 提供人机验证。",
+      "failed": "验证没有完成，请再试一次。"
     },
     "notices": {
       "unverified": "请先验证邮箱：打开我们发给你的邮件，点里面的链接。",
@@ -140,7 +140,7 @@
       "CREDITS_INSUFFICIENT": "积分不够了。",
       "AUTH_INVALID_CREDENTIALS": "邮箱或密码不正确。",
       "AUTH_EMAIL_NOT_CONFIRMED": "请先确认邮箱：打开我们发给你的邮件，点里面的链接。",
-      "AUTH_CAPTCHA_FAILED": "验证没有通过，请完成下方的验证。",
+      "AUTH_CAPTCHA_FAILED": "验证没有完成，请再试一次。",
       "AUTH_RATE_LIMITED": "尝试次数太多，请等一分钟再试。",
       "AUTH_WEAK_PASSWORD": "密码太简单了，请换一个更安全的。",
       "INTERNAL": "出了点问题，请再试一次。",
@@ -614,7 +614,17 @@
         "renewPrice": "续费 <cost>· {price}</cost>",
         "endedPlain": "会员已到期。",
         "endedTier": "你的{tier}会员已到期。",
-        "expiredRest": "{paid, plural, =0 {做过的作品都还在「作品」里。} other {剩下的 <b># 积分</b>仍可使用，做过的作品都还在「作品」里。}}"
+        "expiredRest": "{paid, plural, =0 {做过的作品都还在「作品」里。} other {剩下的 <b># 积分</b>仍可使用，做过的作品都还在「作品」里。}}",
+        "cancelSubscription": "取消订阅",
+        "cancelTitle": "确定取消订阅吗？",
+        "cancelBody": "{date, date, medium} 前{tier}会员和积分照常可用，之后不再扣款；没用完的付费积分仍然可以继续用。",
+        "cancelKeep": "保留订阅",
+        "cancelConfirm": "取消订阅",
+        "cancelPending": "正在取消…",
+        "cancelFailed": "没有取消成功，请稍后再试。",
+        "waffoCancelledWhy": "<b>已取消续费。</b>{date, date, medium} 前会员和积分照常可用，之后不再扣款。",
+        "waffoPastDueWhy": "上一次扣款没有成功。银行卡会再扣一次，通常在第二天；如果还是失败，会员就会结束。积分仍可正常使用。",
+        "waffoPastDueEndedWhy": "上一次扣款没有成功，会员已结束。积分仍可正常使用，想继续时重新选一个套餐即可。"
       },
       "credits": {
         "title": "积分",
@@ -869,12 +879,10 @@
     "cardRenews": "自动续费，随时可取消",
     "walletOnce": "一次性付款，{period, select, year {1 年} other {30 天}}，不自动续费",
     "oneTime": "一次性付款",
-    "planOnce": "一次性付款，{period, select, year {1 年} other {30 天}}",
     "ctaPlan": "继续购买{tier} · {price}{period, select, year {/年} other {/月}}",
     "ctaPack": "继续购买 {count} 积分 · {price}",
     "finePlanCard": "按{period, select, year {年} other {月}}以 {price} 自动续费 · 随时可取消 · 美元",
     "finePlanWallet": "一次性支付 {period, select, year {1 年} other {30 天}} · 不自动续费 · 美元",
-    "finePlanOnce": "一次性支付 {period, select, year {1 年} other {30 天}} · 美元",
     "finePack": "一次性支付 {price} · 美元",
     "redirecting": "正在打开安全付款页…",
     "error": "付款页没能打开，请稍后再试。",
@@ -888,10 +896,11 @@
     "buyPackLabel": "用 {price} 购买 {count} 积分",
     "payNoteCard": "套餐自动续费，随时可取消",
     "payNoteWallet": "一次性支付 30 天或 1 年，不自动续费",
-    "payNoteOnce": "一次性支付 30 天或 1 年",
     "payNotePacks": "积分包一律一次性付款。",
     "cancelled": "<b>已取消付款。</b>没有扣款。",
-    "cancelledClose": "关闭"
+    "cancelledClose": "关闭",
+    "alreadySubscribed": "你已经有一个正在生效的套餐，请先到「我的」里更改或取消。",
+    "goToAccount": "去「我的」"
   },
   "announcement": {
     "dismiss": "关闭公告"
@@ -984,5 +993,8 @@
     "lastUpdated": "最后更新：<date></date>",
     "contents": "目录",
     "questions": "对本页有疑问，请发邮件到 <mail></mail>"
+  },
+  "adminEntry": {
+    "label": "管理后台"
   }
 }

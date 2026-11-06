@@ -11,7 +11,9 @@ const products = TEST_PRODUCTS
 
 function row(patch: Partial<MirrorRow> = {}): MirrorRow {
   return {
+    provider: 'stripe',
     stripeSubscriptionId: 'sub_1',
+    waffoOrderId: null,
     productId: 'pro_yearly',
     status: 'active',
     currentPeriodEnd: days(300),
@@ -27,12 +29,27 @@ describe('summarizeSubscription', () => {
   it('an active card subscription: tier, period and renewal date', () => {
     expect(summarize([row()], days(300))).toEqual({
       kind: 'subscription',
+      provider: 'stripe',
       tier: 'pro',
       interval: 'year',
       state: 'active',
       periodEnd: days(300),
       expired: false,
     })
+  })
+
+  it('a Waffo card subscription says so, so the card offers our Cancel button (T50)', () => {
+    expect(summarize([row({ provider: 'waffo', stripeSubscriptionId: null, waffoOrderId: 'ORD_1' })], days(300))).toMatchObject({ kind: 'subscription', provider: 'waffo', state: 'active' })
+    expect(summarize([row({ provider: 'waffo', stripeSubscriptionId: null, waffoOrderId: 'ORD_1', cancelAtPeriodEnd: true })], days(300))).toMatchObject({ provider: 'waffo', state: 'cancels' })
+  })
+
+  it('several rows: the renewing one wins over a cancelling one with a later end, else the newest', () => {
+    const cancelling = row({ stripeSubscriptionId: 'sub_old', productId: 'max_yearly', currentPeriodEnd: days(300), cancelAtPeriodEnd: true })
+    const renewing = row({ stripeSubscriptionId: 'sub_new', productId: 'starter_monthly', currentPeriodEnd: days(30) })
+    expect(summarize([cancelling, renewing], days(300))).toMatchObject({ tier: 'starter', state: 'active', periodEnd: days(30) })
+    const pastDue = row({ stripeSubscriptionId: 'sub_late', productId: 'pro_monthly', status: 'past_due', currentPeriodEnd: days(5) })
+    expect(summarize([cancelling, pastDue], days(300))).toMatchObject({ tier: 'max', state: 'cancels', periodEnd: days(300) })
+    expect(summarize([row({ status: 'canceled', currentPeriodEnd: days(400) }), pastDue], days(5))).toMatchObject({ tier: 'pro', state: 'past_due' })
   })
 
   it('cancelled in the Portal: cancels at period end', () => {

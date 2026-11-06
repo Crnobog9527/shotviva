@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl"
 
+import { Link } from "../../i18n/ui"
 import { buttonVariants } from "../../ui/button"
 import { cn } from "../../ui/cn"
 import type { CheckoutStatus } from "./use-checkout"
@@ -33,8 +34,24 @@ export function CheckoutBar({ label, fine, tone, status, onClick }: Props) {
         {pending ? t("redirecting") : label}
       </button>
       <p className="mt-2 text-center text-caption leading-[1.4] text-muted-foreground md:col-start-1 md:row-start-1 md:mt-0 md:text-left" aria-live="polite">
-        {status === "error" ? <span className="text-destructive">{t("error")}</span> : fine}
+        <FineLine status={status} fine={fine} />
       </p>
     </div>
+  )
+}
+
+// The fine print, or what went wrong: a failed start, or a subscription already running (one
+// per account), with the way to manage it.
+function FineLine({ status, fine }: { status: CheckoutStatus; fine: string }) {
+  const t = useTranslations("paywall")
+  if (status === "error") return <span className="text-destructive">{t("error")}</span>
+  if (status !== "subscribed") return <>{fine}</>
+  return (
+    <span className="text-foreground">
+      {t("alreadySubscribed")}{" "}
+      <Link href="/account" className="font-medium text-primary underline underline-offset-3">
+        {t("goToAccount")}
+      </Link>
+    </span>
   )
 }

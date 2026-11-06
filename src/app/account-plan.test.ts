@@ -17,19 +17,22 @@ const Intl = NextIntlClientProvider as unknown as FunctionComponent<{ locale: st
 const now = new Date('2026-11-06T12:00:00Z')
 const days = (n: number) => new Date(now.getTime() + n * 86_400_000)
 const manage = async () => {}
+const cancelWaffo = async () => ({ ok: true })
 
 const SINCE = new Date('2026-11-02T08:00:00Z')
 
 async function render(summary: SubscriptionSummary, locale: 'en' | 'zh' = 'en', paid = 38, last: LastMembership | null = null) {
   const facts = { since: SINCE, email: 'mei@example.test', brand: site.brand.name, last }
-  const card: ReactElement = createElement(PlanCard, { summary, products: site.billing.products, paid, manage, facts })
+  const card: ReactElement = createElement(PlanCard, { summary, products: site.billing.products, paid, manage, cancelWaffo, facts })
   const html = renderToStaticMarkup(createElement(Intl, { locale, messages: await loadMessages(locale), timeZone: 'UTC' }, card))
   const text = html.replace(/<script[\s\S]*?<\/script>/g, '').replace(/<[^>]+>/g, ' ').replace(/&#x27;/g, "'").replace(/\s+/g, ' ')
   return { html, text: text.trim() }
 }
 
 const row = (patch: Partial<MirrorRow>): MirrorRow => ({
+  provider: 'stripe',
   stripeSubscriptionId: 'sub_1',
+  waffoOrderId: null,
   productId: 'starter_monthly',
   status: 'active',
   currentPeriodEnd: days(30),
@@ -82,6 +85,39 @@ describe('account Plan card', () => {
     expect(text).toContain('so your plan has ended')
   })
 
+})
+
+describe('account Plan card, Waffo card subscription (T50)', () => {
+  const waffo = (patch: Partial<MirrorRow> = {}) => row({ provider: 'waffo', stripeSubscriptionId: null, waffoOrderId: 'ORD_1', ...patch })
+
+  it('active: renewal date, price per period, our own Cancel subscription (no Stripe portal)', async () => {
+    const { html, text } = await render(summarize([waffo()], days(30)))
+    expect(html).toContain('data-plan="active"')
+    expect(text).toContain('Member Renews Dec 6, 2026 Starter')
+    expect(text).toContain('50 credits a month · $19.90 /mo')
+    expect(buttons(html)).toEqual(['Cancel subscription'])
+    expect(text).not.toMatch(/Manage subscription|Stripe/)
+  })
+
+  it('cancelled: ends at period end, no resubscribe or portal button', async () => {
+    const { html, text } = await render(summarize([waffo({ cancelAtPeriodEnd: true })], days(30)))
+    expect(html).toContain('data-plan="cancelled"')
+    expect(text).toContain('You keep the plan and your credits until Dec 6, 2026; nothing more is charged.')
+    expect(buttons(html)).toEqual([])
+  })
+
+  it('past due: one more try, then the plan ends; Cancel subscription stays', async () => {
+    const { text, html } = await render(summarize([waffo({ status: 'past_due' })], days(2)))
+    expect(text).toContain('Payment failed')
+    expect(text).toContain('tried once more')
+    expect(buttons(html)).toEqual(['Cancel subscription'])
+  })
+
+  it('reads in Chinese', async () => {
+    const { html, text } = await render(summarize([waffo()], days(30)), 'zh')
+    expect(buttons(html)).toEqual(['取消订阅'])
+    expect(text).toContain('自动续费')
+  })
 })
 
 describe('account Plan card without a card subscription', () => {

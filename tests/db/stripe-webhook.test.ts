@@ -231,6 +231,33 @@ describe('settle_checkout', () => {
     expect(await mirrorOf(owner)).toHaveLength(1)
   })
 
+  it('after the 0361 key change (id primary key), Stripe still upserts on stripe_subscription_id (T50)', async () => {
+    const userId = await createUser(db)
+    const subscription = subscriptionObject({ periodEndDays: 30 })
+    const first = stage(checkoutSession({ userId, productId: 'pro_monthly', method: 'card', subscription }))
+    await deliver(eventFor(COMPLETED, first.id))
+    const before = await db.query('select id, provider, waffo_order_id from public.subscriptions where stripe_subscription_id = $1', [subscription.id])
+    expect(before.rows).toEqual([{ id: expect.any(String), provider: 'stripe', waffo_order_id: null }])
+
+    // A second session naming the same subscription takes settle_checkout's on-conflict path:
+    // same row (same id), new state; and sync_subscription still finds it by the Stripe id.
+    const later = { ...subscription, cancel_at_period_end: true }
+    const second = stage(checkoutSession({ userId, productId: 'pro_monthly', method: 'card', subscription: later }))
+    await deliver(eventFor(COMPLETED, second.id))
+    const synced = await db.query("select public.sync_subscription($1, 'past_due', now() + interval '3 days', false) as found", [subscription.id])
+    expect(synced.rows[0].found).toBe(true)
+    const after = await db.query('select id, status from public.subscriptions where stripe_subscription_id = $1', [subscription.id])
+    expect(after.rows).toEqual([{ id: before.rows[0].id, status: 'past_due' }])
+
+    // Each row carries only its own provider's id.
+    await expect(
+      db.query(
+        "insert into public.subscriptions (provider, stripe_subscription_id, waffo_order_id, user_id, product_id, status, current_period_end) values ('waffo', 'sub_mixed', 'ORD_mixed', $1, 'pro_monthly', 'active', now())",
+        [userId],
+      ),
+    ).rejects.toThrow(/subscriptions_provider_ids_check/)
+  })
+
   it('is the only writer: the service role cannot write subscriptions directly', async () => {
     const userId = await createUser(db)
     const { error } = await serviceSupabase().from('subscriptions').insert({

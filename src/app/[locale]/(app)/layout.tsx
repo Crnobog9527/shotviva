@@ -1,10 +1,11 @@
 import type { Metadata } from 'next'
 import { useTranslations } from 'next-intl'
+import { getTranslations } from 'next-intl/server'
 import { Suspense } from 'react'
 
 import { AnalyticsIdentify } from '@/core/analytics/browser'
 import { AnnouncementBanner } from '@/core/announcements'
-import { AppFrame, TabBar, type TabItem } from '@/core/app-shell'
+import { adminEntryFor, AppFrame, TabBar, type AdminEntry, type TabItem } from '@/core/app-shell'
 import { getSessionUser } from '@/core/auth'
 import { PaywallProvider } from '@/core/billing/paywall'
 import { paymentChannel } from '@/core/billing/waffo'
@@ -25,6 +26,17 @@ export const metadata: Metadata = appShellMetadata()
 async function Identity() {
   const user = await getSessionUser()
   return user ? <AnalyticsIdentify userId={user.id} /> : null
+}
+
+// The top bar's Admin item (spec #186), decided here on the server: built only for
+// profiles.role = 'admin', so no one else's props or HTML carry it. /admin checks the role itself.
+async function adminEntry(): Promise<AdminEntry | undefined> {
+  const [user, t] = await Promise.all([getSessionUser(), getTranslations('adminEntry')])
+  return adminEntryFor(user?.role, () => t('label'))
+}
+
+async function Tabs({ items }: { items: TabItem[] }) {
+  return <TabBar items={items} desktopUnder={['/photos/']} admin={await adminEntry()} />
 }
 
 function useTabs(): TabItem[] {
@@ -62,7 +74,7 @@ export default function AppLayout({ children }: LayoutProps<'/[locale]'>) {
         </Suspense>
         {/* usePathname decides tab root vs flow page; on dynamic routes that is request data. */}
         <Suspense fallback={null}>
-          <TabBar items={tabs} desktopUnder={['/photos/']} />
+          <Tabs items={tabs} />
         </Suspense>
         <main className="flex flex-1 flex-col">{children}</main>
         <GenerationRunner />

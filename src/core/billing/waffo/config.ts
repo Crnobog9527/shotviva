@@ -5,6 +5,7 @@ import { createPrivateKey, createPublicKey, type KeyObject } from 'node:crypto'
 import type { PaymentChannel, ProductId } from '../../config'
 import { serverEnv } from '../../env'
 import { AppError } from '../../errors'
+import type { MembershipProductId } from '../../waffo-env'
 
 // Waffo settings for this deployment (ARCHITECTURE §6.3). core/env.ts has already checked the
 // shapes (and that all nine product ids are mapped); this turns them into usable keys.
@@ -17,6 +18,8 @@ export type WaffoConfig = {
   mode: WaffoMode
   privateKey: KeyObject
   productIds: Record<ProductId, string>
+  // The six memberships as recurring products, for card checkouts (T50).
+  subscriptionProductIds: Record<MembershipProductId, string>
 }
 
 export type WaffoWebhookConfig = { storeId: string; mode: WaffoMode; publicKey: KeyObject }
@@ -49,7 +52,7 @@ function keyFrom(raw: string | undefined, kind: 'PRIVATE' | 'PUBLIC', name: stri
 
 export function waffoConfig(): WaffoConfig {
   const env = serverEnv()
-  if (!env.WAFFO_MERCHANT_ID || !env.WAFFO_STORE_ID || !env.WAFFO_PRODUCT_IDS) {
+  if (!env.WAFFO_MERCHANT_ID || !env.WAFFO_STORE_ID || !env.WAFFO_PRODUCT_IDS || !env.WAFFO_SUBSCRIPTION_PRODUCT_IDS) {
     throw new AppError('INTERNAL', 'Waffo is not configured')
   }
   return {
@@ -58,6 +61,7 @@ export function waffoConfig(): WaffoConfig {
     mode: env.WAFFO_ENVIRONMENT,
     privateKey: keyFrom(env.WAFFO_PRIVATE_KEY, 'PRIVATE', 'WAFFO_PRIVATE_KEY'),
     productIds: env.WAFFO_PRODUCT_IDS,
+    subscriptionProductIds: env.WAFFO_SUBSCRIPTION_PRODUCT_IDS,
   }
 }
 

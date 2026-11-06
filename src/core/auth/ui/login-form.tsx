@@ -5,7 +5,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 
 import { Link } from '../../i18n/ui'
 import { CheckEmail } from './check-email'
-import { CaptchaLine, CaptchaSlot, Divider, EmailField, Notice, PasswordField, SubmitButton } from './form-parts'
+import { CaptchaFailed, CaptchaLine, Divider, EmailField, Notice, PasswordField, SubmitButton } from './form-parts'
 import { GoogleButton } from './google-button'
 import { AlertIcon } from './icons'
 import { useAuthForm, type AuthForm, type FormAction } from './use-auth-form'
@@ -69,13 +69,13 @@ export function LoginForm({ action, googleAction, resendAction, next, notice, ar
           placeholder={t('placeholders.password')}
           aside={<Link href="/reset">{t('login.forgot')}</Link>}
         />
-        <CaptchaSlot mode={form.captcha.mode} mount={form.captcha.mountCheckbox} needsTick={form.needsTick} />
         <SubmitButton pending={form.pending}>{t('login.submit')}</SubmitButton>
+        <CaptchaFailed show={form.captchaFailed} />
       </form>
       <p className="au-swap">
         {t.rich('login.toSignup', { link: (chunks) => <Link href={`/signup?next=${encodeURIComponent(next)}`}>{chunks}</Link> })}
       </p>
-      <CaptchaLine enabled={form.captcha.enabled} />
+      <CaptchaLine enabled={form.captchaEnabled} />
     </section>
   )
 }
@@ -84,14 +84,13 @@ type NoticeProps = { form: AuthForm; notice: string | null; resendAction: FormAc
 
 function LoginNotice({ form, notice, resendAction, next, onResent }: NoticeProps) {
   const t = useTranslations('auth')
-  const { state } = form
-  if (state.status === 'error' && state.code === 'AUTH_EMAIL_NOT_CONFIRMED' && form.email) {
+  if (form.errorCode === 'AUTH_EMAIL_NOT_CONFIRMED' && form.email) {
     return <UnverifiedNotice email={form.email} resendAction={resendAction} next={next} onResent={onResent} />
   }
-  if (state.status === 'error' && state.code === 'AUTH_INVALID_CREDENTIALS') {
+  if (form.errorCode === 'AUTH_INVALID_CREDENTIALS') {
     return <Notice>{t.rich('login.creds', { reset: (chunks) => <Link href="/reset">{chunks}</Link> })}</Notice>
   }
-  if (state.status === 'error') return <Notice>{t(`errors.${state.code}`)}</Notice>
+  if (form.errorCode) return <Notice>{t(`errors.${form.errorCode}`)}</Notice>
   return notice ? <Notice>{t(`notices.${notice}`)}</Notice> : null
 }
 
@@ -122,8 +121,8 @@ function UnverifiedNotice({ email, resendAction, next, onResent }: UnverifiedPro
         </p>
         <input type="hidden" name="email" value={email} />
         <input type="hidden" name="next" value={next} />
-        <CaptchaSlot mode={resend.captcha.mode} mount={resend.captcha.mountCheckbox} needsTick={resend.needsTick} />
-        {resend.state.status === 'error' ? <p>{t(`errors.${resend.state.code}`)}</p> : null}
+        {resend.errorCode ? <p>{t(`errors.${resend.errorCode}`)}</p> : null}
+        {resend.captchaFailed ? <p>{t('captcha.failed')}</p> : null}
       </div>
     </form>
   )

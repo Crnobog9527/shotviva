@@ -831,3 +831,20 @@ Owner 2026-11-06 发现中文页有功能缺失。逐页对比现有英文页和
 - 退款、后台查找、结账返回页（T43）对 Waffo 订阅同样可用。
 
 **验收**：LAUNCH_CHECKLIST §5 的 Waffo 沙盒一条全部走通；回调重发不重复入账；单测和数据库测试覆盖；交互验收交给 Codex（沙盒卡）。收尾停掉并删除本地 Docker。
+
+## T51 模板封面走本站同源路径（可派）
+
+**目标**：Owner 2026-11-07 定：DNS 留在 Vercel，不绑 `assets.shotviva.com`；封面从 `https://shotviva.com/assets/covers/...` 读（ARCHITECTURE §8.3「公开读」）。
+
+**范围**：`next.config` 加 rewrite `/assets/:path*` → `${R2_PUBLIC_ORIGIN}/:path*`（变量缺失时不加 rewrite、构建不失败）；`/assets/*` 响应头 `Cache-Control: public, max-age=31536000, immutable`；中间件 matcher 排除 `assets/`；`next/image` 如用到封面，`images` 配置允许本站路径；`.env.example`、`public-env.ts` 注释改成新说法；`R2_PUBLIC_ORIGIN` 加进 env 校验（只在设了 `NEXT_PUBLIC_ASSETS_BASE_URL` 为本站路径时必需）。后台上传封面写的 `templates.cover_*_url` 仍是 `NEXT_PUBLIC_ASSETS_BASE_URL` + 路径，不变。
+
+**验收**：预览上把 `NEXT_PUBLIC_ASSETS_BASE_URL` 设成预览站自己的 `/assets` 时封面能显示、响应头带 immutable、第二次请求命中 Vercel 缓存；单测覆盖 rewrite 配置；交互验收交给 Codex。UI 以外不动，无迁移。
+
+## T52 模板英文说明（可派）
+
+**目标**：后台建模板时可以填英文说明，英文页显示它（ARCHITECTURE §5 `templates`「英文说明」）。
+
+**范围**：迁移（`0380`～`0399`）加 `templates.description`；后台模板编辑页加「英文说明」输入框（≤160 字，计数），保存进现有的模板保存函数；所有显示模板说明的地方按语言取值，中文缺失回退英文；预览环境的模板缓存标签照常失效。
+
+**验收**：后台填英文说明后英文页立即显示，中文页显示中文说明，中文为空时显示英文；单测和数据库测试覆盖；交互验收交给 Codex。收尾停掉并删除本地 Docker。
+

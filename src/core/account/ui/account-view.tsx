@@ -33,10 +33,14 @@ export type AccountData = {
   morePurchases: boolean
   helpUnread: boolean
   graylum: LinkStatus
+  // profiles.role = 'admin': the "Admin" row (spec #186).
+  admin: boolean
 }
 
 export type AccountActions = {
   manageSubscription: () => Promise<void>
+  // A Waffo card subscription is cancelled with our own button (T50).
+  cancelWaffoSubscription: () => Promise<{ ok: boolean }>
   disconnectGraylum: () => Promise<void>
   signOut: () => Promise<void>
 }
@@ -73,7 +77,7 @@ export function AccountView({ data, actions, site }: Props) {
       <AccountHeader email={data.email} />
       <div className="md:mx-(--gutter) md:mt-6 md:grid md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] md:items-start md:gap-4">
         <Group title={t('plan.title')} className={pair}>
-          <PlanCard summary={data.subscription} products={site.products} paid={data.balance.paid} manage={actions.manageSubscription} facts={facts} />
+          <PlanCard summary={data.subscription} products={site.products} paid={data.balance.paid} manage={actions.manageSubscription} cancelWaffo={actions.cancelWaffoSubscription} facts={facts} />
         </Group>
         <Group title={t('credits.title')} className={pair}>
           <CreditDials balance={data.balance} giftRefused={data.giftRefused} allowance={allowance} freeGift={site.freeCredits} />
@@ -81,7 +85,7 @@ export function AccountView({ data, actions, site }: Props) {
         </Group>
       </div>
       <Group title={t('settings.title')}>
-        <SettingsRows email={data.email} purchases={data.purchases} morePurchases={data.morePurchases} helpUnread={data.helpUnread} />
+        <SettingsRows email={data.email} purchases={data.purchases} morePurchases={data.morePurchases} helpUnread={data.helpUnread} admin={data.admin} />
       </Group>
       <IntegrationsPanel graylum={data.graylum} disconnect={actions.disconnectGraylum} />
       <Group title={t('session.title')} hideTitle>

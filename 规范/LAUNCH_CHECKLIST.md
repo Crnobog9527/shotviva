@@ -15,7 +15,7 @@
 - [ ] OpenAI：组织验证完成，有 GPT-Image 系列模型权限（`OPENAI_IMAGE_MODEL` 指定的那个，默认由 Owner 定），设好每月消费上限
 - [ ] Resend：shotviva.com 的 SPF、DKIM、DMARC 都验证通过，已配成 Supabase Auth 的 SMTP
 - [ ] Cloudflare R2：生产桶和预览桶分开，都是私有桶；`inputs/`、`uploads-admin/` 前缀设好 7 天过期规则；CORS 只放行站点域名的 PUT、GET 和 Content-Type（生产桶的来源是 `https://shotviva.com`）
-- [ ] 模板封面公开桶 `shotviva-assets` 已建，绑定 `assets.shotviva.com`，公开桶里只有 `covers/`；10 个模板的封面都已由 Owner 在后台上传
+- [ ] 模板封面公开桶 `shotviva-assets` 已建，开启 r2.dev 公开地址并配给 `R2_PUBLIC_ORIGIN`，封面经 `https://shotviva.com/assets/covers/...` 访问且带一年 immutable 缓存头（T51，DNS 在 Vercel 所以不绑 `assets.shotviva.com`），公开桶里只有 `covers/`；10 个模板的封面都已由 Owner 在后台上传
 - [ ] 伙伴密钥：预览和生产各一把，登记到环境变量；预览密钥在生产调用返回 401
 - [ ] hCaptcha：站点密钥建好，已在 Supabase Auth 里启用
 - [ ] Sentry、PostHog（cookieless 模式）已接入；Vercel Firewall 限频规则已配置
@@ -37,7 +37,7 @@
 
 ## 3. 登录
 
-- [ ] 邮箱 + 密码注册，收到 Resend 发的验证邮件（发件人 support@shotviva.com），点击后能登录；Gmail、Outlook 各测一次，记录进收件箱还是垃圾箱
+- [ ] 邮箱 + 密码注册，收到 Resend 发的验证邮件（发件人 mail@shotviva.com，回信能在飞书的 support@ 收到），点击后能登录；Gmail、Outlook 各测一次，记录进收件箱还是垃圾箱
 - [ ] 发信域名预热：shotviva.com 2026-11-05 才注册，正式推广前至少留一周少量发信，确认 Gmail / Outlook / 飞书都能正常收到（预览验收时飞书企业邮箱曾一直收不到）
 - [ ] 未验证邮箱的账号不能生成
 - [ ] Google 登录可用，回跳地址正确

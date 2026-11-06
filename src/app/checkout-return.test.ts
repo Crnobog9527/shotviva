@@ -30,6 +30,7 @@ const facts = (productId: CheckoutFacts['productId'], overrides: Partial<Checkou
   amount: { minor: 4990, currency: 'usd' },
   card: { brand: 'visa', last4: '4242' },
   receiptUrl: 'https://pay.stripe.com/receipts/r1',
+  recurring: !productId.startsWith('pack'),
   renewsAt: productId.startsWith('pack') ? null : '2026-12-06T00:00:00.000Z',
   ...overrides,
 })
@@ -63,7 +64,7 @@ describe('checkout return page (en)', () => {
     expect(pack).toContain('One-time payment. Nothing renews.')
     expect(pack).not.toContain('Renews')
     expect(pack).toContain('· Alipay')
-    expect(await success('en', 'starter_monthly', { method: 'alipay', card: null, renewsAt: null })).toContain('One-time payment for 30 days. Nothing renews')
+    expect(await success('en', 'starter_monthly', { method: 'alipay', card: null, recurring: false, renewsAt: null })).toContain('One-time payment for 30 days. Nothing renews')
   })
 
   it('pending: confirming, the order and amount, check again', async () => {
