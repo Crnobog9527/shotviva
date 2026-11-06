@@ -390,8 +390,8 @@
       "concurrency": "{count, plural, one {# photo} other {# photos}} generating at a time",
       "support48h": "Email support, reply within 48 hours",
       "support24h": "Priority email support, reply within 24 hours",
-      "supportSameDay": "Priority support, reply the same business day",
       "batch": "Batch upload, up to {count} photos",
+      "brandKit": "Brand kit: your logo and fonts on posters",
       "earlyAccess": "Early access to new features",
       "wishlistVotes": "Your template requests count {weight}× on the Wishlist"
     },

@@ -22,6 +22,9 @@ describe('paywall messages (en)', () => {
     expect(t('perks.concurrency', { count: 1 })).toBe('1 photo generating at a time')
     expect(t('perks.concurrency', { count: 6 })).toBe('6 photos generating at a time')
     expect(t('perks.earlyAccess')).toBe('Early access to new features')
+    expect(t('perks.support48h')).toBe('Email support, reply within 48 hours')
+    expect(t('perks.support24h')).toBe('Priority email support, reply within 24 hours')
+    expect(t('perks.brandKit')).toBe('Brand kit: your logo and fonts on posters')
   })
 
   it('words the payment groups as DESIGN §4.5 fixes them', () => {
@@ -38,6 +41,5 @@ describe('paywall messages (en)', () => {
     expect(text).not.toMatch(/[一-鿿]/)
     expect(text).not.toMatch(/wechat/i)
     expect(text).not.toMatch(/queue/i)
-    expect(text).not.toMatch(/brand kit/i)
   })
 })
