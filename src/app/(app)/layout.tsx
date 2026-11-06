@@ -7,6 +7,7 @@ import { AnnouncementBanner } from '@/core/announcements'
 import { AppFrame, TabBar, type TabItem } from '@/core/app-shell'
 import { getSessionUser } from '@/core/auth'
 import { PaywallProvider } from '@/core/billing/paywall'
+import { paymentChannel } from '@/core/billing/waffo'
 import { isModuleEnabled } from '@/core/config'
 import { appShellMetadata } from '@/core/seo'
 import { isWishlistEnabled } from '@/core/wishlist'
@@ -43,7 +44,7 @@ export default function AppLayout({ children }: LayoutProps<'/'>) {
       <HideWhileGenerating>
         <AnnouncementBanner />
       </HideWhileGenerating>
-      <PaywallProvider products={site.billing.products} wishlistLive={isWishlistEnabled(site)}>
+      <PaywallProvider products={site.billing.products} wishlistLive={isWishlistEnabled(site)} channel={paymentChannel()}>
         <Suspense fallback={null}>
           <Identity />
         </Suspense>

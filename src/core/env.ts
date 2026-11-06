@@ -2,6 +2,7 @@ import 'server-only'
 import { z } from 'zod'
 
 import { sentryBuildEnvSchema } from './build-env'
+import { checkWaffoEnv, waffoEnvShape } from './waffo-env'
 
 // `KEY=` lines in .env files arrive as '' — treat them as unset rather than invalid.
 const blankAsUnset = (value: unknown) => (value === '' ? undefined : value)
@@ -43,7 +44,10 @@ const serverEnvSchema = z.object({
   // Switches the wishlist on for validation outside production (core/wishlist isWishlistEnabled).
   // Ignored when VERCEL_ENV is 'production', so it can never turn the feature on for real users.
   FEATURE_WISHLIST_PREVIEW: z.preprocess(blankAsUnset, z.enum(['on', 'off']).default('off')),
-}).extend(sentryBuildEnvSchema.shape)
+  ...waffoEnvShape,
+})
+  .extend(sentryBuildEnvSchema.shape)
+  .superRefine(checkWaffoEnv)
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>
 
