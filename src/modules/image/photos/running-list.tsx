@@ -2,6 +2,8 @@
 
 import { useTranslations } from 'next-intl'
 
+import { Reveal } from '@/core/ui/reveal-item'
+
 import { estimatedProgress, percent } from '../generation/progress'
 import { GroundedImg } from '../result/grounded-img'
 import { useNow } from '../workspace/use-now'
@@ -35,7 +37,7 @@ function RunningRowView({ row, progress }: { row: RunningRow; progress: number }
   const t = useTranslations('app')
   const thumb = row.previewUrl ?? row.cover
   return (
-    <li className="hairline grid grid-cols-[76px_1fr] items-center gap-4 rounded-media bg-card p-3">
+    <Reveal as="li" className="hairline grid grid-cols-[76px_1fr] items-center gap-4 rounded-media bg-card p-3">
       <span className="relative block aspect-[4/5] overflow-hidden rounded-inner bg-photo-ground">
         {/* The template cover stands in until this tab has the photo; a cut-out cover sits on white. */}
         {thumb ? <GroundedImg ground="white" src={thumb} alt="" className="absolute inset-0 size-full object-cover brightness-75 grayscale" /> : null}
@@ -59,6 +61,6 @@ function RunningRowView({ row, progress }: { row: RunningRow; progress: number }
           {t(row.queued ? 'photos.waiting' : 'photos.generating')}
         </span>
       </span>
-    </li>
+    </Reveal>
   )
 }

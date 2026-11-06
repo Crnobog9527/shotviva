@@ -11,7 +11,7 @@ type Props = { items: readonly AdminNavItem[]; email: string | null; children: R
 // desktop, a dropdown on phones. B tokens only; no separate admin theme.
 export function AdminShell({ items, email, children }: Props) {
   return (
-    <div className="flex min-h-dvh flex-1 flex-col">
+    <div data-admin-shell="" className="flex min-h-dvh flex-1 flex-col">
       <header className="flex min-h-14 items-center gap-3 border-b border-border px-4 md:px-6">
         <span className="font-semibold">{SHELL_COPY.brand}</span>
         <span className="ml-auto hidden min-w-0 truncate text-sm text-muted-foreground sm:block">
