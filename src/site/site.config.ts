@@ -96,10 +96,10 @@ export const site = defineSite({
   // The home page's two bills (DESIGN §6.9 item 6), Owner 2026-11-06: styled product photos
   // $50–$350 per image (Shopify, "Product photography pricing", Jan 2026); white-background
   // packshots $15–$90 (ProShot Media, ProductPhotography.com, soona, Lars Miller Media price
-  // pages, read 2026-11-06). Seconds are Standard (preview jobs measured 19–33 s); LAUNCH §5
-  // measures again before launch.
+  // pages, read 2026-11-06). Seconds per quality (Owner 2026-11-06; preview jobs measured
+  // Standard 19–33 s, HD 32–33 s, Max 41–48 s); LAUNCH §5 measures again before launch.
   marketing: {
     photographer: { styledShotUsd: { low: 50, high: 350 }, packshotUsd: { low: 15, high: 90 } },
-    photoSeconds: { low: 20, high: 40 },
+    photoSeconds: { '1k': { low: 20, high: 40 }, '2k': { low: 30, high: 50 }, '3k': { low: 40, high: 60 } },
   },
 })

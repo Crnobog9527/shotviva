@@ -156,8 +156,8 @@ export const packshotUsd = photographer.packshotUsd
 export const setShotsUsd = times(styledShotUsd, SET_PHOTOS)
 export const quoteUsd: UsdRange = setShotsUsd
 
-// "20–40", seconds for one Standard photo
-export const photoSecondsRange = `${photoSeconds.low}–${photoSeconds.high}`
+// "20–40", seconds for one Standard photo (the bills quote Standard)
+export const photoSecondsRange = `${photoSeconds['1k'].low}–${photoSeconds['1k'].high}`
 
 // The set's credits at the cheapest plan's credit price, rounded the way /pricing shows it:
 // 6 × $0.40 = "$2.40". Undefined until the plans are priced.

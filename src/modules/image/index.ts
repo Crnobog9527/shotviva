@@ -19,6 +19,7 @@ export { ImageWorkspace, type WorkspaceProps } from './workspace/image-workspace
 export { loadAgain } from './again/load-again'
 export { WorkspaceHead } from './workspace/workspace-head'
 export { GenerationRunner } from './generation/generation-runner'
+export { DevelopSecondsProvider } from './generation/develop-seconds-context'
 export { GeneratingPill } from './generation/generating-pill'
 export { HideWhileGenerating } from './generation/hide-while-generating'
 export { PhotosTabBadge } from './generation/photos-tab-badge'
