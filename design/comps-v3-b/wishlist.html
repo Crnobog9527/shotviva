@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B0A09">
+<meta name="robots" content="noindex">
+<title>Wishlist · Shotviva</title>
+<link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/studio.css">
+<link rel="stylesheet" href="css/app.css">
+<script src="js/studio.js"></script>
+<style>
+  /* Wishlist tab (ARCHITECTURE §15, DESIGN §4.7): the wall, the request flow page, and My requests.
+       ?v=wall (default) | request | mine      ?gate=0 (hasn't made a photo yet: can look, can't post or vote)
+       ?request=filled (the form with two photos and text)   ?sent=1 (back on the wall with the "Sent for review" toast)
+     Cards sort by votes; shipped cards pin to the top with "Shipped →" into the template. Names are masked (first letter + ***). */
+  .top { padding: calc(var(--sat) + 8px) var(--gutter) 0; display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+  .top h1 { font: 400 52px/.9 var(--font-display); letter-spacing: -0.03em; }
+  .top .mine { margin-bottom: 2px; }
+  .lede { margin: 8px var(--gutter) 0; font-size: 15px; color: var(--muted-foreground); max-width: 56ch; }
+  .view { display: none; } .view.on { display: block; }
+
+  /* the wall: prints taped to a wall, two across on the phone. Each note hangs from its tape (transform-origin top centre),
+     leans a little (--r, per card), and is blown by the pointer (hover → .blow) and by scrolling (--wind on the wall, decays). */
+  .wall { --wind: 0deg; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 10px; margin: 24px var(--gutter) 0; padding: 12px 0 0; list-style: none; }
+  .wall > li { min-width: 0; --r: 0deg; --k: 1; transform: rotate(calc(var(--r) + var(--wind) * var(--k))); transform-origin: 50% 0; transition: transform .9s cubic-bezier(.2, .8, .2, 1); will-change: transform; }
+  .wall > li:nth-child(6n+1) { --r: -2.2deg; --k: 1.15; } .wall > li:nth-child(6n+2) { --r: 1.6deg; --k: .8; } .wall > li:nth-child(6n+3) { --r: -.8deg; --k: 1.3; }
+  .wall > li:nth-child(6n+4) { --r: 2.4deg; --k: .95; } .wall > li:nth-child(6n+5) { --r: -1.4deg; --k: 1.05; } .wall > li:nth-child(6n+6) { --r: 1deg; --k: .7; }
+  .req { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; padding: 8px 8px 10px; border-radius: 6px; background: #1B1816; box-shadow: inset 0 0 0 1px var(--border), inset 0 1px 0 rgba(255,255,255,.05), 0 18px 28px -18px rgba(0,0,0,.95), 0 2px 4px -2px rgba(0,0,0,.6); }
+  /* the tape: a translucent strip across the top edge, slightly askew */
+  .req::before { content: ""; position: absolute; z-index: 4; left: 50%; top: -9px; width: 64px; height: 20px; transform: translateX(-50%) rotate(var(--tape, -3deg)); border-radius: 2px; pointer-events: none;
+    background: linear-gradient(90deg, rgba(242,236,227,.22), rgba(242,236,227,.34) 50%, rgba(242,236,227,.2)); box-shadow: 0 1px 2px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.08); backdrop-filter: blur(1px); }
+  .wall > li:nth-child(odd) .req { --tape: 3deg; }
+  .req .refs { position: relative; min-width: 0; display: flex; gap: 2px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; border-radius: 3px; background: var(--muted); box-shadow: inset 0 0 0 1px rgba(0,0,0,.5); }
+  .req .refs::-webkit-scrollbar { display: none; }
+  .req .refs img { flex: 0 0 100%; width: 100%; min-width: 0; aspect-ratio: 1; object-fit: cover; scroll-snap-align: start; }
+  .req .refs img + img { flex-basis: 88%; }
+  .req .refs .n { position: absolute; right: 6px; top: 6px; height: 22px; padding: 0 7px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; font: 500 12px/1 var(--font-mono); background: var(--photo-scrim); color: var(--foreground); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  .req .refs .n .i { width: 11px; height: 11px; stroke-width: 2.2; }
+  .req .badge-illus { top: 6px; bottom: auto; left: 6px; height: 22px; font-size: 12px; padding: 0 6px; }
+  .req .body { padding: 10px 4px 0; display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 8px; }
+  /* the note itself: the serif italic is the handwriting on the print */
+  .req .text { min-width: 0; font: italic 400 17px/1.3 var(--font-display); letter-spacing: -0.005em; text-wrap: pretty; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+  .req .foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 8px; }
+  .req .who { flex: 1; min-width: 0; font: 400 13px/1.3 var(--font-sans); color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* the vote: a pill that fills when it's yours; phone shows the heart and the count, the words come back at 768 */
+  .vote { flex: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px 0 9px; border-radius: 999px; font: 600 14px/1 var(--font-sans); color: var(--foreground); background: var(--bone-6); box-shadow: inset 0 0 0 1px var(--border); transition: background .18s, box-shadow .18s, transform .18s var(--ease); }
+  .vote .i { width: 17px; height: 17px; }
+  .vote .w { display: none; }
+  .vote .c { font: 500 14px/1 var(--font-mono); color: var(--bone-dim); }
+  .vote[aria-pressed="true"] { background: color-mix(in srgb, var(--primary) 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 50%, transparent); }
+  .vote[aria-pressed="true"] .i { color: var(--primary); fill: var(--primary); }
+  .vote[aria-pressed="true"] .c { color: var(--foreground); }
+  .vote:active { transform: scale(.94); }
+  .vote[aria-disabled="true"] { opacity: .5; }
+  /* shipped: a rubber stamp across the print, and the note is a link into the template */
+  .req.shipped .stamp { position: absolute; z-index: 5; right: -6px; top: 38px; transform: rotate(12deg); padding: 4px 8px; border: 2px solid var(--success); border-radius: 4px; font: 700 12px/1 var(--font-sans); letter-spacing: .08em; text-transform: uppercase; color: var(--success); background: rgba(11,10,9,.55); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); box-shadow: 0 2px 6px rgba(0,0,0,.5); mix-blend-mode: screen; }
+  .req.shipped .ship { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 36px; margin-top: 2px; font: 500 14px/1.2 var(--font-sans); color: var(--success); text-decoration: none; }
+  .req.shipped .ship .i { width: 16px; height: 16px; flex: none; }
+  /* blown by the pointer: a gust from the left, settling back */
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .wall > li.blow { animation: gust 1.4s cubic-bezier(.2, .8, .2, 1) 1; }
+  }
+  @keyframes gust { 0% { transform: rotate(calc(var(--r) + var(--wind) * var(--k))); } 18% { transform: rotate(calc(var(--r) + 5deg * var(--k))) translateY(-2px); } 48% { transform: rotate(calc(var(--r) - 3deg * var(--k))); } 74% { transform: rotate(calc(var(--r) + 1.5deg * var(--k))); } 100% { transform: rotate(calc(var(--r) + var(--wind) * var(--k))); } }
+  @media (prefers-reduced-motion: reduce) { .wall > li { transform: none !important; transition: none; } }
+  /* the gate line under the fixed primary */
+  .gate { margin: 8px var(--gutter) 0; font-size: 14px; color: var(--muted-foreground); text-align: center; }
+  [data-gate="0"] .vote { opacity: .5; }
+
+  /* fixed primary (phone) → end of content (desktop) */
+  .cta { position: fixed; z-index: 70; left: 0; right: 0; bottom: calc(var(--sab) + 60px); padding: 8px var(--gutter) 0; display: grid; gap: 6px; pointer-events: none; }
+  .cta .btn { pointer-events: auto; box-shadow: inset 0 1px 0 rgba(255,255,255,.38), inset 0 -2px 0 rgba(0,0,0,.12), 0 16px 30px -12px rgba(0,0,0,.9); }
+  .cta small { display: none; text-align: center; font-size: 14px; color: var(--bone-dim); text-shadow: 0 1px 8px var(--background); }
+  [data-gate="0"] .cta .btn { opacity: .5; pointer-events: none; }
+  [data-gate="0"] .cta small { display: block; }
+  body.app.is-wall { padding-bottom: calc(var(--sab) + 150px); }
+
+  /* the request flow page: back + title, the upload row, the text, Submit fixed at the bottom */
+  .nav { position: sticky; top: 0; z-index: 50; height: 56px; padding: 0 8px; padding-top: var(--sat); box-sizing: content-box; display: flex; align-items: center; justify-content: space-between;
+    background: var(--bar); backdrop-filter: blur(24px) saturate(1.4); -webkit-backdrop-filter: blur(24px) saturate(1.4); box-shadow: inset 0 -1px 0 var(--border); }
+  .nav .back { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; padding: 0 8px; font: 500 16px/1 var(--font-sans); color: var(--foreground); text-decoration: none; }
+  .nav .ttl { font: 600 16px/1 var(--font-sans); }
+  .nav .sp { width: 72px; }
+  .form { padding: 20px var(--gutter) 0; display: grid; gap: 20px; }
+  .form h2 { font: 400 32px/1.05 var(--font-display); letter-spacing: -0.02em; }
+  .form .why { margin-top: 8px; font-size: 15px; line-height: 1.5; color: var(--bone-dim); }
+  .slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .slot { position: relative; aspect-ratio: 4 / 5; border-radius: 14px; overflow: hidden; display: grid; place-content: center; justify-items: center; gap: 6px; text-align: center; padding: 8px;
+    background: var(--background); box-shadow: inset 0 0 0 1px var(--input); color: var(--foreground); }
+  .slot::before { content: ""; position: absolute; inset: 10px; border-radius: 8px; pointer-events: none;
+    background: linear-gradient(var(--bone-dim), var(--bone-dim)) top left / 14px 1.5px no-repeat, linear-gradient(var(--bone-dim), var(--bone-dim)) top left / 1.5px 14px no-repeat,
+      linear-gradient(var(--bone-dim), var(--bone-dim)) top right / 14px 1.5px no-repeat, linear-gradient(var(--bone-dim), var(--bone-dim)) top right / 1.5px 14px no-repeat,
+      linear-gradient(var(--bone-dim), var(--bone-dim)) bottom left / 14px 1.5px no-repeat, linear-gradient(var(--bone-dim), var(--bone-dim)) bottom left / 1.5px 14px no-repeat,
+      linear-gradient(var(--bone-dim), var(--bone-dim)) bottom right / 14px 1.5px no-repeat, linear-gradient(var(--bone-dim), var(--bone-dim)) bottom right / 1.5px 14px no-repeat; }
+  .slot .i { width: 22px; height: 22px; }
+  .slot b { font: 600 14px/1.2 var(--font-sans); }
+  .slot small { font-size: 13px; color: var(--muted-foreground); }
+  .slot.has { box-shadow: none; }
+  .slot.has::before { display: none; }
+  .slot.has img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .slot.has .rm { position: absolute; top: 6px; right: 6px; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--photo-scrim); color: var(--foreground); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  .slot.has .rm .i { width: 14px; height: 14px; stroke-width: 2.2; }
+  .slot.more { color: var(--bone-dim); }
+  .form .hint { font-size: 14px; color: var(--muted-foreground); margin-top: -12px; }
+  .form .textarea { min-height: 140px; }
+  .submit { position: fixed; z-index: 70; left: 0; right: 0; bottom: 0; padding: 8px var(--gutter) calc(var(--sab) + 8px); background: var(--bar); backdrop-filter: blur(24px) saturate(1.4); -webkit-backdrop-filter: blur(24px) saturate(1.4); box-shadow: inset 0 1px 0 var(--border); }
+  .submit .btn-primary[aria-disabled="true"] { opacity: .5; }
+  body.app.is-flow { padding-bottom: calc(var(--sab) + 90px); }
+
+  /* My requests */
+  .mine-list { display: grid; gap: 8px; margin: 20px var(--gutter) 0; padding: 0; list-style: none; }
+  .mr { display: flex; gap: 12px; padding: 10px; align-items: center; text-decoration: none; color: inherit; }
+  .mr img { width: 64px; height: 80px; border-radius: 10px; object-fit: cover; flex: none; }
+  .mr .t { flex: 1; min-width: 0; }
+  .mr .text { font-size: 15px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .mr .meta { margin-top: 6px; display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted-foreground); }
+  .st { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: 8px; font: 500 13px/1 var(--font-sans); background: var(--bone-8); color: var(--bone-dim); }
+  .st::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .st.live { background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--primary); }
+  .st.shipped { background: color-mix(in srgb, var(--success) 14%, transparent); color: var(--success); }
+  .st.rejected { color: var(--muted-foreground); }
+  .mr .votes { font: 500 14px/1 var(--font-mono); color: var(--muted-foreground); }
+
+  @media (min-width: 768px) {
+    .top { padding-top: 32px; }
+    .wall { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px 18px; margin-top: 28px; }
+    .req { padding: 10px 10px 12px; }
+    .req .refs img { aspect-ratio: 4 / 3; }
+    .req .text { font-size: 19px; }
+    .vote { height: 40px; padding: 0 14px 0 12px; gap: 8px; }
+    .vote .w { display: inline; }
+    .vote .i { width: 18px; height: 18px; }
+    .cta { position: static; padding: 0; margin: 0 var(--gutter); }
+    .cta .btn { width: auto; min-width: 240px; justify-self: start; margin-top: 24px; }
+    .cta small { text-align: left; }
+    body.app.is-wall { padding-bottom: 80px; }
+    .form { max-width: 560px; margin: 0 auto; padding-top: 32px; }
+    .submit { position: static; padding: 0; background: none; box-shadow: none; max-width: 560px; margin: 24px auto 0; padding: 0 var(--gutter); }
+    .mine-list { max-width: 720px; }
+    .nav { padding-left: max(var(--gutter), calc((100vw - var(--content)) / 2)); padding-right: max(var(--gutter), calc((100vw - var(--content)) / 2)); }
+  }
+  @media (min-width: 1024px) { .wall { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px 20px; } }
+  @media (hover: hover) { .vote:not([aria-pressed="true"]):hover { background: var(--bone-8); box-shadow: inset 0 0 0 1px var(--input); } .req.shipped .ship:hover { text-decoration: underline; text-underline-offset: 3px; } }
+</style>
+</head>
+<body class="app">
+
+<!-- ===== wall ===== -->
+<section class="view" data-v="wall">
+  <header class="top w">
+    <h1>Wishlist</h1>
+    <a class="btn btn-ghost btn-pill mine" href="wishlist.html?v=mine">My requests</a>
+  </header>
+  <p class="lede w">Ask for the template you need. The ones with the most votes get made first.</p>
+  <div class="cta w">
+    <a class="btn btn-primary" href="wishlist.html?v=request">Request a template</a>
+    <small>Create one photo first to join</small>
+  </div>
+  <ul class="wall w" id="wall"></ul>
+</section>
+
+<!-- ===== request a template (flow page: no tab bar) ===== -->
+<section class="view" data-v="request">
+  <header class="nav">
+    <a class="back" href="wishlist.html"><svg class="i" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>Wishlist</a>
+    <span class="ttl">Request a template</span>
+    <span class="sp"></span>
+  </header>
+  <main class="form">
+    <div><h2>What should it look like?</h2><p class="why">Describe the look you want. A reference photo helps: a photo in that style, or your own dish or product.</p></div>
+    <div class="slots" id="slots" role="group" aria-label="Reference photos, up to 3">
+      <button class="slot" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><b>Add a photo</b><small>up to 3</small></button>
+      <span class="slot more" aria-hidden="true"></span>
+      <span class="slot more" aria-hidden="true"></span>
+    </div>
+    <p class="hint">JPG, PNG or WebP · up to 20 MB each · optional</p>
+    <div class="field">
+      <label class="field-label" for="req-text">The look</label>
+      <textarea class="textarea" id="req-text" maxlength="300" rows="5" placeholder="Describe the look you want, e.g. a dark moody poster for our weekend brunch menu" enterkeyhint="done" autocapitalize="sentences"></textarea>
+      <p class="counter"><span id="req-n">0</span>/300</p>
+    </div>
+  </main>
+  <div class="submit"><button class="btn btn-primary" type="button" id="req-go" aria-disabled="true">Submit</button></div>
+</section>
+
+<!-- ===== my requests (flow page) ===== -->
+<section class="view" data-v="mine">
+  <header class="nav">
+    <a class="back" href="wishlist.html"><svg class="i" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>Wishlist</a>
+    <span class="ttl">My requests</span>
+    <span class="sp"></span>
+  </header>
+  <ul class="mine-list w" id="mine"></ul>
+</section>
+
+<nav class="tabbar" aria-label="Main" id="tabs">
+  <a href="create.html"><svg class="i" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M12 8v8M8 12h8"/></svg>Create</a>
+  <a href="wishlist.html" aria-current="page"><svg class="i" viewBox="0 0 24 24"><path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7a4.3 4.3 0 0 1 7.5 2.8C19.5 15.4 12 20 12 20z"/></svg>Wishlist</a>
+  <a href="photos.html"><svg class="i" viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="14" height="14" rx="3"/><path d="M7 3.5h10.5a3 3 0 0 1 3 3V17"/><path d="M3.5 16l4-4 4 4 2-2 4 4"/></svg>Photos</a>
+  <a href="account.html"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20c1.2-3.6 4-5.3 7.5-5.3s6.3 1.7 7.5 5.3"/></svg>Account</a>
+</nav>
+
+<script>
+(function () {
+  const q = window.SV.q, IMG = '../assets/img/';
+  const v = ['request', 'mine'].includes(q.get('v')) ? q.get('v') : 'wall';
+  document.querySelector(`.view[data-v="${v}"]`).classList.add('on');
+  document.body.classList.add(v === 'wall' ? 'is-wall' : 'is-flow');
+  if (v !== 'wall') document.getElementById('tabs').remove();            /* flow pages hide the tab bar (DESIGN §8.2) */
+  document.body.dataset.gate = q.get('gate') === '0' ? '0' : '1';
+  document.title = ({ wall: 'Wishlist', request: 'Request a template', mine: 'My requests' })[v] + ' · Shotviva';
+
+  /* the wall (sample requests; images are stand-ins) */
+  const HEART = '<svg class="i" viewBox="0 0 24 24"><path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7a4.3 4.3 0 0 1 7.5 2.8C19.5 15.4 12 20 12 20z"/></svg>';
+  const R = [
+    { shipped: 'Dark Dining', tpl: 'dark-dining', imgs: ['dark-dining-after.webp'], text: 'Moody, low-light restaurant shots for our specials board. Think candlelight, dark wood, one plate in the light.', who: 'J***', when: '3 weeks ago', votes: 41 },
+    { imgs: ['promo-poster-before.webp', 'delivery-photo-before.webp'], text: 'A flat-lay for brunch menus: the dish from straight above on a marble table, with coffee and cutlery around it.', who: 'M***', when: '5 days ago', votes: 27, mine: true },
+    { imgs: ['evening-glow-before.webp'], text: 'Twilight exterior for rental listings: the house at blue hour with the lights on inside.', who: 'A***', when: '1 week ago', votes: 19 },
+    { imgs: ['pet-studio-before.webp'], text: 'Pet on a Christmas set: a plain red backdrop with a few baubles, for holiday cards.', who: 'S***', when: '2 days ago', votes: 12 },
+    { imgs: ['pure-white-before.webp', 'spa-podium-before.webp', 'lifestyle-table-before.webp'], text: 'Product held in a hand, close up, for small items like earrings and rings. Natural light, plain nails.', who: 'L***', when: '4 days ago', votes: 9 },
+    { imgs: ['korean-manhwa-before.webp'], text: 'A watercolour portrait look, loose and soft, for pet and family photos.', who: 'R***', when: 'yesterday', votes: 3 },
+  ];
+  const card = r => `<li><article class="req${r.shipped ? ' shipped' : ''}">
+    ${r.shipped ? `<span class="stamp" aria-hidden="true">Shipped</span>` : ''}
+    <div class="refs">${r.imgs.map(i => `<img src="${IMG}${i}" alt="Reference photo (illustrative example)">`).join('')}
+      ${r.imgs.length > 1 ? `<span class="n"><svg class="i" viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="14" height="14" rx="3"/><path d="M7 3.5h10.5a3 3 0 0 1 3 3V17"/></svg>${r.imgs.length}</span>` : ''}
+      <span class="badge-illus">Illustrative example</span></div>
+    <div class="body"><p class="text">${r.text}</p>
+      ${r.shipped ? `<a class="ship" href="workspace.html?t=${r.tpl}"><span>Now the <b>${r.shipped}</b> template</span><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a>` : ''}
+      <div class="foot"><span class="who">${r.who} · <time>${r.when}</time></span>
+        <button class="vote" type="button" aria-pressed="${!!r.mine}" aria-label="I want this too, ${r.votes} votes"${document.body.dataset.gate === '0' ? ' aria-disabled="true"' : ''}>${HEART}<span class="w">I want this too</span><span class="c">${r.votes}</span></button></div></div></article></li>`;
+  const wall = document.getElementById('wall');
+  if (wall) {
+    wall.innerHTML = R.map(card).join('');
+    wall.addEventListener('click', e => { const b = e.target.closest('.vote'); if (!b || b.getAttribute('aria-disabled') === 'true') return;
+      const on = b.getAttribute('aria-pressed') !== 'true', c = b.querySelector('.c'); b.setAttribute('aria-pressed', String(on)); c.textContent = +c.textContent + (on ? 1 : -1); });
+    /* the breeze: a gust when the pointer crosses a note; a sway from scroll speed that settles when scrolling stops */
+    wall.addEventListener('pointerenter', e => { const li = e.target.closest('li'); if (!li) return; li.classList.remove('blow'); void li.offsetWidth; li.classList.add('blow'); }, true);
+    wall.addEventListener('animationend', e => e.target.classList.remove('blow'));
+    let lastY = scrollY, lastT = performance.now(), settle;
+    addEventListener('scroll', () => {
+      const now = performance.now(), dy = scrollY - lastY, dt = Math.max(16, now - lastT); lastY = scrollY; lastT = now;
+      const v = Math.max(-6, Math.min(6, dy / dt * 4));                       /* deg, clamped */
+      wall.style.setProperty('--wind', v.toFixed(2) + 'deg');
+      clearTimeout(settle); settle = setTimeout(() => wall.style.setProperty('--wind', '0deg'), 120);
+    }, { passive: true });
+    if (q.get('wind')) wall.style.setProperty('--wind', q.get('wind') + 'deg');   /* review: freeze a gust */
+    if (q.get('sent') === '1') {   /* back from Submit */
+      const t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status');
+      t.innerHTML = '<svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><p><b>Sent for review.</b> It shows on the wall once approved.</p><button class="x" type="button" aria-label="Dismiss"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
+      document.body.append(t); requestAnimationFrame(() => requestAnimationFrame(() => t.classList.add('open')));
+      t.querySelector('.x').addEventListener('click', () => t.classList.remove('open')); setTimeout(() => t.classList.remove('open'), 10000);
+    }
+  }
+
+  /* the request form */
+  const ta = document.getElementById('req-text');
+  if (ta) {
+    const n = document.getElementById('req-n'), go = document.getElementById('req-go'), slots = document.getElementById('slots');
+    const sync = () => { n.textContent = ta.value.length; go.setAttribute('aria-disabled', String(ta.value.trim().length < 10)); };
+    ta.addEventListener('input', sync);
+    const fill = imgs => { slots.innerHTML = imgs.map(i => `<span class="slot has"><img src="${IMG}${i}" alt="Reference photo (illustrative example)"><button class="rm" type="button" aria-label="Remove photo"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></span>`).join('')
+      + (imgs.length < 3 ? `<button class="slot" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><b>Add a photo</b><small>${3 - imgs.length} left</small></button>` : '')
+      + '<span class="slot more" aria-hidden="true"></span>'.repeat(Math.max(0, 2 - imgs.length)); };
+    if (q.get('request') === 'filled') { fill(['promo-poster-before.webp', 'delivery-photo-before.webp']); ta.value = 'A flat-lay for brunch menus: the dish from straight above on a marble table, with coffee and cutlery around it.'; }
+    sync();
+    go.addEventListener('click', () => { if (go.getAttribute('aria-disabled') !== 'true') location.href = 'wishlist.html?sent=1' + (window.SV.frame() || ''); });
+  }
+
+  /* my requests */
+  const mine = document.getElementById('mine');
+  if (mine) {
+    const M = [
+      { st: 'live', label: 'Live', img: 'promo-poster-before.webp', text: 'A flat-lay for brunch menus: the dish from straight above on a marble table, with coffee and cutlery around it.', when: '5 days ago', votes: 27 },
+      { st: 'pending', label: 'Pending', img: 'bright-listing-before.webp', text: 'Staged empty rooms: add simple furniture to an empty listing photo.', when: 'today' },
+      { st: 'shipped', label: 'Shipped', img: 'dark-dining-after.webp', text: 'Moody, low-light restaurant shots for our specials board.', when: '3 weeks ago', votes: 41, tpl: 'dark-dining' },
+      { st: 'rejected', label: 'Rejected', img: 'korean-manhwa-before.webp', text: 'Make it look like the poster of a well-known film.', when: '2 weeks ago' },
+    ];
+    mine.innerHTML = M.map(m => `<li><a class="mr panel" href="${m.tpl ? `workspace.html?t=${m.tpl}` : '#'}"><img src="${IMG}${m.img}" alt=""><span class="t"><span class="text">${m.text}</span>
+      <span class="meta"><span class="st ${m.st}">${m.label}</span><span>${m.when}</span>${m.votes ? `<span class="votes">${m.votes} votes</span>` : ''}</span></span>${m.tpl ? '<svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>' : ''}</a></li>`).join('');
+  }
+})();
+</script>
+</body>
+</html>
