@@ -16,7 +16,13 @@ export type TemplateFormValues = {
   fieldsJson: string
   promptBody: string
   modelParamsJson: string
+  // Chinese display text (templates.translations.zh); blank means "show the English".
+  zh: ZhFormValues
 }
+
+export type ZhFormValues = { name: string; description: string; fields: Record<string, { label: string; placeholder: string }> }
+
+const emptyZh = (): ZhFormValues => ({ name: '', description: '', fields: {} })
 
 const DEFAULT_FIELDS = {
   images: { min: 1, max: 1 },
@@ -39,7 +45,50 @@ export function emptyFormValues(): TemplateFormValues {
     fieldsJson: pretty(DEFAULT_FIELDS),
     promptBody: '',
     modelParamsJson: '{}',
+    zh: emptyZh(),
   }
+}
+
+function toZhValues(template: AdminTemplate): ZhFormValues {
+  const zh = template.translations.zh
+  const fields = Object.fromEntries(
+    Object.entries(zh?.fields ?? {}).map(([key, text]) => [key, { label: text.label ?? '', placeholder: text.placeholder ?? '' }]),
+  )
+  return { name: zh?.name ?? '', description: zh?.description ?? '', fields }
+}
+
+// Copy-field keys of the current JSON, so the Chinese inputs follow the field definition as
+// it is being edited; unparsable JSON shows none until it parses again.
+export function copyKeys(fieldsJson: string): { key: string; label: string }[] {
+  try {
+    const parsed: unknown = JSON.parse(fieldsJson)
+    const copy = (parsed as { copy?: unknown }).copy
+    if (!Array.isArray(copy)) return []
+    return copy.flatMap((field: unknown) => {
+      const { key, label } = (field ?? {}) as { key?: unknown; label?: unknown }
+      return typeof key === 'string' ? [{ key, label: typeof label === 'string' ? label : key }] : []
+    })
+  } catch {
+    return []
+  }
+}
+
+// Only filled-in text, only for keys the fields still have; {} when nothing is translated.
+export function toTranslations(zh: ZhFormValues, keys: readonly string[]) {
+  const fields = Object.fromEntries(
+    keys.flatMap((key) => {
+      const text = zh.fields[key]
+      const label = text?.label.trim()
+      const placeholder = text?.placeholder.trim()
+      return label || placeholder ? [[key, { ...(label ? { label } : {}), ...(placeholder ? { placeholder } : {}) }]] : []
+    }),
+  )
+  const entry = {
+    ...(zh.name.trim() ? { name: zh.name.trim() } : {}),
+    ...(zh.description.trim() ? { description: zh.description.trim() } : {}),
+    ...(Object.keys(fields).length > 0 ? { fields } : {}),
+  }
+  return Object.keys(entry).length > 0 ? { zh: entry } : {}
 }
 
 export function toFormValues(template: AdminTemplate): TemplateFormValues {
@@ -59,6 +108,7 @@ export function toFormValues(template: AdminTemplate): TemplateFormValues {
     fieldsJson: pretty(template.fields),
     promptBody: template.prompt?.body ?? '',
     modelParamsJson: pretty(template.prompt?.modelParams ?? {}),
+    zh: toZhValues(template),
   }
 }
 
@@ -117,6 +167,7 @@ export function buildPayload(values: TemplateFormValues, isNew: boolean, floor: 
         },
         visibleIn,
         fields: fields.value,
+        translations: toTranslations(values.zh, copyKeys(values.fieldsJson).map((field) => field.key)),
       },
       prompt: { body: values.promptBody, modelParams: modelParams.value },
     },

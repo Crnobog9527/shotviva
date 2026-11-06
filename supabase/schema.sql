@@ -1152,7 +1152,7 @@ declare
 begin
   insert into public.templates as t (
     id, module, name, category, cover_before_url, cover_after_url,
-    fields, quality, credits_cost, sort_order, is_active, visible_in
+    fields, quality, credits_cost, sort_order, is_active, visible_in, translations
   ) values (
     v_id,
     coalesce(p_template ->> 'module', 'image'),
@@ -1170,7 +1170,8 @@ begin
       (select coalesce(max(sort_order), 0) + 10 from public.templates)
     ),
     coalesce((p_template ->> 'is_active')::boolean, false),
-    array(select jsonb_array_elements_text(coalesce(p_template -> 'visible_in', '["web"]'::jsonb)))
+    array(select jsonb_array_elements_text(coalesce(p_template -> 'visible_in', '["web"]'::jsonb))),
+    coalesce(p_template -> 'translations', '{}'::jsonb)
   )
   on conflict (id) do update set
     module = excluded.module,
@@ -1184,7 +1185,9 @@ begin
     credits_cost = excluded.credits_cost,
     sort_order = coalesce((p_template ->> 'sort_order')::integer, t.sort_order),
     is_active = coalesce((p_template ->> 'is_active')::boolean, t.is_active),
-    visible_in = excluded.visible_in;
+    visible_in = excluded.visible_in,
+    -- The editor always sends the whole object; the prompt import script does not, and keeps it.
+    translations = case when p_template ? 'translations' then excluded.translations else t.translations end;
 
   if p_prompt is not null then
     insert into public.template_prompts (template_id, body, model_params)
@@ -2480,6 +2483,7 @@ CREATE TABLE IF NOT EXISTS "public"."templates" (
     "cover_media_type" "text" DEFAULT 'image'::"text" NOT NULL,
     "cover_video_url" "text",
     "cover_poster_url" "text",
+    "translations" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
     CONSTRAINT "templates_category_check" CHECK ((("char_length"("category") >= 1) AND ("char_length"("category") <= 60))),
     CONSTRAINT "templates_cover_media_type_check" CHECK (("cover_media_type" = ANY (ARRAY['image'::"text", 'animated'::"text", 'video'::"text"]))),
     CONSTRAINT "templates_cover_motion_complete" CHECK ((("cover_media_type" = 'image'::"text") OR (("cover_video_url" IS NOT NULL) AND ("cover_poster_url" IS NOT NULL)))),
@@ -2489,6 +2493,7 @@ CREATE TABLE IF NOT EXISTS "public"."templates" (
     CONSTRAINT "templates_module_check" CHECK (("module" = ANY (ARRAY['image'::"text", 'video'::"text"]))),
     CONSTRAINT "templates_name_check" CHECK ((("char_length"("name") >= 1) AND ("char_length"("name") <= 120))),
     CONSTRAINT "templates_quality_check" CHECK (("quality" = ANY (ARRAY['high'::"text", 'medium'::"text"]))),
+    CONSTRAINT "templates_translations_check" CHECK ((("jsonb_typeof"("translations") = 'object'::"text") AND (("translations" - 'zh'::"text") = '{}'::"jsonb") AND ((NOT ("translations" ? 'zh'::"text")) OR ("jsonb_typeof"(("translations" -> 'zh'::"text")) = 'object'::"text")))),
     CONSTRAINT "templates_visible_in_check" CHECK (("visible_in" <@ ARRAY['web'::"text", 'partner'::"text"]))
 );
 

@@ -10,6 +10,7 @@ import { ResponsiveSheet } from '@/core/ui/responsive-sheet'
 import { useMediaQuery } from '@/core/ui/use-media-query'
 
 import { isMotion, type CatalogueTemplate } from './catalogue-template'
+import { useCategoryLabel } from './category-label'
 import { CompareSlider } from './compare-slider'
 import { REDUCED_MOTION, useQuietLoop } from './use-motion'
 
@@ -18,12 +19,13 @@ const TIERS = ['1k', '2k', '3k'] as const
 // Template preview (DESIGN §4.2): bottom sheet on phones, dialog on desktop. The compare slider
 // (or the loop), one hint line, the three prices, and "Use this template" into the workspace.
 export function PreviewSheet({ template, onClose }: { template: CatalogueTemplate | null; onClose(): void }) {
+  const label = useCategoryLabel()
   return (
     <ResponsiveSheet
       open={template !== null}
       onOpenChange={(open) => !open && onClose()}
       title={template?.name ?? ''}
-      description={template?.category ?? ''}
+      description={template ? (template.description ?? label(template.category)) : ''}
     >
       {template ? <PreviewBody template={template} onUse={onClose} /> : null}
     </ResponsiveSheet>

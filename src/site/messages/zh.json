@@ -147,6 +147,14 @@
       "hintMotion": "你的照片会按这段短动画的方式变化。",
       "use": "用这个模板"
     },
+    "categories": {
+      "Art Styles": "画风",
+      "Food & Drink": "餐饮",
+      "Products & Resale": "商品与二手",
+      "Beauty & Skincare": "美妆护肤",
+      "Rooms & Spaces": "房间与空间",
+      "Pets": "宠物"
+    },
     "tiers": {
       "1k": {
         "name": "标准",

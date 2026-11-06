@@ -2,7 +2,16 @@ import { describe, expect, it } from 'vitest'
 
 import type { AdminTemplate } from '../templates/types'
 
-import { buildPayload, creditProblems, emptyFormValues, matchesSearch, moveId, toFormValues } from './form-state'
+import {
+  buildPayload,
+  copyKeys,
+  creditProblems,
+  emptyFormValues,
+  matchesSearch,
+  moveId,
+  toFormValues,
+  toTranslations,
+} from './form-state'
 
 const FLOOR = { high: { '1k': 2, '2k': 4, '3k': 6 }, medium: { '1k': 1, '2k': 2, '3k': 3 } }
 
@@ -22,6 +31,7 @@ const template: AdminTemplate = {
   sortOrder: 10,
   isActive: true,
   visibleIn: ['web', 'partner'],
+  translations: {},
   createdAt: '2026-11-05T00:00:00Z',
   updatedAt: '2026-11-05T00:00:00Z',
   prompt: { body: 'FAKE BODY', version: 2, modelParams: { quality: 'high' } },
@@ -69,5 +79,25 @@ describe('template form state', () => {
     expect(matchesSearch(template, 'BURG')).toBe(true)
     expect(matchesSearch(template, 'pizza')).toBe(false)
     expect(matchesSearch(template, ' ')).toBe(true)
+  })
+})
+
+describe('Chinese text in the editor (templates.translations)', () => {
+  it('lists the copy keys of the JSON being edited', () => {
+    expect(copyKeys('{"copy":[{"key":"headline","label":"Headline"},{"key":"price"}]}')).toEqual([
+      { key: 'headline', label: 'Headline' },
+      { key: 'price', label: 'price' },
+    ])
+    expect(copyKeys('{ not json')).toEqual([])
+  })
+
+  it('sends only filled-in text, only for fields that still exist', () => {
+    const zh = {
+      name: ' 促销海报 ',
+      description: '',
+      fields: { headline: { label: '标题', placeholder: '' }, gone: { label: '旧字段', placeholder: '' } },
+    }
+    expect(toTranslations(zh, ['headline', 'price'])).toEqual({ zh: { name: '促销海报', fields: { headline: { label: '标题' } } } })
+    expect(toTranslations({ name: '', description: '', fields: {} }, ['headline'])).toEqual({})
   })
 })

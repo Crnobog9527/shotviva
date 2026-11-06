@@ -6,6 +6,7 @@ const tpl = (id: string, category: string, cover: Partial<CatalogueTemplate['cov
   id,
   name: id,
   category,
+  description: null,
   creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
   copyFields: [],
   cover: { type: 'image', before: null, after: null, motion: null, poster: null, ...cover },

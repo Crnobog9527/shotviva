@@ -19,6 +19,8 @@ const slug = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'lowercase letters, di
 export const copyFieldSchema = z.object({
   key: z.string().regex(/^[a-z][a-z0-9_]*$/),
   label: z.string().min(1).max(60),
+  // Hint inside the empty input; optional in every language (ARCHITECTURE §5).
+  placeholder: z.string().max(200).optional(),
   required: z.boolean().default(false),
   maxLength: z.number().int().min(1).max(4000).default(200),
 })
@@ -42,6 +44,34 @@ export type TemplateFields = z.infer<typeof templateFieldsSchema>
 
 const optionalUrl = z.union([z.url(), z.literal('')]).optional()
 
+// Blank inputs mean "not translated": they are dropped, so the English text shows instead.
+const optionalText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .optional()
+    .transform((text) => text || undefined)
+
+// templates.translations (ARCHITECTURE §5): display text per extra language, English stays in
+// `name` / `fields`. Keys are the enabled languages only (the table check says the same).
+export const templateTranslationSchema = z.object({
+  name: optionalText(120),
+  description: optionalText(300),
+  fields: z
+    .record(z.string().regex(/^[a-z][a-z0-9_]*$/), z.object({ label: optionalText(60), placeholder: optionalText(200) }))
+    .optional(),
+})
+// Stored shape: every item optional, a missing one falls back to English.
+export type TemplateTranslation = {
+  name?: string
+  description?: string
+  fields?: Record<string, { label?: string; placeholder?: string }>
+}
+
+export const templateTranslationsSchema = z.strictObject({ zh: templateTranslationSchema.optional() })
+export type TemplateTranslations = { zh?: TemplateTranslation }
+
 // Public, catalogue-facing part of a template (the `templates` row). Covers are optional and
 // left out by the editor (the cover upload writes them); an omitted cover keeps the stored one.
 export const templateInputSchema = z.object({
@@ -61,6 +91,8 @@ export const templateInputSchema = z.object({
     .array(z.enum(TEMPLATE_SURFACES))
     .min(1)
     .transform((surfaces) => [...new Set(surfaces)]),
+  // Optional: the prompt import script sends none, so a re-import keeps what the editor wrote.
+  translations: templateTranslationsSchema.optional(),
 })
 
 export type TemplateInput = z.infer<typeof templateInputSchema>

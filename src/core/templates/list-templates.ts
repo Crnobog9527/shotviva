@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+import type { Locale } from '../i18n/locales'
+import { localizeTemplate, type LocalizedTemplate } from './localize'
 import type { TemplateSurface } from './schema'
 import { TEMPLATE_COLUMNS, toTemplate, type Template, type TemplateRow } from './types'
 
@@ -19,4 +21,11 @@ export async function listTemplates(
     .returns<TemplateRow[]>()
   if (error) throw new Error(`listTemplates failed: ${error.message}`)
   return data.map(toTemplate)
+}
+
+// The web catalogue in the page's language (names and copy labels from templates.translations,
+// English where a translation is missing). The partner API keeps listTemplates: its contract
+// is English.
+export async function listTemplatesIn(client: SupabaseClient, locale: Locale): Promise<LocalizedTemplate[]> {
+  return (await listTemplates(client, 'web')).map((template) => localizeTemplate(template, locale))
 }

@@ -1,5 +1,5 @@
 import type { CreditsCost, TemplateQuality } from './pricing'
-import type { CoverMediaType, TemplateFields, TemplateSurface } from './schema'
+import type { CoverMediaType, TemplateFields, TemplateSurface, TemplateTranslations } from './schema'
 
 export type Template = {
   id: string
@@ -20,6 +20,8 @@ export type Template = {
   sortOrder: number
   isActive: boolean
   visibleIn: TemplateSurface[]
+  // Other languages' display text; read through localizeTemplate (ARCHITECTURE §5).
+  translations: TemplateTranslations
   createdAt: string
   updatedAt: string
 }
@@ -41,12 +43,13 @@ export type TemplateRow = {
   sort_order: number
   is_active: boolean
   visible_in: TemplateSurface[]
+  translations: TemplateTranslations | null
   created_at: string
   updated_at: string
 }
 
 export const TEMPLATE_COLUMNS =
-  'id, module, name, category, cover_before_url, cover_after_url, cover_media_type, cover_video_url, cover_poster_url, fields, quality, credits_cost, sort_order, is_active, visible_in, created_at, updated_at'
+  'id, module, name, category, cover_before_url, cover_after_url, cover_media_type, cover_video_url, cover_poster_url, fields, quality, credits_cost, sort_order, is_active, visible_in, translations, created_at, updated_at'
 
 export function toTemplate(row: TemplateRow): Template {
   return {
@@ -65,6 +68,7 @@ export function toTemplate(row: TemplateRow): Template {
     sortOrder: row.sort_order,
     isActive: row.is_active,
     visibleIn: row.visible_in,
+    translations: row.translations ?? {},
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }

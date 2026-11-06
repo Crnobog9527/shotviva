@@ -60,6 +60,7 @@ export function CopyFields({ fields, values, onChange }: CopyProps) {
             id={`copy-${field.key}`}
             value={values[field.key] ?? ''}
             maxLength={field.maxLength}
+            placeholder={field.placeholder}
             required={field.required}
             onChange={(event) => onChange({ ...values, [field.key]: event.target.value })}
             onFocus={reveal}
