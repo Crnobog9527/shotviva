@@ -6,7 +6,7 @@
 import { loadQaEnv } from './env'
 import { buildLoginUrl, checkNext, parseLoginArgs } from './login-link'
 import { isPersonaId, PERSONA_IDS, PERSONAS } from './personas'
-import { adminClient, findUserByEmail } from './users'
+import { adminClient, findUserByEmail, retryTransient } from './users'
 
 async function main() {
   const { persona: id, next } = parseLoginArgs(process.argv.slice(2))
@@ -18,7 +18,7 @@ async function main() {
 
   // generateLink would create a missing user for some types; insist on qa:accounts first.
   if (!(await findUserByEmail(db, persona.email))) throw new Error(`${id} does not exist; run pnpm qa:accounts first.`)
-  const { data, error } = await db.auth.admin.generateLink({ type: 'magiclink', email: persona.email })
+  const { data, error } = await retryTransient(() => db.auth.admin.generateLink({ type: 'magiclink', email: persona.email }))
   if (error) throw new Error(`generateLink failed: ${error.message}`)
 
   process.stderr.write(
