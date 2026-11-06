@@ -7,6 +7,7 @@ describe('admin nav', () => {
     expect(adminNavItems({ wishlist: true }).map((item) => item.key)).toEqual([
       'overview',
       'users',
+      'tickets',
       'orders',
       'jobs',
       'templates',
@@ -15,6 +16,13 @@ describe('admin nav', () => {
       'announcements',
     ])
     expect(adminNavItems({ wishlist: false }).map((item) => item.key)).not.toContain('requests')
+  })
+
+  it('shows the open-ticket count on 工单 only, and none at 0 (T27)', () => {
+    const items = adminNavItems({ wishlist: false }, { tickets: 4 })
+    expect(items.find((item) => item.key === 'tickets')?.count).toBe(4)
+    expect(items.filter((item) => item.count !== undefined)).toHaveLength(1)
+    expect(adminNavItems({ wishlist: false }, { tickets: 0 }).find((item) => item.key === 'tickets')?.count).toBeUndefined()
   })
 
   it('highlights the overview only on /admin and other entries on their sub-pages', () => {

@@ -1,11 +1,11 @@
 import { defineLegalPage } from '@/core/content'
 
-import { LAST_UPDATED, contactSection, emailLink, entity, legalLinks, operatorSentence } from './shared'
+import { LAST_UPDATED, contactSection, emailLink, entity, helpLink, legalLinks, operatorSentence } from './shared'
 
 // Same rules as Graylum's refund policy (Owner 2026-11-05), rewritten for Shotviva's
-// products: no founder plans or upgrades, yearly credits issued at once, refunds by email
-// and handled by hand in Stripe or Waffo (ARCHITECTURE §6.3, §10). Differences are listed in
-// the T19 PR.
+// products: no founder plans or upgrades, yearly credits issued at once, requests through Help &
+// feedback or by email, handled by hand in Stripe or Waffo (ARCHITECTURE §6.3, §10; T27 changed
+// only how to ask, Owner 2026-11-06). Differences are listed in the T19 PR.
 export const refundPolicyPage = defineLegalPage({
   path: legalLinks.refunds.href,
   title: `Refund Policy | ${entity.site}`,
@@ -52,9 +52,11 @@ export const refundPolicyPage = defineLegalPage({
       heading: 'How to request a refund',
       blocks: [
         [
-          'Email ',
+          'Sign in and open ',
+          helpLink,
+          ' on your account page, choose "Refund request" and pick the payment it is about. You can also email ',
           emailLink,
-          ' from the email address on your account. Include the date of the payment and what you bought (for example "Pro monthly" or "credit pack"). There is no refund button on the site.',
+          ' from the email address on your account; include the date of the payment and what you bought (for example "Pro monthly" or "credit pack").',
         ],
         'A person reviews every request. If it is approved, we issue the refund through the payment provider that took your payment (Stripe or Waffo), back to the original payment method. Your bank or card issuer decides how long it takes to appear.',
       ],

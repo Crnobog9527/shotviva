@@ -120,6 +120,7 @@ describe('admin_todo_counts', () => {
       failures24h: { total: expect.any(Number), failed: expect.any(Number) },
       pendingRequests: expect.any(Number),
       paymentIssues: expect.any(Number),
+      openTickets: expect.any(Number),
     })
     // A disputed payment shows up (other files may add their own in parallel).
     const userId = await createUser(db)

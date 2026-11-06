@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { TEST_PRODUCTS } from '../stripe/test-products'
 import { packOffers, perCreditUsd, perMonthUsd, tierOffers, usdFormat, yearlySavingPct, yearlySavingUsd } from './offer'
+import { TIER_SUPPORT_REPLY_HOURS } from '../tier-limits'
 import { tierPerks } from './perks'
 
 const offers = tierOffers(TEST_PRODUCTS)
@@ -67,6 +68,7 @@ describe('tier perks (ARCHITECTURE §6.2 会员档位权益)', () => {
     expect(tierPerks('starter', { wishlistLive: false }).live.map((p) => p.key)).toContain('support48h')
     expect(pro.live.map((p) => p.key)).toEqual(['concurrency'])
     expect(tierPerks('max', { wishlistLive: false }).live.map((p) => p.key)).toEqual(['concurrency', 'support24h'])
+    expect(TIER_SUPPORT_REPLY_HOURS).toEqual({ starter: 48, pro: 48, max: 24 })
   })
 
   it('moves the 3× wishlist vote from Coming soon to live once the wishlist is on', () => {

@@ -22,8 +22,13 @@ describe('paywall messages (en)', () => {
     expect(t('perks.concurrency', { count: 1 })).toBe('1 photo generating at a time')
     expect(t('perks.concurrency', { count: 6 })).toBe('6 photos generating at a time')
     expect(t('perks.earlyAccess')).toBe('Early access to new features')
-    expect(t('perks.support48h')).toBe('Email support, reply within 48 hours')
-    expect(t('perks.support24h')).toBe('Priority email support, reply within 24 hours')
+    // Hours come from TIER_SUPPORT_REPLY_HOURS through the perk values (48 / 48 / 24).
+    const support = (tier: 'starter' | 'max') => {
+      const perk = tierPerks(tier, { wishlistLive: false }).live.find((p) => p.key.startsWith('support'))
+      return perk ? t(`perks.${perk.key}`, perk.values) : null
+    }
+    expect(support('starter')).toBe('Email support, reply within 48 hours')
+    expect(support('max')).toBe('Priority email support, reply within 24 hours')
     expect(t('perks.brandKit')).toBe('Brand kit: your logo and fonts on posters')
   })
 
