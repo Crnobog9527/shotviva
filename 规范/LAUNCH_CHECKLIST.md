@@ -62,7 +62,7 @@
 - [ ] Stripe 测试模式·钱包：支付宝单笔买一次 `starter_monthly`，结账页无税，付费池 +50、`paid_until` +30 天，付费墙写明不自动续费；再用卡（MP 单笔）和支付宝各买一次 `pack_s`，付费池 +20、`paid_until` 不变
 - [ ] 用 Stripe 测试时钟把一个 `starter_monthly` 订阅推进到续费：`invoice.paid` 到账后付费池 +50、`paid_until` 延到新一期；再推进一次让续费失败，不发积分、`paid_until` 不延、账号页显示已过期，已有付费积分仍可用
 - [ ] 在 Customer Portal 取消订阅：镜像表 `cancel_at_period_end = true`，`paid_until` 不变，期末后不再续
-- [ ] Waffo 沙盒：卡、支付宝各单笔买一次 `starter_monthly`（一期）和 `pack_s`，都能到账，积分和 `paid_until` 与 Stripe 单笔一致；9 个商品的 Waffo 映射都配了，缺一个启动报错；付款页不显示微信、不显示「自动续费」
+- [ ] Waffo 沙盒：卡订阅 `starter_monthly` 首付到账（积分、`paid_until` 与 Stripe 一致），推进到续费后再到账一次，续费失败不发积分；账号页取消后当期结束不再续；支付宝单笔买一次 `starter_monthly`（一期，不续费）和 `pack_s`；9 个商品的 Waffo 映射都配了，缺一个启动报错；付款页不显示微信，卡写「自动续费」、支付宝写「不自动续费」
 - [ ] 只开 Waffo、只开 Stripe 两种开关状态下，付款页显示正确
 - [ ] 两条通道的回调各重发 3 次，积分只加一次；签名错误返回 400、不加积分；`charge.refunded` 产生 Sentry 告警且不动积分
 - [ ] Stripe / Waffo 正式模式的回调只登记 `https://shotviva.com/...`；测试模式的预览回调（分支地址 + Vercel 绕行密钥）没有出现在正式模式里；绕行密钥不在代码和 PR 里
