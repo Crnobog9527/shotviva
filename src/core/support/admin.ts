@@ -26,10 +26,37 @@ const listRow = z.object({
   created_at: z.string(),
   last_message_at: z.string(),
   preview: z.string().nullable(),
+  tier: z.enum(['starter', 'pro', 'max']).nullable(),
+  due_at: z.string(),
 })
+type ListRow = z.infer<typeof listRow>
 
-// admin_list_tickets, keyset on (last_message_at, id); open tickets on the partial index.
-export async function listAdminTickets(db: SupabaseClient, filter: AdminListFilter, rawCursor?: string | null): Promise<Page<AdminTicketRow>> {
+function toAdminRow(row: ListRow, now: number): AdminTicketRow {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    email: row.email,
+    type: row.type,
+    status: row.status,
+    refundDecision: row.refund_decision,
+    createdAt: row.created_at,
+    lastMessageAt: row.last_message_at,
+    preview: row.preview,
+    tier: row.tier,
+    dueAt: row.due_at,
+    // Only a ticket waiting for the Owner can be late.
+    overdue: row.status === 'open' && Date.parse(row.due_at) < now,
+  }
+}
+
+// admin_list_tickets (0226): the open view soonest due first, keyset on (due_at, id); the other
+// views most recently active first, keyset on (last_message_at, id).
+export async function listAdminTickets(
+  db: SupabaseClient,
+  filter: AdminListFilter,
+  rawCursor?: string | null,
+  now = Date.now(),
+): Promise<Page<AdminTicketRow>> {
   const cursor = decodeCursor(rawCursor)
   const rows = await supportRpc(
     db,
@@ -45,19 +72,10 @@ export async function listAdminTickets(db: SupabaseClient, filter: AdminListFilt
   )
   const page = rows.slice(0, PAGE_SIZE)
   const last = page.at(-1)
+  const key = (row: ListRow) => (filter.status === 'open' ? row.due_at : row.last_message_at)
   return {
-    items: page.map((row) => ({
-      id: row.id,
-      userId: row.user_id,
-      email: row.email,
-      type: row.type,
-      status: row.status,
-      refundDecision: row.refund_decision,
-      createdAt: row.created_at,
-      lastMessageAt: row.last_message_at,
-      preview: row.preview,
-    })),
-    nextCursor: rows.length > PAGE_SIZE && last ? encodeCursor({ c: last.last_message_at, i: last.id }) : null,
+    items: page.map((row) => toAdminRow(row, now)),
+    nextCursor: rows.length > PAGE_SIZE && last ? encodeCursor({ c: key(last), i: last.id }) : null,
   }
 }
 
