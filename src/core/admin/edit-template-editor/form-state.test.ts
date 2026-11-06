@@ -28,4 +28,12 @@ describe('edit template form', () => {
   it('leaves input_fidelity out when set to not send', () => {
     expect(toSaveInput({ ...formFor(settings), inputFidelity: '' }).params).not.toHaveProperty('input_fidelity')
   })
+
+  // T47: the reframe paragraph round-trips, and a blank one is not stored.
+  it('keeps the reframe paragraph when written, leaves it out when blank', () => {
+    const form = { ...formFor({ ...settings, params: { ...settings.params, reframe: 'Extend the frame' } }), classifier: 'c' }
+    expect(form.reframe).toBe('Extend the frame')
+    expect(toSaveInput(form).params).toMatchObject({ reframe: 'Extend the frame' })
+    expect(toSaveInput({ ...form, reframe: '  ' }).params).not.toHaveProperty('reframe')
+  })
 })

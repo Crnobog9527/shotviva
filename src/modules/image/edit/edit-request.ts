@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { RESOLUTIONS, type Resolution } from '@/core/templates'
+import { OUTPUT_ASPECTS, RESOLUTIONS, type OutputAspect, type Resolution } from '@/core/templates'
 
 // Body of POST /api/edit. job_id is client-made, as for /api/generate, so a retried request
 // resolves to the same job instead of charging twice. The instruction's own rules (1–500
@@ -11,6 +11,8 @@ export const editBodySchema = z.object({
   instruction: z.string().max(2000),
   // Omitted means the source work's own tier.
   resolution: z.enum(RESOLUTIONS).optional(),
+  // Omitted means the source work's own size; another one extends the picture to fit (T47).
+  aspect_ratio: z.enum(OUTPUT_ASPECTS).optional(),
 })
 
 export type EditRequest = {
@@ -19,6 +21,7 @@ export type EditRequest = {
   sourceJobId: string
   instruction: string
   resolution?: Resolution
+  aspect?: OutputAspect
 }
 
 export function toEditRequest(userId: string, body: z.infer<typeof editBodySchema>): EditRequest {
@@ -28,5 +31,6 @@ export function toEditRequest(userId: string, body: z.infer<typeof editBodySchem
     sourceJobId: body.source_job_id,
     instruction: body.instruction,
     resolution: body.resolution,
+    aspect: body.aspect_ratio,
   }
 }

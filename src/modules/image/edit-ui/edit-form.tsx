@@ -7,7 +7,7 @@ import { balanceSentence } from '@/core/app-shell/balance-copy'
 import type { Balance } from '@/core/billing/pools'
 import type { CreditsCost } from '@/core/templates/pricing'
 
-import { ResolutionPicker } from '../workspace/option-pickers'
+import { ResolutionPicker, SizePicker } from '../workspace/option-pickers'
 import { sizeLabel, tierName } from '../workspace/workspace-options'
 import { ChangeField } from './change-field'
 import type { EditDraft, EditSource } from './edit-source'
@@ -21,7 +21,8 @@ type Props = {
   onChange(next: Partial<EditDraft>): void
 }
 
-// The panel's form (T6 comp): the change, the size (fixed to the original's), the resolution
+// The panel's form (T6 comp photo.html?edit): the change, the size (the eight tiles, the
+// original's selected; another one extends the picture around the subject, T47), the resolution
 // (defaults to the original's tier), then the balance line.
 export function EditForm({ source, balance, creditsCost, draft, showRequired, onChange }: Props) {
   const t = useTranslations('app')
@@ -29,8 +30,11 @@ export function EditForm({ source, balance, creditsCost, draft, showRequired, on
   return (
     <div className="grid gap-6 pb-4">
       <ChangeField value={draft.text} showRequired={showRequired} onChange={(text) => onChange({ text })} />
-      <Section id="edit-size-h" title={t('edit.size')} aside={sizeLabel(source.aspect, t)}>
-        <p className="hairline rounded-control bg-card px-4 py-3 text-caption text-bone-dim">{t('edit.sizeFixed')}</p>
+      <Section id="edit-size-h" title={t('edit.size')} aside={draft.aspect === source.aspect ? sizeLabel(draft.aspect, t) : t('edit.sizeFrom', { size: sizeLabel(draft.aspect, t), from: sizeLabel(source.aspect, t) })}>
+        <SizePicker value={draft.aspect} onChange={(aspect) => onChange({ aspect })} name="edit-size" labelledBy="edit-size-h" />
+        <p className="hairline mt-3 rounded-inner bg-wash-faint px-3 py-2.5 text-caption leading-[1.4] text-muted-foreground">
+          {draft.aspect === source.aspect ? t('edit.sizeSame') : t('edit.sizeExtend', { size: sizeLabel(draft.aspect, t) })}
+        </p>
       </Section>
       <Section id="res-h" title={t('workspace.resolution')} aside={tierName(draft.resolution, t)}>
         <ResolutionPicker value={draft.resolution} costs={creditsCost} balance={balance} onChange={(resolution) => onChange({ resolution })} />

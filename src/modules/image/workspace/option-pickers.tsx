@@ -15,13 +15,16 @@ const focusRing = 'peer-focus-visible:outline-2 peer-focus-visible:outline-offse
 
 // Size (DESIGN §4.3 step 3): eight tiles four across, each with a drawn ratio glyph. A native
 // radio stays in the DOM for keyboard and screen readers.
-export function SizePicker({ value, onChange }: { value: OutputAspect; onChange(next: OutputAspect): void }) {
+// The edit panel renders it too (T47), under its own heading and radio name.
+type SizeProps = { value: OutputAspect; onChange(next: OutputAspect): void; name?: string; labelledBy?: string }
+
+export function SizePicker({ value, onChange, name = 'size', labelledBy = 'size-h' }: SizeProps) {
   const t = useTranslations('app.sizes')
   return (
-    <div role="radiogroup" aria-labelledby="size-h" className="grid grid-cols-4 gap-2">
+    <div role="radiogroup" aria-labelledby={labelledBy} className="grid grid-cols-4 gap-2">
       {SIZE_OPTIONS.map((size) => (
         <label key={size.id} className="relative cursor-pointer">
-          <input type="radio" name="size" value={size.id} checked={value === size.id} onChange={() => onChange(size.id)} className={radioInput} />
+          <input type="radio" name={name} value={size.id} checked={value === size.id} onChange={() => onChange(size.id)} className={radioInput} />
           <span className={cn('flex min-h-[100px] flex-col items-center justify-end gap-2 rounded-button px-1 py-3 text-center transition-[box-shadow,background]', focusRing, value === size.id ? 'chosen' : 'hairline bg-card')}>
             <span className="grid h-[34px] w-10 place-items-center">
               <i

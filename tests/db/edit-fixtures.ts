@@ -25,6 +25,7 @@ export const TEST_EDIT_PARAMS = {
     global: 'C-GLOBAL',
     fallback: 'C-FALLBACK',
   },
+  reframe: 'C-REFRAME',
 }
 export const TEST_WRAPPER = 'WRAPPER-EDIT'
 
@@ -89,7 +90,7 @@ export async function editSetup(db: Client, templateId: string, { classifier = {
     classifierTimeoutMs: 50,
     track,
   }
-  const edit = (instruction = 'Put it on a beach', extra: { jobId?: string; resolution?: '2k' } = {}) =>
+  const edit = (instruction = 'Put it on a beach', extra: { jobId?: string; resolution?: '2k'; aspect?: '16:9' | '4:5' } = {}) =>
     runEdit(deps, { userId, sourceJobId: sourceId, instruction, ...extra })
   return { userId, sourceId, r2, fake, decision, deps, track, edit }
 }

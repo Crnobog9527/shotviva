@@ -10,4 +10,5 @@ export type EditSource = {
   resolution: Resolution
 }
 
-export type EditDraft = { text: string; resolution: Resolution }
+// aspect: the size of the new photo, the work's own unless another is picked (T47).
+export type EditDraft = { text: string; resolution: Resolution; aspect: OutputAspect }
