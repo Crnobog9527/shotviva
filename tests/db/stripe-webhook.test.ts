@@ -6,7 +6,7 @@ import { handleStripeWebhook } from '@/core/billing/stripe'
 import { serviceSupabase } from './supabase-env'
 
 import { connectAdmin, createUser, DAY_MS, ledgerOf, profileOf } from './helpers'
-import { checkoutSession, eventFor, signed, stripeHarness, subscriptionObject } from './stripe-fixtures'
+import { checkoutSession, eventFor, paymentsOf, signed, stripeHarness, subscriptionObject } from './stripe-fixtures'
 
 // AGENTS §7 test 2 (Stripe, first payment): duplicate and out-of-order events, bad signature,
 // one grant per Checkout Session. Real local Supabase, real signature checks.
@@ -104,6 +104,8 @@ describe('checkout.session.completed', () => {
       { kind: 'purchase', pool: 'paid', delta: 1620, idempotency_key: `purchase:${session.id}` },
     ])
     expect(await mirrorOf(userId)).toHaveLength(1)
+    // T10: one payments row per settled session, however often it is delivered.
+    expect(await paymentsOf(db, userId)).toEqual([expect.objectContaining({ stripe_session_id: session.id, amount_total: 34900 })])
     expect(h.trackBuy).toHaveBeenCalledTimes(1)
   })
 
@@ -209,7 +211,7 @@ describe('refusals and failures', () => {
   })
 
   it('ignores events it does not handle', async () => {
-    const result = await deliver({ ...eventFor('invoice.paid', 'in_1'), data: { object: { id: 'in_1', object: 'invoice' } } })
+    const result = await deliver(eventFor('payment_intent.created', 'pi_1'))
     expect(result).toEqual({ status: 200, body: { received: true } })
     expect(h.retrieve).not.toHaveBeenCalled()
   })
