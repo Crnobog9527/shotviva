@@ -9,8 +9,8 @@ import { DeleteAccountPanel } from '@/core/auth/ui'
 import { readBalance, type Balance } from '@/core/billing'
 import { CheckoutNotice, PaywallButton } from '@/core/billing/paywall'
 import { readSubscriptionSummary, SubscriptionPanel, type SubscriptionSummary } from '@/core/billing/subscription'
-import { readLinkStatus } from '@/core/partner'
-import { GraylumConnection } from '@/core/partner/ui'
+import { readLinkStatus, type LinkStatus } from '@/core/partner'
+import { IntegrationsPanel } from '@/core/partner/ui'
 import { hasUnreadReply } from '@/core/support'
 import { HelpEntry } from '@/core/support/ui'
 import { buttonVariants } from '@/core/ui/button'
@@ -27,7 +27,7 @@ export async function generateMetadata(): Promise<Metadata> {
 type ViewProps = {
   email: string | null
   balance: Balance
-  graylumLinkedAt: Date | null
+  graylum: LinkStatus
   subscription: SubscriptionSummary
   helpUnread: boolean
   // Same-IP rule (ARCHITECTURE §7): this account got no signup gift.
@@ -42,7 +42,7 @@ function AccountHeader() {
   return <TabRootHeader title={useTranslations('auth.account')('title')} />
 }
 
-function AccountView({ email, balance, graylumLinkedAt, subscription, helpUnread, giftRefused }: ViewProps) {
+function AccountView({ email, balance, graylum, subscription, helpUnread, giftRefused }: ViewProps) {
   const t = useTranslations('auth.account')
   const balanceT = useTranslations('app.balance')
   return (
@@ -67,7 +67,7 @@ function AccountView({ email, balance, graylumLinkedAt, subscription, helpUnread
         <SubscriptionPanel summary={subscription} manage={manageSubscriptionAction} />
       </Panel>
       <Panel>
-        <GraylumConnection linkedAt={graylumLinkedAt} disconnect={disconnectGraylumAction} />
+        <IntegrationsPanel graylum={graylum} disconnect={disconnectGraylumAction} />
       </Panel>
       <Panel>
         <HelpEntry unread={helpUnread} />
@@ -99,7 +99,7 @@ async function Account() {
     <AccountView
       email={user.email}
       balance={balance}
-      graylumLinkedAt={graylum.linkedAt}
+      graylum={graylum}
       subscription={subscription}
       helpUnread={helpUnread}
       giftRefused={giftRefused}

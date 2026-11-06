@@ -180,9 +180,10 @@ Owner 2026-11-05 定稿：**B 版「暗房」（Darkroom）**，取代此前的�
    - 原来的模板预览抽屉不再使用。
 3. **模板缩略图的变化动效**：登录后的模板页上，缩略图平时静止；电脑上鼠标悬停时播放「实拍 → 成品」的擦除动画（CSS clip-path 循环），手机上滑入视口时播放一次，「减少动态效果」打开时不播。这只是装饰，不承载任何功能。
 4. **营销页顶部导航**：Templates / Pricing / Log in / Start free。v1 没有 `/templates` 页面（ARCHITECTURE §13），「Templates」链到首页的模板区 `/#templates`。
+   - **语言切换（Owner 2026-11-06）**：导航里 Pricing 和 Log in 之间放一个小地球图标按钮（无文字，`aria-label` 写 "Language / 语言"），点开是两项菜单「English」「简体中文」，当前语言打勾；切换后进入对应语言的同一页（没有中文版的页面去中文首页）。手机上地球图标留在顶栏，不收进菜单。页脚保留文字版切换。浏览器语言是中文时仍是可关闭的提示条，不自动跳转（ARCHITECTURE §17）。应用里在账号页放「Language」一行。
 5. **页脚**：
-   - 主行：`support@shotviva.com` 和 `© 2026 Shotviva AI`。
-   - 下面一行浅色小字：`Operated by Grayscale Luminary LLC · 75 E 3rd St, Sheridan, WY`，加四个法律页链接。这一行满足建站规格 G8 和 LAUNCH §8，主体信息从 `site.config` 读。
+   - 主行：`support@shotviva.com` 和 `© 2026 Shotviva`（品牌名一个字不差，不写 Shotviva AI；Owner 2026-11-06，建站规格 §1）。
+   - 下面一行：四个法律页链接。页脚**不写**运营主体和地址（Owner 2026-11-06：美国法律不要求放在页脚）；主体名称和地址写在条款 / 隐私政策的联系方式一节和首页 Organization 结构化数据里，都从 `site.config` 读，满足建站规格 G8、加州 B&P §17538 的卖家信息披露和 Stripe 审核。
    - MiSans 的署名不放页脚，改放在条款页的「Third-party notices」一节（ARCHITECTURE §17）。
 6. **首页「What a set of photos costs」**：做详细的金额和时间对比，一边是请摄影师（价格、天数），一边是 Shotviva（credits、秒数）。
    - 摄影师报价取有来源的行业区间，来源写进 notes。
