@@ -7,15 +7,24 @@ import { LanguageRow, PurchasesRow, type PurchaseLine } from './sheet-rows'
 
 // Settings (comps-v3-b/account.html): Email (shown, not editable in v1), Language (the
 // NEXT_LOCALE preference), Purchases (the account's recent payments) and Support (the in-site
-// tickets, with the "new reply" dot).
+// tickets, with the "new reply" dot). Admins get "Admin" on top (ARCHITECTURE §10, spec #186):
+// decided here on the server, so a normal user's HTML and client props never carry it. It is
+// only a way in; /admin checks the role itself.
 
-type Props = { email: string | null; purchases: readonly PurchaseLine[]; morePurchases: boolean; helpUnread: boolean }
+type Props = { email: string | null; purchases: readonly PurchaseLine[]; morePurchases: boolean; helpUnread: boolean; admin: boolean }
 
-export function SettingsRows({ email, purchases, morePurchases, helpUnread }: Props) {
+export function SettingsRows({ email, purchases, morePurchases, helpUnread, admin }: Props) {
   const t = useTranslations('app.account.settings')
   const support = useTranslations('app.support')
+  const adminT = useTranslations('adminEntry')
   return (
     <RowsPanel>
+      {admin ? (
+        <Link href="/admin" data-admin-entry="" className={rowClass}>
+          {adminT('label')}
+          <RowValue />
+        </Link>
+      ) : null}
       <div className={rowClass}>
         {t('email')}
         <RowValue chevron={false}>

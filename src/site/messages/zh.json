@@ -993,5 +993,8 @@
     "lastUpdated": "最后更新：<date></date>",
     "contents": "目录",
     "questions": "对本页有疑问，请发邮件到 <mail></mail>"
+  },
+  "adminEntry": {
+    "label": "管理后台"
   }
 }

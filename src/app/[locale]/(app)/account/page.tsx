@@ -55,7 +55,7 @@ async function Account() {
   const purchases = paymentChoices(payments, site.billing.products, t as unknown as Translate, { money: formatMoney(locale) })
   const last = lastMembership(payments, site.billing.products)
   const more = payments.length >= PICKER_LIMIT
-  const data = { email: user.email ?? null, balance, giftRefused, subscription, since, lastMembership: last, works, purchases, morePurchases: more, helpUnread, graylum }
+  const data = { email: user.email ?? null, balance, giftRefused, subscription, since, lastMembership: last, works, purchases, morePurchases: more, helpUnread, graylum, admin: user.role === 'admin' }
   return <AccountView data={data} actions={actions} site={accountSite} />
 }
 

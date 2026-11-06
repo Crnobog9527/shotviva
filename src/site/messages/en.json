@@ -993,5 +993,8 @@
     "lastUpdated": "Last updated <date></date>",
     "contents": "Contents",
     "questions": "Questions about this page: <mail></mail>"
+  },
+  "adminEntry": {
+    "label": "Admin"
   }
 }
