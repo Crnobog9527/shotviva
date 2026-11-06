@@ -99,7 +99,7 @@
 /* breathe: the darkroom's walls, an edge vignette on a 10 s cycle */
 .lbg .lbg-vig {
   inset: 0;
-  background: radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+  background: radial-gradient(120% 90% at 50% 40%, transparent 55%, color-mix(in srgb, var(--photo-ground) 55%, transparent) 100%);
 }
 .lbg[data-on] .lbg-vig { animation: lbg-breathe 10s ease-in-out infinite; }
 @keyframes lbg-breathe {
