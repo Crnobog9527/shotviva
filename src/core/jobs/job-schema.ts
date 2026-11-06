@@ -18,6 +18,8 @@ export type Job = {
   userId: string
   module: JobModule
   templateId: string
+  // The work this one was edited from (ARCHITECTURE §5.2); null for a template generation.
+  parentJobId: string | null
   inputs: Record<string, unknown>
   provider: string | null
   source: JobSource
@@ -41,6 +43,8 @@ export const jobRowSchema = z
     user_id: z.string(),
     module: z.enum(JOB_MODULES),
     template_id: z.string(),
+    // Absent on rows read before T30's migration; set null when the parent is deleted.
+    parent_job_id: z.string().nullable().optional(),
     inputs: z.record(z.string(), z.unknown()),
     provider: z.string().nullable(),
     source: z.enum(JOB_SOURCES),
@@ -60,6 +64,7 @@ export const jobRowSchema = z
       userId: row.user_id,
       module: row.module,
       templateId: row.template_id,
+      parentJobId: row.parent_job_id ?? null,
       inputs: row.inputs,
       provider: row.provider,
       source: row.source,

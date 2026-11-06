@@ -2,7 +2,7 @@ import 'server-only'
 
 import type { ServerEnv } from '../env'
 import { AppError } from '../errors'
-import { ENV_PROVIDER_SOURCE, providerTag, type GenerationProvider } from '../jobs'
+import { ENV_PROVIDER_SOURCE, providerTag, type GenerationProvider, type ProviderPrices } from '../jobs'
 import { DEFAULT_BASE_URL, type ActiveProviderRow, type ProviderAdapters, type ProviderConfig, type ProviderModule } from './types'
 
 // Turns the active ai_providers row (or, without one, the env fallback) into the adapter that
@@ -20,11 +20,17 @@ function envFallback(module: ProviderModule, env: ServerEnv): EnvFallback {
   return { adapter: 'openai_images', config: { baseUrl: DEFAULT_BASE_URL, model: env.OPENAI_IMAGE_MODEL, apiKey: env.OPENAI_API_KEY } }
 }
 
-function build(adapters: ProviderAdapters, adapterId: keyof ProviderAdapters, source: string, config: ProviderConfig) {
+function build(
+  adapters: ProviderAdapters,
+  adapterId: keyof ProviderAdapters,
+  source: string,
+  config: ProviderConfig,
+  prices: ProviderPrices | null,
+) {
   const adapter = adapters[adapterId]
   if (!adapter) throw new AppError('INTERNAL', `provider adapter ${adapterId} is not registered`)
   const provider = adapter(config)
-  return { id: providerTag(source, config.model), generate: provider.generate.bind(provider) } satisfies GenerationProvider
+  return { id: providerTag(source, config.model), prices, generate: provider.generate.bind(provider) } satisfies GenerationProvider
 }
 
 export async function resolveProvider(
@@ -36,10 +42,11 @@ export async function resolveProvider(
 ): Promise<GenerationProvider> {
   if (!row) {
     const fallback = envFallback(module, env)
-    return build(adapters, fallback.adapter, ENV_PROVIDER_SOURCE, fallback.config)
+    // The env fallback has no row to hold prices, so its jobs record usage but no cost.
+    return build(adapters, fallback.adapter, ENV_PROVIDER_SOURCE, fallback.config, null)
   }
   // No silent fallback to env: a provider the Owner switched to must be the one that runs.
   const apiKey = await readKey(row.id)
   if (!apiKey) throw new AppError('INTERNAL', `active provider ${row.id} has no API key; set it in /admin/providers`)
-  return build(adapters, row.adapter, row.id, { baseUrl: row.baseUrl, model: row.model, apiKey })
+  return build(adapters, row.adapter, row.id, { baseUrl: row.baseUrl, model: row.model, apiKey }, row.prices)
 }

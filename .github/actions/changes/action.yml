@@ -1,0 +1,48 @@
+name: Detect code changes
+description: >
+  Sets `code` to 'false' when a pull request, or a push to main, only touches docs and spec files
+  (规范/, seo资料/, docs/, design/, *.md), so the calling job can skip its real work but still
+  finish, quickly and green, under its required check name. Workflow-level paths-ignore would
+  leave required checks pending forever. Anything unexpected gets 'true'. The caller checks out
+  with fetch-depth 2 so a PR merge commit's first parent (the base) is present.
+
+outputs:
+  code:
+    description: "'true' when there is anything to build or test."
+    value: ${{ steps.detect.outputs.code }}
+
+runs:
+  using: composite
+  steps:
+    - id: detect
+      shell: bash
+      env:
+        EVENT: ${{ github.event_name }}
+        # Push only: the commit main pointed at before this push (all zeros for a new branch).
+        BEFORE: ${{ github.event.before }}
+      run: |
+        run_all() {
+          [ -z "${1:-}" ] || echo "::warning::$1; running everything."
+          echo "code=true" >> "$GITHUB_OUTPUT"
+          exit 0
+        }
+        case "$EVENT" in
+          pull_request)
+            base=HEAD^1
+            ;;
+          push)
+            # The whole push, not just its last commit.
+            [[ "$BEFORE" =~ ^[0-9a-f]{40}$ && ! "$BEFORE" =~ ^0+$ ]] || run_all
+            git fetch --no-tags --depth=1 origin "$BEFORE" || run_all "Could not fetch the previous main commit"
+            base=$BEFORE
+            ;;
+          *)
+            run_all
+            ;;
+        esac
+        files=$(git -c core.quotepath=off diff --name-only "$base" HEAD) || run_all "Could not list the changed files"
+        code=$(printf '%s\n' "$files" | scripts/ci/has-code-changes.sh)
+        echo "code=$code" >> "$GITHUB_OUTPUT"
+        if [ "$code" = false ]; then
+          echo "::notice::Docs/spec-only change; skipping build, tests and Supabase."
+        fi

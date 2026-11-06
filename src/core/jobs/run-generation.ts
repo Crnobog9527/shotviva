@@ -3,8 +3,9 @@ import 'server-only'
 import { randomUUID } from 'node:crypto'
 
 import type { ServerTrack } from '../analytics'
-import { AppError } from '../errors'
-import { isOwnInputKey, loadInputImage, outputKeyFor } from '../storage'
+import { tierForBatch, type TierLimits } from '../billing/tier-limits'
+import { AppError, TierRequiredError } from '../errors'
+import { isOwnInputKey, loadInputImage, outputKeyFor, writeInputPreview } from '../storage'
 import {
   DEFAULT_RESOLUTION,
   loadGenerationTemplate,
@@ -17,8 +18,9 @@ import {
 import { settleTracked } from './generation-analytics'
 import type { GenerationRequest } from './generation-request'
 import { findOwnJob } from './job-lookup'
-import type { JobSource } from './job-schema'
+import type { Job, JobSource } from './job-schema'
 import { toJobView, type JobView } from './job-view'
+import { accountLimits } from './account-limits'
 import { assertWithinRateLimit } from './rate-limit'
 import { settleGeneration, type SettleDeps } from './settle-generation'
 import { reserveJob } from './settlement'
@@ -32,8 +34,18 @@ const SURFACE: Record<JobSource, TemplateSurface> = { web: 'web', graylum: 'part
 // (undefined → template.fields.aspectRatios), as its published contract says.
 const ASPECTS: Record<JobSource, readonly string[] | undefined> = { web: OUTPUT_ASPECTS, graylum: undefined }
 
+// A batch bigger than the tier holds (Starter 1, Pro 10, Max 30) is refused per photo; the
+// browser only offers batchMax, so this is someone bypassing the picker or a tier that lapsed
+// mid-batch. Credits, perWindow and concurrency still bound everything else (§6.2).
+function assertBatchAllowed(limits: TierLimits, batchSize: number) {
+  if (batchSize <= limits.batchMax) return
+  const required = tierForBatch(batchSize) ?? 'max'
+  throw new TierRequiredError(required, `A batch of ${batchSize} photos needs a higher plan`)
+}
+
 // Everything that can be rejected without touching credits: template, fields, key
-// ownership, rate limit, then the stored upload itself (HEAD + bytes; bad ones are deleted).
+// ownership, tier limits (batch size, rate limit), then the stored upload itself (HEAD +
+// bytes; bad ones are deleted).
 async function prepare(deps: GenerationDeps, req: GenerationRequest) {
   const { template, prompt } = await loadGenerationTemplate(deps.db, req.templateId, SURFACE[req.source])
   const inputs = validateGenerationInputs(template.fields, {
@@ -45,7 +57,9 @@ async function prepare(deps: GenerationDeps, req: GenerationRequest) {
   })
   // Never touch (or delete) an object outside the caller's own inputs/ prefix.
   if (req.inputKey && !isOwnInputKey(req.userId, req.inputKey)) throw new AppError('INVALID_INPUT', 'Unknown upload')
-  await assertWithinRateLimit(deps.db, req.userId, deps.now?.() ?? new Date(), req.jobId)
+  const limits = await accountLimits(deps.db, req.userId)
+  assertBatchAllowed(limits, req.batchSize ?? 1)
+  await assertWithinRateLimit(deps.db, req.userId, deps.now?.() ?? new Date(), limits, req.jobId)
   const image = req.inputKey ? await loadInputImage(deps.store, req.inputKey) : null
   return { template, prompt, inputs, image }
 }
@@ -64,6 +78,12 @@ function jobInputs(req: GenerationRequest, { inputs, prompt }: Prepared, resolut
     prompt_version: prompt.version,
     attempt_id: attemptId,
   }
+}
+
+// ARCHITECTURE §8 「原图小图」 (T32), only once the result is confirmed: a failed job has no
+// photo page. Edits (T30) settle elsewhere and get none; their source is the work they edited.
+async function keepInputPreview(deps: GenerationDeps, job: Job, image: Prepared['image']) {
+  if (image) await writeInputPreview(deps.store, { userId: job.userId, jobId: job.id, bytes: image.bytes })
 }
 
 // Synchronous generation (ARCHITECTURE §4) shared by the web route and, later, the partner
@@ -104,5 +124,7 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
     params: prompt.modelParams,
   }
   const settle = () => settleGeneration(deps, job, call, outputKeyFor(req.userId, job.id))
-  return toJobView(await settleTracked(job, template.category, settle, { track: deps.track }))
+  const settled = await settleTracked(job, template.category, settle, { track: deps.track, batchSize: req.batchSize ?? 1 })
+  await keepInputPreview(deps, settled, image)
+  return toJobView(settled)
 }

@@ -24,7 +24,7 @@ const [standard, hd, max] = OUTPUT_TIERS
 
 function plansText(): HeadedText {
   const heading = planFrom ? `Plans From ${usd(planFrom.priceUsd)} a Month` : 'Plans and Credit Packs'
-  const yearly = yearlySaving ? ` Yearly plans save ${yearlySaving}% or more.` : ''
+  const yearly = yearlySaving ? ` Yearly plans save up to ${yearlySaving}%.` : ''
   return {
     heading,
     text: `${plansSentence()}${yearly} Paid credits never expire, and every photo you make with them is private and watermark-free. Here is how that compares with a photographer or doing it yourself.`,

@@ -136,7 +136,7 @@ Shotviva 的写法：
 
 - 所有接口默认需要登录。公开接口要在路由文件顶部注释说明为什么公开。**唯一例外**：`/api/partner/*` 用伙伴密钥 + `X-Shotviva-Account` 鉴权，不走用户会话（ARCHITECTURE.md 第 14.3 节）；预览密钥在生产无效。
 - **任何 API 路由不得接收或返回图片字节**（Vercel 函数 4.5MB 上限）。上传走浏览器压缩 + 预签名直传 R2，出图结果写 R2 后只返回 key 或签名地址（ARCHITECTURE.md 第 8 节）。
-- 不开全站跨域：删除底座 `vercel.json` 里 `/api/*` 的 `Access-Control-Allow-Origin: *`。R2 桶的 CORS 只放行站点域名的 PUT。
+- 不开全站跨域：删除底座 `vercel.json` 里 `/api/*` 的 `Access-Control-Allow-Origin: *`。R2 桶的 CORS 只放行站点域名的 PUT（直传）和 GET（付费作品经 302 跳到签名地址后，分享按钮要在浏览器里读图；T31，2026-11-06）。
 - 不准出现底座里那种调试接口和公开出图接口（`/api/debug/*`、`/api/v1`）。
 - 生成接口用 Vercel Firewall 按 IP 限频，再在代码里按账号限频；伙伴接口复用按账号限频。
 - 支付回调先验签，再按事件 id 去重；验签失败返回 400，临时故障返回 500 让对方重试。
@@ -158,6 +158,12 @@ Shotviva 的写法：
 
 涉及数据库函数的测试连本地 Supabase（`supabase start`）跑，不要用 mock 冒充数据库。CI 用 `supabase/setup-cli` action + `supabase start` 起库，第一个 PR（仓库骨架）就把 workflow 建好。
 
+**本地 Docker 用完就收（Owner 2026-11-06）。** 本地 Supabase 和其他 Docker 容器只在测试时开着：
+- 一轮本地测试跑完、短时间内不再用，就停掉自己的栈（`supabase stop --no-backup`，或停掉并删除自己起的容器）。
+- 任务收尾（PR 合并或交接）时，确认本卡起过的容器、网络和卷都已删除，并在交接笔记里写一句「本地 Docker 已清理」。
+- 只动自己这张卡的栈（容器名带本卡编号，如 `shotviva-t25`），不碰别的窗口正在用的，也不碰 Graylum 的容器。
+- 本机 Docker 卡死、命令不返回时，停下来告诉总控，由总控请 Owner 处理，不要反复重试。
+
 ## 8. Git 和发布
 
 - `main` 就是生产环境。不准直接推 main，所有改动走分支和 PR。
@@ -174,7 +180,7 @@ Shotviva 的写法：
 - 新建任何可收录页面前，先确认它在对应语言的主词表里：英文页看 `seo资料/Shotviva 页面与主词映射（美国口径）.csv`，`/zh` 页看 `seo资料/Shotviva 页面与主词映射（中文口径）.csv`（T22 产出；每种语言以各自的 CSV 为唯一来源）；不在表里的页面一律 `noindex` 或不建。
 - **用户能看到的文字一律不写死在组件里**：界面文字走 next-intl 的 `site/messages/{en,zh}.json`，营销页 / 法律页正文按语言放在 `site/content/` 下（后台页面例外：只用中文，文案放在功能目录的 `copy.ts`，见 DESIGN §7）；新增或修改界面文字的 PR 必须同时给出 en 和 zh（T21 合并后生效，ARCHITECTURE §17）。
 - SEO 页面内容按 ARCHITECTURE.md 第 12 节的固定结构写。
-- noindex 由全局配置统一控制，禁止逐页手写。
+- noindex 由全局配置统一控制，禁止逐页手写。预上线期全站关闭收录由 `SITE_INDEXING` 开关控制（ARCHITECTURE §12.0）。
 
 ## 10. 什么时候必须停下问 Owner
 

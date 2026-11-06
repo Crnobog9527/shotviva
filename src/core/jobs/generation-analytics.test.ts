@@ -11,6 +11,7 @@ const job: Job = {
   userId: '00000000-0000-4000-8000-000000000001',
   module: 'image',
   templateId: 'ramen-studio',
+  parentJobId: null,
   inputs: { copy: { dish: 'tonkotsu ramen' }, input_key: 'inputs/u/k.jpg', resolution: '2k' },
   provider: 'env/gpt-image-2.6',
   source: 'web',
@@ -39,7 +40,19 @@ describe('generateEventProps', () => {
       source: 'web',
       duration_ms: 1235,
       model: 'gpt-image-2.6',
+      edit_scope: null,
+      batch_size: 1,
     })
+  })
+
+  it('carries the batch size, 1 when there is no batch', () => {
+    expect(generateEventProps(job, 'food', { status: 'succeeded' }, 0, 30).batch_size).toBe(30)
+  })
+
+  it('reports the judged range of a photo edit, and nothing it does not know', () => {
+    const edit = { ...job, templateId: 'edit', inputs: { ...job.inputs, edit_scope: 'background', instruction: 'Put it on a beach' } }
+    expect(generateEventProps(edit, 'edit', { status: 'succeeded' }, 0).edit_scope).toBe('background')
+    expect(generateEventProps({ ...job, inputs: { edit_scope: 'whatever' } }, 'food', { status: 'succeeded' }, 0).edit_scope).toBeNull()
   })
 
   it('reports no model for a job written before T17', () => {

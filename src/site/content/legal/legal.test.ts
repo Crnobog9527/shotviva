@@ -24,9 +24,10 @@ function pageLinks(page: LegalPage): LegalLink[] {
 }
 
 describe('legal pages (T19)', () => {
-  it('has the four pages, all linked from the footer', () => {
+  it('has the four pages, all linked from the footer, then Contact (T27)', () => {
     expect(legalPages.map((p) => p.path)).toEqual(PATHS)
-    expect(footerLinks.map((l) => l.href)).toEqual(PATHS)
+    expect(footerLinks.map((l) => l.href)).toEqual([...PATHS, '/account/help'])
+    expect(footerLinks.at(-1)?.label).toBe('Contact')
   })
 
   it.each(PATHS)('%s is noindex through the global switch and stays out of the sitemap', (path) => {
@@ -44,7 +45,8 @@ describe('legal pages (T19)', () => {
   })
 
   it('links only to pages that exist, our own email or https', () => {
-    const known = new Set([...PATHS, '/pricing'])
+    // '/account/help' is Help & feedback (T27), where the refund policy sends signed-in users.
+    const known = new Set([...PATHS, '/pricing', '/account/help'])
     for (const link of legalPages.flatMap(pageLinks)) {
       if (link.href.startsWith('/')) expect(known).toContain(link.href)
       else if (link.href.startsWith('mailto:')) expect(link.href).toBe(`mailto:${site.brand.contactEmail}`)

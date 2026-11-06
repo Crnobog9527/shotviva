@@ -23,6 +23,11 @@ function NavLinks({ items, pathname }: { items: readonly AdminNavItem[]; pathnam
               )}
             >
               {item.label}
+              {item.count ? (
+                <span className="ml-auto rounded-full bg-primary px-2 font-mono text-xs leading-5 text-primary-foreground">
+                  {item.count}
+                </span>
+              ) : null}
             </Link>
           </li>
         )

@@ -8,4 +8,13 @@ export {
 export { CREDIT_POOLS, chargePool, creditsNeeded, type Balance, type CreditPool } from './pools'
 export { readBalance } from './balance'
 export { callRpc, type RpcClient, type RpcResult } from './rpc'
-export { NO_TIER_CONCURRENCY, TIER_CONCURRENCY, concurrencyFor, currentTier } from './tier'
+export {
+  BASE_SUPPORT_REPLY_HOURS,
+  MAX_BATCH_SIZE,
+  TIER_LIMITS,
+  batchUpgrade,
+  currentTier,
+  limitsFor,
+  tierForBatch,
+  type TierLimits,
+} from './tier'

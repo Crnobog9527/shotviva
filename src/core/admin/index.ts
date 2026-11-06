@@ -19,6 +19,8 @@ export type {
 } from './templates'
 export { applyCover, createCoverUpload, type ApplyCoverInput, type CoverDeps, type CoverUploadTicket } from './covers'
 export { TemplatesEditor } from './templates-editor'
+export { loadEditTemplateSettings, saveEditTemplate, type EditTemplateSettings, type SaveEditTemplateInput } from './edit-template'
+export { EDIT_TEMPLATE_COPY, EditTemplateEditor } from './edit-template-editor'
 export {
   activate as activateProvider,
   runProviderAction,
@@ -52,16 +54,24 @@ export {
   banUser,
   ledgerPage,
   loadUser,
+  loadUserExtras,
+  lookupHref,
+  lookupUser,
+  listSignupClusters,
+  parseClusterWindow,
   recentJobs,
   searchUsers,
   unbanUser,
   type AdminUserRow,
   type LedgerEntry,
   type UserDetail,
+  type UserExtras,
   type UserJob,
 } from './users'
 export {
-  estimateCosts,
+  costSummary,
+  legacyEstimate,
+  modelCosts,
   filtersHref,
   JOBS_COPY,
   JobsView,
@@ -69,16 +79,54 @@ export {
   listTemplateOptions,
   parseJobFilters,
   type AdminJob,
+  type CostSummary,
   type JobFilters,
+  type UnitCost,
 } from './jobs'
 export {
   DASHBOARD_DAYS,
   loadDashboardStats,
+  loadTodoCounts,
   OVERVIEW_COPY,
   OverviewView,
   successRate,
   type DashboardStats,
   type ModelUsage,
   type StatsWindow,
+  type TodoCounts,
 } from './overview'
-export { USERS_COPY, UserDetailView, UsersSearch, type UserAdminActions } from './users-ui'
+export { SuspiciousView, USERS_COPY, UserDetailView, UsersSearch, type UserAdminActions } from './users-ui'
+export {
+  compensateJob,
+  listStuckJobs,
+  refundStuckJobs,
+  viewWork,
+  type Compensation,
+  type RefundOutcome,
+  type StuckJob,
+  type WorkLinks,
+} from './support'
+export { JobActions, StuckJobsPanel, SUPPORT_COPY, type JobSupportActions, type RefundStuck } from './support-ui'
+export { applyStripeReplay, previewStripeReplay, type ReplayDeps } from './replay'
+export { REPLAY_COPY, ReplayPanel, type ReplayActions } from './replay-ui'
+export {
+  listFeatureSettings,
+  saveFeatureAccess,
+  type FeatureAccessDeps,
+  type FeatureAccessInput,
+  type FeatureSetting,
+} from './features'
+export { FEATURES_COPY, FeaturesEditor, type FeatureAdminActions } from './features-editor'
+export {
+  clearCostSettings,
+  COSTS_CACHE_TAG,
+  COSTS_COPY,
+  COSTS_DAYS,
+  CostsView,
+  loadAdminKeyStatus,
+  loadBilled,
+  loadOurDailyCosts,
+  saveCostSettings,
+  type CostKeyActions,
+  type CostSettingsInput,
+} from './costs'

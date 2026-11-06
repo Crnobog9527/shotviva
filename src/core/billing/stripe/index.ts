@@ -26,3 +26,4 @@ export {
 export { managedPaymentsEnabled, stripeClient, stripeWebhookSecret, type StripeApi } from './client'
 export { fulfilCheckoutSession, type FulfilDeps, type FulfilOutcome } from './fulfil'
 export { handleStripeWebhook, type WebhookDeps, type WebhookResult } from './webhook'
+export { applyReplay, previewReplay, REPLAY_ERRORS, type ReplayOutcome, type ReplayPreview } from './replay'

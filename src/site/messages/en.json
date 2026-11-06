@@ -81,9 +81,15 @@
     },
     "account": {
       "title": "Graylum",
+      "description": "Make photos in Graylum with your Shotviva credits.",
       "connected": "Connected since {date, date, medium}. Graylum can make photos with your credits.",
-      "notConnected": "Not connected.",
+      "notConnected": "Not connected. To connect, start from Graylum and allow it to use your credits.",
       "disconnect": "Disconnect Graylum"
+    },
+    "integrations": {
+      "title": "Integrations",
+      "enabled": "Enabled",
+      "notEnabled": "Not enabled"
     }
   },
   "app": {
@@ -108,7 +114,8 @@
       "free": "You have {free, plural, one {# free credit} other {# free credits}}.",
       "paid": "You have {paid, plural, one {# credit} other {# credits}}.",
       "getCredits": "Get credits",
-      "panelTitle": "Credits"
+      "panelTitle": "Credits",
+      "signupGiftRefused": "This account did not get the free sign-up credits: another account from the same network got them within 24 hours of your sign-up. You can still buy credits."
     },
     "create": {
       "title": "Create",
@@ -218,7 +225,31 @@
       "freeNotice": "This photo uses free credits: it's shown publicly with a watermark. <b>Paid credits make it private and watermark-free.</b>",
       "needsCredits": "{tier} needs {count, plural, one {# credit} other {# credits}}. <b>Paid credits make photos private and watermark-free.</b>",
       "counter": "{count, number} / {max, number}",
-      "developingSize": "{tier} · <mono>{px, number, ::group-off}</mono>"
+      "developingSize": "{tier} · <mono>{px, number, ::group-off}</mono>",
+      "yourPhotos": "Your photos",
+      "addPhotos": "Add the photos you shot",
+      "chooseGalleryMany": "Choose photos from gallery",
+      "addMore": "Add more photos",
+      "batchFull": "That's {max, number}, the most one batch holds.",
+      "photoN": "Photo {index, number}",
+      "removePhoto": "Remove photo {index, number}",
+      "waitingUpload": "Waiting",
+      "batchOnTier": "We kept your first photo. Batch upload, up to {count, number} at once, comes with {tier}.",
+      "batchKept": "We kept the first {max, number}. One batch holds up to {max, number} photos.",
+      "seeTier": "See {tier} · {count, number} photos",
+      "needPhotos": "Add your photos to start",
+      "uploadingManyCta": "Uploading your photos…",
+      "generateBatchCta": "Generate {count, number} photos <cost>· {total, plural, one {# credit} other {# credits}}</cost>",
+      "batchNeedsPaid": "A batch uses paid credits only: {count, number} photos need {total, plural, one {# credit} other {# credits}}. <b>Every photo in it is private and watermark-free.</b>",
+      "waiting": "Waiting",
+      "waitingSlot": "Waiting for a free slot",
+      "statusDone": "Done",
+      "batchTitle": "Developing {count, number} photos",
+      "batchSettledTitle": "{count, number} photos developed",
+      "batchSummary": "{done, number} of {count, number} done{failed, plural, =0 {} other { · # didn't develop}}",
+      "batchLeave": "Usually 20–40 seconds each. You can leave this page; each photo lands in Photos when it's done.",
+      "makeMore": "Make another batch",
+      "getTier": "Get {tier}"
     },
     "errors": {
       "CONTENT_REJECTED": "The photo or your note didn't pass the safety check. Try another photo or change the note.",
@@ -236,7 +267,8 @@
       "fallback": "Something went wrong. Please try again.",
       "refunded": "Your credits were refunded.",
       "onHold": "Your credits are on hold. We'll return them, or contact support.",
-      "notCharged": "No credits were used."
+      "notCharged": "No credits were used.",
+      "TIER_REQUIRED": "This needs the {tier} plan."
     },
     "photos": {
       "title": "Photos",
@@ -256,10 +288,12 @@
       "today": "Today",
       "yesterday": "Yesterday",
       "fallbackName": "Photo",
+      "editedName": "Edited photo",
       "badgeAria": "{count} in progress",
       "pill": "{count, plural, one {Generating…} other {Generating #…}}",
       "doneMeta": "{when} · {size} · {tier}",
-      "runningMeta": "{size} · {tier} · {count, plural, one {# credit} other {# credits}}"
+      "runningMeta": "{size} · {tier} · {count, plural, one {# credit} other {# credits}}",
+      "waiting": "Waiting for a free slot"
     },
     "work": {
       "freePublic": "Public · watermark",
@@ -271,8 +305,49 @@
       "share": "Share",
       "download": "Download",
       "longPress": "Long-press to save",
+      "showTransparency": "Show transparency",
       "makeAnotherWith": "Make another with {name}",
-      "shareText": "Made with {brand} {url}"
+      "shareText": "Made with {brand} {url}",
+      "makeAgain": "Make again",
+      "tierPx": "{tier} · {px}",
+      "when": {
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "meta": "{day} {time}",
+        "made": "{day}, {time}"
+      },
+      "views": {
+        "label": "View",
+        "result": "Result",
+        "onWhite": "On white",
+        "transparent": "Transparent",
+        "original": "Original"
+      },
+      "originalAlt": "The photo you uploaded for {name}",
+      "originalDeleted": "Original deleted",
+      "originalDeletedBody": "Per our privacy rules, the photo you uploaded is no longer kept. The result stays.",
+      "yourNote": "Your note",
+      "showMore": "Show more",
+      "showLess": "Show less",
+      "facts": {
+        "label": "Details",
+        "template": "Template",
+        "size": "Size",
+        "resolution": "Resolution",
+        "resolutionValue": "{tier} · {px} px",
+        "format": "Format",
+        "formatPng": "PNG, transparent background",
+        "credits": "Credits",
+        "visibility": "Visibility",
+        "visibilityFree": "Public, with watermark",
+        "visibilityPrivate": "Private",
+        "visibilityPublic": "Public",
+        "original": "Original",
+        "originalKept": "Kept, {px} px preview",
+        "originalEdited": "The photo you edited",
+        "originalDeleted": "Deleted per our privacy rules",
+        "made": "Made"
+      }
     },
     "wishlist": {
       "title": "Wishlist",
@@ -353,6 +428,107 @@
       "free": "Free",
       "freeDetail": "No membership yet.",
       "seePlans": "See plans"
+    },
+    "support": {
+      "title": "Help & feedback",
+      "entryHint": "Questions, problems or ideas: write to us here.",
+      "newReply": "New reply",
+      "replyTime": "We reply here, usually within {hours} hours.",
+      "replyTimeMax": "Max members get a reply within {hours} hours.",
+      "newTicket": "New request",
+      "mine": "My tickets",
+      "empty": "No tickets yet.",
+      "opened": "Opened {date, date, medium}",
+      "status": {
+        "open": "Submitted",
+        "replied": "Replied",
+        "closed": "Closed"
+      },
+      "types": {
+        "feedback": "Feedback",
+        "image_issue": "Image issue",
+        "billing": "Billing",
+        "refund": "Refund request",
+        "account": "Account",
+        "other": "Other"
+      },
+      "tiers": {
+        "starter": "Starter",
+        "pro": "Pro",
+        "max": "Max"
+      },
+      "product": {
+        "plan": "{tier} · {interval, select, year {Yearly} other {Monthly}}",
+        "pack": "Credit pack · {credits} credits",
+        "option": "{product} · {amount} · {date, date, medium}"
+      },
+      "new": {
+        "title": "New request",
+        "typeLabel": "What is it about?",
+        "bodyLabel": "Message",
+        "placeholder": "Tell us what happened, or what you'd like to see.",
+        "counter": "{count}/{max}",
+        "paymentLabel": "Which payment?",
+        "paymentOptional": "Payment (optional)",
+        "noPayments": "There are no payments on this account yet.",
+        "workLabel": "Work (optional)",
+        "workOption": "{template} · {date, date, medium}",
+        "none": "None",
+        "choose": "Choose one",
+        "submit": "Send",
+        "submitting": "Sending…",
+        "errors": {
+          "RATE_LIMITED": "You've sent 5 tickets in the last 24 hours. Please try again later.",
+          "INVALID_INPUT": "Choose a type and write a message of up to 2,000 characters. A refund request needs a payment.",
+          "NOT_FOUND": "That payment or work isn't on your account.",
+          "generic": "Couldn't send your message. Please try again."
+        }
+      },
+      "thread": {
+        "you": "You",
+        "team": "{brand} support",
+        "sent": "Thanks, we've got it.",
+        "addLabel": "Add to this ticket",
+        "add": "Send",
+        "adding": "Sending…",
+        "closedNote": "This ticket is closed. Writing here opens it again.",
+        "errors": {
+          "INVALID_INPUT": "Write a message of up to 2,000 characters.",
+          "NOT_FOUND": "This ticket no longer exists.",
+          "generic": "Couldn't send your message. Please try again."
+        }
+      },
+      "showMore": "Show more",
+      "loading": "Loading…",
+      "loadFailed": "Couldn't load more. Try again."
+    },
+    "edit": {
+      "open": "Edit",
+      "title": "Edit this photo",
+      "meta": "{name} · {size} · {tier}",
+      "thisPhoto": "This photo",
+      "hint": "Say what to change. Everything else stays as it is.",
+      "label": "What would you like to change?",
+      "placeholder": "e.g. Make the sofa blue, put it on a beach, remove the price tag",
+      "counter": "{count} / {max}",
+      "required": "Say what to change first.",
+      "examples": "Examples",
+      "tries": {
+        "beach": "Put it on a beach",
+        "background": "Make the background pale blue",
+        "brighter": "Make it brighter"
+      },
+      "size": "Size",
+      "sizeFixed": "Same as the original. The framing stays; only what you ask for changes.",
+      "noticeEmpty": "Write what to change, in any language. <b>The original is kept.</b>",
+      "noticeReady": "Makes a new photo; the original stays in Photos.",
+      "noticeFree": "Makes a new photo; the original stays in Photos. <b>Uses free credits: public with a watermark.</b>",
+      "failTitle": "The edit failed",
+      "failUntouched": "The original is untouched.",
+      "changeRequest": "Change the request",
+      "titleEdited": "{name} (edit)",
+      "yourChange": "Your change",
+      "editedFromLabel": "Edited from"
     }
   },
   "paywall": {
@@ -362,7 +538,7 @@
     "billingLabel": "Billing period",
     "monthly": "Monthly",
     "yearly": "Yearly",
-    "savePct": "Save {pct}%",
+    "savePct": "Save up to {pct}%",
     "plansLabel": "Plans",
     "tiers": {
       "starter": "Starter",
@@ -387,12 +563,11 @@
       "noWatermark": "No watermark, commercial use",
       "privateAllTemplates": "Private by default, all templates",
       "concurrency": "{count, plural, one {# photo} other {# photos}} generating at a time",
-      "support48h": "Email support, reply within 48 hours",
-      "support24h": "Priority email support, reply within 24 hours",
-      "supportSameDay": "Priority support, reply the same business day",
+      "support48h": "Email support, reply within {hours} hours",
+      "support24h": "Priority email support, reply within {hours} hours",
       "batch": "Batch upload, up to {count} photos",
       "brandKit": "Brand kit: your logo and fonts on posters",
-      "earlyAccess": "Early access to new templates and features",
+      "earlyAccess": "Early access to new features",
       "wishlistVotes": "Your template requests count {weight}× on the Wishlist"
     },
     "packsLink": "Just need a few photos? Credit packs from {price}",

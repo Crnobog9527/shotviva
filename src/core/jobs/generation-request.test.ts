@@ -30,4 +30,11 @@ describe('POST /api/generate body (T16)', () => {
     expect(generateBodySchema.parse(body({ note: '   ' })).inputs.note).toBeUndefined()
     expect(generateBodySchema.safeParse(body({ note: 'x'.repeat(301) })).success).toBe(false)
   })
+
+  it('takes a batch size from 1 to the largest batchMax (30), absent for a single photo', () => {
+    expect(toGenerationRequest('user-1', generateBodySchema.parse({ template_id: 'pet-studio', batch_size: 30 })).batchSize).toBe(30)
+    expect(toGenerationRequest('user-1', generateBodySchema.parse({ template_id: 'pet-studio' })).batchSize).toBeUndefined()
+    expect(generateBodySchema.safeParse({ template_id: 'pet-studio', batch_size: 31 }).success).toBe(false)
+    expect(generateBodySchema.safeParse({ template_id: 'pet-studio', batch_size: 0 }).success).toBe(false)
+  })
 })

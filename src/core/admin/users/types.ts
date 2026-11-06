@@ -43,6 +43,7 @@ export type UserDetail = {
   freeCredits: number
   paidUntil: string | null
   bannedAt: string | null
+  signupIp: string | null
 }
 
 export const RECENT_JOBS = 10

@@ -30,7 +30,10 @@ export async function applyWatermark(image: Uint8Array): Promise<Uint8Array> {
   const left = Math.max(0, width - mark.info.width - margin)
   const top = Math.max(0, height - mark.info.height - margin)
 
+  // JPEG has no alpha: a cut-out (transparent PNG) would otherwise flatten to black. White
+  // is how the app shows cut-outs; the mark is composited after, on top.
   const output = await base
+    .flatten({ background: '#ffffff' })
     .composite([{ input: mark.data, left, top }])
     .jpeg({ quality: 90, mozjpeg: true })
     .toBuffer()

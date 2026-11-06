@@ -47,7 +47,7 @@ describe('payment copy by channel', () => {
   it('Stripe: the card plan still says it renews, Alipay still says one period', () => {
     expect(say(methodLabel('stripe', 'card'))).toBe('Card · Apple Pay · Google Pay')
     expect(say(methodNote('stripe', { kind: 'plan', method: 'card', period: 'month' }))).toBe('Renews automatically, cancel anytime')
-    expect(say(planFinePrint('stripe', { method: 'card', period: 'year', price: '$139' }))).toBe('Renews yearly at $139 · cancel anytime · USD')
+    expect(say(planFinePrint('stripe', { method: 'card', period: 'year', price: '$191' }))).toBe('Renews yearly at $191 · cancel anytime · USD')
     expect(say(planFinePrint('stripe', { method: 'alipay', period: 'month', price: '$19.90' }))).toMatch(/^One-time payment for 30 days/)
     expect(say(periodIntro('stripe'))).toMatch(/cancel a card plan/)
   })

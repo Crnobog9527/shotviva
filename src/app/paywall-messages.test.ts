@@ -21,6 +21,15 @@ describe('paywall messages (en)', () => {
     }
     expect(t('perks.concurrency', { count: 1 })).toBe('1 photo generating at a time')
     expect(t('perks.concurrency', { count: 6 })).toBe('6 photos generating at a time')
+    expect(t('perks.earlyAccess')).toBe('Early access to new features')
+    // Hours come from TIER_LIMITS.supportHours through the perk values (48 / 48 / 24).
+    const support = (tier: 'starter' | 'max') => {
+      const perk = tierPerks(tier, { wishlistLive: false }).live.find((p) => p.key.startsWith('support'))
+      return perk ? t(`perks.${perk.key}`, perk.values) : null
+    }
+    expect(support('starter')).toBe('Email support, reply within 48 hours')
+    expect(support('max')).toBe('Priority email support, reply within 24 hours')
+    expect(t('perks.brandKit')).toBe('Brand kit: your logo and fonts on posters')
   })
 
   it('words the payment groups as DESIGN §4.5 fixes them', () => {

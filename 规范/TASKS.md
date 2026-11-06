@@ -226,7 +226,7 @@
 
 **范围**：`core/billing/stripe/`、`app/api/webhooks/stripe`、`app/(marketing)/pricing`、付费墙组件、迁移编号段 `0080`～`0099`（T15 PR #24 的规划；**T15 未合并前不写迁移**）：`subscriptions` 表；`products` 表改成 ARCHITECTURE §6.2 的 9 个商品（`starter_monthly` … `pack_l`：改 check 约束、替换种子行，积分包 `days` 为空），一次成型（AGENTS §5：先设计后迁移、一张卡一次成型，不准「先加再改」）；`site/site.config.ts` 的 9 个商品（id、`tier`、`interval`、积分、天数、价格，同步改 T5 的相关测试和 `SiteConfig` 类型）；Stripe Price 按 `lookup_key` 取（§6.2），不加 Price id 环境变量；PostHog `purchase` 参数按 §6.2。不许动：`_apply_credit_change` / `apply_purchase` 的逻辑、续费逻辑（T10）、模板扣费（T16）。（总控 2026-11-05 补：main 上已合并的代码仍是 `pass`/`pack`，由 T9 负责改名。）
 
-**依据**：ARCHITECTURE §6.2 商品表（9 个 id、价格、积分、天数）、「Stripe Product / Price 映射」（三档 Product 各 4 个 Price、积分包 one-time、`lookup_key` 约定）、「分两段上线」、PostHog 参数；§6.3 Stripe 路由表（MP 不传 `payment_method_types`、微信 `client = 'web'`、税码 `txcd_10105001`、「审核没下来之前卡先走普通订阅」）、「要处理的 Stripe 事件」；§6.1 `apply_purchase(user, product_id, event_id)` 用 session id 当 `event_id`；§2 配置示例；DESIGN §4.5（第一屏三档、第二屏月 / 年或 S / M / L、每屏最多三个选项）；建站规格 G3；AGENTS §6 回调验签、§7 测试 2。
+**依据**：ARCHITECTURE §6.2 商品表（9 个 id、价格、积分、天数）、「Stripe Product / Price 映射」（三档 Product 各 4 个 Price、积分包 one-time、`lookup_key` 约定）、「分两段上线」、PostHog 参数；§6.3 Stripe 路由表（MP 不传 `allowed_payment_method_types`；非 MP 路由用 `allowed_payment_method_types`，不用已删除的 `payment_method_types`、微信 `client = 'web'`、税码 `txcd_10105001`、「审核没下来之前卡先走普通订阅」）、「要处理的 Stripe 事件」；§6.1 `apply_purchase(user, product_id, event_id)` 用 session id 当 `event_id`；§2 配置示例；DESIGN §4.5（第一屏三档、第二屏月 / 年或 S / M / L、每屏最多三个选项）；建站规格 G3；AGENTS §6 回调验签、§7 测试 2。
 
 **预览环境的支付回调**（总控 2026-11-05）：预览地址每个 PR 不同，且开着 Vercel 部署保护，Stripe 的回调会被挡成 401。做法：本地开发用 `stripe listen` 转发；CI 用签名后的模拟回调测（AGENTS §7 测试 2）；在预览上端到端验收时，打开 Vercel「Protection Bypass for Automation」，Stripe 测试模式登记一个回调，网址 = 正在验收的 PR 的分支地址 + `/api/webhooks/stripe?x-vercel-protection-bypass=<绕行密钥>`，换 PR 验收时只改网址、签名密钥不变。成功页 / 取消页地址由代码按当前部署地址（`core/site-url`）生成。绕行密钥和签名密钥只放 Vercel 环境变量与 Stripe 后台，不进代码、不进 PR。
 
@@ -436,7 +436,7 @@
 1. 路由：next-intl 开 `zh`，英文不带前缀、中文 `/zh`；中间件只认地址和 `NEXT_LOCALE` Cookie，不按浏览器语言或 IP 自动跳转；浏览器语言为中文的访客在英文页看到可关闭的「切换到中文」提示；页头 / 页脚语言切换器（真实 `<a href>`）。`<html lang>`、hreflang（`en` / `zh-Hans` / `x-default`）、每种语言独立 sitemap；`/zh` 页默认 noindex，T22 的中文主词表合并后，表里的页面放开收录。
 2. 文案：`site/messages/zh.json` 补齐全部界面文字；`/zh`、`/zh/image-to-image-generator`、`/zh/pricing` 三个收录页的中文正文放 `site/content/`。直答块、FAQ、Title、Description 按中文真实问法写，不机器直译，遵守建站规格 G13 和 §6.1；主词以 T22 为准。没有中文版的页面按 ARCHITECTURE §17 处理：不输出 `/zh` hreflang，不弹提示条，切换器指向 `/zh` 首页。法律页不做中文；付费墙「支付宝」；Stripe Checkout 传 `locale`。
 3. 模板：迁移（编号段 `0120`～`0139`，先合并本卡的 [spec] 定义再写）给 `templates` 加 `translations jsonb not null default '{}'`（ARCHITECTURE §5 结构，check 约束只允许已启用语言的键）；`admin_upsert_template` 读写它；公开查询按当前语言取名称和说明，缺项回退英文；后台模板编辑页加中文名称 / 说明 / 字段标签输入。
-4. 字体：按 ARCHITECTURE §17「字体」一条移植 MiSans。分包文件从 Graylum staging 分支 `apps/web/public/fonts/misans/` 原样复制（含 manifest、LICENSE、NOTICE），用 `manifest.json` 的 SHA-256 逐个校验。另外要做的：加载组件、immutable 缓存头、中间件排除、字体栈、页脚署名。英文页面不应因此多下载中文分包（用浏览器网络面板确认）。
+4. 字体：按 ARCHITECTURE §17「字体」一条移植 MiSans。分包文件从 Graylum staging 分支 `apps/web/public/fonts/misans/` 原样复制（含 manifest、LICENSE、NOTICE），用 `manifest.json` 的 SHA-256 逐个校验。另外要做的：加载组件、immutable 缓存头、中间件排除、字体栈、署名（按 ARCHITECTURE §17 和 DESIGN §6.9：放在条款页「Third-party notices」一节并链接 LICENSE，不放页脚）。英文页面不应因此多下载中文分包（用浏览器网络面板确认）。
 5. 邮件：注册时把当前语言写进 `user_metadata.locale`；`supabase/templates/*.html` 四个模板加中文分支（ARCHITECTURE §7）；本地 Supabase + Mailpit 验证中英两种；PR 里给 Owner 写好重新粘贴的步骤。
 6. 埋点：PostHog 事件带 `locale`（ARCHITECTURE §16）。
 
@@ -641,6 +641,86 @@
 - 删号时工单一起删除。
 
 **依赖**：T10、T23（已合并）；T21（中文文案，按合并先后协调）。
+
+## T27b 工单按档位时效排序（接 T27，同一窗口做）
+
+**目标**：让 Owner 兑现「Starter 48 小时、Pro 24 小时、Max 当个工作日」。
+**范围**：`TIER_SUPPORT_REPLY_HOURS` 改为 Starter 48、Pro 48、Max 24；`admin_list_tickets` 每行返回用户当前档位和 `due_at`（最后一条用户消息时间 + 档位时效小时数）；后台列表默认按 `due_at` 升序，超时标红；`admin_todo_counts` 加「已超时工单」一项。迁移编号沿用 `0220`～`0239`。
+**依据**：ARCHITECTURE §6.2「会员档位权益」、§10「站内工单」。
+**测试**：三档的 `due_at` 计算；没有档位按 48 小时；超时计数。
+
+## T28 批量上传（可派）
+
+**目标**：Pro 一次 10 张、Max 一次 30 张，按 ARCHITECTURE §6.2「批量上传的语义」。
+**范围**：
+- 整理 `TIER_LIMITS` 一张表（§6.2），付费墙权益文案从这里读；`perWindow` 按档位替换固定的 20；新增 `TIER_REQUIRED` 错误码和付费墙预选档位。
+- 工作台相册多选（相机入口不变），Pro / Max 以外只取第一张并提示；逐张压缩上传、可取消单张；`job-store` 加排队状态和调度器，按并发上限发请求，刷新后能续跑。
+- 发起前预检整批费用 ≤ 付费池，不够时按钮变「Get credits · N needed」。
+- 生成中改成列表视图（每张一行：缩略图、状态、失败原因、Retry）；`generate` 事件加 `batch_size`。
+- 文案中英文都要有；先过一遍 impeccable，手机稿优先。
+- 不加迁移（不建表、不加 `batch_id`）。
+**测试**：调度器（并发槽位、一张失败不挡后面、刷新恢复）；`perWindow` 按档位的 db 测试；余额预检；Starter 多选只取一张。
+**依赖**：T21（中文文案，按合并先后协调）。
+
+## T29 新功能档位权限（可派）
+
+**目标**：ARCHITECTURE §6.2「新功能抢先用」：权限接口和后台先做好，现在注册表可以是空的。
+**范围**：
+- 迁移（编号段 `0240`～`0259`，本卡 [spec] 已合并）：`feature_access` 表、RLS（打开、不建策略）、`admin_set_feature_access(key, min_tier, open_to_all_at)` 函数（写 `updated_by`）。
+- `core/features`：注册表、`featureOpen` 纯函数、`requireFeature(userId, key)`（档位不够抛 `TIER_REQUIRED`）、带缓存标签的读取。
+- 后台「功能权限」页 `/admin/features` 和导航项（中文，`copy.ts`）。
+- 付费墙 Max 权益文案改成 "Early access to new features"（中英文）。
+**测试**：`featureOpen` 各种组合（无行、min_tier 空、到期开放、档位不足 / 足够、无档位）；`requireFeature` 抛错；未知 key 不能写入；保存后缓存失效。
+**依赖**：T23（后台外壳，已合并）。
+
+## T30 作品编辑（可派；界面等 T6 出稿）
+
+**目标**：ARCHITECTURE §5.2：在自己的作品上写一句话再改一张，先判断改动范围，再按范围加约束出图。
+**范围**：
+- 迁移（编号段 `0260`～`0279`，本卡 [spec] 已合并）：`generation_jobs.parent_job_id`（外键 `on delete set null`）；`reserve_credits` 接受编辑任务（校验原作品属于本人且成功）；内置模板 `edit` 的种子（`visible_in` 为空、默认 2 / 4 / 6；提示词和约束段落不进仓库，只放占位，Owner 在后台填）；`ai_providers.module` 允许 `'decision'`。
+- `openai_responses` 判断适配器（GPT-6 Luna，结构化输出 `{ scope, confidence, keep, change }`、3 秒超时、失败走兜底，接口可替换）；`modules/image` 的编辑路径：读原作品无水印原图、按范围拼提示词、`/v1/images/edits`、`input_fidelity`。
+- 后台：供应商页能配「判断」供应商；`edit` 模板编辑页能改判断指令和六段约束。
+- 前台：作品详情页「Edit」按钮和编辑面板（等 T6 稿）；新作品详情显示「Edited from」链接。文案中英文都要有。
+- `generate` 事件加 `edit_scope`。
+**测试**：只能编辑本人成功作品；扣费、退回和模板出图一致；判断超时 / 失败走兜底；概率最高且 ≥ 0.5 才采用；`inputs` 不含封装提示词；删号时编辑作品一起删。
+**效果检查**：PR 里贴中英文各 10 句典型说法的前后对比（§5.2），不设通过门槛。
+**依赖**：T6 编辑面板设计稿；T17 / T17b 供应商后台（已合并）；T21（中文文案，按合并先后协调）。
+
+## T33 真实出图成本与账单对账（可派）
+
+**目标**：ARCHITECTURE §10.0：每单记真实用量和成本，后台显示真实成本，并和 OpenAI 实际账单对账。
+**范围**：
+- 迁移（编号段 `0280`～`0299`，本卡 [spec] 已合并）：`generation_jobs.provider_usage`、`cost_usd`；`ai_providers` 三个单价字段；结算函数多收用量和成本参数（一次往返）；管理员密钥的 Vault 存取函数（照 T17b 的做法）。
+- 适配器读出图响应的 `usage`（字段名以 OpenAI 当前文档为准）；作品编辑（T30）合并后把判断那一步的 token 也加进来，谁后合并谁补。
+- 后台：供应商页可填单价、没填标红；出图记录每单成本；概览和出图记录的模型统计改用 `cost_usd`，老任务回退估算并标注；新页面 `/admin/costs`（对账）；管理员密钥的填写入口。
+- 删掉不再需要的估算用法，`GENERATION_COST_USD` 只留作老任务回退。
+**测试**：用量换算成本（含缺字段、单价未填）；结算写入一次往返；失败任务有用量也记成本；对账页在没填管理员密钥、接口出错时的显示；密钥只显示后 4 位、不进日志。
+**依赖**：T17 / T17b（已合并）；和 T30 都改结算路径，按合并先后 rebase。
+
+## T34 账号页「集成」区块（可派，小）
+
+**目标**：ARCHITECTURE §13「v1 范围」里的账号页一条：把现在直接摆在账号页上的 Graylum 连接，收进一个「Integrations / 集成」区块。区块里一行一个外部产品，现在只有 Graylum：显示名称、一句说明、状态（已连接为「Enabled / 已启用」，否则「Not enabled / 未启用」），点进去或展开后是现有的连接 / 断开操作。
+**范围**：账号页布局和文案（中英文）；不改 Graylum 连接逻辑和接口；状态读现有的连接记录，不多一次查询。照 DESIGN 现有样式，不需要新设计稿。
+**测试**：已连接 / 未连接 / 已撤销三种状态显示正确；断开后状态变「未启用」。
+**依赖**：T21 中文文案按合并先后协调。
+
+## T32 作品详情显示实拍原图和用户写的话（可派；界面等 T6 出稿）
+
+**目标**：Owner 2026-11-06：Photos 里点进一张作品，除了成品，还要看到当时上传的实拍图和自己写的补充说明，以及模板、清晰度、花费、时间。
+**范围**：
+- 结算时另存原图小图（ARCHITECTURE §8「原图小图」），已有作品没有小图的显示「原图已按隐私规则删除」（7 天内的老作品可以从 `inputs/` 补一次，不强求）。
+- 作品详情页：成品、原图小图（或作品编辑的「Edited from」原作品）、用户写的补充说明 `inputs.note` 或编辑说明 `inputs.instruction`（原文显示，这是用户自己的话，不是我们的提示词）、模板名、清晰度、花费积分、时间。读取一次往返：详情页本来就按主键读 `generation_jobs`，小图用签名地址或现有文件路由。
+- 隐私政策改一句（§8）。
+- 文案中英文都要有。
+**测试**：结算写小图（去 EXIF、尺寸、失败不影响结算）；删号清除；详情页不泄露封装提示词；别人的作品读不到。
+**依赖**：T6 详情页设计稿；和 T30（作品编辑）、T31（透明图显示）都改作品详情页，按合并先后 rebase。
+
+## T35 首页 FAQ 改写（接 T21，同一窗口做）
+
+**目标**：建站规格 G6 首页 9 句和「首页 FAQ 的写法」：重写现有 5 句的答案（A 的首句按 G6 固定写法），加 F（不用写提示词）、G（尺寸格式）、H（手机能不能用）、I（What is Shotviva?，放最后）四句，D 后加 4 行对比表；首页以外的页面 Title 以 ` | Shotviva` 结尾（≤60 字符，建站规格 §1）。中英文一起改，中文按 G13 用母语重写。
+**范围**：`src/site/content/home.ts` 和中文对应内容；`FaqItem` 支持可选的对比表（服务端渲染成 `<table>`，结构化数据里只放问答文字）；所有数字从 `site.config` 和常量读；FAQPage 结构化数据和页面文字同源。
+**测试**：结构化数据和页面文字一致；9 个问题都是 `<h3>`；答案在服务端 HTML 里；数字和价格页一致。
+**依赖**：T21 三个 PR 合并后做。
 
 ## Owner 侧关键路径（不是任务卡，但比代码慢）
 

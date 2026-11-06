@@ -1,10 +1,11 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/core/ui/table'
 
 import { formatBeijing } from '../shell/format'
+import { JobActions, type JobSupportActions } from '../support-ui'
 import type { LedgerEntry, UserJob } from '../users/types'
 import { USERS_COPY as COPY } from './copy'
 
-const JOB_COLUMNS = ['createdAt', 'template', 'status', 'cost', 'pool', 'error'] as const
+const JOB_COLUMNS = ['createdAt', 'template', 'status', 'cost', 'pool', 'error', 'actions'] as const
 const LEDGER_COLUMNS = ['createdAt', 'pool', 'kind', 'delta', 'balance', 'reason'] as const
 
 function Head({ columns }: { columns: readonly string[] }) {
@@ -19,20 +20,23 @@ function Head({ columns }: { columns: readonly string[] }) {
   )
 }
 
-export function UserJobsTable({ jobs }: { jobs: UserJob[] }) {
+export function UserJobsTable({ jobs, actions, highlight }: { jobs: UserJob[]; actions: JobSupportActions; highlight?: string }) {
   if (jobs.length === 0) return <p className="text-sm text-muted-foreground">{COPY.detail.noJobs}</p>
   return (
     <Table>
       <Head columns={JOB_COLUMNS.map((column) => COPY.jobColumns[column])} />
       <TableBody>
         {jobs.map((job) => (
-          <TableRow key={job.id}>
+          <TableRow key={job.id} data-state={job.id === highlight ? 'selected' : undefined}>
             <TableCell className="font-mono text-xs whitespace-nowrap">{formatBeijing(job.createdAt)}</TableCell>
             <TableCell className="font-mono text-xs">{job.templateId}</TableCell>
             <TableCell>{COPY.jobStatus[job.status]}</TableCell>
             <TableCell className="font-mono">{job.creditsCost}</TableCell>
             <TableCell>{COPY.pools[job.creditPool]}</TableCell>
             <TableCell className="font-mono text-xs">{job.errorCode ?? ''}</TableCell>
+            <TableCell>
+              <JobActions job={job} actions={actions} />
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>

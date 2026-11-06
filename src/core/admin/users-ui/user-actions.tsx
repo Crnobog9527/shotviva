@@ -6,7 +6,7 @@ import { Button } from '@/core/ui/button'
 
 import { useAdminAction } from '../shell/use-admin-action'
 import type { ActionValue } from '../templates/types'
-import { AdjustDialog, type AdjustInput } from './adjust-dialog'
+import { AdjustDialog, type AdjustInput, type PoolBalances } from './adjust-dialog'
 import { BanDialog } from './ban-dialog'
 import { USERS_COPY } from './copy'
 
@@ -21,7 +21,9 @@ export type UserAdminActions = {
 type Open = 'adjust' | 'ban' | 'unban' | null
 
 // Dangerous operations open a dialog that asks for the reason and confirms (DESIGN §7).
-export function UserActions({ userId, banned, actions }: { userId: string; banned: boolean; actions: UserAdminActions }) {
+type Props = { userId: string; banned: boolean; balances: PoolBalances; actions: UserAdminActions }
+
+export function UserActions({ userId, banned, balances, actions }: Props) {
   const [open, setOpen] = useState<Open>(null)
   const { pending, error, notice, run, clearError } = useAdminAction()
   const show = (which: Open) => {
@@ -43,6 +45,7 @@ export function UserActions({ userId, banned, actions }: { userId: string; banne
       {notice ? <p className="text-sm text-success">{notice}</p> : null}
       {open === 'adjust' ? (
         <AdjustDialog
+          balances={balances}
           pending={pending}
           error={error}
           onCancel={() => setOpen(null)}

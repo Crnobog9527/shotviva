@@ -8,14 +8,18 @@ import { Input } from '@/core/ui/input'
 import { Label } from '@/core/ui/label'
 import { Textarea } from '@/core/ui/textarea'
 
+import { MODULE_ADAPTER, type ProviderModule } from '@/core/providers/types'
+
 import type { AdminProvider } from '../providers/types'
 
 import { PROVIDERS_COPY } from './copy'
 import { canSave, formFor, type ProviderForm } from './form-state'
+import { PriceFields } from './price-fields'
 
 type Props = {
-  // null for a new provider.
+  // null for a new provider, which joins `module`'s section.
   provider: AdminProvider | null
+  module: ProviderModule
   pending: boolean
   error: string | null
   onCancel: () => void
@@ -38,8 +42,9 @@ function Field({ id, label, hint, children }: FieldProps) {
 // input is a new-password field (no autofill of a saved login), never filled from the server.
 const COPY = PROVIDERS_COPY.form
 
-export function ProviderFormDialog({ provider, pending, error, onCancel, onSubmit }: Props) {
-  const [form, setForm] = useState(() => formFor(provider))
+export function ProviderFormDialog({ provider, module, pending, error, onCancel, onSubmit }: Props) {
+  const [form, setForm] = useState(() => formFor(provider, module))
+  const adapter = MODULE_ADAPTER[form.module]
   const set = (key: keyof ProviderForm) => (event: { target: { value: string } }) =>
     setForm((prev) => ({ ...prev, [key]: event.target.value }))
   const input = (key: 'label' | 'baseUrl' | 'model', mono = false) => (
@@ -59,13 +64,15 @@ export function ProviderFormDialog({ provider, pending, error, onCancel, onSubmi
           </Field>
           <div className="grid gap-1.5">
             <span className="text-sm font-medium">{COPY.adapter}</span>
-            <p className="text-sm">{PROVIDERS_COPY.adapters.openai_images}</p>
-            <p className="text-muted-foreground text-xs">{COPY.adapterHint}</p>
+            <p className="text-sm">
+              {PROVIDERS_COPY.modules[form.module].title} · {PROVIDERS_COPY.adapters[adapter]}
+            </p>
+            <p className="text-muted-foreground text-xs">{COPY.adapterHint[adapter]}</p>
           </div>
           <Field id="baseUrl" label={COPY.baseUrl} hint={COPY.baseUrlHint}>
             {input('baseUrl', true)}
           </Field>
-          <Field id="model" label={COPY.model} hint={COPY.modelHint}>
+          <Field id="model" label={COPY.model} hint={PROVIDERS_COPY.modules[form.module].modelHint}>
             {input('model', true)}
           </Field>
           <Field
@@ -75,6 +82,7 @@ export function ProviderFormDialog({ provider, pending, error, onCancel, onSubmi
           >
             <Input id="provider-apiKey" type="password" autoComplete="new-password" className="font-mono" value={form.apiKey} onChange={set('apiKey')} />
           </Field>
+          <PriceFields form={form} onChange={(field, value) => setForm((prev) => ({ ...prev, [field]: value }))} />
           <Field id="notes" label={COPY.notes}>
             <Textarea id="provider-notes" maxLength={500} value={form.notes} onChange={set('notes')} />
           </Field>

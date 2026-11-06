@@ -51,7 +51,7 @@ export function PhotoCard({ photo, upload, onPick }: { photo: PickedPhoto; uploa
   )
 }
 
-function UploadStage({ upload }: { upload: UploadState }) {
+export function UploadStage({ upload }: { upload: UploadState }) {
   const t = useTranslations('app')
   if (upload.phase === 'done') {
     return (
@@ -68,7 +68,7 @@ function UploadStage({ upload }: { upload: UploadState }) {
   const fraction = uploading ? upload.progress : 0
   return (
     <>
-      <span className="text-body leading-none font-semibold">{t(uploading ? 'workspace.uploading' : 'workspace.compressing')}</span>
+      <span className="text-body leading-none font-semibold">{t(upload.phase === 'idle' ? 'workspace.waitingUpload' : uploading ? 'workspace.uploading' : 'workspace.compressing')}</span>
       <span
         role="progressbar"
         aria-label={t(uploading ? 'workspace.uploadingAria' : 'workspace.compressingAria')}
@@ -77,7 +77,7 @@ function UploadStage({ upload }: { upload: UploadState }) {
         aria-valuemax={100}
         className="mt-3 block h-1 overflow-hidden rounded-full bg-wash-strong"
       >
-        <span className="block h-full rounded-full bg-primary transition-[width]" style={{ width: `${uploading ? percent(fraction) : 8}%` }} />
+        <span className="block h-full rounded-full bg-primary transition-[width]" style={{ width: `${uploading ? percent(fraction) : upload.phase === 'idle' ? 0 : 8}%` }} />
       </span>
     </>
   )

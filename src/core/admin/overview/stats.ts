@@ -8,6 +8,10 @@ import { callRpc, type RpcClient } from '@/core/billing'
 // breakdown. Revenue is a separate function that arrives with the orders page (T9).
 
 const count = z.coerce.number().int().nonnegative()
+// numeric sums come back as JSON numbers.
+const dollars = z.coerce.number().nonnegative()
+// Succeeded jobs settled before T33 (no usage, no cost), per resolution, to estimate.
+const legacy = z.record(z.string(), count)
 
 const windowSchema = z.object({
   key: z.enum(['today', '7d', 'period']),
@@ -19,6 +23,10 @@ const windowSchema = z.object({
   free_credits_used: z.coerce.number().int(),
   paid_credits_used: z.coerce.number().int(),
   new_paying_users: count,
+  // T33 (0283): real cost, jobs whose cost could not be worked out, and pre-T33 jobs to estimate.
+  cost_usd: dollars,
+  uncosted: count,
+  legacy,
 })
 
 const statsSchema = z.object({
@@ -26,8 +34,18 @@ const statsSchema = z.object({
   days: z.number().int(),
   generated_at: z.string(),
   windows: z.array(windowSchema),
-  trend: z.array(z.object({ day: z.string(), jobs: count, succeeded: count })),
-  by_model: z.array(z.object({ model: z.string(), resolution: z.string(), jobs: count, succeeded: count })),
+  trend: z.array(z.object({ day: z.string(), jobs: count, succeeded: count, cost_usd: dollars, legacy })),
+  by_model: z.array(
+    z.object({
+      model: z.string(),
+      resolution: z.string(),
+      jobs: count,
+      succeeded: count,
+      cost_usd: dollars,
+      uncosted: count,
+      legacy: count,
+    }),
+  ),
 })
 
 export type DashboardStats = z.infer<typeof statsSchema>

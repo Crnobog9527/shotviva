@@ -2,6 +2,8 @@
 // and are only bundled for the browser when a client component imports them.
 export { createOpenAIImageProvider, IMAGE_ADAPTERS, imageProvider, outputSize, OUTPUT_SIZES } from './provider'
 export { CREDITS_FLOOR } from './credits-floor'
+// Photo editing (T30), server only like the provider.
+export { editBodySchema, editScopeClassifier, runEdit, toEditRequest, type ClassifierAnswer, type EditDeps, type ScopeClassifier } from './edit'
 export { GENERATION_COST_USD } from './generation-cost'
 export { useUpload, type UploadState } from './workspace/use-upload'
 export { checkPickedFile, uploadPhoto, UploadError, type UploadDeps, type UploadErrorCode } from './workspace/upload-photo'
@@ -22,6 +24,9 @@ export { RunningList } from './photos/running-list'
 export { DoneGrid } from './photos/done-grid'
 export { PhotosCount } from './photos/photos-count'
 export { toPhotoItem, type PhotoItem, type TemplateLookup } from './photos/photo-item'
+export { editDisplay, editOriginal } from './photos/edit-display'
 export { ResultView } from './result/result-view'
+export { toPhotoDetail, type PhotoDetail } from './detail/photo-detail'
+export { EditFlow, EditTrigger, type EditSource } from './edit-ui'
 // Wishlist post form (T12): one upload field, same zone and stages as the workspace.
 export { PhotoSlot, type PhotoSlotProps } from './workspace/photo-slot'

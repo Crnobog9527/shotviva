@@ -20,21 +20,29 @@ describe('clientIp', () => {
 })
 
 describe('recordSignupIp', () => {
-  it('only fills an empty signup_ip', async () => {
-    const is = vi.fn().mockResolvedValue({ error: null })
+  const client = (rows: { id: string }[]) => {
+    const select = vi.fn().mockResolvedValue({ data: rows, error: null })
+    const is = vi.fn(() => ({ select }))
     const eq = vi.fn(() => ({ is }))
     const update = vi.fn(() => ({ eq }))
     const from = vi.fn(() => ({ update }))
-    await recordSignupIp({ from } as never, 'u1', '203.0.113.7')
-    expect(from).toHaveBeenCalledWith('profiles')
-    expect(update).toHaveBeenCalledWith({ signup_ip: '203.0.113.7' })
-    expect(eq).toHaveBeenCalledWith('id', 'u1')
-    expect(is).toHaveBeenCalledWith('signup_ip', null)
+    return { from, update, eq, is }
+  }
+
+  it('only fills an empty signup_ip, and says whether it did', async () => {
+    const first = client([{ id: 'u1' }])
+    expect(await recordSignupIp({ from: first.from } as never, 'u1', '203.0.113.7')).toBe(true)
+    expect(first.from).toHaveBeenCalledWith('profiles')
+    expect(first.update).toHaveBeenCalledWith({ signup_ip: '203.0.113.7' })
+    expect(first.eq).toHaveBeenCalledWith('id', 'u1')
+    expect(first.is).toHaveBeenCalledWith('signup_ip', null)
+    // Already recorded: the update matches no row.
+    expect(await recordSignupIp({ from: client([]).from } as never, 'u1', '203.0.113.7')).toBe(false)
   })
 
   it('does nothing without an address', async () => {
     const from = vi.fn()
-    await recordSignupIp({ from } as never, 'u1', null)
+    expect(await recordSignupIp({ from } as never, 'u1', null)).toBe(false)
     expect(from).not.toHaveBeenCalled()
   })
 })

@@ -5,7 +5,15 @@ import { z } from 'zod'
 import { MEMBERSHIP_TIERS, type MembershipTier } from '../config'
 import { callRpc, type RpcClient } from './rpc'
 
-export { NO_TIER_CONCURRENCY, TIER_CONCURRENCY, concurrencyFor } from './tier-limits'
+export {
+  BASE_SUPPORT_REPLY_HOURS,
+  MAX_BATCH_SIZE,
+  TIER_LIMITS,
+  batchUpgrade,
+  limitsFor,
+  tierForBatch,
+  type TierLimits,
+} from './tier-limits'
 
 // Membership tier perks (ARCHITECTURE §6.2 "会员档位权益"). The tier itself comes only from the
 // SQL function current_tier(); code never derives it from paid_until or purchases on its own.

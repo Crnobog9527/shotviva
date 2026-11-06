@@ -10,6 +10,7 @@ const job: Job = {
   userId: 'u',
   module: 'image',
   templateId: 'pure-white',
+  parentJobId: null,
   inputs: { aspect_ratio: '16:9', resolution: '2k' },
   provider: 'openai',
   source: 'web',

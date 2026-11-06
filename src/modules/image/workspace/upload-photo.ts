@@ -18,12 +18,19 @@ type Ticket = { input_key: string; put_url: string; headers: Record<string, stri
 export type UploadDeps = {
   compress(file: Blob): Promise<Blob>
   requestTicket(contentType: UploadContentType, size: number): Promise<Ticket>
-  put(url: string, body: Blob, headers: Record<string, string>, onProgress: (fraction: number) => void): Promise<void>
+  put(url: string, body: Blob, headers: Record<string, string>, onProgress: (fraction: number) => void, signal?: AbortSignal): Promise<void>
   // The `upload` event (ARCHITECTURE §16.2), sent once the object is in R2.
   track(props: EventProps<'upload'>): void
 }
 
-export type UploadCallbacks = { onPhase(phase: UploadPhase): void; onProgress(fraction: number): void }
+// signal: cancelling one photo of a batch stops its PUT; the compressed blob is just dropped.
+export type UploadCallbacks = { onPhase(phase: UploadPhase): void; onProgress(fraction: number): void; signal?: AbortSignal }
+
+export const isAbort = (error: unknown) => error instanceof DOMException && error.name === 'AbortError'
+
+function throwIfAborted(signal: AbortSignal | undefined) {
+  if (signal?.aborted) throw new DOMException('upload cancelled', 'AbortError')
+}
 
 // Picker-side checks (AGENTS §6): ≤20MB and JPEG/PNG/WebP. HEIC is refused here instead of
 // after a long upload, because the server cannot decode it either.
@@ -40,15 +47,18 @@ export async function uploadPhoto(file: Blob, deps: UploadDeps, callbacks: Uploa
   const originalType = checkPickedFile(file)
   callbacks.onPhase('compressing')
   const compressed = await deps.compress(file).catch(() => null)
+  throwIfAborted(callbacks.signal)
   const body = compressed ?? file
   const contentType: UploadContentType = compressed ? 'image/jpeg' : originalType
 
   const ticket = await deps.requestTicket(contentType, body.size)
+  throwIfAborted(callbacks.signal)
   callbacks.onPhase('uploading')
   callbacks.onProgress(0)
   try {
-    await deps.put(ticket.put_url, body, ticket.headers, callbacks.onProgress)
-  } catch {
+    await deps.put(ticket.put_url, body, ticket.headers, callbacks.onProgress, callbacks.signal)
+  } catch (error) {
+    if (isAbort(error)) throw error
     throw new UploadError('UPLOAD_FAILED', 'Upload failed; check your connection and try again')
   }
   callbacks.onProgress(1)

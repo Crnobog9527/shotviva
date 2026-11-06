@@ -1,5 +1,5 @@
 import { pageGate } from '@/core/content'
-import { llmsTxt, textResponse } from '@/core/seo'
+import { closedSeoFileResponse, llmsTxt, textResponse } from '@/core/seo'
 import { contentPages, homePage } from '@/site/content'
 import { site } from '@/site/site.config'
 
@@ -9,6 +9,7 @@ const pages = [homePage, ...contentPages].map((page) => ({
   description: page.description,
 }))
 
-export function GET() {
-  return textResponse(llmsTxt(site, homePage.answerBlock, pages))
+// 404 while the pre-launch switch is closed (ARCHITECTURE §12.0).
+export async function GET() {
+  return (await closedSeoFileResponse()) ?? textResponse(llmsTxt(site, homePage.answerBlock, pages))
 }

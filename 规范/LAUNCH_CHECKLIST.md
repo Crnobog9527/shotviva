@@ -14,7 +14,7 @@
 - [ ] Stripe 和 Waffo 的生产回调地址、签名密钥都已登记到环境变量
 - [ ] OpenAI：组织验证完成，有 GPT-Image 系列模型权限（`OPENAI_IMAGE_MODEL` 指定的那个，默认由 Owner 定），设好每月消费上限
 - [ ] Resend：shotviva.com 的 SPF、DKIM、DMARC 都验证通过，已配成 Supabase Auth 的 SMTP
-- [ ] Cloudflare R2：生产桶和预览桶分开，都是私有桶；`inputs/`、`uploads-admin/` 前缀设好 7 天过期规则；CORS 只放行站点域名的 PUT 和 Content-Type
+- [ ] Cloudflare R2：生产桶和预览桶分开，都是私有桶；`inputs/`、`uploads-admin/` 前缀设好 7 天过期规则；CORS 只放行站点域名的 PUT、GET 和 Content-Type（生产桶的来源是 `https://shotviva.com`）
 - [ ] 模板封面公开桶 `shotviva-assets` 已建，绑定 `assets.shotviva.com`，公开桶里只有 `covers/`；10 个模板的封面都已由 Owner 在后台上传
 - [ ] 伙伴密钥：预览和生产各一把，登记到环境变量；预览密钥在生产调用返回 401
 - [ ] hCaptcha：站点密钥建好，已在 Supabase Auth 里启用
@@ -102,7 +102,7 @@
 - [ ] 模板名称和说明在 `/zh` 下显示中文；缺翻译的回退英文而不是空白
 - [ ] hreflang（`en` / `zh-Hans` / `x-default`）互指正确；`/zh` 独立 sitemap 只列 3 个收录页；其余 `/zh` 页是 noindex；每个 `/zh` 页 canonical 指向自己；中文页没有中英混排（建站规格 §6.1）
 - [ ] 中文页在 375px 上没有溢出、截断或重叠
-- [ ] 中文页显示的是 MiSans：网络面板里只有同源 `/fonts/misans/` 的分包请求，没有任何外部字体主机；首屏不被字体阻塞；营销页页脚有 MiSans 署名和协议链接；`/fonts/misans/*.woff2` 带一年 immutable 缓存头
+- [ ] 中文页显示的是 MiSans：网络面板里只有同源 `/fonts/misans/` 的分包请求，没有任何外部字体主机；首屏不被字体阻塞；服务条款页「Third-party notices」一节有 MiSans 署名和协议链接；`/fonts/misans/*.woff2` 带一年 immutable 缓存头
 
 ## 7.5 移动端应用壳（iOS Safari 真机 + Android Chrome 真机各一遍）
 
@@ -120,7 +120,7 @@
 - [ ] 隐私政策写明：客服和安全需要时可能查看用户的照片和成品，每次查看都有记录（T25）
 - [ ] 退款政策写明：在网站的 Help & feedback 里提交退款申请，也可以发邮件；隐私政策写明工单内容保留到删号为止（T27）
 - [ ] 用户能在账号页自助删除账号，删除后 `inputs/` 和 `outputs/` 下该用户的对象、任务记录、伙伴关联一起删除
-- [ ] 页脚有官方站点声明、联系方式、主体信息（建站规格 G8）
+- [ ] 页脚有官方站点声明和联系方式，不写运营主体和地址；服务条款和隐私政策的联系方式一节、首页 Organization 结构化数据里有主体名称和地址（建站规格 G8）
 - [ ] 律师顺带确认：MiSans 字体文件通过网站对外提供，是否符合小米字体协议的「再分发」条款（ARCHITECTURE §17）
 
 ## 9. 运营和模板化
@@ -174,3 +174,18 @@
 - [ ] 第 8 周开创作库时：noindex、sitemap 不含 /g 的测试和验收（创作库规格第 4 节）
 - [ ] 有付费会员后：会员到期提醒邮件、到期后保留 90 天和续费恢复
 - [ ] 有付费用户后：卡支付自动续费、自动故障切换
+
+## 预上线（支付审核期，ARCHITECTURE §12.0）
+
+- [ ] 生产 `SITE_INDEXING` 未设或为 `off`；`curl -sI https://shotviva.com/` 带 `x-robots-tag: noindex, nofollow`
+- [ ] `robots.txt` 里 AI 爬虫全部 Disallow，没有 Sitemap 行；`/sitemap.xml`、`/llms.txt` 返回 404
+- [ ] `www.shotviva.com` 和 `shotviva.vercel.app` 308 跳到 `https://shotviva.com`
+- [ ] 无痕窗口能匿名打开首页、`/pricing`、`/terms`、`/privacy`、`/refund-policy`（给支付审核员）
+- [ ] Deployment Protection 保持 Standard，不关闭
+- [ ] 绑域名时没有删改飞书 MX、SPF 和 Resend 的 DNS 记录
+
+## 开放收录那天
+
+- [ ] Production 把 `SITE_INDEXING` 改成 `on` 并重新部署；`curl` 确认页面变 `index, follow`、AI 爬虫按 R11 放行、sitemap 和 llms.txt 可访问
+- [ ] GSC 和 Bing 提交 `sitemap.xml`（和 `sitemap-zh.xml`）
+- [ ] 合并把 `seo:check` 期望值改成 `open` 的 PR
