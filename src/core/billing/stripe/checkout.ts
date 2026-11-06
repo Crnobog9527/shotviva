@@ -66,9 +66,13 @@ type MethodParams = Pick<Stripe.Checkout.SessionCreateParams, 'managed_payments'
 // A typed literal, not a spread into the params: a parameter Stripe removes from the SDK types
 // (as payment_method_types was in 2026-09-30.endive) then fails the type check instead of
 // reaching Stripe as a 400.
+// Managed Payments is always said out loud, on or off: the live Dashboard can turn it on by
+// default for every Checkout Session, and it does not take Alipay. So an Alipay period, an
+// Alipay pack and the plain-card fallback (STRIPE_MANAGED_PAYMENTS off) send enabled: false,
+// and the session never depends on that toggle.
 function methodParams(route: CheckoutRoute): MethodParams {
   if (route.managedPayments) return { managed_payments: { enabled: true } }
-  const params: MethodParams = { allowed_payment_method_types: route.allowedMethods ?? ['card'] }
+  const params: MethodParams = { managed_payments: { enabled: false }, allowed_payment_method_types: route.allowedMethods ?? ['card'] }
   return params
 }
 
