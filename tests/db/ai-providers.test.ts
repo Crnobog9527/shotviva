@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { activateProvider, runProviderAction, saveProvider, testProvider } from '@/core/admin'
+import { activateProvider, removeProvider, runProviderAction, saveProvider, testProvider } from '@/core/admin'
 import { runGeneration, type GenerationProvider } from '@/core/jobs'
 import { listProviders, loadActiveProviderRow, readProviderKey, resolveProvider, setProviderKey } from '@/core/providers'
 import { newInputKey } from '@/core/storage'
@@ -277,5 +277,55 @@ describe('provider prices (T33)', () => {
     await expect(pg.query(`update public.ai_providers set price_output_per_m = -1 where label like $1`, [`${PREFIX}%`])).rejects.toThrow(
       /ai_providers_prices_nonnegative/,
     )
+  })
+})
+
+describe('admin_delete_provider (§3.3)', () => {
+  const secretsOf = async (id: string, secretId: string | null) =>
+    (await pg.query('select id from vault.secrets where id = $1 or name = $2', [secretId, `shotviva.provider.${id}`])).rows
+
+  it('deletes an inactive row and its Vault key, leaving jobs that name it untouched', async () => {
+    const id = await save({})
+    const secretId = (await pg.query<{ v: string }>('select vault_secret_id as v from public.ai_providers where id = $1', [id])).rows[0]?.v ?? null
+    expect(await secretsOf(id, secretId)).toHaveLength(1)
+    const user = await createUser(pg)
+    const jobId = randomUUID()
+    await pg.query(
+      `insert into public.generation_jobs (id, user_id, module, template_id, inputs, provider, source, status, visibility, credits_cost, credit_pool, output_key, finished_at, cost_usd)
+       values ($1, $2, 'image', 'freeform', '{}', $3, 'web', 'succeeded', 'public', 2, 'free', 'outputs/x.png', now(), 0.1)`,
+      [jobId, user, `${id}/gpt-image-2.6`],
+    )
+    expect(await runProviderAction(() => removeProvider(deps(), adminId, { id }))).toEqual({ ok: true, value: undefined })
+    expect((await pg.query('select 1 from public.ai_providers where id = $1', [id])).rows).toHaveLength(0)
+    expect(await secretsOf(id, secretId)).toHaveLength(0)
+    const { rows } = await pg.query('select provider, cost_usd from public.generation_jobs where id = $1', [jobId])
+    expect(rows).toEqual([{ provider: `${id}/gpt-image-2.6`, cost_usd: '0.100000' }])
+  })
+
+  it('refuses the active row in the command and in SQL, keeping the row and its key', async () => {
+    const id = await save({})
+    await activateProvider(deps(), adminId, { id })
+    expect(await runProviderAction(() => removeProvider(deps(), adminId, { id }))).toEqual({ ok: false, reason: 'provider_active' })
+    await expect(pg.query('select public.admin_delete_provider($1)', [id])).rejects.toThrow(/PROVIDER_ACTIVE/)
+    expect(await activeIds()).toEqual([id])
+    expect(await readProviderKey(serviceSupabase(), id)).toBe(KEY)
+  })
+
+  it('reports an unknown id', async () => {
+    await expect(pg.query('select public.admin_delete_provider($1)', [randomUUID()])).rejects.toThrow(/PROVIDER_NOT_FOUND/)
+    expect(await runProviderAction(() => removeProvider(deps(), adminId, { id: randomUUID() }))).toEqual({ ok: false, reason: 'not_found' })
+  })
+
+  it('is out of reach of client roles', async () => {
+    const id = await save({})
+    for (const role of ['anon', 'authenticated']) {
+      await pg.query('begin')
+      await pg.query(`set local role ${role}`)
+      await expect(pg.query('select public.admin_delete_provider($1)', [id])).rejects.toThrow(/permission denied/)
+      await pg.query('rollback')
+    }
+    expect((await anonClient().rpc('admin_delete_provider', { p_id: id })).error).not.toBeNull()
+    expect((await anonSupabase().rpc('admin_delete_provider', { p_id: id })).error?.message).toMatch(/permission denied/)
+    expect((await pg.query('select 1 from public.ai_providers where id = $1', [id])).rows).toHaveLength(1)
   })
 })

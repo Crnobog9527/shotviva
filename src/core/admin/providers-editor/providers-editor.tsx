@@ -8,6 +8,7 @@ import type { AdminProvider, ProviderAdminActions } from '../providers/types'
 
 import { ActivateDialog } from './activate-dialog'
 import { connectionText, PROVIDERS_COPY as COPY } from './copy'
+import { DeleteDialog } from './delete-dialog'
 import { toSaveInput, type ProviderForm } from './form-state'
 import { ProviderFormDialog } from './provider-form-dialog'
 import { ProviderSection } from './provider-section'
@@ -22,6 +23,7 @@ type Editing = { provider: AdminProvider | null; module: ProviderModule }
 export function ProvidersEditor({ providers, actions }: Props) {
   const [editing, setEditing] = useState<Editing | null>(null)
   const [activating, setActivating] = useState<AdminProvider | null>(null)
+  const [deleting, setDeleting] = useState<AdminProvider | null>(null)
   const [testing, setTesting] = useState<string | null>(null)
   const [testResults, setTestResults] = useState<Record<string, { ok: boolean; text: string }>>({})
   const { pending, error, notice, run, clearError } = useProviderActions()
@@ -55,6 +57,10 @@ export function ProvidersEditor({ providers, actions }: Props) {
     setActivating(null)
     run(() => actions.activate({ id: target.id }), () => COPY.activateDialog.done(target.label))
   }
+  const remove = (target: AdminProvider) => {
+    setDeleting(null)
+    run(() => actions.remove({ id: target.id }), () => COPY.deleteDialog.done(target.label))
+  }
 
   return (
     <div className="grid gap-8">
@@ -76,6 +82,7 @@ export function ProvidersEditor({ providers, actions }: Props) {
           onEdit={(provider) => open(provider)}
           onTest={test}
           onActivate={setActivating}
+          onDelete={setDeleting}
         />
       ))}
       {editing ? (
@@ -90,6 +97,7 @@ export function ProvidersEditor({ providers, actions }: Props) {
         />
       ) : null}
       <ActivateDialog target={activating} current={current} pending={pending} onCancel={() => setActivating(null)} onConfirm={activate} />
+      <DeleteDialog target={deleting} pending={pending} onCancel={() => setDeleting(null)} onConfirm={remove} />
     </div>
   )
 }

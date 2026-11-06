@@ -47,6 +47,8 @@ export const PROVIDERS_COPY = {
   test: '测试连接',
   testing: '测试中…',
   activate: '设为当前使用',
+  delete: '删除',
+  deleteActiveHint: '在用的不能删：先把另一条设为当前使用',
   form: {
     titleNew: '新增供应商',
     titleEdit: (label: string) => `编辑「${label}」`,
@@ -86,6 +88,14 @@ export const PROVIDERS_COPY = {
     confirm: '确认切换',
     done: (label: string) => `已切换到「${label}」`,
   },
+  deleteDialog: {
+    title: '删除供应商？',
+    body: (label: string, model: string) =>
+      `删除「${label}」（模型 ${model}），它在 Vault 里的密钥也一起删掉，不能恢复。已有的出图记录和成本不受影响。`,
+    cancel: '取消',
+    confirm: '确认删除',
+    done: (label: string) => `已删除「${label}」`,
+  },
   errors: {
     invalid_input: '填写的内容不合法，请检查各个字段',
     base_url_invalid: '地址格式不对（不能带账号、查询参数或 #）',
@@ -96,6 +106,7 @@ export const PROVIDERS_COPY = {
     api_key_invalid: '密钥格式不对：16～1024 个字符，不能有空格或换行',
     api_key_missing: '这条供应商没有可用的密钥，请编辑后重新填写',
     not_found: '这个供应商不存在，请刷新页面再试',
+    provider_active: '这个供应商正在使用，不能删除。先把另一条设为当前使用再删',
     internal: '操作失败，请稍后重试',
   } satisfies Record<ProviderSettingReason, string>,
 } as const
