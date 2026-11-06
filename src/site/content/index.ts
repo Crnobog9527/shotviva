@@ -25,3 +25,13 @@ export function isLinkEnabled(href: string): boolean {
   return isGateOpen(site, href, pageGates)
 }
 export { acceptableUsePage, footerLinks, legalPages, privacyPage, refundPolicyPage, termsPage } from './legal'
+export {
+  contentPagesIn,
+  countriesIn,
+  findContentPageIn,
+  footerLinksIn,
+  homePageIn,
+  pricingCopyIn,
+  pricingPageIn,
+} from './localized'
+export type { PricingContent } from './pricing'

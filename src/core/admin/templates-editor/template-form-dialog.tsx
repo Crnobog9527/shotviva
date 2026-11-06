@@ -12,6 +12,7 @@ import { buildPayload, emptyFormValues, toFormValues } from './form-state'
 import { TemplateCoverFields } from './template-cover-fields'
 import { TemplatePromptFields } from './template-prompt-fields'
 import { TemplatePublicFields } from './template-public-fields'
+import { TemplateTranslationFields } from './template-translation-fields'
 
 export type EditTarget = { mode: 'new' } | { mode: 'edit'; template: AdminTemplate }
 
@@ -52,6 +53,7 @@ export function TemplateFormDialog({ target, floor, coverActions, pending, error
           <DialogTitle>{isNew ? '新建模板' : `编辑「${target.template.name}」`}</DialogTitle>
         </DialogHeader>
         <TemplatePublicFields values={values} isNew={isNew} floor={floor} onChange={onChange} />
+        <TemplateTranslationFields values={values} onChange={onChange} />
         {target.mode === 'edit' ? (
           <TemplateCoverFields template={target.template} actions={coverActions} />
         ) : (

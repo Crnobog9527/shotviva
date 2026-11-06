@@ -35,3 +35,4 @@ export {
   type LegalText,
 } from './legal/legal-page'
 export { LegalPageView } from './legal/legal-page-view'
+export { NotFoundView } from './blocks/not-found-view'

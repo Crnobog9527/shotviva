@@ -5,6 +5,7 @@ import { localizePath, matchesPaths, splitLocale } from '../i18n/paths'
 import { publicEnv } from '../public-env'
 import { loginPath } from './redirect-target'
 import { toSessionUser, type SessionUser } from './session-user'
+import { NOT_FOUND_PAGE, NOT_FOUND_RENDER_HEADER, localizedNotFound, plainNotFound, type FetchPage } from './not-found-page'
 import { forwardRequest, hasSessionCookie, proxySupabase, updateSession, withCookies, type Forward } from './update-session'
 
 // With cacheComponents, notFound()/redirect() inside a page stream as a 200 after the
@@ -24,7 +25,13 @@ export type Gate = 'admin' | 'signed_in' | null
 
 // `translatedPaths`: pages with a /zh version (site.config); `forward` hands a page request to
 // the locale router (next-intl middleware), which rewrites /pricing to the [locale] tree.
-export type ProxyGateOptions = { translatedPaths: readonly string[]; forward: Forward; devPages?: boolean }
+export type ProxyGateOptions = {
+  translatedPaths: readonly string[]
+  forward: Forward
+  devPages?: boolean
+  // Tests pass their own; the proxy uses fetch.
+  fetchPage?: FetchPage
+}
 
 // `pathname` is the logical path, without the /zh prefix.
 export function gateFor(pathname: string): Gate {
@@ -34,10 +41,7 @@ export function gateFor(pathname: string): Gate {
 }
 
 export function notFoundResponse(): NextResponse {
-  return new NextResponse('Not Found', {
-    status: 404,
-    headers: { 'Content-Type': 'text/plain; charset=utf-8', 'X-Robots-Tag': 'noindex, nofollow' },
-  })
+  return plainNotFound()
 }
 
 async function currentUser(request: NextRequest) {
@@ -73,20 +77,25 @@ export function lowercasePath(pathname: string): string | null {
 
 // Answers that need no session: wrong case, development-only pages, /zh addresses of
 // English-only pages (ARCHITECTURE §17). null means "go on to the gates".
-function addressAnswer(request: NextRequest, options: ProxyGateOptions): NextResponse | null {
+async function addressAnswer(request: NextRequest, options: ProxyGateOptions): Promise<NextResponse | null> {
   const { pathname, search } = request.nextUrl
   const lower = lowercasePath(pathname)
   if (lower) return NextResponse.redirect(new URL(`${lower}${search}`, request.url), 308)
   const { locale, path } = splitLocale(pathname)
+  if (path === NOT_FOUND_PAGE) {
+    return request.headers.get(NOT_FOUND_RENDER_HEADER) === '1' ? null : localizedNotFound(request, locale, options.fetchPage)
+  }
   if (DEV_ONLY.test(path) && (!options.devPages || locale !== DEFAULT_LOCALE)) return notFoundResponse()
-  if (locale !== DEFAULT_LOCALE && !matchesPaths(path, options.translatedPaths)) return notFoundResponse()
+  if (locale !== DEFAULT_LOCALE && !matchesPaths(path, options.translatedPaths)) {
+    return localizedNotFound(request, locale, options.fetchPage)
+  }
   return null
 }
 
 export async function proxyGate(request: NextRequest, options: ProxyGateOptions): Promise<NextResponse> {
   const { pathname, search } = request.nextUrl
   if (NOT_A_PAGE.test(pathname)) return updateSession(request, forwardRequest)
-  const early = addressAnswer(request, options)
+  const early = await addressAnswer(request, options)
   if (early) return early
   const { locale, path } = splitLocale(pathname)
   const gate = gateFor(path)

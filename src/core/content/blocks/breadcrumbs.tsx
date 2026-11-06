@@ -1,10 +1,11 @@
-import { Link } from '../../i18n/ui'
+import { useTranslations } from 'next-intl'
 
+import { Link } from '../../i18n/ui'
 import type { Crumb } from '../../seo'
 
 export function Breadcrumbs({ crumbs }: { crumbs: readonly Crumb[] }) {
   return (
-    <nav aria-label="Breadcrumb">
+    <nav aria-label={useTranslations('marketing')('breadcrumb')}>
       <ol className="flex gap-2">
         {crumbs.map((crumb, i) => (
           <li key={crumb.path}>

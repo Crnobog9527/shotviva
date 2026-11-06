@@ -251,20 +251,22 @@ otp_expiry = 3600
 
 # Auth emails link to our own origin (/auth/confirm with a token hash), never <ref>.supabase.co.
 # The hosted projects get the same files pasted into Dashboard -> Authentication -> Email Templates.
+# Subjects switch on user_metadata.locale like the bodies (T21, ARCHITECTURE §7); checked on
+# local Supabase Auth + Mailpit: a zh account gets the Chinese subject, no locale gets English.
 [auth.email.template.confirmation]
-subject = "Confirm your Shotviva account"
+subject = '{{ if eq .Data.locale "zh" }}确认你的 Shotviva 账号{{ else }}Confirm your Shotviva account{{ end }}'
 content_path = "./supabase/templates/confirm-signup.html"
 
 [auth.email.template.recovery]
-subject = "Reset your Shotviva password"
+subject = '{{ if eq .Data.locale "zh" }}重置你的 Shotviva 密码{{ else }}Reset your Shotviva password{{ end }}'
 content_path = "./supabase/templates/reset-password.html"
 
 [auth.email.template.email_change]
-subject = "Confirm your new email for Shotviva"
+subject = '{{ if eq .Data.locale "zh" }}确认你在 Shotviva 的新邮箱{{ else }}Confirm your new email for Shotviva{{ end }}'
 content_path = "./supabase/templates/change-email.html"
 
 [auth.email.template.magic_link]
-subject = "Your Shotviva sign-in link"
+subject = '{{ if eq .Data.locale "zh" }}你的 Shotviva 登录链接{{ else }}Your Shotviva sign-in link{{ end }}'
 content_path = "./supabase/templates/magic-link.html"
 
 # Uncomment to customize notification email template

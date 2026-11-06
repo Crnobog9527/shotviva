@@ -6,9 +6,10 @@ import { Suspense } from 'react'
 import { AppPage, FlowNav } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
 import { currentTier, limitsFor, readBalance } from '@/core/billing'
+import { currentLocale } from '@/core/i18n/server'
 import { fileUrlFor, findOwnJob, hasInputPreview, originalUrlFor, type Job } from '@/core/jobs'
 import { r2Store } from '@/core/storage'
-import { EDIT_TEMPLATE_ID, listTemplates, loadEditOffer } from '@/core/templates'
+import { EDIT_TEMPLATE_ID, listTemplatesIn, loadEditOffer } from '@/core/templates'
 import { EditFlow, EditTrigger, editDisplay, editOriginal, ResultView, toPhotoDetail } from '@/modules/image'
 import { site } from '@/site/site.config'
 
@@ -20,8 +21,9 @@ function Nav({ title }: { title: string }) {
 // Everything the page reads besides the job, in one round: templates, the upload preview's HEAD
 // (T32), and for editing (T30) the source work, the edit offer, balance and tier.
 async function loadAround(supabase: Awaited<ReturnType<typeof createServerSupabase>>, userId: string, job: Job) {
+  const locale = await currentLocale()
   const [templates, kept, parent, offer, balance, tier] = await Promise.all([
-    listTemplates(supabase, 'web'),
+    listTemplatesIn(supabase, locale),
     // An edit has no upload of its own (T30).
     job.templateId === EDIT_TEMPLATE_ID ? false : hasInputPreview(r2Store(), job),
     job.parentJobId ? findOwnJob(supabase, userId, job.parentJobId) : null,

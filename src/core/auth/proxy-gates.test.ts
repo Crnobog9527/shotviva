@@ -55,6 +55,17 @@ const forward = (request: NextRequest) => {
   response.headers.set('x-forwarded-to', 'locale-router')
   return response
 }
+// Stands in for the static 404 pages (app/[locale]/(marketing)/page-not-found).
+async function notFoundGate(url: string) {
+  const fetched: { url: string; marked: string | null }[] = []
+  const fetchPage = async (target: URL, init: RequestInit) => {
+    fetched.push({ url: target.toString(), marked: new Headers(init.headers).get('x-shotviva-render-404') })
+    const zh = target.pathname.startsWith('/zh')
+    return new Response(zh ? '<html lang="zh-Hans"><h1>页面不存在</h1></html>' : '<html lang="en"><h1>Not here</h1></html>')
+  }
+  const response = await proxyGate(new NextRequest(`http://localhost:3000${url}`), { translatedPaths: zhPaths, forward, fetchPage })
+  return { response, fetched }
+}
 const gate = (url: string) => proxyGate(new NextRequest(`http://localhost:3000${url}`), { translatedPaths: zhPaths, forward })
 
 describe('proxyGate without a session cookie', () => {
@@ -95,10 +106,37 @@ describe('proxyGate on /zh (ARCHITECTURE §17)', () => {
     expect((await gate('/zh/generate/pure-white')).headers.get('location')).toContain('/zh/login?next=')
   })
 
-  it('404s the /zh address of an English-only page, admin included', async () => {
-    for (const path of ['/zh/terms', '/zh/ai-restaurant-menu', '/zh/admin', '/zh/generate']) {
-      expect((await gate(path)).status, path).toBe(404)
+  it('answers a /zh address of an English-only page with the Chinese 404 page, status 404', async () => {
+    for (const path of ['/zh/terms', '/zh/ai-restaurant-menu', '/zh/admin', '/zh/generate', '/zh/nope']) {
+      const { response, fetched } = await notFoundGate(path)
+      expect(response.status, path).toBe(404)
+      expect(response.headers.get('content-type')).toContain('text/html')
+      const html = await response.text()
+      expect(html, path).toContain('<html lang="zh-Hans">')
+      expect(html, path).toContain('页面不存在')
+      expect(fetched).toEqual([{ url: 'http://localhost:3000/zh/page-not-found', marked: '1' }])
     }
+  })
+
+  it('serves the 404 pages themselves only to the proxy, a 404 to everyone else', async () => {
+    expect((await notFoundGate('/page-not-found')).response.status).toBe(404)
+    expect((await notFoundGate('/zh/page-not-found')).response.status).toBe(404)
+    const marked = (url: string) =>
+      proxyGate(new NextRequest(`http://localhost:3000${url}`, { headers: { 'x-shotviva-render-404': '1' } }), {
+        translatedPaths: zhPaths,
+        forward,
+      })
+    expect((await marked('/zh/page-not-found')).headers.get('x-forwarded-to')).toBe('locale-router')
+  })
+
+  it('falls back to a plain 404 when the page cannot be fetched', async () => {
+    const response = await proxyGate(new NextRequest('http://localhost:3000/zh/terms'), {
+      translatedPaths: zhPaths,
+      forward,
+      fetchPage: () => Promise.reject(new Error('offline')),
+    })
+    expect(response.status).toBe(404)
+    expect(await response.text()).toBe('Not Found')
   })
 
   it('sends a signed-out visitor to the Chinese login page, back to the Chinese page', async () => {

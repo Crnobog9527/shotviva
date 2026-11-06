@@ -3,14 +3,17 @@
      Supabase falls back to the Site URL (no or disallowed redirect) build the path ourselves. */ -}}
 {{- $link := printf "%s&token_hash=%s&type=email_change" .RedirectTo .TokenHash -}}
 {{- if eq .RedirectTo .SiteURL -}}{{- $link = printf "%s/auth/confirm?token_hash=%s&type=email_change" .SiteURL .TokenHash -}}{{- end -}}
+{{- /* Language: user_metadata.locale, written at sign-up (ARCHITECTURE §7). Accounts without it
+     (older ones, Google sign-ups) get English. */ -}}
+{{- $zh := eq .Data.locale "zh" -}}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ if $zh }}zh-Hans{{ else }}en{{ end }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <meta name="supported-color-schemes" content="light">
-<title>Confirm your new email for Shotviva</title>
+<title>{{ if $zh }}确认你在 Shotviva 的新邮箱{{ else }}Confirm your new email for Shotviva{{ end }}</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f4f4f2;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f4f2;">
@@ -21,41 +24,41 @@
 <td style="padding:32px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:20px;line-height:24px;font-weight:bold;color:#171717;">Shotviva</td>
 </tr>
 <tr>
-<td style="padding:24px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:22px;line-height:30px;font-weight:bold;color:#171717;">Confirm your email change</td>
+<td style="padding:24px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:22px;line-height:30px;font-weight:bold;color:#171717;">{{ if $zh }}确认更换邮箱{{ else }}Confirm your email change{{ end }}</td>
 </tr>
 <tr>
-<td style="padding:12px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:24px;color:#3d3d3a;">We received a request to change the email address on your Shotviva account from {{ .Email }} to {{ .NewEmail }}. Confirm to finish the change.</td>
+<td style="padding:12px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:24px;color:#3d3d3a;">{{ if $zh }}我们收到了把你 Shotviva 账号的邮箱从 {{ .Email }} 改为 {{ .NewEmail }} 的请求。确认后即可完成更换。{{ else }}We received a request to change the email address on your Shotviva account from {{ .Email }} to {{ .NewEmail }}. Confirm to finish the change.{{ end }}</td>
 </tr>
 <tr>
 <td style="padding:24px 32px 0 32px;">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0">
 <tr>
 <td align="center" bgcolor="#171717" style="background-color:#171717;border-radius:6px;">
-<a href="{{ $link }}" target="_blank" style="display:inline-block;padding:12px 24px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:20px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:6px;">Confirm email change</a>
+<a href="{{ $link }}" target="_blank" style="display:inline-block;padding:12px 24px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:20px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:6px;">{{ if $zh }}确认更换{{ else }}Confirm email change{{ end }}</a>
 </td>
 </tr>
 </table>
 </td>
 </tr>
 <tr>
-<td style="padding:24px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:#5a5a56;">If the button doesn't work, copy and paste this link into your browser:</td>
+<td style="padding:24px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:#5a5a56;">{{ if $zh }}如果按钮点不开，请把下面的链接复制到浏览器打开：{{ else }}If the button doesn't work, copy and paste this link into your browser:{{ end }}</td>
 </tr>
 <tr>
 <td style="padding:6px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;color:#171717;word-break:break-all;"><a href="{{ $link }}" target="_blank" style="color:#171717;text-decoration:underline;">{{ $link }}</a></td>
 </tr>
 <tr>
-<td style="padding:24px 32px 32px 32px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:#5a5a56;">This link works once and expires in 1 hour.</td>
+<td style="padding:24px 32px 32px 32px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:#5a5a56;">{{ if $zh }}这个链接只能用一次，1 小时后失效。{{ else }}This link works once and expires in 1 hour.{{ end }}</td>
 </tr>
 </table>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
 <tr>
-<td style="padding:24px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;color:#6b6b66;">You received this email because an email change was requested for a Shotviva account linked to this address. If you didn't ask for it, ignore this email, nothing will change, and we recommend changing your password.</td>
+<td style="padding:24px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;color:#6b6b66;">{{ if $zh }}有人为关联这个邮箱的 Shotviva 账号申请了更换邮箱，所以你收到了这封邮件。如果不是你本人操作，忽略即可，账号不会有任何变化；建议你修改一下密码。{{ else }}You received this email because an email change was requested for a Shotviva account linked to this address. If you didn't ask for it, ignore this email, nothing will change, and we recommend changing your password.{{ end }}</td>
 </tr>
 <tr>
-<td style="padding:12px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;color:#6b6b66;">Questions? Email <a href="mailto:support@shotviva.com" style="color:#6b6b66;text-decoration:underline;">support@shotviva.com</a>.</td>
+<td style="padding:12px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;color:#6b6b66;">{{ if $zh }}有问题请发邮件至 {{ else }}Questions? Email {{ end }}<a href="mailto:support@shotviva.com" style="color:#6b6b66;text-decoration:underline;">support@shotviva.com</a>{{ if $zh }}。{{ else }}.{{ end }}</td>
 </tr>
 <tr>
-<td style="padding:12px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;color:#6b6b66;">Copyright &copy; 2026 Shotviva. All rights reserved.</td>
+<td style="padding:12px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;color:#6b6b66;">{{ if $zh }}版权所有 &copy; 2026 Shotviva。{{ else }}Copyright &copy; 2026 Shotviva. All rights reserved.{{ end }}</td>
 </tr>
 </table>
 </td>

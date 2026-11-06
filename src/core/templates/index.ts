@@ -1,4 +1,4 @@
-export { listTemplates } from './list-templates'
+export { listTemplates, listTemplatesIn } from './list-templates'
 export {
   COVER_MEDIA_TYPES,
   TEMPLATE_MODULES,
@@ -8,7 +8,17 @@ export {
   templateInputSchema,
   templateWithPromptSchema,
 } from './schema'
-export type { CoverMediaType, PromptInput, TemplateFields, TemplateInput, TemplateSurface } from './schema'
+export type {
+  CoverMediaType,
+  PromptInput,
+  TemplateFields,
+  TemplateInput,
+  TemplateSurface,
+  TemplateTranslation,
+  TemplateTranslations,
+} from './schema'
+export { templateTranslationsSchema } from './schema'
+export { localizeTemplate, type LocalizedTemplate } from './localize'
 export {
   DEFAULT_RESOLUTION,
   NOTE_MAX_LENGTH,
