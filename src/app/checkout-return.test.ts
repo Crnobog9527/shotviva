@@ -31,6 +31,7 @@ const facts = (productId: CheckoutFacts['productId'], overrides: Partial<Checkou
   card: { brand: 'visa', last4: '4242' },
   receiptUrl: 'https://pay.stripe.com/receipts/r1',
   recurring: !productId.startsWith('pack'),
+  paymentKey: 'cs_test_r1',
   renewsAt: productId.startsWith('pack') ? null : '2026-12-06T00:00:00.000Z',
   ...overrides,
 })
@@ -78,6 +79,23 @@ describe('checkout return page (en)', () => {
     expect(html).toContain('Pro · 1 month · 135 credits')
     expect(html).toContain('Check again')
     expect(html).toContain('support@shotviva.com')
+  })
+})
+
+describe('checkout return page, celebration hooks (T55)', () => {
+  it('Pro and Max plates carry their material; Starter and packs the plain card', async () => {
+    expect(await success('en', 'pro_monthly')).toContain('data-material="pro"')
+    expect(await success('en', 'max_yearly')).toContain('data-material="max"')
+    for (const id of ['starter_monthly', 'pack_l'] as const) expect(await success('en', id)).not.toContain('data-material')
+  })
+
+  it('marks the tick, the title and the added credits for the plate moments; renders no particles on the server', async () => {
+    const html = await success('en', 'pro_monthly')
+    expect(html).toContain('data-return-plate=""')
+    expect(html).toContain('data-glyph=""')
+    expect(html).toContain('data-title=""')
+    expect(html).toContain('data-celebrate-added="135">+135')
+    expect(html).not.toContain('<canvas')
   })
 })
 

@@ -65,6 +65,7 @@ describe('checkout return facts (read only)', () => {
       receiptUrl: 'https://pay.stripe.com/receipts/r1',
       recurring: true,
       renewsAt: new Date(1796515200 * 1000).toISOString(),
+      paymentKey: 'cs_test_abc12345',
     })
     expect(retrieve).toHaveBeenCalledWith('cs_test_abc12345', { expand: ['subscription'] })
     expect(charges).toHaveBeenCalledWith('ch_123')
@@ -112,11 +113,11 @@ describe('checkout return facts, Waffo', () => {
 
   it('Waffo card membership: a subscription, with the next renewal from the mirror (T50)', async () => {
     const { stripe } = fakeStripe(null)
-    const payment = { amount_total: 4990, currency: 'usd', method: 'card', stripe_charge_id: null, waffo_order_id: 'ORD_sub1' }
+    const payment = { amount_total: 4990, currency: 'usd', method: 'card', stripe_charge_id: null, waffo_order_id: 'ORD_sub1', waffo_payment_id: 'PAY_first' }
     const mirror = { current_period_end: '2026-12-06T00:00:00+00:00', cancel_at_period_end: false, status: 'active' }
     const { db, calls } = fakeDb(payment, mirror)
     const facts = await readCheckoutFacts({ stripe, db }, USER, { channel: 'waffo', productId: 'pro_monthly' })
-    expect(facts).toMatchObject({ settled: true, recurring: true, renewsAt: '2026-12-06T00:00:00.000Z' })
+    expect(facts).toMatchObject({ settled: true, recurring: true, renewsAt: '2026-12-06T00:00:00.000Z', paymentKey: 'PAY_first' })
     expect(calls).toContainEqual(['eq', 'waffo_order_id', 'ORD_sub1'])
     // activated not in yet: still a subscription, date unknown.
     const early = await readCheckoutFacts({ stripe, db: fakeDb(payment, null).db }, USER, { channel: 'waffo', productId: 'pro_monthly' })
