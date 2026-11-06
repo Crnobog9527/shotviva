@@ -74,7 +74,7 @@ export const site = defineSite({
       { id: 'pack_m', tier: 'pack', interval: null, credits: 55,  paidDays: null, priceUsd: 24.9 },
       { id: 'pack_l', tier: 'pack', interval: null, credits: 115, paidDays: null, priceUsd: 49.9 },
     ],
-    channels: { primary: 'stripe', fallback: 'waffo' },   // 第 6.3 节：Waffo 只做单笔兜底
+    channels: { primary: 'stripe', fallback: 'waffo' },   // 第 6.3 节：Waffo 兜底，卡订阅 + 支付宝单笔
   },
   partners: { graylum: { returnToHosts: ['graylum.com', 'staging.graylum.com'] } },  // 第 14 节
   gallery: { enabled: false },                 // 创作库规格 U9：上线前 8 周不开页面
@@ -375,11 +375,14 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 要处理的 Stripe 事件：`checkout.session.completed` 和 `checkout.session.async_payment_succeeded`（首付 / 单笔 → `settle_checkout`：写镜像表 + `apply_purchase`，同一事务）、`invoice.paid`（只认 `subscription_cycle` → `apply_subscription_renewal`，T10）、`customer.subscription.updated / deleted`（只更新镜像表）、`charge.refunded`（记录 + 告警）、`charge.dispute.created`（拒付 / 争议：记录 + Sentry 告警，不自动扣积分；T10，总控 2026-11-06 补）。其余事件忽略（回 200）。Stripe 后台的回调端点一次订阅这 7 个事件。
 - Stripe 用与 Graylum 同一主体下**新开的独立账户**，避免两边回调互相收到对方的事件。
 
-**Waffo：保留，只做单笔兜底**（Owner 2026-11-05 确认不砍）：
+**Waffo：保留做兜底，卡支付做订阅**（Owner 2026-11-05 确认不砍；2026-11-06 晚加卡订阅）：
 
 - 角色是 Stripe 账户本身没通过、或 Stripe 整体不可用时的收款兜底。Waffo 可以加急当天开通。
-- Waffo 上卖 9 个商品的**单笔**形态：六个会员商品按一期（月付 +30 天、年付 +365 天，积分同表）、三个积分包；不做 Waffo 订阅；Waffo 不支持微信，付款页只显示卡和支付宝。`product_id → Waffo 商品 id` 的映射放环境变量（一个 JSON 映射，九个 id 都要有，缺一个启动时报错）。
-- 通过环境变量指定当前用哪条通道：默认 Stripe；切到 Waffo 时付费墙全部方式都走 Waffo 单笔。**不做自动故障切换**，出问题时人工改开关。
+- **Waffo 上的会员按付款方式分两种**（Owner 2026-11-06 晚）：
+  - **银行卡 = 自动续费订阅**：月付 / 年付按期自动扣款，每期成功扣款走同一个 `apply_purchase`（积分 + `paid_until`，与 Stripe 续费一致，幂等键用 Waffo 的扣款 / 订单号）；续费失败不发积分、不延 `paid_until`；用户可以在账号页取消，取消后当期结束不再续费（镜像到 `subscriptions`，`cancel_at_period_end = true`）。Waffo 没有类似 Stripe Customer Portal 的托管页时，账号页的「Cancel subscription」按钮由我们调 Waffo 的取消接口（这是「不自写取消界面」的唯一例外）。
+  - **支付宝 = 单次购买一期**：月付 +30 天、年付 +365 天，不自动续费，到期后手动再买（和 Stripe 支付宝一致）。
+  - 三个积分包所有方式都是单笔。Waffo 不支持微信，付款页只显示卡和支付宝；卡写明「自动续费，可随时取消」，支付宝写明「不自动续费」。Waffo 不支持微信，付款页只显示卡和支付宝。`product_id → Waffo 商品 id` 的映射放环境变量（一个 JSON 映射，九个 id 都要有，缺一个启动时报错）。
+- 通过环境变量指定当前用哪条通道：默认 Stripe；切到 Waffo 时付费墙全部方式都走 Waffo（卡订阅、支付宝单笔、积分包单笔）。**不做自动故障切换**，出问题时人工改开关。
 - 回调规则和 Stripe 相同：先验签，再按事件 id 去重，最后 `apply_purchase`。
 
 **开发顺序**：先 Stripe（T9 结账 + 首付、T10 续费），再 Waffo 兜底（T13）。做法参照 Graylum **staging 分支**的支付规则，但不复制它的代码：staging 的支付目录约 8900 行，带着首月优惠券、升级、宽限、测试时钟，Shotviva 一项都不要。
@@ -651,7 +654,7 @@ Owner 2026-11-04 决定：**不在 flux-kontext-template 上原地改造**，新
 - 应用页用第 1 节的 `(app)` 应用壳，按 DESIGN.md 第 8 节先出手机稿。
 - **模板需求墙（Wishlist）随 v1 上线**（Owner 2026-11-05 决定），占应用壳第四个 tab，见第 15 节。
 
-v1 不做：积分引擎抽象层、积分过期和批次、订阅的宽限期 / 自动扣回 / 升级降级 / 优惠券 / 自写取消界面、Waffo 订阅、自动故障切换、自动退款、保留期定时任务、提醒邮件、内容审核、作品审核页、第 10 节表格以外的后台页、英文和简体中文以外的语言（`/ja`、`/id` 等，见建站规格 §6）、多行菜单 / 价格单的排版功能（单张促销海报模板要做，见第 5 节）、视频生成实现、服务端 HEIC 转码、原图存储、断点续传、PWA / 离线、需求墙的评论 / 通知 / 重复合并 / 分类筛选。
+v1 不做：积分引擎抽象层、积分过期和批次、订阅的宽限期 / 自动扣回 / 升级降级 / 优惠券 / 自写取消界面（Waffo 卡订阅的取消按钮除外）、自动故障切换、自动退款、保留期定时任务、提醒邮件、内容审核、作品审核页、第 10 节表格以外的后台页、英文和简体中文以外的语言（`/ja`、`/id` 等，见建站规格 §6）、多行菜单 / 价格单的排版功能（单张促销海报模板要做，见第 5 节）、视频生成实现、服务端 HEIC 转码、原图存储、断点续传、PWA / 离线、需求墙的评论 / 通知 / 重复合并 / 分类筛选。
 
 ## 14. 伙伴接口（Graylum 连接器）
 
