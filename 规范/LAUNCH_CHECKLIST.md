@@ -37,7 +37,7 @@
 
 ## 3. 登录
 
-- [ ] 邮箱 + 密码注册，收到 Resend 发的验证邮件（发件人 support@shotviva.com），点击后能登录；Gmail、Outlook 各测一次，记录进收件箱还是垃圾箱
+- [ ] 邮箱 + 密码注册，收到 Resend 发的验证邮件（发件人 mail@shotviva.com，回信能在飞书的 support@ 收到），点击后能登录；Gmail、Outlook 各测一次，记录进收件箱还是垃圾箱
 - [ ] 发信域名预热：shotviva.com 2026-11-05 才注册，正式推广前至少留一周少量发信，确认 Gmail / Outlook / 飞书都能正常收到（预览验收时飞书企业邮箱曾一直收不到）
 - [ ] 未验证邮箱的账号不能生成
 - [ ] Google 登录可用，回跳地址正确
