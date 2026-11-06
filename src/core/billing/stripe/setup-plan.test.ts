@@ -48,7 +48,7 @@ describe('planSetup (scripts/stripe-setup.ts)', () => {
 
   it('skips everything already in place (a second run is a no-op)', () => {
     const plan = planSetup({ products, brand, ...fullAccount() })
-    expect(plan).toMatchObject({ createProducts: [], createPrices: [], existingProducts: 6, existingPrices: 15, mismatches: [] })
+    expect(plan).toMatchObject({ createProducts: [], createPrices: [], replacePrices: [], existingProducts: 6, existingPrices: 15, mismatches: [] })
   })
 
   it('creates only what is missing', () => {
@@ -63,13 +63,15 @@ describe('planSetup (scripts/stripe-setup.ts)', () => {
     const account = fullAccount()
     const price = account.existingPrices.get('pro_yearly_recurring')
     if (!price) throw new Error('fixture')
-    account.existingPrices.set('pro_yearly_recurring', { ...price, unitAmount: 34800, recurring: 'month' })
+    account.existingPrices.set('pro_yearly_recurring', { ...price, unitAmount: 47800, recurring: 'month' })
     account.existingPrices.set('pack_s', { ...(account.existingPrices.get('pack_s') as ExistingPrice), metadataProductId: null })
     account.existingProducts.set('shotviva_max', { id: 'shotviva_max', active: true, taxCode: null })
     const plan = planSetup({ products, brand, ...account })
     expect(plan.mismatches).toHaveLength(3)
     expect(plan.mismatches.join('\n')).toMatch(/shotviva_max tax code is unset/)
-    expect(plan.mismatches.join('\n')).toMatch(/pro_yearly_recurring .*amount 34800 usd ≠ 34900 usd, recurring month ≠ year/)
+    expect(plan.mismatches.join('\n')).toMatch(/pro_yearly_recurring .*recurring month ≠ year/)
+    // A real mismatch is never "fixed" by replacing the Price.
+    expect(plan.replacePrices).toEqual([])
     expect(plan.mismatches.join('\n')).toMatch(/pack_s .*metadata\.product_id null ≠ pack_s/)
   })
 
@@ -77,5 +79,34 @@ describe('planSetup (scripts/stripe-setup.ts)', () => {
     const account = fullAccount()
     account.existingPrices.set('max_monthly', { ...(account.existingPrices.get('max_monthly') as ExistingPrice), active: false })
     expect(planSetup({ products, brand, ...account }).mismatches).toEqual([expect.stringMatching(/max_monthly .*archived/)])
+  })
+})
+
+describe('planSetup price changes (Prices are immutable)', () => {
+  it('replaces a Price whose only difference is the amount, both the recurring and the one-time', () => {
+    const account = fullAccount()
+    for (const key of ['max_yearly_recurring', 'max_yearly']) {
+      const price = account.existingPrices.get(key) as ExistingPrice
+      account.existingPrices.set(key, { ...price, id: `price_old_${key}`, unitAmount: 69900 })
+    }
+    const plan = planSetup({ products, brand, ...account })
+    expect(plan.mismatches).toEqual([])
+    expect(plan.createPrices).toEqual([])
+    expect(plan.replacePrices).toEqual([
+      { price: expect.objectContaining({ lookupKey: 'max_yearly_recurring', unitAmount: 71300, recurring: 'year' }), oldId: 'price_old_max_yearly_recurring', oldAmount: 69900 },
+      { price: expect.objectContaining({ lookupKey: 'max_yearly', unitAmount: 71300, recurring: null }), oldId: 'price_old_max_yearly', oldAmount: 69900 },
+    ])
+  })
+
+  it('is a no-op once the new Prices hold the lookup keys (rerun)', () => {
+    expect(planSetup({ products, brand, ...fullAccount() }).replacePrices).toEqual([])
+  })
+
+  it('still stops on a different currency instead of replacing', () => {
+    const account = fullAccount()
+    account.existingPrices.set('pack_s', { ...(account.existingPrices.get('pack_s') as ExistingPrice), currency: 'eur', unitAmount: 900 })
+    const plan = planSetup({ products, brand, ...account })
+    expect(plan.mismatches).toEqual([expect.stringMatching(/pack_s .*currency eur ≠ usd/)])
+    expect(plan.replacePrices).toEqual([])
   })
 })

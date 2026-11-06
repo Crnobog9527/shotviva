@@ -23,7 +23,7 @@ export function RunningList({ server, covers }: { server: PhotoItem[]; covers: R
       </div>
       <ul aria-live="polite" className="grid gap-3 px-4">
         {rows.map((row) => (
-          <RunningRowView key={row.id} row={row} progress={estimatedProgress(now - row.startedAt)} />
+          <RunningRowView key={row.id} row={row} progress={row.queued ? 0 : estimatedProgress(now - row.startedAt)} />
         ))}
       </ul>
       <p className="mx-4 mt-3 text-caption text-muted-foreground">{t('closeApp')}</p>
@@ -38,7 +38,7 @@ function RunningRowView({ row, progress }: { row: RunningRow; progress: number }
     <li className="hairline grid grid-cols-[76px_1fr] items-center gap-4 rounded-media bg-card p-3">
       <span className="relative block aspect-[4/5] overflow-hidden rounded-inner bg-photo-ground">
         {thumb ? <img src={thumb} alt="" className="absolute inset-0 size-full object-cover brightness-75 grayscale" /> : null}
-        <span aria-hidden="true" className="animate-scan absolute inset-x-0 top-[40%] h-0.5 bg-primary" />
+        {row.queued ? null : <span aria-hidden="true" className="animate-scan absolute inset-x-0 top-[40%] h-0.5 bg-primary" />}
       </span>
       <span className="min-w-0">
         <b className="block text-body font-semibold">{row.templateName}</b>
@@ -54,8 +54,8 @@ function RunningRowView({ row, progress }: { row: RunningRow; progress: number }
           <span className="block h-full rounded-full bg-primary transition-[width] duration-1000" style={{ width: `${percent(progress)}%` }} />
         </span>
         <span className="mt-2 flex items-center gap-2 text-caption">
-          <span aria-hidden="true" className="size-2 rounded-full bg-primary" />
-          {t('photos.generating')}
+          <span aria-hidden="true" className={row.queued ? 'size-2 rounded-full bg-muted-foreground' : 'size-2 rounded-full bg-primary'} />
+          {t(row.queued ? 'photos.waiting' : 'photos.generating')}
         </span>
       </span>
     </li>

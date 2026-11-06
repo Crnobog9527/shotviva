@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { CREDIT_POOLS } from '../billing/pools'
+import { MAX_BATCH_SIZE } from '../billing/tier-limits'
 import { PRODUCT_IDS } from '../config/define-site'
 import { findPii } from './pii'
 
@@ -14,7 +15,7 @@ const errorCode = z.string().regex(/^[A-Z][A-Z0-9_]*$/).max(64)
 
 export const UPLOAD_SIZE_BUCKETS = ['<1MB', '1-5MB', '>5MB'] as const
 export const RESOLUTIONS = ['1k', '2k', '3k'] as const
-export const PAYWALL_TRIGGERS = ['insufficient_credits', 'pricing_page', 'account', 'graylum'] as const
+export const PAYWALL_TRIGGERS = ['insufficient_credits', 'pricing_page', 'account', 'graylum', 'tier_required'] as const
 export const PRODUCT_TIERS = ['starter', 'pro', 'max', 'pack'] as const
 export const PRODUCT_INTERVALS = ['month', 'year'] as const
 export const CHECKOUT_FORMS = ['subscription', 'one_time'] as const
@@ -47,6 +48,8 @@ export const eventSchemas = {
     duration_ms: z.number().int().nonnegative(),
     // Model name only (ARCHITECTURE §16.2); null for jobs written before T17.
     model: z.string().min(1).max(120).nullable(),
+    // Photos in the workspace batch this one belonged to; 1 for a single photo (T28).
+    batch_size: z.number().int().min(1).max(MAX_BATCH_SIZE),
   }),
   paywall_view: z.strictObject({ trigger: z.enum(PAYWALL_TRIGGERS) }),
   checkout_start: z.strictObject(checkoutProps),

@@ -59,6 +59,10 @@
   --frost-light: rgba(11, 10, 9, 0.55);
   --photo-fade: rgba(11, 10, 9, 0.85);
   --photo-ground: #000000;
+  /* Behind result photos: transparent PNGs sit on white, or on a checkerboard on request. */
+  --photo-white: #FFFFFF;
+  --checker-light: #FFFFFF;
+  --checker-dark: #D6D6D6;
 
   /* Fixed chrome over scrolling content (tab bar, nav bar, action bar). */
   --bar-material: rgba(14, 12, 11, 0.78);
@@ -132,6 +136,7 @@
   --color-frost: var(--frost);
   --color-photo-ink: var(--photo-ink);
   --color-photo-ground: var(--photo-ground);
+  --color-photo-white: var(--photo-white);
   --color-safelight-tint: var(--safelight-tint);
   --color-success-tint: var(--success-tint);
 
@@ -249,6 +254,12 @@
 @utility nav-material {
   background: linear-gradient(var(--nav-top), var(--nav-bottom));
   @apply backdrop-blur-[20px];
+}
+/* Transparency checkerboard behind a cut-out result, 8px squares. */
+@utility checker-ground {
+  background-color: var(--checker-light);
+  background-image: conic-gradient(var(--checker-dark) 0 25%, transparent 0 50%, var(--checker-dark) 0 75%, transparent 0);
+  background-size: 16px 16px;
 }
 /* Horizontal rails (filter chips): scroll without a visible bar. */
 @utility no-scrollbar {

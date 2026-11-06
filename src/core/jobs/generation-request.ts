@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { MAX_BATCH_SIZE } from '../billing/tier-limits'
+
 import { NOTE_MAX_LENGTH, OUTPUT_ASPECTS, RESOLUTIONS, type Resolution } from '../templates/output-options'
 import { JOB_VISIBILITIES, type JobSource, type JobVisibility } from './job-schema'
 
@@ -26,6 +28,9 @@ export const generateBodySchema = z.object({
     })
     .default({}),
   visibility: z.enum(JOB_VISIBILITIES).optional(),
+  // How many photos the workspace sent in this batch, this one included (ARCHITECTURE §6.2
+  // "批量上传的语义"): checked against the tier's batchMax and sent with `generate`. Not stored.
+  batch_size: z.number().int().min(1).max(MAX_BATCH_SIZE).optional(),
 })
 
 export type GenerationRequest = {
@@ -43,6 +48,8 @@ export type GenerationRequest = {
   visibility?: JobVisibility | null
   // Partner callId (T7); a repeat returns the first job.
   idempotencyKey?: string | null
+  // Web batches only; absent is a single photo (the partner route has no batches, §14.1).
+  batchSize?: number
 }
 
 export function toGenerationRequest(userId: string, body: z.infer<typeof generateBodySchema>): GenerationRequest {
@@ -57,5 +64,6 @@ export function toGenerationRequest(userId: string, body: z.infer<typeof generat
     resolution: body.inputs.resolution,
     note: body.inputs.note,
     visibility: body.visibility ?? null,
+    batchSize: body.batch_size,
   }
 }

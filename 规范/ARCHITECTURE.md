@@ -124,13 +124,14 @@ interface GenerationProvider {
 |---|---|
 | `id` | uuid |
 | `module` | `'image'`；`'decision'`（作品编辑判断改动范围用，T30，§5.2）；以后视频再加 |
-| `adapter` | 用哪个代码适配器：`'openai_images'`；`'openai_decisions'`（OpenAI 官方 `POST /v1/decisions`，只配官方地址，中转站多半没有这个接口）。接一个接口形态不同的厂商（如 Gemini、Seedream）要写新适配器，是代码任务，不是后台操作 |
+| `adapter` | 用哪个代码适配器：`'openai_images'`；`'openai_responses'`（OpenAI 官方 Responses API，作品编辑判断用，第一版模型 `gpt-6-luna`，Owner 2026-11-06）。接一个接口形态不同的厂商（如 Gemini、Seedream）要写新适配器，是代码任务，不是后台操作 |
 | `label` | 后台显示名，如「OpenAI 官方」「某中转」 |
 | `base_url` | 接口根地址，默认 `https://api.openai.com/v1`；只允许 `https://`，拒绝 localhost、内网和保留地址 |
 | `model` | 模型名，如 `gpt-image-2.6` |
 | `vault_secret_id` | 密钥存在 **Supabase Vault**（`vault.secrets`，由 Supabase 在库内加密），表里只存它的 id。Owner 2026-11-06 改定，和 Graylum 一样；取代原先「应用用 `PROVIDER_SECRETS_KEY` 做 AES-256-GCM」的做法，不再需要任何应用侧加密密钥 |
 | `api_key_last4` | 密钥后 4 位，后台列表里显示用 |
 | `is_active` | 当前在用；同一个 `module` 最多一条为 `true`（部分唯一索引） |
+| `price_input_text_per_m` / `price_input_image_per_m` / `price_output_per_m` | 美元 / 百万 token 的单价，后台填（按 OpenAI 价目页）；用来把每单用量算成 `cost_usd`。`decision` 供应商同样填输入和输出单价（T33） |
 | `notes` | 备注 |
 | `created_at` / `updated_at` / `updated_by` | 审计 |
 
@@ -168,6 +169,8 @@ interface GenerationProvider {
 | parent_job_id | 作品编辑时，被编辑的那张作品的 id（同一用户的成功作品）；模板出图为空。外键 `on delete set null`（T30） |
 | inputs | 用户填的内容（文案、比例、**分辨率 `resolution`：`'1k'` / `'2k'` / `'3k'`**、可选补充说明 `note`（≤300 字符，工作台「Anything to change?」，服务端拼在模板提示词之后，作为用户内容存档）、输入图在 R2 的 key），**不含封装提示词**。伙伴接口（第 14 节）v1 固定 `'1k'`，契约不加字段 |
 | provider | 实际调用的供应商和模型：`<ai_providers.id 或 env>/<模型名>`（第 3.3 节） |
+| provider_usage | 供应商返回的用量（jsonb）：出图的 `input_text_tokens`、`input_image_tokens`、`output_tokens`；作品编辑另记判断那一步的 `decision_input_tokens`。供应商没返回就为空（T33） |
+| cost_usd | 这一单的真实成本（`numeric(10,6)`）= 用量 × 结算时在用供应商的单价快照；以后改单价不影响历史。没有用量或单价没填就为空，后台标「无法计算」（T33） |
 | source | 'web' / 'graylum'，哪条入口发起的 |
 | idempotency_key | 可空，唯一索引。伙伴接口把调用方的 callId 放这里，重复请求返回同一个任务 |
 | status | running → succeeded / failed |
@@ -203,9 +206,9 @@ v1 不写回调解析、定时轮询、超时清理这类定时任务。视频�
 
 - **入口和界面**：作品详情页「Edit」按钮，打开编辑面板（手机底部弹出，电脑和创作面板同一个组件，设计由 T6 出稿）：一个输入框（标签 "What would you like to change?"，1～500 字符，任何语言）、清晰度（默认和原作品同一档）、本次花费；比例固定和原作品一样。只能编辑自己的、成功的作品；免费作品也能编辑。
 - **一单 = 一次普通出图**：走内置模板 `edit`（`visible_in` 为空，不在目录里出现），`reserve_credits` 照常预扣，扣 `templates.credits_cost[resolution]`，默认和标准模板同价 2 / 4 / 6（Owner 2026-11-06，后台可改，不低于下限）；先付费池后免费池、按作品判水印的规则不变。新作品是一张独立作品，`parent_job_id` 指向原作品；原作品不动。编辑出来的作品可以再编辑。
-- **第一步：判断范围**（`ai_providers` 里 `module = 'decision'` 的在用供应商，OpenAI Decisions API）：把原作品（低清晰度）和用户原话送进去，问一组**判断题**（predicate，返回概率，不用选项题：社区实测选项题有偏向、受选项顺序影响），每题对应一种范围：只改某个物件或细节 / 换背景或场景 / 换风格、光线或色调 / 换主体（人、产品本身）/ 整体重做。题目文字放在 `template_prompts` 里 `edit` 模板的参数中，后台可改，不进仓库。取概率最高且 ≥ 0.5 的一种；都低于 0.5、调用失败或超过 3 秒，用「兜底」。
-- **第二步：出图**：`/v1/images/edits`，输入图是原作品在 R2 的无水印原图（服务端直接读，不经用户上传），提示词 = `edit` 模板的封装提示词 + 该范围的约束段落 + 用户原话（原文，不翻译）。约束段落一共六段（五种范围 + 兜底），也放在 `edit` 模板的参数里，Owner 在后台调，**不进仓库**。约束的意思举例：只改物件时「只改用户说的那个东西，其余所有元素保持一致」；换背景时「保留产品的形状、颜色、logo 和文字，背景按要求换」；换主体时「不要保留原主体」。模型支持时带 `input_fidelity: 'high'`（参数也在 `template_prompts`）。
-- **存档**：`generation_jobs.inputs` 记 `instruction`（用户原话）、`edit_scope`（判出的范围或 `fallback`）和各题概率，供 Owner 调约束时看；不存封装提示词。
+- **第一步：判断范围**（`ai_providers` 里 `module = 'decision'` 的在用供应商；Owner 2026-11-06 定用 **GPT-6 Luna**（OpenAI Responses API，便宜、和出图同一个账户），不用 Decisions API，因为它写不出要保留的元素清单）：把原作品（低清晰度）、用户原话和判断指令送进去，用结构化输出拿回 `{ scope, confidence, keep, change }`：`scope` 是五种范围之一（只改某个物件或细节 `object` / 换背景或场景 `background` / 换风格、光线或色调 `style` / 换主体 `subject` / 整体重做 `global`），`confidence` 0～1，`keep` 是图里必须保持不变的具体元素（最多 8 个英文短语），`change` 是一句英文概括。推理用模型允许的最低档，3 秒超时。`confidence` ≥ 0.5 才采用；否则、调用失败或超时，用「兜底」。判断指令放在 `template_prompts` 里 `edit` 模板的参数中，后台可改，不进仓库。判断这一步做成统一接口，按在用供应商的 `adapter` 选实现，以后换模型（例如 Claude Haiku）只加适配器、在后台切换。
+- **第二步：出图**：`/v1/images/edits`，输入图是原作品在 R2 的无水印原图（服务端直接读，不经用户上传），提示词 = `edit` 模板的封装提示词 + 该范围的约束段落（`object` 和 `background` 两种范围把 `keep` 清单写进去，例如「Keep unchanged: …」；`subject` 和 `global` 不写）+ 用户原话（原文，不翻译）。约束段落一共六段（五种范围 + 兜底），也放在 `edit` 模板的参数里，Owner 在后台调，**不进仓库**。约束的意思举例：只改物件时「只改用户说的那个东西，其余所有元素保持一致」；换背景时「保留产品的形状、颜色、logo 和文字，背景按要求换」；换主体时「不要保留原主体」。模型支持时带 `input_fidelity: 'high'`（参数也在 `template_prompts`）。
+- **存档**：`generation_jobs.inputs` 记 `instruction`（用户原话）、`edit_scope`（判出的范围或 `fallback`）、`confidence`、`keep`、`change`，供 Owner 调约束时看；不存封装提示词。判断这一步的 token 记进 `provider_usage.decision_input_tokens` / `decision_output_tokens`，按判断供应商的输入、输出单价算进这一单的 `cost_usd`（§10.0）。
 - **不做**（第一版）：圈选区域（涂抹蒙版，第二版）；伙伴接口的编辑；批量编辑；翻译用户原话。
 - **效果检查**：开发窗口在 PR 里贴中英文各 10 句典型说法的前后对比（例如「沙发换成蓝色」「背景换成海边」「把模特换成男生」「更亮一点」），供 Owner 看效果。这不是通过门槛：效果由 Owner 在后台调约束段落。
 
@@ -417,7 +420,8 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 
 - `inputs/` 前缀：压缩后的输入图，7 天后自动删除。没发起生成的上传对象同样 7 天清掉。
 - `outputs/` 前缀：成品，只存一份无水印原图，一律保留，直到用户删除。
-- 桶 CORS 必须允许站点域名的 `PUT` 和 `Content-Type` 头。
+- **原图小图**（Owner 2026-11-06，T32）：出图成功结算时，服务端用 `sharp` 把这次的输入图（多图模板取第一张）转成长边 768、质量 80 的 WebP，去掉 EXIF / GPS，写到 `outputs/{user_id}/{job_id}-input.webp`，和成品一起保留、一起删除（删号按 `outputs/{user_id}/` 前缀清，已覆盖）。全尺寸输入图仍 7 天删除。写小图失败只记日志，不影响结算。作品编辑（§5.2）的输入是上一张作品，不另存小图，详情页直接链到原作品。
+- 桶 CORS 必须允许站点域名的 `PUT`、`GET` 和 `Content-Type` 头。`GET` 给分享按钮用：付费作品 `/api/files/:id` 302 到签名地址，浏览器要跨域读出图片才能交给系统分享面板（T31）。
 - 所有读取走 `core/storage` 的下载路由（鉴权 + 第 6.2 节的水印规则）或短期签名 GET；伙伴接口返回的签名地址 7 天有效。
 
 **模板封面另用一个公开桶**（Owner 2026-11-05：模板示例图由 Owner 在后台自己上传替换）：
@@ -432,7 +436,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 用户照片和成品绝不进公开桶；公开桶里没有任何用户数据。
 - 换图后首页和模板页通过按需重新生成（ISR revalidate）立即更新，不用重新部署。
 
-会员到期后保留 90 天、续费恢复、删除前提醒，这些等有付费用户后再做。隐私政策 v1 写「上传的照片保留 7 天，成品保留到你删除为止」。
+会员到期后保留 90 天、续费恢复、删除前提醒，这些等有付费用户后再做。隐私政策写「上传的照片原文件保留 7 天；我们为每张作品另存一张缩小的原图预览，方便你在作品详情里对照，它和作品一起保留到你删除为止」（Owner 2026-11-06 改，T32）。
 
 ## 9. 公开创作库
 
@@ -447,6 +451,15 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 
 ## 10. 管理后台
 
+### 10.0 真实出图成本（Owner 2026-11-06，T33）
+
+后台的成本一律用供应商回传的真实用量算，不再用固定单价估算。
+
+- **每单成本**：出图（`/v1/images/edits` / `generations`）返回的 `usage` 写进 `generation_jobs.provider_usage`，结算时乘在用供应商的三项单价得到 `cost_usd`，和结算在同一次调用里写入（`confirm_job` / 失败退回的函数多收两个参数，不另开往返）。失败的任务只要供应商回了用量也记成本（供应商照样收钱）。作品编辑把判断那一步的输入 token 也算进这一单。
+- **后台显示**：出图记录每单显示成本；概览按天、按模型汇总真实成本和单张平均成本；单价没填的供应商在后台供应商页标红提示。
+- **和 OpenAI 实际账单对账**：后台「成本对账」页（`/admin/costs`）按天列出近 30 天 OpenAI 实际扣费（OpenAI Costs API `GET /v1/organization/costs`，按 `api_key_id` 或项目筛选，和发票对得上）和我们逐单加总的 `cost_usd`，并显示差额。需要 Owner 在 OpenAI 组织设置里建一把**管理员密钥（Admin key）**，和出图密钥分开，存进 Supabase Vault（和 §3.3 同一做法，后台填、只显示后 4 位）；没填时这一页只显示我们自己的合计并提示去填。读取在打开页面时进行、缓存 1 小时，不写定时任务。对账只读，不改任何数据。
+- 供应商是 OpenRouter 这类会在响应里直接给出费用的中转时，以响应里的费用为准（适配器负责换算），单价字段可以不填。目前预览和生产都用 OpenAI 官方接口。
+
 v1 后台（Owner 2026-11-06 扩充；T23 做外壳和运营页）：**一个后台外壳**（左侧导航、中文、`/admin` 是概览首页），下挂下面这些页面。**只做本站已有的功能，不照搬 Graylum 后台**：Graylum 的工单、创始会员、导师、技能、发布监控等本站没有，不做。
 
 | 导航 | 路由 | 内容 |
@@ -454,7 +467,7 @@ v1 后台（Owner 2026-11-06 扩充；T23 做外壳和运营页）：**一个后
 | 概览 | `/admin` | 今日 / 近 7 天 / 近 30 天：注册数、出图数、出图成功率、消耗积分（免费 / 付费分开）、新增付费用户、收入；近 30 天出图和收入趋势图。非收入部分由 `admin_dashboard_stats(p_days)` 一次算完；收入由 `admin_revenue_stats(p_days)` 算（T9 之后才有） |
 | 用户 | `/admin/users` | 按邮箱搜（读 `admin.users_overview`，最多返回 50 条）。用户详情：积分两池、会员到期、最近出图、积分流水（分页）。操作：调积分（`admin_adjust_credits`，选池、填原因）、封禁 / 解封（`admin_ban_user` / `admin_unban_user`，填原因） |
 | 订单与收入 | `/admin/orders` | 付款记录（时间、用户邮箱、商品、金额、付款方式、渠道、状态）和订阅状态，按商品和渠道汇总收入；每行链接到 Stripe 后台对应记录。退款仍在 Stripe 后台操作。数据来自 T9 的表，T9 合并后才有 |
-| 出图记录 | `/admin/jobs` | 全部出图任务，按状态、模板、供应商 / 模型、来源（web / graylum）、日期筛选，游标分页；失败任务显示 `error_code`；按模型和清晰度统计次数和估算成本（成本单价表是代码常量，和积分下限放在同一处） |
+| 出图记录 | `/admin/jobs` | 全部出图任务，按状态、模板、供应商 / 模型、来源（web / graylum）、日期筛选，游标分页；失败任务显示 `error_code`；每单显示真实成本 `cost_usd`；按模型和清晰度统计次数和真实成本合计（T33 起；T33 之前的老任务没有用量，按旧的代码常量估算并标「估算」） |
 | 模板 | `/admin/templates` | 见下面第 1 条 |
 | 出图供应商 | `/admin/providers` | 见下面第 3 条 |
 | 需求审核 | `/admin/requests` | 见下面第 2 条；`features.wishlist` 关掉时不出现在导航 |
@@ -605,7 +618,7 @@ Owner 2026-11-04 决定：**不在 flux-kontext-template 上原地改造**，新
 - **v1 不建 `/templates`**：上线只有 6~8 个模板，首页已全部展示，另建一页会和首页内容重复、抢同一个词（建站规格 R1）。
 - **建 `/templates` 的两个条件，同时满足才建**：① 模板数量达到 20 个以上；② 给它找到一个和首页不撞词、核实过美国搜索量和哥飞版 KD 的独立主词（如 `ai food photo templates` 这一类），并登记进主词表 CSV。建好后首页只放精选模板，`/templates` 放完整模板库和分类筛选；分类页以后按创作库标签页的规则接长尾词。
 - 「我的作品」页要有，`noindex`。
-- 账号页要有：已连接 Graylum / 断开（第 14 节）、**删除账号**（服务端路由：`auth.admin.deleteUser` + 按 `inputs/{user_id}/`、`outputs/{user_id}/`、`requests/{user_id}/` 前缀清 R2 + `generation_jobs` 级联），`noindex`。
+- 账号页要有：「Integrations / 集成」区块（Owner 2026-11-06，T34）：列出可连接的外部产品，现在只有 Graylum 一行，显示状态「Enabled / 已启用」或「Not enabled / 未启用」，点进去是连接 / 断开（第 14 节）；以后加别的集成就在这里加一行，不在账号页单独放；**删除账号**（服务端路由：`auth.admin.deleteUser` + 按 `inputs/{user_id}/`、`outputs/{user_id}/`、`requests/{user_id}/` 前缀清 R2 + `generation_jobs` 级联），`noindex`。
 - **Graylum 连接器的 Shotviva 侧随 v1 一起上线**（Owner 2026-11-05 拍板），见第 14 节。
 - 应用页用第 1 节的 `(app)` 应用壳，按 DESIGN.md 第 8 节先出手机稿。
 - **模板需求墙（Wishlist）随 v1 上线**（Owner 2026-11-05 决定），占应用壳第四个 tab，见第 15 节。

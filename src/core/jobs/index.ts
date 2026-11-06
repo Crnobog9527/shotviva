@@ -27,7 +27,7 @@ export {
   type ProviderUsage,
 } from './provider'
 export { RATE_LIMIT, isLiveRunning, rateLimitVerdict } from './rate-limit'
-export { concurrencyLimit } from './concurrency'
+export { accountLimits } from './account-limits'
 export { listOwnJobs, type OwnJobs } from './own-jobs'
 export { ENV_PROVIDER_SOURCE, modelFromTag, providerTag } from './provider-tag'
 export { runGeneration, type GenerationDeps } from './run-generation'

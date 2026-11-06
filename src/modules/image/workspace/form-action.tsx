@@ -25,9 +25,12 @@ const rich = {
   b: (chunks: ReactNode) => <b className="font-medium text-foreground">{chunks}</b>,
 }
 
+const monoCost = (chunks: ReactNode) => <span className="font-mono text-caption font-medium opacity-[.72]">{chunks}</span>
+
 // The workspace's bottom bar: one notice line at most, then the one primary (DESIGN §4.3
-// steps 4–5). The free-credit notice shows only when this photo would use free credits.
-export function FormAction({ state, resolution, onGenerate }: { state: CtaState; resolution: Resolution; onGenerate(): void }) {
+// steps 4–5). The free-credit notice shows only when this photo would use free credits; a
+// batch (T28) says how many photos and that it is paid credits only.
+export function FormAction({ state, resolution, batch, onGenerate }: { state: CtaState; resolution: Resolution; batch: boolean; onGenerate(): void }) {
   const t = useTranslations('app.workspace')
   return (
     <ActionBar>
@@ -38,20 +41,29 @@ export function FormAction({ state, resolution, onGenerate }: { state: CtaState;
         </PaywallButton>
       ) : state.kind === 'generate' ? (
         <button type="button" onClick={onGenerate} className={buttonVariants({ variant: 'cta', size: 'cta' })}>
-          <span>{t.rich('generateCta', { cost: (chunks) => <span className="font-mono text-caption font-medium opacity-[.72]">{chunks}</span>, count: state.cost })}</span>
+          <span>
+            {state.count > 1
+              ? t.rich('generateBatchCta', { cost: monoCost, count: state.count, total: state.cost })
+              : t.rich('generateCta', { cost: monoCost, count: state.cost })}
+          </span>
         </button>
       ) : (
         <button type="button" disabled className={buttonVariants({ variant: 'glass', size: 'cta', className: 'w-full rounded-tile text-cta text-muted-foreground' })}>
-          {t(LABELS[state.kind])}
+          {t(batch ? BATCH_LABELS[state.kind] : LABELS[state.kind])}
         </button>
       )}
     </ActionBar>
   )
 }
 
+const BATCH_LABELS: typeof LABELS = { ...LABELS, 'need-photo': 'needPhotos', uploading: 'uploadingManyCta' }
+
 function Notice({ state, resolution }: { state: CtaState; resolution: Resolution }) {
   const t = useTranslations('app')
   if (state.kind === 'generate' && state.pool === 'free') return <ActionNotice>{t.rich('workspace.freeNotice', rich)}</ActionNotice>
+  if (state.kind === 'get-credits' && state.count > 1) {
+    return <ActionNotice>{t.rich('workspace.batchNeedsPaid', { ...rich, count: state.count, total: state.cost })}</ActionNotice>
+  }
   if (state.kind === 'get-credits') {
     return <ActionNotice>{t.rich('workspace.needsCredits', { ...rich, tier: tierName(resolution, t), count: state.cost })}</ActionNotice>
   }
