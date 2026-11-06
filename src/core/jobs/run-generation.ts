@@ -18,7 +18,7 @@ import {
 import { settleTracked } from './generation-analytics'
 import type { GenerationRequest } from './generation-request'
 import { findOwnJob } from './job-lookup'
-import type { JobSource } from './job-schema'
+import type { Job, JobSource } from './job-schema'
 import { toJobView, type JobView } from './job-view'
 import { accountLimits } from './account-limits'
 import { assertWithinRateLimit } from './rate-limit'
@@ -80,6 +80,12 @@ function jobInputs(req: GenerationRequest, { inputs, prompt }: Prepared, resolut
   }
 }
 
+// ARCHITECTURE §8 「原图小图」 (T32), only once the result is confirmed: a failed job has no
+// photo page. Edits (T30) settle elsewhere and get none; their source is the work they edited.
+async function keepInputPreview(deps: GenerationDeps, job: Job, image: Prepared['image']) {
+  if (image) await writeInputPreview(deps.store, { userId: job.userId, jobId: job.id, bytes: image.bytes })
+}
+
 // Synchronous generation (ARCHITECTURE §4) shared by the web route and, later, the partner
 // route. Returns the settled job; failures after reservation throw GenerationFailure with
 // the credits already refunded. The response never carries image bytes.
@@ -119,8 +125,6 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
   }
   const settle = () => settleGeneration(deps, job, call, outputKeyFor(req.userId, job.id))
   const settled = await settleTracked(job, template.category, settle, { track: deps.track, batchSize: req.batchSize ?? 1 })
-  // Only once the result is confirmed (a failed job has no photo page). Edits (T30) settle
-  // elsewhere and get no preview: their source is the work they were edited from.
-  if (image) await writeInputPreview(deps.store, { userId: req.userId, jobId: job.id, bytes: image.bytes })
+  await keepInputPreview(deps, settled, image)
   return toJobView(settled)
 }
