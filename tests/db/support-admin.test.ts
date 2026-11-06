@@ -1,6 +1,7 @@
 import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { loadTodoCounts } from '@/core/admin'
 import { decideRefund, listAdminTickets, loadAdminTicket, openTicketCount, replyTicket } from '@/core/support'
 
 import { connectAdmin, createUser } from './helpers'
@@ -128,6 +129,17 @@ describe('replies, the list and the open count', () => {
 
     const replied = await listAdminTickets(serviceSupabase(), { status: 'replied', type: 'account' })
     expect(replied.items.some((row) => row.id === ids[0])).toBe(true)
+  })
+
+  it('counts open tickets in the overview to-do strip, like the nav badge (admin_todo_counts, 0224)', async () => {
+    const user = await createUser(db)
+    const before = (await loadTodoCounts(serviceSupabase())).openTickets
+    const id = await ticket(user)
+    // Other files may open tickets in parallel, so only a lower bound is exact.
+    expect((await loadTodoCounts(serviceSupabase())).openTickets).toBeGreaterThanOrEqual(before + 1)
+    await replyTicket(serviceSupabase(), { ticketId: id, body: 'Done', close: true })
+    const [todo, nav] = await Promise.all([loadTodoCounts(serviceSupabase()), openTicketCount(serviceSupabase())])
+    expect(Math.abs(todo.openTickets - nav)).toBeLessThanOrEqual(2)
   })
 
   it('pages with the cursor without repeating rows', async () => {
