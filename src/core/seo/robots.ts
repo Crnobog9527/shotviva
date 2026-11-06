@@ -1,18 +1,23 @@
 import type { MetadataRoute } from 'next'
 
 import type { SiteConfig } from '../config'
+import { AI_CRAWLERS, PRELAUNCH_BLOCKED_CRAWLERS } from './crawlers'
+import { indexingOpenNow } from './indexing-now'
 import { siteOrigin } from './site-url'
 
-// AI crawlers are named and allowed explicitly; GEO is the main traffic source (建站规格 R11, G10).
-export const AI_CRAWLERS = [
-  'GPTBot',
-  'OAI-SearchBot',
-  'PerplexityBot',
-  'ClaudeBot',
-  'ChatGPT-User',
-] as const
+export { AI_CRAWLERS, PRELAUNCH_BLOCKED_CRAWLERS }
 
-export function robotsRules(site: SiteConfig): MetadataRoute.Robots {
+// Closed (ARCHITECTURE §12.0): everyone may fetch, so Google and Bing see the noindex; AI
+// crawlers are disallowed; no Sitemap or Host line. Open: 建站规格 R11 / G10.
+export function robotsRules(site: SiteConfig, open: boolean = indexingOpenNow()): MetadataRoute.Robots {
+  if (!open) {
+    return {
+      rules: [
+        { userAgent: '*', allow: '/' },
+        { userAgent: [...PRELAUNCH_BLOCKED_CRAWLERS], disallow: '/' },
+      ],
+    }
+  }
   return {
     rules: [
       { userAgent: '*', allow: '/' },

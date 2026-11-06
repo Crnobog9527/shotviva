@@ -2,6 +2,7 @@ import 'server-only'
 import { z } from 'zod'
 
 import { sentryBuildEnvSchema } from './build-env'
+import { indexingEnvSchema } from './seo/indexing-env'
 import { checkWaffoEnv, waffoEnvShape } from './waffo-env'
 
 // `KEY=` lines in .env files arrive as '' — treat them as unset rather than invalid.
@@ -47,6 +48,8 @@ const serverEnvSchema = z.object({
   ...waffoEnvShape,
 })
   .extend(sentryBuildEnvSchema.shape)
+  // SITE_INDEXING: the pre-launch indexing switch (ARCHITECTURE §12.0), default off.
+  .extend(indexingEnvSchema.shape)
   .superRefine(checkWaffoEnv)
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>

@@ -1,10 +1,14 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { breadcrumbListLd, organizationLd, serializeJsonLd, softwareApplicationLd } from './json-ld'
 import { llmsTxt } from './llms-txt'
 import { appShellMetadata, pageMetadata } from './metadata'
 import { AI_CRAWLERS, robotsRules } from './robots'
 import { testSite } from './test-site'
+
+// These cases describe the open site (SITE_INDEXING=on in production); the closed, pre-launch
+// state is covered in prelaunch.test.ts.
+vi.mock('./indexing-now', () => ({ indexingOpenNow: () => true }))
 
 const site = testSite()
 const page = { path: '/', title: 'T', description: 'D' }
