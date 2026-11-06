@@ -8,6 +8,7 @@ import { captureAlert, captureError } from '../../analytics/capture-error'
 import { logger } from '../../logger'
 import type { WaffoMode } from './config'
 import { fulfilWaffoOrder, type WaffoFulfilDeps } from './fulfil'
+import { SUBSCRIPTION_STATE_EVENTS, applySubscriptionEvent } from './subscription-sync'
 
 // POST /api/webhooks/waffo (ARCHITECTURE §6.3, AGENTS §6), same rules as Stripe: verify the
 // signature over the raw bytes first (bad → 400, nothing applied), then dedupe by event id, then
@@ -15,9 +16,11 @@ import { fulfilWaffoOrder, type WaffoFulfilDeps } from './fulfil'
 // Waffo signs `${t}.${rawBody}` with RSA-SHA256 (X-Waffo-Signature: t=<ms>,v1=<base64>). Its
 // retries replay the original t and the last one lands 31+ minutes later, so the window is 45
 // minutes as Waffo recommends; replays inside it are harmless because the grant is idempotent.
-// Only order.completed grants (one-time order paid; its eventId is the payment id and it fires
-// once per order). refund.succeeded is recorded and alerted, never clawed back automatically
-// (§6.2, same as Stripe's charge.refunded). Everything else is acknowledged and ignored.
+// Grants: order.completed (a one-time order paid) and subscription.payment_succeeded (a card
+// subscription's first payment and every renewal, T50); both carry the payment id as eventId.
+// The other subscription.* events only update the subscriptions mirror (subscription-sync.ts).
+// refund.succeeded is recorded and alerted, never clawed back automatically (§6.2, same as
+// Stripe's charge.refunded). Everything else (plan changes we never start) is acknowledged.
 
 export const WAFFO_SIGNATURE_WINDOW_MS = 45 * 60 * 1000
 const FUTURE_SKEW_MS = 60 * 1000
@@ -33,6 +36,7 @@ export type WaffoWebhookResult = { status: 200 | 400 | 500; body: Record<string,
 
 const envelopeSchema = z.object({
   eventType: z.string().min(1),
+  timestamp: z.string().optional(),
   eventId: z.string().regex(/^[A-Za-z0-9_.:-]{1,160}$/),
   storeId: z.string(),
   mode: z.enum(['test', 'prod']),
@@ -90,15 +94,24 @@ export async function handleWaffoWebhook(
     return { status: 400, body: { code: 'INVALID_SIGNATURE' } }
   }
   if (event.eventType === 'refund.succeeded') return refundAlert(event)
-  if (event.eventType !== 'order.completed') return { status: 200, body: { received: true } }
-
   try {
-    const outcome = await fulfilWaffoOrder(deps, event)
-    logger.info('waffo order settled', { event_id: event.eventId, outcome })
+    const outcome = await route(deps, event)
+    if (outcome === null) return { status: 200, body: { received: true } }
+    logger.info('waffo event applied', { event_id: event.eventId, type: event.eventType, outcome })
     return { status: 200, body: { received: true, outcome } }
   } catch (error) {
     logger.error('waffo webhook failed', { event_id: event.eventId, type: event.eventType, error })
     captureError(error, { alert: 'payment_webhook_failed', fields: { event_id: event.eventId, event_type: event.eventType } })
     return { status: 500, body: { code: 'WEBHOOK_FAILED' } }
   }
+}
+
+const STATE_EVENTS: readonly string[] = SUBSCRIPTION_STATE_EVENTS
+
+// null: an event this site does not act on.
+function route(deps: WaffoWebhookDeps, event: WaffoEvent): Promise<string> | null {
+  if (event.eventType === 'order.completed') return fulfilWaffoOrder(deps, event)
+  if (event.eventType === 'subscription.payment_succeeded') return fulfilWaffoOrder(deps, event, 'subscription')
+  if (STATE_EVENTS.includes(event.eventType)) return applySubscriptionEvent(deps.db, event)
+  return null
 }

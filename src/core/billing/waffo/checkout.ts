@@ -6,14 +6,16 @@ import { z } from 'zod'
 
 import { trackCheckoutStart } from '../../analytics/funnel'
 import type { ProductId, SiteProduct } from '../../config'
+import type { MembershipProductId } from '../../waffo-env'
 import { AppError } from '../../errors'
 import { localizePath } from '../../i18n/paths'
 import { CHECKOUT_RETURN, successPath, type CheckoutBody } from '../stripe/checkout'
 import type { WaffoApi, WaffoSessionRequest } from './client'
 
-// Waffo hosted checkout for one product, always a one-time payment (ARCHITECTURE §6.3): a
-// membership buys one period (+30 / +365 days, same credits), a pack is the pack. The buyer
-// picks card or Alipay on Waffo's page; one-time products never offer WeChat Pay there.
+// Waffo hosted checkout for one product (ARCHITECTURE §6.3, T50). A membership paid by card is a
+// Waffo subscription product that renews every month or year (cards only on the page); paid by
+// Alipay it buys one period (+30 / +365 days, same credits) as a one-time product; a pack is
+// always one-time. Waffo never offers WeChat Pay for these products.
 // The webhook trusts nothing from the browser: it reads user and product from the order
 // metadata set here with the API key (Waffo ignores metadata from public, slug-auth sessions).
 
@@ -21,9 +23,10 @@ import type { WaffoApi, WaffoSessionRequest } from './client'
 export const WAFFO_SESSION_TTL_SECONDS = 30 * 60
 
 export type WaffoCheckoutDeps = {
-  waffo: WaffoApi
+  waffo: Pick<WaffoApi, 'createCheckoutSession'>
   products: readonly SiteProduct[]
   productIds: Record<ProductId, string>
+  subscriptionProductIds: Record<MembershipProductId, string>
   // This deployment's origin (core/site-url). Waffo needs an absolute https URL.
   origin: string
   returnToHosts: readonly string[]
@@ -47,13 +50,19 @@ function checkoutUrl(data: unknown): string {
   return url.toString()
 }
 
+// A membership paid by card renews (T50); everything else is one payment.
+export function isRecurring(product: SiteProduct, method: CheckoutBody['method']): product is SiteProduct & { id: MembershipProductId } {
+  return product.tier !== 'pack' && method === 'card'
+}
+
 export function waffoSessionRequest(
-  deps: Pick<WaffoCheckoutDeps, 'productIds' | 'origin' | 'returnToHosts'>,
+  deps: Pick<WaffoCheckoutDeps, 'productIds' | 'subscriptionProductIds' | 'origin' | 'returnToHosts'>,
   input: { userId: string; product: SiteProduct; body: CheckoutBody; orderRef: string },
 ): WaffoSessionRequest {
   const { product, body } = input
+  const recurring = isRecurring(product, body.method)
   return {
-    productId: deps.productIds[product.id],
+    productId: recurring ? deps.subscriptionProductIds[product.id as MembershipProductId] : deps.productIds[product.id],
     currency: 'USD',
     // site.config.ts is the one source of prices (§6.2): the session carries it, so a Waffo
     // product priced differently in the dashboard cannot charge another amount. Tax is added
@@ -65,6 +74,8 @@ export function waffoSessionRequest(
     metadata: { user_id: input.userId, product_id: product.id, method: body.method, locale: body.locale },
     orderMerchantExternalId: input.orderRef,
     language: body.locale === 'zh' ? 'zh-Hans' : 'en',
+    // The recurring session takes cards only, so a subscription is never paid by a one-off method.
+    ...(recurring ? { includePaymentMethods: ['card'] } : {}),
   }
 }
 
@@ -85,7 +96,7 @@ export async function createWaffoCheckout(
     product_id: product.id,
     tier: product.tier,
     interval: product.interval,
-    form: 'one_time',
+    form: isRecurring(product, input.body.method) ? 'subscription' : 'one_time',
     channel: 'waffo',
     method: input.body.method,
   }, input.body.locale)

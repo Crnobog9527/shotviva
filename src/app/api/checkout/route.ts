@@ -39,6 +39,7 @@ function startStripe(userId: string, body: CheckoutBody) {
 }
 
 function startWaffo(userId: string, body: CheckoutBody) {
-  const deps = { ...shared, waffo: waffoClient(), productIds: waffoConfig().productIds }
+  const config = waffoConfig()
+  const deps = { ...shared, waffo: waffoClient(), productIds: config.productIds, subscriptionProductIds: config.subscriptionProductIds }
   return createWaffoCheckout(deps, { userId, body })
 }

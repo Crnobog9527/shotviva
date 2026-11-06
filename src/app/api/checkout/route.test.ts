@@ -13,7 +13,7 @@ vi.mock('@/core/billing/stripe', async (original) => ({
 vi.mock('@/core/billing/waffo', () => ({
   paymentChannel: mocks.channel,
   waffoClient: () => ({}),
-  waffoConfig: () => ({ productIds: {} }),
+  waffoConfig: () => ({ productIds: {}, subscriptionProductIds: {} }),
   createWaffoCheckout: mocks.createWaffoCheckout,
 }))
 

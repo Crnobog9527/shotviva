@@ -9,9 +9,11 @@ import { WAFFO_SESSION_TTL_SECONDS, createWaffoCheckout, type WaffoCheckoutDeps 
 import { signWaffoRequest, type WaffoSessionRequest } from './client'
 import { normalizePem } from './config'
 import { waffoKeys } from '../../../../tests/fakes/waffo'
+import { MEMBERSHIP_PRODUCT_IDS, type MembershipProductId } from '../../waffo-env'
 
 const USER = '00000000-0000-4000-8000-000000000001'
 const PRODUCT_IDS_MAP = Object.fromEntries(PRODUCT_IDS.map((id) => [id, `PROD_${id.replace('_', '')}`])) as Record<ProductId, string>
+const SUBSCRIPTION_IDS = Object.fromEntries(MEMBERSHIP_PRODUCT_IDS.map((id) => [id, `PROD_sub${id.replace('_', '')}`])) as Record<MembershipProductId, string>
 const SESSION = {
   sessionId: 'cs_550e8400-e29b-41d4-a716-446655440000',
   checkoutUrl: 'https://checkout.waffo.ai/shotviva/checkout/cs_550e8400-e29b-41d4-a716-446655440000',
@@ -25,6 +27,7 @@ function harness(session: unknown = SESSION) {
     waffo: { createCheckoutSession: create },
     products: TEST_PRODUCTS,
     productIds: PRODUCT_IDS_MAP,
+    subscriptionProductIds: SUBSCRIPTION_IDS,
     origin: 'https://shotviva-git-validation-preview.vercel.app',
     returnToHosts: ['graylum.ai'],
     trackStart,
@@ -36,13 +39,13 @@ function harness(session: unknown = SESSION) {
 const body = (productId: ProductId, method: 'card' | 'alipay' = 'card') => ({ product_id: productId, method, locale: 'en' as const })
 
 describe('createWaffoCheckout', () => {
-  it('a membership buys one period as a one-time payment priced from site.config', async () => {
+  it('a membership by card is the Waffo subscription product, cards only, priced from site.config (T50)', async () => {
     const { deps, create, trackStart } = harness()
     const result = await createWaffoCheckout(deps, { userId: USER, body: body('starter_monthly') })
 
     expect(result).toEqual({ url: SESSION.checkoutUrl })
     expect(create).toHaveBeenCalledWith({
-      productId: 'PROD_startermonthly',
+      productId: 'PROD_substartermonthly',
       currency: 'USD',
       priceSnapshot: { amount: '19.90', taxIncluded: false, taxCategory: 'saas' },
       successUrl: 'https://shotviva-git-validation-preview.vercel.app/checkout?channel=waffo&p=starter_monthly',
@@ -50,24 +53,30 @@ describe('createWaffoCheckout', () => {
       metadata: { user_id: USER, product_id: 'starter_monthly', method: 'card', locale: 'en' },
       orderMerchantExternalId: 'order-ref-1',
       language: 'en',
+      includePaymentMethods: ['card'],
     })
     expect(trackStart).toHaveBeenCalledWith(USER, {
       product_id: 'starter_monthly',
       tier: 'starter',
       interval: 'month',
-      form: 'one_time',
+      form: 'subscription',
       channel: 'waffo',
       method: 'card',
     }, 'en')
   })
 
-  it('never asks Waffo for a subscription, a trial or a payment-method list (no WeChat to hide)', async () => {
-    const { deps, create } = harness()
+  it('Alipay and packs stay one-time products: no trial, no payment-method list', async () => {
+    const { deps, create, trackStart } = harness()
     await createWaffoCheckout(deps, { userId: USER, body: { ...body('max_yearly', 'alipay'), locale: 'zh' } })
-    const request = create.mock.calls[0]?.[0] as unknown as Record<string, unknown>
-    expect(request).not.toHaveProperty('withTrial')
-    expect(request).not.toHaveProperty('includePaymentMethods')
-    expect(request).toMatchObject({ productId: 'PROD_maxyearly', priceSnapshot: { amount: '713.00' }, language: 'zh-Hans' })
+    await createWaffoCheckout(deps, { userId: USER, body: body('pack_l') })
+    const [alipay, pack] = create.mock.calls.map((call) => call[0] as unknown as Record<string, unknown>)
+    for (const request of [alipay, pack]) {
+      expect(request).not.toHaveProperty('withTrial')
+      expect(request).not.toHaveProperty('includePaymentMethods')
+    }
+    expect(alipay).toMatchObject({ productId: 'PROD_maxyearly', priceSnapshot: { amount: '713.00' }, language: 'zh-Hans' })
+    expect(pack).toMatchObject({ productId: 'PROD_packl' })
+    expect(trackStart.mock.calls.map((call) => (call[1] as { form: string }).form)).toEqual(['one_time', 'one_time'])
   })
 
   it('keeps an allowlisted Graylum return in the success URL, drops anything else', async () => {

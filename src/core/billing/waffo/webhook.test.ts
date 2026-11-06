@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TEST_PRODUCTS } from '../stripe/test-products'
 import { chargedMethod, paymentFacts, readWaffoOrder, toCents } from './payment-facts'
 import { WAFFO_SIGNATURE_WINDOW_MS, handleWaffoWebhook, verifyWaffoEvent, type WaffoWebhookDeps } from './webhook'
-import { WAFFO_STORE, orderCompleted, refundSucceeded, signWaffo, waffoKeys } from '../../../../tests/fakes/waffo'
+import { WAFFO_STORE, orderCompleted, refundSucceeded, signWaffo, subscriptionPaid, subscriptionState, waffoKeys } from '../../../../tests/fakes/waffo'
 
 // Signature and routing rules, and the arguments handed to settle_waffo_order; the grant itself runs against real Supabase in
 // tests/db/waffo-webhook.test.ts.
@@ -98,7 +98,8 @@ describe('handleWaffoWebhook', () => {
 
   it('records a refund without touching credits, and ignores other events', async () => {
     expect((await deliver(refundSucceeded('PAY_1'))).status).toBe(200)
-    expect((await deliver({ ...refundSucceeded('PAY_1'), eventType: 'subscription.activated' })).status).toBe(200)
+    // Plan changes are never started from this site: acknowledged, nothing applied.
+    expect((await deliver({ ...refundSucceeded('PAY_1'), eventType: 'subscription.plan_change_scheduled' })).status).toBe(200)
     expect(rpc).not.toHaveBeenCalled()
   })
 
@@ -111,6 +112,51 @@ describe('handleWaffoWebhook', () => {
   it('answers 500 when the database fails, so the retry can grant', async () => {
     rpc.mockResolvedValueOnce({ data: null, error: { message: 'connection reset' } })
     expect((await deliver(orderCompleted({ userId: USER, productId: 'pack_s' }))).status).toBe(500)
+  })
+})
+
+describe('handleWaffoWebhook, card subscriptions (T50)', () => {
+  const deliver = (event: unknown) => {
+    const raw = body(event)
+    return handleWaffoWebhook(deps, { body: raw, signature: signWaffo(raw, keys.privateKey, NOW) })
+  }
+
+  it('grants every subscription charge through settle_waffo_order, keyed by the payment id (T50)', async () => {
+    const event = subscriptionPaid({ userId: USER, productId: 'pro_monthly', orderId: 'ORD_sub1', periodNumber: 2 })
+    const result = await deliver(event)
+    expect(result).toMatchObject({ status: 200, body: { outcome: 'applied' } })
+    expect(rpc).toHaveBeenCalledWith('settle_waffo_order', expect.objectContaining({ p_user_id: USER, p_product_id: 'pro_monthly', p_payment_id: event.eventId, p_order_id: 'ORD_sub1', p_method: 'card' }))
+    expect(deps.trackBuy).toHaveBeenCalledWith(USER, expect.objectContaining({ form: 'subscription', channel: 'waffo', product_id: 'pro_monthly' }), 'en')
+  })
+
+  it('a failed charge (past_due) grants nothing and only updates the mirror', async () => {
+    rpc.mockResolvedValue({ data: true, error: null })
+    const event = subscriptionState({ userId: USER, productId: 'pro_monthly', orderId: 'ORD_sub1', eventType: 'subscription.past_due', orderStatus: 'past_due', timestamp: '2026-12-06T08:31:00.000Z' })
+    expect((await deliver(event)).status).toBe(200)
+    expect(rpc).toHaveBeenCalledTimes(1)
+    expect(rpc).toHaveBeenCalledWith('sync_waffo_subscription', {
+      p_user_id: USER,
+      p_order_id: 'ORD_sub1',
+      p_product_id: 'pro_monthly',
+      p_status: 'past_due',
+      p_current_period_end: null,
+      p_cancel_at_period_end: false,
+      p_event_at: '2026-12-06T08:31:00.000Z',
+    })
+  })
+
+  it.each([
+    ['subscription.activated', 'active', 'active', false],
+    ['subscription.renewed', 'active', 'active', false],
+    ['subscription.recovered', 'active', 'active', false],
+    ['subscription.canceling', 'canceling', 'active', true],
+    ['subscription.uncanceled', 'active', 'active', false],
+    ['subscription.canceled', 'canceled', 'canceled', false],
+  ])('%s (%s) mirrors as %s, cancel_at_period_end %s', async (eventType, orderStatus, status, cancel) => {
+    rpc.mockResolvedValue({ data: true, error: null })
+    const event = subscriptionState({ userId: USER, productId: 'max_yearly', orderId: 'ORD_sub2', eventType, orderStatus, currentPeriodEnd: '2027-11-06' })
+    expect((await deliver(event)).status).toBe(200)
+    expect(rpc).toHaveBeenCalledWith('sync_waffo_subscription', expect.objectContaining({ p_status: status, p_cancel_at_period_end: cancel, p_current_period_end: '2027-11-06T00:00:00.000Z' }))
   })
 })
 

@@ -19,9 +19,10 @@ export async function createPortalUrl(
   deps: { stripe: StripeApi; admin: SupabaseClient },
   input: { userId: string; returnUrl: string },
 ): Promise<string> {
-  const rows = await readMirrorRows(deps.admin, input.userId)
+  // Stripe's subscriptions only: a Waffo one is cancelled with our own button (T50).
+  const rows = (await readMirrorRows(deps.admin, input.userId)).filter((row) => row.provider === 'stripe' && row.stripeSubscriptionId)
   const newest = [...rows].sort((a, b) => b.currentPeriodEnd.getTime() - a.currentPeriodEnd.getTime())[0]
-  if (!newest) throw new AppError('NOT_FOUND', 'no subscription to manage')
+  if (!newest?.stripeSubscriptionId) throw new AppError('NOT_FOUND', 'no subscription to manage')
   const sub = await deps.stripe.subscriptions.retrieve(newest.stripeSubscriptionId)
   const customer = typeof sub.customer === 'string' ? sub.customer : sub.customer.id
   const session = await deps.stripe.billingPortal.sessions.create({ customer, return_url: input.returnUrl })

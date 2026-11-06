@@ -25,9 +25,9 @@ export type PricingContent = {
   business: BusinessBlock
   headings: { faq: string }
   faq: readonly FaqItem[]
-  // The FAQ when the paywall runs on Waffo (PAYMENT_CHANNEL=waffo, ARCHITECTURE §6.3): every
-  // purchase is one-time, so nothing about renewing or cancelling.
-  oneTime: { faq: readonly FaqItem[] }
+  // The FAQ when the paywall runs on Waffo (PAYMENT_CHANNEL=waffo, ARCHITECTURE §6.3): the same,
+  // except where a card plan is cancelled.
+  waffo: { faq: readonly FaqItem[] }
 }
 
 // The business inquiry subject is English on every language, so the Owner can filter on it
@@ -90,16 +90,14 @@ const faq: readonly FaqItem[] = [
   },
 ]
 
-// When the paywall runs on Waffo every purchase is one-time: no cancel question, and unused
-// credits simply stay (ARCHITECTURE §6.3).
+// On Waffo a card plan is cancelled from the account page with our own button (T50), not a
+// Stripe portal; everything else reads the same (ARCHITECTURE §6.3).
 const CANCEL_QUESTION = 'How do I cancel my plan?'
-const oneTimeFaq = faq
-  .filter((item) => item.question !== CANCEL_QUESTION)
-  .map((item) =>
-    item.question === 'Do credits expire?'
-      ? { ...item, answer: 'No. Paid credits never expire, and credits you do not use stay on your account.' }
-      : item,
-  )
+const waffoFaq = faq.map((item) =>
+  item.question === CANCEL_QUESTION
+    ? { ...item, answer: 'Open your account page and choose Cancel subscription. Your plan ends at the end of the period you paid for, and your credits stay on your account.' }
+    : item,
+)
 
 export const pricingPage: PricingContent = {
   path: '/pricing',
@@ -114,10 +112,10 @@ export const pricingPage: PricingContent = {
   business,
   headings: { faq: 'Pricing FAQ' },
   faq,
-  oneTime: { faq: oneTimeFaq },
+  waffo: { faq: waffoFaq },
 }
 
 // The /pricing FAQ for the live channel, in English (localized.ts has every language).
 export function pricingFaq(channel: PaymentChannel): readonly FaqItem[] {
-  return channel === 'waffo' ? pricingPage.oneTime.faq : pricingPage.faq
+  return channel === 'waffo' ? pricingPage.waffo.faq : pricingPage.faq
 }

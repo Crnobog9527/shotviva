@@ -25,7 +25,9 @@ export type CheckoutFacts = {
   amount: { minor: number; currency: string } | null
   card: { brand: string; last4: string } | null
   receiptUrl: string | null
-  // A card subscription's next renewal, ISO; null for one-time purchases.
+  // A card subscription (Stripe, or Waffo since T50): it renews unless cancelled.
+  recurring: boolean
+  // Its next renewal, ISO, once known; null for one-time purchases.
   renewsAt: string | null
 }
 
@@ -36,6 +38,7 @@ const paymentRow = z.object({
   currency: z.string(),
   method: z.enum(['card', 'alipay']),
   stripe_charge_id: z.string().nullable().optional(),
+  waffo_order_id: z.string().nullable().optional(),
 })
 type PaymentRow = z.infer<typeof paymentRow>
 
@@ -59,12 +62,13 @@ async function stripeFacts(deps: FactsDeps, userId: string, sessionId: string): 
   if (!productId) return null
   if (session.status !== 'complete') return { ...unsettled(productId), abandoned: true }
   const row = await readPayment(deps.db, (q) => q.eq('user_id', userId).eq('stripe_session_id', session.id))
-  if (!row) return { ...unsettled(productId), method: methodOfSession(session), amount: sessionAmount(session), renewsAt: renewsAt(session) }
-  return { ...settledFacts(productId, row), ...(await chargeDetails(deps.stripe, row)), renewsAt: renewsAt(session) }
+  const recurring = { recurring: session.mode === 'subscription', renewsAt: renewsAt(session) }
+  if (!row) return { ...unsettled(productId), method: methodOfSession(session), amount: sessionAmount(session), ...recurring }
+  return { ...settledFacts(productId, row), ...(await chargeDetails(deps.stripe, row)), ...recurring }
 }
 
 function unsettled(productId: ProductId): CheckoutFacts {
-  return { productId, settled: false, abandoned: false, method: null, amount: null, card: null, receiptUrl: null, renewsAt: null }
+  return { productId, settled: false, abandoned: false, method: null, amount: null, card: null, receiptUrl: null, recurring: false, renewsAt: null }
 }
 
 function settledFacts(productId: ProductId, row: PaymentRow): CheckoutFacts {
@@ -84,13 +88,30 @@ async function waffoFacts(db: SupabaseClient, userId: string, productId: Product
   const row = await readPayment(db, (q) =>
     q.eq('user_id', userId).eq('product_id', productId).eq('channel', 'waffo').gte('created_at', since).order('created_at', { ascending: false }).limit(1),
   )
-  return row ? settledFacts(productId, row) : unsettled(productId)
+  if (!row) return unsettled(productId)
+  // A membership paid by card on Waffo is a subscription (T50); its next renewal is the
+  // mirror's period end once subscription.activated is in (subscriptions_waffo_order_id_key).
+  const recurring = !productId.startsWith('pack_') && row.method === 'card'
+  const renews = recurring && row.waffo_order_id ? await mirrorPeriodEnd(db, userId, row.waffo_order_id) : null
+  return { ...settledFacts(productId, row), recurring, renewsAt: renews }
+}
+
+async function mirrorPeriodEnd(db: SupabaseClient, userId: string, orderId: string): Promise<string | null> {
+  const { data, error } = await db
+    .from('subscriptions')
+    .select('current_period_end, cancel_at_period_end, status')
+    .eq('waffo_order_id', orderId)
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (error) throw new AppError('INTERNAL', `checkout return: mirror read failed: ${error.message}`)
+  const row = z.object({ current_period_end: z.string(), cancel_at_period_end: z.boolean(), status: z.string() }).nullable().parse(data)
+  return row && row.status === 'active' && !row.cancel_at_period_end ? new Date(row.current_period_end).toISOString() : null
 }
 
 type PaymentsQuery = ReturnType<ReturnType<SupabaseClient['from']>['select']>
 
 async function readPayment(db: SupabaseClient, filter: (query: PaymentsQuery) => PaymentsQuery): Promise<PaymentRow | null> {
-  const { data, error } = await filter(db.from('payments').select('amount_total, currency, method, stripe_charge_id')).maybeSingle()
+  const { data, error } = await filter(db.from('payments').select('amount_total, currency, method, stripe_charge_id, waffo_order_id')).maybeSingle()
   if (error) throw new AppError('INTERNAL', `checkout return: payments read failed: ${error.message}`)
   return data === null ? null : paymentRow.parse(data)
 }

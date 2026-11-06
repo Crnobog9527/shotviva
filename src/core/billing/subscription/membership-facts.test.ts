@@ -10,6 +10,7 @@ import type { SubscriptionSummary } from './summary'
 const end = new Date('2026-12-06T00:00:00Z')
 const sub = (tier: 'starter' | 'pro' | 'max', interval: 'month' | 'year'): SubscriptionSummary => ({
   kind: 'subscription',
+  provider: 'stripe',
   tier,
   interval,
   state: 'active',

@@ -17,6 +17,7 @@ const settled = (overrides: Partial<CheckoutFacts> = {}): CheckoutFacts => ({
   amount: { minor: 4990, currency: 'usd' },
   card: { brand: 'visa', last4: '4242' },
   receiptUrl: 'https://pay.stripe.com/receipts/x',
+  recurring: true,
   renewsAt: '2026-12-06T00:00:00.000Z',
   ...overrides,
 })
@@ -43,15 +44,20 @@ describe('checkout return view', () => {
   ] as const)('%s: +%i credits, %s', (id, credits, fine) => {
     const p = product(id)
     const pack = p.tier === 'pack'
-    const view = returnView(settled({ productId: id, renewsAt: pack ? null : '2027-11-06T00:00:00.000Z' }), p, balance)
+    const view = returnView(settled({ productId: id, recurring: !pack, renewsAt: pack ? null : '2027-11-06T00:00:00.000Z' }), p, balance)
     expect(view).toMatchObject({ state: 'success', credits, fine, kind: pack ? 'pack' : 'plan' })
     expect(view.state === 'success' && view.renews === null).toBe(pack)
   })
 
-  it('a plan paid once (Alipay, Waffo) does not renew and says so', () => {
-    const view = returnView(settled({ method: 'alipay', card: null, renewsAt: null }), product('max_yearly'), balance)
+  it('a plan paid once (Alipay) does not renew and says so', () => {
+    const view = returnView(settled({ method: 'alipay', card: null, recurring: false, renewsAt: null }), product('max_yearly'), balance)
     expect(view).toMatchObject({ state: 'success', renews: null, fine: 'finePeriod', interval: 'year' })
     expect(fineKey({ kind: 'plan', tier: 'pro', interval: 'month', credits: 135 }, false)).toBe('finePeriod')
+  })
+
+  it('a Waffo card subscription renews even before its renewal date is mirrored (T50)', () => {
+    const view = returnView(settled({ receiptUrl: null, card: null, recurring: true, renewsAt: null }), product('pro_monthly'), balance)
+    expect(view).toMatchObject({ state: 'success', renews: null, fine: 'fineMonthly' })
   })
 
   it('pending until the payments row exists, with the session amount or the list price', () => {

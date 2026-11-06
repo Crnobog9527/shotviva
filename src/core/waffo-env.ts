@@ -1,8 +1,8 @@
 import { z } from 'zod'
 
-import { PRODUCT_IDS } from './config/define-site'
+import { PRODUCT_IDS, type ProductId } from './config/define-site'
 
-// Waffo, the one-time fallback channel (T13, ARCHITECTURE §6.3). Merged into core/env.ts; kept
+// Waffo, the fallback channel (T13; card memberships auto-renew since T50, ARCHITECTURE §6.3). Merged into core/env.ts; kept
 // apart so that file stays a list of keys. Every key is optional at parse time so `next build`
 // runs without secrets; checkWaffoEnv makes them required once PAYMENT_CHANNEL is 'waffo', and
 // refuses a partial product map at any time ("九个 id 都要有，缺一个启动时报错").
@@ -23,6 +23,19 @@ function parseJson(value: unknown): unknown {
 // An enum-keyed record is exhaustive in zod 4: all nine ids, nothing else.
 export const waffoProductIdsSchema = z.record(z.enum(PRODUCT_IDS), z.string().regex(/^PROD_[A-Za-z0-9]+$/))
 
+// The six memberships as Waffo subscription products (T50): a card membership on Waffo is a
+// recurring order of one of these. Same rule: all six, nothing else, or start-up fails.
+export const MEMBERSHIP_PRODUCT_IDS = [
+  'starter_monthly',
+  'starter_yearly',
+  'pro_monthly',
+  'pro_yearly',
+  'max_monthly',
+  'max_yearly',
+] as const satisfies readonly ProductId[]
+export type MembershipProductId = (typeof MEMBERSHIP_PRODUCT_IDS)[number]
+export const waffoSubscriptionIdsSchema = z.record(z.enum(MEMBERSHIP_PRODUCT_IDS), z.string().regex(/^PROD_[A-Za-z0-9]+$/))
+
 export const waffoEnvShape = {
   // Which channel the paywall uses (§6.3). Default Stripe; switching is a manual env change and
   // a redeploy, never an automatic failover.
@@ -38,6 +51,9 @@ export const waffoEnvShape = {
   WAFFO_WEBHOOK_PUBLIC_KEY: optionalSecret,
   // {"starter_monthly":"PROD_…", …}: the nine site products to Waffo one-time products.
   WAFFO_PRODUCT_IDS: z.preprocess(blankAsUnset, z.preprocess(parseJson, waffoProductIdsSchema).optional()),
+  // {"starter_monthly":"PROD_…", …}: the six memberships to Waffo subscription products, for card
+  // checkouts (T50). Alipay and the packs keep using WAFFO_PRODUCT_IDS.
+  WAFFO_SUBSCRIPTION_PRODUCT_IDS: z.preprocess(blankAsUnset, z.preprocess(parseJson, waffoSubscriptionIdsSchema).optional()),
 }
 
 type WaffoEnv = {
@@ -49,6 +65,7 @@ type WaffoEnv = {
   WAFFO_PRIVATE_KEY?: string
   WAFFO_WEBHOOK_PUBLIC_KEY?: string
   WAFFO_PRODUCT_IDS?: unknown
+  WAFFO_SUBSCRIPTION_PRODUCT_IDS?: unknown
 }
 
 export const WAFFO_REQUIRED_KEYS = [
@@ -57,6 +74,7 @@ export const WAFFO_REQUIRED_KEYS = [
   'WAFFO_PRIVATE_KEY',
   'WAFFO_WEBHOOK_PUBLIC_KEY',
   'WAFFO_PRODUCT_IDS',
+  'WAFFO_SUBSCRIPTION_PRODUCT_IDS',
 ] as const
 
 export function checkWaffoEnv(env: WaffoEnv, ctx: z.RefinementCtx): void {
