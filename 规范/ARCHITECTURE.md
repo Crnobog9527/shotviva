@@ -314,8 +314,10 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 
 | 用户选的方式 | Checkout Session 怎么建 | 卖家 |
 |---|---|---|
-| 卡 / Apple Pay / Google Pay | `mode: 'subscription'`，`managed_payments: { enabled: true }`，不传 `payment_method_types`（MP 不允许） | Stripe（Link）当商户记录方，结账时另加税 |
-| 支付宝 | `mode: 'payment'`，`payment_method_types: ['alipay']` | Shotviva |
+| 卡 / Apple Pay / Google Pay | `mode: 'subscription'`，`managed_payments: { enabled: true }`，不传 `allowed_payment_method_types`（MP 自己决定付款方式） | Stripe（Link）当商户记录方，结账时另加税 |
+| 支付宝 | `mode: 'payment'`，`allowed_payment_method_types: ['alipay']`（在 Dashboard 已开启的动态付款方式里过滤；Dashboard 没开支付宝时拒绝跳转） | Shotviva |
+
+> Stripe API 2026-09-30（stripe@23）起，Checkout Session 不再接受 `payment_method_types`，传了会 400；按方式限定一律用 `allowed_payment_method_types`。审核下来之前不走 MP 的卡路由传 `['card']`。（T9 修复，2026-11-06）
 
 - 服务端只认用户选的方式，不按 IP 或浏览器语言强制。Managed Payments 的结账页不允许买家国家为中国，所以大陆用户自然选钱包。
 - MP 商品必须设税码 `txcd_10105001`（AI 服务，个人用）。MP 价格不含税，税在结账时另加。
