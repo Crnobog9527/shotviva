@@ -6,6 +6,7 @@ export function testSite(overrides: Partial<SiteConfig> = {}): SiteConfig {
     ...defineSite({
       brand: {
         name: 'Example',
+        copyrightName: 'Example AI',
         domain: 'example.com',
         tagline: 'Example tagline',
         legalName: 'Example LLC',

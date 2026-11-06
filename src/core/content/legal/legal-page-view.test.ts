@@ -48,12 +48,15 @@ describe('LegalPageView', () => {
 })
 
 describe('SiteFooter', () => {
-  it('shows the official-site statement, the operating entity and the legal links', () => {
+  it('shows the official-site statement, contact, copyright and the legal links, not the operating entity', () => {
     const { brand } = testSite()
     const links = [{ href: '/terms', label: 'Terms' }] as const
     const html = renderToStaticMarkup(createElement(SiteFooter, { brand, links }))
     expect(html).toContain('example.com is the only official Example site.')
-    expect(html).toContain('Example is operated by Example LLC, 1 Main St, Springfield, IL 62701, United States.')
+    expect(html).toContain('© 2026 Example AI')
+    expect(html).not.toContain('operated by')
+    expect(html).not.toContain('Example LLC')
+    expect(html).not.toContain('1 Main St')
     expect(html).toContain('href="mailto:hi@example.com"')
     expect(html).toContain('href="/terms"')
   })

@@ -1,11 +1,12 @@
 import Link from 'next/link'
 
-import { formatAddress, type SiteBrand } from '../../config'
+import type { SiteBrand } from '../../config'
 
 export type FooterLink = { href: `/${string}`; label: string }
 
-// Every marketing page carries the official-site statement and who runs the site, with
-// contact details (建站规格 G8, LAUNCH §8). All facts come from the site config.
+// Every marketing page carries the official-site statement, contact email, copyright and the
+// legal links. The operating entity and address live on the legal pages and in the Organization
+// JSON-LD, not here (DESIGN §6.9 item 5, 建站规格 G8; Owner 2026-11-06). Facts come from the config.
 export function SiteFooter({ brand, links }: { brand: SiteBrand; links: readonly FooterLink[] }) {
   return (
     <footer className="mt-16 border-t border-border">
@@ -28,16 +29,13 @@ export function SiteFooter({ brand, links }: { brand: SiteBrand; links: readonly
           {brand.name} — {brand.tagline}. {brand.domain} is the only official {brand.name} site.
         </p>
         <p>
-          {brand.name} is operated by {brand.legalName}, {formatAddress(brand.address)}.
-        </p>
-        <p>
           Launched {brand.launchYear}. Serving {brand.countries.join(', ')}. Contact:{' '}
           <a href={`mailto:${brand.contactEmail}`} className="underline underline-offset-4 hover:text-foreground">
             {brand.contactEmail}
           </a>
         </p>
         <p>
-          © {brand.launchYear} {brand.legalName}
+          © {brand.launchYear} {brand.copyrightName}
         </p>
       </div>
     </footer>

@@ -3,6 +3,7 @@ import { defineSite } from '@/core/config'
 export const site = defineSite({
   brand: {
     name: 'Shotviva',
+    copyrightName: 'Shotviva AI',
     domain: 'shotviva.com',
     tagline: 'AI photo studio',
     // Owner 2026-11-05 (T19). Footer and legal pages read these, never a literal.
