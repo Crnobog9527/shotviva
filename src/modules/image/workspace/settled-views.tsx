@@ -26,7 +26,7 @@ export function SuccessView({ job, shareText, onAgain }: { job: TrackedJob; shar
       {job.previewUrl ? (
         <div className="mt-6">
           <h3 className="mb-3 text-headline leading-[1.2] font-semibold tracking-[-0.01em]">{t('workspace.beforeAfter')}</h3>
-          <CompareSlider before={job.previewUrl} after={fileUrl} afterAlt={t('template.resultAlt', { name: job.templateName })} />
+          <CompareSlider before={job.previewUrl} after={fileUrl} afterGround="white" afterAlt={t('template.resultAlt', { name: job.templateName })} />
         </div>
       ) : null}
       <div className="mt-4 flex gap-2">
