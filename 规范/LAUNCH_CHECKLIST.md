@@ -14,7 +14,7 @@
 - [ ] Stripe 和 Waffo 的生产回调地址、签名密钥都已登记到环境变量
 - [ ] OpenAI：组织验证完成，有 GPT-Image 系列模型权限（`OPENAI_IMAGE_MODEL` 指定的那个，默认由 Owner 定），设好每月消费上限
 - [ ] Resend：shotviva.com 的 SPF、DKIM、DMARC 都验证通过，已配成 Supabase Auth 的 SMTP
-- [ ] Cloudflare R2：生产桶和预览桶分开，都是私有桶；`inputs/`、`uploads-admin/` 前缀设好 7 天过期规则；CORS 只放行站点域名的 PUT 和 Content-Type
+- [ ] Cloudflare R2：生产桶和预览桶分开，都是私有桶；`inputs/`、`uploads-admin/` 前缀设好 7 天过期规则；CORS 只放行站点域名的 PUT、GET 和 Content-Type（生产桶的来源是 `https://shotviva.com`）
 - [ ] 模板封面公开桶 `shotviva-assets` 已建，绑定 `assets.shotviva.com`，公开桶里只有 `covers/`；10 个模板的封面都已由 Owner 在后台上传
 - [ ] 伙伴密钥：预览和生产各一把，登记到环境变量；预览密钥在生产调用返回 401
 - [ ] hCaptcha：站点密钥建好，已在 Supabase Auth 里启用

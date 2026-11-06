@@ -136,7 +136,7 @@ Shotviva 的写法：
 
 - 所有接口默认需要登录。公开接口要在路由文件顶部注释说明为什么公开。**唯一例外**：`/api/partner/*` 用伙伴密钥 + `X-Shotviva-Account` 鉴权，不走用户会话（ARCHITECTURE.md 第 14.3 节）；预览密钥在生产无效。
 - **任何 API 路由不得接收或返回图片字节**（Vercel 函数 4.5MB 上限）。上传走浏览器压缩 + 预签名直传 R2，出图结果写 R2 后只返回 key 或签名地址（ARCHITECTURE.md 第 8 节）。
-- 不开全站跨域：删除底座 `vercel.json` 里 `/api/*` 的 `Access-Control-Allow-Origin: *`。R2 桶的 CORS 只放行站点域名的 PUT。
+- 不开全站跨域：删除底座 `vercel.json` 里 `/api/*` 的 `Access-Control-Allow-Origin: *`。R2 桶的 CORS 只放行站点域名的 PUT（直传）和 GET（付费作品经 302 跳到签名地址后，分享按钮要在浏览器里读图；T31，2026-11-06）。
 - 不准出现底座里那种调试接口和公开出图接口（`/api/debug/*`、`/api/v1`）。
 - 生成接口用 Vercel Firewall 按 IP 限频，再在代码里按账号限频；伙伴接口复用按账号限频。
 - 支付回调先验签，再按事件 id 去重；验签失败返回 400，临时故障返回 500 让对方重试。
