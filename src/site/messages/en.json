@@ -257,6 +257,7 @@
       "today": "Today",
       "yesterday": "Yesterday",
       "fallbackName": "Photo",
+      "editedName": "Edited photo",
       "badgeAria": "{count} in progress",
       "pill": "{count, plural, one {Generating…} other {Generating #…}}",
       "doneMeta": "{when} · {size} · {tier}",
@@ -273,6 +274,7 @@
       "download": "Download",
       "longPress": "Long-press to save",
       "makeAnotherWith": "Make another with {name}",
+      "editedFrom": "Edited from this photo",
       "shareText": "Made with {brand} {url}"
     },
     "wishlist": {
