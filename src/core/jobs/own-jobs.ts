@@ -46,3 +46,25 @@ export async function listRunningJobIds(client: SupabaseClient, userId: string, 
   if (error) throw new AppError('INTERNAL', `listRunningJobIds failed: ${error.message}`)
   return data.map((row) => row.id as string)
 }
+
+export type MonthWorks = { ids: string[]; count: number }
+
+// The account page's film strip (comps-v3-b/account.html): this calendar month's finished,
+// not deleted works, newest first, the first `limit` ids plus how many there are in all. One
+// query on generation_jobs_user_id_created_at_idx (user_id, created_at desc), with the count
+// taken in the same round trip.
+export async function listMonthWorks(client: SupabaseClient, userId: string, now: Date, limit: number): Promise<MonthWorks> {
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString()
+  const { data, error, count } = await client
+    .from('generation_jobs')
+    .select('id', { count: 'exact' })
+    .eq('user_id', userId)
+    .eq('status', 'succeeded')
+    .is('deleted_at', null)
+    .gte('created_at', monthStart)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw new AppError('INTERNAL', `listMonthWorks failed: ${error.message}`)
+  const ids = data.map((row) => row.id as string)
+  return { ids, count: count ?? ids.length }
+}

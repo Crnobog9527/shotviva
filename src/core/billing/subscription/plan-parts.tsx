@@ -6,36 +6,52 @@ import { cn } from '../../ui/cn'
 import { PaywallButton } from '../paywall'
 import type { PaywallOpenOptions } from '../paywall/use-paywall-state'
 
-// Building blocks of the account Plan card (comps-v3-b/account.html, ?sub=…): the tier name in
-// its paywall ink, one status on the right, a sentence saying what happens next, and the one
-// thing to do. Display only; the states are picked in plan-card.tsx.
+// Building blocks of the account membership pass (comps-v3-b/account.html, ?sub=…): a card in
+// the tier's paywall material with the word mark debossed, "Member" and the status along the
+// top, the tier name large in the middle with one sentence on what happens next, and "Since"
+// plus the one thing to do along the bottom. Display only; the states are picked in
+// plan-card.tsx. Materials live in globals.css (.member-pass).
 
-// The paywall's tier inks, quietly: only the name carries the material.
-const TIER_INK: Record<MembershipTier, string> = {
-  starter: 'text-foreground',
-  pro: 'text-[var(--tier-sapphire-ink)]',
-  max: 'text-[var(--tier-max-gold)]',
-}
+type PassProps = { state: string; tier: MembershipTier | null; brand: string; head: ReactNode; foot: ReactNode; children: ReactNode }
 
-export function PlanShell({ state, children }: { state: string; children: ReactNode }) {
+export function Pass({ state, tier, brand, head, foot, children }: PassProps) {
   return (
-    <div data-plan={state} className="hairline-lit grid gap-3 rounded-panel bg-card p-4 md:px-6 md:py-5">
-      {children}
+    <div
+      data-plan={state}
+      data-tier={tier ?? 'none'}
+      className="member-pass grid min-h-[196px] grid-rows-[auto_1fr_auto] gap-3.5 px-[18px] pt-[18px] pb-4 md:min-h-[220px] md:px-6 md:pt-[22px] md:pb-5"
+    >
+      <span aria-hidden="true" className="pass-mark">
+        {brand}.
+      </span>
+      <div className="flex items-center justify-between gap-3 font-mono text-caption leading-none tracking-[0.06em] text-muted-foreground uppercase">{head}</div>
+      <div className="self-center">{children}</div>
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2.5">{foot}</div>
     </div>
   )
 }
 
-export function PlanHead({ name, tier, aside }: { name: string; tier: MembershipTier | null; aside: ReactNode }) {
-  return (
-    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-2 md:items-center">
-      <span className={cn('font-display text-h1 leading-none tracking-[-0.02em]', tier ? TIER_INK[tier] : 'text-foreground')}>{name}</span>
-      {aside}
-    </div>
-  )
+// The status on the right of the top line, in plain case (the line itself is mono capitals).
+export function Status({ children }: { children: ReactNode }) {
+  return <span className="text-right font-sans tracking-normal normal-case">{children}</span>
+}
+
+export function PassName({ children }: { children: ReactNode }) {
+  return <p className="pass-name font-display text-[44px] leading-none tracking-[-0.03em] md:text-[52px]">{children}</p>
 }
 
 export function Muted({ children }: { children: ReactNode }) {
-  return <p className="text-caption text-muted-foreground">{children}</p>
+  return <p className="mt-1.5 text-caption text-muted-foreground">{children}</p>
+}
+
+// "Since / Nov 2026": a small capital label over a plain value, bottom left of the pass.
+export function Since({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <span className="font-mono text-caption leading-[1.4] tracking-[0.06em] text-muted-foreground uppercase">
+      {label}
+      <b className="block font-sans text-label leading-[1.3] font-normal tracking-normal text-bone-dim normal-case">{children}</b>
+    </span>
+  )
 }
 
 // "Payment failed" / "Ended 6 Nov 2026": a small plate with a dot, red when money went wrong.
@@ -44,7 +60,7 @@ export function Flag({ bad = false, children }: { bad?: boolean; children: React
     <span
       data-flag={bad ? 'bad' : 'info'}
       className={cn(
-        'inline-flex h-[26px] items-center gap-1.5 rounded-tag px-2.5 text-caption leading-none font-medium before:size-1.5 before:rounded-full before:bg-current',
+        'inline-flex h-[26px] items-center gap-1.5 rounded-tag px-2.5 font-sans text-caption leading-none font-medium tracking-normal normal-case before:size-1.5 before:rounded-full before:bg-current',
         bad ? 'bg-[color-mix(in_srgb,var(--destructive)_14%,transparent)] text-destructive' : 'bg-wash-strong text-bone-dim',
       )}
     >
@@ -54,17 +70,18 @@ export function Flag({ bad = false, children }: { bad?: boolean; children: React
 }
 
 export function Why({ children }: { children: ReactNode }) {
-  return <p className="max-w-[52ch] text-label leading-normal text-pretty text-bone-dim">{children}</p>
+  return <p className="mt-2 max-w-[52ch] text-label leading-normal text-pretty text-bone-dim">{children}</p>
 }
 
 export function Acts({ children }: { children: ReactNode }) {
   return <div className="flex flex-wrap items-center gap-2">{children}</div>
 }
 
-// Bold and mono chunks of the plan sentences (app.account.plan rich messages).
+// Bold, mono and price chunks of the plan sentences (app.account.plan rich messages).
 export const richTags = {
   b: (chunks: ReactNode) => <b className="font-medium text-foreground">{chunks}</b>,
   mono: (chunks: ReactNode) => <span className="font-mono tracking-normal">{chunks}</span>,
+  cost: (chunks: ReactNode) => <span className="font-normal opacity-80">{chunks}</span>,
 }
 
 const pill = 'press inline-flex items-center justify-center gap-1.5 rounded-full font-semibold tracking-[-0.01em] whitespace-nowrap'

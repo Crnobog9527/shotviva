@@ -58,3 +58,11 @@ export async function readSubscriptionSummary(
   ])
   return summarizeSubscription({ rows, paidUntil, tier, products, now: new Date() })
 }
+
+// "Since" on the membership pass: when the account was made (profiles primary key).
+export async function readMemberSince(admin: SupabaseClient, userId: string): Promise<Date | null> {
+  const { data, error } = await admin.from('profiles').select('created_at').eq('id', userId).maybeSingle()
+  if (error) throw new AppError('INTERNAL', `readMemberSince failed: ${error.message}`)
+  const value = z.object({ created_at: z.string() }).nullable().parse(data)?.created_at
+  return value ? new Date(value) : null
+}
