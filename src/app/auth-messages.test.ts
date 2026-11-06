@@ -10,8 +10,10 @@ import { freeStandardImages } from '@/site/content'
 // The sign-in pages' copy (design/comps-v3-b/auth.html), checked in both languages
 // (ARCHITECTURE §17: the four pages ship in English and Chinese together).
 type T = (key: string, values?: Record<string, unknown>) => string
-const tr = (locale: 'en' | 'zh', messages: object) => createTranslator({ locale, messages, namespace: 'auth' }) as unknown as T
-const t = { en: tr('en', en), zh: tr('zh', zh) }
+const t = {
+  en: createTranslator({ locale: 'en', messages: en, namespace: 'auth' }) as unknown as T,
+  zh: createTranslator({ locale: 'zh', messages: zh, namespace: 'auth' }) as unknown as T,
+}
 
 const FIELD_ERRORS: FieldError[] = ['loginEmail', 'email', 'passwordMissing', 'passwordShort', 'passwordWeak', 'mismatch']
 
