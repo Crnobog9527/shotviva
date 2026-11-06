@@ -66,13 +66,23 @@ export async function setTemplateActive(
   id: string,
   active: boolean,
 ): Promise<void> {
+  // An unpublished template cannot stay featured (T53, templates_featured_live_check).
   const { data, error } = await client
     .from('templates')
-    .update({ is_active: active })
+    .update(active ? { is_active: true } : { is_active: false, featured_rank: null })
     .eq('id', id)
     .select('id')
   if (error) throw new AppError('INTERNAL', `setTemplateActive failed: ${error.message}`)
   if (data.length === 0) throw new AppError('NOT_FOUND', `template ${id} not found`)
+}
+
+// The home featured list in display order (T53); the SQL function checks the rules.
+export async function setFeaturedTemplates(client: SupabaseClient, ids: string[]): Promise<void> {
+  const { error } = await client.rpc('admin_set_featured_templates', { p_ids: ids })
+  if (error) {
+    if (error.code === '22023') throw new AppError('INVALID_INPUT', error.message)
+    throw new AppError('INTERNAL', `setFeaturedTemplates failed: ${error.message}`)
+  }
 }
 
 export async function reorderTemplates(client: SupabaseClient, ids: string[]): Promise<void> {

@@ -6,15 +6,15 @@ import { HomeHero } from './blocks/home-hero'
 import { FreeOfferSection, HomeFacts, StepsSection } from './blocks/home-sections'
 import { RelatedLinks } from './blocks/related-links'
 import { ShootSection } from './blocks/shoot-section'
-import { TemplateGrid, type TemplateLookup } from './blocks/template-grid'
+import { TemplateGrid, type FeaturedSections } from './blocks/template-grid'
 import type { HomePage } from './page-content'
 
 type Props = {
   page: HomePage
   brand: string
   isLinkEnabled: (href: string) => boolean
-  // Each featured template's pair and whether it is live (pickable).
-  templates: TemplateLookup
+  // The admin's featured templates by category, with their covers (T53).
+  templates: FeaturedSections
   // The first-screen generator (modules/image, client), slotted under the hero pair.
   generator: ReactNode
 }
@@ -28,7 +28,7 @@ export function HomePageView({ page, brand, isLinkEnabled, templates, generator 
       <HomeHero page={page} generator={generator} />
       <ShootSection shoot={page.shoot} />
       <StepsSection steps={page.steps} />
-      <TemplateGrid grid={page.templateGrid} media={templates} isLinkEnabled={isLinkEnabled} />
+      <TemplateGrid grid={page.templateGrid} sections={templates} isLinkEnabled={isLinkEnabled} />
       <HomeFacts facts={page.facts} heading={page.headings.facts} intro={page.factsIntro} />
       <FreeOfferSection offer={page.freeOffer} brand={brand} />
       <CostBillsSection bills={page.costBills} />

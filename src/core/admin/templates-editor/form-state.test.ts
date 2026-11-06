@@ -33,6 +33,7 @@ const template: AdminTemplate = {
   isActive: true,
   visibleIn: ['web', 'partner'],
   translations: {},
+  featuredRank: null,
   createdAt: '2026-11-05T00:00:00Z',
   updatedAt: '2026-11-05T00:00:00Z',
   prompt: { body: 'FAKE BODY', version: 2, modelParams: { quality: 'high' } },

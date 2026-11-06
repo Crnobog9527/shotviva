@@ -24,6 +24,8 @@ export type Template = {
   visibleIn: TemplateSurface[]
   // Other languages' display text; read through localizeTemplate (ARCHITECTURE §5).
   translations: TemplateTranslations
+  // Home featured position (T53): 1..12, small first; null when not featured.
+  featuredRank: number | null
   createdAt: string
   updatedAt: string
 }
@@ -47,12 +49,13 @@ export type TemplateRow = {
   is_active: boolean
   visible_in: TemplateSurface[]
   translations: TemplateTranslations | null
+  featured_rank: number | null
   created_at: string
   updated_at: string
 }
 
 export const TEMPLATE_COLUMNS =
-  'id, module, name, description, category, cover_before_url, cover_after_url, cover_media_type, cover_video_url, cover_poster_url, fields, quality, credits_cost, sort_order, is_active, visible_in, translations, created_at, updated_at'
+  'id, module, name, description, category, cover_before_url, cover_after_url, cover_media_type, cover_video_url, cover_poster_url, fields, quality, credits_cost, sort_order, is_active, visible_in, translations, featured_rank, created_at, updated_at'
 
 export function toTemplate(row: TemplateRow): Template {
   return {
@@ -73,6 +76,7 @@ export function toTemplate(row: TemplateRow): Template {
     isActive: row.is_active,
     visibleIn: row.visible_in,
     translations: row.translations ?? {},
+    featuredRank: row.featured_rank ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }

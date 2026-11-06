@@ -69,13 +69,12 @@ export type PageBasics = {
 }
 
 // What an SEO landing page adds to the basics (design/comps-v3-b/landing.html, T44): the
-// generator under the hero opens on `generatorTemplate`; the template section shows only the
-// page's categories; the "full shoot" demo is optional; `factsNote` says where the fact
-// numbers come from (G4: verifiable).
+// template section shows the featured templates of the page's categories (`categories`: the
+// stored category values, T53), and the generator opens on the first of them; the "full shoot"
+// demo is optional; `factsNote` says where the fact numbers come from (G4: verifiable).
 export type LandingParts = {
-  generatorTemplate: string
   factsNote: string
-  templates?: { heading: string; intro: string; categories: readonly [TemplateCategory, ...TemplateCategory[]] }
+  templates?: { heading: string; intro: string; categoryKeys: readonly [string, ...string[]] }
   shoot?: ShootDemo
 }
 
@@ -86,13 +85,16 @@ export type ContentPage = PageBasics & { faq: Between3And5<FaqItem>; costBills: 
 type Nine<T> = readonly [T, T, T, T, T, T, T, T, T]
 export type HomeFaq = Nine<FaqItem>
 
-// `id` is the template's id in the templates table (the comps' slugs, e.g. 'white-background'): a card
-// whose template is live picks it into the home generator; the others still show its name and
-// use (建站规格 R5) with the bundled illustrative pair.
+// One featured template as a card (T53): `id` is its id in the templates table, picked into the
+// home generator; name and use (its description) in the page's language (建站规格 R5).
 export type TemplateCard = { id: string; name: string; use: string }
 
-// One H3 per category, with a short intro and links to its live inner pages (建站规格 §4 H2-2).
-// `drag`: the category whose single template keeps the draggable compare (Art Styles).
+// The copy of one ARCHITECTURE §5 category, in §5 order: `key` is the value stored in
+// templates.category; `drag`: the category whose single template keeps the draggable compare
+// (Art Styles); `links`: its live inner pages. The templates come from the database (T53).
+export type CategoryCopy = { key: string; name: string; intro: string; drag?: boolean; links?: readonly RelatedLink[] }
+
+// One H3 per category with its featured templates, as rendered (建站规格 §4 H2-2).
 export type TemplateCategory = {
   name: string
   drag?: boolean
@@ -145,7 +147,8 @@ export type HomePage = Omit<PageBasics, 'related'> & {
     note: string
     // The price on every card: "from 2 credits".
     price: string
-    categories: readonly [TemplateCategory, ...TemplateCategory[]]
+    // The six §5 categories' copy; which templates show is chosen in admin (featured_rank).
+    categories: readonly [CategoryCopy, ...CategoryCopy[]]
   }
   // Intro paragraph above the facts table.
   factsIntro: string

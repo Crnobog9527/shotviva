@@ -1,7 +1,7 @@
 import { defineHomePage, type CostBills, type HeadedText, type HomePage, type ImageRef, type ShootDemo } from '@/core/content'
 
 import { site } from '../site.config'
-import { templateCategories } from './featured-templates'
+import { templateCategories } from './template-categories'
 import {
   creditFrom,
   fromCredits,
@@ -166,7 +166,7 @@ export const homePage = defineHomePage({
       },
     ],
     plans: plansText(),
-    sample: { src: '/home/templates/spa-podium-after.webp', alt: '', width: 900, height: 1125 },
+    sample: { src: '/home/example-skincare-after.webp', alt: '', width: 900, height: 1125 },
   },
   costBills: productBills(
     `What ${SET_PHOTOS} Product Photos Cost: Photographer vs ${brand}`,

@@ -1,10 +1,9 @@
 import { defineContentPage } from '@/core/content'
 
 import { site } from '../../../site.config'
-import { homeImage, pickCategories } from '../../landing-shared'
+import { CATEGORY, homeImage } from '../../landing-shared'
 import { dayRateUsd, packshotUsd, SET_PHOTOS, styledShotUsd, usdRange } from '../../offer'
 import { PLATFORM_SPECS, px } from '../../platform-specs'
-import { zhTemplateCategories } from '../featured-templates'
 import { productBills, shoot } from '../home'
 import { ZH_TIERS, zhFreeImages, zhFromCredits, zhPlansSentence, zhTierList } from '../offer'
 
@@ -83,13 +82,12 @@ export const zhCommercialPhotography = defineContentPage({
     related: `${brand} 的其他页面`,
   },
   landing: {
-    generatorTemplate: 'white-background',
     factsNote: '以上来自各平台自己的帮助页面（Amazon、Etsy、Shopify），2026 年 11 月核对。平台规则会变，上架前请再确认。',
     shoot,
     templates: {
       heading: '商品图模板：主图、场景和海报',
       intro: `每个模板都从你的商品手机照片开始，到一张成品图结束，${zhFromCredits}。`,
-      categories: pickCategories(zhTemplateCategories, ['products', 'beauty']),
+      categoryKeys: [CATEGORY.products, CATEGORY.beauty],
     },
   },
 })

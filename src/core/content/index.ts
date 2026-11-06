@@ -6,6 +6,7 @@ export {
   type Bill,
   type BillLine,
   type BillTotal,
+  type CategoryCopy,
   type ContentPage,
   type CostBills,
   type Fact,
@@ -29,7 +30,7 @@ export {
 export { LIMITS, countWords, validateContentPage } from './validate-page'
 export { ContentPageView } from './content-page-view'
 export { HomePageView } from './home-page-view'
-export type { TemplateLookup, TemplateMedia } from './blocks/template-grid'
+export type { FeaturedSections, TemplateLookup, TemplateMedia } from './blocks/template-grid'
 export { FactsSection } from './blocks/facts-section'
 export { FaqSection } from './blocks/faq-section'
 export { BusinessSection, type BusinessBlock } from './blocks/business-section'
