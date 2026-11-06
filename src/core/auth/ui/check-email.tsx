@@ -1,0 +1,66 @@
+'use client'
+
+import { useTranslations } from 'next-intl'
+import { useEffect, type ReactNode } from 'react'
+
+import { CaptchaSlot, Notice } from './form-parts'
+import { MailGlyph } from './icons'
+import { useAuthForm, type FormAction } from './use-auth-form'
+import { useCooldown } from './use-cooldown'
+import { validateEmail } from './validate'
+
+type Props = {
+  title: string
+  // "We sent a verification link to …" with the address already in it.
+  text: ReactNode
+  email: string
+  // Sends the same email again: the sign-up link, or the reset link.
+  resendAction: FormAction
+  next?: string
+  // The way back ("Use a different email", "Back to log in").
+  back: ReactNode
+  // Shotviva <support@shotviva.com>, from site.config through the page.
+  sender: string
+  // Arrived here right after a send (the login page's "Send it again").
+  coolingDown?: boolean
+}
+
+// "Check your email" after a sign-up or a reset request (design/comps-v3-b/auth.html
+// `?v=verify|reset-sent`): one glyph, the title, one line, resend with a 60-second wait.
+export function CheckEmail({ title, text, email, resendAction, next, back, sender, coolingDown = false }: Props) {
+  const t = useTranslations('auth')
+  const form = useAuthForm(resendAction, { captcha: true, validate: validateEmail })
+  const cooldown = useCooldown()
+  const { start } = cooldown
+
+  useEffect(() => {
+    if (coolingDown) start()
+  }, [coolingDown, start])
+  useEffect(() => {
+    if (form.state.status === 'sent') start()
+  }, [form.state, start])
+
+  const waiting = cooldown.left > 0
+  return (
+    <section aria-labelledby="au-check-title">
+      <div className="au-glyph">
+        <MailGlyph />
+      </div>
+      <h1 id="au-check-title" className="au-title">
+        {title}
+      </h1>
+      <p className="au-sub">{text}</p>
+      {form.state.status === 'error' ? <Notice>{t(`errors.${form.state.code}`)}</Notice> : null}
+      <form onSubmit={form.onSubmit} className="au-acts">
+        <input type="hidden" name="email" value={email} />
+        {next ? <input type="hidden" name="next" value={next} /> : null}
+        <CaptchaSlot mode={form.captcha.mode} mount={form.captcha.mountCheckbox} needsTick={form.needsTick} />
+        <button type="submit" className="au-btn au-ghost" disabled={form.pending || waiting}>
+          {waiting ? t('resend.wait', { seconds: cooldown.left }) : t('resend.again')}
+        </button>
+        {back}
+      </form>
+      <p className="au-from">{t.rich('resend.from', { sender, b: (chunks) => <b>{chunks}</b> })}</p>
+    </section>
+  )
+}

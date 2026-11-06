@@ -30,7 +30,7 @@ const APP = join(process.cwd(), 'src', 'app', '[locale]')
 // an inner SEO page rendered by (marketing)/[slug].
 function routeExists(path: string): boolean {
   const dir = path === '/' ? '' : path
-  const files = ['(marketing)', '(app)'].flatMap((group) => ['page.tsx', 'route.ts'].map((f) => join(APP, group, dir, f)))
+  const files = ['(marketing)', '(auth)', '(app)'].flatMap((group) => ['page.tsx', 'route.ts'].map((f) => join(APP, group, dir, f)))
   return files.some((file) => existsSync(file)) || contentPages.some((page) => `/${page.slug}` === path)
 }
 

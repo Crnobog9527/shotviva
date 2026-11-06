@@ -32,44 +32,103 @@
   },
   "auth": {
     "google": "使用 Google 账号继续",
+    "or": "或用邮箱",
+    "show": "显示",
+    "hide": "隐藏",
     "fields": {
       "email": "邮箱",
       "password": "密码",
-      "newPassword": "密码（至少 {min} 位）"
+      "newPassword": "新密码",
+      "confirmPassword": "确认新密码"
+    },
+    "placeholders": {
+      "email": "你的邮箱地址",
+      "password": "你的密码",
+      "choose": "设置一个密码",
+      "chooseNew": "设置新密码",
+      "again": "再输一次"
+    },
+    "hints": {
+      "verifyEmail": "我们会发一个链接来验证这个邮箱。",
+      "passwordMin": "至少 {min} 位。"
+    },
+    "fieldErrors": {
+      "loginEmail": "请输入你注册时用的邮箱。",
+      "email": "这看起来不是邮箱地址。",
+      "passwordMissing": "请输入密码。",
+      "passwordShort": "太短了，至少要 {min} 位。",
+      "passwordWeak": "请换一个更安全的密码。",
+      "mismatch": "两次输入的密码不一样。"
+    },
+    "arrived": {
+      "home": {
+        "title": "你的照片和模板都保留着。",
+        "login": "登录后回到首页，它们都还在。",
+        "signup": "验证邮箱后回到首页，它们都还在。"
+      },
+      "graylum": {
+        "title": "正在连接 Graylum。",
+        "login": "登录后，允许 Graylum 使用你的积分。",
+        "signup": "注册完账号后，允许 Graylum 使用你的积分。"
+      }
     },
     "login": {
       "title": "登录",
       "submit": "登录",
       "forgot": "忘记密码？",
-      "toSignup": "注册新账号"
+      "toSignup": "第一次用 Shotviva？<link>免费注册</link>",
+      "creds": "邮箱和密码对不上。忘了密码的话，可以<reset>重设密码</reset>。",
+      "unverified": "请先验证邮箱。验证链接已经发到 <addr>{email}</addr>。<resend>再发一次</resend>。"
     },
     "signup": {
       "title": "注册账号",
-      "freeImages": "注册即送 {count} 张标准清晰度的免费图。",
+      "gift": "{count, plural, other {# 张标准清晰度免费图}}",
+      "giftNote": "会公开展示，并带水印",
       "submit": "注册",
-      "toLogin": "已有账号？去登录",
-      "sentTitle": "请查收邮件",
-      "sent": "我们发了一封确认邮件，点开里面的链接就能激活账号。如果这个邮箱已经注册过，直接登录即可。"
+      "exists": "<addr>{email}</addr> 已经注册过了。可以直接<login>登录</login>，或者<reset>重设密码</reset>。",
+      "fine": "继续即表示你同意<terms>服务条款</terms>和<privacy>隐私政策</privacy>。",
+      "toLogin": "已经有账号？<link>登录</link>"
+    },
+    "verify": {
+      "title": "请查收邮件",
+      "text": "验证链接已经发到 <addr>{email}</addr>，打开它就能完成注册。",
+      "different": "换一个邮箱"
+    },
+    "resend": {
+      "again": "再发一次邮件",
+      "wait": "已重新发送 · {seconds} 秒后可再发",
+      "from": "发件人是 <b>{sender}</b>。过了一分钟还没收到？看看垃圾邮件或推广邮件。"
     },
     "reset": {
-      "title": "重置密码",
-      "submit": "发送重置链接",
-      "toLogin": "返回登录",
-      "sent": "如果这个邮箱注册过账号，重置链接已经发出，请查收。"
+      "title": "重设密码",
+      "sub": "输入你的邮箱，我们会发一个设置新密码的链接。",
+      "submit": "发送重设链接",
+      "back": "返回登录",
+      "sentTitle": "请查收邮件",
+      "sent": "如果 <addr>{email}</addr> 注册过账号，重设链接已经在路上了，{hours} 小时内有效。"
+    },
+    "expired": {
+      "title": "这个链接已经失效",
+      "text": "重设链接 {hours} 小时内有效，而且只能用一次。请重新获取一个，收到后尽快使用。",
+      "newLink": "重新发送链接"
     },
     "update": {
       "title": "设置新密码",
+      "for": "账号：<addr>{email}</addr>",
       "submit": "保存密码",
-      "done": "密码已保存，去我的账号"
+      "doneTitle": "密码已保存",
+      "done": "这台设备已经登录。其他设备会要求你输入新密码。",
+      "continue": "进入 Shotviva"
     },
     "captcha": {
+      "line": "由 hCaptcha 提供人机验证 · <privacy>隐私</privacy> · <terms>条款</terms>",
       "fallback": "请完成下方的验证，再提交一次。",
       "tick": "请勾选下方的方框后继续。"
     },
     "notices": {
-      "unverified": "请先确认邮箱：打开我们发给你的邮件，点里面的链接。",
-      "link_expired": "这个链接已过期或已经用过了，请重新获取。",
-      "callback_failed": "登录没能完成。如果你刚确认完邮箱，请用密码登录。",
+      "unverified": "请先验证邮箱：打开我们发给你的邮件，点里面的链接。",
+      "link_expired": "这个链接已经失效或已经用过了。请在下面登录；如果邮箱还没验证，我们会帮你重新发链接。",
+      "callback_failed": "登录没能完成。如果你刚验证完邮箱，请用密码登录。",
       "oauth_failed": "Google 登录没有完成，请再试一次。"
     },
     "errors": {
