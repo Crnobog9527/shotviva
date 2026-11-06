@@ -65,11 +65,11 @@ export const site = defineSite({
     freeCredits: 6,                               // 进 profiles.free_credits，只能生成免费作品（第 6.1 节）；= 3 张 Standard 档标准模板图，对外说 "3 free Standard images"（Owner 2026-11-05）
     products: [                                   // 9 个商品，价格 Owner 2026-11-05 定稿（第 6.2 节）
       { id: 'starter_monthly', tier: 'starter', interval: 'month', credits: 50,   paidDays: 30,   priceUsd: 19.9 },
-      { id: 'starter_yearly',  tier: 'starter', interval: 'year',  credits: 600,  paidDays: 365,  priceUsd: 139 },
+      { id: 'starter_yearly',  tier: 'starter', interval: 'year',  credits: 600,  paidDays: 365,  priceUsd: 191 },
       { id: 'pro_monthly',     tier: 'pro',     interval: 'month', credits: 135,  paidDays: 30,   priceUsd: 49.9 },
-      { id: 'pro_yearly',      tier: 'pro',     interval: 'year',  credits: 1620, paidDays: 365,  priceUsd: 349 },
+      { id: 'pro_yearly',      tier: 'pro',     interval: 'year',  credits: 1620, paidDays: 365,  priceUsd: 479 },
       { id: 'max_monthly',     tier: 'max',     interval: 'month', credits: 280,  paidDays: 30,   priceUsd: 99 },
-      { id: 'max_yearly',      tier: 'max',     interval: 'year',  credits: 3360, paidDays: 365,  priceUsd: 699 },
+      { id: 'max_yearly',      tier: 'max',     interval: 'year',  credits: 3360, paidDays: 365,  priceUsd: 713 },
       { id: 'pack_s', tier: 'pack', interval: null, credits: 20,  paidDays: null, priceUsd: 9.9 },   // 积分包：不改会员期，所有人可买
       { id: 'pack_m', tier: 'pack', interval: null, credits: 55,  paidDays: null, priceUsd: 24.9 },
       { id: 'pack_l', tier: 'pack', interval: null, credits: 115, paidDays: null, priceUsd: 49.9 },
@@ -250,7 +250,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 订阅续费走 T10 新增的 `apply_subscription_renewal(user, product_id, invoice_id, period_end)`：`credits += 商品积分`，`paid_until = greatest(paid_until, period_end)`（直接对齐 Stripe 的本期结束日，不按天数累加，避免大小月漂移）；同样写流水、按 invoice id 幂等，内部复用 `_apply_credit_change`（总控 2026-11-05 补）。
 - 没用完的积分在续费时自然结转（积分不过期），不做「本期 / 结转」两本账。
 - **计价单位是 credit，不是「张」。**（唯一例外：新用户赠送对外说 "3 free Standard images"，即 6 个免费 credit，见建站规格 G3。） 一次出图扣多少 = 模板在用户所选分辨率的配置值 `templates.credits_cost[resolution]`（第 5 节：`high` 模板默认 1K 2 / 2K 4 / 3K 6，`medium` 1 / 2 / 3），后台模板编辑页可改；会员每月发多少 credit、积分包多少 credit 写在 `site.config.ts`。前台后台都叫 credits，余额显示为 "30 credits + 3 free"。「重新生成」按同一模板、同一分辨率再扣一次。
-- **配置下限（Owner 2026-11-05 定的毛利口径）**：每个质量档 × 分辨率的 credit 数 ≥ `ceil(该档 p95 单次真实成本 ÷ $0.06)`，后台可以往上加价，不能低于下限。下限表是 `modules/image` 里的常量，后台保存模板时在服务端校验，低于下限拒绝保存。$0.06 的来历：最便宜的 credit 是 Max 年付 $0.208，扣最坏手续费（国际卡 + Managed Payments：2.9% + 3.5% + 1.5% + $0.30）和 3% 退款预留后，守 **60% 毛利**（不含注册赠送的 3 个免费 credit，按最坏情况：credits 全部用完）每 credit 的成本上限约 $0.060。成本依据：OpenAI 官方价（图像输入 $8/M、输出 $30/M token），high 质量正方形单张输出 1K $0.053、2K $0.107、3K $0.178，加输入图约 $0.012～$0.021、提示词约 $0.005、失败退回损耗 10%、R2 + Vercel 约 $0.002；输入图 token 上线前按 LAUNCH §5 实测后更新下限表（定稿全文见共享笔记 `pricing-final-2026-11-05.md`）。
+- **配置下限（Owner 2026-11-05 定的毛利口径）**：每个质量档 × 分辨率的 credit 数 ≥ `ceil(该档 p95 单次真实成本 ÷ $0.06)`，后台可以往上加价，不能低于下限。下限表是 `modules/image` 里的常量，后台保存模板时在服务端校验，低于下限拒绝保存。$0.06 的来历：最便宜的 credit 是 Max 年付（定下限时 $0.208；2026-11-06 改价后 $0.212，下限按 $0.208 算更保守，不变），扣最坏手续费（国际卡 + Managed Payments：2.9% + 3.5% + 1.5% + $0.30）和 3% 退款预留后，守 **60% 毛利**（不含注册赠送的 3 个免费 credit，按最坏情况：credits 全部用完）每 credit 的成本上限约 $0.060。成本依据：OpenAI 官方价（图像输入 $8/M、输出 $30/M token），high 质量正方形单张输出 1K $0.053、2K $0.107、3K $0.178，加输入图约 $0.012～$0.021、提示词约 $0.005、失败退回损耗 10%、R2 + Vercel 约 $0.002；输入图 token 上线前按 LAUNCH §5 实测后更新下限表（定稿全文见共享笔记 `pricing-final-2026-11-05.md`）。
 - 余额只能通过 SQL 函数改：发放（`grant_credits` 带 `pool` 参数，注册赠送和活动赠送用 `'free'`）、预扣、确认、退回、管理员调整（`admin_adjust_credits` 带 `pool` 参数）。前端和普通接口都不能直接写余额。
 - 每一笔变动都写进流水表，记录动的是哪个池，带幂等键。
 
@@ -261,16 +261,16 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 | id | 档位 | 价格 | 付费积分 | 每 credit | 会员期 `paid_until` | 卡 / Apple Pay / Google Pay | 支付宝 |
 |---|---|---|---|---|---|---|---|
 | `starter_monthly` | Starter | $19.90 / 月 | 50 / 月 | $0.398 | +30 天 | Stripe **订阅**，每期 +50 | Stripe **单笔**一期会员 |
-| `starter_yearly` | Starter | $139 / 年（合 $11.58/月） | 600，一次发完 | $0.232 | +365 天 | Stripe **订阅**，每年 +600 | Stripe **单笔** |
+| `starter_yearly` | Starter | $191 / 年（合 $15.92/月） | 600，一次发完 | $0.318 | +365 天 | Stripe **订阅**，每年 +600 | Stripe **单笔** |
 | `pro_monthly` | Pro | $49.90 / 月 | 135 / 月 | $0.370 | +30 天 | 订阅 | 单笔 |
-| `pro_yearly` | Pro | $349 / 年（合 $29.08/月） | 1,620，一次发完 | $0.215 | +365 天 | 订阅 | 单笔 |
+| `pro_yearly` | Pro | $479 / 年（合 $39.92/月） | 1,620，一次发完 | $0.296 | +365 天 | 订阅 | 单笔 |
 | `max_monthly` | Max | $99 / 月 | 280 / 月 | $0.354 | +30 天 | 订阅 | 单笔 |
-| `max_yearly` | Max | $699 / 年（合 $58.25/月） | 3,360，一次发完 | $0.208 | +365 天 | 订阅 | 单笔 |
+| `max_yearly` | Max | $713 / 年（合 $59.42/月） | 3,360，一次发完 | $0.212 | +365 天 | 订阅 | 单笔 |
 | `pack_s` | 积分包 | $9.90 | 20 | $0.495 | 不变 | Stripe Managed Payments **单笔** | Stripe **单笔** |
 | `pack_m` | 积分包 | $24.90 | 55 | $0.453 | 不变 | 单笔 | 单笔 |
 | `pack_l` | 积分包 | $49.90 | 115 | $0.434 | 不变 | 单笔 | 单笔 |
 
-- 年付积分 = 12 × 月付积分，一次发完；年付折扣约 41%～42%。积分包每 credit 都高于所有订阅，**所有人可买，包括没买会员的**，所有通道都是单笔，不改 `paid_until`。注册赠送仍是 3 个免费 credit（`billing.freeCredits`），不计入毛利。
+- 年付积分 = 12 × 月付积分，一次发完。**年付折扣（Owner 2026-11-06 改价）**：Starter、Pro 按月价 × 12 打 8 折，Max 打 6 折，金额取整到美元：$191（省 20%）、$479（省 20%）、$713（省 40%）。年付最多省 40%，不得超过。改价在 Stripe 上是新建 Price 并用 `transfer_lookup_key` 接过 lookup key（Price 金额不可改），旧 Price 归档；Waffo 商品价格同步改。积分包每 credit 都高于所有订阅，**所有人可买，包括没买会员的**，所有通道都是单笔，不改 `paid_until`。注册赠送仍是 3 个免费 credit（`billing.freeCredits`），不计入毛利。
 - 积分包不改会员期，但它发的是付费积分，用它生成的作品就是付费作品（无水印、私密、可商用），所以非会员买包也拿到完整权益——这正是「按作品判付费」要解决的事。
 - 价格数字只写在 `site.config.ts`（第 2 节），付费墙、`/pricing`、FAQ、结构化数据都从配置读；建站规格 G3 同步。送 Stripe 时用整数分（`1990`）。
 - **Stripe Product / Price 映射**：Starter、Pro、Max 各一个 Product（税码 `txcd_10105001`），每个 Product 挂 4 个 Price：月付 recurring、月付 one-time、年付 recurring、年付 one-time（同 id 的 recurring 和 one-time 价格相同）；三个积分包各一个 Product，只有 one-time Price。Price 的 `lookup_key` 固定为 `<product_id>`（one-time）和 `<product_id>_recurring`（订阅），服务端按 lookup key 取 Price，不把 Price id 写进代码或配置；每个 Price 的 `metadata.product_id` 也写上，回调反查用。
