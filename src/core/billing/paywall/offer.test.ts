@@ -56,12 +56,15 @@ describe('tier perks (ARCHITECTURE §6.2 会员档位权益)', () => {
 
   it('keeps unbuilt perks in Coming soon and never lists queue priority', () => {
     const pro = tierPerks('pro', { wishlistLive: false })
-    expect(pro.soon.map((p) => p.key)).toEqual(['batch', 'brandKit'])
+    expect(pro.soon.map((p) => p.key)).toEqual(['batch'])
+    expect(tierPerks('max', { wishlistLive: true }).soon.map((p) => p.key)).toEqual(['batch', 'earlyAccess'])
     const all = (['starter', 'pro', 'max'] as const).flatMap((tier) => {
       const perks = tierPerks(tier, { wishlistLive: true })
       return [...perks.live, ...perks.soon].map((p) => p.key)
     })
     expect(all.some((key) => /queue|priority/i.test(key))).toBe(false)
+    // The brand kit was dropped entirely (ARCHITECTURE §6.2, Owner 2026-11-06).
+    expect(all).not.toContain('brandKit')
   })
 
   it('moves the 3× wishlist vote from Coming soon to live once the wishlist is on', () => {
