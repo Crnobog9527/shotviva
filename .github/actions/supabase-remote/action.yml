@@ -20,10 +20,10 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: supabase/setup-cli@v1
+    - uses: supabase/setup-cli@v3
       with:
         # Same CLI as the local-database jobs, so remote and local agree on migration handling.
-        version: 2.107.0
+        version: 2.122.1
 
     - name: Check configuration
       shell: bash
