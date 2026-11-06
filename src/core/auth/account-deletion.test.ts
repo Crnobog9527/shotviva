@@ -2,9 +2,13 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { accountPrefixes, deleteAccount, type AccountDeletionDeps } from './account-deletion'
 
-function deps(overrides: Partial<{ storageError: Error; authError: string }> = {}) {
+function deps(overrides: Partial<{ storageError: Error; authError: string; cancelError: Error }> = {}) {
   const calls: string[] = []
   const value: AccountDeletionDeps = {
+    cancelSubscriptions: vi.fn(async (id: string) => {
+      calls.push(`stripe:${id}`)
+      if (overrides.cancelError) throw overrides.cancelError
+    }),
     storage: {
       deletePrefix: vi.fn(async (prefix: string) => {
         calls.push(`r2:${prefix}`)
@@ -22,10 +26,16 @@ function deps(overrides: Partial<{ storageError: Error; authError: string }> = {
 }
 
 describe('deleteAccount', () => {
-  it('clears every R2 prefix, wishlist images included, then deletes the auth user', async () => {
+  it('cancels subscriptions, clears every R2 prefix (wishlist images included), then deletes the auth user', async () => {
     const { value, calls } = deps()
     await deleteAccount('u1', value)
-    expect(calls).toEqual(['r2:inputs/u1/', 'r2:outputs/u1/', 'r2:requests/u1/', 'auth:u1'])
+    expect(calls).toEqual(['stripe:u1', 'r2:inputs/u1/', 'r2:outputs/u1/', 'r2:requests/u1/', 'auth:u1'])
+  })
+
+  it('deletes nothing when a subscription cannot be cancelled (ARCHITECTURE §13)', async () => {
+    const { value, calls } = deps({ cancelError: new Error('stripe down') })
+    await expect(deleteAccount('u1', value)).rejects.toThrow('stripe down')
+    expect(calls).toEqual(['stripe:u1'])
   })
 
   it('keeps the account when R2 fails, so the user can retry', async () => {

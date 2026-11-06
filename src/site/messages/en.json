@@ -64,11 +64,12 @@
       "signOut": "Sign out",
       "dangerZone": "Delete account",
       "delete": "Delete my account",
-      "deleteWarning": "This permanently deletes your account, your remaining credits and every photo you made. It cannot be undone.",
+      "deleteWarning": "This permanently deletes your account, your remaining credits and every photo you made. Subscriptions are cancelled first. It cannot be undone.",
       "deleteTypeLabel": "Type DELETE to confirm",
       "deleteConfirm": "Delete forever",
       "deleting": "Deleting…",
       "deleteFailed": "Deletion did not finish. Please try again.",
+      "deleteSubscriptionFailed": "We couldn't cancel your subscription, so nothing was deleted. Please try again later, or contact support.",
       "cancel": "Cancel"
     }
   },

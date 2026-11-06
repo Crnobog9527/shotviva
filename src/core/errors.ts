@@ -27,6 +27,9 @@ export const ERROR_CODES = [
   'CONTENT_REJECTED',
   // Provider error, timeout or output write failure; credits are refunded.
   'GENERATION_FAILED',
+  // Account deletion: Stripe would not cancel a live subscription, so nothing was deleted
+  // (ARCHITECTURE §13).
+  'SUBSCRIPTION_CANCEL_FAILED',
   'INTERNAL',
 ] as const
 
@@ -50,6 +53,7 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   IMAGE_UNSUPPORTED: 422,
   CONTENT_REJECTED: 422,
   GENERATION_FAILED: 502,
+  SUBSCRIPTION_CANCEL_FAILED: 502,
   INTERNAL: 500,
 }
 

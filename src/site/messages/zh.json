@@ -64,11 +64,12 @@
       "signOut": "退出登录",
       "dangerZone": "注销账号",
       "delete": "注销我的账号",
-      "deleteWarning": "注销后，你的账号、剩余积分和所有作品都会被永久删除，无法恢复。",
+      "deleteWarning": "注销后，你的账号、剩余积分和所有作品都会被永久删除。订阅会先被取消。注销后无法恢复。",
       "deleteTypeLabel": "输入 DELETE 确认",
       "deleteConfirm": "永久注销",
       "deleting": "正在注销…",
       "deleteFailed": "注销没有完成，请再试一次。",
+      "deleteSubscriptionFailed": "没能取消你的订阅，所以什么都没有删除。请稍后再试，或联系客服。",
       "cancel": "取消"
     }
   },
