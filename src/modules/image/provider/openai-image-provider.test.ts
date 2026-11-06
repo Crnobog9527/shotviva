@@ -43,6 +43,17 @@ describe('openai image provider', () => {
     expect(form.get('image')).toBeInstanceOf(Blob)
   })
 
+  it('sends input_fidelity on an edit only when the template sets it (T30)', async () => {
+    const fetchImpl = vi.fn(async () => json({ data: [{ b64_json: PNG_B64 }] }))
+    await provider(fetchImpl).generate(input({ params: { input_fidelity: 'high' } }))
+    await provider(fetchImpl).generate(input())
+    await provider(fetchImpl).generate(input({ images: [], params: { input_fidelity: 'high' } }))
+    const sent = fetchImpl.mock.calls.map((call) => (call as unknown as [string, RequestInit])[1].body)
+    expect((sent[0] as FormData).get('input_fidelity')).toBe('high')
+    expect((sent[1] as FormData).get('input_fidelity')).toBeNull()
+    expect(JSON.parse(sent[2] as string)).not.toHaveProperty('input_fidelity')
+  })
+
   it('uses the generations endpoint when there is no photo', async () => {
     const fetchImpl = vi.fn(async () => json({ data: [{ b64_json: PNG_B64 }] }))
     await provider(fetchImpl).generate(input({ images: [] }))
