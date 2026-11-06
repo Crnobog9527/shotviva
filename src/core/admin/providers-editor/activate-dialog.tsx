@@ -11,7 +11,7 @@ const COPY = PROVIDERS_COPY.activateDialog
 
 type Props = {
   target: AdminProvider | null
-  // The provider in use now; null means the env fallback.
+  // The provider in use now in the target's module; null means none (env fallback for image).
   current: AdminProvider | null
   pending: boolean
   onCancel: () => void
@@ -21,12 +21,13 @@ type Props = {
 // Switching changes which vendor and model every next generation calls, so it is confirmed with
 // both names on screen (ARCHITECTURE §3.3).
 export function ActivateDialog({ target, current, pending, onCancel, onConfirm }: Props) {
-  const from = current ? `${current.label} · ${current.model}` : COPY.fromEnv
+  const module = target?.module ?? 'image'
+  const from = current ? `${current.label} · ${current.model}` : COPY.fromNone[module]
   return (
     <Dialog open={target !== null} onOpenChange={(open) => !open && onCancel()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{COPY.title}</DialogTitle>
+          <DialogTitle>{COPY.title(module)}</DialogTitle>
           <DialogDescription>
             {target ? COPY.body(from, target.label, target.model) : null}
           </DialogDescription>

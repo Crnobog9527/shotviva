@@ -3,12 +3,15 @@ import 'server-only'
 import { z } from 'zod'
 
 import { track as defaultTrack, type EventProps, type ServerTrack } from '../analytics'
+import { EDIT_SCOPES } from '../templates/edit-params'
 import { GenerationFailure } from './generation-failure'
 import type { Job } from './job-schema'
 import { modelFromTag } from './provider-tag'
 
 // Pre-T16 jobs carry no resolution and every one of them is generated at 1K.
 const resolution = z.enum(['1k', '2k', '3k']).catch('1k')
+// Only edits carry a scope (T30); a template generation has none.
+const editScope = z.enum(EDIT_SCOPES).nullable().catch(null)
 
 type Outcome = { status: 'succeeded' } | { status: 'failed'; errorCode: string | null }
 
@@ -25,6 +28,7 @@ export function generateEventProps(job: Job, category: string, outcome: Outcome,
     duration_ms: Math.max(0, Math.round(durationMs)),
     // The model only: the provider id and its address stay out of analytics (§16.2).
     model: modelFromTag(job.provider),
+    edit_scope: editScope.parse(job.inputs.edit_scope ?? null),
   }
 }
 

@@ -23,6 +23,9 @@ export type OpenAIImageConfig = {
 // floored on.
 const paramsSchema = z.object({
   background: z.enum(['auto', 'opaque', 'transparent']).optional(),
+  // How closely an edit keeps the input photo (T30, ARCHITECTURE §5.2). /images/edits only, and
+  // only when the template sets it, since not every model accepts it.
+  input_fidelity: z.enum(['high', 'low']).optional(),
 })
 
 const responseSchema = z.object({ data: z.array(z.object({ b64_json: z.string().min(1) })).min(1) })
@@ -47,6 +50,7 @@ function buildRequest(config: OpenAIImageConfig, input: ProviderInput): { path: 
   }
   const form = new FormData()
   for (const [key, value] of Object.entries(fields)) form.append(key, value)
+  if (params.input_fidelity) form.append('input_fidelity', params.input_fidelity)
   const imageField = input.images.length === 1 ? 'image' : 'image[]'
   input.images.forEach((image, index) => {
     form.append(imageField, new Blob([image.bytes as BlobPart], { type: image.contentType }), `input-${index}.jpg`)

@@ -29,7 +29,18 @@ export {
 export { TEMPLATE_COLUMNS, toTemplate } from './types'
 export type { Template, TemplateRow } from './types'
 export { TEMPLATES_CACHE_TAG } from './cache'
-export { loadGenerationTemplate, type GenerationTemplate } from './generation-template'
+export { loadEditTemplate, loadGenerationTemplate, type GenerationTemplate } from './generation-template'
+export {
+  DECIDED_SCOPES,
+  EDIT_SCOPES,
+  EDIT_TEMPLATE_ID,
+  editParamsSchema,
+  INSTRUCTION_MAX_LENGTH,
+  instructionSchema,
+  type DecidedScope,
+  type EditParams,
+  type EditScope,
+} from './edit-params'
 export {
   renderPrompt,
   validateGenerationInputs,

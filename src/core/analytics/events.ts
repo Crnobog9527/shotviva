@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { CREDIT_POOLS } from '../billing/pools'
 import { PRODUCT_IDS } from '../config/define-site'
+import { EDIT_SCOPES } from '../templates/edit-params'
 import { findPii } from './pii'
 
 // The event dictionary of ARCHITECTURE §16.2. Names and properties are fixed; changing one
@@ -47,6 +48,8 @@ export const eventSchemas = {
     duration_ms: z.number().int().nonnegative(),
     // Model name only (ARCHITECTURE §16.2); null for jobs written before T17.
     model: z.string().min(1).max(120).nullable(),
+    // Photo edits only (ARCHITECTURE §5.2, T30): the range judged, or 'fallback'.
+    edit_scope: z.enum(EDIT_SCOPES).nullable(),
   }),
   paywall_view: z.strictObject({ trigger: z.enum(PAYWALL_TRIGGERS) }),
   checkout_start: z.strictObject(checkoutProps),

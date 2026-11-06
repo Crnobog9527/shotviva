@@ -23,6 +23,8 @@ const reserveSchema = z.object({
   idempotencyKey: z.string().min(1).nullable().default(null),
   // Applies to paid works only (default private); free works are always public.
   visibility: z.enum(JOB_VISIBILITIES).nullable().default(null),
+  // An edit (ARCHITECTURE §5.2): the caller's own succeeded work; reserve_credits checks it.
+  parentJobId: z.uuid().nullable().default(null),
 })
 
 export type ReserveJobInput = z.input<typeof reserveSchema>
@@ -44,6 +46,7 @@ export async function reserveJob(client: RpcClient, input: ReserveJobInput): Pro
       p_provider: args.provider,
       p_idempotency_key: args.idempotencyKey,
       p_visibility: args.visibility,
+      p_parent_job_id: args.parentJobId,
     },
     jobRowSchema,
   )

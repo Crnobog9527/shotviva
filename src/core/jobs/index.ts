@@ -23,9 +23,11 @@ export {
   type ProviderInput,
   type ProviderOutput,
 } from './provider'
-export { RATE_LIMIT, isLiveRunning, rateLimitVerdict } from './rate-limit'
+export { RATE_LIMIT, assertWithinRateLimit, isLiveRunning, rateLimitVerdict } from './rate-limit'
 export { concurrencyLimit } from './concurrency'
 export { listOwnJobs, type OwnJobs } from './own-jobs'
 export { ENV_PROVIDER_SOURCE, modelFromTag, providerTag } from './provider-tag'
 export { runGeneration, type GenerationDeps } from './run-generation'
-export { PROVIDER_TIMEOUT_MS } from './settle-generation'
+export { PROVIDER_TIMEOUT_MS, settleGeneration, type SettleDeps } from './settle-generation'
+// The photo edit path (modules/image/edit, T30) settles and tracks exactly like a generation.
+export { settleTracked } from './generation-analytics'

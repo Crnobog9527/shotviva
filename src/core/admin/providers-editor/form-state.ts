@@ -1,8 +1,12 @@
+import { MODULE_ADAPTER, type ProviderModule } from '@/core/providers/types'
+
 import type { AdminProvider, SaveProviderInput } from '../providers/types'
 
 // The provider form's local state. The key field always starts blank: the browser never has
 // the stored key, and blank means "keep it" on an edit.
 export type ProviderForm = {
+  // Fixed per row: a new one takes the section it was added from.
+  module: ProviderModule
   label: string
   baseUrl: string
   model: string
@@ -11,6 +15,7 @@ export type ProviderForm = {
 }
 
 export const DEFAULT_FORM: ProviderForm = {
+  module: 'image',
   label: '',
   baseUrl: 'https://api.openai.com/v1',
   model: '',
@@ -18,16 +23,16 @@ export const DEFAULT_FORM: ProviderForm = {
   notes: '',
 }
 
-export function formFor(provider: AdminProvider | null): ProviderForm {
-  if (!provider) return DEFAULT_FORM
-  return { label: provider.label, baseUrl: provider.baseUrl, model: provider.model, apiKey: '', notes: provider.notes ?? '' }
+export function formFor(provider: AdminProvider | null, module: ProviderModule = 'image'): ProviderForm {
+  if (!provider) return { ...DEFAULT_FORM, module }
+  return { module: provider.module, label: provider.label, baseUrl: provider.baseUrl, model: provider.model, apiKey: '', notes: provider.notes ?? '' }
 }
 
 export function toSaveInput(form: ProviderForm, provider: AdminProvider | null): SaveProviderInput {
   return {
     ...(provider ? { id: provider.id } : {}),
-    module: 'image',
-    adapter: 'openai_images',
+    module: form.module,
+    adapter: MODULE_ADAPTER[form.module],
     label: form.label,
     baseUrl: form.baseUrl,
     model: form.model,

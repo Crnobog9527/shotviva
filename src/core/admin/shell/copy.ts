@@ -12,7 +12,7 @@ export const SHELL_COPY = {
     orders: '订单与收入',
     jobs: '出图记录',
     templates: '模板',
-    providers: '出图供应商',
+    providers: 'AI 供应商',
     requests: '需求审核',
     announcements: '公告横幅',
   },
