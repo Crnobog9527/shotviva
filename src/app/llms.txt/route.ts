@@ -10,6 +10,6 @@ const pages = [homePage, ...contentPages].map((page) => ({
 }))
 
 // 404 while the pre-launch switch is closed (ARCHITECTURE §12.0).
-export function GET() {
-  return closedSeoFileResponse() ?? textResponse(llmsTxt(site, homePage.answerBlock, pages))
+export async function GET() {
+  return (await closedSeoFileResponse()) ?? textResponse(llmsTxt(site, homePage.answerBlock, pages))
 }
