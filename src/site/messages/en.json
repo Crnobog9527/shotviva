@@ -436,7 +436,7 @@
     "billingLabel": "Billing period",
     "monthly": "Monthly",
     "yearly": "Yearly",
-    "savePct": "Save {pct}%",
+    "savePct": "Save up to {pct}%",
     "plansLabel": "Plans",
     "tiers": {
       "starter": "Starter",
@@ -465,7 +465,7 @@
       "support24h": "Priority email support, reply within {hours} hours",
       "batch": "Batch upload, up to {count} photos",
       "brandKit": "Brand kit: your logo and fonts on posters",
-      "earlyAccess": "Early access to new templates and features",
+      "earlyAccess": "Early access to new features",
       "wishlistVotes": "Your template requests count {weight}× on the Wishlist"
     },
     "packsLink": "Just need a few photos? Credit packs from {price}",

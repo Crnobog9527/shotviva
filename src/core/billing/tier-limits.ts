@@ -11,8 +11,8 @@ export function concurrencyFor(tier: MembershipTier | null): number {
 
 // Support reply times in hours (ARCHITECTURE §6.2 "会员档位权益", Owner 2026-11-06: Starter and
 // Pro 48, Max 24). Without a tier the base time applies. The paywall perks, the support pages and
-// the admin due times read these; SQL's support_reply_hours (0225) mirrors them, kept equal by
-// tests/db/support-sla.test.ts.
+// the admin due times read these, so the promise is written in one place; SQL's
+// support_reply_hours (0225) mirrors them, kept equal by tests/db/support-sla.test.ts.
 export const TIER_SUPPORT_REPLY_HOURS = { starter: 48, pro: 48, max: 24 } as const satisfies Record<MembershipTier, number>
 export const BASE_SUPPORT_REPLY_HOURS = 48
 
