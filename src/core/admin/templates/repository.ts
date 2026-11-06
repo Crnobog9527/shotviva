@@ -39,13 +39,13 @@ export async function listAdminTemplates(client: SupabaseClient): Promise<AdminT
   }))
 }
 
+// A plain GET, not `head: true`: PostgREST answers HEAD without Content-Length and then
+// closes the connection, and Kong reuses that dead connection for the next request. The
+// POST that follows here (admin_upsert_template) then fails with a 502 (see eslint config).
 export async function templateExists(client: SupabaseClient, id: string): Promise<boolean> {
-  const { count, error } = await client
-    .from('templates')
-    .select('id', { count: 'exact', head: true })
-    .eq('id', id)
+  const { data, error } = await client.from('templates').select('id').eq('id', id).limit(1)
   if (error) throw new AppError('INTERNAL', `templateExists failed: ${error.message}`)
-  return (count ?? 0) > 0
+  return data.length > 0
 }
 
 export async function upsertTemplate(
