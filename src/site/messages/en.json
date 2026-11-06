@@ -947,7 +947,9 @@
       "tagline": "AI photo studio",
       "templates": "Templates",
       "login": "Log in",
-      "startFree": "Start free"
+      "startFree": "Start free",
+      "openApp": "Open app",
+      "account": "Account"
     },
     "hero": {
       "label": "Before and after",

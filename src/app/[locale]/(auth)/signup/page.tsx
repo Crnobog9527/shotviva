@@ -10,6 +10,7 @@ import { freeStandardImages } from '@/site/content'
 import { googleAction, resendSignupAction, signupAction } from '@/app/auth/actions'
 
 import { Arrived } from '../arrived'
+import { redirectIfSignedIn } from '../signed-in-redirect'
 import { sender } from '../sender'
 
 // Sign-in pages are noindex like the rest of the app (建站规格 R6), in both languages, and carry
@@ -20,7 +21,10 @@ export async function generateMetadata(): Promise<Metadata> {
 
 async function Signup({ searchParams }: PageProps<'/[locale]/signup'>) {
   const params = await searchParams
-  const next = nextIn(typeof params.next === 'string' ? params.next : null, await currentLocale())
+  const rawNext = typeof params.next === 'string' ? params.next : null
+  const locale = await currentLocale()
+  await redirectIfSignedIn(rawNext, locale)
+  const next = nextIn(rawNext, locale)
   return (
     <SignupForm
       action={signupAction}

@@ -17,7 +17,8 @@ export function AdminShell({ items, email, children }: Props) {
         <span className="ml-auto hidden min-w-0 truncate text-sm text-muted-foreground sm:block">
           {SHELL_COPY.signedInAs}：{email ?? '—'}
         </span>
-        <Link href="/" className="ml-auto shrink-0 text-sm text-primary hover:underline sm:ml-0">
+        {/* Back to the app, not the marketing home, which reads as signed out (DESIGN §6.9 item 4). */}
+        <Link href="/generate" className="ml-auto shrink-0 text-sm text-primary hover:underline sm:ml-0">
           {SHELL_COPY.backToSite}
         </Link>
       </header>
