@@ -2,7 +2,10 @@
 
 import { useFormatter, useTranslations } from 'next-intl'
 
+import { Link } from '../../i18n/ui'
+
 import { cn } from '../../ui/cn'
+import { EmptyState, STATE_GHOST } from '../../ui/empty-state'
 import type { MyRequest, Page, RequestStatus } from '../types'
 import { ImageStrip } from './image-strip'
 import { ShowMore } from './show-more'
@@ -21,7 +24,14 @@ const TONE: Record<RequestStatus, string> = {
 export function MyRequestsView({ first, loadMore }: { first: Page<MyRequest>; loadMore: LoadPage<MyRequest> }) {
   const t = useTranslations('app.wishlist')
   const list = usePaged(first, loadMore)
-  if (list.items.length === 0) return <p className="px-6 pt-16 text-center text-body text-muted-foreground">{t('mine.empty')}</p>
+  if (list.items.length === 0) {
+    const toWall = (
+      <Link href="/wishlist" className={STATE_GHOST}>
+        {t('mine.toWall')}
+      </Link>
+    )
+    return <EmptyState icon="heart" title={t('mine.empty')} body={t('mine.emptyBody')} action={toWall} />
+  }
   return (
     <>
       <div className="grid gap-3 px-4 pt-4">

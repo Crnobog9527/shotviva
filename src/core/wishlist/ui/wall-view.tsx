@@ -3,7 +3,7 @@
 import { Link } from '../../i18n/ui'
 import { useTranslations } from 'next-intl'
 
-import { buttonVariants } from '../../ui/button'
+import { EmptyState, STATE_GHOST } from '../../ui/empty-state'
 import type { Page, WallCard as WallCardData } from '../types'
 import { RequestBar } from './request-bar'
 import { ShowMore } from './show-more'
@@ -38,18 +38,22 @@ export function WallView({ first, eligible, loadMore }: Props) {
   )
 }
 
-// "Tell us what template you need" and the post button (DESIGN §4.7). The bottom bar stays
-// the one filled primary, so this one is the quiet glass button.
+// "Tell us what template you need" and the post button (DESIGN §4.7, empty.html?v=wishlist).
+// The bottom bar stays the one filled primary, so this one is the ghost.
 function WallEmpty({ eligible }: { eligible: boolean }) {
   const t = useTranslations('app.wishlist')
   return (
-    <div className="grid justify-items-center gap-4 px-6 pt-16 text-center">
-      <p className="font-display text-h1 leading-tight">{t('empty')}</p>
-      {eligible && (
-        <Link href="/wishlist/new" className={buttonVariants({ variant: 'glass', size: 'touch' })}>
-          {t('request')}
-        </Link>
-      )}
-    </div>
+    <EmptyState
+      icon="heart"
+      title={t('empty')}
+      body={t('emptyBody')}
+      action={
+        eligible ? (
+          <Link href="/wishlist/new" className={STATE_GHOST}>
+            {t('request')}
+          </Link>
+        ) : undefined
+      }
+    />
   )
 }

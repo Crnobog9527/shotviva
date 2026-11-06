@@ -23,3 +23,16 @@ export function homeTemplates(page: HomePage, live: readonly LiveTemplate[]) {
   const defaultId = byId.has(DEFAULT_TEMPLATE) ? DEFAULT_TEMPLATE : (live[0]?.id ?? null)
   return { samples, cards, defaultId }
 }
+
+// The 404's "three templates to try instead": every featured template but Art Styles (its card
+// is the drag compare), with the same pair the home page shows.
+export function tryTemplates(page: HomePage, live: readonly LiveTemplate[]) {
+  const { cards } = homeTemplates(page, live)
+  const [, ...rest] = page.templateGrid.categories
+  return rest.flatMap((category) =>
+    category.templates.flatMap((card) => {
+      const media = cards[card.id]
+      return media ? [{ id: card.id, name: card.name, use: card.use, before: media.before, after: media.after }] : []
+    }),
+  )
+}

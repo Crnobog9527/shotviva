@@ -17,7 +17,7 @@ export function findContentPage(slug: string): ContentPage | undefined {
 export { homePage }
 export { BUSINESS_MAIL_SUBJECT, pricingFaq, pricingPage } from './pricing'
 export { freeImagesLabel, freeStandardImages } from './offer'
-export { homeTemplates } from './home-templates'
+export { homeTemplates, tryTemplates } from './home-templates'
 
 // Module ownership of each page, fed to the indexing switch, sitemap and llms.txt.
 export const pageGates = [homePage, ...contentPages].map(pageGate)

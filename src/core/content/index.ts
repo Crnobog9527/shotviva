@@ -51,3 +51,5 @@ export {
 } from './legal/legal-page'
 export { LegalPageView } from './legal/legal-page-view'
 export { NotFoundView } from './blocks/not-found-view'
+export { PROBLEM_GHOST, PROBLEM_PRIMARY, ProblemView } from './blocks/problem-view'
+export { TryTemplates, type TryTemplate } from './blocks/try-templates'

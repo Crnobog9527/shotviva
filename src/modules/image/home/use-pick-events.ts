@@ -19,3 +19,12 @@ export function usePickEvents(onPick: (id: string) => void, onPreview: (id: stri
     return () => document.removeEventListener('click', onClick)
   }, [onPick, onPreview])
 }
+
+// `?open=<template id>` (the 404's "three templates to try"): open the picker on that template
+// once, after hydration. An id that is not live is ignored by `onPreview`'s lookup.
+export function useOpenFromQuery(onPreview: (id: string) => void) {
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('open')
+    if (id) onPreview(id)
+  }, [onPreview])
+}

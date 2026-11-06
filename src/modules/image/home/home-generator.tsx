@@ -15,7 +15,7 @@ import { sampleFor, thumbFor, type SampleLookup } from './home-samples'
 import { SignupSheet } from './signup-sheet'
 import { TemplatePicker } from './template-picker'
 import { useHomeGenerator } from './use-home-generator'
-import { usePickEvents } from './use-pick-events'
+import { useOpenFromQuery, usePickEvents } from './use-pick-events'
 
 export type HomeGeneratorProps = {
   // The live web catalogue (cached), and each template's bundled illustrative pair by id.
@@ -63,6 +63,7 @@ export function HomeGenerator({ templates, samples, defaultId, viewer, googleAct
   )
   const onPreview = useCallback((id: string) => setPickerOn(templates.find((template) => template.id === id) ?? null), [templates])
   usePickEvents(onPick, onPreview)
+  useOpenFromQuery(onPreview)
   const pickPhoto = () => file.current?.click()
   const askToSignUp = () => {
     void state.keepDraft()

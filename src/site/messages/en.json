@@ -331,7 +331,7 @@
       "count": "{running, plural, =0 {} other {# in progress · }}{done} done",
       "footnote": "Photos made with free credits are public with a watermark. Photos made with paid credits are private and watermark-free.",
       "photoAlt": "{name} photo",
-      "empty": "No photos yet. Pick a template, add a phone photo, and it lands here.",
+      "empty": "Pick a template, upload one phone photo, and your first one lands here in about 60 seconds.",
       "emptyCta": "Create your first photo",
       "today": "Today",
       "yesterday": "Yesterday",
@@ -344,7 +344,8 @@
       "waiting": "Waiting for a free slot",
       "makeAgain": "Make again",
       "deleted": "Photo deleted.",
-      "deletedClose": "Close"
+      "deletedClose": "Close",
+      "emptyTitle": "No photos yet"
     },
     "work": {
       "freePublic": "Public · watermark",
@@ -458,8 +459,11 @@
           "live": "Live",
           "shipped": "Shipped",
           "rejected": "Rejected"
-        }
-      }
+        },
+        "emptyBody": "Vote on the wall, or ask for a look we don't have.",
+        "toWall": "Go to the wall"
+      },
+      "emptyBody": "Describe the look, add a reference photo if you have one. Requests with the most votes get made first."
     },
     "account": {
       "metaTitle": "Account",
@@ -513,7 +517,9 @@
       "purchases": {
         "title": "Purchases",
         "lead": "Your recent payments, newest first.",
-        "empty": "No purchases yet."
+        "empty": "No purchases yet",
+        "emptyBody": "Plans and credit packs show up on this list once you buy one.",
+        "seePlans": "See plans"
       },
       "session": {
         "title": "Session",
@@ -626,6 +632,19 @@
       "yourChange": "Your change",
       "editedFromLabel": "Edited from",
       "sourceDeleted": "Original deleted"
+    },
+    "states": {
+      "photoMissing": {
+        "title": "This photo isn't here",
+        "body": "It may have been deleted, or the link is for someone else's account.",
+        "back": "Back to Photos"
+      },
+      "error": {
+        "title": "Couldn't load this page",
+        "body": "Something went wrong on our side. Your photos and credits are safe. Try again in a moment.",
+        "retry": "Try again",
+        "more": "Still stuck? Write to {email}"
+      }
     }
   },
   "paywall": {
@@ -732,10 +751,13 @@
     "language": "Language"
   },
   "notFound": {
-    "title": "This page does not exist",
-    "body": "The link may be old or mistyped. Start again from the home page or pick a template.",
-    "home": "Home",
-    "templates": "Browse templates"
+    "title": "Page not found",
+    "heading": "Nothing developed",
+    "headingEm": "here.",
+    "body": "The page you're after doesn't exist, or it moved. The home page and the templates are still where they were.",
+    "home": "Go to the home page",
+    "templates": "Browse templates",
+    "tryTitle": "Three templates to try instead"
   },
   "marketing": {
     "nav": {
@@ -773,7 +795,10 @@
   },
   "pageError": {
     "title": "Something went wrong",
-    "body": "This page did not load. Try again in a moment.",
-    "retry": "Try again"
+    "heading": "Something went wrong",
+    "headingEm": "on our side.",
+    "body": "The page couldn't load. Your photos and credits are safe. Try again in a moment, and if it keeps happening, write to {email}.",
+    "retry": "Try again",
+    "home": "Go to the home page"
   }
 }

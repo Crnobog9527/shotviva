@@ -18,7 +18,7 @@ describe('404 page in Chinese', () => {
     const html = renderToStaticMarkup(createElement(NextIntlClientProvider, provider))
     expect(html).toContain('页面不存在')
     expect(html).toContain('href="/zh"')
-    expect(html).toContain('href="/zh/generate"')
+    expect(html).toContain('href="/zh#templates"')
     expect(html).not.toMatch(/does not exist/i)
   })
 })
