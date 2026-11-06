@@ -158,6 +158,12 @@ Shotviva 的写法：
 
 涉及数据库函数的测试连本地 Supabase（`supabase start`）跑，不要用 mock 冒充数据库。CI 用 `supabase/setup-cli` action + `supabase start` 起库，第一个 PR（仓库骨架）就把 workflow 建好。
 
+**本地 Docker 用完就收（Owner 2026-11-06）。** 本地 Supabase 和其他 Docker 容器只在测试时开着：
+- 一轮本地测试跑完、短时间内不再用，就停掉自己的栈（`supabase stop --no-backup`，或停掉并删除自己起的容器）。
+- 任务收尾（PR 合并或交接）时，确认本卡起过的容器、网络和卷都已删除，并在交接笔记里写一句「本地 Docker 已清理」。
+- 只动自己这张卡的栈（容器名带本卡编号，如 `shotviva-t25`），不碰别的窗口正在用的，也不碰 Graylum 的容器。
+- 本机 Docker 卡死、命令不返回时，停下来告诉总控，由总控请 Owner 处理，不要反复重试。
+
 ## 8. Git 和发布
 
 - `main` 就是生产环境。不准直接推 main，所有改动走分支和 PR。

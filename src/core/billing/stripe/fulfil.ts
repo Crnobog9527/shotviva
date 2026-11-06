@@ -26,7 +26,7 @@ export type FulfilDeps = {
 
 export type FulfilOutcome = 'applied' | 'replayed' | 'unpaid'
 
-type SessionPurchase = { userId: string; product: SiteProduct; method: CheckoutMethod; subscription: Stripe.Subscription | null }
+export type SessionPurchase = { userId: string; product: SiteProduct; method: CheckoutMethod; subscription: Stripe.Subscription | null }
 
 const metadataSchema = z.object({ user_id: z.uuid(), product_id: z.string(), method: z.enum(CHECKOUT_METHODS) })
 
@@ -58,7 +58,7 @@ function onlyPrice(session: Stripe.Checkout.Session): Stripe.Price | null {
   return items.length === 1 ? (items[0]?.price ?? null) : null
 }
 
-function readPurchase(session: Stripe.Checkout.Session, products: readonly SiteProduct[]): SessionPurchase {
+export function readPurchase(session: Stripe.Checkout.Session, products: readonly SiteProduct[]): SessionPurchase {
   const owner = readOwner(session)
   const product = readProduct(session, owner.product_id, products)
   const subscription = typeof session.subscription === 'object' ? session.subscription : null
