@@ -3,13 +3,14 @@
 import { readJob, submitJob, type GenerateBody, type SubmitOutcome } from './job-api'
 import { applyError, applyView, type TrackedJob } from './job-model'
 import { markSent, nextToSend, requeue } from './scheduler'
-import { loadState, saveState } from './store-persistence'
+import { loadState, saveState, type WorkspaceViews } from './store-persistence'
 
 // Module-level store, so a generation outlives the page that started it: navigating from the
 // workspace to Photos keeps the requests (and this list) alive. Survives a reload through
 // sessionStorage; the server row in generation_jobs stays the truth (Photos reads it).
 // A batch waits here as 'queued' and goes out at most `limit` at a time (scheduler.ts).
 const EMPTY: TrackedJob[] = []
+const NO_IDS: readonly string[] = []
 // A job the server never saw (404) is given up after this long; its POST died pre-reserve.
 const MISSING_GRACE_MS = 30_000
 
@@ -17,12 +18,16 @@ let jobs: TrackedJob[] = EMPTY
 // The account's concurrency (TIER_LIMITS), handed over by the workspace; persisted with the
 // jobs so a reload on another page keeps the same pace.
 let limit = 1
+// The jobs each workspace (by template id) is showing, so a refresh there lands on the same
+// developing view or result instead of an empty form.
+let views: WorkspaceViews = {}
 let restored = false
 const listeners = new Set<() => void>()
 
-function set(next: TrackedJob[]) {
+function set(next: TrackedJob[], nextViews: WorkspaceViews = views) {
   jobs = next
-  saveState({ limit, jobs })
+  views = nextViews
+  saveState({ limit, jobs, views })
   listeners.forEach((listener) => listener())
 }
 
@@ -37,6 +42,7 @@ export function getJobs(): TrackedJob[] {
     if (back.jobs.length) {
       jobs = back.jobs
       limit = back.limit
+      views = back.views
       // Jobs that were in flight before the reload are queued again; send them once the
       // store is read (a microtask, so React is not updated mid-render).
       queueMicrotask(pump)
@@ -46,6 +52,20 @@ export function getJobs(): TrackedJob[] {
 }
 
 export const getServerJobs = () => EMPTY
+
+// The jobs a template's workspace shows (empty: the form). Stable references, for
+// useSyncExternalStore.
+export function getWorkspaceJobs(templateId: string): readonly string[] {
+  getJobs()
+  return views[templateId] ?? NO_IDS
+}
+
+export const getServerWorkspaceJobs = () => NO_IDS
+
+export function setWorkspaceJobs(templateId: string, ids: readonly string[]) {
+  const rest = Object.fromEntries(Object.entries(views).filter(([key]) => key !== templateId))
+  set(getJobs(), ids.length ? { ...rest, [templateId]: [...ids] } : rest)
+}
 
 export function subscribe(listener: () => void): () => void {
   listeners.add(listener)
@@ -86,7 +106,12 @@ export function retryJob(id: string, concurrency: number): string | null {
   if (!failed?.body || failed.status !== 'failed') return null
   limit = Math.max(1, concurrency)
   const next = queued({ ...failed, body: failed.body }, failed.batchSize, Date.now())
-  set(getJobs().map((job) => (job.id === id ? next : job)))
+  // The workspace showing the failed photo shows its retry in the same place.
+  const swapped = Object.fromEntries(Object.entries(views).map(([key, ids]) => [key, ids.map((current) => (current === id ? next.id : current))]))
+  set(
+    getJobs().map((job) => (job.id === id ? next : job)),
+    swapped,
+  )
   pump()
   return next.id
 }
