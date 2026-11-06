@@ -8,8 +8,8 @@ import type { MembershipTier } from '@/core/config'
 
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import type { TrackedJob } from '../generation/job-model'
-import { enqueueJobs, retryJob } from '../generation/job-store'
-import { useJob, useJobs } from '../generation/use-jobs'
+import { enqueueJobs, retryJob, setWorkspaceJobs } from '../generation/job-store'
+import { useJob, useJobs, useWorkspaceJobs } from '../generation/use-jobs'
 import { BatchProgressView } from './batch-progress-view'
 import { startInputs } from './batch-request'
 import { ctaState } from './cta-state'
@@ -35,11 +35,13 @@ const DEFAULTS: FormValues = { aspect: 'original', resolution: '1k', note: '', c
 
 // The workspace flow (DESIGN §4.3–4.4): form → developing → done or failed. One photo keeps the
 // single-photo views; a batch (T28, Pro and Max) develops as a list. The jobs live in the
-// generation store, so leaving this page does not stop them; Photos shows them.
+// generation store, so leaving this page does not stop them; Photos shows them. Which jobs this
+// workspace shows lives there too, so a browser refresh comes back to the same developing view
+// or result rather than the form.
 export function ImageWorkspace({ template, balance, tier, concurrency, shareText }: WorkspaceProps) {
   const photos = usePhotoBatch(limitsFor(tier).batchMax)
   const [values, setValues] = useState(DEFAULTS)
-  const [jobIds, setJobIds] = useState<string[]>([])
+  const jobIds = useWorkspaceJobs(template.id)
   const single = useJob(jobIds.length === 1 ? (jobIds[0] ?? null) : null)
   const running = useRunningCount(concurrency.runningIds)
   const { summary } = photos
@@ -54,16 +56,14 @@ export function ImageWorkspace({ template, balance, tier, concurrency, shareText
   })
 
   const generate = () => {
-    setJobIds(enqueueJobs(startInputs(template, values, summary.ready), concurrency.limit))
+    setWorkspaceJobs(template.id, enqueueJobs(startInputs(template, values, summary.ready), concurrency.limit))
     window.scrollTo({ top: 0 })
   }
-  const retry = (id: string) => {
-    const next = retryJob(id, concurrency.limit)
-    if (next) setJobIds((ids) => ids.map((current) => (current === id ? next : current)))
-  }
+  // retryJob puts the new job where the failed one was in this workspace's list.
+  const retry = (id: string) => void retryJob(id, concurrency.limit)
   const backToForm = (clearPhotos: boolean) => {
     if (clearPhotos) photos.clear()
-    setJobIds([])
+    setWorkspaceJobs(template.id, [])
   }
 
   if (jobIds.length > 1) return <BatchProgressView ids={jobIds} onRetry={retry} onMakeMore={() => backToForm(true)} />

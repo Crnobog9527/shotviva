@@ -9,7 +9,7 @@
 ## 1. 域名与品牌（已定稿，不再讨论）
 - 唯一域名：shotviva.com（已注册）。不使用 .ai，不做 301 跳转。
 - 商标：USPTO 已查，无 shotviva 冲突。
-- 品牌写法全站统一 Shotviva（Logo、Title 后缀、structured data 的 brand 字段、社交账号）。
+- 品牌写法全站统一 Shotviva，一个字不差（Logo、Title 后缀、页脚版权 `© 2026 Shotviva`、structured data 的 `name` / `brand`、`og:site_name`、社交账号；不写 Shotviva AI）。Title 后缀：首页以外的页面在 ≤60 字符内以 ` | Shotviva` 结尾；首页 Title 保持主词写法，等 GSC 里含 shotviva 的查询开始有曝光（通常上线后 4～8 周）再考虑加品牌后缀（Owner 2026-11-06，哥飞 GEO 建议）。X、Instagram、Product Hunt、LinkedIn 的 `shotviva` 账号由 Owner 尽快占住，填进 `site.config` 的 `sameAs`。
 - shotviva 与图片无字面关联，Logo 旁必须常驻 tagline："AI photo studio"（Owner 2026-11-05 定，改为通用写法；原 "AI food & product photo studio" 作废）；每个页面副标题也带一句功能说明。
 - 首页 footer 固定一行站方声明（唯一官方站点），并占用 X / Instagram / Product Hunt / LinkedIn 的 shotviva 账号名。
 
@@ -24,7 +24,7 @@ R7 结构化数据（JSON-LD 四类必做）：SoftwareApplication（首页+所�
 R8 内链规则：任何页面从首页出发 ≤3 次点击；内页指回首页锚文本只用「AI image to image」或「img to img」；同族互链（interior↔architectural、restaurant-flyer↔restaurant-poster、工具页↔模板分类、首页模板分类块的每个分类↔对应垂直页）；博客每篇至少链回一个工具页且锚文本用该页主词；首页必须直链所有已上线的内页。
 R9 图片 SEO：WebP/AVIF + CDN；首屏对比图不许 lazy load（LCP 要素）；alt 写「场景+主体+光线」，例 "AI food photo of grilled salmon on ceramic plate, studio lighting"，不许 image1、不许堆词；每张对比图配一行可见 caption（说明改了什么）。
 R10 内容模块（每页五块，缺一不算完成）：① 首屏 1 张前后对比图 + 一句直答（G1）+ 试用入口 ② 可核验事实块（平台尺寸/免费张数/价格/支持语言）③ 成本对比表（请摄影师 vs 本站，全站一套价格）④ FAQ 3~5 条用真实问法（首页例外，见 G6，上限 8 条） ⑤ 族内互链块 2~3 个相关页。
-R11 技术底座：Next.js App Router + next-intl，SSG/ISR。robots.txt 显式放行 GPTBot、OAI-SearchBot、PerplexityBot、ClaudeBot、ChatGPT-User，不许 Disallow: /。移动端 LCP <2.5s、CLS <0.1、INP <200ms。
+R11 技术底座：Next.js App Router + next-intl，SSG/ISR。robots.txt 显式放行 GPTBot、OAI-SearchBot、PerplexityBot、ClaudeBot、ChatGPT-User，不许 Disallow: /。移动端 LCP <2.5s、CLS <0.1、INP <200ms。（预上线期例外：开放收录前 AI 爬虫一律 Disallow、全站 noindex、不发布 sitemap 和 llms.txt，见 ARCHITECTURE §12.0；放行五个 AI 爬虫是开放收录那天的事）
 R12 监控节奏：上线当天 GSC 验证站点 + 提交 sitemap；上线满 2 周起每两周看一次 img to img（难度 14.3，首页的副词，不单独建页，靠首页文案和内页回链锚文本带动）是否先出排名、首页均排是否进前 20；每月看 AI 引荐来源与首页模板区点击率。判定线：上线 8 周后首页有排名（前 20）但首页→模板（点开任一模板进入工作台）点击率 <5%，才考虑换首页主词，此前不许动。另看一条「付费链路」指标（2026-11-05 补）：首页→垂直页（/ai-restaurant-menu、/commercial-photography、/interior-photography）的点击占比，低于 5% 先改首页的用例 / 内链块（§4 首页骨架的最后一个 H2），不改首页主词——通用定位下这是唯一能判断「泛流量有没有漏到付费页」的指标。
 
 ## 3. GEO 规则（13 条）
@@ -34,8 +34,8 @@ G2 Title 带年份与限定词：AI 联网会自己组带年份的搜索词，Ti
 G3 每个数字只能一套口径：免费额度（对外统一写 "3 free Standard images"，即注册送 6 个免费 credit = 3 张 Standard 档标准模板图，Owner 2026-11-05 定；其余计价仍用 credit，不说「张」）、价格（唯一来源是 site.config.ts；Owner 2026-11-05 定稿：Starter $19.90/月 50 credits 或 $191/年 600 credits，Pro $49.90/月 135 或 $479/年 1,620，Max $99/月 280 或 $713/年 3,360（年付 Owner 2026-11-06 改价：Starter / Pro 8 折，Max 6 折，取整）；积分包 $9.90/20、$24.90/55、$49.90/115；卡支付可订阅自动续费，钱包和积分包为单笔，见 规范/ARCHITECTURE.md §6.1、§6.2）、每张图消耗（按模板和清晰度：Standard / HD / Max 三档，即 1024 / 2048 / 2880 px，标准模板 2 / 4 / 6 credits，页面上写 "from 2 credits"；对外不写 1K / 2K / 3K，不写 4K）、支持语言数、出图耗时，全站（首页/价格页/FAQ/结构化数据/站外目录）完全一致；AI 交叉比对发现两套就不引用；改价一次改全站。
 G4 每页写死可核验事实，至少 3 条。全站通用的：免费额度（3 free Standard images）与价格档位；每张消耗（from 2 credits）；输出三档像素（Standard 1024 / HD 2048 / Max 2880 px）；上传限制（JPG / PNG / WebP，最大 20MB）；出图耗时（秒/张）；保留主体不变的技术说明。垂直页另加本行业的：餐饮页写 DoorDash/Uber Eats/Grubhub 菜单图推荐尺寸与比例，电商页写 Amazon / eBay / Etsy 主图要求，空间页写 Airbnb 封面图比例。
 G5 用 HTML 表格承载对比（成本、尺寸要求、模板分类），不用图片——AI 抽表格成功率显著高于段落。
-G6 FAQ 必须用用户原话。首页 8 句（通用；2026-11-05 定前 5 句，2026-11-06 Owner 按 GEO 审查加 F～H 并改写答案；首页 FAQ 以 8 句为上限，加第 9 句前要答得上「会被搜吗、和本页主词有关吗」）：
-A What is image to image AI?
+G6 FAQ 必须用用户原话。首页 9 句（通用；2026-11-05 定前 5 句，2026-11-06 Owner 按 GEO 审查加 F～I 并改写答案；首页 FAQ 以 9 句为上限，再加之前要答得上「会被搜吗、和本页主词有关吗」）。H2 保持 "Image to Image AI FAQ"，不改成品牌名：
+A What is image to image AI?（问题文字不动；答案首句固定为："Shotviva is an image to image AI tool that gives a photo you already have a new look while the subject stays as shot — in 3 steps: upload one phone photo, pick a template, choose Standard, HD or Max." 一句同时给出品牌实体和主词）
 B Is image to image AI free?（答：new users get 3 free Standard images，之后 from 2 credits a photo，套餐和每 credit 价格从配置读）
 C Does image to image AI keep my photo's subject the same?
 D How is image to image AI different from an AI image generator?（答案末尾链 /image-to-image-generator；答案后紧跟一张 4 行对比表：起点 / 主体 / 适合 / 风险）
@@ -43,6 +43,7 @@ E Can I use the photos commercially?（答：付费积分生成的作品无水�
 F Do I need to write prompts?（答：不用；选模板、填文字即可，想调整时可以用大白话说一句；答案末尾链 /image-to-image-generator）
 G What sizes and formats can I export?（答：PNG，Standard / HD / Max 三档，即 1024 / 2048 / 2880 px，比例按模板；付费作品全尺寸无水印。不写 JPG、不写 1080×1080 这类我们不出的尺寸）
 H Can I use Shotviva on my phone?（答：可以，直接在手机浏览器里用，iPhone 的 Safari、Android 的 Chrome 都行，不用装 App；用相机拍或从相册选，出图后保存或分享。不承诺「添加到主屏幕」之类没做的功能）
+I What is Shotviva?（放最后一位，问题里不带 AI；答案写它是什么、做什么、和同类工具的区别。它是品牌问句，价值低于前面几条，不占主词位置）
 
 首页 FAQ 的写法（2026-11-06 GEO 审查，Owner 同意）：
 - 每个答案第一句写出实体名（Shotviva 或 Image to image AI），不用 It、Yes、Photos 开头；AI 单独摘走任何一条都能看懂。
@@ -60,9 +61,9 @@ H Can I use Shotviva on my phone?（答：可以，直接在手机浏览器里�
 8 how to take better food photos with my iPhone
 分配：1/2/4 → /ai-food-photography 与 /commercial-photography；3 → /ai-restaurant-menu；6/8 → 博客；5 → 物料期 /restaurant-flyer；7 → 菜单页。首页不再承接这 8 句中的任何一句（原来由首页兼顾的 2 改由 /commercial-photography 承接）。
 G7 榜单与对比页（AI 回答推荐类问题的主要来源）必做三篇：best AI food photography tools 2026；Shotviva vs hiring a photographer（成本对比）；foodshot.ai alternatives / ezmaker.ai alternatives。规矩：真实列出竞品并给客观描述，纯自夸的榜单 AI 不引用。排期：Shotviva vs hiring a photographer 并入 /commercial-photography 的成本对比，不另建页；另外两篇作为博客排在第 3 周，URL 已登记在主词表 CSV，搜索量核实后再建。
-G8 实体信息写全：每页页脚或 About 说明是谁做的、何时上线、服务哪些国家、联系方式（AI 判断可信度会看实体是否明确）。
+G8 实体信息写全：说明是谁做的、何时上线、服务哪些国家、联系方式（AI 判断可信度会看实体是否明确）。放在法律页的联系方式一节和 Organization 结构化数据里；页脚只放联系邮箱和版权（Owner 2026-11-06）。
 G9 站外要有独立来源（每月 3~5 个，持续不像一次砸完）：Reddit r/smallbusiness / r/Etsy / r/Flipping / r/restaurateur / r/Chefit / r/airbnb_hosts（回答问题不发广告，按分类分散）；Product Hunt 上线页；AI 工具目录（There's An AI For That、Futurepedia 等）；1~2 篇第三方评测或访谈。
-G10 robots 与 AI 抓取：robots.txt 放行上述五个爬虫，不要因怕被白嫖而屏蔽 AI 爬虫（GEO 是本站流量大头）；可选 /llms.txt 列主要页面与一句话说明。
+G10 robots 与 AI 抓取：robots.txt 放行上述五个爬虫，不要因怕被白嫖而屏蔽 AI 爬虫（GEO 是本站流量大头）；可选 /llms.txt 列主要页面与一句话说明。（同上，预上线期例外见 ARCHITECTURE §12.0）
 G11 服务端渲染 + 语义化 HTML：AI 抓取不看 JS 渲染后的 DOM，直答块/事实块/FAQ 必须在源码里；FAQ 用 <h3>+<p>，不用 <div> 拼。
 G12 每周自测 SOP：每周一把 G6 首页 5 句 + 垂直页八句原话丢进开联网的 ChatGPT（另加 Perplexity 抽查 2 句），记录①提没提 ②排第几 ③引用哪个页面 ④截图存档。连续 4 周不提 → 检查承接页是否上线、直答块是否在源码；提到但引用竞品 → 抄它的页面结构、补它有你没有的事实块。
 G13 多语言 GEO：/zh（v1）和以后的 /ja、/id，直答块与 FAQ 必须按该语言的真实问法用母语重写，不许机器直译（日语/印尼语问法与英文差异大，直译的句子 AI 不引用）。
