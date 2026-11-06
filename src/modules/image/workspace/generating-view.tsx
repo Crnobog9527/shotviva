@@ -8,7 +8,6 @@ import type { ReactNode } from 'react'
 import { ActionBar } from '@/core/app-shell'
 import { buttonVariants } from '@/core/ui/button'
 
-import { useDevelopSeconds } from '../generation/develop-seconds-context'
 import type { TrackedJob } from '../generation/job-model'
 import { estimatedProgress, percent } from '../generation/progress'
 import { Tick } from './photo-card'
@@ -23,7 +22,6 @@ export function GeneratingView({ job }: { job: TrackedJob }) {
   const waiting = job.status === 'queued'
   const fraction = waiting ? 0 : estimatedProgress(now - job.startedAt)
   const t = useTranslations('app')
-  const seconds = useDevelopSeconds([job.resolution])
   const format = useFormatter()
   return (
     <section aria-labelledby="gen-h" className="px-4 pt-2">
@@ -57,7 +55,7 @@ export function GeneratingView({ job }: { job: TrackedJob }) {
           <span className="font-mono text-caption leading-none text-muted-foreground">{format.number(fraction, { style: 'percent', maximumFractionDigits: 0 })}</span>
         </li>
       </ol>
-      <p className="mt-4 text-caption text-bone-dim">{t('workspace.leave', seconds)}</p>
+      <p className="mt-4 text-caption text-bone-dim">{t('workspace.leave')}</p>
       <ActionBar>
         <Link href="/generate" className={buttonVariants({ variant: 'glass', size: 'cta', className: 'w-full rounded-control' })}>
           {t('workspace.backToCreate')}

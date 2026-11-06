@@ -5,7 +5,7 @@ import {
   SET_PHOTOS,
   creditFrom,
   packshotUsd,
-  photoSecondsRange,
+  photoSeconds,
   photosLeftInPlan,
   planFrom,
   quoteUsd,
@@ -84,7 +84,7 @@ function costBills(): CostBills {
     },
     site: {
       title: brand,
-      total: { amount: plan, suffix: '/月起', when: `${standard.name}画质每张 ${photoSecondsRange} 秒` },
+      total: { amount: plan, suffix: '/月起', when: `每张 ${photoSeconds} 秒左右` },
       lines: [
         { label: `入门版，每月 ${planFrom?.credits ?? ''} 积分`, value: plan },
         { label: `这 ${SET_PHOTOS} 张，${standard.name}`, value: `${setCredits} 积分 ≈ ${setCostUsd ?? ''}` },

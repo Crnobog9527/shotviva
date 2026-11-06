@@ -8,7 +8,7 @@ import {
   freeImagesLabel,
   freeStandardImages,
   packshotUsd,
-  photoSecondsRange,
+  photoSeconds,
   photosLeftInPlan,
   planFrom,
   plansSentence,
@@ -92,7 +92,7 @@ function costBills(): CostBills {
     },
     site: {
       title: brand,
-      total: { prefix: 'from', amount: plan, suffix: '/month', when: `${photoSecondsRange} seconds a photo at ${standard.name}` },
+      total: { prefix: 'from', amount: plan, suffix: '/month', when: `about ${photoSeconds} seconds a photo` },
       lines: [
         { label: `Starter plan, ${planFrom?.credits ?? ''} credits a month`, value: plan },
         { label: `These ${SET_PHOTOS} photos, ${standard.name}`, value: `${setCredits} credits ≈ ${setCostUsd ?? ''}` },

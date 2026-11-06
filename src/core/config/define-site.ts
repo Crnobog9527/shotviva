@@ -128,14 +128,10 @@ export type MarketingNumbers = {
     // Plain white-background packshots.
     packshotUsd: UsdRange
   }
-  // Seconds a photo usually takes to develop, per quality (1k Standard, 2k HD, 3k Max). The
-  // home bill quotes Standard; the workspace and Photos quote the photo's own quality. Retuned
-  // after the LAUNCH §5 measurement.
-  photoSeconds: PhotoSeconds
+  // About how many seconds a photo takes, one round figure for every quality (Owner
+  // 2026-11-06): no ranges or per-quality times, so a slower provider never breaks a promise.
+  photoSecondsApprox: number
 }
-
-export type SecondsRange = { low: number; high: number }
-export type PhotoSeconds = Record<'1k' | '2k' | '3k', SecondsRange>
 
 export function defineSite<const T extends SiteConfig>(config: T): T {
   return config

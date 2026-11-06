@@ -3,7 +3,6 @@
 /* eslint-disable @next/next/no-img-element -- template covers and local photo previews */
 import { useTranslations } from 'next-intl'
 
-import { useDevelopSeconds } from '../generation/develop-seconds-context'
 import { estimatedProgress, percent } from '../generation/progress'
 import { useNow } from '../workspace/use-now'
 import { runningMeta, type PhotoItem } from './photo-item'
@@ -15,13 +14,12 @@ export function RunningList({ server, covers }: { server: PhotoItem[]; covers: R
   const t = useTranslations('app.photos')
   const rows = useRunningItems(server, covers)
   const now = useNow()
-  const seconds = useDevelopSeconds(rows.map((row) => row.resolution))
   if (rows.length === 0) return null
   return (
     <section aria-labelledby="run-h">
       <div className="mx-(--gutter) mt-6 mb-3 flex items-baseline justify-between gap-3 md:mt-8">
         <h2 id="run-h" className="text-headline leading-[1.2] font-semibold tracking-[-0.01em]">{t('inProgress')}</h2>
-        <span className="text-caption text-muted-foreground">{t('usually', seconds)}</span>
+        <span className="text-caption text-muted-foreground">{t('usually')}</span>
       </div>
       <ul aria-live="polite" className="grid gap-3 px-(--gutter) md:grid-cols-2">
         {rows.map((row) => (

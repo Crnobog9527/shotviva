@@ -12,7 +12,7 @@ import { isModuleEnabled } from '@/core/config'
 import { appShellMetadata } from '@/core/seo'
 import { SupportTabBadge } from '@/core/support'
 import { isWishlistEnabled } from '@/core/wishlist'
-import { DevelopSecondsProvider, GenerationRunner, HideWhileGenerating, PhotosTabBadge } from '@/modules/image'
+import { GenerationRunner, HideWhileGenerating, PhotosTabBadge } from '@/modules/image'
 import { site } from '@/site/site.config'
 
 // Every logged-in page is noindex through this one layout, never per page (AGENTS §9).
@@ -64,10 +64,7 @@ export default function AppLayout({ children }: LayoutProps<'/[locale]'>) {
         <Suspense fallback={null}>
           <TabBar items={tabs} desktopUnder={['/photos/']} />
         </Suspense>
-        {/* Per-quality develop times from site.config, for the workspace and Photos hints. */}
-        <DevelopSecondsProvider seconds={site.marketing.photoSeconds}>
-          <main className="flex flex-1 flex-col">{children}</main>
-        </DevelopSecondsProvider>
+        <main className="flex flex-1 flex-col">{children}</main>
         <GenerationRunner />
       </PaywallProvider>
     </AppFrame>

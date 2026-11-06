@@ -7,7 +7,6 @@ import { ActionBar } from '@/core/app-shell'
 import { buttonVariants } from '@/core/ui/button'
 
 import type { TrackedJob } from '../generation/job-model'
-import { useDevelopSeconds } from '../generation/develop-seconds-context'
 import { isActive } from '../generation/scheduler'
 import { useJobs } from '../generation/use-jobs'
 import { BatchJobRow } from './batch-job-row'
@@ -24,7 +23,6 @@ export function BatchProgressView({ ids, onRetry, onMakeMore }: Props) {
   const byId = new Map(useJobs().map((job) => [job.id, job]))
   const jobs = ids.map((id) => byId.get(id)).filter((job): job is TrackedJob => job !== undefined)
   const settled = !jobs.some(isActive)
-  const seconds = useDevelopSeconds(jobs.map((job) => job.resolution))
   const done = jobs.filter((job) => job.status === 'succeeded').length
   const failed = jobs.filter((job) => job.status === 'failed').length
   return (
@@ -49,7 +47,7 @@ export function BatchProgressView({ ids, onRetry, onMakeMore }: Props) {
           </button>
         </div>
       ) : (
-        <p className="mt-4 text-caption text-bone-dim">{t('batchLeave', seconds)}</p>
+        <p className="mt-4 text-caption text-bone-dim">{t('batchLeave')}</p>
       )}
       <ActionBar>
         {settled ? (

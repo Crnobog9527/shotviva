@@ -38,7 +38,7 @@ export function testSite(overrides: Partial<SiteConfig> = {}): SiteConfig {
       },
       marketing: {
         photographer: { styledShotUsd: { low: 50, high: 350 }, packshotUsd: { low: 15, high: 90 } },
-        photoSeconds: { '1k': { low: 20, high: 40 }, '2k': { low: 30, high: 50 }, '3k': { low: 40, high: 60 } },
+        photoSecondsApprox: 60,
       },
     }),
     ...overrides,
