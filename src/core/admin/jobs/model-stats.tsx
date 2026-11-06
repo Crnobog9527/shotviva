@@ -2,16 +2,31 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 
 import type { ModelUsage } from '../overview/stats'
 import { JOBS_COPY } from './copy'
-import { estimateCosts } from './cost'
+import { modelCosts, type CostSummary, type UnitCost } from './cost'
+import { usdFine, usdTotal } from './cost-format'
 
 const COPY = JOBS_COPY.stats
-const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 3 })
 
-type Props = { usage: ModelUsage[]; days: number; unitCost: Readonly<Record<string, number>> }
+type Props = { usage: ModelUsage[]; days: number; unitCost: UnitCost }
 
-// Count and estimated cost per model × resolution over the overview's period (admin_dashboard_stats).
+function CostCells({ cost, uncosted }: { cost: CostSummary; uncosted: number }) {
+  return (
+    <>
+      <TableCell className="font-mono">{usdTotal.format(cost.real)}</TableCell>
+      <TableCell className="font-mono text-muted-foreground">{cost.estimated > 0 ? COPY.estimated(usdTotal.format(cost.estimated)) : '—'}</TableCell>
+      <TableCell className="font-mono">{cost.perImage === null ? '—' : usdFine.format(cost.perImage)}</TableCell>
+      <TableCell className={`font-mono ${uncosted > 0 ? 'text-destructive' : ''}`}>{uncosted > 0 ? uncosted : '—'}</TableCell>
+    </>
+  )
+}
+
+const HEADERS = [COPY.model, COPY.resolution, COPY.jobs, COPY.succeeded, COPY.cost, COPY.estimate, COPY.perImage, COPY.uncosted]
+
+// Count and real cost per model × resolution over the overview's period (admin_dashboard_stats,
+// T33). Pre-T33 jobs carry no usage and are estimated in their own column, labelled 「估算」.
 export function ModelStats({ usage, days, unitCost }: Props) {
-  const { rows, total } = estimateCosts(usage, unitCost)
+  const { rows, total } = modelCosts(usage, unitCost)
+  const uncosted = rows.reduce((sum, row) => sum + row.uncosted, 0)
   return (
     <section className="grid gap-2 rounded-lg border border-border bg-card p-4">
       <h2 className="font-semibold">{COPY.title(days)}</h2>
@@ -22,7 +37,7 @@ export function ModelStats({ usage, days, unitCost }: Props) {
         <Table>
           <TableHeader>
             <TableRow>
-              {[COPY.model, COPY.resolution, COPY.jobs, COPY.succeeded, COPY.unit, COPY.cost].map((label) => (
+              {HEADERS.map((label) => (
                 <TableHead key={label}>{label}</TableHead>
               ))}
             </TableRow>
@@ -34,15 +49,14 @@ export function ModelStats({ usage, days, unitCost }: Props) {
                 <TableCell className="font-mono text-xs uppercase">{row.resolution}</TableCell>
                 <TableCell className="font-mono">{row.jobs}</TableCell>
                 <TableCell className="font-mono">{row.succeeded}</TableCell>
-                <TableCell className="font-mono">{row.unit === null ? COPY.unknownUnit : usd.format(row.unit)}</TableCell>
-                <TableCell className="font-mono">{row.cost === null ? '—' : usd.format(row.cost)}</TableCell>
+                <CostCells cost={row} uncosted={row.uncosted} />
               </TableRow>
             ))}
             <TableRow>
-              <TableCell colSpan={5} className="font-semibold">
+              <TableCell colSpan={4} className="font-semibold">
                 {COPY.total}
               </TableCell>
-              <TableCell className="font-mono font-semibold">{usd.format(total)}</TableCell>
+              <CostCells cost={total} uncosted={uncosted} />
             </TableRow>
           </TableBody>
         </Table>

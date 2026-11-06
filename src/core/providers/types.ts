@@ -1,4 +1,4 @@
-import type { GenerationProvider } from '../jobs'
+import type { GenerationProvider, ProviderPrices } from '../jobs'
 
 // Provider settings (ARCHITECTURE §3.3). Mirrors the checks on public.ai_providers.
 
@@ -32,6 +32,8 @@ export type AdminProvider = {
   apiKeyLast4: string | null
   isActive: boolean
   notes: string | null
+  // Per-million-token prices (T33); a null one is flagged on the admin page.
+  prices: ProviderPrices
   updatedAt: string
 }
 
@@ -42,4 +44,6 @@ export type ActiveProviderRow = {
   adapter: ProviderAdapterId
   baseUrl: string
   model: string
+  // Snapshot used to cost each job (T33). Cached with the row; a save expires the tag.
+  prices: ProviderPrices
 }

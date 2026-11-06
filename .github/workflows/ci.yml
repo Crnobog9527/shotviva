@@ -5,44 +5,88 @@ on:
   push:
     branches: [main]
 
+# A new push to a PR cancels that PR's run in progress. Pushes to main are grouped per commit,
+# so every merge gets a complete run and none is cancelled or dropped from the queue.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
+# Both job names are required checks on main. A docs/spec-only PR (规范/, seo资料/, docs/,
+# design/, *.md) still runs both jobs, but each stops after the change detection step and
+# reports success in seconds (.github/actions/changes). Every other step is gated on it.
 jobs:
   checks:
     name: lint · typecheck · test · build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+        with:
+          fetch-depth: 2
+      - id: changes
+        uses: ./.github/actions/changes
+      - if: steps.changes.outputs.code == 'true'
+        uses: pnpm/action-setup@v4
+      # cache: pnpm restores the pnpm store keyed on pnpm-lock.yaml.
+      - if: steps.changes.outputs.code == 'true'
+        uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
-      - run: pnpm typecheck
-      - run: pnpm test
-      - run: pnpm build
+      - if: steps.changes.outputs.code == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.changes.outputs.code == 'true'
+        run: pnpm lint
+      - if: steps.changes.outputs.code == 'true'
+        run: pnpm typecheck
+      - if: steps.changes.outputs.code == 'true'
+        run: pnpm test
+      - if: steps.changes.outputs.code == 'true'
+        run: pnpm build
 
+  # One local Supabase per run serves both the DB tests and the schema.sql snapshot check
+  # (AGENTS §5), which used to start its own database in a separate workflow.
   db:
     name: supabase db tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+        with:
+          fetch-depth: 2
+      - id: changes
+        uses: ./.github/actions/changes
+      - if: steps.changes.outputs.code == 'true'
+        uses: pnpm/action-setup@v4
+      - if: steps.changes.outputs.code == 'true'
+        uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: pnpm
-      - uses: supabase/setup-cli@v1
+      - if: steps.changes.outputs.code == 'true'
+        uses: supabase/setup-cli@v1
         with:
+          # pg_dump output depends on the CLI's Postgres image; scripts/db-schema.ts says to
+          # regenerate locally with this same version.
           version: 2.107.0
-      - run: pnpm install --frozen-lockfile
+      - if: steps.changes.outputs.code == 'true'
+        run: pnpm install --frozen-lockfile
       # Only the services DB tests need; later cards drop names from this list as they need them.
-      - run: supabase start -x studio,imgproxy,edge-runtime,analytics,vector,inbucket,functions,realtime,storage
-      - run: pnpm test:db
+      - if: steps.changes.outputs.code == 'true'
+        run: supabase start -x studio,imgproxy,edge-runtime,analytics,vector,inbucket,functions,realtime,storage
+      # Before the tests, so the snapshot comes from migrations only, not from test data.
+      - name: schema.sql matches migrations (export)
+        if: steps.changes.outputs.code == 'true'
+        run: pnpm db:schema
+      - name: schema.sql matches migrations
+        if: steps.changes.outputs.code == 'true'
+        run: |
+          if [ -n "$(git status --porcelain -- supabase/schema.sql)" ]; then
+            git --no-pager diff -- supabase/schema.sql
+            echo "::error file=supabase/schema.sql::schema.sql is out of date with supabase/migrations. Run \`supabase db reset && pnpm db:schema\` and commit the result."
+            exit 1
+          fi
+          echo "schema.sql matches the migrations."
+      - if: steps.changes.outputs.code == 'true'
+        run: pnpm test:db

@@ -12,9 +12,11 @@ import { beijingDayStart, type JobFilters } from './filters'
 // All generation jobs, newest first (ARCHITECTURE §10). Index generation_jobs_created_at_id_idx
 // (0160) drives the order, the keyset and the date range; status / template / source / model
 // are filters on that walk. Only list columns are read: inputs is a jsonb, so just its
-// resolution key is selected.
+// resolution key is selected. provider_usage (T33) is at most four integers, read only to tell
+// 「无法计算」 (usage, no price) from a pre-T33 job (neither).
 
-const COLUMNS = 'id, created_at, finished_at, user_id, template_id, status, source, provider, credit_pool, credits_cost, error_code, resolution:inputs->>resolution'
+const COLUMNS =
+  'id, created_at, finished_at, user_id, template_id, status, source, provider, credit_pool, credits_cost, error_code, resolution:inputs->>resolution, cost_usd, provider_usage'
 
 const rowSchema = z.object({
   id: z.uuid(),
@@ -29,6 +31,8 @@ const rowSchema = z.object({
   credits_cost: z.number(),
   error_code: z.string().nullable(),
   resolution: z.string().nullable(),
+  cost_usd: z.coerce.number().nullable(),
+  provider_usage: z.record(z.string(), z.unknown()).nullable(),
 })
 
 export type AdminJob = {
@@ -44,6 +48,8 @@ export type AdminJob = {
   creditPool: 'free' | 'paid'
   creditsCost: number
   errorCode: string | null
+  costUsd: number | null
+  hasUsage: boolean
 }
 
 function toJob(row: z.infer<typeof rowSchema>): AdminJob {
@@ -61,6 +67,8 @@ function toJob(row: z.infer<typeof rowSchema>): AdminJob {
     creditPool: row.credit_pool,
     creditsCost: row.credits_cost,
     errorCode: row.error_code,
+    costUsd: row.cost_usd,
+    hasUsage: row.provider_usage !== null,
   }
 }
 

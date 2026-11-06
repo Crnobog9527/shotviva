@@ -258,3 +258,24 @@ describe('generation through the active provider', () => {
     expect(jobProvider).toBe('env/gpt-image-2.5-sunburst')
   })
 })
+
+describe('provider prices (T33)', () => {
+  it('saves, lists and clears the three per-million prices, and the active row carries them', async () => {
+    const id = await save({ priceInputTextPerM: '5', priceInputImagePerM: '8', priceOutputPerM: '30' })
+    const listed = (await listProviders(serviceSupabase())).find((p) => p.id === id)
+    expect(listed?.prices).toEqual({ inputTextPerM: 5, inputImagePerM: 8, outputPerM: 30 })
+
+    await activateProvider(deps(), adminId, { id })
+    expect((await loadActiveProviderRow(serviceSupabase(), 'image'))?.prices).toEqual({ inputTextPerM: 5, inputImagePerM: 8, outputPerM: 30 })
+
+    await save({ id, apiKey: '', priceInputTextPerM: '', priceInputImagePerM: '8', priceOutputPerM: '30' })
+    expect((await listProviders(serviceSupabase())).find((p) => p.id === id)?.prices.inputTextPerM).toBeNull()
+  })
+
+  it('refuses a negative price in the command and in SQL', async () => {
+    await expect(save({ priceOutputPerM: '-1' })).rejects.toMatchObject({ reason: 'invalid_input' })
+    await expect(pg.query(`update public.ai_providers set price_output_per_m = -1 where label like $1`, [`${PREFIX}%`])).rejects.toThrow(
+      /ai_providers_prices_nonnegative/,
+    )
+  })
+})

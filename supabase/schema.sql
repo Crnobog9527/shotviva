@@ -279,6 +279,53 @@ $$;
 ALTER FUNCTION "public"."admin_ban_user"("p_user_id" "uuid", "p_reason" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_daily_costs"("p_days" integer) RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_today timestamptz;
+  v_start timestamptz;
+begin
+  if p_days is null or p_days < 1 or p_days > 90 then
+    raise exception 'INVALID_INPUT' using detail = 'p_days must be between 1 and 90';
+  end if;
+
+  v_today := date_trunc('day', now() at time zone 'UTC') at time zone 'UTC';
+  v_start := v_today - make_interval(days => p_days - 1);
+
+  return (
+    with jobs as (
+      select date_trunc('day', g.created_at at time zone 'UTC') as day, g.status, g.provider_usage, g.cost_usd
+        from public.generation_jobs g
+       where g.created_at >= v_start
+    ),
+    per_day as (
+      select j.day,
+             coalesce(sum(j.cost_usd), 0) as cost_usd,
+             count(*) filter (where j.cost_usd is not null) as costed,
+             count(*) filter (where j.cost_usd is null and j.provider_usage is not null) as uncosted,
+             count(*) filter (where j.cost_usd is null and j.provider_usage is null and j.status <> 'running') as no_usage
+        from jobs j
+       group by j.day
+    )
+    select coalesce(jsonb_agg(jsonb_build_object(
+             'day', to_char(d.day, 'YYYY-MM-DD'),
+             'cost_usd', coalesce(p.cost_usd, 0),
+             'costed', coalesce(p.costed, 0),
+             'uncosted', coalesce(p.uncosted, 0),
+             'no_usage', coalesce(p.no_usage, 0)
+           ) order by d.day), '[]'::jsonb)
+      from generate_series(v_start at time zone 'UTC', v_today at time zone 'UTC', interval '1 day') as d(day)
+      left join per_day p on p.day = d.day
+  );
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_daily_costs"("p_days" integer) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_dashboard_stats"("p_days" integer) RETURNS "jsonb"
     LANGUAGE "plpgsql" STABLE
     SET "search_path" TO ''
@@ -306,7 +353,10 @@ begin
            case when position('/' in g.provider) > 0
                 then substr(g.provider, position('/' in g.provider) + 1)
                 else coalesce(g.provider, 'unknown') end as model,
-           coalesce(g.inputs ->> 'resolution', '1k') as resolution
+           coalesce(g.inputs ->> 'resolution', '1k') as resolution,
+           g.cost_usd,
+           g.provider_usage is not null and g.cost_usd is null as uncosted,
+           g.status = 'succeeded' and g.provider_usage is null and g.cost_usd is null as legacy
       from public.generation_jobs g
      where g.created_at >= v_start
   ),
@@ -338,7 +388,12 @@ begin
              'failed', (select count(*) from jobs j where j.created_at >= w.since and j.status = 'failed'),
              'free_credits_used', (select coalesce(sum(s.used), 0) from spend s where s.created_at >= w.since and s.pool = 'free'),
              'paid_credits_used', (select coalesce(sum(s.used), 0) from spend s where s.created_at >= w.since and s.pool = 'paid'),
-             'new_paying_users', (select count(*) from first_purchases f where f.first_at >= w.since)
+             'new_paying_users', (select count(*) from first_purchases f where f.first_at >= w.since),
+             'cost_usd', (select coalesce(sum(j.cost_usd), 0) from jobs j where j.created_at >= w.since),
+             'uncosted', (select count(*) from jobs j where j.created_at >= w.since and j.uncosted),
+             'legacy', (select coalesce(jsonb_object_agg(r.resolution, r.n), '{}'::jsonb)
+                          from (select j.resolution, count(*) as n from jobs j
+                                 where j.created_at >= w.since and j.legacy group by j.resolution) r)
            ) order by w.since desc) as value
       from windows w
   ),
@@ -347,16 +402,26 @@ begin
              'day', to_char(d.day at time zone v_tz, 'YYYY-MM-DD'),
              'jobs', (select count(*) from jobs j where j.created_at >= d.day and j.created_at < d.day + interval '1 day'),
              'succeeded', (select count(*) from jobs j
-                            where j.created_at >= d.day and j.created_at < d.day + interval '1 day' and j.status = 'succeeded')
+                            where j.created_at >= d.day and j.created_at < d.day + interval '1 day' and j.status = 'succeeded'),
+             'cost_usd', (select coalesce(sum(j.cost_usd), 0) from jobs j
+                           where j.created_at >= d.day and j.created_at < d.day + interval '1 day'),
+             'legacy', (select coalesce(jsonb_object_agg(r.resolution, r.n), '{}'::jsonb)
+                          from (select j.resolution, count(*) as n from jobs j
+                                 where j.created_at >= d.day and j.created_at < d.day + interval '1 day' and j.legacy
+                                 group by j.resolution) r)
            ) order by d.day) as value
       from generate_series(v_start, v_today, interval '1 day') as d(day)
   ),
   by_model as (
     select jsonb_agg(jsonb_build_object(
-             'model', m.model, 'resolution', m.resolution, 'jobs', m.jobs, 'succeeded', m.succeeded
+             'model', m.model, 'resolution', m.resolution, 'jobs', m.jobs, 'succeeded', m.succeeded,
+             'cost_usd', m.cost_usd, 'uncosted', m.uncosted, 'legacy', m.legacy
            ) order by m.jobs desc, m.model, m.resolution) as value
       from (
-        select j.model, j.resolution, count(*) as jobs, count(*) filter (where j.status = 'succeeded') as succeeded
+        select j.model, j.resolution, count(*) as jobs, count(*) filter (where j.status = 'succeeded') as succeeded,
+               coalesce(sum(j.cost_usd), 0) as cost_usd,
+               count(*) filter (where j.uncosted) as uncosted,
+               count(*) filter (where j.legacy) as legacy
           from jobs j
          group by j.model, j.resolution
       ) m
@@ -638,6 +703,18 @@ $_$;
 ALTER FUNCTION "public"."admin_lookup"("p_query" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_openai_admin_key_status"() RETURNS TABLE("key_last4" "text", "project_id" "text")
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select (select right(decrypted_secret, 4) from vault.decrypted_secrets where name = 'shotviva.openai_admin_key'),
+         (select decrypted_secret from vault.decrypted_secrets where name = 'shotviva.openai_costs_project');
+$$;
+
+
+ALTER FUNCTION "public"."admin_openai_admin_key_status"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) RETURNS "void"
     LANGUAGE "sql"
     SET "search_path" TO ''
@@ -853,6 +930,64 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_set_feature_access"("p_key" "text", "p_min_tier" "text", "p_open_to_all_at" timestamp with time zone, "p_actor" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_set_openai_admin_key"("p_key" "text") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_name constant text := 'shotviva.openai_admin_key';
+  v_secret uuid;
+begin
+  -- Same shape rule as provider keys: printable ASCII without whitespace, 16-1024 characters.
+  if p_key is not null and (char_length(p_key) not between 16 and 1024 or p_key !~ '^[!-~]+$') then
+    raise exception 'PROVIDER_KEY_INVALID' using errcode = '23514';
+  end if;
+
+  if p_key is null then
+    delete from vault.secrets where name in (v_name, 'shotviva.openai_costs_project');
+    return;
+  end if;
+
+  select id into v_secret from vault.secrets where name = v_name;
+  if v_secret is null then
+    perform vault.create_secret(p_key, v_name, 'Shotviva OpenAI Admin key (cost reconciliation)');
+  else
+    perform vault.update_secret(v_secret, p_key);
+  end if;
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."admin_set_openai_admin_key"("p_key" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_set_openai_costs_project"("p_project_id" "text") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_name constant text := 'shotviva.openai_costs_project';
+  v_secret uuid;
+begin
+  if p_project_id is not null and p_project_id !~ '^proj_[A-Za-z0-9]{1,64}$' then
+    raise exception 'INVALID_INPUT' using errcode = '23514', detail = 'project id must look like proj_…';
+  end if;
+
+  select id into v_secret from vault.secrets where name = v_name;
+  if p_project_id is null then
+    delete from vault.secrets where name = v_name;
+  elsif v_secret is null then
+    perform vault.create_secret(p_project_id, v_name, 'Shotviva OpenAI project id for cost reconciliation');
+  else
+    perform vault.update_secret(v_secret, p_project_id);
+  end if;
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."admin_set_openai_costs_project"("p_project_id" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_set_provider_key"("p_id" "uuid", "p_key" "text") RETURNS "void"
@@ -1212,12 +1347,16 @@ CREATE TABLE IF NOT EXISTS "public"."generation_jobs" (
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "finished_at" timestamp with time zone,
     "credit_pool" "text" NOT NULL,
+    "provider_usage" "jsonb",
+    "cost_usd" numeric(10,6),
     CONSTRAINT "generation_jobs_check" CHECK ((("status" = 'running'::"text") = ("finished_at" IS NULL))),
     CONSTRAINT "generation_jobs_check1" CHECK ((("status" <> 'succeeded'::"text") OR ("output_key" IS NOT NULL))),
+    CONSTRAINT "generation_jobs_cost_usd_nonnegative" CHECK ((("cost_usd" IS NULL) OR ("cost_usd" >= (0)::numeric))),
     CONSTRAINT "generation_jobs_credit_pool_check" CHECK (("credit_pool" = ANY (ARRAY['free'::"text", 'paid'::"text"]))),
     CONSTRAINT "generation_jobs_credits_cost_check" CHECK (("credits_cost" > 0)),
     CONSTRAINT "generation_jobs_free_work_public" CHECK ((("credit_pool" = 'paid'::"text") OR ("visibility" = 'public'::"text"))),
     CONSTRAINT "generation_jobs_module_check" CHECK (("module" = ANY (ARRAY['image'::"text", 'video'::"text"]))),
+    CONSTRAINT "generation_jobs_provider_usage_object" CHECK ((("provider_usage" IS NULL) OR ("jsonb_typeof"("provider_usage") = 'object'::"text"))),
     CONSTRAINT "generation_jobs_source_check" CHECK (("source" = ANY (ARRAY['web'::"text", 'graylum'::"text"]))),
     CONSTRAINT "generation_jobs_status_check" CHECK (("status" = ANY (ARRAY['running'::"text", 'succeeded'::"text", 'failed'::"text"]))),
     CONSTRAINT "generation_jobs_visibility_check" CHECK (("visibility" = ANY (ARRAY['public'::"text", 'private'::"text"])))
@@ -1227,7 +1366,7 @@ CREATE TABLE IF NOT EXISTS "public"."generation_jobs" (
 ALTER TABLE "public"."generation_jobs" OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text") RETURNS "public"."generation_jobs"
+CREATE OR REPLACE FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text", "p_provider_usage" "jsonb" DEFAULT NULL::"jsonb", "p_cost_usd" numeric DEFAULT NULL::numeric) RETURNS "public"."generation_jobs"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
@@ -1238,6 +1377,7 @@ begin
   if not found then
     raise exception 'JOB_NOT_FOUND';
   end if;
+  -- A repeat keeps the first settlement, usage and cost included.
   if v_job.status = 'succeeded' then
     return v_job;
   end if;
@@ -1249,7 +1389,8 @@ begin
   end if;
 
   update public.generation_jobs
-     set status = 'succeeded', output_key = p_output_key, finished_at = now()
+     set status = 'succeeded', output_key = p_output_key, finished_at = now(),
+         provider_usage = p_provider_usage, cost_usd = p_cost_usd
    where id = p_job_id
   returning * into v_job;
   return v_job;
@@ -1257,7 +1398,7 @@ end;
 $$;
 
 
-ALTER FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text") OWNER TO "postgres";
+ALTER FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."create_support_ticket"("p_user_id" "uuid", "p_type" "text", "p_body" "text", "p_payment_id" bigint, "p_job_id" "uuid") RETURNS "public"."support_tickets"
@@ -1513,6 +1654,18 @@ $$;
 ALTER FUNCTION "public"."mark_ticket_seen"("p_ticket_id" "uuid", "p_user_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."openai_admin_key"() RETURNS TABLE("api_key" "text", "project_id" "text")
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select (select decrypted_secret from vault.decrypted_secrets where name = 'shotviva.openai_admin_key'),
+         (select decrypted_secret from vault.decrypted_secrets where name = 'shotviva.openai_costs_project');
+$$;
+
+
+ALTER FUNCTION "public"."openai_admin_key"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."provider_api_key"("p_id" "uuid") RETURNS "text"
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -1627,7 +1780,7 @@ $$;
 ALTER FUNCTION "public"."refund_eligibility"("p_payment_id" bigint, "p_asked_at" timestamp with time zone) OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."refund_job"("p_job_id" "uuid", "p_error_code" "text") RETURNS "public"."generation_jobs"
+CREATE OR REPLACE FUNCTION "public"."refund_job"("p_job_id" "uuid", "p_error_code" "text", "p_provider_usage" "jsonb" DEFAULT NULL::"jsonb", "p_cost_usd" numeric DEFAULT NULL::numeric) RETURNS "public"."generation_jobs"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
@@ -1657,7 +1810,8 @@ begin
   );
 
   update public.generation_jobs
-     set status = 'failed', error_code = coalesce(nullif(p_error_code, ''), 'UNKNOWN'), finished_at = now()
+     set status = 'failed', error_code = coalesce(nullif(p_error_code, ''), 'UNKNOWN'), finished_at = now(),
+         provider_usage = p_provider_usage, cost_usd = p_cost_usd
    where id = p_job_id
   returning * into v_job;
   return v_job;
@@ -1665,7 +1819,7 @@ end;
 $$;
 
 
-ALTER FUNCTION "public"."refund_job"("p_job_id" "uuid", "p_error_code" "text") OWNER TO "postgres";
+ALTER FUNCTION "public"."refund_job"("p_job_id" "uuid", "p_error_code" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."reserve_credits"("p_job_id" "uuid", "p_user_id" "uuid", "p_module" "text", "p_template_id" "text", "p_credits_cost" integer, "p_source" "text", "p_inputs" "jsonb" DEFAULT '{}'::"jsonb", "p_provider" "text" DEFAULT NULL::"text", "p_idempotency_key" "text" DEFAULT NULL::"text", "p_visibility" "text" DEFAULT NULL::"text") RETURNS "public"."generation_jobs"
@@ -2073,6 +2227,9 @@ CREATE TABLE IF NOT EXISTS "public"."ai_providers" (
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_by" "uuid",
     "vault_secret_id" "uuid",
+    "price_input_text_per_m" numeric(12,6),
+    "price_input_image_per_m" numeric(12,6),
+    "price_output_per_m" numeric(12,6),
     CONSTRAINT "ai_providers_adapter_check" CHECK (("adapter" = 'openai_images'::"text")),
     CONSTRAINT "ai_providers_api_key_last4_check" CHECK ((("char_length"("api_key_last4") >= 1) AND ("char_length"("api_key_last4") <= 4))),
     CONSTRAINT "ai_providers_base_url_check" CHECK ((("base_url" ~ '^https://[^\s/?#@]+(/[^\s?#]*)?$'::"text") AND ("char_length"("base_url") <= 300))),
@@ -2080,7 +2237,8 @@ CREATE TABLE IF NOT EXISTS "public"."ai_providers" (
     CONSTRAINT "ai_providers_label_check" CHECK ((("char_length"("label") >= 1) AND ("char_length"("label") <= 80))),
     CONSTRAINT "ai_providers_model_check" CHECK ((("char_length"("model") >= 1) AND ("char_length"("model") <= 120))),
     CONSTRAINT "ai_providers_module_check" CHECK (("module" = 'image'::"text")),
-    CONSTRAINT "ai_providers_notes_check" CHECK ((("notes" IS NULL) OR ("char_length"("notes") <= 500)))
+    CONSTRAINT "ai_providers_notes_check" CHECK ((("notes" IS NULL) OR ("char_length"("notes") <= 500))),
+    CONSTRAINT "ai_providers_prices_nonnegative" CHECK (((COALESCE("price_input_text_per_m", (0)::numeric) >= (0)::numeric) AND (COALESCE("price_input_image_per_m", (0)::numeric) >= (0)::numeric) AND (COALESCE("price_output_per_m", (0)::numeric) >= (0)::numeric)))
 );
 
 
@@ -2807,6 +2965,11 @@ GRANT ALL ON FUNCTION "public"."admin_ban_user"("p_user_id" "uuid", "p_reason" "
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_daily_costs"("p_days" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_daily_costs"("p_days" integer) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_dashboard_stats"("p_days" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_dashboard_stats"("p_days" integer) TO "service_role";
 
@@ -2842,6 +3005,11 @@ GRANT ALL ON FUNCTION "public"."admin_lookup"("p_query" "text") TO "service_role
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_openai_admin_key_status"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_openai_admin_key_status"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) TO "service_role";
 
@@ -2869,6 +3037,16 @@ GRANT ALL ON FUNCTION "public"."admin_search_users"("p_query" "text") TO "servic
 
 REVOKE ALL ON FUNCTION "public"."admin_set_feature_access"("p_key" "text", "p_min_tier" "text", "p_open_to_all_at" timestamp with time zone, "p_actor" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_set_feature_access"("p_key" "text", "p_min_tier" "text", "p_open_to_all_at" timestamp with time zone, "p_actor" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_set_openai_admin_key"("p_key" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_openai_admin_key"("p_key" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_set_openai_costs_project"("p_project_id" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_openai_costs_project"("p_project_id" "text") TO "service_role";
 
 
 
@@ -2917,8 +3095,8 @@ GRANT SELECT ON TABLE "public"."generation_jobs" TO "authenticated";
 
 
 
-REVOKE ALL ON FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text") FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text") TO "service_role";
+REVOKE ALL ON FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric) TO "service_role";
 
 
 
@@ -2960,6 +3138,11 @@ GRANT ALL ON FUNCTION "public"."mark_ticket_seen"("p_ticket_id" "uuid", "p_user_
 
 
 
+REVOKE ALL ON FUNCTION "public"."openai_admin_key"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."openai_admin_key"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."provider_api_key"("p_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."provider_api_key"("p_id" "uuid") TO "service_role";
 
@@ -2975,8 +3158,8 @@ GRANT ALL ON FUNCTION "public"."refund_eligibility"("p_payment_id" bigint, "p_as
 
 
 
-REVOKE ALL ON FUNCTION "public"."refund_job"("p_job_id" "uuid", "p_error_code" "text") FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."refund_job"("p_job_id" "uuid", "p_error_code" "text") TO "service_role";
+REVOKE ALL ON FUNCTION "public"."refund_job"("p_job_id" "uuid", "p_error_code" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."refund_job"("p_job_id" "uuid", "p_error_code" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric) TO "service_role";
 
 
 

@@ -1,5 +1,7 @@
 export { JOBS_COPY } from './copy'
-export { estimateCosts } from './cost'
+export { costSummary, legacyEstimate, modelCosts, type CostSummary, type UnitCost } from './cost'
+export { usdFine, usdTotal } from './cost-format'
+export { ModelStats } from './model-stats'
 export { filtersHref, parseJobFilters, type JobFilters } from './filters'
 export { JobsView } from './jobs-view'
 export { listJobs, listTemplateOptions, type AdminJob } from './repository'

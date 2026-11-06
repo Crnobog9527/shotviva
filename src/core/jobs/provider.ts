@@ -22,10 +22,31 @@ export type ProviderInput = {
   signal: AbortSignal
 }
 
-export type ProviderOutput = { bytes: Uint8Array; contentType: 'image/png' }
+// What the provider reported using, as stored in generation_jobs.provider_usage (ARCHITECTURE §4,
+// T33). A field the provider did not report is left out, never guessed; cost then stays null.
+// decision_* are the photo-edit decision step's tokens (T30, §5), added by that flow.
+export type ProviderUsage = {
+  input_text_tokens?: number
+  input_image_tokens?: number
+  output_tokens?: number
+  decision_input_tokens?: number
+  decision_output_tokens?: number
+}
+
+export type ProviderOutput = { bytes: Uint8Array; contentType: 'image/png'; usage?: ProviderUsage | null }
+
+// US dollars per million tokens, from the provider's ai_providers row (§3.3). null: not filled in.
+export type ProviderPrices = {
+  inputTextPerM: number | null
+  inputImagePerM: number | null
+  outputPerM: number | null
+}
 
 export type GenerationProvider = {
   id: string
+  // Price snapshot taken when the provider was resolved for this request; null for the env
+  // fallback, which has no row to hold prices.
+  prices?: ProviderPrices | null
   generate(input: ProviderInput): Promise<ProviderOutput>
 }
 
@@ -34,10 +55,13 @@ export type ProviderFailureKind = 'content_rejected' | 'timeout' | 'failed'
 
 export class ProviderError extends Error {
   readonly kind: ProviderFailureKind
+  // Usage the provider reported on a call that still failed (it is billed all the same).
+  readonly usage: ProviderUsage | null
 
-  constructor(kind: ProviderFailureKind, message: string, options?: { cause?: unknown }) {
+  constructor(kind: ProviderFailureKind, message: string, options?: { cause?: unknown; usage?: ProviderUsage | null }) {
     super(message, options)
     this.name = 'ProviderError'
     this.kind = kind
+    this.usage = options?.usage ?? null
   }
 }
