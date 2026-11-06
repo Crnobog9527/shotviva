@@ -3,7 +3,7 @@
 import { useTranslations } from 'next-intl'
 import { useEffect, type ReactNode } from 'react'
 
-import { CaptchaFailed, Notice } from './form-parts'
+import { CaptchaFailed, CaptchaLine, Notice } from './form-parts'
 import { MailGlyph } from './icons'
 import { useAuthForm, type FormAction } from './use-auth-form'
 import { useCooldown } from './use-cooldown'
@@ -64,6 +64,7 @@ export function CheckEmail({ title, text, email, resendAction, next, back, sende
       </form>
       {aside ? <p className="au-swap">{aside}</p> : null}
       <p className="au-from">{t.rich('resend.from', { sender, b: (chunks) => <b>{chunks}</b> })}</p>
+      <CaptchaLine enabled={form.captchaEnabled} />
     </section>
   )
 }

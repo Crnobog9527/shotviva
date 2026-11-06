@@ -7,7 +7,7 @@ import { Link } from '../../i18n/ui'
 import type { FormState } from '../flows/form-state'
 import { PASSWORD_MIN } from '../flows/schemas'
 import { CheckEmail } from './check-email'
-import { CaptchaFailed, CaptchaLine, Divider, EmailField, Notice, PasswordField, SubmitButton } from './form-parts'
+import { CaptchaFailed, Divider, EmailField, hcaptchaLink, Notice, PasswordField, SubmitButton } from './form-parts'
 import { GoogleButton } from './google-button'
 import { GiftGlyph } from './icons'
 import { useAuthForm, type AuthForm, type FormAction } from './use-auth-form'
@@ -96,15 +96,15 @@ export function SignupForm({ action, googleAction, resendAction, next, freeImage
         <CaptchaFailed show={form.captchaFailed} />
       </form>
       <p className="au-fine">
-        {t.rich('signup.fine', {
+        {t.rich(form.captchaEnabled ? 'signup.fineCaptcha' : 'signup.fine', {
           terms: (chunks) => <Link href="/terms">{chunks}</Link>,
           privacy: (chunks) => <Link href="/privacy">{chunks}</Link>,
+          hcaptcha: hcaptchaLink,
         })}
       </p>
       <p className="au-swap">
         {t.rich('signup.toLogin', { link: (chunks) => <Link href={`/login?next=${encodeURIComponent(next)}`}>{chunks}</Link> })}
       </p>
-      <CaptchaLine enabled={form.captchaEnabled} />
     </section>
   )
 }
