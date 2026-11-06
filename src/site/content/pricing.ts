@@ -1,3 +1,4 @@
+import type { PaymentChannel } from '@/core/config'
 import type { FaqItem } from '@/core/content'
 
 import { site } from '../site.config'
@@ -81,5 +82,29 @@ export const pricingPage = {
     },
   ] satisfies FaqItem[],
 } as const
+
+// When the paywall runs on Waffo (ARCHITECTURE §6.3, PAYMENT_CHANNEL=waffo) every purchase is
+// one-time, so /pricing says nothing about renewing or cancelling.
+const oneTimePayment = [
+  'Card or Alipay: a one-time payment for one month or one year of a plan. When it ends, buy again if you want more.',
+  'Credit packs are always a one-time payment and can be bought without a plan.',
+] as const
+
+const CANCEL_QUESTION = 'How do I cancel my plan?'
+
+export function pricingPayment(channel: PaymentChannel): readonly string[] {
+  return channel === 'waffo' ? oneTimePayment : pricingPage.payment
+}
+
+export function pricingFaq(channel: PaymentChannel): readonly FaqItem[] {
+  if (channel !== 'waffo') return pricingPage.faq
+  return pricingPage.faq
+    .filter((item) => item.question !== CANCEL_QUESTION)
+    .map((item) =>
+      item.question === 'Do credits expire?'
+        ? { ...item, answer: 'No. Paid credits never expire, and credits you do not use stay on your account.' }
+        : item,
+    )
+}
 
 export type PricingTable = Table

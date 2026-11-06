@@ -37,7 +37,7 @@ export {
   loadRevenueStats,
   ORDERS_COPY,
   OrdersView,
-  purchaseSource,
+  paymentSource,
   stripeDashboardUrl,
   usd,
   type AdminPurchase,

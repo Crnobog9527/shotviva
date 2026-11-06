@@ -33,7 +33,7 @@ function WindowCards({ window, days, revenue }: { window: StatsWindow; days: num
           hint={COPY.cards.creditsHint(window.free_credits_used, window.paid_credits_used)}
         />
         <StatCard title={COPY.cards.newPaying} value={number.format(window.new_paying_users)} />
-        {/* admin_revenue_stats: list price, the orders page has the detail. */}
+        {/* admin_revenue_stats: net of tax and refunds (payments, 0168); the orders page has the detail. */}
         <StatCard
           title={COPY.cards.revenue}
           value={money ? usd.format(money.revenue_usd) : '—'}

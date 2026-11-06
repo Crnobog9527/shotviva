@@ -4,10 +4,11 @@ import { getTranslations } from 'next-intl/server'
 import { Suspense, type ReactNode } from 'react'
 
 import { AppPage, BalanceChip, balanceSentence, TabRootHeader } from '@/core/app-shell'
-import { createServerSupabase, requireUser } from '@/core/auth'
+import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
 import { DeleteAccountPanel } from '@/core/auth/ui'
 import { readBalance, type Balance } from '@/core/billing'
 import { CheckoutNotice, PaywallButton } from '@/core/billing/paywall'
+import { readSubscriptionSummary, SubscriptionPanel, type SubscriptionSummary } from '@/core/billing/subscription'
 import { readLinkStatus } from '@/core/partner'
 import { GraylumConnection } from '@/core/partner/ui'
 import { buttonVariants } from '@/core/ui/button'
@@ -15,12 +16,13 @@ import { site } from '@/site/site.config'
 
 import { signOutAction } from '../../auth/actions'
 import { disconnectGraylumAction } from './partner-actions'
+import { manageSubscriptionAction } from './subscription-actions'
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('app.account'))('metaTitle') }
 }
 
-type ViewProps = { email: string | null; balance: Balance; graylumLinkedAt: Date | null }
+type ViewProps = { email: string | null; balance: Balance; graylumLinkedAt: Date | null; subscription: SubscriptionSummary }
 
 function Panel({ children }: { children: ReactNode }) {
   return <section className="hairline-lit mx-4 mt-4 rounded-panel bg-card p-4">{children}</section>
@@ -30,7 +32,7 @@ function AccountHeader() {
   return <TabRootHeader title={useTranslations('auth.account')('title')} />
 }
 
-function AccountView({ email, balance, graylumLinkedAt }: ViewProps) {
+function AccountView({ email, balance, graylumLinkedAt, subscription }: ViewProps) {
   const t = useTranslations('auth.account')
   const balanceT = useTranslations('app.balance')
   return (
@@ -51,6 +53,9 @@ function AccountView({ email, balance, graylumLinkedAt }: ViewProps) {
         </PaywallButton>
       </Panel>
       <Panel>
+        <SubscriptionPanel summary={subscription} manage={manageSubscriptionAction} />
+      </Panel>
+      <Panel>
         <GraylumConnection linkedAt={graylumLinkedAt} disconnect={disconnectGraylumAction} />
       </Panel>
       <form action={signOutAction} className="mx-4 mt-6">
@@ -68,8 +73,12 @@ function AccountView({ email, balance, graylumLinkedAt }: ViewProps) {
 async function Account() {
   const user = await requireUser('/account')
   const supabase = await createServerSupabase()
-  const [graylum, balance] = await Promise.all([readLinkStatus(supabase, user.id), readBalance(supabase, user.id)])
-  return <AccountView email={user.email} balance={balance} graylumLinkedAt={graylum.linkedAt} />
+  const [graylum, balance, subscription] = await Promise.all([
+    readLinkStatus(supabase, user.id),
+    readBalance(supabase, user.id),
+    readSubscriptionSummary(createAdminSupabase(), user.id, site.billing.products),
+  ])
+  return <AccountView email={user.email} balance={balance} graylumLinkedAt={graylum.linkedAt} subscription={subscription} />
 }
 
 export default function AccountPage() {

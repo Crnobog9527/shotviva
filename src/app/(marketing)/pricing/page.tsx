@@ -1,15 +1,18 @@
 import type { Metadata } from 'next'
 
 import { PaywallProvider, PricingPlans } from '@/core/billing/paywall'
+import { paymentChannel } from '@/core/billing/waffo'
 import { Breadcrumbs, FaqSection } from '@/core/content'
 import { JsonLdScript, breadcrumbListLd, faqPageLd, pageMetadata } from '@/core/seo'
-import { homePage, pricingPage, type PricingTable } from '@/site/content'
+import { homePage, pricingFaq, pricingPage, pricingPayment, type PricingTable } from '@/site/content'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { site } from '@/site/site.config'
 
 // Prices render from site.config (plans through core/billing/paywall, tables through
 // site/content) into the static HTML. Indexable: /pricing is in the keyword map CSV and in
 // site.indexing. Buying opens the same paywall as the app; signed-out buyers sign in first.
+// PAYMENT_CHANNEL is read when the page renders (at build): switching channel is an env change
+// plus a redeploy, which re-renders this page with the matching payment copy.
 export const metadata: Metadata = pageMetadata(site, pricingPage)
 
 const crumbs = [
@@ -49,9 +52,11 @@ function PriceTable({ table }: { table: PricingTable }) {
 export default function PricingPage() {
   const { tables } = pricingPage
   const wishlistLive = isWishlistEnabled(site)
+  const channel = paymentChannel()
+  const faq = pricingFaq(channel)
   return (
     <article className="mx-auto flex w-full max-w-5xl flex-col gap-8 py-4">
-      <JsonLdScript data={[breadcrumbListLd(site, crumbs), faqPageLd(pricingPage.faq)]} />
+      <JsonLdScript data={[breadcrumbListLd(site, crumbs), faqPageLd(faq)]} />
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4">
         <Breadcrumbs crumbs={crumbs} />
         <header>
@@ -59,7 +64,7 @@ export default function PricingPage() {
           <p>{pricingPage.intro}</p>
         </header>
       </div>
-      <PaywallProvider products={site.billing.products} wishlistLive={wishlistLive}>
+      <PaywallProvider products={site.billing.products} wishlistLive={wishlistLive} channel={channel}>
         <PricingPlans products={site.billing.products} wishlistLive={wishlistLive} />
       </PaywallProvider>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4">
@@ -69,12 +74,12 @@ export default function PricingPage() {
         <section>
           <h2>How you pay</h2>
           <ul>
-            {pricingPage.payment.map((line) => (
+            {pricingPayment(channel).map((line) => (
               <li key={line}>{line}</li>
             ))}
           </ul>
         </section>
-        <FaqSection faq={pricingPage.faq} heading="Pricing FAQ" />
+        <FaqSection faq={faq} heading="Pricing FAQ" />
       </div>
     </article>
   )

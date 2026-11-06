@@ -6,32 +6,55 @@ import { z } from 'zod'
 import { AppError } from '@/core/errors'
 
 import { afterCursor, decodeCursor, PAGE_SIZE, toPage, type Page } from '../cursor'
-import { purchaseSource, type PurchaseSource } from './source'
+import { paymentSource, type PurchaseSource } from './source'
 
-// /admin/orders reads (Plan A): purchases from the ledger, subscriptions from T9's mirror.
-// Indexes: credit_ledger_purchases_created_at_id_idx (0166) for purchases; products and the
-// subscriber emails are looked up by primary key.
+// /admin/orders reads: payments (T10, what was actually charged) and T9's subscription mirror.
+// Indexes: payments_created_at_id_idx (0105) for the payment list; subscriptions keyset on its
+// created_at with the primary key; subscriber emails by primary key through Auth.
 
 const fail = (what: string, error: { message: string }): never => {
   throw new AppError('INTERNAL', `admin orders ${what} failed`, { cause: new Error(error.message) })
 }
 
-const purchaseRow = z.object({
+const PAYMENT_COLUMNS =
+  'id, created_at, user_id, product_id, channel, stripe_session_id, stripe_invoice_id, stripe_charge_id, waffo_order_id, ' +
+  'amount_total, amount_tax, amount_refunded, currency, method, status'
+
+const nullableId = z.string().nullable()
+
+const paymentRow = z.object({
   id: z.union([z.number(), z.string()]).transform(String),
   created_at: z.string(),
   user_id: z.uuid(),
-  product_id: z.string().nullable(),
-  idempotency_key: z.string(),
+  product_id: z.string(),
+  channel: z.enum(['stripe', 'waffo']),
+  stripe_session_id: nullableId,
+  stripe_invoice_id: nullableId,
+  stripe_charge_id: nullableId,
+  waffo_order_id: nullableId,
+  amount_total: z.number().int(),
+  amount_tax: z.number().int(),
+  amount_refunded: z.number().int(),
+  currency: z.string(),
+  method: z.enum(['card', 'alipay']),
+  status: z.enum(['paid', 'refunded', 'partially_refunded', 'disputed']),
 })
+
+export type PaymentStatus = z.infer<typeof paymentRow>['status']
 
 export type AdminPurchase = PurchaseSource & {
   id: string
   createdAt: string
   userId: string
   email: string | null
-  productId: string | null
-  // List price at read time (products.price_usd); not the amount charged.
-  listPriceUsd: number | null
+  productId: string
+  // Smallest currency unit, as charged (tax included); the currency may be the buyer's.
+  amountTotal: number
+  amountTax: number
+  amountRefunded: number
+  currency: string
+  method: 'card' | 'alipay'
+  status: PaymentStatus
 }
 
 // Emails come live from Auth, one call per distinct user on the page (≤ 30), never copied.
@@ -41,35 +64,32 @@ async function emailsFor(db: SupabaseClient, ids: string[]): Promise<Map<string,
   return new Map(found)
 }
 
-async function listPrices(db: SupabaseClient): Promise<Map<string, number>> {
-  const { data, error } = await db.from('products').select('id, price_usd')
-  if (error) fail('products', error)
-  const rows = z.array(z.object({ id: z.string(), price_usd: z.coerce.number() })).parse(data)
-  return new Map(rows.map((row) => [row.id, row.price_usd]))
-}
-
 export async function listPurchases(db: SupabaseClient, cursor?: string | null): Promise<Page<AdminPurchase>> {
   let query = db
-    .from('credit_ledger')
-    .select('id, created_at, user_id, product_id, idempotency_key')
-    .eq('kind', 'purchase')
+    .from('payments')
+    .select(PAYMENT_COLUMNS)
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
     .limit(PAGE_SIZE + 1)
   const after = decodeCursor(cursor)
   if (after) query = query.or(afterCursor(after))
-  const [{ data, error }, prices] = await Promise.all([query, listPrices(db)])
-  if (error) fail('purchases', error)
-  const rows = purchaseRow.array().parse(data)
+  const { data, error } = await query
+  if (error) fail('payments', error)
+  const rows = paymentRow.array().parse(data)
   const emails = await emailsFor(db, rows.slice(0, PAGE_SIZE).map((row) => row.user_id))
   return toPage(rows, (row) => ({
-    ...purchaseSource(row.idempotency_key),
+    ...paymentSource(row),
     id: row.id,
     createdAt: row.created_at,
     userId: row.user_id,
     email: emails.get(row.user_id) ?? null,
     productId: row.product_id,
-    listPriceUsd: row.product_id ? (prices.get(row.product_id) ?? null) : null,
+    amountTotal: row.amount_total,
+    amountTax: row.amount_tax,
+    amountRefunded: row.amount_refunded,
+    currency: row.currency,
+    method: row.method,
+    status: row.status,
   }))
 }
 
