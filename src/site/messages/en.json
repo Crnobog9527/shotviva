@@ -610,7 +610,8 @@
     "buyPackLabel": "Buy {count, plural, one {# credit} other {# credits}} for {price}",
     "payNoteCard": "Plans renew automatically, cancel anytime",
     "payNoteWallet": "One-time payment for 30 days or 1 year, no auto-renew",
-    "payNoteOnce": "One-time payment for 30 days or 1 year"
+    "payNoteOnce": "One-time payment for 30 days or 1 year",
+    "payNotePacks": "Credit packs are always a one-time payment."
   },
   "announcement": {
     "dismiss": "Dismiss announcement"

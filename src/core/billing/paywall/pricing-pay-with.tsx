@@ -7,7 +7,8 @@ import { MethodMark } from "./pay-methods"
 
 // /pricing's "Pay with" (comps-v3-b pricing.html): the two payment groups as plain rows, not
 // choices; the method is picked in the paywall. Renders on the server, so the payment terms
-// are in the static HTML, worded for the live channel.
+// are in the static HTML, worded for the live channel: renewal terms are visible before
+// purchase (DESIGN §4.5, Stripe merchant review), and packs are one-time on every channel.
 export function PricingPayWith({ channel }: { channel: PaymentChannel }) {
   const t = useTranslations("paywall")
   return (
@@ -33,6 +34,7 @@ export function PricingPayWith({ channel }: { channel: PaymentChannel }) {
           )
         })}
       </ul>
+      <p className="px-0.5 text-caption text-muted-foreground">{t("payNotePacks")}</p>
     </section>
   )
 }

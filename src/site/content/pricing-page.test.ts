@@ -1,8 +1,11 @@
+import { NextIntlClientProvider } from 'next-intl'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
+import { PricingPayWith } from '@/core/billing/paywall'
 import { BusinessSection } from '@/core/content'
+import messages from '@/site/messages/en.json'
 
 import { site } from '../site.config'
 import { BUSINESS_MAIL_SUBJECT, pricingPage } from './pricing'
@@ -42,5 +45,26 @@ describe('/pricing page copy', () => {
       expect(html).toContain(`${page.business.aside[0]}${site.brand.contactEmail}${page.business.aside[1]}`)
       expect(JSON.stringify(page.business)).not.toContain('@')
     }
+  })
+})
+
+// DESIGN §4.5 and Stripe's merchant review: the renewal terms are on the page before purchase.
+describe('/pricing "Pay with"', () => {
+  const render = (channel: 'stripe' | 'waffo') =>
+    renderToStaticMarkup(createElement(NextIntlClientProvider, { locale: 'en', messages }, createElement(PricingPayWith, { channel })))
+
+  it('Stripe: card renews and can be cancelled, Alipay pays once, packs are one-time', () => {
+    const html = render('stripe')
+    expect(html).toContain('Card · Apple Pay · Google Pay')
+    expect(html).toContain('Plans renew automatically, cancel anytime')
+    expect(html).toContain('One-time payment for 30 days or 1 year, no auto-renew')
+    expect(html).toContain('Credit packs are always a one-time payment.')
+    expect(html).toContain('All prices in USD')
+  })
+
+  it('Waffo: every line is one-time, nothing renews', () => {
+    const html = render('waffo')
+    expect(html).not.toMatch(/renew automatically|cancel anytime/i)
+    expect(html).toContain('One-time payment for 30 days or 1 year')
   })
 })

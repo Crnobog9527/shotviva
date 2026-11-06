@@ -51,10 +51,11 @@ describe('payment copy by channel', () => {
     expect(say(planFinePrint('stripe', { method: 'alipay', period: 'month', price: '$19.90' }))).toMatch(/^One-time payment for 30 days/)
     expect(say(pricingMethodNote('stripe', 'card'))).toBe('Plans renew automatically, cancel anytime')
     expect(say(pricingMethodNote('stripe', 'alipay'))).toBe('One-time payment for 30 days or 1 year, no auto-renew')
+    expect(t('payNotePacks')).toBe('Credit packs are always a one-time payment.')
   })
 
   it('/pricing: Waffo drops the renewal lines and the cancel question; Stripe keeps them', () => {
-    const waffo = [...CHECKOUT_METHODS.map((m) => say(pricingMethodNote('waffo', m))), ...pricingFaq('waffo').flatMap((item) => [item.question, item.answer])]
+    const waffo = [t('payNotePacks'), ...CHECKOUT_METHODS.map((m) => say(pricingMethodNote('waffo', m))), ...pricingFaq('waffo').flatMap((item) => [item.question, item.answer])]
     for (const line of waffo) expect(line).not.toMatch(RENEWAL)
     expect(pricingFaq('waffo').length).toBeGreaterThan(0)
 
