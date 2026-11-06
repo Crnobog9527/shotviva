@@ -1,8 +1,9 @@
 import type { Metadata, Viewport } from 'next'
 import { NextIntlClientProvider } from 'next-intl'
+import { getMessages } from 'next-intl/server'
 import { locale as rootLocale } from 'next/root-params'
 
-import { htmlLang, isLocale } from '@/core/i18n'
+import { clientMessages, htmlLang, isLocale } from '@/core/i18n'
 import { TranslatedPathsProvider } from '@/core/i18n/ui'
 import { rootMetadata } from '@/core/seo'
 import { MiSansFont } from '@/core/ui/misans-font'
@@ -32,10 +33,12 @@ export function generateStaticParams() {
 
 export default async function RootLayout({ children }: LayoutProps<'/[locale]'>) {
   const locale = await rootLocale()
+  // Everything but the server-only namespaces (the admin entry's label, spec #186).
+  const messages = clientMessages(await getMessages())
   return (
     <html lang={htmlLang(isLocale(locale) ? locale : site.locales.default)} className={`${fontVariables} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
-        <NextIntlClientProvider>
+        <NextIntlClientProvider messages={messages}>
           <TranslatedPathsProvider paths={site.locales.zhPaths}>{children}</TranslatedPathsProvider>
         </NextIntlClientProvider>
         <MiSansFont />

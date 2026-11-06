@@ -1,11 +1,13 @@
 'use client'
 
+import { ShieldCheck } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 
 import { usePathname } from '../i18n/navigation'
 import { Link } from '../i18n/ui'
 import { cn } from '../ui/cn'
+import type { AdminEntry } from './admin-entry'
 import { TabGlyph, type TabIcon } from './tab-icons'
 
 export type TabItem = { href: `/${string}`; label: string; icon: TabIcon; badge?: ReactNode }
@@ -18,6 +20,7 @@ type Props = {
   // Pages below a tab that keep the bar from md up (the photo page, T38); phones keep the
   // flow-page rule and show no bar there.
   desktopUnder?: readonly `/${string}/`[]
+  admin?: AdminEntry
 }
 
 // The app shell's tabs (DESIGN §8.2, §6.9 item 7): fixed at the bottom on phones, 50px rows
@@ -25,7 +28,7 @@ type Props = {
 // From md up the same items become a 56px top bar, links left-aligned in the content column,
 // the current one a bone pill with a safelight glyph. AppFrame reserves the phone bar's room
 // through data-tabbar.
-export function TabBar({ items, desktopUnder = [] }: Props) {
+export function TabBar({ items, desktopUnder = [], admin }: Props) {
   const pathname = usePathname()
   const t = useTranslations('app.tabs')
   const root = isRoot(pathname, items)
@@ -44,6 +47,7 @@ export function TabBar({ items, desktopUnder = [] }: Props) {
         {items.map((item) => (
           <TabLink key={item.href} item={item} current={pathname.startsWith(item.href)} />
         ))}
+        {admin ? <AdminLink entry={admin} /> : null}
       </div>
     </nav>
   )
@@ -64,5 +68,20 @@ function TabLink({ item, current }: { item: TabItem; current: boolean }) {
       {item.label}
       {item.badge}
     </Link>
+  )
+}
+
+// Right end of the desktop top bar. The phone tab bar keeps its fixed slots (DESIGN §8.2):
+// on phones the account page's Admin row is the way in.
+function AdminLink({ entry }: { entry: AdminEntry }) {
+  return (
+    <a
+      href={entry.href}
+      data-admin-entry=""
+      className="press hidden min-h-10 items-center gap-2 rounded-full px-3.5 text-label leading-none font-medium text-muted-foreground md:ml-auto md:flex md:hover:text-foreground"
+    >
+      <ShieldCheck aria-hidden className="size-5" strokeWidth={1.75} />
+      {entry.label}
+    </a>
   )
 }
