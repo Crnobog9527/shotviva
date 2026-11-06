@@ -19,6 +19,7 @@ type Props = {
   onEdit: (provider: AdminProvider) => void
   onTest: (provider: AdminProvider) => void
   onActivate: (provider: AdminProvider) => void
+  onDelete: (provider: AdminProvider) => void
 }
 
 // One module's providers: what it is for, whether one is switched on, and its rows.

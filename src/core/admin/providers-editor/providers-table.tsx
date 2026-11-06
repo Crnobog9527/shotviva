@@ -8,6 +8,7 @@ import type { AdminProvider } from '../providers/types'
 
 import { PROVIDERS_COPY as COPY } from './copy'
 import { PricesCell } from './prices-cell'
+import { deleteControl } from './row-actions'
 
 type Props = {
   providers: AdminProvider[]
@@ -18,6 +19,7 @@ type Props = {
   onEdit: (provider: AdminProvider) => void
   onTest: (provider: AdminProvider) => void
   onActivate: (provider: AdminProvider) => void
+  onDelete: (provider: AdminProvider) => void
 }
 
 // UTC and fixed, so the server render and the browser agree.
@@ -25,7 +27,48 @@ const formatUpdatedAt = (iso: string) => `${new Date(iso).toISOString().slice(0,
 
 const COLUMNS = ['label', 'adapter', 'baseUrl', 'model', 'key', 'prices', 'status', 'updatedAt'] as const
 
-export function ProvidersTable({ providers, testResults, testing, pending, onEdit, onTest, onActivate }: Props) {
+type Handlers = Pick<Props, 'onEdit' | 'onTest' | 'onActivate' | 'onDelete'>
+type RowProps = { provider: AdminProvider; result: { ok: boolean; text: string } | undefined; testing: string | null; pending: boolean; handlers: Handlers }
+
+// Edit, test, switch and delete for one row, with the last test outcome under them.
+function RowActions({ provider, result, testing, pending, handlers }: RowProps) {
+  const remove = deleteControl(provider, pending)
+  return (
+    <>
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button variant="outline" size="sm" disabled={pending} onClick={() => handlers.onEdit(provider)}>
+          {COPY.edit}
+        </Button>
+        <Button variant="outline" size="sm" disabled={pending || testing !== null} onClick={() => handlers.onTest(provider)}>
+          {testing === provider.id ? COPY.testing : COPY.test}
+        </Button>
+        {provider.isActive ? null : (
+          <Button size="sm" disabled={pending} onClick={() => handlers.onActivate(provider)}>
+            {COPY.activate}
+          </Button>
+        )}
+        <Button
+          variant="outline"
+          size="sm"
+          className="text-destructive"
+          disabled={remove.disabled}
+          title={remove.hint ?? undefined}
+          onClick={() => handlers.onDelete(provider)}
+        >
+          {COPY.delete}
+        </Button>
+      </div>
+      {remove.hint ? <p className="text-muted-foreground mt-1 text-right text-xs">{remove.hint}</p> : null}
+      {result ? (
+        <p role="status" className={`mt-1 text-right text-xs ${result.ok ? 'text-emerald-700' : 'text-destructive'}`}>
+          {result.text}
+        </p>
+      ) : null}
+    </>
+  )
+}
+
+export function ProvidersTable({ providers, testResults, testing, pending, ...handlers }: Props) {
   if (providers.length === 0) return <p className="text-muted-foreground py-8 text-center text-sm">{COPY.empty}</p>
   return (
     <Table>
@@ -58,24 +101,7 @@ export function ProvidersTable({ providers, testResults, testing, pending, onEdi
               </TableCell>
               <TableCell className="text-xs">{formatUpdatedAt(provider.updatedAt)}</TableCell>
               <TableCell>
-                <div className="flex flex-wrap justify-end gap-2">
-                  <Button variant="outline" size="sm" disabled={pending} onClick={() => onEdit(provider)}>
-                    {COPY.edit}
-                  </Button>
-                  <Button variant="outline" size="sm" disabled={pending || testing !== null} onClick={() => onTest(provider)}>
-                    {testing === provider.id ? COPY.testing : COPY.test}
-                  </Button>
-                  {provider.isActive ? null : (
-                    <Button size="sm" disabled={pending} onClick={() => onActivate(provider)}>
-                      {COPY.activate}
-                    </Button>
-                  )}
-                </div>
-                {result ? (
-                  <p role="status" className={`mt-1 text-right text-xs ${result.ok ? 'text-emerald-700' : 'text-destructive'}`}>
-                    {result.text}
-                  </p>
-                ) : null}
+                <RowActions provider={provider} result={result} testing={testing} pending={pending} handlers={handlers} />
               </TableCell>
             </TableRow>
           )

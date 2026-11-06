@@ -150,6 +150,15 @@ export async function deleteProvider(db: SupabaseClient, id: string): Promise<vo
   if (error) fail('delete', error)
 }
 
+// The admin's delete (§3.3): admin_delete_provider refuses the active row and removes the Vault
+// key in the same transaction.
+export async function adminDeleteProvider(db: SupabaseClient, id: string): Promise<void> {
+  const { error } = await db.rpc('admin_delete_provider', { p_id: id })
+  if (error?.message.includes('PROVIDER_NOT_FOUND')) throw new ProviderSettingError('not_found', `provider ${id} not found`)
+  if (error?.message.includes('PROVIDER_ACTIVE')) throw new ProviderSettingError('provider_active', `provider ${id} is in use`)
+  if (error) fail('delete', error)
+}
+
 export async function activateProvider(db: SupabaseClient, id: string): Promise<void> {
   const { error } = await db.rpc('admin_activate_provider', { p_id: id })
   if (error?.message.includes('PROVIDER_NOT_FOUND')) throw new ProviderSettingError('not_found', `provider ${id} not found`)

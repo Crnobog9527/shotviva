@@ -4,6 +4,7 @@ import { refresh, updateTag } from 'next/cache'
 
 import {
   activateProvider,
+  removeProvider,
   runProviderAction,
   saveProvider,
   testProvider,
@@ -37,6 +38,14 @@ export async function activateProviderAction(input: unknown): Promise<ProviderAc
   const admin = await requireAdmin()
   return runProviderAction(async () => {
     await activateProvider(deps(), admin.id, input)
+    providersChanged()
+  })
+}
+
+export async function deleteProviderAction(input: unknown): Promise<ProviderActionResult> {
+  const admin = await requireAdmin()
+  return runProviderAction(async () => {
+    await removeProvider(deps(), admin.id, input)
     providersChanged()
   })
 }
