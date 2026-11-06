@@ -1,6 +1,7 @@
 import type { Client } from 'pg'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { lookupUser } from '@/core/admin/users/lookup'
 import { cancelWaffoSubscription, handleWaffoWebhook, type WaffoWebhookDeps } from '@/core/billing/waffo'
 import { site } from '@/site/site.config'
 
@@ -74,6 +75,9 @@ describe('Waffo card subscription: charges', () => {
       { waffo_order_id: order, waffo_payment_id: first.eventId, method: 'card' },
       { waffo_order_id: order, waffo_payment_id: renewal.eventId, method: 'card' },
     ])
+    // The admin lookup finds the buyer by the order id (two charges) or a charge's payment id.
+    expect(await lookupUser(serviceSupabase(), order)).toMatchObject({ kind: 'waffo', userId })
+    expect(await lookupUser(serviceSupabase(), renewal.eventId)).toMatchObject({ kind: 'waffo', userId })
   })
 
   it('a failed renewal (past_due) grants nothing and leaves paid_until where it was', async () => {

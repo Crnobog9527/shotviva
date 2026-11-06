@@ -139,15 +139,19 @@ describe('order.completed', () => {
     expect(await paymentsOf(userId)).toHaveLength(2)
   })
 
-  it('a second payment row for the same Waffo order rolls its grant back (500), keeping one of each', async () => {
+  it('one row per charge: a second payment on the same order grants once more (T50), each payment id once', async () => {
+    // order.completed fires once per one-time order; a subscription order has a charge every
+    // period, so the order id is no longer unique (ARCHITECTURE §6.2 payments, spec #172).
     const userId = await createUser(db)
     const first = orderCompleted({ userId, productId: 'pack_s' })
-    const twin = { ...orderCompleted({ userId, productId: 'pack_s' }), data: { ...first.data, paymentId: 'PAY_twin' } }
+    const twinPayment = paymentId()
+    const twin = { ...orderCompleted({ userId, productId: 'pack_s' }), eventId: twinPayment, data: { ...first.data, paymentId: twinPayment } }
     await deliver(first)
-    expect((await deliver(twin)).status).toBe(500)
-    expect((await profileOf(db, userId)).credits).toBe(20)
-    expect(await ledgerOf(db, userId)).toHaveLength(1)
-    expect(await paymentsOf(userId)).toHaveLength(1)
+    expect((await deliver(twin)).status).toBe(200)
+    expect((await deliver(twin)).body.outcome).toBe('replayed')
+    expect((await profileOf(db, userId)).credits).toBe(40)
+    expect(await ledgerOf(db, userId)).toHaveLength(2)
+    expect((await paymentsOf(userId)).map((row) => row.waffo_order_id)).toEqual([first.data.orderId, first.data.orderId])
   })
 
   it('settle_waffo_order is service-role only, and payments stays unwritable directly', async () => {
