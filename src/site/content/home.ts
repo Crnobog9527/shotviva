@@ -50,7 +50,8 @@ const photo = (file: string, alt: string): ImageRef => ({ src: `/home/${file}.we
 const phoneShot = photo('hero-set-phone', 'Phone snapshot of a woven leather tote on a busy kitchen counter, window light (illustrative example)')
 const listingShot = photo('hero-set-listing', 'The same woven leather tote as a white-background listing photo, soft studio light (illustrative example)')
 
-const shoot: ShootDemo = {
+// Also the /commercial-photography demo (T44).
+export const shoot: ShootDemo = {
   heading: { lead: 'One phone photo → ', emphasis: 'a full shoot' },
   intro: 'Shot on a phone on a kitchen counter. Three deliverables, and the same tote in every one: the weave, the stitching, the chain.',
   phone: { image: phoneShot, file: 'IMG_2047.jpg', caption: 'As shot on a phone. Window light, a busy counter, keys and a mug in frame.' },
@@ -76,11 +77,12 @@ const shoot: ShootDemo = {
 }
 
 // Two bills for the same job (DESIGN §6.9 item 6): every figure from site.config via offer.ts.
-function costBills(): CostBills {
+// The landing pages reuse it with their own heading and intro; `moreFine` adds a source.
+export function productBills(heading: string, intro: string, moreFine = ''): CostBills {
   const plan = planFrom ? usd(planFrom.priceUsd) : ''
   return {
-    heading: `What ${SET_PHOTOS} Product Photos Cost: Photographer vs ${brand}`,
-    intro: `One product, ${SET_PHOTOS} styled photos, retouched and ready to post. The same job, two bills.`,
+    heading,
+    intro,
     photographer: {
       title: "A photographer's quote",
       total: { amount: usdRange(quoteUsd), when: 'delivered in days' },
@@ -88,7 +90,7 @@ function costBills(): CostBills {
         { label: `${SET_PHOTOS} styled shots, ${usdRange(styledShotUsd)} each`, value: usdRange(setShotsUsd) },
         { label: 'Booking, shoot, edits', value: 'days' },
       ],
-      fine: `Per-image rates published in 2026 for the US: styled product photos ${usdRange(styledShotUsd)} (Shopify, Jan 2026); plain-white packshots ${usdRange(packshotUsd)} (studio price lists). Many studios add booking or setup fees. Your quotes will vary.`,
+      fine: `Per-image rates published in 2026 for the US: styled product photos ${usdRange(styledShotUsd)} (Shopify, Jan 2026); plain-white packshots ${usdRange(packshotUsd)} (studio price lists)${moreFine}. Many studios add booking or setup fees. Your quotes will vary.`,
     },
     site: {
       title: brand,
@@ -166,7 +168,10 @@ export const homePage = defineHomePage({
     plans: plansText(),
     sample: { src: '/home/templates/spa-podium-after.webp', alt: '', width: 900, height: 1125 },
   },
-  costBills: costBills(),
+  costBills: productBills(
+    `What ${SET_PHOTOS} Product Photos Cost: Photographer vs ${brand}`,
+    `One product, ${SET_PHOTOS} styled photos, retouched and ready to post. The same job, two bills.`,
+  ),
   faq: [
     // A: the fixed first sentence names the brand and the keyword together (建站规格 G6).
     {
@@ -221,6 +226,16 @@ export const homePage = defineHomePage({
     },
   ],
   related: [
+    {
+      href: '/ai-restaurant-menu',
+      anchor: 'AI restaurant menu photos',
+      note: 'For restaurants that need menu and delivery-app photos from a phone shot.',
+    },
+    {
+      href: '/commercial-photography',
+      anchor: 'Commercial product photography',
+      note: 'For shops and sellers who need studio product shots without a photographer.',
+    },
     {
       href: '/image-to-image-generator',
       anchor: 'Image to image generator',

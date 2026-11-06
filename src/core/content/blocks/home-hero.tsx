@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-import type { HomePage } from '../page-content'
+import type { PageBasics } from '../page-content'
 import { PhotoPair } from './photo-pair'
 
 // "Restyle a Photo, Keep the Subject": the part after the last comma is set in italic (the
@@ -16,9 +16,9 @@ function Headline({ text }: { text: string }) {
   )
 }
 
-type Props = { page: HomePage; generator: ReactNode }
+type Props = { page: Pick<PageBasics, 'h1' | 'subtitle' | 'answerBlock' | 'hero'>; generator: ReactNode }
 
-// First screen (ARCHITECTURE §13 item 2, DESIGN §6.9): H1, subtitle and the direct answer in
+// First screen of the home page and every landing page (ARCHITECTURE §13 item 2, DESIGN §6.9): H1, subtitle and the direct answer in
 // the server HTML (建站规格 R5, G1), the phone → AI pair with its caption (R9), then the
 // generator. ≥1024 the copy and the pair share a row and the generator bench spans under them.
 export function HomeHero({ page, generator }: Props) {

@@ -442,7 +442,7 @@
       "count": "{running, plural, =0 {} other {# 张生成中 · }}{done} 张已完成",
       "footnote": "用免费积分生成的图会公开并带水印；用付费积分生成的图是私密的，没有水印。",
       "photoAlt": "{name} 作品",
-      "empty": "还没有作品。选一个模板，加一张手机照片，生成的图就会出现在这里。",
+      "empty": "选一个模板，上传一张手机照片，第一张作品 60 秒左右就会出现在这里。",
       "emptyCta": "做第一张图",
       "today": "今天",
       "yesterday": "昨天",
@@ -455,7 +455,8 @@
       "waiting": "排队中，等空位",
       "makeAgain": "再做一张",
       "deleted": "已删除这张作品。",
-      "deletedClose": "关闭"
+      "deletedClose": "关闭",
+      "emptyTitle": "还没有作品"
     },
     "work": {
       "freePublic": "公开 · 带水印",
@@ -656,7 +657,9 @@
       "purchases": {
         "title": "购买记录",
         "lead": "最近的付款，最新的在前。",
-        "empty": "还没有购买记录。"
+        "empty": "还没有购买记录",
+        "emptyBody": "买了套餐或积分包之后，会显示在这里。",
+        "seePlans": "看看套餐"
       },
       "session": {
         "title": "登录",
@@ -778,6 +781,19 @@
       "yourChange": "你的修改",
       "editedFromLabel": "修改自",
       "sourceDeleted": "原作品已删除"
+    },
+    "states": {
+      "photoMissing": {
+        "title": "这张作品不在这里",
+        "body": "它可能已经被删除，或者这个链接属于别人的账号。",
+        "back": "回到作品"
+      },
+      "error": {
+        "title": "页面没能加载出来",
+        "body": "是我们这边出了问题。你的照片和积分都安全，请稍后再试。",
+        "retry": "重试",
+        "more": "还是不行？写信到 {email}"
+      }
     },
     "checkout": {
       "metaTitle": "付款结果",
@@ -915,9 +931,12 @@
   },
   "notFound": {
     "title": "页面不存在",
-    "body": "链接可能已过期或输错了。回到首页，或者挑一个模板开始。",
+    "heading": "这一页",
+    "headingEm": "没有显影出来。",
+    "body": "页面不存在，或者已经搬走了。首页和模板都还在原来的地方。",
     "home": "回首页",
-    "templates": "看看模板"
+    "templates": "看看模板",
+    "tryTitle": "换这三个模板试试"
   },
   "marketing": {
     "nav": {
@@ -955,8 +974,11 @@
   },
   "pageError": {
     "title": "出了点问题",
-    "body": "页面没能加载出来，请稍后再试。",
-    "retry": "重试"
+    "heading": "是我们这边",
+    "headingEm": "出了点问题。",
+    "body": "页面没能加载出来。你的照片和积分都安全，请稍后再试；如果一直这样，请写信到 {email}。",
+    "retry": "重试",
+    "home": "回首页"
   },
   "legal": {
     "pagesLabel": "法律文件",

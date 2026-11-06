@@ -2,7 +2,7 @@ import { PRICE_PENDING } from '@/core/config'
 import { MAX_UPLOAD_BYTES, UPLOAD_CONTENT_TYPES } from '@/core/storage/rules'
 
 import { site } from '../../site.config'
-import { OUTPUT_TIERS, PHOTOGRAPHER_HOURLY_USD, freeStandardImages, packFrom, planFrom, setCredits, usd, yearlySaving } from '../offer'
+import { OUTPUT_TIERS, freeStandardImages, packFrom, planFrom, usd, yearlySaving } from '../offer'
 
 // The Chinese wording of every public number (建站规格 G3, §6.1): same figures as offer.ts,
 // read from site.config, written the way mainland e-commerce sellers say it. Prices stay in
@@ -29,8 +29,6 @@ export const zhFromCredits = `${STANDARD?.credits ?? 2} 积分起`
 // 「3 张免费标准图」: the only place the site counts in images instead of credits.
 export const zhFreeImages = `${freeStandardImages} 张免费标准图`
 
-export const zhSetCredits = `${setCredits} 积分`
-
 const FORMATS: Record<string, string> = { 'image/jpeg': 'JPG', 'image/png': 'PNG', 'image/webp': 'WebP' }
 const formats = UPLOAD_CONTENT_TYPES.map((type) => FORMATS[type] ?? type)
 // 「JPG、PNG 或 WebP，最大 20MB」
@@ -38,9 +36,6 @@ export const zhUploadLimits = `${formats.slice(0, -1).join('、')} 或 ${formats
 
 const LANGUAGE_NAMES: Record<string, string> = { en: '英文', zh: '简体中文' }
 export const zhLanguages = site.locales.enabled.map((code) => LANGUAGE_NAMES[code] ?? code).join('、')
-
-// Same market rate as offer.ts (Snappr, US city, 2026), in dollars like every other figure.
-export const zhPhotographerRate = `美国城市每小时 ${usd(PHOTOGRAPHER_HOURLY_USD.low)}–${usd(PHOTOGRAPHER_HOURLY_USD.high)}`
 
 export const zhPlanFrom = planFrom ? `${usd(planFrom.priceUsd)}/月起` : PRICE_PENDING
 export const zhPackFrom = packFrom ? `${usd(packFrom.priceUsd)} 起` : PRICE_PENDING

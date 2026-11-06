@@ -1,10 +1,20 @@
-import { NotFoundView } from '@/core/content'
+import { currentLocale } from '@/core/i18n/server'
 
-// notFound() anywhere under [locale] (an unknown template or photo), in the page's language.
-export default function NotFound() {
+import { MarketingFooter, MarketingHeader } from './marketing-chrome'
+import { NotFoundContent } from './not-found-content'
+
+// notFound() anywhere under [locale] (an unknown template, an unknown inner page), in the
+// page's language, inside the marketing shell. In-app misses (a photo that is not there) have
+// their own state next to the page.
+export default async function NotFound() {
+  const locale = await currentLocale()
   return (
-    <main className="flex min-h-dvh flex-col">
-      <NotFoundView />
-    </main>
+    <>
+      <MarketingHeader locale={locale} />
+      <main className="flex flex-1 flex-col">
+        <NotFoundContent locale={locale} />
+      </main>
+      <MarketingFooter locale={locale} />
+    </>
   )
 }

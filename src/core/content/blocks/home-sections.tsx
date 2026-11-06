@@ -96,3 +96,24 @@ export function FreeOfferSection({ offer, brand }: { offer: HomePage['freeOffer'
     </section>
   )
 }
+
+// A landing page's verifiable facts (建站规格 R10 ②, G4) as three cards, with where the numbers
+// come from under them (design/comps-v3-b/landing.html).
+export function FactCards({ facts, heading, note }: { facts: readonly Fact[]; heading: string; note: string }) {
+  return (
+    <section className="mk-block mk-reveal" aria-labelledby="facts-h">
+      <h2 className="mk-h2" id="facts-h">
+        {heading}
+      </h2>
+      <div className="mk-free">
+        {facts.map((fact) => (
+          <article key={fact.label}>
+            <h3>{fact.label}</h3>
+            <p>{fact.value}</p>
+          </article>
+        ))}
+      </div>
+      <p className="mk-facts-note">{note}</p>
+    </section>
+  )
+}

@@ -3,7 +3,8 @@
 import { useLocale, useTranslations } from 'next-intl'
 import { useState, type ReactNode } from 'react'
 
-import { LanguageOptions } from '../../i18n/ui'
+import { LanguageOptions, Link } from '../../i18n/ui'
+import { EmptyState, STATE_GHOST } from '../../ui/empty-state'
 import { ResponsiveSheet } from '../../ui/responsive-sheet'
 import { RowValue, rowClass } from './rows'
 
@@ -47,7 +48,17 @@ export function PurchasesRow({ purchases, more }: { purchases: readonly Purchase
   return (
     <SheetRow label={t('settings.purchases')} value={value} title={t('purchases.title')} description={t('purchases.lead')}>
       {count === 0 ? (
-        <p className="mt-6 text-body text-bone-dim">{t('purchases.empty')}</p>
+        <EmptyState
+          icon="receipt"
+          title={t('purchases.empty')}
+          body={t('purchases.emptyBody')}
+          action={
+            <Link href="/pricing" className={STATE_GHOST}>
+              {t('purchases.seePlans')}
+            </Link>
+          }
+          className="mx-0 md:mx-0"
+        />
       ) : (
         <ul className="mt-4 divide-y divide-hairline">
           {purchases.map((line) => (

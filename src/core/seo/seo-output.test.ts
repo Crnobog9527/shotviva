@@ -55,6 +55,12 @@ describe('metadata in two languages (建站规格 §6.1, LAUNCH §7.6)', () => {
     expect(pageMetadata(site, { ...page, path: '/generate' }, 'zh').robots).toEqual({ index: false, follow: false })
   })
 
+  it('emits no hreflang when the Chinese twin is noindex (ARCHITECTURE §17)', () => {
+    // /generate has a /zh version but only /zh is indexable in Chinese on the test site.
+    expect(pageMetadata(site, { ...page, path: '/generate' }).alternates?.languages).toBeUndefined()
+    expect(pageMetadata(site, { ...page, path: '/generate' }, 'zh').alternates?.languages).toBeUndefined()
+  })
+
   it('emits no hreflang on an English-only page', () => {
     const terms = pageMetadata(site, { ...page, path: '/terms' })
     expect(terms.alternates?.languages).toBeUndefined()
