@@ -306,7 +306,46 @@
       "longPress": "长按保存",
       "showTransparency": "显示透明区域",
       "makeAnotherWith": "用 {name} 再做一张",
-      "shareText": "用 {brand} 制作 {url}"
+      "shareText": "用 {brand} 制作 {url}",
+      "makeAgain": "再做一张",
+      "tierPx": "{tier} · {px}",
+      "when": {
+        "today": "今天",
+        "yesterday": "昨天",
+        "meta": "{day} {time}",
+        "made": "{day} {time}"
+      },
+      "views": {
+        "label": "查看",
+        "result": "效果图",
+        "onWhite": "白底",
+        "transparent": "透明",
+        "original": "原图"
+      },
+      "originalAlt": "你为 {name} 上传的照片",
+      "originalDeleted": "原图已删除",
+      "originalDeletedBody": "按隐私规则，你上传的照片已不再保留，生成的图片不受影响。",
+      "yourNote": "你的补充说明",
+      "showMore": "展开",
+      "showLess": "收起",
+      "facts": {
+        "label": "详情",
+        "template": "模板",
+        "size": "尺寸",
+        "resolution": "清晰度",
+        "resolutionValue": "{tier} · {px} px",
+        "format": "格式",
+        "formatPng": "PNG，透明背景",
+        "credits": "积分",
+        "visibility": "可见性",
+        "visibilityFree": "公开，带水印",
+        "visibilityPrivate": "私密",
+        "visibilityPublic": "公开",
+        "original": "原图",
+        "originalKept": "已保留，{px} px 预览",
+        "originalDeleted": "已按隐私规则删除",
+        "made": "生成时间"
+      }
     },
     "wishlist": {
       "title": "许愿墙",
