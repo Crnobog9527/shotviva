@@ -33,8 +33,9 @@ let restore: () => Promise<void>
 beforeAll(async () => {
   db = await connectAdmin()
   templateId = await seedTemplate(db)
+  // Waits while another file holds the edit template (edit-fixtures), hence the long timeout.
   restore = await publishEditTemplate(db)
-})
+}, 120_000)
 
 afterAll(async () => {
   await restore()
@@ -81,6 +82,22 @@ describe('runEdit: one ordinary generation on the edit template', () => {
     // A subject swap gets no keep list.
     expect(fake.calls[0]?.prompt).toBe(`${TEST_WRAPPER}\n\nC-SUBJECT\n\n把模特换成男生`)
     expect(fake.calls[0]?.resolution).toBe('2k')
+  })
+
+  // T47: the panel offers the eight sizes; another size than the work's is sent to the model.
+  it("makes the edit at the size asked for, the work's own when none is", async () => {
+    const { fake, edit } = await setup()
+    const view = await edit('Put it on a beach', { aspect: '16:9' })
+    expect((await editRow(view.id)).inputs).toMatchObject({ aspect_ratio: '16:9' })
+    expect(fake.calls[0]?.aspectRatio).toBe('16:9')
+    expect(fake.calls[0]?.prompt).toMatch(/Put it on a beach\n\nC-REFRAME$/)
+  })
+
+  it("asks for the work's own size without the reframe paragraph", async () => {
+    const { fake, edit } = await setup()
+    await edit('Put it on a beach', { aspect: '4:5' })
+    expect(fake.calls[0]?.aspectRatio).toBe('4:5')
+    expect(fake.calls[0]?.prompt).not.toContain('C-REFRAME')
   })
 
   it('edits an edit', async () => {

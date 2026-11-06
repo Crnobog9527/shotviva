@@ -40,7 +40,7 @@ function DesktopSheet({ open, onOpenChange, photo, meta, form, bar }: Props) {
             <DialogPrimitive.Description className="-mt-2 text-caption text-muted-foreground">{meta}</DialogPrimitive.Description>
             <p className="text-caption text-bone-dim">{t('hint')}</p>
           </div>
-          <div className="flex min-h-0 flex-col p-6 pt-14">
+          <div className="flex max-h-[calc(100dvh-48px)] min-h-0 flex-col p-6 pt-14">
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{form}</div>
             {bar}
           </div>

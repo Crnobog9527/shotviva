@@ -33,45 +33,71 @@ const monoCost = (chunks: ReactNode) => <span className="font-mono text-caption 
 const PAGE = 'md:px-0 lg:sticky lg:bottom-0 lg:z-10 lg:mt-4 lg:bg-[linear-gradient(transparent,var(--background)_16px)] lg:pt-6 lg:pb-6'
 
 // addFirst: Make again without its photo (T40) says what it will cost once the photo is in.
-type Props = { state: CtaState; resolution: Resolution; batch: boolean; onGenerate(): void; placement?: 'page' | 'sheet'; addFirst?: number | null }
+// limit: photos developing at once (TIER_LIMITS concurrency), said above a batch's Generate.
+type Props = {
+  state: CtaState
+  resolution: Resolution
+  batch: boolean
+  onGenerate(): void
+  placement?: 'page' | 'sheet'
+  addFirst?: number | null
+  limit?: number
+}
 
 // The creation form's bottom bar: one notice line at most, then the one primary (DESIGN §4.3
 // steps 4–5). The free-credit notice shows only when this photo would use free credits; a
 // batch (T28) says how many photos and that it is paid credits only.
-export function FormAction({ state, resolution, batch, onGenerate, placement = 'page', addFirst = null }: Props) {
+export function FormAction({ state, resolution, batch, onGenerate, placement = 'page', addFirst = null, limit = 1 }: Props) {
   const t = useTranslations('app.workspace')
   return (
     <ActionBar inline={placement === 'sheet'} className={placement === 'page' ? PAGE : undefined}>
       {state.kind === 'need-photo' && addFirst !== null ? (
         <ActionNotice>{t.rich('again.addFirst', { ...rich, count: addFirst })}</ActionNotice>
       ) : (
-        <Notice state={state} resolution={resolution} />
+        <Notice state={state} resolution={resolution} limit={limit} />
       )}
-      {state.kind === 'get-credits' ? (
-        <PaywallButton trigger="insufficient_credits" className={buttonVariants({ variant: 'cta-neutral', size: 'cta' })}>
-          <span>{t.rich('getCreditsCta', { ...rich, count: state.needed })}</span>
-        </PaywallButton>
-      ) : state.kind === 'generate' ? (
-        <button type="button" onClick={onGenerate} className={buttonVariants({ variant: 'cta', size: 'cta' })}>
-          <span>
-            {state.count > 1
-              ? t.rich('generateBatchCta', { cost: monoCost, count: state.count, total: state.cost })
-              : t.rich('generateCta', { cost: monoCost, count: state.cost })}
-          </span>
-        </button>
-      ) : (
-        <button type="button" disabled className={buttonVariants({ variant: 'glass', size: 'cta', className: 'w-full rounded-tile text-cta text-muted-foreground' })}>
-          {t(batch ? BATCH_LABELS[state.kind] : LABELS[state.kind])}
-        </button>
-      )}
+      <Primary state={state} batch={batch} onGenerate={onGenerate} />
     </ActionBar>
+  )
+}
+
+// The one primary: Get credits (opens the paywall), Generate, or a disabled label saying what is
+// missing.
+function Primary({ state, batch, onGenerate }: { state: CtaState; batch: boolean; onGenerate(): void }) {
+  const t = useTranslations('app.workspace')
+  if (state.kind === 'get-credits') {
+    return (
+      <PaywallButton trigger="insufficient_credits" className={buttonVariants({ variant: 'cta-neutral', size: 'cta' })}>
+        <span>{t.rich('getCreditsCta', { ...rich, count: state.needed })}</span>
+      </PaywallButton>
+    )
+  }
+  if (state.kind === 'generate') {
+    return (
+      <button type="button" onClick={onGenerate} className={buttonVariants({ variant: 'cta', size: 'cta' })}>
+        <span>
+          {state.count > 1
+            ? t.rich('generateBatchCta', { cost: monoCost, count: state.count, total: state.cost })
+            : t.rich('generateCta', { cost: monoCost, count: state.cost })}
+        </span>
+      </button>
+    )
+  }
+  return (
+    <button type="button" disabled className={buttonVariants({ variant: 'glass', size: 'cta', className: 'w-full rounded-tile text-cta text-muted-foreground' })}>
+      {t(batch ? BATCH_LABELS[state.kind] : LABELS[state.kind])}
+    </button>
   )
 }
 
 const BATCH_LABELS: typeof LABELS = { ...LABELS, 'need-photo': 'needPhotos', uploading: 'uploadingManyCta' }
 
-function Notice({ state, resolution }: { state: CtaState; resolution: Resolution }) {
+function Notice({ state, resolution, limit }: { state: CtaState; resolution: Resolution; limit: number }) {
   const t = useTranslations('app')
+  // A batch is paid credits only (ARCHITECTURE §6.2), so it never gets the free-credit notice.
+  if (state.kind === 'generate' && state.count > 1) {
+    return <ActionNotice>{t.rich('workspace.batch.notice', { ...rich, count: state.count, each: state.cost / state.count, limit })}</ActionNotice>
+  }
   if (state.kind === 'generate' && state.pool === 'free') return <ActionNotice>{t.rich('workspace.freeNotice', rich)}</ActionNotice>
   if (state.kind === 'get-credits' && state.count > 1) {
     return <ActionNotice>{t.rich('workspace.batchNeedsPaid', { ...rich, count: state.count, total: state.cost })}</ActionNotice>

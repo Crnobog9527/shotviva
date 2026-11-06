@@ -10,6 +10,7 @@ export type EditTemplateForm = {
   inputFidelity: '' | 'high' | 'low'
   classifier: string
   constraints: Record<EditScope, string>
+  reframe: string
 }
 
 const text = (value: unknown) => (typeof value === 'string' ? value : '')
@@ -27,6 +28,7 @@ export function formFor(settings: EditTemplateSettings): EditTemplateForm {
     inputFidelity: fidelity === 'high' || fidelity === 'low' ? fidelity : '',
     classifier: text(settings.params.classifier),
     constraints: Object.fromEntries(EDIT_SCOPES.map((s) => [s, text(constraints[s])])) as Record<EditScope, string>,
+    reframe: text(settings.params.reframe),
   }
 }
 
@@ -39,6 +41,7 @@ export function toSaveInput(form: EditTemplateForm): SaveEditTemplateInput {
       ...(form.inputFidelity ? { input_fidelity: form.inputFidelity } : {}),
       classifier: form.classifier,
       constraints: form.constraints,
+      ...(form.reframe.trim() ? { reframe: form.reframe } : {}),
     },
   }
 }

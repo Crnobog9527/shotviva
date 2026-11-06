@@ -11,7 +11,7 @@ export type GenerateBody = {
 }
 
 // A photo edit (ARCHITECTURE §5.2): goes to /api/edit, settles and polls like any job.
-export type EditBody = { source_job_id: string; instruction: string; resolution: string; batch_size?: number }
+export type EditBody = { source_job_id: string; instruction: string; resolution: string; aspect_ratio?: string; batch_size?: number }
 
 export type JobBody = GenerateBody | EditBody
 

@@ -33,13 +33,15 @@ type Props = {
   onChange(next: Partial<FormValues>): void
   // Opened with Make again (T40): the note on top, and the photo slot when the photo is missing.
   again?: AgainStart | null
+  // Under the photo slot: the creation dialog's way to a batch on the workspace page.
+  photoExtra?: ReactNode
 }
 
 // One column, one scroll, no wizard (DESIGN §4.3): photo → text the template needs → the
 // optional note → size → resolution, then the balance line above the action bar. The one form
 // source (T38): the workspace page and the creation dialog both render it, and their frames
 // set the side padding.
-export function WorkspaceForm({ template, balance, tier, photos, values, onChange, again }: Props) {
+export function WorkspaceForm({ template, balance, tier, photos, values, onChange, again, photoExtra }: Props) {
   const t = useTranslations('app')
   const balanceT = useTranslations('app.balance')
   const noteT = useTranslations('app.workspace.notePlaceholder')
@@ -48,8 +50,9 @@ export function WorkspaceForm({ template, balance, tier, photos, values, onChang
     <>
       {again ? <AgainNote again={again} template={template} /> : null}
       <Section id="photo-h" title={t(photos.batchMax > 1 ? 'workspace.yourPhotos' : 'workspace.yourPhoto')} aside={<PhotoAside photos={photos} />}>
-        <PhotoField photos={photos} missing={again?.missing ?? null} />
+        <PhotoField photos={photos} missing={again?.missing ?? null} tier={tier} />
         <BatchHint tier={tier} dropped={photos.dropped} />
+        {photoExtra}
       </Section>
       {template.copyFields.length > 0 ? (
         <div className="pt-6">
@@ -87,14 +90,14 @@ export function WorkspaceForm({ template, balance, tier, photos, values, onChang
 
 // Single-photo tiers keep the one-photo card with Replace; Pro and Max get the batch list. Make
 // again without its photo asks for it again in the empty slot.
-function PhotoField({ photos, missing }: { photos: PhotoBatch; missing: 'old' | 'failed' | null }) {
+function PhotoField({ photos, missing, tier }: { photos: PhotoBatch; missing: 'old' | 'failed' | null; tier: MembershipTier | null }) {
   const [first] = photos.photos
   if (!first && missing) return <MissingPhoto reason={missing} multiple={photos.batchMax > 1} onPick={photos.add} />
   if (photos.batchMax <= 1) {
     return first ? <PhotoCard photo={first} upload={first.upload} onPick={(file) => photos.add([file])} /> : <PhotoPickers onPick={photos.add} />
   }
   if (!first) return <PhotoPickers onPick={photos.add} multiple />
-  return <BatchPhotos photos={photos.photos} max={photos.batchMax} onAdd={photos.add} onRemove={photos.remove} />
+  return <BatchPhotos photos={photos.photos} max={photos.batchMax} tier={tier} onAdd={photos.add} onRemove={photos.remove} />
 }
 
 // "4:5 · as shot" for one photo; "3 / 10" for a batch.

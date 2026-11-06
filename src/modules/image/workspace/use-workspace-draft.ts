@@ -27,6 +27,9 @@ export type DraftInput = {
   // Make again from a finished work (T40, workspace page only): its settings, and its photos
   // when they were kept with it.
   again?: AgainStart | null
+  // The creation dialog takes one photo; a batch is added on the workspace page (DESIGN §6.9
+  // item 2).
+  single?: boolean
 }
 
 const DEFAULTS: FormValues = { aspect: 'original', resolution: '1k', note: '', copy: {} }
@@ -35,8 +38,8 @@ const DEFAULTS: FormValues = { aspect: 'original', resolution: '1k', note: '', c
 // dialog Create opens and the workspace page. Photos upload as they are picked; start() queues
 // one job per ready photo in the generation store and makes them this template's workspace
 // jobs, so the workspace page shows them developing (and after a refresh).
-export function useWorkspaceDraft({ template, balance, tier, concurrency, again = null }: DraftInput) {
-  const photos = usePhotoBatch(limitsFor(tier).batchMax, again ? { photos: again.photos, madeAt: again.madeAt } : undefined)
+export function useWorkspaceDraft({ template, balance, tier, concurrency, again = null, single = false }: DraftInput) {
+  const photos = usePhotoBatch(single ? 1 : limitsFor(tier).batchMax, again ? { photos: again.photos, madeAt: again.madeAt } : undefined)
   const [values, setValues] = useState(again?.values ?? DEFAULTS)
   useAgainOpensForm(template.id, again?.jobId)
   const running = useRunningCount(concurrency.runningIds)

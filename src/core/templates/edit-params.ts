@@ -30,6 +30,9 @@ export const editParamsSchema = z.object({
   // The classifier's own instructions (system text), sent with the photo and the user's words.
   classifier: z.string().trim().min(1).max(20000),
   constraints: z.object(Object.fromEntries(EDIT_SCOPES.map((scope) => [scope, paragraph])) as Record<EditScope, typeof paragraph>),
+  // Added at the end when the edit asks for another size than the work's (T47, §5.2): extend
+  // the picture to the new frame, the subject where it is. Optional, so older rows still parse.
+  reframe: paragraph.optional(),
 })
 
 export type EditParams = z.infer<typeof editParamsSchema>
