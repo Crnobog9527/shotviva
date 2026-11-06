@@ -59,7 +59,10 @@ async function prepare(deps: GenerationDeps, req: GenerationRequest) {
   if (req.inputKey && !isOwnInputKey(req.userId, req.inputKey)) throw new AppError('INVALID_INPUT', 'Unknown upload')
   const limits = await accountLimits(deps.db, req.userId)
   assertBatchAllowed(limits, req.batchSize ?? 1)
-  await assertWithinRateLimit(deps.db, req.userId, deps.now?.() ?? new Date(), limits, req.jobId)
+  await assertWithinRateLimit(deps.db, req.userId, deps.now?.() ?? new Date(), limits, {
+    jobId: req.jobId,
+    idempotencyKey: req.idempotencyKey,
+  })
   const image = req.inputKey ? await loadInputImage(deps.store, req.inputKey) : null
   return { template, prompt, inputs, image }
 }

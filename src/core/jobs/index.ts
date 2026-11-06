@@ -27,7 +27,7 @@ export {
   type ProviderPrices,
   type ProviderUsage,
 } from './provider'
-export { RATE_LIMIT, assertWithinRateLimit, isLiveRunning, rateLimitVerdict } from './rate-limit'
+export { RATE_LIMIT, assertWithinRateLimit, countsAgainst, isLiveRunning, rateLimitVerdict, type ReplayOf } from './rate-limit'
 export { accountLimits } from './account-limits'
 export { listOwnJobs, type OwnJobs } from './own-jobs'
 export { ENV_PROVIDER_SOURCE, modelFromTag, providerTag } from './provider-tag'

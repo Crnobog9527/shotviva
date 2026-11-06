@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { TIER_LIMITS } from '../billing/tier-limits'
-import { RATE_LIMIT, rateLimitVerdict } from './rate-limit'
+import { RATE_LIMIT, countsAgainst, rateLimitVerdict } from './rate-limit'
 
 const now = new Date('2026-11-05T12:00:00Z')
 const ago = (ms: number) => new Date(now.getTime() - ms).toISOString()
@@ -41,5 +41,20 @@ describe('rateLimitVerdict', () => {
   it('lets a Max batch of 30 through where Starter stops at 20', () => {
     expect(rateLimitVerdict(finished(25), now, TIER_LIMITS.max)).toBe('ok')
     expect(rateLimitVerdict(finished(25), now, TIER_LIMITS.starter)).toBe('too_many_recent')
+  })
+})
+
+describe('countsAgainst', () => {
+  const job = { id: 'job-1', idempotency_key: 'call-1' }
+
+  it('skips the replayed job, matched by id or by Idempotency-Key', () => {
+    expect(countsAgainst(job, { jobId: 'job-1' })).toBe(false)
+    expect(countsAgainst(job, { idempotencyKey: 'call-1' })).toBe(false)
+  })
+
+  it('counts every other job, and every job for a request that names none', () => {
+    expect(countsAgainst(job, { jobId: 'job-2', idempotencyKey: 'call-2' })).toBe(true)
+    expect(countsAgainst({ id: 'job-3', idempotency_key: null }, { idempotencyKey: null })).toBe(true)
+    expect(countsAgainst(job, {})).toBe(true)
   })
 })
