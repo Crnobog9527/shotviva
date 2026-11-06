@@ -17,6 +17,13 @@ export type AgainStart = {
   missing: 'old' | 'failed' | null
 }
 
+// Make again's link from a finished work (the photo page and the Photos grid): the template's
+// workspace with ?again, so it opens with the work's settings and kept photo (T40). Links to it
+// must not prefetch: opening it copies the kept photo back to a fresh upload.
+export function makeAgainHref(templateId: string, jobId: string): string {
+  return `/generate/${encodeURIComponent(templateId)}?again=${encodeURIComponent(jobId)}`
+}
+
 const DEFAULTS: FormValues = { aspect: 'original', resolution: '1k', note: '', copy: {} }
 
 const isAspect = (value: unknown): value is OutputAspect => (OUTPUT_ASPECTS as readonly unknown[]).includes(value)
