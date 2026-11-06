@@ -104,14 +104,18 @@ function cheapest(ids: readonly string[]): SiteProduct | undefined {
 export const planFrom = cheapest(PLAN_TIERS.map((tier) => tier.monthly))
 export const packFrom = cheapest(PACKS.map((pack) => pack.id))
 
-// Smallest yearly saving across the tiers, rounded down: "41%".
+// Largest yearly saving across the tiers, rounded to the nearest whole percent: "up to 40%"
+// (DESIGN §6.9; Max saves 39.98%).
 function yearlySavingPct(): number | undefined {
   const pcts = PLAN_TIERS.flatMap((tier) => {
     const month = product(tier.monthly)
     const year = product(tier.yearly)
-    return month && year ? [1 - year.priceUsd / (month.priceUsd * 12)] : []
+    if (!month || !year) return []
+    // From integer cents, so float error cannot move a .5 boundary.
+    const monthlyYear = Math.round(month.priceUsd * 100) * 12
+    return [Math.round(((monthlyYear - Math.round(year.priceUsd * 100)) * 100) / monthlyYear)]
   })
-  return pcts.length === PLAN_TIERS.length ? Math.floor(Math.min(...pcts) * 100) : undefined
+  return pcts.length === PLAN_TIERS.length ? Math.max(...pcts) : undefined
 }
 
 export const yearlySaving = yearlySavingPct()

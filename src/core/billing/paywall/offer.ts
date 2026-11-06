@@ -2,7 +2,7 @@ import type { MembershipProduct, MembershipTier, PackProduct, ProductInterval, S
 
 // The numbers the paywall and /pricing show, all derived from site.config's nine products
 // (ARCHITECTURE §6.2, 建站规格 G3): nothing here is typed by hand. Amounts are computed in
-// cents so $19.90 × 12 − $139 is exactly $99.80.
+// cents so $19.90 × 12 − $191 is exactly $47.80.
 
 export type Period = ProductInterval
 
@@ -31,7 +31,7 @@ export function productFor(offer: TierOffer, period: Period): MembershipProduct 
   return period === 'year' ? offer.yearly : offer.monthly
 }
 
-// Monthly price, or the yearly price spread over twelve months ($139 → $11.58).
+// Monthly price, or the yearly price spread over twelve months ($191 → $15.92).
 export function perMonthUsd(offer: TierOffer, period: Period): number {
   return period === 'year' ? Math.round(cents(offer.yearly.priceUsd) / 12) / 100 : offer.monthly.priceUsd
 }
@@ -41,19 +41,25 @@ export function perCreditUsd(product: SiteProduct): number {
   return Math.round(cents(product.priceUsd) / product.credits + 1e-9) / 100
 }
 
-// What a year costs on monthly minus the yearly price: $99.80 / $249.80 / $489.
+// What a year costs on monthly minus the yearly price: $47.80 / $119.80 / $475.
 export function yearlySavingUsd(offer: TierOffer): number {
   return (cents(offer.monthly.priceUsd) * 12 - cents(offer.yearly.priceUsd)) / 100
 }
 
-// The smallest saving across the tiers, rounded down, for "Save 41%" on the Yearly segment.
+// The largest saving across the tiers, rounded to the nearest whole percent, for "Save up to
+// 40%" on the Yearly segment (DESIGN §6.9; control 2026-11-06: Max's 39.98% reads 40%).
 export function yearlySavingPct(offers: readonly TierOffer[]): number | null {
   if (offers.length === 0) return null
-  const pcts = offers.map((o) => 1 - cents(o.yearly.priceUsd) / (cents(o.monthly.priceUsd) * 12))
-  return Math.floor(Math.min(...pcts) * 100)
+  return Math.max(...offers.map(savingPct))
 }
 
-// Whole dollars without decimals ("$139"), the rest with two ("$19.90").
+function savingPct(offer: TierOffer): number {
+  const monthlyYear = cents(offer.monthly.priceUsd) * 12
+  // Whole percent, from integer cents so float error cannot move a .5 boundary.
+  return Math.round(((monthlyYear - cents(offer.yearly.priceUsd)) * 100) / monthlyYear)
+}
+
+// Whole dollars without decimals ("$191"), the rest with two ("$19.90").
 export function usdFormat(amount: number) {
   const whole = Number.isInteger(amount)
   return { style: 'currency', currency: 'USD', minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: whole ? 0 : 2 } as const
