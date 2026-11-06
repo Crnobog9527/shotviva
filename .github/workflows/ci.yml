@@ -46,3 +46,10 @@ jobs:
       # Only the services DB tests need; later cards drop names from this list as they need them.
       - run: supabase start -x studio,imgproxy,edge-runtime,analytics,vector,inbucket,functions,realtime,storage
       - run: pnpm test:db
+      # TEMPORARY (fix/ci-db-flake evidence, removed before merge)
+      - name: HEAD vs GET probe through Kong
+        if: always()
+        run: ANON_KEY=$(supabase status -o env | sed -n 's/^ANON_KEY="\(.*\)"$/\1/p') node scripts/ci-head-probe.mjs
+      - name: Kong upstream errors
+        if: always()
+        run: docker logs supabase_kong_shotviva 2>&1 | grep -E 'upstream|\" 50[234] ' | cut -c1-300 | tail -40 || true
