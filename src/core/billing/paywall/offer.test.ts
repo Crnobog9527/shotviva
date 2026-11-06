@@ -17,15 +17,16 @@ describe('paywall numbers (DESIGN §4.5, all from the config)', () => {
     expect(packOffers(TEST_PRODUCTS).map((p) => p.id)).toEqual(['pack_s', 'pack_m', 'pack_l'])
   })
 
-  it('saves $99.80 / $249.80 / $489 a year, at least 41%', () => {
-    expect(offers.map(yearlySavingUsd)).toEqual([99.8, 249.8, 489])
-    expect(yearlySavingPct(offers)).toBe(41)
+  it('saves $47.80 / $119.80 / $475 a year; "up to" is the largest saving, rounded down', () => {
+    expect(offers.map(yearlySavingUsd)).toEqual([47.8, 119.8, 475])
+    // Max: 1 − 713 / 1188 = 39.98%, never shown as more than it is.
+    expect(yearlySavingPct(offers)).toBe(39)
   })
 
   it('spreads the yearly price over twelve months', () => {
-    expect(perMonthUsd(offer('starter'), 'year')).toBe(11.58)
-    expect(perMonthUsd(offer('pro'), 'year')).toBe(29.08)
-    expect(perMonthUsd(offer('max'), 'year')).toBe(58.25)
+    expect(perMonthUsd(offer('starter'), 'year')).toBe(15.92)
+    expect(perMonthUsd(offer('pro'), 'year')).toBe(39.92)
+    expect(perMonthUsd(offer('max'), 'year')).toBe(59.42)
     expect(perMonthUsd(offer('pro'), 'month')).toBe(49.9)
   })
 
@@ -36,7 +37,7 @@ describe('paywall numbers (DESIGN §4.5, all from the config)', () => {
   })
 
   it('formats whole dollars without cents', () => {
-    expect(new Intl.NumberFormat('en-US', usdFormat(139)).format(139)).toBe('$139')
+    expect(new Intl.NumberFormat('en-US', usdFormat(191)).format(191)).toBe('$191')
     expect(new Intl.NumberFormat('en-US', usdFormat(19.9)).format(19.9)).toBe('$19.90')
   })
 
