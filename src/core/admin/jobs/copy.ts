@@ -28,6 +28,7 @@ export const JOBS_COPY = {
     source: '来源',
     duration: '耗时',
     error: '失败原因',
+    actions: '操作',
   },
   empty: '没有符合条件的出图任务。',
   next: '下一页',

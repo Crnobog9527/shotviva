@@ -18,7 +18,7 @@ const { POST: postRequest } = await import('./route')
 const { POST: postVote } = await import('./[id]/vote/route')
 
 const ORIGIN = 'http://localhost:3000'
-const USER = { id: '0b6f3f0e-5d1c-4c47-9a49-6a3f6f8d2e11', email: null, role: 'user', emailVerified: true }
+const USER = { id: '0b6f3f0e-5d1c-4c47-9a49-6a3f6f8d2e11', email: null, role: 'user', emailVerified: true, banned: false }
 const REQUEST_ID = '7d1e2c3b-0000-4000-8000-000000000000'
 const post = (path: string, body: unknown = {}, origin = ORIGIN) =>
   new NextRequest(`${ORIGIN}${path}`, {

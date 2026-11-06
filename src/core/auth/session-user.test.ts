@@ -25,4 +25,10 @@ describe('toSessionUser', () => {
     expect(toSessionUser(base, { role: 'Admin' }).role).toBe('user')
     expect(toSessionUser(base, null).role).toBe('user')
   })
+
+  it('marks a profile with banned_at as banned', () => {
+    expect(toSessionUser(base, { role: 'user', banned_at: '2026-11-06T00:00:00Z' }).banned).toBe(true)
+    expect(toSessionUser(base, { role: 'user', banned_at: null }).banned).toBe(false)
+    expect(toSessionUser(base, null).banned).toBe(false)
+  })
 })

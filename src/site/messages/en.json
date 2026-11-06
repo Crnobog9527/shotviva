@@ -108,7 +108,8 @@
       "free": "You have {free, plural, one {# free credit} other {# free credits}}.",
       "paid": "You have {paid, plural, one {# credit} other {# credits}}.",
       "getCredits": "Get credits",
-      "panelTitle": "Credits"
+      "panelTitle": "Credits",
+      "signupGiftRefused": "This account did not get the free sign-up credits: another account from the same network got them within 24 hours of your sign-up. You can still buy credits."
     },
     "create": {
       "title": "Create",

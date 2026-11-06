@@ -61,13 +61,14 @@ const profileRow = z.object({
   paid_until: z.string().nullable(),
   banned_at: z.string().nullable(),
   created_at: z.string(),
+  signup_ip: z.string().nullable(),
 })
 
 // Profile by primary key; the email is read live from Auth, never copied (ARCHITECTURE §10).
 export async function loadUser(db: SupabaseClient, id: string): Promise<UserDetail | null> {
   if (!isUuid(id)) return null
   const [profile, auth] = await Promise.all([
-    db.from('profiles').select('id, role, credits, free_credits, paid_until, banned_at, created_at').eq('id', id).maybeSingle(),
+    db.from('profiles').select('id, role, credits, free_credits, paid_until, banned_at, created_at, signup_ip').eq('id', id).maybeSingle(),
     db.auth.admin.getUserById(id),
   ])
   if (profile.error) fail('profile', profile.error)
@@ -82,6 +83,7 @@ export async function loadUser(db: SupabaseClient, id: string): Promise<UserDeta
     freeCredits: row.free_credits,
     paidUntil: row.paid_until,
     bannedAt: row.banned_at,
+    signupIp: row.signup_ip,
   }
 }
 
@@ -129,22 +131,34 @@ const jobRow = z.object({
   error_code: z.string().nullable(),
 })
 
-export async function recentJobs(db: SupabaseClient, userId: string): Promise<UserJob[]> {
+const JOB_COLUMNS = 'id, created_at, template_id, status, credits_cost, credit_pool, error_code'
+
+const toUserJob = (row: z.infer<typeof jobRow>): UserJob => ({
+  id: row.id,
+  createdAt: row.created_at,
+  templateId: row.template_id,
+  status: row.status,
+  creditsCost: row.credits_cost,
+  creditPool: row.credit_pool,
+  errorCode: row.error_code,
+})
+
+// The job a lookup landed on (?job=), by primary key, and only if it belongs to this user.
+async function focusedJob(db: SupabaseClient, userId: string, jobId: string | null | undefined): Promise<UserJob | null> {
+  if (!jobId || !isUuid(jobId)) return null
+  const { data, error } = await db.from('generation_jobs').select(JOB_COLUMNS).eq('id', jobId).eq('user_id', userId).maybeSingle()
+  if (error) fail('job', error)
+  return data ? toUserJob(jobRow.parse(data)) : null
+}
+
+// The recent jobs, plus the focused job on top when it is older than those.
+export async function recentJobs(db: SupabaseClient, userId: string, focusJobId?: string | null): Promise<UserJob[]> {
   if (!isUuid(userId)) return []
-  const { data, error } = await db
-    .from('generation_jobs')
-    .select('id, created_at, template_id, status, credits_cost, credit_pool, error_code')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(RECENT_JOBS)
-  if (error) fail('jobs', error)
-  return jobRow.array().parse(data).map((row) => ({
-    id: row.id,
-    createdAt: row.created_at,
-    templateId: row.template_id,
-    status: row.status,
-    creditsCost: row.credits_cost,
-    creditPool: row.credit_pool,
-    errorCode: row.error_code,
-  }))
+  const [recent, focus] = await Promise.all([
+    db.from('generation_jobs').select(JOB_COLUMNS).eq('user_id', userId).order('created_at', { ascending: false }).limit(RECENT_JOBS),
+    focusedJob(db, userId, focusJobId),
+  ])
+  if (recent.error) fail('jobs', recent.error)
+  const jobs = jobRow.array().parse(recent.data).map(toUserJob)
+  return focus && !jobs.some((job) => job.id === focus.id) ? [focus, ...jobs] : jobs
 }

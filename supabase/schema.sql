@@ -218,6 +218,11 @@ begin
     raise exception 'PROFILE_NOT_FOUND';
   end if;
 
+  update public.partner_links
+     set revoked_at = now(), link_code = null, code_expires_at = null
+   where user_id = p_user_id
+     and revoked_at is null;
+
   insert into public.admin_audit_log (action, user_id, reason) values ('ban_user', p_user_id, p_reason);
   return v_banned_at;
 end;
@@ -345,6 +350,69 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_list_template_requests"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_lookup"("p_query" "text") RETURNS TABLE("kind" "text", "user_id" "uuid", "job_id" "uuid")
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_q text := btrim(coalesce(p_query, ''));
+  v_users uuid[];
+begin
+  if length(v_q) = 0 or length(v_q) > 320 then
+    return;
+  end if;
+
+  if v_q ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+    return query select 'user'::text, p.id, null::uuid from public.profiles p where p.id = v_q::uuid;
+    if found then return; end if;
+    return query select 'job'::text, j.user_id, j.id from public.generation_jobs j where j.id = v_q::uuid;
+    return;
+  end if;
+
+  if v_q like 'cs\_%' then
+    return query select 'checkout'::text, pay.user_id, null::uuid from public.payments pay where pay.stripe_session_id = v_q;
+    if found then return; end if;
+    return query select 'checkout'::text, l.user_id, null::uuid from public.credit_ledger l where l.idempotency_key = 'purchase:' || v_q;
+    return;
+  end if;
+
+  if v_q like 'in\_%' then
+    return query select 'invoice'::text, pay.user_id, null::uuid from public.payments pay where pay.stripe_invoice_id = v_q;
+    if found then return; end if;
+    return query select 'invoice'::text, l.user_id, null::uuid from public.credit_ledger l where l.idempotency_key = 'renewal:' || v_q;
+    return;
+  end if;
+
+  if v_q ~ '^(ch|py)_' then
+    return query select 'charge'::text, pay.user_id, null::uuid from public.payments pay where pay.stripe_charge_id = v_q;
+    return;
+  end if;
+
+  if v_q like 'sub\_%' then
+    return query select 'subscription'::text, s.user_id, null::uuid from public.subscriptions s where s.stripe_subscription_id = v_q;
+    return;
+  end if;
+
+  return query select 'waffo'::text, pay.user_id, null::uuid from public.payments pay where pay.waffo_order_id = v_q;
+  if found then return; end if;
+  return query select 'waffo'::text, l.user_id, null::uuid from public.credit_ledger l where l.idempotency_key = 'purchase:' || v_q;
+  if found then return; end if;
+
+  -- The query is a literal substring: % and _ typed by the admin match themselves.
+  select array_agg(u.id) into v_users
+    from (select au.id from auth.users au
+           where au.email ilike '%' || replace(replace(replace(v_q, '\', '\\'), '%', '\%'), '_', '\_') || '%'
+           limit 2) u;
+  if cardinality(v_users) = 1 then
+    return query select 'email'::text, v_users[1], null::uuid;
+  end if;
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."admin_lookup"("p_query" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) RETURNS "void"
@@ -542,6 +610,55 @@ $_$;
 ALTER FUNCTION "public"."admin_set_provider_key"("p_id" "uuid", "p_key" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_signup_ip_clusters"("p_days" integer) RETURNS TABLE("signup_ip" "inet", "accounts" integer, "last_signup_at" timestamp with time zone, "members" "jsonb")
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if p_days is null or p_days not in (1, 7) then
+    raise exception 'INVALID_INPUT' using detail = 'p_days must be 1 or 7';
+  end if;
+
+  return query
+  with recent as (
+    select p.id, p.signup_ip, p.created_at, p.free_credits, p.banned_at
+      from public.profiles p
+     where p.created_at >= now() - make_interval(days => p_days)
+       and p.signup_ip is not null
+  ), clusters as (
+    select r.signup_ip, count(*)::integer as accounts, max(r.created_at) as last_signup_at
+      from recent r
+     group by r.signup_ip
+    having count(*) >= 3
+     order by count(*) desc, max(r.created_at) desc
+     limit 50
+  )
+  select c.signup_ip, c.accounts, c.last_signup_at,
+         (select jsonb_agg(jsonb_build_object(
+                    'id', r.id,
+                    'email', u.email,
+                    'created_at', r.created_at,
+                    'free_credits', r.free_credits,
+                    'free_used', coalesce(used.credits, 0),
+                    'banned_at', r.banned_at)
+                  order by r.created_at desc)
+            from recent r
+            left join auth.users u on u.id = r.id
+            left join lateral (
+              select -sum(l.delta)::integer as credits
+                from public.credit_ledger l
+               where l.user_id = r.id and l.pool = 'free' and l.kind in ('reserve', 'refund')
+            ) used on true
+           where r.signup_ip = c.signup_ip)
+    from clusters c
+   order by c.accounts desc, c.last_signup_at desc;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_signup_ip_clusters"("p_days" integer) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_unban_user"("p_user_id" "uuid", "p_reason" "text") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -619,6 +736,29 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_upsert_template"("p_template" "jsonb", "p_prompt" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_view_work"("p_job_id" "uuid") RETURNS TABLE("user_id" "uuid", "status" "text", "output_key" "text", "input_key" "text", "created_at" timestamp with time zone)
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_job public.generation_jobs;
+begin
+  select * into v_job from public.generation_jobs j where j.id = p_job_id;
+  if not found then
+    raise exception 'JOB_NOT_FOUND';
+  end if;
+
+  insert into public.admin_audit_log (action, user_id, target_id, reason)
+  values ('view_work', v_job.user_id, p_job_id::text, '客服查看作品');
+
+  return query select v_job.user_id, v_job.status, v_job.output_key, v_job.inputs ->> 'input_key', v_job.created_at;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_view_work"("p_job_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."apply_purchase"("p_user_id" "uuid", "p_product_id" "text", "p_event_id" "text") RETURNS "public"."credit_change"
@@ -931,10 +1071,31 @@ CREATE OR REPLACE FUNCTION "public"."grant_credits"("p_user_id" "uuid", "p_amoun
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
+declare
+  v_profile public.profiles;
 begin
   if p_amount is null or p_amount <= 0 then
     raise exception 'INVALID_INPUT' using detail = 'amount must be positive';
   end if;
+
+  if p_idempotency_key = 'signup:' || p_user_id::text then
+    select * into v_profile from public.profiles where id = p_user_id;
+    if found and v_profile.signup_ip is not null then
+      perform pg_advisory_xact_lock(hashtextextended('shotviva.signup_ip:' || host(v_profile.signup_ip), 0));
+      if not exists (select 1 from public.credit_ledger where idempotency_key = p_idempotency_key)
+         and exists (
+           select 1
+             from public.profiles other
+             join public.credit_ledger l on l.idempotency_key = 'signup:' || other.id::text
+            where other.signup_ip = v_profile.signup_ip
+              and other.id <> p_user_id
+              and l.created_at > v_profile.created_at - interval '24 hours'
+         ) then
+        return row(false, v_profile.credits, v_profile.free_credits, v_profile.paid_until)::public.credit_change;
+      end if;
+    end if;
+  end if;
+
   return public._apply_credit_change(p_user_id, p_pool, 'grant', p_amount, p_reason, p_idempotency_key);
 end;
 $$;
@@ -1436,8 +1597,10 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "user_id" "uuid" NOT NULL,
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text"]))),
-    CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0))
+    "target_id" "text",
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text"]))),
+    CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
+    CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );
 
 
@@ -1824,6 +1987,10 @@ CREATE INDEX "generation_jobs_created_at_id_idx" ON "public"."generation_jobs" U
 
 
 
+CREATE INDEX "generation_jobs_running_created_at_idx" ON "public"."generation_jobs" USING "btree" ("created_at") WHERE ("status" = 'running'::"text");
+
+
+
 CREATE INDEX "generation_jobs_template_id_idx" ON "public"."generation_jobs" USING "btree" ("template_id");
 
 
@@ -1844,11 +2011,19 @@ CREATE INDEX "payments_created_at_id_idx" ON "public"."payments" USING "btree" (
 
 
 
+CREATE INDEX "payments_user_id_created_at_idx" ON "public"."payments" USING "btree" ("user_id", "created_at" DESC);
+
+
+
 CREATE INDEX "payments_user_id_idx" ON "public"."payments" USING "btree" ("user_id");
 
 
 
 CREATE INDEX "profiles_created_at_idx" ON "public"."profiles" USING "btree" ("created_at");
+
+
+
+CREATE INDEX "profiles_signup_ip_created_at_idx" ON "public"."profiles" USING "btree" ("signup_ip", "created_at");
 
 
 
@@ -2102,6 +2277,11 @@ GRANT ALL ON FUNCTION "public"."admin_list_template_requests"() TO "service_role
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_lookup"("p_query" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_lookup"("p_query" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) TO "service_role";
 
@@ -2127,6 +2307,11 @@ GRANT ALL ON FUNCTION "public"."admin_set_provider_key"("p_id" "uuid", "p_key" "
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_signup_ip_clusters"("p_days" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_signup_ip_clusters"("p_days" integer) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_unban_user"("p_user_id" "uuid", "p_reason" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_unban_user"("p_user_id" "uuid", "p_reason" "text") TO "service_role";
 
@@ -2134,6 +2319,11 @@ GRANT ALL ON FUNCTION "public"."admin_unban_user"("p_user_id" "uuid", "p_reason"
 
 REVOKE ALL ON FUNCTION "public"."admin_upsert_template"("p_template" "jsonb", "p_prompt" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_upsert_template"("p_template" "jsonb", "p_prompt" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_view_work"("p_job_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_view_work"("p_job_id" "uuid") TO "service_role";
 
 
 

@@ -12,7 +12,7 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   // getUser() validates the token with Supabase Auth; the cookie alone is not trusted.
   const { data, error } = await supabase.auth.getUser()
   if (error || !data.user) return null
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).maybeSingle()
+  const { data: profile } = await supabase.from('profiles').select('role, banned_at').eq('id', data.user.id).maybeSingle()
   return toSessionUser(data.user, profile)
 })
 
