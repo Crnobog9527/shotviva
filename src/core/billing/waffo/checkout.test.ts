@@ -67,7 +67,7 @@ describe('createWaffoCheckout', () => {
     const request = create.mock.calls[0]?.[0] as unknown as Record<string, unknown>
     expect(request).not.toHaveProperty('withTrial')
     expect(request).not.toHaveProperty('includePaymentMethods')
-    expect(request).toMatchObject({ productId: 'PROD_maxyearly', priceSnapshot: { amount: '699.00' }, language: 'zh-Hans' })
+    expect(request).toMatchObject({ productId: 'PROD_maxyearly', priceSnapshot: { amount: '713.00' }, language: 'zh-Hans' })
   })
 
   it('keeps an allowlisted Graylum return in the success URL, drops anything else', async () => {
