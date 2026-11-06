@@ -1,11 +1,13 @@
 'use client'
 
-import { useCallback, useEffect } from 'react'
+import { useCallback } from 'react'
 
 // One-shot entry fade for app pages (DESIGN §5 「签收稿的应用页动效补齐」, DESKTOP-NOTES item 6):
 // an element tagged with the ref fades up once (480ms, globals.css [data-reveal]) the first time
-// it enters the viewport. Elements entering together stagger 40ms apart, at most 8 steps. One
-// shared observer serves the whole page. Under reduced motion they are shown at once.
+// it scrolls into the viewport. Elements entering together stagger 40ms apart, at most 8 steps.
+// One shared observer serves the whole page. What is already on screen when it is tagged shows at
+// once: hiding it would delay the page's largest paint (LCP) and flash server-rendered markup.
+// Under reduced motion everything shows at once.
 
 export const REVEAL_STEP_MS = 40
 export const REVEAL_MAX_STEPS = 8
@@ -18,13 +20,6 @@ export function revealDelays(count: number): number[] {
 const inDocumentOrder = (a: Element, b: Element) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1)
 
 let shared: IntersectionObserver | null = null
-// False while the first page is hydrating: refs run before effects, so an element tagged then was
-// already painted by the server render. The layouts' first effect (LivingBackground) flips it, so
-// pages reached by client navigation reveal from the start.
-let hydrated = false
-export function markHydrated() {
-  hydrated = true
-}
 
 function observer(): IntersectionObserver {
   if (shared) return shared
@@ -49,17 +44,15 @@ const inView = (element: HTMLElement) => {
   return box.top < window.innerHeight && box.bottom > 0
 }
 
-// Shown at once: under reduced motion, without IntersectionObserver, and for server-rendered
-// markup already on screen while hydrating (hiding what was just painted would flash).
+// Shown at once: under reduced motion, without IntersectionObserver, and when already on screen.
 function showsAtOnce(element: HTMLElement): boolean {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !('IntersectionObserver' in window)) return true
-  return !hydrated && inView(element)
+  return inView(element)
 }
 
 // The ref for an element that should reveal. It sets data-reveal itself, so markup rendered on
 // the server is never hidden before this runs.
 export function useReveal<T extends HTMLElement>() {
-  useEffect(markHydrated, [])
   return useCallback((element: T | null) => {
     if (!element) return
     element.dataset.reveal = ''

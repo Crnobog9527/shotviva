@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
-import { markHydrated } from './reveal'
 import './living-background.css'
 
 const REDUCED = '(prefers-reduced-motion: reduce)'
@@ -18,7 +17,6 @@ const POINTER = '(hover: hover) and (pointer: fine)'
 export function LivingBackground() {
   const [mount, setMount] = useState<{ pointer: boolean } | null>(null)
   useEffect(() => {
-    markHydrated()
     if (window.matchMedia(REDUCED).matches) return
     let second = 0
     const first = requestAnimationFrame(() => {
