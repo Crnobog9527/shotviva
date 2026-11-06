@@ -93,7 +93,8 @@ export async function loadMyThread(client: SupabaseClient, ticketId: string): Pr
   return { ...toSummary(row), messages: row.support_ticket_messages.map(toMessage) }
 }
 
-const PICKER_LIMIT = 20
+// Page size of the ticket form's pickers; the account page's Purchases list shares the payments one.
+export const PICKER_LIMIT = 20
 
 const paymentRow = z.object({
   id: z.union([z.number(), z.string()]).transform(String),
@@ -103,7 +104,8 @@ const paymentRow = z.object({
   created_at: z.string(),
 })
 
-// The author's latest payments for the billing / refund picker, on payments_user_id_idx.
+// The author's latest payments for the billing / refund picker and the account page's
+// Purchases list, on payments_user_id_created_at_idx.
 export async function listPaymentOptions(db: SupabaseClient, userId: string): Promise<PaymentOption[]> {
   const { data, error } = await db
     .from('payments')
