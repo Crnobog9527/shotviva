@@ -1,3 +1,5 @@
+import type { MembershipTier } from './config'
+
 // Single source of error codes. User-facing copy lives in the UI layer, not here,
 // so log messages and what the user sees can evolve independently.
 export const ERROR_CODES = [
@@ -15,6 +17,9 @@ export const ERROR_CODES = [
   'CONFLICT',
   // Per-account generation limit (core/jobs/rate-limit.ts).
   'RATE_LIMITED',
+  // The membership tier is too low for this (a batch bigger than the tier allows, a Max-only
+  // feature); the body names required_tier so the paywall can open on it (ARCHITECTURE §6.2).
+  'TIER_REQUIRED',
   // Upload checks (ARCHITECTURE §8.2): over 20MB, or not a JPEG/PNG/WebP we can decode.
   'IMAGE_TOO_LARGE',
   'IMAGE_UNSUPPORTED',
@@ -40,6 +45,7 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   AUTH_WEAK_PASSWORD: 422,
   CONFLICT: 409,
   RATE_LIMITED: 429,
+  TIER_REQUIRED: 403,
   IMAGE_TOO_LARGE: 422,
   IMAGE_UNSUPPORTED: 422,
   CONTENT_REJECTED: 422,
@@ -64,6 +70,19 @@ export class AppError extends Error {
 
   toBody(): ErrorBody {
     return { code: this.code, message: this.message }
+  }
+}
+
+export class TierRequiredError extends AppError {
+  readonly requiredTier: MembershipTier
+
+  constructor(requiredTier: MembershipTier, message: string) {
+    super('TIER_REQUIRED', message)
+    this.requiredTier = requiredTier
+  }
+
+  override toBody(): ErrorBody & { required_tier: MembershipTier } {
+    return { ...super.toBody(), required_tier: this.requiredTier }
   }
 }
 

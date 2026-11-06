@@ -34,6 +34,9 @@ const FROM_APP: Record<ErrorCode, PartnerErrorCode> = {
   AUTH_WEAK_PASSWORD: 'internal',
   CONFLICT: 'invalid_input',
   RATE_LIMITED: 'rate_limited',
+  // The partner contract (§14.6) has no tier code and no partner route is tier-gated; reaching
+  // this is a server bug, not something the partner can act on.
+  TIER_REQUIRED: 'internal',
   IMAGE_TOO_LARGE: 'invalid_input',
   IMAGE_UNSUPPORTED: 'invalid_input',
   CONTENT_REJECTED: 'content_rejected',
