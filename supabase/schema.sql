@@ -1187,6 +1187,7 @@ CREATE TABLE IF NOT EXISTS "public"."generation_jobs" (
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "finished_at" timestamp with time zone,
     "credit_pool" "text" NOT NULL,
+    "parent_job_id" "uuid",
     CONSTRAINT "generation_jobs_check" CHECK ((("status" = 'running'::"text") = ("finished_at" IS NULL))),
     CONSTRAINT "generation_jobs_check1" CHECK ((("status" <> 'succeeded'::"text") OR ("output_key" IS NOT NULL))),
     CONSTRAINT "generation_jobs_credit_pool_check" CHECK (("credit_pool" = ANY (ARRAY['free'::"text", 'paid'::"text"]))),
@@ -1643,7 +1644,7 @@ $$;
 ALTER FUNCTION "public"."refund_job"("p_job_id" "uuid", "p_error_code" "text") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."reserve_credits"("p_job_id" "uuid", "p_user_id" "uuid", "p_module" "text", "p_template_id" "text", "p_credits_cost" integer, "p_source" "text", "p_inputs" "jsonb" DEFAULT '{}'::"jsonb", "p_provider" "text" DEFAULT NULL::"text", "p_idempotency_key" "text" DEFAULT NULL::"text", "p_visibility" "text" DEFAULT NULL::"text") RETURNS "public"."generation_jobs"
+CREATE OR REPLACE FUNCTION "public"."reserve_credits"("p_job_id" "uuid", "p_user_id" "uuid", "p_module" "text", "p_template_id" "text", "p_credits_cost" integer, "p_source" "text", "p_inputs" "jsonb" DEFAULT '{}'::"jsonb", "p_provider" "text" DEFAULT NULL::"text", "p_idempotency_key" "text" DEFAULT NULL::"text", "p_visibility" "text" DEFAULT NULL::"text", "p_parent_job_id" "uuid" DEFAULT NULL::"uuid") RETURNS "public"."generation_jobs"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
@@ -1656,6 +1657,10 @@ declare
 begin
   if v_resolution not in ('1k', '2k', '3k') then
     raise exception 'INVALID_INPUT' using detail = 'resolution must be 1k, 2k or 3k';
+  end if;
+  -- The `edit` template is only for edits, and an edit only runs on it.
+  if (p_template_id = 'edit') <> (p_parent_job_id is not null) then
+    raise exception 'INVALID_INPUT' using detail = 'an edit runs on the edit template with a parent job';
   end if;
 
   -- Lock the profile first so concurrent reserves for one user run one at a time: the pool
@@ -1685,6 +1690,15 @@ begin
     raise exception 'USER_BANNED';
   end if;
 
+  -- Someone else's work, a failed or running one, or a missing one all look the same.
+  if p_parent_job_id is not null then
+    perform 1 from public.generation_jobs
+     where id = p_parent_job_id and user_id = p_user_id and status = 'succeeded';
+    if not found then
+      raise exception 'PARENT_JOB_NOT_FOUND';
+    end if;
+  end if;
+
   select (t.credits_cost ->> v_resolution)::integer into v_cost
     from public.templates t
    where t.id = p_template_id;
@@ -1707,7 +1721,7 @@ begin
 
   insert into public.generation_jobs
     (id, user_id, module, template_id, inputs, provider, source, idempotency_key,
-     credit_pool, visibility, credits_cost)
+     credit_pool, visibility, credits_cost, parent_job_id)
   values
     (p_job_id, p_user_id, p_module, p_template_id,
      coalesce(p_inputs, '{}'::jsonb) || jsonb_build_object('resolution', v_resolution),
@@ -1716,7 +1730,8 @@ begin
      v_pool,
      -- Free works are always public (ARCHITECTURE §9); paid works default to private.
      case when v_pool = 'paid' then coalesce(p_visibility, 'private') else 'public' end,
-     v_cost)
+     v_cost,
+     p_parent_job_id)
   returning * into v_job;
 
   return v_job;
@@ -1724,7 +1739,7 @@ end;
 $$;
 
 
-ALTER FUNCTION "public"."reserve_credits"("p_job_id" "uuid", "p_user_id" "uuid", "p_module" "text", "p_template_id" "text", "p_credits_cost" integer, "p_source" "text", "p_inputs" "jsonb", "p_provider" "text", "p_idempotency_key" "text", "p_visibility" "text") OWNER TO "postgres";
+ALTER FUNCTION "public"."reserve_credits"("p_job_id" "uuid", "p_user_id" "uuid", "p_module" "text", "p_template_id" "text", "p_credits_cost" integer, "p_source" "text", "p_inputs" "jsonb", "p_provider" "text", "p_idempotency_key" "text", "p_visibility" "text", "p_parent_job_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."set_job_visibility"("p_job_id" "uuid", "p_user_id" "uuid", "p_visibility" "text") RETURNS "public"."generation_jobs"
@@ -2037,13 +2052,14 @@ CREATE TABLE IF NOT EXISTS "public"."ai_providers" (
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_by" "uuid",
     "vault_secret_id" "uuid",
-    CONSTRAINT "ai_providers_adapter_check" CHECK (("adapter" = 'openai_images'::"text")),
+    CONSTRAINT "ai_providers_adapter_check" CHECK (("adapter" = ANY (ARRAY['openai_images'::"text", 'openai_decisions'::"text"]))),
     CONSTRAINT "ai_providers_api_key_last4_check" CHECK ((("char_length"("api_key_last4") >= 1) AND ("char_length"("api_key_last4") <= 4))),
     CONSTRAINT "ai_providers_base_url_check" CHECK ((("base_url" ~ '^https://[^\s/?#@]+(/[^\s?#]*)?$'::"text") AND ("char_length"("base_url") <= 300))),
     CONSTRAINT "ai_providers_key_pair" CHECK ((("vault_secret_id" IS NULL) = ("api_key_last4" IS NULL))),
     CONSTRAINT "ai_providers_label_check" CHECK ((("char_length"("label") >= 1) AND ("char_length"("label") <= 80))),
     CONSTRAINT "ai_providers_model_check" CHECK ((("char_length"("model") >= 1) AND ("char_length"("model") <= 120))),
-    CONSTRAINT "ai_providers_module_check" CHECK (("module" = 'image'::"text")),
+    CONSTRAINT "ai_providers_module_adapter" CHECK (((("module" = 'image'::"text") AND ("adapter" = 'openai_images'::"text")) OR (("module" = 'decision'::"text") AND ("adapter" = 'openai_decisions'::"text")))),
+    CONSTRAINT "ai_providers_module_check" CHECK (("module" = ANY (ARRAY['image'::"text", 'decision'::"text"]))),
     CONSTRAINT "ai_providers_notes_check" CHECK ((("notes" IS NULL) OR ("char_length"("notes") <= 500)))
 );
 
@@ -2279,7 +2295,7 @@ CREATE TABLE IF NOT EXISTS "public"."templates" (
     CONSTRAINT "templates_module_check" CHECK (("module" = ANY (ARRAY['image'::"text", 'video'::"text"]))),
     CONSTRAINT "templates_name_check" CHECK ((("char_length"("name") >= 1) AND ("char_length"("name") <= 120))),
     CONSTRAINT "templates_quality_check" CHECK (("quality" = ANY (ARRAY['high'::"text", 'medium'::"text"]))),
-    CONSTRAINT "templates_visible_in_check" CHECK ((("cardinality"("visible_in") > 0) AND ("visible_in" <@ ARRAY['web'::"text", 'partner'::"text"])))
+    CONSTRAINT "templates_visible_in_check" CHECK (("visible_in" <@ ARRAY['web'::"text", 'partner'::"text"]))
 );
 
 
@@ -2421,6 +2437,10 @@ CREATE INDEX "generation_jobs_created_at_id_idx" ON "public"."generation_jobs" U
 
 
 
+CREATE INDEX "generation_jobs_parent_job_id_idx" ON "public"."generation_jobs" USING "btree" ("parent_job_id") WHERE ("parent_job_id" IS NOT NULL);
+
+
+
 CREATE INDEX "generation_jobs_running_created_at_idx" ON "public"."generation_jobs" USING "btree" ("created_at") WHERE ("status" = 'running'::"text");
 
 
@@ -2546,6 +2566,11 @@ ALTER TABLE ONLY "public"."credit_ledger"
 
 ALTER TABLE ONLY "public"."feature_access"
     ADD CONSTRAINT "feature_access_updated_by_fkey" FOREIGN KEY ("updated_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."generation_jobs"
+    ADD CONSTRAINT "generation_jobs_parent_job_id_fkey" FOREIGN KEY ("parent_job_id") REFERENCES "public"."generation_jobs"("id") ON DELETE SET NULL;
 
 
 
@@ -2944,8 +2969,8 @@ GRANT ALL ON FUNCTION "public"."refund_job"("p_job_id" "uuid", "p_error_code" "t
 
 
 
-REVOKE ALL ON FUNCTION "public"."reserve_credits"("p_job_id" "uuid", "p_user_id" "uuid", "p_module" "text", "p_template_id" "text", "p_credits_cost" integer, "p_source" "text", "p_inputs" "jsonb", "p_provider" "text", "p_idempotency_key" "text", "p_visibility" "text") FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."reserve_credits"("p_job_id" "uuid", "p_user_id" "uuid", "p_module" "text", "p_template_id" "text", "p_credits_cost" integer, "p_source" "text", "p_inputs" "jsonb", "p_provider" "text", "p_idempotency_key" "text", "p_visibility" "text") TO "service_role";
+REVOKE ALL ON FUNCTION "public"."reserve_credits"("p_job_id" "uuid", "p_user_id" "uuid", "p_module" "text", "p_template_id" "text", "p_credits_cost" integer, "p_source" "text", "p_inputs" "jsonb", "p_provider" "text", "p_idempotency_key" "text", "p_visibility" "text", "p_parent_job_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."reserve_credits"("p_job_id" "uuid", "p_user_id" "uuid", "p_module" "text", "p_template_id" "text", "p_credits_cost" integer, "p_source" "text", "p_inputs" "jsonb", "p_provider" "text", "p_idempotency_key" "text", "p_visibility" "text", "p_parent_job_id" "uuid") TO "service_role";
 
 
 

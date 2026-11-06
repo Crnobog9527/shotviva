@@ -19,6 +19,8 @@ const SQL_ERROR_CODES: Record<string, ErrorCode> = {
   INVALID_INPUT: 'INVALID_INPUT',
   PROFILE_NOT_FOUND: 'NOT_FOUND',
   JOB_NOT_FOUND: 'NOT_FOUND',
+  // An edit's source is not the caller's own succeeded work (T30).
+  PARENT_JOB_NOT_FOUND: 'NOT_FOUND',
   TEMPLATE_NOT_FOUND: 'NOT_FOUND',
   PRODUCT_NOT_FOUND: 'NOT_FOUND',
   IDEMPOTENCY_CONFLICT: 'CONFLICT',
