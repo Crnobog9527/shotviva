@@ -65,10 +65,15 @@
   @media (min-width: 1024px) {
     .mk-legal { display: grid; grid-template-columns: 240px minmax(0, 1fr); column-gap: 64px; }
     .mk-legal-head { grid-column: 1 / -1; }
+    /* Sticky under the app bar (64px + the safe area) with a 24px gap, and never taller than the
+       space below that line: the Terms list is taller than a laptop screen, so it scrolls on its
+       own. Near the end of the page the column's grid row ends with the text and a sticky box
+       cannot leave its row, so LegalTocSpy also caps the height at the text's bottom edge
+       (--mk-toc-max); without that the column would be pushed up under the bar. */
     .mk-legal-toc-side {
-      grid-column: 1; grid-row: 2; align-self: start; position: sticky; top: 88px; margin-top: 40px; padding: 8px 4px; background: none; box-shadow: none;
-      /* The Terms list is taller than a laptop screen: it scrolls on its own instead of sliding under the app bar. */
-      max-height: calc(100dvh - 104px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
+      --mk-toc-top: calc(var(--sat) + 88px);
+      grid-column: 1; grid-row: 2; align-self: start; position: sticky; top: var(--mk-toc-top); margin-top: 40px; padding: 8px 4px; background: none; box-shadow: none;
+      max-height: min(var(--mk-toc-max, 100dvh), calc(100dvh - var(--mk-toc-top) - 16px)); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
     }
     .mk-legal-toc-side a { min-height: 36px; }
     .mk-legal-text { grid-column: 2; grid-row: 2; margin-top: 40px; }
