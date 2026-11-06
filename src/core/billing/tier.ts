@@ -7,10 +7,12 @@ import { callRpc, type RpcClient } from './rpc'
 
 export {
   BASE_SUPPORT_REPLY_HOURS,
-  NO_TIER_CONCURRENCY,
-  TIER_CONCURRENCY,
-  TIER_SUPPORT_REPLY_HOURS,
-  concurrencyFor,
+  MAX_BATCH_SIZE,
+  TIER_LIMITS,
+  batchUpgrade,
+  limitsFor,
+  tierForBatch,
+  type TierLimits,
 } from './tier-limits'
 
 // Membership tier perks (ARCHITECTURE §6.2 "会员档位权益"). The tier itself comes only from the

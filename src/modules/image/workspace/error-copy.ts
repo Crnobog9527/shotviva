@@ -6,8 +6,9 @@ import type { JobFailure } from '../generation/job-model'
 // credits came back. Codes come from core/errors or a job's stored error_code; the words are
 // in site/messages (app.errors), `t` is scoped there.
 
-export function failureReason(failure: JobFailure, t: Translate): string {
-  return t.has(failure.code) ? t(failure.code) : t('fallback')
+// values: TIER_REQUIRED names the plan ({tier}); other messages ignore it.
+export function failureReason(failure: JobFailure, t: Translate, values?: Record<string, string>): string {
+  return t.has(failure.code) ? t(failure.code, values) : t('fallback')
 }
 
 // refunded: true → charged and refunded; false → charged, refund failed; null → never charged.
@@ -18,4 +19,6 @@ export function refundLine(failure: JobFailure, t: Translate): string {
 }
 
 // Whether "Retry" makes sense with the same photo (not for a rejected or unusable photo).
-export const canRetry = (failure: JobFailure) => !['CONTENT_REJECTED', 'IMAGE_TOO_LARGE', 'IMAGE_UNSUPPORTED', 'CREDITS_INSUFFICIENT'].includes(failure.code)
+// TIER_REQUIRED would only fail again; it gets the plan's paywall instead.
+export const canRetry = (failure: JobFailure) =>
+  !['CONTENT_REJECTED', 'IMAGE_TOO_LARGE', 'IMAGE_UNSUPPORTED', 'CREDITS_INSUFFICIENT', 'TIER_REQUIRED'].includes(failure.code)

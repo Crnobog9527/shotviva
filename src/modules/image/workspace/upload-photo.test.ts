@@ -56,4 +56,20 @@ describe('uploadPhoto', () => {
     await expect(uploadPhoto(blob(100, 'image/jpeg'), d, callbacks())).rejects.toMatchObject({ code: 'UPLOAD_FAILED' })
     expect(d.track).not.toHaveBeenCalled()
   })
+
+  it('stops a cancelled photo: no ticket after compressing, no UPLOAD_FAILED, no event', async () => {
+    const controller = new AbortController()
+    const d = deps({ compress: vi.fn(async () => (controller.abort(), blob(10, 'image/jpeg'))) })
+    await expect(uploadPhoto(blob(100, 'image/jpeg'), d, { ...callbacks(), signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' })
+    expect(d.requestTicket).not.toHaveBeenCalled()
+    expect(d.track).not.toHaveBeenCalled()
+  })
+
+  it('passes the signal to the PUT and keeps its AbortError', async () => {
+    const controller = new AbortController()
+    const put = vi.fn(async () => Promise.reject(new DOMException('aborted', 'AbortError')))
+    const d = deps({ put })
+    await expect(uploadPhoto(blob(100, 'image/jpeg'), d, { ...callbacks(), signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' })
+    expect(put.mock.calls[0]).toContain(controller.signal)
+  })
 })
