@@ -1,0 +1,8 @@
+/* /connect/graylum (design/comps-v3-b/connect.html): the plate rises in once; nothing under
+   "reduce motion" (the class is motion-safe only). */
+@keyframes connect-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}

@@ -1,6 +1,7 @@
 @import "tailwindcss";
 /* Tier and pack materials for the paywall and /pricing (T37). */
 @import "../core/billing/paywall/tiers.css";
+@import "../core/content/blocks/business-slip.css";
 
 /* "Darkroom" design tokens (DESIGN §3, design/tokens/tokens.css, Owner 2026-11-05).
    Warm black ground, bone type, one safelight. shadcn/ui variable names, so the shadcn base

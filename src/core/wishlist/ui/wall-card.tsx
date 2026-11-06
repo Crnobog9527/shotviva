@@ -1,41 +1,48 @@
 'use client'
 
+import { useFormatter, useTranslations } from 'next-intl'
+
 import { Link } from '../../i18n/ui'
-import { useTranslations } from 'next-intl'
-
 import type { VoteResult, WallCard as WallCardData } from '../types'
+import { ChevronIcon } from './icons'
 import { ImageStrip } from './image-strip'
-import { VoteButton } from './vote-button'
+import { VoteButton, VoteCount } from './vote-button'
 
-type Props = { card: WallCardData; canVote: boolean; onVote(result: VoteResult): void }
+type Props = { card: WallCardData; canVote: boolean; now: Date; onVote(result: VoteResult): void }
 
-// One request on the wall (DESIGN §4.7): reference photos, the description, the masked author
-// and "I want this too". A shipped card opens with a "Shipped →" strip into its template.
-export function WallCard({ card, canVote, onVote }: Props) {
+// One request on the wall (B comp wishlist.html .req): a print taped to the wall with its
+// reference photos, the note in the hand of the serif, the masked author and when, and the vote.
+// A shipped request gets the "Shipped" stamp and links into its template (ARCHITECTURE §15.1).
+export function WallCard({ card, canVote, now, onVote }: Props) {
   const t = useTranslations('app.wishlist')
+  const format = useFormatter()
   return (
-    <article className="hairline-lit overflow-hidden rounded-panel bg-card">
+    <article className="wl-req">
       {card.template && (
-        <Link
-          href={`/generate/${card.template.id}`}
-          className="press flex min-h-11 items-center justify-between gap-3 bg-wash px-4 py-2 text-caption font-semibold"
-        >
-          <span className="text-primary">{t('shipped')}</span>
-          <span className="flex min-w-0 items-center gap-1">
-            <span className="truncate">{card.template.name}</span>
-            <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 flex-none text-primary" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 5l7 7-7 7" />
-            </svg>
-          </span>
-        </Link>
+        <span className="wl-stamp" aria-hidden="true">
+          {t('shipped')}
+        </span>
       )}
-      <div className="grid gap-3 p-3">
-        <ImageStrip urls={card.imageUrls} />
-        <p className="px-1 text-body leading-[1.45] break-words">{card.description}</p>
-        <div className="flex items-end justify-between gap-3 px-1">
-          <span className="pb-3 text-caption text-muted-foreground">{t('by', { name: card.authorLabel })}</span>
-          {card.status === 'live' && (
+      <ImageStrip urls={card.imageUrls} />
+      <div className="grid min-w-0 gap-2 px-1 pt-2.5">
+        <p className="wl-text">{card.description}</p>
+        {card.template && (
+          <Link
+            href={`/generate/${card.template.id}`}
+            className="press flex min-h-9 items-center justify-between gap-2 text-label font-medium text-success hover:underline hover:underline-offset-3"
+          >
+            <span className="min-w-0">{t.rich('nowTemplate', { name: card.template.name, b: (chunks) => <b className="font-semibold">{chunks}</b> })}</span>
+            <ChevronIcon />
+          </Link>
+        )}
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
+          <span className="min-w-0 flex-1 truncate text-[13px] leading-snug text-muted-foreground">
+            {t('byline', { name: card.authorLabel, when: format.relativeTime(new Date(card.createdAt), now) })}
+          </span>
+          {card.status === 'live' ? (
             <VoteButton requestId={card.id} voted={card.voted} count={card.votesCount} enabled={canVote} onResult={onVote} />
+          ) : (
+            <VoteCount count={card.votesCount} />
           )}
         </div>
       </div>

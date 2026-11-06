@@ -39,18 +39,22 @@ export type CheckoutDeps = {
   trackStart?: typeof trackCheckoutStart
 }
 
-// Where Stripe sends the buyer back. The account page reads `checkout=success` to say thanks
-// (and, for a Graylum top-up, offers the way back); the credits themselves arrive through the
-// webhook, not this redirect.
+// Where the buyer comes back (T43). Stripe fills {CHECKOUT_SESSION_ID} into success_url; the
+// return page reads that session and our payments row, and says thanks or "confirming". Waffo
+// has no placeholder, so its success URL names the product (core/billing/checkout-return). The
+// credits themselves arrive through the webhook, never this redirect. Cancel goes back to
+// /pricing, which shows a toast.
 export const CHECKOUT_RETURN = {
-  success: '/account?checkout=success',
-  cancel: '/pricing?checkout=cancelled',
+  stripe: '/checkout?session_id={CHECKOUT_SESSION_ID}',
+  waffo: (productId: string) => `/checkout?channel=waffo&p=${encodeURIComponent(productId)}`,
+  cancel: '/pricing?checkout=cancel',
 } as const
 
-export function successPath(returnTo: string | undefined, hosts: readonly string[]): string {
+// The return path, plus the Graylum way back when the top-up came from an allowlisted host.
+export function successPath(base: string, returnTo: string | undefined, hosts: readonly string[]): string {
   const back = allowlistedUrl(returnTo, hosts)
-  if (!back) return CHECKOUT_RETURN.success
-  return `${CHECKOUT_RETURN.success}&from=graylum&return_to=${encodeURIComponent(back.toString())}`
+  if (!back) return base
+  return `${base}&from=graylum&return_to=${encodeURIComponent(back.toString())}`
 }
 
 // `locale` is for analytics only: renewals have no page, so their `purchase` event reads the
@@ -80,7 +84,7 @@ function sessionParams(
     client_reference_id: metadata.user_id,
     metadata,
     locale: input.locale,
-    // Back to the account / pricing page in the language the buyer checked out in.
+    // Back to the return page / pricing in the language the buyer checked out in.
     success_url: `${input.origin}${localizePath(input.successPath, input.locale)}`,
     cancel_url: `${input.origin}${localizePath(CHECKOUT_RETURN.cancel, input.locale)}`,
     ...methodParams(route),
@@ -110,7 +114,7 @@ export async function createCheckout(
     sessionParams(route, priceId, metadata, {
       locale: body.locale,
       origin: deps.origin,
-      successPath: successPath(body.return_to, deps.returnToHosts),
+      successPath: successPath(CHECKOUT_RETURN.stripe, body.return_to, deps.returnToHosts),
     }),
   )
   if (!session.url) throw new AppError('INTERNAL', 'Stripe returned a session without a URL')

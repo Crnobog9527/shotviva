@@ -48,6 +48,8 @@ export const site = defineSite({
       '/wishlist/mine',
       '/connect/graylum',
       '/connect/graylum/authorize',
+      // The checkout return page (T43, noindex like every app page).
+      '/checkout',
     ],
   },
   billing: {

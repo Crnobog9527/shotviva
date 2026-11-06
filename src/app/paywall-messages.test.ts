@@ -39,6 +39,8 @@ describe('paywall messages (en)', () => {
     expect(t('walletOnce', { period: 'month' })).toBe('One-time payment, 30 days, no auto-renew')
     expect(t('walletOnce', { period: 'year' })).toBe('One-time payment, 1 year, no auto-renew')
     expect(t('oneTime')).toBe('One-time payment')
+    // Stripe's cancel_url lands on /pricing?checkout=cancel with this toast (T43).
+    expect(String((t as unknown as { rich: (k: string, v: unknown) => unknown }).rich?.('cancelled', { b: (c: string) => c }) ?? '')).toBe('Checkout cancelled. Nothing was charged.')
   })
 
   it('shows no Chinese and no WeChat Pay on the English paywall', () => {
