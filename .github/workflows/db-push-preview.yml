@@ -4,9 +4,13 @@
 # instead of being papered over.
 name: DB push (preview)
 
+# Only merges that change a migration; the daily drift check (db-drift.yml) still compares
+# preview with main every day.
 on:
   push:
     branches: [main]
+    paths:
+      - 'supabase/migrations/**'
   # Rerun after fixing a failed push (e.g. secrets were missing).
   workflow_dispatch:
 

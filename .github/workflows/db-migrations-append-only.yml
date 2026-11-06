@@ -3,9 +3,13 @@
 # with `[baseline]` in the PR title; `edited` reruns the check when the title changes.
 name: DB migrations append-only
 
+# Only PRs that touch a migration (a modified, renamed or deleted file there is in the PR's
+# changed files). Not a required check, so path filtering cannot leave anything pending.
 on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
+    paths:
+      - 'supabase/migrations/**'
 
 concurrency:
   group: db-append-only-${{ github.event.pull_request.number }}
@@ -17,6 +21,8 @@ permissions:
 jobs:
   append-only:
     name: merged migrations unchanged
+    # `edited` matters only for the title ([baseline]); a description edit skips the job.
+    if: github.event.action != 'edited' || github.event.changes.title != null
     runs-on: ubuntu-latest
     steps:
       # The PR head itself, not the merge ref, with full history so origin/main and the
