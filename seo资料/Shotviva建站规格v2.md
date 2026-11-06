@@ -24,7 +24,7 @@ R7 结构化数据（JSON-LD 四类必做）：SoftwareApplication（首页+所�
 R8 内链规则：任何页面从首页出发 ≤3 次点击；内页指回首页锚文本只用「AI image to image」或「img to img」；同族互链（interior↔architectural、restaurant-flyer↔restaurant-poster、工具页↔模板分类、首页模板分类块的每个分类↔对应垂直页）；博客每篇至少链回一个工具页且锚文本用该页主词；首页必须直链所有已上线的内页。
 R9 图片 SEO：WebP/AVIF + CDN；首屏对比图不许 lazy load（LCP 要素）；alt 写「场景+主体+光线」，例 "AI food photo of grilled salmon on ceramic plate, studio lighting"，不许 image1、不许堆词；每张对比图配一行可见 caption（说明改了什么）。
 R10 内容模块（每页五块，缺一不算完成）：① 首屏 1 张前后对比图 + 一句直答（G1）+ 试用入口 ② 可核验事实块（平台尺寸/免费张数/价格/支持语言）③ 成本对比表（请摄影师 vs 本站，全站一套价格）④ FAQ 3~5 条用真实问法（首页例外，见 G6，上限 8 条） ⑤ 族内互链块 2~3 个相关页。
-R11 技术底座：Next.js App Router + next-intl，SSG/ISR。robots.txt 显式放行 GPTBot、OAI-SearchBot、PerplexityBot、ClaudeBot、ChatGPT-User，不许 Disallow: /。移动端 LCP <2.5s、CLS <0.1、INP <200ms。
+R11 技术底座：Next.js App Router + next-intl，SSG/ISR。robots.txt 显式放行 GPTBot、OAI-SearchBot、PerplexityBot、ClaudeBot、ChatGPT-User，不许 Disallow: /。移动端 LCP <2.5s、CLS <0.1、INP <200ms。（预上线期例外：开放收录前 AI 爬虫一律 Disallow、全站 noindex、不发布 sitemap 和 llms.txt，见 ARCHITECTURE §12.0；放行五个 AI 爬虫是开放收录那天的事）
 R12 监控节奏：上线当天 GSC 验证站点 + 提交 sitemap；上线满 2 周起每两周看一次 img to img（难度 14.3，首页的副词，不单独建页，靠首页文案和内页回链锚文本带动）是否先出排名、首页均排是否进前 20；每月看 AI 引荐来源与首页模板区点击率。判定线：上线 8 周后首页有排名（前 20）但首页→模板（点开任一模板进入工作台）点击率 <5%，才考虑换首页主词，此前不许动。另看一条「付费链路」指标（2026-11-05 补）：首页→垂直页（/ai-restaurant-menu、/commercial-photography、/interior-photography）的点击占比，低于 5% 先改首页的用例 / 内链块（§4 首页骨架的最后一个 H2），不改首页主词——通用定位下这是唯一能判断「泛流量有没有漏到付费页」的指标。
 
 ## 3. GEO 规则（13 条）
@@ -63,7 +63,7 @@ I What is Shotviva?（放最后一位，问题里不带 AI；答案写它是什�
 G7 榜单与对比页（AI 回答推荐类问题的主要来源）必做三篇：best AI food photography tools 2026；Shotviva vs hiring a photographer（成本对比）；foodshot.ai alternatives / ezmaker.ai alternatives。规矩：真实列出竞品并给客观描述，纯自夸的榜单 AI 不引用。排期：Shotviva vs hiring a photographer 并入 /commercial-photography 的成本对比，不另建页；另外两篇作为博客排在第 3 周，URL 已登记在主词表 CSV，搜索量核实后再建。
 G8 实体信息写全：说明是谁做的、何时上线、服务哪些国家、联系方式（AI 判断可信度会看实体是否明确）。放在法律页的联系方式一节和 Organization 结构化数据里；页脚只放联系邮箱和版权（Owner 2026-11-06）。
 G9 站外要有独立来源（每月 3~5 个，持续不像一次砸完）：Reddit r/smallbusiness / r/Etsy / r/Flipping / r/restaurateur / r/Chefit / r/airbnb_hosts（回答问题不发广告，按分类分散）；Product Hunt 上线页；AI 工具目录（There's An AI For That、Futurepedia 等）；1~2 篇第三方评测或访谈。
-G10 robots 与 AI 抓取：robots.txt 放行上述五个爬虫，不要因怕被白嫖而屏蔽 AI 爬虫（GEO 是本站流量大头）；可选 /llms.txt 列主要页面与一句话说明。
+G10 robots 与 AI 抓取：robots.txt 放行上述五个爬虫，不要因怕被白嫖而屏蔽 AI 爬虫（GEO 是本站流量大头）；可选 /llms.txt 列主要页面与一句话说明。（同上，预上线期例外见 ARCHITECTURE §12.0）
 G11 服务端渲染 + 语义化 HTML：AI 抓取不看 JS 渲染后的 DOM，直答块/事实块/FAQ 必须在源码里；FAQ 用 <h3>+<p>，不用 <div> 拼。
 G12 每周自测 SOP：每周一把 G6 首页 5 句 + 垂直页八句原话丢进开联网的 ChatGPT（另加 Perplexity 抽查 2 句），记录①提没提 ②排第几 ③引用哪个页面 ④截图存档。连续 4 周不提 → 检查承接页是否上线、直答块是否在源码；提到但引用竞品 → 抄它的页面结构、补它有你没有的事实块。
 G13 多语言 GEO：/zh（v1）和以后的 /ja、/id，直答块与 FAQ 必须按该语言的真实问法用母语重写，不许机器直译（日语/印尼语问法与英文差异大，直译的句子 AI 不引用）。
