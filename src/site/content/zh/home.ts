@@ -50,7 +50,8 @@ const photo = (file: string, alt: string): ImageRef => ({ src: `/home/${file}.we
 const phoneShot = photo('hero-set-phone', '手机随手拍：厨房台面上的一只编织皮托特包，窗边自然光（示意图）')
 const listingShot = photo('hero-set-listing', '同一只编织皮托特包的白底商品图，柔和影棚光（示意图）')
 
-const shoot: ShootDemo = {
+// Also the /zh/commercial-photography demo (T44).
+export const shoot: ShootDemo = {
   heading: { lead: '一张手机照片 → ', emphasis: '一整套图' },
   intro: '在厨房台面上用手机随手拍了一张。做出三张成品图，每张里都是同一只包：编织纹路、缝线、链条都没变。',
   phone: { image: phoneShot, file: 'IMG_2047.jpg', caption: '手机原图：窗边光线，台面很乱，钥匙和杯子都入镜了。' },
@@ -68,11 +69,12 @@ const shoot: ShootDemo = {
 }
 
 // Same two bills as the English home, same figures from site.config, in dollars (§6.1 rule 8).
-function costBills(): CostBills {
+// The landing pages reuse it with their own heading and intro; `moreFine` adds a source.
+export function productBills(heading: string, intro: string, moreFine = ''): CostBills {
   const plan = planFrom ? usd(planFrom.priceUsd) : ''
   return {
-    heading: `${SET_PHOTOS} 张商品图要花多少钱：请摄影师和用 ${brand} 对比`,
-    intro: `一个商品，${SET_PHOTOS} 张造型图，精修好、可以直接发。同样的活，两张账单。`,
+    heading,
+    intro,
     photographer: {
       title: '摄影师报价',
       total: { amount: usdRange(quoteUsd), when: '几天后交图' },
@@ -80,7 +82,7 @@ function costBills(): CostBills {
         { label: `${SET_PHOTOS} 张造型图，每张 ${usdRange(styledShotUsd)}`, value: usdRange(setShotsUsd) },
         { label: '预约、拍摄、修图', value: '几天' },
       ],
-      fine: `美国 2026 年公开的单张价格：造型产品图 ${usdRange(styledShotUsd)}（Shopify，2026 年 1 月）；纯白底产品图 ${usdRange(packshotUsd)}（工作室价目表）。很多工作室另收预约或布景费。实际报价因人而异。`,
+      fine: `美国 2026 年公开的单张价格：造型产品图 ${usdRange(styledShotUsd)}（Shopify，2026 年 1 月）；纯白底产品图 ${usdRange(packshotUsd)}（工作室价目表）${moreFine}。很多工作室另收预约或布景费。实际报价因人而异。`,
     },
     site: {
       title: brand,
@@ -154,7 +156,10 @@ export const zhHomePage = defineHomePage({
     plans: plansText(),
     sample: { src: '/home/templates/spa-podium-after.webp', alt: '', width: 900, height: 1125 },
   },
-  costBills: costBills(),
+  costBills: productBills(
+    `${SET_PHOTOS} 张商品图要花多少钱：请摄影师和用 ${brand} 对比`,
+    `一个商品，${SET_PHOTOS} 张造型图，精修好、可以直接发。同样的活，两张账单。`,
+  ),
   faq: [
     // A–I follow 建站规格 G6 in order, asked the way Chinese users ask (G13, 中文用户真实问法).
     // A's first sentence is the Chinese form of G6's fixed sentence: brand and keyword together.
@@ -209,6 +214,8 @@ export const zhHomePage = defineHomePage({
     },
   ],
   related: [
+    { href: '/ai-restaurant-menu', anchor: 'AI菜单配图', note: '餐厅用手机拍菜，直接做成菜单和外卖平台的图。' },
+    { href: '/commercial-photography', anchor: '商业产品摄影', note: '网店和卖家不请摄影师，也能做出影棚级商品图。' },
     { href: '/image-to-image-generator', anchor: '图生图在线工具', note: '想看看图生图对菜品、商品、房间和宠物照片的效果。' },
     { href: '/pricing', anchor: `${brand} 价格`, note: '店主、卖家和房东在月付、年付套餐和一次性积分包之间比较。' },
   ],

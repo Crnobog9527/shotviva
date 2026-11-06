@@ -10,6 +10,7 @@ import type { TemplateCategory } from '@/core/content'
 export const templateCategories: readonly [TemplateCategory, ...TemplateCategory[]] = [
   {
     name: 'Art Styles',
+    drag: true,
     intro: 'Turn a phone photo into a drawing. The pose, the layout and the subject stay as shot.',
     templates: [
       { id: 'korean-manhwa', name: 'Korean Manhwa', use: 'Redraws your photo in a clean Korean manhwa style, same pose and framing.' },

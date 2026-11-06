@@ -1,33 +1,37 @@
 import type { Metadata } from 'next'
-import { getTranslations } from 'next-intl/server'
-import Link from 'next/link'
+import { NextIntlClientProvider } from 'next-intl'
+import { setRequestLocale } from 'next-intl/server'
 
+import { TranslatedPathsProvider } from '@/core/i18n/ui'
+import { loadMessages } from '@/site/i18n/messages'
 import { site } from '@/site/site.config'
 
+import { MarketingFooter, MarketingHeader } from './[locale]/marketing-chrome'
+import { NotFoundContent } from './[locale]/not-found-content'
 import { fontVariables } from './fonts'
 import './globals.css'
 
 // An address that matches no route at all has no [locale] root layout to render in, so Next
 // serves this document on its own (experimental.globalNotFound). /zh addresses never get here:
-// the proxy answers them first, so it is English. next/link: there is no locale context.
+// the proxy answers them first, so it is English, in the same marketing shell as every 404.
 export const metadata: Metadata = { title: `Page not found | ${site.brand.name}`, robots: { index: false, follow: false } }
 
 export default async function GlobalNotFound() {
-  const t = await getTranslations({ locale: 'en', namespace: 'notFound' })
+  // No [locale] segment here: pin the request locale so server components read 'en' without
+  // touching request headers (which would stop the page from prerendering).
+  setRequestLocale('en')
   return (
     <html lang="en" className={`${fontVariables} h-full antialiased`}>
-      <body className="flex min-h-dvh flex-col items-center justify-center gap-4 p-6 text-center">
-        <p className="font-mono text-caption text-muted-foreground">404</p>
-        <h1 className="text-xl font-semibold">{t('title')}</h1>
-        <p className="max-w-sm text-muted-foreground">{t('body')}</p>
-        <p className="flex gap-6">
-          <Link href="/" className="underline underline-offset-4">
-            {t('home')}
-          </Link>
-          <Link href="/generate" className="underline underline-offset-4">
-            {t('templates')}
-          </Link>
-        </p>
+      <body className="flex min-h-full flex-col">
+        <NextIntlClientProvider locale="en" messages={await loadMessages('en')}>
+          <TranslatedPathsProvider paths={site.locales.zhPaths}>
+            <MarketingHeader locale="en" />
+            <main className="flex flex-1 flex-col">
+              <NotFoundContent locale="en" />
+            </main>
+            <MarketingFooter locale="en" />
+          </TranslatedPathsProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   )

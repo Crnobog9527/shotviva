@@ -37,7 +37,12 @@ export function testSite(overrides: Partial<SiteConfig> = {}): SiteConfig {
         canonicalRedirectHosts: ['example.vercel.app'],
       },
       marketing: {
-        photographer: { styledShotUsd: { low: 50, high: 350 }, packshotUsd: { low: 15, high: 90 } },
+        photographer: {
+      styledShotUsd: { low: 50, high: 350 },
+      packshotUsd: { low: 15, high: 90 },
+      dayRateUsd: { low: 500, high: 3000 },
+      foodHalfDayUsd: { low: 400, high: 2500 },
+    },
         photoSecondsApprox: 60,
       },
     }),

@@ -1,11 +1,13 @@
 import { defineContentPage } from '@/core/content'
 
 import { site } from '../../site.config'
-import { freeImagesLabel, fromCredits, plansSentence, tierPixels, uploadLimits } from '../offer'
-import { placeholderHero, sharedCostTable, sharedFacts } from '../shared'
+import { productBills } from '../home'
+import { pairImage, sizeCountWord } from '../landing-shared'
+import { freeImagesLabel, fromCredits, photoSeconds, plansSentence, SET_PHOTOS, tierList, tierPixels, uploadLimits } from '../offer'
 
-// Final copy (T11). Owns "image to image generator" so the home page never targets it
-// (建站规格 R1). No audience in the Title / H1: this is a general tool page (G2, §4).
+// Final SEO copy (T11): Title, H1, answer and FAQ own "image to image generator" so the home
+// page never targets it (建站规格 R1). Layout and the facts / bills / links blocks follow the
+// v3-b landing comp (T44). No audience in the Title / H1: a general tool page (G2, §4).
 const brand = site.brand.name
 
 export const imageToImageGenerator = defineContentPage({
@@ -18,9 +20,27 @@ export const imageToImageGenerator = defineContentPage({
   h1: 'Image to Image Generator With Ready-Made Templates',
   subtitle: 'Start from your own photo, not a blank text box. The subject stays as shot.',
   answerBlock: `Image to image generator tools make a new picture from a photo you upload. The ${brand} generator works with templates: pick one for food, products, beauty, rooms, pets or an art style, and it sets the light, the scene or the style for you. The subject stays as shot, and new users get ${freeImagesLabel}.`,
-  hero: placeholderHero('The generator kept the dish and the plate and changed only the scene.'),
-  facts: sharedFacts(),
-  costTable: sharedCostTable(),
+  hero: {
+    before: pairImage('spa-podium-before', 'Phone photo of a skincare jar on a bathroom shelf, flat indoor light (illustrative example)'),
+    after: pairImage('spa-podium-after', 'The same skincare jar on a stone podium in soft spa light, Spa Podium template (illustrative example)'),
+    caption: 'Your phone photo → Spa Podium template: same jar, a new set and light · Illustrative example',
+    cta: { label: 'Upload photo', href: '/generate' },
+  },
+  facts: [
+    { label: `One Photo: ${uploadLimits}`, value: 'A phone photo is enough. No cut-out, no white background, no editing first.' },
+    {
+      label: 'A Template Instead of a Description',
+      value: 'Each template carries the light, the scene or the art style. One optional line, "Anything to change?", takes a short note.',
+    },
+    {
+      label: `${tierList}, as PNG`,
+      value: `${tierPixels} on the long side, in ${sizeCountWord} sizes from a square listing to a 9:16 story. About ${photoSeconds} seconds a photo, ${fromCredits}.`,
+    },
+  ],
+  costBills: productBills(
+    `What ${SET_PHOTOS} Product Photos Cost: Photographer vs Image to Image`,
+    `One product, ${SET_PHOTOS} styled photos, retouched and ready to post. The same job, two bills.`,
+  ),
   faq: [
     {
       question: 'What is an image to image generator?',
@@ -46,12 +66,17 @@ export const imageToImageGenerator = defineContentPage({
     },
   ],
   related: [
-    { href: '/', anchor: 'AI image to image', note: 'All templates, grouped by food, products, beauty, rooms, pets and art styles.' },
-    { href: '/pricing', anchor: 'Pricing', note: 'Monthly plans, yearly plans and one-time credit packs.' },
+    { href: '/', anchor: 'AI image to image', note: 'The studio: templates for food, products, rooms, pets and art styles.' },
+    { href: '/commercial-photography', anchor: 'Commercial product photography', note: 'For shops and sellers who need studio product shots without a photographer.' },
+    { href: '/ai-restaurant-menu', anchor: 'AI restaurant menu photos', note: 'For restaurants that need menu and delivery-app photos from a phone shot.' },
   ],
   headings: {
-    facts: 'Image to Image Generator Facts',
-    costTable: `Image to Image Generator vs a Photographer`,
+    facts: 'What an Image to Image Generator Needs From You',
     faq: 'Image to Image Generator FAQ',
+    related: `More From ${brand}`,
+  },
+  landing: {
+    generatorTemplate: 'spa-podium',
+    factsNote: `These are ${brand}'s own limits and sizes, the same on every page of this site.`,
   },
 })

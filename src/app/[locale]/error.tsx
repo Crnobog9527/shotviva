@@ -4,20 +4,33 @@ import { useTranslations } from 'next-intl'
 import { useEffect } from 'react'
 
 import { captureError } from '@/core/analytics/browser'
-import { buttonVariants } from '@/core/ui/button'
+import { PROBLEM_GHOST, PROBLEM_PRIMARY, ProblemView } from '@/core/content'
+import { Link } from '@/core/i18n/ui'
+import { site } from '@/site/site.config'
 
 // An error inside a page: the root layout (and its messages) still stand, so the notice is in
-// the page's language. app/global-error.tsx only covers a failing root layout.
+// the page's language (design/comps-v3-b/404.html?v=error). In-app pages have their own
+// error state inside the app shell. app/global-error.tsx only covers a failing root layout.
 export default function PageError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   const t = useTranslations('pageError')
   useEffect(() => captureError(error), [error])
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-4 p-6 text-center">
-      <h1 className="text-xl font-semibold">{t('title')}</h1>
-      <p className="max-w-sm text-muted-foreground">{t('body')}</p>
-      <button type="button" onClick={reset} className={buttonVariants({ size: 'touch' })}>
-        {t('retry')}
-      </button>
+    <main className="flex flex-1 flex-col pb-16">
+      <ProblemView
+        code="500"
+        heading={{ lead: t('heading'), emphasis: t('headingEm') }}
+        body={t('body', { email: site.brand.contactEmail })}
+        actions={
+          <>
+            <button type="button" onClick={reset} className={PROBLEM_PRIMARY}>
+              {t('retry')}
+            </button>
+            <Link href="/" className={PROBLEM_GHOST}>
+              {t('home')}
+            </Link>
+          </>
+        }
+      />
     </main>
   )
 }
