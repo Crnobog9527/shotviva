@@ -482,6 +482,31 @@ v1 后台（Owner 2026-11-06 扩充；T23 做外壳和运营页）：**一个后
 - **可疑注册**：`admin_signup_ip_clusters(p_days)` 列出近 24 小时或 7 天内同一 IP 注册 ≥3 个账号的情况，可以逐个封禁。
 - **按 Stripe id 重放入账**（T26）：后台输入 `cs_…` 后，从 Stripe 取回 session，确认已付款，预览将入账的内容，Owner 确认后走和回调同一个 `settle_checkout`（同一个幂等键，回调和重放谁先到都只入账一次）。输入 `sub_…` 则调用 `sync_subscription`。每次重放写审计日志 `replay_checkout`。Waffo 的重放等 T13。
 - **概览「待处理」条**（T26）：`admin_todo_counts()` 一次返回卡住的任务、近 1 小时和 24 小时失败率、待审需求、待处理的退款和争议、最近一次入账时间，以及当前在用的供应商和模型，每项都有索引支撑。
+- **站内工单**（T27，Owner 2026-11-06 定，详细设计见 `docs/proposals/admin-roadmap.md` A8，本节是规范口径）：
+  - **用户侧入口**：账号页的「Help & feedback」和页脚的「Contact」。付费墙、`/pricing`、订阅区块里不放任何退款入口。
+  - **提交工单**：
+    - 类型并列成一个普通列表，按顺序是：意见反馈、出图问题（可选附一张自己的作品）、付款问题（可选附一笔自己的付款）、退款申请（必须选一笔自己的付款）、账号问题、其他。退款申请的样式和其他项一样，不做突出。
+    - 正文不超过 2000 字，不收附件。
+    - 「我的工单」里能看到状态（已提交 / 已回复 / 已关闭）和往来消息，用户可以在工单里补充。
+    - 中英文文案都要有，页面 `noindex`。
+  - **退款全部人工处理**：后台打开退款工单时，显示这笔付款的信息、`refund_eligibility(payment_id)` 给出的三项参考检查（是否首次购买、是否在 7 天内、付款后是否用过任何积分），以及建议退款金额（税前价 × 94% + 全部税额，Owner 可以改）。Owner 选择同意（填金额）或拒绝，写回复，系统记审计日志 `decide_refund`。Owner 到 Stripe / Waffo 后台完成退款，退款回调更新付款状态，然后提示扣回积分。**不写任何自动退款或会动钱的代码。**
+  - **数据**：
+    - `support_tickets` 表：`id`、`user_id`、`type`（`feedback` / `image_issue` / `billing` / `refund` / `account` / `other`）、`status`（`open` / `replied` / `closed`）、`payment_id`、`job_id`（都必须是本人的）、`refund_decision`、`refund_amount_cents`、`created_at`、`last_message_at`、`user_seen_at`、`closed_at`。
+    - `support_ticket_messages` 表：`id`、`ticket_id`、`author`（`user` / `admin`）、`body`（不超过 2000 字）、`created_at`。
+    - RLS：用户只能读自己的工单，写入只经服务端。删号时工单一并删除。
+    - 索引：`support_tickets(user_id, created_at desc, id desc)`；部分索引 `support_tickets(last_message_at desc, id desc) where status = 'open'`；`support_ticket_messages(ticket_id, created_at)`。
+    - 函数（都只授权 `service_role`）：`create_support_ticket`（按账号限频，24 小时内最多 5 张）、`add_ticket_message`、`admin_reply_ticket`、`admin_decide_refund`、`admin_list_tickets`（游标分页）、`refund_eligibility`、`mark_ticket_seen`。
+  - **通知**（Owner 定：不发邮件）：
+    - Owner 侧：后台导航「工单」旁显示待处理数，概览的「待处理」条里也计入。
+    - 用户侧：最后一条消息是 Owner 发的、且晚于 `user_seen_at` 时，账号 tab 和「我的工单」显示小红点。只在页面加载时查一次，不轮询，也不用 Realtime。
+    - 提交成功页写一句回复时效（「通常 48 小时内，会员按档位更快」），时效数字从会员权益表读。
+  - **条款**：
+    - 退款政策改成「在网站的 Help & feedback 里提交退款申请，也可以发邮件」，审核规则不变：7 天内、首次购买、付款后没用过积分、扣 6% 手续费。
+    - 隐私政策加一句：工单内容保留到删号为止。
+- **收入口径**（T10 后续，总控 2026-11-06）：
+  - `admin_revenue_stats` 改为读 `payments`。函数签名不变，用 `create or replace` 修改；这是「一次写成」的例外，原因是 T23 写这个函数时数据源还不存在。
+  - 收入按净额计：`amount_total − amount_tax − amount_refunded`。只汇总 `currency = 'usd'` 的行，另外返回非美元付款的笔数。
+  - 卡片结账时如果发生了 Adaptive Pricing 币种转换，回调记录换算前的美元金额和税。
 - P1 和 P2 项（模板表现、毛利、真实 token 用量、失败分析、审计日志查看页、运行时开关、Graylum 统计、代删账号、作品审核队列、CSV 导出等）上线后按提案排期，不在 v1 范围。
 
 **仍然不做页面、留在 Supabase / Stripe 后台的运营操作**：设为管理员（在 Studio 改 `profiles.role`）、退款（在 Stripe / Waffo 后台）、作品审核页（第 6~7 周和审核功能一起做）。
