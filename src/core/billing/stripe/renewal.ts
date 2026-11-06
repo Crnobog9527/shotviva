@@ -93,6 +93,6 @@ export async function renewFromInvoice(deps: FulfilDeps, invoiceId: string): Pro
     // List price in USD: with Adaptive Pricing the invoice may be in the buyer's currency.
     amount_usd: product.priceUsd,
     credits: product.credits,
-  })
+  }, sub.metadata?.locale === 'zh' ? 'zh' : 'en')
   return 'applied'
 }

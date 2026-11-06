@@ -1,0 +1,176 @@
+/* Shotviva v3-b · plan tiers, credit packs and payment rows. Round 3.
+   Shared by the paywall sheet/dialog (paywall.html) and the pricing page (pricing.html).
+   Tier materials: Starter matte graphite, Pro sapphire glass, Max black and gold (tokens in studio.css). */
+
+/* billing toggle; the Yearly half carries the "Save up to 40%" badge (the number comes from site.config at build time) */
+.seg { position: relative; display: grid; grid-template-columns: 1fr 1fr; margin: 16px 0 12px; padding: 4px; border-radius: 16px; background: var(--bone-6); box-shadow: inset 0 0 0 1px var(--border); }
+.seg button { position: relative; z-index: 1; min-height: 44px; padding: 0 6px; border-radius: 12px; font: 600 15px/1 var(--font-sans); color: var(--bone-dim); display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: color .25s; white-space: nowrap; }
+@media (min-width: 768px) { .seg button { font-size: 16px; gap: 8px; } }
+.seg button[aria-pressed="true"] { color: var(--background); }
+.seg .thumb { position: absolute; z-index: 0; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px); border-radius: 12px; background: var(--foreground); transition: transform .4s var(--spring); }
+.seg[data-v="y"] .thumb { transform: translateX(100%); }
+/* phone: the Yearly half is wider so the badge fits; the thumb moves by left/width instead of a transform */
+@media (max-width: 767px) {
+  .seg { grid-template-columns: 42% 58%; }
+  .seg .thumb { width: calc(42% - 4px); transition: left .4s var(--spring), width .4s var(--spring); }
+  .seg[data-v="y"] .thumb { transform: none; left: 42%; width: calc(58% - 4px); }
+}
+.seg .badge { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 7px; border-radius: 999px; font: 500 14px/1 var(--font-sans); letter-spacing: -0.01em;
+  color: var(--primary); background: color-mix(in srgb, var(--primary) 16%, transparent); transition: background-color .25s, color .25s; }
+.seg .badge b { font: 500 14px/1 var(--font-mono); }
+.seg button[aria-pressed="true"] .badge { background: var(--primary); color: var(--primary-foreground); }
+
+/* tiers */
+.tiers { display: grid; gap: 8px; }
+.tier { position: relative; display: block; cursor: pointer; border-radius: 22px; isolation: isolate; }
+.tier input { position: absolute; opacity: 0; pointer-events: none; }
+.tier .card { position: relative; display: block; padding: 16px 16px 12px; border-radius: 22px; overflow: hidden; isolation: isolate; transition: box-shadow .25s, transform .3s var(--ease); }
+.tier .row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.tier .nm { font: 600 17px/1.3 var(--font-sans); letter-spacing: -0.015em; }
+.tier .flag { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: 999px; font: 600 14px/1 var(--font-sans); margin-left: 8px; vertical-align: 2px; }
+.tier .check { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; box-shadow: inset 0 0 0 1.5px rgba(242,236,227,.3); transition: background .2s, box-shadow .2s; }
+.tier .check .i { width: 13px; height: 13px; stroke-width: 3; opacity: 0; }
+.tier input:checked + .card .check { background: var(--foreground); box-shadow: none; color: var(--background); }
+.tier input:checked + .card .check .i { opacity: 1; }
+.tier input:focus-visible + .card { outline: 2px solid var(--ring); outline-offset: 3px; }
+.tier .price { display: flex; align-items: baseline; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.tier .amt { font: 400 40px/.9 var(--font-display); letter-spacing: -0.02em; }
+.tier .per { font-size: 14px; color: var(--muted-foreground); }
+.tier .was { font: 400 14px/1 var(--font-mono); color: var(--muted-foreground); text-decoration: line-through; margin-left: 4px; }
+.tier .facts { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; font-size: 14px; color: var(--bone-dim); }
+.tier .facts .mono { font-size: 14px; color: var(--muted-foreground); }
+.tier .saving { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; padding: 8px 8px 8px 12px; border-radius: 12px; font-size: 14px; }
+.tier .saving b { font: 600 14px/1 var(--font-mono); white-space: nowrap; }
+.tier .saving > span { white-space: nowrap; }
+.tier .saving[hidden] { display: none; }
+/* the numbers that change with the toggle crossfade (tiers.js drives the swap) */
+[data-p], [data-was], [data-cr], [data-each], [data-save] { transition: opacity .1s var(--ease); }
+.tiers.swapping [data-p], .tiers.swapping [data-was], .tiers.swapping [data-cr], .tiers.swapping [data-each], .tiers.swapping [data-save] { opacity: 0; }
+
+.perks { display: grid; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--bone-8); }
+.perks-h { font: 600 14px/1.3 var(--font-sans); color: var(--muted-foreground); }
+.perk { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; line-height: 1.35; color: var(--bone-dim); }
+.perk .i { flex: none; width: 15px; height: 15px; margin-top: 2px; stroke-width: 2.5; fill: none; stroke: currentColor; color: var(--muted-foreground); }
+.perks-h.soon-h { margin-top: 6px; }
+.perk.soon { padding-left: 23px; color: var(--muted-foreground); }
+
+/* per-tier action (pricing page only): the recommended tier carries the page's one primary */
+.tier .act { margin-top: 16px; }
+.tier .act .btn { width: 100%; }
+.tier .act .btn-ghost { min-height: 48px; border-radius: 16px; }
+
+/* a sheen: one soft band of light that sweeps across the card once (reveal, hover); Max also idles at a lower alpha */
+.tier .card::after { content: ""; position: absolute; z-index: -1; top: -40%; bottom: -40%; left: -30%; width: 60%; pointer-events: none; opacity: 0;
+  background: linear-gradient(100deg, transparent 30%, var(--sheen, rgba(255,255,255,.07)) 50%, transparent 70%); transform: translateX(-80%) skewX(-12deg); }
+.tier.sheen-once .card::after { animation: sheen 1.6s var(--ease) 1; }
+@keyframes sheen { 0% { transform: translateX(-80%) skewX(-12deg); opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { transform: translateX(260%) skewX(-12deg); opacity: 0; } }
+
+/* Starter: matte graphite. Flat, quiet. */
+.t-starter .card { background: var(--graphite); box-shadow: inset 0 0 0 1px var(--border); }
+.t-starter .saving { background: rgba(242,236,227,.05); color: var(--bone-dim); }
+.t-starter input:checked + .card { box-shadow: inset 0 0 0 1.5px rgba(242,236,227,.7); }
+
+/* Pro: sapphire glass. A corner light, a cool rim that brightens on hover, blue checks. */
+.t-pro { --sheen: color-mix(in srgb, var(--sapphire-ink) 14%, transparent); }
+.t-pro .card { background: radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--sapphire-flag) 32%, transparent), transparent 60%), linear-gradient(180deg, var(--sapphire-top), var(--sapphire-deep));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sapphire-rim) 40%, transparent), inset 0 1px 0 color-mix(in srgb, var(--sapphire-ink) 25%, transparent); }
+.t-pro .nm { color: var(--sapphire-ink); }
+.t-pro .flag { background: var(--sapphire-flag); color: var(--sapphire-deep); }
+.t-pro .saving { background: color-mix(in srgb, var(--sapphire-flag) 16%, transparent); color: var(--sapphire-ink); }
+.t-pro input:checked + .card { box-shadow: inset 0 0 0 1.5px var(--sapphire-rim), inset 0 1px 0 color-mix(in srgb, var(--sapphire-ink) 30%, transparent); }
+.t-pro input:checked + .card .check { background: var(--sapphire-rim); color: var(--sapphire-deep); }
+.t-pro .perk .i { color: var(--sapphire-rim); }
+
+/* Max: black and gold foil. Foil wordmark, a gold rim turning slowly (9s), a faint gold glow behind, gold checks. */
+.t-max { --sheen: color-mix(in srgb, var(--max-gold) 12%, transparent); }
+.t-max::before { content: ""; position: absolute; z-index: -2; inset: -12px; border-radius: 30px; pointer-events: none;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--max-gold) 13%, transparent), transparent); filter: blur(22px); }
+.t-max .card { background: radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--max-gold) 22%, transparent), transparent 60%), linear-gradient(160deg, var(--max-black-top), var(--max-black-deep) 60%); isolation: isolate; }
+.t-max .card::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; padding: 1.5px; background: var(--gold-rim);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: turn 9s linear infinite; }
+@keyframes turn { from { --a: 0deg; } to { --a: 360deg; } }
+.t-max .card::after { animation: sheen-idle 6s var(--ease) infinite; --sheen: color-mix(in srgb, var(--max-gold) 5%, transparent); }
+.t-max.sheen-once .card::after { animation: sheen 1.6s var(--ease) 1; --sheen: color-mix(in srgb, var(--max-gold) 12%, transparent); }
+@keyframes sheen-idle { 0% { transform: translateX(-80%) skewX(-12deg); opacity: 0; } 8% { opacity: 1; } 42% { opacity: 1; } 50%, 100% { transform: translateX(260%) skewX(-12deg); opacity: 0; } }
+.t-max .nm { background: var(--chrome); -webkit-background-clip: text; background-clip: text; color: transparent; letter-spacing: -0.01em; }
+.t-max .amt { color: var(--max-gold); }
+.t-max .flag { background: var(--chrome); color: var(--max-black-deep); }
+.t-max .saving { background: color-mix(in srgb, var(--max-gold) 12%, transparent); color: var(--max-gold); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--max-gold) 26%, transparent); }
+.t-max input:checked + .card::before { padding: 2px; }
+.t-max input:checked + .card .check { background: var(--max-gold); color: var(--max-black-deep); }
+.t-max .perk .i { color: var(--max-gold); }
+.t-max .act .btn-ghost { color: var(--max-gold); }
+
+/* hover: a lift, a brighter rim, the sheen (tiers.js adds .sheen-once on pointer enter); pointer devices only */
+@media (hover: hover) {
+  .tier .card:hover { transform: translateY(-2px); }
+  .tier input:not(:checked) + .card:hover, .pack input:not(:checked) + .card:hover, .pay:not(:has(input:checked)):hover { box-shadow: inset 0 0 0 1px var(--input); }
+  .t-pro .card:hover, .t-pro input:not(:checked) + .card:hover { box-shadow: inset 0 0 0 1px var(--sapphire-rim), inset 0 1px 0 color-mix(in srgb, var(--sapphire-ink) 25%, transparent); }
+  .seg button:not([aria-pressed="true"]):hover { color: var(--foreground); }
+}
+
+/* reveal with stagger (tiers.js adds .in to the container; each card gets --d) */
+.tiers.stagger .tier, .packs.stagger .pack { opacity: 0; transform: translateY(12px); transition: opacity .48s var(--ease), transform .48s var(--ease); transition-delay: var(--d, 0ms); }
+.tiers.stagger.in .tier, .packs.stagger.in .pack { opacity: 1; transform: none; }
+
+/* packs: three distinct cards. 20 graphite · 55 sapphire-tinted "Most popular" · 115 gold-tinted "Best value". */
+.sub-h { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 24px 2px 8px; }
+.sub-h h3 { font: 600 17px/1.2 var(--font-sans); }
+.sub-h span { font-size: 14px; color: var(--muted-foreground); }
+.packs { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.pack { position: relative; cursor: pointer; isolation: isolate; }
+.pack input { position: absolute; opacity: 0; pointer-events: none; }
+.pack .card { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "cr usd" "flag each" "act act"; align-items: center; column-gap: 12px; padding: 12px 14px; border-radius: 16px; overflow: hidden;
+  background: var(--graphite); box-shadow: inset 0 0 0 1px var(--border); text-align: left; transition: box-shadow .18s, transform .3s var(--ease); }
+.pack .cr { grid-area: cr; font: 400 40px/.9 var(--font-display); letter-spacing: -0.02em; display: flex; align-items: baseline; }
+.pack .cr small { font: 400 14px/1 var(--font-sans); color: var(--muted-foreground); margin-left: 6px; }
+.pack .flag { grid-area: flag; justify-self: start; display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: 999px; font: 600 14px/1 var(--font-sans); margin-top: 8px; }
+.pack .usd { grid-area: usd; justify-self: end; font: 600 16px/1 var(--font-sans); }
+.pack .each { grid-area: each; justify-self: end; margin-top: 8px; font: 500 14px/1 var(--font-mono); color: var(--muted-foreground); white-space: nowrap; }
+.pack .act { grid-area: act; display: block; margin-top: 12px; }
+.pack .act .btn { width: 100%; }
+.pack input:checked + .card { box-shadow: inset 0 0 0 1.5px var(--foreground); }
+.pack input:focus-visible + .card { outline: 2px solid var(--ring); outline-offset: 2px; }
+.p-55 .card { background: radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--sapphire-flag) 22%, transparent), transparent 60%), linear-gradient(180deg, color-mix(in srgb, var(--sapphire-top) 55%, var(--graphite)), var(--graphite));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sapphire-rim) 34%, transparent); }
+.p-55 .cr { color: var(--sapphire-ink); }
+.p-55 .flag { background: var(--sapphire-flag); color: var(--sapphire-deep); }
+.p-55 .each { color: var(--sapphire-ink); }
+.p-55 input:checked + .card { box-shadow: inset 0 0 0 1.5px var(--sapphire-rim); }
+.p-115 .card { background: radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--max-gold) 16%, transparent), transparent 60%), linear-gradient(160deg, color-mix(in srgb, var(--max-black-top) 70%, var(--graphite)), var(--max-black-deep));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--max-gold) 34%, transparent); }
+.p-115 .cr { color: var(--max-gold); }
+.p-115 .flag { background: var(--chrome); color: var(--max-black-deep); }
+.p-115 .each { color: var(--max-gold); }
+.p-115 input:checked + .card { box-shadow: inset 0 0 0 1.5px var(--max-gold); }
+@media (hover: hover) {
+  .pack .card:hover { transform: translateY(-2px); }
+  .p-55 input:not(:checked) + .card:hover, .p-55 .card:hover { box-shadow: inset 0 0 0 1px var(--sapphire-rim); }
+  .p-115 input:not(:checked) + .card:hover, .p-115 .card:hover { box-shadow: inset 0 0 0 1px var(--max-gold); }
+}
+@media (min-width: 768px) {
+  .t-max::before { inset: -20px; }
+  .packs { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .pack .card { grid-template-columns: 1fr; grid-template-rows: 34px auto auto auto auto; grid-template-areas: "flag" "cr" "usd" "each" "act"; row-gap: 0; padding: 16px; height: 100%; align-content: start; }
+  .pack .flag { margin: 0; align-self: start; }
+  .pack .usd { justify-self: start; margin-top: 12px; }
+  .pack .each { justify-self: start; margin-top: 6px; }
+  .pack .act { margin-top: 16px; }
+}
+
+/* payment */
+.pays { display: grid; gap: 8px; }
+.pay { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 12px; border-radius: 16px; background: var(--graphite); box-shadow: inset 0 0 0 1px var(--border); cursor: pointer; transition: box-shadow .18s; }
+.pay input { appearance: none; -webkit-appearance: none; margin: 0; width: 20px; height: 20px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px rgba(242,236,227,.35); flex: none; transition: box-shadow .2s; }
+.pay input:checked { box-shadow: inset 0 0 0 6px var(--foreground); }
+.pay .lbl { flex: 1; font: 500 16px/1.3 var(--font-sans); }
+.pay .lbl small { display: block; font-size: 14px; color: var(--muted-foreground); font-weight: 400; margin-top: 2px; }
+.pay .marks { display: flex; gap: 4px; color: var(--bone-dim); }
+.pay .pm { width: 28px; height: 20px; }
+.pay:has(input:checked) { box-shadow: inset 0 0 0 1.5px rgba(242,236,227,.6); }
+
+/* reduced motion: the rim and sheen hold still, cards simply appear */
+@media (prefers-reduced-motion: reduce) {
+  .t-max .card::before, .t-max .card::after, .tier .card::after { animation: none !important; }
+  .tiers.stagger .tier, .packs.stagger .pack { transform: none; transition-delay: 0ms !important; }
+}

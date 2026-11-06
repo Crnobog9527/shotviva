@@ -5,6 +5,7 @@ import { useState } from "react"
 
 import type { ProductId } from "../../config"
 import { loginPath } from "../../auth/redirect-target"
+import { localeOfPath, localizePath } from "../../i18n/paths"
 import type { CheckoutMethod } from "../stripe/catalog"
 
 export type CheckoutStatus = "idle" | "pending" | "error"
@@ -24,7 +25,9 @@ export function useCheckout() {
         body: JSON.stringify({ product_id: productId, method, locale: locale.startsWith("zh") ? "zh" : "en", ...partnerReturn() }),
       })
       if (response.status === 401) {
-        window.location.assign(loginPath(`${window.location.pathname}${window.location.search}`))
+        // The login page of the page's own language; `next` is the address as it stands.
+        const here = `${window.location.pathname}${window.location.search}`
+        window.location.assign(localizePath(loginPath(here), localeOfPath(window.location.pathname)))
         return
       }
       const body: unknown = await response.json().catch(() => null)

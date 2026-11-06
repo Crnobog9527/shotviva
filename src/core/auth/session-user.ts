@@ -1,5 +1,7 @@
 import type { User } from '@supabase/supabase-js'
 
+import { isLocale, type Locale } from '../i18n/locales'
+
 export type Role = 'user' | 'admin'
 
 export type SessionUser = {
@@ -9,6 +11,13 @@ export type SessionUser = {
   emailVerified: boolean
   // Banned accounts keep signing in but cannot generate, post or check out (ARCHITECTURE §7).
   banned: boolean
+  // user_metadata.locale, written at sign-up (ARCHITECTURE §7); null for older and Google accounts.
+  locale: Locale | null
+}
+
+export function metadataLocale(user: Pick<User, 'user_metadata'>): Locale | null {
+  const value: unknown = user.user_metadata?.locale
+  return isLocale(value) ? value : null
 }
 
 // Google accounts arrive verified; email sign-ups only after the link is clicked.
@@ -19,7 +28,7 @@ export function isEmailVerified(user: Pick<User, 'email_confirmed_at' | 'app_met
 }
 
 export function toSessionUser(
-  user: Pick<User, 'id' | 'email' | 'email_confirmed_at' | 'app_metadata'>,
+  user: Pick<User, 'id' | 'email' | 'email_confirmed_at' | 'app_metadata'> & Partial<Pick<User, 'user_metadata'>>,
   profile: { role: string; banned_at?: string | null } | null,
 ): SessionUser {
   return {
@@ -29,5 +38,6 @@ export function toSessionUser(
     role: profile?.role === 'admin' ? 'admin' : 'user',
     emailVerified: isEmailVerified(user),
     banned: profile?.banned_at != null,
+    locale: metadataLocale({ user_metadata: user.user_metadata ?? {} }),
   }
 }

@@ -1,5 +1,6 @@
-import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 
+import { Link } from '../../i18n/ui'
 import type { HomePage } from '../page-content'
 
 type Props = { grid: HomePage['templateGrid']; isLinkEnabled: (href: string) => boolean }
@@ -7,6 +8,7 @@ type Props = { grid: HomePage['templateGrid']; isLinkEnabled: (href: string) => 
 // One H3 per category; template names and uses are in the HTML source (建站规格 R5, §4 H2-2).
 // Real cards with covers come with T8 on top of T3 data.
 export function TemplateGrid({ grid, isLinkEnabled }: Props) {
+  const t = useTranslations('marketing')
   return (
     <section>
       <h2>{grid.heading}</h2>
@@ -20,7 +22,7 @@ export function TemplateGrid({ grid, isLinkEnabled }: Props) {
             <ul>
               {category.templates.map((template) => (
                 <li key={template.name}>
-                  <strong>{template.name}</strong>: {template.use}
+                  {t.rich('templateLine', { name: template.name, use: template.use, b: (chunks) => <strong>{chunks}</strong> })}
                 </li>
               ))}
             </ul>

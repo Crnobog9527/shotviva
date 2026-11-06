@@ -4,8 +4,11 @@ import type { LegalBlock, LegalLink, LegalText } from './legal-page'
 
 const linkClass = 'underline underline-offset-4 hover:text-foreground'
 
+// Files such as /fonts/misans/LICENSE.pdf are plain downloads, not pages for the router.
+const isFile = (href: string) => /\.[a-z0-9]+$/i.test(href)
+
 function InlineLink({ link }: { link: LegalLink }) {
-  if (link.href.startsWith('/')) {
+  if (link.href.startsWith('/') && !isFile(link.href)) {
     return (
       <Link href={link.href} className={linkClass}>
         {link.label}

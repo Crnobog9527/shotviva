@@ -1,5 +1,6 @@
 import 'server-only'
 
+import type { Locale } from '../i18n/locales'
 import type { EventProps } from './events'
 import { track } from './server-track'
 
@@ -7,11 +8,11 @@ import { track } from './server-track'
 // ad blocker cannot drop them (ARCHITECTURE §16.2); both are fire-and-forget.
 
 // When the Checkout Session (Stripe) or hosted checkout (Waffo) has been created.
-export function trackCheckoutStart(userId: string, props: EventProps<'checkout_start'>): void {
-  track('checkout_start', props, { distinctId: userId })
+export function trackCheckoutStart(userId: string, props: EventProps<'checkout_start'>, locale: Locale): void {
+  track('checkout_start', props, { distinctId: userId, locale })
 }
 
 // After the webhook has credited the purchase (apply_purchase applied: true), never on a replay.
-export function trackPurchase(userId: string, props: EventProps<'purchase'>): void {
-  track('purchase', props, { distinctId: userId })
+export function trackPurchase(userId: string, props: EventProps<'purchase'>, locale: Locale): void {
+  track('purchase', props, { distinctId: userId, locale })
 }

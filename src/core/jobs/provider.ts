@@ -44,8 +44,8 @@ export type ProviderPrices = {
 
 export type GenerationProvider = {
   id: string
-  // Price snapshot taken when the provider was resolved for this request; null for the env
-  // fallback, which has no row to hold prices.
+  // Price snapshot taken when the provider was resolved for this request: the row's prices with
+  // empty ones filled from MODEL_PRICES; null when neither has any (the job then has no cost).
   prices?: ProviderPrices | null
   generate(input: ProviderInput): Promise<ProviderOutput>
 }

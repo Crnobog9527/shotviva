@@ -1,0 +1,5 @@
+{
+  "derivedFrom": "hero-set-listing.webp",
+  "how": "ImageMagick: flood-fill the white background to alpha from the four corners (fuzz 16%), soften the matte edge (blur 0.8, level 0-85%), resize to 768px wide, PNG32. Illustrative example of a transparent-PNG result for the photo detail page (T31/T32).",
+  "createdAt": "2026-11-06T15:30:00+00:00"
+}

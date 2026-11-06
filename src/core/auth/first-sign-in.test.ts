@@ -29,14 +29,14 @@ describe('onVerifiedSignIn', () => {
   it('tracks signup when the IP was stored now, even if the gift was refused', async () => {
     mocks.recordSignupIp.mockResolvedValue(true)
     mocks.grantSignupCredits.mockResolvedValue(false)
-    await onVerifiedSignIn('u1', 6, 'email')
-    expect(mocks.track).toHaveBeenCalledExactlyOnceWith('signup', { method: 'email' }, { distinctId: 'u1' })
+    await onVerifiedSignIn('u1', 6, 'email', 'zh')
+    expect(mocks.track).toHaveBeenCalledExactlyOnceWith('signup', { method: 'email' }, { distinctId: 'u1', locale: 'zh' })
   })
 
   it('does not track a later sign-in, even when a failed gift is retried then', async () => {
     mocks.recordSignupIp.mockResolvedValue(false)
     mocks.grantSignupCredits.mockResolvedValue(true)
-    await onVerifiedSignIn('u1', 6, 'google')
+    await onVerifiedSignIn('u1', 6, 'google', 'en')
     expect(mocks.track).not.toHaveBeenCalled()
   })
 
@@ -44,7 +44,7 @@ describe('onVerifiedSignIn', () => {
     mocks.headers.mockResolvedValue(new Headers())
     mocks.recordSignupIp.mockResolvedValue(false)
     mocks.grantSignupCredits.mockResolvedValue(true)
-    await onVerifiedSignIn('u1', 6, 'email')
+    await onVerifiedSignIn('u1', 6, 'email', 'zh')
     expect(mocks.track).toHaveBeenCalledOnce()
   })
 })

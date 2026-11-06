@@ -3,6 +3,7 @@ import 'server-only'
 import { z } from 'zod'
 
 import { track as defaultTrack, type EventProps, type ServerTrack } from '../analytics'
+import { DEFAULT_LOCALE, type Locale } from '../i18n/locales'
 import { EDIT_SCOPES } from '../templates/edit-params'
 import { GenerationFailure } from './generation-failure'
 import type { Job } from './job-schema'
@@ -41,18 +42,19 @@ export async function settleTracked<T>(
   job: Job,
   category: string,
   settle: () => Promise<T>,
-  options: { track?: ServerTrack; now?: () => number; batchSize?: number } = {},
+  options: { track?: ServerTrack; now?: () => number; batchSize?: number; locale?: Locale } = {},
 ): Promise<T> {
   const track = options.track ?? defaultTrack
   const now = options.now ?? Date.now
+  const ctx = { distinctId: job.userId, locale: options.locale ?? DEFAULT_LOCALE }
   const started = now()
   try {
     const settled = await settle()
-    track('generate', generateEventProps(job, category, { status: 'succeeded' }, now() - started, options.batchSize), { distinctId: job.userId })
+    track('generate', generateEventProps(job, category, { status: 'succeeded' }, now() - started, options.batchSize), ctx)
     return settled
   } catch (error) {
     const errorCode = error instanceof GenerationFailure ? error.jobCode : null
-    track('generate', generateEventProps(job, category, { status: 'failed', errorCode }, now() - started, options.batchSize), { distinctId: job.userId })
+    track('generate', generateEventProps(job, category, { status: 'failed', errorCode }, now() - started, options.batchSize), ctx)
     throw error
   }
 }

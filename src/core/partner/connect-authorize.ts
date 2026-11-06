@@ -5,6 +5,8 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 import { assertSameOrigin, loginPath, type SessionUser } from '../auth'
 import type { PartnerSiteConfig } from '../config'
+import { DEFAULT_LOCALE, type Locale } from '../i18n/locales'
+import { localizePath } from '../i18n/paths'
 import { logger } from '../logger'
 import { issueLinkCode } from './link-code'
 import { connectRedirectUrl, parseConnectRequest } from './return-to'
@@ -23,6 +25,8 @@ export type ConnectAuthorizeDeps = {
   db: () => SupabaseClient
   user: () => Promise<SessionUser | null>
   config: PartnerSiteConfig
+  // Language of the connect page that posted; the login detour stays in it.
+  locale?: Locale
 }
 
 const plain = (body: string, status: number) =>
@@ -49,7 +53,11 @@ export async function handleConnectAuthorize(request: NextRequest, deps: Connect
 
   const user = await deps.user()
   // The session expired between showing the page and the click: sign in, then start over.
-  if (!user || !user.emailVerified) return NextResponse.redirect(new URL(loginPath(connectPagePath(params)), request.url), 303)
+  if (!user || !user.emailVerified) {
+    const locale = deps.locale ?? DEFAULT_LOCALE
+    const login = localizePath(loginPath(localizePath(connectPagePath(params), locale)), locale)
+    return NextResponse.redirect(new URL(login, request.url), 303)
+  }
   try {
     const code = await issueLinkCode(deps.db(), user.id)
     return NextResponse.redirect(connectRedirectUrl(connect, code), 302)

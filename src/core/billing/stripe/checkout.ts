@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { trackCheckoutStart } from '../../analytics/funnel'
 import { PRODUCT_IDS, type SiteProduct } from '../../config'
 import { AppError } from '../../errors'
+import { localizePath } from '../../i18n/paths'
 import { allowlistedUrl } from '../../partner/return-to'
 import { CHECKOUT_METHODS, checkoutRoute, type CheckoutMethod, type CheckoutRoute } from './catalog'
 import type { StripeApi } from './client'
@@ -52,7 +53,9 @@ export function successPath(returnTo: string | undefined, hosts: readonly string
   return `${CHECKOUT_RETURN.success}&from=graylum&return_to=${encodeURIComponent(back.toString())}`
 }
 
-type Metadata = { user_id: string; product_id: string; method: CheckoutMethod }
+// `locale` is for analytics only: renewals have no page, so their `purchase` event reads the
+// language from the subscription's metadata (ARCHITECTURE §16.2).
+type Metadata = { user_id: string; product_id: string; method: CheckoutMethod; locale: CheckoutBody['locale'] }
 
 type MethodParams = Pick<Stripe.Checkout.SessionCreateParams, 'managed_payments' | 'allowed_payment_method_types'>
 
@@ -77,8 +80,9 @@ function sessionParams(
     client_reference_id: metadata.user_id,
     metadata,
     locale: input.locale,
-    success_url: `${input.origin}${input.successPath}`,
-    cancel_url: `${input.origin}${CHECKOUT_RETURN.cancel}`,
+    // Back to the account / pricing page in the language the buyer checked out in.
+    success_url: `${input.origin}${localizePath(input.successPath, input.locale)}`,
+    cancel_url: `${input.origin}${localizePath(CHECKOUT_RETURN.cancel, input.locale)}`,
     ...methodParams(route),
     ...(route.mode === 'subscription' ? { subscription_data: { metadata } } : { payment_intent_data: { metadata } }),
   }
@@ -101,7 +105,7 @@ export async function createCheckout(
   if (!product || product.priceUsd <= 0) throw new AppError('NOT_FOUND', 'Unknown product')
   const route = checkoutRoute(product, body.method, deps.managedPayments)
   const priceId = await resolvePriceId(deps.stripe, product, route)
-  const metadata = { user_id: input.userId, product_id: product.id, method: body.method }
+  const metadata = { user_id: input.userId, product_id: product.id, method: body.method, locale: body.locale }
   const session = await deps.stripe.checkout.sessions.create(
     sessionParams(route, priceId, metadata, {
       locale: body.locale,
@@ -118,6 +122,6 @@ export async function createCheckout(
     form: route.form,
     channel: 'stripe',
     method: body.method,
-  })
+  }, body.locale)
   return { url: session.url }
 }

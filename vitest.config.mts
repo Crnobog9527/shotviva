@@ -13,6 +13,9 @@ export default defineConfig({
     },
   },
   test: {
+    // next-intl's ESM build imports 'next/navigation' without an extension; inlining lets Vite
+    // resolve it the way Next does.
+    server: { deps: { inline: ['next-intl'] } },
     projects: [
       {
         extends: true,

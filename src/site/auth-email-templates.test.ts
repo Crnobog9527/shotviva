@@ -39,6 +39,16 @@ describe.each(Object.entries(TEMPLATES))('supabase/templates/%s.html', (name, ty
     expect(html).not.toMatch(/<img|<script|<link|url\(/i)
   })
 
+  it('has a Chinese branch for every line, chosen by user_metadata.locale (ARCHITECTURE §7)', () => {
+    expect(html).toContain('{{- $zh := eq .Data.locale "zh" -}}')
+    expect(html).toContain('<html lang="{{ if $zh }}zh-Hans{{ else }}en{{ end }}">')
+    const branches = html.match(/\{\{ if \$zh \}\}([^{]*)\{\{ else \}\}/g) ?? []
+    expect(branches.length).toBeGreaterThanOrEqual(10)
+    // Every text cell between tags is a language branch: no bare English sentence is left.
+    const bare = [...html.matchAll(/>([^<>{}]*[A-Za-z]{3,}[^<>{}]*)</g)].map((m) => m[1]?.trim()).filter((text) => text && text !== 'Shotviva' && !text.includes('@'))
+    expect(bare).toEqual([])
+  })
+
   it('is wired into the local Supabase config', () => {
     expect(config).toContain(`content_path = "./supabase/templates/${name}.html"`)
   })

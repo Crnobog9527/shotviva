@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server'
 import { errorResponse, jsonResponse } from '@/core/api-response'
 import { assertSameOrigin, createAdminSupabase, requireApiUser } from '@/core/auth'
 import { AppError } from '@/core/errors'
+import { localeOfReferer } from '@/core/i18n'
 import { generateBodySchema, runGeneration, toGenerationRequest } from '@/core/jobs'
 import { r2Store } from '@/core/storage'
 import { imageProvider } from '@/modules/image'
@@ -19,7 +20,9 @@ export async function POST(request: NextRequest) {
     if (!body.success) throw new AppError('INVALID_INPUT', 'template_id is required')
     // The active provider in /admin/providers, else the env fallback (ARCHITECTURE §3.3).
     const deps = { db: createAdminSupabase(), store: r2Store(), provider: await imageProvider() }
-    return jsonResponse(await runGeneration(deps, toGenerationRequest(user.id, body.data)))
+    // The `generate` event's locale: the workspace page's language, else the account's.
+    const locale = localeOfReferer(request.headers.get('referer')) ?? user.locale ?? undefined
+    return jsonResponse(await runGeneration(deps, { ...toGenerationRequest(user.id, body.data), locale }))
   } catch (error) {
     return errorResponse(error, 'generate')
   }

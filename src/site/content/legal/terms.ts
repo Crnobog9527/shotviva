@@ -11,6 +11,30 @@ const sections: readonly [LegalSection, ...LegalSection[]] = [
   ...termsServiceSections,
   ...termsBillingSections,
   ...termsGeneralSections,
+  // The MiSans licence asks for attribution; it lives here, not in the footer (ARCHITECTURE §17,
+  // DESIGN §6.9).
+  {
+    id: 'third-party-notices',
+    heading: 'Third-party notices',
+    blocks: [
+      ['This site uses the MiSans font, © Xiaomi. ', { href: '/fonts/misans/LICENSE.pdf', label: 'Read the MiSans font licence' }, '.'],
+      // Self-hosted Latin fonts (src/app/fonts/OFL-*.txt), all under the SIL Open Font License 1.1.
+      [
+        'Geist and Geist Mono: Copyright 2024 The Geist Project Authors (',
+        { href: 'https://github.com/vercel/geist-font', label: 'github.com/vercel/geist-font' },
+        '), licensed under the ',
+        { href: 'https://openfontlicense.org', label: 'SIL Open Font License, Version 1.1' },
+        '.',
+      ],
+      [
+        'Instrument Serif: Copyright 2022 The Instrument Serif Project Authors (',
+        { href: 'https://github.com/Instrument/instrument-serif', label: 'github.com/Instrument/instrument-serif' },
+        '), licensed under the ',
+        { href: 'https://openfontlicense.org', label: 'SIL Open Font License, Version 1.1' },
+        '.',
+      ],
+    ],
+  },
   contactSection('these Terms'),
 ]
 

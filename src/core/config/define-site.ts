@@ -1,3 +1,5 @@
+import type { Locale } from '../i18n/locales'
+
 // Shape of site/site.config.ts. Core reads the site only through this type,
 // so a new site swaps site/ without touching core (ARCHITECTURE §0, §2).
 export type ModuleId = 'image' | 'video'
@@ -79,7 +81,14 @@ export type PartnerSiteConfig = {
 export type SiteConfig = {
   brand: SiteBrand
   modules: Record<ModuleId, boolean>
-  locales: { default: string; enabled: readonly string[] }
+  locales: {
+    default: Locale
+    enabled: readonly Locale[]
+    // Logical paths (`/generate/[templateId]` style) of the pages that have a /zh version
+    // (ARCHITECTURE §17). Every other /zh address 404s, emits no zh hreflang, shows no switch
+    // banner, and the switcher points at /zh.
+    zhPaths: readonly `/${string}`[]
+  }
   billing: {
     currency: 'usd'
     freeCredits: number
@@ -99,6 +108,9 @@ export type SiteConfig = {
     // Production hosts that 308 to brand.domain once the deployment is configured for it
     // (ARCHITECTURE §12.0, core/seo canonicalHostRedirect).
     canonicalRedirectHosts: readonly string[]
+    // The /zh pages allowed into search; each must be in the Chinese keyword map CSV
+    // (AGENTS §9, 建站规格 §6.1) and in locales.zhPaths. Every other /zh page is noindex.
+    zhIndexablePaths: readonly `/${string}`[]
   }
 }
 

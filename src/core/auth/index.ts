@@ -1,10 +1,9 @@
 // Server-side entry. Client components live in core/auth/ui (import '@/core/auth/ui').
 export { getSessionUser, requireAdmin, requireUser } from './session'
-export { loginPath, sanitizeNext } from './redirect-target'
+export { loginPath, nextIn, sanitizeNext } from './redirect-target'
 export type { Role, SessionUser } from './session-user'
 export { createServerSupabase } from './supabase-server'
 export { createAdminSupabase } from './supabase-admin'
-export { proxyGate } from './proxy-gates'
 export { handleAuthCallback } from './flows/callback'
 export { handleAuthConfirm } from './flows/confirm'
 export { signInWithGoogle, signInWithPassword, signOut } from './flows/sign-in'

@@ -9,256 +9,223 @@
 <link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="css/studio.css">
+<link rel="stylesheet" href="css/app.css">
 <script src="js/studio.js"></script>
 <style>
+  /* The workspace page is the full-page form of the creation panel: the form markup comes from SV.formHTML (one source
+     with the create-page dialog); this file only owns the page chrome, the two columns and the stage. */
   body { padding-bottom: calc(var(--sab) + 190px); }
-  .nav { position: sticky; top: 0; z-index: 50; padding: var(--sat) 6px 0;
-    background: linear-gradient(rgba(11,10,9,.94), rgba(11,10,9,.8)); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+  .nav { position: sticky; top: 0; z-index: 50; padding: var(--sat) 8px 0;
+    background: linear-gradient(color-mix(in srgb, var(--background) 94%, transparent), color-mix(in srgb, var(--background) 80%, transparent)); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
   .nav-row { height: 52px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
-  .back { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; padding: 0 10px 0 4px; font: 500 16px/1 var(--font-sans); text-decoration: none; color: var(--foreground); justify-self: start; }
+  .back { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; padding: 0 8px 0 4px; font: 500 16px/1 var(--font-sans); text-decoration: none; color: var(--foreground); justify-self: start; }
   .back .i { width: 22px; height: 22px; stroke-width: 2.2; color: var(--primary); }
-  .nav-title { font: 600 15.5px/1 var(--font-sans); letter-spacing: -0.01em; opacity: 0; transition: opacity .2s; }
+  .nav-title { font: 600 15px/1 var(--font-sans); letter-spacing: -0.01em; opacity: 0; transition: opacity .2s; }
   .nav.scrolled .nav-title { opacity: 1; }
-  .nav .bal { justify-self: end; margin-right: 10px; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px 0 4px; border-radius: 999px; background: rgba(242,236,227,.06); font: 500 14px/1 var(--font-sans); text-decoration: none; }
-  .nav .bal .coin { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 35% 30%, #FF8A63, var(--primary) 60%, #C93A14); color: var(--primary-foreground); font: 600 10.5px/1 var(--font-mono); }
+  .nav .bal { justify-self: end; margin-right: 8px; }
 
-  .head { display: flex; gap: 14px; align-items: center; padding: 6px var(--gutter) 4px; }
+  .head { display: flex; gap: 12px; align-items: center; padding: 8px var(--gutter) 4px; }
   .head img { width: 56px; height: 70px; border-radius: 12px; object-fit: cover; box-shadow: inset 0 0 0 1px var(--border); }
   .head h1 { font: 400 36px/1 var(--font-display); letter-spacing: -0.02em; }
-  .head p { font-size: 14px; color: var(--muted-foreground); margin-top: 3px; }
+  .head p { font-size: 14px; color: var(--muted-foreground); margin-top: 4px; text-wrap: pretty; }
 
-  .sec { padding: 26px var(--gutter) 0; }
-  .sec-h { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
-  .sec-h h2 { font: 600 17px/1.2 var(--font-sans); letter-spacing: -0.01em; }
-
-  /* photo */
-  .photo { display: flex; gap: 14px; padding: 12px; align-items: center; }
-  .photo .thumb { position: relative; flex: 0 0 92px; aspect-ratio: 4 / 5; border-radius: 12px; overflow: hidden; }
-  .photo .thumb img { width: 100%; height: 100%; object-fit: cover; }
-  .photo .meta { flex: 1; min-width: 0; }
-  .photo .ok { display: inline-flex; align-items: center; gap: 6px; font: 600 16px/1 var(--font-sans); }
-  .photo .ok .dot { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; background: rgba(127,214,160,.16); color: var(--success); }
-  .photo .ok .dot .i { width: 11px; height: 11px; stroke-width: 3; }
-  .photo .size { font: 400 14px/1.4 var(--font-mono); color: var(--muted-foreground); margin-top: 8px; }
-  .photo .btn { margin-top: 10px; height: 36px; min-height: 44px; padding: 0 14px; border-radius: 999px; font-size: 14px; }
-  .photo .btn .i { width: 16px; height: 16px; }
-
-  .empty { padding: 12px; }
-  .empty .frame { position: relative; aspect-ratio: 16 / 9; border-radius: 14px; display: grid; place-content: center; justify-items: center; gap: 8px; text-align: center;
-    background: repeating-linear-gradient(135deg, rgba(242,236,227,.03) 0 8px, transparent 8px 16px), #0E0D0C; box-shadow: inset 0 0 0 1px rgba(242,236,227,.12); }
-  .empty .frame b { font: 600 16px/1.2 var(--font-sans); }
-  .empty .frame span { font: 400 14px/1.3 var(--font-sans); color: var(--muted-foreground); }
-  .empty .two { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 10px; }
-  .empty .two .btn { min-height: 50px; padding: 0 10px; gap: 6px; border-radius: 14px; font-size: 16px; white-space: nowrap; }
-  .empty .two .btn .i { width: 18px; height: 18px; }
-  .empty .two .btn:first-child { background: var(--foreground); color: var(--background); }
-
-  /* size */
-  .sizes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-  .opt { position: relative; }
-  .opt input { position: absolute; opacity: 0; pointer-events: none; }
-  .size-tile { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 7px; height: 100px; padding: 10px 2px 10px; border-radius: 14px; cursor: pointer;
-    background: var(--card); box-shadow: inset 0 0 0 1px var(--border); transition: box-shadow .2s, background .2s; text-align: center; }
-  .size-tile .glyph { display: grid; place-items: center; width: 40px; height: 34px; }
-  .size-tile .glyph i { display: block; border: 1.5px solid rgba(242,236,227,.5); border-radius: 3px; transition: border-color .2s, background .2s; }
-  .size-tile .glyph i.orig { border-style: dashed; }
-  .size-tile b { font: 600 14px/1 var(--font-sans); letter-spacing: -0.02em; }
-  .size-tile small { font: 400 14px/1 var(--font-mono); letter-spacing: -0.03em; color: var(--muted-foreground); }
-  .opt input:checked + .size-tile { background: linear-gradient(180deg, rgba(255,91,46,.14), rgba(255,91,46,.04)); box-shadow: inset 0 0 0 1.5px var(--primary); }
-  .opt input:checked + .size-tile .glyph i { border-color: var(--primary); background: rgba(255,91,46,.18); }
-  .opt input:focus-visible + .size-tile, .opt input:focus-visible + .res { outline: 2px solid var(--ring); outline-offset: 2px; }
-
-  /* resolution */
-  .ress { display: grid; gap: 8px; }
-  .res { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 12px; padding: 14px 14px 14px 16px; border-radius: 16px; cursor: pointer; min-height: 64px;
-    background: var(--card); box-shadow: inset 0 0 0 1px var(--border); transition: box-shadow .2s, background .2s; }
-  .res .n { font: 600 16px/1.2 var(--font-sans); display: flex; align-items: baseline; gap: 8px; }
-  .res .n .px { font: 400 14px/1 var(--font-mono); color: var(--muted-foreground); }
-  .res .u { grid-column: 1; font-size: 14px; color: var(--muted-foreground); }
-  .res .c { grid-row: 1 / span 2; grid-column: 2; text-align: right; font: 400 24px/1 var(--font-display); }
-  .res .c small { display: block; font: 400 14px/1 var(--font-sans); color: var(--muted-foreground); margin-top: 4px; }
-  .opt input:checked + .res { background: linear-gradient(180deg, rgba(255,91,46,.12), rgba(255,91,46,.03)); box-shadow: inset 0 0 0 1.5px var(--primary); }
-
-  .foot { padding: 20px var(--gutter) 0; font-size: 14px; color: var(--muted-foreground); display: flex; gap: 8px; align-items: center; }
-  .foot .i { width: 16px; height: 16px; color: var(--primary); }
-
-  /* fixed bottom bar */
-  .bar { position: fixed; z-index: 60; left: 0; right: 0; bottom: 0; padding: 12px var(--gutter) calc(var(--sab) + 10px);
-    background: linear-gradient(rgba(16,14,12,.82), rgba(16,14,12,.96)); backdrop-filter: blur(24px) saturate(1.3); -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  /* fixed bottom bar: the one primary */
+  .bar { position: fixed; z-index: 60; left: 0; right: 0; bottom: 0; padding: 12px var(--gutter) calc(var(--sab) + 8px);
+    background: linear-gradient(color-mix(in srgb, var(--bar) 82%, transparent), color-mix(in srgb, var(--bar) 96%, transparent)); backdrop-filter: blur(24px) saturate(1.3); -webkit-backdrop-filter: blur(24px) saturate(1.3);
     box-shadow: inset 0 1px 0 var(--border); }
-  .notice { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.4; color: var(--bone-dim); margin-bottom: 10px; }
-  .notice .i { width: 16px; height: 16px; color: var(--muted-foreground); margin-top: 1px; }
-  .notice b { color: var(--foreground); font-weight: 500; }
-  .btn-primary.need { background: var(--foreground); color: var(--background); }
+  .bar .btn-ghost { width: 100%; min-height: 52px; border-radius: 16px; }
 
-  /* generating */
-  .gen { padding: 10px var(--gutter) 0; }
+  /* ---------- the stage: the print in the tray, one block for every state ---------- */
+  .stage { padding: 8px var(--gutter) 0; }
+  .dev { position: relative; aspect-ratio: 4 / 5; border-radius: 22px; overflow: hidden; background: var(--background); box-shadow: inset 0 0 0 1px var(--border); }
   [data-state="generating"] .dev { aspect-ratio: 5 / 4; }
-  .dev { position: relative; aspect-ratio: 4 / 5; border-radius: 22px; overflow: hidden; background: #000; box-shadow: inset 0 0 0 1px var(--border); }
   .dev img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   .dev .neg { filter: grayscale(1) contrast(.85) brightness(.7); }
-  .dev .pos { clip-path: inset(0 0 var(--left, 62%) 0); }
-  .dev .scan { position: absolute; left: 0; right: 0; top: calc(100% - var(--left, 62%)); height: 2px; margin-top: -1px; background: var(--primary); box-shadow: 0 0 24px 6px rgba(255,91,46,.45); }
+  [data-state="generating"] .dev .pos { clip-path: inset(0 0 var(--left, 62%) 0); }
+  .dev .scan { position: absolute; left: 0; right: 0; top: calc(100% - var(--left, 62%)); height: 2px; margin-top: -1px; background: var(--primary); }
   @property --left { syntax: "<percentage>"; inherits: true; initial-value: 62%; }
-  .dev { animation: lefts 7s var(--ease) infinite alternate; }
+  /* the page's one authored moment: the safelight scan develops the negative while generating */
+  [data-state="generating"] .dev { animation: lefts 7s var(--ease) infinite alternate; }
   @keyframes lefts { from { --left: 78%; } to { --left: 46%; } }
-  .dev .hud { position: absolute; left: 14px; right: 14px; top: 14px; display: flex; justify-content: space-between; z-index: 2; }
-  .dev .badge-illus { left: 14px; bottom: 14px; }
-  .steps { list-style: none; margin: 16px 0 0; padding: 4px 16px; border-radius: 18px; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
+  .dev .hud { position: absolute; left: 12px; right: 12px; top: 12px; display: flex; justify-content: space-between; z-index: 2; }
+  .dev .badge-illus { left: 12px; bottom: 12px; }
+  /* empty: the template's sample pair fills the tray */
+  .dev .pair { position: absolute; inset: 0; aspect-ratio: auto; border-radius: 0; box-shadow: none; }
+  .dev .compare { position: absolute; inset: 0; aspect-ratio: auto; border-radius: 0; }
+  .stage-cap { margin-top: 12px; font-size: 14px; color: var(--muted-foreground); }
+
+  .steps { list-style: none; margin: 0; padding: 4px 16px; border-radius: 18px; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
   .steps li { display: flex; align-items: center; gap: 12px; min-height: 52px; font-size: 16px; }
   .steps li + li { border-top: 1px solid var(--hairline); }
-  .steps .tick { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; flex: none; background: rgba(127,214,160,.15); color: var(--success); }
+  .steps .tick { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; flex: none; background: color-mix(in srgb, var(--success) 15%, transparent); color: var(--success); }
   .steps .tick .i { width: 12px; height: 12px; stroke-width: 3; }
-  .steps .now .tick { background: rgba(255,91,46,.16); }
-  .steps .now .tick::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--primary); animation: pulse 1.4s ease-in-out infinite; }
-  @keyframes pulse { 50% { transform: scale(.55); opacity: .5; } }
-  .steps .prog { flex: 1; height: 4px; border-radius: 2px; background: rgba(242,236,227,.08); overflow: hidden; margin-left: 4px; }
+  .steps .now .tick { background: color-mix(in srgb, var(--primary) 16%, transparent); }
+  .steps .now .tick::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--primary); }
+  .steps .prog { flex: 1; height: 4px; border-radius: 2px; background: var(--bone-8); overflow: hidden; margin-left: 4px; }
   .steps .prog i { display: block; height: 100%; width: 46%; background: var(--primary); border-radius: 2px; }
   .steps .pct { font: 400 14px/1 var(--font-mono); color: var(--muted-foreground); }
-  .leave { margin-top: 14px; font-size: 14px; color: var(--bone-dim); }
+  .leave { margin-top: 12px; font-size: 14px; color: var(--bone-dim); }
 
-  [data-state="empty"] .only-ready, [data-state="empty"] .only-gen,
-  [data-state="ready"] .only-empty, [data-state="ready"] .only-gen,
-  [data-state="generating"] .only-form, [data-state="generating"] .only-empty, [data-state="generating"] .only-ready { display: none !important; }
-  [data-state="generating"] { padding-bottom: calc(var(--sab) + 110px); }
+  /* result / failure rows */
+  .result { margin-top: 16px; padding: 16px; display: grid; gap: 4px; }
+  .result .t { display: flex; align-items: center; gap: 8px; font: 600 16px/1.25 var(--font-sans); }
+  .result .t .dot { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; flex: none; background: color-mix(in srgb, var(--success) 15%, transparent); color: var(--success); }
+  .result .t .dot .i { width: 12px; height: 12px; stroke-width: 3; }
+  .result.fail .t .dot { background: color-mix(in srgb, var(--destructive) 14%, transparent); color: var(--destructive); }
+  .result p { font-size: 14px; line-height: 1.4; color: var(--muted-foreground); }
+  .result .btn { justify-self: start; margin-top: 8px; }
+  .result .link { font-size: 15px; }
+
+  body[data-state="generating"], body[data-state="done"], body[data-state="failed"] { padding-bottom: calc(var(--sab) + 150px); }
+
+  /* phone: the stage appears above the column once there is a print to show */
+  .cols { display: flex; flex-direction: column; }
+  .col-b { order: -1; }
+  [data-state="empty"] .col-b, [data-state="ready"] .col-b { display: none; }
+  [data-state="failed"] .col-b { order: 0; } /* the message comes first on a failure */
+
+  /* ======================= desktop: two columns from 1024 up ======================= */
+  @media (min-width: 768px) {
+    .nav-row { height: 60px; }
+  }
+  @media (min-width: 1024px) {
+    body, body[data-state="done"], body[data-state="failed"] { padding-bottom: 48px; }
+    .head { padding-top: 24px; }
+    .cols { display: grid; grid-template-columns: minmax(380px, 440px) minmax(0, 1fr); column-gap: 48px; align-items: start; padding: 0 var(--gutter); }
+    .col-a { min-width: 0; }
+    .col-b, [data-state="failed"] .col-b { order: 0; position: sticky; top: 72px; }
+    [data-state="empty"] .col-b, [data-state="ready"] .col-b { display: block; }
+    .sec, .stage, .foot { padding-left: 0; padding-right: 0; }
+    .form .sec:first-child { padding-top: 16px; }
+    /* the stage keeps 4:5 and never exceeds the viewport */
+    .dev { width: min(100%, calc((100dvh - 220px) * 0.8)); margin-inline: auto; }
+    [data-state="generating"] .dev { aspect-ratio: 4 / 5; }
+    .stage-cap { text-align: center; }
+    .steps, .result, .leave { max-width: none; }
+    /* the one primary: sticky at the end of the form column */
+    .bar { position: sticky; left: auto; right: auto; bottom: 0; margin-top: 16px; padding: 24px 0 24px;
+      background: linear-gradient(color-mix(in srgb, var(--background) 0%, transparent), var(--background) 16px); box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  }
 </style>
 </head>
 <body data-state="ready">
 <header class="nav" id="nav">
-  <div class="nav-row">
+  <div class="nav-row w">
     <a class="back" href="create.html"><svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>Create</a>
     <span class="nav-title" aria-hidden="true">Pure White</span>
-    <a class="bal" href="paywall.html" id="bal"><span class="coin" aria-hidden="true" id="bal-n">6</span><span id="bal-t">6 free</span></a>
+    <a class="bal" href="paywall.html" id="bal"><span class="coin" aria-hidden="true"></span><span id="bal-t">6 free</span></a>
   </div>
 </header>
 
-<main>
+<main class="w">
   <div class="head">
     <img src="../assets/img/pure-white-after.webp" alt="" id="tpl-img">
-    <div><h1 id="tpl-name">Pure White</h1><p id="tpl-use">Marketplace · white background</p></div>
+    <div><h1 id="tpl-name">Pure White</h1><p id="tpl-use">Products &amp; Resale · Clean white background, soft shadow, catalogue-ready.</p></div>
   </div>
 
-  <div class="only-form">
-    <section class="sec" aria-labelledby="ph">
-      <div class="sec-h"><h2 id="ph">Your photo</h2><span class="meas">4:5 · as shot</span></div>
-      <div class="panel photo only-ready">
-        <div class="thumb"><img src="../assets/img/pure-white-before.webp" alt="Your uploaded photo (illustrative example)"></div>
-        <div class="meta">
-          <span class="ok"><span class="dot"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>Uploaded</span>
-          <p class="size">Compressed · 0.9 MB</p>
-          <button class="btn btn-ghost" type="button" data-go="empty"><svg class="i" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4"/></svg>Replace photo</button>
+  <div class="cols">
+    <div class="col-a">
+      <div id="form-root"></div>
+
+      <section class="sec" data-show="generating" aria-live="polite" aria-labelledby="gh">
+        <h2 id="gh" class="sr-only">Generating</h2>
+        <ol class="steps">
+          <li><span class="tick"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>Compressing</li>
+          <li><span class="tick"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>Uploading</li>
+          <li class="now"><span class="tick" aria-hidden="true"></span>Generating<span class="prog" role="progressbar" aria-label="Generating" aria-valuenow="46" aria-valuemin="0" aria-valuemax="100"><i></i></span><span class="pct">46%</span></li>
+        </ol>
+        <p class="leave">Usually 20–40 seconds. You can leave this page: it lands in Photos when it's done.</p>
+      </section>
+
+      <section class="sec" data-show="done" aria-live="polite" aria-labelledby="dh">
+        <h2 id="dh" class="sr-only">Done</h2>
+        <div class="panel result">
+          <span class="t"><span class="dot"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>Saved to Photos</span>
+          <p>Standard · 1024 px · 2 credits used. Made with free credits, so it's public with a watermark.</p>
+          <a class="link" href="create.html">Make another <svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a>
+        </div>
+      </section>
+
+      <section class="sec" data-show="failed" aria-live="assertive" aria-labelledby="fh">
+        <h2 id="fh" class="sr-only">Failed</h2>
+        <div class="panel result fail">
+          <span class="t"><span class="dot"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></span>Generation failed. Your credits were refunded.</span>
+          <p>Your photo and settings are kept. Try again, or change the photo.</p>
+          <button class="btn btn-ghost btn-pill" type="button" data-go="empty">Change photo</button>
+        </div>
+      </section>
+
+      <div class="bar">
+        <div data-show="empty ready" id="bar-root"></div>
+        <div data-show="generating"><a class="btn btn-ghost" href="create.html">Back to Create</a></div>
+        <div data-show="done">
+          <a class="btn btn-primary" href="#" id="share"><svg class="i" viewBox="0 0 24 24"><path d="M12 4v11M7.5 8.5L12 4l4.5 4.5M5 14v4.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V14"/></svg><span class="m-only">Share</span><span class="d-only">Download</span></a>
+        </div>
+        <div data-show="failed">
+          <button class="btn btn-primary" type="button" data-go="generating">Retry <span class="cost" id="retry-cost">· 2 credits</span></button>
         </div>
       </div>
-      <div class="panel empty only-empty">
-        <div class="frame"><b>Add the photo you shot</b><span>JPG, PNG or WebP · up to 20MB</span></div>
-        <div class="two">
-          <button class="btn" type="button" data-go="ready"><svg class="i" viewBox="0 0 24 24"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6H8l1.5-2h5L16 6h1.5A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.5"/></svg>Take photo</button>
-          <button class="btn btn-ghost" type="button" data-go="ready"><svg class="i" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M3.5 15l4.5-4.5 4.5 4.5 2.5-2.5 5.5 5.5"/><circle cx="15.5" cy="9" r="1.5"/></svg>Choose from gallery</button>
-        </div>
-      </div>
-    </section>
-
-    <section class="sec">
-      <label class="field-label" for="note">Anything to change? <span class="opt">(optional)</span></label>
-      <textarea class="textarea" id="note" maxlength="300" rows="3" placeholder="e.g. keep the chain gold, soften the shadow"></textarea>
-      <p class="counter"><span id="cnt">0</span> / 300</p>
-    </section>
-
-    <section class="sec" aria-labelledby="sz">
-      <div class="sec-h"><h2 id="sz">Size</h2><span class="meas" id="sz-now">Original</span></div>
-      <div class="sizes" role="radiogroup" aria-labelledby="sz" id="sizes"></div>
-    </section>
-
-    <section class="sec" aria-labelledby="rs">
-      <div class="sec-h"><h2 id="rs">Resolution</h2></div>
-      <div class="ress" role="radiogroup" aria-labelledby="rs">
-        <label class="opt"><input type="radio" name="res" value="2" checked><span class="res"><span class="n">Standard <span class="px">1024 px</span></span><span class="u">Social &amp; delivery apps</span><span class="c">2<small>credits</small></span></span></label>
-        <label class="opt"><input type="radio" name="res" value="4"><span class="res"><span class="n">HD <span class="px">2048 px</span></span><span class="u">Websites &amp; online stores</span><span class="c">4<small>credits</small></span></span></label>
-        <label class="opt"><input type="radio" name="res" value="6"><span class="res"><span class="n">Max <span class="px">2880 px</span></span><span class="u">Print &amp; zoom</span><span class="c">6<small>credits</small></span></span></label>
-      </div>
-    </section>
-
-    <p class="foot" id="foot"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v4.5M12 16h.01"/></svg><span id="foot-t">You have 6 free credits.</span></p>
-  </div>
-
-  <section class="gen only-gen" aria-live="polite" aria-labelledby="gh">
-    <h2 id="gh" class="sr-only">Generating</h2>
-    <div class="dev">
-      <img class="neg" src="../assets/img/pure-white-before.webp" alt="">
-      <img class="pos" src="../assets/img/pure-white-after.webp" alt="Your photo being restyled with Pure White (illustrative example)">
-      <span class="scan" aria-hidden="true"></span>
-      <span class="hud"><span class="pill" style="background:rgba(11,10,9,.6);color:#fff">Developing</span><span class="pill" style="background:rgba(11,10,9,.6);color:#fff">Standard · 1024</span></span>
-      <span class="badge-illus">Illustrative example</span>
     </div>
-    <ol class="steps">
-      <li><span class="tick"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>Compressing</li>
-      <li><span class="tick"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>Uploading</li>
-      <li class="now"><span class="tick" aria-hidden="true"></span>Generating<span class="prog" role="progressbar" aria-label="Generating" aria-valuenow="46" aria-valuemin="0" aria-valuemax="100"><i></i></span><span class="pct">46%</span></li>
-    </ol>
-    <p class="leave">You can leave this page. It lands in Photos when it's done.</p>
-  </section>
-</main>
 
-<div class="bar">
-  <div class="only-form">
-    <p class="notice" id="notice"><svg class="i" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>
-      <span>This photo uses free credits: it's shown publicly with a watermark. <b>Paid credits make it private and watermark-free.</b></span></p>
-    <a class="btn btn-primary" id="cta" href="#">Generate <span class="cost">· 2 credits</span></a>
+    <div class="col-b">
+      <div class="stage">
+        <div class="dev" id="dev">
+          <span data-show="empty" id="stage-tpl"></span>
+          <img class="you" src="../assets/img/pure-white-before.webp" alt="Your uploaded photo (illustrative example)" data-show="ready">
+          <img class="neg" src="../assets/img/pure-white-before.webp" alt="" data-show="generating failed">
+          <img class="pos" src="../assets/img/pure-white-after.webp" alt="Your photo restyled with Pure White (illustrative example)" data-show="generating done">
+          <span class="scan" aria-hidden="true" data-show="generating"></span>
+          <span class="hud">
+            <span class="pill on-photo" data-show="ready">Your photo</span><span class="pill on-photo" data-show="ready">4:5 · as shot</span>
+            <span class="pill on-photo" data-show="generating">Developing</span>
+            <span class="pill on-photo" data-show="done">Done</span>
+            <span class="pill on-photo" data-show="failed">Not developed</span>
+            <span class="pill on-photo" data-show="generating done failed">Standard · 1024</span>
+          </span>
+          <span class="badge-illus" data-show="ready generating done failed">Illustrative example</span>
+        </div>
+        <p class="stage-cap" data-show="empty">Template example: the phone photo on the left, the AI result on the right.</p>
+        <p class="stage-cap" data-show="ready">Your photo, as shot. The template keeps it and changes the light and background.</p>
+        <p class="stage-cap" data-show="done">Phone photo → <span id="cap-name">Pure White</span>. Long-press to save on a phone.</p>
+        <p class="stage-cap" data-show="failed">Nothing was charged.</p>
+      </div>
+    </div>
   </div>
-  <div class="only-gen"><a class="btn btn-ghost" href="create.html" style="width:100%;min-height:52px;border-radius:16px">Back to Create</a></div>
-</div>
+</main>
 
 <script>
 (function () {
-  const { T, q } = window.SV;
-  const frame = document.documentElement.classList.contains('framed') ? '&frame=1' : '';
+  const { T, q, catName, pair, compare, bindCompare, formHTML, barHTML, bindForm, reveal } = window.SV;
   const t = T.find(x => x.id === q.get('t')) || T[0];
   document.getElementById('tpl-name').textContent = t.name;
+  document.getElementById('cap-name').textContent = t.name;
   document.querySelector('.nav-title').textContent = t.name;
   document.title = t.name + ' · Shotviva';
   document.getElementById('tpl-img').src = `../assets/img/${t.id}-after.webp`;
-  if (t.id !== 'pure-white') document.getElementById('tpl-use').textContent = t.use;
+  document.getElementById('tpl-use').textContent = catName(t) + ' · ' + t.desc;
+  ['you', 'neg'].forEach(c => document.querySelector('.dev .' + c).src = `../assets/img/${t.id}-before.webp`);
+  document.querySelector('.dev .pos').src = `../assets/img/${t.id}-after.webp`;
+  document.querySelector('.dev .pos').alt = `Your photo restyled with ${t.name} (illustrative example)`;
+  const stage = document.getElementById('stage-tpl');
+  stage.innerHTML = t.cat === 'art' ? compare(t, { badge: true }) : pair(t, { lg: true, badge: true, video: true });
+  if (t.cat === 'art') bindCompare(stage);
 
-  const SIZES = [['Original', 'as shot', 0, 0], ['Banner', '16:9', 16, 9], ['Post', '4:5', 4, 5], ['Listing', '1:1', 1, 1], ['Story', '9:16', 9, 16], ['Rental', '3:2', 3, 2], ['Website', '4:3', 4, 3], ['Pin', '2:3', 2, 3]];
-  document.getElementById('sizes').innerHTML = SIZES.map(([n, r, w, h], i) => {
-    let gw = 22, gh = 28;
-    if (w) { const s = Math.min(34 / w, 30 / h); gw = Math.round(w * s); gh = Math.round(h * s); }
-    return `<label class="opt"><input type="radio" name="size" value="${n}" ${i ? '' : 'checked'}><span class="size-tile"><span class="glyph"><i class="${w ? '' : 'orig'}" style="width:${gw}px;height:${gh}px"></i></span><b>${n}</b><small>${r}</small></span></label>`;
-  }).join('');
-  document.getElementById('sizes').addEventListener('change', e => document.getElementById('sz-now').textContent = e.target.value + ' · ' + SIZES.find(s => s[0] === e.target.value)[1]);
-
+  // the shared form + primary (same source as the create-page dialog)
+  document.getElementById('form-root').innerHTML = formHTML(t, 'ws');
+  document.getElementById('bar-root').innerHTML = barHTML();
+  const STATES = ['empty', 'ready', 'generating', 'done', 'failed'];
+  const setState = s => { document.body.dataset.state = s; window.scrollTo(0, 0); };
   // balance: ?balance=0 shows the "not enough credits" state
   const bal = q.has('balance') ? +q.get('balance') : 6;
-  document.getElementById('bal-n').textContent = bal;
   document.getElementById('bal-t').textContent = bal + ' free';
-  const cta = document.getElementById('cta'), notice = document.getElementById('notice');
-  function update() {
-    const cost = +document.querySelector('input[name=res]:checked').value;
-    if (cost > bal) {
-      cta.classList.add('need');
-      cta.innerHTML = `Get credits <span class="cost">· ${cost - bal} needed</span>`;
-      cta.href = 'paywall.html' + (frame ? '?frame=1' : '');
-      notice.querySelector('span').innerHTML = `This needs ${cost} credits and you have ${bal}. <b>Paid credits make photos private and watermark-free.</b>`;
-    } else {
-      cta.classList.remove('need');
-      cta.innerHTML = `Generate <span class="cost">· ${cost} credits</span>`;
-      cta.href = '#';
-      notice.querySelector('span').innerHTML = `This photo uses free credits: it's shown publicly with a watermark. <b>Paid credits make it private and watermark-free.</b>`;
-    }
-    document.getElementById('foot-t').textContent = bal > 0 ? `You have ${bal} free credits.` : 'You have 0 credits left.';
-  }
-  document.querySelectorAll('input[name=res]').forEach(r => r.addEventListener('change', update));
-  update();
+  bindForm(document.body, 'ws', { balance: bal, state: setState, onGenerate: () => { if (document.body.dataset.state === 'ready') setState('generating'); },
+    onCost: c => { document.getElementById('retry-cost').textContent = `· ${c} credits`; } });
+  setState(STATES.includes(q.get('state')) ? q.get('state') : 'ready');
+  document.getElementById('share').addEventListener('click', e => e.preventDefault());
 
-  const setState = s => { document.body.dataset.state = s; window.scrollTo(0, 0); };
-  setState(['empty', 'ready', 'generating'].includes(q.get('state')) ? q.get('state') : 'ready');
-  document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => setState(b.dataset.go)));
-  cta.addEventListener('click', e => { if (!cta.classList.contains('need')) { e.preventDefault(); if (document.body.dataset.state === 'ready') setState('generating'); } });
-
-  const note = document.getElementById('note');
-  note.addEventListener('input', () => document.getElementById('cnt').textContent = note.value.length);
   const nav = document.getElementById('nav');
   addEventListener('scroll', () => nav.classList.toggle('scrolled', scrollY > 60), { passive: true });
+  reveal([document.querySelector('.head'), ...document.querySelectorAll('.form > .sec, .form > .foot'), document.querySelector('.stage')]);
 })();
 </script>
 </body>

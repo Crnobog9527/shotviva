@@ -35,29 +35,40 @@ export function rateLimitVerdict(recent: RecentJob[], now: Date, limits: RateLim
   return 'ok'
 }
 
-// jobId: a request that names its job (web retries, partner Idempotency-Key) is a replay of that
-// one job, so its own row never counts against it; concurrent replays then settle as one job
-// instead of rate-limiting each other once the limit is 1.
+// A request that names its job, by id (web retries) or by Idempotency-Key (partner calls), is a
+// replay of that one job, so that job's row never counts against it: concurrent replays settle as
+// one job in reserve_credits instead of rate-limiting each other once the limit is 1. Matching
+// the key matters for the partner route, which has no job id until reserve_credits creates the
+// row: a same-key call that looked the key up just before the first call inserted its job used to
+// get a 429 here (CI flake in tests/db/partner-generate, 2026-11-06).
+export type ReplayOf = { jobId?: string; idempotencyKey?: string | null }
+
+export function countsAgainst(job: { id: string; idempotency_key: string | null }, replay: ReplayOf): boolean {
+  if (replay.jobId && job.id === replay.jobId) return false
+  if (replay.idempotencyKey && job.idempotency_key === replay.idempotencyKey) return false
+  return true
+}
+
 export async function assertWithinRateLimit(
   client: SupabaseClient,
   userId: string,
   now: Date,
   limits: RateLimits,
-  jobId?: string,
+  replay: ReplayOf = {},
 ): Promise<void> {
   const since = new Date(now.getTime() - RATE_LIMIT.WINDOW_MS).toISOString()
   // One row past the window cap is enough to decide, and the caller's own row may be in it.
   // Served by generation_jobs(user_id, created_at).
   const { data, error } = await client
     .from('generation_jobs')
-    .select('id, status, created_at')
+    .select('id, status, created_at, idempotency_key')
     .eq('user_id', userId)
     .gte('created_at', since)
     .order('created_at', { ascending: false })
     .limit(limits.perWindow + 1)
-    .returns<(RecentJob & { id: string })[]>()
+    .returns<(RecentJob & { id: string; idempotency_key: string | null })[]>()
   if (error) throw new AppError('INTERNAL', `rate limit lookup failed: ${error.message}`)
-  const others = data.filter((job) => job.id !== jobId)
+  const others = data.filter((job) => countsAgainst(job, replay))
   const verdict = rateLimitVerdict(others, now, limits)
   if (verdict === 'too_many_running') throw new AppError('RATE_LIMITED', 'Wait for one of your photos to finish')
   if (verdict === 'too_many_recent') throw new AppError('RATE_LIMITED', 'Too many images in a short time; try again in a few minutes')

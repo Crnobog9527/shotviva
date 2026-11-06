@@ -20,12 +20,24 @@ const indexingIsOpen = indexingOpen(parseIndexingEnv(process.env))
 
 const nextConfig: NextConfig = {
   cacheComponents: true,
+  // Pages live under app/[locale]; an address matching no route at all has no root layout,
+  // so app/global-not-found.tsx renders it (ARCHITECTURE §17).
+  experimental: { globalNotFound: true },
   partialPrefetching: true,
   poweredByHeader: false,
   // PostHog's API paths end in a slash (/i/v0/e/); a trailing-slash redirect would break them.
   skipTrailingSlashRedirect: true,
+  // MiSans files are content-addressed (ARCHITECTURE §17): a changed font ships under a new
+  // hash, so the woff2 subsets and the stylesheet can be cached for a year. NOTICE, README and
+  // LICENSE.pdf keep the default caching.
   async headers() {
-    return xRobotsTagRules(indexingIsOpen, SITE_DOMAIN)
+    return [
+      ...xRobotsTagRules(indexingIsOpen, SITE_DOMAIN),
+      {
+        source: '/fonts/misans/:asset(.+\\.(?:woff2|css))',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+      },
+    ]
   },
   async rewrites() {
     return [

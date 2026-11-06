@@ -5,12 +5,24 @@ import { publicEnv } from '../public-env'
 
 const SESSION_COOKIE = /^sb-.+-auth-token(\.\d+)?$/
 
+// What the proxy finally answers with for a request it lets through: a plain pass-through,
+// or the locale router's rewrite into the [locale] tree.
+export type Forward = (request: NextRequest) => NextResponse
+
+export const forwardRequest: Forward = (request) => NextResponse.next({ request })
+
 export function hasSessionCookie(request: NextRequest): boolean {
   return request.cookies.getAll().some(({ name }) => SESSION_COOKIE.test(name))
 }
 
+export function withCookies(target: NextResponse, from: NextResponse): NextResponse {
+  from.cookies.getAll().forEach((cookie) => target.cookies.set(cookie))
+  return target
+}
+
 // A request-scoped client whose refreshed cookies land on `response()`. Server Components
 // cannot write cookies, so the token refresh (and its rotated cookies) happens in the proxy.
+// The rotated cookies are also written into the request itself, which every forward copies.
 export function proxySupabase(request: NextRequest) {
   let response = NextResponse.next({ request })
   const supabase = createServerClient(publicEnv.NEXT_PUBLIC_SUPABASE_URL, publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
@@ -27,9 +39,9 @@ export function proxySupabase(request: NextRequest) {
 }
 
 // Visitors without a session cookie skip the Auth round trip, keeping marketing pages fast.
-export async function updateSession(request: NextRequest): Promise<NextResponse> {
-  if (!hasSessionCookie(request) || !publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY) return NextResponse.next({ request })
+export async function updateSession(request: NextRequest, forward: Forward = forwardRequest): Promise<NextResponse> {
+  if (!hasSessionCookie(request) || !publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY) return forward(request)
   const { supabase, response } = proxySupabase(request)
   await supabase.auth.getUser()
-  return response()
+  return withCookies(forward(request), response())
 }

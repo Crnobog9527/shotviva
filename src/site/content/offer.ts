@@ -44,13 +44,13 @@ const FORMAT_NAMES: Record<string, string> = { 'image/jpeg': 'JPG', 'image/png':
 const formats = UPLOAD_CONTENT_TYPES.map((type) => FORMAT_NAMES[type] ?? type)
 export const uploadLimits = `${formats.slice(0, -1).join(', ')} or ${formats.at(-1)}, up to ${MAX_UPLOAD_BYTES / 1024 / 1024}MB`
 
-const LANGUAGE_NAMES: Record<string, string> = { en: 'English' }
+const LANGUAGE_NAMES: Record<string, string> = { en: 'English', zh: 'Simplified Chinese' }
 export const languages = site.locales.enabled.map((code) => LANGUAGE_NAMES[code] ?? code).join(', ')
 
 // Market rate for hiring a product photographer, used in the cost tables. Not our price, so it
 // is not in site.config. Source: Snappr product photography rates, Philadelphia, 2026
 // (snappr.com/how-much-does-a-photographer-cost/product/philadelphia-pa): $139–$300 an hour.
-const PHOTOGRAPHER_HOURLY_USD = { low: 139, high: 300 } as const
+export const PHOTOGRAPHER_HOURLY_USD = { low: 139, high: 300 } as const
 export const photographerRate = `$${PHOTOGRAPHER_HOURLY_USD.low}–$${PHOTOGRAPHER_HOURLY_USD.high} an hour`
 
 // --- Plans and packs. Product ids are fixed by ARCHITECTURE §6.2. Until T9 puts the nine

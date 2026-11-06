@@ -133,7 +133,7 @@ describe('invoice.paid (subscription_cycle) → apply_subscription_renewal', () 
       method: 'card',
       status: 'paid',
     })
-    expect(h.trackBuy).toHaveBeenLastCalledWith(userId, expect.objectContaining({ product_id: 'starter_monthly', form: 'subscription', amount_usd: 19.9 }))
+    expect(h.trackBuy).toHaveBeenLastCalledWith(userId, expect.objectContaining({ product_id: 'starter_monthly', form: 'subscription', amount_usd: 19.9 }), 'en')
     // The renewal keeps the tier (current_tier reads the newest membership ledger row).
     expect(await currentTier(serviceClient(), userId)).toBe('starter')
   })

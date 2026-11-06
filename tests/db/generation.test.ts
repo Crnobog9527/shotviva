@@ -163,7 +163,7 @@ describe('runGeneration: generate event', () => {
     expect(track).toHaveBeenCalledOnce()
     const [event, props, ctx] = track.mock.calls[0] ?? []
     expect(event).toBe('generate')
-    expect(ctx).toEqual({ distinctId: userId })
+    expect(ctx).toEqual({ distinctId: userId, locale: 'en' })
     expect(props).toMatchObject({
       template_id: templateId,
       category: 'test',

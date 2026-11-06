@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { currentLocale, localized } from '../../i18n/server'
 import { logger } from '../../logger'
 import { DEFAULT_AFTER_LOGIN } from '../redirect-target'
 import { createServerSupabase } from '../supabase-server'
@@ -16,10 +17,13 @@ export async function signUpWithPassword(form: FormData): Promise<FormState> {
   const { email, password, captchaToken } = parsed.data
 
   const supabase = await createServerSupabase()
+  const locale = await currentLocale()
+  // user_metadata.locale picks the language of every auth email this account gets
+  // (ARCHITECTURE §7: `{{ if eq .Data.locale "zh" }}` in supabase/templates/*.html).
   const { error } = await supabase.auth.signUp({
     email,
     password,
-    options: { captchaToken, emailRedirectTo: confirmUrl(DEFAULT_AFTER_LOGIN) },
+    options: { captchaToken, data: { locale }, emailRedirectTo: confirmUrl(await localized(DEFAULT_AFTER_LOGIN)) },
   })
   if (error) {
     const code = classifyAuthError(error)
@@ -37,7 +41,7 @@ export async function requestPasswordReset(form: FormData): Promise<FormState> {
   const supabase = await createServerSupabase()
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     captchaToken,
-    redirectTo: confirmUrl('/reset/update'),
+    redirectTo: confirmUrl(await localized('/reset/update')),
   })
   const code = error ? classifyAuthError(error) : null
   // Only captcha and rate limits are shown; anything else still says "sent" to avoid enumeration.

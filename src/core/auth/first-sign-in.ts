@@ -2,6 +2,7 @@ import 'server-only'
 import { headers } from 'next/headers'
 
 import { track } from '../analytics'
+import type { Locale } from '../i18n/locales'
 import { billingGrant, grantSignupCredits } from './free-credits'
 import { clientIp, recordSignupIp } from './signup-ip'
 import { createAdminSupabase } from './supabase-admin'
@@ -14,10 +15,16 @@ export type SignInMethod = 'email' | 'google'
 // first sign-in is the one that stored it: the grant can no longer tell, since an account the
 // same-IP rule refuses never has a grant applied. Without one (local dev) it falls back to the
 // grant, whose signup idempotency key applies only once.
-export async function onVerifiedSignIn(userId: string, freeCredits: number, method: SignInMethod): Promise<void> {
+// `locale` is the language the account signed up in (user_metadata) or else the page's.
+export async function onVerifiedSignIn(
+  userId: string,
+  freeCredits: number,
+  method: SignInMethod,
+  locale: Locale,
+): Promise<void> {
   const admin = createAdminSupabase()
   const address = clientIp(await headers())
   const ipStored = await recordSignupIp(admin, userId, address)
   const granted = await grantSignupCredits(billingGrant(admin), userId, freeCredits)
-  if (address ? ipStored : granted) track('signup', { method }, { distinctId: userId })
+  if (address ? ipStored : granted) track('signup', { method }, { distinctId: userId, locale })
 }

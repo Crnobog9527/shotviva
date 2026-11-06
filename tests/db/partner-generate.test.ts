@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
+import { reserveJob, runGeneration } from '@/core/jobs'
 import { handleGenerate, revokeLink, type FetchLike, type GenerateRequest } from '@/core/partner'
 
 import { png } from '../fakes/images'
@@ -30,7 +31,8 @@ afterAll(async () => {
   await db.end()
 })
 
-const freeform: GenerateRequest = { template_id: 'freeform', inputs: { copy: { prompt: 'a bowl of ramen on slate' } } }
+const freeformCopy = { prompt: 'a bowl of ramen on slate' }
+const freeform: GenerateRequest = { template_id: 'freeform', inputs: { copy: freeformCopy } }
 
 async function setup(behaviour: FakeBehaviour = 'ok', credits = 3) {
   const userId = await linkedUser(db, { credits })
@@ -40,7 +42,7 @@ async function setup(behaviour: FakeBehaviour = 'ok', credits = 3) {
   const deps = { ...routeDeps(r2.store), provider: fake.provider, providerTimeoutMs: 200, fetch }
   const generate = (body: unknown, key: string | undefined = randomUUID()) =>
     handleGenerate(partnerRequest('/api/partner/generate', { method: 'POST', account: userId, idempotencyKey: key, body }), deps)
-  return { userId, r2, fake, fetch, generate }
+  return { userId, r2, fake, fetch, generate, deps }
 }
 
 describe('POST /api/partner/generate: success', () => {
@@ -84,6 +86,51 @@ describe('POST /api/partner/generate: Idempotency-Key', () => {
     expect(responses.map((r) => r.status).sort()).toContain(200)
     expect(fake.generate).toHaveBeenCalledTimes(1)
     expect((await profileOf(db, userId)).credits).toBe(1)
+  })
+
+  // The interleaving behind the CI flake (2026-11-06): request B looked the key up before
+  // request A inserted its job, so B went on into runGeneration while A's job was running. On a
+  // Starter account (one job in flight) the rate limit counted A's job against B and B got a
+  // 429 instead of A's job. Reserving A's row first makes that interleaving deterministic.
+  it('a same-key request that reaches generation while the first is in flight joins that job, not a 429', async () => {
+    const { userId, fake, deps } = await setup()
+    const first = await reserveJob(deps.db, {
+      jobId: randomUUID(),
+      userId,
+      module: 'image',
+      templateId: 'freeform',
+      source: 'graylum',
+      idempotencyKey: 'call-late',
+      inputs: { copy: freeformCopy, resolution: '1k', attempt_id: randomUUID() },
+    })
+    const view = await runGeneration(deps, {
+      userId,
+      source: 'graylum',
+      templateId: 'freeform',
+      inputKey: null,
+      copy: freeformCopy,
+      idempotencyKey: 'call-late',
+    })
+    expect(view).toMatchObject({ id: first.id, status: 'running' })
+    expect(fake.generate).not.toHaveBeenCalled()
+    expect((await profileOf(db, userId)).credits).toBe(1)
+    expect(await jobCount(db, userId)).toBe(1)
+  })
+
+  it('a different key still waits its turn on a one-job account', async () => {
+    const { userId, deps } = await setup()
+    await reserveJob(deps.db, {
+      jobId: randomUUID(),
+      userId,
+      module: 'image',
+      templateId: 'freeform',
+      source: 'graylum',
+      idempotencyKey: 'call-a',
+      inputs: { copy: freeformCopy, resolution: '1k', attempt_id: randomUUID() },
+    })
+    const other = runGeneration(deps, { userId, source: 'graylum', templateId: 'freeform', inputKey: null, copy: freeformCopy, idempotencyKey: 'call-b' })
+    await expect(other).rejects.toMatchObject({ code: 'RATE_LIMITED' })
+    expect(await jobCount(db, userId)).toBe(1)
   })
 
   it('is required', async () => {

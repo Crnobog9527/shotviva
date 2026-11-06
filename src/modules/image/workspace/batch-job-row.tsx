@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element -- local previews and the finished photo route */
 import { useFormatter, useTranslations } from 'next-intl'
-import Link from 'next/link'
+import { Link } from '@/core/i18n/ui'
 
 import { PaywallButton } from '@/core/billing/paywall'
 import { cn } from '@/core/ui/cn'

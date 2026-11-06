@@ -70,8 +70,8 @@ describe('createCheckout routing', () => {
       locale: 'zh',
       metadata: { user_id: USER, product_id: 'starter_monthly', method: 'card' },
       subscription_data: { metadata: { user_id: USER, product_id: 'starter_monthly', method: 'card' } },
-      success_url: 'https://pr-1.example.app/account?checkout=success',
-      cancel_url: 'https://pr-1.example.app/pricing?checkout=cancelled',
+      success_url: 'https://pr-1.example.app/zh/account?checkout=success',
+      cancel_url: 'https://pr-1.example.app/zh/pricing?checkout=cancelled',
     })
     expect(params).not.toHaveProperty('payment_method_types')
     expect(params).not.toHaveProperty('allowed_payment_method_types')
@@ -82,7 +82,7 @@ describe('createCheckout routing', () => {
       form: 'subscription',
       channel: 'stripe',
       method: 'card',
-    })
+    }, 'zh')
   })
 
   it('opens Alipay as a one-time payment for one period, Shotviva as seller', async () => {
@@ -98,7 +98,7 @@ describe('createCheckout routing', () => {
     })
     expect(params).not.toHaveProperty('managed_payments')
     expect(params).not.toHaveProperty('payment_method_types')
-    expect(d.trackStart).toHaveBeenCalledWith(USER, expect.objectContaining({ form: 'one_time', method: 'alipay', interval: 'year' }))
+    expect(d.trackStart).toHaveBeenCalledWith(USER, expect.objectContaining({ form: 'one_time', method: 'alipay', interval: 'year' }), 'en')
   })
 
   it('sells a pack by card as a Managed Payments one-time payment', async () => {

@@ -42,9 +42,20 @@ describe('resolveProvider', () => {
     const env = parseServerEnv({ OPENAI_API_KEY: 'sk-env-0123456789', OPENAI_IMAGE_MODEL: 'gpt-image-2.5-sunburst' })
     const provider = await resolveProvider('image', null, env, adapters, readKey)
     expect(provider.id).toBe('env/gpt-image-2.5-sunburst')
-    expect(provider.prices).toBeNull()
+    // No row to hold prices, so the model's official price applies (§10.0).
+    expect(provider.prices).toEqual({ inputTextPerM: 5, inputImagePerM: 8, outputPerM: 30 })
     expect(readKey).not.toHaveBeenCalled()
     expect(configs).toEqual([{ baseUrl: 'https://api.openai.com/v1', model: 'gpt-image-2.5-sunburst', apiKey: 'sk-env-0123456789' }])
+  })
+
+  it("fills a row's empty prices from the price table for its model, keeping the ones it has", async () => {
+    const { adapters } = recordingAdapters()
+    const env = parseServerEnv({})
+    const empty = { inputTextPerM: null, inputImagePerM: null, outputPerM: null }
+    const official = { ...row, model: 'gpt-image-2.6-sunburst', prices: { ...empty, outputPerM: 40 } }
+    expect((await resolveProvider('image', official, env, adapters, async () => RELAY_KEY)).prices).toEqual({ inputTextPerM: 5, inputImagePerM: 8, outputPerM: 40 })
+    // A model the table does not know, with nothing filled in: no snapshot, so jobs are uncosted.
+    expect((await resolveProvider('image', { ...row, prices: empty }, env, adapters, async () => RELAY_KEY)).prices).toBeNull()
   })
 
   it('fails without a fallback key, and when the active row has no key (no silent env fallback)', async () => {

@@ -18,7 +18,11 @@ function fromJson(value: unknown): unknown {
 }
 
 // orderMetadata is documented as an object; accept a JSON string too rather than drop a payment.
-const metadataSchema = z.preprocess(fromJson, z.object({ user_id: z.uuid(), product_id: z.enum(PRODUCT_IDS) }))
+// `locale` is analytics only (ARCHITECTURE §16.2); orders created before T21 have none.
+const metadataSchema = z.preprocess(
+  fromJson,
+  z.object({ user_id: z.uuid(), product_id: z.enum(PRODUCT_IDS), locale: z.enum(['en', 'zh']).catch('en').default('en') }),
+)
 const money = z.string().regex(/^\d{1,7}(\.\d{1,2})?$/)
 
 const orderSchema = z.object({

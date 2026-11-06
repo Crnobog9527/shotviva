@@ -59,7 +59,10 @@ async function prepare(deps: GenerationDeps, req: GenerationRequest) {
   if (req.inputKey && !isOwnInputKey(req.userId, req.inputKey)) throw new AppError('INVALID_INPUT', 'Unknown upload')
   const limits = await accountLimits(deps.db, req.userId)
   assertBatchAllowed(limits, req.batchSize ?? 1)
-  await assertWithinRateLimit(deps.db, req.userId, deps.now?.() ?? new Date(), limits, req.jobId)
+  await assertWithinRateLimit(deps.db, req.userId, deps.now?.() ?? new Date(), limits, {
+    jobId: req.jobId,
+    idempotencyKey: req.idempotencyKey,
+  })
   const image = req.inputKey ? await loadInputImage(deps.store, req.inputKey) : null
   return { template, prompt, inputs, image }
 }
@@ -124,7 +127,11 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
     params: prompt.modelParams,
   }
   const settle = () => settleGeneration(deps, job, call, outputKeyFor(req.userId, job.id))
-  const settled = await settleTracked(job, template.category, settle, { track: deps.track, batchSize: req.batchSize ?? 1 })
+  const settled = await settleTracked(job, template.category, settle, {
+    track: deps.track,
+    batchSize: req.batchSize ?? 1,
+    locale: req.locale,
+  })
   await keepInputPreview(deps, settled, image)
   return toJobView(settled)
 }

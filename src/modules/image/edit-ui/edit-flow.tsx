@@ -1,10 +1,10 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 
 import type { Balance } from '@/core/billing/pools'
+import { useRouter } from '@/core/i18n'
 import { EDIT_TEMPLATE_ID } from '@/core/templates/edit-params'
 import type { CreditsCost } from '@/core/templates/pricing'
 

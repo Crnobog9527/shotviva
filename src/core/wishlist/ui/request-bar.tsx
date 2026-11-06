@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import { Link } from '../../i18n/ui'
 import { useTranslations } from 'next-intl'
 
 import { ActionBar, ActionNotice } from '../../app-shell'
