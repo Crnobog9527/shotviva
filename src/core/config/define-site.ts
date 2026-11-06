@@ -122,14 +122,15 @@ export type UsdRange = { low: number; high: number }
 
 export type MarketingNumbers = {
   photographer: {
-    // One styled product shot, and retouching per image, typical 2026 US studio rates.
+    // Published per-image rates (Owner 2026-11-06). Retouching is not a separate figure: many
+    // studios include it in the shot price, so a line of its own would count it twice.
     styledShotUsd: UsdRange
-    retouchUsd: UsdRange
-    // Where plain white packshots start.
-    packshotFromUsd: number
+    // Plain white-background packshots.
+    packshotUsd: UsdRange
   }
-  // Seconds one photo usually takes to develop (LAUNCH §5 measures it).
-  photoSeconds: UsdRange
+  // About how many seconds a photo takes, one round figure for every quality (Owner
+  // 2026-11-06): no ranges or per-quality times, so a slower provider never breaks a promise.
+  photoSecondsApprox: number
 }
 
 export function defineSite<const T extends SiteConfig>(config: T): T {

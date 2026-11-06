@@ -143,23 +143,21 @@ export function plansSentence(): string {
 // --- The home page's two bills (DESIGN §6.9 item 6). The photographer's rates and the seconds
 // a photo takes live in site.config.marketing; everything here is arithmetic on them. ---
 
-const { photographer, photoSeconds } = site.marketing
+const { photographer, photoSecondsApprox } = site.marketing
 
 const times = (range: UsdRange, n: number): UsdRange => ({ low: range.low * n, high: range.high * n })
 
-// "$89–$300"
+// "$50–$350"
 export const usdRange = (range: UsdRange) => `${usd(range.low)}–${usd(range.high)}`
 
 export const styledShotUsd = photographer.styledShotUsd
-export const retouchUsd = photographer.retouchUsd
-export const packshotFromUsd = photographer.packshotFromUsd
-// Three styled shots, three retouches, and the quote they add up to: $297–$990.
+export const packshotUsd = photographer.packshotUsd
+// Three styled shots, the whole quote: $150–$1,050 (retouching is in the shot price).
 export const setShotsUsd = times(styledShotUsd, SET_PHOTOS)
-export const setRetouchUsd = times(retouchUsd, SET_PHOTOS)
-export const quoteUsd: UsdRange = { low: setShotsUsd.low + setRetouchUsd.low, high: setShotsUsd.high + setRetouchUsd.high }
+export const quoteUsd: UsdRange = setShotsUsd
 
-// "20–40"
-export const photoSecondsRange = `${photoSeconds.low}–${photoSeconds.high}`
+// "60": the one round figure for how long a photo takes (no ranges, no per-quality times).
+export const photoSeconds = photoSecondsApprox
 
 // The set's credits at the cheapest plan's credit price, rounded the way /pricing shows it:
 // 6 × $0.40 = "$2.40". Undefined until the plans are priced.

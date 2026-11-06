@@ -117,7 +117,7 @@ export type ShootDemo = {
 // 2026-11-06 replaced the table). Every number is read from site.config.
 export type BillTotal = { prefix?: string; amount: string; suffix?: string; when: string }
 export type BillLine = { label: string; value: string }
-export type Bill = { title: string; total: BillTotal; lines: readonly [BillLine, BillLine, BillLine]; fine: string }
+export type Bill = { title: string; total: BillTotal; lines: readonly [BillLine, BillLine, ...BillLine[]]; fine: string }
 export type CostBills = { heading: string; intro: string; photographer: Bill; site: Bill }
 
 // The home page is the same structure plus the 3-step block, the grouped template grid and

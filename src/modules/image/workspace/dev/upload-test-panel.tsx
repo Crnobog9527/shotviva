@@ -13,7 +13,7 @@ import { useTestGeneration, type TestGeneration } from './use-test-generation'
 export type TestTemplate = { id: string; name: string; aspectRatios: string[]; copyKeys: string[] }
 
 function generationText(generation: TestGeneration): string | null {
-  if (generation.phase === 'generating') return 'Generating… usually 20–40 seconds. You can leave this page.'
+  if (generation.phase === 'generating') return 'Generating… usually about 60 seconds. You can leave this page.'
   if (generation.phase === 'failed') {
     return `Failed: ${generation.code} ${generation.message}${generation.refunded ? ' (image refunded)' : ''}`
   }
