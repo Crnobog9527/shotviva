@@ -1,5 +1,5 @@
 import type { Locale } from '../i18n/locales'
-import { localizePath } from '../i18n/paths'
+import { localizePath, splitLocale } from '../i18n/paths'
 
 export const DEFAULT_AFTER_LOGIN = '/account'
 
@@ -29,4 +29,16 @@ export function loginPath(next?: string): string {
 export function nextIn(value: string | null | undefined, locale: Locale): string {
   const next = sanitizeNext(value)
   return next === DEFAULT_AFTER_LOGIN ? localizePath(next, locale) : next
+}
+
+// Where a login or sign-up page's visitor came from, for the line under its title
+// (design/comps-v3-b/auth.html `?next=photo|graylum`): the home generator (its draft waits on
+// the home page) or the Graylum connect page. `connectPath` is core/partner's CONNECT_PAGE_PATH.
+export type ArrivedFrom = 'home' | 'graylum' | null
+
+export function arrivedFrom(next: string, connectPath: string): ArrivedFrom {
+  const { path } = splitLocale(new URL(sanitizeNext(next), 'http://local.invalid').pathname)
+  if (path === '/') return 'home'
+  if (path === connectPath || path.startsWith(`${connectPath}/`)) return 'graylum'
+  return null
 }

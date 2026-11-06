@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 
+import { CheckoutCancelToast } from '@/core/billing/checkout-return'
 import { PaywallProvider, PricingPayWith, PricingPlans } from '@/core/billing/paywall'
 import { paymentChannel } from '@/core/billing/waffo'
 import { BusinessSection, CreditBuys, FaqSection, PricingHero } from '@/core/content'
@@ -12,6 +13,7 @@ import { site } from '@/site/site.config'
 
 // /pricing as comps-v3-b pricing.html (T37): hero, the plans and packs (core/billing/paywall,
 // prices from site.config), "For business", what a credit buys, how to pay, then the FAQ.
+// Stripe's cancel_url lands here (?checkout=cancel) and shows a toast (T43).
 // Everything renders into the static HTML, in US dollars in both languages (建站规格 §6.1, R5).
 // Indexable: /pricing and /zh/pricing are in their keyword map CSVs and in site.indexing.
 // Buying opens the same paywall as the app; signed-out buyers sign in first.
@@ -39,6 +41,7 @@ export default async function PricingPage() {
   return (
     <article className="mx-auto w-full max-w-[1120px] px-4 pb-16 md:px-8 lg:px-10">
       <JsonLdScript data={[breadcrumbListLd(site, crumbs), faqPageLd(faq)]} />
+      <CheckoutCancelToast />
       <PricingHero text={page} />
       <PaywallProvider products={site.billing.products} wishlistLive={wishlistLive} channel={channel}>
         <PricingPlans products={site.billing.products} wishlistLive={wishlistLive} />

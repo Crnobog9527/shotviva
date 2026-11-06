@@ -32,6 +32,11 @@ describe('/pricing page copy', () => {
     expect(business.prompts.length).toBeGreaterThanOrEqual(4)
   })
 
+  it('tags the order slip in each language', () => {
+    expect(pricingPage.business.tag).toBe('Made to order')
+    expect(zhPricingPage.business.tag).toBe('按需定制')
+  })
+
   it('mails support with the English subject on both languages', () => {
     expect(BUSINESS_MAIL_SUBJECT).toBe('Business inquiry — Shotviva')
     for (const page of Object.values(pages)) {
@@ -40,6 +45,9 @@ describe('/pricing page copy', () => {
       )
       expect(html).toContain('href="mailto:support@shotviva.com?subject=Business%20inquiry%20%E2%80%94%20Shotviva&amp;body=')
       expect(html).toContain(page.business.cta)
+      // The order slip (T43): the "Made to order" tag and the slip material.
+      expect(html).toContain(page.business.tag)
+      expect(html).toContain('biz-slip')
       for (const item of page.business.items) expect(html).toContain(item.title)
       // The address beside the button is the config's, never typed into the copy.
       expect(html).toContain(`${page.business.aside[0]}${site.brand.contactEmail}${page.business.aside[1]}`)

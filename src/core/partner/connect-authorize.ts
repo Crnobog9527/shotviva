@@ -32,6 +32,15 @@ export type ConnectAuthorizeDeps = {
 const plain = (body: string, status: number) =>
   new NextResponse(body, { status, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } })
 
+export type ConnectFailureCode = 'invalid' | 'failed'
+
+// Back to the connect page in its "not valid" / "went wrong" state (B comp connect.html
+// ?v=error). Nothing from the request is echoed into the address.
+function failurePage(request: NextRequest, failure: ConnectFailureCode, locale: Locale): NextResponse {
+  const page = localizePath(`${CONNECT_PAGE_PATH}?error=${failure}`, locale)
+  return NextResponse.redirect(new URL(page, request.url), 303)
+}
+
 const field = (form: FormData, name: string) => {
   const value = form.get(name)
   return typeof value === 'string' ? value : null
@@ -49,12 +58,12 @@ export async function handleConnectAuthorize(request: NextRequest, deps: Connect
   const form = await request.formData().catch(() => new FormData())
   const params = { state: field(form, 'state'), return_to: field(form, 'return_to') }
   const connect = parseConnectRequest(params, deps.config)
-  if (!connect) return plain('This connect link is not valid. Go back to Graylum and try again.', 400)
+  const locale = deps.locale ?? DEFAULT_LOCALE
+  if (!connect) return failurePage(request, 'invalid', locale)
 
   const user = await deps.user()
   // The session expired between showing the page and the click: sign in, then start over.
   if (!user || !user.emailVerified) {
-    const locale = deps.locale ?? DEFAULT_LOCALE
     const login = localizePath(loginPath(localizePath(connectPagePath(params), locale)), locale)
     return NextResponse.redirect(new URL(login, request.url), 303)
   }
@@ -63,6 +72,6 @@ export async function handleConnectAuthorize(request: NextRequest, deps: Connect
     return NextResponse.redirect(connectRedirectUrl(connect, code), 302)
   } catch (error) {
     logger.error('connect authorize failed', { error })
-    return plain('Something went wrong. Please try again.', 500)
+    return failurePage(request, 'failed', locale)
   }
 }

@@ -47,6 +47,7 @@ const creditBuys: CreditBuysBlock = {
 // (Owner 2026-11-06), so nothing here promises an SLA, SSO or team seats.
 const business: BusinessBlock = {
   heading: 'For business',
+  tag: 'Made to order',
   who: 'For brands, e-commerce sellers, restaurant groups and agencies that need photos at volume. Tell us what you need and we set it up for you:',
   items: [
     { title: 'Volume pricing and invoicing', detail: 'Annual contracts, priced for your volume and billed by invoice.' },

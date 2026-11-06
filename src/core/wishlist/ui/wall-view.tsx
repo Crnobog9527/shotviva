@@ -1,59 +1,42 @@
 'use client'
 
-import { Link } from '../../i18n/ui'
-import { useTranslations } from 'next-intl'
-
-import { EmptyState, STATE_GHOST } from '../../ui/empty-state'
 import type { Page, WallCard as WallCardData } from '../types'
 import { RequestBar } from './request-bar'
 import { ShowMore } from './show-more'
+import { useBreeze } from './use-breeze'
 import { usePaged, type LoadPage } from './use-paged'
 import { WallCard } from './wall-card'
+import { WallEmpty } from './wishlist-state'
 
-type Props = { first: Page<WallCardData>; eligible: boolean; loadMore: LoadPage<WallCardData> }
+// `now` comes from the server render, so "3 days ago" reads the same before and after hydration.
+type Props = { first: Page<WallCardData>; eligible: boolean; now: string; loadMore: LoadPage<WallCardData> }
 
-// The wall (DESIGN §4.7, ARCHITECTURE §15.1): shipped first, then by votes; empty is fine,
-// there is no seeded content.
-export function WallView({ first, eligible, loadMore }: Props) {
+// The wall (B comp wishlist.html, ARCHITECTURE §15.1): shipped first, then by votes. The one
+// primary sits under the lede on desktop and fixed above the tab bar on phones. Empty is fine:
+// there is no seeded content, and the empty plate carries the primary itself.
+export function WallView({ first, eligible, now, loadMore }: Props) {
   const wall = usePaged(first, loadMore)
+  const { wall: wallRef, gust, settled } = useBreeze()
+  const at = new Date(now)
+  if (wall.items.length === 0) return <WallEmpty eligible={eligible} />
   return (
-    <>
-      {wall.items.length === 0 ? (
-        <WallEmpty eligible={eligible} />
-      ) : (
-        <div className="grid gap-3 px-4 pt-4">
-          {wall.items.map((card) => (
+    <div className="flex flex-col">
+      <ul ref={wallRef} className="wl-wall">
+        {wall.items.map((card) => (
+          <li key={card.id} onPointerEnter={gust} onAnimationEnd={settled}>
             <WallCard
-              key={card.id}
               card={card}
               canVote={eligible}
+              now={at}
               onVote={(result) => wall.update(card.id, (item) => ({ ...item, voted: result.voted, votesCount: result.votesCount }))}
             />
-          ))}
-        </div>
-      )}
-      <ShowMore hasMore={wall.hasMore} loading={wall.loading} failed={wall.failed} onMore={wall.more} />
+          </li>
+        ))}
+      </ul>
+      <div className="pt-6">
+        <ShowMore hasMore={wall.hasMore} loading={wall.loading} failed={wall.failed} onMore={wall.more} />
+      </div>
       <RequestBar eligible={eligible} />
-    </>
-  )
-}
-
-// "Tell us what template you need" and the post button (DESIGN §4.7, empty.html?v=wishlist).
-// The bottom bar stays the one filled primary, so this one is the ghost.
-function WallEmpty({ eligible }: { eligible: boolean }) {
-  const t = useTranslations('app.wishlist')
-  return (
-    <EmptyState
-      icon="heart"
-      title={t('empty')}
-      body={t('emptyBody')}
-      action={
-        eligible ? (
-          <Link href="/wishlist/new" className={STATE_GHOST}>
-            {t('request')}
-          </Link>
-        ) : undefined
-      }
-    />
+    </div>
   )
 }

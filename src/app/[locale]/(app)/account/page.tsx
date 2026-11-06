@@ -25,7 +25,6 @@ const accountSite = {
   products: site.billing.products,
   brand: site.brand.name,
   freeCredits: site.billing.freeCredits,
-  returnToHosts: site.partners.graylum.returnToHosts,
 }
 
 const actions = {
