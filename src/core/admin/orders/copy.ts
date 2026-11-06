@@ -1,9 +1,9 @@
 // /admin/orders copy (DESIGN §7: Chinese only, kept out of site/messages).
 export const ORDERS_COPY = {
   title: '订单与收入',
-  priceNote: '收入汇总按商品标价计；付款记录是实付金额（含税，原币种）。退款和争议在 Stripe 后台处理，这里只显示状态。',
+  priceNote: '收入为净额：实付减去税（Managed Payments 代扣）再减去已退款。付款记录显示实付金额（含税）。退款和争议在 Stripe 后台处理，这里只显示状态。T10 上线前的付款不在其中。',
   windows: { today: '今日', '7d': '近 7 天', period: (days: number) => `近 ${days} 天` },
-  revenue: '收入（标价）',
+  revenue: '收入（净额）',
   purchases: (n: number) => `${n} 笔付款`,
   byProduct: (days: number) => `近 ${days} 天按商品和渠道`,
   columns: {
@@ -19,7 +19,7 @@ export const ORDERS_COPY = {
     status: '状态',
     link: 'Stripe',
     purchases: '笔数',
-    revenue: '收入（标价）',
+    revenue: '收入（净额）',
   },
   forms: { checkout: '首付 / 单笔', renewal: '订阅续费', waffo: 'Waffo 单笔' },
   channels: { stripe: 'Stripe', waffo: 'Waffo' },
