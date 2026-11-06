@@ -37,42 +37,49 @@ export type TrackedJob = {
   fileUrl: string | null
   creditPool: CreditPool | null
   failure: JobFailure | null
+  // When it succeeded or failed in this tab (ms epoch); a reload keeps a settled job the
+  // workspace still shows for a while, so its result comes back too.
+  settledAt?: number
   // Object URL of the picked photo; this tab only, never persisted.
   previewUrl?: string
 }
 
 export type ErrorBodyLike = { code?: string; message?: string; refunded?: boolean; required_tier?: MembershipTier }
 
-const settledFields = { retryAt: undefined }
+const settled = (now: number) => ({ retryAt: undefined, settledAt: now })
 
-export function applyView(job: TrackedJob, view: JobView): TrackedJob {
+export function applyView(job: TrackedJob, view: JobView, now = Date.now()): TrackedJob {
   if (view.status === 'running') return job
-  if (view.status === 'succeeded') return { ...job, ...settledFields, status: 'succeeded', fileUrl: view.file_url, creditPool: view.credit_pool }
-  return { ...job, ...settledFields, status: 'failed', failure: { code: view.error_code ?? 'GENERATION_FAILED', message: '', refunded: true } }
+  if (view.status === 'succeeded') return { ...job, ...settled(now), status: 'succeeded', fileUrl: view.file_url, creditPool: view.credit_pool }
+  return { ...job, ...settled(now), status: 'failed', failure: { code: view.error_code ?? 'GENERATION_FAILED', message: '', refunded: true } }
 }
 
-export function applyError(job: TrackedJob, body: ErrorBodyLike): TrackedJob {
+export function applyError(job: TrackedJob, body: ErrorBodyLike, now = Date.now()): TrackedJob {
   const failure: JobFailure = { code: body.code ?? 'INTERNAL', message: body.message ?? '', refunded: body.refunded ?? null }
   if (body.required_tier) failure.requiredTier = body.required_tier
-  return { ...job, ...settledFields, status: 'failed', failure }
+  return { ...job, ...settled(now), status: 'failed', failure }
 }
 
-// Only unsettled jobs are worth restoring after a reload. A running one older than the
-// function limit died with its function (same 6 minutes as core/jobs RUNNING_STALE_MS); a
-// queued one is dropped after an hour, the photo's moment has passed.
+// What a reload brings back: every unsettled job, and the settled ones a workspace is still
+// showing (`keep`), so a refresh lands on the same developing list or result. A running job
+// older than the function limit died with its function (same 6 minutes as core/jobs
+// RUNNING_STALE_MS); a queued one is dropped after an hour, the photo's moment has passed; a
+// settled one after 30 minutes (it is in Photos anyway).
 const RUNNING_STALE_MS = 6 * 60 * 1000
 const QUEUED_STALE_MS = 60 * 60 * 1000
+const SETTLED_KEEP_MS = 30 * 60 * 1000
 
 const isUnsettled = (job: TrackedJob) => job.status === 'running' || job.status === 'queued'
 
-export function serialize(jobs: readonly TrackedJob[]): string {
+export function serialize(jobs: readonly TrackedJob[], keep: ReadonlySet<string> = new Set()): string {
   // previewUrl: undefined drops the key from the JSON.
-  return JSON.stringify(jobs.filter(isUnsettled).map((job) => ({ ...job, previewUrl: undefined })))
+  return JSON.stringify(jobs.filter((job) => isUnsettled(job) || keep.has(job.id)).map((job) => ({ ...job, previewUrl: undefined })))
 }
 
 function fresh(job: TrackedJob, now: number): boolean {
   if (job.status === 'running') return now - job.startedAt < RUNNING_STALE_MS
-  return now - job.queuedAt < QUEUED_STALE_MS
+  if (job.status === 'queued') return now - job.queuedAt < QUEUED_STALE_MS
+  return job.settledAt !== undefined && now - job.settledAt < SETTLED_KEEP_MS
 }
 
 // A job that was running when the tab reloaded lost its request, so it goes back in the queue
@@ -92,7 +99,7 @@ export function restore(raw: string | null, now: number): TrackedJob[] {
     const parsed: unknown = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
     return (parsed as TrackedJob[])
-      .filter((job) => job && typeof job.id === 'string' && isUnsettled(job) && fresh(job, now))
+      .filter((job) => job && typeof job.id === 'string' && fresh(job, now))
       .map(resumed)
   } catch {
     return []
