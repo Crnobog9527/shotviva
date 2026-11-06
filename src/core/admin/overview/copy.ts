@@ -21,5 +21,17 @@ export const OVERVIEW_COPY = {
     revenueDay: (day: string, amount: string) => `${day}：${amount}`,
     day: (day: string, jobs: number, succeeded: number) => `${day}：出图 ${jobs}，成功 ${succeeded}`,
   },
+  todo: {
+    title: '待处理',
+    stuck: '卡住的任务',
+    fail1h: '近 1 小时失败率',
+    fail24h: '近 24 小时失败率',
+    requests: '待审需求',
+    paymentIssues: '退款和争议（60 天内）',
+    lastPurchase: '最近一次入账',
+    provider: '在用的供应商',
+    noProvider: '没有在用的供应商',
+    never: '还没有',
+  },
   error: '统计读取失败，请稍后刷新。',
 } as const

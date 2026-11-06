@@ -3,6 +3,8 @@ import type { RevenueStats } from '../orders/revenue'
 import { StatCard } from '../shell/admin-blocks'
 import { OVERVIEW_COPY as COPY } from './copy'
 import { successRate, type DashboardStats, type StatsWindow } from './stats'
+import type { TodoCounts } from './todo'
+import { TodoStrip } from './todo-strip'
 import { RevenueTrend, TrendChart } from './trend-chart'
 
 const number = new Intl.NumberFormat('zh-CN')
@@ -44,9 +46,12 @@ function WindowCards({ window, days, revenue }: { window: StatsWindow; days: num
   )
 }
 
-export function OverviewView({ stats, revenue }: { stats: DashboardStats; revenue: RevenueStats }) {
+type Props = { stats: DashboardStats; revenue: RevenueStats; todo: { counts: TodoCounts; wishlist: boolean } }
+
+export function OverviewView({ stats, revenue, todo }: Props) {
   return (
     <div className="grid gap-6">
+      <TodoStrip todo={todo.counts} wishlist={todo.wishlist} />
       <p className="text-sm text-muted-foreground">{COPY.timezone}</p>
       {stats.windows.map((window) => (
         <WindowCards key={window.key} window={window} days={stats.days} revenue={revenue} />
