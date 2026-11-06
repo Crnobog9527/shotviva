@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { AppError } from '@/core/errors'
 
 // The overview 「待处理」 strip (ARCHITECTURE §10, T26): admin_todo_counts (0189), one call, each
-// count on its own index (see the migrations). T27 (0224) added open_tickets.
+// count on its own index (see the migrations). T27 added open_tickets (0224) and overdue_tickets (0227).
 
 const window = z.object({ total: z.number(), failed: z.number() })
 
@@ -19,6 +19,7 @@ const todoSchema = z.object({
   last_purchase_at: z.string().nullable(),
   provider: z.object({ label: z.string(), model: z.string() }).nullable(),
   open_tickets: z.number(),
+  overdue_tickets: z.number(),
 })
 
 export type TodoCounts = {
@@ -30,6 +31,7 @@ export type TodoCounts = {
   lastPurchaseAt: string | null
   provider: { label: string; model: string } | null
   openTickets: number
+  overdueTickets: number
 }
 
 export async function loadTodoCounts(db: SupabaseClient): Promise<TodoCounts> {
@@ -45,5 +47,6 @@ export async function loadTodoCounts(db: SupabaseClient): Promise<TodoCounts> {
     lastPurchaseAt: row.last_purchase_at,
     provider: row.provider,
     openTickets: row.open_tickets,
+    overdueTickets: row.overdue_tickets,
   }
 }

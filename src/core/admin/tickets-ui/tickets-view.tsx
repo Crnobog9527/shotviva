@@ -1,5 +1,6 @@
 import Link from 'next/link'
 
+import { BASE_SUPPORT_REPLY_HOURS, TIER_SUPPORT_REPLY_HOURS } from '@/core/billing'
 import type { AdminListFilter, AdminTicketRow, Page } from '@/core/support'
 import { TICKET_STATUSES, TICKET_TYPES } from '@/core/support/rules'
 import { Badge } from '@/core/ui/badge'
@@ -17,6 +18,7 @@ export function TicketsView({ filter, page, paged }: Props) {
   return (
     <div className="grid gap-4">
       <Filters filter={filter} />
+      {filter.status === 'open' ? <p className="text-xs text-muted-foreground">{COPY.sortHint({ ...TIER_SUPPORT_REPLY_HOURS, base: BASE_SUPPORT_REPLY_HOURS })}</p> : null}
       {page.items.length === 0 ? <EmptyState title={COPY.empty} /> : <TicketsTable rows={page.items} />}
       <div className="flex gap-4 text-sm">
         {paged ? (
@@ -80,7 +82,18 @@ function Filters({ filter }: { filter: AdminListFilter }) {
   )
 }
 
-const COLUMNS = ['lastMessageAt', 'email', 'type', 'status', 'preview'] as const
+// The reply's due time; late open tickets in red with the word, not only the colour.
+function DueAt({ row }: { row: AdminTicketRow }) {
+  if (row.status !== 'open') return <span className="text-xs text-muted-foreground">—</span>
+  return (
+    <span className={cn('font-mono text-xs', row.overdue && 'font-semibold text-destructive')}>
+      {formatBeijing(row.dueAt)}
+      {row.overdue ? <span className="ml-1 font-sans">{COPY.overdue}</span> : null}
+    </span>
+  )
+}
+
+const COLUMNS = ['dueAt', 'lastMessageAt', 'email', 'tier', 'type', 'status', 'preview'] as const
 
 function TicketsTable({ rows }: { rows: AdminTicketRow[] }) {
   return (
@@ -95,8 +108,12 @@ function TicketsTable({ rows }: { rows: AdminTicketRow[] }) {
       <TableBody>
         {rows.map((row) => (
           <TableRow key={row.id}>
+            <TableCell className="whitespace-nowrap">
+              <DueAt row={row} />
+            </TableCell>
             <TableCell className="font-mono text-xs whitespace-nowrap">{formatBeijing(row.lastMessageAt)}</TableCell>
             <TableCell className="text-sm">{row.email ?? row.userId.slice(0, 8)}</TableCell>
+            <TableCell className="text-sm whitespace-nowrap">{COPY.tiers[row.tier ?? 'none']}</TableCell>
             <TableCell className="text-sm whitespace-nowrap">{COPY.types[row.type]}</TableCell>
             <TableCell className="whitespace-nowrap">
               <Badge variant={row.status === 'open' ? 'default' : 'secondary'}>{COPY.statuses[row.status]}</Badge>

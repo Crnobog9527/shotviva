@@ -20,7 +20,8 @@ export function tierPerks(tier: MembershipTier, options: { wishlistLive: boolean
   if (tier === 'pro') {
     return {
       heading: 'plusStarter',
-      live: [concurrency('pro'), { key: 'support24h', values: { hours: TIER_SUPPORT_REPLY_HOURS.pro } }],
+      // Pro answers in the same 48 hours as Starter, so it lists no support perk of its own.
+      live: [concurrency('pro')],
       soon: [{ key: 'batch', values: { count: 10 } }, { key: 'brandKit' }],
     }
   }
@@ -28,7 +29,7 @@ export function tierPerks(tier: MembershipTier, options: { wishlistLive: boolean
   const wishlist: Perk = { key: 'wishlistVotes', values: { weight: 3 } }
   return {
     heading: 'plusPro',
-    live: [concurrency('max'), { key: 'supportSameDay' }, ...(options.wishlistLive ? [wishlist] : [])],
+    live: [concurrency('max'), { key: 'support24h', values: { hours: TIER_SUPPORT_REPLY_HOURS.max } }, ...(options.wishlistLive ? [wishlist] : [])],
     soon: [{ key: 'batch', values: { count: 30 } }, { key: 'earlyAccess' }, ...(options.wishlistLive ? [] : [wishlist])],
   }
 }

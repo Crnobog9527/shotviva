@@ -14,5 +14,6 @@ export {
   TIER_CONCURRENCY,
   TIER_SUPPORT_REPLY_HOURS,
   concurrencyFor,
+  supportHoursFor,
   currentTier,
 } from './tier'

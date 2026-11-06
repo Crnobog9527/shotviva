@@ -11,6 +11,7 @@ export {
   TIER_CONCURRENCY,
   TIER_SUPPORT_REPLY_HOURS,
   concurrencyFor,
+  supportHoursFor,
 } from './tier-limits'
 
 // Membership tier perks (ARCHITECTURE §6.2 "会员档位权益"). The tier itself comes only from the

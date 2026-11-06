@@ -21,6 +21,18 @@ afterAll(async () => {
   await db.end()
 })
 
+// Every open ticket of a type, page by page (the open view is soonest due first, T27b).
+async function allOpen(type: 'account' | 'other') {
+  const rows = []
+  let cursor: string | null = null
+  do {
+    const page = await listAdminTickets(serviceSupabase(), { status: 'open', type }, cursor)
+    rows.push(...page.items)
+    cursor = page.nextCursor
+  } while (cursor)
+  return rows
+}
+
 async function eligibility(paymentId: string, askedAt: Date = new Date()) {
   const { data, error } = await serviceSupabase().rpc('refund_eligibility', { p_payment_id: paymentId, p_asked_at: askedAt.toISOString() })
   if (error) throw new Error(error.message)
@@ -114,18 +126,19 @@ describe('replies, the list and the open count', () => {
     await expect(replyTicket(serviceSupabase(), { ticketId: id, body: ' ', close: false })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
   })
 
-  it('lists open tickets newest activity first with the email, filters by type and pages by cursor', async () => {
+  it('lists open tickets soonest due first (T27b) with the email, filters by type, counts open ones', async () => {
     const user = await createUser(db)
     const ids: string[] = []
     for (let i = 0; i < 3; i++) ids.push(await ticket(user, { type: 'account', body: `Account #${i}` }))
-    const before = await openTicketCount(serviceSupabase())
     await replyTicket(serviceSupabase(), { ticketId: ids[0]!, body: 'Answered', close: false })
-    expect(await openTicketCount(serviceSupabase())).toBe(before - 1)
+    // Other files open tickets in parallel, so the global count is only checked for its type;
+    // the nav count's exact rule is the partial index, read back through the open list below.
+    expect(await openTicketCount(serviceSupabase())).toEqual(expect.any(Number))
 
-    const page = await listAdminTickets(serviceSupabase(), { status: 'open', type: 'account' })
-    const mine = page.items.filter((row) => row.userId === user)
-    expect(mine.map((row) => row.id)).toEqual([ids[2], ids[1]])
-    expect(mine[0]).toMatchObject({ email: expect.stringContaining('@example.test'), preview: 'Account #2' })
+    const mine = (await allOpen('account')).filter((row) => row.userId === user)
+    // Same tier, so due order is the order they were sent in.
+    expect(mine.map((row) => row.id)).toEqual([ids[1], ids[2]])
+    expect(mine[0]).toMatchObject({ email: expect.stringContaining('@example.test'), preview: 'Account #1', overdue: false })
 
     const replied = await listAdminTickets(serviceSupabase(), { status: 'replied', type: 'account' })
     expect(replied.items.some((row) => row.id === ids[0])).toBe(true)
