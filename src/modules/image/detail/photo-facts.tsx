@@ -22,14 +22,17 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-function originalFact(original: OriginalSource, f: (key: 'originalKept' | 'originalEdited' | 'originalDeleted', values?: { px: number }) => string) {
+type FactKey = 'originalWithWork' | 'originalKept' | 'originalEdited' | 'originalDeleted'
+
+function originalFact(original: OriginalSource, keptWithWork: boolean, f: (key: FactKey, values?: { px: number }) => string) {
+  if (keptWithWork && original.kind !== 'source') return f('originalWithWork')
   if (original.kind === 'preview') return f('originalKept', { px: INPUT_PREVIEW_PX })
   return f(original.kind === 'source' ? 'originalEdited' : 'originalDeleted')
 }
 
 // The facts table (T6 photo.html, T32): what was made, how, for how much, and whether the
-// upload's preview is still kept. Sizes and counts in mono, words in the sans.
-export function PhotoFacts({ item, original }: { item: PhotoItem; original: OriginalSource }) {
+// upload is kept with it (T40; before that only a preview). Sizes and counts in mono, words in the sans.
+export function PhotoFacts({ item, original, keptWithWork }: { item: PhotoItem; original: OriginalSource; keptWithWork: boolean }) {
   const t = useTranslations('app')
   const f = useTranslations('app.result.facts')
   const mono = (text: string) => <span className="font-mono text-caption">{text}</span>
@@ -41,7 +44,7 @@ export function PhotoFacts({ item, original }: { item: PhotoItem; original: Orig
       {item.fileUrl ? <FormatRow fileUrl={item.fileUrl} className={ROW} /> : null}
       <Row label={f('credits')}>{mono(t('credits', { count: item.credits }))}</Row>
       <Row label={f('visibility')}>{f(VISIBILITY[workTagKey(item.creditPool, item.visibility)])}</Row>
-      <Row label={f('original')}>{originalFact(original, f)}</Row>
+      <Row label={f('original')}>{originalFact(original, keptWithWork, f)}</Row>
       <Row label={f('made')}>
         <PhotoWhen iso={item.createdAt} variant="made" />
       </Row>

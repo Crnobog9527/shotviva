@@ -9,8 +9,9 @@ import type { ObjectStore } from '@/core/storage'
 
 // Admin "查看作品" (ARCHITECTURE §10, T25). admin_view_work writes the view_work audit row and
 // returns the job's keys in the same call, so no view goes unrecorded. The output is the clean
-// original (no watermark, whatever the pool); the input lives 7 days under inputs/ (bucket
-// lifecycle) and reads as expired after that. Links are signed for 5 minutes and only ever
+// original (no watermark, whatever the pool). The input is the copy kept with the work (T40,
+// outputs/…-in-1) when there is one; works made before T40 only have their inputs/ upload, which
+// the bucket lifecycle deletes after 7 days, and those read as expired. Links are signed for 5 minutes and only ever
 // point at R2: no image bytes pass through the function (AGENTS §6).
 
 export const VIEW_LINK_SECONDS = 300
@@ -34,11 +35,14 @@ const viewSchema = z
 
 type Deps = { db: SupabaseClient; store: ObjectStore; now?: Date }
 
+const isKeptCopy = (key: string) => key.startsWith('outputs/')
+
 async function inputLink(store: ObjectStore, key: string | null, createdAt: string, now: Date) {
   if (!key) return { input: null, inputExpired: false }
-  // The lifecycle rule may run a little late or early; past 7 days it is gone by policy, and
-  // inside 7 days a HEAD tells a deleted object from a live one.
-  if (now.getTime() - Date.parse(createdAt) >= INPUT_LIFETIME_MS || !(await store.head(key))) {
+  // The lifecycle rule may run a little late or early; past 7 days an inputs/ upload is gone by
+  // policy, and otherwise a HEAD tells a deleted object from a live one.
+  const pastLifecycle = !isKeptCopy(key) && now.getTime() - Date.parse(createdAt) >= INPUT_LIFETIME_MS
+  if (pastLifecycle || !(await store.head(key))) {
     return { input: null, inputExpired: true }
   }
   return { input: await store.presignGet(key, { expiresInSeconds: VIEW_LINK_SECONDS }), inputExpired: false }

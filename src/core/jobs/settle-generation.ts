@@ -4,7 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { captureError } from '../analytics'
 import { logger } from '../logger'
-import type { ObjectStore } from '../storage'
+import { keepJobInputs, type ObjectStore } from '../storage'
 import { classifyFailure, GenerationFailure, type FailureStage } from './generation-failure'
 import { jobCostUsd } from './job-cost'
 import type { Job } from './job-schema'
@@ -66,6 +66,19 @@ function costOf(provider: GenerationProvider, usage: ProviderUsage | null, decis
   return { usage: all, costUsd: jobCostUsd(all, provider.prices, decision?.prices) }
 }
 
+// The output written, and alongside it the job's uploads copied next to it (T40, §8.3「输入图随
+// 作品保留」). The copy never throws: a failed one is just not kept.
+async function storeOutput(deps: SettleDeps, job: Job, output: { key: string; bytes: Uint8Array; contentType: string }, inputKeys: string[]) {
+  const [, kept] = await Promise.all([
+    deps.store.put(output.key, output.bytes, output.contentType),
+    keepJobInputs(deps.store, { userId: job.userId, jobId: job.id }, inputKeys),
+  ])
+  return kept
+}
+
+// decision: the photo-edit step's cost (T30). inputKeys: the job's own uploads, kept with it (T40).
+export type SettleExtras = { decision?: DecisionCost; inputKeys?: string[] }
+
 // Steps 2–3 of ARCHITECTURE §4 for a freshly reserved job: provider → write output → confirm.
 // Any failure, timeout included, refunds before the error reaches the client. A failure after
 // the provider answered still records what it reported using.
@@ -74,7 +87,7 @@ export async function settleGeneration(
   job: Job,
   call: Omit<ProviderInput, 'signal'>,
   outputKey: string,
-  decision?: DecisionCost,
+  { decision, inputKeys = [] }: SettleExtras = {},
 ): Promise<Job> {
   let stage: FailureStage = 'provider'
   let usage: ProviderUsage | null = null
@@ -85,9 +98,9 @@ export async function settleGeneration(
     )
     usage = output.usage ?? null
     stage = 'store_output'
-    await deps.store.put(outputKey, output.bytes, output.contentType)
+    const keptInputs = await storeOutput(deps, job, { key: outputKey, bytes: output.bytes, contentType: output.contentType }, inputKeys)
     stage = 'confirm'
-    return await confirmJob(deps.db, { jobId: job.id, outputKey, ...costOf(deps.provider, usage, decision) })
+    return await confirmJob(deps.db, { jobId: job.id, outputKey, keptInputs, ...costOf(deps.provider, usage, decision) })
   } catch (error) {
     if (error instanceof ProviderError && error.usage) usage = error.usage
     const failure = classifyFailure(stage, error)

@@ -27,7 +27,7 @@ export const SUPPORT_COPY = {
     body: '链接 5 分钟内有效。这次查看已写入审计日志。',
     output: '成品（无水印原图）',
     input: '上传的原图',
-    inputExpired: '已过期：上传的原图在 7 天后自动删除。',
+    inputExpired: '已过期：这是原图随作品保留之前的老作品，上传的原图 7 天后已自动删除。',
     noInput: '这一单没有上传图片。',
     noOutput: '这一单没有成品。',
     close: '关闭',

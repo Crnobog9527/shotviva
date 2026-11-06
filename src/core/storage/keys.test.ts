@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { inputPreviewKeyFor, isOwnInputKey, newInputKey, newRequestImageKey, outputKeyFor } from './keys'
+import { contentTypeOfKey, inputPreviewKeyFor, isKeptInputKey, isOwnInputKey, keptInputKeyFor, newInputKey, newRequestImageKey, outputKeyFor } from './keys'
 
 const USER = '0b6f3f0e-5d1c-4c47-9a49-6a3f6f8d2e11'
 const OTHER = '7d1e2c3b-0000-4000-8000-000000000000'
@@ -22,5 +22,20 @@ describe('storage keys', () => {
     expect(isOwnInputKey(USER, `outputs/${USER}/x.png`)).toBe(false)
     expect(isOwnInputKey(USER, `inputs/${USER}/../${OTHER}/a.jpg`)).toBe(false)
     expect(isOwnInputKey(USER, `inputs/${USER}/not-a-uuid.jpg`)).toBe(false)
+  })
+
+  it('keeps a job’s uploads under its own outputs/ slot, extension and all (T40)', () => {
+    const job = '5c0d9a8e-1111-4222-8333-444455556666'
+    const upload = newInputKey(USER, 'image/jpeg')
+    const kept = keptInputKeyFor(USER, job, 1, upload)
+    expect(kept).toBe(`outputs/${USER}/${job}-in-1.jpg`)
+    expect(keptInputKeyFor(USER, job, 2, newInputKey(USER, 'image/png'))).toBe(`outputs/${USER}/${job}-in-2.png`)
+    expect(isKeptInputKey(USER, job, kept)).toBe(true)
+    expect(isKeptInputKey(OTHER, job, kept)).toBe(false)
+    expect(isKeptInputKey(USER, '00000000-0000-4000-8000-000000000000', kept)).toBe(false)
+    expect(isKeptInputKey(USER, job, `outputs/${USER}/${job}.png`)).toBe(false)
+    expect(isKeptInputKey(USER, job, `outputs/${USER}/${job}-input.webp`)).toBe(false)
+    expect(contentTypeOfKey(kept)).toBe('image/jpeg')
+    expect(contentTypeOfKey('outputs/x/y.gif')).toBeNull()
   })
 })

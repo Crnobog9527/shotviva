@@ -51,9 +51,10 @@ export function ResultView({ item, detail, shareText, edit, parent, change }: Pr
         <div className="mt-4 grid gap-2">
           <ShareButton fileUrl={fileUrl} name={`shotviva-${item.templateId}`} shareText={shareText} />
           {edit}
-          {/* An edit has no template page to go back to. */}
+          {/* An edit has no template page to go back to. No prefetch: opening the workspace copies
+              the kept photo back to a fresh upload (T40). */}
           {item.templateId === EDIT_TEMPLATE_ID ? null : (
-            <Link href={`/generate/${item.templateId}`} className={buttonVariants({ variant: 'glass', size: 'touch', className: 'min-h-12 gap-1.5' })}>
+            <Link href={`/generate/${item.templateId}?again=${item.id}`} prefetch={false} className={buttonVariants({ variant: 'glass', size: 'touch', className: 'min-h-12 gap-1.5' })}>
               <AgainIcon />
               {t('result.makeAgain')}
             </Link>
@@ -62,7 +63,7 @@ export function ResultView({ item, detail, shareText, edit, parent, change }: Pr
         {parent ? <EditedFrom parent={parent} /> : null}
         {change ? <YourChange text={change} /> : null}
         {detail.note ? <NoteQuote note={detail.note} /> : null}
-        <PhotoFacts item={item} original={detail.original} />
+        <PhotoFacts item={item} original={detail.original} keptWithWork={detail.keptWithWork} />
       </div>
     </section>
   )

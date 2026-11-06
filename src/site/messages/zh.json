@@ -287,7 +287,17 @@
       "stageLabel": "预览",
       "stageYours": "你的照片",
       "stageYoursCaption": "这是你拍的原图。模板会保留主体，只换光线和背景。",
-      "stageSampleCaption": "模板示例：左边是手机原图，右边是 AI 出图。"
+      "stageSampleCaption": "模板示例：左边是手机原图，右边是 AI 出图。",
+      "again": {
+        "note": "<b>再做一张：</b>{summary}，沿用 <day></day> 那张的设置。",
+        "noteKept": "保留补充说明",
+        "kept": "原图，随作品保留",
+        "keptFrom": "<day></day> · {size}",
+        "missingTitle": "原图不可用",
+        "missingOld": "这张作品是在我们开始保留原图之前做的。把同一张照片再加一次，其余设置都和原来一样。",
+        "missingFailed": "暂时没能取回原图。把同一张照片再加一次，其余设置都和原来一样。",
+        "addFirst": "先添加照片。<b>之后和其他照片一样，扣 {count} 积分。</b>"
+      }
     },
     "errors": {
       "CONTENT_REJECTED": "照片或补充说明没有通过安全审核。请换一张照片，或改一下说明。",
@@ -363,8 +373,8 @@
         "original": "原图"
       },
       "originalAlt": "你为 {name} 上传的照片",
-      "originalDeleted": "原图已删除",
-      "originalDeletedBody": "按隐私规则，你上传的照片已不再保留，生成的图片不受影响。",
+      "originalDeleted": "原图不可用",
+      "originalDeletedBody": "这张作品是在开始随作品保留原图之前做的，生成的图片不受影响。",
       "yourNote": "你的补充说明",
       "showMore": "展开",
       "showLess": "收起",
@@ -382,9 +392,10 @@
         "visibilityPrivate": "私密",
         "visibilityPublic": "公开",
         "original": "原图",
+        "originalWithWork": "随这张作品保留",
         "originalKept": "已保留，{px} px 预览",
         "originalEdited": "你改的那张照片",
-        "originalDeleted": "已按隐私规则删除",
+        "originalDeleted": "早于原图保留功能",
         "made": "生成时间"
       }
     },

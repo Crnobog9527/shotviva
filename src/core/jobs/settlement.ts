@@ -67,12 +67,22 @@ const costSchema = {
   costUsd: z.number().nonnegative().nullable().default(null),
 }
 
-export async function confirmJob(client: RpcClient, input: { jobId: string; outputKey: string } & JobCost): Promise<Job> {
-  const args = z.object({ jobId: z.uuid(), outputKey: z.string().min(1), ...costSchema }).parse(input)
+// keptInputs: the job's uploads, already copied next to the result (T40); recorded as
+// inputs.kept_inputs in this same call. confirm_job drops any key outside the job's own slot.
+export async function confirmJob(client: RpcClient, input: { jobId: string; outputKey: string; keptInputs?: string[] } & JobCost): Promise<Job> {
+  const args = z
+    .object({ jobId: z.uuid(), outputKey: z.string().min(1), keptInputs: z.array(z.string().min(1)).max(30).default([]), ...costSchema })
+    .parse(input)
   return callRpc(
     client,
     'confirm_job',
-    { p_job_id: args.jobId, p_output_key: args.outputKey, p_provider_usage: args.usage, p_cost_usd: args.costUsd },
+    {
+      p_job_id: args.jobId,
+      p_output_key: args.outputKey,
+      p_provider_usage: args.usage,
+      p_cost_usd: args.costUsd,
+      p_kept_inputs: args.keptInputs.length > 0 ? args.keptInputs : null,
+    },
     jobRowSchema,
   )
 }

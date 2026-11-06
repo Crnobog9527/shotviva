@@ -9,6 +9,9 @@ import type { UploadContentType } from './rules'
 //   outputs/{user_id}/{job_id}-input.webp
 //                                     768px preview of the job's upload, kept with the result
 //                                     (ARCHITECTURE §8 「原图小图」, T32)
+//   outputs/{user_id}/{job_id}-in-{n}.{ext}
+//                                     the job's own uploads (n from 1), copied at settle and
+//                                     kept with the result for Make again (§8.3, T40)
 //   requests/{user_id}/{uuid}.jpg     wishlist reference image, re-encoded; kept until the
 //                                     request is rejected or taken down (ARCHITECTURE §15.1)
 
@@ -18,8 +21,11 @@ const EXTENSION: Record<UploadContentType, string> = {
   'image/webp': 'webp',
 }
 
+const CONTENT_TYPE: Record<string, UploadContentType> = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp' }
+
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 const INPUT_KEY = new RegExp(`^inputs/(${UUID})/${UUID}\\.(jpg|png|webp)$`)
+const KEPT_KEY = new RegExp(`^outputs/(${UUID})/(${UUID})-in-[1-9][0-9]?\\.(jpg|png|webp)$`)
 
 export function newInputKey(userId: string, contentType: UploadContentType): string {
   return `inputs/${userId}/${randomUUID()}.${EXTENSION[contentType]}`
@@ -35,6 +41,23 @@ export function outputKeyFor(userId: string, jobId: string): string {
 
 export function inputPreviewKeyFor(userId: string, jobId: string): string {
   return `outputs/${userId}/${jobId}-input.webp`
+}
+
+// The upload's own extension is kept: normal uploads are JPEG (the browser compresses), the
+// rare uncompressed fallback stays PNG or WebP, and a copy never changes the bytes.
+export function keptInputKeyFor(userId: string, jobId: string, n: number, inputKey: string): string {
+  return `outputs/${userId}/${jobId}-in-${n}.${inputKey.slice(inputKey.lastIndexOf('.') + 1)}`
+}
+
+// A kept input belongs to exactly one user's job; the shape is checked before any copy back.
+export function isKeptInputKey(userId: string, jobId: string, key: string): boolean {
+  const match = KEPT_KEY.exec(key)
+  return match !== null && match[1] === userId.toLowerCase() && match[2] === jobId.toLowerCase()
+}
+
+// Content type from a key's extension (jpg / png / webp), for a fresh inputs/ key.
+export function contentTypeOfKey(key: string): UploadContentType | null {
+  return CONTENT_TYPE[key.slice(key.lastIndexOf('.') + 1)] ?? null
 }
 
 // Keys come back from the browser, so ownership is checked by shape, never trusted.

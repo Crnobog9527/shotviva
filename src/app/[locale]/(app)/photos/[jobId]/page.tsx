@@ -7,7 +7,7 @@ import { AppPage, FlowNav } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
 import { currentTier, limitsFor, readBalance } from '@/core/billing'
 import { currentLocale } from '@/core/i18n/server'
-import { fileUrlFor, findOwnJob, hasInputPreview, originalUrlFor, type Job } from '@/core/jobs'
+import { fileUrlFor, findOwnJob, hasInputPreview, keptInputsOf, originalUrlFor, type Job } from '@/core/jobs'
 import { r2Store } from '@/core/storage'
 import { EDIT_TEMPLATE_ID, listTemplatesIn, loadEditOffer } from '@/core/templates'
 import { EditFlow, EditTrigger, editDisplay, editOriginal, ResultView, toPhotoDetail } from '@/modules/image'
@@ -49,7 +49,7 @@ async function Result({ params }: { params: Promise<{ jobId: string }> }) {
   const lookup = new Map(templates.map((tpl) => [tpl.id, { name: tpl.name, cover: tpl.coverAfterUrl }]))
   const names = { fallback: t('photos.fallbackName'), edited: t('photos.editedName'), titleEdited: (name: string) => t('edit.titleEdited', { name }) }
   const { item, source, change } = editDisplay(job, parent, lookup, names, fileUrlFor)
-  const detail = toPhotoDetail(job, kept ? originalUrlFor(job.id) : null)
+  const detail = toPhotoDetail(job, kept ? originalUrlFor(job.id) : null, keptInputsOf(job).length > 0)
   const view = (
     <ResultView
       item={item}

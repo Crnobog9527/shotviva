@@ -130,6 +130,6 @@ export async function runEdit(deps: EditDeps, req: EditRequest): Promise<JobView
     quality: prepared.template.quality,
     params: prepared.params.input_fidelity ? { input_fidelity: prepared.params.input_fidelity } : {},
   }
-  const settle = () => settleGeneration(deps, job, call, outputKeyFor(req.userId, job.id), decisionCost(deps.classifier, decision))
+  const settle = () => settleGeneration(deps, job, call, outputKeyFor(req.userId, job.id), { decision: decisionCost(deps.classifier, decision) })
   return toJobView(await settleTracked(job, prepared.template.category, settle, { track: deps.track }))
 }

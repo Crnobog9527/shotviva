@@ -287,7 +287,17 @@
       "stageLabel": "Preview",
       "stageYours": "Your photo",
       "stageYoursCaption": "Your photo, as shot. The template keeps it and changes the light and background.",
-      "stageSampleCaption": "Template example: the phone photo on the left, the AI result on the right."
+      "stageSampleCaption": "Template example: the phone photo on the left, the AI result on the right.",
+      "again": {
+        "note": "<b>Making again:</b> {summary}, from <day></day>.",
+        "noteKept": "note kept",
+        "kept": "Original photo, kept with the work",
+        "keptFrom": "From <day></day> · {size}",
+        "missingTitle": "The original photo isn't available",
+        "missingOld": "This work was made before we started keeping originals. Add the same photo again and everything else is as it was.",
+        "missingFailed": "We couldn't bring back the original just now. Add the same photo again and everything else is as it was.",
+        "addFirst": "Add the photo first. <b>Then it costs {count} credits, like any photo.</b>"
+      }
     },
     "errors": {
       "CONTENT_REJECTED": "The photo or your note didn't pass the safety check. Try another photo or change the note.",
@@ -363,8 +373,8 @@
         "original": "Original"
       },
       "originalAlt": "The photo you uploaded for {name}",
-      "originalDeleted": "Original deleted",
-      "originalDeletedBody": "Per our privacy rules, the photo you uploaded is no longer kept. The result stays.",
+      "originalDeleted": "Original not available",
+      "originalDeletedBody": "This photo was made before originals were kept with each work. The result stays.",
       "yourNote": "Your note",
       "showMore": "Show more",
       "showLess": "Show less",
@@ -382,9 +392,10 @@
         "visibilityPrivate": "Private",
         "visibilityPublic": "Public",
         "original": "Original",
+        "originalWithWork": "Kept with this photo",
         "originalKept": "Kept, {px} px preview",
         "originalEdited": "The photo you edited",
-        "originalDeleted": "Deleted per our privacy rules",
+        "originalDeleted": "Made before originals were kept",
         "made": "Made"
       }
     },
