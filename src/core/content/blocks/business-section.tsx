@@ -38,7 +38,7 @@ export function BusinessSection({ block, email, subject, page }: Props) {
       <p className="mt-2.5 max-w-[60ch] text-body leading-normal text-pretty text-bone-dim">{block.who}</p>
       <ul className="mt-5 border-t border-[rgba(242,236,227,.16)] md:grid md:grid-cols-2 md:gap-x-8 lg:grid-cols-3 lg:gap-x-10">
         {block.items.map((item, i) => (
-          <li key={item.title} className="grid grid-cols-[28px_1fr] gap-x-2.5 gap-y-0.5 border-b border-[rgba(242,236,227,.1)] py-3 md:py-3.5">
+          <li key={item.title} className="grid grid-cols-[28px_1fr] content-start gap-x-2.5 gap-y-0.5 border-b border-[rgba(242,236,227,.1)] py-3 md:py-3.5">
             <BusinessIcon index={i} />
             <b className="text-body leading-[1.3] font-semibold tracking-[-0.01em]">{item.title}</b>
             <span className="text-caption leading-[1.4] text-muted-foreground">{item.detail}</span>

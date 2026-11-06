@@ -9,7 +9,7 @@ export function ReturnPlate({ pending, children }: { pending: boolean; children:
   return (
     <div
       data-state={pending ? 'pending' : 'success'}
-      className="relative grid min-h-[calc(100dvh-var(--sab)-80px)] place-items-start justify-items-center px-[var(--gutter)] pt-[calc(var(--sat)+32px)] pb-6 md:min-h-[calc(100dvh-56px)] md:place-items-center md:py-10"
+      className="relative grid min-h-[calc(100dvh-var(--sab)-80px)] overflow-x-clip place-items-start justify-items-center px-[var(--gutter)] pt-[calc(var(--sat)+32px)] pb-6 md:min-h-[calc(100dvh-56px)] md:place-items-center md:py-10"
     >
       <div
         aria-hidden="true"

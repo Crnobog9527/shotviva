@@ -1,29 +1,35 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 const SHOW_MS = 10_000
 
 // Stripe's cancel_url is /pricing?checkout=cancel (T43, comps-v3-b pricing.html): one toast
 // from the top, nothing else on the page changes. The page is static, so the address is read
-// after hydration; the parameter is then taken off so a reload does not show it again.
+// after hydration; the parameter is then taken off so a reload does not show it again. The
+// drop-in is a CSS animation (off with reduced motion).
 export function CheckoutCancelToast() {
   const t = useTranslations('paywall')
   const [open, setOpen] = useState(false)
+  // The parameter is removed on first read; the ref keeps the answer for Strict Mode's second run.
+  const cancelled = useRef(false)
   useEffect(() => {
     const url = new URL(window.location.href)
-    if (url.searchParams.get('checkout') !== 'cancel') return
-    url.searchParams.delete('checkout')
-    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
-    // A frame later, so the toast drops in instead of appearing (DESIGN §8.4).
-    const show = requestAnimationFrame(() => setOpen(true))
-    const hide = setTimeout(() => setOpen(false), SHOW_MS)
-    return () => {
-      cancelAnimationFrame(show)
-      clearTimeout(hide)
+    if (!cancelled.current) {
+      if (url.searchParams.get('checkout') !== 'cancel') return
+      cancelled.current = true
+      url.searchParams.delete('checkout')
+      window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
     }
+    const show = requestAnimationFrame(() => setOpen(true))
+    return () => cancelAnimationFrame(show)
   }, [])
+  useEffect(() => {
+    if (!open) return
+    const hide = setTimeout(() => setOpen(false), SHOW_MS)
+    return () => clearTimeout(hide)
+  }, [open])
   if (!open) return null
   return (
     <div
