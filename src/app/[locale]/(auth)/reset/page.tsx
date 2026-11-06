@@ -2,19 +2,24 @@ import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
 import { Suspense } from 'react'
 
+import { EMAIL_LINK_HOURS } from '@/core/auth'
 import { ResetRequestForm } from '@/core/auth/ui'
 
 import { resetRequestAction } from '@/app/auth/actions'
 
-// Sign-in pages are noindex like the rest of the app (建站规格 R6); the root template adds
-// " | Shotviva" to the title.
+import { sender } from '../arrived'
+
+// Sign-in pages are noindex like the rest of the app (建站规格 R6), in both languages, and carry
+// no hreflang (ARCHITECTURE §17); the root template adds " | Shotviva" to the title.
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('auth.reset'))('title') }
 }
 
 async function Reset({ searchParams }: PageProps<'/[locale]/reset'>) {
   const { error } = await searchParams
-  return <ResetRequestForm action={resetRequestAction} linkExpired={error === 'link_expired'} />
+  return (
+    <ResetRequestForm action={resetRequestAction} linkExpired={error === 'link_expired'} linkHours={EMAIL_LINK_HOURS} sender={sender} />
+  )
 }
 
 export default function ResetPage(props: PageProps<'/[locale]/reset'>) {
