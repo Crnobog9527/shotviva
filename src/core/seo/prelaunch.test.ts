@@ -137,7 +137,7 @@ describe('the switch closes Chinese too (ARCHITECTURE §12.0, §17)', () => {
     expect(zhSitemapUrls(site)).toEqual([])
   })
 
-  it('answers the Chinese sitemap with a 404 while closed', () => {
-    expect(closedSeoFileResponse()?.status).toBe(404)
+  it('answers the Chinese sitemap\'s closed response with a 404', async () => {
+    expect((await closedSeoFileResponse())?.status).toBe(404)
   })
 })
