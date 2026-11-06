@@ -73,5 +73,7 @@ describe('decision providers', () => {
       (id) => readProviderKey(serviceSupabase(), id),
     )
     expect(credentials).toMatchObject({ tag: `${second}/gpt-6-luna`, adapter: 'openai_responses', config: { apiKey: KEY } })
+    // No prices on the row: gpt-6-luna's official input / output prices apply (§10.0).
+    expect(credentials?.prices).toEqual({ inputTextPerM: 0.1, inputImagePerM: null, outputPerM: 0.5 })
   })
 })

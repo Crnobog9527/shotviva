@@ -2,7 +2,7 @@ import 'server-only'
 
 import type { ServerEnv } from '../env'
 import { AppError } from '../errors'
-import { ENV_PROVIDER_SOURCE, providerTag, type GenerationProvider, type ProviderPrices } from '../jobs'
+import { effectivePrices, ENV_PROVIDER_SOURCE, providerTag, type GenerationProvider, type ProviderPrices } from '../jobs'
 import { DEFAULT_BASE_URL, type ActiveProviderRow, type ProviderAdapters, type ProviderConfig, type ProviderModule } from './types'
 
 // Turns the active ai_providers row (or, without one, the env fallback) into the adapter that
@@ -30,7 +30,9 @@ function build(
   const adapter = adapters[adapterId]
   if (!adapter) throw new AppError('INTERNAL', `provider adapter ${adapterId} is not registered`)
   const provider = adapter(config)
-  return { id: providerTag(source, config.model), prices, generate: provider.generate.bind(provider) } satisfies GenerationProvider
+  // Row prices first, then the official price table for the model (ARCHITECTURE §10.0).
+  const snapshot = effectivePrices(config.model, prices)
+  return { id: providerTag(source, config.model), prices: snapshot, generate: provider.generate.bind(provider) } satisfies GenerationProvider
 }
 
 export async function resolveProvider(
@@ -42,7 +44,7 @@ export async function resolveProvider(
 ): Promise<GenerationProvider> {
   if (!row) {
     const fallback = envFallback(module, env)
-    // The env fallback has no row to hold prices, so its jobs record usage but no cost.
+    // The env fallback has no row to hold prices; its model's official prices still apply.
     return build(adapters, fallback.adapter, ENV_PROVIDER_SOURCE, fallback.config, null)
   }
   // No silent fallback to env: a provider the Owner switched to must be the one that runs.

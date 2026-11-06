@@ -30,6 +30,8 @@ export const COSTS_COPY = {
     return `这次没读到 OpenAI 账单：${reasons[failure]}。下面只显示我们自己记录的成本，稍后刷新重试。`
   },
   dash: '—',
+  drift: (days: number, from: string, to: string, percent: number) =>
+    `${from} 到 ${to} 连续 ${days} 天，我们记录的成本和 OpenAI 实际扣费相差超过 ${percent}%。价目表里的官方价可能过期了（或后台供应商单价填错、有算不出成本的单），请对照 OpenAI 价格页核对。`,
   key: {
     title: 'OpenAI 管理员密钥',
     body: '在 OpenAI 组织设置的 Admin keys 里新建一把（和出图用的密钥分开），只用来读账单。存进 Supabase Vault，页面上只显示后 4 位。',

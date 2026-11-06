@@ -97,7 +97,7 @@ describe('settlement records usage and cost (T33)', () => {
     expect(args[log.indexOf('rpc:confirm_job')]).toMatchObject({ p_provider_usage: USAGE, p_cost_usd: COST })
   })
 
-  it('records usage but no cost when the provider has no price snapshot (env fallback)', async () => {
+  it('records usage but no cost when the provider has no price snapshot (no row price, model not in MODEL_PRICES)', async () => {
     const { deps, request } = await setup('ok', null)
     const view = await runGeneration(deps, request)
     expect(await costRow(view.id)).toEqual({ status: 'succeeded', provider_usage: USAGE, cost_usd: null })

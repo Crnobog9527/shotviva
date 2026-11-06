@@ -13,7 +13,7 @@ import { MODULE_ADAPTER, type ProviderModule } from '@/core/providers/types'
 import type { AdminProvider } from '../providers/types'
 
 import { PROVIDERS_COPY } from './copy'
-import { canSave, formFor, type ProviderForm } from './form-state'
+import { canSave, formFor, withModel, type ProviderForm } from './form-state'
 import { PriceFields } from './price-fields'
 
 type Props = {
@@ -47,8 +47,10 @@ export function ProviderFormDialog({ provider, module, pending, error, onCancel,
   const adapter = MODULE_ADAPTER[form.module]
   const set = (key: keyof ProviderForm) => (event: { target: { value: string } }) =>
     setForm((prev) => ({ ...prev, [key]: event.target.value }))
+  // The model drives the official-price pre-fill (§10.0).
+  const setModel = (event: { target: { value: string } }) => setForm((prev) => withModel(prev, event.target.value))
   const input = (key: 'label' | 'baseUrl' | 'model', mono = false) => (
-    <Input id={`provider-${key}`} className={mono ? 'font-mono' : undefined} value={form[key]} onChange={set(key)} />
+    <Input id={`provider-${key}`} className={mono ? 'font-mono' : undefined} value={form[key]} onChange={key === 'model' ? setModel : set(key)} />
   )
 
   return (
