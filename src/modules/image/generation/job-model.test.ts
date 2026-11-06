@@ -49,6 +49,12 @@ describe('job model', () => {
     expect(applyError(job, { code: 'RATE_LIMITED' }).failure?.refunded).toBeNull()
   })
 
+  it('stamps when a job settled, which decides how long a refresh keeps its result', () => {
+    expect(applyView(job, view({ status: 'succeeded', file_url: '/api/files/x' }), 9_000).settledAt).toBe(9_000)
+    expect(applyError(job, { code: 'GENERATION_FAILED' }, 9_500).settledAt).toBe(9_500)
+    expect(applyView(job, view({}), 9_000).settledAt).toBeUndefined()
+  })
+
   it('keeps the tier a TIER_REQUIRED answer names, for the paywall', () => {
     expect(applyError(job, { code: 'TIER_REQUIRED', required_tier: 'max' }).failure?.requiredTier).toBe('max')
   })
