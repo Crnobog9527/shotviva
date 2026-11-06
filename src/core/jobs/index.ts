@@ -32,7 +32,7 @@ export {
 } from './provider'
 export { RATE_LIMIT, assertWithinRateLimit, countsAgainst, isLiveRunning, rateLimitVerdict, type ReplayOf } from './rate-limit'
 export { accountLimits } from './account-limits'
-export { listOwnJobs, listRunningJobIds, type OwnJobs } from './own-jobs'
+export { listMonthWorks, listOwnJobs, listRunningJobIds, type MonthWorks, type OwnJobs } from './own-jobs'
 export { ENV_PROVIDER_SOURCE, modelFromTag, providerTag } from './provider-tag'
 export { runGeneration, type GenerationDeps } from './run-generation'
 export { PROVIDER_TIMEOUT_MS, settleGeneration, type DecisionCost, type SettleDeps, type SettleExtras } from './settle-generation'
