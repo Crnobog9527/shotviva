@@ -6,11 +6,19 @@ import { localizePath } from '../i18n/paths'
 import { INDEX, NOINDEX, hasTranslation, isIndexableIn } from './indexing'
 import { absoluteUrl, siteOrigin } from './site-url'
 
+// " | Shotviva"
+export function brandSuffix(site: SiteConfig): string {
+  return ` | ${site.brand.name}`
+}
+
 // Root default: nothing is indexable unless a page opts in through pageMetadata.
 export function rootMetadata(site: SiteConfig): Metadata {
   return {
     metadataBase: new URL(siteOrigin(site)),
-    title: site.brand.name,
+    // Every page below the home page ends its Title with " | Shotviva" (建站规格 §1). Pages that
+    // set a plain title (app, sign-in, 404) get it from this template; SEO pages set the whole
+    // title themselves through pageMetadata.
+    title: { default: site.brand.name, template: `%s${brandSuffix(site)}` },
     applicationName: site.brand.name,
     robots: NOINDEX,
   }

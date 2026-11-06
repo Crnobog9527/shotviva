@@ -120,6 +120,16 @@ function yearlySavingPct(): number | undefined {
 
 export const yearlySaving = yearlySavingPct()
 
+// The lowest price of one credit across every plan and pack, e.g. "$0.21" (Max yearly), for
+// the home FAQ (建站规格 G6 B). From the same rounding as perCredit.
+function lowestCreditPrice(): string | undefined {
+  const ids = [...PLAN_TIERS.flatMap((tier) => [tier.monthly, tier.yearly]), ...PACKS.map((pack) => pack.id)]
+  const prices = ids.filter((id) => product(id)).map((id) => perCredit(id))
+  return prices.sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)))[0]
+}
+
+export const creditFrom = lowestCreditPrice()
+
 // One sentence on paid options, used by the home page, the generator page and FAQ answers.
 export function plansSentence(): string {
   if (!planFrom) return 'Paid plans and one-time credit packs are coming soon.'
