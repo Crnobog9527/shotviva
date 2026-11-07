@@ -1,0 +1,44 @@
+{
+ "cache_key": "cache_templates_buyers",
+ "is_cached": false,
+ "last_refresh": "2026-11-08T08:00:00.000000Z",
+ "next_allowed_client_refresh": "2026-11-08T08:01:00.000000Z",
+ "timezone": "UTC",
+ "columns": [
+  "template",
+  "buyers"
+ ],
+ "types": [
+  [
+   "template",
+   "String"
+  ],
+  [
+   "buyers",
+   "UInt64"
+  ]
+ ],
+ "results": [
+  [
+   "ramen-studio",
+   11
+  ],
+  [
+   "white-ground",
+   4
+  ]
+ ],
+ "hasMore": false,
+ "limit": 100,
+ "offset": 0,
+ "modifiers": {
+  "personsOnEventsMode": "person_id_override_properties_joined"
+ },
+ "query_status": null,
+ "timings": [
+  {
+   "k": "./query",
+   "t": 0.21
+  }
+ ]
+}

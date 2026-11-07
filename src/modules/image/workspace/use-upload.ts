@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react'
 
-import { track } from '@/core/analytics/browser'
+import { track, trackUploadError } from '@/core/analytics/browser'
 
 import { compressImage, putWithProgress, requestTicket, UploadError, uploadPhoto, type UploadDeps, type UploadErrorCode, type UploadPhase } from '@/core/storage/upload'
 
@@ -17,6 +17,7 @@ export const uploadDeps: UploadDeps = {
   requestTicket,
   put: putWithProgress,
   track: (props) => track('upload', props),
+  trackError: trackUploadError,
 }
 
 // Upload half of DESIGN §4.4 (Compressing → Uploading with progress); the Generating phase

@@ -1,0 +1,116 @@
+{
+ "cache_key": "cache_funnel_device",
+ "is_cached": false,
+ "last_refresh": "2026-11-08T08:00:00.000000Z",
+ "next_allowed_client_refresh": "2026-11-08T08:01:00.000000Z",
+ "timezone": "UTC",
+ "columns": [
+  "cur",
+  "seg",
+  "s0",
+  "s1",
+  "s2",
+  "s3",
+  "s4",
+  "s5"
+ ],
+ "types": [
+  [
+   "cur",
+   "Bool"
+  ],
+  [
+   "seg",
+   "String"
+  ],
+  [
+   "s0",
+   "UInt64"
+  ],
+  [
+   "s1",
+   "UInt64"
+  ],
+  [
+   "s2",
+   "UInt64"
+  ],
+  [
+   "s3",
+   "UInt64"
+  ],
+  [
+   "s4",
+   "UInt64"
+  ],
+  [
+   "s5",
+   "UInt64"
+  ]
+ ],
+ "results": [
+  [
+   1,
+   "Desktop",
+   900,
+   300,
+   240,
+   120,
+   40,
+   18
+  ],
+  [
+   1,
+   "Mobile",
+   1300,
+   260,
+   190,
+   80,
+   22,
+   7
+  ],
+  [
+   1,
+   "Tablet",
+   40,
+   8,
+   6,
+   2,
+   1,
+   0
+  ],
+  [
+   0,
+   "Desktop",
+   820,
+   250,
+   200,
+   100,
+   30,
+   12
+  ],
+  [
+   0,
+   "Mobile",
+   1200,
+   230,
+   170,
+   70,
+   20,
+   6
+  ]
+ ],
+ "hasMore": false,
+ "limit": 100,
+ "offset": 0,
+ "modifiers": {
+  "personsOnEventsMode": "person_id_override_properties_joined"
+ },
+ "query_status": null,
+ "timings": [
+  {
+   "k": "./query",
+   "t": 0.21
+  }
+ ]
+}

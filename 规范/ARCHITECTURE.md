@@ -427,6 +427,14 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
   - 已退款 / 部分退款的付款照样能下载，行上标「已退款」；Stripe 的收据页会显示退款。
   - 手机号账号没有邮箱时，这里是拿收据的主要途径。
 
+- **拒付申诉证据（Owner 2026-11-08，T82）**：防「积分用完再拒付」。
+  - **先核实谁负责拒付**：海外银行卡（Managed Payments，Stripe 是卖家）、中国银行卡（普通 Stripe）、支付宝 / 微信支付、Waffo 各自的拒付由谁应诉、能不能通过接口提交证据，开发先查文档并在测试模式验证，写进 PR；只有需要我们应诉的渠道接入下面的流程。
+  - **平时就记证据**：开始结账时记录用户 IP 和 User-Agent（存在付款行，和 `stripe_session_id` 关联）；结账页开启 Stripe 的「必须同意服务条款」（`consent_collection.terms_of_service = 'required'`，自定义文字带服务条款和退款政策链接；Managed Payments 不支持时写明），同意时间从 session 回读并存下；每次出图和下载记录 IP（只存哈希以外的必要形式，按隐私政策写明用途：防欺诈和处理争议）。
+  - **拒付来了自动整理**：收到 `charge.dispute.created` 后，服务端汇总注册时间、付款信息、同意条款的时间、付款时 IP、这笔积分的消耗明细（每张图时间、IP、是否下载）、退款政策原文和产品说明，按 Stripe 证据字段（`customer_email_address`、`customer_purchase_ip`、`service_date`、`access_activity_log`、`refund_policy`、`refund_policy_disclosure`、`terms_of_service`、`product_description`、`uncategorized_text` 等）写进这笔拒付，`submit = false` 只存草稿；飞书告警写明截止日期和后台链接（T72）。
+  - **后台「拒付」页**：列出每笔拒付（金额、用户、原因、状态、截止日期），点开预览证据草稿，可补充文字或附件，Owner 点「提交申诉」才 `submit = true`（只能交一次，二次确认）。截止前 3 天还没提交，飞书再提醒一次（打开后台时检查，不写定时任务；告警由收到的 Stripe 事件和后台访问触发，若需要准时提醒再单独定）。
+  - **预防**：发生拒付的账号自动封禁（填原因「拒付」，Owner 可在后台解封）；中国银行卡路由强制 3D Secure（`payment_method_options.card.request_three_d_secure = 'any'`）。
+  - 迁移编号段 `0720`～`0739`。
+
 - 要处理的 Stripe 事件：`checkout.session.completed` 和 `checkout.session.async_payment_succeeded`（首付 / 单笔 → `settle_checkout`：写镜像表 + `apply_purchase`，同一事务）、`invoice.paid`（只认 `subscription_cycle` → `apply_subscription_renewal`，T10）、`customer.subscription.updated / deleted`（只更新镜像表）、`charge.refunded`（记录 + 自动扣回积分 + 告警，T71）、`charge.dispute.created`（记录 + 全额扣回 + 告警，T71）、`charge.dispute.closed`（我方胜诉时把拒付扣回的积分还回，T71）。其余事件忽略（回 200）。Stripe 后台的回调端点订阅这 8 个事件（T71 新增 `charge.dispute.closed`，Owner 在 Stripe 后台勾选）。
 - Stripe 用与 Graylum 同一主体下**新开的独立账户**，避免两边回调互相收到对方的事件。
 
