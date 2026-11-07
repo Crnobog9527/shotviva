@@ -755,6 +755,27 @@ $$;
 ALTER FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) RETURNS TABLE("user_id" "uuid", "total" integer, "last_24h" integer)
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  perform public.purge_identity_refusals();
+  return query
+  select r.user_id,
+         count(*)::integer as total,
+         (count(*) filter (where r.created_at > now() - interval '24 hours'))::integer as last_24h
+    from public.identity_refusals r
+   where r.user_id = any (p_user_ids[1:200])
+     and r.created_at > now() - interval '90 days'
+   group by r.user_id;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_list_template_requests"() RETURNS TABLE("id" "uuid", "email" "text", "description" "text", "image_keys" "text"[], "status" "text", "template_id" "text", "votes_count" integer, "created_at" timestamp with time zone)
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -2004,6 +2025,52 @@ $$;
 ALTER FUNCTION "public"."attach_ticket_images"("p_ticket_id" "uuid", "p_owner_id" "uuid", "p_message_id" "uuid", "p_images" "jsonb") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."begin_identity_judge"("p_user_id" "uuid", "p_text_hash" "text", "p_per_hour" integer) RETURNS "jsonb"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_cached boolean;
+  v_id bigint;
+begin
+  if p_user_id is null or p_per_hour is null or p_per_hour < 1 then
+    raise exception 'INVALID_INPUT' using detail = 'user and a positive hourly limit are required';
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended('identity_judge:' || p_user_id::text, 0));
+
+  if p_text_hash is not null then
+    select c.identity_swap into v_cached
+      from public.identity_judge_calls c
+     where c.user_id = p_user_id and c.text_hash = p_text_hash and c.identity_swap is not null
+       and c.created_at > now() - interval '10 minutes'
+     order by c.created_at desc
+     limit 1;
+    if found then
+      return jsonb_build_object('status', 'cached', 'identity_swap', v_cached);
+    end if;
+  end if;
+
+  if (select count(*) from public.identity_judge_calls c
+       where c.user_id = p_user_id and c.created_at > now() - interval '1 hour') >= p_per_hour then
+    return jsonb_build_object('status', 'limited');
+  end if;
+
+  insert into public.identity_judge_calls (user_id, text_hash) values (p_user_id, p_text_hash)
+  returning id into v_id;
+
+  delete from public.identity_judge_calls c
+   where c.id in (select o.id from public.identity_judge_calls o
+                   where o.created_at < now() - interval '1 day'
+                   order by o.created_at
+                   limit 500);
+  return jsonb_build_object('status', 'call', 'id', v_id);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."begin_identity_judge"("p_user_id" "uuid", "p_text_hash" "text", "p_per_hour" integer) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."bump_template_prompt_version"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -2333,6 +2400,17 @@ $$;
 ALTER FUNCTION "public"."delete_provider_vault_secret"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."finish_identity_judge"("p_id" bigint, "p_identity_swap" boolean) RETURNS "void"
+    LANGUAGE "sql"
+    SET "search_path" TO ''
+    AS $$
+  update public.identity_judge_calls set identity_swap = p_identity_swap where id = p_id
+$$;
+
+
+ALTER FUNCTION "public"."finish_identity_judge"("p_id" bigint, "p_identity_swap" boolean) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."grant_credits"("p_user_id" "uuid", "p_amount" integer, "p_reason" "text", "p_idempotency_key" "text", "p_pool" "text") RETURNS "public"."credit_change"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -2435,6 +2513,52 @@ $$;
 
 
 ALTER FUNCTION "public"."provider_api_key"("p_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."purge_identity_refusals"() RETURNS "void"
+    LANGUAGE "sql"
+    SET "search_path" TO ''
+    AS $$
+  delete from public.identity_refusals r
+   where r.id in (select o.id from public.identity_refusals o
+                   where o.created_at < now() - interval '90 days'
+                   order by o.created_at
+                   limit 500)
+$$;
+
+
+ALTER FUNCTION "public"."purge_identity_refusals"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."record_identity_refusal"("p_user_id" "uuid", "p_entry" "text", "p_method" "text", "p_excerpt" "text", "p_input_tokens" integer DEFAULT NULL::integer, "p_output_tokens" integer DEFAULT NULL::integer) RETURNS boolean
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_excerpt text := left(btrim(p_excerpt), 200);
+begin
+  if p_user_id is null or coalesce(v_excerpt, '') = '' then
+    raise exception 'INVALID_INPUT' using detail = 'user and excerpt are required';
+  end if;
+  -- Concurrent photos of one batch queue here, so only the first of them writes.
+  perform pg_advisory_xact_lock(hashtextextended('identity_refusal:' || p_user_id::text, 0));
+
+  if exists (select 1 from public.identity_refusals r
+              where r.user_id = p_user_id and r.entry = p_entry and r.excerpt = v_excerpt
+                and r.created_at > now() - interval '10 minutes') then
+    return false;
+  end if;
+
+  insert into public.identity_refusals (user_id, entry, method, excerpt, input_tokens, output_tokens)
+  values (p_user_id, p_entry, p_method, v_excerpt, p_input_tokens, p_output_tokens);
+
+  perform public.purge_identity_refusals();
+  return true;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."record_identity_refusal"("p_user_id" "uuid", "p_entry" "text", "p_method" "text", "p_excerpt" "text", "p_input_tokens" integer, "p_output_tokens" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."record_payment_issue"("p_charge_id" "text", "p_kind" "text", "p_amount_refunded" integer DEFAULT NULL::integer) RETURNS "jsonb"
@@ -3310,6 +3434,61 @@ CREATE TABLE IF NOT EXISTS "public"."feature_access" (
 ALTER TABLE "public"."feature_access" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."identity_judge_calls" (
+    "id" bigint NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "text_hash" "text",
+    "identity_swap" boolean,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "identity_judge_calls_text_hash_check" CHECK (("text_hash" ~ '^[0-9a-f]{64}$'::"text"))
+);
+
+
+ALTER TABLE "public"."identity_judge_calls" OWNER TO "postgres";
+
+
+ALTER TABLE "public"."identity_judge_calls" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."identity_judge_calls_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."identity_refusals" (
+    "id" bigint NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "entry" "text" NOT NULL,
+    "method" "text" NOT NULL,
+    "excerpt" "text" NOT NULL,
+    "input_tokens" integer,
+    "output_tokens" integer,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "identity_refusals_entry_check" CHECK (("entry" = ANY (ARRAY['workspace'::"text", 'edit'::"text", 'partner'::"text"]))),
+    CONSTRAINT "identity_refusals_excerpt_check" CHECK ((("char_length"("excerpt") >= 1) AND ("char_length"("excerpt") <= 200))),
+    CONSTRAINT "identity_refusals_input_tokens_check" CHECK (("input_tokens" >= 0)),
+    CONSTRAINT "identity_refusals_method_check" CHECK (("method" = ANY (ARRAY['keyword'::"text", 'model'::"text"]))),
+    CONSTRAINT "identity_refusals_output_tokens_check" CHECK (("output_tokens" >= 0))
+);
+
+
+ALTER TABLE "public"."identity_refusals" OWNER TO "postgres";
+
+
+ALTER TABLE "public"."identity_refusals" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."identity_refusals_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."partner_links" (
     "user_id" "uuid" NOT NULL,
     "partner" "text" NOT NULL,
@@ -3634,6 +3813,16 @@ ALTER TABLE ONLY "public"."generation_jobs"
 
 
 
+ALTER TABLE ONLY "public"."identity_judge_calls"
+    ADD CONSTRAINT "identity_judge_calls_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."identity_refusals"
+    ADD CONSTRAINT "identity_refusals_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."partner_links"
     ADD CONSTRAINT "partner_links_pkey" PRIMARY KEY ("user_id", "partner");
 
@@ -3800,6 +3989,22 @@ CREATE INDEX "generation_jobs_user_id_created_at_idx" ON "public"."generation_jo
 
 
 CREATE UNIQUE INDEX "generation_jobs_user_idempotency_key_idx" ON "public"."generation_jobs" USING "btree" ("user_id", "idempotency_key") WHERE ("idempotency_key" IS NOT NULL);
+
+
+
+CREATE INDEX "identity_judge_calls_created_at_idx" ON "public"."identity_judge_calls" USING "btree" ("created_at");
+
+
+
+CREATE INDEX "identity_judge_calls_user_id_created_at_idx" ON "public"."identity_judge_calls" USING "btree" ("user_id", "created_at" DESC);
+
+
+
+CREATE INDEX "identity_refusals_created_at_idx" ON "public"."identity_refusals" USING "btree" ("created_at");
+
+
+
+CREATE INDEX "identity_refusals_user_id_created_at_idx" ON "public"."identity_refusals" USING "btree" ("user_id", "created_at" DESC);
 
 
 
@@ -3990,6 +4195,16 @@ ALTER TABLE ONLY "public"."generation_jobs"
 
 
 
+ALTER TABLE ONLY "public"."identity_judge_calls"
+    ADD CONSTRAINT "identity_judge_calls_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."identity_refusals"
+    ADD CONSTRAINT "identity_refusals_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."partner_links"
     ADD CONSTRAINT "partner_links_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
@@ -4107,6 +4322,12 @@ ALTER TABLE "public"."generation_jobs" ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "generation_jobs_select_own" ON "public"."generation_jobs" FOR SELECT TO "authenticated" USING (((( SELECT "auth"."uid"() AS "uid") = "user_id") AND ("deleted_at" IS NULL)));
 
+
+
+ALTER TABLE "public"."identity_judge_calls" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."identity_refusals" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."partner_links" ENABLE ROW LEVEL SECURITY;
@@ -4284,6 +4505,11 @@ GRANT ALL ON FUNCTION "public"."admin_delete_template_category"("p_key" "text", 
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_list_template_requests"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_list_template_requests"() TO "service_role";
 
@@ -4423,6 +4649,11 @@ REVOKE ALL ON FUNCTION "public"."attach_ticket_images"("p_ticket_id" "uuid", "p_
 
 
 
+REVOKE ALL ON FUNCTION "public"."begin_identity_judge"("p_user_id" "uuid", "p_text_hash" "text", "p_per_hour" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."begin_identity_judge"("p_user_id" "uuid", "p_text_hash" "text", "p_per_hour" integer) TO "service_role";
+
+
+
 GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."generation_jobs" TO "service_role";
 GRANT SELECT ON TABLE "public"."generation_jobs" TO "authenticated";
 
@@ -4462,6 +4693,11 @@ REVOKE ALL ON FUNCTION "public"."delete_provider_vault_secret"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "public"."finish_identity_judge"("p_id" bigint, "p_identity_swap" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."finish_identity_judge"("p_id" bigint, "p_identity_swap" boolean) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."grant_credits"("p_user_id" "uuid", "p_amount" integer, "p_reason" "text", "p_idempotency_key" "text", "p_pool" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."grant_credits"("p_user_id" "uuid", "p_amount" integer, "p_reason" "text", "p_idempotency_key" "text", "p_pool" "text") TO "service_role";
 
@@ -4483,6 +4719,16 @@ GRANT ALL ON FUNCTION "public"."openai_admin_key"() TO "service_role";
 
 REVOKE ALL ON FUNCTION "public"."provider_api_key"("p_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."provider_api_key"("p_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."purge_identity_refusals"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."purge_identity_refusals"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."record_identity_refusal"("p_user_id" "uuid", "p_entry" "text", "p_method" "text", "p_excerpt" "text", "p_input_tokens" integer, "p_output_tokens" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."record_identity_refusal"("p_user_id" "uuid", "p_entry" "text", "p_method" "text", "p_excerpt" "text", "p_input_tokens" integer, "p_output_tokens" integer) TO "service_role";
 
 
 
@@ -4608,6 +4854,26 @@ GRANT UPDATE ON SEQUENCE "public"."credit_ledger_id_seq" TO "service_role";
 
 
 GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."feature_access" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."identity_judge_calls" TO "service_role";
+
+
+
+GRANT UPDATE ON SEQUENCE "public"."identity_judge_calls_id_seq" TO "anon";
+GRANT UPDATE ON SEQUENCE "public"."identity_judge_calls_id_seq" TO "authenticated";
+GRANT UPDATE ON SEQUENCE "public"."identity_judge_calls_id_seq" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."identity_refusals" TO "service_role";
+
+
+
+GRANT UPDATE ON SEQUENCE "public"."identity_refusals_id_seq" TO "anon";
+GRANT UPDATE ON SEQUENCE "public"."identity_refusals_id_seq" TO "authenticated";
+GRANT UPDATE ON SEQUENCE "public"."identity_refusals_id_seq" TO "service_role";
 
 
 
