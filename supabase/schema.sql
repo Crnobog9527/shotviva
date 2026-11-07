@@ -755,6 +755,23 @@ $$;
 ALTER FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_get_dispute"("p_dispute_id" "text") RETURNS TABLE("stripe_dispute_id" "text", "stripe_charge_id" "text", "payment_id" bigint, "user_id" "uuid", "email" "text", "product_id" "text", "amount" integer, "currency" "text", "reason" "text", "responder" "text", "due_by" timestamp with time zone, "auto_banned_at" timestamp with time zone, "evidence_drafted_at" timestamp with time zone, "submitted_at" timestamp with time zone, "reminded_at" timestamp with time zone, "created_at" timestamp with time zone)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select d.stripe_dispute_id, d.stripe_charge_id, d.payment_id, d.user_id, coalesce(nullif(u.email::text, ''), nullif(u.phone::text, '')),
+         p.product_id, d.amount, d.currency, d.reason, d.responder, d.due_by,
+         d.auto_banned_at, d.evidence_drafted_at, d.submitted_at, d.reminded_at, d.created_at
+    from public.payment_disputes d
+    left join auth.users u on u.id = d.user_id
+    left join public.payments p on p.id = d.payment_id
+   where d.stripe_dispute_id = p_dispute_id;
+$$;
+
+
+ALTER FUNCTION "public"."admin_get_dispute"("p_dispute_id" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) RETURNS TABLE("user_id" "uuid", "total" integer, "last_24h" integer)
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -774,23 +791,6 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."admin_get_dispute"("p_dispute_id" "text") RETURNS TABLE("stripe_dispute_id" "text", "stripe_charge_id" "text", "payment_id" bigint, "user_id" "uuid", "email" "text", "product_id" "text", "amount" integer, "currency" "text", "reason" "text", "responder" "text", "due_by" timestamp with time zone, "auto_banned_at" timestamp with time zone, "evidence_drafted_at" timestamp with time zone, "submitted_at" timestamp with time zone, "reminded_at" timestamp with time zone, "created_at" timestamp with time zone)
-    LANGUAGE "sql" STABLE SECURITY DEFINER
-    SET "search_path" TO ''
-    AS $$
-  select d.stripe_dispute_id, d.stripe_charge_id, d.payment_id, d.user_id, coalesce(nullif(u.email::text, ''), nullif(u.phone::text, '')),
-         p.product_id, d.amount, d.currency, d.reason, d.responder, d.due_by,
-         d.auto_banned_at, d.evidence_drafted_at, d.submitted_at, d.reminded_at, d.created_at
-    from public.payment_disputes d
-    left join auth.users u on u.id = d.user_id
-    left join public.payments p on p.id = d.payment_id
-   where d.stripe_dispute_id = p_dispute_id;
-$$;
-
-
-ALTER FUNCTION "public"."admin_get_dispute"("p_dispute_id" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_list_disputes"("p_cursor_at" timestamp with time zone, "p_cursor_id" "text", "p_limit" integer) RETURNS TABLE("stripe_dispute_id" "text", "stripe_charge_id" "text", "payment_id" bigint, "user_id" "uuid", "email" "text", "product_id" "text", "amount" integer, "currency" "text", "reason" "text", "responder" "text", "due_by" timestamp with time zone, "auto_banned_at" timestamp with time zone, "evidence_drafted_at" timestamp with time zone, "submitted_at" timestamp with time zone, "reminded_at" timestamp with time zone, "created_at" timestamp with time zone)
@@ -2496,17 +2496,6 @@ $$;
 ALTER FUNCTION "public"."delete_provider_vault_secret"() OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."finish_identity_judge"("p_id" bigint, "p_identity_swap" boolean) RETURNS "void"
-    LANGUAGE "sql"
-    SET "search_path" TO ''
-    AS $$
-  update public.identity_judge_calls set identity_swap = p_identity_swap where id = p_id
-$$;
-
-
-ALTER FUNCTION "public"."finish_identity_judge"("p_id" bigint, "p_identity_swap" boolean) OWNER TO "postgres";
-
-
 CREATE OR REPLACE FUNCTION "public"."dispute_evidence_facts"("p_dispute_id" "text") RETURNS "jsonb"
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -2584,6 +2573,17 @@ $$;
 
 
 ALTER FUNCTION "public"."dispute_evidence_facts"("p_dispute_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."finish_identity_judge"("p_id" bigint, "p_identity_swap" boolean) RETURNS "void"
+    LANGUAGE "sql"
+    SET "search_path" TO ''
+    AS $$
+  update public.identity_judge_calls set identity_swap = p_identity_swap where id = p_id
+$$;
+
+
+ALTER FUNCTION "public"."finish_identity_judge"("p_id" bigint, "p_identity_swap" boolean) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."grant_credits"("p_user_id" "uuid", "p_amount" integer, "p_reason" "text", "p_idempotency_key" "text", "p_pool" "text") RETURNS "public"."credit_change"
@@ -2786,6 +2786,32 @@ $$;
 
 
 ALTER FUNCTION "public"."purge_identity_refusals"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."reconcile_dispute_submitted"("p_dispute_id" "text") RETURNS timestamp with time zone
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_row public.payment_disputes;
+begin
+  update public.payment_disputes set submitted_at = now()
+   where stripe_dispute_id = p_dispute_id and submitted_at is null
+  returning * into v_row;
+  if not found then
+    return null;
+  end if;
+  -- The audit log names a user; a dispute whose account was deleted has none to name.
+  if v_row.user_id is not null then
+    insert into public.admin_audit_log (action, user_id, reason, target_id)
+    values ('submit_dispute', v_row.user_id, '提交拒付申诉证据 · Stripe 上已提交，打开后台时补记', p_dispute_id);
+  end if;
+  return v_row.submitted_at;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."reconcile_dispute_submitted"("p_dispute_id" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."record_identity_refusal"("p_user_id" "uuid", "p_entry" "text", "p_method" "text", "p_excerpt" "text", "p_input_tokens" integer DEFAULT NULL::integer, "p_output_tokens" integer DEFAULT NULL::integer) RETURNS boolean
@@ -4891,13 +4917,13 @@ GRANT ALL ON FUNCTION "public"."admin_delete_template_category"("p_key" "text", 
 
 
 
-REVOKE ALL ON FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) TO "service_role";
-
-
-
 REVOKE ALL ON FUNCTION "public"."admin_get_dispute"("p_dispute_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_get_dispute"("p_dispute_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) TO "service_role";
 
 
 
@@ -5099,13 +5125,13 @@ REVOKE ALL ON FUNCTION "public"."delete_provider_vault_secret"() FROM PUBLIC;
 
 
 
-REVOKE ALL ON FUNCTION "public"."finish_identity_judge"("p_id" bigint, "p_identity_swap" boolean) FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."finish_identity_judge"("p_id" bigint, "p_identity_swap" boolean) TO "service_role";
-
-
-
 REVOKE ALL ON FUNCTION "public"."dispute_evidence_facts"("p_dispute_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."dispute_evidence_facts"("p_dispute_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."finish_identity_judge"("p_id" bigint, "p_identity_swap" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."finish_identity_judge"("p_id" bigint, "p_identity_swap" boolean) TO "service_role";
 
 
 
@@ -5145,6 +5171,11 @@ GRANT ALL ON FUNCTION "public"."provider_api_key"("p_id" "uuid") TO "service_rol
 
 REVOKE ALL ON FUNCTION "public"."purge_identity_refusals"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."purge_identity_refusals"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."reconcile_dispute_submitted"("p_dispute_id" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."reconcile_dispute_submitted"("p_dispute_id" "text") TO "service_role";
 
 
 
