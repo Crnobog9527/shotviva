@@ -48,7 +48,8 @@ describe('payment copy by channel', () => {
 
   it('Stripe: the card plan still says it renews, the wallet line (Alipay / WeChat Pay, T73) still says one period', () => {
     expect(say(methodLabel('stripe', 'card'))).toBe('Card · Apple Pay · Google Pay')
-    expect(say(methodLabel('stripe', 'alipay'))).toBe('Alipay / WeChat Pay')
+    // No-break space keeps "WeChat Pay" whole on narrow phones.
+    expect(say(methodLabel('stripe', 'alipay'))).toBe('Alipay / WeChat\u00a0Pay')
     expect(say(methodLabel('waffo', 'alipay'))).toBe('Alipay')
     expect(say(methodNote('stripe', { kind: 'plan', method: 'alipay', period: 'month' }))).toBe('One-time payment, 30 days, no auto-renew')
     expect(say(methodNote('stripe', { kind: 'plan', method: 'card', period: 'month' }))).toBe('Renews automatically, cancel anytime')

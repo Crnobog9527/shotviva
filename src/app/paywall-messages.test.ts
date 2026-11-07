@@ -36,7 +36,7 @@ describe('paywall messages (en)', () => {
     expect(t('card')).toBe('Card · Apple Pay · Google Pay')
     expect(t('alipay')).toBe('Alipay')
     // The Stripe wallet line (T73): one checkout offering both.
-    expect(t('wallet')).toBe('Alipay / WeChat Pay')
+    expect(t('wallet')).toBe('Alipay / WeChat\u00a0Pay')
     expect(t('cardRenews')).toBe('Renews automatically, cancel anytime')
     expect(t('walletOnce', { period: 'month' })).toBe('One-time payment, 30 days, no auto-renew')
     expect(t('walletOnce', { period: 'year' })).toBe('One-time payment, 1 year, no auto-renew')
