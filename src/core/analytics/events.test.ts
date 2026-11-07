@@ -30,6 +30,7 @@ const valid: { [E in EventName]: unknown } = {
   signup: { method: 'google' },
   upload: { size_bucket: '1-5MB', compressed: true },
   generate,
+  generate_refused: { reason: 'identity_swap', source: 'partner' },
   paywall_view: { trigger: 'insufficient_credits' },
   contact_sales_click: { page: '/zh/pricing' },
   checkout_start: checkout,
@@ -37,8 +38,8 @@ const valid: { [E in EventName]: unknown } = {
 }
 
 describe('event dictionary (ARCHITECTURE §16.2)', () => {
-  it('covers exactly the seven named events', () => {
-    expect(Object.keys(eventSchemas).sort()).toEqual(['checkout_start', 'contact_sales_click', 'generate', 'paywall_view', 'purchase', 'signup', 'upload'])
+  it('covers exactly the eight named events', () => {
+    expect(Object.keys(eventSchemas).sort()).toEqual(['checkout_start', 'contact_sales_click', 'generate', 'generate_refused', 'paywall_view', 'purchase', 'signup', 'upload'])
   })
 
   it.each(Object.entries(valid))('accepts a well-formed %s', (event, props) => {
@@ -57,6 +58,9 @@ describe('event dictionary (ARCHITECTURE §16.2)', () => {
     expect(validateEvent('purchase', checkout).ok).toBe(false)
     expect(validateEvent('contact_sales_click', { page: '/pricing' }).ok).toBe(true)
     expect(validateEvent('contact_sales_click', { page: '/account' }).ok).toBe(false)
+    // T81: no text rides on a refusal, only which entry it came from.
+    expect(validateEvent('generate_refused', { reason: 'identity_swap', source: 'workspace', note: 'x' }).ok).toBe(false)
+    expect(validateEvent('generate_refused', { reason: 'nsfw', source: 'workspace' }).ok).toBe(false)
   })
 
   // 中国银行卡 (T64, ARCHITECTURE §6.3): checkout_start.method = 'cn_card'; still no WeChat Pay.

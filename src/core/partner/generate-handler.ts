@@ -3,6 +3,7 @@ import 'server-only'
 import type { NextResponse } from 'next/server'
 import type { z } from 'zod'
 
+import type { IdentityJudge } from '../identity-guard'
 import type { GenerationProvider } from '../jobs'
 import type { FetchLike } from './fetch-image'
 import { checkedReturnTo, type PartnerRouteDeps } from './handlers'
@@ -22,6 +23,8 @@ export type PartnerGenerateRouteDeps = PartnerRouteDeps & {
   provider: GenerationProvider
   providerTimeoutMs?: number
   fetch?: FetchLike
+  // The face-swap screen's decision call (ARCHITECTURE §5.1a); absent means keywords only.
+  identityJudge?: IdentityJudge | null
 }
 
 function describe(error: z.ZodError): string {

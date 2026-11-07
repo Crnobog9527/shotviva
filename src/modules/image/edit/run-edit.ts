@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto'
 
 import type { ServerTrack } from '@/core/analytics'
 import { AppError } from '@/core/errors'
+import { IDENTITY_EDIT_ADDENDUM, matchIdentitySwapKeyword, refuseIdentitySwap } from '@/core/identity-guard'
 import {
   accountLimits,
   assertWithinRateLimit,
@@ -101,7 +102,20 @@ function decisionCost(classifier: ScopeClassifier | null, decision: EditClassifi
 
 async function classify(deps: EditDeps, p: Prepared): Promise<EditClassification> {
   const imageDataUrl = await decisionPreview(p.image.bytes)
-  return classifyEditScope(deps.classifier, { imageDataUrl, instruction: p.instruction, instructions: p.params.classifier }, deps.classifierTimeoutMs)
+  // The edit template's own instructions, untouched, plus the face-swap question (§5.1a), so the
+  // one scope call answers both. Nothing here reaches the image model.
+  const instructions = `${p.params.classifier.trim()}\n\n${IDENTITY_EDIT_ADDENDUM}`
+  return classifyEditScope(deps.classifier, { imageDataUrl, instruction: p.instruction, instructions }, deps.classifierTimeoutMs)
+}
+
+// ARCHITECTURE §5.1a for an edit: the keyword list first (no call), then the scope call's own
+// identity_swap answer. Either refuses before reserve_credits, so nothing is charged.
+async function screenedDecision(deps: EditDeps, req: EditRequest, p: Prepared): Promise<EditClassification> {
+  const refusal = { userId: req.userId, entry: 'edit' as const, text: p.instruction }
+  if (matchIdentitySwapKeyword(p.instruction)) await refuseIdentitySwap(deps, { ...refusal, method: 'keyword' })
+  const decision = await classify(deps, p)
+  if (decision.identitySwap) await refuseIdentitySwap(deps, { ...refusal, method: 'model' })
+  return decision
 }
 
 export async function runEdit(deps: EditDeps, req: EditRequest): Promise<JobView> {
@@ -110,7 +124,7 @@ export async function runEdit(deps: EditDeps, req: EditRequest): Promise<JobView
     if (existing) return toJobView(existing)
   }
   const prepared = await prepare(deps, req)
-  const decision = await classify(deps, prepared)
+  const decision = await screenedDecision(deps, req, prepared)
   const resolution = req.resolution ?? sourceResolution(prepared.source)
   const attemptId = randomUUID()
   const job = await reserveJob(deps.db, {

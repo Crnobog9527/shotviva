@@ -558,6 +558,39 @@ $$;
 ALTER FUNCTION "public"."admin_delete_provider"("p_id" "uuid") OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."identity_refusals" (
+    "id" bigint NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "entry" "text" NOT NULL,
+    "method" "text" NOT NULL,
+    "excerpt" "text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "identity_refusals_entry_check" CHECK (("entry" = ANY (ARRAY['workspace'::"text", 'edit'::"text", 'partner'::"text"]))),
+    CONSTRAINT "identity_refusals_excerpt_check" CHECK ((("char_length"("excerpt") >= 1) AND ("char_length"("excerpt") <= 200))),
+    CONSTRAINT "identity_refusals_method_check" CHECK (("method" = ANY (ARRAY['keyword'::"text", 'model'::"text"])))
+);
+
+
+ALTER TABLE "public"."identity_refusals" OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) RETURNS TABLE("user_id" "uuid", "total" integer, "last_24h" integer)
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select r.user_id,
+         count(*)::integer as total,
+         (count(*) filter (where r.created_at > now() - interval '24 hours'))::integer as last_24h
+    from public.identity_refusals r
+   where r.user_id = any (p_user_ids[1:200])
+     and r.created_at > now() - interval '90 days'
+   group by r.user_id
+$$;
+
+
+ALTER FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_list_template_requests"() RETURNS TABLE("id" "uuid", "email" "text", "description" "text", "image_keys" "text"[], "status" "text", "template_id" "text", "votes_count" integer, "created_at" timestamp with time zone)
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -1954,6 +1987,41 @@ $$;
 ALTER FUNCTION "public"."provider_api_key"("p_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."record_identity_refusal"("p_user_id" "uuid", "p_entry" "text", "p_method" "text", "p_excerpt" "text") RETURNS boolean
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_excerpt text := left(btrim(p_excerpt), 200);
+begin
+  if p_user_id is null or coalesce(v_excerpt, '') = '' then
+    raise exception 'INVALID_INPUT' using detail = 'user and excerpt are required';
+  end if;
+  -- Concurrent photos of one batch queue here, so only the first of them writes.
+  perform pg_advisory_xact_lock(hashtextextended('identity_refusal:' || p_user_id::text, 0));
+
+  if exists (select 1 from public.identity_refusals r
+              where r.user_id = p_user_id and r.entry = p_entry and r.excerpt = v_excerpt
+                and r.created_at > now() - interval '10 minutes') then
+    return false;
+  end if;
+
+  insert into public.identity_refusals (user_id, entry, method, excerpt)
+  values (p_user_id, p_entry, p_method, v_excerpt);
+
+  delete from public.identity_refusals r
+   where r.id in (select o.id from public.identity_refusals o
+                   where o.created_at < now() - interval '90 days'
+                   order by o.created_at
+                   limit 200);
+  return true;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."record_identity_refusal"("p_user_id" "uuid", "p_entry" "text", "p_method" "text", "p_excerpt" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."record_payment_issue"("p_charge_id" "text", "p_kind" "text", "p_amount_refunded" integer DEFAULT NULL::integer) RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -2724,6 +2792,17 @@ CREATE TABLE IF NOT EXISTS "public"."feature_access" (
 ALTER TABLE "public"."feature_access" OWNER TO "postgres";
 
 
+ALTER TABLE "public"."identity_refusals" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."identity_refusals_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."partner_links" (
     "user_id" "uuid" NOT NULL,
     "partner" "text" NOT NULL,
@@ -3024,6 +3103,11 @@ ALTER TABLE ONLY "public"."generation_jobs"
 
 
 
+ALTER TABLE ONLY "public"."identity_refusals"
+    ADD CONSTRAINT "identity_refusals_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."partner_links"
     ADD CONSTRAINT "partner_links_pkey" PRIMARY KEY ("user_id", "partner");
 
@@ -3184,6 +3268,14 @@ CREATE UNIQUE INDEX "generation_jobs_user_idempotency_key_idx" ON "public"."gene
 
 
 
+CREATE INDEX "identity_refusals_created_at_idx" ON "public"."identity_refusals" USING "btree" ("created_at");
+
+
+
+CREATE INDEX "identity_refusals_user_id_created_at_idx" ON "public"."identity_refusals" USING "btree" ("user_id", "created_at" DESC);
+
+
+
 CREATE UNIQUE INDEX "partner_links_partner_link_code_idx" ON "public"."partner_links" USING "btree" ("partner", "link_code") WHERE ("link_code" IS NOT NULL);
 
 
@@ -3339,6 +3431,11 @@ ALTER TABLE ONLY "public"."generation_jobs"
 
 
 
+ALTER TABLE ONLY "public"."identity_refusals"
+    ADD CONSTRAINT "identity_refusals_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."partner_links"
     ADD CONSTRAINT "partner_links_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
@@ -3451,6 +3548,9 @@ ALTER TABLE "public"."generation_jobs" ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "generation_jobs_select_own" ON "public"."generation_jobs" FOR SELECT TO "authenticated" USING (((( SELECT "auth"."uid"() AS "uid") = "user_id") AND ("deleted_at" IS NULL)));
 
+
+
+ALTER TABLE "public"."identity_refusals" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."partner_links" ENABLE ROW LEVEL SECURITY;
@@ -3603,6 +3703,15 @@ GRANT ALL ON FUNCTION "public"."admin_decide_refund"("p_ticket_id" "uuid", "p_de
 
 REVOKE ALL ON FUNCTION "public"."admin_delete_provider"("p_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_delete_provider"("p_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."identity_refusals" TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) TO "service_role";
 
 
 
@@ -3788,6 +3897,11 @@ GRANT ALL ON FUNCTION "public"."provider_api_key"("p_id" "uuid") TO "service_rol
 
 
 
+REVOKE ALL ON FUNCTION "public"."record_identity_refusal"("p_user_id" "uuid", "p_entry" "text", "p_method" "text", "p_excerpt" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."record_identity_refusal"("p_user_id" "uuid", "p_entry" "text", "p_method" "text", "p_excerpt" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."record_payment_issue"("p_charge_id" "text", "p_kind" "text", "p_amount_refunded" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."record_payment_issue"("p_charge_id" "text", "p_kind" "text", "p_amount_refunded" integer) TO "service_role";
 
@@ -3905,6 +4019,12 @@ GRANT UPDATE ON SEQUENCE "public"."credit_ledger_id_seq" TO "service_role";
 
 
 GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."feature_access" TO "service_role";
+
+
+
+GRANT UPDATE ON SEQUENCE "public"."identity_refusals_id_seq" TO "anon";
+GRANT UPDATE ON SEQUENCE "public"."identity_refusals_id_seq" TO "authenticated";
+GRANT UPDATE ON SEQUENCE "public"."identity_refusals_id_seq" TO "service_role";
 
 
 

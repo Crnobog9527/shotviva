@@ -4,6 +4,7 @@ import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { listAdminTemplates, loadEditTemplateSettings, saveEditTemplate } from '@/core/admin'
+import { IDENTITY_EDIT_ADDENDUM } from '@/core/identity-guard'
 import { GenerationFailure, ProviderError, reserveJob, type GenerationProvider, type ProviderPrices } from '@/core/jobs'
 import { listTemplates } from '@/core/templates'
 import { CREDITS_FLOOR, runEdit } from '@/modules/image'
@@ -69,7 +70,8 @@ describe('runEdit: one ordinary generation on the edit template', () => {
 
     const asked = decision?.classify.mock.calls[0]?.[0]
     expect(asked?.instruction).toBe('Put it on a beach')
-    expect(asked?.instructions).toBe(TEST_EDIT_PARAMS.classifier)
+    // The template's own instructions untouched, then the face-swap question (T81, §5.1a).
+    expect(asked?.instructions).toBe(`${TEST_EDIT_PARAMS.classifier}\n\n${IDENTITY_EDIT_ADDENDUM}`)
     expect(asked?.imageDataUrl).toMatch(/^data:image\/jpeg;base64,/)
 
     expect(track).toHaveBeenCalledWith('generate', expect.objectContaining({ template_id: 'edit', category: 'edit', edit_scope: 'background' }), expect.anything())

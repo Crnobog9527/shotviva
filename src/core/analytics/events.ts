@@ -24,6 +24,9 @@ export const PAYMENT_CHANNELS = ['stripe', 'waffo'] as const
 // No WeChat Pay (Owner 2026-11-05, ARCHITECTURE §6.2). `cn_card` is 中国银行卡, the zh pages'
 // plain Stripe card route (T64, §6.3); `card` stays the Managed Payments card group.
 export const PAYMENT_METHODS = ['card', 'alipay', 'cn_card'] as const
+// Where a `generate_refused` came from: the workspace (note or text fields), a photo edit, the
+// partner API. Mirrors core/identity-guard IDENTITY_ENTRIES.
+export const IDENTITY_SOURCES = ['workspace', 'edit', 'partner'] as const
 export const CONTACT_SALES_PAGES = ['/pricing', '/zh/pricing'] as const
 
 const checkoutProps = {
@@ -56,6 +59,8 @@ export const eventSchemas = {
     // Photos in the workspace batch this one belonged to; 1 for a single photo (T28).
     batch_size: z.number().int().min(1).max(MAX_BATCH_SIZE),
   }),
+  // A request refused before charging (ARCHITECTURE §5.1a, T81): which entry, never the words.
+  generate_refused: z.strictObject({ reason: z.enum(['identity_swap']), source: z.enum(IDENTITY_SOURCES) }),
   paywall_view: z.strictObject({ trigger: z.enum(PAYWALL_TRIGGERS) }),
   // The pricing page's "For business" Contact us (DESIGN §6.9 item 8, T37).
   contact_sales_click: z.strictObject({ page: z.enum(CONTACT_SALES_PAGES) }),
@@ -71,7 +76,7 @@ export type EventName = keyof typeof eventSchemas
 export type EventProps<E extends EventName> = z.infer<(typeof eventSchemas)[E]>
 
 // §16.2: money and credit events go out from the server so ad blockers cannot drop them.
-export const SERVER_EVENTS = ['signup', 'generate', 'checkout_start', 'purchase'] as const
+export const SERVER_EVENTS = ['signup', 'generate', 'generate_refused', 'checkout_start', 'purchase'] as const
 export const BROWSER_EVENTS = ['upload', 'paywall_view', 'contact_sales_click'] as const
 export type ServerEventName = (typeof SERVER_EVENTS)[number]
 export type BrowserEventName = (typeof BROWSER_EVENTS)[number]
