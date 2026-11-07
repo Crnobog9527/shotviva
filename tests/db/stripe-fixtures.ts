@@ -94,6 +94,8 @@ type SubscriptionInput = {
   userId?: string
   productId?: ProductId
   priceProductId?: string
+  // The card route the subscription was opened on (checkout metadata); cn_card is 中国银行卡 (T64).
+  method?: 'card' | 'cn_card'
 }
 
 export function subscriptionObject(input: SubscriptionInput) {
@@ -109,7 +111,7 @@ export function subscriptionObject(input: SubscriptionInput) {
     status: input.status ?? 'active',
     cancel_at_period_end: input.cancelAtPeriodEnd ?? false,
     cancel_at: input.cancelAt ?? null,
-    metadata: input.userId ? { user_id: input.userId, product_id: input.productId, method: 'card' } : {},
+    metadata: input.userId ? { user_id: input.userId, product_id: input.productId, method: input.method ?? 'card' } : {},
     items: { object: 'list', data: [item] },
   } as unknown as Stripe.Subscription
 }

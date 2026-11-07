@@ -36,7 +36,7 @@ const paymentRow = z.object({
   amount_tax: z.number().int(),
   amount_refunded: z.number().int(),
   currency: z.string(),
-  method: z.enum(['card', 'alipay']),
+  method: z.enum(['card', 'alipay', 'cn_card']),
   status: z.enum(['paid', 'refunded', 'partially_refunded', 'disputed']),
 })
 
@@ -53,7 +53,8 @@ export type AdminPurchase = PurchaseSource & {
   amountTax: number
   amountRefunded: number
   currency: string
-  method: 'card' | 'alipay'
+  // card = Managed Payments card, cn_card = plain Stripe card (中国银行卡, T64), alipay.
+  method: 'card' | 'alipay' | 'cn_card'
   status: PaymentStatus
 }
 

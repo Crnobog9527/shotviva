@@ -660,6 +660,7 @@
         "walletAlipayWhy": "One {interval, select, year {year} other {month}}, paid with <b>{method}</b>. It doesn't renew by itself: renew before {date, date, medium} to keep the plan, or let it end and your credits still work.",
         "alipay": "Alipay",
         "card": "Card",
+        "cnCard": "Card",
         "renewPrice": "Renew <cost>· {price}</cost>",
         "endedPlain": "Your plan ended.",
         "endedTier": "Your {tier} plan ended.",

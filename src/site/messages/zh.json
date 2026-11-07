@@ -660,6 +660,7 @@
         "walletAlipayWhy": "一次性购买一{interval, select, year {年} other {个月}}，用<b>{method}</b>付款，不会自动续费：{date, date, medium} 前续费可以保留会员；不续费的话，积分仍可使用。",
         "alipay": "支付宝",
         "card": "银行卡",
+        "cnCard": "中国银行卡",
         "renewPrice": "续费 <cost>· {price}</cost>",
         "endedPlain": "会员已到期。",
         "endedTier": "你的{tier}会员已到期。",

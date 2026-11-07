@@ -26,17 +26,22 @@ export const INVOICE_EXPAND = ['payments.data.payment.payment_intent']
 const idOf = (value: string | { id: string } | null | undefined): string | null =>
   typeof value === 'string' ? value : (value?.id ?? null)
 
-// What payments.method holds (ARCHITECTURE §6.1): `card` / `alipay`. 中国银行卡 is a card charge.
-export type RecordedMethod = 'card' | 'alipay'
+// What payments.method holds (ARCHITECTURE §6.1): `card` is the Managed Payments card group
+// (海外银行卡), `cn_card` the plain Stripe card route (中国银行卡, T64), `alipay` Alipay.
+export type RecordedMethod = CheckoutMethod
 
-const recorded = (method: CheckoutMethod): RecordedMethod => (method === 'alipay' ? 'alipay' : 'card')
+// A card charge records the card route it went through, read from our own checkout metadata
+// (the session's for a first payment, the subscription's for a renewal).
+export function cardRouteOf(method: unknown): 'card' | 'cn_card' {
+  return method === 'cn_card' ? 'cn_card' : 'card'
+}
 
 // Alipay is the only wallet sold (§6.2); every other method Managed Payments offers (card,
-// Apple / Google Pay, Link) belongs to the "Card · Apple Pay · Google Pay" group.
-export function methodOfCharge(charge: Stripe.Charge | null, fallback: CheckoutMethod): RecordedMethod {
+// Apple / Google Pay, Link) belongs to the card group of the route the session was opened on.
+export function methodOfCharge(charge: Stripe.Charge | null, picked: CheckoutMethod): RecordedMethod {
   const type = charge?.payment_method_details?.type
-  if (!type) return recorded(fallback)
-  return type === 'alipay' ? 'alipay' : 'card'
+  if (!type) return picked
+  return type === 'alipay' ? 'alipay' : cardRouteOf(picked)
 }
 
 function expandedCharge(intent: string | Stripe.PaymentIntent | null): Stripe.Charge | null {
@@ -57,13 +62,14 @@ export function invoiceTax(invoice: Stripe.Invoice): number {
   return (invoice.total_taxes ?? []).reduce((sum, tax) => sum + tax.amount, 0)
 }
 
-// Subscriptions are card-only (Alipay cannot subscribe, §6.3), so an invoice is always 'card'.
-export function invoiceFacts(invoice: Stripe.Invoice): PaymentFacts {
+// Subscriptions are card-only (Alipay cannot subscribe, §6.3): an invoice is paid by the card
+// route its subscription was opened on (`subscriptionMethod`, the subscription's metadata).
+export function invoiceFacts(invoice: Stripe.Invoice, subscriptionMethod: unknown): PaymentFacts {
   return {
     amountTotal: invoice.amount_paid,
     amountTax: invoiceTax(invoice),
     currency: invoice.currency,
-    method: 'card',
+    method: cardRouteOf(subscriptionMethod),
     invoiceId: invoice.id,
     chargeId: invoiceChargeId(invoice),
   }
@@ -73,7 +79,7 @@ export function invoiceFacts(invoice: Stripe.Invoice): PaymentFacts {
 export async function sessionFacts(
   stripe: StripeApi,
   session: Stripe.Checkout.Session,
-  fallbackMethod: CheckoutMethod,
+  picked: CheckoutMethod,
 ): Promise<PaymentFacts> {
   if (session.amount_total === null || !session.currency) {
     throw new AppError('INVALID_INPUT', `checkout session ${session.id}: no amount`)
@@ -86,8 +92,8 @@ export async function sessionFacts(
   const invoiceId = idOf(session.invoice)
   if (session.mode === 'subscription' && invoiceId) {
     const invoice = await stripe.invoices.retrieve(invoiceId, { expand: INVOICE_EXPAND })
-    return { ...base, method: 'card', invoiceId, chargeId: invoiceChargeId(invoice) }
+    return { ...base, method: cardRouteOf(picked), invoiceId, chargeId: invoiceChargeId(invoice) }
   }
   const charge = expandedCharge(session.payment_intent)
-  return { ...base, method: methodOfCharge(charge, fallbackMethod), invoiceId, chargeId: charge?.id ?? null }
+  return { ...base, method: methodOfCharge(charge, picked), invoiceId, chargeId: charge?.id ?? null }
 }

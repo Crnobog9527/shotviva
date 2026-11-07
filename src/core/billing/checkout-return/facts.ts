@@ -39,7 +39,7 @@ export type FactsDeps = { stripe: StripeApi; db: SupabaseClient }
 const paymentRow = z.object({
   amount_total: z.number().int(),
   currency: z.string(),
-  method: z.enum(['card', 'alipay']),
+  method: z.enum(CHECKOUT_METHODS),
   stripe_charge_id: z.string().nullable().optional(),
   waffo_order_id: z.string().nullable().optional(),
   waffo_payment_id: z.string().nullable().optional(),
