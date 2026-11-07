@@ -3,7 +3,7 @@ import 'server-only'
 import { z } from 'zod'
 
 import { callRpc, type RpcClient } from '@/core/billing'
-import { alertDisputeDueSoon, disputeAdminPath } from '@/core/billing/stripe'
+import { alertDisputeDueSoon } from '@/core/billing/stripe'
 import { logger } from '@/core/logger'
 
 import type { DisputeListItem } from './repository'
@@ -21,22 +21,24 @@ export function reminderCandidates(items: readonly DisputeListItem[], now: Date)
     .map((item) => item.stripe_dispute_id)
 }
 
-export async function sendDueReminders(db: RpcClient, items: readonly DisputeListItem[], origin: string, now = new Date()): Promise<void> {
+export async function sendDueReminders(db: RpcClient, items: readonly DisputeListItem[], now = new Date()): Promise<void> {
   const ids = reminderCandidates(items, now)
   if (ids.length === 0) return
   try {
     const claimed = new Set(await callRpc(db, 'claim_dispute_reminders', { p_dispute_ids: ids }, z.array(z.string())))
     for (const item of items.filter((i) => claimed.has(i.stripe_dispute_id))) {
+      const dueBy = item.live?.dueBy ?? item.due_by
+      if (!dueBy) continue
       alertDisputeDueSoon({
         disputeId: item.stripe_dispute_id,
         amount: item.amount,
         currency: item.currency,
         reason: item.reason,
-        dueBy: item.live?.dueBy ?? item.due_by,
+        dueBy,
         responder: item.responder,
         autoBanned: item.auto_banned_at !== null,
         userId: item.user_id,
-        adminUrl: `${origin}${disputeAdminPath(item.stripe_dispute_id)}`,
+        productId: item.product_id,
       })
     }
   } catch (error) {

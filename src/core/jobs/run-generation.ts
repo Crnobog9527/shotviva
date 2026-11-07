@@ -23,6 +23,7 @@ import { toJobView, type JobView } from './job-view'
 import { accountLimits } from './account-limits'
 import { assertWithinRateLimit } from './rate-limit'
 import { settleGeneration, type SettleDeps } from './settle-generation'
+import { recordJobClientIp } from './job-download'
 import { reserveJob } from './settlement'
 
 // `track` is injectable so tests can assert the `generate` event without PostHog.
@@ -83,14 +84,13 @@ function jobInputs(req: GenerationRequest, { inputs, prompt }: Prepared, resolut
   }
 }
 
-// What reserve_credits takes straight from the request; the IP is dispute evidence (T82).
+// What reserve_credits takes straight from the request.
 function reserveFields(req: GenerationRequest) {
   return {
     userId: req.userId,
     source: req.source,
     idempotencyKey: req.idempotencyKey ?? null,
     visibility: req.visibility ?? null,
-    clientIp: req.clientIp ?? null,
   }
 }
 
@@ -119,6 +119,8 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
   const attemptId = randomUUID()
   const job = await reserveJob(deps.db, { ...reserveFields(req), jobId, module: template.module, templateId: template.id, provider: deps.provider.id, inputs: jobInputs(req, prepared, resolution, attemptId) })
   if (job.inputs.attempt_id !== attemptId) return toJobView(job)
+  // Dispute evidence (T82): the IP that started this paid or free work.
+  await recordJobClientIp(deps.db, { userId: req.userId, jobId: job.id, ip: req.clientIp })
 
   const call = {
     prompt: renderPrompt(prompt.body, inputs),

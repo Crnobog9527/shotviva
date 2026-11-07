@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { Button } from '@/core/ui/button'
 
 import { useAdminAction } from '../shell/use-admin-action'
 import { DISPUTE_UI } from './copy'
+import { useDraftState } from './draft-state'
 import type { DisputeActions } from './types'
 
 type Slot = { field: string; label: string }
@@ -24,19 +25,28 @@ export function AttachForm({ id, slots, actions }: { id: string; slots: readonly
   const [field, setField] = useState(slots[0]?.field ?? '')
   const [file, setFile] = useState<File | null>(null)
   const { pending, error, notice, run } = useAdminAction()
+  const { mark } = useDraftState()
+  useEffect(() => mark('file', file !== null), [file, mark])
   return (
     <form
       className="grid gap-3"
       onSubmit={(event) => {
         event.preventDefault()
-        if (file) run(() => upload(actions, id, field, file), () => DISPUTE_UI.attached)
+        if (file)
+          run(
+            () => upload(actions, id, field, file),
+            () => {
+              setFile(null)
+              return DISPUTE_UI.attached
+            },
+          )
       }}
     >
       <p className="text-sm text-muted-foreground">{DISPUTE_UI.attachHint}</p>
       <div className="flex flex-wrap items-end gap-3">
         <label className="grid gap-1 text-sm">
           <span className="font-medium">{DISPUTE_UI.attachField}</span>
-          <select className="h-9 rounded-md border border-input bg-transparent px-3" value={field} onChange={(e) => setField(e.target.value)}>
+          <select className="h-11 rounded-md sm:h-9 border border-input bg-transparent px-3" value={field} onChange={(e) => setField(e.target.value)}>
             {slots.map((slot) => (
               <option key={slot.field} value={slot.field}>
                 {slot.label}
@@ -53,7 +63,7 @@ export function AttachForm({ id, slots, actions }: { id: string; slots: readonly
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
           />
         </label>
-        <Button type="submit" variant="outline" disabled={pending || !file}>
+        <Button type="submit" variant="outline" className="h-11 sm:h-9" disabled={pending || !file}>
           {DISPUTE_UI.attach}
         </Button>
       </div>

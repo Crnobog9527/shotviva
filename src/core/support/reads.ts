@@ -114,9 +114,12 @@ const paymentRow = z.object({
   product_id: z.string(),
   amount_total: z.number(),
   currency: z.string(),
-  // cn_card = 中国银行卡, the plain Stripe card route (T64).
-  method: z.enum(['card', 'alipay', 'cn_card']),
+  // cn_card = 中国银行卡, the plain Stripe card route (T64); wechat_pay since T73.
+  method: z.enum(['card', 'alipay', 'wechat_pay', 'cn_card']),
   created_at: z.string(),
+  channel: z.enum(['stripe', 'waffo']),
+  status: z.enum(['paid', 'refunded', 'partially_refunded', 'disputed']),
+  stripe_invoice_id: z.string().nullable(),
 })
 
 // The author's latest payments for the billing / refund picker and the account page's
@@ -124,7 +127,7 @@ const paymentRow = z.object({
 export async function listPaymentOptions(db: SupabaseClient, userId: string): Promise<PaymentOption[]> {
   const { data, error } = await db
     .from('payments')
-    .select('id, product_id, amount_total, currency, method, created_at')
+    .select('id, product_id, amount_total, currency, method, created_at, channel, status, stripe_invoice_id')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(PICKER_LIMIT)
@@ -136,6 +139,9 @@ export async function listPaymentOptions(db: SupabaseClient, userId: string): Pr
     currency: row.currency,
     method: row.method,
     createdAt: row.created_at,
+    channel: row.channel,
+    status: row.status,
+    hasInvoice: row.stripe_invoice_id !== null,
   }))
 }
 

@@ -5,7 +5,6 @@ import { createAdminSupabase } from '@/core/auth'
 import { handleStripeWebhook, managedPaymentsEnabled, stripeClient, stripeWebhookSecret } from '@/core/billing/stripe'
 import { cancelOtherSubscriptions } from '@/core/billing/subscription'
 import { waffoClient } from '@/core/billing/waffo'
-import { appOrigin } from '@/core/site-url'
 import { disputeEvidenceConfig } from '@/site/dispute-evidence'
 import { site } from '@/site/site.config'
 
@@ -26,7 +25,7 @@ export async function POST(request: NextRequest) {
       cancelOthers: (userId: string, keep: { stripeSubscriptionId?: string | null }) =>
         cancelOtherSubscriptions({ admin: db, stripe: () => stripe, waffo: () => waffoClient() }, userId, keep),
       // A dispute stages its evidence draft and links the admin page (T82).
-      evidence: disputeEvidenceConfig({ managedPayments: managedPaymentsEnabled(), adminOrigin: appOrigin }),
+      evidence: disputeEvidenceConfig({ managedPayments: managedPaymentsEnabled() }),
     }
   } catch (error) {
     // Missing keys: 500 so Stripe keeps retrying until the environment is fixed.

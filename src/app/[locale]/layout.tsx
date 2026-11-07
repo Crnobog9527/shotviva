@@ -6,7 +6,7 @@ import { locale as rootLocale } from 'next/root-params'
 import { ConsentSlot } from '@/core/analytics/browser'
 import { clientMessages, htmlLang, isLocale } from '@/core/i18n'
 import { TranslatedPathsProvider } from '@/core/i18n/ui'
-import { rootMetadata } from '@/core/seo'
+import { rootMetadata, ShortcutTitleSync } from '@/core/seo'
 import { MiSansStylesheet } from '@/core/ui/misans-stylesheet'
 import { site } from '@/site/site.config'
 
@@ -50,6 +50,8 @@ export default async function RootLayout({ children }: LayoutProps<'/[locale]'>)
             {children}
             {/* The analytics cookie bar, for EU/EEA/UK/CH visitors who have not answered (T70). */}
             <ConsentSlot />
+            {/* Huawei Browser names a home-screen shortcut after the live page title (core/seo/shortcut-title.ts). */}
+            <ShortcutTitleSync name={site.brand.name} />
           </TranslatedPathsProvider>
         </NextIntlClientProvider>
       </body>

@@ -28,10 +28,16 @@ function Card({ card }: { card: DisputeCard }) {
             <dd className="truncate">{card.user}</dd>
           </div>
           <div>
-            <dt className="sr-only">{COPY.columns.due}</dt>
+            <dt className="sr-only">{card.due ? COPY.columns.due : COPY.columns.received}</dt>
             <dd className={card.tone === 'urgent' ? 'font-medium text-foreground' : undefined}>
-              {COPY.columns.due} {card.due}
-              {card.daysLeft ? ` · ${card.daysLeft}` : ''}
+              {card.due ? (
+                <>
+                  {COPY.columns.due} <span className="whitespace-nowrap">{card.due}</span>
+                  {card.daysLeft ? <span className="whitespace-nowrap"> · {card.daysLeft}</span> : null}
+                </>
+              ) : (
+                `${COPY.columns.received} ${card.received}`
+              )}
             </dd>
           </div>
           <div>

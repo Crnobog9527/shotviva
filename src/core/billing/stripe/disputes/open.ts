@@ -3,11 +3,12 @@ import 'server-only'
 import type Stripe from 'stripe'
 import { z } from 'zod'
 
+import type { DisputeOpenedAlert } from '../../../alerts'
 import { logger } from '../../../logger'
 import { callRpc, type RpcClient } from '../../rpc'
 import type { StripeApi } from '../client'
 import { alertDisputeOpened } from './alerts'
-import { disputeAdminPath, type DisputeEvidenceConfig } from './config'
+import type { DisputeEvidenceConfig } from './config'
 import { buildEvidence } from './evidence'
 import { evidenceFactsSchema } from './facts'
 import { isRespondable } from './labels'
@@ -73,13 +74,15 @@ async function draft(deps: DisputeDeps, dispute: Stripe.Dispute): Promise<void> 
 
 export type DisputeOutcome = 'drafted' | 'recorded' | 'replayed'
 
-export async function openDispute(deps: DisputeDeps, disputeId: string): Promise<DisputeOutcome> {
+// `owner`: the Feishu alert payment-issues.ts built for this dispute (payment facts, T71 clawback);
+// sent here once, with the deadline and the ban added, when the dispute is new.
+export async function openDispute(deps: DisputeDeps, disputeId: string, owner: DisputeOpenedAlert): Promise<DisputeOutcome> {
   const dispute = await deps.stripe.disputes.retrieve(disputeId, { expand: ['charge'] })
   const opened = await open(deps, dispute)
   const stage = !opened.drafted && canStage(dispute)
   if (stage) await draft(deps, dispute)
   if (opened.created) {
-    alertDisputeOpened({
+    const facts = {
       disputeId: dispute.id,
       amount: dispute.amount,
       currency: dispute.currency,
@@ -88,8 +91,9 @@ export async function openDispute(deps: DisputeDeps, disputeId: string): Promise
       responder: opened.responder,
       autoBanned: opened.auto_banned,
       userId: opened.user_id,
-      adminUrl: `${deps.evidence.adminOrigin}${disputeAdminPath(dispute.id)}`,
-    })
+      productId: owner.productId,
+    }
+    alertDisputeOpened(facts, owner)
   }
   logger.info('stripe dispute opened', { dispute_id: dispute.id, created: opened.created, staged: stage, responder: opened.responder })
   if (stage) return 'drafted'

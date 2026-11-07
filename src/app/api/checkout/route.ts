@@ -7,6 +7,7 @@ import {
   checkoutBodySchema,
   createCheckout,
   managedPaymentsEnabled,
+  wechatPayEnabled,
   stripeClient,
   termsConsentEnabled,
   type CheckoutBody,
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
 const shared = { products: site.billing.products, origin: appOrigin, returnToHosts: site.partners.graylum.returnToHosts }
 
 function startStripe(userId: string, body: CheckoutBody, client: CheckoutClient) {
-  const deps = { ...shared, stripe: stripeClient(), managedPayments: managedPaymentsEnabled(), termsConsent: termsConsentEnabled() }
+  const deps = { ...shared, stripe: stripeClient(), managedPayments: managedPaymentsEnabled(), wechatPay: wechatPayEnabled(), termsConsent: termsConsentEnabled() }
   return createCheckout(deps, { userId, body, client })
 }
 

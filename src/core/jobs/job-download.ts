@@ -16,3 +16,14 @@ export async function recordJobDownload(db: RpcClient, input: { userId: string; 
     logger.warn('recording a download failed', { job_id: input.jobId, error })
   }
 }
+
+// The website request's IP on a job this request just created (record_job_client_ip, 0723,
+// T82). Best effort like the download note: logged on failure, never fails the generation.
+export async function recordJobClientIp(db: RpcClient, input: { userId: string; jobId: string; ip: string | null | undefined }): Promise<void> {
+  if (!input.ip) return
+  try {
+    await callRpc(db, 'record_job_client_ip', { p_job_id: input.jobId, p_user_id: input.userId, p_ip: input.ip }, z.boolean())
+  } catch (error) {
+    logger.warn('recording a job IP failed', { job_id: input.jobId, error })
+  }
+}

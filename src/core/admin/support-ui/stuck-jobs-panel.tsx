@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { useState } from 'react'
 
 import { Button } from '@/core/ui/button'
@@ -12,6 +11,7 @@ import type { StuckJob } from '../support/stuck-jobs'
 import type { ActionValue } from '../templates/types'
 import { ConfirmDialog } from './confirm-dialog'
 import { SUPPORT_COPY } from './copy'
+import { UserLink } from '../users-ui/user-link'
 
 const COPY = SUPPORT_COPY.stuck
 const COLUMNS = ['createdAt', 'user', 'template', 'credits', 'source', 'action'] as const
@@ -82,9 +82,9 @@ function StuckTable({ jobs, onRefund }: { jobs: StuckJob[]; onRefund: (id: strin
           <TableRow key={job.id}>
             <TableCell className="font-mono text-xs whitespace-nowrap">{formatBeijing(job.createdAt)}</TableCell>
             <TableCell>
-              <Link href={`/admin/users/${job.userId}?job=${job.id}`} className="font-mono text-xs text-primary hover:underline">
+              <UserLink userId={job.userId} jobId={job.id} className="font-mono text-xs">
                 {job.userId.slice(0, 8)}
-              </Link>
+              </UserLink>
             </TableCell>
             <TableCell className="font-mono text-xs">{job.templateId}</TableCell>
             <TableCell className="font-mono text-xs whitespace-nowrap">

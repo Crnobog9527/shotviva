@@ -7,7 +7,7 @@ import type { DisputeListItem } from '../disputes/repository'
 // server-only Stripe folder.
 
 export const TEXT_LABELS: Record<TextField, string> = {
-  uncategorized_text: '总结（可在下面修改）',
+  uncategorized_text: '总结',
   product_description: '产品说明',
   access_activity_log: '账号活动记录（时间、IP、出图、下载）',
   refund_policy_disclosure: '退款政策与同意条款记录',
@@ -36,8 +36,10 @@ export type DisputeCard = {
   userId: string | null
   status: string
   tone: StatusTone
-  due: string
+  // Shown only while Stripe still takes evidence; a closed or submitted one shows when it came in.
+  due: string | null
   daysLeft: string | null
+  received: string
   responder: string
   banned: boolean
   drafted: boolean
@@ -62,8 +64,13 @@ export function daysLeft(dueBy: Date | null, now: Date): string | null {
 
 function statusLabel(item: DisputeListItem): string {
   if (!item.live) return item.submitted_at ? COPY.submittedTag : '—'
+  // Managed Payments: Stripe answers, so 「待提交证据」 would read as the Owner's to-do.
+  if (item.responder === 'stripe' && item.live.open) return COPY.stripeHandling
   return STATUS_ZH[item.live.status] ?? item.live.status
 }
+
+const BEIJING_OFFSET_MS = 8 * 60 * 60 * 1000
+const beijing = (at: Date) => new Date(at.getTime() + BEIJING_OFFSET_MS).toISOString().slice(0, 16).replace('T', ' ')
 
 function userLabel(item: DisputeListItem): string {
   if (item.email) return item.email
@@ -80,8 +87,9 @@ export function toCard(item: DisputeListItem, now: Date): DisputeCard {
     userId: item.user_id,
     status: statusLabel(item),
     tone: tone(item),
-    due: formatDeadline(dueBy),
+    due: item.live?.open ? formatDeadline(dueBy) : null,
     daysLeft: item.live?.open ? daysLeft(dueBy, now) : null,
+    received: beijing(item.created_at),
     responder: COPY.responder[item.responder],
     banned: item.auto_banned_at !== null,
     drafted: item.evidence_drafted_at !== null,

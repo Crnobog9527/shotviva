@@ -1,12 +1,12 @@
 import 'server-only'
 
+import { notifyOwner, type DisputeOpenedAlert } from '../../../alerts'
 import { captureAlert } from '../../../analytics/capture-error'
-import { formatAmount, formatDeadline, REASON_ZH } from './labels'
 
-// Owner alerts for disputes (T82), in plain Chinese with the deadline and the admin link.
-// T72 hook: when core/alerts (PR #276) is on main, send the same `text` with
-// notifyOwner({ kind: 'dispute_opened' | 'dispute_due_soon', ... }) next to each captureAlert
-// below; the Sentry alert stays as the fallback. Fields carry ids only, never the email.
+// Dispute alerts (T82). The Owner's plain-Chinese message goes through core/alerts (T72, Feishu):
+// the dispute_opened alert now carries the deadline, who answers and the ban, and links the admin
+// 「拒付」 page; dispute_due_soon is the one three-day reminder. Sentry keeps the developers' copy.
+// Fields carry ids only, never the email.
 
 export type DisputeAlertFacts = {
   disputeId: string
@@ -17,21 +17,7 @@ export type DisputeAlertFacts = {
   responder: 'shotviva' | 'stripe'
   autoBanned: boolean
   userId: string | null
-  adminUrl: string
-}
-
-const WHO: Record<DisputeAlertFacts['responder'], string> = {
-  shotviva: '需要你在后台检查证据后点「提交申诉」',
-  stripe: '这笔走 Managed Payments，由 Stripe 应诉，证据草稿已存给 Stripe 参考，不用提交',
-}
-
-export function disputeOpenedText(f: DisputeAlertFacts): string {
-  const ban = f.autoBanned ? '账号已自动封禁。' : '账号没有自动封禁（管理员或已封禁）。'
-  return `收到一笔拒付：${formatAmount(f.amount, f.currency)}，原因「${REASON_ZH[f.reason] ?? f.reason}」，截止 ${formatDeadline(f.dueBy)}。${ban}证据草稿已整理好，${WHO[f.responder]}。后台：${f.adminUrl}`
-}
-
-export function disputeDueSoonText(f: DisputeAlertFacts): string {
-  return `拒付申诉快到期了：${formatAmount(f.amount, f.currency)}，截止 ${formatDeadline(f.dueBy)}，证据还没提交。后台：${f.adminUrl}`
+  productId: string | null
 }
 
 const fields = (f: DisputeAlertFacts) => ({
@@ -45,10 +31,20 @@ const fields = (f: DisputeAlertFacts) => ({
   auto_banned: f.autoBanned,
 })
 
-export function alertDisputeOpened(f: DisputeAlertFacts): void {
-  captureAlert('dispute_opened', disputeOpenedText(f), { fields: fields(f) })
+// `base` is the payment-side alert payment-issues.ts built (amount, product, T71 clawback).
+export function alertDisputeOpened(f: DisputeAlertFacts, base: DisputeOpenedAlert): void {
+  captureAlert('dispute_opened', `Stripe dispute ${f.disputeId}: evidence drafted (${f.responder})`, { fields: fields(f) })
+  notifyOwner({ ...base, evidence: { dueBy: f.dueBy?.toISOString() ?? null, responder: f.responder, autoBanned: f.autoBanned } })
 }
 
-export function alertDisputeDueSoon(f: DisputeAlertFacts): void {
-  captureAlert('dispute_due_soon', disputeDueSoonText(f), { fields: fields(f) })
+export function alertDisputeDueSoon(f: DisputeAlertFacts & { dueBy: Date }): void {
+  captureAlert('dispute_due_soon', `Stripe dispute ${f.disputeId}: evidence not submitted, due within 3 days`, { fields: fields(f) })
+  notifyOwner({
+    kind: 'dispute_due_soon',
+    disputeId: f.disputeId,
+    userId: f.userId,
+    productId: f.productId,
+    amount: { cents: f.amount, currency: f.currency },
+    dueBy: f.dueBy.toISOString(),
+  })
 }

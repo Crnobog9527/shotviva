@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { disputeDueSoonText, disputeOpenedText, type LiveDispute } from '@/core/billing/stripe'
+import type { LiveDispute } from '@/core/billing/stripe'
 
 import { daysLeft, toCard } from '../disputes-ui/view-model'
 import { sniffEvidenceFile } from './commands'
 import { reminderCandidates } from './reminders'
 import type { DisputeListItem } from './repository'
 
-// T82: the admin 「拒付」 page's pure parts and the Owner alert wording.
+// T82: the admin 「拒付」 page's pure parts.
 
 const now = new Date('2026-11-08T00:00:00Z')
 const day = 24 * 60 * 60 * 1000
@@ -91,17 +91,5 @@ describe('sniffEvidenceFile', () => {
     expect(sniffEvidenceFile(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d]))).toBe('image/png')
     expect(sniffEvidenceFile(new Uint8Array([0xff, 0xd8, 0xff, 0xe0]))).toBe('image/jpeg')
     expect(sniffEvidenceFile(new Uint8Array([0x47, 0x49, 0x46, 0x38]))).toBeNull()
-  })
-})
-
-describe('Owner alerts', () => {
-  const facts = { disputeId: 'dp_1', amount: 1990, currency: 'usd', reason: 'fraudulent', dueBy: new Date('2026-11-18T15:59:00Z'), responder: 'shotviva' as const, autoBanned: true, userId: null, adminUrl: 'https://shotviva.com/admin/disputes/dp_1' }
-
-  it('says amount, reason, deadline in Beijing time, the ban, what to do and the link', () => {
-    expect(disputeOpenedText(facts)).toBe(
-      '收到一笔拒付：US$19.90，原因「盗刷 / 非本人交易」，截止 2026-11-18 23:59（北京时间）。账号已自动封禁。证据草稿已整理好，需要你在后台检查证据后点「提交申诉」。后台：https://shotviva.com/admin/disputes/dp_1',
-    )
-    expect(disputeOpenedText({ ...facts, responder: 'stripe', autoBanned: false })).toContain('由 Stripe 应诉')
-    expect(disputeDueSoonText(facts)).toContain('截止 2026-11-18 23:59（北京时间），证据还没提交')
   })
 })

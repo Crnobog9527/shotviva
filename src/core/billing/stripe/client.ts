@@ -56,6 +56,11 @@ export function managedPaymentsEnabled(): boolean {
   return serverEnv().STRIPE_MANAGED_PAYMENTS === 'on'
 }
 
+// T73: whether the wallet line offers WeChat Pay beside Alipay (STRIPE_WECHAT_PAY, default off).
+export function wechatPayEnabled(): boolean {
+  return serverEnv().STRIPE_WECHAT_PAY === 'on'
+}
+
 export function termsConsentEnabled(): boolean {
   return serverEnv().STRIPE_TERMS_CONSENT === 'on'
 }

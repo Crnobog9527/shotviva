@@ -3,7 +3,6 @@ import type { Metadata } from 'next'
 import { AdminPage, DISPUTES_COPY, DisputesList, listDisputes, sendDueReminders, toCard } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { stripeClient } from '@/core/billing/stripe'
-import { appOrigin } from '@/core/site-url'
 
 // /admin/disputes (ARCHITECTURE §6.3 「后台拒付页」, T82): every dispute with Stripe's live status.
 // Opening it also sends the one 「截止前 3 天」 reminder per dispute (no scheduled job).
@@ -17,7 +16,7 @@ export default async function AdminDisputesPage({ searchParams }: PageProps<'/[l
   const cursor = typeof p === 'string' ? p : null
   const db = createAdminSupabase()
   const page = await listDisputes({ db, stripe: stripeClient() }, cursor)
-  await sendDueReminders(db, page.items, appOrigin)
+  await sendDueReminders(db, page.items)
   const now = new Date()
   return (
     <AdminPage title={DISPUTES_COPY.title}>

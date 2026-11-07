@@ -8,11 +8,28 @@ import type { MembershipTier, PaymentChannel, ProductId, SiteProduct } from '../
 // AI services, personal use. Managed Payments requires a tax code on every Product.
 export const STRIPE_TAX_CODE = 'txcd_10105001'
 
-// What the buyer picked on the paywall (no WeChat Pay, §6.2). `card` is the Managed Payments
-// route ("Card · Apple Pay · Google Pay", on zh pages 海外银行卡); `cn_card` is the plain Stripe
-// card route for Chinese-issued cards, which Managed Payments refuses (T64).
+// What the buyer picked on the paywall. `card` is the Managed Payments route ("Card · Apple Pay ·
+// Google Pay", on zh pages 海外银行卡); `cn_card` is the plain Stripe card route for
+// Chinese-issued cards, which Managed Payments refuses (T64). `alipay` is the wallet line: on
+// Stripe it opens one checkout offering Alipay and WeChat Pay (支付宝 / 微信支付, T73), on Waffo
+// Alipay alone. The key stays `alipay` so sessions opened before T73 still settle. WeChat Pay
+// joins only while STRIPE_WECHAT_PAY is on (stripe/client wechatPayEnabled); off is the pre-T73
+// Alipay-only line, labels included.
 export const CHECKOUT_METHODS = ['card', 'alipay', 'cn_card'] as const
 export type CheckoutMethod = (typeof CHECKOUT_METHODS)[number]
+
+// What payments.method holds (ARCHITECTURE §6.1): the picked route, except that a wallet
+// payment records the wallet the buyer actually paid with on Stripe's page.
+export const RECORDED_METHODS = ['card', 'alipay', 'wechat_pay', 'cn_card'] as const
+export type RecordedMethod = (typeof RECORDED_METHODS)[number]
+
+// The wallets the Stripe wallet route can offer, in the order Checkout should list them (§6.3).
+export const STRIPE_WALLETS = ['alipay', 'wechat_pay'] as const
+export type StripeWallet = (typeof STRIPE_WALLETS)[number]
+
+export function stripeWallets(wechatPay: boolean): readonly StripeWallet[] {
+  return wechatPay ? STRIPE_WALLETS : ['alipay']
+}
 
 // The methods a page offers, in the order it lists them (ARCHITECTURE §6.3 「中文页付款方式」):
 // zh pages on Stripe lead with 中国银行卡, then Alipay, then the Managed Payments card; English
@@ -59,21 +76,21 @@ export type CheckoutRoute = {
   // since API 2026-09-30.endive (stripe@23) Checkout no longer takes payment_method_types and
   // filters the account's dynamic payment methods instead. The method must be on in the
   // Dashboard (Settings → Payment methods), or Stripe silently drops it.
-  allowedMethods: ['card'] | ['alipay'] | null
+  allowedMethods: ['card'] | readonly StripeWallet[] | null
 }
 
 // §6.3: a card buys a membership as a subscription and a pack as a one-time payment, through
-// Managed Payments while it is on; Alipay cannot subscribe, so it always buys one period or
-// one pack as a one-time payment, with Shotviva as the seller. 中国银行卡 is the card route with
+// Managed Payments while it is on; Alipay and WeChat Pay cannot subscribe, so the wallet line
+// always buys one period or one pack as a one-time payment, with Shotviva as the seller. 中国银行卡 is the card route with
 // Managed Payments off: the same plain-card path as the pre-approval fallback, never a second one.
-export function checkoutRoute(product: SiteProduct, method: CheckoutMethod, managedPayments: boolean): CheckoutRoute {
+export function checkoutRoute(product: SiteProduct, method: CheckoutMethod, managedPayments: boolean, wechatPay = false): CheckoutRoute {
   if (method === 'alipay') {
     return {
       mode: 'payment',
       form: 'one_time',
       lookupKey: lookupKey(product.id, 'one_time'),
       managedPayments: false,
-      allowedMethods: ['alipay'],
+      allowedMethods: stripeWallets(wechatPay),
     }
   }
   const form: CheckoutForm = product.tier === 'pack' ? 'one_time' : 'subscription'

@@ -8,6 +8,7 @@ import {
   accountLimits,
   assertWithinRateLimit,
   findOwnJob,
+  recordJobClientIp,
   reserveJob,
   settleGeneration,
   settleTracked,
@@ -122,10 +123,11 @@ export async function runEdit(deps: EditDeps, req: EditRequest): Promise<JobView
     provider: deps.provider.id,
     parentJobId: prepared.source.id,
     inputs: jobInputs(prepared, decision, resolution, attemptId),
-    clientIp: req.clientIp ?? null,
   })
   // Two concurrent requests with one job id: only the one that created the row calls the model.
   if (job.inputs.attempt_id !== attemptId) return toJobView(job)
+  // Dispute evidence (T82): the IP that started this edit.
+  await recordJobClientIp(deps.db, { userId: req.userId, jobId: job.id, ip: req.clientIp })
 
   const call = {
     prompt: composeEditPrompt(prepared.prompt.body, prepared.params, decision.scope, prepared.instruction, decision.keep, prepared.reframed),

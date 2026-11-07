@@ -23,7 +23,6 @@ let template: string
 
 const evidence: DisputeEvidenceConfig = {
   managedPayments: true,
-  adminOrigin: 'https://preview.example.app',
   context: (productId, charge) => ({
     brand: 'Shotviva',
     origin: 'https://shotviva.com',
@@ -73,9 +72,10 @@ async function buyPack(method: 'card' | 'cn_card', options: { managed?: boolean;
 async function makeWork(userId: string, source: 'web' | 'graylum' = 'web', ip = '203.0.113.7') {
   const jobId = randomUUID()
   const { error } = await serviceSupabase().rpc('reserve_credits', {
-    p_job_id: jobId, p_user_id: userId, p_module: 'image', p_template_id: template, p_credits_cost: null, p_source: source, p_inputs: {}, p_client_ip: ip,
+    p_job_id: jobId, p_user_id: userId, p_module: 'image', p_template_id: template, p_credits_cost: null, p_source: source, p_inputs: {},
   })
   expect(error).toBeNull()
+  await serviceSupabase().rpc('record_job_client_ip', { p_job_id: jobId, p_user_id: userId, p_ip: ip })
   await db.query("update public.generation_jobs set status = 'succeeded', output_key = 'x', finished_at = now() where id = $1", [jobId])
   return jobId
 }
@@ -101,12 +101,14 @@ describe('checkout context on the payment row', () => {
 })
 
 describe('works keep their IP and downloads', () => {
-  it('reserve_credits stores a web request’s IP and never a partner call’s', async () => {
+  it('record_job_client_ip stores a web job’s IP, first write wins, never a partner call’s', async () => {
     const userId = await createUser(db, { credits: 20 })
     const web = await makeWork(userId, 'web')
     const partner = await makeWork(userId, 'graylum', '198.51.100.1')
     const { rows } = await db.query('select id, host(client_ip) as ip from public.generation_jobs where id = any($1)', [[web, partner]])
     expect(Object.fromEntries(rows.map((r) => [r.id, r.ip]))).toEqual({ [web]: '203.0.113.7', [partner]: null })
+    const again = await serviceSupabase().rpc('record_job_client_ip', { p_job_id: web, p_user_id: userId, p_ip: '198.51.100.3' })
+    expect(again.data).toBe(false)
   })
 
   it('record_job_download keeps the first time and IP, counts each, and ignores other people’s works', async () => {
@@ -140,7 +142,7 @@ describe('charge.dispute.created', () => {
     expect(params.evidence).toMatchObject({ customer_purchase_ip: '203.0.113.7', customer_name: 'Test Buyer' })
     expect(params.evidence?.access_activity_log).toContain('Checkout browser: Mozilla/5.0 T82')
     expect(params.evidence?.access_activity_log).toContain('IP 203.0.113.7 · image created')
-    expect(captureAlert).toHaveBeenCalledWith('dispute_opened', expect.stringContaining('https://preview.example.app/admin/disputes/'), expect.anything())
+    expect(captureAlert).toHaveBeenCalledWith('dispute_opened', expect.stringContaining(dispute.id), { fields: expect.objectContaining({ responder: 'shotviva', auto_banned: true }) })
 
     // Redelivered: nothing new, no second ban row, no second draft or alert.
     vi.mocked(captureAlert).mockClear()

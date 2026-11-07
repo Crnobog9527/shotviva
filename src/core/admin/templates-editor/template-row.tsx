@@ -7,18 +7,16 @@ import { Switch } from '@/core/ui/switch'
 import { TableCell, TableRow } from '@/core/ui/table'
 
 import type { AdminTemplate } from '../templates/types'
+import { DragHandle, MoveButtons, sortableRowClass, useSortableItem } from '../ui/sortable'
 import { bulkCopy } from './copy'
 import { canFeature } from './featured-state'
 
 const SURFACE_LABEL = { web: '站内', partner: '伙伴' } as const
 
 export type RowHandlers = {
-  // Reordering is only meaningful on the full, unfiltered list.
-  canReorder: boolean
   pending: boolean
   onEdit: (template: AdminTemplate) => void
   onToggle: (template: AdminTemplate, active: boolean) => void
-  onMove: (index: number, direction: -1 | 1) => void
   // 首页精选 (T53): whether the list is full, and the switch handler.
   featuredFull: boolean
   onFeature: (template: AdminTemplate, on: boolean) => void
@@ -26,17 +24,17 @@ export type RowHandlers = {
 
 type Props = RowHandlers & {
   template: AdminTemplate
-  index: number
-  last: boolean
   // Bulk selection (T60).
   checked: boolean
   onSelect: (id: string, on: boolean) => void
 }
 
+// One row of the catalogue; dragged by its handle (or long-pressed on touch), T76.
 export function TemplateRow(props: Props) {
-  const { template, index, last, checked, onSelect, canReorder, pending, onEdit, onToggle, onMove, featuredFull, onFeature } = props
+  const { template, checked, onSelect, pending, onEdit, onToggle, featuredFull, onFeature } = props
+  const item = useSortableItem(template.id)
   return (
-    <TableRow data-state={checked ? 'selected' : undefined}>
+    <TableRow {...item.row} className={sortableRowClass} data-state={checked ? 'selected' : undefined}>
       <TableCell>
         <Checkbox
           aria-label={bulkCopy.selectRow(template.name)}
@@ -45,25 +43,9 @@ export function TemplateRow(props: Props) {
         />
       </TableCell>
       <TableCell>
-        <div className="flex gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-label={`上移 ${template.name}`}
-            disabled={!canReorder || pending || index === 0}
-            onClick={() => onMove(index, -1)}
-          >
-            ↑
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-label={`下移 ${template.name}`}
-            disabled={!canReorder || pending || last}
-            onClick={() => onMove(index, 1)}
-          >
-            ↓
-          </Button>
+        <div className="flex items-center">
+          <DragHandle handle={item.handle} />
+          <MoveButtons item={item} />
         </div>
       </TableCell>
       <TableCell>

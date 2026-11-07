@@ -8,7 +8,7 @@ import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/a
 import { currentTier, limitsFor, readBalance } from '@/core/billing'
 import { currentLocale } from '@/core/i18n/server'
 import { listOwnJobs } from '@/core/jobs'
-import { listTemplatesIn } from '@/core/templates'
+import { listTemplatesIn, loadEditOffer } from '@/core/templates'
 import { r2Store } from '@/core/storage'
 import { ImageWorkspace, loadAgain, toCatalogueTemplate, WorkspaceHead } from '@/modules/image'
 import { site } from '@/site/site.config'
@@ -30,12 +30,14 @@ async function Workspace({ params, searchParams }: RouteProps) {
   if (!found) notFound()
   const template = toCatalogueTemplate(found)
   const againId = typeof query.again === 'string' ? query.again : undefined
-  const [balance, tier, own, again] = await Promise.all([
+  const [balance, tier, own, again, editOffer] = await Promise.all([
     readBalance(supabase, user.id),
     // current_tier() is service-role only; the user's own id comes from the session.
     currentTier(createAdminSupabase(), user.id),
     listOwnJobs(supabase, user.id, new Date()),
     loadAgain({ db: supabase, store: r2Store }, { userId: user.id, jobId: againId, template }),
+    // "Edit this photo" on the done view only when editing is on (T30).
+    loadEditOffer(supabase),
   ])
   const t = await getTranslations('app.result')
   return (
@@ -48,6 +50,7 @@ async function Workspace({ params, searchParams }: RouteProps) {
         tier={tier}
         concurrency={{ limit: limitsFor(tier).concurrency, runningIds: own.running.map((job) => job.id) }}
         again={again}
+        editable={editOffer !== null}
         shareText={t('shareText', { brand: site.brand.name, url: `https://${site.brand.domain}/?utm_source=share&utm_medium=web_share` })}
       />
     </>

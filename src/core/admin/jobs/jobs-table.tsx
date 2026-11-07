@@ -1,5 +1,3 @@
-import Link from 'next/link'
-
 import { Badge } from '@/core/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/core/ui/table'
 
@@ -10,6 +8,7 @@ import { JOBS_COPY as COPY } from './copy'
 import { jobCostCell, type UnitCost } from './cost'
 import { usdFine } from './cost-format'
 import type { AdminJob } from './repository'
+import { UserLink } from '../users-ui/user-link'
 
 const COLUMNS = ['createdAt', 'user', 'template', 'status', 'model', 'resolution', 'credits', 'cost', 'source', 'duration', 'error', 'actions'] as const
 
@@ -55,9 +54,9 @@ export function JobsTable({ jobs, actions, unitCost }: Props) {
           <TableRow key={job.id}>
             <TableCell className="font-mono text-xs whitespace-nowrap">{formatBeijing(job.createdAt)}</TableCell>
             <TableCell>
-              <Link href={`/admin/users/${job.userId}`} className="font-mono text-xs text-primary hover:underline">
+              <UserLink userId={job.userId} className="font-mono text-xs">
                 {job.userId.slice(0, 8)}
-              </Link>
+              </UserLink>
             </TableCell>
             <TableCell className="font-mono text-xs">{job.templateId}</TableCell>
             <TableCell>

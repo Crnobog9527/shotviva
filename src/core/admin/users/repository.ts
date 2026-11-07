@@ -6,10 +6,10 @@ import { z } from 'zod'
 import { AppError } from '@/core/errors'
 
 import { afterCursor, decodeCursor, PAGE_SIZE, toPage, type Page } from '../cursor'
-import { RECENT_JOBS, type AdminUserRow, type LedgerEntry, type UserDetail, type UserJob } from './types'
+import { RECENT_JOBS, type LedgerEntry, type UserDetail, type UserJob } from './types'
 
-// Reads for /admin/users, service-role client only. Indexes: admin_search_users (0165);
-// profiles primary key; credit_ledger_user_id_created_at_idx; generation_jobs_user_id_created_at_idx.
+// Reads for the user detail (T77: a dialog), service-role client only. Indexes: profiles primary
+// key; credit_ledger_user_id_created_at_idx; generation_jobs_user_id_created_at_idx.
 
 const fail = (what: string, error: { message: string }): never => {
   throw new AppError('INTERNAL', `admin users ${what} failed`, { cause: new Error(error.message) })
@@ -18,43 +18,6 @@ const fail = (what: string, error: { message: string }): never => {
 const isUuid = (id: string) => z.uuid().safeParse(id).success
 
 const role = z.enum(['user', 'admin']).catch('user')
-
-const searchRow = z.object({
-  id: z.uuid(),
-  email: z.string().nullable(),
-  // auth.users.created_at is nullable.
-  created_at: z.string().nullable(),
-  provider: z.string().nullable(),
-  role: role.nullable(),
-  credits: z.number().nullable(),
-  free_credits: z.number().nullable(),
-  paid_until: z.string().nullable(),
-  generation_count: z.number(),
-  last_generation_at: z.string().nullable(),
-  banned_at: z.string().nullable(),
-  // Since 0442; optional so a database without it still parses.
-  phone: z.string().nullable().optional(),
-})
-
-export async function searchUsers(db: SupabaseClient, query: string): Promise<AdminUserRow[]> {
-  if (query.trim().length === 0) return []
-  const { data, error } = await db.rpc('admin_search_users', { p_query: query.trim() })
-  if (error) fail('search', error)
-  return searchRow.array().parse(data).map((row) => ({
-    id: row.id,
-    email: row.email,
-    phone: row.phone ?? null,
-    createdAt: row.created_at,
-    provider: row.provider,
-    role: row.role ?? 'user',
-    credits: row.credits ?? 0,
-    freeCredits: row.free_credits ?? 0,
-    paidUntil: row.paid_until,
-    generationCount: row.generation_count,
-    lastGenerationAt: row.last_generation_at,
-    bannedAt: row.banned_at,
-  }))
-}
 
 const profileRow = z.object({
   id: z.uuid(),

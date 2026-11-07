@@ -7,20 +7,22 @@ import { FILE_LABELS, TEXT_LABELS } from './view-model'
 
 const OPEN_BY_DEFAULT = new Set(['uncategorized_text', 'customer_purchase_ip', 'customer_email_address', 'service_date'])
 
+// The Stripe field name stays available on hover for anyone matching the Stripe Dashboard.
+
 function TextField({ field, value }: { field: (typeof TEXT_FIELDS)[number]; value: string }) {
   return (
     <details className="group rounded-md border border-border bg-background" open={OPEN_BY_DEFAULT.has(field)}>
-      <summary className="flex cursor-pointer items-baseline gap-2 px-3 py-2 text-sm font-medium marker:text-muted-foreground">
+      <summary title={field} className="cursor-pointer px-3 py-3 text-sm font-medium marker:text-muted-foreground sm:py-2">
         {TEXT_LABELS[field]}
-        <span className="font-mono text-xs font-normal text-muted-foreground">{field}</span>
       </summary>
       <pre className="max-h-80 overflow-auto border-t border-border px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">{value}</pre>
     </details>
   )
 }
 
-export function EvidencePreview({ live, missing }: { live: LiveDispute; missing: string }) {
-  const fields = TEXT_FIELDS.filter((field) => live.text[field])
+// skipSummary: while editable, the summary shows in its edit box instead (no second copy).
+export function EvidencePreview({ live, missing, skipSummary }: { live: LiveDispute; missing: string; skipSummary: boolean }) {
+  const fields = TEXT_FIELDS.filter((field) => live.text[field] && !(skipSummary && field === 'uncategorized_text'))
   const files = FILE_FIELDS.filter((field) => live.files[field])
   if (fields.length === 0 && files.length === 0) return <p className="text-sm text-muted-foreground">{missing}</p>
   return (

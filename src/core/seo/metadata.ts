@@ -24,7 +24,8 @@ export function rootMetadata(site: SiteConfig, locale: Locale = DEFAULT_LOCALE):
     applicationName: site.brand.name,
     // Home-screen shortcut name (Owner 2026-11-07): iOS "Add to Home Screen" reads
     // apple-mobile-web-app-title, Chrome on Android the manifest name (app/manifest.ts); both are
-    // the brand, never the long SEO title. capable: false keeps it opening in the browser, like the
+    // the brand, never the long SEO title. Huawei Browser reads neither, only the page title
+    // (ShortcutTitleSync, shortcut-title.ts). capable: false keeps it opening in the browser, like the
     // manifest's display: browser, so OAuth and hosted checkout redirects are never stranded.
     // startupImage (T65): opened from the home screen as a web app, iOS shows the "S." on the
     // darkroom ground instead of a black screen while the page loads.

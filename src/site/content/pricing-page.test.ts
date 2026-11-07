@@ -59,8 +59,8 @@ describe('/pricing page copy', () => {
 // DESIGN §4.5 and Stripe's merchant review: the renewal terms are on the page before purchase.
 describe('/pricing "Pay with"', () => {
   // The provider's props typed in full, as home-faq.test.ts does: children is a required prop.
-  const render = (channel: 'stripe' | 'waffo') => {
-    const provider: ComponentProps<typeof NextIntlClientProvider> = { locale: 'en', messages, children: createElement(PricingPayWith, { channel }) }
+  const render = (channel: 'stripe' | 'waffo', wechatPay = false) => {
+    const provider: ComponentProps<typeof NextIntlClientProvider> = { locale: 'en', messages, children: createElement(PricingPayWith, { channel, wechatPay }) }
     return renderToStaticMarkup(createElement(NextIntlClientProvider, provider))
   }
 
@@ -71,6 +71,17 @@ describe('/pricing "Pay with"', () => {
     expect(html).toContain('One-time payment for 30 days or 1 year, no auto-renew')
     expect(html).toContain('Credit packs are always a one-time payment.')
     expect(html).toContain('All prices in USD')
+    // STRIPE_WECHAT_PAY off (default): the wallet row is Alipay alone, as before T73.
+    expect(html).toContain('>Alipay<')
+    expect(html).not.toMatch(/wechat/i)
+  })
+
+  it('Stripe with STRIPE_WECHAT_PAY on: the wallet row is "Alipay / WeChat Pay", terms unchanged (T73)', () => {
+    const html = render('stripe', true)
+    expect(html).toContain('Alipay / WeChat\u00a0Pay')
+    expect(html).toContain('One-time payment for 30 days or 1 year, no auto-renew')
+    // Waffo has no WeChat Pay, switch or not.
+    expect(render('waffo', true)).not.toMatch(/wechat/i)
   })
 
   it('Waffo: the same terms (card plans renew since T50), the card group labelled "Card"', () => {

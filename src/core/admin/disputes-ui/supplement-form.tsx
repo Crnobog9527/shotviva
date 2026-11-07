@@ -1,12 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { Button } from '@/core/ui/button'
 import { Textarea } from '@/core/ui/textarea'
 
 import { useAdminAction } from '../shell/use-admin-action'
 import { DISPUTE_UI } from './copy'
+import { useDraftState } from './draft-state'
 import type { DisputeActions } from './types'
 
 // The summary (uncategorized_text) is the field the Owner most often adds to: a reply from the
@@ -15,6 +16,8 @@ export function SupplementForm({ id, initial, save }: { id: string; initial: str
   const [text, setText] = useState(initial)
   const { pending, error, notice, run } = useAdminAction()
   const changed = text.trim() !== initial.trim()
+  const { mark } = useDraftState()
+  useEffect(() => mark('summary', changed), [changed, mark])
   return (
     <form
       className="grid gap-2"
@@ -26,10 +29,10 @@ export function SupplementForm({ id, initial, save }: { id: string; initial: str
       <label className="grid gap-1 text-sm">
         <span className="font-medium">{DISPUTE_UI.supplementLabel}</span>
         <span className="text-muted-foreground">{DISPUTE_UI.supplementHint}</span>
-        <Textarea rows={8} value={text} onChange={(event) => setText(event.target.value)} maxLength={20000} className="font-mono text-xs" />
+        <Textarea rows={8} value={text} onChange={(event) => setText(event.target.value)} maxLength={20000} className="font-mono text-base sm:text-xs" />
       </label>
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" variant="outline" disabled={pending || !changed || text.trim().length === 0}>
+        <Button type="submit" variant="outline" className="h-11 sm:h-9" disabled={pending || !changed || text.trim().length === 0}>
           {DISPUTE_UI.save}
         </Button>
         <span className="text-xs text-muted-foreground tabular-nums">{text.length} / 20000</span>

@@ -35,6 +35,8 @@ describe('paywall messages (en)', () => {
   it('words the payment groups as DESIGN §4.5 fixes them', () => {
     expect(t('card')).toBe('Card · Apple Pay · Google Pay')
     expect(t('alipay')).toBe('Alipay')
+    // The Stripe wallet line (T73): one checkout offering both.
+    expect(t('wallet')).toBe('Alipay / WeChat\u00a0Pay')
     expect(t('cardRenews')).toBe('Renews automatically, cancel anytime')
     expect(t('walletOnce', { period: 'month' })).toBe('One-time payment, 30 days, no auto-renew')
     expect(t('walletOnce', { period: 'year' })).toBe('One-time payment, 1 year, no auto-renew')
@@ -43,10 +45,9 @@ describe('paywall messages (en)', () => {
     expect(String((t as unknown as { rich: (k: string, v: unknown) => unknown }).rich?.('cancelled', { b: (c: string) => c }) ?? '')).toBe('Checkout cancelled. Nothing was charged.')
   })
 
-  it('shows no Chinese and no WeChat Pay on the English paywall', () => {
+  it('shows no Chinese on the English paywall', () => {
     const text = JSON.stringify(messages.paywall)
     expect(text).not.toMatch(/[一-鿿]/)
-    expect(text).not.toMatch(/wechat/i)
     expect(text).not.toMatch(/queue/i)
   })
 })

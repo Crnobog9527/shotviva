@@ -3,7 +3,7 @@ export const DISPUTE_UI = {
   facts: {
     user: '用户',
     product: '买的什么',
-    charge: 'Stripe 付款',
+    charge: 'Stripe 拒付',
     due: '截止',
     drafted: '证据草稿',
     responder: '谁来应诉',
@@ -13,7 +13,7 @@ export const DISPUTE_UI = {
   notDrafted: '还没整理（Stripe 重发回调时会再试）',
   evidenceTitle: '证据草稿（英文，发给发卡行看）',
   evidenceMissing: 'Stripe 上还没有证据草稿。',
-  supplementLabel: '修改总结 / 补充说明',
+  supplementLabel: '总结（可修改、补充）',
   supplementHint: '用英文写。可以补充用户的工单、聊天记录要点。保存后仍是草稿。',
   save: '保存草稿',
   saved: '已保存到 Stripe（仍是草稿）',
@@ -25,6 +25,9 @@ export const DISPUTE_UI = {
   attached: '附件已加到草稿',
   submitTitle: '提交申诉',
   submitBody: '提交后证据直接发给发卡行，之后不能再修改，也不能再补充。',
+  jumpToSubmit: '去提交 ↓',
+  unsaved: (d: { summary: boolean; file: boolean }) =>
+    `${[d.summary ? '修改的总结还没保存' : '', d.file ? '选好的附件还没上传' : ''].filter(Boolean).join('，')}。先保存或上传，否则提交的是旧草稿。`,
   submit: '提交申诉…',
   confirmTitle: '确定提交这笔申诉？',
   confirmBody: (amount: string) => `${amount} 的拒付。Stripe 只允许提交一次，提交后无法撤回或补充。`,
@@ -32,7 +35,7 @@ export const DISPUTE_UI = {
   confirm: '确认提交',
   cancel: '取消',
   submitted: (at: string) => `已于 ${at} 提交申诉，等待发卡行审核（通常 60～75 天出结果）。`,
+  received: (at: string) => `收到 ${at}`,
   closed: 'Stripe 上这笔已经不能再提交证据。',
-  stripeOnly: '由 Stripe 应诉，这里不提交。',
   liveMissing: '暂时读不到 Stripe 上的状态，请稍后刷新。',
 } as const

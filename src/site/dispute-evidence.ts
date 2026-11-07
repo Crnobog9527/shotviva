@@ -12,7 +12,7 @@ import { site } from './site.config'
 const origin = `https://${site.brand.domain}`
 const refundPolicyText = legalPlainText(refundPolicyPage, origin)
 
-export function disputeEvidenceConfig(input: { managedPayments: boolean; adminOrigin: string }): DisputeEvidenceConfig {
+export function disputeEvidenceConfig(input: { managedPayments: boolean }): DisputeEvidenceConfig {
   return {
     ...input,
     context: (productId, charge) => {
