@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { helpParamValue, isTicketId, parseHelpParam, tabOf } from './help-param'
+import { helpParamValue, isTicketId, parseHelpJob, parseHelpParam, tabOf } from './help-param'
 
 const ID = '3f2b8c1e-9a4d-4e7b-8c21-5d6f7a8b9c0d'
 
@@ -38,5 +38,12 @@ describe('?help= on the account page (T68)', () => {
   it('checks ticket ids as UUIDs', () => {
     expect(isTicketId(ID)).toBe(true)
     expect(isTicketId('not-a-uuid')).toBe(false)
+  })
+
+  it('reads the work sent along by the photo page as a job id, or nothing (T78)', () => {
+    expect(parseHelpJob(ID.toUpperCase())).toBe(ID)
+    expect(parseHelpJob('2fa821c6')).toBeNull()
+    expect(parseHelpJob('javascript:alert(1)')).toBeNull()
+    expect(parseHelpJob(null)).toBeNull()
   })
 })

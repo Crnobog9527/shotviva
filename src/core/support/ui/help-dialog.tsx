@@ -43,7 +43,7 @@ function HelpSheet({ actions, payments, replyTime, brand, unread }: Props) {
   const t = useTranslations('app.support')
   const idBase = useId()
   const router = useRouter()
-  const { view, go, close } = useHelpRoute()
+  const { view, job, go, close } = useHelpRoute()
   // What stays on screen while the sheet animates out after ?help= is gone.
   const [shown, setShown] = useState<HelpView>(view ?? { tab: 'new' })
   if (view && helpParamValue(view) !== helpParamValue(shown)) setShown(view)
@@ -78,7 +78,7 @@ function HelpSheet({ actions, payments, replyTime, brand, unread }: Props) {
     <ResponsiveSheet tall open={view !== null} onOpenChange={(open) => !open && close()} title={t('title')} description={replyTime}>
       <span ref={top} hidden />
       <HelpTabs current={tab} onChange={(next) => go({ tab: next })} idBase={idBase} />
-      {panel('new', <HelpNewView actions={actions} payments={payments} onSent={onSent} />)}
+      {panel('new', <HelpNewView actions={actions} payments={payments} job={job} onSent={onSent} />)}
       {panel(
         'list',
         shown.tab === 'thread' ? (

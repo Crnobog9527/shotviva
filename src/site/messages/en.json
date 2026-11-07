@@ -559,8 +559,12 @@
         "originalKept": "Kept, {px} px preview",
         "originalEdited": "The photo you edited",
         "originalDeleted": "Made before originals were kept",
-        "made": "Made"
+        "made": "Made",
+        "reference": "Photo ID",
+        "copyReference": "Copy photo ID",
+        "copied": "Copied"
       },
+      "problem": "Problem with this photo?",
       "delete": {
         "open": "Delete",
         "title": "Delete this photo?",
@@ -712,7 +716,14 @@
         "lead": "Your recent payments, newest first.",
         "empty": "No purchases yet",
         "emptyBody": "Plans and credit packs show up on this list once you buy one.",
-        "seePlans": "See plans"
+        "seePlans": "See plans",
+        "receipt": "Receipt",
+        "invoice": "Invoice",
+        "linkLabel": "{document} for {purchase} (opens in a new tab)",
+        "emailed": "Receipt sent to your payment email",
+        "refunded": "Refunded",
+        "partlyRefunded": "Partly refunded",
+        "unavailable": "We couldn't open that receipt or invoice just now. Try again in a minute. If it still won't open, ask us in Support and we'll send it to you."
       },
       "session": {
         "title": "Session",
@@ -771,7 +782,8 @@
         "paymentOptional": "Payment (optional)",
         "noPayments": "There are no payments on this account yet.",
         "workLabel": "Work (optional)",
-        "workOption": "{template} · {date, date, medium}",
+        "workOption": "{template} · {date, date, medium} · {ref}",
+        "workRef": "Photo ID {ref}",
         "none": "None",
         "choose": "Choose one",
         "submit": "Send",

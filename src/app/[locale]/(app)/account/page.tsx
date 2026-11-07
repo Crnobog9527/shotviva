@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { getLocale, getTranslations } from 'next-intl/server'
+import { getTranslations } from 'next-intl/server'
 import { Suspense } from 'react'
 
 import { AccountHeader, AccountView, STRIP_FRAMES } from '@/core/account/ui'
@@ -7,11 +7,13 @@ import { AppPage } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser, signupGiftRefused } from '@/core/auth'
 import { maskPhone } from '@/core/auth/phone'
 import { readBalance } from '@/core/billing'
+import { purchaseLines } from '@/core/billing/documents'
 import { lastMembership, readMemberSince, readSubscriptionSummary } from '@/core/billing/subscription'
 import { listMonthWorks } from '@/core/jobs'
 import { readLinkStatus } from '@/core/partner'
 import { formatMoney, hasUnreadReply, listPaymentOptions, paymentChoices, PICKER_LIMIT, ReplyTime } from '@/core/support'
 import { HelpDialog, type HelpActions } from '@/core/support/ui'
+import { currentLocale } from '@/core/i18n/server'
 import type { Translate } from '@/core/translate'
 import { site } from '@/site/site.config'
 
@@ -61,12 +63,14 @@ async function Account() {
     readMemberSince(admin, user.id),
     listMonthWorks(supabase, user.id, new Date(), STRIP_FRAMES),
     getTranslations('app.support'),
-    getLocale(),
+    currentLocale(),
   ])
   const purchases = paymentChoices(payments, site.billing.products, t as unknown as Translate, { money: formatMoney(locale) })
   const last = lastMembership(payments, site.billing.products)
   const more = payments.length >= PICKER_LIMIT
-  const data = { email: user.email, phone: maskPhone(user.phone) || null, balance, giftRefused, subscription, since, lastMembership: last, works, purchases, morePurchases: more, helpUnread, graylum, admin: user.role === 'admin' }
+  // Each line with its receipt / invoice links (T80); the support picker keeps the plain labels.
+  const lines = purchaseLines(payments, purchases, locale)
+  const data = { email: user.email, phone: maskPhone(user.phone) || null, balance, giftRefused, subscription, since, lastMembership: last, works, purchases: lines, morePurchases: more, helpUnread, graylum, admin: user.role === 'admin' }
   // Help & feedback opens over the page (?help=…, T68); its payments picker is the Purchases list.
   return (
     <>
