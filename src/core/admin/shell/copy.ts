@@ -7,6 +7,7 @@ export const SHELL_COPY = {
   menu: '切换页面',
   nav: {
     overview: '概览',
+    analytics: '流量与转化',
     users: '用户',
     tickets: '工单',
     orders: '订单与收入',

@@ -5,11 +5,12 @@ import { z } from 'zod'
 
 import type { CheckoutStartMethod } from '../../analytics/events'
 import { trackCheckoutStart } from '../../analytics/funnel'
-import { PRODUCT_IDS, type PaymentChannel, type SiteProduct } from '../../config'
+import { PRODUCT_IDS, type PaymentChannel, type ProductId, type SiteProduct } from '../../config'
 import { AppError } from '../../errors'
 import { localizePath } from '../../i18n/paths'
 import { allowlistedUrl } from '../../partner/return-to'
 import { CHECKOUT_METHODS, checkoutRoute, offeredMethods, type CheckoutMethod, type CheckoutRoute } from './catalog'
+import { cancelReturnUrl, PRICING_CANCELLED } from './cancel-return'
 import { cardOnlyConfigId } from './card-only'
 import type { StripeApi } from './client'
 import { resolvePriceId } from './prices'
@@ -47,11 +48,11 @@ export type CheckoutDeps = {
 // return page reads that session and our payments row, and says thanks or "confirming". Waffo
 // has no placeholder, so its success URL names the product (core/billing/checkout-return). The
 // credits themselves arrive through the webhook, never this redirect. Cancel goes back to
-// /pricing, which shows a toast.
+// /pricing, which shows a toast, by way of /api/checkout/cancel (cancel-return.ts, T74).
 export const CHECKOUT_RETURN = {
   stripe: '/checkout?session_id={CHECKOUT_SESSION_ID}',
   waffo: (productId: string) => `/checkout?channel=waffo&p=${encodeURIComponent(productId)}`,
-  cancel: '/pricing?checkout=cancel',
+  cancel: PRICING_CANCELLED,
 } as const
 
 // The return path, plus the Graylum way back when the top-up came from an allowlisted host.
@@ -63,7 +64,7 @@ export function successPath(base: string, returnTo: string | undefined, hosts: r
 
 // `locale` is for analytics only: renewals have no page, so their `purchase` event reads the
 // language from the subscription's metadata (ARCHITECTURE §16.2).
-type Metadata = { user_id: string; product_id: string; method: CheckoutMethod; locale: CheckoutBody['locale'] }
+type Metadata = { user_id: string; product_id: ProductId; method: CheckoutMethod; locale: CheckoutBody['locale'] }
 
 type MethodParams = Pick<
   Stripe.Checkout.SessionCreateParams,
@@ -133,7 +134,8 @@ function sessionParams(
     locale: input.locale,
     // Back to the return page / pricing in the language the buyer checked out in.
     success_url: `${input.origin}${localizePath(input.successPath, input.locale)}`,
-    cancel_url: `${input.origin}${localizePath(CHECKOUT_RETURN.cancel, input.locale)}`,
+    // Through /api/checkout/cancel, which counts the cancel and lands on pricing (T74).
+    cancel_url: cancelReturnUrl(input.origin, { product_id: metadata.product_id, method: metadata.method, locale: input.locale }),
     ...methodParams(route, input.cardOnlyConfig),
     ...(route.mode === 'subscription' ? { subscription_data: { metadata } } : { payment_intent_data: { metadata } }),
   }

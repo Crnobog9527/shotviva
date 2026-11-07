@@ -1,7 +1,7 @@
 import type { MembershipProduct, PackProduct } from '../../config'
 import type { CheckoutTone } from './checkout-bar'
 import { productFor, type Period, type TierOffer } from './offer'
-import { isTierPick, type PaywallPick } from './use-paywall-state'
+import { isTierPick, type PaywallChoice, type PaywallPick } from './use-paywall-state'
 
 // What the one paywall pick buys: a plan at the chosen period, or a pack. Pure, so the
 // checkout bar's product, wording and colour are unit-tested.
@@ -22,4 +22,17 @@ export function checkoutTone(resolved: ResolvedPick): CheckoutTone {
   if (resolved.kind === 'pack') return 'bone'
   if (resolved.offer.tier === 'pro') return 'primary'
   return resolved.offer.tier === 'max' ? 'gold' : 'bone'
+}
+
+// `paywall_select` (T74, ARCHITECTURE §16.2): what a pick or a Monthly / Yearly switch lands on,
+// with the method shown at that moment. Null when the pick resolves to nothing.
+export function selectedProduct(
+  choice: PaywallChoice,
+  patch: Partial<PaywallChoice>,
+  offers: readonly TierOffer[],
+  packs: readonly PackProduct[],
+): { product_id: ResolvedPick['product']['id']; method: PaywallChoice['method'] } | null {
+  const next = { ...choice, ...patch }
+  const resolved = resolvePick(next.pick, next.period, offers, packs)
+  return resolved ? { product_id: resolved.product.id, method: next.method } : null
 }

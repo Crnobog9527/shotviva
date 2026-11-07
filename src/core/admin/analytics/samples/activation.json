@@ -1,0 +1,79 @@
+{
+ "cache_key": "cache_activation",
+ "is_cached": false,
+ "last_refresh": "2026-11-08T08:00:00.000000Z",
+ "next_allowed_client_refresh": "2026-11-08T08:01:00.000000Z",
+ "timezone": "UTC",
+ "columns": [
+  "cur",
+  "signups",
+  "active_24h",
+  "seconds_to_image",
+  "seconds_to_paid",
+  "used_gift",
+  "paid_after_gift"
+ ],
+ "types": [
+  [
+   "cur",
+   "Bool"
+  ],
+  [
+   "signups",
+   "UInt64"
+  ],
+  [
+   "active_24h",
+   "UInt64"
+  ],
+  [
+   "seconds_to_image",
+   "Nullable(Float64)"
+  ],
+  [
+   "seconds_to_paid",
+   "Nullable(Float64)"
+  ],
+  [
+   "used_gift",
+   "UInt64"
+  ],
+  [
+   "paid_after_gift",
+   "UInt64"
+  ]
+ ],
+ "results": [
+  [
+   1,
+   144,
+   90,
+   5400.0,
+   259200.0,
+   61,
+   14
+  ],
+  [
+   0,
+   120,
+   66,
+   7200.0,
+   null,
+   50,
+   9
+  ]
+ ],
+ "hasMore": false,
+ "limit": 100,
+ "offset": 0,
+ "modifiers": {
+  "personsOnEventsMode": "person_id_override_properties_joined"
+ },
+ "query_status": null,
+ "timings": [
+  {
+   "k": "./query",
+   "t": 0.21
+  }
+ ]
+}

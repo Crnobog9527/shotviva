@@ -4,7 +4,7 @@ import { logger } from '../../logger'
 import { publicEnv } from '../../public-env'
 import { persistenceFor } from '../consent/decision'
 import { onConsentChange, readConsent } from '../consent/store'
-import { validateEvent, type BrowserEventName, type EventProps } from '../events'
+import { categorySlug, validateEvent, type BrowserEventName, type EventProps } from '../events'
 import { sentryOptions } from '../sentry-options'
 import { clearPosthogStorage, syncPosthog } from './consent-sync'
 import { posthogConfig } from './posthog-config'
@@ -85,6 +85,21 @@ export function trackPaywallView(trigger: EventProps<'paywall_view'>['trigger'])
 
 export function trackContactSales(page: EventProps<'contact_sales_click'>['page']): void {
   track('contact_sales_click', { page })
+}
+
+// T74 (ARCHITECTURE §16.2): a template looked at, a product picked in the paywall, a failed upload.
+// `category` is the template's category as stored (display name before T75, key after); it is
+// sent as categorySlug, the same value `generate` carries.
+export function trackTemplateView(template: { id: string; category: string }, surface: EventProps<'template_view'>['surface']): void {
+  track('template_view', { template_id: template.id, category: categorySlug(template.category), surface })
+}
+
+export function trackPaywallSelect(props: EventProps<'paywall_select'>): void {
+  track('paywall_select', props)
+}
+
+export function trackUploadError(reason: EventProps<'upload_error'>['reason']): void {
+  track('upload_error', { reason })
 }
 
 // The Supabase user id, nothing else: no email or name as person properties (§16.1).
