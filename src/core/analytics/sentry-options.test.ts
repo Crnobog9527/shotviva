@@ -19,4 +19,11 @@ describe('sentryOptions (ARCHITECTURE §16.3)', () => {
     expect(sentryOptions('preview')).toMatchObject({ enabled: true, environment: 'preview', sendDefaultPii: false, tracesSampleRate: 0 })
     expect(sentryOptions(undefined).environment).toBe('development')
   })
+
+  // An empty list means no request gets sentry-trace / baggage, same-origin ones included, so a
+  // read of /api/files/:id that redirects to R2 stays a simple CORS GET (no preflight).
+  it('propagates no trace headers', async () => {
+    const sentryOptions = await load({ NEXT_PUBLIC_SENTRY_DSN: 'https://abc@o1.ingest.us.sentry.io/2' })
+    expect(sentryOptions('production').tracePropagationTargets).toEqual([])
+  })
 })

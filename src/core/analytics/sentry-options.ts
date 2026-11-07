@@ -13,6 +13,12 @@ export function sentryOptions(vercelEnv: string | undefined = publicEnv.NEXT_PUB
     environment: vercelEnv ?? 'development',
     // Errors only: no performance tracing, no replay, no default PII (IP, cookies, user).
     tracesSampleRate: 0,
+    // No sentry-trace / baggage headers on any request. Sentry adds them to every same-origin
+    // fetch even with tracing off, and they survive a redirect: /api/files/:id 302s a paid work to
+    // a signed R2 URL, so the browser's read of it (Share, transparency: result-file.ts) needed a
+    // CORS preflight for those headers, which the bucket (Content-Type only) refuses, and Share
+    // fell back to Download (Codex on the test site, 2026-11-08). Nothing reads the headers.
+    tracePropagationTargets: [],
     sendDefaultPii: false,
     beforeSend: scrubEvent,
     beforeBreadcrumb: scrubBreadcrumb,
