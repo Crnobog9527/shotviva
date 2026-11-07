@@ -778,7 +778,9 @@
           "RATE_LIMITED": "You've sent 5 tickets in the last 24 hours. Please try again later.",
           "INVALID_INPUT": "Choose a type and write a message of up to 2,000 characters. A refund request needs a payment.",
           "NOT_FOUND": "That payment or work isn't on your account.",
-          "generic": "Couldn't send your message. Please try again."
+          "generic": "Couldn't send your message. Please try again.",
+          "IMAGE_TOO_LARGE": "An image is larger than 10 MB. Remove it and send again.",
+          "IMAGE_UNSUPPORTED": "An image couldn't be read. Remove it and send again."
         }
       },
       "thread": {
@@ -792,7 +794,9 @@
         "errors": {
           "INVALID_INPUT": "Write a message of up to 2,000 characters.",
           "NOT_FOUND": "This ticket no longer exists.",
-          "generic": "Couldn't send your message. Please try again."
+          "generic": "Couldn't send your message. Please try again.",
+          "IMAGE_TOO_LARGE": "An image is larger than 10 MB. Remove it and send again.",
+          "IMAGE_UNSUPPORTED": "An image couldn't be read. Remove it and send again."
         }
       },
       "showMore": "Show more",
@@ -806,7 +810,23 @@
       "loadError": "Couldn't load your tickets",
       "loadErrorBody": "Check your connection and try again.",
       "retry": "Try again",
-      "notFoundBody": "It may have been deleted, or it belongs to another account."
+      "notFoundBody": "It may have been deleted, or it belongs to another account.",
+      "images": {
+        "label": "Images (optional)",
+        "hint": "Screenshots or photos, up to 3, 10 MB each.",
+        "add": "Add",
+        "count": "{count}/{max}",
+        "remove": "Remove image {n}",
+        "uploading": "Uploading",
+        "failed": "Couldn't upload",
+        "open": "Open image {n}",
+        "errors": {
+          "IMAGE_TOO_LARGE": "That image is larger than 10 MB. Remove it to send.",
+          "IMAGE_UNSUPPORTED": "That file isn't an image we can read. Use a JPG, PNG, WebP or HEIC image.",
+          "UPLOAD_FAILED": "An image didn't upload. Check your connection, remove it and add it again.",
+          "TOO_MANY": "Up to {max} images per message."
+        }
+      }
     },
     "edit": {
       "open": "Edit",

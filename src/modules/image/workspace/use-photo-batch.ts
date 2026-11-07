@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { summarize, takeBatch, uploadsToStart, type BatchPhoto } from './photo-batch'
 import { naturalSize, nearestRatio } from './photo-ratio'
-import { isAbort, UploadError, uploadPhoto } from './upload-photo'
+import { isAbort, UploadError, uploadPhoto } from '@/core/storage/upload'
 import { uploadDeps, type UploadState } from './use-upload'
 
 // file is null for a kept photo (Make again, T40): it is already in R2, so nothing uploads.

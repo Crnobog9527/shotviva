@@ -6,8 +6,8 @@ export { CREDITS_FLOOR } from './credits-floor'
 export { editBodySchema, editScopeClassifier, runEdit, toEditRequest, type ClassifierAnswer, type EditDeps, type ScopeClassifier } from './edit'
 export { GENERATION_COST_USD } from './generation-cost'
 export { useUpload, type UploadState } from './workspace/use-upload'
-export { checkPickedFile, uploadPhoto, UploadError, type UploadDeps, type UploadErrorCode } from './workspace/upload-photo'
-export { targetSize } from './workspace/compress-image'
+export { checkPickedFile, uploadPhoto, UploadError, type UploadDeps, type UploadErrorCode } from '@/core/storage/upload'
+export { targetSize } from '@/core/storage/upload'
 // TEMPORARY T4 harness, kept while the T16 validation handoff still points Codex at it.
 export { UploadTestPanel, type TestTemplate } from './workspace/dev/upload-test-panel'
 

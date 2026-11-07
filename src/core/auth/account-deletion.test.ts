@@ -29,7 +29,7 @@ describe('deleteAccount', () => {
   it('cancels subscriptions, clears every R2 prefix (wishlist images included), then deletes the auth user', async () => {
     const { value, calls } = deps()
     await deleteAccount('u1', value)
-    expect(calls).toEqual(['stripe:u1', 'r2:inputs/u1/', 'r2:outputs/u1/', 'r2:requests/u1/', 'auth:u1'])
+    expect(calls).toEqual(['stripe:u1', 'r2:inputs/u1/', 'r2:outputs/u1/', 'r2:requests/u1/', 'r2:tickets/u1/', 'auth:u1'])
   })
 
   it('deletes nothing when a subscription cannot be cancelled (ARCHITECTURE §13)', async () => {
@@ -51,6 +51,6 @@ describe('deleteAccount', () => {
 
   it('scopes prefixes to the user id with a trailing slash', () => {
     // Without the slash, deleting "u1" would also match "u10…".
-    expect(accountPrefixes('u1')).toEqual(['inputs/u1/', 'outputs/u1/', 'requests/u1/'])
+    expect(accountPrefixes('u1')).toEqual(['inputs/u1/', 'outputs/u1/', 'requests/u1/', 'tickets/u1/'])
   })
 })

@@ -6,7 +6,7 @@ import type { ActionResult } from '../templates/types'
 import { ticketErrorText } from './copy'
 
 export type TicketAdminActions = {
-  reply(input: { ticketId: string; body: string; close: boolean }): Promise<ActionResult>
+  reply(input: { ticketId: string; body: string; close: boolean; images: string[] }): Promise<ActionResult>
   decide(input: { ticketId: string; decision: 'approved' | 'rejected'; amountCents?: number; body: string }): Promise<ActionResult>
 }
 

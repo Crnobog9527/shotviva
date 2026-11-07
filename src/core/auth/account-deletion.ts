@@ -13,9 +13,10 @@ export type CancelSubscriptions = (userId: string) => Promise<unknown>
 export type AccountDeletionDeps = { storage: AccountStorage; authAdmin: AuthAdmin; cancelSubscriptions: CancelSubscriptions }
 
 // Key layout fixed by ARCHITECTURE §8.2 / T4: inputs/{user_id}/…, outputs/{user_id}/…, plus
-// the wishlist's reference images requests/{user_id}/… (§15.1, T12).
+// the wishlist's reference images requests/{user_id}/… (§15.1, T12) and the support-ticket
+// images tickets/{user_id}/… (§10, T69; the Owner's replies are filed under the author too).
 export function accountPrefixes(userId: string): string[] {
-  return [`inputs/${userId}/`, `outputs/${userId}/`, `requests/${userId}/`]
+  return [`inputs/${userId}/`, `outputs/${userId}/`, `requests/${userId}/`, `tickets/${userId}/`]
 }
 
 // Subscriptions go first (ARCHITECTURE §13): if Stripe will not cancel one, nothing is deleted
