@@ -13,7 +13,7 @@ import type { AdminCategory } from './types'
 type Row = CategoryRow & { templates: { count: number }[] }
 
 // All categories in display order with their template counts, in one request (the count
-// is an embedded aggregate over templates_category_idx).
+// is an embedded aggregate over templates_category_key_idx).
 export async function listAdminCategories(client: SupabaseClient): Promise<AdminCategory[]> {
   const { data, error } = await client
     .from('template_categories')

@@ -64,7 +64,7 @@ export async function upsertTemplate(
   prompt: PromptInput,
 ): Promise<void> {
   const { error } = await client.rpc('admin_upsert_template', toUpsertArgs(template, prompt))
-  // templates_category_fkey (T75): the category was deleted while the form was open.
+  // templates_category_key_fkey (T75): the category was deleted while the form was open.
   if (error?.code === '23503') throw new AppError('INVALID_INPUT', '所选分类已经不存在了，请重新选择分类')
   if (error) throw new AppError('INTERNAL', `upsertTemplate failed: ${error.message}`)
 }
