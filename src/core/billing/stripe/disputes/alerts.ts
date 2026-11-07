@@ -18,9 +18,11 @@ export type DisputeAlertFacts = {
   autoBanned: boolean
   userId: string | null
   productId: string | null
+  // Did the evidence draft reach Stripe on this delivery (see DisputeEvidenceFacts.draft).
+  draft: 'staged' | 'failed' | 'skipped'
 }
 
-const fields = (f: DisputeAlertFacts) => ({
+const fields = (f: Omit<DisputeAlertFacts, 'draft'> & { draft?: DisputeAlertFacts['draft'] }) => ({
   dispute_id: f.disputeId,
   user_id: f.userId,
   amount: f.amount,
@@ -29,15 +31,16 @@ const fields = (f: DisputeAlertFacts) => ({
   responder: f.responder,
   due_by: f.dueBy?.toISOString() ?? null,
   auto_banned: f.autoBanned,
+  draft: f.draft ?? null,
 })
 
 // `base` is the payment-side alert payment-issues.ts built (amount, product, T71 clawback).
 export function alertDisputeOpened(f: DisputeAlertFacts, base: DisputeOpenedAlert): void {
-  captureAlert('dispute_opened', `Stripe dispute ${f.disputeId}: evidence drafted (${f.responder})`, { fields: fields(f) })
-  notifyOwner({ ...base, evidence: { dueBy: f.dueBy?.toISOString() ?? null, responder: f.responder, autoBanned: f.autoBanned } })
+  captureAlert('dispute_opened', `Stripe dispute ${f.disputeId}: evidence ${f.draft} (${f.responder})`, { fields: fields(f) })
+  notifyOwner({ ...base, evidence: { dueBy: f.dueBy?.toISOString() ?? null, responder: f.responder, autoBanned: f.autoBanned, draft: f.draft } })
 }
 
-export function alertDisputeDueSoon(f: DisputeAlertFacts & { dueBy: Date }): void {
+export function alertDisputeDueSoon(f: Omit<DisputeAlertFacts, 'draft'> & { dueBy: Date }): void {
   captureAlert('dispute_due_soon', `Stripe dispute ${f.disputeId}: evidence not submitted, due within 3 days`, { fields: fields(f) })
   notifyOwner({
     kind: 'dispute_due_soon',

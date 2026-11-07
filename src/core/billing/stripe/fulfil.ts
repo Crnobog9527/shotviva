@@ -109,7 +109,8 @@ export async function fulfilCheckoutSession(deps: FulfilDeps, sessionId: string)
     payment,
   })
   // Dispute evidence (T82): the checkout IP, browser and Terms consent on the payment row. Also on
-  // a replay, so a crash between the two calls is mended by Stripe's redelivery.
+  // a replay, so a crash between the two calls is mended by Stripe's redelivery. Best effort: a
+  // failure is logged and alerted, never fails this webhook or skips the step below.
   await recordPaymentContext(deps.db, session)
   // Also on a replay: a crash after settling would otherwise leave the old plan billing. The
   // step is idempotent (ended rows are skipped).

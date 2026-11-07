@@ -103,9 +103,19 @@ const deadline = (iso: string | null) => (iso ? `截止北京时间 ${BEIJING_DA
 const disputePath = (disputeId: string) => `/admin/disputes/${encodeURIComponent(disputeId)}`
 
 // T82: the evidence is drafted; say what is left for the Owner and by when.
+const STAGED_TODO: Record<DisputeEvidenceFacts['responder'], string> = {
+  shotviva: '申诉证据已整理成草稿，请到后台检查后提交',
+  stripe: '这笔由 Stripe 应诉（Managed Payments），证据草稿已存给 Stripe 参考，不用你提交',
+}
+
+const DRAFT_TODO: Record<Exclude<DisputeEvidenceFacts['draft'], 'staged'>, string> = {
+  failed: '证据草稿这次没能存到 Stripe（Stripe 重发通知时会自动重试），请到后台看看，必要时直接在 Stripe 后台提交',
+  skipped: 'Stripe 上这笔已经不接受证据，请到后台看看',
+}
+
 function evidenceText(e: DisputeEvidenceFacts): string {
   const ban = e.autoBanned ? '账号已自动封禁。' : ''
-  const todo = e.responder === 'shotviva' ? '申诉证据已整理成草稿，请到后台检查后提交' : '这笔由 Stripe 应诉（Managed Payments），证据草稿已存给 Stripe 参考，不用你提交'
+  const todo = e.draft === 'staged' ? STAGED_TODO[e.responder] : DRAFT_TODO[e.draft]
   return `${ban}${todo}，${deadline(e.dueBy)}。`
 }
 

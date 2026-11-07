@@ -23,7 +23,7 @@ describe('contextOf', () => {
       p_ip: null,
       p_user_agent: null,
       p_terms_accepted_at: null,
-      p_managed_payments: false,
+      p_managed_payments: null,
     })
   })
 })

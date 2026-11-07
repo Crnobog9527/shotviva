@@ -6,6 +6,7 @@ import { callRpc, type RpcClient } from '@/core/billing'
 import { disputeRowSchema, toLive, type DisputeRow, type LiveDispute, type StripeApi } from '@/core/billing/stripe'
 
 import { decodeCursor, encodeCursor, PAGE_SIZE, type Page } from '../cursor'
+import { reconcileSubmitted } from './reconcile'
 
 // /admin/disputes (ARCHITECTURE §6.3 「后台拒付页」, T82): our rows from admin_list_disputes
 // (0729, (created_at, id) cursor) joined with Stripe's live status. Stripe is asked once per page
@@ -23,7 +24,8 @@ export async function listDisputes(deps: { db: RpcClient; stripe: StripeApi }, r
     z.array(disputeRowSchema),
   )
   const live = rows.length > 0 ? await liveById(deps.stripe) : new Map<string, LiveDispute>()
-  const items = rows.slice(0, PAGE_SIZE).map((row) => ({ ...row, live: live.get(row.stripe_dispute_id) ?? null }))
+  const page = rows.slice(0, PAGE_SIZE).map((row) => ({ ...row, live: live.get(row.stripe_dispute_id) ?? null }))
+  const items = await Promise.all(page.map((item) => reconcileSubmitted(deps.db, item, item.live)))
   const last = items.at(-1)
   const nextCursor = rows.length > PAGE_SIZE && last ? encodeCursor({ created_at: last.created_at.toISOString(), id: last.stripe_dispute_id }) : null
   return { items, nextCursor }

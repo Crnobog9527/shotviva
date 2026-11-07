@@ -6,6 +6,10 @@
 --   admin_get_dispute          one row for the detail page.
 --   admin_mark_dispute_submitted  after Stripe accepted submit = true: once only (DISPUTE_ALREADY_SUBMITTED
 --                              the second time), only for disputes we answer, audit row submit_dispute.
+--   reconcile_dispute_submitted  Stripe shows a submission our row lacks (our mark failed after
+--                              Stripe accepted submit = true, or it was sent from the Stripe
+--                              Dashboard): record it when the admin page sees it, actor unknown,
+--                              with its audit row. Idempotent.
 --   claim_dispute_reminders    the 「截止前 3 天」 reminder, claimed atomically so two admin page
 --                              loads send it once. The page passes the ids Stripe still says need
 --                              a response (a dispute answered in the Stripe Dashboard is skipped).
@@ -100,6 +104,30 @@ begin
 end;
 $$;
 
+create function public.reconcile_dispute_submitted(p_dispute_id text)
+returns timestamptz
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_row public.payment_disputes;
+begin
+  update public.payment_disputes set submitted_at = now()
+   where stripe_dispute_id = p_dispute_id and submitted_at is null
+  returning * into v_row;
+  if not found then
+    return null;
+  end if;
+  -- The audit log names a user; a dispute whose account was deleted has none to name.
+  if v_row.user_id is not null then
+    insert into public.admin_audit_log (action, user_id, reason, target_id)
+    values ('submit_dispute', v_row.user_id, '提交拒付申诉证据 · Stripe 上已提交，打开后台时补记', p_dispute_id);
+  end if;
+  return v_row.submitted_at;
+end;
+$$;
+
 create function public.claim_dispute_reminders(p_dispute_ids text[])
 returns setof text
 language sql
@@ -121,9 +149,11 @@ revoke execute on function public.mark_dispute_drafted(text) from public, anon, 
 revoke execute on function public.admin_list_disputes(timestamptz, text, integer) from public, anon, authenticated;
 revoke execute on function public.admin_get_dispute(text) from public, anon, authenticated;
 revoke execute on function public.admin_mark_dispute_submitted(text, uuid) from public, anon, authenticated;
+revoke execute on function public.reconcile_dispute_submitted(text) from public, anon, authenticated;
 revoke execute on function public.claim_dispute_reminders(text[]) from public, anon, authenticated;
 grant execute on function public.mark_dispute_drafted(text) to service_role;
 grant execute on function public.admin_list_disputes(timestamptz, text, integer) to service_role;
 grant execute on function public.admin_get_dispute(text) to service_role;
 grant execute on function public.admin_mark_dispute_submitted(text, uuid) to service_role;
+grant execute on function public.reconcile_dispute_submitted(text) to service_role;
 grant execute on function public.claim_dispute_reminders(text[]) to service_role;

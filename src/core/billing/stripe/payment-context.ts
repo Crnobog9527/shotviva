@@ -3,6 +3,8 @@ import 'server-only'
 import type Stripe from 'stripe'
 import { z } from 'zod'
 
+import { captureError } from '../../analytics/capture-error'
+import { logger } from '../../logger'
 import { callRpc, type RpcClient } from '../rpc'
 import { BUYER_META } from './checkout-evidence'
 
@@ -23,10 +25,20 @@ export function contextOf(session: Stripe.Checkout.Session, now: Date) {
     p_ip: address.success ? address.data : null,
     p_user_agent: agent && agent.length > 0 ? agent : null,
     p_terms_accepted_at: session.consent?.terms_of_service === 'accepted' ? now.toISOString() : null,
-    p_managed_payments: session.managed_payments?.enabled ?? false,
+    // null when the Session does not say: open_payment_dispute (0727) then falls back to the route
+    // default, never to "ours" (that would offer a submit, and its evidence fee, on an MP dispute).
+    p_managed_payments: session.managed_payments?.enabled ?? null,
   }
 }
 
+// Best effort: evidence must never fail the checkout webhook (the credits are already granted) or
+// skip what follows it (cancelling an upgraded-from subscription). Logged and sent to Sentry.
 export async function recordPaymentContext(db: RpcClient, session: Stripe.Checkout.Session, now = new Date()): Promise<boolean> {
-  return callRpc(db, 'record_payment_context', contextOf(session, now), z.boolean())
+  try {
+    return await callRpc(db, 'record_payment_context', contextOf(session, now), z.boolean())
+  } catch (error) {
+    logger.error('stripe payment context not recorded', { session_id: session.id, error })
+    captureError(error, { fields: { session_id: session.id, stage: 'payment_context' } })
+    return false
+  }
 }

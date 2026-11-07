@@ -186,6 +186,7 @@ export {
   createDisputeUpload,
   DISPUTES_COPY,
   listDisputes,
+  reconcileSubmitted,
   saveDisputeText,
   sendDueReminders,
   submitDispute,

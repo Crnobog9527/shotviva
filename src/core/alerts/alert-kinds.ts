@@ -27,8 +27,15 @@ export type RefundAlert = PaymentFacts & {
 }
 
 // T82: what the dispute flow adds once the evidence is staged: the deadline (ISO, null when the
-// bank takes no response), who answers (us, or Stripe for Managed Payments) and the automatic ban.
-export type DisputeEvidenceFacts = { dueBy: string | null; responder: 'shotviva' | 'stripe'; autoBanned: boolean }
+// bank takes no response), who answers (us, or Stripe for Managed Payments), the automatic ban, and
+// whether the draft reached Stripe: 'failed' is retried on Stripe's redelivery, but the Owner is told
+// now, since this alert is sent once; 'skipped' means Stripe no longer takes evidence.
+export type DisputeEvidenceFacts = {
+  dueBy: string | null
+  responder: 'shotviva' | 'stripe'
+  autoBanned: boolean
+  draft: 'staged' | 'failed' | 'skipped'
+}
 
 export type DisputeOpenedAlert = PaymentFacts & { kind: 'dispute_opened'; disputeId: string; credits: Clawback | null; evidence?: DisputeEvidenceFacts }
 

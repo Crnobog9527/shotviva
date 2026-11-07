@@ -5,7 +5,8 @@ import type Stripe from 'stripe'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { captureAlert } from '@/core/analytics/capture-error'
-import { handleStripeWebhook, submitEvidence, type DisputeEvidenceConfig } from '@/core/billing/stripe'
+import { reconcileSubmitted } from '@/core/admin'
+import { handleStripeWebhook, loadDisputeRow, submitEvidence, toLive, type DisputeEvidenceConfig } from '@/core/billing/stripe'
 
 import { connectAdmin, createPricedTemplate, createUser, profileOf } from './helpers'
 import { serviceSupabase } from './supabase-env'
@@ -175,10 +176,14 @@ describe('charge.dispute.created', () => {
     const { dispute, event } = openDisputeEvent(charge)
     h.disputeUpdate.mockRejectedValueOnce(new Error('stripe down'))
     expect((await deliver(event)).status).toBe(500)
+    // The one alert still goes out, saying the draft failed.
+    expect(captureAlert).toHaveBeenCalledWith('dispute_opened', expect.stringContaining('failed'), { fields: expect.objectContaining({ draft: 'failed' }) })
+    vi.mocked(captureAlert).mockClear()
     expect(await disputeRow(dispute.id)).toMatchObject({ evidence_drafted_at: null, auto_banned_at: expect.any(Date) })
     expect((await deliver(event)).status).toBe(200)
     expect(await disputeRow(dispute.id)).toMatchObject({ evidence_drafted_at: expect.any(Date) })
     expect((await db.query("select count(*)::int as n from public.admin_audit_log where user_id = $1 and action = 'ban_user'", [userId])).rows[0].n).toBe(1)
+    expect(captureAlert).not.toHaveBeenCalledWith('dispute_opened', expect.anything(), expect.anything())
   })
 })
 
@@ -202,6 +207,20 @@ describe('submitting evidence', () => {
     expect(audit.rows).toHaveLength(1)
     await expect(submitEvidence(deps, { id: dispute.id, actorId: admin })).rejects.toMatchObject({ code: 'CONFLICT' })
     expect(h.disputeUpdate).toHaveBeenCalledTimes(2)
+  })
+
+  it('a submission Stripe has and our row lacks is recorded on the admin page, once, with its audit row', async () => {
+    const { dispute } = await drafted()
+    // Submitted outside our mark (the mark failed, or the Stripe Dashboard was used).
+    await h.stripe.disputes.update(dispute.id, { submit: true })
+    const live = toLive(await h.stripe.disputes.retrieve(dispute.id))
+    const db2 = serviceSupabase()
+    const row = await loadDisputeRow(db2, dispute.id)
+    expect((await reconcileSubmitted(db2, row, live)).submitted_at).toEqual(expect.any(Date))
+    await reconcileSubmitted(db2, row, live)
+    expect(await disputeRow(dispute.id)).toMatchObject({ submitted_at: expect.any(Date), submitted_by: null })
+    const audit = await db.query("select reason from public.admin_audit_log where action = 'submit_dispute' and target_id = $1", [dispute.id])
+    expect(audit.rows).toEqual([{ reason: expect.stringContaining('补记') }])
   })
 
   it('admin_mark_dispute_submitted refuses a non-admin actor and a second mark', async () => {

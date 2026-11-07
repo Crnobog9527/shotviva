@@ -2,7 +2,9 @@ import 'server-only'
 
 import { z } from 'zod'
 
+import { captureError } from '../../../analytics/capture-error'
 import { AppError } from '../../../errors'
+import { logger } from '../../../logger'
 import { callRpc, type RpcClient } from '../../rpc'
 import type { StripeApi } from '../client'
 import { FIELD_LIMIT } from './activity-log'
@@ -76,11 +78,18 @@ export async function submitEvidence(deps: ManageDeps, input: { id: unknown; act
   if (row.responder !== 'shotviva') throw new AppError('FORBIDDEN', DISPUTE_ERRORS.stripeAnswers)
   if (!live.hasEvidence) throw new AppError('INVALID_INPUT', DISPUTE_ERRORS.noEvidence)
   await deps.stripe.disputes.update(row.stripe_dispute_id, { submit: true })
-  const at = await callRpc(
-    deps.db,
-    'admin_mark_dispute_submitted',
-    { p_dispute_id: row.stripe_dispute_id, p_actor: input.actorId },
-    z.string().transform((value) => new Date(value)),
-  )
-  return at
+  // Stripe has it now; a failed mark must not read as a failed submit. The admin page records the
+  // submission from Stripe's submission_count on its next load (reconcile_dispute_submitted).
+  try {
+    return await callRpc(
+      deps.db,
+      'admin_mark_dispute_submitted',
+      { p_dispute_id: row.stripe_dispute_id, p_actor: input.actorId },
+      z.string().transform((value) => new Date(value)),
+    )
+  } catch (error) {
+    logger.error('stripe dispute submitted but not marked', { dispute_id: row.stripe_dispute_id, error })
+    captureError(error, { fields: { dispute_id: row.stripe_dispute_id, stage: 'dispute_mark' } })
+    return new Date()
+  }
 }

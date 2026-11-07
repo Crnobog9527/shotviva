@@ -81,26 +81,34 @@ export type DisputeOutcome = 'drafted' | 'recorded' | 'replayed'
 
 // `owner`: the Feishu alert payment-issues.ts built for this dispute (payment facts, T71 clawback);
 // sent here once, with the deadline and the ban added, when the dispute is new.
+// The draft is tried before the alert so the alert can say how it went, and its failure is held
+// until the alert is out: the alert is sent once (on the delivery that created the row), so a draft
+// that keeps failing still reaches the Owner. The error is then rethrown for Stripe's redelivery.
 export async function openDispute(deps: DisputeDeps, disputeId: string, owner: DisputeOpenedAlert): Promise<DisputeOutcome> {
   const dispute = await deps.stripe.disputes.retrieve(disputeId, { expand: ['charge'] })
   const opened = await open(deps, dispute)
   const stage = !opened.drafted && canStage(dispute)
-  if (stage) await draft(deps, dispute)
-  if (opened.created) {
-    const facts = {
-      disputeId: dispute.id,
-      amount: dispute.amount,
-      currency: dispute.currency,
-      reason: dispute.reason,
-      dueBy: dueBy(dispute),
-      responder: opened.responder,
-      autoBanned: opened.auto_banned,
-      userId: opened.user_id,
-      productId: owner.productId,
-    }
-    alertDisputeOpened(facts, owner)
-  }
-  logger.info('stripe dispute opened', { dispute_id: dispute.id, created: opened.created, staged: stage, responder: opened.responder })
+  const failure = stage ? await draft(deps, dispute).then(() => null, (error: unknown) => ({ error })) : null
+  if (opened.created) alertDisputeOpened(alertFacts(dispute, opened, owner, draftState(stage, failure !== null)), owner)
+  logger.info('stripe dispute opened', { dispute_id: dispute.id, created: opened.created, staged: stage, failed: failure !== null, responder: opened.responder })
+  if (failure) throw failure.error
   if (stage) return 'drafted'
   return opened.created ? 'recorded' : 'replayed'
+}
+
+const draftState = (stage: boolean, failed: boolean) => (failed ? 'failed' : stage ? 'staged' : 'skipped')
+
+function alertFacts(dispute: Stripe.Dispute, opened: Opened, owner: DisputeOpenedAlert, draft: 'staged' | 'failed' | 'skipped') {
+  return {
+    disputeId: dispute.id,
+    amount: dispute.amount,
+    currency: dispute.currency,
+    reason: dispute.reason,
+    dueBy: dueBy(dispute),
+    responder: opened.responder,
+    autoBanned: opened.auto_banned,
+    userId: opened.user_id,
+    productId: owner.productId,
+    draft,
+  }
 }
