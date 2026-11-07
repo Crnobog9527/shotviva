@@ -16,6 +16,14 @@ describe('redaction', () => {
   })
 })
 
+describe('phone sign-in redaction (T63)', () => {
+  it('masks mainland numbers in any spelling and anything under an otp key', () => {
+    expect(redactString('to 14000000001, +8614000000001 and 8614000000001')).toBe('to [phone], [phone] and [phone]')
+    expect(redactString('job 1762500000000 cost 2')).toBe('job 1762500000000 cost 2')
+    expect(redact({ sms: { otp: '402913' }, phone: '140****0001' })).toEqual({ sms: { otp: '[redacted]' }, phone: '140****0001' })
+  })
+})
+
 describe('logger', () => {
   afterEach(() => vi.restoreAllMocks())
 

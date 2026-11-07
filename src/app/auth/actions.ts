@@ -6,11 +6,13 @@ import {
   loginPath,
   requestPasswordReset,
   resendSignupEmail,
+  sendPhoneCode,
   signInWithGoogle,
   signInWithPassword,
   signOut,
   signUpWithPassword,
   updatePassword,
+  verifyPhoneCode,
   type FormState,
 } from '@/core/auth'
 import { site } from '@/site/site.config'
@@ -29,6 +31,15 @@ export async function signupAction(_: FormState, form: FormData) {
 
 export async function resendSignupAction(_: FormState, form: FormData) {
   return resendSignupEmail(form)
+}
+
+// Phone sign-in (T63), Chinese pages only: ask for the SMS code, then enter it.
+export async function phoneSendAction(_: FormState, form: FormData) {
+  return sendPhoneCode(form)
+}
+
+export async function phoneVerifyAction(_: FormState, form: FormData) {
+  return verifyPhoneCode(form, { freeCredits: site.billing.freeCredits })
 }
 
 export async function resetRequestAction(_: FormState, form: FormData) {

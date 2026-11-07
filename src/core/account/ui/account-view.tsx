@@ -20,6 +20,8 @@ import type { PurchaseLine } from './sheet-rows'
 
 export type AccountData = {
   email: string | null
+  // A phone sign-up's number, masked (140****5678); null for email and Google accounts (T63).
+  phone: string | null
   balance: Balance
   // Same-IP rule (ARCHITECTURE §7): this account got no signup gift.
   giftRefused: boolean
@@ -55,10 +57,11 @@ export type AccountSite = {
 
 type Props = { data: AccountData; actions: AccountActions; site: AccountSite }
 
+// Who is signed in: the email, or the masked phone of an account that has none.
 export function AccountHeader({ email }: { email?: string | null }) {
   const t = useTranslations('auth.account')
   const who = email ? (
-    <span title={email} className="block max-w-[52vw] truncate text-caption leading-none text-muted-foreground md:max-w-80">
+    <span title={email} className="block max-w-[52vw] truncate text-caption leading-none text-muted-foreground tabular-nums md:max-w-80">
       {email}
     </span>
   ) : undefined
@@ -74,7 +77,7 @@ export function AccountView({ data, actions, site }: Props) {
   const allowance = planAllowance(data.subscription, data.lastMembership, site.products)
   return (
     <>
-      <AccountHeader email={data.email} />
+      <AccountHeader email={data.email ?? data.phone} />
       <div className="md:mx-(--gutter) md:mt-6 md:grid md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] md:items-start md:gap-4">
         <Group title={t('plan.title')} className={pair}>
           <PlanCard summary={data.subscription} products={site.products} paid={data.balance.paid} manage={actions.manageSubscription} cancelWaffo={actions.cancelWaffoSubscription} facts={facts} />
@@ -85,7 +88,7 @@ export function AccountView({ data, actions, site }: Props) {
         </Group>
       </div>
       <Group title={t('settings.title')}>
-        <SettingsRows email={data.email} purchases={data.purchases} morePurchases={data.morePurchases} helpUnread={data.helpUnread} admin={data.admin} />
+        <SettingsRows email={data.email} phone={data.phone} purchases={data.purchases} morePurchases={data.morePurchases} helpUnread={data.helpUnread} admin={data.admin} />
       </Group>
       <IntegrationsPanel graylum={data.graylum} disconnect={actions.disconnectGraylum} />
       <Group title={t('session.title')} hideTitle>

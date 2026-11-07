@@ -19,7 +19,7 @@ async function render(element: ReactElement, locale: 'en' | 'zh' = 'en') {
   return renderToStaticMarkup(createElement(Intl, { locale, messages: await loadMessages(locale), timeZone: 'UTC' }, element))
 }
 
-const rows = (admin: boolean) => createElement(SettingsRows, { email: 'a@example.test', purchases: [], morePurchases: false, helpUnread: false, admin })
+const rows = (admin: boolean) => createElement(SettingsRows, { email: 'a@example.test', phone: null, purchases: [], morePurchases: false, helpUnread: false, admin })
 
 describe('account page Admin row', () => {
   it('an admin gets "Admin" as the first Settings row, linking to /admin', async () => {
@@ -85,5 +85,23 @@ describe('app shell Admin item', () => {
     const html = await render(bar('user'))
     expect(html).not.toContain('/admin')
     expect(html).not.toContain('data-admin-entry')
+  })
+})
+
+describe('account Settings for a phone sign-up (T63)', () => {
+  const phoneRows = (email: string | null) =>
+    createElement(SettingsRows, { email, phone: '140****5678', purchases: [], morePurchases: false, helpUnread: false, admin: false })
+
+  it('shows the masked number, and no empty email row when there is no email', async () => {
+    const html = await render(phoneRows(null), 'zh')
+    expect(html).toContain('手机号')
+    expect(html).toContain('140****5678')
+    expect(html).not.toContain('邮箱')
+  })
+
+  it('keeps the email row when the account has both', async () => {
+    const html = await render(phoneRows('a@example.test'))
+    expect(html).toContain('Phone')
+    expect(html).toContain('a@example.test')
   })
 })

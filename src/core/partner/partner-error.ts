@@ -32,6 +32,12 @@ const FROM_APP: Record<ErrorCode, PartnerErrorCode> = {
   AUTH_CAPTCHA_FAILED: 'internal',
   AUTH_RATE_LIMITED: 'internal',
   AUTH_WEAK_PASSWORD: 'internal',
+  AUTH_PHONE_INVALID: 'internal',
+  AUTH_CONSENT_REQUIRED: 'internal',
+  AUTH_SMS_COOLDOWN: 'internal',
+  AUTH_SMS_DAILY_LIMIT: 'internal',
+  AUTH_SMS_FAILED: 'internal',
+  AUTH_OTP_INVALID: 'internal',
   CONFLICT: 'invalid_input',
   RATE_LIMITED: 'rate_limited',
   // The partner contract (§14.6) has no tier code and no partner route is tier-gated; reaching

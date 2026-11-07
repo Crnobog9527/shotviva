@@ -15,7 +15,7 @@ const t = {
   zh: createTranslator({ locale: 'zh', messages: zh, namespace: 'auth' }) as unknown as T,
 }
 
-const FIELD_ERRORS: FieldError[] = ['loginEmail', 'email', 'passwordMissing', 'passwordShort', 'passwordWeak', 'mismatch']
+const FIELD_ERRORS: FieldError[] = ['loginEmail', 'email', 'passwordMissing', 'passwordShort', 'passwordWeak', 'mismatch', 'phone', 'code', 'consent']
 
 describe('auth messages', () => {
   it('says what the signed-off comp says (en)', () => {
@@ -41,7 +41,15 @@ describe('auth messages', () => {
   it('has one line for a verification that did not complete, and no checkbox wording', () => {
     expect(t.en('captcha.failed')).toBe("Verification didn't complete. Please try again.")
     expect(t.zh('captcha.failed')).toBe('验证没有完成，请再试一次。')
-    for (const messages of [en.auth, zh.auth]) expect(JSON.stringify(messages)).not.toMatch(/check below|tick|勾选|下方的验证/i)
+    // The phone consent box (T63) is a real checkbox; nothing else may talk about ticking one.
+    const withoutConsent = (messages: typeof en.auth) => {
+      const copy = structuredClone(messages) as Partial<typeof en.auth>
+      delete copy.phone
+      delete (copy.fieldErrors as Partial<typeof en.auth.fieldErrors>).consent
+      delete (copy.errors as Partial<typeof en.auth.errors>).AUTH_CONSENT_REQUIRED
+      return copy
+    }
+    for (const messages of [en.auth, zh.auth]) expect(JSON.stringify(withoutConsent(messages))).not.toMatch(/check below|tick|勾选|下方的验证/i)
   })
 
   it('discloses hCaptcha inside the consent sentence, or in one short line (Owner 2026-11-07)', () => {
@@ -58,6 +66,20 @@ describe('auth messages', () => {
       const text = JSON.stringify(messages)
       expect(text).not.toMatch(/apple/i)
       expect(text).not.toMatch(/prompt/i)
+    }
+  })
+
+  it('has the phone sign-in copy in both languages (T63)', () => {
+    const addr = (chunks: string) => chunks
+    expect(t.zh('tabs.phone')).toBe('手机号')
+    expect(t.zh('phone.send')).toBe('获取验证码')
+    expect(t.zh('code.sent', { phone: '140****5678', minutes: 5, addr })).toBe('验证码已发送至 140****5678，5 分钟内有效。')
+    expect(t.zh('code.wait', { seconds: 42 })).toBe('42 秒后可重新获取')
+    expect(t.zh('phone.consent', { privacy: addr })).toMatch(/隐私政策.*中国大陆以外.*美国.*短信服务商/)
+    expect(t.en('phone.consent', { privacy: addr })).toMatch(/Privacy Policy.*outside mainland China.*United States.*SMS provider/)
+    for (const code of ['AUTH_PHONE_INVALID', 'AUTH_CONSENT_REQUIRED', 'AUTH_SMS_COOLDOWN', 'AUTH_SMS_DAILY_LIMIT', 'AUTH_SMS_FAILED', 'AUTH_OTP_INVALID']) {
+      expect(t.en(`errors.${code}`)).not.toMatch(/auth\./)
+      expect(t.zh(`errors.${code}`)).toMatch(/[一-鿿]/)
     }
   })
 })

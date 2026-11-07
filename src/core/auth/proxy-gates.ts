@@ -64,9 +64,9 @@ export function decide(
   search: string,
   locale: Locale = DEFAULT_LOCALE,
 ) {
-  if (gate === 'admin') return user?.emailVerified && user.role === 'admin' ? 'pass' : 'not_found'
+  if (gate === 'admin') return user?.verified && user.role === 'admin' ? 'pass' : 'not_found'
   if (!user) return { redirect: localizePath(loginPath(`${pathname}${search}`), locale) }
-  if (!user.emailVerified) return { redirect: localizePath('/login?error=unverified', locale) }
+  if (!user.verified) return { redirect: localizePath('/login?error=unverified', locale) }
   return 'pass'
 }
 

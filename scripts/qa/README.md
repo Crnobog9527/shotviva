@@ -93,6 +93,23 @@ lands on `next` (default `/account`).
 > anywhere; each works once. The window must already be through Vercel's deployment
 > protection.
 
+## Phone sign-in persona (T63, Chinese pages)
+
+Phone accounts are not made by `pnpm qa:accounts`. They come from Supabase **test phone numbers**:
+a number with a fixed code, for which Supabase sends no SMS and does not call the Send SMS hook.
+
+- Owner, once, on the **preview** project only: Supabase → Authentication → Sign In / Providers →
+  Phone → *Test phone numbers and OTPs*. Add two or three numbers in the 140 range (IoT data-only
+  numbers that cannot receive SMS, so never a person's), e.g. `8614000000101=<6 digits>`, with a
+  far expiry date. Keep the numbers and codes in the team's password manager, not in this repo.
+- In the browser: open `/zh/login` (or `/zh/signup`), 手机号 tab, enter the number, tick the
+  consent box, 获取验证码, then type the fixed code. A new number becomes a new account with the
+  signup gift (same-IP rule as always); the same number again signs that account in.
+- Our own limits still count test numbers (one per minute, five a day per number, twenty a day per
+  network), so the limit checks can be validated without real SMS. To start a number fresh as a
+  new account, delete it from its own account page (注销账号); the limit rows expire after a day.
+- Real SMS is never sent from the preview: the preview's `SMS_PROVIDER` is `fake`.
+
 ## Guards
 
 - `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are read from `.env.local` only.

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
-import { AdminPage, ledgerPage, loadUser, loadUserExtras, recentJobs, UserDetailView, USERS_COPY } from '@/core/admin'
+import { accountLabel, AdminPage, ledgerPage, loadUser, loadUserExtras, recentJobs, UserDetailView, USERS_COPY } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { serverEnv } from '@/core/env'
 
@@ -22,7 +22,7 @@ export default async function AdminUserPage({ params, searchParams }: PageProps<
   if (!user) notFound()
   const extras = await loadUserExtras(db, user)
   return (
-    <AdminPage title={user.email ?? user.id}>
+    <AdminPage title={accountLabel(user)}>
       <UserDetailView
         user={user}
         jobs={jobs}

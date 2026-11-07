@@ -19,7 +19,7 @@ export function assertSameOrigin(request: NextRequest): void {
 export async function requireApiUser(): Promise<SessionUser> {
   const user = await getSessionUser()
   if (!user) throw new AppError('UNAUTHORIZED', 'Sign in first')
-  if (!user.emailVerified) throw new AppError('FORBIDDEN', 'Verify your email first')
+  if (!user.verified) throw new AppError('FORBIDDEN', 'Verify your email or phone first')
   return user
 }
 

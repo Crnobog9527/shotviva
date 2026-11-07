@@ -121,6 +121,19 @@ describe('createCheckout routing', () => {
 
 // Every route states Managed Payments explicitly (control 2026-11-07: the live Dashboard has
 // "Managed Payments enabled by default for all Checkout Sessions" on, and MP takes no Alipay).
+describe('no email from us (T63: phone accounts may have none)', () => {
+  it('never sends customer_email or a customer: Stripe Checkout asks the buyer for the receipt address', async () => {
+    for (const [product_id, method] of [['starter_monthly', 'card'], ['max_yearly', 'alipay'], ['pack_s', 'card']] as const) {
+      const { stripe, create } = fakeStripe()
+      await createCheckout(deps(stripe), { userId: USER, body: { product_id, method, locale: 'zh' } })
+      const params = sent(create)
+      expect(params).toBeDefined()
+      expect(params).not.toHaveProperty('customer_email')
+      expect(params).not.toHaveProperty('customer')
+    }
+  })
+})
+
 describe('Managed Payments is explicit on every route', () => {
   it.each([
     ['card membership, MP on', 'pro_monthly', 'card', true, { mode: 'subscription', managed_payments: { enabled: true } }, null],

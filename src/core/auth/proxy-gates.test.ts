@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import { decide, gateFor, lowercasePath, notFoundResponse, proxyGate, toAccountLocale } from './proxy-gates'
 
-const user = (role: 'user' | 'admin', emailVerified = true) => ({ id: 'u', email: null, role, emailVerified, banned: false, locale: null })
+const user = (role: 'user' | 'admin', verified = true) => ({ id: 'u', email: null, phone: null, role, verified, banned: false, locale: null })
 
 describe('gateFor', () => {
   it.each([

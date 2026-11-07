@@ -12,7 +12,7 @@ export const privacyCollectSections: readonly [LegalSection, ...LegalSection[]] 
       'Information you give us:',
       {
         list: [
-          'Account details: your email address and password (stored only in scrambled, hashed form by our sign-in provider), and a display name. If you sign in with Google, we receive your name, email address and profile picture from Google.',
+          'Account details: your email address and password (stored only in scrambled, hashed form by our sign-in provider), and a display name. If you sign in with Google, we receive your name, email address and profile picture from Google. If you sign in with a mainland China mobile number, we keep that number instead (see "Phone numbers and text messages").',
           'Photos you upload. Before a photo leaves your device, your browser shrinks it and saves it again, which removes hidden photo data such as camera details and GPS location. If your browser cannot do this, the original file is uploaded and we shrink it on our servers.',
           'Text you enter for a template, such as a title, a price or a note about what to change.',
           'The images the Service creates for you (your works), and whether each one is public or private.',
@@ -50,7 +50,7 @@ export const privacyCollectSections: readonly [LegalSection, ...LegalSection[]] 
           'To show public works, and to run the Wishlist.',
           'To keep the Service safe: prevent fraud and abuse, enforce limits on free credits, and investigate misuse.',
           'To understand how the Service is used and fix problems, through analytics and error reports.',
-          'To send account emails, such as email confirmation and password reset. We do not send marketing emails.',
+          'To send account emails, such as email confirmation and password reset, and sign-in codes by text message. We do not send marketing emails or messages.',
           'To answer your messages, and to comply with the law and enforce our terms.',
         ],
       },

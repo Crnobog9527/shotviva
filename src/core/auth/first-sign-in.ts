@@ -7,7 +7,7 @@ import { billingGrant, grantSignupCredits } from './free-credits'
 import { clientIp, recordSignupIp } from './signup-ip'
 import { createAdminSupabase } from './supabase-admin'
 
-export type SignInMethod = 'email' | 'google'
+export type SignInMethod = 'email' | 'google' | 'phone'
 
 // Runs after any verified sign-in (email link, Google, password). Order matters: the IP is
 // stored before the grant so the same-IP rule in grant_credits (0184) can see it.
