@@ -4,6 +4,7 @@ import { CircleAlertIcon, ImagePlusIcon, XIcon } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useId, useRef } from 'react'
 
+import { REPLAY_BLOCK_CLASS } from '../../analytics/browser'
 import type { UploadErrorCode } from '../../storage/upload'
 
 import { UPLOAD_ACCEPT } from '../../storage/rules'
@@ -113,7 +114,7 @@ function Thumb({ item, text, n, onRemove }: { item: PickedImage; text: ImagesTex
     <div className="relative size-20">
       {/* A local object URL of the picked file: next/image has nothing to optimise here. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={item.preview} alt="" className={cn('size-20 rounded-control object-cover shadow-[inset_0_0_0_1px_var(--border)]', item.status !== 'ready' && 'opacity-55')} />
+      <img src={item.preview} alt="" className={cn(REPLAY_BLOCK_CLASS, 'size-20 rounded-control object-cover shadow-[inset_0_0_0_1px_var(--border)]', item.status !== 'ready' && 'opacity-55')} />
       {item.status === 'uploading' ? (
         <span role="progressbar" aria-label={text.uploading} aria-valuenow={Math.round(item.progress * 100)} className="absolute inset-x-2 bottom-2 h-1 overflow-hidden rounded-full bg-wash-strong">
           <span className="block h-full rounded-full bg-foreground transition-[width] motion-reduce:transition-none" style={{ width: `${Math.max(8, item.progress * 100)}%` }} />

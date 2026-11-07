@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element -- auth-gated download route, not a static asset */
 import { useTranslations } from 'next-intl'
 
+import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
 import type { OriginalSource } from './photo-detail'
 
 // The "Original" view, laid over the result so the frame keeps the result's size: the 768px
@@ -8,7 +9,7 @@ import type { OriginalSource } from './photo-detail'
 export function OriginalLayer({ source, alt }: { source: OriginalSource; alt: string }) {
   const t = useTranslations('app.result')
   if (source.kind !== 'deleted') {
-    return <img src={source.url} alt={alt} decoding="async" className="absolute inset-0 size-full bg-photo-ground object-contain" />
+    return <img src={source.url} alt={alt} decoding="async" className={`${REPLAY_BLOCK_CLASS} absolute inset-0 size-full bg-photo-ground object-contain`} />
   }
   return (
     <div className="absolute inset-0 grid place-content-center justify-items-center gap-2 bg-card p-6 text-center">

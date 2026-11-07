@@ -3,6 +3,7 @@
 import { useFormatter, useTranslations } from 'next-intl'
 import { forwardRef } from 'react'
 
+import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
 import { NOTE_MAX_LENGTH } from '@/core/templates/output-options'
 
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
@@ -41,7 +42,7 @@ function Drop({ url, onPick }: { url: string | null; onPick(): void }) {
       {url ? (
         <>
           {/* eslint-disable-next-line @next/next/no-img-element -- a local object URL */}
-          <img className="mk-shot" src={url} alt="" />
+          <img className={`${REPLAY_BLOCK_CLASS} mk-shot`} src={url} alt="" />
           <span className="mk-replace-pill" aria-hidden>
             {t('replace')}
           </span>

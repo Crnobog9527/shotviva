@@ -4,6 +4,7 @@
 import { useFormatter, useTranslations } from 'next-intl'
 import { useState } from 'react'
 
+import { REPLAY_BLOCK_CLASS } from '../../analytics/browser'
 import { Dialog, DialogContent, DialogTitle } from '../../ui/dialog'
 import { StackIcon } from './icons'
 
@@ -21,7 +22,7 @@ export function ImageStrip({ urls }: { urls: readonly string[] }) {
       <div className="wl-refs">
         {urls.map((url, index) => (
           <button key={url} type="button" onClick={() => setOpen(index)} aria-label={alt(index)} className="press">
-            <img src={url} alt="" loading="lazy" />
+            <img className={REPLAY_BLOCK_CLASS} src={url} alt="" loading="lazy" />
           </button>
         ))}
         {urls.length > 1 && (
@@ -34,7 +35,7 @@ export function ImageStrip({ urls }: { urls: readonly string[] }) {
       <Dialog open={open !== null} onOpenChange={(value) => !value && setOpen(null)}>
         <DialogContent className="max-w-[min(92vw,720px)] border-none bg-photo-ground p-0">
           <DialogTitle className="sr-only">{open === null ? '' : alt(open)}</DialogTitle>
-          {open !== null && <img src={urls[open]} alt={alt(open)} className="max-h-[85dvh] w-full rounded-media object-contain" />}
+          {open !== null && <img src={urls[open]} alt={alt(open)} className={`${REPLAY_BLOCK_CLASS} max-h-[85dvh] w-full rounded-media object-contain`} />}
         </DialogContent>
       </Dialog>
     </>

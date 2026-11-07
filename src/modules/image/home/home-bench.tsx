@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl'
 import { forwardRef } from 'react'
 
+import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
 import { NOTE_MAX_LENGTH } from '@/core/templates/output-options'
 
 import { GroundedImg } from '../result/grounded-img'
@@ -41,7 +42,7 @@ export const HomeBench = forwardRef<HTMLDivElement, Props>(function HomeBench({ 
           </span>
           <PlusIcon className="mk-plus" />
           {/* eslint-disable-next-line @next/next/no-img-element -- a local object URL, not an optimisable asset */}
-          {photo.url ? <img className="mk-shot" src={photo.url} alt="" /> : null}
+          {photo.url ? <img className={`${REPLAY_BLOCK_CLASS} mk-shot`} src={photo.url} alt="" /> : null}
           <span className="mk-replace" aria-hidden>
             {t('replace')}
           </span>

@@ -30,7 +30,7 @@ export const privacyPage = defineLegalPage({
       list: [
         'The photos you use to create an image are kept with that image, so you can make it again at any time, and are deleted with it. Photos you upload but do not use are deleted automatically after 7 days. Images you create are kept until you delete them.',
         'Images made with free credits are public. Images made with paid credits are private unless you make them public.',
-        'We do not sell your information, we do not use advertising cookies, and our analytics do not use cookies.',
+        'We do not sell your information and we do not use advertising cookies. Our analytics use a cookie outside the EU, the EEA, the UK and Switzerland, and inside them only if you accept.',
         'We do not use your photos or images to train AI models.',
         'You can delete your account and its data yourself at any time.',
       ],

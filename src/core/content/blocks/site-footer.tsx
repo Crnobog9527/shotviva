@@ -1,6 +1,7 @@
 import { useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 
+import { CookieSettingsButton } from '../../analytics/browser'
 import type { SiteBrand } from '../../config'
 import { Link } from '../../i18n/ui'
 
@@ -8,9 +9,9 @@ export type FooterLink = { href: `/${string}`; label: string }
 
 // Every marketing page: the wordmark, the contact email and the copyright, then the legal links
 // and the text language switch (DESIGN §6.9 item 5, 建站规格 G8: the footer carries only the
-// contact email and the copyright). The operating entity, address, launch year and countries
-// live on the legal pages and in the Organization JSON-LD. The MiSans attribution is on the
-// Terms page (ARCHITECTURE §17).
+// contact email and the copyright). The legal links end with Cookie settings (T70). The operating
+// entity, address, launch year and countries live on the legal pages and in the Organization
+// JSON-LD. The MiSans attribution is on the Terms page (ARCHITECTURE §17).
 type Props = {
   brand: SiteBrand
   links: readonly FooterLink[]
@@ -40,6 +41,11 @@ export function SiteFooter({ brand, links, languageSwitch }: Props) {
                 <Link href={link.href}>{link.label}</Link>
               </span>
             ))}
+            {/* Reopens the analytics cookie bar (T70). */}
+            <span className="mk-foot-item">
+              <span aria-hidden>·</span>
+              <CookieSettingsButton className="mk-foot-btn" />
+            </span>
           </nav>
           {languageSwitch ? (
             <nav className="mk-foot-lang" aria-label={t('language')}>

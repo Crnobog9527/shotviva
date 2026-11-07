@@ -1022,7 +1022,16 @@
   "footer": {
     "legalNav": "法律条款",
     "copyright": "© {year} {name}",
-    "language": "语言"
+    "language": "语言",
+    "cookieSettings": "Cookie 设置"
+  },
+  "consent": {
+    "label": "Cookie 提示",
+    "settingsTitle": "Cookie 设置",
+    "body": "<lead>帮我们把 Shotviva 做得更好。</lead>统计 Cookie 让我们看到大家在网站上怎么走，从不用于广告。<link>隐私政策</link>",
+    "accept": "接受",
+    "necessary": "仅必要",
+    "close": "关闭 Cookie 设置"
   },
   "notFound": {
     "title": "页面不存在",

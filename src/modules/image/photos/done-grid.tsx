@@ -1,3 +1,4 @@
+import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
 import { Link } from '@/core/i18n/ui'
 import { Reveal } from '@/core/ui/reveal-item'
 import { useFormatter, useTranslations } from 'next-intl'
@@ -29,7 +30,7 @@ export function DoneGrid({ items, now, anyRunning, liveTemplates }: { items: Pho
             <div className="flex h-full flex-col transition-transform duration-250 ease-house hover:-translate-y-0.5">
               <Link href={`/photos/${item.id}`} className="group press block rounded-control">
                 <span className="hairline relative block aspect-[4/5] overflow-hidden rounded-control bg-muted transition-shadow group-hover:shadow-[inset_0_0_0_1px_var(--input)]">
-                  {item.fileUrl ? <GroundedImg ground="white" src={item.fileUrl} alt={t('photos.photoAlt', { name: item.templateName })} loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover transition-transform duration-600 ease-house group-hover:scale-[1.02]" /> : null}
+                  {item.fileUrl ? <GroundedImg ground="white" src={item.fileUrl} alt={t('photos.photoAlt', { name: item.templateName })} loading="lazy" decoding="async" className={`${REPLAY_BLOCK_CLASS} absolute inset-0 size-full object-cover transition-transform duration-600 ease-house group-hover:scale-[1.02]`} /> : null}
                   <WorkTag pool={item.creditPool} visibility={item.visibility} className="absolute bottom-2 left-2" />
                 </span>
                 <b className="mt-2 block text-body font-semibold">{item.templateName}</b>

@@ -1,6 +1,8 @@
 import type { CaptureResult, PostHogConfig } from 'posthog-js'
 
 import { localeOfPath } from '../../i18n/paths'
+import { persistenceFor, replayAllowed, type Consent } from '../consent/decision'
+import { REPLAY_BLOCK_CLASS } from '../replay'
 
 // ARCHITECTURE §16.1. Kept as a pure object so a unit test can pin every privacy setting.
 export const INGEST_PATH = '/ingest'
@@ -45,21 +47,35 @@ export function withLocale(capture: CaptureResult | null, pathname: string): Cap
   return { ...capture, properties: { ...capture.properties, locale: localeOfPath(pathname) } }
 }
 
-export function posthogConfig(): Partial<PostHogConfig> {
+// What the replay recorder may see, prepared before replay is ever switched on (T70): every
+// input and textarea masked, and the user's own photos and works blocked (drawn as an empty box)
+// wherever they carry REPLAY_BLOCK_CLASS. The client-side values win over the project's
+// "Privacy and masking" settings.
+export const REPLAY_MASKING = {
+  maskAllInputs: true,
+  blockSelector: `.${REPLAY_BLOCK_CLASS}`,
+} as const
+
+// `consent` decides cookies or memory (ARCHITECTURE §16.1, T70); `pathname` keeps replay off on
+// pages that must never be recorded. Both change later through set_config (consent-sync.ts).
+export function posthogConfig(consent: Consent, pathname: string): Partial<PostHogConfig> {
   return {
     // Same-origin proxy (next.config.ts rewrites) so ad blockers do not drop events.
     api_host: INGEST_PATH,
     ui_host: 'https://us.posthog.com',
     defaults: '2026-01-30',
-    // No cookie, no localStorage: nothing to consent to, hence no cookie banner.
-    persistence: 'memory',
-    // Anonymous visitors get no person profile; identify() after sign-in creates one.
+    // Cookies outside the EU/EEA/UK/CH or after "Accept"; otherwise nothing stored in the browser.
+    persistence: persistenceFor(consent),
+    // Anonymous visitors get no person profile; identify() after sign-in creates one and merges
+    // the anonymous events before it into it.
     person_profiles: 'identified_only',
     capture_pageview: 'history_change',
     capture_pageleave: 'if_capture_pageview',
     autocapture: true,
-    // Session Replay stays off until the Owner decides otherwise (masking + privacy policy).
-    disable_session_recording: true,
+    // Not forced on: the PostHog project's replay switch and sampling decide. Kept off here only
+    // without cookie consent and on /admin and /checkout.
+    disable_session_recording: !replayAllowed(consent, pathname),
+    session_recording: REPLAY_MASKING,
     // These features keep their own state in localStorage; none is used in v1.
     disable_surveys: true,
     disable_product_tours: true,

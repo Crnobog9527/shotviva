@@ -1,4 +1,5 @@
 /* eslint-disable @next/next/no-img-element -- auth-gated download route, not a static asset */
+import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
 import { Link } from '@/core/i18n/ui'
 import { useTranslations } from 'next-intl'
 
@@ -10,7 +11,7 @@ export function EditedFrom({ parent }: { parent: EditParent }) {
   const t = useTranslations('app.edit')
   return (
     <Link href={`/photos/${parent.id}`} className="hairline press mt-3 flex min-h-[71px] items-center gap-3 rounded-panel bg-card px-3 py-2">
-      <img src={parent.fileUrl} alt="" className="h-[55px] w-11 flex-none rounded-md bg-photo-ground object-cover" />
+      <img src={parent.fileUrl} alt="" className={`${REPLAY_BLOCK_CLASS} h-[55px] w-11 flex-none rounded-md bg-photo-ground object-cover`} />
       <span className="grid flex-1 gap-0.5">
         <span className="text-caption text-muted-foreground">{t('editedFromLabel')}</span>
         <span className="text-body font-medium">{parent.name}</span>
