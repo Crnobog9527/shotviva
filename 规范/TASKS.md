@@ -1068,3 +1068,15 @@ Owner 2026-11-06 发现中文页有功能缺失。逐页对比现有英文页和
 - Waffo 通道不变（Waffo 不支持微信）。
 
 **验收**：测试模式下结账页同时出现支付宝和微信支付，各付一笔积分包和 Starter 一期，到账、付款方式记录正确；只开支付宝时只显示支付宝；英文页同样；单测覆盖 Session 参数和方式记录；交互验收交给 Codex（测试站）。正式站上线前 Owner 确认 Stripe 已批准微信支付。
+
+## T74 后台中文「流量与转化」页 + 补齐统计点（可派）
+
+**目标**：Owner 2026-11-07：PostHog 后台是英文，要在自己的管理后台用中文看用于优化体验和转化的指标（ARCHITECTURE §16.2a，新增事件见 §16.2）。
+
+**范围**：
+- 补统计点：`template_view`、`paywall_select`、`checkout_cancel`、`upload_error`；打开 `capture_pageleave`；事件字典单测更新。
+- 后台新页 `/admin/analytics`（导航名「流量与转化」）：六块内容按 §16.2a；服务端 HogQL 查询放 `core/admin/analytics/`，每块一个查询函数 + 单测（用录制的响应样例），缓存 10 分钟，失败时该块显示「暂时读不到」不影响其他块；时间范围切换；漏斗维度切换；中文指标说明；「在 PostHog 打开」链接。只有管理员能进。
+- 环境变量 `POSTHOG_PERSONAL_API_KEY`（只读，Query 权限）、`POSTHOG_PROJECT_ID`，只登记名字；没配置时页面提示去配置。
+- 按 DESIGN 的后台样式，impeccable 核对。
+
+**验收**：测试站配测试数据后六块都有数；切换时间范围和漏斗维度正确；新事件在 PostHog 能查到；缺密钥时页面友好提示；非管理员 404；交互验收交给 Codex。Owner 侧：PostHog 生成只读个人 API 密钥，由配置窗口按剪贴板流程写进 Vercel。
