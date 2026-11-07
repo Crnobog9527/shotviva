@@ -1,3 +1,5 @@
+/* Layer order first (layer-order.test.ts): see LAYER_ORDER there. */
+@layer properties, theme, base, components, utilities;
 /* Wishlist tab (design/comps-v3-b/wishlist.html, signed off 2026-11-06; DESIGN §4.7). The wall's
    prints, tape, lean and breeze are page-specific, so they live here rather than in globals.css.
    Every colour is a token from globals.css. */

@@ -126,7 +126,7 @@ describe('purchase list (payments)', () => {
     const mine = page.items.filter((row) => row.userId === buyer)
     expect(mine.map((row) => [row.productId, row.channel, row.form, row.method, row.status])).toEqual([
       ['pack_s', 'stripe', 'checkout', 'card', 'paid'],
-      ['starter_monthly', 'waffo', 'waffo', 'card', 'paid'],
+      ['starter_monthly', 'waffo', 'waffo_subscription', 'card', 'paid'],
       ['pro_monthly', 'stripe', 'renewal', 'card', 'partially_refunded'],
       ['pack_m', 'stripe', 'checkout', 'alipay', 'paid'],
     ])

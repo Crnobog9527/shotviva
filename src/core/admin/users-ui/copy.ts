@@ -89,6 +89,10 @@ export const USERS_COPY = {
   },
   admin: '管理员',
   banned: '已封禁',
+  // Face-swap refusals (ARCHITECTURE §5.1a, T81): the list's red flag and the dialog's count.
+  refusalFlag: (n: number) => `24 小时内换脸被拒 ${n} 次`,
+  refusalFact: '换脸被拒',
+  refusalCount: (total: number, last24h: number) => `近 90 天 ${total} 次 · 24 小时内 ${last24h} 次`,
   normal: '正常',
   never: '—',
   detail: {

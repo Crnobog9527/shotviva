@@ -30,6 +30,7 @@ const valid: { [E in EventName]: unknown } = {
   signup: { method: 'google' },
   upload: { size_bucket: '1-5MB', compressed: true },
   generate,
+  generate_refused: { reason: 'identity_swap', source: 'partner' },
   paywall_view: { trigger: 'insufficient_credits' },
   contact_sales_click: { page: '/zh/pricing' },
   checkout_start: checkout,
@@ -42,12 +43,13 @@ const valid: { [E in EventName]: unknown } = {
 }
 
 describe('event dictionary (ARCHITECTURE §16.2)', () => {
-  it('covers exactly the twelve named events', () => {
+  it('covers exactly the thirteen named events', () => {
     expect(Object.keys(eventSchemas).sort()).toEqual([
       'checkout_cancel',
       'checkout_start',
       'contact_sales_click',
       'generate',
+      'generate_refused',
       'paywall_select',
       'paywall_view',
       'purchase',
@@ -153,5 +155,14 @@ describe('wallet methods (T73)', () => {
     expect(validateEvent('checkout_start', { ...checkout, method: 'wechat_pay' }).ok).toBe(false)
     expect(validateEvent('purchase', { ...valid.purchase as object, method: 'wechat_pay' }).ok).toBe(true)
     expect(validateEvent('purchase', { ...valid.purchase as object, method: 'alipay_or_wechat' }).ok).toBe(false)
+  })
+})
+
+describe('generate_refused (ARCHITECTURE §5.1a, T81)', () => {
+  it('carries which entry refused, never the words', () => {
+    expect(SERVER_EVENTS).toContain('generate_refused')
+    expect(validateEvent('generate_refused', { reason: 'identity_swap', source: 'workspace', note: 'x' }).ok).toBe(false)
+    expect(validateEvent('generate_refused', { reason: 'nsfw', source: 'workspace' }).ok).toBe(false)
+    expect(validateEvent('generate_refused', { reason: 'identity_swap', source: 'web' }).ok).toBe(false)
   })
 })

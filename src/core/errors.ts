@@ -34,6 +34,9 @@ export const ERROR_CODES = [
   'IMAGE_UNSUPPORTED',
   // The provider's own safety refusal; credits are refunded.
   'CONTENT_REJECTED',
+  // The user's words ask to swap a face or turn someone into a real person (ARCHITECTURE §5.1a,
+  // T81); refused before any credit is reserved.
+  'IDENTITY_SWAP_REFUSED',
   // Provider error, timeout or output write failure; credits are refunded.
   'GENERATION_FAILED',
   // Account deletion: Stripe would not cancel a live subscription, so nothing was deleted
@@ -72,6 +75,7 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   IMAGE_TOO_LARGE: 422,
   IMAGE_UNSUPPORTED: 422,
   CONTENT_REJECTED: 422,
+  IDENTITY_SWAP_REFUSED: 422,
   GENERATION_FAILED: 502,
   SUBSCRIPTION_CANCEL_FAILED: 502,
   DOWNGRADE_NOT_ALLOWED: 409,

@@ -1,3 +1,5 @@
+/* Layer order first (layer-order.test.ts): see LAYER_ORDER there. */
+@layer properties, theme, base, components, utilities;
 /* Tier and credit-pack materials for the paywall and /pricing (DESIGN §4.5, comps-v3-b
    tiers.css; T37). Starter matte graphite, Pro sapphire glass (recommended), Max black and
    gold foil with a slowly turning rim, a faint glow and an idle sheen. Packs: the smallest in

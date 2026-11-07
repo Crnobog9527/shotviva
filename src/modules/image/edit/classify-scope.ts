@@ -18,9 +18,12 @@ export type EditClassification = {
   change: string | null
   // Tokens the step used, for the job's cost (T33); null when nothing was billed or reported.
   usage: ClassifierUsage | null
+  // ARCHITECTURE §5.1a: the words ask for a face swap. Taken whatever the confidence; false when
+  // the model never answered (the edit is then let through, the keywords having run first).
+  identitySwap: boolean
 }
 
-const FALLBACK: EditClassification = { scope: 'fallback', confidence: null, keep: [], change: null, usage: null }
+const FALLBACK: EditClassification = { scope: 'fallback', confidence: null, keep: [], change: null, usage: null, identitySwap: false }
 
 async function withTimeout(classifier: ScopeClassifier, input: Omit<ClassifierInput, 'signal'>, ms: number) {
   const controller = new AbortController()
@@ -48,7 +51,7 @@ export async function classifyEditScope(
     const answer = await withTimeout(classifier, input, timeoutMs)
     const confidence = Math.round(answer.confidence * 10_000) / 10_000
     const scope = confidence >= CONFIDENCE_THRESHOLD ? answer.scope : 'fallback'
-    return { scope, confidence, keep: answer.keep, change: answer.change, usage: answer.usage }
+    return { scope, confidence, keep: answer.keep, change: answer.change, usage: answer.usage, identitySwap: answer.identitySwap }
   } catch (error) {
     // The error carries a status, a timeout or a parse failure, never the user's words.
     logger.warn('edit classifier failed; using fallback', { provider: classifier.tag, error })

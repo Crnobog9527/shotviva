@@ -202,6 +202,54 @@ describe('handleWaffoWebhook, upgrades (T66)', () => {
   })
 })
 
+// Codex's Waffo run (2026-11-07): Waffo leaves the old order `canceling` until its period end.
+// A charge or a resume on an order an upgrade ended is handed to refuseEnded; refused, it grants
+// nothing (T66).
+describe('handleWaffoWebhook, orders an upgrade ended (T66)', () => {
+  const deliver = (event: unknown) => {
+    const raw = body(event)
+    return handleWaffoWebhook(deps, { body: raw, signature: signWaffo(raw, keys.privateKey, NOW) })
+  }
+
+  it('a renewal charge on an ended order grants nothing', async () => {
+    const refuseEnded = vi.fn(async () => true)
+    deps = { ...deps, refuseEnded }
+    const event = subscriptionPaid({ userId: USER, productId: 'starter_monthly', orderId: 'ORD_old', periodNumber: 2 })
+    expect(await deliver(event)).toMatchObject({ status: 200, body: { outcome: 'ended' } })
+    expect(refuseEnded).toHaveBeenCalledWith({ orderId: 'ORD_old', at: expect.any(String), what: 'charge' })
+    expect(rpc).not.toHaveBeenCalledWith('settle_waffo_order', expect.anything())
+    expect(deps.trackBuy).not.toHaveBeenCalled()
+  })
+
+  it('a charge on a live order still grants; one-time orders are never checked', async () => {
+    const refuseEnded = vi.fn(async () => false)
+    deps = { ...deps, refuseEnded }
+    expect(await deliver(subscriptionPaid({ userId: USER, productId: 'pro_monthly', orderId: 'ORD_new' }))).toMatchObject({ body: { outcome: 'applied' } })
+    expect(rpc).toHaveBeenCalledWith('settle_waffo_order', expect.objectContaining({ p_order_id: 'ORD_new' }))
+    refuseEnded.mockClear()
+    await deliver(orderCompleted({ userId: USER, productId: 'pack_s' }))
+    expect(refuseEnded).not.toHaveBeenCalled()
+  })
+
+  it('a resume (uncanceled) of an ended order, which the mirror leaves unchanged, is cancelled again', async () => {
+    rpc.mockResolvedValue({ data: false, error: null })
+    const refuseEnded = vi.fn(async () => true)
+    deps = { ...deps, refuseEnded }
+    const event = subscriptionState({ userId: USER, productId: 'starter_monthly', orderId: 'ORD_old', eventType: 'subscription.uncanceled', orderStatus: 'active', timestamp: '2026-11-20T10:00:00.000Z' })
+    expect(await deliver(event)).toMatchObject({ status: 200, body: { outcome: 'ended' } })
+    expect(refuseEnded).toHaveBeenCalledWith({ orderId: 'ORD_old', at: '2026-11-20T10:00:00.000Z', what: 'reactivation' })
+  })
+
+  it('a canceling event the mirror ignores is no resume', async () => {
+    rpc.mockResolvedValue({ data: false, error: null })
+    const refuseEnded = vi.fn(async () => true)
+    deps = { ...deps, refuseEnded }
+    const event = subscriptionState({ userId: USER, productId: 'starter_monthly', orderId: 'ORD_old', eventType: 'subscription.canceling', orderStatus: 'canceling' })
+    expect(await deliver(event)).toMatchObject({ body: { outcome: 'unchanged' } })
+    expect(refuseEnded).not.toHaveBeenCalled()
+  })
+})
+
 describe('paymentFacts', () => {
   const pack = TEST_PRODUCTS.find((p) => p.id === 'pack_s')!
   const order = (data: Record<string, unknown>) => readWaffoOrder('PAY_1', { orderId: 'ORD_1', orderMetadata: { user_id: USER, product_id: 'pack_s' }, ...data })

@@ -35,6 +35,10 @@ export type UserListRow = {
   interval: 'month' | 'year' | null
   lastGenerationAt: string | null
   bannedAt: string | null
+  // Face-swap refusals in the last 24 hours (ARCHITECTURE §5.1a, T81); `refusalFlag` at three or
+  // more, shown red. Banning stays the Owner's call.
+  refusals24h: number
+  refusalFlag: boolean
 }
 
 // unavailable: the database has no admin_list_users yet (this code deployed before migration
