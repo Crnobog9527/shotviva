@@ -411,6 +411,11 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - MP 商品必须设税码 `txcd_10105001`（AI 服务，个人用）。MP 价格不含税，税在结账时另加。
 - 顾客账单：卡支付显示 `LINK.COM* SHOTVIVA`，钱包支付显示 SHOTVIVA。MP 结账页不支持自定义域名。
 - 正式环境的 Managed Payments 要等 Stripe 资格审核。**审核没下来之前的兜底**：卡先不带 `managed_payments` 走普通订阅（Shotviva 当卖家），审核通过后翻开关。
+- **账号页购买记录里下载收据和发票（Owner 2026-11-08，T80）**：账号页「Purchases / 购买记录」每一笔付款旁边放「收据」，有发票的再放「发票」，点了在新标签页打开或下载付款服务商出的正式文件，我们不自己生成 PDF。
+  - 链接在用户点击时由服务端现取（服务端核对这笔 `payments` 行属于当前用户），不存进数据库，也不在页面 HTML 里提前放：Stripe 一次性付款取 charge 的 `receipt_url`；订阅首付和续费取 invoice 的 `hosted_invoice_url` / `invoice_pdf`；Managed Payments（海外银行卡）、支付宝 / 微信支付、中国银行卡各自能拿到什么，由开发先在 Stripe 测试模式逐一核实后写进 PR，拿不到发票的只给收据；Waffo 按它的接口能给的给，什么都没有时显示「收据已发送到付款邮箱」。
+  - 已退款 / 部分退款的付款照样能下载，行上标「已退款」；Stripe 的收据页会显示退款。
+  - 手机号账号没有邮箱时，这里是拿收据的主要途径。
+
 - 要处理的 Stripe 事件：`checkout.session.completed` 和 `checkout.session.async_payment_succeeded`（首付 / 单笔 → `settle_checkout`：写镜像表 + `apply_purchase`，同一事务）、`invoice.paid`（只认 `subscription_cycle` → `apply_subscription_renewal`，T10）、`customer.subscription.updated / deleted`（只更新镜像表）、`charge.refunded`（记录 + 自动扣回积分 + 告警，T71）、`charge.dispute.created`（记录 + 全额扣回 + 告警，T71）、`charge.dispute.closed`（我方胜诉时把拒付扣回的积分还回，T71）。其余事件忽略（回 200）。Stripe 后台的回调端点订阅这 8 个事件（T71 新增 `charge.dispute.closed`，Owner 在 Stripe 后台勾选）。
 - Stripe 用与 Graylum 同一主体下**新开的独立账户**，避免两边回调互相收到对方的事件。
 
