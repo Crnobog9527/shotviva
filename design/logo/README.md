@@ -23,3 +23,10 @@
 - `src/app/apple-icon.png`：`c-s-dot-icon-1024.svg` 去掉圆角的满版 180（iOS 自己切圆角，透明角会变黑）。
 - `public/icons/icon-192.png` / `icon-512.png`：manifest 图标，取 `export/c/icon-512.png`（192 由它缩）。
 - **导航只用字标「Shotviva.」，不用 `-lockup-tight` 的「S. Shotviva」**（T58 用 impeccable 比对 375 / 1280 后决定）：并排时 S 出现两次，读起来像缩写人名「S. Shotviva」；手机营销顶栏本来就有副标题、地球和登录，再多 30px 更挤；「S.」本来就是字标压缩成的，留给放不下字标的地方（标签页、主屏幕、OAuth）。
+
+## 邮件字标（2026-11-07）
+
+- `public/brand/email/shotviva-wordmark@2x.png`（线上地址 `https://shotviva.com/brand/email/shotviva-wordmark@2x.png`）：Supabase 四个登录邮件模板（`supabase/templates/`）顶部的「Shotviva.」。邮件客户端不加载网页字体，所以字标做成图片。
+- 浅底配色（邮件卡片是白底）：墨色 `#0B0A09`，句点 `#FF5B2E`，不透明白底（邮件客户端的深色模式不会把图片里的深字反白，白底保证仍然读得清）。
+- 做法：无头 Chrome 用 `src/app/fonts/instrument-serif.woff2` 按 72px、字距 -0.02em（同导航字标）渲染，裁到字形边缘、补成偶数尺寸 210×60，邮件里按 105×30 显示；ImageMagick 最高压缩、去掉附加块（无损，约 5 KB）。
+- 改字标时换新文件名，不覆盖旧文件：这个地址缓存一年（`next.config.ts`），已经发出去的邮件还指着它。
