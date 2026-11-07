@@ -25,7 +25,7 @@ export {
   type CheckoutBody,
   type CheckoutDeps,
 } from './checkout'
-export { cancelReturnUrl, handleCancelReturn, type CancelTrack } from './cancel-return'
+export { CANCEL_COOKIE, cancelReturnUrl, handleCancelReturn, type CancelReturn, type CancelTrack } from './cancel-return'
 export { managedPaymentsEnabled, stripeClient, stripeWebhookSecret, type StripeApi } from './client'
 export { fulfilCheckoutSession, type FulfilDeps, type FulfilOutcome } from './fulfil'
 export { handleStripeWebhook, type WebhookDeps, type WebhookResult } from './webhook'

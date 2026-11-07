@@ -9,7 +9,7 @@ describe('转化漏斗 query', () => {
     for (const event of ['$pageview', 'upload', 'generate', 'paywall_view', 'checkout_start', 'purchase']) expect(query).toContain(`'${event}'`)
     expect(query).toContain("properties.status = 'succeeded'")
     expect(query).toContain('countIf(h0 AND h1 AND t1 >= t0 AND h2 AND t2 >= t1) AS s2')
-    expect(query).toContain('GROUP BY person_id, cur')
+    expect(query).toContain('GROUP BY person_id, in_current')
   })
 
   it('splits by the first page view’s property, or by first-seen for new / returning', () => {
@@ -21,6 +21,23 @@ describe('转化漏斗 query', () => {
     expect(visitor).toContain('LEFT JOIN')
     expect(visitor).toContain("'new', 'returning'")
     expect(funnelQuery(WEEK, 'none').query).not.toContain('JOIN')
+  })
+
+  // Control review of #280: the outer `seg` / `cur` aliases must not share a name with a column
+  // of the inner query, or HogQL may refuse it or group by the inner value instead of new/returning.
+  it.each(['none', 'locale', 'device', 'source', 'country', 'visitor'] as const)('keeps outer and inner names apart (%s)', (dim) => {
+    const { query } = funnelQuery(WEEK, dim)
+    const inner = query.slice(query.indexOf('FROM ('), query.indexOf(') AS p'))
+    expect(inner).not.toMatch(/\bAS (seg|cur)\b/)
+    expect(query.match(/\bAS seg\b/g)).toHaveLength(1)
+    expect(query.match(/\bAS cur\b/g)).toHaveLength(1)
+    expect(query).toContain('GROUP BY person_id, in_current')
+  })
+
+  it('labels new / returning from first-seen against the start of each period', () => {
+    const { query } = funnelQuery(WEEK, 'visitor')
+    expect(query).toContain(`if(f.first_seen >= if(p.in_current, toDateTime('${WEEK.start}'), toDateTime('${WEEK.prevStart}')), 'new', 'returning') AS seg`)
+    expect(query).toContain('ON f.person_id = p.person_id')
   })
 
   it('only takes the six dimensions', () => {
@@ -35,6 +52,16 @@ describe('loadFunnel (recorded answers)', () => {
     expect(funnel.current).toEqual([2240, 568, 436, 202, 63, 25])
     expect(funnel.previous).toEqual([2020, 480, 370, 170, 50, 18])
     expect(funnel.segments.map((s) => s.value)).toEqual(['Mobile', 'Desktop', 'Tablet'])
+  })
+
+  it('splits new and returning visitors, each period apart (sample answer)', async () => {
+    const funnel = await loadFunnel(fakeRun(), WEEK, 'visitor')
+    expect(funnel.segments).toEqual([
+      { value: 'new', counts: [1500, 330, 250, 110, 30, 9] },
+      { value: 'returning', counts: [700, 240, 190, 95, 35, 17] },
+    ])
+    expect(funnel.current).toEqual([2200, 570, 440, 205, 65, 26])
+    expect(funnel.previous).toEqual([2020, 480, 370, 170, 50, 18])
   })
 
   it(`shows the ${MAX_SEGMENTS} biggest groups and sums the rest, unknowns included, into 其他`, async () => {

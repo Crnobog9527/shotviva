@@ -7,7 +7,9 @@ import { count, flag, label } from './values'
 
 // Block 2 「转化漏斗」 (ARCHITECTURE §16.2a): 进站 → 上传 → 出图 → 付费墙 → 开始结账 → 付款, per person
 // and period. A person reaches a step when they did it, at or after the step before (first time
-// each), inside the same period. Split by one dimension of the person's first page view.
+// each), inside the same period. Split by one dimension of the person's first page view. The
+// inner columns (in_current, first_value) are named apart from the outer aliases (cur, seg), so
+// HogQL never has to choose between p.seg and the new / returning label (control review of #280).
 
 export const FUNNEL_STEPS = [
   { key: 'visit', event: '$pageview', where: '' },
@@ -54,10 +56,10 @@ function reachedColumns(): string {
 }
 
 function segmentSource(window: Window, dim: FunnelDim): { seg: string; join: string } {
-  if (dim !== 'visitor') return { seg: 'p.seg', join: '' }
+  if (dim !== 'visitor') return { seg: 'p.first_value', join: '' }
   const lookback = new Date(Date.parse(window.prevStart) - LOOKBACK_DAYS * 86_400_000).toISOString()
   return {
-    seg: `if(f.first_seen >= if(p.cur, ${at(window.start)}, ${at(window.prevStart)}), 'new', 'returning')`,
+    seg: `if(f.first_seen >= if(p.in_current, ${at(window.start)}, ${at(window.prevStart)}), 'new', 'returning')`,
     join: `LEFT JOIN (
   SELECT person_id, min(timestamp) AS first_seen FROM events
   WHERE event = '$pageview' AND timestamp >= ${at(lookback)} AND timestamp < ${at(window.end)}
@@ -72,14 +74,14 @@ export function funnelQuery(window: Window, dim: FunnelDim): HogQL {
   return {
     name: `funnel.${dim}`,
     query: `
-SELECT cur, ${seg} AS seg, ${reachedColumns()}
+SELECT p.in_current AS cur, ${seg} AS seg, ${reachedColumns()}
 FROM (
-  SELECT person_id, ${periodColumn(window)} AS cur,
-    argMinIf(toString(${first}), timestamp, event = '$pageview') AS seg,
+  SELECT person_id, ${periodColumn(window)} AS in_current,
+    argMinIf(toString(${first}), timestamp, event = '$pageview') AS first_value,
     ${stepColumns()}
   FROM events
   WHERE event IN (${eventList(FUNNEL_STEPS.map((step) => step.event))}) AND ${bothPeriods(window)}
-  GROUP BY person_id, cur
+  GROUP BY person_id, in_current
 ) AS p
 ${join}
 WHERE p.h0
