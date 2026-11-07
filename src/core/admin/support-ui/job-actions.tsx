@@ -33,7 +33,7 @@ export function JobActions({ job, actions }: { job: SupportJob; actions: JobSupp
       },
     )
   return (
-    <div className="flex flex-wrap items-center gap-1">
+    <div className="flex items-center gap-1 whitespace-nowrap">
       <Button size="sm" variant="ghost" disabled={pending} onClick={() => run(() => actions.view({ jobId: job.id }), setLinks)}>
         {SUPPORT_COPY.view.button}
       </Button>

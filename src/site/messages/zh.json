@@ -557,8 +557,12 @@
         "originalKept": "已保留，{px} px 预览",
         "originalEdited": "你改的那张照片",
         "originalDeleted": "早于原图保留功能",
-        "made": "生成时间"
+        "made": "生成时间",
+        "reference": "编号",
+        "copyReference": "复制编号",
+        "copied": "已复制"
       },
+      "problem": "这张图有问题？",
       "delete": {
         "open": "删除",
         "title": "删除这张作品？",
@@ -776,7 +780,8 @@
         "paymentOptional": "付款记录（选填）",
         "noPayments": "这个账号还没有付款记录。",
         "workLabel": "相关作品（选填）",
-        "workOption": "{template} · {date, date, medium}",
+        "workOption": "{template} · {date, date, medium} · {ref}",
+        "workRef": "编号 {ref}",
         "none": "不选",
         "choose": "请选择",
         "submit": "发送",

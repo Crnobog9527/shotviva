@@ -72,9 +72,28 @@ export function ResultView({ item, detail, shareText, edit, parent, parentDelete
         {parent ? <EditedFrom parent={parent} /> : parentDeleted ? <EditedFromDeleted /> : null}
         {change ? <YourChange text={change} /> : null}
         {detail.note ? <NoteQuote note={detail.note} /> : null}
-        <PhotoFacts item={item} original={detail.original} keptWithWork={detail.keptWithWork} />
+        <PhotoFacts item={item} original={detail.original} keptWithWork={detail.keptWithWork} reference={detail.reference} />
+        {detail.reference ? <ProblemLink jobId={item.id} /> : null}
       </div>
     </section>
+  )
+}
+
+// "Problem with this photo?" (T78): Help & feedback on the account page, as an image issue with
+// this work picked, so the ticket arrives with its reference number. No prefetch: the account
+// page reads payments and the session's tier.
+function ProblemLink({ jobId }: { jobId: string }) {
+  const t = useTranslations('app.result')
+  return (
+    <p className="mt-3 flex justify-end">
+      <Link
+        href={`/account?help=new&job=${jobId}`}
+        prefetch={false}
+        className="inline-flex min-h-11 items-center text-label text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+      >
+        {t('problem')}
+      </Link>
+    </p>
   )
 }
 

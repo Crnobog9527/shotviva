@@ -154,19 +154,30 @@ const workRow = z.object({
 
 // The author's latest finished works for the image-issue picker, read with their own session
 // (generation_jobs_select_own) on generation_jobs_user_id_created_at_idx.
-export async function listWorkOptions(client: SupabaseClient, userId: string): Promise<WorkOption[]> {
-  const { data, error } = await client
-    .from('generation_jobs')
-    .select('id, template_id, created_at, templates(name)')
-    .eq('user_id', userId)
-    .eq('status', 'succeeded')
-    .is('deleted_at', null)
-    .order('created_at', { ascending: false })
-    .limit(PICKER_LIMIT)
-  if (error) readFailed('listWorkOptions', error)
-  return workRow.array().parse(data).map((row) => ({
-    id: row.id,
-    templateName: row.templates?.name ?? row.template_id,
-    createdAt: row.created_at,
-  }))
+const toWorkOption = (row: z.infer<typeof workRow>): WorkOption => ({
+  id: row.id,
+  templateName: row.templates?.name ?? row.template_id,
+  createdAt: row.created_at,
+})
+
+// `include`: a work sent along from its photo page (T78). When it is older than the latest
+// PICKER_LIMIT it is read by its primary key, in parallel, and listed first; someone else's or
+// a deleted one reads as missing and is left out.
+export async function listWorkOptions(client: SupabaseClient, userId: string, include: string | null = null): Promise<WorkOption[]> {
+  const works = () =>
+    client
+      .from('generation_jobs')
+      .select('id, template_id, created_at, templates(name)')
+      .eq('user_id', userId)
+      .eq('status', 'succeeded')
+      .is('deleted_at', null)
+  const [latest, extra] = await Promise.all([
+    works().order('created_at', { ascending: false }).limit(PICKER_LIMIT),
+    include ? works().eq('id', include).maybeSingle() : null,
+  ])
+  if (latest.error) readFailed('listWorkOptions', latest.error)
+  if (extra?.error) readFailed('listWorkOptions', extra.error)
+  const options = workRow.array().parse(latest.data).map(toWorkOption)
+  const own = extra?.data ? toWorkOption(workRow.parse(extra.data)) : null
+  return own && !options.some((option) => option.id === own.id) ? [own, ...options] : options
 }
