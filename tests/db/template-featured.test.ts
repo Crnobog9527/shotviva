@@ -1,7 +1,7 @@
 import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { saveTemplate, setFeaturedTemplates, setTemplateActive, setTemplateOrder } from '@/core/admin'
+import { bulkEditTemplates, saveTemplate, setFeaturedTemplates, setTemplateActive, setTemplateOrder } from '@/core/admin'
 import { listTemplatesIn } from '@/core/templates'
 
 import { CREDITS_FLOOR } from '@/modules/image/credits-floor'
@@ -139,12 +139,19 @@ describe('reordering the featured list', () => {
     expect(await featured()).toEqual([O3, O1, O2])
   })
 
+  // T79: a batch edit that takes a featured template off the web takes it off the list too.
+  it('drops a template from the list when a batch edit makes it partner-only', async () => {
+    const outcome = await bulkEditTemplates(client, admin, { ids: [O1], patch: { visibleIn: ['partner'] } }, CREDITS_FLOOR)
+    expect(outcome).toEqual({ changed: 1, failures: [] })
+    expect(await featured()).toEqual([O3, O2])
+  })
+
   it('refuses a caller who is not an admin, and no client role may call it', async () => {
     const visitor = await createUser(pg)
     await expect(setTemplateOrder(client, visitor, { group: 'featured', ids: [O1, O2, O3] })).rejects.toMatchObject({
       code: 'FORBIDDEN',
     })
-    expect(await featured()).toEqual([O3, O1, O2])
+    expect(await featured()).toEqual([O3, O2])
     const { rows } = await pg.query<{ auth: boolean; anon: boolean }>(
       `select has_function_privilege('authenticated', 'public.admin_set_template_order(text, text[], uuid)', 'execute') as auth,
               has_function_privilege('anon', 'public.admin_set_template_order(text, text[], uuid)', 'execute') as anon`,

@@ -1,6 +1,7 @@
 import type { Template } from '@/core/templates'
 
 import type { CoverPurpose } from '../covers/cover-rules'
+import type { BulkEditOutcome, BulkEditPatch } from './bulk-edit-rules'
 import type { ActiveChangeOutcome } from './publish-rules'
 
 export type AdminTemplate = Template & {
@@ -34,6 +35,8 @@ export type TemplateAdminActions = {
   setActive: (input: { id: string; active: boolean; reason?: string }) => Promise<ActionResult>
   // The bulk bar (T60): one call for the batch, partial success reported per template.
   setActiveMany: (input: { ids: string[]; active: boolean; reason?: string }) => Promise<ActionValue<ActiveChangeOutcome>>
+  // Batch edit (T79): prices, entry points and quality of the ticked templates, all or nothing.
+  editMany: (input: { ids: string[]; patch: BulkEditPatch }) => Promise<ActionValue<BulkEditOutcome>>
   // Drag-to-reorder and the arrows (T76): one group's whole new order.
   setOrder: (input: { group: TemplateOrderGroup; ids: string[] }) => Promise<ActionResult>
   // The home featured list in display order (T53).

@@ -73,6 +73,8 @@ export function TemplatesEditor({ templates, floor, actions }: Props) {
         selected={selectedInOrder(templates, selected)}
         busy={pending}
         setActiveMany={actions.setActiveMany}
+        editMany={actions.editMany}
+        floor={floor}
         onClear={() => setSelected(new Set())}
       />
       <TemplatesTable

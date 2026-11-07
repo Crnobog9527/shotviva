@@ -4,6 +4,7 @@ import { refresh, revalidateTag } from 'next/cache'
 
 import {
   applyCover,
+  bulkEditTemplates,
   createCoverUpload,
   runAdminAction,
   runAdminQuery,
@@ -16,6 +17,7 @@ import {
   type ActionValue,
   type ActiveChangeOutcome,
   type ApplyCoverRequest,
+  type BulkEditOutcome,
   type CoverTicket,
   type CoverUploadRequest,
   type SaveTemplatePayload,
@@ -61,6 +63,17 @@ export async function setTemplatesActiveAction(input: unknown): Promise<ActionVa
   return runAdminQuery(async () => {
     const outcome = await setTemplatesActive(createAdminSupabase(), admin.id, input, CREDITS_FLOOR)
     if (outcome.changed.length > 0) catalogueChanged()
+    return outcome
+  })
+}
+
+// Batch edit (T79): one call for the ticked templates; a refusal lists the templates that fail
+// and changes nothing.
+export async function bulkEditTemplatesAction(input: unknown): Promise<ActionValue<BulkEditOutcome>> {
+  const admin = await requireAdmin()
+  return runAdminQuery(async () => {
+    const outcome = await bulkEditTemplates(createAdminSupabase(), admin.id, input, CREDITS_FLOOR)
+    if (outcome.changed > 0) catalogueChanged()
     return outcome
   })
 }

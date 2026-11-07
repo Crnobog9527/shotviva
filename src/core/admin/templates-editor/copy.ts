@@ -65,3 +65,27 @@ export const orderCopy = {
   filtered: '清空搜索后可拖动排序',
   dragHint: '按住左边的把手上下拖动调整顺序；手机上长按整行再拖。',
 } as const
+
+// Batch edit (T79).
+export const bulkEditCopy = {
+  open: '批量编辑…',
+  title: (count: number) => `批量编辑 ${count} 个模板`,
+  hint: '只改填了或选了的项，留空 / 「不改」的保持每个模板原来的值。保存前逐个按积分下限检查，有一个不合格就整批不保存。',
+  creditsLegend: '积分（每档单独填，留空不改）',
+  floorHint: (high: number, medium: number) => `下限 high ${high} / medium ${medium}`,
+  surfaces: '展示入口',
+  surfaceOptions: { '': '不改', web: '只在站内', partner: '只给伙伴', both: '站内 + 伙伴' },
+  quality: '出图质量（送给模型的 quality）',
+  qualityOptions: { '': '不改', high: 'high', medium: 'medium' },
+  nothing: '至少改一项',
+  next: '检查并确认',
+  back: '返回修改',
+  cancel: '取消',
+  reviewTitle: (count: number) => `确认修改这 ${count} 个模板？`,
+  changes: '要改的内容',
+  templates: (count: number) => `涉及的模板（${count} 个）`,
+  featuredNote: (names: string) => `${names} 在首页精选里，不再站内展示后会从首页精选移除。`,
+  failuresTitle: (count: number) => `${count} 个模板不合格，整批不会保存：`,
+  confirm: (count: number) => `确认修改 ${count} 个`,
+  done: (count: number) => `已批量修改 ${count} 个模板`,
+} as const
