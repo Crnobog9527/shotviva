@@ -712,40 +712,6 @@ $$;
 ALTER FUNCTION "public"."admin_delete_provider"("p_id" "uuid") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."admin_get_dispute"("p_dispute_id" "text") RETURNS TABLE("stripe_dispute_id" "text", "stripe_charge_id" "text", "payment_id" bigint, "user_id" "uuid", "email" "text", "product_id" "text", "amount" integer, "currency" "text", "reason" "text", "responder" "text", "due_by" timestamp with time zone, "auto_banned_at" timestamp with time zone, "evidence_drafted_at" timestamp with time zone, "submitted_at" timestamp with time zone, "reminded_at" timestamp with time zone, "created_at" timestamp with time zone)
-    LANGUAGE "sql" STABLE SECURITY DEFINER
-    SET "search_path" TO ''
-    AS $$
-  select d.stripe_dispute_id, d.stripe_charge_id, d.payment_id, d.user_id, coalesce(nullif(u.email::text, ''), nullif(u.phone::text, '')),
-         p.product_id, d.amount, d.currency, d.reason, d.responder, d.due_by,
-         d.auto_banned_at, d.evidence_drafted_at, d.submitted_at, d.reminded_at, d.created_at
-    from public.payment_disputes d
-    left join auth.users u on u.id = d.user_id
-    left join public.payments p on p.id = d.payment_id
-   where d.stripe_dispute_id = p_dispute_id;
-$$;
-
-
-ALTER FUNCTION "public"."admin_get_dispute"("p_dispute_id" "text") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."admin_list_disputes"("p_cursor_at" timestamp with time zone, "p_cursor_id" "text", "p_limit" integer) RETURNS TABLE("stripe_dispute_id" "text", "stripe_charge_id" "text", "payment_id" bigint, "user_id" "uuid", "email" "text", "product_id" "text", "amount" integer, "currency" "text", "reason" "text", "responder" "text", "due_by" timestamp with time zone, "auto_banned_at" timestamp with time zone, "evidence_drafted_at" timestamp with time zone, "submitted_at" timestamp with time zone, "reminded_at" timestamp with time zone, "created_at" timestamp with time zone)
-    LANGUAGE "sql" STABLE SECURITY DEFINER
-    SET "search_path" TO ''
-    AS $$
-  select d.stripe_dispute_id, d.stripe_charge_id, d.payment_id, d.user_id, coalesce(nullif(u.email::text, ''), nullif(u.phone::text, '')),
-         p.product_id, d.amount, d.currency, d.reason, d.responder, d.due_by,
-         d.auto_banned_at, d.evidence_drafted_at, d.submitted_at, d.reminded_at, d.created_at
-    from public.payment_disputes d
-    left join auth.users u on u.id = d.user_id
-    left join public.payments p on p.id = d.payment_id
-   where p_cursor_at is null or (d.created_at, d.stripe_dispute_id) < (p_cursor_at, p_cursor_id)
-   order by d.created_at desc, d.stripe_dispute_id desc
-   limit least(greatest(coalesce(p_limit, 30), 1), 50);
-$$;
-
-
-ALTER FUNCTION "public"."admin_list_disputes"("p_cursor_at" timestamp with time zone, "p_cursor_id" "text", "p_limit" integer) OWNER TO "postgres";
 CREATE OR REPLACE FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") RETURNS integer
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -787,6 +753,42 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_get_dispute"("p_dispute_id" "text") RETURNS TABLE("stripe_dispute_id" "text", "stripe_charge_id" "text", "payment_id" bigint, "user_id" "uuid", "email" "text", "product_id" "text", "amount" integer, "currency" "text", "reason" "text", "responder" "text", "due_by" timestamp with time zone, "auto_banned_at" timestamp with time zone, "evidence_drafted_at" timestamp with time zone, "submitted_at" timestamp with time zone, "reminded_at" timestamp with time zone, "created_at" timestamp with time zone)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select d.stripe_dispute_id, d.stripe_charge_id, d.payment_id, d.user_id, coalesce(nullif(u.email::text, ''), nullif(u.phone::text, '')),
+         p.product_id, d.amount, d.currency, d.reason, d.responder, d.due_by,
+         d.auto_banned_at, d.evidence_drafted_at, d.submitted_at, d.reminded_at, d.created_at
+    from public.payment_disputes d
+    left join auth.users u on u.id = d.user_id
+    left join public.payments p on p.id = d.payment_id
+   where d.stripe_dispute_id = p_dispute_id;
+$$;
+
+
+ALTER FUNCTION "public"."admin_get_dispute"("p_dispute_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_list_disputes"("p_cursor_at" timestamp with time zone, "p_cursor_id" "text", "p_limit" integer) RETURNS TABLE("stripe_dispute_id" "text", "stripe_charge_id" "text", "payment_id" bigint, "user_id" "uuid", "email" "text", "product_id" "text", "amount" integer, "currency" "text", "reason" "text", "responder" "text", "due_by" timestamp with time zone, "auto_banned_at" timestamp with time zone, "evidence_drafted_at" timestamp with time zone, "submitted_at" timestamp with time zone, "reminded_at" timestamp with time zone, "created_at" timestamp with time zone)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select d.stripe_dispute_id, d.stripe_charge_id, d.payment_id, d.user_id, coalesce(nullif(u.email::text, ''), nullif(u.phone::text, '')),
+         p.product_id, d.amount, d.currency, d.reason, d.responder, d.due_by,
+         d.auto_banned_at, d.evidence_drafted_at, d.submitted_at, d.reminded_at, d.created_at
+    from public.payment_disputes d
+    left join auth.users u on u.id = d.user_id
+    left join public.payments p on p.id = d.payment_id
+   where p_cursor_at is null or (d.created_at, d.stripe_dispute_id) < (p_cursor_at, p_cursor_id)
+   order by d.created_at desc, d.stripe_dispute_id desc
+   limit least(greatest(coalesce(p_limit, 30), 1), 50);
+$$;
+
+
+ALTER FUNCTION "public"."admin_list_disputes"("p_cursor_at" timestamp with time zone, "p_cursor_id" "text", "p_limit" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_list_template_requests"() RETURNS TABLE("id" "uuid", "email" "text", "description" "text", "image_keys" "text"[], "status" "text", "template_id" "text", "votes_count" integer, "created_at" timestamp with time zone)
@@ -4663,6 +4665,11 @@ GRANT ALL ON FUNCTION "public"."admin_delete_provider"("p_id" "uuid") TO "servic
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_get_dispute"("p_dispute_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_get_dispute"("p_dispute_id" "text") TO "service_role";
 
@@ -4670,8 +4677,6 @@ GRANT ALL ON FUNCTION "public"."admin_get_dispute"("p_dispute_id" "text") TO "se
 
 REVOKE ALL ON FUNCTION "public"."admin_list_disputes"("p_cursor_at" timestamp with time zone, "p_cursor_id" "text", "p_limit" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_list_disputes"("p_cursor_at" timestamp with time zone, "p_cursor_id" "text", "p_limit" integer) TO "service_role";
-REVOKE ALL ON FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") TO "service_role";
 
 
 
