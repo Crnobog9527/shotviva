@@ -30,23 +30,23 @@ function PairCard({ template, onOpen, eager }: Props) {
   const { before, after, type, motion } = template.cover
   return (
     <div className="relative transition-transform duration-250 ease-house hover:-translate-y-0.5">
-    <button
-      ref={ref}
-      type="button"
-      aria-haspopup="dialog"
-      onClick={() => onOpen(template.id)}
-      className="group block w-full rounded-tile text-left transition-transform duration-250 ease-house active:scale-[.97]"
-    >
-      {before && after ? (
-        <PairMedia before={before} after={after} alt={alt} eager={eager} sizes={COVER_SIZES.cardPlate} video={type === 'video' && motion ? motion : undefined} className="transition-shadow group-hover:shadow-[inset_0_0_0_1px_var(--input)]" />
-      ) : isMotion(template) ? (
-        <LoopPlate template={template} alt={alt} sizes={COVER_SIZES.cardFrame} />
-      ) : (
-        <span className="hairline block aspect-[8/5] rounded-control bg-muted" />
-      )}
-      <CardMeta template={template} />
-    </button>
-    <FavoriteButton template={template} surface="create_card" className="top-0.5 right-0.5" />
+      <button
+        ref={ref}
+        type="button"
+        aria-haspopup="dialog"
+        onClick={() => onOpen(template.id)}
+        className="group block w-full rounded-tile text-left transition-transform duration-250 ease-house active:scale-[.97]"
+      >
+        {before && after ? (
+          <PairMedia before={before} after={after} alt={alt} eager={eager} sizes={COVER_SIZES.cardPlate} video={type === 'video' && motion ? motion : undefined} className="transition-shadow group-hover:shadow-[inset_0_0_0_1px_var(--input)]" />
+        ) : isMotion(template) ? (
+          <LoopPlate template={template} alt={alt} sizes={COVER_SIZES.cardFrame} />
+        ) : (
+          <span className="hairline block aspect-[8/5] rounded-control bg-muted" />
+        )}
+        <CardMeta template={template} />
+      </button>
+      <FavoriteButton template={template} surface="create_card" className="top-0.5 right-0.5" />
     </div>
   )
 }
