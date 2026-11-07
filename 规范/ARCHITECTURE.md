@@ -369,6 +369,15 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 这张表是 §15.6「不做后台开关」的例外，只管档位门槛，不管功能开不开（功能开关仍在 `site.config` 的 `features`）。
 - 保存函数签名是 `admin_set_feature_access(p_key, p_min_tier, p_open_to_all_at, p_actor)`：服务端用 service role 调用时拿不到 `auth.uid()`，所以由服务端传管理员 id 写进 `updated_by`（和 `admin_activate_announcement` 同一做法，T29）。
 
+#### 联盟返佣（Owner 2026-11-07 定，尚未接入）
+
+- **不自己开发联盟系统**，用第三方联盟工具接入（选型待 Owner 定；接入前核对：能否追踪 Managed Payments 订阅、支付宝单笔和 Waffo 订单怎么记）。网站这边只做记录推广码、结账时把推广码传给支付平台，届时另开任务卡。
+- **返佣比例**：代理绑定自己推荐的客户，按该客户每一笔付款**终身**返佣：
+  - 积分包（`pack_s` / `pack_m` / `pack_l`）和月付会员（`*_monthly`）：**15%**；
+  - 年付会员（`*_yearly`）：**10%**（年付折扣更大，Owner 定）。
+- **返佣基数**：该笔付款不含税的实付金额（`payments.amount_total − payments.amount_tax`）；退款的付款不返或追回。
+- **毛利核算**（`.local/affiliate-margin-2026-11-07.md`，2026-11-07）：按实测出图成本（约 $0.03 / 积分），返佣后所有商品毛利率在 65% 以上；按规范最坏成本（$0.06 / 积分、积分全部用完），最低是 Max 年付走 Managed Payments 国际卡，约 51%。未计第三方工具月费和给代理打款的手续费（约再少 1～3 个百分点）。
+
 ### 6.3 通道
 
 **Stripe：一个账户，按付款方式路由**（照 Graylum staging `methodRouting.ts` 的做法，Graylum 2026-10-12 沙盒实测两种模式共用一个账户 PASS）：
