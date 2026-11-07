@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { MANIFEST_PATHS, rootMetadata, startupImages, webManifest } from '@/core/seo'
+import { MISANS_STYLESHEET } from '@/core/ui/misans-stylesheet'
 import { site } from '@/site/site.config'
 
 import { GET as enManifest } from './manifest.webmanifest/route'
@@ -62,5 +63,17 @@ describe('MiSans files', () => {
       expect(data.length).toBe(bytes)
       expect(createHash('sha256').update(data).digest('hex')).toBe(sha256)
     }
+  })
+
+  // T67: headings only, so the linked stylesheet declares one weight (400) alone, copied verbatim.
+  it('links a stylesheet that is exactly the 400 rules of the official one', () => {
+    const dir = join(process.cwd(), 'public/fonts/misans')
+    const rules = (css: string) => css.match(/@font-face\{[^}]*\}/g) ?? []
+    const official = rules(readFileSync(join(dir, 'misans-4bf5d8a22f58eaab.css'), 'utf8')).filter((rule) => rule.includes('font-weight:400'))
+    const linked = readFileSync(join(process.cwd(), 'public', MISANS_STYLESHEET), 'utf8')
+    expect(rules(linked)).toEqual(official)
+    expect(official).toHaveLength(56)
+    const weights = new Map((JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8')) as { file: string; weight: string }[]).map((f) => [f.file, f.weight]))
+    for (const rule of rules(linked)) expect(weights.get(rule.match(/url\("\.\/([^"]+)"\)/)?.[1] ?? '')).toBe('400')
   })
 })

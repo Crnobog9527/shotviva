@@ -195,14 +195,14 @@
   --ease-house: var(--ease);
 }
 
-/* "MiSans Fallback" (T65, ARCHITECTURE §17): on a first visit to a Chinese page the system CJK font
-   stands in until a MiSans subset arrives. Its vertical metrics are overridden to MiSans's own
-   (hhea ascent 1044, descent 282, no line gap, per 1000 units), so lines keep their height when
-   MiSans swaps in. size-adjust stays 100%: every CJK glyph in MiSans, PingFang SC, Microsoft
-   YaHei and Noto Sans CJK advances exactly 1em, so scaling would change line breaks (the ink
-   differs by about 1%: measured 0.883 vs 0.891 em on 100 common characters). One face per weight
-   in use (400 / 500 / 600), each mapped to the system font's own weight instead of a synthetic
-   bold; local() faces that are not installed are skipped. CJK ranges only: Latin stays Geist. */
+/* "MiSans Fallback" (T65, T67, ARCHITECTURE §17): on a first visit to a Chinese page the system
+   CJK font stands in for a heading until its MiSans subset arrives. Its vertical metrics are
+   overridden to MiSans's own (hhea ascent 1044, descent 282, no line gap, per 1000 units), so a
+   heading keeps its height when MiSans swaps in. size-adjust stays 100%: every CJK glyph in
+   MiSans, PingFang SC, Microsoft YaHei and Noto Sans CJK advances exactly 1em, so scaling would
+   change line breaks (the ink differs by about 1%). One face, regular, like the only MiSans
+   weight in use: PingFang SC Regular, Microsoft YaHei, Noto Sans CJK SC; local() faces that
+   are not installed are skipped. CJK ranges only: Latin stays Geist. */
 @font-face {
   font-family: "MiSans Fallback";
   font-weight: 400;
@@ -213,43 +213,26 @@
   line-gap-override: 0%;
   unicode-range: U+2E80-2FDF, U+3000-303F, U+3100-312F, U+31A0-31BF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF;
 }
-@font-face {
-  font-family: "MiSans Fallback";
-  font-weight: 500;
-  src: local("PingFang SC Medium"), local("PingFangSC-Medium"), local("Microsoft YaHei"), local("MicrosoftYaHei"), local("Noto Sans CJK SC Medium"), local("NotoSansCJKsc-Medium"), local("Noto Sans SC Medium");
-  size-adjust: 100%;
-  ascent-override: 104.4%;
-  descent-override: 28.2%;
-  line-gap-override: 0%;
-  unicode-range: U+2E80-2FDF, U+3000-303F, U+3100-312F, U+31A0-31BF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF;
-}
-@font-face {
-  font-family: "MiSans Fallback";
-  font-weight: 600;
-  src: local("PingFang SC Semibold"), local("PingFangSC-Semibold"), local("Microsoft YaHei Bold"), local("MicrosoftYaHei-Bold"), local("Noto Sans CJK SC Bold"), local("NotoSansCJKsc-Bold"), local("Noto Sans SC Bold");
-  size-adjust: 100%;
-  ascent-override: 104.4%;
-  descent-override: 28.2%;
-  line-gap-override: 0%;
-  unicode-range: U+2E80-2FDF, U+3000-303F, U+3100-312F, U+31A0-31BF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF;
-}
 
 /* Fonts come from next/font (src/app/fonts.ts); Tailwind emits these on :root, so
    font-sans / font-mono / font-display and var(--font-*) all resolve to the self-hosted files. */
 @theme {
-  /* Latin glyphs stay Geist / Instrument Serif / Geist Mono; Simplified Chinese glyphs come
-     from MiSans (public/fonts/misans/, linked in the server-rendered head of Chinese pages by
-     core/ui/misans-stylesheet.tsx), then its metric-matched fallback, then the system CJK fonts
-     (DESIGN §3.2, ARCHITECTURE §17). */
-  --font-sans: var(--font-geist), "MiSans", "MiSans Fallback", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-display: var(--font-instrument-serif), "MiSans", "MiSans Fallback", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Times New Roman", serif;
-  --font-mono: var(--font-geist-mono), "MiSans", "MiSans Fallback", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", ui-monospace, "SF Mono", Menlo, monospace;
+  /* Latin glyphs stay Geist / Instrument Serif / Geist Mono. Chinese text uses the system CJK
+     fonts everywhere (T67, ARCHITECTURE §17 「中文字体只用于标题」): PingFang on Apple devices,
+     Microsoft YaHei on Windows, Noto / Source Han Sans on Android and Linux, all already on
+     the visitor's device. Only Chinese headings use MiSans (below). */
+  --font-sans: var(--font-geist), "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: var(--font-instrument-serif), "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", "Times New Roman", serif;
+  --font-mono: var(--font-geist-mono), "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", ui-monospace, "SF Mono", Menlo, monospace;
 }
 
-/* Chinese pages (DESIGN §3.2): headings in Geist + MiSans instead of Instrument Serif, no
-   italics, body line height at least 1.6. */
+/* Chinese pages (DESIGN §3.2): headings and large figures (the display role) in Geist + MiSans
+   instead of Instrument Serif, everything else in the system fonts above; no italics, body line
+   height at least 1.6. MiSans is declared at its regular weight only, the weight the display role
+   has always rendered at (public/fonts/misans/misans-400-*.css, linked in the server-rendered
+   head by core/ui/misans-stylesheet.tsx), then its metric-matched fallback. */
 html:lang(zh-Hans) {
-  --font-display: var(--font-sans);
+  --font-display: var(--font-geist), "MiSans", "MiSans Fallback", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 html:lang(zh-Hans) body {
   line-height: 1.6;
@@ -261,7 +244,7 @@ html:lang(zh-Hans) :is(em, i, .italic) {
 /* Chinese words on an English page (the switcher's 中文, the globe's language hint) use the system
    CJK fonts, so an English page never downloads a MiSans subset (ARCHITECTURE §17). */
 @utility font-cjk-system {
-  font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", sans-serif;
 }
 
 @layer base {
