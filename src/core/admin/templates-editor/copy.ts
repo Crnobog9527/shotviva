@@ -68,6 +68,8 @@ export const bulkEditCopy = {
   surfaceOptions: { '': '不改', web: '只在站内', partner: '只给伙伴', both: '站内 + 伙伴' },
   quality: '出图质量（送给模型的 quality）',
   qualityOptions: { '': '不改', high: 'high', medium: 'medium' },
+  category: '分类',
+  categoryKeep: '不改',
   nothing: '至少改一项',
   next: '检查并确认',
   back: '返回修改',

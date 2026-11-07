@@ -8,6 +8,7 @@ import { bulkEditFailures, isEmptyPatch } from '../templates/bulk-edit-rules'
 import type { AdminTemplate } from '../templates/types'
 import { BulkEditFields } from './bulk-edit-fields'
 import { BulkEditReview } from './bulk-edit-review'
+import type { CategoryOption } from './category-field'
 import { readBulkEdit } from './bulk-edit-state'
 import { bulkEditCopy as COPY } from './copy'
 import type { BulkEditState } from './use-bulk-edit'
@@ -18,11 +19,12 @@ type Props = {
   templates: AdminTemplate[]
   skipped: AdminTemplate[]
   floor: CreditsFloor
+  categories: readonly CategoryOption[]
 }
 
 // Batch edit (T79): fill in what changes → review the changes, the templates and any that
 // would fail → one all-or-nothing save.
-export function BulkEditDialog({ edit, templates, skipped, floor }: Props) {
+export function BulkEditDialog({ edit, templates, skipped, floor, categories }: Props) {
   const { patch, problems } = readBulkEdit(edit.values)
   const empty = isEmptyPatch(patch) || templates.length === 0
   const invalid = Object.keys(problems).length > 0
@@ -38,9 +40,9 @@ export function BulkEditDialog({ edit, templates, skipped, floor }: Props) {
         </DialogHeader>
         <SkippedNote skipped={skipped} none={templates.length === 0} />
         {reviewing ? (
-          <BulkEditReview templates={templates} patch={patch} failures={failures} />
+          <BulkEditReview templates={templates} patch={patch} failures={failures} categories={categories} />
         ) : (
-          <BulkEditFields values={edit.values} problems={problems} floor={floor} onChange={edit.setValues} />
+          <BulkEditFields values={edit.values} problems={problems} floor={floor} categories={categories} onChange={edit.setValues} />
         )}
         {edit.error ? (
           <p role="alert" className="text-destructive text-sm">

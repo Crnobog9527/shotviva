@@ -76,6 +76,7 @@ export function TemplatesEditor({ templates, categories, floor, actions }: Props
         setActiveMany={actions.setActiveMany}
         editMany={actions.editMany}
         floor={floor}
+        categories={categories}
         onClear={() => setSelected(new Set())}
       />
       <TemplatesTable

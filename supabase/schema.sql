@@ -444,6 +444,7 @@ declare
   v_patch jsonb := coalesce(p_patch, '{}');
   v_cost jsonb := coalesce(p_patch -> 'credits_cost', '{}');
   v_visible text[];
+  v_category text := p_patch ->> 'category_key';
   v_failures jsonb;
   v_changed integer;
 begin
@@ -456,8 +457,8 @@ begin
   if cardinality(v_ids) = 0 or cardinality(v_ids) > 200 then
     raise exception 'INVALID_INPUT' using detail = 'between 1 and 200 templates';
   end if;
-  if jsonb_typeof(v_patch) <> 'object' or v_patch = '{}' or v_patch - 'credits_cost' - 'visible_in' - 'quality' <> '{}' then
-    raise exception 'INVALID_INPUT' using detail = 'patch must name credits_cost, visible_in or quality';
+  if jsonb_typeof(v_patch) <> 'object' or v_patch = '{}' or v_patch - 'credits_cost' - 'visible_in' - 'quality' - 'category_key' <> '{}' then
+    raise exception 'INVALID_INPUT' using detail = 'patch must name credits_cost, visible_in, quality or category_key';
   end if;
   if v_patch ? 'quality' and (v_patch ->> 'quality') is distinct from 'high' and (v_patch ->> 'quality') is distinct from 'medium' then
     raise exception 'INVALID_INPUT' using detail = 'quality must be high or medium';
@@ -480,6 +481,13 @@ begin
       raise exception 'INVALID_INPUT' using detail = 'visible_in must be web, partner or both';
     end if;
   end if;
+  if v_patch ? 'category_key' then
+    -- Held until commit, so the category cannot be deleted under this write.
+    perform 1 from public.template_categories c where c.key = v_category and not c.is_system for share;
+    if not found then
+      raise exception 'CATEGORY_NOT_FOUND' using detail = 'category_key must name a category that is not a system one';
+    end if;
+  end if;
   if p_floor is null or exists (
     select 1 from unnest(array['high', 'medium']) as q(quality), unnest(array['1k', '2k', '3k']) as r(res)
     where jsonb_typeof(p_floor -> q.quality -> r.res) is distinct from 'number'
@@ -495,14 +503,16 @@ begin
            t.description, t.cover_before_url, t.cover_after_url, t.visible_in as old_visible,
            coalesce(v_patch ->> 'quality', t.quality) as quality,
            t.credits_cost || v_cost as credits_cost,
-           coalesce(v_visible, t.visible_in) as visible_in
+           coalesce(v_visible, t.visible_in) as visible_in,
+           a.id in ('edit', 'freeform') or coalesce(c.is_system, false) as is_builtin
     from unnest(v_ids) as a(id)
     left join public.templates t on t.id = a.id
+    left join public.template_categories c on c.key = t.category_key
   ),
   failures as (
     select jsonb_build_object('id', p.id, 'name', p.name, 'reason', case when p.found then 'system' else 'not_found' end) as failure
     from planned p
-    where not p.found or p.id in ('edit', 'freeform')
+    where not p.found or p.is_builtin
     union all
     select jsonb_build_object(
       'id', p.id, 'name', p.name, 'reason', 'below_floor', 'resolution', r.res,
@@ -510,11 +520,11 @@ begin
     )
     from planned p
     cross join unnest(array['1k', '2k', '3k']) as r(res)
-    where p.found and p.id not in ('edit', 'freeform') and (p.credits_cost ->> r.res)::integer < (p_floor -> p.quality ->> r.res)::integer
+    where p.found and not p.is_builtin and (p.credits_cost ->> r.res)::integer < (p_floor -> p.quality ->> r.res)::integer
     union all
     select jsonb_build_object('id', p.id, 'name', p.name, 'reason', 'web_incomplete')
     from planned p
-    where p.found and p.id not in ('edit', 'freeform') and p.is_active
+    where p.found and not p.is_builtin and p.is_active
       and 'web' = any (p.visible_in) and not ('web' = any (p.old_visible))
       and (nullif(btrim(p.description), '') is null or nullif(btrim(p.cover_before_url), '') is null
            or nullif(btrim(p.cover_after_url), '') is null)
@@ -529,6 +539,8 @@ begin
   set quality = coalesce(v_patch ->> 'quality', t.quality),
       credits_cost = t.credits_cost || v_cost,
       visible_in = coalesce(v_visible, t.visible_in),
+      -- templates.category (the English name) follows through T75's trigger.
+      category_key = coalesce(v_category, t.category_key),
       featured_rank = case when v_visible is not null and not ('web' = any (v_visible)) then null else t.featured_rank end
   where t.id = any (v_ids);
   get diagnostics v_changed = row_count;

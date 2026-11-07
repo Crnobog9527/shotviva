@@ -8,8 +8,8 @@ describe('batch edit form (T79)', () => {
   })
 
   it('turns filled boxes and choices into a patch, tier by tier', () => {
-    const values = { ...emptyBulkEdit(), credits: { '1k': '', '2k': ' 5 ', '3k': '' }, surfaces: 'both' as const, quality: 'medium' as const }
-    expect(readBulkEdit(values).patch).toEqual({ creditsCost: { '2k': 5 }, visibleIn: ['web', 'partner'], quality: 'medium' })
+    const values = { ...emptyBulkEdit(), credits: { '1k': '', '2k': ' 5 ', '3k': '' }, surfaces: 'both' as const, quality: 'medium' as const, category: 'pets' }
+    expect(readBulkEdit(values).patch).toEqual({ creditsCost: { '2k': 5 }, visibleIn: ['web', 'partner'], quality: 'medium', categoryKey: 'pets' })
   })
 
   it('flags a credit box that is not a whole number from 1 to 999', () => {

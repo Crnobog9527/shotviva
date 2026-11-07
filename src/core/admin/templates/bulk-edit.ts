@@ -30,6 +30,8 @@ const inputSchema = z.object({
         .refine((surfaces) => new Set(surfaces).size === surfaces.length, 'surfaces must be unique')
         .optional(),
       quality: z.enum(TEMPLATE_QUALITIES).optional(),
+      // A template_categories key (T75); the SQL function refuses unknown and system ones.
+      categoryKey: z.string().min(1).max(40).optional(),
     })
     .refine((patch) => !isEmptyPatch(patch), '至少改一项'),
 })
@@ -55,11 +57,13 @@ const toSqlPatch = (patch: BulkEditPatch) => ({
   ...(patch.creditsCost && Object.keys(patch.creditsCost).length > 0 ? { credits_cost: patch.creditsCost } : {}),
   ...(patch.visibleIn ? { visible_in: patch.visibleIn } : {}),
   ...(patch.quality ? { quality: patch.quality } : {}),
+  ...(patch.categoryKey ? { category_key: patch.categoryKey } : {}),
 })
 
 const SQL_ERRORS: Record<string, [code: 'FORBIDDEN' | 'INVALID_INPUT', message: string]> = {
   NOT_ADMIN: ['FORBIDDEN', '只有管理员能批量编辑模板'],
   INVALID_INPUT: ['INVALID_INPUT', '批量编辑的内容不完整，请刷新页面后再试'],
+  CATEGORY_NOT_FOUND: ['INVALID_INPUT', '选的分类不存在或已被删除，请刷新页面后再选'],
 }
 
 export async function bulkEditTemplates(

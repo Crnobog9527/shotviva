@@ -13,6 +13,8 @@ export type BulkEditPatch = {
   creditsCost?: Partial<CreditsCost>
   visibleIn?: TemplateSurface[]
   quality?: TemplateQuality
+  // A template_categories key (T75), never a system category.
+  categoryKey?: string
 }
 
 export type BulkEditFailure =
@@ -24,18 +26,20 @@ export type BulkEditOutcome = { changed: number; failures: BulkEditFailure[] }
 export type BulkEditCandidate = Pick<
   Template,
   'id' | 'name' | 'quality' | 'creditsCost' | 'visibleIn' | 'isActive' | 'description' | 'coverBeforeUrl' | 'coverAfterUrl'
->
+> & { categoryInfo?: { isSystem: boolean } }
 
-// The built-in templates (T75 puts both in system categories): photo edit has its own page, and
-// the partner API's free-prompt `freeform` must not pick up a web template's prices or entry
-// points from a 「全选」. The dialog leaves them out; the SQL function refuses them as `system`.
+// The built-in templates: photo edit has its own page, and the partner API's free-prompt
+// `freeform` must not pick up a web template's prices, entry points or category from a 「全选」.
+// T75 puts both in system categories; the ids are kept too, as 0640 does. The dialog leaves them
+// out; the SQL function refuses them as `system`.
 export const BULK_EDIT_SYSTEM_IDS: ReadonlySet<string> = new Set([EDIT_TEMPLATE_ID, 'freeform'])
-export const isBulkEditable = (template: Pick<Template, 'id'>) => !BULK_EDIT_SYSTEM_IDS.has(template.id)
+export const isBulkEditable = (template: { id: string; categoryInfo?: { isSystem: boolean } }) =>
+  !BULK_EDIT_SYSTEM_IDS.has(template.id) && template.categoryInfo?.isSystem !== true
 
 const RESOLUTION_LABEL: Record<Resolution, string> = { '1k': 'Standard', '2k': 'HD', '3k': 'Max' }
 
 export const isEmptyPatch = (patch: BulkEditPatch) =>
-  Object.keys(patch.creditsCost ?? {}).length === 0 && !patch.visibleIn && !patch.quality
+  Object.keys(patch.creditsCost ?? {}).length === 0 && !patch.visibleIn && !patch.quality && !patch.categoryKey
 
 const blank = (text: string | null) => !text || text.trim() === ''
 
@@ -77,7 +81,7 @@ export function describeFailure(failure: BulkEditFailure): string {
 }
 
 // The confirm step's list of what changes, in the editor's own words.
-export function describePatch(patch: BulkEditPatch): string[] {
+export function describePatch(patch: BulkEditPatch, categoryName: (key: string) => string = (key) => key): string[] {
   const lines: string[] = []
   const tiers = RESOLUTIONS.filter((resolution) => patch.creditsCost?.[resolution] !== undefined)
   if (tiers.length > 0) {
@@ -88,5 +92,6 @@ export function describePatch(patch: BulkEditPatch): string[] {
     lines.push(`展示入口 → ${patch.visibleIn.map((surface) => label[surface]).join(' + ')}`)
   }
   if (patch.quality) lines.push(`出图质量 → ${patch.quality}`)
+  if (patch.categoryKey) lines.push(`分类 → ${categoryName(patch.categoryKey)}`)
   return lines
 }

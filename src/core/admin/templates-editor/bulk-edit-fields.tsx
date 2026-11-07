@@ -6,6 +6,7 @@ import { RESOLUTIONS } from '@/core/templates/output-options'
 import type { CreditsFloor } from '@/core/templates/pricing'
 
 import type { BulkEditValues, SurfaceChoice } from './bulk-edit-state'
+import type { CategoryOption } from './category-field'
 import { bulkEditCopy as COPY } from './copy'
 import { TIER_LABEL } from './form-state'
 
@@ -15,11 +16,13 @@ type Props = {
   values: BulkEditValues
   problems: Partial<Record<keyof BulkEditValues['credits'], string>>
   floor: CreditsFloor
+  // T75's categories; system ones (photo edit, freeform) are never offered as a target.
+  categories: readonly CategoryOption[]
   onChange: (values: BulkEditValues) => void
 }
 
 // The batch-edit form: three optional credit boxes, entry points, quality. Each starts on 不改.
-export function BulkEditFields({ values, problems, floor, onChange }: Props) {
+export function BulkEditFields({ values, problems, floor, categories, onChange }: Props) {
   return (
     <div className="grid gap-4">
       <fieldset className="grid gap-2">
@@ -43,7 +46,7 @@ export function BulkEditFields({ values, problems, floor, onChange }: Props) {
           ))}
         </div>
       </fieldset>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-3">
         <div className="grid gap-1.5">
           <Label htmlFor="bulk-surfaces">{COPY.surfaces}</Label>
           <select
@@ -74,7 +77,26 @@ export function BulkEditFields({ values, problems, floor, onChange }: Props) {
             ))}
           </select>
         </div>
+        <CategoryChoice value={values.category} categories={categories} onChange={(category) => onChange({ ...values, category })} />
       </div>
+    </div>
+  )
+}
+
+function CategoryChoice({ value, categories, onChange }: { value: string; categories: readonly CategoryOption[]; onChange: (key: string) => void }) {
+  return (
+    <div className="grid gap-1.5">
+      <Label htmlFor="bulk-category">{COPY.category}</Label>
+      <select id="bulk-category" className={SELECT} value={value} onChange={(event) => onChange(event.target.value)}>
+        <option value="">{COPY.categoryKeep}</option>
+        {categories
+          .filter((category) => !category.isSystem)
+          .map((category) => (
+            <option key={category.key} value={category.key}>
+              {category.nameZh} · {category.nameEn}
+            </option>
+          ))}
+      </select>
     </div>
   )
 }

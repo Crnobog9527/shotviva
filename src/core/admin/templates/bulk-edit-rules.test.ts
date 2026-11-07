@@ -57,11 +57,15 @@ describe('batch edit floor check (T79)', () => {
     ])
     expect(isBulkEditable({ id: 'freeform' })).toBe(false)
     expect(isBulkEditable({ id: 'a' })).toBe(true)
+    // Any template T75 put in a system category, whatever its id.
+    expect(isBulkEditable({ id: 'b', categoryInfo: { isSystem: true } })).toBe(false)
   })
 
   it('describes the change and knows an empty one', () => {
     expect(isEmptyPatch({})).toBe(true)
     expect(isEmptyPatch({ creditsCost: {} })).toBe(true)
+    expect(isEmptyPatch({ categoryKey: 'pets' })).toBe(false)
+    expect(describePatch({ categoryKey: 'pets' }, () => '宠物 · Pets')).toEqual(['分类 → 宠物 · Pets'])
     expect(describePatch({ creditsCost: { '2k': 5 }, visibleIn: ['web', 'partner'], quality: 'medium' })).toEqual([
       '积分：HD → 5',
       '展示入口 → 站内 + 伙伴',

@@ -92,6 +92,30 @@ describe('batch edit of templates', () => {
     expect((await rows())[ids[2]!]?.visible_in).toEqual(['web', 'partner'])
   })
 
+  // T75 categories: a batch moves templates into one category; system categories are no target.
+  it('moves templates into a category, never into a system one', async () => {
+    const outcome = await bulkEditTemplates(client, admin, { ids: ids.slice(0, 2), patch: { categoryKey: 'pets' } }, CREDITS_FLOOR)
+    expect(outcome).toEqual({ changed: 2, failures: [] })
+    const { rows: moved } = await pg.query<{ category_key: string; category: string }>(
+      'select category_key, category from public.templates where id = any($1)',
+      [ids.slice(0, 2)],
+    )
+    expect(moved).toEqual([
+      { category_key: 'pets', category: 'Pets' },
+      { category_key: 'pets', category: 'Pets' },
+    ])
+    for (const target of ['freeform', 'edit', 'no-such-category']) {
+      await expect(bulkEditTemplates(client, admin, { ids, patch: { categoryKey: target } }, CREDITS_FLOOR)).rejects.toMatchObject({
+        code: 'INVALID_INPUT',
+      })
+    }
+    const { rows: still } = await pg.query<{ n: number }>(
+      "select count(*)::int as n from public.templates where id = any($1) and category_key in ('freeform', 'edit')",
+      [ids],
+    )
+    expect(still[0]?.n).toBe(0)
+  })
+
   it('refuses unknown and system templates, bad input and a caller who is not an admin', async () => {
     const missing = await bulkEditTemplates(client, admin, { ids: ['test-bulkedit-nope', 'edit'], patch: { quality: 'high' } }, CREDITS_FLOOR)
     expect(missing.failures.map((failure) => failure.reason).sort()).toEqual(['not_found', 'system'])

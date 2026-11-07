@@ -2,13 +2,18 @@
 
 import { describeFailure, describePatch, type BulkEditFailure, type BulkEditPatch } from '../templates/bulk-edit-rules'
 import type { AdminTemplate } from '../templates/types'
+import type { CategoryOption } from './category-field'
 import { bulkEditCopy as COPY } from './copy'
 
-type Props = { templates: AdminTemplate[]; patch: BulkEditPatch; failures: BulkEditFailure[] }
+type Props = { templates: AdminTemplate[]; patch: BulkEditPatch; failures: BulkEditFailure[]; categories: readonly CategoryOption[] }
 
 // The confirm step (T79): what changes, on which templates, and every template that would fail
 // the floor or the web rules (the whole batch is then refused).
-export function BulkEditReview({ templates, patch, failures }: Props) {
+export function BulkEditReview({ templates, patch, failures, categories }: Props) {
+  const categoryName = (key: string) => {
+    const category = categories.find((option) => option.key === key)
+    return category ? `${category.nameZh} · ${category.nameEn}` : key
+  }
   const offWeb = patch.visibleIn !== undefined && !patch.visibleIn.includes('web')
   const featured = offWeb ? templates.filter((template) => template.featuredRank !== null) : []
   return (
@@ -16,7 +21,7 @@ export function BulkEditReview({ templates, patch, failures }: Props) {
       <div>
         <p className="font-medium">{COPY.changes}</p>
         <ul className="mt-1 list-disc pl-5">
-          {describePatch(patch).map((line) => (
+          {describePatch(patch, categoryName).map((line) => (
             <li key={line}>{line}</li>
           ))}
         </ul>
