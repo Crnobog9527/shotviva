@@ -1,5 +1,6 @@
 // Admin area (ARCHITECTURE §10): the template + prompt editor and the provider settings (T17).
 export {
+  bulkEditTemplates,
   listAdminTemplates,
   runAdminAction,
   runAdminQuery,
@@ -15,6 +16,7 @@ export type {
   ActiveChangeOutcome,
   AdminTemplate,
   ApplyCoverRequest,
+  BulkEditOutcome,
   CoverTicket,
   CoverUploadRequest,
   SaveTemplatePayload,

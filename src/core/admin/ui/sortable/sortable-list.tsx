@@ -64,7 +64,7 @@ export function SortableList({ ids, labelOf, onReorder, disabled = false, disabl
   }
 
   return (
-    <SortableListContext value={{ ...state, labelOf, instructionsId, disabledHint, reducedMotion }}>
+    <SortableListContext value={{ ...state, labelOf, instructionsId, disabledHint, blocked: disabled && disabledHint !== undefined, reducedMotion }}>
       <DndContext
         id={dndId}
         sensors={sensors}
