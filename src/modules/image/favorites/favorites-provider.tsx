@@ -8,7 +8,7 @@ import { useRouter } from '@/core/i18n'
 
 import { FavoriteNotice } from './favorite-notice'
 import { createFavoritesStore, type FavoriteFailure, type SendResult } from './favorites-store'
-import { signInForFavorite } from './favorite-return'
+import { rememberFavoriteReturn, signInForFavorite } from './favorite-return'
 
 export type FavoriteSurface = EventProps<'template_favorite'>['surface']
 type Target = { id: string; category: string }
@@ -69,7 +69,9 @@ export function FavoritesProvider({ initialIds, signedIn, returnTo, children }: 
   const set = useCallback(
     (template: Target, surface: FavoriteSurface, saved: boolean) => {
       if (!signedIn) {
-        if (returnTo) router.push(signInForFavorite(returnTo, template.id))
+        if (!returnTo) return
+        rememberFavoriteReturn(template.id)
+        router.push(signInForFavorite(returnTo, template.id))
         return
       }
       meta.set(template.id, { category: template.category, surface })

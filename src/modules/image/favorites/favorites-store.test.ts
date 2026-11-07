@@ -115,9 +115,10 @@ describe('savedIn', () => {
 })
 
 describe('failureOf', () => {
-  it('names the cap and folds everything else into a retry', () => {
+  it('names the cap and a template that is not live, and folds everything else into a retry', () => {
     expect(failureOf('FAVORITES_LIMIT')).toBe('limit')
-    expect(failureOf('NOT_FOUND')).toBe('failed')
+    expect(failureOf('NOT_FOUND')).toBe('unavailable')
+    expect(failureOf('UNAUTHORIZED')).toBe('failed')
     expect(failureOf(null)).toBe('failed')
   })
 })

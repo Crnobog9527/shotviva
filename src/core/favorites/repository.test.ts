@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { describe, expect, it, vi } from 'vitest'
 
-import { setFavorite } from './repository'
+import { listFavoriteIdsOrEmpty, setFavorite } from './repository'
 
 // A client whose writes answer `error`; records what was asked.
 function fakeClient(error: { message: string } | null) {
@@ -40,5 +40,20 @@ describe('setFavorite (ARCHITECTURE §5.1b)', () => {
     await expect(setFavorite(bad.client, USER, '../x', true)).rejects.toMatchObject({ code: 'NOT_FOUND' })
     await expect(setFavorite(bad.client, USER, 'a'.repeat(65), true)).rejects.toMatchObject({ code: 'NOT_FOUND' })
     expect(bad.from).not.toHaveBeenCalled()
+  })
+})
+
+describe('listFavoriteIdsOrEmpty', () => {
+  // A read chain whose every step returns itself and ends in `answer`.
+  function readClient(answer: unknown) {
+    const chain: Record<string, unknown> = {}
+    for (const step of ['select', 'eq', 'contains', 'order', 'limit']) chain[step] = () => chain
+    chain.returns = () => Promise.resolve(answer)
+    return { from: () => chain } as unknown as SupabaseClient
+  }
+
+  it('returns the ids, or [] when the read fails (pages never break on it)', async () => {
+    await expect(listFavoriteIdsOrEmpty(readClient({ data: [{ template_id: 'a' }], error: null }), USER)).resolves.toEqual(['a'])
+    await expect(listFavoriteIdsOrEmpty(readClient({ data: null, error: { message: 'timeout' } }), USER)).resolves.toEqual([])
   })
 })

@@ -6,7 +6,7 @@ import { Suspense, type ReactNode } from 'react'
 import { AppPage, BalanceChip, TabRootHeader } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
 import { currentTier, limitsFor, readBalance } from '@/core/billing'
-import { listFavoriteIds } from '@/core/favorites'
+import { listFavoriteIdsOrEmpty } from '@/core/favorites'
 import { currentLocale } from '@/core/i18n/server'
 import { listRunningJobIds } from '@/core/jobs'
 import { listTemplatesIn } from '@/core/templates'
@@ -34,7 +34,8 @@ async function Create() {
     // current_tier() is service-role only; the user's own id comes from the session.
     currentTier(createAdminSupabase(), user.id),
     listRunningJobIds(supabase, user.id, new Date()),
-    listFavoriteIds(supabase, user.id),
+    // A failed read degrades to no favorites (logged), never to an error page or signed-out home.
+    listFavoriteIdsOrEmpty(supabase, user.id),
   ])
   return (
     <>

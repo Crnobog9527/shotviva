@@ -3,6 +3,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { AppError } from '../errors'
+import { logger } from '../logger'
 import { FAVORITES_MAX, favoriteTemplateIdSchema } from './rules'
 
 // Every call takes the signed-in user's own session client (createServerSupabase): RLS keeps
@@ -27,6 +28,17 @@ export async function listFavoriteIds(client: SupabaseClient, userId: string): P
     .returns<FavoriteRow[]>()
   if (error) throw new AppError('INTERNAL', 'favorites read failed', { cause: error })
   return data.map((row) => row.template_id)
+}
+
+// For pages: a failed read must not break Create or turn the home generator into the signed-out
+// one, so it degrades to "nothing saved yet" (the hearts still work) and is logged.
+export async function listFavoriteIdsOrEmpty(client: SupabaseClient, userId: string): Promise<string[]> {
+  try {
+    return await listFavoriteIds(client, userId)
+  } catch (error) {
+    logger.error('favorites.read_failed', { error })
+    return []
+  }
 }
 
 // Exception messages raised by the 0741 trigger.

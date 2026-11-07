@@ -5,7 +5,8 @@
 
 export type SendResult = { ok: true } | { ok: false; code: string | null }
 export type Send = (templateId: string, saved: boolean) => Promise<SendResult>
-export type FavoriteFailure = 'limit' | 'failed'
+// limit: the 200 cap; unavailable: the template is not live (unpublished, partner-only, gone).
+export type FavoriteFailure = 'limit' | 'unavailable' | 'failed'
 
 type Events = {
   // The server has it: analytics fires here, so a rolled-back tap is never counted.
@@ -19,7 +20,10 @@ export type FavoritesStore = {
   set(templateId: string, saved: boolean): void
 }
 
-export const failureOf = (code: string | null): FavoriteFailure => (code === 'FAVORITES_LIMIT' ? 'limit' : 'failed')
+export function failureOf(code: string | null): FavoriteFailure {
+  if (code === 'FAVORITES_LIMIT') return 'limit'
+  return code === 'NOT_FOUND' ? 'unavailable' : 'failed'
+}
 
 // Newest first: taps not yet confirmed (latest tap first), then the server's list without them.
 function project(confirmed: readonly string[], pending: ReadonlyMap<string, boolean>): string[] {

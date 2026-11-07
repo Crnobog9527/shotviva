@@ -923,6 +923,7 @@
       "save": "Save {name}",
       "saved": "Saved",
       "limit": "You can save up to {max} templates. Remove one to save another.",
+      "unavailable": "That template isn’t available right now, so it wasn’t saved.",
       "failed": "Couldn’t save that change. Check your connection and try again.",
       "close": "Close",
       "pickerGroup": "Saved"

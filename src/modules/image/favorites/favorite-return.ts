@@ -1,7 +1,42 @@
 // Signed out, a heart goes to sign-in and back (ARCHITECTURE §5.1b): the page it was tapped on
 // comes back with ?favorite=<template id>, saves that template once and drops the parameter.
+// The tap also leaves a marker in this tab's sessionStorage, and only a return whose id matches
+// it saves anything, so a crafted cross-site link with ?favorite= does nothing.
 
 export const FAVORITE_PARAM = 'favorite'
+const MARKER_KEY = 'shotviva.favorite-return'
+
+type MarkerStore = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
+
+// Storage can be missing or throw (private mode, blocked site data): then nothing is remembered
+// and the return saves nothing, which is the safe side.
+function sessionStore(): MarkerStore | null {
+  try {
+    return window.sessionStorage
+  } catch {
+    return null
+  }
+}
+
+export function rememberFavoriteReturn(templateId: string, store: MarkerStore | null = sessionStore()): void {
+  try {
+    store?.setItem(MARKER_KEY, templateId)
+  } catch {
+    // Not remembered: the return will not save.
+  }
+}
+
+// Whether this return was started by a heart tap in this tab for `templateId`. The marker is
+// cleared either way, so it is used once.
+export function takeFavoriteReturn(templateId: string, store: MarkerStore | null = sessionStore()): boolean {
+  try {
+    const marked = store?.getItem(MARKER_KEY) ?? null
+    store?.removeItem(MARKER_KEY)
+    return marked === templateId
+  } catch {
+    return false
+  }
+}
 
 // The login page in the visitor's language (the i18n router adds the prefix), returning to
 // `returnTo` (already in its language, e.g. '/zh') with the template to save.

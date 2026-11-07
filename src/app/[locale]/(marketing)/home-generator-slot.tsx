@@ -8,7 +8,7 @@ import { PaywallProvider } from '@/core/billing/paywall'
 import { wechatPayEnabled } from '@/core/billing/stripe'
 import { StandingSlot } from '@/core/billing/standing'
 import { paymentChannel } from '@/core/billing/waffo'
-import { listFavoriteIds } from '@/core/favorites'
+import { listFavoriteIdsOrEmpty } from '@/core/favorites'
 import { listOwnJobs } from '@/core/jobs'
 import { logger } from '@/core/logger'
 import { isWishlistEnabled } from '@/core/wishlist'
@@ -28,7 +28,8 @@ async function viewerOf(): Promise<HomeViewer | null> {
     // current_tier() is service-role only; the user's own id comes from the session.
     currentTier(createAdminSupabase(), user.id),
     listOwnJobs(supabase, user.id, new Date()),
-    listFavoriteIds(supabase, user.id),
+    // A failed read degrades to no favorites (logged), never to an error page or signed-out home.
+    listFavoriteIdsOrEmpty(supabase, user.id),
   ])
   return { balance, concurrency: { limit: limitsFor(tier).concurrency, runningIds: own.running.map((job) => job.id) }, favoriteIds }
 }

@@ -1,4 +1,4 @@
 import 'server-only'
 
-export { listFavoriteIds, setFavorite } from './repository'
+export { listFavoriteIds, listFavoriteIdsOrEmpty, setFavorite } from './repository'
 export { FAVORITES_MAX, favoriteTemplateIdSchema } from './rules'
