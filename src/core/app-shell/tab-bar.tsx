@@ -39,6 +39,8 @@ export function TabBar({ items, desktopUnder = [], admin }: Props) {
     <nav
       aria-label={t('label')}
       data-tabbar={root ? '' : undefined}
+      // Stays put while pages slide or fade under it (T56; globals.css).
+      style={{ viewTransitionName: 'app-tabs' }}
       className={cn(
         'bar-material fixed inset-x-0 bottom-0 z-60 px-2 pt-1 pb-[calc(var(--sab)+4px)]',
         'md:sticky md:top-0 md:bottom-auto md:h-14 md:p-0 md:shadow-[inset_0_-1px_0_var(--border)]',

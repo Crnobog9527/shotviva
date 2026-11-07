@@ -445,6 +445,60 @@ html[data-pushed-back] [data-app-ground] {
   html[data-pushed-back] [data-app-ground] { filter: brightness(0.45); }
 }
 
+/* Page transitions between app pages (DESIGN §8.2 「页面切换过渡」, T56). React's <ViewTransition>
+   in AppPage gives the leaving and the entering page a class per navigation type
+   (core/ui/nav-motion): push-in/out going deeper, pop-in/out coming back, tab-in/out between
+   tab roots. Only transform and opacity animate, never past 300ms. The rest of the page (ground,
+   living background, banner) and the two bars swap at once and stay put: the bars are named
+   (app-flow-nav, app-tabs) so they leave the sliding snapshot. No type, no animation. */
+::view-transition { pointer-events: none; }
+::view-transition-old(root),
+::view-transition-old(app-flow-nav),
+::view-transition-old(app-tabs) { display: none; }
+::view-transition-new(root),
+::view-transition-group(app-flow-nav),
+::view-transition-new(app-flow-nav),
+::view-transition-group(app-tabs),
+::view-transition-new(app-tabs) { animation: none; }
+::view-transition-group(app-flow-nav),
+::view-transition-group(app-tabs) { z-index: 2; }
+
+@keyframes sv-page-from-right { from { transform: translateX(100%); } }
+@keyframes sv-page-to-right { to { transform: translateX(100%); } }
+@keyframes sv-page-recede { to { transform: translateX(-30%); opacity: 0.5; } }
+@keyframes sv-page-return { from { transform: translateX(-30%); opacity: 0.5; } }
+@keyframes sv-page-fade-in { from { opacity: 0; } }
+@keyframes sv-page-fade-out { to { opacity: 0; } }
+
+/* Phones: the new page pushes in from the right over the old one, which recedes left and dims
+   (over the dark ground); back reverses it. The page on top is painted on the ground so the
+   one under it never shows through. Tabs cross-fade in 150ms. */
+@media (max-width: 767px) {
+  ::view-transition-group(.push-in),
+  ::view-transition-group(.pop-out) { z-index: 1; }
+  ::view-transition-new(.push-in) { animation: sv-page-from-right 300ms var(--ease) both; background: var(--background); }
+  ::view-transition-old(.push-out) { animation: sv-page-recede 300ms var(--ease) both; }
+  ::view-transition-old(.pop-out) { animation: sv-page-to-right 300ms var(--ease) both; background: var(--background); }
+  ::view-transition-new(.pop-in) { animation: sv-page-return 300ms var(--ease) both; }
+}
+::view-transition-new(.tab-in) { animation: sv-page-fade-in 150ms var(--ease) both; }
+::view-transition-old(.tab-out) { animation: sv-page-fade-out 150ms var(--ease) both; }
+
+/* Desktop: a short fade, whichever way. */
+@media (min-width: 768px) {
+  ::view-transition-new(.push-in),
+  ::view-transition-new(.pop-in) { animation: sv-page-fade-in 180ms var(--ease) both; }
+  ::view-transition-old(.push-out),
+  ::view-transition-old(.pop-out) { animation: sv-page-fade-out 120ms var(--ease) both; }
+}
+
+/* Reduced motion never gets a type (nav-motion), and in case one slips through, nothing moves. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) { animation: none !important; }
+}
+
 /* One-shot entry fade (core/ui/reveal.ts): hidden only once the hook has tagged the element, so
    server-rendered markup is never invisible before it runs; shown at once under reduced motion. */
 @media (prefers-reduced-motion: no-preference) {
