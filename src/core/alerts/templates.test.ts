@@ -72,18 +72,19 @@ describe('renderAlert', () => {
 
 describe('renderAlert: operations', () => {
   it('generation failure spike', () => {
-    expect(text({ kind: 'generation_spike', failed: 7, total: 20, windowMinutes: 60, hour: '2026-11-08T10' })).toBe(
+    expect(text({ kind: 'generation_spike', failed: 7, total: 20, windowMinutes: 60 })).toBe(
       '【出图失败偏多】过去 60 分钟有 7 张图没生成出来（共 20 张，失败 35%），失败的积分会自动退回，可能是出图服务出了问题。\n去后台看：https://shotviva.com/admin/jobs?status=failed',
     )
   })
 
   it('tickets: new and follow-up, refund requests tagged', () => {
-    const ticket = { kind: 'ticket', ticketId: TICKET, userId: USER } as const
-    expect(text({ ...ticket, messageId: null, ticketType: 'refund' })).toBe(
+    const ticket = { kind: 'ticket', ticketId: TICKET, userId: USER, pending: null } as const
+    expect(text({ ...ticket, reply: false, ticketType: 'refund' })).toBe(
       `【新工单·退款申请】j***@gmail.com 提交了一张「申请退款」工单，等你回复。\n去后台看：https://shotviva.com/admin/tickets/${TICKET}`,
     )
-    expect(text({ ...ticket, messageId: 'm1', ticketType: 'image_issue' })).toContain('【工单回复】j***@gmail.com 在「出图问题」工单里补充了新消息。')
-    expect(text({ ...ticket, messageId: null, ticketType: null })).toContain('提交了一张「其他」工单')
+    expect(text({ ...ticket, reply: true, ticketType: 'image_issue' })).toContain('【工单回复】j***@gmail.com 在「出图问题」工单里补充了新消息。')
+    expect(text({ ...ticket, reply: true, ticketType: 'refund', pending: 4 })).toContain('【工单回复·退款申请】j***@gmail.com 在「申请退款」工单里有 4 条新消息还没回复。')
+    expect(text({ ...ticket, reply: false, ticketType: null })).toContain('提交了一张「其他」工单')
   })
 
   it('old subscription not cancelled after an upgrade', () => {

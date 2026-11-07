@@ -38,20 +38,21 @@ export async function createTicket(db: SupabaseClient, userId: string, input: un
     idRow,
   )
   // The Owner hears of every new ticket in Feishu (T72); refund requests are tagged.
-  await notifyOwner({ kind: 'ticket', ticketId: row.id, messageId: null, userId, ticketType: type })
+  notifyOwner({ kind: 'ticket', ticketId: row.id, reply: false, userId, ticketType: type, pending: null })
   return row.id
 }
 
 export async function addTicketMessage(db: SupabaseClient, userId: string, input: unknown, images: readonly TicketImageRow[] = []): Promise<void> {
   const parsed = addMessageSchema.safeParse(input)
   if (!parsed.success) throw new AppError('INVALID_INPUT', 'message input is invalid')
-  const message = await supportRpc(
+  await supportRpc(
     db,
     'add_ticket_message',
     { p_ticket_id: parsed.data.ticketId, p_user_id: userId, p_body: parsed.data.body, p_images: images },
     idRow,
   )
-  await notifyOwner({ kind: 'ticket', ticketId: parsed.data.ticketId, messageId: message.id, userId, ticketType: null })
+  // Collapsed to one alert per ticket per 30 minutes, with the number of unanswered messages.
+  notifyOwner({ kind: 'ticket', ticketId: parsed.data.ticketId, reply: true, userId, ticketType: null, pending: null })
 }
 
 // Clears the "new reply" dot when the author opens the ticket; writes nothing if already read.

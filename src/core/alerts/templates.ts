@@ -137,8 +137,10 @@ function generationSpike(alert: GenerationSpikeAlert): Rendered {
 function ticket(alert: TicketAlert, who: string): Rendered {
   const type = (alert.ticketType && TICKET_TYPES[alert.ticketType]) || '其他'
   const tag = alert.ticketType === 'refund' ? '·退款申请' : ''
-  const line = alert.messageId
-    ? `【工单回复${tag}】${who} 在「${type}」工单里补充了新消息。`
+  // Replies are sent at most once per ticket per 30 minutes, so say how many are waiting.
+  const waiting = alert.pending && alert.pending > 1 ? `有 ${alert.pending} 条新消息还没回复` : '补充了新消息'
+  const line = alert.reply
+    ? `【工单回复${tag}】${who} 在「${type}」工单里${waiting}。`
     : `【新工单${tag}】${who} 提交了一张「${type}」工单，等你回复。`
   return { line, path: `/admin/tickets/${alert.ticketId}` }
 }

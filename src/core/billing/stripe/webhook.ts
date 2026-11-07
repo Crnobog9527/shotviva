@@ -68,7 +68,7 @@ export async function handleStripeWebhook(
     logger.error('stripe webhook failed', { ...fields, error })
     captureError(error, { alert: 'payment_webhook_failed', fields })
     // Stripe retries this event for days; the Owner hears once (deduped by event id).
-    await notifyOwner(stripeFailureAlert(event))
+    notifyOwner(stripeFailureAlert(event))
     return { status: 500, body: { code: 'WEBHOOK_FAILED' } }
   }
 }

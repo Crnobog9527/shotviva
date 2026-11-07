@@ -39,6 +39,14 @@ describe('sendFeishu', () => {
     const failure = sendFeishu(config, 'x', { fetch: fetch as never, now })
     await expect(failure).rejects.toThrow('code 19021')
     await expect(failure).rejects.not.toThrow('test-hook')
+    await expect(failure).rejects.toMatchObject({ definite: true, rateLimited: false })
+  })
+
+  it('flags rate limiting (code 11232, HTTP 429) so money alerts can retry', async () => {
+    const limited = sendFeishu(config, 'x', { fetch: (async () => answer({ code: 11232, msg: 'frequency limited' })) as never, now })
+    await expect(limited).rejects.toMatchObject({ definite: true, rateLimited: true })
+    const http = sendFeishu(config, 'x', { fetch: (async () => answer({}, 429)) as never, now })
+    await expect(http).rejects.toMatchObject({ definite: true, rateLimited: true })
   })
 
   it('fails on HTTP errors, odd bodies and network errors', async () => {
@@ -48,5 +56,8 @@ describe('sendFeishu', () => {
       throw new TypeError(`fetch failed ${config.webhookUrl}`)
     }
     await expect(sendFeishu(config, 'x', { fetch: down as never, now })).rejects.toThrow('feishu request failed: TypeError')
+    // No answer, or an unreadable 2xx: the message may have arrived.
+    await expect(sendFeishu(config, 'x', { fetch: down as never, now })).rejects.toMatchObject({ definite: false })
+    await expect(sendFeishu(config, 'x', { fetch: (async () => new Response('<html>')) as never, now })).rejects.toMatchObject({ definite: false })
   })
 })

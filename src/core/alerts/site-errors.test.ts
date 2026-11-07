@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { renderAlert } from './templates'
-import { areaOf, createErrorWindow, errorSlot, pathArea, sentryIssuesUrl, siteErrorsAlert } from './site-errors'
+import { areaOf, createErrorWindow, pathArea, sentryIssuesUrl, siteErrorsAlert } from './site-errors'
 
 const T0 = Date.parse('2026-11-08T06:05:00Z')
 const minute = 60_000
@@ -55,17 +55,13 @@ describe('the 10-minute window: ≥ 10 in all, or ≥ 3 in payments or sign-in',
     expect(window.record('auth', T0 + 11 * minute)).toBeNull()
   })
 
-  it('keys by half hour, so one message per 30 minutes', () => {
-    expect(errorSlot(new Date('2026-11-08T06:29:59Z'))).toBe('2026-11-08T06:00')
-    expect(errorSlot(new Date('2026-11-08T06:30:00Z'))).toBe('2026-11-08T06:30')
-  })
 })
 
 describe('the message', () => {
   const url = sentryIssuesUrl('acme', 'production')
 
   it('names the area, the count and since when (Beijing time), and links Sentry', () => {
-    const alert = siteErrorsAlert({ total: 4, byArea: { payment: 3, site: 1 }, since: '2026-11-08T06:05:00.000Z', trigger: 'payment' }, new Date(T0), url)
+    const alert = siteErrorsAlert({ total: 4, byArea: { payment: 3, site: 1 }, since: '2026-11-08T06:05:00.000Z', trigger: 'payment' }, url)
     const { sentence, link } = renderAlert(alert, { who: null, origin: 'https://shotviva.com', testSite: false })
     expect(`${sentence}\n${link}`).toBe(
       '【付款出错】过去 10 分钟服务器出错 4 次（北京时间 14:05 开始），出在：付款 3 次、网站页面 1 次。用户可能受影响，详情在 Sentry。\n去 Sentry 看：https://acme.sentry.io/issues/?environment=production&statsPeriod=1h',
@@ -73,7 +69,7 @@ describe('the message', () => {
   })
 
   it('says 「网站报错偏多」 for a general spike, and falls back to sentry.io without the org', () => {
-    const alert = siteErrorsAlert({ total: 12, byArea: { generate: 8, auth: 1, site: 3 }, since: '2026-11-08T06:05:00.000Z', trigger: 'total' }, new Date(T0), sentryIssuesUrl(undefined, 'preview'))
+    const alert = siteErrorsAlert({ total: 12, byArea: { generate: 8, auth: 1, site: 3 }, since: '2026-11-08T06:05:00.000Z', trigger: 'total' }, sentryIssuesUrl(undefined, 'preview'))
     const { sentence, link } = renderAlert(alert, { who: null, origin: 'https://x', testSite: true })
     expect(sentence).toBe('（测试站）【网站报错偏多】过去 10 分钟服务器出错 12 次（北京时间 14:05 开始），出在：出图 8 次、网站页面 3 次、登录 1 次。用户可能受影响，详情在 Sentry。')
     expect(link).toBe('去 Sentry 看：https://sentry.io/issues/?environment=preview&statsPeriod=1h')

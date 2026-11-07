@@ -79,11 +79,11 @@ export function verifyWaffoEvent(deps: VerifyDeps, body: string, header: string 
   return event.data
 }
 
-async function refundAlert(event: WaffoEvent): Promise<WaffoWebhookResult> {
+function refundAlert(event: WaffoEvent): WaffoWebhookResult {
   const fields = { event_id: event.eventId, order_id: String(event.data.orderId ?? ''), payment_id: String(event.data.paymentId ?? '') }
   logger.warn('waffo refund recorded', fields)
   captureAlert('charge_refunded', 'Waffo refund.succeeded: adjust credits by hand if needed', { fields })
-  await notifyOwner(waffoRefundAlert(event))
+  notifyOwner(waffoRefundAlert(event))
   return { status: 200, body: { received: true } }
 }
 
@@ -106,7 +106,7 @@ export async function handleWaffoWebhook(
   } catch (error) {
     logger.error('waffo webhook failed', { event_id: event.eventId, type: event.eventType, error })
     captureError(error, { alert: 'payment_webhook_failed', fields: { event_id: event.eventId, event_type: event.eventType } })
-    await notifyOwner(waffoFailureAlert(event))
+    notifyOwner(waffoFailureAlert(event))
     return { status: 500, body: { code: 'WEBHOOK_FAILED' } }
   }
 }

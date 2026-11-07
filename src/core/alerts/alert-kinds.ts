@@ -33,11 +33,18 @@ export type DisputeClosedAlert = PaymentFacts & { kind: 'dispute_closed'; disput
 
 export type PaymentFailedAlert = PaymentFacts & { kind: 'payment_failed'; channel: AlertChannel; eventId: string; step: PaymentStep }
 
-export type GenerationSpikeAlert = { kind: 'generation_spike'; failed: number; total: number; windowMinutes: number; hour: string }
+export type GenerationSpikeAlert = { kind: 'generation_spike'; failed: number; total: number; windowMinutes: number }
 
-// A user's new ticket (messageId null) or their follow-up message on one. ticketType null on a
-// follow-up: the notifier reads it.
-export type TicketAlert = { kind: 'ticket'; ticketId: string; messageId: string | null; userId: string; ticketType: string | null }
+// A user's new ticket, or their follow-up on one (reply). The notifier fills ticketType for a
+// follow-up and pending: the user's messages since the Owner last answered.
+export type TicketAlert = {
+  kind: 'ticket'
+  ticketId: string
+  reply: boolean
+  userId: string
+  ticketType: string | null
+  pending: number | null
+}
 
 // T66: an upgrade was paid but an old subscription would not cancel. productId null: the old
 // subscriptions could not even be read.
@@ -62,8 +69,6 @@ export type SiteErrorsAlert = {
   // What crossed the line: payments or sign-in on their own, or the total.
   trigger: ErrorArea | 'total'
   windowMinutes: number
-  // The half hour (UTC), so one message per 30 minutes.
-  slot: string
   sentryUrl: string
 }
 
@@ -79,20 +84,34 @@ export type OwnerAlert =
 
 export type OwnerAlertKind = OwnerAlert['kind']
 
-const KEYS: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K }>) => string } = {
+const MINUTE = 60_000
+
+// How a kind is sent (ARCHITECTURE §16.4; control review 2026-11-08):
+// - key: one message per key. With cooldownMs the key can fire again once that long has passed
+//   since it last fired (a sliding window, kept in the R2 mark); without, never again.
+// - budget 'tickets': ticket alerts share an hourly cap, so a burst of tickets or replies can never
+//   flood the group or use up Feishu's own rate limit.
+// - money: refunds, disputes and payments that did not land are never capped, are tried even
+//   while sending is backing off, and are retried when Feishu says it is rate limiting.
+export type AlertPolicy = { key: string; cooldownMs?: number; budget?: 'tickets'; money: boolean }
+
+const POLICIES: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K }>) => AlertPolicy } = {
   // Keyed by the refunded total, so a second partial refund on the same charge is a new message.
-  refund: (a) => `refund:${a.channel}:${a.refundId}:${a.refunded?.cents ?? ''}`,
-  dispute_opened: (a) => `dispute_opened:${a.disputeId}`,
-  dispute_closed: (a) => `dispute_closed:${a.disputeId}`,
-  payment_failed: (a) => `payment_failed:${a.channel}:${a.eventId}`,
-  generation_spike: (a) => `generation_spike:${a.hour}`,
-  ticket: (a) => `ticket:${a.ticketId}:${a.messageId ?? 'new'}`,
-  subscription_cancel_failed: (a) => `subscription_cancel_failed:${a.userId}:${a.subscriptionRef ?? 'read'}`,
-  site_errors: (a) => `site_errors:${a.slot}`,
+  refund: (a) => ({ key: `refund:${a.channel}:${a.refundId}:${a.refunded?.cents ?? ''}`, money: true }),
+  dispute_opened: (a) => ({ key: `dispute_opened:${a.disputeId}`, money: true }),
+  dispute_closed: (a) => ({ key: `dispute_closed:${a.disputeId}`, money: true }),
+  payment_failed: (a) => ({ key: `payment_failed:${a.channel}:${a.eventId}`, money: true }),
+  generation_spike: () => ({ key: 'generation_spike', cooldownMs: 60 * MINUTE, money: false }),
+  // A new ticket once; replies at most once per ticket per 30 minutes, counted when sent.
+  ticket: (a) =>
+    a.reply
+      ? { key: `ticket_reply:${a.ticketId}`, cooldownMs: 30 * MINUTE, budget: 'tickets', money: false }
+      : { key: `ticket:${a.ticketId}`, budget: 'tickets', money: false },
+  subscription_cancel_failed: (a) => ({ key: `subscription_cancel_failed:${a.userId}:${a.subscriptionRef ?? 'read'}`, money: false }),
+  site_errors: () => ({ key: 'site_errors', cooldownMs: 30 * MINUTE, money: false }),
 }
 
-// One message per fact: a redelivered webhook, a retried handler or a second instance builds
-// the same key, and the dedupe drops it.
-export function dedupeKey(alert: OwnerAlert): string {
-  return (KEYS[alert.kind] as (a: OwnerAlert) => string)(alert)
+// A redelivered webhook, a retried handler or a second instance builds the same key.
+export function alertPolicy(alert: OwnerAlert): AlertPolicy {
+  return (POLICIES[alert.kind] as (a: OwnerAlert) => AlertPolicy)(alert)
 }

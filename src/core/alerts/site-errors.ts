@@ -7,11 +7,11 @@ import type { ErrorArea, SiteErrorsAlert } from './alert-kinds'
 // Counting is in memory, per function instance, in a 10-minute window: no table, no extra
 // request, nothing on the healthy path. At Shotviva's traffic Vercel Fluid compute serves the
 // site from one or a few instances per region, and a real outage fails on every instance, so
-// each one crosses the line on its own; the R2 dedupe mark (key = the half hour) lets exactly one
-// message out per 30 minutes however many instances do. What a per-instance count can miss is a
+// each one crosses the line on its own; the R2 mark lets exactly one message out, then none for
+// 30 minutes after it (sliding from that message), however many instances keep crossing. What a per-instance count can miss is a
 // slow trickle spread thinly over many instances; Sentry still records those.
 
-export const SITE_ERROR_RULE = { windowMinutes: 10, minTotal: 10, minCritical: 3, quietMinutes: 30 } as const
+export const SITE_ERROR_RULE = { windowMinutes: 10, minTotal: 10, minCritical: 3 } as const
 
 const CRITICAL: readonly ErrorArea[] = ['payment', 'auth']
 
@@ -66,14 +66,8 @@ export function createErrorWindow(): ErrorWindow {
   }
 }
 
-// The half hour a breach falls in (UTC): the dedupe key, so at most one message per 30 minutes.
-export function errorSlot(now: Date): string {
-  const minutes = now.getUTCMinutes() < SITE_ERROR_RULE.quietMinutes ? '00' : '30'
-  return `${now.toISOString().slice(0, 13)}:${minutes}`
-}
-
-export function siteErrorsAlert(breach: ErrorBreach, now: Date, sentryUrl: string): SiteErrorsAlert {
-  return { kind: 'site_errors', ...breach, windowMinutes: SITE_ERROR_RULE.windowMinutes, slot: errorSlot(now), sentryUrl }
+export function siteErrorsAlert(breach: ErrorBreach, sentryUrl: string): SiteErrorsAlert {
+  return { kind: 'site_errors', ...breach, windowMinutes: SITE_ERROR_RULE.windowMinutes, sentryUrl }
 }
 
 // The Sentry issue list for this environment, last hour.

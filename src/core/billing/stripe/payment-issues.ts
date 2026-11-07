@@ -79,7 +79,7 @@ async function record(deps: FulfilDeps, issue: Issue): Promise<IssueOutcome> {
   logger.warn(`stripe charge ${issue.kind} recorded`, fields)
   // The Owner reviews every one, recorded or not: credits were not taken back.
   captureAlert(ALERT[issue.kind], `Stripe charge ${issue.chargeId} ${issue.kind}: credits not clawed back`, { fields })
-  await notifyOwner(ownerAlert(issue, payment))
+  notifyOwner(ownerAlert(issue, payment))
   return payment ? 'recorded' : 'unknown_charge'
 }
 

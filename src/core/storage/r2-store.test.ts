@@ -51,21 +51,4 @@ describe('createR2Store', () => {
     expect(command).toBeInstanceOf(CopyObjectCommand)
     expect(command.input).toMatchObject({ Bucket: 'bucket', Key: 'outputs/u/j-in-1.jpg', CopySource: 'bucket/inputs/u/a%20b.jpg' })
   })
-
-  it('writes only when the key is free: If-None-Match *, false on 412 or 409, other errors thrown', async () => {
-    const statuses = [undefined, 412, 409, 500]
-    const send = vi.fn(async () => {
-      const status = statuses.shift()
-      if (status) throw Object.assign(new Error('conditional'), { $metadata: { httpStatusCode: status } })
-      return {}
-    })
-    const store = createR2Store({ send } as never, 'bucket')
-    const body = new Uint8Array([1])
-    await expect(store.putIfAbsent('ops/alerts/a', body, 'text/plain')).resolves.toBe(true)
-    await expect(store.putIfAbsent('ops/alerts/a', body, 'text/plain')).resolves.toBe(false)
-    await expect(store.putIfAbsent('ops/alerts/a', body, 'text/plain')).resolves.toBe(false)
-    await expect(store.putIfAbsent('ops/alerts/a', body, 'text/plain')).rejects.toThrow('conditional')
-    const [command] = send.mock.calls[0] as unknown as [PutObjectCommand]
-    expect(command.input).toMatchObject({ Bucket: 'bucket', Key: 'ops/alerts/a', IfNoneMatch: '*' })
-  })
 })
