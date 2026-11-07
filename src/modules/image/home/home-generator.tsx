@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl'
 import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { trackTemplateView } from '@/core/analytics/browser'
 import type { FormAction } from '@/core/auth/ui'
 import { UPLOAD_ACCEPT } from '@/core/storage/rules'
 
@@ -105,6 +106,8 @@ export function HomeGenerator({ templates, defaultId, viewer, googleAction, home
         onClose={() => setPickerOn(null)}
         onPick={(id) => {
           setPickerOn(null)
+          const picked = templates.find((template) => template.id === id)
+          if (picked) trackTemplateView({ template_id: picked.id, category: picked.category, surface: 'home_picker' })
           onPick(id)
         }}
         sampleOf={sampleFor}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { eventSchemas, uploadSizeBucket, validateEvent, type EventName } from './events'
+import { BROWSER_EVENTS, eventSchemas, SERVER_EVENTS, uploadSizeBucket, validateEvent, type EventName } from './events'
 
 const generate = {
   template_id: 'ramen-studio',
@@ -34,11 +34,46 @@ const valid: { [E in EventName]: unknown } = {
   contact_sales_click: { page: '/zh/pricing' },
   checkout_start: checkout,
   purchase: { ...checkout, product_id: 'pack_s', tier: 'pack', interval: null, form: 'one_time', amount_usd: 9.9, credits: 20 },
+  template_view: { template_id: 'ramen-studio', category: 'food', surface: 'workspace' },
+  paywall_select: { product_id: 'pro_yearly', method: 'cn_card' },
+  checkout_cancel: { product_id: 'pack_m', method: 'alipay' },
+  upload_error: { reason: 'transfer_failed' },
 }
 
 describe('event dictionary (ARCHITECTURE §16.2)', () => {
-  it('covers exactly the seven named events', () => {
-    expect(Object.keys(eventSchemas).sort()).toEqual(['checkout_start', 'contact_sales_click', 'generate', 'paywall_view', 'purchase', 'signup', 'upload'])
+  it('covers exactly the eleven named events', () => {
+    expect(Object.keys(eventSchemas).sort()).toEqual([
+      'checkout_cancel',
+      'checkout_start',
+      'contact_sales_click',
+      'generate',
+      'paywall_select',
+      'paywall_view',
+      'purchase',
+      'signup',
+      'template_view',
+      'upload',
+      'upload_error',
+    ])
+  })
+
+  it('sends every event from exactly one side', () => {
+    const sides = [...SERVER_EVENTS, ...BROWSER_EVENTS]
+    expect(new Set(sides).size).toBe(sides.length)
+    expect([...sides].sort()).toEqual(Object.keys(eventSchemas).sort())
+    // §16.2 (T74): checkout_cancel is a server event; the other three are browser events.
+    expect(SERVER_EVENTS).toContain('checkout_cancel')
+    expect(BROWSER_EVENTS).toEqual(expect.arrayContaining(['template_view', 'paywall_select', 'upload_error']))
+  })
+
+  // T74: enums only, so no file name, message or free text fits.
+  it('keeps the four T74 events to their enums', () => {
+    expect(validateEvent('template_view', { ...(valid.template_view as object), surface: 'gallery' }).ok).toBe(false)
+    expect(validateEvent('template_view', { template_id: 'ramen-studio', category: 'food' }).ok).toBe(false)
+    expect(validateEvent('paywall_select', { product_id: 'pro_yearly', method: 'paypal' }).ok).toBe(false)
+    expect(validateEvent('checkout_cancel', { product_id: 'unknown', method: 'card' }).ok).toBe(false)
+    expect(validateEvent('upload_error', { reason: 'IMG_0042.HEIC is too large' }).ok).toBe(false)
+    expect(validateEvent('upload_error', { reason: 'too_large', file: 'IMG_0042.HEIC' }).ok).toBe(false)
   })
 
   it.each(Object.entries(valid))('accepts a well-formed %s', (event, props) => {

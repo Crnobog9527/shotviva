@@ -40,7 +40,7 @@ describe('createCheckout routing', () => {
       metadata: { user_id: USER, product_id: 'starter_monthly', method: 'card' },
       subscription_data: { metadata: { user_id: USER, product_id: 'starter_monthly', method: 'card' } },
       success_url: 'https://pr-1.example.app/zh/checkout?session_id={CHECKOUT_SESSION_ID}',
-      cancel_url: 'https://pr-1.example.app/zh/pricing?checkout=cancel',
+      cancel_url: 'https://pr-1.example.app/api/checkout/cancel?p=starter_monthly&m=card&l=zh',
     })
     expect(params).not.toHaveProperty('payment_method_types')
     expect(params).not.toHaveProperty('allowed_payment_method_types')

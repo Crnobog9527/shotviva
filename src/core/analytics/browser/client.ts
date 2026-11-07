@@ -87,6 +87,19 @@ export function trackContactSales(page: EventProps<'contact_sales_click'>['page'
   track('contact_sales_click', { page })
 }
 
+// T74 (ARCHITECTURE §16.2): a template looked at, a product picked in the paywall, a failed upload.
+export function trackTemplateView(props: EventProps<'template_view'>): void {
+  track('template_view', props)
+}
+
+export function trackPaywallSelect(props: EventProps<'paywall_select'>): void {
+  track('paywall_select', props)
+}
+
+export function trackUploadError(reason: EventProps<'upload_error'>['reason']): void {
+  track('upload_error', { reason })
+}
+
 // The Supabase user id, nothing else: no email or name as person properties (§16.1).
 export function identify(userId: string): void {
   if (!enabled()) return

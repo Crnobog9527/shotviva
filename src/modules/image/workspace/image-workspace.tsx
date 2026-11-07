@@ -1,5 +1,8 @@
 'use client'
 
+import { useEffect } from 'react'
+
+import { trackTemplateView } from '@/core/analytics/browser'
 import { useReveal } from '@/core/ui/reveal'
 
 import type { TrackedJob } from '../generation/job-model'
@@ -27,6 +30,8 @@ export function ImageWorkspace({ shareText, ...input }: WorkspaceProps) {
   const jobIds = useWorkspaceJobs(template.id)
   const single = useJob(jobIds.length === 1 ? (jobIds[0] ?? null) : null)
   const reveal = useReveal<HTMLDivElement>()
+  // template_view (T74, ARCHITECTURE §16.2): once per template the workspace opens on.
+  useEffect(() => trackTemplateView({ template_id: template.id, category: template.category, surface: 'workspace' }), [template.id, template.category])
 
   const generate = () => {
     draft.start()

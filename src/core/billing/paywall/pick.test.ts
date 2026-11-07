@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { TEST_PRODUCTS } from '../stripe/test-products'
 import { packLooks, packOffers, tierOffers } from './offer'
-import { checkoutTone, resolvePick } from './pick'
+import { checkoutTone, resolvePick, selectedProduct } from './pick'
 import { DEFAULT_CHOICE, choiceFor } from './use-paywall-state'
 
 const offers = tierOffers(TEST_PRODUCTS)
@@ -60,5 +60,15 @@ describe('paywall pick', () => {
       { tone: 'graphite', flag: null },
       { tone: 'graphite', flag: null },
     ])
+  })
+})
+
+// paywall_select (T74): the product a pick or a period switch lands on, with the shown method.
+describe('selectedProduct', () => {
+  const choice = { period: 'year', pick: 'pro', method: 'cn_card' } as const
+  it('names the plan at the period, or the pack', () => {
+    expect(selectedProduct(choice, { pick: 'max' }, offers, packs)).toEqual({ product_id: 'max_yearly', method: 'cn_card' })
+    expect(selectedProduct(choice, { period: 'month' }, offers, packs)).toEqual({ product_id: 'pro_monthly', method: 'cn_card' })
+    expect(selectedProduct(choice, { pick: 'pack_s' }, offers, packs)).toEqual({ product_id: 'pack_s', method: 'cn_card' })
   })
 })
