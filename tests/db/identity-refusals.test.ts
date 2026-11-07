@@ -81,6 +81,29 @@ describe('workspace: note and text fields', () => {
     await expect(run({ copy: { dish: 'make her look like Taylor Swift' } })).rejects.toMatchObject({ code: 'IDENTITY_SWAP_REFUSED' })
     expect((await profileOf(db, userId)).credits).toBe(3)
     expect((await refusals(userId))[0]).toMatchObject({ method: 'model', excerpt: 'make her look like Taylor Swift' })
+    // No job carries the refusing call's tokens, so the row does.
+    const { rows } = await db.query('select input_tokens, output_tokens from public.identity_refusals where user_id = $1', [userId])
+    expect(rows[0]).toEqual({ input_tokens: 400, output_tokens: 6 })
+  })
+
+  it('reuses the verdict for the same words within 10 minutes instead of calling again', async () => {
+    const judge = fakeJudge(false)
+    const { run } = await webSetup(judge)
+    expect((await run({ note: '让他笑一下' })).status).toBe('succeeded')
+    expect((await run({ note: '让他笑一下' })).status).toBe('succeeded')
+    expect(judge.judge).toHaveBeenCalledTimes(1)
+  })
+
+  it('answers RATE_LIMITED after 30 decision calls in an hour, before the model or any credit', async () => {
+    const judge = fakeJudge(false)
+    const { userId, run } = await webSetup(judge)
+    await db.query('insert into public.identity_judge_calls (user_id) select $1 from generate_series(1, 30)', [userId])
+    await expect(run({ note: '换成夜景' })).rejects.toMatchObject({ code: 'RATE_LIMITED' })
+    expect(judge.judge).not.toHaveBeenCalled()
+    expect((await profileOf(db, userId)).credits).toBe(3)
+    // Calls older than an hour no longer count.
+    await db.query("update public.identity_judge_calls set created_at = now() - interval '61 minutes' where user_id = $1", [userId])
+    expect((await run({ note: '换成夜景' })).status).toBe('succeeded')
   })
 
   it('generates as before when allowed, the judge’s tokens billed with the job, the prompt untouched', async () => {
@@ -161,6 +184,13 @@ describe('identity_refusals functions', () => {
     expect((await record('edit', 'face swap us')).rows[0]?.recorded).toBe(true)
     expect((await record('workspace', 'swap their faces')).rows[0]?.recorded).toBe(true)
     expect(await refusals(userId)).toHaveLength(3)
+  })
+
+  it('sweeps rows past 90 days when the admin counts are read, too', async () => {
+    const userId = await createUser(db)
+    await db.query("insert into public.identity_refusals (user_id, entry, method, excerpt, created_at) values ($1, 'edit', 'model', 'old', now() - interval '91 days')", [userId])
+    expect((await identityRefusalCounts(serviceSupabase(), [userId])).has(userId)).toBe(false)
+    expect(await refusals(userId)).toEqual([])
   })
 
   it('counts refusals over 90 days and 24 hours per account; three in a day flags it', async () => {

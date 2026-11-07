@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 
 import type { ServerTrack } from '@/core/analytics'
 import { AppError } from '@/core/errors'
-import { IDENTITY_EDIT_ADDENDUM, matchIdentitySwapKeyword, refuseIdentitySwap } from '@/core/identity-guard'
+import { IDENTITY_EDIT_ADDENDUM, matchIdentitySwapKeyword, refuseIdentitySwap, takeJudgeSlot, tooManyJudgeCalls } from '@/core/identity-guard'
 import {
   accountLimits,
   assertWithinRateLimit,
@@ -109,12 +109,14 @@ async function classify(deps: EditDeps, p: Prepared): Promise<EditClassification
 }
 
 // ARCHITECTURE §5.1a for an edit: the keyword list first (no call), then the scope call's own
-// identity_swap answer. Either refuses before reserve_credits, so nothing is charged.
+// identity_swap answer. Either refuses before reserve_credits, so nothing is charged. The scope
+// call counts against the account's hourly decision calls like the workspace's (judge-slots.ts).
 async function screenedDecision(deps: EditDeps, req: EditRequest, p: Prepared): Promise<EditClassification> {
   const refusal = { userId: req.userId, entry: 'edit' as const, text: p.instruction }
   if (matchIdentitySwapKeyword(p.instruction)) await refuseIdentitySwap(deps, { ...refusal, method: 'keyword' })
+  if (deps.classifier && (await takeJudgeSlot(deps.db, req.userId, null)).status === 'limited') throw tooManyJudgeCalls()
   const decision = await classify(deps, p)
-  if (decision.identitySwap) await refuseIdentitySwap(deps, { ...refusal, method: 'model' })
+  if (decision.identitySwap) await refuseIdentitySwap(deps, { ...refusal, method: 'model', usage: decision.usage })
   return decision
 }
 

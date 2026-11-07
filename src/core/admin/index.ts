@@ -37,6 +37,9 @@ export {
   type SaveProviderInput,
 } from './providers'
 export { PROVIDERS_COPY, ProvidersEditor } from './providers-editor'
+// The face-swap dry run beside the decision provider (ARCHITECTURE §5.1a, T81).
+export { dryRunIdentityScreen, type DryRunResult } from './identity-dry-run'
+export { IdentityDryRun } from './identity-dry-run-ui'
 export { AdminPage, AdminShell, adminNavItems, EmptyState, SHELL_COPY, StatCard, type AdminNavItem } from './shell'
 export {
   listPurchases,

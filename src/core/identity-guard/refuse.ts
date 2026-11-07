@@ -6,7 +6,7 @@ import { track as defaultTrack, type ServerTrack } from '../analytics'
 import { AppError } from '../errors'
 import { DEFAULT_LOCALE, type Locale } from '../i18n/locales'
 import { logger } from '../logger'
-import type { IdentityEntry, RefusalMethod } from './judge'
+import type { IdentityEntry, IdentityJudgeUsage, RefusalMethod } from './judge'
 
 // What a refusal leaves behind (ARCHITECTURE §5.1a 「留痕」): one row in identity_refusals with
 // the first 200 characters of what was typed (0701 keeps them 90 days), and a `generate_refused`
@@ -16,7 +16,8 @@ export const EXCERPT_MAX = 200
 
 export type RefusalDeps = { db: SupabaseClient; track?: ServerTrack }
 
-export type Refusal = { userId: string; entry: IdentityEntry; method: RefusalMethod; text: string; locale?: Locale }
+// usage: what the decision call that refused it cost; no job carries it, so the row does.
+export type Refusal = { userId: string; entry: IdentityEntry; method: RefusalMethod; text: string; locale?: Locale; usage?: IdentityJudgeUsage | null }
 
 // Counted in code points, as Postgres' char_length counts them, so an emoji is never cut in half.
 export const excerptOf = (text: string) => Array.from(text.trim()).slice(0, EXCERPT_MAX).join('')
@@ -30,6 +31,8 @@ async function record(db: SupabaseClient, refusal: Refusal): Promise<boolean> {
     p_entry: refusal.entry,
     p_method: refusal.method,
     p_excerpt: excerptOf(refusal.text),
+    p_input_tokens: refusal.usage?.inputTokens ?? null,
+    p_output_tokens: refusal.usage?.outputTokens ?? null,
   })
   if (!error) return data !== false
   logger.error('identity refusal not recorded', { entry: refusal.entry, error: new Error(error.message) })

@@ -6,9 +6,11 @@
 --            (a photo edit), 'partner' (the partner API, e.g. Graylum's freeform prompt)
 --   method   what refused it: 'keyword' (the list in code) or 'model' (the decision provider)
 --   excerpt  the first 200 characters of what was typed, for the Owner deciding on a ban
+--   input_tokens / output_tokens  what the decision call that refused it used (no job carries
+--            it); null for a keyword refusal or a reused verdict
 --
--- Kept 90 days: record_identity_refusal (0701) deletes older rows as it writes a new one, and
--- every read only looks at the last 90 days. Private: RLS on with no policy, reached only
+-- Kept 90 days: the 0701 functions delete older rows whenever a refusal is written or the admin
+-- counts are read, and every read only looks at the last 90 days. Private: RLS on with no policy, reached only
 -- through the 0701 functions with the service role.
 
 create table public.identity_refusals (
@@ -17,6 +19,8 @@ create table public.identity_refusals (
   entry text not null check (entry in ('workspace', 'edit', 'partner')),
   method text not null check (method in ('keyword', 'model')),
   excerpt text not null check (char_length(excerpt) between 1 and 200),
+  input_tokens integer check (input_tokens >= 0),
+  output_tokens integer check (output_tokens >= 0),
   created_at timestamptz not null default now()
 );
 

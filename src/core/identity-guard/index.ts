@@ -11,7 +11,18 @@ export {
   type IdentityJudgeUsage,
   type RefusalMethod,
 } from './judge'
-export { matchIdentitySwapKeyword } from './keywords'
+export { JUDGE_CALLS_PER_HOUR, keepVerdict, takeJudgeSlot, textHash, type JudgeSlot } from './judge-slots'
+export { matchAnyField, matchIdentitySwapKeyword } from './keywords'
 export { IDENTITY_EDIT_ADDENDUM, IDENTITY_JUDGE_INSTRUCTIONS } from './question'
 export { EXCERPT_MAX, excerptOf, IdentitySwapRefused, refuseIdentitySwap, type Refusal, type RefusalDeps } from './refuse'
-export { IDENTITY_JUDGE_TIMEOUT_MS, screenIdentityText, userText, type ScreenDeps, type ScreenInput, type ScreenResult } from './screen'
+export {
+  IDENTITY_JUDGE_TIMEOUT_MS,
+  judgeWithin,
+  screenIdentityText,
+  tooManyJudgeCalls,
+  userFields,
+  userText,
+  type ScreenDeps,
+  type ScreenInput,
+  type ScreenResult,
+} from './screen'

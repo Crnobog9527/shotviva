@@ -5,6 +5,7 @@
  *
  *   OPENAI_API_KEY=… pnpm eval:identity              # gpt-6-luna on api.openai.com
  *   IDENTITY_MODEL=… OPENAI_BASE_URL=… pnpm eval:identity
+ *   OPENAI_API_KEY=… pnpm eval:identity --json   # also prints examples.recorded.json to commit
  *
  * The key is read from the environment only and never printed. Each sentence is one billed call
  * (about 450 input and 6 output tokens on gpt-6-luna, well under a cent for the whole set).
@@ -84,6 +85,13 @@ async function main() {
   console.log(`Text-only call (${env.IDENTITY_MODEL}): p50 ${pct(ms, 50)} ms, p95 ${pct(ms, 95)} ms, max ${Math.max(...ms)} ms`)
   console.log(`Tokens per call: ${inTok.toFixed(0)} in, ${outTok.toFixed(1)} out; cost per call: ${cost === null ? 'unknown model price' : `$${cost.toFixed(7)}`}`)
   console.log(`Photo edit (merged into the scope call): +${addendumTok} input tokens, +~6 output tokens, no extra request`)
+  if (process.argv.includes('--json')) console.log(`\n${JSON.stringify(recordingOf(answered), null, 2)}`)
+}
+
+// The shape of src/core/identity-guard/examples.recorded.json, replayed by examples.test.ts.
+function recordingOf(rows: Row[]) {
+  const answers = Object.fromEntries(rows.map((row) => [row.text, { identitySwap: row.model === true, ms: row.ms, inputTokens: row.inTok, outputTokens: row.outTok }]))
+  return { model: env.IDENTITY_MODEL, recordedAt: new Date().toISOString(), answers }
 }
 
 void main()
