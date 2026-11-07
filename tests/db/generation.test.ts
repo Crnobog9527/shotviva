@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
-import type { ServerTrack } from '@/core/analytics'
+import { validateEvent, type ServerTrack } from '@/core/analytics'
 
 import { GenerationFailure, runGeneration, type GenerationRequest } from '@/core/jobs'
 import { newInputKey } from '@/core/storage'
@@ -175,6 +175,9 @@ describe('runGeneration: generate event', () => {
       source: 'web',
     })
     expect(JSON.stringify(props)).not.toMatch(/ramen|WRAPPED|inputs\//)
+    // T75: templates.category is a template_categories key, so the dictionary takes the event
+    // (before T75 production refused every one: "category: invalid_format").
+    expect(validateEvent('generate', props).ok).toBe(true)
   })
 
   it('reports a timeout as failed with the stored error code', async () => {
