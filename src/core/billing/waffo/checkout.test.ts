@@ -38,6 +38,14 @@ function harness(session: unknown = SESSION) {
 
 const body = (productId: ProductId, method: 'card' | 'alipay' = 'card') => ({ product_id: productId, method, locale: 'en' as const })
 
+describe('createWaffoCheckout without an email (T63)', () => {
+  it('carries no buyer email: Waffo’s checkout page collects it (T63: phone accounts may have none)', async () => {
+    const { deps, create } = harness()
+    await createWaffoCheckout(deps, { userId: USER, body: body('pro_yearly', 'alipay') })
+    expect(JSON.stringify(create.mock.calls[0])).not.toMatch(/email/i)
+  })
+})
+
 describe('createWaffoCheckout', () => {
   it('a membership by card is the Waffo subscription product, cards only, priced from site.config (T50)', async () => {
     const { deps, create, trackStart } = harness()

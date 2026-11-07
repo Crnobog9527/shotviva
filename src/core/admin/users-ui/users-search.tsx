@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 
 import { EmptyState } from '../shell/admin-blocks'
 import { formatBeijing } from '../shell/format'
+import { accountLabel, formatAdminPhone } from '../users/label'
 import type { AdminUserRow } from '../users/types'
 import { USERS_COPY as COPY } from './copy'
 
@@ -44,8 +45,9 @@ function UsersTable({ rows }: { rows: AdminUserRow[] }) {
           <TableRow key={row.id}>
             <TableCell>
               <Link href={`/admin/users/${row.id}`} className="text-primary hover:underline">
-                {row.email ?? row.id}
+                {accountLabel(row)}
               </Link>
+              {row.email && row.phone ? <span className="block font-mono text-xs text-muted-foreground">{formatAdminPhone(row.phone)}</span> : null}
             </TableCell>
             <TableCell className="font-mono text-xs whitespace-nowrap">{formatBeijing(row.createdAt) ?? COPY.never}</TableCell>
             <TableCell className="text-xs">{row.provider ?? COPY.never}</TableCell>

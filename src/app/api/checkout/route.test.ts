@@ -22,7 +22,7 @@ vi.mock('@/core/billing/waffo', () => ({
 const { POST } = await import('./route')
 
 const ORIGIN = 'http://localhost:3000'
-const USER = { id: '0b6f3f0e-5d1c-4c47-9a49-6a3f6f8d2e11', email: null, role: 'user', emailVerified: true, banned: false }
+const USER = { id: '0b6f3f0e-5d1c-4c47-9a49-6a3f6f8d2e11', email: null, role: 'user', verified: true, banned: false }
 const request = (productId = 'pack_s', method = 'card') =>
   new NextRequest(`${ORIGIN}/api/checkout`, {
     method: 'POST',

@@ -12,7 +12,7 @@ import { logger } from '@/core/logger'
 export async function redirectIfSignedIn(rawNext: string | null, locale: Locale): Promise<void> {
   let verified = false
   try {
-    verified = (await getSessionUser())?.emailVerified === true
+    verified = (await getSessionUser())?.verified === true
   } catch (error) {
     unstable_rethrow(error)
     logger.error('auth.session_read_failed', { error })

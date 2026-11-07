@@ -54,6 +54,7 @@ export { listAnnouncements, saveAnnouncement, setAnnouncementActive } from './an
 export { ANNOUNCEMENTS_COPY, AnnouncementsEditor, type AnnouncementAdminActions } from './announcements-editor'
 export { decodeCursor, encodeCursor, PAGE_SIZE, type Page } from './cursor'
 export {
+  accountLabel,
   adjustUserCredits,
   banUser,
   ledgerPage,

@@ -6,10 +6,12 @@ import { useState, type ReactNode } from 'react'
 import { Link } from '../../i18n/ui'
 import type { FormState } from '../flows/form-state'
 import { PASSWORD_MIN } from '../flows/schemas'
+import { AuthTabs } from './auth-tabs'
 import { CheckEmail } from './check-email'
 import { CaptchaFailed, Divider, EmailField, hcaptchaLink, Notice, PasswordField, SubmitButton } from './form-parts'
 import { GoogleButton } from './google-button'
 import { GiftGlyph } from './icons'
+import { PhoneSignIn, type PhoneActions } from './phone-sign-in'
 import { useAuthForm, type AuthForm, type FormAction } from './use-auth-form'
 import { validateSignup } from './validate'
 
@@ -22,13 +24,15 @@ type Props = {
   freeImages: number
   arrived?: ReactNode
   sender: string
+  // Chinese pages only (T63): the 手机号 tab, shown first.
+  phone?: PhoneActions
 }
 
 const addr = (chunks: ReactNode) => <span className="au-addr">{chunks}</span>
 
 // /signup (design/comps-v3-b/auth.html `?v=signup|verify`, `?err=weak`; a registered address gets the same
 // neutral "check your email" view, never `?err=exists`: control 2026-11-06).
-export function SignupForm({ action, googleAction, resendAction, next, freeImages, arrived, sender }: Props) {
+export function SignupForm({ action, googleAction, resendAction, next, freeImages, arrived, sender, phone }: Props) {
   const t = useTranslations('auth')
   const form = useAuthForm(action, { captcha: true, validate: validateSignup })
   // "Use a different email" puts this answer aside; the next submit brings a new one.
@@ -71,6 +75,34 @@ export function SignupForm({ action, googleAction, resendAction, next, freeImage
           <span>{t('signup.giftNote')}</span>
         </span>
       </div>
+      {phone ? (
+        <AuthTabs
+          initial="phone"
+          phone={<PhoneSignIn actions={phone} next={next} submitLabel={t('signup.submit')} termsLine={false} />}
+          email={<EmailSignup form={form} googleAction={googleAction} next={next} />}
+        />
+      ) : (
+        <EmailSignup form={form} googleAction={googleAction} next={next} />
+      )}
+      <p className="au-fine">
+        {t.rich(form.captchaEnabled ? 'signup.fineCaptcha' : 'signup.fine', {
+          terms: (chunks) => <Link href="/terms">{chunks}</Link>,
+          privacy: (chunks) => <Link href="/privacy">{chunks}</Link>,
+          hcaptcha: hcaptchaLink,
+        })}
+      </p>
+      <p className="au-swap">
+        {t.rich('signup.toLogin', { link: (chunks) => <Link href={`/login?next=${encodeURIComponent(next)}`}>{chunks}</Link> })}
+      </p>
+    </section>
+  )
+}
+
+// Google, then email and password: the whole page in English, the 邮箱 tab in Chinese.
+function EmailSignup({ form, googleAction, next }: { form: AuthForm; googleAction: FormAction; next: string }) {
+  const t = useTranslations('auth')
+  return (
+    <>
       <SignupNotice form={form} />
       <GoogleButton action={googleAction} next={next} appearance="auth" />
       <Divider />
@@ -95,17 +127,7 @@ export function SignupForm({ action, googleAction, resendAction, next, freeImage
         <SubmitButton pending={form.pending}>{t('signup.submit')}</SubmitButton>
         <CaptchaFailed show={form.captchaFailed} />
       </form>
-      <p className="au-fine">
-        {t.rich(form.captchaEnabled ? 'signup.fineCaptcha' : 'signup.fine', {
-          terms: (chunks) => <Link href="/terms">{chunks}</Link>,
-          privacy: (chunks) => <Link href="/privacy">{chunks}</Link>,
-          hcaptcha: hcaptchaLink,
-        })}
-      </p>
-      <p className="au-swap">
-        {t.rich('signup.toLogin', { link: (chunks) => <Link href={`/login?next=${encodeURIComponent(next)}`}>{chunks}</Link> })}
-      </p>
-    </section>
+    </>
   )
 }
 

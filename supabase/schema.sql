@@ -914,19 +914,22 @@ $$;
 ALTER FUNCTION "public"."admin_review_template_request"("p_request_id" "uuid", "p_status" "text", "p_template_id" "text") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."admin_search_users"("p_query" "text") RETURNS TABLE("id" "uuid", "email" "text", "created_at" timestamp with time zone, "provider" "text", "role" "text", "credits" integer, "free_credits" integer, "paid_until" timestamp with time zone, "generation_count" integer, "last_generation_at" timestamp with time zone, "banned_at" timestamp with time zone)
+CREATE OR REPLACE FUNCTION "public"."admin_search_users"("p_query" "text") RETURNS TABLE("id" "uuid", "email" "text", "created_at" timestamp with time zone, "provider" "text", "role" "text", "credits" integer, "free_credits" integer, "paid_until" timestamp with time zone, "generation_count" integer, "last_generation_at" timestamp with time zone, "banned_at" timestamp with time zone, "phone" "text")
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
-    AS $$
+    AS $_$
   select o.id, o.email, o.created_at, o.provider, o.role, o.credits, o.free_credits, o.paid_until,
-         o.generation_count, o.last_generation_at, o.banned_at
+         o.generation_count, o.last_generation_at, o.banned_at, o.phone
     from admin.users_overview o
    -- The query is a literal substring: % and _ typed by the admin match themselves.
    where length(btrim(coalesce(p_query, ''))) > 0
-     and o.email ilike '%' || replace(replace(replace(btrim(p_query), '\', '\\'), '%', '\%'), '_', '\_') || '%'
+     and (o.email ilike '%' || replace(replace(replace(btrim(p_query), '\', '\\'), '%', '\%'), '_', '\_') || '%'
+          or (btrim(p_query) ~ '^\+?[0-9][0-9 -]{2,}$'
+              and length(regexp_replace(p_query, '[^0-9]', '', 'g')) >= 4
+              and o.phone like '%' || regexp_replace(p_query, '[^0-9]', '', 'g') || '%'))
    order by o.created_at desc, o.id desc
    limit 50
-$$;
+$_$;
 
 
 ALTER FUNCTION "public"."admin_search_users"("p_query" "text") OWNER TO "postgres";
@@ -1151,6 +1154,7 @@ begin
          (select jsonb_agg(jsonb_build_object(
                     'id', r.id,
                     'email', u.email,
+                    'phone', nullif(u.phone, ''),
                     'created_at', r.created_at,
                     'free_credits', r.free_credits,
                     'free_used', coalesce(used.credits, 0),
@@ -2196,6 +2200,110 @@ $$;
 ALTER FUNCTION "public"."settle_waffo_order"("p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."sms_authorize_send"("p_phone_key" "text") RETURNS "text"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_since timestamptz := now() - interval '24 hours';
+  v_request public.sms_sends;
+begin
+  if p_phone_key is null or p_phone_key !~ '^[0-9a-f]{64}$' then
+    raise exception 'INVALID_INPUT' using detail = 'phone_key must be a sha256 hex digest';
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended('sms:phone:' || p_phone_key, 0));
+
+  select * into v_request
+    from public.sms_sends s
+   where s.phone_key = p_phone_key and s.sent_at is null and s.requested_at > now() - interval '2 minutes'
+   order by s.requested_at desc
+   limit 1
+   for update;
+  if not found then
+    return 'no_request';
+  end if;
+
+  if exists (select 1 from public.sms_sends s
+              where s.phone_key = p_phone_key and s.sent_at > now() - interval '60 seconds') then
+    return 'phone_cooldown';
+  end if;
+  if (select count(*) from public.sms_sends s
+       where s.phone_key = p_phone_key and s.sent_at > v_since) >= 5 then
+    return 'phone_daily';
+  end if;
+  if v_request.ip is not null and (select count(*) from public.sms_sends s
+                                    where s.ip = v_request.ip and s.sent_at > v_since) >= 20 then
+    return 'ip_daily';
+  end if;
+
+  update public.sms_sends set sent_at = now() where id = v_request.id;
+  return 'ok';
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."sms_authorize_send"("p_phone_key" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."sms_release_send"("p_phone_key" "text") RETURNS "void"
+    LANGUAGE "sql"
+    SET "search_path" TO ''
+    AS $$
+  delete from public.sms_sends s
+   where s.id = (select o.id from public.sms_sends o
+                  where o.phone_key = p_phone_key and o.sent_at is null
+                    and o.requested_at > now() - interval '2 minutes'
+                  order by o.requested_at desc
+                  limit 1)
+$$;
+
+
+ALTER FUNCTION "public"."sms_release_send"("p_phone_key" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet") RETURNS "text"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_since timestamptz := now() - interval '24 hours';
+begin
+  if p_phone_key is null or p_phone_key !~ '^[0-9a-f]{64}$' then
+    raise exception 'INVALID_INPUT' using detail = 'phone_key must be a sha256 hex digest';
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended('sms:phone:' || p_phone_key, 0));
+  if p_ip is not null then
+    perform pg_advisory_xact_lock(hashtextextended('sms:ip:' || host(p_ip), 0));
+  end if;
+
+  if exists (select 1 from public.sms_sends s
+              where s.phone_key = p_phone_key and s.requested_at > now() - interval '60 seconds') then
+    return 'phone_cooldown';
+  end if;
+  if (select count(*) from public.sms_sends s
+       where s.phone_key = p_phone_key and s.requested_at > v_since) >= 5 then
+    return 'phone_daily';
+  end if;
+  if p_ip is not null and (select count(*) from public.sms_sends s
+                            where s.ip = p_ip and s.requested_at > v_since) >= 20 then
+    return 'ip_daily';
+  end if;
+
+  insert into public.sms_sends (phone_key, ip) values (p_phone_key, p_ip);
+  -- The rows have done their job after a day; keep two, then let them go.
+  delete from public.sms_sends s
+   where s.id in (select o.id from public.sms_sends o
+                   where o.requested_at < now() - interval '2 days'
+                   order by o.requested_at
+                   limit 200);
+  return 'ok';
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."support_reply_hours"("p_tier" "text") RETURNS integer
     LANGUAGE "sql" IMMUTABLE
     SET "search_path" TO ''
@@ -2386,7 +2494,8 @@ CREATE OR REPLACE VIEW "admin"."users_overview" AS
     "p"."paid_until",
     COALESCE("j"."generation_count", 0) AS "generation_count",
     "j"."last_generation_at",
-    "p"."banned_at"
+    "p"."banned_at",
+    NULLIF("u"."phone", ''::"text") AS "phone"
    FROM (("auth"."users" "u"
      LEFT JOIN "public"."profiles" "p" ON (("p"."id" = "u"."id")))
      LEFT JOIN LATERAL ( SELECT ("count"(*))::integer AS "generation_count",
@@ -2398,7 +2507,7 @@ CREATE OR REPLACE VIEW "admin"."users_overview" AS
 ALTER VIEW "admin"."users_overview" OWNER TO "postgres";
 
 
-COMMENT ON VIEW "admin"."users_overview" IS 'Owner support view (ARCHITECTURE §10): search by email; credits = paid pool, free_credits = free pool.';
+COMMENT ON VIEW "admin"."users_overview" IS 'Owner support view (ARCHITECTURE §10): search by email or phone; credits = paid pool, free_credits = free pool.';
 
 
 
@@ -2620,6 +2729,30 @@ CREATE TABLE IF NOT EXISTS "public"."site_announcements" (
 ALTER TABLE "public"."site_announcements" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."sms_sends" (
+    "id" bigint NOT NULL,
+    "phone_key" "text" NOT NULL,
+    "ip" "inet",
+    "requested_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "sent_at" timestamp with time zone,
+    CONSTRAINT "sms_sends_phone_key_check" CHECK (("phone_key" ~ '^[0-9a-f]{64}$'::"text"))
+);
+
+
+ALTER TABLE "public"."sms_sends" OWNER TO "postgres";
+
+
+ALTER TABLE "public"."sms_sends" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."sms_sends_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."subscriptions" (
     "stripe_subscription_id" "text",
     "user_id" "uuid" NOT NULL,
@@ -2821,6 +2954,11 @@ ALTER TABLE ONLY "public"."site_announcements"
 
 
 
+ALTER TABLE ONLY "public"."sms_sends"
+    ADD CONSTRAINT "sms_sends_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."subscriptions"
     ADD CONSTRAINT "subscriptions_pkey" PRIMARY KEY ("id");
 
@@ -2944,6 +3082,18 @@ CREATE INDEX "profiles_signup_ip_created_at_idx" ON "public"."profiles" USING "b
 
 
 CREATE INDEX "site_announcements_created_at_id_idx" ON "public"."site_announcements" USING "btree" ("created_at" DESC, "id" DESC);
+
+
+
+CREATE INDEX "sms_sends_ip_requested_at_idx" ON "public"."sms_sends" USING "btree" ("ip", "requested_at" DESC) WHERE ("ip" IS NOT NULL);
+
+
+
+CREATE INDEX "sms_sends_phone_key_requested_at_idx" ON "public"."sms_sends" USING "btree" ("phone_key", "requested_at" DESC);
+
+
+
+CREATE INDEX "sms_sends_requested_at_idx" ON "public"."sms_sends" USING "btree" ("requested_at");
 
 
 
@@ -3171,6 +3321,9 @@ CREATE POLICY "profiles_select_own" ON "public"."profiles" FOR SELECT TO "authen
 
 
 ALTER TABLE "public"."site_announcements" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."sms_sends" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."subscriptions" ENABLE ROW LEVEL SECURITY;
@@ -3504,6 +3657,21 @@ GRANT ALL ON FUNCTION "public"."settle_waffo_order"("p_user_id" "uuid", "p_produ
 
 
 
+REVOKE ALL ON FUNCTION "public"."sms_authorize_send"("p_phone_key" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."sms_authorize_send"("p_phone_key" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."sms_release_send"("p_phone_key" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."sms_release_send"("p_phone_key" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."support_reply_hours"("p_tier" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."support_reply_hours"("p_tier" "text") TO "service_role";
 
@@ -3613,6 +3781,16 @@ GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."products" T
 
 
 GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."site_announcements" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."sms_sends" TO "service_role";
+
+
+
+GRANT UPDATE ON SEQUENCE "public"."sms_sends_id_seq" TO "anon";
+GRANT UPDATE ON SEQUENCE "public"."sms_sends_id_seq" TO "authenticated";
+GRANT UPDATE ON SEQUENCE "public"."sms_sends_id_seq" TO "service_role";
 
 
 

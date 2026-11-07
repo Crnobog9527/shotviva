@@ -63,7 +63,7 @@ export async function handleConnectAuthorize(request: NextRequest, deps: Connect
 
   const user = await deps.user()
   // The session expired between showing the page and the click: sign in, then start over.
-  if (!user || !user.emailVerified) {
+  if (!user || !user.verified) {
     const login = localizePath(loginPath(localizePath(connectPagePath(params), locale)), locale)
     return NextResponse.redirect(new URL(login, request.url), 303)
   }

@@ -32,6 +32,8 @@ const searchRow = z.object({
   generation_count: z.number(),
   last_generation_at: z.string().nullable(),
   banned_at: z.string().nullable(),
+  // Since 0442; optional so a database without it still parses.
+  phone: z.string().nullable().optional(),
 })
 
 export async function searchUsers(db: SupabaseClient, query: string): Promise<AdminUserRow[]> {
@@ -41,6 +43,7 @@ export async function searchUsers(db: SupabaseClient, query: string): Promise<Ad
   return searchRow.array().parse(data).map((row) => ({
     id: row.id,
     email: row.email,
+    phone: row.phone ?? null,
     createdAt: row.created_at,
     provider: row.provider,
     role: row.role ?? 'user',
@@ -64,7 +67,7 @@ const profileRow = z.object({
   signup_ip: z.string().nullable(),
 })
 
-// Profile by primary key; the email is read live from Auth, never copied (ARCHITECTURE §10).
+// Profile by primary key; the email and phone are read live from Auth, never copied (ARCHITECTURE §10).
 export async function loadUser(db: SupabaseClient, id: string): Promise<UserDetail | null> {
   if (!isUuid(id)) return null
   const [profile, auth] = await Promise.all([
@@ -76,7 +79,8 @@ export async function loadUser(db: SupabaseClient, id: string): Promise<UserDeta
   const row = profileRow.parse(profile.data)
   return {
     id: row.id,
-    email: auth.data.user?.email ?? null,
+    email: auth.data.user?.email || null,
+    phone: auth.data.user?.phone || null,
     createdAt: row.created_at,
     role: row.role,
     credits: row.credits,

@@ -33,6 +33,27 @@
   "auth": {
     "google": "使用 Google 账号继续",
     "or": "或用邮箱",
+    "tabs": {
+      "label": "登录方式",
+      "phone": "手机号",
+      "email": "邮箱"
+    },
+    "phone": {
+      "field": "手机号",
+      "placeholder": "11 位手机号",
+      "hint": "仅支持中国大陆（+86）手机号，新号码会自动注册。",
+      "consent": "我已阅读并同意<privacy>隐私政策</privacy>，同意将我的手机号等个人信息传输到中国大陆以外处理（数据存放在美国，短信由短信服务商发送）。",
+      "send": "获取验证码",
+      "terms": "继续即表示你同意<terms>服务条款</terms>。"
+    },
+    "code": {
+      "field": "验证码",
+      "hint": "短信里的 6 位数字。",
+      "sent": "验证码已发送至 <addr>{phone}</addr>，{minutes} 分钟内有效。",
+      "resend": "重新获取验证码",
+      "wait": "{seconds} 秒后可重新获取",
+      "change": "换个手机号"
+    },
     "show": "显示",
     "hide": "隐藏",
     "fields": {
@@ -58,7 +79,10 @@
       "passwordMissing": "请输入密码。",
       "passwordShort": "太短了，至少要 {min} 位。",
       "passwordWeak": "请换一个更安全的密码。",
-      "mismatch": "两次输入的密码不一样。"
+      "mismatch": "两次输入的密码不一样。",
+      "phone": "请输入 11 位中国大陆手机号。",
+      "code": "请输入 6 位验证码。",
+      "consent": "请先勾选同意，才能发送验证码。"
     },
     "arrived": {
       "home": {
@@ -143,6 +167,12 @@
       "AUTH_CAPTCHA_FAILED": "验证没有完成，请再试一次。",
       "AUTH_RATE_LIMITED": "尝试次数太多，请等一分钟再试。",
       "AUTH_WEAK_PASSWORD": "密码太简单了，请换一个更安全的。",
+      "AUTH_PHONE_INVALID": "目前只支持中国大陆（+86）手机号。",
+      "AUTH_CONSENT_REQUIRED": "请先勾选同意隐私政策和个人信息出境。",
+      "AUTH_SMS_COOLDOWN": "验证码刚发过，请 60 秒后再获取。",
+      "AUTH_SMS_DAILY_LIMIT": "这个号码今天获取验证码的次数已用完，请明天再试，或改用邮箱。",
+      "AUTH_SMS_FAILED": "短信没有发出去，请稍后再试，或改用邮箱。",
+      "AUTH_OTP_INVALID": "验证码不对或已过期，请检查后重输，或重新获取。",
       "INTERNAL": "出了点问题，请再试一次。",
       "CONFLICT": "这个请求已经处理过了。"
     },
@@ -662,6 +692,7 @@
       "settings": {
         "title": "设置",
         "email": "邮箱",
+        "phone": "手机号",
         "language": "语言",
         "purchases": "购买记录",
         "purchasesNone": "暂无",

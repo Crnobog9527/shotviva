@@ -22,13 +22,13 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
 export async function requireUser(next?: string): Promise<SessionUser> {
   const user = await getSessionUser()
   if (!user) redirect(await localized(loginPath(next ? await localized(next) : undefined)))
-  if (!user.emailVerified) redirect(await localized('/login?error=unverified'))
+  if (!user.verified) redirect(await localized('/login?error=unverified'))
   return user
 }
 
 // Admin pages must not reveal they exist, so non-admins get a plain 404.
 export async function requireAdmin(): Promise<SessionUser> {
   const user = await getSessionUser()
-  if (!user || !user.emailVerified || user.role !== 'admin') notFound()
+  if (!user || !user.verified || user.role !== 'admin') notFound()
   return user
 }

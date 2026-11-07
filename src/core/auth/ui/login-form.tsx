@@ -4,10 +4,12 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useState, type ReactNode } from 'react'
 
 import { Link } from '../../i18n/ui'
+import { AuthTabs } from './auth-tabs'
 import { CheckEmail } from './check-email'
 import { CaptchaFailed, CaptchaLine, Divider, EmailField, Notice, PasswordField, SubmitButton } from './form-parts'
 import { GoogleButton } from './google-button'
 import { AlertIcon } from './icons'
+import { PhoneSignIn, type PhoneActions } from './phone-sign-in'
 import { useAuthForm, type AuthForm, type FormAction } from './use-auth-form'
 import { validateEmail, validateLogin } from './validate'
 
@@ -21,12 +23,14 @@ type Props = {
   // The line under the title: the home draft, or the Graylum connection.
   arrived?: ReactNode
   sender: string
+  // Chinese pages only (T63): the 手机号 tab, shown first unless a notice is about the email flow.
+  phone?: PhoneActions
 }
 
 const addr = (chunks: ReactNode) => <span className="au-addr">{chunks}</span>
 
 // /login (design/comps-v3-b/auth.html `?v=login`, `?err=creds|unverified`, `?captcha=1`).
-export function LoginForm({ action, googleAction, resendAction, next, notice, arrived, sender }: Props) {
+export function LoginForm({ action, googleAction, resendAction, next, notice, arrived, sender, phone }: Props) {
   const t = useTranslations('auth')
   const form = useAuthForm(action, { captcha: true, validate: validateLogin })
   const [verifying, setVerifying] = useState<string | null>(null)
@@ -56,6 +60,28 @@ export function LoginForm({ action, googleAction, resendAction, next, notice, ar
       </h1>
       {arrived}
       <LoginNotice form={form} notice={notice} resendAction={resendAction} next={next} onResent={setVerifying} />
+      {phone ? (
+        <AuthTabs
+          initial={notice ? 'email' : 'phone'}
+          phone={<PhoneSignIn actions={phone} next={next} submitLabel={t('login.submit')} termsLine />}
+          email={<EmailLogin form={form} googleAction={googleAction} next={next} />}
+        />
+      ) : (
+        <EmailLogin form={form} googleAction={googleAction} next={next} />
+      )}
+      <p className="au-swap">
+        {t.rich('login.toSignup', { link: (chunks) => <Link href={`/signup?next=${encodeURIComponent(next)}`}>{chunks}</Link> })}
+      </p>
+      <CaptchaLine enabled={form.captchaEnabled} />
+    </section>
+  )
+}
+
+// Google, then email and password: the whole page in English, the 邮箱 tab in Chinese.
+function EmailLogin({ form, googleAction, next }: { form: AuthForm; googleAction: FormAction; next: string }) {
+  const t = useTranslations('auth')
+  return (
+    <>
       <GoogleButton action={googleAction} next={next} appearance="auth" />
       <Divider />
       <form onSubmit={form.onSubmit} noValidate className="au-form">
@@ -72,11 +98,7 @@ export function LoginForm({ action, googleAction, resendAction, next, notice, ar
         <SubmitButton pending={form.pending}>{t('login.submit')}</SubmitButton>
         <CaptchaFailed show={form.captchaFailed} />
       </form>
-      <p className="au-swap">
-        {t.rich('login.toSignup', { link: (chunks) => <Link href={`/signup?next=${encodeURIComponent(next)}`}>{chunks}</Link> })}
-      </p>
-      <CaptchaLine enabled={form.captchaEnabled} />
-    </section>
+    </>
   )
 }
 

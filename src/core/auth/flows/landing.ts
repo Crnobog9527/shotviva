@@ -9,7 +9,7 @@ import { localeOfPath } from '../../i18n/paths'
 import { logger } from '../../logger'
 import { onVerifiedSignIn } from '../first-sign-in'
 import { sanitizeNext } from '../redirect-target'
-import { isEmailVerified, metadataLocale } from '../session-user'
+import { isVerified, metadataLocale } from '../session-user'
 import type { CallbackFlow } from './callback-url'
 import { callbackTarget, type CallbackOutcome } from './callback-target'
 
@@ -40,7 +40,7 @@ export async function landOnSession(
 ): Promise<CallbackOutcome> {
   const { data } = await supabase.auth.getUser()
   if (!data.user) return { kind: 'no_session', flow }
-  const verified = isEmailVerified(data.user)
+  const verified = isVerified(data.user)
   const stored = metadataLocale(data.user)
   const locale = stored ?? localeOfPath(sanitizeNext(nextParam))
   // Google accounts never pass through signUp, so their auth emails would stay English: store

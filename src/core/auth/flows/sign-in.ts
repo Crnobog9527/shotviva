@@ -5,7 +5,7 @@ import { currentLocale, localized } from '../../i18n/server'
 import { logger } from '../../logger'
 import { onVerifiedSignIn } from '../first-sign-in'
 import { sanitizeNext } from '../redirect-target'
-import { isEmailVerified, metadataLocale } from '../session-user'
+import { isVerified, metadataLocale } from '../session-user'
 import { createServerSupabase } from '../supabase-server'
 import { classifyAuthError } from './classify-auth-error'
 import { callbackUrl } from './callback-url'
@@ -28,7 +28,7 @@ export async function signInWithPassword(form: FormData, options: SignInOptions)
     return failed(code)
   }
   // With confirmations on Supabase refuses unverified sign-ins; this guards a misconfigured project.
-  if (!isEmailVerified(data.user)) {
+  if (!isVerified(data.user)) {
     await supabase.auth.signOut({ scope: 'local' })
     return failed('AUTH_EMAIL_NOT_CONFIRMED')
   }
