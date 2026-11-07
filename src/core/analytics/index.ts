@@ -15,4 +15,5 @@ export { createServerTracker, track, type ServerTrack, type TrackContext } from 
 export { trackCheckoutStart, trackPurchase } from './funnel'
 export { ALERTS, captureAlert, captureError, type AlertKind, type CaptureContext } from './capture-error'
 export { onRequestError, registerSentry } from './sentry-server'
+export { onServerError, signalServerError, type ServerErrorSignal } from './server-errors'
 export { REPLAY_BLOCK_CLASS } from './replay'

@@ -3,6 +3,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { captureError } from '../analytics/capture-error'
+import type { ServerErrorSignal } from '../analytics/server-errors'
 import { createAdminSupabase } from '../auth/supabase-admin'
 import { serverEnv } from '../env'
 import { logger, redactString } from '../logger'
@@ -14,6 +15,7 @@ import { createDedupe, type Dedupe } from './dedupe'
 import { enrich } from './enrich'
 import { sendFeishu, type FeishuDeps } from './feishu'
 import { isSpike, readFailureStats, spikeAlert, spikeHour } from './failure-spike'
+import { areaOf, createErrorWindow, sentryIssuesUrl, siteErrorsAlert, type ErrorWindow } from './site-errors'
 import { renderAlert } from './templates'
 
 // notifyOwner (ARCHITECTURE §16.4, T72): the Owner's plain-Chinese business alert, posted to the
@@ -29,6 +31,8 @@ export type NotifyDeps = {
   feishu: FeishuDeps
   origin: string
   testSite: boolean
+  // This environment's Sentry issue list, linked from 「网站报错异常」.
+  sentryUrl: string
 }
 
 async function deliver(deps: NotifyDeps & { config: FeishuConfig }, alert: OwnerAlert): Promise<void> {
@@ -67,6 +71,16 @@ export async function noteGenerationFailureWith(deps: NotifyDeps, now: Date = ne
   }
 }
 
+// Every server error passes here (core/analytics signalServerError, wired at start-up): counted
+// in the window, and one alert per half hour when the window crosses the rule.
+export async function noteServerErrorWith(deps: NotifyDeps, window: ErrorWindow, signal: ServerErrorSignal, now: Date = new Date()): Promise<void> {
+  if (!deps.config) return
+  const area = areaOf(signal)
+  if (!area) return
+  const breach = window.record(area, now.getTime())
+  if (breach) await notifyOwnerWith(deps, siteErrorsAlert(breach, now, deps.sentryUrl))
+}
+
 // The R2 bucket holds the dedupe marks; a deployment without R2 dedupes per instance only.
 function markerStore() {
   try {
@@ -90,6 +104,7 @@ function defaultDeps(): NotifyDeps {
     feishu: { fetch: (input, init) => fetch(input, init), now: Date.now },
     origin: appOrigin,
     testSite: env.VERCEL_ENV !== 'production',
+    sentryUrl: sentryIssuesUrl(env.SENTRY_ORG, env.VERCEL_ENV ?? 'development'),
   }
   return defaults
 }
@@ -109,4 +124,10 @@ export function notifyOwner(alert: OwnerAlert): Promise<void> {
 
 export function noteGenerationFailure(): Promise<void> {
   return safely((deps) => noteGenerationFailureWith(deps))
+}
+
+const errorWindow = createErrorWindow()
+
+export function noteServerError(signal: ServerErrorSignal): Promise<void> {
+  return safely((deps) => noteServerErrorWith(deps, errorWindow, signal))
 }

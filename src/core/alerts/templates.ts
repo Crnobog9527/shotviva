@@ -9,6 +9,7 @@ import type {
   OwnerAlertKind,
   PaymentFailedAlert,
   RefundAlert,
+  SiteErrorsAlert,
   TicketAlert,
 } from './alert-kinds'
 
@@ -24,7 +25,8 @@ export type RenderContext = {
   testSite: boolean
 }
 
-type Rendered = { line: string; path: string }
+// path: an admin page on this site; href: somewhere else (the Sentry issue list).
+type Rendered = { line: string; path: string; href?: string }
 
 const PRODUCT_NAMES: Record<string, string> = {
   starter_monthly: 'Starter 月付',
@@ -149,6 +151,39 @@ function cancelFailed(alert: CancelFailedAlert, who: string): Rendered {
   return { line, path: `/admin/users/${alert.userId}` }
 }
 
+const AREAS: Record<keyof SiteErrorsAlert['byArea'], string> = {
+  payment: '付款',
+  auth: '登录',
+  generate: '出图',
+  admin: '后台',
+  site: '网站页面',
+}
+
+const TITLES: Record<SiteErrorsAlert['trigger'], string> = {
+  payment: '付款出错',
+  auth: '登录出错',
+  generate: '网站报错偏多',
+  admin: '网站报错偏多',
+  site: '网站报错偏多',
+  total: '网站报错偏多',
+}
+
+// The Owner reads alerts in China: times are Beijing time.
+const BEIJING = new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+
+function siteErrors(alert: SiteErrorsAlert): Rendered {
+  const areas = (Object.entries(alert.byArea) as [keyof typeof AREAS, number][])
+    .sort((a, b) => b[1] - a[1])
+    .map(([area, count]) => `${AREAS[area]} ${count} 次`)
+    .join('、')
+  const since = BEIJING.format(new Date(alert.since))
+  return {
+    line: `【${TITLES[alert.trigger]}】过去 ${alert.windowMinutes} 分钟服务器出错 ${alert.total} 次（北京时间 ${since} 开始），出在：${areas}。用户可能受影响，详情在 Sentry。`,
+    path: '',
+    href: alert.sentryUrl,
+  }
+}
+
 const RENDERERS: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K }>, who: string) => Rendered } = {
   refund,
   dispute_opened: disputeOpened,
@@ -157,6 +192,7 @@ const RENDERERS: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K 
   generation_spike: generationSpike,
   ticket,
   subscription_cancel_failed: cancelFailed,
+  site_errors: siteErrors,
 }
 
 export type RenderedAlert = { sentence: string; link: string }
@@ -164,6 +200,7 @@ export type RenderedAlert = { sentence: string; link: string }
 // The sentence(s), then the link on its own line.
 export function renderAlert(alert: OwnerAlert, ctx: RenderContext): RenderedAlert {
   const render = RENDERERS[alert.kind] as (a: OwnerAlert, who: string) => Rendered
-  const { line, path } = render(alert, ctx.who ?? '一位用户')
-  return { sentence: `${ctx.testSite ? '（测试站）' : ''}${line}`, link: `去后台看：${ctx.origin}${path}` }
+  const { line, path, href } = render(alert, ctx.who ?? '一位用户')
+  const link = href ? `去 Sentry 看：${href}` : `去后台看：${ctx.origin}${path}`
+  return { sentence: `${ctx.testSite ? '（测试站）' : ''}${line}`, link }
 }

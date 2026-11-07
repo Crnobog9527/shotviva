@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryStore } from '../../../tests/fakes/memory-store'
 import type { OwnerAlert } from './alert-kinds'
 import { createDedupe } from './dedupe'
-import { noteGenerationFailureWith, notifyOwnerWith, type NotifyDeps } from './notify'
+import { noteGenerationFailureWith, noteServerErrorWith, notifyOwnerWith, type NotifyDeps } from './notify'
+import { createErrorWindow } from './site-errors'
 
 const captureError = vi.hoisted(() => vi.fn())
 vi.mock('../analytics/capture-error', () => ({ captureError }))
@@ -44,6 +45,7 @@ function setup(db = fakeDb(), fetch = vi.fn(async () => ok())) {
     feishu: { fetch: fetch as never, now: () => 1_700_000_000_000 },
     origin: 'https://shotviva.com',
     testSite: false,
+    sentryUrl: 'https://acme.sentry.io/issues/?environment=production&statsPeriod=1h',
   }
   const sent = () => fetch.mock.calls.map((call) => JSON.parse(String((call as unknown as [string, RequestInit])[1].body)).content.text as string)
   return { deps, fetch, sent, objects, db }
@@ -133,3 +135,29 @@ describe('noteGenerationFailureWith', () => {
     expect(db.from).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('noteServerErrorWith', () => {
+  const at = (minute: number) => new Date(Date.parse('2026-11-08T06:05:00Z') + minute * 60_000)
+  const payment = { source: 'api', route: 'checkout' } as const
+
+  it('sends one 「网站报错异常」 per half hour while errors keep coming', async () => {
+    const { deps, sent } = setup()
+    const window = createErrorWindow()
+    for (let i = 0; i < 6; i += 1) await noteServerErrorWith(deps, window, payment, at(i))
+    expect(sent()).toHaveLength(1)
+    expect(sent()[0]).toContain('【付款出错】过去 10 分钟服务器出错 3 次')
+    expect(sent()[0]).toContain('去 Sentry 看：https://acme.sentry.io/issues/')
+    // Next half hour, still failing: one more.
+    for (let i = 26; i < 29; i += 1) await noteServerErrorWith(deps, window, payment, at(i))
+    expect(sent()).toHaveLength(2)
+  })
+
+  it('ignores warnings and does nothing when alerts are off', async () => {
+    const { deps, fetch } = setup()
+    const window = createErrorWindow()
+    for (let i = 0; i < 12; i += 1) await noteServerErrorWith(deps, window, { source: 'capture', alert: null, level: 'warning' }, at(0))
+    for (let i = 0; i < 12; i += 1) await noteServerErrorWith({ ...deps, config: null }, window, payment, at(0))
+    expect(fetch).not.toHaveBeenCalled()
+  })
+})
+

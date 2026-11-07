@@ -2,3 +2,4 @@
 // Server only. Sentry (core/analytics captureAlert) stays the developers' channel.
 export type { AlertChannel, Clawback, Money, OwnerAlert, OwnerAlertKind, PaymentFailedAlert, PaymentStep } from './alert-kinds'
 export { noteGenerationFailure, notifyOwner } from './notify'
+export { registerOwnerErrorAlerts } from './register'

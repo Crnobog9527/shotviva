@@ -49,6 +49,24 @@ export type CancelFailedAlert = {
   subscriptionRef: string | null
 }
 
+// Where on the site a server error happened, for 「网站报错异常」.
+export type ErrorArea = 'payment' | 'auth' | 'generate' | 'admin' | 'site'
+
+// More server errors than usual in the last few minutes (Sentry has the details).
+export type SiteErrorsAlert = {
+  kind: 'site_errors'
+  total: number
+  byArea: Partial<Record<ErrorArea, number>>
+  // The first error still in the window (ISO).
+  since: string
+  // What crossed the line: payments or sign-in on their own, or the total.
+  trigger: ErrorArea | 'total'
+  windowMinutes: number
+  // The half hour (UTC), so one message per 30 minutes.
+  slot: string
+  sentryUrl: string
+}
+
 export type OwnerAlert =
   | RefundAlert
   | DisputeOpenedAlert
@@ -57,6 +75,7 @@ export type OwnerAlert =
   | GenerationSpikeAlert
   | TicketAlert
   | CancelFailedAlert
+  | SiteErrorsAlert
 
 export type OwnerAlertKind = OwnerAlert['kind']
 
@@ -69,6 +88,7 @@ const KEYS: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K }>) =
   generation_spike: (a) => `generation_spike:${a.hour}`,
   ticket: (a) => `ticket:${a.ticketId}:${a.messageId ?? 'new'}`,
   subscription_cancel_failed: (a) => `subscription_cancel_failed:${a.userId}:${a.subscriptionRef ?? 'read'}`,
+  site_errors: (a) => `site_errors:${a.slot}`,
 }
 
 // One message per fact: a redelivered webhook, a retried handler or a second instance builds
