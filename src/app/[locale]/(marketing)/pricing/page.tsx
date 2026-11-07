@@ -28,9 +28,9 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function PricingPage() {
   const locale = await currentLocale()
   // "from N credits" filled from the live catalogue (建站规格 G4).
-  const credits = startingCredits(await cachedWebCatalogue(locale))
+  const [catalogue, wishlistLive] = await Promise.all([cachedWebCatalogue(locale), isWishlistEnabled(site)])
+  const credits = startingCredits(catalogue)
   const page = fillCredits(pricingPageIn(locale), credits)
-  const wishlistLive = isWishlistEnabled(site)
   const channel = paymentChannel()
   const faq = fillCredits(pricingFaqIn(locale, channel), credits)
   const path = localizePath(page.path, locale)

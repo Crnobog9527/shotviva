@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('@/site/site.config', () => ({ site: mocks.site }))
+// The admin switch is on; these tests close the wishlist through the site config.
+vi.mock('@/core/system-settings/read', () => ({ cachedSystemSettings: async () => ({ wishlist_enabled: true }) }))
 vi.mock('@/core/auth/session', () => ({ getSessionUser: mocks.getSessionUser }))
 vi.mock('@/core/auth/supabase-server', () => ({ createServerSupabase: async () => ({}) }))
 vi.mock('@/core/storage/r2-store', () => ({ r2Store: () => ({}) }))

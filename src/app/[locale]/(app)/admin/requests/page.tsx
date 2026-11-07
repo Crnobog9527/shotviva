@@ -17,7 +17,7 @@ export const instant = false
 export const metadata: Metadata = { title: REQUESTS_COPY.title }
 
 export default async function AdminRequestsPage() {
-  if (!isWishlistEnabled(site)) notFound()
+  if (!(await isWishlistEnabled(site))) notFound()
   await requireAdmin()
   const db = createAdminSupabase()
   const [requests, templates] = await Promise.all([listAdminRequests({ db, store: r2Store() }), listTemplateOptions(db)])

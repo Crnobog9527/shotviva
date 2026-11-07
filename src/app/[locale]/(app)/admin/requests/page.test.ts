@@ -11,7 +11,7 @@ vi.mock('@/core/auth', () => ({ requireAdmin: () => mocks.requireAdmin(), create
 vi.mock('@/core/storage', () => ({ r2Store: () => ({}) }))
 vi.mock('@/site/site.config', () => ({ site: mocks.site }))
 vi.mock('@/core/wishlist', () => ({
-  isWishlistEnabled: (site: typeof mocks.site) => site.features.wishlist,
+  isWishlistEnabled: async (site: typeof mocks.site) => site.features.wishlist,
   listAdminRequests: () => mocks.listAdminRequests(),
   listTemplateOptions: async () => [],
 }))

@@ -89,10 +89,11 @@ export const site = defineSite({
   },
   // 创作库规格 U9: no gallery pages for the first 8 weeks.
   gallery: { enabled: false },
-  // Template wishlist (ARCHITECTURE §15). When off, the tab bar has three tabs and /wishlist,
-  // /api/wishlist and /admin/requests 404 (§15.6). Preview deployments can switch it on with
-  // FEATURE_WISHLIST_PREVIEW=on for validation; production always follows this value.
-  features: { wishlist: false },
+  // Template wishlist (ARCHITECTURE §15): true means this site has the feature. Whether it is
+  // open is the admin switch on /admin/features (system_settings wishlist_enabled, default
+  // off, §15.6 T62); while closed the tab bar has three tabs and /wishlist, /api/wishlist and
+  // /admin/requests 404. Preview deployments can also open it with FEATURE_WISHLIST_PREVIEW=on.
+  features: { wishlist: true },
   indexing: {
     // The two T44 landing pages are in the keyword map CSV (第一批 第 2 周).
     indexablePaths: ['/', '/image-to-image-generator', '/commercial-photography', '/ai-restaurant-menu', '/pricing'],

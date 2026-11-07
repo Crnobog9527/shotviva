@@ -10,7 +10,7 @@ import { site } from '@/site/site.config'
 // input_keys come from /api/uploads; the photos themselves never pass through here (AGENTS §6).
 export async function POST(request: NextRequest) {
   try {
-    assertWishlistEnabled(site)
+    await assertWishlistEnabled(site)
     assertSameOrigin(request)
     const user = await requireApiUser()
     const body: unknown = await request.json().catch(() => null)
