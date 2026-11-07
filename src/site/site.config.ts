@@ -44,10 +44,6 @@ export const site = defineSite({
       '/photos',
       '/photos/[jobId]',
       '/account',
-      // Help & feedback (T27) belongs to the account page.
-      '/account/help',
-      '/account/help/new',
-      '/account/help/[id]',
       '/wishlist',
       '/wishlist/new',
       '/wishlist/mine',

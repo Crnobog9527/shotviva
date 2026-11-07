@@ -4,6 +4,7 @@ import createNextIntlPlugin from 'next-intl/plugin'
 
 import { parseSentryBuildEnv } from './src/core/build-env'
 import { indexingOpen, parseIndexingEnv, xRobotsTagRules } from './src/core/seo/indexing-env'
+import { legacyHelpRedirects } from './src/core/support/legacy-redirects'
 import { assetsHeaders, assetsRemotePatterns, assetsRewrites, readAssetsEnv } from './src/core/storage/assets-env'
 import { SITE_DOMAIN } from './src/site/domain'
 
@@ -58,6 +59,10 @@ const nextConfig: NextConfig = {
         headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
       },
     ]
+  },
+  // The old /account/help pages open the account page's Help dialog instead (T68).
+  async redirects() {
+    return legacyHelpRedirects()
   },
   async rewrites() {
     return [
