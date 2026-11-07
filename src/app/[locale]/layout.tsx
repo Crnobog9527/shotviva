@@ -6,7 +6,7 @@ import { locale as rootLocale } from 'next/root-params'
 import { clientMessages, htmlLang, isLocale } from '@/core/i18n'
 import { TranslatedPathsProvider } from '@/core/i18n/ui'
 import { rootMetadata } from '@/core/seo'
-import { MiSansFont } from '@/core/ui/misans-font'
+import { MiSansStylesheet } from '@/core/ui/misans-stylesheet'
 import { site } from '@/site/site.config'
 
 import { fontVariables } from '../fonts'
@@ -39,13 +39,14 @@ export default async function RootLayout({ children }: LayoutProps<'/[locale]'>)
   const locale = await rootLocale()
   // Everything but the server-only namespaces (the admin entry's label, spec #186).
   const messages = clientMessages(await getMessages())
+  const lang = isLocale(locale) ? locale : site.locales.default
   return (
-    <html lang={htmlLang(isLocale(locale) ? locale : site.locales.default)} className={`${fontVariables} h-full antialiased`}>
+    <html lang={htmlLang(lang)} className={`${fontVariables} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
+        {lang === 'zh' ? <MiSansStylesheet /> : null}
         <NextIntlClientProvider messages={messages}>
           <TranslatedPathsProvider paths={site.locales.zhPaths}>{children}</TranslatedPathsProvider>
         </NextIntlClientProvider>
-        <MiSansFont />
       </body>
     </html>
   )
