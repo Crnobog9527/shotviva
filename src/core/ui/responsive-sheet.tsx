@@ -40,7 +40,7 @@ export function ResponsiveSheet({ open, onOpenChange, title, description, childr
               dialogSize(wide, tall),
             )}
           >
-            <div className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", wide ? "px-7 pt-6 pb-5" : tall ? "px-6 pt-6" : "p-4 pt-6")}>
+            <div className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", wide ? "px-7 pt-6 pb-5" : tall ? "px-6 pt-6 [scrollbar-gutter:stable]" : "p-4 pt-6")}>
               <SheetHeading title={title} description={description} aside={aside} Title={DialogPrimitive.Title} Description={DialogPrimitive.Description} />
               {children}
             </div>
@@ -67,7 +67,7 @@ export function ResponsiveSheet({ open, onOpenChange, title, description, childr
 
 function dialogSize(wide: boolean, tall: boolean): string {
   if (wide) return "max-h-[calc(100dvh-64px)] w-[min(920px,calc(100%-64px))]"
-  if (tall) return "h-[min(760px,calc(100dvh-64px))] w-[min(640px,calc(100%-64px))]"
+  if (tall) return "h-[min(760px,calc(100dvh-64px))] w-[min(640px,calc(100%-64px))] overflow-hidden"
   return "max-h-[calc(100dvh-48px)] w-[min(480px,calc(100%-32px))]"
 }
 

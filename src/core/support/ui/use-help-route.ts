@@ -34,14 +34,14 @@ export function useHelpRoute() {
   const view = parseHelpParam(useSearchParams().get(HELP_PARAM))
 
   // Arrived with ?help= (a deep link, a reload, an old address): put the bare account page
-  // underneath, so Back closes the dialog here too.
-  const arrived = view !== null && !ownsEntry()
+  // underneath, so Back closes the dialog here too. History exists only in the browser.
+  const open = view !== null
   useEffect(() => {
-    if (!arrived) return
+    if (!open || ownsEntry()) return
     const target = window.location.href
     window.history.replaceState(null, '', urlWith(null))
     window.history.pushState({ [MARK]: true }, '', target)
-  }, [arrived])
+  }, [open])
 
   const go = useCallback((next: HelpView) => {
     window.history.replaceState({ [MARK]: true }, '', urlWith(next))

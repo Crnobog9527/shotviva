@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { Suspense, useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 
 import { ResponsiveSheet } from '../../ui/responsive-sheet'
 import type { TicketSummary } from '../types'
@@ -30,7 +30,16 @@ type Props = {
 // from md, a full-height bottom drawer below (DESIGN §8.4). New ticket and My tickets as tabs;
 // a ticket opens in place with its messages and the reply field. Where it stands is ?help=…
 // (use-help-route), so Back closes it and old /account/help links open it.
-export function HelpDialog({ actions, payments, replyTime, brand, unread }: Props) {
+// ?help= is read in the browser only (useSearchParams), so the page around it still prerenders.
+export function HelpDialog(props: Props) {
+  return (
+    <Suspense fallback={null}>
+      <HelpSheet {...props} />
+    </Suspense>
+  )
+}
+
+function HelpSheet({ actions, payments, replyTime, brand, unread }: Props) {
   const t = useTranslations('app.support')
   const idBase = useId()
   const router = useRouter()
@@ -40,6 +49,12 @@ export function HelpDialog({ actions, payments, replyTime, brand, unread }: Prop
   if (view && helpParamValue(view) !== helpParamValue(shown)) setShown(view)
   const [sentId, setSentId] = useState<string | null>(null)
   useRefreshDots(view !== null, unread && shown.tab === 'thread', router.refresh)
+  // A new place in the dialog starts at its top: the marker's parent is the sheet's scrolling body.
+  const top = useRef<HTMLSpanElement>(null)
+  const place = helpParamValue(shown)
+  useEffect(() => {
+    top.current?.parentElement?.scrollTo({ top: 0 })
+  }, [place])
 
   const onSent = useCallback(
     (id: string) => {
@@ -57,6 +72,7 @@ export function HelpDialog({ actions, payments, replyTime, brand, unread }: Prop
   )
   return (
     <ResponsiveSheet tall open={view !== null} onOpenChange={(open) => !open && close()} title={t('title')} description={replyTime}>
+      <span ref={top} hidden />
       <HelpTabs current={tab} onChange={(next) => go({ tab: next })} idBase={idBase} />
       {panel('new', <HelpNewView actions={actions} payments={payments} onSent={onSent} />)}
       {panel(

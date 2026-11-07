@@ -30,7 +30,7 @@ export function TicketForm({ submit, payments, works, onSent }: Props) {
   // A refund request on an account without payments cannot be sent; say so instead.
   const blocked = type !== null && attachmentFor(type) === 'payment-required' && payments.length === 0
   return (
-    <form onSubmit={(event) => dispatchKeeping(event, action)} className="grid gap-6 pt-5">
+    <form onSubmit={(event) => dispatchKeeping(event, action)} className="grid grid-cols-[minmax(0,1fr)] gap-6 pt-5">
       <TypePicker value={type} onChange={setType} />
       {type && <AttachmentField key={type} type={type} payments={payments} works={works} />}
       <BodyField

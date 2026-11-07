@@ -13,7 +13,7 @@ export function ThreadView({ thread, brand, notice, form }: Props) {
   const t = useTranslations('app.support')
   const format = useFormatter()
   return (
-    <div className="grid gap-4 pt-3 pb-[calc(var(--sab)+24px)] md:pb-6">
+    <div className="grid gap-4 pt-2 pb-[calc(var(--sab)+24px)] md:pb-6">
       <div className="flex items-center justify-between gap-3">
         <span className="font-mono text-caption text-muted-foreground">
           {t('opened', { date: new Date(thread.createdAt) })}
