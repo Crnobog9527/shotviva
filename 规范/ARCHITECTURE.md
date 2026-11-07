@@ -372,10 +372,12 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 |---|---|---|
 | 卡 / Apple Pay / Google Pay | `mode: 'subscription'`，`managed_payments: { enabled: true }`，不传 `allowed_payment_method_types`（MP 自己决定付款方式） | Stripe（Link）当商户记录方，结账时另加税 |
 | 支付宝 | `mode: 'payment'`，`allowed_payment_method_types: ['alipay']`（在 Dashboard 已开启的动态付款方式里过滤；Dashboard 没开支付宝时拒绝跳转） | Shotviva |
+| 中国银行卡（只在中文页出现，T64） | 会员 `mode: 'subscription'`、积分包 `mode: 'payment'`，**不带** `managed_payments`，`allowed_payment_method_types: ['card']`，不开自动税（与审核前的兜底卡路由同一条代码路径）；会员照常自动续费，账号页「Manage subscription」进普通 Stripe Customer Portal | Shotviva |
 
 > Stripe API 2026-09-30（stripe@23）起，Checkout Session 不再接受 `payment_method_types`，传了会 400；按方式限定一律用 `allowed_payment_method_types`。审核下来之前不走 MP 的卡路由传 `['card']`。（T9 修复，2026-11-06）
 
-- 服务端只认用户选的方式，不按 IP 或浏览器语言强制。Managed Payments 的结账页不允许买家国家为中国，所以大陆用户自然选钱包。
+- 服务端只认用户选的方式，不按 IP 或浏览器语言强制。Managed Payments 的结账页不允许买家国家为中国（2026-11-07 正式站真卡实测：中国发卡的 Visa 被拒「China is not currently supported」），所以给中文页加「中国银行卡」这条普通 Stripe 卡路由（T64，Owner 2026-11-07）。
+- **中文页付款方式（Owner 2026-11-07，T64）**：三项，顺序固定：① **中国银行卡**（上表第三行，普通 Stripe）② **支付宝** ③ **海外银行卡 · Apple Pay · Google Pay**（原来的 MP 卡路由，只改名）。英文页不变（Card · Apple Pay · Google Pay 和 Alipay，没有中国银行卡）。中国银行卡这条路由由 Shotviva 当卖家：大陆买家不涉及我们需要申报的销售税 / 增值税；非大陆用户在中文页选它的情况接受，不做卡 BIN 拦截（上线后看数据再定）。埋点 `checkout_start.method = 'cn_card'`。
 - MP 商品必须设税码 `txcd_10105001`（AI 服务，个人用）。MP 价格不含税，税在结账时另加。
 - 顾客账单：卡支付显示 `LINK.COM* SHOTVIVA`，钱包支付显示 SHOTVIVA。MP 结账页不支持自定义域名。
 - 正式环境的 Managed Payments 要等 Stripe 资格审核。**审核没下来之前的兜底**：卡先不带 `managed_payments` 走普通订阅（Shotviva 当卖家），审核通过后翻开关。
