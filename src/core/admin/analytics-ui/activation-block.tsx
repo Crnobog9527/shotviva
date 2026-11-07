@@ -10,9 +10,9 @@ const COPY = ANALYTICS_COPY.activation
 
 function Tile({ id, metric, value, change, note }: { id: string; metric: Metric; value: string; change: Delta; note?: string }) {
   return (
-    <div className="grid content-start gap-1 rounded-lg border border-border bg-background/40 p-4">
+    <div className="grid content-start gap-1 border-t border-border pt-3">
       <MetricLabel id={id} metric={metric} className="text-sm text-muted-foreground" />
-      <p className="font-mono text-2xl font-semibold tabular-nums">{value}</p>
+      <p className="text-2xl font-semibold tabular-nums">{value}</p>
       <DeltaText delta={change} />
       {note ? <p className="text-xs text-muted-foreground">{note}</p> : null}
     </div>
@@ -24,7 +24,7 @@ export function ActivationView({ activation }: { activation: Activation }) {
   const { current: now, previous: before } = activation
   const m = COPY.metrics
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-x-4 gap-y-5 lg:grid-cols-5">
       <Tile id="act-signups" metric={m.signups} value={n(now.signups)} change={delta(now.signups, before.signups)} />
       <Tile id="act-24h" metric={m.active24h} value={pct(now.active24hRate)} change={pointDelta(now.active24hRate, before.active24hRate)} />
       <Tile id="act-image" metric={m.toImage} value={hours(now.hoursToImage)} change={delta(now.hoursToImage, before.hoursToImage)} />

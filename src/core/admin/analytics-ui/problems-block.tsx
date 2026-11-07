@@ -14,7 +14,7 @@ const RATING_CLASS = { good: 'text-success', fair: 'text-foreground', poor: 'tex
 
 function Failures({ id, metric, stats, reasonName }: { id: string; metric: Metric; stats: FailureStats; reasonName(reason: string): string }) {
   return (
-    <div className="grid content-start gap-3 rounded-lg border border-border bg-background/40 p-4">
+    <div className="grid content-start gap-3 border-t border-border pt-4">
       <MetricLabel id={id} metric={metric} className="text-sm text-muted-foreground" />
       <p className="font-mono text-2xl font-semibold tabular-nums">{n(stats.failed)}</p>
       <p className="text-xs text-muted-foreground">
@@ -43,7 +43,7 @@ function VitalCell({ metric, value }: { metric: Vital; value: number | null }) {
   const level = rating(metric, value)
   const text = metric === 'cls' ? (value === null ? '—' : value.toFixed(2)) : ms(value)
   return (
-    <TableCell className="text-right font-mono whitespace-nowrap tabular-nums">
+    <TableCell className="text-right whitespace-nowrap tabular-nums">
       <span className={cn(level ? RATING_CLASS[level] : 'text-muted-foreground')}>{text}</span>
       {level ? <span className={cn('ml-1.5 text-xs', RATING_CLASS[level])}>{COPY.rating[level]}</span> : null}
     </TableCell>
@@ -87,7 +87,7 @@ const imageReason = (code: string) => (COPY.imageReasons[code] ? `${COPY.imageRe
 export function ProblemsView({ problems }: { problems: Problems }) {
   return (
     <div className="grid gap-5">
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">
         <Failures id="problems-uploads" metric={COPY.uploads} stats={problems.uploads} reasonName={uploadReason} />
         <Failures id="problems-images" metric={COPY.images} stats={problems.images} reasonName={imageReason} />
       </div>

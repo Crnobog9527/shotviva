@@ -5,7 +5,7 @@ type Metric = { label: string; help: string }
 
 export const ANALYTICS_COPY = {
   title: '流量与转化',
-  intro: '数据来自 PostHog，每 10 分钟更新一次。括号里是和上一个同样长时段的对比。',
+  intro: '数据来自 PostHog，每 10 分钟更新一次。数字旁边的小字是和上一个同样长时段比的变化',
   ranges: { today: '今天', '7d': '最近 7 天', '30d': '最近 30 天' },
   rangeLabel: '时间范围',
   compare: { today: '和昨天同一时段比', '7d': '和再往前 7 天比', '30d': '和再往前 30 天比' },

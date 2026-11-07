@@ -46,7 +46,7 @@ export function AnalyticsView({ query, projectId, giftCredits, templateNames }: 
   return (
     <div className="grid min-w-0 gap-6">
       <p className="text-sm text-muted-foreground">
-        {COPY.intro} {COPY.compare[query.range]}。
+        {COPY.intro}（{COPY.compare[query.range]}）。
       </p>
       {blocks.map((block) => (
         // Keyed on the query so switching range shows the skeleton instead of stale numbers.

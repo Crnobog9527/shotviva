@@ -34,7 +34,7 @@ export function MetricLabel({ id, metric, className, sort }: LabelProps) {
         type="button"
         popoverTarget={popover}
         aria-label={COPY.helpLabel(metric.label)}
-        className="grid size-5 flex-none place-items-center rounded-full border border-border text-[11px] leading-none font-medium text-muted-foreground hover:border-foreground/40 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+        className="grid size-6 flex-none place-items-center rounded-full border border-border text-xs leading-none font-medium text-muted-foreground hover:border-foreground/40 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
       >
         ?
       </button>
@@ -42,7 +42,7 @@ export function MetricLabel({ id, metric, className, sort }: LabelProps) {
         id={popover}
         popover="auto"
         role="tooltip"
-        className="m-auto w-[min(20rem,calc(100vw-2rem))] rounded-lg border border-border bg-popover p-4 text-left text-sm leading-relaxed font-normal text-popover-foreground shadow-lg backdrop:bg-black/50"
+        className="m-auto w-[min(20rem,calc(100vw-2rem))] rounded-lg whitespace-normal border border-border bg-popover p-4 text-left text-sm leading-relaxed font-normal text-popover-foreground shadow-lg backdrop:bg-black/50"
       >
         <span className="mb-1 block font-semibold">{metric.label}</span>
         {metric.help}
@@ -69,7 +69,7 @@ export function BlockFrame({ title, desc, links = [], children }: FrameProps) {
   return (
     <section className="grid min-w-0 gap-4 rounded-lg border border-border bg-card p-4 md:p-5">
       <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
-        <div className="grid min-w-0 flex-1 gap-1">
+        <div className="grid min-w-0 flex-[1_1_18rem] gap-1">
           <h2 className="text-base font-semibold">{title}</h2>
           <p className="text-sm text-muted-foreground">{desc}</p>
         </div>
@@ -90,7 +90,7 @@ export function BlockFrame({ title, desc, links = [], children }: FrameProps) {
 
 export function Unavailable() {
   return (
-    <div role="status" className="rounded-md border border-dashed border-border px-4 py-8 text-center">
+    <div role="status" className="rounded-md bg-muted px-4 py-8 text-center">
       <p className="font-medium">{COPY.unavailable}</p>
       <p className="mt-1 text-sm text-muted-foreground">{COPY.unavailableBody}</p>
     </div>

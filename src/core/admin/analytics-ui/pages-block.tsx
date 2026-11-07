@@ -38,7 +38,8 @@ function Row({ row }: { row: PageRow }) {
       <TableCell className={cell}>
         {n(row.visitors)} <DeltaText delta={delta(row.visitors, row.visitorsPrev)} />
       </TableCell>
-      <TableCell className={cell}>{duration(row.avgSeconds)}</TableCell>
+      {/* Chinese units read badly in the mono face; tabular digits keep the column aligned. */}
+      <TableCell className="text-right whitespace-nowrap tabular-nums">{duration(row.avgSeconds)}</TableCell>
       <TableCell className={cell}>{pct(row.avgScroll)}</TableCell>
       <TableCell className={cell}>{pct(row.bounceRate)}</TableCell>
       <TableCell className={cell}>{pct(row.signupRate)}</TableCell>

@@ -2,7 +2,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { readPayment } from '../analytics/load'
 import { sqlEditorLink } from '../analytics/links'
 import { methodsQuery, type Payment } from '../analytics/payment'
-import { StatCard } from '../shell/admin-blocks'
 import { ANALYTICS_COPY } from './copy'
 import { n, pct, pointDelta } from './format'
 import { BlockFrame, DeltaText, Empty, MetricLabel, Unavailable } from './parts'
@@ -83,9 +82,10 @@ export function PaymentView({ payment }: { payment: Payment }) {
         <Picks payment={payment} />
       </div>
       <Methods payment={payment} />
-      <div className="max-w-xs">
-        <StatCard title={COPY.metrics.cancels.label} value={n(cancels.current)} hint={ANALYTICS_COPY.previousTimes(n(cancels.previous))} />
-        <p className="mt-2 text-xs text-muted-foreground">{COPY.metrics.cancels.help}</p>
+      <div className="grid max-w-xs gap-1 border-t border-border pt-3">
+        <MetricLabel id="payment-cancels" metric={COPY.metrics.cancels} className="text-sm text-muted-foreground" />
+        <p className="font-mono text-2xl font-semibold tabular-nums">{n(cancels.current)}</p>
+        <p className="text-xs text-muted-foreground">{ANALYTICS_COPY.previousTimes(n(cancels.previous))}</p>
       </div>
     </div>
   )
