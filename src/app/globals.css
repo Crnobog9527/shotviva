@@ -195,15 +195,55 @@
   --ease-house: var(--ease);
 }
 
+/* "MiSans Fallback" (T65, ARCHITECTURE §17): on a first visit to a Chinese page the system CJK font
+   stands in until a MiSans subset arrives. Its vertical metrics are overridden to MiSans's own
+   (hhea ascent 1044, descent 282, no line gap, per 1000 units), so lines keep their height when
+   MiSans swaps in. size-adjust stays 100%: every CJK glyph in MiSans, PingFang SC, Microsoft
+   YaHei and Noto Sans CJK advances exactly 1em, so scaling would change line breaks (the ink
+   differs by about 1%: measured 0.883 vs 0.891 em on 100 common characters). One face per weight
+   in use (400 / 500 / 600), each mapped to the system font's own weight instead of a synthetic
+   bold; local() faces that are not installed are skipped. CJK ranges only: Latin stays Geist. */
+@font-face {
+  font-family: "MiSans Fallback";
+  font-weight: 400;
+  src: local("PingFang SC Regular"), local("PingFangSC-Regular"), local("Microsoft YaHei"), local("MicrosoftYaHei"), local("Noto Sans CJK SC"), local("NotoSansCJKsc-Regular"), local("Noto Sans SC");
+  size-adjust: 100%;
+  ascent-override: 104.4%;
+  descent-override: 28.2%;
+  line-gap-override: 0%;
+  unicode-range: U+2E80-2FDF, U+3000-303F, U+3100-312F, U+31A0-31BF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF;
+}
+@font-face {
+  font-family: "MiSans Fallback";
+  font-weight: 500;
+  src: local("PingFang SC Medium"), local("PingFangSC-Medium"), local("Microsoft YaHei"), local("MicrosoftYaHei"), local("Noto Sans CJK SC Medium"), local("NotoSansCJKsc-Medium"), local("Noto Sans SC Medium");
+  size-adjust: 100%;
+  ascent-override: 104.4%;
+  descent-override: 28.2%;
+  line-gap-override: 0%;
+  unicode-range: U+2E80-2FDF, U+3000-303F, U+3100-312F, U+31A0-31BF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF;
+}
+@font-face {
+  font-family: "MiSans Fallback";
+  font-weight: 600;
+  src: local("PingFang SC Semibold"), local("PingFangSC-Semibold"), local("Microsoft YaHei Bold"), local("MicrosoftYaHei-Bold"), local("Noto Sans CJK SC Bold"), local("NotoSansCJKsc-Bold"), local("Noto Sans SC Bold");
+  size-adjust: 100%;
+  ascent-override: 104.4%;
+  descent-override: 28.2%;
+  line-gap-override: 0%;
+  unicode-range: U+2E80-2FDF, U+3000-303F, U+3100-312F, U+31A0-31BF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF;
+}
+
 /* Fonts come from next/font (src/app/fonts.ts); Tailwind emits these on :root, so
    font-sans / font-mono / font-display and var(--font-*) all resolve to the self-hosted files. */
 @theme {
   /* Latin glyphs stay Geist / Instrument Serif / Geist Mono; Simplified Chinese glyphs come
-     from MiSans (public/fonts/misans/, attached after hydration by core/ui/misans-font.tsx),
-     then the system CJK fonts (DESIGN §3.2, ARCHITECTURE §17). */
-  --font-sans: var(--font-geist), "MiSans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-display: var(--font-instrument-serif), "MiSans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Times New Roman", serif;
-  --font-mono: var(--font-geist-mono), "MiSans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", ui-monospace, "SF Mono", Menlo, monospace;
+     from MiSans (public/fonts/misans/, linked in the server-rendered head of Chinese pages by
+     core/ui/misans-stylesheet.tsx), then its metric-matched fallback, then the system CJK fonts
+     (DESIGN §3.2, ARCHITECTURE §17). */
+  --font-sans: var(--font-geist), "MiSans", "MiSans Fallback", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: var(--font-instrument-serif), "MiSans", "MiSans Fallback", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Times New Roman", serif;
+  --font-mono: var(--font-geist-mono), "MiSans", "MiSans Fallback", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 /* Chinese pages (DESIGN §3.2): headings in Geist + MiSans instead of Instrument Serif, no

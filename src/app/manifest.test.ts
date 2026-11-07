@@ -1,4 +1,5 @@
-import { existsSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
@@ -46,5 +47,20 @@ describe('iOS startup images', () => {
       expect(image.media).toMatch(/^\(device-width: \d+px\) and \(device-height: \d+px\) and \(-webkit-device-pixel-ratio: [23]\) and \(orientation: portrait\)$/)
     }
     expect(rootMetadata(site).appleWebApp).toMatchObject({ startupImage: images })
+  })
+})
+
+// ARCHITECTURE §17: the MiSans files are the official, unmodified subsets; T65 changes how they
+// load, never their bytes.
+describe('MiSans files', () => {
+  it('still match manifest.json byte for byte', () => {
+    const dir = join(process.cwd(), 'public/fonts/misans')
+    const files: { file: string; sha256: string; bytes: number }[] = JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8'))
+    expect(files).toHaveLength(168)
+    for (const { file, sha256, bytes } of files) {
+      const data = readFileSync(join(dir, file))
+      expect(data.length).toBe(bytes)
+      expect(createHash('sha256').update(data).digest('hex')).toBe(sha256)
+    }
   })
 })
