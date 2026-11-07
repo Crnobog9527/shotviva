@@ -34,9 +34,16 @@ const list = (filters: UserFilters = {}) => listUsers(service, { q: token, ...fi
 const ids = async (filters: UserFilters = {}) => (await list(filters)).rows.map((row) => row.id)
 
 const users: Record<string, string> = {}
+// The admin running the batches (the server action passes requireAdmin()'s id).
+let actor: string
+
+const reasonsOf = async (id: string, table: 'credit_ledger' | 'admin_audit_log') =>
+  (await db.query<{ reason: string }>(`select reason from public.${table} where user_id = $1 order by id`, [id])).rows.map((row) => row.reason)
 
 beforeAll(async () => {
   db = await connectAdmin()
+  actor = await createUser(db)
+  await db.query("update public.profiles set role = 'admin' where id = $1", [actor])
   users.max = await namedUser('max', 1, { credits: 3 })
   users.lapsed = await namedUser('lapsed', 2, { credits: 40 })
   users.google = await namedUser('google', 3, { freeCredits: 1 })
@@ -106,21 +113,30 @@ describe('admin_batch_adjust_credits', () => {
   it('writes one ledger row per user, once per batch however often it is sent', async () => {
     const three = [await createUser(db), await createUser(db), await createUser(db)]
     const input = { userIds: three, pool: 'paid', amount: 5, reason: 'launch gift', batchKey: randomUUID() }
-    expect(await batchAdjustCredits(service, input)).toEqual({ kind: 'done', changed: 3, unchanged: 0 })
-    expect(await batchAdjustCredits(service, input)).toEqual({ kind: 'done', changed: 0, unchanged: 3 })
+    expect(await batchAdjustCredits(service, actor, input)).toEqual({ kind: 'done', changed: 3, unchanged: 0 })
+    expect(await batchAdjustCredits(service, actor, input)).toEqual({ kind: 'done', changed: 0, unchanged: 3 })
     for (const id of three) {
       expect((await profileOf(db, id)).credits).toBe(5)
       expect((await ledgerOf(db, id)).filter((row) => row.kind === 'admin_adjust')).toEqual([
         { kind: 'admin_adjust', pool: 'paid', delta: 5, idempotency_key: `admin_batch:${input.batchKey}:${id}` },
       ])
     }
-    await expect(batchAdjustCredits(service, { ...input, amount: 6 })).rejects.toMatchObject({ code: 'CONFLICT' })
+    await expect(batchAdjustCredits(service, actor, { ...input, amount: 6 })).rejects.toMatchObject({ code: 'CONFLICT' })
+    expect(await reasonsOf(three[0]!, 'credit_ledger')).toEqual([`launch gift · 操作人 ${actor}`])
+  })
+
+  it('refuses an actor who is not an admin', async () => {
+    const someone = await createUser(db)
+    const target = await createUser(db)
+    const input = { userIds: [target], pool: 'paid', amount: 1, reason: 'x', batchKey: randomUUID() }
+    await expect(batchAdjustCredits(service, someone, input)).rejects.toMatchObject({ code: 'FORBIDDEN' })
+    expect(await ledgerOf(db, target)).toEqual([])
   })
 
   it('changes nobody and names who blocked it when one pool would go below zero', async () => {
     const rich = await createUser(db, { freeCredits: 5 })
     const poor = await createUser(db, { freeCredits: 1 })
-    const outcome = await batchAdjustCredits(service, { userIds: [rich, poor], pool: 'free', amount: -2, reason: 'abuse', batchKey: randomUUID() })
+    const outcome = await batchAdjustCredits(service, actor, { userIds: [rich, poor], pool: 'free', amount: -2, reason: 'abuse', batchKey: randomUUID() })
     expect(outcome).toEqual({ kind: 'rejected', reason: 'insufficient', userIds: [poor] })
     expect((await profileOf(db, rich)).free_credits).toBe(5)
     expect(await ledgerOf(db, rich)).toEqual([])
@@ -129,7 +145,7 @@ describe('admin_batch_adjust_credits', () => {
   it('changes nobody when an account is gone', async () => {
     const here = await createUser(db)
     const gone = randomUUID()
-    const outcome = await batchAdjustCredits(service, { userIds: [here, gone], pool: 'paid', amount: 1, reason: 'x', batchKey: randomUUID() })
+    const outcome = await batchAdjustCredits(service, actor, { userIds: [here, gone], pool: 'paid', amount: 1, reason: 'x', batchKey: randomUUID() })
     expect(outcome).toEqual({ kind: 'rejected', reason: 'missing', userIds: [gone] })
     expect(await ledgerOf(db, here)).toEqual([])
   })
@@ -137,16 +153,16 @@ describe('admin_batch_adjust_credits', () => {
   it('refuses more than 50 users, a repeated user and a missing reason', async () => {
     const base = { pool: 'paid', amount: 1, reason: 'x', batchKey: randomUUID() }
     const many = Array.from({ length: 51 }, () => randomUUID())
-    await expect(batchAdjustCredits(service, { ...base, userIds: many })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    await expect(batchAdjustCredits(service, actor, { ...base, userIds: many })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
     const one = await createUser(db)
-    await expect(batchAdjustCredits(service, { ...base, userIds: [one, one] })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
-    await expect(batchAdjustCredits(service, { ...base, userIds: [one], reason: ' ' })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
-    const { error } = await service.rpc('admin_batch_adjust_credits', { p_user_ids: many, p_pool: 'paid', p_amount: 1, p_reason: 'x', p_batch_key: 'k' })
+    await expect(batchAdjustCredits(service, actor, { ...base, userIds: [one, one] })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    await expect(batchAdjustCredits(service, actor, { ...base, userIds: [one], reason: ' ' })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    const { error } = await service.rpc('admin_batch_adjust_credits', { p_actor: actor, p_user_ids: many, p_pool: 'paid', p_amount: 1, p_reason: 'x', p_batch_key: 'k' })
     expect(error?.message).toBe('INVALID_INPUT')
   })
 
   it('is not callable by anon', async () => {
-    const { error } = await anonSupabase().rpc('admin_batch_adjust_credits', { p_user_ids: [randomUUID()], p_pool: 'paid', p_amount: 1, p_reason: 'x', p_batch_key: 'k' })
+    const { error } = await anonSupabase().rpc('admin_batch_adjust_credits', { p_actor: randomUUID(), p_user_ids: [randomUUID()], p_pool: 'paid', p_amount: 1, p_reason: 'x', p_batch_key: 'k' })
     expect(error?.message).toMatch(/permission denied/)
   })
 })
@@ -160,27 +176,39 @@ describe('admin_batch_set_banned', () => {
     await db.query("update public.profiles set banned_at = now() - interval '1 day' where id = $1", [already])
     const before = (await profileOf(db, already)).banned_at
     const input = { userIds: [...fresh, already], banned: true, reason: 'spam ring' }
-    expect(await batchSetBanned(service, input)).toEqual({ kind: 'done', changed: 2, unchanged: 1 })
-    expect(await batchSetBanned(service, input)).toEqual({ kind: 'done', changed: 0, unchanged: 3 })
+    expect(await batchSetBanned(service, actor, input)).toEqual({ kind: 'done', changed: 2, unchanged: 1 })
+    expect(await batchSetBanned(service, actor, input)).toEqual({ kind: 'done', changed: 0, unchanged: 3 })
     for (const id of fresh) {
       expect((await profileOf(db, id)).banned_at).toBeInstanceOf(Date)
       expect(await auditOf(id)).toEqual(['ban_user'])
     }
     expect((await profileOf(db, already)).banned_at).toEqual(before)
     expect(await auditOf(already)).toEqual([])
-    expect(await batchSetBanned(service, { ...input, banned: false, reason: 'appeal' })).toEqual({ kind: 'done', changed: 3, unchanged: 0 })
+    expect(await batchSetBanned(service, actor, { ...input, banned: false, reason: 'appeal' })).toEqual({ kind: 'done', changed: 3, unchanged: 0 })
     expect(await auditOf(fresh[0]!)).toEqual(['ban_user', 'unban_user'])
+    expect(await reasonsOf(fresh[0]!, 'admin_audit_log')).toEqual([`spam ring · 操作人 ${actor}`, `appeal · 操作人 ${actor}`])
+  })
+
+  it('never bans an admin or the acting admin, and then bans nobody', async () => {
+    const plain = await createUser(db)
+    const otherAdmin = await createUser(db)
+    await db.query("update public.profiles set role = 'admin' where id = $1", [otherAdmin])
+    const outcome = await batchSetBanned(service, actor, { userIds: [plain, otherAdmin, actor], banned: true, reason: 'x' })
+    expect(outcome).toEqual({ kind: 'rejected', reason: 'protected', userIds: [otherAdmin, actor].sort() })
+    expect((await profileOf(db, plain)).banned_at).toBeNull()
+    expect((await profileOf(db, otherAdmin)).banned_at).toBeNull()
+    await expect(batchSetBanned(service, plain, { userIds: [otherAdmin], banned: true, reason: 'x' })).rejects.toMatchObject({ code: 'FORBIDDEN' })
   })
 
   it('changes nobody when an account is gone', async () => {
     const here = await createUser(db)
     const gone = randomUUID()
-    expect(await batchSetBanned(service, { userIds: [here, gone], banned: true, reason: 'x' })).toEqual({ kind: 'rejected', reason: 'missing', userIds: [gone] })
+    expect(await batchSetBanned(service, actor, { userIds: [here, gone], banned: true, reason: 'x' })).toEqual({ kind: 'rejected', reason: 'missing', userIds: [gone] })
     expect((await profileOf(db, here)).banned_at).toBeNull()
   })
 
   it('is not callable by anon', async () => {
-    const { error } = await anonSupabase().rpc('admin_batch_set_banned', { p_user_ids: [randomUUID()], p_banned: true, p_reason: 'x' })
+    const { error } = await anonSupabase().rpc('admin_batch_set_banned', { p_actor: randomUUID(), p_user_ids: [randomUUID()], p_banned: true, p_reason: 'x' })
     expect(error?.message).toMatch(/permission denied/)
   })
 })

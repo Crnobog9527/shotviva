@@ -20,12 +20,13 @@ export type UserBatchActions = {
 }
 
 // summary: the count line, shown where the batch bar appears.
-type Props = { rows: UserListRow[]; actions: UserBatchActions; summary: ReactNode }
+type Props = { rows: UserListRow[]; actions: UserBatchActions; currentUserId: string; summary: ReactNode }
 
 // The page of users with ticks and the batch actions (ARCHITECTURE §10.a). The server action
 // refreshes the page on success, so the list shows the new balances and statuses.
-export function UsersList({ rows, actions, summary }: Props) {
-  const pageIds = useMemo(() => rows.map((row) => row.id), [rows])
+export function UsersList({ rows, actions, currentUserId, summary }: Props) {
+  // Admins and the signed-in admin cannot be ticked, so no batch can ban them (0622 refuses too).
+  const pageIds = useMemo(() => rows.filter((row) => row.role !== 'admin' && row.id !== currentUserId).map((row) => row.id), [rows, currentUserId])
   const selection = useSelection(pageIds)
   const [open, setOpen] = useState<BatchKind | null>(null)
   const [rejection, setRejection] = useState<Rejection | null>(null)
@@ -67,10 +68,10 @@ export function UsersList({ rows, actions, summary }: Props) {
         }
       />
       <div className="hidden md:block">
-        <UsersTable rows={rows} selection={selection} />
+        <UsersTable rows={rows} selection={selection} currentUserId={currentUserId} />
       </div>
       <div className="md:hidden">
-        <UsersCards rows={rows} selection={selection} />
+        <UsersCards rows={rows} selection={selection} currentUserId={currentUserId} />
       </div>
       {open === 'adjust' && people.length > 0 ? (
         <BatchAdjustDialog

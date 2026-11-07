@@ -45,7 +45,11 @@ export function UsersFilters({ filters }: { filters: UserFilters }) {
             <Input name="q" type="search" defaultValue={filters.q ?? ''} placeholder={USERS_COPY.search.placeholder} />
           </Field>
         </div>
-        <Button type="submit">{USERS_COPY.search.submit}</Button>
+        {/* The first submit button, so Enter in the box submits with it; only this one sends the
+            lookup flag (LOOKUP_PARAM), 筛选 below does not. */}
+        <Button type="submit" name="lookup" value="1">
+          {USERS_COPY.search.submit}
+        </Button>
       </div>
       <p className="-mt-1 text-xs text-muted-foreground">{USERS_COPY.search.hint}</p>
       <div className="grid grid-cols-2 items-end gap-3 sm:grid-cols-3 xl:grid-cols-[repeat(6,minmax(0,1fr))_auto]">

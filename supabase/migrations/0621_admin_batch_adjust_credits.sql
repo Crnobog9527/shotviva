@@ -10,8 +10,12 @@
 -- Idempotent per batch: the dialog sends one key per opening; each user's ledger row is keyed
 -- admin_batch:<key>:<user id> (credit_ledger.idempotency_key is unique), so submitting the same
 -- batch again writes nothing. The same key with a different pool or amount is a conflict.
+--
+-- Who did it: p_actor is the signed-in admin. It is checked here as well (NOT_ADMIN unless that
+-- profile's role is admin), and every ledger row's reason ends with 「· 操作人 <actor id>」.
 
 create function public.admin_batch_adjust_credits(
+  p_actor uuid,
   p_user_ids uuid[],
   p_pool text,
   p_amount integer,
@@ -30,6 +34,9 @@ declare
   v_id uuid;
   v_applied integer := 0;
 begin
+  if p_actor is null or not exists (select 1 from public.profiles where id = p_actor and role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
   if p_pool is null or p_pool not in ('free', 'paid') then
     raise exception 'INVALID_INPUT' using detail = 'pool must be free or paid';
   end if;
@@ -86,7 +93,7 @@ begin
 
   foreach v_id in array v_ids loop
     if (public._apply_credit_change(
-          v_id, p_pool, 'admin_adjust', p_amount, v_reason,
+          v_id, p_pool, 'admin_adjust', p_amount, v_reason || ' · 操作人 ' || p_actor::text,
           'admin_batch:' || p_batch_key || ':' || v_id::text
         )).applied then
       v_applied := v_applied + 1;
@@ -97,5 +104,5 @@ begin
 end;
 $$;
 
-revoke execute on function public.admin_batch_adjust_credits(uuid[], text, integer, text, text) from public, anon, authenticated;
-grant execute on function public.admin_batch_adjust_credits(uuid[], text, integer, text, text) to service_role;
+revoke execute on function public.admin_batch_adjust_credits(uuid, uuid[], text, integer, text, text) from public, anon, authenticated;
+grant execute on function public.admin_batch_adjust_credits(uuid, uuid[], text, integer, text, text) to service_role;

@@ -1,6 +1,7 @@
 'use client'
 
 import { Checkbox } from '@/core/ui/checkbox'
+import { cn } from '@/core/ui/cn'
 
 import { formatBeijing } from '../shell/format'
 import { accountLabel, formatAdminPhone } from '../users/label'
@@ -38,11 +39,18 @@ export const providerLabel = (provider: string | null) => (provider ? (COPY.prov
 export const day = (iso: string | null) => formatBeijing(iso) ?? COPY.never
 
 // The box is 16px; the label around it makes a 40px target (a button is labelable, so a press on
-// the padding toggles it), which matters on the phone cards.
-export function RowCheckbox({ row, selection }: { row: UserListRow; selection: Selection }) {
+// the padding toggles it), which matters on the phone cards. Admin rows and the signed-in admin's
+// own row are greyed out with the reason as a tooltip.
+export function RowCheckbox({ row, selection, self }: { row: UserListRow; selection: Selection; self: boolean }) {
+  const locked = row.role === 'admin' ? COPY.locked.admin : self ? COPY.locked.self : null
   return (
-    <label className="-m-3 grid size-10 cursor-pointer place-items-center">
-      <Checkbox aria-label={COPY.selectOne(accountLabel(row))} checked={selection.has(row.id)} onCheckedChange={() => selection.toggle(row.id)} />
+    <label className={cn('-m-3 grid size-10 place-items-center', locked ? 'cursor-not-allowed' : 'cursor-pointer')} title={locked ?? undefined}>
+      <Checkbox
+        aria-label={locked ? `${accountLabel(row)}：${locked}` : COPY.selectOne(accountLabel(row))}
+        disabled={locked !== null}
+        checked={selection.has(row.id)}
+        onCheckedChange={() => selection.toggle(row.id)}
+      />
     </label>
   )
 }

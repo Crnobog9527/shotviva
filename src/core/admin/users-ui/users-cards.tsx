@@ -9,7 +9,7 @@ import { AccountCell, AllCheckbox, CreditsCell, day, providerLabel, RowCheckbox 
 import type { Selection } from './use-selection'
 
 // The list below md: one card per user, the same facts as the table, nothing scrolls sideways.
-export function UsersCards({ rows, selection }: { rows: UserListRow[]; selection: Selection }) {
+export function UsersCards({ rows, selection, currentUserId }: { rows: UserListRow[]; selection: Selection; currentUserId: string }) {
   return (
     <div className="grid gap-2">
       <label className="flex items-center gap-3 px-1 text-sm text-muted-foreground">
@@ -23,7 +23,7 @@ export function UsersCards({ rows, selection }: { rows: UserListRow[]; selection
             className={cn('grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 rounded-lg border border-border p-3', selection.has(row.id) && 'bg-muted/60')}
           >
             <div className="pt-0.5">
-              <RowCheckbox row={row} selection={selection} />
+              <RowCheckbox row={row} selection={selection} self={row.id === currentUserId} />
             </div>
             <div className="grid min-w-0 gap-2">
               <div className="flex items-start justify-between gap-2">

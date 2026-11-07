@@ -2,21 +2,26 @@
 -- page, numbered pages with a total, filters (tier, sign-up method, status, sign-up dates), the
 -- lookup box's email / phone substring, and three sorts. One call answers a page and its total.
 --
--- The tier is current_tier()'s rule, inlined so a page is one query: while paid_until is in the
--- future, the newest positive paid-pool ledger row with a non-pack product names the plan
--- (starter_monthly → Starter, monthly); otherwise the account is free. The row comes back with
--- the product id so the page can show monthly / yearly.
+-- The tier is current_tier()'s rule, inlined: while paid_until is in the future, the newest
+-- positive paid-pool ledger row with a non-pack product names the plan (starter_monthly →
+-- Starter, monthly); otherwise the account is free. Rows carry the product id so the page can
+-- show monthly / yearly.
 --
--- Indexes, per part of the query:
---   page in sign-up order, date range   profiles_created_at_idx (0040)
---   the plan of a paid account          credit_ledger_user_plan_idx (new, partial: purchases only,
---                                        so a heavy user's thousands of reserve rows are skipped)
---   Starter / Pro / Max filter          profiles_paid_until_idx (new, partial)
---   已封禁 filter                        profiles_banned_at_idx (new, partial)
---   last generation (sort and column)   generation_jobs_user_id_created_at_idx
---   auth.users                          its primary key
--- The email substring cannot use an index (ilike '%…%'), as in admin_search_users; the total
--- counts the whole filtered set, which is what the page shows.
+-- The count and the page are built from only the filters that were asked for (dynamic SQL; every
+-- value is a bound parameter, the text comes from this function alone), so each call is planned
+-- for what it actually filters:
+--   plain list, newest first     profiles_created_at_idx scanned backwards with limit/offset; the
+--                                count is a plain count over profiles
+--   sign-up date range           profiles_created_at_idx
+--   Starter / Pro / Max          profiles_paid_until_idx (new, partial), then the plan below
+--   the plan of a paid account   credit_ledger_user_plan_idx (new, partial: purchases only, so a
+--                                heavy user's thousands of reserve rows are skipped)
+--   已封禁                        profiles_banned_at_idx (new, partial)
+--   sort / column 最近出图         one row per user from generation_jobs_user_id_created_at_idx
+--                                (user_id, created_at desc), limit 1, in a lateral join
+--   email / phone / sign-up      auth.users by primary key; only joined when one of them is
+--   method                       asked for (an email substring cannot use an index, as in
+--                                admin_search_users)
 
 create index credit_ledger_user_plan_idx
   on public.credit_ledger (user_id, created_at desc, id desc)
@@ -45,9 +50,17 @@ security definer
 set search_path = ''
 as $$
 declare
+  -- A ledger row that names the plan of profile p (current_tier()'s rule).
+  c_plan constant text := 'l.user_id = p.id and l.pool = ''paid'' and l.delta > 0 '
+                          'and l.product_id is not null and l.product_id not like ''pack_%''';
   v_q text := nullif(btrim(coalesce(p_query, '')), '');
   v_like text;
   v_digits text;
+  v_where text := 'true';
+  v_from text := 'public.profiles p';
+  v_order text := 'p.created_at desc, p.id desc';
+  v_total bigint;
+  v_ids uuid[];
 begin
   if p_tier is not null and p_tier not in ('free', 'starter', 'pro', 'max') then
     raise exception 'INVALID_INPUT' using detail = 'tier must be free, starter, pro or max';
@@ -77,80 +90,94 @@ begin
     end if;
   end if;
 
-  return (
-    with matched as (
-      select p.id, p.created_at, p.role, p.credits, p.free_credits, p.paid_until, p.banned_at,
-             u.email::text as email,
-             nullif(u.phone, '')::text as phone,
-             -- The method the account signed up with; linking Google later does not change it.
-             u.raw_app_meta_data ->> 'provider' as provider,
-             plan.product_id
-        from public.profiles p
+  -- Parameters: $1 email pattern, $2 phone digits, $3 sign-up method, $4 from, $5 to, $6 tier,
+  -- $7 offset. The method is the one the account signed up with; linking Google later does not
+  -- change it.
+  if v_q is not null or p_provider is not null then
+    v_where := v_where || ' and exists (select 1 from auth.users u where u.id = p.id'
+      || case when v_q is null then ''
+              when v_digits is null then ' and u.email ilike $1'
+              else ' and (u.email ilike $1 or u.phone like ''%'' || $2 || ''%'')' end
+      || case when p_provider is null then '' else ' and u.raw_app_meta_data ->> ''provider'' = $3' end
+      || ')';
+  end if;
+  if p_status = 'banned' then
+    v_where := v_where || ' and p.banned_at is not null';
+  elsif p_status = 'active' then
+    v_where := v_where || ' and p.banned_at is null';
+  end if;
+  if p_from is not null then
+    v_where := v_where || ' and p.created_at >= $4';
+  end if;
+  if p_to is not null then
+    v_where := v_where || ' and p.created_at < $5';
+  end if;
+  if p_tier = 'free' then
+    v_where := v_where || ' and (p.paid_until is null or p.paid_until <= now() '
+      || 'or not exists (select 1 from public.credit_ledger l where ' || c_plan || '))';
+  elsif p_tier is not null then
+    v_where := v_where || ' and p.paid_until > now() and split_part((select l.product_id '
+      || 'from public.credit_ledger l where ' || c_plan
+      || ' order by l.created_at desc, l.id desc limit 1), ''_'', 1) = $6';
+  end if;
+
+  execute 'select count(*) from public.profiles p where ' || v_where
+    into v_total
+    using v_like, v_digits, p_provider, p_from, p_to, p_tier;
+
+  if p_sort = 'last_job' then
+    v_from := v_from || ' left join lateral (select g.created_at from public.generation_jobs g '
+      || 'where g.user_id = p.id order by g.created_at desc limit 1) j on true';
+    v_order := 'j.created_at desc nulls last, p.created_at desc, p.id desc';
+  elsif p_sort = 'paid_credits' then
+    v_order := 'p.credits desc, p.created_at desc, p.id desc';
+  end if;
+
+  -- ARRAY(subquery) keeps the subquery's order.
+  execute 'select array(select p.id from ' || v_from || ' where ' || v_where
+      || ' order by ' || v_order || ' limit 50 offset $7)'
+    into v_ids
+    using v_like, v_digits, p_provider, p_from, p_to, p_tier, (p_page - 1) * 50;
+
+  -- The 50 rows of the page, each joined by primary key.
+  return jsonb_build_object(
+    'total', v_total,
+    'rows', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'id', p.id,
+               'email', u.email::text,
+               'phone', nullif(u.phone, '')::text,
+               'created_at', p.created_at,
+               'provider', u.raw_app_meta_data ->> 'provider',
+               'role', p.role,
+               'credits', p.credits,
+               'free_credits', p.free_credits,
+               'paid_until', p.paid_until,
+               'tier', coalesce(split_part(plan.product_id, '_', 1), 'free'),
+               'product_id', plan.product_id,
+               'last_generation_at', j.created_at,
+               'banned_at', p.banned_at
+             ) order by ids.n)
+        from unnest(v_ids) with ordinality as ids(id, n)
+        join public.profiles p on p.id = ids.id
         join auth.users u on u.id = p.id
         left join lateral (
           select l.product_id
             from public.credit_ledger l
            where p.paid_until > now()
-             and l.user_id = p.id
-             and l.pool = 'paid'
-             and l.delta > 0
-             and l.product_id is not null
-             and l.product_id not like 'pack_%'
+             and l.user_id = p.id and l.pool = 'paid' and l.delta > 0
+             and l.product_id is not null and l.product_id not like 'pack_%'
            order by l.created_at desc, l.id desc
            limit 1
         ) plan on true
-       where (v_q is null
-              or u.email ilike v_like
-              or (v_digits is not null and u.phone like '%' || v_digits || '%'))
-         and (p_provider is null or u.raw_app_meta_data ->> 'provider' = p_provider)
-         and (p_status is null or (p_status = 'banned') = (p.banned_at is not null))
-         and (p_from is null or p.created_at >= p_from)
-         and (p_to is null or p.created_at < p_to)
-         and (p_tier is null or p_tier = 'free' or p.paid_until > now())
-    ), filtered as (
-      select m.*, coalesce(split_part(m.product_id, '_', 1), 'free') as tier
-        from matched m
-       where p_tier is null or coalesce(split_part(m.product_id, '_', 1), 'free') = p_tier
-    ), ranked as (
-      select f.*,
-             row_number() over (
-               order by
-                 case when p_sort = 'paid_credits' then f.credits end desc nulls last,
-                 -- Only evaluated when sorting by it: CASE skips the subquery otherwise.
-                 case when p_sort = 'last_job' then
-                   (select max(g.created_at) from public.generation_jobs g where g.user_id = f.id)
-                 end desc nulls last,
-                 f.created_at desc,
-                 f.id desc
-             ) as position
-        from filtered f
-    ), page as (
-      select r.*
-        from ranked r
-       where r.position > (p_page - 1) * 50
-         and r.position <= p_page * 50
-    )
-    select jsonb_build_object(
-      'total', (select count(*) from filtered),
-      'rows', coalesce((
-        select jsonb_agg(jsonb_build_object(
-                 'id', pg.id,
-                 'email', pg.email,
-                 'phone', pg.phone,
-                 'created_at', pg.created_at,
-                 'provider', pg.provider,
-                 'role', pg.role,
-                 'credits', pg.credits,
-                 'free_credits', pg.free_credits,
-                 'paid_until', pg.paid_until,
-                 'tier', pg.tier,
-                 'product_id', pg.product_id,
-                 'last_generation_at', (select max(g.created_at) from public.generation_jobs g where g.user_id = pg.id),
-                 'banned_at', pg.banned_at
-               ) order by pg.position)
-          from page pg
-      ), '[]'::jsonb)
-    )
+        left join lateral (
+          select g.created_at
+            from public.generation_jobs g
+           where g.user_id = p.id
+           order by g.created_at desc
+           limit 1
+        ) j on true
+    ), '[]'::jsonb)
   );
 end;
 $$;

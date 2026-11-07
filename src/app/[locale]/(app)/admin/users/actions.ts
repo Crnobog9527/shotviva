@@ -57,13 +57,14 @@ export async function userDetailAction(input: unknown): Promise<ActionValue<User
   return runAdminQuery(() => loadUserDetail(createAdminSupabase(), input))
 }
 
-// Batch actions on the users list (T77): all or nothing, at most 50 users.
+// Batch actions on the users list (T77): all or nothing, at most 50 users. The signed-in admin
+// is passed as the actor; the SQL function checks the role again and records it.
 export async function batchAdjustCreditsAction(input: unknown): Promise<ActionValue<BatchOutcome>> {
-  await requireAdmin()
-  return run(() => batchAdjustCredits(createAdminSupabase(), input))
+  const admin = await requireAdmin()
+  return run(() => batchAdjustCredits(createAdminSupabase(), admin.id, input))
 }
 
 export async function batchSetBannedAction(input: unknown): Promise<ActionValue<BatchOutcome>> {
-  await requireAdmin()
-  return run(() => batchSetBanned(createAdminSupabase(), input))
+  const admin = await requireAdmin()
+  return run(() => batchSetBanned(createAdminSupabase(), admin.id, input))
 }

@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { AppError } from '@/core/errors'
+import { logger } from '@/core/logger'
 
 import { beijingDayStart } from '../jobs/filters'
 import type { UserFilters } from './list-filters'
@@ -53,18 +54,30 @@ const toRow = (row: z.infer<typeof rowSchema>): UserListRow => ({
   bannedAt: row.banned_at,
 })
 
+// PostgREST's "no such function" (PGRST202) or Postgres's undefined_function (42883): this code
+// is live but migration 0620 has not run on this database yet (deploy before DB push).
+export function isMissingFunction(error: { code?: string; message?: string }): boolean {
+  return error.code === 'PGRST202' || error.code === '42883' || /could not find the function/i.test(error.message ?? '')
+}
+
+const rpcArgs = (filters: UserFilters) => ({
+  p_query: filters.q ?? null,
+  p_tier: filters.tier ?? null,
+  p_provider: filters.provider ?? null,
+  p_status: filters.status ?? null,
+  p_from: filters.from ? beijingDayStart(filters.from) : null,
+  p_to: filters.to ? beijingDayStart(filters.to, 1) : null,
+  p_sort: filters.sort ?? 'created',
+  p_page: filters.page ?? 1,
+})
+
 export async function listUsers(db: SupabaseClient, filters: UserFilters): Promise<UserListPage> {
   const page = filters.page ?? 1
-  const { data, error } = await db.rpc('admin_list_users', {
-    p_query: filters.q ?? null,
-    p_tier: filters.tier ?? null,
-    p_provider: filters.provider ?? null,
-    p_status: filters.status ?? null,
-    p_from: filters.from ? beijingDayStart(filters.from) : null,
-    p_to: filters.to ? beijingDayStart(filters.to, 1) : null,
-    p_sort: filters.sort ?? 'created',
-    p_page: page,
-  })
+  const { data, error } = await db.rpc('admin_list_users', rpcArgs(filters))
+  if (error && isMissingFunction(error)) {
+    logger.warn('admin.users.list_unavailable', { code: error.code })
+    return { total: 0, page, pageCount: 1, rows: [], unavailable: true }
+  }
   if (error) throw new AppError('INTERNAL', 'admin list users failed', { cause: new Error(error.message) })
   const result = resultSchema.parse(data)
   return {

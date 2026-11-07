@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/core/ui/input'
 import { Textarea } from '@/core/ui/textarea'
 
-import type { UserListRow } from '../users/list-types'
+import type { BatchOutcome, UserListRow } from '../users/list-types'
 import { BatchPeople } from './batch-people'
 import { USERS_COPY } from './copy'
 
@@ -16,7 +16,7 @@ const COPY = USERS_COPY.batch
 type Person = Pick<UserListRow, 'id' | 'email' | 'phone'>
 
 // Users the batch was refused for (all or nothing: nobody changed).
-export type Rejection = { reason: 'missing' | 'insufficient'; people: Person[] }
+export type Rejection = { reason: Extract<BatchOutcome, { kind: 'rejected' }>['reason']; people: Person[] }
 
 type Shared = { people: Person[]; pending: boolean; error: string | null; rejection: Rejection | null; onCancel: () => void }
 

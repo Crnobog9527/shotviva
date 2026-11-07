@@ -11,7 +11,7 @@ import type { Selection } from './use-selection'
 const COLUMNS = ['account', 'tier', 'credits', 'provider', 'createdAt', 'lastJob', 'status'] as const
 
 // The list from md up; phones get UsersCards. Ticked rows are tinted.
-export function UsersTable({ rows, selection }: { rows: UserListRow[]; selection: Selection }) {
+export function UsersTable({ rows, selection, currentUserId }: { rows: UserListRow[]; selection: Selection; currentUserId: string }) {
   return (
     <Table>
       <TableHeader>
@@ -30,7 +30,7 @@ export function UsersTable({ rows, selection }: { rows: UserListRow[]; selection
         {rows.map((row) => (
           <TableRow key={row.id} data-state={selection.has(row.id) ? 'selected' : undefined}>
             <TableCell>
-              <RowCheckbox row={row} selection={selection} />
+              <RowCheckbox row={row} selection={selection} self={row.id === currentUserId} />
             </TableCell>
             <TableCell className="max-w-72">
               <AccountCell row={row} />

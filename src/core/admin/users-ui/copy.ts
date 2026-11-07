@@ -31,6 +31,9 @@ export const USERS_COPY = {
   empty: '没有符合条件的用户。',
   emptyAll: '还没有用户。',
   emptyHint: '换个条件，或清除筛选再看。',
+  unavailable: '用户列表要等这次的数据库更新跑完才能显示。',
+  unavailableHint: '上面的查找照常可用：输入邮箱、手机号、用户 id 或订单号能直接打开那个用户。',
+  locked: { admin: '管理员账号不能批量操作', self: '这是你自己的账号，不能批量操作' },
   pages: { previous: '上一页', next: '下一页', label: '翻页', page: (n: number) => `第 ${n} 页` },
   columns: {
     select: '选择',
@@ -65,6 +68,7 @@ export const USERS_COPY = {
     rejected: {
       missing: '这些账号已经不存在，整批没有执行：',
       insufficient: '这些用户扣减后余额会小于 0，整批没有执行：',
+      protected: '管理员和你自己的账号不能批量封禁，整批没有执行：',
     },
     done: {
       adjust: (changed: number, repeated: number) => (repeated > 0 ? `已给 ${changed} 人调整，${repeated} 人这一批之前已调整过` : `已给 ${changed} 人调整积分`),

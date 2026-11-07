@@ -60,6 +60,7 @@ export {
   ledgerPage,
   loadUser,
   loadUserExtras,
+  LOOKUP_PARAM,
   lookupHref,
   lookupUser,
   listSignupClusters,

@@ -5,6 +5,8 @@ import { z } from 'zod'
 
 import { AppError } from '@/core/errors'
 
+import { usersHref, type UserFilters } from './list-filters'
+
 // The lookup box (ARCHITECTURE §10「万能查找」): admin_lookup (0182) routes the query by its
 // shape over unique indexes and answers at most one user. No hit means "show the email list".
 
@@ -29,12 +31,18 @@ export async function lookupUser(db: SupabaseClient, query: string): Promise<Loo
   return row ? { kind: row.kind, userId: row.user_id, jobId: row.job_id } : null
 }
 
-// Where a hit lands: the list with that user's detail dialog open (T77), the job highlighted when
-// the query was a job id. An email substring that matched one account keeps the query, so the
-// list behind the dialog shows that account; any other kind of query shows the plain list.
-export function lookupHref(hit: LookupHit, query: string): string {
-  const params = new URLSearchParams()
-  if (hit.kind === 'email') params.set('q', query.trim())
+// The search button's submit flag (?lookup=1): only that submission runs admin_lookup, and the
+// page always redirects it away, so a refresh, a filter change or closing the dialog never runs
+// the lookup again and never reopens the dialog.
+export const LOOKUP_PARAM = 'lookup'
+
+// Where a hit lands: the list (with the filters it was submitted with) and that user's detail
+// dialog open, the job highlighted when the query was a job id. An email substring that matched
+// one account keeps the query, so the list behind the dialog shows that account; for an id or an
+// order number the query is dropped (it would match nobody as an email).
+export function lookupHref(hit: LookupHit, filters: UserFilters): string {
+  const base = usersHref(hit.kind === 'email' ? filters : { ...filters, q: undefined })
+  const params = new URLSearchParams(base.split('?')[1] ?? '')
   params.set('user', hit.userId)
   if (hit.jobId) params.set('userJob', hit.jobId)
   return `/admin/users?${params.toString()}`

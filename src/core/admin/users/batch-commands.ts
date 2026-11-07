@@ -11,7 +11,8 @@ import { BATCH_MAX, type BatchOutcome } from './list-types'
 // Batch actions on the /admin/users list (ARCHITECTURE §10.a, T77): one SQL function call each,
 // one transaction, all or nothing (0621, 0622). When the batch is refused because of particular
 // users (an account gone, a pool that would drop below zero) the outcome names them, so the
-// dialog can list them by email; any other failure is an error.
+// dialog can list them by email; any other failure is an error. `actorId` is the signed-in admin
+// (requireAdmin); the SQL function checks the role again and records who did it.
 
 const userIds = z.array(z.uuid()).min(1).max(BATCH_MAX).refine((ids) => new Set(ids).size === ids.length)
 
@@ -26,9 +27,11 @@ const adjustSchema = z.object({
 
 const banSchema = z.object({ userIds, banned: z.boolean(), reason: reasonSchema })
 
-const REJECTIONS: Record<string, 'missing' | 'insufficient'> = {
+const REJECTIONS: Record<string, Extract<BatchOutcome, { kind: 'rejected' }>['reason']> = {
   PROFILE_NOT_FOUND: 'missing',
   CREDITS_INSUFFICIENT: 'insufficient',
+  // A ban that would hit an admin or the acting admin (0622).
+  PROTECTED_USER: 'protected',
 }
 
 const ids = (details: unknown): string[] => (typeof details === 'string' ? details.split(',').filter((id) => z.uuid().safeParse(id).success) : [])
@@ -44,12 +47,12 @@ async function callBatch(db: SupabaseClient, fn: string, args: Record<string, un
 const adjustResult = z.object({ applied: z.number().int(), repeated: z.number().int() })
 const banResult = z.object({ changed: z.number().int(), unchanged: z.number().int() })
 
-export async function batchAdjustCredits(db: SupabaseClient, input: unknown): Promise<BatchOutcome> {
+export async function batchAdjustCredits(db: SupabaseClient, actorId: string, input: unknown): Promise<BatchOutcome> {
   const args = parse(adjustSchema, input)
   return callBatch(
     db,
     'admin_batch_adjust_credits',
-    { p_user_ids: args.userIds, p_pool: args.pool, p_amount: args.amount, p_reason: args.reason, p_batch_key: args.batchKey },
+    { p_actor: actorId, p_user_ids: args.userIds, p_pool: args.pool, p_amount: args.amount, p_reason: args.reason, p_batch_key: args.batchKey },
     (data) => {
       const result = adjustResult.parse(data)
       return { kind: 'done', changed: result.applied, unchanged: result.repeated }
@@ -57,9 +60,9 @@ export async function batchAdjustCredits(db: SupabaseClient, input: unknown): Pr
   )
 }
 
-export async function batchSetBanned(db: SupabaseClient, input: unknown): Promise<BatchOutcome> {
+export async function batchSetBanned(db: SupabaseClient, actorId: string, input: unknown): Promise<BatchOutcome> {
   const args = parse(banSchema, input)
-  return callBatch(db, 'admin_batch_set_banned', { p_user_ids: args.userIds, p_banned: args.banned, p_reason: args.reason }, (data) => ({
+  return callBatch(db, 'admin_batch_set_banned', { p_actor: actorId, p_user_ids: args.userIds, p_banned: args.banned, p_reason: args.reason }, (data) => ({
     kind: 'done',
     ...banResult.parse(data),
   }))

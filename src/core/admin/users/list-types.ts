@@ -37,10 +37,13 @@ export type UserListRow = {
   bannedAt: string | null
 }
 
-export type UserListPage = { total: number; page: number; pageCount: number; rows: UserListRow[] }
+// unavailable: the database has no admin_list_users yet (this code deployed before migration
+// 0620 ran); the page says so and the lookup box keeps working.
+export type UserListPage = { total: number; page: number; pageCount: number; rows: UserListRow[]; unavailable?: true }
 
 // A batch either ran (changed: users it changed; unchanged: already in that state, or already
-// adjusted by this same batch) or was refused as a whole because of the named users.
+// adjusted by this same batch) or was refused as a whole because of the named users: gone,
+// a pool that would drop below zero, or (a ban) an admin or the acting admin.
 export type BatchOutcome =
   | { kind: 'done'; changed: number; unchanged: number }
-  | { kind: 'rejected'; reason: 'missing' | 'insufficient'; userIds: string[] }
+  | { kind: 'rejected'; reason: 'missing' | 'insufficient' | 'protected'; userIds: string[] }

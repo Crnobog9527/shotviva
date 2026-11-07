@@ -14,6 +14,7 @@ export const USER_ERRORS = {
   insufficient: '扣减后余额会小于 0，已拒绝。',
   notFound: '用户不存在。',
   conflict: '这次调整已经提交过了，请刷新页面查看。',
+  forbidden: '只有管理员能做这个操作。',
 } as const
 
 export const reasonSchema = z.string().trim().min(1).max(500)
@@ -44,6 +45,7 @@ export function friendly(error: unknown): never {
   if (appError.code === 'NOT_FOUND') throw new AppError(appError.code, USER_ERRORS.notFound)
   if (appError.code === 'CONFLICT') throw new AppError(appError.code, USER_ERRORS.conflict)
   if (appError.code === 'INVALID_INPUT') throw new AppError(appError.code, USER_ERRORS.input)
+  if (appError.code === 'FORBIDDEN') throw new AppError(appError.code, USER_ERRORS.forbidden)
   throw appError
 }
 
