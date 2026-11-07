@@ -10,7 +10,7 @@ import type { SmsMessage } from './types'
 
 // The SMS adapters behind the Send SMS hook (T63). Throwaway credentials; no network.
 const MESSAGE: SmsMessage = { to: { e164: '+8614000000001', national: '14000000001' }, code: '402913', validMinutes: 5 }
-const CONFIG = { accessKeyId: 'test-key-id', accessKeySecret: 'test-key-secret', signName: 'Shotviva', templateCode: 'SMS_000000' }
+const CONFIG = { accessKeyId: 'test-key-id', accessKeySecret: 'test-key-secret', signName: 'TEST_SIGN', templateCode: 'TEST_TEMPLATE' }
 const ALIYUN_ENV = {
   SMS_PROVIDER: 'aliyun' as const,
   ALIYUN_SMS_ACCESS_KEY_ID: 'id',
@@ -64,8 +64,8 @@ describe('aliyunSmsSender (Dypnsapi SendSmsVerifyCode)', () => {
     expect(Object.fromEntries(query)).toEqual({
       CountryCode: '86',
       PhoneNumber: '14000000001',
-      SignName: 'Shotviva',
-      TemplateCode: 'SMS_000000',
+      SignName: 'TEST_SIGN',
+      TemplateCode: 'TEST_TEMPLATE',
       TemplateParam: '{"code":"402913","min":"5"}',
       ReturnVerifyCode: 'false',
     })

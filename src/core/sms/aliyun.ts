@@ -13,7 +13,8 @@ import type { SmsResult, SmsSender } from './types'
 // is Shotviva's or editable). Supabase makes the code: it goes in TemplateParam as `code`, with
 // `min` for how long it works, so Aliyun only delivers it. Aliyun cannot check a code it did not
 // make, so verification stays with Supabase verifyOtp (never CheckSmsVerifyCode), and the code
-// is not asked back in the response.
+// is not asked back in the response. SendSmsVerifyCode is the only action this adapter calls: the
+// production RAM user is allowed nothing else. The signature and template come from env only.
 // https://help.aliyun.com/zh/pnvs/developer-reference/api-dypnsapi-2017-05-25-sendsmsverifycode
 
 export const ALIYUN_SMS_HOST = 'dypnsapi.aliyuncs.com'
@@ -30,8 +31,11 @@ type Deps = { fetch?: typeof fetch; now?: () => Date; nonce?: () => string }
 
 const responseSchema = z.object({ Code: z.string() })
 
-// "Not this number, not now" rather than a broken setup: Aliyun's own frequency and daily caps,
-// and a number it will not deliver to. Both spellings (with and without isv.) are accepted.
+// "Not this number, not now" rather than a broken setup (the reference's error table): the
+// number's daily cap (BUSINESS_LIMIT_CONTROL), the frequency check (FREQUENCY_FAIL) and a number
+// it will not deliver to. Both spellings (with and without isv.) are accepted. Anything else
+// (permissions, parameters, FUNCTION_NOT_OPENED, balance) is a setup failure, logged by its code.
+// Either way the visitor sees one plain line (AUTH_SMS_FAILED), never Aliyun's text.
 const REJECTED = new Set(['BUSINESS_LIMIT_CONTROL', 'FREQUENCY_FAIL', 'MOBILE_NUMBER_ILLEGAL'])
 const rejected = (code: string) => REJECTED.has(code.replace(/^isv\./, ''))
 
