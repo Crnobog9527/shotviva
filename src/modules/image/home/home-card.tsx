@@ -10,6 +10,7 @@ import { GroundedImg } from '../result/grounded-img'
 import { UPLOAD_FORMAT_NAMES, UPLOAD_MAX_MB } from '../workspace/upload-formats'
 import { notePlaceholder } from '../workspace/workspace-options'
 import { HomeCtaButton } from './home-cta-button'
+import { thumbImage } from './thumb-image'
 import { ArrowIcon, GiftIcon, PlusIcon } from './home-icons'
 import type { HomeGeneratorState } from './use-home-generator'
 
@@ -69,7 +70,7 @@ function Rail({ state, thumbOf }: Pick<Props, 'state' | 'thumbOf'>) {
         const thumb = thumbOf(template)
         return (
           <button key={template.id} type="button" className="mk-pick" aria-pressed={template.id === state.template?.id} onClick={() => state.choose(template.id)}>
-            {thumb ? <GroundedImg ground="white" src={thumb} alt="" /> : <span className="mk-pick-blank" aria-hidden />}
+            {thumb ? <GroundedImg ground="white" {...thumbImage(thumb, 84)} alt="" /> : <span className="mk-pick-blank" aria-hidden />}
             {template.name}
           </button>
         )
@@ -132,7 +133,7 @@ export const HomeCard = forwardRef<HTMLElement, Props>(function HomeCard({ state
         </>
       ) : (
         <div className="mk-current">
-          {thumb ? <GroundedImg className="mk-thumb" ground="white" src={thumb} alt="" /> : <span className="mk-thumb" aria-hidden />}
+          {thumb ? <GroundedImg className="mk-thumb" ground="white" {...thumbImage(thumb, 44)} alt="" /> : <span className="mk-thumb" aria-hidden />}
           <span className="mk-current-t">
             <small>{t('template')}</small>
             <b>{template?.name ?? t('noTemplates')}</b>

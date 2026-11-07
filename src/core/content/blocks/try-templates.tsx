@@ -51,7 +51,7 @@ export function TryTemplates({ templates }: { templates: readonly TryTemplate[] 
             <PhotoPair
               before={{ src: card.before, alt: home('beforeAlt', { name: card.name }), ...SIZE }}
               after={{ src: card.after, alt: home('afterAlt', { name: card.name, use: card.use }), ...SIZE }}
-              sizes="(min-width: 768px) 33vw, 100vw"
+              sizes="(min-width: 768px) 17vw, 50vw"
             />
             <span className="mk-tpl-meta">
               <b>{card.name}</b>

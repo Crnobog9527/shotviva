@@ -10,9 +10,12 @@ type Props = {
   after: ImageRef
   // 'lg': the hero and single-template rows (20px corners, labels on top); default: a card.
   size?: 'lg' | 'card'
-  // The hero pair is the LCP element: preloaded, never lazy (建站规格 R9).
+  // The hero pair is above the fold: never lazy (建站规格 R9). Only the phone photo is
+  // preloaded, so on a phone one right-sized image, not two, competes with the CSS for the
+  // first paint.
   preload?: boolean
-  // Rendered width of the whole pair, for the image srcset.
+  // Rendered width of ONE plate (half the pair), for the image srcset. The pair's own width
+  // here made every plate download at twice the pixels it shows.
   sizes: string
   className?: string
 }
@@ -21,6 +24,11 @@ type Props = {
 // right, one frame with a hairline between. On the right plate the phone photo sits under the
 // result so the hover wipe (marketing.css) can develop one into the other; nothing depends on it.
 // The result has white behind it: a transparent cut-out cover reads as white, not as that photo.
+// React preloads every non-lazy <img> it renders on the server; `fetchPriority="low"` is what
+// keeps the hero's right plate out of the <head> while it still loads at once (Chrome raises
+// an in-viewport image's priority after layout).
+const afterLoading = (preload: boolean) => (preload ? ({ loading: 'eager', fetchPriority: 'low' } as const) : ({ loading: 'lazy' } as const))
+
 export function PhotoPair({ before, after, size = 'card', preload = false, sizes, className }: Props) {
   const t = useTranslations('marketing.home')
   const loading = preload ? undefined : 'lazy'
@@ -31,7 +39,7 @@ export function PhotoPair({ before, after, size = 'card', preload = false, sizes
       </span>
       <span className="mk-pane">
         <Image className="mk-ph" src={before.src} alt="" aria-hidden width={before.width} height={before.height} sizes={sizes} loading="lazy" />
-        <WhiteGroundImage className="mk-a" src={after.src} alt={after.alt} width={after.width} height={after.height} sizes={sizes} preload={preload} loading={loading} />
+        <WhiteGroundImage className="mk-a" src={after.src} alt={after.alt} width={after.width} height={after.height} sizes={sizes} {...afterLoading(preload)} />
         <span className="mk-ws" aria-hidden />
       </span>
       <span className="mk-hl" aria-hidden />
