@@ -41,7 +41,6 @@ export function PhotoPair({ before, after, size = 'card', preload = false, sizes
       <span className="mk-tag mk-tag-r" aria-hidden>
         {t('ai')}
       </span>
-      <span className="mk-illus">{t('illustrative')}</span>
     </span>
   )
 }

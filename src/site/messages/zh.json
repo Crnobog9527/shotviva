@@ -987,7 +987,6 @@
     "home": {
       "phone": "原图",
       "ai": "AI",
-      "illustrative": "示意图",
       "beforeAlt": "{name}模板示例：手机原图（示意图）",
       "afterAlt": "{name}模板示例：AI 成图，{use}（示意图）",
       "pickAria": "{name}。{use}选用这个模板",

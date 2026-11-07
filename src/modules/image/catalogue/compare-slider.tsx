@@ -14,7 +14,6 @@ type Props = {
   after: string
   afterAlt: string
   afterGround?: PhotoGround
-  badge?: string
   className?: string
   // On a template card a tap opens the creation dialog and only a drag compares (T38).
   onTap?(): void
@@ -27,7 +26,7 @@ type Props = {
 // drag, tap-to-jump and keyboard control. afterGround (white unless said otherwise) gives the
 // after plate an opaque backdrop inside its clip, so a transparent result or cut-out cover never
 // lets the before photo show through.
-export function CompareSlider({ before, after, afterAlt, afterGround = 'white', badge, className, onTap, tagsAt = 'top' }: Props) {
+export function CompareSlider({ before, after, afterAlt, afterGround = 'white', className, onTap, tagsAt = 'top' }: Props) {
   const [x, setX] = useState(50)
   const t = useTranslations('app.template')
   const tap = useTap(x, setX, onTap)
@@ -46,7 +45,6 @@ export function CompareSlider({ before, after, afterAlt, afterGround = 'white', 
         </span>
       </span>
       <SplitTags size={tagsAt === 'top' ? 'large' : 'pair'} />
-      {badge ? <span className="frost absolute bottom-3 left-3 z-3 inline-flex h-[26px] items-center rounded-tag px-2 text-caption leading-none font-medium text-photo-ink">{badge}</span> : null}
       <input
         type="range"
         min={0}

@@ -32,13 +32,3 @@ export function SplitTags({ hidden = false, size = 'card' }: { hidden?: boolean;
     </>
   )
 }
-
-// "Illustrative example" on a photo: frosted, 26px.
-export function ExampleBadge({ className }: { className?: string }) {
-  const t = useTranslations('app.template')
-  return (
-    <span className={cn('frost absolute z-4 inline-flex h-[26px] items-center rounded-tag px-2 text-caption leading-none font-medium text-photo-ink', className)}>
-      {t('example')}
-    </span>
-  )
-}
