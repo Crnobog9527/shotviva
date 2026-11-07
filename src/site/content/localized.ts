@@ -12,7 +12,7 @@ import { zhHomePage } from './zh/home'
 import { zhAiRestaurantMenu } from './zh/pages/ai-restaurant-menu'
 import { zhCommercialPhotography } from './zh/pages/commercial-photography'
 import { zhImageToImageGenerator } from './zh/pages/image-to-image-generator'
-import { zhPricingPage } from './zh/pricing'
+import { ALIPAY_QUESTION, ZH_WECHAT_PAY_FAQ, zhPricingPage } from './zh/pricing'
 
 // Marketing copy per language (ARCHITECTURE §17: body copy lives in site/content by language).
 // Every SEO page has a Chinese text (ARCHITECTURE §17); only those in site.indexing are indexable.
@@ -38,9 +38,13 @@ const ZH_LEGAL_LABELS: Record<string, string> = {
 export const homePageIn = (locale: Locale): HomePage => HOME[locale]
 export const pricingPageIn = (locale: Locale): PricingContent => PRICING[locale]
 // /pricing's FAQ for the live channel (on Waffo a card plan is cancelled from the account page).
-export function pricingFaqIn(locale: Locale, channel: PaymentChannel): readonly FaqItem[] {
+// With STRIPE_WECHAT_PAY on (T73, Stripe only) the zh Alipay answer names WeChat Pay too and
+// says the wallet is picked on the checkout page; off, it is the pre-T73 text.
+export function pricingFaqIn(locale: Locale, channel: PaymentChannel, wechatPay = false): readonly FaqItem[] {
   const page = PRICING[locale]
-  return channel === 'waffo' ? page.waffo.faq : page.faq
+  if (channel === 'waffo') return page.waffo.faq
+  if (!wechatPay) return page.faq
+  return page.faq.map((item) => (item.question === ALIPAY_QUESTION ? ZH_WECHAT_PAY_FAQ : item))
 }
 
 export const contentPagesIn = (locale: Locale): readonly ContentPage[] => INNER[locale]

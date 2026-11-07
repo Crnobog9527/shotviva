@@ -103,7 +103,7 @@ describe('event dictionary (ARCHITECTURE §16.2)', () => {
     expect(validateEvent('contact_sales_click', { page: '/account' }).ok).toBe(false)
   })
 
-  // 中国银行卡 (T64, ARCHITECTURE §6.3): checkout_start.method = 'cn_card'; still no WeChat Pay.
+  // 中国银行卡 (T64, ARCHITECTURE §6.3): checkout_start.method = 'cn_card'.
   it('takes cn_card as a checkout method', () => {
     expect(validateEvent('checkout_start', { ...checkout, method: 'cn_card' }).ok).toBe(true)
     expect(validateEvent('purchase', { ...valid.purchase as object, method: 'cn_card' }).ok).toBe(true)
@@ -139,5 +139,17 @@ describe('uploadSizeBucket', () => {
     expect(uploadSizeBucket(1024 * 1024)).toBe('1-5MB')
     expect(uploadSizeBucket(5 * 1024 * 1024)).toBe('1-5MB')
     expect(uploadSizeBucket(18_000_000)).toBe('>5MB')
+  })
+})
+
+// T73: with WeChat Pay on, the Stripe wallet line starts as alipay_or_wechat; purchase names the
+// wallet that paid.
+describe('wallet methods (T73)', () => {
+  it('starts the wallet line as alipay_or_wechat and buys with alipay or wechat_pay', () => {
+    expect(validateEvent('checkout_start', { ...checkout, method: 'alipay_or_wechat' }).ok).toBe(true)
+    expect(validateEvent('checkout_start', { ...checkout, method: 'alipay' }).ok).toBe(true)
+    expect(validateEvent('checkout_start', { ...checkout, method: 'wechat_pay' }).ok).toBe(false)
+    expect(validateEvent('purchase', { ...valid.purchase as object, method: 'wechat_pay' }).ok).toBe(true)
+    expect(validateEvent('purchase', { ...valid.purchase as object, method: 'alipay_or_wechat' }).ok).toBe(false)
   })
 })

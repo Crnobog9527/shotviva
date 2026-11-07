@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { PRODUCT_IDS, type ProductId } from '../../config'
 import { AppError } from '../../errors'
 import { logger } from '../../logger'
-import { CHECKOUT_METHODS, type CheckoutMethod } from '../stripe/catalog'
+import { CHECKOUT_METHODS, RECORDED_METHODS, type CheckoutMethod, type RecordedMethod } from '../stripe/catalog'
 import type { StripeApi } from '../stripe/client'
 import type { ReturnQuery } from './query'
 
@@ -21,7 +21,9 @@ export type CheckoutFacts = {
   settled: boolean
   // The buyer left Stripe without paying (session still open or expired).
   abandoned: boolean
-  method: CheckoutMethod | null
+  // The payments row's method once settled (Alipay or WeChat Pay on the wallet line, T73); before
+  // that the route the session was opened on.
+  method: RecordedMethod | null
   amount: { minor: number; currency: string } | null
   card: { brand: string; last4: string } | null
   receiptUrl: string | null
@@ -39,7 +41,7 @@ export type FactsDeps = { stripe: StripeApi; db: SupabaseClient }
 const paymentRow = z.object({
   amount_total: z.number().int(),
   currency: z.string(),
-  method: z.enum(CHECKOUT_METHODS),
+  method: z.enum(RECORDED_METHODS),
   stripe_charge_id: z.string().nullable().optional(),
   waffo_order_id: z.string().nullable().optional(),
   waffo_payment_id: z.string().nullable().optional(),

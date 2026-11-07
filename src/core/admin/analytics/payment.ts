@@ -10,13 +10,13 @@ import { count, flag, label, rate } from './values'
 // payment method, how many who started a checkout paid; and how often checkout was cancelled.
 
 // The four methods the Owner reads (§16.2a). Waffo is one route whatever the method; 支付宝 and
-// 微信支付 are one Stripe route (T73).
+// 微信支付 are one Stripe route (T73); its checkout_start reads alipay_or_wechat while both are sold.
 export const METHOD_GROUPS = ['card', 'cn_card', 'alipay_wechat', 'waffo'] as const
 export type MethodGroup = (typeof METHOD_GROUPS)[number]
 
 const METHOD_GROUP_EXPR = `multiIf(
     properties.channel = 'waffo', 'waffo',
-    properties.method IN ('alipay', 'wechat_pay', 'wechat'), 'alipay_wechat',
+    properties.method IN ('alipay', 'alipay_or_wechat', 'wechat_pay', 'wechat'), 'alipay_wechat',
     properties.method = 'cn_card', 'cn_card',
     properties.method = 'card', 'card',
     'other')`

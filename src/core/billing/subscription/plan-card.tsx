@@ -62,9 +62,9 @@ function SinceFoot({ facts, withEmail = false, children }: { facts: PassFacts; w
 }
 
 // "50 credits a month · $19.90/mo · Card", from the product the mirror row names; the method
-// (card or Alipay, through Stripe or Waffo; 中国银行卡 on zh, "Card" on en, T64) from the newest
+// (card, Alipay or WeChat Pay, through Stripe or Waffo; 中国银行卡 on zh, "Card" on en, T64) from the newest
 // payment for that same product.
-const METHOD_KEYS = { card: 'card', alipay: 'alipay', cn_card: 'cnCard' } as const
+const METHOD_KEYS = { card: 'card', alipay: 'alipay', wechat_pay: 'wechatPay', cn_card: 'cnCard' } as const
 
 function PerPeriod({ summary, ctx }: { summary: Subscribed; ctx: Ctx }) {
   const t = useTranslations('app.account.plan')
@@ -129,16 +129,19 @@ function WaffoPass({ summary, ctx }: { summary: Subscribed; ctx: Ctx }) {
   return pass('active', <Status>{t('renewsPlain', { date })}</Status>, <PerPeriod summary={summary} ctx={ctx} />, <SinceFoot facts={ctx.facts} withEmail>{cancel}</SinceFoot>)
 }
 
-// Alipay (Stripe or Waffo): one period paid once. The newest membership purchase says which period and
+const walletOf = (method: keyof typeof METHOD_KEYS) => (method === 'alipay' || method === 'wechat_pay' ? method : null)
+
+// Alipay (Stripe or Waffo) or WeChat Pay (Stripe, T73): one period paid once. The newest membership purchase says which period and
 // how it was paid when it is the tier the account has now.
 function WalletPass({ summary, ctx }: { summary: Extract<SubscriptionSummary, { kind: 'paid_until' }>; ctx: Ctx }) {
   const t = useTranslations('app.account.plan')
   const names = useNames()
   const date = summary.paidUntil
   const last = ctx.facts.last && ctx.facts.last.product.tier === summary.tier ? ctx.facts.last : null
+  const wallet = last ? walletOf(last.method) : null
   const why =
-    last?.method === 'alipay'
-      ? t.rich('walletAlipayWhy', { ...richTags, interval: last.product.interval, method: t('alipay'), date })
+    last && wallet
+      ? t.rich('walletAlipayWhy', { ...richTags, interval: last.product.interval, method: t(METHOD_KEYS[wallet]), date })
       : t('walletWhy', { date })
   const options = summary.tier ? { tier: summary.tier, period: last?.product.interval } : undefined
   const renew = last && last.product.priceUsd > 0 ? t.rich('renewPrice', { ...richTags, price: names.usd(last.product.priceUsd) }) : t('renew')
