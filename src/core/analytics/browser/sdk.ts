@@ -1,6 +1,6 @@
 import type { PostHog } from 'posthog-js'
 
-type SentrySdk = typeof import('@sentry/nextjs')
+type SentrySdk = typeof import('./sentry-entry')
 export type Sdks = { sentry: SentrySdk | null; posthog: PostHog | null }
 export type SdkLoaders = { sentry: (() => Promise<SentrySdk>) | null; posthog: (() => Promise<PostHog>) | null }
 
