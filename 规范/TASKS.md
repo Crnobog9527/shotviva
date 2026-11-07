@@ -930,3 +930,16 @@ Owner 2026-11-06 发现中文页有功能缺失。逐页对比现有英文页和
 **范围**：从当时的 main 重新开分支，不在 #13 上续做；pnpm 12（保留默认 24 小时发布期限制，不加豁免）、TypeScript 6、ESLint 10 及配套插件；Node 先确认 Vercel 是否支持 26.x，不支持就留在 24（`.nvmrc`、`engines`、CI 同步）。只升工具链，不顺带改业务代码；新规则报出的问题单独列清单，能机械修的修，不能的记下来。
 
 **验收**：CI 四项全绿；本地 lint / typecheck / 单测 / build 通过；预览部署正常；构建产物体积和 Lighthouse 不退步；关闭 #13。
+
+## T62 需求墙开关做进后台（可派）
+
+**目标**：Owner 2026-11-07：需求墙开不开由 Owner 在管理后台自己切换，不用改代码、不用部署（ARCHITECTURE §15.6 最后一条）。
+
+**范围**：
+- 迁移（编号段 `0420`～`0439`）：`system_settings`（`key text primary key`、`value jsonb`、`updated_by`、`updated_at`），RLS 开启且拒绝所有客户端；`admin_set_system_setting(key, value)` 只认 `role = admin`，只接受登记过的 key（先只有 `wishlist_enabled`，布尔），写后台操作记录（同 `admin_set_feature_access` 的做法）。只加不改，不动已有迁移。
+- `core/wishlist`：`isWishlistEnabled(site)` 改为 `features.wishlist && (运行时开关 || 预览覆盖)`；运行时开关读 `system_settings`，走 `'use cache'` + `cacheTag('system-settings')`，读失败按「关」处理且只缓存一分钟（同 #205 的做法）。所有调用处（tab bar、`/wishlist` 布局、`/api/wishlist/*`、后台导航和审核页、首页和定价页的 `wishlistLive`）都改用新判断，判断仍只在一处。
+- `site.config.ts`：`features.wishlist` 改为 `true`（含义改为「本站有这个功能」）；上线时运行时开关默认关，所以正式站行为不变。
+- 后台「功能权限」页加一个「需求墙」开关卡：显示当前状态、最后修改人和时间；切换前确认弹窗（开：用户 tab 出现第四项、可以提交和投票；关：入口和页面全部隐藏，已有数据保留）；保存后 `updateTag`，刷新前台立即生效。只有中文后台文案。
+- 预览覆盖 `FEATURE_WISHLIST_PREVIEW=on` 保留，只在非生产生效。
+
+**验收**：后台打开后，不重新部署，前台登录用户马上看到 Wishlist tab、能提交需求；关掉后 tab 消失、`/wishlist` 和接口 404、后台审核页隐藏、已有数据重开后还在；非管理员调 RPC 被拒；单测覆盖开关组合（站点无此功能 / 开 / 关 / 预览覆盖 / 读失败）；数据库测试覆盖 RLS 和 RPC；交互验收交给 Codex（测试站）。生产迁移走「DB push (production)」工作流，Owner 批准。
