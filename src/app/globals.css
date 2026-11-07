@@ -424,6 +424,12 @@ html:lang(zh-Hans) :is(em, i, .italic) {
   }
 }
 
+/* The tab bar's stand-in (core/app-shell TabBarSlot) in a dynamic-param page's prerendered shell:
+   the desktop bar's 56px on the photo page, nothing anywhere else. */
+@media (min-width: 768px) {
+  [data-app-ground]:has([data-under-tabbar]) > [data-tabbar-slot] { height: 56px; }
+}
+
 /* While the paywall is up (core/ui/use-push-back), the app page behind it steps back like an iOS
    page card on phones: scale .92, 18px corners, brightness .55, 450ms (comps-v3-b paywall.html
    .behind). From md up it only dims. Under reduced motion it dims without moving. */
