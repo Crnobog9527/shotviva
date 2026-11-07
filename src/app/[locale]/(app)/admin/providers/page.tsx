@@ -1,15 +1,18 @@
 import type { Metadata } from 'next'
 
-import { AdminPage, PROVIDERS_COPY, ProvidersEditor } from '@/core/admin'
+import { AdminPage, IdentityDryRun, PROVIDERS_COPY, ProvidersEditor } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { listProviders } from '@/core/providers'
 
-import { activateProviderAction, deleteProviderAction, saveProviderAction, testProviderAction } from './actions'
+import { activateProviderAction, deleteProviderAction, identityDryRunAction, saveProviderAction, testProviderAction } from './actions'
 
 // Admin-only, request-time page (ARCHITECTURE §3.3, §10). The proxy answers non-admins with a
 // 404 first; requireAdmin() stays the authoritative check. The listing never carries key
 // ciphertext or plaintext, only the last four characters.
 export const instant = false
+
+// The face-swap dry run (T81) asks the decision model up to 50 times, four at a time.
+export const maxDuration = 120
 
 export const metadata: Metadata = { title: PROVIDERS_COPY.title }
 
@@ -22,6 +25,7 @@ export default async function AdminProvidersPage() {
         providers={providers}
         actions={{ save: saveProviderAction, activate: activateProviderAction, test: testProviderAction, remove: deleteProviderAction }}
       />
+      <IdentityDryRun run={identityDryRunAction} />
     </AdminPage>
   )
 }

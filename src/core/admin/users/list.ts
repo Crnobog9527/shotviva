@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { AppError } from '@/core/errors'
+import { identityRefusalCounts, type RefusalCounts } from '@/core/identity-guard'
 import { logger } from '@/core/logger'
 
 import { beijingDayStart } from '../jobs/filters'
@@ -38,7 +39,18 @@ export function planInterval(productId: string | null): UserListRow['interval'] 
   return null
 }
 
-const toRow = (row: z.infer<typeof rowSchema>): UserListRow => ({
+// The page's refusal counts in one call (0701). Before that migration runs (code deployed first)
+// or on any error the list still shows, just without the flag.
+export async function pageRefusals(db: SupabaseClient, userIds: string[]): Promise<Map<string, RefusalCounts>> {
+  try {
+    return await identityRefusalCounts(db, userIds)
+  } catch (error) {
+    logger.warn('admin.users.refusals_unavailable', { error })
+    return new Map()
+  }
+}
+
+const toRow = (row: z.infer<typeof rowSchema>, refusals?: RefusalCounts): UserListRow => ({
   id: row.id,
   email: row.email || null,
   phone: row.phone || null,
@@ -52,6 +64,8 @@ const toRow = (row: z.infer<typeof rowSchema>): UserListRow => ({
   interval: row.tier === 'free' ? null : planInterval(row.product_id),
   lastGenerationAt: row.last_generation_at,
   bannedAt: row.banned_at,
+  refusals24h: refusals?.last24h ?? 0,
+  refusalFlag: refusals?.flagged ?? false,
 })
 
 // PostgREST's "no such function" (PGRST202) or Postgres's undefined_function (42883): this code
@@ -80,10 +94,11 @@ export async function listUsers(db: SupabaseClient, filters: UserFilters): Promi
   }
   if (error) throw new AppError('INTERNAL', 'admin list users failed', { cause: new Error(error.message) })
   const result = resultSchema.parse(data)
+  const refusals = await pageRefusals(db, result.rows.map((row) => row.id))
   return {
     total: result.total,
     page,
     pageCount: Math.max(1, Math.ceil(result.total / USERS_PAGE_SIZE)),
-    rows: result.rows.map(toRow),
+    rows: result.rows.map((row) => toRow(row, refusals.get(row.id))),
   }
 }

@@ -3,7 +3,7 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/core/ui/table'
 
 import type { UserListRow } from '../users/list-types'
-import { TierBadge, UserStatus } from './badges'
+import { RefusalFlag, TierBadge, UserStatus } from './badges'
 import { USERS_COPY as COPY } from './copy'
 import { AccountCell, AllCheckbox, CreditsCell, day, providerLabel, RowCheckbox } from './user-cells'
 import type { Selection } from './use-selection'
@@ -45,7 +45,10 @@ export function UsersTable({ rows, selection, currentUserId }: { rows: UserListR
             <TableCell className="font-mono text-xs whitespace-nowrap tabular-nums">{day(row.createdAt)}</TableCell>
             <TableCell className="font-mono text-xs whitespace-nowrap tabular-nums">{day(row.lastGenerationAt)}</TableCell>
             <TableCell>
-              <UserStatus role={row.role} bannedAt={row.bannedAt} />
+              <div className="flex flex-wrap items-center gap-1.5">
+                <UserStatus role={row.role} bannedAt={row.bannedAt} />
+                <RefusalFlag flagged={row.refusalFlag} last24h={row.refusals24h} />
+              </div>
             </TableCell>
           </TableRow>
         ))}

@@ -21,7 +21,7 @@ export const ORDERS_COPY = {
     purchases: '笔数',
     revenue: '收入（净额）',
   },
-  forms: { checkout: '首付 / 单笔', renewal: '订阅续费', waffo: 'Waffo 单笔' },
+  forms: { checkout: '首付 / 单笔', renewal: '订阅续费', waffo: 'Waffo 单笔', waffo_subscription: 'Waffo 订阅扣款' },
   channels: { stripe: 'Stripe', waffo: 'Waffo' },
   // MP 卡 = Managed Payments（Link 当卖家、另加税）；普通卡 = 中国银行卡，Shotviva 当卖家（T64）。
   methods: { card: 'MP 卡', cn_card: '普通卡（中国银行卡）', alipay: '支付宝', wechat_pay: '微信支付' },

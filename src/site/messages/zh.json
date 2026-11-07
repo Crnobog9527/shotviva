@@ -365,6 +365,7 @@
       "failTitle": "这张照片没有生成成功",
       "retry": "重试",
       "useAnother": "换一张照片",
+      "editWords": "改一下文字",
       "doneState": {
         "hud": "已完成",
         "saved": "已存进「作品」",
@@ -450,6 +451,7 @@
     },
     "errors": {
       "CONTENT_REJECTED": "照片或补充说明没有通过安全审核。请换一张照片，或改一下说明。",
+      "IDENTITY_SWAP_REFUSED": "为保护每个人的肖像权，Shotviva 不能把人换成另一个人或换脸。可以改表情、妆容、光线和背景。",
       "GENERATION_FAILED": "这张照片没能生成，通常再试一次就好。",
       "PROVIDER_FAILED": "这张照片没能生成，通常再试一次就好。",
       "PROVIDER_TIMEOUT": "这张照片生成太久超时了，通常再试一次就好。",

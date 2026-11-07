@@ -20,6 +20,9 @@ export const PARTNER_ERROR_CODES = [
   'invalid_input', // 422 bad body, unknown field, bad image URL / image, bad return_to, bad code
   'quota_exhausted', // 402 out of credits; send the user to top_up_url
   'content_rejected', // 422 the image model's own safety refusal; nothing charged
+  // 422 the words ask to swap a face or turn someone into a real person (ARCHITECTURE §5.1a);
+  // refused before charging. Spelled like the web's error code, as the spec names it.
+  'IDENTITY_SWAP_REFUSED',
   'generation_failed', // 500 provider or storage failure; credits already refunded
   'rate_limited', // 429 per-account generation limit; retry in a few minutes
   'not_found', // 404 unknown template or job

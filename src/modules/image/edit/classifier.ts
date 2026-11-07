@@ -26,6 +26,9 @@ export type ClassifierAnswer = {
   keep: string[]
   // One short English line summing up the change.
   change: string
+  // Whether the words ask to swap a face or turn someone into a real person (ARCHITECTURE §5.1a);
+  // answered in this same call, so an edit costs no extra request.
+  identitySwap: boolean
   usage: ClassifierUsage | null
 }
 

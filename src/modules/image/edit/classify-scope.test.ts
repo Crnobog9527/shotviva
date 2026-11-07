@@ -10,10 +10,11 @@ const answer = (overrides: Partial<ClassifierAnswer> = {}): ClassifierAnswer => 
   keep: ['red bottle'],
   change: 'new beach background',
   usage: { inputTokens: 900, outputTokens: 40 },
+  identitySwap: false,
   ...overrides,
 })
 const classifier = (classify: ScopeClassifier['classify']): ScopeClassifier => ({ tag: 'fake/luna', classify })
-const FALLBACK = { scope: 'fallback', confidence: null, keep: [], change: null, usage: null }
+const FALLBACK = { scope: 'fallback', confidence: null, keep: [], change: null, usage: null, identitySwap: false }
 
 describe('classifyEditScope', () => {
   it('uses the answer at confidence 0.5 or above, rounded, with its keep list and usage', async () => {
@@ -23,6 +24,7 @@ describe('classifyEditScope', () => {
       keep: ['red bottle'],
       change: 'new beach background',
       usage: { inputTokens: 900, outputTokens: 40 },
+      identitySwap: false,
     })
     expect((await classifyEditScope(classifier(async () => answer({ confidence: 0.5 })), input)).scope).toBe('background')
   })
@@ -46,6 +48,11 @@ describe('classifyEditScope', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  // T81 (§5.1a): the face-swap answer stands even when the scope is too unsure to use.
+  it('keeps identity_swap whatever the confidence', async () => {
+    expect((await classifyEditScope(classifier(async () => answer({ confidence: 0.2, identitySwap: true })), input)).identitySwap).toBe(true)
   })
 
   it('falls back when the call fails or there is no provider', async () => {

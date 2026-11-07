@@ -63,7 +63,7 @@ export function fakeClassifier(behaviour: ClassifierBehaviour) {
   const classify = vi.fn<ScopeClassifier['classify']>(async () => {
     if (behaviour === 'hang') return new Promise<never>(() => {})
     if (behaviour === 'fail') throw new Error('openai responses 503')
-    return { scope: 'background', confidence: 0.9, keep: ['amber bottle'], change: 'beach background', usage: { inputTokens: 800, outputTokens: 30 }, ...behaviour }
+    return { scope: 'background', confidence: 0.9, keep: ['amber bottle'], change: 'beach background', usage: { inputTokens: 800, outputTokens: 30 }, identitySwap: false, ...behaviour }
   })
   const classifier: ScopeClassifier = { tag: 'fake/luna', classify }
   return { classifier, classify }

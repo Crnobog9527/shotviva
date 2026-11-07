@@ -1,0 +1,6 @@
+{
+  "note": "Real decision-model answers for examples.test-data.ts, replayed by examples.test.ts. Fill from the admin dry run's JSON (/admin/providers, 换脸判断试跑) or scripts/identity-judge-eval.ts --json. Empty until a run on the test site.",
+  "model": null,
+  "recordedAt": null,
+  "answers": {}
+}

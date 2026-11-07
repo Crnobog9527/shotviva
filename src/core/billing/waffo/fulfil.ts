@@ -7,8 +7,10 @@ import type { ProductId, SiteProduct } from '../../config'
 import { AppError } from '../../errors'
 import { creditChangeSchema, type CreditChange } from '../credits'
 import type { CancelOthers } from '../subscription/cancel-others'
+import type { RefuseEnded } from '../subscription/ended-order'
 import { callRpc, type RpcClient } from '../rpc'
-import { paymentFacts, readWaffoOrder, type WaffoPaymentFacts } from './payment-facts'
+import { paymentFacts, readWaffoOrder, type WaffoOrder, type WaffoPaymentFacts } from './payment-facts'
+import { isoOf } from './subscription-sync'
 
 // A verified order.completed or subscription.payment_succeeded becomes exactly one
 // settle_waffo_order (0200, 0360): apply_purchase keyed by Waffo's event id (the payment id,
@@ -24,9 +26,12 @@ export type WaffoFulfilDeps = {
   trackBuy?: typeof trackPurchase
   // The upgrade step (T66, same as Stripe's): cancel the buyer's other renewing subscriptions.
   cancelOthers?: CancelOthers
+  // T66: a charge on an order an upgrade already ended is refused (no credits, alert).
+  refuseEnded?: RefuseEnded
 }
 
-export type WaffoFulfilOutcome = 'applied' | 'replayed' | 'unpaid'
+// 'ended': a charge on an order an upgrade ended (T66); nothing granted, the Owner is alerted.
+export type WaffoFulfilOutcome = 'applied' | 'replayed' | 'unpaid' | 'ended'
 
 const inputSchema = z.object({ userId: z.uuid(), paymentId: z.string().min(1), orderId: z.string().min(1) })
 
@@ -74,11 +79,12 @@ function track(deps: WaffoFulfilDeps, userId: string, product: SiteProduct, fact
 // renewal sends no payment event, so it grants nothing and paid_until stays.
 export async function fulfilWaffoOrder(
   deps: WaffoFulfilDeps,
-  event: { eventId: string; data: unknown },
+  event: { eventId: string; timestamp?: string; data: unknown },
   form: WaffoChargeForm = 'one_time',
 ): Promise<WaffoFulfilOutcome> {
   const order = readWaffoOrder(event.eventId, event.data)
   if (order.paymentStatus !== undefined && order.paymentStatus !== 'succeeded') return 'unpaid'
+  if (await endedBefore(deps, order, form, event.timestamp)) return 'ended'
   const { user_id: userId, product_id: productId, locale } = order.orderMetadata
   const product = deps.products.find((p) => p.id === productId)
   if (!product) throw new AppError('INVALID_INPUT', `waffo order ${event.eventId}: unknown product`)
@@ -90,4 +96,12 @@ export async function fulfilWaffoOrder(
   if (!change.applied) return 'replayed'
   track(deps, userId, product, facts, { locale, form })
   return 'applied'
+}
+
+// A subscription charge taken after an upgrade ended its order. When it was taken: the event's
+// own time, else its payment date; unknown → not refused.
+async function endedBefore(deps: WaffoFulfilDeps, order: WaffoOrder, form: WaffoChargeForm, timestamp: string | undefined): Promise<boolean> {
+  const at = isoOf(timestamp) ?? isoOf(order.paymentDate)
+  if (form !== 'subscription' || !deps.refuseEnded || !at) return false
+  return deps.refuseEnded({ orderId: order.orderId, at, what: 'charge' })
 }
