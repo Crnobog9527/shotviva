@@ -585,13 +585,15 @@ v1 后台（Owner 2026-11-06 扩充；T23 做外壳和运营页）：**一个后
   - **在弹窗里完成（Owner 2026-11-07，T68）**：点「Help & feedback」不跳页，在账号页上直接弹出工单弹窗（电脑是居中对话框，手机是全高底部抽屉，按 DESIGN 的 Sheet 样式）。弹窗里两个页签「新建工单」「我的工单」；点开一张工单在弹窗内显示往来消息，并能直接补充回复；提交成功、返回列表都不离开弹窗。原来的 `/account/help`、`/account/help/new`、`/account/help/[id]` 保留为深链：打开后跳到 `/account?help=new` / `?help=list` / `?help=<id>`，账号页读这个参数自动打开弹窗到对应位置（页脚「Contact」指向 `/account?help=new`，未登录先去登录）。
   - **提交工单**：
     - 类型并列成一个普通列表，按顺序是：意见反馈、出图问题（可选附一张自己的作品）、付款问题（可选附一笔自己的付款）、退款申请（必须选一笔自己的付款）、账号问题、其他。退款申请的样式和其他项一样，不做突出。
-    - 正文不超过 2000 字，不收附件。
+    - 正文不超过 2000 字。
+    - **可以附图片（Owner 2026-11-07，T69）**：新建工单和每次补充回复都能附最多 3 张图片（截图或照片），JPG / PNG / WebP / HEIC（HEIC 在浏览器端转 JPEG，同出图上传），每张 ≤ 10 MB。走现有的 R2 直传：私有桶 `tickets/<user_id>/<ticket_id>/` 前缀，上传后服务端校验类型和大小、清除 EXIF、转 WebP，失败的删掉；图片只能用户本人和管理员经签名地址查看，不进创作库、不进公开读取。删工单 / 删号时一并删除文件。管理员回复也可以附图。
     - 「我的工单」里能看到状态（已提交 / 已回复 / 已关闭）和往来消息，用户可以在工单里补充。
     - 中英文文案都要有，页面 `noindex`。
   - **退款全部人工处理**：后台打开退款工单时，显示这笔付款的信息、`refund_eligibility(payment_id)` 给出的三项参考检查（是否首次购买、是否在 7 天内、付款后是否用过任何积分），以及建议退款金额（税前价 × 94% + 全部税额，Owner 可以改）。Owner 选择同意（填金额）或拒绝，写回复，系统记审计日志 `decide_refund`。Owner 到 Stripe / Waffo 后台完成退款，退款回调更新付款状态，然后提示扣回积分。**不写任何自动退款或会动钱的代码。**
   - **数据**：
     - `support_tickets` 表：`id`、`user_id`、`type`（`feedback` / `image_issue` / `billing` / `refund` / `account` / `other`）、`status`（`open` / `replied` / `closed`）、`payment_id`、`job_id`（都必须是本人的）、`refund_decision`、`refund_amount_cents`、`created_at`、`last_message_at`、`user_seen_at`、`closed_at`。
     - `support_ticket_messages` 表：`id`、`ticket_id`、`author`（`user` / `admin`）、`body`（不超过 2000 字）、`created_at`。
+    - `support_ticket_attachments` 表（T69，迁移编号段 `0500`～`0519`，只加不改）：`id`、`message_id`、`ticket_id`、`object_key`、`content_type`、`bytes`、`width`、`height`、`created_at`；每条消息最多 3 行（函数里校验）；RLS 同工单，写入只经服务端。
     - RLS：用户只能读自己的工单，写入只经服务端。删号时工单一并删除。
     - 索引：`support_tickets(user_id, created_at desc, id desc)`；部分索引 `support_tickets(last_message_at desc, id desc) where status = 'open'`；`support_ticket_messages(ticket_id, created_at)`。
     - 函数（都只授权 `service_role`）：`create_support_ticket`（按账号限频，24 小时内最多 5 张）、`add_ticket_message`、`admin_reply_ticket`、`admin_decide_refund`、`admin_list_tickets`（游标分页）、`refund_eligibility`、`mark_ticket_seen`。
