@@ -38,7 +38,7 @@ export function SubscriptionsTable({ subscriptions, counts, stripeLive }: Props)
             {subscriptions.map((row) => (
               <TableRow key={row.id}>
                 <TableCell>
-                  <UserLink userId={row.userId}>{row.email ?? row.userId.slice(0, 8)}</UserLink>
+                  <UserLink userId={row.userId} title={row.email ?? row.userId} className="block max-w-44 truncate">{row.email ?? row.userId.slice(0, 8)}</UserLink>
                 </TableCell>
                 <TableCell className="font-mono text-xs">{row.productId}</TableCell>
                 <TableCell className="text-xs">{COPY.subStatus[row.status] ?? row.status}</TableCell>

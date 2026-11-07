@@ -34,7 +34,7 @@ export function ProviderSection({ module, providers, onAdd, ...table }: Props) {
           {COPY.add}
         </Button>
       </div>
-      <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">{copy.notice}</p>
+      <p className="rounded-md border border-border bg-card p-3 text-sm text-muted-foreground">{copy.notice}</p>
       {anyActive ? null : <p className="text-muted-foreground text-sm">{copy.none}</p>}
       <ProvidersTable providers={providers} {...table} />
     </section>

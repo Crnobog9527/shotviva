@@ -4,14 +4,14 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { AppError } from '@/core/errors'
-import { modelFromTag } from '@/core/jobs'
+import { jobRef, jobRefRange, jobRefsOrShort, modelFromTag } from '@/core/jobs'
 
 import { afterCursor, decodeCursor, PAGE_SIZE, toPage, type Page } from '../cursor'
-import { beijingDayStart, type JobFilters } from './filters'
+import { beijingDayStart, refFilter, type JobFilters } from './filters'
 
 // All generation jobs, newest first (ARCHITECTURE §10). Index generation_jobs_created_at_id_idx
 // (0160) drives the order, the keyset and the date range; status / template / source / model
-// are filters on that walk. Only list columns are read: inputs is a jsonb, so just its
+// are filters on that walk; a reference number (T78) is a range on generation_jobs_pkey. Only list columns are read: inputs is a jsonb, so just its
 // resolution key is selected. provider_usage (T33) is at most four integers, read only to tell
 // 「无法计算」 (usage, no price) from a pre-T33 job (neither).
 
@@ -39,6 +39,8 @@ const rowSchema = z.object({
 
 export type AdminJob = {
   id: string
+  // Reference number (T78): the first 8 characters of the id, longer when another job shares them.
+  ref: string
   createdAt: string
   durationMs: number | null
   userId: string
@@ -59,6 +61,7 @@ export type AdminJob = {
 function toJob(row: z.infer<typeof rowSchema>): AdminJob {
   return {
     id: row.id,
+    ref: jobRef(row.id),
     createdAt: row.created_at,
     durationMs: row.finished_at ? Date.parse(row.finished_at) - Date.parse(row.created_at) : null,
     userId: row.user_id,
@@ -77,13 +80,21 @@ function toJob(row: z.infer<typeof rowSchema>): AdminJob {
   }
 }
 
-export async function listJobs(db: SupabaseClient, filters: JobFilters): Promise<Page<AdminJob>> {
-  let query = db
+const baseQuery = (db: SupabaseClient) =>
+  db
     .from('generation_jobs')
     .select(COLUMNS)
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
     .limit(PAGE_SIZE + 1)
+
+// A reference number is a range on generation_jobs_pkey (T78).
+function filtered(base: ReturnType<typeof baseQuery>, filters: JobFilters, ref: string | null) {
+  let query = base
+  if (ref) {
+    const { from, to } = jobRefRange(ref)
+    query = query.gte('id', from).lte('id', to)
+  }
   if (filters.status) query = query.eq('status', filters.status)
   if (filters.template) query = query.eq('template_id', filters.template)
   if (filters.source) query = query.eq('source', filters.source)
@@ -91,10 +102,24 @@ export async function listJobs(db: SupabaseClient, filters: JobFilters): Promise
   if (filters.from) query = query.gte('created_at', beijingDayStart(filters.from))
   if (filters.to) query = query.lt('created_at', beijingDayStart(filters.to, 1))
   const after = decodeCursor(filters.cursor)
-  if (after) query = query.or(afterCursor(after))
-  const { data, error } = await query
+  return after ? query.or(afterCursor(after)) : query
+}
+
+// A reference typed with the wrong shape (too short, not hex) matches nothing; the filter bar
+// says why.
+export async function listJobs(db: SupabaseClient, filters: JobFilters): Promise<Page<AdminJob>> {
+  const { ref, invalid } = refFilter(filters)
+  if (invalid) return { items: [], nextCursor: null }
+  const { data, error } = await filtered(baseQuery(db), filters, ref)
   if (error) throw new AppError('INTERNAL', 'generation_jobs list failed', { cause: new Error(error.message) })
-  return toPage(rowSchema.array().parse(data), toJob)
+  const page = toPage(rowSchema.array().parse(data), toJob)
+  return { ...page, items: await withRefs(db, page.items) }
+}
+
+// One more round trip on the primary key: does any other job share a row's first 8 characters?
+async function withRefs(db: SupabaseClient, jobs: AdminJob[]): Promise<AdminJob[]> {
+  const refs = await jobRefsOrShort(db, jobs.map((job) => job.id))
+  return jobs.map((job) => ({ ...job, ref: refs.get(job.id) ?? job.ref }))
 }
 
 // Filter dropdown: every template id and name. A handful of rows.

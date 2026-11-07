@@ -549,8 +549,12 @@
         "originalKept": "Kept, {px} px preview",
         "originalEdited": "The photo you edited",
         "originalDeleted": "Made before originals were kept",
-        "made": "Made"
+        "made": "Made",
+        "reference": "Photo ID",
+        "copyReference": "Copy photo ID",
+        "copied": "Copied"
       },
+      "problem": "Problem with this photo?",
       "delete": {
         "open": "Delete",
         "title": "Delete this photo?",
@@ -768,7 +772,8 @@
         "paymentOptional": "Payment (optional)",
         "noPayments": "There are no payments on this account yet.",
         "workLabel": "Work (optional)",
-        "workOption": "{template} · {date, date, medium}",
+        "workOption": "{template} · {date, date, medium} · {ref}",
+        "workRef": "Photo ID {ref}",
         "none": "None",
         "choose": "Choose one",
         "submit": "Send",

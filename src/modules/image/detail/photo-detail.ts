@@ -6,7 +6,8 @@ import type { Translate } from '@/core/translate'
 // keptWithWork: the full upload is kept next to the result for Make again (T40); works made
 // before that only have the preview, or nothing.
 export type OriginalSource = { kind: 'preview'; url: string } | { kind: 'source'; url: string } | { kind: 'deleted' }
-export type PhotoDetail = { note: string | null; original: OriginalSource; keptWithWork: boolean }
+// reference: the work's reference number (T78), read on the server; absent where not shown.
+export type PhotoDetail = { note: string | null; original: OriginalSource; keptWithWork: boolean; reference?: string }
 
 // Only what the user typed into "Anything to change?", exactly as typed. The wrapper prompt is
 // never stored in inputs (ARCHITECTURE §4), and no other input field is read here, so nothing
