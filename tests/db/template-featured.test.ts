@@ -23,6 +23,10 @@ const template = (id: string) => ({
   creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
   visibleIn: ['web'],
   fields: { images: { min: 1, max: 1 }, copy: [], aspectRatios: ['1:1'] },
+  // What a web template needs before it may go live (T60 publish rules).
+  description: 'Test template.',
+  coverBeforeUrl: `https://assets.test/covers/${id}/before.webp`,
+  coverAfterUrl: `https://assets.test/covers/${id}/after.webp`,
 })
 const prompt = { body: 'one', modelParams: {} }
 
@@ -40,7 +44,7 @@ describe('home featured templates', () => {
   beforeAll(async () => {
     pg = await connectAdmin()
     for (const id of [...ids, HIDDEN]) await saveTemplate(client, ADMIN_ID, { isNew: true, template: template(id), prompt }, CREDITS_FLOOR)
-    for (const id of ids) await setTemplateActive(client, ADMIN_ID, { id, active: true })
+    for (const id of ids) await setTemplateActive(client, ADMIN_ID, { id, active: true }, CREDITS_FLOOR)
   })
 
   afterAll(async () => {
@@ -72,7 +76,7 @@ describe('home featured templates', () => {
   it('keeps the rank through an ordinary edit, and clears it when the template is unpublished', async () => {
     await saveTemplate(client, ADMIN_ID, { isNew: false, template: { ...template(C), name: 'Renamed' }, prompt }, CREDITS_FLOOR)
     expect((await ranks())[C]).toBe(2)
-    await setTemplateActive(client, ADMIN_ID, { id: C, active: false, reason: 'cover is wrong' })
+    await setTemplateActive(client, ADMIN_ID, { id: C, active: false, reason: 'cover is wrong' }, CREDITS_FLOOR)
     expect((await ranks())[C]).toBeNull()
   })
 
