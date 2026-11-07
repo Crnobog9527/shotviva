@@ -7,6 +7,7 @@ import type { Balance } from '@/core/billing/pools'
 import { useRouter } from '@/core/i18n'
 import { EDIT_TEMPLATE_ID } from '@/core/templates/edit-params'
 import type { CreditsCost } from '@/core/templates/pricing'
+import { navTypesFor } from '@/core/ui/nav-motion'
 
 import { retryJob, startJob } from '../generation/job-store'
 import { useJob } from '../generation/use-jobs'
@@ -33,7 +34,7 @@ export function EditFlow({ source, balance, creditsCost, concurrency, children }
   const job = useJob(jobId)
 
   useEffect(() => {
-    if (job?.status === 'succeeded') router.push(`/photos/${job.id}`)
+    if (job?.status === 'succeeded') router.push(`/photos/${job.id}`, { transitionTypes: navTypesFor(`/photos/${job.id}`) })
   }, [job?.status, job?.id, router])
 
   const generate = (next: EditDraft) => {

@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { limitsFor } from '@/core/billing/tier-limits'
 import { useRouter } from '@/core/i18n'
 import { Link } from '@/core/i18n/ui'
+import { navTypesFor } from '@/core/ui/nav-motion'
 
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import { useCategoryLabel } from '../catalogue/category-label'
@@ -44,7 +45,7 @@ function CreateBody({ template, open, onClose, ...context }: BodyProps) {
   const generate = () => {
     draft.start()
     onClose()
-    router.push(`/generate/${template.id}`)
+    router.push(`/generate/${template.id}`, { transitionTypes: navTypesFor(`/generate/${template.id}`) })
   }
   return (
     <CreateSheet
