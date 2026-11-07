@@ -30,7 +30,7 @@ export function FeatureCard({ template, onOpen }: { template: CatalogueTemplate;
       className="group hairline relative mt-4 block w-full overflow-hidden rounded-panel bg-card text-left transition-shadow hover:shadow-[inset_0_0_0_1px_var(--input)] md:mt-6"
     >
       {hasStills(template) ? (
-        <PairMedia before={before as string} after={after as string} alt={alt} eager video={motion ?? undefined} size="feature" badge className="rounded-panel md:aspect-[8/3]" />
+        <PairMedia before={before as string} after={after as string} alt={alt} eager video={motion ?? undefined} size="feature" className="rounded-panel md:aspect-[8/3]" />
       ) : (
         <LoopPlate template={template} alt={alt} className="rounded-panel md:aspect-[8/3]" />
       )}

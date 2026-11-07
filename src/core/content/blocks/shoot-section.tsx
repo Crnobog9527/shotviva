@@ -1,5 +1,4 @@
 import Image from 'next/image'
-import { useTranslations } from 'next-intl'
 
 import type { ShootDemo } from '../page-content'
 
@@ -8,7 +7,6 @@ const RESULT_SIZES = '(min-width: 1024px) 236px, (min-width: 768px) 33vw, 50vw'
 // "One phone photo → a full shoot" (ARCHITECTURE §13 item 2): the phone snapshot as large as a
 // result, the three results from three templates, and the two-line bill under them.
 export function ShootSection({ shoot }: { shoot: ShootDemo }) {
-  const t = useTranslations('marketing.home')
   const { phone, bill } = shoot
   return (
     <section className="mk-block mk-reveal" id="shoot" aria-labelledby="shoot-h">
@@ -28,7 +26,6 @@ export function ShootSection({ shoot }: { shoot: ShootDemo }) {
           <figcaption className="mk-src-meta">
             <span className="sr-only">{phone.file}. </span>
             <p>{phone.caption}</p>
-            <span className="mk-pill">{t('illustrative')}</span>
           </figcaption>
         </figure>
         <div className="mk-develop" aria-hidden>
@@ -39,10 +36,9 @@ export function ShootSection({ shoot }: { shoot: ShootDemo }) {
           <span className="mk-lbl">{shoot.arrow}</span>
         </div>
         <ol className="mk-outs">
-          {shoot.results.map((result, i) => (
+          {shoot.results.map((result) => (
             <li key={result.title} className="mk-lift">
               <Image className="mk-zoom" src={result.image.src} alt={result.image.alt} width={result.image.width} height={result.image.height} sizes={RESULT_SIZES} />
-              {i === 0 ? <span className="mk-illus">{t('illustrative')}</span> : null}
               <span className="mk-out-cap">
                 <b>{result.title}</b>
                 <small>{result.template}</small>

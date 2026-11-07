@@ -29,7 +29,6 @@ export function CompareSlider({ before, after, label, sizes }: Props) {
       <span className="mk-tag mk-tag-r" aria-hidden>
         {t('ai')}
       </span>
-      <span className="mk-illus">{t('illustrative')}</span>
       <input type="range" min={0} max={100} value={x} onChange={(event) => setX(Number(event.target.value))} aria-label={label} />
     </div>
   )
