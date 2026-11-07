@@ -5,15 +5,26 @@
 // this URL. The woff2 files are the official ones, untouched.
 export const MISANS_STYLESHEET = '/fonts/misans/misans-400-e8d416058231a4c2.css'
 
-// Chinese pages only (T65, ARCHITECTURE §17「加载」): the @font-face declarations go into the
-// server-rendered <head> (React hoists a `precedence` stylesheet there and holds the first paint
-// for it), so the browser knows every MiSans subset before its first layout. Subsets already in
-// the cache are used on that first paint: no system-font frame, no swap flash on reloads or when
-// switching from English. A first visit still paints the headings in the metric-matched
-// "MiSans Fallback" (globals.css) and swaps once their subsets arrive. Body text is in the
-// system fonts and never waits. unicode-range keeps the download to the
-// subsets the page's text needs; the woff2 files are never preloaded. English pages show their
-// few Chinese words in the system fonts (font-cjk-system) and never load MiSans.
+const LINK_ID = 'misans-font'
+
+// Chinese pages only (T65/T67, ARCHITECTURE §17「加载」). A script in the server HTML, at the top
+// of <body>, attaches the stylesheet as soon as the page's first contentful paint has happened
+// (PerformanceObserver 'paint', with a 1 s fallback): long before hydration, which the old
+// inserter waited for, but never ahead of the first paint. Measured, both earlier variants cost
+// the first paint: a render-blocking <link> in <head> (+0.15 s FCP on Vercel, up to 0.9 s in CI's
+// Lighthouse), and heading subsets requested before the first paint, which Lighthouse charges to
+// FCP (2.6 s instead of 1.4 s). On a repeat visit the stylesheet and subsets come from the cache,
+// so headings turn MiSans a frame or two after the first paint; a first visit paints them in the
+// metric-matched "MiSans Fallback" (globals.css) and swaps once they arrive. Body and UI text are
+// in the system fonts and never change. English pages never load MiSans. The language switch is
+// a full page load (a real <a href>), so this always runs on arriving at a Chinese page.
+const INSERT = [
+  '(function(){var d=document,done=0;',
+  `function go(){if(done||d.getElementById('${LINK_ID}'))return;done=1;var l=d.createElement('link');l.id='${LINK_ID}';l.rel='stylesheet';l.href='${MISANS_STYLESHEET}';d.head.appendChild(l)}`,
+  "try{new PerformanceObserver(function(p){if(p.getEntriesByName('first-contentful-paint').length)go()}).observe({type:'paint',buffered:true})}catch(e){}",
+  'setTimeout(go,1000)})()',
+].join('')
+
 export function MiSansStylesheet() {
-  return <link rel="stylesheet" href={MISANS_STYLESHEET} precedence="default" />
+  return <script id="misans-font-loader" dangerouslySetInnerHTML={{ __html: INSERT }} />
 }
