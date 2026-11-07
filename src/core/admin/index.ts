@@ -1,12 +1,12 @@
 // Admin area (ARCHITECTURE §10): the template + prompt editor and the provider settings (T17).
 export {
   listAdminTemplates,
-  reorderTemplates,
   runAdminAction,
   runAdminQuery,
   saveTemplate,
   setFeaturedTemplates,
   setTemplateActive,
+  setTemplateOrder,
   setTemplatesActive,
 } from './templates'
 export type {
@@ -19,6 +19,7 @@ export type {
   CoverUploadRequest,
   SaveTemplatePayload,
   TemplateAdminActions,
+  TemplateOrderGroup,
 } from './templates'
 export { applyCover, createCoverUpload, type ApplyCoverInput, type CoverDeps, type CoverUploadTicket } from './covers'
 export { TemplatesEditor } from './templates-editor'

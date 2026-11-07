@@ -2,18 +2,18 @@
 
 import { useState } from 'react'
 
-import { Button } from '@/core/ui/button'
-import { Input } from '@/core/ui/input'
 import type { CreditsFloor } from '@/core/templates/pricing'
 
-import type { AdminTemplate, TemplateAdminActions } from '../templates/types'
+import type { AdminTemplate, TemplateAdminActions, TemplateOrderGroup } from '../templates/types'
 
 import { BulkPublish } from './bulk-publish'
+import { orderCopy } from './copy'
 import { FeaturedPanel } from './featured-panel'
 import { FEATURED_LIMIT, featuredIds, toggleFeatured } from './featured-state'
-import { matchesSearch, moveId } from './form-state'
+import { matchesSearch } from './form-state'
 import { selectedInOrder, toggleId, toggleVisible } from './selection-state'
 import { TemplateFormDialog, type EditTarget } from './template-form-dialog'
+import { catalogueOrder, Toolbar } from './toolbar'
 import { TemplatesTable } from './templates-table'
 import { UnpublishDialog } from './unpublish-dialog'
 import { useTemplateActions } from './use-template-actions'
@@ -25,7 +25,7 @@ export function TemplatesEditor({ templates, floor, actions }: Props) {
   const [editing, setEditing] = useState<EditTarget | null>(null)
   const [unpublishing, setUnpublishing] = useState<AdminTemplate | null>(null)
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set())
-  const { pending, error, notice, run, clearError } = useTemplateActions()
+  const { pending, error, notice, run, report, clearError } = useTemplateActions()
   const visible = templates.filter((template) => matchesSearch(template, query))
   const visibleIds = visible.map((template) => template.id)
   // After a cover upload the page refreshes; show the dialog the fresh row, not the snapshot.
@@ -48,31 +48,27 @@ export function TemplatesEditor({ templates, floor, actions }: Props) {
     const ids = toggleFeatured(featured, template, on)
     if (ids) setFeatured(ids)
   }
-  const move = (index: number, direction: -1 | 1) => {
-    const ids = moveId(templates.map((template) => template.id), index, direction)
-    if (ids) run(() => actions.reorder(ids), '排序已保存')
-  }
+  // Drag, keyboard or arrows (T76): the list shows the new order at once and falls back to the
+  // server's order if this save fails.
+  const saveOrder = (group: TemplateOrderGroup) => (ids: string[]) =>
+    report(() => actions.setOrder({ group, ids }), orderCopy.saved, orderCopy.failed)
 
   return (
-    <div className="grid gap-4">
-      <div className="flex items-center gap-3">
-        <Input
-          className="max-w-xs"
-          placeholder="搜索 ID / 名称 / 分类"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-        <Button className="ml-auto" onClick={() => openEditor({ mode: 'new' })}>
-          新建模板
-        </Button>
-      </div>
+    <div className="grid min-w-0 grid-cols-1 gap-4">
+      <Toolbar query={query} onQuery={setQuery} onNew={() => openEditor({ mode: 'new' })} />
       {notice ? <p className="text-sm text-emerald-700">{notice}</p> : null}
       {error && !editing ? (
         <p role="alert" className="text-destructive text-sm">
           {error}
         </p>
       ) : null}
-      <FeaturedPanel ids={featured} templates={templates} pending={pending} onChange={setFeatured} />
+      <FeaturedPanel
+        ids={featured}
+        templates={templates}
+        pending={pending}
+        onReorder={saveOrder('featured')}
+        onRemove={(id) => setFeatured(featured.filter((other) => other !== id))}
+      />
       <BulkPublish
         selected={selectedInOrder(templates, selected)}
         busy={pending}
@@ -88,11 +84,10 @@ export function TemplatesEditor({ templates, floor, actions }: Props) {
         }}
         featuredFull={featured.length >= FEATURED_LIMIT}
         onFeature={feature}
-        canReorder={query.trim() === ''}
+        order={catalogueOrder(query, pending, saveOrder('catalogue'))}
         pending={pending}
         onEdit={(template) => openEditor({ mode: 'edit', template })}
         onToggle={toggle}
-        onMove={move}
       />
       {target ? (
         <TemplateFormDialog
