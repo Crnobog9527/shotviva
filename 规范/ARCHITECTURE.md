@@ -203,6 +203,15 @@ v1 不写回调解析、定时轮询、超时清理这类定时任务。视频�
 
 仓库里只放模板的字段结构和种子数据格式。种子提示词放在不进 git 的本地文件里，用脚本导入数据库。
 
+### 5.1b 收藏模板（Owner 2026-11-08，T83）
+
+模板多了以后好找。每个模板卡片和模板弹窗上有一个收藏按钮（心形，点一下收藏、再点取消，立即生效、乐观更新）。
+- **在哪看**：创作页的模板分类条最前面加「收藏」（中文）/ "Saved"（英文），有收藏时才显示，点开只列收藏的模板，最新收藏的在前，点模板直接打开创作弹窗；首页生成器的模板选择器里，登录用户同样有这一项。
+- **未登录**：点收藏先去登录，登录回来自动把这个模板收藏上。
+- **数据**：新表 `template_favorites(user_id, template_id, created_at)`，主键 `(user_id, template_id)`，RLS 只能读写自己的行，每人最多 200 个；模板下架或改成只给伙伴用时不在收藏里显示（行保留，重新上架后回来）；模板删除时级联删除；删号时随账号删除。
+- 收藏只影响登录用户自己的页面，模板目录和首页的服务端缓存不变（收藏列表在客户端或按用户单独读取，不进公共缓存）。
+- 埋点 `template_favorite`（`template_id`、`category`、`action = add / remove`、`surface`）。迁移编号段 `0740`～`0759`。
+
 ### 5.1a 禁止换脸：按用户输入的文字判断意图（Owner 2026-11-08，T81）
 
 换脸、换身份一定要靠用户写字下指令，所以只审**用户输入、会送进出图模型的文字**，不碰模板提示词（不往模板里加任何「保持长相」之类的句子，以免把模型带偏），也不对图片做人脸检测或识别。多图参考（如同一商品多角度）照常可用。
@@ -229,7 +238,7 @@ v1 不写回调解析、定时轮询、超时清理这类定时任务。视频�
 
 **模板分类由后台管理（Owner 2026-11-08，T75）**：分类不再写死在代码里（`TEMPLATE_CATEGORIES`、`messages` 里的 `app.categories`、`site/content` 两份分类说明都删掉，改从数据库读）。
 - 新表 `template_categories`（公开读，只有管理员能写）：`key`（英文短标识，如 `food-drink`，建好后不能改，页面、埋点、缓存都认它）、`name_en` / `name_zh`（显示名，必填，英文 ≤ 32 字、中文 ≤ 12 字，各自不重名）、`intro_en` / `intro_zh`（首页分类说明，可空，空就不显示说明）、`sort_order`（决定创作页分类条和首页分组的顺序）、`card_style`（`pair` 并排对比 / `compare` 拖动对比；现在只有「画风」是 `compare`，原来按名字 `'Art Styles'` 判断的地方都改成看这个字段）。
-- `templates.category` 改成存分类的 `key`（迁移时按现有英文名回填；现有数据里不在六个之内的手填分类也各建一条）。模板编辑页只能从已有分类里选，去掉「新分类…」手填。
+- **先扩后收（总控 2026-11-08 审 #283 后改）**：`templates.category` 保持存英文名不动（旧版本代码照常工作），新增 `templates.category_key`（外键，非空，有索引），按现有值回填（匹配 key / 英文名（不分大小写）/ 中文名，都不匹配就新建一个分类，名称重复时加「 2」「 3」直到两种语言都不重名）；两个触发器保持同步：写 `category_key` 时把 `category` 改成对应英文名，只写 `category` 时解析出 key；分类改英文名时同步改模板上的 `category`。`edit`、`freeform` 是系统分类（`is_system`）：站内永不展示、分类管理里不显示、不能改名、删除或作为移入目标。新代码读 `category_key`；数据库还没迁移时退回读旧列（访客页面和出图照常，后台模板页要等迁移）。迁移 `0580`～`0583` 只加不改，正式库可以先迁移，回滚到上一版部署随时安全。模板编辑页只能从已有分类里选，去掉「新分类…」手填。**收尾**（T84，T75 上正式站并稳定一周后）：删掉 `templates.category`、触发器里按名称解析的分支和迁移前的兼容读取。
 - 后台模板页加「分类管理」：列表显示每个分类的中英文名称、说明、样式、用到它的模板数；可以新增、编辑名称和说明、调整顺序、删除。
 - 删除：没有模板用它就直接删；有模板在用，删除时必须选一个分类把这些模板（含未上架的）移过去，移动和删除在同一个事务里完成。至少保留一个分类。
 - 改名只改显示，`key` 不变，所以 SEO 页面地址、PostHog 里的 `category`（从这一版起发 `key`）都不受影响。保存后 `revalidateTag('templates', 'max')`，和模板保存一样。
@@ -426,6 +435,14 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
   - 链接在用户点击时由服务端现取（服务端核对这笔 `payments` 行属于当前用户），不存进数据库，也不在页面 HTML 里提前放：Stripe 一次性付款取 charge 的 `receipt_url`；订阅首付和续费取 invoice 的 `hosted_invoice_url` / `invoice_pdf`；Managed Payments（海外银行卡）、支付宝 / 微信支付、中国银行卡各自能拿到什么，由开发先在 Stripe 测试模式逐一核实后写进 PR，拿不到发票的只给收据；Waffo 按它的接口能给的给，什么都没有时显示「收据已发送到付款邮箱」。
   - 已退款 / 部分退款的付款照样能下载，行上标「已退款」；Stripe 的收据页会显示退款。
   - 手机号账号没有邮箱时，这里是拿收据的主要途径。
+
+- **拒付申诉证据（Owner 2026-11-08，T82）**：防「积分用完再拒付」。
+  - **先核实谁负责拒付**：海外银行卡（Managed Payments，Stripe 是卖家）、中国银行卡（普通 Stripe）、支付宝 / 微信支付、Waffo 各自的拒付由谁应诉、能不能通过接口提交证据，开发先查文档并在测试模式验证，写进 PR；只有需要我们应诉的渠道接入下面的流程。
+  - **平时就记证据**：开始结账时记录用户 IP 和 User-Agent（存在付款行，和 `stripe_session_id` 关联）；结账页开启 Stripe 的「必须同意服务条款」（`consent_collection.terms_of_service = 'required'`，自定义文字带服务条款和退款政策链接；Managed Payments 不支持时写明），同意时间从 session 回读并存下；每次出图和下载记录 IP（只存哈希以外的必要形式，按隐私政策写明用途：防欺诈和处理争议）。
+  - **拒付来了自动整理**：收到 `charge.dispute.created` 后，服务端汇总注册时间、付款信息、同意条款的时间、付款时 IP、这笔积分的消耗明细（每张图时间、IP、是否下载）、退款政策原文和产品说明，按 Stripe 证据字段（`customer_email_address`、`customer_purchase_ip`、`service_date`、`access_activity_log`、`refund_policy`、`refund_policy_disclosure`、`terms_of_service`、`product_description`、`uncategorized_text` 等）写进这笔拒付，`submit = false` 只存草稿；飞书告警写明截止日期和后台链接（T72）。
+  - **后台「拒付」页**：列出每笔拒付（金额、用户、原因、状态、截止日期），点开预览证据草稿，可补充文字或附件，Owner 点「提交申诉」才 `submit = true`（只能交一次，二次确认）。截止前 3 天还没提交，飞书再提醒一次（打开后台时检查，不写定时任务；告警由收到的 Stripe 事件和后台访问触发，若需要准时提醒再单独定）。
+  - **预防**：发生拒付的账号自动封禁（填原因「拒付」，Owner 可在后台解封）；中国银行卡路由强制 3D Secure（`payment_method_options.card.request_three_d_secure = 'any'`）。
+  - 迁移编号段 `0720`～`0739`。
 
 - 要处理的 Stripe 事件：`checkout.session.completed` 和 `checkout.session.async_payment_succeeded`（首付 / 单笔 → `settle_checkout`：写镜像表 + `apply_purchase`，同一事务）、`invoice.paid`（只认 `subscription_cycle` → `apply_subscription_renewal`，T10）、`customer.subscription.updated / deleted`（只更新镜像表）、`charge.refunded`（记录 + 自动扣回积分 + 告警，T71）、`charge.dispute.created`（记录 + 全额扣回 + 告警，T71）、`charge.dispute.closed`（我方胜诉时把拒付扣回的积分还回，T71）。其余事件忽略（回 200）。Stripe 后台的回调端点订阅这 8 个事件（T71 新增 `charge.dispute.closed`，Owner 在 Stripe 后台勾选）。
 - Stripe 用与 Graylum 同一主体下**新开的独立账户**，避免两边回调互相收到对方的事件。

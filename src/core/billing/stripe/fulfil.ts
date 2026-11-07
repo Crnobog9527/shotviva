@@ -8,7 +8,7 @@ import type { SiteProduct } from '../../config'
 import { AppError } from '../../errors'
 import type { RpcClient } from '../rpc'
 import type { CancelOthers } from '../subscription/cancel-others'
-import { CHECKOUT_METHODS, lookupKey, type CheckoutMethod } from './catalog'
+import { CHECKOUT_METHODS, lookupKey, type CheckoutMethod, type RecordedMethod } from './catalog'
 import type { StripeApi } from './client'
 import { SESSION_EXPAND, sessionFacts } from './payment-facts'
 import { settleCheckout, subscriptionState } from './settle'
@@ -73,7 +73,7 @@ export function readPurchase(session: Stripe.Checkout.Session, products: readonl
 }
 
 // The webhook has no page: the language is the one the Checkout Session was opened in.
-function track(deps: FulfilDeps, session: Stripe.Checkout.Session, purchase: SessionPurchase): void {
+function track(deps: FulfilDeps, session: Stripe.Checkout.Session, purchase: SessionPurchase, method: RecordedMethod): void {
   const { product } = purchase
   ;(deps.trackBuy ?? trackPurchase)(purchase.userId, {
     product_id: product.id,
@@ -81,7 +81,8 @@ function track(deps: FulfilDeps, session: Stripe.Checkout.Session, purchase: Ses
     interval: product.interval,
     form: session.mode === 'subscription' ? 'subscription' : 'one_time',
     channel: 'stripe',
-    method: purchase.method,
+    // What paid, as payments.method records it: on the wallet line Alipay or WeChat Pay.
+    method,
     // Before tax: Managed Payments adds tax on top and keeps it.
     amount_usd: (session.amount_subtotal ?? Math.round(product.priceUsd * 100)) / 100,
     credits: product.credits,
@@ -94,17 +95,18 @@ export async function fulfilCheckoutSession(deps: FulfilDeps, sessionId: string)
   const session = await deps.stripe.checkout.sessions.retrieve(sessionId, { expand: SESSION_EXPAND })
   if (session.payment_status === 'unpaid') return 'unpaid'
   const purchase = readPurchase(session, deps.products)
+  const payment = await sessionFacts(deps.stripe, session, purchase.method)
   const change = await settleCheckout(deps.db, {
     userId: purchase.userId,
     productId: purchase.product.id,
     sessionId: session.id,
     subscription: purchase.subscription ? subscriptionState(purchase.subscription) : null,
-    payment: await sessionFacts(deps.stripe, session, purchase.method),
+    payment,
   })
   // Also on a replay: a crash after settling would otherwise leave the old plan billing. The
   // step is idempotent (ended rows are skipped).
   if (purchase.product.tier !== 'pack') await deps.cancelOthers?.(purchase.userId, { stripeSubscriptionId: purchase.subscription?.id ?? null })
   if (!change.applied) return 'replayed'
-  track(deps, session, purchase)
+  track(deps, session, purchase, payment.method)
   return 'applied'
 }

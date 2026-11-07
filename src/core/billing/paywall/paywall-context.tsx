@@ -9,7 +9,7 @@ import type { EventProps } from "../../analytics/events"
 import type { PaymentChannel, SiteProduct } from "../../config"
 import { offeredMethods } from "../stripe/catalog"
 import { holdsMembership, NO_STANDING, type MemberStanding } from "../subscription/standing"
-import { PaymentChannelContext } from "./channel-context"
+import { PaymentChannelContext, WechatPayContext } from "./channel-context"
 import { StandingContext } from "./standing-context"
 import { usePaywallState, type PaywallOpenOptions } from "./use-paywall-state"
 
@@ -26,12 +26,13 @@ const PaywallContext = createContext<PaywallApi | null>(null)
 
 // One paywall per page tree: the app shell and /pricing mount this, and every entry point
 // ("Get credits", the balance chip, a plan on /pricing) opens the same sheet. Products come in
-// as props: core never imports the site config. `channel` is the server's PAYMENT_CHANNEL.
+// as props: core never imports the site config. `channel` is the server's PAYMENT_CHANNEL and
+// `wechatPay` its STRIPE_WECHAT_PAY (T73).
 // It also holds what the buyer already has (T66, fed by StandingSlot), so a member opens on a
 // plan they can actually buy; the rule that decides it is fetched only for members.
-type ProviderProps = { products: readonly SiteProduct[]; wishlistLive: boolean; channel: PaymentChannel; children: ReactNode }
+type ProviderProps = { products: readonly SiteProduct[]; wishlistLive: boolean; channel: PaymentChannel; wechatPay: boolean; children: ReactNode }
 
-export function PaywallProvider({ products, wishlistLive, channel, children }: ProviderProps) {
+export function PaywallProvider({ products, wishlistLive, channel, wechatPay, children }: ProviderProps) {
   const [open, setOpen] = useState(false)
   const [trigger, setTrigger] = useState<PaywallTrigger>("account")
   const [standing, setStanding] = useState<MemberStanding>(NO_STANDING)
@@ -58,12 +59,14 @@ export function PaywallProvider({ products, wishlistLive, channel, children }: P
   const held = useMemo(() => ({ standing, setStanding }), [standing])
   return (
     <PaymentChannelContext.Provider value={channel}>
-      <StandingContext.Provider value={held}>
-        <PaywallContext.Provider value={api}>
-          {children}
-          <PaywallSheet open={open} onOpenChange={setOpen} trigger={trigger} products={products} wishlistLive={wishlistLive} state={state} />
-        </PaywallContext.Provider>
-      </StandingContext.Provider>
+      <WechatPayContext.Provider value={wechatPay}>
+        <StandingContext.Provider value={held}>
+          <PaywallContext.Provider value={api}>
+            {children}
+            <PaywallSheet open={open} onOpenChange={setOpen} trigger={trigger} products={products} wishlistLive={wishlistLive} state={state} />
+          </PaywallContext.Provider>
+        </StandingContext.Provider>
+      </WechatPayContext.Provider>
     </PaymentChannelContext.Provider>
   )
 }

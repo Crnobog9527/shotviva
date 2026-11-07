@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { eventSchemas, uploadSizeBucket, validateEvent, type EventName } from './events'
+import { BROWSER_EVENTS, categorySlug, eventSchemas, SERVER_EVENTS, uploadSizeBucket, validateEvent, type EventName } from './events'
 
 const generate = {
   template_id: 'ramen-studio',
@@ -35,11 +35,56 @@ const valid: { [E in EventName]: unknown } = {
   contact_sales_click: { page: '/zh/pricing' },
   checkout_start: checkout,
   purchase: { ...checkout, product_id: 'pack_s', tier: 'pack', interval: null, form: 'one_time', amount_usd: 9.9, credits: 20 },
+  template_view: { template_id: 'ramen-studio', category: 'food', surface: 'workspace' },
+  paywall_select: { product_id: 'pro_yearly', method: 'cn_card' },
+  checkout_cancel: { product_id: 'pack_m', method: 'alipay' },
+  upload_error: { reason: 'transfer_failed' },
 }
 
 describe('event dictionary (ARCHITECTURE §16.2)', () => {
-  it('covers exactly the eight named events', () => {
-    expect(Object.keys(eventSchemas).sort()).toEqual(['checkout_start', 'contact_sales_click', 'generate', 'generate_refused', 'paywall_view', 'purchase', 'signup', 'upload'])
+  it('covers exactly the twelve named events', () => {
+    expect(Object.keys(eventSchemas).sort()).toEqual([
+      'checkout_cancel',
+      'checkout_start',
+      'contact_sales_click',
+      'generate',
+      'generate_refused',
+      'paywall_select',
+      'paywall_view',
+      'purchase',
+      'signup',
+      'template_view',
+      'upload',
+      'upload_error',
+    ])
+  })
+
+  it('sends every event from exactly one side', () => {
+    const sides = [...SERVER_EVENTS, ...BROWSER_EVENTS]
+    expect(new Set(sides).size).toBe(sides.length)
+    expect([...sides].sort()).toEqual(Object.keys(eventSchemas).sort())
+    // §16.2 (T74): checkout_cancel is a server event; the other three are browser events.
+    expect(SERVER_EVENTS).toContain('checkout_cancel')
+    expect(BROWSER_EVENTS).toEqual(expect.arrayContaining(['template_view', 'paywall_select', 'upload_error']))
+  })
+
+  // T74: template_view's category is the same slug generate sends: the display name before T75,
+  // the category key after it, which is already a slug and passes unchanged.
+  it('sends template_view with the category slug, old names and T75 keys alike', () => {
+    expect(validateEvent('template_view', { template_id: 'ramen-studio', category: 'Food & Drink', surface: 'workspace' }).ok).toBe(false)
+    expect(categorySlug('Food & Drink')).toBe('food-drink')
+    expect(categorySlug('food-drink')).toBe('food-drink')
+    expect(validateEvent('template_view', { template_id: 'ramen-studio', category: categorySlug('Food & Drink'), surface: 'workspace' }).ok).toBe(true)
+  })
+
+  // T74: enums only, so no file name, message or free text fits.
+  it('keeps the four T74 events to their enums', () => {
+    expect(validateEvent('template_view', { ...(valid.template_view as object), surface: 'gallery' }).ok).toBe(false)
+    expect(validateEvent('template_view', { template_id: 'ramen-studio', category: 'food' }).ok).toBe(false)
+    expect(validateEvent('paywall_select', { product_id: 'pro_yearly', method: 'paypal' }).ok).toBe(false)
+    expect(validateEvent('checkout_cancel', { product_id: 'unknown', method: 'card' }).ok).toBe(false)
+    expect(validateEvent('upload_error', { reason: 'IMG_0042.HEIC is too large' }).ok).toBe(false)
+    expect(validateEvent('upload_error', { reason: 'too_large', file: 'IMG_0042.HEIC' }).ok).toBe(false)
   })
 
   it.each(Object.entries(valid))('accepts a well-formed %s', (event, props) => {
@@ -63,7 +108,7 @@ describe('event dictionary (ARCHITECTURE §16.2)', () => {
     expect(validateEvent('generate_refused', { reason: 'nsfw', source: 'workspace' }).ok).toBe(false)
   })
 
-  // 中国银行卡 (T64, ARCHITECTURE §6.3): checkout_start.method = 'cn_card'; still no WeChat Pay.
+  // 中国银行卡 (T64, ARCHITECTURE §6.3): checkout_start.method = 'cn_card'.
   it('takes cn_card as a checkout method', () => {
     expect(validateEvent('checkout_start', { ...checkout, method: 'cn_card' }).ok).toBe(true)
     expect(validateEvent('purchase', { ...valid.purchase as object, method: 'cn_card' }).ok).toBe(true)
@@ -99,5 +144,17 @@ describe('uploadSizeBucket', () => {
     expect(uploadSizeBucket(1024 * 1024)).toBe('1-5MB')
     expect(uploadSizeBucket(5 * 1024 * 1024)).toBe('1-5MB')
     expect(uploadSizeBucket(18_000_000)).toBe('>5MB')
+  })
+})
+
+// T73: with WeChat Pay on, the Stripe wallet line starts as alipay_or_wechat; purchase names the
+// wallet that paid.
+describe('wallet methods (T73)', () => {
+  it('starts the wallet line as alipay_or_wechat and buys with alipay or wechat_pay', () => {
+    expect(validateEvent('checkout_start', { ...checkout, method: 'alipay_or_wechat' }).ok).toBe(true)
+    expect(validateEvent('checkout_start', { ...checkout, method: 'alipay' }).ok).toBe(true)
+    expect(validateEvent('checkout_start', { ...checkout, method: 'wechat_pay' }).ok).toBe(false)
+    expect(validateEvent('purchase', { ...valid.purchase as object, method: 'wechat_pay' }).ok).toBe(true)
+    expect(validateEvent('purchase', { ...valid.purchase as object, method: 'alipay_or_wechat' }).ok).toBe(false)
   })
 })

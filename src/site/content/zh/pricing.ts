@@ -36,6 +36,8 @@ const business: BusinessBlock = {
 
 const yearly = zhYearlySaving ? `${zhYearlySaving}。` : ''
 
+export const ALIPAY_QUESTION = '能用支付宝付款吗？'
+
 const faq: readonly FaqItem[] = [
   { question: '积分会过期吗？', answer: '不会。付费积分永不过期，套餐续费时没用完的积分会继续保留。' },
   {
@@ -47,7 +49,7 @@ const faq: readonly FaqItem[] = [
     answer: '可以。积分包是一次性付款，所有人都能买，得到的付费积分和套餐里的一样。',
   },
   {
-    question: '能用支付宝付款吗？',
+    question: ALIPAY_QUESTION,
     answer: '可以。用支付宝买套餐是一次性付款，买一个月或一年，到期不会自动扣款；积分包也能用支付宝买。价格同样以美元计。',
   },
   {
@@ -55,6 +57,12 @@ const faq: readonly FaqItem[] = [
     answer: '打开「我的」页面，点「管理订阅」。套餐会在已付费周期结束时到期，积分留在你的账号里。',
   },
 ]
+
+// 支付宝那一项在 STRIPE_WECHAT_PAY 打开时（T73，只在 Stripe 通道）换成这一条；关着时是上面的原文。
+export const ZH_WECHAT_PAY_FAQ: FaqItem = {
+  question: '能用支付宝或微信支付付款吗？',
+  answer: '可以。付款方式选「支付宝 / 微信支付」，在结账页再选其中一种。用它们买套餐是一次性付款，买一个月或一年，到期不会自动扣款；积分包也能这样买。价格同样以美元计。',
+}
 
 // Waffo 通道（T50）：银行卡套餐同样自动续费，只是取消按钮在「我的」页面上，不经过 Stripe。
 const CANCEL_QUESTION = '怎么取消套餐？'

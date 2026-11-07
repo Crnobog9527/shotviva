@@ -9,11 +9,13 @@ import {
   ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
+  type S3ClientConfig,
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 import { serverEnv } from '../env'
 import { AppError } from '../errors'
+import { createR2MarkerStore, MARKER_TIMEOUT_MS, type MarkerStore } from './marker-store'
 import type { ObjectStore } from './object-store'
 
 // Cloudflare R2 through its S3 API. Written fresh for Shotviva (not copied from the
@@ -29,8 +31,10 @@ const isNotFound = (error: unknown) =>
     (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode === 404)
 
 // R2 rejects the CRC32 checksum headers newer SDKs add to presigned URLs by default.
-export function createR2Client(config: { accountId: string; accessKeyId: string; secretAccessKey: string }) {
+// extra: per-use overrides, e.g. the alert markers' short timeout and single attempt.
+export function createR2Client(config: { accountId: string; accessKeyId: string; secretAccessKey: string }, extra: S3ClientConfig = {}) {
   return new S3Client({
+    ...extra,
     region: 'auto',
     endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey },
@@ -129,4 +133,23 @@ export function r2PublicStore(): ObjectStore {
   if (!credentials || !R2_PUBLIC_BUCKET) throw new AppError('INTERNAL', 'R2 public assets bucket is not configured')
   cachedPublic = createR2Store(createR2Client(credentials), R2_PUBLIC_BUCKET)
   return cachedPublic
+}
+
+let cachedMarkers: MarkerStore | null | undefined
+
+// The owner-alert dedupe markers (core/alerts, T72) in the private bucket. A client of its own:
+// one attempt, no SDK retries, a short socket timeout, so an alert never waits on a slow R2.
+// null when R2 is not configured (alerts then dedupe per instance only).
+export function r2MarkerStore(): MarkerStore | null {
+  if (cachedMarkers !== undefined) return cachedMarkers
+  const credentials = r2Credentials()
+  const { R2_BUCKET } = serverEnv()
+  cachedMarkers =
+    credentials && R2_BUCKET
+      ? createR2MarkerStore(
+          createR2Client(credentials, { maxAttempts: 1, requestHandler: { connectionTimeout: 1000, requestTimeout: MARKER_TIMEOUT_MS } }),
+          R2_BUCKET,
+        )
+      : null
+  return cachedMarkers
 }

@@ -4,6 +4,7 @@ import createNextIntlPlugin from 'next-intl/plugin'
 
 import { parseSentryBuildEnv } from './src/core/build-env'
 import { indexingOpen, parseIndexingEnv, xRobotsTagRules } from './src/core/seo/indexing-env'
+import { legacyUserRedirects } from './src/core/admin/users/legacy-redirects'
 import { legacyHelpRedirects } from './src/core/support/legacy-redirects'
 import { assetsHeaders, assetsRemotePatterns, assetsRewrites, readAssetsEnv } from './src/core/storage/assets-env'
 import { SITE_DOMAIN } from './src/site/domain'
@@ -65,7 +66,7 @@ const nextConfig: NextConfig = {
   },
   // The old /account/help pages open the account page's Help dialog instead (T68).
   async redirects() {
-    return legacyHelpRedirects()
+    return [...legacyHelpRedirects(), ...legacyUserRedirects()]
   },
   async rewrites() {
     return [

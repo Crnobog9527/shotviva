@@ -10,7 +10,7 @@ import { currentLocale } from '@/core/i18n/server'
 import { fileUrlFor, findOwnJob, hasInputPreview, keptInputsOf, originalUrlFor, type Job } from '@/core/jobs'
 import { r2Store } from '@/core/storage'
 import { EDIT_TEMPLATE_ID, listTemplatesIn, loadEditOffer } from '@/core/templates'
-import { DeleteWork, EditFlow, EditTrigger, editDisplay, editOriginal, ResultView, toPhotoDetail } from '@/modules/image'
+import { DeleteWork, EditFlow, EditTrigger, editDisplay, editOriginal, opensEdit, ResultView, toPhotoDetail } from '@/modules/image'
 import { site } from '@/site/site.config'
 
 import { deleteWorkAction } from './actions'
@@ -40,9 +40,10 @@ async function loadAround(supabase: Awaited<ReturnType<typeof createServerSupaba
 
 // One finished photo, a flow page pushed from Photos: the result, the upload's preview and the
 // user's note (T32), Share, and Edit when editing is on (ARCHITECTURE §5.2). An edit shows the
-// work it came from and the words it used.
-async function Result({ params }: { params: Promise<{ jobId: string }> }) {
-  const { jobId } = await params
+// work it came from and the words it used. ?edit=1 ("Edit this photo" on the workspace) opens
+// the edit panel straight away.
+async function Result({ params, searchParams }: Pick<PageProps<'/[locale]/photos/[jobId]'>, 'params' | 'searchParams'>) {
+  const [{ jobId }, query] = await Promise.all([params, searchParams])
   const user = await requireUser(`/photos/${jobId}`)
   const supabase = await createServerSupabase()
   const job = await findOwnJob(supabase, user.id, jobId)
@@ -75,6 +76,7 @@ async function Result({ params }: { params: Promise<{ jobId: string }> }) {
           balance={balance}
           creditsCost={offer.creditsCost}
           concurrency={limitsFor(tier).concurrency}
+          openOnLoad={opensEdit(query.edit)}
         >
           {view}
         </EditFlow>
@@ -85,11 +87,11 @@ async function Result({ params }: { params: Promise<{ jobId: string }> }) {
   )
 }
 
-export default function ResultPage({ params }: PageProps<'/[locale]/photos/[jobId]'>) {
+export default function ResultPage({ params, searchParams }: PageProps<'/[locale]/photos/[jobId]'>) {
   return (
     <AppPage wide>
       <Suspense fallback={<Nav title="" />}>
-        <Result params={params} />
+        <Result params={params} searchParams={searchParams} />
       </Suspense>
     </AppPage>
   )

@@ -32,7 +32,7 @@ export { ResultView } from './result/result-view'
 export { DeleteWork, type DeleteWorkAction } from './result/delete-work'
 export { DeletedToast } from './photos/deleted-toast'
 export { toPhotoDetail, type PhotoDetail } from './detail/photo-detail'
-export { EditFlow, EditTrigger, type EditSource } from './edit-ui'
+export { EditFlow, EditTrigger, opensEdit, type EditSource } from './edit-ui'
 // Wishlist post form (T12): one upload field, same zone and stages as the workspace.
 export { PhotoTile, type PhotoTileProps } from './workspace/photo-tile'
 // Home first-screen generator (T36): same pipeline as the workspace (DESIGN §6.9 item 9).

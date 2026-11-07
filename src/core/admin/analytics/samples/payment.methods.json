@@ -1,0 +1,93 @@
+{
+ "cache_key": "cache_payment_methods",
+ "is_cached": false,
+ "last_refresh": "2026-11-08T08:00:00.000000Z",
+ "next_allowed_client_refresh": "2026-11-08T08:01:00.000000Z",
+ "timezone": "UTC",
+ "columns": [
+  "cur",
+  "method",
+  "started",
+  "paid",
+  "cancels"
+ ],
+ "types": [
+  [
+   "cur",
+   "Bool"
+  ],
+  [
+   "method",
+   "String"
+  ],
+  [
+   "started",
+   "UInt64"
+  ],
+  [
+   "paid",
+   "UInt64"
+  ],
+  [
+   "cancels",
+   "UInt64"
+  ]
+ ],
+ "results": [
+  [
+   1,
+   "card",
+   60,
+   38,
+   9
+  ],
+  [
+   1,
+   "cn_card",
+   30,
+   12,
+   6
+  ],
+  [
+   1,
+   "alipay_wechat",
+   25,
+   19,
+   2
+  ],
+  [
+   1,
+   "other",
+   2,
+   1,
+   0
+  ],
+  [
+   0,
+   "card",
+   50,
+   30,
+   7
+  ],
+  [
+   0,
+   "alipay_wechat",
+   20,
+   12,
+   3
+  ]
+ ],
+ "hasMore": false,
+ "limit": 100,
+ "offset": 0,
+ "modifiers": {
+  "personsOnEventsMode": "person_id_override_properties_joined"
+ },
+ "query_status": null,
+ "timings": [
+  {
+   "k": "./query",
+   "t": 0.21
+  }
+ ]
+}
