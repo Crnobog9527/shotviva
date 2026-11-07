@@ -378,7 +378,8 @@
         "hud": "Done",
         "saved": "Saved to Photos",
         "line": "{tier} · <mono>{px, number, ::group-off}</mono> px · {count, plural, one {# credit} other {# credits}} used.{pool, select, free { Made with free credits, so it's public with a watermark.} paid { Made with paid credits, so it's private and watermark-free.} other {}}",
-        "caption": "Phone photo → {name}."
+        "caption": "Phone photo → {name}.",
+        "edit": "Edit this photo"
       },
       "failState": {
         "hud": "Not developed",
