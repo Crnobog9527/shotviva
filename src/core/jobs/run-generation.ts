@@ -157,8 +157,11 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
     quality: template.quality,
     params: prompt.modelParams,
   }
-  const extras = { inputKeys: req.inputKey ? [req.inputKey] : [], decision: screenCost(deps, prepared.screen) }
-  const settle = () => settleGeneration(deps, job, call, outputKeyFor(req.userId, job.id), extras)
+  const settle = () =>
+    settleGeneration(deps, job, call, outputKeyFor(req.userId, job.id), {
+      inputKeys: req.inputKey ? [req.inputKey] : [],
+      decision: screenCost(deps, prepared.screen),
+    })
   const settled = await settleTracked(job, template.category, settle, {
     track: deps.track,
     batchSize: req.batchSize ?? 1,

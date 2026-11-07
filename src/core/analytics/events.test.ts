@@ -103,9 +103,6 @@ describe('event dictionary (ARCHITECTURE §16.2)', () => {
     expect(validateEvent('purchase', checkout).ok).toBe(false)
     expect(validateEvent('contact_sales_click', { page: '/pricing' }).ok).toBe(true)
     expect(validateEvent('contact_sales_click', { page: '/account' }).ok).toBe(false)
-    // T81: no text rides on a refusal, only which entry it came from.
-    expect(validateEvent('generate_refused', { reason: 'identity_swap', source: 'workspace', note: 'x' }).ok).toBe(false)
-    expect(validateEvent('generate_refused', { reason: 'nsfw', source: 'workspace' }).ok).toBe(false)
   })
 
   // 中国银行卡 (T64, ARCHITECTURE §6.3): checkout_start.method = 'cn_card'.
@@ -156,5 +153,14 @@ describe('wallet methods (T73)', () => {
     expect(validateEvent('checkout_start', { ...checkout, method: 'wechat_pay' }).ok).toBe(false)
     expect(validateEvent('purchase', { ...valid.purchase as object, method: 'wechat_pay' }).ok).toBe(true)
     expect(validateEvent('purchase', { ...valid.purchase as object, method: 'alipay_or_wechat' }).ok).toBe(false)
+  })
+})
+
+describe('generate_refused (ARCHITECTURE §5.1a, T81)', () => {
+  it('carries which entry refused, never the words', () => {
+    expect(SERVER_EVENTS).toContain('generate_refused')
+    expect(validateEvent('generate_refused', { reason: 'identity_swap', source: 'workspace', note: 'x' }).ok).toBe(false)
+    expect(validateEvent('generate_refused', { reason: 'nsfw', source: 'workspace' }).ok).toBe(false)
+    expect(validateEvent('generate_refused', { reason: 'identity_swap', source: 'web' }).ok).toBe(false)
   })
 })
