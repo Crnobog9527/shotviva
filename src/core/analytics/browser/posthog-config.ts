@@ -70,7 +70,9 @@ export function posthogConfig(consent: Consent, pathname: string): Partial<PostH
     // the anonymous events before it into it.
     person_profiles: 'identified_only',
     capture_pageview: 'history_change',
-    capture_pageleave: 'if_capture_pageview',
+    // $pageleave carries the page's time on page and deepest scroll ($prev_pageview_duration,
+    // $prev_pageview_max_scroll_percentage) that /admin/analytics reads (ARCHITECTURE §16.2a, T74).
+    capture_pageleave: true,
     autocapture: true,
     // Not forced on: the PostHog project's replay switch and sampling decide. Kept off here only
     // without cookie consent and on /admin and /checkout.

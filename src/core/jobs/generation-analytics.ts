@@ -3,6 +3,7 @@ import 'server-only'
 import { z } from 'zod'
 
 import { track as defaultTrack, type EventProps, type ServerTrack } from '../analytics'
+import { categorySlug } from '../analytics/events'
 import { DEFAULT_LOCALE, type Locale } from '../i18n/locales'
 import { EDIT_SCOPES } from '../templates/edit-params'
 import { GenerationFailure } from './generation-failure'
@@ -14,20 +15,9 @@ const resolution = z.enum(['1k', '2k', '3k']).catch('1k')
 // Only edits carry a scope (T30); a template generation has none.
 const editScope = z.enum(EDIT_SCOPES).nullable().catch(null)
 
-// templates.category holds the template_categories key since T75 ("products-resale"), already
-// a slug, so this returns it unchanged; it stays as the guard the dictionary needs (ARCHITECTURE
-// §16.2, events.ts: before T75 the stored display names were refused as "invalid_format").
-// Lowercased, with each run of other characters turned into one hyphen; nothing left becomes
-// 'uncategorized' rather than losing the event.
-export function categorySlug(category: string): string {
-  const slug = category
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 64)
-    .replace(/-+$/, '')
-  return slug || 'uncategorized'
-}
+// The category as the event dictionary takes it (moved to events.ts in T74 so the browser's
+// template_view sends the same value). Re-exported for the existing callers and tests.
+export { categorySlug }
 
 type Outcome = { status: 'succeeded' } | { status: 'failed'; errorCode: string | null }
 

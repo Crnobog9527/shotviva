@@ -153,3 +153,5 @@ export {
   type CostKeyActions,
   type CostSettingsInput,
 } from './costs'
+export { parseFunnelDim, parsePageSort, parseRange, posthogProjectId, type FunnelDim, type PageSort, type Range } from './analytics'
+export { ANALYTICS_COPY, AnalyticsView, RangeTabs, Unconfigured, type AnalyticsQuery } from './analytics-ui'

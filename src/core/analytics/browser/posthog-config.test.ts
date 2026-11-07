@@ -34,6 +34,12 @@ describe('posthogConfig (ARCHITECTURE §16.1, T70)', () => {
     expect(posthogConfig(outsideEurope, '/').session_recording).toEqual({ maskAllInputs: true, blockSelector: `.${REPLAY_BLOCK_CLASS}` })
   })
 
+  // T74: time on page and scroll depth come from $pageleave, so it is on whatever the defaults say.
+  it('captures page views on client navigation and page leaves', () => {
+    expect(posthogConfig(outsideEurope, '/')).toMatchObject({ capture_pageview: 'history_change', capture_pageleave: true })
+    expect(posthogConfig(european, '/')).toMatchObject({ capture_pageleave: true })
+  })
+
   it('sends through the same-origin /ingest proxy', () => {
     expect(posthogConfig(outsideEurope, '/')).toMatchObject({ api_host: '/ingest', ui_host: 'https://us.posthog.com' })
   })

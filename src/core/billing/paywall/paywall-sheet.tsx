@@ -2,6 +2,8 @@
 
 import { useTranslations } from "next-intl"
 
+import { trackPaywallSelect } from "../../analytics/browser"
+
 import type { SiteProduct } from "../../config"
 import { ResponsiveSheet } from "../../ui/responsive-sheet"
 import { usePushBack } from "../../ui/use-push-back"
@@ -11,8 +13,8 @@ import { PayMethods } from "./pay-methods"
 import { PaywallCheckout } from "./paywall-checkout"
 import type { PaywallTrigger } from "./paywall-context"
 import { PackPicker, TierPicker } from "./paywall-pickers"
-import { resolvePick } from "./pick"
-import type { PaywallState } from "./use-paywall-state"
+import { resolvePick, selectedProduct } from "./pick"
+import type { PaywallChoice, PaywallState } from "./use-paywall-state"
 
 type Props = {
   open: boolean
@@ -33,6 +35,13 @@ export function PaywallSheet({ open, onOpenChange, trigger, products, wishlistLi
   const packs = packOffers(products)
   const { choice, update } = state
   const resolved = resolvePick(choice.pick, choice.period, offers, packs)
+  // The buyer's own picks count as paywall_select (T74); the preselected opening does not.
+  const select = (patch: Partial<PaywallChoice>) => {
+    update(patch)
+    const picked = selectedProduct(choice, patch, offers, packs)
+    if (picked) trackPaywallSelect(picked)
+  }
+  const picking = { ...state, update: select }
   // The page behind steps back on phones and dims on desktop (paywall.html .behind).
   usePushBack(open)
   return (
@@ -45,15 +54,15 @@ export function PaywallSheet({ open, onOpenChange, trigger, products, wishlistLi
       aside={
         <BillingToggle
           period={choice.period}
-          onChange={(period) => update({ period })}
+          onChange={(period) => select({ period })}
           savePct={yearlySavingPct(offers)}
           className="mt-4 md:mt-1 md:w-[400px] md:flex-none"
         />
       }
       footer={resolved ? <PaywallCheckout resolved={resolved} choice={choice} /> : null}
     >
-      <TierPicker offers={offers} wishlistLive={wishlistLive} state={state} />
-      <PackPicker packs={packs} state={state} />
+      <TierPicker offers={offers} wishlistLive={wishlistLive} state={picking} />
+      <PackPicker packs={packs} state={picking} />
       <PayMethods method={choice.method} onChange={(method) => update({ method })} kind={resolved?.kind ?? "plan"} period={choice.period} />
     </ResponsiveSheet>
   )

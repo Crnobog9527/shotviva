@@ -12,6 +12,11 @@ export function trackCheckoutStart(userId: string, props: EventProps<'checkout_s
   track('checkout_start', props, { distinctId: userId, locale })
 }
 
+// Back from the hosted checkout without paying (Stripe's cancel_url, T74).
+export function trackCheckoutCancel(userId: string, props: EventProps<'checkout_cancel'>, locale: Locale): void {
+  track('checkout_cancel', props, { distinctId: userId, locale })
+}
+
 // After the webhook has credited the purchase (apply_purchase applied: true), never on a replay.
 export function trackPurchase(userId: string, props: EventProps<'purchase'>, locale: Locale): void {
   track('purchase', props, { distinctId: userId, locale })

@@ -128,7 +128,7 @@ Owner 2026-11-05 定稿：**B 版「暗房」（Darkroom）**，取代此前的�
      - **档位权益**（Owner 2026-11-05，见 ARCHITECTURE §6.2「会员档位权益」）：每张卡列 "Everything in X, plus"。**只有已经上线的权益可以写成现有功能**；没上线的放在卡片底部单独一组，统一标 "Coming soon"，灰色小字，不能和现有权益混排。哪些上线、哪些 Coming soon 以 ARCHITECTURE §6.2 那张表为准。
      - 英文页面付款方式只写 "Alipay"，不带中文；中文页面写「支付宝」（Owner 2026-11-06）。
   2. **第二屏：选周期**。顶部分段控件 **Monthly / Yearly**（Yearly 段上标 "Save 40%"，折扣数从配置算），下面是所选档位的价格、credits 总数（年付写 "600 credits upfront"）和每 credit 单价；再往下是两组付款方式。从积分包入口进来的第二屏是 S / M / L 三项（"20 credits · $9.90" 并标 "One-time · no subscription"），再往下同样两组付款方式。
-- **两组付款方式**：「Card · Apple Pay · Google Pay」和「Alipay」（不接微信支付，Owner 2026-11-05）。会员商品下，卡那组小字 "Renews automatically, cancel anytime"，钱包那组小字 "One-time payment, 30 days / 1 year, no auto-renew"；积分包在两组下都是单笔，小字只写 "One-time payment"。走 Waffo 时全部单笔。
+- **两组付款方式**：「Card · Apple Pay · Google Pay」和「Alipay」；开关 `STRIPE_WECHAT_PAY` 打开后这一组改名「Alipay / WeChat Pay」（中文「支付宝 / 微信支付」，T73，Owner 2026-11-07；原「不接微信支付」作废）。会员商品下，卡那组小字 "Renews automatically, cancel anytime"，钱包那组小字 "One-time payment, 30 days / 1 year, no auto-renew"；积分包在两组下都是单笔，小字只写 "One-time payment"。走 Waffo 时全部单笔。
 - `/pricing` 页用同一套信息，桌面三栏并排（Starter / Pro / Max，顶部 Monthly / Yearly 切换），积分包一行三项放在下面；手机上退化成和付费墙一样的竖排。
 - 账号页「Subscription」区块：当前档位和周期（"Pro · Yearly"）、状态（Active / Cancels on … / Past due / Free）、下次续费日，一个「Manage subscription」按钮打开 Stripe Customer Portal；钱包用户显示 "Paid until …" 和「Renew」按钮。
 - 付款方式图标：卡、支付宝，按当前通道可用的方式显示。

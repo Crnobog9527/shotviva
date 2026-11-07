@@ -4,4 +4,15 @@
 export { compressImage, targetSize } from './compress-image'
 export { putWithProgress } from './put-with-progress'
 export { requestTicket } from './request-ticket'
-export { checkPickedFile, isAbort, UploadError, uploadPhoto, type UploadCallbacks, type UploadDeps, type UploadErrorCode, type UploadPhase } from './upload-photo'
+export {
+  checkPickedFile,
+  isAbort,
+  UploadError,
+  uploadErrorReason,
+  uploadPhoto,
+  type UploadCallbacks,
+  type UploadDeps,
+  type UploadErrorCode,
+  type UploadErrorReason,
+  type UploadPhase,
+} from './upload-photo'

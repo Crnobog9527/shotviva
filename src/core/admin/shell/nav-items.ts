@@ -6,6 +6,8 @@ export type AdminNavItem = { key: AdminNavKey; href: `/admin${string}`; label: s
 // Order fixed by T23 / ARCHITECTURE §10; later pages append.
 const ITEMS: readonly { key: AdminNavKey; href: `/admin${string}` }[] = [
   { key: 'overview', href: '/admin' },
+  // T74 (ARCHITECTURE §16.2a): traffic and conversion from PostHog, next to the business overview.
+  { key: 'analytics', href: '/admin/analytics' },
   { key: 'users', href: '/admin/users' },
   { key: 'tickets', href: '/admin/tickets' },
   { key: 'orders', href: '/admin/orders' },

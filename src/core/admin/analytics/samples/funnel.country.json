@@ -1,0 +1,156 @@
+{
+ "cache_key": "cache_funnel_country",
+ "is_cached": false,
+ "last_refresh": "2026-11-08T08:00:00.000000Z",
+ "next_allowed_client_refresh": "2026-11-08T08:01:00.000000Z",
+ "timezone": "UTC",
+ "columns": [
+  "cur",
+  "seg",
+  "s0",
+  "s1",
+  "s2",
+  "s3",
+  "s4",
+  "s5"
+ ],
+ "types": [
+  [
+   "cur",
+   "Bool"
+  ],
+  [
+   "seg",
+   "String"
+  ],
+  [
+   "s0",
+   "UInt64"
+  ],
+  [
+   "s1",
+   "UInt64"
+  ],
+  [
+   "s2",
+   "UInt64"
+  ],
+  [
+   "s3",
+   "UInt64"
+  ],
+  [
+   "s4",
+   "UInt64"
+  ],
+  [
+   "s5",
+   "UInt64"
+  ]
+ ],
+ "results": [
+  [
+   1,
+   "US",
+   800,
+   200,
+   160,
+   80,
+   26,
+   13
+  ],
+  [
+   1,
+   "CN",
+   600,
+   150,
+   120,
+   60,
+   20,
+   10
+  ],
+  [
+   1,
+   "GB",
+   200,
+   50,
+   40,
+   20,
+   6,
+   3
+  ],
+  [
+   1,
+   "DE",
+   150,
+   37,
+   30,
+   15,
+   5,
+   2
+  ],
+  [
+   1,
+   "CA",
+   120,
+   30,
+   24,
+   12,
+   4,
+   2
+  ],
+  [
+   1,
+   "AU",
+   90,
+   22,
+   18,
+   9,
+   3,
+   1
+  ],
+  [
+   1,
+   "JP",
+   60,
+   15,
+   12,
+   6,
+   2,
+   1
+  ],
+  [
+   1,
+   "FR",
+   40,
+   10,
+   8,
+   4,
+   1,
+   0
+  ],
+  [
+   1,
+   "",
+   30,
+   7,
+   6,
+   3,
+   1,
+   0
+  ]
+ ],
+ "hasMore": false,
+ "limit": 100,
+ "offset": 0,
+ "modifiers": {
+  "personsOnEventsMode": "person_id_override_properties_joined"
+ },
+ "query_status": null,
+ "timings": [
+  {
+   "k": "./query",
+   "t": 0.21
+  }
+ ]
+}

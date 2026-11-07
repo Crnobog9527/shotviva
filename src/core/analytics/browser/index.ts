@@ -1,5 +1,16 @@
 // Browser entry (ARCHITECTURE §16). Server code imports '@/core/analytics'.
-export { identify, initBrowserAnalytics, onRouterTransitionStart, resetIdentity, track, trackContactSales, trackPaywallView } from './client'
+export {
+  identify,
+  initBrowserAnalytics,
+  onRouterTransitionStart,
+  resetIdentity,
+  track,
+  trackContactSales,
+  trackPaywallSelect,
+  trackPaywallView,
+  trackTemplateView,
+  trackUploadError,
+} from './client'
 export { AnalyticsIdentify } from './analytics-identify'
 export { ConsentSlot } from '../consent-ui/consent-slot'
 export { CookieSettingsButton } from '../consent-ui/cookie-settings-button'
