@@ -950,12 +950,12 @@ Owner 2026-11-06 发现中文页有功能缺失。逐页对比现有英文页和
 
 **范围**：
 - 中文登录 / 注册页加「手机号登录 / 邮箱登录」页签（中文默认手机号），英文页不变；按 DESIGN 的表单样式做，必须用 impeccable skill 核对；手机号输入固定 `+86`，验证码 6 格，60 秒倒计时重发。
-- Supabase 手机号 OTP（`signInWithOtp({ phone })` + `verifyOtp`）；Send SMS Auth Hook 指向 `app/api/auth/sms-hook`：校验 Hook 签名，限频（同号 60 秒 1 条 / 每天 5 条，同 IP 每天 20 条，非 `+86` 拒绝），再交给短信适配器；适配器两个实现：阿里云 Dysmsapi `SendSms`（环境变量 `ALIYUN_SMS_ACCESS_KEY_ID` / `ALIYUN_SMS_ACCESS_KEY_SECRET` / `ALIYUN_SMS_SIGN_NAME` / `ALIYUN_SMS_TEMPLATE_CODE`，模板参数名 `code`）和测试用假发送；限频计数用数据库（迁移编号段 `0440`～`0459`，只加不改）或现有限频设施，二选一说明理由。日志、Sentry、埋点里不出现验证码。
+- Supabase 手机号 OTP（`signInWithOtp({ phone })` + `verifyOtp`）；Send SMS Auth Hook 指向 `app/api/auth/sms-hook`：校验 Hook 签名，限频（同号 60 秒 1 条 / 每天 5 条，同 IP 每天 20 条，非 `+86` 拒绝），再交给短信适配器；适配器两个实现：阿里云号码认证服务 Dypnsapi `SendSmsVerifyCode`（Owner 2026-11-07 改用：免企业资质，赠送签名 + 配套模板；环境变量 `ALIYUN_SMS_ACCESS_KEY_ID` / `ALIYUN_SMS_ACCESS_KEY_SECRET` / `ALIYUN_SMS_SIGN_NAME` / `ALIYUN_SMS_TEMPLATE_CODE`，模板参数 `code` 和 `min`，验证码由 Supabase 生成）和测试用假发送；限频计数用数据库（迁移编号段 `0440`～`0459`，只加不改）或现有限频设施，二选一说明理由。日志、Sentry、埋点里不出现验证码。
 - 手机号验证过 = 已验证：出图、注册赠送（同 IP 规则照旧）、埋点 `signup.method = 'phone'`；所有「必须已验证邮箱」的判断改为「邮箱或手机号已验证」。
 - 无邮箱账号：结账不传 `customer_email`（让 Stripe / Waffo 收集），工单回复只站内提醒，账号页显示脱敏手机号，后台用户列表 / 搜索 / 用户详情能显示和搜手机号；所有读 `email` 的地方处理空值。
 - 合规：手机号注册单独勾选同意隐私政策和个人信息出境（未勾不能发码）；隐私政策加手机号 / 短信服务商 / 出境一节（英文）。
 - 环境变量登记进 `.env.example`（只有名字）；`scripts/qa` 给预览加一个用 Supabase 测试号码的手机号 QA 账号说明。
 
-**Owner 侧（不阻塞开发，阻塞上线）**：服务商开通阿里云短信（中国公司主体），签名和验证码模板过审，拿到 AccessKey；阿里云设每日上限和余额报警；Supabase 预览 / 生产开启手机号登录、配 Send SMS Hook（地址 + 密钥）、预览配测试号码。密钥由 Owner 从剪贴板直接写进 Vercel / Supabase，不经过聊天。
+**Owner 侧（不阻塞开发，阻塞上线）**：用 Owner 本人实名的阿里云账号开通号码认证服务的「短信认证」，在控制台取赠送签名名称和配套模板编号，建只有短信认证发送权限的 RAM 子账号并生成 AccessKey，买套餐包或充值，设余额报警；Supabase 预览 / 生产开启手机号登录、配 Send SMS Hook（地址 + 密钥）、预览配测试号码。密钥由 Owner 从剪贴板直接写进 Vercel / Supabase，不经过聊天。
 
 **验收**：中文页手机号注册 → 收码 → 登录 → 能出图、有注册赠送；同号 60 秒内重发被拒、每天第 6 条被拒、非 +86 被拒；未勾同意不能发码；英文页不出现手机号入口；无邮箱账号能结账（支付页收邮箱）、能开工单；后台能搜到手机号；单测覆盖 Hook 签名、限频、适配器（假发送）和空邮箱分支；交互验收交给 Codex（测试站，用 Supabase 测试号码，不发真短信）；生产真短信由 Owner 在第 10 阶段实测一条。
