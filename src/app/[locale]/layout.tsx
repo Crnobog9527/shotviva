@@ -12,8 +12,12 @@ import { site } from '@/site/site.config'
 import { fontVariables } from '../fonts'
 import '../globals.css'
 
-// Default robots is noindex; only paths in site.indexing opt in (core/seo/indexing.ts).
-export const metadata: Metadata = rootMetadata(site)
+// Default robots is noindex; only paths in site.indexing opt in (core/seo/indexing.ts). The web
+// app manifest follows the language (T65).
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await rootLocale()
+  return rootMetadata(site, isLocale(locale) ? locale : site.locales.default)
+}
 
 // viewport-fit=cover so fixed bars can pad with env(safe-area-inset-*) (DESIGN §8.5).
 export const viewport: Viewport = {
