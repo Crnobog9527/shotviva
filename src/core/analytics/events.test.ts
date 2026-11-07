@@ -109,15 +109,6 @@ describe('event dictionary (ARCHITECTURE §16.2)', () => {
     expect(validateEvent('purchase', { ...valid.purchase as object, method: 'cn_card' }).ok).toBe(true)
     expect(validateEvent('checkout_start', { ...checkout, method: 'wechat' }).ok).toBe(false)
   })
-
-  // T73: the Stripe wallet line starts as alipay_or_wechat; purchase names the wallet that paid.
-  it('starts the wallet line as alipay_or_wechat and buys with alipay or wechat_pay', () => {
-    expect(validateEvent('checkout_start', { ...checkout, method: 'alipay_or_wechat' }).ok).toBe(true)
-    expect(validateEvent('checkout_start', { ...checkout, method: 'alipay' }).ok).toBe(true)
-    expect(validateEvent('checkout_start', { ...checkout, method: 'wechat_pay' }).ok).toBe(false)
-    expect(validateEvent('purchase', { ...valid.purchase as object, method: 'wechat_pay' }).ok).toBe(true)
-    expect(validateEvent('purchase', { ...valid.purchase as object, method: 'alipay_or_wechat' }).ok).toBe(false)
-  })
 })
 
 describe('no personal data in events (ARCHITECTURE §16.1)', () => {
@@ -148,5 +139,17 @@ describe('uploadSizeBucket', () => {
     expect(uploadSizeBucket(1024 * 1024)).toBe('1-5MB')
     expect(uploadSizeBucket(5 * 1024 * 1024)).toBe('1-5MB')
     expect(uploadSizeBucket(18_000_000)).toBe('>5MB')
+  })
+})
+
+// T73: with WeChat Pay on, the Stripe wallet line starts as alipay_or_wechat; purchase names the
+// wallet that paid.
+describe('wallet methods (T73)', () => {
+  it('starts the wallet line as alipay_or_wechat and buys with alipay or wechat_pay', () => {
+    expect(validateEvent('checkout_start', { ...checkout, method: 'alipay_or_wechat' }).ok).toBe(true)
+    expect(validateEvent('checkout_start', { ...checkout, method: 'alipay' }).ok).toBe(true)
+    expect(validateEvent('checkout_start', { ...checkout, method: 'wechat_pay' }).ok).toBe(false)
+    expect(validateEvent('purchase', { ...valid.purchase as object, method: 'wechat_pay' }).ok).toBe(true)
+    expect(validateEvent('purchase', { ...valid.purchase as object, method: 'alipay_or_wechat' }).ok).toBe(false)
   })
 })
