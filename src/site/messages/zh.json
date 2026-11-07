@@ -940,11 +940,10 @@
       "en": "English",
       "zh": "简体中文"
     },
-    "banner": {
-      "text": "这个页面有中文版。",
-      "textSite": "Shotviva 有简体中文版。",
-      "switch": "切换到中文",
-      "dismiss": "关闭，继续看英文版"
+    "hint": {
+      "text": "切换到中文？",
+      "switch": "切换",
+      "dismiss": "不用了，继续看英文版"
     },
     "inCurrent": {
       "en": "英文",

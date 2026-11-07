@@ -218,7 +218,7 @@ html:lang(zh-Hans) :is(em, i, .italic) {
   font-style: normal;
 }
 
-/* Chinese words on an English page (the switcher's 中文, the switch banner) use the system
+/* Chinese words on an English page (the switcher's 中文, the globe's language hint) use the system
    CJK fonts, so an English page never downloads a MiSans subset (ARCHITECTURE §17). */
 @utility font-cjk-system {
   font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;

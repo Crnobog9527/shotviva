@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
-import { DEFAULT_LOCALE, type Locale } from '../i18n/locales'
+import { chosenLocale } from '../i18n/locale-cookie'
+import { localeRedirect } from '../i18n/locale-redirect'
+import { DEFAULT_LOCALE, LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE, type Locale } from '../i18n/locales'
 import { localizePath, matchesPaths, splitLocale } from '../i18n/paths'
 import { publicEnv } from '../public-env'
 import { loginPath } from './redirect-target'
@@ -93,11 +95,30 @@ async function addressAnswer(request: NextRequest, options: ProxyGateOptions): P
   return null
 }
 
+// A 307 to the chosen language's twin (ARCHITECTURE §17); null when there is nothing to move.
+function toChosenLocale(request: NextRequest, chosen: Locale | null, translatedPaths: readonly string[]): NextResponse | null {
+  const { pathname, search } = request.nextUrl
+  const target = localeRedirect({ method: request.method, pathname, search, chosen }, translatedPaths)
+  return target ? NextResponse.redirect(new URL(target, request.url), 307) : null
+}
+
+// Signed in on another device, or before the cookie existed: the account's own language
+// (user_metadata.locale) stands in for the cookie on app pages, and is copied into it.
+export function toAccountLocale(request: NextRequest, user: SessionUser | null, translatedPaths: readonly string[]): NextResponse | null {
+  if (!user?.locale) return null
+  const moved = toChosenLocale(request, user.locale, translatedPaths)
+  moved?.cookies.set(LOCALE_COOKIE, user.locale, { path: '/', maxAge: LOCALE_COOKIE_MAX_AGE, sameSite: 'lax' })
+  return moved
+}
+
 export async function proxyGate(request: NextRequest, options: ProxyGateOptions): Promise<NextResponse> {
   const { pathname, search } = request.nextUrl
   if (NOT_A_PAGE.test(pathname)) return updateSession(request, forwardRequest)
   const early = await addressAnswer(request, options)
   if (early) return early
+  const chosen = chosenLocale(request.headers.get('cookie') ?? '')
+  const moved = toChosenLocale(request, chosen, options.translatedPaths)
+  if (moved) return moved
   const { locale, path } = splitLocale(pathname)
   const gate = gateFor(path)
   if (!gate) return updateSession(request, options.forward)
@@ -106,7 +127,13 @@ export async function proxyGate(request: NextRequest, options: ProxyGateOptions)
     ? await currentUser(request)
     : { user: null, response: () => NextResponse.next({ request }) }
   const verdict = decide(gate, user, pathname, search, locale)
-  if (verdict === 'pass') return withCookies(options.forward(request), response())
-  if (verdict === 'not_found') return withCookies(notFoundResponse(), response())
-  return withCookies(NextResponse.redirect(new URL(verdict.redirect, request.url)), response())
+  return withCookies(gatedAnswer(request, verdict, chosen ? null : user, options), response())
+}
+
+// What a gated page answers once the session is known. `user` is passed only when no language
+// was chosen on this device, so the account's language can stand in (ARCHITECTURE §17).
+function gatedAnswer(request: NextRequest, verdict: ReturnType<typeof decide>, user: SessionUser | null, options: ProxyGateOptions) {
+  if (verdict === 'pass') return toAccountLocale(request, user, options.translatedPaths) ?? options.forward(request)
+  if (verdict === 'not_found') return notFoundResponse()
+  return NextResponse.redirect(new URL(verdict.redirect, request.url))
 }

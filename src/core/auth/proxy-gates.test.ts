@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { describe, expect, it } from 'vitest'
 
-import { decide, gateFor, lowercasePath, notFoundResponse, proxyGate } from './proxy-gates'
+import { decide, gateFor, lowercasePath, notFoundResponse, proxyGate, toAccountLocale } from './proxy-gates'
 
 const user = (role: 'user' | 'admin', emailVerified = true) => ({ id: 'u', email: null, role, emailVerified, banned: false, locale: null })
 
@@ -176,5 +176,44 @@ describe('development-only pages', () => {
       proxyGate(new NextRequest(`http://localhost:3000${url}`), { translatedPaths: zhPaths, forward, devPages: true })
     expect((await dev('/generate/upload-test')).status).toBe(307)
     expect((await dev('/zh/generate/upload-test')).status).toBe(404)
+  })
+})
+
+// ARCHITECTURE §17 「怎么选语言」: the stored choice (NEXT_LOCALE) moves a visit to its twin.
+describe('the chosen language', () => {
+  const visit = (url: string, cookie: string, method = 'GET') =>
+    proxyGate(new NextRequest(`http://localhost:3000${url}`, { method, headers: { cookie } }), { translatedPaths: zhPaths, forward })
+
+  it('307s a zh choice from an English page to its /zh twin, query kept', async () => {
+    const response = await visit('/pricing?ref=nav', 'NEXT_LOCALE=zh')
+    expect(response.status).toBe(307)
+    expect(response.headers.get('location')).toBe('http://localhost:3000/zh/pricing?ref=nav')
+    expect((await visit('/', 'NEXT_LOCALE=zh')).headers.get('location')).toBe('http://localhost:3000/zh')
+  })
+
+  it('307s an en choice from a /zh page back to English, before the sign-in gate', async () => {
+    expect((await visit('/zh/pricing', 'NEXT_LOCALE=en')).headers.get('location')).toBe('http://localhost:3000/pricing')
+    expect((await visit('/zh/account', 'NEXT_LOCALE=en')).headers.get('location')).toBe('http://localhost:3000/account')
+  })
+
+  it('serves the page when it is already in the chosen language: no loop', async () => {
+    expect((await visit('/zh/pricing', 'NEXT_LOCALE=zh')).headers.get('x-forwarded-to')).toBe('locale-router')
+    expect((await visit('/pricing', 'NEXT_LOCALE=en')).headers.get('x-forwarded-to')).toBe('locale-router')
+  })
+
+  it('leaves untwinned pages, POSTs and visitors without a choice alone', async () => {
+    expect((await visit('/terms', 'NEXT_LOCALE=zh')).headers.get('x-forwarded-to')).toBe('locale-router')
+    expect((await visit('/pricing', 'NEXT_LOCALE=zh', 'POST')).headers.get('x-forwarded-to')).toBe('locale-router')
+    expect((await visit('/pricing', '')).headers.get('x-forwarded-to')).toBe('locale-router')
+  })
+
+  it('on app pages, an account language stands in for a missing cookie and is copied into it', () => {
+    const signedIn = { ...user('user'), locale: 'zh' as const }
+    const moved = toAccountLocale(new NextRequest('http://localhost:3000/photos?x=1'), signedIn, [...zhPaths, '/photos'])
+    expect(moved?.status).toBe(307)
+    expect(moved?.headers.get('location')).toBe('http://localhost:3000/zh/photos?x=1')
+    expect(moved?.cookies.get('NEXT_LOCALE')?.value).toBe('zh')
+    expect(toAccountLocale(new NextRequest('http://localhost:3000/zh/photos'), signedIn, [...zhPaths, '/photos'])).toBeNull()
+    expect(toAccountLocale(new NextRequest('http://localhost:3000/photos'), user('user'), [...zhPaths, '/photos'])).toBeNull()
   })
 })
