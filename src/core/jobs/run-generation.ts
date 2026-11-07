@@ -25,6 +25,7 @@ import { toJobView, type JobView } from './job-view'
 import { accountLimits } from './account-limits'
 import { assertWithinRateLimit } from './rate-limit'
 import { settleGeneration, type DecisionCost, type SettleDeps } from './settle-generation'
+import { recordJobClientIp } from './job-download'
 import { reserveJob } from './settlement'
 
 // `track` is injectable so tests can assert the `generate` event without PostHog.
@@ -113,6 +114,16 @@ function jobInputs(req: GenerationRequest, { inputs, prompt }: Prepared, resolut
   }
 }
 
+// What reserve_credits takes straight from the request.
+function reserveFields(req: GenerationRequest) {
+  return {
+    userId: req.userId,
+    source: req.source,
+    idempotencyKey: req.idempotencyKey ?? null,
+    visibility: req.visibility ?? null,
+  }
+}
+
 // ARCHITECTURE §8 「原图小图」 (T32), only once the result is confirmed: a failed job has no photo
 // page. Edits (T30) settle elsewhere and get none; their source is the work they edited. (The
 // upload itself is copied next to the result during settle, T40.)
@@ -136,18 +147,10 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
   // Marks which request created the row: two concurrent requests with one job id both get
   // the row back from reserve_credits (charged once), but only the creator calls the provider.
   const attemptId = randomUUID()
-  const job = await reserveJob(deps.db, {
-    jobId,
-    userId: req.userId,
-    module: template.module,
-    templateId: template.id,
-    source: req.source,
-    provider: deps.provider.id,
-    idempotencyKey: req.idempotencyKey ?? null,
-    visibility: req.visibility ?? null,
-    inputs: jobInputs(req, prepared, resolution, attemptId),
-  })
+  const job = await reserveJob(deps.db, { ...reserveFields(req), jobId, module: template.module, templateId: template.id, provider: deps.provider.id, inputs: jobInputs(req, prepared, resolution, attemptId) })
   if (job.inputs.attempt_id !== attemptId) return toJobView(job)
+  // Dispute evidence (T82): the IP that started this paid or free work.
+  await recordJobClientIp(deps.db, { userId: req.userId, jobId: job.id, ip: req.clientIp })
 
   const call = {
     prompt: renderPrompt(prompt.body, inputs),

@@ -32,6 +32,7 @@ export const privacyCollectSections: readonly [LegalSection, ...LegalSection[]] 
         list: [
           'Technical data such as your IP address, browser and device type, and the pages you visit, in our server logs.',
           'The IP address you signed up from, kept on your account to stop people from collecting free credits with many accounts.',
+          'For fraud prevention and to answer payment disputes: the IP address and browser (user agent) you started a card or wallet checkout from, the time you accepted our Terms of Service and Refund Policy at checkout, the IP address each image was created from, and when and from which IP address you first downloaded it (with how many times).',
           'Signals from our bot check (hCaptcha) when you sign up, sign in or reset your password.',
           'Usage analytics and error reports, described in "Analytics and cookies" and "Error reports" below.',
         ],
@@ -49,6 +50,7 @@ export const privacyCollectSections: readonly [LegalSection, ...LegalSection[]] 
           'To take payments, add credits, manage subscriptions and handle refunds.',
           'To show public works, and to run the Wishlist.',
           'To keep the Service safe: prevent fraud and abuse, enforce limits on free credits, and investigate misuse.',
+          'To answer a chargeback or payment dispute: if you ask your bank to reverse a payment, we send our records of that purchase and of how its credits were used (the dates, IP addresses, browser, Terms acceptance, the images created and whether they were downloaded, your account email and our refund policy) to the payment provider, which passes them to your bank. When a dispute is opened, the account is suspended; contact us if you believe this is a mistake.',
           'To understand how the Service is used and fix problems, through analytics and error reports.',
           'To send account emails, such as email confirmation and password reset, and sign-in codes by text message. We do not send marketing emails or messages.',
           'To answer your messages, and to comply with the law and enforce our terms.',
@@ -56,7 +58,7 @@ export const privacyCollectSections: readonly [LegalSection, ...LegalSection[]] 
       },
       'When it is needed to answer a support request or to keep the Service safe, our support staff may look at the photos you uploaded and the images you created. Every such view is recorded.',
       `We do not sell your personal information, we do not share it for targeted advertising, and we do not use your photos or works to train AI models.`,
-      'If you are in the European Economic Area, the United Kingdom or Switzerland: we process your information to perform our contract with you (running the Service and taking payments), for our legitimate interests (security, fraud prevention, analytics and improving the Service), to comply with legal obligations (such as keeping tax records), and with your consent where we ask for it.',
+      'If you are in the European Economic Area, the United Kingdom or Switzerland: we process your information to perform our contract with you (running the Service and taking payments), for our legitimate interests (security, fraud prevention, answering payment disputes, analytics and improving the Service), to comply with legal obligations (such as keeping tax records), and with your consent where we ask for it.',
     ],
   },
   {

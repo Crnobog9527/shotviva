@@ -11,6 +11,8 @@ const ITEMS: readonly { key: AdminNavKey; href: `/admin${string}` }[] = [
   { key: 'users', href: '/admin/users' },
   { key: 'tickets', href: '/admin/tickets' },
   { key: 'orders', href: '/admin/orders' },
+  // T82 (ARCHITECTURE §6.3 「后台拒付页」), next to the payments it is about.
+  { key: 'disputes', href: '/admin/disputes' },
   { key: 'jobs', href: '/admin/jobs' },
   // T33 (ARCHITECTURE §10.0), next to the jobs whose cost it reconciles.
   { key: 'costs', href: '/admin/costs' },

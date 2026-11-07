@@ -81,11 +81,13 @@ describe('STRIPE_WECHAT_PAY on: both wallets', () => {
 })
 
 describe('card routes ignore the switch', () => {
-  it.each([false, true])('wechatPay %s: no payment_method_options, the card method tracked', async (wechatPay) => {
+  // 中国银行卡 carries its own 3DS option (T82) and never the WeChat one.
+  it.each([false, true])('wechatPay %s: no WeChat options on card routes, the card method tracked', async (wechatPay) => {
     for (const method of ['card', 'cn_card'] as const) {
       const { d, create } = wallet(['card', 'alipay', 'wechat_pay'], wechatPay)
       await createCheckout(d, { userId: USER, body: { product_id: 'pack_s', method, locale: 'zh' } })
-      expect(sent(create)).not.toHaveProperty('payment_method_options')
+      if (method === 'card') expect(sent(create)).not.toHaveProperty('payment_method_options')
+      else expect(sent(create)?.payment_method_options).toEqual({ card: { request_three_d_secure: 'any' } })
       expect(d.trackStart).toHaveBeenCalledWith(USER, expect.objectContaining({ method }), 'zh')
     }
   })

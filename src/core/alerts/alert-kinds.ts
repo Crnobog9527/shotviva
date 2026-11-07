@@ -26,7 +26,21 @@ export type RefundAlert = PaymentFacts & {
   waffoPaymentId?: string | null
 }
 
-export type DisputeOpenedAlert = PaymentFacts & { kind: 'dispute_opened'; disputeId: string; credits: Clawback | null }
+// T82: what the dispute flow adds once the evidence is staged: the deadline (ISO, null when the
+// bank takes no response), who answers (us, or Stripe for Managed Payments), the automatic ban, and
+// whether the draft reached Stripe: 'failed' is retried on Stripe's redelivery, but the Owner is told
+// now, since this alert is sent once; 'skipped' means Stripe no longer takes evidence.
+export type DisputeEvidenceFacts = {
+  dueBy: string | null
+  responder: 'shotviva' | 'stripe'
+  autoBanned: boolean
+  draft: 'staged' | 'failed' | 'skipped'
+}
+
+export type DisputeOpenedAlert = PaymentFacts & { kind: 'dispute_opened'; disputeId: string; credits: Clawback | null; evidence?: DisputeEvidenceFacts }
+
+// T82: the one reminder, three days before the deadline, while evidence we must submit is unsent.
+export type DisputeDueSoonAlert = PaymentFacts & { kind: 'dispute_due_soon'; disputeId: string; dueBy: string }
 
 // charge.dispute.closed (T71 wires it): won → the clawed-back credits are given back.
 export type DisputeClosedAlert = PaymentFacts & { kind: 'dispute_closed'; disputeId: string; won: boolean; creditsReturned: number | null }
@@ -76,6 +90,7 @@ export type OwnerAlert =
   | RefundAlert
   | DisputeOpenedAlert
   | DisputeClosedAlert
+  | DisputeDueSoonAlert
   | PaymentFailedAlert
   | GenerationSpikeAlert
   | TicketAlert
@@ -100,6 +115,7 @@ const POLICIES: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K }
   refund: (a) => ({ key: `refund:${a.channel}:${a.refundId}:${a.refunded?.cents ?? ''}`, money: true }),
   dispute_opened: (a) => ({ key: `dispute_opened:${a.disputeId}`, money: true }),
   dispute_closed: (a) => ({ key: `dispute_closed:${a.disputeId}`, money: true }),
+  dispute_due_soon: (a) => ({ key: `dispute_due_soon:${a.disputeId}`, money: true }),
   payment_failed: (a) => ({ key: `payment_failed:${a.channel}:${a.eventId}`, money: true }),
   generation_spike: () => ({ key: 'generation_spike', cooldownMs: 60 * MINUTE, money: false }),
   // A new ticket once; replies at most once per ticket per 30 minutes, counted when sent.

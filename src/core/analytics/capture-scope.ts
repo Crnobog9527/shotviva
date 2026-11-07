@@ -19,6 +19,10 @@ export const ALERTS = [
   // An upgrade was paid but an old subscription would not cancel (T66, ARCHITECTURE §6.2 「升级」):
   // the Owner cancels it by hand; the new plan stays.
   'subscription_cancel_failed',
+  // T82 (ARCHITECTURE §6.3 「拒付申诉证据」): a dispute arrived (deadline + admin link), and the one
+  // reminder three days before the deadline while evidence we must submit is still unsubmitted.
+  'dispute_opened',
+  'dispute_due_soon',
 ] as const
 
 export type AlertKind = (typeof ALERTS)[number]

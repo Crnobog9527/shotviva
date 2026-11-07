@@ -2,10 +2,11 @@ import 'server-only'
 
 import { z } from 'zod'
 
-import { notifyOwner, type Clawback, type OwnerAlert } from '../../alerts'
+import { notifyOwner, type Clawback, type DisputeOpenedAlert, type OwnerAlert } from '../../alerts'
 import { captureAlert, type AlertKind } from '../../analytics/capture-error'
 import { logger } from '../../logger'
 import { callRpc } from '../rpc'
+import { openDispute } from './disputes/open'
 import type { FulfilDeps } from './fulfil'
 
 // charge.refunded and charge.dispute.created (ARCHITECTURE §6.2, §6.3): record on the payment
@@ -68,7 +69,7 @@ function ownerAlert(issue: Issue, payment: Payment): OwnerAlert {
   return { kind: 'refund', channel: 'stripe', refundId: issue.chargeId, refunded, ...facts }
 }
 
-async function record(deps: FulfilDeps, issue: Issue): Promise<IssueOutcome> {
+async function recordIssue(deps: FulfilDeps, issue: Issue): Promise<Payment> {
   const payment = await callRpc(
     deps.db,
     'record_payment_issue',
@@ -79,6 +80,11 @@ async function record(deps: FulfilDeps, issue: Issue): Promise<IssueOutcome> {
   logger.warn(`stripe charge ${issue.kind} recorded`, fields)
   // The Owner reviews every one, recorded or not: credits were not taken back.
   captureAlert(ALERT[issue.kind], `Stripe charge ${issue.chargeId} ${issue.kind}: credits not clawed back`, { fields })
+  return payment
+}
+
+async function record(deps: FulfilDeps, issue: Issue): Promise<IssueOutcome> {
+  const payment = await recordIssue(deps, issue)
   notifyOwner(ownerAlert(issue, payment))
   return payment ? 'recorded' : 'unknown_charge'
 }
@@ -91,5 +97,15 @@ export async function recordRefund(deps: FulfilDeps, chargeId: string): Promise<
 export async function recordDispute(deps: FulfilDeps, disputeId: string): Promise<IssueOutcome> {
   const dispute = await deps.stripe.disputes.retrieve(disputeId)
   const chargeId = typeof dispute.charge === 'string' ? dispute.charge : dispute.charge.id
-  return record(deps, { kind: 'disputed', chargeId, amountRefunded: null, sourceId: dispute.id })
+  const issue: Issue = { kind: 'disputed', chargeId, amountRefunded: null, sourceId: dispute.id }
+  if (!deps.evidence) {
+    logger.warn('stripe dispute: no evidence config wired, draft skipped', { dispute_id: dispute.id })
+    return record(deps, issue)
+  }
+  // T82: the dispute row, the ban and the evidence draft; the Owner's alert goes out from there,
+  // once, with the deadline and the admin link (core/billing/stripe/disputes).
+  const payment = await recordIssue(deps, issue)
+  const owner = ownerAlert(issue, payment) as DisputeOpenedAlert
+  await openDispute({ stripe: deps.stripe, db: deps.db, evidence: deps.evidence }, dispute.id, owner)
+  return payment ? 'recorded' : 'unknown_charge'
 }
