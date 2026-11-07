@@ -65,7 +65,7 @@ export async function renewFromInvoice(deps: FulfilDeps, invoiceId: string): Pro
   if (invoice.status !== 'paid') return 'unpaid'
   const sub = await deps.stripe.subscriptions.retrieve(subscriptionIdOf(invoice))
   const { userId, product } = readOwner(invoice.id, sub, deps.products)
-  const facts = invoiceFacts(invoice)
+  const facts = invoiceFacts(invoice, sub.metadata?.method)
   const change = await callRpc(
     deps.db,
     'apply_subscription_renewal',
@@ -89,7 +89,8 @@ export async function renewFromInvoice(deps: FulfilDeps, invoiceId: string): Pro
     interval: product.interval,
     form: 'subscription',
     channel: 'stripe',
-    method: 'card',
+    // The card route the subscription was opened on: a 中国银行卡 subscription renews as cn_card.
+    method: facts.method,
     // List price in USD: with Adaptive Pricing the invoice may be in the buyer's currency.
     amount_usd: product.priceUsd,
     credits: product.credits,

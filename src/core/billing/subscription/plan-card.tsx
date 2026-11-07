@@ -62,7 +62,10 @@ function SinceFoot({ facts, withEmail = false, children }: { facts: PassFacts; w
 }
 
 // "50 credits a month · $19.90/mo · Card", from the product the mirror row names; the method
-// (card or Alipay, through Stripe or Waffo) from the newest payment for that same product.
+// (card or Alipay, through Stripe or Waffo; 中国银行卡 on zh, "Card" on en, T64) from the newest
+// payment for that same product.
+const METHOD_KEYS = { card: 'card', alipay: 'alipay', cn_card: 'cnCard' } as const
+
 function PerPeriod({ summary, ctx }: { summary: Subscribed; ctx: Ctx }) {
   const t = useTranslations('app.account.plan')
   const usd = useNames().usd
@@ -72,7 +75,7 @@ function PerPeriod({ summary, ctx }: { summary: Subscribed; ctx: Ctx }) {
   const last = ctx.facts.last
   const method = last && last.product.id === product.id ? last.method : null
   if (!method) return <Muted>{t.rich('perPeriod', values)}</Muted>
-  return <Muted>{t.rich('perPeriodMethod', { ...values, method: method === 'alipay' ? t('alipay') : t('card') })}</Muted>
+  return <Muted>{t.rich('perPeriodMethod', { ...values, method: t(METHOD_KEYS[method]) })}</Muted>
 }
 
 function SubscribedPass({ summary, ctx }: { summary: Subscribed; ctx: Ctx }) {

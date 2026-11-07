@@ -23,7 +23,8 @@ export const ORDERS_COPY = {
   },
   forms: { checkout: '首付 / 单笔', renewal: '订阅续费', waffo: 'Waffo 单笔' },
   channels: { stripe: 'Stripe', waffo: 'Waffo' },
-  methods: { card: '卡', alipay: '支付宝' },
+  // MP 卡 = Managed Payments（Link 当卖家、另加税）；普通卡 = 中国银行卡，Shotviva 当卖家（T64）。
+  methods: { card: 'MP 卡', cn_card: '普通卡（中国银行卡）', alipay: '支付宝' },
   statuses: { paid: '已付款', refunded: '已退款', partially_refunded: '部分退款', disputed: '争议中' },
   openInStripe: '在 Stripe 查看',
   noLink: '—',

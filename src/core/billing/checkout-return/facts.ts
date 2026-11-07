@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { PRODUCT_IDS, type ProductId } from '../../config'
 import { AppError } from '../../errors'
 import { logger } from '../../logger'
-import type { CheckoutMethod } from '../stripe/catalog'
+import { CHECKOUT_METHODS, type CheckoutMethod } from '../stripe/catalog'
 import type { StripeApi } from '../stripe/client'
 import type { ReturnQuery } from './query'
 
@@ -39,7 +39,7 @@ export type FactsDeps = { stripe: StripeApi; db: SupabaseClient }
 const paymentRow = z.object({
   amount_total: z.number().int(),
   currency: z.string(),
-  method: z.enum(['card', 'alipay']),
+  method: z.enum(CHECKOUT_METHODS),
   stripe_charge_id: z.string().nullable().optional(),
   waffo_order_id: z.string().nullable().optional(),
   waffo_payment_id: z.string().nullable().optional(),
@@ -142,7 +142,7 @@ async function retrieveCharge(stripe: StripeApi, id: string): Promise<Stripe.Cha
 
 function methodOfSession(session: Stripe.Checkout.Session): CheckoutMethod | null {
   const method = session.metadata?.method
-  return method === 'card' || method === 'alipay' ? method : null
+  return CHECKOUT_METHODS.find((m) => m === method) ?? null
 }
 
 function sessionAmount(session: Stripe.Checkout.Session): CheckoutFacts['amount'] {

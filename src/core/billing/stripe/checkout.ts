@@ -4,11 +4,11 @@ import type Stripe from 'stripe'
 import { z } from 'zod'
 
 import { trackCheckoutStart } from '../../analytics/funnel'
-import { PRODUCT_IDS, type SiteProduct } from '../../config'
+import { PRODUCT_IDS, type PaymentChannel, type SiteProduct } from '../../config'
 import { AppError } from '../../errors'
 import { localizePath } from '../../i18n/paths'
 import { allowlistedUrl } from '../../partner/return-to'
-import { CHECKOUT_METHODS, checkoutRoute, type CheckoutMethod, type CheckoutRoute } from './catalog'
+import { CHECKOUT_METHODS, checkoutRoute, offeredMethods, type CheckoutMethod, type CheckoutRoute } from './catalog'
 import type { StripeApi } from './client'
 import { resolvePriceId } from './prices'
 
@@ -68,8 +68,9 @@ type MethodParams = Pick<Stripe.Checkout.SessionCreateParams, 'managed_payments'
 // reaching Stripe as a 400.
 // Managed Payments is always said out loud, on or off: the live Dashboard can turn it on by
 // default for every Checkout Session, and it does not take Alipay. So an Alipay period, an
-// Alipay pack and the plain-card fallback (STRIPE_MANAGED_PAYMENTS off) send enabled: false,
-// and the session never depends on that toggle.
+// Alipay pack, 中国银行卡 and the plain-card fallback (STRIPE_MANAGED_PAYMENTS off) send
+// enabled: false, and the session never depends on that toggle. No automatic_tax anywhere:
+// Managed Payments adds its own tax, and on the plain routes Shotviva is the seller (§6.3).
 function methodParams(route: CheckoutRoute): MethodParams {
   if (route.managedPayments) return { managed_payments: { enabled: true } }
   const params: MethodParams = { managed_payments: { enabled: false }, allowed_payment_method_types: route.allowedMethods ?? ['card'] }
@@ -102,6 +103,14 @@ function assertMethodOffered(route: CheckoutRoute, session: Pick<Stripe.Checkout
   const required = route.allowedMethods?.[0]
   if (!required || session.payment_method_types?.includes(required)) return
   throw new AppError('INTERNAL', `Checkout session ${session.id} does not offer ${required}; turn it on in Stripe Settings → Payment methods`)
+}
+
+// Checkout takes only what the buyer's page listed (catalog offeredMethods): 中国银行卡 exists on
+// zh pages over Stripe alone (§6.3, T64), so asking for it with an English locale or on Waffo is
+// refused (422) rather than quietly opened.
+export function assertOffered(body: Pick<CheckoutBody, 'method' | 'locale'>, channel: PaymentChannel): void {
+  if (offeredMethods(channel, body.locale).includes(body.method)) return
+  throw new AppError('INVALID_INPUT', `${body.method} is not offered on ${channel} for locale ${body.locale}`)
 }
 
 export async function createCheckout(

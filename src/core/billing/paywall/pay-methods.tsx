@@ -1,21 +1,22 @@
 "use client"
 
-import { useTranslations } from "next-intl"
+import { useLocale, useTranslations } from "next-intl"
 
 import { cn } from "../../ui/cn"
-import { CHECKOUT_METHODS, type CheckoutMethod } from "../stripe/catalog"
+import { offeredMethods, type CheckoutMethod } from "../stripe/catalog"
 import { methodLabel, methodNote } from "./copy"
 import type { Period } from "./offer"
 import { usePaymentChannel } from "./channel-context"
 
 type Props = { method: CheckoutMethod; onChange(method: CheckoutMethod): void; kind: "plan" | "pack"; period: Period }
 
-// The two payment groups (DESIGN §4.5): card with Apple Pay and Google Pay, and Alipay. For a
-// plan the card renews and Alipay buys one period; for a pack both are one-time. On Waffo
-// (ARCHITECTURE §6.3) both are one-time and nothing mentions renewing (copy.ts).
+// The payment groups (DESIGN §4.5): card with Apple Pay and Google Pay, and Alipay; zh pages on
+// Stripe lead with 中国银行卡 (ARCHITECTURE §6.3, T64). For a plan a card renews and Alipay buys
+// one period; for a pack all are one-time (copy.ts).
 export function PayMethods({ method, onChange, kind, period }: Props) {
   const t = useTranslations("paywall")
   const channel = usePaymentChannel()
+  const methods = offeredMethods(channel, useLocale())
   const label = (m: CheckoutMethod) => {
     const msg = methodLabel(channel, m)
     return t(msg.key, msg.values)
@@ -31,11 +32,13 @@ export function PayMethods({ method, onChange, kind, period }: Props) {
         <span className="text-caption text-muted-foreground">{t("pricesInUsd")}</span>
       </div>
       <div role="radiogroup" aria-label={t("payLabel")} className="grid gap-2 md:grid-cols-2">
-        {CHECKOUT_METHODS.map((m) => (
+        {methods.map((m) => (
           <label
             key={m}
             className={cn(
-              "flex min-h-14 cursor-pointer items-center gap-3 rounded-control bg-[var(--tier-graphite)] px-3 py-2 transition-shadow",
+              // zh pages list three (T64): the last of an odd count spans the row, so the
+              // overseas-card line keeps one line and no half-empty row is left.
+              "flex min-h-14 cursor-pointer items-center gap-3 rounded-control bg-[var(--tier-graphite)] px-3 py-2 transition-shadow md:odd:last:col-span-2",
               method === m ? "shadow-[inset_0_0_0_1.5px_var(--bone-dim)]" : "shadow-[inset_0_0_0_1px_var(--border)] hover:shadow-[inset_0_0_0_1px_var(--input)]",
               "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring",
             )}
@@ -62,7 +65,7 @@ export function PayMethods({ method, onChange, kind, period }: Props) {
 
 // Neutral marks only: no third-party logo files are bundled.
 export function MethodMark({ method }: { method: CheckoutMethod }) {
-  if (method === "card") {
+  if (method !== "alipay") {
     return (
       <svg viewBox="0 0 28 20" aria-hidden="true" className="h-5 w-7 text-bone-dim" fill="none" stroke="currentColor">
         <rect x=".75" y=".75" width="26.5" height="18.5" rx="3.5" strokeWidth="1.5" />

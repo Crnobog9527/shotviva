@@ -101,7 +101,8 @@ const paymentRow = z.object({
   product_id: z.string(),
   amount_total: z.number(),
   currency: z.string(),
-  method: z.enum(['card', 'alipay']),
+  // cn_card = 中国银行卡, the plain Stripe card route (T64).
+  method: z.enum(['card', 'alipay', 'cn_card']),
   created_at: z.string(),
 })
 

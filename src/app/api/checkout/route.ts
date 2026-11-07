@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server'
 import { errorResponse, jsonResponse } from '@/core/api-response'
 import { assertSameOrigin, createAdminSupabase, requireApiBuyer } from '@/core/auth'
 import {
+  assertOffered,
   checkoutBodySchema,
   createCheckout,
   managedPaymentsEnabled,
@@ -26,10 +27,13 @@ export async function POST(request: NextRequest) {
     const user = await requireApiBuyer()
     const body = checkoutBodySchema.safeParse(await request.json().catch(() => null))
     if (!body.success) throw new AppError('INVALID_INPUT', 'product_id and method are required')
+    // Only what the buyer's page listed: 中国银行卡 needs a zh locale and the Stripe channel (T64).
+    const channel = paymentChannel()
+    assertOffered(body.data, channel)
     // One running subscription per account: a membership while one is live answers 409.
     const product = site.billing.products.find((p) => p.id === body.data.product_id)
     if (product) await assertCanBuy(createAdminSupabase(), user.id, product)
-    const start = paymentChannel() === 'waffo' ? startWaffo : startStripe
+    const start = channel === 'waffo' ? startWaffo : startStripe
     return jsonResponse(await start(user.id, body.data))
   } catch (error) {
     return errorResponse(error, 'checkout')

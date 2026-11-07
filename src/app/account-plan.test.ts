@@ -177,7 +177,7 @@ describe('account Plan card without a card subscription', () => {
 
 // Gap audit C12: the active card names how the plan is paid, as account.html does.
 describe('account Plan card payment method (gap audit C12)', () => {
-  const paidWith = (productId: string, method: 'card' | 'alipay') => lastMembership([{ productId, method }], site.billing.products)
+  const paidWith = (productId: string, method: 'card' | 'alipay' | 'cn_card') => lastMembership([{ productId, method }], site.billing.products)
 
   it('an active subscription paid by card says so after the price', async () => {
     const { text } = await render(summarize([row({})], days(30)), 'en', 38, paidWith('starter_monthly', 'card'))
@@ -202,5 +202,12 @@ describe('account Plan card payment method (gap audit C12)', () => {
 
   it('speaks Chinese', async () => {
     expect((await render(summarize([row({})], days(30)), 'zh', 38, paidWith('starter_monthly', 'card'))).text).toContain('/月 · 银行卡')
+  })
+
+  // T64: a 中国银行卡 (plain Stripe card) subscription names it on zh and reads "Card" on en.
+  it('names 中国银行卡 on zh and Card on en for a cn_card subscription', async () => {
+    const cn = paidWith('starter_monthly', 'cn_card')
+    expect((await render(summarize([row({})], days(30)), 'zh', 38, cn)).text).toContain('/月 · 中国银行卡')
+    expect((await render(summarize([row({})], days(30)), 'en', 38, cn)).text).toContain('$19.90 /mo · Card')
   })
 })
