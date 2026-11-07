@@ -20,7 +20,7 @@ export const USERS_COPY = {
     reset: '清除',
     dates: '日期按北京时间',
   },
-  sorts: { created: '注册时间（新到旧）', last_job: '最近出图（新到旧）', paid_credits: '付费积分（多到少）' } as Record<string, string>,
+  sorts: { created: '最新注册', last_job: '最近出图', paid_credits: '付费积分最多' } as Record<string, string>,
   tiers: { free: '免费', starter: 'Starter', pro: 'Pro', max: 'Max' } as Record<string, string>,
   intervals: { month: '月付', year: '年付' } as Record<string, string>,
   providers: { email: '邮箱', google: 'Google', phone: '手机号' } as Record<string, string>,

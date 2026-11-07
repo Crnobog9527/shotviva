@@ -27,7 +27,8 @@ export function UserDetailView({ data, actions, support, onLedgerPage }: Props) 
   const { user, jobs, ledger, extras } = data
   return (
     <div className="grid gap-6">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      {/* Two cards a row on a phone leave ~130px: the figures step down a size so dates stay on one line. */}
+      <div className="grid grid-cols-2 gap-3 max-sm:[&_p.font-mono]:text-lg md:grid-cols-4">
         <StatCard title={COPY.detail.paid} value={String(user.credits)} />
         <StatCard title={COPY.detail.free} value={String(user.freeCredits)} />
         <StatCard title={COPY.detail.paidUntil} value={formatBeijing(user.paidUntil)?.slice(0, 10) ?? COPY.never} hint={formatBeijing(user.paidUntil) ?? undefined} />

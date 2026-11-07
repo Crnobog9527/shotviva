@@ -23,9 +23,8 @@ export function UsersListView({ filters, list, actions }: Props) {
           <EmptyState title={COPY.emptyAll} />
         )
       ) : (
-        <section className="grid gap-3" aria-label={COPY.total(list.total)}>
-          <p className="text-sm text-muted-foreground tabular-nums">{COPY.range(first, last, list.total)}</p>
-          <UsersList rows={list.rows} actions={actions} />
+        <section className="grid gap-2" aria-label={COPY.total(list.total)}>
+          <UsersList rows={list.rows} actions={actions} summary={<p className="text-sm text-muted-foreground tabular-nums">{COPY.range(first, last, list.total)}</p>} />
           <UsersPagination filters={filters} page={list.page} pageCount={list.pageCount} />
         </section>
       )}

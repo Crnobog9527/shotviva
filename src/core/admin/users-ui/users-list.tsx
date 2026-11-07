@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 
 import { useAdminAction } from '../shell/use-admin-action'
 import type { ActionValue } from '../templates/types'
@@ -19,11 +19,12 @@ export type UserBatchActions = {
   setBanned: (input: { userIds: string[]; banned: boolean; reason: string }) => Promise<ActionValue<BatchOutcome>>
 }
 
-type Props = { rows: UserListRow[]; actions: UserBatchActions }
+// summary: the count line, shown where the batch bar appears.
+type Props = { rows: UserListRow[]; actions: UserBatchActions; summary: ReactNode }
 
 // The page of users with ticks and the batch actions (ARCHITECTURE §10.a). The server action
 // refreshes the page on success, so the list shows the new balances and statuses.
-export function UsersList({ rows, actions }: Props) {
+export function UsersList({ rows, actions, summary }: Props) {
   const pageIds = useMemo(() => rows.map((row) => row.id), [rows])
   const selection = useSelection(pageIds)
   const [open, setOpen] = useState<BatchKind | null>(null)
@@ -49,13 +50,22 @@ export function UsersList({ rows, actions }: Props) {
   const shared = { people, pending, error, rejection, onCancel: () => setOpen(null) }
 
   return (
-    <div className="grid gap-3">
-      <BatchBar count={selection.ids.length} pending={pending} onPick={pick} onClear={selection.clear} />
-      {notice ? (
-        <p role="status" className="text-sm text-success">
-          {notice}
-        </p>
-      ) : null}
+    // Room below the last card for the floating batch bar on phones.
+    <div className={selection.ids.length > 0 ? 'grid gap-2 max-md:pb-36' : 'grid gap-2'}>
+      <BatchBar
+        count={selection.ids.length}
+        pending={pending}
+        onPick={pick}
+        onClear={selection.clear}
+        idle={
+          <>
+            {summary}
+            <p role="status" className="text-sm text-success">
+              {notice}
+            </p>
+          </>
+        }
+      />
       <div className="hidden md:block">
         <UsersTable rows={rows} selection={selection} />
       </div>

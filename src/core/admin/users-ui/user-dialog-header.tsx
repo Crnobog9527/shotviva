@@ -43,7 +43,7 @@ export function UserDialogHeader({ userId, data }: { userId: string; data: UserD
 function Fact({ term, value }: { term: string; value: string }) {
   return (
     <div className="flex min-w-0 gap-1.5">
-      <dt>{term}</dt>
+      <dt className="shrink-0">{term}</dt>
       <dd className="min-w-0 font-mono break-all text-foreground select-all">{value}</dd>
     </div>
   )
