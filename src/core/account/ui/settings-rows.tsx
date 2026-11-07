@@ -3,7 +3,9 @@ import { useTranslations } from 'next-intl'
 import { Link } from '../../i18n/ui'
 import { HelpRow } from './help-row'
 import { RowValue, RowsPanel, rowClass } from './rows'
-import { LanguageRow, PurchasesRow, type PurchaseLine } from './sheet-rows'
+import type { PurchaseLine } from '../../billing/documents/lines'
+import { PurchasesRow } from './purchases-row'
+import { LanguageRow } from './sheet-rows'
 
 // Settings (comps-v3-b/account.html): Email (shown, not editable in v1; a phone sign-up shows
 // its masked number instead, and has no email row when it has no email, T63), Language (the

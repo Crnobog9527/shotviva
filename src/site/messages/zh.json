@@ -710,7 +710,14 @@
         "lead": "最近的付款，最新的在前。",
         "empty": "还没有购买记录",
         "emptyBody": "买了套餐或积分包之后，会显示在这里。",
-        "seePlans": "看看套餐"
+        "seePlans": "看看套餐",
+        "receipt": "收据",
+        "invoice": "发票",
+        "linkLabel": "{purchase}的{document}（在新标签页打开）",
+        "emailed": "收据已发送到付款邮箱",
+        "refunded": "已退款",
+        "partlyRefunded": "部分退款",
+        "unavailable": "刚才没能打开这份收据或发票，请稍后再试。还是打不开的话，在客服里告诉我们，我们发给你。"
       },
       "session": {
         "title": "登录",
