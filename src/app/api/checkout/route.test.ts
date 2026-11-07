@@ -23,11 +23,11 @@ const { POST } = await import('./route')
 
 const ORIGIN = 'http://localhost:3000'
 const USER = { id: '0b6f3f0e-5d1c-4c47-9a49-6a3f6f8d2e11', email: null, role: 'user', verified: true, banned: false }
-const request = (productId = 'pack_s', method = 'card') =>
+const request = (productId = 'pack_s', method = 'card', locale?: 'en' | 'zh') =>
   new NextRequest(`${ORIGIN}/api/checkout`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', origin: ORIGIN },
-    body: JSON.stringify({ product_id: productId, method }),
+    body: JSON.stringify({ product_id: productId, method, ...(locale ? { locale } : {}) }),
   })
 const liveRow = (status: string, cancelAtPeriodEnd = false) => ({
   provider: 'stripe',
@@ -94,5 +94,35 @@ describe('POST /api/checkout', () => {
     mocks.getSessionUser.mockResolvedValue(USER)
     mocks.mirror.mockResolvedValue([liveRow('canceled'), liveRow('incomplete_expired')])
     expect((await POST(request('pro_yearly'))).status).toBe(200)
+  })
+
+})
+
+// 中国银行卡 (T64): zh pages on Stripe only.
+describe('POST /api/checkout cn_card', () => {
+  beforeEach(() => {
+    mocks.createCheckout.mockReset().mockResolvedValue({ url: 'https://checkout.stripe.test/c/1' })
+    mocks.createWaffoCheckout.mockReset().mockResolvedValue({ url: 'https://pay.waffo.test/c/1' })
+    mocks.channel.mockReset().mockReturnValue('stripe')
+    mocks.mirror.mockReset().mockResolvedValue([])
+    mocks.getSessionUser.mockReset().mockResolvedValue(USER)
+  })
+
+  it('takes cn_card with a zh locale on Stripe', async () => {
+    expect((await POST(request('starter_monthly', 'cn_card', 'zh'))).status).toBe(200)
+    expect(mocks.createCheckout).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ body: expect.objectContaining({ method: 'cn_card', locale: 'zh' }) }))
+  })
+
+  it.each([undefined, 'en'] as const)('answers 422 for cn_card with locale %s', async (locale) => {
+    const response = await POST(request('pack_s', 'cn_card', locale))
+    expect(response.status).toBe(422)
+    expect(await response.json()).toMatchObject({ code: 'INVALID_INPUT' })
+    expect(mocks.createCheckout).not.toHaveBeenCalled()
+  })
+
+  it('answers 422 for cn_card on Waffo, which never lists it', async () => {
+    mocks.channel.mockReturnValue('waffo')
+    expect((await POST(request('pack_s', 'cn_card', 'zh'))).status).toBe(422)
+    expect(mocks.createWaffoCheckout).not.toHaveBeenCalled()
   })
 })

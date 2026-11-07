@@ -22,7 +22,7 @@ export function initBrowserAnalytics(): void {
     void loadSdks({
       sentry: sentry.enabled
         ? async () => {
-            const sdk = await import('@sentry/nextjs')
+            const sdk = await import('./sentry-entry')
             sdk.init(sentry)
             return sdk
           }

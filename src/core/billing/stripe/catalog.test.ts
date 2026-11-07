@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { checkoutRoute, desiredPrices, lookupKey, stripeProductId } from './catalog'
+import { checkoutRoute, desiredPrices, lookupKey, offeredMethods, stripeProductId } from './catalog'
 import { TEST_PRODUCTS, testProduct as product } from './test-products'
 
 describe('checkoutRoute (ARCHITECTURE §6.3)', () => {
@@ -40,6 +40,47 @@ describe('checkoutRoute (ARCHITECTURE §6.3)', () => {
       managedPayments: false,
       allowedMethods: ['card'],
     })
+  })
+})
+
+// 中国银行卡 (T64): the pre-approval plain-card route, whatever the Managed Payments switch says.
+describe('cn_card route (ARCHITECTURE §6.3, T64)', () => {
+  it.each([true, false])('subscribes a membership by plain card, Managed Payments %s', (managedPayments) => {
+    expect(checkoutRoute(product('starter_monthly'), 'cn_card', managedPayments)).toEqual({
+      mode: 'subscription',
+      form: 'subscription',
+      lookupKey: 'starter_monthly_recurring',
+      managedPayments: false,
+      allowedMethods: ['card'],
+    })
+  })
+
+  it('sells a pack by plain card as a one-time payment', () => {
+    expect(checkoutRoute(product('pack_m'), 'cn_card', true)).toEqual({
+      mode: 'payment',
+      form: 'one_time',
+      lookupKey: 'pack_m',
+      managedPayments: false,
+      allowedMethods: ['card'],
+    })
+  })
+
+  it('takes the same route as the Managed Payments-off card fallback', () => {
+    for (const id of ['starter_monthly', 'pro_yearly', 'pack_s'] as const) {
+      expect(checkoutRoute(product(id), 'cn_card', true)).toEqual(checkoutRoute(product(id), 'card', false))
+    }
+  })
+})
+
+describe('offeredMethods (「中文页付款方式」)', () => {
+  it('zh pages on Stripe list 中国银行卡, Alipay, then the Managed Payments card', () => {
+    expect(offeredMethods('stripe', 'zh')).toEqual(['cn_card', 'alipay', 'card'])
+  })
+
+  it('English pages and Waffo keep card and Alipay, with no 中国银行卡', () => {
+    expect(offeredMethods('stripe', 'en')).toEqual(['card', 'alipay'])
+    expect(offeredMethods('waffo', 'zh')).toEqual(['card', 'alipay'])
+    expect(offeredMethods('waffo', 'en')).toEqual(['card', 'alipay'])
   })
 })
 

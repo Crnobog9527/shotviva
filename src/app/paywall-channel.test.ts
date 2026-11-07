@@ -6,6 +6,7 @@ import { CHECKOUT_METHODS } from '@/core/billing/stripe'
 import type { PaymentChannel } from '@/core/config'
 import { pricingFaq } from '@/site/content'
 import messages from '@/site/messages/en.json'
+import zhMessages from '@/site/messages/zh.json'
 
 // ARCHITECTURE §6.3 (T50): on both channels a card plan renews and can be cancelled, Alipay buys
 // one period that does not renew, packs are one-time. Waffo only labels the card group "Card".
@@ -53,6 +54,20 @@ describe('payment copy by channel', () => {
     expect(say(pricingMethodNote('stripe', 'card'))).toBe('Plans renew automatically, cancel anytime')
     expect(say(pricingMethodNote('stripe', 'alipay'))).toBe('One-time payment for 30 days or 1 year, no auto-renew')
     expect(t('payNotePacks')).toBe('Credit packs are always a one-time payment.')
+  })
+
+  // 中国银行卡 (T64): worded like a card, plans renew, packs one-time.
+  it('Stripe zh: 中国银行卡 renews like a card, packs stay one-time', () => {
+    const zh = createTranslator({ locale: 'zh', messages: zhMessages, namespace: 'paywall' }) as unknown as typeof t
+    const sayZh = (msg: PaywallMessage) => zh(msg.key, msg.values)
+    expect(sayZh(methodLabel('stripe', 'cn_card'))).toBe('中国银行卡')
+    // No-break spaces keep "Apple Pay" / "Google Pay" whole when the row wraps at 375.
+    expect(sayZh(methodLabel('stripe', 'card'))).toBe('海外银行卡 · Apple\u00a0Pay · Google\u00a0Pay')
+    expect(sayZh(methodLabel('stripe', 'alipay'))).toBe('支付宝')
+    expect(sayZh(methodNote('stripe', { kind: 'plan', method: 'cn_card', period: 'month' }))).toBe('自动续费，随时可取消')
+    expect(sayZh(methodNote('stripe', { kind: 'pack', method: 'cn_card', period: 'month' }))).toBe('一次性付款')
+    expect(sayZh(planFinePrint('stripe', { method: 'cn_card', period: 'month', price: '$19.90' }))).toBe('按月以 $19.90 自动续费 · 随时可取消 · 美元')
+    expect(sayZh(pricingMethodNote('stripe', 'cn_card'))).toBe('套餐自动续费，随时可取消')
   })
 
   it('/pricing FAQ: both channels answer how to cancel; Waffo points at Cancel subscription', () => {

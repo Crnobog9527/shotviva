@@ -1,11 +1,13 @@
 "use client"
 
 import dynamic from "next/dynamic"
+import { useLocale } from "next-intl"
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react"
 
 import { trackPaywallView } from "../../analytics/browser"
 import type { EventProps } from "../../analytics/events"
 import type { PaymentChannel, SiteProduct } from "../../config"
+import { offeredMethods } from "../stripe/catalog"
 import { PaymentChannelContext } from "./channel-context"
 import { usePaywallState, type PaywallOpenOptions } from "./use-paywall-state"
 
@@ -28,7 +30,7 @@ type ProviderProps = { products: readonly SiteProduct[]; wishlistLive: boolean; 
 export function PaywallProvider({ products, wishlistLive, channel, children }: ProviderProps) {
   const [open, setOpen] = useState(false)
   const [trigger, setTrigger] = useState<PaywallTrigger>("account")
-  const state = usePaywallState()
+  const state = usePaywallState(offeredMethods(channel, useLocale())[0])
   const { reset } = state
   const api = useMemo<PaywallApi>(
     () => ({
