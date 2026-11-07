@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl'
 
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import { GroundedImg } from '../result/grounded-img'
+import { thumbImage } from './thumb-image'
 import { categoriesOf } from '../catalogue/catalogue-template'
 import { useCategoryLabel } from '../catalogue/category-label'
 import type { TemplateSample } from './home-samples'
@@ -63,7 +64,7 @@ export function PickerList({ templates, selected, onSelect, thumbOf }: Omit<Prop
               const thumb = thumbOf(template)
               return (
                 <button key={template.id} type="button" role="radio" aria-checked={template.id === selected.id} className="mk-pk-row" onClick={() => onSelect(template.id)}>
-                  {thumb ? <GroundedImg className="mk-pk-th" ground="white" src={thumb} alt="" /> : <span className="mk-pk-th" aria-hidden />}
+                  {thumb ? <GroundedImg className="mk-pk-th" ground="white" {...thumbImage(thumb, 44)} alt="" /> : <span className="mk-pk-th" aria-hidden />}
                   <span className="mk-pk-t">
                     <b>{template.name}</b>
                     {template.description ? <small>{template.description}</small> : null}

@@ -10,9 +10,11 @@ type Props = {
   after: ImageRef
   // 'lg': the hero and single-template rows (20px corners, labels on top); default: a card.
   size?: 'lg' | 'card'
-  // The hero pair is the LCP element: preloaded, never lazy (建站规格 R9).
+  // The hero pair is above the fold: never lazy (建站规格 R9). Only the phone photo is
+  // preloaded, so on a phone one right-sized image, not two, competes with the CSS.
   preload?: boolean
-  // Rendered width of the whole pair, for the image srcset.
+  // Rendered width of ONE plate (half the pair), for the image srcset. The pair's own width
+  // here made every plate download at twice the pixels it shows.
   sizes: string
   className?: string
 }
@@ -31,7 +33,7 @@ export function PhotoPair({ before, after, size = 'card', preload = false, sizes
       </span>
       <span className="mk-pane">
         <Image className="mk-ph" src={before.src} alt="" aria-hidden width={before.width} height={before.height} sizes={sizes} loading="lazy" />
-        <WhiteGroundImage className="mk-a" src={after.src} alt={after.alt} width={after.width} height={after.height} sizes={sizes} preload={preload} loading={loading} />
+        <WhiteGroundImage className="mk-a" src={after.src} alt={after.alt} width={after.width} height={after.height} sizes={sizes} loading={preload ? 'eager' : 'lazy'} />
         <span className="mk-ws" aria-hidden />
       </span>
       <span className="mk-hl" aria-hidden />
