@@ -8,7 +8,6 @@ import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import { GroundedImg } from '../result/grounded-img'
 import { thumbImage } from './thumb-image'
 import { categoriesOf } from '../catalogue/catalogue-template'
-import { useCategoryLabel } from '../catalogue/category-label'
 import type { TemplateSample } from './home-samples'
 
 type Props = {
@@ -27,7 +26,6 @@ const PLATE_SIZES = '(min-width: 768px) 230px, 50vw'
 // SEO surface) and what it is.
 export function PickerSample({ selected, sampleOf }: Pick<Props, 'selected' | 'sampleOf'>) {
   const t = useTranslations('app.template')
-  const label = useCategoryLabel()
   const sample = sampleOf(selected)
   return (
     <div className="mk-pk-sample">
@@ -48,7 +46,7 @@ export function PickerSample({ selected, sampleOf }: Pick<Props, 'selected' | 's
       ) : (
         <span className="mk-pk-blank" aria-hidden />
       )}
-      <p className="mk-pk-cap">{[label(selected.category), selected.description, t('example')].filter(Boolean).join(' · ')}</p>
+      <p className="mk-pk-cap">{[selected.categoryName, selected.description, t('example')].filter(Boolean).join(' · ')}</p>
     </div>
   )
 }
@@ -56,16 +54,15 @@ export function PickerSample({ selected, sampleOf }: Pick<Props, 'selected' | 's
 // The right column: templates grouped by category, one chosen (a radio group).
 export function PickerList({ templates, selected, onSelect, thumbOf }: Omit<Props, 'sampleOf'>) {
   const t = useTranslations('app.template')
-  const label = useCategoryLabel()
   return (
     <div className="mk-pk-list" role="radiogroup">
       {categoriesOf(templates).map((category) => (
-        <div key={category} role="group" aria-label={label(category)}>
+        <div key={category.key} role="group" aria-label={category.name}>
           <p className="mk-pk-cat" aria-hidden>
-            {label(category)}
+            {category.name}
           </p>
           {templates
-            .filter((template) => template.category === category)
+            .filter((template) => template.category === category.key)
             .map((template) => {
               const thumb = thumbOf(template)
               return (

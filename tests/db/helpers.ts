@@ -129,7 +129,7 @@ export async function createPricedTemplate(
   const id = `t16-${randomUUID().slice(0, 8)}`
   await db.query(
     `insert into public.templates (id, name, category, fields, quality, credits_cost, is_active, visible_in)
-     values ($1, 'T16 priced', 'test', $2, $3, $4, true, array['web', 'partner'])`,
+     values ($1, 'T16 priced', 'pets', $2, $3, $4, true, array['web', 'partner'])`,
     [id, JSON.stringify({ images: { min: 0, max: 1 }, copy: [], aspectRatios: ['1:1'] }), quality, JSON.stringify(cost)],
   )
   return id

@@ -25,7 +25,12 @@ type Props = {
 // UTC and fixed, so the server render and the browser agree.
 const formatUpdatedAt = (iso: string) => `${new Date(iso).toISOString().slice(0, 16).replace('T', ' ')} UTC`
 
-const COLUMNS = ['label', 'adapter', 'baseUrl', 'model', 'key', 'prices', 'status', 'updatedAt'] as const
+// Nine columns did not fit at 1280 (T78): the adapter goes under the name (one per module
+// anyway), the address under the model, the update time under the status.
+const COLUMNS = ['label', 'model', 'key', 'prices', 'status'] as const
+
+// The buttons stay in view while a 1280 window scrolls the table sideways.
+const STICKY = 'sticky right-0 bg-background shadow-[inset_1px_0_0_var(--border)]'
 
 type Handlers = Pick<Props, 'onEdit' | 'onTest' | 'onActivate' | 'onDelete'>
 type RowProps = { provider: AdminProvider; result: { ok: boolean; text: string } | undefined; testing: string | null; pending: boolean; handlers: Handlers }
@@ -58,9 +63,9 @@ function RowActions({ provider, result, testing, pending, handlers }: RowProps) 
           {COPY.delete}
         </Button>
       </div>
-      {remove.hint ? <p className="text-muted-foreground mt-1 text-right text-xs">{remove.hint}</p> : null}
+      {remove.hint ? <p className="text-muted-foreground mt-1 text-right text-xs whitespace-normal">{remove.hint}</p> : null}
       {result ? (
-        <p role="status" className={`mt-1 text-right text-xs ${result.ok ? 'text-emerald-700' : 'text-destructive'}`}>
+        <p role="status" className={`mt-1 text-right text-xs whitespace-normal ${result.ok ? 'text-success' : 'text-destructive'}`}>
           {result.text}
         </p>
       ) : null}
@@ -77,7 +82,7 @@ export function ProvidersTable({ providers, testResults, testing, pending, ...ha
           {COLUMNS.map((column) => (
             <TableHead key={column}>{COPY.columns[column]}</TableHead>
           ))}
-          <TableHead className="text-right">{COPY.columns.actions}</TableHead>
+          <TableHead className={`text-right ${STICKY}`}>{COPY.columns.actions}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -87,20 +92,28 @@ export function ProvidersTable({ providers, testResults, testing, pending, ...ha
             <TableRow key={provider.id}>
               <TableCell>
                 <div className="font-medium">{provider.label}</div>
-                {provider.notes ? <div className="text-muted-foreground max-w-48 truncate text-xs">{provider.notes}</div> : null}
+                <div className="text-muted-foreground text-xs">{COPY.adapters[provider.adapter]}</div>
+                {provider.notes ? (
+                  <div className="text-muted-foreground max-w-48 truncate text-xs" title={provider.notes}>
+                    {provider.notes}
+                  </div>
+                ) : null}
               </TableCell>
-              <TableCell>{COPY.adapters[provider.adapter]}</TableCell>
-              <TableCell className="font-mono text-xs">{provider.baseUrl}</TableCell>
-              <TableCell className="font-mono text-xs">{provider.model}</TableCell>
+              <TableCell className="font-mono text-xs">
+                <div>{provider.model}</div>
+                <div className="text-muted-foreground w-48 break-all whitespace-normal">{provider.baseUrl}</div>
+              </TableCell>
               <TableCell className="font-mono text-xs">{COPY.keyMasked(provider.apiKeyLast4)}</TableCell>
               <TableCell>
                 <PricesCell prices={provider.prices} module={provider.module} model={provider.model} />
               </TableCell>
               <TableCell>
                 <Badge variant={provider.isActive ? 'default' : 'secondary'}>{provider.isActive ? COPY.active : COPY.inactive}</Badge>
+                <div className="text-muted-foreground mt-1 text-xs" title={COPY.columns.updatedAt}>
+                  {formatUpdatedAt(provider.updatedAt)}
+                </div>
               </TableCell>
-              <TableCell className="text-xs">{formatUpdatedAt(provider.updatedAt)}</TableCell>
-              <TableCell>
+              <TableCell className={`min-w-44 ${STICKY}`}>
                 <RowActions provider={provider} result={result} testing={testing} pending={pending} handlers={handlers} />
               </TableCell>
             </TableRow>

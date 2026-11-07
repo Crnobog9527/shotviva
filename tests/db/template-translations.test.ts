@@ -18,7 +18,7 @@ const ID = 'test-i18n-poster'
 const template = {
   id: ID,
   name: 'Test Poster',
-  category: 'test',
+  category: 'pets',
   quality: 'high',
   creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
   visibleIn: ['web'],

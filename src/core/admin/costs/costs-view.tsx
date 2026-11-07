@@ -1,4 +1,4 @@
-import { usdFine, usdTotal } from '../jobs/cost-format'
+import { usdTotal } from '../jobs/cost-format'
 import { StatCard } from '../shell/admin-blocks'
 import type { Billed } from './billed'
 import { COSTS_COPY as COPY } from './copy'
@@ -35,13 +35,19 @@ export function CostsView({ days, ours, billed, keyStatus, actions }: Props) {
   const { rows, totals, drift } = reconcile(ours, billed.status === 'ok' ? billed.byDay : null)
   return (
     <div className="grid gap-6">
-      <p className="text-sm text-muted-foreground">{COPY.intro(days)}</p>
+      <div className="grid max-w-3xl gap-2 text-sm text-muted-foreground">
+        <p>{COPY.intro(days)}</p>
+        <p>
+          <span className="text-foreground">{COPY.scopeNote[0]}</span>
+          {COPY.scopeNote.slice(1).join('')}
+        </p>
+      </div>
       <BilledNotice billed={billed} />
       <DriftNotice drift={drift} />
       <div className="grid gap-3 md:grid-cols-3">
         <StatCard title={COPY.cards.billed} value={totals.billed === null ? COPY.dash : usdTotal.format(totals.billed)} hint={COPY.cards.scope(keyStatus.projectId)} />
-        <StatCard title={COPY.cards.ours} value={usdTotal.format(totals.ours)} hint={COPY.cards.oursHint(totals.uncosted, totals.noUsage)} />
-        <StatCard title={COPY.cards.difference} value={totals.difference === null ? COPY.dash : usdFine.format(totals.difference)} />
+        <StatCard title={COPY.cards.ours} value={usdTotal.format(totals.ours)} hint={`${COPY.cards.oursScope}；${COPY.cards.oursHint(totals.uncosted, totals.noUsage)}`} />
+        <StatCard title={COPY.cards.difference} value={totals.difference === null ? COPY.dash : usdTotal.format(totals.difference)} />
       </div>
       <CostsTable rows={rows} />
       <KeyPanel keyLast4={keyStatus.keyLast4} projectId={keyStatus.projectId} actions={actions} />

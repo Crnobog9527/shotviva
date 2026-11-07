@@ -9,7 +9,6 @@ import { Link } from '@/core/i18n/ui'
 import { navTypesFor } from '@/core/ui/nav-motion'
 
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
-import { useCategoryLabel } from '../catalogue/category-label'
 import { isCompareSample, TemplateSample } from '../catalogue/template-sample'
 import { CreateSheet } from './create-sheet'
 import { FormAction } from './form-action'
@@ -37,7 +36,6 @@ type BodyProps = CreateContext & { template: CatalogueTemplate; open: boolean; o
 
 function CreateBody({ template, open, onClose, ...context }: BodyProps) {
   const t = useTranslations('app.template')
-  const label = useCategoryLabel()
   const router = useRouter()
   const draft = useWorkspaceDraft({ template, ...context, single: true })
   const batch = limitsFor(context.tier).batchMax > 1 && draft.photos.photos.length === 0
@@ -52,7 +50,7 @@ function CreateBody({ template, open, onClose, ...context }: BodyProps) {
       open={open}
       onOpenChange={(next) => !next && onClose()}
       title={template.name}
-      description={[label(template.category), template.description].filter(Boolean).join(' · ')}
+      description={[template.categoryName, template.description].filter(Boolean).join(' · ')}
       hint={t(tall ? 'hintCompare' : 'hintPair')}
       tall={tall}
       folded={draft.photos.photos.length > 0}

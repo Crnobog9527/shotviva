@@ -292,14 +292,6 @@
       "animatedMeta": "{category} · 动图",
       "hintPair": "左边是手机原图，右边是 AI 出图。"
     },
-    "categories": {
-      "Art Styles": "画风",
-      "Food & Drink": "餐饮",
-      "Products & Resale": "商品与二手",
-      "Beauty & Skincare": "美妆护肤",
-      "Rooms & Spaces": "房间与空间",
-      "Pets": "宠物"
-    },
     "tiers": {
       "1k": {
         "name": "标准",
@@ -347,12 +339,12 @@
       "noteLabel": "还有想改的地方吗？",
       "optional": "（选填）",
       "notePlaceholder": {
-        "Food & Drink": "例如：加一小枝薄荷，去掉餐巾",
-        "Products & Resale": "例如：链子保持金色，阴影柔和一点",
-        "Beauty & Skincare": "例如：标签保持清晰，加几滴水珠",
-        "Rooms & Spaces": "例如：沙发不动，台灯的光暖一点",
-        "Pets": "例如：项圈保留，用柔和的灰色背景",
-        "Art Styles": "例如：眼镜保留，线条柔和一点",
+        "food-drink": "例如：加一小枝薄荷，去掉餐巾",
+        "products-resale": "例如：链子保持金色，阴影柔和一点",
+        "beauty-skincare": "例如：标签保持清晰，加几滴水珠",
+        "rooms-spaces": "例如：沙发不动，台灯的光暖一点",
+        "pets": "例如：项圈保留，用柔和的灰色背景",
+        "art-styles": "例如：眼镜保留，线条柔和一点",
         "fallback": "例如：颜色不变，背景提亮"
       },
       "wait": "请等一张作品完成",
@@ -557,8 +549,12 @@
         "originalKept": "已保留，{px} px 预览",
         "originalEdited": "你改的那张照片",
         "originalDeleted": "早于原图保留功能",
-        "made": "生成时间"
+        "made": "生成时间",
+        "reference": "编号",
+        "copyReference": "复制编号",
+        "copied": "已复制"
       },
+      "problem": "这张图有问题？",
       "delete": {
         "open": "删除",
         "title": "删除这张作品？",
@@ -776,7 +772,8 @@
         "paymentOptional": "付款记录（选填）",
         "noPayments": "这个账号还没有付款记录。",
         "workLabel": "相关作品（选填）",
-        "workOption": "{template} · {date, date, medium}",
+        "workOption": "{template} · {date, date, medium} · {ref}",
+        "workRef": "编号 {ref}",
         "none": "不选",
         "choose": "请选择",
         "submit": "发送",

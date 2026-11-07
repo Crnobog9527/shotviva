@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { ServerTrack } from '../analytics'
 import { AppError } from '../errors'
+import { CATEGORY_KEY_PATTERN, categoryInputSchema } from '../templates/categories'
 import { validateEvent } from '../analytics'
 import { categorySlug, generateEventProps, settleTracked } from './generation-analytics'
 import { GenerationFailure } from './generation-failure'
@@ -52,6 +53,18 @@ describe('generateEventProps', () => {
     const props = generateEventProps(job, 'Products & Resale', { status: 'succeeded' }, 1000)
     expect(props.category).toBe('products-resale')
     expect(validateEvent('generate', props).ok).toBe(true)
+  })
+
+  // T75: templates.category is a template_categories key. Every key the admin can create is
+  // already a dictionary slug, so it goes out unchanged and the event is accepted.
+  it('sends a category key as it is, and every valid key passes the dictionary', () => {
+    for (const key of ['art-styles', 'food-drink', 'products-resale', 'beauty-skincare', 'rooms-spaces', 'pets', 'edit', 'freeform', 'kids-2', 'x'.repeat(40)]) {
+      expect(CATEGORY_KEY_PATTERN.test(key), key).toBe(true)
+      expect(categoryInputSchema.shape.key.safeParse(key).success, key).toBe(true)
+      const props = generateEventProps(job, key, { status: 'succeeded' }, 1000)
+      expect(props.category).toBe(key)
+      expect(validateEvent('generate', props).ok, key).toBe(true)
+    }
   })
 
   it('maps a job to the dictionary and never copies its user inputs', () => {

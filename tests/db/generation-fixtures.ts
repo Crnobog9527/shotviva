@@ -19,7 +19,7 @@ export async function seedTemplate(db: Client, options: { visibleIn?: string[]; 
   }
   await db.query(
     `insert into public.templates (id, name, category, fields, quality, credits_cost, is_active, visible_in)
-     values ($1, 'T4 test', 'test', $2, 'medium', '{"1k": 1, "2k": 2, "3k": 3}', true, $3)`,
+     values ($1, 'T4 test', 'pets', $2, 'medium', '{"1k": 1, "2k": 2, "3k": 3}', true, $3)`,
     [id, JSON.stringify(fields), options.visibleIn ?? ['web']],
   )
   await db.query('insert into public.template_prompts (template_id, body) values ($1, $2)', [

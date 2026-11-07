@@ -8,6 +8,7 @@ import type { CreditsFloor } from '@/core/templates/pricing'
 
 import type { AdminTemplate, SaveTemplatePayload, TemplateAdminActions } from '../templates/types'
 
+import type { CategoryOption } from './category-field'
 import { buildPayload, emptyFormValues, toFormValues } from './form-state'
 import { TemplateCoverFields } from './template-cover-fields'
 import { TemplatePromptFields } from './template-prompt-fields'
@@ -19,6 +20,7 @@ export type EditTarget = { mode: 'new' } | { mode: 'edit'; template: AdminTempla
 type Props = {
   target: EditTarget
   floor: CreditsFloor
+  categories: readonly CategoryOption[]
   coverActions: Pick<TemplateAdminActions, 'requestCoverUpload' | 'applyCover'>
   pending: boolean
   error: string | null
@@ -27,7 +29,7 @@ type Props = {
 }
 
 // Mounted fresh per target (keyed by the container), so initial state comes straight from props.
-export function TemplateFormDialog({ target, floor, coverActions, pending, error, onCancel, onSubmit }: Props) {
+export function TemplateFormDialog({ target, floor, categories, coverActions, pending, error, onCancel, onSubmit }: Props) {
   const isNew = target.mode === 'new'
   const [values, setValues] = useState(() =>
     target.mode === 'edit' ? toFormValues(target.template) : emptyFormValues(),
@@ -52,7 +54,7 @@ export function TemplateFormDialog({ target, floor, coverActions, pending, error
         <DialogHeader>
           <DialogTitle>{isNew ? '新建模板' : `编辑「${target.template.name}」`}</DialogTitle>
         </DialogHeader>
-        <TemplatePublicFields values={values} isNew={isNew} floor={floor} onChange={onChange} />
+        <TemplatePublicFields values={values} isNew={isNew} floor={floor} categories={categories} onChange={onChange} />
         <TemplateTranslationFields values={values} onChange={onChange} />
         {target.mode === 'edit' ? (
           <TemplateCoverFields template={target.template} actions={coverActions} />

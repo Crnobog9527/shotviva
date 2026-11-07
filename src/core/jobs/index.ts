@@ -39,3 +39,6 @@ export { runGeneration, type GenerationDeps } from './run-generation'
 export { PROVIDER_TIMEOUT_MS, settleGeneration, type DecisionCost, type SettleDeps, type SettleExtras } from './settle-generation'
 // The photo edit path (modules/image/edit, T30) settles and tracks exactly like a generation.
 export { settleTracked } from './generation-analytics'
+// Reference numbers (T78): pure helpers in ./ref (client-safe), service-role reads here.
+export { findJobIdsByRef, jobRefOrShort, jobRefsFor, jobRefsOrShort } from './job-ref-reads'
+export { JOB_REF_LENGTH, JOB_REF_MIN, jobRef, jobRefRange, normalizeJobRef } from './ref'

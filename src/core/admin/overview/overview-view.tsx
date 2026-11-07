@@ -23,7 +23,7 @@ function WindowCards({ window, days, revenue }: { window: StatsWindow; days: num
   return (
     <section className="grid gap-3">
       <h2 className="text-sm font-semibold text-muted-foreground">{windowTitle(window, days)}</h2>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 2xl:grid-cols-6">
         <StatCard title={COPY.cards.signups} value={number.format(window.signups)} />
         <StatCard title={COPY.cards.jobs} value={number.format(window.jobs)} />
         <StatCard

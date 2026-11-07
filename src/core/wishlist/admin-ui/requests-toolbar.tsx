@@ -16,7 +16,7 @@ type Props = {
 export function RequestsToolbar({ filter, counts, onStatus, onSort, onQuery }: Props) {
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <div className="flex gap-1" role="tablist">
+      <div className="flex flex-wrap gap-1" role="tablist">
         {REQUEST_STATUSES.map((status) => (
           <Button
             key={status}

@@ -92,12 +92,9 @@ export type HomeFaq = Nine<FaqItem>
 // `credits`: its own Standard (1K) price, shown as "from N credits" (建站规格 G4).
 export type TemplateCard = { id: string; name: string; use: string; credits: number }
 
-// The copy of one ARCHITECTURE §5 category, in §5 order: `key` is the value stored in
-// templates.category; `drag`: the category whose single template keeps the draggable compare
-// (Art Styles); `links`: its live inner pages. The templates come from the database (T53).
-export type CategoryCopy = { key: string; name: string; intro: string; drag?: boolean; links?: readonly RelatedLink[] }
-
-// One H3 per category with its featured templates, as rendered (建站规格 §4 H2-2).
+// One H3 per category with its featured templates, as rendered (建站规格 §4 H2-2). Name, intro
+// and order come from template_categories, managed in admin (T75); `drag`: its card style is
+// 'compare' (画风), so a single template keeps the draggable compare; `links`: live inner pages.
 export type TemplateCategory = {
   name: string
   drag?: boolean
@@ -148,8 +145,6 @@ export type HomePage = Omit<PageBasics, 'related'> & {
     intro: string
     // "All template images are illustrative examples." under the grid.
     note: string
-    // The six §5 categories' copy; which templates show is chosen in admin (featured_rank).
-    categories: readonly [CategoryCopy, ...CategoryCopy[]]
   }
   // Intro paragraph above the facts table.
   factsIntro: string

@@ -6,7 +6,6 @@ export {
   type Bill,
   type BillLine,
   type BillTotal,
-  type CategoryCopy,
   type ContentPage,
   type CostBills,
   type Fact,
