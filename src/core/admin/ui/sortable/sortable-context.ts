@@ -9,6 +9,8 @@ export type SortableListContextValue = SortableListState & {
   labelOf: (id: string) => string
   instructionsId: string
   disabledHint?: string
+  // Off for the reason disabledHint gives (handles greyed), not just busy saving.
+  blocked: boolean
   reducedMotion: boolean
 }
 

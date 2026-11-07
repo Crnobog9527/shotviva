@@ -25,7 +25,7 @@ export function TemplatesEditor({ templates, floor, actions }: Props) {
   const [editing, setEditing] = useState<EditTarget | null>(null)
   const [unpublishing, setUnpublishing] = useState<AdminTemplate | null>(null)
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set())
-  const { pending, error, notice, run, report, clearError } = useTemplateActions()
+  const { pending, error, notice, run, clearError } = useTemplateActions()
   const visible = templates.filter((template) => matchesSearch(template, query))
   const visibleIds = visible.map((template) => template.id)
   // After a cover upload the page refreshes; show the dialog the fresh row, not the snapshot.
@@ -51,7 +51,7 @@ export function TemplatesEditor({ templates, floor, actions }: Props) {
   // Drag, keyboard or arrows (T76): the list shows the new order at once and falls back to the
   // server's order if this save fails.
   const saveOrder = (group: TemplateOrderGroup) => (ids: string[]) =>
-    report(() => actions.setOrder({ group, ids }), orderCopy.saved, orderCopy.failed)
+    run(() => actions.setOrder({ group, ids }), orderCopy.saved, undefined, orderCopy.failed)
 
   return (
     <div className="grid min-w-0 grid-cols-1 gap-4">
