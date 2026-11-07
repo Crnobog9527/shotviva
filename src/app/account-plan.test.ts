@@ -174,3 +174,33 @@ describe('account Plan card without a card subscription', () => {
     expect((await render(summarize([row({})], days(30)), 'zh')).text).toContain('加入于 2026年11月 · mei@example.test')
   })
 })
+
+// Gap audit C12: the active card names how the plan is paid, as account.html does.
+describe('account Plan card payment method (gap audit C12)', () => {
+  const paidWith = (productId: string, method: 'card' | 'alipay') => lastMembership([{ productId, method }], site.billing.products)
+
+  it('an active subscription paid by card says so after the price', async () => {
+    const { text } = await render(summarize([row({})], days(30)), 'en', 38, paidWith('starter_monthly', 'card'))
+    expect(text).toContain('50 credits a month · $19.90 /mo · Card')
+  })
+
+  it('names Alipay when that is how the plan was paid', async () => {
+    const { text } = await render(summarize([row({ productId: 'pro_yearly', currentPeriodEnd: days(300) })], days(300)), 'en', 38, paidWith('pro_yearly', 'alipay'))
+    expect(text).toContain('/yr · Alipay')
+  })
+
+  it('works the same for a Waffo subscription', async () => {
+    const waffo = row({ provider: 'waffo', stripeSubscriptionId: null, waffoOrderId: 'ORD_1' })
+    expect((await render(summarize([waffo], days(30)), 'en', 38, paidWith('starter_monthly', 'alipay'))).text).toContain('/mo · Alipay')
+  })
+
+  it('says nothing about the method when the newest payment is for another product', async () => {
+    const { text } = await render(summarize([row({})], days(30)), 'en', 38, paidWith('max_yearly', 'card'))
+    expect(text).toContain('50 credits a month · $19.90 /mo')
+    expect(text).not.toMatch(/· (Card|Alipay)/)
+  })
+
+  it('speaks Chinese', async () => {
+    expect((await render(summarize([row({})], days(30)), 'zh', 38, paidWith('starter_monthly', 'card'))).text).toContain('/月 · 银行卡')
+  })
+})

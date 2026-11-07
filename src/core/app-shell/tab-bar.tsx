@@ -19,6 +19,10 @@ type Props = {
   // Pages below a tab that keep the bar from md up (the photo page, T38); phones keep the
   // flow-page rule and show no bar there.
   desktopUnder?: readonly `/${string}/`[]
+  // Pages that are not a tab but sit in the full shell like one: the bar on phones and the top
+  // bar from md, with no tab marked current (the checkout return page, comps-v3-b
+  // checkout.html, gap audit C1).
+  shellPages?: readonly `/${string}`[]
   // The Admin item (AdminLink), streamed in its own Suspense by the layout: it reads the
   // session, and the bar itself must not wait for that (see below).
   admin?: ReactNode
@@ -42,10 +46,10 @@ type Props = {
 // own Tailwind CSS does exactly that) beats every layered rule, md: ones included: the bar then
 // stays fixed on desktop over the page's top, and a flow page's action bar covers its bottom.
 // With max-md: classes there is no bare `.fixed` on the element for such a rule to match.
-export function TabBar({ items, desktopUnder = [], admin }: Props) {
+export function TabBar({ items, desktopUnder = [], shellPages = [], admin }: Props) {
   const pathname = usePathname()
   const t = useTranslations('app.tabs')
-  const root = isRoot(pathname, items)
+  const root = isRoot(pathname, items) || shellPages.some((page) => pathname === page || pathname === `${page}/`)
   if (!root && !desktopUnder.some((prefix) => pathname.startsWith(prefix))) return null
   return (
     <nav

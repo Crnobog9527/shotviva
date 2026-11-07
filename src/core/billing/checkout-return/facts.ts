@@ -29,6 +29,9 @@ export type CheckoutFacts = {
   recurring: boolean
   // Its next renewal, ISO, once known; null for one-time purchases.
   renewsAt: string | null
+  // Names this one payment for the once-only celebration (T55): the Stripe session id, or
+  // Waffo's payment id (its order id on rows from before T50).
+  paymentKey: string | null
 }
 
 export type FactsDeps = { stripe: StripeApi; db: SupabaseClient }
@@ -39,6 +42,7 @@ const paymentRow = z.object({
   method: z.enum(['card', 'alipay']),
   stripe_charge_id: z.string().nullable().optional(),
   waffo_order_id: z.string().nullable().optional(),
+  waffo_payment_id: z.string().nullable().optional(),
 })
 type PaymentRow = z.infer<typeof paymentRow>
 
@@ -64,11 +68,11 @@ async function stripeFacts(deps: FactsDeps, userId: string, sessionId: string): 
   const row = await readPayment(deps.db, (q) => q.eq('user_id', userId).eq('stripe_session_id', session.id))
   const recurring = { recurring: session.mode === 'subscription', renewsAt: renewsAt(session) }
   if (!row) return { ...unsettled(productId), method: methodOfSession(session), amount: sessionAmount(session), ...recurring }
-  return { ...settledFacts(productId, row), ...(await chargeDetails(deps.stripe, row)), ...recurring }
+  return { ...settledFacts(productId, row), ...(await chargeDetails(deps.stripe, row)), ...recurring, paymentKey: session.id }
 }
 
 function unsettled(productId: ProductId): CheckoutFacts {
-  return { productId, settled: false, abandoned: false, method: null, amount: null, card: null, receiptUrl: null, recurring: false, renewsAt: null }
+  return { productId, settled: false, abandoned: false, method: null, amount: null, card: null, receiptUrl: null, recurring: false, renewsAt: null, paymentKey: null }
 }
 
 function settledFacts(productId: ProductId, row: PaymentRow): CheckoutFacts {
@@ -93,7 +97,7 @@ async function waffoFacts(db: SupabaseClient, userId: string, productId: Product
   // mirror's period end once subscription.activated is in (subscriptions_waffo_order_id_key).
   const recurring = !productId.startsWith('pack_') && row.method === 'card'
   const renews = recurring && row.waffo_order_id ? await mirrorPeriodEnd(db, userId, row.waffo_order_id) : null
-  return { ...settledFacts(productId, row), recurring, renewsAt: renews }
+  return { ...settledFacts(productId, row), recurring, renewsAt: renews, paymentKey: row.waffo_payment_id ?? row.waffo_order_id ?? null }
 }
 
 async function mirrorPeriodEnd(db: SupabaseClient, userId: string, orderId: string): Promise<string | null> {
@@ -111,7 +115,7 @@ async function mirrorPeriodEnd(db: SupabaseClient, userId: string, orderId: stri
 type PaymentsQuery = ReturnType<ReturnType<SupabaseClient['from']>['select']>
 
 async function readPayment(db: SupabaseClient, filter: (query: PaymentsQuery) => PaymentsQuery): Promise<PaymentRow | null> {
-  const { data, error } = await filter(db.from('payments').select('amount_total, currency, method, stripe_charge_id, waffo_order_id')).maybeSingle()
+  const { data, error } = await filter(db.from('payments').select('amount_total, currency, method, stripe_charge_id, waffo_order_id, waffo_payment_id')).maybeSingle()
   if (error) throw new AppError('INTERNAL', `checkout return: payments read failed: ${error.message}`)
   return data === null ? null : paymentRow.parse(data)
 }

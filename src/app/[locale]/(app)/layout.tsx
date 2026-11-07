@@ -52,7 +52,8 @@ async function Tabs({ items }: { items: TabItem[] }) {
       <Admin />
     </Suspense>
   )
-  return <TabBar items={shown} desktopUnder={['/photos/']} admin={admin} />
+  // /checkout (the payment return page) wears the shell like a tab root (gap audit C1).
+  return <TabBar items={shown} desktopUnder={['/photos/']} shellPages={['/checkout']} admin={admin} />
 }
 
 // The paywall lists the wishlist perk only while it is open. The switch read is cached
