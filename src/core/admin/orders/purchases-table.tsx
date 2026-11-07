@@ -1,5 +1,3 @@
-import Link from 'next/link'
-
 import { Badge } from '@/core/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/core/ui/table'
 
@@ -8,6 +6,7 @@ import { ORDERS_COPY as COPY } from './copy'
 import { formatMinor } from './money'
 import type { AdminPurchase } from './repository'
 import { stripeDashboardUrl } from './source'
+import { UserLink } from '../users-ui/user-link'
 
 // ARCHITECTURE §10: time, buyer, product, amount, method, channel, status, link. Amounts are
 // what was charged (payments, T10), in the charge's own currency.
@@ -28,9 +27,7 @@ function PurchaseRow({ row, stripeLive }: { row: AdminPurchase; stripeLive: bool
     <TableRow>
       <TableCell className="font-mono text-xs whitespace-nowrap">{formatBeijing(row.createdAt)}</TableCell>
       <TableCell>
-        <Link href={`/admin/users/${row.userId}`} className="text-primary hover:underline">
-          {row.email ?? row.userId.slice(0, 8)}
-        </Link>
+        <UserLink userId={row.userId}>{row.email ?? row.userId.slice(0, 8)}</UserLink>
       </TableCell>
       <TableCell className="font-mono text-xs">{row.productId}</TableCell>
       <TableCell className="font-mono">{money(row.amountTotal)}</TableCell>

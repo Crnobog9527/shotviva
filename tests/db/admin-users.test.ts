@@ -3,17 +3,17 @@ import { randomUUID } from 'node:crypto'
 import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { adjustUserCredits, banUser, ledgerPage, loadUser, searchUsers, unbanUser } from '@/core/admin'
+import { adjustUserCredits, banUser, ledgerPage, loadUser, unbanUser } from '@/core/admin'
 
 import { connectAdmin, createUser, ledgerOf, profileOf } from './helpers'
 import { serviceSupabase } from './supabase-env'
 
-// T23 /admin/users: search through admin_search_users, and the three writes. Adjusting writes
-// the ledger; ban and unban write admin_audit_log (ARCHITECTURE §10 「审计」).
+// T23 /admin/users: the three writes on one user (the list and the batches are in
+// admin-users-list.test.ts). Adjusting writes the ledger; ban and unban write admin_audit_log
+// (ARCHITECTURE §10 「审计」).
 
 let db: Client
 let user: string
-let email: string
 const service = serviceSupabase()
 
 const auditOf = async (id: string) =>
@@ -22,31 +22,10 @@ const auditOf = async (id: string) =>
 beforeAll(async () => {
   db = await connectAdmin()
   user = await createUser(db, { credits: 5, freeCredits: 2 })
-  email = (await db.query<{ email: string }>('select email from auth.users where id = $1', [user])).rows[0]!.email
 })
 
 afterAll(async () => {
   await db.end()
-})
-
-describe('admin_search_users', () => {
-  it('finds by email substring, case-insensitively, at most 50 rows', async () => {
-    const rows = await searchUsers(service, email.slice(3, 20).toUpperCase())
-    expect(rows.map((row) => row.id)).toEqual([user])
-    expect(rows[0]).toMatchObject({ email, credits: 5, freeCredits: 2, role: 'user', bannedAt: null })
-    expect((await searchUsers(service, 'example.test')).length).toBeLessThanOrEqual(50)
-  })
-
-  it('treats % and _ literally and ignores a blank query', async () => {
-    expect(await searchUsers(service, '%')).toEqual([])
-    expect(await searchUsers(service, '   ')).toEqual([])
-  })
-
-  it('is not callable by anon', async () => {
-    const { anonSupabase } = await import('./supabase-env')
-    const { error } = await anonSupabase().rpc('admin_search_users', { p_query: 'a' })
-    expect(error?.message).toMatch(/permission denied/)
-  })
 })
 
 describe('adjust credits', () => {
