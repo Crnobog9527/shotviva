@@ -971,3 +971,14 @@ Owner 2026-11-06 发现中文页有功能缺失。逐页对比现有英文页和
 - 埋点 `checkout_start.method = 'cn_card'`；Waffo 通道开着时（`PAYMENT_CHANNEL=waffo`）中国银行卡不出现（Waffo 自己有卡）。
 
 **验收**：中文页三项顺序正确、英文页不变；测试模式下用 Stripe 测试卡走中国银行卡买积分包和 Starter 月付，积分和会员到账、续费（测试时钟）、Portal 取消都正常；MP 路由不受影响；单测覆盖 locale 校验、Session 参数（无 managed_payments、只 card）、埋点值；交互验收交给 Codex（测试站）。正式站上线后由 Owner 的朋友用中国 Visa 真卡实测一笔再退款。
+
+## T65 中国大陆访问提速：字体提前加载、网页 App 启动画面（可派）
+
+**目标**：Owner 2026-11-07：大陆用户访问慢（ITDOG 320 个点平均 3.85 秒，慢在跨境下载，12 个点超时），切到中文页时文字闪一下，iPhone「作为网页 App 打开」时长时间黑屏。
+
+**范围**：
+- MiSans 改为服务端在 `<head>` 直接引用汇总 CSS（ARCHITECTURE §17「加载」），去掉 hydration 后插入的客户端组件；系统 fallback 字体加 `size-adjust` / `ascent-override` / `descent-override` 贴近 MiSans。字体二进制保持官方原样，不子集化（README 和授权要求）。
+- iOS 网页 App：加 `apple-touch-startup-image` 启动图（品牌深色底 + 居中「S.」，覆盖主流 iPhone 尺寸，从 `design/logo/` 生成），打开时不再纯黑屏；中文页使用 `start_url: '/zh'` 的中文 manifest（英文页仍是 `/`），中文用户加到桌面后直接进中文页。
+- 测量：上线前后各在测试站测 `/zh` 的 Lighthouse 移动端；CI 的 Lighthouse 不能退步；在 PR 里写清中文页首屏下载的字体字节数前后对比。
+
+**验收**：中文页刷新、从英文切到中文时不再闪（第二次访问起完全不闪）；iPhone 加到桌面并选「作为网页 App 打开」时先显示启动图；中文页加到桌面后打开是中文页；字体文件字节未改（SHA-256 与 `manifest.json` 一致）；交互验收交给 Codex（测试站）+ Owner 用 iPhone 实测。

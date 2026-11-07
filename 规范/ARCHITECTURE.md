@@ -858,10 +858,10 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
   - **文件**：官方未修改的静态 WOFF2 分包（简体中文 + 拉丁，400 / 500 / 600，约 168 个文件、5.8 MB），放在 `public/fonts/misans/`。
     - 同目录保留 `manifest.json`（每个文件的来源、unicode-range、字节数、SHA-256）、汇总 CSS、`LICENSE.pdf`、`NOTICE.txt`、`README.md`。
     - 文件名用内容哈希，不重新生成，也不重新子集化。
-  - **加载**：根布局挂一个客户端组件。hydration 后等两帧（两次 `requestAnimationFrame`），再往 `<head>` 插入 `<link rel="stylesheet" id="misans-font" href="/fonts/misans/misans-<hash>.css">`，用 id 防止重复插入。
+  - **加载**（Owner 2026-11-07 改，T65：原来 hydration 后再插入样式表，每次进中文页都会先用系统字体画一遍、再换成 MiSans，看起来闪一下，网速慢时更明显）：根布局在服务端直接把 `<link rel="stylesheet" href="/fonts/misans/misans-<hash>.css">` 写进 `<head>`（汇总 CSS 只有 `@font-face` 声明，几 KB），浏览器第一次排版时就知道要哪些分包、立刻开始下载；分包已在缓存时首屏直接用 MiSans，不再闪。系统字体 fallback 用 `size-adjust` / `ascent-override` 调到接近 MiSans 的字宽和行高，首次访问的切换尽量看不出来。
     - 汇总 CSS 里每个 `@font-face` 都带 `unicode-range` 和 `font-display: swap`。
     - 首屏先用系统字体，浏览器只下载页面上实际用到的分包。
-    - 不 preload，不用 Google Fonts，也不用任何 CDN。
+    - 不预加载 woff2 分包（交给 unicode-range 按需取），不用 Google Fonts，也不用任何 CDN。
   - **缓存**：只给 `/fonts/misans/*.woff2` 和 `*.css` 发 `Cache-Control: public, max-age=31536000, immutable`，NOTICE、PDF 不加。改字体必须换新哈希 URL。
   - **路由**：中间件（`src/proxy.ts`）的 matcher 排除 `fonts/misans/`。这个目录不放私密文件。
   - **署名（协议要求）**：写在条款页的「Third-party notices」一节：「本网站使用 MiSans 字体，版权归小米所有」（英文写 "This site uses the MiSans font, © Xiaomi."），并链接 `/fonts/misans/LICENSE.pdf`。页脚不放（Owner 2026-11-06，DESIGN §6.9）。
