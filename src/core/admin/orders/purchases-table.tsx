@@ -28,7 +28,7 @@ function PurchaseRow({ row, stripeLive }: { row: AdminPurchase; stripeLive: bool
     <TableRow>
       <TableCell className="font-mono text-xs whitespace-nowrap">{formatBeijing(row.createdAt)}</TableCell>
       <TableCell>
-        <Link href={`/admin/users/${row.userId}`} className="text-primary hover:underline">
+        <Link href={`/admin/users/${row.userId}`} title={row.email ?? row.userId} className="block max-w-44 truncate text-primary hover:underline">
           {row.email ?? row.userId.slice(0, 8)}
         </Link>
       </TableCell>

@@ -9,6 +9,10 @@ describe('lookupHref', () => {
     expect(lookupHref({ kind: 'checkout', userId, jobId: null })).toBe(`/admin/users/${userId}`)
     expect(lookupHref({ kind: 'job', userId, jobId: 'j1' })).toBe(`/admin/users/${userId}?job=j1`)
   })
+
+  it('lists the jobs when several share the reference number typed', () => {
+    expect(lookupHref({ kind: 'jobs', ref: '2fa821c6' })).toBe('/admin/jobs?ref=2fa821c6')
+  })
 })
 
 describe('parseClusterWindow', () => {

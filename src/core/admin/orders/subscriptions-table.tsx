@@ -39,7 +39,7 @@ export function SubscriptionsTable({ subscriptions, counts, stripeLive }: Props)
             {subscriptions.map((row) => (
               <TableRow key={row.id}>
                 <TableCell>
-                  <Link href={`/admin/users/${row.userId}`} className="text-primary hover:underline">
+                  <Link href={`/admin/users/${row.userId}`} title={row.email ?? row.userId} className="block max-w-44 truncate text-primary hover:underline">
                     {row.email ?? row.userId.slice(0, 8)}
                   </Link>
                 </TableCell>

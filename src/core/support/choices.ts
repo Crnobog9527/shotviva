@@ -1,4 +1,5 @@
 import type { SiteProduct } from '../config'
+import { jobRef } from '../jobs/ref'
 import type { Translate } from '../translate'
 import type { PaymentOption, WorkOption } from './types'
 
@@ -34,7 +35,8 @@ export function paymentChoices(
 export function workChoices(options: readonly WorkOption[], t: Translate): Choice[] {
   return options.map((option) => ({
     value: option.id,
-    label: t('new.workOption', { template: option.templateName, date: new Date(option.createdAt) }),
+    // The reference number (T78) is how the user and the Owner tell two works apart.
+    label: t('new.workOption', { template: option.templateName, date: new Date(option.createdAt), ref: jobRef(option.id) }),
   }))
 }
 

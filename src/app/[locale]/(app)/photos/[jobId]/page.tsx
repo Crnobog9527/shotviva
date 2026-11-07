@@ -7,7 +7,7 @@ import { AppPage, BalanceChip, FlowNav } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
 import { currentTier, limitsFor, readBalance } from '@/core/billing'
 import { currentLocale } from '@/core/i18n/server'
-import { fileUrlFor, findOwnJob, hasInputPreview, keptInputsOf, originalUrlFor, type Job } from '@/core/jobs'
+import { fileUrlFor, findOwnJob, hasInputPreview, jobRefOf, keptInputsOf, originalUrlFor, type Job } from '@/core/jobs'
 import { r2Store } from '@/core/storage'
 import { EDIT_TEMPLATE_ID, listTemplatesIn, loadEditOffer } from '@/core/templates'
 import { DeleteWork, EditFlow, EditTrigger, editDisplay, editOriginal, ResultView, toPhotoDetail } from '@/modules/image'
@@ -22,10 +22,12 @@ function Nav({ title, aside }: { title: string; aside?: ReactNode }) {
 }
 
 // Everything the page reads besides the job, in one round: templates, the upload preview's HEAD
-// (T32), and for editing (T30) the source work, the edit offer, balance and tier.
+// (T32), for editing (T30) the source work, the edit offer, balance and tier, and the reference
+// number (T78; whether another job shares its first 8 characters is a service-role question).
 async function loadAround(supabase: Awaited<ReturnType<typeof createServerSupabase>>, userId: string, job: Job) {
   const locale = await currentLocale()
-  const [templates, kept, parent, offer, balance, tier] = await Promise.all([
+  const admin = createAdminSupabase()
+  const [templates, kept, parent, offer, balance, tier, reference] = await Promise.all([
     listTemplatesIn(supabase, locale),
     // An edit has no upload of its own (T30).
     job.templateId === EDIT_TEMPLATE_ID ? false : hasInputPreview(r2Store(), job),
@@ -33,9 +35,10 @@ async function loadAround(supabase: Awaited<ReturnType<typeof createServerSupaba
     loadEditOffer(supabase),
     readBalance(supabase, userId),
     // current_tier() is service-role only; the user's own id comes from the session.
-    currentTier(createAdminSupabase(), userId),
+    currentTier(admin, userId),
+    jobRefOf(admin, job.id),
   ])
-  return { templates, kept, parent, offer, balance, tier }
+  return { templates, kept, parent, offer, balance, tier, reference }
 }
 
 // One finished photo, a flow page pushed from Photos: the result, the upload's preview and the
@@ -47,12 +50,12 @@ async function Result({ params }: { params: Promise<{ jobId: string }> }) {
   const supabase = await createServerSupabase()
   const job = await findOwnJob(supabase, user.id, jobId)
   if (!job || job.status !== 'succeeded') notFound()
-  const { templates, kept, parent, offer, balance, tier } = await loadAround(supabase, user.id, job)
+  const { templates, kept, parent, offer, balance, tier, reference } = await loadAround(supabase, user.id, job)
   const t = await getTranslations('app')
   const lookup = new Map(templates.map((tpl) => [tpl.id, { name: tpl.name, cover: tpl.coverAfterUrl }]))
   const names = { fallback: t('photos.fallbackName'), edited: t('photos.editedName'), titleEdited: (name: string) => t('edit.titleEdited', { name }) }
   const { item, source, change } = editDisplay(job, parent, lookup, names, fileUrlFor)
-  const detail = toPhotoDetail(job, kept ? originalUrlFor(job.id) : null, keptInputsOf(job).length > 0)
+  const detail = { ...toPhotoDetail(job, kept ? originalUrlFor(job.id) : null, keptInputsOf(job).length > 0), reference }
   const view = (
     <ResultView
       item={item}

@@ -30,6 +30,8 @@ import type { Translate } from '@/core/translate'
 // T68). Server actions are public endpoints, so each checks the session itself; the SQL
 // functions check ownership and the 5-per-24h limit. Reads run on the user's own session (RLS).
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 function failed(where: string, error: unknown): FormState {
   const appError = toAppError(error)
   if (appError.code === 'INTERNAL') logger.error(`support.${where}.failed`, { error: appError.cause ?? appError })
@@ -92,9 +94,11 @@ export async function loadTicketThread(ticketId: string): Promise<ShownThread | 
 }
 
 // The image-issue picker's works, read when the New ticket tab first opens rather than on
-// every account page load.
-export async function loadWorkChoices(): Promise<Choice[]> {
+// every account page load; plus the one "Problem with this photo?" sent along (T78), read
+// through RLS like the rest, so another user's id finds nothing.
+export async function loadWorkChoices(jobId?: string | null): Promise<Choice[]> {
   const user = await requireApiUser()
-  const [works, t] = await Promise.all([listWorkOptions(await createServerSupabase(), user.id), getTranslations('app.support')])
+  const include = typeof jobId === 'string' && UUID.test(jobId) ? jobId : null
+  const [works, t] = await Promise.all([listWorkOptions(await createServerSupabase(), user.id, include), getTranslations('app.support')])
   return workChoices(works, t as unknown as Translate)
 }
