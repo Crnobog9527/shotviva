@@ -29,7 +29,7 @@ export const evidenceFactsSchema = z.object({
     created_at: time,
   }),
   user: z
-    .object({ id: z.uuid(), email: z.string().nullable(), signed_up_at: time, signup_ip: ip, banned_at: nullableTime })
+    .object({ id: z.uuid(), email: z.string().nullable(), signed_up_at: nullableTime, signup_ip: ip, banned_at: nullableTime })
     .nullable(),
   payment: z
     .object({

@@ -22,7 +22,7 @@ function workLine(work: EvidenceWork): string {
 
 function header(facts: EvidenceFacts): string[] {
   const lines: string[] = []
-  if (facts.user) lines.push(`Account created: ${utc(facts.user.signed_up_at)}, sign-up IP ${orUnknown(facts.user.signup_ip)}`)
+  if (facts.user?.signed_up_at) lines.push(`Account created: ${utc(facts.user.signed_up_at)}, sign-up IP ${orUnknown(facts.user.signup_ip)}`)
   const pay = facts.payment
   if (pay) {
     const source = pay.context_from === 'first_payment' ? ' (from the first payment of this subscription)' : ''

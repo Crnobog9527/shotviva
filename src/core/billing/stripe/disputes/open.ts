@@ -4,6 +4,7 @@ import type Stripe from 'stripe'
 import { z } from 'zod'
 
 import type { DisputeOpenedAlert } from '../../../alerts'
+import { AppError } from '../../../errors'
 import { logger } from '../../../logger'
 import { callRpc, type RpcClient } from '../../rpc'
 import type { StripeApi } from '../client'
@@ -65,7 +66,11 @@ export function canStage(dispute: Stripe.Dispute): boolean {
 }
 
 async function draft(deps: DisputeDeps, dispute: Stripe.Dispute): Promise<void> {
-  const facts = await callRpc(deps.db, 'dispute_evidence_facts', { p_dispute_id: dispute.id }, evidenceFactsSchema)
+  const raw = await callRpc(deps.db, 'dispute_evidence_facts', { p_dispute_id: dispute.id }, z.unknown())
+  const parsed = evidenceFactsSchema.safeParse(raw)
+  // Paths only, never values: the facts hold an email and IPs.
+  if (!parsed.success) throw new AppError('INTERNAL', `dispute_evidence_facts shape: ${parsed.error.issues.map((i) => i.path.join('.')).join(', ')}`)
+  const facts = parsed.data
   const billing = chargeOf(dispute).billing
   const context = deps.evidence.context(facts.payment?.product_id ?? null, { email: billing?.email ?? null, name: billing?.name ?? null })
   await deps.stripe.disputes.update(dispute.id, { evidence: buildEvidence(facts, context), submit: false })
