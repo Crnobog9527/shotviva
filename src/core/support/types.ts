@@ -28,7 +28,18 @@ export type TicketThread = TicketSummary & { messages: TicketMessage[] }
 export type ShownThread = TicketSummary & { messages: ShownMessage[] }
 
 // What the submit form offers to attach: the author's own payments and works.
-export type PaymentOption = { id: string; productId: string; amountTotal: number; currency: string; method: 'card' | 'alipay' | 'cn_card'; createdAt: string }
+export type PaymentOption = {
+  id: string
+  productId: string
+  amountTotal: number
+  currency: string
+  method: 'card' | 'alipay' | 'cn_card'
+  createdAt: string
+  // For the account page's receipt and invoice links (T80).
+  channel: 'stripe' | 'waffo'
+  status: 'paid' | 'refunded' | 'partially_refunded' | 'disputed'
+  hasInvoice: boolean
+}
 export type WorkOption = { id: string; templateName: string; createdAt: string }
 
 export type AdminTicketRow = {
