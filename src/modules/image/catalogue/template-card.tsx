@@ -7,6 +7,7 @@ import { LoopPlate } from './card-media'
 import { cardPrice, hasStills, isArtStyle, isMotion, type CatalogueTemplate } from './catalogue-template'
 import { useCategoryLabel } from './category-label'
 import { CompareSlider } from './compare-slider'
+import { COVER_SIZES } from './cover-sizes'
 import { PairMedia } from './pair-media'
 import { useHoverWipe } from './use-hover-wipe'
 
@@ -35,9 +36,9 @@ function PairCard({ template, onOpen, eager }: Props) {
       className="group block w-full rounded-tile text-left transition-transform duration-250 ease-house hover:-translate-y-0.5 active:scale-[.97]"
     >
       {before && after ? (
-        <PairMedia before={before} after={after} alt={alt} eager={eager} video={type === 'video' && motion ? motion : undefined} className="transition-shadow group-hover:shadow-[inset_0_0_0_1px_var(--input)]" />
+        <PairMedia before={before} after={after} alt={alt} eager={eager} sizes={COVER_SIZES.cardPlate} video={type === 'video' && motion ? motion : undefined} className="transition-shadow group-hover:shadow-[inset_0_0_0_1px_var(--input)]" />
       ) : isMotion(template) ? (
-        <LoopPlate template={template} alt={alt} />
+        <LoopPlate template={template} alt={alt} sizes={COVER_SIZES.cardFrame} />
       ) : (
         <span className="hairline block aspect-[8/5] rounded-control bg-muted" />
       )}
@@ -49,7 +50,7 @@ function PairCard({ template, onOpen, eager }: Props) {
 // The one card with the drag compare (Art Styles): a tap on the photo opens the dialog, a drag
 // compares; the name and price below are their own button for the keyboard. From md up it is the
 // tall card spanning two rows (the grid sets the span).
-function ArtCard({ template, onOpen }: Props) {
+function ArtCard({ template, onOpen, eager }: Props) {
   const t = useTranslations('app.template')
   return (
     <div className="flex h-full flex-col rounded-tile">
@@ -59,6 +60,7 @@ function ArtCard({ template, onOpen }: Props) {
         afterAlt={t('resultAlt', { name: template.name })}
         onTap={() => onOpen(template.id)}
         tagsAt="bottom"
+        cover={{ sizes: COVER_SIZES.artCard, lazy: !eager }}
         className="hairline rounded-control md:aspect-auto md:min-h-[280px] md:flex-1"
       />
       <button type="button" aria-haspopup="dialog" onClick={() => onOpen(template.id)} className="press block w-full rounded-inner text-left">

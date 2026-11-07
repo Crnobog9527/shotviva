@@ -6,6 +6,7 @@ import { useRef } from 'react'
 import { LoopPlate } from './card-media'
 import { hasStills, type CatalogueTemplate } from './catalogue-template'
 import { useCategoryLabel } from './category-label'
+import { COVER_SIZES, FEATURE_POSTER_WIDTH } from './cover-sizes'
 import { PairMedia } from './pair-media'
 import { useHoverWipe } from './use-hover-wipe'
 
@@ -30,9 +31,9 @@ export function FeatureCard({ template, onOpen }: { template: CatalogueTemplate;
       className="group hairline relative mt-4 block w-full overflow-hidden rounded-panel bg-card text-left transition-shadow hover:shadow-[inset_0_0_0_1px_var(--input)] md:mt-6"
     >
       {hasStills(template) ? (
-        <PairMedia before={before as string} after={after as string} alt={alt} eager video={motion ?? undefined} size="feature" className="rounded-panel md:aspect-[8/3]" />
+        <PairMedia before={before as string} after={after as string} alt={alt} eager sizes={COVER_SIZES.featurePlate} video={motion ?? undefined} size="feature" className="rounded-panel md:aspect-[8/3]" />
       ) : (
-        <LoopPlate template={template} alt={alt} className="rounded-panel md:aspect-[8/3]" />
+        <LoopPlate template={template} alt={alt} sizes={COVER_SIZES.featureFrame} posterWidth={FEATURE_POSTER_WIDTH} className="rounded-panel md:aspect-[8/3]" />
       )}
       <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 z-5 h-[56%] bg-[linear-gradient(180deg,transparent,var(--photo-fade))]" />
       <span className="absolute inset-x-4 bottom-4 z-6 flex items-end justify-between gap-3 md:inset-x-6 md:bottom-6">
