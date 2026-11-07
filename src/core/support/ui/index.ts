@@ -1,8 +1,12 @@
 // Help & feedback UI (strings in site/messages app.support). Data comes from '@/core/support'
-// on the server; forms take server actions from app/(app)/account/help.
+// on the server; the dialog takes server actions from app/(app)/account/help-actions.ts.
 export { AddMessageForm } from './add-message-form'
 export { formError, IDLE, type Choice, type FormAction, type FormState } from './form-state'
 export { ThreadView } from './thread-view'
 export { TicketForm } from './ticket-form'
 export { TicketsList } from './tickets-list'
 export { UnreadDot } from './unread-dot'
+export { HelpDialog } from './help-dialog'
+export type { HelpActions } from './help-actions'
+export { parseHelpParam, type HelpView } from './help-param'
+export { openHelp } from './use-help-route'

@@ -735,8 +735,6 @@
       "newReply": "New reply",
       "replyTime": "We reply here, usually within {hours} hours.",
       "replyTimeMax": "Max members get a reply within {hours} hours.",
-      "newTicket": "New request",
-      "mine": "My tickets",
       "empty": "No tickets yet.",
       "opened": "Opened {date, date, medium}",
       "status": {
@@ -763,7 +761,6 @@
         "option": "{product} · {amount} · {date, date, medium}"
       },
       "new": {
-        "title": "New request",
         "typeLabel": "What is it about?",
         "bodyLabel": "Message",
         "placeholder": "Tell us what happened, or what you'd like to see.",
@@ -800,7 +797,16 @@
       },
       "showMore": "Show more",
       "loading": "Loading…",
-      "loadFailed": "Couldn't load more. Try again."
+      "loadFailed": "Couldn't load more. Try again.",
+      "tabs": {
+        "new": "New ticket",
+        "mine": "My tickets"
+      },
+      "emptyBody": "Questions, problems with an image, billing or refunds: write to us here.",
+      "loadError": "Couldn't load your tickets",
+      "loadErrorBody": "Check your connection and try again.",
+      "retry": "Try again",
+      "notFoundBody": "It may have been deleted, or it belongs to another account."
     },
     "edit": {
       "open": "Edit",

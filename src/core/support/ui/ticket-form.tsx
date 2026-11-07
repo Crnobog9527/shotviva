@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { useActionState, useState } from 'react'
+import { useActionState, useEffect, useState } from 'react'
 
 import { ActionBar, ActionNotice } from '../../app-shell'
 import { buttonVariants } from '../../ui/button'
@@ -12,18 +12,25 @@ import { dispatchKeeping } from './dispatch'
 import { IDLE, type Choice, type FormAction } from './form-state'
 import { TypePicker } from './type-picker'
 
-type Props = { submit: FormAction; payments: readonly Choice[]; works: readonly Choice[] }
+// The bar pinned to the bottom edge of the Help dialog's scrolling body (ResponsiveSheet `tall`
+// has no bottom padding): full bleed over the body's 16 / 24px gutters.
+export const DIALOG_FOOT = 'sticky bottom-0 z-10 -mx-4 mt-2 md:-mx-6'
 
-// New request (a flow page): pick a type, optionally one's own payment or work, write up to
-// 2,000 characters. The server action redirects to the new ticket on success.
-export function TicketForm({ submit, payments, works }: Props) {
+type Props = { submit: FormAction; payments: readonly Choice[]; works: readonly Choice[]; onSent(ticketId: string): void }
+
+// New ticket (the dialog's first tab): pick a type, optionally one's own payment or work,
+// write up to 2,000 characters. On success the dialog opens the new ticket.
+export function TicketForm({ submit, payments, works, onSent }: Props) {
   const t = useTranslations('app.support.new')
   const [state, action, pending] = useActionState(submit, IDLE)
   const [type, setType] = useState<TicketType | null>(null)
+  useEffect(() => {
+    if (state.ticketId) onSent(state.ticketId)
+  }, [state, onSent])
   // A refund request on an account without payments cannot be sent; say so instead.
   const blocked = type !== null && attachmentFor(type) === 'payment-required' && payments.length === 0
   return (
-    <form onSubmit={(event) => dispatchKeeping(event, action)} className="grid gap-6 px-4 pt-4 pb-32">
+    <form onSubmit={(event) => dispatchKeeping(event, action)} className="grid grid-cols-[minmax(0,1fr)] gap-6 pt-5">
       <TypePicker value={type} onChange={setType} />
       {type && <AttachmentField key={type} type={type} payments={payments} works={works} />}
       <BodyField
@@ -32,7 +39,7 @@ export function TicketForm({ submit, payments, works }: Props) {
         placeholder={t('placeholder')}
         counter={(count, max) => t('counter', { count, max })}
       />
-      <ActionBar>
+      <ActionBar inline className={DIALOG_FOOT}>
         {state.error && <ActionNotice>{t(`errors.${state.error}`)}</ActionNotice>}
         <button
           type="submit"

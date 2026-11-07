@@ -31,8 +31,8 @@ const ZH_LEGAL_LABELS: Record<string, string> = {
   '/privacy': '隐私政策',
   '/refund-policy': '退款政策',
   '/acceptable-use': '使用规范',
-  // Help & feedback (T27) has a Chinese version.
-  '/account/help': '联系我们',
+  // Help & feedback (T27, a dialog on the account page since T68) has a Chinese version.
+  '/account?help=new': '联系我们',
 }
 
 export const homePageIn = (locale: Locale): HomePage => HOME[locale]

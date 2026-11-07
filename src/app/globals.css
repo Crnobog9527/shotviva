@@ -447,6 +447,16 @@ html:lang(zh-Hans) :is(em, i, .italic) {
   }
 }
 
+/* Bottom drawers (vaul) slide up 500ms by default; under reduced motion they appear and go in
+   place (T68). vaul injects its own stylesheet, hence !important. */
+@media (prefers-reduced-motion: reduce) {
+  [data-vaul-drawer],
+  [data-vaul-overlay] {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
 /* The tab bar's stand-in (core/app-shell TabBarSlot) in a dynamic-param page's prerendered shell:
    the desktop bar's 56px on the photo page, nothing anywhere else. */
 @media (min-width: 768px) {
