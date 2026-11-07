@@ -939,6 +939,7 @@
     "walletOnce": "One-time payment, {period, select, year {1 year} other {30 days}}, no auto-renew",
     "oneTime": "One-time payment",
     "ctaPlan": "Continue with {tier} · {price}{period, select, year {/yr} other {/mo}}",
+    "ctaUpgrade": "Upgrade to {tier} · {price}{period, select, year {/yr} other {/mo}}",
     "ctaPack": "Continue with {count, plural, one {# credit} other {# credits}} · {price}",
     "finePlanCard": "Renews {period, select, year {yearly} other {monthly}} at {price} · cancel anytime · USD",
     "finePlanWallet": "One-time payment for {period, select, year {1 year} other {30 days}} · no auto-renew · USD",
@@ -946,6 +947,7 @@
     "redirecting": "Opening secure checkout…",
     "error": "Checkout did not open. Please try again in a moment.",
     "choose": "Choose {tier}",
+    "upgradeTo": "Upgrade to {tier}",
     "perCreditShort": "{price} / credit",
     "savingLabel": "You save<vs> vs monthly</vs>",
     "savingAmount": "{amount} a year",
@@ -958,8 +960,14 @@
     "payNotePacks": "Credit packs are always a one-time payment.",
     "cancelled": "<b>Checkout cancelled.</b> Nothing was charged.",
     "cancelledClose": "Dismiss",
-    "alreadySubscribed": "You already have a plan running. Change or cancel it in Account first.",
-    "goToAccount": "Go to Account"
+    "downgradeRefused": "Plans only go up while yours runs.",
+    "goToAccount": "Go to Account",
+    "yourPlan": "Your plan",
+    "notAvailable": "Not available",
+    "lockLower": "Can't switch down. Cancel, then buy it after your plan ends.",
+    "lockCurrentNote": "This is your plan. Manage or cancel it in Account.",
+    "upgradeNote": "Starts now, all its credits at once; your credits stay.",
+    "upgradeNoteCancels": "Starts now, all its credits at once; your current subscription ends today and your credits stay."
   },
   "announcement": {
     "dismiss": "Dismiss announcement"

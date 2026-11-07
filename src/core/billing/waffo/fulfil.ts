@@ -6,6 +6,7 @@ import { trackPurchase } from '../../analytics/funnel'
 import type { ProductId, SiteProduct } from '../../config'
 import { AppError } from '../../errors'
 import { creditChangeSchema, type CreditChange } from '../credits'
+import type { CancelOthers } from '../subscription/cancel-others'
 import { callRpc, type RpcClient } from '../rpc'
 import { paymentFacts, readWaffoOrder, type WaffoPaymentFacts } from './payment-facts'
 
@@ -21,6 +22,8 @@ export type WaffoFulfilDeps = {
   db: RpcClient
   products: readonly SiteProduct[]
   trackBuy?: typeof trackPurchase
+  // The upgrade step (T66, same as Stripe's): cancel the buyer's other renewing subscriptions.
+  cancelOthers?: CancelOthers
 }
 
 export type WaffoFulfilOutcome = 'applied' | 'replayed' | 'unpaid'
@@ -81,6 +84,9 @@ export async function fulfilWaffoOrder(
   if (!product) throw new AppError('INVALID_INPUT', `waffo order ${event.eventId}: unknown product`)
   const facts = paymentFacts(order, product)
   const change = await settleWaffoOrder(deps.db, { userId, productId, paymentId: event.eventId, facts })
+  // A membership's charge (first payment or renewal): any other renewing subscription is the
+  // plan this one upgraded from (T66). A renewal finds nothing to cancel. Replays too, as on Stripe.
+  if (product.tier !== 'pack') await deps.cancelOthers?.(userId, { waffoOrderId: form === 'subscription' ? facts.orderId : null })
   if (!change.applied) return 'replayed'
   track(deps, userId, product, facts, { locale, form })
   return 'applied'

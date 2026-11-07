@@ -17,7 +17,7 @@ export function Tick({ className = "text-[var(--tier-tick)]" }: { className?: st
 export function PerkList({ perks }: { perks: TierPerks }) {
   const t = useTranslations("paywall")
   return (
-    <div className="mt-3 grid gap-1.5 border-t border-[var(--wash-strong)] pt-3 text-caption leading-[1.35]">
+    <div className="tier-perks mt-3 grid gap-1.5 border-t border-[var(--wash-strong)] pt-3 text-caption leading-[1.35]">
       <p className="font-semibold text-muted-foreground">{t(`perkHeadings.${perks.heading}`)}</p>
       <ul className="grid gap-1.5">
         {perks.live.map((perk) => (
