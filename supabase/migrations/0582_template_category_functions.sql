@@ -8,12 +8,14 @@
 --   CATEGORY_KEY_TAKEN      a new category's key is already used
 --   CATEGORY_NAME_EN_TAKEN  another category has this English name (ignoring case)
 --   CATEGORY_NAME_ZH_TAKEN  another category has this Chinese name
---   CATEGORY_LAST           deleting it would leave no category
+--   CATEGORY_SYSTEM         a built-in template's category (is_system): not editable or deletable
+--   CATEGORY_LAST           deleting it would leave no category on the site
 --   CATEGORY_MOVE_REQUIRED  templates use it and no destination was given
 
 -- Create (p_is_new) or edit one category. The key is set once at creation and never changes;
--- an edit changes names, intros and card style only. A new category goes to the end of the
--- order. Empty intros are stored as null (no intro shown).
+-- an edit changes names, intros and card style only (a new English name is copied onto
+-- templates.category by the 0581 trigger). A new category goes to the end of the site's order
+-- and is never a system one. Empty intros are stored as null (no intro shown).
 create function public.admin_save_template_category(p_category jsonb, p_is_new boolean, p_actor uuid)
 returns void
 language plpgsql
@@ -47,9 +49,12 @@ begin
     insert into public.template_categories (key, name_en, name_zh, intro_en, intro_zh, card_style, sort_order)
     values (
       v_key, v_name_en, v_name_zh, v_intro_en, v_intro_zh, v_style,
-      (select coalesce(max(c.sort_order), 0) + 10 from public.template_categories c)
+      (select coalesce(max(c.sort_order), 0) + 10 from public.template_categories c where not c.is_system)
     );
   else
+    if exists (select 1 from public.template_categories c where c.key = v_key and c.is_system) then
+      raise exception 'CATEGORY_SYSTEM';
+    end if;
     update public.template_categories
     set name_en = v_name_en,
         name_zh = v_name_zh,
@@ -67,7 +72,8 @@ $$;
 revoke execute on function public.admin_save_template_category(jsonb, boolean, uuid) from public, anon, authenticated;
 grant execute on function public.admin_save_template_category(jsonb, boolean, uuid) to service_role;
 
--- The whole order in one write: p_keys is every category exactly once, in display order.
+-- The whole order in one write: p_keys is every category except the system ones, each once, in
+-- display order. System categories keep their place.
 create function public.admin_reorder_template_categories(p_keys text[], p_actor uuid)
 returns void
 language plpgsql
@@ -81,7 +87,7 @@ begin
   end if;
   if cardinality(v_keys) <> (select count(distinct k) from unnest(v_keys) as u(k))
      or (select array_agg(k order by k) from unnest(v_keys) as u(k))
-        is distinct from (select array_agg(c.key order by c.key) from public.template_categories c) then
+        is distinct from (select array_agg(c.key order by c.key) from public.template_categories c where not c.is_system) then
     raise exception 'INVALID_INPUT' using detail = 'the order must list every category once';
   end if;
 
@@ -95,10 +101,11 @@ $$;
 revoke execute on function public.admin_reorder_template_categories(text[], uuid) from public, anon, authenticated;
 grant execute on function public.admin_reorder_template_categories(text[], uuid) to service_role;
 
--- Delete one category. Templates using it (published or not) move to p_move_to in the same
--- transaction; with none, p_move_to is ignored. At least one category always remains. The
--- categories are locked first so two deletes cannot both pass the "not the last" check.
--- Returns how many templates moved.
+-- Delete one category. Templates using it (published or not) move to p_move_to, another
+-- non-system category, in the same transaction (the 0581 trigger rewrites their
+-- templates.category to its English name); with none, p_move_to is ignored. At least one
+-- non-system category always remains. The categories are locked first so two deletes cannot
+-- both pass that check. Returns how many templates moved.
 create function public.admin_delete_template_category(p_key text, p_move_to text, p_actor uuid)
 returns integer
 language plpgsql
@@ -114,18 +121,21 @@ begin
   if not exists (select 1 from public.template_categories c where c.key = p_key) then
     raise exception 'CATEGORY_NOT_FOUND';
   end if;
-  if (select count(*) from public.template_categories) <= 1 then
+  if exists (select 1 from public.template_categories c where c.key = p_key and c.is_system) then
+    raise exception 'CATEGORY_SYSTEM';
+  end if;
+  if (select count(*) from public.template_categories c where not c.is_system) <= 1 then
     raise exception 'CATEGORY_LAST';
   end if;
 
-  if exists (select 1 from public.templates t where t.category = p_key) then
+  if exists (select 1 from public.templates t where t.category_key = p_key) then
     if p_move_to is null then
       raise exception 'CATEGORY_MOVE_REQUIRED';
     end if;
-    if p_move_to = p_key or not exists (select 1 from public.template_categories c where c.key = p_move_to) then
-      raise exception 'INVALID_INPUT' using detail = 'move_to must be another existing category';
+    if p_move_to = p_key or not exists (select 1 from public.template_categories c where c.key = p_move_to and not c.is_system) then
+      raise exception 'INVALID_INPUT' using detail = 'move_to must be another existing, non-system category';
     end if;
-    update public.templates set category = p_move_to where category = p_key;
+    update public.templates set category_key = p_move_to where category_key = p_key;
     get diagnostics v_moved = row_count;
   else
     v_moved := 0;

@@ -5,8 +5,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { AppError } from '@/core/errors'
 import {
   EDIT_TEMPLATE_ID,
-  TEMPLATE_COLUMNS,
+  selectTemplates,
   toTemplate,
+  type PreT75TemplateRow,
   type PromptInput,
   type TemplateInput,
   type TemplateRow,
@@ -19,19 +20,23 @@ import type { AdminTemplate } from './types'
 // Every function expects a service-role client; callers must have passed requireAdmin().
 
 type PromptRow = { body: string; version: number; model_params: Record<string, unknown> }
-type AdminRow = TemplateRow & { template_prompts: PromptRow | null }
+type AdminRow = (TemplateRow | PreT75TemplateRow) & { template_prompts: PromptRow | null }
 
 export async function listAdminTemplates(client: SupabaseClient): Promise<AdminTemplate[]> {
-  const { data, error } = await client
-    .from('templates')
-    .select(`${TEMPLATE_COLUMNS}, template_prompts(body, version, model_params)`)
-    // The built-in edit template has its own page (/admin/templates/edit): this editor's form
-    // would refuse its empty visible_in, and its params are not free-form JSON.
-    .neq('id', EDIT_TEMPLATE_ID)
-    .order('sort_order', { ascending: true })
-    .order('id', { ascending: true })
-    .returns<AdminRow[]>()
-  if (error) throw new AppError('INTERNAL', `listAdminTemplates failed: ${error.message}`)
+  const { data, error } = await selectTemplates(
+    (columns) =>
+      client
+        .from('templates')
+        .select(columns)
+        // The built-in edit template has its own page (/admin/templates/edit): this editor's
+        // form would refuse its empty visible_in, and its params are not free-form JSON.
+        .neq('id', EDIT_TEMPLATE_ID)
+        .order('sort_order', { ascending: true })
+        .order('id', { ascending: true })
+        .returns<AdminRow[]>(),
+    ', template_prompts(body, version, model_params)',
+  )
+  if (error || !data) throw new AppError('INTERNAL', `listAdminTemplates failed: ${error?.message ?? 'no data'}`)
   return data.map((row) => ({
     ...toTemplate(row),
     prompt: row.template_prompts

@@ -1,8 +1,10 @@
 -- T75: template categories move from code into the database so the Owner manages them in admin
--- (ARCHITECTURE §5 「模板分类由后台管理」). `key` is the stable id that templates.category,
--- pages, analytics and caches use; it never changes once created. Names and intros are display
--- text in both languages. `card_style` replaces the old check on the name 'Art Styles':
--- 'compare' cards are the drag compare, 'pair' the side-by-side pair.
+-- (ARCHITECTURE §5 「模板分类由后台管理」). `key` is the stable id that templates.category_key
+-- (0581), pages, analytics and caches use; it never changes once created. Names and intros are
+-- display text in both languages. `card_style` replaces the old check on the name 'Art Styles':
+-- 'compare' cards are the drag compare, 'pair' the side-by-side pair. `is_system` marks the
+-- categories of the built-in templates (photo edit, partner freeform): never shown on Create or
+-- the home page, and not editable or deletable in admin.
 --
 -- Public read (every page shows the names), written only through the admin SQL functions
 -- (0582) with the service role.
@@ -21,6 +23,7 @@ create table public.template_categories (
   card_style text not null default 'pair'
     constraint template_categories_card_style_check check (card_style in ('pair', 'compare')),
   sort_order integer not null default 0,
+  is_system boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -65,3 +68,9 @@ insert into public.template_categories (key, name_en, name_zh, intro_en, intro_z
   ('pets', 'Pets', '宠物',
    'Turn a snapshot of your pet into a studio portrait. Your pet still looks like your pet.',
    '把宠物的随手拍变成影棚写真，你家的宠物还是你家的样子。', 'pair', 60);
+
+-- The built-in templates' categories. English names equal the values templates.category holds
+-- for them today ('edit' 0264, 'freeform' 0003), so that column does not change.
+insert into public.template_categories (key, name_en, name_zh, card_style, sort_order, is_system) values
+  ('edit', 'edit', '修图', 'pair', 1000, true),
+  ('freeform', 'freeform', '自由生成', 'pair', 1010, true);

@@ -10,7 +10,7 @@ const base: Template = {
   name: 'Promo Poster',
   description: null,
   category: 'food-drink',
-  categoryInfo: { key: 'food-drink', nameEn: 'Food & Drink', nameZh: '餐饮', introEn: 'Dishes.', introZh: null, cardStyle: 'pair', sortOrder: 20 },
+  categoryInfo: { key: 'food-drink', nameEn: 'Food & Drink', nameZh: '餐饮', introEn: 'Dishes.', introZh: null, cardStyle: 'pair', sortOrder: 20, isSystem: false },
   coverBeforeUrl: null,
   coverAfterUrl: null,
   coverMediaType: 'image',

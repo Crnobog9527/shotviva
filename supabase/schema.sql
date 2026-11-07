@@ -572,18 +572,21 @@ begin
   if not exists (select 1 from public.template_categories c where c.key = p_key) then
     raise exception 'CATEGORY_NOT_FOUND';
   end if;
-  if (select count(*) from public.template_categories) <= 1 then
+  if exists (select 1 from public.template_categories c where c.key = p_key and c.is_system) then
+    raise exception 'CATEGORY_SYSTEM';
+  end if;
+  if (select count(*) from public.template_categories c where not c.is_system) <= 1 then
     raise exception 'CATEGORY_LAST';
   end if;
 
-  if exists (select 1 from public.templates t where t.category = p_key) then
+  if exists (select 1 from public.templates t where t.category_key = p_key) then
     if p_move_to is null then
       raise exception 'CATEGORY_MOVE_REQUIRED';
     end if;
-    if p_move_to = p_key or not exists (select 1 from public.template_categories c where c.key = p_move_to) then
-      raise exception 'INVALID_INPUT' using detail = 'move_to must be another existing category';
+    if p_move_to = p_key or not exists (select 1 from public.template_categories c where c.key = p_move_to and not c.is_system) then
+      raise exception 'INVALID_INPUT' using detail = 'move_to must be another existing, non-system category';
     end if;
-    update public.templates set category = p_move_to where category = p_key;
+    update public.templates set category_key = p_move_to where category_key = p_key;
     get diagnostics v_moved = row_count;
   else
     v_moved := 0;
@@ -795,7 +798,7 @@ begin
   end if;
   if cardinality(v_keys) <> (select count(distinct k) from unnest(v_keys) as u(k))
      or (select array_agg(k order by k) from unnest(v_keys) as u(k))
-        is distinct from (select array_agg(c.key order by c.key) from public.template_categories c) then
+        is distinct from (select array_agg(c.key order by c.key) from public.template_categories c where not c.is_system) then
     raise exception 'INVALID_INPUT' using detail = 'the order must list every category once';
   end if;
 
@@ -1021,9 +1024,12 @@ begin
     insert into public.template_categories (key, name_en, name_zh, intro_en, intro_zh, card_style, sort_order)
     values (
       v_key, v_name_en, v_name_zh, v_intro_en, v_intro_zh, v_style,
-      (select coalesce(max(c.sort_order), 0) + 10 from public.template_categories c)
+      (select coalesce(max(c.sort_order), 0) + 10 from public.template_categories c where not c.is_system)
     );
   else
+    if exists (select 1 from public.template_categories c where c.key = v_key and c.is_system) then
+      raise exception 'CATEGORY_SYSTEM';
+    end if;
     update public.template_categories
     set name_en = v_name_en,
         name_zh = v_name_zh,
@@ -1377,13 +1383,16 @@ declare
   v_id text := p_template ->> 'id';
 begin
   insert into public.templates as t (
-    id, module, name, category, cover_before_url, cover_after_url,
+    id, module, name, category, category_key, cover_before_url, cover_after_url,
     fields, quality, credits_cost, sort_order, is_active, visible_in, translations, description, featured_rank
   ) values (
     v_id,
     coalesce(p_template ->> 'module', 'image'),
     p_template ->> 'name',
+    -- New code sends the key; old code and the prompt import send a name. The 0581 trigger
+    -- fills whichever is missing.
     p_template ->> 'category',
+    nullif(p_template ->> 'category_key', ''),
     nullif(p_template ->> 'cover_before_url', ''),
     nullif(p_template ->> 'cover_after_url', ''),
     coalesce(p_template -> 'fields', '{}'::jsonb),
@@ -1405,6 +1414,8 @@ begin
     module = excluded.module,
     name = excluded.name,
     category = excluded.category,
+    -- After the BEFORE INSERT trigger, so always set (EXCLUDED carries the trigger's values).
+    category_key = excluded.category_key,
     -- Only when the payload carries them: the editor leaves covers to the upload.
     cover_before_url = case when p_template ? 'cover_before_url' then excluded.cover_before_url else t.cover_before_url end,
     cover_after_url = case when p_template ? 'cover_after_url' then excluded.cover_after_url else t.cover_after_url end,
@@ -2612,6 +2623,81 @@ $$;
 ALTER FUNCTION "public"."sync_waffo_subscription"("p_user_id" "uuid", "p_order_id" "text", "p_product_id" "text", "p_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean, "p_event_at" timestamp with time zone) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."template_categories_sync_name"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  update public.templates set category = new.name_en where category_key = new.key and category <> new.name_en;
+  return null;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."template_categories_sync_name"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."template_category_for"("p_value" "text") RETURNS "text"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_value text := btrim(coalesce(p_value, ''));
+  v_key text;
+  v_base text;
+  v_name_en text;
+  v_name_zh text;
+  v_n integer;
+begin
+  if v_value = '' then
+    return null;
+  end if;
+  select c.key into v_key
+  from public.template_categories c
+  where c.key = v_value or lower(c.name_en) = lower(v_value) or c.name_zh = v_value
+  order by (c.key = v_value) desc, c.sort_order
+  limit 1;
+  if v_key is not null then
+    return v_key;
+  end if;
+
+  v_base := rtrim(left(btrim(regexp_replace(lower(v_value), '[^a-z0-9]+', '-', 'g'), '-'), 36), '-');
+  if v_base = '' then
+    v_base := 'category';
+  end if;
+  v_key := v_base;
+  v_n := 1;
+  while exists (select 1 from public.template_categories c where c.key = v_key) loop
+    v_n := v_n + 1;
+    v_key := v_base || '-' || v_n;
+  end loop;
+
+  v_name_en := btrim(left(v_value, 32));
+  v_n := 1;
+  while exists (select 1 from public.template_categories c where lower(c.name_en) = lower(v_name_en)) loop
+    v_n := v_n + 1;
+    v_name_en := btrim(left(v_value, 32 - length(' ' || v_n))) || ' ' || v_n;
+  end loop;
+  v_name_zh := btrim(left(v_value, 12));
+  v_n := 1;
+  while exists (select 1 from public.template_categories c where c.name_zh = v_name_zh) loop
+    v_n := v_n + 1;
+    v_name_zh := btrim(left(v_value, 12 - length(' ' || v_n))) || ' ' || v_n;
+  end loop;
+
+  insert into public.template_categories (key, name_en, name_zh, card_style, sort_order)
+  values (
+    v_key, v_name_en, v_name_zh, 'pair',
+    (select coalesce(max(c.sort_order), 0) + 10 from public.template_categories c where not c.is_system)
+  );
+  return v_key;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."template_category_for"("p_value" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."template_request_votes_count"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -2628,6 +2714,34 @@ $$;
 
 
 ALTER FUNCTION "public"."template_request_votes_count"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."templates_sync_category"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if new.category_key is not null and (tg_op = 'INSERT' or new.category_key is distinct from old.category_key) then
+    -- The key was written: the name follows it below.
+    null;
+  elsif tg_op = 'INSERT' or new.category is distinct from old.category then
+    -- Only the name was written. A rename of the template's own category keeps its key.
+    if tg_op = 'INSERT' or not exists (
+      select 1 from public.template_categories c
+      where c.key = new.category_key
+        and (c.key = btrim(new.category) or lower(c.name_en) = lower(btrim(new.category)) or c.name_zh = btrim(new.category))
+    ) then
+      new.category_key := public.template_category_for(new.category);
+    end if;
+  end if;
+  -- An unknown key keeps a non-null name, so the foreign key (not NOT NULL) is what refuses it.
+  new.category := coalesce((select c.name_en from public.template_categories c where c.key = new.category_key), new.category, new.category_key);
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."templates_sync_category"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."toggle_template_request_vote"("p_request_id" "uuid", "p_user_id" "uuid") RETURNS TABLE("voted" boolean, "votes_count" integer)
@@ -3054,6 +3168,7 @@ CREATE TABLE IF NOT EXISTS "public"."template_categories" (
     "intro_zh" "text",
     "card_style" "text" DEFAULT 'pair'::"text" NOT NULL,
     "sort_order" integer DEFAULT 0 NOT NULL,
+    "is_system" boolean DEFAULT false NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     CONSTRAINT "template_categories_card_style_check" CHECK (("card_style" = ANY (ARRAY['pair'::"text", 'compare'::"text"]))),
@@ -3116,6 +3231,7 @@ CREATE TABLE IF NOT EXISTS "public"."templates" (
     "translations" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
     "description" "text",
     "featured_rank" smallint,
+    "category_key" "text" NOT NULL,
     CONSTRAINT "templates_category_check" CHECK ((("char_length"("category") >= 1) AND ("char_length"("category") <= 60))),
     CONSTRAINT "templates_cover_media_type_check" CHECK (("cover_media_type" = ANY (ARRAY['image'::"text", 'animated'::"text", 'video'::"text"]))),
     CONSTRAINT "templates_cover_motion_complete" CHECK ((("cover_media_type" = 'image'::"text") OR (("cover_video_url" IS NOT NULL) AND ("cover_poster_url" IS NOT NULL)))),
@@ -3431,7 +3547,7 @@ CREATE INDEX "templates_active_sort_idx" ON "public"."templates" USING "btree" (
 
 
 
-CREATE INDEX "templates_category_idx" ON "public"."templates" USING "btree" ("category");
+CREATE INDEX "templates_category_key_idx" ON "public"."templates" USING "btree" ("category_key");
 
 
 
@@ -3455,6 +3571,10 @@ CREATE OR REPLACE TRIGGER "template_categories_set_updated_at" BEFORE UPDATE ON 
 
 
 
+CREATE OR REPLACE TRIGGER "template_categories_sync_name" AFTER UPDATE OF "name_en" ON "public"."template_categories" FOR EACH ROW WHEN (("old"."name_en" IS DISTINCT FROM "new"."name_en")) EXECUTE FUNCTION "public"."template_categories_sync_name"();
+
+
+
 CREATE OR REPLACE TRIGGER "template_prompts_bump_version" BEFORE UPDATE ON "public"."template_prompts" FOR EACH ROW EXECUTE FUNCTION "public"."bump_template_prompt_version"();
 
 
@@ -3464,6 +3584,10 @@ CREATE OR REPLACE TRIGGER "template_request_votes_count" AFTER INSERT OR DELETE 
 
 
 CREATE OR REPLACE TRIGGER "templates_set_updated_at" BEFORE UPDATE ON "public"."templates" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
+
+
+
+CREATE OR REPLACE TRIGGER "templates_sync_category" BEFORE INSERT OR UPDATE OF "category", "category_key" ON "public"."templates" FOR EACH ROW EXECUTE FUNCTION "public"."templates_sync_category"();
 
 
 
@@ -4040,6 +4164,11 @@ GRANT ALL ON FUNCTION "public"."sync_subscription"("p_subscription_id" "text", "
 
 REVOKE ALL ON FUNCTION "public"."sync_waffo_subscription"("p_user_id" "uuid", "p_order_id" "text", "p_product_id" "text", "p_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean, "p_event_at" timestamp with time zone) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."sync_waffo_subscription"("p_user_id" "uuid", "p_order_id" "text", "p_product_id" "text", "p_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean, "p_event_at" timestamp with time zone) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."template_category_for"("p_value" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."template_category_for"("p_value" "text") TO "service_role";
 
 
 

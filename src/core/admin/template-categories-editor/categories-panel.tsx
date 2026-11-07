@@ -19,7 +19,9 @@ const asValue = (result: ActionResult) => (result.ok ? { ok: true as const, valu
 
 // 分类管理 (ARCHITECTURE §5 「模板分类由后台管理」, T75): list, add, edit, reorder and delete
 // template categories. Every save refreshes the page, so the list is what the database holds.
-export function CategoriesPanel({ categories, actions }: Props) {
+export function CategoriesPanel({ categories: all, actions }: Props) {
+  // The built-in templates' categories are managed by code, not here (T75).
+  const categories = all.filter((category) => !category.isSystem)
   const [editing, setEditing] = useState<CategoryTarget | null>(null)
   const [deleting, setDeleting] = useState<AdminCategory | null>(null)
   const { pending, error, notice, run, clearError } = useAdminAction()

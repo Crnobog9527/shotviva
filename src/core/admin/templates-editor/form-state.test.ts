@@ -21,7 +21,7 @@ const template: AdminTemplate = {
   name: 'Burger hero',
   description: 'Stacked burger, studio light',
   category: 'burgers',
-  categoryInfo: { key: 'burgers', nameEn: 'Burgers', nameZh: '汉堡', introEn: null, introZh: null, cardStyle: 'pair', sortOrder: 70 },
+  categoryInfo: { key: 'burgers', nameEn: 'Burgers', nameZh: '汉堡', introEn: null, introZh: null, cardStyle: 'pair', sortOrder: 70, isSystem: false },
   coverBeforeUrl: null,
   coverAfterUrl: null,
   coverMediaType: 'image',

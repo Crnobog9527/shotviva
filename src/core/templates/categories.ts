@@ -21,6 +21,9 @@ export type Category = {
   // 'compare': the drag compare card (today only 画风); 'pair': the side-by-side pair.
   cardStyle: CardStyle
   sortOrder: number
+  // A built-in template's category (photo edit, partner freeform): never on Create or the home
+  // page, not editable or deletable in admin.
+  isSystem: boolean
 }
 
 export type CategoryRow = {
@@ -31,9 +34,10 @@ export type CategoryRow = {
   intro_zh: string | null
   card_style: CardStyle
   sort_order: number
+  is_system: boolean
 }
 
-export const CATEGORY_COLUMNS = 'key, name_en, name_zh, intro_en, intro_zh, card_style, sort_order'
+export const CATEGORY_COLUMNS = 'key, name_en, name_zh, intro_en, intro_zh, card_style, sort_order, is_system'
 
 export function toCategory(row: CategoryRow): Category {
   return {
@@ -44,6 +48,25 @@ export function toCategory(row: CategoryRow): Category {
     introZh: row.intro_zh,
     cardStyle: row.card_style,
     sortOrder: row.sort_order,
+    isSystem: row.is_system,
+  }
+}
+
+// Only while a database has no template_categories yet (before migration 0580–0583, or a
+// deployment rolled back onto it): the template's stored English name stands in for both
+// names, with no intro, and 'Art Styles' keeps the drag compare as before T75. Goes with the
+// card that drops templates.category.
+const PRE_T75_SYSTEM = new Set(['edit', 'freeform'])
+export function preT75Category(name: string): Category {
+  return {
+    key: suggestCategoryKey(name) || 'uncategorized',
+    nameEn: name,
+    nameZh: name,
+    introEn: null,
+    introZh: null,
+    cardStyle: name === 'Art Styles' ? 'compare' : 'pair',
+    sortOrder: 0,
+    isSystem: PRE_T75_SYSTEM.has(name),
   }
 }
 

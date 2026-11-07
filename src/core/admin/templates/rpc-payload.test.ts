@@ -7,7 +7,7 @@ import { toUpsertArgs } from './rpc-payload'
 const template = templateInputSchema.parse({
   id: 'salad-bowl',
   name: 'Salad bowl',
-  category: 'salads',
+  category: 'food-drink',
   visibleIn: ['web'],
   quality: 'medium',
   creditsCost: { '1k': 1, '2k': 2, '3k': 3 },
@@ -27,6 +27,16 @@ describe('toUpsertArgs', () => {
     expect(args.p_template).not.toHaveProperty('cover_before_url')
     const withCover = toUpsertArgs({ ...template, coverAfterUrl: 'https://a.test/x.webp' }, { body: 'x', modelParams: {} })
     expect(withCover.p_template).toMatchObject({ cover_after_url: 'https://a.test/x.webp' })
+  })
+
+  // T75: the admin form's category is a key; the prompt import may give a name.
+  it('sends the admin form\'s category as the key, the import\'s as a value to resolve', () => {
+    const prompt = { body: 'x', modelParams: {} }
+    expect(toUpsertArgs(template, prompt).p_template).toMatchObject({ category_key: 'food-drink' })
+    expect(toUpsertArgs(template, prompt).p_template).not.toHaveProperty('category')
+    const imported = toUpsertArgs({ ...template, category: 'Food & Drink' }, prompt, { categoryByName: true }).p_template
+    expect(imported).toMatchObject({ category: 'Food & Drink' })
+    expect(imported).not.toHaveProperty('category_key')
   })
 
   it('passes them through when given', () => {

@@ -1,4 +1,4 @@
-import { CATEGORY_COLUMNS, toCategory, type Category, type CategoryRow } from './categories'
+import { CATEGORY_COLUMNS, preT75Category, toCategory, type Category, type CategoryRow } from './categories'
 import type { CreditsCost, TemplateQuality } from './pricing'
 import type { CoverMediaType, TemplateFields, TemplateSurface, TemplateTranslations } from './schema'
 
@@ -8,7 +8,8 @@ export type Template = {
   name: string
   // English one-line description (T52); null when not filled in. Read through localizeTemplate.
   description: string | null
-  // The template_categories key (T75); its names and card style are in categoryInfo.
+  // The template_categories key (templates.category_key, T75); names and card style are in
+  // categoryInfo.
   category: string
   categoryInfo: Category
   coverBeforeUrl: string | null
@@ -33,14 +34,11 @@ export type Template = {
   updatedAt: string
 }
 
-export type TemplateRow = {
+type TemplateRowBase = {
   id: string
   module: 'image' | 'video'
   name: string
   description: string | null
-  category: string
-  // Embedded through templates_category_fkey; never null (category is not null).
-  template_categories: CategoryRow
   cover_before_url: string | null
   cover_after_url: string | null
   cover_media_type: CoverMediaType
@@ -59,16 +57,31 @@ export type TemplateRow = {
   updated_at: string
 }
 
-export const TEMPLATE_COLUMNS = `id, module, name, description, category, template_categories(${CATEGORY_COLUMNS}), cover_before_url, cover_after_url, cover_media_type, cover_video_url, cover_poster_url, fields, quality, credits_cost, sort_order, is_active, visible_in, translations, featured_rank, created_at, updated_at`
+// templates.category_key and its category, embedded through templates_category_key_fkey
+// (never null: the column is not null). templates.category (the English name, kept in step by
+// the 0581 trigger) is not read.
+export type TemplateRow = TemplateRowBase & { category_key: string; template_categories: CategoryRow }
+// The same read on a database before migrations 0580–0583 (see selectTemplates).
+export type PreT75TemplateRow = TemplateRowBase & { category: string }
 
-export function toTemplate(row: TemplateRow): Template {
+const BASE_COLUMNS =
+  'id, module, name, description, cover_before_url, cover_after_url, cover_media_type, cover_video_url, cover_poster_url, fields, quality, credits_cost, sort_order, is_active, visible_in, translations, featured_rank, created_at, updated_at'
+export const TEMPLATE_COLUMNS = `${BASE_COLUMNS}, category_key, template_categories(${CATEGORY_COLUMNS})`
+export const PRE_T75_TEMPLATE_COLUMNS = `${BASE_COLUMNS}, category`
+
+function categoryOf(row: TemplateRow | PreT75TemplateRow): Category {
+  return 'template_categories' in row ? toCategory(row.template_categories) : preT75Category(row.category)
+}
+
+export function toTemplate(row: TemplateRow | PreT75TemplateRow): Template {
+  const categoryInfo = categoryOf(row)
   return {
     id: row.id,
     module: row.module,
     name: row.name,
     description: row.description ?? null,
-    category: row.category,
-    categoryInfo: toCategory(row.template_categories),
+    category: categoryInfo.key,
+    categoryInfo,
     coverBeforeUrl: row.cover_before_url,
     coverAfterUrl: row.cover_after_url,
     coverMediaType: row.cover_media_type,

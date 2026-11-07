@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 
 import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -12,8 +10,9 @@ import { CREDITS_FLOOR } from '@/modules/image/credits-floor'
 import { connectAdmin, createUser } from './helpers'
 import { anonSupabase, serviceSupabase } from './supabase-env'
 
-// T75 (ARCHITECTURE §5 「模板分类由后台管理」): template_categories, the backfill of
-// templates.category to keys (0581) and the three admin functions (0582), through the same
+// T75 (ARCHITECTURE §5 「模板分类由后台管理」): template_categories (0580), templates.category_key
+// with its sync triggers next to the old templates.category name (0581, expand only), the three
+// admin functions (0582) and admin_upsert_template's category_key (0583), through the same
 // commands the 分类管理 panel calls. Test categories use the `t75-` key prefix.
 const service = serviceSupabase()
 let db: Client
@@ -41,8 +40,11 @@ const template = (id: string, categoryKey: string) => ({
 })
 const prompt = { body: 'one', modelParams: {} }
 const categoryOf = async (id: string) =>
+  (await db.query<{ category_key: string }>('select category_key from public.templates where id = $1', [id])).rows[0]?.category_key
+const nameOf = async (id: string) =>
   (await db.query<{ category: string }>('select category from public.templates where id = $1', [id])).rows[0]?.category
-const keys = async () => (await db.query<{ key: string }>('select key from public.template_categories order by sort_order, key')).rows.map((row) => row.key)
+const keys = async () =>
+  (await db.query<{ key: string }>('select key from public.template_categories where not is_system order by sort_order, key')).rows.map((row) => row.key)
 
 beforeAll(async () => {
   db = await connectAdmin()
@@ -59,7 +61,7 @@ afterAll(async () => {
 
 describe('seeded categories and the backfill', () => {
   it('holds the six categories with names, intros and 画风 as the one drag compare', async () => {
-    const all = await listAdminCategories(service)
+    const all = (await listAdminCategories(service)).filter((row) => !row.isSystem)
     const six = all.filter((row) => ['art-styles', 'food-drink', 'products-resale', 'beauty-skincare', 'rooms-spaces', 'pets'].includes(row.key))
     expect(six.map((row) => [row.key, row.nameEn, row.nameZh])).toEqual([
       ['art-styles', 'Art Styles', '画风'],
@@ -73,44 +75,69 @@ describe('seeded categories and the backfill', () => {
     expect(six.every((row) => row.introEn && row.introZh)).toBe(true)
   })
 
-  it('moved the built-in templates onto their own categories', async () => {
-    expect(await categoryOf('edit')).toBe('edit')
-    expect(await categoryOf('freeform')).toBe('freeform')
-    const { rows } = await db.query("select key, name_en, name_zh from public.template_categories where key in ('edit', 'freeform') order by key")
+  it('keeps the built-in templates on their own system categories, names unchanged', async () => {
+    expect([await categoryOf('edit'), await nameOf('edit')]).toEqual(['edit', 'edit'])
+    expect([await categoryOf('freeform'), await nameOf('freeform')]).toEqual(['freeform', 'freeform'])
+    const { rows } = await db.query("select key, name_en, name_zh, is_system from public.template_categories where key in ('edit', 'freeform') order by key")
     expect(rows).toEqual([
-      { key: 'edit', name_en: 'Photo edit', name_zh: '修图' },
-      { key: 'freeform', name_en: 'freeform', name_zh: '自由生成' },
+      { key: 'edit', name_en: 'edit', name_zh: '修图', is_system: true },
+      { key: 'freeform', name_en: 'freeform', name_zh: '自由生成', is_system: true },
     ])
   })
 
-  // The 0581 backfill, re-run on old-style values inside a transaction that is rolled back:
-  // names match by English name (any case, outer spaces) or Chinese name; anything else gets
-  // its own category, with a unique slug key.
-  it('maps old stored names to keys and gives stray values their own category', async () => {
-    const migration = readFileSync(join(process.cwd(), 'supabase', 'migrations', '0581_templates_category_key.sql'), 'utf8')
-    const backfill = migration.slice(migration.indexOf('do $$'), migration.indexOf('$$;') + 3)
+  // The 0581 backfill and trigger use one lookup (template_category_for): a write that sets
+  // only templates.category (the old build, the import) gets its key; names match by English
+  // name (any case, outer spaces) or Chinese name; anything else gets its own category, with a
+  // unique slug key and names numbered until unique. Inside a rolled-back transaction.
+  it('finds or creates the key for a written name, keeping templates.category the English name', async () => {
     const old = [
       ['t75-old-a', 'Food & Drink'],
       ['t75-old-b', ' pets '],
       ['t75-old-c', '宠物'],
       ['t75-old-d', 'Burgers & Fries'],
       ['t75-old-e', '  Burgers & Fries '],
-      ['t75-old-f', '早餐'],
+      ['t75-old-f', 'Burgers & Friends'],
+      ['t75-old-g', '早餐'],
+      ['t75-old-h', 'products'],
     ]
     await db.query('begin')
     try {
-      await db.query('alter table public.templates drop constraint templates_category_fkey')
       for (const [id, value] of old) {
         await db.query("insert into public.templates (id, name, category, credits_cost) values ($1, $1, $2, '{\"1k\": 2, \"2k\": 4, \"3k\": 6}')", [id, value])
       }
-      await db.query(backfill)
-      const { rows } = await db.query<{ id: string; category: string }>("select id, category from public.templates where id like 't75-old-%' order by id")
-      expect(rows.map((row) => row.category)).toEqual(['food-drink', 'pets', 'pets', 'burgers-fries', 'burgers-fries', 'category'])
-      const strays = await db.query("select key, name_en, name_zh, card_style from public.template_categories where key in ('burgers-fries', 'category') order by key")
-      expect(strays.rows).toEqual([
-        { key: 'burgers-fries', name_en: 'Burgers & Fries', name_zh: 'Burgers & Fr', card_style: 'pair' },
-        { key: 'category', name_en: '早餐', name_zh: '早餐', card_style: 'pair' },
+      const { rows } = await db.query<{ category_key: string; category: string }>(
+        "select category_key, category from public.templates where id like 't75-old-%' order by id",
+      )
+      expect(rows.map((row) => row.category_key)).toEqual(['food-drink', 'pets', 'pets', 'burgers-fries', 'burgers-fries', 'burgers-friends', 'category', 'products'])
+      expect(rows.map((row) => row.category)).toEqual(['Food & Drink', 'Pets', 'Pets', 'Burgers & Fries', 'Burgers & Fries', 'Burgers & Friends', '早餐', 'products'])
+      const created = await db.query(
+        "select key, name_en, name_zh, card_style, is_system from public.template_categories where key in ('burgers-fries', 'burgers-friends', 'category', 'products') order by key",
+      )
+      expect(created.rows).toEqual([
+        { key: 'burgers-fries', name_en: 'Burgers & Fries', name_zh: 'Burgers & Fr', card_style: 'pair', is_system: false },
+        // Its Chinese name cut to 12 collides with the one above: numbered.
+        { key: 'burgers-friends', name_en: 'Burgers & Friends', name_zh: 'Burgers & 2', card_style: 'pair', is_system: false },
+        { key: 'category', name_en: '早餐', name_zh: '早餐', card_style: 'pair', is_system: false },
+        { key: 'products', name_en: 'products', name_zh: 'products', card_style: 'pair', is_system: false },
       ])
+    } finally {
+      await db.query('rollback')
+    }
+  })
+
+  // What the build live before T75 sends: only `category`, as a name.
+  it('saves an old-style admin payload through admin_upsert_template', async () => {
+    await db.query('begin')
+    try {
+      await db.query(
+        `select public.admin_upsert_template($1::jsonb, null)`,
+        [JSON.stringify({ id: 't75-legacy', name: 'Legacy', category: 'Rooms & Spaces', credits_cost: { '1k': 2, '2k': 4, '3k': 6 } })],
+      )
+      expect([await categoryOf('t75-legacy'), await nameOf('t75-legacy')]).toEqual(['rooms-spaces', 'Rooms & Spaces'])
+      await db.query(`select public.admin_upsert_template($1::jsonb, null)`, [
+        JSON.stringify({ id: 't75-legacy', name: 'Legacy', category: 'Art Styles', credits_cost: { '1k': 2, '2k': 4, '3k': 6 } }),
+      ])
+      expect([await categoryOf('t75-legacy'), await nameOf('t75-legacy')]).toEqual(['art-styles', 'Art Styles'])
     } finally {
       await db.query('rollback')
     }
@@ -121,6 +148,13 @@ describe('seeded categories and the backfill', () => {
     await db.query("update public.templates set is_active = true where id = 't75-read'")
     const zh = (await listTemplatesIn(anonSupabase(), 'zh')).find((row) => row.id === 't75-read')
     expect(zh?.categoryView).toMatchObject({ key: 'pets', name: '宠物', compare: false })
+    expect(await nameOf('t75-read')).toBe('Pets')
+  })
+
+  it('never lists a template in a system category on the site', async () => {
+    await saveTemplate(service, admin, { isNew: true, template: template('t75-system', 'freeform'), prompt }, CREDITS_FLOOR)
+    await db.query("update public.templates set is_active = true where id = 't75-system'")
+    expect((await listTemplatesIn(anonSupabase(), 'en')).some((row) => row.id === 't75-system')).toBe(false)
   })
 })
 
@@ -128,9 +162,20 @@ describe('admin category functions', () => {
   it('creates a category at the end of the order and edits its names, never its key', async () => {
     await saveTemplateCategory(service, admin, { isNew: true, category: category('t75-kids', 'Kids', '儿童', { introZh: '小朋友。' }) })
     expect((await keys()).at(-1)).toBe('t75-kids')
+    await saveTemplate(service, admin, { isNew: true, template: template('t75-kid', 't75-kids'), prompt }, CREDITS_FLOOR)
+    expect(await nameOf('t75-kid')).toBe('Kids')
     await saveTemplateCategory(service, admin, { isNew: false, category: category('t75-kids', 'Kids & Family', '亲子', { cardStyle: 'compare' }) })
     const { rows } = await db.query("select name_en, name_zh, intro_zh, card_style from public.template_categories where key = 't75-kids'")
     expect(rows[0]).toEqual({ name_en: 'Kids & Family', name_zh: '亲子', intro_zh: null, card_style: 'compare' })
+    // The rename reaches templates.category; the key stays.
+    expect([await categoryOf('t75-kid'), await nameOf('t75-kid')]).toEqual(['t75-kids', 'Kids & Family'])
+  })
+
+  it('locks the system categories', async () => {
+    await expect(saveTemplateCategory(service, admin, { isNew: false, category: category('edit', 'Edit', '编辑') })).rejects.toMatchObject({ message: expect.stringContaining('系统分类') })
+    await expect(deleteTemplateCategory(service, admin, { key: 'freeform', moveTo: 'pets' })).rejects.toMatchObject({ message: expect.stringContaining('系统分类') })
+    await expect(deleteTemplateCategory(service, admin, { key: 'pets', moveTo: 'edit' })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    expect(await keys()).toContain('pets')
   })
 
   it('refuses a taken key, a taken name in either language, and a non-admin', async () => {
@@ -172,6 +217,7 @@ describe('admin category functions', () => {
 
     expect(await deleteTemplateCategory(service, admin, { key: 't75-old', moveTo: 't75-kids' })).toEqual({ moved: 2 })
     expect([await categoryOf('t75-live'), await categoryOf('t75-draft')]).toEqual(['t75-kids', 't75-kids'])
+    expect([await nameOf('t75-live'), await nameOf('t75-draft')]).toEqual(['Kids & Family', 'Kids & Family'])
     expect(await keys()).not.toContain('t75-old')
   })
 
@@ -179,8 +225,8 @@ describe('admin category functions', () => {
     // Alone inside a rolled-back transaction: every template on one category, the rest gone.
     await db.query('begin')
     try {
-      await db.query("update public.templates set category = 'pets' where category <> 'pets'")
-      await db.query("delete from public.template_categories where key <> 'pets'")
+      await db.query("update public.templates set category_key = 'pets' where category_key <> 'pets' and category_key not in ('edit', 'freeform')")
+      await db.query("delete from public.template_categories where key <> 'pets' and not is_system")
       await expect(db.query('select public.admin_delete_template_category($1, null, $2)', ['pets', admin])).rejects.toThrow(/CATEGORY_LAST/)
     } finally {
       await db.query('rollback')

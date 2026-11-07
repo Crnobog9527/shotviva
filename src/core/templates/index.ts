@@ -36,8 +36,9 @@ export {
   type FloorViolation,
   type TemplateQuality,
 } from './pricing'
-export { TEMPLATE_COLUMNS, toTemplate } from './types'
-export type { Template, TemplateRow } from './types'
+export { PRE_T75_TEMPLATE_COLUMNS, TEMPLATE_COLUMNS, toTemplate } from './types'
+export type { PreT75TemplateRow, Template, TemplateRow } from './types'
+export { selectTemplates } from './select-templates'
 export { TEMPLATES_CACHE_TAG } from './cache'
 export { loadEditTemplate, loadGenerationTemplate, type GenerationTemplate } from './generation-template'
 export { loadEditOffer } from './edit-offer'

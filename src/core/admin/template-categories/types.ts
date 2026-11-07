@@ -2,8 +2,9 @@ import type { Category } from '@/core/templates/categories'
 
 import type { ActionResult, ActionValue } from '../templates/types'
 
-// A category as the admin list shows it: how many templates use it, published or not
-// (the photo-edit template included), so the delete dialog can say what will move.
+// A category as the admin reads it: how many templates use it, published or not, so the
+// delete dialog can say what will move. System categories (isSystem) are left out of
+// 分类管理 and the template form's list.
 export type AdminCategory = Category & { templateCount: number }
 
 export type SaveCategoryPayload = { isNew: boolean; category: unknown }

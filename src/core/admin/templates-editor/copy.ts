@@ -22,6 +22,7 @@ export const categoryCopy = {
   label: '分类',
   placeholder: '请选择分类',
   hint: '要新增分类或改名，在本页上方的「分类管理」里改。',
+  systemHint: '内置模板的系统分类，不能更改。',
 } as const
 
 // Bulk 上架 / 下架 (T60).

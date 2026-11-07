@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { AdminCategory } from '../template-categories/types'
 import { buildCategoryPayload, emptyCategoryValues, moveKey, patchCategoryValues, toCategoryValues } from './category-form-state'
 
-const pets: AdminCategory = { key: 'pets', nameEn: 'Pets', nameZh: '宠物', introEn: 'Portraits.', introZh: null, cardStyle: 'pair', sortOrder: 60, templateCount: 2 }
+const pets: AdminCategory = { key: 'pets', nameEn: 'Pets', nameZh: '宠物', introEn: 'Portraits.', introZh: null, cardStyle: 'pair', sortOrder: 60, isSystem: false, templateCount: 2 }
 
 describe('category form (T75)', () => {
   it('derives a new key from the English name until the admin types one', () => {
