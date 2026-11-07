@@ -18,7 +18,8 @@ export function ConnectShell({ brandName, email, footer, children }: Props) {
               {brandName}
               <i className="text-primary not-italic">.</i>
             </span>
-            <span className="border-l border-border pl-2 text-caption leading-tight whitespace-nowrap text-muted-foreground">{t('tagline')}</span>
+            {/* Phones keep the wordmark and the signed-in email; the tagline joins from sm up. */}
+            <span className="hidden border-l border-border pl-2 text-caption leading-tight whitespace-nowrap text-muted-foreground sm:inline">{t('tagline')}</span>
           </Link>
           {email && <span className="truncate text-caption text-muted-foreground">{email}</span>}
         </div>

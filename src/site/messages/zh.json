@@ -1045,13 +1045,16 @@
     "tryTitle": "换这三个模板试试"
   },
   "marketing": {
+    "appDescription": "AI 影棚",
     "nav": {
       "label": "主导航",
       "pricing": "价格",
-      "tagline": "AI 影棚",
+      "tagline": "保留真实照片细节，AI 一键出大片",
       "templates": "模板",
       "login": "登录",
       "startFree": "免费开始",
+      "uploadPhoto": "上传照片",
+      "generate": "生成",
       "openApp": "进入应用",
       "account": "账号"
     },

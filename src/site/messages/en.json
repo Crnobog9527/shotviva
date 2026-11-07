@@ -1045,13 +1045,16 @@
     "tryTitle": "Three templates to try instead"
   },
   "marketing": {
+    "appDescription": "AI photo studio",
     "nav": {
       "label": "Main",
       "pricing": "Pricing",
-      "tagline": "AI photo studio",
+      "tagline": "AI edits, true to your photo",
       "templates": "Templates",
       "login": "Log in",
       "startFree": "Start free",
+      "uploadPhoto": "Upload photo",
+      "generate": "Generate",
       "openApp": "Open app",
       "account": "Account"
     },
