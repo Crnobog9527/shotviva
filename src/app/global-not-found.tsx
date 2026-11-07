@@ -1,10 +1,9 @@
 import type { Metadata } from 'next'
 import { NextIntlClientProvider } from 'next-intl'
 import { setRequestLocale } from 'next-intl/server'
-import { Suspense } from 'react'
 
 import { AnnouncementBanner } from '@/core/announcements'
-import { SwitchBanner, TranslatedPathsProvider } from '@/core/i18n/ui'
+import { TranslatedPathsProvider } from '@/core/i18n/ui'
 import { loadMessages } from '@/site/i18n/messages'
 import { site } from '@/site/site.config'
 
@@ -27,10 +26,6 @@ export default async function GlobalNotFound() {
       <body className="flex min-h-full flex-col">
         <NextIntlClientProvider locale="en" messages={await loadMessages('en')}>
           <TranslatedPathsProvider paths={site.locales.zhPaths}>
-            {/* As on every marketing page (gap audit B13). */}
-            <Suspense fallback={null}>
-              <SwitchBanner translatedPaths={site.locales.zhPaths} site />
-            </Suspense>
             <AnnouncementBanner />
             <MarketingHeader locale="en" />
             <main className="flex flex-1 flex-col">
