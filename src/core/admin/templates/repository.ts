@@ -12,6 +12,7 @@ import {
   type TemplateRow,
 } from '@/core/templates'
 
+import type { PublishCandidate } from './publish-rules'
 import { toUpsertArgs } from './rpc-payload'
 import type { AdminTemplate } from './types'
 
@@ -61,19 +62,41 @@ export async function upsertTemplate(
   if (error) throw new AppError('INTERNAL', `upsertTemplate failed: ${error.message}`)
 }
 
-export async function setTemplateActive(
-  client: SupabaseClient,
-  id: string,
-  active: boolean,
-): Promise<void> {
-  // An unpublished template cannot stay featured (T53, templates_featured_live_check).
+type CandidateRow = Pick<
+  TemplateRow,
+  'id' | 'name' | 'description' | 'visible_in' | 'cover_before_url' | 'cover_after_url' | 'quality' | 'credits_cost' | 'is_active'
+> & { template_prompts: { version: number } | null }
+
+// Only what the publish rules read (T60); one query for the whole batch, by primary key.
+export async function loadPublishCandidates(client: SupabaseClient, ids: readonly string[]): Promise<PublishCandidate[]> {
   const { data, error } = await client
     .from('templates')
+    .select('id, name, description, visible_in, cover_before_url, cover_after_url, quality, credits_cost, is_active, template_prompts(version)')
+    .in('id', ids)
+    .returns<CandidateRow[]>()
+  if (error) throw new AppError('INTERNAL', `loadPublishCandidates failed: ${error.message}`)
+  return data.map((row) => ({
+    id: row.id,
+    name: row.name,
+    description: row.description ?? null,
+    visibleIn: row.visible_in,
+    coverBeforeUrl: row.cover_before_url,
+    coverAfterUrl: row.cover_after_url,
+    quality: row.quality,
+    creditsCost: row.credits_cost,
+    isActive: row.is_active,
+    hasPrompt: row.template_prompts !== null,
+  }))
+}
+
+// One update for the batch (primary-key filter).
+export async function setTemplatesActive(client: SupabaseClient, ids: readonly string[], active: boolean): Promise<void> {
+  // An unpublished template cannot stay featured (T53, templates_featured_live_check).
+  const { error } = await client
+    .from('templates')
     .update(active ? { is_active: true } : { is_active: false, featured_rank: null })
-    .eq('id', id)
-    .select('id')
-  if (error) throw new AppError('INTERNAL', `setTemplateActive failed: ${error.message}`)
-  if (data.length === 0) throw new AppError('NOT_FOUND', `template ${id} not found`)
+    .in('id', ids)
+  if (error) throw new AppError('INTERNAL', `setTemplatesActive failed: ${error.message}`)
 }
 
 // The home featured list in display order (T53); the SQL function checks the rules.

@@ -7,10 +7,12 @@ export {
   saveTemplate,
   setFeaturedTemplates,
   setTemplateActive,
+  setTemplatesActive,
 } from './templates'
 export type {
   ActionResult,
   ActionValue,
+  ActiveChangeOutcome,
   AdminTemplate,
   ApplyCoverRequest,
   CoverTicket,

@@ -7,6 +7,7 @@ import { AppError } from '@/core/errors'
 import { logger } from '@/core/logger'
 import { creditsBelowFloor, promptInputSchema, templateInputSchema, type CreditsFloor } from '@/core/templates'
 
+import { describeBlockers, planActiveChange, type ActiveChangeOutcome } from './publish-rules'
 import * as repo from './repository'
 import type { SaveTemplatePayload } from './types'
 
@@ -56,22 +57,49 @@ export async function saveTemplate(
   logger.info('admin.template.saved', { adminId, templateId: template.id, isNew: payload.isNew })
 }
 
+// The 上架 switch and the bulk bar (T60) share this one path: same rules, same log line, same
+// single write. 200 covers the whole catalogue many times over.
 const setActiveSchema = z.object({
-  id: z.string().min(1).max(64),
+  ids: z
+    .array(z.string().min(1).max(64))
+    .min(1)
+    .max(200)
+    .refine((ids) => new Set(ids).size === ids.length, 'ids must be unique'),
   active: z.boolean(),
   reason: z.string().trim().max(500).optional(),
 })
 
+export async function setTemplatesActive(
+  client: SupabaseClient,
+  adminId: string,
+  input: unknown,
+  floor: CreditsFloor,
+): Promise<ActiveChangeOutcome> {
+  const { ids, active, reason } = parseOrThrow(setActiveSchema, input, 'input')
+  // Unpublishing is a dangerous operation (DESIGN §7): it needs a stated reason.
+  if (!active && !reason) throw new AppError('INVALID_INPUT', 'a reason is required to unpublish')
+  const outcome = planActiveChange(ids, await repo.loadPublishCandidates(client, ids), active, floor)
+  if (outcome.changed.length === 0) return outcome
+  await repo.setTemplatesActive(client, outcome.changed.map((item) => item.id), active)
+  // One line per template, the same audit record the single switch has always written.
+  for (const item of outcome.changed) {
+    logger.info('admin.template.active_changed', { adminId, templateId: item.id, active, reason })
+  }
+  return outcome
+}
+
+// The single switch: a batch of one whose refusal is an error the editor shows as-is.
 export async function setTemplateActive(
   client: SupabaseClient,
   adminId: string,
   input: unknown,
+  floor: CreditsFloor,
 ): Promise<void> {
-  const { id, active, reason } = parseOrThrow(setActiveSchema, input, 'input')
-  // Unpublishing is a dangerous operation (DESIGN §7): it needs a stated reason.
-  if (!active && !reason) throw new AppError('INVALID_INPUT', 'a reason is required to unpublish')
-  await repo.setTemplateActive(client, id, active)
-  logger.info('admin.template.active_changed', { adminId, templateId: id, active, reason })
+  const { id, ...rest } = parseOrThrow(z.looseObject({ id: z.string() }), input, 'input')
+  const [skipped] = (await setTemplatesActive(client, adminId, { ...rest, ids: [id] }, floor)).skipped
+  if (!skipped) return
+  if (skipped.blockers.includes('not_found')) throw new AppError('NOT_FOUND', `template ${id} not found`)
+  throw new AppError('INVALID_INPUT', `「${skipped.name}」不能上架：${describeBlockers(skipped.blockers)}`)
 }
 
 const reorderSchema = z
