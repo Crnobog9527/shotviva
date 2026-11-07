@@ -1,13 +1,18 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react"
 
 import { trackPaywallView } from "../../analytics/browser"
 import type { EventProps } from "../../analytics/events"
 import type { PaymentChannel, SiteProduct } from "../../config"
 import { PaymentChannelContext } from "./channel-context"
-import { PaywallSheet } from "./paywall-sheet"
 import { usePaywallState, type PaywallOpenOptions } from "./use-paywall-state"
+
+// The sheet (drawer, dialog, checkout flow) is a chunk of its own: a closed sheet renders nothing,
+// so it loads once a provider mounts instead of riding on every page that only has a button that
+// could open it (the home generator, signed out, has no provider at all).
+const PaywallSheet = dynamic(() => import("./paywall-sheet").then((m) => m.PaywallSheet), { ssr: false })
 
 export type PaywallTrigger = EventProps<"paywall_view">["trigger"]
 

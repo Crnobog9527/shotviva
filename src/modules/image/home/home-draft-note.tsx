@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react'
 
-import { ArrivedNote } from '@/core/auth/ui'
+// The note's own file, not the auth/ui barrel: the barrel's sign-up form brings hCaptcha and
+// the account panels into every page with the generator.
+import { ArrivedNote } from '@/core/auth/ui/arrived-note'
 
 import { loadDraft } from './home-draft'
 

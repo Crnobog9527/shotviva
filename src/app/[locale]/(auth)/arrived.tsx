@@ -1,7 +1,7 @@
 import { arrivedFrom } from '@/core/auth'
 import { ArrivedNote } from '@/core/auth/ui'
 import { CONNECT_PAGE_PATH } from '@/core/partner'
-import { HomeDraftNote } from '@/modules/image'
+import { HomeDraftNote } from '@/modules/image/marketing'
 
 // Graylum's own mark (design/assets/img/graylum-mark.png, Owner-supplied 2026-11-06).
 const GRAYLUM_MARK = '/brand/graylum-mark.png'
