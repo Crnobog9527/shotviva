@@ -158,7 +158,13 @@ export const zhHomePage = defineHomePage({
     `一个商品，${SET_PHOTOS} 张造型图，精修好、可以直接发。同样的活，两张账单。`,
   ),
   faq: [
-    // A–I follow 建站规格 G6 in order, asked the way Chinese users ask (G13, 中文用户真实问法).
+    // I, the brand question, comes first on /zh and opens by default (建站规格 G6 exception,
+    // Owner 2026-11-08: Chinese visitors first need to know what Shotviva is). English keeps it last.
+    {
+      question: `${brand} 是什么？`,
+      answer: `${brand} 是一个网页版的 AI 照片工作室：用一张手机照片，套上菜品、商品、房间、宠物或画风模板，做出成品图。和凭提示词生成整张图的 AI 生图工具不同，${brand} 从你真实拍的照片出发，主体保持原样。新用户送 ${zhFreeImages}，之后每张 ${zhFromCredits}。`,
+    },
+    // A–H follow 建站规格 G6 in order, asked the way Chinese users ask (G13, 中文用户真实问法).
     // A's first sentence is the Chinese form of G6's fixed sentence: brand and keyword together.
     {
       question: '怎么把自己的照片变成 AI 图？',
@@ -203,11 +209,6 @@ export const zhHomePage = defineHomePage({
     {
       question: '手机上能用吗？要下载软件吗？',
       answer: `${brand} 直接在手机浏览器里就能用，iPhone 用 Safari、安卓手机用 Chrome 都行，不用下载软件。可以用相机现拍，也可以从相册选一张，出图后保存或分享。`,
-    },
-    // I: the brand question, last.
-    {
-      question: `${brand} 是什么？`,
-      answer: `${brand} 是一个网页版的 AI 照片工作室：用一张手机照片，套上菜品、商品、房间、宠物或画风模板，做出成品图。和凭提示词生成整张图的 AI 生图工具不同，${brand} 从你真实拍的照片出发，主体保持原样。新用户送 ${zhFreeImages}，之后每张 ${zhFromCredits}。`,
     },
   ],
   related: [

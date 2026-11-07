@@ -29,7 +29,9 @@ type Props = {
 // white seam and a 40px frosted knob. A transparent full-surface range input gives one-finger
 // drag, tap-to-jump and keyboard control. afterGround (white unless said otherwise) gives the
 // after plate an opaque backdrop inside its clip, so a transparent result or cut-out cover never
-// lets the before photo show through.
+// lets the before photo show through. Only a sideways drag compares: pan-y on the surface and on
+// the range input hands a vertical swipe to the page or sheet scroller, and data-vaul-no-drag
+// keeps the creation sheet from sliding under a sideways drag (Owner 2026-11-08, phones).
 export function CompareSlider({ before, after, afterAlt, afterGround = 'white', className, onTap, tagsAt = 'top', cover }: Props) {
   const [x, setX] = useState(50)
   const t = useTranslations('app.template')
@@ -37,6 +39,7 @@ export function CompareSlider({ before, after, afterAlt, afterGround = 'white', 
   const media = (url: string) => (cover ? { ...coverImage(url, cover.sizes), loading: cover.lazy ? ('lazy' as const) : undefined } : { src: url })
   return (
     <div
+      data-vaul-no-drag=""
       style={{ '--x': `${x}%` } as CSSProperties}
       className={cn('relative aspect-[4/5] touch-pan-y overflow-hidden rounded-media bg-muted select-none', className)}
     >
@@ -59,7 +62,7 @@ export function CompareSlider({ before, after, afterAlt, afterGround = 'white', 
         onPointerDown={tap.down}
         onPointerUp={tap.up}
         aria-label={t('compareAria')}
-        className="absolute inset-0 z-4 m-0 size-full cursor-ew-resize opacity-0"
+        className="absolute inset-0 z-4 m-0 size-full cursor-ew-resize touch-pan-y opacity-0"
       />
     </div>
   )

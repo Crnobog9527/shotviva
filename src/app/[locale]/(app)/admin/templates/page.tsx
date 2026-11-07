@@ -9,12 +9,12 @@ import {
   applyCoverAction,
   deleteTemplateCategoryAction,
   reorderTemplateCategoriesAction,
-  reorderTemplatesAction,
   saveTemplateCategoryAction,
   setFeaturedTemplatesAction,
   requestCoverUploadAction,
   saveTemplateAction,
   setTemplateActiveAction,
+  setTemplateOrderAction,
   setTemplatesActiveAction,
 } from './actions'
 
@@ -50,7 +50,7 @@ export default async function AdminTemplatesPage() {
           save: saveTemplateAction,
           setActive: setTemplateActiveAction,
           setActiveMany: setTemplatesActiveAction,
-          reorder: reorderTemplatesAction,
+          setOrder: setTemplateOrderAction,
           setFeatured: setFeaturedTemplatesAction,
           requestCoverUpload: requestCoverUploadAction,
           applyCover: applyCoverAction,

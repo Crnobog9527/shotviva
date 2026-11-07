@@ -281,6 +281,160 @@ $$;
 ALTER FUNCTION "public"."admin_ban_user"("p_user_id" "uuid", "p_reason" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_batch_adjust_credits"("p_actor" "uuid", "p_user_ids" "uuid"[], "p_pool" "text", "p_amount" integer, "p_reason" "text", "p_batch_key" "text") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_reason text := btrim(coalesce(p_reason, ''));
+  v_ids uuid[];
+  v_bad uuid[];
+  v_id uuid;
+  v_applied integer := 0;
+begin
+  if p_actor is null or not exists (select 1 from public.profiles where id = p_actor and role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if p_pool is null or p_pool not in ('free', 'paid') then
+    raise exception 'INVALID_INPUT' using detail = 'pool must be free or paid';
+  end if;
+  if p_amount is null or p_amount = 0 or abs(p_amount) > 100000 then
+    raise exception 'INVALID_INPUT' using detail = 'amount must be a non-zero integer up to 100000';
+  end if;
+  if length(v_reason) = 0 or length(v_reason) > 500 then
+    raise exception 'INVALID_INPUT' using detail = 'reason is required, at most 500 characters';
+  end if;
+  if p_batch_key is null or length(p_batch_key) = 0 or length(p_batch_key) > 64 then
+    raise exception 'INVALID_INPUT' using detail = 'batch key is required';
+  end if;
+  if p_user_ids is null or cardinality(p_user_ids) = 0 or cardinality(p_user_ids) > 50
+     or array_position(p_user_ids, null) is not null then
+    raise exception 'INVALID_INPUT' using detail = 'between 1 and 50 users';
+  end if;
+
+  select array_agg(distinct i order by i) into v_ids from unnest(p_user_ids) as i;
+  if cardinality(v_ids) <> cardinality(p_user_ids) then
+    raise exception 'INVALID_INPUT' using detail = 'a user is listed twice';
+  end if;
+
+  perform 1 from public.profiles where id = any(v_ids) order by id for update;
+
+  select array_agg(i order by i) into v_bad
+    from unnest(v_ids) as i
+   where not exists (select 1 from public.profiles p where p.id = i);
+  if v_bad is not null then
+    raise exception 'PROFILE_NOT_FOUND' using detail = array_to_string(v_bad, ',');
+  end if;
+
+  if exists (
+    select 1
+      from unnest(v_ids) as i
+      join public.credit_ledger l on l.idempotency_key = 'admin_batch:' || p_batch_key || ':' || i::text
+     where l.user_id <> i or l.kind <> 'admin_adjust' or l.pool <> p_pool or l.delta <> p_amount
+  ) then
+    raise exception 'IDEMPOTENCY_CONFLICT';
+  end if;
+
+  -- Users this batch already adjusted are skipped, so a resubmit never trips over the balance
+  -- its own first run produced.
+  select array_agg(p.id order by p.id) into v_bad
+    from public.profiles p
+   where p.id = any(v_ids)
+     and not exists (
+       select 1 from public.credit_ledger l
+        where l.idempotency_key = 'admin_batch:' || p_batch_key || ':' || p.id::text
+     )
+     and (case when p_pool = 'paid' then p.credits else p.free_credits end) + p_amount < 0;
+  if v_bad is not null then
+    raise exception 'CREDITS_INSUFFICIENT' using detail = array_to_string(v_bad, ',');
+  end if;
+
+  foreach v_id in array v_ids loop
+    if (public._apply_credit_change(
+          v_id, p_pool, 'admin_adjust', p_amount, v_reason || ' · 操作人 ' || p_actor::text,
+          'admin_batch:' || p_batch_key || ':' || v_id::text
+        )).applied then
+      v_applied := v_applied + 1;
+    end if;
+  end loop;
+
+  return jsonb_build_object('applied', v_applied, 'repeated', cardinality(v_ids) - v_applied);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_batch_adjust_credits"("p_actor" "uuid", "p_user_ids" "uuid"[], "p_pool" "text", "p_amount" integer, "p_reason" "text", "p_batch_key" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_batch_set_banned"("p_actor" "uuid", "p_user_ids" "uuid"[], "p_banned" boolean, "p_reason" "text") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_reason text := btrim(coalesce(p_reason, ''));
+  v_ids uuid[];
+  v_bad uuid[];
+  v_id uuid;
+  v_changed integer := 0;
+begin
+  if p_actor is null or not exists (select 1 from public.profiles where id = p_actor and role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if p_banned is null then
+    raise exception 'INVALID_INPUT' using detail = 'banned must be true or false';
+  end if;
+  if length(v_reason) = 0 or length(v_reason) > 500 then
+    raise exception 'INVALID_INPUT' using detail = 'reason is required, at most 500 characters';
+  end if;
+  if p_user_ids is null or cardinality(p_user_ids) = 0 or cardinality(p_user_ids) > 50
+     or array_position(p_user_ids, null) is not null then
+    raise exception 'INVALID_INPUT' using detail = 'between 1 and 50 users';
+  end if;
+
+  select array_agg(distinct i order by i) into v_ids from unnest(p_user_ids) as i;
+  if cardinality(v_ids) <> cardinality(p_user_ids) then
+    raise exception 'INVALID_INPUT' using detail = 'a user is listed twice';
+  end if;
+
+  perform 1 from public.profiles where id = any(v_ids) order by id for update;
+
+  select array_agg(i order by i) into v_bad
+    from unnest(v_ids) as i
+   where not exists (select 1 from public.profiles p where p.id = i);
+  if v_bad is not null then
+    raise exception 'PROFILE_NOT_FOUND' using detail = array_to_string(v_bad, ',');
+  end if;
+
+  if p_banned then
+    select array_agg(p.id order by p.id) into v_bad
+      from public.profiles p
+     where p.id = any(v_ids) and (p.role = 'admin' or p.id = p_actor);
+    if v_bad is not null then
+      raise exception 'PROTECTED_USER' using detail = array_to_string(v_bad, ',');
+    end if;
+  end if;
+
+  for v_id in
+    select p.id from public.profiles p
+     where p.id = any(v_ids) and (p.banned_at is null) = p_banned
+     order by p.id
+  loop
+    if p_banned then
+      perform public.admin_ban_user(v_id, v_reason || ' · 操作人 ' || p_actor::text);
+    else
+      perform public.admin_unban_user(v_id, v_reason || ' · 操作人 ' || p_actor::text);
+    end if;
+    v_changed := v_changed + 1;
+  end loop;
+
+  return jsonb_build_object('changed', v_changed, 'unchanged', cardinality(v_ids) - v_changed);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_batch_set_banned"("p_actor" "uuid", "p_user_ids" "uuid"[], "p_banned" boolean, "p_reason" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_daily_costs"("p_days" integer) RETURNS "jsonb"
     LANGUAGE "plpgsql" STABLE
     SET "search_path" TO ''
@@ -690,6 +844,147 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_list_tickets"("p_status" "text", "p_type" "text", "p_cursor_at" timestamp with time zone, "p_cursor_id" "uuid", "p_limit" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_list_users"("p_query" "text" DEFAULT NULL::"text", "p_tier" "text" DEFAULT NULL::"text", "p_provider" "text" DEFAULT NULL::"text", "p_status" "text" DEFAULT NULL::"text", "p_from" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_to" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_sort" "text" DEFAULT 'created'::"text", "p_page" integer DEFAULT 1) RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  -- A ledger row that names the plan of profile p (current_tier()'s rule).
+  c_plan constant text := 'l.user_id = p.id and l.pool = ''paid'' and l.delta > 0 '
+                          'and l.product_id is not null and l.product_id not like ''pack_%''';
+  v_q text := nullif(btrim(coalesce(p_query, '')), '');
+  v_like text;
+  v_digits text;
+  v_where text := 'true';
+  v_from text := 'public.profiles p';
+  v_order text := 'p.created_at desc, p.id desc';
+  v_total bigint;
+  v_ids uuid[];
+begin
+  if p_tier is not null and p_tier not in ('free', 'starter', 'pro', 'max') then
+    raise exception 'INVALID_INPUT' using detail = 'tier must be free, starter, pro or max';
+  end if;
+  if p_provider is not null and p_provider not in ('email', 'google', 'phone') then
+    raise exception 'INVALID_INPUT' using detail = 'provider must be email, google or phone';
+  end if;
+  if p_status is not null and p_status not in ('active', 'banned') then
+    raise exception 'INVALID_INPUT' using detail = 'status must be active or banned';
+  end if;
+  if p_sort is null or p_sort not in ('created', 'last_job', 'paid_credits') then
+    raise exception 'INVALID_INPUT' using detail = 'sort must be created, last_job or paid_credits';
+  end if;
+  if p_page is null or p_page < 1 or p_page > 10000 then
+    raise exception 'INVALID_INPUT' using detail = 'page must be between 1 and 10000';
+  end if;
+  if length(v_q) > 320 then
+    raise exception 'INVALID_INPUT' using detail = 'query is too long';
+  end if;
+
+  -- The lookup box's substring rules (admin_search_users, 0442): % and _ match themselves; a
+  -- query of digits, spaces, dashes and a leading + with at least 4 digits also matches the phone.
+  if v_q is not null then
+    v_like := '%' || replace(replace(replace(v_q, '\', '\\'), '%', '\%'), '_', '\_') || '%';
+    if v_q ~ '^\+?[0-9][0-9 -]{2,}$' and length(regexp_replace(v_q, '[^0-9]', '', 'g')) >= 4 then
+      v_digits := regexp_replace(v_q, '[^0-9]', '', 'g');
+    end if;
+  end if;
+
+  -- Parameters: $1 email pattern, $2 phone digits, $3 sign-up method, $4 from, $5 to, $6 tier,
+  -- $7 offset. The method is the one the account signed up with; linking Google later does not
+  -- change it.
+  if v_q is not null or p_provider is not null then
+    v_where := v_where || ' and exists (select 1 from auth.users u where u.id = p.id'
+      || case when v_q is null then ''
+              when v_digits is null then ' and u.email ilike $1'
+              else ' and (u.email ilike $1 or u.phone like ''%'' || $2 || ''%'')' end
+      || case when p_provider is null then '' else ' and u.raw_app_meta_data ->> ''provider'' = $3' end
+      || ')';
+  end if;
+  if p_status = 'banned' then
+    v_where := v_where || ' and p.banned_at is not null';
+  elsif p_status = 'active' then
+    v_where := v_where || ' and p.banned_at is null';
+  end if;
+  if p_from is not null then
+    v_where := v_where || ' and p.created_at >= $4';
+  end if;
+  if p_to is not null then
+    v_where := v_where || ' and p.created_at < $5';
+  end if;
+  if p_tier = 'free' then
+    v_where := v_where || ' and (p.paid_until is null or p.paid_until <= now() '
+      || 'or not exists (select 1 from public.credit_ledger l where ' || c_plan || '))';
+  elsif p_tier is not null then
+    v_where := v_where || ' and p.paid_until > now() and split_part((select l.product_id '
+      || 'from public.credit_ledger l where ' || c_plan
+      || ' order by l.created_at desc, l.id desc limit 1), ''_'', 1) = $6';
+  end if;
+
+  execute 'select count(*) from public.profiles p where ' || v_where
+    into v_total
+    using v_like, v_digits, p_provider, p_from, p_to, p_tier;
+
+  if p_sort = 'last_job' then
+    v_from := v_from || ' left join lateral (select g.created_at from public.generation_jobs g '
+      || 'where g.user_id = p.id order by g.created_at desc limit 1) j on true';
+    v_order := 'j.created_at desc nulls last, p.created_at desc, p.id desc';
+  elsif p_sort = 'paid_credits' then
+    v_order := 'p.credits desc, p.created_at desc, p.id desc';
+  end if;
+
+  -- ARRAY(subquery) keeps the subquery's order.
+  execute 'select array(select p.id from ' || v_from || ' where ' || v_where
+      || ' order by ' || v_order || ' limit 50 offset $7)'
+    into v_ids
+    using v_like, v_digits, p_provider, p_from, p_to, p_tier, (p_page - 1) * 50;
+
+  -- The 50 rows of the page, each joined by primary key.
+  return jsonb_build_object(
+    'total', v_total,
+    'rows', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'id', p.id,
+               'email', u.email::text,
+               'phone', nullif(u.phone, '')::text,
+               'created_at', p.created_at,
+               'provider', u.raw_app_meta_data ->> 'provider',
+               'role', p.role,
+               'credits', p.credits,
+               'free_credits', p.free_credits,
+               'paid_until', p.paid_until,
+               'tier', coalesce(split_part(plan.product_id, '_', 1), 'free'),
+               'product_id', plan.product_id,
+               'last_generation_at', j.created_at,
+               'banned_at', p.banned_at
+             ) order by ids.n)
+        from unnest(v_ids) with ordinality as ids(id, n)
+        join public.profiles p on p.id = ids.id
+        join auth.users u on u.id = p.id
+        left join lateral (
+          select l.product_id
+            from public.credit_ledger l
+           where p.paid_until > now()
+             and l.user_id = p.id and l.pool = 'paid' and l.delta > 0
+             and l.product_id is not null and l.product_id not like 'pack_%'
+           order by l.created_at desc, l.id desc
+           limit 1
+        ) plan on true
+        left join lateral (
+          select g.created_at
+            from public.generation_jobs g
+           where g.user_id = p.id
+           order by g.created_at desc
+           limit 1
+        ) j on true
+    ), '[]'::jsonb)
+  );
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."admin_list_users"("p_query" "text", "p_tier" "text", "p_provider" "text", "p_status" "text", "p_from" timestamp with time zone, "p_to" timestamp with time zone, "p_sort" "text", "p_page" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_log_replay"("p_user_id" "uuid", "p_target_id" "text", "p_reason" "text") RETURNS "void"
@@ -1259,6 +1554,63 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_set_system_setting"("p_key" "text", "p_value" "jsonb", "p_actor" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_set_template_order"("p_group" "text", "p_ids" "text"[], "p_actor" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_ids text[] := coalesce(p_ids, '{}');
+  v_members text[];
+begin
+  if p_actor is null then
+    raise exception 'INVALID_INPUT' using detail = 'actor is required';
+  end if;
+  if not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if p_group is null or p_group not in ('catalogue', 'featured') then
+    raise exception 'INVALID_INPUT' using detail = 'group must be catalogue or featured';
+  end if;
+  if cardinality(v_ids) <> (select count(distinct id) from unnest(v_ids) as u(id)) then
+    raise exception 'INVALID_INPUT' using detail = 'ids must not repeat';
+  end if;
+
+  -- Holds off other template writes for these few milliseconds, so the membership checked
+  -- below is still the membership when the new order is written. Reads are not blocked.
+  lock table public.templates in share row exclusive mode;
+
+  select coalesce(array_agg(t.id), '{}') into v_members
+  from public.templates t
+  where case p_group
+    when 'catalogue' then t.id <> 'edit'
+    else t.featured_rank is not null
+  end;
+
+  if cardinality(v_members) <> cardinality(v_ids) or not (v_members @> v_ids) then
+    raise exception 'ORDER_MISMATCH'
+      using detail = format('%s ids given, the %s group has %s', cardinality(v_ids), p_group, cardinality(v_members));
+  end if;
+
+  if p_group = 'catalogue' then
+    update public.templates t
+    set sort_order = o.position * 10
+    from unnest(v_ids) with ordinality as o(id, position)
+    where t.id = o.id and t.sort_order is distinct from o.position * 10;
+  else
+    -- Cleared first so the one-per-position index never sees two rows on one rank mid-way.
+    update public.templates set featured_rank = null where featured_rank is not null;
+    update public.templates t
+    set featured_rank = o.position
+    from unnest(v_ids) with ordinality as o(id, position)
+    where t.id = o.id;
+  end if;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_set_template_order"("p_group" "text", "p_ids" "text"[], "p_actor" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_signup_ip_clusters"("p_days" integer) RETURNS TABLE("signup_ip" "inet", "accounts" integer, "last_signup_at" timestamp with time zone, "members" "jsonb")
@@ -2997,7 +3349,7 @@ CREATE TABLE IF NOT EXISTS "public"."payments" (
     CONSTRAINT "payments_check" CHECK ((("amount_tax" >= 0) AND ("amount_tax" <= "amount_total"))),
     CONSTRAINT "payments_check1" CHECK ((("amount_refunded" >= 0) AND ("amount_refunded" <= "amount_total"))),
     CONSTRAINT "payments_currency_check" CHECK (("currency" ~ '^[a-z]{3}$'::"text")),
-    CONSTRAINT "payments_method_check" CHECK (("method" = ANY (ARRAY['card'::"text", 'alipay'::"text", 'cn_card'::"text"]))),
+    CONSTRAINT "payments_method_check" CHECK (("method" = ANY (ARRAY['card'::"text", 'alipay'::"text", 'wechat_pay'::"text", 'cn_card'::"text"]))),
     CONSTRAINT "payments_status_check" CHECK (("status" = ANY (ARRAY['paid'::"text", 'refunded'::"text", 'partially_refunded'::"text", 'disputed'::"text"]))),
     CONSTRAINT "payments_stripe_charge_id_check" CHECK (("stripe_charge_id" ~ '^(ch|py)_'::"text")),
     CONSTRAINT "payments_stripe_ids_check" CHECK ((("channel" <> 'stripe'::"text") OR ("stripe_session_id" IS NOT NULL) OR ("stripe_invoice_id" IS NOT NULL))),
@@ -3423,6 +3775,10 @@ CREATE INDEX "credit_ledger_user_id_created_at_idx" ON "public"."credit_ledger" 
 
 
 
+CREATE INDEX "credit_ledger_user_plan_idx" ON "public"."credit_ledger" USING "btree" ("user_id", "created_at" DESC, "id" DESC) WHERE (("pool" = 'paid'::"text") AND ("delta" > 0) AND ("product_id" IS NOT NULL) AND ("product_id" !~~ 'pack_%'::"text"));
+
+
+
 CREATE INDEX "generation_jobs_created_at_id_idx" ON "public"."generation_jobs" USING "btree" ("created_at" DESC, "id" DESC);
 
 
@@ -3471,7 +3827,15 @@ CREATE INDEX "payments_waffo_order_id_idx" ON "public"."payments" USING "btree" 
 
 
 
+CREATE INDEX "profiles_banned_at_idx" ON "public"."profiles" USING "btree" ("banned_at") WHERE ("banned_at" IS NOT NULL);
+
+
+
 CREATE INDEX "profiles_created_at_idx" ON "public"."profiles" USING "btree" ("created_at");
+
+
+
+CREATE INDEX "profiles_paid_until_idx" ON "public"."profiles" USING "btree" ("paid_until") WHERE ("paid_until" IS NOT NULL);
 
 
 
@@ -3880,6 +4244,16 @@ GRANT ALL ON FUNCTION "public"."admin_ban_user"("p_user_id" "uuid", "p_reason" "
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_batch_adjust_credits"("p_actor" "uuid", "p_user_ids" "uuid"[], "p_pool" "text", "p_amount" integer, "p_reason" "text", "p_batch_key" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_batch_adjust_credits"("p_actor" "uuid", "p_user_ids" "uuid"[], "p_pool" "text", "p_amount" integer, "p_reason" "text", "p_batch_key" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_batch_set_banned"("p_actor" "uuid", "p_user_ids" "uuid"[], "p_banned" boolean, "p_reason" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_batch_set_banned"("p_actor" "uuid", "p_user_ids" "uuid"[], "p_banned" boolean, "p_reason" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_daily_costs"("p_days" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_daily_costs"("p_days" integer) TO "service_role";
 
@@ -3917,6 +4291,11 @@ GRANT ALL ON FUNCTION "public"."admin_list_template_requests"() TO "service_role
 
 REVOKE ALL ON FUNCTION "public"."admin_list_tickets"("p_status" "text", "p_type" "text", "p_cursor_at" timestamp with time zone, "p_cursor_id" "uuid", "p_limit" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_list_tickets"("p_status" "text", "p_type" "text", "p_cursor_at" timestamp with time zone, "p_cursor_id" "uuid", "p_limit" integer) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_list_users"("p_query" "text", "p_tier" "text", "p_provider" "text", "p_status" "text", "p_from" timestamp with time zone, "p_to" timestamp with time zone, "p_sort" "text", "p_page" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_list_users"("p_query" "text", "p_tier" "text", "p_provider" "text", "p_status" "text", "p_from" timestamp with time zone, "p_to" timestamp with time zone, "p_sort" "text", "p_page" integer) TO "service_role";
 
 
 
@@ -3997,6 +4376,11 @@ GRANT ALL ON FUNCTION "public"."admin_set_provider_key"("p_id" "uuid", "p_key" "
 
 REVOKE ALL ON FUNCTION "public"."admin_set_system_setting"("p_key" "text", "p_value" "jsonb", "p_actor" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_set_system_setting"("p_key" "text", "p_value" "jsonb", "p_actor" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_set_template_order"("p_group" "text", "p_ids" "text"[], "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_template_order"("p_group" "text", "p_ids" "text"[], "p_actor" "uuid") TO "service_role";
 
 
 

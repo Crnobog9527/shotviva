@@ -171,6 +171,10 @@ describe('account Plan card without a card subscription', () => {
     const wallet = await render(summarize([], days(25), 'pro'), 'zh', 0, last)
     expect(wallet.text).toContain('一次性购买一个月，用 支付宝 付款，不会自动续费')
     expect(buttons(wallet.html)).toEqual(['续费 · $49.90'])
+    // T73: a period paid on the Stripe wallet line with WeChat Pay names it.
+    const wechat = lastMembership([{ productId: 'pro_monthly', method: 'wechat_pay' }], site.billing.products)
+    expect((await render(summarize([], days(25), 'pro'), 'zh', 0, wechat)).text).toContain('一次性购买一个月，用 微信支付 付款，不会自动续费')
+    expect((await render(summarize([], days(25), 'pro'), 'en', 0, wechat)).text).toContain('One month, paid with WeChat Pay .')
     expect((await render(summarize([row({})], days(30)), 'zh')).text).toContain('加入于 2026年11月 · mei@example.test')
   })
 })

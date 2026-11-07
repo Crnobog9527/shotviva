@@ -102,20 +102,20 @@ export async function setTemplateActive(
   throw new AppError('INVALID_INPUT', `「${skipped.name}」不能上架：${describeBlockers(skipped.blockers)}`)
 }
 
-const reorderSchema = z
-  .array(z.string().min(1).max(64))
-  .min(1)
-  .max(500)
-  .refine((ids) => new Set(ids).size === ids.length, 'ids must be unique')
+// Drag-to-reorder (T76): one group's whole new order per save. The SQL function also refuses a
+// list that is not exactly the group, so an out-of-date page cannot scramble the order.
+const orderSchema = z.object({
+  group: z.enum(['catalogue', 'featured']),
+  ids: z
+    .array(z.string().min(1).max(64))
+    .max(500)
+    .refine((ids) => new Set(ids).size === ids.length, 'ids must be unique'),
+})
 
-export async function reorderTemplates(
-  client: SupabaseClient,
-  adminId: string,
-  input: unknown,
-): Promise<void> {
-  const ids = parseOrThrow(reorderSchema, input, 'ids')
-  await repo.reorderTemplates(client, ids)
-  logger.info('admin.template.reordered', { adminId, count: ids.length })
+export async function setTemplateOrder(client: SupabaseClient, adminId: string, input: unknown): Promise<void> {
+  const { group, ids } = parseOrThrow(orderSchema, input, 'input')
+  await repo.setTemplateOrder(client, group, ids, adminId)
+  logger.info('admin.template.reordered', { adminId, group, count: ids.length })
 }
 
 // The home featured list (T53, ARCHITECTURE §12): ids in display order, at most 12, published

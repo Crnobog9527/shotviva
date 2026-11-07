@@ -5,8 +5,8 @@ import type { SubscriptionSummary } from './summary'
 // account.html): which membership was bought last and how, and how many paid credits a period
 // of the current plan brings. Pure; the payments come from the list the page already reads.
 
-// cn_card = 中国银行卡, the zh pages' plain Stripe card route (T64).
-export type PaymentMethod = 'card' | 'alipay' | 'cn_card'
+// cn_card = 中国银行卡, the zh pages' plain Stripe card route (T64); wechat_pay since T73.
+export type PaymentMethod = 'card' | 'alipay' | 'wechat_pay' | 'cn_card'
 export type PaymentFact = { productId: string; method: PaymentMethod }
 export type LastMembership = { product: MembershipProduct; method: PaymentMethod }
 

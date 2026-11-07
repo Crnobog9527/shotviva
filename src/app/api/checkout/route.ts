@@ -7,6 +7,7 @@ import {
   checkoutBodySchema,
   createCheckout,
   managedPaymentsEnabled,
+  wechatPayEnabled,
   stripeClient,
   type CheckoutBody,
 } from '@/core/billing/stripe'
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
 const shared = { products: site.billing.products, origin: appOrigin, returnToHosts: site.partners.graylum.returnToHosts }
 
 function startStripe(userId: string, body: CheckoutBody) {
-  const deps = { ...shared, stripe: stripeClient(), managedPayments: managedPaymentsEnabled() }
+  const deps = { ...shared, stripe: stripeClient(), managedPayments: managedPaymentsEnabled(), wechatPay: wechatPayEnabled() }
   return createCheckout(deps, { userId, body })
 }
 

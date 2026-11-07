@@ -369,7 +369,8 @@
         "hud": "已完成",
         "saved": "已存进「作品」",
         "line": "{tier} · <mono>{px, number, ::group-off}</mono> px · 用了 {count} 积分。{pool, select, free {用的是免费积分，所以会公开展示，并带水印。} paid {用的是付费积分，所以是私密的，没有水印。} other {}}",
-        "caption": "手机照片 → {name}。"
+        "caption": "手机照片 → {name}。",
+        "edit": "继续编辑"
       },
       "failState": {
         "hud": "没有生成",
@@ -650,6 +651,7 @@
         "opensStripeBottom": "安全账单页面",
         "walletAlipayWhy": "一次性购买一{interval, select, year {年} other {个月}}，用<b>{method}</b>付款，不会自动续费：{date, date, medium} 前续费可以保留会员；不续费的话，积分仍可使用。",
         "alipay": "支付宝",
+        "wechatPay": "微信支付",
         "card": "银行卡",
         "cnCard": "中国银行卡",
         "renewPrice": "续费 <cost>· {price}</cost>",
@@ -700,7 +702,14 @@
         "lead": "最近的付款，最新的在前。",
         "empty": "还没有购买记录",
         "emptyBody": "买了套餐或积分包之后，会显示在这里。",
-        "seePlans": "看看套餐"
+        "seePlans": "看看套餐",
+        "receipt": "收据",
+        "invoice": "发票",
+        "linkLabel": "{purchase}的{document}（在新标签页打开）",
+        "emailed": "收据已发送到付款邮箱",
+        "refunded": "已退款",
+        "partlyRefunded": "部分退款",
+        "unavailable": "刚才没能打开这份收据或发票，请稍后再试。还是打不开的话，在客服里告诉我们，我们发给你。"
       },
       "session": {
         "title": "登录",
@@ -882,7 +891,7 @@
       "renewsValue": "{date, date, medium} · {price}",
       "paid": "已支付",
       "paidCard": "{amount} · {brand} ···· {last4}",
-      "paidMethod": "{amount} · {method, select, alipay {支付宝} other {银行卡}}",
+      "paidMethod": "{amount} · {method, select, alipay {支付宝} wechat_pay {微信支付} other {银行卡}}",
       "start": "开始创作",
       "receipt": "收据",
       "manage": "在「我的」里管理",
@@ -893,6 +902,7 @@
       "finePack": "一次性付款，不会续费。",
       "titlePending": "正在确认付款",
       "subPendingAlipay": "支付宝还在确认这笔付款，通常不到一分钟。确认后积分会自动到账，你可以先离开这个页面。",
+      "subPendingWallet": "支付宝或微信支付还在确认这笔付款，通常不到一分钟。确认后积分会自动到账，你可以先离开这个页面。",
       "subPending": "付款已成功，正在为你加积分，通常几秒钟就好。你可以先离开这个页面。",
       "order": "订单",
       "amount": "金额",
@@ -949,6 +959,7 @@
     "pricesInUsd": "所有价格均以美元计",
     "card": "海外银行卡 · Apple Pay · Google Pay",
     "alipay": "支付宝",
+    "wallet": "支付宝 / 微信支付",
     "cnCard": "中国银行卡",
     "cardOnly": "银行卡",
     "cardRenews": "自动续费，随时可取消",
@@ -1033,13 +1044,16 @@
     "tryTitle": "换这三个模板试试"
   },
   "marketing": {
+    "appDescription": "AI 影棚",
     "nav": {
       "label": "主导航",
       "pricing": "价格",
-      "tagline": "AI 影棚",
+      "tagline": "保留真实照片细节，AI 一键出大片",
       "templates": "模板",
       "login": "登录",
       "startFree": "免费开始",
+      "uploadPhoto": "上传照片",
+      "generate": "生成",
       "openApp": "进入应用",
       "account": "账号"
     },

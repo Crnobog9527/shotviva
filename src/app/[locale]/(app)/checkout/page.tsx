@@ -6,7 +6,7 @@ import { Suspense } from 'react'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
 import { readBalance } from '@/core/billing'
 import { PendingReturn, SuccessReturn, partnerParams, readCheckoutFacts, readReturnQuery, returnView } from '@/core/billing/checkout-return'
-import { CHECKOUT_RETURN, stripeClient } from '@/core/billing/stripe'
+import { CHECKOUT_RETURN, stripeClient, wechatPayEnabled } from '@/core/billing/stripe'
 import { localizePath } from '@/core/i18n'
 import { currentLocale } from '@/core/i18n/server'
 import { pricingReturnTarget } from '@/core/partner'
@@ -33,7 +33,7 @@ async function CheckoutReturn({ searchParams }: { searchParams: Promise<Search> 
   if (!facts || !product) notFound()
   if (facts.abandoned) redirect(localizePath(CHECKOUT_RETURN.cancel, locale))
   const view = returnView(facts, product, await readBalance(await createServerSupabase(), user.id))
-  if (view.state === 'pending') return <PendingReturn view={view} again={localizePath(here, locale)} email={site.brand.contactEmail} />
+  if (view.state === 'pending') return <PendingReturn view={view} again={localizePath(here, locale)} email={site.brand.contactEmail} wechatPay={wechatPayEnabled()} />
   const back = pricingReturnTarget(partnerParams(params), { returnToHosts: site.partners.graylum.returnToHosts })
   return <SuccessReturn view={view} back={back} />
 }

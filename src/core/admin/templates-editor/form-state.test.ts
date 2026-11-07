@@ -8,7 +8,6 @@ import {
   creditProblems,
   emptyFormValues,
   matchesSearch,
-  moveId,
   toFormValues,
   toTranslations,
 } from './form-state'
@@ -71,12 +70,6 @@ describe('template form state', () => {
     expect(buildPayload(low, false, FLOOR)).toMatchObject({ ok: false, message: expect.stringContaining('Standard') })
     expect(creditProblems({ ...low, quality: 'medium' }, FLOOR)).toEqual({})
     expect(creditProblems({ ...low, credits: { ...low.credits, '2k': '2.5' } }, FLOOR)).toMatchObject({ '2k': '请填正整数' })
-  })
-
-  it('moves ids within bounds only', () => {
-    expect(moveId(['a', 'b', 'c'], 1, -1)).toEqual(['b', 'a', 'c'])
-    expect(moveId(['a', 'b', 'c'], 2, 1)).toBeNull()
-    expect(moveId(['a', 'b', 'c'], 0, -1)).toBeNull()
   })
 
   it('searches id, name and category', () => {

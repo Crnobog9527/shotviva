@@ -180,14 +180,6 @@ export function buildPayload(values: TemplateFormValues, isNew: boolean, floor: 
   }
 }
 
-export function moveId(ids: string[], index: number, direction: -1 | 1): string[] | null {
-  const target = index + direction
-  if (index < 0 || index >= ids.length || target < 0 || target >= ids.length) return null
-  const next = [...ids]
-  ;[next[index], next[target]] = [next[target] as string, next[index] as string]
-  return next
-}
-
 export function matchesSearch(template: AdminTemplate, query: string): boolean {
   const q = query.trim().toLowerCase()
   if (!q) return true

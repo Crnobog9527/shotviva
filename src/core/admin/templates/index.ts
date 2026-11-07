@@ -1,4 +1,4 @@
-export { FEATURED_MAX, reorderTemplates, saveTemplate, setFeaturedTemplates, setTemplateActive, setTemplatesActive } from './commands'
+export { FEATURED_MAX, saveTemplate, setFeaturedTemplates, setTemplateActive, setTemplateOrder, setTemplatesActive } from './commands'
 export { listAdminTemplates } from './repository'
 export { runAdminAction, runAdminQuery } from './run-action'
 export type {
@@ -10,6 +10,7 @@ export type {
   CoverUploadRequest,
   SaveTemplatePayload,
   TemplateAdminActions,
+  TemplateOrderGroup,
 } from './types'
 export {
   describeBlockers,

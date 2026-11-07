@@ -2,7 +2,7 @@ import 'server-only'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-import { AppError } from '@/core/errors'
+import { AppError, type ErrorCode } from '@/core/errors'
 import {
   EDIT_TEMPLATE_ID,
   selectTemplates,
@@ -115,7 +115,24 @@ export async function setFeaturedTemplates(client: SupabaseClient, ids: string[]
   }
 }
 
-export async function reorderTemplates(client: SupabaseClient, ids: string[]): Promise<void> {
-  const { error } = await client.rpc('admin_reorder_templates', { p_ids: ids })
-  if (error) throw new AppError('INTERNAL', `reorderTemplates failed: ${error.message}`)
+// What the admin sees when admin_set_template_order refuses (0600); anything else is INTERNAL.
+const ORDER_ERRORS: Record<string, [ErrorCode, string]> = {
+  ORDER_MISMATCH: ['CONFLICT', '列表在别处改过了（有模板新增、删除或进出精选），请刷新页面后再排序'],
+  NOT_ADMIN: ['FORBIDDEN', '只有管理员能调整顺序'],
+  INVALID_INPUT: ['INVALID_INPUT', '顺序没保存：提交的列表不完整，请刷新页面后再试'],
+}
+
+// One group's whole order in one call (T76): 'catalogue' rewrites sort_order, 'featured' the
+// home featured ranks.
+export async function setTemplateOrder(
+  client: SupabaseClient,
+  group: 'catalogue' | 'featured',
+  ids: string[],
+  actor: string,
+): Promise<void> {
+  const { error } = await client.rpc('admin_set_template_order', { p_group: group, p_ids: ids, p_actor: actor })
+  if (!error) return
+  const known = ORDER_ERRORS[error.message]
+  if (known) throw new AppError(known[0], known[1])
+  throw new AppError('INTERNAL', `setTemplateOrder failed: ${error.message}`)
 }

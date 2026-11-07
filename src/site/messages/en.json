@@ -369,7 +369,8 @@
         "hud": "Done",
         "saved": "Saved to Photos",
         "line": "{tier} · <mono>{px, number, ::group-off}</mono> px · {count, plural, one {# credit} other {# credits}} used.{pool, select, free { Made with free credits, so it's public with a watermark.} paid { Made with paid credits, so it's private and watermark-free.} other {}}",
-        "caption": "Phone photo → {name}."
+        "caption": "Phone photo → {name}.",
+        "edit": "Edit this photo"
       },
       "failState": {
         "hud": "Not developed",
@@ -650,6 +651,7 @@
         "opensStripeBottom": "secure billing page",
         "walletAlipayWhy": "One {interval, select, year {year} other {month}}, paid with <b>{method}</b>. It doesn't renew by itself: renew before {date, date, medium} to keep the plan, or let it end and your credits still work.",
         "alipay": "Alipay",
+        "wechatPay": "WeChat Pay",
         "card": "Card",
         "cnCard": "Card",
         "renewPrice": "Renew <cost>· {price}</cost>",
@@ -700,7 +702,14 @@
         "lead": "Your recent payments, newest first.",
         "empty": "No purchases yet",
         "emptyBody": "Plans and credit packs show up on this list once you buy one.",
-        "seePlans": "See plans"
+        "seePlans": "See plans",
+        "receipt": "Receipt",
+        "invoice": "Invoice",
+        "linkLabel": "{document} for {purchase} (opens in a new tab)",
+        "emailed": "Receipt sent to your payment email",
+        "refunded": "Refunded",
+        "partlyRefunded": "Partly refunded",
+        "unavailable": "We couldn't open that receipt or invoice just now. Try again in a minute. If it still won't open, ask us in Support and we'll send it to you."
       },
       "session": {
         "title": "Session",
@@ -882,7 +891,7 @@
       "renewsValue": "{date, date, medium} · {price}",
       "paid": "Paid",
       "paidCard": "{amount} · {brand} ···· {last4}",
-      "paidMethod": "{amount} · {method, select, alipay {Alipay} other {Card}}",
+      "paidMethod": "{amount} · {method, select, alipay {Alipay} wechat_pay {WeChat Pay} other {Card}}",
       "start": "Start creating",
       "receipt": "Receipt",
       "manage": "Manage in Account",
@@ -893,6 +902,7 @@
       "finePack": "One-time payment. Nothing renews.",
       "titlePending": "Confirming your payment",
       "subPendingAlipay": "Alipay is still confirming it. This usually takes under a minute. Your credits appear as soon as it clears; you can leave this page.",
+      "subPendingWallet": "Alipay or WeChat Pay is still confirming it. This usually takes under a minute. Your credits appear as soon as it clears; you can leave this page.",
       "subPending": "Your payment went through and we're adding your credits. This usually takes a few seconds; you can leave this page.",
       "order": "Order",
       "amount": "Amount",
@@ -949,6 +959,7 @@
     "pricesInUsd": "All prices in USD",
     "card": "Card · Apple Pay · Google Pay",
     "alipay": "Alipay",
+    "wallet": "Alipay / WeChat Pay",
     "cnCard": "China-issued card",
     "cardOnly": "Card",
     "cardRenews": "Renews automatically, cancel anytime",
@@ -1033,13 +1044,16 @@
     "tryTitle": "Three templates to try instead"
   },
   "marketing": {
+    "appDescription": "AI photo studio",
     "nav": {
       "label": "Main",
       "pricing": "Pricing",
-      "tagline": "AI photo studio",
+      "tagline": "AI edits, true to your photo",
       "templates": "Templates",
       "login": "Log in",
       "startFree": "Start free",
+      "uploadPhoto": "Upload photo",
+      "generate": "Generate",
       "openApp": "Open app",
       "account": "Account"
     },
