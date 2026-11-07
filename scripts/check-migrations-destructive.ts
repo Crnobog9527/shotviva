@@ -22,9 +22,10 @@
  *     new definition only widens;
  *   - `update t set … where <col> = <literal> [and …]` (or `in (<literals>)`): targeted rows such
  *     as a catalog price fix, not a bulk rewrite.
- * Columns this same file adds are the deployed code's blind spot, so the guard also lets through
- * `alter column … set not null` on one, and an `update` that sets only such columns (a backfill):
- * nothing live reads or writes them yet.
+ * Columns this same file adds are the deployed code's blind spot: an `update` that sets only such
+ * columns (a backfill) passes. `alter column … set not null` on one passes when the same file
+ * gives it a default; without one it is a warning, since the deployed code's inserts (which never
+ * set the column) must still succeed through a trigger the reviewer has to check.
  *
  * A contract PR (the old structure is confirmed unused on production) goes through with
  * `[contract]` in the PR title, passed in as PR_TITLE.
@@ -220,6 +221,7 @@ const MESSAGES: Record<string, string> = {
   'set-schema': 'moves to another schema:',
   'type-change': 'changes the type of column',
   'set-not-null': 'tightens column to not null:',
+  'set-not-null-new-column': "makes a column this file adds not null, without a default: the deployed code's inserts must still succeed (a trigger has to fill it):",
   'add-constraint': 'adds a constraint to existing table',
   'add-not-null-column': 'adds a not null column without a default:',
   'unique-index': 'adds a unique index to existing table',
@@ -236,6 +238,8 @@ type Context = {
   addedConstraints: Set<string>
   /** `table:column` for every column this file adds to an existing table. */
   addedColumns: Set<string>
+  /** The subset of addedColumns this file gives a default (on add, or `alter column … set default`). */
+  defaultedColumns: Set<string>
 }
 
 // Words in a constraint expression that are not column names. Anything else counts as a column,
@@ -302,6 +306,7 @@ export function scanMigration(sql: string): Finding[] {
     droppedConstraints: new Set(),
     addedConstraints: new Set(),
     addedColumns: new Set(),
+    defaultedColumns: new Set(),
   }
   for (const statement of statements) collectConstraints(statement.text, context)
 
@@ -339,8 +344,12 @@ function collectConstraints(text: string, context: Context) {
     const added = new RegExp(String.raw`^add constraint (${IDENT})`).exec(action)
     if (added) context.addedConstraints.add(`${table}:${objectName(added[1])}`)
     const column = new RegExp(String.raw`^add (?:column )?(?:if not exists )?(${IDENT})`).exec(action)
-    if (column && !/^(constraint|check|unique|primary|foreign|exclude)$/.test(column[1]))
+    if (column && !/^(constraint|check|unique|primary|foreign|exclude)$/.test(column[1])) {
       context.addedColumns.add(`${table}:${objectName(column[1])}`)
+      if (/\bdefault\b/.test(action)) context.defaultedColumns.add(`${table}:${objectName(column[1])}`)
+    }
+    const setDefault = new RegExp(String.raw`^alter (?:column )?(${IDENT}) set default\b`).exec(action)
+    if (setDefault) context.defaultedColumns.add(`${table}:${objectName(setDefault[1])}`)
   }
 }
 
@@ -428,7 +437,9 @@ function checkAlterTable(table: string, rest: string, context: Context, report: 
       const name = `${table}.${objectName(alterColumn[1])}`
       const change = alterColumn[2]
       if (/^set not null\b/.test(change)) {
-        if (!context.addedColumns.has(`${table}:${objectName(alterColumn[1])}`)) report('set-not-null', name)
+        const key = `${table}:${objectName(alterColumn[1])}`
+        if (!context.addedColumns.has(key)) report('set-not-null', name)
+        else if (!context.defaultedColumns.has(key)) report('set-not-null-new-column', name, 'warning')
       }
       else if (/^drop default\b/.test(change)) report('drop-default', name)
       else if (/^drop (identity|expression)\b/.test(change)) report('drop-identity', name)
