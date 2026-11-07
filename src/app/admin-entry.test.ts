@@ -12,6 +12,8 @@ import { loadMessages } from '@/site/i18n/messages'
 // profiles.role = 'admin'. A normal user's HTML carries no link, no label, no hidden element.
 
 vi.mock('@/core/i18n/navigation', async (original) => ({ ...(await original()), usePathname: () => '/account' }))
+// Purchases reads ?purchases= (T80); outside the App Router there is no search params context.
+vi.mock('next/navigation', async (original) => ({ ...(await original()), useSearchParams: () => new URLSearchParams() }))
 
 const Intl = NextIntlClientProvider as unknown as FunctionComponent<{ locale: string; messages: unknown; timeZone: string }>
 
