@@ -7,8 +7,9 @@ import { clearPriceCache } from './prices'
 import { CARD_ONLY_CONFIG, deps, fakeStripe, sent, USER } from './test-checkout'
 
 // 中国银行卡 (T64, ARCHITECTURE §6.3), fixed after Codex's run on #249: the plain card route must
-// show the card form only (no Link with its bank / Klarna buttons, no Apple Pay / Google Pay)
-// and charge USD (no Adaptive Pricing), while the Managed Payments card and Alipay stay as they were.
+// show the card form only (no Link with its bank / Klarna buttons, no Apple Pay / Google Pay),
+// while the Managed Payments card and Alipay stay as they were. Adaptive Pricing is left to the
+// Dashboard (Owner 2026-11-08: the buyer may see their own currency; Shotviva is paid in USD).
 
 beforeEach(() => {
   clearPriceCache()
@@ -18,7 +19,7 @@ beforeEach(() => {
 const withConfig = () => fakeStripe(undefined, { configs: [{ id: 'pmc_default', name: 'Default', active: true }, CARD_ONLY_CONFIG] })
 
 describe('createCheckout 中国银行卡 session params', () => {
-  it('opens a Starter monthly on the card-only configuration: no MP, no Link, USD, zh, no tax', async () => {
+  it('opens a Starter monthly on the card-only configuration: no MP, no Link, zh, no tax', async () => {
     const { stripe, create } = withConfig()
     const d = deps(stripe)
     await createCheckout(d, { userId: USER, body: { product_id: 'starter_monthly', method: 'cn_card', locale: 'zh' } })
@@ -29,7 +30,6 @@ describe('createCheckout 中国银行卡 session params', () => {
       managed_payments: { enabled: false },
       payment_method_configuration: 'pmc_card_only',
       wallet_options: { link: { display: 'never' } },
-      adaptive_pricing: { enabled: false },
       locale: 'zh',
       metadata: { user_id: USER, product_id: 'starter_monthly', method: 'cn_card', locale: 'zh' },
       subscription_data: { metadata: { method: 'cn_card' } },
@@ -38,6 +38,8 @@ describe('createCheckout 中国银行卡 session params', () => {
     // Stripe takes one filter or the other, never both.
     expect(params).not.toHaveProperty('allowed_payment_method_types')
     expect(params).not.toHaveProperty('automatic_tax')
+    // Local-currency display stays as the Dashboard sets it (Owner 2026-11-08).
+    expect(params).not.toHaveProperty('adaptive_pricing')
     expect(d.trackStart).toHaveBeenCalledWith(USER, expect.objectContaining({ form: 'subscription', method: 'cn_card' }), 'zh')
   })
 
@@ -49,16 +51,15 @@ describe('createCheckout 中国银行卡 session params', () => {
       line_items: [{ price: 'price_pack_m' }],
       payment_method_configuration: 'pmc_card_only',
       wallet_options: { link: { display: 'never' } },
-      adaptive_pricing: { enabled: false },
       payment_intent_data: { metadata: { product_id: 'pack_m', method: 'cn_card' } },
     })
   })
 
-  it('without the configuration still filters to card, turns Link off and charges USD', async () => {
+  it('without the configuration still filters to card and turns Link off', async () => {
     const { stripe, create } = fakeStripe()
     await createCheckout(deps(stripe), { userId: USER, body: { product_id: 'pack_s', method: 'cn_card', locale: 'zh' } })
     const params = sent(create)
-    expect(params).toMatchObject({ allowed_payment_method_types: ['card'], wallet_options: { link: { display: 'never' } }, adaptive_pricing: { enabled: false } })
+    expect(params).toMatchObject({ allowed_payment_method_types: ['card'], wallet_options: { link: { display: 'never' } } })
     expect(params).not.toHaveProperty('payment_method_configuration')
   })
 
@@ -75,7 +76,7 @@ describe('createCheckout 中国银行卡 session params', () => {
   it('gives the pre-approval card fallback (MP off) the same card-only checkout', async () => {
     const { stripe, create } = withConfig()
     await createCheckout(deps(stripe, { managedPayments: false }), { userId: USER, body: { product_id: 'max_monthly', method: 'card', locale: 'en' } })
-    expect(sent(create)).toMatchObject({ managed_payments: { enabled: false }, payment_method_configuration: 'pmc_card_only', adaptive_pricing: { enabled: false } })
+    expect(sent(create)).toMatchObject({ managed_payments: { enabled: false }, payment_method_configuration: 'pmc_card_only' })
   })
 })
 

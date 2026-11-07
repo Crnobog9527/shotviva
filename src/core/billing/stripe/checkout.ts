@@ -64,7 +64,7 @@ type Metadata = { user_id: string; product_id: string; method: CheckoutMethod; l
 
 type MethodParams = Pick<
   Stripe.Checkout.SessionCreateParams,
-  'managed_payments' | 'allowed_payment_method_types' | 'wallet_options' | 'adaptive_pricing' | 'payment_method_configuration'
+  'managed_payments' | 'allowed_payment_method_types' | 'wallet_options' | 'payment_method_configuration'
 >
 
 // A typed literal, not a spread into the params: a parameter Stripe removes from the SDK types
@@ -85,13 +85,12 @@ function methodParams(route: CheckoutRoute, cardOnlyConfig: string | null): Meth
   return { managed_payments: off, ...methods, ...PLAIN_CARD }
 }
 
-// 中国银行卡 and the card fallback (T64, Codex on #249): the card form only, charged in USD.
-// allowed_payment_method_types ['card'] alone still let Checkout show Link (with its bank and
-// Klarna buttons), Apple Pay and Google Pay, and Adaptive Pricing showed the buyer's currency
-// (NT$). The card-only configuration (card-only.ts) turns the wallets off, Link is also turned
-// off here in case that configuration is missing, and prices stay in USD as the paywall says
-// (「所有价格均以美元计」).
-const PLAIN_CARD = { wallet_options: { link: { display: 'never' } }, adaptive_pricing: { enabled: false } } satisfies MethodParams
+// 中国银行卡 and the card fallback (T64, Codex on #249): the card form only. allowed_payment_method_types
+// ['card'] alone still let Checkout show Link (with its bank and Klarna buttons), Apple Pay and
+// Google Pay. The card-only configuration (card-only.ts) turns the wallets off; Link is also turned
+// off here in case that configuration is missing. Adaptive Pricing stays as the Dashboard sets it
+// (Owner 2026-11-08): the buyer may see their own currency, Shotviva is paid in USD.
+const PLAIN_CARD = { wallet_options: { link: { display: 'never' } } } satisfies MethodParams
 
 function isPlainCard(route: CheckoutRoute): boolean {
   return !route.managedPayments && route.allowedMethods?.[0] === 'card'
