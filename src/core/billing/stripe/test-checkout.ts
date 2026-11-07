@@ -53,7 +53,7 @@ export function fakeStripe(price: (key: string) => Stripe.Price = priceFor, opti
 }
 
 export function deps(stripe: StripeApi, overrides: Partial<CheckoutDeps> = {}): CheckoutDeps {
-  return { stripe, products: TEST_PRODUCTS, managedPayments: true, origin: 'https://pr-1.example.app', returnToHosts: ['graylum.com'], trackStart: vi.fn(), ...overrides }
+  return { stripe, products: TEST_PRODUCTS, managedPayments: true, termsConsent: false, origin: 'https://pr-1.example.app', returnToHosts: ['graylum.com'], trackStart: vi.fn(), ...overrides }
 }
 
 export const sent = (create: ReturnType<typeof fakeStripe>['create']) => create.mock.calls[0]?.[0]

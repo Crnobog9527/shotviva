@@ -26,6 +26,9 @@ const reserveSchema = z.object({
   visibility: z.enum(JOB_VISIBILITIES).nullable().default(null),
   // An edit (ARCHITECTURE §5.2): the caller's own succeeded work; reserve_credits checks it.
   parentJobId: z.uuid().nullable().default(null),
+  // The website request's IP, kept on the job as dispute evidence (T82); reserve_credits keeps it
+  // for web jobs only.
+  clientIp: z.union([z.ipv4(), z.ipv6()]).nullable().default(null),
 })
 
 export type ReserveJobInput = z.input<typeof reserveSchema>
@@ -48,6 +51,7 @@ export async function reserveJob(client: RpcClient, input: ReserveJobInput): Pro
       p_idempotency_key: args.idempotencyKey,
       p_visibility: args.visibility,
       p_parent_job_id: args.parentJobId,
+      p_client_ip: args.clientIp,
     },
     jobRowSchema,
   )

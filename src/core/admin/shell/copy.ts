@@ -11,6 +11,7 @@ export const SHELL_COPY = {
     users: '用户',
     tickets: '工单',
     orders: '订单与收入',
+    disputes: '拒付',
     jobs: '出图记录',
     costs: '成本对账',
     templates: '模板',

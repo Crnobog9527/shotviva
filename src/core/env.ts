@@ -47,6 +47,9 @@ const serverEnvSchema = z.object({
   // Cards go through Managed Payments (Link is merchant of record). 'off' is the fallback until
   // Stripe approves Managed Payments on the live account: cards then use a plain Checkout.
   STRIPE_MANAGED_PAYMENTS: z.preprocess(blankAsUnset, z.enum(['on', 'off']).default('on')),
+  // T82: Checkout's required Terms of Service box. Off until the Owner has set the Terms URL in
+  // Stripe's public business details for that mode: without it Stripe refuses the session (400).
+  STRIPE_TERMS_CONSENT: z.preprocess(blankAsUnset, z.enum(['on', 'off']).default('off')),
   // Switches the wishlist on for validation outside production (core/wishlist isWishlistEnabled).
   // Ignored when VERCEL_ENV is 'production', so it can never turn the feature on for real users.
   FEATURE_WISHLIST_PREVIEW: z.preprocess(blankAsUnset, z.enum(['on', 'off']).default('off')),

@@ -144,3 +144,15 @@ export {
 } from './costs'
 export { parseFunnelDim, parsePageSort, parseRange, posthogProjectId, type FunnelDim, type PageSort, type Range } from './analytics'
 export { ANALYTICS_COPY, AnalyticsView, RangeTabs, Unconfigured, type AnalyticsQuery } from './analytics-ui'
+export {
+  attachDisputeFile,
+  createDisputeUpload,
+  DISPUTES_COPY,
+  listDisputes,
+  saveDisputeText,
+  sendDueReminders,
+  submitDispute,
+  type DisputeListItem,
+  type DisputeUploadTicket,
+} from './disputes'
+export { DisputeDetail, DisputesList, toCard, type DisputeActions, type DisputeCard } from './disputes-ui'

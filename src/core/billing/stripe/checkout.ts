@@ -11,6 +11,7 @@ import { allowlistedUrl } from '../../partner/return-to'
 import { CHECKOUT_METHODS, checkoutRoute, offeredMethods, type CheckoutMethod, type CheckoutRoute } from './catalog'
 import { cancelReturnUrl, PRICING_CANCELLED } from './cancel-return'
 import { cardOnlyConfigId } from './card-only'
+import { buyerMetadata, evidenceParams } from './checkout-evidence'
 import type { StripeApi } from './client'
 import { resolvePriceId } from './prices'
 
@@ -34,6 +35,9 @@ export type CheckoutDeps = {
   stripe: StripeApi
   products: readonly SiteProduct[]
   managedPayments: boolean
+  // T82: Checkout's required Terms box (STRIPE_TERMS_CONSENT); off until the Terms URL is set in
+  // Stripe's public details, or Stripe refuses the session.
+  termsConsent: boolean
   // This deployment's origin (core/site-url): previews return to their own URL.
   origin: string
   // site.partners.graylum.returnToHosts
@@ -68,6 +72,10 @@ type MethodParams = Pick<
   'managed_payments' | 'allowed_payment_method_types' | 'wallet_options' | 'payment_method_configuration'
 >
 
+// The request that opened checkout (T82): carried in the session's own metadata (not the
+// subscription's or the PaymentIntent's) and copied onto the payment row when it settles.
+export type CheckoutClient = { ip: string | null; userAgent: string | null }
+
 // A typed literal, not a spread into the params: a parameter Stripe removes from the SDK types
 // (as payment_method_types was in 2026-09-30.endive) then fails the type check instead of
 // reaching Stripe as a 400.
@@ -97,23 +105,28 @@ function isPlainCard(route: CheckoutRoute): boolean {
   return !route.managedPayments && route.allowedMethods?.[0] === 'card'
 }
 
-function sessionParams(
-  route: CheckoutRoute,
-  priceId: string,
-  metadata: Metadata,
-  input: { locale: CheckoutBody['locale']; origin: string; successPath: string; cardOnlyConfig: string | null },
-): Stripe.Checkout.SessionCreateParams {
+type SessionInput = {
+  locale: CheckoutBody['locale']
+  origin: string
+  successPath: string
+  cardOnlyConfig: string | null
+  termsConsent: boolean
+  client: CheckoutClient
+}
+
+function sessionParams(route: CheckoutRoute, priceId: string, metadata: Metadata, input: SessionInput): Stripe.Checkout.SessionCreateParams {
   return {
     mode: route.mode,
     line_items: [{ price: priceId, quantity: 1 }],
     client_reference_id: metadata.user_id,
-    metadata,
+    metadata: { ...metadata, ...buyerMetadata(input.client) },
     locale: input.locale,
     // Back to the return page / pricing in the language the buyer checked out in.
     success_url: `${input.origin}${localizePath(input.successPath, input.locale)}`,
     // Through /api/checkout/cancel, which counts the cancel and lands on pricing (T74).
     cancel_url: cancelReturnUrl(input.origin, { product_id: metadata.product_id, method: metadata.method, locale: input.locale }),
     ...methodParams(route, input.cardOnlyConfig),
+    ...evidenceParams(route, metadata.method, input),
     ...(route.mode === 'subscription' ? { subscription_data: { metadata } } : { payment_intent_data: { metadata } }),
   }
 }
@@ -136,7 +149,7 @@ export function assertOffered(body: Pick<CheckoutBody, 'method' | 'locale'>, cha
 
 export async function createCheckout(
   deps: CheckoutDeps,
-  input: { userId: string; body: CheckoutBody },
+  input: { userId: string; body: CheckoutBody; client?: CheckoutClient },
 ): Promise<{ url: string }> {
   const { body } = input
   const product = deps.products.find((p) => p.id === body.product_id)
@@ -151,6 +164,8 @@ export async function createCheckout(
       origin: deps.origin,
       successPath: successPath(CHECKOUT_RETURN.stripe, body.return_to, deps.returnToHosts),
       cardOnlyConfig,
+      termsConsent: deps.termsConsent,
+      client: input.client ?? { ip: null, userAgent: null },
     }),
   )
   if (!session.url) throw new AppError('INTERNAL', 'Stripe returned a session without a URL')

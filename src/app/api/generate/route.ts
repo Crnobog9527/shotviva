@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server'
 
 import { errorResponse, jsonResponse } from '@/core/api-response'
-import { assertSameOrigin, createAdminSupabase, requireApiUser } from '@/core/auth'
+import { assertSameOrigin, clientIp, createAdminSupabase, requireApiUser } from '@/core/auth'
 import { AppError } from '@/core/errors'
 import { localeOfReferer } from '@/core/i18n'
 import { generateBodySchema, runGeneration, toGenerationRequest } from '@/core/jobs'
@@ -22,7 +22,9 @@ export async function POST(request: NextRequest) {
     const deps = { db: createAdminSupabase(), store: r2Store(), provider: await imageProvider() }
     // The `generate` event's locale: the workspace page's language, else the account's.
     const locale = localeOfReferer(request.headers.get('referer')) ?? user.locale ?? undefined
-    return jsonResponse(await runGeneration(deps, { ...toGenerationRequest(user.id, body.data), locale }))
+    // The IP is kept on the job as dispute evidence (T82).
+    const req = { ...toGenerationRequest(user.id, body.data), locale, clientIp: clientIp(request.headers) }
+    return jsonResponse(await runGeneration(deps, req))
   } catch (error) {
     return errorResponse(error, 'generate')
   }

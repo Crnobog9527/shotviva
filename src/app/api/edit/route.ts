@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server'
 
 import { errorResponse, jsonResponse } from '@/core/api-response'
-import { assertSameOrigin, createAdminSupabase, requireApiUser } from '@/core/auth'
+import { assertSameOrigin, clientIp, createAdminSupabase, requireApiUser } from '@/core/auth'
 import { AppError } from '@/core/errors'
 import { r2Store } from '@/core/storage'
 import { editBodySchema, editScopeClassifier, imageProvider, runEdit, toEditRequest } from '@/modules/image'
@@ -18,7 +18,8 @@ export async function POST(request: NextRequest) {
     if (!body.success) throw new AppError('INVALID_INPUT', 'source_job_id and instruction are required')
     const [provider, classifier] = await Promise.all([imageProvider(), editScopeClassifier()])
     const deps = { db: createAdminSupabase(), store: r2Store(), provider, classifier }
-    return jsonResponse(await runEdit(deps, toEditRequest(user.id, body.data)))
+    // The IP is kept on the job as dispute evidence (T82).
+    return jsonResponse(await runEdit(deps, { ...toEditRequest(user.id, body.data), clientIp: clientIp(request.headers) }))
   } catch (error) {
     return errorResponse(error, 'edit')
   }

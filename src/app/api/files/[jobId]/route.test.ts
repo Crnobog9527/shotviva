@@ -3,11 +3,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AppError } from '@/core/errors'
 
-const mocks = vi.hoisted(() => ({ requireApiUser: vi.fn(), resolveJobFile: vi.fn() }))
+const mocks = vi.hoisted(() => ({ requireApiUser: vi.fn(), resolveJobFile: vi.fn(), recordJobDownload: vi.fn(), after: vi.fn() }))
 
-vi.mock('@/core/auth', () => ({ requireApiUser: mocks.requireApiUser, createAdminSupabase: () => ({}) }))
+vi.mock('@/core/auth', () => ({ requireApiUser: mocks.requireApiUser, createAdminSupabase: () => ({}), clientIp: () => '203.0.113.7' }))
 vi.mock('@/core/storage', () => ({ r2Store: () => ({}) }))
-vi.mock('@/core/jobs', () => ({ resolveJobFile: mocks.resolveJobFile }))
+vi.mock('@/core/jobs', () => ({ resolveJobFile: mocks.resolveJobFile, recordJobDownload: mocks.recordJobDownload }))
+// after() needs a request scope; here it runs the callback at once so the test can see it.
+vi.mock('next/server', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  after: (work: () => unknown) => {
+    mocks.after()
+    return work()
+  },
+}))
 
 const { GET } = await import('./route')
 
@@ -32,6 +40,8 @@ describe('GET /api/files/[jobId]', () => {
     expect(response.status).toBe(302)
     expect(response.headers.get('location')).toBe('https://r2.example/signed')
     expect(response.headers.get('cache-control')).toBe('private, no-store')
+    // Showing the image is not a download.
+    expect(mocks.recordJobDownload).not.toHaveBeenCalled()
   })
 
   it('streams watermarked bytes, as an attachment on ?download=1', async () => {
@@ -39,6 +49,8 @@ describe('GET /api/files/[jobId]', () => {
     const response = await call('?download=1')
     expect(mocks.resolveJobFile).toHaveBeenCalledWith(expect.anything(), { userId: 'u1', jobId: 'j1', download: true })
     expect(response.headers.get('content-type')).toBe('image/jpeg')
+    // Dispute evidence (T82): an explicit download is noted with the caller's IP.
+    expect(mocks.recordJobDownload).toHaveBeenCalledWith(expect.anything(), { userId: 'u1', jobId: 'j1', ip: '203.0.113.7' })
     expect(response.headers.get('content-disposition')).toBe('attachment; filename="shotviva-j1.jpg"')
   })
 

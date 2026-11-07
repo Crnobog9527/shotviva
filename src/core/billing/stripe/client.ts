@@ -16,7 +16,10 @@ export type StripeApi = {
   invoices: Pick<Stripe['invoices'], 'retrieve'>
   subscriptions: Pick<Stripe['subscriptions'], 'retrieve' | 'cancel'>
   charges: Pick<Stripe['charges'], 'retrieve'>
-  disputes: Pick<Stripe['disputes'], 'retrieve'>
+  // T82: stage evidence (submit = false), the Owner's one submit, and live status on the admin page.
+  disputes: Pick<Stripe['disputes'], 'retrieve' | 'update' | 'list'>
+  // T82: an attachment the Owner adds to the evidence (purpose dispute_evidence).
+  files: Pick<Stripe['files'], 'create'>
   billingPortal: { sessions: Pick<Stripe['billingPortal']['sessions'], 'create'> }
   // T64: the card-only configuration 中国银行卡 checks out with (card-only.ts).
   paymentMethodConfigurations: Pick<Stripe['paymentMethodConfigurations'], 'list'>
@@ -51,4 +54,8 @@ export function stripeWebhookSecret(): string {
 
 export function managedPaymentsEnabled(): boolean {
   return serverEnv().STRIPE_MANAGED_PAYMENTS === 'on'
+}
+
+export function termsConsentEnabled(): boolean {
+  return serverEnv().STRIPE_TERMS_CONSENT === 'on'
 }

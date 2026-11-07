@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { captureAlert, type AlertKind } from '../../analytics/capture-error'
 import { logger } from '../../logger'
 import { callRpc } from '../rpc'
+import { openDispute } from './disputes/open'
 import type { FulfilDeps } from './fulfil'
 
 // charge.refunded and charge.dispute.created (ARCHITECTURE §6.2, §6.3): record on the payment
@@ -70,5 +71,9 @@ export async function recordRefund(deps: FulfilDeps, chargeId: string): Promise<
 export async function recordDispute(deps: FulfilDeps, disputeId: string): Promise<IssueOutcome> {
   const dispute = await deps.stripe.disputes.retrieve(disputeId)
   const chargeId = typeof dispute.charge === 'string' ? dispute.charge : dispute.charge.id
-  return record(deps, { kind: 'disputed', chargeId, amountRefunded: null, sourceId: dispute.id })
+  const outcome = await record(deps, { kind: 'disputed', chargeId, amountRefunded: null, sourceId: dispute.id })
+  // T82: the dispute row, the ban and the evidence draft (core/billing/stripe/disputes).
+  if (deps.evidence) await openDispute({ stripe: deps.stripe, db: deps.db, evidence: deps.evidence }, dispute.id)
+  else logger.warn('stripe dispute: no evidence config wired, draft skipped', { dispute_id: dispute.id })
+  return outcome
 }

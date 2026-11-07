@@ -122,6 +122,7 @@ export async function runEdit(deps: EditDeps, req: EditRequest): Promise<JobView
     provider: deps.provider.id,
     parentJobId: prepared.source.id,
     inputs: jobInputs(prepared, decision, resolution, attemptId),
+    clientIp: req.clientIp ?? null,
   })
   // Two concurrent requests with one job id: only the one that created the row calls the model.
   if (job.inputs.attempt_id !== attemptId) return toJobView(job)

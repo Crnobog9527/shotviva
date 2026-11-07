@@ -10,6 +10,8 @@ import type { RpcClient } from '../rpc'
 import type { CancelOthers } from '../subscription/cancel-others'
 import { CHECKOUT_METHODS, lookupKey, type CheckoutMethod } from './catalog'
 import type { StripeApi } from './client'
+import type { DisputeEvidenceConfig } from './disputes/config'
+import { recordPaymentContext } from './payment-context'
 import { SESSION_EXPAND, sessionFacts } from './payment-facts'
 import { settleCheckout, subscriptionState } from './settle'
 
@@ -28,6 +30,9 @@ export type FulfilDeps = {
   // The upgrade step (T66): after a membership is paid, cancel the buyer's other renewing
   // subscriptions. Wired by the webhook route and the admin replay; absent in tests that only settle.
   cancelOthers?: CancelOthers
+  // T82: the dispute evidence wiring (site facts, admin link). Wired by the webhook route; absent
+  // in the admin replay, which never sees a dispute.
+  evidence?: DisputeEvidenceConfig
 }
 
 export type FulfilOutcome = 'applied' | 'replayed' | 'unpaid'
@@ -101,6 +106,9 @@ export async function fulfilCheckoutSession(deps: FulfilDeps, sessionId: string)
     subscription: purchase.subscription ? subscriptionState(purchase.subscription) : null,
     payment: await sessionFacts(deps.stripe, session, purchase.method),
   })
+  // Dispute evidence (T82): the checkout IP, browser and Terms consent on the payment row. Also on
+  // a replay, so a crash between the two calls is mended by Stripe's redelivery.
+  await recordPaymentContext(deps.db, session)
   // Also on a replay: a crash after settling would otherwise leave the old plan billing. The
   // step is idempotent (ended rows are skipped).
   if (purchase.product.tier !== 'pack') await deps.cancelOthers?.(purchase.userId, { stripeSubscriptionId: purchase.subscription?.id ?? null })

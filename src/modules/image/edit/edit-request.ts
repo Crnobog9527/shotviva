@@ -22,6 +22,8 @@ export type EditRequest = {
   instruction: string
   resolution?: Resolution
   aspect?: OutputAspect
+  // The request's IP, stored on the job for dispute evidence (T82).
+  clientIp?: string | null
 }
 
 export function toEditRequest(userId: string, body: z.infer<typeof editBodySchema>): EditRequest {

@@ -1,8 +1,8 @@
-import { NextResponse, type NextRequest } from 'next/server'
+import { after, NextResponse, type NextRequest } from 'next/server'
 
 import { errorResponse } from '@/core/api-response'
-import { createAdminSupabase, requireApiUser } from '@/core/auth'
-import { resolveJobFile } from '@/core/jobs'
+import { clientIp, createAdminSupabase, requireApiUser } from '@/core/auth'
+import { recordJobDownload, resolveJobFile } from '@/core/jobs'
 import { r2Store } from '@/core/storage'
 
 const NO_STORE = 'private, no-store'
@@ -15,7 +15,10 @@ export async function GET(request: NextRequest, { params }: RouteContext<'/api/f
     const user = await requireApiUser()
     const download = request.nextUrl.searchParams.get('download') === '1'
     const deps = { db: createAdminSupabase(), store: r2Store() }
-    const file = await resolveJobFile(deps, { userId: user.id, jobId: (await params).jobId, download })
+    const jobId = (await params).jobId
+    const file = await resolveJobFile(deps, { userId: user.id, jobId, download })
+    // Dispute evidence (T82): a download is noted after the response, never slowing it.
+    if (download) after(() => recordJobDownload(deps.db, { userId: user.id, jobId, ip: clientIp(request.headers) }))
     if (file.kind === 'redirect') {
       return NextResponse.redirect(file.url, { status: 302, headers: { 'Cache-Control': NO_STORE } })
     }
