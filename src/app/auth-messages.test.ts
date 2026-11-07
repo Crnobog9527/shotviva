@@ -68,13 +68,23 @@ describe('auth messages', () => {
       expect(text).not.toMatch(/prompt/i)
     }
   })
+})
 
+describe('phone sign-in messages', () => {
   it('has the phone sign-in copy in both languages (T63)', () => {
     const addr = (chunks: string) => chunks
     expect(t.zh('tabs.phone')).toBe('手机号')
     expect(t.zh('phone.send')).toBe('获取验证码')
     expect(t.zh('code.sent', { phone: '140****5678', minutes: 5, addr })).toBe('验证码已发送至 140****5678，5 分钟内有效。')
     expect(t.zh('code.wait', { seconds: 42 })).toBe('42 秒后可重新获取')
+    for (const code of ['AUTH_PHONE_INVALID', 'AUTH_CONSENT_REQUIRED', 'AUTH_SMS_COOLDOWN', 'AUTH_SMS_DAILY_LIMIT', 'AUTH_SMS_FAILED', 'AUTH_OTP_INVALID']) {
+      expect(t.en(`errors.${code}`)).not.toMatch(/auth\./)
+      expect(t.zh(`errors.${code}`)).toMatch(/[一-鿿]/)
+    }
+  })
+
+  it('asks consent to the Terms, Privacy Policy, Acceptable Use Policy and the transfer (Owner 2026-11-08)', () => {
+    const addr = (chunks: string) => chunks
     const legal = { terms: addr, privacy: addr, aup: addr }
     expect(t.zh('phone.consent', legal)).toBe(
       '我已阅读并同意《服务条款》《隐私政策》《使用规范》，并同意将我的手机号等个人信息传输到中国大陆以外处理（数据存放在美国，短信由短信服务商发送）。',
@@ -82,15 +92,11 @@ describe('auth messages', () => {
     expect(t.en('phone.consent', legal)).toMatch(
       /Terms of Service.*Privacy Policy.*Acceptable Use Policy.*outside mainland China.*United States.*SMS provider/,
     )
-    // Owner 2026-11-08: the three documents are each a link of their own.
+    // Each document is a link of its own.
     const tagged = (tag: string) => (chunks: string) => `[${tag}:${chunks}]`
     const links = { terms: tagged('terms'), privacy: tagged('privacy'), aup: tagged('aup') }
     expect(t.zh('phone.consent', links)).toContain('[terms:《服务条款》][privacy:《隐私政策》][aup:《使用规范》]')
     expect(t.zh('errors.AUTH_CONSENT_REQUIRED')).toBe('请先勾选同意服务条款、隐私政策、使用规范和个人信息出境。')
     expect(t.en('errors.AUTH_CONSENT_REQUIRED')).toMatch(/Terms of Service.*Privacy Policy.*Acceptable Use Policy.*cross-border/)
-    for (const code of ['AUTH_PHONE_INVALID', 'AUTH_CONSENT_REQUIRED', 'AUTH_SMS_COOLDOWN', 'AUTH_SMS_DAILY_LIMIT', 'AUTH_SMS_FAILED', 'AUTH_OTP_INVALID']) {
-      expect(t.en(`errors.${code}`)).not.toMatch(/auth\./)
-      expect(t.zh(`errors.${code}`)).toMatch(/[一-鿿]/)
-    }
   })
 })
