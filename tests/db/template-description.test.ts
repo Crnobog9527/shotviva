@@ -19,7 +19,7 @@ const ENGLISH = 'A clean studio shot on white'
 const template = {
   id: ID,
   name: 'Test Description',
-  category: 'test',
+  category: 'pets',
   quality: 'high',
   creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
   visibleIn: ['web'],

@@ -6,7 +6,8 @@ import { AppError } from '../errors'
 import { logger } from '../logger'
 import { EDIT_TEMPLATE_ID } from './edit-params'
 import { templateFieldsSchema, type TemplateSurface } from './schema'
-import { TEMPLATE_COLUMNS, toTemplate, type Template, type TemplateRow } from './types'
+import { selectTemplates } from './select-templates'
+import { toTemplate, type PreT75TemplateRow, type Template, type TemplateRow } from './types'
 
 export type GenerationTemplate = {
   template: Template
@@ -14,7 +15,7 @@ export type GenerationTemplate = {
   prompt: { body: string; version: number; modelParams: Record<string, unknown> }
 }
 
-type Row = TemplateRow & {
+type Row = (TemplateRow | PreT75TemplateRow) & {
   template_prompts: { body: string; version: number; model_params: Record<string, unknown> } | null
 }
 
@@ -22,13 +23,10 @@ type Row = TemplateRow & {
 // filter keeps partner-only templates such as `freeform` out of the web generate route; null
 // means a built-in template such as `edit`, which is on no surface (ARCHITECTURE §5.2).
 async function loadTemplate(client: SupabaseClient, id: string, surface: TemplateSurface | null): Promise<GenerationTemplate> {
-  let query = client
-    .from('templates')
-    .select(`${TEMPLATE_COLUMNS}, template_prompts(body, version, model_params)`)
-    .eq('id', id)
-    .eq('is_active', true)
-  if (surface) query = query.contains('visible_in', [surface])
-  const { data, error } = await query.maybeSingle<Row>()
+  const { data, error } = await selectTemplates((columns) => {
+    const query = client.from('templates').select(columns).eq('id', id).eq('is_active', true)
+    return (surface ? query.contains('visible_in', [surface]) : query).maybeSingle<Row>()
+  }, ', template_prompts(body, version, model_params)')
   if (error) throw new AppError('INTERNAL', `loadGenerationTemplate failed: ${error.message}`)
   if (!data) throw new AppError('NOT_FOUND', 'Template not found')
 

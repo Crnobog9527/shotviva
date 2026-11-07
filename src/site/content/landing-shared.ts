@@ -10,6 +10,7 @@ export const homeImage = (file: string, alt: string): ImageRef => ({ src: `/home
 export const SIZE_COUNT = OUTPUT_ASPECTS.length
 export const sizeCountWord = (['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'] as const)[SIZE_COUNT] ?? String(SIZE_COUNT)
 
-// The §5 category names a landing page's template section shows (templates.category, matched
-// case-insensitively); the templates in them are the admin's featured ones (T53).
-export const CATEGORY = { food: 'Food & Drink', products: 'Products & Resale', beauty: 'Beauty & Skincare' } as const
+// The category keys a landing page's template section shows (template_categories.key, which
+// never changes, T75); the templates in them are the admin's featured ones (T53). A key the
+// Owner deletes in admin simply shows nothing.
+export const CATEGORY = { food: 'food-drink', products: 'products-resale', beauty: 'beauty-skincare' } as const

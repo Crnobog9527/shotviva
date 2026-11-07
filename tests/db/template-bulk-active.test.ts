@@ -17,7 +17,7 @@ const template = (id: string, covers = true) => ({
   id,
   name: id,
   description: 'Bulk test.',
-  category: 'test',
+  category: 'pets',
   quality: 'high',
   creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
   visibleIn: ['web'],
