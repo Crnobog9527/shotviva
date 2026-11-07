@@ -13,7 +13,7 @@ export type PaymentFacts = {
   amountTotal: number
   amountTax: number
   currency: string
-  method: CheckoutMethod
+  method: RecordedMethod
   invoiceId: string | null
   chargeId: string | null
 }
@@ -26,11 +26,16 @@ export const INVOICE_EXPAND = ['payments.data.payment.payment_intent']
 const idOf = (value: string | { id: string } | null | undefined): string | null =>
   typeof value === 'string' ? value : (value?.id ?? null)
 
+// What payments.method holds (ARCHITECTURE §6.1): `card` / `alipay`. 中国银行卡 is a card charge.
+export type RecordedMethod = 'card' | 'alipay'
+
+const recorded = (method: CheckoutMethod): RecordedMethod => (method === 'alipay' ? 'alipay' : 'card')
+
 // Alipay is the only wallet sold (§6.2); every other method Managed Payments offers (card,
 // Apple / Google Pay, Link) belongs to the "Card · Apple Pay · Google Pay" group.
-export function methodOfCharge(charge: Stripe.Charge | null, fallback: CheckoutMethod): CheckoutMethod {
+export function methodOfCharge(charge: Stripe.Charge | null, fallback: CheckoutMethod): RecordedMethod {
   const type = charge?.payment_method_details?.type
-  if (!type) return fallback
+  if (!type) return recorded(fallback)
   return type === 'alipay' ? 'alipay' : 'card'
 }
 

@@ -21,8 +21,9 @@ export const PRODUCT_TIERS = ['starter', 'pro', 'max', 'pack'] as const
 export const PRODUCT_INTERVALS = ['month', 'year'] as const
 export const CHECKOUT_FORMS = ['subscription', 'one_time'] as const
 export const PAYMENT_CHANNELS = ['stripe', 'waffo'] as const
-// No WeChat Pay (Owner 2026-11-05, ARCHITECTURE §6.2).
-export const PAYMENT_METHODS = ['card', 'alipay'] as const
+// No WeChat Pay (Owner 2026-11-05, ARCHITECTURE §6.2). `cn_card` is 中国银行卡, the zh pages'
+// plain Stripe card route (T64, §6.3); `card` stays the Managed Payments card group.
+export const PAYMENT_METHODS = ['card', 'alipay', 'cn_card'] as const
 export const CONTACT_SALES_PAGES = ['/pricing', '/zh/pricing'] as const
 
 const checkoutProps = {

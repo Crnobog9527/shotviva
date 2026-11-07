@@ -2,7 +2,7 @@ import type Stripe from 'stripe'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { STRIPE_TAX_CODE, priceCents } from './catalog'
-import { createCheckout, type CheckoutDeps } from './checkout'
+import { assertOffered, createCheckout, type CheckoutDeps } from './checkout'
 import type { StripeApi } from './client'
 import { clearPriceCache } from './prices'
 import { TEST_PRODUCTS, testProduct } from './test-products'
@@ -53,6 +53,75 @@ function deps(stripe: StripeApi, overrides: Partial<CheckoutDeps> = {}): Checkou
 const sent = (create: ReturnType<typeof fakeStripe>['create']) => create.mock.calls[0]?.[0]
 
 beforeEach(() => clearPriceCache())
+
+describe('createCheckout 中国银行卡 (T64)', () => {
+  it('opens a Starter monthly as a plain card subscription: no Managed Payments, card only, zh, no tax', async () => {
+    const { stripe, create } = fakeStripe()
+    const d = deps(stripe, { managedPayments: true })
+    await createCheckout(d, { userId: USER, body: { product_id: 'starter_monthly', method: 'cn_card', locale: 'zh' } })
+    const params = sent(create)
+    expect(params).toMatchObject({
+      mode: 'subscription',
+      line_items: [{ price: 'price_starter_monthly_recurring', quantity: 1 }],
+      allowed_payment_method_types: ['card'],
+      managed_payments: { enabled: false },
+      locale: 'zh',
+      metadata: { user_id: USER, product_id: 'starter_monthly', method: 'cn_card', locale: 'zh' },
+      subscription_data: { metadata: { method: 'cn_card' } },
+      success_url: 'https://pr-1.example.app/zh/checkout?session_id={CHECKOUT_SESSION_ID}',
+    })
+    expect(params).not.toHaveProperty('automatic_tax')
+    expect(params).not.toHaveProperty('payment_method_types')
+    expect(d.trackStart).toHaveBeenCalledWith(USER, {
+      product_id: 'starter_monthly',
+      tier: 'starter',
+      interval: 'month',
+      form: 'subscription',
+      channel: 'stripe',
+      method: 'cn_card',
+    }, 'zh')
+  })
+
+  it('sells a pack as a plain one-time card payment', async () => {
+    const { stripe, create } = fakeStripe()
+    const d = deps(stripe)
+    await createCheckout(d, { userId: USER, body: { product_id: 'pack_m', method: 'cn_card', locale: 'zh' } })
+    const params = sent(create)
+    expect(params).toMatchObject({
+      mode: 'payment',
+      line_items: [{ price: 'price_pack_m' }],
+      allowed_payment_method_types: ['card'],
+      managed_payments: { enabled: false },
+      payment_intent_data: { metadata: { product_id: 'pack_m', method: 'cn_card' } },
+    })
+    expect(params).not.toHaveProperty('automatic_tax')
+    expect(params).not.toHaveProperty('subscription_data')
+    expect(d.trackStart).toHaveBeenCalledWith(USER, expect.objectContaining({ form: 'one_time', method: 'cn_card', tier: 'pack' }), 'zh')
+  })
+
+  it('leaves the Managed Payments card on zh pages as it was', async () => {
+    const { stripe, create } = fakeStripe()
+    await createCheckout(deps(stripe), { userId: USER, body: { product_id: 'pro_monthly', method: 'card', locale: 'zh' } })
+    expect(sent(create)).toMatchObject({ mode: 'subscription', managed_payments: { enabled: true } })
+    expect(sent(create)).not.toHaveProperty('allowed_payment_method_types')
+  })
+})
+
+describe('assertOffered (the locale gate)', () => {
+  it('takes 中国银行卡 only with a zh locale on Stripe', () => {
+    expect(() => assertOffered({ method: 'cn_card', locale: 'zh' }, 'stripe')).not.toThrow()
+    expect(() => assertOffered({ method: 'cn_card', locale: 'en' }, 'stripe')).toThrow(expect.objectContaining({ code: 'INVALID_INPUT' }))
+    expect(() => assertOffered({ method: 'cn_card', locale: 'zh' }, 'waffo')).toThrow(expect.objectContaining({ code: 'INVALID_INPUT' }))
+  })
+
+  it('keeps card and Alipay on every page and channel', () => {
+    for (const channel of ['stripe', 'waffo'] as const) {
+      for (const locale of ['en', 'zh'] as const) {
+        for (const method of ['card', 'alipay'] as const) expect(() => assertOffered({ method, locale }, channel)).not.toThrow()
+      }
+    }
+  })
+})
 
 describe('createCheckout routing', () => {
   it('opens a card membership as a Managed Payments subscription, with no method list', async () => {

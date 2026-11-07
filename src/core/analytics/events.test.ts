@@ -58,6 +58,13 @@ describe('event dictionary (ARCHITECTURE §16.2)', () => {
     expect(validateEvent('contact_sales_click', { page: '/pricing' }).ok).toBe(true)
     expect(validateEvent('contact_sales_click', { page: '/account' }).ok).toBe(false)
   })
+
+  // 中国银行卡 (T64, ARCHITECTURE §6.3): checkout_start.method = 'cn_card'; still no WeChat Pay.
+  it('takes cn_card as a checkout method', () => {
+    expect(validateEvent('checkout_start', { ...checkout, method: 'cn_card' }).ok).toBe(true)
+    expect(validateEvent('purchase', { ...valid.purchase as object, method: 'cn_card' }).ok).toBe(true)
+    expect(validateEvent('checkout_start', { ...checkout, method: 'wechat' }).ok).toBe(false)
+  })
 })
 
 describe('no personal data in events (ARCHITECTURE §16.1)', () => {

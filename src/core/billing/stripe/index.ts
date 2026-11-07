@@ -6,6 +6,7 @@ export {
   checkoutRoute,
   desiredPrices,
   lookupKey,
+  offeredMethods,
   priceCents,
   stripeProductId,
   stripeProductName,
@@ -15,6 +16,7 @@ export {
   type DesiredPrice,
 } from './catalog'
 export {
+  assertOffered,
   CHECKOUT_LOCALES,
   CHECKOUT_RETURN,
   checkoutBodySchema,

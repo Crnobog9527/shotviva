@@ -26,15 +26,17 @@ export function isTierPick(pick: PaywallPick): pick is MembershipTier {
   return (MEMBERSHIP_TIERS as readonly string[]).includes(pick)
 }
 
-export function choiceFor(options: PaywallOpenOptions = {}): PaywallChoice {
+// `method` is the first method the page lists (catalog offeredMethods): Card on English pages,
+// 中国银行卡 on zh pages over Stripe (ARCHITECTURE §6.3, T64).
+export function choiceFor(options: PaywallOpenOptions = {}, method: CheckoutMethod = DEFAULT_CHOICE.method): PaywallChoice {
   const pick = options.step === "packs" || (options.packId && !options.tier) ? (options.packId ?? DEFAULT_PACK) : (options.tier ?? DEFAULT_CHOICE.pick)
-  return { ...DEFAULT_CHOICE, period: options.period ?? DEFAULT_CHOICE.period, pick }
+  return { ...DEFAULT_CHOICE, period: options.period ?? DEFAULT_CHOICE.period, pick, method }
 }
 
-export function usePaywallState() {
-  const [choice, setChoice] = useState<PaywallChoice>(DEFAULT_CHOICE)
+export function usePaywallState(firstMethod: CheckoutMethod = DEFAULT_CHOICE.method) {
+  const [choice, setChoice] = useState<PaywallChoice>(() => choiceFor({}, firstMethod))
   const update = useCallback((patch: Partial<PaywallChoice>) => setChoice((current) => ({ ...current, ...patch })), [])
-  const reset = useCallback((options?: PaywallOpenOptions) => setChoice(choiceFor(options)), [])
+  const reset = useCallback((options?: PaywallOpenOptions) => setChoice(choiceFor(options, firstMethod)), [firstMethod])
   return { choice, update, reset }
 }
 

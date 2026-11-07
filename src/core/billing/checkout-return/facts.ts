@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { PRODUCT_IDS, type ProductId } from '../../config'
 import { AppError } from '../../errors'
 import { logger } from '../../logger'
-import type { CheckoutMethod } from '../stripe/catalog'
+import { CHECKOUT_METHODS, type CheckoutMethod } from '../stripe/catalog'
 import type { StripeApi } from '../stripe/client'
 import type { ReturnQuery } from './query'
 
@@ -142,7 +142,7 @@ async function retrieveCharge(stripe: StripeApi, id: string): Promise<Stripe.Cha
 
 function methodOfSession(session: Stripe.Checkout.Session): CheckoutMethod | null {
   const method = session.metadata?.method
-  return method === 'card' || method === 'alipay' ? method : null
+  return CHECKOUT_METHODS.find((m) => m === method) ?? null
 }
 
 function sessionAmount(session: Stripe.Checkout.Session): CheckoutFacts['amount'] {

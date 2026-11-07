@@ -89,7 +89,9 @@ export async function renewFromInvoice(deps: FulfilDeps, invoiceId: string): Pro
     interval: product.interval,
     form: 'subscription',
     channel: 'stripe',
-    method: 'card',
+    // Which card route the subscription was opened on (its checkout metadata): a 中国银行卡
+    // subscription renews as cn_card, so the funnel splits renewals the way it splits first payments.
+    method: sub.metadata?.method === 'cn_card' ? 'cn_card' : 'card',
     // List price in USD: with Adaptive Pricing the invoice may be in the buyer's currency.
     amount_usd: product.priceUsd,
     credits: product.credits,

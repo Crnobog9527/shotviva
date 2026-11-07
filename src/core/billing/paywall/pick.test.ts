@@ -16,6 +16,12 @@ describe('paywall pick', () => {
     expect(DEFAULT_CHOICE).toEqual({ period: 'year', pick: 'pro', method: 'card' })
   })
 
+  // zh pages on Stripe list 中国银行卡 first, so it starts selected there (T64).
+  it('starts on the first method the page lists', () => {
+    expect(choiceFor({}, 'cn_card')).toEqual({ period: 'year', pick: 'pro', method: 'cn_card' })
+    expect(choiceFor({ step: 'packs' }, 'cn_card')).toMatchObject({ pick: 'pack_m', method: 'cn_card' })
+  })
+
   it('keeps the old entry points: a tier (account, batch rows, /pricing) or the packs', () => {
     expect(choiceFor({ step: 'period', tier: 'max' }).pick).toBe('max')
     expect(choiceFor({ tier: 'starter', period: 'month' })).toMatchObject({ pick: 'starter', period: 'month' })
