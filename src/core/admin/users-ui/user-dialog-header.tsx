@@ -6,7 +6,7 @@ import { Dialog as DialogPrimitive } from 'radix-ui'
 import { accountLabel, formatAdminPhone } from '../users/label'
 import type { UserDetailData } from '../users/detail-types'
 import { USER_TIERS, type UserTier } from '../users/list-types'
-import { TierBadge, UserStatus } from './badges'
+import { RefusalFlag, TierBadge, UserStatus } from './badges'
 import { USERS_COPY } from './copy'
 
 const COPY = USERS_COPY.dialog
@@ -24,12 +24,14 @@ export function UserDialogHeader({ userId, data }: { userId: string; data: UserD
           <DialogPrimitive.Title className="min-w-0 truncate text-lg font-semibold">{user ? accountLabel(user) : USERS_COPY.title}</DialogPrimitive.Title>
           {user ? <TierBadge tier={asTier(data.extras.subscription.tier)} paidUntil={user.paidUntil} className="flex items-center gap-2" /> : null}
           {user ? <UserStatus role={user.role} bannedAt={user.bannedAt} /> : null}
+          <HeaderRefusalFlag data={data} />
         </div>
         <DialogPrimitive.Description asChild>
           <dl className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
             <Fact term={COPY.email} value={user ? (user.email ?? COPY.none) : '…'} />
             <Fact term={COPY.phone} value={user ? (formatAdminPhone(user.phone) ?? COPY.none) : '…'} />
             <Fact term={COPY.id} value={userId} />
+            <RefusalFact data={data} />
           </dl>
         </DialogPrimitive.Description>
       </div>
@@ -47,4 +49,18 @@ function Fact({ term, value }: { term: string; value: string }) {
       <dd className="min-w-0 font-mono break-all text-foreground select-all">{value}</dd>
     </div>
   )
+}
+
+// Face-swap refusals (ARCHITECTURE §5.1a, T81): the red flag beside the status at three or more
+// in 24 hours, and the counts always in the facts line.
+function HeaderRefusalFlag({ data }: { data: UserDetailData | undefined }) {
+  if (!data) return null
+  const { flagged, last24h } = data.extras.identityRefusals
+  return <RefusalFlag flagged={flagged} last24h={last24h} />
+}
+
+function RefusalFact({ data }: { data: UserDetailData | undefined }) {
+  if (!data) return null
+  const { total, last24h } = data.extras.identityRefusals
+  return <Fact term={USERS_COPY.refusalFact} value={USERS_COPY.refusalCount(total, last24h)} />
 }

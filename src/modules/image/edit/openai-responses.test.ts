@@ -12,7 +12,7 @@ function classifier(fetchImpl: typeof fetch) {
   return createOpenAIResponsesClassifier({ apiKey: 'sk-test', model: 'gpt-6-luna', baseUrl: 'https://api.openai.com/v1', fetch: fetchImpl }, 'row/gpt-6-luna')
 }
 
-const good = { scope: 'background', confidence: 0.93, keep: ['amber glass bottle', 'white label text'], change: 'Replace the background with a beach.' }
+const good = { scope: 'background', confidence: 0.93, keep: ['amber glass bottle', 'white label text'], change: 'Replace the background with a beach.', identity_swap: false }
 
 describe('openai responses classifier', () => {
   it('sends the low-detail photo, the words as typed and a strict schema at the lowest effort', async () => {
@@ -31,11 +31,18 @@ describe('openai responses classifier', () => {
       text: { format: { type: 'json_schema', strict: true } },
     })
     expect(body.text.format.schema.properties.scope.enum).toEqual(['object', 'background', 'style', 'subject', 'global'])
-    expect(body.text.format.schema.required).toEqual(['scope', 'confidence', 'keep', 'change'])
+    expect(body.text.format.schema.required).toEqual(['scope', 'confidence', 'keep', 'change', 'identity_swap'])
   })
 
   it('returns the answer and the token usage', async () => {
-    expect(await classifier(vi.fn(async () => reply(good))).classify(input)).toEqual({ ...good, usage: { inputTokens: 812, outputTokens: 37 } })
+    expect(await classifier(vi.fn(async () => reply({ ...good, identity_swap: true }))).classify(input)).toEqual({
+      scope: good.scope,
+      confidence: good.confidence,
+      keep: good.keep,
+      change: good.change,
+      identitySwap: true,
+      usage: { inputTokens: 812, outputTokens: 37 },
+    })
   })
 
   it('caps keep at 8 and clamps confidence into 0–1', async () => {

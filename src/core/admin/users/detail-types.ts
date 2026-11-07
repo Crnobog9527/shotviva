@@ -38,6 +38,8 @@ export type UserExtras = {
   graylum: GraylumLink | null
   sameIp: SameIpAccount[]
   requests: UserRequest[]
+  // Face-swap refusals (ARCHITECTURE §5.1a, T81): over the 90 days kept and the last 24 hours.
+  identityRefusals: { total: number; last24h: number; flagged: boolean }
 }
 
 export const DETAIL_ROWS = 10

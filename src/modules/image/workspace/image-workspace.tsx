@@ -72,5 +72,5 @@ type SingleProps = { job: TrackedJob; shareText: string; editable: boolean; onRe
 // One photo, settled: done or failed (DESIGN §4.4).
 function SingleJobView({ job, shareText, editable, onRetry, onBack }: SingleProps) {
   if (job.status === 'succeeded') return <SuccessView job={job} shareText={shareText} editable={editable} onAgain={() => onBack(false)} />
-  return <FailureView job={job} onRetry={onRetry} onNewPhoto={() => onBack(true)} />
+  return <FailureView job={job} onRetry={onRetry} onNewPhoto={() => onBack(true)} onEditWords={() => onBack(false)} />
 }

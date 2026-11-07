@@ -29,6 +29,9 @@ export const PAYMENT_CHANNELS = ['stripe', 'waffo'] as const
 export const PAYMENT_METHODS = ['card', 'alipay', 'wechat_pay', 'cn_card'] as const
 export const CHECKOUT_START_METHODS = ['card', 'alipay', 'alipay_or_wechat', 'cn_card'] as const
 export type CheckoutStartMethod = (typeof CHECKOUT_START_METHODS)[number]
+// Where a `generate_refused` came from: the workspace (note or text fields), a photo edit, the
+// partner API. Mirrors core/identity-guard IDENTITY_ENTRIES.
+export const IDENTITY_SOURCES = ['workspace', 'edit', 'partner'] as const
 export const CONTACT_SALES_PAGES = ['/pricing', '/zh/pricing'] as const
 // T74 (ARCHITECTURE §16.2): where a template was looked at, and why an upload failed. Enums
 // only, so a file name or an error message can never ride along.
@@ -64,6 +67,8 @@ export const eventSchemas = {
     // Photos in the workspace batch this one belonged to; 1 for a single photo (T28).
     batch_size: z.number().int().min(1).max(MAX_BATCH_SIZE),
   }),
+  // A request refused before charging (ARCHITECTURE §5.1a, T81): which entry, never the words.
+  generate_refused: z.strictObject({ reason: z.enum(['identity_swap']), source: z.enum(IDENTITY_SOURCES) }),
   paywall_view: z.strictObject({ trigger: z.enum(PAYWALL_TRIGGERS) }),
   // The pricing page's "For business" Contact us (DESIGN §6.9 item 8, T37).
   contact_sales_click: z.strictObject({ page: z.enum(CONTACT_SALES_PAGES) }),
@@ -87,7 +92,7 @@ export type EventName = keyof typeof eventSchemas
 export type EventProps<E extends EventName> = z.infer<(typeof eventSchemas)[E]>
 
 // §16.2: money and credit events go out from the server so ad blockers cannot drop them.
-export const SERVER_EVENTS = ['signup', 'generate', 'checkout_start', 'checkout_cancel', 'purchase'] as const
+export const SERVER_EVENTS = ['signup', 'generate', 'generate_refused', 'checkout_start', 'checkout_cancel', 'purchase'] as const
 export const BROWSER_EVENTS = ['upload', 'upload_error', 'paywall_view', 'paywall_select', 'template_view', 'contact_sales_click'] as const
 export type ServerEventName = (typeof SERVER_EVENTS)[number]
 export type BrowserEventName = (typeof BROWSER_EVENTS)[number]
