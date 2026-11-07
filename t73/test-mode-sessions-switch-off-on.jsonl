@@ -1,0 +1,2 @@
+{"STRIPE_WECHAT_PAY":"off","created":true,"id":"cs_test_a1jc9rxCZxKXWeZSviFsb1UlcYilBWVWjPZvn7rY6lVK8bJVeBpAOfP8Rv","mode":"payment","payment_method_types":["alipay"],"payment_method_options":{},"amount":1990,"currency":"usd"}
+{"STRIPE_WECHAT_PAY":"on","created":true,"id":"cs_test_a1X3YiMQJGhdZ0nHuW03gqK5DphkK6az7rbVLQC2SaPasgBvZ408KBMHDZ","mode":"payment","payment_method_types":["alipay","wechat_pay"],"payment_method_options":{"wechat_pay":{"app_id":null,"client":"web"}},"amount":1990,"currency":"usd"}
