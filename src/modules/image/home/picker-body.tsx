@@ -1,6 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
+import type { ReactNode } from 'react'
 
 import { coverImage } from '@/core/ui/cover-image'
 
@@ -65,22 +66,35 @@ export function PickerList({ templates, selected, onSelect, thumbOf }: Omit<Prop
   const savedName = useTranslations('app.favorites')('pickerGroup')
   const ids = useFavorites()?.ids
   const saved = ids ? savedIn(ids, templates) : []
-  const groups = [
-    ...(saved.length > 0 ? [{ key: 'saved', name: savedName, items: saved }] : []),
-    ...categoriesOf(templates).map((category) => ({ ...category, items: templates.filter((template) => template.category === category.key) })),
-  ]
+  const row = (template: CatalogueTemplate) => (
+    <PickerRow key={template.id} template={template} chosen={template.id === selected.id} onSelect={onSelect} thumb={thumbOf(template)} />
+  )
+  // Two radio groups, so a saved template listed twice is never two checked radios in one group.
   return (
-    <div className="mk-pk-list" role="radiogroup">
-      {groups.map((group) => (
-        <div key={group.key} role="group" aria-label={group.name}>
-          <p className="mk-pk-cat" aria-hidden>
-            {group.name}
-          </p>
-          {group.items.map((template) => (
-            <PickerRow key={template.id} template={template} chosen={template.id === selected.id} onSelect={onSelect} thumb={thumbOf(template)} />
-          ))}
+    <div className="mk-pk-list">
+      {saved.length > 0 ? (
+        <div role="radiogroup" aria-label={savedName} className="contents">
+          <PickerGroup name={savedName}>{saved.map(row)}</PickerGroup>
         </div>
-      ))}
+      ) : null}
+      <div role="radiogroup" className="contents">
+        {categoriesOf(templates).map((category) => (
+          <PickerGroup key={category.key} name={category.name}>
+            {templates.filter((template) => template.category === category.key).map(row)}
+          </PickerGroup>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function PickerGroup({ name, children }: { name: string; children: ReactNode }) {
+  return (
+    <div role="group" aria-label={name}>
+      <p className="mk-pk-cat" aria-hidden>
+        {name}
+      </p>
+      {children}
     </div>
   )
 }
