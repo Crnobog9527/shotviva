@@ -41,7 +41,13 @@ function Facts({ row, live, now, stripeUrl }: Omit<Props, 'actions'>) {
   return (
     <dl className="grid gap-4 rounded-lg border border-border bg-card p-4 sm:grid-cols-2 lg:grid-cols-3">
       <Fact label={UI.facts.user}>
-        {row.user_id ? <Link href={`/admin/users/${row.user_id}`} className="text-primary hover:underline">{card.user}</Link> : card.user}
+        {row.user_id ? (
+          <Link href={`/admin/users/${row.user_id}`} className="inline-block py-1 text-primary hover:underline">
+            {card.user}
+          </Link>
+        ) : (
+          card.user
+        )}
       </Fact>
       <Fact label={UI.facts.product}>{row.product_id ?? '—'}</Fact>
       <Fact label={UI.facts.due}>{card.due ?? '—'}</Fact>
@@ -104,7 +110,7 @@ function Header({ card, canSubmit }: { card: ReturnType<typeof toCard>; canSubmi
           {UI.facts.due} <span className="whitespace-nowrap">{card.due}</span>
           {card.daysLeft ? <span className="whitespace-nowrap"> · {card.daysLeft}</span> : null}
           {canSubmit ? (
-            <a href="#submit" className="ml-3 inline-block py-2 whitespace-nowrap text-primary hover:underline">
+            <a href="#submit" className="ml-3 inline-block py-3 whitespace-nowrap text-primary hover:underline sm:py-2">
               {UI.jumpToSubmit}
             </a>
           ) : null}
@@ -120,7 +126,7 @@ export function DisputeDetail({ row, live, now, stripeUrl, actions }: Props) {
   const card = toCard({ ...row, live }, now)
   return (
     <div className="grid gap-4">
-      <Link href="/admin/disputes" className="inline-block justify-self-start py-2 text-sm text-primary hover:underline">
+      <Link href="/admin/disputes" className="inline-block justify-self-start py-3 text-sm text-primary hover:underline sm:py-2">
         {COPY.back}
       </Link>
       <Header card={card} canSubmit={row.responder === 'shotviva' && !row.submitted_at && (live?.open ?? false)} />
