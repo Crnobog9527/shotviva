@@ -1,7 +1,6 @@
 import { defineHomePage, type CostBills, type HeadedText, type HomePage, type ImageRef, type ShootDemo } from '@/core/content'
 
 import { site } from '../site.config'
-import { templateCategories } from './template-categories'
 import {
   creditFrom,
   fromCredits,
@@ -148,7 +147,6 @@ export const homePage = defineHomePage({
     heading: 'Img to Img Templates: No Prompts to Write',
     intro: `Every template starts from your phone photo and ends with a finished picture. Pick one and ${brand} does the rest. Templates cost ${fromCredits} a photo.`,
     note: 'All template images are illustrative examples.',
-    categories: templateCategories,
   },
   facts: sharedFacts(),
   factsIntro: `Many AI image to image tools redraw the whole picture. ${brand} templates are built to keep what you shot, the product, the dish, the room or the pet, and change only the look around it. These facts are the same on every page of this site.`,

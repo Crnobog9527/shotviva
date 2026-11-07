@@ -293,14 +293,6 @@
       "animatedMeta": "{category} · animated",
       "hintPair": "Phone photo on the left, the AI result on the right."
     },
-    "categories": {
-      "Art Styles": "Art Styles",
-      "Food & Drink": "Food & Drink",
-      "Products & Resale": "Products & Resale",
-      "Beauty & Skincare": "Beauty & Skincare",
-      "Rooms & Spaces": "Rooms & Spaces",
-      "Pets": "Pets"
-    },
     "tiers": {
       "1k": {
         "name": "Standard",
@@ -348,12 +340,12 @@
       "noteLabel": "Anything to change?",
       "optional": "(optional)",
       "notePlaceholder": {
-        "Food & Drink": "e.g. Add a sprig of mint, remove the napkin",
-        "Products & Resale": "e.g. Keep the chain gold, soften the shadow",
-        "Beauty & Skincare": "e.g. Keep the label sharp, add a few water drops",
-        "Rooms & Spaces": "e.g. Keep the sofa, warm up the lamp light",
-        "Pets": "e.g. Keep the collar, use a soft grey backdrop",
-        "Art Styles": "e.g. Keep the glasses, softer line work",
+        "food-drink": "e.g. Add a sprig of mint, remove the napkin",
+        "products-resale": "e.g. Keep the chain gold, soften the shadow",
+        "beauty-skincare": "e.g. Keep the label sharp, add a few water drops",
+        "rooms-spaces": "e.g. Keep the sofa, warm up the lamp light",
+        "pets": "e.g. Keep the collar, use a soft grey backdrop",
+        "art-styles": "e.g. Keep the glasses, softer line work",
         "fallback": "e.g. Keep the colours, brighten the background"
       },
       "wait": "Wait for a photo to finish",

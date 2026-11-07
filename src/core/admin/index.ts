@@ -22,6 +22,17 @@ export type {
 } from './templates'
 export { applyCover, createCoverUpload, type ApplyCoverInput, type CoverDeps, type CoverUploadTicket } from './covers'
 export { TemplatesEditor } from './templates-editor'
+export {
+  deleteTemplateCategory,
+  listAdminCategories,
+  reorderTemplateCategories,
+  saveTemplateCategory,
+  type AdminCategory,
+  type CategoryAdminActions,
+  type DeleteCategoryPayload,
+  type SaveCategoryPayload,
+} from './template-categories'
+export { CategoriesPanel } from './template-categories-editor'
 export { loadEditTemplateSettings, saveEditTemplate, type EditTemplateSettings, type SaveEditTemplateInput } from './edit-template'
 export { EDIT_TEMPLATE_COPY, EditTemplateEditor } from './edit-template-editor'
 export {

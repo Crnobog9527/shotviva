@@ -166,7 +166,7 @@ describe('runGeneration: generate event', () => {
     expect(ctx).toEqual({ distinctId: userId, locale: 'en' })
     expect(props).toMatchObject({
       template_id: templateId,
-      category: 'test',
+      category: 'pets',
       resolution: '1k',
       credits_cost: 1,
       credit_pool: 'paid',

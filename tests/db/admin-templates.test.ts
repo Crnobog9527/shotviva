@@ -16,7 +16,7 @@ const B = 'test-admin-b'
 const template = (id: string, name = id) => ({
   id,
   name,
-  category: 'test',
+  category: 'pets',
   quality: 'high',
   creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
   visibleIn: ['web'],

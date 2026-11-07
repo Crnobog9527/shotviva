@@ -191,5 +191,5 @@ export function moveId(ids: string[], index: number, direction: -1 | 1): string[
 export function matchesSearch(template: AdminTemplate, query: string): boolean {
   const q = query.trim().toLowerCase()
   if (!q) return true
-  return [template.id, template.name, template.category].some((text) => text.toLowerCase().includes(q))
+  return [template.id, template.name, template.category, template.categoryInfo.nameZh, template.categoryInfo.nameEn].some((text) => text.toLowerCase().includes(q))
 }

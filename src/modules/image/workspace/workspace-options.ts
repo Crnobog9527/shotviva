@@ -41,7 +41,7 @@ export function sizeLabel(id: OutputAspect, t: Translate): string {
   return id === 'original' ? name : t('sizes.withRatio', { name, ratio: id })
 }
 
-// Example for "Anything to change?", matched to the template's category so a handbag never gets
-// a food example (B comp workspace.html). Categories are admin text, so unknown ones fall back.
-// `t` scoped to app.workspace.notePlaceholder.
+// Example for "Anything to change?", matched to the template's category key so a handbag never
+// gets a food example (B comp workspace.html). Categories are added in admin (T75), so one
+// without its own example falls back. `t` scoped to app.workspace.notePlaceholder.
 export const notePlaceholder = (category: string, t: Translate) => (t.has(category) ? t(category) : t('fallback'))

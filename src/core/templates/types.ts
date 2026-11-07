@@ -1,3 +1,4 @@
+import { CATEGORY_COLUMNS, toCategory, type Category, type CategoryRow } from './categories'
 import type { CreditsCost, TemplateQuality } from './pricing'
 import type { CoverMediaType, TemplateFields, TemplateSurface, TemplateTranslations } from './schema'
 
@@ -7,7 +8,9 @@ export type Template = {
   name: string
   // English one-line description (T52); null when not filled in. Read through localizeTemplate.
   description: string | null
+  // The template_categories key (T75); its names and card style are in categoryInfo.
   category: string
+  categoryInfo: Category
   coverBeforeUrl: string | null
   coverAfterUrl: string | null
   // 'animated' / 'video' cards also have the motion file and its first frame.
@@ -36,6 +39,8 @@ export type TemplateRow = {
   name: string
   description: string | null
   category: string
+  // Embedded through templates_category_fkey; never null (category is not null).
+  template_categories: CategoryRow
   cover_before_url: string | null
   cover_after_url: string | null
   cover_media_type: CoverMediaType
@@ -54,8 +59,7 @@ export type TemplateRow = {
   updated_at: string
 }
 
-export const TEMPLATE_COLUMNS =
-  'id, module, name, description, category, cover_before_url, cover_after_url, cover_media_type, cover_video_url, cover_poster_url, fields, quality, credits_cost, sort_order, is_active, visible_in, translations, featured_rank, created_at, updated_at'
+export const TEMPLATE_COLUMNS = `id, module, name, description, category, template_categories(${CATEGORY_COLUMNS}), cover_before_url, cover_after_url, cover_media_type, cover_video_url, cover_poster_url, fields, quality, credits_cost, sort_order, is_active, visible_in, translations, featured_rank, created_at, updated_at`
 
 export function toTemplate(row: TemplateRow): Template {
   return {
@@ -64,6 +68,7 @@ export function toTemplate(row: TemplateRow): Template {
     name: row.name,
     description: row.description ?? null,
     category: row.category,
+    categoryInfo: toCategory(row.template_categories),
     coverBeforeUrl: row.cover_before_url,
     coverAfterUrl: row.cover_after_url,
     coverMediaType: row.cover_media_type,

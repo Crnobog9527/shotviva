@@ -1,56 +1,36 @@
 'use client'
 
-import { useState } from 'react'
-
-import { Input } from '@/core/ui/input'
 import { Label } from '@/core/ui/label'
-import { isKnownCategory, TEMPLATE_CATEGORIES } from '@/core/templates/categories'
 
 import { categoryCopy as COPY } from './copy'
 
-const NEW = '__new__'
 const SELECT = 'border-input h-9 rounded-md border bg-transparent px-3 text-sm'
 
-type Props = { value: string; onChange: (category: string) => void }
+// What the picker needs of each template_categories row (T75).
+export type CategoryOption = { key: string; nameZh: string; nameEn: string }
 
-// templates.category: one of the six stored English names, or "新分类…" with a text box for a
-// genuinely new one. A stored value outside the six opens on the text box, as stored, with a
-// warning; nothing is rewritten unless the admin picks another.
-export function CategoryField({ value, onChange }: Props) {
-  const [custom, setCustom] = useState(value !== '' && !isKnownCategory(value))
-  const choice = custom ? NEW : value
-  const pick = (next: string) => {
-    if (next === NEW) {
-      setCustom(true)
-      onChange(isKnownCategory(value) ? '' : value)
-      return
-    }
-    setCustom(false)
-    onChange(next)
-  }
+type Props = { value: string; categories: readonly CategoryOption[]; onChange: (category: string) => void }
+
+// templates.category is a category key (ARCHITECTURE §5, T75): the admin picks one of the
+// categories managed in 分类管理; there is no free-typed option any more. A key that is no
+// longer in the list (deleted while the form was open) shows the placeholder until one is
+// picked, and saving without one is refused.
+export function CategoryField({ value, categories, onChange }: Props) {
+  const known = categories.some((category) => category.key === value)
   return (
     <div className="grid gap-1.5">
       <Label htmlFor="tpl-category">{COPY.label}</Label>
-      <select id="tpl-category" className={SELECT} value={choice} onChange={(event) => pick(event.target.value)}>
+      <select id="tpl-category" className={SELECT} value={known ? value : ''} onChange={(event) => onChange(event.target.value)}>
         <option value="" disabled>
           {COPY.placeholder}
         </option>
-        {TEMPLATE_CATEGORIES.map((category) => (
-          <option key={category} value={category}>
-            {COPY.zh[category]} · {category}
+        {categories.map((category) => (
+          <option key={category.key} value={category.key}>
+            {category.nameZh} · {category.nameEn}
           </option>
         ))}
-        <option value={NEW}>{COPY.newOption}</option>
       </select>
-      {custom ? (
-        <>
-          <Label htmlFor="tpl-category-new" className="text-xs">
-            {COPY.newLabel}
-          </Label>
-          <Input id="tpl-category-new" value={value} maxLength={60} onChange={(event) => onChange(event.target.value)} />
-          {value.trim() !== '' ? <p className="text-destructive text-xs">{COPY.offList(value.trim())}</p> : null}
-        </>
-      ) : null}
+      <p className="text-muted-foreground text-xs">{COPY.hint}</p>
     </div>
   )
 }

@@ -16,7 +16,6 @@ import {
   usd,
   usdRange,
 } from '../offer'
-import { zhTemplateCategories } from './template-categories'
 import {
   ZH_TIERS,
   zhFreeImages,
@@ -136,7 +135,6 @@ export const zhHomePage = defineHomePage({
     heading: 'AI改图模板：不用写提示词',
     intro: `每个模板都从你的手机照片开始，到一张成品图结束。选一个，剩下的交给 ${brand}。每张${zhFromCredits}。`,
     note: '模板图片均为示意图。',
-    categories: zhTemplateCategories,
   },
   facts: zhSharedFacts(),
   factsIntro: `很多 AI改图工具会把整张图重画一遍。${brand} 的模板专门保留你拍的东西，比如商品、菜品、房间或宠物，只改它周围的样子。下面这些信息在本站每一页都一样。`,

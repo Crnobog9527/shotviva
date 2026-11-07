@@ -558,6 +558,46 @@ $$;
 ALTER FUNCTION "public"."admin_delete_provider"("p_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") RETURNS integer
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_moved integer;
+begin
+  if p_actor is null or not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+  perform 1 from public.template_categories for update;
+  if not exists (select 1 from public.template_categories c where c.key = p_key) then
+    raise exception 'CATEGORY_NOT_FOUND';
+  end if;
+  if (select count(*) from public.template_categories) <= 1 then
+    raise exception 'CATEGORY_LAST';
+  end if;
+
+  if exists (select 1 from public.templates t where t.category = p_key) then
+    if p_move_to is null then
+      raise exception 'CATEGORY_MOVE_REQUIRED';
+    end if;
+    if p_move_to = p_key or not exists (select 1 from public.template_categories c where c.key = p_move_to) then
+      raise exception 'INVALID_INPUT' using detail = 'move_to must be another existing category';
+    end if;
+    update public.templates set category = p_move_to where category = p_key;
+    get diagnostics v_moved = row_count;
+  else
+    v_moved := 0;
+  end if;
+
+  delete from public.template_categories where key = p_key;
+  return v_moved;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_list_template_requests"() RETURNS TABLE("id" "uuid", "email" "text", "description" "text", "image_keys" "text"[], "status" "text", "template_id" "text", "votes_count" integer, "created_at" timestamp with time zone)
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -743,6 +783,33 @@ $$;
 ALTER FUNCTION "public"."admin_openai_admin_key_status"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_reorder_template_categories"("p_keys" "text"[], "p_actor" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_keys text[] := coalesce(p_keys, '{}');
+begin
+  if p_actor is null or not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if cardinality(v_keys) <> (select count(distinct k) from unnest(v_keys) as u(k))
+     or (select array_agg(k order by k) from unnest(v_keys) as u(k))
+        is distinct from (select array_agg(c.key order by c.key) from public.template_categories c) then
+    raise exception 'INVALID_INPUT' using detail = 'the order must list every category once';
+  end if;
+
+  update public.template_categories c
+  set sort_order = o.position * 10
+  from unnest(v_keys) with ordinality as o(key, position)
+  where c.key = o.key and c.sort_order <> o.position * 10;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_reorder_template_categories"("p_keys" "text"[], "p_actor" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) RETURNS "void"
     LANGUAGE "sql"
     SET "search_path" TO ''
@@ -920,6 +987,59 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_review_template_request"("p_request_id" "uuid", "p_status" "text", "p_template_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_save_template_category"("p_category" "jsonb", "p_is_new" boolean, "p_actor" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_key text := btrim(coalesce(p_category ->> 'key', ''));
+  v_name_en text := btrim(coalesce(p_category ->> 'name_en', ''));
+  v_name_zh text := btrim(coalesce(p_category ->> 'name_zh', ''));
+  v_intro_en text := nullif(btrim(coalesce(p_category ->> 'intro_en', '')), '');
+  v_intro_zh text := nullif(btrim(coalesce(p_category ->> 'intro_zh', '')), '');
+  v_style text := coalesce(p_category ->> 'card_style', 'pair');
+begin
+  if p_actor is null or not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if v_name_en = '' or v_name_zh = '' then
+    raise exception 'INVALID_INPUT' using detail = 'both names are required';
+  end if;
+  if exists (select 1 from public.template_categories c where lower(c.name_en) = lower(v_name_en) and c.key <> v_key) then
+    raise exception 'CATEGORY_NAME_EN_TAKEN';
+  end if;
+  if exists (select 1 from public.template_categories c where c.name_zh = v_name_zh and c.key <> v_key) then
+    raise exception 'CATEGORY_NAME_ZH_TAKEN';
+  end if;
+
+  if coalesce(p_is_new, false) then
+    if exists (select 1 from public.template_categories c where c.key = v_key) then
+      raise exception 'CATEGORY_KEY_TAKEN';
+    end if;
+    insert into public.template_categories (key, name_en, name_zh, intro_en, intro_zh, card_style, sort_order)
+    values (
+      v_key, v_name_en, v_name_zh, v_intro_en, v_intro_zh, v_style,
+      (select coalesce(max(c.sort_order), 0) + 10 from public.template_categories c)
+    );
+  else
+    update public.template_categories
+    set name_en = v_name_en,
+        name_zh = v_name_zh,
+        intro_en = v_intro_en,
+        intro_zh = v_intro_zh,
+        card_style = v_style
+    where key = v_key;
+    if not found then
+      raise exception 'CATEGORY_NOT_FOUND';
+    end if;
+  end if;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_save_template_category"("p_category" "jsonb", "p_is_new" boolean, "p_actor" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_search_users"("p_query" "text") RETURNS TABLE("id" "uuid", "email" "text", "created_at" timestamp with time zone, "provider" "text", "role" "text", "credits" integer, "free_credits" integer, "paid_until" timestamp with time zone, "generation_count" integer, "last_generation_at" timestamp with time zone, "banned_at" timestamp with time zone, "phone" "text")
@@ -2926,6 +3046,28 @@ CREATE TABLE IF NOT EXISTS "public"."system_settings" (
 ALTER TABLE "public"."system_settings" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."template_categories" (
+    "key" "text" NOT NULL,
+    "name_en" "text" NOT NULL,
+    "name_zh" "text" NOT NULL,
+    "intro_en" "text",
+    "intro_zh" "text",
+    "card_style" "text" DEFAULT 'pair'::"text" NOT NULL,
+    "sort_order" integer DEFAULT 0 NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "template_categories_card_style_check" CHECK (("card_style" = ANY (ARRAY['pair'::"text", 'compare'::"text"]))),
+    CONSTRAINT "template_categories_intro_en_check" CHECK ((("intro_en" IS NULL) OR (("char_length"("intro_en") >= 1) AND ("char_length"("intro_en") <= 200)))),
+    CONSTRAINT "template_categories_intro_zh_check" CHECK ((("intro_zh" IS NULL) OR (("char_length"("intro_zh") >= 1) AND ("char_length"("intro_zh") <= 200)))),
+    CONSTRAINT "template_categories_key_check" CHECK ((("key" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text") AND ("char_length"("key") <= 40))),
+    CONSTRAINT "template_categories_name_en_check" CHECK ((("char_length"("name_en") >= 1) AND ("char_length"("name_en") <= 32) AND ("name_en" = "btrim"("name_en")))),
+    CONSTRAINT "template_categories_name_zh_check" CHECK ((("char_length"("name_zh") >= 1) AND ("char_length"("name_zh") <= 12) AND ("name_zh" = "btrim"("name_zh"))))
+);
+
+
+ALTER TABLE "public"."template_categories" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."template_prompts" (
     "template_id" "text" NOT NULL,
     "body" "text" NOT NULL,
@@ -3124,6 +3266,11 @@ ALTER TABLE ONLY "public"."system_settings"
 
 
 
+ALTER TABLE ONLY "public"."template_categories"
+    ADD CONSTRAINT "template_categories_pkey" PRIMARY KEY ("key");
+
+
+
 ALTER TABLE ONLY "public"."template_prompts"
     ADD CONSTRAINT "template_prompts_pkey" PRIMARY KEY ("template_id");
 
@@ -3256,6 +3403,14 @@ CREATE INDEX "support_tickets_user_id_created_at_idx" ON "public"."support_ticke
 
 
 
+CREATE UNIQUE INDEX "template_categories_name_en_key" ON "public"."template_categories" USING "btree" ("lower"("name_en"));
+
+
+
+CREATE UNIQUE INDEX "template_categories_name_zh_key" ON "public"."template_categories" USING "btree" ("name_zh");
+
+
+
 CREATE INDEX "template_request_votes_user_id_idx" ON "public"."template_request_votes" USING "btree" ("user_id");
 
 
@@ -3276,6 +3431,10 @@ CREATE INDEX "templates_active_sort_idx" ON "public"."templates" USING "btree" (
 
 
 
+CREATE INDEX "templates_category_idx" ON "public"."templates" USING "btree" ("category");
+
+
+
 CREATE UNIQUE INDEX "templates_featured_rank_key" ON "public"."templates" USING "btree" ("featured_rank") WHERE ("featured_rank" IS NOT NULL);
 
 
@@ -3289,6 +3448,10 @@ CREATE OR REPLACE TRIGGER "ai_providers_set_updated_at" BEFORE UPDATE ON "public
 
 
 CREATE OR REPLACE TRIGGER "site_announcements_set_updated_at" BEFORE UPDATE ON "public"."site_announcements" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
+
+
+
+CREATE OR REPLACE TRIGGER "template_categories_set_updated_at" BEFORE UPDATE ON "public"."template_categories" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
 
 
 
@@ -3434,6 +3597,11 @@ ALTER TABLE ONLY "public"."template_requests"
 
 
 
+ALTER TABLE ONLY "public"."templates"
+    ADD CONSTRAINT "templates_category_fkey" FOREIGN KEY ("category") REFERENCES "public"."template_categories"("key");
+
+
+
 ALTER TABLE "public"."admin_audit_log" ENABLE ROW LEVEL SECURITY;
 
 
@@ -3508,6 +3676,13 @@ CREATE POLICY "support_tickets_select_own" ON "public"."support_tickets" FOR SEL
 
 
 ALTER TABLE "public"."system_settings" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."template_categories" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "template_categories_select_all" ON "public"."template_categories" FOR SELECT TO "authenticated", "anon" USING (true);
+
 
 
 ALTER TABLE "public"."template_prompts" ENABLE ROW LEVEL SECURITY;
@@ -3606,6 +3781,11 @@ GRANT ALL ON FUNCTION "public"."admin_delete_provider"("p_id" "uuid") TO "servic
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_list_template_requests"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_list_template_requests"() TO "service_role";
 
@@ -3631,6 +3811,11 @@ GRANT ALL ON FUNCTION "public"."admin_openai_admin_key_status"() TO "service_rol
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_reorder_template_categories"("p_keys" "text"[], "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_reorder_template_categories"("p_keys" "text"[], "p_actor" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) TO "service_role";
 
@@ -3648,6 +3833,11 @@ GRANT ALL ON FUNCTION "public"."admin_revenue_stats"("p_days" integer) TO "servi
 
 REVOKE ALL ON FUNCTION "public"."admin_review_template_request"("p_request_id" "uuid", "p_status" "text", "p_template_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_review_template_request"("p_request_id" "uuid", "p_status" "text", "p_template_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_save_template_category"("p_category" "jsonb", "p_is_new" boolean, "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_save_template_category"("p_category" "jsonb", "p_is_new" boolean, "p_actor" "uuid") TO "service_role";
 
 
 
@@ -3976,6 +4166,12 @@ GRANT SELECT ON TABLE "public"."support_ticket_attachments" TO "service_role";
 
 
 GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."system_settings" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."template_categories" TO "service_role";
+GRANT SELECT ON TABLE "public"."template_categories" TO "anon";
+GRANT SELECT ON TABLE "public"."template_categories" TO "authenticated";
 
 
 

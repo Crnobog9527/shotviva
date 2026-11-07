@@ -5,6 +5,9 @@ import { refresh, revalidateTag } from 'next/cache'
 import {
   applyCover,
   createCoverUpload,
+  deleteTemplateCategory,
+  reorderTemplateCategories,
+  saveTemplateCategory,
   reorderTemplates,
   runAdminAction,
   runAdminQuery,
@@ -79,6 +82,33 @@ export async function reorderTemplatesAction(ids: unknown): Promise<ActionResult
   return runAdminAction(async () => {
     await reorderTemplates(createAdminSupabase(), admin.id, ids)
     catalogueChanged()
+  })
+}
+
+// 分类管理 (T75): names, intros, card style and order show on every catalogue page; a delete
+// also moves templates, so all three expire the catalogue like a template save.
+export async function saveTemplateCategoryAction(payload: unknown): Promise<ActionResult> {
+  const admin = await requireAdmin()
+  return runAdminAction(async () => {
+    await saveTemplateCategory(createAdminSupabase(), admin.id, payload)
+    catalogueChanged()
+  })
+}
+
+export async function reorderTemplateCategoriesAction(keys: unknown): Promise<ActionResult> {
+  const admin = await requireAdmin()
+  return runAdminAction(async () => {
+    await reorderTemplateCategories(createAdminSupabase(), admin.id, keys)
+    catalogueChanged()
+  })
+}
+
+export async function deleteTemplateCategoryAction(payload: unknown): Promise<ActionValue<{ moved: number }>> {
+  const admin = await requireAdmin()
+  return runAdminQuery(async () => {
+    const outcome = await deleteTemplateCategory(createAdminSupabase(), admin.id, payload)
+    catalogueChanged()
+    return outcome
   })
 }
 
