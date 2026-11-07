@@ -20,6 +20,7 @@ const template: AdminTemplate = {
   name: 'Burger hero',
   description: 'Stacked burger, studio light',
   category: 'burgers',
+  categoryInfo: { key: 'burgers', nameEn: 'Burgers', nameZh: '汉堡', introEn: null, introZh: null, cardStyle: 'pair', sortOrder: 70, isSystem: false },
   coverBeforeUrl: null,
   coverAfterUrl: null,
   coverMediaType: 'image',
@@ -75,6 +76,8 @@ describe('template form state', () => {
     expect(matchesSearch(template, 'BURG')).toBe(true)
     expect(matchesSearch(template, 'pizza')).toBe(false)
     expect(matchesSearch(template, ' ')).toBe(true)
+    // The category's names, as 分类管理 shows them (T75).
+    expect(matchesSearch(template, '汉堡')).toBe(true)
   })
 })
 

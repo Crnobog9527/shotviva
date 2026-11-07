@@ -33,7 +33,7 @@ export default async function HomePage() {
   const free = locale === 'zh' ? zhFreeImages : freeImagesLabel
   const ldMeta = { ...meta, path: localizePath(meta.path, locale) }
   const catalogue = live.map(toCatalogueTemplate)
-  const { defaultId, ...sections } = featuredSections(page.templateGrid.categories, live)
+  const { defaultId, ...sections } = featuredSections(live)
   return (
     <>
       <JsonLdScript data={[softwareApplicationLd(site, ldMeta, free), organizationLd(site), faqPageLd(page.faq)]} />

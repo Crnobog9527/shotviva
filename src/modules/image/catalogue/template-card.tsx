@@ -5,8 +5,7 @@ import { useRef } from 'react'
 
 import { FavoriteButton } from '../favorites/favorite-button'
 import { LoopPlate } from './card-media'
-import { cardPrice, hasStills, isArtStyle, isMotion, type CatalogueTemplate } from './catalogue-template'
-import { useCategoryLabel } from './category-label'
+import { cardPrice, hasStills, isCompareCategory, isMotion, type CatalogueTemplate } from './catalogue-template'
 import { CompareSlider } from './compare-slider'
 import { COVER_SIZES } from './cover-sizes'
 import { PairMedia } from './pair-media'
@@ -14,13 +13,13 @@ import { useHoverWipe } from './use-hover-wipe'
 
 type Props = { template: CatalogueTemplate; onOpen(id: string): void; eager?: boolean }
 
-// A template card (DESIGN §4.2 and §6.9 items 1–3, B comp create.html). Art Styles keeps the
-// drag compare; every other template is the side-by-side pair that plays its change on hover.
+// A template card (DESIGN §4.2 and §6.9 items 1–3, B comp create.html). A 'compare' category
+// (画风) keeps the drag compare; every other template is the side-by-side pair that plays its change on hover.
 // A tap opens the creation dialog straight away: there is no preview step any more. The save
 // heart (T83) sits over the photo's top-right corner, beside the card's button, not inside it.
 export function TemplateCard(props: Props) {
   const { template } = props
-  if (isArtStyle(template) && hasStills(template)) return <ArtCard {...props} />
+  if (isCompareCategory(template) && hasStills(template)) return <ArtCard {...props} />
   return <PairCard {...props} />
 }
 
@@ -52,7 +51,7 @@ function PairCard({ template, onOpen, eager }: Props) {
   )
 }
 
-// The one card with the drag compare (Art Styles): a tap on the photo opens the dialog, a drag
+// The one card with the drag compare (画风 / Art Styles): a tap on the photo opens the dialog, a drag
 // compares; the name and price below are their own button for the keyboard. From md up it is the
 // tall card spanning two rows (the grid sets the span).
 function ArtCard({ template, onOpen, eager }: Props) {
@@ -78,8 +77,7 @@ function ArtCard({ template, onOpen, eager }: Props) {
 
 function CardMeta({ template }: { template: CatalogueTemplate }) {
   const t = useTranslations('app.template')
-  const label = useCategoryLabel()
-  const category = label(template.category)
+  const category = template.categoryName
   const kind = isMotion(template) ? t(template.cover.type === 'video' ? 'featureMeta' : 'animatedMeta', { category }) : category
   return (
     <span className="block pt-2">

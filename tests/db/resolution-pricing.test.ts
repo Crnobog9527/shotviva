@@ -133,7 +133,7 @@ describe('admin save checks the floor', () => {
   const payload = (creditsCost: Record<string, number>, quality = 'high', isNew = false) => ({
     isNew,
     template: {
-      id, name: 'Floor test', category: 'test', quality, creditsCost, visibleIn: ['web'],
+      id, name: 'Floor test', category: 'pets', quality, creditsCost, visibleIn: ['web'],
       fields: { images: { min: 1, max: 1 }, copy: [], aspectRatios: ['1:1'] },
     },
     prompt: { body: 'FAKE', modelParams: {} },

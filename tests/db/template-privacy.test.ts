@@ -21,7 +21,7 @@ async function seed(id: string, isActive: boolean) {
     p_template: {
       id,
       name: id,
-      category: 'test',
+      category: 'pets',
       fields,
       quality: 'medium',
       credits_cost: { '1k': 1, '2k': 2, '3k': 3 },
