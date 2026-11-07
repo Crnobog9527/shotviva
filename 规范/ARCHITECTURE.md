@@ -257,7 +257,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
   入账失败时，镜像表的写入一起回滚。同一 session 的重发和兄弟事件只入账一次。`checkout.session.completed` 和 `checkout.session.async_payment_succeeded` 都走它。
 - **付款记录与续费函数**（T10，总控 2026-11-06 按 T10 开工前的问题定）：
   - **表 `payments`**（私有，只授权 service role）：每次成功付款一行。
-    - 字段：`user_id`、`product_id`、`channel`（`stripe` / `waffo`）、`stripe_session_id` / `stripe_invoice_id` / `stripe_charge_id`（各自可空且唯一）、`waffo_order_id`（可空，**不唯一**，有索引：一张 Waffo 订阅订单每期都有一笔扣款）、`waffo_payment_id`（Waffo 的 `PAY_` 扣款号，可空、唯一；T50）、`amount_total`（实付，含税，单位为分，int）、`currency`、`amount_tax`（分）、`method`（`card` = MP 卡（海外银行卡）/ `alipay` / `cn_card` = 普通 Stripe 卡（中国银行卡，T64）；迁移只放宽 `payments_method_check`，不改函数；续费沿用订阅 metadata 里记的方式）、`status`（`paid` / `refunded` / `partially_refunded` / `disputed`）、`amount_refunded`（分，默认 0）、`created_at`。
+    - 字段：`user_id`、`product_id`、`channel`（`stripe` / `waffo`）、`stripe_session_id` / `stripe_invoice_id` / `stripe_charge_id`（各自可空且唯一）、`waffo_order_id`（可空，**不唯一**，有索引：一张 Waffo 订阅订单每期都有一笔扣款）、`waffo_payment_id`（Waffo 的 `PAY_` 扣款号，可空、唯一；T50）、`amount_total`（实付，含税，单位为分，int）、`currency`、`amount_tax`（分）、`method`（`card` = MP 卡（海外银行卡）/ `alipay` / `wechat_pay`（T73）/ `cn_card` = 普通 Stripe 卡（中国银行卡，T64）；迁移只放宽 `payments_method_check`，不改函数；续费沿用订阅 metadata 里记的方式）、`status`（`paid` / `refunded` / `partially_refunded` / `disputed`）、`amount_refunded`（分，默认 0）、`created_at`。
     - 约束：Stripe 行至少有 session 或 invoice 之一；Waffo 行必须有 `waffo_order_id` 和 `waffo_payment_id`（T50 之前的老行可以没有 `waffo_payment_id`）。
     - 不回填 T10 上线前的历史付款。
   - **`settle_checkout` 改签名**：新增参数 `p_amount_total`、`p_currency`、`p_amount_tax`、`p_method`、`p_invoice_id`（可空）、`p_charge_id`（可空），在同一事务里写 `payments`。参数变了无法 `create or replace`，按 AGENTS §5「签名必须变」的例外，由新迁移删掉旧的 7 参数版本后重建，PR 写明原因；调用方同步改。
@@ -294,8 +294,8 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 积分包不改会员期，但它发的是付费积分，用它生成的作品就是付费作品（无水印、私密、可商用），所以非会员买包也拿到完整权益——这正是「按作品判付费」要解决的事。
 - 价格数字只写在 `site.config.ts`（第 2 节），付费墙、`/pricing`、FAQ、结构化数据都从配置读；建站规格 G3 同步。送 Stripe 时用整数分（`1990`）。
 - **Stripe Product / Price 映射**：Starter、Pro、Max 各一个 Product（税码 `txcd_10105001`），每个 Product 挂 4 个 Price：月付 recurring、月付 one-time、年付 recurring、年付 one-time（同 id 的 recurring 和 one-time 价格相同）；三个积分包各一个 Product，只有 one-time Price。Price 的 `lookup_key` 固定为 `<product_id>`（one-time）和 `<product_id>_recurring`（订阅），服务端按 lookup key 取 Price，不把 Price id 写进代码或配置；每个 Price 的 `metadata.product_id` 也写上，回调反查用。
-- **不接微信支付**（Owner 2026-11-05 定，只保留卡和支付宝）。支付宝在 Stripe 普通模式下不支持订阅，所以钱包用户买会员买的是「一期」（`starter_monthly` 的单笔形态 = 30 天 50 credits），`paid_until` 到了自己再买。这不是功能缺失，是 Stripe 的限制，付费墙文案要说清楚（"Renews automatically" vs "30 days, no auto-renew"）。
-- **PostHog `purchase` 事件参数**：`product_id`、`tier`（`starter` / `pro` / `max` / `pack`）、`interval`（`month` / `year` / 空）、`form`（`subscription` / `one_time`）、`channel`（`stripe` / `waffo`）、`method`（`card` / `alipay` / `cn_card`）、`amount_usd`、`credits`。`generate` 事件加 `resolution` 和 `credits_cost`。
+- **支付宝和微信支付放在同一个结账页**（Owner 2026-11-07 改，T73；原「不接微信支付」作废）：用户选「支付宝 / 微信支付」后进 Stripe 结账页，两种都列出，自己选。支付宝和微信支付在 Stripe 普通模式下都不支持订阅，所以钱包用户买会员买的是「一期」（`starter_monthly` 的单笔形态 = 30 天 50 credits），`paid_until` 到了自己再买。这不是功能缺失，是 Stripe 的限制，付费墙文案要说清楚（"Renews automatically" vs "30 days, no auto-renew"）。
+- **PostHog `purchase` 事件参数**：`product_id`、`tier`（`starter` / `pro` / `max` / `pack`）、`interval`（`month` / `year` / 空）、`form`（`subscription` / `one_time`）、`channel`（`stripe` / `waffo`）、`method`（`card` / `alipay` / `wechat_pay` / `cn_card`）、`amount_usd`、`credits`。`generate` 事件加 `resolution` 和 `credits_cost`。
 
 已经确定的规则：
 
@@ -326,7 +326,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 不做：首月优惠券、降级、补差价 / 按比例退款、宽限期、测试时钟自动化、到期提醒邮件。
 - **分两段上线**：上线当天必须有「订阅模式建结账 + 首付发放」（和单笔几乎相同）；续费、取消同步、Portal 链接在第一个付费用户满 30 天之前上线即可（TASKS T10）。
 - 账号页「Subscription」区块显示当前档位（Starter / Pro / Max）和月付 / 年付；镜像表 `subscriptions.product_id` 存 9 个 id 之一。
-- 卡和支付宝能付（第 6.3 节的路由），不接微信支付。
+- 卡、支付宝、微信支付能付（第 6.3 节的路由；微信支付 T73 起）。
 - **水印在下载路由加，按作品判**：成品只存一份无水印原图；`core/storage` 的下载路由对 `credit_pool = 'free'` 的作品用 `sharp` 叠右下角「Made with Shotviva」后返回（约 50ms），`credit_pool = 'paid'` 的作品永不加水印。工作台预览和将来创作库展示同样走这个路由。
 - **免费作品**（免费积分生成）：`visibility = 'public'`，带水印，用户不能改私密，可以删除。买了会员之后它们**仍然**是免费作品——不会自动去水印、不会自动私密；想要无水印版就用付费积分再生成一张。
 - **付费作品**（付费积分生成）：默认 `visibility = 'private'`、无水印、可商用，用户可以改公开（进创作库，仍无水印）。会员到期、积分用完都不影响已有付费作品。
@@ -393,13 +393,13 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 | 用户选的方式 | Checkout Session 怎么建 | 卖家 |
 |---|---|---|
 | 卡 / Apple Pay / Google Pay | `mode: 'subscription'`，`managed_payments: { enabled: true }`，不传 `allowed_payment_method_types`（MP 自己决定付款方式） | Stripe（Link）当商户记录方，结账时另加税 |
-| 支付宝 | `mode: 'payment'`，`allowed_payment_method_types: ['alipay']`（在 Dashboard 已开启的动态付款方式里过滤；Dashboard 没开支付宝时拒绝跳转） | Shotviva |
+| 支付宝 / 微信支付（T73） | `mode: 'payment'`，`allowed_payment_method_types: ['alipay', 'wechat_pay']`，`payment_method_options.wechat_pay.client: 'web'`（在 Dashboard 已开启的动态付款方式里过滤；两种都没开时拒绝跳转，只开了一种就只显示那一种） | Shotviva |
 | 中国银行卡（只在中文页出现，T64） | 会员 `mode: 'subscription'`、积分包 `mode: 'payment'`，**不带** `managed_payments`，用专用的付款方式配置「Shotviva card only (T64)」（只开银行卡，Link / Apple Pay / Google Pay 关；由 `scripts/stripe-setup.ts` 维护、按名字查找，Stripe 不允许它和 `allowed_payment_method_types` 同时传，配置缺失时才退回 `['card']`），`wallet_options.link: 'never'`，按当地货币显示照 Stripe 账户默认（Owner 2026-11-07：显示当地货币可以，到账是美元），不开自动税（与审核前的兜底卡路由同一条代码路径）；会员照常自动续费，账号页「Manage subscription」进普通 Stripe Customer Portal | Shotviva |
 
 > Stripe API 2026-09-30（stripe@23）起，Checkout Session 不再接受 `payment_method_types`，传了会 400；按方式限定一律用 `allowed_payment_method_types`。审核下来之前不走 MP 的卡路由传 `['card']`。（T9 修复，2026-11-06）
 
 - 服务端只认用户选的方式，不按 IP 或浏览器语言强制。Managed Payments 的结账页不允许买家国家为中国（2026-11-07 正式站真卡实测：中国发卡的 Visa 被拒「China is not currently supported」），所以给中文页加「中国银行卡」这条普通 Stripe 卡路由（T64，Owner 2026-11-07）。
-- **中文页付款方式（Owner 2026-11-07，T64）**：三项，顺序固定：① **中国银行卡**（上表第三行，普通 Stripe）② **支付宝** ③ **海外银行卡 · Apple Pay · Google Pay**（原来的 MP 卡路由，只改名）。英文页不变（Card · Apple Pay · Google Pay 和 Alipay，没有中国银行卡）。中国银行卡这条路由由 Shotviva 当卖家：大陆买家不涉及我们需要申报的销售税 / 增值税；非大陆用户在中文页选它的情况接受，不做卡 BIN 拦截（上线后看数据再定）。埋点 `checkout_start.method = 'cn_card'`。
+- **中文页付款方式（Owner 2026-11-07，T64）**：三项，顺序固定：① **中国银行卡**（上表第三行，普通 Stripe）② **支付宝 / 微信支付**（T73）③ **海外银行卡 · Apple Pay · Google Pay**（原来的 MP 卡路由，只改名）。英文页不变（Card · Apple Pay · Google Pay 和 Alipay，没有中国银行卡）。中国银行卡这条路由由 Shotviva 当卖家：大陆买家不涉及我们需要申报的销售税 / 增值税；非大陆用户在中文页选它的情况接受，不做卡 BIN 拦截（上线后看数据再定）。埋点 `checkout_start.method = 'cn_card'`。
 - MP 商品必须设税码 `txcd_10105001`（AI 服务，个人用）。MP 价格不含税，税在结账时另加。
 - 顾客账单：卡支付显示 `LINK.COM* SHOTVIVA`，钱包支付显示 SHOTVIVA。MP 结账页不支持自定义域名。
 - 正式环境的 Managed Payments 要等 Stripe 资格审核。**审核没下来之前的兜底**：卡先不带 `managed_payments` 走普通订阅（Shotviva 当卖家），审核通过后翻开关。
@@ -835,6 +835,21 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 | `$pageview` | 浏览器：自动 | — |
 
 所有事件都带 `locale`（`en` / `zh`，浏览器端注册为公共属性，服务端发时从请求或 `user_metadata.locale` 取；Owner 2026-11-06）。钱和积分相关的事件（`signup`、`generate`、`checkout_start`、`purchase`）一律服务端发，保证不被广告拦截漏掉；发送失败只记日志，不影响业务。
+
+- **新增事件（T74，Owner 2026-11-07）**：`template_view`（浏览器：打开模板详情或在选择器里选中模板，`template_id`、`category`、`surface`）、`paywall_select`（浏览器：付费墙里选中商品，`product_id`、`method`）、`checkout_cancel`（服务端：结账取消返回，`product_id`、`method`）、`upload_error`（浏览器：上传失败，`reason` 枚举，不含文件名）。PostHog 打开 `capture_pageleave`（停留时间、最大滚动深度）。
+
+### 16.2a 后台「流量与转化」页（Owner 2026-11-07，T74）
+
+PostHog 的英文后台不好读，后台加一个中文页，用 PostHog Query API（HogQL，服务端用只读的个人 API 密钥 `POSTHOG_PERSONAL_API_KEY`，项目 `POSTHOG_PROJECT_ID`=712352）读数据，`'use cache'` 缓存 10 分钟，按中文展示；不搬 PostHog 全部功能，每块旁边有「在 PostHog 打开」链接。时间范围今天 / 7 天 / 30 天，带和上一周期的对比。
+
+1. **每页表现**：浏览量、访客、平均停留时间、平均滚动深度、跳出率、从该页进站后注册 / 付款的比例（可排序）。
+2. **转化漏斗**：进站 → 上传 → 出图 → 付费墙 → 开始结账 → 付款，每步人数和流失；可按 中 / 英、手机 / 电脑、来源、国家、新 / 老访客切换。
+3. **付款环节**：付费墙里各商品被选次数与点去付款的比例；按付款方式（海外银行卡 / 中国银行卡 / 支付宝·微信支付 / Waffo）的「开始结账 → 付款成功」比例；结账取消次数。
+4. **新用户激活**：注册后 24 小时内出第一张图的比例；注册到首次出图、首次付款的平均时长；免费积分用完后付款的比例。
+5. **模板表现**：各模板浏览、使用、出图成功率、带来的付款。
+6. **体验问题**：上传失败、出图失败次数与最常见原因；各页面真实打开速度（Web Vitals，慢的在前）。
+
+每个指标名旁边一个「?」用一句中文解释含义。留存、续费率、渠道长期价值等第二批指标上线跑一两个月后再加。
 
 ### 16.3 Sentry
 
