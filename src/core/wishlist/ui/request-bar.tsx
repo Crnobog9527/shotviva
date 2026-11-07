@@ -8,7 +8,7 @@ import { buttonVariants } from '../../ui/button'
 // plus padding and the home-indicator inset) instead of covering it. It renders after the wall,
 // so its phone spacer ends the list; from md up `order-first` lifts it under the lede as a
 // content-width button (B comp wishlist.html .cta).
-const PLACEMENT = 'bottom-[calc(var(--sab)+58px)] pb-3 md:order-first md:mt-6 md:px-(--gutter) md:pb-0'
+const PLACEMENT = 'max-md:bottom-[calc(var(--sab)+58px)] pb-3 md:order-first md:mt-6 md:px-(--gutter) md:pb-0'
 const DESKTOP_WIDTH = 'md:w-auto md:min-w-60 md:px-8'
 
 // The wall's one primary (DESIGN §4.7): "Request a template", or the same button greyed with

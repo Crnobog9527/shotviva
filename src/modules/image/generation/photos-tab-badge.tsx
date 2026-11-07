@@ -15,7 +15,7 @@ export function PhotosTabBadge() {
   return (
     <span
       aria-label={t('badgeAria', { count: running })}
-      className="absolute top-1 left-[calc(50%+4px)] grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 font-mono text-caption leading-none font-medium text-primary-foreground md:static md:ml-1"
+      className="grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 font-mono text-caption leading-none font-medium text-primary-foreground max-md:absolute max-md:top-1 max-md:left-[calc(50%+4px)] md:ml-1"
     >
       {running}
     </span>
