@@ -107,7 +107,7 @@ export function HomeGenerator({ templates, defaultId, viewer, googleAction, home
         onPick={(id) => {
           setPickerOn(null)
           const picked = templates.find((template) => template.id === id)
-          if (picked) trackTemplateView({ template_id: picked.id, category: picked.category, surface: 'home_picker' })
+          if (picked) trackTemplateView(picked, 'home_picker')
           onPick(id)
         }}
         sampleOf={sampleFor}

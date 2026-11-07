@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { BROWSER_EVENTS, eventSchemas, SERVER_EVENTS, uploadSizeBucket, validateEvent, type EventName } from './events'
+import { BROWSER_EVENTS, categorySlug, eventSchemas, SERVER_EVENTS, uploadSizeBucket, validateEvent, type EventName } from './events'
 
 const generate = {
   template_id: 'ramen-studio',
@@ -64,6 +64,15 @@ describe('event dictionary (ARCHITECTURE §16.2)', () => {
     // §16.2 (T74): checkout_cancel is a server event; the other three are browser events.
     expect(SERVER_EVENTS).toContain('checkout_cancel')
     expect(BROWSER_EVENTS).toEqual(expect.arrayContaining(['template_view', 'paywall_select', 'upload_error']))
+  })
+
+  // T74: template_view's category is the same slug generate sends: the display name before T75,
+  // the category key after it, which is already a slug and passes unchanged.
+  it('sends template_view with the category slug, old names and T75 keys alike', () => {
+    expect(validateEvent('template_view', { template_id: 'ramen-studio', category: 'Food & Drink', surface: 'workspace' }).ok).toBe(false)
+    expect(categorySlug('Food & Drink')).toBe('food-drink')
+    expect(categorySlug('food-drink')).toBe('food-drink')
+    expect(validateEvent('template_view', { template_id: 'ramen-studio', category: categorySlug('Food & Drink'), surface: 'workspace' }).ok).toBe(true)
   })
 
   // T74: enums only, so no file name, message or free text fits.

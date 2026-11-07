@@ -31,7 +31,8 @@ export function ImageWorkspace({ shareText, ...input }: WorkspaceProps) {
   const single = useJob(jobIds.length === 1 ? (jobIds[0] ?? null) : null)
   const reveal = useReveal<HTMLDivElement>()
   // template_view (T74, ARCHITECTURE §16.2): once per template the workspace opens on.
-  useEffect(() => trackTemplateView({ template_id: template.id, category: template.category, surface: 'workspace' }), [template.id, template.category])
+  const { id: templateId, category } = template
+  useEffect(() => trackTemplateView({ id: templateId, category }, 'workspace'), [templateId, category])
 
   const generate = () => {
     draft.start()
