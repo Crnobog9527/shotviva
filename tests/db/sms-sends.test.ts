@@ -3,7 +3,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { listSignupClusters, searchUsers } from '@/core/admin'
+import { listSignupClusters, listUsers } from '@/core/admin'
 import { authorizeSmsSend, releaseSmsSend, requestSmsSend } from '@/core/auth/phone'
 
 import { connectAdmin } from './helpers'
@@ -150,14 +150,14 @@ describe('phone accounts in /admin/users (0442)', () => {
 
   it('finds an account with no email by its number, typed with +86 and spaces', async () => {
     const typed = `+86 ${number.slice(2, 5)} ${number.slice(5, 9)} ${number.slice(9)}`
-    const rows = await searchUsers(service, typed)
+    const { rows } = await listUsers(service, { q: typed })
     expect(rows.map((row) => row.id)).toEqual([user])
-    expect(rows[0]).toMatchObject({ email: null, phone: number })
-    expect((await searchUsers(service, number.slice(-6))).map((row) => row.id)).toContain(user)
+    expect(rows[0]).toMatchObject({ email: null, phone: number, provider: null, tier: 'free' })
+    expect((await listUsers(service, { q: number.slice(-6) })).rows.map((row) => row.id)).toContain(user)
   })
 
   it('does not match on fewer than 4 digits', async () => {
-    expect((await searchUsers(service, '140')).map((row) => row.id)).not.toContain(user)
+    expect((await listUsers(service, { q: '140' })).rows.map((row) => row.id)).not.toContain(user)
   })
 
   it('names the phone of each member of a same-IP cluster', async () => {

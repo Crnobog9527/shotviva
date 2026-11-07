@@ -8,6 +8,7 @@ import { AnnouncementBanner } from '@/core/announcements'
 import { AdminLink, adminEntryFor, AppFrame, BrandProvider, TabBar, TabBarSlot, type TabItem } from '@/core/app-shell'
 import { getSessionUser } from '@/core/auth'
 import { PaywallProvider } from '@/core/billing/paywall'
+import { wechatPayEnabled } from '@/core/billing/stripe'
 import { StandingSlot } from '@/core/billing/standing'
 import { paymentChannel } from '@/core/billing/waffo'
 import { isModuleEnabled } from '@/core/config'
@@ -63,7 +64,7 @@ async function Tabs({ items }: { items: TabItem[] }) {
 async function Paywall({ children }: { children: ReactNode }) {
   const wishlistLive = await isWishlistEnabled(site)
   return (
-    <PaywallProvider products={site.billing.products} wishlistLive={wishlistLive} channel={paymentChannel()}>
+    <PaywallProvider products={site.billing.products} wishlistLive={wishlistLive} channel={paymentChannel()} wechatPay={wechatPayEnabled()}>
       {children}
       <StandingSlot />
     </PaywallProvider>

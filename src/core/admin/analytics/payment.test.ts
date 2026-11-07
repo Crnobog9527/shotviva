@@ -13,7 +13,7 @@ describe('付款环节 queries', () => {
   it('groups methods as the Owner reads them: Waffo first, 支付宝 and 微信支付 together', () => {
     const { query } = methodsQuery(WEEK)
     expect(query).toContain("properties.channel = 'waffo', 'waffo'")
-    expect(query).toContain("properties.method IN ('alipay', 'wechat_pay', 'wechat'), 'alipay_wechat'")
+    expect(query).toContain("properties.method IN ('alipay', 'alipay_or_wechat', 'wechat_pay', 'wechat'), 'alipay_wechat'")
     expect(query).toContain("'checkout_cancel'")
   })
 })

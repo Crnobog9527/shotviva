@@ -21,9 +21,14 @@ export const PRODUCT_TIERS = ['starter', 'pro', 'max', 'pack'] as const
 export const PRODUCT_INTERVALS = ['month', 'year'] as const
 export const CHECKOUT_FORMS = ['subscription', 'one_time'] as const
 export const PAYMENT_CHANNELS = ['stripe', 'waffo'] as const
-// No WeChat Pay (Owner 2026-11-05, ARCHITECTURE §6.2). `cn_card` is 中国银行卡, the zh pages'
-// plain Stripe card route (T64, §6.3); `card` stays the Managed Payments card group.
-export const PAYMENT_METHODS = ['card', 'alipay', 'cn_card'] as const
+// `cn_card` is 中国银行卡, the zh pages' plain Stripe card route (T64, §6.3); `card` stays the
+// Managed Payments card group. `purchase` records the method that paid: Alipay or WeChat Pay
+// (T73), both offered on the one Stripe wallet checkout. `checkout_start` fires before the
+// buyer has picked one on that page, so the Stripe wallet line starts as `alipay_or_wechat`;
+// Waffo's wallet line is Alipay alone and starts as `alipay`.
+export const PAYMENT_METHODS = ['card', 'alipay', 'wechat_pay', 'cn_card'] as const
+export const CHECKOUT_START_METHODS = ['card', 'alipay', 'alipay_or_wechat', 'cn_card'] as const
+export type CheckoutStartMethod = (typeof CHECKOUT_START_METHODS)[number]
 export const CONTACT_SALES_PAGES = ['/pricing', '/zh/pricing'] as const
 // T74 (ARCHITECTURE §16.2): where a template was looked at, and why an upload failed. Enums
 // only, so a file name or an error message can never ride along.
@@ -39,7 +44,6 @@ const checkoutProps = {
   interval: z.enum(PRODUCT_INTERVALS).nullable(),
   form: z.enum(CHECKOUT_FORMS),
   channel: z.enum(PAYMENT_CHANNELS),
-  method: z.enum(PAYMENT_METHODS),
 }
 
 export const eventSchemas = {
@@ -65,7 +69,7 @@ export const eventSchemas = {
   paywall_view: z.strictObject({ trigger: z.enum(PAYWALL_TRIGGERS) }),
   // The pricing page's "For business" Contact us (DESIGN §6.9 item 8, T37).
   contact_sales_click: z.strictObject({ page: z.enum(CONTACT_SALES_PAGES) }),
-  checkout_start: z.strictObject(checkoutProps),
+  checkout_start: z.strictObject({ ...checkoutProps, method: z.enum(CHECKOUT_START_METHODS) }),
   // T74: the template workspace opened, or a template picked in the home generator's picker.
   template_view: z.strictObject({ template_id: slug, category: slug, surface: z.enum(TEMPLATE_VIEW_SURFACES) }),
   // T83: a template saved or unsaved (sent once the server has it, so a rolled-back tap is not counted).
@@ -82,6 +86,7 @@ export const eventSchemas = {
   upload_error: z.strictObject({ reason: z.enum(UPLOAD_ERROR_REASONS) }),
   purchase: z.strictObject({
     ...checkoutProps,
+    method: z.enum(PAYMENT_METHODS),
     amount_usd: z.number().nonnegative(),
     credits: z.number().int().nonnegative(),
   }),

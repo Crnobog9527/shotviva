@@ -64,7 +64,7 @@ export function ProvidersEditor({ providers, actions }: Props) {
 
   return (
     <div className="grid gap-8">
-      {notice ? <p className="text-sm text-emerald-700">{notice}</p> : null}
+      {notice ? <p className="text-sm text-success">{notice}</p> : null}
       {error && !editing ? (
         <p role="alert" className="text-destructive text-sm">
           {error}

@@ -11,3 +11,10 @@ export const PaymentChannelContext = createContext<PaymentChannel>("stripe")
 export function usePaymentChannel(): PaymentChannel {
   return useContext(PaymentChannelContext)
 }
+
+// STRIPE_WECHAT_PAY (T73), also handed down by PaywallProvider: the wallet line's label.
+export const WechatPayContext = createContext(false)
+
+export function useWechatPay(): boolean {
+  return useContext(WechatPayContext)
+}

@@ -117,14 +117,18 @@ function TicketsTable({ rows }: { rows: AdminTicketRow[] }) {
               <DueAt row={row} />
             </TableCell>
             <TableCell className="font-mono text-xs whitespace-nowrap">{formatBeijing(row.lastMessageAt)}</TableCell>
-            <TableCell className="text-sm">{row.email ?? row.userId.slice(0, 8)}</TableCell>
+            <TableCell className="text-sm">
+              <span className="block max-w-44 truncate" title={row.email ?? row.userId}>
+                {row.email ?? row.userId.slice(0, 8)}
+              </span>
+            </TableCell>
             <TableCell className="text-sm whitespace-nowrap">{COPY.tiers[row.tier ?? 'none']}</TableCell>
             <TableCell className="text-sm whitespace-nowrap">{COPY.types[row.type]}</TableCell>
             <TableCell className="whitespace-nowrap">
               <Badge variant={row.status === 'open' ? 'default' : 'secondary'}>{COPY.statuses[row.status]}</Badge>
               {row.refundDecision ? <span className="ml-2 text-xs text-muted-foreground">{COPY.decisions[row.refundDecision]}</span> : null}
             </TableCell>
-            <TableCell className="max-w-md">
+            <TableCell className="min-w-64 whitespace-normal">
               <Link href={`/admin/tickets/${row.id}`} className="line-clamp-2 text-sm text-primary hover:underline">
                 {row.preview ?? '—'}
               </Link>

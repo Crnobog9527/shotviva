@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
+import { AdminPage } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { r2Store } from '@/core/storage'
 import { isWishlistEnabled, listAdminRequests, listTemplateOptions } from '@/core/wishlist'
@@ -22,9 +23,8 @@ export default async function AdminRequestsPage() {
   const db = createAdminSupabase()
   const [requests, templates] = await Promise.all([listAdminRequests({ db, store: r2Store() }), listTemplateOptions(db)])
   return (
-    <div className="mx-auto grid w-full max-w-6xl gap-6 p-6">
-      <h1 className="text-xl font-semibold">{REQUESTS_COPY.title}</h1>
+    <AdminPage title={REQUESTS_COPY.title}>
       <RequestsReview requests={requests} templates={templates} actions={{ review: reviewRequestAction }} />
-    </div>
+    </AdminPage>
   )
 }

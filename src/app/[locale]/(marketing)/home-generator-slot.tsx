@@ -5,6 +5,7 @@ import { googleAction } from '@/app/auth/actions'
 import { createAdminSupabase, createServerSupabase, getSessionUser } from '@/core/auth'
 import { currentTier, limitsFor, readBalance } from '@/core/billing'
 import { PaywallProvider } from '@/core/billing/paywall'
+import { wechatPayEnabled } from '@/core/billing/stripe'
 import { StandingSlot } from '@/core/billing/standing'
 import { paymentChannel } from '@/core/billing/waffo'
 import { listFavoriteIds } from '@/core/favorites'
@@ -50,7 +51,7 @@ async function WithViewer(props: Base) {
   if (!viewer) return <HomeGenerator {...props} viewer={null} googleAction={googleAction} />
   // "Get credits · N needed" opens the same paywall as the workspace (DESIGN §6.9 item 9).
   return (
-    <PaywallProvider products={site.billing.products} wishlistLive={wishlistLive} channel={paymentChannel()}>
+    <PaywallProvider products={site.billing.products} wishlistLive={wishlistLive} channel={paymentChannel()} wechatPay={wechatPayEnabled()}>
       <HomeGenerator {...props} viewer={viewer} googleAction={googleAction} />
       {/* What the member holds, so the paywall locks lower plans (T66). */}
       <StandingSlot />

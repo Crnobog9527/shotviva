@@ -8,8 +8,12 @@ const openTicketCount = vi.fn()
 vi.mock('@/core/auth', () => ({ requireAdmin: () => requireAdmin(), createAdminSupabase: () => ({}) }))
 vi.mock('@/core/admin', () => ({
   AdminShell: () => null,
+  UserDialogHost: () => null,
   adminNavItems: (flags: unknown, counts: unknown) => adminNavItems(flags, counts),
 }))
+vi.mock('@/core/env', () => ({ serverEnv: () => ({ VERCEL_ENV: 'preview' }) }))
+vi.mock('./jobs/actions', () => ({ compensateJobAction: vi.fn(), viewWorkAction: vi.fn() }))
+vi.mock('./users/actions', () => ({ adjustCreditsAction: vi.fn(), banUserAction: vi.fn(), unbanUserAction: vi.fn(), userDetailAction: vi.fn() }))
 vi.mock('@/core/support', () => ({ openTicketCount: () => openTicketCount() }))
 vi.mock('@/core/logger', () => ({ logger: { warn: () => undefined } }))
 vi.mock('@/core/wishlist', () => ({ isWishlistEnabled: async () => false }))

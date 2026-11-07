@@ -6,10 +6,11 @@ import { EmptyState } from '../shell/admin-blocks'
 import { formatBeijing } from '../shell/format'
 import { CLUSTER_WINDOWS, type ClusterWindow, type SignupCluster } from '../users/clusters'
 import { accountLabel } from '../users/label'
+import { UserStatus } from './badges'
 import { BanButton } from './ban-button'
 import { USERS_COPY } from './copy'
 import type { UserAdminActions } from './user-actions'
-import { UserStatus } from './users-search'
+import { UserLink } from './user-link'
 
 const COPY = USERS_COPY.suspicious
 const COLUMNS = ['email', 'createdAt', 'free', 'used', 'status', 'action'] as const
@@ -52,9 +53,7 @@ function ClusterTable({ cluster, ban }: { cluster: SignupCluster; ban: UserAdmin
           {cluster.members.map((member) => (
             <TableRow key={member.id}>
               <TableCell>
-                <Link href={`/admin/users/${member.id}`} className="text-primary hover:underline">
-                  {accountLabel(member)}
-                </Link>
+                <UserLink userId={member.id}>{accountLabel(member)}</UserLink>
               </TableCell>
               <TableCell className="font-mono text-xs whitespace-nowrap">{formatBeijing(member.createdAt)}</TableCell>
               <TableCell className="font-mono">{member.freeCredits}</TableCell>

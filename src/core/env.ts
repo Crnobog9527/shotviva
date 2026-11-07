@@ -1,6 +1,7 @@
 import 'server-only'
 import { z } from 'zod'
 
+import { alertsEnvShape } from './alerts/alerts-env'
 import { sentryBuildEnvSchema } from './build-env'
 import { indexingEnvSchema } from './seo/indexing-env'
 import { smsEnvShape } from './sms/sms-env'
@@ -47,12 +48,18 @@ const serverEnvSchema = z.object({
   // Cards go through Managed Payments (Link is merchant of record). 'off' is the fallback until
   // Stripe approves Managed Payments on the live account: cards then use a plain Checkout.
   STRIPE_MANAGED_PAYMENTS: z.preprocess(blankAsUnset, z.enum(['on', 'off']).default('on')),
+  // WeChat Pay beside Alipay on the wallet checkout (T73): Checkout params, the paywall / pricing
+  // labels, the zh pricing FAQ and the legal copy all follow it. Off (unset) is the pre-T73 site,
+  // Alipay alone; turn it on per environment once Stripe has approved WeChat Pay there.
+  STRIPE_WECHAT_PAY: z.preprocess(blankAsUnset, z.enum(['on', 'off']).default('off')),
   // Switches the wishlist on for validation outside production (core/wishlist isWishlistEnabled).
   // Ignored when VERCEL_ENV is 'production', so it can never turn the feature on for real users.
   FEATURE_WISHLIST_PREVIEW: z.preprocess(blankAsUnset, z.enum(['on', 'off']).default('off')),
   ...waffoEnvShape,
   // Phone sign-in (T63): the SMS adapter and the Send SMS hook secret (core/sms).
   ...smsEnvShape,
+  // Owner business alerts to a Feishu group bot (T72, ARCHITECTURE §16.4); unset → none sent.
+  ...alertsEnvShape,
   // /admin/analytics (T74, ARCHITECTURE §16.2a): a read-only PostHog personal API key with the
   // Query Read permission, and the project it reads. Both unset → the page asks to configure them.
   POSTHOG_PERSONAL_API_KEY: optionalSecret,

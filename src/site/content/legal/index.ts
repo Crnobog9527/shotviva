@@ -20,3 +20,4 @@ export const footerLinks: readonly FooterLink[] = [
 ]
 
 export { acceptableUsePage, privacyPage, refundPolicyPage, termsPage }
+export { WECHAT_PAY_LEGAL_EDITS, withWechatPay } from './wechat-pay'

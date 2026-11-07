@@ -44,6 +44,8 @@ export const site = defineSite({
       '/photos',
       '/photos/[jobId]',
       '/account',
+      // The Purchases list's receipt / invoice redirect (T80), so /zh links reach it.
+      '/account/purchases/[paymentId]/[document]',
       '/wishlist',
       '/wishlist/new',
       '/wishlist/mine',

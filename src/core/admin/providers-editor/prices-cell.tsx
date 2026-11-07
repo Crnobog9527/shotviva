@@ -20,7 +20,7 @@ export function PricesCell({ prices, module, model }: Props) {
       ? COPY.decisionPrices(price(shown.inputTextPerM), price(shown.outputPerM))
       : COPY.prices(price(shown.inputTextPerM), price(shown.inputImagePerM), price(shown.outputPerM))
   return (
-    <div className={`max-w-56 text-xs ${missing ? 'text-destructive' : ''}`}>
+    <div className={`w-52 text-xs whitespace-normal ${missing ? 'text-destructive' : ''}`}>
       <div className="font-mono">{text}</div>
       {fromTable ? <div className="text-muted-foreground">{COPY.pricesFromTable(fromTable)}</div> : null}
       {missing ? <div role="note">{COPY.pricesMissing}</div> : null}

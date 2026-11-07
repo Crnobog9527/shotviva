@@ -19,6 +19,9 @@ export type ActionFailure = { ok: false; code: string; message: string }
 export type ActionResult = { ok: true } | ActionFailure
 export type ActionValue<T> = { ok: true; value: T } | ActionFailure
 
+// The two lists /admin/templates orders (T76): the whole catalogue and the home featured list.
+export type TemplateOrderGroup = 'catalogue' | 'featured'
+
 export type CoverUploadRequest = { templateId: string; purpose: CoverPurpose; contentType: string; size: number }
 export type CoverTicket = { key: string; putUrl: string; headers: { 'Content-Type': string } }
 export type ApplyCoverRequest =
@@ -31,7 +34,8 @@ export type TemplateAdminActions = {
   setActive: (input: { id: string; active: boolean; reason?: string }) => Promise<ActionResult>
   // The bulk bar (T60): one call for the batch, partial success reported per template.
   setActiveMany: (input: { ids: string[]; active: boolean; reason?: string }) => Promise<ActionValue<ActiveChangeOutcome>>
-  reorder: (ids: string[]) => Promise<ActionResult>
+  // Drag-to-reorder and the arrows (T76): one group's whole new order.
+  setOrder: (input: { group: TemplateOrderGroup; ids: string[] }) => Promise<ActionResult>
   // The home featured list in display order (T53).
   setFeatured: (ids: string[]) => Promise<ActionResult>
   requestCoverUpload: (input: CoverUploadRequest) => Promise<ActionValue<CoverTicket>>

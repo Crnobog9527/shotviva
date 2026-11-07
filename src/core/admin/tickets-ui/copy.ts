@@ -47,8 +47,10 @@ export const TICKETS_COPY = {
     paidUntil: '会员到期',
     registered: '注册时间',
     banned: '已封禁',
-    work: '附带的作品',
+    work: '附带的作品编号',
     viewJob: '在出图记录里查看 →',
+    copyRef: '复制编号',
+    copied: '已复制',
   },
   reply: {
     label: '回复',

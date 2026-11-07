@@ -6,6 +6,7 @@ import { getTranslations } from 'next-intl/server'
 
 import { createAdminSupabase, createServerSupabase, requireApiUser } from '@/core/auth'
 import { AppError, toAppError } from '@/core/errors'
+import { jobRefsOrShort } from '@/core/jobs'
 import { logger } from '@/core/logger'
 import { r2Store } from '@/core/storage'
 import {
@@ -29,6 +30,8 @@ import type { Translate } from '@/core/translate'
 // Help & feedback in the account page's dialog (ARCHITECTURE §10 「站内工单」「在弹窗里完成」,
 // T68). Server actions are public endpoints, so each checks the session itself; the SQL
 // functions check ownership and the 5-per-24h limit. Reads run on the user's own session (RLS).
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 function failed(where: string, error: unknown): FormState {
   const appError = toAppError(error)
@@ -92,9 +95,13 @@ export async function loadTicketThread(ticketId: string): Promise<ShownThread | 
 }
 
 // The image-issue picker's works, read when the New ticket tab first opens rather than on
-// every account page load.
-export async function loadWorkChoices(): Promise<Choice[]> {
+// every account page load; plus the one "Problem with this photo?" sent along (T78), read
+// through RLS like the rest, so another user's id finds nothing.
+export async function loadWorkChoices(jobId?: string | null): Promise<Choice[]> {
   const user = await requireApiUser()
-  const [works, t] = await Promise.all([listWorkOptions(await createServerSupabase(), user.id), getTranslations('app.support')])
-  return workChoices(works, t as unknown as Translate)
+  const include = typeof jobId === 'string' && UUID.test(jobId) ? jobId : null
+  const [works, t] = await Promise.all([listWorkOptions(await createServerSupabase(), user.id, include), getTranslations('app.support')])
+  // Whether another job shares a work's first 8 characters is a service-role question (ids only).
+  const refs = await jobRefsOrShort(createAdminSupabase(), works.map((work) => work.id))
+  return workChoices(works, t as unknown as Translate, refs)
 }
