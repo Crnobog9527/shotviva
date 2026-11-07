@@ -4,6 +4,7 @@ import { z } from 'zod'
 
 import { AppError } from '../../errors'
 import { callRpc, type RpcClient } from '../rpc'
+import type { RefuseEnded } from '../subscription/ended-order'
 import { metadataSchema } from './payment-facts'
 
 // A Waffo card subscription's state, mirrored into subscriptions (provider 'waffo', T50,
@@ -81,8 +82,13 @@ export function syncWaffoSubscription(db: RpcClient, input: WaffoSubscriptionSyn
 export type SubscriptionEvent = { eventId: string; eventType: string; timestamp?: string; data: unknown }
 
 // One subscription.* event → the mirror. 'ignored' for statuses the mirror does not hold
-// (pending, closed: never paid).
-export async function applySubscriptionEvent(db: RpcClient, event: SubscriptionEvent): Promise<'synced' | 'unchanged' | 'ignored'> {
+// (pending, closed: never paid). 'ended': an order an upgrade ended came back to life (the buyer
+// resumed it in Waffo's portal): `refuseEnded` cancels it again and alerts (T66).
+export async function applySubscriptionEvent(
+  db: RpcClient,
+  event: SubscriptionEvent,
+  refuseEnded?: RefuseEnded,
+): Promise<'synced' | 'unchanged' | 'ignored' | 'ended'> {
   const parsed = subscriptionSchema.safeParse(event.data)
   if (!parsed.success) throw new AppError('INVALID_INPUT', `waffo ${event.eventType} ${event.eventId}: order fields`)
   const state = mirrorState(parsed.data.orderStatus)
@@ -96,5 +102,9 @@ export async function applySubscriptionEvent(db: RpcClient, event: SubscriptionE
     periodEnd: isoOf(parsed.data.currentPeriodEnd),
     eventAt,
   })
-  return changed ? 'synced' : 'unchanged'
+  if (changed) return 'synced'
+  // canceled is final in the mirror, so a resumed order lands here, unchanged.
+  const renews = state.status === 'active' && !state.cancelAtPeriodEnd
+  if (renews && refuseEnded && (await refuseEnded({ orderId: parsed.data.orderId, at: eventAt, what: 'reactivation' }))) return 'ended'
+  return 'unchanged'
 }

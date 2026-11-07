@@ -7,6 +7,7 @@ import type { CreditsFloor } from '@/core/templates/pricing'
 import type { AdminTemplate, TemplateAdminActions, TemplateOrderGroup } from '../templates/types'
 
 import { BulkPublish } from './bulk-publish'
+import type { CategoryOption } from './category-field'
 import { orderCopy } from './copy'
 import { FeaturedPanel } from './featured-panel'
 import { FEATURED_LIMIT, featuredIds, toggleFeatured } from './featured-state'
@@ -18,9 +19,9 @@ import { TemplatesTable } from './templates-table'
 import { UnpublishDialog } from './unpublish-dialog'
 import { useTemplateActions } from './use-template-actions'
 
-type Props = { templates: AdminTemplate[]; floor: CreditsFloor; actions: TemplateAdminActions }
+type Props = { templates: AdminTemplate[]; categories: readonly CategoryOption[]; floor: CreditsFloor; actions: TemplateAdminActions }
 
-export function TemplatesEditor({ templates, floor, actions }: Props) {
+export function TemplatesEditor({ templates, categories, floor, actions }: Props) {
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState<EditTarget | null>(null)
   const [unpublishing, setUnpublishing] = useState<AdminTemplate | null>(null)
@@ -96,6 +97,7 @@ export function TemplatesEditor({ templates, floor, actions }: Props) {
           key={target.mode === 'edit' ? target.template.id : 'new'}
           target={target}
           floor={floor}
+          categories={categories}
           coverActions={actions}
           pending={pending}
           error={error}

@@ -41,7 +41,8 @@ export function toPartnerTemplate(template: Template): PartnerTemplate {
   return {
     id: template.id,
     name: template.name,
-    category: template.category,
+    // The English display name, as before T75: the partner contract predates category keys.
+    category: template.categoryInfo.nameEn,
     cover_before_url: template.coverBeforeUrl || null,
     cover_after_url: template.coverAfterUrl || null,
     // Partner jobs are always Standard ('1k'), so that is the one price the contract shows.

@@ -818,6 +818,70 @@ $$;
 ALTER FUNCTION "public"."admin_delete_provider"("p_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") RETURNS integer
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_moved integer;
+begin
+  if p_actor is null or not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+  perform 1 from public.template_categories for update;
+  if not exists (select 1 from public.template_categories c where c.key = p_key) then
+    raise exception 'CATEGORY_NOT_FOUND';
+  end if;
+  if exists (select 1 from public.template_categories c where c.key = p_key and c.is_system) then
+    raise exception 'CATEGORY_SYSTEM';
+  end if;
+  if (select count(*) from public.template_categories c where not c.is_system) <= 1 then
+    raise exception 'CATEGORY_LAST';
+  end if;
+
+  if exists (select 1 from public.templates t where t.category_key = p_key) then
+    if p_move_to is null then
+      raise exception 'CATEGORY_MOVE_REQUIRED';
+    end if;
+    if p_move_to = p_key or not exists (select 1 from public.template_categories c where c.key = p_move_to and not c.is_system) then
+      raise exception 'INVALID_INPUT' using detail = 'move_to must be another existing, non-system category';
+    end if;
+    update public.templates set category_key = p_move_to where category_key = p_key;
+    get diagnostics v_moved = row_count;
+  else
+    v_moved := 0;
+  end if;
+
+  delete from public.template_categories where key = p_key;
+  return v_moved;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) RETURNS TABLE("user_id" "uuid", "total" integer, "last_24h" integer)
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  perform public.purge_identity_refusals();
+  return query
+  select r.user_id,
+         count(*)::integer as total,
+         (count(*) filter (where r.created_at > now() - interval '24 hours'))::integer as last_24h
+    from public.identity_refusals r
+   where r.user_id = any (p_user_ids[1:200])
+     and r.created_at > now() - interval '90 days'
+   group by r.user_id;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_list_template_requests"() RETURNS TABLE("id" "uuid", "email" "text", "description" "text", "image_keys" "text"[], "status" "text", "template_id" "text", "votes_count" integer, "created_at" timestamp with time zone)
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -1144,6 +1208,33 @@ $$;
 ALTER FUNCTION "public"."admin_openai_admin_key_status"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_reorder_template_categories"("p_keys" "text"[], "p_actor" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_keys text[] := coalesce(p_keys, '{}');
+begin
+  if p_actor is null or not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if cardinality(v_keys) <> (select count(distinct k) from unnest(v_keys) as u(k))
+     or (select array_agg(k order by k) from unnest(v_keys) as u(k))
+        is distinct from (select array_agg(c.key order by c.key) from public.template_categories c where not c.is_system) then
+    raise exception 'INVALID_INPUT' using detail = 'the order must list every category once';
+  end if;
+
+  update public.template_categories c
+  set sort_order = o.position * 10
+  from unnest(v_keys) with ordinality as o(key, position)
+  where c.key = o.key and c.sort_order <> o.position * 10;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_reorder_template_categories"("p_keys" "text"[], "p_actor" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) RETURNS "void"
     LANGUAGE "sql"
     SET "search_path" TO ''
@@ -1321,6 +1412,62 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_review_template_request"("p_request_id" "uuid", "p_status" "text", "p_template_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_save_template_category"("p_category" "jsonb", "p_is_new" boolean, "p_actor" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_key text := btrim(coalesce(p_category ->> 'key', ''));
+  v_name_en text := btrim(coalesce(p_category ->> 'name_en', ''));
+  v_name_zh text := btrim(coalesce(p_category ->> 'name_zh', ''));
+  v_intro_en text := nullif(btrim(coalesce(p_category ->> 'intro_en', '')), '');
+  v_intro_zh text := nullif(btrim(coalesce(p_category ->> 'intro_zh', '')), '');
+  v_style text := coalesce(p_category ->> 'card_style', 'pair');
+begin
+  if p_actor is null or not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if v_name_en = '' or v_name_zh = '' then
+    raise exception 'INVALID_INPUT' using detail = 'both names are required';
+  end if;
+  if exists (select 1 from public.template_categories c where lower(c.name_en) = lower(v_name_en) and c.key <> v_key) then
+    raise exception 'CATEGORY_NAME_EN_TAKEN';
+  end if;
+  if exists (select 1 from public.template_categories c where c.name_zh = v_name_zh and c.key <> v_key) then
+    raise exception 'CATEGORY_NAME_ZH_TAKEN';
+  end if;
+
+  if coalesce(p_is_new, false) then
+    if exists (select 1 from public.template_categories c where c.key = v_key) then
+      raise exception 'CATEGORY_KEY_TAKEN';
+    end if;
+    insert into public.template_categories (key, name_en, name_zh, intro_en, intro_zh, card_style, sort_order)
+    values (
+      v_key, v_name_en, v_name_zh, v_intro_en, v_intro_zh, v_style,
+      (select coalesce(max(c.sort_order), 0) + 10 from public.template_categories c where not c.is_system)
+    );
+  else
+    if exists (select 1 from public.template_categories c where c.key = v_key and c.is_system) then
+      raise exception 'CATEGORY_SYSTEM';
+    end if;
+    update public.template_categories
+    set name_en = v_name_en,
+        name_zh = v_name_zh,
+        intro_en = v_intro_en,
+        intro_zh = v_intro_zh,
+        card_style = v_style
+    where key = v_key;
+    if not found then
+      raise exception 'CATEGORY_NOT_FOUND';
+    end if;
+  end if;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_save_template_category"("p_category" "jsonb", "p_is_new" boolean, "p_actor" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_search_users"("p_query" "text") RETURNS TABLE("id" "uuid", "email" "text", "created_at" timestamp with time zone, "provider" "text", "role" "text", "credits" integer, "free_credits" integer, "paid_until" timestamp with time zone, "generation_count" integer, "last_generation_at" timestamp with time zone, "banned_at" timestamp with time zone, "phone" "text")
@@ -1715,13 +1862,16 @@ declare
   v_id text := p_template ->> 'id';
 begin
   insert into public.templates as t (
-    id, module, name, category, cover_before_url, cover_after_url,
+    id, module, name, category, category_key, cover_before_url, cover_after_url,
     fields, quality, credits_cost, sort_order, is_active, visible_in, translations, description, featured_rank
   ) values (
     v_id,
     coalesce(p_template ->> 'module', 'image'),
     p_template ->> 'name',
+    -- New code sends the key; old code and the prompt import send a name. The 0581 trigger
+    -- fills whichever is missing.
     p_template ->> 'category',
+    nullif(p_template ->> 'category_key', ''),
     nullif(p_template ->> 'cover_before_url', ''),
     nullif(p_template ->> 'cover_after_url', ''),
     coalesce(p_template -> 'fields', '{}'::jsonb),
@@ -1743,6 +1893,8 @@ begin
     module = excluded.module,
     name = excluded.name,
     category = excluded.category,
+    -- After the BEFORE INSERT trigger, so always set (EXCLUDED carries the trigger's values).
+    category_key = excluded.category_key,
     -- Only when the payload carries them: the editor leaves covers to the upload.
     cover_before_url = case when p_template ? 'cover_before_url' then excluded.cover_before_url else t.cover_before_url end,
     cover_after_url = case when p_template ? 'cover_after_url' then excluded.cover_after_url else t.cover_after_url end,
@@ -1977,6 +2129,52 @@ $$;
 
 
 ALTER FUNCTION "public"."attach_ticket_images"("p_ticket_id" "uuid", "p_owner_id" "uuid", "p_message_id" "uuid", "p_images" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."begin_identity_judge"("p_user_id" "uuid", "p_text_hash" "text", "p_per_hour" integer) RETURNS "jsonb"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_cached boolean;
+  v_id bigint;
+begin
+  if p_user_id is null or p_per_hour is null or p_per_hour < 1 then
+    raise exception 'INVALID_INPUT' using detail = 'user and a positive hourly limit are required';
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended('identity_judge:' || p_user_id::text, 0));
+
+  if p_text_hash is not null then
+    select c.identity_swap into v_cached
+      from public.identity_judge_calls c
+     where c.user_id = p_user_id and c.text_hash = p_text_hash and c.identity_swap is not null
+       and c.created_at > now() - interval '10 minutes'
+     order by c.created_at desc
+     limit 1;
+    if found then
+      return jsonb_build_object('status', 'cached', 'identity_swap', v_cached);
+    end if;
+  end if;
+
+  if (select count(*) from public.identity_judge_calls c
+       where c.user_id = p_user_id and c.created_at > now() - interval '1 hour') >= p_per_hour then
+    return jsonb_build_object('status', 'limited');
+  end if;
+
+  insert into public.identity_judge_calls (user_id, text_hash) values (p_user_id, p_text_hash)
+  returning id into v_id;
+
+  delete from public.identity_judge_calls c
+   where c.id in (select o.id from public.identity_judge_calls o
+                   where o.created_at < now() - interval '1 day'
+                   order by o.created_at
+                   limit 500);
+  return jsonb_build_object('status', 'call', 'id', v_id);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."begin_identity_judge"("p_user_id" "uuid", "p_text_hash" "text", "p_per_hour" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."bump_template_prompt_version"() RETURNS "trigger"
@@ -2308,6 +2506,17 @@ $$;
 ALTER FUNCTION "public"."delete_provider_vault_secret"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."finish_identity_judge"("p_id" bigint, "p_identity_swap" boolean) RETURNS "void"
+    LANGUAGE "sql"
+    SET "search_path" TO ''
+    AS $$
+  update public.identity_judge_calls set identity_swap = p_identity_swap where id = p_id
+$$;
+
+
+ALTER FUNCTION "public"."finish_identity_judge"("p_id" bigint, "p_identity_swap" boolean) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."grant_credits"("p_user_id" "uuid", "p_amount" integer, "p_reason" "text", "p_idempotency_key" "text", "p_pool" "text") RETURNS "public"."credit_change"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -2410,6 +2619,52 @@ $$;
 
 
 ALTER FUNCTION "public"."provider_api_key"("p_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."purge_identity_refusals"() RETURNS "void"
+    LANGUAGE "sql"
+    SET "search_path" TO ''
+    AS $$
+  delete from public.identity_refusals r
+   where r.id in (select o.id from public.identity_refusals o
+                   where o.created_at < now() - interval '90 days'
+                   order by o.created_at
+                   limit 500)
+$$;
+
+
+ALTER FUNCTION "public"."purge_identity_refusals"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."record_identity_refusal"("p_user_id" "uuid", "p_entry" "text", "p_method" "text", "p_excerpt" "text", "p_input_tokens" integer DEFAULT NULL::integer, "p_output_tokens" integer DEFAULT NULL::integer) RETURNS boolean
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_excerpt text := left(btrim(p_excerpt), 200);
+begin
+  if p_user_id is null or coalesce(v_excerpt, '') = '' then
+    raise exception 'INVALID_INPUT' using detail = 'user and excerpt are required';
+  end if;
+  -- Concurrent photos of one batch queue here, so only the first of them writes.
+  perform pg_advisory_xact_lock(hashtextextended('identity_refusal:' || p_user_id::text, 0));
+
+  if exists (select 1 from public.identity_refusals r
+              where r.user_id = p_user_id and r.entry = p_entry and r.excerpt = v_excerpt
+                and r.created_at > now() - interval '10 minutes') then
+    return false;
+  end if;
+
+  insert into public.identity_refusals (user_id, entry, method, excerpt, input_tokens, output_tokens)
+  values (p_user_id, p_entry, p_method, v_excerpt, p_input_tokens, p_output_tokens);
+
+  perform public.purge_identity_refusals();
+  return true;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."record_identity_refusal"("p_user_id" "uuid", "p_entry" "text", "p_method" "text", "p_excerpt" "text", "p_input_tokens" integer, "p_output_tokens" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."record_payment_issue"("p_charge_id" "text", "p_kind" "text", "p_amount_refunded" integer DEFAULT NULL::integer) RETURNS "jsonb"
@@ -2950,6 +3205,81 @@ $$;
 ALTER FUNCTION "public"."sync_waffo_subscription"("p_user_id" "uuid", "p_order_id" "text", "p_product_id" "text", "p_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean, "p_event_at" timestamp with time zone) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."template_categories_sync_name"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  update public.templates set category = new.name_en where category_key = new.key and category <> new.name_en;
+  return null;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."template_categories_sync_name"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."template_category_for"("p_value" "text") RETURNS "text"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_value text := btrim(coalesce(p_value, ''));
+  v_key text;
+  v_base text;
+  v_name_en text;
+  v_name_zh text;
+  v_n integer;
+begin
+  if v_value = '' then
+    return null;
+  end if;
+  select c.key into v_key
+  from public.template_categories c
+  where c.key = v_value or lower(c.name_en) = lower(v_value) or c.name_zh = v_value
+  order by (c.key = v_value) desc, c.sort_order
+  limit 1;
+  if v_key is not null then
+    return v_key;
+  end if;
+
+  v_base := rtrim(left(btrim(regexp_replace(lower(v_value), '[^a-z0-9]+', '-', 'g'), '-'), 36), '-');
+  if v_base = '' then
+    v_base := 'category';
+  end if;
+  v_key := v_base;
+  v_n := 1;
+  while exists (select 1 from public.template_categories c where c.key = v_key) loop
+    v_n := v_n + 1;
+    v_key := v_base || '-' || v_n;
+  end loop;
+
+  v_name_en := btrim(left(v_value, 32));
+  v_n := 1;
+  while exists (select 1 from public.template_categories c where lower(c.name_en) = lower(v_name_en)) loop
+    v_n := v_n + 1;
+    v_name_en := btrim(left(v_value, 32 - length(' ' || v_n))) || ' ' || v_n;
+  end loop;
+  v_name_zh := btrim(left(v_value, 12));
+  v_n := 1;
+  while exists (select 1 from public.template_categories c where c.name_zh = v_name_zh) loop
+    v_n := v_n + 1;
+    v_name_zh := btrim(left(v_value, 12 - length(' ' || v_n))) || ' ' || v_n;
+  end loop;
+
+  insert into public.template_categories (key, name_en, name_zh, card_style, sort_order)
+  values (
+    v_key, v_name_en, v_name_zh, 'pair',
+    (select coalesce(max(c.sort_order), 0) + 10 from public.template_categories c where not c.is_system)
+  );
+  return v_key;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."template_category_for"("p_value" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."template_request_votes_count"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -2966,6 +3296,34 @@ $$;
 
 
 ALTER FUNCTION "public"."template_request_votes_count"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."templates_sync_category"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if new.category_key is not null and (tg_op = 'INSERT' or new.category_key is distinct from old.category_key) then
+    -- The key was written: the name follows it below.
+    null;
+  elsif tg_op = 'INSERT' or new.category is distinct from old.category then
+    -- Only the name was written. A rename of the template's own category keeps its key.
+    if tg_op = 'INSERT' or not exists (
+      select 1 from public.template_categories c
+      where c.key = new.category_key
+        and (c.key = btrim(new.category) or lower(c.name_en) = lower(btrim(new.category)) or c.name_zh = btrim(new.category))
+    ) then
+      new.category_key := public.template_category_for(new.category);
+    end if;
+  end if;
+  -- An unknown key keeps a non-null name, so the foreign key (not NOT NULL) is what refuses it.
+  new.category := coalesce((select c.name_en from public.template_categories c where c.key = new.category_key), new.category, new.category_key);
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."templates_sync_category"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."toggle_template_request_vote"("p_request_id" "uuid", "p_user_id" "uuid") RETURNS TABLE("voted" boolean, "votes_count" integer)
@@ -3182,6 +3540,61 @@ CREATE TABLE IF NOT EXISTS "public"."feature_access" (
 ALTER TABLE "public"."feature_access" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."identity_judge_calls" (
+    "id" bigint NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "text_hash" "text",
+    "identity_swap" boolean,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "identity_judge_calls_text_hash_check" CHECK (("text_hash" ~ '^[0-9a-f]{64}$'::"text"))
+);
+
+
+ALTER TABLE "public"."identity_judge_calls" OWNER TO "postgres";
+
+
+ALTER TABLE "public"."identity_judge_calls" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."identity_judge_calls_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."identity_refusals" (
+    "id" bigint NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "entry" "text" NOT NULL,
+    "method" "text" NOT NULL,
+    "excerpt" "text" NOT NULL,
+    "input_tokens" integer,
+    "output_tokens" integer,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "identity_refusals_entry_check" CHECK (("entry" = ANY (ARRAY['workspace'::"text", 'edit'::"text", 'partner'::"text"]))),
+    CONSTRAINT "identity_refusals_excerpt_check" CHECK ((("char_length"("excerpt") >= 1) AND ("char_length"("excerpt") <= 200))),
+    CONSTRAINT "identity_refusals_input_tokens_check" CHECK (("input_tokens" >= 0)),
+    CONSTRAINT "identity_refusals_method_check" CHECK (("method" = ANY (ARRAY['keyword'::"text", 'model'::"text"]))),
+    CONSTRAINT "identity_refusals_output_tokens_check" CHECK (("output_tokens" >= 0))
+);
+
+
+ALTER TABLE "public"."identity_refusals" OWNER TO "postgres";
+
+
+ALTER TABLE "public"."identity_refusals" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."identity_refusals_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."partner_links" (
     "user_id" "uuid" NOT NULL,
     "partner" "text" NOT NULL,
@@ -3384,6 +3797,29 @@ CREATE TABLE IF NOT EXISTS "public"."system_settings" (
 ALTER TABLE "public"."system_settings" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."template_categories" (
+    "key" "text" NOT NULL,
+    "name_en" "text" NOT NULL,
+    "name_zh" "text" NOT NULL,
+    "intro_en" "text",
+    "intro_zh" "text",
+    "card_style" "text" DEFAULT 'pair'::"text" NOT NULL,
+    "sort_order" integer DEFAULT 0 NOT NULL,
+    "is_system" boolean DEFAULT false NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "template_categories_card_style_check" CHECK (("card_style" = ANY (ARRAY['pair'::"text", 'compare'::"text"]))),
+    CONSTRAINT "template_categories_intro_en_check" CHECK ((("intro_en" IS NULL) OR (("char_length"("intro_en") >= 1) AND ("char_length"("intro_en") <= 200)))),
+    CONSTRAINT "template_categories_intro_zh_check" CHECK ((("intro_zh" IS NULL) OR (("char_length"("intro_zh") >= 1) AND ("char_length"("intro_zh") <= 200)))),
+    CONSTRAINT "template_categories_key_check" CHECK ((("key" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text") AND ("char_length"("key") <= 40))),
+    CONSTRAINT "template_categories_name_en_check" CHECK ((("char_length"("name_en") >= 1) AND ("char_length"("name_en") <= 32) AND ("name_en" = "btrim"("name_en")))),
+    CONSTRAINT "template_categories_name_zh_check" CHECK ((("char_length"("name_zh") >= 1) AND ("char_length"("name_zh") <= 12) AND ("name_zh" = "btrim"("name_zh"))))
+);
+
+
+ALTER TABLE "public"."template_categories" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."template_prompts" (
     "template_id" "text" NOT NULL,
     "body" "text" NOT NULL,
@@ -3432,6 +3868,7 @@ CREATE TABLE IF NOT EXISTS "public"."templates" (
     "translations" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
     "description" "text",
     "featured_rank" smallint,
+    "category_key" "text" NOT NULL,
     CONSTRAINT "templates_category_check" CHECK ((("char_length"("category") >= 1) AND ("char_length"("category") <= 60))),
     CONSTRAINT "templates_cover_media_type_check" CHECK (("cover_media_type" = ANY (ARRAY['image'::"text", 'animated'::"text", 'video'::"text"]))),
     CONSTRAINT "templates_cover_motion_complete" CHECK ((("cover_media_type" = 'image'::"text") OR (("cover_video_url" IS NOT NULL) AND ("cover_poster_url" IS NOT NULL)))),
@@ -3479,6 +3916,16 @@ ALTER TABLE ONLY "public"."feature_access"
 
 ALTER TABLE ONLY "public"."generation_jobs"
     ADD CONSTRAINT "generation_jobs_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."identity_judge_calls"
+    ADD CONSTRAINT "identity_judge_calls_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."identity_refusals"
+    ADD CONSTRAINT "identity_refusals_pkey" PRIMARY KEY ("id");
 
 
 
@@ -3582,6 +4029,11 @@ ALTER TABLE ONLY "public"."system_settings"
 
 
 
+ALTER TABLE ONLY "public"."template_categories"
+    ADD CONSTRAINT "template_categories_pkey" PRIMARY KEY ("key");
+
+
+
 ALTER TABLE ONLY "public"."template_prompts"
     ADD CONSTRAINT "template_prompts_pkey" PRIMARY KEY ("template_id");
 
@@ -3643,6 +4095,22 @@ CREATE INDEX "generation_jobs_user_id_created_at_idx" ON "public"."generation_jo
 
 
 CREATE UNIQUE INDEX "generation_jobs_user_idempotency_key_idx" ON "public"."generation_jobs" USING "btree" ("user_id", "idempotency_key") WHERE ("idempotency_key" IS NOT NULL);
+
+
+
+CREATE INDEX "identity_judge_calls_created_at_idx" ON "public"."identity_judge_calls" USING "btree" ("created_at");
+
+
+
+CREATE INDEX "identity_judge_calls_user_id_created_at_idx" ON "public"."identity_judge_calls" USING "btree" ("user_id", "created_at" DESC);
+
+
+
+CREATE INDEX "identity_refusals_created_at_idx" ON "public"."identity_refusals" USING "btree" ("created_at");
+
+
+
+CREATE INDEX "identity_refusals_user_id_created_at_idx" ON "public"."identity_refusals" USING "btree" ("user_id", "created_at" DESC);
 
 
 
@@ -3726,6 +4194,14 @@ CREATE INDEX "support_tickets_user_id_created_at_idx" ON "public"."support_ticke
 
 
 
+CREATE UNIQUE INDEX "template_categories_name_en_key" ON "public"."template_categories" USING "btree" ("lower"("name_en"));
+
+
+
+CREATE UNIQUE INDEX "template_categories_name_zh_key" ON "public"."template_categories" USING "btree" ("name_zh");
+
+
+
 CREATE INDEX "template_request_votes_user_id_idx" ON "public"."template_request_votes" USING "btree" ("user_id");
 
 
@@ -3746,6 +4222,10 @@ CREATE INDEX "templates_active_sort_idx" ON "public"."templates" USING "btree" (
 
 
 
+CREATE INDEX "templates_category_key_idx" ON "public"."templates" USING "btree" ("category_key");
+
+
+
 CREATE UNIQUE INDEX "templates_featured_rank_key" ON "public"."templates" USING "btree" ("featured_rank") WHERE ("featured_rank" IS NOT NULL);
 
 
@@ -3762,6 +4242,14 @@ CREATE OR REPLACE TRIGGER "site_announcements_set_updated_at" BEFORE UPDATE ON "
 
 
 
+CREATE OR REPLACE TRIGGER "template_categories_set_updated_at" BEFORE UPDATE ON "public"."template_categories" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
+
+
+
+CREATE OR REPLACE TRIGGER "template_categories_sync_name" AFTER UPDATE OF "name_en" ON "public"."template_categories" FOR EACH ROW WHEN (("old"."name_en" IS DISTINCT FROM "new"."name_en")) EXECUTE FUNCTION "public"."template_categories_sync_name"();
+
+
+
 CREATE OR REPLACE TRIGGER "template_prompts_bump_version" BEFORE UPDATE ON "public"."template_prompts" FOR EACH ROW EXECUTE FUNCTION "public"."bump_template_prompt_version"();
 
 
@@ -3771,6 +4259,10 @@ CREATE OR REPLACE TRIGGER "template_request_votes_count" AFTER INSERT OR DELETE 
 
 
 CREATE OR REPLACE TRIGGER "templates_set_updated_at" BEFORE UPDATE ON "public"."templates" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
+
+
+
+CREATE OR REPLACE TRIGGER "templates_sync_category" BEFORE INSERT OR UPDATE OF "category", "category_key" ON "public"."templates" FOR EACH ROW EXECUTE FUNCTION "public"."templates_sync_category"();
 
 
 
@@ -3806,6 +4298,16 @@ ALTER TABLE ONLY "public"."generation_jobs"
 
 ALTER TABLE ONLY "public"."generation_jobs"
     ADD CONSTRAINT "generation_jobs_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."identity_judge_calls"
+    ADD CONSTRAINT "identity_judge_calls_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."identity_refusals"
+    ADD CONSTRAINT "identity_refusals_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
 
 
@@ -3904,6 +4406,11 @@ ALTER TABLE ONLY "public"."template_requests"
 
 
 
+ALTER TABLE ONLY "public"."templates"
+    ADD CONSTRAINT "templates_category_key_fkey" FOREIGN KEY ("category_key") REFERENCES "public"."template_categories"("key");
+
+
+
 ALTER TABLE "public"."admin_audit_log" ENABLE ROW LEVEL SECURITY;
 
 
@@ -3921,6 +4428,12 @@ ALTER TABLE "public"."generation_jobs" ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "generation_jobs_select_own" ON "public"."generation_jobs" FOR SELECT TO "authenticated" USING (((( SELECT "auth"."uid"() AS "uid") = "user_id") AND ("deleted_at" IS NULL)));
 
+
+
+ALTER TABLE "public"."identity_judge_calls" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."identity_refusals" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."partner_links" ENABLE ROW LEVEL SECURITY;
@@ -3978,6 +4491,13 @@ CREATE POLICY "support_tickets_select_own" ON "public"."support_tickets" FOR SEL
 
 
 ALTER TABLE "public"."system_settings" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."template_categories" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "template_categories_select_all" ON "public"."template_categories" FOR SELECT TO "authenticated", "anon" USING (true);
+
 
 
 ALTER TABLE "public"."template_prompts" ENABLE ROW LEVEL SECURITY;
@@ -4091,6 +4611,16 @@ GRANT ALL ON FUNCTION "public"."admin_delete_provider"("p_id" "uuid") TO "servic
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_list_template_requests"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_list_template_requests"() TO "service_role";
 
@@ -4121,6 +4651,11 @@ GRANT ALL ON FUNCTION "public"."admin_openai_admin_key_status"() TO "service_rol
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_reorder_template_categories"("p_keys" "text"[], "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_reorder_template_categories"("p_keys" "text"[], "p_actor" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) TO "service_role";
 
@@ -4138,6 +4673,11 @@ GRANT ALL ON FUNCTION "public"."admin_revenue_stats"("p_days" integer) TO "servi
 
 REVOKE ALL ON FUNCTION "public"."admin_review_template_request"("p_request_id" "uuid", "p_status" "text", "p_template_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_review_template_request"("p_request_id" "uuid", "p_status" "text", "p_template_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_save_template_category"("p_category" "jsonb", "p_is_new" boolean, "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_save_template_category"("p_category" "jsonb", "p_is_new" boolean, "p_actor" "uuid") TO "service_role";
 
 
 
@@ -4220,6 +4760,11 @@ REVOKE ALL ON FUNCTION "public"."attach_ticket_images"("p_ticket_id" "uuid", "p_
 
 
 
+REVOKE ALL ON FUNCTION "public"."begin_identity_judge"("p_user_id" "uuid", "p_text_hash" "text", "p_per_hour" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."begin_identity_judge"("p_user_id" "uuid", "p_text_hash" "text", "p_per_hour" integer) TO "service_role";
+
+
+
 GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."generation_jobs" TO "service_role";
 GRANT SELECT ON TABLE "public"."generation_jobs" TO "authenticated";
 
@@ -4259,6 +4804,11 @@ REVOKE ALL ON FUNCTION "public"."delete_provider_vault_secret"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "public"."finish_identity_judge"("p_id" bigint, "p_identity_swap" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."finish_identity_judge"("p_id" bigint, "p_identity_swap" boolean) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."grant_credits"("p_user_id" "uuid", "p_amount" integer, "p_reason" "text", "p_idempotency_key" "text", "p_pool" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."grant_credits"("p_user_id" "uuid", "p_amount" integer, "p_reason" "text", "p_idempotency_key" "text", "p_pool" "text") TO "service_role";
 
@@ -4280,6 +4830,16 @@ GRANT ALL ON FUNCTION "public"."openai_admin_key"() TO "service_role";
 
 REVOKE ALL ON FUNCTION "public"."provider_api_key"("p_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."provider_api_key"("p_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."purge_identity_refusals"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."purge_identity_refusals"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."record_identity_refusal"("p_user_id" "uuid", "p_entry" "text", "p_method" "text", "p_excerpt" "text", "p_input_tokens" integer, "p_output_tokens" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."record_identity_refusal"("p_user_id" "uuid", "p_entry" "text", "p_method" "text", "p_excerpt" "text", "p_input_tokens" integer, "p_output_tokens" integer) TO "service_role";
 
 
 
@@ -4348,6 +4908,11 @@ GRANT ALL ON FUNCTION "public"."sync_waffo_subscription"("p_user_id" "uuid", "p_
 
 
 
+REVOKE ALL ON FUNCTION "public"."template_category_for"("p_value" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."template_category_for"("p_value" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."template_request_votes_count"() FROM PUBLIC;
 
 
@@ -4400,6 +4965,26 @@ GRANT UPDATE ON SEQUENCE "public"."credit_ledger_id_seq" TO "service_role";
 
 
 GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."feature_access" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."identity_judge_calls" TO "service_role";
+
+
+
+GRANT UPDATE ON SEQUENCE "public"."identity_judge_calls_id_seq" TO "anon";
+GRANT UPDATE ON SEQUENCE "public"."identity_judge_calls_id_seq" TO "authenticated";
+GRANT UPDATE ON SEQUENCE "public"."identity_judge_calls_id_seq" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."identity_refusals" TO "service_role";
+
+
+
+GRANT UPDATE ON SEQUENCE "public"."identity_refusals_id_seq" TO "anon";
+GRANT UPDATE ON SEQUENCE "public"."identity_refusals_id_seq" TO "authenticated";
+GRANT UPDATE ON SEQUENCE "public"."identity_refusals_id_seq" TO "service_role";
 
 
 
@@ -4471,6 +5056,12 @@ GRANT SELECT ON TABLE "public"."support_ticket_attachments" TO "service_role";
 
 
 GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."system_settings" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."template_categories" TO "service_role";
+GRANT SELECT ON TABLE "public"."template_categories" TO "anon";
+GRANT SELECT ON TABLE "public"."template_categories" TO "authenticated";
 
 
 

@@ -46,6 +46,7 @@ export const acceptableUsePage = defineLegalPage({
             'Nudity or sexually explicit content of any person.',
             'Intimate or sexual images of a real person made or shared without their consent.',
             'Images that put a real, identifiable person into a fake situation to deceive, embarrass, harass or harm them, or that make them appear to say or endorse something they did not.',
+            'Face swaps and impersonation: putting one person’s face or identity onto another person, merging the faces of different people, passing yourself or anyone else off as someone else, or making a fake image of a specific real person. Changing the expression, makeup, hair, lighting or background of a photo of yourself is fine. We refuse these requests before any credits are used, and we may suspend or close accounts that keep trying.',
             'Violence, threats, harassment, bullying, or content that attacks people based on race, ethnicity, religion, gender, sexual orientation, disability or similar traits.',
             'Content that promotes self-harm, terrorism, or illegal activity, including illegal drugs, weapons or scams.',
             'Fake documents, receipts, IDs, tickets or official materials, or anything made to commit fraud.',

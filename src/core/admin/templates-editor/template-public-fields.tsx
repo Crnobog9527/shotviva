@@ -7,7 +7,7 @@ import { Textarea } from '@/core/ui/textarea'
 import type { CreditsFloor } from '@/core/templates/pricing'
 import { TEMPLATE_DESCRIPTION_MAX } from '@/core/templates/schema'
 
-import { CategoryField } from './category-field'
+import { CategoryField, type CategoryOption } from './category-field'
 import { publicCopy } from './copy'
 import type { TemplateFormValues } from './form-state'
 import { TemplatePriceFields } from './template-price-fields'
@@ -16,6 +16,7 @@ type Props = {
   values: TemplateFormValues
   isNew: boolean
   floor: CreditsFloor
+  categories: readonly CategoryOption[]
   onChange: (patch: Partial<TemplateFormValues>) => void
 }
 
@@ -55,7 +56,7 @@ function DescriptionField({ value, onChange }: { value: string; onChange: (value
   )
 }
 
-export function TemplatePublicFields({ values, isNew, floor, onChange }: Props) {
+export function TemplatePublicFields({ values, isNew, floor, categories, onChange }: Props) {
   return (
     <fieldset className="grid gap-3">
       <legend className="mb-1 text-sm font-semibold">公开信息</legend>
@@ -63,7 +64,7 @@ export function TemplatePublicFields({ values, isNew, floor, onChange }: Props) 
         <TextField id="id" label="ID（小写字母、数字、短横线，创建后不可改）" value={values.id}
           disabled={!isNew} onChange={(id) => onChange({ id })} />
         <TextField id="name" label={publicCopy.name} value={values.name} onChange={(name) => onChange({ name })} />
-        <CategoryField value={values.category} onChange={(category) => onChange({ category })} />
+        <CategoryField value={values.category} categories={categories} onChange={(category) => onChange({ category })} />
       </div>
       <DescriptionField value={values.description} onChange={(description) => onChange({ description })} />
       <TemplatePriceFields values={values} floor={floor} onChange={onChange} />

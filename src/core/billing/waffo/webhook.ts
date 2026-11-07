@@ -117,6 +117,6 @@ const STATE_EVENTS: readonly string[] = SUBSCRIPTION_STATE_EVENTS
 function route(deps: WaffoWebhookDeps, event: WaffoEvent): Promise<string> | null {
   if (event.eventType === 'order.completed') return fulfilWaffoOrder(deps, event)
   if (event.eventType === 'subscription.payment_succeeded') return fulfilWaffoOrder(deps, event, 'subscription')
-  if (STATE_EVENTS.includes(event.eventType)) return applySubscriptionEvent(deps.db, event)
+  if (STATE_EVENTS.includes(event.eventType)) return applySubscriptionEvent(deps.db, event, deps.refuseEnded)
   return null
 }

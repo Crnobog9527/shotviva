@@ -7,7 +7,7 @@ import { cn } from '@/core/ui/cn'
 import { Reveal } from '@/core/ui/reveal-item'
 
 import { CreateDialog, type CreateContext } from '../workspace/create-dialog'
-import { categoriesOf, hasStills, isArtStyle, isMotion, type CatalogueTemplate } from './catalogue-template'
+import { categoriesOf, hasStills, isCompareCategory, isMotion, type CatalogueTemplate } from './catalogue-template'
 import { ALL, CategoryChips } from './category-chips'
 import { FeatureCard } from './feature-card'
 import { TemplateCard } from './template-card'
@@ -43,7 +43,7 @@ export function TemplateCatalogue({ templates, create }: Props) {
       <h2 className="sr-only">{t('templates')}</h2>
       <ul className="mt-2 grid grid-flow-row-dense grid-cols-1 gap-x-3 gap-y-6 px-(--gutter) md:mt-3 md:grid-cols-2 md:gap-x-4 lg:grid-cols-3">
         {shown.map((template, index) => (
-          <Reveal as="li" key={template.id} className={cn(isArtStyle(template) && hasStills(template) && 'md:row-span-2')}>
+          <Reveal as="li" key={template.id} className={cn(isCompareCategory(template) && hasStills(template) && 'md:row-span-2')}>
             <TemplateCard template={template} onOpen={setOpenId} eager={index < 3} />
           </Reveal>
         ))}

@@ -5,13 +5,13 @@ import { useTranslations } from 'next-intl'
 import { cn } from '@/core/ui/cn'
 
 import { LoopPlate } from './card-media'
-import { hasStills, isArtStyle, isMotion, type CatalogueTemplate } from './catalogue-template'
+import { hasStills, isCompareCategory, isMotion, type CatalogueTemplate } from './catalogue-template'
 import { CompareSlider } from './compare-slider'
 import { COVER_SIZES } from './cover-sizes'
 import { PairMedia } from './pair-media'
 
 // The template's example in the creation dialog and on the workspace stage (B comp app.css
-// .cd-media / .dev): the side-by-side pair, the drag compare for Art Styles, or the loop when a
+// .cd-media / .dev): the side-by-side pair, the drag compare for a 'compare' category (画风), or the loop when a
 // motion template has no stills. `fill` stretches it over the workspace stage, which is only drawn
 // from lg up: its covers load lazily, so a phone (where it is display:none) never fetches them.
 export function TemplateSample({ template, fill = false, className }: { template: CatalogueTemplate; fill?: boolean; className?: string }) {
@@ -19,7 +19,7 @@ export function TemplateSample({ template, fill = false, className }: { template
   const { before, after } = template.cover
   const sizes = fill ? { plate: COVER_SIZES.stagePlate, frame: COVER_SIZES.stageFrame } : { plate: COVER_SIZES.dialogPlate, frame: COVER_SIZES.dialogFrame }
   const frame = cn(fill && 'absolute inset-0 aspect-auto size-full rounded-none shadow-none', className)
-  if (before && after && isArtStyle(template)) {
+  if (before && after && isCompareCategory(template)) {
     return <CompareSlider before={before} after={after} afterAlt={t('resultAlt', { name: template.name })} cover={{ sizes: sizes.frame, lazy: fill }} className={frame} />
   }
   if (hasStills(template)) return <PairMedia before={before as string} after={after as string} alt={t('cardAlt', { name: template.name })} eager={!fill} sizes={sizes.plate} size="pair" className={frame} />
@@ -28,4 +28,4 @@ export function TemplateSample({ template, fill = false, className }: { template
 }
 
 // Whether the sample is the tall drag compare (the dialog sizes its strip by it).
-export const isCompareSample = (template: CatalogueTemplate) => isArtStyle(template) && hasStills(template)
+export const isCompareSample = (template: CatalogueTemplate) => isCompareCategory(template) && hasStills(template)

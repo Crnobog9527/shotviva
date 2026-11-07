@@ -7,7 +7,7 @@ import { site } from '../../site.config'
 // email themselves; they read them here, from site.config (T19).
 const { brand } = site
 
-export const LAST_UPDATED = '2026-11-07'
+export const LAST_UPDATED = '2026-11-08'
 
 export const entity = {
   site: brand.name,

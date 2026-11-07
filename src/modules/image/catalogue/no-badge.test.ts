@@ -22,6 +22,9 @@ const tpl = (category: string): CatalogueTemplate => ({
   id: 'white-background',
   name: 'White Background',
   category,
+  categoryName: category,
+  categoryOrder: 10,
+  compare: category === 'art-styles',
   description: null,
   creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
   copyFields: [],
@@ -34,8 +37,8 @@ describe('template examples carry no badge', () => {
     ['PairMedia pair', createElement(PairMedia, { before: 'b.webp', after: 'a.webp', alt: 'x', size: 'pair', sizes: '50vw' })],
     ['PairMedia feature', createElement(PairMedia, { before: 'b.webp', after: 'a.webp', alt: 'x', size: 'feature', sizes: '50vw' })],
     ['CompareSlider', createElement(CompareSlider, { before: 'b.webp', after: 'a.webp', afterAlt: 'x' })],
-    ['TemplateSample pair', createElement(TemplateSample, { template: tpl('Products & Resale') })],
-    ['TemplateSample compare', createElement(TemplateSample, { template: tpl('Art Styles') })],
+    ['TemplateSample pair', createElement(TemplateSample, { template: tpl('products-resale') })],
+    ['TemplateSample compare', createElement(TemplateSample, { template: tpl('art-styles') })],
   ]
   it.each(cases)('%s', (_name, element) => {
     expect(render(element)).not.toMatch(BADGE)

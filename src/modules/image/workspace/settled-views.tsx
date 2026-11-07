@@ -60,14 +60,18 @@ export function SuccessView({ job, shareText, editable, onAgain }: SuccessProps)
   )
 }
 
+type FailureProps = { job: TrackedJob; onRetry(): void; onNewPhoto(): void; onEditWords(): void }
+
 // Failed (DESIGN §4.4, B comp workspace.html?state=failed): the message leads on a phone. What
 // happened to the credits, that the photo and settings are kept (or the reason, when it is one
 // the user can act on), Change photo, and Retry with its cost. The tray keeps the photo as a
-// grey negative, "Not developed".
-export function FailureView({ job, onRetry, onNewPhoto }: { job: TrackedJob; onRetry(): void; onNewPhoto(): void }) {
+// grey negative, "Not developed". Refused words (ARCHITECTURE §5.1a) go back to the form with
+// the photo kept: it is the text that has to change, not the photo.
+export function FailureView({ job, onRetry, onNewPhoto, onEditWords }: FailureProps) {
   const t = useTranslations('app')
   const errors = useTranslations('app.errors')
   const { failure, retry } = readFailure(job.failure, job.inputKey !== null)
+  const words = failure.code === 'IDENTITY_SWAP_REFUSED'
   const size = t.rich('workspace.developingSize', { tier: tierName(job.resolution, t), px: tierPx(job.resolution), mono: monoTag })
   const tray = (
     <>
@@ -77,8 +81,8 @@ export function FailureView({ job, onRetry, onNewPhoto }: { job: TrackedJob; onR
   )
   const bar = (
     <ActionBar className="md:px-0">
-      <button type="button" onClick={retry ? onRetry : onNewPhoto} className={buttonVariants({ variant: 'cta', size: 'cta' })}>
-        {retry ? t.rich('workspace.retryCost', { count: job.credits, cost: costTag }) : t('workspace.useAnother')}
+      <button type="button" onClick={retry ? onRetry : words ? onEditWords : onNewPhoto} className={buttonVariants({ variant: 'cta', size: 'cta' })}>
+        {retry ? t.rich('workspace.retryCost', { count: job.credits, cost: costTag }) : t(words ? 'workspace.editWords' : 'workspace.useAnother')}
       </button>
     </ActionBar>
   )

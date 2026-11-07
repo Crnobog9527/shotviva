@@ -71,14 +71,23 @@ describe('cancelOtherSubscriptions', () => {
     expect(mocks.alert).not.toHaveBeenCalled()
   })
 
-  it('cancels an old Waffo order through cancel-order and mirrors it as cancelling', async () => {
+  // Waffo can only stop an active order at its period end (it answers `canceling`); for us the
+  // old plan ends at the upgrade, so the mirror says canceled, ending now (Codex's Waffo run).
+  it('cancels an old Waffo order through cancel-order and mirrors it as ended at the upgrade', async () => {
     const t = deps()
     mocks.mirror.mockResolvedValue([waffoRow('ORD_old'), waffoRow('ORD_new', { productId: 'max_monthly' })])
     expect(await cancelOtherSubscriptions(t.deps, USER, { waffoOrderId: 'ORD_new' })).toEqual({ cancelled: 1, failed: 0 })
     expect(t.waffo.cancelSubscription).toHaveBeenCalledWith('ORD_old')
     expect(t.rpc).toHaveBeenCalledWith(
       'sync_waffo_subscription',
-      expect.objectContaining({ p_order_id: 'ORD_old', p_product_id: 'starter_monthly', p_status: 'active', p_cancel_at_period_end: true }),
+      expect.objectContaining({
+        p_order_id: 'ORD_old',
+        p_product_id: 'starter_monthly',
+        p_status: 'canceled',
+        p_cancel_at_period_end: false,
+        p_current_period_end: '2026-11-07T10:00:00.000Z',
+        p_event_at: '2026-11-07T10:00:00.000Z',
+      }),
     )
   })
 

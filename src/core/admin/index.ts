@@ -25,6 +25,17 @@ export type {
 } from './templates'
 export { applyCover, createCoverUpload, type ApplyCoverInput, type CoverDeps, type CoverUploadTicket } from './covers'
 export { TemplatesEditor } from './templates-editor'
+export {
+  deleteTemplateCategory,
+  listAdminCategories,
+  reorderTemplateCategories,
+  saveTemplateCategory,
+  type AdminCategory,
+  type CategoryAdminActions,
+  type DeleteCategoryPayload,
+  type SaveCategoryPayload,
+} from './template-categories'
+export { CategoriesPanel } from './template-categories-editor'
 export { loadEditTemplateSettings, saveEditTemplate, type EditTemplateSettings, type SaveEditTemplateInput } from './edit-template'
 export { EDIT_TEMPLATE_COPY, EditTemplateEditor } from './edit-template-editor'
 export {
@@ -39,6 +50,9 @@ export {
   type SaveProviderInput,
 } from './providers'
 export { PROVIDERS_COPY, ProvidersEditor } from './providers-editor'
+// The face-swap dry run beside the decision provider (ARCHITECTURE §5.1a, T81).
+export { dryRunIdentityScreen, type DryRunResult } from './identity-dry-run'
+export { IdentityDryRun } from './identity-dry-run-ui'
 export { AdminPage, AdminShell, adminNavItems, EmptyState, SHELL_COPY, StatCard, type AdminNavItem } from './shell'
 export {
   listPurchases,

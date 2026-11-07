@@ -5,7 +5,6 @@ import { useRef } from 'react'
 
 import { LoopPlate } from './card-media'
 import { hasStills, type CatalogueTemplate } from './catalogue-template'
-import { useCategoryLabel } from './category-label'
 import { COVER_SIZES, FEATURE_POSTER_WIDTH } from './cover-sizes'
 import { PairMedia } from './pair-media'
 import { useHoverWipe } from './use-hover-wipe'
@@ -16,7 +15,6 @@ import { useHoverWipe } from './use-hover-wipe'
 // with a frosted "Make one" pill: a tap opens the creation dialog.
 export function FeatureCard({ template, onOpen }: { template: CatalogueTemplate; onOpen(id: string): void }) {
   const t = useTranslations('app.template')
-  const label = useCategoryLabel()
   const ref = useRef<HTMLButtonElement>(null)
   useHoverWipe(ref)
   const { before, after, motion } = template.cover
@@ -26,7 +24,7 @@ export function FeatureCard({ template, onOpen }: { template: CatalogueTemplate;
       ref={ref}
       type="button"
       aria-haspopup="dialog"
-      aria-label={t('featureAria', { name: template.name, category: label(template.category) })}
+      aria-label={t('featureAria', { name: template.name, category: template.categoryName })}
       onClick={() => onOpen(template.id)}
       className="group hairline relative mt-4 block w-full overflow-hidden rounded-panel bg-card text-left transition-shadow hover:shadow-[inset_0_0_0_1px_var(--input)] md:mt-6"
     >
@@ -39,7 +37,7 @@ export function FeatureCard({ template, onOpen }: { template: CatalogueTemplate;
       <span className="absolute inset-x-4 bottom-4 z-6 flex items-end justify-between gap-3 md:inset-x-6 md:bottom-6">
         <span>
           <b className="block font-display text-h1 leading-none font-normal tracking-[-0.02em] text-photo-ink">{template.name}</b>
-          <small className="mt-1 block text-caption text-bone-dim">{t('featureMeta', { category: label(template.category) })}</small>
+          <small className="mt-1 block text-caption text-bone-dim">{t('featureMeta', { category: template.categoryName })}</small>
         </span>
         <span className="frost inline-flex min-h-9 flex-none items-center gap-0.5 rounded-full px-3.5 text-caption leading-none font-semibold text-photo-ink shadow-[inset_0_0_0_1px_var(--input)]">
           {t('makeOne')}

@@ -22,6 +22,10 @@
  *     new definition only widens;
  *   - `update t set … where <col> = <literal> [and …]` (or `in (<literals>)`): targeted rows such
  *     as a catalog price fix, not a bulk rewrite.
+ * Columns this same file adds are the deployed code's blind spot: an `update` that sets only such
+ * columns (a backfill) passes. `alter column … set not null` on one passes when the same file
+ * gives it a default; without one it is a warning, since the deployed code's inserts (which never
+ * set the column) must still succeed through a trigger the reviewer has to check.
  *
  * A contract PR (the old structure is confirmed unused on production) goes through with
  * `[contract]` in the PR title, passed in as PR_TITLE.
@@ -217,6 +221,7 @@ const MESSAGES: Record<string, string> = {
   'set-schema': 'moves to another schema:',
   'type-change': 'changes the type of column',
   'set-not-null': 'tightens column to not null:',
+  'set-not-null-new-column': "makes a column this file adds not null, without a default: the deployed code's inserts must still succeed (a trigger has to fill it):",
   'add-constraint': 'adds a constraint to existing table',
   'add-not-null-column': 'adds a not null column without a default:',
   'unique-index': 'adds a unique index to existing table',
@@ -233,6 +238,8 @@ type Context = {
   addedConstraints: Set<string>
   /** `table:column` for every column this file adds to an existing table. */
   addedColumns: Set<string>
+  /** The subset of addedColumns this file gives a default (on add, or `alter column … set default`). */
+  defaultedColumns: Set<string>
 }
 
 // Words in a constraint expression that are not column names. Anything else counts as a column,
@@ -284,6 +291,13 @@ function onlyNewColumns(table: string, expr: string | null, context: Context) {
   return refs.length > 0 && refs.every((column) => context.addedColumns.has(`${table}:${column}`))
 }
 
+/** True when every column an update's SET list assigns was added by this same file (a backfill). */
+function setsOnlyNewColumns(table: string, rest: string, context: Context) {
+  const assignments = rest.replace(/ where .*$/, '').replace(/ from .*$/, '')
+  const targets = splitTopLevel(assignments).map((assignment) => new RegExp(String.raw`^(${IDENT}) ?=`).exec(assignment.trim())?.[1])
+  return targets.length > 0 && targets.every((column) => column !== undefined && context.addedColumns.has(`${table}:${objectName(column)}`))
+}
+
 /** Scans one migration's SQL. Errors fail the check; warnings are for the reviewer. */
 export function scanMigration(sql: string): Finding[] {
   const statements = splitStatements(sql)
@@ -292,6 +306,7 @@ export function scanMigration(sql: string): Finding[] {
     droppedConstraints: new Set(),
     addedConstraints: new Set(),
     addedColumns: new Set(),
+    defaultedColumns: new Set(),
   }
   for (const statement of statements) collectConstraints(statement.text, context)
 
@@ -329,8 +344,12 @@ function collectConstraints(text: string, context: Context) {
     const added = new RegExp(String.raw`^add constraint (${IDENT})`).exec(action)
     if (added) context.addedConstraints.add(`${table}:${objectName(added[1])}`)
     const column = new RegExp(String.raw`^add (?:column )?(?:if not exists )?(${IDENT})`).exec(action)
-    if (column && !/^(constraint|check|unique|primary|foreign|exclude)$/.test(column[1]))
+    if (column && !/^(constraint|check|unique|primary|foreign|exclude)$/.test(column[1])) {
       context.addedColumns.add(`${table}:${objectName(column[1])}`)
+      if (/\bdefault\b/.test(action)) context.defaultedColumns.add(`${table}:${objectName(column[1])}`)
+    }
+    const setDefault = new RegExp(String.raw`^alter (?:column )?(${IDENT}) set default\b`).exec(action)
+    if (setDefault) context.defaultedColumns.add(`${table}:${objectName(setDefault[1])}`)
   }
 }
 
@@ -392,7 +411,7 @@ function checkStatement(text: string, context: Context, report: (rule: string, s
     const table = objectName(update[1])
     const where = / where (.+?)(?: returning .*)?$/.exec(update[2])?.[1]
     const targeted = where !== undefined && TARGETED_WHERE.test(where.replace(/ ?([(,=]) ?/g, '$1').replace(/ \)/g, ')'))
-    if (!created.has(table) && !targeted) report('bulk-update', table)
+    if (!created.has(table) && !targeted && !setsOnlyNewColumns(table, update[2], context)) report('bulk-update', table)
   }
 }
 
@@ -417,7 +436,11 @@ function checkAlterTable(table: string, rest: string, context: Context, report: 
     if (alterColumn) {
       const name = `${table}.${objectName(alterColumn[1])}`
       const change = alterColumn[2]
-      if (/^set not null\b/.test(change)) report('set-not-null', name)
+      if (/^set not null\b/.test(change)) {
+        const key = `${table}:${objectName(alterColumn[1])}`
+        if (!context.addedColumns.has(key)) report('set-not-null', name)
+        else if (!context.defaultedColumns.has(key)) report('set-not-null-new-column', name, 'warning')
+      }
       else if (/^drop default\b/.test(change)) report('drop-default', name)
       else if (/^drop (identity|expression)\b/.test(change)) report('drop-identity', name)
       else if (/^(set data )?type\b/.test(change)) report('type-change', name)
