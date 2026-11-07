@@ -48,6 +48,9 @@ function HelpSheet({ actions, payments, replyTime, brand, unread }: Props) {
   const [shown, setShown] = useState<HelpView>(view ?? { tab: 'new' })
   if (view && helpParamValue(view) !== helpParamValue(shown)) setShown(view)
   const [sentId, setSentId] = useState<string | null>(null)
+  // Bumped by every send: My tickets reads its list again even if it were still mounted
+  // (Codex on the old pages saw "No tickets yet." until a reload).
+  const [listRound, setListRound] = useState(0)
   useRefreshDots(view !== null, unread && shown.tab === 'thread', router.refresh)
   // A new place in the dialog starts at its top: the marker's parent is the sheet's scrolling body.
   const top = useRef<HTMLSpanElement>(null)
@@ -59,6 +62,7 @@ function HelpSheet({ actions, payments, replyTime, brand, unread }: Props) {
   const onSent = useCallback(
     (id: string) => {
       setSentId(id)
+      setListRound((round) => round + 1)
       go({ tab: 'thread', id })
     },
     [go],
@@ -87,7 +91,7 @@ function HelpSheet({ actions, payments, replyTime, brand, unread }: Props) {
             onBack={() => go({ tab: 'list' })}
           />
         ) : tab === 'list' ? (
-          <HelpListView load={actions.loadTickets} onOpen={onOpen} onNew={() => go({ tab: 'new' })} />
+          <HelpListView key={listRound} load={actions.loadTickets} onOpen={onOpen} onNew={() => go({ tab: 'new' })} />
         ) : null,
       )}
     </ResponsiveSheet>
