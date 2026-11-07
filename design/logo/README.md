@@ -15,3 +15,11 @@
 授权：Instrument Serif 为 SIL OFL 1.1，字形改作标志允许；署名在 Terms 的 Third-party notices。商标：先注册文字 Shotviva，再注册「S. + Shotviva.」组合标；图形单独注册由律师判断。
 
 选型过程（第一轮 A–D、第二轮 E–G、第三轮 H–J、第四轮 K–N、第五轮 P–S、第六轮 T–X、第七轮线性 Y / Z / O、十种风格 1–10、主流 AI 语法 11–20、暗房角色 21–30、手绘手势 31–40、网飞丝带 41–46）的文件已清理，记录见 `comps-v3-b/DESKTOP-NOTES.md` 第十七到三十三轮。
+
+## 站内落地（T58）
+
+- `src/app/icon.svg` 就是 `c-s-dot-small.svg`，随浏览器浅深色换墨色（Chrome / Edge / Firefox / Safari 26+ 用它）。
+- `src/app/favicon.ico` 是给不认 SVG 图标的浏览器的兜底：16 / 32 / 48 三档都是暗房方块（`#0B0A09`，圆角）上的骨白「S.」（favicon 加重 +110），浅色和深色标签栏都清楚。透明底的单色 ICO 做不到两边都清楚。
+- `src/app/apple-icon.png`：`c-s-dot-icon-1024.svg` 去掉圆角的满版 180（iOS 自己切圆角，透明角会变黑）。
+- `public/icons/icon-192.png` / `icon-512.png`：manifest 图标，取 `export/c/icon-512.png`（192 由它缩）。
+- **导航只用字标「Shotviva.」，不用 `-lockup-tight` 的「S. Shotviva」**（T58 用 impeccable 比对 375 / 1280 后决定）：并排时 S 出现两次，读起来像缩写人名「S. Shotviva」；手机营销顶栏本来就有副标题、地球和登录，再多 30px 更挤；「S.」本来就是字标压缩成的，留给放不下字标的地方（标签页、主屏幕、OAuth）。
