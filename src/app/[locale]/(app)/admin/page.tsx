@@ -15,10 +15,15 @@ export const metadata: Metadata = { title: OVERVIEW_COPY.title }
 export default async function AdminOverviewPage() {
   await requireAdmin()
   const db = createAdminSupabase()
-  const [stats, revenue, counts] = await Promise.all([loadDashboardStats(db), loadRevenueStats(db, DASHBOARD_DAYS), loadTodoCounts(db)])
+  const [stats, revenue, counts, wishlist] = await Promise.all([
+    loadDashboardStats(db),
+    loadRevenueStats(db, DASHBOARD_DAYS),
+    loadTodoCounts(db),
+    isWishlistEnabled(site),
+  ])
   return (
     <AdminPage title={OVERVIEW_COPY.title}>
-      <OverviewView stats={stats} revenue={revenue} todo={{ counts, wishlist: isWishlistEnabled(site) }} unitCost={GENERATION_COST_USD} />
+      <OverviewView stats={stats} revenue={revenue} todo={{ counts, wishlist }} unitCost={GENERATION_COST_USD} />
     </AdminPage>
   )
 }

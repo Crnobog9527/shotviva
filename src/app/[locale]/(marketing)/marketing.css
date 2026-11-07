@@ -68,10 +68,6 @@
   .mk-hot em { font-style: normal; color: var(--primary); }
   .mk-intro { margin-top: 12px; font-size: 16px; line-height: 1.5; color: var(--bone-dim); }
   .mk-pill { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: 999px; font: 500 14px/1 var(--font-sans); background: var(--wash-strong); color: var(--bone-dim); }
-  .mk-illus {
-    position: absolute; z-index: 3; left: 8px; bottom: 8px; height: 26px; padding: 0 8px; border-radius: 8px; display: inline-flex; align-items: center;
-    font: 500 14px/1 var(--font-sans); color: var(--foreground); background: var(--frost); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-  }
   .mk-cost { display: inline-block; font: 500 14px/1 var(--font-mono); letter-spacing: 0; color: var(--bone-dim); padding: 4px 6px; border-radius: 6px; background: var(--wash); white-space: nowrap; }
 
   /* ---------- hero ---------- */
@@ -101,12 +97,10 @@
   }
   .mk-tag-l { left: 8px; }
   .mk-tag-r { right: 8px; background: var(--safelight-tag); color: var(--primary-foreground); }
-  .mk-pair .mk-illus { left: 8px; top: 8px; bottom: auto; }
   .mk-pair-lg { border-radius: 20px; }
   .mk-pair-lg .mk-tag { top: 12px; bottom: auto; height: 28px; padding: 0 10px; }
   .mk-pair-lg .mk-tag-l { left: 12px; }
   .mk-pair-lg .mk-tag-r { right: 12px; background: var(--primary); }
-  .mk-pair-lg .mk-illus { top: auto; bottom: 12px; left: 12px; }
 }
 
 /* ======================= the first-screen generator ======================= */
@@ -283,7 +277,6 @@
   }
   .mk-src-meta { grid-column: 2; grid-row: 1; align-self: center; }
   .mk-src-meta p { font-size: 14px; line-height: 1.4; color: var(--muted-foreground); }
-  .mk-src-meta .mk-pill { margin-top: 8px; height: 26px; }
   .mk-develop { grid-column: 1 / -1; grid-row: 2; display: flex; align-items: center; gap: 8px; padding: 4px 0 4px 8px; }
   .mk-line { width: 1.5px; height: 40px; background: linear-gradient(var(--border), var(--primary)); }
   .mk-arrow { display: none; }
@@ -293,7 +286,6 @@
   .mk-outs li:first-child { grid-row: 3; grid-column: 1 / -1; aspect-ratio: 1 / 1; }
   .mk-outs img { width: 100%; height: 100%; object-fit: cover; }
   .mk-outs li:first-child img { object-position: 50% 72%; }
-  .mk-outs li:first-child .mk-illus { top: 12px; left: 12px; bottom: auto; }
   .mk-out-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 48px 12px 12px; background: linear-gradient(transparent, color-mix(in srgb, var(--background) 90%, transparent) 62%); }
   .mk-out-cap b { display: block; font: 600 16px/1.2 var(--font-sans); }
   .mk-out-cap small { display: block; margin-top: 2px; font-size: 14px; color: var(--bone-dim); }
@@ -360,7 +352,6 @@
   .mk-compare .mk-tag { top: 12px; bottom: auto; height: 28px; padding: 0 10px; }
   .mk-compare .mk-tag-l { left: 12px; }
   .mk-compare .mk-tag-r { right: 12px; background: var(--primary); }
-  .mk-compare .mk-illus { left: 12px; bottom: 12px; }
   .mk-compare:has(input:focus-visible) { outline: 2px solid var(--ring); outline-offset: 2px; }
 
   /* facts */

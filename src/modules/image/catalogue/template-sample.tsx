@@ -17,9 +17,9 @@ export function TemplateSample({ template, fill = false, className }: { template
   const { before, after } = template.cover
   const frame = cn(fill && 'absolute inset-0 aspect-auto size-full rounded-none shadow-none', className)
   if (before && after && isArtStyle(template)) {
-    return <CompareSlider before={before} after={after} afterAlt={t('resultAlt', { name: template.name })} badge={t('example')} className={frame} />
+    return <CompareSlider before={before} after={after} afterAlt={t('resultAlt', { name: template.name })} className={frame} />
   }
-  if (hasStills(template)) return <PairMedia before={before as string} after={after as string} alt={t('cardAlt', { name: template.name })} eager size="pair" badge className={frame} />
+  if (hasStills(template)) return <PairMedia before={before as string} after={after as string} alt={t('cardAlt', { name: template.name })} eager size="pair" className={frame} />
   if (isMotion(template)) return <LoopPlate template={template} alt={t('loopAria', { name: template.name })} className={frame} />
   return <span className={cn('block aspect-[8/5] rounded-media bg-muted', frame)} />
 }

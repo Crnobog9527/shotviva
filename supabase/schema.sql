@@ -1090,6 +1090,40 @@ $_$;
 ALTER FUNCTION "public"."admin_set_provider_key"("p_id" "uuid", "p_key" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_set_system_setting"("p_key" "text", "p_value" "jsonb", "p_actor" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if p_actor is null then
+    raise exception 'INVALID_INPUT' using detail = 'actor is required';
+  end if;
+  if not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+
+  case p_key
+    when 'wishlist_enabled' then
+      if p_value is null or jsonb_typeof(p_value) <> 'boolean' then
+        raise exception 'INVALID_INPUT' using detail = 'wishlist_enabled must be a boolean';
+      end if;
+    else
+      raise exception 'INVALID_INPUT' using detail = 'unknown setting';
+  end case;
+
+  insert into public.system_settings (key, value, updated_at, updated_by)
+  values (p_key, p_value, now(), p_actor)
+  on conflict (key) do update
+    set value = excluded.value,
+        updated_at = excluded.updated_at,
+        updated_by = excluded.updated_by;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_set_system_setting"("p_key" "text", "p_value" "jsonb", "p_actor" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_signup_ip_clusters"("p_days" integer) RETURNS TABLE("signup_ip" "inet", "accounts" integer, "last_signup_at" timestamp with time zone, "members" "jsonb")
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -2622,6 +2656,18 @@ ALTER TABLE "public"."subscriptions" ALTER COLUMN "id" ADD GENERATED ALWAYS AS I
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."system_settings" (
+    "key" "text" NOT NULL,
+    "value" "jsonb" NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_by" "uuid",
+    CONSTRAINT "system_settings_key_check" CHECK (("key" ~ '^[a-z][a-z0-9_]{0,39}$'::"text"))
+);
+
+
+ALTER TABLE "public"."system_settings" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."template_prompts" (
     "template_id" "text" NOT NULL,
     "body" "text" NOT NULL,
@@ -2797,6 +2843,11 @@ ALTER TABLE ONLY "public"."support_ticket_messages"
 
 ALTER TABLE ONLY "public"."support_tickets"
     ADD CONSTRAINT "support_tickets_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."system_settings"
+    ADD CONSTRAINT "system_settings_pkey" PRIMARY KEY ("key");
 
 
 
@@ -3050,6 +3101,11 @@ ALTER TABLE ONLY "public"."support_tickets"
 
 
 
+ALTER TABLE ONLY "public"."system_settings"
+    ADD CONSTRAINT "system_settings_updated_by_fkey" FOREIGN KEY ("updated_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
 ALTER TABLE ONLY "public"."template_prompts"
     ADD CONSTRAINT "template_prompts_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON DELETE CASCADE;
 
@@ -3134,6 +3190,9 @@ ALTER TABLE "public"."support_tickets" ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "support_tickets_select_own" ON "public"."support_tickets" FOR SELECT TO "authenticated" USING ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
 
+
+
+ALTER TABLE "public"."system_settings" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."template_prompts" ENABLE ROW LEVEL SECURITY;
@@ -3304,6 +3363,11 @@ GRANT ALL ON FUNCTION "public"."admin_set_openai_costs_project"("p_project_id" "
 
 REVOKE ALL ON FUNCTION "public"."admin_set_provider_key"("p_id" "uuid", "p_key" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_set_provider_key"("p_id" "uuid", "p_key" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_set_system_setting"("p_key" "text", "p_value" "jsonb", "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_system_setting"("p_key" "text", "p_value" "jsonb", "p_actor" "uuid") TO "service_role";
 
 
 
@@ -3559,6 +3623,10 @@ GRANT SELECT ON TABLE "public"."subscriptions" TO "service_role";
 GRANT UPDATE ON SEQUENCE "public"."subscriptions_id_seq" TO "anon";
 GRANT UPDATE ON SEQUENCE "public"."subscriptions_id_seq" TO "authenticated";
 GRANT UPDATE ON SEQUENCE "public"."subscriptions_id_seq" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."system_settings" TO "service_role";
 
 
 

@@ -12,7 +12,7 @@ vi.mock('@/core/admin', () => ({
 }))
 vi.mock('@/core/support', () => ({ openTicketCount: () => openTicketCount() }))
 vi.mock('@/core/logger', () => ({ logger: { warn: () => undefined } }))
-vi.mock('@/core/wishlist', () => ({ isWishlistEnabled: () => false }))
+vi.mock('@/core/wishlist', () => ({ isWishlistEnabled: async () => false }))
 vi.mock('@/site/site.config', () => ({ site: {} }))
 
 const { default: AdminLayout } = await import('./layout')

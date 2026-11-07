@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
-import { Suspense } from 'react'
+import { Suspense, type ReactNode } from 'react'
 
 import { AnalyticsIdentify } from '@/core/analytics/browser'
 import { AnnouncementBanner } from '@/core/announcements'
@@ -38,13 +38,29 @@ async function Admin() {
   return entry ? <AdminLink entry={entry} /> : null
 }
 
-function Tabs({ items }: { items: TabItem[] }) {
+// The Wishlist tab is built with the others and dropped here while the wishlist is closed: the
+// switch is an admin setting read at runtime (ARCHITECTURE §15.6). That read is cached
+// (core/system-settings), so the bar stays in the prerendered shell; the session is read only
+// by the Admin item, in its own Suspense.
+async function Tabs({ items }: { items: TabItem[] }) {
+  const shown = (await isWishlistEnabled(site)) ? items : items.filter((item) => item.href !== '/wishlist')
   const admin = (
     <Suspense fallback={null}>
       <Admin />
     </Suspense>
   )
-  return <TabBar items={items} desktopUnder={['/photos/']} admin={admin} />
+  return <TabBar items={shown} desktopUnder={['/photos/']} admin={admin} />
+}
+
+// The paywall lists the wishlist perk only while it is open. The switch read is cached
+// (core/system-settings), so this stays in the prerendered shell.
+async function Paywall({ children }: { children: ReactNode }) {
+  const wishlistLive = await isWishlistEnabled(site)
+  return (
+    <PaywallProvider products={site.billing.products} wishlistLive={wishlistLive} channel={paymentChannel()}>
+      {children}
+    </PaywallProvider>
+  )
 }
 
 function useTabs(): TabItem[] {
@@ -52,7 +68,7 @@ function useTabs(): TabItem[] {
   const image = isModuleEnabled(site, 'image')
   return [
     ...(image ? [{ href: '/generate', label: t('create'), icon: 'create' } as const] : []),
-    ...(isWishlistEnabled(site) ? [{ href: '/wishlist', label: t('wishlist'), icon: 'wishlist' } as const] : []),
+    { href: '/wishlist', label: t('wishlist'), icon: 'wishlist' } as const,
     ...(image ? [{ href: '/photos', label: t('photos'), icon: 'photos', badge: <PhotosTabBadge /> } as const] : []),
     // The "new reply" dot, read once per page load (ARCHITECTURE §10 「站内工单」).
     {
@@ -76,7 +92,7 @@ export default function AppLayout({ children }: LayoutProps<'/[locale]'>) {
       <HideWhileGenerating>
         <AnnouncementBanner />
       </HideWhileGenerating>
-      <PaywallProvider products={site.billing.products} wishlistLive={isWishlistEnabled(site)} channel={paymentChannel()}>
+      <Paywall>
         {/* The wordmark in the top bar and the phone tab-root headers reads the brand from here. */}
         <BrandProvider name={site.brand.name}>
           <Suspense fallback={null}>
@@ -93,7 +109,7 @@ export default function AppLayout({ children }: LayoutProps<'/[locale]'>) {
         </BrandProvider>
         {/* DESIGN §5 「全站流动背景」 (T54); it renders nothing on /admin. */}
         <LivingBackground />
-      </PaywallProvider>
+      </Paywall>
     </AppFrame>
   )
 }

@@ -33,3 +33,26 @@ export const categoryCopy = {
     'Art Styles': '画风',
   },
 } as const
+
+// Bulk 上架 / 下架 (T60).
+export const bulkCopy = {
+  selectAll: '全选当前列表',
+  selectRow: (name: string) => `选择 ${name}`,
+  selected: (count: number) => `已选 ${count} 个`,
+  publish: '上架所选',
+  unpublish: '下架所选',
+  clear: '取消选择',
+  cancel: '取消',
+  title: (active: boolean, count: number) => `${active ? '上架' : '下架'}这 ${count} 个模板？`,
+  publishHint:
+    '缺提示词、缺英文名称或说明、缺前后对比封面、积分低于下限的不会上架，结果里逐条列出原因；其余立即出现在首页和 Create。',
+  unpublishHint: '下架后用户和伙伴入口都看不到这些模板，可以随时重新上架。',
+  featuredNote: (names: string) => `${names} 在首页精选里，下架后会从首页精选移除。`,
+  reasonLabel: '下架原因（必填，写进每个模板的操作记录）',
+  confirm: (active: boolean) => (active ? '确认上架' : '确认下架'),
+  resultTitle: (active: boolean) => (active ? '批量上架结果' : '批量下架结果'),
+  changed: (active: boolean, count: number) => `${active ? '已上架' : '已下架'} ${count} 个`,
+  unchanged: (active: boolean, count: number) => `${count} 个原本就已${active ? '上架' : '下架'}，没有改动`,
+  skipped: (active: boolean, count: number) => `${count} 个没有${active ? '上架' : '下架'}，保持原状`,
+  dismiss: '关闭',
+} as const
