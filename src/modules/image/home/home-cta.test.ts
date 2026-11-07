@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { homeCta, type HomeViewer } from './home-cta'
 
-const viewer = (free: number, paid: number, limit = 1): HomeViewer => ({ balance: { free, paid }, concurrency: { limit, runningIds: [] } })
+const viewer = (free: number, paid: number, limit = 1): HomeViewer => ({ balance: { free, paid }, concurrency: { limit, runningIds: [] }, favoriteIds: [] })
 const base = { cost: 2, running: 0, needsCopy: false }
 
 // DESIGN §6.9 item 9: the home bar charges the same way as the workspace.

@@ -35,13 +35,14 @@ const valid: { [E in EventName]: unknown } = {
   checkout_start: checkout,
   purchase: { ...checkout, product_id: 'pack_s', tier: 'pack', interval: null, form: 'one_time', amount_usd: 9.9, credits: 20 },
   template_view: { template_id: 'ramen-studio', category: 'food', surface: 'workspace' },
+  template_favorite: { template_id: 'ramen-studio', category: 'food-drink', action: 'add', surface: 'create_card' },
   paywall_select: { product_id: 'pro_yearly', method: 'cn_card' },
   checkout_cancel: { product_id: 'pack_m', method: 'alipay' },
   upload_error: { reason: 'transfer_failed' },
 }
 
 describe('event dictionary (ARCHITECTURE §16.2)', () => {
-  it('covers exactly the eleven named events', () => {
+  it('covers exactly the twelve named events', () => {
     expect(Object.keys(eventSchemas).sort()).toEqual([
       'checkout_cancel',
       'checkout_start',
@@ -51,6 +52,7 @@ describe('event dictionary (ARCHITECTURE §16.2)', () => {
       'paywall_view',
       'purchase',
       'signup',
+      'template_favorite',
       'template_view',
       'upload',
       'upload_error',

@@ -11,6 +11,7 @@ import { navTypesFor } from '@/core/ui/nav-motion'
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import { useCategoryLabel } from '../catalogue/category-label'
 import { isCompareSample, TemplateSample } from '../catalogue/template-sample'
+import { FavoriteButton } from '../favorites/favorite-button'
 import { CreateSheet } from './create-sheet'
 import { FormAction } from './form-action'
 import { useWorkspaceDraft, type DraftInput } from './use-workspace-draft'
@@ -56,7 +57,13 @@ function CreateBody({ template, open, onClose, ...context }: BodyProps) {
       hint={t(tall ? 'hintCompare' : 'hintPair')}
       tall={tall}
       folded={draft.photos.photos.length > 0}
-      sample={<TemplateSample template={template} className="max-md:h-full max-md:aspect-auto" />}
+      sample={
+        <div className="relative max-md:h-full">
+          <TemplateSample template={template} className="max-md:h-full max-md:aspect-auto" />
+          {/* The save heart (T83) takes the right corner the Phone / AI tags leave free. */}
+          <FavoriteButton template={template} surface="create_dialog" className={tall ? 'right-1 bottom-1' : 'top-1 right-1'} />
+        </div>
+      }
       form={
         <WorkspaceForm
           template={template}

@@ -9,6 +9,8 @@ import type { FormAction } from '@/core/auth/ui'
 import { UPLOAD_ACCEPT } from '@/core/storage/rules'
 
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
+import { FavoritesProvider } from '../favorites/favorites-provider'
+import { FavoriteReturn } from '../favorites/favorite-return-effect'
 import { HomeBench } from './home-bench'
 import { HomeCard } from './home-card'
 import type { HomeViewer } from './home-cta'
@@ -85,8 +87,12 @@ export function HomeGenerator({ templates, defaultId, viewer, googleAction, home
     setSignUp(true)
   }
   const shared = { state, gift: t('gift', { images: freeImages }), onPickPhoto: pickPhoto, onOpenPicker: () => setPickerOn(state.template), onSignUp: askToSignUp }
+  // Signed in, the picker's hearts save on the visitor's account; signed out a heart goes to
+  // sign-in and comes back here to save it (T83).
   return (
+    <FavoritesProvider initialIds={viewer?.favoriteIds ?? []} signedIn={viewer !== null} returnTo={homePath}>
     <div className="mk-generator">
+      <FavoriteReturn signedIn={viewer !== null} templates={templates} onSaved={onPreview} />
       <HomeCard ref={card} thumbOf={thumbFor} {...shared} />
       <HomeBench ref={bench} thumb={state.template ? thumbFor(state.template) : null} {...shared} />
       <input
@@ -116,5 +122,6 @@ export function HomeGenerator({ templates, defaultId, viewer, googleAction, home
       {viewer ? null : <SignupSheet open={signUp} onOpenChange={setSignUp} googleAction={googleAction} next={homePath} gift={freeImages} />}
       <HomeDock watch={watch} hasPhoto={state.photo.url !== null} cost={state.template?.creditsCost['1k'] ?? null} onClick={bring} />
     </div>
+    </FavoritesProvider>
   )
 }

@@ -2492,6 +2492,42 @@ $$;
 ALTER FUNCTION "public"."sync_waffo_subscription"("p_user_id" "uuid", "p_order_id" "text", "p_product_id" "text", "p_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean, "p_event_at" timestamp with time zone) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."template_favorites_guard"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  perform 1 from public.profiles where id = new.user_id for update;
+  if not found then
+    raise exception 'PROFILE_NOT_FOUND';
+  end if;
+
+  if exists (
+    select 1 from public.template_favorites f
+     where f.user_id = new.user_id and f.template_id = new.template_id
+  ) then
+    return new;
+  end if;
+
+  if not exists (
+    select 1 from public.templates t
+     where t.id = new.template_id and t.is_active and 'web' = any (t.visible_in)
+  ) then
+    raise exception 'TEMPLATE_NOT_FOUND';
+  end if;
+
+  if (select count(*) from public.template_favorites f where f.user_id = new.user_id) >= 200 then
+    raise exception 'FAVORITES_LIMIT';
+  end if;
+
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."template_favorites_guard"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."template_request_votes_count"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -2926,6 +2962,16 @@ CREATE TABLE IF NOT EXISTS "public"."system_settings" (
 ALTER TABLE "public"."system_settings" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."template_favorites" (
+    "user_id" "uuid" DEFAULT "auth"."uid"() NOT NULL,
+    "template_id" "text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."template_favorites" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."template_prompts" (
     "template_id" "text" NOT NULL,
     "body" "text" NOT NULL,
@@ -3124,6 +3170,11 @@ ALTER TABLE ONLY "public"."system_settings"
 
 
 
+ALTER TABLE ONLY "public"."template_favorites"
+    ADD CONSTRAINT "template_favorites_pkey" PRIMARY KEY ("user_id", "template_id");
+
+
+
 ALTER TABLE ONLY "public"."template_prompts"
     ADD CONSTRAINT "template_prompts_pkey" PRIMARY KEY ("template_id");
 
@@ -3256,6 +3307,10 @@ CREATE INDEX "support_tickets_user_id_created_at_idx" ON "public"."support_ticke
 
 
 
+CREATE INDEX "template_favorites_template_id_idx" ON "public"."template_favorites" USING "btree" ("template_id");
+
+
+
 CREATE INDEX "template_request_votes_user_id_idx" ON "public"."template_request_votes" USING "btree" ("user_id");
 
 
@@ -3289,6 +3344,10 @@ CREATE OR REPLACE TRIGGER "ai_providers_set_updated_at" BEFORE UPDATE ON "public
 
 
 CREATE OR REPLACE TRIGGER "site_announcements_set_updated_at" BEFORE UPDATE ON "public"."site_announcements" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
+
+
+
+CREATE OR REPLACE TRIGGER "template_favorites_guard" BEFORE INSERT ON "public"."template_favorites" FOR EACH ROW EXECUTE FUNCTION "public"."template_favorites_guard"();
 
 
 
@@ -3409,6 +3468,16 @@ ALTER TABLE ONLY "public"."system_settings"
 
 
 
+ALTER TABLE ONLY "public"."template_favorites"
+    ADD CONSTRAINT "template_favorites_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."template_favorites"
+    ADD CONSTRAINT "template_favorites_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."template_prompts"
     ADD CONSTRAINT "template_prompts_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON DELETE CASCADE;
 
@@ -3508,6 +3577,21 @@ CREATE POLICY "support_tickets_select_own" ON "public"."support_tickets" FOR SEL
 
 
 ALTER TABLE "public"."system_settings" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."template_favorites" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "template_favorites_delete_own" ON "public"."template_favorites" FOR DELETE TO "authenticated" USING ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
+
+
+
+CREATE POLICY "template_favorites_insert_own" ON "public"."template_favorites" FOR INSERT TO "authenticated" WITH CHECK ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
+
+
+
+CREATE POLICY "template_favorites_select_own" ON "public"."template_favorites" FOR SELECT TO "authenticated" USING ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
+
 
 
 ALTER TABLE "public"."template_prompts" ENABLE ROW LEVEL SECURITY;
@@ -3853,6 +3937,10 @@ GRANT ALL ON FUNCTION "public"."sync_waffo_subscription"("p_user_id" "uuid", "p_
 
 
 
+REVOKE ALL ON FUNCTION "public"."template_favorites_guard"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."template_request_votes_count"() FROM PUBLIC;
 
 
@@ -3976,6 +4064,11 @@ GRANT SELECT ON TABLE "public"."support_ticket_attachments" TO "service_role";
 
 
 GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."system_settings" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,DELETE ON TABLE "public"."template_favorites" TO "authenticated";
+GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."template_favorites" TO "service_role";
 
 
 

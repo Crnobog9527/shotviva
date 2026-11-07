@@ -13,6 +13,8 @@ export { UploadTestPanel, type TestTemplate } from './workspace/dev/upload-test-
 
 // App shell pieces (T8).
 export { TemplateCatalogue } from './catalogue/template-catalogue'
+// Saved templates (T83): the provider every page with hearts wraps its catalogue in.
+export { FavoritesProvider } from './favorites'
 export { toCatalogueTemplate, type CatalogueTemplate } from './catalogue/catalogue-template'
 export { ImageWorkspace, type WorkspaceProps } from './workspace/image-workspace'
 // Make again (T40): server only; reads the work and copies its kept photos back.

@@ -50,6 +50,8 @@ const FROM_APP: Record<ErrorCode, PartnerErrorCode> = {
   // Account deletion only; no partner route deletes accounts.
   SUBSCRIPTION_CANCEL_FAILED: 'internal',
   DOWNGRADE_NOT_ALLOWED: 'internal',
+  // Saved templates are a web-only feature; no partner route saves templates.
+  FAVORITES_LIMIT: 'internal',
   INTERNAL: 'internal',
 }
 

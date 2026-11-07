@@ -28,6 +28,8 @@ export const CONTACT_SALES_PAGES = ['/pricing', '/zh/pricing'] as const
 // T74 (ARCHITECTURE §16.2): where a template was looked at, and why an upload failed. Enums
 // only, so a file name or an error message can never ride along.
 export const TEMPLATE_VIEW_SURFACES = ['workspace', 'home_picker'] as const
+// T83 (ARCHITECTURE §5.1b): where a template was saved or unsaved.
+export const TEMPLATE_FAVORITE_SURFACES = ['create_card', 'create_dialog', 'home_picker'] as const
 export const UPLOAD_ERROR_REASONS = ['too_large', 'unsupported', 'ticket_failed', 'transfer_failed', 'unknown'] as const
 
 const checkoutProps = {
@@ -66,6 +68,13 @@ export const eventSchemas = {
   checkout_start: z.strictObject(checkoutProps),
   // T74: the template workspace opened, or a template picked in the home generator's picker.
   template_view: z.strictObject({ template_id: slug, category: slug, surface: z.enum(TEMPLATE_VIEW_SURFACES) }),
+  // T83: a template saved or unsaved (sent once the server has it, so a rolled-back tap is not counted).
+  template_favorite: z.strictObject({
+    template_id: slug,
+    category: slug,
+    action: z.enum(['add', 'remove']),
+    surface: z.enum(TEMPLATE_FAVORITE_SURFACES),
+  }),
   // T74: a product picked inside the paywall (a tier, a pack, or Monthly / Yearly moving the pick).
   paywall_select: z.strictObject({ product_id: z.enum(PRODUCT_IDS), method: z.enum(PAYMENT_METHODS) }),
   // T74: the buyer came back from the hosted checkout without paying (Stripe's cancel_url).
@@ -83,7 +92,7 @@ export type EventProps<E extends EventName> = z.infer<(typeof eventSchemas)[E]>
 
 // §16.2: money and credit events go out from the server so ad blockers cannot drop them.
 export const SERVER_EVENTS = ['signup', 'generate', 'checkout_start', 'checkout_cancel', 'purchase'] as const
-export const BROWSER_EVENTS = ['upload', 'upload_error', 'paywall_view', 'paywall_select', 'template_view', 'contact_sales_click'] as const
+export const BROWSER_EVENTS = ['upload', 'upload_error', 'paywall_view', 'paywall_select', 'template_view', 'template_favorite', 'contact_sales_click'] as const
 export type ServerEventName = (typeof SERVER_EVENTS)[number]
 export type BrowserEventName = (typeof BROWSER_EVENTS)[number]
 
@@ -104,7 +113,7 @@ export function validateEvent<E extends EventName>(event: E, props: unknown): Va
 // characters turned into one hyphen; a name with no Latin letters or digits left becomes
 // 'uncategorized' rather than losing the event. From T75 the column holds the category's stable
 // key (already this shape, e.g. 'food-drink'), which passes through unchanged, so events before
-// and after T75 carry the same value. Used by `generate` (server) and `template_view` (browser).
+// and after T75 carry the same value. Used by `generate` (server), `template_view` and `template_favorite` (browser).
 export function categorySlug(category: string): string {
   const slug = category
     .toLowerCase()
