@@ -373,6 +373,7 @@
       "failTitle": "这张照片没有生成成功",
       "retry": "重试",
       "useAnother": "换一张照片",
+      "editWords": "改一下文字",
       "doneState": {
         "hud": "已完成",
         "saved": "已存进「作品」",

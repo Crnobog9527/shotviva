@@ -373,6 +373,7 @@
       "failTitle": "This photo didn't develop",
       "retry": "Retry",
       "useAnother": "Use another photo",
+      "editWords": "Change what you wrote",
       "doneState": {
         "hud": "Done",
         "saved": "Saved to Photos",

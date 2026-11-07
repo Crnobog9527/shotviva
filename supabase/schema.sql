@@ -712,22 +712,6 @@ $$;
 ALTER FUNCTION "public"."admin_delete_provider"("p_id" "uuid") OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."identity_refusals" (
-    "id" bigint NOT NULL,
-    "user_id" "uuid" NOT NULL,
-    "entry" "text" NOT NULL,
-    "method" "text" NOT NULL,
-    "excerpt" "text" NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    CONSTRAINT "identity_refusals_entry_check" CHECK (("entry" = ANY (ARRAY['workspace'::"text", 'edit'::"text", 'partner'::"text"]))),
-    CONSTRAINT "identity_refusals_excerpt_check" CHECK ((("char_length"("excerpt") >= 1) AND ("char_length"("excerpt") <= 200))),
-    CONSTRAINT "identity_refusals_method_check" CHECK (("method" = ANY (ARRAY['keyword'::"text", 'model'::"text"])))
-);
-
-
-ALTER TABLE "public"."identity_refusals" OWNER TO "postgres";
-
-
 CREATE OR REPLACE FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) RETURNS TABLE("user_id" "uuid", "total" integer, "last_24h" integer)
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
@@ -3087,6 +3071,22 @@ CREATE TABLE IF NOT EXISTS "public"."feature_access" (
 ALTER TABLE "public"."feature_access" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."identity_refusals" (
+    "id" bigint NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "entry" "text" NOT NULL,
+    "method" "text" NOT NULL,
+    "excerpt" "text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "identity_refusals_entry_check" CHECK (("entry" = ANY (ARRAY['workspace'::"text", 'edit'::"text", 'partner'::"text"]))),
+    CONSTRAINT "identity_refusals_excerpt_check" CHECK ((("char_length"("excerpt") >= 1) AND ("char_length"("excerpt") <= 200))),
+    CONSTRAINT "identity_refusals_method_check" CHECK (("method" = ANY (ARRAY['keyword'::"text", 'model'::"text"])))
+);
+
+
+ALTER TABLE "public"."identity_refusals" OWNER TO "postgres";
+
+
 ALTER TABLE "public"."identity_refusals" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME "public"."identity_refusals_id_seq"
     START WITH 1
@@ -4023,10 +4023,6 @@ GRANT ALL ON FUNCTION "public"."admin_delete_provider"("p_id" "uuid") TO "servic
 
 
 
-GRANT ALL ON TABLE "public"."identity_refusals" TO "service_role";
-
-
-
 REVOKE ALL ON FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) TO "service_role";
 
@@ -4341,6 +4337,10 @@ GRANT UPDATE ON SEQUENCE "public"."credit_ledger_id_seq" TO "service_role";
 
 
 GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."feature_access" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."identity_refusals" TO "service_role";
 
 
 
