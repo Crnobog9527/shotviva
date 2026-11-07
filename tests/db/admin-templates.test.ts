@@ -21,6 +21,10 @@ const template = (id: string, name = id) => ({
   creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
   visibleIn: ['web'],
   fields: { images: { min: 1, max: 1 }, copy: [], aspectRatios: ['1:1'] },
+  // What a web template needs before it may go live (T60 publish rules).
+  description: 'Test template.',
+  coverBeforeUrl: `https://assets.test/covers/${id}/before.webp`,
+  coverAfterUrl: `https://assets.test/covers/${id}/after.webp`,
 })
 const prompt = (body: string) => ({ body, modelParams: {} })
 
@@ -65,17 +69,17 @@ describe('admin template commands', () => {
     expect(a?.prompt).toMatchObject({ body: 'two', version: 2 })
   })
 
-  it('publishes freely but requires a reason to unpublish', async () => {
-    await setTemplateActive(client, ADMIN_ID, { id: A, active: true })
-    await expect(setTemplateActive(client, ADMIN_ID, { id: A, active: false })).rejects.toMatchObject({
+  it('publishes a complete template but requires a reason to unpublish', async () => {
+    await setTemplateActive(client, ADMIN_ID, { id: A, active: true }, CREDITS_FLOOR)
+    await expect(setTemplateActive(client, ADMIN_ID, { id: A, active: false }, CREDITS_FLOOR)).rejects.toMatchObject({
       code: 'INVALID_INPUT',
     })
-    await setTemplateActive(client, ADMIN_ID, { id: A, active: false, reason: 'cover is wrong' })
+    await setTemplateActive(client, ADMIN_ID, { id: A, active: false, reason: 'cover is wrong' }, CREDITS_FLOOR)
     expect((await listAdminTemplates(client)).find((row) => row.id === A)?.isActive).toBe(false)
   })
 
   it('keeps the stored status when an edit omits it', async () => {
-    await setTemplateActive(client, ADMIN_ID, { id: B, active: true })
+    await setTemplateActive(client, ADMIN_ID, { id: B, active: true }, CREDITS_FLOOR)
     await saveTemplate(client, ADMIN_ID, { isNew: false, template: template(B, 'B2'), prompt: prompt('one') }, CREDITS_FLOOR)
     expect((await listAdminTemplates(client)).find((row) => row.id === B)?.isActive).toBe(true)
   })

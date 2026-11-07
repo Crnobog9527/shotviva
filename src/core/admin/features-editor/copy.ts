@@ -2,7 +2,9 @@
 // here rather than in site/messages (DESIGN §7, AGENTS §9).
 export const FEATURES_COPY = {
   title: '功能权限',
-  intro: '新功能可以先只给高档位会员用（ARCHITECTURE §6.2「新功能抢先用」）。这里只管谁能用，不管功能开不开；功能开关仍在站点配置里。',
+  switchesHeading: '功能开关',
+  gatesHeading: '新功能谁能用',
+  intro: '新功能可以先只给高档位会员用（ARCHITECTURE §6.2「新功能抢先用」）。这里只管谁能用；功能开不开看上面的开关。',
   empty: '暂时没有可设置的功能',
   emptyBody: '新功能在代码的功能注册表里登记后，会出现在这里。',
   who: '谁能用',

@@ -10,13 +10,13 @@ import { site } from '@/site/site.config'
 // on the viewer's own client, so RLS decides what comes back.
 
 export async function loadWallPage(cursor: string): Promise<Page<WallCard>> {
-  assertWishlistEnabled(site)
+  await assertWishlistEnabled(site)
   await requireApiUser()
   return listWall(await createServerSupabase(), r2Store(), cursor)
 }
 
 export async function loadMyRequestsPage(cursor: string): Promise<Page<MyRequest>> {
-  assertWishlistEnabled(site)
+  await assertWishlistEnabled(site)
   const user = await requireApiUser()
   return listMyRequests(await createServerSupabase(), r2Store(), user.id, cursor)
 }

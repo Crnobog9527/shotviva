@@ -1,6 +1,7 @@
 import type { Template } from '@/core/templates'
 
 import type { CoverPurpose } from '../covers/cover-rules'
+import type { ActiveChangeOutcome } from './publish-rules'
 
 export type AdminTemplate = Template & {
   // null only if a template was created outside the admin flow without a prompt.
@@ -28,6 +29,8 @@ export type ApplyCoverRequest =
 export type TemplateAdminActions = {
   save: (payload: SaveTemplatePayload) => Promise<ActionResult>
   setActive: (input: { id: string; active: boolean; reason?: string }) => Promise<ActionResult>
+  // The bulk bar (T60): one call for the batch, partial success reported per template.
+  setActiveMany: (input: { ids: string[]; active: boolean; reason?: string }) => Promise<ActionValue<ActiveChangeOutcome>>
   reorder: (ids: string[]) => Promise<ActionResult>
   // The home featured list in display order (T53).
   setFeatured: (ids: string[]) => Promise<ActionResult>

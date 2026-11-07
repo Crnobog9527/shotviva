@@ -55,4 +55,4 @@
 
 ## 示意图（上线前必须替换）
 
-`assets/img/*` 和 `assets/video/*` 全部是示意图，界面上每张都标 "Illustrative example"。
+`assets/img/*` 和 `assets/video/*` 全部是示意图，图片上不再叠加 "Illustrative example" 标签（Owner 2026-11-07）；说明改放在图片的替代文字和区块的一行说明文字里。

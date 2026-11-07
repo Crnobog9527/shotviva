@@ -8,9 +8,11 @@ import type { CreditsFloor } from '@/core/templates/pricing'
 
 import type { AdminTemplate, TemplateAdminActions } from '../templates/types'
 
+import { BulkPublish } from './bulk-publish'
 import { FeaturedPanel } from './featured-panel'
 import { FEATURED_LIMIT, featuredIds, toggleFeatured } from './featured-state'
 import { matchesSearch, moveId } from './form-state'
+import { selectedInOrder, toggleId, toggleVisible } from './selection-state'
 import { TemplateFormDialog, type EditTarget } from './template-form-dialog'
 import { TemplatesTable } from './templates-table'
 import { UnpublishDialog } from './unpublish-dialog'
@@ -22,8 +24,10 @@ export function TemplatesEditor({ templates, floor, actions }: Props) {
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState<EditTarget | null>(null)
   const [unpublishing, setUnpublishing] = useState<AdminTemplate | null>(null)
+  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set())
   const { pending, error, notice, run, clearError } = useTemplateActions()
   const visible = templates.filter((template) => matchesSearch(template, query))
+  const visibleIds = visible.map((template) => template.id)
   // After a cover upload the page refreshes; show the dialog the fresh row, not the snapshot.
   const target: EditTarget | null =
     editing?.mode === 'edit'
@@ -69,8 +73,19 @@ export function TemplatesEditor({ templates, floor, actions }: Props) {
         </p>
       ) : null}
       <FeaturedPanel ids={featured} templates={templates} pending={pending} onChange={setFeatured} />
+      <BulkPublish
+        selected={selectedInOrder(templates, selected)}
+        busy={pending}
+        setActiveMany={actions.setActiveMany}
+        onClear={() => setSelected(new Set())}
+      />
       <TemplatesTable
         templates={visible}
+        selection={{
+          selected,
+          onSelect: (id, on) => setSelected((current) => toggleId(current, id, on)),
+          onSelectVisible: (on) => setSelected((current) => toggleVisible(visibleIds, current, on)),
+        }}
         featuredFull={featured.length >= FEATURED_LIMIT}
         onFeature={feature}
         canReorder={query.trim() === ''}

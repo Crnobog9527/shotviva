@@ -3,15 +3,7 @@
 import { cn } from '@/core/ui/cn'
 
 import { GroundedImg } from '../result/grounded-img'
-import { ExampleBadge, SplitTags } from './split-tags'
-
-// Where "Illustrative example" sits. On the phone the feature's right plate has no room beside
-// the AI tag; the page footnote says it there.
-const BADGE = {
-  card: 'top-2 left-2',
-  pair: 'top-3 left-3',
-  feature: 'top-3 left-[calc(50%+12px)] max-md:hidden',
-}
+import { SplitTags } from './split-tags'
 
 type Props = {
   before: string
@@ -21,7 +13,6 @@ type Props = {
   // A video template's loop, played on the right plate by useHoverWipe (or the Quiet Loop).
   video?: string
   size?: 'card' | 'pair' | 'feature'
-  badge?: boolean
   className?: string
 }
 
@@ -29,7 +20,7 @@ type Props = {
 // photo on the left plate and the AI result on the right, a hairline between them, "Phone" and
 // "AI" on the bottom corners. The right plate keeps the phone photo under the result and a
 // safelight seam for the hover wipe (useHoverWipe finds them by data-wipe).
-export function PairMedia({ before, after, alt, eager = false, video, size = 'card', badge = false, className }: Props) {
+export function PairMedia({ before, after, alt, eager = false, video, size = 'card', className }: Props) {
   const loading = eager ? 'eager' : 'lazy'
   const plate = 'absolute inset-0 size-full object-cover transition-transform duration-600 ease-house group-hover:scale-[1.02]'
   return (
@@ -46,7 +37,6 @@ export function PairMedia({ before, after, alt, eager = false, video, size = 'ca
       </span>
       <span aria-hidden="true" className="absolute inset-y-0 left-1/2 z-3 w-px bg-[var(--input)]" />
       <SplitTags size={size} />
-      {badge ? <ExampleBadge className={BADGE[size]} /> : null}
     </span>
   )
 }

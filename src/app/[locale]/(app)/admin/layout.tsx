@@ -24,9 +24,9 @@ async function ticketCount(): Promise<number> {
 
 export default async function AdminLayout({ children }: LayoutProps<'/[locale]/admin'>) {
   const admin = await requireAdmin()
-  const tickets = await ticketCount()
+  const [tickets, wishlist] = await Promise.all([ticketCount(), isWishlistEnabled(site)])
   return (
-    <AdminShell items={adminNavItems({ wishlist: isWishlistEnabled(site) }, { tickets })} email={admin.email}>
+    <AdminShell items={adminNavItems({ wishlist }, { tickets })} email={admin.email}>
       {children}
     </AdminShell>
   )

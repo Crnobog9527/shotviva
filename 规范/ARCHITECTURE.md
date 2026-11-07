@@ -765,10 +765,14 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 
 需求墙是一个**可整体关闭的功能**，不是产品的固定部分：这个仓库当模板开视频站时，视频站不需要它。
 
-- 开关在 `site.config.ts`：`features: { wishlist: boolean }`。和 `modules`、`gallery.enabled` 一样是建站时的配置，不是运行时后台开关——「关不关」是每个站建站时定一次的事，放配置最省（不用设置表、不用缓存、build 时就能裁掉）。
+- 开关分两层（见本节最后一条，T62）：`site.config.ts` 的 `features: { wishlist: boolean }` 决定这个站有没有这个功能；有的话，开不开由后台运行时开关决定。
 - `features.wishlist = false` 时：tab bar 只渲染三项；`app/(app)/wishlist/*` 和 `app/api/wishlist/*` 返回 404；后台的需求审核页不出现在后台导航且直接 404；`template_requests` 两张表的迁移仍然跑（表空着无害，避免模板站的迁移序列分叉）。
 - 判断只在一处：`core/wishlist/index.ts` 导出 `isWishlistEnabled(site: SiteConfig)`，**配置由调用方传入**（core 不能 import `site/`，写法同 `core/config` 的 `isModuleEnabled(site, id)`）；`features` 的类型加在 `core/config/define-site.ts`。路由、layout、后台导航都调它，不准各自读 `features.wishlist`（总控 2026-11-05 补）。
-- 以后真需要「上线后临时关掉」（例如垃圾内容太多）再加运行时开关，一个 `system_settings` 行，一小时的事；v1 不做。
+- **后台运行时开关（Owner 2026-11-07 改，T62）**：需求墙开不开由 Owner 在后台「功能权限」页自己控制，不再改代码。两层：
+  - `site.config.features.wishlist` 改为「这个站有没有需求墙这个功能」（模板仓库开别的站可以整个去掉）。`false` 时一切照旧：后台开关不出现、路由 404。Shotviva 设为 `true`。
+  - 运行时开关存一行 `system_settings`（key `wishlist_enabled`，默认关），只有 `role = admin` 经 RPC 能写，客户端读不到表；读取走 `'use cache'` + `cacheTag`，后台保存时 `updateTag`，改完不用部署、马上生效。
+  - `isWishlistEnabled(site)` 仍是唯一判断处：`features.wishlist && (运行时开关 || 预览覆盖)`；`FEATURE_WISHLIST_PREVIEW=on` 仍只在非生产生效。
+  - 关掉时行为和原来 `features.wishlist = false` 一样（tab 三项、路由和接口 404、后台审核页隐藏）；已有的需求和投票数据保留，重新打开后原样出现。
 
 ## 16. 埋点与错误监控（Owner 2026-11-05）
 

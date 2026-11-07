@@ -12,6 +12,7 @@ vi.mock('@/core/admin', () => ({
 vi.mock('./actions', () => ({
   saveTemplateAction: vi.fn(),
   setTemplateActiveAction: vi.fn(),
+  setTemplatesActiveAction: vi.fn(),
   reorderTemplatesAction: vi.fn(),
   setFeaturedTemplatesAction: vi.fn(),
   requestCoverUploadAction: vi.fn(),

@@ -888,3 +888,58 @@ Owner 2026-11-06 发现中文页有功能缺失。逐页对比现有英文页和
 
 **验收**：中文浏览器第一次进英文首页看到地球气泡；点切换后之后直接进中文；点关闭后不再提醒且停在英文；登录后应用页语言跟选择一致；Googlebot 抓取英文页不跳转；单测覆盖中间件跳转和判断逻辑；交互验收交给 Codex。
 
+
+## T58 站点图标和导航换成定稿 Logo「S.」（可派）
+
+**目标**：Owner 2026-11-07 定稿 Logo C「S.」：用字标字体 Instrument Serif 的 S 和句点，句点橙色，按光学尺寸分三档加重（图标 +80、字标旁 +45、favicon +110）。素材和说明在 `design/logo/`（`README.md`、`test.html`、`export/c/`）。
+
+**范围**：
+- 替换 `src/app/favicon.ico`（16 / 32 / 48，从 `export/c/favicon-*` 生成），浅色和深色标签栏都要清楚（可加 `icon.svg` 或按配色切换）。
+- 加 apple-touch 图标（180）和 manifest 图标（192 / 512，取 `export/c/icon-*`）；没有 manifest 就加最小的一份，颜色按 DESIGN。
+- 导航组合：用 `c-s-dot-lockup-tight.svg` 的排法，或者只用字标，二选一用 impeccable skill 核对；同一画面不能出现两个句点。手机顶栏、电脑顶栏、应用页标题栏都要看。
+- 不在本卡：OG 分享图、Google OAuth 品牌 logo（Owner 自己上传 `export/c/icon-120.png`）。
+
+**验收**：Chrome / Safari 浅深两种标签栏的 favicon 清楚不切头；iOS「添加到主屏幕」显示 180 图标；manifest 图标被浏览器识别；导航在手机和电脑上都没有两个句点；构建和单测通过；交互验收交给 Codex。
+
+## T59 删除图片上的「Illustrative example」标签（可派）
+
+**目标**：Owner 2026-11-07：全站图片上的「Illustrative example / 示意图」标签全部删掉（DESIGN「The No Badge Rule」）。示意说明改放在文字里，不在图片上。
+
+**范围**：删掉营销页和应用页所有叠在图片上的这个标签：`compare-slider`、`photo-pair`、`shoot-section`（含区块顶部那个 pill）、`PairMedia` 的 `badge`（`feature-card`、`template-sample` 等调用处）以及模板卡上同类标签；清掉不再用的样式（`.mk-illus` 等）和不再用的文案键（中英文一起）。保留：图片替代文字里的「(illustrative example)」，以及区块里本来就有的那一行说明文字（`Template images are illustrative examples` / `模板图片仅为效果示例`）。
+
+**验收**：首页、模板页、Create、价格页、内容页、照片详情页的中英文版在手机和电脑上都看不到这个标签；替代文字仍带说明；构建、单测、lint 通过；交互验收交给 Codex。
+
+## T60 后台模板批量上架 / 下架（可派）
+
+**目标**：Owner 2026-11-07：`/admin/templates` 一次上架多个模板，不用逐个点开关（首批 9 个草稿要一起上架）。
+
+**范围**：
+- 模板表每行加勾选框，表头加「全选当前列表」（跟随搜索过滤结果）；勾选后出现批量操作条：「上架所选」「下架所选」「取消选择」，显示已选数量。
+- 批量上架和单个上架开关走同一套校验（缺封面、缺名称或说明、积分低于下限等不能上架的，照单个开关的规则拦下）；能上的上架，不能上的保持原状并逐条列出原因，不整批失败。
+- 确认弹窗写明将上架 / 下架哪几个模板；下架时提醒会从首页精选里移除（如果单个下架也这样处理）。
+- 服务端一次请求处理整批，仍然只认 `profiles.role = 'admin'`；写和单个开关同样的后台操作记录；改完让模板目录缓存失效，和单个开关一致。
+- `edit`、`freeform` 这类系统模板如果单个开关有特殊规则，批量也照办。
+- 中英文后台文案一起加。
+
+**验收**：勾 9 个草稿一键上架，前台模板列表和 Create 立即出现（缓存按单个开关的方式失效）；混入一个缺封面的，其余照常上架、它单独报原因；批量下架同理；非管理员调接口被拒；单测覆盖批量校验和部分成功；交互验收交给 Codex（测试站）。
+
+## T61 工具链升级（上线后再派）
+
+**目标**：Owner 2026-11-07：工具链升级放到正式上线以后做。旧的草稿 PR #13（Node 26 / pnpm 12 / TS 6 / ESLint 10，11-05）卡在 pnpm 12 的 24 小时发布期限制后无人接手，现在和 main 冲突，作废重做。
+
+**范围**：从当时的 main 重新开分支，不在 #13 上续做；pnpm 12（保留默认 24 小时发布期限制，不加豁免）、TypeScript 6、ESLint 10 及配套插件；Node 先确认 Vercel 是否支持 26.x，不支持就留在 24（`.nvmrc`、`engines`、CI 同步）。只升工具链，不顺带改业务代码；新规则报出的问题单独列清单，能机械修的修，不能的记下来。
+
+**验收**：CI 四项全绿；本地 lint / typecheck / 单测 / build 通过；预览部署正常；构建产物体积和 Lighthouse 不退步；关闭 #13。
+
+## T62 需求墙开关做进后台（可派）
+
+**目标**：Owner 2026-11-07：需求墙开不开由 Owner 在管理后台自己切换，不用改代码、不用部署（ARCHITECTURE §15.6 最后一条）。
+
+**范围**：
+- 迁移（编号段 `0420`～`0439`）：`system_settings`（`key text primary key`、`value jsonb`、`updated_by`、`updated_at`），RLS 开启且拒绝所有客户端；`admin_set_system_setting(key, value)` 只认 `role = admin`，只接受登记过的 key（先只有 `wishlist_enabled`，布尔），写后台操作记录（同 `admin_set_feature_access` 的做法）。只加不改，不动已有迁移。
+- `core/wishlist`：`isWishlistEnabled(site)` 改为 `features.wishlist && (运行时开关 || 预览覆盖)`；运行时开关读 `system_settings`，走 `'use cache'` + `cacheTag('system-settings')`，读失败按「关」处理且只缓存一分钟（同 #205 的做法）。所有调用处（tab bar、`/wishlist` 布局、`/api/wishlist/*`、后台导航和审核页、首页和定价页的 `wishlistLive`）都改用新判断，判断仍只在一处。
+- `site.config.ts`：`features.wishlist` 改为 `true`（含义改为「本站有这个功能」）；上线时运行时开关默认关，所以正式站行为不变。
+- 后台「功能权限」页加一个「需求墙」开关卡：显示当前状态、最后修改人和时间；切换前确认弹窗（开：用户 tab 出现第四项、可以提交和投票；关：入口和页面全部隐藏，已有数据保留）；保存后 `updateTag`，刷新前台立即生效。只有中文后台文案。
+- 预览覆盖 `FEATURE_WISHLIST_PREVIEW=on` 保留，只在非生产生效。
+
+**验收**：后台打开后，不重新部署，前台登录用户马上看到 Wishlist tab、能提交需求；关掉后 tab 消失、`/wishlist` 和接口 404、后台审核页隐藏、已有数据重开后还在；非管理员调 RPC 被拒；单测覆盖开关组合（站点无此功能 / 开 / 关 / 预览覆盖 / 读失败）；数据库测试覆盖 RLS 和 RPC；交互验收交给 Codex（测试站）。生产迁移走「DB push (production)」工作流，Owner 批准。

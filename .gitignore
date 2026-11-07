@@ -25,6 +25,9 @@ design/comps-v3-b/shots/
 design/assets/*
 !design/assets/img/
 !design/assets/video/
+# final logo (signed off 2026-11-07); superseded top-level export PNGs stay local
+!design/logo/
+design/logo/export/*.png
 
 # deps / build
 node_modules/

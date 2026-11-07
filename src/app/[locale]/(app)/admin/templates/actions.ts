@@ -11,8 +11,10 @@ import {
   saveTemplate,
   setFeaturedTemplates,
   setTemplateActive,
+  setTemplatesActive,
   type ActionResult,
   type ActionValue,
+  type ActiveChangeOutcome,
   type ApplyCoverRequest,
   type CoverTicket,
   type CoverUploadRequest,
@@ -45,8 +47,18 @@ export async function saveTemplateAction(payload: SaveTemplatePayload): Promise<
 export async function setTemplateActiveAction(input: unknown): Promise<ActionResult> {
   const admin = await requireAdmin()
   return runAdminAction(async () => {
-    await setTemplateActive(createAdminSupabase(), admin.id, input)
+    await setTemplateActive(createAdminSupabase(), admin.id, input, CREDITS_FLOOR)
     catalogueChanged()
+  })
+}
+
+// Bulk 上架 / 下架 (T60): the same command as the switch, one request for the whole batch.
+export async function setTemplatesActiveAction(input: unknown): Promise<ActionValue<ActiveChangeOutcome>> {
+  const admin = await requireAdmin()
+  return runAdminQuery(async () => {
+    const outcome = await setTemplatesActive(createAdminSupabase(), admin.id, input, CREDITS_FLOOR)
+    if (outcome.changed.length > 0) catalogueChanged()
+    return outcome
   })
 }
 

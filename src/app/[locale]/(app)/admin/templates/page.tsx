@@ -12,6 +12,7 @@ import {
   requestCoverUploadAction,
   saveTemplateAction,
   setTemplateActiveAction,
+  setTemplatesActiveAction,
 } from './actions'
 
 // Admin-only, request-time page. The proxy (core/auth proxyGate) answers non-admins with a real
@@ -39,6 +40,7 @@ export default async function AdminTemplatesPage() {
         actions={{
           save: saveTemplateAction,
           setActive: setTemplateActiveAction,
+          setActiveMany: setTemplatesActiveAction,
           reorder: reorderTemplatesAction,
           setFeatured: setFeaturedTemplatesAction,
           requestCoverUpload: requestCoverUploadAction,

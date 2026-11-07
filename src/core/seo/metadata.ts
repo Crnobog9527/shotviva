@@ -20,6 +20,11 @@ export function rootMetadata(site: SiteConfig): Metadata {
     // title themselves through pageMetadata.
     title: { default: site.brand.name, template: `%s${brandSuffix(site)}` },
     applicationName: site.brand.name,
+    // Home-screen shortcut name (Owner 2026-11-07): iOS "Add to Home Screen" reads
+    // apple-mobile-web-app-title, Chrome on Android the manifest name (app/manifest.ts); both are
+    // the brand, never the long SEO title. capable: false keeps it opening in the browser, like the
+    // manifest's display: browser, so OAuth and hosted checkout redirects are never stranded.
+    appleWebApp: { title: site.brand.name, capable: false },
     robots: NOINDEX,
   }
 }

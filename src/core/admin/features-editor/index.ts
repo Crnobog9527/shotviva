@@ -1,2 +1,3 @@
 export { FEATURES_COPY } from './copy'
-export { FeaturesEditor, type FeatureAdminActions } from './features-editor'
+export { FeaturesEditor, type FeatureAdminActions, type WishlistSwitchState } from './features-editor'
+export { WISHLIST_SWITCH_COPY } from './wishlist-copy'

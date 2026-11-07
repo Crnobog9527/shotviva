@@ -8,7 +8,7 @@ import { site } from '@/site/site.config'
 // POST → { voted, votesCount }. Signed-in only. Toggles the caller's vote on a live request.
 export async function POST(request: NextRequest, { params }: RouteContext<'/api/wishlist/requests/[id]/vote'>) {
   try {
-    assertWishlistEnabled(site)
+    await assertWishlistEnabled(site)
     assertSameOrigin(request)
     const user = await requireApiUser()
     const { id } = await params

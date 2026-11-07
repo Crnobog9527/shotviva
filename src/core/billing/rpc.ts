@@ -28,6 +28,8 @@ const SQL_ERROR_CODES: Record<string, ErrorCode> = {
   // A work still generating cannot be deleted (T41).
   JOB_RUNNING: 'CONFLICT',
   USER_BANNED: 'FORBIDDEN',
+  // An admin-only setting saved by someone who is not an admin (T62).
+  NOT_ADMIN: 'FORBIDDEN',
   // A free work cannot be made private (ARCHITECTURE §6.2).
   FREE_WORK_PUBLIC: 'FORBIDDEN',
 }

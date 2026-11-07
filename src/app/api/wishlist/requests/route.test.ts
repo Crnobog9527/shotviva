@@ -12,6 +12,8 @@ vi.mock('@/core/auth/session', () => ({ getSessionUser: mocks.getSessionUser }))
 vi.mock('@/core/auth/supabase-admin', () => ({ createAdminSupabase: () => ({}) }))
 vi.mock('@/core/storage/r2-store', () => ({ r2Store: () => ({}) }))
 vi.mock('@/site/site.config', () => ({ site: mocks.site }))
+// The admin switch is on; these tests close the wishlist through the site config.
+vi.mock('@/core/system-settings/read', () => ({ cachedSystemSettings: async () => ({ wishlist_enabled: true }) }))
 vi.mock('@/core/wishlist/requests', () => ({ createRequest: mocks.createRequest, toggleVote: mocks.toggleVote }))
 
 const { POST: postRequest } = await import('./route')

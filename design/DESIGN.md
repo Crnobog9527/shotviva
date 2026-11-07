@@ -366,7 +366,7 @@ Every component maps to shadcn/ui (new-york) or to one of the self-built compone
 **The Quiet Loop Rule.** A template video is muted, loops, plays inline and shows no controls. It plays only while it is in view and pauses when it leaves. The poster frame (the split image) shows first and the video loads after. With reduced motion, only the poster is shown and it never plays.
 
 ### Compare Slider
-*Self-built (§2).* A 4:5 well with 20px corners; the after plate clipped at the handle position, a 2px white seam and a 40px frosted round knob with a double chevron. A full-surface transparent range input gives one-finger drag, tap-to-jump and keyboard control. "Phone" and "AI" tags top corners, "Illustrative example" badge bottom-left.
+*Self-built (§2).* A 4:5 well with 20px corners; the after plate clipped at the handle position, a 2px white seam and a 40px frosted round knob with a double chevron. A full-surface transparent range input gives one-finger drag, tap-to-jump and keyboard control. "Phone" and "AI" tags top corners; no badge on the image (The No Badge Rule).
 
 ### Upload Zone
 *Self-built (§2).* On the homepage: a 4:5 well inside the generator card with the viewfinder brackets, a mono "4:5" readout, the Pure White split as the at-rest picture under a dark fade, and a 64px shutter (bone disc in a bone ring) over "Add your phone photo" and the format line. In the workspace: a 16:9 hatched recess with the same copy and two stacked buttons, "Take photo" and "Choose from gallery"; once filled, a 4:5 thumbnail with an "Uploaded" success tick, a mono file size and a ghost Replace photo.
@@ -385,7 +385,7 @@ Every component maps to shadcn/ui (new-york) or to one of the self-built compone
 **The Live Perks Rule.** Each tier lists only perks that are live today, under "Includes" or "Everything in X, plus", with a check. Perks that are not live sit below in their own group headed "Coming soon", in Ash caption text without checks, never mixed into the live list. Tier copy never promises queue priority or faster generation.
 
 ### Badges and Tags
-*shadcn `Badge`.* Pills (28px, bone 7%, Bone Dim) for sizes and states; the "Illustrative example" badge (26px, 8px corners, frosted black at 62%) on every stand-in image; on-photo "Free · public" (dark) and "Paid · private" or "Private" (Safelight or Bone) tags; mono cost plates on cards.
+*shadcn `Badge`.* Pills (28px, bone 7%, Bone Dim) for sizes and states; on-photo "Free · public" (dark) and "Paid · private" or "Private" (Safelight or Bone) tags; mono cost plates on cards.
 
 ### Credit Cost and Balance
 
@@ -403,7 +403,7 @@ Every component maps to shadcn/ui (new-york) or to one of the self-built compone
 - **Do** tell tiers apart by material: graphite, sapphire glass, black and gold with solid gold type and a gold rim (The Tier Materials Rule).
 - **Do** list only live perks with checks and put the rest in a separate grey "Coming soon" group (The Live Perks Rule).
 - **Do** draw edges as inset 1px bone hairlines and keep drop shadows to the Raised and Sheet levels.
-- **Do** label every stand-in image "Illustrative example".
+- **Do** keep stand-in images clean: no "Illustrative example" badge on any image (Owner 2026-11-07, The No Badge Rule). The disclosure lives in text instead: the alt text says "(illustrative example)", and a section that shows template examples keeps its one plain caption line ("Template images are illustrative examples").
 - **Do** reserve Geist Mono for measurements.
 - **Do** map each component to shadcn/ui (new-york) or a 规范 §2 self-built component, using the `:root` variables, not literal colours.
 

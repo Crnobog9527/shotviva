@@ -987,7 +987,6 @@
     "home": {
       "phone": "Phone",
       "ai": "AI",
-      "illustrative": "Illustrative example",
       "beforeAlt": "{name} template example: the phone photo before (illustrative example)",
       "afterAlt": "{name} template example: the AI result, {use} (illustrative example)",
       "pickAria": "{name}. {use} Pick this template",

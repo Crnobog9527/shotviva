@@ -17,6 +17,15 @@ describe('proxy matcher', () => {
     expect(runsOn('/fonts/misans/misans-abc.css')).toBe(false)
   })
 
+  // T58: the locale router would otherwise rewrite these into the [locale] tree.
+  it('skips the app icons and the web app manifest', () => {
+    expect(runsOn('/favicon.ico')).toBe(false)
+    expect(runsOn('/icon.svg')).toBe(false)
+    expect(runsOn('/apple-icon.png')).toBe(false)
+    expect(runsOn('/icons/icon-192.png')).toBe(false)
+    expect(runsOn('/manifest.webmanifest')).toBe(false)
+  })
+
   it('still runs on pages', () => {
     expect(runsOn('/pricing')).toBe(true)
     expect(runsOn('/zh/pricing')).toBe(true)

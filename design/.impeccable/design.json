@@ -744,7 +744,7 @@
       "**Do** tell tiers apart by material: graphite, sapphire glass, black and gold with solid gold type and a gold rim (The Tier Materials Rule).",
       "**Do** list only live perks with checks and put the rest in a separate grey \"Coming soon\" group (The Live Perks Rule).",
       "**Do** draw edges as inset 1px bone hairlines and keep drop shadows to the Raised and Sheet levels.",
-      "**Do** label every stand-in image \"Illustrative example\".",
+      "**Do** keep stand-in images clean: no \"Illustrative example\" badge on any image; disclose in alt text and one section caption line instead (Owner 2026-11-07).",
       "**Do** reserve Geist Mono for measurements.",
       "**Do** map each component to shadcn/ui (new-york) or a 规范 §2 self-built component, using the `:root` variables, not literal colours."
     ],
