@@ -106,17 +106,18 @@ describe('seeded categories and the backfill', () => {
         await db.query("insert into public.templates (id, name, category, credits_cost) values ($1, $1, $2, '{\"1k\": 2, \"2k\": 4, \"3k\": 6}')", [id, value])
       }
       const { rows } = await db.query<{ category_key: string; category: string }>(
-        "select category_key, category from public.templates where id like 't75-old-%' order by id",
+        "select category_key, category from public.templates where id like 't75-old-%' order by id collate \"C\"",
       )
       expect(rows.map((row) => row.category_key)).toEqual(['food-drink', 'pets', 'pets', 'burgers-fries', 'burgers-fries', 'burgers-friends', 'category', 'products'])
       expect(rows.map((row) => row.category)).toEqual(['Food & Drink', 'Pets', 'Pets', 'Burgers & Fries', 'Burgers & Fries', 'Burgers & Friends', '早餐', 'products'])
       const created = await db.query(
-        "select key, name_en, name_zh, card_style, is_system from public.template_categories where key in ('burgers-fries', 'burgers-friends', 'category', 'products') order by key",
+        "select key, name_en, name_zh, card_style, is_system from public.template_categories where key in ('burgers-fries', 'burgers-friends', 'category', 'products') order by key collate \"C\"",
       )
       expect(created.rows).toEqual([
-        { key: 'burgers-fries', name_en: 'Burgers & Fries', name_zh: 'Burgers & Fr', card_style: 'pair', is_system: false },
-        // Its Chinese name cut to 12 collides with the one above: numbered.
+        // Created after burgers-fries (inserted first): its Chinese name cut to 12 collides with
+        // that one's, so it is numbered.
         { key: 'burgers-friends', name_en: 'Burgers & Friends', name_zh: 'Burgers & 2', card_style: 'pair', is_system: false },
+        { key: 'burgers-fries', name_en: 'Burgers & Fries', name_zh: 'Burgers & Fr', card_style: 'pair', is_system: false },
         { key: 'category', name_en: '早餐', name_zh: '早餐', card_style: 'pair', is_system: false },
         { key: 'products', name_en: 'products', name_zh: 'products', card_style: 'pair', is_system: false },
       ])
