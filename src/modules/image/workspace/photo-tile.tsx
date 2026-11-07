@@ -4,6 +4,7 @@
 import { useTranslations } from 'next-intl'
 import { useEffect, useRef } from 'react'
 
+import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
 import { UPLOAD_ACCEPT } from '@/core/storage/rules'
 import { cn } from '@/core/ui/cn'
 
@@ -60,7 +61,7 @@ export function PhotoTile({ hint, onKeyChange, onPickedChange, onRemove }: Photo
   }
   return (
     <div className={cn('relative aspect-[4/5] overflow-hidden rounded-[14px] bg-muted', photo.upload.phase === 'error' && 'shadow-[inset_0_0_0_1.5px_var(--destructive)]')}>
-      <img src={photo.photo.url} alt={t('photoAlt')} className="absolute inset-0 size-full object-cover" />
+      <img src={photo.photo.url} alt={t('photoAlt')} className={`${REPLAY_BLOCK_CLASS} absolute inset-0 size-full object-cover`} />
       <TileStage upload={photo.upload} />
       <button
         type="button"

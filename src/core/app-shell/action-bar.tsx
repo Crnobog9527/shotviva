@@ -41,6 +41,8 @@ function FixedBar({ children, className }: { children: ReactNode; className?: st
       <div aria-hidden="true" className="md:hidden" style={{ height }} />
       <div
         ref={bar}
+        // The consent bar moves out of its way on phones (core/analytics, T70).
+        data-action-bar=""
         className={cn(
           // Fixed only below md, never `fixed` + `md:static`: see the note above TabBar in tab-bar.tsx.
           'action-material z-60 px-4 pt-3 pb-[calc(var(--sab)+12px)] max-md:fixed max-md:inset-x-0 max-md:bottom-0',

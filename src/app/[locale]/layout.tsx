@@ -3,6 +3,7 @@ import { NextIntlClientProvider } from 'next-intl'
 import { getMessages } from 'next-intl/server'
 import { locale as rootLocale } from 'next/root-params'
 
+import { ConsentSlot } from '@/core/analytics/browser'
 import { clientMessages, htmlLang, isLocale } from '@/core/i18n'
 import { TranslatedPathsProvider } from '@/core/i18n/ui'
 import { rootMetadata } from '@/core/seo'
@@ -45,7 +46,11 @@ export default async function RootLayout({ children }: LayoutProps<'/[locale]'>)
       <body className="flex min-h-full flex-col">
         {lang === 'zh' ? <MiSansStylesheet /> : null}
         <NextIntlClientProvider messages={messages}>
-          <TranslatedPathsProvider paths={site.locales.zhPaths}>{children}</TranslatedPathsProvider>
+          <TranslatedPathsProvider paths={site.locales.zhPaths}>
+            {children}
+            {/* The analytics cookie bar, for EU/EEA/UK/CH visitors who have not answered (T70). */}
+            <ConsentSlot />
+          </TranslatedPathsProvider>
         </NextIntlClientProvider>
       </body>
     </html>

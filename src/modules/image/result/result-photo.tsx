@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from 'react'
 
+import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
 import type { CreditPool } from '@/core/billing/pools'
 import { cn } from '@/core/ui/cn'
 
@@ -28,7 +29,7 @@ export function ResultPhoto({ src, alt, pool, visibility, hud, fit }: Props) {
   const fitClass = FIT[fit ? 'on' : 'off']
   return (
     <figure className={cn('hairline relative overflow-hidden rounded-panel bg-photo-ground', fitClass.figure)}>
-      <GroundedImg src={src} alt={alt} ground={transparent && checker ? 'checker' : 'white'} className={cn('block h-auto w-full', fitClass.img)} />
+      <GroundedImg src={src} alt={alt} ground={transparent && checker ? 'checker' : 'white'} className={cn(REPLAY_BLOCK_CLASS, 'block h-auto w-full', fitClass.img)} />
       {hud ? <TrayHud hud={hud} /> : null}
       {transparent ? <TransparencyToggle pressed={checker} onToggle={() => setChecker((on) => !on)} className={cn('absolute right-3', hud ? 'bottom-3' : 'top-3')} /> : null}
       {pool ? <WorkTag pool={pool} visibility={visibility ?? defaultVisibility(pool)} className="absolute bottom-3 left-3" /> : null}

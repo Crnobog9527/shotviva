@@ -4,6 +4,7 @@ import { useFormatter, useTranslations } from 'next-intl'
 /* eslint-disable @next/next/no-img-element -- local object URL of the picked photo */
 import { useRef } from 'react'
 
+import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
 import { UPLOAD_ACCEPT } from '@/core/storage/rules'
 
 import { ShortDay } from '../again/short-day'
@@ -24,7 +25,7 @@ export function PhotoCard({ photo, upload, onPick }: { photo: CardPhoto; upload:
   return (
     <div className="hairline-lit flex items-center gap-4 rounded-panel bg-card p-3">
       <div className="relative aspect-[4/5] w-24 flex-none overflow-hidden rounded-inner bg-muted">
-        <img src={photo.url} alt={t('workspace.photoAlt')} className="size-full object-cover" />
+        <img src={photo.url} alt={t('workspace.photoAlt')} className={`${REPLAY_BLOCK_CLASS} size-full object-cover`} />
       </div>
       <div className="min-w-0 flex-1" aria-live="polite">
         <UploadStage upload={upload} kept={photo.keptFrom !== undefined} />

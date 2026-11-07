@@ -1,21 +1,41 @@
 import type { CaptureResult } from 'posthog-js'
 import { describe, expect, it } from 'vitest'
 
+import type { Consent } from '../consent/decision'
+import { REPLAY_BLOCK_CLASS } from '../replay'
 import { posthogConfig, scrubCapture, scrubUrl } from './posthog-config'
 
-describe('posthogConfig (ARCHITECTURE §16.1)', () => {
-  it('stores nothing in the browser and records no sessions', () => {
-    expect(posthogConfig()).toMatchObject({
-      persistence: 'memory',
-      disable_session_recording: true,
+const outsideEurope: Consent = { regionOpen: true, choice: null }
+const european: Consent = { regionOpen: false, choice: null }
+
+describe('posthogConfig (ARCHITECTURE §16.1, T70)', () => {
+  it('uses cookies outside Europe and leaves replay to the PostHog project', () => {
+    expect(posthogConfig(outsideEurope, '/')).toMatchObject({
+      persistence: 'localStorage+cookie',
+      disable_session_recording: false,
       disable_surveys: true,
       disable_product_tours: true,
       person_profiles: 'identified_only',
     })
   })
 
+  it('stores nothing and records nothing for a European visitor who has not accepted', () => {
+    expect(posthogConfig(european, '/')).toMatchObject({ persistence: 'memory', disable_session_recording: true })
+    expect(posthogConfig({ ...european, choice: 'necessary' }, '/')).toMatchObject({ persistence: 'memory', disable_session_recording: true })
+    expect(posthogConfig({ ...european, choice: 'accepted' }, '/')).toMatchObject({ persistence: 'localStorage+cookie', disable_session_recording: false })
+  })
+
+  it('never records /admin or the checkout return page', () => {
+    expect(posthogConfig(outsideEurope, '/admin/users')).toMatchObject({ disable_session_recording: true })
+    expect(posthogConfig(outsideEurope, '/zh/checkout')).toMatchObject({ disable_session_recording: true })
+  })
+
+  it('masks every input and blocks the users\' photos in replay', () => {
+    expect(posthogConfig(outsideEurope, '/').session_recording).toEqual({ maskAllInputs: true, blockSelector: `.${REPLAY_BLOCK_CLASS}` })
+  })
+
   it('sends through the same-origin /ingest proxy', () => {
-    expect(posthogConfig()).toMatchObject({ api_host: '/ingest', ui_host: 'https://us.posthog.com' })
+    expect(posthogConfig(outsideEurope, '/')).toMatchObject({ api_host: '/ingest', ui_host: 'https://us.posthog.com' })
   })
 })
 

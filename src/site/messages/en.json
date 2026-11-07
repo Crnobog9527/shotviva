@@ -1022,7 +1022,16 @@
   "footer": {
     "legalNav": "Legal",
     "copyright": "© {year} {name}",
-    "language": "Language"
+    "language": "Language",
+    "cookieSettings": "Cookie settings"
+  },
+  "consent": {
+    "label": "Cookies",
+    "settingsTitle": "Cookie settings",
+    "body": "<lead>Help us make Shotviva better.</lead> Analytics cookies let us see how people find their way around the site. Never used for ads. <link>Privacy policy</link>",
+    "accept": "Accept",
+    "necessary": "Necessary only",
+    "close": "Close cookie settings"
   },
   "notFound": {
     "title": "Page not found",

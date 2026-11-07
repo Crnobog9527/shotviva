@@ -1,3 +1,4 @@
+import { REPLAY_BLOCK_CLASS } from '../../analytics/browser'
 import type { TicketImage } from '../types'
 
 // A message's images (T69): small squares in the card; each opens the full image (a short-lived
@@ -18,7 +19,7 @@ export function MessageImages({ images, openLabel }: { images: readonly TicketIm
           >
             {/* A private, signed R2 URL that expires: nothing for next/image to cache. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={image.url} alt="" width={image.width} height={image.height} loading="lazy" decoding="async" className="size-24 object-cover" />
+            <img src={image.url} alt="" width={image.width} height={image.height} loading="lazy" decoding="async" className={`${REPLAY_BLOCK_CLASS} size-24 object-cover`} />
           </a>
         </li>
       ))}

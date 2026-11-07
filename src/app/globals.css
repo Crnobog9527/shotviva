@@ -428,6 +428,15 @@ html:lang(zh-Hans) :is(em, i, .italic) {
 @keyframes sv-dialog-out {
   to { opacity: 0; scale: 0.98; }
 }
+/* The consent bar (core/analytics, T70) rises 12px into place once; still under reduced motion. */
+@keyframes sv-consent-in {
+  from { transform: translateY(12px); opacity: 0; }
+}
+@utility consent-in {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: sv-consent-in 360ms var(--ease) both;
+  }
+}
 @keyframes sv-scrim-in {
   from { opacity: 0; }
 }

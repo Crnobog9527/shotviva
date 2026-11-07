@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element -- short-lived signed R2 URLs, not optimisable */
 import { useFormatter, useTranslations } from 'next-intl'
 
+import { REPLAY_BLOCK_CLASS } from '../../analytics/browser'
 import { Link } from '../../i18n/ui'
 import type { MyRequest, Page } from '../types'
 import { ChevronIcon } from './icons'
@@ -58,7 +59,7 @@ function RowBody({ request, now }: { request: MyRequest; now: Date }) {
   return (
     <>
       {photo ? (
-        <img src={photo} alt="" loading="lazy" className="h-20 w-16 flex-none rounded-[10px] object-cover" />
+        <img src={photo} alt="" loading="lazy" className={`${REPLAY_BLOCK_CLASS} h-20 w-16 flex-none rounded-[10px] object-cover`} />
       ) : (
         <span aria-hidden="true" className="h-20 w-16 flex-none rounded-[10px] bg-muted" />
       )}

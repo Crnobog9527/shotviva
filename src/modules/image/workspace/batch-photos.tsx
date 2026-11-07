@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl'
 /* eslint-disable @next/next/no-img-element -- local object URLs of the picked photos */
 import { useRef } from 'react'
 
+import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
 import type { MembershipTier } from '@/core/config'
 import { UPLOAD_ACCEPT } from '@/core/storage/rules'
 import { cn } from '@/core/ui/cn'
@@ -74,7 +75,7 @@ function TrayPhoto({ photo, index, onRemove }: { photo: BatchPhoto; index: numbe
   const fraction = upload.phase === 'uploading' ? upload.progress : upload.phase === 'compressing' ? 0.08 : 0
   return (
     <li className={cn('relative aspect-[4/5] overflow-hidden rounded-[10px] bg-muted', upload.phase === 'error' && 'shadow-[inset_0_0_0_1.5px_var(--destructive)]')}>
-      <img src={photo.url} alt={t('photoN', { index })} className={cn('size-full object-cover', moving && 'brightness-75', upload.phase === 'error' && 'opacity-60')} />
+      <img src={photo.url} alt={t('photoN', { index })} className={cn(REPLAY_BLOCK_CLASS, 'size-full object-cover', moving && 'brightness-75', upload.phase === 'error' && 'opacity-60')} />
       <span aria-hidden="true" className="frost absolute bottom-1 left-1 grid h-5 min-w-5 place-items-center rounded-[6px] px-1 font-mono text-caption leading-none text-photo-ink">
         {index}
       </span>
