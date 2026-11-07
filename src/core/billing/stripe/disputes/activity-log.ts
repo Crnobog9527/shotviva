@@ -16,7 +16,8 @@ function workLine(work: EvidenceWork): string {
       ? `downloaded ${work.download_count}x (first ${utc(work.downloaded_at)}, IP ${orUnknown(work.download_ip)})`
       : 'viewed on the website'
   const size = work.resolution ? `, ${work.resolution}` : ''
-  return `- ${utc(work.created_at)} · IP ${orUnknown(work.client_ip)} · image created (${work.template_id}${size}, ${work.credits_cost} credits) · ${download}`
+  const credits = `${work.credits_cost} ${work.credits_cost === 1 ? 'credit' : 'credits'}`
+  return `- ${utc(work.created_at)} · IP ${orUnknown(work.client_ip)} · image created (${work.template_id}${size}, ${credits}) · ${download}`
 }
 
 function header(facts: EvidenceFacts): string[] {

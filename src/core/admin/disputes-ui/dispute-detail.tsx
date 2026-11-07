@@ -84,7 +84,7 @@ export function DisputeDetail({ row, live, now, stripeUrl, actions }: Props) {
         {COPY.back}
       </Link>
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="font-mono text-2xl font-semibold tabular-nums">{card.amount}</h1>
+        <h2 className="font-mono text-2xl font-semibold tabular-nums">{card.amount}</h2>
         <StatusBadge label={card.status} tone={card.tone} />
         {card.banned ? <span className="text-sm text-muted-foreground">{COPY.bannedTag}</span> : null}
       </div>
