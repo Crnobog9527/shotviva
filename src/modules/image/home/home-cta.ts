@@ -8,6 +8,8 @@ export type HomeViewer = {
   balance: Balance
   // TIER_LIMITS concurrency, and the jobs running when the page was rendered.
   concurrency: { limit: number; runningIds: string[] }
+  // Saved template ids, newest first (T83), read with the visitor's own session.
+  favoriteIds: string[]
 }
 
 export type HomePhotoStatus = 'none' | 'uploading' | 'ready' | 'error'

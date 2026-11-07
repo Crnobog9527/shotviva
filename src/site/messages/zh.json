@@ -918,6 +918,15 @@
       "checkAgain": "再查一次",
       "backToCreate": "返回创作",
       "finePending": "如果 10 分钟后「我的」里还没有显示，请写信到 {email}，附上付款时间。"
+    },
+    "favorites": {
+      "save": "收藏 {name}",
+      "saved": "收藏",
+      "limit": "最多收藏 {max} 个模板，取消一个后再收藏。",
+      "unavailable": "这个模板暂时不可用，没有收藏上。",
+      "failed": "没能保存这次修改，请检查网络后重试。",
+      "close": "关闭",
+      "pickerGroup": "收藏"
     }
   },
   "paywall": {

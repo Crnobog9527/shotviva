@@ -45,6 +45,8 @@ export const ERROR_CODES = [
   // A membership checkout for the same plan or a lower one while a membership runs: only
   // upgrades (ARCHITECTURE §6.2 「升级」, T66); to go lower, cancel and buy again once it ends.
   'DOWNGRADE_NOT_ALLOWED',
+  // Saved templates (ARCHITECTURE §5.1b, T83): the account already holds the most it may.
+  'FAVORITES_LIMIT',
   'INTERNAL',
 ] as const
 
@@ -77,6 +79,7 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   GENERATION_FAILED: 502,
   SUBSCRIPTION_CANCEL_FAILED: 502,
   DOWNGRADE_NOT_ALLOWED: 409,
+  FAVORITES_LIMIT: 409,
   INTERNAL: 500,
 }
 

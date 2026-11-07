@@ -560,6 +560,16 @@ html[data-pushed-back] [data-app-ground] {
   }
 }
 
+/* A heart just saved (T83): one small spring pop, none under reduced motion. */
+@keyframes sv-heart-pop {
+  40% { transform: scale(1.24); }
+}
+@utility animate-heart-pop {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: sv-heart-pop 360ms var(--spring);
+  }
+}
+
 /* Developing scan line in Photos rows: sweeps while a photo develops; still under reduced motion. */
 @keyframes sv-scan {
   from { top: 8%; }

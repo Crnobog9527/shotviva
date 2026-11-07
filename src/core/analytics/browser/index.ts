@@ -8,6 +8,7 @@ export {
   trackContactSales,
   trackPaywallSelect,
   trackPaywallView,
+  trackTemplateFavorite,
   trackTemplateView,
   trackUploadError,
 } from './client'

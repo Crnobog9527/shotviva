@@ -3174,6 +3174,42 @@ $$;
 ALTER FUNCTION "public"."template_category_for"("p_value" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."template_favorites_guard"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  perform 1 from public.profiles where id = new.user_id for update;
+  if not found then
+    raise exception 'PROFILE_NOT_FOUND';
+  end if;
+
+  if exists (
+    select 1 from public.template_favorites f
+     where f.user_id = new.user_id and f.template_id = new.template_id
+  ) then
+    return new;
+  end if;
+
+  if not exists (
+    select 1 from public.templates t
+     where t.id = new.template_id and t.is_active and 'web' = any (t.visible_in)
+  ) then
+    raise exception 'TEMPLATE_NOT_FOUND';
+  end if;
+
+  if (select count(*) from public.template_favorites f where f.user_id = new.user_id) >= 200 then
+    raise exception 'FAVORITES_LIMIT';
+  end if;
+
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."template_favorites_guard"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."template_request_votes_count"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -3714,6 +3750,16 @@ CREATE TABLE IF NOT EXISTS "public"."template_categories" (
 ALTER TABLE "public"."template_categories" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."template_favorites" (
+    "user_id" "uuid" DEFAULT "auth"."uid"() NOT NULL,
+    "template_id" "text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."template_favorites" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."template_prompts" (
     "template_id" "text" NOT NULL,
     "body" "text" NOT NULL,
@@ -3928,6 +3974,11 @@ ALTER TABLE ONLY "public"."template_categories"
 
 
 
+ALTER TABLE ONLY "public"."template_favorites"
+    ADD CONSTRAINT "template_favorites_pkey" PRIMARY KEY ("user_id", "template_id");
+
+
+
 ALTER TABLE ONLY "public"."template_prompts"
     ADD CONSTRAINT "template_prompts_pkey" PRIMARY KEY ("template_id");
 
@@ -4096,6 +4147,10 @@ CREATE UNIQUE INDEX "template_categories_name_zh_key" ON "public"."template_cate
 
 
 
+CREATE INDEX "template_favorites_template_id_idx" ON "public"."template_favorites" USING "btree" ("template_id");
+
+
+
 CREATE INDEX "template_request_votes_user_id_idx" ON "public"."template_request_votes" USING "btree" ("user_id");
 
 
@@ -4141,6 +4196,10 @@ CREATE OR REPLACE TRIGGER "template_categories_set_updated_at" BEFORE UPDATE ON 
 
 
 CREATE OR REPLACE TRIGGER "template_categories_sync_name" AFTER UPDATE OF "name_en" ON "public"."template_categories" FOR EACH ROW WHEN (("old"."name_en" IS DISTINCT FROM "new"."name_en")) EXECUTE FUNCTION "public"."template_categories_sync_name"();
+
+
+
+CREATE OR REPLACE TRIGGER "template_favorites_guard" BEFORE INSERT ON "public"."template_favorites" FOR EACH ROW EXECUTE FUNCTION "public"."template_favorites_guard"();
 
 
 
@@ -4275,6 +4334,16 @@ ALTER TABLE ONLY "public"."system_settings"
 
 
 
+ALTER TABLE ONLY "public"."template_favorites"
+    ADD CONSTRAINT "template_favorites_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."template_favorites"
+    ADD CONSTRAINT "template_favorites_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."template_prompts"
     ADD CONSTRAINT "template_prompts_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON DELETE CASCADE;
 
@@ -4391,6 +4460,21 @@ ALTER TABLE "public"."template_categories" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "template_categories_select_all" ON "public"."template_categories" FOR SELECT TO "authenticated", "anon" USING (true);
+
+
+
+ALTER TABLE "public"."template_favorites" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "template_favorites_delete_own" ON "public"."template_favorites" FOR DELETE TO "authenticated" USING ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
+
+
+
+CREATE POLICY "template_favorites_insert_own" ON "public"."template_favorites" FOR INSERT TO "authenticated" WITH CHECK ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
+
+
+
+CREATE POLICY "template_favorites_select_own" ON "public"."template_favorites" FOR SELECT TO "authenticated" USING ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
 
 
 
@@ -4802,6 +4886,10 @@ GRANT ALL ON FUNCTION "public"."template_category_for"("p_value" "text") TO "ser
 
 
 
+REVOKE ALL ON FUNCTION "public"."template_favorites_guard"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."template_request_votes_count"() FROM PUBLIC;
 
 
@@ -4951,6 +5039,11 @@ GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public
 GRANT ALL ON TABLE "public"."template_categories" TO "service_role";
 GRANT SELECT ON TABLE "public"."template_categories" TO "anon";
 GRANT SELECT ON TABLE "public"."template_categories" TO "authenticated";
+
+
+
+GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."template_favorites" TO "service_role";
+GRANT SELECT,INSERT,DELETE ON TABLE "public"."template_favorites" TO "authenticated";
 
 
 
