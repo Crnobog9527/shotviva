@@ -7,6 +7,7 @@ import { trackPurchase } from '../../analytics/funnel'
 import type { SiteProduct } from '../../config'
 import { AppError } from '../../errors'
 import type { RpcClient } from '../rpc'
+import type { CancelOthers } from '../subscription/cancel-others'
 import { CHECKOUT_METHODS, lookupKey, type CheckoutMethod } from './catalog'
 import type { StripeApi } from './client'
 import { SESSION_EXPAND, sessionFacts } from './payment-facts'
@@ -15,6 +16,8 @@ import { settleCheckout, subscriptionState } from './settle'
 // First payment and one-time purchases (ARCHITECTURE §6.1, §6.3): a paid Checkout Session
 // becomes exactly one settle_checkout (mirror + apply_purchase), keyed by the session id, so
 // redelivered events, the completed + async_payment_succeeded pair, and any retry settle once.
+// A membership bought while another runs is an upgrade (§6.2 「升级」, T66): apply_purchase
+// grants it in full at once, then the other renewing subscriptions are cancelled.
 
 export type FulfilDeps = {
   stripe: StripeApi
@@ -22,6 +25,9 @@ export type FulfilDeps = {
   db: RpcClient
   products: readonly SiteProduct[]
   trackBuy?: typeof trackPurchase
+  // The upgrade step (T66): after a membership is paid, cancel the buyer's other renewing
+  // subscriptions. Wired by the webhook route and the admin replay; absent in tests that only settle.
+  cancelOthers?: CancelOthers
 }
 
 export type FulfilOutcome = 'applied' | 'replayed' | 'unpaid'
@@ -95,6 +101,9 @@ export async function fulfilCheckoutSession(deps: FulfilDeps, sessionId: string)
     subscription: purchase.subscription ? subscriptionState(purchase.subscription) : null,
     payment: await sessionFacts(deps.stripe, session, purchase.method),
   })
+  // Also on a replay: a crash after settling would otherwise leave the old plan billing. The
+  // step is idempotent (ended rows are skipped).
+  if (purchase.product.tier !== 'pack') await deps.cancelOthers?.(purchase.userId, { stripeSubscriptionId: purchase.subscription?.id ?? null })
   if (!change.applied) return 'replayed'
   track(deps, session, purchase)
   return 'applied'

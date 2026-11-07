@@ -7,6 +7,8 @@ import { cn } from "../../ui/cn"
 import { packLooks, type TierOffer } from "./offer"
 import { PackCard } from "./pack-card"
 import { tierPerks } from "./perks"
+import { useStanding } from "./standing-context"
+import { planStanding } from "./standing-pick"
 import { TierCard } from "./tier-card"
 import type { PaywallState } from "./use-paywall-state"
 
@@ -17,18 +19,37 @@ const focusRing = "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-o
 
 type TierProps = { offers: TierOffer[]; wishlistLive: boolean; state: PaywallState }
 
+// A member's lower and current plans stay visible but cannot be picked (T66); the checkout bar
+// explains a locked pick left over from switching Monthly / Yearly.
 export function TierPicker({ offers, wishlistLive, state }: TierProps) {
   const t = useTranslations("paywall")
+  const standing = useStanding()
   const { choice, update } = state
   return (
     // From md the cards are about 280px wide: the saving reads just "You save".
     <div role="radiogroup" aria-label={t("plansLabel")} className="mt-4 grid gap-2 md:mt-6 md:grid-cols-3 md:gap-3 md:[&_.tier-saving-vs]:hidden">
       {offers.map((offer) => {
         const selected = choice.pick === offer.tier
+        const { lock } = planStanding(standing, offer.tier, choice.period)
         return (
-          <label key={offer.tier} data-tier={offer.tier} className={cn("tier-shell cursor-pointer", focusRing)}>
-            <input type="radio" name={PICK} value={offer.tier} checked={selected} onChange={() => update({ pick: offer.tier })} className="sr-only" />
-            <TierCard offer={offer} period={choice.period} selected={selected} perks={tierPerks(offer.tier, { wishlistLive })} check={<Check on={selected} />} />
+          <label key={offer.tier} data-tier={offer.tier} className={cn("tier-shell", lock ? "cursor-default" : "cursor-pointer", focusRing)}>
+            <input
+              type="radio"
+              name={PICK}
+              value={offer.tier}
+              checked={selected}
+              disabled={lock !== null}
+              onChange={() => update({ pick: offer.tier })}
+              className="sr-only"
+            />
+            <TierCard
+              offer={offer}
+              period={choice.period}
+              selected={selected}
+              perks={tierPerks(offer.tier, { wishlistLive })}
+              check={lock ? null : <Check on={selected} />}
+              lock={lock}
+            />
           </label>
         )
       })}

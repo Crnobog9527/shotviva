@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl"
 import type { ReactNode } from "react"
 
 import { cn } from "../../ui/cn"
+import type { BlockReason } from "../subscription/upgrade-rule"
 import { perCreditUsd, perMonthUsd, productFor, yearlySavingUsd, type Period, type TierOffer } from "./offer"
 import { PerkList } from "./perk-list"
 import type { TierPerks } from "./perks"
@@ -20,16 +21,19 @@ type Props = {
   check?: ReactNode
   // /pricing's per-tier button, pinned to the bottom so the three cards line up.
   footer?: ReactNode
+  // A member's lower or current plan (T66): dimmed, with why it cannot be bought.
+  lock?: BlockReason | null
 }
 
 // One tier in its material (DESIGN §4.5, comps-v3-b tiers.css): price a month, credits, price
 // per credit, the yearly saving only on Yearly, then its perks. Same card on /pricing and in
 // the paywall, so both say exactly the same thing.
-export function TierCard({ offer, period, perks, selected, check, footer }: Props) {
+export function TierCard({ offer, period, perks, selected, check, footer, lock }: Props) {
   const t = useTranslations("paywall")
-  const flag = FLAGS[offer.tier]
+  // The member's own plan wears "Your plan" where the sales flag would be.
+  const flag = lock === "current" ? "yourPlan" : lock ? null : FLAGS[offer.tier]
   return (
-    <div className="tier-card flex h-full flex-col px-4 pt-4 pb-3" data-tier={offer.tier} data-selected={selected}>
+    <div className="tier-card flex h-full flex-col px-4 pt-4 pb-3" data-tier={offer.tier} data-selected={selected} data-locked={lock ? "true" : undefined}>
       <div className="flex items-start justify-between gap-2">
         <span>
           <span className="tier-name text-headline font-semibold tracking-[-0.015em] text-[var(--tier-ink)]">{t(`tiers.${offer.tier}`)}</span>
@@ -41,6 +45,7 @@ export function TierCard({ offer, period, perks, selected, check, footer }: Prop
         </span>
         {check}
       </div>
+      {lock === "lower" ? <LockNote /> : null}
       {/* Keyed on the period: the numbers fade in when the toggle changes them. */}
       <div key={period} className="tier-swap">
         <Price offer={offer} period={period} />
@@ -91,5 +96,19 @@ function Facts({ offer, period }: { offer: TierOffer; period: Period }) {
         </p>
       ) : null}
     </>
+  )
+}
+
+// Why a lower plan is not on offer: plans only go up (ARCHITECTURE §6.2 「升级」).
+function LockNote() {
+  const t = useTranslations("paywall")
+  return (
+    <p className="tier-lock mt-2 flex items-start gap-1.5 text-caption leading-[1.35] text-bone-dim">
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="mt-px size-[14px] flex-none" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+        <rect x="5" y="11" width="14" height="9" rx="2" />
+        <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+      </svg>
+      {t("lockLower")}
+    </p>
   )
 }

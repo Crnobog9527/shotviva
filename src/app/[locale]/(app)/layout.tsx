@@ -8,6 +8,7 @@ import { AnnouncementBanner } from '@/core/announcements'
 import { AdminLink, adminEntryFor, AppFrame, BrandProvider, TabBar, TabBarSlot, type TabItem } from '@/core/app-shell'
 import { getSessionUser } from '@/core/auth'
 import { PaywallProvider } from '@/core/billing/paywall'
+import { StandingSlot } from '@/core/billing/subscription'
 import { paymentChannel } from '@/core/billing/waffo'
 import { isModuleEnabled } from '@/core/config'
 import { appShellMetadata } from '@/core/seo'
@@ -57,12 +58,14 @@ async function Tabs({ items }: { items: TabItem[] }) {
 }
 
 // The paywall lists the wishlist perk only while it is open. The switch read is cached
-// (core/system-settings), so this stays in the prerendered shell.
+// (core/system-settings), so this stays in the prerendered shell. What the member already holds
+// (T66: lower plans locked, higher ones Upgrade) streams in through its own Suspense hole.
 async function Paywall({ children }: { children: ReactNode }) {
   const wishlistLive = await isWishlistEnabled(site)
   return (
     <PaywallProvider products={site.billing.products} wishlistLive={wishlistLive} channel={paymentChannel()}>
       {children}
+      <StandingSlot />
     </PaywallProvider>
   )
 }

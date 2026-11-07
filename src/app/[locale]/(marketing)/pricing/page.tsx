@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 
 import { CheckoutCancelToast, PaywallProvider, PricingPayWith, PricingPlans } from '@/core/billing/paywall'
+import { StandingSlot } from '@/core/billing/subscription'
 import { paymentChannel } from '@/core/billing/waffo'
 import { BusinessSection, CreditBuys, FaqSection, PricingHero } from '@/core/content'
 import { localizePath } from '@/core/i18n'
@@ -16,7 +17,9 @@ import { site } from '@/site/site.config'
 // Stripe's cancel_url lands here (?checkout=cancel) and shows a toast (T43).
 // Everything renders into the static HTML, in US dollars in both languages (建站规格 §6.1, R5).
 // Indexable: /pricing and /zh/pricing are in their keyword map CSVs and in site.indexing.
-// Buying opens the same paywall as the app; signed-out buyers sign in first.
+// Buying opens the same paywall as the app; signed-out buyers sign in first. A signed-in member's
+// plans (T66: lower ones locked, higher ones Upgrade) come from a request-time hole, after the
+// static HTML.
 // PAYMENT_CHANNEL is read when the page renders (at build): switching channel is an env change
 // plus a redeploy, which re-renders this page with the matching payment copy.
 export async function generateMetadata(): Promise<Metadata> {
@@ -44,6 +47,7 @@ export default async function PricingPage() {
       <PricingHero text={page} />
       <PaywallProvider products={site.billing.products} wishlistLive={wishlistLive} channel={channel}>
         <PricingPlans products={site.billing.products} wishlistLive={wishlistLive} />
+        <StandingSlot />
       </PaywallProvider>
       <BusinessSection
         block={page.business}

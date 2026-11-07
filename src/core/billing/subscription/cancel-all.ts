@@ -32,7 +32,7 @@ function isMissing(error: unknown): boolean {
 
 // Whether Stripe will never bill it again: already ended, or unknown to Stripe. False when
 // Stripe could not be asked.
-async function endedInStripe(stripe: Pick<StripeApi, 'subscriptions'>, id: string): Promise<boolean> {
+export async function endedInStripe(stripe: Pick<StripeApi, 'subscriptions'>, id: string): Promise<boolean> {
   try {
     return ENDED.has((await stripe.subscriptions.retrieve(id)).status)
   } catch (error) {

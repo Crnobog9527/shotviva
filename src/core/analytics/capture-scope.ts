@@ -16,6 +16,9 @@ export const ALERTS = [
   'charge_refunded',
   // charge.dispute.created (T10, ARCHITECTURE §6.3): recorded, credits not clawed back.
   'charge_disputed',
+  // An upgrade was paid but an old subscription would not cancel (T66, ARCHITECTURE §6.2 「升级」):
+  // the Owner cancels it by hand; the new plan stays.
+  'subscription_cancel_failed',
 ] as const
 
 export type AlertKind = (typeof ALERTS)[number]

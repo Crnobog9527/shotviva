@@ -18,9 +18,10 @@ import { site } from '@/site/site.config'
 
 // Starts a hosted checkout for one product and payment method; answers { url } to redirect to.
 // Signed-in, same-origin, not banned (403, before the channel switch so it covers both
-// channels; ARCHITECTURE §7), and no membership while a subscription runs (409
-// SUBSCRIPTION_EXISTS). PAYMENT_CHANNEL picks Stripe (routing per payment method lives
-// in core/billing/stripe) or Waffo (card memberships recurring, the rest one-time, ARCHITECTURE §6.3).
+// channels; ARCHITECTURE §7), and while a membership runs only a higher plan (409
+// DOWNGRADE_NOT_ALLOWED otherwise; §6.2 「升级」, T66). PAYMENT_CHANNEL picks Stripe (routing per
+// payment method lives in core/billing/stripe) or Waffo (card memberships recurring, the rest
+// one-time, ARCHITECTURE §6.3).
 export async function POST(request: NextRequest) {
   try {
     assertSameOrigin(request)
@@ -30,7 +31,8 @@ export async function POST(request: NextRequest) {
     // Only what the buyer's page listed: 中国银行卡 needs a zh locale and the Stripe channel (T64).
     const channel = paymentChannel()
     assertOffered(body.data, channel)
-    // One running subscription per account: a membership while one is live answers 409.
+    // Upgrades only: the same or a lower plan while a membership runs answers 409. An upgrade is
+    // an ordinary checkout at full price; the payment webhook cancels the old subscription.
     const product = site.billing.products.find((p) => p.id === body.data.product_id)
     if (product) await assertCanBuy(createAdminSupabase(), user.id, product)
     const start = channel === 'waffo' ? startWaffo : startStripe

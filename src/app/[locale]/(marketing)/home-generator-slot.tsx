@@ -5,6 +5,7 @@ import { googleAction } from '@/app/auth/actions'
 import { createAdminSupabase, createServerSupabase, getSessionUser } from '@/core/auth'
 import { currentTier, limitsFor, readBalance } from '@/core/billing'
 import { PaywallProvider } from '@/core/billing/paywall'
+import { StandingSlot } from '@/core/billing/subscription'
 import { paymentChannel } from '@/core/billing/waffo'
 import { listOwnJobs } from '@/core/jobs'
 import { logger } from '@/core/logger'
@@ -49,6 +50,8 @@ async function WithViewer(props: Base) {
   return (
     <PaywallProvider products={site.billing.products} wishlistLive={wishlistLive} channel={paymentChannel()}>
       <HomeGenerator {...props} viewer={viewer} googleAction={googleAction} />
+      {/* What the member holds, so the paywall locks lower plans (T66). */}
+      <StandingSlot />
     </PaywallProvider>
   )
 }

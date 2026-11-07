@@ -939,6 +939,7 @@
     "walletOnce": "一次性付款，{period, select, year {1 年} other {30 天}}，不自动续费",
     "oneTime": "一次性付款",
     "ctaPlan": "继续购买{tier} · {price}{period, select, year {/年} other {/月}}",
+    "ctaUpgrade": "升级到{tier} · {price}{period, select, year {/年} other {/月}}",
     "ctaPack": "继续购买 {count} 积分 · {price}",
     "finePlanCard": "按{period, select, year {年} other {月}}以 {price} 自动续费 · 随时可取消 · 美元",
     "finePlanWallet": "一次性支付 {period, select, year {1 年} other {30 天}} · 不自动续费 · 美元",
@@ -946,6 +947,7 @@
     "redirecting": "正在打开安全付款页…",
     "error": "付款页没能打开，请稍后再试。",
     "choose": "选择{tier}",
+    "upgradeTo": "升级到{tier}",
     "perCreditShort": "每积分 {price}",
     "savingLabel": "<vs>比按月付</vs>每年省",
     "savingAmount": "{amount}",
@@ -958,8 +960,14 @@
     "payNotePacks": "积分包一律一次性付款。",
     "cancelled": "<b>已取消付款。</b>没有扣款。",
     "cancelledClose": "关闭",
-    "alreadySubscribed": "你已经有一个正在生效的套餐，请先到「我的」里更改或取消。",
-    "goToAccount": "去「我的」"
+    "downgradeRefused": "会员期内只能升级，不能降级。",
+    "goToAccount": "去「我的」",
+    "yourPlan": "当前套餐",
+    "notAvailable": "不可选",
+    "lockLower": "不能降级，可先取消，到期后重新订。",
+    "lockCurrentNote": "这是你当前的套餐，可在「我的」里管理或取消。",
+    "upgradeNote": "立即生效，积分一次到账，已有积分保留。",
+    "upgradeNoteCancels": "立即生效，积分一次到账；原订阅今天取消，已有积分保留。"
   },
   "announcement": {
     "dismiss": "关闭公告"

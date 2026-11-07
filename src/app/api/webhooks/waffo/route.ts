@@ -2,7 +2,9 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 import { errorResponse } from '@/core/api-response'
 import { createAdminSupabase } from '@/core/auth'
-import { handleWaffoWebhook, waffoWebhookConfig } from '@/core/billing/waffo'
+import { stripeClient } from '@/core/billing/stripe'
+import { cancelOtherSubscriptions } from '@/core/billing/subscription'
+import { handleWaffoWebhook, waffoClient, waffoWebhookConfig } from '@/core/billing/waffo'
 import { site } from '@/site/site.config'
 
 // Public on purpose: Waffo calls it without a session. The X-Waffo-Signature header is the
@@ -12,7 +14,11 @@ import { site } from '@/site/site.config'
 export async function POST(request: NextRequest) {
   let deps
   try {
-    deps = { ...waffoWebhookConfig(), db: createAdminSupabase(), products: site.billing.products }
+    const db = createAdminSupabase()
+    // An upgrade cancels the old subscription, whichever channel bills it (T66).
+    const cancelOthers = (userId: string, keep: { waffoOrderId?: string | null }) =>
+      cancelOtherSubscriptions({ admin: db, stripe: stripeClient, waffo: () => waffoClient() }, userId, keep)
+    deps = { ...waffoWebhookConfig(), db, products: site.billing.products, cancelOthers }
   } catch (error) {
     // Missing keys: 500 so Waffo keeps retrying while the environment is fixed.
     return errorResponse(error, 'webhooks/waffo')

@@ -226,6 +226,16 @@
   }
 }
 
+/* A member's lower or current plan (T66): the material stays so the three still compare, the
+   numbers and perks step back, and nothing lifts or sweeps. The reason line keeps full contrast. */
+@layer components {
+  .tier-card[data-locked="true"] .tier-swap,
+  .tier-card[data-locked="true"] .tier-perks { opacity: 0.5; }
+  .tier-shell .tier-card[data-locked="true"]::after,
+  .tier-shell:hover .tier-card[data-locked="true"]::after { animation: none; }
+  .tier-shell:hover .tier-card[data-locked="true"] { transform: none; }
+}
+
 /* The checkout-cancel toast drops in from the top (T43); the return page's pending clock turns. */
 @keyframes sv-toast-in {
   from { opacity: 0; transform: translate(-50%, -12px); }
