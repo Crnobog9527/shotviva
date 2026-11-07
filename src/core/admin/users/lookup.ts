@@ -19,9 +19,9 @@ export type LookupHit = { kind: LookupKind; userId: string; jobId: string | null
 const FULL_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // A job's reference number or any 6+ character prefix of its id (ARCHITECTURE §10.a 「出图编号」):
-// a range on generation_jobs_pkey, tried before admin_lookup. A full id still goes to
-// admin_lookup, which checks accounts first. No job: null, and the query carries on as an email
-// fragment or order number.
+// a range on generation_jobs_pkey, tried only when admin_lookup found nothing, so an all-digit
+// email fragment (a QQ address) or an order number still finds its account first. A full id is
+// admin_lookup's own (accounts first, then jobs).
 async function lookupJobRef(db: SupabaseClient, query: string): Promise<LookupHit | null> {
   const ref = FULL_UUID.test(query) ? null : normalizeJobRef(query)
   if (!ref) return null
@@ -39,14 +39,13 @@ const rowSchema = z.object({
 export async function lookupUser(db: SupabaseClient, query: string): Promise<LookupHit | null> {
   const q = query.trim()
   if (q.length === 0) return null
-  const byRef = await lookupJobRef(db, q)
-  if (byRef) return byRef
   const { data, error } = await db.rpc('admin_lookup', { p_query: q })
   if (error) throw new AppError('INTERNAL', 'admin lookup failed', { cause: new Error(error.message) })
   // A Waffo subscription order (ORD_…) matches one payments row per charge (T50), all the same
   // user; every other kind of query matches at most one row.
   const row = rowSchema.array().parse(data)[0]
-  return row ? { kind: row.kind, userId: row.user_id, jobId: row.job_id } : null
+  if (row) return { kind: row.kind, userId: row.user_id, jobId: row.job_id }
+  return lookupJobRef(db, q)
 }
 
 // The search button's submit flag (?lookup=1): only that submission runs admin_lookup, and the

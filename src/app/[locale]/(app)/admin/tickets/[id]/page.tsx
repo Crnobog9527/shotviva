@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 import { AdminPage, loadUser } from '@/core/admin'
 import { TICKETS_COPY, TicketDetailView } from '@/core/admin/tickets-ui'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
-import { jobRefOf } from '@/core/jobs'
+import { jobRefOrShort } from '@/core/jobs'
 import { serverEnv } from '@/core/env'
 import { r2Store } from '@/core/storage'
 import { loadAdminTicket, showMessages } from '@/core/support'
@@ -28,7 +28,7 @@ export default async function AdminTicketPage({ params }: PageProps<'/[locale]/a
   const [user, messages, jobRef] = await Promise.all([
     loadUser(db, ticket.userId),
     showMessages(r2Store(), ticket.messages),
-    ticket.jobId ? jobRefOf(db, ticket.jobId) : null,
+    ticket.jobId ? jobRefOrShort(db, ticket.jobId) : null,
   ])
   return (
     <AdminPage title={TICKETS_COPY.detailTitle}>

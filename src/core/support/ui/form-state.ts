@@ -15,4 +15,5 @@ export function formError(code: string): FormError {
 export type FormAction = (state: FormState, data: FormData) => Promise<FormState>
 
 // One choice of a picker, already worded on the server (product names, money, dates).
-export type Choice = { value: string; label: string }
+// ref: a work's reference number (T78), worded on the server like the label.
+export type Choice = { value: string; label: string; ref?: string }

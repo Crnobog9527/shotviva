@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { AppError } from '../errors'
+import { logger } from '../logger'
 import { JOB_REF_LENGTH, jobRef, jobRefRange } from './ref'
 
 // Reference numbers need the service role: whether a prefix is shared is a question about every
@@ -40,8 +41,20 @@ export async function jobRefsFor(db: SupabaseClient, jobIds: readonly string[]):
   return refs
 }
 
-export async function jobRefOf(db: SupabaseClient, jobId: string): Promise<string> {
-  return (await jobRefsFor(db, [jobId])).get(jobId) ?? jobRef(jobId)
+// For every page that shows a number (the photo page, the help picker, the admin jobs list and
+// ticket): a failed read never fails the page; it shows the plain first 8 characters instead, which is
+// what the shared-prefix check returns for all but astronomically rare ids.
+export async function jobRefsOrShort(db: SupabaseClient, jobIds: readonly string[]): Promise<Map<string, string>> {
+  try {
+    return await jobRefsFor(db, jobIds)
+  } catch (error) {
+    logger.warn('jobs.ref.read_failed', { error })
+    return new Map(jobIds.map((id) => [id, jobRef(id)]))
+  }
+}
+
+export async function jobRefOrShort(db: SupabaseClient, jobId: string): Promise<string> {
+  return (await jobRefsOrShort(db, [jobId])).get(jobId) ?? jobRef(jobId)
 }
 
 // The jobs whose id starts with `prefix` (already normalized), at most `limit`, by id.

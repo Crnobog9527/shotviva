@@ -7,7 +7,7 @@ import { AppPage, BalanceChip, FlowNav } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
 import { currentTier, limitsFor, readBalance } from '@/core/billing'
 import { currentLocale } from '@/core/i18n/server'
-import { fileUrlFor, findOwnJob, hasInputPreview, jobRefOf, keptInputsOf, originalUrlFor, type Job } from '@/core/jobs'
+import { fileUrlFor, findOwnJob, hasInputPreview, jobRefOrShort, keptInputsOf, originalUrlFor, type Job } from '@/core/jobs'
 import { r2Store } from '@/core/storage'
 import { EDIT_TEMPLATE_ID, listTemplatesIn, loadEditOffer } from '@/core/templates'
 import { DeleteWork, EditFlow, EditTrigger, editDisplay, editOriginal, ResultView, toPhotoDetail } from '@/modules/image'
@@ -23,7 +23,8 @@ function Nav({ title, aside }: { title: string; aside?: ReactNode }) {
 
 // Everything the page reads besides the job, in one round: templates, the upload preview's HEAD
 // (T32), for editing (T30) the source work, the edit offer, balance and tier, and the reference
-// number (T78; whether another job shares its first 8 characters is a service-role question).
+// number (T78; whether another job shares its first 8 characters is a service-role question,
+// and a failed read falls back to the first 8 characters rather than failing the page).
 async function loadAround(supabase: Awaited<ReturnType<typeof createServerSupabase>>, userId: string, job: Job) {
   const locale = await currentLocale()
   const admin = createAdminSupabase()
@@ -36,7 +37,7 @@ async function loadAround(supabase: Awaited<ReturnType<typeof createServerSupaba
     readBalance(supabase, userId),
     // current_tier() is service-role only; the user's own id comes from the session.
     currentTier(admin, userId),
-    jobRefOf(admin, job.id),
+    jobRefOrShort(admin, job.id),
   ])
   return { templates, kept, parent, offer, balance, tier, reference }
 }

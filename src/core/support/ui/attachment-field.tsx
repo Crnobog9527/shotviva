@@ -3,7 +3,7 @@
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 
-import { jobRef } from '../../jobs/ref'
+
 import { attachmentFor, type TicketType } from '../rules'
 import type { Choice } from './form-state'
 
@@ -34,10 +34,11 @@ type PickerProps = { name: string; label: string; choices: readonly Choice[]; re
 function WorkPicker({ label, works, initial }: { label: string; works: readonly Choice[]; initial: string }) {
   const t = useTranslations('app.support.new')
   const [picked, setPicked] = useState(initial)
+  const ref = works.find((choice) => choice.value === picked)?.ref
   return (
     <div className="grid gap-2">
       <Picker name="jobId" label={label} choices={works} required={false} initial={initial} onPick={setPicked} />
-      {picked ? <p className="font-mono text-caption text-muted-foreground">{t('workRef', { ref: jobRef(picked) })}</p> : null}
+      {ref ? <p className="font-mono text-caption text-muted-foreground">{t('workRef', { ref })}</p> : null}
     </div>
   )
 }

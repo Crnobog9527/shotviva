@@ -28,8 +28,14 @@ describe('submit form pickers', () => {
   it('words each work by template, date and reference number (T78)', () => {
     const id = '2fa821c6-1a2b-4c3d-8e4f-000000000001'
     expect(workChoices([{ id, templateName: 'Pure White', createdAt: '2026-11-03T12:00:00Z' }], t)).toEqual([
-      { value: id, label: 'Pure White · Nov 3, 2026 · 2fa821c6' },
+      { value: id, ref: '2fa821c6', label: 'Pure White · Nov 3, 2026 · 2fa821c6' },
     ])
+    // A longer number from the server (another job shares the first 8) is used as is.
+    const refs = new Map([[id, '2fa821c6-1a2b']])
+    expect(workChoices([{ id, templateName: 'Pure White', createdAt: '2026-11-03T12:00:00Z' }], t, refs)[0]).toMatchObject({
+      ref: '2fa821c6-1a2b',
+      label: 'Pure White · Nov 3, 2026 · 2fa821c6-1a2b',
+    })
   })
 })
 

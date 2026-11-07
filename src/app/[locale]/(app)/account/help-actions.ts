@@ -6,6 +6,7 @@ import { getTranslations } from 'next-intl/server'
 
 import { createAdminSupabase, createServerSupabase, requireApiUser } from '@/core/auth'
 import { AppError, toAppError } from '@/core/errors'
+import { jobRefsOrShort } from '@/core/jobs'
 import { logger } from '@/core/logger'
 import { r2Store } from '@/core/storage'
 import {
@@ -100,5 +101,7 @@ export async function loadWorkChoices(jobId?: string | null): Promise<Choice[]> 
   const user = await requireApiUser()
   const include = typeof jobId === 'string' && UUID.test(jobId) ? jobId : null
   const [works, t] = await Promise.all([listWorkOptions(await createServerSupabase(), user.id, include), getTranslations('app.support')])
-  return workChoices(works, t as unknown as Translate)
+  // Whether another job shares a work's first 8 characters is a service-role question (ids only).
+  const refs = await jobRefsOrShort(createAdminSupabase(), works.map((work) => work.id))
+  return workChoices(works, t as unknown as Translate, refs)
 }

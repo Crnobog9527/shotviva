@@ -6,7 +6,8 @@ import type { PaymentOption, WorkOption } from './types'
 // The submit form's pickers, worded on the server (app.support.product / app.support.new) so
 // the client gets plain labels. Money in the payment's own currency, as charged.
 
-type Choice = { value: string; label: string }
+// ref: a work's reference number (T78), as long as the photo page shows it.
+type Choice = { value: string; label: string; ref?: string }
 type Formats = { money(cents: number, currency: string): string }
 
 function productLabel(productId: string, products: readonly SiteProduct[], t: Translate): string {
@@ -32,12 +33,14 @@ export function paymentChoices(
   }))
 }
 
-export function workChoices(options: readonly WorkOption[], t: Translate): Choice[] {
-  return options.map((option) => ({
-    value: option.id,
+// `refs`: reference numbers read on the server (jobRefsOrShort), so the picker shows the same,
+// longer number the photo page and the admin show when two jobs share the first 8 characters.
+export function workChoices(options: readonly WorkOption[], t: Translate, refs: ReadonlyMap<string, string> = new Map()): Choice[] {
+  return options.map((option) => {
+    const ref = refs.get(option.id) ?? jobRef(option.id)
     // The reference number (T78) is how the user and the Owner tell two works apart.
-    label: t('new.workOption', { template: option.templateName, date: new Date(option.createdAt), ref: jobRef(option.id) }),
-  }))
+    return { value: option.id, ref, label: t('new.workOption', { template: option.templateName, date: new Date(option.createdAt), ref }) }
+  })
 }
 
 // Stripe-style smallest units: two decimals except zero-decimal currencies, which the payments

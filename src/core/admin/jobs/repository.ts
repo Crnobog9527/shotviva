@@ -4,7 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { AppError } from '@/core/errors'
-import { jobRef, jobRefRange, jobRefsFor, modelFromTag } from '@/core/jobs'
+import { jobRef, jobRefRange, jobRefsOrShort, modelFromTag } from '@/core/jobs'
 
 import { afterCursor, decodeCursor, PAGE_SIZE, toPage, type Page } from '../cursor'
 import { beijingDayStart, refFilter, type JobFilters } from './filters'
@@ -118,7 +118,7 @@ export async function listJobs(db: SupabaseClient, filters: JobFilters): Promise
 
 // One more round trip on the primary key: does any other job share a row's first 8 characters?
 async function withRefs(db: SupabaseClient, jobs: AdminJob[]): Promise<AdminJob[]> {
-  const refs = await jobRefsFor(db, jobs.map((job) => job.id))
+  const refs = await jobRefsOrShort(db, jobs.map((job) => job.id))
   return jobs.map((job) => ({ ...job, ref: refs.get(job.id) ?? job.ref }))
 }
 
