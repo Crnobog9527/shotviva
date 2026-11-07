@@ -42,14 +42,16 @@
   .mk-word { font: 400 24px/44px var(--font-display); letter-spacing: -0.02em; white-space: nowrap; }
   .mk-word i, .mk-foot-word i { color: var(--primary); font-style: normal; }
   /* margin-right keeps clear air before the nav: the tagline hides rather than touch the globe.
-     Phones: at most two small lines in a box capped in em, so a long tagline's size does not move
-     while fonts load; Chinese breaks after the comma because 9 CJK characters fill exactly 9em. */
+     Below 1024px: two small lines in a box capped in em, so its size does not move while fonts
+     load. The caps fit the Owner's copy (2026-11-08): "AI edits, true / to your photo" in 7.5em;
+     Chinese breaks after the comma because 9 CJK characters fill exactly 9em. A longer copy
+     needs a new cap here, or it takes a third line that the 44px brand line clips. */
   .mk-brand-tag {
     font: 400 12px/15px var(--font-sans); color: var(--muted-foreground); padding-left: 8px; border-left: 1px solid var(--border);
-    margin-right: 4px; width: max-content; max-width: calc(10.5em + 9px); text-wrap: balance;
+    margin-right: 4px; width: max-content; max-width: calc(7.5em + 9px); text-wrap: balance;
   }
   .mk-brand-tag:lang(zh) { max-width: calc(9.05em + 9px); text-wrap: wrap; }
-  @media (min-width: 768px) {
+  @media (min-width: 1024px) {
     .mk-brand-tag, .mk-brand-tag:lang(zh) { max-width: none; font-size: 14px; line-height: 1.15; white-space: nowrap; margin-right: 16px; }
   }
   .mk-nav { display: flex; align-items: center; gap: 4px; }
@@ -64,7 +66,18 @@
   .mk-start {
     position: relative; align-items: center; height: 36px; padding: 0 16px; border-radius: 999px; font: 600 14px/1 var(--font-sans); letter-spacing: -0.01em;
     white-space: nowrap; text-decoration: none; background: var(--primary); color: var(--primary-foreground); box-shadow: var(--shadow-raised);
+    justify-items: center;
   }
+  /* Start free and its stand-ins for the scrolled-away generator (nav-account.tsx): one grid
+     cell, so the button is as wide as its widest label whichever shows; <html data-gen-away>
+     (modules/image use-header-upload) picks the label. */
+  .mk-start > span { grid-area: 1 / 1; display: inline-flex; align-items: center; gap: 6px; transition: opacity .2s var(--ease), visibility 0s .2s; }
+  .mk-start svg { width: 18px; height: 18px; margin-left: -2px; }
+  .mk-start-up, .mk-start-gen,
+  html[data-gen-away] .mk-start-free { visibility: hidden; opacity: 0; }
+  html[data-gen-away="upload"] .mk-start-up,
+  html[data-gen-away="generate"] .mk-start-gen { visibility: visible; opacity: 1; transition: opacity .2s var(--ease), visibility 0s; }
+  @media (prefers-reduced-motion: reduce) { .mk-start > span { transition: none; } }
   @media (min-width: 768px) {
     .mk-appbar-row { height: 64px; }
     .mk-nav { gap: 2px; }
@@ -74,7 +87,7 @@
     }
     .mk-nl[aria-current="page"] { color: var(--foreground); }
     .mk-login { margin-left: 8px; }
-    .mk-start { display: inline-flex; margin-left: 8px; }
+    .mk-start { display: inline-grid; margin-left: 8px; }
   }
 
   /* ---------- type ---------- */
@@ -186,7 +199,8 @@
   .mk-gen-error, .mk-bench-error { padding: 8px 4px 0; font-size: 14px; line-height: 1.4; color: var(--destructive); }
   .mk-bench-wrap { display: none; }
 
-  /* floating primary: shown only while the generator is off screen */
+  /* floating primary, phones only: shown while the generator is off screen. From 768px up the
+     header's primary stands in for it (Owner 2026-11-08: a floating bar is a phone pattern). */
   .mk-dock {
     position: fixed; z-index: 70; left: 12px; right: 12px; bottom: calc(var(--sab) + 12px); visibility: hidden;
     transform: translateY(calc(100% + var(--sab) + 40px)); transition: transform .45s var(--ease), visibility 0s .45s;
@@ -195,7 +209,7 @@
 
   @media (min-width: 768px) {
     .mk-gen { max-width: 480px; margin: 24px 0 0; }
-    .mk-dock { left: auto; right: var(--gutter); width: 320px; bottom: 24px; }
+    .mk-dock { display: none; }
   }
 
   /* ---------- desktop (≥1024): the bench, one 88px bar that never grows ---------- */
@@ -255,7 +269,6 @@
     .mk-bench .mk-cta { flex: none; width: auto; padding: 0 22px; }
     .mk-bench-gift, .mk-bench-error { position: relative; z-index: 1; }
     .mk-bench-error { text-align: center; }
-    .mk-dock { width: 320px; }
   }
   @media (min-width: 1024px) and (prefers-reduced-motion: no-preference) {
     .mk-bench-wrap::before { animation: mk-breathe 8s ease-in-out infinite; }

@@ -1050,6 +1050,8 @@
       "templates": "模板",
       "login": "登录",
       "startFree": "免费开始",
+      "uploadPhoto": "上传照片",
+      "generate": "生成",
       "openApp": "进入应用",
       "account": "账号"
     },

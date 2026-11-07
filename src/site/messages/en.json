@@ -1050,6 +1050,8 @@
       "templates": "Templates",
       "login": "Log in",
       "startFree": "Start free",
+      "uploadPhoto": "Upload photo",
+      "generate": "Generate",
       "openApp": "Open app",
       "account": "Account"
     },
