@@ -48,6 +48,17 @@ jobs:
       # The app top bar must be in every app page's prerendered shell (scripts/app-shell-check-lib.ts).
       - if: steps.changes.outputs.code == 'true'
         run: pnpm check:app-shell
+      # First-load JS per route against scripts/js-budget.json (performance pass, B8).
+      - if: steps.changes.outputs.code == 'true'
+        run: pnpm js:budget
+      # The SEO text of every indexable page must be in the server HTML (建站规格 R5): the
+      # built app, fetched without JavaScript, checked against site/content.
+      - name: SEO text is server-rendered
+        if: steps.changes.outputs.code == 'true'
+        run: |
+          pnpm start > /tmp/next-start.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf -o /dev/null http://localhost:3000/robots.txt && break; sleep 1; done
+          pnpm seo:ssr http://localhost:3000
 
   # One local Supabase per run serves both the DB tests and the schema.sql snapshot check
   # (AGENTS §5), which used to start its own database in a separate workflow.
