@@ -22,6 +22,9 @@
  *     new definition only widens;
  *   - `update t set … where <col> = <literal> [and …]` (or `in (<literals>)`): targeted rows such
  *     as a catalog price fix, not a bulk rewrite.
+ * Columns this same file adds are the deployed code's blind spot, so the guard also lets through
+ * `alter column … set not null` on one, and an `update` that sets only such columns (a backfill):
+ * nothing live reads or writes them yet.
  *
  * A contract PR (the old structure is confirmed unused on production) goes through with
  * `[contract]` in the PR title, passed in as PR_TITLE.
@@ -284,6 +287,13 @@ function onlyNewColumns(table: string, expr: string | null, context: Context) {
   return refs.length > 0 && refs.every((column) => context.addedColumns.has(`${table}:${column}`))
 }
 
+/** True when every column an update's SET list assigns was added by this same file (a backfill). */
+function setsOnlyNewColumns(table: string, rest: string, context: Context) {
+  const assignments = rest.replace(/ where .*$/, '').replace(/ from .*$/, '')
+  const targets = splitTopLevel(assignments).map((assignment) => new RegExp(String.raw`^(${IDENT}) ?=`).exec(assignment.trim())?.[1])
+  return targets.length > 0 && targets.every((column) => column !== undefined && context.addedColumns.has(`${table}:${objectName(column)}`))
+}
+
 /** Scans one migration's SQL. Errors fail the check; warnings are for the reviewer. */
 export function scanMigration(sql: string): Finding[] {
   const statements = splitStatements(sql)
@@ -392,7 +402,7 @@ function checkStatement(text: string, context: Context, report: (rule: string, s
     const table = objectName(update[1])
     const where = / where (.+?)(?: returning .*)?$/.exec(update[2])?.[1]
     const targeted = where !== undefined && TARGETED_WHERE.test(where.replace(/ ?([(,=]) ?/g, '$1').replace(/ \)/g, ')'))
-    if (!created.has(table) && !targeted) report('bulk-update', table)
+    if (!created.has(table) && !targeted && !setsOnlyNewColumns(table, update[2], context)) report('bulk-update', table)
   }
 }
 
@@ -417,7 +427,9 @@ function checkAlterTable(table: string, rest: string, context: Context, report: 
     if (alterColumn) {
       const name = `${table}.${objectName(alterColumn[1])}`
       const change = alterColumn[2]
-      if (/^set not null\b/.test(change)) report('set-not-null', name)
+      if (/^set not null\b/.test(change)) {
+        if (!context.addedColumns.has(`${table}:${objectName(alterColumn[1])}`)) report('set-not-null', name)
+      }
       else if (/^drop default\b/.test(change)) report('drop-default', name)
       else if (/^drop (identity|expression)\b/.test(change)) report('drop-identity', name)
       else if (/^(set data )?type\b/.test(change)) report('type-change', name)
