@@ -1,3 +1,5 @@
+/* Layer order first (layer-order.test.ts): see LAYER_ORDER there. */
+@layer properties, theme, base, components, utilities;
 /* Sign-in pages (/login, /signup, /reset, /reset/update): the signed-off v3-b comp
    design/comps-v3-b/auth.html, ported class for class with an `au-` prefix. One column; on the
    phone the form is the page, from 768px it sits on a plate under one safelight. Colours come from

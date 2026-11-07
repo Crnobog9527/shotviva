@@ -1,3 +1,5 @@
+/* Layer order first (layer-order.test.ts): see LAYER_ORDER there. */
+@layer properties, theme, base, components, utilities;
 /* Site announcement (T23 table, T44 look; design/comps-v3-b/css/studio.css `.ann`). Two tones from
    site_announcements.tone: "info" is quiet (bone 6% ground, no motion, the link a grey pill);
    "promo" is the band for offers (warm safelight ground, a breathing glow, a light sweep every
