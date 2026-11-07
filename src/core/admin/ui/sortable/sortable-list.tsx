@@ -71,6 +71,8 @@ export function SortableList({ ids, labelOf, onReorder, disabled = false, disabl
         collisionDetection={closestCenter}
         modifiers={[verticalOnly]}
         accessibility={{
+          // dnd-kit's own hidden text would otherwise render inside the <table>.
+          container: mounted ? document.body : undefined,
           announcements: pointerAnnouncements(state.shown, labelOf),
           screenReaderInstructions: { draggable: sortableCopy.instructions },
         }}

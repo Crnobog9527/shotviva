@@ -54,7 +54,7 @@ export function TemplatesEditor({ templates, floor, actions }: Props) {
     report(() => actions.setOrder({ group, ids }), orderCopy.saved, orderCopy.failed)
 
   return (
-    <div className="grid gap-4">
+    <div className="grid min-w-0 grid-cols-1 gap-4">
       <Toolbar query={query} onQuery={setQuery} onNew={() => openEditor({ mode: 'new' })} />
       {notice ? <p className="text-sm text-emerald-700">{notice}</p> : null}
       {error && !editing ? (

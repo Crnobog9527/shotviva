@@ -42,7 +42,7 @@ export function FeaturedPanel({ ids, templates, pending, onReorder, onRemove }: 
           <p className="text-muted-foreground mt-1 text-sm">{orderCopy.dragHint}</p>
           <SortableList ids={ids} labelOf={nameOf} onReorder={onReorder} disabled={pending}>
             {(order) => (
-              <ol className="mt-3 grid gap-1">
+              <ol className="mt-3 grid grid-cols-1 gap-1">
                 {order.map((id) => (
                   <FeaturedRow key={id} id={id} name={nameOf(id)} pending={pending} onRemove={onRemove} />
                 ))}
@@ -62,7 +62,7 @@ function FeaturedRow({ id, name, pending, onRemove }: { id: string; name: string
       <DragHandle handle={item.handle} />
       <span className="text-muted-foreground w-6 font-mono tabular-nums">{item.index + 1}</span>
       <span className="min-w-0 flex-1 truncate">
-        {name} <span className="text-muted-foreground font-mono text-xs">{id}</span>
+        {name} <span className="text-muted-foreground font-mono text-xs max-sm:hidden">{id}</span>
       </span>
       <MoveButtons item={item} />
       <Button variant="ghost" size="sm" disabled={pending} onClick={() => onRemove(id)}>

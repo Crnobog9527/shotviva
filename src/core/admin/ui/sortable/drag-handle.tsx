@@ -10,14 +10,15 @@ import type { SortableItem } from './use-sortable-item'
 // The grip a row is dragged by (mouse) and sorted from (keyboard). Greyed while the list
 // cannot be dragged; its title says why.
 export function DragHandle({ handle }: { handle: SortableItem['handle'] }) {
-  const { lifted, ...props } = handle
+  const { lifted, blocked, ...props } = handle
   return (
     <button
       type="button"
       {...props}
       className={cn(
         'text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 inline-flex size-8 shrink-0 cursor-grab touch-manipulation items-center justify-center rounded-md outline-none focus-visible:ring-[3px] active:cursor-grabbing',
-        'aria-disabled:cursor-not-allowed aria-disabled:opacity-35 aria-disabled:hover:text-muted-foreground',
+        'aria-disabled:cursor-default',
+        blocked && 'hover:text-muted-foreground cursor-not-allowed opacity-35',
         lifted && 'text-primary hover:text-primary cursor-grabbing',
       )}
     >

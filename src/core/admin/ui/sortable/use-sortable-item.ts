@@ -54,6 +54,8 @@ export function useSortableItem(id: string) {
       'aria-disabled': list.locked,
       title: list.disabled ? list.disabledHint : undefined,
       lifted,
+      // Greyed only when the list cannot be dragged at all, not during the short save.
+      blocked: list.disabled,
     },
     moveUp: { label: sortableCopy.moveUp(label), onClick: () => list.move(id, -1), disabled: list.locked || index === 0 },
     moveDown: {
