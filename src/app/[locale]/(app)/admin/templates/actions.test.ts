@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const requireAdmin = vi.fn()
 const setTemplatesActive = vi.fn()
-const cache = vi.hoisted(() => ({ updateTag: vi.fn(), revalidatePath: vi.fn(), refresh: vi.fn() }))
+const cache = vi.hoisted(() => ({ revalidateTag: vi.fn(), refresh: vi.fn() }))
 
 vi.mock('next/cache', () => cache)
 vi.mock('@/core/auth', () => ({ requireAdmin: () => requireAdmin(), createAdminSupabase: () => ({}) }))
@@ -46,12 +46,12 @@ describe('setTemplatesActiveAction (T60 bulk)', () => {
     const result = await setTemplatesActiveAction({ ids: ['t0', 't1'], active: true })
     expect(result).toMatchObject({ ok: true, value: { changed: [{ id: 't0' }, { id: 't1' }] } })
     expect(setTemplatesActive).toHaveBeenCalledWith({}, 'admin', { ids: ['t0', 't1'], active: true }, {})
-    expect(cache.updateTag).toHaveBeenCalledWith('templates')
-    expect(cache.revalidatePath).toHaveBeenCalledWith('/')
+    // Stale-while-revalidate, never a blocking expiry (performance B1).
+    expect(cache.revalidateTag).toHaveBeenCalledWith('templates', 'max')
 
-    cache.updateTag.mockReset()
+    cache.revalidateTag.mockReset()
     setTemplatesActive.mockResolvedValue(outcome(0))
     await setTemplatesActiveAction({ ids: ['t0'], active: true })
-    expect(cache.updateTag).not.toHaveBeenCalled()
+    expect(cache.revalidateTag).not.toHaveBeenCalled()
   })
 })

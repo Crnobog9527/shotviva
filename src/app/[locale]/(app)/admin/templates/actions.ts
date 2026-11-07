@@ -1,6 +1,6 @@
 'use server'
 
-import { refresh, revalidatePath, updateTag } from 'next/cache'
+import { refresh, revalidateTag } from 'next/cache'
 
 import {
   applyCover,
@@ -28,11 +28,14 @@ import { CREDITS_FLOOR } from '@/modules/image'
 
 // Server actions are public endpoints, so each one re-checks the admin role itself.
 
-// Prices and covers show on the home page and template pages: expire them now so the next
-// visitor sees the change without a redeploy (ARCHITECTURE §8.3).
+// Prices and covers show on the home page and the landing pages, so a save marks the cached
+// catalogue stale (ARCHITECTURE §8.3). 'max' is stale-while-revalidate: the next visitor still
+// gets the cached page at once and the fresh one is rendered behind it, instead of waiting a
+// second or more for every marketing page to re-render after each admin save (performance B1).
+// The tag covers every page that reads the catalogue, '/' included. The admin's own lists read
+// the database directly, and refresh() re-renders them now. Charges never read this cache.
 function catalogueChanged() {
-  updateTag(TEMPLATES_CACHE_TAG)
-  revalidatePath('/')
+  revalidateTag(TEMPLATES_CACHE_TAG, 'max')
   refresh()
 }
 
