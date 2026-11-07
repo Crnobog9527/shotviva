@@ -1,3 +1,5 @@
+/* Layer order first (layer-order.test.ts): see LAYER_ORDER there. */
+@layer properties, theme, base, components, utilities;
 /* The four legal pages (T45): design/comps-v3-b/legal.html, ported class for class with an
    `mk-legal` prefix. A 68ch reading measure at 17px, serif section titles with mono counters, a
    contents list that is a folded card on phones and a sticky column from 1024px. Tokens from

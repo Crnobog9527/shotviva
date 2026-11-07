@@ -91,7 +91,8 @@ function Facts({ offer, period }: { offer: TierOffer; period: Period }) {
       </p>
       {period === "year" ? (
         <p className="tier-plate mt-2 flex items-center justify-between gap-2 rounded-inner bg-[var(--tier-plate)] py-2 pr-2 pl-3 text-caption text-[var(--tier-plate-ink)]">
-          <span className="whitespace-nowrap">{t.rich("savingLabel", { vs: (chunks) => <span className="tier-saving-vs">{chunks}</span> })}</span>
+          {/* The label may wrap and the amount may not: at 320px the Max plate is wider than its card. */}
+          <span className="min-w-0">{t.rich("savingLabel", { vs: (chunks) => <span className="tier-saving-vs">{chunks}</span> })}</span>
           <b className="font-mono font-semibold whitespace-nowrap">{t("savingAmount", { amount: money(yearlySavingUsd(offer)) })}</b>
         </p>
       ) : null}
