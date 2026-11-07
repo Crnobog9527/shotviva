@@ -900,3 +900,11 @@ Owner 2026-11-06 发现中文页有功能缺失。逐页对比现有英文页和
 - 不在本卡：OG 分享图、Google OAuth 品牌 logo（Owner 自己上传 `export/c/icon-120.png`）。
 
 **验收**：Chrome / Safari 浅深两种标签栏的 favicon 清楚不切头；iOS「添加到主屏幕」显示 180 图标；manifest 图标被浏览器识别；导航在手机和电脑上都没有两个句点；构建和单测通过；交互验收交给 Codex。
+
+## T59 删除图片上的「Illustrative example」标签（可派）
+
+**目标**：Owner 2026-11-07：全站图片上的「Illustrative example / 示意图」标签全部删掉（DESIGN「The No Badge Rule」）。示意说明改放在文字里，不在图片上。
+
+**范围**：删掉营销页和应用页所有叠在图片上的这个标签：`compare-slider`、`photo-pair`、`shoot-section`（含区块顶部那个 pill）、`PairMedia` 的 `badge`（`feature-card`、`template-sample` 等调用处）以及模板卡上同类标签；清掉不再用的样式（`.mk-illus` 等）和不再用的文案键（中英文一起）。保留：图片替代文字里的「(illustrative example)」，以及区块里本来就有的那一行说明文字（`Template images are illustrative examples` / `模板图片仅为效果示例`）。
+
+**验收**：首页、模板页、Create、价格页、内容页、照片详情页的中英文版在手机和电脑上都看不到这个标签；替代文字仍带说明；构建、单测、lint 通过；交互验收交给 Codex。
