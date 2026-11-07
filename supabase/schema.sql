@@ -4067,8 +4067,8 @@ GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public
 
 
 
-GRANT SELECT,INSERT,DELETE ON TABLE "public"."template_favorites" TO "authenticated";
 GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."template_favorites" TO "service_role";
+GRANT SELECT,INSERT,DELETE ON TABLE "public"."template_favorites" TO "authenticated";
 
 
 
