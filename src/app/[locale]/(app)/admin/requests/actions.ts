@@ -10,7 +10,7 @@ import { site } from '@/site/site.config'
 
 // Server actions are public endpoints, so this re-checks the admin role and the switch itself.
 export async function reviewRequestAction(input: unknown): Promise<ActionResult> {
-  assertWishlistEnabled(site)
+  await assertWishlistEnabled(site)
   await requireAdmin()
   return runAdminAction(async () => {
     await reviewRequest({ db: createAdminSupabase(), store: r2Store() }, input)

@@ -120,7 +120,14 @@ export {
   type FeatureAccessInput,
   type FeatureSetting,
 } from './features'
-export { FEATURES_COPY, FeaturesEditor, type FeatureAdminActions } from './features-editor'
+export { FEATURES_COPY, FeaturesEditor, WISHLIST_SWITCH_COPY, type FeatureAdminActions, type WishlistSwitchState } from './features-editor'
+export {
+  loadWishlistSwitch,
+  saveWishlistSwitch,
+  type SystemSettingDeps,
+  type WishlistSwitch,
+  type WishlistSwitchInput,
+} from './system-settings'
 export {
   clearCostSettings,
   COSTS_CACHE_TAG,
