@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { bulkEditFailures, describeFailure, describePatch, isEmptyPatch, type BulkEditCandidate } from './bulk-edit-rules'
+import { bulkEditFailures, describeFailure, describePatch, isBulkEditable, isEmptyPatch, type BulkEditCandidate } from './bulk-edit-rules'
 
 const FLOOR = { high: { '1k': 2, '2k': 4, '3k': 6 }, medium: { '1k': 1, '2k': 2, '3k': 3 } }
 
@@ -47,6 +47,16 @@ describe('batch edit floor check (T79)', () => {
     // Unpublished, or already on the web: not this rule's business.
     expect(bulkEditFailures([{ ...partnerOnly, isActive: false }], { visibleIn: ['web'] }, FLOOR)).toEqual([])
     expect(bulkEditFailures([template('w', { coverAfterUrl: null })], { visibleIn: ['web'] }, FLOOR)).toEqual([])
+  })
+
+  it('never batch-edits the built-in edit and freeform templates', () => {
+    const failures = bulkEditFailures([template('freeform', { visibleIn: ['partner'] }), template('edit'), template('a')], { quality: 'high' }, FLOOR)
+    expect(failures).toEqual([
+      { id: 'freeform', name: 'FREEFORM', reason: 'system' },
+      { id: 'edit', name: 'EDIT', reason: 'system' },
+    ])
+    expect(isBulkEditable({ id: 'freeform' })).toBe(false)
+    expect(isBulkEditable({ id: 'a' })).toBe(true)
   })
 
   it('describes the change and knows an empty one', () => {

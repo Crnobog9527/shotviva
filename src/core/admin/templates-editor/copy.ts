@@ -88,4 +88,6 @@ export const bulkEditCopy = {
   failuresTitle: (count: number) => `${count} 个模板不合格，整批不会保存：`,
   confirm: (count: number) => `确认修改 ${count} 个`,
   done: (count: number) => `已批量修改 ${count} 个模板`,
+  skipped: (names: string) => `${names} 是系统模板（作品编辑 / 伙伴自由生成），不参与批量编辑，已跳过。`,
+  noneEditable: '选中的都是系统模板，没有可批量编辑的模板。',
 } as const

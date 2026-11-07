@@ -4,6 +4,7 @@ import { useState } from 'react'
 
 import type { CreditsFloor } from '@/core/templates/pricing'
 
+import { isBulkEditable } from '../templates/bulk-edit-rules'
 import type { AdminTemplate, TemplateAdminActions } from '../templates/types'
 import { BulkBar } from './bulk-bar'
 import { BulkConfirmDialog } from './bulk-confirm-dialog'
@@ -59,7 +60,12 @@ export function BulkPublish({ selected, busy, setActiveMany, editMany, floor, on
         </p>
       ) : null}
       {outcome ? <BulkResult outcome={outcome} onDismiss={dismiss} /> : null}
-      <BulkEditDialog edit={edit} templates={selected} floor={floor} />
+      <BulkEditDialog
+        edit={edit}
+        templates={selected.filter(isBulkEditable)}
+        skipped={selected.filter((template) => !isBulkEditable(template))}
+        floor={floor}
+      />
       <BulkConfirmDialog
         active={asking}
         templates={selected}

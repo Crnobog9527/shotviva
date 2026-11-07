@@ -502,7 +502,7 @@ begin
   failures as (
     select jsonb_build_object('id', p.id, 'name', p.name, 'reason', case when p.found then 'system' else 'not_found' end) as failure
     from planned p
-    where not p.found or p.id = 'edit'
+    where not p.found or p.id in ('edit', 'freeform')
     union all
     select jsonb_build_object(
       'id', p.id, 'name', p.name, 'reason', 'below_floor', 'resolution', r.res,
@@ -510,11 +510,11 @@ begin
     )
     from planned p
     cross join unnest(array['1k', '2k', '3k']) as r(res)
-    where p.found and p.id <> 'edit' and (p.credits_cost ->> r.res)::integer < (p_floor -> p.quality ->> r.res)::integer
+    where p.found and p.id not in ('edit', 'freeform') and (p.credits_cost ->> r.res)::integer < (p_floor -> p.quality ->> r.res)::integer
     union all
     select jsonb_build_object('id', p.id, 'name', p.name, 'reason', 'web_incomplete')
     from planned p
-    where p.found and p.id <> 'edit' and p.is_active
+    where p.found and p.id not in ('edit', 'freeform') and p.is_active
       and 'web' = any (p.visible_in) and not ('web' = any (p.old_visible))
       and (nullif(btrim(p.description), '') is null or nullif(btrim(p.cover_before_url), '') is null
            or nullif(btrim(p.cover_after_url), '') is null)

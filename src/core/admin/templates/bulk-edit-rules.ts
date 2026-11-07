@@ -1,3 +1,4 @@
+import { EDIT_TEMPLATE_ID } from '@/core/templates/edit-params'
 import { RESOLUTIONS, type Resolution } from '@/core/templates/output-options'
 import { creditsBelowFloor, type CreditsCost, type CreditsFloor, type TemplateQuality } from '@/core/templates/pricing'
 import type { TemplateSurface } from '@/core/templates/schema'
@@ -25,6 +26,12 @@ export type BulkEditCandidate = Pick<
   'id' | 'name' | 'quality' | 'creditsCost' | 'visibleIn' | 'isActive' | 'description' | 'coverBeforeUrl' | 'coverAfterUrl'
 >
 
+// The built-in templates (T75 puts both in system categories): photo edit has its own page, and
+// the partner API's free-prompt `freeform` must not pick up a web template's prices or entry
+// points from a 「全选」. The dialog leaves them out; the SQL function refuses them as `system`.
+export const BULK_EDIT_SYSTEM_IDS: ReadonlySet<string> = new Set([EDIT_TEMPLATE_ID, 'freeform'])
+export const isBulkEditable = (template: Pick<Template, 'id'>) => !BULK_EDIT_SYSTEM_IDS.has(template.id)
+
 const RESOLUTION_LABEL: Record<Resolution, string> = { '1k': 'Standard', '2k': 'HD', '3k': 'Max' }
 
 export const isEmptyPatch = (patch: BulkEditPatch) =>
@@ -46,6 +53,7 @@ export function bulkEditFailures(
   floor: CreditsFloor,
 ): BulkEditFailure[] {
   return templates.flatMap((template): BulkEditFailure[] => {
+    if (!isBulkEditable(template)) return [{ id: template.id, name: template.name, reason: 'system' }]
     const quality = patch.quality ?? template.quality
     const cost = { ...template.creditsCost, ...patch.creditsCost }
     const { id, name } = template
@@ -62,7 +70,7 @@ export function describeFailure(failure: BulkEditFailure): string {
     case 'web_incomplete':
       return '已上架，缺英文说明或前后对比封面，不能加到站内'
     case 'system':
-      return '系统模板，在「作品编辑」页单独管理'
+      return '系统模板（作品编辑 / 伙伴自由生成），不参与批量编辑'
     case 'not_found':
       return '模板不存在（可能已被删除），请刷新页面'
   }

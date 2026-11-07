@@ -12,13 +12,19 @@ import { readBulkEdit } from './bulk-edit-state'
 import { bulkEditCopy as COPY } from './copy'
 import type { BulkEditState } from './use-bulk-edit'
 
-type Props = { edit: BulkEditState; templates: AdminTemplate[]; floor: CreditsFloor }
+type Props = {
+  edit: BulkEditState
+  // The ticked templates batch edit applies to, and the system ones it leaves out.
+  templates: AdminTemplate[]
+  skipped: AdminTemplate[]
+  floor: CreditsFloor
+}
 
 // Batch edit (T79): fill in what changes → review the changes, the templates and any that
 // would fail → one all-or-nothing save.
-export function BulkEditDialog({ edit, templates, floor }: Props) {
+export function BulkEditDialog({ edit, templates, skipped, floor }: Props) {
   const { patch, problems } = readBulkEdit(edit.values)
-  const empty = isEmptyPatch(patch)
+  const empty = isEmptyPatch(patch) || templates.length === 0
   const invalid = Object.keys(problems).length > 0
   // The server's list when it refused; until then, the same rules run here.
   const failures = edit.failures ?? bulkEditFailures(templates, patch, floor)
@@ -30,6 +36,7 @@ export function BulkEditDialog({ edit, templates, floor }: Props) {
           <DialogTitle>{reviewing ? COPY.reviewTitle(templates.length) : COPY.title(templates.length)}</DialogTitle>
           <DialogDescription>{COPY.hint}</DialogDescription>
         </DialogHeader>
+        <SkippedNote skipped={skipped} none={templates.length === 0} />
         {reviewing ? (
           <BulkEditReview templates={templates} patch={patch} failures={failures} />
         ) : (
@@ -40,7 +47,7 @@ export function BulkEditDialog({ edit, templates, floor }: Props) {
             {edit.error}
           </p>
         ) : null}
-        {!reviewing && empty && !invalid ? <p className="text-muted-foreground text-sm">{COPY.nothing}</p> : null}
+        {reviewing ? null : <NothingYet show={templates.length > 0 && empty && !invalid} />}
         <BulkEditFooter
           edit={edit}
           canReview={!empty && !invalid}
@@ -73,4 +80,15 @@ function BulkEditFooter({ edit, canReview, canSave, onSave, count }: FooterProps
       )}
     </DialogFooter>
   )
+}
+
+// Ticked system templates are left out of the batch, and said so (review of #288).
+function SkippedNote({ skipped, none }: { skipped: AdminTemplate[]; none: boolean }) {
+  if (skipped.length === 0) return null
+  const names = skipped.map((template) => `「${template.name}」`).join('、')
+  return <p className="text-muted-foreground text-sm">{none ? COPY.noneEditable : COPY.skipped(names)}</p>
+}
+
+function NothingYet({ show }: { show: boolean }) {
+  return show ? <p className="text-muted-foreground text-sm">{COPY.nothing}</p> : null
 }

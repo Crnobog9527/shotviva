@@ -10,7 +10,9 @@
 --
 -- Every template is checked as it would be after the edit: each tier at or above the floor of
 -- its (possibly new) quality (§6.1), and a live template newly put on the web must already have
--- what a web card shows (English description, both covers; T60 publish rules). If any template
+-- what a web card shows (English description, both covers; T60 publish rules). The built-in
+-- templates `edit` (photo edit, its own page) and `freeform` (the partner API's free prompt) are
+-- never batch-edited: they come back as `system`. If any template
 -- fails, nothing changes and the failures come back, one entry per problem:
 --   {"failures": [{"id", "name", "reason": "below_floor", "resolution", "floor", "given"}
 --                 | {"id", "name", "reason": "web_incomplete" | "not_found" | "system"}]}
@@ -85,7 +87,7 @@ begin
   failures as (
     select jsonb_build_object('id', p.id, 'name', p.name, 'reason', case when p.found then 'system' else 'not_found' end) as failure
     from planned p
-    where not p.found or p.id = 'edit'
+    where not p.found or p.id in ('edit', 'freeform')
     union all
     select jsonb_build_object(
       'id', p.id, 'name', p.name, 'reason', 'below_floor', 'resolution', r.res,
@@ -93,11 +95,11 @@ begin
     )
     from planned p
     cross join unnest(array['1k', '2k', '3k']) as r(res)
-    where p.found and p.id <> 'edit' and (p.credits_cost ->> r.res)::integer < (p_floor -> p.quality ->> r.res)::integer
+    where p.found and p.id not in ('edit', 'freeform') and (p.credits_cost ->> r.res)::integer < (p_floor -> p.quality ->> r.res)::integer
     union all
     select jsonb_build_object('id', p.id, 'name', p.name, 'reason', 'web_incomplete')
     from planned p
-    where p.found and p.id <> 'edit' and p.is_active
+    where p.found and p.id not in ('edit', 'freeform') and p.is_active
       and 'web' = any (p.visible_in) and not ('web' = any (p.old_visible))
       and (nullif(btrim(p.description), '') is null or nullif(btrim(p.cover_before_url), '') is null
            or nullif(btrim(p.cover_after_url), '') is null)
