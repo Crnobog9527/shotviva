@@ -14,6 +14,7 @@ import { TICKETS_COPY as COPY } from './copy'
 import { RefundPanel, PaymentFacts } from './refund-panel'
 import { ReplyForm } from './reply-form'
 import type { TicketAdminActions } from './use-ticket-action'
+import { UserLink } from '../users-ui/user-link'
 
 // jobRef: the attached work's reference number (T78), null when the ticket has none.
 type Props = { ticket: AdminTicket; user: UserDetail | null; jobRef: string | null; stripeLive: boolean; actions: TicketAdminActions }
@@ -47,9 +48,9 @@ function UserSummary({ ticket, user }: { ticket: AdminTicket; user: UserDetail |
         <h2 className="font-semibold">{COPY.user.heading}</h2>
         <span className="min-w-0 text-sm [overflow-wrap:anywhere]">{user ? accountLabel(user) : ticket.userId}</span>
         {user?.bannedAt ? <Badge variant="destructive">{COPY.user.banned}</Badge> : null}
-        <Link href={`/admin/users/${ticket.userId}`} className="text-sm text-primary hover:underline">
+        <UserLink userId={ticket.userId} className="text-sm">
           {COPY.user.open}
-        </Link>
+        </UserLink>
       </div>
       {user && <UserStats user={user} />}
     </section>

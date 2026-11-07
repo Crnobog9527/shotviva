@@ -63,7 +63,7 @@ export function LoginForm({ action, googleAction, resendAction, next, notice, ar
       {phone ? (
         <AuthTabs
           initial={notice ? 'email' : 'phone'}
-          phone={<PhoneSignIn actions={phone} next={next} submitLabel={t('login.submit')} termsLine />}
+          phone={<PhoneSignIn actions={phone} next={next} submitLabel={t('login.submit')} />}
           email={<EmailLogin form={form} googleAction={googleAction} next={next} />}
         />
       ) : (

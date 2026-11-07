@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/nextjs'
 
 import { captureAlertWith, captureErrorWith, type AlertKind, type CaptureContext } from './capture-scope'
+import { signalServerError } from './server-errors'
 
 export { ALERTS, type AlertKind, type CaptureContext } from './capture-scope'
 
@@ -8,6 +9,7 @@ export { ALERTS, type AlertKind, type CaptureContext } from './capture-scope'
 // browser/capture.ts, which waits for the SDK it loads after the page.
 export function captureError(error: unknown, ctx: CaptureContext = {}): void {
   captureErrorWith(Sentry, error, ctx)
+  signalServerError({ source: 'capture', alert: ctx.alert ?? null, level: ctx.level ?? 'error' })
 }
 
 export function captureAlert(alert: AlertKind, message: string, ctx: Omit<CaptureContext, 'alert'> = {}): void {

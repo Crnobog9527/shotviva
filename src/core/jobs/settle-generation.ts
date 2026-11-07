@@ -2,6 +2,7 @@ import 'server-only'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+import { noteGenerationFailure } from '../alerts'
 import { captureError } from '../analytics'
 import { logger } from '../logger'
 import { keepJobInputs, type ObjectStore } from '../storage'
@@ -112,6 +113,9 @@ export async function settleGeneration(
       captureError(error, { alert: 'generation_failed', fields: { jobId: job.id, stage, jobCode: failure.jobCode, source: job.source } })
     }
     const refunded = await refundSafely(deps.db, job.id, failure.jobCode, costOf(deps.provider, usage, decision))
+    // After the refund, so this job counts as failed in the Owner's failure-rate check (T72); the
+    // check itself runs after the response (after()), never on this request.
+    if (failure.jobCode !== 'CONTENT_REJECTED') noteGenerationFailure()
     throw new GenerationFailure(failure.error, job.id, refunded, failure.jobCode)
   }
 }

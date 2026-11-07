@@ -2,14 +2,16 @@ import 'server-only'
 
 import { z } from 'zod'
 
+import { notifyOwner, type Clawback, type OwnerAlert } from '../../alerts'
 import { captureAlert, type AlertKind } from '../../analytics/capture-error'
 import { logger } from '../../logger'
 import { callRpc } from '../rpc'
 import type { FulfilDeps } from './fulfil'
 
 // charge.refunded and charge.dispute.created (ARCHITECTURE §6.2, §6.3): record on the payment
-// and alert the Owner in Sentry. Credits are never clawed back: Link support can refund without
-// us, and the Owner decides by hand (admin_adjust_credits). Amounts are re-read from Stripe.
+// and alert the Owner in Sentry and in Feishu (T72, plain Chinese). Credits are never clawed back
+// here yet: Link support can refund without us, and the Owner decides by hand (admin_adjust_credits)
+// until T71. Amounts are re-read from Stripe.
 
 export type IssueOutcome = 'recorded' | 'unknown_charge'
 
@@ -21,6 +23,9 @@ const issueSchema = z
     amount_total: z.number().int(),
     amount_refunded: z.number().int(),
     currency: z.string(),
+    // T71's clawback totals on the payment row; absent until record_payment_issue returns them.
+    credits_clawed_back: z.number().int().optional(),
+    clawback_shortfall: z.number().int().optional(),
   })
   .nullable()
 
@@ -48,6 +53,21 @@ function alertFields(issue: Issue, payment: Payment): Record<string, string | nu
   }
 }
 
+// T71's totals, once record_payment_issue returns them.
+function clawback(payment: NonNullable<Payment>): Clawback | null {
+  if (payment.credits_clawed_back === undefined) return null
+  return { clawedBack: payment.credits_clawed_back, shortfall: payment.clawback_shortfall ?? 0 }
+}
+
+function ownerAlert(issue: Issue, payment: Payment): OwnerAlert {
+  const facts = payment
+    ? { userId: payment.user_id, productId: payment.product_id, amount: { cents: payment.amount_total, currency: payment.currency }, credits: clawback(payment) }
+    : { userId: null, productId: null, amount: null, credits: null }
+  if (issue.kind === 'disputed') return { kind: 'dispute_opened', disputeId: issue.sourceId, ...facts }
+  const refunded = payment ? { cents: payment.amount_refunded, currency: payment.currency } : null
+  return { kind: 'refund', channel: 'stripe', refundId: issue.chargeId, refunded, ...facts }
+}
+
 async function record(deps: FulfilDeps, issue: Issue): Promise<IssueOutcome> {
   const payment = await callRpc(
     deps.db,
@@ -59,6 +79,7 @@ async function record(deps: FulfilDeps, issue: Issue): Promise<IssueOutcome> {
   logger.warn(`stripe charge ${issue.kind} recorded`, fields)
   // The Owner reviews every one, recorded or not: credits were not taken back.
   captureAlert(ALERT[issue.kind], `Stripe charge ${issue.chargeId} ${issue.kind}: credits not clawed back`, { fields })
+  notifyOwner(ownerAlert(issue, payment))
   return payment ? 'recorded' : 'unknown_charge'
 }
 

@@ -60,18 +60,30 @@ export {
   ledgerPage,
   loadUser,
   loadUserExtras,
+  LOOKUP_PARAM,
   lookupHref,
   lookupUser,
   listSignupClusters,
   parseClusterWindow,
   recentJobs,
-  searchUsers,
   unbanUser,
-  type AdminUserRow,
+  batchAdjustCredits,
+  batchSetBanned,
+  hasListFilters,
+  listUsers,
+  loadUserDetail,
+  pageItems,
+  parseUserFilters,
+  usersHref,
+  type BatchOutcome,
   type LedgerEntry,
   type UserDetail,
+  type UserDetailData,
   type UserExtras,
+  type UserFilters,
   type UserJob,
+  type UserListPage,
+  type UserListRow,
 } from './users'
 export {
   costSummary,
@@ -100,7 +112,17 @@ export {
   type StatsWindow,
   type TodoCounts,
 } from './overview'
-export { SuspiciousView, USERS_COPY, UserDetailView, UsersSearch, type UserAdminActions } from './users-ui'
+export {
+  SuspiciousView,
+  USERS_COPY,
+  UserDetailView,
+  UserDialogHost,
+  UserLink,
+  UsersListView,
+  type UserAdminActions,
+  type UserBatchActions,
+  type UserDialogActions,
+} from './users-ui'
 export {
   compensateJob,
   listStuckJobs,
@@ -142,3 +164,5 @@ export {
   type CostKeyActions,
   type CostSettingsInput,
 } from './costs'
+export { parseFunnelDim, parsePageSort, parseRange, posthogProjectId, type FunnelDim, type PageSort, type Range } from './analytics'
+export { ANALYTICS_COPY, AnalyticsView, RangeTabs, Unconfigured, type AnalyticsQuery } from './analytics-ui'

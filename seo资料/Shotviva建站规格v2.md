@@ -44,7 +44,7 @@ E Can I use the photos commercially?（答：付费积分生成的作品无水�
 F Do I need to write prompts?（答：不用；选模板、填文字即可，想调整时可以用大白话说一句；答案末尾链 /image-to-image-generator）
 G What sizes and formats can I export?（答：PNG，Standard / HD / Max 三档，即 1024 / 2048 / 2880 px，比例按模板；付费作品全尺寸无水印。不写 JPG、不写 1080×1080 这类我们不出的尺寸）
 H Can I use Shotviva on my phone?（答：可以，直接在手机浏览器里用，iPhone 的 Safari、Android 的 Chrome 都行，不用装 App；用相机拍或从相册选，出图后保存或分享。不承诺「添加到主屏幕」之类没做的功能）
-I What is Shotviva?（放最后一位，问题里不带 AI；答案写它是什么、做什么、和同类工具的区别。它是品牌问句，价值低于前面几条，不占主词位置）
+I What is Shotviva?（放最后一位，问题里不带 AI；答案写它是什么、做什么、和同类工具的区别。它是品牌问句，价值低于前面几条，不占主词位置）。**例外：中文首页 /zh 把「Shotviva 是什么？」放第一位并默认展开**（Owner 2026-11-08：中文访客先要知道这是什么）；英文首页顺序不变
 
 首页 FAQ 的写法（2026-11-06 GEO 审查，Owner 同意）：
 - 每个答案第一句写出实体名（Shotviva 或 Image to image AI），不用 It、Yes、Photos 开头；AI 单独摘走任何一条都能看懂。
