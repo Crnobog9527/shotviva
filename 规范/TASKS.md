@@ -888,3 +888,15 @@ Owner 2026-11-06 发现中文页有功能缺失。逐页对比现有英文页和
 
 **验收**：中文浏览器第一次进英文首页看到地球气泡；点切换后之后直接进中文；点关闭后不再提醒且停在英文；登录后应用页语言跟选择一致；Googlebot 抓取英文页不跳转；单测覆盖中间件跳转和判断逻辑；交互验收交给 Codex。
 
+
+## T58 站点图标和导航换成定稿 Logo「S.」（可派）
+
+**目标**：Owner 2026-11-07 定稿 Logo C「S.」：用字标字体 Instrument Serif 的 S 和句点，句点橙色，按光学尺寸分三档加重（图标 +80、字标旁 +45、favicon +110）。素材和说明在 `design/logo/`（`README.md`、`test.html`、`export/c/`）。
+
+**范围**：
+- 替换 `src/app/favicon.ico`（16 / 32 / 48，从 `export/c/favicon-*` 生成），浅色和深色标签栏都要清楚（可加 `icon.svg` 或按配色切换）。
+- 加 apple-touch 图标（180）和 manifest 图标（192 / 512，取 `export/c/icon-*`）；没有 manifest 就加最小的一份，颜色按 DESIGN。
+- 导航组合：用 `c-s-dot-lockup-tight.svg` 的排法，或者只用字标，二选一用 impeccable skill 核对；同一画面不能出现两个句点。手机顶栏、电脑顶栏、应用页标题栏都要看。
+- 不在本卡：OG 分享图、Google OAuth 品牌 logo（Owner 自己上传 `export/c/icon-120.png`）。
+
+**验收**：Chrome / Safari 浅深两种标签栏的 favicon 清楚不切头；iOS「添加到主屏幕」显示 180 图标；manifest 图标被浏览器识别；导航在手机和电脑上都没有两个句点；构建和单测通过；交互验收交给 Codex。
