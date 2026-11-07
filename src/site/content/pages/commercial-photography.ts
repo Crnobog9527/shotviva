@@ -1,9 +1,9 @@
 import { defineContentPage } from '@/core/content'
 
 import { site } from '../../site.config'
-import { templateCategories } from '../featured-templates'
 import { productBills, shoot } from '../home'
-import { homeImage, pickCategories } from '../landing-shared'
+import { CATEGORY, homeImage } from '../landing-shared'
+import { pricingRelated } from '../shared'
 import { dayRateUsd, freeImagesLabel, fromCredits, OUTPUT_TIERS, packshotUsd, plansSentence, SET_PHOTOS, styledShotUsd, tierList, usdRange } from '../offer'
 import { PLATFORM_SPECS, px } from '../platform-specs'
 
@@ -24,7 +24,7 @@ export const commercialPhotography = defineContentPage({
   description: `Commercial photography from one phone photo: listing shots, lifestyle scenes and promo posters, styled and retouched by a template. ${freeImagesLabel}.`,
   h1: 'Commercial Photography From a Phone Photo, No Studio Booked',
   subtitle: 'Listing shots, lifestyle scenes and promo posters from the product photo you already took.',
-  answerBlock: `Commercial photography for a small brand usually means a studio day, a photographer and a retoucher. ${brand} does the same job from one phone photo: upload it, pick a template such as Pure White or Lifestyle Table, and download a styled, retouched product shot in ${tierList}. New users get ${freeImagesLabel}.`,
+  answerBlock: `Commercial photography for a small brand usually means a studio day, a photographer and a retoucher. ${brand} does the same job from one phone photo: upload it, pick a template such as White Background or Lifestyle Table, and download a styled, retouched product shot in ${tierList}. New users get ${freeImagesLabel}.`,
   hero: {
     before: homeImage('hero-set-phone', 'Phone snapshot of a woven leather tote on a busy kitchen counter, window light (illustrative example)'),
     after: homeImage('hero-set-lifestyle', 'The same tote on a café chair by a window in warm morning light, Lifestyle Table template (illustrative example)'),
@@ -34,7 +34,7 @@ export const commercialPhotography = defineContentPage({
   facts: [
     {
       label: `Amazon: Pure White Main Image, ${px(amazon.zoomPx)} px for Zoom`,
-      value: `Amazon wants the main image on pure white and ${px(amazon.minPx)} to ${px(amazon.maxPx)} px on the longest side; over ${px(amazon.zoomPx)} px lets shoppers zoom. Pure White at ${hd.name} is ${px(hd.px)} px.`,
+      value: `Amazon wants the main image on pure white and ${px(amazon.minPx)} to ${px(amazon.maxPx)} px on the longest side; over ${px(amazon.zoomPx)} px lets shoppers zoom. White Background at ${hd.name} is ${px(hd.px)} px.`,
     },
     {
       label: `Etsy and Shopify: ${px(etsy.minPx)} px and Up`,
@@ -77,6 +77,7 @@ export const commercialPhotography = defineContentPage({
     { href: '/', anchor: 'AI image to image', note: 'The studio: templates for food, products, rooms, pets and art styles.' },
     { href: '/image-to-image-generator', anchor: 'Image to image generator', note: 'For anyone who wants to see how image to image works on a photo.' },
     { href: '/ai-restaurant-menu', anchor: 'AI restaurant menu photos', note: 'For restaurants that need menu and delivery-app photos from a phone shot.' },
+    pricingRelated(),
   ],
   headings: {
     facts: 'Marketplace Photo Rules Your Shots Will Meet',
@@ -84,13 +85,12 @@ export const commercialPhotography = defineContentPage({
     related: `More From ${brand}`,
   },
   landing: {
-    generatorTemplate: 'pure-white',
     factsNote: 'From the platforms\' own help pages (Amazon, Etsy, Shopify), checked November 2026. Platforms change their rules; check before you list.',
     shoot,
     templates: {
       heading: 'Product Photo Templates: Listings, Scenes and Posters',
       intro: `Every template starts from your phone photo of the product and ends with a finished shot, ${fromCredits}.`,
-      categories: pickCategories(templateCategories, ['products', 'beauty']),
+      categoryKeys: [CATEGORY.products, CATEGORY.beauty],
     },
   },
 })

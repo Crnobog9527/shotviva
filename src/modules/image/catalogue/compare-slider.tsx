@@ -24,9 +24,10 @@ type Props = {
 
 // Compare slider (DESIGN "Compare Slider", §8.3): the after plate clipped at the handle, a 2px
 // white seam and a 40px frosted knob. A transparent full-surface range input gives one-finger
-// drag, tap-to-jump and keyboard control. afterGround gives the after plate an opaque backdrop
-// inside its clip, so a transparent result never lets the before photo show through.
-export function CompareSlider({ before, after, afterAlt, afterGround, badge, className, onTap, tagsAt = 'top' }: Props) {
+// drag, tap-to-jump and keyboard control. afterGround (white unless said otherwise) gives the
+// after plate an opaque backdrop inside its clip, so a transparent result or cut-out cover never
+// lets the before photo show through.
+export function CompareSlider({ before, after, afterAlt, afterGround = 'white', badge, className, onTap, tagsAt = 'top' }: Props) {
   const [x, setX] = useState(50)
   const t = useTranslations('app.template')
   const tap = useTap(x, setX, onTap)

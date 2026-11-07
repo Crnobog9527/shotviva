@@ -42,3 +42,16 @@ export function arrivedFrom(next: string, connectPath: string): ArrivedFrom {
   if (path === connectPath || path.startsWith(`${connectPath}/`)) return 'graylum'
   return null
 }
+
+// Where a signed-in visitor of /login or /signup goes instead of the form (DESIGN §6.9 item 4):
+// the `next` they came with when it is a safe same-site path, otherwise the app (/generate) in
+// the page's language.
+export const SIGNED_IN_HOME = '/generate'
+
+export function signedInTarget(value: string | null | undefined, locale: Locale): string {
+  const home = localizePath(SIGNED_IN_HOME, locale)
+  if (!value) return home
+  const next = sanitizeNext(value)
+  // sanitizeNext answers DEFAULT_AFTER_LOGIN for anything unsafe; only keep it when asked for.
+  return next === DEFAULT_AFTER_LOGIN && value !== DEFAULT_AFTER_LOGIN ? home : next
+}

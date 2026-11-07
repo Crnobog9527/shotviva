@@ -1,4 +1,4 @@
-import type { Fact } from '@/core/content'
+import type { Fact, RelatedLink } from '@/core/content'
 
 import {
   FromCredits,
@@ -36,4 +36,11 @@ export function sharedFacts(): readonly [Fact, Fact, Fact, ...Fact[]] {
     { label: 'Prompts', value: 'None to write: you pick a template' },
     { label: 'Languages', value: languages },
   ]
+}
+
+// The Pricing card that closes a landing page's "More From Shotviva" (gap audit B10,
+// design/comps-v3-b/landing.html): the cheapest plan and the signup gift, from offer.ts.
+export function pricingRelated(): RelatedLink {
+  const note = planFrom ? `Plans from ${usd(planFrom.priceUsd)} a month, ${freeImagesLabel} to start.` : 'Plans and one-time credit packs.'
+  return { href: '/pricing', anchor: 'Pricing', note }
 }

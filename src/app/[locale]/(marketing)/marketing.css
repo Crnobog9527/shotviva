@@ -16,7 +16,8 @@
   }
 
   /* ---------- ground and width ---------- */
-  body:has(.mk-appbar) {
+  /* On <html>, under the living background (core/ui/living-background), not on body. */
+  html:has(.mk-appbar) {
     background: linear-gradient(180deg, var(--mk-ground-top) 0, var(--background) 40vh) no-repeat, var(--background);
   }
   .mk-w { width: 100%; max-width: calc(var(--mk-content) + 2 * var(--gutter)); margin-inline: auto; }
@@ -54,6 +55,7 @@
       display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 999px;
       font: 500 15px/1 var(--font-sans); color: var(--bone-dim); text-decoration: none; transition: color .18s, background-color .18s;
     }
+    .mk-nl[aria-current="page"] { color: var(--foreground); }
     .mk-login { margin-left: 8px; }
     .mk-start { display: inline-flex; margin-left: 8px; }
   }
@@ -401,6 +403,8 @@
 
   /* FAQ: <details>, the answers in the HTML (建站规格 G11) */
   .mk-faq { margin-top: 16px; }
+  /* /pricing: the page already has its gutter. */
+  .mk-pricing-faq > .mk-block { padding: 48px 0 0; }
   .mk-faq details { border-top: 1px solid var(--border); }
   .mk-faq details:last-child { border-bottom: 1px solid var(--border); }
   .mk-faq summary { list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 60px; padding: 12px 0; cursor: pointer; }
@@ -612,4 +616,27 @@
 
 @layer components {
   .mk-facts-note { margin-top: 12px; font-size: 14px; line-height: 1.4; color: var(--muted-foreground); }
+}
+
+/* Signed in (DESIGN §6.9 item 4): "Open app" is the bar's primary on every width, next to an
+   account disc the size of the globe. */
+@layer components {
+  .mk-open {
+    position: relative; display: inline-flex; align-items: center; height: 36px; padding: 0 16px; border-radius: 999px; font: 600 14px/1 var(--font-sans);
+    letter-spacing: -0.01em; white-space: nowrap; text-decoration: none; background: var(--primary); color: var(--primary-foreground); box-shadow: var(--shadow-raised);
+  }
+  .mk-open::before, .mk-acct::before { content: ""; position: absolute; inset: -4px -2px; }
+  .mk-open:active { transform: scale(.975); }
+  .mk-acct {
+    position: relative; width: 36px; height: 36px; margin-left: 4px; border-radius: 50%; display: grid; place-items: center; color: var(--bone-dim);
+    background: var(--wash); box-shadow: inset 0 0 0 1px var(--border); transition: background-color .18s, color .18s;
+  }
+  .mk-acct svg { width: 18px; height: 18px; }
+  @media (min-width: 768px) { .mk-open { margin-left: 8px; } .mk-acct { margin-left: 6px; } }
+  @media (hover: hover) { .mk-acct:hover { background: var(--wash-strong); color: var(--foreground); } .mk-open:hover { filter: brightness(1.04); } }
+}
+
+/* A featured template whose covers are not uploaded yet (T53): the pair's frame, hatched. */
+@layer components {
+  .mk-pair-blank .mk-pane { background: repeating-linear-gradient(135deg, var(--hatch) 0 8px, transparent 8px 16px), var(--recess); }
 }

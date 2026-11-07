@@ -4,7 +4,7 @@ import { Suspense } from 'react'
 import { AnnouncementBanner } from '@/core/announcements'
 import { SiteFooter } from '@/core/content'
 import { currentLocale } from '@/core/i18n/server'
-import { FooterLocales, FooterLocalesFallback, Link, LocaleMenu, SwitchBanner } from '@/core/i18n/ui'
+import { FooterLocales, FooterLocalesFallback, Link, LocaleMenu } from '@/core/i18n/ui'
 import { footerLinksIn } from '@/site/content'
 import { site } from '@/site/site.config'
 
@@ -22,9 +22,6 @@ export default async function AuthLayout({ children }: LayoutProps<'/[locale]'>)
   const t = await getTranslations('marketing.nav')
   return (
     <>
-      <Suspense fallback={null}>
-        <SwitchBanner translatedPaths={zhPaths} />
-      </Suspense>
       <AnnouncementBanner />
       <header className="mk-appbar">
         <div className="mk-w mk-appbar-row">

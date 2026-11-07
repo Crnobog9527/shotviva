@@ -4,8 +4,9 @@ export const LOCALES = ['en', 'zh'] as const
 export type Locale = (typeof LOCALES)[number]
 export const DEFAULT_LOCALE: Locale = 'en'
 
-// The cookie a visitor's explicit choice is stored in (switcher, banner). Functional, never
-// analytics; only the banner and locale-less redirects read it (ARCHITECTURE §17).
+// The cookie a visitor's explicit choice is stored in (globe menu and hint, footer switch,
+// account Language row). Functional, never analytics; the proxy reads it to send later visits to
+// the chosen language, and the globe hint stays away once it exists (ARCHITECTURE §17).
 export const LOCALE_COOKIE = 'NEXT_LOCALE'
 export const LOCALE_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
 

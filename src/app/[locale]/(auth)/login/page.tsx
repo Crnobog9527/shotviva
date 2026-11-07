@@ -9,6 +9,7 @@ import { currentLocale } from '@/core/i18n/server'
 import { googleAction, loginAction, resendSignupAction } from '@/app/auth/actions'
 
 import { Arrived } from '../arrived'
+import { redirectIfSignedIn } from '../signed-in-redirect'
 import { sender } from '../sender'
 
 // Sign-in pages are noindex like the rest of the app (建站规格 R6), in both languages, and carry
@@ -22,7 +23,11 @@ const NOTICES = new Set(['unverified', 'link_expired', 'callback_failed', 'oauth
 async function Login({ searchParams }: PageProps<'/[locale]/login'>) {
   const params = await searchParams
   const error = typeof params.error === 'string' && NOTICES.has(params.error) ? params.error : null
-  const next = nextIn(typeof params.next === 'string' ? params.next : null, await currentLocale())
+  const rawNext = typeof params.next === 'string' ? params.next : null
+  const locale = await currentLocale()
+  // An unverified account is sent here with ?error=unverified; showing the form is the point.
+  if (!error) await redirectIfSignedIn(rawNext, locale)
+  const next = nextIn(rawNext, locale)
   return (
     <LoginForm
       action={loginAction}

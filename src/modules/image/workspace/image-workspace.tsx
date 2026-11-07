@@ -1,6 +1,6 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useReveal } from '@/core/ui/reveal'
 
 import type { TrackedJob } from '../generation/job-model'
 import { retryJob, setWorkspaceJobs } from '../generation/job-store'
@@ -26,6 +26,7 @@ export function ImageWorkspace({ shareText, ...input }: WorkspaceProps) {
   const draft = useWorkspaceDraft(input)
   const jobIds = useWorkspaceJobs(template.id)
   const single = useJob(jobIds.length === 1 ? (jobIds[0] ?? null) : null)
+  const reveal = useReveal<HTMLDivElement>()
 
   const generate = () => {
     draft.start()
@@ -40,10 +41,10 @@ export function ImageWorkspace({ shareText, ...input }: WorkspaceProps) {
 
   if (jobIds.length > 1) return <BatchProgressView ids={jobIds} limit={concurrency.limit} onRetry={retry} onMakeMore={() => backToForm(true)} />
   if (single && (single.status === 'queued' || single.status === 'running')) return <GeneratingView job={single} />
-  if (single) return <Settled><SingleJobView job={single} shareText={shareText} onRetry={() => retry(single.id)} onBack={backToForm} /></Settled>
+  if (single) return <SingleJobView job={single} shareText={shareText} onRetry={() => retry(single.id)} onBack={backToForm} />
   return (
     <div className="lg:grid lg:grid-cols-[minmax(380px,440px)_minmax(0,1fr)] lg:items-start lg:gap-x-12 lg:px-(--gutter)">
-      <div className="min-w-0 px-(--gutter) lg:px-0">
+      <div ref={reveal} className="min-w-0 px-(--gutter) lg:px-0">
         <WorkspaceForm template={template} balance={balance} tier={tier} photos={draft.photos} values={draft.values} onChange={draft.change} again={input.again} />
         <FormAction
           state={draft.state}
@@ -57,12 +58,6 @@ export function ImageWorkspace({ shareText, ...input }: WorkspaceProps) {
       <WorkspaceStage template={template} photo={draft.photos.photos[0] ?? null} />
     </div>
   )
-}
-
-// Done and failed keep their phone column, centred on wider screens; developing (one photo or a
-// batch) uses the page's two columns with the tray.
-function Settled({ children }: { children: ReactNode }) {
-  return <div className="md:mx-auto md:max-w-[720px]">{children}</div>
 }
 
 type SingleProps = { job: TrackedJob; shareText: string; onRetry(): void; onBack(clearPhotos: boolean): void }

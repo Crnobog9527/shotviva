@@ -9,6 +9,7 @@ import { Link } from '../i18n/ui'
 import { cn } from '../ui/cn'
 import type { AdminEntry } from './admin-entry'
 import { TabGlyph, type TabIcon } from './tab-icons'
+import { Wordmark } from './wordmark'
 
 export type TabItem = { href: `/${string}`; label: string; icon: TabIcon; badge?: ReactNode }
 
@@ -26,7 +27,8 @@ type Props = {
 // The app shell's tabs (DESIGN §8.2, §6.9 item 7): fixed at the bottom on phones, 50px rows
 // plus the safe area, only on tab roots; flow pages (workspace, result) push in without it.
 // From md up the same items become a 56px top bar, links left-aligned in the content column,
-// the current one a bone pill with a safelight glyph. AppFrame reserves the phone bar's room
+// the current one a bone pill with a safelight glyph, after the wordmark at the far left and
+// before the Admin entry at the right end (spec #199). AppFrame reserves the phone bar's room
 // through data-tabbar.
 export function TabBar({ items, desktopUnder = [], admin }: Props) {
   const pathname = usePathname()
@@ -37,6 +39,8 @@ export function TabBar({ items, desktopUnder = [], admin }: Props) {
     <nav
       aria-label={t('label')}
       data-tabbar={root ? '' : undefined}
+      // Stays put while pages slide or fade under it (T56; globals.css).
+      style={{ viewTransitionName: 'app-tabs' }}
       className={cn(
         'bar-material fixed inset-x-0 bottom-0 z-60 px-2 pt-1 pb-[calc(var(--sab)+4px)]',
         'md:sticky md:top-0 md:bottom-auto md:h-14 md:p-0 md:shadow-[inset_0_-1px_0_var(--border)]',
@@ -44,6 +48,7 @@ export function TabBar({ items, desktopUnder = [], admin }: Props) {
       )}
     >
       <div className={cn('grid md:content-column md:flex md:h-full md:items-center md:gap-1 md:px-(--gutter)', items.length === 4 ? 'grid-cols-4' : 'grid-cols-3')}>
+        <Wordmark className="hidden md:mr-4 md:inline-flex" />
         {items.map((item) => (
           <TabLink key={item.href} item={item} current={pathname.startsWith(item.href)} />
         ))}

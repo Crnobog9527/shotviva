@@ -5,13 +5,14 @@ import { Suspense } from 'react'
 
 import { AnalyticsIdentify } from '@/core/analytics/browser'
 import { AnnouncementBanner } from '@/core/announcements'
-import { adminEntryFor, AppFrame, TabBar, type AdminEntry, type TabItem } from '@/core/app-shell'
+import { adminEntryFor, AppFrame, BrandProvider, TabBar, type AdminEntry, type TabItem } from '@/core/app-shell'
 import { getSessionUser } from '@/core/auth'
 import { PaywallProvider } from '@/core/billing/paywall'
 import { paymentChannel } from '@/core/billing/waffo'
 import { isModuleEnabled } from '@/core/config'
 import { appShellMetadata } from '@/core/seo'
 import { SupportTabBadge } from '@/core/support'
+import { LivingBackground } from '@/core/ui/living-background'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { GenerationRunner, HideWhileGenerating, PhotosTabBadge } from '@/modules/image'
 import { site } from '@/site/site.config'
@@ -69,15 +70,20 @@ export default function AppLayout({ children }: LayoutProps<'/[locale]'>) {
         <AnnouncementBanner />
       </HideWhileGenerating>
       <PaywallProvider products={site.billing.products} wishlistLive={isWishlistEnabled(site)} channel={paymentChannel()}>
-        <Suspense fallback={null}>
-          <Identity />
-        </Suspense>
-        {/* usePathname decides tab root vs flow page; on dynamic routes that is request data. */}
-        <Suspense fallback={null}>
-          <Tabs items={tabs} />
-        </Suspense>
-        <main className="flex flex-1 flex-col">{children}</main>
-        <GenerationRunner />
+        {/* The wordmark in the top bar and the phone tab-root headers reads the brand from here. */}
+        <BrandProvider name={site.brand.name}>
+          <Suspense fallback={null}>
+            <Identity />
+          </Suspense>
+          {/* usePathname decides tab root vs flow page; on dynamic routes that is request data. */}
+          <Suspense fallback={null}>
+            <Tabs items={tabs} />
+          </Suspense>
+          <main className="flex flex-1 flex-col">{children}</main>
+          <GenerationRunner />
+        </BrandProvider>
+        {/* DESIGN §5 「全站流动背景」 (T54); it renders nothing on /admin. */}
+        <LivingBackground />
       </PaywallProvider>
     </AppFrame>
   )

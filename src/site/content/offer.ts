@@ -8,7 +8,8 @@ import { site } from '../site.config'
 
 // The three output tiers as the public sees them (ARCHITECTURE §5, §8.1; DESIGN §4.3). The
 // pixel sizes are fixed by modules/image (T16) and the per-template cost lives in
-// templates.credits_cost; these are the `high` defaults that "from 2 credits" quotes.
+// templates.credits_cost; these are the `high` defaults (the signup gift, the bills, what a
+// credit buys). "from N credits" is not one of them: see fromCredits below.
 // Public copy never says 1K / 2K / 3K or 4K.
 export const OUTPUT_TIERS = [
   { name: 'Standard', px: 1024, credits: 2, use: 'social posts and delivery apps' },
@@ -26,9 +27,11 @@ export const tierList = `${tierNames.slice(0, -1).join(', ')} or ${tierNames.at(
 // "Standard 1024 px, HD 2048 px, Max 2880 px"
 export const tierPixels = OUTPUT_TIERS.map((tier) => `${tier.name} ${tier.px} px`).join(', ')
 
-// "from 2 credits" / "From 2 credits"
-export const fromCredits = `from ${STANDARD.credits} credits`
-export const FromCredits = `From ${STANDARD.credits} credits`
+// "from N credits" / "From N credits": N is the cheapest Standard price among the published web
+// templates (建站规格 G4, gap audit A1), known only when the page renders. Copy carries these
+// markers; the page fills them from the catalogue (fillCredits in ./credits).
+export const fromCredits = '⟦from-credits⟧'
+export const FromCredits = '⟦From-credits⟧'
 
 // "One product, three styled photos": the home demo and the two bills (DESIGN §6.9 item 6).
 export const SET_PHOTOS = 3

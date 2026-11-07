@@ -89,3 +89,17 @@ export async function reorderTemplates(
   await repo.reorderTemplates(client, ids)
   logger.info('admin.template.reordered', { adminId, count: ids.length })
 }
+
+// The home featured list (T53, ARCHITECTURE §12): ids in display order, at most 12, published
+// web templates only (the SQL function enforces the last rule against the live rows).
+export const FEATURED_MAX = 12
+const featuredSchema = z
+  .array(z.string().min(1).max(64))
+  .max(FEATURED_MAX)
+  .refine((ids) => new Set(ids).size === ids.length, 'ids must be unique')
+
+export async function setFeaturedTemplates(client: SupabaseClient, adminId: string, input: unknown): Promise<void> {
+  const ids = parseOrThrow(featuredSchema, input, 'ids')
+  await repo.setFeaturedTemplates(client, ids)
+  logger.info('admin.template.featured', { adminId, count: ids.length })
+}

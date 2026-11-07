@@ -4,26 +4,25 @@ import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import { sampleFor, thumbFor } from './home-samples'
 
 const template = (cover: Partial<CatalogueTemplate['cover']>): CatalogueTemplate => ({
-  id: 'pure-white',
-  name: 'Pure White',
+  id: 'white-background',
+  name: 'White Background',
   category: 'Products & Resale',
   description: null,
   creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
   copyFields: [],
   cover: { type: 'image', before: null, after: null, motion: null, poster: null, ...cover },
 })
-const bundled = { 'pure-white': { before: '/home/templates/pure-white-before.webp', after: '/home/templates/pure-white-after.webp' } }
 
 describe('home samples', () => {
-  it('prefers the cover the admin set', () => {
+  it('uses the cover the admin set', () => {
     const live = template({ before: 'https://r2/b.webp', after: 'https://r2/a.webp' })
-    expect(sampleFor(live, bundled)).toEqual({ before: 'https://r2/b.webp', after: 'https://r2/a.webp' })
-    expect(thumbFor(live, bundled)).toBe('https://r2/a.webp')
+    expect(sampleFor(live)).toEqual({ before: 'https://r2/b.webp', after: 'https://r2/a.webp' })
+    expect(thumbFor(live)).toBe('https://r2/a.webp')
   })
 
-  it('falls back to the bundled illustrative pair, or nothing', () => {
-    expect(sampleFor(template({}), bundled)).toEqual(bundled['pure-white'])
-    expect(thumbFor(template({}), bundled)).toBe('/home/templates/pure-white-after.webp')
-    expect(sampleFor({ ...template({}), id: 'other' }, bundled)).toBeNull()
+  it('shows no pair until both covers are uploaded', () => {
+    expect(sampleFor(template({ after: 'https://r2/a.webp' }))).toBeNull()
+    expect(thumbFor(template({}))).toBeNull()
+    expect(thumbFor(template({ poster: 'https://r2/p.webp' }))).toBe('https://r2/p.webp')
   })
 })

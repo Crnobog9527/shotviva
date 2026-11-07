@@ -1,10 +1,10 @@
 import { defineContentPage } from '@/core/content'
 
 import { site } from '../../../site.config'
-import { homeImage, pickCategories } from '../../landing-shared'
+import { CATEGORY, homeImage } from '../../landing-shared'
+import { zhPricingRelated } from '../shared'
 import { dayRateUsd, packshotUsd, SET_PHOTOS, styledShotUsd, usdRange } from '../../offer'
 import { PLATFORM_SPECS, px } from '../../platform-specs'
-import { zhTemplateCategories } from '../featured-templates'
 import { productBills, shoot } from '../home'
 import { ZH_TIERS, zhFreeImages, zhFromCredits, zhPlansSentence, zhTierList } from '../offer'
 
@@ -76,6 +76,7 @@ export const zhCommercialPhotography = defineContentPage({
     { href: '/', anchor: 'AI改图', note: '全部模板，按餐饮、商品、美妆、房间、宠物和画风分类。' },
     { href: '/image-to-image-generator', anchor: '图生图在线工具', note: '想看看图生图对一张照片能做什么。' },
     { href: '/ai-restaurant-menu', anchor: 'AI菜单配图', note: '餐厅用手机拍菜，直接做成菜单和外卖平台的图。' },
+    zhPricingRelated(brand),
   ],
   headings: {
     facts: '电商平台对商品图的要求',
@@ -83,13 +84,12 @@ export const zhCommercialPhotography = defineContentPage({
     related: `${brand} 的其他页面`,
   },
   landing: {
-    generatorTemplate: 'pure-white',
     factsNote: '以上来自各平台自己的帮助页面（Amazon、Etsy、Shopify），2026 年 11 月核对。平台规则会变，上架前请再确认。',
     shoot,
     templates: {
       heading: '商品图模板：主图、场景和海报',
       intro: `每个模板都从你的商品手机照片开始，到一张成品图结束，${zhFromCredits}。`,
-      categories: pickCategories(zhTemplateCategories, ['products', 'beauty']),
+      categoryKeys: [CATEGORY.products, CATEGORY.beauty],
     },
   },
 })

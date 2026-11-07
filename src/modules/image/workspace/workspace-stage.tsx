@@ -4,6 +4,8 @@
 import { useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 
+import { useReveal } from '@/core/ui/reveal'
+
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import { TemplateSample } from '../catalogue/template-sample'
 import type { BatchPhoto } from './photo-batch'
@@ -14,8 +16,9 @@ import type { BatchPhoto } from './photo-batch'
 // phone form is one column (DESIGN §8.6, the one desktop-only layout).
 export function WorkspaceStage({ template, photo }: { template: CatalogueTemplate; photo: BatchPhoto | null }) {
   const t = useTranslations('app')
+  const reveal = useReveal<HTMLElement>()
   return (
-    <aside aria-label={t('workspace.stageLabel')} className="hidden pt-4 lg:sticky lg:top-[72px] lg:block">
+    <aside ref={reveal} aria-label={t('workspace.stageLabel')} className="hidden pt-4 lg:sticky lg:top-[72px] lg:block">
       <div className="hairline relative mx-auto aspect-[4/5] w-[min(100%,calc((100dvh-220px)*0.8))] overflow-hidden rounded-panel bg-background">
         {photo ? (
           <>

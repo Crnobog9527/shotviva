@@ -4,7 +4,7 @@ import { DRAFT_TTL_MS, parseDraft } from './home-draft'
 
 const now = 1_800_000_000_000
 const raw = (value: object) => JSON.stringify(value)
-const draft = { templateId: 'pure-white', aspect: '4:5', note: 'warmer', savedAt: now - 1000, hasPhoto: true }
+const draft = { templateId: 'white-background', aspect: '4:5', note: 'warmer', savedAt: now - 1000, hasPhoto: true }
 
 describe('parseDraft', () => {
   it('reads back what the home generator saved before sign-up', () => {

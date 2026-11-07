@@ -14,7 +14,7 @@ import {
 } from '@/core/seo'
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
 import { toCatalogueTemplate } from '@/modules/image'
-import { contentPagesIn, findContentPageIn, freeImagesLabel, homePageIn, homeTemplates, isLinkEnabled } from '@/site/content'
+import { contentPagesIn, featuredSections, fillCredits, findContentPageIn, freeImagesLabel, homePageIn, isLinkEnabled, startingCredits } from '@/site/content'
 import { zhFreeImages } from '@/site/content/zh/offer'
 import { site } from '@/site/site.config'
 
@@ -39,11 +39,13 @@ export function generateStaticParams({ params }: { params: { locale: string } })
   return slugs.length > 0 ? slugs : NO_PAGES
 }
 
+// The page's copy with "from N credits" filled from the live catalogue (建站规格 G4).
 async function load(params: Promise<{ slug: string }>) {
   const locale = await currentLocale()
-  const page = findContentPageIn((await params).slug, locale)
-  if (!page || !isEnabled(page)) notFound()
-  return { locale, page }
+  const found = findContentPageIn((await params).slug, locale)
+  if (!found || !isEnabled(found)) notFound()
+  const live = await cachedWebCatalogue(locale)
+  return { locale, live, page: fillCredits(found, startingCredits(live)) }
 }
 
 export async function generateMetadata({ params }: PageProps<'/[locale]/[slug]'>): Promise<Metadata> {
@@ -52,7 +54,7 @@ export async function generateMetadata({ params }: PageProps<'/[locale]/[slug]'>
 }
 
 export default async function ContentRoute({ params }: PageProps<'/[locale]/[slug]'>) {
-  const { locale, page } = await load(params)
+  const { locale, live, page } = await load(params)
   const path = pagePath(page)
   const crumbs = [
     { name: homePageIn(locale).label, path: '/' },
@@ -63,16 +65,17 @@ export default async function ContentRoute({ params }: PageProps<'/[locale]/[slu
   const ld = [breadcrumbListLd(site, ldCrumbs), faqPageLd(page.faq)]
   if (page.module) ld.push(softwareApplicationLd(site, meta, locale === 'zh' ? zhFreeImages : freeImagesLabel))
   const home = homePageIn(locale)
-  const catalogue = (await cachedWebCatalogue(locale)).map(toCatalogueTemplate)
-  const templates = homeTemplates(home, catalogue, page.landing.generatorTemplate)
+  const catalogue = live.map(toCatalogueTemplate)
+  // The page's own categories' featured templates; the generator opens on the first of them.
+  const { defaultId, ...sections } = featuredSections(home.templateGrid.categories, live, page.landing.templates?.categoryKeys)
   const free = locale === 'zh' ? zhFreeImages : freeImagesLabel
   const generator = (
-    <HomeGeneratorSlot templates={catalogue} samples={templates.samples} defaultId={templates.defaultId} homePath={localizePath(path, locale)} freeImages={free} />
+    <HomeGeneratorSlot templates={catalogue} defaultId={defaultId} homePath={localizePath(path, locale)} freeImages={free} />
   )
   return (
     <>
       <JsonLdScript data={ld} />
-      <ContentPageView page={page} isLinkEnabled={isLinkEnabled} templates={templates.cards} price={home.templateGrid.price} generator={generator} />
+      <ContentPageView page={page} isLinkEnabled={isLinkEnabled} templates={sections} generator={generator} />
     </>
   )
 }

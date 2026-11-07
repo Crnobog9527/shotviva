@@ -30,10 +30,10 @@ export function ResponsiveSheet({ open, onOpenChange, title, description, childr
     return (
       <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
         <DialogPrimitive.Portal>
-          <DialogPrimitive.Overlay className="fixed inset-0 z-90 bg-[var(--scrim)] backdrop-blur-[2px]" />
+          <DialogPrimitive.Overlay className="scrim-motion fixed inset-0 z-90 bg-[var(--scrim)] backdrop-blur-[2px]" />
           <DialogPrimitive.Content
             className={cn(
-              "shadow-sheet fixed top-1/2 left-1/2 z-100 flex -translate-1/2 flex-col rounded-panel bg-popover outline-none",
+              "dialog-motion shadow-sheet fixed top-1/2 left-1/2 z-100 flex -translate-1/2 flex-col rounded-panel bg-popover outline-none",
               wide ? "max-h-[calc(100dvh-64px)] w-[min(920px,calc(100%-64px))]" : "max-h-[calc(100dvh-48px)] w-[min(480px,calc(100%-32px))]",
             )}
           >

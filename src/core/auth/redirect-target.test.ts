@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { arrivedFrom, DEFAULT_AFTER_LOGIN, loginPath, sanitizeNext } from './redirect-target'
+import { arrivedFrom, DEFAULT_AFTER_LOGIN, loginPath, sanitizeNext, signedInTarget } from './redirect-target'
 
 describe('sanitizeNext', () => {
   it('keeps same-site paths with query', () => {
@@ -45,5 +45,25 @@ describe('arrivedFrom (the line under the login / sign-up title)', () => {
     expect(arrivedFrom('/zh/pricing', CONNECT)).toBeNull()
     expect(arrivedFrom('/connect/graylumx', CONNECT)).toBeNull()
     expect(arrivedFrom('//evil.example/connect/graylum', CONNECT)).toBeNull()
+  })
+})
+
+// DESIGN §6.9 item 4: /login and /signup send a signed-in visitor on instead of showing the form.
+describe('signedInTarget', () => {
+  it('goes to the app when no next was given, in the page language', () => {
+    expect(signedInTarget(null, 'en')).toBe('/generate')
+    expect(signedInTarget('', 'zh')).toBe('/zh/generate')
+  })
+
+  it('keeps a safe next as written', () => {
+    expect(signedInTarget('/photos/abc', 'en')).toBe('/photos/abc')
+    expect(signedInTarget('/zh/pricing?checkout=1', 'zh')).toBe('/zh/pricing?checkout=1')
+    expect(signedInTarget(DEFAULT_AFTER_LOGIN, 'en')).toBe(DEFAULT_AFTER_LOGIN)
+  })
+
+  it('never follows an off-site next; it goes to the app instead', () => {
+    expect(signedInTarget('//evil.example', 'en')).toBe('/generate')
+    expect(signedInTarget('https://evil.example/x', 'zh')).toBe('/zh/generate')
+    expect(signedInTarget('/\\evil.example', 'en')).toBe('/generate')
   })
 })

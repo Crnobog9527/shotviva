@@ -199,7 +199,7 @@
     },
     "account": {
       "title": "Graylum",
-      "description": "Make photos in Graylum with your Shotviva credits.",
+      "description": "Your AI social media coach. Find your angle, create posts, and learn from your numbers, with a clear next step every time. Connect to create images with your Shotviva credits.",
       "connected": "Connected since <b>{date, date, medium}</b>. Graylum can make photos with your credits.",
       "notConnected": "Not connected. To connect, start from Graylum and allow it to use your credits.",
       "disconnect": "Disconnect Graylum"
@@ -216,7 +216,8 @@
       "create": "Create",
       "wishlist": "Wishlist",
       "photos": "Photos",
-      "account": "Account"
+      "account": "Account",
+      "home": "{brand} home page"
     },
     "sheet": {
       "close": "Close"
@@ -343,6 +344,21 @@
       "failTitle": "This photo didn't develop",
       "retry": "Retry",
       "useAnother": "Use another photo",
+      "doneState": {
+        "hud": "Done",
+        "saved": "Saved to Photos",
+        "line": "{tier} · <mono>{px, number, ::group-off}</mono> px · {count, plural, one {# credit} other {# credits}} used.{pool, select, free { Made with free credits, so it's public with a watermark.} paid { Made with paid credits, so it's private and watermark-free.} other {}}",
+        "caption": "Phone photo → {name}."
+      },
+      "failState": {
+        "hud": "Not developed",
+        "title": "Generation failed.",
+        "titleRefunded": "Generation failed. Your credits were refunded.",
+        "kept": "Your photo and settings are kept. Try again, or change the photo.",
+        "changePhoto": "Change photo",
+        "caption": "Nothing was charged."
+      },
+      "retryCost": "Retry <cost>· {count, plural, one {# credit} other {# credits}}</cost>",
       "generateCta": "Generate <cost>· {count, plural, one {# credit} other {# credits}}</cost>",
       "getCreditsCta": "Get credits <cost>· <mono>{count, number}</mono> needed</cost>",
       "freeNotice": "This photo uses free credits: it's shown publicly with a watermark. <b>Paid credits make it private and watermark-free.</b>",
@@ -467,6 +483,7 @@
       "back": "Photos",
       "share": "Share",
       "download": "Download",
+      "downloadPx": "Download <cost>· <mono>{px, number, ::group-off}</mono> px</cost>",
       "longPress": "Long-press to save",
       "showTransparency": "Show transparency",
       "makeAnotherWith": "Make another with {name}",
@@ -652,7 +669,7 @@
       },
       "language": {
         "title": "Language",
-        "lead": "Changes the language of the app. Your photos and credits stay the same."
+        "lead": "Changes the app and emails. Your photos and templates stay the same."
       },
       "purchases": {
         "title": "Purchases",
@@ -774,13 +791,20 @@
       "noticeEmpty": "Write what to change, in any language. <b>The original is kept.</b>",
       "noticeReady": "Makes a new photo; the original stays in Photos.",
       "noticeFree": "Makes a new photo; the original stays in Photos. <b>Uses free credits: public with a watermark.</b>",
-      "failTitle": "The edit failed",
+      "failTitle": "The edit failed.",
       "failUntouched": "The original is untouched.",
       "changeRequest": "Change the request",
       "titleEdited": "{name} (edit)",
       "yourChange": "Your change",
       "editedFromLabel": "Edited from",
-      "sourceDeleted": "Original deleted"
+      "sourceDeleted": "Original deleted",
+      "requestSent": "Request sent",
+      "leave": "Usually about 60 seconds. You can leave this page: the new photo lands in Photos when it's done.",
+      "developingCaption": "The edit is developing over the original.",
+      "failTitleRefunded": "The edit failed. Your credits were refunded.",
+      "failKept": "Your request is kept. Try again, or change what you asked for.",
+      "metaDeveloping": "{size} · {tier} · {count, plural, one {# credit} other {# credits}} · edit",
+      "metaFailed": "Just now · {size} · {tier} · {refund, select, refunded {{count, plural, one {# credit} other {# credits}} refunded} hold {credits on hold} other {nothing charged}} · edit"
     },
     "states": {
       "photoMissing": {
@@ -916,10 +940,10 @@
       "en": "English",
       "zh": "简体中文"
     },
-    "banner": {
-      "text": "这个页面有中文版。",
-      "switch": "切换到中文",
-      "dismiss": "关闭，继续看英文版"
+    "hint": {
+      "text": "切换到中文？",
+      "switch": "切换",
+      "dismiss": "不用了，继续看英文版"
     },
     "inCurrent": {
       "en": "English",
@@ -947,7 +971,9 @@
       "tagline": "AI photo studio",
       "templates": "Templates",
       "login": "Log in",
-      "startFree": "Start free"
+      "startFree": "Start free",
+      "openApp": "Open app",
+      "account": "Account"
     },
     "hero": {
       "label": "Before and after",
@@ -987,8 +1013,8 @@
     "pages": {
       "terms": "Terms",
       "privacy": "Privacy",
-      "refunds": "Refunds",
-      "acceptableUse": "Acceptable use"
+      "refunds": "Refund Policy",
+      "acceptableUse": "Acceptable Use"
     },
     "lastUpdated": "Last updated <date></date>",
     "contents": "Contents",

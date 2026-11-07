@@ -199,7 +199,7 @@
     },
     "account": {
       "title": "Graylum",
-      "description": "用你的 Shotviva 积分在 Graylum 里出图。",
+      "description": "不懂运营也能做好自媒体。Graylum 像专业运营一样陪你定方向、出内容、看数据复盘，告诉你下一步做什么。连接后，配图直接用 Shotviva 积分生成。",
       "connected": "<b>{date, date, medium}</b> 起已连接。Graylum 可以用你的积分出图。",
       "notConnected": "未连接。要连接，请从 Graylum 发起，并允许它使用你的积分。",
       "disconnect": "断开 Graylum"
@@ -216,7 +216,8 @@
       "create": "创作",
       "wishlist": "许愿墙",
       "photos": "作品",
-      "account": "我的"
+      "account": "我的",
+      "home": "{brand} 首页"
     },
     "sheet": {
       "close": "关闭"
@@ -343,6 +344,21 @@
       "failTitle": "这张照片没有生成成功",
       "retry": "重试",
       "useAnother": "换一张照片",
+      "doneState": {
+        "hud": "已完成",
+        "saved": "已存进「作品」",
+        "line": "{tier} · <mono>{px, number, ::group-off}</mono> px · 用了 {count} 积分。{pool, select, free {用的是免费积分，所以会公开展示，并带水印。} paid {用的是付费积分，所以是私密的，没有水印。} other {}}",
+        "caption": "手机照片 → {name}。"
+      },
+      "failState": {
+        "hud": "没有生成",
+        "title": "生成失败。",
+        "titleRefunded": "生成失败，积分已退回。",
+        "kept": "照片和设置都还在。可以重试，或者换一张照片。",
+        "changePhoto": "换照片",
+        "caption": "没有扣积分。"
+      },
+      "retryCost": "重试 <cost>· {count} 积分</cost>",
       "generateCta": "生成 <cost>· {count} 积分</cost>",
       "getCreditsCta": "获取积分 <cost>· 需要 <mono>{count, number}</mono></cost>",
       "freeNotice": "这张图用的是免费积分：会公开展示，并带水印。<b>用付费积分生成的图是私密的，没有水印。</b>",
@@ -467,6 +483,7 @@
       "back": "作品",
       "share": "分享",
       "download": "下载",
+      "downloadPx": "下载 <cost>· <mono>{px, number, ::group-off}</mono> px</cost>",
       "longPress": "长按保存",
       "showTransparency": "显示透明区域",
       "makeAnotherWith": "用 {name} 再做一张",
@@ -652,7 +669,7 @@
       },
       "language": {
         "title": "语言",
-        "lead": "切换应用的显示语言。你的作品和积分不受影响。"
+        "lead": "应用和邮件都会换成所选语言。你的作品和模板保持不变。"
       },
       "purchases": {
         "title": "购买记录",
@@ -774,13 +791,20 @@
       "noticeEmpty": "用任何语言写下要改的地方。<b>原图会保留。</b>",
       "noticeReady": "会生成一张新照片，原图仍在作品里。",
       "noticeFree": "会生成一张新照片，原图仍在作品里。<b>使用免费积分：公开并带水印。</b>",
-      "failTitle": "修改失败",
+      "failTitle": "修改失败。",
       "failUntouched": "原图没有变。",
       "changeRequest": "改一下要求",
       "titleEdited": "{name}（修改版）",
       "yourChange": "你的修改",
       "editedFromLabel": "修改自",
-      "sourceDeleted": "原作品已删除"
+      "sourceDeleted": "原作品已删除",
+      "requestSent": "请求已发送",
+      "leave": "一般 60 秒左右。可以离开这个页面，新照片完成后会出现在「作品」里。",
+      "developingCaption": "修改正在原图上生成。",
+      "failTitleRefunded": "修改失败，积分已退回。",
+      "failKept": "你的要求还在。可以重试，或者改一下要求。",
+      "metaDeveloping": "{size} · {tier} · {count} 积分 · 修改",
+      "metaFailed": "刚刚 · {size} · {tier} · {refund, select, refunded {已退回 {count} 积分} hold {积分暂扣} other {没有扣积分}} · 修改"
     },
     "states": {
       "photoMissing": {
@@ -916,10 +940,10 @@
       "en": "English",
       "zh": "简体中文"
     },
-    "banner": {
-      "text": "这个页面有中文版。",
-      "switch": "切换到中文",
-      "dismiss": "关闭，继续看英文版"
+    "hint": {
+      "text": "切换到中文？",
+      "switch": "切换",
+      "dismiss": "不用了，继续看英文版"
     },
     "inCurrent": {
       "en": "英文",
@@ -947,7 +971,9 @@
       "tagline": "AI 影棚",
       "templates": "模板",
       "login": "登录",
-      "startFree": "免费开始"
+      "startFree": "免费开始",
+      "openApp": "进入应用",
+      "account": "账号"
     },
     "hero": {
       "label": "前后对比",

@@ -1,8 +1,8 @@
 import { defineContentPage, type CostBills } from '@/core/content'
 
 import { site } from '../../site.config'
-import { templateCategories } from '../featured-templates'
-import { pairImage, pickCategories, sizeCountWord } from '../landing-shared'
+import { CATEGORY, pairImage, sizeCountWord } from '../landing-shared'
+import { pricingRelated } from '../shared'
 import {
   foodHalfDayUsd,
   freeImagesLabel,
@@ -68,8 +68,8 @@ export const aiRestaurantMenu = defineContentPage({
   subtitle: 'Menu, delivery-app and promo photos of the dishes you already serve, shot on the pass with a phone.',
   answerBlock: `AI restaurant menu photos start from the dish photo you already took and turn it into a menu, delivery-app or promo image, with the plate kept as served. With ${brand} you upload one phone photo, pick Delivery Menu, Dark Dining or Promo Poster, and download it in ${tierList}. New users get ${freeImagesLabel}.`,
   hero: {
-    before: pairImage('delivery-photo-before', 'Phone photo of a dish on a restaurant kitchen pass, harsh overhead light (illustrative example)'),
-    after: pairImage('delivery-photo-after', 'The same dish as a bright delivery-app photo, soft daylight, Delivery Menu template (illustrative example)'),
+    before: pairImage('example-dish-before', 'Phone photo of a dish on a restaurant kitchen pass, harsh overhead light (illustrative example)'),
+    after: pairImage('example-dish-after', 'The same dish as a bright delivery-app photo, soft daylight, Delivery Menu template (illustrative example)'),
     caption: 'Your phone photo → Delivery Menu template: same plate, brighter light · Illustrative example',
     cta: { label: 'Upload photo', href: '/generate' },
   },
@@ -115,6 +115,7 @@ export const aiRestaurantMenu = defineContentPage({
     { href: '/', anchor: 'AI image to image', note: 'The studio: templates for food, products, rooms, pets and art styles.' },
     { href: '/commercial-photography', anchor: 'Commercial product photography', note: 'For shops and sellers who need studio product shots without a photographer.' },
     { href: '/image-to-image-generator', anchor: 'Image to image generator', note: 'For anyone who wants to see how image to image works on a photo.' },
+    pricingRelated(),
   ],
   headings: {
     facts: 'Menu and Delivery-App Photo Sizes',
@@ -122,12 +123,11 @@ export const aiRestaurantMenu = defineContentPage({
     related: `More From ${brand}`,
   },
   landing: {
-    generatorTemplate: 'delivery-photo',
     factsNote: 'From the apps\' own merchant help pages (DoorDash, Uber Eats, Grubhub), checked November 2026. Apps change their rules; check before you upload.',
     templates: {
-      heading: 'Menu Photo Templates: Delivery Menu, Dark Dining, Promo Poster',
+      heading: 'Menu Photo Templates for Delivery Apps, Menus and Posters',
       intro: `Every template starts from your phone photo of the dish and ends with a menu-ready photo, ${fromCredits}.`,
-      categories: pickCategories(templateCategories, ['food']),
+      categoryKeys: [CATEGORY.food],
     },
   },
 })

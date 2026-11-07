@@ -6,6 +6,7 @@ import { cloneElement, useCallback, useState, type ReactElement } from 'react'
 import { ActionBar, ActionNotice } from '../../app-shell'
 import { useRouter } from '../../i18n/navigation'
 import { buttonVariants } from '../../ui/button'
+import { navTypesFor } from '../../ui/nav-motion'
 import { IMAGES_MAX, IMAGES_MIN } from '../rules'
 import { DescriptionField } from './description-field'
 import { canSubmit, settleSlots, tilesLeft, uploadedKeys, type Slot } from './post-form-state'
@@ -34,7 +35,7 @@ export function PostForm({ photoTile, uploadRules }: Props) {
   const router = useRouter()
   const [slots, setSlots] = useState<Slot[]>(() => settleSlots([]))
   const [description, setDescription] = useState('')
-  const post = usePostRequest(() => router.push('/wishlist?sent=1'))
+  const post = usePostRequest(() => router.push('/wishlist?sent=1', { transitionTypes: navTypesFor('/wishlist') }))
   const change = useCallback((id: number, patch: Partial<Slot>) => {
     setSlots((current) => settleSlots(current.map((slot) => (slot.id === id ? { ...slot, ...patch } : slot))))
   }, [])

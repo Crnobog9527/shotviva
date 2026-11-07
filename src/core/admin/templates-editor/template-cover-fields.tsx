@@ -21,12 +21,13 @@ const still = (url: string | null) => (url ? { url, video: false } : null)
 export function TemplateCoverFields({ template, actions }: Props) {
   const { pending, busy, message, upload, clearMotion } = useCoverUpload(template.id, actions)
   const motion = template.coverMediaType !== 'image' && template.coverVideoUrl
-    ? { url: template.coverVideoUrl, video: template.coverMediaType === 'video' }
+    ? { url: template.coverVideoUrl, video: template.coverMediaType === 'video', poster: template.coverPosterUrl }
     : null
   return (
     <fieldset className="grid gap-3">
       <legend className="mb-1 text-sm font-semibold">封面（上传后立即生效，不随「保存」）</legend>
-      <div className="grid grid-cols-3 gap-3">
+      {/* Three cards on wide screens, two below ~1100px, one below ~700px. */}
+      <div className="grid grid-cols-1 gap-4 min-[700px]:grid-cols-2 min-[1100px]:grid-cols-3">
         <CoverSlot id="cover-before" label="前图（手机原图）" accept={acceptFor('before')} hint="JPEG / PNG / WebP，≤20MB"
           preview={still(template.coverBeforeUrl)} busy={busy === 'before'} disabled={pending}
           onFile={(file) => upload('before', file)} />

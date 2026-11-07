@@ -32,8 +32,8 @@ function DesktopSheet({ open, onOpenChange, photo, meta, form, bar }: Props) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-90 bg-[var(--scrim)] backdrop-blur-[2px]" />
-        <DialogPrimitive.Content className="shadow-sheet fixed top-1/2 left-1/2 z-100 grid max-h-[calc(100dvh-48px)] w-[min(1040px,calc(100%-32px))] -translate-1/2 grid-cols-2 overflow-hidden rounded-panel bg-popover outline-none">
+        <DialogPrimitive.Overlay className="scrim-motion fixed inset-0 z-90 bg-[var(--scrim)] backdrop-blur-[2px]" />
+        <DialogPrimitive.Content className="dialog-motion shadow-sheet fixed top-1/2 left-1/2 z-100 grid max-h-[calc(100dvh-48px)] w-[min(1040px,calc(100%-32px))] -translate-1/2 grid-cols-2 overflow-hidden rounded-panel bg-popover outline-none">
           <div className="grid content-start gap-4 overflow-y-auto border-r border-hairline p-6">
             <EditPhoto src={photo} className="mx-auto aspect-[4/5] max-h-[520px] w-full" />
             <DialogPrimitive.Title className="font-display text-h1 leading-[1.05]">{t('title')}</DialogPrimitive.Title>

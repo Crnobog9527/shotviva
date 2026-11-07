@@ -2,6 +2,8 @@
 /* Tier and pack materials for the paywall and /pricing (T37). */
 @import "../core/billing/paywall/tiers.css";
 @import "../core/content/blocks/business-slip.css";
+/* The living background (T54): inlined here so it adds no render-blocking request. */
+@import "../core/ui/living-background.css";
 
 /* "Darkroom" design tokens (DESIGN §3, design/tokens/tokens.css, Owner 2026-11-05).
    Warm black ground, bone type, one safelight. shadcn/ui variable names, so the shadcn base
@@ -54,6 +56,8 @@
   --success-tint: rgba(127, 214, 160, 0.16);
   --coin-light: #FF8A63;                     /* balance coin highlight */
   --coin-dark: #C93A14;                      /* balance coin shade */
+  --safelight-warm: #FFB08F;                 /* the living background's second, warmer pool */
+  --ground-top: #0E0C0A;                     /* the top of the room: app pages' ground (DESKTOP-NOTES item 6) */
 
   /* On-photo material: labels and seams that sit on top of an image. */
   --photo-ink: #FFFFFF;
@@ -214,7 +218,7 @@ html:lang(zh-Hans) :is(em, i, .italic) {
   font-style: normal;
 }
 
-/* Chinese words on an English page (the switcher's 中文, the switch banner) use the system
+/* Chinese words on an English page (the switcher's 中文, the globe's language hint) use the system
    CJK fonts, so an English page never downloads a MiSans subset (ARCHITECTURE §17). */
 @utility font-cjk-system {
   font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
@@ -228,8 +232,13 @@ html:lang(zh-Hans) :is(em, i, .italic) {
     -webkit-text-size-adjust: 100%;
     background: var(--background);
   }
+  /* The page ground sits on <html> (the canvas), so the living background (core/ui) can slide
+     between it and the content; body stays transparent. */
+  html:has([data-app-ground]) {
+    background: linear-gradient(180deg, var(--ground-top) 0, var(--background) 40vh) no-repeat, var(--background);
+  }
   body {
-    background: var(--background);
+    background: transparent;
     color: var(--foreground);
     font: 400 16px/1.5 var(--font-sans);
     letter-spacing: -0.006em;
@@ -384,6 +393,122 @@ html:lang(zh-Hans) :is(em, i, .italic) {
   }
   @media (prefers-reduced-motion: reduce) {
     opacity: .35;
+  }
+}
+
+/* Desktop dialogs open and close the way the comp's sheets do (comps-v3-b css/studio.css .sheet
+   from 768px): scale .98 to 1 with a fade over 250ms; the scrim fades with them. Radix sets
+   data-state and waits for the closing animation. Nothing moves under reduced motion. */
+@keyframes sv-dialog-in {
+  from { opacity: 0; scale: 0.98; }
+}
+@keyframes sv-dialog-out {
+  to { opacity: 0; scale: 0.98; }
+}
+@keyframes sv-scrim-in {
+  from { opacity: 0; }
+}
+@keyframes sv-scrim-out {
+  to { opacity: 0; }
+}
+@utility dialog-motion {
+  @media (prefers-reduced-motion: no-preference) {
+    &[data-state="open"] { animation: sv-dialog-in 250ms var(--ease); }
+    &[data-state="closed"] { animation: sv-dialog-out 200ms var(--ease); }
+  }
+}
+@utility scrim-motion {
+  @media (prefers-reduced-motion: no-preference) {
+    &[data-state="open"] { animation: sv-scrim-in 250ms var(--ease); }
+    &[data-state="closed"] { animation: sv-scrim-out 200ms var(--ease); }
+  }
+}
+
+/* While the paywall is up (core/ui/use-push-back), the app page behind it steps back like an iOS
+   page card on phones: scale .92, 18px corners, brightness .55, 450ms (comps-v3-b paywall.html
+   .behind). From md up it only dims. Under reduced motion it dims without moving. */
+[data-app-ground] {
+  transform-origin: 50% 0;
+  transition: transform 450ms var(--ease), border-radius 450ms, filter 450ms;
+}
+@media (max-width: 767px) and (prefers-reduced-motion: no-preference) {
+  html[data-pushed-back] [data-app-ground] {
+    transform: translateY(calc(var(--sat) * 0.5)) scale(0.92);
+    border-radius: 18px;
+    overflow: hidden;
+  }
+}
+html[data-pushed-back] [data-app-ground] {
+  filter: brightness(0.55);
+}
+@media (min-width: 768px) {
+  html[data-pushed-back] [data-app-ground] { filter: brightness(0.45); }
+}
+
+/* Page transitions between app pages (DESIGN §8.2 「页面切换过渡」, T56). React's <ViewTransition>
+   in AppPage gives the leaving and the entering page a class per navigation type
+   (core/ui/nav-motion): push-in/out going deeper, pop-in/out coming back, tab-in/out between
+   tab roots. Only transform and opacity animate, never past 300ms. The rest of the page (ground,
+   living background, banner) and the two bars swap at once and stay put: the bars are named
+   (app-flow-nav, app-tabs) so they leave the sliding snapshot. No type, no animation. */
+::view-transition { pointer-events: none; }
+::view-transition-old(root),
+::view-transition-old(app-flow-nav),
+::view-transition-old(app-tabs) { display: none; }
+::view-transition-new(root),
+::view-transition-group(app-flow-nav),
+::view-transition-new(app-flow-nav),
+::view-transition-group(app-tabs),
+::view-transition-new(app-tabs) { animation: none; }
+::view-transition-group(app-flow-nav),
+::view-transition-group(app-tabs) { z-index: 2; }
+
+@keyframes sv-page-from-right { from { transform: translateX(100%); } }
+@keyframes sv-page-to-right { to { transform: translateX(100%); } }
+@keyframes sv-page-recede { to { transform: translateX(-30%); opacity: 0.5; } }
+@keyframes sv-page-return { from { transform: translateX(-30%); opacity: 0.5; } }
+@keyframes sv-page-fade-in { from { opacity: 0; } }
+@keyframes sv-page-fade-out { to { opacity: 0; } }
+
+/* Phones: the new page pushes in from the right over the old one, which recedes left and dims
+   (over the dark ground); back reverses it. The page on top is painted on the ground so the
+   one under it never shows through. Tabs cross-fade in 150ms. */
+@media (max-width: 767px) {
+  ::view-transition-group(.push-in),
+  ::view-transition-group(.pop-out) { z-index: 1; }
+  ::view-transition-new(.push-in) { animation: sv-page-from-right 300ms var(--ease) both; background: var(--background); }
+  ::view-transition-old(.push-out) { animation: sv-page-recede 300ms var(--ease) both; }
+  ::view-transition-old(.pop-out) { animation: sv-page-to-right 300ms var(--ease) both; background: var(--background); }
+  ::view-transition-new(.pop-in) { animation: sv-page-return 300ms var(--ease) both; }
+}
+::view-transition-new(.tab-in) { animation: sv-page-fade-in 150ms var(--ease) both; }
+::view-transition-old(.tab-out) { animation: sv-page-fade-out 150ms var(--ease) both; }
+
+/* Desktop: a short fade, whichever way. */
+@media (min-width: 768px) {
+  ::view-transition-new(.push-in),
+  ::view-transition-new(.pop-in) { animation: sv-page-fade-in 180ms var(--ease) both; }
+  ::view-transition-old(.push-out),
+  ::view-transition-old(.pop-out) { animation: sv-page-fade-out 120ms var(--ease) both; }
+}
+
+/* Reduced motion never gets a type (nav-motion), and in case one slips through, nothing moves. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) { animation: none !important; }
+}
+
+/* One-shot entry fade (core/ui/reveal.ts): hidden only once the hook has tagged the element, so
+   server-rendered markup is never invisible before it runs; shown at once under reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-reveal] {
+    transition: opacity 480ms var(--ease), transform 480ms var(--ease);
+    transition-delay: var(--reveal-delay, 0ms);
+  }
+  [data-reveal]:not([data-in]) {
+    opacity: 0;
+    transform: translateY(12px);
   }
 }
 

@@ -9,6 +9,7 @@ import {
   runAdminAction,
   runAdminQuery,
   saveTemplate,
+  setFeaturedTemplates,
   setTemplateActive,
   type ActionResult,
   type ActionValue,
@@ -45,6 +46,15 @@ export async function setTemplateActiveAction(input: unknown): Promise<ActionRes
   const admin = await requireAdmin()
   return runAdminAction(async () => {
     await setTemplateActive(createAdminSupabase(), admin.id, input)
+    catalogueChanged()
+  })
+}
+
+// 首页精选 (T53): the home and landing template sections read this list.
+export async function setFeaturedTemplatesAction(ids: unknown): Promise<ActionResult> {
+  const admin = await requireAdmin()
+  return runAdminAction(async () => {
+    await setFeaturedTemplates(createAdminSupabase(), admin.id, ids)
     catalogueChanged()
   })
 }

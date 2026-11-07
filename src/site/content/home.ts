@@ -1,7 +1,7 @@
 import { defineHomePage, type CostBills, type HeadedText, type HomePage, type ImageRef, type ShootDemo } from '@/core/content'
 
 import { site } from '../site.config'
-import { templateCategories } from './featured-templates'
+import { templateCategories } from './template-categories'
 import {
   creditFrom,
   fromCredits,
@@ -57,7 +57,7 @@ export const shoot: ShootDemo = {
   phone: { image: phoneShot, file: 'IMG_2047.jpg', caption: 'As shot on a phone. Window light, a busy counter, keys and a mug in frame.' },
   arrow: 'Three templates, same tote',
   results: [
-    { image: listingShot, title: 'Marketplace listing', template: 'Pure White template' },
+    { image: listingShot, title: 'Marketplace listing', template: 'White Background template' },
     {
       image: photo('hero-set-lifestyle', 'The same tote on a café chair by a window, warm morning light (illustrative example)'),
       title: 'Lifestyle scene',
@@ -139,7 +139,7 @@ export const homePage = defineHomePage({
   hero: {
     before: phoneShot,
     after: listingShot,
-    caption: 'Your phone photo → Pure White template: same tote, only the light and background changed · Illustrative example',
+    caption: 'Your phone photo → White Background template: same tote, only the light and background changed · Illustrative example',
     cta: { label: 'Upload photo', href: '/generate' },
   },
   shoot,
@@ -148,7 +148,6 @@ export const homePage = defineHomePage({
     heading: 'Img to Img Templates: No Prompts to Write',
     intro: `Every template starts from your phone photo and ends with a finished picture. Pick one and ${brand} does the rest. Templates cost ${fromCredits} a photo.`,
     note: 'All template images are illustrative examples.',
-    price: fromCredits,
     categories: templateCategories,
   },
   facts: sharedFacts(),
@@ -166,7 +165,7 @@ export const homePage = defineHomePage({
       },
     ],
     plans: plansText(),
-    sample: { src: '/home/templates/spa-podium-after.webp', alt: '', width: 900, height: 1125 },
+    sample: { src: '/home/example-skincare-after.webp', alt: '', width: 900, height: 1125 },
   },
   costBills: productBills(
     `What ${SET_PHOTOS} Product Photos Cost: Photographer vs ${brand}`,

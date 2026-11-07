@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 import { site } from '../site.config'
 import { contentPages, homePage, pricingPage } from './index'
+import { fillCredits } from './credits'
 import { freeImagesLabel, fromCredits, tierList, tierPixels, uploadLimits } from './offer'
 
 const allPages = [homePage, ...contentPages]
@@ -49,7 +50,7 @@ describe('home page skeleton', () => {
     expect(homePage.freeOffer.points[0].heading).toBe('3 Free Standard Images When You Sign Up')
   })
 
-  it('groups the first 10 templates into the 6 categories, Art Styles first (ARCHITECTURE §5)', () => {
+  it('carries the copy of the 6 §5 categories, Art Styles first; templates come from admin (T53)', () => {
     const { categories } = homePage.templateGrid
     expect(categories.map((c) => c.name)).toEqual([
       'Art Styles',
@@ -59,7 +60,8 @@ describe('home page skeleton', () => {
       'Rooms & Spaces',
       'Pets',
     ])
-    expect(categories.flatMap((c) => c.templates).length).toBe(10)
+    expect(categories.map((c) => c.key)).toEqual(categories.map((c) => c.name))
+    expect(categories.filter((c) => c.drag).map((c) => c.name)).toEqual(['Art Styles'])
   })
 })
 
@@ -67,7 +69,8 @@ describe('public numbers', () => {
   it('counts the 6 free credits as "3 free Standard images" (建站规格 G3)', () => {
     expect(site.billing.freeCredits).toBe(6)
     expect(freeImagesLabel).toBe('3 free Standard images')
-    expect(fromCredits).toBe('from 2 credits')
+    // Filled from the catalogue at render time (credits.test.ts).
+    expect(fillCredits(fromCredits, 2)).toBe('from 2 credits')
     expect(tierList).toBe('Standard, HD or Max')
     expect(tierPixels).toBe('Standard 1024 px, HD 2048 px, Max 2880 px')
     expect(uploadLimits).toBe('JPG, PNG or WebP, up to 20MB')
@@ -83,7 +86,7 @@ describe('public numbers', () => {
   it('never says 1K / 2K / 3K / 4K or hard-codes a price in page copy (G3)', () => {
     const dir = join(process.cwd(), 'src', 'site', 'content')
     // offer.ts is the one place numbers are read and is left out on purpose.
-    const files = ['home.ts', 'shared.ts', 'pricing.ts', 'featured-templates.ts', ...readdirSync(join(dir, 'pages')).map((f) => `pages/${f}`)]
+    const files = ['home.ts', 'shared.ts', 'pricing.ts', 'template-categories.ts', ...readdirSync(join(dir, 'pages')).map((f) => `pages/${f}`)]
     for (const file of files) {
       const source = readFileSync(join(dir, file), 'utf8')
       expect(source, file).not.toMatch(/\$\d/)

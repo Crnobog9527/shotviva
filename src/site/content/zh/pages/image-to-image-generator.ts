@@ -2,6 +2,7 @@ import { defineContentPage } from '@/core/content'
 
 import { site } from '../../../site.config'
 import { pairImage, SIZE_COUNT } from '../../landing-shared'
+import { zhPricingRelated } from '../shared'
 import { photoSeconds, SET_PHOTOS } from '../../offer'
 import { productBills } from '../home'
 import { zhFreeImages, zhFromCredits, zhPlansSentence, zhTierList, zhTierPixels, zhUploadLimits } from '../offer'
@@ -23,8 +24,8 @@ export const zhImageToImageGenerator = defineContentPage({
   subtitle: '从你自己的照片出发，而不是一个空白的输入框。主体保持原样。',
   answerBlock: `图生图就是用你上传的照片生成一张新图。${brand} 的图生图在线工具用模板出图：不用装软件，也不用写提示词，选一个餐饮、商品、美妆、房间、宠物或画风模板，光线、场景或画风就由模板定好。主体保持原样，新用户送 ${zhFreeImages}。`,
   hero: {
-    before: pairImage('spa-podium-before', '手机随手拍：浴室架子上的一罐护肤品，室内平光（示意图）'),
-    after: pairImage('spa-podium-after', '同一罐护肤品放在石台上，柔和的水疗光，水疗展台模板（示意图）'),
+    before: pairImage('example-skincare-before', '手机随手拍：浴室架子上的一罐护肤品，室内平光（示意图）'),
+    after: pairImage('example-skincare-after', '同一罐护肤品放在石台上，柔和的水疗光，水疗展台模板（示意图）'),
     caption: '你的手机照片 → 水疗展台模板：还是这罐护肤品，换了布景和光线 · 示意图',
     cta: { label: '上传照片', href: '/generate' },
   },
@@ -60,6 +61,7 @@ export const zhImageToImageGenerator = defineContentPage({
     { href: '/', anchor: 'AI改图', note: '全部模板，按餐饮、商品、美妆、房间、宠物和画风分类。' },
     { href: '/commercial-photography', anchor: '商业产品摄影', note: '网店和卖家不请摄影师，也能做出影棚级商品图。' },
     { href: '/ai-restaurant-menu', anchor: 'AI菜单配图', note: '餐厅用手机拍菜，直接做成菜单和外卖平台的图。' },
+    zhPricingRelated(brand),
   ],
   headings: {
     facts: 'AI图生图：你只需要准备这些',
@@ -67,7 +69,6 @@ export const zhImageToImageGenerator = defineContentPage({
     related: `${brand} 的其他页面`,
   },
   landing: {
-    generatorTemplate: 'spa-podium',
     factsNote: `这些是 ${brand} 自己的上传限制和出图尺寸，本站每一页都一样。`,
   },
 })

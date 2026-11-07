@@ -6,7 +6,9 @@ import { forwardRef } from 'react'
 import { NOTE_MAX_LENGTH } from '@/core/templates/output-options'
 
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
+import { GroundedImg } from '../result/grounded-img'
 import { UPLOAD_FORMAT_NAMES, UPLOAD_MAX_MB } from '../workspace/upload-formats'
+import { notePlaceholder } from '../workspace/workspace-options'
 import { HomeCtaButton } from './home-cta-button'
 import { ArrowIcon, GiftIcon, PlusIcon } from './home-icons'
 import type { HomeGeneratorState } from './use-home-generator'
@@ -67,13 +69,29 @@ function Rail({ state, thumbOf }: Pick<Props, 'state' | 'thumbOf'>) {
         const thumb = thumbOf(template)
         return (
           <button key={template.id} type="button" className="mk-pick" aria-pressed={template.id === state.template?.id} onClick={() => state.choose(template.id)}>
-            {/* eslint-disable-next-line @next/next/no-img-element -- admin cover or bundled sample */}
-            {thumb ? <img src={thumb} alt="" /> : <span className="mk-pick-blank" aria-hidden />}
+            {thumb ? <GroundedImg ground="white" src={thumb} alt="" /> : <span className="mk-pick-blank" aria-hidden />}
             {template.name}
           </button>
         )
       })}
     </div>
+  )
+}
+
+// The note, with the workspace's example for the template's category as its placeholder
+// (home.html #gen-note).
+function NoteBox({ state }: { state: HomeGeneratorState }) {
+  const t = useTranslations('app.workspace.notePlaceholder')
+  const category = state.template ? state.template.category : ''
+  return (
+    <textarea
+      className="mk-textarea"
+      maxLength={NOTE_MAX_LENGTH}
+      rows={2}
+      placeholder={notePlaceholder(category, t)}
+      value={state.note}
+      onChange={(event) => state.setNote(event.target.value)}
+    />
   )
 }
 
@@ -109,13 +127,12 @@ export const HomeCard = forwardRef<HTMLElement, Props>(function HomeCard({ state
             <span className="mk-field-label">
               {app('workspace.noteLabel')} <span className="text-muted-foreground">{app('workspace.optional')}</span>
             </span>
-            <textarea className="mk-textarea" maxLength={NOTE_MAX_LENGTH} rows={2} value={state.note} onChange={(event) => state.setNote(event.target.value)} />
+            <NoteBox state={state} />
           </label>
         </>
       ) : (
         <div className="mk-current">
-          {/* eslint-disable-next-line @next/next/no-img-element -- admin cover or bundled sample */}
-          {thumb ? <img className="mk-thumb" src={thumb} alt="" /> : <span className="mk-thumb" aria-hidden />}
+          {thumb ? <GroundedImg className="mk-thumb" ground="white" src={thumb} alt="" /> : <span className="mk-thumb" aria-hidden />}
           <span className="mk-current-t">
             <small>{t('template')}</small>
             <b>{template?.name ?? t('noTemplates')}</b>

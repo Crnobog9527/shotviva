@@ -7,7 +7,8 @@ import { BusinessSection, CreditBuys, FaqSection, PricingHero } from '@/core/con
 import { localizePath } from '@/core/i18n'
 import { currentLocale } from '@/core/i18n/server'
 import { JsonLdScript, breadcrumbListLd, faqPageLd, pageMetadata } from '@/core/seo'
-import { BUSINESS_MAIL_SUBJECT, homePageIn, pricingFaqIn, pricingPageIn } from '@/site/content'
+import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
+import { BUSINESS_MAIL_SUBJECT, fillCredits, homePageIn, pricingFaqIn, pricingPageIn, startingCredits } from '@/site/content'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { site } from '@/site/site.config'
 
@@ -24,15 +25,14 @@ export async function generateMetadata(): Promise<Metadata> {
   return pageMetadata(site, pricingPageIn(locale), locale)
 }
 
-const faqStyle =
-  'mt-12 max-w-3xl [&_h2]:font-display [&_h2]:text-h1 [&_h2]:leading-none [&_h3]:mt-6 [&_h3]:text-headline [&_h3]:font-semibold [&_p]:mt-2 [&_p]:text-bone-dim [&_table]:mt-3 [&_table]:text-caption'
-
 export default async function PricingPage() {
   const locale = await currentLocale()
-  const page = pricingPageIn(locale)
+  // "from N credits" filled from the live catalogue (建站规格 G4).
+  const credits = startingCredits(await cachedWebCatalogue(locale))
+  const page = fillCredits(pricingPageIn(locale), credits)
   const wishlistLive = isWishlistEnabled(site)
   const channel = paymentChannel()
-  const faq = pricingFaqIn(locale, channel)
+  const faq = fillCredits(pricingFaqIn(locale, channel), credits)
   const path = localizePath(page.path, locale)
   const crumbs = [
     { name: homePageIn(locale).label, path: localizePath('/', locale) },
@@ -56,8 +56,9 @@ export default async function PricingPage() {
         <CreditBuys block={page.creditBuys} />
         <PricingPayWith channel={channel} />
       </div>
-      <div className={faqStyle}>
-        <FaqSection faq={faq} heading={page.headings.faq} />
+      {/* The home page's accordion (gap audit B8); every answer stays in the server HTML. */}
+      <div className="mk-pricing-faq">
+        <FaqSection faq={faq} heading={page.headings.faq} variant="accordion" />
       </div>
     </article>
   )

@@ -3,6 +3,7 @@ import 'server-only'
 import { cacheLife, cacheTag } from 'next/cache'
 
 import { createAdminSupabase } from '../auth/supabase-admin'
+import { FAILED_READ_LIFE } from '../cache-life'
 import { AppError } from '../errors'
 import { logger } from '../logger'
 import { localize, pickLive } from './rules'
@@ -35,17 +36,29 @@ export type BannerState = { items: BannerAnnouncement[]; initialId: string | nul
 // server HTML already carries the banner (no layout shift). Starts and ends inside the cached
 // candidates are followed in the browser, and every admin change expires the tag, so the
 // entry can live an hour: marketing pages are not regenerated every minute for it.
-// A failed read shows no banner rather than breaking every page.
-export async function bannerState(locale: BannerLocale): Promise<BannerState> {
-  'use cache'
-  cacheTag(ANNOUNCEMENTS_CACHE_TAG)
-  cacheLife({ revalidate: 3600, expire: 86_400 })
+// A failed read shows no banner rather than breaking every page, and that empty state is only
+// kept for a minute (FAILED_READ_LIFE), not the hour.
+export const BANNER_LIFE = { revalidate: 3600, expire: 86_400 } as const
+
+type Load = (now: Date) => Promise<AnnouncementRow[]>
+const loadLive: Load = (now) => loadBannerCandidates(createAdminSupabase(), now)
+
+// The cached body, apart for tests.
+export async function bannerOrEmpty(locale: BannerLocale, load: Load = loadLive): Promise<BannerState> {
   const now = new Date()
   try {
-    const items = (await loadBannerCandidates(createAdminSupabase(), now)).map((row) => localize(row, locale))
+    const items = (await load(now)).map((row) => localize(row, locale))
+    cacheLife(BANNER_LIFE)
     return { items, initialId: pickLive(items, now.getTime())?.id ?? null }
   } catch (error) {
+    cacheLife(FAILED_READ_LIFE)
     logger.error('announcements.banner_read_failed', { error })
     return { items: [], initialId: null }
   }
+}
+
+export async function bannerState(locale: BannerLocale): Promise<BannerState> {
+  'use cache'
+  cacheTag(ANNOUNCEMENTS_CACHE_TAG)
+  return bannerOrEmpty(locale)
 }

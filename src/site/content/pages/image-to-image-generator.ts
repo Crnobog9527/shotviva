@@ -3,6 +3,7 @@ import { defineContentPage } from '@/core/content'
 import { site } from '../../site.config'
 import { productBills } from '../home'
 import { pairImage, sizeCountWord } from '../landing-shared'
+import { pricingRelated } from '../shared'
 import { freeImagesLabel, fromCredits, photoSeconds, plansSentence, SET_PHOTOS, tierList, tierPixels, uploadLimits } from '../offer'
 
 // Final SEO copy (T11): Title, H1, answer and FAQ own "image to image generator" so the home
@@ -21,8 +22,8 @@ export const imageToImageGenerator = defineContentPage({
   subtitle: 'Start from your own photo, not a blank text box. The subject stays as shot.',
   answerBlock: `Image to image generator tools make a new picture from a photo you upload. The ${brand} generator works with templates: pick one for food, products, beauty, rooms, pets or an art style, and it sets the light, the scene or the style for you. The subject stays as shot, and new users get ${freeImagesLabel}.`,
   hero: {
-    before: pairImage('spa-podium-before', 'Phone photo of a skincare jar on a bathroom shelf, flat indoor light (illustrative example)'),
-    after: pairImage('spa-podium-after', 'The same skincare jar on a stone podium in soft spa light, Spa Podium template (illustrative example)'),
+    before: pairImage('example-skincare-before', 'Phone photo of a skincare jar on a bathroom shelf, flat indoor light (illustrative example)'),
+    after: pairImage('example-skincare-after', 'The same skincare jar on a stone podium in soft spa light, Spa Podium template (illustrative example)'),
     caption: 'Your phone photo → Spa Podium template: same jar, a new set and light · Illustrative example',
     cta: { label: 'Upload photo', href: '/generate' },
   },
@@ -69,6 +70,7 @@ export const imageToImageGenerator = defineContentPage({
     { href: '/', anchor: 'AI image to image', note: 'The studio: templates for food, products, rooms, pets and art styles.' },
     { href: '/commercial-photography', anchor: 'Commercial product photography', note: 'For shops and sellers who need studio product shots without a photographer.' },
     { href: '/ai-restaurant-menu', anchor: 'AI restaurant menu photos', note: 'For restaurants that need menu and delivery-app photos from a phone shot.' },
+    pricingRelated(),
   ],
   headings: {
     facts: 'What an Image to Image Generator Needs From You',
@@ -76,7 +78,6 @@ export const imageToImageGenerator = defineContentPage({
     related: `More From ${brand}`,
   },
   landing: {
-    generatorTemplate: 'spa-podium',
     factsNote: `These are ${brand}'s own limits and sizes, the same on every page of this site.`,
   },
 })
