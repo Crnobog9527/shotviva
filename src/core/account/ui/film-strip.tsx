@@ -1,5 +1,6 @@
 import { useTranslations } from 'next-intl'
 
+import { REPLAY_BLOCK_CLASS } from '../../analytics/browser'
 import { Link } from '../../i18n/ui'
 import { Chevron } from './rows'
 
@@ -31,7 +32,7 @@ export function FilmStrip({ ids, count, fileUrl }: Props) {
             <li key={id}>
               <Link href={`/photos/${id}`} className={frame} aria-label={t('open')}>
                 {/* eslint-disable-next-line @next/next/no-img-element -- /api/files answers a redirect to a short-lived signed URL, as on Photos */}
-                <img src={fileUrl(id)} alt="" loading="lazy" decoding="async" className="size-full object-cover" />
+                <img src={fileUrl(id)} alt="" loading="lazy" decoding="async" className={`${REPLAY_BLOCK_CLASS} size-full object-cover`} />
               </Link>
             </li>
           ))}

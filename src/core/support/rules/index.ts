@@ -30,3 +30,8 @@ export function isTicketType(value: unknown): value is TicketType {
 export function isUnread(ticket: { lastMessageAt: string; userSeenAt: string }): boolean {
   return Date.parse(ticket.lastMessageAt) > Date.parse(ticket.userSeenAt)
 }
+
+// Images on a ticket message (ARCHITECTURE §10 「可以附图片」, T69): at most 3, each at most 10 MB
+// as picked. The browser re-encodes to a ≤2048px JPEG first; the server re-checks and stores WebP.
+export const TICKET_IMAGES_MAX = 3
+export const TICKET_IMAGE_MAX_BYTES = 10 * 1024 * 1024

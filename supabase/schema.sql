@@ -126,7 +126,7 @@ CREATE TABLE IF NOT EXISTS "public"."support_ticket_messages" (
 ALTER TABLE "public"."support_ticket_messages" OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."add_ticket_message"("p_ticket_id" "uuid", "p_user_id" "uuid", "p_body" "text") RETURNS "public"."support_ticket_messages"
+CREATE OR REPLACE FUNCTION "public"."add_ticket_message"("p_ticket_id" "uuid", "p_user_id" "uuid", "p_body" "text", "p_images" "jsonb" DEFAULT '[]'::"jsonb") RETURNS "public"."support_ticket_messages"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
@@ -147,12 +147,14 @@ begin
   insert into public.support_ticket_messages (ticket_id, author, body)
   values (p_ticket_id, 'user', btrim(p_body))
   returning * into v_message;
+
+  perform public.attach_ticket_images(p_ticket_id, p_user_id, v_message.id, p_images);
   return v_message;
 end;
 $$;
 
 
-ALTER FUNCTION "public"."add_ticket_message"("p_ticket_id" "uuid", "p_user_id" "uuid", "p_body" "text") OWNER TO "postgres";
+ALTER FUNCTION "public"."add_ticket_message"("p_ticket_id" "uuid", "p_user_id" "uuid", "p_body" "text", "p_images" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_activate_announcement"("p_id" "uuid", "p_active" boolean, "p_actor" "uuid") RETURNS "uuid"[]
@@ -755,19 +757,23 @@ $$;
 ALTER FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."admin_reply_ticket"("p_ticket_id" "uuid", "p_body" "text", "p_close" boolean) RETURNS "public"."support_tickets"
+CREATE OR REPLACE FUNCTION "public"."admin_reply_ticket"("p_ticket_id" "uuid", "p_body" "text", "p_close" boolean, "p_images" "jsonb" DEFAULT '[]'::"jsonb") RETURNS "public"."support_tickets"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
 declare
   v_body text := nullif(btrim(coalesce(p_body, '')), '');
   v_ticket public.support_tickets;
+  v_message_id uuid;
 begin
   if v_body is null and not coalesce(p_close, false) then
     raise exception 'INVALID_INPUT' using detail = 'a reply needs a message';
   end if;
   if char_length(v_body) > 2000 then
     raise exception 'INVALID_INPUT' using detail = 'body must be at most 2000 characters';
+  end if;
+  if v_body is null and coalesce(jsonb_array_length(case when jsonb_typeof(p_images) = 'array' then p_images end), 0) > 0 then
+    raise exception 'INVALID_INPUT' using detail = 'images need a message';
   end if;
 
   update public.support_tickets
@@ -781,14 +787,16 @@ begin
   end if;
 
   if v_body is not null then
-    insert into public.support_ticket_messages (ticket_id, author, body) values (p_ticket_id, 'admin', v_body);
+    insert into public.support_ticket_messages (ticket_id, author, body) values (p_ticket_id, 'admin', v_body)
+    returning id into v_message_id;
+    perform public.attach_ticket_images(p_ticket_id, v_ticket.user_id, v_message_id, p_images);
   end if;
   return v_ticket;
 end;
 $$;
 
 
-ALTER FUNCTION "public"."admin_reply_ticket"("p_ticket_id" "uuid", "p_body" "text", "p_close" boolean) OWNER TO "postgres";
+ALTER FUNCTION "public"."admin_reply_ticket"("p_ticket_id" "uuid", "p_body" "text", "p_close" boolean, "p_images" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_revenue_stats"("p_days" integer) RETURNS "jsonb"
@@ -1467,6 +1475,52 @@ $$;
 ALTER FUNCTION "public"."apply_subscription_renewal"("p_user_id" "uuid", "p_product_id" "text", "p_invoice_id" "text", "p_period_end" timestamp with time zone, "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_charge_id" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."attach_ticket_images"("p_ticket_id" "uuid", "p_owner_id" "uuid", "p_message_id" "uuid", "p_images" "jsonb") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_prefix text := 'tickets/' || p_owner_id::text || '/' || p_ticket_id::text || '/';
+  v_image jsonb;
+begin
+  if p_images is null or jsonb_typeof(p_images) = 'null' then
+    return;
+  end if;
+  if jsonb_typeof(p_images) <> 'array' then
+    raise exception 'INVALID_INPUT' using detail = 'images must be a list';
+  end if;
+  if jsonb_array_length(p_images) > 3 then
+    raise exception 'INVALID_INPUT' using detail = 'at most 3 images per message';
+  end if;
+
+  for v_image in select value from jsonb_array_elements(p_images) loop
+    if jsonb_typeof(v_image) <> 'object' or left(coalesce(v_image ->> 'object_key', ''), char_length(v_prefix)) <> v_prefix then
+      raise exception 'INVALID_INPUT' using detail = 'image is not under this ticket';
+    end if;
+    begin
+      insert into public.support_ticket_attachments (message_id, ticket_id, object_key, content_type, bytes, width, height)
+      values (
+        p_message_id,
+        p_ticket_id,
+        v_image ->> 'object_key',
+        v_image ->> 'content_type',
+        (v_image ->> 'bytes')::integer,
+        (v_image ->> 'width')::integer,
+        (v_image ->> 'height')::integer
+      );
+    exception
+      when check_violation or not_null_violation or unique_violation
+        or invalid_text_representation or numeric_value_out_of_range then
+        raise exception 'INVALID_INPUT' using detail = 'image entry is invalid';
+    end;
+  end loop;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."attach_ticket_images"("p_ticket_id" "uuid", "p_owner_id" "uuid", "p_message_id" "uuid", "p_images" "jsonb") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."bump_template_prompt_version"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -1571,12 +1625,13 @@ $$;
 ALTER FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric, "p_kept_inputs" "text"[]) OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."create_support_ticket"("p_user_id" "uuid", "p_type" "text", "p_body" "text", "p_payment_id" bigint, "p_job_id" "uuid") RETURNS "public"."support_tickets"
+CREATE OR REPLACE FUNCTION "public"."create_support_ticket"("p_user_id" "uuid", "p_type" "text", "p_body" "text", "p_payment_id" bigint, "p_job_id" "uuid", "p_ticket_id" "uuid" DEFAULT NULL::"uuid", "p_images" "jsonb" DEFAULT '[]'::"jsonb") RETURNS "public"."support_tickets"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
 declare
   v_ticket public.support_tickets;
+  v_message_id uuid;
 begin
   perform 1 from public.profiles where id = p_user_id for update;
   if not found then
@@ -1616,18 +1671,21 @@ begin
     raise exception 'RATE_LIMITED';
   end if;
 
-  insert into public.support_tickets (user_id, type, payment_id, job_id)
-  values (p_user_id, p_type, p_payment_id, p_job_id)
+  insert into public.support_tickets (id, user_id, type, payment_id, job_id)
+  values (coalesce(p_ticket_id, gen_random_uuid()), p_user_id, p_type, p_payment_id, p_job_id)
   returning * into v_ticket;
 
   insert into public.support_ticket_messages (ticket_id, author, body)
-  values (v_ticket.id, 'user', btrim(p_body));
+  values (v_ticket.id, 'user', btrim(p_body))
+  returning id into v_message_id;
+
+  perform public.attach_ticket_images(v_ticket.id, p_user_id, v_message_id, p_images);
   return v_ticket;
 end;
 $$;
 
 
-ALTER FUNCTION "public"."create_support_ticket"("p_user_id" "uuid", "p_type" "text", "p_body" "text", "p_payment_id" bigint, "p_job_id" "uuid") OWNER TO "postgres";
+ALTER FUNCTION "public"."create_support_ticket"("p_user_id" "uuid", "p_type" "text", "p_body" "text", "p_payment_id" bigint, "p_job_id" "uuid", "p_ticket_id" "uuid", "p_images" "jsonb") OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."template_requests" (
@@ -2835,6 +2893,27 @@ ALTER TABLE "public"."subscriptions" ALTER COLUMN "id" ADD GENERATED ALWAYS AS I
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."support_ticket_attachments" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "message_id" "uuid" NOT NULL,
+    "ticket_id" "uuid" NOT NULL,
+    "object_key" "text" NOT NULL,
+    "content_type" "text" NOT NULL,
+    "bytes" integer NOT NULL,
+    "width" integer NOT NULL,
+    "height" integer NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "support_ticket_attachments_bytes_check" CHECK ((("bytes" >= 1) AND ("bytes" <= 10485760))),
+    CONSTRAINT "support_ticket_attachments_content_type_check" CHECK (("content_type" = 'image/webp'::"text")),
+    CONSTRAINT "support_ticket_attachments_height_check" CHECK ((("height" >= 1) AND ("height" <= 10000))),
+    CONSTRAINT "support_ticket_attachments_object_key_check" CHECK (("object_key" ~ '^tickets/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.webp$'::"text")),
+    CONSTRAINT "support_ticket_attachments_width_check" CHECK ((("width" >= 1) AND ("width" <= 10000)))
+);
+
+
+ALTER TABLE "public"."support_ticket_attachments" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."system_settings" (
     "key" "text" NOT NULL,
     "value" "jsonb" NOT NULL,
@@ -3020,6 +3099,16 @@ ALTER TABLE ONLY "public"."subscriptions"
 
 
 
+ALTER TABLE ONLY "public"."support_ticket_attachments"
+    ADD CONSTRAINT "support_ticket_attachments_object_key_key" UNIQUE ("object_key");
+
+
+
+ALTER TABLE ONLY "public"."support_ticket_attachments"
+    ADD CONSTRAINT "support_ticket_attachments_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."support_ticket_messages"
     ADD CONSTRAINT "support_ticket_messages_pkey" PRIMARY KEY ("id");
 
@@ -3144,6 +3233,14 @@ CREATE INDEX "sms_sends_requested_at_idx" ON "public"."sms_sends" USING "btree" 
 
 
 CREATE INDEX "subscriptions_user_id_idx" ON "public"."subscriptions" USING "btree" ("user_id");
+
+
+
+CREATE INDEX "support_ticket_attachments_message_id_idx" ON "public"."support_ticket_attachments" USING "btree" ("message_id");
+
+
+
+CREATE INDEX "support_ticket_attachments_ticket_id_idx" ON "public"."support_ticket_attachments" USING "btree" ("ticket_id");
 
 
 
@@ -3277,6 +3374,16 @@ ALTER TABLE ONLY "public"."subscriptions"
 
 
 
+ALTER TABLE ONLY "public"."support_ticket_attachments"
+    ADD CONSTRAINT "support_ticket_attachments_message_id_fkey" FOREIGN KEY ("message_id") REFERENCES "public"."support_ticket_messages"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."support_ticket_attachments"
+    ADD CONSTRAINT "support_ticket_attachments_ticket_id_fkey" FOREIGN KEY ("ticket_id") REFERENCES "public"."support_tickets"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."support_ticket_messages"
     ADD CONSTRAINT "support_ticket_messages_ticket_id_fkey" FOREIGN KEY ("ticket_id") REFERENCES "public"."support_tickets"("id") ON DELETE CASCADE;
 
@@ -3375,6 +3482,15 @@ ALTER TABLE "public"."sms_sends" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."subscriptions" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."support_ticket_attachments" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "support_ticket_attachments_select_own" ON "public"."support_ticket_attachments" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM "public"."support_tickets" "t"
+  WHERE (("t"."id" = "support_ticket_attachments"."ticket_id") AND ("t"."user_id" = ( SELECT "auth"."uid"() AS "uid"))))));
+
+
+
 ALTER TABLE "public"."support_ticket_messages" ENABLE ROW LEVEL SECURITY;
 
 
@@ -3440,8 +3556,8 @@ GRANT SELECT ON TABLE "public"."support_ticket_messages" TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."add_ticket_message"("p_ticket_id" "uuid", "p_user_id" "uuid", "p_body" "text") FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."add_ticket_message"("p_ticket_id" "uuid", "p_user_id" "uuid", "p_body" "text") TO "service_role";
+REVOKE ALL ON FUNCTION "public"."add_ticket_message"("p_ticket_id" "uuid", "p_user_id" "uuid", "p_body" "text", "p_images" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."add_ticket_message"("p_ticket_id" "uuid", "p_user_id" "uuid", "p_body" "text", "p_images" "jsonb") TO "service_role";
 
 
 
@@ -3520,8 +3636,8 @@ GRANT ALL ON FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) TO "s
 
 
 
-REVOKE ALL ON FUNCTION "public"."admin_reply_ticket"("p_ticket_id" "uuid", "p_body" "text", "p_close" boolean) FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."admin_reply_ticket"("p_ticket_id" "uuid", "p_body" "text", "p_close" boolean) TO "service_role";
+REVOKE ALL ON FUNCTION "public"."admin_reply_ticket"("p_ticket_id" "uuid", "p_body" "text", "p_close" boolean, "p_images" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_reply_ticket"("p_ticket_id" "uuid", "p_body" "text", "p_close" boolean, "p_images" "jsonb") TO "service_role";
 
 
 
@@ -3605,6 +3721,10 @@ GRANT ALL ON FUNCTION "public"."apply_subscription_renewal"("p_user_id" "uuid", 
 
 
 
+REVOKE ALL ON FUNCTION "public"."attach_ticket_images"("p_ticket_id" "uuid", "p_owner_id" "uuid", "p_message_id" "uuid", "p_images" "jsonb") FROM PUBLIC;
+
+
+
 GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."generation_jobs" TO "service_role";
 GRANT SELECT ON TABLE "public"."generation_jobs" TO "authenticated";
 
@@ -3615,8 +3735,8 @@ GRANT ALL ON FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "
 
 
 
-REVOKE ALL ON FUNCTION "public"."create_support_ticket"("p_user_id" "uuid", "p_type" "text", "p_body" "text", "p_payment_id" bigint, "p_job_id" "uuid") FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."create_support_ticket"("p_user_id" "uuid", "p_type" "text", "p_body" "text", "p_payment_id" bigint, "p_job_id" "uuid") TO "service_role";
+REVOKE ALL ON FUNCTION "public"."create_support_ticket"("p_user_id" "uuid", "p_type" "text", "p_body" "text", "p_payment_id" bigint, "p_job_id" "uuid", "p_ticket_id" "uuid", "p_images" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."create_support_ticket"("p_user_id" "uuid", "p_type" "text", "p_body" "text", "p_payment_id" bigint, "p_job_id" "uuid", "p_ticket_id" "uuid", "p_images" "jsonb") TO "service_role";
 
 
 
@@ -3847,6 +3967,11 @@ GRANT SELECT ON TABLE "public"."subscriptions" TO "service_role";
 GRANT UPDATE ON SEQUENCE "public"."subscriptions_id_seq" TO "anon";
 GRANT UPDATE ON SEQUENCE "public"."subscriptions_id_seq" TO "authenticated";
 GRANT UPDATE ON SEQUENCE "public"."subscriptions_id_seq" TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "public"."support_ticket_attachments" TO "authenticated";
+GRANT SELECT ON TABLE "public"."support_ticket_attachments" TO "service_role";
 
 
 

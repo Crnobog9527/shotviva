@@ -2,8 +2,11 @@
 
 import { logger } from '../../logger'
 import { publicEnv } from '../../public-env'
+import { persistenceFor } from '../consent/decision'
+import { onConsentChange, readConsent } from '../consent/store'
 import { validateEvent, type BrowserEventName, type EventProps } from '../events'
 import { sentryOptions } from '../sentry-options'
+import { clearPosthogStorage, syncPosthog } from './consent-sync'
 import { posthogConfig } from './posthog-config'
 import { afterLoad, loadedSdks, loadSdks, withSdks } from './sdk'
 
@@ -30,12 +33,36 @@ export function initBrowserAnalytics(): void {
       posthog: key
         ? async () => {
             const { default: posthog } = await import('posthog-js')
-            posthog.init(key, posthogConfig())
+            posthog.init(key, posthogConfig(readConsent(), window.location.pathname))
             return posthog
           }
         : null,
     })
   })
+  if (key) watchConsent()
+}
+
+// ARCHITECTURE §16.1 (T70): cookies or memory follow the visitor's region and answer; an answer
+// given on the bar applies at once, before or after PostHog is in (the queue keeps it in order).
+function watchConsent(): void {
+  if (persistenceFor(readConsent()) === 'memory') clearStorage()
+  onConsentChange((consent) =>
+    withSdks(({ posthog }) => {
+      if (!posthog) return
+      syncPosthog(posthog, consent, window.location.pathname)
+      // set_config clears the cookie and localStorage; the tab's window id in sessionStorage is
+      // kept by PostHog's session manager, outside its persistence.
+      if (persistenceFor(consent) === 'memory') clearStorage()
+    }),
+  )
+}
+
+function clearStorage(): void {
+  try {
+    clearPosthogStorage(document, [window.localStorage, window.sessionStorage])
+  } catch {
+    // Storage blocked: there is nothing of ours in it either.
+  }
 }
 
 const enabled = () => started && Boolean(publicEnv.NEXT_PUBLIC_POSTHOG_KEY)
@@ -75,6 +102,9 @@ export function resetIdentity(): void {
 
 // Next calls this on every client navigation. Before Sentry is in there is nothing to record
 // (tracing is off, sentry-options.ts), so navigations are not queued.
+// PostHog's replay is held off before /admin and /checkout are shown and let go after them.
 export function onRouterTransitionStart(href: string, navigationType: string): void {
-  loadedSdks()?.sentry?.captureRouterTransitionStart(href, navigationType)
+  const sdks = loadedSdks()
+  sdks?.sentry?.captureRouterTransitionStart(href, navigationType)
+  if (sdks?.posthog) syncPosthog(sdks.posthog, readConsent(), href)
 }

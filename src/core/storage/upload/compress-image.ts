@@ -1,4 +1,4 @@
-import { INPUT_JPEG_QUALITY, INPUT_LONG_EDGE } from '@/core/storage/rules'
+import { INPUT_JPEG_QUALITY, INPUT_LONG_EDGE } from '../rules'
 
 export function targetSize(width: number, height: number, longEdge = INPUT_LONG_EDGE) {
   const scale = Math.min(1, longEdge / Math.max(width, height))

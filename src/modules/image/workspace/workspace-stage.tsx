@@ -4,6 +4,7 @@
 import { useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 
+import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
 import { useReveal } from '@/core/ui/reveal'
 
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
@@ -22,7 +23,7 @@ export function WorkspaceStage({ template, photo }: { template: CatalogueTemplat
       <div className="hairline relative mx-auto aspect-[4/5] w-[min(100%,calc((100dvh-220px)*0.8))] overflow-hidden rounded-panel bg-background">
         {photo ? (
           <>
-            <img src={photo.url} alt={t('workspace.photoAlt')} className="absolute inset-0 size-full object-cover" />
+            <img src={photo.url} alt={t('workspace.photoAlt')} className={`${REPLAY_BLOCK_CLASS} absolute inset-0 size-full object-cover`} />
             <span className="absolute inset-x-3 top-3 z-2 flex justify-between">
               <Pill>{t('workspace.stageYours')}</Pill>
               {photo.ratio ? (

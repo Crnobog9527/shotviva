@@ -1,6 +1,7 @@
 import createMiddleware from 'next-intl/middleware'
 import type { NextRequest } from 'next/server'
 
+import { withAnalyticsRegion } from '@/core/analytics/consent'
 import { proxyGate } from '@/core/auth/proxy'
 import { serverEnv } from '@/core/env'
 import { routing } from '@/core/i18n/routing'
@@ -17,16 +18,21 @@ const localeRouter = createMiddleware(routing)
 // §12.0). Then the Supabase session is refreshed and /admin (404), signed-in pages (307 to the
 // login page of the same language) and /zh addresses of English-only pages (the Chinese 404)
 // answer with real statuses before rendering; pages still call requireUser()/requireAdmin().
-// Every response gets X-Robots-Tag while indexing is closed or off-domain.
+// Every response gets X-Robots-Tag while indexing is closed or off-domain, and the analytics
+// region cookie (T70).
 export async function proxy(request: NextRequest) {
   const redirect = canonicalRedirectResponse(request, hosts)
   if (redirect) return redirect
+  const env = serverEnv()
   const response = await proxyGate(request, {
     translatedPaths: site.locales.zhPaths,
     forward: localeRouter,
     // /generate/upload-test only under `next dev`.
-    devPages: serverEnv().NODE_ENV === 'development',
+    devPages: env.NODE_ENV === 'development',
   })
+  // Whether analytics may use cookies for this visitor (ARCHITECTURE §16.1, T70); the test
+  // site and local dev accept ?sv_country=XX to act as a visitor from that country.
+  withAnalyticsRegion(response, request, { testOverride: env.VERCEL_ENV !== 'production' })
   return withHostNoindex(response, request, hosts.canonicalHost)
 }
 

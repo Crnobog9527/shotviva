@@ -2,6 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element -- local previews and the finished photo route */
 import { useFormatter, useTranslations } from 'next-intl'
+import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
 import { Link } from '@/core/i18n/ui'
 
 import { PaywallButton } from '@/core/billing/paywall'
@@ -48,7 +49,7 @@ function Thumb({ job }: { job: TrackedJob }) {
   const src = job.status === 'succeeded' ? (job.fileUrl ?? job.previewUrl) : job.previewUrl
   return (
     <span className="relative block h-[50px] w-10 overflow-hidden rounded-[8px] bg-photo-ground">
-      {src ? <img src={src} alt="" loading="lazy" decoding="async" className={cn('absolute inset-0 size-full object-cover', job.status === 'failed' && 'opacity-60')} /> : null}
+      {src ? <img src={src} alt="" loading="lazy" decoding="async" className={cn(REPLAY_BLOCK_CLASS, 'absolute inset-0 size-full object-cover', job.status === 'failed' && 'opacity-60')} /> : null}
     </span>
   )
 }

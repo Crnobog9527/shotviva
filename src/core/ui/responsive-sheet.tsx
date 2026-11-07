@@ -100,7 +100,7 @@ type CloseComponent = typeof DialogPrimitive.Close | typeof DrawerClose
 function SheetClose({ Close }: { Close: CloseComponent }) {
   const t = useTranslations("app.sheet")
   return (
-    <Close aria-label={t("close")} className="absolute top-3 right-3 grid size-11 place-items-center rounded-full text-bone-dim">
+    <Close aria-label={t("close")} className="absolute top-3 right-3 z-20 grid size-11 place-items-center rounded-full text-bone-dim">
       <span className="grid size-[30px] place-items-center rounded-full bg-wash-strong">
         <XIcon className="size-4" strokeWidth={2.2} aria-hidden="true" />
       </span>

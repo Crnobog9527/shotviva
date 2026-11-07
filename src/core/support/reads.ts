@@ -70,11 +70,23 @@ export async function hasUnreadReply(client: SupabaseClient, userId: string): Pr
   return rows.some((row) => isUnread({ lastMessageAt: row.last_message_at, userSeenAt: row.user_seen_at }))
 }
 
-const messageRow = z.object({ id: z.uuid(), author: z.enum(['user', 'admin']), body: z.string(), created_at: z.string() })
+const attachmentRow = z.object({ id: z.uuid(), object_key: z.string(), width: z.number(), height: z.number() })
+export const messageRow = z.object({
+  id: z.uuid(),
+  author: z.enum(['user', 'admin']),
+  body: z.string(),
+  created_at: z.string(),
+  // Embedded on support_ticket_attachments_message_id_idx (T69).
+  support_ticket_attachments: attachmentRow.array().default([]),
+})
 const threadRow = summaryRow.extend({ support_ticket_messages: messageRow.array() })
 
+// The thread's messages with their images, in one request.
+export const MESSAGE_COLUMNS = 'id, author, body, created_at, support_ticket_attachments(id, object_key, width, height, created_at)'
+
 export function toMessage(row: z.infer<typeof messageRow>): TicketMessage {
-  return { id: row.id, author: row.author, body: row.body, createdAt: row.created_at }
+  const attachments = row.support_ticket_attachments.map((a) => ({ id: a.id, objectKey: a.object_key, width: a.width, height: a.height }))
+  return { id: row.id, author: row.author, body: row.body, createdAt: row.created_at, attachments }
 }
 
 // One ticket with its messages in one request: the ticket by primary key, the thread on
@@ -83,9 +95,10 @@ export async function loadMyThread(client: SupabaseClient, ticketId: string): Pr
   if (!ticketIdSchema.safeParse(ticketId).success) return null
   const { data, error } = await client
     .from('support_tickets')
-    .select(`${SUMMARY_COLUMNS}, support_ticket_messages(id, author, body, created_at)`)
+    .select(`${SUMMARY_COLUMNS}, support_ticket_messages(${MESSAGE_COLUMNS})`)
     .eq('id', ticketId)
     .order('created_at', { referencedTable: 'support_ticket_messages', ascending: true })
+    .order('created_at', { referencedTable: 'support_ticket_messages.support_ticket_attachments', ascending: true })
     .maybeSingle()
   if (error) readFailed('loadMyThread', error)
   if (!data) return null

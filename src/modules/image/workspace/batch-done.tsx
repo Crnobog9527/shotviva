@@ -2,6 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element -- local previews and the finished photo route */
 import { useTranslations } from 'next-intl'
+import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
 import { Link } from '@/core/i18n/ui'
 
 import { ActionBar } from '@/core/app-shell'
@@ -69,13 +70,13 @@ function DoneTile({ job, index }: { job: TrackedJob; index: number }) {
   if (job.status === 'succeeded' && job.fileUrl) {
     return (
       <Link href={`/photos/${job.id}`} aria-label={t('photoN', { index })} className={`press ${frame}`}>
-        <img src={job.fileUrl} alt="" loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover" />
+        <img src={job.fileUrl} alt="" loading="lazy" decoding="async" className={`${REPLAY_BLOCK_CLASS} absolute inset-0 size-full object-cover`} />
       </Link>
     )
   }
   return (
     <span className={frame}>
-      {job.previewUrl ? <img src={job.previewUrl} alt="" className="absolute inset-0 size-full object-cover" /> : null}
+      {job.previewUrl ? <img src={job.previewUrl} alt="" className={`${REPLAY_BLOCK_CLASS} absolute inset-0 size-full object-cover`} /> : null}
       <span className="absolute inset-0 grid place-items-center bg-[var(--photo-fade)] text-center text-caption leading-tight font-medium text-foreground">{t('batch.refunded')}</span>
     </span>
   )

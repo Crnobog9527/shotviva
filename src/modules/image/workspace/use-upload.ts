@@ -4,10 +4,7 @@ import { useCallback, useState } from 'react'
 
 import { track } from '@/core/analytics/browser'
 
-import { compressImage } from './compress-image'
-import { putWithProgress } from './put-with-progress'
-import { requestTicket } from './request-ticket'
-import { UploadError, uploadPhoto, type UploadDeps, type UploadErrorCode, type UploadPhase } from './upload-photo'
+import { compressImage, putWithProgress, requestTicket, UploadError, uploadPhoto, type UploadDeps, type UploadErrorCode, type UploadPhase } from '@/core/storage/upload'
 
 export type UploadState =
   | { phase: 'idle' }

@@ -798,8 +798,8 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 
 ### 16.1 PostHog 配置
 
-- 无 Cookie：浏览器端 `persistence: 'memory'`，不写 Cookie、不写本地存储，所以不弹 Cookie 同意框。登录后用 Supabase 用户 id `identify`，未登录只按会话统计。
-- 不开录屏（Session Replay），上线后看漏斗需要时再由 Owner 决定开启（届时要遮挡图片和输入框、改隐私政策）。自动记录点击、热力图、Web Vitals 打开（PostHog 后台已开）。
+- **按地区决定是否用 Cookie（Owner 2026-11-07，T70）**：欧盟、欧洲经济区、英国、瑞士以外的访客，浏览器端 `persistence: 'localStorage+cookie'`，匿名访客跨刷新、跨天能连成一条路径，不弹任何东西；这些地区的访客默认 `persistence: 'memory'`（不写 Cookie、不写本地存储），页面底部显示一条同意条（「接受」/「仅必要」，中英文，按 DESIGN 样式，不挡内容），点「接受」后切换为 Cookie 记录并记住选择，点「仅必要」保持现状且不再询问；页脚加「Cookie 设置」可以改主意。地区由服务端读 Vercel 的 `x-vercel-ip-country` 决定并传给页面，读不到时按需要同意处理。不用 Termly 等第三方同意平台（只有 PostHog 一家用 Cookie）。登录后用 Supabase 用户 id `identify`，注册前的匿名行为并到账号下。隐私政策补「统计与 Cookie」一节，列进律师审阅清单。
+- 录屏（Session Replay）的遮挡在代码里先配好（T70）：所有输入框和文本域遮挡、用户上传的照片和作品图片遮挡（加统一的遮挡类名）、后台和结账返回页不录；录屏本身是否开启、采样比例由 Owner 在 PostHog 后台决定（Owner 决定前保持关闭）。开启前隐私政策要写明。自动记录点击、热力图、Web Vitals 打开（PostHog 后台已开）。
 - 走同域代理：`/ingest/*` 改写到 `us.i.posthog.com`，减少广告拦截造成的丢数。
 - 公开变量：`NEXT_PUBLIC_POSTHOG_KEY`、`NEXT_PUBLIC_POSTHOG_HOST`（已在 Vercel 三个环境配好）；服务端用同一个项目密钥发事件。
 - 不发任何个人信息：事件属性里不准出现邮箱、文案原文、补充说明 `note`、图片地址、提示词。

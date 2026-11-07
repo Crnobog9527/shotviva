@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element -- local object URL of the picked photo, or the result route */
 import type { ReactNode } from 'react'
 
+import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
 import { cn } from '@/core/ui/cn'
 
 // The stage's print tray (B comp workspace.html .dev, round 14). `developing` plays the
@@ -13,7 +14,7 @@ type TrayProps = { src: string | null; developing: boolean; negative?: boolean; 
 
 export function DevelopTray({ src, developing, negative = false, hud, className }: TrayProps) {
   return (
-    <div className={cn('hairline relative isolate overflow-hidden rounded-panel bg-photo-ground', className)}>
+    <div className={cn(REPLAY_BLOCK_CLASS, 'hairline relative isolate overflow-hidden rounded-panel bg-photo-ground', className)}>
       {src && developing ? (
         <>
           <img src={src} alt="" className="dev-neg absolute inset-0 size-full object-cover" />

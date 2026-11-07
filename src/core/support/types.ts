@@ -14,9 +14,18 @@ export type TicketSummary = {
   unread: boolean
 }
 
-export type TicketMessage = { id: string; author: 'user' | 'admin'; body: string; createdAt: string }
+// An image on a message (T69), as stored: the server signs objectKey into a short-lived URL
+// (TicketImage) before anything reaches a browser.
+export type TicketAttachment = { id: string; objectKey: string; width: number; height: number }
+export type TicketImage = { id: string; url: string; width: number; height: number }
+
+export type TicketMessage = { id: string; author: 'user' | 'admin'; body: string; createdAt: string; attachments: TicketAttachment[] }
+
+// A message as the thread views get it: images signed, keys gone.
+export type ShownMessage = Omit<TicketMessage, 'attachments'> & { images: TicketImage[] }
 
 export type TicketThread = TicketSummary & { messages: TicketMessage[] }
+export type ShownThread = TicketSummary & { messages: ShownMessage[] }
 
 // What the submit form offers to attach: the author's own payments and works.
 export type PaymentOption = { id: string; productId: string; amountTotal: number; currency: string; method: 'card' | 'alipay' | 'cn_card'; createdAt: string }
@@ -79,3 +88,6 @@ export type AdminTicket = {
   payment: AdminPayment | null
   eligibility: RefundEligibility | null
 }
+
+// The admin detail page's ticket once its images are signed (T69).
+export type ShownAdminTicket = Omit<AdminTicket, 'messages'> & { messages: ShownMessage[] }

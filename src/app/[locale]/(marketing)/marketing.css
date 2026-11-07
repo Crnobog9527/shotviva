@@ -505,14 +505,14 @@
   }
   .mk-foot-fine nav { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; }
   .mk-foot-item { display: inline-flex; align-items: center; gap: 8px; }
-  .mk-foot-fine a { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted-foreground); text-decoration: none; }
+  .mk-foot-fine a, .mk-foot-btn { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted-foreground); text-decoration: none; font: inherit; cursor: pointer; }
   .mk-foot-lang [aria-current] { color: var(--bone-dim); }
   @media (min-width: 768px) {
     .mk-footer { padding-top: 40px; }
     .mk-foot-main { margin-top: 12px; }
   }
   @media (hover: hover) {
-    .mk-mail:hover, .mk-foot-fine a:hover { color: var(--foreground); text-decoration: underline; text-underline-offset: 3px; }
+    .mk-mail:hover, .mk-foot-fine a:hover, .mk-foot-btn:hover { color: var(--foreground); text-decoration: underline; text-underline-offset: 3px; }
   }
 
   /* ---------- template picker: 1040px dialog from 768, bottom drawer on phones ---------- */
