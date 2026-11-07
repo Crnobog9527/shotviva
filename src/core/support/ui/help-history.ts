@@ -1,4 +1,4 @@
-import { HELP_PARAM, helpParamValue, type HelpView } from './help-param'
+import { HELP_JOB_PARAM, HELP_PARAM, helpParamValue, type HelpView } from './help-param'
 
 // The Help dialog's history entries (T68). Opening from the Support row pushes one entry, marked
 // in its state; moving inside the dialog replaces the current entry; closing goes back over a
@@ -25,11 +25,14 @@ export type HistoryPort = {
   onFirstGesture(run: () => void): () => void
 }
 
-// `href` with ?help= set to `view`, or removed; path, other params and hash kept.
+// `href` with ?help= set to `view`, or removed; path, other params and hash kept. The work a
+// photo page sent along (&job=) stays only while New ticket shows, so closing or moving on
+// does not pick it again next time.
 export function urlWith(href: string, view: HelpView | null): string {
   const url = new URL(href)
   if (view) url.searchParams.set(HELP_PARAM, helpParamValue(view))
   else url.searchParams.delete(HELP_PARAM)
+  if (view?.tab !== 'new') url.searchParams.delete(HELP_JOB_PARAM)
   return `${url.pathname}${url.search}${url.hash}`
 }
 

@@ -557,8 +557,12 @@
         "originalKept": "已保留，{px} px 预览",
         "originalEdited": "你改的那张照片",
         "originalDeleted": "早于原图保留功能",
-        "made": "生成时间"
+        "made": "生成时间",
+        "reference": "编号",
+        "copyReference": "复制编号",
+        "copied": "已复制"
       },
+      "problem": "这张图有问题？",
       "delete": {
         "open": "删除",
         "title": "删除这张作品？",
@@ -710,7 +714,14 @@
         "lead": "最近的付款，最新的在前。",
         "empty": "还没有购买记录",
         "emptyBody": "买了套餐或积分包之后，会显示在这里。",
-        "seePlans": "看看套餐"
+        "seePlans": "看看套餐",
+        "receipt": "收据",
+        "invoice": "发票",
+        "linkLabel": "{purchase}的{document}（在新标签页打开）",
+        "emailed": "收据已发送到付款邮箱",
+        "refunded": "已退款",
+        "partlyRefunded": "部分退款",
+        "unavailable": "刚才没能打开这份收据或发票，请稍后再试。还是打不开的话，在客服里告诉我们，我们发给你。"
       },
       "session": {
         "title": "登录",
@@ -769,7 +780,8 @@
         "paymentOptional": "付款记录（选填）",
         "noPayments": "这个账号还没有付款记录。",
         "workLabel": "相关作品（选填）",
-        "workOption": "{template} · {date, date, medium}",
+        "workOption": "{template} · {date, date, medium} · {ref}",
+        "workRef": "编号 {ref}",
         "none": "不选",
         "choose": "请选择",
         "submit": "发送",

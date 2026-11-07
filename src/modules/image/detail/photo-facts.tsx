@@ -2,6 +2,7 @@ import { useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 
 import { INPUT_PREVIEW_PX } from '@/core/storage/rules'
+import { CopyText } from '@/core/ui/copy-text'
 
 import type { PhotoItem } from '../photos/photo-item'
 import { workTagKey } from '../result/work-tag'
@@ -32,7 +33,10 @@ function originalFact(original: OriginalSource, keptWithWork: boolean, f: (key: 
 
 // The facts table (T6 photo.html, T32): what was made, how, for how much, and whether the
 // upload is kept with it (T40; before that only a preview). Sizes and counts in mono, words in the sans.
-export function PhotoFacts({ item, original, keptWithWork }: { item: PhotoItem; original: OriginalSource; keptWithWork: boolean }) {
+type Props = { item: PhotoItem; original: OriginalSource; keptWithWork: boolean; reference?: string }
+
+// The reference number last (T78): small, mono, copied on a press; it is what a ticket quotes.
+export function PhotoFacts({ item, original, keptWithWork, reference }: Props) {
   const t = useTranslations('app')
   const f = useTranslations('app.result.facts')
   const mono = (text: string) => <span className="font-mono text-caption">{text}</span>
@@ -48,6 +52,11 @@ export function PhotoFacts({ item, original, keptWithWork }: { item: PhotoItem; 
       <Row label={f('made')}>
         <PhotoWhen iso={item.createdAt} variant="made" />
       </Row>
+      {reference ? (
+        <Row label={f('reference')}>
+          <CopyText value={reference} label={f('copyReference')} copied={f('copied')} className="text-caption text-muted-foreground" />
+        </Row>
+      ) : null}
     </dl>
   )
 }

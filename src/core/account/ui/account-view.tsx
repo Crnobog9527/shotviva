@@ -1,6 +1,7 @@
 import { useTranslations } from 'next-intl'
 
 import type { Balance } from '../../billing'
+import type { PurchaseLine } from '../../billing/documents/lines'
 import { PlanCard, planAllowance, type LastMembership, type SubscriptionSummary } from '../../billing/subscription'
 import type { SiteProduct } from '../../config'
 import { TabRootHeader } from '../../app-shell'
@@ -12,7 +13,6 @@ import { FilmStrip } from './film-strip'
 import { Group } from './rows'
 import { SessionRows } from './session-rows'
 import { SettingsRows } from './settings-rows'
-import type { PurchaseLine } from './sheet-rows'
 
 // /account (comps-v3-b/account.html, SIGN-OFF row 08, T39 + T48): the membership pass, the
 // credit dials and this month's film strip (side by side from md), then plain rows. Everything

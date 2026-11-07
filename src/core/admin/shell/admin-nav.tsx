@@ -40,7 +40,7 @@ function NavLinks({ items, pathname }: { items: readonly AdminNavItem[]; pathnam
 export function AdminSidebar({ items }: { items: readonly AdminNavItem[] }) {
   const pathname = usePathname()
   return (
-    <nav aria-label={SHELL_COPY.navLabel} className="hidden w-56 shrink-0 border-r border-border p-3 md:block">
+    <nav aria-label={SHELL_COPY.navLabel} className="hidden w-52 shrink-0 border-r border-border p-3 md:block">
       <NavLinks items={items} pathname={pathname} />
     </nav>
   )

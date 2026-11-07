@@ -1,18 +1,22 @@
-# Applies merged migrations to the production database. Runs from main (queued automatically when
-# a merge touches supabase/migrations/, or started by hand), and is bound
-# to the `production` environment, whose required reviewer (the Owner) must approve each run
-# on GitHub before the job starts (AGENTS §5, LAUNCH_CHECKLIST §1). The approval record is
+# Applies merged migrations to the production database. Runs from main, started automatically
+# when a merge touches supabase/migrations/ (or by hand), with no approval step: review happens
+# on the PR before it merges (AGENTS §5, Owner 2026-11-08). The run history of this workflow is
 # the audit trail of what ran on production and when.
 #
-# The production password and project ref live only on the `production` environment, not
-# on the repository, so no other workflow can reach production and an environment that was
-# never set up (no reviewer, no secrets) fails at "Check configuration" without touching it.
+# Because the migration lands before the Vercel deployment is promoted, every migration must keep
+# the code currently live on production working (expand, then contract). PRs that add a
+# destructive migration fail "DB migrations expand-only" unless their title has `[contract]`
+# (.github/workflows/db-migrations-expand-only.yml).
+#
+# The job is bound to the `production` environment. It no longer has a required reviewer; it
+# holds the production password and project ref (not on the repository, so no other workflow can
+# reach production) and its branch policy only lets runs from main use them. An environment that
+# was never set up (no secrets) fails at "Check configuration" without touching the database.
 name: DB push (production)
 
 on:
   workflow_dispatch:
-  # Also queue a run whenever a merge to main adds or changes migrations. It still waits for the
-  # Owner's approval on the `production` environment before touching the database.
+  # Also run whenever a merge to main adds or changes migrations.
   push:
     branches: [main]
     paths:

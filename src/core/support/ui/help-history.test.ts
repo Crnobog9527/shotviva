@@ -145,4 +145,20 @@ describe('urlWith', () => {
     expect(urlWith('https://x.test/zh/account?a=1#top', { tab: 'list' })).toBe('/zh/account?a=1&help=list#top')
     expect(urlWith('https://x.test/account?help=new&a=1', null)).toBe('/account?a=1')
   })
+
+  it('keeps the photo page\'s work only while New ticket shows (T78)', () => {
+    const href = 'https://x.test/account?help=new&job=abc'
+    expect(urlWith(href, { tab: 'new' })).toBe('/account?help=new&job=abc')
+    expect(urlWith(href, { tab: 'list' })).toBe('/account?help=list')
+    expect(urlWith(href, null)).toBe('/account')
+  })
+
+  it('arrives on the bare account page under a dialog opened from the photo page', () => {
+    const tab = fakeTab('/account?help=new&job=abc')
+    arriveIn(tab.port)
+    tab.gesture()
+    expect(tab.current()).toBe('/account?help=new&job=abc')
+    tab.pressBack()
+    expect(tab.current()).toBe('/account')
+  })
 })
