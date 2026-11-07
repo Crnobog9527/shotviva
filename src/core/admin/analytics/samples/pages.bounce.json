@@ -1,0 +1,56 @@
+{
+ "cache_key": "cache_pages_bounce",
+ "is_cached": false,
+ "last_refresh": "2026-11-08T08:00:00.000000Z",
+ "next_allowed_client_refresh": "2026-11-08T08:01:00.000000Z",
+ "timezone": "UTC",
+ "columns": [
+  "path",
+  "sessions",
+  "bounces"
+ ],
+ "types": [
+  [
+   "path",
+   "String"
+  ],
+  [
+   "sessions",
+   "UInt64"
+  ],
+  [
+   "bounces",
+   "UInt64"
+  ]
+ ],
+ "results": [
+  [
+   "/",
+   1300,
+   598
+  ],
+  [
+   "/zh",
+   470,
+   141
+  ],
+  [
+   "/pricing",
+   120,
+   30
+  ]
+ ],
+ "hasMore": false,
+ "limit": 100,
+ "offset": 0,
+ "modifiers": {
+  "personsOnEventsMode": "person_id_override_properties_joined"
+ },
+ "query_status": null,
+ "timings": [
+  {
+   "k": "./query",
+   "t": 0.21
+  }
+ ]
+}

@@ -1,0 +1,106 @@
+{
+ "cache_key": "cache_funnel_visitor",
+ "is_cached": false,
+ "last_refresh": "2026-11-08T08:00:00.000000Z",
+ "next_allowed_client_refresh": "2026-11-08T08:01:00.000000Z",
+ "timezone": "UTC",
+ "columns": [
+  "cur",
+  "seg",
+  "s0",
+  "s1",
+  "s2",
+  "s3",
+  "s4",
+  "s5"
+ ],
+ "types": [
+  [
+   "cur",
+   "Bool"
+  ],
+  [
+   "seg",
+   "String"
+  ],
+  [
+   "s0",
+   "UInt64"
+  ],
+  [
+   "s1",
+   "UInt64"
+  ],
+  [
+   "s2",
+   "UInt64"
+  ],
+  [
+   "s3",
+   "UInt64"
+  ],
+  [
+   "s4",
+   "UInt64"
+  ],
+  [
+   "s5",
+   "UInt64"
+  ]
+ ],
+ "results": [
+  [
+   1,
+   "new",
+   1500,
+   330,
+   250,
+   110,
+   30,
+   9
+  ],
+  [
+   1,
+   "returning",
+   700,
+   240,
+   190,
+   95,
+   35,
+   17
+  ],
+  [
+   0,
+   "new",
+   1400,
+   300,
+   230,
+   100,
+   26,
+   8
+  ],
+  [
+   0,
+   "returning",
+   620,
+   180,
+   140,
+   70,
+   24,
+   10
+  ]
+ ],
+ "hasMore": false,
+ "limit": 100,
+ "offset": 0,
+ "modifiers": {
+  "personsOnEventsMode": "person_id_override_properties_joined"
+ },
+ "query_status": null,
+ "timings": [
+  {
+   "k": "./query",
+   "t": 0.21
+  }
+ ]
+}

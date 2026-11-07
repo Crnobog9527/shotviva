@@ -25,6 +25,10 @@ export const PAYMENT_CHANNELS = ['stripe', 'waffo'] as const
 // plain Stripe card route (T64, §6.3); `card` stays the Managed Payments card group.
 export const PAYMENT_METHODS = ['card', 'alipay', 'cn_card'] as const
 export const CONTACT_SALES_PAGES = ['/pricing', '/zh/pricing'] as const
+// T74 (ARCHITECTURE §16.2): where a template was looked at, and why an upload failed. Enums
+// only, so a file name or an error message can never ride along.
+export const TEMPLATE_VIEW_SURFACES = ['workspace', 'home_picker'] as const
+export const UPLOAD_ERROR_REASONS = ['too_large', 'unsupported', 'ticket_failed', 'transfer_failed', 'unknown'] as const
 
 const checkoutProps = {
   product_id: z.enum(PRODUCT_IDS),
@@ -60,6 +64,13 @@ export const eventSchemas = {
   // The pricing page's "For business" Contact us (DESIGN §6.9 item 8, T37).
   contact_sales_click: z.strictObject({ page: z.enum(CONTACT_SALES_PAGES) }),
   checkout_start: z.strictObject(checkoutProps),
+  // T74: the template workspace opened, or a template picked in the home generator's picker.
+  template_view: z.strictObject({ template_id: slug, category: slug, surface: z.enum(TEMPLATE_VIEW_SURFACES) }),
+  // T74: a product picked inside the paywall (a tier, a pack, or Monthly / Yearly moving the pick).
+  paywall_select: z.strictObject({ product_id: z.enum(PRODUCT_IDS), method: z.enum(PAYMENT_METHODS) }),
+  // T74: the buyer came back from the hosted checkout without paying (Stripe's cancel_url).
+  checkout_cancel: z.strictObject({ product_id: z.enum(PRODUCT_IDS), method: z.enum(PAYMENT_METHODS) }),
+  upload_error: z.strictObject({ reason: z.enum(UPLOAD_ERROR_REASONS) }),
   purchase: z.strictObject({
     ...checkoutProps,
     amount_usd: z.number().nonnegative(),
@@ -71,8 +82,8 @@ export type EventName = keyof typeof eventSchemas
 export type EventProps<E extends EventName> = z.infer<(typeof eventSchemas)[E]>
 
 // §16.2: money and credit events go out from the server so ad blockers cannot drop them.
-export const SERVER_EVENTS = ['signup', 'generate', 'checkout_start', 'purchase'] as const
-export const BROWSER_EVENTS = ['upload', 'paywall_view', 'contact_sales_click'] as const
+export const SERVER_EVENTS = ['signup', 'generate', 'checkout_start', 'checkout_cancel', 'purchase'] as const
+export const BROWSER_EVENTS = ['upload', 'upload_error', 'paywall_view', 'paywall_select', 'template_view', 'contact_sales_click'] as const
 export type ServerEventName = (typeof SERVER_EVENTS)[number]
 export type BrowserEventName = (typeof BROWSER_EVENTS)[number]
 
@@ -85,6 +96,23 @@ export function validateEvent<E extends EventName>(event: E, props: unknown): Va
   const result = eventSchemas[event].safeParse(props)
   if (result.success) return { ok: true, props: result.data as EventProps<E> }
   return { ok: false, issues: result.error.issues.map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.code}`) }
+}
+
+// templates.category holds the admin's display name since T53 ("Products & Resale", "Food &
+// Drink"), but the dictionary takes a slug (§16.2), so every `generate` event was refused and
+// dropped ("category: invalid_format" in production logs). Lowercased, with each run of other
+// characters turned into one hyphen; a name with no Latin letters or digits left becomes
+// 'uncategorized' rather than losing the event. From T75 the column holds the category's stable
+// key (already this shape, e.g. 'food-drink'), which passes through unchanged, so events before
+// and after T75 carry the same value. Used by `generate` (server) and `template_view` (browser).
+export function categorySlug(category: string): string {
+  const slug = category
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64)
+    .replace(/-+$/, '')
+  return slug || 'uncategorized'
 }
 
 const MB = 1024 * 1024
