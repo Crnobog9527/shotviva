@@ -29,7 +29,13 @@ export async function lookupUser(db: SupabaseClient, query: string): Promise<Loo
   return row ? { kind: row.kind, userId: row.user_id, jobId: row.job_id } : null
 }
 
-// Where a hit lands: the user's detail, with the job highlighted when the query was a job id.
-export function lookupHref(hit: LookupHit): string {
-  return hit.jobId ? `/admin/users/${hit.userId}?job=${hit.jobId}` : `/admin/users/${hit.userId}`
+// Where a hit lands: the list with that user's detail dialog open (T77), the job highlighted when
+// the query was a job id. An email substring that matched one account keeps the query, so the
+// list behind the dialog shows that account; any other kind of query shows the plain list.
+export function lookupHref(hit: LookupHit, query: string): string {
+  const params = new URLSearchParams()
+  if (hit.kind === 'email') params.set('q', query.trim())
+  params.set('user', hit.userId)
+  if (hit.jobId) params.set('userJob', hit.jobId)
+  return `/admin/users?${params.toString()}`
 }

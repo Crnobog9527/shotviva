@@ -2,23 +2,27 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
-import { AdminPage, lookupHref, lookupUser, searchUsers, USERS_COPY, UsersSearch } from '@/core/admin'
+import { AdminPage, listUsers, lookupHref, lookupUser, parseUserFilters, USERS_COPY, UsersListView } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 
-// /admin/users (ARCHITECTURE §10): the lookup box. admin_lookup opens the one user an id or email
-// points at; otherwise the email substring list from admin_search_users, at most 50 rows.
+import { batchAdjustCreditsAction, batchSetBannedAction } from './actions'
+
+// /admin/users (ARCHITECTURE §10.a, T77): the list of users, 50 a page, filtered and sorted from
+// the URL. The lookup box still opens the one user an id, an order number or a one-account email
+// substring points at (admin_lookup): as the detail dialog over this list (?user=, mounted by
+// the admin layout). With ?user= already set the lookup is skipped, so it never loops.
 export const instant = false
 
 export const metadata: Metadata = { title: USERS_COPY.title }
 
 export default async function AdminUsersPage({ searchParams }: PageProps<'/[locale]/admin/users'>) {
   await requireAdmin()
-  const { q } = await searchParams
-  const query = typeof q === 'string' ? q.slice(0, 200) : ''
+  const params = await searchParams
+  const filters = parseUserFilters(params)
   const db = createAdminSupabase()
-  const hit = query.trim() ? await lookupUser(db, query) : null
-  if (hit) redirect(lookupHref(hit))
-  const rows = query.trim() ? await searchUsers(db, query) : null
+  const hit = filters.q && !params.user ? await lookupUser(db, filters.q) : null
+  if (hit) redirect(lookupHref(hit, filters.q ?? ''))
+  const list = await listUsers(db, filters)
   const suspicious = (
     <Link href="/admin/users/suspicious" className="text-sm text-primary hover:underline">
       {USERS_COPY.suspiciousLink}
@@ -26,7 +30,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps<'/[loca
   )
   return (
     <AdminPage title={USERS_COPY.title} actions={suspicious}>
-      <UsersSearch query={query} rows={rows} />
+      <UsersListView filters={filters} list={list} actions={{ adjust: batchAdjustCreditsAction, setBanned: batchSetBannedAction }} />
     </AdminPage>
   )
 }

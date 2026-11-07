@@ -16,7 +16,9 @@ export const USER_ERRORS = {
   conflict: '这次调整已经提交过了，请刷新页面查看。',
 } as const
 
-const reason = z.string().trim().min(1).max(500)
+export const reasonSchema = z.string().trim().min(1).max(500)
+
+const reason = reasonSchema
 
 const adjustSchema = z.object({
   userId: z.uuid(),
@@ -29,14 +31,14 @@ const adjustSchema = z.object({
 
 const banSchema = z.object({ userId: z.uuid(), reason })
 
-function parse<T>(schema: z.ZodType<T>, input: unknown): T {
+export function parse<T>(schema: z.ZodType<T>, input: unknown): T {
   const parsed = schema.safeParse(input)
   if (!parsed.success) throw new AppError('INVALID_INPUT', USER_ERRORS.input)
   return parsed.data
 }
 
 // SQL errors arrive as AppErrors carrying the exception name; the admin reads Chinese.
-function friendly(error: unknown): never {
+export function friendly(error: unknown): never {
   const appError = toAppError(error)
   if (appError.code === 'CREDITS_INSUFFICIENT') throw new AppError(appError.code, USER_ERRORS.insufficient)
   if (appError.code === 'NOT_FOUND') throw new AppError(appError.code, USER_ERRORS.notFound)

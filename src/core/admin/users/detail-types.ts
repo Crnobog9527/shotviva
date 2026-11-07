@@ -1,3 +1,6 @@
+import type { Page } from '../cursor'
+import type { LedgerEntry, UserDetail, UserJob } from './types'
+
 // Shapes of the T25 user detail blocks (ARCHITECTURE §10「用户详情补全」). Money is in the
 // currency's minor unit, as Stripe and payments store it.
 
@@ -40,3 +43,13 @@ export type UserExtras = {
 export const DETAIL_ROWS = 10
 // Same-IP accounts shown on the detail page; a bigger cluster belongs in 「可疑注册」.
 export const SAME_IP_ROWS = 20
+
+// Everything the user detail dialog shows (T77), as a server action hands it over.
+export type UserDetailData = {
+  user: UserDetail
+  jobs: UserJob[]
+  ledger: Page<LedgerEntry>
+  // Whether `ledger` is a later page (the dialog offers a way back to the first).
+  ledgerPaged: boolean
+  extras: UserExtras
+}
