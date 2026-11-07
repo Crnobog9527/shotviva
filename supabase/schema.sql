@@ -281,6 +281,145 @@ $$;
 ALTER FUNCTION "public"."admin_ban_user"("p_user_id" "uuid", "p_reason" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_batch_adjust_credits"("p_user_ids" "uuid"[], "p_pool" "text", "p_amount" integer, "p_reason" "text", "p_batch_key" "text") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_reason text := btrim(coalesce(p_reason, ''));
+  v_ids uuid[];
+  v_bad uuid[];
+  v_id uuid;
+  v_applied integer := 0;
+begin
+  if p_pool is null or p_pool not in ('free', 'paid') then
+    raise exception 'INVALID_INPUT' using detail = 'pool must be free or paid';
+  end if;
+  if p_amount is null or p_amount = 0 or abs(p_amount) > 100000 then
+    raise exception 'INVALID_INPUT' using detail = 'amount must be a non-zero integer up to 100000';
+  end if;
+  if length(v_reason) = 0 or length(v_reason) > 500 then
+    raise exception 'INVALID_INPUT' using detail = 'reason is required, at most 500 characters';
+  end if;
+  if p_batch_key is null or length(p_batch_key) = 0 or length(p_batch_key) > 64 then
+    raise exception 'INVALID_INPUT' using detail = 'batch key is required';
+  end if;
+  if p_user_ids is null or cardinality(p_user_ids) = 0 or cardinality(p_user_ids) > 50
+     or array_position(p_user_ids, null) is not null then
+    raise exception 'INVALID_INPUT' using detail = 'between 1 and 50 users';
+  end if;
+
+  select array_agg(distinct i order by i) into v_ids from unnest(p_user_ids) as i;
+  if cardinality(v_ids) <> cardinality(p_user_ids) then
+    raise exception 'INVALID_INPUT' using detail = 'a user is listed twice';
+  end if;
+
+  perform 1 from public.profiles where id = any(v_ids) order by id for update;
+
+  select array_agg(i order by i) into v_bad
+    from unnest(v_ids) as i
+   where not exists (select 1 from public.profiles p where p.id = i);
+  if v_bad is not null then
+    raise exception 'PROFILE_NOT_FOUND' using detail = array_to_string(v_bad, ',');
+  end if;
+
+  if exists (
+    select 1
+      from unnest(v_ids) as i
+      join public.credit_ledger l on l.idempotency_key = 'admin_batch:' || p_batch_key || ':' || i::text
+     where l.user_id <> i or l.kind <> 'admin_adjust' or l.pool <> p_pool or l.delta <> p_amount
+  ) then
+    raise exception 'IDEMPOTENCY_CONFLICT';
+  end if;
+
+  -- Users this batch already adjusted are skipped, so a resubmit never trips over the balance
+  -- its own first run produced.
+  select array_agg(p.id order by p.id) into v_bad
+    from public.profiles p
+   where p.id = any(v_ids)
+     and not exists (
+       select 1 from public.credit_ledger l
+        where l.idempotency_key = 'admin_batch:' || p_batch_key || ':' || p.id::text
+     )
+     and (case when p_pool = 'paid' then p.credits else p.free_credits end) + p_amount < 0;
+  if v_bad is not null then
+    raise exception 'CREDITS_INSUFFICIENT' using detail = array_to_string(v_bad, ',');
+  end if;
+
+  foreach v_id in array v_ids loop
+    if (public._apply_credit_change(
+          v_id, p_pool, 'admin_adjust', p_amount, v_reason,
+          'admin_batch:' || p_batch_key || ':' || v_id::text
+        )).applied then
+      v_applied := v_applied + 1;
+    end if;
+  end loop;
+
+  return jsonb_build_object('applied', v_applied, 'repeated', cardinality(v_ids) - v_applied);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_batch_adjust_credits"("p_user_ids" "uuid"[], "p_pool" "text", "p_amount" integer, "p_reason" "text", "p_batch_key" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_batch_set_banned"("p_user_ids" "uuid"[], "p_banned" boolean, "p_reason" "text") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_reason text := btrim(coalesce(p_reason, ''));
+  v_ids uuid[];
+  v_bad uuid[];
+  v_id uuid;
+  v_changed integer := 0;
+begin
+  if p_banned is null then
+    raise exception 'INVALID_INPUT' using detail = 'banned must be true or false';
+  end if;
+  if length(v_reason) = 0 or length(v_reason) > 500 then
+    raise exception 'INVALID_INPUT' using detail = 'reason is required, at most 500 characters';
+  end if;
+  if p_user_ids is null or cardinality(p_user_ids) = 0 or cardinality(p_user_ids) > 50
+     or array_position(p_user_ids, null) is not null then
+    raise exception 'INVALID_INPUT' using detail = 'between 1 and 50 users';
+  end if;
+
+  select array_agg(distinct i order by i) into v_ids from unnest(p_user_ids) as i;
+  if cardinality(v_ids) <> cardinality(p_user_ids) then
+    raise exception 'INVALID_INPUT' using detail = 'a user is listed twice';
+  end if;
+
+  perform 1 from public.profiles where id = any(v_ids) order by id for update;
+
+  select array_agg(i order by i) into v_bad
+    from unnest(v_ids) as i
+   where not exists (select 1 from public.profiles p where p.id = i);
+  if v_bad is not null then
+    raise exception 'PROFILE_NOT_FOUND' using detail = array_to_string(v_bad, ',');
+  end if;
+
+  for v_id in
+    select p.id from public.profiles p
+     where p.id = any(v_ids) and (p.banned_at is null) = p_banned
+     order by p.id
+  loop
+    if p_banned then
+      perform public.admin_ban_user(v_id, v_reason);
+    else
+      perform public.admin_unban_user(v_id, v_reason);
+    end if;
+    v_changed := v_changed + 1;
+  end loop;
+
+  return jsonb_build_object('changed', v_changed, 'unchanged', cardinality(v_ids) - v_changed);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_batch_set_banned"("p_user_ids" "uuid"[], "p_banned" boolean, "p_reason" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_daily_costs"("p_days" integer) RETURNS "jsonb"
     LANGUAGE "plpgsql" STABLE
     SET "search_path" TO ''
@@ -647,6 +786,125 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_list_tickets"("p_status" "text", "p_type" "text", "p_cursor_at" timestamp with time zone, "p_cursor_id" "uuid", "p_limit" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_list_users"("p_query" "text" DEFAULT NULL::"text", "p_tier" "text" DEFAULT NULL::"text", "p_provider" "text" DEFAULT NULL::"text", "p_status" "text" DEFAULT NULL::"text", "p_from" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_to" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_sort" "text" DEFAULT 'created'::"text", "p_page" integer DEFAULT 1) RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_q text := nullif(btrim(coalesce(p_query, '')), '');
+  v_like text;
+  v_digits text;
+begin
+  if p_tier is not null and p_tier not in ('free', 'starter', 'pro', 'max') then
+    raise exception 'INVALID_INPUT' using detail = 'tier must be free, starter, pro or max';
+  end if;
+  if p_provider is not null and p_provider not in ('email', 'google', 'phone') then
+    raise exception 'INVALID_INPUT' using detail = 'provider must be email, google or phone';
+  end if;
+  if p_status is not null and p_status not in ('active', 'banned') then
+    raise exception 'INVALID_INPUT' using detail = 'status must be active or banned';
+  end if;
+  if p_sort is null or p_sort not in ('created', 'last_job', 'paid_credits') then
+    raise exception 'INVALID_INPUT' using detail = 'sort must be created, last_job or paid_credits';
+  end if;
+  if p_page is null or p_page < 1 or p_page > 10000 then
+    raise exception 'INVALID_INPUT' using detail = 'page must be between 1 and 10000';
+  end if;
+  if length(v_q) > 320 then
+    raise exception 'INVALID_INPUT' using detail = 'query is too long';
+  end if;
+
+  -- The lookup box's substring rules (admin_search_users, 0442): % and _ match themselves; a
+  -- query of digits, spaces, dashes and a leading + with at least 4 digits also matches the phone.
+  if v_q is not null then
+    v_like := '%' || replace(replace(replace(v_q, '\', '\\'), '%', '\%'), '_', '\_') || '%';
+    if v_q ~ '^\+?[0-9][0-9 -]{2,}$' and length(regexp_replace(v_q, '[^0-9]', '', 'g')) >= 4 then
+      v_digits := regexp_replace(v_q, '[^0-9]', '', 'g');
+    end if;
+  end if;
+
+  return (
+    with matched as (
+      select p.id, p.created_at, p.role, p.credits, p.free_credits, p.paid_until, p.banned_at,
+             u.email::text as email,
+             nullif(u.phone, '')::text as phone,
+             -- The method the account signed up with; linking Google later does not change it.
+             u.raw_app_meta_data ->> 'provider' as provider,
+             plan.product_id
+        from public.profiles p
+        join auth.users u on u.id = p.id
+        left join lateral (
+          select l.product_id
+            from public.credit_ledger l
+           where p.paid_until > now()
+             and l.user_id = p.id
+             and l.pool = 'paid'
+             and l.delta > 0
+             and l.product_id is not null
+             and l.product_id not like 'pack_%'
+           order by l.created_at desc, l.id desc
+           limit 1
+        ) plan on true
+       where (v_q is null
+              or u.email ilike v_like
+              or (v_digits is not null and u.phone like '%' || v_digits || '%'))
+         and (p_provider is null or u.raw_app_meta_data ->> 'provider' = p_provider)
+         and (p_status is null or (p_status = 'banned') = (p.banned_at is not null))
+         and (p_from is null or p.created_at >= p_from)
+         and (p_to is null or p.created_at < p_to)
+         and (p_tier is null or p_tier = 'free' or p.paid_until > now())
+    ), filtered as (
+      select m.*, coalesce(split_part(m.product_id, '_', 1), 'free') as tier
+        from matched m
+       where p_tier is null or coalesce(split_part(m.product_id, '_', 1), 'free') = p_tier
+    ), ranked as (
+      select f.*,
+             row_number() over (
+               order by
+                 case when p_sort = 'paid_credits' then f.credits end desc nulls last,
+                 -- Only evaluated when sorting by it: CASE skips the subquery otherwise.
+                 case when p_sort = 'last_job' then
+                   (select max(g.created_at) from public.generation_jobs g where g.user_id = f.id)
+                 end desc nulls last,
+                 f.created_at desc,
+                 f.id desc
+             ) as position
+        from filtered f
+    ), page as (
+      select r.*
+        from ranked r
+       where r.position > (p_page - 1) * 50
+         and r.position <= p_page * 50
+    )
+    select jsonb_build_object(
+      'total', (select count(*) from filtered),
+      'rows', coalesce((
+        select jsonb_agg(jsonb_build_object(
+                 'id', pg.id,
+                 'email', pg.email,
+                 'phone', pg.phone,
+                 'created_at', pg.created_at,
+                 'provider', pg.provider,
+                 'role', pg.role,
+                 'credits', pg.credits,
+                 'free_credits', pg.free_credits,
+                 'paid_until', pg.paid_until,
+                 'tier', pg.tier,
+                 'product_id', pg.product_id,
+                 'last_generation_at', (select max(g.created_at) from public.generation_jobs g where g.user_id = pg.id),
+                 'banned_at', pg.banned_at
+               ) order by pg.position)
+          from page pg
+      ), '[]'::jsonb)
+    )
+  );
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."admin_list_users"("p_query" "text", "p_tier" "text", "p_provider" "text", "p_status" "text", "p_from" timestamp with time zone, "p_to" timestamp with time zone, "p_sort" "text", "p_page" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_log_replay"("p_user_id" "uuid", "p_target_id" "text", "p_reason" "text") RETURNS "void"
@@ -3160,6 +3418,10 @@ CREATE INDEX "credit_ledger_user_id_created_at_idx" ON "public"."credit_ledger" 
 
 
 
+CREATE INDEX "credit_ledger_user_plan_idx" ON "public"."credit_ledger" USING "btree" ("user_id", "created_at" DESC, "id" DESC) WHERE (("pool" = 'paid'::"text") AND ("delta" > 0) AND ("product_id" IS NOT NULL) AND ("product_id" !~~ 'pack_%'::"text"));
+
+
+
 CREATE INDEX "generation_jobs_created_at_id_idx" ON "public"."generation_jobs" USING "btree" ("created_at" DESC, "id" DESC);
 
 
@@ -3208,7 +3470,15 @@ CREATE INDEX "payments_waffo_order_id_idx" ON "public"."payments" USING "btree" 
 
 
 
+CREATE INDEX "profiles_banned_at_idx" ON "public"."profiles" USING "btree" ("banned_at") WHERE ("banned_at" IS NOT NULL);
+
+
+
 CREATE INDEX "profiles_created_at_idx" ON "public"."profiles" USING "btree" ("created_at");
+
+
+
+CREATE INDEX "profiles_paid_until_idx" ON "public"."profiles" USING "btree" ("paid_until") WHERE ("paid_until" IS NOT NULL);
 
 
 
@@ -3581,6 +3851,16 @@ GRANT ALL ON FUNCTION "public"."admin_ban_user"("p_user_id" "uuid", "p_reason" "
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_batch_adjust_credits"("p_user_ids" "uuid"[], "p_pool" "text", "p_amount" integer, "p_reason" "text", "p_batch_key" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_batch_adjust_credits"("p_user_ids" "uuid"[], "p_pool" "text", "p_amount" integer, "p_reason" "text", "p_batch_key" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_batch_set_banned"("p_user_ids" "uuid"[], "p_banned" boolean, "p_reason" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_batch_set_banned"("p_user_ids" "uuid"[], "p_banned" boolean, "p_reason" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_daily_costs"("p_days" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_daily_costs"("p_days" integer) TO "service_role";
 
@@ -3613,6 +3893,11 @@ GRANT ALL ON FUNCTION "public"."admin_list_template_requests"() TO "service_role
 
 REVOKE ALL ON FUNCTION "public"."admin_list_tickets"("p_status" "text", "p_type" "text", "p_cursor_at" timestamp with time zone, "p_cursor_id" "uuid", "p_limit" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_list_tickets"("p_status" "text", "p_type" "text", "p_cursor_at" timestamp with time zone, "p_cursor_id" "uuid", "p_limit" integer) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_list_users"("p_query" "text", "p_tier" "text", "p_provider" "text", "p_status" "text", "p_from" timestamp with time zone, "p_to" timestamp with time zone, "p_sort" "text", "p_page" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_list_users"("p_query" "text", "p_tier" "text", "p_provider" "text", "p_status" "text", "p_from" timestamp with time zone, "p_to" timestamp with time zone, "p_sort" "text", "p_page" integer) TO "service_role";
 
 
 
