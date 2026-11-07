@@ -1,5 +1,6 @@
 // Admin area (ARCHITECTURE §10): the template + prompt editor and the provider settings (T17).
 export {
+  bulkEditTemplates,
   listAdminTemplates,
   runAdminAction,
   runAdminQuery,
@@ -15,6 +16,7 @@ export type {
   ActiveChangeOutcome,
   AdminTemplate,
   ApplyCoverRequest,
+  BulkEditOutcome,
   CoverTicket,
   CoverUploadRequest,
   SaveTemplatePayload,
@@ -48,6 +50,9 @@ export {
   type SaveProviderInput,
 } from './providers'
 export { PROVIDERS_COPY, ProvidersEditor } from './providers-editor'
+// The face-swap dry run beside the decision provider (ARCHITECTURE §5.1a, T81).
+export { dryRunIdentityScreen, type DryRunResult } from './identity-dry-run'
+export { IdentityDryRun } from './identity-dry-run-ui'
 export { AdminPage, AdminShell, adminNavItems, EmptyState, SHELL_COPY, StatCard, type AdminNavItem } from './shell'
 export {
   listPurchases,
@@ -178,3 +183,16 @@ export {
 } from './costs'
 export { parseFunnelDim, parsePageSort, parseRange, posthogProjectId, type FunnelDim, type PageSort, type Range } from './analytics'
 export { ANALYTICS_COPY, AnalyticsView, RangeTabs, Unconfigured, type AnalyticsQuery } from './analytics-ui'
+export {
+  attachDisputeFile,
+  createDisputeUpload,
+  DISPUTES_COPY,
+  listDisputes,
+  reconcileSubmitted,
+  saveDisputeText,
+  sendDueReminders,
+  submitDispute,
+  type DisputeListItem,
+  type DisputeUploadTicket,
+} from './disputes'
+export { DisputeDetail, DisputesList, toCard, type DisputeActions, type DisputeCard } from './disputes-ui'

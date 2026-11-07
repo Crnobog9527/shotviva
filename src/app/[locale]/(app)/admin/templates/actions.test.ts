@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const requireAdmin = vi.fn()
 const setTemplatesActive = vi.fn()
 const setTemplateOrder = vi.fn()
+const bulkEditTemplates = vi.fn()
 const cache = vi.hoisted(() => ({ revalidateTag: vi.fn(), refresh: vi.fn() }))
 
 vi.mock('next/cache', () => cache)
@@ -11,6 +12,7 @@ vi.mock('@/core/auth', () => ({ requireAdmin: () => requireAdmin(), createAdminS
 vi.mock('@/core/admin', () => ({
   setTemplatesActive: (...args: unknown[]) => setTemplatesActive(...args),
   setTemplateOrder: (...args: unknown[]) => setTemplateOrder(...args),
+  bulkEditTemplates: (...args: unknown[]) => bulkEditTemplates(...args),
   runAdminAction: async (work: () => Promise<void>) => {
     await work()
     return { ok: true }
@@ -22,7 +24,7 @@ vi.mock('@/core/storage', () => ({ r2Store: vi.fn(), r2PublicStore: vi.fn() }))
 vi.mock('@/core/templates', () => ({ TEMPLATES_CACHE_TAG: 'templates' }))
 vi.mock('@/modules/image', () => ({ CREDITS_FLOOR: {} }))
 
-const { setTemplateOrderAction, setTemplatesActiveAction } = await import('./actions')
+const { bulkEditTemplatesAction, setTemplateOrderAction, setTemplatesActiveAction } = await import('./actions')
 
 const outcome = (changed: number) => ({
   active: true,
@@ -84,5 +86,27 @@ describe('setTemplateOrderAction (T76 drag-to-reorder)', () => {
     expect(setTemplateOrder).toHaveBeenCalledWith({}, 'admin', input)
     expect(cache.revalidateTag).toHaveBeenCalledWith('templates', 'max')
     expect(cache.refresh).toHaveBeenCalled()
+  })
+})
+
+describe('bulkEditTemplatesAction (T79 batch edit)', () => {
+  beforeEach(() => {
+    requireAdmin.mockReset()
+    bulkEditTemplates.mockReset()
+    Object.values(cache).forEach((fn) => fn.mockReset())
+  })
+
+  it('expires the catalogue only when the batch was saved', async () => {
+    requireAdmin.mockResolvedValue({ id: 'admin', email: null })
+    const input = { ids: ['a', 'b'], patch: { quality: 'medium' } }
+    bulkEditTemplates.mockResolvedValue({ changed: 2, failures: [] })
+    expect(await bulkEditTemplatesAction(input)).toEqual({ ok: true, value: { changed: 2, failures: [] } })
+    expect(bulkEditTemplates).toHaveBeenCalledWith({}, 'admin', input, {})
+    expect(cache.revalidateTag).toHaveBeenCalledWith('templates', 'max')
+
+    cache.revalidateTag.mockReset()
+    bulkEditTemplates.mockResolvedValue({ changed: 0, failures: [{ id: 'a', name: 'A', reason: 'web_incomplete' }] })
+    await bulkEditTemplatesAction(input)
+    expect(cache.revalidateTag).not.toHaveBeenCalled()
   })
 })

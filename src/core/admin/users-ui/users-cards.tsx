@@ -3,7 +3,7 @@
 import { cn } from '@/core/ui/cn'
 
 import type { UserListRow } from '../users/list-types'
-import { TierBadge, UserStatus } from './badges'
+import { RefusalFlag, TierBadge, UserStatus } from './badges'
 import { USERS_COPY as COPY } from './copy'
 import { AccountCell, AllCheckbox, CreditsCell, day, providerLabel, RowCheckbox } from './user-cells'
 import type { Selection } from './use-selection'
@@ -30,6 +30,7 @@ export function UsersCards({ rows, selection, currentUserId }: { rows: UserListR
                 <AccountCell row={row} />
                 <UserStatus role={row.role} bannedAt={row.bannedAt} />
               </div>
+              <RefusalFlag flagged={row.refusalFlag} last24h={row.refusals24h} />
               <div className="flex flex-wrap items-start gap-x-4 gap-y-1">
                 <TierBadge tier={row.tier} interval={row.interval} paidUntil={row.paidUntil} />
                 <span className="text-xs text-muted-foreground">

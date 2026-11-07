@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl'
 import { useRef } from 'react'
 
+import { FavoriteButton } from '../favorites/favorite-button'
 import { LoopPlate } from './card-media'
 import { cardPrice, hasStills, isCompareCategory, isMotion, type CatalogueTemplate } from './catalogue-template'
 import { CompareSlider } from './compare-slider'
@@ -14,7 +15,8 @@ type Props = { template: CatalogueTemplate; onOpen(id: string): void; eager?: bo
 
 // A template card (DESIGN §4.2 and §6.9 items 1–3, B comp create.html). A 'compare' category
 // (画风) keeps the drag compare; every other template is the side-by-side pair that plays its change on hover.
-// A tap opens the creation dialog straight away: there is no preview step any more.
+// A tap opens the creation dialog straight away: there is no preview step any more. The save
+// heart (T83) sits over the photo's top-right corner, beside the card's button, not inside it.
 export function TemplateCard(props: Props) {
   const { template } = props
   if (isCompareCategory(template) && hasStills(template)) return <ArtCard {...props} />
@@ -27,22 +29,25 @@ function PairCard({ template, onOpen, eager }: Props) {
   useHoverWipe(ref)
   const { before, after, type, motion } = template.cover
   return (
-    <button
-      ref={ref}
-      type="button"
-      aria-haspopup="dialog"
-      onClick={() => onOpen(template.id)}
-      className="group block w-full rounded-tile text-left transition-transform duration-250 ease-house hover:-translate-y-0.5 active:scale-[.97]"
-    >
-      {before && after ? (
-        <PairMedia before={before} after={after} alt={alt} eager={eager} sizes={COVER_SIZES.cardPlate} video={type === 'video' && motion ? motion : undefined} className="transition-shadow group-hover:shadow-[inset_0_0_0_1px_var(--input)]" />
-      ) : isMotion(template) ? (
-        <LoopPlate template={template} alt={alt} sizes={COVER_SIZES.cardFrame} />
-      ) : (
-        <span className="hairline block aspect-[8/5] rounded-control bg-muted" />
-      )}
-      <CardMeta template={template} />
-    </button>
+    <div className="relative transition-transform duration-250 ease-house hover:-translate-y-0.5">
+      <button
+        ref={ref}
+        type="button"
+        aria-haspopup="dialog"
+        onClick={() => onOpen(template.id)}
+        className="group block w-full rounded-tile text-left transition-transform duration-250 ease-house active:scale-[.97]"
+      >
+        {before && after ? (
+          <PairMedia before={before} after={after} alt={alt} eager={eager} sizes={COVER_SIZES.cardPlate} video={type === 'video' && motion ? motion : undefined} className="transition-shadow group-hover:shadow-[inset_0_0_0_1px_var(--input)]" />
+        ) : isMotion(template) ? (
+          <LoopPlate template={template} alt={alt} sizes={COVER_SIZES.cardFrame} />
+        ) : (
+          <span className="hairline block aspect-[8/5] rounded-control bg-muted" />
+        )}
+        <CardMeta template={template} />
+      </button>
+      <FavoriteButton template={template} surface="create_card" className="top-0.5 right-0.5" />
+    </div>
   )
 }
 
@@ -52,7 +57,8 @@ function PairCard({ template, onOpen, eager }: Props) {
 function ArtCard({ template, onOpen, eager }: Props) {
   const t = useTranslations('app.template')
   return (
-    <div className="flex h-full flex-col rounded-tile">
+    <div className="relative flex h-full flex-col rounded-tile">
+      <FavoriteButton template={template} surface="create_card" className="top-0.5 right-0.5" />
       <CompareSlider
         before={template.cover.before as string}
         after={template.cover.after as string}

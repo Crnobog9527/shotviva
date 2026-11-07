@@ -1,3 +1,5 @@
+/* Layer order first (layer-order.test.ts): see LAYER_ORDER there. */
+@layer properties, theme, base, components, utilities;
 /* The pricing page's "For business" order slip (comps-v3-b pricing.html, Owner 11-06 night, T43):
    the lightest plate on the site, a fine drafting grid, a drawn rim with corner brackets. Quieter
    than the Max card; no price, no fourth tier. */

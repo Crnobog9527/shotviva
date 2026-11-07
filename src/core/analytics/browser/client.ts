@@ -94,6 +94,14 @@ export function trackTemplateView(template: { id: string; category: string }, su
   track('template_view', { template_id: template.id, category: categorySlug(template.category), surface })
 }
 
+export function trackTemplateFavorite(
+  template: { id: string; category: string },
+  action: EventProps<'template_favorite'>['action'],
+  surface: EventProps<'template_favorite'>['surface'],
+): void {
+  track('template_favorite', { template_id: template.id, category: categorySlug(template.category), action, surface })
+}
+
 export function trackPaywallSelect(props: EventProps<'paywall_select'>): void {
   track('paywall_select', props)
 }

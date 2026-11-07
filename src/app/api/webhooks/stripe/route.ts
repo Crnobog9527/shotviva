@@ -2,9 +2,10 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 import { errorResponse } from '@/core/api-response'
 import { createAdminSupabase } from '@/core/auth'
-import { handleStripeWebhook, stripeClient, stripeWebhookSecret } from '@/core/billing/stripe'
+import { handleStripeWebhook, managedPaymentsEnabled, stripeClient, stripeWebhookSecret } from '@/core/billing/stripe'
 import { cancelOtherSubscriptions } from '@/core/billing/subscription'
 import { waffoClient } from '@/core/billing/waffo'
+import { disputeEvidenceConfig } from '@/site/dispute-evidence'
 import { site } from '@/site/site.config'
 
 // Public on purpose: Stripe calls it without a session. The Stripe-Signature header is the
@@ -23,6 +24,8 @@ export async function POST(request: NextRequest) {
       // An upgrade cancels the old subscription, whichever channel bills it (T66).
       cancelOthers: (userId: string, keep: { stripeSubscriptionId?: string | null }) =>
         cancelOtherSubscriptions({ admin: db, stripe: () => stripe, waffo: () => waffoClient() }, userId, keep),
+      // A dispute stages its evidence draft and links the admin page (T82).
+      evidence: disputeEvidenceConfig({ managedPayments: managedPaymentsEnabled() }),
     }
   } catch (error) {
     // Missing keys: 500 so Stripe keeps retrying until the environment is fixed.

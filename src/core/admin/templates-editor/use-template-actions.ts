@@ -27,21 +27,19 @@ export function useTemplateActions() {
     return result.ok
   }
 
-  const run = (work: () => Promise<ActionResult>, success: string, onSuccess?: () => void) => {
-    setError(null)
-    setNotice(null)
-    startTransition(async () => {
-      if (settle(await callAction(work), success)) onSuccess?.()
+  // Every save goes through this one transition, so `pending` is true while any of them runs
+  // and the switches, 移出 and the bulk bar wait for it. The promise settles once the outcome
+  // is shown, for a caller that also keeps its own transition open (the sortable lists'
+  // optimistic order, T76).
+  const run = (work: () => Promise<ActionResult>, success: string, onSuccess?: () => void, failurePrefix?: string) =>
+    new Promise<void>((resolve) => {
+      setError(null)
+      setNotice(null)
+      startTransition(async () => {
+        if (settle(await callAction(work), success, failurePrefix)) onSuccess?.()
+        resolve()
+      })
     })
-  }
 
-  // For a caller that runs its own transition (the sortable lists' optimistic order): the
-  // same banner, and a promise that settles once the outcome is shown.
-  const report = async (work: () => Promise<ActionResult>, success: string, failurePrefix?: string) => {
-    setError(null)
-    setNotice(null)
-    settle(await callAction(work), success, failurePrefix)
-  }
-
-  return { pending, error, notice, run, report, clearError: () => setError(null) }
+  return { pending, error, notice, run, clearError: () => setError(null) }
 }

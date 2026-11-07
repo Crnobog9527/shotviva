@@ -10,6 +10,16 @@ export function UserStatus({ role, bannedAt }: { role: 'user' | 'admin'; bannedA
   return <Badge variant="secondary">{role === 'admin' ? COPY.admin : COPY.normal}</Badge>
 }
 
+// Three or more face-swap refusals within 24 hours (ARCHITECTURE §5.1a); nothing otherwise.
+export function RefusalFlag({ flagged, last24h }: { flagged: boolean; last24h: number }) {
+  if (!flagged) return null
+  return (
+    <Badge variant="destructive" title={COPY.refusalFlag(last24h)}>
+      {COPY.refusalFlag(last24h)}
+    </Badge>
+  )
+}
+
 // The plan colours of the pricing page (globals.css tier tokens): Starter graphite, Pro sapphire,
 // Max gold; free is an outline, so paying users stand out in a long list.
 const TIER_STYLE: Record<UserListRow['tier'], string> = {

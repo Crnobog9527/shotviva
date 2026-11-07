@@ -1,0 +1,32 @@
+// /admin/disputes copy (DESIGN §7: admin is Chinese only, copy beside the feature).
+export const DISPUTES_COPY = {
+  title: '拒付',
+  intro: '持卡人向发卡行发起拒付后，这里自动整理好申诉证据（已作为草稿存到 Stripe，还没提交）。检查、补充后点「提交申诉」，只能提交一次。',
+  empty: '还没有拒付',
+  emptyBody: '收到拒付时会自动出现在这里，并在飞书 / Sentry 提醒你。',
+  columns: { amount: '金额', user: '用户', reason: '原因', status: '状态', due: '截止', received: '收到', responder: '谁来应诉' },
+  responder: { shotviva: '我们提交', stripe: 'Stripe 处理' },
+  responderHint: {
+    shotviva: '这笔是普通 Stripe 卡付款（中国银行卡），需要你检查证据后提交申诉。',
+    stripe: '这笔走 Managed Payments（海外银行卡），由 Stripe 决定是否应诉并自己提交证据。草稿已存给 Stripe 参考，这里不提供提交按钮（自己提交要另付证据费）。',
+  },
+  submittedTag: '已提交',
+  stripeHandling: 'Stripe 处理中',
+  draftMissing: '证据草稿还没整理好',
+  unknownUser: '（账号已删除或付款不在表里）',
+  bannedTag: '已自动封号',
+  next: '下一页',
+  open: '查看',
+  stripeLink: '在 Stripe 后台打开',
+  back: '← 拒付列表',
+  errors: {
+    notFound: '没找到这笔拒付',
+    closed: 'Stripe 上这笔拒付已经不能再提交证据（可能已提交、已过期或已结案）',
+    stripeAnswers: '这笔由 Stripe 应诉，不能从这里提交',
+    noEvidence: '还没有证据草稿，不能提交',
+    submitted: '这笔已经提交过了，只能提交一次',
+    text: '补充说明要在 1 到 20000 个字符之间',
+    file: '附件只收 PDF、PNG、JPG，不超过 4MB',
+    upload: '没找到上传的文件，请重新上传',
+  },
+} as const

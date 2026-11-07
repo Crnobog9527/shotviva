@@ -3,7 +3,7 @@
 export { createOpenAIImageProvider, IMAGE_ADAPTERS, imageProvider, outputSize, OUTPUT_SIZES } from './provider'
 export { CREDITS_FLOOR } from './credits-floor'
 // Photo editing (T30), server only like the provider.
-export { editBodySchema, editScopeClassifier, runEdit, toEditRequest, type ClassifierAnswer, type EditDeps, type ScopeClassifier } from './edit'
+export { editBodySchema, editScopeClassifier, identityJudge, runEdit, toEditRequest, type ClassifierAnswer, type EditDeps, type ScopeClassifier } from './edit'
 export { GENERATION_COST_USD } from './generation-cost'
 export { useUpload, type UploadState } from './workspace/use-upload'
 export { checkPickedFile, uploadPhoto, UploadError, type UploadDeps, type UploadErrorCode } from '@/core/storage/upload'
@@ -13,6 +13,8 @@ export { UploadTestPanel, type TestTemplate } from './workspace/dev/upload-test-
 
 // App shell pieces (T8).
 export { TemplateCatalogue } from './catalogue/template-catalogue'
+// Saved templates (T83): the provider every page with hearts wraps its catalogue in.
+export { FavoritesProvider } from './favorites'
 export { toCatalogueTemplate, type CatalogueTemplate } from './catalogue/catalogue-template'
 export { ImageWorkspace, type WorkspaceProps } from './workspace/image-workspace'
 // Make again (T40): server only; reads the work and copies its kept photos back.

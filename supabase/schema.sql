@@ -435,6 +435,124 @@ $$;
 ALTER FUNCTION "public"."admin_batch_set_banned"("p_actor" "uuid", "p_user_ids" "uuid"[], "p_banned" boolean, "p_reason" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_bulk_edit_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid") RETURNS "jsonb"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_ids text[] := array(select distinct u.id from unnest(coalesce(p_ids, '{}')) as u(id));
+  v_patch jsonb := coalesce(p_patch, '{}');
+  v_cost jsonb := coalesce(p_patch -> 'credits_cost', '{}');
+  v_visible text[];
+  v_category text := p_patch ->> 'category_key';
+  v_failures jsonb;
+  v_changed integer;
+begin
+  if p_actor is null then
+    raise exception 'INVALID_INPUT' using detail = 'actor is required';
+  end if;
+  if not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if cardinality(v_ids) = 0 or cardinality(v_ids) > 200 then
+    raise exception 'INVALID_INPUT' using detail = 'between 1 and 200 templates';
+  end if;
+  if jsonb_typeof(v_patch) <> 'object' or v_patch = '{}' or v_patch - 'credits_cost' - 'visible_in' - 'quality' - 'category_key' <> '{}' then
+    raise exception 'INVALID_INPUT' using detail = 'patch must name credits_cost, visible_in, quality or category_key';
+  end if;
+  if v_patch ? 'quality' and (v_patch ->> 'quality') is distinct from 'high' and (v_patch ->> 'quality') is distinct from 'medium' then
+    raise exception 'INVALID_INPUT' using detail = 'quality must be high or medium';
+  end if;
+  if jsonb_typeof(v_cost) <> 'object' then
+    raise exception 'INVALID_INPUT' using detail = 'credits_cost must be an object';
+  end if;
+  if exists (
+    select 1 from jsonb_each(v_cost) as e(key, value)
+    where e.key not in ('1k', '2k', '3k') or jsonb_typeof(e.value) <> 'number' or e.value::text !~ '^[1-9][0-9]{0,2}$'
+  ) then
+    raise exception 'INVALID_INPUT' using detail = 'credits_cost tiers must be whole numbers 1..999';
+  end if;
+  if v_patch ? 'visible_in' then
+    if jsonb_typeof(v_patch -> 'visible_in') <> 'array' then
+      raise exception 'INVALID_INPUT' using detail = 'visible_in must be an array';
+    end if;
+    v_visible := array(select distinct x from jsonb_array_elements_text(v_patch -> 'visible_in') as v(x) order by x desc);
+    if cardinality(v_visible) = 0 or not (v_visible <@ array['web', 'partner']) then
+      raise exception 'INVALID_INPUT' using detail = 'visible_in must be web, partner or both';
+    end if;
+  end if;
+  if v_patch ? 'category_key' then
+    -- Held until commit, so the category cannot be deleted under this write.
+    perform 1 from public.template_categories c where c.key = v_category and not c.is_system for share;
+    if not found then
+      raise exception 'CATEGORY_NOT_FOUND' using detail = 'category_key must name a category that is not a system one';
+    end if;
+  end if;
+  if p_floor is null or exists (
+    select 1 from unnest(array['high', 'medium']) as q(quality), unnest(array['1k', '2k', '3k']) as r(res)
+    where jsonb_typeof(p_floor -> q.quality -> r.res) is distinct from 'number'
+  ) then
+    raise exception 'INVALID_INPUT' using detail = 'floor table is incomplete';
+  end if;
+
+  -- The rows are checked and written under one lock, so no other save slips in between.
+  perform 1 from public.templates t where t.id = any (v_ids) for update;
+
+  with planned as (
+    select a.id, t.id is not null as found, coalesce(t.name, a.id) as name, t.is_active,
+           t.description, t.cover_before_url, t.cover_after_url, t.visible_in as old_visible,
+           coalesce(v_patch ->> 'quality', t.quality) as quality,
+           t.credits_cost || v_cost as credits_cost,
+           coalesce(v_visible, t.visible_in) as visible_in,
+           a.id in ('edit', 'freeform') or coalesce(c.is_system, false) as is_builtin
+    from unnest(v_ids) as a(id)
+    left join public.templates t on t.id = a.id
+    left join public.template_categories c on c.key = t.category_key
+  ),
+  failures as (
+    select jsonb_build_object('id', p.id, 'name', p.name, 'reason', case when p.found then 'system' else 'not_found' end) as failure
+    from planned p
+    where not p.found or p.is_builtin
+    union all
+    select jsonb_build_object(
+      'id', p.id, 'name', p.name, 'reason', 'below_floor', 'resolution', r.res,
+      'floor', (p_floor -> p.quality ->> r.res)::integer, 'given', (p.credits_cost ->> r.res)::integer
+    )
+    from planned p
+    cross join unnest(array['1k', '2k', '3k']) as r(res)
+    where p.found and not p.is_builtin and (p.credits_cost ->> r.res)::integer < (p_floor -> p.quality ->> r.res)::integer
+    union all
+    select jsonb_build_object('id', p.id, 'name', p.name, 'reason', 'web_incomplete')
+    from planned p
+    where p.found and not p.is_builtin and p.is_active
+      and 'web' = any (p.visible_in) and not ('web' = any (p.old_visible))
+      and (nullif(btrim(p.description), '') is null or nullif(btrim(p.cover_before_url), '') is null
+           or nullif(btrim(p.cover_after_url), '') is null)
+  )
+  select coalesce(jsonb_agg(f.failure), '[]'::jsonb) into v_failures from failures f;
+
+  if jsonb_array_length(v_failures) > 0 then
+    return jsonb_build_object('failures', v_failures);
+  end if;
+
+  update public.templates t
+  set quality = coalesce(v_patch ->> 'quality', t.quality),
+      credits_cost = t.credits_cost || v_cost,
+      visible_in = coalesce(v_visible, t.visible_in),
+      -- templates.category (the English name) follows through T75's trigger.
+      category_key = coalesce(v_category, t.category_key),
+      featured_rank = case when v_visible is not null and not ('web' = any (v_visible)) then null else t.featured_rank end
+  where t.id = any (v_ids);
+  get diagnostics v_changed = row_count;
+
+  return jsonb_build_object('failures', '[]'::jsonb, 'changed', v_changed);
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."admin_bulk_edit_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_daily_costs"("p_days" integer) RETURNS "jsonb"
     LANGUAGE "plpgsql" STABLE
     SET "search_path" TO ''
@@ -755,6 +873,63 @@ $$;
 ALTER FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_get_dispute"("p_dispute_id" "text") RETURNS TABLE("stripe_dispute_id" "text", "stripe_charge_id" "text", "payment_id" bigint, "user_id" "uuid", "email" "text", "product_id" "text", "amount" integer, "currency" "text", "reason" "text", "responder" "text", "due_by" timestamp with time zone, "auto_banned_at" timestamp with time zone, "evidence_drafted_at" timestamp with time zone, "submitted_at" timestamp with time zone, "reminded_at" timestamp with time zone, "created_at" timestamp with time zone)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select d.stripe_dispute_id, d.stripe_charge_id, d.payment_id, d.user_id, coalesce(nullif(u.email::text, ''), nullif(u.phone::text, '')),
+         p.product_id, d.amount, d.currency, d.reason, d.responder, d.due_by,
+         d.auto_banned_at, d.evidence_drafted_at, d.submitted_at, d.reminded_at, d.created_at
+    from public.payment_disputes d
+    left join auth.users u on u.id = d.user_id
+    left join public.payments p on p.id = d.payment_id
+   where d.stripe_dispute_id = p_dispute_id;
+$$;
+
+
+ALTER FUNCTION "public"."admin_get_dispute"("p_dispute_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) RETURNS TABLE("user_id" "uuid", "total" integer, "last_24h" integer)
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  perform public.purge_identity_refusals();
+  return query
+  select r.user_id,
+         count(*)::integer as total,
+         (count(*) filter (where r.created_at > now() - interval '24 hours'))::integer as last_24h
+    from public.identity_refusals r
+   where r.user_id = any (p_user_ids[1:200])
+     and r.created_at > now() - interval '90 days'
+   group by r.user_id;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_list_disputes"("p_cursor_at" timestamp with time zone, "p_cursor_id" "text", "p_limit" integer) RETURNS TABLE("stripe_dispute_id" "text", "stripe_charge_id" "text", "payment_id" bigint, "user_id" "uuid", "email" "text", "product_id" "text", "amount" integer, "currency" "text", "reason" "text", "responder" "text", "due_by" timestamp with time zone, "auto_banned_at" timestamp with time zone, "evidence_drafted_at" timestamp with time zone, "submitted_at" timestamp with time zone, "reminded_at" timestamp with time zone, "created_at" timestamp with time zone)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select d.stripe_dispute_id, d.stripe_charge_id, d.payment_id, d.user_id, coalesce(nullif(u.email::text, ''), nullif(u.phone::text, '')),
+         p.product_id, d.amount, d.currency, d.reason, d.responder, d.due_by,
+         d.auto_banned_at, d.evidence_drafted_at, d.submitted_at, d.reminded_at, d.created_at
+    from public.payment_disputes d
+    left join auth.users u on u.id = d.user_id
+    left join public.payments p on p.id = d.payment_id
+   where p_cursor_at is null or (d.created_at, d.stripe_dispute_id) < (p_cursor_at, p_cursor_id)
+   order by d.created_at desc, d.stripe_dispute_id desc
+   limit least(greatest(coalesce(p_limit, 30), 1), 50);
+$$;
+
+
+ALTER FUNCTION "public"."admin_list_disputes"("p_cursor_at" timestamp with time zone, "p_cursor_id" "text", "p_limit" integer) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_list_template_requests"() RETURNS TABLE("id" "uuid", "email" "text", "description" "text", "image_keys" "text"[], "status" "text", "template_id" "text", "votes_count" integer, "created_at" timestamp with time zone)
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -1067,6 +1242,42 @@ $_$;
 
 
 ALTER FUNCTION "public"."admin_lookup"("p_query" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_mark_dispute_submitted"("p_dispute_id" "text", "p_actor" "uuid") RETURNS timestamp with time zone
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_row public.payment_disputes;
+begin
+  if p_actor is null or not exists (select 1 from public.profiles where id = p_actor and role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+
+  select * into v_row from public.payment_disputes where stripe_dispute_id = p_dispute_id for update;
+  if not found then
+    raise exception 'DISPUTE_NOT_FOUND';
+  end if;
+  if v_row.responder <> 'shotviva' then
+    raise exception 'DISPUTE_NOT_OURS' using detail = 'Stripe answers Managed Payments disputes';
+  end if;
+  if v_row.submitted_at is not null then
+    raise exception 'DISPUTE_ALREADY_SUBMITTED';
+  end if;
+
+  update public.payment_disputes set submitted_at = now(), submitted_by = p_actor
+   where stripe_dispute_id = p_dispute_id
+  returning * into v_row;
+
+  insert into public.admin_audit_log (action, user_id, reason, target_id)
+  values ('submit_dispute', coalesce(v_row.user_id, p_actor), '提交拒付申诉证据 · 操作人 ' || p_actor::text, p_dispute_id);
+  return v_row.submitted_at;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_mark_dispute_submitted"("p_dispute_id" "text", "p_actor" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_openai_admin_key_status"() RETURNS TABLE("key_last4" "text", "project_id" "text")
@@ -2004,6 +2215,52 @@ $$;
 ALTER FUNCTION "public"."attach_ticket_images"("p_ticket_id" "uuid", "p_owner_id" "uuid", "p_message_id" "uuid", "p_images" "jsonb") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."begin_identity_judge"("p_user_id" "uuid", "p_text_hash" "text", "p_per_hour" integer) RETURNS "jsonb"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_cached boolean;
+  v_id bigint;
+begin
+  if p_user_id is null or p_per_hour is null or p_per_hour < 1 then
+    raise exception 'INVALID_INPUT' using detail = 'user and a positive hourly limit are required';
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended('identity_judge:' || p_user_id::text, 0));
+
+  if p_text_hash is not null then
+    select c.identity_swap into v_cached
+      from public.identity_judge_calls c
+     where c.user_id = p_user_id and c.text_hash = p_text_hash and c.identity_swap is not null
+       and c.created_at > now() - interval '10 minutes'
+     order by c.created_at desc
+     limit 1;
+    if found then
+      return jsonb_build_object('status', 'cached', 'identity_swap', v_cached);
+    end if;
+  end if;
+
+  if (select count(*) from public.identity_judge_calls c
+       where c.user_id = p_user_id and c.created_at > now() - interval '1 hour') >= p_per_hour then
+    return jsonb_build_object('status', 'limited');
+  end if;
+
+  insert into public.identity_judge_calls (user_id, text_hash) values (p_user_id, p_text_hash)
+  returning id into v_id;
+
+  delete from public.identity_judge_calls c
+   where c.id in (select o.id from public.identity_judge_calls o
+                   where o.created_at < now() - interval '1 day'
+                   order by o.created_at
+                   limit 500);
+  return jsonb_build_object('status', 'call', 'id', v_id);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."begin_identity_judge"("p_user_id" "uuid", "p_text_hash" "text", "p_per_hour" integer) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."bump_template_prompt_version"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -2021,6 +2278,25 @@ $$;
 
 
 ALTER FUNCTION "public"."bump_template_prompt_version"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."claim_dispute_reminders"("p_dispute_ids" "text"[]) RETURNS SETOF "text"
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  update public.payment_disputes
+     set reminded_at = now()
+   where stripe_dispute_id = any(p_dispute_ids)
+     and responder = 'shotviva'
+     and submitted_at is null
+     and reminded_at is null
+     and due_by is not null
+     and due_by <= now() + interval '3 days'
+  returning stripe_dispute_id;
+$$;
+
+
+ALTER FUNCTION "public"."claim_dispute_reminders"("p_dispute_ids" "text"[]) OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."generation_jobs" (
@@ -2044,11 +2320,16 @@ CREATE TABLE IF NOT EXISTS "public"."generation_jobs" (
     "provider_usage" "jsonb",
     "cost_usd" numeric(10,6),
     "deleted_at" timestamp with time zone,
+    "client_ip" "inet",
+    "downloaded_at" timestamp with time zone,
+    "download_ip" "inet",
+    "download_count" integer DEFAULT 0 NOT NULL,
     CONSTRAINT "generation_jobs_check" CHECK ((("status" = 'running'::"text") = ("finished_at" IS NULL))),
     CONSTRAINT "generation_jobs_check1" CHECK ((("status" <> 'succeeded'::"text") OR ("output_key" IS NOT NULL))),
     CONSTRAINT "generation_jobs_cost_usd_nonnegative" CHECK ((("cost_usd" IS NULL) OR ("cost_usd" >= (0)::numeric))),
     CONSTRAINT "generation_jobs_credit_pool_check" CHECK (("credit_pool" = ANY (ARRAY['free'::"text", 'paid'::"text"]))),
     CONSTRAINT "generation_jobs_credits_cost_check" CHECK (("credits_cost" > 0)),
+    CONSTRAINT "generation_jobs_download_count_check" CHECK (("download_count" >= 0)),
     CONSTRAINT "generation_jobs_free_work_public" CHECK ((("credit_pool" = 'paid'::"text") OR ("visibility" = 'public'::"text"))),
     CONSTRAINT "generation_jobs_module_check" CHECK (("module" = ANY (ARRAY['image'::"text", 'video'::"text"]))),
     CONSTRAINT "generation_jobs_provider_usage_object" CHECK ((("provider_usage" IS NULL) OR ("jsonb_typeof"("provider_usage") = 'object'::"text"))),
@@ -2333,6 +2614,96 @@ $$;
 ALTER FUNCTION "public"."delete_provider_vault_secret"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."dispute_evidence_facts"("p_dispute_id" "text") RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_dispute public.payment_disputes;
+  v_payment public.payments;
+  v_context public.payments;
+  v_user jsonb;
+  v_works jsonb;
+  v_totals jsonb;
+begin
+  select * into v_dispute from public.payment_disputes where stripe_dispute_id = p_dispute_id;
+  if not found then
+    raise exception 'DISPUTE_NOT_FOUND';
+  end if;
+
+  select * into v_payment from public.payments where id = v_dispute.payment_id;
+  if v_payment.id is not null then
+    v_context := v_payment;
+    if v_payment.purchase_ip is null and v_payment.terms_accepted_at is null then
+      select * into v_context from public.payments p
+       where p.user_id = v_payment.user_id and p.product_id = v_payment.product_id
+         and p.channel = 'stripe' and p.stripe_session_id is not null
+         and p.created_at <= v_payment.created_at
+       order by p.created_at desc limit 1;
+    end if;
+  end if;
+
+  select jsonb_build_object(
+           'id', u.id, 'email', nullif(u.email, ''), 'signed_up_at', u.created_at,
+           'signup_ip', host(p.signup_ip), 'banned_at', p.banned_at)
+    into v_user
+    from auth.users u join public.profiles p on p.id = u.id
+   where u.id = v_dispute.user_id;
+
+  if v_payment.id is not null then
+    select coalesce(jsonb_agg(w order by w.created_at), '[]'::jsonb) into v_works
+      from (
+        select g.created_at, host(g.client_ip) as client_ip, g.template_id, g.credits_cost,
+               g.inputs ->> 'resolution' as resolution,
+               g.downloaded_at, host(g.download_ip) as download_ip, g.download_count
+          from public.generation_jobs g
+         where g.user_id = v_payment.user_id and g.status = 'succeeded' and g.credit_pool = 'paid'
+           and g.created_at >= v_payment.created_at and g.created_at <= v_dispute.created_at
+         order by g.created_at
+         limit 200
+      ) w;
+    select jsonb_build_object('count', count(*), 'credits', coalesce(sum(g.credits_cost), 0),
+             'downloaded', count(*) filter (where g.download_count > 0))
+      into v_totals
+      from public.generation_jobs g
+     where g.user_id = v_payment.user_id and g.status = 'succeeded' and g.credit_pool = 'paid'
+       and g.created_at >= v_payment.created_at and g.created_at <= v_dispute.created_at;
+  end if;
+
+  return jsonb_build_object(
+    'dispute', jsonb_build_object('id', v_dispute.stripe_dispute_id, 'charge_id', v_dispute.stripe_charge_id,
+      'amount', v_dispute.amount, 'currency', v_dispute.currency, 'reason', v_dispute.reason,
+      'responder', v_dispute.responder, 'created_at', v_dispute.created_at),
+    'user', v_user,
+    'payment', case when v_payment.id is null then null else jsonb_build_object(
+      'id', v_payment.id, 'product_id', v_payment.product_id, 'method', v_payment.method,
+      'amount_total', v_payment.amount_total, 'currency', v_payment.currency,
+      'created_at', v_payment.created_at, 'renewal', v_payment.stripe_session_id is null,
+      'purchase_ip', host(v_context.purchase_ip), 'purchase_user_agent', v_context.purchase_user_agent,
+      'terms_accepted_at', v_context.terms_accepted_at,
+      'context_from', case when v_context.id is null then null when v_context.id = v_payment.id then 'this_payment' else 'first_payment' end)
+    end,
+    'works', coalesce(v_works, '[]'::jsonb),
+    'totals', coalesce(v_totals, jsonb_build_object('count', 0, 'credits', 0, 'downloaded', 0))
+  );
+end;
+$$;
+
+
+ALTER FUNCTION "public"."dispute_evidence_facts"("p_dispute_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."finish_identity_judge"("p_id" bigint, "p_identity_swap" boolean) RETURNS "void"
+    LANGUAGE "sql"
+    SET "search_path" TO ''
+    AS $$
+  update public.identity_judge_calls set identity_swap = p_identity_swap where id = p_id
+$$;
+
+
+ALTER FUNCTION "public"."finish_identity_judge"("p_id" bigint, "p_identity_swap" boolean) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."grant_credits"("p_user_id" "uuid", "p_amount" integer, "p_reason" "text", "p_idempotency_key" "text", "p_pool" "text") RETURNS "public"."credit_change"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -2384,6 +2755,20 @@ $$;
 ALTER FUNCTION "public"."handle_new_user"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."mark_dispute_drafted"("p_dispute_id" "text") RETURNS boolean
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  update public.payment_disputes
+     set evidence_drafted_at = coalesce(evidence_drafted_at, now())
+   where stripe_dispute_id = p_dispute_id
+  returning true;
+$$;
+
+
+ALTER FUNCTION "public"."mark_dispute_drafted"("p_dispute_id" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."mark_ticket_seen"("p_ticket_id" "uuid", "p_user_id" "uuid") RETURNS "void"
     LANGUAGE "sql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -2395,6 +2780,75 @@ $$;
 
 
 ALTER FUNCTION "public"."mark_ticket_seen"("p_ticket_id" "uuid", "p_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."open_payment_dispute"("p_dispute_id" "text", "p_charge_id" "text", "p_amount" integer, "p_currency" "text", "p_reason" "text", "p_due_by" timestamp with time zone, "p_managed_default" boolean) RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_row public.payment_disputes;
+  v_payment public.payments;
+  v_managed boolean;
+  v_profile public.profiles;
+begin
+  if p_dispute_id is null or p_charge_id is null or p_amount is null or p_currency is null
+     or p_reason is null or p_managed_default is null then
+    raise exception 'INVALID_INPUT' using detail = 'dispute id, charge id, amount, currency, reason and the default are required';
+  end if;
+
+  select * into v_row from public.payment_disputes where stripe_dispute_id = p_dispute_id;
+  if found then
+    return jsonb_build_object('created', false, 'user_id', v_row.user_id, 'payment_id', v_row.payment_id,
+      'responder', v_row.responder, 'auto_banned', v_row.auto_banned_at is not null, 'drafted', v_row.evidence_drafted_at is not null);
+  end if;
+
+  select * into v_payment from public.payments where stripe_charge_id = p_charge_id;
+  v_managed := case
+    when v_payment.id is null then p_managed_default
+    when v_payment.method = 'cn_card' then false
+    when v_payment.method = 'card' then coalesce(
+      v_payment.managed_payments,
+      (select p.managed_payments from public.payments p
+        where p.user_id = v_payment.user_id and p.product_id = v_payment.product_id
+          and p.channel = 'stripe' and p.stripe_session_id is not null
+          and p.created_at <= v_payment.created_at
+        order by p.created_at desc limit 1),
+      p_managed_default)
+    else p_managed_default
+  end;
+
+  insert into public.payment_disputes
+    (stripe_dispute_id, stripe_charge_id, payment_id, user_id, amount, currency, reason, responder, due_by)
+  values
+    (p_dispute_id, p_charge_id, v_payment.id, v_payment.user_id, p_amount, lower(p_currency), p_reason,
+     case when v_managed then 'stripe' else 'shotviva' end, p_due_by)
+  on conflict (stripe_dispute_id) do nothing
+  returning * into v_row;
+  if not found then
+    -- A concurrent delivery inserted it first; that one bans.
+    select * into v_row from public.payment_disputes where stripe_dispute_id = p_dispute_id;
+    return jsonb_build_object('created', false, 'user_id', v_row.user_id, 'payment_id', v_row.payment_id,
+      'responder', v_row.responder, 'auto_banned', v_row.auto_banned_at is not null, 'drafted', v_row.evidence_drafted_at is not null);
+  end if;
+
+  if v_row.user_id is not null then
+    select * into v_profile from public.profiles where id = v_row.user_id for update;
+    if found and v_profile.role <> 'admin' and v_profile.banned_at is null then
+      perform public.admin_ban_user(v_row.user_id, '拒付');
+      update public.payment_disputes set auto_banned_at = now()
+       where stripe_dispute_id = p_dispute_id
+      returning * into v_row;
+    end if;
+  end if;
+
+  return jsonb_build_object('created', true, 'user_id', v_row.user_id, 'payment_id', v_row.payment_id,
+    'responder', v_row.responder, 'auto_banned', v_row.auto_banned_at is not null, 'drafted', v_row.evidence_drafted_at is not null);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."open_payment_dispute"("p_dispute_id" "text", "p_charge_id" "text", "p_amount" integer, "p_currency" "text", "p_reason" "text", "p_due_by" timestamp with time zone, "p_managed_default" boolean) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."openai_admin_key"() RETURNS TABLE("api_key" "text", "project_id" "text")
@@ -2435,6 +2889,141 @@ $$;
 
 
 ALTER FUNCTION "public"."provider_api_key"("p_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."purge_identity_refusals"() RETURNS "void"
+    LANGUAGE "sql"
+    SET "search_path" TO ''
+    AS $$
+  delete from public.identity_refusals r
+   where r.id in (select o.id from public.identity_refusals o
+                   where o.created_at < now() - interval '90 days'
+                   order by o.created_at
+                   limit 500)
+$$;
+
+
+ALTER FUNCTION "public"."purge_identity_refusals"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."reconcile_dispute_submitted"("p_dispute_id" "text") RETURNS timestamp with time zone
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_row public.payment_disputes;
+begin
+  update public.payment_disputes set submitted_at = now()
+   where stripe_dispute_id = p_dispute_id and submitted_at is null
+  returning * into v_row;
+  if not found then
+    return null;
+  end if;
+  -- The audit log names a user; a dispute whose account was deleted has none to name.
+  if v_row.user_id is not null then
+    insert into public.admin_audit_log (action, user_id, reason, target_id)
+    values ('submit_dispute', v_row.user_id, '提交拒付申诉证据 · Stripe 上已提交，打开后台时补记', p_dispute_id);
+  end if;
+  return v_row.submitted_at;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."reconcile_dispute_submitted"("p_dispute_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."record_identity_refusal"("p_user_id" "uuid", "p_entry" "text", "p_method" "text", "p_excerpt" "text", "p_input_tokens" integer DEFAULT NULL::integer, "p_output_tokens" integer DEFAULT NULL::integer) RETURNS boolean
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_excerpt text := left(btrim(p_excerpt), 200);
+begin
+  if p_user_id is null or coalesce(v_excerpt, '') = '' then
+    raise exception 'INVALID_INPUT' using detail = 'user and excerpt are required';
+  end if;
+  -- Concurrent photos of one batch queue here, so only the first of them writes.
+  perform pg_advisory_xact_lock(hashtextextended('identity_refusal:' || p_user_id::text, 0));
+
+  if exists (select 1 from public.identity_refusals r
+              where r.user_id = p_user_id and r.entry = p_entry and r.excerpt = v_excerpt
+                and r.created_at > now() - interval '10 minutes') then
+    return false;
+  end if;
+
+  insert into public.identity_refusals (user_id, entry, method, excerpt, input_tokens, output_tokens)
+  values (p_user_id, p_entry, p_method, v_excerpt, p_input_tokens, p_output_tokens);
+
+  perform public.purge_identity_refusals();
+  return true;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."record_identity_refusal"("p_user_id" "uuid", "p_entry" "text", "p_method" "text", "p_excerpt" "text", "p_input_tokens" integer, "p_output_tokens" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."record_job_client_ip"("p_job_id" "uuid", "p_user_id" "uuid", "p_ip" "inet") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  update public.generation_jobs
+     set client_ip = p_ip
+   where id = p_job_id
+     and user_id = p_user_id
+     and source = 'web'
+     and client_ip is null;
+  return found;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."record_job_client_ip"("p_job_id" "uuid", "p_user_id" "uuid", "p_ip" "inet") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."record_job_download"("p_job_id" "uuid", "p_user_id" "uuid", "p_ip" "inet" DEFAULT NULL::"inet") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  update public.generation_jobs
+     set downloaded_at = coalesce(downloaded_at, now()),
+         download_ip = case when downloaded_at is null then p_ip else download_ip end,
+         download_count = download_count + 1
+   where id = p_job_id
+     and user_id = p_user_id
+     and status = 'succeeded'
+     and deleted_at is null;
+  return found;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."record_job_download"("p_job_id" "uuid", "p_user_id" "uuid", "p_ip" "inet") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."record_payment_context"("p_session_id" "text", "p_ip" "inet" DEFAULT NULL::"inet", "p_user_agent" "text" DEFAULT NULL::"text", "p_terms_accepted_at" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_managed_payments" boolean DEFAULT NULL::boolean) RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if p_session_id is null or p_session_id not like 'cs\_%' then
+    raise exception 'INVALID_INPUT' using detail = 'a cs_ session id is required';
+  end if;
+
+  update public.payments
+     set purchase_ip = coalesce(purchase_ip, p_ip),
+         purchase_user_agent = coalesce(purchase_user_agent, nullif(left(p_user_agent, 500), '')),
+         terms_accepted_at = coalesce(terms_accepted_at, p_terms_accepted_at),
+         managed_payments = coalesce(managed_payments, p_managed_payments)
+   where stripe_session_id = p_session_id;
+  return found;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."record_payment_context"("p_session_id" "text", "p_ip" "inet", "p_user_agent" "text", "p_terms_accepted_at" timestamp with time zone, "p_managed_payments" boolean) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."record_payment_issue"("p_charge_id" "text", "p_kind" "text", "p_amount_refunded" integer DEFAULT NULL::integer) RETURNS "jsonb"
@@ -3050,6 +3639,42 @@ $$;
 ALTER FUNCTION "public"."template_category_for"("p_value" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."template_favorites_guard"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  perform 1 from public.profiles where id = new.user_id for update;
+  if not found then
+    raise exception 'PROFILE_NOT_FOUND';
+  end if;
+
+  if exists (
+    select 1 from public.template_favorites f
+     where f.user_id = new.user_id and f.template_id = new.template_id
+  ) then
+    return new;
+  end if;
+
+  if not exists (
+    select 1 from public.templates t
+     where t.id = new.template_id and t.is_active and 'web' = any (t.visible_in)
+  ) then
+    raise exception 'TEMPLATE_NOT_FOUND';
+  end if;
+
+  if (select count(*) from public.template_favorites f where f.user_id = new.user_id) >= 200 then
+    raise exception 'FAVORITES_LIMIT';
+  end if;
+
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."template_favorites_guard"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."template_request_votes_count"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -3208,7 +3833,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "target_id" "text",
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text"]))),
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text"]))),
     CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
     CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );
@@ -3310,6 +3935,61 @@ CREATE TABLE IF NOT EXISTS "public"."feature_access" (
 ALTER TABLE "public"."feature_access" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."identity_judge_calls" (
+    "id" bigint NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "text_hash" "text",
+    "identity_swap" boolean,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "identity_judge_calls_text_hash_check" CHECK (("text_hash" ~ '^[0-9a-f]{64}$'::"text"))
+);
+
+
+ALTER TABLE "public"."identity_judge_calls" OWNER TO "postgres";
+
+
+ALTER TABLE "public"."identity_judge_calls" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."identity_judge_calls_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."identity_refusals" (
+    "id" bigint NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "entry" "text" NOT NULL,
+    "method" "text" NOT NULL,
+    "excerpt" "text" NOT NULL,
+    "input_tokens" integer,
+    "output_tokens" integer,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "identity_refusals_entry_check" CHECK (("entry" = ANY (ARRAY['workspace'::"text", 'edit'::"text", 'partner'::"text"]))),
+    CONSTRAINT "identity_refusals_excerpt_check" CHECK ((("char_length"("excerpt") >= 1) AND ("char_length"("excerpt") <= 200))),
+    CONSTRAINT "identity_refusals_input_tokens_check" CHECK (("input_tokens" >= 0)),
+    CONSTRAINT "identity_refusals_method_check" CHECK (("method" = ANY (ARRAY['keyword'::"text", 'model'::"text"]))),
+    CONSTRAINT "identity_refusals_output_tokens_check" CHECK (("output_tokens" >= 0))
+);
+
+
+ALTER TABLE "public"."identity_refusals" OWNER TO "postgres";
+
+
+ALTER TABLE "public"."identity_refusals" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."identity_refusals_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."partner_links" (
     "user_id" "uuid" NOT NULL,
     "partner" "text" NOT NULL,
@@ -3325,6 +4005,35 @@ CREATE TABLE IF NOT EXISTS "public"."partner_links" (
 
 
 ALTER TABLE "public"."partner_links" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."payment_disputes" (
+    "stripe_dispute_id" "text" NOT NULL,
+    "stripe_charge_id" "text" NOT NULL,
+    "payment_id" bigint,
+    "user_id" "uuid",
+    "amount" integer NOT NULL,
+    "currency" "text" NOT NULL,
+    "reason" "text" NOT NULL,
+    "responder" "text" NOT NULL,
+    "due_by" timestamp with time zone,
+    "auto_banned_at" timestamp with time zone,
+    "evidence_drafted_at" timestamp with time zone,
+    "submitted_at" timestamp with time zone,
+    "submitted_by" "uuid",
+    "reminded_at" timestamp with time zone,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "payment_disputes_amount_check" CHECK (("amount" >= 0)),
+    CONSTRAINT "payment_disputes_check" CHECK ((("submitted_by" IS NULL) OR ("submitted_at" IS NOT NULL))),
+    CONSTRAINT "payment_disputes_currency_check" CHECK (("currency" ~ '^[a-z]{3}$'::"text")),
+    CONSTRAINT "payment_disputes_reason_check" CHECK (("length"("reason") > 0)),
+    CONSTRAINT "payment_disputes_responder_check" CHECK (("responder" = ANY (ARRAY['shotviva'::"text", 'stripe'::"text"]))),
+    CONSTRAINT "payment_disputes_stripe_charge_id_check" CHECK (("stripe_charge_id" ~ '^(ch|py)_'::"text")),
+    CONSTRAINT "payment_disputes_stripe_dispute_id_check" CHECK (("stripe_dispute_id" ~ '^(dp|du)_'::"text"))
+);
+
+
+ALTER TABLE "public"."payment_disputes" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."payments" (
@@ -3344,12 +4053,17 @@ CREATE TABLE IF NOT EXISTS "public"."payments" (
     "status" "text" DEFAULT 'paid'::"text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "waffo_payment_id" "text",
+    "purchase_ip" "inet",
+    "purchase_user_agent" "text",
+    "terms_accepted_at" timestamp with time zone,
+    "managed_payments" boolean,
     CONSTRAINT "payments_amount_total_check" CHECK (("amount_total" >= 0)),
     CONSTRAINT "payments_channel_check" CHECK (("channel" = ANY (ARRAY['stripe'::"text", 'waffo'::"text"]))),
     CONSTRAINT "payments_check" CHECK ((("amount_tax" >= 0) AND ("amount_tax" <= "amount_total"))),
     CONSTRAINT "payments_check1" CHECK ((("amount_refunded" >= 0) AND ("amount_refunded" <= "amount_total"))),
     CONSTRAINT "payments_currency_check" CHECK (("currency" ~ '^[a-z]{3}$'::"text")),
     CONSTRAINT "payments_method_check" CHECK (("method" = ANY (ARRAY['card'::"text", 'alipay'::"text", 'wechat_pay'::"text", 'cn_card'::"text"]))),
+    CONSTRAINT "payments_purchase_user_agent_check" CHECK ((("length"("purchase_user_agent") >= 1) AND ("length"("purchase_user_agent") <= 500))),
     CONSTRAINT "payments_status_check" CHECK (("status" = ANY (ARRAY['paid'::"text", 'refunded'::"text", 'partially_refunded'::"text", 'disputed'::"text"]))),
     CONSTRAINT "payments_stripe_charge_id_check" CHECK (("stripe_charge_id" ~ '^(ch|py)_'::"text")),
     CONSTRAINT "payments_stripe_ids_check" CHECK ((("channel" <> 'stripe'::"text") OR ("stripe_session_id" IS NOT NULL) OR ("stripe_invoice_id" IS NOT NULL))),
@@ -3535,6 +4249,16 @@ CREATE TABLE IF NOT EXISTS "public"."template_categories" (
 ALTER TABLE "public"."template_categories" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."template_favorites" (
+    "user_id" "uuid" DEFAULT "auth"."uid"() NOT NULL,
+    "template_id" "text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."template_favorites" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."template_prompts" (
     "template_id" "text" NOT NULL,
     "body" "text" NOT NULL,
@@ -3634,8 +4358,23 @@ ALTER TABLE ONLY "public"."generation_jobs"
 
 
 
+ALTER TABLE ONLY "public"."identity_judge_calls"
+    ADD CONSTRAINT "identity_judge_calls_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."identity_refusals"
+    ADD CONSTRAINT "identity_refusals_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."partner_links"
     ADD CONSTRAINT "partner_links_pkey" PRIMARY KEY ("user_id", "partner");
+
+
+
+ALTER TABLE ONLY "public"."payment_disputes"
+    ADD CONSTRAINT "payment_disputes_pkey" PRIMARY KEY ("stripe_dispute_id");
 
 
 
@@ -3739,6 +4478,11 @@ ALTER TABLE ONLY "public"."template_categories"
 
 
 
+ALTER TABLE ONLY "public"."template_favorites"
+    ADD CONSTRAINT "template_favorites_pkey" PRIMARY KEY ("user_id", "template_id");
+
+
+
 ALTER TABLE ONLY "public"."template_prompts"
     ADD CONSTRAINT "template_prompts_pkey" PRIMARY KEY ("template_id");
 
@@ -3803,7 +4547,31 @@ CREATE UNIQUE INDEX "generation_jobs_user_idempotency_key_idx" ON "public"."gene
 
 
 
+CREATE INDEX "identity_judge_calls_created_at_idx" ON "public"."identity_judge_calls" USING "btree" ("created_at");
+
+
+
+CREATE INDEX "identity_judge_calls_user_id_created_at_idx" ON "public"."identity_judge_calls" USING "btree" ("user_id", "created_at" DESC);
+
+
+
+CREATE INDEX "identity_refusals_created_at_idx" ON "public"."identity_refusals" USING "btree" ("created_at");
+
+
+
+CREATE INDEX "identity_refusals_user_id_created_at_idx" ON "public"."identity_refusals" USING "btree" ("user_id", "created_at" DESC);
+
+
+
 CREATE UNIQUE INDEX "partner_links_partner_link_code_idx" ON "public"."partner_links" USING "btree" ("partner", "link_code") WHERE ("link_code" IS NOT NULL);
+
+
+
+CREATE INDEX "payment_disputes_created_at_idx" ON "public"."payment_disputes" USING "btree" ("created_at" DESC, "stripe_dispute_id" DESC);
+
+
+
+CREATE INDEX "payment_disputes_unsubmitted_due_idx" ON "public"."payment_disputes" USING "btree" ("due_by") WHERE (("submitted_at" IS NULL) AND ("responder" = 'shotviva'::"text"));
 
 
 
@@ -3891,6 +4659,10 @@ CREATE UNIQUE INDEX "template_categories_name_zh_key" ON "public"."template_cate
 
 
 
+CREATE INDEX "template_favorites_template_id_idx" ON "public"."template_favorites" USING "btree" ("template_id");
+
+
+
 CREATE INDEX "template_request_votes_user_id_idx" ON "public"."template_request_votes" USING "btree" ("user_id");
 
 
@@ -3936,6 +4708,10 @@ CREATE OR REPLACE TRIGGER "template_categories_set_updated_at" BEFORE UPDATE ON 
 
 
 CREATE OR REPLACE TRIGGER "template_categories_sync_name" AFTER UPDATE OF "name_en" ON "public"."template_categories" FOR EACH ROW WHEN (("old"."name_en" IS DISTINCT FROM "new"."name_en")) EXECUTE FUNCTION "public"."template_categories_sync_name"();
+
+
+
+CREATE OR REPLACE TRIGGER "template_favorites_guard" BEFORE INSERT ON "public"."template_favorites" FOR EACH ROW EXECUTE FUNCTION "public"."template_favorites_guard"();
 
 
 
@@ -3990,8 +4766,33 @@ ALTER TABLE ONLY "public"."generation_jobs"
 
 
 
+ALTER TABLE ONLY "public"."identity_judge_calls"
+    ADD CONSTRAINT "identity_judge_calls_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."identity_refusals"
+    ADD CONSTRAINT "identity_refusals_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."partner_links"
     ADD CONSTRAINT "partner_links_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."payment_disputes"
+    ADD CONSTRAINT "payment_disputes_payment_id_fkey" FOREIGN KEY ("payment_id") REFERENCES "public"."payments"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."payment_disputes"
+    ADD CONSTRAINT "payment_disputes_submitted_by_fkey" FOREIGN KEY ("submitted_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."payment_disputes"
+    ADD CONSTRAINT "payment_disputes_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
 
 
@@ -4060,6 +4861,16 @@ ALTER TABLE ONLY "public"."system_settings"
 
 
 
+ALTER TABLE ONLY "public"."template_favorites"
+    ADD CONSTRAINT "template_favorites_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."template_favorites"
+    ADD CONSTRAINT "template_favorites_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."template_prompts"
     ADD CONSTRAINT "template_prompts_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON DELETE CASCADE;
 
@@ -4109,11 +4920,20 @@ CREATE POLICY "generation_jobs_select_own" ON "public"."generation_jobs" FOR SEL
 
 
 
+ALTER TABLE "public"."identity_judge_calls" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."identity_refusals" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."partner_links" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "partner_links_select_own" ON "public"."partner_links" FOR SELECT TO "authenticated" USING ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
 
+
+
+ALTER TABLE "public"."payment_disputes" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."payments" ENABLE ROW LEVEL SECURITY;
@@ -4170,6 +4990,21 @@ ALTER TABLE "public"."template_categories" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "template_categories_select_all" ON "public"."template_categories" FOR SELECT TO "authenticated", "anon" USING (true);
+
+
+
+ALTER TABLE "public"."template_favorites" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "template_favorites_delete_own" ON "public"."template_favorites" FOR DELETE TO "authenticated" USING ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
+
+
+
+CREATE POLICY "template_favorites_insert_own" ON "public"."template_favorites" FOR INSERT TO "authenticated" WITH CHECK ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
+
+
+
+CREATE POLICY "template_favorites_select_own" ON "public"."template_favorites" FOR SELECT TO "authenticated" USING ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
 
 
 
@@ -4254,6 +5089,11 @@ GRANT ALL ON FUNCTION "public"."admin_batch_set_banned"("p_actor" "uuid", "p_use
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_bulk_edit_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_bulk_edit_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_daily_costs"("p_days" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_daily_costs"("p_days" integer) TO "service_role";
 
@@ -4284,6 +5124,21 @@ GRANT ALL ON FUNCTION "public"."admin_delete_template_category"("p_key" "text", 
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_get_dispute"("p_dispute_id" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_get_dispute"("p_dispute_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_list_disputes"("p_cursor_at" timestamp with time zone, "p_cursor_id" "text", "p_limit" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_list_disputes"("p_cursor_at" timestamp with time zone, "p_cursor_id" "text", "p_limit" integer) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_list_template_requests"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_list_template_requests"() TO "service_role";
 
@@ -4306,6 +5161,11 @@ GRANT ALL ON FUNCTION "public"."admin_log_replay"("p_user_id" "uuid", "p_target_
 
 REVOKE ALL ON FUNCTION "public"."admin_lookup"("p_query" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_lookup"("p_query" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_mark_dispute_submitted"("p_dispute_id" "text", "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_mark_dispute_submitted"("p_dispute_id" "text", "p_actor" "uuid") TO "service_role";
 
 
 
@@ -4423,6 +5283,16 @@ REVOKE ALL ON FUNCTION "public"."attach_ticket_images"("p_ticket_id" "uuid", "p_
 
 
 
+REVOKE ALL ON FUNCTION "public"."begin_identity_judge"("p_user_id" "uuid", "p_text_hash" "text", "p_per_hour" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."begin_identity_judge"("p_user_id" "uuid", "p_text_hash" "text", "p_per_hour" integer) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."claim_dispute_reminders"("p_dispute_ids" "text"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."claim_dispute_reminders"("p_dispute_ids" "text"[]) TO "service_role";
+
+
+
 GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."generation_jobs" TO "service_role";
 GRANT SELECT ON TABLE "public"."generation_jobs" TO "authenticated";
 
@@ -4462,6 +5332,16 @@ REVOKE ALL ON FUNCTION "public"."delete_provider_vault_secret"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "public"."dispute_evidence_facts"("p_dispute_id" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."dispute_evidence_facts"("p_dispute_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."finish_identity_judge"("p_id" bigint, "p_identity_swap" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."finish_identity_judge"("p_id" bigint, "p_identity_swap" boolean) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."grant_credits"("p_user_id" "uuid", "p_amount" integer, "p_reason" "text", "p_idempotency_key" "text", "p_pool" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."grant_credits"("p_user_id" "uuid", "p_amount" integer, "p_reason" "text", "p_idempotency_key" "text", "p_pool" "text") TO "service_role";
 
@@ -4471,8 +5351,18 @@ REVOKE ALL ON FUNCTION "public"."handle_new_user"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "public"."mark_dispute_drafted"("p_dispute_id" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."mark_dispute_drafted"("p_dispute_id" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."mark_ticket_seen"("p_ticket_id" "uuid", "p_user_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."mark_ticket_seen"("p_ticket_id" "uuid", "p_user_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."open_payment_dispute"("p_dispute_id" "text", "p_charge_id" "text", "p_amount" integer, "p_currency" "text", "p_reason" "text", "p_due_by" timestamp with time zone, "p_managed_default" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."open_payment_dispute"("p_dispute_id" "text", "p_charge_id" "text", "p_amount" integer, "p_currency" "text", "p_reason" "text", "p_due_by" timestamp with time zone, "p_managed_default" boolean) TO "service_role";
 
 
 
@@ -4483,6 +5373,36 @@ GRANT ALL ON FUNCTION "public"."openai_admin_key"() TO "service_role";
 
 REVOKE ALL ON FUNCTION "public"."provider_api_key"("p_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."provider_api_key"("p_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."purge_identity_refusals"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."purge_identity_refusals"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."reconcile_dispute_submitted"("p_dispute_id" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."reconcile_dispute_submitted"("p_dispute_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."record_identity_refusal"("p_user_id" "uuid", "p_entry" "text", "p_method" "text", "p_excerpt" "text", "p_input_tokens" integer, "p_output_tokens" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."record_identity_refusal"("p_user_id" "uuid", "p_entry" "text", "p_method" "text", "p_excerpt" "text", "p_input_tokens" integer, "p_output_tokens" integer) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."record_job_client_ip"("p_job_id" "uuid", "p_user_id" "uuid", "p_ip" "inet") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."record_job_client_ip"("p_job_id" "uuid", "p_user_id" "uuid", "p_ip" "inet") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."record_job_download"("p_job_id" "uuid", "p_user_id" "uuid", "p_ip" "inet") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."record_job_download"("p_job_id" "uuid", "p_user_id" "uuid", "p_ip" "inet") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."record_payment_context"("p_session_id" "text", "p_ip" "inet", "p_user_agent" "text", "p_terms_accepted_at" timestamp with time zone, "p_managed_payments" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."record_payment_context"("p_session_id" "text", "p_ip" "inet", "p_user_agent" "text", "p_terms_accepted_at" timestamp with time zone, "p_managed_payments" boolean) TO "service_role";
 
 
 
@@ -4556,6 +5476,10 @@ GRANT ALL ON FUNCTION "public"."template_category_for"("p_value" "text") TO "ser
 
 
 
+REVOKE ALL ON FUNCTION "public"."template_favorites_guard"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."template_request_votes_count"() FROM PUBLIC;
 
 
@@ -4608,6 +5532,26 @@ GRANT UPDATE ON SEQUENCE "public"."credit_ledger_id_seq" TO "service_role";
 
 
 GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."feature_access" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."identity_judge_calls" TO "service_role";
+
+
+
+GRANT UPDATE ON SEQUENCE "public"."identity_judge_calls_id_seq" TO "anon";
+GRANT UPDATE ON SEQUENCE "public"."identity_judge_calls_id_seq" TO "authenticated";
+GRANT UPDATE ON SEQUENCE "public"."identity_judge_calls_id_seq" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."identity_refusals" TO "service_role";
+
+
+
+GRANT UPDATE ON SEQUENCE "public"."identity_refusals_id_seq" TO "anon";
+GRANT UPDATE ON SEQUENCE "public"."identity_refusals_id_seq" TO "authenticated";
+GRANT UPDATE ON SEQUENCE "public"."identity_refusals_id_seq" TO "service_role";
 
 
 
@@ -4685,6 +5629,11 @@ GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public
 GRANT ALL ON TABLE "public"."template_categories" TO "service_role";
 GRANT SELECT ON TABLE "public"."template_categories" TO "anon";
 GRANT SELECT ON TABLE "public"."template_categories" TO "authenticated";
+
+
+
+GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."template_favorites" TO "service_role";
+GRANT SELECT,INSERT,DELETE ON TABLE "public"."template_favorites" TO "authenticated";
 
 
 

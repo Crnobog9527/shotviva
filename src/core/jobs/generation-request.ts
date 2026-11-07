@@ -52,6 +52,8 @@ export type GenerationRequest = {
   batchSize?: number
   // Language of the page that asked, for the `generate` event only (ARCHITECTURE §16.2).
   locale?: Locale
+  // The website request's IP, stored on the job for dispute evidence (T82). Web only.
+  clientIp?: string | null
 }
 
 export function toGenerationRequest(userId: string, body: z.infer<typeof generateBodySchema>): GenerationRequest {

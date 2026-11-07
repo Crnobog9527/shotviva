@@ -1,5 +1,15 @@
 export { FEATURED_MAX, saveTemplate, setFeaturedTemplates, setTemplateActive, setTemplateOrder, setTemplatesActive } from './commands'
 export { listAdminTemplates } from './repository'
+export { bulkEditTemplates } from './bulk-edit'
+export {
+  bulkEditFailures,
+  describeFailure,
+  describePatch,
+  isEmptyPatch,
+  type BulkEditFailure,
+  type BulkEditOutcome,
+  type BulkEditPatch,
+} from './bulk-edit-rules'
 export { runAdminAction, runAdminQuery } from './run-action'
 export type {
   ActionResult,

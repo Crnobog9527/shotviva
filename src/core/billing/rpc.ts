@@ -32,6 +32,11 @@ const SQL_ERROR_CODES: Record<string, ErrorCode> = {
   NOT_ADMIN: 'FORBIDDEN',
   // A free work cannot be made private (ARCHITECTURE §6.2).
   FREE_WORK_PUBLIC: 'FORBIDDEN',
+  // Dispute evidence (T82): an unknown dispute, a Managed Payments one (Stripe answers it), and a
+  // second submit of the one submission Stripe allows.
+  DISPUTE_NOT_FOUND: 'NOT_FOUND',
+  DISPUTE_NOT_OURS: 'FORBIDDEN',
+  DISPUTE_ALREADY_SUBMITTED: 'CONFLICT',
 }
 
 export function toRpcError(fn: string, error: { message: string; code?: string }): AppError {

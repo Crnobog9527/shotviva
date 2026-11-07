@@ -43,7 +43,21 @@ export function stripeHarness() {
     invoices: { retrieve: invoices.retrieve },
     subscriptions: { retrieve: subscriptions.retrieve, cancel: vi.fn() },
     charges: { retrieve: charges.retrieve },
-    disputes: { retrieve: disputes.retrieve },
+    // T82: update merges staged evidence into the stored dispute, as Stripe does with submit=false.
+    disputes: {
+      retrieve: disputes.retrieve,
+      update: vi.fn(async (id: string, params: Stripe.DisputeUpdateParams) => {
+        const found = disputes.map.get(id)
+        if (!found) throw new Error(`no such dispute ${id}`)
+        const evidence = { ...found.evidence, ...(params.evidence as Partial<Stripe.Dispute.Evidence>) }
+        const details = { ...found.evidence_details, has_evidence: true, submission_count: (found.evidence_details?.submission_count ?? 0) + (params.submit === false ? 0 : 1) }
+        const updated = { ...found, evidence, evidence_details: details, status: params.submit === false ? found.status : 'under_review' } as Stripe.Dispute
+        disputes.map.set(id, updated)
+        return structuredClone(updated)
+      }),
+      list: vi.fn(async () => ({ data: [...disputes.map.values()].map((d) => structuredClone(d)) })),
+    },
+    files: { create: vi.fn(async () => ({ id: `file_${uid()}` })) },
     billingPortal: { sessions: { create: vi.fn() } },
   } as unknown as StripeApi
   const trackBuy = vi.fn()
@@ -63,6 +77,7 @@ export function stripeHarness() {
     subscriptions: subscriptions.map,
     charges: charges.map,
     disputes: disputes.map,
+    disputeUpdate: stripe.disputes.update as unknown as ReturnType<typeof vi.fn>,
     stripe,
   }
 }
@@ -258,4 +273,19 @@ export async function mirrorOf(db: Client, userId: string) {
     [userId],
   )
   return rows
+}
+
+// A dispute as Stripe returns it with charge expanded (T82): needs a response, due in 10 days.
+export function disputeObject(charge: Stripe.Charge, input: { reason?: string; status?: string; dueDays?: number } = {}) {
+  return {
+    id: `dp_${uid()}`,
+    object: 'dispute',
+    amount: charge.amount,
+    currency: 'usd',
+    charge: { ...charge, billing_details: { email: 'buyer@example.test', name: 'Test Buyer' } },
+    reason: input.reason ?? 'fraudulent',
+    status: input.status ?? 'needs_response',
+    evidence: {},
+    evidence_details: { due_by: now() + (input.dueDays ?? 10) * DAY_S, has_evidence: false, submission_count: 0, past_due: false },
+  } as unknown as Stripe.Dispute
 }

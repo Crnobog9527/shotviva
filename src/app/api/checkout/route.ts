@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server'
 
 import { errorResponse, jsonResponse } from '@/core/api-response'
-import { assertSameOrigin, createAdminSupabase, requireApiBuyer } from '@/core/auth'
+import { assertSameOrigin, clientIp, createAdminSupabase, requireApiBuyer } from '@/core/auth'
 import {
   assertOffered,
   checkoutBodySchema,
@@ -9,7 +9,9 @@ import {
   managedPaymentsEnabled,
   wechatPayEnabled,
   stripeClient,
+  termsConsentEnabled,
   type CheckoutBody,
+  type CheckoutClient,
 } from '@/core/billing/stripe'
 import { assertCanBuy } from '@/core/billing/subscription'
 import { createWaffoCheckout, paymentChannel, waffoClient, waffoConfig } from '@/core/billing/waffo'
@@ -36,8 +38,10 @@ export async function POST(request: NextRequest) {
     // an ordinary checkout at full price; the payment webhook cancels the old subscription.
     const product = site.billing.products.find((p) => p.id === body.data.product_id)
     if (product) await assertCanBuy(createAdminSupabase(), user.id, product)
-    const start = channel === 'waffo' ? startWaffo : startStripe
-    return jsonResponse(await start(user.id, body.data))
+    if (channel === 'waffo') return jsonResponse(await startWaffo(user.id, body.data))
+    // Dispute evidence (T82): who opened checkout, from where.
+    const client = { ip: clientIp(request.headers), userAgent: request.headers.get('user-agent') }
+    return jsonResponse(await startStripe(user.id, body.data, client))
   } catch (error) {
     return errorResponse(error, 'checkout')
   }
@@ -45,9 +49,9 @@ export async function POST(request: NextRequest) {
 
 const shared = { products: site.billing.products, origin: appOrigin, returnToHosts: site.partners.graylum.returnToHosts }
 
-function startStripe(userId: string, body: CheckoutBody) {
-  const deps = { ...shared, stripe: stripeClient(), managedPayments: managedPaymentsEnabled(), wechatPay: wechatPayEnabled() }
-  return createCheckout(deps, { userId, body })
+function startStripe(userId: string, body: CheckoutBody, client: CheckoutClient) {
+  const deps = { ...shared, stripe: stripeClient(), managedPayments: managedPaymentsEnabled(), wechatPay: wechatPayEnabled(), termsConsent: termsConsentEnabled() }
+  return createCheckout(deps, { userId, body, client })
 }
 
 function startWaffo(userId: string, body: CheckoutBody) {

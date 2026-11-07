@@ -5,6 +5,7 @@ import { z } from 'zod'
 
 import { AppError } from '@/core/errors'
 
+import { pageRefusals } from './list'
 import { DETAIL_ROWS, SAME_IP_ROWS, type GraylumLink, type SameIpAccount, type UserExtras, type UserPayment, type UserRequest, type UserSubscription } from './detail-types'
 
 // The five T25 blocks on /admin/users/[id] (ARCHITECTURE §10「用户详情补全」), one query each,
@@ -15,6 +16,7 @@ import { DETAIL_ROWS, SAME_IP_ROWS, type GraylumLink, type SameIpAccount, type U
 //   graylum         partner_links primary key (user_id, partner)
 //   same IP         profiles_signup_ip_created_at_idx (0180)
 //   requests        template_requests_user_id_created_at_idx
+//   refusals        identity_refusals_user_id_created_at_idx (0700, T81)
 
 const fail = (what: string, error: { message: string }): never => {
   throw new AppError('INTERNAL', `admin user ${what} failed`, { cause: new Error(error.message) })
@@ -152,12 +154,14 @@ export async function userRequests(db: SupabaseClient, userId: string): Promise<
 
 // All five blocks at once; the signup IP comes from the profile the page already read.
 export async function loadUserExtras(db: SupabaseClient, user: { id: string; signupIp: string | null }): Promise<UserExtras> {
-  const [payments, subscription, graylum, sameIp, requests] = await Promise.all([
+  const [payments, subscription, graylum, sameIp, requests, refusals] = await Promise.all([
     userPayments(db, user.id),
     userSubscription(db, user.id),
     userGraylumLink(db, user.id),
     sameIpAccounts(db, user.id, user.signupIp),
     userRequests(db, user.id),
+    pageRefusals(db, [user.id]),
   ])
-  return { signupIp: user.signupIp, payments, subscription, graylum, sameIp, requests }
+  const identityRefusals = refusals.get(user.id) ?? { total: 0, last24h: 0, flagged: false }
+  return { signupIp: user.signupIp, payments, subscription, graylum, sameIp, requests, identityRefusals }
 }

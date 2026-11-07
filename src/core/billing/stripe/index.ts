@@ -27,10 +27,12 @@ export {
   createCheckout,
   successPath,
   type CheckoutBody,
+  type CheckoutClient,
   type CheckoutDeps,
 } from './checkout'
 export { CANCEL_COOKIE, cancelReturnUrl, handleCancelReturn, type CancelReturn, type CancelTrack } from './cancel-return'
-export { managedPaymentsEnabled, wechatPayEnabled, stripeClient, stripeWebhookSecret, type StripeApi } from './client'
+export { managedPaymentsEnabled, stripeClient, stripeWebhookSecret, termsConsentEnabled, wechatPayEnabled, type StripeApi } from './client'
 export { fulfilCheckoutSession, type FulfilDeps, type FulfilOutcome } from './fulfil'
 export { handleStripeWebhook, type WebhookDeps, type WebhookResult } from './webhook'
 export { applyReplay, previewReplay, REPLAY_ERRORS, type ReplayOutcome, type ReplayPreview } from './replay'
+export * from './disputes'

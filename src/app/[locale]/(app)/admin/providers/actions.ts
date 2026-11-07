@@ -4,6 +4,8 @@ import { refresh, updateTag } from 'next/cache'
 
 import {
   activateProvider,
+  dryRunIdentityScreen,
+  type DryRunResult,
   removeProvider,
   runProviderAction,
   saveProvider,
@@ -13,6 +15,7 @@ import {
 } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { PROVIDERS_CACHE_TAG, type ConnectionResult } from '@/core/providers'
+import { identityJudge } from '@/modules/image'
 
 // Server actions are public endpoints, so each one re-checks the admin role itself. None of
 // them returns a key: save answers with the row id, test with the HTTP outcome only.
@@ -53,4 +56,10 @@ export async function deleteProviderAction(input: unknown): Promise<ProviderActi
 export async function testProviderAction(input: unknown): Promise<ProviderActionResult<ConnectionResult>> {
   await requireAdmin()
   return runProviderAction(() => testProvider(deps(), input))
+}
+
+// The face-swap dry run (ARCHITECTURE §5.1a, T81): the active decision row, no credits, no records.
+export async function identityDryRunAction(input: unknown): Promise<DryRunResult> {
+  await requireAdmin()
+  return dryRunIdentityScreen(await identityJudge(), input)
 }

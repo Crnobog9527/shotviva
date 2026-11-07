@@ -16,6 +16,7 @@ vi.mock('./actions', () => ({
   saveTemplateAction: vi.fn(),
   setTemplateActiveAction: vi.fn(),
   setTemplatesActiveAction: vi.fn(),
+  bulkEditTemplatesAction: vi.fn(),
   setTemplateOrderAction: vi.fn(),
   setFeaturedTemplatesAction: vi.fn(),
   requestCoverUploadAction: vi.fn(),

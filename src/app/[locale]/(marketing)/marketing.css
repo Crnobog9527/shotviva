@@ -1,3 +1,5 @@
+/* Layer order first (layer-order.test.ts): see LAYER_ORDER there. */
+@layer properties, theme, base, components, utilities;
 /* Marketing pages (home, pricing, inner SEO pages): the signed-off v3-b comp
    (design/comps-v3-b/home.html + css/marketing.css), ported class for class with an `mk-` prefix.
    Colours come from the tokens in globals.css only. Motion: one hover wipe on template cards,

@@ -13,6 +13,7 @@ const HTTP_STATUS: Record<PartnerErrorCode, number> = {
   invalid_input: 422,
   quota_exhausted: 402,
   content_rejected: 422,
+  IDENTITY_SWAP_REFUSED: 422,
   generation_failed: 500,
   rate_limited: 429,
   not_found: 404,
@@ -46,10 +47,13 @@ const FROM_APP: Record<ErrorCode, PartnerErrorCode> = {
   IMAGE_TOO_LARGE: 'invalid_input',
   IMAGE_UNSUPPORTED: 'invalid_input',
   CONTENT_REJECTED: 'content_rejected',
+  IDENTITY_SWAP_REFUSED: 'IDENTITY_SWAP_REFUSED',
   GENERATION_FAILED: 'generation_failed',
   // Account deletion only; no partner route deletes accounts.
   SUBSCRIPTION_CANCEL_FAILED: 'internal',
   DOWNGRADE_NOT_ALLOWED: 'internal',
+  // Saved templates are a web-only feature; no partner route saves templates.
+  FAVORITES_LIMIT: 'internal',
   INTERNAL: 'internal',
 }
 

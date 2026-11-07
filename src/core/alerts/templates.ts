@@ -2,6 +2,8 @@ import type {
   CancelFailedAlert,
   Clawback,
   DisputeClosedAlert,
+  DisputeDueSoonAlert,
+  DisputeEvidenceFacts,
   DisputeOpenedAlert,
   GenerationSpikeAlert,
   Money,
@@ -93,11 +95,42 @@ function refund(alert: RefundAlert, who: string): Rendered {
   }
 }
 
+// The Owner reads alerts in China: deadlines are Beijing time.
+const BEIJING_DAY = new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+
+const deadline = (iso: string | null) => (iso ? `截止北京时间 ${BEIJING_DAY.format(new Date(iso))}` : '银行不接受回应')
+
+const disputePath = (disputeId: string) => `/admin/disputes/${encodeURIComponent(disputeId)}`
+
+// T82: the evidence is drafted; say what is left for the Owner and by when.
+const STAGED_TODO: Record<DisputeEvidenceFacts['responder'], string> = {
+  shotviva: '申诉证据已整理成草稿，请到后台检查后提交',
+  stripe: '这笔由 Stripe 应诉（Managed Payments），证据草稿已存给 Stripe 参考，不用你提交',
+}
+
+const DRAFT_TODO: Record<Exclude<DisputeEvidenceFacts['draft'], 'staged'>, string> = {
+  failed: '证据草稿这次没能存到 Stripe（Stripe 重发通知时会自动重试），请到后台看看，必要时直接在 Stripe 后台提交',
+  skipped: 'Stripe 上这笔已经不接受证据，请到后台看看',
+}
+
+function evidenceText(e: DisputeEvidenceFacts): string {
+  const ban = e.autoBanned ? '账号已自动封禁。' : ''
+  const todo = e.draft === 'staged' ? STAGED_TODO[e.responder] : DRAFT_TODO[e.draft]
+  return `${ban}${todo}，${deadline(e.dueBy)}。`
+}
+
 function disputeOpened(alert: DisputeOpenedAlert, who: string): Rendered {
   const amount = alert.amount ? ` ${money(alert.amount)}` : ''
+  const head = `【拒付】${who} 向银行投诉了 ${productName(alert.productId)}${amount} 这笔扣款，${creditsText(alert.credits)}。`
+  if (!alert.evidence) return { line: `${head}请尽快到 Stripe 后台提交证据。`, path: userPath(alert.userId) }
+  return { line: `${head}${evidenceText(alert.evidence)}`, path: disputePath(alert.disputeId) }
+}
+
+function disputeDueSoon(alert: DisputeDueSoonAlert, who: string): Rendered {
+  const amount = alert.amount ? ` ${money(alert.amount)}` : ''
   return {
-    line: `【拒付】${who} 向银行投诉了 ${productName(alert.productId)}${amount} 这笔扣款，${creditsText(alert.credits)}。请尽快到 Stripe 后台提交证据。`,
-    path: userPath(alert.userId),
+    line: `【拒付快到期】${who} 的 ${productName(alert.productId)}${amount} 拒付还没提交申诉，${deadline(alert.dueBy)}，只剩不到 3 天。`,
+    path: disputePath(alert.disputeId),
   }
 }
 
@@ -190,6 +223,7 @@ const RENDERERS: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K 
   refund,
   dispute_opened: disputeOpened,
   dispute_closed: disputeClosed,
+  dispute_due_soon: disputeDueSoon,
   payment_failed: paymentFailed,
   generation_spike: generationSpike,
   ticket,

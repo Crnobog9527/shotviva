@@ -7,7 +7,7 @@ import { serverEnv } from '@/core/env'
 import { partnerErrorResponse, type PartnerGenerateRouteDeps, type PartnerRouteDeps } from '@/core/partner'
 import { appOrigin } from '@/core/site-url'
 import { r2Store } from '@/core/storage'
-import { imageProvider } from '@/modules/image'
+import { identityJudge, imageProvider } from '@/modules/image'
 import { site } from '@/site/site.config'
 
 // Wiring for /api/partner/*: service-role db (no user session on these routes, ARCHITECTURE
@@ -22,9 +22,10 @@ function partnerDeps(): PartnerRouteDeps {
   }
 }
 
-// Same provider resolution as /api/generate: the active row, else the env fallback.
+// Same provider resolution and face-swap screening (§5.1a) as /api/generate.
 async function partnerGenerateDeps(): Promise<PartnerGenerateRouteDeps> {
-  return { ...partnerDeps(), provider: await imageProvider() }
+  const [provider, judge] = await Promise.all([imageProvider(), identityJudge()])
+  return { ...partnerDeps(), provider, identityJudge: judge }
 }
 
 // A missing secret throws while wiring; answer that in the partner error shape too.
