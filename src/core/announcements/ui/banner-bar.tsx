@@ -31,22 +31,30 @@ const ICONS: Record<AnnouncementTone, ReactNode> = {
   ),
 }
 
+// A short message (a typical offer line, up to about two phone lines) is balanced on phones and,
+// in Chinese, breaks only at punctuation and spaces, so 「40%。」 never ends up alone on a line.
+// Longer ones keep normal breaking: breaking only at punctuation would leave ragged lines. Width
+// counts a CJK character as two, as it renders, so the cut is the same in both languages.
+const SHORT_MESSAGE_WIDTH = 64
+
+function isShortMessage(message: string): boolean {
+  let width = 0
+  for (const char of message) width += (char.codePointAt(0) ?? 0) >= 0x2e80 ? 2 : 1
+  return width <= SHORT_MESSAGE_WIDTH
+}
+
 // The banner's look (design/comps-v3-b `.ann`, T44), shared by the live banner and the admin
-// preview: an icon, the message with its link as a pill, and the close button. One row that
-// wraps instead of squeezing the header at 375px.
+// preview: an icon, the message, its link as a pill, and the close button. The link sits beside
+// the message on wider screens and on its own row under it on phones (banner.css).
 export function BannerBar({ message, link, tone, dismissLabel, onDismiss, className, ...rest }: Props) {
+  const short = isShortMessage(message)
+  // A long message with a link puts the link on its own row at every width (banner.css).
+  const classes = cn('sv-ann', tone === 'promo' && 'sv-promo', short && 'sv-ann-short', link && !short && 'sv-ann-stack', className)
   return (
-    <div {...rest} className={cn('sv-ann', tone === 'promo' && 'sv-promo', className)}>
+    <div {...rest} className={classes}>
       {ICONS[tone]}
-      <p>
-        {message}
-        {link ? (
-          <>
-            {' '}
-            <BannerLink url={link.url} label={link.label} name={message} />
-          </>
-        ) : null}
-      </p>
+      <p>{message}</p>
+      {link ? <BannerLink url={link.url} label={link.label} name={message} /> : null}
       <button type="button" onClick={onDismiss} aria-label={dismissLabel} className="sv-ann-x">
         <svg viewBox="0 0 24 24" aria-hidden {...stroke} strokeWidth={2.2}>
           <path d="M6 6l12 12M18 6L6 18" />
