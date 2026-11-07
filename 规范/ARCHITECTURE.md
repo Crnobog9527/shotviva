@@ -257,7 +257,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
   入账失败时，镜像表的写入一起回滚。同一 session 的重发和兄弟事件只入账一次。`checkout.session.completed` 和 `checkout.session.async_payment_succeeded` 都走它。
 - **付款记录与续费函数**（T10，总控 2026-11-06 按 T10 开工前的问题定）：
   - **表 `payments`**（私有，只授权 service role）：每次成功付款一行。
-    - 字段：`user_id`、`product_id`、`channel`（`stripe` / `waffo`）、`stripe_session_id` / `stripe_invoice_id` / `stripe_charge_id`（各自可空且唯一）、`waffo_order_id`（可空，**不唯一**，有索引：一张 Waffo 订阅订单每期都有一笔扣款）、`waffo_payment_id`（Waffo 的 `PAY_` 扣款号，可空、唯一；T50）、`amount_total`（实付，含税，单位为分，int）、`currency`、`amount_tax`（分）、`method`（`card` / `alipay`）、`status`（`paid` / `refunded` / `partially_refunded` / `disputed`）、`amount_refunded`（分，默认 0）、`created_at`。
+    - 字段：`user_id`、`product_id`、`channel`（`stripe` / `waffo`）、`stripe_session_id` / `stripe_invoice_id` / `stripe_charge_id`（各自可空且唯一）、`waffo_order_id`（可空，**不唯一**，有索引：一张 Waffo 订阅订单每期都有一笔扣款）、`waffo_payment_id`（Waffo 的 `PAY_` 扣款号，可空、唯一；T50）、`amount_total`（实付，含税，单位为分，int）、`currency`、`amount_tax`（分）、`method`（`card` = MP 卡（海外银行卡）/ `alipay` / `cn_card` = 普通 Stripe 卡（中国银行卡，T64）；迁移只放宽 `payments_method_check`，不改函数；续费沿用订阅 metadata 里记的方式）、`status`（`paid` / `refunded` / `partially_refunded` / `disputed`）、`amount_refunded`（分，默认 0）、`created_at`。
     - 约束：Stripe 行至少有 session 或 invoice 之一；Waffo 行必须有 `waffo_order_id` 和 `waffo_payment_id`（T50 之前的老行可以没有 `waffo_payment_id`）。
     - 不回填 T10 上线前的历史付款。
   - **`settle_checkout` 改签名**：新增参数 `p_amount_total`、`p_currency`、`p_amount_tax`、`p_method`、`p_invoice_id`（可空）、`p_charge_id`（可空），在同一事务里写 `payments`。参数变了无法 `create or replace`，按 AGENTS §5「签名必须变」的例外，由新迁移删掉旧的 7 参数版本后重建，PR 写明原因；调用方同步改。
@@ -295,7 +295,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 价格数字只写在 `site.config.ts`（第 2 节），付费墙、`/pricing`、FAQ、结构化数据都从配置读；建站规格 G3 同步。送 Stripe 时用整数分（`1990`）。
 - **Stripe Product / Price 映射**：Starter、Pro、Max 各一个 Product（税码 `txcd_10105001`），每个 Product 挂 4 个 Price：月付 recurring、月付 one-time、年付 recurring、年付 one-time（同 id 的 recurring 和 one-time 价格相同）；三个积分包各一个 Product，只有 one-time Price。Price 的 `lookup_key` 固定为 `<product_id>`（one-time）和 `<product_id>_recurring`（订阅），服务端按 lookup key 取 Price，不把 Price id 写进代码或配置；每个 Price 的 `metadata.product_id` 也写上，回调反查用。
 - **不接微信支付**（Owner 2026-11-05 定，只保留卡和支付宝）。支付宝在 Stripe 普通模式下不支持订阅，所以钱包用户买会员买的是「一期」（`starter_monthly` 的单笔形态 = 30 天 50 credits），`paid_until` 到了自己再买。这不是功能缺失，是 Stripe 的限制，付费墙文案要说清楚（"Renews automatically" vs "30 days, no auto-renew"）。
-- **PostHog `purchase` 事件参数**：`product_id`、`tier`（`starter` / `pro` / `max` / `pack`）、`interval`（`month` / `year` / 空）、`form`（`subscription` / `one_time`）、`channel`（`stripe` / `waffo`）、`method`（`card` / `alipay`）、`amount_usd`、`credits`。`generate` 事件加 `resolution` 和 `credits_cost`。
+- **PostHog `purchase` 事件参数**：`product_id`、`tier`（`starter` / `pro` / `max` / `pack`）、`interval`（`month` / `year` / 空）、`form`（`subscription` / `one_time`）、`channel`（`stripe` / `waffo`）、`method`（`card` / `alipay` / `cn_card`）、`amount_usd`、`credits`。`generate` 事件加 `resolution` 和 `credits_cost`。
 
 已经确定的规则：
 
