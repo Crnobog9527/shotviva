@@ -35,6 +35,13 @@ type Props = {
 // or the page paints from the top of the window and the bar arrives a beat later, pushing it
 // down 56px (and, with any scroll at that moment, leaving the page's top under the sticky bar).
 // The Admin item comes in as a slot for that reason.
+//
+// The phone placement is written max-md: only, never `fixed inset-x-0 bottom-0` overridden by
+// `md:sticky md:top-0 md:bottom-auto`. Our utilities live in a cascade layer, and any unlayered
+// `.fixed` or `.bottom-0` on the page (a browser extension or an automation tool injecting its
+// own Tailwind CSS does exactly that) beats every layered rule, md: ones included: the bar then
+// stays fixed on desktop over the page's top, and a flow page's action bar covers its bottom.
+// With max-md: classes there is no bare `.fixed` on the element for such a rule to match.
 export function TabBar({ items, desktopUnder = [], admin }: Props) {
   const pathname = usePathname()
   const t = useTranslations('app.tabs')
@@ -47,8 +54,8 @@ export function TabBar({ items, desktopUnder = [], admin }: Props) {
       // Stays put while pages slide or fade under it (T56; globals.css).
       style={{ viewTransitionName: 'app-tabs' }}
       className={cn(
-        'bar-material fixed inset-x-0 bottom-0 z-60 px-2 pt-1 pb-[calc(var(--sab)+4px)]',
-        'md:sticky md:top-0 md:bottom-auto md:h-14 md:p-0 md:shadow-[inset_0_-1px_0_var(--border)]',
+        'bar-material z-60 px-2 pt-1 pb-[calc(var(--sab)+4px)] max-md:fixed max-md:inset-x-0 max-md:bottom-0',
+        'md:sticky md:top-0 md:h-14 md:p-0 md:shadow-[inset_0_-1px_0_var(--border)]',
         !root && 'max-md:hidden',
       )}
     >

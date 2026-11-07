@@ -9,7 +9,7 @@ export function UnreadDot({ label, tab = false }: { label: string; tab?: boolean
         aria-hidden="true"
         className={cn(
           'inline-block size-2.5 shrink-0 rounded-full bg-primary',
-          tab && 'absolute top-2 left-[calc(50%+8px)] md:static md:ml-1',
+          tab && 'max-md:absolute max-md:top-2 max-md:left-[calc(50%+8px)] md:ml-1',
         )}
       />
       <span className="sr-only">{label}</span>
