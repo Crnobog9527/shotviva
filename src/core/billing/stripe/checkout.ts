@@ -9,7 +9,7 @@ import { PRODUCT_IDS, type PaymentChannel, type SiteProduct } from '../../config
 import { AppError } from '../../errors'
 import { localizePath } from '../../i18n/paths'
 import { allowlistedUrl } from '../../partner/return-to'
-import { CHECKOUT_METHODS, checkoutRoute, offeredMethods, STRIPE_WALLETS, type CheckoutMethod, type CheckoutRoute } from './catalog'
+import { CHECKOUT_METHODS, checkoutRoute, offeredMethods, type CheckoutMethod, type CheckoutRoute } from './catalog'
 import { cardOnlyConfigId } from './card-only'
 import type { StripeApi } from './client'
 import { resolvePriceId } from './prices'
@@ -34,6 +34,8 @@ export type CheckoutDeps = {
   stripe: StripeApi
   products: readonly SiteProduct[]
   managedPayments: boolean
+  // STRIPE_WECHAT_PAY (T73): WeChat Pay beside Alipay on the wallet line.
+  wechatPay: boolean
   // This deployment's origin (core/site-url): previews return to their own URL.
   origin: string
   // site.partners.graylum.returnToHosts
@@ -79,7 +81,7 @@ type MethodParams = Pick<
 function methodParams(route: CheckoutRoute, cardOnlyConfig: string | null): MethodParams {
   if (route.managedPayments) return { managed_payments: { enabled: true } }
   const off = { enabled: false }
-  if (isWallet(route)) return { managed_payments: off, allowed_payment_method_types: [...STRIPE_WALLETS], ...WALLET }
+  if (isWallet(route)) return walletParams(route.allowedMethods ?? [])
   if (!isPlainCard(route)) return { managed_payments: off, allowed_payment_method_types: ['card'] }
   // Stripe takes one of allowed_payment_method_types and payment_method_configuration; the
   // configuration has only card on, so it is the same filter with the wallets off too.
@@ -96,11 +98,21 @@ const PLAIN_CARD = { wallet_options: { link: { display: 'never' } } } satisfies 
 
 // 支付宝 / 微信支付 (T73): one Checkout page lists both and the buyer picks there. On a desktop
 // browser WeChat Pay shows a QR code to scan with the phone; `client: 'web'` is the only client
-// a Stripe-hosted page takes.
-const WALLET = { payment_method_options: { wechat_pay: { client: 'web' } } } satisfies MethodParams
+// a Stripe-hosted page takes. With STRIPE_WECHAT_PAY off the line is Alipay alone and the params
+// are exactly the pre-T73 ones (no payment_method_options).
+const WECHAT_WEB = { payment_method_options: { wechat_pay: { client: 'web' } } } satisfies MethodParams
+
+function walletParams(wallets: readonly string[]): MethodParams {
+  const base: MethodParams = { managed_payments: { enabled: false }, allowed_payment_method_types: [...wallets] as MethodTypes }
+  return offersWechat(wallets) ? { ...base, ...WECHAT_WEB } : base
+}
+
+type MethodTypes = NonNullable<Stripe.Checkout.SessionCreateParams['allowed_payment_method_types']>
+
+const offersWechat = (methods: readonly string[] | null): boolean => methods?.includes('wechat_pay') ?? false
 
 function isWallet(route: CheckoutRoute): boolean {
-  return route.allowedMethods === STRIPE_WALLETS
+  return route.allowedMethods?.[0] === 'alipay'
 }
 
 function isPlainCard(route: CheckoutRoute): boolean {
@@ -134,13 +146,17 @@ function sessionParams(
 function assertMethodOffered(route: CheckoutRoute, session: Pick<Stripe.Checkout.Session, 'id' | 'payment_method_types'>) {
   const wanted: readonly string[] = route.allowedMethods ?? []
   if (wanted.length === 0 || wanted.some((m) => session.payment_method_types?.includes(m))) return
+  if (wanted.length === 1) {
+    throw new AppError('INTERNAL', `Checkout session ${session.id} does not offer ${wanted[0]}; turn it on in Stripe Settings → Payment methods`)
+  }
   throw new AppError('INTERNAL', `Checkout session ${session.id} offers none of ${wanted.join(', ')}; turn one on in Stripe Settings → Payment methods`)
 }
 
-// checkout_start (ARCHITECTURE §16.2): the Stripe wallet line is not yet one wallet or the
-// other, so it is `alipay_or_wechat`; `purchase` then records the wallet that paid.
+// checkout_start (ARCHITECTURE §16.2): with WeChat Pay on, the Stripe wallet line is not yet one
+// wallet or the other, so it is `alipay_or_wechat`; `purchase` then records the wallet that paid.
+// Off, it is `alipay` as before T73.
 function startedMethod(method: CheckoutMethod, route: CheckoutRoute): CheckoutStartMethod {
-  return isWallet(route) ? 'alipay_or_wechat' : method
+  return offersWechat(route.allowedMethods) ? 'alipay_or_wechat' : method
 }
 
 // Checkout takes only what the buyer's page listed (catalog offeredMethods): 中国银行卡 exists on
@@ -158,7 +174,7 @@ export async function createCheckout(
   const { body } = input
   const product = deps.products.find((p) => p.id === body.product_id)
   if (!product || product.priceUsd <= 0) throw new AppError('NOT_FOUND', 'Unknown product')
-  const route = checkoutRoute(product, body.method, deps.managedPayments)
+  const route = checkoutRoute(product, body.method, deps.managedPayments, deps.wechatPay)
   const priceId = await resolvePriceId(deps.stripe, product, route)
   const cardOnlyConfig = isPlainCard(route) ? await cardOnlyConfigId(deps.stripe) : null
   const metadata = { user_id: input.userId, product_id: product.id, method: body.method, locale: body.locale }

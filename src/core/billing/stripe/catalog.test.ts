@@ -24,13 +24,13 @@ describe('checkoutRoute (ARCHITECTURE §6.3)', () => {
     })
   })
 
-  it('sells one period of a membership on the wallet line (Alipay / WeChat Pay) as a plain one-time payment', () => {
+  it('sells one period of a membership by Alipay as a plain one-time payment', () => {
     expect(checkoutRoute(product('pro_yearly'), 'alipay', true)).toEqual({
       mode: 'payment',
       form: 'one_time',
       lookupKey: 'pro_yearly',
       managedPayments: false,
-      allowedMethods: ['alipay', 'wechat_pay'],
+      allowedMethods: ['alipay'],
     })
   })
 

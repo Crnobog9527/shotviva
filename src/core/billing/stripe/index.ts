@@ -5,6 +5,7 @@ export {
   RECORDED_METHODS,
   STRIPE_TAX_CODE,
   STRIPE_WALLETS,
+  stripeWallets,
   checkoutRoute,
   desiredPrices,
   lookupKey,
@@ -28,7 +29,7 @@ export {
   type CheckoutBody,
   type CheckoutDeps,
 } from './checkout'
-export { managedPaymentsEnabled, stripeClient, stripeWebhookSecret, type StripeApi } from './client'
+export { managedPaymentsEnabled, wechatPayEnabled, stripeClient, stripeWebhookSecret, type StripeApi } from './client'
 export { fulfilCheckoutSession, type FulfilDeps, type FulfilOutcome } from './fulfil'
 export { handleStripeWebhook, type WebhookDeps, type WebhookResult } from './webhook'
 export { applyReplay, previewReplay, REPLAY_ERRORS, type ReplayOutcome, type ReplayPreview } from './replay'

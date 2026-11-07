@@ -6,20 +6,21 @@ import { cn } from "../../ui/cn"
 import { offeredMethods, type CheckoutMethod } from "../stripe/catalog"
 import { methodLabel, methodNote } from "./copy"
 import type { Period } from "./offer"
-import { usePaymentChannel } from "./channel-context"
+import { usePaymentChannel, useWechatPay } from "./channel-context"
 
 type Props = { method: CheckoutMethod; onChange(method: CheckoutMethod): void; kind: "plan" | "pack"; period: Period }
 
 // The payment groups (DESIGN §4.5): card with Apple Pay and Google Pay, and the wallets (支付宝 /
-// 微信支付 on Stripe, T73; Alipay alone on Waffo); zh pages on Stripe lead with 中国银行卡
+// 微信支付 on Stripe while STRIPE_WECHAT_PAY is on, T73; otherwise Alipay alone); zh pages on Stripe lead with 中国银行卡
 // (ARCHITECTURE §6.3, T64). For a plan a card renews and a wallet buys one period; for a pack
 // all are one-time (copy.ts).
 export function PayMethods({ method, onChange, kind, period }: Props) {
   const t = useTranslations("paywall")
   const channel = usePaymentChannel()
+  const wechatPay = useWechatPay()
   const methods = offeredMethods(channel, useLocale())
   const label = (m: CheckoutMethod) => {
-    const msg = methodLabel(channel, m)
+    const msg = methodLabel(channel, m, wechatPay)
     return t(msg.key, msg.values)
   }
   const note = (m: CheckoutMethod) => {

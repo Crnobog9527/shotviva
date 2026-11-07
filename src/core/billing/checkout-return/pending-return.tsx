@@ -6,11 +6,18 @@ import { Glyph, ReturnPlate, Row, Rows, fineClass, subClass, titleClass } from '
 import { useChargedMoney } from './use-money'
 import type { PendingView } from './view-model'
 
-type Props = { view: PendingView; again: string; email: string }
+// `wechatPay`: STRIPE_WECHAT_PAY (T73). The wallet line's session says only `alipay` until the
+// payment lands, so with WeChat Pay on the copy names both wallets.
+type Props = { view: PendingView; again: string; email: string; wechatPay: boolean }
+
+function pendingKey(method: PendingView['method'], wechatPay: boolean): string {
+  if (method === 'wechat_pay' || (method === 'alipay' && wechatPay)) return 'subPendingWallet'
+  return method === 'alipay' ? 'subPendingAlipay' : 'subPending'
+}
 
 // Paid, but the credits are not in yet (comps-v3-b checkout.html `?r=pending`): Alipay still
 // confirming, or the webhook a moment behind. Nothing polls; "Check again" reloads this page.
-export function PendingReturn({ view, again, email }: Props) {
+export function PendingReturn({ view, again, email, wechatPay }: Props) {
   const t = useTranslations('app.checkout')
   const tiers = useTranslations('paywall.tiers')
   const money = useChargedMoney()
@@ -21,7 +28,7 @@ export function PendingReturn({ view, again, email }: Props) {
     <ReturnPlate pending>
       <Glyph pending />
       <h1 className={titleClass}>{t('titlePending')}</h1>
-      <p className={subClass}>{t(view.method === 'alipay' || view.method === 'wechat_pay' ? 'subPendingWallet' : 'subPending')}</p>
+      <p className={subClass}>{t(pendingKey(view.method, wechatPay))}</p>
       <Rows>
         <Row label={t('order')}>{order}</Row>
         {view.amount ? <Row label={t('amount')}>{money(view.amount)}</Row> : null}

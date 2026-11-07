@@ -74,9 +74,14 @@ describe('checkout return page (en)', () => {
     if (!product) throw new Error('pro_monthly')
     const view = returnView(facts('pro_monthly', { settled: false, method: 'alipay' }), product, balance)
     if (view.state !== 'pending') throw new Error('expected pending')
-    const html = await render('en', createElement(PendingReturn, { view, again: '/checkout?session_id=cs_test_x', email: 'support@shotviva.com' }))
+    const pending = (wechatPay: boolean) =>
+      render('en', createElement(PendingReturn, { view, again: '/checkout?session_id=cs_test_x', email: 'support@shotviva.com', wechatPay }))
+    // STRIPE_WECHAT_PAY on (T73): the wallet line may be either wallet until the payment lands.
+    expect(await pending(true)).toContain('Alipay or WeChat Pay is still confirming it.')
+    const html = await pending(false)
     expect(html).toContain('Confirming your payment')
-    expect(html).toContain('Alipay or WeChat Pay is still confirming it.')
+    expect(html).toContain('Alipay is still confirming it.')
+    expect(html).not.toContain('WeChat')
     expect(html).toContain('Pro · 1 month · 135 credits')
     expect(html).toContain('Check again')
     expect(html).toContain('support@shotviva.com')

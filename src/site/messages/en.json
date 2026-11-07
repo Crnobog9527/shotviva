@@ -902,6 +902,7 @@
       "finePeriod": "One-time payment for {period, select, year {1 year} other {30 days}}. Nothing renews; renew from Account when it ends.",
       "finePack": "One-time payment. Nothing renews.",
       "titlePending": "Confirming your payment",
+      "subPendingAlipay": "Alipay is still confirming it. This usually takes under a minute. Your credits appear as soon as it clears; you can leave this page.",
       "subPendingWallet": "Alipay or WeChat Pay is still confirming it. This usually takes under a minute. Your credits appear as soon as it clears; you can leave this page.",
       "subPending": "Your payment went through and we're adding your credits. This usually takes a few seconds; you can leave this page.",
       "order": "Order",

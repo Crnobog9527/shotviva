@@ -91,10 +91,10 @@ describe('the other routes are untouched', () => {
     expect(configs).not.toHaveBeenCalled()
   })
 
-  it('the wallet line keeps its own filter and no card-only settings', async () => {
+  it('Alipay keeps its own filter and no card-only settings', async () => {
     const { stripe, create } = withConfig()
     await createCheckout(deps(stripe), { userId: USER, body: { product_id: 'pack_l', method: 'alipay', locale: 'zh' } })
-    expect(sent(create)).toMatchObject({ allowed_payment_method_types: ['alipay', 'wechat_pay'], managed_payments: { enabled: false } })
+    expect(sent(create)).toMatchObject({ allowed_payment_method_types: ['alipay'], managed_payments: { enabled: false } })
     expect(sent(create)).not.toHaveProperty('payment_method_configuration')
     expect(sent(create)).not.toHaveProperty('wallet_options')
   })

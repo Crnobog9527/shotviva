@@ -45,6 +45,13 @@ describe('Stripe keys', () => {
     expect(env.STRIPE_MANAGED_PAYMENTS).toBe('on')
   })
 
+  it('default WeChat Pay off (T73): unset or blank is off, only on / off are taken', () => {
+    expect(parseServerEnv({}).STRIPE_WECHAT_PAY).toBe('off')
+    expect(parseServerEnv({ STRIPE_WECHAT_PAY: '' }).STRIPE_WECHAT_PAY).toBe('off')
+    expect(parseServerEnv({ STRIPE_WECHAT_PAY: 'on' }).STRIPE_WECHAT_PAY).toBe('on')
+    expect(() => parseServerEnv({ STRIPE_WECHAT_PAY: 'yes' })).toThrow(/STRIPE_WECHAT_PAY/)
+  })
+
   it('refuse a value that is not a Stripe key, naming only the key', () => {
     expect(() => parseServerEnv({ STRIPE_SECRET_KEY: 'pk_test_123' })).toThrow(/STRIPE_SECRET_KEY/)
     expect(() => parseServerEnv({ STRIPE_SECRET_KEY: 'pk_test_123' })).not.toThrow(/pk_test_123/)

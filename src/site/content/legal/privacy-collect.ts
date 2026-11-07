@@ -23,7 +23,7 @@ export const privacyCollectSections: readonly [LegalSection, ...LegalSection[]] 
       'Information from purchases:',
       {
         list: [
-          'What you bought, the price, the date, the payment provider and the payment method type (for example card, Alipay or WeChat Pay), your subscription status, and a record of every credit added to or used from your account.',
+          'What you bought, the price, the date, the payment provider and the payment method type (for example card or Alipay), your subscription status, and a record of every credit added to or used from your account.',
           'Our payment providers (Stripe, Link and Waffo) collect your payment details on their own pages. We never receive or store your full card number.',
         ],
       },
