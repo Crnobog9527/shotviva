@@ -105,3 +105,17 @@ export function desiredPrices(products: readonly SiteProduct[]): DesiredPrice[] 
     return [{ ...base, lookupKey: lookupKey(product.id, 'subscription'), recurring: product.interval }, oneTime]
   })
 }
+
+// 中国银行卡 and the pre-approval card fallback sell through the card form alone (T64): the
+// account's default payment method configuration also turns on Link (which brings its own
+// bank and Klarna buttons), Apple Pay and Google Pay, and allowed_payment_method_types ['card']
+// keeps all of those because they pay "by card". This configuration, kept by
+// scripts/stripe-setup.ts and found by name at checkout, turns them off.
+export const CARD_ONLY_CONFIG_NAME = 'Shotviva card only (T64)'
+export const CARD_ONLY_PREFERENCES = { card: 'on', apple_pay: 'off', google_pay: 'off', link: 'off' } as const
+export type CardOnlyMethod = keyof typeof CARD_ONLY_PREFERENCES
+
+// What differs between an existing configuration's preferences and the card-only ones.
+export function cardOnlyDrift(found: Partial<Record<CardOnlyMethod, string | null>>): CardOnlyMethod[] {
+  return (Object.keys(CARD_ONLY_PREFERENCES) as CardOnlyMethod[]).filter((m) => found[m] !== CARD_ONLY_PREFERENCES[m])
+}

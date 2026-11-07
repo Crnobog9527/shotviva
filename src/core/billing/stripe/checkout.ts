@@ -9,6 +9,7 @@ import { AppError } from '../../errors'
 import { localizePath } from '../../i18n/paths'
 import { allowlistedUrl } from '../../partner/return-to'
 import { CHECKOUT_METHODS, checkoutRoute, offeredMethods, type CheckoutMethod, type CheckoutRoute } from './catalog'
+import { cardOnlyConfigId } from './card-only'
 import type { StripeApi } from './client'
 import { resolvePriceId } from './prices'
 
@@ -61,7 +62,10 @@ export function successPath(base: string, returnTo: string | undefined, hosts: r
 // language from the subscription's metadata (ARCHITECTURE §16.2).
 type Metadata = { user_id: string; product_id: string; method: CheckoutMethod; locale: CheckoutBody['locale'] }
 
-type MethodParams = Pick<Stripe.Checkout.SessionCreateParams, 'managed_payments' | 'allowed_payment_method_types'>
+type MethodParams = Pick<
+  Stripe.Checkout.SessionCreateParams,
+  'managed_payments' | 'allowed_payment_method_types' | 'wallet_options' | 'adaptive_pricing' | 'payment_method_configuration'
+>
 
 // A typed literal, not a spread into the params: a parameter Stripe removes from the SDK types
 // (as payment_method_types was in 2026-09-30.endive) then fails the type check instead of
@@ -71,17 +75,33 @@ type MethodParams = Pick<Stripe.Checkout.SessionCreateParams, 'managed_payments'
 // Alipay pack, 中国银行卡 and the plain-card fallback (STRIPE_MANAGED_PAYMENTS off) send
 // enabled: false, and the session never depends on that toggle. No automatic_tax anywhere:
 // Managed Payments adds its own tax, and on the plain routes Shotviva is the seller (§6.3).
-function methodParams(route: CheckoutRoute): MethodParams {
+function methodParams(route: CheckoutRoute, cardOnlyConfig: string | null): MethodParams {
   if (route.managedPayments) return { managed_payments: { enabled: true } }
-  const params: MethodParams = { managed_payments: { enabled: false }, allowed_payment_method_types: route.allowedMethods ?? ['card'] }
-  return params
+  const off = { enabled: false }
+  if (!isPlainCard(route)) return { managed_payments: off, allowed_payment_method_types: route.allowedMethods ?? ['card'] }
+  // Stripe takes one of allowed_payment_method_types and payment_method_configuration; the
+  // configuration has only card on, so it is the same filter with the wallets off too.
+  const methods: MethodParams = cardOnlyConfig ? { payment_method_configuration: cardOnlyConfig } : { allowed_payment_method_types: ['card'] }
+  return { managed_payments: off, ...methods, ...PLAIN_CARD }
+}
+
+// 中国银行卡 and the card fallback (T64, Codex on #249): the card form only, charged in USD.
+// allowed_payment_method_types ['card'] alone still let Checkout show Link (with its bank and
+// Klarna buttons), Apple Pay and Google Pay, and Adaptive Pricing showed the buyer's currency
+// (NT$). The card-only configuration (card-only.ts) turns the wallets off, Link is also turned
+// off here in case that configuration is missing, and prices stay in USD as the paywall says
+// (「所有价格均以美元计」).
+const PLAIN_CARD = { wallet_options: { link: { display: 'never' } }, adaptive_pricing: { enabled: false } } satisfies MethodParams
+
+function isPlainCard(route: CheckoutRoute): boolean {
+  return !route.managedPayments && route.allowedMethods?.[0] === 'card'
 }
 
 function sessionParams(
   route: CheckoutRoute,
   priceId: string,
   metadata: Metadata,
-  input: { locale: CheckoutBody['locale']; origin: string; successPath: string },
+  input: { locale: CheckoutBody['locale']; origin: string; successPath: string; cardOnlyConfig: string | null },
 ): Stripe.Checkout.SessionCreateParams {
   return {
     mode: route.mode,
@@ -92,7 +112,7 @@ function sessionParams(
     // Back to the return page / pricing in the language the buyer checked out in.
     success_url: `${input.origin}${localizePath(input.successPath, input.locale)}`,
     cancel_url: `${input.origin}${localizePath(CHECKOUT_RETURN.cancel, input.locale)}`,
-    ...methodParams(route),
+    ...methodParams(route, input.cardOnlyConfig),
     ...(route.mode === 'subscription' ? { subscription_data: { metadata } } : { payment_intent_data: { metadata } }),
   }
 }
@@ -122,12 +142,14 @@ export async function createCheckout(
   if (!product || product.priceUsd <= 0) throw new AppError('NOT_FOUND', 'Unknown product')
   const route = checkoutRoute(product, body.method, deps.managedPayments)
   const priceId = await resolvePriceId(deps.stripe, product, route)
+  const cardOnlyConfig = isPlainCard(route) ? await cardOnlyConfigId(deps.stripe) : null
   const metadata = { user_id: input.userId, product_id: product.id, method: body.method, locale: body.locale }
   const session = await deps.stripe.checkout.sessions.create(
     sessionParams(route, priceId, metadata, {
       locale: body.locale,
       origin: deps.origin,
       successPath: successPath(CHECKOUT_RETURN.stripe, body.return_to, deps.returnToHosts),
+      cardOnlyConfig,
     }),
   )
   if (!session.url) throw new AppError('INTERNAL', 'Stripe returned a session without a URL')
