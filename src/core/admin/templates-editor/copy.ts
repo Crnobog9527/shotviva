@@ -56,3 +56,12 @@ export const bulkCopy = {
   skipped: (active: boolean, count: number) => `${count} 个没有${active ? '上架' : '下架'}，保持原状`,
   dismiss: '关闭',
 } as const
+
+// Drag-to-reorder and the arrows (T76).
+export const orderCopy = {
+  saved: '排序已保存',
+  failed: '顺序没保存，已退回原来的顺序。',
+  offline: '连不上服务器，请检查网络后重试。',
+  filtered: '清空搜索后可拖动排序',
+  dragHint: '按住左边的把手上下拖动调整顺序；手机上长按整行再拖。',
+} as const

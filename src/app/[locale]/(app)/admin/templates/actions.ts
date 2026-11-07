@@ -5,12 +5,12 @@ import { refresh, revalidateTag } from 'next/cache'
 import {
   applyCover,
   createCoverUpload,
-  reorderTemplates,
   runAdminAction,
   runAdminQuery,
   saveTemplate,
   setFeaturedTemplates,
   setTemplateActive,
+  setTemplateOrder,
   setTemplatesActive,
   type ActionResult,
   type ActionValue,
@@ -74,10 +74,11 @@ export async function setFeaturedTemplatesAction(ids: unknown): Promise<ActionRe
   })
 }
 
-export async function reorderTemplatesAction(ids: unknown): Promise<ActionResult> {
+// Drag-to-reorder and the arrows (T76): one group's whole order per call.
+export async function setTemplateOrderAction(input: unknown): Promise<ActionResult> {
   const admin = await requireAdmin()
   return runAdminAction(async () => {
-    await reorderTemplates(createAdminSupabase(), admin.id, ids)
+    await setTemplateOrder(createAdminSupabase(), admin.id, input)
     catalogueChanged()
   })
 }

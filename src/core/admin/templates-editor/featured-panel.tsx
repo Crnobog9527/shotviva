@@ -1,18 +1,27 @@
 'use client'
 
+import { DragHandle, MoveButtons, SortableList, sortableRowClass, useSortableItem } from '../ui/sortable'
 import { Button } from '@/core/ui/button'
+import { cn } from '@/core/ui/cn'
 
 import type { AdminTemplate } from '../templates/types'
-import { moveId } from './form-state'
+import { orderCopy } from './copy'
 import { FEATURED_LIMIT } from './featured-state'
 
-type Props = { ids: string[]; templates: AdminTemplate[]; pending: boolean; onChange: (ids: string[]) => void }
+type Props = {
+  ids: string[]
+  templates: AdminTemplate[]
+  pending: boolean
+  // Drag, keyboard or arrows (T76): the whole new order, saved optimistically.
+  onReorder: (ids: string[]) => Promise<void>
+  onRemove: (id: string) => void
+}
 
 // 首页精选 (T53): the home page's featured templates in display order; the switch in the table
 // adds or removes one, this list orders them. With none chosen, the home page shows the six
 // most recently published.
-export function FeaturedPanel({ ids, templates, pending, onChange }: Props) {
-  const byId = new Map(templates.map((template) => [template.id, template]))
+export function FeaturedPanel({ ids, templates, pending, onReorder, onRemove }: Props) {
+  const nameOf = (id: string) => templates.find((template) => template.id === id)?.name ?? id
   return (
     <section aria-labelledby="featured-h" className="rounded-md border p-4">
       <div className="flex items-baseline justify-between gap-3">
@@ -29,26 +38,36 @@ export function FeaturedPanel({ ids, templates, pending, onChange }: Props) {
       {ids.length === 0 ? (
         <p className="text-muted-foreground mt-3 text-sm">还没有精选模板，在下表「首页精选」一列打开。</p>
       ) : (
-        <ol className="mt-3 grid gap-1">
-          {ids.map((id, index) => (
-            <li key={id} className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground w-6 font-mono">{index + 1}</span>
-              <span className="flex-1">
-                {byId.get(id)?.name ?? id} <span className="text-muted-foreground font-mono text-xs">{id}</span>
-              </span>
-              <Button variant="ghost" size="sm" aria-label={`上移 ${id}`} disabled={pending || index === 0} onClick={() => onChange(moveId(ids, index, -1) ?? ids)}>
-                ↑
-              </Button>
-              <Button variant="ghost" size="sm" aria-label={`下移 ${id}`} disabled={pending || index === ids.length - 1} onClick={() => onChange(moveId(ids, index, 1) ?? ids)}>
-                ↓
-              </Button>
-              <Button variant="ghost" size="sm" disabled={pending} onClick={() => onChange(ids.filter((other) => other !== id))}>
-                移出
-              </Button>
-            </li>
-          ))}
-        </ol>
+        <>
+          <p className="text-muted-foreground mt-1 text-sm">{orderCopy.dragHint}</p>
+          <SortableList ids={ids} labelOf={nameOf} onReorder={onReorder} disabled={pending}>
+            {(order) => (
+              <ol className="mt-3 grid gap-1">
+                {order.map((id) => (
+                  <FeaturedRow key={id} id={id} name={nameOf(id)} pending={pending} onRemove={onRemove} />
+                ))}
+              </ol>
+            )}
+          </SortableList>
+        </>
       )}
     </section>
+  )
+}
+
+function FeaturedRow({ id, name, pending, onRemove }: { id: string; name: string; pending: boolean; onRemove: (id: string) => void }) {
+  const item = useSortableItem(id)
+  return (
+    <li {...item.row} className={cn('flex min-h-10 items-center gap-2 rounded-md pr-1 text-sm', sortableRowClass)}>
+      <DragHandle handle={item.handle} />
+      <span className="text-muted-foreground w-6 font-mono tabular-nums">{item.index + 1}</span>
+      <span className="min-w-0 flex-1 truncate">
+        {name} <span className="text-muted-foreground font-mono text-xs">{id}</span>
+      </span>
+      <MoveButtons item={item} />
+      <Button variant="ghost" size="sm" disabled={pending} onClick={() => onRemove(id)}>
+        移出
+      </Button>
+    </li>
   )
 }

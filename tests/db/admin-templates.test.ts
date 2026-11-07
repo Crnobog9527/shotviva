@@ -1,11 +1,11 @@
 import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { listAdminTemplates, reorderTemplates, saveTemplate, setTemplateActive } from '@/core/admin'
+import { listAdminTemplates, saveTemplate, setTemplateActive, setTemplateOrder } from '@/core/admin'
 
 import { CREDITS_FLOOR } from '@/modules/image/credits-floor'
 
-import { connectAdmin } from './helpers'
+import { connectAdmin, createUser } from './helpers'
 import { serviceSupabase as serviceClient } from './supabase-env'
 
 
@@ -84,10 +84,45 @@ describe('admin template commands', () => {
     expect((await listAdminTemplates(client)).find((row) => row.id === B)?.isActive).toBe(true)
   })
 
-  it('reorders by the given id order', async () => {
-    await reorderTemplates(client, ADMIN_ID, [B, A])
-    const ids = (await listAdminTemplates(client)).map((row) => row.id)
+  // T76: a drop saves the whole catalogue's order in one call. Other test files add templates
+  // at the same time, so the full list is read and saved inside one locked transaction.
+  it('rewrites the whole catalogue order in one call, the built-in edit template left out', async () => {
+    const admin = await createUser(pg)
+    await pg.query("update public.profiles set role = 'admin' where id = $1", [admin])
+    await pg.query('begin')
+    try {
+      await pg.query('lock table public.templates in share row exclusive mode')
+      const { rows } = await pg.query<{ id: string }>("select id from public.templates where id <> 'edit' order by sort_order, id")
+      const others = rows.map((row) => row.id).filter((id) => id !== A && id !== B)
+      await pg.query('select public.admin_set_template_order($1, $2, $3)', ['catalogue', [B, ...others, A], admin])
+      await pg.query('commit')
+    } catch (error) {
+      await pg.query('rollback')
+      throw error
+    }
+    const listed = await listAdminTemplates(client)
+    const ids = listed.map((row) => row.id)
+    expect(ids[0]).toBe(B)
     expect(ids.indexOf(B)).toBeLessThan(ids.indexOf(A))
-    await expect(reorderTemplates(client, ADMIN_ID, [A, A])).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    expect(listed.find((row) => row.id === B)?.sortOrder).toBe(10)
+  })
+
+  it('refuses a partial list, a repeat and a caller who is not an admin, changing nothing', async () => {
+    const admin = await createUser(pg)
+    await pg.query("update public.profiles set role = 'admin' where id = $1", [admin])
+    const before = (await listAdminTemplates(client)).map((row) => row.id)
+    await expect(setTemplateOrder(client, admin, { group: 'catalogue', ids: [A, B] })).rejects.toMatchObject({ code: 'CONFLICT' })
+    await expect(setTemplateOrder(client, admin, { group: 'catalogue', ids: [A, A] })).rejects.toMatchObject({
+      code: 'INVALID_INPUT',
+    })
+    await expect(pg.query('select public.admin_set_template_order($1, $2, $3)', ['catalogue', [A, A], admin])).rejects.toThrow(
+      /INVALID_INPUT/,
+    )
+    const visitor = await createUser(pg)
+    await expect(setTemplateOrder(client, visitor, { group: 'catalogue', ids: before })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    })
+    const after = (await listAdminTemplates(client)).map((row) => row.id)
+    expect(after.indexOf(B)).toBeLessThan(after.indexOf(A))
   })
 })
