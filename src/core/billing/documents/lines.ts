@@ -32,7 +32,8 @@ export function documentPath(paymentId: string, document: PaymentDocument): stri
   return `/account/purchases/${encodeURIComponent(paymentId)}/${document}`
 }
 
-// Every Stripe charge has a receipt (refunded ones too: the page shows the refund). Only rows
+// Every Stripe charge has a receipt (refunded ones too: the page shows the refund), whatever
+// the method: card, 中国银行卡, Alipay, WeChat Pay. Only rows
 // with an invoice id get 「发票」: subscriptions, and one-time Managed Payments purchases,
 // which Stripe invoices as "Sold through Link". Waffo's API has neither (its buyer gets an
 // order confirmation email), so its rows get the email note instead of links.

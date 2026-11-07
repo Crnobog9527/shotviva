@@ -114,8 +114,8 @@ const paymentRow = z.object({
   product_id: z.string(),
   amount_total: z.number(),
   currency: z.string(),
-  // cn_card = 中国银行卡, the plain Stripe card route (T64).
-  method: z.enum(['card', 'alipay', 'cn_card']),
+  // cn_card = 中国银行卡, the plain Stripe card route (T64); wechat_pay since T73.
+  method: z.enum(['card', 'alipay', 'wechat_pay', 'cn_card']),
   created_at: z.string(),
   channel: z.enum(['stripe', 'waffo']),
   status: z.enum(['paid', 'refunded', 'partially_refunded', 'disputed']),

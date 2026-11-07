@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl'
 import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { trackTemplateView } from '@/core/analytics/browser'
 import type { FormAction } from '@/core/auth/ui'
 import { UPLOAD_ACCEPT } from '@/core/storage/rules'
 
@@ -13,6 +14,8 @@ import { HomeCard } from './home-card'
 import type { HomeViewer } from './home-cta'
 import { HomeDock } from './home-dock'
 import { sampleFor, thumbFor } from './home-samples'
+import { useGeneratorAway } from './use-generator-away'
+import { useHeaderUpload } from './use-header-upload'
 import { useHomeGenerator } from './use-home-generator'
 import { useOpenFromQuery, usePickEvents } from './use-pick-events'
 
@@ -65,6 +68,19 @@ export function HomeGenerator({ templates, defaultId, viewer, googleAction, home
     const shown = [bench.current, card.current].find((element) => element && element.offsetParent !== null)
     shown?.scrollIntoView({ behavior: smooth(), block: 'center' })
   }, [])
+  const { away, past, footer } = useGeneratorAway(watch)
+  const hasPhoto = state.photo.url !== null
+  // The header's stand-in (768px up): "Upload photo" opens the picker straight from the click
+  // (browsers allow it only inside the user's gesture) while the page scrolls back behind it;
+  // with a photo in, "Generate" just brings the generator back.
+  const fromHeader = useCallback(
+    (mode: 'upload' | 'generate') => {
+      if (mode === 'upload') file.current?.click()
+      bring()
+    },
+    [bring],
+  )
+  useHeaderUpload(past ? (hasPhoto ? 'generate' : 'upload') : null, fromHeader)
   const { choose } = state
   const onPick = useCallback(
     (id: string) => {
@@ -105,13 +121,15 @@ export function HomeGenerator({ templates, defaultId, viewer, googleAction, home
         onClose={() => setPickerOn(null)}
         onPick={(id) => {
           setPickerOn(null)
+          const picked = templates.find((template) => template.id === id)
+          if (picked) trackTemplateView(picked, 'home_picker')
           onPick(id)
         }}
         sampleOf={sampleFor}
         thumbOf={thumbFor}
       />
       {viewer ? null : <SignupSheet open={signUp} onOpenChange={setSignUp} googleAction={googleAction} next={homePath} gift={freeImages} />}
-      <HomeDock watch={watch} hasPhoto={state.photo.url !== null} cost={state.template?.creditsCost['1k'] ?? null} onClick={bring} />
+      <HomeDock show={away && !footer} hasPhoto={hasPhoto} cost={state.template?.creditsCost['1k'] ?? null} onClick={bring} />
     </div>
   )
 }

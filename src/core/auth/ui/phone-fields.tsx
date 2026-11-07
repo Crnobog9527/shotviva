@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { useId } from 'react'
+import { useId, type ReactNode } from 'react'
 
 import { Link } from '../../i18n/ui'
 import { FieldLines, useFieldError } from './form-parts'
@@ -51,6 +51,16 @@ export function PhoneField({ form, value, onChange }: PhoneProps) {
   )
 }
 
+// Each document opens in a new tab so the number typed so far stays put.
+const legalLink = (href: string) =>
+  function LegalLink(chunks: ReactNode) {
+    return (
+      <Link href={href} target="_blank" rel="noopener">
+        {chunks}
+      </Link>
+    )
+  }
+
 // PIPL: its own box, unticked by default, before a code can be sent; the server checks it again.
 export function ConsentCheck({ form }: { form: AuthForm }) {
   const t = useTranslations('auth.phone')
@@ -69,11 +79,9 @@ export function ConsentCheck({ form }: { form: AuthForm }) {
         />
         <span>
           {t.rich('consent', {
-            privacy: (chunks) => (
-              <Link href="/privacy#phone-numbers" target="_blank" rel="noopener">
-                {chunks}
-              </Link>
-            ),
+            terms: legalLink('/terms'),
+            privacy: legalLink('/privacy#phone-numbers'),
+            aup: legalLink('/acceptable-use'),
           })}
         </span>
       </label>

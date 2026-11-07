@@ -2,7 +2,8 @@
 
 import { useCallback, useState } from 'react'
 
-import { checkPickedFile, UploadError, type UploadErrorCode } from '@/core/storage/upload'
+import { trackUploadError } from '@/core/analytics/browser'
+import { checkPickedFile, UploadError, uploadErrorReason, type UploadErrorCode } from '@/core/storage/upload'
 import { usePhoto } from '../workspace/use-photo'
 import type { HomePhotoStatus } from './home-cta'
 
@@ -32,6 +33,9 @@ export function useHomePhoto(signedIn: boolean): HomePhoto {
         checkPickedFile(next)
       } catch (failure) {
         setError(failure instanceof UploadError ? failure.code : 'UPLOAD_FAILED')
+        // Refused at the picker (T74 upload_error); a signed-in pick that passes is counted by uploadPhoto.
+        const reason = uploadErrorReason(failure, 'pick')
+        if (reason) trackUploadError(reason)
         return
       }
       setError(null)

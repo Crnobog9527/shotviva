@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import type { ReactNode } from 'react'
 
 import { Badge } from '@/core/ui/badge'
@@ -6,6 +5,7 @@ import { Badge } from '@/core/ui/badge'
 import { formatBeijing } from '../shell/format'
 import { SAME_IP_ROWS, type GraylumLink, type SameIpAccount, type UserRequest, type UserSubscription } from '../users/detail-types'
 import { USERS_COPY } from './copy'
+import { UserLink } from './user-link'
 
 const COPY = USERS_COPY.extras
 const day = (iso: string | null) => formatBeijing(iso)?.slice(0, 10) ?? USERS_COPY.never
@@ -59,9 +59,9 @@ export function SameIpBlock({ signupIp, accounts }: { signupIp: string | null; a
       <ul className="grid gap-1">
         {accounts.map((account) => (
           <li key={account.id} className="flex flex-wrap items-center gap-2">
-            <Link href={`/admin/users/${account.id}`} className="font-mono text-xs text-primary hover:underline">
+            <UserLink userId={account.id} className="font-mono text-xs">
               {account.id.slice(0, 8)}
-            </Link>
+            </UserLink>
             <span className="text-xs text-muted-foreground">{COPY.sameIpLine(day(account.createdAt), account.freeCredits)}</span>
             {account.bannedAt ? <Badge variant="destructive">{USERS_COPY.banned}</Badge> : null}
           </li>

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 
 import { CheckoutCancelToast, PaywallProvider, PricingPayWith, PricingPlans } from '@/core/billing/paywall'
+import { wechatPayEnabled } from '@/core/billing/stripe'
 import { StandingSlot } from '@/core/billing/standing'
 import { paymentChannel } from '@/core/billing/waffo'
 import { BusinessSection, CreditBuys, FaqSection, PricingHero } from '@/core/content'
@@ -34,7 +35,8 @@ export default async function PricingPage() {
   const credits = startingCredits(catalogue)
   const page = fillCredits(pricingPageIn(locale), credits)
   const channel = paymentChannel()
-  const faq = fillCredits(pricingFaqIn(locale, channel), credits)
+  const wechatPay = wechatPayEnabled()
+  const faq = fillCredits(pricingFaqIn(locale, channel, wechatPay), credits)
   const path = localizePath(page.path, locale)
   const crumbs = [
     { name: homePageIn(locale).label, path: localizePath('/', locale) },
@@ -45,7 +47,7 @@ export default async function PricingPage() {
       <JsonLdScript data={[breadcrumbListLd(site, crumbs), faqPageLd(faq)]} />
       <CheckoutCancelToast />
       <PricingHero text={page} />
-      <PaywallProvider products={site.billing.products} wishlistLive={wishlistLive} channel={channel}>
+      <PaywallProvider products={site.billing.products} wishlistLive={wishlistLive} channel={channel} wechatPay={wechatPay}>
         <PricingPlans products={site.billing.products} wishlistLive={wishlistLive} />
         <StandingSlot />
       </PaywallProvider>
@@ -57,7 +59,7 @@ export default async function PricingPage() {
       />
       <div className="mt-6 grid gap-6 md:mt-8 md:grid-cols-2 md:items-start md:gap-8">
         <CreditBuys block={page.creditBuys} />
-        <PricingPayWith channel={channel} />
+        <PricingPayWith channel={channel} wechatPay={wechatPay} />
       </div>
       {/* The home page's accordion (gap audit B8); every answer stays in the server HTML. */}
       <div className="mk-pricing-faq">

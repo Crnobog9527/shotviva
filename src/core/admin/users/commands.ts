@@ -14,9 +14,12 @@ export const USER_ERRORS = {
   insufficient: '扣减后余额会小于 0，已拒绝。',
   notFound: '用户不存在。',
   conflict: '这次调整已经提交过了，请刷新页面查看。',
+  forbidden: '只有管理员能做这个操作。',
 } as const
 
-const reason = z.string().trim().min(1).max(500)
+export const reasonSchema = z.string().trim().min(1).max(500)
+
+const reason = reasonSchema
 
 const adjustSchema = z.object({
   userId: z.uuid(),
@@ -29,19 +32,20 @@ const adjustSchema = z.object({
 
 const banSchema = z.object({ userId: z.uuid(), reason })
 
-function parse<T>(schema: z.ZodType<T>, input: unknown): T {
+export function parse<T>(schema: z.ZodType<T>, input: unknown): T {
   const parsed = schema.safeParse(input)
   if (!parsed.success) throw new AppError('INVALID_INPUT', USER_ERRORS.input)
   return parsed.data
 }
 
 // SQL errors arrive as AppErrors carrying the exception name; the admin reads Chinese.
-function friendly(error: unknown): never {
+export function friendly(error: unknown): never {
   const appError = toAppError(error)
   if (appError.code === 'CREDITS_INSUFFICIENT') throw new AppError(appError.code, USER_ERRORS.insufficient)
   if (appError.code === 'NOT_FOUND') throw new AppError(appError.code, USER_ERRORS.notFound)
   if (appError.code === 'CONFLICT') throw new AppError(appError.code, USER_ERRORS.conflict)
   if (appError.code === 'INVALID_INPUT') throw new AppError(appError.code, USER_ERRORS.input)
+  if (appError.code === 'FORBIDDEN') throw new AppError(appError.code, USER_ERRORS.forbidden)
   throw appError
 }
 

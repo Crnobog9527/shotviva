@@ -33,7 +33,7 @@ export type PaymentOption = {
   productId: string
   amountTotal: number
   currency: string
-  method: 'card' | 'alipay' | 'cn_card'
+  method: 'card' | 'alipay' | 'wechat_pay' | 'cn_card'
   createdAt: string
   // For the account page's receipt and invoice links (T80).
   channel: 'stripe' | 'waffo'

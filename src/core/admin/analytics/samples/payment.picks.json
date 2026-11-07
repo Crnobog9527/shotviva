@@ -1,0 +1,64 @@
+{
+ "cache_key": "cache_payment_picks",
+ "is_cached": false,
+ "last_refresh": "2026-11-08T08:00:00.000000Z",
+ "next_allowed_client_refresh": "2026-11-08T08:01:00.000000Z",
+ "timezone": "UTC",
+ "columns": [
+  "product",
+  "picks",
+  "pickers",
+  "went_to_pay"
+ ],
+ "types": [
+  [
+   "product",
+   "String"
+  ],
+  [
+   "picks",
+   "UInt64"
+  ],
+  [
+   "pickers",
+   "UInt64"
+  ],
+  [
+   "went_to_pay",
+   "UInt64"
+  ]
+ ],
+ "results": [
+  [
+   "pro_yearly",
+   140,
+   96,
+   41
+  ],
+  [
+   "pack_m",
+   88,
+   70,
+   33
+  ],
+  [
+   "max_monthly",
+   21,
+   18,
+   4
+  ]
+ ],
+ "hasMore": false,
+ "limit": 100,
+ "offset": 0,
+ "modifiers": {
+  "personsOnEventsMode": "person_id_override_properties_joined"
+ },
+ "query_status": null,
+ "timings": [
+  {
+   "k": "./query",
+   "t": 0.21
+  }
+ ]
+}

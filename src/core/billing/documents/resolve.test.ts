@@ -77,6 +77,14 @@ describe('resolvePaymentDocument: ownership and Stripe links (T80)', () => {
     expect(charges).toHaveBeenCalledWith('py_alipay')
   })
 
+  it('WeChat Pay (T73) is a one-time charge like Alipay: its receipt, no invoice', async () => {
+    const row = stripeRow({ stripe_charge_id: 'py_wechat' })
+    const { result, charges } = run(row, 'receipt')
+    await expect(result).resolves.toBe(RECEIPT)
+    expect(charges).toHaveBeenCalledWith('py_wechat')
+    await expect(run(row, 'invoice').result).resolves.toBeNull()
+  })
+
   it('no invoice on a one-time payment that has none', async () => {
     const { result, invoices } = run(stripeRow(), 'invoice')
     await expect(result).resolves.toBeNull()

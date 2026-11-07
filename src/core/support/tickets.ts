@@ -3,6 +3,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
+import { notifyOwner } from '../alerts'
 import { AppError } from '../errors'
 import type { TicketImageRow } from './images'
 import { supportRpc } from './rpc'
@@ -36,6 +37,8 @@ export async function createTicket(db: SupabaseClient, userId: string, input: un
     },
     idRow,
   )
+  // The Owner hears of every new ticket in Feishu (T72); refund requests are tagged.
+  notifyOwner({ kind: 'ticket', ticketId: row.id, reply: false, userId, ticketType: type, pending: null })
   return row.id
 }
 
@@ -48,6 +51,8 @@ export async function addTicketMessage(db: SupabaseClient, userId: string, input
     { p_ticket_id: parsed.data.ticketId, p_user_id: userId, p_body: parsed.data.body, p_images: images },
     idRow,
   )
+  // Collapsed to one alert per ticket per 30 minutes, with the number of unanswered messages.
+  notifyOwner({ kind: 'ticket', ticketId: parsed.data.ticketId, reply: true, userId, ticketType: null, pending: null })
 }
 
 // Clears the "new reply" dot when the author opens the ticket; writes nothing if already read.
