@@ -1,5 +1,5 @@
 import { NextIntlClientProvider } from 'next-intl'
-import { createElement, type FunctionComponent, type ReactElement } from 'react'
+import { createElement, type FunctionComponent, type ReactElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -16,6 +16,9 @@ import { loadMessages } from '@/site/i18n/messages'
 // placement is written max-md:.
 
 vi.mock('@/core/i18n/navigation', async (original) => ({ ...(await original()), usePathname: () => '/account' }))
+
+// children as createElement's third argument (react/no-children-prop) needs it optional here.
+const Bar = ActionBar as FunctionComponent<{ className?: string; children?: ReactNode }>
 
 const Intl = NextIntlClientProvider as unknown as FunctionComponent<{ locale: string; messages: unknown; timeZone: string }>
 
@@ -64,7 +67,7 @@ describe('bar placement survives injected unlayered CSS', () => {
   })
 
   it('the action bar', async () => {
-    const html = await render(createElement(ActionBar, { className: 'md:px-0', children: 'Download' }))
+    const html = await render(createElement(Bar, { className: 'md:px-0' }, 'Download'))
     expect(html).toContain('max-md:fixed')
     expect(bareOverrides(html)).toEqual([])
   })
