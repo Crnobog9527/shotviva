@@ -160,6 +160,48 @@ describe('handleWaffoWebhook, card subscriptions (T50)', () => {
   })
 })
 
+// The upgrade step (T66): a paid membership hands the buyer to cancelOthers, keeping the order
+// just paid; packs never do; a replay asks again (the step is idempotent).
+describe('handleWaffoWebhook, upgrades (T66)', () => {
+  const deliver = (event: unknown) => {
+    const raw = body(event)
+    return handleWaffoWebhook(deps, { body: raw, signature: signWaffo(raw, keys.privateKey, NOW) })
+  }
+
+  it('a card subscription charge keeps its own order and cancels the others', async () => {
+    const cancelOthers = vi.fn(async () => ({ cancelled: 1, failed: 0 }))
+    deps = { ...deps, cancelOthers }
+    await deliver(subscriptionPaid({ userId: USER, productId: 'max_monthly', orderId: 'ORD_new' }))
+    expect(cancelOthers).toHaveBeenCalledWith(USER, { waffoOrderId: 'ORD_new' })
+  })
+
+  it('a one-time membership keeps nothing; a pack calls nothing', async () => {
+    const cancelOthers = vi.fn(async () => ({ cancelled: 0, failed: 0 }))
+    deps = { ...deps, cancelOthers }
+    await deliver(orderCompleted({ userId: USER, productId: 'pro_monthly' }))
+    expect(cancelOthers).toHaveBeenCalledWith(USER, { waffoOrderId: null })
+    cancelOthers.mockClear()
+    await deliver(orderCompleted({ userId: USER, productId: 'pack_s' }))
+    expect(cancelOthers).not.toHaveBeenCalled()
+  })
+
+  it('a replayed charge still runs the step, and it runs after the grant', async () => {
+    const order: string[] = []
+    rpc.mockImplementation(async () => {
+      order.push('settle')
+      return { data: { applied: false, credits: 20, free_credits: 0, paid_until: null }, error: null }
+    })
+    const cancelOthers = vi.fn(async () => {
+      order.push('cancel')
+      return { cancelled: 0, failed: 0 }
+    })
+    deps = { ...deps, cancelOthers }
+    const result = await deliver(subscriptionPaid({ userId: USER, productId: 'pro_yearly', orderId: 'ORD_new' }))
+    expect(result).toMatchObject({ status: 200, body: { outcome: 'replayed' } })
+    expect(order).toEqual(['settle', 'cancel'])
+  })
+})
+
 describe('paymentFacts', () => {
   const pack = TEST_PRODUCTS.find((p) => p.id === 'pack_s')!
   const order = (data: Record<string, unknown>) => readWaffoOrder('PAY_1', { orderId: 'ORD_1', orderMetadata: { user_id: USER, product_id: 'pack_s' }, ...data })

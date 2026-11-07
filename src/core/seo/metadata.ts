@@ -5,6 +5,8 @@ import { DEFAULT_LOCALE, hreflang, type Locale } from '../i18n/locales'
 import { localizePath } from '../i18n/paths'
 import { INDEX, NOINDEX, hasTranslation, isIndexableIn } from './indexing'
 import { absoluteUrl, siteOrigin } from './site-url'
+import { startupImages } from './startup-images'
+import { MANIFEST_PATHS } from './web-manifest'
 
 // " | Shotviva"
 export function brandSuffix(site: SiteConfig): string {
@@ -12,7 +14,7 @@ export function brandSuffix(site: SiteConfig): string {
 }
 
 // Root default: nothing is indexable unless a page opts in through pageMetadata.
-export function rootMetadata(site: SiteConfig): Metadata {
+export function rootMetadata(site: SiteConfig, locale: Locale = DEFAULT_LOCALE): Metadata {
   return {
     metadataBase: new URL(siteOrigin(site)),
     // Every page below the home page ends its Title with " | Shotviva" (建站规格 §1). Pages that
@@ -24,7 +26,11 @@ export function rootMetadata(site: SiteConfig): Metadata {
     // apple-mobile-web-app-title, Chrome on Android the manifest name (app/manifest.ts); both are
     // the brand, never the long SEO title. capable: false keeps it opening in the browser, like the
     // manifest's display: browser, so OAuth and hosted checkout redirects are never stranded.
-    appleWebApp: { title: site.brand.name, capable: false },
+    // startupImage (T65): opened from the home screen as a web app, iOS shows the "S." on the
+    // darkroom ground instead of a black screen while the page loads.
+    appleWebApp: { title: site.brand.name, capable: false, startupImage: startupImages() },
+    // Per language (T65): a /zh page added to the home screen starts at /zh.
+    manifest: MANIFEST_PATHS[locale],
     robots: NOINDEX,
   }
 }

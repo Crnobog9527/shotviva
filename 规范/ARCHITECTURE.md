@@ -310,7 +310,12 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - **续费失败：什么都不做。** 不再发积分，`paid_until` 到期后账号页显示会员已过期；已有的付费积分照常可用。Stripe 自己重试，哪天扣成功哪天再发。不写宽限期。
 - 取消：期末生效（Stripe 默认）。用户在 Stripe Customer Portal（Managed Payments 下是 Link 的客户门户）自己取消，账号页只放一个「Manage subscription」链接，不自己写取消界面。`customer.subscription.updated / deleted` 只更新镜像表。
 - 外部退款（Managed Payments 下 Link 客服 60 天内可以不经我们退款）：`charge.refunded` 只写记录 + Sentry 告警，Owner 手动 `admin_adjust_credits`。不写自动扣回。
-- 不做：首月优惠券、升级降级、按比例退款、宽限期、测试时钟自动化、到期提醒邮件。
+- **升级（Owner 2026-11-07，T66）**：会员本质是打折卖积分，升级就是按全价买更高的档，不补差价、不按比例、不退钱。
+  - 只能往高升：Starter → Pro → Max；同一档月付 → 年付也算升级。不能降级（高档换低档、年付换同档月付），想降只能先取消，等当期结束后重新订。
+  - 有会员时买更高的档：付款页照常按新档全价结账；付款成功后新档**立即生效**，新档这一期的积分**立即全额到账**（年付一次到账，同首购），`paid_until` 按新档从付款时起算（`greatest(原 paid_until, 付款时 + 新档周期)`）；旧档没用完的积分全部保留，不扣不退。
+  - 旧的自动续费订阅在新档付款成功后**立即取消**（不按比例退款、不再续费），由付款回调里同一处处理：Stripe（MP 卡 / 中国银行卡）调取消订阅接口，Waffo 调 `cancel-order`；取消失败只告警，Owner 手动处理，不回滚新档。支付宝等一次性购买没有订阅可取消。
+  - 付费墙和定价页：已有会员时，比当前档低或同档同周期的选项显示为不可选（写明「不能降级，可在到期后重新订」），更高的档显示「升级」。服务端同样校验，低档或同档请求返回 409。
+- 不做：首月优惠券、降级、补差价 / 按比例退款、宽限期、测试时钟自动化、到期提醒邮件。
 - **分两段上线**：上线当天必须有「订阅模式建结账 + 首付发放」（和单笔几乎相同）；续费、取消同步、Portal 链接在第一个付费用户满 30 天之前上线即可（TASKS T10）。
 - 账号页「Subscription」区块显示当前档位（Starter / Pro / Max）和月付 / 年付；镜像表 `subscriptions.product_id` 存 9 个 id 之一。
 - 卡和支付宝能付（第 6.3 节的路由），不接微信支付。
@@ -404,7 +409,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - hCaptcha 交给 Supabase Auth 自带的人机验证校验。前端**只做隐形验证**：页面上不放任何验证控件，用户点提交按钮时才调用 hCaptcha，需要挑战时由 hCaptcha 自己弹出验证窗口（Owner 2026-11-07：不再降级为页面内的显式 checkbox）。验证失败或被关掉时，表单下方给一句提示，再点一次按钮重新弹出；hCaptcha 的告知并进表单下方的条款那句（Owner 2026-11-07）：「继续即表示你同意服务条款和隐私政策，本页由 hCaptcha 提供人机验证。」，hCaptcha 链到它的隐私说明；没有条款句的表单（登录、找回密码、重发）只放一句同样样式的「本页由 hCaptcha 提供人机验证。」；隐私政策的第三方服务里列出 hCaptcha。hCaptcha 的语言跟随页面语言。
 - 防刷免费额度：邮箱验证 + hCaptcha + **同 IP 限制**（Owner 2026-11-06 定：上线就开）。发放注册赠送的 SQL 函数检查同一个 `signup_ip` 24 小时内是否已经给别的账号发过；发过就不再发。后注册的账号照常能注册、能付费，只是没有免费额度，账号页显示一句说明。不引入设备指纹库。
 - **封禁的范围**（Owner 2026-11-06 定）：被封禁（`banned_at` 不为空）的账号不能出图、不能用需求墙、**不能创建结账**（`/api/checkout` 返回 403）；封禁时在同一事务里**断开 Graylum 连接**（`partner_links` 置为断开）。账号仍可以登录、查看和下载自己的作品、删号。
-- 验证邮件、重置密码邮件由 Supabase Auth 发，SMTP 配成 Resend，发件人 `Shotviva <mail@shotviva.com>`（Owner 2026-11-07 由 `support@` 改为 `mail@`；回信进飞书邮箱，`mail@` 设为 `support@` 的别名；网站和法律页上的联系邮箱仍是 `support@`。更早 2026-11-05 由 `noreply@` 改来：Resend 提示 no-reply 发件人影响送达，且用户回信能直接进飞书的 support 邮箱）。**v1 不写任何发信代码**，只改 Supabase 的邮件模板。
+- 验证邮件、重置密码邮件由 Supabase Auth 发，SMTP 配成 Resend，发件人 `Shotviva <mail@shotviva.com>`（Owner 2026-11-07 由 `support@` 改为 `mail@`；回信进飞书邮箱，`mail@` 设为 `support@` 的别名；网站和法律页上的联系邮箱仍是 `support@`。更早 2026-11-05 由 `noreply@` 改来：Resend 提示 no-reply 发件人影响送达，且用户回信能直接进飞书的 support 邮箱）。**v1 不写任何发信代码**，只改 Supabase 的邮件模板。邮件里引用的图片（`public/brand/email/` 下，如字标 `shotviva-wordmark@2x.png`）**上线后永不删除、永不改名、永不改内容**：已经发出的邮件会一直引用原地址；换新图一律用新文件名，并重新粘贴模板（Owner 2026-11-07）。审 PR 时凡是删改 `public/brand/email/` 已有文件的一律打回。
 - 邮件按用户语言发（Owner 2026-11-06）：注册时把当前页面语言写进 `user_metadata.locale`（`'en'` / `'zh'`，`signUp` 的 `options.data`）；四个模板正文用 `{{ if eq .Data.locale "zh" }}…{{ else }}…{{ end }}` 放中英两版；邮件标题如果 Supabase 支持同样的条件写法就中英分开，不支持就保持英文（T21 在本地 Supabase 实测后定）；没有 `locale` 的老账号和 Google 登录账号发英文。
 - 管理员身份存在数据库 `profiles.role`，不用环境变量里的邮箱列表。
 - **中国大陆手机号验证码登录（Owner 2026-11-07，T63）**：给大陆用户的快捷注册 / 登录，和邮箱、Google 并存。
@@ -577,15 +582,18 @@ v1 后台（Owner 2026-11-06 扩充；T23 做外壳和运营页）：**一个后
     - 被限制的账号在账号页显示一句说明，中英文都要有。
 - **站内工单**（T27，Owner 2026-11-06 定，详细设计见 `docs/proposals/admin-roadmap.md` A8，本节是规范口径）：
   - **用户侧入口**：账号页的「Help & feedback」和页脚的「Contact」。付费墙、`/pricing`、订阅区块里不放任何退款入口。
+  - **在弹窗里完成（Owner 2026-11-07，T68）**：点「Help & feedback」不跳页，在账号页上直接弹出工单弹窗（电脑是居中对话框，手机是全高底部抽屉，按 DESIGN 的 Sheet 样式）。弹窗里两个页签「新建工单」「我的工单」；点开一张工单在弹窗内显示往来消息，并能直接补充回复；提交成功、返回列表都不离开弹窗。原来的 `/account/help`、`/account/help/new`、`/account/help/[id]` 保留为深链：打开后跳到 `/account?help=new` / `?help=list` / `?help=<id>`，账号页读这个参数自动打开弹窗到对应位置（页脚「Contact」指向 `/account?help=new`，未登录先去登录）。
   - **提交工单**：
     - 类型并列成一个普通列表，按顺序是：意见反馈、出图问题（可选附一张自己的作品）、付款问题（可选附一笔自己的付款）、退款申请（必须选一笔自己的付款）、账号问题、其他。退款申请的样式和其他项一样，不做突出。
-    - 正文不超过 2000 字，不收附件。
+    - 正文不超过 2000 字。
+    - **可以附图片（Owner 2026-11-07，T69）**：新建工单和每次补充回复都能附最多 3 张图片（截图或照片），JPG / PNG / WebP / HEIC（HEIC 在浏览器端转 JPEG，同出图上传），每张 ≤ 10 MB。走现有的 R2 直传：私有桶 `tickets/<user_id>/<ticket_id>/` 前缀，上传后服务端校验类型和大小、清除 EXIF、转 WebP，失败的删掉；图片只能用户本人和管理员经签名地址查看，不进创作库、不进公开读取。删工单 / 删号时一并删除文件。管理员回复也可以附图。
     - 「我的工单」里能看到状态（已提交 / 已回复 / 已关闭）和往来消息，用户可以在工单里补充。
     - 中英文文案都要有，页面 `noindex`。
   - **退款全部人工处理**：后台打开退款工单时，显示这笔付款的信息、`refund_eligibility(payment_id)` 给出的三项参考检查（是否首次购买、是否在 7 天内、付款后是否用过任何积分），以及建议退款金额（税前价 × 94% + 全部税额，Owner 可以改）。Owner 选择同意（填金额）或拒绝，写回复，系统记审计日志 `decide_refund`。Owner 到 Stripe / Waffo 后台完成退款，退款回调更新付款状态，然后提示扣回积分。**不写任何自动退款或会动钱的代码。**
   - **数据**：
     - `support_tickets` 表：`id`、`user_id`、`type`（`feedback` / `image_issue` / `billing` / `refund` / `account` / `other`）、`status`（`open` / `replied` / `closed`）、`payment_id`、`job_id`（都必须是本人的）、`refund_decision`、`refund_amount_cents`、`created_at`、`last_message_at`、`user_seen_at`、`closed_at`。
     - `support_ticket_messages` 表：`id`、`ticket_id`、`author`（`user` / `admin`）、`body`（不超过 2000 字）、`created_at`。
+    - `support_ticket_attachments` 表（T69，迁移编号段 `0500`～`0519`，只加不改）：`id`、`message_id`、`ticket_id`、`object_key`、`content_type`、`bytes`、`width`、`height`、`created_at`；每条消息最多 3 行（函数里校验）；RLS 同工单，写入只经服务端。
     - RLS：用户只能读自己的工单，写入只经服务端。删号时工单一并删除。
     - 索引：`support_tickets(user_id, created_at desc, id desc)`；部分索引 `support_tickets(last_message_at desc, id desc) where status = 'open'`；`support_ticket_messages(ticket_id, created_at)`。
     - 函数（都只授权 `service_role`）：`create_support_ticket`（按账号限频，24 小时内最多 5 张）、`add_ticket_message`、`admin_reply_ticket`、`admin_decide_refund`、`admin_list_tickets`（游标分页）、`refund_eligibility`、`mark_ticket_seen`。
@@ -854,14 +862,15 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 - **付款**：中文页付款方式写「支付宝」，英文页写 "Alipay"（DESIGN §4.5）；Stripe Checkout 托管页传 `locale`（`en` / `zh`）。
 - **法律页**：只有英文（Owner 2026-11-06 晚）。以后要做中文版时，它是英文版的翻译，页首注明「本中文版本仅供参考，如与英文版本不一致，以英文版本为准」，律师审英文版。
 - **邮件**：见第 7 节，按 `user_metadata.locale` 发中文或英文。
+- **中文字体只用于标题（Owner 2026-11-07，T67）**：MiSans 只给标题和大字用（400 一档，与现有标题字重一致；T67 实测 600 会让标题明显变粗）；正文、按钮、导航、表单、说明等界面文字的中文一律用系统字体栈 `"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", sans-serif`（英文字体不变）。目的：大陆访问是跨境下载瓶颈（ITDOG 平均 3.85 秒），中文页首次字体下载从约 1 MB 降到约 265 KB；汇总 CSS 只声明 400 一档，体积随之变小。下面关于文件和授权的规则不变（不改、不子集化官方分包）。
 - **字体：中文用小米 MiSans，照 Graylum 的做法移植**（Owner 2026-11-06；参考 `seo资料/全站中文字体.md`，以及 Graylum staging 分支的 `apps/web/public/fonts/misans/`、`src/components/misans-font.tsx`）：
   - **文件**：官方未修改的静态 WOFF2 分包（简体中文 + 拉丁，400 / 500 / 600，约 168 个文件、5.8 MB），放在 `public/fonts/misans/`。
     - 同目录保留 `manifest.json`（每个文件的来源、unicode-range、字节数、SHA-256）、汇总 CSS、`LICENSE.pdf`、`NOTICE.txt`、`README.md`。
     - 文件名用内容哈希，不重新生成，也不重新子集化。
-  - **加载**：根布局挂一个客户端组件。hydration 后等两帧（两次 `requestAnimationFrame`），再往 `<head>` 插入 `<link rel="stylesheet" id="misans-font" href="/fonts/misans/misans-<hash>.css">`，用 id 防止重复插入。
+  - **加载**（Owner 2026-11-07 改，T65：原来 hydration 后再插入样式表，每次进中文页都会先用系统字体画一遍、再换成 MiSans，看起来闪一下，网速慢时更明显）：服务端 HTML 里的一段内联脚本在首次内容绘制之后立刻插入 `<link rel="stylesheet" href="/fonts/misans/misans-<hash>.css">`（T67 实测：阻塞式 `<head>` 引用让 `/zh` 首帧慢约 0.15 s、CI Lighthouse 不过线，所以不用）。正文是系统字体，永远不换；标题回访时首帧后约 45 ms 换成 MiSans。系统字体 fallback 用 `size-adjust` / `ascent-override` 调到接近 MiSans 的字宽和行高，首次访问的切换尽量看不出来。
     - 汇总 CSS 里每个 `@font-face` 都带 `unicode-range` 和 `font-display: swap`。
     - 首屏先用系统字体，浏览器只下载页面上实际用到的分包。
-    - 不 preload，不用 Google Fonts，也不用任何 CDN。
+    - 不预加载 woff2 分包（交给 unicode-range 按需取），不用 Google Fonts，也不用任何 CDN。
   - **缓存**：只给 `/fonts/misans/*.woff2` 和 `*.css` 发 `Cache-Control: public, max-age=31536000, immutable`，NOTICE、PDF 不加。改字体必须换新哈希 URL。
   - **路由**：中间件（`src/proxy.ts`）的 matcher 排除 `fonts/misans/`。这个目录不放私密文件。
   - **署名（协议要求）**：写在条款页的「Third-party notices」一节：「本网站使用 MiSans 字体，版权归小米所有」（英文写 "This site uses the MiSans font, © Xiaomi."），并链接 `/fonts/misans/LICENSE.pdf`。页脚不放（Owner 2026-11-06，DESIGN §6.9）。

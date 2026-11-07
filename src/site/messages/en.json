@@ -735,8 +735,6 @@
       "newReply": "New reply",
       "replyTime": "We reply here, usually within {hours} hours.",
       "replyTimeMax": "Max members get a reply within {hours} hours.",
-      "newTicket": "New request",
-      "mine": "My tickets",
       "empty": "No tickets yet.",
       "opened": "Opened {date, date, medium}",
       "status": {
@@ -763,7 +761,6 @@
         "option": "{product} · {amount} · {date, date, medium}"
       },
       "new": {
-        "title": "New request",
         "typeLabel": "What is it about?",
         "bodyLabel": "Message",
         "placeholder": "Tell us what happened, or what you'd like to see.",
@@ -800,7 +797,16 @@
       },
       "showMore": "Show more",
       "loading": "Loading…",
-      "loadFailed": "Couldn't load more. Try again."
+      "loadFailed": "Couldn't load more. Try again.",
+      "tabs": {
+        "new": "New ticket",
+        "mine": "My tickets"
+      },
+      "emptyBody": "Questions, problems with an image, billing or refunds: write to us here.",
+      "loadError": "Couldn't load your tickets",
+      "loadErrorBody": "Check your connection and try again.",
+      "retry": "Try again",
+      "notFoundBody": "It may have been deleted, or it belongs to another account."
     },
     "edit": {
       "open": "Edit",
@@ -939,6 +945,7 @@
     "walletOnce": "One-time payment, {period, select, year {1 year} other {30 days}}, no auto-renew",
     "oneTime": "One-time payment",
     "ctaPlan": "Continue with {tier} · {price}{period, select, year {/yr} other {/mo}}",
+    "ctaUpgrade": "Upgrade to {tier} · {price}{period, select, year {/yr} other {/mo}}",
     "ctaPack": "Continue with {count, plural, one {# credit} other {# credits}} · {price}",
     "finePlanCard": "Renews {period, select, year {yearly} other {monthly}} at {price} · cancel anytime · USD",
     "finePlanWallet": "One-time payment for {period, select, year {1 year} other {30 days}} · no auto-renew · USD",
@@ -946,6 +953,7 @@
     "redirecting": "Opening secure checkout…",
     "error": "Checkout did not open. Please try again in a moment.",
     "choose": "Choose {tier}",
+    "upgradeTo": "Upgrade to {tier}",
     "perCreditShort": "{price} / credit",
     "savingLabel": "You save<vs> vs monthly</vs>",
     "savingAmount": "{amount} a year",
@@ -958,8 +966,14 @@
     "payNotePacks": "Credit packs are always a one-time payment.",
     "cancelled": "<b>Checkout cancelled.</b> Nothing was charged.",
     "cancelledClose": "Dismiss",
-    "alreadySubscribed": "You already have a plan running. Change or cancel it in Account first.",
-    "goToAccount": "Go to Account"
+    "downgradeRefused": "Plans only go up while yours runs.",
+    "goToAccount": "Go to Account",
+    "yourPlan": "Your plan",
+    "notAvailable": "Not available",
+    "lockLower": "Can't switch down. Cancel, then buy it after your plan ends.",
+    "lockCurrentNote": "This is your plan. Manage or cancel it in Account.",
+    "upgradeNote": "Starts now, all its credits at once; your credits stay.",
+    "upgradeNoteCancels": "Starts now, all its credits at once; your current subscription ends today and your credits stay."
   },
   "announcement": {
     "dismiss": "Dismiss announcement"

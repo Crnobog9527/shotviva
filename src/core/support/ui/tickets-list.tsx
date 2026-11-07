@@ -1,6 +1,5 @@
 'use client'
 
-import { Link } from '../../i18n/ui'
 import { useFormatter, useTranslations } from 'next-intl'
 
 import { buttonVariants } from '../../ui/button'
@@ -9,18 +8,20 @@ import { StatusChip } from './status-chip'
 import { UnreadDot } from './unread-dot'
 import { usePaged, type LoadPage } from './use-paged'
 
+type Props = { first: Page<TicketSummary>; loadMore: LoadPage<TicketSummary>; onOpen(ticket: TicketSummary): void }
+
 // My tickets (ARCHITECTURE §10 「站内工单」): newest first, each with its state and, after an
-// Owner reply the user has not opened yet, the "new reply" dot.
-export function TicketsList({ first, loadMore }: { first: Page<TicketSummary>; loadMore: LoadPage<TicketSummary> }) {
+// Owner reply the user has not opened yet, the "new reply" dot. A row opens the ticket in the
+// dialog. The empty case is the dialog's.
+export function TicketsList({ first, loadMore, onOpen }: Props) {
   const t = useTranslations('app.support')
   const list = usePaged(first, loadMore)
-  if (list.items.length === 0) return <p className="px-2 pt-4 text-body text-muted-foreground">{t('empty')}</p>
   return (
     <div className="grid gap-3">
       <ul className="hairline-lit grid overflow-hidden rounded-panel bg-card">
         {list.items.map((ticket) => (
           <li key={ticket.id} className="not-last:shadow-[inset_0_-1px_0_var(--border)]">
-            <TicketRow ticket={ticket} />
+            <TicketRow ticket={ticket} onOpen={onOpen} />
           </li>
         ))}
       </ul>
@@ -40,11 +41,11 @@ export function TicketsList({ first, loadMore }: { first: Page<TicketSummary>; l
   )
 }
 
-function TicketRow({ ticket }: { ticket: TicketSummary }) {
+function TicketRow({ ticket, onOpen }: { ticket: TicketSummary; onOpen(ticket: TicketSummary): void }) {
   const t = useTranslations('app.support')
   const format = useFormatter()
   return (
-    <Link href={`/account/help/${ticket.id}`} className="press flex min-h-16 items-center gap-3 px-4 py-3">
+    <button type="button" onClick={() => onOpen(ticket)} className="press flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left">
       <span className="grid min-w-0 flex-1 gap-1">
         <span className="flex items-center gap-2 text-body font-medium">
           {t(`types.${ticket.type}`)}
@@ -55,6 +56,6 @@ function TicketRow({ ticket }: { ticket: TicketSummary }) {
         </span>
       </span>
       <StatusChip status={ticket.status} />
-    </Link>
+    </button>
   )
 }

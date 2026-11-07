@@ -8,9 +8,10 @@ import { loginPath } from "../../auth/redirect-target"
 import { localeOfPath, localizePath } from "../../i18n/paths"
 import type { CheckoutMethod } from "../stripe/catalog"
 
-// "subscribed": the server refused a membership because a subscription is already running
-// (409 SUBSCRIPTION_EXISTS, one per account); the paywall points to Account instead.
-export type CheckoutStatus = "idle" | "pending" | "error" | "subscribed"
+// "refused": the server refused a membership as the same plan or a lower one than the buyer
+// holds (409 DOWNGRADE_NOT_ALLOWED, T66), say from a page opened before the plan changed; the
+// paywall says plans only go up and points to Account.
+export type CheckoutStatus = "idle" | "pending" | "error" | "refused"
 
 // Asks the server for a Stripe Checkout Session and goes there. Signed-out buyers (the public
 // /pricing page) go to sign-in first and come back to the same page.
@@ -33,7 +34,7 @@ export function useCheckout() {
         return
       }
       const answer = readAnswer(response.status, await response.json().catch(() => null))
-      if (answer.kind === "subscribed") setStatus("subscribed")
+      if (answer.kind === "refused") setStatus("refused")
       else window.location.assign(answer.url)
     } catch {
       setStatus("error")
@@ -43,13 +44,13 @@ export function useCheckout() {
   return { status, start }
 }
 
-type Answer = { kind: "url"; url: string } | { kind: "subscribed" }
+type Answer = { kind: "url"; url: string } | { kind: "refused" }
 
-// The checkout URL, or 409 SUBSCRIPTION_EXISTS (one running subscription per account); anything
-// else throws and shows the generic error.
+// The checkout URL, or 409 DOWNGRADE_NOT_ALLOWED (only upgrades while a membership runs);
+// anything else throws and shows the generic error.
 export function readAnswer(status: number, body: unknown): Answer {
   const record = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {}
-  if (status === 409 && record.code === "SUBSCRIPTION_EXISTS") return { kind: "subscribed" }
+  if (status === 409 && record.code === "DOWNGRADE_NOT_ALLOWED") return { kind: "refused" }
   if (status < 200 || status >= 300 || typeof record.url !== "string") throw new Error("no checkout url")
   return { kind: "url", url: record.url }
 }

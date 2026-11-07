@@ -8,7 +8,9 @@ import { trackPaywallView } from "../../analytics/browser"
 import type { EventProps } from "../../analytics/events"
 import type { PaymentChannel, SiteProduct } from "../../config"
 import { offeredMethods } from "../stripe/catalog"
+import { holdsMembership, NO_STANDING, type MemberStanding } from "../subscription/standing"
 import { PaymentChannelContext } from "./channel-context"
+import { StandingContext } from "./standing-context"
 import { usePaywallState, type PaywallOpenOptions } from "./use-paywall-state"
 
 // The sheet (drawer, dialog, checkout flow) is a chunk of its own: a closed sheet renders nothing,
@@ -25,30 +27,43 @@ const PaywallContext = createContext<PaywallApi | null>(null)
 // One paywall per page tree: the app shell and /pricing mount this, and every entry point
 // ("Get credits", the balance chip, a plan on /pricing) opens the same sheet. Products come in
 // as props: core never imports the site config. `channel` is the server's PAYMENT_CHANNEL.
+// It also holds what the buyer already has (T66, fed by StandingSlot), so a member opens on a
+// plan they can actually buy; the rule that decides it is fetched only for members.
 type ProviderProps = { products: readonly SiteProduct[]; wishlistLive: boolean; channel: PaymentChannel; children: ReactNode }
 
 export function PaywallProvider({ products, wishlistLive, channel, children }: ProviderProps) {
   const [open, setOpen] = useState(false)
   const [trigger, setTrigger] = useState<PaywallTrigger>("account")
+  const [standing, setStanding] = useState<MemberStanding>(NO_STANDING)
   const state = usePaywallState(offeredMethods(channel, useLocale())[0])
   const { reset } = state
   const api = useMemo<PaywallApi>(
     () => ({
       open(next, options) {
-        reset(options)
-        setTrigger(next)
-        setOpen(true)
-        trackPaywallView(next)
+        const show = (picked?: PaywallOpenOptions) => {
+          reset(picked)
+          setTrigger(next)
+          setOpen(true)
+          trackPaywallView(next)
+        }
+        if (!holdsMembership(standing)) return show(options)
+        void import("./standing-pick").then(
+          (rule) => show(rule.openOptionsFor(options ?? {}, standing)),
+          () => show(options),
+        )
       },
     }),
-    [reset],
+    [reset, standing],
   )
+  const held = useMemo(() => ({ standing, setStanding }), [standing])
   return (
     <PaymentChannelContext.Provider value={channel}>
-      <PaywallContext.Provider value={api}>
-        {children}
-        <PaywallSheet open={open} onOpenChange={setOpen} trigger={trigger} products={products} wishlistLive={wishlistLive} state={state} />
-      </PaywallContext.Provider>
+      <StandingContext.Provider value={held}>
+        <PaywallContext.Provider value={api}>
+          {children}
+          <PaywallSheet open={open} onOpenChange={setOpen} trigger={trigger} products={products} wishlistLive={wishlistLive} state={state} />
+        </PaywallContext.Provider>
+      </StandingContext.Provider>
     </PaymentChannelContext.Provider>
   )
 }

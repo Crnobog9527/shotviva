@@ -20,6 +20,7 @@ export const MAX_COVER_VIDEO_SECONDS = 15
 
 export const COVER_STILL_EDGE = 1600
 export const COVER_STILL_QUALITY = 82
+export const COVER_STILL_EFFORT = 6
 // Animations play in a card, so a smaller edge keeps first paint light (GIF-sized files
 // would undo the reason we convert them).
 export const COVER_ANIMATED_EDGE = 1080

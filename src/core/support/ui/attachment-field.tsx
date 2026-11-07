@@ -33,7 +33,7 @@ function Picker({ name, label, choices, required }: { name: string; label: strin
         name={name}
         required={required}
         defaultValue=""
-        className="hairline-lit min-h-12 rounded-control bg-card px-3 text-body"
+        className="hairline-lit min-h-12 w-full min-w-0 truncate rounded-control bg-card px-3 text-body"
       >
         <option value="">{required ? t('choose') : t('none')}</option>
         {choices.map((choice) => (

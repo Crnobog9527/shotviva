@@ -30,3 +30,4 @@
 - 浅底配色（邮件卡片是白底）：墨色 `#0B0A09`，句点 `#FF5B2E`，不透明白底（邮件客户端的深色模式不会把图片里的深字反白，白底保证仍然读得清）。
 - 做法：无头 Chrome 用 `src/app/fonts/instrument-serif.woff2` 按 72px、字距 -0.02em（同导航字标）渲染，裁到字形边缘、补成偶数尺寸 210×60，邮件里按 105×30 显示；ImageMagick 最高压缩、去掉附加块（无损，约 5 KB）。
 - 改字标时换新文件名，不覆盖旧文件：这个地址缓存一年（`next.config.ts`），已经发出去的邮件还指着它。
+- **iOS 网页 App 启动图（T65）**：`startup.py` 生成 `export/startup/startup-<宽>x<高>.svg`（整屏暗房底 `#0B0A09`，App 图标的「S.」连同句点微光居中，图标框占屏宽 40%，去掉圆角底板），再用 Chrome 无头按真实像素渲染成 `public/startup/*.png`（命令写在脚本头部）。尺寸和 `src/core/seo/startup-images.ts` 一一对应，测试会检查每个文件都在。
