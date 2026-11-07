@@ -27,3 +27,5 @@ export { canonicalHostRedirect, type CanonicalRedirectInput } from './canonical-
 export { canonicalRedirectResponse, withHostNoindex } from './proxy-seo'
 export { llmsTxt, textResponse, type LlmsPage } from './llms-txt'
 export { absoluteUrl, siteOrigin } from './site-url'
+export { STARTUP_SCREENS, startupImages } from './startup-images'
+export { MANIFEST_PATHS, manifestResponse, webManifest } from './web-manifest'

@@ -46,7 +46,7 @@ describe('Title brand suffix', () => {
 
   it('adds the suffix to every page that sets a plain title (app, sign-in, admin, 404)', () => {
     expect(rootMetadata(site).title).toEqual({ default: 'Shotviva', template: '%s | Shotviva' })
-    expect(rootMetadata(site).appleWebApp).toEqual({ title: 'Shotviva', capable: false })
+    expect(rootMetadata(site).appleWebApp).toMatchObject({ title: 'Shotviva', capable: false })
     expect(rootMetadata(site).applicationName).toBe('Shotviva')
   })
 })
