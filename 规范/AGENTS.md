@@ -97,6 +97,7 @@
   - 预览库：`main` 每次合并后，CI 自动执行 `supabase db push`。
   - 生产库：只通过 GitHub Actions 的「DB push (production)」工作流执行，工作流挂 `production` environment，必须 Owner 在 GitHub 上点批准。合并到 main 的改动里有新迁移时，工作流自动排队，Owner 只需在 GitHub（邮件或手机通知）点批准；也可以手动触发（Owner 2026-11-07）。
   - **生产发布顺序**（总控 2026-11-07）：Vercel 关掉「自动把生产域名指到新部署」。合并到 main 只构建生产部署、不上线；总控检查这批合并里有没有新迁移：有就先请 Owner 批准「DB push (production)」，跑完核对迁移记录，再把部署提升为生产（Vercel Promote）；没有迁移直接提升。
+  - **界面改动先验收再上线**（Owner 2026-11-07）：一批合并里只要有改了页面、组件、样式或动效的 PR，总控先把 main 合进 `validation/preview` 并部署测试站，等 Codex 在该 PR 上发出通过的「Validation result」，再把生产部署提升上线；没通过就修好重验，不提升。纯规范、纯文案、纯后端或数据修复，以及 Owner 明确说「先上线」的紧急修复，照旧直接提升（紧急修复上线后仍补验收）。
   - **迁移写法**：只做向前兼容的「先扩后收」，加列、加表、加函数参数都给默认值，旧代码在新库上照常运行；删列、改名、收紧约束要拆成两次发布（先上不再用它的代码，下一次再删）。
   - 禁止任何人（包括总控和开发窗口）用 Supabase 后台、SQL 编辑器、MCP 工具或脚本手动执行迁移、改表、改函数。排查问题只读不写。**例外：Owner 的运营数据修改**（如把某个账号的 `role` 改成 `admin`、在 Studio 修正一行业务数据、调用 `admin_adjust_credits` / `admin_ban_user`）不是迁移，可以在 Supabase 后台做。
 - CI 拦截修改或删除已合并迁移文件的 PR（基线压缩需 Owner 同意后在 PR 标题加 `[baseline]` 才放行）。
