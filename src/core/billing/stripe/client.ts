@@ -18,6 +18,8 @@ export type StripeApi = {
   charges: Pick<Stripe['charges'], 'retrieve'>
   disputes: Pick<Stripe['disputes'], 'retrieve'>
   billingPortal: { sessions: Pick<Stripe['billingPortal']['sessions'], 'create'> }
+  // T64: the card-only configuration 中国银行卡 checks out with (card-only.ts).
+  paymentMethodConfigurations: Pick<Stripe['paymentMethodConfigurations'], 'list'>
 }
 
 let cached: Stripe | undefined

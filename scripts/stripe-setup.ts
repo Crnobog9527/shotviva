@@ -1,6 +1,9 @@
 /**
  * Keeps the Stripe catalog equal to site.config's nine products (ARCHITECTURE §6.2): 6 Products
- * with tax code txcd_10105001 and 15 Prices with lookup_key and metadata.product_id. Idempotent.
+ * with tax code txcd_10105001 and 15 Prices with lookup_key and metadata.product_id. Also keeps
+ * the card-only payment method configuration 中国银行卡 checks out with (T64): card on, Link,
+ * Apple Pay and Google Pay off; created when missing, its preferences reset when they drift.
+ * Idempotent.
  * Without --apply it only prints the plan (dry run); with --apply it writes:
  *
  *   pnpm tsx --env-file=.env.local scripts/stripe-setup.ts                  # dry run
@@ -17,7 +20,13 @@ import Stripe from 'stripe'
 import { z } from 'zod'
 
 import type { DesiredPrice } from '../src/core/billing/stripe/catalog'
-import { STRIPE_TAX_CODE } from '../src/core/billing/stripe/catalog'
+import {
+  CARD_ONLY_CONFIG_NAME,
+  CARD_ONLY_PREFERENCES,
+  STRIPE_TAX_CODE,
+  cardOnlyDrift,
+  type CardOnlyMethod,
+} from '../src/core/billing/stripe/catalog'
 import {
   planSetup,
   type DesiredProduct,
@@ -125,6 +134,37 @@ function printPlan(plan: SetupPlan): void {
   console.log(writes === 0 ? 'Nothing to do: everything is in place.' : `${writes} change(s) planned.`)
 }
 
+type CardOnlyPlan = { action: 'create' } | { action: 'update'; id: string; drift: CardOnlyMethod[] } | { action: 'none'; id: string }
+
+async function planCardOnly(): Promise<CardOnlyPlan> {
+  const { data } = await stripe.paymentMethodConfigurations.list({ limit: 100 })
+  const found = data.find((c) => c.active && c.name === CARD_ONLY_CONFIG_NAME)
+  if (!found) return { action: 'create' }
+  const preference = (m: CardOnlyMethod) => found[m]?.display_preference?.preference ?? null
+  const drift = cardOnlyDrift({ card: preference('card'), apple_pay: preference('apple_pay'), google_pay: preference('google_pay'), link: preference('link') })
+  return drift.length > 0 ? { action: 'update', id: found.id, drift } : { action: 'none', id: found.id }
+}
+
+const preferences = Object.fromEntries(
+  Object.entries(CARD_ONLY_PREFERENCES).map(([method, preference]) => [method, { display_preference: { preference } }]),
+)
+
+async function applyCardOnly(plan: CardOnlyPlan): Promise<void> {
+  if (plan.action === 'create') {
+    const created = await stripe.paymentMethodConfigurations.create({ name: CARD_ONLY_CONFIG_NAME, ...preferences })
+    console.log(`created payment method configuration ${CARD_ONLY_CONFIG_NAME} (${created.id})`)
+  } else if (plan.action === 'update') {
+    await stripe.paymentMethodConfigurations.update(plan.id, preferences)
+    console.log(`reset ${plan.drift.join(', ')} on ${CARD_ONLY_CONFIG_NAME} (${plan.id})`)
+  }
+}
+
+function printCardOnly(plan: CardOnlyPlan): void {
+  if (plan.action === 'create') console.log(`  + Payment method configuration ${CARD_ONLY_CONFIG_NAME}`)
+  else if (plan.action === 'update') console.log(`  ~ ${CARD_ONLY_CONFIG_NAME}: reset ${plan.drift.join(', ')}`)
+  else console.log(`  = ${CARD_ONLY_CONFIG_NAME} in place (${plan.id})`)
+}
+
 async function main(): Promise<void> {
   console.log(`Stripe ${live ? 'LIVE' : 'test'} account${apply ? '' : ' (dry run)'}`)
   const plan0 = planSetup({ products, brand: site.brand.name, existingProducts: new Map(), existingPrices: new Map() })
@@ -143,6 +183,8 @@ async function main(): Promise<void> {
     process.exit(1)
   }
   printPlan(plan)
+  const cardOnly = await planCardOnly()
+  printCardOnly(cardOnly)
   if (!apply) {
     console.log('Dry run: nothing was written. Re-run with --apply to make these changes.')
     return
@@ -150,6 +192,7 @@ async function main(): Promise<void> {
   for (const product of plan.createProducts) await createProduct(product)
   for (const price of plan.createPrices) await createPrice(price)
   for (const change of plan.replacePrices) await replacePrice(change)
+  await applyCardOnly(cardOnly)
   console.log(
     `Done: ${plan.createProducts.length} Products and ${plan.createPrices.length} Prices created, ` +
       `${plan.replacePrices.length} Prices replaced, ` +

@@ -1,111 +1,11 @@
 import type Stripe from 'stripe'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { STRIPE_TAX_CODE, priceCents } from './catalog'
-import { assertOffered, createCheckout, type CheckoutDeps } from './checkout'
-import type { StripeApi } from './client'
+import { assertOffered, createCheckout } from './checkout'
 import { clearPriceCache } from './prices'
-import { TEST_PRODUCTS, testProduct } from './test-products'
-
-const USER = '00000000-0000-4000-8000-000000000001'
-
-// A Price as scripts/stripe-setup.ts creates it, for the lookup key asked for.
-function priceFor(key: string, overrides: Partial<Stripe.Price> = {}): Stripe.Price {
-  const recurring = key.endsWith('_recurring')
-  const productId = key.replace(/_recurring$/, '')
-  const product = testProduct(productId)
-  return {
-    id: `price_${key}`,
-    lookup_key: key,
-    currency: 'usd',
-    unit_amount: priceCents(product),
-    type: recurring ? 'recurring' : 'one_time',
-    recurring: recurring && product.interval ? { interval: product.interval } : null,
-    metadata: { product_id: productId },
-    product: { id: 'prod', tax_code: STRIPE_TAX_CODE },
-    ...overrides,
-  } as Stripe.Price
-}
-
-// Like Stripe since 2026-09-30.endive: the session lists the methods it offers, i.e. the
-// account's enabled methods filtered by allowed_payment_method_types. `enabled` is what the
-// Dashboard has switched on; Managed Payments picks its own.
-function fakeStripe(price: (key: string) => Stripe.Price = priceFor, enabled: readonly string[] = ['card', 'alipay', 'link']) {
-  const create = vi.fn(async (params: Stripe.Checkout.SessionCreateParams) => {
-    if ('payment_method_types' in params) throw new Error('400: payment_method_types is no longer supported')
-    const allowed = params.allowed_payment_method_types
-    return {
-      id: 'cs_test_1',
-      url: 'https://checkout.stripe.com/c/pay/cs_test_1',
-      payment_method_types: allowed ? enabled.filter((m) => (allowed as string[]).includes(m)) : ['card', 'link'],
-      params,
-    }
-  })
-  const list = vi.fn(async (params: Stripe.PriceListParams) => ({ data: (params.lookup_keys ?? []).map(price) }))
-  const stripe = { checkout: { sessions: { create } }, prices: { list } } as unknown as StripeApi
-  return { stripe, create, list }
-}
-
-function deps(stripe: StripeApi, overrides: Partial<CheckoutDeps> = {}): CheckoutDeps {
-  return { stripe, products: TEST_PRODUCTS, managedPayments: true, origin: 'https://pr-1.example.app', returnToHosts: ['graylum.com'], trackStart: vi.fn(), ...overrides }
-}
-
-const sent = (create: ReturnType<typeof fakeStripe>['create']) => create.mock.calls[0]?.[0]
+import { deps, fakeStripe, priceFor, sent, USER } from './test-checkout'
 
 beforeEach(() => clearPriceCache())
-
-describe('createCheckout 中国银行卡 (T64)', () => {
-  it('opens a Starter monthly as a plain card subscription: no Managed Payments, card only, zh, no tax', async () => {
-    const { stripe, create } = fakeStripe()
-    const d = deps(stripe, { managedPayments: true })
-    await createCheckout(d, { userId: USER, body: { product_id: 'starter_monthly', method: 'cn_card', locale: 'zh' } })
-    const params = sent(create)
-    expect(params).toMatchObject({
-      mode: 'subscription',
-      line_items: [{ price: 'price_starter_monthly_recurring', quantity: 1 }],
-      allowed_payment_method_types: ['card'],
-      managed_payments: { enabled: false },
-      locale: 'zh',
-      metadata: { user_id: USER, product_id: 'starter_monthly', method: 'cn_card', locale: 'zh' },
-      subscription_data: { metadata: { method: 'cn_card' } },
-      success_url: 'https://pr-1.example.app/zh/checkout?session_id={CHECKOUT_SESSION_ID}',
-    })
-    expect(params).not.toHaveProperty('automatic_tax')
-    expect(params).not.toHaveProperty('payment_method_types')
-    expect(d.trackStart).toHaveBeenCalledWith(USER, {
-      product_id: 'starter_monthly',
-      tier: 'starter',
-      interval: 'month',
-      form: 'subscription',
-      channel: 'stripe',
-      method: 'cn_card',
-    }, 'zh')
-  })
-
-  it('sells a pack as a plain one-time card payment', async () => {
-    const { stripe, create } = fakeStripe()
-    const d = deps(stripe)
-    await createCheckout(d, { userId: USER, body: { product_id: 'pack_m', method: 'cn_card', locale: 'zh' } })
-    const params = sent(create)
-    expect(params).toMatchObject({
-      mode: 'payment',
-      line_items: [{ price: 'price_pack_m' }],
-      allowed_payment_method_types: ['card'],
-      managed_payments: { enabled: false },
-      payment_intent_data: { metadata: { product_id: 'pack_m', method: 'cn_card' } },
-    })
-    expect(params).not.toHaveProperty('automatic_tax')
-    expect(params).not.toHaveProperty('subscription_data')
-    expect(d.trackStart).toHaveBeenCalledWith(USER, expect.objectContaining({ form: 'one_time', method: 'cn_card', tier: 'pack' }), 'zh')
-  })
-
-  it('leaves the Managed Payments card on zh pages as it was', async () => {
-    const { stripe, create } = fakeStripe()
-    await createCheckout(deps(stripe), { userId: USER, body: { product_id: 'pro_monthly', method: 'card', locale: 'zh' } })
-    expect(sent(create)).toMatchObject({ mode: 'subscription', managed_payments: { enabled: true } })
-    expect(sent(create)).not.toHaveProperty('allowed_payment_method_types')
-  })
-})
 
 describe('assertOffered (the locale gate)', () => {
   it('takes 中国银行卡 only with a zh locale on Stripe', () => {
@@ -230,7 +130,7 @@ describe('createCheckout with allowed_payment_method_types (API 2026-09-30.endiv
   })
 
   it('refuses to send the buyer to a checkout that cannot take Alipay (off in the Dashboard)', async () => {
-    const { stripe } = fakeStripe(priceFor, ['card', 'link'])
+    const { stripe } = fakeStripe(priceFor, { enabled: ['card', 'link'] })
     const d = deps(stripe)
     await expect(
       createCheckout(d, { userId: USER, body: { product_id: 'starter_monthly', method: 'alipay', locale: 'en' } }),

@@ -1032,3 +1032,51 @@ Owner 2026-11-06 发现中文页有功能缺失。逐页对比现有英文页和
 - 不影响 SEO 页面的服务端渲染和首屏（同意条按需加载）；CI 的 JS 预算和 Lighthouse 照常通过。
 
 **验收**：美国 / 中国 IP 访问不弹同意条、刷新后 PostHog 的 distinct_id 不变；欧洲 IP（测试时用请求头模拟或 Vercel 国家覆盖）弹同意条，点「仅必要」后不写 Cookie，点「接受」后开始写；登录后匿名行为并入账号；页脚可改设置；单测覆盖国家判断和持久化切换；交互验收交给 Codex（测试站）。
+
+## T71 退款自动扣回积分（可派）
+
+**目标**：Owner 2026-11-07：退款后用户不能留着积分。规则见 ARCHITECTURE §6.2「退款自动扣回积分」。
+
+**范围**：
+- 迁移（编号段 `0520`～`0539`，只加不改）：付款行记 `credits_clawed_back`、`clawback_shortfall`；一个 `clawback_payment_credits(payment_id, event_id, refunded_ratio, reason)` 函数按「发放 × 累计退款比例 − 已扣回，封顶付费余额，不为负」扣回并写流水，幂等；会员退款把 `paid_until` 回退到退款时刻（不早于其他有效购买）；拒付胜诉的「还回」函数；管理员「扣回这笔付款剩余积分」函数（记到该付款名下）。
+- 回调：Stripe `charge.refunded`、`charge.dispute.created`、`charge.dispute.closed`（won）；Waffo `refund.succeeded`；会员退款时取消仍在续费的订阅（复用 T66 的取消逻辑）。
+- 后台：退款工单和订单页加「扣回这笔付款的剩余积分」按钮（确认弹窗写清数量）；订单页、用户详情显示已扣回 / 欠扣；Sentry 告警含欠扣。
+- 条款：英文退款政策 / 条款里的退款一节与新规则一致（7 天内未用积分全额退款；用过积分的个案人工处理、按剩余比例退款；退款会扣回积分）；列入律师审阅清单。
+- `scripts/stripe-setup.ts` 或上线清单写明 Stripe 回调要加订阅 `charge.dispute.closed`。
+
+**验收**：测试卡买积分包 → 全额退款 → 积分全部扣回；部分退款按比例；重复回调不重复扣；先在后台人工扣回再部分退款，回调不再多扣；积分已花掉时余额到 0、记欠扣并告警；会员退款立即结束会员并取消订阅；拒付扣回、胜诉还回；Waffo 退款同样；单测 + 数据库测试覆盖幂等、封顶、不为负；交互验收交给 Codex（测试站）。生产迁移走 DB push，Owner 批准。
+
+## T72 中文业务告警发到飞书群机器人（可派）
+
+**目标**：Owner 2026-11-07：Sentry 的告警是英文技术描述，看不懂；要中文、大白话的业务提醒，发到飞书群（ARCHITECTURE §16.4）。
+
+**范围**：`core/alerts` 的 `notifyOwner` + 飞书自定义机器人签名发送 + 去重 + 未配置时跳过；接入点：Stripe / Waffo 退款、拒付开始与结果、付款回调处理失败、出图失败率偏高（每小时最多一次）、新工单 / 补充回复、T66 旧订阅取消失败；T71 合并后退款告警带上扣回 / 欠扣结果（T71 未合并时先写「积分处理见后台」）。中文模板集中一处、可单测；脱敏规则复用 `core/logger`。环境变量 `FEISHU_ALERT_WEBHOOK_URL`、`FEISHU_ALERT_SECRET` 只登记名字。
+
+**Owner 侧**：飞书建一个群 → 群设置 → 群机器人 → 添加「自定义机器人」→ 安全设置勾「签名校验」→ 复制 Webhook 地址和签名密钥（存密码管理器，不发聊天），由配置窗口按剪贴板流程写进 Vercel 正式环境。
+
+**验收**：测试群里能收到每种告警的中文消息、链接能打开后台对应页；同一事件不重复发；飞书挂掉时业务不受影响；单测覆盖模板、签名、去重、失败率阈值；交互验收交给 Codex（测试站配测试群）。
+
+## T73 支付宝收银台加微信支付（可派）
+
+**目标**：Owner 2026-11-07：微信支付已在 Stripe 申请开通；把微信支付加进支付宝那条结账，付款方式改名「支付宝 / 微信支付」（ARCHITECTURE §6.2、§6.3）。
+
+**范围**：
+- 结账：钱包路由 `allowed_payment_method_types: ['alipay', 'wechat_pay']` + `payment_method_options.wechat_pay.client: 'web'`；Dashboard 只开了一种时只显示那一种，都没开才拒绝。
+- 文案：中文「支付宝 / 微信支付」，英文 "Alipay / WeChat Pay"；说明照旧「不自动续费，一次一期」。中文页顺序：中国银行卡、支付宝 / 微信支付、海外银行卡 · Apple Pay · Google Pay；英文页同样合并成一项。impeccable 核对样式。
+- 数据：`payments.method` 允许 `wechat_pay`（迁移编号段 `0560`～`0579`，只放宽约束）；回调按实际付款方式写 `alipay` 或 `wechat_pay`；账号页会员卡、后台订单页显示「微信支付」。
+- 埋点 `checkout_start` / `purchase` 的 `method` 加 `wechat_pay`（结账开始时记 `alipay_or_wechat`，付款成功时记实际方式，二选一在 PR 里说明）。
+- Waffo 通道不变（Waffo 不支持微信）。
+
+**验收**：测试模式下结账页同时出现支付宝和微信支付，各付一笔积分包和 Starter 一期，到账、付款方式记录正确；只开支付宝时只显示支付宝；英文页同样；单测覆盖 Session 参数和方式记录；交互验收交给 Codex（测试站）。正式站上线前 Owner 确认 Stripe 已批准微信支付。
+
+## T74 后台中文「流量与转化」页 + 补齐统计点（可派）
+
+**目标**：Owner 2026-11-07：PostHog 后台是英文，要在自己的管理后台用中文看用于优化体验和转化的指标（ARCHITECTURE §16.2a，新增事件见 §16.2）。
+
+**范围**：
+- 补统计点：`template_view`、`paywall_select`、`checkout_cancel`、`upload_error`；打开 `capture_pageleave`；事件字典单测更新。
+- 后台新页 `/admin/analytics`（导航名「流量与转化」）：六块内容按 §16.2a；服务端 HogQL 查询放 `core/admin/analytics/`，每块一个查询函数 + 单测（用录制的响应样例），缓存 10 分钟，失败时该块显示「暂时读不到」不影响其他块；时间范围切换；漏斗维度切换；中文指标说明；「在 PostHog 打开」链接。只有管理员能进。
+- 环境变量 `POSTHOG_PERSONAL_API_KEY`（只读，Query 权限）、`POSTHOG_PROJECT_ID`，只登记名字；没配置时页面提示去配置。
+- 按 DESIGN 的后台样式，impeccable 核对。
+
+**验收**：测试站配测试数据后六块都有数；切换时间范围和漏斗维度正确；新事件在 PostHog 能查到；缺密钥时页面友好提示；非管理员 404；交互验收交给 Codex。Owner 侧：PostHog 生成只读个人 API 密钥，由配置窗口按剪贴板流程写进 Vercel。

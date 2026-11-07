@@ -257,7 +257,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
   入账失败时，镜像表的写入一起回滚。同一 session 的重发和兄弟事件只入账一次。`checkout.session.completed` 和 `checkout.session.async_payment_succeeded` 都走它。
 - **付款记录与续费函数**（T10，总控 2026-11-06 按 T10 开工前的问题定）：
   - **表 `payments`**（私有，只授权 service role）：每次成功付款一行。
-    - 字段：`user_id`、`product_id`、`channel`（`stripe` / `waffo`）、`stripe_session_id` / `stripe_invoice_id` / `stripe_charge_id`（各自可空且唯一）、`waffo_order_id`（可空，**不唯一**，有索引：一张 Waffo 订阅订单每期都有一笔扣款）、`waffo_payment_id`（Waffo 的 `PAY_` 扣款号，可空、唯一；T50）、`amount_total`（实付，含税，单位为分，int）、`currency`、`amount_tax`（分）、`method`（`card` = MP 卡（海外银行卡）/ `alipay` / `cn_card` = 普通 Stripe 卡（中国银行卡，T64）；迁移只放宽 `payments_method_check`，不改函数；续费沿用订阅 metadata 里记的方式）、`status`（`paid` / `refunded` / `partially_refunded` / `disputed`）、`amount_refunded`（分，默认 0）、`created_at`。
+    - 字段：`user_id`、`product_id`、`channel`（`stripe` / `waffo`）、`stripe_session_id` / `stripe_invoice_id` / `stripe_charge_id`（各自可空且唯一）、`waffo_order_id`（可空，**不唯一**，有索引：一张 Waffo 订阅订单每期都有一笔扣款）、`waffo_payment_id`（Waffo 的 `PAY_` 扣款号，可空、唯一；T50）、`amount_total`（实付，含税，单位为分，int）、`currency`、`amount_tax`（分）、`method`（`card` = MP 卡（海外银行卡）/ `alipay` / `wechat_pay`（T73）/ `cn_card` = 普通 Stripe 卡（中国银行卡，T64）；迁移只放宽 `payments_method_check`，不改函数；续费沿用订阅 metadata 里记的方式）、`status`（`paid` / `refunded` / `partially_refunded` / `disputed`）、`amount_refunded`（分，默认 0）、`created_at`。
     - 约束：Stripe 行至少有 session 或 invoice 之一；Waffo 行必须有 `waffo_order_id` 和 `waffo_payment_id`（T50 之前的老行可以没有 `waffo_payment_id`）。
     - 不回填 T10 上线前的历史付款。
   - **`settle_checkout` 改签名**：新增参数 `p_amount_total`、`p_currency`、`p_amount_tax`、`p_method`、`p_invoice_id`（可空）、`p_charge_id`（可空），在同一事务里写 `payments`。参数变了无法 `create or replace`，按 AGENTS §5「签名必须变」的例外，由新迁移删掉旧的 7 参数版本后重建，PR 写明原因；调用方同步改。
@@ -294,8 +294,8 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 积分包不改会员期，但它发的是付费积分，用它生成的作品就是付费作品（无水印、私密、可商用），所以非会员买包也拿到完整权益——这正是「按作品判付费」要解决的事。
 - 价格数字只写在 `site.config.ts`（第 2 节），付费墙、`/pricing`、FAQ、结构化数据都从配置读；建站规格 G3 同步。送 Stripe 时用整数分（`1990`）。
 - **Stripe Product / Price 映射**：Starter、Pro、Max 各一个 Product（税码 `txcd_10105001`），每个 Product 挂 4 个 Price：月付 recurring、月付 one-time、年付 recurring、年付 one-time（同 id 的 recurring 和 one-time 价格相同）；三个积分包各一个 Product，只有 one-time Price。Price 的 `lookup_key` 固定为 `<product_id>`（one-time）和 `<product_id>_recurring`（订阅），服务端按 lookup key 取 Price，不把 Price id 写进代码或配置；每个 Price 的 `metadata.product_id` 也写上，回调反查用。
-- **不接微信支付**（Owner 2026-11-05 定，只保留卡和支付宝）。支付宝在 Stripe 普通模式下不支持订阅，所以钱包用户买会员买的是「一期」（`starter_monthly` 的单笔形态 = 30 天 50 credits），`paid_until` 到了自己再买。这不是功能缺失，是 Stripe 的限制，付费墙文案要说清楚（"Renews automatically" vs "30 days, no auto-renew"）。
-- **PostHog `purchase` 事件参数**：`product_id`、`tier`（`starter` / `pro` / `max` / `pack`）、`interval`（`month` / `year` / 空）、`form`（`subscription` / `one_time`）、`channel`（`stripe` / `waffo`）、`method`（`card` / `alipay` / `cn_card`）、`amount_usd`、`credits`。`generate` 事件加 `resolution` 和 `credits_cost`。
+- **支付宝和微信支付放在同一个结账页**（Owner 2026-11-07 改，T73；原「不接微信支付」作废）：用户选「支付宝 / 微信支付」后进 Stripe 结账页，两种都列出，自己选。支付宝和微信支付在 Stripe 普通模式下都不支持订阅，所以钱包用户买会员买的是「一期」（`starter_monthly` 的单笔形态 = 30 天 50 credits），`paid_until` 到了自己再买。这不是功能缺失，是 Stripe 的限制，付费墙文案要说清楚（"Renews automatically" vs "30 days, no auto-renew"）。
+- **PostHog `purchase` 事件参数**：`product_id`、`tier`（`starter` / `pro` / `max` / `pack`）、`interval`（`month` / `year` / 空）、`form`（`subscription` / `one_time`）、`channel`（`stripe` / `waffo`）、`method`（`card` / `alipay` / `wechat_pay` / `cn_card`）、`amount_usd`、`credits`。`generate` 事件加 `resolution` 和 `credits_cost`。
 
 已经确定的规则：
 
@@ -309,7 +309,15 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 续费成功：`invoice.paid`（`billing_reason = subscription_cycle`）→ `apply_subscription_renewal`（T10），`paid_until = greatest(paid_until, 本期 period_end)`。
 - **续费失败：什么都不做。** 不再发积分，`paid_until` 到期后账号页显示会员已过期；已有的付费积分照常可用。Stripe 自己重试，哪天扣成功哪天再发。不写宽限期。
 - 取消：期末生效（Stripe 默认）。用户在 Stripe Customer Portal（Managed Payments 下是 Link 的客户门户）自己取消，账号页只放一个「Manage subscription」链接，不自己写取消界面。`customer.subscription.updated / deleted` 只更新镜像表。
-- 外部退款（Managed Payments 下 Link 客服 60 天内可以不经我们退款）：`charge.refunded` 只写记录 + Sentry 告警，Owner 手动 `admin_adjust_credits`。不写自动扣回。
+- **退款自动扣回积分（Owner 2026-11-07 改，T71；推翻原来「只告警、不扣回」）**：
+  - 退款政策（Owner 原话）：「用户充值以后 7 天内，如果没有使用积分才可以退款；一旦使用了积分就不能退款……个别用了一半积分要退款的，改成人工审核：我会先把他剩余的付费积分扣掉，再按剩下的比例给他退款。」
+  - 常规：7 天内、没用过积分 → 全额退款；退款回调（Stripe `charge.refunded`、Waffo `refund.succeeded`）**自动扣回这笔付款发放的积分**。
+  - 扣回量按付款记账、幂等：`本次应扣 = 该笔发放积分 × 累计退款比例 − 该笔已扣回`，再以当前付费池余额封顶，余额永远不为负；同一退款事件重复到达只扣一次。扣回写进积分流水，关联 `payment_id` 和退款号。
+  - 人工审核（用过积分的例外）：Owner 在后台退款工单 / 订单页点「扣回这笔付款的剩余积分」，扣掉用户剩余的付费积分并**记到这笔付款名下**，然后按比例退款；之后到达的退款回调按上面公式计算，已扣回的部分不会再扣。
+  - 扣不够（积分已被花掉，例如 Link 客服直接退款）：差额记在付款行（`clawback_shortfall`），Sentry 告警，后台订单和用户详情显示「欠扣 N 积分」；不做下次充值补扣，不封号。
+  - 会员退款：会员资格立即结束（`paid_until` 改为退款时刻，不早于其他仍有效的购买），仍在续费的订阅同时取消（不按比例、不开发票）；这一期发的积分按上面规则扣回。
+  - 拒付：`charge.dispute.created` 时先按全额扣回（同一公式、同一封顶），`charge.dispute.closed` 且结果为我方胜诉时，把这笔拒付扣回的积分还给用户（总控 2026-11-07 定）。
+  - Waffo 退款与 Stripe 同一规则、同一函数。
 - **升级（Owner 2026-11-07，T66）**：会员本质是打折卖积分，升级就是按全价买更高的档，不补差价、不按比例、不退钱。
   - 只能往高升：Starter → Pro → Max；同一档月付 → 年付也算升级。不能降级（高档换低档、年付换同档月付），想降只能先取消，等当期结束后重新订。
   - 有会员时买更高的档：付款页照常按新档全价结账；付款成功后新档**立即生效**，新档这一期的积分**立即全额到账**（年付一次到账，同首购），`paid_until` 按新档从付款时起算（`greatest(原 paid_until, 付款时 + 新档周期)`）；旧档没用完的积分全部保留，不扣不退。
@@ -318,7 +326,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 不做：首月优惠券、降级、补差价 / 按比例退款、宽限期、测试时钟自动化、到期提醒邮件。
 - **分两段上线**：上线当天必须有「订阅模式建结账 + 首付发放」（和单笔几乎相同）；续费、取消同步、Portal 链接在第一个付费用户满 30 天之前上线即可（TASKS T10）。
 - 账号页「Subscription」区块显示当前档位（Starter / Pro / Max）和月付 / 年付；镜像表 `subscriptions.product_id` 存 9 个 id 之一。
-- 卡和支付宝能付（第 6.3 节的路由），不接微信支付。
+- 卡、支付宝、微信支付能付（第 6.3 节的路由；微信支付 T73 起）。
 - **水印在下载路由加，按作品判**：成品只存一份无水印原图；`core/storage` 的下载路由对 `credit_pool = 'free'` 的作品用 `sharp` 叠右下角「Made with Shotviva」后返回（约 50ms），`credit_pool = 'paid'` 的作品永不加水印。工作台预览和将来创作库展示同样走这个路由。
 - **免费作品**（免费积分生成）：`visibility = 'public'`，带水印，用户不能改私密，可以删除。买了会员之后它们**仍然**是免费作品——不会自动去水印、不会自动私密；想要无水印版就用付费积分再生成一张。
 - **付费作品**（付费积分生成）：默认 `visibility = 'private'`、无水印、可商用，用户可以改公开（进创作库，仍无水印）。会员到期、积分用完都不影响已有付费作品。
@@ -369,6 +377,15 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 这张表是 §15.6「不做后台开关」的例外，只管档位门槛，不管功能开不开（功能开关仍在 `site.config` 的 `features`）。
 - 保存函数签名是 `admin_set_feature_access(p_key, p_min_tier, p_open_to_all_at, p_actor)`：服务端用 service role 调用时拿不到 `auth.uid()`，所以由服务端传管理员 id 写进 `updated_by`（和 `admin_activate_announcement` 同一做法，T29）。
 
+#### 联盟返佣（Owner 2026-11-07 定，尚未接入）
+
+- **不自己开发联盟系统**，用第三方联盟工具接入（选型待 Owner 定；接入前核对：能否追踪 Managed Payments 订阅、支付宝单笔和 Waffo 订单怎么记）。网站这边只做记录推广码、结账时把推广码传给支付平台，届时另开任务卡。
+- **返佣比例**：代理绑定自己推荐的客户，按该客户每一笔付款**终身**返佣：
+  - 积分包（`pack_s` / `pack_m` / `pack_l`）和月付会员（`*_monthly`）：**15%**；
+  - 年付会员（`*_yearly`）：**10%**（年付折扣更大，Owner 定）。
+- **返佣基数**：该笔付款不含税的实付金额（`payments.amount_total − payments.amount_tax`）；退款的付款不返或追回。
+- **毛利核算**（`.local/affiliate-margin-2026-11-07.md`，2026-11-07）：按实测出图成本（约 $0.03 / 积分），返佣后所有商品毛利率在 65% 以上；按规范最坏成本（$0.06 / 积分、积分全部用完），最低是 Max 年付走 Managed Payments 国际卡，约 51%。未计第三方工具月费和给代理打款的手续费（约再少 1～3 个百分点）。
+
 ### 6.3 通道
 
 **Stripe：一个账户，按付款方式路由**（照 Graylum staging `methodRouting.ts` 的做法，Graylum 2026-10-12 沙盒实测两种模式共用一个账户 PASS）：
@@ -376,17 +393,17 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 | 用户选的方式 | Checkout Session 怎么建 | 卖家 |
 |---|---|---|
 | 卡 / Apple Pay / Google Pay | `mode: 'subscription'`，`managed_payments: { enabled: true }`，不传 `allowed_payment_method_types`（MP 自己决定付款方式） | Stripe（Link）当商户记录方，结账时另加税 |
-| 支付宝 | `mode: 'payment'`，`allowed_payment_method_types: ['alipay']`（在 Dashboard 已开启的动态付款方式里过滤；Dashboard 没开支付宝时拒绝跳转） | Shotviva |
-| 中国银行卡（只在中文页出现，T64） | 会员 `mode: 'subscription'`、积分包 `mode: 'payment'`，**不带** `managed_payments`，`allowed_payment_method_types: ['card']`，不开自动税（与审核前的兜底卡路由同一条代码路径）；会员照常自动续费，账号页「Manage subscription」进普通 Stripe Customer Portal | Shotviva |
+| 支付宝 / 微信支付（T73） | `mode: 'payment'`，`allowed_payment_method_types: ['alipay', 'wechat_pay']`，`payment_method_options.wechat_pay.client: 'web'`（在 Dashboard 已开启的动态付款方式里过滤；两种都没开时拒绝跳转，只开了一种就只显示那一种） | Shotviva |
+| 中国银行卡（只在中文页出现，T64） | 会员 `mode: 'subscription'`、积分包 `mode: 'payment'`，**不带** `managed_payments`，用专用的付款方式配置「Shotviva card only (T64)」（只开银行卡，Link / Apple Pay / Google Pay 关；由 `scripts/stripe-setup.ts` 维护、按名字查找，Stripe 不允许它和 `allowed_payment_method_types` 同时传，配置缺失时才退回 `['card']`），`wallet_options.link: 'never'`，按当地货币显示照 Stripe 账户默认（Owner 2026-11-07：显示当地货币可以，到账是美元），不开自动税（与审核前的兜底卡路由同一条代码路径）；会员照常自动续费，账号页「Manage subscription」进普通 Stripe Customer Portal | Shotviva |
 
 > Stripe API 2026-09-30（stripe@23）起，Checkout Session 不再接受 `payment_method_types`，传了会 400；按方式限定一律用 `allowed_payment_method_types`。审核下来之前不走 MP 的卡路由传 `['card']`。（T9 修复，2026-11-06）
 
 - 服务端只认用户选的方式，不按 IP 或浏览器语言强制。Managed Payments 的结账页不允许买家国家为中国（2026-11-07 正式站真卡实测：中国发卡的 Visa 被拒「China is not currently supported」），所以给中文页加「中国银行卡」这条普通 Stripe 卡路由（T64，Owner 2026-11-07）。
-- **中文页付款方式（Owner 2026-11-07，T64）**：三项，顺序固定：① **中国银行卡**（上表第三行，普通 Stripe）② **支付宝** ③ **海外银行卡 · Apple Pay · Google Pay**（原来的 MP 卡路由，只改名）。英文页不变（Card · Apple Pay · Google Pay 和 Alipay，没有中国银行卡）。中国银行卡这条路由由 Shotviva 当卖家：大陆买家不涉及我们需要申报的销售税 / 增值税；非大陆用户在中文页选它的情况接受，不做卡 BIN 拦截（上线后看数据再定）。埋点 `checkout_start.method = 'cn_card'`。
+- **中文页付款方式（Owner 2026-11-07，T64）**：三项，顺序固定：① **中国银行卡**（上表第三行，普通 Stripe）② **支付宝 / 微信支付**（T73）③ **海外银行卡 · Apple Pay · Google Pay**（原来的 MP 卡路由，只改名）。英文页不变（Card · Apple Pay · Google Pay 和 Alipay，没有中国银行卡）。中国银行卡这条路由由 Shotviva 当卖家：大陆买家不涉及我们需要申报的销售税 / 增值税；非大陆用户在中文页选它的情况接受，不做卡 BIN 拦截（上线后看数据再定）。埋点 `checkout_start.method = 'cn_card'`。
 - MP 商品必须设税码 `txcd_10105001`（AI 服务，个人用）。MP 价格不含税，税在结账时另加。
 - 顾客账单：卡支付显示 `LINK.COM* SHOTVIVA`，钱包支付显示 SHOTVIVA。MP 结账页不支持自定义域名。
 - 正式环境的 Managed Payments 要等 Stripe 资格审核。**审核没下来之前的兜底**：卡先不带 `managed_payments` 走普通订阅（Shotviva 当卖家），审核通过后翻开关。
-- 要处理的 Stripe 事件：`checkout.session.completed` 和 `checkout.session.async_payment_succeeded`（首付 / 单笔 → `settle_checkout`：写镜像表 + `apply_purchase`，同一事务）、`invoice.paid`（只认 `subscription_cycle` → `apply_subscription_renewal`，T10）、`customer.subscription.updated / deleted`（只更新镜像表）、`charge.refunded`（记录 + 告警）、`charge.dispute.created`（拒付 / 争议：记录 + Sentry 告警，不自动扣积分；T10，总控 2026-11-06 补）。其余事件忽略（回 200）。Stripe 后台的回调端点一次订阅这 7 个事件。
+- 要处理的 Stripe 事件：`checkout.session.completed` 和 `checkout.session.async_payment_succeeded`（首付 / 单笔 → `settle_checkout`：写镜像表 + `apply_purchase`，同一事务）、`invoice.paid`（只认 `subscription_cycle` → `apply_subscription_renewal`，T10）、`customer.subscription.updated / deleted`（只更新镜像表）、`charge.refunded`（记录 + 自动扣回积分 + 告警，T71）、`charge.dispute.created`（记录 + 全额扣回 + 告警，T71）、`charge.dispute.closed`（我方胜诉时把拒付扣回的积分还回，T71）。其余事件忽略（回 200）。Stripe 后台的回调端点订阅这 8 个事件（T71 新增 `charge.dispute.closed`，Owner 在 Stripe 后台勾选）。
 - Stripe 用与 Graylum 同一主体下**新开的独立账户**，避免两边回调互相收到对方的事件。
 
 **Waffo：保留做兜底，卡支付做订阅**（Owner 2026-11-05 确认不砍；2026-11-06 晚加卡订阅）：
@@ -589,7 +606,7 @@ v1 后台（Owner 2026-11-06 扩充；T23 做外壳和运营页）：**一个后
     - **可以附图片（Owner 2026-11-07，T69）**：新建工单和每次补充回复都能附最多 3 张图片（截图或照片），JPG / PNG / WebP / HEIC（HEIC 在浏览器端转 JPEG，同出图上传），每张 ≤ 10 MB。走现有的 R2 直传：私有桶 `tickets/<user_id>/<ticket_id>/` 前缀，上传后服务端校验类型和大小、清除 EXIF、转 WebP，失败的删掉；图片只能用户本人和管理员经签名地址查看，不进创作库、不进公开读取。删工单 / 删号时一并删除文件。管理员回复也可以附图。
     - 「我的工单」里能看到状态（已提交 / 已回复 / 已关闭）和往来消息，用户可以在工单里补充。
     - 中英文文案都要有，页面 `noindex`。
-  - **退款全部人工处理**：后台打开退款工单时，显示这笔付款的信息、`refund_eligibility(payment_id)` 给出的三项参考检查（是否首次购买、是否在 7 天内、付款后是否用过任何积分），以及建议退款金额（税前价 × 94% + 全部税额，Owner 可以改）。Owner 选择同意（填金额）或拒绝，写回复，系统记审计日志 `decide_refund`。Owner 到 Stripe / Waffo 后台完成退款，退款回调更新付款状态，然后提示扣回积分。**不写任何自动退款或会动钱的代码。**
+  - **退款全部人工处理**：后台打开退款工单时，显示这笔付款的信息、`refund_eligibility(payment_id)` 给出的三项参考检查（是否首次购买、是否在 7 天内、付款后是否用过任何积分），以及建议退款金额（税前价 × 94% + 全部税额，Owner 可以改）。Owner 选择同意（填金额）或拒绝，写回复，系统记审计日志 `decide_refund`。Owner 到 Stripe / Waffo 后台完成退款，退款回调更新付款状态并自动扣回积分（T71）；用过积分的人工审核先点「扣回这笔付款的剩余积分」再按比例退款。**不写任何自动退款或会动钱的代码。**
   - **数据**：
     - `support_tickets` 表：`id`、`user_id`、`type`（`feedback` / `image_issue` / `billing` / `refund` / `account` / `other`）、`status`（`open` / `replied` / `closed`）、`payment_id`、`job_id`（都必须是本人的）、`refund_decision`、`refund_amount_cents`、`created_at`、`last_message_at`、`user_seen_at`、`closed_at`。
     - `support_ticket_messages` 表：`id`、`ticket_id`、`author`（`user` / `admin`）、`body`（不超过 2000 字）、`created_at`。
@@ -819,11 +836,40 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 
 所有事件都带 `locale`（`en` / `zh`，浏览器端注册为公共属性，服务端发时从请求或 `user_metadata.locale` 取；Owner 2026-11-06）。钱和积分相关的事件（`signup`、`generate`、`checkout_start`、`purchase`）一律服务端发，保证不被广告拦截漏掉；发送失败只记日志，不影响业务。
 
+- **新增事件（T74，Owner 2026-11-07）**：`template_view`（浏览器：打开模板详情或在选择器里选中模板，`template_id`、`category`、`surface`）、`paywall_select`（浏览器：付费墙里选中商品，`product_id`、`method`）、`checkout_cancel`（服务端：结账取消返回，`product_id`、`method`）、`upload_error`（浏览器：上传失败，`reason` 枚举，不含文件名）。PostHog 打开 `capture_pageleave`（停留时间、最大滚动深度）。
+
+### 16.2a 后台「流量与转化」页（Owner 2026-11-07，T74）
+
+PostHog 的英文后台不好读，后台加一个中文页，用 PostHog Query API（HogQL，服务端用只读的个人 API 密钥 `POSTHOG_PERSONAL_API_KEY`，项目 `POSTHOG_PROJECT_ID`=712352）读数据，`'use cache'` 缓存 10 分钟，按中文展示；不搬 PostHog 全部功能，每块旁边有「在 PostHog 打开」链接。时间范围今天 / 7 天 / 30 天，带和上一周期的对比。
+
+1. **每页表现**：浏览量、访客、平均停留时间、平均滚动深度、跳出率、从该页进站后注册 / 付款的比例（可排序）。
+2. **转化漏斗**：进站 → 上传 → 出图 → 付费墙 → 开始结账 → 付款，每步人数和流失；可按 中 / 英、手机 / 电脑、来源、国家、新 / 老访客切换。
+3. **付款环节**：付费墙里各商品被选次数与点去付款的比例；按付款方式（海外银行卡 / 中国银行卡 / 支付宝·微信支付 / Waffo）的「开始结账 → 付款成功」比例；结账取消次数。
+4. **新用户激活**：注册后 24 小时内出第一张图的比例；注册到首次出图、首次付款的平均时长；免费积分用完后付款的比例。
+5. **模板表现**：各模板浏览、使用、出图成功率、带来的付款。
+6. **体验问题**：上传失败、出图失败次数与最常见原因；各页面真实打开速度（Web Vitals，慢的在前）。
+
+每个指标名旁边一个「?」用一句中文解释含义。留存、续费率、渠道长期价值等第二批指标上线跑一两个月后再加。
+
 ### 16.3 Sentry
 
 - 前后端都接 `@sentry/nextjs`；`NEXT_PUBLIC_SENTRY_DSN` 公开，`SENTRY_AUTH_TOKEN`（上传源码映射）放 Vercel 加密变量。
 - 必须告警的：出图失败率异常、支付回调验签失败或处理失败、`charge.refunded`、退回积分失败（第 4 节 refund 失败会让积分卡在预扣状态）。
 - 上报前去掉邮箱、令牌、提示词（复用 `core/logger` 的打码规则）。
+
+### 16.4 业务告警（飞书群机器人，Owner 2026-11-07，T72）
+
+Sentry 留给开发看技术错误；给 Owner 的是「业务告警」：一句中文大白话 + 后台链接，发到飞书群的自定义机器人（开启签名校验）。
+
+- **发送**：`core/alerts` 一个 `notifyOwner(kind, facts)`，按 kind 套中文模板，POST 到 `FEISHU_ALERT_WEBHOOK_URL`（带 `FEISHU_ALERT_SECRET` 签名）；发送失败只记日志和 Sentry，绝不影响业务；同一事件重复只发一次（按事件 id 去重）；没配置环境变量时静默跳过（预览环境默认不发，测试时可单独配一个测试群）。
+- **告警种类和文案方向**（金额用美元，带用户的脱敏邮箱或手机号、商品名，最后一行是后台链接）：
+  - 退款：「有一笔退款：xxx 的 Pro 月付 $49.90 已退款，已自动扣回 135 积分。」（扣回结果来自 T71；欠扣时写「还差 N 积分没扣回」）
+  - 拒付开始 / 拒付结果（胜诉还回积分 / 败诉）。
+  - 付款回调处理失败：「一笔 $19.90 的 Starter 月付没能自动到账，请到后台订单页处理。」
+  - 出图失败率偏高：过去 60 分钟失败 ≥ 5 张且失败率 ≥ 30%，每小时最多提醒一次。
+  - 新工单：用户新建工单或补充回复时提醒，退款申请类单独标出。
+  - 升级后旧订阅取消失败（T66）。
+- 不发任何提示词、图片地址、完整邮箱或手机号、密钥。
 
 ## 17. 多语言：英文 + 简体中文（Owner 2026-11-06）
 
