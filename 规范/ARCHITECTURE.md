@@ -309,7 +309,15 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 续费成功：`invoice.paid`（`billing_reason = subscription_cycle`）→ `apply_subscription_renewal`（T10），`paid_until = greatest(paid_until, 本期 period_end)`。
 - **续费失败：什么都不做。** 不再发积分，`paid_until` 到期后账号页显示会员已过期；已有的付费积分照常可用。Stripe 自己重试，哪天扣成功哪天再发。不写宽限期。
 - 取消：期末生效（Stripe 默认）。用户在 Stripe Customer Portal（Managed Payments 下是 Link 的客户门户）自己取消，账号页只放一个「Manage subscription」链接，不自己写取消界面。`customer.subscription.updated / deleted` 只更新镜像表。
-- 外部退款（Managed Payments 下 Link 客服 60 天内可以不经我们退款）：`charge.refunded` 只写记录 + Sentry 告警，Owner 手动 `admin_adjust_credits`。不写自动扣回。
+- **退款自动扣回积分（Owner 2026-11-07 改，T71；推翻原来「只告警、不扣回」）**：
+  - 退款政策（Owner 原话）：「用户充值以后 7 天内，如果没有使用积分才可以退款；一旦使用了积分就不能退款……个别用了一半积分要退款的，改成人工审核：我会先把他剩余的付费积分扣掉，再按剩下的比例给他退款。」
+  - 常规：7 天内、没用过积分 → 全额退款；退款回调（Stripe `charge.refunded`、Waffo `refund.succeeded`）**自动扣回这笔付款发放的积分**。
+  - 扣回量按付款记账、幂等：`本次应扣 = 该笔发放积分 × 累计退款比例 − 该笔已扣回`，再以当前付费池余额封顶，余额永远不为负；同一退款事件重复到达只扣一次。扣回写进积分流水，关联 `payment_id` 和退款号。
+  - 人工审核（用过积分的例外）：Owner 在后台退款工单 / 订单页点「扣回这笔付款的剩余积分」，扣掉用户剩余的付费积分并**记到这笔付款名下**，然后按比例退款；之后到达的退款回调按上面公式计算，已扣回的部分不会再扣。
+  - 扣不够（积分已被花掉，例如 Link 客服直接退款）：差额记在付款行（`clawback_shortfall`），Sentry 告警，后台订单和用户详情显示「欠扣 N 积分」；不做下次充值补扣，不封号。
+  - 会员退款：会员资格立即结束（`paid_until` 改为退款时刻，不早于其他仍有效的购买），仍在续费的订阅同时取消（不按比例、不开发票）；这一期发的积分按上面规则扣回。
+  - 拒付：`charge.dispute.created` 时先按全额扣回（同一公式、同一封顶），`charge.dispute.closed` 且结果为我方胜诉时，把这笔拒付扣回的积分还给用户（总控 2026-11-07 定）。
+  - Waffo 退款与 Stripe 同一规则、同一函数。
 - **升级（Owner 2026-11-07，T66）**：会员本质是打折卖积分，升级就是按全价买更高的档，不补差价、不按比例、不退钱。
   - 只能往高升：Starter → Pro → Max；同一档月付 → 年付也算升级。不能降级（高档换低档、年付换同档月付），想降只能先取消，等当期结束后重新订。
   - 有会员时买更高的档：付款页照常按新档全价结账；付款成功后新档**立即生效**，新档这一期的积分**立即全额到账**（年付一次到账，同首购），`paid_until` 按新档从付款时起算（`greatest(原 paid_until, 付款时 + 新档周期)`）；旧档没用完的积分全部保留，不扣不退。
@@ -395,7 +403,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - MP 商品必须设税码 `txcd_10105001`（AI 服务，个人用）。MP 价格不含税，税在结账时另加。
 - 顾客账单：卡支付显示 `LINK.COM* SHOTVIVA`，钱包支付显示 SHOTVIVA。MP 结账页不支持自定义域名。
 - 正式环境的 Managed Payments 要等 Stripe 资格审核。**审核没下来之前的兜底**：卡先不带 `managed_payments` 走普通订阅（Shotviva 当卖家），审核通过后翻开关。
-- 要处理的 Stripe 事件：`checkout.session.completed` 和 `checkout.session.async_payment_succeeded`（首付 / 单笔 → `settle_checkout`：写镜像表 + `apply_purchase`，同一事务）、`invoice.paid`（只认 `subscription_cycle` → `apply_subscription_renewal`，T10）、`customer.subscription.updated / deleted`（只更新镜像表）、`charge.refunded`（记录 + 告警）、`charge.dispute.created`（拒付 / 争议：记录 + Sentry 告警，不自动扣积分；T10，总控 2026-11-06 补）。其余事件忽略（回 200）。Stripe 后台的回调端点一次订阅这 7 个事件。
+- 要处理的 Stripe 事件：`checkout.session.completed` 和 `checkout.session.async_payment_succeeded`（首付 / 单笔 → `settle_checkout`：写镜像表 + `apply_purchase`，同一事务）、`invoice.paid`（只认 `subscription_cycle` → `apply_subscription_renewal`，T10）、`customer.subscription.updated / deleted`（只更新镜像表）、`charge.refunded`（记录 + 自动扣回积分 + 告警，T71）、`charge.dispute.created`（记录 + 全额扣回 + 告警，T71）、`charge.dispute.closed`（我方胜诉时把拒付扣回的积分还回，T71）。其余事件忽略（回 200）。Stripe 后台的回调端点订阅这 8 个事件（T71 新增 `charge.dispute.closed`，Owner 在 Stripe 后台勾选）。
 - Stripe 用与 Graylum 同一主体下**新开的独立账户**，避免两边回调互相收到对方的事件。
 
 **Waffo：保留做兜底，卡支付做订阅**（Owner 2026-11-05 确认不砍；2026-11-06 晚加卡订阅）：
@@ -598,7 +606,7 @@ v1 后台（Owner 2026-11-06 扩充；T23 做外壳和运营页）：**一个后
     - **可以附图片（Owner 2026-11-07，T69）**：新建工单和每次补充回复都能附最多 3 张图片（截图或照片），JPG / PNG / WebP / HEIC（HEIC 在浏览器端转 JPEG，同出图上传），每张 ≤ 10 MB。走现有的 R2 直传：私有桶 `tickets/<user_id>/<ticket_id>/` 前缀，上传后服务端校验类型和大小、清除 EXIF、转 WebP，失败的删掉；图片只能用户本人和管理员经签名地址查看，不进创作库、不进公开读取。删工单 / 删号时一并删除文件。管理员回复也可以附图。
     - 「我的工单」里能看到状态（已提交 / 已回复 / 已关闭）和往来消息，用户可以在工单里补充。
     - 中英文文案都要有，页面 `noindex`。
-  - **退款全部人工处理**：后台打开退款工单时，显示这笔付款的信息、`refund_eligibility(payment_id)` 给出的三项参考检查（是否首次购买、是否在 7 天内、付款后是否用过任何积分），以及建议退款金额（税前价 × 94% + 全部税额，Owner 可以改）。Owner 选择同意（填金额）或拒绝，写回复，系统记审计日志 `decide_refund`。Owner 到 Stripe / Waffo 后台完成退款，退款回调更新付款状态，然后提示扣回积分。**不写任何自动退款或会动钱的代码。**
+  - **退款全部人工处理**：后台打开退款工单时，显示这笔付款的信息、`refund_eligibility(payment_id)` 给出的三项参考检查（是否首次购买、是否在 7 天内、付款后是否用过任何积分），以及建议退款金额（税前价 × 94% + 全部税额，Owner 可以改）。Owner 选择同意（填金额）或拒绝，写回复，系统记审计日志 `decide_refund`。Owner 到 Stripe / Waffo 后台完成退款，退款回调更新付款状态并自动扣回积分（T71）；用过积分的人工审核先点「扣回这笔付款的剩余积分」再按比例退款。**不写任何自动退款或会动钱的代码。**
   - **数据**：
     - `support_tickets` 表：`id`、`user_id`、`type`（`feedback` / `image_issue` / `billing` / `refund` / `account` / `other`）、`status`（`open` / `replied` / `closed`）、`payment_id`、`job_id`（都必须是本人的）、`refund_decision`、`refund_amount_cents`、`created_at`、`last_message_at`、`user_seen_at`、`closed_at`。
     - `support_ticket_messages` 表：`id`、`ticket_id`、`author`（`user` / `admin`）、`body`（不超过 2000 字）、`created_at`。
