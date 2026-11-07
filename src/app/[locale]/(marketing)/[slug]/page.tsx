@@ -64,10 +64,9 @@ export default async function ContentRoute({ params }: PageProps<'/[locale]/[slu
   const ldCrumbs = crumbs.map((crumb) => ({ ...crumb, path: localizePath(crumb.path, locale) }))
   const ld = [breadcrumbListLd(site, ldCrumbs), faqPageLd(page.faq)]
   if (page.module) ld.push(softwareApplicationLd(site, meta, locale === 'zh' ? zhFreeImages : freeImagesLabel))
-  const home = homePageIn(locale)
   const catalogue = live.map(toCatalogueTemplate)
   // The page's own categories' featured templates; the generator opens on the first of them.
-  const { defaultId, ...sections } = featuredSections(home.templateGrid.categories, live, page.landing.templates?.categoryKeys)
+  const { defaultId, ...sections } = featuredSections(live, page.landing.templates?.categoryKeys)
   const free = locale === 'zh' ? zhFreeImages : freeImagesLabel
   const generator = (
     <HomeGeneratorSlot templates={catalogue} defaultId={defaultId} homePath={localizePath(path, locale)} freeImages={free} />

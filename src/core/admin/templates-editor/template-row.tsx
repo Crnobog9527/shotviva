@@ -52,7 +52,7 @@ export function TemplateRow(props: Props) {
         <div className="font-medium">{template.name}</div>
         <div className="text-muted-foreground font-mono text-xs">{template.id}</div>
       </TableCell>
-      <TableCell>{template.category}</TableCell>
+      <TableCell>{template.categoryInfo.nameZh}</TableCell>
       <TableCell>
         <div className="flex gap-1">
           {template.visibleIn.map((surface) => (

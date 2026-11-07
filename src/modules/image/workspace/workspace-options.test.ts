@@ -28,7 +28,7 @@ describe('workspace options', () => {
   })
 
   it('matches the note example to the category, with a fallback', () => {
-    expect(notePlaceholder('Pets', echoTranslate(['Pets']))).toBe('Pets')
-    expect(notePlaceholder('Something new', echoTranslate(['Pets']))).toBe('fallback')
+    expect(notePlaceholder('pets', echoTranslate(['pets']))).toBe('pets')
+    expect(notePlaceholder('something-new', echoTranslate(['pets']))).toBe('fallback')
   })
 })

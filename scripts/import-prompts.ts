@@ -8,6 +8,8 @@
  * Format: scripts/prompts.example.json. Real prompts never go into git (AGENTS §5).
  * Re-running is safe: rows are upserted by id; omitted sortOrder / isActive keep stored values.
  * Prices below the floor table (modules/image/credits-floor.ts) are refused, as in the admin page.
+ * `category`: a category key from 分类管理 (e.g. food-drink) or a category's English / Chinese
+ * name; a value no category has creates one (T75, resolved by the 0581 trigger).
  */
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -51,7 +53,7 @@ async function main() {
   })
   const templates = readTemplates(path)
   for (const { prompt, ...template } of templates) {
-    const { error } = await client.rpc('admin_upsert_template', toUpsertArgs(template, prompt))
+    const { error } = await client.rpc('admin_upsert_template', toUpsertArgs(template, prompt, { categoryByName: true }))
     if (error) throw new Error(`Failed on ${template.id}: ${error.message}`)
     // Ids and counts only: prompt bodies must never reach logs.
     process.stdout.write(`imported ${template.id}\n`)

@@ -1,12 +1,15 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
-import { listAdminTemplates, TemplatesEditor } from '@/core/admin'
+import { CategoriesPanel, listAdminCategories, listAdminTemplates, TemplatesEditor } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { CREDITS_FLOOR } from '@/modules/image'
 
 import {
   applyCoverAction,
+  deleteTemplateCategoryAction,
+  reorderTemplateCategoriesAction,
+  saveTemplateCategoryAction,
   setFeaturedTemplatesAction,
   requestCoverUploadAction,
   saveTemplateAction,
@@ -24,7 +27,8 @@ export const metadata: Metadata = { title: '模板与提示词' }
 
 export default async function AdminTemplatesPage() {
   await requireAdmin()
-  const templates = await listAdminTemplates(createAdminSupabase())
+  const db = createAdminSupabase()
+  const [templates, categories] = await Promise.all([listAdminTemplates(db), listAdminCategories(db)])
   return (
     <div className="mx-auto grid w-full max-w-6xl gap-6 p-6">
       <div className="flex items-center gap-3">
@@ -34,8 +38,13 @@ export default async function AdminTemplatesPage() {
           作品编辑的判断题和约束段落 →
         </Link>
       </div>
+      <CategoriesPanel
+        categories={categories}
+        actions={{ save: saveTemplateCategoryAction, reorder: reorderTemplateCategoriesAction, remove: deleteTemplateCategoryAction }}
+      />
       <TemplatesEditor
         templates={templates}
+        categories={categories}
         floor={CREDITS_FLOOR}
         actions={{
           save: saveTemplateAction,
