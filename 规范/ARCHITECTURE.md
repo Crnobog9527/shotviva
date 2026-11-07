@@ -582,6 +582,7 @@ v1 后台（Owner 2026-11-06 扩充；T23 做外壳和运营页）：**一个后
     - 被限制的账号在账号页显示一句说明，中英文都要有。
 - **站内工单**（T27，Owner 2026-11-06 定，详细设计见 `docs/proposals/admin-roadmap.md` A8，本节是规范口径）：
   - **用户侧入口**：账号页的「Help & feedback」和页脚的「Contact」。付费墙、`/pricing`、订阅区块里不放任何退款入口。
+  - **在弹窗里完成（Owner 2026-11-07，T68）**：点「Help & feedback」不跳页，在账号页上直接弹出工单弹窗（电脑是居中对话框，手机是全高底部抽屉，按 DESIGN 的 Sheet 样式）。弹窗里两个页签「新建工单」「我的工单」；点开一张工单在弹窗内显示往来消息，并能直接补充回复；提交成功、返回列表都不离开弹窗。原来的 `/account/help`、`/account/help/new`、`/account/help/[id]` 保留为深链：打开后跳到 `/account?help=new` / `?help=list` / `?help=<id>`，账号页读这个参数自动打开弹窗到对应位置（页脚「Contact」指向 `/account?help=new`，未登录先去登录）。
   - **提交工单**：
     - 类型并列成一个普通列表，按顺序是：意见反馈、出图问题（可选附一张自己的作品）、付款问题（可选附一笔自己的付款）、退款申请（必须选一笔自己的付款）、账号问题、其他。退款申请的样式和其他项一样，不做突出。
     - 正文不超过 2000 字，不收附件。
@@ -859,6 +860,7 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 - **付款**：中文页付款方式写「支付宝」，英文页写 "Alipay"（DESIGN §4.5）；Stripe Checkout 托管页传 `locale`（`en` / `zh`）。
 - **法律页**：只有英文（Owner 2026-11-06 晚）。以后要做中文版时，它是英文版的翻译，页首注明「本中文版本仅供参考，如与英文版本不一致，以英文版本为准」，律师审英文版。
 - **邮件**：见第 7 节，按 `user_metadata.locale` 发中文或英文。
+- **中文字体只用于标题（Owner 2026-11-07，T67）**：MiSans 只给标题和大字用（半粗 600 一档）；正文、按钮、导航、表单、说明等界面文字的中文一律用系统字体栈 `"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", sans-serif`（英文字体不变）。目的：大陆访问是跨境下载瓶颈（ITDOG 平均 3.85 秒），中文页首次字体下载从约 1 MB 降到约 265 KB；汇总 CSS 只声明 600 一档，体积随之变小，就能按下面「加载」放进 `<head>`，不再闪。下面关于文件和授权的规则不变（不改、不子集化官方分包）。
 - **字体：中文用小米 MiSans，照 Graylum 的做法移植**（Owner 2026-11-06；参考 `seo资料/全站中文字体.md`，以及 Graylum staging 分支的 `apps/web/public/fonts/misans/`、`src/components/misans-font.tsx`）：
   - **文件**：官方未修改的静态 WOFF2 分包（简体中文 + 拉丁，400 / 500 / 600，约 168 个文件、5.8 MB），放在 `public/fonts/misans/`。
     - 同目录保留 `manifest.json`（每个文件的来源、unicode-range、字节数、SHA-256）、汇总 CSS、`LICENSE.pdf`、`NOTICE.txt`、`README.md`。
