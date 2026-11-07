@@ -1,6 +1,7 @@
 import 'server-only'
 import { z } from 'zod'
 
+import { alertsEnvShape } from './alerts/alerts-env'
 import { sentryBuildEnvSchema } from './build-env'
 import { indexingEnvSchema } from './seo/indexing-env'
 import { smsEnvShape } from './sms/sms-env'
@@ -53,6 +54,8 @@ const serverEnvSchema = z.object({
   ...waffoEnvShape,
   // Phone sign-in (T63): the SMS adapter and the Send SMS hook secret (core/sms).
   ...smsEnvShape,
+  // Owner business alerts to a Feishu group bot (T72, ARCHITECTURE §16.4); unset → none sent.
+  ...alertsEnvShape,
 })
   .extend(sentryBuildEnvSchema.shape)
   // SITE_INDEXING: the pre-launch indexing switch (ARCHITECTURE §12.0), default off.

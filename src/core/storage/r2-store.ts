@@ -28,6 +28,12 @@ const isNotFound = (error: unknown) =>
   ((error as { name?: string }).name === 'NotFound' ||
     (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode === 404)
 
+// 412: something is already there. 409: a concurrent conditional write to the same key won.
+const lostRace = (error: unknown) => {
+  const status = (error as { $metadata?: { httpStatusCode?: number } } | null)?.$metadata?.httpStatusCode
+  return status === 412 || status === 409
+}
+
 // R2 rejects the CRC32 checksum headers newer SDKs add to presigned URLs by default.
 export function createR2Client(config: { accountId: string; accessKeyId: string; secretAccessKey: string }) {
   return new S3Client({
@@ -89,6 +95,15 @@ export function createR2Store(client: S3Like, bucket: string, presign: Presign =
       await client.send(
         new PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ContentType: contentType, CacheControl: options?.cacheControl }),
       )
+    },
+    async putIfAbsent(key, body, contentType) {
+      try {
+        await client.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ContentType: contentType, IfNoneMatch: '*' }))
+        return true
+      } catch (error) {
+        if (lostRace(error)) return false
+        throw error
+      }
     },
     async copy(sourceKey, destinationKey) {
       await client.send(new CopyObjectCommand({ Bucket: bucket, Key: destinationKey, CopySource: copySource(bucket, sourceKey) }))

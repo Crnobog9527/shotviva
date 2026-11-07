@@ -4,9 +4,11 @@ import { verify as verifySignature, type KeyObject } from 'node:crypto'
 
 import { z } from 'zod'
 
+import { notifyOwner } from '../../alerts'
 import { captureAlert, captureError } from '../../analytics/capture-error'
 import { logger } from '../../logger'
 import type { WaffoMode } from './config'
+import { waffoFailureAlert, waffoRefundAlert } from './failure-alert'
 import { fulfilWaffoOrder, type WaffoFulfilDeps } from './fulfil'
 import { SUBSCRIPTION_STATE_EVENTS, applySubscriptionEvent } from './subscription-sync'
 
@@ -19,8 +21,9 @@ import { SUBSCRIPTION_STATE_EVENTS, applySubscriptionEvent } from './subscriptio
 // Grants: order.completed (a one-time order paid) and subscription.payment_succeeded (a card
 // subscription's first payment and every renewal, T50); both carry the payment id as eventId.
 // The other subscription.* events only update the subscriptions mirror (subscription-sync.ts).
-// refund.succeeded is recorded and alerted, never clawed back automatically (§6.2, same as
-// Stripe's charge.refunded). Everything else (plan changes we never start) is acknowledged.
+// refund.succeeded is recorded and alerted (Sentry, and the Owner's Feishu group, T72), never
+// clawed back automatically yet (§6.2, same as Stripe's charge.refunded; T71 changes that).
+// Everything else (plan changes we never start) is acknowledged.
 
 export const WAFFO_SIGNATURE_WINDOW_MS = 45 * 60 * 1000
 const FUTURE_SKEW_MS = 60 * 1000
@@ -76,10 +79,11 @@ export function verifyWaffoEvent(deps: VerifyDeps, body: string, header: string 
   return event.data
 }
 
-function refundAlert(event: WaffoEvent): WaffoWebhookResult {
+async function refundAlert(event: WaffoEvent): Promise<WaffoWebhookResult> {
   const fields = { event_id: event.eventId, order_id: String(event.data.orderId ?? ''), payment_id: String(event.data.paymentId ?? '') }
   logger.warn('waffo refund recorded', fields)
   captureAlert('charge_refunded', 'Waffo refund.succeeded: adjust credits by hand if needed', { fields })
+  await notifyOwner(waffoRefundAlert(event))
   return { status: 200, body: { received: true } }
 }
 
@@ -102,6 +106,7 @@ export async function handleWaffoWebhook(
   } catch (error) {
     logger.error('waffo webhook failed', { event_id: event.eventId, type: event.eventType, error })
     captureError(error, { alert: 'payment_webhook_failed', fields: { event_id: event.eventId, event_type: event.eventType } })
+    await notifyOwner(waffoFailureAlert(event))
     return { status: 500, body: { code: 'WEBHOOK_FAILED' } }
   }
 }

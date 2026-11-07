@@ -3,6 +3,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
+import { notifyOwner } from '../alerts'
 import { AppError } from '../errors'
 import type { TicketImageRow } from './images'
 import { supportRpc } from './rpc'
@@ -36,18 +37,21 @@ export async function createTicket(db: SupabaseClient, userId: string, input: un
     },
     idRow,
   )
+  // The Owner hears of every new ticket in Feishu (T72); refund requests are tagged.
+  await notifyOwner({ kind: 'ticket', ticketId: row.id, messageId: null, userId, ticketType: type })
   return row.id
 }
 
 export async function addTicketMessage(db: SupabaseClient, userId: string, input: unknown, images: readonly TicketImageRow[] = []): Promise<void> {
   const parsed = addMessageSchema.safeParse(input)
   if (!parsed.success) throw new AppError('INVALID_INPUT', 'message input is invalid')
-  await supportRpc(
+  const message = await supportRpc(
     db,
     'add_ticket_message',
     { p_ticket_id: parsed.data.ticketId, p_user_id: userId, p_body: parsed.data.body, p_images: images },
     idRow,
   )
+  await notifyOwner({ kind: 'ticket', ticketId: parsed.data.ticketId, messageId: message.id, userId, ticketType: null })
 }
 
 // Clears the "new reply" dot when the author opens the ticket; writes nothing if already read.

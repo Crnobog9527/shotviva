@@ -2,8 +2,10 @@ import 'server-only'
 
 import type Stripe from 'stripe'
 
+import { notifyOwner } from '../../alerts'
 import { captureAlert, captureError } from '../../analytics/capture-error'
 import { logger } from '../../logger'
+import { stripeFailureAlert } from './failure-alert'
 import { fulfilCheckoutSession, type FulfilDeps } from './fulfil'
 import { recordDispute, recordRefund } from './payment-issues'
 import { renewFromInvoice } from './renewal'
@@ -65,6 +67,8 @@ export async function handleStripeWebhook(
   } catch (error) {
     logger.error('stripe webhook failed', { ...fields, error })
     captureError(error, { alert: 'payment_webhook_failed', fields })
+    // Stripe retries this event for days; the Owner hears once (deduped by event id).
+    await notifyOwner(stripeFailureAlert(event))
     return { status: 500, body: { code: 'WEBHOOK_FAILED' } }
   }
 }

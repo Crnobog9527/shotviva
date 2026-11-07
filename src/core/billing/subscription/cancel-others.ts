@@ -2,6 +2,7 @@ import 'server-only'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+import { notifyOwner } from '../../alerts'
 import { captureAlert } from '../../analytics/capture-error'
 import { logger } from '../../logger'
 import type { RpcClient } from '../rpc'
@@ -82,6 +83,7 @@ async function cancelOne(deps: CancelOthersDeps, row: MirrorRow, userId: string)
     const fields = { user_id: userId, provider: row.provider, subscription: ref, product_id: row.productId }
     logger.error('old subscription cancel after upgrade failed', { ...fields, error })
     captureAlert('subscription_cancel_failed', 'Upgrade paid but the old subscription was not cancelled: cancel it by hand', { fields })
+    await notifyOwner({ kind: 'subscription_cancel_failed', userId, channel: row.provider, productId: row.productId, subscriptionRef: ref })
     return false
   }
 }
@@ -95,6 +97,7 @@ export async function cancelOtherSubscriptions(deps: CancelOthersDeps, userId: s
   } catch (error) {
     logger.error('upgrade: mirror read failed', { userId, error })
     captureAlert('subscription_cancel_failed', 'Upgrade paid but the old subscriptions could not be read: check by hand', { fields: { user_id: userId } })
+    await notifyOwner({ kind: 'subscription_cancel_failed', userId, channel: null, productId: null, subscriptionRef: null })
     return { cancelled: 0, failed: 1 }
   }
   for (const row of rows) {

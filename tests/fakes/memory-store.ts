@@ -27,6 +27,11 @@ export function createMemoryStore() {
       }
       objects.set(key, { body, contentType })
     },
+    putIfAbsent: async (key, body, contentType) => {
+      if (objects.has(key)) return false
+      objects.set(key, { body, contentType })
+      return true
+    },
     copy: async (sourceKey, destinationKey) => {
       if (failCopy.next) {
         failCopy.next = false
