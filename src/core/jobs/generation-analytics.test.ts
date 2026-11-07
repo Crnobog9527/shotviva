@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { ServerTrack } from '../analytics'
 import { AppError } from '../errors'
-import { generateEventProps, settleTracked } from './generation-analytics'
+import { validateEvent } from '../analytics'
+import { categorySlug, generateEventProps, settleTracked } from './generation-analytics'
 import { GenerationFailure } from './generation-failure'
 import type { Job } from './job-schema'
 
@@ -27,7 +28,32 @@ const job: Job = {
   deletedAt: null,
 }
 
+describe('categorySlug', () => {
+  it('turns the stored category names (T53) into dictionary slugs', () => {
+    expect(categorySlug('Products & Resale')).toBe('products-resale')
+    expect(categorySlug('Food & Drink')).toBe('food-drink')
+    expect(categorySlug('Beauty & Skincare')).toBe('beauty-skincare')
+    expect(categorySlug('Art Styles')).toBe('art-styles')
+    expect(categorySlug('Pets')).toBe('pets')
+    expect(categorySlug('  Rooms & Spaces ')).toBe('rooms-spaces')
+  })
+
+  it('keeps slugs as they are and never returns an empty or over-long value', () => {
+    expect(categorySlug('food')).toBe('food')
+    expect(categorySlug('宠物')).toBe('uncategorized')
+    expect(categorySlug(`${'a'.repeat(63)} b`)).toBe('a'.repeat(63))
+  })
+})
+
 describe('generateEventProps', () => {
+  // Production, 2026-11-07, on every settled job: {"msg":"analytics event refused",
+  // "event":"generate","issues":["category: invalid_format"]}.
+  it('builds an event the dictionary accepts from a real category name', () => {
+    const props = generateEventProps(job, 'Products & Resale', { status: 'succeeded' }, 1000)
+    expect(props.category).toBe('products-resale')
+    expect(validateEvent('generate', props).ok).toBe(true)
+  })
+
   it('maps a job to the dictionary and never copies its user inputs', () => {
     const props = generateEventProps(job, 'food', { status: 'succeeded' }, 1234.6)
     expect(props).toEqual({
