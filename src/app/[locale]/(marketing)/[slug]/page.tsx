@@ -13,7 +13,7 @@ import {
   softwareApplicationLd,
 } from '@/core/seo'
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
-import { toCatalogueTemplate } from '@/modules/image'
+import { toCatalogueTemplate } from '@/modules/image/marketing'
 import { contentPagesIn, featuredSections, fillCredits, findContentPageIn, freeImagesLabel, homePageIn, isLinkEnabled, startingCredits } from '@/site/content'
 import { zhFreeImages } from '@/site/content/zh/offer'
 import { site } from '@/site/site.config'

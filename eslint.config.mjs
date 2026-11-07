@@ -53,9 +53,11 @@ const coreUpwardImport = {
   message: 'core must not import modules, site or app; use the module registry.',
 }
 
+// A module may also publish marketing.ts: a narrow entry for marketing pages, whose client
+// bundle would otherwise include every client component index.ts exports (performance B7).
 const deepModuleImport = {
-  group: ['@/modules/*/**'],
-  message: "Import a module through its index.ts ('@/modules/<id>'), not its internals.",
+  group: ['@/modules/*/**', '!@/modules/*/marketing'],
+  message: "Import a module through its index.ts ('@/modules/<id>') or its marketing.ts, not its internals.",
 }
 
 export default defineConfig([

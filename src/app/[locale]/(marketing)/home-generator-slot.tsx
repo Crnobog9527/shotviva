@@ -9,7 +9,7 @@ import { paymentChannel } from '@/core/billing/waffo'
 import { listOwnJobs } from '@/core/jobs'
 import { logger } from '@/core/logger'
 import { isWishlistEnabled } from '@/core/wishlist'
-import { HomeGenerator, type HomeGeneratorProps, type HomeViewer } from '@/modules/image'
+import { HomeGenerator, type HomeGeneratorProps, type HomeViewer } from '@/modules/image/marketing'
 import { site } from '@/site/site.config'
 
 type Base = Omit<HomeGeneratorProps, 'viewer' | 'googleAction'>
