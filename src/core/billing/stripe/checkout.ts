@@ -3,12 +3,13 @@ import 'server-only'
 import type Stripe from 'stripe'
 import { z } from 'zod'
 
+import type { CheckoutStartMethod } from '../../analytics/events'
 import { trackCheckoutStart } from '../../analytics/funnel'
 import { PRODUCT_IDS, type PaymentChannel, type SiteProduct } from '../../config'
 import { AppError } from '../../errors'
 import { localizePath } from '../../i18n/paths'
 import { allowlistedUrl } from '../../partner/return-to'
-import { CHECKOUT_METHODS, checkoutRoute, offeredMethods, type CheckoutMethod, type CheckoutRoute } from './catalog'
+import { CHECKOUT_METHODS, checkoutRoute, offeredMethods, STRIPE_WALLETS, type CheckoutMethod, type CheckoutRoute } from './catalog'
 import { cardOnlyConfigId } from './card-only'
 import type { StripeApi } from './client'
 import { resolvePriceId } from './prices'
@@ -64,21 +65,22 @@ type Metadata = { user_id: string; product_id: string; method: CheckoutMethod; l
 
 type MethodParams = Pick<
   Stripe.Checkout.SessionCreateParams,
-  'managed_payments' | 'allowed_payment_method_types' | 'wallet_options' | 'payment_method_configuration'
+  'managed_payments' | 'allowed_payment_method_types' | 'wallet_options' | 'payment_method_configuration' | 'payment_method_options'
 >
 
 // A typed literal, not a spread into the params: a parameter Stripe removes from the SDK types
 // (as payment_method_types was in 2026-09-30.endive) then fails the type check instead of
 // reaching Stripe as a 400.
 // Managed Payments is always said out loud, on or off: the live Dashboard can turn it on by
-// default for every Checkout Session, and it does not take Alipay. So an Alipay period, an
-// Alipay pack, 中国银行卡 and the plain-card fallback (STRIPE_MANAGED_PAYMENTS off) send
+// default for every Checkout Session, and it takes neither wallet. So a wallet period, a
+// wallet pack, 中国银行卡 and the plain-card fallback (STRIPE_MANAGED_PAYMENTS off) send
 // enabled: false, and the session never depends on that toggle. No automatic_tax anywhere:
 // Managed Payments adds its own tax, and on the plain routes Shotviva is the seller (§6.3).
 function methodParams(route: CheckoutRoute, cardOnlyConfig: string | null): MethodParams {
   if (route.managedPayments) return { managed_payments: { enabled: true } }
   const off = { enabled: false }
-  if (!isPlainCard(route)) return { managed_payments: off, allowed_payment_method_types: route.allowedMethods ?? ['card'] }
+  if (isWallet(route)) return { managed_payments: off, allowed_payment_method_types: [...STRIPE_WALLETS], ...WALLET }
+  if (!isPlainCard(route)) return { managed_payments: off, allowed_payment_method_types: ['card'] }
   // Stripe takes one of allowed_payment_method_types and payment_method_configuration; the
   // configuration has only card on, so it is the same filter with the wallets off too.
   const methods: MethodParams = cardOnlyConfig ? { payment_method_configuration: cardOnlyConfig } : { allowed_payment_method_types: ['card'] }
@@ -91,6 +93,15 @@ function methodParams(route: CheckoutRoute, cardOnlyConfig: string | null): Meth
 // off here in case that configuration is missing. Adaptive Pricing stays as the Dashboard sets it
 // (Owner 2026-11-08): the buyer may see their own currency, Shotviva is paid in USD.
 const PLAIN_CARD = { wallet_options: { link: { display: 'never' } } } satisfies MethodParams
+
+// 支付宝 / 微信支付 (T73): one Checkout page lists both and the buyer picks there. On a desktop
+// browser WeChat Pay shows a QR code to scan with the phone; `client: 'web'` is the only client
+// a Stripe-hosted page takes.
+const WALLET = { payment_method_options: { wechat_pay: { client: 'web' } } } satisfies MethodParams
+
+function isWallet(route: CheckoutRoute): boolean {
+  return route.allowedMethods === STRIPE_WALLETS
+}
 
 function isPlainCard(route: CheckoutRoute): boolean {
   return !route.managedPayments && route.allowedMethods?.[0] === 'card'
@@ -117,11 +128,19 @@ function sessionParams(
 }
 
 // allowed_payment_method_types filters silently: a method that is off in the Dashboard leaves
-// the buyer on a checkout page that cannot take their payment. Refuse instead of redirecting.
+// the buyer on a checkout page that cannot take their payment. Refuse instead of redirecting
+// when none of the route's methods survived; the wallet route opens with just Alipay or just
+// WeChat Pay while the other is still off (or awaiting Stripe's approval).
 function assertMethodOffered(route: CheckoutRoute, session: Pick<Stripe.Checkout.Session, 'id' | 'payment_method_types'>) {
-  const required = route.allowedMethods?.[0]
-  if (!required || session.payment_method_types?.includes(required)) return
-  throw new AppError('INTERNAL', `Checkout session ${session.id} does not offer ${required}; turn it on in Stripe Settings → Payment methods`)
+  const wanted: readonly string[] = route.allowedMethods ?? []
+  if (wanted.length === 0 || wanted.some((m) => session.payment_method_types?.includes(m))) return
+  throw new AppError('INTERNAL', `Checkout session ${session.id} offers none of ${wanted.join(', ')}; turn one on in Stripe Settings → Payment methods`)
+}
+
+// checkout_start (ARCHITECTURE §16.2): the Stripe wallet line is not yet one wallet or the
+// other, so it is `alipay_or_wechat`; `purchase` then records the wallet that paid.
+function startedMethod(method: CheckoutMethod, route: CheckoutRoute): CheckoutStartMethod {
+  return isWallet(route) ? 'alipay_or_wechat' : method
 }
 
 // Checkout takes only what the buyer's page listed (catalog offeredMethods): 中国银行卡 exists on
@@ -159,7 +178,7 @@ export async function createCheckout(
     interval: product.interval,
     form: route.form,
     channel: 'stripe',
-    method: body.method,
+    method: startedMethod(body.method, route),
   }, body.locale)
   return { url: session.url }
 }

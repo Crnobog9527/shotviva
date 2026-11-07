@@ -65,6 +65,7 @@ describe('checkout return page (en)', () => {
     expect(pack).toContain('One-time payment. Nothing renews.')
     expect(pack).not.toContain('Renews')
     expect(pack).toContain('· Alipay')
+    expect(await success('en', 'pack_l', { method: 'wechat_pay', card: null, receiptUrl: null })).toContain('· WeChat Pay')
     expect(await success('en', 'starter_monthly', { method: 'alipay', card: null, recurring: false, renewsAt: null })).toContain('One-time payment for 30 days. Nothing renews')
   })
 
@@ -75,7 +76,7 @@ describe('checkout return page (en)', () => {
     if (view.state !== 'pending') throw new Error('expected pending')
     const html = await render('en', createElement(PendingReturn, { view, again: '/checkout?session_id=cs_test_x', email: 'support@shotviva.com' }))
     expect(html).toContain('Confirming your payment')
-    expect(html).toContain('Alipay is still confirming it.')
+    expect(html).toContain('Alipay or WeChat Pay is still confirming it.')
     expect(html).toContain('Pro · 1 month · 135 credits')
     expect(html).toContain('Check again')
     expect(html).toContain('support@shotviva.com')
@@ -110,5 +111,6 @@ describe('checkout return page (zh)', () => {
   it('names the plan and the method in Chinese', async () => {
     expect(await success('zh', 'max_monthly')).toContain('你已开通旗舰版')
     expect(await success('zh', 'pack_s', { method: 'alipay', card: null })).toContain('· 支付宝')
+    expect(await success('zh', 'pack_s', { method: 'wechat_pay', card: null })).toContain('· 微信支付')
   })
 })

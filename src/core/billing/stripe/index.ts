@@ -2,7 +2,9 @@
 // site's products; core never imports site.
 export {
   CHECKOUT_METHODS,
+  RECORDED_METHODS,
   STRIPE_TAX_CODE,
+  STRIPE_WALLETS,
   checkoutRoute,
   desiredPrices,
   lookupKey,
@@ -14,6 +16,7 @@ export {
   type CheckoutMethod,
   type CheckoutRoute,
   type DesiredPrice,
+  type RecordedMethod,
 } from './catalog'
 export {
   assertOffered,

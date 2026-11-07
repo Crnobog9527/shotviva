@@ -3,7 +3,7 @@ import 'server-only'
 import type Stripe from 'stripe'
 
 import { AppError } from '../../errors'
-import type { CheckoutMethod } from './catalog'
+import type { CheckoutMethod, RecordedMethod } from './catalog'
 import type { StripeApi } from './client'
 
 // What a payments row records (TASKS T10), read from objects the webhook just retrieved from
@@ -27,8 +27,9 @@ const idOf = (value: string | { id: string } | null | undefined): string | null 
   typeof value === 'string' ? value : (value?.id ?? null)
 
 // What payments.method holds (ARCHITECTURE §6.1): `card` is the Managed Payments card group
-// (海外银行卡), `cn_card` the plain Stripe card route (中国银行卡, T64), `alipay` Alipay.
-export type RecordedMethod = CheckoutMethod
+// (海外银行卡), `cn_card` the plain Stripe card route (中国银行卡, T64), `alipay` / `wechat_pay`
+// the wallet that paid on the wallet route (T73).
+export type { RecordedMethod }
 
 // A card charge records the card route it went through, read from our own checkout metadata
 // (the session's for a first payment, the subscription's for a renewal).
@@ -36,12 +37,15 @@ export function cardRouteOf(method: unknown): 'card' | 'cn_card' {
   return method === 'cn_card' ? 'cn_card' : 'card'
 }
 
-// Alipay is the only wallet sold (§6.2); every other method Managed Payments offers (card,
-// Apple / Google Pay, Link) belongs to the card group of the route the session was opened on.
+// The wallets sold are Alipay and WeChat Pay (§6.2, T73), both on the one wallet checkout, so
+// the charge says which the buyer chose there. Every other method Managed Payments offers
+// (card, Apple / Google Pay, Link) belongs to the card group of the route the session was
+// opened on. With no charge to read, the picked route stands (the wallet line reads `alipay`).
 export function methodOfCharge(charge: Stripe.Charge | null, picked: CheckoutMethod): RecordedMethod {
   const type = charge?.payment_method_details?.type
   if (!type) return picked
-  return type === 'alipay' ? 'alipay' : cardRouteOf(picked)
+  if (type === 'alipay' || type === 'wechat_pay') return type
+  return cardRouteOf(picked)
 }
 
 function expandedCharge(intent: string | Stripe.PaymentIntent | null): Stripe.Charge | null {
@@ -62,7 +66,7 @@ export function invoiceTax(invoice: Stripe.Invoice): number {
   return (invoice.total_taxes ?? []).reduce((sum, tax) => sum + tax.amount, 0)
 }
 
-// Subscriptions are card-only (Alipay cannot subscribe, §6.3): an invoice is paid by the card
+// Subscriptions are card-only (neither wallet can subscribe, §6.3): an invoice is paid by the card
 // route its subscription was opened on (`subscriptionMethod`, the subscription's metadata).
 export function invoiceFacts(invoice: Stripe.Invoice, subscriptionMethod: unknown): PaymentFacts {
   return {

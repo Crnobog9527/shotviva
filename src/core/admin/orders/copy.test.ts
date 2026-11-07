@@ -6,7 +6,8 @@ import { ORDERS_COPY } from './copy'
 describe('orders method labels', () => {
   it('names each recorded method, the two card routes apart', () => {
     const { methods } = ORDERS_COPY
-    expect(Object.keys(methods).sort()).toEqual(['alipay', 'card', 'cn_card'])
+    expect(Object.keys(methods).sort()).toEqual(['alipay', 'card', 'cn_card', 'wechat_pay'])
+    expect(methods.wechat_pay).toBe('微信支付')
     expect(methods.card).not.toBe(methods.cn_card)
     expect(methods.cn_card).toContain('中国银行卡')
   })

@@ -3,9 +3,10 @@ import type { CheckoutMethod } from "../stripe/catalog"
 import type { Period } from "./offer"
 
 // Which paywall message each payment line uses (DESIGN §4.5, ARCHITECTURE §6.3). On both
-// channels a card plan renews and can be cancelled anytime, Alipay buys one period that does not
-// renew, and packs are one-time (Waffo card subscriptions since T50). The channel only changes
-// the card label: Waffo's subscription page takes cards, not Apple Pay or Google Pay. 中国银行卡
+// channels a card plan renews and can be cancelled anytime, the wallet line buys one period that
+// does not renew, and packs are one-time (Waffo card subscriptions since T50). The channel
+// changes two labels: Waffo's subscription page takes cards, not Apple Pay or Google Pay, and
+// its wallet is Alipay alone, while Stripe's wallet checkout lists Alipay and WeChat Pay (T73). 中国银行卡
 // (zh pages on Stripe, T64) reads like a card: plans renew, packs are one-time. On zh pages the
 // Managed Payments card is worded 海外银行卡 by the zh catalog itself. Pure, so every line is
 // unit-tested.
@@ -14,7 +15,8 @@ export type PaywallMessage = { key: string; values?: Record<string, string> }
 
 export function methodLabel(channel: PaymentChannel, method: CheckoutMethod): PaywallMessage {
   if (method === "card") return { key: channel === "waffo" ? "cardOnly" : "card" }
-  return { key: method === "cn_card" ? "cnCard" : "alipay" }
+  if (method === "cn_card") return { key: "cnCard" }
+  return { key: channel === "waffo" ? "alipay" : "wallet" }
 }
 
 export function methodNote(

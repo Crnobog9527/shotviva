@@ -30,7 +30,7 @@ export const refundPolicyPage = defineLegalPage({
           ],
         },
         'Yearly plans: all of the credits for the year are added when you pay. If a refund is approved, all credits from that purchase are removed from your account.',
-        'Membership bought with Alipay: this is a single payment for one period and does not renew. The same seven-day, no-credits-used rule applies.',
+        'Membership bought with Alipay or WeChat Pay: this is a single payment for one period and does not renew. The same seven-day, no-credits-used rule applies.',
       ],
     },
     {

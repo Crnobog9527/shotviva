@@ -10,9 +10,10 @@ import { usePaymentChannel } from "./channel-context"
 
 type Props = { method: CheckoutMethod; onChange(method: CheckoutMethod): void; kind: "plan" | "pack"; period: Period }
 
-// The payment groups (DESIGN §4.5): card with Apple Pay and Google Pay, and Alipay; zh pages on
-// Stripe lead with 中国银行卡 (ARCHITECTURE §6.3, T64). For a plan a card renews and Alipay buys
-// one period; for a pack all are one-time (copy.ts).
+// The payment groups (DESIGN §4.5): card with Apple Pay and Google Pay, and the wallets (支付宝 /
+// 微信支付 on Stripe, T73; Alipay alone on Waffo); zh pages on Stripe lead with 中国银行卡
+// (ARCHITECTURE §6.3, T64). For a plan a card renews and a wallet buys one period; for a pack
+// all are one-time (copy.ts).
 export function PayMethods({ method, onChange, kind, period }: Props) {
   const t = useTranslations("paywall")
   const channel = usePaymentChannel()

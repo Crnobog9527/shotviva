@@ -54,21 +54,22 @@ describe('createCheckout routing', () => {
     }, 'zh')
   })
 
-  it('opens Alipay as a one-time payment for one period, Shotviva as seller', async () => {
+  it('opens the wallet line (Alipay / WeChat Pay) as a one-time payment for one period, Shotviva as seller', async () => {
     const { stripe, create } = fakeStripe()
     const d = deps(stripe)
     await createCheckout(d, { userId: USER, body: { product_id: 'pro_yearly', method: 'alipay', locale: 'en' } })
     const params = sent(create)
     expect(params).toMatchObject({
       mode: 'payment',
-      allowed_payment_method_types: ['alipay'],
+      allowed_payment_method_types: ['alipay', 'wechat_pay'],
+      payment_method_options: { wechat_pay: { client: 'web' } },
       line_items: [{ price: 'price_pro_yearly' }],
       payment_intent_data: { metadata: { product_id: 'pro_yearly', method: 'alipay' } },
     })
     // Said out loud: the Dashboard's "Managed Payments by default" must not pull Alipay into MP.
     expect(params).toMatchObject({ managed_payments: { enabled: false } })
     expect(params).not.toHaveProperty('payment_method_types')
-    expect(d.trackStart).toHaveBeenCalledWith(USER, expect.objectContaining({ form: 'one_time', method: 'alipay', interval: 'year' }), 'en')
+    expect(d.trackStart).toHaveBeenCalledWith(USER, expect.objectContaining({ form: 'one_time', method: 'alipay_or_wechat', interval: 'year' }), 'en')
   })
 
   it('sells a pack by card as a Managed Payments one-time payment', async () => {
@@ -107,11 +108,11 @@ describe('Managed Payments is explicit on every route', () => {
   it.each([
     ['card membership, MP on', 'pro_monthly', 'card', true, { mode: 'subscription', managed_payments: { enabled: true } }, null],
     ['card pack, MP on', 'pack_m', 'card', true, { mode: 'payment', managed_payments: { enabled: true } }, null],
-    ['Alipay period, MP on', 'starter_monthly', 'alipay', true, { mode: 'payment', managed_payments: { enabled: false } }, ['alipay']],
-    ['Alipay pack, MP on', 'pack_l', 'alipay', true, { mode: 'payment', managed_payments: { enabled: false } }, ['alipay']],
+    ['wallet period, MP on', 'starter_monthly', 'alipay', true, { mode: 'payment', managed_payments: { enabled: false } }, ['alipay', 'wechat_pay']],
+    ['wallet pack, MP on', 'pack_l', 'alipay', true, { mode: 'payment', managed_payments: { enabled: false } }, ['alipay', 'wechat_pay']],
     ['card membership, MP off', 'max_yearly', 'card', false, { mode: 'subscription', managed_payments: { enabled: false } }, ['card']],
     ['card pack, MP off', 'pack_s', 'card', false, { mode: 'payment', managed_payments: { enabled: false } }, ['card']],
-    ['Alipay period, MP off', 'pro_yearly', 'alipay', false, { mode: 'payment', managed_payments: { enabled: false } }, ['alipay']],
+    ['wallet period, MP off', 'pro_yearly', 'alipay', false, { mode: 'payment', managed_payments: { enabled: false } }, ['alipay', 'wechat_pay']],
   ] as const)('%s', async (_, productId, method, managedPayments, expected, methods) => {
     const { stripe, create } = fakeStripe()
     await createCheckout(deps(stripe, { managedPayments }), { userId: USER, body: { product_id: productId, method, locale: 'en' } })
@@ -123,18 +124,18 @@ describe('Managed Payments is explicit on every route', () => {
 })
 
 describe('createCheckout with allowed_payment_method_types (API 2026-09-30.endive)', () => {
-  it('sells an Alipay pack as a one-time payment limited to Alipay', async () => {
+  it('sells a wallet pack as a one-time payment limited to Alipay and WeChat Pay', async () => {
     const { stripe, create } = fakeStripe()
     await createCheckout(deps(stripe), { userId: USER, body: { product_id: 'pack_s', method: 'alipay', locale: 'zh' } })
-    expect(sent(create)).toMatchObject({ mode: 'payment', allowed_payment_method_types: ['alipay'], locale: 'zh' })
+    expect(sent(create)).toMatchObject({ mode: 'payment', allowed_payment_method_types: ['alipay', 'wechat_pay'], locale: 'zh' })
   })
 
-  it('refuses to send the buyer to a checkout that cannot take Alipay (off in the Dashboard)', async () => {
+  it('refuses to send the buyer to a wallet checkout with neither Alipay nor WeChat Pay on in the Dashboard', async () => {
     const { stripe } = fakeStripe(priceFor, { enabled: ['card', 'link'] })
     const d = deps(stripe)
     await expect(
       createCheckout(d, { userId: USER, body: { product_id: 'starter_monthly', method: 'alipay', locale: 'en' } }),
-    ).rejects.toThrow(/does not offer alipay/)
+    ).rejects.toThrow(/offers none of alipay, wechat_pay/)
     expect(d.trackStart).not.toHaveBeenCalled()
   })
 

@@ -21,7 +21,7 @@ export function PendingReturn({ view, again, email }: Props) {
     <ReturnPlate pending>
       <Glyph pending />
       <h1 className={titleClass}>{t('titlePending')}</h1>
-      <p className={subClass}>{t(view.method === 'alipay' ? 'subPendingAlipay' : 'subPending')}</p>
+      <p className={subClass}>{t(view.method === 'alipay' || view.method === 'wechat_pay' ? 'subPendingWallet' : 'subPending')}</p>
       <Rows>
         <Row label={t('order')}>{order}</Row>
         {view.amount ? <Row label={t('amount')}>{money(view.amount)}</Row> : null}
