@@ -98,5 +98,7 @@ describe('phone sign-in messages', () => {
     expect(t.zh('phone.consent', links)).toContain('[terms:《服务条款》][privacy:《隐私政策》][aup:《使用规范》]')
     expect(t.zh('errors.AUTH_CONSENT_REQUIRED')).toBe('请先勾选同意服务条款、隐私政策、使用规范和个人信息出境。')
     expect(t.en('errors.AUTH_CONSENT_REQUIRED')).toMatch(/Terms of Service.*Privacy Policy.*Acceptable Use Policy.*cross-border/)
+    // The box says it, so the phone tab has no 「继续即表示你同意服务条款」 line under the button (control 2026-11-08).
+    for (const messages of [en.auth, zh.auth]) expect(Object.keys(messages.phone)).not.toContain('terms')
   })
 })

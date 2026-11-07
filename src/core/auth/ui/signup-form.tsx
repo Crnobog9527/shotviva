@@ -78,7 +78,7 @@ export function SignupForm({ action, googleAction, resendAction, next, freeImage
       {phone ? (
         <AuthTabs
           initial="phone"
-          phone={<PhoneSignIn actions={phone} next={next} submitLabel={t('signup.submit')} termsLine={false} />}
+          phone={<PhoneSignIn actions={phone} next={next} submitLabel={t('signup.submit')} />}
           email={<EmailSignup form={form} googleAction={googleAction} next={next} />}
         />
       ) : (

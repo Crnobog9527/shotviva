@@ -43,8 +43,7 @@
       "placeholder": "11-digit number",
       "hint": "Mainland China (+86) numbers only. A new number creates an account.",
       "consent": "I have read and agree to the <terms>Terms of Service</terms>, <privacy>Privacy Policy</privacy> and <aup>Acceptable Use Policy</aup>, and agree that my phone number and other personal information are transferred outside mainland China (stored in the United States; the text message is sent by an SMS provider).",
-      "send": "Get code",
-      "terms": "By continuing you agree to the <terms>Terms</terms>."
+      "send": "Get code"
     },
     "code": {
       "field": "Verification code",
