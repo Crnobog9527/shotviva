@@ -10,6 +10,7 @@ import {
   COVER_ANIMATED_EDGE,
   COVER_ANIMATED_QUALITY,
   COVER_STILL_EDGE,
+  COVER_STILL_EFFORT,
   COVER_STILL_QUALITY,
   MAX_COVER_VIDEO_SECONDS,
 } from './cover-rules'
@@ -48,13 +49,16 @@ function file(bytes: Uint8Array, contentType: CoverFile['contentType']): CoverFi
 
 const decodeFailed = () => new AppError('INVALID_INPUT', '图片无法解码，请换一个文件')
 
-// A still (before / after / poster): first frame only, EXIF orientation baked in, metadata dropped.
+// A still (before / after / poster): first frame only, EXIF orientation baked in, metadata dropped,
+// an alpha channel kept (a white-background template's cut-out "after" stays transparent; the
+// site paints white behind it). The slowest encoder effort: the admin waits a second once, and
+// every visitor's copy is a little smaller (the optimiser re-encodes from this file).
 export async function stillCover(bytes: Uint8Array): Promise<CoverFile> {
   try {
     const out = await sharp(bytes, { limitInputPixels: MAX_INPUT_PIXELS })
       .rotate()
       .resize({ width: COVER_STILL_EDGE, height: COVER_STILL_EDGE, fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: COVER_STILL_QUALITY })
+      .webp({ quality: COVER_STILL_QUALITY, effort: COVER_STILL_EFFORT })
       .toBuffer()
     return file(new Uint8Array(out), 'image/webp')
   } catch {

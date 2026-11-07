@@ -30,9 +30,9 @@ const tpl = (category: string): CatalogueTemplate => ({
 
 describe('template examples carry no badge', () => {
   const cases: [string, ReactElement][] = [
-    ['PairMedia card', createElement(PairMedia, { before: 'b.webp', after: 'a.webp', alt: 'x' })],
-    ['PairMedia pair', createElement(PairMedia, { before: 'b.webp', after: 'a.webp', alt: 'x', size: 'pair' })],
-    ['PairMedia feature', createElement(PairMedia, { before: 'b.webp', after: 'a.webp', alt: 'x', size: 'feature' })],
+    ['PairMedia card', createElement(PairMedia, { before: 'b.webp', after: 'a.webp', alt: 'x', sizes: '50vw' })],
+    ['PairMedia pair', createElement(PairMedia, { before: 'b.webp', after: 'a.webp', alt: 'x', size: 'pair', sizes: '50vw' })],
+    ['PairMedia feature', createElement(PairMedia, { before: 'b.webp', after: 'a.webp', alt: 'x', size: 'feature', sizes: '50vw' })],
     ['CompareSlider', createElement(CompareSlider, { before: 'b.webp', after: 'a.webp', afterAlt: 'x' })],
     ['TemplateSample pair', createElement(TemplateSample, { template: tpl('Products & Resale') })],
     ['TemplateSample compare', createElement(TemplateSample, { template: tpl('Art Styles') })],
