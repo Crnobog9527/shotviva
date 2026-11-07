@@ -3,6 +3,8 @@
 export type AdminUserRow = {
   id: string
   email: string | null
+  // auth.users.phone, E.164 digits without '+' (phone sign-ups, T63)
+  phone: string | null
   createdAt: string | null
   provider: string | null
   role: 'user' | 'admin'
@@ -39,6 +41,7 @@ export type UserJob = {
 export type UserDetail = {
   id: string
   email: string | null
+  phone: string | null
   createdAt: string
   role: 'user' | 'admin'
   credits: number

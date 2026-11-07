@@ -25,9 +25,12 @@ export function FlowNav({ back, title, aside, underTabBar = false, pinnedTitle =
     <header
       // Stays put while the page under it slides (T56; globals.css).
       style={{ viewTransitionName: 'app-flow-nav' }}
+      // Lets the tab bar's stand-in hold the bar's room on this page (AppFrame's TabBarSlot).
+      data-under-tabbar={underTabBar ? '' : undefined}
       className={cn(
-        'nav-material sticky top-0 z-50 px-1 pt-[var(--sat)] md:px-[calc(var(--gutter)-12px)]',
-        underTabBar && 'md:top-14',
+        'nav-material sticky z-50 px-1 pt-[var(--sat)] md:px-[calc(var(--gutter)-12px)]',
+        // max-md:/md: rather than top-0 + md:top-14 (the note above TabBar in tab-bar.tsx).
+        underTabBar ? 'max-md:top-0 md:top-14' : 'top-0',
         scrolled && 'shadow-[inset_0_-1px_0_var(--border)]',
       )}
     >

@@ -93,6 +93,68 @@
   .au-notice a, .au-notice button { color: var(--foreground); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
 
 
+  /* phone sign-in (T63, Chinese pages): 手机号 / 邮箱 is the paywall's Monthly / Yearly segmented
+     control (bone thumb sliding on a wash track); the +86 sits inside the field; the code is six
+     cells drawn under one transparent input */
+  .au-tabs {
+    position: relative; display: grid; grid-template-columns: 1fr 1fr; margin-top: 20px; padding: 4px; border-radius: 16px;
+    background: var(--wash); box-shadow: inset 0 0 0 1px var(--border);
+  }
+  .au-tabs::before {
+    content: ""; position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px); border-radius: 12px;
+    background: var(--foreground); transition: transform .4s var(--spring);
+  }
+  .au-tabs:has(.au-tab:last-child[aria-selected="true"])::before { transform: translateX(100%); }
+  .au-tab {
+    position: relative; z-index: 1; min-height: 44px; border-radius: 12px; font: 600 15px/1 var(--font-sans); color: var(--bone-dim);
+    transition: color .2s;
+  }
+  .au-tab[aria-selected="true"] { color: var(--background); }
+  .au-tab:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+  [role="tabpanel"]:focus-visible { outline: none; }
+
+  .au-tel .au-input { padding-left: 64px; letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+  .au-cc {
+    position: absolute; left: 0; top: 0; bottom: 0; display: flex; align-items: center; padding: 0 12px 0 14px;
+    font: 500 16px/1 var(--font-sans); color: var(--bone-dim); pointer-events: none;
+  }
+  .au-cc::after { content: ""; position: absolute; right: 0; top: 16px; bottom: 16px; width: 1px; background: var(--input); }
+
+  .au-check { display: flex; gap: 12px; align-items: flex-start; padding: 4px 0; font-size: 14px; line-height: 1.55; color: var(--bone-dim); cursor: pointer; }
+  .au-check input {
+    flex: none; width: 22px; height: 22px; margin-top: 0; border-radius: 7px; background: var(--wash-faint); box-shadow: inset 0 0 0 1.5px var(--input);
+    display: grid; place-content: center; transition: background-color .15s, box-shadow .15s; -webkit-appearance: none; appearance: none; cursor: pointer;
+  }
+  .au-check input::after {
+    content: ""; width: 10px; height: 6px; margin-top: -2px; border: solid var(--primary-foreground); border-width: 0 0 2px 2px;
+    transform: rotate(-45deg) scale(0); transition: transform .18s var(--spring);
+  }
+  .au-check input:checked { background: var(--primary); box-shadow: none; }
+  .au-check input:checked::after { transform: rotate(-45deg) scale(1); }
+  .au-check input:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+  .au-check input[aria-invalid="true"]:not(:checked) { box-shadow: inset 0 0 0 1.5px var(--destructive); }
+  .au-check a { color: var(--foreground); text-decoration: underline; text-decoration-color: var(--input); text-underline-offset: 3px; }
+
+  .au-sent { margin-top: 20px; }
+  .au-code { position: relative; }
+  .au-cells { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+  .au-cell {
+    display: grid; place-items: center; height: 56px; border-radius: 14px; background: var(--wash-faint); box-shadow: inset 0 0 0 1px var(--input);
+    font: 500 24px/1 var(--font-mono); font-variant-numeric: tabular-nums; color: var(--foreground); transition: box-shadow .2s, background-color .2s;
+  }
+  .au-cell[data-filled] { background: var(--wash); }
+  .au-code:focus-within .au-cell[data-active] {
+    box-shadow: inset 0 0 0 1.5px var(--primary), 0 0 0 4px color-mix(in srgb, var(--primary) 14%, transparent);
+  }
+  .au-code:has([aria-invalid="true"]) .au-cell { box-shadow: inset 0 0 0 1.5px var(--destructive); }
+  /* the real field: over the cells, invisible, so taps, paste and SMS autofill all land in it */
+  .au-code-input {
+    position: absolute; inset: 0; width: 100%; height: 100%; border: 0; padding: 0; background: transparent; color: transparent; caret-color: transparent;
+    font-size: 16px; letter-spacing: 1em; outline: none; -webkit-appearance: none; appearance: none;
+  }
+  .au-code-input::selection { background: transparent; }
+  .au-change { margin-top: 4px; color: var(--bone-dim); }
+
   .au-swap { margin-top: 20px; font-size: 15px; line-height: 1.5; color: var(--bone-dim); text-align: center; }
   .au-swap a { color: var(--foreground); font-weight: 500; text-decoration: none; padding: 10px 0; margin: -10px 0; }
   .au-fine { margin-top: 16px; font-size: 14px; line-height: 1.5; color: var(--muted-foreground); text-align: center; }
@@ -128,7 +190,10 @@
     .au-eye:hover { color: var(--foreground); background: var(--wash-strong); }
     .au-primary:hover { filter: brightness(1.06); }
     .au-ghost:hover { background: var(--wash-strong); box-shadow: inset 0 0 0 1px var(--input); }
+    .au-tab[aria-selected="false"]:hover { color: var(--foreground); }
+    .au-change:hover, .au-check a:hover { color: var(--foreground); }
   }
   @media (prefers-reduced-motion: no-preference) { .au-plate { animation: au-rise .5s var(--ease) both; } }
+  @media (prefers-reduced-motion: reduce) { .au-tabs::before, .au-check input::after { transition: none; } }
   @keyframes au-rise { from { opacity: 0; transform: translateY(10px); } }
 }

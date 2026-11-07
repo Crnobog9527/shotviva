@@ -257,7 +257,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
   入账失败时，镜像表的写入一起回滚。同一 session 的重发和兄弟事件只入账一次。`checkout.session.completed` 和 `checkout.session.async_payment_succeeded` 都走它。
 - **付款记录与续费函数**（T10，总控 2026-11-06 按 T10 开工前的问题定）：
   - **表 `payments`**（私有，只授权 service role）：每次成功付款一行。
-    - 字段：`user_id`、`product_id`、`channel`（`stripe` / `waffo`）、`stripe_session_id` / `stripe_invoice_id` / `stripe_charge_id`（各自可空且唯一）、`waffo_order_id`（可空，**不唯一**，有索引：一张 Waffo 订阅订单每期都有一笔扣款）、`waffo_payment_id`（Waffo 的 `PAY_` 扣款号，可空、唯一；T50）、`amount_total`（实付，含税，单位为分，int）、`currency`、`amount_tax`（分）、`method`（`card` / `alipay`）、`status`（`paid` / `refunded` / `partially_refunded` / `disputed`）、`amount_refunded`（分，默认 0）、`created_at`。
+    - 字段：`user_id`、`product_id`、`channel`（`stripe` / `waffo`）、`stripe_session_id` / `stripe_invoice_id` / `stripe_charge_id`（各自可空且唯一）、`waffo_order_id`（可空，**不唯一**，有索引：一张 Waffo 订阅订单每期都有一笔扣款）、`waffo_payment_id`（Waffo 的 `PAY_` 扣款号，可空、唯一；T50）、`amount_total`（实付，含税，单位为分，int）、`currency`、`amount_tax`（分）、`method`（`card` = MP 卡（海外银行卡）/ `alipay` / `cn_card` = 普通 Stripe 卡（中国银行卡，T64）；迁移只放宽 `payments_method_check`，不改函数；续费沿用订阅 metadata 里记的方式）、`status`（`paid` / `refunded` / `partially_refunded` / `disputed`）、`amount_refunded`（分，默认 0）、`created_at`。
     - 约束：Stripe 行至少有 session 或 invoice 之一；Waffo 行必须有 `waffo_order_id` 和 `waffo_payment_id`（T50 之前的老行可以没有 `waffo_payment_id`）。
     - 不回填 T10 上线前的历史付款。
   - **`settle_checkout` 改签名**：新增参数 `p_amount_total`、`p_currency`、`p_amount_tax`、`p_method`、`p_invoice_id`（可空）、`p_charge_id`（可空），在同一事务里写 `payments`。参数变了无法 `create or replace`，按 AGENTS §5「签名必须变」的例外，由新迁移删掉旧的 7 参数版本后重建，PR 写明原因；调用方同步改。
@@ -295,7 +295,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 价格数字只写在 `site.config.ts`（第 2 节），付费墙、`/pricing`、FAQ、结构化数据都从配置读；建站规格 G3 同步。送 Stripe 时用整数分（`1990`）。
 - **Stripe Product / Price 映射**：Starter、Pro、Max 各一个 Product（税码 `txcd_10105001`），每个 Product 挂 4 个 Price：月付 recurring、月付 one-time、年付 recurring、年付 one-time（同 id 的 recurring 和 one-time 价格相同）；三个积分包各一个 Product，只有 one-time Price。Price 的 `lookup_key` 固定为 `<product_id>`（one-time）和 `<product_id>_recurring`（订阅），服务端按 lookup key 取 Price，不把 Price id 写进代码或配置；每个 Price 的 `metadata.product_id` 也写上，回调反查用。
 - **不接微信支付**（Owner 2026-11-05 定，只保留卡和支付宝）。支付宝在 Stripe 普通模式下不支持订阅，所以钱包用户买会员买的是「一期」（`starter_monthly` 的单笔形态 = 30 天 50 credits），`paid_until` 到了自己再买。这不是功能缺失，是 Stripe 的限制，付费墙文案要说清楚（"Renews automatically" vs "30 days, no auto-renew"）。
-- **PostHog `purchase` 事件参数**：`product_id`、`tier`（`starter` / `pro` / `max` / `pack`）、`interval`（`month` / `year` / 空）、`form`（`subscription` / `one_time`）、`channel`（`stripe` / `waffo`）、`method`（`card` / `alipay`）、`amount_usd`、`credits`。`generate` 事件加 `resolution` 和 `credits_cost`。
+- **PostHog `purchase` 事件参数**：`product_id`、`tier`（`starter` / `pro` / `max` / `pack`）、`interval`（`month` / `year` / 空）、`form`（`subscription` / `one_time`）、`channel`（`stripe` / `waffo`）、`method`（`card` / `alipay` / `cn_card`）、`amount_usd`、`credits`。`generate` 事件加 `resolution` 和 `credits_cost`。
 
 已经确定的规则：
 
@@ -372,10 +372,12 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 |---|---|---|
 | 卡 / Apple Pay / Google Pay | `mode: 'subscription'`，`managed_payments: { enabled: true }`，不传 `allowed_payment_method_types`（MP 自己决定付款方式） | Stripe（Link）当商户记录方，结账时另加税 |
 | 支付宝 | `mode: 'payment'`，`allowed_payment_method_types: ['alipay']`（在 Dashboard 已开启的动态付款方式里过滤；Dashboard 没开支付宝时拒绝跳转） | Shotviva |
+| 中国银行卡（只在中文页出现，T64） | 会员 `mode: 'subscription'`、积分包 `mode: 'payment'`，**不带** `managed_payments`，`allowed_payment_method_types: ['card']`，不开自动税（与审核前的兜底卡路由同一条代码路径）；会员照常自动续费，账号页「Manage subscription」进普通 Stripe Customer Portal | Shotviva |
 
 > Stripe API 2026-09-30（stripe@23）起，Checkout Session 不再接受 `payment_method_types`，传了会 400；按方式限定一律用 `allowed_payment_method_types`。审核下来之前不走 MP 的卡路由传 `['card']`。（T9 修复，2026-11-06）
 
-- 服务端只认用户选的方式，不按 IP 或浏览器语言强制。Managed Payments 的结账页不允许买家国家为中国，所以大陆用户自然选钱包。
+- 服务端只认用户选的方式，不按 IP 或浏览器语言强制。Managed Payments 的结账页不允许买家国家为中国（2026-11-07 正式站真卡实测：中国发卡的 Visa 被拒「China is not currently supported」），所以给中文页加「中国银行卡」这条普通 Stripe 卡路由（T64，Owner 2026-11-07）。
+- **中文页付款方式（Owner 2026-11-07，T64）**：三项，顺序固定：① **中国银行卡**（上表第三行，普通 Stripe）② **支付宝** ③ **海外银行卡 · Apple Pay · Google Pay**（原来的 MP 卡路由，只改名）。英文页不变（Card · Apple Pay · Google Pay 和 Alipay，没有中国银行卡）。中国银行卡这条路由由 Shotviva 当卖家：大陆买家不涉及我们需要申报的销售税 / 增值税；非大陆用户在中文页选它的情况接受，不做卡 BIN 拦截（上线后看数据再定）。埋点 `checkout_start.method = 'cn_card'`。
 - MP 商品必须设税码 `txcd_10105001`（AI 服务，个人用）。MP 价格不含税，税在结账时另加。
 - 顾客账单：卡支付显示 `LINK.COM* SHOTVIVA`，钱包支付显示 SHOTVIVA。MP 结账页不支持自定义域名。
 - 正式环境的 Managed Payments 要等 Stripe 资格审核。**审核没下来之前的兜底**：卡先不带 `managed_payments` 走普通订阅（Shotviva 当卖家），审核通过后翻开关。
@@ -405,6 +407,14 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 验证邮件、重置密码邮件由 Supabase Auth 发，SMTP 配成 Resend，发件人 `Shotviva <mail@shotviva.com>`（Owner 2026-11-07 由 `support@` 改为 `mail@`；回信进飞书邮箱，`mail@` 设为 `support@` 的别名；网站和法律页上的联系邮箱仍是 `support@`。更早 2026-11-05 由 `noreply@` 改来：Resend 提示 no-reply 发件人影响送达，且用户回信能直接进飞书的 support 邮箱）。**v1 不写任何发信代码**，只改 Supabase 的邮件模板。
 - 邮件按用户语言发（Owner 2026-11-06）：注册时把当前页面语言写进 `user_metadata.locale`（`'en'` / `'zh'`，`signUp` 的 `options.data`）；四个模板正文用 `{{ if eq .Data.locale "zh" }}…{{ else }}…{{ end }}` 放中英两版；邮件标题如果 Supabase 支持同样的条件写法就中英分开，不支持就保持英文（T21 在本地 Supabase 实测后定）；没有 `locale` 的老账号和 Google 登录账号发英文。
 - 管理员身份存在数据库 `profiles.role`，不用环境变量里的邮箱列表。
+- **中国大陆手机号验证码登录（Owner 2026-11-07，T63）**：给大陆用户的快捷注册 / 登录，和邮箱、Google 并存。
+  - 只收 `+86` 大陆手机号；入口只在中文登录 / 注册页显示（「手机号登录」和「邮箱登录」两个页签，中文页默认手机号），英文页不显示。
+  - 流程：填手机号 → 隐形 hCaptcha → 收 6 位验证码（5 分钟有效）→ 填码即注册或登录，不设密码。用的是 Supabase Auth 自带的手机号 OTP；短信不走 Twilio，走 Supabase 的「Send SMS」Auth Hook 指向我们自己的接口（校验 Hook 签名），接口调用**阿里云号码认证服务的「短信认证」**（Dypnsapi `SendSmsVerifyCode`，Owner 2026-11-07 定：个人实名账号可用、不要企业资质；用阿里云赠送的签名和配套的验证码模板，签名不是 Shotviva、不可修改，赠送签名和模板必须配套）。验证码由 Supabase 生成，Hook 把它作为模板参数 `code`（另传有效分钟数 `min`）交给接口下发；校验仍由 Supabase `verifyOtp` 完成，不调用 `CheckSmsVerifyCode`。签名名称、模板编号、AccessKey（RAM 子账号，只给短信认证发送权限）都在环境变量。发短信这一层是可替换的适配器（阿里云 / 测试用的假发送），代码和日志里**永远不出现验证码明文**。
+  - 防刷（缺一不可）：发码前过 hCaptcha（Supabase 自带校验）；同一手机号 60 秒 1 条、每天 5 条，同一 IP 每天 20 条，超了 Hook 直接拒绝且不调用阿里云；阿里云后台设每日发送上限和余额报警（Owner）；只接受 `+86` 开头的号码。
+  - 手机号验证过就等同邮箱验证过：能出图、能领注册赠送（同 IP 规则照旧）。埋点 `signup.method` 加 `phone`。
+  - 手机号账号可以没有邮箱：Stripe / Waffo 结账时由支付页自己收邮箱开收据；客服工单回复只在站内提醒；账号页显示脱敏手机号（`138****5678`），v1 不做绑定邮箱和换号；删号照常。后台用户列表和搜索要能显示、搜索手机号，邮箱为空不报错。
+  - 合规（个人信息保护法）：手机号注册时单独勾选同意「隐私政策」和「个人信息出境」（数据存美国 Supabase，短信经阿里云发送）；隐私政策补「手机号的用途、短信服务商、出境」一节（英文，中文页链接同一份），列进律师审阅清单。
+  - Supabase 控制台的手机号登录开关、Hook 地址和密钥、测试号码由 Owner 配置（预览和生产分开）；预览用 Supabase 的测试号码 + 固定验证码给 QA 账号，不发真短信。
 
 ## 8. 上传、存储与保留期
 
@@ -650,7 +660,7 @@ Owner 2026-11-04 决定：**不在 flux-kontext-template 上原地改造**，新
   1. H1 + 直答块（以主词 `image to image ai` 开头，40~60 个英文词，建站规格 G1）
   2. 首屏生成器 + 前后对比图（Owner 2026-11-05）：首屏就能出图——上传照片 → 选模板（默认模板与首屏演示一致，暂定 Pure White，Owner 可在后台改）→ 可选「Anything to change?」→ "Generate · 2 credits"；结果直接显示在首屏对比图里。未登录时先弹出登录抽屉，登录后回到首页继续。生成器是客户端组件，首屏正文（H1、副标题、直答块）仍是服务端渲染、源码可见（建站规格 R5）。首屏下方的第一组演示是「一张手机照片 → 一整套图」（Owner 2026-11-05）：同一件商品从随手拍的杂乱桌面照 → 白底主图 / 生活场景 / 促销海报，并写一句「请摄影师拍这一套要 $___」（金额从配置读）；不再用画风迁移做首屏默认演示
   3. 精选模板网格：按第 5 节的 6 个分类分组，每个分类一个 H3，每个模板的名称和用途说明都写在源码里（建站规格 §4 首页骨架 H2-2）
-     - **精选模板由后台挑选，不写死在代码里**（Owner 2026-11-07）：`templates` 加 `featured_rank`（可空整数，空 = 不上首页，小的排前面）。后台模板列表加「首页精选」开关和排序（拖动或填序号），只能选已上架的模板，最多 12 个。首页模板区按第 5 节的分类顺序分组显示被选中的模板（没有被选模板的分类不显示），名称、说明（英文 `description` / 中文 `translations.zh.description`，规则同 T52）、封面都从数据库读；SEO 落地页的模板列表同样从精选里按分类筛。页面仍是静态生成，打 `templates` 缓存标签，后台改动后立即失效，模板名称和说明照旧出现在页面源码里。一个都没选时，退回显示最新上架的 6 个。`site/content` 里写死的模板清单和 `public/home/templates/` 的示意图删除（首屏示意图保留）。迁移编号段 `0400`～`0419`（T53）。
+     - **精选模板由后台挑选，不写死在代码里**（Owner 2026-11-07）：`templates` 加 `featured_rank`（可空整数，空 = 不上首页，小的排前面）。后台模板列表加「首页精选」开关和排序（拖动或填序号），只能选已上架的模板，最多 12 个。首页模板区按第 5 节的分类顺序分组显示被选中的模板（没有被选模板的分类不显示），名称、说明（英文 `description` / 中文 `translations.zh.description`，规则同 T52）、封面都从数据库读；SEO 落地页的模板列表同样从精选里按分类筛。页面仍是静态生成，打 `templates` 缓存标签；后台保存后用 `revalidateTag('templates', 'max')`：先照常给访客缓存页，后台再生成新页，保存后的第一位访客可能还看到一次旧内容，但不会被阻塞等待（性能卡 #235，总控 2026-11-07；公告横幅仍立即失效，因为可能是紧急通知）。模板名称和说明照旧出现在页面源码里。一个都没选时，退回显示最新上架的 6 个。`site/content` 里写死的模板清单和 `public/home/templates/` 的示意图删除（首屏示意图保留）。迁移编号段 `0400`～`0419`（T53）。
   4. 可核验事实块：免费额度、每张消耗、三档像素、上传限制、出图耗时（建站规格 G4 通用事实）
   5. 成本对比表：请摄影师 vs Shotviva
   6. FAQ 3~5 条
@@ -858,5 +868,5 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
   - **授权边界**：
     - MiSans 只用于网页显示。服务端往图片上画字的地方（如水印 "Made with Shotviva"）不用 MiSans，以免变成「把字体嵌入导出文件」。
     - 字体文件放在私有仓库，通过网站对外提供，和 Graylum 一样；律师审法律页时一并确认协议里的「再分发」条款（LAUNCH §8）。
-- **已知限制（写进 FAQ）**：中国大陆用户不开 VPN 用不了 Google 登录，用邮箱注册即可。
+- **已知限制（写进 FAQ）**：中国大陆用户不开 VPN 用不了 Google 登录，用手机号验证码（T63 上线后）或邮箱注册即可。
 

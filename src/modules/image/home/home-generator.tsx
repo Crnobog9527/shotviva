@@ -1,7 +1,8 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { useCallback, useMemo, useRef, useState } from 'react'
+import dynamic from 'next/dynamic'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { FormAction } from '@/core/auth/ui'
 import { UPLOAD_ACCEPT } from '@/core/storage/rules'
@@ -12,8 +13,6 @@ import { HomeCard } from './home-card'
 import type { HomeViewer } from './home-cta'
 import { HomeDock } from './home-dock'
 import { sampleFor, thumbFor } from './home-samples'
-import { SignupSheet } from './signup-sheet'
-import { TemplatePicker } from './template-picker'
 import { useHomeGenerator } from './use-home-generator'
 import { useOpenFromQuery, usePickEvents } from './use-pick-events'
 
@@ -28,6 +27,23 @@ export type HomeGeneratorProps = {
   homePath: string
   // "3 free Standard images", from site.config (G3).
   freeImages: string
+}
+
+// The picker and the sign-up sheet are closed on arrival and carry the dialog, drawer and
+// sign-in code (radix, vaul, hCaptcha): they load once the page is idle, not before the first
+// paint. Both render nothing until then, which is what a closed one shows anyway.
+const loadPicker = () => import('./template-picker')
+const loadSignup = () => import('./signup-sheet')
+const TemplatePicker = dynamic(() => loadPicker().then((m) => m.TemplatePicker), { ssr: false })
+const SignupSheet = dynamic(() => loadSignup().then((m) => m.SignupSheet), { ssr: false })
+
+function usePrefetchDialogs() {
+  useEffect(() => {
+    const start = () => void Promise.all([loadPicker(), loadSignup()])
+    if (typeof window.requestIdleCallback !== 'function') return void window.setTimeout(start, 1500)
+    const id = window.requestIdleCallback(start, { timeout: 4000 })
+    return () => window.cancelIdleCallback(id)
+  }, [])
 }
 
 const smooth = () => (window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth')
@@ -60,6 +76,7 @@ export function HomeGenerator({ templates, defaultId, viewer, googleAction, home
   )
   const onPreview = useCallback((id: string) => setPickerOn(templates.find((template) => template.id === id) ?? null), [templates])
   usePickEvents(onPick, onPreview)
+  usePrefetchDialogs()
   useOpenFromQuery(onPreview)
   const pickPhoto = () => file.current?.click()
   const askToSignUp = () => {

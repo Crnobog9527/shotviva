@@ -10,7 +10,7 @@ import { logger } from '@/core/logger'
 // An unverified account is treated as signed out (the app would send it back to log in).
 async function signedIn(): Promise<boolean> {
   try {
-    return (await getSessionUser())?.emailVerified === true
+    return (await getSessionUser())?.verified === true
   } catch (error) {
     unstable_rethrow(error)
     logger.error('nav.session_read_failed', { error })

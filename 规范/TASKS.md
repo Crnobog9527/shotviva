@@ -943,3 +943,31 @@ Owner 2026-11-06 发现中文页有功能缺失。逐页对比现有英文页和
 - 预览覆盖 `FEATURE_WISHLIST_PREVIEW=on` 保留，只在非生产生效。
 
 **验收**：后台打开后，不重新部署，前台登录用户马上看到 Wishlist tab、能提交需求；关掉后 tab 消失、`/wishlist` 和接口 404、后台审核页隐藏、已有数据重开后还在；非管理员调 RPC 被拒；单测覆盖开关组合（站点无此功能 / 开 / 关 / 预览覆盖 / 读失败）；数据库测试覆盖 RLS 和 RPC；交互验收交给 Codex（测试站）。生产迁移走「DB push (production)」工作流，Owner 批准。
+
+## T63 中国大陆手机号验证码登录（阿里云短信）（可派）
+
+**目标**：Owner 2026-11-07：大陆用户不习惯邮箱注册，给中文页加手机号验证码快捷注册 / 登录（ARCHITECTURE §7「中国大陆手机号验证码登录」）。
+
+**范围**：
+- 中文登录 / 注册页加「手机号登录 / 邮箱登录」页签（中文默认手机号），英文页不变；按 DESIGN 的表单样式做，必须用 impeccable skill 核对；手机号输入固定 `+86`，验证码 6 格，60 秒倒计时重发。
+- Supabase 手机号 OTP（`signInWithOtp({ phone })` + `verifyOtp`）；Send SMS Auth Hook 指向 `app/api/auth/sms-hook`：校验 Hook 签名，限频（同号 60 秒 1 条 / 每天 5 条，同 IP 每天 20 条，非 `+86` 拒绝），再交给短信适配器；适配器两个实现：阿里云号码认证服务 Dypnsapi `SendSmsVerifyCode`（Owner 2026-11-07 改用：免企业资质，赠送签名 + 配套模板；环境变量 `ALIYUN_SMS_ACCESS_KEY_ID` / `ALIYUN_SMS_ACCESS_KEY_SECRET` / `ALIYUN_SMS_SIGN_NAME` / `ALIYUN_SMS_TEMPLATE_CODE`，模板参数 `code` 和 `min`，验证码由 Supabase 生成）和测试用假发送；限频计数用数据库（迁移编号段 `0440`～`0459`，只加不改）或现有限频设施，二选一说明理由。日志、Sentry、埋点里不出现验证码。
+- 手机号验证过 = 已验证：出图、注册赠送（同 IP 规则照旧）、埋点 `signup.method = 'phone'`；所有「必须已验证邮箱」的判断改为「邮箱或手机号已验证」。
+- 无邮箱账号：结账不传 `customer_email`（让 Stripe / Waffo 收集），工单回复只站内提醒，账号页显示脱敏手机号，后台用户列表 / 搜索 / 用户详情能显示和搜手机号；所有读 `email` 的地方处理空值。
+- 合规：手机号注册单独勾选同意隐私政策和个人信息出境（未勾不能发码）；隐私政策加手机号 / 短信服务商 / 出境一节（英文）。
+- 环境变量登记进 `.env.example`（只有名字）；`scripts/qa` 给预览加一个用 Supabase 测试号码的手机号 QA 账号说明。
+
+**Owner 侧（不阻塞开发，阻塞上线）**：用 Owner 本人实名的阿里云账号开通号码认证服务的「短信认证」，在控制台取赠送签名名称和配套模板编号，建只有短信认证发送权限的 RAM 子账号并生成 AccessKey，买套餐包或充值，设余额报警；Supabase 预览 / 生产开启手机号登录、配 Send SMS Hook（地址 + 密钥）、预览配测试号码。密钥由 Owner 从剪贴板直接写进 Vercel / Supabase，不经过聊天。
+
+**验收**：中文页手机号注册 → 收码 → 登录 → 能出图、有注册赠送；同号 60 秒内重发被拒、每天第 6 条被拒、非 +86 被拒；未勾同意不能发码；英文页不出现手机号入口；无邮箱账号能结账（支付页收邮箱）、能开工单；后台能搜到手机号；单测覆盖 Hook 签名、限频、适配器（假发送）和空邮箱分支；交互验收交给 Codex（测试站，用 Supabase 测试号码，不发真短信）；生产真短信由 Owner 在第 10 阶段实测一条。
+
+## T64 中文页付款方式加「中国银行卡」（普通 Stripe 结账）（可派）
+
+**目标**：Owner 2026-11-07：Stripe Managed Payments 不收中国大陆买家（正式站真卡实测被拒），中文页加一条普通 Stripe 卡结账「中国银行卡」，并调整付款方式顺序（ARCHITECTURE §6.3「中文页付款方式」）。
+
+**范围**：
+- 付费墙 / 定价页的付款方式选择（中文页）：① 中国银行卡 ② 支付宝 ③ 海外银行卡 · Apple Pay · Google Pay（原卡路由改名）；英文页完全不变。说明文案：中国银行卡会员「自动续费，可随时取消」，积分包单笔；海外银行卡照旧。按 DESIGN 的付款方式样式做，必须用 impeccable skill 核对。
+- `/api/checkout` 接受新方式 `cn_card`：只在请求带中文 locale 时接受；会员建 `mode: 'subscription'`、积分包 `mode: 'payment'`，不带 `managed_payments`，`allowed_payment_method_types: ['card']`，不开自动税，Checkout `locale: 'zh'`；复用现有的非 MP 卡路由代码，不另写一套。发放、续费、取消、退款走现有回调（`settle_checkout` / `invoice.paid` / 镜像表），确认非 MP 订阅的 Customer Portal 能取消。
+- 账号页会员卡上的付款方式显示「中国银行卡」（中文）/ "Card"（英文）；后台订单页渠道显示能区分 MP 卡和普通卡。
+- 埋点 `checkout_start.method = 'cn_card'`；Waffo 通道开着时（`PAYMENT_CHANNEL=waffo`）中国银行卡不出现（Waffo 自己有卡）。
+
+**验收**：中文页三项顺序正确、英文页不变；测试模式下用 Stripe 测试卡走中国银行卡买积分包和 Starter 月付，积分和会员到账、续费（测试时钟）、Portal 取消都正常；MP 路由不受影响；单测覆盖 locale 校验、Session 参数（无 managed_payments、只 card）、埋点值；交互验收交给 Codex（测试站）。正式站上线后由 Owner 的朋友用中国 Visa 真卡实测一笔再退款。

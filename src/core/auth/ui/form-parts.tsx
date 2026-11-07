@@ -43,13 +43,13 @@ type FieldProps = {
   hint?: string
 }
 
-function useFieldError(form: AuthForm, name: FieldName): string | null {
+export function useFieldError(form: AuthForm, name: FieldName): string | null {
   const t = useTranslations('auth.fieldErrors')
   const error: FieldError | undefined = form.fieldErrors[name]
   return error ? t(error, { min: PASSWORD_MIN }) : null
 }
 
-function FieldLines({ id, hint, error }: { id: string; hint?: string; error: string | null }) {
+export function FieldLines({ id, hint, error }: { id: string; hint?: string; error: string | null }) {
   if (error) {
     return (
       <p id={id} className="au-err">

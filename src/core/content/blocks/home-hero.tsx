@@ -16,6 +16,10 @@ function Headline({ text }: { text: string }) {
   )
 }
 
+// One plate of the hero pair: 172 px on a 375 px phone (half of 100vw − the gutters), 320 px
+// at 768–1023 (the pair is capped at 640), 268 px from 1024 (the pair takes half the row).
+const HERO_PLATE_SIZES = '(min-width: 1024px) 268px, (min-width: 768px) 320px, 50vw'
+
 type Props = { page: Pick<PageBasics, 'h1' | 'subtitle' | 'answerBlock' | 'hero'>; generator: ReactNode }
 
 // First screen of the home page and every landing page (ARCHITECTURE §13 item 2, DESIGN §6.9): H1, subtitle and the direct answer in
@@ -33,7 +37,7 @@ export function HomeHero({ page, generator }: Props) {
         <p className="mk-answer">{page.answerBlock}</p>
       </div>
       <figure className="mk-hero-pair">
-        <PhotoPair before={hero.before} after={hero.after} size="lg" preload sizes="(min-width: 1024px) 536px, (min-width: 768px) 640px, 100vw" />
+        <PhotoPair before={hero.before} after={hero.after} size="lg" preload sizes={HERO_PLATE_SIZES} />
         <figcaption className="mk-cap">{hero.caption}</figcaption>
       </figure>
       {generator}

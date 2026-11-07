@@ -45,6 +45,9 @@ jobs:
         run: pnpm test
       - if: steps.changes.outputs.code == 'true'
         run: pnpm build
+      # The app top bar must be in every app page's prerendered shell (scripts/app-shell-check-lib.ts).
+      - if: steps.changes.outputs.code == 'true'
+        run: pnpm check:app-shell
 
   # One local Supabase per run serves both the DB tests and the schema.sql snapshot check
   # (AGENTS §5), which used to start its own database in a separate workflow.

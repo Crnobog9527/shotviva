@@ -1,0 +1,36 @@
+# Fails a PR that silently undoes recent work on main: a file it changed is back, byte for byte,
+# to how it was before a recent commit changed it (scripts/check-stale-revert.sh). #212 did that
+# from a stale working tree and took the T55 celebration, #210 and #211 with it while CI stayed
+# green. A deliberate revert passes with `[revert]` in the PR title; `edited` reruns the check
+# when the title changes.
+name: No silent reverts
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+concurrency:
+  group: stale-revert-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  stale-revert:
+    name: no silent reverts of recent main
+    # `edited` matters only for the title ([revert]); a description edit skips the job.
+    if: github.event.action != 'edited' || github.event.changes.title != null
+    runs-on: ubuntu-latest
+    steps:
+      # The PR head itself, not the merge ref, with full history so origin/main, the merge
+      # base and the recent commits on main are all available.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Check no changed file is back to an earlier state of main
+        env:
+          # Through env, never interpolated into the script: titles are untrusted input.
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: scripts/check-stale-revert.sh origin/main HEAD

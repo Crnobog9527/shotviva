@@ -13,6 +13,15 @@ export function AppFrame({ children }: { children: ReactNode }) {
   )
 }
 
+// Stands in for the tab bar in the prerendered shell of the pages whose path the shell can't know
+// (a dynamic param, like /photos/[jobId]): the bar's usePathname waits for the request there. It
+// holds the desktop bar's 56px only on the photo page, the one such page that keeps the bar from
+// md up (its FlowNav says so with data-under-tabbar; globals.css), so the page never jumps when
+// the bar takes its place. Everywhere else it takes no room, like the bar.
+export function TabBarSlot() {
+  return <div aria-hidden="true" data-tabbar-slot="" />
+}
+
 // The page transition (DESIGN §8.2, T56): each navigation's type (ui/nav-motion) names the class
 // the entering and the leaving page get; globals.css draws them. No type (browser back, a
 // refresh, a redirect, reduced motion) is no animation.

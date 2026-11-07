@@ -13,6 +13,15 @@ export const ERROR_CODES = [
   'AUTH_CAPTCHA_FAILED',
   'AUTH_RATE_LIMITED',
   'AUTH_WEAK_PASSWORD',
+  // Phone sign-in (T63): not a mainland +86 mobile number; the consent box was not ticked; the
+  // number's 60-second gap or a daily limit (number or network); the SMS did not go out; a wrong
+  // or expired code.
+  'AUTH_PHONE_INVALID',
+  'AUTH_CONSENT_REQUIRED',
+  'AUTH_SMS_COOLDOWN',
+  'AUTH_SMS_DAILY_LIMIT',
+  'AUTH_SMS_FAILED',
+  'AUTH_OTP_INVALID',
   // Idempotency key reused for a different request, or a job settled the other way.
   'CONFLICT',
   // Per-account generation limit (core/jobs/rate-limit.ts).
@@ -49,6 +58,12 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   AUTH_CAPTCHA_FAILED: 422,
   AUTH_RATE_LIMITED: 429,
   AUTH_WEAK_PASSWORD: 422,
+  AUTH_PHONE_INVALID: 422,
+  AUTH_CONSENT_REQUIRED: 422,
+  AUTH_SMS_COOLDOWN: 429,
+  AUTH_SMS_DAILY_LIMIT: 429,
+  AUTH_SMS_FAILED: 502,
+  AUTH_OTP_INVALID: 401,
   CONFLICT: 409,
   RATE_LIMITED: 429,
   TIER_REQUIRED: 403,

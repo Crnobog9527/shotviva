@@ -18,7 +18,8 @@ export type FeaturedSections = { categories: readonly TemplateCategory[]; media:
 type Grid = Pick<HomePage['templateGrid'], 'heading' | 'intro' | 'note'>
 type Props = { grid: Pick<Grid, 'heading' | 'intro'> & Partial<Pick<Grid, 'note'>>; sections: FeaturedSections; isLinkEnabled: (href: string) => boolean }
 
-const CARD_SIZES = '(min-width: 1024px) 552px, (min-width: 768px) 50vw, 100vw'
+// One plate of a card's pair: 172 px on a 375 px phone, 174 px at 800, 274 px at 1280.
+const CARD_SIZES = '(min-width: 1024px) 276px, (min-width: 768px) 25vw, 50vw'
 
 // "from 1 credit": the template's own Standard price.
 function Cost({ card }: { card: TemplateCard }) {

@@ -36,7 +36,7 @@ const checkoutProps = {
 }
 
 export const eventSchemas = {
-  signup: z.strictObject({ method: z.enum(['email', 'google']) }),
+  signup: z.strictObject({ method: z.enum(['email', 'google', 'phone']) }),
   upload: z.strictObject({ size_bucket: z.enum(UPLOAD_SIZE_BUCKETS), compressed: z.boolean() }),
   generate: z.strictObject({
     template_id: slug,

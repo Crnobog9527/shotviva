@@ -6,6 +6,7 @@ import { cn } from '@/core/ui/cn'
 
 import { StatCard } from '../shell/admin-blocks'
 import { formatBeijing } from '../shell/format'
+import { accountLabel } from '../users/label'
 import type { UserDetail } from '../users/types'
 import { TICKETS_COPY as COPY } from './copy'
 import { RefundPanel, PaymentFacts } from './refund-panel'
@@ -40,7 +41,7 @@ function UserSummary({ ticket, user }: { ticket: AdminTicket; user: UserDetail |
     <section className="grid gap-3">
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="font-semibold">{COPY.user.heading}</h2>
-        <span className="text-sm">{user?.email ?? ticket.userId}</span>
+        <span className="text-sm">{user ? accountLabel(user) : ticket.userId}</span>
         {user?.bannedAt ? <Badge variant="destructive">{COPY.user.banned}</Badge> : null}
         <Link href={`/admin/users/${ticket.userId}`} className="text-sm text-primary hover:underline">
           {COPY.user.open}

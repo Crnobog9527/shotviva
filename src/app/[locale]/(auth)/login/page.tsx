@@ -6,11 +6,14 @@ import { nextIn } from '@/core/auth'
 import { LoginForm } from '@/core/auth/ui'
 import { currentLocale } from '@/core/i18n/server'
 
-import { googleAction, loginAction, resendSignupAction } from '@/app/auth/actions'
+import { googleAction, loginAction, phoneSendAction, phoneVerifyAction, resendSignupAction } from '@/app/auth/actions'
 
 import { Arrived } from '../arrived'
 import { redirectIfSignedIn } from '../signed-in-redirect'
 import { sender } from '../sender'
+
+// Mainland phone sign-in is offered on the Chinese pages only (ARCHITECTURE §7, T63).
+const phone = { send: phoneSendAction, verify: phoneVerifyAction }
 
 // Sign-in pages are noindex like the rest of the app (建站规格 R6), in both languages, and carry
 // no hreflang (ARCHITECTURE §17); the root template adds " | Shotviva" to the title.
@@ -37,6 +40,7 @@ async function Login({ searchParams }: PageProps<'/[locale]/login'>) {
       notice={error}
       arrived={<Arrived next={next} page="login" />}
       sender={sender}
+      phone={locale === 'zh' ? phone : undefined}
     />
   )
 }

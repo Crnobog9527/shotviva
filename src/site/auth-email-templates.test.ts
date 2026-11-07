@@ -17,6 +17,21 @@ const TEMPLATES = {
 const read = (name: string) => readFileSync(fileURLToPath(new URL(`../../supabase/templates/${name}.html`, import.meta.url)), 'utf8')
 const config = readFileSync(fileURLToPath(new URL('../../supabase/config.toml', import.meta.url)), 'utf8')
 
+// public/ is served at the site root; the PNG's own size (IHDR) is 2x the size the email shows.
+const WORDMARK = (() => {
+  const path = '/brand/email/shotviva-wordmark@2x.png'
+  const png = readFileSync(fileURLToPath(new URL(`../../public${path}`, import.meta.url)))
+  return { path, bytes: png.length, width: png.readUInt32BE(16), height: png.readUInt32BE(20) }
+})()
+
+describe('public/brand/email/shotviva-wordmark@2x.png', () => {
+  it('stays small and has even dimensions so the 1x box is whole pixels', () => {
+    expect(WORDMARK.bytes).toBeLessThan(15 * 1024)
+    expect(WORDMARK.width % 2).toBe(0)
+    expect(WORDMARK.height % 2).toBe(0)
+  })
+})
+
 describe.each(Object.entries(TEMPLATES))('supabase/templates/%s.html', (name, type) => {
   const html = read(name)
 
@@ -32,7 +47,16 @@ describe.each(Object.entries(TEMPLATES))('supabase/templates/%s.html', (name, ty
     expect(html).toContain('>{{ $link }}</a>')
   })
 
-  it('says not to reply, links the support address, and carries the copyright line, with nothing that tracks or needs images', () => {
+  it('shows the real wordmark as one hosted 2x PNG on our own origin, with a serif text fallback', () => {
+    // Mail clients don't load web fonts, so "Shotviva." in Instrument Serif ships as an image
+    // (Owner 2026-11-07); alt text styled in a serif keeps the brand readable when images are off.
+    const img = html.match(/<img [^>]*>/g) ?? []
+    expect(img).toEqual([expect.stringContaining(`src="https://${site.brand.domain}${WORDMARK.path}"`)])
+    expect(img[0]).toContain(`width="${WORDMARK.width / 2}" height="${WORDMARK.height / 2}" alt="${site.brand.name}"`)
+    expect(img[0]).toMatch(/style="display:block;[^"]*font-family:Georgia,'Times New Roman',serif;/)
+  })
+
+  it('says not to reply, links the support address, and carries the copyright line, with nothing that tracks', () => {
     const { contactEmail, name: brandName } = site.brand
     // Owner 2026-11-07: auth emails come from mail@ (spec #175); replies belong at support@.
     expect(html).toContain("This is an automated email, please don't reply. Need help? Contact {{ end }}")
@@ -40,7 +64,7 @@ describe.each(Object.entries(TEMPLATES))('supabase/templates/%s.html', (name, ty
     expect(html).toContain(`<a href="mailto:${contactEmail}" style="color:#6b6b66;text-decoration:underline;">${contactEmail}</a></td>`)
     expect(html).not.toContain('Questions? Email')
     expect(html).toContain(`Copyright &copy; 2026 ${brandName}. All rights reserved.`)
-    expect(html).not.toMatch(/<img|<script|<link|url\(/i)
+    expect(html).not.toMatch(/<script|<link|url\(/i)
   })
 
   it('has a Chinese branch for every line, chosen by user_metadata.locale (ARCHITECTURE §7)', () => {

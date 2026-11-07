@@ -1,13 +1,11 @@
 'use client'
 
-import { ShieldCheck } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 
 import { usePathname } from '../i18n/navigation'
 import { Link } from '../i18n/ui'
 import { cn } from '../ui/cn'
-import type { AdminEntry } from './admin-entry'
 import { TabGlyph, type TabIcon } from './tab-icons'
 import { Wordmark } from './wordmark'
 
@@ -21,7 +19,13 @@ type Props = {
   // Pages below a tab that keep the bar from md up (the photo page, T38); phones keep the
   // flow-page rule and show no bar there.
   desktopUnder?: readonly `/${string}/`[]
-  admin?: AdminEntry
+  // Pages that are not a tab but sit in the full shell like one: the bar on phones and the top
+  // bar from md, with no tab marked current (the checkout return page, comps-v3-b
+  // checkout.html, gap audit C1).
+  shellPages?: readonly `/${string}`[]
+  // The Admin item (AdminLink), streamed in its own Suspense by the layout: it reads the
+  // session, and the bar itself must not wait for that (see below).
+  admin?: ReactNode
 }
 
 // The app shell's tabs (DESIGN §8.2, §6.9 item 7): fixed at the bottom on phones, 50px rows
@@ -30,10 +34,22 @@ type Props = {
 // the current one a bone pill with a safelight glyph, after the wordmark at the far left and
 // before the Admin entry at the right end (spec #199). AppFrame reserves the phone bar's room
 // through data-tabbar.
-export function TabBar({ items, desktopUnder = [], admin }: Props) {
+//
+// Nothing in the bar may read request data: it has to be in every app page's prerendered shell,
+// or the page paints from the top of the window and the bar arrives a beat later, pushing it
+// down 56px (and, with any scroll at that moment, leaving the page's top under the sticky bar).
+// The Admin item comes in as a slot for that reason.
+//
+// The phone placement is written max-md: only, never `fixed inset-x-0 bottom-0` overridden by
+// `md:sticky md:top-0 md:bottom-auto`. Our utilities live in a cascade layer, and any unlayered
+// `.fixed` or `.bottom-0` on the page (a browser extension or an automation tool injecting its
+// own Tailwind CSS does exactly that) beats every layered rule, md: ones included: the bar then
+// stays fixed on desktop over the page's top, and a flow page's action bar covers its bottom.
+// With max-md: classes there is no bare `.fixed` on the element for such a rule to match.
+export function TabBar({ items, desktopUnder = [], shellPages = [], admin }: Props) {
   const pathname = usePathname()
   const t = useTranslations('app.tabs')
-  const root = isRoot(pathname, items)
+  const root = isRoot(pathname, items) || shellPages.some((page) => pathname === page || pathname === `${page}/`)
   if (!root && !desktopUnder.some((prefix) => pathname.startsWith(prefix))) return null
   return (
     <nav
@@ -42,8 +58,8 @@ export function TabBar({ items, desktopUnder = [], admin }: Props) {
       // Stays put while pages slide or fade under it (T56; globals.css).
       style={{ viewTransitionName: 'app-tabs' }}
       className={cn(
-        'bar-material fixed inset-x-0 bottom-0 z-60 px-2 pt-1 pb-[calc(var(--sab)+4px)]',
-        'md:sticky md:top-0 md:bottom-auto md:h-14 md:p-0 md:shadow-[inset_0_-1px_0_var(--border)]',
+        'bar-material z-60 px-2 pt-1 pb-[calc(var(--sab)+4px)] max-md:fixed max-md:inset-x-0 max-md:bottom-0',
+        'md:sticky md:top-0 md:h-14 md:p-0 md:shadow-[inset_0_-1px_0_var(--border)]',
         !root && 'max-md:hidden',
       )}
     >
@@ -52,7 +68,7 @@ export function TabBar({ items, desktopUnder = [], admin }: Props) {
         {items.map((item) => (
           <TabLink key={item.href} item={item} current={pathname.startsWith(item.href)} />
         ))}
-        {admin ? <AdminLink entry={admin} /> : null}
+        {admin}
       </div>
     </nav>
   )
@@ -73,20 +89,5 @@ function TabLink({ item, current }: { item: TabItem; current: boolean }) {
       {item.label}
       {item.badge}
     </Link>
-  )
-}
-
-// Right end of the desktop top bar. The phone tab bar keeps its fixed slots (DESIGN §8.2):
-// on phones the account page's Admin row is the way in.
-function AdminLink({ entry }: { entry: AdminEntry }) {
-  return (
-    <a
-      href={entry.href}
-      data-admin-entry=""
-      className="press hidden min-h-10 items-center gap-2 rounded-full px-3.5 text-label leading-none font-medium text-muted-foreground md:ml-auto md:flex md:hover:text-foreground"
-    >
-      <ShieldCheck aria-hidden className="size-5" strokeWidth={1.75} />
-      {entry.label}
-    </a>
   )
 }

@@ -1,14 +1,16 @@
 import { defineLegalPage, type LegalSection } from '@/core/content'
 
 import { privacyCollectSections } from './privacy-collect'
+import { privacyPhoneSections } from './privacy-phone'
 import { privacyRightsSections } from './privacy-rights'
 import { privacyShareSections } from './privacy-share'
 import { LAST_UPDATED, contactSection, entity, legalLinks, operatorSentence } from './shared'
 
 // Structure follows Graylum's staging privacy.html; facts are Shotviva's (ARCHITECTURE §8.3,
-// §14, §16). Split into three files only to stay under the 300-line rule (AGENTS §3.1).
+// §14, §16; phone sign-in T63). Split into four files only to stay under the 300-line rule (AGENTS §3.1).
 const sections: readonly [LegalSection, ...LegalSection[]] = [
   ...privacyCollectSections,
+  ...privacyPhoneSections,
   ...privacyShareSections,
   ...privacyRightsSections,
   contactSection('this Privacy Policy or your information'),

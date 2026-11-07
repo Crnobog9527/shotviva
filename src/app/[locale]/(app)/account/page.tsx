@@ -5,6 +5,7 @@ import { Suspense } from 'react'
 import { AccountHeader, AccountView, STRIP_FRAMES } from '@/core/account/ui'
 import { AppPage } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser, signupGiftRefused } from '@/core/auth'
+import { maskPhone } from '@/core/auth/phone'
 import { readBalance } from '@/core/billing'
 import { lastMembership, readMemberSince, readSubscriptionSummary } from '@/core/billing/subscription'
 import { listMonthWorks } from '@/core/jobs'
@@ -55,7 +56,7 @@ async function Account() {
   const purchases = paymentChoices(payments, site.billing.products, t as unknown as Translate, { money: formatMoney(locale) })
   const last = lastMembership(payments, site.billing.products)
   const more = payments.length >= PICKER_LIMIT
-  const data = { email: user.email ?? null, balance, giftRefused, subscription, since, lastMembership: last, works, purchases, morePurchases: more, helpUnread, graylum, admin: user.role === 'admin' }
+  const data = { email: user.email, phone: maskPhone(user.phone) || null, balance, giftRefused, subscription, since, lastMembership: last, works, purchases, morePurchases: more, helpUnread, graylum, admin: user.role === 'admin' }
   return <AccountView data={data} actions={actions} site={accountSite} />
 }
 

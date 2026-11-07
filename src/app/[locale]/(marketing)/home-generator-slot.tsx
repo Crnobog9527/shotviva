@@ -9,7 +9,7 @@ import { paymentChannel } from '@/core/billing/waffo'
 import { listOwnJobs } from '@/core/jobs'
 import { logger } from '@/core/logger'
 import { isWishlistEnabled } from '@/core/wishlist'
-import { HomeGenerator, type HomeGeneratorProps, type HomeViewer } from '@/modules/image'
+import { HomeGenerator, type HomeGeneratorProps, type HomeViewer } from '@/modules/image/marketing'
 import { site } from '@/site/site.config'
 
 type Base = Omit<HomeGeneratorProps, 'viewer' | 'googleAction'>
@@ -18,7 +18,7 @@ type Base = Omit<HomeGeneratorProps, 'viewer' | 'googleAction'>
 // else (copy, templates, samples) is in the prerendered shell (建站规格 R5).
 async function viewerOf(): Promise<HomeViewer | null> {
   const user = await getSessionUser()
-  if (!user?.emailVerified) return null
+  if (!user?.verified) return null
   const supabase = await createServerSupabase()
   const [balance, tier, own] = await Promise.all([
     readBalance(supabase, user.id),

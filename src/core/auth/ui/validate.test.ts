@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { validateEmail, validateLogin, validateNewPassword, validateSignup } from './validate'
+import { validateCode, validateEmail, validateLogin, validateNewPassword, validatePhoneSend, validateSignup } from './validate'
 
 const form = (fields: Record<string, string>) => {
   const data = new FormData()
@@ -28,5 +28,12 @@ describe('auth field checks (design/comps-v3-b/auth.html)', () => {
     expect(validateNewPassword(form({ password: 'hunter2', confirm: 'hunter2' }))).toEqual({ password: 'passwordShort' })
     expect(validateNewPassword(form({ password: 'hunter2x', confirm: 'hunter2y' }))).toEqual({ confirm: 'mismatch' })
     expect(validateNewPassword(form({ password: 'hunter2x', confirm: 'hunter2x' }))).toBeNull()
+  })
+
+  it('phone sign-in wants a mainland number and the consent box before a code (T63)', () => {
+    expect(validatePhoneSend(form({ phone: '140 0000 0001', consent: 'on' }))).toBeNull()
+    expect(validatePhoneSend(form({ phone: '+14155550123' }))).toEqual({ phone: 'phone', consent: 'consent' })
+    expect(validateCode(form({ code: '402913' }))).toBeNull()
+    expect(validateCode(form({ code: '4029' }))).toEqual({ code: 'code' })
   })
 })

@@ -14,6 +14,7 @@ export type ClusterWindow = (typeof CLUSTER_WINDOWS)[number]
 export type ClusterMember = {
   id: string
   email: string | null
+  phone: string | null
   createdAt: string
   freeCredits: number
   freeUsed: number
@@ -25,6 +26,8 @@ export type SignupCluster = { ip: string; accounts: number; lastSignupAt: string
 const memberSchema = z.object({
   id: z.uuid(),
   email: z.string().nullable(),
+  // Since 0442.
+  phone: z.string().nullable().optional(),
   created_at: z.string(),
   free_credits: z.number(),
   free_used: z.number(),
@@ -52,6 +55,7 @@ export async function listSignupClusters(db: SupabaseClient, days: ClusterWindow
     members: row.members.map((member) => ({
       id: member.id,
       email: member.email,
+      phone: member.phone ?? null,
       createdAt: member.created_at,
       freeCredits: member.free_credits,
       freeUsed: member.free_used,

@@ -3,6 +3,7 @@ import { z } from 'zod'
 
 import { sentryBuildEnvSchema } from './build-env'
 import { indexingEnvSchema } from './seo/indexing-env'
+import { smsEnvShape } from './sms/sms-env'
 import { assetsEnvShape, checkAssetsEnv } from './storage/assets-env'
 import { checkWaffoEnv, waffoEnvShape } from './waffo-env'
 
@@ -50,6 +51,8 @@ const serverEnvSchema = z.object({
   // Ignored when VERCEL_ENV is 'production', so it can never turn the feature on for real users.
   FEATURE_WISHLIST_PREVIEW: z.preprocess(blankAsUnset, z.enum(['on', 'off']).default('off')),
   ...waffoEnvShape,
+  // Phone sign-in (T63): the SMS adapter and the Send SMS hook secret (core/sms).
+  ...smsEnvShape,
 })
   .extend(sentryBuildEnvSchema.shape)
   // SITE_INDEXING: the pre-launch indexing switch (ARCHITECTURE §12.0), default off.

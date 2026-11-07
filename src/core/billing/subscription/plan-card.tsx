@@ -61,13 +61,18 @@ function SinceFoot({ facts, withEmail = false, children }: { facts: PassFacts; w
   )
 }
 
-// "50 credits a month · $19.90/mo", from the product the mirror row names.
-function PerPeriod({ summary, products }: { summary: Subscribed; products: Props['products'] }) {
+// "50 credits a month · $19.90/mo · Card", from the product the mirror row names; the method
+// (card or Alipay, through Stripe or Waffo) from the newest payment for that same product.
+function PerPeriod({ summary, ctx }: { summary: Subscribed; ctx: Ctx }) {
   const t = useTranslations('app.account.plan')
   const usd = useNames().usd
-  const product = products.find((p) => p.tier === summary.tier && p.interval === summary.interval)
+  const product = ctx.products.find((p) => p.tier === summary.tier && p.interval === summary.interval)
   if (!product || product.priceUsd <= 0) return null
-  return <Muted>{t.rich('perPeriod', { ...richTags, credits: product.credits, interval: summary.interval, price: usd(product.priceUsd) })}</Muted>
+  const values = { ...richTags, credits: product.credits, interval: summary.interval, price: usd(product.priceUsd) }
+  const last = ctx.facts.last
+  const method = last && last.product.id === product.id ? last.method : null
+  if (!method) return <Muted>{t.rich('perPeriod', values)}</Muted>
+  return <Muted>{t.rich('perPeriodMethod', { ...values, method: method === 'alipay' ? t('alipay') : t('card') })}</Muted>
 }
 
 function SubscribedPass({ summary, ctx }: { summary: Subscribed; ctx: Ctx }) {
@@ -94,7 +99,7 @@ function SubscribedPass({ summary, ctx }: { summary: Subscribed; ctx: Ctx }) {
     return pass('paused', <Flag>{t('paused')}</Flag>, <Why>{t('pausedWhy')}</Why>, <SinceFoot facts={ctx.facts}>{manage}</SinceFoot>)
   }
   const foot = <SinceFoot facts={ctx.facts} withEmail>{manage}</SinceFoot>
-  return pass('active', <Status>{t('renewsPlain', { date })}</Status>, <PerPeriod summary={summary} products={ctx.products} />, foot)
+  return pass('active', <Status>{t('renewsPlain', { date })}</Status>, <PerPeriod summary={summary} ctx={ctx} />, foot)
 }
 
 // A Waffo card subscription (T50): the same states, but Waffo has no portal of ours. Active and
@@ -118,7 +123,7 @@ function WaffoPass({ summary, ctx }: { summary: Subscribed; ctx: Ctx }) {
     const why = summary.expired ? t('waffoPastDueEndedWhy') : t('waffoPastDueWhy')
     return pass('past_due', <Flag bad>{t('paymentFailed')}</Flag>, <Why>{why}</Why>, <SinceFoot facts={ctx.facts}>{cancel}</SinceFoot>)
   }
-  return pass('active', <Status>{t('renewsPlain', { date })}</Status>, <PerPeriod summary={summary} products={ctx.products} />, <SinceFoot facts={ctx.facts} withEmail>{cancel}</SinceFoot>)
+  return pass('active', <Status>{t('renewsPlain', { date })}</Status>, <PerPeriod summary={summary} ctx={ctx} />, <SinceFoot facts={ctx.facts} withEmail>{cancel}</SinceFoot>)
 }
 
 // Alipay (Stripe or Waffo): one period paid once. The newest membership purchase says which period and

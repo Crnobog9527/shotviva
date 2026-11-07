@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { EmptyState } from '../shell/admin-blocks'
 import { formatBeijing } from '../shell/format'
 import { CLUSTER_WINDOWS, type ClusterWindow, type SignupCluster } from '../users/clusters'
+import { accountLabel } from '../users/label'
 import { BanButton } from './ban-button'
 import { USERS_COPY } from './copy'
 import type { UserAdminActions } from './user-actions'
@@ -52,7 +53,7 @@ function ClusterTable({ cluster, ban }: { cluster: SignupCluster; ban: UserAdmin
             <TableRow key={member.id}>
               <TableCell>
                 <Link href={`/admin/users/${member.id}`} className="text-primary hover:underline">
-                  {member.email ?? member.id}
+                  {accountLabel(member)}
                 </Link>
               </TableCell>
               <TableCell className="font-mono text-xs whitespace-nowrap">{formatBeijing(member.createdAt)}</TableCell>

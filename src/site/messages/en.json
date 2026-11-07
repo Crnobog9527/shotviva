@@ -33,6 +33,27 @@
   "auth": {
     "google": "Continue with Google",
     "or": "or with email",
+    "tabs": {
+      "label": "Sign-in method",
+      "phone": "Phone",
+      "email": "Email"
+    },
+    "phone": {
+      "field": "Mobile number",
+      "placeholder": "11-digit number",
+      "hint": "Mainland China (+86) numbers only. A new number creates an account.",
+      "consent": "I have read and agree to the <privacy>Privacy Policy</privacy>, and agree that my phone number and other personal information are transferred outside mainland China (stored in the United States; the text message is sent by an SMS provider).",
+      "send": "Get code",
+      "terms": "By continuing you agree to the <terms>Terms</terms>."
+    },
+    "code": {
+      "field": "Verification code",
+      "hint": "The 6 digits in the text message.",
+      "sent": "We sent a code to <addr>{phone}</addr>. It works for {minutes} minutes.",
+      "resend": "Send a new code",
+      "wait": "New code in {seconds} s",
+      "change": "Use a different number"
+    },
     "show": "Show",
     "hide": "Hide",
     "fields": {
@@ -58,7 +79,10 @@
       "passwordMissing": "Enter your password.",
       "passwordShort": "Too short. Use {min} characters or more.",
       "passwordWeak": "Choose a stronger password.",
-      "mismatch": "The two passwords don't match."
+      "mismatch": "The two passwords don't match.",
+      "phone": "Enter an 11-digit mainland China mobile number.",
+      "code": "Enter the 6-digit code.",
+      "consent": "Tick the box to agree before we send a code."
     },
     "arrived": {
       "home": {
@@ -143,6 +167,12 @@
       "AUTH_CAPTCHA_FAILED": "Verification didn't complete. Please try again.",
       "AUTH_RATE_LIMITED": "Too many attempts. Please wait a minute and try again.",
       "AUTH_WEAK_PASSWORD": "Please choose a stronger password.",
+      "AUTH_PHONE_INVALID": "Only mainland China (+86) mobile numbers work here.",
+      "AUTH_CONSENT_REQUIRED": "Agree to the Privacy Policy and the cross-border transfer first.",
+      "AUTH_SMS_COOLDOWN": "A code was just sent. Wait 60 seconds before asking again.",
+      "AUTH_SMS_DAILY_LIMIT": "No more codes today for this number. Try again tomorrow, or use email.",
+      "AUTH_SMS_FAILED": "The text message didn't go out. Try again in a moment, or use email.",
+      "AUTH_OTP_INVALID": "That code is wrong or has expired. Check it, or get a new one.",
       "INTERNAL": "Something went wrong. Please try again.",
       "CONFLICT": "That request was already handled."
     },
@@ -604,6 +634,7 @@
       "plan": {
         "title": "Plan",
         "perPeriod": "<mono>{credits, plural, one {# credit} other {# credits}}</mono> a {interval, select, year {year} other {month}} · <mono>{price}</mono>/{interval, select, year {yr} other {mo}}",
+        "perPeriodMethod": "<mono>{credits, plural, one {# credit} other {# credits}}</mono> a {interval, select, year {year} other {month}} · <mono>{price}</mono>/{interval, select, year {yr} other {mo}} · {method}",
         "member": "Member",
         "noPlan": "No plan",
         "manage": "Manage subscription",
@@ -628,6 +659,7 @@
         "opensStripeBottom": "secure billing page",
         "walletAlipayWhy": "One {interval, select, year {year} other {month}}, paid with <b>{method}</b>. It doesn't renew by itself: renew before {date, date, medium} to keep the plan, or let it end and your credits still work.",
         "alipay": "Alipay",
+        "card": "Card",
         "renewPrice": "Renew <cost>· {price}</cost>",
         "endedPlain": "Your plan ended.",
         "endedTier": "Your {tier} plan ended.",
@@ -660,6 +692,7 @@
       "settings": {
         "title": "Settings",
         "email": "Email",
+        "phone": "Phone",
         "language": "Language",
         "purchases": "Purchases",
         "purchasesNone": "None",
