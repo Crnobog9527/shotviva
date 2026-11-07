@@ -11,8 +11,15 @@ import { Chevron } from './rows'
 // account.html). Each ring shows what is left of what the period (or the signup gift) gave,
 // and says what those credits make: paid photos are private with no watermark, free ones public
 // and watermarked (ARCHITECTURE §6.1). "Buy credits" opens the paywall on the credit packs.
+//
+// The two dials sit one above the other and "of N" rides next to the count ("3 / 6 free"), so
+// each line under a count is one short phrase that stays on one line at every width (Owner
+// 2026-11-08: "共 6 · 公开、带水印" left "印" alone on a second line). Side by side, the text beside a
+// ring had 82px at 375, 26px at 768 and 109px at 1440.
 
 type DialProps = { kind: 'paid' | 'free'; count: number; of: number | null; label: string; ringLabel: string }
+
+export type DialFigures = { paidOf: number | null; freeOf: number | null }
 
 // Share of the ring: left over given, full when there is no "given" (or more than it).
 export function ringValue(count: number, of: number | null): number {
@@ -33,9 +40,11 @@ function Dial({ kind, count, of, label, ringLabel }: DialProps) {
       <div className="min-w-0">
         <p className="font-display text-h1 leading-none tracking-[-0.02em] whitespace-nowrap">
           {count}
-          <small className="ml-1.5 font-mono text-caption tracking-normal text-muted-foreground">{t(kind)}</small>
+          <small className="ml-1.5 font-mono text-caption tracking-normal text-muted-foreground">
+            {of === null ? t(kind) : t('outOf', { total: of, kind: t(kind) })}
+          </small>
         </p>
-        <p className="mt-1 text-caption leading-[1.3] text-muted-foreground hyphens-auto">{label}</p>
+        <p className="mt-1 truncate text-caption leading-[1.3] text-muted-foreground">{label}</p>
       </div>
     </div>
   )
@@ -43,28 +52,31 @@ function Dial({ kind, count, of, label, ringLabel }: DialProps) {
 
 type Props = { balance: Balance; giftRefused: boolean; allowance: Allowance | null; freeGift: number }
 
-// The two dials' words: "of 50 this month" only while it is true, since packs or a carried-over
-// balance can top what the period gave.
-function useDialCopy(balance: Balance, allowance: Allowance | null, freeGift: number) {
+// What each ring is measured against: "of 50" only while it is true, since packs or a
+// carried-over balance can top what the period gave; "of 6" only when the signup gift was
+// actually given (the same-IP rule can withhold it, ARCHITECTURE §7: then "0 / 6" reads wrong).
+export function dialFigures(balance: Balance, allowance: Allowance | null, freeGift: number, giftRefused: boolean): DialFigures {
+  return {
+    paidOf: allowance && balance.paid <= allowance.credits ? allowance.credits : null,
+    freeOf: !giftRefused && balance.free <= freeGift ? freeGift : null,
+  }
+}
+
+function useDialCopy(balance: Balance, figures: DialFigures) {
   const t = useTranslations('app.account.credits')
-  const paidOf = allowance && balance.paid <= allowance.credits ? allowance : null
-  const freeOf = balance.free <= freeGift ? freeGift : null
-  const paid = paidOf
-    ? { of: paidOf.credits, label: t('paidOf', { total: paidOf.credits, interval: paidOf.interval }), ringLabel: t('paidRingOf', { count: balance.paid, total: paidOf.credits }) }
-    : { of: null, label: t('paidUse'), ringLabel: t('paidRing', { count: balance.paid }) }
-  const free = freeOf
-    ? { of: freeOf, label: t('freeOf', { total: freeOf }), ringLabel: t('freeRingOf', { count: balance.free, total: freeOf }) }
-    : { of: null, label: t('freeUse'), ringLabel: t('freeRing', { count: balance.free }) }
+  const { paidOf, freeOf } = figures
+  const paid = { of: paidOf, label: t('paidUse'), ringLabel: paidOf === null ? t('paidRing', { count: balance.paid }) : t('paidRingOf', { count: balance.paid, total: paidOf }) }
+  const free = { of: freeOf, label: t('freeUse'), ringLabel: freeOf === null ? t('freeRing', { count: balance.free }) : t('freeRingOf', { count: balance.free, total: freeOf }) }
   return { paid, free }
 }
 
 export function CreditDials({ balance, giftRefused, allowance, freeGift }: Props) {
   const t = useTranslations('app.account.credits')
   const balanceT = useTranslations('app.balance')
-  const copy = useDialCopy(balance, allowance, freeGift)
+  const copy = useDialCopy(balance, dialFigures(balance, allowance, freeGift, giftRefused))
   return (
     <>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid gap-2">
         <Dial kind="paid" count={balance.paid} {...copy.paid} />
         <Dial kind="free" count={balance.free} {...copy.free} />
       </div>

@@ -3,7 +3,7 @@ import { createElement, type FunctionComponent, type ReactElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
-import { CreditDials, ringValue } from '@/core/account/ui/credit-dials'
+import { CreditDials, dialFigures, ringValue } from '@/core/account/ui/credit-dials'
 import { FilmStrip } from '@/core/account/ui/film-strip'
 import { loadMessages } from '@/site/i18n/messages'
 import { site } from '@/site/site.config'
@@ -19,16 +19,17 @@ async function render(element: ReactElement, locale: 'en' | 'zh' = 'en') {
   return { html, text: html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() }
 }
 
-const dials = (paid: number, free: number, allowance: { credits: number; interval: 'month' | 'year' } | null) =>
-  createElement(CreditDials, { balance: { paid, free }, giftRefused: false, allowance, freeGift: site.billing.freeCredits })
+const dials = (paid: number, free: number, allowance: { credits: number; interval: 'month' | 'year' } | null, giftRefused = false) =>
+  createElement(CreditDials, { balance: { paid, free }, giftRefused, allowance, freeGift: site.billing.freeCredits })
 
 const ring = (html: string, kind: string) => html.match(new RegExp(`data-dial="${kind}".*?--ring-v:(\\d+)`))?.[1]
 
 describe('credit dials', () => {
   it('rings what is left of the period and of the signup gift', async () => {
     const { html, text } = await render(dials(38, 3, { credits: 50, interval: 'month' }))
-    expect(text).toContain('38 paid of 50 this month · private, no watermark')
-    expect(text).toContain('3 free of 6 · public, watermarked')
+    // "of N" sits next to the count; the line under it is one short phrase (Owner 2026-11-08).
+    expect(text).toContain('38 / 50 paid private, no watermark')
+    expect(text).toContain('3 / 6 free public, watermarked')
     expect(ring(html, 'paid')).toBe('76')
     expect(ring(html, 'free')).toBe('50')
     expect(html).toContain('aria-label="38 of 50 paid credits left"')
@@ -44,7 +45,27 @@ describe('credit dials', () => {
   })
 
   it('speaks Chinese', async () => {
-    expect((await render(dials(500, 2, { credits: 600, interval: 'year' }), 'zh')).text).toContain('本年共 600 · 私密、无水印')
+    const { text } = await render(dials(500, 2, { credits: 600, interval: 'year' }), 'zh')
+    expect(text).toContain('500 / 600 付费 私密、无水印')
+    expect(text).toContain('2 / 6 免费 公开、带水印')
+  })
+
+  it('drops "/ 6" when the signup gift was withheld (same-IP rule), in both languages', async () => {
+    const en = await render(dials(0, 0, null, true))
+    expect(en.text).toContain('0 free public, watermarked')
+    expect(en.text).not.toContain('/ 6')
+    expect(en.html).toContain('aria-label="0 free credits left"')
+    const zh = await render(dials(0, 0, null, true), 'zh')
+    expect(zh.text).toContain('0 免费 公开、带水印')
+    expect(zh.text).not.toContain('/ 6')
+  })
+
+  it('dialFigures: what each ring is measured against', () => {
+    const month = { credits: 50, interval: 'month' as const }
+    expect(dialFigures({ paid: 38, free: 3 }, month, 6, false)).toEqual({ paidOf: 50, freeOf: 6 })
+    expect(dialFigures({ paid: 38, free: 0 }, month, 6, true)).toEqual({ paidOf: 50, freeOf: null })
+    expect(dialFigures({ paid: 80, free: 9 }, month, 6, false)).toEqual({ paidOf: null, freeOf: null })
+    expect(dialFigures({ paid: 0, free: 6 }, null, 6, false)).toEqual({ paidOf: null, freeOf: 6 })
   })
 
   it('ringValue clamps to 0–100', () => {
