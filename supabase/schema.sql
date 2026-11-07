@@ -3722,7 +3722,7 @@ ALTER TABLE ONLY "public"."template_requests"
 
 
 ALTER TABLE ONLY "public"."templates"
-    ADD CONSTRAINT "templates_category_fkey" FOREIGN KEY ("category") REFERENCES "public"."template_categories"("key");
+    ADD CONSTRAINT "templates_category_key_fkey" FOREIGN KEY ("category_key") REFERENCES "public"."template_categories"("key");
 
 
 
