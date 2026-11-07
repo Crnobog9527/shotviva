@@ -5,9 +5,10 @@ import { z } from 'zod'
 
 import { AppError } from '../errors'
 import { decodeCursor, encodeCursor, PAGE_SIZE } from './cursor'
-import { toMessage } from './reads'
+import { MESSAGE_COLUMNS, messageRow, toMessage } from './reads'
 import { readFailed, supportRpc } from './rpc'
 import { TICKET_STATUSES, TICKET_TYPES } from './rules'
+import type { TicketImageRow } from './images'
 import { adminReplySchema, decideRefundSchema, ticketIdSchema, type AdminListFilter } from './schema'
 import type { AdminPayment, AdminTicket, AdminTicketRow, Page, RefundEligibility } from './types'
 
@@ -97,9 +98,7 @@ const ticketRow = z.object({
   refund_amount_cents: z.number().nullable(),
   created_at: z.string(),
   closed_at: z.string().nullable(),
-  support_ticket_messages: z
-    .object({ id: z.uuid(), author: z.enum(['user', 'admin']), body: z.string(), created_at: z.string() })
-    .array(),
+  support_ticket_messages: messageRow.array(),
 })
 
 const paymentRow = z.object({
@@ -165,9 +164,10 @@ export async function loadAdminTicket(db: SupabaseClient, id: string): Promise<A
   if (!ticketIdSchema.safeParse(id).success) return null
   const { data, error } = await db
     .from('support_tickets')
-    .select('id, user_id, type, status, payment_id, job_id, refund_decision, refund_amount_cents, created_at, closed_at, support_ticket_messages(id, author, body, created_at)')
+    .select(`id, user_id, type, status, payment_id, job_id, refund_decision, refund_amount_cents, created_at, closed_at, support_ticket_messages(${MESSAGE_COLUMNS})`)
     .eq('id', id)
     .order('created_at', { referencedTable: 'support_ticket_messages', ascending: true })
+    .order('created_at', { referencedTable: 'support_ticket_messages.support_ticket_attachments', ascending: true })
     .maybeSingle()
   if (error) readFailed('loadAdminTicket', error)
   if (!data) return null
@@ -195,11 +195,20 @@ export async function loadAdminTicket(db: SupabaseClient, id: string): Promise<A
 
 const anyRow = z.object({ id: z.uuid() })
 
-export async function replyTicket(db: SupabaseClient, input: unknown): Promise<void> {
+// The Owner's reply; images (T69) are already stored under the ticket author's prefix.
+export async function replyTicket(db: SupabaseClient, input: unknown, images: readonly TicketImageRow[] = []): Promise<void> {
   const parsed = adminReplySchema.safeParse(input)
   if (!parsed.success) throw new AppError('INVALID_INPUT', '请填写回复内容（最多 2000 字）')
   const { ticketId, body, close } = parsed.data
-  await supportRpc(db, 'admin_reply_ticket', { p_ticket_id: ticketId, p_body: body, p_close: close }, anyRow)
+  await supportRpc(db, 'admin_reply_ticket', { p_ticket_id: ticketId, p_body: body, p_close: close, p_images: images }, anyRow)
+}
+
+// Whose ticket it is, for filing the Owner's images under the author (primary key read).
+export async function ticketAuthor(db: SupabaseClient, ticketId: string): Promise<string | null> {
+  if (!ticketIdSchema.safeParse(ticketId).success) return null
+  const { data, error } = await db.from('support_tickets').select('user_id').eq('id', ticketId).maybeSingle()
+  if (error) readFailed('ticketAuthor', error)
+  return data ? z.object({ user_id: z.uuid() }).parse(data).user_id : null
 }
 
 // Records the decision, the reply and the audit row (decide_refund) in one transaction.

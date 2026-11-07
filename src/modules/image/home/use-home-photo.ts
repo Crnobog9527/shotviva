@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react'
 
-import { checkPickedFile, UploadError, type UploadErrorCode } from '../workspace/upload-photo'
+import { checkPickedFile, UploadError, type UploadErrorCode } from '@/core/storage/upload'
 import { usePhoto } from '../workspace/use-photo'
 import type { HomePhotoStatus } from './home-cta'
 

@@ -2,10 +2,11 @@ import { useFormatter, useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 
 import { cn } from '../../ui/cn'
-import type { TicketMessage, TicketThread } from '../types'
+import type { ShownMessage, ShownThread } from '../types'
+import { MessageImages } from './message-images'
 import { StatusChip } from './status-chip'
 
-type Props = { thread: TicketThread; brand: string; notice?: ReactNode; form: ReactNode }
+type Props = { thread: ShownThread; brand: string; notice?: ReactNode; form: ReactNode }
 
 // One ticket inside the Help dialog: its state, the messages in order, then the field to add
 // to it. The Owner's messages carry the brand's name, the user's read "You".
@@ -33,8 +34,9 @@ export function ThreadView({ thread, brand, notice, form }: Props) {
   )
 }
 
-function MessageCard({ message, brand, when }: { message: TicketMessage; brand: string; when: string }) {
+function MessageCard({ message, brand, when }: { message: ShownMessage; brand: string; when: string }) {
   const t = useTranslations('app.support.thread')
+  const images = useTranslations('app.support.images')
   const fromTeam = message.author === 'admin'
   return (
     <article className={cn('hairline-lit grid gap-2 rounded-panel p-4', fromTeam ? 'bg-card' : 'bg-wash')}>
@@ -45,6 +47,7 @@ function MessageCard({ message, brand, when }: { message: TicketMessage; brand: 
         <span className="font-mono text-caption text-muted-foreground">{when}</span>
       </header>
       <p className="text-body leading-[1.5] break-words whitespace-pre-wrap">{message.body}</p>
+      <MessageImages images={message.images} openLabel={(n) => images('open', { n })} />
     </article>
   )
 }

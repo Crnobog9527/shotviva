@@ -4,7 +4,7 @@ export { createUpload, uploadRequestSchema, type UploadTicket } from './create-u
 export { loadInputImage, loadOutputImage, normalizeInputImage, type InputImage } from './input-image'
 export { writeInputPreview } from './input-preview'
 export { copyBackKeptInputs, keepJobInputs, type RestoredInput } from './kept-inputs'
-export { inputPreviewKeyFor, isKeptInputKey, isOwnInputKey, keptInputKeyFor, newInputKey, newRequestImageKey, outputKeyFor } from './keys'
+export { inputPreviewKeyFor, isKeptInputKey, isOwnInputKey, keptInputKeyFor, newInputKey, newRequestImageKey, newTicketImageKey, outputKeyFor } from './keys'
 export type { ObjectHead, ObjectStore, PresignGetOptions } from './object-store'
 export { createR2Client, createR2Store, r2PublicStore, r2Store } from './r2-store'
 export { sniffImageType, type SniffedType } from './sniff'

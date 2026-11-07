@@ -1,5 +1,5 @@
-import { uploadSizeBucket, type EventProps } from '@/core/analytics/events'
-import { isUploadContentType, MAX_UPLOAD_BYTES, type UploadContentType } from '@/core/storage/rules'
+import { uploadSizeBucket, type EventProps } from '../../analytics/events'
+import { isUploadContentType, MAX_UPLOAD_BYTES, type UploadContentType } from '../rules'
 
 export type UploadPhase = 'compressing' | 'uploading'
 

@@ -14,6 +14,10 @@ import type { UploadContentType } from './rules'
 //                                     kept with the result for Make again (§8.3, T40)
 //   requests/{user_id}/{uuid}.jpg     wishlist reference image, re-encoded; kept until the
 //                                     request is rejected or taken down (ARCHITECTURE §15.1)
+//   tickets/{user_id}/{ticket_id}/{uuid}.webp
+//                                     a support-ticket image, re-encoded by the server (EXIF
+//                                     gone); user_id is the ticket's author, also for the Owner's
+//                                     images; kept with the ticket (ARCHITECTURE §10, T69)
 
 const EXTENSION: Record<UploadContentType, string> = {
   'image/jpeg': 'jpg',
@@ -33,6 +37,10 @@ export function newInputKey(userId: string, contentType: UploadContentType): str
 
 export function newRequestImageKey(userId: string): string {
   return `requests/${userId}/${randomUUID()}.jpg`
+}
+
+export function newTicketImageKey(ticketAuthorId: string, ticketId: string): string {
+  return `tickets/${ticketAuthorId}/${ticketId}/${randomUUID()}.webp`
 }
 
 export function outputKeyFor(userId: string, jobId: string): string {

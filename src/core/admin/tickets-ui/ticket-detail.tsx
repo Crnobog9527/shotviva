@@ -1,6 +1,7 @@
 import Link from 'next/link'
 
-import type { AdminTicket } from '@/core/support'
+import type { ShownAdminTicket as AdminTicket } from '@/core/support'
+import { MessageImages } from '@/core/support/ui'
 import { Badge } from '@/core/ui/badge'
 import { cn } from '@/core/ui/cn'
 
@@ -82,6 +83,7 @@ function Thread({ ticket }: { ticket: AdminTicket }) {
               <span className="font-mono">{formatBeijing(message.createdAt)}</span>
             </p>
             <p className="mt-1 text-sm break-words whitespace-pre-wrap">{message.body}</p>
+            <MessageImages images={message.images} openLabel={COPY.thread.openImage} />
           </li>
         ))}
       </ol>

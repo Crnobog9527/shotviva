@@ -778,7 +778,9 @@
           "RATE_LIMITED": "24 小时内你已经提交了 5 个工单，请稍后再试。",
           "INVALID_INPUT": "请选择类型，并写下不超过 2,000 字的内容。申请退款需要选择对应的付款记录。",
           "NOT_FOUND": "这笔付款或这件作品不在你的账号里。",
-          "generic": "没能发送，请再试一次。"
+          "generic": "没能发送，请再试一次。",
+          "IMAGE_TOO_LARGE": "有图片超过 10 MB，移除后再发送。",
+          "IMAGE_UNSUPPORTED": "有图片无法读取，移除后再发送。"
         }
       },
       "thread": {
@@ -792,7 +794,9 @@
         "errors": {
           "INVALID_INPUT": "请写下不超过 2,000 字的内容。",
           "NOT_FOUND": "这个工单已经不存在了。",
-          "generic": "没能发送，请再试一次。"
+          "generic": "没能发送，请再试一次。",
+          "IMAGE_TOO_LARGE": "有图片超过 10 MB，移除后再发送。",
+          "IMAGE_UNSUPPORTED": "有图片无法读取，移除后再发送。"
         }
       },
       "showMore": "查看更多",
@@ -806,7 +810,23 @@
       "loadError": "没能加载工单",
       "loadErrorBody": "请检查网络后重试。",
       "retry": "重试",
-      "notFoundBody": "它可能已被删除，或者属于另一个账号。"
+      "notFoundBody": "它可能已被删除，或者属于另一个账号。",
+      "images": {
+        "label": "图片（选填）",
+        "hint": "截图或照片，最多 3 张，每张不超过 10 MB。",
+        "add": "添加",
+        "count": "{count}/{max}",
+        "remove": "移除第 {n} 张图片",
+        "uploading": "上传中",
+        "failed": "上传失败",
+        "open": "查看第 {n} 张图片",
+        "errors": {
+          "IMAGE_TOO_LARGE": "这张图片超过 10 MB，移除后才能发送。",
+          "IMAGE_UNSUPPORTED": "这个文件无法读取，请用 JPG、PNG、WebP 或 HEIC 图片。",
+          "UPLOAD_FAILED": "有图片没传上去。请检查网络，移除后重新添加。",
+          "TOO_MANY": "每条消息最多 {max} 张图片。"
+        }
+      }
     },
     "edit": {
       "open": "修改",

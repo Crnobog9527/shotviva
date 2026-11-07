@@ -14,7 +14,8 @@ export const tabId = (idBase: string, tab: HelpTab) => `${idBase}-tab-${tab}`
 export const panelId = (idBase: string, tab: HelpTab) => `${idBase}-panel-${tab}`
 
 // New ticket / My tickets: the paywall's segmented control (billing-toggle) as WAI-ARIA tabs,
-// arrows and Home / End move between them. It stays put while the panel scrolls under it.
+// arrows and Home / End move between them. It stays put while the panel scrolls under it, flush
+// with the top edge and clear of the close button (like the title).
 export function HelpTabs({ current, onChange, idBase }: Props) {
   const t = useTranslations('app.support')
   const buttons = useRef<Partial<Record<HelpTab, HTMLButtonElement | null>>>({})
@@ -26,8 +27,8 @@ export function HelpTabs({ current, onChange, idBase }: Props) {
     buttons.current[target]?.focus()
   }
   return (
-    <div className="sticky top-0 z-10 -mx-4 bg-popover px-4 pt-4 pb-1 md:-mx-6 md:px-6">
-      <div role="tablist" aria-label={t('title')} onKeyDown={onKeyDown} className="relative grid grid-cols-2 rounded-control bg-wash p-1 shadow-[inset_0_0_0_1px_var(--border)]">
+    <div className="sticky top-0 z-10 -mx-4 bg-popover px-4 pt-4 pb-1 md:-top-6 md:-mx-6 md:px-6 md:pt-6">
+      <div role="tablist" aria-label={t('title')} onKeyDown={onKeyDown} className="relative mr-12 grid grid-cols-2 rounded-control bg-wash p-1 shadow-[inset_0_0_0_1px_var(--border)]">
         <span
           aria-hidden="true"
           className={cn(

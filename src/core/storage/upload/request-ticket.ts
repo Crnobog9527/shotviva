@@ -1,4 +1,4 @@
-import type { UploadContentType } from '@/core/storage/rules'
+import type { UploadContentType } from '../rules'
 
 import { UploadError, type UploadErrorCode } from './upload-photo'
 

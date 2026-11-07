@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { attachmentFor, BODY_MAX, TICKET_STATUSES, TICKET_TYPES } from './rules'
+import { attachmentFor, BODY_MAX, TICKET_IMAGES_MAX, TICKET_STATUSES, TICKET_TYPES } from './rules'
 
 // Inputs from the browser (AGENTS §4). Ids that do not parse read as "not found" further on.
 
@@ -36,9 +36,19 @@ export const ticketIdSchema = z.uuid()
 
 export const addMessageSchema = z.object({ ticketId: ticketIdSchema, body })
 
+// The picked images' upload keys from a form (T69); shape and ownership are checked on use.
+export const imageKeysSchema = z.array(z.string().min(1).max(200)).max(TICKET_IMAGES_MAX)
+
 export const adminReplySchema = z
-  .object({ ticketId: ticketIdSchema, body: z.string().trim().max(BODY_MAX), close: z.boolean() })
+  .object({
+    ticketId: ticketIdSchema,
+    body: z.string().trim().max(BODY_MAX),
+    close: z.boolean(),
+    // The picked images' upload keys (T69); a bare close takes none.
+    images: z.array(z.string().min(1).max(200)).max(TICKET_IMAGES_MAX).default([]),
+  })
   .refine((input) => input.close || input.body.length > 0, { path: ['body'], message: 'reply required' })
+  .refine((input) => input.images.length === 0 || input.body.length > 0, { path: ['images'], message: 'images need a reply' })
 
 export const decideRefundSchema = z.discriminatedUnion('decision', [
   z.object({ ticketId: ticketIdSchema, decision: z.literal('approved'), amountCents: z.number().int().positive(), body }),

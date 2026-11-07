@@ -5,7 +5,8 @@ import { AdminPage, loadUser } from '@/core/admin'
 import { TICKETS_COPY, TicketDetailView } from '@/core/admin/tickets-ui'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { serverEnv } from '@/core/env'
-import { loadAdminTicket } from '@/core/support'
+import { r2Store } from '@/core/storage'
+import { loadAdminTicket, showMessages } from '@/core/support'
 
 import { decideRefundAction, replyTicketAction } from '../actions'
 
@@ -21,11 +22,12 @@ export default async function AdminTicketPage({ params }: PageProps<'/[locale]/a
   const db = createAdminSupabase()
   const ticket = await loadAdminTicket(db, id)
   if (!ticket) notFound()
-  const user = await loadUser(db, ticket.userId)
+  // Images as short-lived signed URLs (T69), next to the author lookup.
+  const [user, messages] = await Promise.all([loadUser(db, ticket.userId), showMessages(r2Store(), ticket.messages)])
   return (
     <AdminPage title={TICKETS_COPY.detailTitle}>
       <TicketDetailView
-        ticket={ticket}
+        ticket={{ ...ticket, messages }}
         user={user}
         stripeLive={serverEnv().VERCEL_ENV === 'production'}
         actions={{ reply: replyTicketAction, decide: decideRefundAction }}

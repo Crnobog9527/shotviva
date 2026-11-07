@@ -22,7 +22,23 @@ export const TICKETS_COPY = {
   sortHint: (h: { starter: number; pro: number; max: number; base: number }) =>
     `待处理按回复到期时间排序，最急的在前（从用户最后一条消息算起：Starter ${h.starter} 小时、Pro ${h.pro} 小时、Max ${h.max} 小时，无档位 ${h.base} 小时）。`,
   decisions: { approved: '已同意退款', rejected: '已拒绝退款' },
-  thread: { user: '用户', admin: '我们', heading: '消息往来' },
+  thread: { user: '用户', admin: '我们', heading: '消息往来', openImage: (n: number) => `打开第 ${n} 张图片` },
+  // The reply's images (T69); the user sees them in the thread like their own.
+  images: {
+    label: '图片',
+    hint: '可选，最多 3 张截图或照片，每张不超过 10 MB；用户在工单里能看到。',
+    add: '添加图片',
+    count: (count: number, max: number) => `${count}/${max}`,
+    remove: (n: number) => `移除第 ${n} 张图片`,
+    uploading: '上传中',
+    failed: '上传失败',
+    errors: {
+      IMAGE_TOO_LARGE: '图片超过 10 MB。',
+      IMAGE_UNSUPPORTED: '请用 JPG、PNG、WebP 或 HEIC 图片。',
+      UPLOAD_FAILED: '上传失败，请检查网络后重试。',
+      TOO_MANY: '每条回复最多 3 张图片。',
+    },
+  },
   user: {
     heading: '用户信息',
     open: '打开用户详情 →',
@@ -80,12 +96,16 @@ export const TICKETS_COPY = {
     done: '已记录决定',
   },
   errors: {
-    INVALID_INPUT: '请检查输入：回复不能为空且不超过 2000 字；同意时金额要大于 0 且不超过未退金额。',
+    INVALID_INPUT: '请检查输入：回复不能为空且不超过 2000 字；带图片时要写回复；同意时金额要大于 0 且不超过未退金额。',
+    IMAGE_TOO_LARGE: '有图片超过 10 MB，请移除后再发。',
+    IMAGE_UNSUPPORTED: '有图片无法读取，请移除后再发。',
     NOT_FOUND: '工单不存在或已被删除。',
     generic: '操作失败，请稍后重试',
   },
 } as const
 
 export function ticketErrorText(code: string): string {
-  return code === 'INVALID_INPUT' || code === 'NOT_FOUND' ? TICKETS_COPY.errors[code] : TICKETS_COPY.errors.generic
+  return code === 'INVALID_INPUT' || code === 'NOT_FOUND' || code === 'IMAGE_TOO_LARGE' || code === 'IMAGE_UNSUPPORTED'
+    ? TICKETS_COPY.errors[code]
+    : TICKETS_COPY.errors.generic
 }
