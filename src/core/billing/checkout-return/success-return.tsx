@@ -2,6 +2,8 @@ import { useTranslations } from 'next-intl'
 
 import { Link } from '../../i18n/ui'
 import { buttonVariants } from '../../ui/button'
+import { CelebrationLoader } from './celebration/loader'
+import { levelOf, plateMaterial } from './celebration/levels'
 import { Credits, Glyph, ReturnPlate, Row, Rows, fineClass, linkClass, subClass, titleClass } from './parts'
 import { useChargedMoney } from './use-money'
 import { brandName, type SuccessView } from './view-model'
@@ -9,20 +11,23 @@ import { brandName, type SuccessView } from './view-model'
 type Props = { view: SuccessView; back: string | null }
 
 // Paid and the credits are in (comps-v3-b checkout.html `?r=success`): what you now have, then
-// one action. The receipt is Stripe's hosted one; Waffo has none.
+// one action. The receipt is Stripe's hosted one; Waffo has none. The first time a payment
+// lands here it is celebrated, by tier (T55); the pending state never is.
 export function SuccessReturn({ view, back }: Props) {
   const t = useTranslations('app.checkout')
   const tiers = useTranslations('paywall.tiers')
   const money = useChargedMoney()
   const count = view.credits.toLocaleString()
+  const level = levelOf(view.productId)
   return (
-    <ReturnPlate pending={false}>
+    <ReturnPlate pending={false} material={plateMaterial(level)}>
+      <CelebrationLoader level={level} paymentKey={view.paymentKey} />
       <Glyph pending={false} />
-      <h1 className={titleClass}>{view.tier ? t('titlePlan', { tier: tiers(view.tier) }) : t('titlePack', { count: view.credits })}</h1>
+      <h1 data-title="" className={titleClass}>{view.tier ? t('titlePlan', { tier: tiers(view.tier) }) : t('titlePack', { count: view.credits })}</h1>
       <p className={subClass}>{view.kind === 'plan' ? t('subPlan', { count: view.credits }) : t('subPack')}</p>
       <Rows>
         <Row label={t('added')}>
-          <Credits count={`+${count}`} unit={t('unit')} added />
+          <Credits count={`+${count}`} unit={t('unit')} added={view.credits} />
         </Row>
         <Row label={t('balance')}>
           <Credits count={view.balance.toLocaleString()} unit={t('unit')} />

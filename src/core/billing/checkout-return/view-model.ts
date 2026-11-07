@@ -1,4 +1,4 @@
-import type { MembershipTier, ProductInterval, SiteProduct } from '../../config'
+import type { MembershipTier, ProductId, ProductInterval, SiteProduct } from '../../config'
 import type { CheckoutMethod } from '../stripe/catalog'
 import type { Balance } from '../pools'
 import type { CheckoutFacts } from './facts'
@@ -22,6 +22,9 @@ export type SuccessView = Order & {
   paid: (Money & { method: CheckoutMethod | null; card: { brand: string; last4: string } | null }) | null
   receiptUrl: string | null
   fine: FineKey
+  // What was bought and which payment, for the celebration (T55).
+  productId: ProductId
+  paymentKey: string | null
 }
 
 export type PendingView = Order & { state: 'pending'; amount: Money | null; method: CheckoutMethod | null }
@@ -55,6 +58,8 @@ export function returnView(facts: CheckoutFacts, product: SiteProduct, balance: 
     renews,
     paid: facts.amount ? { ...facts.amount, method: facts.method, card: facts.card } : null,
     receiptUrl: facts.receiptUrl,
+    productId: product.id,
+    paymentKey: facts.paymentKey,
     fine: fineKey(order, facts.recurring),
   }
 }

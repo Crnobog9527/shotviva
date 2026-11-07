@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 
-import { CheckoutCancelToast } from '@/core/billing/checkout-return'
-import { PaywallProvider, PricingPayWith, PricingPlans } from '@/core/billing/paywall'
+import { CheckoutCancelToast, PaywallProvider, PricingPayWith, PricingPlans } from '@/core/billing/paywall'
 import { paymentChannel } from '@/core/billing/waffo'
 import { BusinessSection, CreditBuys, FaqSection, PricingHero } from '@/core/content'
 import { localizePath } from '@/core/i18n'
