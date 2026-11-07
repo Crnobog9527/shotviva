@@ -18,7 +18,8 @@ const PARTNER = 'test-bulkedit-partner'
 const template = (id: string, over: Record<string, unknown> = {}) => ({
   id,
   name: id,
-  category: 'test',
+  // A seeded T75 category key; the batch-category case moves templates to 'pets'.
+  category: 'food-drink',
   quality: 'high',
   creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
   visibleIn: ['web'],
