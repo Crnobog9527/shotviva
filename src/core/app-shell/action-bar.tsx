@@ -42,8 +42,9 @@ function FixedBar({ children, className }: { children: ReactNode; className?: st
       <div
         ref={bar}
         className={cn(
-          'action-material fixed inset-x-0 bottom-0 z-60 px-4 pt-3 pb-[calc(var(--sab)+12px)]',
-          'md:static md:mt-8 md:bg-none md:px-4 md:pb-8 md:shadow-none md:backdrop-blur-none',
+          // Fixed only below md, never `fixed` + `md:static`: see the note above TabBar in tab-bar.tsx.
+          'action-material z-60 px-4 pt-3 pb-[calc(var(--sab)+12px)] max-md:fixed max-md:inset-x-0 max-md:bottom-0',
+          'md:mt-8 md:bg-none md:px-4 md:pb-8 md:shadow-none md:backdrop-blur-none',
           className,
         )}
       >
