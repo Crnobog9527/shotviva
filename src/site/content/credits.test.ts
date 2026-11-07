@@ -46,3 +46,19 @@ describe('from N credits', () => {
     }
   })
 })
+
+// T73: the zh Alipay answer names WeChat Pay only with STRIPE_WECHAT_PAY on, on Stripe.
+describe('pricing FAQ and STRIPE_WECHAT_PAY', () => {
+  const wallet = (faq: readonly { question: string; answer: string }[]) => faq.find((item) => item.question.includes('支付宝'))
+  it('off (default): the pre-T73 Alipay answer', () => {
+    expect(wallet(pricingFaqIn('zh', 'stripe'))).toMatchObject({ question: '能用支付宝付款吗？' })
+    expect(JSON.stringify(pricingFaqIn('zh', 'stripe', false))).not.toContain('微信')
+  })
+  it('on: the WeChat Pay answer on Stripe, never on Waffo, never in English', () => {
+    expect(wallet(pricingFaqIn('zh', 'stripe', true))).toMatchObject({ question: '能用支付宝或微信支付付款吗？' })
+    expect(wallet(pricingFaqIn('zh', 'stripe', true))?.answer).toContain('在结账页再选其中一种')
+    expect(JSON.stringify(pricingFaqIn('zh', 'waffo', true))).not.toContain('微信')
+    expect(JSON.stringify(pricingFaqIn('en', 'stripe', true))).not.toMatch(/wechat/i)
+    expect(pricingFaqIn('zh', 'stripe', true)).toHaveLength(pricingFaqIn('zh', 'stripe').length)
+  })
+})

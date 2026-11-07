@@ -1,12 +1,12 @@
 import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { saveTemplate, setFeaturedTemplates, setTemplateActive } from '@/core/admin'
+import { saveTemplate, setFeaturedTemplates, setTemplateActive, setTemplateOrder } from '@/core/admin'
 import { listTemplatesIn } from '@/core/templates'
 
 import { CREDITS_FLOOR } from '@/modules/image/credits-floor'
 
-import { connectAdmin } from './helpers'
+import { connectAdmin, createUser } from './helpers'
 import { serviceSupabase as serviceClient } from './supabase-env'
 
 // T53 (ARCHITECTURE §12 home item 3): the home featured list, chosen and ordered in admin.
@@ -18,7 +18,7 @@ const HIDDEN = 'test-feat-hidden'
 const template = (id: string) => ({
   id,
   name: id,
-  category: 'test',
+  category: 'pets',
   quality: 'high',
   creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
   visibleIn: ['web'],
@@ -91,5 +91,64 @@ describe('home featured templates', () => {
       "select has_function_privilege('authenticated', 'public.admin_set_featured_templates(text[])', 'execute') as allowed",
     )
     expect(rows[0]?.allowed).toBe(false)
+  })
+})
+
+// T76: dragging the featured list saves its whole new order through admin_set_template_order.
+// In this file because featured ranks are global: no other test file may change them meanwhile.
+describe('reordering the featured list', () => {
+  let pg: Client
+  let admin: string
+  const client = serviceClient()
+  const order = ['test-feat-o1', 'test-feat-o2', 'test-feat-o3'] as const
+  const [O1, O2, O3] = order
+  const featured = async () =>
+    (await pg.query<{ id: string }>('select id from public.templates where featured_rank is not null order by featured_rank')).rows.map(
+      (row) => row.id,
+    )
+
+  beforeAll(async () => {
+    pg = await connectAdmin()
+    admin = await createUser(pg)
+    await pg.query("update public.profiles set role = 'admin' where id = $1", [admin])
+    for (const id of order) {
+      await saveTemplate(client, ADMIN_ID, { isNew: true, template: template(id), prompt }, CREDITS_FLOOR)
+      await setTemplateActive(client, ADMIN_ID, { id, active: true }, CREDITS_FLOOR)
+    }
+    await setFeaturedTemplates(client, ADMIN_ID, [...order])
+  })
+
+  afterAll(async () => {
+    await pg.query('delete from public.templates where id like $1', ['test-feat-o%'])
+    await pg.end()
+  })
+
+  it('stores the new order in one call', async () => {
+    await setTemplateOrder(client, admin, { group: 'featured', ids: [O3, O1, O2] })
+    expect(await featured()).toEqual([O3, O1, O2])
+  })
+
+  it('refuses a missing id, an extra id and a repeat, changing nothing', async () => {
+    await expect(setTemplateOrder(client, admin, { group: 'featured', ids: [O1, O2] })).rejects.toMatchObject({ code: 'CONFLICT' })
+    await expect(setTemplateOrder(client, admin, { group: 'featured', ids: [O3, O1, O2, HIDDEN] })).rejects.toMatchObject({
+      code: 'CONFLICT',
+    })
+    await expect(pg.query('select public.admin_set_template_order($1, $2, $3)', ['featured', [O3, O3, O1], admin])).rejects.toThrow(
+      /INVALID_INPUT/,
+    )
+    expect(await featured()).toEqual([O3, O1, O2])
+  })
+
+  it('refuses a caller who is not an admin, and no client role may call it', async () => {
+    const visitor = await createUser(pg)
+    await expect(setTemplateOrder(client, visitor, { group: 'featured', ids: [O1, O2, O3] })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    })
+    expect(await featured()).toEqual([O3, O1, O2])
+    const { rows } = await pg.query<{ auth: boolean; anon: boolean }>(
+      `select has_function_privilege('authenticated', 'public.admin_set_template_order(text, text[], uuid)', 'execute') as auth,
+              has_function_privilege('anon', 'public.admin_set_template_order(text, text[], uuid)', 'execute') as anon`,
+    )
+    expect(rows[0]).toEqual({ auth: false, anon: false })
   })
 })

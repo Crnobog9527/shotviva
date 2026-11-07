@@ -42,9 +42,8 @@
       "field": "手机号",
       "placeholder": "11 位手机号",
       "hint": "仅支持中国大陆（+86）手机号，新号码会自动注册。",
-      "consent": "我已阅读并同意<privacy>隐私政策</privacy>，同意将我的手机号等个人信息传输到中国大陆以外处理（数据存放在美国，短信由短信服务商发送）。",
-      "send": "获取验证码",
-      "terms": "继续即表示你同意<terms>服务条款</terms>。"
+      "consent": "我已阅读并同意<terms>《服务条款》</terms><privacy>《隐私政策》</privacy><aup>《使用规范》</aup>，并同意将我的手机号等个人信息传输到中国大陆以外处理（数据存放在美国，短信由短信服务商发送）。",
+      "send": "获取验证码"
     },
     "code": {
       "field": "验证码",
@@ -168,7 +167,7 @@
       "AUTH_RATE_LIMITED": "尝试次数太多，请等一分钟再试。",
       "AUTH_WEAK_PASSWORD": "密码太简单了，请换一个更安全的。",
       "AUTH_PHONE_INVALID": "目前只支持中国大陆（+86）手机号。",
-      "AUTH_CONSENT_REQUIRED": "请先勾选同意隐私政策和个人信息出境。",
+      "AUTH_CONSENT_REQUIRED": "请先勾选同意服务条款、隐私政策、使用规范和个人信息出境。",
       "AUTH_SMS_COOLDOWN": "验证码刚发过，请 60 秒后再获取。",
       "AUTH_SMS_DAILY_LIMIT": "这个号码今天获取验证码的次数已用完，请明天再试，或改用邮箱。",
       "AUTH_SMS_FAILED": "短信没有发出去，请稍后再试，或改用邮箱。",
@@ -293,14 +292,6 @@
       "animatedMeta": "{category} · 动图",
       "hintPair": "左边是手机原图，右边是 AI 出图。"
     },
-    "categories": {
-      "Art Styles": "画风",
-      "Food & Drink": "餐饮",
-      "Products & Resale": "商品与二手",
-      "Beauty & Skincare": "美妆护肤",
-      "Rooms & Spaces": "房间与空间",
-      "Pets": "宠物"
-    },
     "tiers": {
       "1k": {
         "name": "标准",
@@ -348,12 +339,12 @@
       "noteLabel": "还有想改的地方吗？",
       "optional": "（选填）",
       "notePlaceholder": {
-        "Food & Drink": "例如：加一小枝薄荷，去掉餐巾",
-        "Products & Resale": "例如：链子保持金色，阴影柔和一点",
-        "Beauty & Skincare": "例如：标签保持清晰，加几滴水珠",
-        "Rooms & Spaces": "例如：沙发不动，台灯的光暖一点",
-        "Pets": "例如：项圈保留，用柔和的灰色背景",
-        "Art Styles": "例如：眼镜保留，线条柔和一点",
+        "food-drink": "例如：加一小枝薄荷，去掉餐巾",
+        "products-resale": "例如：链子保持金色，阴影柔和一点",
+        "beauty-skincare": "例如：标签保持清晰，加几滴水珠",
+        "rooms-spaces": "例如：沙发不动，台灯的光暖一点",
+        "pets": "例如：项圈保留，用柔和的灰色背景",
+        "art-styles": "例如：眼镜保留，线条柔和一点",
         "fallback": "例如：颜色不变，背景提亮"
       },
       "wait": "请等一张作品完成",
@@ -378,7 +369,8 @@
         "hud": "已完成",
         "saved": "已存进「作品」",
         "line": "{tier} · <mono>{px, number, ::group-off}</mono> px · 用了 {count} 积分。{pool, select, free {用的是免费积分，所以会公开展示，并带水印。} paid {用的是付费积分，所以是私密的，没有水印。} other {}}",
-        "caption": "手机照片 → {name}。"
+        "caption": "手机照片 → {name}。",
+        "edit": "继续编辑"
       },
       "failState": {
         "hud": "没有生成",
@@ -557,8 +549,12 @@
         "originalKept": "已保留，{px} px 预览",
         "originalEdited": "你改的那张照片",
         "originalDeleted": "早于原图保留功能",
-        "made": "生成时间"
+        "made": "生成时间",
+        "reference": "编号",
+        "copyReference": "复制编号",
+        "copied": "已复制"
       },
+      "problem": "这张图有问题？",
       "delete": {
         "open": "删除",
         "title": "删除这张作品？",
@@ -659,6 +655,7 @@
         "opensStripeBottom": "安全账单页面",
         "walletAlipayWhy": "一次性购买一{interval, select, year {年} other {个月}}，用<b>{method}</b>付款，不会自动续费：{date, date, medium} 前续费可以保留会员；不续费的话，积分仍可使用。",
         "alipay": "支付宝",
+        "wechatPay": "微信支付",
         "card": "银行卡",
         "cnCard": "中国银行卡",
         "renewPrice": "续费 <cost>· {price}</cost>",
@@ -709,7 +706,14 @@
         "lead": "最近的付款，最新的在前。",
         "empty": "还没有购买记录",
         "emptyBody": "买了套餐或积分包之后，会显示在这里。",
-        "seePlans": "看看套餐"
+        "seePlans": "看看套餐",
+        "receipt": "收据",
+        "invoice": "发票",
+        "linkLabel": "{purchase}的{document}（在新标签页打开）",
+        "emailed": "收据已发送到付款邮箱",
+        "refunded": "已退款",
+        "partlyRefunded": "部分退款",
+        "unavailable": "刚才没能打开这份收据或发票，请稍后再试。还是打不开的话，在客服里告诉我们，我们发给你。"
       },
       "session": {
         "title": "登录",
@@ -768,7 +772,8 @@
         "paymentOptional": "付款记录（选填）",
         "noPayments": "这个账号还没有付款记录。",
         "workLabel": "相关作品（选填）",
-        "workOption": "{template} · {date, date, medium}",
+        "workOption": "{template} · {date, date, medium} · {ref}",
+        "workRef": "编号 {ref}",
         "none": "不选",
         "choose": "请选择",
         "submit": "发送",
@@ -891,7 +896,7 @@
       "renewsValue": "{date, date, medium} · {price}",
       "paid": "已支付",
       "paidCard": "{amount} · {brand} ···· {last4}",
-      "paidMethod": "{amount} · {method, select, alipay {支付宝} other {银行卡}}",
+      "paidMethod": "{amount} · {method, select, alipay {支付宝} wechat_pay {微信支付} other {银行卡}}",
       "start": "开始创作",
       "receipt": "收据",
       "manage": "在「我的」里管理",
@@ -902,6 +907,7 @@
       "finePack": "一次性付款，不会续费。",
       "titlePending": "正在确认付款",
       "subPendingAlipay": "支付宝还在确认这笔付款，通常不到一分钟。确认后积分会自动到账，你可以先离开这个页面。",
+      "subPendingWallet": "支付宝或微信支付还在确认这笔付款，通常不到一分钟。确认后积分会自动到账，你可以先离开这个页面。",
       "subPending": "付款已成功，正在为你加积分，通常几秒钟就好。你可以先离开这个页面。",
       "order": "订单",
       "amount": "金额",
@@ -958,6 +964,7 @@
     "pricesInUsd": "所有价格均以美元计",
     "card": "海外银行卡 · Apple Pay · Google Pay",
     "alipay": "支付宝",
+    "wallet": "支付宝 / 微信支付",
     "cnCard": "中国银行卡",
     "cardOnly": "银行卡",
     "cardRenews": "自动续费，随时可取消",
@@ -1042,13 +1049,16 @@
     "tryTitle": "换这三个模板试试"
   },
   "marketing": {
+    "appDescription": "AI 影棚",
     "nav": {
       "label": "主导航",
       "pricing": "价格",
-      "tagline": "AI 影棚",
+      "tagline": "保留真实照片细节，AI 一键出大片",
       "templates": "模板",
       "login": "登录",
       "startFree": "免费开始",
+      "uploadPhoto": "上传照片",
+      "generate": "生成",
       "openApp": "进入应用",
       "account": "账号"
     },

@@ -2,11 +2,12 @@ import 'server-only'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-import { AppError } from '@/core/errors'
+import { AppError, type ErrorCode } from '@/core/errors'
 import {
   EDIT_TEMPLATE_ID,
-  TEMPLATE_COLUMNS,
+  selectTemplates,
   toTemplate,
+  type PreT75TemplateRow,
   type PromptInput,
   type TemplateInput,
   type TemplateRow,
@@ -19,19 +20,23 @@ import type { AdminTemplate } from './types'
 // Every function expects a service-role client; callers must have passed requireAdmin().
 
 type PromptRow = { body: string; version: number; model_params: Record<string, unknown> }
-type AdminRow = TemplateRow & { template_prompts: PromptRow | null }
+type AdminRow = (TemplateRow | PreT75TemplateRow) & { template_prompts: PromptRow | null }
 
 export async function listAdminTemplates(client: SupabaseClient): Promise<AdminTemplate[]> {
-  const { data, error } = await client
-    .from('templates')
-    .select(`${TEMPLATE_COLUMNS}, template_prompts(body, version, model_params)`)
-    // The built-in edit template has its own page (/admin/templates/edit): this editor's form
-    // would refuse its empty visible_in, and its params are not free-form JSON.
-    .neq('id', EDIT_TEMPLATE_ID)
-    .order('sort_order', { ascending: true })
-    .order('id', { ascending: true })
-    .returns<AdminRow[]>()
-  if (error) throw new AppError('INTERNAL', `listAdminTemplates failed: ${error.message}`)
+  const { data, error } = await selectTemplates(
+    (columns) =>
+      client
+        .from('templates')
+        .select(columns)
+        // The built-in edit template has its own page (/admin/templates/edit): this editor's
+        // form would refuse its empty visible_in, and its params are not free-form JSON.
+        .neq('id', EDIT_TEMPLATE_ID)
+        .order('sort_order', { ascending: true })
+        .order('id', { ascending: true })
+        .returns<AdminRow[]>(),
+    ', template_prompts(body, version, model_params)',
+  )
+  if (error || !data) throw new AppError('INTERNAL', `listAdminTemplates failed: ${error?.message ?? 'no data'}`)
   return data.map((row) => ({
     ...toTemplate(row),
     prompt: row.template_prompts
@@ -59,6 +64,8 @@ export async function upsertTemplate(
   prompt: PromptInput,
 ): Promise<void> {
   const { error } = await client.rpc('admin_upsert_template', toUpsertArgs(template, prompt))
+  // templates_category_key_fkey (T75): the category was deleted while the form was open.
+  if (error?.code === '23503') throw new AppError('INVALID_INPUT', '所选分类已经不存在了，请重新选择分类')
   if (error) throw new AppError('INTERNAL', `upsertTemplate failed: ${error.message}`)
 }
 
@@ -108,7 +115,24 @@ export async function setFeaturedTemplates(client: SupabaseClient, ids: string[]
   }
 }
 
-export async function reorderTemplates(client: SupabaseClient, ids: string[]): Promise<void> {
-  const { error } = await client.rpc('admin_reorder_templates', { p_ids: ids })
-  if (error) throw new AppError('INTERNAL', `reorderTemplates failed: ${error.message}`)
+// What the admin sees when admin_set_template_order refuses (0600); anything else is INTERNAL.
+const ORDER_ERRORS: Record<string, [ErrorCode, string]> = {
+  ORDER_MISMATCH: ['CONFLICT', '列表在别处改过了（有模板新增、删除或进出精选），请刷新页面后再排序'],
+  NOT_ADMIN: ['FORBIDDEN', '只有管理员能调整顺序'],
+  INVALID_INPUT: ['INVALID_INPUT', '顺序没保存：提交的列表不完整，请刷新页面后再试'],
+}
+
+// One group's whole order in one call (T76): 'catalogue' rewrites sort_order, 'featured' the
+// home featured ranks.
+export async function setTemplateOrder(
+  client: SupabaseClient,
+  group: 'catalogue' | 'featured',
+  ids: string[],
+  actor: string,
+): Promise<void> {
+  const { error } = await client.rpc('admin_set_template_order', { p_group: group, p_ids: ids, p_actor: actor })
+  if (!error) return
+  const known = ORDER_ERRORS[error.message]
+  if (known) throw new AppError(known[0], known[1])
+  throw new AppError('INTERNAL', `setTemplateOrder failed: ${error.message}`)
 }

@@ -3,6 +3,9 @@
 // and dependency-free (no zod in the account page's bundle for one id check).
 
 export const HELP_PARAM = 'help'
+// `?help=new&job=<job id>`: "Problem with this photo?" on the photo page (T78) opens New ticket
+// as an image issue with that work picked. Only meaningful next to help=new.
+export const HELP_JOB_PARAM = 'job'
 
 export type HelpView = { tab: 'new' } | { tab: 'list' } | { tab: 'thread'; id: string }
 
@@ -19,6 +22,10 @@ export function parseHelpParam(value: string | null | undefined): HelpView | nul
   if (!value) return null
   if (value === 'new' || value === 'list') return { tab: value }
   return isTicketId(value) ? { tab: 'thread', id: value.toLowerCase() } : null
+}
+
+export function parseHelpJob(value: string | null | undefined): string | null {
+  return value && UUID.test(value) ? value.toLowerCase() : null
 }
 
 export function helpParamValue(view: HelpView): string {

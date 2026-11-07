@@ -120,7 +120,7 @@
   }
   .au-cc::after { content: ""; position: absolute; right: 0; top: 16px; bottom: 16px; width: 1px; background: var(--input); }
 
-  .au-check { display: flex; gap: 12px; align-items: flex-start; padding: 4px 0; font-size: 14px; line-height: 1.55; color: var(--bone-dim); cursor: pointer; }
+  .au-check { display: flex; gap: 12px; align-items: flex-start; min-height: 44px; padding: 4px 0; font-size: 14px; line-height: 1.55; color: var(--bone-dim); cursor: pointer; }
   .au-check input {
     flex: none; width: 22px; height: 22px; margin-top: 0; border-radius: 7px; background: var(--wash-faint); box-shadow: inset 0 0 0 1.5px var(--input);
     display: grid; place-content: center; transition: background-color .15s, box-shadow .15s; -webkit-appearance: none; appearance: none; cursor: pointer;
@@ -133,7 +133,8 @@
   .au-check input:checked::after { transform: rotate(-45deg) scale(1); }
   .au-check input:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
   .au-check input[aria-invalid="true"]:not(:checked) { box-shadow: inset 0 0 0 1.5px var(--destructive); }
-  .au-check a { color: var(--foreground); text-decoration: underline; text-decoration-color: var(--input); text-underline-offset: 3px; }
+  /* the three links sit side by side: each stays on one line and gets a taller hit area without moving the lines */
+  .au-check a { padding-block: 3px; white-space: nowrap; color: var(--foreground); text-decoration: underline; text-decoration-color: var(--input); text-underline-offset: 3px; }
 
   .au-sent { margin-top: 20px; }
   .au-code { position: relative; }

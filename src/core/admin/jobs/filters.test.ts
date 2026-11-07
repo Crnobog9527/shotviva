@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { beijingDayStart, filtersHref, parseJobFilters } from './filters'
+import { beijingDayStart, filtersHref, parseJobFilters, refFilter } from './filters'
 
 describe('job filters', () => {
   it('keeps valid filters and drops junk instead of failing', () => {
@@ -23,5 +23,22 @@ describe('job filters', () => {
   it('builds page links that keep the filters', () => {
     expect(filtersHref({ status: 'failed', cursor: 'old' }, 'next')).toBe('/admin/jobs?status=failed&cursor=next')
     expect(filtersHref({}, null)).toBe('/admin/jobs')
+  })
+})
+
+describe('refFilter (T78)', () => {
+  it('reads a reference number or prefix from the URL, with or without dashes', () => {
+    expect(refFilter(parseJobFilters({ ref: ' 2FA821C6 ' }))).toEqual({ ref: '2fa821c6', invalid: false })
+    expect(refFilter(parseJobFilters({ ref: '2fa821c61a' }))).toEqual({ ref: '2fa821c6-1a', invalid: false })
+  })
+
+  it('is no filter when empty, and invalid when it cannot be a prefix', () => {
+    expect(refFilter(parseJobFilters({}))).toEqual({ ref: null, invalid: false })
+    expect(refFilter(parseJobFilters({ ref: '2fa82' }))).toEqual({ ref: null, invalid: true })
+    expect(refFilter(parseJobFilters({ ref: 'someone@x' }))).toEqual({ ref: null, invalid: true })
+  })
+
+  it('keeps the reference in the next-page link', () => {
+    expect(filtersHref(parseJobFilters({ ref: '2fa821', status: 'failed' }), 'c1')).toBe('/admin/jobs?ref=2fa821&status=failed&cursor=c1')
   })
 })

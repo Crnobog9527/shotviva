@@ -10,7 +10,7 @@ import { MethodMark } from "./pay-methods"
 // choices; the method is picked in the paywall. Renders on the server, so the payment terms
 // are in the static HTML, worded for the live channel: renewal terms are visible before
 // purchase (DESIGN §4.5, Stripe merchant review), and packs are one-time on every channel.
-export function PricingPayWith({ channel }: { channel: PaymentChannel }) {
+export function PricingPayWith({ channel, wechatPay }: { channel: PaymentChannel; wechatPay: boolean }) {
   const t = useTranslations("paywall")
   const methods = offeredMethods(channel, useLocale())
   return (
@@ -23,7 +23,7 @@ export function PricingPayWith({ channel }: { channel: PaymentChannel }) {
       </div>
       <ul className="grid gap-2">
         {methods.map((method) => {
-          const label = methodLabel(channel, method)
+          const label = methodLabel(channel, method, wechatPay)
           const note = pricingMethodNote(channel, method)
           return (
             <li key={method} className="flex min-h-14 items-center gap-3 rounded-control bg-[var(--tier-graphite)] px-3 py-2 shadow-[inset_0_0_0_1px_var(--border)]">

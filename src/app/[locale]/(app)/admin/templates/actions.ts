@@ -5,12 +5,15 @@ import { refresh, revalidateTag } from 'next/cache'
 import {
   applyCover,
   createCoverUpload,
-  reorderTemplates,
+  deleteTemplateCategory,
+  reorderTemplateCategories,
+  saveTemplateCategory,
   runAdminAction,
   runAdminQuery,
   saveTemplate,
   setFeaturedTemplates,
   setTemplateActive,
+  setTemplateOrder,
   setTemplatesActive,
   type ActionResult,
   type ActionValue,
@@ -74,11 +77,39 @@ export async function setFeaturedTemplatesAction(ids: unknown): Promise<ActionRe
   })
 }
 
-export async function reorderTemplatesAction(ids: unknown): Promise<ActionResult> {
+// Drag-to-reorder and the arrows (T76): one group's whole order per call.
+export async function setTemplateOrderAction(input: unknown): Promise<ActionResult> {
   const admin = await requireAdmin()
   return runAdminAction(async () => {
-    await reorderTemplates(createAdminSupabase(), admin.id, ids)
+    await setTemplateOrder(createAdminSupabase(), admin.id, input)
     catalogueChanged()
+  })
+}
+
+// 分类管理 (T75): names, intros, card style and order show on every catalogue page; a delete
+// also moves templates, so all three expire the catalogue like a template save.
+export async function saveTemplateCategoryAction(payload: unknown): Promise<ActionResult> {
+  const admin = await requireAdmin()
+  return runAdminAction(async () => {
+    await saveTemplateCategory(createAdminSupabase(), admin.id, payload)
+    catalogueChanged()
+  })
+}
+
+export async function reorderTemplateCategoriesAction(keys: unknown): Promise<ActionResult> {
+  const admin = await requireAdmin()
+  return runAdminAction(async () => {
+    await reorderTemplateCategories(createAdminSupabase(), admin.id, keys)
+    catalogueChanged()
+  })
+}
+
+export async function deleteTemplateCategoryAction(payload: unknown): Promise<ActionValue<{ moved: number }>> {
+  const admin = await requireAdmin()
+  return runAdminQuery(async () => {
+    const outcome = await deleteTemplateCategory(createAdminSupabase(), admin.id, payload)
+    catalogueChanged()
+    return outcome
   })
 }
 

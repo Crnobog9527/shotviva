@@ -2,6 +2,9 @@
 export const JOBS_COPY = {
   title: '出图记录',
   filters: {
+    ref: '编号',
+    refPlaceholder: '至少 6 位，如 2fa821c6',
+    refInvalid: '编号是出图任务 id 的前几位：至少 6 位，只有数字 0–9 和字母 a–f。',
     status: '状态',
     template: '模板',
     model: '模型',
@@ -16,9 +19,12 @@ export const JOBS_COPY = {
   },
   status: { running: '进行中', succeeded: '成功', failed: '失败' },
   deletedByUser: '用户已删除',
+  copyRef: '复制编号',
+  copied: '已复制',
   sources: { web: '网站', graylum: 'Graylum' },
   pools: { free: '免费', paid: '付费' },
   columns: {
+    ref: '编号',
     createdAt: '时间',
     user: '用户',
     template: '模板',
@@ -28,7 +34,6 @@ export const JOBS_COPY = {
     credits: '积分',
     source: '来源',
     duration: '耗时',
-    error: '失败原因',
     cost: '成本',
     actions: '操作',
   },

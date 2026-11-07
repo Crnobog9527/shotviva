@@ -6,7 +6,10 @@ import { sampleFor, thumbFor } from './home-samples'
 const template = (cover: Partial<CatalogueTemplate['cover']>): CatalogueTemplate => ({
   id: 'white-background',
   name: 'White Background',
-  category: 'Products & Resale',
+  category: 'products-resale',
+  categoryName: 'Products & Resale',
+  categoryOrder: 30,
+  compare: false,
   description: null,
   creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
   copyFields: [],

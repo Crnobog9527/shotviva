@@ -3,7 +3,6 @@
 import { useTranslations } from 'next-intl'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
-import { Link } from '../../i18n/ui'
 import type { FormState } from '../flows/form-state'
 import { maskPhone, parseMainlandPhone, SMS_CODE_MINUTES } from '../phone/phone-number'
 import { CodeField } from './code-field'
@@ -20,15 +19,13 @@ type Props = {
   next: string
   // The button that enters the code: 「登录」 or 「注册」.
   submitLabel: string
-  // Log-in page only: the sign-up page already says it under the form.
-  termsLine: boolean
 }
 
 const addr = (chunks: ReactNode) => <span className="au-addr">{chunks}</span>
 
 // Phone sign-in, the 手机号 tab (ARCHITECTURE §7, T63): number + consent → invisible hCaptcha →
 // six-digit code → signed in (a new number signs up). No password.
-export function PhoneSignIn({ actions, next, submitLabel, termsLine }: Props) {
+export function PhoneSignIn({ actions, next, submitLabel }: Props) {
   const t = useTranslations('auth')
   const send = useAuthForm(actions.send, { captcha: true, validate: validatePhoneSend })
   const [phone, setPhone] = useState('')
@@ -47,7 +44,6 @@ export function PhoneSignIn({ actions, next, submitLabel, termsLine }: Props) {
         <SubmitButton pending={send.pending}>{t('phone.send')}</SubmitButton>
         <CaptchaFailed show={send.captchaFailed} />
       </form>
-      {termsLine ? <p className="au-fine">{t.rich('phone.terms', { terms: (chunks) => <Link href="/terms">{chunks}</Link> })}</p> : null}
     </>
   )
 }

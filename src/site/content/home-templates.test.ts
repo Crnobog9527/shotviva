@@ -1,18 +1,24 @@
 import { describe, expect, it } from 'vitest'
 
-import { TEMPLATE_CATEGORIES } from '@/core/templates/categories'
-
 import { FALLBACK_COUNT, featuredSections, featuredTemplates, tryTemplates } from './home-templates'
-import { CATEGORY } from './landing-shared'
-import { templateCategories } from './template-categories'
-import { zhTemplateCategories } from './zh/template-categories'
+
+// What localizeTemplate attaches from template_categories (T75): name and intro in the page's
+// language, its place in the 分类管理 order, and whether it is the drag compare.
+const CATEGORIES = {
+  'art-styles': { key: 'art-styles', name: 'Art Styles', intro: 'Drawings.', compare: true, sortOrder: 10 },
+  'food-drink': { key: 'food-drink', name: 'Food & Drink', intro: 'Dishes.', compare: false, sortOrder: 20 },
+  pets: { key: 'pets', name: '宠物', intro: '', compare: false, sortOrder: 60 },
+  fresh: { key: 'fresh', name: 'Fresh', intro: 'Added in admin.', compare: false, sortOrder: 70 },
+} as const
+type Key = keyof typeof CATEGORIES
 
 let day = 0
-const live = (id: string, category: string, extra: { rank?: number; covers?: boolean; description?: string; credits?: number } = {}) => ({
+const live = (id: string, category: Key, extra: { rank?: number; covers?: boolean; description?: string; credits?: number } = {}) => ({
   id,
   name: `Name ${id}`,
   description: extra.description ?? `Use of ${id}`,
   category,
+  categoryView: CATEGORIES[category],
   coverBeforeUrl: extra.covers === false ? null : `https://shotviva.com/assets/covers/${id}/b.webp`,
   coverAfterUrl: extra.covers === false ? null : `https://shotviva.com/assets/covers/${id}/a.webp`,
   featuredRank: extra.rank ?? null,
@@ -23,43 +29,37 @@ const live = (id: string, category: string, extra: { rank?: number; covers?: boo
 // T53, ARCHITECTURE §12 home item 3.
 describe('featured templates from the database', () => {
   it('uses the admin\'s featured list in rank order', () => {
-    const rows = [live('a', 'Pets', { rank: 2 }), live('b', 'Pets'), live('c', 'Food & Drink', { rank: 1 })]
+    const rows = [live('a', 'pets', { rank: 2 }), live('b', 'pets'), live('c', 'food-drink', { rank: 1 })]
     expect(featuredTemplates(rows).map((t) => t.id)).toEqual(['c', 'a'])
   })
 
   it('falls back to the six most recently published when nothing is featured', () => {
-    const rows = Array.from({ length: 8 }, (_, i) => live(`t${i}`, 'Pets'))
+    const rows = Array.from({ length: 8 }, (_, i) => live(`t${i}`, 'pets'))
     expect(featuredTemplates(rows).map((t) => t.id)).toEqual(['t7', 't6', 't5', 't4', 't3', 't2'].slice(0, FALLBACK_COUNT))
   })
 
-  it('groups under the §5 categories in §5 order, hides empty ones, keeps unknown ones after', () => {
-    const rows = [live('pet', 'Pets', { rank: 1 }), live('art', 'Art Styles', { rank: 2, credits: 1 }), live('odd', 'products', { rank: 3 }), live('dish', 'Food & Drink', { rank: 4 })]
-    const { categories, media, defaultId } = featuredSections(templateCategories, rows)
-    expect(categories.map((c) => c.name)).toEqual(['Art Styles', 'Food & Drink', 'Pets', 'products'])
-    expect(categories[0]?.drag).toBe(true)
+  // T75: names, intros and order come from 分类管理; the drag compare follows card_style.
+  it('groups in the admin\'s category order with the stored names and intros, hiding empty ones', () => {
+    const rows = [live('new', 'fresh', { rank: 1 }), live('pet', 'pets', { rank: 2 }), live('art', 'art-styles', { rank: 3, credits: 1 }), live('dish', 'food-drink', { rank: 4 })]
+    const { categories, media, defaultId } = featuredSections(rows)
+    expect(categories.map((c) => c.name)).toEqual(['Art Styles', 'Food & Drink', '宠物', 'Fresh'])
+    expect(categories.map((c) => c.intro)).toEqual(['Drawings.', 'Dishes.', '', 'Added in admin.'])
+    expect(categories.map((c) => c.drag === true)).toEqual([true, false, false, false])
     // Each card carries its own Standard price (建站规格 G4).
     expect(categories[0]?.templates).toEqual([{ id: 'art', name: 'Name art', use: 'Use of art', credits: 1 }])
     expect(media.pet).toEqual({ before: 'https://shotviva.com/assets/covers/pet/b.webp', after: 'https://shotviva.com/assets/covers/pet/a.webp', live: true })
-    expect(defaultId).toBe('pet')
+    expect(defaultId).toBe('new')
   })
 
-  it('keeps a landing page to its own categories and opens its generator on the first of them', () => {
-    const rows = [live('pet', 'Pets', { rank: 1 }), live('dish', 'Food & Drink', { rank: 2 }), live('dish2', 'Food & Drink', { rank: 3 })]
-    const { categories, defaultId } = featuredSections(templateCategories, rows, ['Food & Drink'])
+  it('keeps a landing page to its own category keys and opens its generator on the first of them', () => {
+    const rows = [live('pet', 'pets', { rank: 1 }), live('dish', 'food-drink', { rank: 2 }), live('dish2', 'food-drink', { rank: 3 })]
+    const { categories, defaultId } = featuredSections(rows, ['food-drink'])
     expect(categories.map((c) => c.templates.map((t) => t.id))).toEqual([['dish', 'dish2']])
     expect(defaultId).toBe('dish')
   })
 
-  it('offers the 404 only templates with both covers, never Art Styles', () => {
-    const rows = [live('art', 'Art Styles', { rank: 1 }), live('bare', 'Pets', { rank: 2, covers: false }), live('pet', 'Pets', { rank: 3 })]
-    expect(tryTemplates(templateCategories, rows).map((t) => t.id)).toEqual(['pet'])
-  })
-
-  it('names only §5 categories on the landing pages, with the same keys in both languages', () => {
-    const keys = templateCategories.map((c) => c.key)
-    for (const key of Object.values(CATEGORY)) expect(keys).toContain(key)
-    expect(zhTemplateCategories.map((c) => c.key)).toEqual(keys)
-    // The same six the admin picks from (core/templates/categories), in §5 page order.
-    expect([...keys].sort()).toEqual([...TEMPLATE_CATEGORIES].sort())
+  it('offers the 404 only templates with both covers, never a compare category', () => {
+    const rows = [live('art', 'art-styles', { rank: 1 }), live('bare', 'pets', { rank: 2, covers: false }), live('pet', 'pets', { rank: 3 })]
+    expect(tryTemplates(rows).map((t) => t.id)).toEqual(['pet'])
   })
 })

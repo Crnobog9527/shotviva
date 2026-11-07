@@ -56,6 +56,20 @@ describe('payment copy by channel', () => {
     expect(t('payNotePacks')).toBe('Credit packs are always a one-time payment.')
   })
 
+  // T73: STRIPE_WECHAT_PAY on names both wallets on Stripe; Waffo stays Alipay; the note is the same.
+  it('Stripe with STRIPE_WECHAT_PAY on: the wallet line reads Alipay / WeChat Pay, Waffo stays Alipay', () => {
+    const zh = createTranslator({ locale: 'zh', messages: zhMessages, namespace: 'paywall' }) as unknown as typeof t
+    const sayZh = (msg: PaywallMessage) => zh(msg.key, msg.values)
+    // No-break space keeps "WeChat Pay" whole on narrow phones.
+    expect(say(methodLabel('stripe', 'alipay', true))).toBe('Alipay / WeChat\u00a0Pay')
+    expect(sayZh(methodLabel('stripe', 'alipay', true))).toBe('支付宝 / 微信支付')
+    expect(say(methodLabel('waffo', 'alipay', true))).toBe('Alipay')
+    expect(sayZh(methodLabel('waffo', 'alipay', true))).toBe('支付宝')
+    expect(say(methodLabel('stripe', 'alipay', false))).toBe('Alipay')
+    expect(say(methodLabel('stripe', 'card', true))).toBe('Card · Apple Pay · Google Pay')
+    expect(sayZh(methodNote('stripe', { kind: 'plan', method: 'alipay', period: 'month' }))).toBe('一次性付款，30 天，不自动续费')
+  })
+
   // 中国银行卡 (T64): worded like a card, plans renew, packs one-time.
   it('Stripe zh: 中国银行卡 renews like a card, packs stay one-time', () => {
     const zh = createTranslator({ locale: 'zh', messages: zhMessages, namespace: 'paywall' }) as unknown as typeof t

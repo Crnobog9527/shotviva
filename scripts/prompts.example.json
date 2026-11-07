@@ -1,11 +1,11 @@
 {
-  "$comment": "Format example only. Copy to .local/prompts.json (gitignored) and replace with real templates. Every value below is fake.",
+  "$comment": "Format example only. Copy to .local/prompts.json (gitignored) and replace with real templates. Every value below is fake. category: a category key from 分类管理 (e.g. food-drink) or a category's English or Chinese name.",
   "templates": [
     {
       "id": "example-burger-hero",
       "module": "image",
       "name": "Example burger hero",
-      "category": "Food & Drink",
+      "category": "food-drink",
       "coverBeforeUrl": "https://example.com/covers/example-burger-before.jpg",
       "coverAfterUrl": "https://example.com/covers/example-burger-after.jpg",
       "fields": {

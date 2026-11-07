@@ -1,5 +1,5 @@
 import type { MembershipTier, ProductId, ProductInterval, SiteProduct } from '../../config'
-import type { CheckoutMethod } from '../stripe/catalog'
+import type { RecordedMethod } from '../stripe/catalog'
 import type { Balance } from '../pools'
 import type { CheckoutFacts } from './facts'
 
@@ -19,7 +19,7 @@ export type SuccessView = Order & {
   state: 'success'
   balance: number
   renews: { at: string; priceUsd: number } | null
-  paid: (Money & { method: CheckoutMethod | null; card: { brand: string; last4: string } | null }) | null
+  paid: (Money & { method: RecordedMethod | null; card: { brand: string; last4: string } | null }) | null
   receiptUrl: string | null
   fine: FineKey
   // What was bought and which payment, for the celebration (T55).
@@ -27,7 +27,7 @@ export type SuccessView = Order & {
   paymentKey: string | null
 }
 
-export type PendingView = Order & { state: 'pending'; amount: Money | null; method: CheckoutMethod | null }
+export type PendingView = Order & { state: 'pending'; amount: Money | null; method: RecordedMethod | null }
 
 export type ReturnView = SuccessView | PendingView
 

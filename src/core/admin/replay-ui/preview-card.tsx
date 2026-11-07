@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import type { ReactNode } from 'react'
 
 import type { ReplayPreview } from '@/core/billing/stripe'
@@ -6,6 +5,7 @@ import { Button } from '@/core/ui/button'
 
 import { formatBeijing } from '../shell/format'
 import { REPLAY_COPY as COPY } from './copy'
+import { UserLink } from '../users-ui/user-link'
 
 type Props = { preview: ReplayPreview; pending: boolean; onCancel: () => void; onConfirm: () => void }
 
@@ -26,9 +26,7 @@ function Row({ label, value }: { label: string; value: ReactNode }) {
 
 function Details({ preview }: { preview: ReplayPreview }) {
   const user = (
-    <Link href={`/admin/users/${preview.userId}`} className="text-primary hover:underline">
-      {preview.userId}
-    </Link>
+    <UserLink userId={preview.userId}>{preview.userId}</UserLink>
   )
   if (preview.kind === 'checkout') {
     return (

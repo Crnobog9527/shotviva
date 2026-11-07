@@ -6,6 +6,7 @@ describe('admin nav', () => {
   it('lists the T23 pages in order and drops the review entry while the wishlist is off', () => {
     expect(adminNavItems({ wishlist: true }).map((item) => item.key)).toEqual([
       'overview',
+      'analytics',
       'users',
       'tickets',
       'orders',

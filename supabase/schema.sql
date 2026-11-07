@@ -281,6 +281,160 @@ $$;
 ALTER FUNCTION "public"."admin_ban_user"("p_user_id" "uuid", "p_reason" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_batch_adjust_credits"("p_actor" "uuid", "p_user_ids" "uuid"[], "p_pool" "text", "p_amount" integer, "p_reason" "text", "p_batch_key" "text") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_reason text := btrim(coalesce(p_reason, ''));
+  v_ids uuid[];
+  v_bad uuid[];
+  v_id uuid;
+  v_applied integer := 0;
+begin
+  if p_actor is null or not exists (select 1 from public.profiles where id = p_actor and role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if p_pool is null or p_pool not in ('free', 'paid') then
+    raise exception 'INVALID_INPUT' using detail = 'pool must be free or paid';
+  end if;
+  if p_amount is null or p_amount = 0 or abs(p_amount) > 100000 then
+    raise exception 'INVALID_INPUT' using detail = 'amount must be a non-zero integer up to 100000';
+  end if;
+  if length(v_reason) = 0 or length(v_reason) > 500 then
+    raise exception 'INVALID_INPUT' using detail = 'reason is required, at most 500 characters';
+  end if;
+  if p_batch_key is null or length(p_batch_key) = 0 or length(p_batch_key) > 64 then
+    raise exception 'INVALID_INPUT' using detail = 'batch key is required';
+  end if;
+  if p_user_ids is null or cardinality(p_user_ids) = 0 or cardinality(p_user_ids) > 50
+     or array_position(p_user_ids, null) is not null then
+    raise exception 'INVALID_INPUT' using detail = 'between 1 and 50 users';
+  end if;
+
+  select array_agg(distinct i order by i) into v_ids from unnest(p_user_ids) as i;
+  if cardinality(v_ids) <> cardinality(p_user_ids) then
+    raise exception 'INVALID_INPUT' using detail = 'a user is listed twice';
+  end if;
+
+  perform 1 from public.profiles where id = any(v_ids) order by id for update;
+
+  select array_agg(i order by i) into v_bad
+    from unnest(v_ids) as i
+   where not exists (select 1 from public.profiles p where p.id = i);
+  if v_bad is not null then
+    raise exception 'PROFILE_NOT_FOUND' using detail = array_to_string(v_bad, ',');
+  end if;
+
+  if exists (
+    select 1
+      from unnest(v_ids) as i
+      join public.credit_ledger l on l.idempotency_key = 'admin_batch:' || p_batch_key || ':' || i::text
+     where l.user_id <> i or l.kind <> 'admin_adjust' or l.pool <> p_pool or l.delta <> p_amount
+  ) then
+    raise exception 'IDEMPOTENCY_CONFLICT';
+  end if;
+
+  -- Users this batch already adjusted are skipped, so a resubmit never trips over the balance
+  -- its own first run produced.
+  select array_agg(p.id order by p.id) into v_bad
+    from public.profiles p
+   where p.id = any(v_ids)
+     and not exists (
+       select 1 from public.credit_ledger l
+        where l.idempotency_key = 'admin_batch:' || p_batch_key || ':' || p.id::text
+     )
+     and (case when p_pool = 'paid' then p.credits else p.free_credits end) + p_amount < 0;
+  if v_bad is not null then
+    raise exception 'CREDITS_INSUFFICIENT' using detail = array_to_string(v_bad, ',');
+  end if;
+
+  foreach v_id in array v_ids loop
+    if (public._apply_credit_change(
+          v_id, p_pool, 'admin_adjust', p_amount, v_reason || ' · 操作人 ' || p_actor::text,
+          'admin_batch:' || p_batch_key || ':' || v_id::text
+        )).applied then
+      v_applied := v_applied + 1;
+    end if;
+  end loop;
+
+  return jsonb_build_object('applied', v_applied, 'repeated', cardinality(v_ids) - v_applied);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_batch_adjust_credits"("p_actor" "uuid", "p_user_ids" "uuid"[], "p_pool" "text", "p_amount" integer, "p_reason" "text", "p_batch_key" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_batch_set_banned"("p_actor" "uuid", "p_user_ids" "uuid"[], "p_banned" boolean, "p_reason" "text") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_reason text := btrim(coalesce(p_reason, ''));
+  v_ids uuid[];
+  v_bad uuid[];
+  v_id uuid;
+  v_changed integer := 0;
+begin
+  if p_actor is null or not exists (select 1 from public.profiles where id = p_actor and role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if p_banned is null then
+    raise exception 'INVALID_INPUT' using detail = 'banned must be true or false';
+  end if;
+  if length(v_reason) = 0 or length(v_reason) > 500 then
+    raise exception 'INVALID_INPUT' using detail = 'reason is required, at most 500 characters';
+  end if;
+  if p_user_ids is null or cardinality(p_user_ids) = 0 or cardinality(p_user_ids) > 50
+     or array_position(p_user_ids, null) is not null then
+    raise exception 'INVALID_INPUT' using detail = 'between 1 and 50 users';
+  end if;
+
+  select array_agg(distinct i order by i) into v_ids from unnest(p_user_ids) as i;
+  if cardinality(v_ids) <> cardinality(p_user_ids) then
+    raise exception 'INVALID_INPUT' using detail = 'a user is listed twice';
+  end if;
+
+  perform 1 from public.profiles where id = any(v_ids) order by id for update;
+
+  select array_agg(i order by i) into v_bad
+    from unnest(v_ids) as i
+   where not exists (select 1 from public.profiles p where p.id = i);
+  if v_bad is not null then
+    raise exception 'PROFILE_NOT_FOUND' using detail = array_to_string(v_bad, ',');
+  end if;
+
+  if p_banned then
+    select array_agg(p.id order by p.id) into v_bad
+      from public.profiles p
+     where p.id = any(v_ids) and (p.role = 'admin' or p.id = p_actor);
+    if v_bad is not null then
+      raise exception 'PROTECTED_USER' using detail = array_to_string(v_bad, ',');
+    end if;
+  end if;
+
+  for v_id in
+    select p.id from public.profiles p
+     where p.id = any(v_ids) and (p.banned_at is null) = p_banned
+     order by p.id
+  loop
+    if p_banned then
+      perform public.admin_ban_user(v_id, v_reason || ' · 操作人 ' || p_actor::text);
+    else
+      perform public.admin_unban_user(v_id, v_reason || ' · 操作人 ' || p_actor::text);
+    end if;
+    v_changed := v_changed + 1;
+  end loop;
+
+  return jsonb_build_object('changed', v_changed, 'unchanged', cardinality(v_ids) - v_changed);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_batch_set_banned"("p_actor" "uuid", "p_user_ids" "uuid"[], "p_banned" boolean, "p_reason" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_daily_costs"("p_days" integer) RETURNS "jsonb"
     LANGUAGE "plpgsql" STABLE
     SET "search_path" TO ''
@@ -558,6 +712,49 @@ $$;
 ALTER FUNCTION "public"."admin_delete_provider"("p_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") RETURNS integer
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_moved integer;
+begin
+  if p_actor is null or not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+  perform 1 from public.template_categories for update;
+  if not exists (select 1 from public.template_categories c where c.key = p_key) then
+    raise exception 'CATEGORY_NOT_FOUND';
+  end if;
+  if exists (select 1 from public.template_categories c where c.key = p_key and c.is_system) then
+    raise exception 'CATEGORY_SYSTEM';
+  end if;
+  if (select count(*) from public.template_categories c where not c.is_system) <= 1 then
+    raise exception 'CATEGORY_LAST';
+  end if;
+
+  if exists (select 1 from public.templates t where t.category_key = p_key) then
+    if p_move_to is null then
+      raise exception 'CATEGORY_MOVE_REQUIRED';
+    end if;
+    if p_move_to = p_key or not exists (select 1 from public.template_categories c where c.key = p_move_to and not c.is_system) then
+      raise exception 'INVALID_INPUT' using detail = 'move_to must be another existing, non-system category';
+    end if;
+    update public.templates set category_key = p_move_to where category_key = p_key;
+    get diagnostics v_moved = row_count;
+  else
+    v_moved := 0;
+  end if;
+
+  delete from public.template_categories where key = p_key;
+  return v_moved;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_list_template_requests"() RETURNS TABLE("id" "uuid", "email" "text", "description" "text", "image_keys" "text"[], "status" "text", "template_id" "text", "votes_count" integer, "created_at" timestamp with time zone)
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -647,6 +844,147 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_list_tickets"("p_status" "text", "p_type" "text", "p_cursor_at" timestamp with time zone, "p_cursor_id" "uuid", "p_limit" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_list_users"("p_query" "text" DEFAULT NULL::"text", "p_tier" "text" DEFAULT NULL::"text", "p_provider" "text" DEFAULT NULL::"text", "p_status" "text" DEFAULT NULL::"text", "p_from" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_to" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_sort" "text" DEFAULT 'created'::"text", "p_page" integer DEFAULT 1) RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  -- A ledger row that names the plan of profile p (current_tier()'s rule).
+  c_plan constant text := 'l.user_id = p.id and l.pool = ''paid'' and l.delta > 0 '
+                          'and l.product_id is not null and l.product_id not like ''pack_%''';
+  v_q text := nullif(btrim(coalesce(p_query, '')), '');
+  v_like text;
+  v_digits text;
+  v_where text := 'true';
+  v_from text := 'public.profiles p';
+  v_order text := 'p.created_at desc, p.id desc';
+  v_total bigint;
+  v_ids uuid[];
+begin
+  if p_tier is not null and p_tier not in ('free', 'starter', 'pro', 'max') then
+    raise exception 'INVALID_INPUT' using detail = 'tier must be free, starter, pro or max';
+  end if;
+  if p_provider is not null and p_provider not in ('email', 'google', 'phone') then
+    raise exception 'INVALID_INPUT' using detail = 'provider must be email, google or phone';
+  end if;
+  if p_status is not null and p_status not in ('active', 'banned') then
+    raise exception 'INVALID_INPUT' using detail = 'status must be active or banned';
+  end if;
+  if p_sort is null or p_sort not in ('created', 'last_job', 'paid_credits') then
+    raise exception 'INVALID_INPUT' using detail = 'sort must be created, last_job or paid_credits';
+  end if;
+  if p_page is null or p_page < 1 or p_page > 10000 then
+    raise exception 'INVALID_INPUT' using detail = 'page must be between 1 and 10000';
+  end if;
+  if length(v_q) > 320 then
+    raise exception 'INVALID_INPUT' using detail = 'query is too long';
+  end if;
+
+  -- The lookup box's substring rules (admin_search_users, 0442): % and _ match themselves; a
+  -- query of digits, spaces, dashes and a leading + with at least 4 digits also matches the phone.
+  if v_q is not null then
+    v_like := '%' || replace(replace(replace(v_q, '\', '\\'), '%', '\%'), '_', '\_') || '%';
+    if v_q ~ '^\+?[0-9][0-9 -]{2,}$' and length(regexp_replace(v_q, '[^0-9]', '', 'g')) >= 4 then
+      v_digits := regexp_replace(v_q, '[^0-9]', '', 'g');
+    end if;
+  end if;
+
+  -- Parameters: $1 email pattern, $2 phone digits, $3 sign-up method, $4 from, $5 to, $6 tier,
+  -- $7 offset. The method is the one the account signed up with; linking Google later does not
+  -- change it.
+  if v_q is not null or p_provider is not null then
+    v_where := v_where || ' and exists (select 1 from auth.users u where u.id = p.id'
+      || case when v_q is null then ''
+              when v_digits is null then ' and u.email ilike $1'
+              else ' and (u.email ilike $1 or u.phone like ''%'' || $2 || ''%'')' end
+      || case when p_provider is null then '' else ' and u.raw_app_meta_data ->> ''provider'' = $3' end
+      || ')';
+  end if;
+  if p_status = 'banned' then
+    v_where := v_where || ' and p.banned_at is not null';
+  elsif p_status = 'active' then
+    v_where := v_where || ' and p.banned_at is null';
+  end if;
+  if p_from is not null then
+    v_where := v_where || ' and p.created_at >= $4';
+  end if;
+  if p_to is not null then
+    v_where := v_where || ' and p.created_at < $5';
+  end if;
+  if p_tier = 'free' then
+    v_where := v_where || ' and (p.paid_until is null or p.paid_until <= now() '
+      || 'or not exists (select 1 from public.credit_ledger l where ' || c_plan || '))';
+  elsif p_tier is not null then
+    v_where := v_where || ' and p.paid_until > now() and split_part((select l.product_id '
+      || 'from public.credit_ledger l where ' || c_plan
+      || ' order by l.created_at desc, l.id desc limit 1), ''_'', 1) = $6';
+  end if;
+
+  execute 'select count(*) from public.profiles p where ' || v_where
+    into v_total
+    using v_like, v_digits, p_provider, p_from, p_to, p_tier;
+
+  if p_sort = 'last_job' then
+    v_from := v_from || ' left join lateral (select g.created_at from public.generation_jobs g '
+      || 'where g.user_id = p.id order by g.created_at desc limit 1) j on true';
+    v_order := 'j.created_at desc nulls last, p.created_at desc, p.id desc';
+  elsif p_sort = 'paid_credits' then
+    v_order := 'p.credits desc, p.created_at desc, p.id desc';
+  end if;
+
+  -- ARRAY(subquery) keeps the subquery's order.
+  execute 'select array(select p.id from ' || v_from || ' where ' || v_where
+      || ' order by ' || v_order || ' limit 50 offset $7)'
+    into v_ids
+    using v_like, v_digits, p_provider, p_from, p_to, p_tier, (p_page - 1) * 50;
+
+  -- The 50 rows of the page, each joined by primary key.
+  return jsonb_build_object(
+    'total', v_total,
+    'rows', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'id', p.id,
+               'email', u.email::text,
+               'phone', nullif(u.phone, '')::text,
+               'created_at', p.created_at,
+               'provider', u.raw_app_meta_data ->> 'provider',
+               'role', p.role,
+               'credits', p.credits,
+               'free_credits', p.free_credits,
+               'paid_until', p.paid_until,
+               'tier', coalesce(split_part(plan.product_id, '_', 1), 'free'),
+               'product_id', plan.product_id,
+               'last_generation_at', j.created_at,
+               'banned_at', p.banned_at
+             ) order by ids.n)
+        from unnest(v_ids) with ordinality as ids(id, n)
+        join public.profiles p on p.id = ids.id
+        join auth.users u on u.id = p.id
+        left join lateral (
+          select l.product_id
+            from public.credit_ledger l
+           where p.paid_until > now()
+             and l.user_id = p.id and l.pool = 'paid' and l.delta > 0
+             and l.product_id is not null and l.product_id not like 'pack_%'
+           order by l.created_at desc, l.id desc
+           limit 1
+        ) plan on true
+        left join lateral (
+          select g.created_at
+            from public.generation_jobs g
+           where g.user_id = p.id
+           order by g.created_at desc
+           limit 1
+        ) j on true
+    ), '[]'::jsonb)
+  );
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."admin_list_users"("p_query" "text", "p_tier" "text", "p_provider" "text", "p_status" "text", "p_from" timestamp with time zone, "p_to" timestamp with time zone, "p_sort" "text", "p_page" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_log_replay"("p_user_id" "uuid", "p_target_id" "text", "p_reason" "text") RETURNS "void"
@@ -741,6 +1079,33 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_openai_admin_key_status"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_reorder_template_categories"("p_keys" "text"[], "p_actor" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_keys text[] := coalesce(p_keys, '{}');
+begin
+  if p_actor is null or not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if cardinality(v_keys) <> (select count(distinct k) from unnest(v_keys) as u(k))
+     or (select array_agg(k order by k) from unnest(v_keys) as u(k))
+        is distinct from (select array_agg(c.key order by c.key) from public.template_categories c where not c.is_system) then
+    raise exception 'INVALID_INPUT' using detail = 'the order must list every category once';
+  end if;
+
+  update public.template_categories c
+  set sort_order = o.position * 10
+  from unnest(v_keys) with ordinality as o(key, position)
+  where c.key = o.key and c.sort_order <> o.position * 10;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_reorder_template_categories"("p_keys" "text"[], "p_actor" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) RETURNS "void"
@@ -920,6 +1285,62 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_review_template_request"("p_request_id" "uuid", "p_status" "text", "p_template_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_save_template_category"("p_category" "jsonb", "p_is_new" boolean, "p_actor" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_key text := btrim(coalesce(p_category ->> 'key', ''));
+  v_name_en text := btrim(coalesce(p_category ->> 'name_en', ''));
+  v_name_zh text := btrim(coalesce(p_category ->> 'name_zh', ''));
+  v_intro_en text := nullif(btrim(coalesce(p_category ->> 'intro_en', '')), '');
+  v_intro_zh text := nullif(btrim(coalesce(p_category ->> 'intro_zh', '')), '');
+  v_style text := coalesce(p_category ->> 'card_style', 'pair');
+begin
+  if p_actor is null or not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if v_name_en = '' or v_name_zh = '' then
+    raise exception 'INVALID_INPUT' using detail = 'both names are required';
+  end if;
+  if exists (select 1 from public.template_categories c where lower(c.name_en) = lower(v_name_en) and c.key <> v_key) then
+    raise exception 'CATEGORY_NAME_EN_TAKEN';
+  end if;
+  if exists (select 1 from public.template_categories c where c.name_zh = v_name_zh and c.key <> v_key) then
+    raise exception 'CATEGORY_NAME_ZH_TAKEN';
+  end if;
+
+  if coalesce(p_is_new, false) then
+    if exists (select 1 from public.template_categories c where c.key = v_key) then
+      raise exception 'CATEGORY_KEY_TAKEN';
+    end if;
+    insert into public.template_categories (key, name_en, name_zh, intro_en, intro_zh, card_style, sort_order)
+    values (
+      v_key, v_name_en, v_name_zh, v_intro_en, v_intro_zh, v_style,
+      (select coalesce(max(c.sort_order), 0) + 10 from public.template_categories c where not c.is_system)
+    );
+  else
+    if exists (select 1 from public.template_categories c where c.key = v_key and c.is_system) then
+      raise exception 'CATEGORY_SYSTEM';
+    end if;
+    update public.template_categories
+    set name_en = v_name_en,
+        name_zh = v_name_zh,
+        intro_en = v_intro_en,
+        intro_zh = v_intro_zh,
+        card_style = v_style
+    where key = v_key;
+    if not found then
+      raise exception 'CATEGORY_NOT_FOUND';
+    end if;
+  end if;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_save_template_category"("p_category" "jsonb", "p_is_new" boolean, "p_actor" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_search_users"("p_query" "text") RETURNS TABLE("id" "uuid", "email" "text", "created_at" timestamp with time zone, "provider" "text", "role" "text", "credits" integer, "free_credits" integer, "paid_until" timestamp with time zone, "generation_count" integer, "last_generation_at" timestamp with time zone, "banned_at" timestamp with time zone, "phone" "text")
@@ -1135,6 +1556,63 @@ $$;
 ALTER FUNCTION "public"."admin_set_system_setting"("p_key" "text", "p_value" "jsonb", "p_actor" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_set_template_order"("p_group" "text", "p_ids" "text"[], "p_actor" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_ids text[] := coalesce(p_ids, '{}');
+  v_members text[];
+begin
+  if p_actor is null then
+    raise exception 'INVALID_INPUT' using detail = 'actor is required';
+  end if;
+  if not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if p_group is null or p_group not in ('catalogue', 'featured') then
+    raise exception 'INVALID_INPUT' using detail = 'group must be catalogue or featured';
+  end if;
+  if cardinality(v_ids) <> (select count(distinct id) from unnest(v_ids) as u(id)) then
+    raise exception 'INVALID_INPUT' using detail = 'ids must not repeat';
+  end if;
+
+  -- Holds off other template writes for these few milliseconds, so the membership checked
+  -- below is still the membership when the new order is written. Reads are not blocked.
+  lock table public.templates in share row exclusive mode;
+
+  select coalesce(array_agg(t.id), '{}') into v_members
+  from public.templates t
+  where case p_group
+    when 'catalogue' then t.id <> 'edit'
+    else t.featured_rank is not null
+  end;
+
+  if cardinality(v_members) <> cardinality(v_ids) or not (v_members @> v_ids) then
+    raise exception 'ORDER_MISMATCH'
+      using detail = format('%s ids given, the %s group has %s', cardinality(v_ids), p_group, cardinality(v_members));
+  end if;
+
+  if p_group = 'catalogue' then
+    update public.templates t
+    set sort_order = o.position * 10
+    from unnest(v_ids) with ordinality as o(id, position)
+    where t.id = o.id and t.sort_order is distinct from o.position * 10;
+  else
+    -- Cleared first so the one-per-position index never sees two rows on one rank mid-way.
+    update public.templates set featured_rank = null where featured_rank is not null;
+    update public.templates t
+    set featured_rank = o.position
+    from unnest(v_ids) with ordinality as o(id, position)
+    where t.id = o.id;
+  end if;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_set_template_order"("p_group" "text", "p_ids" "text"[], "p_actor" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_signup_ip_clusters"("p_days" integer) RETURNS TABLE("signup_ip" "inet", "accounts" integer, "last_signup_at" timestamp with time zone, "members" "jsonb")
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -1257,13 +1735,16 @@ declare
   v_id text := p_template ->> 'id';
 begin
   insert into public.templates as t (
-    id, module, name, category, cover_before_url, cover_after_url,
+    id, module, name, category, category_key, cover_before_url, cover_after_url,
     fields, quality, credits_cost, sort_order, is_active, visible_in, translations, description, featured_rank
   ) values (
     v_id,
     coalesce(p_template ->> 'module', 'image'),
     p_template ->> 'name',
+    -- New code sends the key; old code and the prompt import send a name. The 0581 trigger
+    -- fills whichever is missing.
     p_template ->> 'category',
+    nullif(p_template ->> 'category_key', ''),
     nullif(p_template ->> 'cover_before_url', ''),
     nullif(p_template ->> 'cover_after_url', ''),
     coalesce(p_template -> 'fields', '{}'::jsonb),
@@ -1285,6 +1766,8 @@ begin
     module = excluded.module,
     name = excluded.name,
     category = excluded.category,
+    -- After the BEFORE INSERT trigger, so always set (EXCLUDED carries the trigger's values).
+    category_key = excluded.category_key,
     -- Only when the payload carries them: the editor leaves covers to the upload.
     cover_before_url = case when p_template ? 'cover_before_url' then excluded.cover_before_url else t.cover_before_url end,
     cover_after_url = case when p_template ? 'cover_after_url' then excluded.cover_after_url else t.cover_after_url end,
@@ -2492,6 +2975,81 @@ $$;
 ALTER FUNCTION "public"."sync_waffo_subscription"("p_user_id" "uuid", "p_order_id" "text", "p_product_id" "text", "p_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean, "p_event_at" timestamp with time zone) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."template_categories_sync_name"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  update public.templates set category = new.name_en where category_key = new.key and category <> new.name_en;
+  return null;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."template_categories_sync_name"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."template_category_for"("p_value" "text") RETURNS "text"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_value text := btrim(coalesce(p_value, ''));
+  v_key text;
+  v_base text;
+  v_name_en text;
+  v_name_zh text;
+  v_n integer;
+begin
+  if v_value = '' then
+    return null;
+  end if;
+  select c.key into v_key
+  from public.template_categories c
+  where c.key = v_value or lower(c.name_en) = lower(v_value) or c.name_zh = v_value
+  order by (c.key = v_value) desc, c.sort_order
+  limit 1;
+  if v_key is not null then
+    return v_key;
+  end if;
+
+  v_base := rtrim(left(btrim(regexp_replace(lower(v_value), '[^a-z0-9]+', '-', 'g'), '-'), 36), '-');
+  if v_base = '' then
+    v_base := 'category';
+  end if;
+  v_key := v_base;
+  v_n := 1;
+  while exists (select 1 from public.template_categories c where c.key = v_key) loop
+    v_n := v_n + 1;
+    v_key := v_base || '-' || v_n;
+  end loop;
+
+  v_name_en := btrim(left(v_value, 32));
+  v_n := 1;
+  while exists (select 1 from public.template_categories c where lower(c.name_en) = lower(v_name_en)) loop
+    v_n := v_n + 1;
+    v_name_en := btrim(left(v_value, 32 - length(' ' || v_n))) || ' ' || v_n;
+  end loop;
+  v_name_zh := btrim(left(v_value, 12));
+  v_n := 1;
+  while exists (select 1 from public.template_categories c where c.name_zh = v_name_zh) loop
+    v_n := v_n + 1;
+    v_name_zh := btrim(left(v_value, 12 - length(' ' || v_n))) || ' ' || v_n;
+  end loop;
+
+  insert into public.template_categories (key, name_en, name_zh, card_style, sort_order)
+  values (
+    v_key, v_name_en, v_name_zh, 'pair',
+    (select coalesce(max(c.sort_order), 0) + 10 from public.template_categories c where not c.is_system)
+  );
+  return v_key;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."template_category_for"("p_value" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."template_request_votes_count"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -2508,6 +3066,34 @@ $$;
 
 
 ALTER FUNCTION "public"."template_request_votes_count"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."templates_sync_category"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if new.category_key is not null and (tg_op = 'INSERT' or new.category_key is distinct from old.category_key) then
+    -- The key was written: the name follows it below.
+    null;
+  elsif tg_op = 'INSERT' or new.category is distinct from old.category then
+    -- Only the name was written. A rename of the template's own category keeps its key.
+    if tg_op = 'INSERT' or not exists (
+      select 1 from public.template_categories c
+      where c.key = new.category_key
+        and (c.key = btrim(new.category) or lower(c.name_en) = lower(btrim(new.category)) or c.name_zh = btrim(new.category))
+    ) then
+      new.category_key := public.template_category_for(new.category);
+    end if;
+  end if;
+  -- An unknown key keeps a non-null name, so the foreign key (not NOT NULL) is what refuses it.
+  new.category := coalesce((select c.name_en from public.template_categories c where c.key = new.category_key), new.category, new.category_key);
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."templates_sync_category"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."toggle_template_request_vote"("p_request_id" "uuid", "p_user_id" "uuid") RETURNS TABLE("voted" boolean, "votes_count" integer)
@@ -2763,7 +3349,7 @@ CREATE TABLE IF NOT EXISTS "public"."payments" (
     CONSTRAINT "payments_check" CHECK ((("amount_tax" >= 0) AND ("amount_tax" <= "amount_total"))),
     CONSTRAINT "payments_check1" CHECK ((("amount_refunded" >= 0) AND ("amount_refunded" <= "amount_total"))),
     CONSTRAINT "payments_currency_check" CHECK (("currency" ~ '^[a-z]{3}$'::"text")),
-    CONSTRAINT "payments_method_check" CHECK (("method" = ANY (ARRAY['card'::"text", 'alipay'::"text", 'cn_card'::"text"]))),
+    CONSTRAINT "payments_method_check" CHECK (("method" = ANY (ARRAY['card'::"text", 'alipay'::"text", 'wechat_pay'::"text", 'cn_card'::"text"]))),
     CONSTRAINT "payments_status_check" CHECK (("status" = ANY (ARRAY['paid'::"text", 'refunded'::"text", 'partially_refunded'::"text", 'disputed'::"text"]))),
     CONSTRAINT "payments_stripe_charge_id_check" CHECK (("stripe_charge_id" ~ '^(ch|py)_'::"text")),
     CONSTRAINT "payments_stripe_ids_check" CHECK ((("channel" <> 'stripe'::"text") OR ("stripe_session_id" IS NOT NULL) OR ("stripe_invoice_id" IS NOT NULL))),
@@ -2926,6 +3512,29 @@ CREATE TABLE IF NOT EXISTS "public"."system_settings" (
 ALTER TABLE "public"."system_settings" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."template_categories" (
+    "key" "text" NOT NULL,
+    "name_en" "text" NOT NULL,
+    "name_zh" "text" NOT NULL,
+    "intro_en" "text",
+    "intro_zh" "text",
+    "card_style" "text" DEFAULT 'pair'::"text" NOT NULL,
+    "sort_order" integer DEFAULT 0 NOT NULL,
+    "is_system" boolean DEFAULT false NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "template_categories_card_style_check" CHECK (("card_style" = ANY (ARRAY['pair'::"text", 'compare'::"text"]))),
+    CONSTRAINT "template_categories_intro_en_check" CHECK ((("intro_en" IS NULL) OR (("char_length"("intro_en") >= 1) AND ("char_length"("intro_en") <= 200)))),
+    CONSTRAINT "template_categories_intro_zh_check" CHECK ((("intro_zh" IS NULL) OR (("char_length"("intro_zh") >= 1) AND ("char_length"("intro_zh") <= 200)))),
+    CONSTRAINT "template_categories_key_check" CHECK ((("key" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text") AND ("char_length"("key") <= 40))),
+    CONSTRAINT "template_categories_name_en_check" CHECK ((("char_length"("name_en") >= 1) AND ("char_length"("name_en") <= 32) AND ("name_en" = "btrim"("name_en")))),
+    CONSTRAINT "template_categories_name_zh_check" CHECK ((("char_length"("name_zh") >= 1) AND ("char_length"("name_zh") <= 12) AND ("name_zh" = "btrim"("name_zh"))))
+);
+
+
+ALTER TABLE "public"."template_categories" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."template_prompts" (
     "template_id" "text" NOT NULL,
     "body" "text" NOT NULL,
@@ -2974,6 +3583,7 @@ CREATE TABLE IF NOT EXISTS "public"."templates" (
     "translations" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
     "description" "text",
     "featured_rank" smallint,
+    "category_key" "text" NOT NULL,
     CONSTRAINT "templates_category_check" CHECK ((("char_length"("category") >= 1) AND ("char_length"("category") <= 60))),
     CONSTRAINT "templates_cover_media_type_check" CHECK (("cover_media_type" = ANY (ARRAY['image'::"text", 'animated'::"text", 'video'::"text"]))),
     CONSTRAINT "templates_cover_motion_complete" CHECK ((("cover_media_type" = 'image'::"text") OR (("cover_video_url" IS NOT NULL) AND ("cover_poster_url" IS NOT NULL)))),
@@ -3124,6 +3734,11 @@ ALTER TABLE ONLY "public"."system_settings"
 
 
 
+ALTER TABLE ONLY "public"."template_categories"
+    ADD CONSTRAINT "template_categories_pkey" PRIMARY KEY ("key");
+
+
+
 ALTER TABLE ONLY "public"."template_prompts"
     ADD CONSTRAINT "template_prompts_pkey" PRIMARY KEY ("template_id");
 
@@ -3157,6 +3772,10 @@ CREATE INDEX "credit_ledger_purchases_created_at_id_idx" ON "public"."credit_led
 
 
 CREATE INDEX "credit_ledger_user_id_created_at_idx" ON "public"."credit_ledger" USING "btree" ("user_id", "created_at" DESC);
+
+
+
+CREATE INDEX "credit_ledger_user_plan_idx" ON "public"."credit_ledger" USING "btree" ("user_id", "created_at" DESC, "id" DESC) WHERE (("pool" = 'paid'::"text") AND ("delta" > 0) AND ("product_id" IS NOT NULL) AND ("product_id" !~~ 'pack_%'::"text"));
 
 
 
@@ -3208,7 +3827,15 @@ CREATE INDEX "payments_waffo_order_id_idx" ON "public"."payments" USING "btree" 
 
 
 
+CREATE INDEX "profiles_banned_at_idx" ON "public"."profiles" USING "btree" ("banned_at") WHERE ("banned_at" IS NOT NULL);
+
+
+
 CREATE INDEX "profiles_created_at_idx" ON "public"."profiles" USING "btree" ("created_at");
+
+
+
+CREATE INDEX "profiles_paid_until_idx" ON "public"."profiles" USING "btree" ("paid_until") WHERE ("paid_until" IS NOT NULL);
 
 
 
@@ -3256,6 +3883,14 @@ CREATE INDEX "support_tickets_user_id_created_at_idx" ON "public"."support_ticke
 
 
 
+CREATE UNIQUE INDEX "template_categories_name_en_key" ON "public"."template_categories" USING "btree" ("lower"("name_en"));
+
+
+
+CREATE UNIQUE INDEX "template_categories_name_zh_key" ON "public"."template_categories" USING "btree" ("name_zh");
+
+
+
 CREATE INDEX "template_request_votes_user_id_idx" ON "public"."template_request_votes" USING "btree" ("user_id");
 
 
@@ -3276,6 +3911,10 @@ CREATE INDEX "templates_active_sort_idx" ON "public"."templates" USING "btree" (
 
 
 
+CREATE INDEX "templates_category_key_idx" ON "public"."templates" USING "btree" ("category_key");
+
+
+
 CREATE UNIQUE INDEX "templates_featured_rank_key" ON "public"."templates" USING "btree" ("featured_rank") WHERE ("featured_rank" IS NOT NULL);
 
 
@@ -3292,6 +3931,14 @@ CREATE OR REPLACE TRIGGER "site_announcements_set_updated_at" BEFORE UPDATE ON "
 
 
 
+CREATE OR REPLACE TRIGGER "template_categories_set_updated_at" BEFORE UPDATE ON "public"."template_categories" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
+
+
+
+CREATE OR REPLACE TRIGGER "template_categories_sync_name" AFTER UPDATE OF "name_en" ON "public"."template_categories" FOR EACH ROW WHEN (("old"."name_en" IS DISTINCT FROM "new"."name_en")) EXECUTE FUNCTION "public"."template_categories_sync_name"();
+
+
+
 CREATE OR REPLACE TRIGGER "template_prompts_bump_version" BEFORE UPDATE ON "public"."template_prompts" FOR EACH ROW EXECUTE FUNCTION "public"."bump_template_prompt_version"();
 
 
@@ -3301,6 +3948,10 @@ CREATE OR REPLACE TRIGGER "template_request_votes_count" AFTER INSERT OR DELETE 
 
 
 CREATE OR REPLACE TRIGGER "templates_set_updated_at" BEFORE UPDATE ON "public"."templates" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
+
+
+
+CREATE OR REPLACE TRIGGER "templates_sync_category" BEFORE INSERT OR UPDATE OF "category", "category_key" ON "public"."templates" FOR EACH ROW EXECUTE FUNCTION "public"."templates_sync_category"();
 
 
 
@@ -3434,6 +4085,11 @@ ALTER TABLE ONLY "public"."template_requests"
 
 
 
+ALTER TABLE ONLY "public"."templates"
+    ADD CONSTRAINT "templates_category_key_fkey" FOREIGN KEY ("category_key") REFERENCES "public"."template_categories"("key");
+
+
+
 ALTER TABLE "public"."admin_audit_log" ENABLE ROW LEVEL SECURITY;
 
 
@@ -3510,6 +4166,13 @@ CREATE POLICY "support_tickets_select_own" ON "public"."support_tickets" FOR SEL
 ALTER TABLE "public"."system_settings" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."template_categories" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "template_categories_select_all" ON "public"."template_categories" FOR SELECT TO "authenticated", "anon" USING (true);
+
+
+
 ALTER TABLE "public"."template_prompts" ENABLE ROW LEVEL SECURITY;
 
 
@@ -3581,6 +4244,16 @@ GRANT ALL ON FUNCTION "public"."admin_ban_user"("p_user_id" "uuid", "p_reason" "
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_batch_adjust_credits"("p_actor" "uuid", "p_user_ids" "uuid"[], "p_pool" "text", "p_amount" integer, "p_reason" "text", "p_batch_key" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_batch_adjust_credits"("p_actor" "uuid", "p_user_ids" "uuid"[], "p_pool" "text", "p_amount" integer, "p_reason" "text", "p_batch_key" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_batch_set_banned"("p_actor" "uuid", "p_user_ids" "uuid"[], "p_banned" boolean, "p_reason" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_batch_set_banned"("p_actor" "uuid", "p_user_ids" "uuid"[], "p_banned" boolean, "p_reason" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_daily_costs"("p_days" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_daily_costs"("p_days" integer) TO "service_role";
 
@@ -3606,6 +4279,11 @@ GRANT ALL ON FUNCTION "public"."admin_delete_provider"("p_id" "uuid") TO "servic
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_list_template_requests"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_list_template_requests"() TO "service_role";
 
@@ -3613,6 +4291,11 @@ GRANT ALL ON FUNCTION "public"."admin_list_template_requests"() TO "service_role
 
 REVOKE ALL ON FUNCTION "public"."admin_list_tickets"("p_status" "text", "p_type" "text", "p_cursor_at" timestamp with time zone, "p_cursor_id" "uuid", "p_limit" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_list_tickets"("p_status" "text", "p_type" "text", "p_cursor_at" timestamp with time zone, "p_cursor_id" "uuid", "p_limit" integer) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_list_users"("p_query" "text", "p_tier" "text", "p_provider" "text", "p_status" "text", "p_from" timestamp with time zone, "p_to" timestamp with time zone, "p_sort" "text", "p_page" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_list_users"("p_query" "text", "p_tier" "text", "p_provider" "text", "p_status" "text", "p_from" timestamp with time zone, "p_to" timestamp with time zone, "p_sort" "text", "p_page" integer) TO "service_role";
 
 
 
@@ -3628,6 +4311,11 @@ GRANT ALL ON FUNCTION "public"."admin_lookup"("p_query" "text") TO "service_role
 
 REVOKE ALL ON FUNCTION "public"."admin_openai_admin_key_status"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_openai_admin_key_status"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_reorder_template_categories"("p_keys" "text"[], "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_reorder_template_categories"("p_keys" "text"[], "p_actor" "uuid") TO "service_role";
 
 
 
@@ -3648,6 +4336,11 @@ GRANT ALL ON FUNCTION "public"."admin_revenue_stats"("p_days" integer) TO "servi
 
 REVOKE ALL ON FUNCTION "public"."admin_review_template_request"("p_request_id" "uuid", "p_status" "text", "p_template_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_review_template_request"("p_request_id" "uuid", "p_status" "text", "p_template_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_save_template_category"("p_category" "jsonb", "p_is_new" boolean, "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_save_template_category"("p_category" "jsonb", "p_is_new" boolean, "p_actor" "uuid") TO "service_role";
 
 
 
@@ -3683,6 +4376,11 @@ GRANT ALL ON FUNCTION "public"."admin_set_provider_key"("p_id" "uuid", "p_key" "
 
 REVOKE ALL ON FUNCTION "public"."admin_set_system_setting"("p_key" "text", "p_value" "jsonb", "p_actor" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_set_system_setting"("p_key" "text", "p_value" "jsonb", "p_actor" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_set_template_order"("p_group" "text", "p_ids" "text"[], "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_template_order"("p_group" "text", "p_ids" "text"[], "p_actor" "uuid") TO "service_role";
 
 
 
@@ -3853,6 +4551,11 @@ GRANT ALL ON FUNCTION "public"."sync_waffo_subscription"("p_user_id" "uuid", "p_
 
 
 
+REVOKE ALL ON FUNCTION "public"."template_category_for"("p_value" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."template_category_for"("p_value" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."template_request_votes_count"() FROM PUBLIC;
 
 
@@ -3976,6 +4679,12 @@ GRANT SELECT ON TABLE "public"."support_ticket_attachments" TO "service_role";
 
 
 GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."system_settings" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."template_categories" TO "service_role";
+GRANT SELECT ON TABLE "public"."template_categories" TO "anon";
+GRANT SELECT ON TABLE "public"."template_categories" TO "authenticated";
 
 
 

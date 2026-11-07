@@ -33,7 +33,12 @@ const A_FIRST_SENTENCE =
   'Shotviva is an image to image AI tool that gives a photo you already have a new look while the subject stays as shot — in 3 steps: upload one phone photo, pick a template, choose Standard, HD or Max.'
 
 const firstSentence = (text: string) => text.split(/(?<=[.。])\s*/)[0] ?? text
-const byLetter = (faq: readonly FaqItem[], letter: string) => faq['ABCDEFGHI'.indexOf(letter)] as FaqItem
+// G6 letters by position: English asks A–I in order; /zh moves the brand question I to the front
+// (建站规格 G6 exception, Owner 2026-11-08).
+const EN_ORDER = 'ABCDEFGHI'
+const ZH_ORDER = 'IABCDEFGH'
+const byLetterIn = (faq: readonly FaqItem[], letter: string, order: string) => faq[order.indexOf(letter)] as FaqItem
+const byLetter = (faq: readonly FaqItem[], letter: string) => byLetterIn(faq, letter, EN_ORDER)
 
 async function render(faq: readonly FaqItem[], locale: Locale, variant: 'list' | 'accordion' = 'list') {
   const section = createElement(FaqSection, { faq, heading: 'FAQ', variant })
@@ -133,10 +138,14 @@ describe('home FAQ accordion (T36)', () => {
 
 describe('home FAQ, Chinese (建站规格 G6, G13)', () => {
   const faq: readonly FaqItem[] = zhHomePage.faq
+  const byLetter = (items: readonly FaqItem[], letter: string) => byLetterIn(items, letter, ZH_ORDER)
 
-  it('has the same nine questions in the same order, asked the Chinese way, the brand question last', () => {
+  it('asks the brand question first, then A–H in the G6 order, the Chinese way', () => {
     expect(faq).toHaveLength(9)
-    expect(faq.at(-1)?.question).toBe('Shotviva 是什么？')
+    expect(faq[0]?.question).toBe('Shotviva 是什么？')
+    expect(byLetter(faq, 'A').question).toBe('怎么把自己的照片变成 AI 图？')
+    expect(byLetter(faq, 'H').question).toBe('手机上能用吗？要下载软件吗？')
+    expect(faq.at(-1)).toBe(byLetter(faq, 'H'))
     expect(zhHomePage.headings.faq).toBe('AI改图常见问题')
   })
 
@@ -164,6 +173,25 @@ describe('home FAQ, Chinese (建站规格 G6, G13)', () => {
     expect(html).toContain('<caption>AI改图和 AI 生图对比</caption>')
     expect(html).toContain('href="/zh/image-to-image-generator"')
     expect(html).toContain('去描述它。<a href="/zh/image-to-image-generator"')
+  })
+
+  it('opens the brand question by default and keeps every question and answer in the HTML', async () => {
+    const html = decode(await render(faq, 'zh', 'accordion'))
+    expect(html.match(/<details/g)).toHaveLength(9)
+    expect(html.match(/<details open="">/g)).toHaveLength(1)
+    const open = html.indexOf('<details open="">')
+    expect(open).toBeLessThan(html.indexOf('<h3>Shotviva 是什么？</h3>'))
+    expect(html.indexOf('<details', open + 1)).toBeGreaterThan(html.indexOf('<h3>Shotviva 是什么？</h3>'))
+    for (const item of faq) {
+      expect(html).toContain(`<h3>${item.question}</h3>`)
+      expect(html).toContain(`<p>${item.answer}`)
+    }
+  })
+
+  it('lists the FAQPage structured data in the page order, the brand question first', () => {
+    const entities = faqPageLd(faq).mainEntity as { name: string }[]
+    expect(entities.map((entity) => entity.name)).toEqual(faq.map((item) => item.question))
+    expect(entities[0]?.name).toBe('Shotviva 是什么？')
   })
 })
 

@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest'
 
-import { cardPrice, categoriesOf, hasStills, isArtStyle, isMotion, type CatalogueTemplate } from './catalogue-template'
+import { cardPrice, categoriesOf, hasStills, isCompareCategory, isMotion, type CatalogueTemplate } from './catalogue-template'
 import { isCompareSample } from './template-sample'
 
+// Category order and card style as set in 分类管理 (T75); 'art-styles' is the compare one.
+const ORDER: Record<string, number> = { 'art-styles': 10, 'products-resale': 30, pets: 60 }
 const tpl = (id: string, category: string, cover: Partial<CatalogueTemplate['cover']> = {}): CatalogueTemplate => ({
   id,
   name: id,
   category,
+  categoryName: `Name of ${category}`,
+  categoryOrder: ORDER[category] ?? 100,
+  compare: category === 'art-styles',
   description: null,
   creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
   copyFields: [],
@@ -14,8 +19,11 @@ const tpl = (id: string, category: string, cover: Partial<CatalogueTemplate['cov
 })
 
 describe('catalogue helpers', () => {
-  it('lists categories once, in catalogue order', () => {
-    expect(categoriesOf([tpl('a', 'Art Styles'), tpl('b', 'Pets'), tpl('c', 'Art Styles')])).toEqual(['Art Styles', 'Pets'])
+  it('lists categories once, in the admin\'s category order, with their names', () => {
+    expect(categoriesOf([tpl('b', 'pets'), tpl('a', 'art-styles'), tpl('c', 'pets')])).toEqual([
+      { key: 'art-styles', name: 'Name of art-styles' },
+      { key: 'pets', name: 'Name of pets' },
+    ])
   })
 
   it('prices the card at the Standard tier', () => {
@@ -29,14 +37,18 @@ describe('catalogue helpers', () => {
     expect(isMotion(tpl('i', 'x'))).toBe(false)
   })
 
-  // DESIGN §6.9 item 1: only Art Styles keeps the drag compare; everything else is the pair.
-  it('gives the drag compare to Art Styles with both stills, the pair to the rest', () => {
+  // DESIGN §6.9 item 1: a category whose card style is 'compare' (画风) keeps the drag compare;
+  // everything else is the pair. T75: decided by card_style, never by the category's name.
+  it('gives the drag compare to a compare category with both stills, the pair to the rest', () => {
     const stills = { before: 'https://a/b.webp', after: 'https://a/a.webp' }
-    expect(isCompareSample(tpl('manhwa', 'Art Styles', stills))).toBe(true)
-    expect(isCompareSample(tpl('manhwa', 'Art Styles', { before: 'https://a/b.webp' }))).toBe(false)
-    expect(isCompareSample(tpl('white', 'Products & Resale', stills))).toBe(false)
-    expect(isArtStyle(tpl('x', 'Art Styles'))).toBe(true)
-    expect(hasStills(tpl('x', 'Pets', stills))).toBe(true)
-    expect(hasStills(tpl('x', 'Pets', { after: 'https://a/a.webp' }))).toBe(false)
+    expect(isCompareSample(tpl('manhwa', 'art-styles', stills))).toBe(true)
+    expect(isCompareSample(tpl('manhwa', 'art-styles', { before: 'https://a/b.webp' }))).toBe(false)
+    expect(isCompareSample(tpl('white', 'products-resale', stills))).toBe(false)
+    expect(isCompareCategory(tpl('x', 'art-styles'))).toBe(true)
+    // Renamed, the same category keeps it; a pair category named "Art Styles" does not get it.
+    expect(isCompareSample({ ...tpl('manhwa', 'art-styles', stills), categoryName: '漫画风' })).toBe(true)
+    expect(isCompareSample({ ...tpl('x', 'pets', stills), categoryName: 'Art Styles' })).toBe(false)
+    expect(hasStills(tpl('x', 'pets', stills))).toBe(true)
+    expect(hasStills(tpl('x', 'pets', { after: 'https://a/a.webp' }))).toBe(false)
   })
 })

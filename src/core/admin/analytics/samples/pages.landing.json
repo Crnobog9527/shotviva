@@ -1,0 +1,64 @@
+{
+ "cache_key": "cache_pages_landing",
+ "is_cached": false,
+ "last_refresh": "2026-11-08T08:00:00.000000Z",
+ "next_allowed_client_refresh": "2026-11-08T08:01:00.000000Z",
+ "timezone": "UTC",
+ "columns": [
+  "path",
+  "people",
+  "signups",
+  "buyers"
+ ],
+ "types": [
+  [
+   "path",
+   "String"
+  ],
+  [
+   "people",
+   "UInt64"
+  ],
+  [
+   "signups",
+   "UInt64"
+  ],
+  [
+   "buyers",
+   "UInt64"
+  ]
+ ],
+ "results": [
+  [
+   "/",
+   1100,
+   88,
+   9
+  ],
+  [
+   "/zh",
+   400,
+   44,
+   6
+  ],
+  [
+   "/pricing",
+   90,
+   12,
+   5
+  ]
+ ],
+ "hasMore": false,
+ "limit": 100,
+ "offset": 0,
+ "modifiers": {
+  "personsOnEventsMode": "person_id_override_properties_joined"
+ },
+ "query_status": null,
+ "timings": [
+  {
+   "k": "./query",
+   "t": 0.21
+  }
+ ]
+}

@@ -4,6 +4,7 @@ import type { ShownAdminTicket as AdminTicket } from '@/core/support'
 import { MessageImages } from '@/core/support/ui'
 import { Badge } from '@/core/ui/badge'
 import { cn } from '@/core/ui/cn'
+import { CopyText } from '@/core/ui/copy-text'
 
 import { StatCard } from '../shell/admin-blocks'
 import { formatBeijing } from '../shell/format'
@@ -13,12 +14,14 @@ import { TICKETS_COPY as COPY } from './copy'
 import { RefundPanel, PaymentFacts } from './refund-panel'
 import { ReplyForm } from './reply-form'
 import type { TicketAdminActions } from './use-ticket-action'
+import { UserLink } from '../users-ui/user-link'
 
-type Props = { ticket: AdminTicket; user: UserDetail | null; stripeLive: boolean; actions: TicketAdminActions }
+// jobRef: the attached work's reference number (T78), null when the ticket has none.
+type Props = { ticket: AdminTicket; user: UserDetail | null; jobRef: string | null; stripeLive: boolean; actions: TicketAdminActions }
 
 // /admin/tickets/[id]: the thread, who wrote it (A2's user summary), what it points at, and for
 // refund requests the review panel. Replying is the last block.
-export function TicketDetailView({ ticket, user, stripeLive, actions }: Props) {
+export function TicketDetailView({ ticket, user, jobRef, stripeLive, actions }: Props) {
   return (
     <div className="grid gap-6">
       <div className="flex flex-wrap items-center gap-3">
@@ -30,6 +33,7 @@ export function TicketDetailView({ ticket, user, stripeLive, actions }: Props) {
         <span className="font-mono text-xs text-muted-foreground">{formatBeijing(ticket.createdAt)}</span>
       </div>
       <UserSummary ticket={ticket} user={user} />
+      {jobRef ? <AttachedWork jobRef={jobRef} /> : null}
       <Thread ticket={ticket} />
       <Attached ticket={ticket} stripeLive={stripeLive} decide={actions.decide} />
       <ReplyForm ticketId={ticket.id} closed={ticket.status === 'closed'} reply={actions.reply} />
@@ -42,19 +46,28 @@ function UserSummary({ ticket, user }: { ticket: AdminTicket; user: UserDetail |
     <section className="grid gap-3">
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="font-semibold">{COPY.user.heading}</h2>
-        <span className="text-sm">{user ? accountLabel(user) : ticket.userId}</span>
+        <span className="min-w-0 text-sm [overflow-wrap:anywhere]">{user ? accountLabel(user) : ticket.userId}</span>
         {user?.bannedAt ? <Badge variant="destructive">{COPY.user.banned}</Badge> : null}
-        <Link href={`/admin/users/${ticket.userId}`} className="text-sm text-primary hover:underline">
+        <UserLink userId={ticket.userId} className="text-sm">
           {COPY.user.open}
-        </Link>
+        </UserLink>
       </div>
       {user && <UserStats user={user} />}
-      {ticket.jobId && (
-        <p className="text-sm">
-          {COPY.user.work}：<span className="font-mono text-xs">{ticket.jobId}</span>
-        </p>
-      )}
     </section>
+  )
+}
+
+// The work an image-issue ticket points at, by its reference number (T78): the same number the
+// user sees under the photo, and one press away from that job's row with view / compensate.
+function AttachedWork({ jobRef }: { jobRef: string }) {
+  return (
+    <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+      <span>{COPY.user.work}</span>
+      <CopyText value={jobRef} label={COPY.user.copyRef} copied={COPY.user.copied} className="text-sm" />
+      <Link href={`/admin/jobs?ref=${jobRef}`} className="text-primary hover:underline">
+        {COPY.user.viewJob}
+      </Link>
+    </p>
   )
 }
 
@@ -82,7 +95,7 @@ function Thread({ ticket }: { ticket: AdminTicket }) {
               <span className="font-semibold">{COPY.thread[message.author]}</span>
               <span className="font-mono">{formatBeijing(message.createdAt)}</span>
             </p>
-            <p className="mt-1 text-sm break-words whitespace-pre-wrap">{message.body}</p>
+            <p className="mt-1 text-sm whitespace-pre-wrap [overflow-wrap:anywhere]">{message.body}</p>
             <MessageImages images={message.images} openLabel={COPY.thread.openImage} />
           </li>
         ))}

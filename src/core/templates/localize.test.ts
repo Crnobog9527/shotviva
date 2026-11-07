@@ -9,7 +9,8 @@ const base: Template = {
   module: 'image',
   name: 'Promo Poster',
   description: null,
-  category: 'Food & Drink',
+  category: 'food-drink',
+  categoryInfo: { key: 'food-drink', nameEn: 'Food & Drink', nameZh: '餐饮', introEn: 'Dishes.', introZh: null, cardStyle: 'pair', sortOrder: 20, isSystem: false },
   coverBeforeUrl: null,
   coverAfterUrl: null,
   coverMediaType: 'image',
@@ -35,6 +36,12 @@ const base: Template = {
 }
 
 describe('localizeTemplate (ARCHITECTURE §5, LAUNCH §7.6 #5)', () => {
+  // T75: the category's name and intro in the page's language, its order and card style.
+  it('attaches its category in the page\'s language', () => {
+    expect(localizeTemplate(base, 'en').categoryView).toEqual({ key: 'food-drink', name: 'Food & Drink', intro: 'Dishes.', compare: false, sortOrder: 20 })
+    expect(localizeTemplate({ ...base, translations: { zh: { name: '促销海报' } } }, 'zh').categoryView).toMatchObject({ name: '餐饮', intro: '' })
+  })
+
   it('uses the Chinese name, description and field text where they exist', () => {
     const zh = localizeTemplate(
       { ...base, translations: { zh: { name: '促销海报', description: '一张图加标题和价格', fields: { headline: { label: '标题', placeholder: '例如：周末特价' } } } } },

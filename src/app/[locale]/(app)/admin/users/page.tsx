@@ -2,23 +2,30 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
-import { AdminPage, lookupHref, lookupUser, searchUsers, USERS_COPY, UsersSearch } from '@/core/admin'
+import { AdminPage, listUsers, LOOKUP_PARAM, lookupHref, lookupUser, parseUserFilters, USERS_COPY, usersHref, UsersListView } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 
-// /admin/users (ARCHITECTURE §10): the lookup box. admin_lookup opens the one user an id or email
-// points at; otherwise the email substring list from admin_search_users, at most 50 rows.
+import { batchAdjustCreditsAction, batchSetBannedAction } from './actions'
+
+// /admin/users (ARCHITECTURE §10.a, T77): the list of users, 50 a page, filtered and sorted from
+// the URL. Pressing 查找 (?lookup=1) runs admin_lookup once: a unique hit (id, order number, an
+// email substring only one account has) opens that user's dialog over the list, anything else
+// filters the list; either way the flag is redirected away, so the dialog never reopens on its
+// own. The dialog (?user=) is mounted by the admin layout.
 export const instant = false
 
 export const metadata: Metadata = { title: USERS_COPY.title }
 
 export default async function AdminUsersPage({ searchParams }: PageProps<'/[locale]/admin/users'>) {
-  await requireAdmin()
-  const { q } = await searchParams
-  const query = typeof q === 'string' ? q.slice(0, 200) : ''
+  const admin = await requireAdmin()
+  const params = await searchParams
+  const filters = parseUserFilters(params)
   const db = createAdminSupabase()
-  const hit = query.trim() ? await lookupUser(db, query) : null
-  if (hit) redirect(lookupHref(hit))
-  const rows = query.trim() ? await searchUsers(db, query) : null
+  if (params[LOOKUP_PARAM] !== undefined) {
+    const hit = filters.q ? await lookupUser(db, filters.q) : null
+    redirect(hit ? lookupHref(hit, filters) : usersHref(filters))
+  }
+  const list = await listUsers(db, filters)
   const suspicious = (
     <Link href="/admin/users/suspicious" className="text-sm text-primary hover:underline">
       {USERS_COPY.suspiciousLink}
@@ -26,7 +33,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps<'/[loca
   )
   return (
     <AdminPage title={USERS_COPY.title} actions={suspicious}>
-      <UsersSearch query={query} rows={rows} />
+      <UsersListView filters={filters} list={list} actions={{ adjust: batchAdjustCreditsAction, setBanned: batchSetBannedAction }} currentUserId={admin.id} />
     </AdminPage>
   )
 }

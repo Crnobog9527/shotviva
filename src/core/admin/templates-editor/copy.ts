@@ -16,22 +16,13 @@ export const publicCopy = {
   descriptionHint: '英文页面显示这句；中文说明留空时，中文页面也显示它。不会自动翻译。',
 } as const
 
-// The category picker (DESIGN §7 admin is Chinese): each stored English name with its zh label,
-// the same text as app.categories in zh.json (a unit test keeps them equal).
+// The category picker (DESIGN §7 admin is Chinese). Categories themselves are managed in
+// 分类管理 on the same page (T75).
 export const categoryCopy = {
   label: '分类',
   placeholder: '请选择分类',
-  newOption: '新分类…',
-  newLabel: '新分类的英文名（存进数据库，页面按英文名显示，中文名要另加到 zh.json）',
-  offList: (stored: string) => `「${stored}」不是六个固定分类之一，Create 页会多出一个分类标签。确认是新分类再保存。`,
-  zh: {
-    'Food & Drink': '餐饮',
-    'Products & Resale': '商品与二手',
-    'Beauty & Skincare': '美妆护肤',
-    'Rooms & Spaces': '房间与空间',
-    Pets: '宠物',
-    'Art Styles': '画风',
-  },
+  hint: '要新增分类或改名，在本页上方的「分类管理」里改。',
+  systemHint: '内置模板的系统分类，不能更改。',
 } as const
 
 // Bulk 上架 / 下架 (T60).
@@ -55,4 +46,13 @@ export const bulkCopy = {
   unchanged: (active: boolean, count: number) => `${count} 个原本就已${active ? '上架' : '下架'}，没有改动`,
   skipped: (active: boolean, count: number) => `${count} 个没有${active ? '上架' : '下架'}，保持原状`,
   dismiss: '关闭',
+} as const
+
+// Drag-to-reorder and the arrows (T76).
+export const orderCopy = {
+  saved: '排序已保存',
+  failed: '顺序没保存，已退回原来的顺序。',
+  offline: '连不上服务器，请检查网络后重试。',
+  filtered: '清空搜索后可拖动排序',
+  dragHint: '按住左边的把手上下拖动调整顺序；手机上长按整行再拖。',
 } as const

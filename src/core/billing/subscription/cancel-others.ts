@@ -2,6 +2,7 @@ import 'server-only'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+import { notifyOwner } from '../../alerts'
 import { captureAlert } from '../../analytics/capture-error'
 import { logger } from '../../logger'
 import type { RpcClient } from '../rpc'
@@ -9,7 +10,7 @@ import type { StripeApi } from '../stripe/client'
 import { subscriptionState } from '../stripe/settle'
 import { writeSubscriptionState } from '../stripe/subscription-sync'
 import type { WaffoApi } from '../waffo/client'
-import { isoOf, mirrorState, syncWaffoSubscription } from '../waffo/subscription-sync'
+import { syncWaffoSubscription, type MirrorState } from '../waffo/subscription-sync'
 import { endedInStripe } from './cancel-all'
 import { readMirrorRows } from './read-summary'
 import { isLiveStatus, type MirrorRow } from './summary'
@@ -17,8 +18,12 @@ import { isLiveStatus, type MirrorRow } from './summary'
 // The upgrade's second half (ARCHITECTURE §6.2 「升级」, T66): once a higher membership is paid,
 // every OTHER subscription that would still renew is cancelled at once, in the same webhook
 // handling. Stripe (Managed Payments card and 中国银行卡 alike): cancel now, no proration, no
-// final invoice. Waffo: cancel-order (it never charges again). The mirror is written from the
-// answer straight away. A failed cancel is logged and alerted for the Owner to finish by hand;
+// final invoice. Waffo: cancel-order, which for an active order only stops renewal at the
+// period end (docs.waffo.ai "Cancel Subscription": "There is no immediate cancellation option");
+// for us the old plan ends at the upgrade all the same, so its mirror row is written `canceled`
+// with the upgrade time as its end (canceled is final in sync_waffo_subscription, so Waffo's own
+// canceling / canceled events cannot reopen it), and ended-order.ts refuses any later charge or
+// reactivation of that order. The mirror is written from the answer straight away. A failed cancel is logged and alerted for the Owner to finish by hand;
 // it never undoes the new plan and never fails the webhook (the payment is already granted).
 // Idempotent: a redelivered event finds the old rows ended (or Stripe answers "already ended").
 
@@ -34,6 +39,8 @@ export type CancelOthersDeps = {
 export type KeepSubscription = { stripeSubscriptionId?: string | null; waffoOrderId?: string | null }
 
 export type CancelOthersResult = { cancelled: number; failed: number }
+
+const ENDED_BY_UPGRADE: MirrorState = { status: 'canceled', cancelAtPeriodEnd: false }
 
 // What the payment webhooks are handed: cancelOtherSubscriptions bound to its clients. Never throws.
 export type CancelOthers = (userId: string, keep: KeepSubscription) => Promise<CancelOthersResult>
@@ -61,14 +68,16 @@ async function cancelStripe(deps: CancelOthersDeps, id: string): Promise<void> {
 
 async function cancelWaffo(deps: CancelOthersDeps, row: MirrorRow & { waffoOrderId: string }, userId: string): Promise<void> {
   const result = await deps.waffo().cancelSubscription(row.waffoOrderId)
+  const at = (deps.now ?? (() => new Date()))().toISOString()
   await syncWaffoSubscription(deps.admin, {
     userId,
     orderId: row.waffoOrderId,
     productId: row.productId,
-    state: mirrorState(result.status) ?? { status: 'active', cancelAtPeriodEnd: true },
-    periodEnd: isoOf(result.currentPeriodEnd),
-    eventAt: (deps.now ?? (() => new Date()))().toISOString(),
+    state: ENDED_BY_UPGRADE,
+    periodEnd: at,
+    eventAt: at,
   })
+  logger.info('waffo order ended by upgrade', { orderId: row.waffoOrderId, waffoStatus: result.status, waffoPeriodEnd: result.currentPeriodEnd ?? null })
 }
 
 async function cancelOne(deps: CancelOthersDeps, row: MirrorRow, userId: string): Promise<boolean> {
@@ -82,6 +91,7 @@ async function cancelOne(deps: CancelOthersDeps, row: MirrorRow, userId: string)
     const fields = { user_id: userId, provider: row.provider, subscription: ref, product_id: row.productId }
     logger.error('old subscription cancel after upgrade failed', { ...fields, error })
     captureAlert('subscription_cancel_failed', 'Upgrade paid but the old subscription was not cancelled: cancel it by hand', { fields })
+    notifyOwner({ kind: 'subscription_cancel_failed', userId, channel: row.provider, productId: row.productId, subscriptionRef: ref })
     return false
   }
 }
@@ -95,6 +105,7 @@ export async function cancelOtherSubscriptions(deps: CancelOthersDeps, userId: s
   } catch (error) {
     logger.error('upgrade: mirror read failed', { userId, error })
     captureAlert('subscription_cancel_failed', 'Upgrade paid but the old subscriptions could not be read: check by hand', { fields: { user_id: userId } })
+    notifyOwner({ kind: 'subscription_cancel_failed', userId, channel: null, productId: null, subscriptionRef: null })
     return { cancelled: 0, failed: 1 }
   }
   for (const row of rows) {

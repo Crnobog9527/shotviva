@@ -1,11 +1,10 @@
-import Link from 'next/link'
-
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/core/ui/table'
 
 import { formatBeijing } from '../shell/format'
 import { ORDERS_COPY as COPY } from './copy'
 import type { AdminSubscription } from './repository'
 import { stripeDashboardUrl } from './source'
+import { UserLink } from '../users-ui/user-link'
 
 const COLUMNS = ['email', 'product', 'status', 'periodEnd', 'cancel'] as const
 
@@ -39,9 +38,7 @@ export function SubscriptionsTable({ subscriptions, counts, stripeLive }: Props)
             {subscriptions.map((row) => (
               <TableRow key={row.id}>
                 <TableCell>
-                  <Link href={`/admin/users/${row.userId}`} className="text-primary hover:underline">
-                    {row.email ?? row.userId.slice(0, 8)}
-                  </Link>
+                  <UserLink userId={row.userId} title={row.email ?? row.userId} className="block max-w-44 truncate">{row.email ?? row.userId.slice(0, 8)}</UserLink>
                 </TableCell>
                 <TableCell className="font-mono text-xs">{row.productId}</TableCell>
                 <TableCell className="text-xs">{COPY.subStatus[row.status] ?? row.status}</TableCell>

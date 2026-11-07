@@ -5,6 +5,13 @@ export const COSTS_COPY = {
   title: '成本对账',
   intro: (days: number) =>
     `近 ${days} 天，每天 OpenAI 实际扣费和我们逐单记下的成本对比。按 UTC 自然日（北京时间早上 8 点换日），和 OpenAI 账单一致。打开页面时向 OpenAI 读取，缓存 1 小时；只读，不改任何数据。`,
+  // ARCHITECTURE §10.a 「成本对账说明」(T78): the two sides count different things.
+  scopeNote: [
+    '两边算的范围不一样：',
+    '「OpenAI 实际扣费」是这个 OpenAI 项目下的全部用量，测试站、本地开发只要用的是同一个项目的密钥，也会算进去。',
+    '「我们记录的成本」只算本站数据库里记下了成本的出图，正式站后台就只算正式站用户的出图。',
+    '所以测试多的日子差额会偏大，不一定是算错了。',
+  ],
   cards: {
     ours: '我们记录的成本',
     billed: 'OpenAI 实际扣费',
@@ -15,7 +22,9 @@ export const COSTS_COPY = {
       if (noUsage > 0) parts.push(`${noUsage} 单没有用量（T33 之前的老任务或超时）`)
       return parts.length ? `不含：${parts.join('；')}` : '每单都有成本'
     },
-    scope: (projectId: string | null) => (projectId ? `只算项目 ${projectId}` : '整个 OpenAI 组织（没填项目 ID）'),
+    scope: (projectId: string | null) =>
+      projectId ? `项目 ${projectId} 下的全部用量，含测试站和本地开发` : '整个 OpenAI 组织的全部用量（没填项目 ID），含测试站和本地开发',
+    oursScope: '只算本站数据库里的出图',
   },
   columns: { day: '日期（UTC）', billed: 'OpenAI 实际', ours: '我们记录', difference: '差额', costed: '有成本的单', missing: '算不出 / 无用量' },
   noKey: '还没有填 OpenAI 管理员密钥，下面只显示我们自己记录的成本。在下方填入密钥后即可对账。',

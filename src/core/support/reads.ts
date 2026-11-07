@@ -114,9 +114,12 @@ const paymentRow = z.object({
   product_id: z.string(),
   amount_total: z.number(),
   currency: z.string(),
-  // cn_card = 中国银行卡, the plain Stripe card route (T64).
-  method: z.enum(['card', 'alipay', 'cn_card']),
+  // cn_card = 中国银行卡, the plain Stripe card route (T64); wechat_pay since T73.
+  method: z.enum(['card', 'alipay', 'wechat_pay', 'cn_card']),
   created_at: z.string(),
+  channel: z.enum(['stripe', 'waffo']),
+  status: z.enum(['paid', 'refunded', 'partially_refunded', 'disputed']),
+  stripe_invoice_id: z.string().nullable(),
 })
 
 // The author's latest payments for the billing / refund picker and the account page's
@@ -124,7 +127,7 @@ const paymentRow = z.object({
 export async function listPaymentOptions(db: SupabaseClient, userId: string): Promise<PaymentOption[]> {
   const { data, error } = await db
     .from('payments')
-    .select('id, product_id, amount_total, currency, method, created_at')
+    .select('id, product_id, amount_total, currency, method, created_at, channel, status, stripe_invoice_id')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(PICKER_LIMIT)
@@ -136,6 +139,9 @@ export async function listPaymentOptions(db: SupabaseClient, userId: string): Pr
     currency: row.currency,
     method: row.method,
     createdAt: row.created_at,
+    channel: row.channel,
+    status: row.status,
+    hasInvoice: row.stripe_invoice_id !== null,
   }))
 }
 
@@ -148,19 +154,30 @@ const workRow = z.object({
 
 // The author's latest finished works for the image-issue picker, read with their own session
 // (generation_jobs_select_own) on generation_jobs_user_id_created_at_idx.
-export async function listWorkOptions(client: SupabaseClient, userId: string): Promise<WorkOption[]> {
-  const { data, error } = await client
-    .from('generation_jobs')
-    .select('id, template_id, created_at, templates(name)')
-    .eq('user_id', userId)
-    .eq('status', 'succeeded')
-    .is('deleted_at', null)
-    .order('created_at', { ascending: false })
-    .limit(PICKER_LIMIT)
-  if (error) readFailed('listWorkOptions', error)
-  return workRow.array().parse(data).map((row) => ({
-    id: row.id,
-    templateName: row.templates?.name ?? row.template_id,
-    createdAt: row.created_at,
-  }))
+const toWorkOption = (row: z.infer<typeof workRow>): WorkOption => ({
+  id: row.id,
+  templateName: row.templates?.name ?? row.template_id,
+  createdAt: row.created_at,
+})
+
+// `include`: a work sent along from its photo page (T78). When it is older than the latest
+// PICKER_LIMIT it is read by its primary key, in parallel, and listed first; someone else's or
+// a deleted one reads as missing and is left out.
+export async function listWorkOptions(client: SupabaseClient, userId: string, include: string | null = null): Promise<WorkOption[]> {
+  const works = () =>
+    client
+      .from('generation_jobs')
+      .select('id, template_id, created_at, templates(name)')
+      .eq('user_id', userId)
+      .eq('status', 'succeeded')
+      .is('deleted_at', null)
+  const [latest, extra] = await Promise.all([
+    works().order('created_at', { ascending: false }).limit(PICKER_LIMIT),
+    include ? works().eq('id', include).maybeSingle() : null,
+  ])
+  if (latest.error) readFailed('listWorkOptions', latest.error)
+  if (extra?.error) readFailed('listWorkOptions', extra.error)
+  const options = workRow.array().parse(latest.data).map(toWorkOption)
+  const own = extra?.data ? toWorkOption(workRow.parse(extra.data)) : null
+  return own && !options.some((option) => option.id === own.id) ? [own, ...options] : options
 }

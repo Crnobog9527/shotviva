@@ -1,0 +1,115 @@
+{
+ "cache_key": "cache_pages_views",
+ "is_cached": false,
+ "last_refresh": "2026-11-08T08:00:00.000000Z",
+ "next_allowed_client_refresh": "2026-11-08T08:01:00.000000Z",
+ "timezone": "UTC",
+ "columns": [
+  "path",
+  "views",
+  "views_prev",
+  "visitors",
+  "visitors_prev",
+  "avg_seconds",
+  "avg_scroll"
+ ],
+ "types": [
+  [
+   "path",
+   "String"
+  ],
+  [
+   "views",
+   "UInt64"
+  ],
+  [
+   "views_prev",
+   "UInt64"
+  ],
+  [
+   "visitors",
+   "UInt64"
+  ],
+  [
+   "visitors_prev",
+   "UInt64"
+  ],
+  [
+   "avg_seconds",
+   "Nullable(Float64)"
+  ],
+  [
+   "avg_scroll",
+   "Nullable(Float64)"
+  ]
+ ],
+ "results": [
+  [
+   "/",
+   1840,
+   1602,
+   1210,
+   1033,
+   41.2,
+   0.58
+  ],
+  [
+   "/zh",
+   622,
+   "590",
+   431,
+   402,
+   55.9,
+   0.64
+  ],
+  [
+   "/pricing",
+   410,
+   388,
+   301,
+   280,
+   72.5,
+   0.81
+  ],
+  [
+   "/generate/ramen-studio",
+   198,
+   0,
+   120,
+   0,
+   128.4,
+   0.92
+  ],
+  [
+   "/photos/:id",
+   95,
+   60,
+   40,
+   31,
+   null,
+   null
+  ],
+  [
+   "/ghost",
+   0,
+   0,
+   0,
+   0,
+   null,
+   null
+  ]
+ ],
+ "hasMore": false,
+ "limit": 100,
+ "offset": 0,
+ "modifiers": {
+  "personsOnEventsMode": "person_id_override_properties_joined"
+ },
+ "query_status": null,
+ "timings": [
+  {
+   "k": "./query",
+   "t": 0.21
+  }
+ ]
+}
