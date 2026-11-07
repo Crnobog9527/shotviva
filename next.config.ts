@@ -29,7 +29,12 @@ const nextConfig: NextConfig = {
   // Pages live under app/[locale]; an address matching no route at all has no root layout,
   // so app/global-not-found.tsx renders it (ARCHITECTURE §17).
   experimental: { globalNotFound: true },
-  partialPrefetching: true,
+  // Off for the site as a whole: with it on, every page's HTML also embeds a runtime prefetch
+  // of itself (a second copy of the page tree and of the client messages, about 40% of the
+  // marketing pages' HTML) and the server renders the page twice to produce it. The signed-in
+  // app opts back in per segment (app/[locale]/(app)/layout.tsx), where its instant
+  // navigations between tabs (T56) use it. Marketing links prefetch the cached page instead.
+  partialPrefetching: false,
   images: { remotePatterns: assetsRemotePatterns(assets.NEXT_PUBLIC_ASSETS_BASE_URL) },
   poweredByHeader: false,
   // PostHog's API paths end in a slash (/i/v0/e/); a trailing-slash redirect would break them.

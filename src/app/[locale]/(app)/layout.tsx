@@ -23,6 +23,9 @@ import { site } from '@/site/site.config'
 // Every page inside still calls requireUser() itself.
 export const metadata: Metadata = appShellMetadata()
 
+// Partial Prefetching for the app only (next.config.ts keeps it off for marketing pages).
+export const prefetch = 'partial'
+
 // Same cached session lookup the page's requireUser() makes, so no extra auth round trip.
 async function Identity() {
   const user = await getSessionUser()
