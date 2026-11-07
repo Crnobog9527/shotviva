@@ -42,9 +42,8 @@
       "field": "手机号",
       "placeholder": "11 位手机号",
       "hint": "仅支持中国大陆（+86）手机号，新号码会自动注册。",
-      "consent": "我已阅读并同意<privacy>隐私政策</privacy>，同意将我的手机号等个人信息传输到中国大陆以外处理（数据存放在美国，短信由短信服务商发送）。",
-      "send": "获取验证码",
-      "terms": "继续即表示你同意<terms>服务条款</terms>。"
+      "consent": "我已阅读并同意<terms>《服务条款》</terms><privacy>《隐私政策》</privacy><aup>《使用规范》</aup>，并同意将我的手机号等个人信息传输到中国大陆以外处理（数据存放在美国，短信由短信服务商发送）。",
+      "send": "获取验证码"
     },
     "code": {
       "field": "验证码",
@@ -168,7 +167,7 @@
       "AUTH_RATE_LIMITED": "尝试次数太多，请等一分钟再试。",
       "AUTH_WEAK_PASSWORD": "密码太简单了，请换一个更安全的。",
       "AUTH_PHONE_INVALID": "目前只支持中国大陆（+86）手机号。",
-      "AUTH_CONSENT_REQUIRED": "请先勾选同意隐私政策和个人信息出境。",
+      "AUTH_CONSENT_REQUIRED": "请先勾选同意服务条款、隐私政策、使用规范和个人信息出境。",
       "AUTH_SMS_COOLDOWN": "验证码刚发过，请 60 秒后再获取。",
       "AUTH_SMS_DAILY_LIMIT": "这个号码今天获取验证码的次数已用完，请明天再试，或改用邮箱。",
       "AUTH_SMS_FAILED": "短信没有发出去，请稍后再试，或改用邮箱。",
