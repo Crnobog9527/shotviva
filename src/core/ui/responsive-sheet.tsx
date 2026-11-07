@@ -13,18 +13,21 @@ type Props = {
   open: boolean
   onOpenChange(open: boolean): void
   title: string
-  description: string
+  description: ReactNode
   children: ReactNode
   // The paywall (DESIGN §4.5, comps-v3-b): a 920px dialog / a full-height drawer, with `aside`
   // beside the title from md up and `footer` fixed below the scrolling body.
   wide?: boolean
+  // Help & feedback (T68): a 640px dialog of fixed height (switching tabs never resizes it) / a
+  // full-height drawer. The body has no bottom padding, so a sticky footer can sit on its edge.
+  tall?: boolean
   aside?: ReactNode
   footer?: ReactNode
 }
 
 // shadcn's Responsive Dialog pattern (DESIGN §8.4): one component that is a bottom Drawer
 // below md and a centred Dialog from md up. Both return focus to the opener on close.
-export function ResponsiveSheet({ open, onOpenChange, title, description, children, wide = false, aside, footer }: Props) {
+export function ResponsiveSheet({ open, onOpenChange, title, description, children, wide = false, tall = false, aside, footer }: Props) {
   const desktop = useMediaQuery("(min-width: 768px)")
   if (desktop) {
     return (
@@ -34,10 +37,10 @@ export function ResponsiveSheet({ open, onOpenChange, title, description, childr
           <DialogPrimitive.Content
             className={cn(
               "dialog-motion shadow-sheet fixed top-1/2 left-1/2 z-100 flex -translate-1/2 flex-col rounded-panel bg-popover outline-none",
-              wide ? "max-h-[calc(100dvh-64px)] w-[min(920px,calc(100%-64px))]" : "max-h-[calc(100dvh-48px)] w-[min(480px,calc(100%-32px))]",
+              dialogSize(wide, tall),
             )}
           >
-            <div className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", wide ? "px-7 pt-6 pb-5" : "p-4 pt-6")}>
+            <div className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", wide ? "px-7 pt-6 pb-5" : tall ? "px-6 pt-6" : "p-4 pt-6")}>
               <SheetHeading title={title} description={description} aside={aside} Title={DialogPrimitive.Title} Description={DialogPrimitive.Description} />
               {children}
             </div>
@@ -50,8 +53,8 @@ export function ResponsiveSheet({ open, onOpenChange, title, description, childr
   }
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className={wide ? "h-[calc(100dvh-var(--sat)-12px)]" : undefined}>
-        <div className={cn("min-h-0 overflow-y-auto overscroll-contain px-4", wide ? "flex-1 pb-5" : "pb-[calc(var(--sab)+16px)]")}>
+      <DrawerContent className={wide || tall ? "h-[calc(100dvh-var(--sat)-12px)]" : undefined}>
+        <div className={cn("min-h-0 overflow-y-auto overscroll-contain px-4", wide ? "flex-1 pb-5" : tall ? "flex-1" : "pb-[calc(var(--sab)+16px)]")}>
           <SheetHeading title={title} description={description} aside={aside} Title={DrawerTitle} Description={DrawerDescription} />
           {children}
         </div>
@@ -62,9 +65,15 @@ export function ResponsiveSheet({ open, onOpenChange, title, description, childr
   )
 }
 
+function dialogSize(wide: boolean, tall: boolean): string {
+  if (wide) return "max-h-[calc(100dvh-64px)] w-[min(920px,calc(100%-64px))]"
+  if (tall) return "h-[min(760px,calc(100dvh-64px))] w-[min(640px,calc(100%-64px))]"
+  return "max-h-[calc(100dvh-48px)] w-[min(480px,calc(100%-32px))]"
+}
+
 type HeadingProps = {
   title: string
-  description: string
+  description: ReactNode
   aside: ReactNode
   Title: typeof DialogPrimitive.Title | typeof DrawerTitle
   Description: typeof DialogPrimitive.Description | typeof DrawerDescription

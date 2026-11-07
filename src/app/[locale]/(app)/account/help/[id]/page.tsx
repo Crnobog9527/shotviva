@@ -1,61 +1,11 @@
-import type { Metadata } from 'next'
-import { notFound } from 'next/navigation'
-import { getTranslations } from 'next-intl/server'
-import { Suspense } from 'react'
+import { redirect } from 'next/navigation'
 
-import { AppPage, FlowNav } from '@/core/app-shell'
-import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
-import { loadMyThread, markTicketSeen, ReplyTime } from '@/core/support'
-import { AddMessageForm, ThreadView } from '@/core/support/ui'
-import { site } from '@/site/site.config'
+import { localized } from '@/core/i18n/server'
+import { legacyHelpTarget } from '@/core/support/ui'
 
-import { addMessageAction } from '../actions'
-
-export async function generateMetadata(): Promise<Metadata> {
-  return { title: (await getTranslations('app.support'))('title') }
-}
-
-// "Thanks, we've got it" after sending, with the reply time for the user's tier.
-async function SentNotice({ userId }: { userId: string }) {
-  const t = await getTranslations('app.support')
-  return (
-    <p role="status" className="hairline-lit rounded-panel bg-card p-4 text-body">
-      {t('thread.sent')} <ReplyTime userId={userId} />
-    </p>
-  )
-}
-
-// Opening the ticket clears its dot: read through RLS (someone else's ticket is a 404) and mark
-// it seen in parallel; mark_ticket_seen only touches the author's own ticket.
-async function Thread({ params, searchParams }: PageProps<'/[locale]/account/help/[id]'>) {
-  const [{ id }, { sent }] = await Promise.all([params, searchParams])
-  const user = await requireUser(`/account/help/${id}`)
-  const [thread, t] = await Promise.all([
-    loadMyThread(await createServerSupabase(), id),
-    getTranslations('app.support'),
-    markTicketSeen(createAdminSupabase(), user.id, id),
-  ])
-  if (!thread) notFound()
-  return (
-    <>
-      <FlowNav back={{ href: '/account/help', label: t('title') }} title={t(`types.${thread.type}`)} />
-      <h1 className="px-4 pt-2 font-display text-h1 leading-tight">{t(`types.${thread.type}`)}</h1>
-      <ThreadView
-        thread={thread}
-        brand={site.brand.name}
-        notice={sent === '1' ? <SentNotice userId={user.id} /> : undefined}
-        form={<AddMessageForm send={addMessageAction.bind(null, thread.id)} closed={thread.status === 'closed'} />}
-      />
-    </>
-  )
-}
-
-export default function TicketPage(props: PageProps<'/[locale]/account/help/[id]'>) {
-  return (
-    <AppPage>
-      <Suspense>
-        <Thread {...props} />
-      </Suspense>
-    </AppPage>
-  )
+// The old ticket page: a deep link to that ticket in the dialog (T68). Whose ticket it is is
+// checked when the dialog reads it; a malformed id lands on My tickets.
+export default async function TicketPage({ params }: PageProps<'/[locale]/account/help/[id]'>) {
+  const { id } = await params
+  redirect(await localized(legacyHelpTarget(id)))
 }

@@ -1,7 +1,8 @@
-// What a ticket form's server action hands back. Creating redirects on success; adding a
-// message returns sentAt so the field can start empty. Codes match app.support.*.errors.
+// What a ticket form's server action hands back. Creating returns the new ticket's id (the
+// dialog opens it); both return sentAt so the field can start empty. Codes match
+// app.support.*.errors.
 export type FormError = 'RATE_LIMITED' | 'INVALID_INPUT' | 'NOT_FOUND' | 'generic'
-export type FormState = { error: FormError | null; sentAt?: number }
+export type FormState = { error: FormError | null; sentAt?: number; ticketId?: string }
 
 export const IDLE: FormState = { error: null }
 

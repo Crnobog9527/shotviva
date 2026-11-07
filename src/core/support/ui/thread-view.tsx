@@ -7,13 +7,13 @@ import { StatusChip } from './status-chip'
 
 type Props = { thread: TicketThread; brand: string; notice?: ReactNode; form: ReactNode }
 
-// One ticket: its state, the messages in order, then the field to add to it. The Owner's
-// messages carry the brand's name, the user's read "You".
+// One ticket inside the Help dialog: its state, the messages in order, then the field to add
+// to it. The Owner's messages carry the brand's name, the user's read "You".
 export function ThreadView({ thread, brand, notice, form }: Props) {
   const t = useTranslations('app.support')
   const format = useFormatter()
   return (
-    <div className="grid gap-4 px-4 pt-3 pb-16">
+    <div className="grid gap-4 pt-3 pb-[calc(var(--sab)+24px)] md:pb-6">
       <div className="flex items-center justify-between gap-3">
         <span className="font-mono text-caption text-muted-foreground">
           {t('opened', { date: new Date(thread.createdAt) })}
