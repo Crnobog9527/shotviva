@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 
 import { CheckoutCancelToast, PaywallProvider, PricingPayWith, PricingPlans } from '@/core/billing/paywall'
-import { StandingSlot } from '@/core/billing/subscription'
+import { StandingSlot } from '@/core/billing/standing'
 import { paymentChannel } from '@/core/billing/waffo'
 import { BusinessSection, CreditBuys, FaqSection, PricingHero } from '@/core/content'
 import { localizePath } from '@/core/i18n'

@@ -8,10 +8,9 @@ import { trackPaywallView } from "../../analytics/browser"
 import type { EventProps } from "../../analytics/events"
 import type { PaymentChannel, SiteProduct } from "../../config"
 import { offeredMethods } from "../stripe/catalog"
-import { NO_STANDING, type MemberStanding } from "../subscription/upgrade-rule"
+import { holdsMembership, NO_STANDING, type MemberStanding } from "../subscription/standing"
 import { PaymentChannelContext } from "./channel-context"
 import { StandingContext } from "./standing-context"
-import { openOptionsFor } from "./standing-pick"
 import { usePaywallState, type PaywallOpenOptions } from "./use-paywall-state"
 
 // The sheet (drawer, dialog, checkout flow) is a chunk of its own: a closed sheet renders nothing,
@@ -29,7 +28,7 @@ const PaywallContext = createContext<PaywallApi | null>(null)
 // ("Get credits", the balance chip, a plan on /pricing) opens the same sheet. Products come in
 // as props: core never imports the site config. `channel` is the server's PAYMENT_CHANNEL.
 // It also holds what the buyer already has (T66, fed by StandingSlot), so a member opens on a
-// plan they can actually buy.
+// plan they can actually buy; the rule that decides it is fetched only for members.
 type ProviderProps = { products: readonly SiteProduct[]; wishlistLive: boolean; channel: PaymentChannel; children: ReactNode }
 
 export function PaywallProvider({ products, wishlistLive, channel, children }: ProviderProps) {
@@ -41,10 +40,17 @@ export function PaywallProvider({ products, wishlistLive, channel, children }: P
   const api = useMemo<PaywallApi>(
     () => ({
       open(next, options) {
-        reset(openOptionsFor(options ?? {}, standing))
-        setTrigger(next)
-        setOpen(true)
-        trackPaywallView(next)
+        const show = (picked?: PaywallOpenOptions) => {
+          reset(picked)
+          setTrigger(next)
+          setOpen(true)
+          trackPaywallView(next)
+        }
+        if (!holdsMembership(standing)) return show(options)
+        void import("./standing-pick").then(
+          (rule) => show(rule.openOptionsFor(options ?? {}, standing)),
+          () => show(options),
+        )
       },
     }),
     [reset, standing],

@@ -7,11 +7,13 @@ import { getSessionUser } from '../../auth/session'
 import { createAdminSupabase } from '../../auth/supabase-admin'
 import { logger } from '../../logger'
 import { StandingFeed } from '../paywall/standing-context'
-import { readStanding } from './guard'
-import type { MemberStanding } from './upgrade-rule'
+import { readStanding } from '../subscription/guard'
+import type { MemberStanding } from '../subscription/standing'
 
 // The request-time hole that tells the paywall what the buyer holds (T66). Placed inside a
-// PaywallProvider; the page around it stays prerendered. Signed out, unverified, or a failed
+// PaywallProvider; the page around it stays prerendered. Its own entry, apart from
+// core/billing/subscription: that barrel carries the account page's Plan card and its client
+// pieces (the Waffo cancel sheet), which must not ride into the marketing pages' first load. Signed out, unverified, or a failed
 // read: nothing is sent, the cards read as for a new buyer, and checkout still refuses (409).
 async function standingOf(): Promise<MemberStanding | null> {
   try {

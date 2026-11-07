@@ -1,4 +1,7 @@
 import { MEMBERSHIP_TIERS, type MembershipTier, type ProductId } from '../../config'
+import type { MemberStanding } from './standing'
+
+export { NO_STANDING, type MemberStanding } from './standing'
 
 // Membership upgrades (Owner 2026-11-07, ARCHITECTURE §6.2 「升级」, T66): a membership is
 // discounted credits, so an upgrade is the higher plan bought at full price; nothing is
@@ -16,18 +19,6 @@ export function membershipRank(productId: ProductId): number {
 function tierRank(tier: MembershipTier): number {
   return MEMBERSHIP_TIERS.indexOf(tier)
 }
-
-// What the buyer holds right now.
-export type MemberStanding = {
-  // The highest-ranked subscription that may still bill (Stripe or Waffo mirror, any live
-  // status, cancelling ones too: their paid period is still running).
-  subscription: ProductId | null
-  // current_tier(): the tier of the latest membership purchase while paid_until runs. For a
-  // one-time period (Alipay, Waffo one-time) this is all there is; it carries no interval.
-  tier: MembershipTier | null
-}
-
-export const NO_STANDING: MemberStanding = { subscription: null, tier: null }
 
 // buy: no membership in the way (or a pack). upgrade: higher than what is held; on payment the
 // other renewing subscriptions are cancelled. blocked: equal or lower, 409 DOWNGRADE_NOT_ALLOWED.

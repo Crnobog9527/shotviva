@@ -11,8 +11,8 @@ import { packLooks, packOffers, tierOffers, yearlySavingPct, type Period, type T
 import { PackCard } from "./pack-card"
 import { usePaywall, type PaywallTrigger } from "./paywall-context"
 import { tierPerks } from "./perks"
-import { useStanding } from "./standing-context"
-import { planStanding, type PlanStanding } from "./standing-pick"
+import { usePlanReader } from "./standing-context"
+import type { PlanStanding } from "./standing-pick"
 import { TierCard } from "./tier-card"
 import { useMoney } from "./use-money"
 
@@ -27,7 +27,7 @@ const ghost = "w-full min-h-12 rounded-control"
 export function PricingPlans({ products, wishlistLive }: { products: readonly SiteProduct[]; wishlistLive: boolean }) {
   const t = useTranslations("paywall")
   const paywall = usePaywall()
-  const standing = useStanding()
+  const readPlan = usePlanReader()
   const [period, setPeriod] = useState<Period>("year")
   const offers = tierOffers(products)
   return (
@@ -35,7 +35,7 @@ export function PricingPlans({ products, wishlistLive }: { products: readonly Si
       <BillingToggle period={period} onChange={setPeriod} savePct={yearlySavingPct(offers)} className="mt-6 md:mt-8 md:w-[400px]" />
       <div className="mt-3 grid gap-2 md:mt-8 md:grid-cols-3 md:gap-4">
         {offers.map((offer) => {
-          const member = planStanding(standing, offer.tier, period)
+          const member = readPlan(offer.tier, period)
           return (
             <div key={offer.tier} data-tier={offer.tier} className="tier-shell">
               <TierCard
