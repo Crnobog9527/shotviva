@@ -1042,6 +1042,7 @@
     "tryTitle": "Three templates to try instead"
   },
   "marketing": {
+    "appDescription": "AI photo studio",
     "nav": {
       "label": "Main",
       "pricing": "Pricing",
