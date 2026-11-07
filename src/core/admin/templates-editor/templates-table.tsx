@@ -4,6 +4,7 @@ import { Checkbox } from '@/core/ui/checkbox'
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/core/ui/table'
 
 import type { AdminTemplate } from '../templates/types'
+import { SortableList } from '../ui/sortable'
 import { bulkCopy } from './copy'
 import { headerState } from './selection-state'
 import { TemplateRow, type RowHandlers } from './template-row'
@@ -15,9 +16,18 @@ export type TableSelection = {
   onSelectVisible: (on: boolean) => void
 }
 
-type Props = RowHandlers & { templates: AdminTemplate[]; selection: TableSelection }
+// Drag-to-reorder (T76): only on the full list, since sorting a search result would scramble
+// the rows it hides.
+export type TableOrder = {
+  onReorder: (ids: string[]) => Promise<void>
+  disabled: boolean
+  disabledHint?: string
+}
 
-export function TemplatesTable({ templates, selection, ...rowProps }: Props) {
+type Props = RowHandlers & { templates: AdminTemplate[]; selection: TableSelection; order: TableOrder }
+
+export function TemplatesTable({ templates, selection, order, ...rowProps }: Props) {
+  const byId = new Map(templates.map((template) => [template.id, template]))
   if (templates.length === 0) {
     return <p className="text-muted-foreground py-8 text-center text-sm">没有匹配的模板</p>
   }
@@ -47,19 +57,31 @@ export function TemplatesTable({ templates, selection, ...rowProps }: Props) {
           <TableHead className="text-right">操作</TableHead>
         </TableRow>
       </TableHeader>
-      <TableBody>
-        {templates.map((template, index) => (
-          <TemplateRow
-            key={template.id}
-            template={template}
-            index={index}
-            last={index === templates.length - 1}
-            checked={selection.selected.has(template.id)}
-            onSelect={selection.onSelect}
-            {...rowProps}
-          />
-        ))}
-      </TableBody>
+      <SortableList
+        ids={templates.map((template) => template.id)}
+        labelOf={(id) => byId.get(id)?.name ?? id}
+        onReorder={order.onReorder}
+        disabled={order.disabled}
+        disabledHint={order.disabledHint}
+      >
+        {(ids) => (
+          <TableBody>
+            {ids.map((id) => {
+              const template = byId.get(id)
+              if (!template) return null
+              return (
+                <TemplateRow
+                  key={id}
+                  template={template}
+                  checked={selection.selected.has(id)}
+                  onSelect={selection.onSelect}
+                  {...rowProps}
+                />
+              )
+            })}
+          </TableBody>
+        )}
+      </SortableList>
     </Table>
   )
 }

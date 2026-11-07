@@ -7,11 +7,11 @@ import { CREDITS_FLOOR } from '@/modules/image'
 
 import {
   applyCoverAction,
-  reorderTemplatesAction,
   setFeaturedTemplatesAction,
   requestCoverUploadAction,
   saveTemplateAction,
   setTemplateActiveAction,
+  setTemplateOrderAction,
   setTemplatesActiveAction,
 } from './actions'
 
@@ -41,7 +41,7 @@ export default async function AdminTemplatesPage() {
           save: saveTemplateAction,
           setActive: setTemplateActiveAction,
           setActiveMany: setTemplatesActiveAction,
-          reorder: reorderTemplatesAction,
+          setOrder: setTemplateOrderAction,
           setFeatured: setFeaturedTemplatesAction,
           requestCoverUpload: requestCoverUploadAction,
           applyCover: applyCoverAction,
