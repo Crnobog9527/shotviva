@@ -862,12 +862,12 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 - **付款**：中文页付款方式写「支付宝」，英文页写 "Alipay"（DESIGN §4.5）；Stripe Checkout 托管页传 `locale`（`en` / `zh`）。
 - **法律页**：只有英文（Owner 2026-11-06 晚）。以后要做中文版时，它是英文版的翻译，页首注明「本中文版本仅供参考，如与英文版本不一致，以英文版本为准」，律师审英文版。
 - **邮件**：见第 7 节，按 `user_metadata.locale` 发中文或英文。
-- **中文字体只用于标题（Owner 2026-11-07，T67）**：MiSans 只给标题和大字用（半粗 600 一档）；正文、按钮、导航、表单、说明等界面文字的中文一律用系统字体栈 `"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", sans-serif`（英文字体不变）。目的：大陆访问是跨境下载瓶颈（ITDOG 平均 3.85 秒），中文页首次字体下载从约 1 MB 降到约 265 KB；汇总 CSS 只声明 600 一档，体积随之变小，就能按下面「加载」放进 `<head>`，不再闪。下面关于文件和授权的规则不变（不改、不子集化官方分包）。
+- **中文字体只用于标题（Owner 2026-11-07，T67）**：MiSans 只给标题和大字用（400 一档，与现有标题字重一致；T67 实测 600 会让标题明显变粗）；正文、按钮、导航、表单、说明等界面文字的中文一律用系统字体栈 `"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", sans-serif`（英文字体不变）。目的：大陆访问是跨境下载瓶颈（ITDOG 平均 3.85 秒），中文页首次字体下载从约 1 MB 降到约 265 KB；汇总 CSS 只声明 400 一档，体积随之变小。下面关于文件和授权的规则不变（不改、不子集化官方分包）。
 - **字体：中文用小米 MiSans，照 Graylum 的做法移植**（Owner 2026-11-06；参考 `seo资料/全站中文字体.md`，以及 Graylum staging 分支的 `apps/web/public/fonts/misans/`、`src/components/misans-font.tsx`）：
   - **文件**：官方未修改的静态 WOFF2 分包（简体中文 + 拉丁，400 / 500 / 600，约 168 个文件、5.8 MB），放在 `public/fonts/misans/`。
     - 同目录保留 `manifest.json`（每个文件的来源、unicode-range、字节数、SHA-256）、汇总 CSS、`LICENSE.pdf`、`NOTICE.txt`、`README.md`。
     - 文件名用内容哈希，不重新生成，也不重新子集化。
-  - **加载**（Owner 2026-11-07 改，T65：原来 hydration 后再插入样式表，每次进中文页都会先用系统字体画一遍、再换成 MiSans，看起来闪一下，网速慢时更明显）：根布局在服务端直接把 `<link rel="stylesheet" href="/fonts/misans/misans-<hash>.css">` 写进 `<head>`（汇总 CSS 只有 `@font-face` 声明，几 KB），浏览器第一次排版时就知道要哪些分包、立刻开始下载；分包已在缓存时首屏直接用 MiSans，不再闪。系统字体 fallback 用 `size-adjust` / `ascent-override` 调到接近 MiSans 的字宽和行高，首次访问的切换尽量看不出来。
+  - **加载**（Owner 2026-11-07 改，T65：原来 hydration 后再插入样式表，每次进中文页都会先用系统字体画一遍、再换成 MiSans，看起来闪一下，网速慢时更明显）：服务端 HTML 里的一段内联脚本在首次内容绘制之后立刻插入 `<link rel="stylesheet" href="/fonts/misans/misans-<hash>.css">`（T67 实测：阻塞式 `<head>` 引用让 `/zh` 首帧慢约 0.15 s、CI Lighthouse 不过线，所以不用）。正文是系统字体，永远不换；标题回访时首帧后约 45 ms 换成 MiSans。系统字体 fallback 用 `size-adjust` / `ascent-override` 调到接近 MiSans 的字宽和行高，首次访问的切换尽量看不出来。
     - 汇总 CSS 里每个 `@font-face` 都带 `unicode-range` 和 `font-display: swap`。
     - 首屏先用系统字体，浏览器只下载页面上实际用到的分包。
     - 不预加载 woff2 分包（交给 unicode-range 按需取），不用 Google Fonts，也不用任何 CDN。
