@@ -52,6 +52,39 @@ describe('summarizeSubscription', () => {
     expect(summarize([row({ status: 'canceled', currentPeriodEnd: days(400) }), pastDue], days(5))).toMatchObject({ tier: 'pro', state: 'past_due' })
   })
 
+})
+
+describe('summarizeSubscription with several rows (T66)', () => {
+  // After an upgrade (T66) the old plan's row stays next to the new one. Codex's Waffo run
+  // (2026-11-07): old Starter cancelling, current Pro then cancelled by the member, both ending
+  // the same day; the card said "Starter cancelled". The current tier's row wins, on both
+  // providers, whatever the row order.
+  it.each(['stripe', 'waffo'] as const)('after an upgrade the card shows the current plan (%s)', (provider) => {
+    const ids = (n: string) => (provider === 'stripe' ? { stripeSubscriptionId: `sub_${n}`, waffoOrderId: null } : { stripeSubscriptionId: null, waffoOrderId: `ORD_${n}` })
+    const end = days(30)
+    const oldStarter = row({ provider, ...ids('starter'), productId: 'starter_monthly', currentPeriodEnd: end, cancelAtPeriodEnd: true })
+    const pro = row({ provider, ...ids('pro'), productId: 'pro_monthly', currentPeriodEnd: end })
+    const proCancelled = { ...pro, cancelAtPeriodEnd: true }
+    for (const rows of [[oldStarter, proCancelled], [proCancelled, oldStarter]]) {
+      expect(summarize(rows, end, 'pro')).toMatchObject({ provider, tier: 'pro', interval: 'month', state: 'cancels' })
+    }
+    // The old row still renewing (its cancel failed and is alerted): the card still shows Pro.
+    const oldRenewing = { ...oldStarter, cancelAtPeriodEnd: false }
+    expect(summarize([oldRenewing, proCancelled], end, 'pro')).toMatchObject({ tier: 'pro', state: 'cancels' })
+    expect(summarize([oldRenewing, pro], end, 'pro')).toMatchObject({ tier: 'pro', state: 'active' })
+    // Three plans deep (Starter → Pro → Max): Max.
+    const max = row({ provider, ...ids('max'), productId: 'max_yearly', currentPeriodEnd: days(365) })
+    expect(summarize([oldStarter, { ...proCancelled }, max], days(365), 'max')).toMatchObject({ tier: 'max', interval: 'year', state: 'active' })
+  })
+
+  it('without a current tier (paid_until run out), the renewing row, then the higher plan', () => {
+    const starter = row({ stripeSubscriptionId: 'sub_s', productId: 'starter_monthly', status: 'past_due', currentPeriodEnd: days(-1) })
+    const pro = row({ stripeSubscriptionId: 'sub_p', productId: 'pro_monthly', status: 'past_due', currentPeriodEnd: days(-1) })
+    expect(summarize([starter, pro], days(-1))).toMatchObject({ tier: 'pro', state: 'past_due', expired: true })
+  })
+})
+
+describe('summarizeSubscription, single states', () => {
   it('cancelled in the Portal: cancels at period end', () => {
     expect(summarize([row({ cancelAtPeriodEnd: true })], days(300))).toMatchObject({ kind: 'subscription', state: 'cancels', periodEnd: days(300) })
   })

@@ -3,6 +3,7 @@
 // the card is a server component.
 export { cancelAllSubscriptions } from './cancel-all'
 export { assertCanBuy, heldSubscription, readStanding } from './guard'
+export { refuseEndedOrder, type EndedOrderInput, type RefuseEnded } from './ended-order'
 export { cancelOtherSubscriptions, type CancelOthers, type CancelOthersDeps, type KeepSubscription } from './cancel-others'
 export { blockReason, membershipRank, NO_STANDING, purchaseVerdict, type BlockReason, type MemberStanding, type PurchaseVerdict } from './upgrade-rule'
 export { createPortalUrl } from './portal'
