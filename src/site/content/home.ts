@@ -149,7 +149,7 @@ export const homePage = defineHomePage({
     note: 'All template images are illustrative examples.',
   },
   facts: sharedFacts(),
-  factsIntro: `Many AI image to image tools redraw the whole picture. ${brand} templates are built to keep what you shot, the product, the dish, the room or the pet, and change only the look around it. These facts are the same on every page of this site.`,
+  factsIntro: `Most AI image to image tools hand you a new picture. What you wanted was your picture, only better: the same product, the same dish, the same room, with nicer light and a cleaner scene. That is what ${brand} is built for. The prices and sizes below are the same on every page of this site.`,
   freeOffer: {
     heading: 'Free Image to Image AI: What You Get',
     points: [
@@ -245,7 +245,7 @@ export const homePage = defineHomePage({
     },
   ],
   headings: {
-    facts: 'AI Image to Image: What Stays the Same',
+    facts: `Why Choose ${brand} for AI Image to Image`,
     faq: 'Image to Image AI FAQ',
     related: 'Image to Image AI for Food, Products, Rooms and More',
   },
