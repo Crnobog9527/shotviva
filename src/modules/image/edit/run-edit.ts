@@ -116,7 +116,7 @@ async function screenedDecision(deps: EditDeps, req: EditRequest, p: Prepared): 
   const slot = deps.classifier ? await takeJudgeSlot(deps.db, req.userId, null) : null
   if (slot?.status === 'limited') throw tooManyJudgeCalls()
   const decision = await classify(deps, p)
-  // The scope call never answered (error or its 3 s budget, §5.2): the edit goes through
+  // The scope call never answered (both 5 s attempts, or an error): the edit goes through
   // unscreened, counted like the workspace's fail-opens.
   if (slot && decision.confidence === null) {
     logger.warn(FAIL_OPEN_LOG, { provider: deps.classifier?.tag, entry: 'edit' })
