@@ -7,12 +7,13 @@ import { cn } from '@/core/ui/cn'
 import type { CatalogueToggle } from '../catalogue/catalogue-template'
 import type { ToggleValues } from './toggle-state'
 
-type Props = { toggles: readonly CatalogueToggle[]; values: ToggleValues; onRequest(key: string, on: boolean): void; compact?: boolean }
+// onPrepare: a row is about to be used (pointed at, focused), e.g. to fetch the confirm dialog.
+type Props = { toggles: readonly CatalogueToggle[]; values: ToggleValues; onRequest(key: string, on: boolean): void; onPrepare?(): void; compact?: boolean }
 
 // One row per toggle (DESIGN §4.3, under the text fields): the name and its one-line hint, a
 // switch on the right. The whole row is the 44px+ target; off until the user turns it on. Ids are
 // per instance: the home page mounts the phone card and the desktop bench at once.
-export function ToggleRows({ toggles, values, onRequest, compact = false }: Props) {
+export function ToggleRows({ toggles, values, onRequest, onPrepare, compact = false }: Props) {
   const idPrefix = useId()
   return (
     <div className={cn('grid', compact ? 'gap-2' : 'gap-3')}>
@@ -29,6 +30,8 @@ export function ToggleRows({ toggles, values, onRequest, compact = false }: Prop
             aria-labelledby={`${id}-label`}
             aria-describedby={hint ? `${id}-hint` : undefined}
             onClick={() => onRequest(toggle.key, !on)}
+            onPointerEnter={onPrepare}
+            onFocus={onPrepare}
             className={cn(
               'press flex w-full items-center gap-3 rounded-control bg-wash-faint text-left shadow-[inset_0_0_0_1px_var(--input)] transition-shadow focus-visible:shadow-[inset_0_0_0_1.5px_var(--primary),0_0_0_4px_var(--safelight-halo)] focus-visible:outline-none',
               compact ? 'min-h-11 px-3 py-2' : 'min-h-13 p-4',
