@@ -1,5 +1,7 @@
 import Link from 'next/link'
 
+import { disputeAdminPath } from '@/core/billing/stripe'
+
 import { EmptyState } from '../shell'
 import { DISPUTES_COPY as COPY } from '../disputes/copy'
 import { StatusBadge } from './status-badge'
@@ -12,7 +14,7 @@ function Card({ card }: { card: DisputeCard }) {
   return (
     <li>
       <Link
-        href={`/admin/disputes/${card.id}`}
+        href={disputeAdminPath(card.id)}
         className="grid gap-2 rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary/50 focus-visible:outline-2 focus-visible:outline-primary"
       >
         <div className="flex flex-wrap items-center gap-2">
