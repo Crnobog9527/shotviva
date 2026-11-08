@@ -4,6 +4,7 @@ import { CheckIcon } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 
 import { buttonVariants } from '../../ui/button'
+import { cn } from '../../ui/cn'
 import { ResponsiveSheet } from '../../ui/responsive-sheet'
 import type { InquiryPage } from '../rules'
 import type { InquiryCopy } from './copy'
@@ -54,7 +55,7 @@ function usePrefill(open: boolean, actions: InquiryDialogActions, fill: (start: 
 
 function Sent({ copy, onClose }: { copy: InquiryCopy; onClose(): void }) {
   return (
-    <div className="grid justify-items-center gap-8 pt-14 pb-8">
+    <div className="grid min-h-[min(440px,60dvh)] content-center justify-items-center gap-8 pt-6 pb-10">
       <span className="grid size-16 place-items-center rounded-full bg-success-tint text-success">
         <CheckIcon aria-hidden="true" className="size-8" strokeWidth={2.4} />
       </span>
@@ -62,7 +63,7 @@ function Sent({ copy, onClose }: { copy: InquiryCopy; onClose(): void }) {
       <p role="status" className="sr-only">
         {copy.success.title} {copy.success.body}
       </p>
-      <button type="button" onClick={onClose} className={buttonVariants({ variant: 'cta-neutral', size: 'cta' })}>
+      <button type="button" onClick={onClose} className={cn(buttonVariants({ variant: 'cta-neutral', size: 'cta' }), 'md:w-60')}>
         {copy.success.close}
       </button>
     </div>
