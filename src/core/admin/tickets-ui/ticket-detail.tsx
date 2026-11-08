@@ -35,7 +35,7 @@ export function TicketDetailView({ ticket, user, jobRef, stripeLive, actions }: 
       <UserSummary ticket={ticket} user={user} />
       {jobRef ? <AttachedWork jobRef={jobRef} /> : null}
       <Thread ticket={ticket} />
-      <Attached ticket={ticket} stripeLive={stripeLive} decide={actions.decide} />
+      <Attached ticket={ticket} stripeLive={stripeLive} actions={actions} />
       <ReplyForm ticketId={ticket.id} closed={ticket.status === 'closed'} reply={actions.reply} />
     </div>
   )
@@ -104,14 +104,21 @@ function Thread({ ticket }: { ticket: AdminTicket }) {
   )
 }
 
-function Attached({ ticket, stripeLive, decide }: { ticket: AdminTicket; stripeLive: boolean; decide: TicketAdminActions['decide'] }) {
+function Attached({ ticket, stripeLive, actions }: { ticket: AdminTicket; stripeLive: boolean; actions: TicketAdminActions }) {
   if (!ticket.payment) return null
   const decided = ticket.refundDecision ? { decision: ticket.refundDecision, amountCents: ticket.refundAmountCents } : null
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <PaymentFacts payment={ticket.payment} stripeLive={stripeLive} />
       {ticket.type === 'refund' && ticket.eligibility ? (
-        <RefundPanel ticketId={ticket.id} payment={ticket.payment} eligibility={ticket.eligibility} decided={decided} decide={decide} />
+        <RefundPanel
+          ticketId={ticket.id}
+          payment={ticket.payment}
+          eligibility={ticket.eligibility}
+          decided={decided}
+          decide={actions.decide}
+          clawback={actions.clawback}
+        />
       ) : null}
     </div>
   )

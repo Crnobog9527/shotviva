@@ -61,13 +61,15 @@ export type TicketAlert = {
 }
 
 // T66: an upgrade was paid but an old subscription would not cancel. productId null: the old
-// subscriptions could not even be read.
+// subscriptions could not even be read. T71: cause 'refund', a refunded membership's own
+// subscription would not cancel (absent: an upgrade).
 export type CancelFailedAlert = {
   kind: 'subscription_cancel_failed'
   userId: string
   channel: AlertChannel | null
   productId: string | null
   subscriptionRef: string | null
+  cause?: 'upgrade' | 'refund'
 }
 
 // Where on the site a server error happened, for 「网站报错异常」.

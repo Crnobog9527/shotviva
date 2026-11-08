@@ -109,6 +109,12 @@ describe('renderAlert: operations', () => {
     )
   })
 
+  it('a refunded membership whose subscription would not cancel (T71)', () => {
+    expect(text({ kind: 'subscription_cancel_failed', userId: USER, channel: 'waffo', productId: 'pro_monthly', subscriptionRef: 'ORD_1', cause: 'refund' })).toBe(
+      `【订阅没取消】j***@gmail.com 的 Pro 月付 已退款，但这笔的订阅没能自动取消，下个周期还会扣费，请到 Waffo 后台手动取消。\n去后台看：https://shotviva.com/admin/users/${USER}`,
+    )
+  })
+
   it('marks the test site, and puts no ids, codes or event names in the sentence', () => {
     const { sentence } = renderAlert(refund(), { ...ctx, origin: 'https://validation.example', testSite: true })
     expect(sentence.startsWith('（测试站）【退款】')).toBe(true)

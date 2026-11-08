@@ -111,7 +111,7 @@ export const USERS_COPY = {
   extras: {
     payments: (n: number) => `最近 ${n} 笔付款`,
     noPayments: '没有付款记录（T10 上线前的付款只在积分流水里）。',
-    paymentColumns: { createdAt: '时间', product: '商品', amount: '实付（含税）', tax: '税', refunded: '已退', method: '方式', status: '状态', link: '付款单号' },
+    paymentColumns: { createdAt: '时间', product: '商品', amount: '实付（含税）', tax: '税', refunded: '已退', credits: '积分扣回', method: '方式', status: '状态', link: '付款单号' },
     paymentStatus: { paid: '已付', refunded: '已退款', partially_refunded: '部分退款', disputed: '争议中' } as Record<string, string>,
     methods: { card: 'MP 卡', cn_card: '普通卡（中国银行卡）', alipay: '支付宝', wechat_pay: '微信支付' } as Record<string, string>,
     subscription: '订阅和档位',
@@ -145,7 +145,15 @@ export const USERS_COPY = {
   jobColumns: { createdAt: '时间', template: '模板', status: '状态', cost: '积分', pool: '池', error: '失败原因', actions: '操作' },
   ledgerColumns: { createdAt: '时间', pool: '池', kind: '类型', delta: '变动', balance: '变动后余额', reason: '原因' },
   pools: { free: '免费', paid: '付费' },
-  kinds: { grant: '赠送', reserve: '出图预扣', refund: '退回', purchase: '购买', admin_adjust: '后台调整' } as Record<string, string>,
+  kinds: {
+    grant: '赠送',
+    reserve: '出图预扣',
+    refund: '退回',
+    purchase: '购买',
+    admin_adjust: '后台调整',
+    clawback: '退款 / 拒付扣回',
+    clawback_restore: '拒付胜诉还回',
+  } as Record<string, string>,
   jobStatus: { running: '进行中', succeeded: '成功', failed: '失败' },
   jobDeletedByUser: '用户已删除',
   actions: {

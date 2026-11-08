@@ -5,7 +5,10 @@ import { LAST_UPDATED, contactSection, emailLink, entity, helpLink, legalLinks, 
 // Same rules as Graylum's refund policy (Owner 2026-11-05), rewritten for Shotviva's
 // products: no founder plans or upgrades, yearly credits issued at once, requests through Help &
 // feedback or by email, handled by hand in Stripe or Waffo (ARCHITECTURE §6.3, §10; T27 changed
-// only how to ask, Owner 2026-11-06). Differences are listed in the T19 PR.
+// only how to ask, Owner 2026-11-06). Differences are listed in the T19 PR. T71 (Owner
+// 2026-11-07, ARCHITECTURE §6.2): a refund takes the purchase's credits back automatically, a
+// membership refund ends the membership and its renewal, partly used purchases can be refunded
+// pro rata after review, and a dispute takes the credits back until it is decided for us.
 export const refundPolicyPage = defineLegalPage({
   path: legalLinks.refunds.href,
   title: `Refund Policy | ${entity.site}`,
@@ -29,7 +32,8 @@ export const refundPolicyPage = defineLegalPage({
             'None of the credits from that purchase have been used. This means that, since that payment, your account has not used any credits at all, including credits you had before and free credits we gave you.',
           ],
         },
-        'Yearly plans: all of the credits for the year are added when you pay. If a refund is approved, all credits from that purchase are removed from your account.',
+        'When a purchase is refunded, the credits it added are removed from your account automatically. Yearly plans: all of the credits for the year are added when you pay, so a refund removes all of them.',
+        'A refunded membership ends right away, and if it renews automatically, the subscription is cancelled at the same time; nothing more is charged for it. Membership time from your other purchases still counts.',
         'Membership bought with Alipay: this is a single payment for one period and does not renew. The same seven-day, no-credits-used rule applies.',
       ],
     },
@@ -45,6 +49,7 @@ export const refundPolicyPage = defineLegalPage({
             'The rest of a subscription period after you cancel. When you cancel, the subscription stops renewing at the end of the current period, and no part of the period is refunded. Credits you already have stay on your account.',
           ],
         },
+        'In exceptional cases we may, at our discretion, refund part of a purchase whose credits have been partly used. If we do, we first remove the paid credits from that purchase that are still on your account, and then refund the share of the price that matches them.',
       ],
     },
     {
@@ -66,7 +71,7 @@ export const refundPolicyPage = defineLegalPage({
       heading: 'Card payments sold by Link',
       blocks: [
         `Card, Apple Pay and Google Pay purchases may be sold to you by Link (part of Stripe) as the merchant of record. Checkout tells you when this is the case, and your card statement then shows "LINK.COM* ${entity.site.toUpperCase()}".`,
-        `For these purchases you can ask us for a refund under this policy, or contact Link directly. Link handles refunds under its own terms, which may give you more than this policy does. If Link refunds a purchase, we remove the credits that purchase added to your account.`,
+        `For these purchases you can ask us for a refund under this policy, or contact Link directly. Link handles refunds under its own terms, which may give you more than this policy does. If Link refunds a purchase, we remove the credits that purchase added to your account, as far as you still have them.`,
       ],
     },
     {
@@ -107,6 +112,7 @@ export const refundPolicyPage = defineLegalPage({
           emailLink,
           ' first so we can look into it quickly, before you open a dispute with your bank.',
         ],
+        'If you open a dispute or chargeback, the credits from that purchase are removed from your account while it is open. If the dispute is decided in our favour, they are returned; if it is decided in yours, they stay removed.',
       ],
     },
     contactSection('this Refund Policy'),

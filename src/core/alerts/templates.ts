@@ -180,7 +180,9 @@ function ticket(alert: TicketAlert, who: string): Rendered {
 
 function cancelFailed(alert: CancelFailedAlert, who: string): Rendered {
   const where = alert.channel ? CHANNELS[alert.channel] : '付款'
-  const line = alert.productId
+  const line = alert.cause === 'refund'
+    ? `【订阅没取消】${who} 的 ${productName(alert.productId)} 已退款，但这笔的订阅没能自动取消，下个周期还会扣费，请到 ${where} 后台手动取消。`
+    : alert.productId
     ? `【旧订阅没取消】${who} 升级后，原来的 ${productName(alert.productId)} 订阅没能自动取消，下个周期还会扣费，请到 ${where} 后台手动取消。`
     : `【旧订阅没取消】${who} 升级付款成功了，但系统没读到原来的订阅，请到后台确认有没有要手动取消的。`
   return { line, path: `/admin/users/${alert.userId}` }

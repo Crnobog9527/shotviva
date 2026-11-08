@@ -117,10 +117,12 @@ const paymentRow = z.object({
   method: z.string(),
   status: z.string(),
   created_at: z.string(),
+  credits_clawed_back: z.number(),
+  clawback_shortfall: z.number(),
 })
 
 const PAYMENT_COLUMNS =
-  'id, product_id, channel, stripe_session_id, stripe_invoice_id, stripe_charge_id, waffo_order_id, waffo_payment_id, amount_total, amount_tax, amount_refunded, currency, method, status, created_at'
+  'id, product_id, channel, stripe_session_id, stripe_invoice_id, stripe_charge_id, waffo_order_id, waffo_payment_id, amount_total, amount_tax, amount_refunded, currency, method, status, created_at, credits_clawed_back, clawback_shortfall'
 
 function toPayment(row: z.infer<typeof paymentRow>): AdminPayment {
   return {
@@ -139,6 +141,8 @@ function toPayment(row: z.infer<typeof paymentRow>): AdminPayment {
     method: row.method,
     status: row.status,
     createdAt: row.created_at,
+    creditsClawedBack: row.credits_clawed_back,
+    clawbackShortfall: row.clawback_shortfall,
   }
 }
 

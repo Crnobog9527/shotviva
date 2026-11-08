@@ -1,5 +1,6 @@
 import type { AdminPayment, RefundEligibility } from '@/core/support'
 
+import { ClawbackButton, ClawbackStatus } from '../clawback-ui'
 import { stripeDashboardUrl } from '../orders/source'
 import { formatBeijing } from '../shell/format'
 import { TICKETS_COPY as COPY } from './copy'
@@ -69,10 +70,11 @@ type PanelProps = {
   eligibility: RefundEligibility
   decided: { decision: 'approved' | 'rejected'; amountCents: number | null } | null
   decide: TicketAdminActions['decide']
+  clawback?: TicketAdminActions['clawback']
 }
 
 // The three policy checks as hints, the suggested amount, and the decision (ARCHITECTURE §10).
-export function RefundPanel({ ticketId, payment, eligibility, decided, decide }: PanelProps) {
+export function RefundPanel({ ticketId, payment, eligibility, decided, decide, clawback }: PanelProps) {
   const checks = [
     [COPY.refund.checks.firstPurchase, eligibility.firstPurchase],
     [COPY.refund.checks.within7Days, eligibility.within7Days],
@@ -99,6 +101,14 @@ export function RefundPanel({ ticketId, payment, eligibility, decided, decide }:
       )}
       <RefundDecisionForm ticketId={ticketId} suggestedCents={eligibility.suggestedCents} decide={decide} />
       <p className="text-xs text-muted-foreground">{COPY.refund.afterApprove}</p>
+      <div className="grid gap-2 border-t border-border pt-3 text-sm">
+        <p className="flex flex-wrap items-center gap-2">
+          {COPY.refund.clawbackLabel}
+          <ClawbackStatus clawedBack={payment.creditsClawedBack} shortfall={payment.clawbackShortfall} />
+        </p>
+        <p className="text-xs text-muted-foreground">{COPY.refund.clawbackHint}</p>
+        {clawback ? <ClawbackButton paymentId={payment.id} actions={clawback} /> : null}
+      </div>
     </section>
   )
 }

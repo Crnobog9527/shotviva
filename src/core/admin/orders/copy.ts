@@ -1,7 +1,7 @@
 // /admin/orders copy (DESIGN §7: Chinese only, kept out of site/messages).
 export const ORDERS_COPY = {
   title: '订单与收入',
-  priceNote: '收入为净额：实付减去税（Managed Payments 代扣）再减去已退款。付款记录显示实付金额（含税）。退款和争议在 Stripe 后台处理，这里只显示状态。T10 上线前的付款不在其中。',
+  priceNote: '收入为净额：实付减去税（Managed Payments 代扣）再减去已退款。付款记录显示实付金额（含税）。退款和争议在 Stripe 后台处理；退款、拒付回调会自动扣回这笔发放的积分，「积分扣回」列显示已扣回和欠扣。用过积分要按比例退款的，先点「扣回剩余积分」再去退款。T10 上线前的付款不在其中。',
   windows: { today: '今日', '7d': '近 7 天', period: (days: number) => `近 ${days} 天` },
   revenue: '收入（净额）',
   purchases: (n: number) => `${n} 笔付款`,
@@ -13,6 +13,7 @@ export const ORDERS_COPY = {
     amount: '实付（含税）',
     tax: '税',
     refunded: '已退',
+    credits: '积分扣回',
     method: '付款方式',
     form: '类型',
     channel: '渠道',

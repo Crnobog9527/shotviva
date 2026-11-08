@@ -37,12 +37,14 @@ const paymentRow = z.object({
   currency: z.string(),
   method: z.string(),
   status: z.string(),
+  credits_clawed_back: z.number(),
+  clawback_shortfall: z.number(),
 })
 
 export async function userPayments(db: SupabaseClient, userId: string): Promise<UserPayment[]> {
   const { data, error } = await db
     .from('payments')
-    .select('id, created_at, product_id, channel, stripe_session_id, stripe_invoice_id, stripe_charge_id, waffo_order_id, amount_total, amount_tax, amount_refunded, currency, method, status')
+    .select('id, created_at, product_id, channel, stripe_session_id, stripe_invoice_id, stripe_charge_id, waffo_order_id, amount_total, amount_tax, amount_refunded, currency, method, status, credits_clawed_back, clawback_shortfall')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(DETAIL_ROWS)
@@ -61,6 +63,8 @@ export async function userPayments(db: SupabaseClient, userId: string): Promise<
     currency: row.currency,
     method: row.method,
     status: row.status,
+    creditsClawedBack: row.credits_clawed_back,
+    clawbackShortfall: row.clawback_shortfall,
   }))
 }
 

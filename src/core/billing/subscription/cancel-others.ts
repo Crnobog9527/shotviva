@@ -80,18 +80,26 @@ async function cancelWaffo(deps: CancelOthersDeps, row: MirrorRow & { waffoOrder
   logger.info('waffo order ended by upgrade', { orderId: row.waffoOrderId, waffoStatus: result.status, waffoPeriodEnd: result.currentPeriodEnd ?? null })
 }
 
-async function cancelOne(deps: CancelOthersDeps, row: MirrorRow, userId: string): Promise<boolean> {
+// Why a subscription is cut short: an upgrade replaced it, or its payment was refunded (T71).
+export type CancelCause = 'upgrade' | 'refund'
+
+const FAILED: Record<CancelCause, string> = {
+  upgrade: 'Upgrade paid but the old subscription was not cancelled: cancel it by hand',
+  refund: 'Membership refunded but its subscription was not cancelled: cancel it by hand',
+}
+
+async function cancelOne(deps: CancelOthersDeps, row: MirrorRow, userId: string, cause: CancelCause): Promise<boolean> {
   const ref = row.provider === 'stripe' ? row.stripeSubscriptionId : row.waffoOrderId
   try {
     if (row.provider === 'waffo' && row.waffoOrderId) await cancelWaffo(deps, { ...row, waffoOrderId: row.waffoOrderId }, userId)
     else if (row.stripeSubscriptionId) await cancelStripe(deps, row.stripeSubscriptionId)
-    logger.info('old subscription cancelled after upgrade', { userId, provider: row.provider, ref })
+    logger.info(`subscription cancelled after ${cause}`, { userId, provider: row.provider, ref })
     return true
   } catch (error) {
-    const fields = { user_id: userId, provider: row.provider, subscription: ref, product_id: row.productId }
-    logger.error('old subscription cancel after upgrade failed', { ...fields, error })
-    captureAlert('subscription_cancel_failed', 'Upgrade paid but the old subscription was not cancelled: cancel it by hand', { fields })
-    notifyOwner({ kind: 'subscription_cancel_failed', userId, channel: row.provider, productId: row.productId, subscriptionRef: ref })
+    const fields = { user_id: userId, provider: row.provider, subscription: ref, product_id: row.productId, cause }
+    logger.error(`subscription cancel after ${cause} failed`, { ...fields, error })
+    captureAlert('subscription_cancel_failed', FAILED[cause], { fields })
+    notifyOwner({ kind: 'subscription_cancel_failed', userId, channel: row.provider, productId: row.productId, subscriptionRef: ref, cause })
     return false
   }
 }
@@ -109,8 +117,36 @@ export async function cancelOtherSubscriptions(deps: CancelOthersDeps, userId: s
     return { cancelled: 0, failed: 1 }
   }
   for (const row of rows) {
-    if (await cancelOne(deps, row, userId)) result.cancelled += 1
+    if (await cancelOne(deps, row, userId, 'upgrade')) result.cancelled += 1
     else result.failed += 1
   }
   return result
+}
+
+// The subscription a refunded membership payment belongs to (ARCHITECTURE §6.2 「会员退款」, T71):
+// cancelled at once, no proration, the same way an upgrade ends the old one. Only that one: the
+// user's other memberships still count (their paid_until is kept). Nothing to do when it is not
+// renewing any more (already cancelling or ended), or for a one-time purchase (target empty).
+export type CancelRefunded = (userId: string, target: KeepSubscription) => Promise<'cancelled' | 'none' | 'failed'>
+
+const matches = (row: MirrorRow, target: KeepSubscription) =>
+  row.provider === 'stripe'
+    ? Boolean(target.stripeSubscriptionId) && row.stripeSubscriptionId === target.stripeSubscriptionId
+    : Boolean(target.waffoOrderId) && row.waffoOrderId === target.waffoOrderId
+
+export async function cancelRefundedSubscription(deps: CancelOthersDeps, userId: string, target: KeepSubscription): Promise<'cancelled' | 'none' | 'failed'> {
+  if (!target.stripeSubscriptionId && !target.waffoOrderId) return 'none'
+  let rows: MirrorRow[]
+  try {
+    rows = (await readMirrorRows(deps.admin, userId)).filter((row) => renewing(row, {}) && matches(row, target))
+  } catch (error) {
+    const ref = target.stripeSubscriptionId ?? target.waffoOrderId ?? null
+    logger.error('refund: mirror read failed', { userId, ref, error })
+    captureAlert('subscription_cancel_failed', FAILED.refund, { fields: { user_id: userId, subscription: ref, cause: 'refund' } })
+    notifyOwner({ kind: 'subscription_cancel_failed', userId, channel: target.stripeSubscriptionId ? 'stripe' : 'waffo', productId: null, subscriptionRef: ref, cause: 'refund' })
+    return 'failed'
+  }
+  let outcome: 'cancelled' | 'none' | 'failed' = 'none'
+  for (const row of rows) outcome = (await cancelOne(deps, row, userId, 'refund')) ? 'cancelled' : 'failed'
+  return outcome
 }

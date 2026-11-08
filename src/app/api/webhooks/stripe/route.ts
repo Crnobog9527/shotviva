@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { errorResponse } from '@/core/api-response'
 import { createAdminSupabase } from '@/core/auth'
 import { handleStripeWebhook, managedPaymentsEnabled, stripeClient, stripeWebhookSecret } from '@/core/billing/stripe'
-import { cancelOtherSubscriptions } from '@/core/billing/subscription'
+import { cancelOtherSubscriptions, cancelRefundedSubscription, type KeepSubscription } from '@/core/billing/subscription'
 import { waffoClient } from '@/core/billing/waffo'
 import { disputeEvidenceConfig } from '@/site/dispute-evidence'
 import { site } from '@/site/site.config'
@@ -16,14 +16,16 @@ export async function POST(request: NextRequest) {
   try {
     const stripe = stripeClient()
     const db = createAdminSupabase()
+    const cancelDeps = { admin: db, stripe: () => stripe, waffo: () => waffoClient() }
     deps = {
       stripe,
       db,
       products: site.billing.products,
       webhookSecret: stripeWebhookSecret(),
       // An upgrade cancels the old subscription, whichever channel bills it (T66).
-      cancelOthers: (userId: string, keep: { stripeSubscriptionId?: string | null }) =>
-        cancelOtherSubscriptions({ admin: db, stripe: () => stripe, waffo: () => waffoClient() }, userId, keep),
+      cancelOthers: (userId: string, keep: KeepSubscription) => cancelOtherSubscriptions(cancelDeps, userId, keep),
+      // A refunded membership's own subscription stops at once (T71).
+      cancelRefunded: (userId: string, target: KeepSubscription) => cancelRefundedSubscription(cancelDeps, userId, target),
       // A dispute stages its evidence draft and links the admin page (T82).
       evidence: disputeEvidenceConfig({ managedPayments: managedPaymentsEnabled() }),
     }
