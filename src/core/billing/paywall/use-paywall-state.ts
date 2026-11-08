@@ -18,8 +18,11 @@ export type PaywallChoice = { period: Period; pick: PaywallPick; method: Checkou
 // /pricing) keep their shape.
 export type PaywallOpenOptions = { step?: "tiers" | "period" | "packs"; period?: Period; tier?: MembershipTier; packId?: ProductId }
 
-// Yearly and Pro start selected, as in the comp: the recommended tier at its best rate.
-export const DEFAULT_CHOICE: PaywallChoice = { period: "year", pick: "pro", method: "card" }
+// Monthly and Pro start selected (DESIGN §4.5 「默认显示按月」, Owner 2026-11-08): opening on
+// Yearly let careless buyers read the yearly per-month price as the monthly one. The Yearly
+// segment keeps its "Save up to 40%" badge. A member holding a yearly plan still opens on
+// Yearly (standing-pick openOptionsFor).
+export const DEFAULT_CHOICE: PaywallChoice = { period: "month", pick: "pro", method: "card" }
 const DEFAULT_PACK: ProductId = "pack_m"
 
 export function isTierPick(pick: PaywallPick): pick is MembershipTier {

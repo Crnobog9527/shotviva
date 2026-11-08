@@ -23,6 +23,9 @@ const prefix = (locale: Locale, path: string) => (locale === 'en' ? path : path 
 // Markers ("from N credits") are filled from the live catalogue; check the text around them.
 const pieces = (text: string) => text.split(/⟦[^⟧]*⟧/).map((s) => s.trim()).filter((s) => s.length > 8)
 const usdText = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`
+// The plans render Monthly first (DESIGN §4.5 「默认显示按月」), so the static HTML carries the
+// monthly plan prices and the packs; the yearly totals appear once a visitor picks Yearly.
+const monthlyAndPackPrices = () => site.billing.products.filter((p) => p.interval !== 'year').map((p) => usdText(p.priceUsd))
 const faqStrings =(faq: readonly FaqItem[]) => ({
   'FAQ questions': faq.map((item) => item.question),
   'FAQ answers': faq.flatMap((item) => pieces(item.answer).slice(0, 1)),
@@ -47,7 +50,7 @@ function pages(): Expect[] {
       path: prefix(locale, '/pricing'),
       locale,
       h1: pricing.h1,
-      strings: { intro: pieces(pricing.intro).slice(0, 1), prices: site.billing.products.map((p) => usdText(p.priceUsd)), ...faqStrings(pricing.faq) },
+      strings: { intro: pieces(pricing.intro).slice(0, 1), prices: monthlyAndPackPrices(), ...faqStrings(pricing.faq) },
     })
     for (const page of contentPagesIn(locale)) {
       out.push({

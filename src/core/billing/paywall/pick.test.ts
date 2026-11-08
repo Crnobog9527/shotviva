@@ -11,20 +11,22 @@ const packs = packOffers(TEST_PRODUCTS)
 // The one-screen paywall (comps-v3-b paywall.html, T37): one pick among three tiers and three
 // packs, preselected by whoever opened it.
 describe('paywall pick', () => {
-  it('opens on Pro, Yearly, card by default', () => {
+  // Monthly first (DESIGN §4.5 「默认显示按月」): a yearly default read as the monthly price.
+  it('opens on Pro, Monthly, card by default', () => {
     expect(choiceFor()).toEqual(DEFAULT_CHOICE)
-    expect(DEFAULT_CHOICE).toEqual({ period: 'year', pick: 'pro', method: 'card' })
+    expect(DEFAULT_CHOICE).toEqual({ period: 'month', pick: 'pro', method: 'card' })
   })
 
   // zh pages on Stripe list 中国银行卡 first, so it starts selected there (T64).
   it('starts on the first method the page lists', () => {
-    expect(choiceFor({}, 'cn_card')).toEqual({ period: 'year', pick: 'pro', method: 'cn_card' })
+    expect(choiceFor({}, 'cn_card')).toEqual({ period: 'month', pick: 'pro', method: 'cn_card' })
     expect(choiceFor({ step: 'packs' }, 'cn_card')).toMatchObject({ pick: 'pack_m', method: 'cn_card' })
   })
 
   it('keeps the old entry points: a tier (account, batch rows, /pricing) or the packs', () => {
     expect(choiceFor({ step: 'period', tier: 'max' }).pick).toBe('max')
     expect(choiceFor({ tier: 'starter', period: 'month' })).toMatchObject({ pick: 'starter', period: 'month' })
+    expect(choiceFor({ tier: 'max', period: 'year' })).toMatchObject({ pick: 'max', period: 'year' })
     expect(choiceFor({ step: 'packs', packId: 'pack_l' }).pick).toBe('pack_l')
     expect(choiceFor({ step: 'packs' }).pick).toBe('pack_m')
     expect(choiceFor({ packId: 'pack_s' }).pick).toBe('pack_s')
