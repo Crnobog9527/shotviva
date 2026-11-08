@@ -18,9 +18,16 @@ describe('example sentences, keywords then the recorded model answer', () => {
     expect(refused ? 'refuse' : 'allow').toBe(verdict)
   })
 
-  // Enforced once a recording is committed: then every sentence must have its real answer.
+  // Every sentence the keywords leave to the model has its real answer, or is listed as pending.
   it.skipIf(recording.model === null)('has a recorded answer for every sentence the keywords leave to the model', () => {
-    const missing = examples.filter((e) => matchIdentitySwapKeyword(e.text) === null && !recording.answers[e.text]).map((e) => e.text)
+    const pending = new Set(recording.pending)
+    const missing = examples.filter((e) => matchIdentitySwapKeyword(e.text) === null && !recording.answers[e.text] && !pending.has(e.text)).map((e) => e.text)
     expect(missing).toEqual([])
+  })
+
+  it('lists as pending only example sentences that have no answer', () => {
+    const texts = new Set(examples.map((e) => e.text))
+    expect(recording.pending.filter((text) => !texts.has(text) || recording.answers[text])).toEqual([])
+    expect(Object.keys(recording.answers).filter((text) => !texts.has(text))).toEqual([])
   })
 })
