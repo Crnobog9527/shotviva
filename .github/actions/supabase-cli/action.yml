@@ -32,7 +32,7 @@ runs:
       uses: actions/cache@v4
       with:
         path: ~/.cache/supabase-cli/${{ steps.pin.outputs.version }}
-        key: supabase-cli-${{ runner.os }}-${{ runner.arch }}-${{ steps.pin.outputs.version }}-${{ steps.pin.outputs.sha256 }}
+        key: supabase-cli-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.pin.outputs.version }}-${{ steps.pin.outputs.sha256 }}
 
     - name: Download the CLI
       if: steps.cache.outputs.cache-hit != 'true'
@@ -50,7 +50,8 @@ runs:
           "$BASE_URL/v$VERSION/supabase_${VERSION}_linux_amd64.tar.gz" "$archive"
         echo "$SHA256  $archive" | sha256sum --check --strict
         mkdir -p "$DIR"
-        tar -xzf "$archive" -C "$DIR" supabase
+        # The whole tarball: `supabase` is a shim that runs `supabase-go` from the same directory.
+        tar -xzf "$archive" -C "$DIR"
         rm -f "$archive"
 
     - shell: bash
@@ -58,4 +59,6 @@ runs:
         DIR: ${{ steps.pin.outputs.dir }}
       run: |
         echo "$DIR" >> "$GITHUB_PATH"
+        # A broken install fails here, not later inside the `supabase start` retry loop.
+        [ -x "$DIR/supabase-go" ] || { echo "::error::supabase-go is missing from $DIR"; exit 1; }
         "$DIR/supabase" --version
