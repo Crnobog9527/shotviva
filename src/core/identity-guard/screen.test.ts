@@ -79,12 +79,20 @@ describe('screenIdentityText (ARCHITECTURE §5.1a)', () => {
     expect(track).not.toHaveBeenCalled()
   })
 
-  it('fails open when the model errors, hangs past the deadline or is not switched on', async () => {
-    for (const behaviour of ['fail', 'hang', null] as const) {
-      const { rpc, screen } = setup(behaviour)
+  it('fails open after two attempts when the model errors or hangs, and marks the call failed', async () => {
+    for (const behaviour of ['fail', 'hang'] as const) {
+      const { rpc, judge, screen } = setup(behaviour)
       expect(await screen('make her look like Taylor Swift')).toEqual({ usage: null })
+      expect(judge).toHaveBeenCalledTimes(2)
+      expect(rpc).toHaveBeenCalledWith('fail_identity_judge', { p_id: 7 })
       expect(refusalCalls(rpc)).toEqual([])
     }
+  })
+
+  it('lets the request through unscreened when no decision provider is on', async () => {
+    const { rpc, screen } = setup(null)
+    expect(await screen('make her look like Taylor Swift')).toEqual({ usage: null })
+    expect(rpc).not.toHaveBeenCalled()
   })
 
   it('makes no call when the user typed nothing', async () => {

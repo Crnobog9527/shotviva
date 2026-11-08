@@ -7,7 +7,7 @@ import { CopyText } from '@/core/ui/copy-text'
 import { Textarea } from '@/core/ui/textarea'
 
 import { toRecording } from '../identity-dry-run/recording'
-import type { DryRunResult } from '../identity-dry-run/types'
+import type { DryRunResult, JudgeStats } from '../identity-dry-run/types'
 import { DRY_RUN_COPY as COPY } from './copy'
 import { DryRunTable } from './results-table'
 import { summarize } from './summary'
@@ -41,8 +41,10 @@ function Results({ result }: { result: Done }) {
 
 // The face-swap dry run (ARCHITECTURE §5.1a, T81): lines in, the model's verdicts with latency
 // and tokens out, plus the JSON that examples.recorded.json takes. `run` is the server
-// action, which re-checks the admin role.
-export function IdentityDryRun({ run }: { run: (input: { text: string }) => Promise<DryRunResult> }) {
+// action, which re-checks the admin role; `stats` counts production's calls and fail-opens.
+type Props = { run: (input: { text: string }) => Promise<DryRunResult>; stats: JudgeStats | null }
+
+export function IdentityDryRun({ run, stats }: Props) {
   const [text, setText] = useState('')
   const [result, setResult] = useState<DryRunResult | null>(null)
   const [failed, setFailed] = useState(false)
@@ -63,6 +65,7 @@ export function IdentityDryRun({ run }: { run: (input: { text: string }) => Prom
         {COPY.title}
       </h2>
       <p className="text-sm text-muted-foreground">{COPY.intro}</p>
+      <p className="text-sm text-muted-foreground">{stats ? COPY.stats(stats.calls, stats.refused, stats.failedOpen) : COPY.statsUnavailable}</p>
       <Textarea value={text} onChange={(event) => setText(event.target.value)} placeholder={COPY.placeholder} rows={8} />
       <div className="flex items-center gap-3">
         <Button type="button" onClick={submit} disabled={pending || text.trim().length === 0}>

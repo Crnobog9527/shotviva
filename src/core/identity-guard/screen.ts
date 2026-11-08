@@ -4,8 +4,8 @@ import { AppError } from '../errors'
 import type { Locale } from '../i18n/locales'
 import { logger } from '../logger'
 import type { IdentityEntry, IdentityJudge, IdentityJudgeAnswer, IdentityJudgeUsage } from './judge'
-import { keepVerdict, takeJudgeSlot, textHash } from './judge-slots'
-import { IDENTITY_JUDGE_INSTRUCTIONS } from './question'
+import { IDENTITY_JUDGE_TIMEOUT_MS, JudgeFailure, judgeWithRetry } from './judge-call'
+import { FAIL_OPEN_LOG, keepVerdict, markJudgeFailed, takeJudgeSlot, textHash, type JudgeSlot } from './judge-slots'
 import { refuseIdentitySwap, type RefusalDeps } from './refuse'
 
 // ARCHITECTURE §5.1a for the workspace note, template text fields and the partner prompt: one
@@ -13,8 +13,6 @@ import { refuseIdentitySwap, type RefusalDeps } from './refuse'
 // model judges the intent in any language (question.ts). A judge that errors, times out or is
 // not switched on lets the request through and logs it, so generation never depends on the
 // decision model. Calls are capped per account and reuse a recent verdict (judge-slots.ts).
-
-export const IDENTITY_JUDGE_TIMEOUT_MS = 3_000
 
 export type ScreenDeps = RefusalDeps & { identityJudge?: IdentityJudge | null; identityJudgeTimeoutMs?: number }
 
@@ -30,30 +28,18 @@ export const userFields = (texts: ScreenInput['texts']): string[] => texts.map((
 // All of them, one per line: what the judge reads and the refusal row keeps.
 export const userText = (texts: ScreenInput['texts']): string => userFields(texts).join('\n')
 
-export async function judgeWithin(judge: IdentityJudge, text: string, ms: number): Promise<IdentityJudgeAnswer> {
-  const controller = new AbortController()
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const deadline = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => {
-      controller.abort()
-      reject(new Error(`identity judge exceeded ${ms}ms`))
-    }, ms)
-  })
-  try {
-    return await Promise.race([judge.judge({ text, instructions: IDENTITY_JUDGE_INSTRUCTIONS, signal: controller.signal }), deadline])
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
 export const tooManyJudgeCalls = () => new AppError('RATE_LIMITED', 'Too many requests checked in the last hour; try again later')
 
-async function ask(deps: ScreenDeps, judge: IdentityJudge, text: string, entry: IdentityEntry): Promise<IdentityJudgeAnswer | null> {
+// A failed call lets the request through (fail open). Each one is logged under one message and
+// marked on its slot row, so /admin/providers can count them (0705).
+async function ask(deps: ScreenDeps, judge: IdentityJudge, text: string, entry: IdentityEntry, slot: JudgeSlot): Promise<IdentityJudgeAnswer | null> {
   try {
-    return await judgeWithin(judge, text, deps.identityJudgeTimeoutMs ?? IDENTITY_JUDGE_TIMEOUT_MS)
+    return (await judgeWithRetry(judge, text, deps.identityJudgeTimeoutMs ?? IDENTITY_JUDGE_TIMEOUT_MS)).answer
   } catch (error) {
+    const attempts = error instanceof JudgeFailure ? error.attempts : 1
     // The error carries a status, a timeout or a parse failure, never the user's words.
-    logger.warn('identity judge failed; request allowed', { provider: judge.tag, entry, error })
+    logger.warn(FAIL_OPEN_LOG, { provider: judge.tag, entry, attempts, error })
+    await markJudgeFailed(deps.db, slot)
     return null
   }
 }
@@ -68,7 +54,7 @@ export async function screenIdentityText(deps: ScreenDeps, input: ScreenInput): 
   const slot = await takeJudgeSlot(deps.db, input.userId, textHash(text))
   if (slot.status === 'limited') throw tooManyJudgeCalls()
   if (slot.status === 'cached') return slot.identitySwap ? refuseIdentitySwap(deps, { ...refusal, method: 'model' }) : { usage: null }
-  const answer = await ask(deps, judge, text, input.entry)
+  const answer = await ask(deps, judge, text, input.entry, slot)
   if (!answer) return { usage: null }
   await keepVerdict(deps.db, slot, answer.identitySwap)
   if (answer.identitySwap) return refuseIdentitySwap(deps, { ...refusal, method: 'model', usage: answer.usage })

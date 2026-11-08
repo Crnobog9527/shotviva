@@ -30,7 +30,7 @@ describe('admin face-swap dry run (T81)', () => {
       // No keyword list any more: only the model decides.
       ['face swap us', false],
     ])
-    expect(result.rows[0]).toMatchObject({ inputTokens: 400, outputTokens: 6, error: null })
+    expect(result.rows[0]).toMatchObject({ inputTokens: 400, outputTokens: 6, attempts: 1, error: null })
     expect(fake.judge).toHaveBeenCalledTimes(3)
   })
 
@@ -45,7 +45,8 @@ describe('admin face-swap dry run (T81)', () => {
 
   it('shows a failed call or no provider as an error', async () => {
     const failed = await dryRunIdentityScreen(judge(() => new Error('openai responses 503')), { text: '换成夜景' }, now)
-    expect(failed.ok && failed.rows[0]).toMatchObject({ identitySwap: null, error: 'openai responses 503' })
+    // Production's retry: a 5xx is asked once more before it counts as failed.
+    expect(failed.ok && failed.rows[0]).toMatchObject({ identitySwap: null, attempts: 2, error: 'openai responses 503' })
     const none = await dryRunIdentityScreen(null, { text: 'deepfake my boss' }, now)
     expect(none.ok && none).toMatchObject({ model: null, rows: [{ identitySwap: null, error: 'no decision provider is on' }] })
   })

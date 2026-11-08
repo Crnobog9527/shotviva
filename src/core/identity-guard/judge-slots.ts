@@ -46,3 +46,14 @@ export async function keepVerdict(db: SupabaseClient, slot: JudgeSlot, identityS
   const { error } = await db.rpc('finish_identity_judge', { p_id: slot.id, p_identity_swap: identitySwap })
   if (error) logger.warn('identity judge verdict not kept', { error: new Error(error.message) })
 }
+
+// Every fail-open is logged under this one message, so the logs can be counted too.
+export const FAIL_OPEN_LOG = 'identity judge failed open'
+
+// Marks a call that never answered (both attempts failed), for the fail-open count on
+// /admin/providers (0705). Never throws.
+export async function markJudgeFailed(db: SupabaseClient, slot: JudgeSlot): Promise<void> {
+  if (slot.status !== 'call' || slot.id === null) return
+  const { error } = await db.rpc('fail_identity_judge', { p_id: slot.id })
+  if (error) logger.warn('identity judge failure not marked', { error: new Error(error.message) })
+}
