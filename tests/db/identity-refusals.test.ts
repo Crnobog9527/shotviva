@@ -4,7 +4,7 @@ import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import type { ServerTrack } from '@/core/analytics'
-import { identityRefusalCounts, type IdentityJudge } from '@/core/identity-guard'
+import { identityJudgeStats, identityRefusalCounts, type IdentityJudge } from '@/core/identity-guard'
 import { runGeneration, type GenerationRequest } from '@/core/jobs'
 import { handleGenerate, type FetchLike } from '@/core/partner'
 import { newInputKey } from '@/core/storage'
@@ -117,6 +117,19 @@ describe('workspace: note and text fields', () => {
   })
 
   // No keyword list (Owner 2026-11-08): without an answer from the model, even "face swap" passes.
+  it('marks a call that failed twice as failed open, and the admin stats count it', async () => {
+    const judge = fakeJudge('fail')
+    const { userId, run } = await webSetup(judge)
+    const before = await identityJudgeStats(serviceSupabase())
+    expect((await run({ note: '换成夜景' })).status).toBe('succeeded')
+    expect(judge.judge).toHaveBeenCalledTimes(2)
+    const { rows } = await db.query('select failed, identity_swap from public.identity_judge_calls where user_id = $1', [userId])
+    expect(rows).toEqual([{ failed: true, identity_swap: null }])
+    const after = await identityJudgeStats(serviceSupabase())
+    expect(after!.failedOpen - before!.failedOpen).toBeGreaterThanOrEqual(1)
+    expect(after!.calls - before!.calls).toBeGreaterThanOrEqual(1)
+  })
+
   it('lets the request through when the judge fails or is off', async () => {
     for (const judge of [fakeJudge('fail'), null]) {
       const { userId, run } = await webSetup(judge)

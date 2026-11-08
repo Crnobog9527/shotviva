@@ -1,13 +1,17 @@
 import 'server-only'
 
+import { IDENTITY_JUDGE_ATTEMPTS, IDENTITY_JUDGE_TIMEOUT_MS, isRetryable } from '@/core/identity-guard'
 import { logger } from '@/core/logger'
 import type { EditScope } from '@/core/templates'
 
 import type { ClassifierInput, ClassifierUsage, ScopeClassifier } from './classifier'
 
-// ARCHITECTURE §5.2: the classifier must not hold the edit up. Over 3 seconds, an error, or no
-// decision provider switched on all mean the fallback paragraph.
-export const CLASSIFIER_TIMEOUT_MS = 3_000
+// ARCHITECTURE §5.2: the classifier must not hold the edit up. It also answers the face-swap
+// question (§5.1a), so it gets the same deadline and retry as the workspace's judge: 5 seconds an
+// attempt, a second attempt after a timeout, a 5xx or a dropped connection (an edit already takes
+// about a minute). Both attempts failing, another error, or no decision provider switched on all
+// mean the fallback paragraph, and the edit goes through unscreened (fail open).
+export const CLASSIFIER_TIMEOUT_MS = IDENTITY_JUDGE_TIMEOUT_MS
 export const CONFIDENCE_THRESHOLD = 0.5
 
 export type EditClassification = {
@@ -41,6 +45,16 @@ async function withTimeout(classifier: ScopeClassifier, input: Omit<ClassifierIn
   }
 }
 
+async function withRetry(classifier: ScopeClassifier, input: Omit<ClassifierInput, 'signal'>, ms: number) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await withTimeout(classifier, input, ms)
+    } catch (error) {
+      if (attempt >= IDENTITY_JUDGE_ATTEMPTS || !isRetryable(error)) throw error
+    }
+  }
+}
+
 export async function classifyEditScope(
   classifier: ScopeClassifier | null,
   input: Omit<ClassifierInput, 'signal'>,
@@ -48,7 +62,7 @@ export async function classifyEditScope(
 ): Promise<EditClassification> {
   if (!classifier) return FALLBACK
   try {
-    const answer = await withTimeout(classifier, input, timeoutMs)
+    const answer = await withRetry(classifier, input, timeoutMs)
     const confidence = Math.round(answer.confidence * 10_000) / 10_000
     const scope = confidence >= CONFIDENCE_THRESHOLD ? answer.scope : 'fallback'
     return { scope, confidence, keep: answer.keep, change: answer.change, usage: answer.usage, identitySwap: answer.identitySwap }

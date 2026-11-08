@@ -28,3 +28,18 @@ export async function identityRefusalCounts(db: SupabaseClient, userIds: readonl
       .map((r) => [r.user_id, { total: r.total, last24h: r.last_24h, flagged: r.last_24h >= REFUSAL_FLAG_24H }]),
   )
 }
+
+// Production's decision calls over the last `hours` (0705, on identity_judge_calls_created_at_idx):
+// made, refused, and failed open (both attempts failed, the request went through). Null when the
+// read fails, so the providers page still opens.
+export type JudgeStats = { calls: number; refused: number; failedOpen: number }
+
+const statsRow = z.object({ calls: z.number().int(), refused: z.number().int(), failed_open: z.number().int() })
+
+export async function identityJudgeStats(db: SupabaseClient, hours = 24): Promise<JudgeStats | null> {
+  const { data, error } = await db.rpc('admin_identity_judge_stats', { p_hours: hours })
+  const row = statsRow.array().safeParse(data)
+  if (error || !row.success || !row.data[0]) return null
+  return { calls: row.data[0].calls, refused: row.data[0].refused, failedOpen: row.data[0].failed_open }
+}
+

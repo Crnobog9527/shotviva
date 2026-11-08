@@ -1158,6 +1158,21 @@ $$;
 ALTER FUNCTION "public"."admin_get_dispute"("p_dispute_id" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_identity_judge_stats"("p_hours" integer) RETURNS TABLE("calls" integer, "refused" integer, "failed_open" integer)
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select count(*)::integer as calls,
+         (count(*) filter (where c.identity_swap))::integer as refused,
+         (count(*) filter (where c.failed))::integer as failed_open
+    from public.identity_judge_calls c
+   where c.created_at > now() - make_interval(hours => least(greatest(coalesce(p_hours, 24), 1), 24))
+$$;
+
+
+ALTER FUNCTION "public"."admin_identity_judge_stats"("p_hours" integer) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) RETURNS TABLE("user_id" "uuid", "total" integer, "last_24h" integer)
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -3136,6 +3151,17 @@ $$;
 ALTER FUNCTION "public"."dispute_evidence_facts"("p_dispute_id" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."fail_identity_judge"("p_id" bigint) RETURNS "void"
+    LANGUAGE "sql"
+    SET "search_path" TO ''
+    AS $$
+  update public.identity_judge_calls set failed = true where id = p_id
+$$;
+
+
+ALTER FUNCTION "public"."fail_identity_judge"("p_id" bigint) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."finish_identity_judge"("p_id" bigint, "p_identity_swap" boolean) RETURNS "void"
     LANGUAGE "sql"
     SET "search_path" TO ''
@@ -4531,6 +4557,7 @@ CREATE TABLE IF NOT EXISTS "public"."identity_judge_calls" (
     "text_hash" "text",
     "identity_swap" boolean,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "failed" boolean DEFAULT false NOT NULL,
     CONSTRAINT "identity_judge_calls_text_hash_check" CHECK (("text_hash" ~ '^[0-9a-f]{64}$'::"text"))
 );
 
@@ -5704,6 +5731,11 @@ GRANT ALL ON FUNCTION "public"."admin_get_dispute"("p_dispute_id" "text") TO "se
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_identity_judge_stats"("p_hours" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_identity_judge_stats"("p_hours" integer) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) TO "service_role";
 
@@ -5918,6 +5950,11 @@ REVOKE ALL ON FUNCTION "public"."delete_provider_vault_secret"() FROM PUBLIC;
 
 REVOKE ALL ON FUNCTION "public"."dispute_evidence_facts"("p_dispute_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."dispute_evidence_facts"("p_dispute_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."fail_identity_judge"("p_id" bigint) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."fail_identity_judge"("p_id" bigint) TO "service_role";
 
 
 

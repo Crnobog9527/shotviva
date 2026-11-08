@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 
 import type { ServerTrack } from '@/core/analytics'
 import { AppError } from '@/core/errors'
-import { IDENTITY_EDIT_ADDENDUM, refuseIdentitySwap, takeJudgeSlot, tooManyJudgeCalls } from '@/core/identity-guard'
+import { FAIL_OPEN_LOG, IDENTITY_EDIT_ADDENDUM, markJudgeFailed, refuseIdentitySwap, takeJudgeSlot, tooManyJudgeCalls } from '@/core/identity-guard'
 import {
   accountLimits,
   assertWithinRateLimit,
@@ -113,8 +113,15 @@ async function classify(deps: EditDeps, p: Prepared): Promise<EditClassification
 // reserve_credits, so nothing is charged. The call counts against the account's hourly decision
 // calls like the workspace's (judge-slots.ts).
 async function screenedDecision(deps: EditDeps, req: EditRequest, p: Prepared): Promise<EditClassification> {
-  if (deps.classifier && (await takeJudgeSlot(deps.db, req.userId, null)).status === 'limited') throw tooManyJudgeCalls()
+  const slot = deps.classifier ? await takeJudgeSlot(deps.db, req.userId, null) : null
+  if (slot?.status === 'limited') throw tooManyJudgeCalls()
   const decision = await classify(deps, p)
+  // The scope call never answered (both 5 s attempts, or an error): the edit goes through
+  // unscreened, counted like the workspace's fail-opens.
+  if (slot && decision.confidence === null) {
+    logger.warn(FAIL_OPEN_LOG, { provider: deps.classifier?.tag, entry: 'edit' })
+    await markJudgeFailed(deps.db, slot)
+  }
   if (decision.identitySwap) {
     await refuseIdentitySwap(deps, { userId: req.userId, entry: 'edit', text: p.instruction, method: 'model', usage: decision.usage })
   }
