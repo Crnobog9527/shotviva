@@ -7,6 +7,7 @@ import { buttonVariants } from '@/core/ui/button'
 import { cn } from '@/core/ui/cn'
 
 import { DetailHead } from '../detail/detail-head'
+import { EditHint } from '../edit-ui/edit-hint'
 import { DetailPhoto } from '../detail/detail-photo'
 import { NoteQuote } from '../detail/note-quote'
 import { PhotoFacts } from '../detail/photo-facts'
@@ -100,9 +101,12 @@ function ProblemLink({ jobId }: { jobId: string }) {
 function QuietActions({ edit, again }: { edit: ReactNode; again: ReactNode }) {
   if (!edit && !again) return null
   return (
-    <div className={cn('grid gap-2', edit && again ? 'grid-cols-2' : null)}>
-      {edit}
-      {again}
+    <div className="grid gap-2">
+      <div className={cn('grid gap-2', edit && again ? 'grid-cols-2' : null)}>
+        {edit}
+        {again}
+      </div>
+      {edit ? <EditHint /> : null}
     </div>
   )
 }
