@@ -40,6 +40,7 @@ const creditBuys: CreditBuysBlock = {
   heading: 'What a credit buys',
   tiers: OUTPUT_TIERS.map((tier) => ({ name: tier.name, credits: tier.credits })),
   unit: 'credits',
+  unitOne: 'credit',
   note: `Per photo on most templates, at ${pixels.slice(0, -1).join(', ')} or ${pixels.at(-1)} px. Every size and shape costs the same at a given resolution.`,
 }
 
@@ -103,7 +104,7 @@ export const pricingPage: PricingContent = {
   path: '/pricing',
   label: 'Pricing',
   title: `${brand} Pricing: ${titlePrice}`,
-  description: `${brand} pricing: Starter, Pro and Max plans, monthly or yearly, plus one-time credit packs. New users get ${freeImagesLabel}. Credits never expire.`,
+  description: `${brand} pricing: Starter, Pro and Max plans, monthly or yearly, plus credit packs. New users get ${freeImagesLabel}. Credits never expire.`,
   h1: `${brand} Pricing: pay monthly, pay yearly, or buy credits once`,
   h1Em: 'or buy credits once',
   intro: `Every photo made with paid credits is private and watermark-free. A photo costs ${fromCredits}, depending on the template and whether you pick ${tierList}.${yearly}${packs}`,

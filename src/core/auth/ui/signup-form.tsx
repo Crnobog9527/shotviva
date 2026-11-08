@@ -20,8 +20,9 @@ type Props = {
   googleAction: FormAction
   resendAction: FormAction
   next: string
-  // The free Standard images of the sign-up gift, from site.config through the page.
-  freeImages: number
+  // The free Standard images of the sign-up gift at the catalogue's cheapest Standard price,
+  // through the page; `upTo` when templates cost different amounts (T91).
+  freeImages: { count: number; upTo: boolean }
   arrived?: ReactNode
   sender: string
   // Chinese pages only (T63): the 手机号 tab, shown first.
@@ -71,7 +72,7 @@ export function SignupForm({ action, googleAction, resendAction, next, freeImage
           <GiftGlyph />
         </span>
         <span>
-          <b>{t('signup.gift', { count: freeImages })}</b>
+          <b>{t('signup.gift', { count: freeImages.count, upTo: String(freeImages.upTo) })}</b>
           <span>{t('signup.giftNote')}</span>
         </span>
       </div>

@@ -4,7 +4,7 @@ import { site } from '../../site.config'
 import { productBills, shoot } from '../home'
 import { CATEGORY, homeImage } from '../landing-shared'
 import { pricingRelated } from '../shared'
-import { dayRateUsd, freeImagesLabel, fromCredits, OUTPUT_TIERS, packshotUsd, plansSentence, SET_PHOTOS, styledShotUsd, tierList, usdRange } from '../offer'
+import { dayRateUsd, freeImagesLabel, FreeImagesShort, fromCredits, OUTPUT_TIERS, packshotUsd, plansSentence, SET_PHOTOS, styledShotUsd, tierList, usdRange } from '../offer'
 import { PLATFORM_SPECS, px } from '../platform-specs'
 
 // /commercial-photography (建站规格 §4 第一批: "替代方案页 + 成本对比", keyword "commercial
@@ -21,7 +21,7 @@ export const commercialPhotography = defineContentPage({
   label: 'Commercial product photography',
   module: 'image',
   title: `Commercial Photography Without a Studio (2026) | ${brand}`,
-  description: `Commercial photography from one phone photo: listing shots, lifestyle scenes and promo posters, styled and retouched by a template. ${freeImagesLabel}.`,
+  description: `Commercial photography from one phone photo: listing shots, lifestyle scenes and promo posters, styled and retouched by a template. ${FreeImagesShort}.`,
   h1: 'Commercial Photography From a Phone Photo, No Studio Booked',
   subtitle: 'Listing shots, lifestyle scenes and promo posters from the product photo you already took.',
   answerBlock: `Commercial photography for a small brand usually means a studio day, a photographer and a retoucher. ${brand} does the same job from one phone photo: upload it, pick a template such as White Background or Lifestyle Table, and download a styled, retouched product shot in ${tierList}. New users get ${freeImagesLabel}.`,
@@ -66,7 +66,7 @@ export const commercialPhotography = defineContentPage({
     },
     {
       question: 'Do I own the photos?',
-      answer: `Yes. Photos made with paid credits are private, watermark-free and yours to use in listings, ads and social posts. The ${freeImagesLabel} are public with a watermark.`,
+      answer: `Yes. Photos made with paid credits are private, watermark-free and yours to use in listings, ads and social posts. Photos made with the free credits are public with a watermark.`,
     },
     {
       question: 'What should my phone photo look like?',
