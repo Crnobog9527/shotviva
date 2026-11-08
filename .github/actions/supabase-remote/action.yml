@@ -1,6 +1,6 @@
 name: Link a remote Supabase project
 description: >
-  Installs the pinned Supabase CLI and links the checkout to one remote project, so the
+  Installs the pinned Supabase CLI (./.github/actions/supabase-cli) and links the checkout to one remote project, so the
   caller's next steps can run `supabase db push` / `supabase migration list --linked`.
   The calling job sets SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD and SUPABASE_PROJECT_REF
   in its env (the CLI reads the first two itself); the inputs only name where each value
@@ -20,10 +20,9 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: supabase/setup-cli@v1
-      with:
-        # Same CLI as the local-database jobs, so remote and local agree on migration handling.
-        version: 2.107.0
+    # Same pinned CLI as the local-database job, so remote and local agree on migration
+    # handling; cached, and the download is retried on 5xx (T88).
+    - uses: ./.github/actions/supabase-cli
 
     - name: Check configuration
       shell: bash

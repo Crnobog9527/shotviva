@@ -1,0 +1,61 @@
+name: Install the Supabase CLI
+description: >
+  Puts the pinned Supabase CLI on PATH (T88). The binary is kept in the Actions cache, keyed on
+  the version and checksum, so most runs never download it; on a miss it comes from the CLI's
+  GitHub release through scripts/ci/retry.sh (5xx and timeouts are retried with backoff, up to
+  5 attempts) and must match the pinned SHA-256. Replaces supabase/setup-cli, whose one-shot
+  download failed jobs with HTTP 504. The caller has checked out the repo (for scripts/ci).
+  To bump the CLI, change VERSION and SHA256 below together (checksums.txt on the release, the
+  supabase_<version>_linux_amd64.tar.gz line) and regenerate supabase/schema.sql with it.
+
+outputs:
+  version:
+    description: The CLI version on PATH.
+    value: ${{ steps.pin.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - id: pin
+      shell: bash
+      run: |
+        VERSION=2.107.0
+        SHA256=ea233b337be698cee5bbca0795ee3e63b9dd154948c515c03cb72f191b3d103c
+        [ "$RUNNER_OS" = Linux ] && [ "$RUNNER_ARCH" = X64 ] || { echo "::error::Only linux/amd64 runners are supported"; exit 1; }
+        {
+          echo "version=$VERSION"
+          echo "sha256=$SHA256"
+          echo "dir=$HOME/.cache/supabase-cli/$VERSION"
+        } >> "$GITHUB_OUTPUT"
+
+    - id: cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/supabase-cli/${{ steps.pin.outputs.version }}
+        key: supabase-cli-${{ runner.os }}-${{ runner.arch }}-${{ steps.pin.outputs.version }}-${{ steps.pin.outputs.sha256 }}
+
+    - name: Download the CLI
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        VERSION: ${{ steps.pin.outputs.version }}
+        SHA256: ${{ steps.pin.outputs.sha256 }}
+        DIR: ${{ steps.pin.outputs.dir }}
+      run: |
+        # SUPABASE_CLI_BASE_URL (job env) exists only so the retry path can be exercised against
+        # a stand-in server; the checksum still has to match.
+        BASE_URL=${SUPABASE_CLI_BASE_URL:-https://github.com/supabase/cli/releases/download}
+        archive="$RUNNER_TEMP/supabase_${VERSION}_linux_amd64.tar.gz"
+        "$GITHUB_WORKSPACE/scripts/ci/retry.sh" "$GITHUB_WORKSPACE/scripts/ci/download.sh" \
+          "$BASE_URL/v$VERSION/supabase_${VERSION}_linux_amd64.tar.gz" "$archive"
+        echo "$SHA256  $archive" | sha256sum --check --strict
+        mkdir -p "$DIR"
+        tar -xzf "$archive" -C "$DIR" supabase
+        rm -f "$archive"
+
+    - shell: bash
+      env:
+        DIR: ${{ steps.pin.outputs.dir }}
+      run: |
+        echo "$DIR" >> "$GITHUB_PATH"
+        "$DIR/supabase" --version
