@@ -8,16 +8,11 @@
 #   scripts/ci/retry.sh scripts/ci/supabase-start.sh <services to exclude, comma separated>
 set -u
 
-# The Go CLI itself when the release ships it (2.107+: `supabase` is a wrapper around
-# `supabase-go`). Through the wrapper, CI runs sat idle for up to 95 s after the stack was up.
-cli=supabase
-command -v supabase-go > /dev/null && cli=supabase-go
-
 log=$(mktemp)
 began=$(date +%s)
-"$cli" start -x "${1:?services to exclude}" 2>&1 | tee "$log"
+supabase start -x "${1:?services to exclude}" 2>&1 | tee "$log"
 status=${PIPESTATUS[0]}
-echo "$cli start exited $status after $(( $(date +%s) - began ))s."
+echo "supabase start exited $status after $(( $(date +%s) - began ))s."
 if [ "$status" -eq 0 ]; then
   rm -f "$log"
   exit 0
@@ -25,6 +20,6 @@ fi
 permanent=false
 grep -q 'SQLSTATE' "$log" && permanent=true
 rm -f "$log"
-"$cli" stop --no-backup > /dev/null 2>&1 || true
+supabase stop --no-backup > /dev/null 2>&1 || true
 [ "$permanent" = true ] && exit 64
 exit 75

@@ -66,11 +66,18 @@ runs:
     - shell: bash
       env:
         DIR: ${{ steps.pin.outputs.dir }}
+        VERSION: ${{ steps.pin.outputs.version }}
       run: |
         echo "$DIR" >> "$GITHUB_PATH"
-        # The CLI asks api.github.com for its latest release after commands; when GitHub is slow
-        # that held one run for 93 s after `supabase start` had finished.
-        # Likewise its telemetry, which CI has no use for.
+        # After every command the Go CLI asks api.github.com for its latest release unless
+        # supabase/.temp/cli-latest is under 10 hours old, and no setting turns that off; on a
+        # slow GitHub it held runs for up to 104 s after `supabase start` was done. The pinned
+        # version is the latest we want, so record it as the answer.
+        if [ -d supabase ]; then
+          mkdir -p supabase/.temp
+          printf 'v%s' "$VERSION" > supabase/.temp/cli-latest
+        fi
+        # The wrapper's own release check and both layers' telemetry, which CI has no use for.
         {
           echo "SUPABASE_NO_UPDATE_NOTIFIER=1"
           echo "SUPABASE_TELEMETRY_DISABLED=1"
