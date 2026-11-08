@@ -38,6 +38,9 @@ export const CONTACT_SALES_PAGES = ['/pricing', '/zh/pricing'] as const
 export const TEMPLATE_VIEW_SURFACES = ['workspace', 'home_picker'] as const
 // T83 (ARCHITECTURE §5.1b): where a template was saved or unsaved.
 export const TEMPLATE_FAVORITE_SURFACES = ['create_card', 'create_dialog', 'home_picker'] as const
+// T90: the new-version banner, shown by a version check or by a stale-build failure.
+export const APP_UPDATE_ACTIONS = ['shown', 'refreshed', 'dismissed'] as const
+export const APP_UPDATE_REASONS = ['version', 'error'] as const
 export const UPLOAD_ERROR_REASONS = ['too_large', 'unsupported', 'ticket_failed', 'transfer_failed', 'unknown'] as const
 
 const checkoutProps = {
@@ -89,6 +92,7 @@ export const eventSchemas = {
   // T74: the buyer came back from the hosted checkout without paying (Stripe's cancel_url).
   checkout_cancel: z.strictObject({ product_id: z.enum(PRODUCT_IDS), method: z.enum(PAYMENT_METHODS) }),
   upload_error: z.strictObject({ reason: z.enum(UPLOAD_ERROR_REASONS) }),
+  app_update_prompt: z.strictObject({ action: z.enum(APP_UPDATE_ACTIONS), reason: z.enum(APP_UPDATE_REASONS) }),
   purchase: z.strictObject({
     ...checkoutProps,
     method: z.enum(PAYMENT_METHODS),
@@ -102,7 +106,7 @@ export type EventProps<E extends EventName> = z.infer<(typeof eventSchemas)[E]>
 
 // §16.2: money and credit events go out from the server so ad blockers cannot drop them.
 export const SERVER_EVENTS = ['signup', 'generate', 'generate_refused', 'checkout_start', 'checkout_cancel', 'purchase'] as const
-export const BROWSER_EVENTS = ['upload', 'upload_error', 'paywall_view', 'paywall_select', 'template_view', 'template_favorite', 'contact_sales_click'] as const
+export const BROWSER_EVENTS = ['upload', 'upload_error', 'paywall_view', 'paywall_select', 'template_view', 'template_favorite', 'contact_sales_click', 'app_update_prompt'] as const
 export type ServerEventName = (typeof SERVER_EVENTS)[number]
 export type BrowserEventName = (typeof BROWSER_EVENTS)[number]
 

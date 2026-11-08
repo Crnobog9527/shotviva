@@ -1050,6 +1050,13 @@
     "necessary": "Necessary only",
     "close": "Close cookie settings"
   },
+  "appUpdate": {
+    "label": "New version",
+    "body": "Shotviva has been updated. Refresh to keep going.",
+    "refresh": "Refresh",
+    "close": "Close",
+    "photosLost": "You'll need to upload your photos again."
+  },
   "notFound": {
     "title": "Page not found",
     "heading": "Nothing developed",

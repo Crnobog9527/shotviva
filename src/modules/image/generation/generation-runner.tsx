@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef } from 'react'
 
+import { useUpdateHold } from '@/core/app-update'
+
 import { pollRunning } from './job-store'
 import { isActive } from './scheduler'
 import { useJobs } from './use-jobs'
@@ -16,6 +18,8 @@ export function GenerationRunner() {
   const jobs = useJobs()
   const router = useRouter()
   const running = jobs.filter(isActive).length
+  // The new-version banner waits for this tab's photos to finish developing (T90).
+  useUpdateHold('generate', running > 0)
   const settled = jobs.length - running
   const seen = useRef(settled)
 

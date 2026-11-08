@@ -5,6 +5,7 @@ import { useLocale } from "next-intl"
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react"
 
 import { trackPaywallView } from "../../analytics/browser"
+import { useUpdateHold } from "../../app-update/holds"
 import type { EventProps } from "../../analytics/events"
 import type { PaymentChannel, SiteProduct } from "../../config"
 import { offeredMethods } from "../stripe/catalog"
@@ -34,6 +35,8 @@ type ProviderProps = { products: readonly SiteProduct[]; wishlistLive: boolean; 
 
 export function PaywallProvider({ products, wishlistLive, channel, wechatPay, children }: ProviderProps) {
   const [open, setOpen] = useState(false)
+  // The paywall is the start of a checkout: the new-version banner waits until it closes (T90).
+  useUpdateHold("checkout", open)
   const [trigger, setTrigger] = useState<PaywallTrigger>("account")
   const [standing, setStanding] = useState<MemberStanding>(NO_STANDING)
   const state = usePaywallState(offeredMethods(channel, useLocale())[0])
