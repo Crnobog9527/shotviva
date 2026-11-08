@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { useUpdateHold } from '@/core/app-update'
+
 import { summarize, takeBatch, uploadsToStart, type BatchPhoto } from './photo-batch'
 import { naturalSize, nearestRatio } from './photo-ratio'
 import { isAbort, UploadError, uploadPhoto } from '@/core/storage/upload'
@@ -56,6 +58,7 @@ export function usePhotoBatch(batchMax: number, kept?: KeptStart) {
     setEntries((list) => list.map((entry) => (entry.id === id ? { ...entry, ...change } : entry)))
   }, [])
   const cancel = useBatchUploads(entries, patch)
+  useBatchHolds(entries)
   useKeptRatios(entries, patch)
 
   const add = (files: readonly File[]) => {
@@ -124,4 +127,11 @@ function newEntry(file: File, patch: (id: string, change: Partial<Entry>) => voi
     .then(({ width, height }) => patch(id, { ratio: nearestRatio(width, height) }))
     .catch(() => undefined)
   return { id, file, url, bytes: file.size, ratio: null, upload: { phase: 'idle' } }
+}
+
+// The new-version banner (T90) waits while a photo uploads, and says a refresh drops the picked
+// photos: they live in this tab's memory only. Kept photos (Make again) come back with the URL.
+function useBatchHolds(entries: Entry[]) {
+  useUpdateHold('upload', entries.some((entry) => entry.upload.phase === 'compressing' || entry.upload.phase === 'uploading'))
+  useUpdateHold('photos', entries.some((entry) => entry.file !== null))
 }

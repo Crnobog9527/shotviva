@@ -1059,6 +1059,13 @@
     "necessary": "仅必要",
     "close": "关闭 Cookie 设置"
   },
+  "appUpdate": {
+    "label": "新版本提示",
+    "body": "Shotviva 已更新，刷新后继续使用",
+    "refresh": "刷新",
+    "close": "关闭",
+    "photosLost": "刷新后需要重新上传照片"
+  },
   "notFound": {
     "title": "页面不存在",
     "heading": "这一页",

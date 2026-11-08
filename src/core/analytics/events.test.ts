@@ -41,9 +41,11 @@ const valid: { [E in EventName]: unknown } = {
   paywall_select: { product_id: 'pro_yearly', method: 'cn_card' },
   checkout_cancel: { product_id: 'pack_m', method: 'alipay' },
   upload_error: { reason: 'transfer_failed' },
+  app_update_prompt: { action: 'shown', reason: 'version' },
 }
 
 const EVENT_NAMES = [
+      'app_update_prompt',
       'checkout_cancel',
       'checkout_start',
       'contact_sales_click',
@@ -61,7 +63,7 @@ const EVENT_NAMES = [
 ]
 
 describe('event dictionary (ARCHITECTURE §16.2)', () => {
-  it('covers exactly the fourteen named events', () => {
+  it('covers exactly the fifteen named events', () => {
     expect(Object.keys(eventSchemas).sort()).toEqual(EVENT_NAMES)
   })
 
@@ -116,6 +118,16 @@ describe('event dictionary (ARCHITECTURE §16.2)', () => {
     expect(validateEvent('checkout_start', { ...checkout, method: 'cn_card' }).ok).toBe(true)
     expect(validateEvent('purchase', { ...valid.purchase as object, method: 'cn_card' }).ok).toBe(true)
     expect(validateEvent('checkout_start', { ...checkout, method: 'wechat' }).ok).toBe(false)
+  })
+})
+
+describe('app_update_prompt (T90)', () => {
+  // T90: the new-version banner, enums only.
+  it('keeps app_update_prompt to its enums', () => {
+    expect(BROWSER_EVENTS).toContain('app_update_prompt')
+    expect(validateEvent('app_update_prompt', { action: 'refreshed', reason: 'error' }).ok).toBe(true)
+    expect(validateEvent('app_update_prompt', { action: 'clicked', reason: 'version' }).ok).toBe(false)
+    expect(validateEvent('app_update_prompt', { action: 'shown', reason: 'version', version: 'dpl_1' }).ok).toBe(false)
   })
 })
 
