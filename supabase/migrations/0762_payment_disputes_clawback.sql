@@ -1,5 +1,5 @@
 -- T71: a dispute's own share of the clawback, so a won dispute gives back exactly what it took
--- (charge.dispute.closed, close_payment_dispute 0529). credits_clawed_back / clawback_shortfall:
+-- (charge.dispute.closed, close_payment_dispute 0769). credits_clawed_back / clawback_shortfall:
 -- what open_payment_dispute took and wrote off for it; closed_status: Stripe's final status
 -- (won, lost, warning_closed …); credits_restored: what the win gave back.
 alter table public.payment_disputes

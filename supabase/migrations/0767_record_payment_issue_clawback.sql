@@ -8,7 +8,7 @@
 -- clawback ref is 'refund:<charge>:<that total>', so each new total settles once and a replay of
 -- it takes nothing. A membership refund (any amount) ends the membership
 -- (_end_membership_after_refund); the webhook then cancels the subscription it paid for.
--- Dispute: status becomes disputed, nothing else here. open_payment_dispute (0528) takes the
+-- Dispute: status becomes disputed, nothing else here. open_payment_dispute (0768) takes the
 -- credits back and keeps the dispute's own share, so a win can give exactly that back; the
 -- clawback keys are left out of this answer so the deployed alert does not report 0 taken.
 --

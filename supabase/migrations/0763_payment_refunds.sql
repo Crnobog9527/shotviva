@@ -11,5 +11,5 @@ create table public.payment_refunds (
 );
 
 alter table public.payment_refunds enable row level security;
--- Private (AGENTS §5): only record_waffo_refund (0530) writes it.
+-- Private (AGENTS §5): only record_waffo_refund (0770) writes it.
 revoke all on public.payment_refunds from public, anon, authenticated, service_role;

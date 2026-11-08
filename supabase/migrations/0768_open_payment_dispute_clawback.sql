@@ -1,6 +1,6 @@
 -- T71 (ARCHITECTURE §6.2 「拒付」): a new dispute also takes the purchase's credits back in full
 -- (the same clawback_payment_credits, capped at the paid balance) and keeps its own share on the
--- dispute row, so a win gives exactly that back (close_payment_dispute, 0529). Everything else is
+-- dispute row, so a win gives exactly that back (close_payment_dispute, 0769). Everything else is
 -- 0727 unchanged: idempotent by dispute id (a redelivery takes nothing again), the same ban.
 -- The answer gains the payment's clawback totals for the Owner's one alert (T72).
 create or replace function public._payment_dispute_answer(p_row public.payment_disputes, p_created boolean)
