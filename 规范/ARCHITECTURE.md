@@ -543,7 +543,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - `admin_set_test_run_cover`（0823，`create or replace`，签名不变）：
   - `p_locale` 为 null：写通用封面，和原来一样。
   - `p_locale` 为语言码：写 `cover_locales -> 语言 -> after`。只有模板还没有通用前图时，才同时写该语言的 `before`（前图各语言共用）。翻译出来的试跑没有测试照片，所以只会写后图。
-- `admin_set_template_locale_cover(p_actor, p_template_id, p_locale, p_patch jsonb, p_clear boolean default false)`（0824，新）：后台语言页签的上传、替换和删除，一次调用、一个事务。
+- `admin_set_template_locale_cover(p_actor, p_template_id, p_locale, p_patch jsonb, p_assets_base text, p_locales text[], p_clear boolean default false)`（0824，新；审查后加 `p_assets_base`：地址必须在本站资源域名下；`p_locales`：服务端传入已上线语言，用于判断改动后已上架的站内模板是否仍有前图和后图，失去最后一张时抛 `COVER_STILL_NEEDED`，本来就不完整的模板允许补传；辅助函数 `_template_has_cover_parts`）：后台语言页签的上传、替换和删除，一次调用、一个事务。
   - 把 `p_patch` 合并进该语言：值为 null 表示删掉这个键；某个语言删空后整项去掉。
   - `p_clear` 为 true 时删掉整个语言。
   - 校验：键只能是上面五个，地址必须是 https，`media` 只能是两个值。
@@ -557,7 +557,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - **翻译提示词**：放在 `edit` 模板 `model_params.cover_translate`（`editParamsSchema` 的可选键），在「作品编辑的判断题和约束段落」页编辑。`{{language}}` 会换成目标语言的英文名（`Intl.DisplayNames`）。没填时翻译不可用，提示去填。
   - 出图参数：输入是来源后图（从公开桶按地址取）；尺寸跟随原图（`original`）；清晰度默认 2K；质量档和 `input_fidelity` 用 edit 模板的。
   - 没有用户输入的文字，所以不走换脸判断。
-- **上架条件（总控 2026-11-08 按 Owner「只传一套封面所有语言都用它」改）**：站内模板上架要求「前图和后图各至少有一张」，可以来自不同地方（例如通用前图 + 中文后图），因为前台按部分各自取封面，每种语言都能取到前后图；只有「准备中」语言的封面不算。T87 一并修改 `publish-rules` 和批量编辑的校验：批量编辑新增 5 参数重载 `admin_bulk_edit_templates(…, p_locales text[])`（0825，由服务端传入已上线语言，不设默认值），旧的 4 参数版本（0640）保留给已部署的旧代码，T87 上线稳定后由收尾卡删除。语言页签删除封面时，如果会让已上架的站内模板缺前图或后图，拒绝并提示。封面地址只接受本站资源桶的地址。翻译生成的结果只能设为它的目标语言的后图。
+- **上架条件（总控 2026-11-08 按 Owner「只传一套封面所有语言都用它」改）**：站内模板上架要求「前图和后图各至少有一张」，可以来自不同地方（例如通用前图 + 中文后图），因为前台按部分各自取封面，每种语言都能取到前后图；只有「准备中」语言的封面不算。T87 一并修改 `publish-rules` 和批量编辑的校验：批量编辑新增 5 参数重载 `admin_bulk_edit_templates(…, p_locales text[])`（0825，由服务端传入已上线语言，不设默认值），旧的 4 参数版本（0640）保留给已部署的旧代码，T87 上线稳定后由收尾卡删除。语言页签删除封面时，如果会让已上架的站内模板缺前图或后图，拒绝并提示。封面地址只接受本站资源桶的地址。翻译生成的结果只能设为它的目标语言的后图（`admin_set_test_run_cover` 遇到其他情况抛 `TRANSLATE_TARGET_ONLY`）；翻译试跑的 `prompt_version` 记为空，翻译提示词及其版本记在 `inputs`。
 
 - **展示媒体支持三种**（Owner 2026-11-05，参考 Lovart）：静态图、动图、短视频。`templates` 增加 `cover_media_type`（`'image'` / `'animated'` / `'video'`）、`cover_video_url`、`cover_poster_url`（视频和动图的封面帧，静态图时为空）；前后对比图字段照旧，用于静态图模板和预览抽屉里的拖动对比。
   - 动图一律存动态 WebP：后台上传 GIF 也收，服务端转成动态 WebP（GIF 体积通常大 5～10 倍，拖慢首屏）。
