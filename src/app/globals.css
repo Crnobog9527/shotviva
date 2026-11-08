@@ -705,3 +705,4 @@ html:lang(zh-Hans) .member-pass .pass-caps {
   letter-spacing: 0;
   text-transform: none;
 }
+/* T88 demo only (PR never merged): a frontend-only change. */
