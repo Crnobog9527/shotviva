@@ -13,6 +13,11 @@ export const recordingSchema = z.object({
   note: z.string().optional(),
   model: z.string().nullable(),
   recordedAt: z.string().nullable(),
+  // Which judge prompt the answers came from (free text, e.g. the PR that last changed it).
+  promptVersion: z.string().optional(),
+  // Sentences whose answer must be recorded again (added since the run, or the prompt changed
+  // for them). Each one has no answer; the next full run empties this list.
+  pending: z.array(z.string()).default([]),
   answers: z.record(z.string(), recordedAnswerSchema),
 })
 
