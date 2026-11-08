@@ -25,14 +25,17 @@ runs:
         {
           echo "version=$VERSION"
           echo "sha256=$SHA256"
-          echo "dir=$HOME/.cache/supabase-cli/$VERSION"
+          echo "dir=$HOME/.cache/supabase-cli"
         } >> "$GITHUB_OUTPUT"
 
+    # Explicit restore and save with a fixed path: the cache version hashes the path, and in a
+    # composite action's post step `steps.*` outputs are empty, so actions/cache saved under a
+    # different path than it restored and never hit.
     - id: cache
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
-        path: ~/.cache/supabase-cli/${{ steps.pin.outputs.version }}
-        key: supabase-cli-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.pin.outputs.version }}-${{ steps.pin.outputs.sha256 }}
+        path: ~/.cache/supabase-cli
+        key: supabase-cli-v3-${{ runner.os }}-${{ runner.arch }}-${{ steps.pin.outputs.version }}-${{ steps.pin.outputs.sha256 }}
 
     - name: Download the CLI
       if: steps.cache.outputs.cache-hit != 'true'
@@ -54,6 +57,12 @@ runs:
         tar -xzf "$archive" -C "$DIR"
         rm -f "$archive"
 
+    - if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ~/.cache/supabase-cli
+        key: ${{ steps.cache.outputs.cache-primary-key }}
+
     - shell: bash
       env:
         DIR: ${{ steps.pin.outputs.dir }}
@@ -61,7 +70,12 @@ runs:
         echo "$DIR" >> "$GITHUB_PATH"
         # The CLI asks api.github.com for its latest release after commands; when GitHub is slow
         # that held one run for 93 s after `supabase start` had finished.
-        echo "SUPABASE_NO_UPDATE_NOTIFIER=1" >> "$GITHUB_ENV"
+        # Likewise its telemetry, which CI has no use for.
+        {
+          echo "SUPABASE_NO_UPDATE_NOTIFIER=1"
+          echo "SUPABASE_TELEMETRY_DISABLED=1"
+          echo "DO_NOT_TRACK=1"
+        } >> "$GITHUB_ENV"
         # A broken install fails here, not later inside the `supabase start` retry loop.
         [ -x "$DIR/supabase-go" ] || { echo "::error::supabase-go is missing from $DIR"; exit 1; }
         "$DIR/supabase" --version
