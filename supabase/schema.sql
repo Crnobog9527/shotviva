@@ -5153,6 +5153,14 @@ CREATE TABLE IF NOT EXISTS "public"."system_settings" (
 ALTER TABLE "public"."system_settings" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."t88_demo" (
+    "id" bigint NOT NULL
+);
+
+
+ALTER TABLE "public"."t88_demo" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."template_categories" (
     "key" "text" NOT NULL,
     "name_en" "text" NOT NULL,
@@ -5422,6 +5430,11 @@ ALTER TABLE ONLY "public"."support_tickets"
 
 ALTER TABLE ONLY "public"."system_settings"
     ADD CONSTRAINT "system_settings_pkey" PRIMARY KEY ("key");
+
+
+
+ALTER TABLE ONLY "public"."t88_demo"
+    ADD CONSTRAINT "t88_demo_pkey" PRIMARY KEY ("id");
 
 
 
@@ -6007,6 +6020,9 @@ CREATE POLICY "support_tickets_select_own" ON "public"."support_tickets" FOR SEL
 
 
 ALTER TABLE "public"."system_settings" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."t88_demo" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."template_categories" ENABLE ROW LEVEL SECURITY;
@@ -6738,6 +6754,12 @@ GRANT SELECT ON TABLE "public"."support_ticket_attachments" TO "service_role";
 
 
 GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."system_settings" TO "service_role";
+
+
+
+GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."t88_demo" TO "anon";
+GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."t88_demo" TO "authenticated";
+GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."t88_demo" TO "service_role";
 
 
 
