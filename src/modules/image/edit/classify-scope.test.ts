@@ -37,17 +37,31 @@ describe('classifyEditScope', () => {
     })
   })
 
-  it('falls back with nothing recorded after 3 seconds, and aborts the call', async () => {
+  // T81 follow-up (#319): 5 seconds an attempt, a second attempt after a timeout, then fallback.
+  it('falls back with nothing recorded after two 5-second attempts, aborting each', async () => {
     vi.useFakeTimers()
-    let signal: AbortSignal | undefined
+    const signals: AbortSignal[] = []
+    const classify = vi.fn<ScopeClassifier['classify']>((call) => (signals.push(call.signal), new Promise(() => {})))
     try {
-      const pending = classifyEditScope(classifier((call) => ((signal = call.signal), new Promise(() => {}))), input)
-      await vi.advanceTimersByTimeAsync(3_000)
+      const pending = classifyEditScope(classifier(classify), input)
+      await vi.advanceTimersByTimeAsync(5_000)
+      expect(classify).toHaveBeenCalledTimes(2)
+      await vi.advanceTimersByTimeAsync(5_000)
       expect(await pending).toEqual(FALLBACK)
-      expect(signal?.aborted).toBe(true)
+      expect(signals.map((signal) => signal.aborted)).toEqual([true, true])
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('answers from the second attempt after a 5xx, and does not retry a 4xx', async () => {
+    const flaky = vi.fn<ScopeClassifier['classify']>()
+    flaky.mockRejectedValueOnce(new Error('openai responses 503')).mockResolvedValueOnce(answer())
+    expect((await classifyEditScope(classifier(flaky), input)).scope).toBe('background')
+    expect(flaky).toHaveBeenCalledTimes(2)
+    const bad = vi.fn<ScopeClassifier['classify']>(async () => Promise.reject(new Error('openai responses 400')))
+    expect(await classifyEditScope(classifier(bad), input)).toEqual(FALLBACK)
+    expect(bad).toHaveBeenCalledTimes(1)
   })
 
   // T81 (§5.1a): the face-swap answer stands even when the scope is too unsure to use.

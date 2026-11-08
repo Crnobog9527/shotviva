@@ -32,7 +32,10 @@ export function DryRunTable({ rows }: { rows: DryRunRow[] }) {
             <TableCell>
               <Verdict row={row} />
             </TableCell>
-            <TableCell className="text-right font-mono text-xs tabular-nums">{row.ms ?? COPY.none}</TableCell>
+            <TableCell className="text-right font-mono text-xs tabular-nums">
+              {row.ms ?? COPY.none}
+              {row.attempts > 1 ? <span className="text-muted-foreground"> {COPY.retried}</span> : null}
+            </TableCell>
             <TableCell className="text-right font-mono text-xs tabular-nums">
               {row.inputTokens ?? COPY.none} / {row.outputTokens ?? COPY.none}
             </TableCell>

@@ -25,4 +25,7 @@ export const DRY_RUN_COPY = {
   model: (name: string, version: string) => `模型：${name}（提示词 ${version}）`,
   json: '复制为例句录制 JSON（examples.recorded.json）',
   copied: '已复制',
+  retried: '（重试 1 次）',
+  stats: (calls: number, refused: number, failed: number) => `线上过去 24 小时：判断 ${calls} 次，拒绝 ${refused} 次，判断失败直接放行 ${failed} 次。`,
+  statsUnavailable: '线上判断次数暂时读不到。',
 }

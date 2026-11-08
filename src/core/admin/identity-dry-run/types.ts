@@ -11,12 +11,17 @@ export type DryRunRow = {
   // The decision model's answer, which is the production verdict; null when it failed or no
   // decision provider is on (production then lets the request through).
   identitySwap: boolean | null
+  // Both attempts together when the first timed out or got a 5xx; `attempts` says how many.
   ms: number | null
+  attempts: number
   inputTokens: number | null
   outputTokens: number | null
   // The failure as a short reason (status code, timeout, parse), never the words.
   error: string | null
 }
+
+// Production's decision calls over the last 24 hours (0705): made, refused, and failed open.
+export type JudgeStats = { calls: number; refused: number; failedOpen: number }
 
 export type DryRunResult =
   | { ok: true; model: string | null; promptVersion: string; prices: ProviderPrices | null; ranAt: string; rows: DryRunRow[] }
