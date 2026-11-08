@@ -617,6 +617,10 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 
 索引 `(template_id, created_at desc)`（面板列表，取 50 条）、`(created_at)`（当天预算、清理、成本对账）。
 
+#### 表 `admin_test_spend`（私有，同上；审查后新增，2026-11-08）
+
+每次试跑一行，**没有外键**（删模板、裁剪 50 条、30 天清理都不影响它），100 天后才清。字段：`run_id`（唯一）、`template_id`（只记值）、`day`（北京时间自然日）、`cost_usd`、`counted_as`（`actual` 真实成本 / `estimate` 调过出图模型但算不出成本时按估算 / `zero` 未调用模型或 10 分钟超时）、`created_at`。**每日预算和成本对账页的「后台试跑」都只读这张表。**预算判断和占用（`admin_begin_test_run`）在任何模型调用之前完成，包括换脸判断和编辑范围判断；超预算一个模型都不调。换脸被拒的试跑记为 `failed / IDENTITY_SWAP_REFUSED`，判断用掉的 token 计入成本。试跑不占管理员的换脸判断配额，也不计入「AI 供应商」页的用户统计。清理改为 `POST /api/admin/test-runs/cleanup`（同源校验）。
+
 #### 函数（普通 plpgsql，`search_path = ''`，只授权 `service_role`；带 `p_actor` 的在函数里再核对是管理员）
 
 - `admin_begin_test_run(p_actor, p_run_id, p_template_id, p_kind, p_parent_id, p_photo_id, p_batch_id, p_resolution, p_inputs, p_prompt_version, p_provider, p_estimate_usd)`：按 `p_run_id` 幂等；advisory lock 串行化预算判断；当天（北京时间自然日）已花 = 已结束记录的 `cost_usd` 合计 + 10 分钟内仍在跑的记录的 `estimate_usd`；已花 + 本次估算 > 预算就抛 `TEST_BUDGET_EXCEEDED`（不调用供应商）。编辑时校验父记录、继承 `photo_id`；更新照片 `last_used_at`。返回新行。
@@ -627,7 +631,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - `admin_test_daily_costs(p_days)`：成本对账页按 UTC 日返回试跑的 `cost_usd` 合计和次数，和 `admin_daily_costs` 并列显示为「后台试跑」，计入「我们记录的成本」。
 - 预算：`system_settings` 新键 `admin_test_daily_budget_usd`（数字，0～1000，默认 5），`admin_set_system_setting` 用 `create or replace` 加这个键。
 
-迁移 `0780`～`0788`，只加表、索引、函数；`admin_set_system_setting` 只多认一个键，旧代码不受影响。
+迁移 `0780`～`0789`，只加表、索引、函数；`admin_set_system_setting` 只多认一个键，旧代码不受影响。
 
 #### 其他实现口径（不涉及数据结构，供审查）
 
