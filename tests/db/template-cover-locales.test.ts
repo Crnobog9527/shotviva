@@ -42,7 +42,9 @@ const localesOf = async (id: string) =>
     [id],
   )).rows[0]!
 
-const setLocale = (args: Record<string, unknown>) => service.rpc('admin_set_template_locale_cover', { p_actor: admin, ...args })
+// Test URLs live on https://a.test, passed as the assets origin like the server passes its own.
+const setLocale = (args: Record<string, unknown>) =>
+  service.rpc('admin_set_template_locale_cover', { p_actor: admin, p_assets_base: 'https://a.test', p_locales: ['en', 'zh'], ...args })
 
 function provider() {
   const calls: Omit<ProviderInput, 'signal'>[] = []
@@ -72,9 +74,31 @@ describe('admin_set_template_locale_cover', () => {
     expect((await setLocale({ p_template_id: id, p_locale: 'ZH', p_patch: {} })).error?.message).toBe('INVALID_INPUT')
     expect((await setLocale({ p_template_id: id, p_locale: 'zh', p_patch: { title: 'x' } })).error?.message).toBe('INVALID_INPUT')
     expect((await setLocale({ p_template_id: id, p_locale: 'zh', p_patch: { after: 'http://a.test/x.webp' } })).error?.message).toBe('INVALID_INPUT')
+    // Only our own assets origin.
+    expect((await setLocale({ p_template_id: id, p_locale: 'zh', p_patch: { after: 'https://evil.test/x.webp' } })).error?.message).toBe('INVALID_INPUT')
     const user = await createUser(db)
-    const { error } = await service.rpc('admin_set_template_locale_cover', { p_actor: user, p_template_id: id, p_locale: 'zh', p_patch: {} })
+    const { error } = await service.rpc('admin_set_template_locale_cover', {
+      p_actor: user,
+      p_template_id: id,
+      p_locale: 'zh',
+      p_patch: {},
+      p_assets_base: 'https://a.test',
+      p_locales: ['en', 'zh'],
+    })
     expect(error?.message).toBe('NOT_ADMIN')
+  })
+})
+
+describe('a live web template keeps something to show', () => {
+  it('refuses to remove its last "after" (zh only), but lets an incomplete one be filled', async () => {
+    const id = await seedTemplate(db)
+    await db.query("update public.templates set cover_before_url = 'https://a.test/b.webp' where id = $1", [id])
+    // Live on the web without any "after" yet: an upload is how it gets fixed.
+    expect((await setLocale({ p_template_id: id, p_locale: 'zh', p_patch: { after: 'https://a.test/za.webp' } })).error).toBeNull()
+    expect((await setLocale({ p_template_id: id, p_locale: 'zh', p_patch: {}, p_clear: true })).error?.message).toBe('COVER_STILL_NEEDED')
+    expect((await localesOf(id)).cover_locales.zh?.after).toBe('https://a.test/za.webp')
+    await db.query('update public.templates set is_active = false where id = $1', [id])
+    expect((await setLocale({ p_template_id: id, p_locale: 'zh', p_patch: {}, p_clear: true })).error).toBeNull()
   })
 })
 
@@ -145,7 +169,16 @@ describe('test runs into language covers', () => {
       expect(run).toMatchObject({ kind: 'translate', status: 'succeeded', parentId: null, photoId: null, resolution: '2k' })
       expect(run.inputs).toMatchObject({ source_locale: null, target_locale: 'ja' })
       expect(p.calls[0]).toMatchObject({ prompt: 'TRANSLATE-ONLY into Japanese', aspectRatio: 'original', resolution: '2k' })
-      await setTestRunCover({ db: service, store: r2.store, assets: assets.store, assetsBaseUrl: BASE }, admin, run.id, 'ja')
+      // Its prompt is the edit template's: recorded under its own name, not as this template's version.
+      expect(run.promptVersion).toBeNull()
+      expect(run.inputs).toMatchObject({ translate_prompt: 'edit.cover_translate' })
+      const coverDeps = { db: service, store: r2.store, assets: assets.store, assetsBaseUrl: BASE }
+      // A translation only ever becomes its own language's "after".
+      await expect(setTestRunCover(coverDeps, admin, run.id, null)).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+      await expect(setTestRunCover(coverDeps, admin, run.id, 'zh')).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+      const direct = await service.rpc('admin_set_test_run_cover', { p_actor: admin, p_run_id: run.id, p_before_url: null, p_after_url: `${BASE}/x.webp`, p_locale: 'zh' })
+      expect(direct.error?.message).toBe('TRANSLATE_TARGET_ONLY')
+      await setTestRunCover(coverDeps, admin, run.id, 'ja')
       expect(Object.keys((await localesOf(id)).cover_locales.ja ?? {})).toEqual(['after'])
       // An upcoming language is stored but never shown on the launched pages.
       expect((await listTemplatesIn(anonSupabase(), 'en')).find((t) => t.id === id)?.coverAfterUrl).toBe(`${BASE}/covers/${id}/after-src.webp`)

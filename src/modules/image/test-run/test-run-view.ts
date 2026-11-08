@@ -26,7 +26,8 @@ export function toTestRunView(run: TestRun, outputUrl: string | null): TestRunVi
     sourceLocale: text(run.inputs.source_locale),
     targetLocale: text(run.inputs.target_locale),
     editScope: text(run.inputs.edit_scope),
-    promptVersion: run.promptVersion,
+    // A translation's prompt is the edit template's (T87); the panel labels it 编辑模板 vN.
+    promptVersion: run.promptVersion ?? (typeof run.inputs.translate_prompt_version === 'number' ? run.inputs.translate_prompt_version : null),
     model: run.provider ? run.provider.slice(run.provider.indexOf('/') + 1) : null,
     costUsd: run.costUsd,
     estimateUsd: run.estimateUsd,

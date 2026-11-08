@@ -39,7 +39,8 @@ export type BeginTestRun = {
   batchId: string
   resolution: Resolution
   inputs: Record<string, unknown>
-  promptVersion: number
+  // null for a translation: its prompt is the edit template's, recorded in inputs (T87).
+  promptVersion: number | null
   provider: string
   estimateUsd: number
 }

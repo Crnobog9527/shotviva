@@ -6,6 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { AppError } from '@/core/errors'
+import { LOCALES } from '@/core/i18n/locales'
 import { logger } from '@/core/logger'
 import type { ObjectStore } from '@/core/storage'
 
@@ -158,10 +159,17 @@ async function writeLocaleCover(deps: CoverDeps, input: z.infer<typeof applySche
     p_template_id: input.templateId,
     p_locale: input.locale,
     p_patch: localePatch(columns),
+    // Only our public assets origin is accepted; the launched languages decide what a live
+    // template may not lose (0824).
+    p_assets_base: deps.assetsBaseUrl,
+    p_locales: LOCALES,
     p_clear: input.slot === 'clear-locale',
   })
   if (!error) return
   if (error.message === 'TEMPLATE_NOT_FOUND') throw new AppError('NOT_FOUND', `template ${input.templateId} not found`)
+  if (error.message === 'COVER_STILL_NEEDED') {
+    throw new AppError('INVALID_INPUT', '这个模板已上架，删掉后就没有前图或后图可显示了。先给通用或其他已上线语言传好封面，或先下架再删。')
+  }
   throw new AppError('INTERNAL', `language cover update failed: ${error.message}`)
 }
 

@@ -34,13 +34,18 @@ export function languageName(code: string): string {
   return new Intl.DisplayNames(['en'], { type: 'language' }).of(code) ?? code
 }
 
-// The edit template (published or not: this is the admin's tool) and its translation prompt.
+// The edit template (published or not: this is the admin's tool) and its translation prompt. A
+// parameter that does not parse says which one; a missing prompt says where to write it.
 async function loadTranslateSetup(db: SupabaseClient) {
   const loaded = await loadTestTemplate(db, EDIT_TEMPLATE_ID, { allowEdit: true })
   const params = editParamsSchema.partial().safeParse(loaded.prompt.modelParams)
-  const prompt = params.success ? params.data.cover_translate?.trim() : undefined
+  if (!params.success) {
+    const fields = params.error.issues.map((issue) => issue.path.join('.') || 'model_params').join('、')
+    throw new AppError('INVALID_INPUT', `「作品编辑」的参数不合法（${fields}），先在那一页改好再翻译`)
+  }
+  const prompt = params.data.cover_translate?.trim()
   if (!prompt) throw new AppError('NOT_FOUND', '还没有填封面翻译提示词：在「作品编辑的判断题和约束段落」页填写')
-  return { loaded, prompt, inputFidelity: params.success ? params.data.input_fidelity : undefined }
+  return { loaded, prompt, inputFidelity: params.data.input_fidelity }
 }
 
 // The source "after" cover as the model's input: read from the public bucket by its key.
@@ -69,8 +74,18 @@ export async function runTestTranslate(deps: TestTranslateDeps, req: TestTransla
     photoId: null,
     batchId: body.batch_id,
     resolution,
-    inputs: { source_locale: body.source_locale, target_locale: body.target_locale, source_url: sourceUrl, aspect_ratio: 'original', attempt_id: attemptId },
-    promptVersion: setup.loaded.prompt.version,
+    // The prompt is the edit template's cover_translate, not this template's: its version is kept
+    // in inputs under its own name, and prompt_version (this template's) stays empty.
+    inputs: {
+      source_locale: body.source_locale,
+      target_locale: body.target_locale,
+      source_url: sourceUrl,
+      aspect_ratio: 'original',
+      translate_prompt: 'edit.cover_translate',
+      translate_prompt_version: setup.loaded.prompt.version,
+      attempt_id: attemptId,
+    },
+    promptVersion: null,
     provider: deps.provider.id,
     estimateUsd: estimateRunUsd(resolution, setup.loaded.template.quality, deps.provider.prices),
   })
