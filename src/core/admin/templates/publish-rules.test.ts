@@ -74,7 +74,7 @@ describe('planActiveChange', () => {
 })
 
 it('describes blockers in the admin language', () => {
-  expect(describeBlockers(['no_cover', 'below_floor'])).toBe('缺一套完整的前后对比封面（通用或任一已上线语言，站内模板必填）、积分低于下限')
+  expect(describeBlockers(['no_cover', 'below_floor'])).toBe('缺前后对比封面（通用或任一已上线语言里要有前图和后图，站内模板必填）、积分低于下限')
 })
 
 describe('publish rule with per-language covers (T87)', () => {
@@ -82,6 +82,10 @@ describe('publish rule with per-language covers (T87)', () => {
 
   it('a launched language’s own complete set is enough for the web', () => {
     expect(publishBlockers(bare({ coverLocales: { zh: { before: 'https://a/zb.webp', after: 'https://a/za.webp' } } }), CREDITS_FLOOR)).toEqual([])
+  })
+
+  it('a common "before" with a launched language’s "after" is complete, as every page shows both', () => {
+    expect(publishBlockers(bare({ coverBeforeUrl: 'https://a/b.webp', coverLocales: { zh: { after: 'https://a/za.webp' } } }), CREDITS_FLOOR)).toEqual([])
   })
 
   it('an incomplete set, or one of a language not launched yet, is not', () => {

@@ -182,4 +182,12 @@ describe('publishing with only a language’s covers (0825)', () => {
     const ok = await bulkEditTemplates(service, admin, { ids: [zhOnly], patch: { visibleIn: ['web', 'partner'] } }, CREDITS_FLOOR)
     expect(ok).toMatchObject({ failures: [], changed: 1 })
   })
+
+  it('a common "before" with a zh "after" counts (what 「设为中文封面」 writes when a common "before" exists)', async () => {
+    const mixed = await seedTemplate(db, { visibleIn: ['partner'] })
+    await db.query("update public.templates set description = 'One line.', cover_before_url = 'https://a.test/b.webp' where id = $1", [mixed])
+    await setLocale({ p_template_id: mixed, p_locale: 'zh', p_patch: { after: 'https://a.test/za.webp' } })
+    const outcome = await bulkEditTemplates(service, admin, { ids: [mixed], patch: { visibleIn: ['web', 'partner'] } }, CREDITS_FLOOR)
+    expect(outcome).toMatchObject({ failures: [], changed: 1 })
+  })
 })

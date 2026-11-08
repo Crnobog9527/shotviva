@@ -72,12 +72,15 @@ export function coverForLocale(t: CoverSource, locale: string): ResolvedCover {
 }
 
 // Whether a web card has something to show (the publish rule, Owner 2026-11-08: one uploaded set
-// shows for every language): at least one complete before + after set, the common one or a
-// launched language's own. Languages not launched yet never count.
+// shows for every language), judged by the same fallback as coverForLocale: every page gets a
+// "before" and an "after" when each exists somewhere it can be taken from, i.e. in the common
+// cover or in a launched language's own (a common "before" with a zh "after" is complete, which
+// is what 「设为中文封面」 writes when a common "before" exists). Languages not launched yet never
+// count. Under the fallback, one launched page resolving both means every launched page does.
 export function hasCompleteCoverSet(t: Pick<CoverSource, 'coverBeforeUrl' | 'coverAfterUrl' | 'coverLocales'>, launched: readonly string[] = LOCALES): boolean {
   const filled = (url: string | null | undefined) => Boolean(url && url.trim() !== '')
-  if (filled(t.coverBeforeUrl) && filled(t.coverAfterUrl)) return true
-  return launched.some((code) => filled(t.coverLocales[code]?.before) && filled(t.coverLocales[code]?.after))
+  const anywhere = (common: string | null, key: 'before' | 'after') => filled(common) || launched.some((code) => filled(t.coverLocales[code]?.[key]))
+  return anywhere(t.coverBeforeUrl, 'before') && anywhere(t.coverAfterUrl, 'after')
 }
 
 // The template as seen in `locale`: its cover columns replaced by what that page shows, so every

@@ -29,11 +29,17 @@ function describe(run: TestRunView | null, chosen: string, languages: readonly C
 }
 
 // 设为封面 (ARCHITECTURE §10.b): it changes what visitors see, so it asks first.
-export function CoverDialog({ run, languages, onClose, onDone, onError }: Props) {
+// Remounted per run, so a choice left from a cancelled dialog never carries over.
+export function CoverDialog(props: Props) {
+  return <CoverDialogBody key={props.run?.id ?? 'none'} {...props} />
+}
+
+function CoverDialogBody({ run, languages, onClose, onDone, onError }: Props) {
   const [saving, setSaving] = useState(false)
-  // A translation defaults to the language it was translated into; anything else to 通用.
-  const [locale, setLocale] = useState<string>('')
-  const chosen = locale || run?.targetLocale || ''
+  // A translation defaults to the language it was translated into; anything else to 通用. undefined
+  // = not touched yet, so an explicit 通用 ('') is never replaced by that default.
+  const [locale, setLocale] = useState<string | undefined>(undefined)
+  const chosen = locale ?? run?.targetLocale ?? ''
   const confirm = async () => {
     if (!run) return
     setSaving(true)
@@ -44,7 +50,7 @@ export function CoverDialog({ run, languages, onClose, onDone, onError }: Props)
       onError(failureMessage(error))
     } finally {
       setSaving(false)
-      setLocale('')
+      setLocale(undefined)
       onClose()
     }
   }

@@ -24,7 +24,7 @@ export const PUBLISH_BLOCKER_LABEL: Record<PublishBlocker, string> = {
   no_prompt: '缺提示词',
   no_name: '缺英文名称',
   no_description: '缺英文说明（站内模板必填）',
-  no_cover: '缺一套完整的前后对比封面（通用或任一已上线语言，站内模板必填）',
+  no_cover: '缺前后对比封面（通用或任一已上线语言里要有前图和后图，站内模板必填）',
   below_floor: '积分低于下限',
 }
 
@@ -50,7 +50,7 @@ export function publishBlockers(template: PublishCandidate, floor: CreditsFloor)
     ['no_prompt', !template.hasPrompt],
     ['no_name', blank(template.name)],
     ['no_description', onWeb && blank(template.description)],
-    // One complete set, common or a launched language's own, shows for every language (T87).
+    // A before and an after every launched page can show under the cover fallback (T87).
     ['no_cover', onWeb && !hasCompleteCoverSet(template)],
     ['below_floor', creditsBelowFloor(template.quality, template.creditsCost, floor).length > 0],
   ]

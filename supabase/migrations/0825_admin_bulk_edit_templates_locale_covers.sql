@@ -1,7 +1,9 @@
 -- T87: the batch edit (0640) under the per-language cover rule (ARCHITECTURE §8.3, Owner
 -- 2026-11-08: one uploaded cover set shows for every language). A live template newly put on the
--- web needs its English description and at least one complete before + after set: the common
--- cover, or the own cover of any launched language. p_locales is the launched languages, passed
+-- web needs its English description and a "before" and an "after" that every launched page can
+-- show under the cover fallback (core/templates cover-locales.ts): each in the common cover or in
+-- a launched language's own (a common "before" with a zh "after" counts, as 「设为中文封面」 writes
+-- it). p_locales is the launched languages, passed
 -- by the server (core/i18n LOCALES), so no language is written here and upcoming ones never count.
 --
 -- A new overload with one more argument and no default: code deployed before this migration
@@ -100,13 +102,13 @@ begin
     from planned p
     where p.found and not p.is_builtin and p.is_active
       and 'web' = any (p.visible_in) and not ('web' = any (p.old_visible))
-      and (nullif(btrim(p.description), '') is null or not (
-             (nullif(btrim(p.cover_before_url), '') is not null and nullif(btrim(p.cover_after_url), '') is not null)
-             or exists (
-               select 1 from unnest(coalesce(p_locales, '{}')) as l(code)
-               where nullif(btrim(p.cover_locales -> l.code ->> 'before'), '') is not null
-                 and nullif(btrim(p.cover_locales -> l.code ->> 'after'), '') is not null
-             )))
+      and (nullif(btrim(p.description), '') is null
+           or not (nullif(btrim(p.cover_before_url), '') is not null or exists (
+             select 1 from unnest(coalesce(p_locales, '{}')) as l(code)
+             where nullif(btrim(p.cover_locales -> l.code ->> 'before'), '') is not null))
+           or not (nullif(btrim(p.cover_after_url), '') is not null or exists (
+             select 1 from unnest(coalesce(p_locales, '{}')) as l(code)
+             where nullif(btrim(p.cover_locales -> l.code ->> 'after'), '') is not null)))
   )
   select coalesce(jsonb_agg(f.failure), '[]'::jsonb) into v_failures from failures f;
 
