@@ -1,6 +1,7 @@
 import 'server-only'
 
-import { GenerationFailure, settleProviderCall, type DecisionCost, type ProviderInput, type SettleDeps, type SettleLedger } from '@/core/jobs'
+import { IdentitySwapRefused, type IdentityJudgeUsage } from '@/core/identity-guard'
+import { GenerationFailure, settleProviderCall, type DecisionCost, type ProviderInput, type ProviderPrices, type SettleDeps, type SettleLedger } from '@/core/jobs'
 import { logger } from '@/core/logger'
 
 import { testOutputKey } from './test-run-keys'
@@ -42,4 +43,41 @@ export async function settleTestRun(deps: SettleDeps, run: TestRun, call: Omit<P
     if (!(error instanceof GenerationFailure)) throw error
     return (await findTestRun(deps.db, run.id)) ?? run
   }
+}
+
+// The cost of a run that only reached the decision model (refused): its tokens at that model's
+// prices; null when a price is missing (the budget then counts 0 for it, 0785).
+export function decisionOnlyCost(usage: IdentityJudgeUsage | null, prices: ProviderPrices | null | undefined) {
+  if (!usage) return { usage: null, costUsd: null }
+  const tokens = { decision_input_tokens: usage.inputTokens, decision_output_tokens: usage.outputTokens }
+  const input = prices?.inputTextPerM
+  const output = prices?.outputPerM
+  const costUsd = input == null || output == null ? null : Math.round(((usage.inputTokens * input + usage.outputTokens * output) / 1e6) * 1e6) / 1e6
+  return { usage: tokens, costUsd }
+}
+
+export type ModelStep = { call: Omit<ProviderInput, 'signal'>; decision?: DecisionCost }
+
+// After admin_begin_test_run (the budget is held before any model is called, ARCHITECTURE §10.b):
+// the decision step (face-swap judge, or the edit's scope call), then the image call. A refusal
+// ends the run as failed / IDENTITY_SWAP_REFUSED with what the decision call cost; anything else
+// that breaks before the image call ends it as PREPARE_FAILED and is rethrown.
+export async function continueTestRun(
+  deps: SettleDeps,
+  run: TestRun,
+  step: () => Promise<ModelStep>,
+  decisionPrices: ProviderPrices | null | undefined,
+): Promise<TestRun> {
+  const started = Date.now()
+  let next: ModelStep
+  try {
+    next = await step()
+  } catch (error) {
+    const refused = error instanceof IdentitySwapRefused
+    const cost = refused ? decisionOnlyCost(error.usage, decisionPrices) : {}
+    await failSafely(deps, run.id, started, refused ? 'IDENTITY_SWAP_REFUSED' : 'PREPARE_FAILED', cost)
+    if (!refused) throw error
+    return (await findTestRun(deps.db, run.id)) ?? run
+  }
+  return settleTestRun(deps, run, next.call, next.decision)
 }

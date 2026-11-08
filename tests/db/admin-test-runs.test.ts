@@ -28,25 +28,28 @@ const service = serviceSupabase()
 const RUN_COST = 0.0685
 const PRICES = { inputTextPerM: 5, inputImagePerM: 8, outputPerM: 30 }
 
-function provider(delayMs = 0) {
+function provider(delayMs = 0, priced = true) {
   const calls: Omit<ProviderInput, 'signal'>[] = []
   const generate = vi.fn(async (input: ProviderInput) => {
     calls.push({ ...input })
     if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs))
     return { bytes: await png(1232, 1536), contentType: 'image/png' as const, usage: { input_text_tokens: 100, input_image_tokens: 1000, output_tokens: 2000 } }
   })
-  const fake: GenerationProvider = { id: 'fake-openai/gpt-image-2.6', prices: PRICES, generate }
+  const fake: GenerationProvider = { id: 'fake-openai/gpt-image-2.6', prices: priced ? PRICES : null, generate }
   return { fake, calls, generate }
 }
 
-function judge(identitySwap: boolean): IdentityJudge {
-  return { tag: 'fake/luna', prices: null, judge: vi.fn(async () => ({ identitySwap, usage: { inputTokens: 400, outputTokens: 6 } })) }
+function judge(identitySwap: boolean) {
+  const call = vi.fn(async () => ({ identitySwap, usage: { inputTokens: 400, outputTokens: 6 } }))
+  const fake: IdentityJudge = { tag: 'fake/luna', prices: { inputTextPerM: 0.1, inputImagePerM: null, outputPerM: 0.5 }, judge: call }
+  return { fake, call }
 }
 
-async function setup(options: { delayMs?: number; swap?: boolean } = {}) {
+async function setup(options: { delayMs?: number; swap?: boolean; priced?: boolean } = {}) {
   const r2 = createMemoryStore()
-  const p = provider(options.delayMs)
-  const deps = { db: service, store: r2.store, provider: p.fake, providerTimeoutMs: 2_000, identityJudge: judge(options.swap ?? false) }
+  const p = provider(options.delayMs, options.priced ?? true)
+  const j = judge(options.swap ?? false)
+  const deps = { db: service, store: r2.store, provider: p.fake, providerTimeoutMs: 2_000, identityJudge: j.fake }
   const templateId = await seedTemplate(db)
   const photoId = randomUUID()
   const key = `admin-tests/photos/${photoId}.jpg`
@@ -63,7 +66,7 @@ async function setup(options: { delayMs?: number; swap?: boolean } = {}) {
         inputs: { copy: { dish: 'salmon' }, resolution: '1k', aspect_ratio: '4:5', note: extra.note },
       },
     })
-  return { r2, p, deps, templateId, photoId, generate }
+  return { r2, p, j, deps, templateId, photoId, generate }
 }
 
 const runRow = async (id: string) =>
@@ -95,7 +98,8 @@ describe('first runs', () => {
     const { p, r2, templateId, generate } = await setup()
     await db.query('update public.templates set is_active = false where id = $1', [templateId])
     const run = await generate({ note: 'warmer light' })
-    expect(run).toMatchObject({ status: 'succeeded', kind: 'generate', resolution: '1k', costUsd: RUN_COST, outputKey: `admin-tests/outputs/${run.id}.png` })
+    // The judge's tokens (400 × $0.1 + 6 × $0.5 per M) join the image call's, as on a user's job.
+    expect(run).toMatchObject({ status: 'succeeded', kind: 'generate', resolution: '1k', costUsd: 0.068543, outputKey: `admin-tests/outputs/${run.id}.png` })
     // The user's prompt composition: the wrapper with the copy, then the note.
     expect(p.calls[0]).toMatchObject({ prompt: 'WRAPPED studio shot of salmon, keep the plate unchanged\n\nwarmer light', aspectRatio: '4:5', quality: 'medium' })
     expect(r2.objects.has(`admin-tests/outputs/${run.id}.png`)).toBe(true)
@@ -113,14 +117,16 @@ describe('first runs', () => {
     expect(p.generate).toHaveBeenCalledTimes(1)
   })
 
-  it('refuses a face swap like the workspace, without a refusal row or a run', async () => {
+  it('refuses a face swap like the workspace: a failed run with the judge’s cost, no refusal row, no judge slot', async () => {
     const { p, generate } = await setup({ swap: true })
-    const runId = randomUUID()
-    await expect(generate({ runId, note: 'put my face on her' })).rejects.toMatchObject({ code: 'IDENTITY_SWAP_REFUSED' })
+    const slots = async () => (await db.query('select count(*)::int as n from public.identity_judge_calls where user_id = $1', [admin])).rows[0].n
+    const before = await slots()
+    const run = await generate({ note: 'put my face on her' })
+    expect(run).toMatchObject({ status: 'failed', errorCode: 'IDENTITY_SWAP_REFUSED', costUsd: 0.000043 })
     expect(p.generate).not.toHaveBeenCalled()
-    expect(await runRow(runId)).toBeUndefined()
     const refusals = await db.query('select count(*)::int as n from public.identity_refusals where user_id = $1', [admin])
     expect(refusals.rows[0].n).toBe(0)
+    expect(await slots()).toBe(before)
   })
 
   it('is refused for anyone but an admin', async () => {
@@ -149,6 +155,32 @@ describe('daily budget', () => {
     expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(2)
     expect(results.find((r) => r.status === 'rejected')).toMatchObject({ reason: { code: 'TEST_BUDGET_EXCEEDED' } })
     expect(p.generate).toHaveBeenCalledTimes(2)
+  })
+
+  it('calls no model at all once the budget is spent', async () => {
+    const { p, j, generate } = await setup()
+    await budgetLeft(0)
+    await expect(generate({ note: 'warmer' })).rejects.toMatchObject({ code: 'TEST_BUDGET_EXCEEDED' })
+    expect(j.call).not.toHaveBeenCalled()
+    expect(p.generate).not.toHaveBeenCalled()
+  })
+
+  it('counts a finished run that cannot be priced at its estimate, not $0', async () => {
+    const { generate } = await setup({ priced: false })
+    const before = (await loadTestBudget(service)).spentUsd
+    const run = await generate()
+    expect(run.costUsd).toBeNull()
+    expect((await loadTestBudget(service)).spentUsd - before).toBeCloseTo(run.estimateUsd, 6)
+  })
+
+  it('keeps spend after the records go: deleting the template neither refunds the budget nor drops the cost', async () => {
+    const { templateId, generate } = await setup()
+    await generate()
+    const costs = async () => ((await service.rpc('admin_test_daily_costs', { p_days: 1 })).data as { cost_usd: number }[])[0]?.cost_usd ?? 0
+    const [spentBefore, costBefore] = [(await loadTestBudget(service)).spentUsd, await costs()]
+    await db.query('delete from public.templates where id = $1', [templateId])
+    expect((await loadTestBudget(service)).spentUsd).toBeCloseTo(spentBefore, 6)
+    expect(await costs()).toBeCloseTo(costBefore, 6)
   })
 
   it('accepts 0–1000 dollars only', async () => {

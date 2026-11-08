@@ -1,9 +1,10 @@
 -- T85: the daily budget for admin test runs (ARCHITECTURE §10.b 「费用」). The budget is the
--- system setting admin_test_daily_budget_usd (0787), $5 when unset. A day is a Beijing calendar
--- day, like the rest of the admin's "today". Spent is the real cost of today's finished runs plus,
--- for runs still going (started in the last 10 minutes; older ones died with their function and
--- hold nothing), the estimate they reserved. Read by the panel and by admin_begin_test_run (0783).
--- Index: admin_test_runs_created_at_idx (0781).
+-- system setting admin_test_daily_budget_usd (0788), $5 when unset. A day is a Beijing calendar
+-- day, like the rest of the admin's "today". Spent is read from admin_test_spend (0782), so trimming
+-- or deleting records never gives money back: each finished run's counted_usd, plus, for runs
+-- still going (started in the last 10 minutes; older ones died with their function and hold
+-- nothing), the estimate they reserved. Read by the panel, by the routes before any model call,
+-- and by admin_begin_test_run (0784). Index: admin_test_spend_started_at_idx (0782).
 
 create function public.admin_test_budget_status()
 returns jsonb
@@ -23,14 +24,14 @@ begin
    where s.key = 'admin_test_daily_budget_usd';
 
   select coalesce(sum(case
-           when r.status = 'running' and r.created_at > now() - interval '10 minutes' then r.estimate_usd
-           when r.status = 'running' then 0
-           else coalesce(r.cost_usd, 0)
+           when x.counted_usd is not null then x.counted_usd
+           when x.started_at > now() - interval '10 minutes' then x.estimate_usd
+           else 0
          end), 0),
          count(*)
     into v_spent, v_runs
-    from public.admin_test_runs r
-   where r.created_at >= v_start;
+    from public.admin_test_spend x
+   where x.started_at >= v_start;
 
   return jsonb_build_object(
     'budget_usd', coalesce(v_budget, 5),

@@ -86,6 +86,13 @@ export function finishTestRun(db: SupabaseClient, finish: FinishTestRun): Promis
   )
 }
 
+// An edit's scope decision, known only after the run started (the budget is held first): written
+// onto the still-running row's inputs, as a user's edit keeps it (§5.2 「存档」).
+export async function recordDecision(db: SupabaseClient, runId: string, inputs: Record<string, unknown>): Promise<void> {
+  const { error } = await db.from('admin_test_runs').update({ inputs }).eq('id', runId).eq('status', 'running')
+  if (error) readFailed('admin_test_runs decision', error)
+}
+
 export async function findTestRun(db: SupabaseClient, runId: string): Promise<TestRun | null> {
   const { data, error } = await db.from('admin_test_runs').select(TEST_RUN_COLUMNS).eq('id', runId).maybeSingle()
   if (error) readFailed('admin_test_runs read', error)

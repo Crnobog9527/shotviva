@@ -2,7 +2,7 @@
 -- Kept apart from users' uploads: the private bucket's admin-tests/photos/ prefix, a row here, and
 -- no link to any account's works. "最近用过的测试照片" reads the newest last_used_at rows; every
 -- test run bumps it. Rows unused for 30 days that no cover run points at are cleaned up when the
--- panel opens (admin_cleanup_test_runs, 0785), not by a scheduled job.
+-- panel opens (admin_cleanup_test_runs, 0786), not by a scheduled job.
 -- Private: RLS on with no policy, read and written through the service role only.
 
 create table public.admin_test_photos (

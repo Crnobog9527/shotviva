@@ -101,6 +101,8 @@ export const TEST_RUN_COPY = {
     OUTPUT_WRITE_FAILED: '结果没写进存储',
     CONFIRM_FAILED: '结算失败',
     TIMEOUT: '超过 10 分钟没结束',
+    IDENTITY_SWAP_REFUSED: '换脸判断拒绝了这段文字',
+    PREPARE_FAILED: '出图前的判断步骤出错',
   } as Record<string, string>,
 } as const
 

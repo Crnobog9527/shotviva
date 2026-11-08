@@ -4,22 +4,20 @@ import { errorResponse, jsonResponse } from '@/core/api-response'
 import { assertSameOrigin, createAdminSupabase, requireApiAdmin } from '@/core/auth'
 import { AppError } from '@/core/errors'
 import { r2Store } from '@/core/storage'
-import { cleanupOnOpen, identityJudge, imageProvider, loadTestPanel, runTestGenerate, signRun, testGenerateBodySchema } from '@/modules/image'
+import { identityJudge, imageProvider, loadTestPanel, runTestGenerate, signRun, testGenerateBodySchema } from '@/modules/image'
 
 // Admin template test runs (ARCHITECTURE §10.b, T85). Admin only: anyone else gets a 404, as the
-// admin pages do. GET is the panel's data (?cleanup=1 when the panel opens also runs the 30-day
-// cleanup); POST is one 「首次出图」, synchronous like /api/generate with the same 300 s budget —
+// admin pages do. GET is the panel's data (read only; the cleanup is POST ./cleanup); POST is one
+// 「首次出图」, synchronous like /api/generate with the same 300 s budget —
 // a ×3 batch is three parallel POSTs. Answers with signed URLs, never image bytes.
 export const maxDuration = 300
 
 export async function GET(request: NextRequest) {
   try {
-    const admin = await requireApiAdmin()
+    await requireApiAdmin()
     const templateId = request.nextUrl.searchParams.get('template_id')
     if (!templateId || templateId.length > 64) throw new AppError('INVALID_INPUT', 'template_id is required')
-    const deps = { db: createAdminSupabase(), store: r2Store() }
-    if (request.nextUrl.searchParams.get('cleanup') === '1') await cleanupOnOpen(deps, admin.id)
-    return jsonResponse(await loadTestPanel(deps, templateId))
+    return jsonResponse(await loadTestPanel({ db: createAdminSupabase(), store: r2Store() }, templateId))
   } catch (error) {
     return errorResponse(error, 'admin-test-runs')
   }

@@ -3,9 +3,9 @@
 -- limits, the overview, the jobs list, failure alerts and PostHog never see these rows. An edit
 -- points at the run it edited (parent_id), so the runs of one template form a tree; photo_id is
 -- the test photo at the root of that branch (an edit inherits it), the "before" cover if the run
--- is set as the cover. Cost is the provider's real usage, as on generation_jobs (§10.0), and
--- /admin/costs shows it as 后台试跑 (0788). estimate_usd is what the daily budget holds while the
--- run is still going (0782).
+-- is set as the cover. Cost is the provider's real usage, as on generation_jobs (§10.0); what
+-- counts against the budget and shows on /admin/costs as 后台试跑 is kept in admin_test_spend
+-- (0782), which survives the trims below. estimate_usd is what the run held while it ran.
 -- Private: RLS on with no policy, read and written through the service role only.
 
 create table public.admin_test_runs (
@@ -36,7 +36,7 @@ create table public.admin_test_runs (
 
 -- The panel's list: a template's last 50 runs, newest first.
 create index admin_test_runs_template_created_idx on public.admin_test_runs (template_id, created_at desc);
--- Today's budget, the 30-day cleanup and the per-day costs.
+-- The 30-day cleanup.
 create index admin_test_runs_created_at_idx on public.admin_test_runs (created_at);
 -- The parent_id and photo_id set-null cascades.
 create index admin_test_runs_parent_id_idx on public.admin_test_runs (parent_id) where parent_id is not null;

@@ -1,11 +1,12 @@
--- T85: starts an admin test run (ARCHITECTURE §10.b), before the provider is called. One call:
--- the admin check, the daily budget under a lock (so the three requests of a ×3 batch cannot all
--- slip under it together), the edit's parent check, the row, and the photo's last_used_at.
+-- T85: starts an admin test run (ARCHITECTURE §10.b), before any model is called (the face-swap
+-- judge and the edit-scope call included). One call: the admin check, the daily budget under a
+-- lock (so the three requests of a ×3 batch cannot all slip under it together), the edit's parent
+-- check, the run, its spend row (0782) holding the estimate, and the photo's last_used_at.
 --
 -- p_run_id comes from the browser; a repeat returns the existing row and starts nothing (the
 -- caller sees status <> 'running' or a row it did not just create and does not call the model).
 -- An edit (p_kind = 'edit') names a succeeded run of the same template with a result; it takes
--- that run's photo. Over the budget (spent today, 0782, plus p_estimate_usd) raises
+-- that run's photo. Over the budget (spent today, 0783, plus p_estimate_usd) raises
 -- TEST_BUDGET_EXCEEDED and nothing is written. Works on unpublished templates too.
 
 create function public.admin_begin_test_run(
@@ -92,6 +93,9 @@ begin
     select * into v_row from public.admin_test_runs r where r.id = p_run_id;
     return to_jsonb(v_row);
   end if;
+
+  insert into public.admin_test_spend (run_id, template_id, estimate_usd)
+  values (p_run_id, p_template_id, p_estimate_usd);
 
   if v_photo is not null then
     update public.admin_test_photos set last_used_at = now() where id = v_photo;

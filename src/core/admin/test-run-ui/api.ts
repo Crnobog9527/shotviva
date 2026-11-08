@@ -37,8 +37,11 @@ async function call<T>(url: string, init?: { method?: string; body?: unknown }):
   throw new TestRunError(body?.code ?? 'INTERNAL', body?.message ?? `HTTP ${response.status}`)
 }
 
-export const loadPanel = (templateId: string, cleanup: boolean) =>
-  call<TestPanelData>(`/api/admin/test-runs?template_id=${encodeURIComponent(templateId)}${cleanup ? '&cleanup=1' : ''}`)
+// cleanup: when the panel opens, the 30-day cleanup runs first (a POST: it deletes data).
+export async function loadPanel(templateId: string, cleanup: boolean): Promise<TestPanelData> {
+  if (cleanup) await call<{ ok: true }>('/api/admin/test-runs/cleanup', { method: 'POST', body: {} })
+  return call<TestPanelData>(`/api/admin/test-runs?template_id=${encodeURIComponent(templateId)}`)
+}
 
 export type GenerateInput = {
   runId: string

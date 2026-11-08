@@ -1,7 +1,9 @@
 -- T85: settles an admin test run (ARCHITECTURE §10.b), the counterpart of confirm_job / refund_job
 -- for a run nobody pays for: the result key or the error, the provider's usage and real cost
--- (§10.0; a failure the provider still billed keeps its cost), and how long it took. Only a
--- running row changes; a repeat returns the row as it was settled.
+-- (§10.0; a failure the provider still billed keeps its cost), and how long it took; and, in the
+-- same transaction, what the budget counts for it (admin_test_spend, 0782): the real cost, else
+-- the run's estimate when the image model was called (it succeeded, or it failed after reporting
+-- output tokens), else 0. Only a running row changes; a repeat returns the row as it was settled.
 
 create function public.admin_finish_test_run(
   p_run_id uuid,
@@ -42,7 +44,17 @@ begin
     if not found then
       raise exception 'TEST_RUN_NOT_FOUND';
     end if;
+    return to_jsonb(v_row);
   end if;
+
+  update public.admin_test_spend x
+     set cost_usd = p_cost_usd,
+         counted_usd = coalesce(
+           p_cost_usd,
+           case when p_status = 'succeeded' or (p_provider_usage ->> 'output_tokens') is not null then x.estimate_usd else 0 end
+         ),
+         finished_at = now()
+   where x.run_id = p_run_id;
   return to_jsonb(v_row);
 end;
 $$;

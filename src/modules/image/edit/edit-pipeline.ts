@@ -33,7 +33,8 @@ export async function loadEditPipeline(db: SupabaseClient): Promise<EditPipeline
   return { template, prompt, params: params.data }
 }
 
-// quiet: an admin test run, refused the same way but leaving no refusal row or event (T85).
+// quiet: an admin test run, refused the same way but leaving no refusal row or event and taking no
+// judge slot (T85: the admin's hourly quota and /admin/providers' counts are users' only).
 export type DecideDeps = { db: SupabaseClient; classifier: ScopeClassifier | null; classifierTimeoutMs?: number; track?: ServerTrack; quiet?: boolean }
 
 export type DecideInput = { userId: string; pipeline: EditPipeline; image: InputImage; instruction: string }
@@ -50,7 +51,7 @@ async function classify(deps: DecideDeps, input: DecideInput): Promise<EditClass
 // anything is charged or started. The call counts against the account's hourly decision calls
 // like the workspace's (judge-slots.ts).
 export async function decideEdit(deps: DecideDeps, input: DecideInput): Promise<EditClassification> {
-  const slot = deps.classifier ? await takeJudgeSlot(deps.db, input.userId, null) : null
+  const slot = deps.classifier && !deps.quiet ? await takeJudgeSlot(deps.db, input.userId, null) : null
   if (slot?.status === 'limited') throw tooManyJudgeCalls()
   const decision = await classify(deps, input)
   // The scope call never answered (both 5 s attempts, or an error): the edit goes through

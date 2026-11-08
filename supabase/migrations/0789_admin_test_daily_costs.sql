@@ -1,7 +1,8 @@
 -- T85: admin test runs on /admin/costs (ARCHITECTURE §10.b 「费用」, §10.0). The same UTC days as
 -- admin_daily_costs (0284), so OpenAI's bill and our two columns cover the same hours; a run counts
--- on the day it started. The page adds this to 「我们记录的成本」 and shows it as 后台试跑.
--- Index: admin_test_runs_created_at_idx (0781).
+-- on the day it started. Read from admin_test_spend (0782), so trimmed records and deleted
+-- templates keep their cost. The page adds this to 「我们记录的成本」 and shows it as 后台试跑.
+-- Index: admin_test_spend_started_at_idx (0782).
 
 create function public.admin_test_daily_costs(p_days integer)
 returns jsonb
@@ -27,11 +28,11 @@ begin
              'runs', p.runs
            ) order by p.day), '[]'::jsonb)
       from (
-        select date_trunc('day', r.created_at at time zone 'UTC') as day,
-               coalesce(sum(r.cost_usd), 0) as cost_usd,
+        select date_trunc('day', x.started_at at time zone 'UTC') as day,
+               coalesce(sum(x.cost_usd), 0) as cost_usd,
                count(*) as runs
-          from public.admin_test_runs r
-         where r.created_at >= v_start
+          from public.admin_test_spend x
+         where x.started_at >= v_start
          group by 1
       ) p
   );
