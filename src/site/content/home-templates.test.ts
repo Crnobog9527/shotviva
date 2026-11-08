@@ -13,7 +13,7 @@ const CATEGORIES = {
 type Key = keyof typeof CATEGORIES
 
 let day = 0
-const live = (id: string, category: Key, extra: { rank?: number; covers?: boolean; description?: string; credits?: number } = {}) => ({
+const live = (id: string, category: Key, extra: { rank?: number; covers?: boolean; description?: string } = {}) => ({
   id,
   name: `Name ${id}`,
   description: extra.description ?? `Use of ${id}`,
@@ -23,7 +23,7 @@ const live = (id: string, category: Key, extra: { rank?: number; covers?: boolea
   coverAfterUrl: extra.covers === false ? null : `https://shotviva.com/assets/covers/${id}/a.webp`,
   featuredRank: extra.rank ?? null,
   createdAt: `2026-11-${String(++day).padStart(2, '0')}T00:00:00Z`,
-  creditsCost: { '1k': extra.credits ?? 2, '2k': 4, '3k': 6 },
+  creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
 })
 
 // T53, ARCHITECTURE §12 home item 3.
@@ -40,13 +40,13 @@ describe('featured templates from the database', () => {
 
   // T75: names, intros and order come from 分类管理; the drag compare follows card_style.
   it('groups in the admin\'s category order with the stored names and intros, hiding empty ones', () => {
-    const rows = [live('new', 'fresh', { rank: 1 }), live('pet', 'pets', { rank: 2 }), live('art', 'art-styles', { rank: 3, credits: 1 }), live('dish', 'food-drink', { rank: 4 })]
+    const rows = [live('new', 'fresh', { rank: 1 }), live('pet', 'pets', { rank: 2 }), live('art', 'art-styles', { rank: 3 }), live('dish', 'food-drink', { rank: 4 })]
     const { categories, media, defaultId } = featuredSections(rows)
     expect(categories.map((c) => c.name)).toEqual(['Art Styles', 'Food & Drink', '宠物', 'Fresh'])
     expect(categories.map((c) => c.intro)).toEqual(['Drawings.', 'Dishes.', '', 'Added in admin.'])
     expect(categories.map((c) => c.drag === true)).toEqual([true, false, false, false])
-    // Each card carries its own Standard price (建站规格 G4).
-    expect(categories[0]?.templates).toEqual([{ id: 'art', name: 'Name art', use: 'Use of art', credits: 1 }])
+    // Name and use only: the marketing cards carry no price (DESIGN, Owner 2026-11-08).
+    expect(categories[0]?.templates).toEqual([{ id: 'art', name: 'Name art', use: 'Use of art' }])
     expect(media.pet).toEqual({ before: 'https://shotviva.com/assets/covers/pet/b.webp', after: 'https://shotviva.com/assets/covers/pet/a.webp', live: true })
     expect(defaultId).toBe('new')
   })
