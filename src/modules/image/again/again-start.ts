@@ -40,12 +40,17 @@ function copyOf(raw: unknown, template: CatalogueTemplate): Record<string, strin
   )
 }
 
+const asRecord = (raw: unknown): Record<string, unknown> => (typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {})
+
 // The work's toggles as it was made (T89), for the template's toggles of today: Make again keeps
-// an accepted choice on without asking again; a toggle the template no longer has is dropped.
-function togglesOf(raw: unknown, template: CatalogueTemplate): Record<string, boolean> {
-  if (typeof raw !== 'object' || raw === null) return {}
-  const values = raw as Record<string, unknown>
-  return Object.fromEntries(template.toggles.flatMap((toggle) => (values[toggle.key] === true ? [[toggle.key, true]] : [])))
+// a choice on without asking again only when the user saw today's dialog for it, i.e. the work
+// recorded a confirmation (a toggle that gained `confirm` after the work starts off). A toggle the
+// template no longer has is dropped.
+function togglesOf(inputs: Record<string, unknown>, template: CatalogueTemplate): Record<string, boolean> {
+  const values = asRecord(inputs.toggles)
+  const confirmedAt = asRecord(inputs.toggles_confirmed_at)
+  const kept = template.toggles.filter((toggle) => values[toggle.key] === true && (!toggle.confirm || typeof confirmedAt[toggle.key] === 'string'))
+  return Object.fromEntries(kept.map((toggle) => [toggle.key, true]))
 }
 
 // The old work's form, read back from its stored inputs and checked against what the template
@@ -58,7 +63,7 @@ export function againValues(inputs: Record<string, unknown>, template: Catalogue
     resolution,
     note: typeof inputs.note === 'string' ? inputs.note.slice(0, NOTE_MAX_LENGTH) : '',
     copy: copyOf(inputs.copy, template),
-    toggles: togglesOf(inputs.toggles, template),
+    toggles: togglesOf(inputs, template),
   }
 }
 

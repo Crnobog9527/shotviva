@@ -70,11 +70,13 @@ function toggleValue(toggle: ToggleField, given: Record<string, unknown>, accept
   return value
 }
 
-// Only the template's own toggles, only booleans; absent ones take their default (off).
+// Only the template's own toggles, only booleans; absent ones take their default (off). A key the
+// template no longer has is ignored when it is off (a queued job or an open tab after an admin
+// removed or renamed it), refused when it asks for something on.
 function checkToggles(fields: TemplateFields, raw: RawGenerationInputs): Pick<GenerationInputs, 'toggles' | 'confirmed'> {
   const defined = fields.toggles ?? []
   const given = raw.toggles ?? {}
-  const unknown = Object.keys(given).find((key) => !defined.some((toggle) => toggle.key === key))
+  const unknown = Object.keys(given).find((key) => given[key] !== false && !defined.some((toggle) => toggle.key === key))
   if (unknown) throw invalid(`Unknown option: ${unknown}`)
   const accepted = new Set(raw.togglesConfirmed ?? [])
   const toggles: Record<string, boolean> = {}

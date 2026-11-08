@@ -26,10 +26,16 @@ describe('againValues', () => {
     })
   })
 
-  it('keeps a toggle the work was made with on, without asking again, and drops ones the template lost (T89)', () => {
+  it('keeps a confirmed toggle on without asking again, and drops ones the template lost (T89)', () => {
     const inputs = { toggles: { replate: true, steam: true }, toggles_confirmed_at: { replate: '2026-11-08T12:00:00Z' } }
     expect(againValues(inputs, template).toggles).toEqual({ replate: true })
     expect(againValues({ toggles: { replate: false } }, template).toggles).toEqual({})
+  })
+
+  it('starts a toggle off when the work has no confirmation for today’s dialog (T89)', () => {
+    // On before the toggle had a dialog: the user never saw it, so no confirm flag is sent for them.
+    expect(againValues({ toggles: { replate: true } }, template).toggles).toEqual({})
+    expect(againValues({ toggles: { replate: true }, toggles_confirmed_at: { replate: 1 } }, template).toggles).toEqual({})
   })
 })
 

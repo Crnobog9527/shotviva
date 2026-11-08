@@ -5,19 +5,29 @@ import type { CatalogueToggle } from '../catalogue/catalogue-template'
 
 export type ToggleValues = Record<string, boolean>
 
-// The template's own toggles only, true where on. A key the template no longer has is dropped.
-export function chosenToggles(toggles: readonly CatalogueToggle[], values: ToggleValues): ToggleValues {
-  return Object.fromEntries(toggles.map((toggle) => [toggle.key, values[toggle.key] === true]))
+// /api/generate's inputs.toggles and inputs.toggles_confirmed: only the toggles that are on (off
+// is the default), so a queued job or an open tab still goes through after an admin removes or
+// renames a toggle the user never turned on. A toggle with a dialog can only be on here after the
+// user accepted it (or Make again kept a work's confirmed choice), so every such toggle that is
+// on goes out as confirmed; the server refuses one without it.
+export function toggleRequest(toggles: readonly CatalogueToggle[], values: ToggleValues): { toggles?: ToggleValues; toggles_confirmed?: string[] } {
+  const on = toggles.filter((toggle) => values[toggle.key] === true)
+  if (on.length === 0) return {}
+  const confirmed = on.filter((toggle) => toggle.confirm).map((toggle) => toggle.key)
+  return { toggles: Object.fromEntries(on.map((toggle) => [toggle.key, true])), ...(confirmed.length > 0 ? { toggles_confirmed: confirmed } : {}) }
 }
 
-// /api/generate's inputs.toggles and inputs.toggles_confirmed. A toggle with a dialog can only be
-// on here after the user accepted it (or Make again kept a work's accepted choice), so every
-// such toggle that is on goes out as confirmed; the server refuses one without it.
-export function toggleRequest(toggles: readonly CatalogueToggle[], values: ToggleValues): { toggles?: ToggleValues; toggles_confirmed?: string[] } {
-  if (toggles.length === 0) return {}
-  const chosen = chosenToggles(toggles, values)
-  const confirmed = toggles.filter((toggle) => toggle.confirm && chosen[toggle.key]).map((toggle) => toggle.key)
-  return { toggles: chosen, ...(confirmed.length > 0 ? { toggles_confirmed: confirmed } : {}) }
+// A draft kept across sign-up (T89, home generator): the toggles that were on and which of them the
+// visitor confirmed. Restored only for the template's toggles of today, and a toggle with a dialog
+// only when its confirmation came along (it gained a dialog since, or the draft is odd: off).
+export function draftToggles(toggles: readonly CatalogueToggle[], values: ToggleValues) {
+  const on = toggles.filter((toggle) => values[toggle.key] === true)
+  return { toggles: on.map((toggle) => toggle.key), confirmed: on.filter((toggle) => toggle.confirm).map((toggle) => toggle.key) }
+}
+
+export function restoreToggles(toggles: readonly CatalogueToggle[], draft: { toggles: readonly string[]; confirmed: readonly string[] }): ToggleValues {
+  const kept = toggles.filter((toggle) => draft.toggles.includes(toggle.key) && (!toggle.confirm || draft.confirmed.includes(toggle.key)))
+  return Object.fromEntries(kept.map((toggle) => [toggle.key, true]))
 }
 
 const storageKey = (templateId: string, key: string) => `shotviva:toggle-confirmed:${templateId}:${key}`

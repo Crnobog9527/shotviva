@@ -26,7 +26,7 @@ export function TemplateToggles({ template, values, onChange, surface, compact, 
   if (toggles.length === 0) return null
   return (
     <div className={className}>
-      <ToggleRows idPrefix={`toggle-${surface}`} toggles={toggles} values={values} onRequest={flow.request} compact={compact} />
+      <ToggleRows toggles={toggles} values={values} onRequest={flow.request} compact={compact} />
       <ToggleConfirmSheet toggle={flow.asking} onAccept={flow.accept} onCancel={flow.cancel} />
     </div>
   )

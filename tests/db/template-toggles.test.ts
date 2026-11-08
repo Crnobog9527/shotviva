@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { listJobs, parseJobFilters, recentJobs } from '@/core/admin'
 import { runGeneration, type GenerationRequest } from '@/core/jobs'
 import { handleGenerate } from '@/core/partner'
 import { newInputKey } from '@/core/storage'
@@ -90,12 +91,24 @@ describe('template toggles on the web (T89)', () => {
   })
 
   it('renders the on fragment once confirmed and records the server time of the confirmation', async () => {
-    const { fake, deps, request } = await setup()
+    const { userId, fake, deps, request } = await setup()
     const view = await runGeneration(deps, request({ toggles: { replate: true }, togglesConfirmed: ['replate'] }))
     expect(fake.calls[0]?.prompt).toBe('WRAPPED dish. FAKE-ON')
     const inputs = await inputsOf(view.id)
     expect(inputs?.toggles).toEqual({ replate: true })
     expect(inputs?.toggles_confirmed_at).toEqual({ replate: NOW.toISOString() })
+    // Both admin lists (出图记录, the user detail dialog) show it with the confirm time.
+    const shown = [{ key: 'replate', on: true, confirmedAt: NOW.toISOString() }]
+    const page = await listJobs(serviceSupabase(), parseJobFilters({ template: templateId }))
+    expect(page.items.find((job) => job.id === view.id)?.toggles).toEqual(shown)
+    expect((await recentJobs(serviceSupabase(), userId)).find((job) => job.id === view.id)?.toggles).toEqual(shown)
+  })
+
+  it('ignores an off key the template no longer has, and refuses an on one', async () => {
+    const { fake, deps, request } = await setup()
+    await runGeneration(deps, request({ toggles: { renamed: false } }))
+    expect(fake.calls[0]?.prompt).toBe('WRAPPED dish. FAKE-OFF')
+    await expect(runGeneration(deps, request({ toggles: { renamed: true } }))).rejects.toMatchObject({ code: 'INVALID_INPUT' })
   })
 })
 

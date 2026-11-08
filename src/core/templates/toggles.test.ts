@@ -54,5 +54,6 @@ describe('model_params.toggles (T89)', () => {
     expect(toggleSetupProblems([replate], 'Shot.', params)).toHaveLength(1)
     expect(toggleSetupProblems([replate], 'Shot. {{replate}}', { toggles: { replate: { on: 'x', off: ' ' } } })).toHaveLength(1)
     expect(toggleSetupProblems([replate], 'Shot.', {})).toHaveLength(3)
+    expect(toggleSetupProblems([replate], 'Shot. {{replate}}', { toggles: { replate: { on: 'plate {{dish}}', off: 'x' } } })).toHaveLength(1)
   })
 })

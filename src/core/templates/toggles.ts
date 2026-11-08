@@ -60,7 +60,9 @@ export function providerParams(modelParams: Record<string, unknown>): Record<str
 const hasPlaceholder = (body: string, key: string) => new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`).test(body)
 
 // The admin save's refusals (T89): every toggle needs its {{key}} in the prompt body and both an
-// "on" and an "off" fragment. Chinese messages: only the admin editor shows them (DESIGN §7).
+// "on" and an "off" fragment, neither holding a placeholder of its own (renderPrompt inserts a
+// fragment as it is, so `{{` would reach the model raw). Chinese messages: only the admin editor
+// shows them (DESIGN §7).
 export function toggleSetupProblems(toggles: readonly ToggleField[], body: string, modelParams: Record<string, unknown>): string[] {
   const fragments = toggleFragments(modelParams)
   return toggles.flatMap((toggle) => {
@@ -69,6 +71,7 @@ export function toggleSetupProblems(toggles: readonly ToggleField[], body: strin
     const own = fragments[toggle.key]
     if (!own?.on.trim()) problems.push(`开关 ${toggle.key}：缺「开」那段（model_params.toggles.${toggle.key}.on）`)
     if (!own?.off.trim()) problems.push(`开关 ${toggle.key}：缺「关」那段（model_params.toggles.${toggle.key}.off）`)
+    if (own && (own.on.includes('{{') || own.off.includes('{{'))) problems.push(`开关 ${toggle.key}：「开」「关」两段里不能有 {{ 占位符`)
     return problems
   })
 }

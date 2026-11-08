@@ -8,10 +8,10 @@ import type { OutputAspect } from '@/core/templates/output-options'
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import { enqueueJobs, setWorkspaceJobs } from '../generation/job-store'
 import { useJobs } from '../generation/use-jobs'
-import type { ToggleValues } from '../toggles'
+import { draftToggles, rememberConfirmed, restoreToggles, type ToggleValues } from '../toggles'
 import { startInputs } from '../workspace/batch-request'
 import { homeCta, type HomeViewer } from './home-cta'
-import { clearDraft, loadDraft, saveDraft } from './home-draft'
+import { clearDraft, loadDraft, saveDraft, type HomeDraft } from './home-draft'
 import { useHomePhoto, type HomePhoto } from './use-home-photo'
 
 type Args = { templates: readonly CatalogueTemplate[]; defaultId: string | null; viewer: HomeViewer | null }
@@ -27,22 +27,22 @@ function useRunning(serverIds: readonly string[]): number {
   return ids.size
 }
 
-type Restore = { signedIn: boolean; known: (id: string) => boolean; apply(templateId: string | null, aspect: OutputAspect, note: string): void; pick(file: File): void }
+type Restore = { signedIn: boolean; apply(draft: HomeDraft): void; pick(file: File): void }
 
 // Brings back what a signed-out visitor set up before sign-up, once. Signed in, the photo now
 // uploads and the draft is spent.
-function useRestoreDraft({ signedIn, known, apply, pick }: Restore) {
+function useRestoreDraft({ signedIn, apply, pick }: Restore) {
   const done = useRef(false)
   useEffect(() => {
     if (done.current) return
     done.current = true
     void loadDraft().then((found) => {
       if (!found) return
-      apply(known(found.draft.templateId) ? found.draft.templateId : null, found.draft.aspect, found.draft.note)
+      apply(found.draft)
       if (found.photo) pick(found.photo)
       if (signedIn) void clearDraft()
     })
-  }, [signedIn, known, apply, pick])
+  }, [signedIn, apply, pick])
 }
 
 // Starts the photo exactly as the workspace does (DESIGN §6.9 item 9): one job in the
@@ -74,13 +74,22 @@ export function useHomeGenerator({ templates, defaultId, viewer }: Args) {
   const toggles = template && chosen.templateId === template.id ? chosen.values : {}
   const setToggles = useCallback((values: ToggleValues) => setChosen({ templateId: template?.id ?? null, values }), [template])
   const photo = useHomePhoto(viewer !== null)
-  const known = useCallback((id: string) => templates.some((candidate) => candidate.id === id), [templates])
-  const apply = useCallback((id: string | null, nextAspect: OutputAspect, nextNote: string) => {
-    if (id) setTemplateId(id)
-    setAspect(nextAspect)
-    setNote(nextNote)
-  }, [])
-  useRestoreDraft({ signedIn: viewer !== null, known, apply, pick: photo.pick })
+  const apply = useCallback(
+    (draft: HomeDraft) => {
+      const saved = templates.find((candidate) => candidate.id === draft.templateId)
+      if (saved) {
+        setTemplateId(saved.id)
+        // The confirmed toggles stay on, and count as confirmed for this session (T89).
+        const values = restoreToggles(saved.toggles, draft)
+        setChosen({ templateId: saved.id, values })
+        for (const key of draft.confirmed.filter((confirmed) => values[confirmed])) rememberConfirmed(saved.id, key)
+      }
+      setAspect(draft.aspect)
+      setNote(draft.note)
+    },
+    [templates],
+  )
+  useRestoreDraft({ signedIn: viewer !== null, apply, pick: photo.pick })
   const running = useRunning(viewer?.concurrency.runningIds ?? [])
   const cta = homeCta({
     viewer,
@@ -104,7 +113,7 @@ export function useHomeGenerator({ templates, defaultId, viewer }: Args) {
     cta,
     generate: () => start(aspect, note.trim(), toggles),
     // Before the sign-up prompt: what to bring back afterwards.
-    keepDraft: () => (template ? saveDraft({ templateId: template.id, aspect, note }, photo.file) : Promise.resolve()),
+    keepDraft: () => (template ? saveDraft({ templateId: template.id, aspect, note, ...draftToggles(template.toggles, toggles) }, photo.file) : Promise.resolve()),
   }
 }
 

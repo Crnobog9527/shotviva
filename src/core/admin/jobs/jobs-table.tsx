@@ -8,6 +8,7 @@ import { formatBeijing } from '../shell/format'
 import { JOBS_COPY as COPY } from './copy'
 import { jobCostCell, type UnitCost } from './cost'
 import { usdFine } from './cost-format'
+import { JobToggles } from './job-toggles'
 import type { AdminJob } from './repository'
 import { UserLink } from '../users-ui/user-link'
 
@@ -59,12 +60,7 @@ function TemplateCell({ job }: { job: AdminJob }) {
   return (
     <TableCell>
       <div className="font-mono text-xs">{job.templateId}</div>
-      {job.toggles.map((toggle) => (
-        <div key={toggle.key} className={toggle.on ? 'mt-1 text-xs text-amber-700 dark:text-amber-400' : 'mt-1 text-xs text-muted-foreground'}>
-          {COPY.toggle(toggle.key, toggle.on)}
-          {toggle.on && toggle.confirmedAt ? ` · ${COPY.toggleConfirmed(formatBeijing(toggle.confirmedAt) ?? toggle.confirmedAt)}` : null}
-        </div>
-      ))}
+      <JobToggles toggles={job.toggles} />
     </TableCell>
   )
 }

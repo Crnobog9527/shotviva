@@ -98,8 +98,14 @@ describe('toggles (T89)', () => {
     expect(validateGenerationInputs(toggled, { imageCount: 1, togglesConfirmed: ['replate'] }).confirmed).toEqual([])
   })
 
+  it('ignores a key the template no longer has when it is off, refuses it when on', () => {
+    expect(validateGenerationInputs(toggled, { imageCount: 1, toggles: { removed: false } }).toggles).toEqual({ replate: false, steam: false })
+    expect(() => validateGenerationInputs(toggled, { imageCount: 1, toggles: { removed: true } })).toThrow(expect.objectContaining({ code: 'INVALID_INPUT' }))
+  })
+
   it.each([
     ['unknown key', { prompt: true }],
+    ['unknown key, not a boolean', { prompt: 'off' }],
     ['non-boolean value', { steam: 'yes' }],
   ])('rejects %s', (_, toggles) => {
     expect(() => validateGenerationInputs(toggled, { imageCount: 1, toggles })).toThrow(expect.objectContaining({ code: 'INVALID_INPUT' }))
