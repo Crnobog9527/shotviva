@@ -48,7 +48,7 @@ export const termsPage = defineLegalPage({
   lastUpdated: LAST_UPDATED,
   intro: [
     operatorSentence,
-    'Please read these Terms carefully. Using free credits means the images you create are shown publicly, and you are responsible for the people and the intellectual property in what you upload (see "Free works, likeness and your responsibility"). These Terms also limit our liability and choose the courts of Wyoming for disputes.',
+    'Please read these Terms carefully. Using free credits means the images you create are shown publicly, and you are responsible for the people and the intellectual property in what you upload (see "Free works, likeness and your responsibility"). You are also responsible for how you use the images you create, including making sure they match what you actually sell (see "AI-made images and using them in your business"). These Terms also limit our liability and choose the courts of Wyoming for disputes.',
   ],
   sections,
 })

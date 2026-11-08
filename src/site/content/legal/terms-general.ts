@@ -59,6 +59,7 @@ export const termsGeneralSections: readonly LegalSection[] = [
     blocks: [
       `TO THE FULLEST EXTENT THE LAW ALLOWS, ${entity.company.toUpperCase()} AND ITS MEMBERS, MANAGERS, EMPLOYEES AND AGENTS WILL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY OR PUNITIVE DAMAGES, OR FOR ANY LOSS OF PROFITS, REVENUE, DATA OR GOODWILL, ARISING FROM OR RELATED TO THE SERVICE, EVEN IF WE WERE TOLD THEY WERE POSSIBLE.`,
       'TO THE FULLEST EXTENT THE LAW ALLOWS, OUR TOTAL LIABILITY FOR ALL CLAIMS RELATED TO THE SERVICE IS LIMITED TO THE AMOUNT YOU PAID FOR THE SERVICE IN THE SIX (6) MONTHS BEFORE THE EVENT THAT GAVE RISE TO THE CLAIM.',
+      'These limits do not apply to liability that cannot be limited by law, such as liability for our own fraud or willful misconduct.',
       'Some states and countries do not allow some of these limits. Where they do not, the limits apply only as far as the law allows, and you may have additional rights.',
     ],
   },
@@ -66,7 +67,7 @@ export const termsGeneralSections: readonly LegalSection[] = [
     id: 'indemnity',
     heading: 'Indemnity',
     blocks: [
-      `You agree to defend and indemnify ${entity.company} and its members, managers, employees and agents against any third-party claim, and the losses, damages and reasonable legal fees that come from it, arising from Your Content, your use of Outputs, or your breach of these Terms or of anyone’s rights.`,
+      `You agree to defend and indemnify ${entity.company} and its members, managers, employees and agents against any third-party claim, and the losses, damages and reasonable legal fees that come from it, arising from Your Content, your use of Outputs (including claims by your customers, the platforms you sell on, or regulators about images you published), or your breach of these Terms or of anyone’s rights.`,
       'This includes every claim described in "Free works, likeness and your responsibility" above: claims about the likeness, image, publicity, privacy or reputation of a person shown in a photo or reference image you uploaded, including claims caused by our public display of a free work made from it, and claims that material you provided, or an image created from it, infringes copyright, trademark or other intellectual property.',
       'We will tell you about such a claim and may choose to take over its defense, in which case you agree to cooperate with us.',
     ],

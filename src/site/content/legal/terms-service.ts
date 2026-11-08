@@ -101,6 +101,15 @@ export const termsServiceSections: readonly [LegalSection, ...LegalSection[]] = 
     ],
   },
   {
+    id: 'using-outputs',
+    heading: 'AI-made images and using them in your business',
+    blocks: [
+      'Check before you use an Output. AI results can differ from your real product, dish or place, and the same template can give different results each time. Before you publish or use an Output, check it yourself. You decide whether and how to use it, whether that use is lawful, and whether you need to label it as AI-made under the law or the rules of the platform where you post it. We do not review Outputs before you use them.',
+      'Using Outputs in your business. Shotviva is a tool. When you use an Output on a menu, a delivery app, a store listing, an ad or anywhere else, you are the seller or advertiser, not us. You alone are responsible for making sure it fairly shows what your customers will get. We are not a party to any dealings between you and your customers, the platforms you sell on, or regulators. Complaints, refunds, bad reviews, platform penalties or fines that come from an image not matching the real product are your responsibility.',
+      'This includes images made with options you choose to turn on that change how your product looks, such as "Upgrade plating & tableware". The Service records when you turned such an option on.',
+    ],
+  },
+  {
     id: 'responsibility',
     heading: 'Free works, likeness and your responsibility',
     blocks: [
