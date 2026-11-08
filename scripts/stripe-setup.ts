@@ -3,7 +3,9 @@
  * with tax code txcd_10105001 and 15 Prices with lookup_key and metadata.product_id. Also keeps
  * the card-only payment method configuration 中国银行卡 checks out with (T64): card on, Link,
  * Apple Pay and Google Pay off; created when missing, its preferences reset when they drift.
- * Idempotent.
+ * Idempotent. Also reads (never changes) the account's webhook endpoints and names any event the
+ * Shotviva endpoint is not subscribed to yet (src/core/billing/stripe/webhook-events.ts; T71 added
+ * charge.dispute.closed): the Owner ticks those in the Dashboard (Developers → Webhooks).
  * Without --apply it only prints the plan (dry run); with --apply it writes:
  *
  *   pnpm tsx --env-file=.env.local scripts/stripe-setup.ts                  # dry run
@@ -35,6 +37,7 @@ import {
   type PriceReplacement,
   type SetupPlan,
 } from '../src/core/billing/stripe/setup-plan'
+import { missingWebhookEvents } from '../src/core/billing/stripe/webhook-events'
 import { site } from '../src/site/site.config'
 
 const env = z
@@ -165,6 +168,17 @@ function printCardOnly(plan: CardOnlyPlan): void {
   else console.log(`  = ${CARD_ONLY_CONFIG_NAME} in place (${plan.id})`)
 }
 
+// Read only: webhook endpoints are set up by hand in the Dashboard (one per mode, ARCHITECTURE §6.3).
+async function checkWebhookEvents(): Promise<void> {
+  const endpoints = (await stripe.webhookEndpoints.list({ limit: 100 })).data.filter((e) => e.url.includes('/api/webhooks/stripe'))
+  if (endpoints.length === 0) console.log('  ! No webhook endpoint for /api/webhooks/stripe on this account.')
+  for (const endpoint of endpoints) {
+    const missing = missingWebhookEvents(endpoint.enabled_events)
+    if (missing.length === 0) console.log(`  = Webhook ${endpoint.url}: all events subscribed`)
+    else console.log(`  ! Webhook ${endpoint.url}: subscribe it to ${missing.join(', ')} (Dashboard → Developers → Webhooks)`)
+  }
+}
+
 async function main(): Promise<void> {
   console.log(`Stripe ${live ? 'LIVE' : 'test'} account${apply ? '' : ' (dry run)'}`)
   const plan0 = planSetup({ products, brand: site.brand.name, existingProducts: new Map(), existingPrices: new Map() })
@@ -183,6 +197,7 @@ async function main(): Promise<void> {
     process.exit(1)
   }
   printPlan(plan)
+  await checkWebhookEvents()
   const cardOnly = await planCardOnly()
   printCardOnly(cardOnly)
   if (!apply) {

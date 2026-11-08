@@ -6,11 +6,12 @@ import { ORDERS_COPY as COPY } from './copy'
 import { formatMinor } from './money'
 import type { AdminPurchase } from './repository'
 import { stripeDashboardUrl } from './source'
+import { ClawbackButton, ClawbackStatus, type ClawbackActions } from '../clawback-ui'
 import { UserLink } from '../users-ui/user-link'
 
 // ARCHITECTURE §10: time, buyer, product, amount, method, channel, status, link. Amounts are
 // what was charged (payments, T10), in the charge's own currency.
-const COLUMNS = ['createdAt', 'email', 'product', 'amount', 'tax', 'refunded', 'method', 'form', 'channel', 'status', 'link'] as const
+const COLUMNS = ['createdAt', 'email', 'product', 'amount', 'tax', 'refunded', 'credits', 'method', 'form', 'channel', 'status', 'link'] as const
 
 function ProviderLink({ row, stripeLive }: { row: AdminPurchase; stripeLive: boolean }) {
   if (row.channel !== 'stripe' || !row.providerId) return <span className="font-mono text-xs">{row.providerId ?? COPY.noLink}</span>
@@ -21,7 +22,9 @@ function ProviderLink({ row, stripeLive }: { row: AdminPurchase; stripeLive: boo
   )
 }
 
-function PurchaseRow({ row, stripeLive }: { row: AdminPurchase; stripeLive: boolean }) {
+type RowProps = { row: AdminPurchase; stripeLive: boolean; clawback?: ClawbackActions }
+
+function PurchaseRow({ row, stripeLive, clawback }: RowProps) {
   const money = (amount: number) => formatMinor(amount, row.currency)
   return (
     <TableRow>
@@ -33,6 +36,12 @@ function PurchaseRow({ row, stripeLive }: { row: AdminPurchase; stripeLive: bool
       <TableCell className="font-mono">{money(row.amountTotal)}</TableCell>
       <TableCell className="font-mono text-xs">{money(row.amountTax)}</TableCell>
       <TableCell className="font-mono text-xs">{row.amountRefunded > 0 ? money(row.amountRefunded) : COPY.noLink}</TableCell>
+      <TableCell>
+        <span className="grid gap-1">
+          <ClawbackStatus clawedBack={row.creditsClawedBack} shortfall={row.clawbackShortfall} />
+          {clawback ? <ClawbackButton paymentId={row.id} actions={clawback} /> : null}
+        </span>
+      </TableCell>
       <TableCell className="text-xs">{COPY.methods[row.method]}</TableCell>
       <TableCell className="text-xs">{COPY.forms[row.form]}</TableCell>
       <TableCell className="text-xs">{COPY.channels[row.channel]}</TableCell>
@@ -46,7 +55,7 @@ function PurchaseRow({ row, stripeLive }: { row: AdminPurchase; stripeLive: bool
   )
 }
 
-export function PurchasesTable({ purchases, stripeLive }: { purchases: AdminPurchase[]; stripeLive: boolean }) {
+export function PurchasesTable({ purchases, stripeLive, clawback }: { purchases: AdminPurchase[]; stripeLive: boolean; clawback?: ClawbackActions }) {
   if (purchases.length === 0) return <p className="text-sm text-muted-foreground">{COPY.noPurchases}</p>
   return (
     <Table>
@@ -59,7 +68,7 @@ export function PurchasesTable({ purchases, stripeLive }: { purchases: AdminPurc
       </TableHeader>
       <TableBody>
         {purchases.map((row) => (
-          <PurchaseRow key={row.id} row={row} stripeLive={stripeLive} />
+          <PurchaseRow key={row.id} row={row} stripeLive={stripeLive} clawback={clawback} />
         ))}
       </TableBody>
     </Table>

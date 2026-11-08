@@ -18,7 +18,7 @@ const fail = (what: string, error: { message: string }): never => {
 
 const PAYMENT_COLUMNS =
   'id, created_at, user_id, product_id, channel, stripe_session_id, stripe_invoice_id, stripe_charge_id, waffo_order_id, ' +
-  'amount_total, amount_tax, amount_refunded, currency, method, status'
+  'amount_total, amount_tax, amount_refunded, currency, method, status, credits_clawed_back, clawback_shortfall'
 
 const nullableId = z.string().nullable()
 
@@ -38,6 +38,8 @@ const paymentRow = z.object({
   currency: z.string(),
   method: z.enum(['card', 'alipay', 'wechat_pay', 'cn_card']),
   status: z.enum(['paid', 'refunded', 'partially_refunded', 'disputed']),
+  credits_clawed_back: z.number().int(),
+  clawback_shortfall: z.number().int(),
 })
 
 export type PaymentStatus = z.infer<typeof paymentRow>['status']
@@ -57,6 +59,9 @@ export type AdminPurchase = PurchaseSource & {
   // wechat_pay (T73).
   method: 'card' | 'alipay' | 'wechat_pay' | 'cn_card'
   status: PaymentStatus
+  // T71: credits taken back for this payment, and those already spent (「欠扣」, written off).
+  creditsClawedBack: number
+  clawbackShortfall: number
 }
 
 // Emails come live from Auth, one call per distinct user on the page (≤ 30), never copied.
@@ -92,6 +97,8 @@ export async function listPurchases(db: SupabaseClient, cursor?: string | null):
     currency: row.currency,
     method: row.method,
     status: row.status,
+    creditsClawedBack: row.credits_clawed_back,
+    clawbackShortfall: row.clawback_shortfall,
   }))
 }
 

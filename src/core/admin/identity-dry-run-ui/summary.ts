@@ -23,7 +23,7 @@ export function summarize(rows: DryRunRow[], prices: ProviderPrices | null): Dry
   const outputTokens = mean(answered.map((row) => row.outputTokens ?? 0))
   return {
     answered: answered.length,
-    refused: rows.filter((row) => row.refused).length,
+    refused: rows.filter((row) => row.identitySwap === true).length,
     p50: percentile(ms, 50),
     p95: percentile(ms, 95),
     inputTokens,

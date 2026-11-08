@@ -1,12 +1,13 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/core/ui/table'
 
+import { ClawbackStatus } from '../clawback-ui'
 import { stripeDashboardUrl } from '../orders/source'
 import { formatBeijing } from '../shell/format'
 import { DETAIL_ROWS, type UserPayment } from '../users/detail-types'
 import { USERS_COPY } from './copy'
 
 const COPY = USERS_COPY.extras
-const COLUMNS = ['createdAt', 'product', 'amount', 'tax', 'refunded', 'method', 'status', 'link'] as const
+const COLUMNS = ['createdAt', 'product', 'amount', 'tax', 'refunded', 'credits', 'method', 'status', 'link'] as const
 
 // Minor units to a display amount. Currencies differ under Adaptive Pricing (T10 notes), and
 // some (JPY, KRW) have no minor unit, so the divisor comes from the currency itself.
@@ -48,6 +49,9 @@ export function PaymentsBlock({ payments, stripeLive }: { payments: UserPayment[
                 <TableCell className="font-mono text-xs">{money(payment.amountTotal, payment.currency)}</TableCell>
                 <TableCell className="font-mono text-xs">{money(payment.amountTax, payment.currency)}</TableCell>
                 <TableCell className="font-mono text-xs">{payment.amountRefunded > 0 ? money(payment.amountRefunded, payment.currency) : ''}</TableCell>
+                <TableCell>
+                  <ClawbackStatus clawedBack={payment.creditsClawedBack} shortfall={payment.clawbackShortfall} />
+                </TableCell>
                 <TableCell className="text-xs">{COPY.methods[payment.method] ?? payment.method}</TableCell>
                 <TableCell className="text-xs">{COPY.paymentStatus[payment.status] ?? payment.status}</TableCell>
                 <TableCell>

@@ -60,12 +60,12 @@ describe('renderAlert', () => {
     const base = { userId: USER, productId: 'pro_monthly', amount: usd(4990), disputeId: 'du_1', credits: null }
     const evidence = { dueBy: '2026-11-18T15:59:00Z', responder: 'shotviva' as const, autoBanned: true, draft: 'staged' as const }
     expect(text({ kind: 'dispute_opened', ...base, evidence })).toBe(
-      '【拒付】j***@gmail.com 向银行投诉了 Pro 月付 $49.90 这笔扣款，积分处理见后台。账号已自动封禁。申诉证据已整理成草稿，请到后台检查后提交，截止北京时间 11月18日 23:59。\n去后台看：https://shotviva.com/admin/disputes/du_1',
+      '【拒付】j***@gmail.com 向银行投诉了 Pro 月付 $49.90 这笔扣款，积分处理见后台。账号已自动封禁。申诉证据已整理成草稿，请到后台检查后提交，截止北京时间 11月18日 23:59。\n去后台看：https://shotviva.com/admin/disputes/view?id=du_1',
     )
     expect(text({ kind: 'dispute_opened', ...base, evidence: { ...evidence, responder: 'stripe', autoBanned: false } })).toContain('这笔由 Stripe 应诉（Managed Payments），证据草稿已存给 Stripe 参考，不用你提交')
     expect(text({ kind: 'dispute_opened', ...base, evidence: { ...evidence, draft: 'failed' } })).toContain('证据草稿这次没能存到 Stripe（Stripe 重发通知时会自动重试）')
     expect(text({ kind: 'dispute_due_soon', userId: USER, productId: 'pack_s', amount: usd(990), disputeId: 'du_2', dueBy: '2026-11-18T15:59:00Z' })).toBe(
-      '【拒付快到期】j***@gmail.com 的 S 积分包 $9.90 拒付还没提交申诉，截止北京时间 11月18日 23:59，只剩不到 3 天。\n去后台看：https://shotviva.com/admin/disputes/du_2',
+      '【拒付快到期】j***@gmail.com 的 S 积分包 $9.90 拒付还没提交申诉，截止北京时间 11月18日 23:59，只剩不到 3 天。\n去后台看：https://shotviva.com/admin/disputes/view?id=du_2',
     )
   })
 
@@ -106,6 +106,12 @@ describe('renderAlert: operations', () => {
     )
     expect(text({ kind: 'subscription_cancel_failed', userId: USER, channel: null, productId: null, subscriptionRef: null })).toContain(
       '升级付款成功了，但系统没读到原来的订阅，请到后台确认有没有要手动取消的。',
+    )
+  })
+
+  it('a refunded membership whose subscription would not cancel (T71)', () => {
+    expect(text({ kind: 'subscription_cancel_failed', userId: USER, channel: 'waffo', productId: 'pro_monthly', subscriptionRef: 'ORD_1', cause: 'refund' })).toBe(
+      `【订阅没取消】j***@gmail.com 的 Pro 月付 已退款，但这笔的订阅没能自动取消，下个周期还会扣费，请到 Waffo 后台手动取消。\n去后台看：https://shotviva.com/admin/users/${USER}`,
     )
   })
 

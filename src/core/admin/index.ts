@@ -57,16 +57,21 @@ export { AdminPage, AdminShell, adminNavItems, EmptyState, SHELL_COPY, StatCard,
 export {
   listPurchases,
   listSubscriptions,
+  applyClawback,
   loadRevenueStats,
   ORDERS_COPY,
   OrdersView,
+  previewClawback,
   paymentSource,
   stripeDashboardUrl,
   usd,
   type AdminPurchase,
   type AdminSubscription,
+  type ClawbackPreview,
+  type ClawbackResult,
   type RevenueStats,
 } from './orders'
+export { ClawbackButton, ClawbackStatus, type ClawbackActions } from './clawback-ui'
 export { listAnnouncements, saveAnnouncement, setAnnouncementActive } from './announcements'
 export { ANNOUNCEMENTS_COPY, AnnouncementsEditor, type AnnouncementAdminActions } from './announcements-editor'
 export { decodeCursor, encodeCursor, PAGE_SIZE, type Page } from './cursor'

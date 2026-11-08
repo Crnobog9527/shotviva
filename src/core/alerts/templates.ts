@@ -100,7 +100,9 @@ const BEIJING_DAY = new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai'
 
 const deadline = (iso: string | null) => (iso ? `截止北京时间 ${BEIJING_DAY.format(new Date(iso))}` : '银行不接受回应')
 
-const disputePath = (disputeId: string) => `/admin/disputes/${encodeURIComponent(disputeId)}`
+// Same address as core/billing/stripe disputeAdminPath: the Stripe id is case-sensitive and the
+// proxy lowercases page paths, so it goes in the query.
+const disputePath = (disputeId: string) => `/admin/disputes/view?id=${encodeURIComponent(disputeId)}`
 
 // T82: the evidence is drafted; say what is left for the Owner and by when.
 const STAGED_TODO: Record<DisputeEvidenceFacts['responder'], string> = {
@@ -180,7 +182,9 @@ function ticket(alert: TicketAlert, who: string): Rendered {
 
 function cancelFailed(alert: CancelFailedAlert, who: string): Rendered {
   const where = alert.channel ? CHANNELS[alert.channel] : '付款'
-  const line = alert.productId
+  const line = alert.cause === 'refund'
+    ? `【订阅没取消】${who} 的 ${productName(alert.productId)} 已退款，但这笔的订阅没能自动取消，下个周期还会扣费，请到 ${where} 后台手动取消。`
+    : alert.productId
     ? `【旧订阅没取消】${who} 升级后，原来的 ${productName(alert.productId)} 订阅没能自动取消，下个周期还会扣费，请到 ${where} 后台手动取消。`
     : `【旧订阅没取消】${who} 升级付款成功了，但系统没读到原来的订阅，请到后台确认有没有要手动取消的。`
   return { line, path: `/admin/users/${alert.userId}` }

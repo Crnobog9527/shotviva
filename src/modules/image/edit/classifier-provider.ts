@@ -34,8 +34,8 @@ export const IDENTITY_JUDGE_ADAPTERS: Partial<Record<ProviderAdapterId, (config:
   openai_responses: (config, tag) => createOpenAIIdentityJudge(config, tag),
 }
 
-// Null when no decision row is switched on or it cannot be built: generation then screens the
-// user's words with the keyword list alone rather than failing.
+// Null when no decision row is switched on or it cannot be built: generation then goes ahead
+// with the user's words unscreened (fail open) rather than failing.
 export async function identityJudge(): Promise<IdentityJudge | null> {
   try {
     const credentials = await activeCredentials('decision')
@@ -44,7 +44,7 @@ export async function identityJudge(): Promise<IdentityJudge | null> {
     if (!build) throw new Error(`adapter ${credentials.adapter} is not an identity judge`)
     return { ...build(credentials.config, credentials.tag), prices: credentials.prices }
   } catch (error) {
-    logger.error('identity judge unavailable; keywords only', { error })
+    logger.error('identity judge unavailable; requests are not screened', { error })
     return null
   }
 }

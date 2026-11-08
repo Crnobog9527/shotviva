@@ -9,16 +9,20 @@ import { logger } from '@/core/logger'
 
 import { attachDisputeFileAction, createDisputeUploadAction, saveDisputeTextAction, submitDisputeAction } from '../actions'
 
-// /admin/disputes/[id] (T82): our row, and the draft as Stripe holds it now.
+// /admin/disputes/view?id=… (T82): our row, and the draft as Stripe holds it now. The Stripe id
+// rides in the query, not the path: the proxy sends every mixed-case path to its lowercase form
+// (建站规格 R4, core/auth/proxy-gates.ts), and Stripe ids are case-sensitive (du_1UZFae…).
+// disputeAdminPath builds this address everywhere it is linked.
 export const instant = false
 
 export const metadata: Metadata = { title: DISPUTES_COPY.title }
 
 const actions = { saveText: saveDisputeTextAction, createUpload: createDisputeUploadAction, attach: attachDisputeFileAction, submit: submitDisputeAction }
 
-export default async function AdminDisputePage({ params }: PageProps<'/[locale]/admin/disputes/[id]'>) {
+export default async function AdminDisputePage({ searchParams }: PageProps<'/[locale]/admin/disputes/view'>) {
   await requireAdmin()
-  const { id } = await params
+  const { id } = await searchParams
+  if (typeof id !== 'string') notFound()
   const db = createAdminSupabase()
   const found = await loadDisputeRow(db, id).catch(() => null)
   if (!found) notFound()

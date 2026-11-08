@@ -30,7 +30,7 @@ import { reserveJob } from './settlement'
 
 // `track` is injectable so tests can assert the `generate` event without PostHog.
 // `identityJudge`: the text-only decision call of ARCHITECTURE §5.1a; null or absent means the
-// keyword list alone screens the user's words.
+// user's words go through unscreened (fail open).
 export type GenerationDeps = SettleDeps & {
   now?: () => Date
   track?: ServerTrack

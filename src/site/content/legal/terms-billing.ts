@@ -49,9 +49,10 @@ export const termsBillingSections: readonly LegalSection[] = [
       [
         'Refunds are covered by our ',
         legalLinks.refunds,
-        '. In short: you can ask within seven days of your first purchase of a plan or credit pack if no credits have been used since that payment; renewals are not refundable.',
+        '. In short: you can ask within seven days of your first purchase of a plan or credit pack if no credits have been used since that payment; renewals are not refundable; a partly used purchase may, after review, be refunded in proportion to the credits you have not used.',
       ],
-      'If you dispute a charge with your bank instead of contacting us, we may suspend your account while the dispute is open. If the dispute succeeds, we remove the credits from that purchase.',
+      'When a purchase is refunded, the credits it added are removed from your account, and a refunded membership ends right away (an automatically renewing one is cancelled).',
+      'If you dispute a charge with your bank instead of contacting us, we remove the credits from that purchase and may suspend your account while the dispute is open. If the dispute is decided in our favour, the credits are returned.',
     ],
   },
   {

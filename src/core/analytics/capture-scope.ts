@@ -14,7 +14,7 @@ export const ALERTS = [
   'payment_webhook_signature',
   'payment_webhook_failed',
   'charge_refunded',
-  // charge.dispute.created (T10, ARCHITECTURE §6.3): recorded, credits not clawed back.
+  // charge.dispute.created (T10, ARCHITECTURE §6.3): recorded; T71 claws the credits back.
   'charge_disputed',
   // An upgrade was paid but an old subscription would not cancel (T66, ARCHITECTURE §6.2 「升级」):
   // the Owner cancels it by hand; the new plan stays.
@@ -23,6 +23,10 @@ export const ALERTS = [
   // reminder three days before the deadline while evidence we must submit is still unsubmitted.
   'dispute_opened',
   'dispute_due_soon',
+  // T71 (ARCHITECTURE §6.2): credits a refund or dispute should have taken back were already
+  // spent (written off as 「欠扣」), and charge.dispute.closed (won: the credits went back).
+  'clawback_shortfall',
+  'dispute_closed',
 ] as const
 
 export type AlertKind = (typeof ALERTS)[number]

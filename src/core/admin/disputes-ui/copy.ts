@@ -1,4 +1,4 @@
-// Detail-page copy for /admin/disputes/[id] (DESIGN §7, Chinese only).
+// Detail-page copy for /admin/disputes/view?id=… (DESIGN §7, Chinese only).
 export const DISPUTE_UI = {
   facts: {
     user: '用户',

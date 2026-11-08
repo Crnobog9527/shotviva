@@ -1,6 +1,8 @@
 {
-  "note": "Real decision-model answers for examples.test-data.ts, replayed by examples.test.ts. Fill from the admin dry run's JSON (/admin/providers, 换脸判断试跑) or scripts/identity-judge-eval.ts --json. Empty until a run on the test site.",
+  "note": "Real decision-model answers for examples.test-data.ts, replayed by examples.test.ts for the prompt version they were recorded with. The judge prompt changed to t81-principle-1 (no keyword list, a short principle), so the answers recorded for #300's prompt no longer apply and were removed. Paste the admin dry run's JSON here (/admin/providers, 换脸判断试跑; two batches merged into one `answers`).",
   "model": null,
+  "promptVersion": null,
   "recordedAt": null,
+  "pending": [],
   "answers": {}
 }

@@ -12,8 +12,7 @@ export {
   type RefusalMethod,
 } from './judge'
 export { JUDGE_CALLS_PER_HOUR, keepVerdict, takeJudgeSlot, textHash, type JudgeSlot } from './judge-slots'
-export { matchAnyField, matchIdentitySwapKeyword } from './keywords'
-export { IDENTITY_EDIT_ADDENDUM, IDENTITY_JUDGE_INSTRUCTIONS } from './question'
+export { IDENTITY_EDIT_ADDENDUM, IDENTITY_JUDGE_INSTRUCTIONS, IDENTITY_PROMPT_VERSION } from './question'
 export { EXCERPT_MAX, excerptOf, IdentitySwapRefused, refuseIdentitySwap, type Refusal, type RefusalDeps } from './refuse'
 export {
   IDENTITY_JUDGE_TIMEOUT_MS,

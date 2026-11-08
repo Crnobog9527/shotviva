@@ -7,6 +7,8 @@ import type { ProviderPrices } from '../jobs/provider'
 export const IDENTITY_ENTRIES = ['workspace', 'edit', 'partner'] as const
 export type IdentityEntry = (typeof IDENTITY_ENTRIES)[number]
 
+// Refusals come from the decision model only. 'keyword' remains for rows written while a keyword
+// list existed (#300–#314); identity_refusals still accepts both.
 export const REFUSAL_METHODS = ['keyword', 'model'] as const
 export type RefusalMethod = (typeof REFUSAL_METHODS)[number]
 
