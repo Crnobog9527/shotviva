@@ -249,6 +249,58 @@ describe('disputes: everything back at once, given back on a win', () => {
     expect(await paymentOf(charge.id)).toMatchObject({ status: 'partially_refunded', credits_clawed_back: 10 })
   })
 
+  it('a redelivered charge.dispute.created after a won close leaves the payment paid', async () => {
+    const userId = await createUser(db, { credits: 0 })
+    const { charge } = await buy(userId)
+    const opened = dispute(charge)
+    const created = eventFor('charge.dispute.created', opened.id)
+    await deliver(created)
+    await deliver(close(opened, 'won'))
+    await deliver(created)
+    expect(await paymentOf(charge.id)).toMatchObject({ status: 'paid', credits_clawed_back: 0 })
+    expect((await profileOf(db, userId)).credits).toBe(20)
+  })
+
+  // An inquiry (du_) that escalates into a chargeback (dp_) on the same charge.
+  async function escalated() {
+    const userId = await createUser(db, { credits: 0 })
+    const { charge } = await buy(userId)
+    const inquiry = { ...disputeObject(charge, { status: 'warning_under_review' }), id: `du_${charge.id}` } as Stripe.Dispute
+    h.disputes.set(inquiry.id, inquiry)
+    await deliver(eventFor('charge.dispute.created', inquiry.id))
+    const chargeback = dispute(charge)
+    await deliver(eventFor('charge.dispute.created', chargeback.id))
+    expect((await profileOf(db, userId)).credits).toBe(0)
+    return { userId, charge, inquiry, chargeback }
+  }
+
+  it('inquiry closed, then the chargeback lost: the share moves to the chargeback and stays taken', async () => {
+    const { userId, charge, inquiry, chargeback } = await escalated()
+    expect((await deliver(close(inquiry, 'warning_closed'))).body.outcome).toBe('superseded')
+    expect((await profileOf(db, userId)).credits).toBe(0)
+    expect(await paymentOf(charge.id)).toMatchObject({ status: 'disputed', credits_clawed_back: 20 })
+    expect(await disputeRow(chargeback.id)).toMatchObject({ credits_clawed_back: 20 })
+    expect((await deliver(close(chargeback, 'lost'))).body.outcome).toBe('lost')
+    expect((await profileOf(db, userId)).credits).toBe(0)
+    expect(await paymentOf(charge.id)).toMatchObject({ status: 'disputed', credits_clawed_back: 20 })
+  })
+
+  it('chargeback lost first, then the inquiry closed: nothing is given back', async () => {
+    const { userId, charge, inquiry, chargeback } = await escalated()
+    await deliver(close(chargeback, 'lost'))
+    await deliver(close(inquiry, 'warning_closed'))
+    expect((await profileOf(db, userId)).credits).toBe(0)
+    expect(await paymentOf(charge.id)).toMatchObject({ status: 'disputed', credits_clawed_back: 20 })
+  })
+
+  it('inquiry closed, then the chargeback won: the credits come back once', async () => {
+    const { userId, charge, inquiry, chargeback } = await escalated()
+    await deliver(close(inquiry, 'warning_closed'))
+    expect((await deliver(close(chargeback, 'won'))).body.outcome).toBe('kept')
+    expect((await profileOf(db, userId)).credits).toBe(20)
+    expect(await paymentOf(charge.id)).toMatchObject({ status: 'paid', credits_clawed_back: 0 })
+  })
+
   it('a closed dispute we never recorded is acknowledged and changes nothing', async () => {
     const charge = chargeObject({ amount: 990 })
     const opened = disputeObject(charge)
@@ -259,7 +311,13 @@ describe('disputes: everything back at once, given back on a win', () => {
 
 describe('who can call it', () => {
   const CALLABLE = ['record_waffo_refund(text, text, integer)', 'close_payment_dispute(text, text)', 'admin_clawback_payment(bigint, uuid)', 'payment_clawback_preview(bigint)']
-  const INTERNAL = ['clawback_payment_credits(bigint, text, text)', '_end_membership_after_refund(uuid)', '_payment_granted_credits(public.payments)']
+  const INTERNAL = [
+    'clawback_payment_credits(bigint, text, text)',
+    '_end_membership_after_refund(uuid, public.payments)',
+    '_membership_end_without_refunded(uuid)',
+    '_payment_granted_credits(public.payments)',
+    '_payment_dispute_answer(public.payment_disputes, boolean)',
+  ]
 
   it('the service role only; the internal steps not even that; payment_refunds is private', async () => {
     for (const fn of CALLABLE) {

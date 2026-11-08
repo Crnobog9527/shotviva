@@ -6,11 +6,15 @@
 --
 -- Refund: amount_refunded is Stripe's running total for the charge and only ever grows; the
 -- clawback ref is 'refund:<charge>:<that total>', so each new total settles once and a replay of
--- it takes nothing. A membership refund (any amount) ends the membership
--- (_end_membership_after_refund); the webhook then cancels the subscription it paid for.
+-- it takes nothing. A membership refund (any amount) ends the membership when it still counted
+-- (_end_membership_after_refund: paid_until moved back, or this payment's own period is the
+-- current one); only then does the webhook cancel the subscription it paid for. Refunding an old
+-- renewal whose period is over ends nothing.
 -- Dispute: status becomes disputed, nothing else here. open_payment_dispute (0768) takes the
 -- credits back and keeps the dispute's own share, so a win can give exactly that back; the
--- clawback keys are left out of this answer so the deployed alert does not report 0 taken.
+-- clawback keys are left out of this answer so the deployed alert does not report 0 taken. A
+-- redelivered charge.dispute.created after every dispute on the charge has closed (a win put the
+-- status back) leaves the status alone; a genuinely new dispute is marked by open_payment_dispute.
 --
 -- Returns null when no payment has this charge (paid before payments existed, or not ours).
 create or replace function public.record_payment_issue(
@@ -48,7 +52,12 @@ begin
     returning * into v_payment;
   else
     update public.payments
-       set status = 'disputed'
+       set status = case
+             when exists (select 1 from public.payment_disputes d where d.stripe_charge_id = p_charge_id)
+              and not exists (select 1 from public.payment_disputes d where d.stripe_charge_id = p_charge_id and d.closed_at is null)
+             then status
+             else 'disputed'
+           end
      where stripe_charge_id = p_charge_id
     returning * into v_payment;
   end if;
@@ -72,11 +81,11 @@ begin
   if v_payment.amount_refunded > 0 then
     perform public.clawback_payment_credits(
       v_payment.id, 'refund:' || p_charge_id || ':' || v_payment.amount_refunded, '退款扣回 ' || p_charge_id);
-    v_membership := exists (select 1 from public.products where id = v_payment.product_id and days is not null);
-    if v_membership then
-      v_paid_until := public._end_membership_after_refund(v_payment.user_id);
+    if exists (select 1 from public.products where id = v_payment.product_id and days is not null) then
+      v_membership := public._end_membership_after_refund(v_payment.user_id, v_payment);
     end if;
     select * into v_payment from public.payments where id = v_payment.id;
+    select paid_until into v_paid_until from public.profiles where id = v_payment.user_id;
   end if;
 
   return jsonb_build_object(

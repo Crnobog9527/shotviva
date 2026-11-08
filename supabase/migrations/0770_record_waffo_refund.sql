@@ -1,7 +1,7 @@
 -- T71 (ARCHITECTURE §6.2 「Waffo 退款与 Stripe 同一规则、同一函数」): refund.succeeded from Waffo.
 -- Finds the payment by its PAY_ id, adds this refund once (payment_refunds, keyed by Waffo's event
--- id), then takes the credits back and ends a refunded membership exactly as record_payment_issue
--- does for Stripe (clawback ref 'refund:<event id>'). p_amount is this refund in cents; null (Waffo
+-- id), then takes the credits back and ends a refunded membership (when it still counted) exactly
+-- as record_payment_issue does for Stripe (clawback ref 'refund:<event id>'). p_amount is this refund in cents; null (Waffo
 -- may leave refundedAmount out) counts as the whole rest of the payment, so a refund we cannot size
 -- still takes the credits back. A disputed payment stays disputed.
 -- Returns null when no payment has this PAY_ id (before T50, or not ours); the webhook alerts
@@ -44,14 +44,14 @@ begin
     returning * into v_payment;
   end if;
 
-  v_membership := v_payment.amount_refunded > 0
-    and exists (select 1 from public.products where id = v_payment.product_id and days is not null);
+  v_membership := false;
   if v_payment.amount_refunded > 0 then
     perform public.clawback_payment_credits(v_payment.id, 'refund:' || p_refund_ref, '退款扣回 ' || p_refund_ref);
-    if v_membership then
-      v_paid_until := public._end_membership_after_refund(v_payment.user_id);
+    if exists (select 1 from public.products where id = v_payment.product_id and days is not null) then
+      v_membership := public._end_membership_after_refund(v_payment.user_id, v_payment);
     end if;
     select * into v_payment from public.payments where id = v_payment.id;
+    select paid_until into v_paid_until from public.profiles where id = v_payment.user_id;
   end if;
 
   return jsonb_build_object(

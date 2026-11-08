@@ -14,11 +14,14 @@ import type { FulfilDeps } from '../fulfil'
 // one transaction, once per dispute: only the first delivery restores and alerts the Owner.
 // A dispute we have no row for (opened before T82) is only logged and alerted in Sentry.
 
-export type CloseOutcome = 'kept' | 'lost' | 'replayed' | 'unknown_dispute'
+// superseded: an inquiry closed while the chargeback it escalated into is still open; its share
+// moved to that one, and the Owner hears when that one closes.
+export type CloseOutcome = 'kept' | 'lost' | 'superseded' | 'replayed' | 'unknown_dispute'
 
 const closedSchema = z
   .object({
     first_close: z.boolean(),
+    superseded: z.boolean(),
     kept: z.boolean(),
     closed_status: z.string(),
     credits_restored: z.number().int(),
@@ -65,6 +68,7 @@ export async function closeDispute(deps: FulfilDeps, disputeId: string): Promise
   }
   logger.info('stripe dispute closed', { dispute_id: dispute.id, status: closed.closed_status, first: closed.first_close, restored: closed.credits_restored })
   if (!closed.first_close) return 'replayed'
+  if (closed.superseded && closed.kept) return 'superseded'
   alert(dispute.id, closed)
   return closed.kept ? 'kept' : 'lost'
 }

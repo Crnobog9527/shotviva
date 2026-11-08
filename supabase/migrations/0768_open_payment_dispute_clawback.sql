@@ -2,7 +2,9 @@
 -- (the same clawback_payment_credits, capped at the paid balance) and keeps its own share on the
 -- dispute row, so a win gives exactly that back (close_payment_dispute, 0769). Everything else is
 -- 0727 unchanged: idempotent by dispute id (a redelivery takes nothing again), the same ban.
--- The answer gains the payment's clawback totals for the Owner's one alert (T72).
+-- The answer gains the payment's clawback totals for the Owner's one alert (T72). A second dispute
+-- on a payment still disputed (an inquiry escalated to a chargeback) takes nothing new; when the
+-- first one closes, its share moves to the one still open (close_payment_dispute, 0769).
 create or replace function public._payment_dispute_answer(p_row public.payment_disputes, p_created boolean)
 returns jsonb
 language sql
@@ -55,7 +57,9 @@ begin
     return public._payment_dispute_answer(v_row, false);
   end if;
 
-  select * into v_payment from public.payments where stripe_charge_id = p_charge_id;
+  -- Locked first: every T71 path locks the payment before the profile (and before other
+  -- disputes of it), so a refund and a dispute arriving together cannot deadlock.
+  select * into v_payment from public.payments where stripe_charge_id = p_charge_id for update;
   v_managed := case
     when v_payment.id is null then p_managed_default
     when v_payment.method = 'cn_card' then false

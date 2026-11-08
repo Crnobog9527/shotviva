@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+
 import type { Client } from 'pg'
 import type Stripe from 'stripe'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -67,11 +69,28 @@ function refundAll(charge: Stripe.Charge) {
   return eventFor('charge.refunded', charge.id)
 }
 
-// As if bought ten days ago: its grant and payment dated back, paid_until 20 days ahead.
-async function backdate(userId: string, sessionId: string) {
-  await db.query("update public.credit_ledger set created_at = now() - interval '10 days' where idempotency_key = $1", [`purchase:${sessionId}`])
-  await db.query("update public.payments set created_at = now() - interval '10 days' where stripe_session_id = $1", [sessionId])
-  await db.query("update public.profiles set paid_until = now() + interval '20 days' where id = $1", [userId])
+// As if bought `ago` days earlier: its grant and payment dated back, its period (and paid_until)
+// ending `until` days from now.
+async function shift(userId: string, sessionId: string, ago: number, until: number) {
+  const at = `now() - make_interval(days => ${ago})`
+  const end = `now() + make_interval(days => ${until})`
+  await db.query(`update public.credit_ledger set created_at = ${at}, paid_until_after = ${end} where idempotency_key = $1`, [`purchase:${sessionId}`])
+  await db.query(`update public.payments set created_at = ${at} where stripe_session_id = $1`, [sessionId])
+  await db.query(`update public.profiles set paid_until = ${end} where id = $1`, [userId])
+}
+
+const backdate = (userId: string, sessionId: string) => shift(userId, sessionId, 10, 20)
+
+// A Starter renewal paid `ago` days earlier for a period ending `until` days from now.
+async function renew(userId: string, ago: number, until: number) {
+  const invoice = `in_${randomUUID().replaceAll('-', '')}`
+  const { error } = await serviceSupabase().rpc('apply_subscription_renewal', {
+    p_user_id: userId, p_product_id: 'starter_monthly', p_invoice_id: invoice, p_period_end: new Date(Date.now() + until * DAY_MS).toISOString(),
+    p_amount_total: 1990, p_currency: 'usd', p_amount_tax: 0, p_method: 'card', p_charge_id: null,
+  })
+  expect(error).toBeNull()
+  await db.query(`update public.credit_ledger set created_at = now() - make_interval(days => ${ago}) where idempotency_key = $1`, [`renewal:${invoice}`])
+  await db.query(`update public.payments set created_at = now() - make_interval(days => ${ago}) where stripe_invoice_id = $1`, [invoice])
 }
 
 describe('a refunded membership ends at once', () => {
@@ -145,6 +164,57 @@ describe('a refunded membership ends at once', () => {
     expect(cancel).toHaveBeenCalledWith(subscription.id, { prorate: false, invoice_now: false })
     expect((await mirrorOf(db, userId))[0]).toMatchObject({ stripe_subscription_id: subscription.id, status: 'canceled' })
     expect(Math.abs(daysFromNow((await profileOf(db, userId)).paid_until))).toBeLessThan(0.01)
+  })
+})
+
+describe('which refunds end a membership', () => {
+  // Starter 1 Jan → Pro 15 Jan → Max 20 Jan (T66 upgrades), here 19 and 5 days ago and now.
+  it('upgrades replay as upgrades: refunding Max leaves the Pro period, not stacked days', async () => {
+    const userId = await createUser(db, { credits: 0 })
+    const starter = await buyPeriod(userId, 'starter_monthly')
+    await shift(userId, starter.session.id, 19, 11)
+    const pro = await buyPeriod(userId, 'pro_monthly')
+    await shift(userId, pro.session.id, 5, 25)
+    const max = await buyPeriod(userId, 'max_monthly')
+    expect(daysFromNow((await profileOf(db, userId)).paid_until)).toBeCloseTo(30, 2)
+
+    await deliver(refundAll(max.charge))
+    expect(daysFromNow((await profileOf(db, userId)).paid_until)).toBeCloseTo(25, 2)
+    expect(await tierOf(userId)).toBe('pro')
+  })
+
+  it('after a refunded Pro upgrade, buying Pro again is an upgrade from Starter (not stacked)', async () => {
+    const userId = await createUser(db, { credits: 0 })
+    await buyPeriod(userId, 'starter_monthly')
+    const pro = await buyPeriod(userId, 'pro_monthly')
+    await deliver(refundAll(pro.charge))
+    await buyPeriod(userId, 'pro_monthly')
+    expect(daysFromNow((await profileOf(db, userId)).paid_until)).toBeCloseTo(30, 2)
+    expect(await tierOf(userId)).toBe('pro')
+  })
+
+  it('a partial refund of an old renewal (Jan of Jan/Feb/Mar) ends nothing and cancels nothing', async () => {
+    const userId = await createUser(db, { credits: 0 })
+    const subscription = subscriptionObject({ periodEndDays: 30, userId, productId: 'starter_monthly', method: 'card' })
+    h.subscriptions.set(subscription.id, subscription)
+    const session = checkoutSession({ userId, productId: 'starter_monthly', method: 'card', subscription })
+    h.sessions.set(session.id, session)
+    await deliver(eventFor('checkout.session.completed', session.id))
+    // January: paid 65 days ago, its period over 35 days ago.
+    await shift(userId, session.id, 65, -35)
+    await renew(userId, 35, -5)
+    await renew(userId, 5, 25)
+    const jan = chargeObject({ amount: cents('starter_monthly') })
+    h.charges.set(jan.id, jan)
+    await db.query('update public.payments set stripe_charge_id = $2 where stripe_session_id = $1', [session.id, jan.id])
+    const cancel = h.stripe.subscriptions.cancel as unknown as ReturnType<typeof vi.fn>
+
+    h.charges.set(jan.id, { ...jan, amount_refunded: 500 })
+    await deliver(eventFor('charge.refunded', jan.id))
+    expect(cancel).not.toHaveBeenCalled()
+    expect(daysFromNow((await profileOf(db, userId)).paid_until)).toBeCloseTo(25, 2)
+    expect((await mirrorOf(db, userId))[0]).toMatchObject({ status: 'active' })
+    expect(await tierOf(userId)).toBe('starter')
   })
 })
 
