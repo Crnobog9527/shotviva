@@ -1,4 +1,5 @@
 import { MEMBERSHIP_TIERS, type MembershipTier, type ProductId } from '../../config'
+import { heldPeriod } from '../subscription/standing'
 import { blockReason, purchaseVerdict, type BlockReason, type MemberStanding } from '../subscription/upgrade-rule'
 import type { Period } from './offer'
 import { choiceFor, isTierPick, type PaywallOpenOptions } from './use-paywall-state'
@@ -22,12 +23,15 @@ const otherPeriod = (period: Period): Period => (period === 'year' ? 'month' : '
 
 // Where the paywall opens for a member: the asked-for plan if it can be bought; else the same
 // tier at the other period, then the next tiers up (asked period first); else the packs, which
-// are always open.
+// are always open. With no period asked, a member starts at the period they hold, so a yearly
+// member compares yearly plans while everyone else opens on Monthly (DESIGN §4.5).
 export function openOptionsFor(options: PaywallOpenOptions, standing: MemberStanding): PaywallOpenOptions {
-  const asked = choiceFor(options)
+  const held = heldPeriod(standing)
+  const start = options.period === undefined && held !== null ? { ...options, period: held } : options
+  const asked = choiceFor(start)
   if (!isTierPick(asked.pick)) return options
   const open = (tier: MembershipTier, period: Period) => purchaseVerdict(standing, planIdOf(tier, period)) !== 'blocked'
-  if (open(asked.pick, asked.period)) return options
+  if (open(asked.pick, asked.period)) return start
   const higher = MEMBERSHIP_TIERS.slice(MEMBERSHIP_TIERS.indexOf(asked.pick) + 1)
   const candidates: [MembershipTier, Period][] = [
     [asked.pick, otherPeriod(asked.period)],

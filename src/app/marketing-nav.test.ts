@@ -56,23 +56,37 @@ describe('globe menu (B2)', () => {
   })
 })
 
-describe('card prices (A1)', () => {
-  it('each template card and 404 card shows its own Standard price', async () => {
+// Owner 2026-11-08 (DESIGN): the home grid, the landing grids and the 404 cards show a template's
+// name and use, never a "from N credits" / 「N 积分起」 chip; prices stay on /pricing, the paywall
+// and the generate button.
+describe('no price on marketing template cards', () => {
+  const card = (id: string) => ({ id, name: `Name ${id}`, use: `Use of ${id}` })
+  const media = { cheap: { before: '/b.webp', after: '/a.webp', live: true }, dear: { before: null, after: null, live: false }, art: { before: '/b.webp', after: '/a.webp', live: true } }
+  const sections = {
+    categories: [
+      { name: 'Art Styles', intro: '', drag: true, templates: [card('art')] as [ReturnType<typeof card>] },
+      { name: 'Pets', intro: '', templates: [card('cheap'), card('dear')] as [ReturnType<typeof card>, ReturnType<typeof card>] },
+    ],
+    media,
+  }
+  const noPrice = (html: string) => {
+    expect(html).not.toMatch(/credit|积分|mk-cost/)
+  }
+
+  it('the template grid (grid and single-template rows) shows name and use only, en and zh', async () => {
     const { TemplateGrid } = await import('@/core/content/blocks/template-grid')
+    const grid = createElement(TemplateGrid, { grid: { heading: 'h', intro: 'i' }, sections, isLinkEnabled: () => true })
+    for (const locale of ['en', 'zh'] as const) {
+      const html = await render(grid, locale)
+      for (const id of ['art', 'cheap', 'dear']) expect(html).toContain(`Use of ${id}`)
+      noPrice(html)
+    }
+  })
+
+  it('the 404 cards show name and use only', async () => {
     const { TryTemplates } = await import('@/core/content')
-    const card = (id: string, credits: number) => ({ id, name: id, use: 'use', credits })
-    const media = { cheap: { before: '/b.webp', after: '/a.webp', live: true }, dear: { before: null, after: null, live: false } }
-    const grid = createElement(TemplateGrid, {
-      grid: { heading: 'h', intro: 'i' },
-      sections: { categories: [{ name: 'Pets', intro: '', templates: [card('cheap', 1), card('dear', 3)] }], media },
-      isLinkEnabled: () => true,
-    })
-    const html = await render(grid)
-    expect(html).toContain('from 1 credit<')
-    expect(html).toContain('from 3 credits<')
-    const zh = await render(grid, 'zh')
-    expect(zh).toContain('1 积分起')
-    const tries = await render(createElement(TryTemplates, { templates: [{ ...card('cheap', 1), before: '/b.webp', after: '/a.webp' }] }))
-    expect(tries).toContain('from 1 credit<')
+    const tries = await render(createElement(TryTemplates, { templates: [{ ...card('cheap'), before: '/b.webp', after: '/a.webp' }] }))
+    expect(tries).toContain('Use of cheap')
+    noPrice(tries)
   })
 })

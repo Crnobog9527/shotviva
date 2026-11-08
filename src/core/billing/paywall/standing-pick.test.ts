@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { heldPeriod } from '../subscription/standing'
 import { NO_STANDING, type MemberStanding } from '../subscription/upgrade-rule'
 import { openOptionsFor, planIdOf, planStanding } from './standing-pick'
 
@@ -7,6 +8,15 @@ import { openOptionsFor, planIdOf, planStanding } from './standing-pick'
 
 const starterMonthly: MemberStanding = { subscription: 'starter_monthly', tier: 'starter' }
 const maxYearly: MemberStanding = { subscription: 'max_yearly', tier: 'max' }
+
+describe('heldPeriod', () => {
+  it('is the period of the subscription held, none for a one-time period or nobody', () => {
+    expect(heldPeriod(maxYearly)).toBe('year')
+    expect(heldPeriod(starterMonthly)).toBe('month')
+    expect(heldPeriod({ subscription: null, tier: 'pro' })).toBeNull()
+    expect(heldPeriod(NO_STANDING)).toBeNull()
+  })
+})
 
 describe('planIdOf', () => {
   it('builds the product id from tier and period', () => {
@@ -48,8 +58,22 @@ describe('openOptionsFor', () => {
     const proMonthly: MemberStanding = { subscription: 'pro_monthly', tier: 'pro' }
     expect(openOptionsFor({ tier: 'starter', period: 'month' }, proMonthly)).toEqual({ step: 'tiers', tier: 'pro', period: 'year' })
     const proYearly: MemberStanding = { subscription: 'pro_yearly', tier: 'pro' }
-    // The default (Pro yearly) is theirs: Max yearly is the next plan up at the same period.
+    // A yearly member starts at Yearly; Pro yearly is theirs, so Max yearly is the next plan up.
     expect(openOptionsFor({}, proYearly)).toEqual({ step: 'tiers', tier: 'max', period: 'year' })
+    // The default (Pro monthly) is theirs: Pro yearly is the step up on the same tier.
+    expect(openOptionsFor({}, proMonthly)).toEqual({ step: 'tiers', tier: 'pro', period: 'year' })
+  })
+
+  // DESIGN §4.5 「默认显示按月」: everyone opens on Monthly except a member holding a yearly plan.
+  it('starts a member at the period they hold when no period is asked', () => {
+    const starterYearly: MemberStanding = { subscription: 'starter_yearly', tier: 'starter' }
+    expect(openOptionsFor({}, starterYearly)).toEqual({ period: 'year' })
+    expect(openOptionsFor({ step: 'period', tier: 'max' }, starterYearly)).toEqual({ step: 'period', tier: 'max', period: 'year' })
+    expect(openOptionsFor({}, starterMonthly)).toEqual({ period: 'month' })
+    // A one-time period has no interval: Monthly as for everyone.
+    expect(openOptionsFor({}, { subscription: null, tier: 'starter' })).toEqual({})
+    // A period asked for (the /pricing toggle) wins.
+    expect(openOptionsFor({ tier: 'max', period: 'month' }, starterYearly)).toEqual({ tier: 'max', period: 'month' })
   })
 
   it('opens on the packs when nothing higher is left', () => {

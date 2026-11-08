@@ -13,19 +13,13 @@ export type TemplateLookup = Readonly<Record<string, TemplateMedia>>
 export type FeaturedSections = { categories: readonly TemplateCategory[]; media: TemplateLookup }
 
 // Heading and intro from the page's copy; the categories with their featured templates from the
-// database (T53), each card at its own Standard price (建站规格 G4). The landing pages show a
-// subset with their own heading; no `note`.
+// database (T53). No price on the cards (DESIGN, Owner 2026-11-08): prices live on /pricing, the
+// paywall and the generate button. The landing pages show a subset with their own heading; no `note`.
 type Grid = Pick<HomePage['templateGrid'], 'heading' | 'intro' | 'note'>
 type Props = { grid: Pick<Grid, 'heading' | 'intro'> & Partial<Pick<Grid, 'note'>>; sections: FeaturedSections; isLinkEnabled: (href: string) => boolean }
 
 // One plate of a card's pair: 172 px on a 375 px phone, 174 px at 800, 274 px at 1280.
 const CARD_SIZES = '(min-width: 1024px) 276px, (min-width: 768px) 25vw, 50vw'
-
-// "from 1 credit": the template's own Standard price.
-function Cost({ card }: { card: TemplateCard }) {
-  const t = useTranslations('app.template')
-  return <span className="mk-cost">{t('fromCredits', { count: card.credits })}</span>
-}
 
 function images(card: TemplateCard, media: TemplateMedia, t: ReturnType<typeof useTranslations>): { before: ImageRef; after: ImageRef } | null {
   if (!media.before || !media.after) return null
@@ -50,12 +44,11 @@ function Meta({ card }: { card: TemplateCard }) {
     <span className="mk-tpl-meta">
       <b>{card.name}</b>
       <span className="mk-use">{card.use}</span>
-      <Cost card={card} />
     </span>
   )
 }
 
-// One card: the pair, then name, use and price, all in the HTML (建站规格 R5). A live template
+// One card: the pair, then name and use, both in the HTML (建站规格 R5). A live template
 // is a button that picks it into the generator (DESIGN §6.9 item 2: no confirm step). `size`:
 // 'lg' in a single-template row (home.html solo(): 20px corners, labels on top).
 function PairCard({ card, media, size = 'card' }: { card: TemplateCard; media: TemplateMedia; size?: 'lg' | 'card' }) {
@@ -93,7 +86,6 @@ function Solo({ card, media, art }: { card: TemplateCard; media: TemplateMedia; 
       <div className="mk-solo-meta">
         <b>{card.name}</b>
         <span className="mk-use">{art && pictures ? t('withDragHint', { use: card.use }) : card.use}</span>
-        <Cost card={card} />
         {media.live ? (
           <button type="button" className="mk-ghost-pill" data-preview-template={card.id}>
             {t('preview')}

@@ -34,7 +34,7 @@ function grouped(featured: readonly Live[]): Group[] {
 }
 
 function toCategory({ view, templates }: Group): TemplateCategory {
-  const [first, ...rest] = templates.map((template) => ({ id: template.id, name: template.name, use: template.description ?? '', credits: template.creditsCost['1k'] }))
+  const [first, ...rest] = templates.map((template) => ({ id: template.id, name: template.name, use: template.description ?? '' }))
   return {
     name: view.name,
     intro: view.intro,
@@ -62,7 +62,7 @@ export function tryTemplates(live: readonly Live[]): TryTemplate[] {
     .flatMap((group) => group.templates)
     .flatMap((template) =>
       template.coverBeforeUrl && template.coverAfterUrl
-        ? [{ id: template.id, name: template.name, use: template.description ?? '', credits: template.creditsCost['1k'], before: template.coverBeforeUrl, after: template.coverAfterUrl }]
+        ? [{ id: template.id, name: template.name, use: template.description ?? '', before: template.coverBeforeUrl, after: template.coverAfterUrl }]
         : [],
     )
 }

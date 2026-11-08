@@ -11,7 +11,8 @@ import { packLooks, packOffers, tierOffers, yearlySavingPct, type Period, type T
 import { PackCard } from "./pack-card"
 import { usePaywall, type PaywallTrigger } from "./paywall-context"
 import { tierPerks } from "./perks"
-import { usePlanReader } from "./standing-context"
+import { heldPeriod } from "../subscription/standing"
+import { usePlanReader, useStanding } from "./standing-context"
 import type { PlanStanding } from "./standing-pick"
 import { TierCard } from "./tier-card"
 import { useMoney } from "./use-money"
@@ -23,12 +24,16 @@ const ghost = "w-full min-h-12 rounded-control"
 // Only Pro's "Choose Pro" is a solid primary; Starter and Max are ghost buttons (Max's in
 // gold). Every button opens the same paywall with that plan or pack picked; for a member the
 // lower and current plans are locked and higher ones say Upgrade (T66). Prices render on
-// the server (Yearly first), so they are in the static HTML (建站规格 R5).
+// the server, Monthly first (DESIGN §4.5 「默认显示按月」), so they are in the static HTML
+// (建站规格 R5). A signed-in member with a yearly plan sees Yearly once their standing streams in,
+// so their own plan reads "Your plan"; a period the visitor picks always wins.
 export function PricingPlans({ products, wishlistLive }: { products: readonly SiteProduct[]; wishlistLive: boolean }) {
   const t = useTranslations("paywall")
   const paywall = usePaywall()
   const readPlan = usePlanReader()
-  const [period, setPeriod] = useState<Period>("year")
+  const held = heldPeriod(useStanding())
+  const [picked, setPeriod] = useState<Period | null>(null)
+  const period = picked ?? held ?? "month"
   const offers = tierOffers(products)
   return (
     <section aria-label={t("plansLabel")}>

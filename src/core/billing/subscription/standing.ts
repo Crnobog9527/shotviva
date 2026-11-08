@@ -14,6 +14,13 @@ export type MemberStanding = {
 
 export const NO_STANDING: MemberStanding = { subscription: null, tier: null }
 
+// The billing period of the subscription held: a yearly member's paywall and /pricing open on
+// Yearly (DESIGN §4.5). A one-time period carries no interval, so it has none.
+export function heldPeriod(standing: MemberStanding): 'month' | 'year' | null {
+  if (standing.subscription === null) return null
+  return standing.subscription.endsWith('_yearly') ? 'year' : 'month'
+}
+
 // Holds any membership at all: only then is the upgrade rule worth loading.
 export function holdsMembership(standing: MemberStanding): boolean {
   return standing.subscription !== null || standing.tier !== null
