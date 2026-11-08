@@ -61,46 +61,108 @@ jobs:
           pnpm seo:ssr http://localhost:3000
 
   # One local Supabase per run serves both the DB tests and the schema.sql snapshot check
-  # (AGENTS §5), which used to start its own database in a separate workflow.
+  # (AGENTS §5), which used to start its own database in a separate workflow. T88: it runs only
+  # when the change can affect the database or the DB tests (scripts/ci/db-test-inputs.ts);
+  # otherwise it stops after change detection and reports success under the same required name.
   db:
     name: supabase db tests
     runs-on: ubuntu-latest
+    outputs:
+      schema-fix: ${{ steps.schema.outputs.fix }}
+      schema-head: ${{ steps.schema.outputs.head }}
+      schema-tree: ${{ steps.schema.outputs.tree }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
+      # Node 24 for scripts/ci/db-test-inputs.ts in the change detection.
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
       - id: changes
         uses: ./.github/actions/changes
-      - if: steps.changes.outputs.code == 'true'
+        with:
+          db: 'true'
+      - if: steps.changes.outputs.db == 'true'
         uses: pnpm/action-setup@v4
-      - if: steps.changes.outputs.code == 'true'
+      - if: steps.changes.outputs.db == 'true'
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: pnpm
-      - if: steps.changes.outputs.code == 'true'
-        uses: supabase/setup-cli@v1
-        with:
-          # pg_dump output depends on the CLI's Postgres image; scripts/db-schema.ts says to
-          # regenerate locally with this same version.
-          version: 2.107.0
-      - if: steps.changes.outputs.code == 'true'
+      - if: steps.changes.outputs.db == 'true'
         run: pnpm install --frozen-lockfile
-      # Only the services DB tests need; later cards drop names from this list as they need them.
-      - if: steps.changes.outputs.code == 'true'
-        run: supabase start -x studio,imgproxy,edge-runtime,analytics,vector,inbucket,functions,realtime,storage
+      # Pinned CLI and the stack's images from the Actions cache; downloads, pulls and the start
+      # itself are retried with backoff (.github/actions/supabase-start). Only the services DB
+      # tests need; later cards drop names from this list as they need them.
+      - if: steps.changes.outputs.db == 'true'
+        uses: ./.github/actions/supabase-start
+        with:
+          exclude: studio,imgproxy,edge-runtime,analytics,vector,inbucket,functions,realtime,storage
       # Before the tests, so the snapshot comes from migrations only, not from test data.
       - name: schema.sql matches migrations (export)
-        if: steps.changes.outputs.code == 'true'
+        if: steps.changes.outputs.db == 'true'
         run: pnpm db:schema
+      # A stale file on a same-repo PR is not a failure: the tests run with the regenerated file
+      # and the schema-sql job below commits it to the branch (scripts/ci/schema-check.sh).
       - name: schema.sql matches migrations
-        if: steps.changes.outputs.code == 'true'
-        run: |
-          if [ -n "$(git status --porcelain -- supabase/schema.sql)" ]; then
-            git --no-pager diff -- supabase/schema.sql
-            echo "::error file=supabase/schema.sql::schema.sql is out of date with supabase/migrations. Run \`supabase db reset && pnpm db:schema\` and commit the result."
-            exit 1
-          fi
-          echo "schema.sql matches the migrations."
-      - if: steps.changes.outputs.code == 'true'
+        id: schema
+        if: steps.changes.outputs.db == 'true'
+        env:
+          EVENT: ${{ github.event_name }}
+          SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+          REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+          FIX_DIR: ${{ runner.temp }}/schema-fix
+        run: scripts/ci/schema-check.sh
+      - if: steps.schema.outputs.fix == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: schema-sql
+          path: ${{ runner.temp }}/schema-fix/schema.sql
+          retention-days: 3
+      - if: steps.changes.outputs.db == 'true'
         run: pnpm test:db
+
+  # T88: commits the schema.sql the db job regenerated to the PR branch, once both required jobs
+  # have finished, and posts their results on the new commit (scripts/ci/schema-commit.sh). The
+  # only job with write access, and it installs and builds nothing. Runs for same-repo PRs only
+  # (the db job prepares a fix for nothing else) and never on top of its own commit.
+  schema-sql:
+    name: commit regenerated schema.sql
+    needs: [checks, db]
+    if: ${{ !cancelled() && needs.db.outputs.schema-fix == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      checks: write
+    steps:
+      # The tested branch head with full history (blobs on demand) for the migration guards'
+      # merge base; no stored credentials, the push step passes the token itself.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.db.outputs.schema-head }}
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/download-artifact@v4
+        with:
+          name: schema-sql
+          path: ${{ runner.temp }}/schema-fix
+      - name: Commit schema.sql and carry the results over
+        env:
+          FIX_FILE: ${{ runner.temp }}/schema-fix/schema.sql
+          TREE: ${{ needs.db.outputs.schema-tree }}
+          OLD_HEAD: ${{ needs.db.outputs.schema-head }}
+          HEAD_REF: ${{ github.head_ref }}
+          # Through env, never interpolated into the script: titles are untrusted input.
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          CHECKS_RESULT: ${{ needs.checks.result }}
+          DB_RESULT: ${{ needs.db.result }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/ci/schema-commit.sh

@@ -8,8 +8,9 @@
  * that public functions hang on tables outside public (e.g. on_auth_user_created on
  * auth.users), which a public-only dump would miss. CI rebuilds the database from the
  * migrations, reruns this and fails if the committed file differs, so regenerate and commit
- * it with every migration. Use the CLI version CI pins (.github/workflows/ci.yml, job `db`):
- * another pg_dump version may format the dump differently.
+ * it with every migration (on a same-repo PR, CI commits the regenerated file itself, T88). Use
+ * the CLI version CI pins (.github/actions/supabase-cli): another pg_dump version may format the
+ * dump differently.
  */
 import { execFileSync } from 'node:child_process'
 import { writeFileSync } from 'node:fs'

@@ -63,6 +63,23 @@ How it gets there:
 The script ends with a table of each persona's role, tier, balances, works, ledger rows and
 what this run did (`created`, `recreated`, `reset` or `unchanged`).
 
+## Resetting one persona (T88)
+
+```bash
+pnpm qa:reset qa-free
+```
+
+This puts one persona back into its starting state from the table above, exactly as
+`pnpm qa:accounts` would, and does not touch the other four. It takes exactly one persona;
+anything else (`all`, a typo, two names) is refused before it reads `.env.local`. It ends with the
+same state table, with one row.
+
+- Use it when your own persona is in the wrong state mid-validation (it bought something, ran
+  out of credits, got banned).
+- `qa:accounts` resets **all five**. While other validation lanes are running, that pulls the
+  state out from under their windows (`qa-fresh` is deleted and recreated, balances jump back),
+  so it is only for setting up before anyone starts.
+
 ## Signing in
 
 ```bash
@@ -86,12 +103,16 @@ lands on `next` (default `/account`).
 
 ## For Codex (paste-ready)
 
-> Before validating, run `pnpm qa:accounts` (from the repo root, which has the preview
-> `.env.local`). For each browser window, run `pnpm qa:login <persona>` (add
-> `--next /path` to land on a specific page) and open the printed link in that window only.
-> Personas: `qa-admin`, `qa-creator`, `qa-fresh`, `qa-max`, `qa-free`. Never paste the links
-> anywhere; each works once. The window must already be through Vercel's deployment
-> protection.
+> From the repo root, which has the preview `.env.local`. For each browser window, run
+> `pnpm qa:login <persona>` (add `--next /path` to land on a specific page) and open the
+> printed link in that window only. Personas: `qa-admin`, `qa-creator`, `qa-fresh`, `qa-max`,
+> `qa-free`. Never paste the links anywhere; each works once. The window must already be through
+> Vercel's deployment protection.
+>
+> If your persona is not in its starting state, run `pnpm qa:reset <persona>` for **your own
+> lane's persona only**, then sign in again. Never run `pnpm qa:accounts` while validating in
+> parallel: it resets all five personas, including the ones other lanes are using. Only run it
+> when you are the only one validating, before you start.
 
 ## Phone sign-in persona (T63, Chinese pages)
 
