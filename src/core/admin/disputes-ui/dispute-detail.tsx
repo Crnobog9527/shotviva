@@ -120,7 +120,7 @@ function Header({ card, canSubmit }: { card: ReturnType<typeof toCard>; canSubmi
   )
 }
 
-// /admin/disputes/[id]: what happened, what Stripe holds as the draft, and the Owner's three
+// /admin/disputes/view?id=…: what happened, what Stripe holds as the draft, and the Owner's three
 // actions (edit the summary, attach a file, submit once).
 export function DisputeDetail({ row, live, now, stripeUrl, actions }: Props) {
   const card = toCard({ ...row, live }, now)

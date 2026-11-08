@@ -100,7 +100,9 @@ const BEIJING_DAY = new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai'
 
 const deadline = (iso: string | null) => (iso ? `截止北京时间 ${BEIJING_DAY.format(new Date(iso))}` : '银行不接受回应')
 
-const disputePath = (disputeId: string) => `/admin/disputes/${encodeURIComponent(disputeId)}`
+// Same address as core/billing/stripe disputeAdminPath: the Stripe id is case-sensitive and the
+// proxy lowercases page paths, so it goes in the query.
+const disputePath = (disputeId: string) => `/admin/disputes/view?id=${encodeURIComponent(disputeId)}`
 
 // T82: the evidence is drafted; say what is left for the Owner and by when.
 const STAGED_TODO: Record<DisputeEvidenceFacts['responder'], string> = {

@@ -10,4 +10,6 @@ export type DisputeEvidenceConfig = {
   context: (productId: string | null, charge: EvidenceContext['charge']) => EvidenceContext
 }
 
-export const disputeAdminPath = (disputeId: string) => `/admin/disputes/${encodeURIComponent(disputeId)}`
+// The admin page of one dispute. The id goes in the query: the proxy lowercases every page path
+// (建站规格 R4), and a Stripe id is case-sensitive, so /admin/disputes/du_1UZFae… would 404.
+export const disputeAdminPath = (disputeId: string) => `/admin/disputes/view?id=${encodeURIComponent(disputeId)}`
