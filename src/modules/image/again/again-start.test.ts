@@ -32,6 +32,11 @@ describe('againValues', () => {
     expect(againValues({ toggles: { replate: false } }, template).toggles).toEqual({})
   })
 
+  it('reads a template without toggles as having none (T89)', () => {
+    const plain = { ...template, toggles: undefined } as unknown as CatalogueTemplate
+    expect(againValues({ toggles: { replate: true }, toggles_confirmed_at: { replate: 'x' } }, plain).toggles).toEqual({})
+  })
+
   it('starts a toggle off when the work has no confirmation for today’s dialog (T89)', () => {
     // On before the toggle had a dialog: the user never saw it, so no confirm flag is sent for them.
     expect(againValues({ toggles: { replate: true } }, template).toggles).toEqual({})

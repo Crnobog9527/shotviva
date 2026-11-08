@@ -49,7 +49,8 @@ const asRecord = (raw: unknown): Record<string, unknown> => (typeof raw === 'obj
 function togglesOf(inputs: Record<string, unknown>, template: CatalogueTemplate): Record<string, boolean> {
   const values = asRecord(inputs.toggles)
   const confirmedAt = asRecord(inputs.toggles_confirmed_at)
-  const kept = template.toggles.filter((toggle) => values[toggle.key] === true && (!toggle.confirm || typeof confirmedAt[toggle.key] === 'string'))
+  // A template object without `toggles` (built before T89) has none.
+  const kept = (template.toggles ?? []).filter((toggle) => values[toggle.key] === true && (!toggle.confirm || typeof confirmedAt[toggle.key] === 'string'))
   return Object.fromEntries(kept.map((toggle) => [toggle.key, true]))
 }
 
