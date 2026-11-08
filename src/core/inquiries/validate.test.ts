@@ -47,6 +47,13 @@ describe('validateInquiry', () => {
     expect(fieldError('company', { ...GOOD, company: 'x'.repeat(201) })).toBe('tooLong')
   })
 
+  it('counts characters as the database does (code points), so emoji and rare CJK fit (control review)', () => {
+    expect(fieldError('message', { ...GOOD, message: '𠀀'.repeat(1000) })).toBeNull()
+    expect(fieldError('message', { ...GOOD, message: '😀'.repeat(1001) })).toBe('tooLong')
+    expect(fieldError('message', { ...GOOD, message: '😀'.repeat(10) })).toBeNull()
+    expect(fieldError('name', { ...GOOD, name: '😀'.repeat(100) })).toBeNull()
+  })
+
   it('leaves optional fields alone when empty, and checks them when filled', () => {
     expect(fieldError('phone', GOOD)).toBeNull()
     expect(fieldError('phone', { ...GOOD, phone: '+86 138-0013-8000' })).toBeNull()

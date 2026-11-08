@@ -4,7 +4,7 @@ import { useFormatter } from 'next-intl'
 import type { ReactNode } from 'react'
 
 import { INQUIRY_NEEDS, INQUIRY_PLATFORMS, INQUIRY_USES, LIMITS, MONTHLY_VOLUMES, START_TIMES, TEAM_SIZES } from '../rules'
-import type { InquiryField, InquiryValues } from '../validate'
+import { charCount, type InquiryField, type InquiryValues } from '../validate'
 import { ChoiceField } from './choice-field'
 import type { InquiryCopy } from './copy'
 import { TextField, type TextFieldProps } from './text-field'
@@ -86,7 +86,7 @@ export function NeedsSection({ form, copy }: SectionProps) {
   const text = textFields(form, copy)
   const format = useFormatter()
   // A measurement, the same in both languages (DESIGN "The Measurement Mono Rule").
-  const counter = `${format.number(form.values.message.trim().length)} / ${format.number(LIMITS.message)}`
+  const counter = `${format.number(charCount(form.values.message.trim()))} / ${format.number(LIMITS.message)}`
   return (
     <Section title={copy.sections.needs}>
       <ChoiceField id="iq-volume" legend={copy.fields.volume} options={MONTHLY_VOLUMES} labels={copy.choices.volume}

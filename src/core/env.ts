@@ -68,7 +68,8 @@ const serverEnvSchema = z.object({
   POSTHOG_PERSONAL_API_KEY: optionalSecret,
   POSTHOG_PROJECT_ID: z.preprocess(blankAsUnset, z.string().regex(/^\d+$/).optional()),
   // hCaptcha's secret, the same one Supabase Auth holds (T86): the business inquiry form checks
-  // its invisible token on our server. Checked only when NEXT_PUBLIC_HCAPTCHA_SITEKEY is set too.
+  // its invisible token on our server when NEXT_PUBLIC_HCAPTCHA_SITEKEY is set too. Production with
+  // the site key but no secret refuses every inquiry (core/inquiries/captcha captchaMode).
   HCAPTCHA_SECRET: optionalSecret,
 })
   .extend(sentryBuildEnvSchema.shape)

@@ -10,7 +10,7 @@ import { createAdminSupabase } from '../auth/supabase-admin'
 import { serverEnv } from '../env'
 import { logger } from '../logger'
 import { publicEnv } from '../public-env'
-import { captchaCheck, captchaConfig } from './captcha'
+import { captchaCheck, captchaMode, warnMissingSecret, type CaptchaEnv } from './captcha'
 import { inquiryIpHash } from './ip-hash'
 import { INQUIRY_PAGES } from './rules'
 import { submitInquiry, type SubmitOutcome } from './submit'
@@ -30,10 +30,16 @@ export async function handleInquirySubmit(input: unknown): Promise<SubmitOutcome
     const env = serverEnv()
     const secret = env.SUPABASE_SERVICE_ROLE_KEY
     if (!secret) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set')
+    const captchaEnv: CaptchaEnv = { secret: env.HCAPTCHA_SECRET, siteKey: publicEnv.NEXT_PUBLIC_HCAPTCHA_SITEKEY, production: env.VERCEL_ENV === 'production' }
+    warnMissingSecret(captchaEnv)
+    const captcha = captchaMode(captchaEnv)
+    if (captcha.mode === 'closed') {
+      logger.error('business inquiry refused: HCAPTCHA_SECRET is missing in production')
+      return { ok: false, error: 'generic' }
+    }
     const [user, ip] = await Promise.all([getSessionUser(), headers().then(clientIp)])
-    const captcha = captchaConfig(env.HCAPTCHA_SECRET, publicEnv.NEXT_PUBLIC_HCAPTCHA_SITEKEY)
     return await submitInquiry(
-      { db: createAdminSupabase(), captcha: captcha ? captchaCheck(captcha) : null, notify: notifyOwner },
+      { db: createAdminSupabase(), captcha: captcha.mode === 'on' ? captchaCheck(captcha.config) : null, notify: notifyOwner },
       input,
       { locale: page === '/zh/pricing' ? 'zh' : 'en', page, userId: user?.id ?? null, ip, ipHash: inquiryIpHash(ip, secret) },
     )

@@ -34,7 +34,9 @@ function ariaFor(error: string | null, hint: boolean, optional: boolean, noteId:
 export function TextField(props: TextFieldProps) {
   const { id, label, value, error, onChange, onBlur, optional, placeholder, hint, maxLength, input, counter } = props
   const noteId = `${id}-note`
-  const shared = { id, value, placeholder, maxLength, onBlur, ...ariaFor(error, Boolean(hint), Boolean(optional), noteId) }
+  // The browser counts UTF-16 units, so its cap is doubled: it only stops a runaway paste and never
+  // cuts an answer the limit (counted in characters, validate.ts) allows; "too long" says the rest.
+  const shared = { id, value, placeholder, maxLength: maxLength * 2, onBlur, ...ariaFor(error, Boolean(hint), Boolean(optional), noteId) }
   return (
     <div className="grid content-start gap-2">
       <label htmlFor={id} className="text-label leading-[1.3]">

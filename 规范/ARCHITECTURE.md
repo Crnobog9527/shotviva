@@ -1033,6 +1033,7 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 | `checkout_start` | 服务端：创建 Checkout Session 时 | `product_id`、`tier`、`interval`、`form`、`channel`、`method` |
 | `purchase` | 服务端：支付回调入账成功后 | 第 6.2 节 `purchase` 参数 |
 | `contact_sales_click` | 浏览器：定价页「For business」的 Contact us 按钮（DESIGN §6.9 第 8 条） | `page`（`/pricing` 或 `/zh/pricing`） |
+| `business_inquiry_submit` | 浏览器：企业咨询表单提交成功（服务端已存下）后（T86，ARCHITECTURE §10.c） | `volume`（每月出图量档：`under_100` / `100_500` / `500_2000` / `2000_10000` / `over_10000`）、`uses`（主要用途数组，至少 1 个：`ecommerce` / `food_menu` / `social` / `real_estate` / `ads` / `other`）；不含任何联系方式或填写的文字 |
 | `$pageview` | 浏览器：自动 | — |
 
 所有事件都带 `locale`（`en` / `zh`，浏览器端注册为公共属性，服务端发时从请求或 `user_metadata.locale` 取；Owner 2026-11-06）。钱和积分相关的事件（`signup`、`generate`、`checkout_start`、`purchase`）一律服务端发，保证不被广告拦截漏掉；发送失败只记日志，不影响业务。

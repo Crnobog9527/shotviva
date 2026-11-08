@@ -88,8 +88,12 @@ const PHONE = /^\+\d{6,15}$/
 // A web address or a shop link, with or without the scheme; any script's letters in the name.
 const WEBSITE = /^(https?:\/\/)?([\p{L}\p{N}-]+\.)+[\p{L}]{2,}(:\d{2,5})?([/?#]\S*)?$/iu
 
+// Characters as the database counts them (char_length: code points), not UTF-16 units, so an
+// emoji or a rare CJK character is one, and a long answer is caught here with its field marked.
+export const charCount = (value: string) => [...value].length
+
 function text(value: string, required: boolean, max: number, min = 1): FieldError | null {
-  const length = value.trim().length
+  const length = charCount(value.trim())
   if (length === 0) return required ? 'required' : null
   if (length < min) return 'tooShort'
   return length > max ? 'tooLong' : null

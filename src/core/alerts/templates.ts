@@ -1,4 +1,5 @@
 import { INQUIRIES_COPY } from '../admin/inquiries-ui/copy'
+import { visitorText } from './visitor-text'
 import type {
   BusinessInquiryAlert,
   CancelFailedAlert,
@@ -226,10 +227,9 @@ function siteErrors(alert: SiteErrorsAlert): Rendered {
 }
 
 // T86: company, volume and uses only; the contact details are in the admin. The company name is
-// the visitor's own words: one line, cut short.
+// the visitor's own words: made safe for a Feishu text message (visitor-text.ts) and cut short.
 function businessInquiry(alert: BusinessInquiryAlert): Rendered {
-  const company = alert.company.replace(/\s+/g, ' ').trim()
-  const name = company.length > 40 ? `${company.slice(0, 40)}…` : company
+  const name = visitorText(alert.company, 40)
   const uses = alert.uses.map((use) => INQUIRIES_COPY.uses[use]).join('、')
   return {
     line: `【新企业咨询】「${name}」想合作，每月预计出图 ${INQUIRIES_COPY.volumes[alert.volume]}，用途：${uses}。请到后台查看联系方式并跟进。`,

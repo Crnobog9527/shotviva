@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { describe, expect, it, vi } from 'vitest'
 
-import { captchaCheck, captchaConfig } from './captcha'
+import { captchaCheck, captchaMode } from './captcha'
 import { inquiryIpHash } from './ip-hash'
 import { inquiryRow, submitInquiry, type InquiryContext, type SubmitDeps } from './submit'
 import { EMPTY_INQUIRY, type InquiryValues } from './validate'
@@ -83,10 +83,11 @@ describe('hCaptcha check', () => {
   const config = { secret: 's3cret', siteKey: 'site' }
   const reply = (body: unknown) => vi.fn(async () => new Response(JSON.stringify(body)))
 
-  it('is on only with both the site key and the secret', () => {
-    expect(captchaConfig(undefined, 'site')).toBeNull()
-    expect(captchaConfig('s3cret', '')).toBeNull()
-    expect(captchaConfig('s3cret', 'site')).toEqual(config)
+  it('is on with both the site key and the secret, closed in production with the key alone (control review)', () => {
+    expect(captchaMode({ secret: 's3cret', siteKey: 'site', production: true })).toEqual({ mode: 'on', config })
+    expect(captchaMode({ secret: undefined, siteKey: 'site', production: true })).toEqual({ mode: 'closed' })
+    expect(captchaMode({ secret: undefined, siteKey: 'site', production: false })).toEqual({ mode: 'off' })
+    expect(captchaMode({ secret: 's3cret', siteKey: '', production: true })).toEqual({ mode: 'off' })
   })
 
   it('asks siteverify with the secret, token and IP, and follows its answer', async () => {
@@ -98,12 +99,20 @@ describe('hCaptcha check', () => {
     expect(await captchaCheck(config, reply({ success: false }))('tok', null)).toBe(false)
   })
 
-  it('refuses a missing token without asking, and lets people through when hCaptcha is unreachable', async () => {
+  it('refuses a missing token without asking, and lets people through only when hCaptcha is unreachable', async () => {
     const never = reply({ success: true })
     expect(await captchaCheck(config, never)(null, null)).toBe(false)
     expect(never).not.toHaveBeenCalled()
     const down = vi.fn(async () => Promise.reject(new Error('offline')))
     expect(await captchaCheck(config, down)('tok', null)).toBe(true)
+  })
+
+  it('fails closed on an error status or an answer that is not JSON', async () => {
+    const status = vi.fn(async () => new Response(JSON.stringify({ success: true }), { status: 500 }))
+    expect(await captchaCheck(config, status)('tok', null)).toBe(false)
+    const html = vi.fn(async () => new Response('<html>busy</html>'))
+    expect(await captchaCheck(config, html)('tok', null)).toBe(false)
+    expect(await captchaCheck(config, reply({ ok: true }))('tok', null)).toBe(false)
   })
 })
 
@@ -115,5 +124,13 @@ describe('inquiryIpHash', () => {
     expect(hash).not.toBe(inquiryIpHash('198.18.0.1', 'secret-b'))
     expect(hash).not.toBe(inquiryIpHash('198.18.0.2', 'secret-a'))
     expect(inquiryIpHash(null, 'secret-a')).toBeNull()
+  })
+
+  it('counts an IPv6 address by its /64, however it is written (control review)', () => {
+    const a = inquiryIpHash('2001:db8:85a3:12::1', 'k')
+    expect(inquiryIpHash('2001:db8:85a3:12:ffff:ffff:ffff:ffff', 'k')).toBe(a)
+    expect(inquiryIpHash('2001:0DB8:85A3:0012:0000:0000:0000:0042', 'k')).toBe(a)
+    expect(inquiryIpHash('2001:db8:85a3:13::1', 'k')).not.toBe(a)
+    expect(inquiryIpHash('::ffff:198.18.0.1', 'k')).toBe(inquiryIpHash('198.18.0.1', 'k'))
   })
 })
