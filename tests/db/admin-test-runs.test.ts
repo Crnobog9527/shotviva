@@ -214,6 +214,20 @@ describe('set as cover', () => {
     expect(Math.max(meta.width ?? 0, meta.height ?? 0)).toBeLessThanOrEqual(1600)
     expect((await runRow(run.id)).cover_set_at).not.toBeNull()
   })
+
+  it('takes only the default language until per-language covers land (p_locale, T87)', async () => {
+    const { generate } = await setup()
+    const run = await generate()
+    const { error } = await service.rpc('admin_set_test_run_cover', {
+      p_actor: admin,
+      p_run_id: run.id,
+      p_before_url: null,
+      p_after_url: 'https://assets.test/covers/x/after-0.webp',
+      p_locale: 'zh',
+    })
+    expect(error?.message).toBe('INVALID_INPUT')
+    expect((await runRow(run.id)).cover_set_at).toBeNull()
+  })
 })
 
 describe('cleanup when the panel opens', () => {

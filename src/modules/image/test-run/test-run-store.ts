@@ -145,7 +145,8 @@ export function markTestRunCover(db: SupabaseClient, input: { actorId: string; r
   return callRpc(
     db,
     'admin_set_test_run_cover',
-    { p_actor: input.actorId, p_run_id: input.runId, p_before_url: input.beforeUrl, p_after_url: input.afterUrl },
+    // p_locale null: the default (English) cover; per-language covers come with T87.
+    { p_actor: input.actorId, p_run_id: input.runId, p_before_url: input.beforeUrl, p_after_url: input.afterUrl, p_locale: null },
     z.string(),
   )
 }
