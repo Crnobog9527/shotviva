@@ -723,6 +723,9 @@ begin
     return to_jsonb(v_row);
   end if;
 
+  insert into public.admin_test_spend (run_id, template_id, estimate_usd)
+  values (p_run_id, p_template_id, p_estimate_usd);
+
   if v_photo is not null then
     update public.admin_test_photos set last_used_at = now() where id = v_photo;
   end if;
@@ -918,6 +921,10 @@ begin
   update public.admin_test_runs r
      set status = 'failed', error_code = 'TIMEOUT', finished_at = now()
    where r.status = 'running' and r.created_at < now() - interval '10 minutes';
+  update public.admin_test_spend x
+     set counted_usd = 0, finished_at = now()
+   where x.counted_usd is null and x.started_at < now() - interval '10 minutes';
+  delete from public.admin_test_spend x where x.started_at < now() - interval '100 days';
 
   with ranked as (
     select r.id, r.created_at, r.cover_set_at,
@@ -1300,7 +1307,17 @@ begin
     if not found then
       raise exception 'TEST_RUN_NOT_FOUND';
     end if;
+    return to_jsonb(v_row);
   end if;
+
+  update public.admin_test_spend x
+     set cost_usd = p_cost_usd,
+         counted_usd = coalesce(
+           p_cost_usd,
+           case when p_status = 'succeeded' or (p_provider_usage ->> 'output_tokens') is not null then x.estimate_usd else 0 end
+         ),
+         finished_at = now()
+   where x.run_id = p_run_id;
   return to_jsonb(v_row);
 end;
 $$;
@@ -2383,14 +2400,14 @@ begin
    where s.key = 'admin_test_daily_budget_usd';
 
   select coalesce(sum(case
-           when r.status = 'running' and r.created_at > now() - interval '10 minutes' then r.estimate_usd
-           when r.status = 'running' then 0
-           else coalesce(r.cost_usd, 0)
+           when x.counted_usd is not null then x.counted_usd
+           when x.started_at > now() - interval '10 minutes' then x.estimate_usd
+           else 0
          end), 0),
          count(*)
     into v_spent, v_runs
-    from public.admin_test_runs r
-   where r.created_at >= v_start;
+    from public.admin_test_spend x
+   where x.started_at >= v_start;
 
   return jsonb_build_object(
     'budget_usd', coalesce(v_budget, 5),
@@ -2427,11 +2444,11 @@ begin
              'runs', p.runs
            ) order by p.day), '[]'::jsonb)
       from (
-        select date_trunc('day', r.created_at at time zone 'UTC') as day,
-               coalesce(sum(r.cost_usd), 0) as cost_usd,
+        select date_trunc('day', x.started_at at time zone 'UTC') as day,
+               coalesce(sum(x.cost_usd), 0) as cost_usd,
                count(*) as runs
-          from public.admin_test_runs r
-         where r.created_at >= v_start
+          from public.admin_test_spend x
+         where x.started_at >= v_start
          group by 1
       ) p
   );
@@ -4802,6 +4819,23 @@ CREATE TABLE IF NOT EXISTS "public"."admin_test_runs" (
 ALTER TABLE "public"."admin_test_runs" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."admin_test_spend" (
+    "run_id" "uuid" NOT NULL,
+    "template_id" "text" NOT NULL,
+    "started_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "estimate_usd" numeric(10,6) NOT NULL,
+    "cost_usd" numeric(10,6),
+    "counted_usd" numeric(10,6),
+    "finished_at" timestamp with time zone,
+    CONSTRAINT "admin_test_spend_cost_usd_check" CHECK (("cost_usd" >= (0)::numeric)),
+    CONSTRAINT "admin_test_spend_counted_usd_check" CHECK (("counted_usd" >= (0)::numeric)),
+    CONSTRAINT "admin_test_spend_estimate_usd_check" CHECK (("estimate_usd" >= (0)::numeric))
+);
+
+
+ALTER TABLE "public"."admin_test_spend" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."ai_providers" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "module" "text" DEFAULT 'image'::"text" NOT NULL,
@@ -5241,6 +5275,11 @@ ALTER TABLE ONLY "public"."admin_test_runs"
 
 
 
+ALTER TABLE ONLY "public"."admin_test_spend"
+    ADD CONSTRAINT "admin_test_spend_pkey" PRIMARY KEY ("run_id");
+
+
+
 ALTER TABLE ONLY "public"."ai_providers"
     ADD CONSTRAINT "ai_providers_pkey" PRIMARY KEY ("id");
 
@@ -5433,6 +5472,10 @@ CREATE INDEX "admin_test_runs_photo_id_idx" ON "public"."admin_test_runs" USING 
 
 
 CREATE INDEX "admin_test_runs_template_created_idx" ON "public"."admin_test_runs" USING "btree" ("template_id", "created_at" DESC);
+
+
+
+CREATE INDEX "admin_test_spend_started_at_idx" ON "public"."admin_test_spend" USING "btree" ("started_at");
 
 
 
@@ -5876,6 +5919,9 @@ ALTER TABLE "public"."admin_test_photos" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."admin_test_runs" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."admin_test_spend" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."ai_providers" ENABLE ROW LEVEL SECURITY;
@@ -6583,6 +6629,10 @@ GRANT ALL ON TABLE "public"."admin_test_photos" TO "service_role";
 
 
 GRANT ALL ON TABLE "public"."admin_test_runs" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."admin_test_spend" TO "service_role";
 
 
 
