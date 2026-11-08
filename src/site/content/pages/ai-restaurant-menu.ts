@@ -6,6 +6,7 @@ import { pricingRelated } from '../shared'
 import {
   foodHalfDayUsd,
   freeImagesLabel,
+  FreeImagesShort,
   fromCredits,
   MENU_DISHES,
   menuCostUsd,
@@ -49,8 +50,8 @@ function menuBills(): CostBills {
       total: { prefix: 'from', amount: plan, suffix: '/month', when: `about ${photoSeconds} seconds a photo` },
       lines: [
         { label: `Starter plan, ${planFrom?.credits ?? ''} credits a month`, value: plan },
-        { label: `${MENU_DISHES} dishes, ${standard.name}`, value: `${menuCredits} credits ≈ ${menuCostUsd ?? ''}` },
-        { label: 'Left for the rest of the month', value: `${photosLeftAfterMenu ?? ''} more photos` },
+        { label: `${MENU_DISHES} dishes, ${standard.name}`, value: `${menuCredits} credits ≈ ${menuCostUsd}` },
+        { label: 'Left for the rest of the month', value: `${photosLeftAfterMenu} more photos` },
       ],
       fine: `Shoot each dish on the pass with a phone; the template does the light and the styling. Start with ${freeImagesLabel}, no card needed.`,
     },
@@ -63,7 +64,7 @@ export const aiRestaurantMenu = defineContentPage({
   label: 'AI restaurant menu photos',
   module: 'image',
   title: `AI Restaurant Menu Photos From Your Phone (2026) | ${brand}`,
-  description: `AI restaurant menu photos from the dish photo you already took: delivery-app, menu and promo shots with the plate kept as served. ${freeImagesLabel}.`,
+  description: `AI restaurant menu photos from the dish photo you already took: delivery-app, menu and promo shots with the plate kept as served. ${FreeImagesShort}.`,
   h1: 'AI Restaurant Menu Photos From One Phone Shot',
   subtitle: 'Menu, delivery-app and promo photos of the dishes you already serve, shot on the pass with a phone.',
   answerBlock: `AI restaurant menu photos start from the dish photo you already took and turn it into a menu, delivery-app or promo image, with the plate kept as served. With ${brand} you upload one phone photo, pick Delivery Menu, Dark Dining or Promo Poster, and download it in ${tierList}. New users get ${freeImagesLabel}.`,

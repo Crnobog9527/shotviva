@@ -1,6 +1,6 @@
 // "What a credit buys" on /pricing (comps-v3-b pricing.html): the credits one photo costs at
-// each resolution, as a definition list on one flat plate. The numbers come from the page
-// content, which reads them from the config (建站规格 G3).
+// each resolution, as a definition list on one flat plate. The page fills the numbers from the
+// published templates (T91); the content's own config numbers stand in when there are none.
 export type CreditBuysBlock = {
   heading: string
   tiers: readonly { name: string; credits: number }[]

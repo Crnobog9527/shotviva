@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { pagePath, validateContentPage } from '@/core/content'
 
 import { site } from '../site.config'
+import { FALLBACK_CREDITS, fillCredits } from './credits'
 import { contentPages, homePage } from './index'
 
 const allPages = [homePage, ...contentPages]
@@ -21,8 +22,10 @@ function csvUrls(): string[] {
 }
 
 describe('site content', () => {
+  // Measured as served: "up to 6 free Standard images" (mixed template prices, the longest) and
+  // the no-catalogue "3 free Standard images" (T91).
   it.each(allPages.map((p) => [pagePath(p), p] as const))('%s passes the TDK / G1 rules', (_, page) => {
-    expect(validateContentPage(page)).toEqual([])
+    for (const facts of [{ from: 1, same: false }, FALLBACK_CREDITS]) expect(validateContentPage(fillCredits(page, facts))).toEqual([])
   })
 
   it('gives every page its own keyword (R1)', () => {

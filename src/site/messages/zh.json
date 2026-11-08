@@ -105,7 +105,7 @@
     },
     "signup": {
       "title": "注册账号",
-      "gift": "{count, plural, other {# 张标准清晰度免费图}}",
+      "gift": "{upTo, select, true {最多 } other {}}{count, plural, other {# 张标准清晰度免费图}}",
       "giftNote": "会公开展示，并带水印",
       "submit": "注册",
       "fine": "继续即表示你同意<terms>服务条款</terms>和<privacy>隐私政策</privacy>。",

@@ -3,6 +3,7 @@ import type { ContentPage, FaqItem, FooterLink, HomePage } from '@/core/content'
 import type { Locale } from '@/core/i18n'
 
 import { homePage } from './home'
+import { FreeImagesLabel } from './offer'
 import { footerLinks } from './legal'
 import { aiRestaurantMenu } from './pages/ai-restaurant-menu'
 import { commercialPhotography } from './pages/commercial-photography'
@@ -12,6 +13,7 @@ import { zhHomePage } from './zh/home'
 import { zhAiRestaurantMenu } from './zh/pages/ai-restaurant-menu'
 import { zhCommercialPhotography } from './zh/pages/commercial-photography'
 import { zhImageToImageGenerator } from './zh/pages/image-to-image-generator'
+import { zhFreeImages } from './zh/offer'
 import { ALIPAY_QUESTION, ZH_WECHAT_PAY_FAQ, zhPricingPage } from './zh/pricing'
 
 // Marketing copy per language (ARCHITECTURE §17: body copy lives in site/content by language).
@@ -46,6 +48,10 @@ export function pricingFaqIn(locale: Locale, channel: PaymentChannel, wechatPay 
   if (!wechatPay) return page.faq
   return page.faq.map((item) => (item.question === ALIPAY_QUESTION ? ZH_WECHAT_PAY_FAQ : item))
 }
+
+// The signup gift on its own (the generator's gift line, the sign-up sheet, JSON-LD's free
+// offer), a marker for fillCredits like the page copy: "Up to 6 free Standard images".
+export const freeImagesIn = (locale: Locale): string => (locale === 'zh' ? zhFreeImages : FreeImagesLabel)
 
 export const contentPagesIn = (locale: Locale): readonly ContentPage[] => INNER[locale]
 
