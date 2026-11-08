@@ -97,9 +97,16 @@ export const termsServiceSections: readonly [LegalSection, ...LegalSection[]] = 
         legalLinks.acceptableUse,
         '.',
       ],
-      // T89 (Owner 2026-11-08): draft wording; the Owner or a lawyer may still change it.
-      'You are responsible for images you create with options that change how your product looks (for example, AI upgraded plating and tableware), including making sure that the images you publish match what you actually sell or serve. Disputes caused by differences between such an image and the real product are your responsibility.',
       'We do not use your photos or Outputs to train AI models.',
+    ],
+  },
+  {
+    id: 'using-outputs',
+    heading: 'AI-made images and using them in your business',
+    blocks: [
+      'Check before you use an Output. AI results can differ from your real product, dish or place, and the same template can give different results each time. Before you publish or use an Output, check it yourself. You decide whether and how to use it, whether that use is lawful, and whether you need to label it as AI-made under the law or the rules of the platform where you post it. We do not review Outputs before you use them.',
+      'Using Outputs in your business. Shotviva is a tool. When you use an Output on a menu, a delivery app, a store listing, an ad or anywhere else, you are the seller or advertiser, not us. You alone are responsible for making sure it fairly shows what your customers will get. We are not a party to any dealings between you and your customers, the platforms you sell on, or regulators. Complaints, refunds, bad reviews, platform penalties or fines that come from an image not matching the real product are your responsibility.',
+      'This includes images made with options you choose to turn on that change how your product looks, such as "Upgrade plating & tableware". The Service records when you turned such an option on.',
     ],
   },
   {
