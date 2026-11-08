@@ -82,7 +82,16 @@ describe('generateEventProps', () => {
       model: 'gpt-image-2.6',
       edit_scope: null,
       batch_size: 1,
+      toggles: {},
     })
+  })
+
+  it('carries the template toggles as stored on the job (T89), and nothing odd', () => {
+    const toggled = { ...job, inputs: { ...job.inputs, toggles: { replate: true }, toggles_confirmed_at: { replate: '2026-11-08T12:00:00Z' } } }
+    const props = generateEventProps(toggled, 'food', { status: 'succeeded' }, 0)
+    expect(props.toggles).toEqual({ replate: true })
+    expect(validateEvent('generate', props).ok).toBe(true)
+    expect(generateEventProps({ ...job, inputs: { toggles: 'on' } }, 'food', { status: 'succeeded' }, 0).toggles).toEqual({})
   })
 
   it('carries the batch size, 1 when there is no batch', () => {

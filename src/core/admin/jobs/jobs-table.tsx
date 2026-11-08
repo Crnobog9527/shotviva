@@ -8,6 +8,7 @@ import { formatBeijing } from '../shell/format'
 import { JOBS_COPY as COPY } from './copy'
 import { jobCostCell, type UnitCost } from './cost'
 import { usdFine } from './cost-format'
+import { JobToggles } from './job-toggles'
 import type { AdminJob } from './repository'
 import { UserLink } from '../users-ui/user-link'
 
@@ -54,6 +55,16 @@ function StatusCell({ job }: { job: AdminJob }) {
   )
 }
 
+// The template, and under it any toggle the user chose (T89) with when they confirmed it.
+function TemplateCell({ job }: { job: AdminJob }) {
+  return (
+    <TableCell>
+      <div className="font-mono text-xs">{job.templateId}</div>
+      <JobToggles toggles={job.toggles} />
+    </TableCell>
+  )
+}
+
 function JobRow({ job, actions, unitCost }: { job: AdminJob; actions: JobSupportActions; unitCost: UnitCost }) {
   return (
     <TableRow>
@@ -66,7 +77,7 @@ function JobRow({ job, actions, unitCost }: { job: AdminJob; actions: JobSupport
           {job.userId.slice(0, 8)}
         </UserLink>
       </TableCell>
-      <TableCell className="font-mono text-xs">{job.templateId}</TableCell>
+      <TemplateCell job={job} />
       <StatusCell job={job} />
       <TableCell className="font-mono text-xs">{job.model}</TableCell>
       <TableCell className="font-mono text-xs uppercase">{job.resolution}</TableCell>

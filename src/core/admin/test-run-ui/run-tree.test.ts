@@ -17,6 +17,7 @@ function run(id: string, extra: Partial<TestRunView> = {}): TestRunView {
     aspectRatio: '4:5',
     copy: {},
     note: null,
+    toggles: {},
     instruction: null,
     sourceLocale: null,
     targetLocale: null,

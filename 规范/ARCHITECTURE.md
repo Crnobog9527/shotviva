@@ -169,7 +169,7 @@ interface GenerationProvider {
 | module | 'image' / 'video' |
 | template_id | 用的模板（作品编辑用内置模板 `edit`，§5.2） |
 | parent_job_id | 作品编辑时，被编辑的那张作品的 id（同一用户的成功作品）；模板出图为空。外键 `on delete set null`（T30） |
-| inputs | 用户填的内容（文案、比例、**分辨率 `resolution`：`'1k'` / `'2k'` / `'3k'`**、可选补充说明 `note`（≤300 字符，工作台「Anything to change?」，服务端拼在模板提示词之后，作为用户内容存档）、输入图在 R2 的 key），**不含封装提示词**。伙伴接口（第 14 节）v1 固定 `'1k'`，契约不加字段 |
+| inputs | 用户填的内容（文案、比例、**分辨率 `resolution`：`'1k'` / `'2k'` / `'3k'`**、可选补充说明 `note`（≤300 字符，工作台「Anything to change?」，服务端拼在模板提示词之后，作为用户内容存档）、模板开关 `toggles` / `toggles_confirmed_at`（T89，见 §5.1c）、输入图在 R2 的 key），**不含封装提示词**。伙伴接口（第 14 节）v1 固定 `'1k'`，契约不加字段 |
 | provider | 实际调用的供应商和模型：`<ai_providers.id 或 env>/<模型名>`（第 3.3 节） |
 | provider_usage | 供应商返回的用量（jsonb）：出图的 `input_text_tokens`、`input_image_tokens`、`output_tokens`；作品编辑另记判断那一步的 `decision_input_tokens`。供应商没返回就为空（T33） |
 | cost_usd | 这一单的真实成本（`numeric(10,6)`）= 用量 × 结算时在用供应商的单价快照；以后改单价不影响历史。没有用量或单价没填就为空，后台标「无法计算」（T33） |
@@ -211,6 +211,35 @@ v1 不写回调解析、定时轮询、超时清理这类定时任务。视频�
 - **数据**：新表 `template_favorites(user_id, template_id, created_at)`，主键 `(user_id, template_id)`，RLS 只能读写自己的行，每人最多 200 个；模板下架或改成只给伙伴用时不在收藏里显示（行保留，重新上架后回来）；模板删除时级联删除；删号时随账号删除。
 - 收藏只影响登录用户自己的页面，模板目录和首页的服务端缓存不变（收藏列表在客户端或按用户单独读取，不进公共缓存）。
 - 埋点 `template_favorite`（`template_id`、`category`、`action = add / remove`、`surface`）。迁移编号段 `0740`～`0759`。
+
+### 5.1c 模板开关（Owner 2026-11-08，T89）
+
+模板可以给用户几个开 / 关选项，第一个是餐饮菜品的「优化摆盘和器皿」/ "Upgrade plating & tableware"。哪些模板配由后台定，代码里不按分类写死。
+
+**数据定义**
+
+- `templates.fields.toggles`（公开，可选，默认 `[]`，最多 3 个）：每项 `{ key, label, hint?, default, confirm? }`。
+  - `key`：`^[a-z][a-z0-9_]*$`，不能和 `fields.copy` 的 key 重名，也不能是 `aspect_ratio`（同一套 `{{key}}` 占位符）。
+  - `label`（英文，≤60）、`hint`（英文，≤200，可选）。
+  - `default`：只能是 `false`。
+  - `confirm`（可选）：开启前的确认框 `{ title ≤80, body ≤1200, checkbox ≤120, accept ≤40 }`，英文。确认框文字是模板数据，不写死在代码里。
+  - 旧模板的 `fields` 没有 `toggles`，读出时按 `[]` 处理。
+- `templates.translations.zh.fields.<key>`：开关的中文 `label`、`hint`、`confirm: { title, body, checkbox, accept }`，每一项缺了就回退英文，和文案字段同一个 `fields` 对象（文案字段用 `label` / `placeholder`）。
+- `template_prompts.model_params.toggles.<key>`（私有）：`{ on, off }` 两段文字。`renderPrompt` 按用户的选择把对应一段放进正文的 `{{<key>}}`；没录的按空串（不会把占位符原样发给模型）。这两段只用来拼提示词，`model_params` 其余的键照旧交给出图供应商，`toggles` 不传过去。提示词片段不进仓库（测试用假片段）。
+- 后台保存（`saveTemplate` 和导入脚本）：定义了开关却在提示词正文里没有 `{{<key>}}`，或缺 `on` / `off` 任一段（空白也算缺），拒绝保存（`INVALID_INPUT`，提示是哪个开关缺什么）。数据库函数 `admin_upsert_template` 不变，没有迁移。
+- `generation_jobs.inputs`（只在模板有开关时写）：
+  - `toggles: { "<key>": true | false }`：模板的每个开关都记，没开的记 `false`。
+  - `toggles_confirmed_at: { "<key>": "<ISO 时间>" }`：带 `confirm` 的开关为开时，记服务端收到请求的时间。没有这样的开关时不写这个键。
+- `admin_test_runs.inputs.toggles`：后台试跑的开关选择，结构同上（不记确认时间）。
+
+**请求和规则**
+
+- `/api/generate` 的 `inputs` 加 `toggles: { key: boolean }`（可选，缺的 key 按关）和 `toggles_confirmed: string[]`（用户在确认框里确认过的 key）。
+- 服务端校验：key 必须属于该模板、值必须是布尔。带 `confirm` 的开关为开时，`toggles_confirmed` 里必须有它，否则 `INVALID_INPUT`，在扣积分之前拒绝。
+- 浏览器只有在用户勾选并点了确认（或同一浏览器会话里这个模板确认过，sessionStorage；或「再来一张」沿用原作品已开启的选择）后才会把开关打开，所以会把开着的这类开关都放进 `toggles_confirmed`。
+- 伙伴接口 v1 不收开关：请求里带了也丢掉，一律按关（§14.6 契约不变）。
+- 后台试跑（§10.b）的开关直接开或关，管理员不弹确认框。
+- 积分价格不变。开关不是用户写的文字，不送换脸判断（§5.1a）。作品编辑（§5.2）不受影响。
 
 ### 5.1a 禁止换脸：按用户输入的文字判断意图（Owner 2026-11-08，T81）
 
@@ -998,7 +1027,7 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 |---|---|---|
 | `signup` | 服务端：邮箱验证完成 / 首次 Google 登录时（和注册赠送同一处） | `method`（`email` / `google`） |
 | `upload` | 浏览器：直传 R2 成功后 | `size_bucket`（`<1MB` / `1-5MB` / `>5MB`）、`compressed`（是否走了浏览器压缩） |
-| `generate` | 服务端：任务结算后（成功或失败都发） | `template_id`、`category`、`resolution`、`credits_cost`、`credit_pool`、`status`、`error_code`、`source`（`web` / `graylum`）、`duration_ms`、`model`（实际调用的模型名，不含密钥和地址）、`batch_size`（单张为 1，T28 起）、`edit_scope`（作品编辑时的范围或 `fallback`，模板出图为空，T30 起） |
+| `generate` | 服务端：任务结算后（成功或失败都发） | `template_id`、`category`、`resolution`、`credits_cost`、`credit_pool`、`status`、`error_code`、`source`（`web` / `graylum`）、`duration_ms`、`model`（实际调用的模型名，不含密钥和地址）、`batch_size`（单张为 1，T28 起）、`edit_scope`（作品编辑时的范围或 `fallback`，模板出图为空，T30 起）、`toggles`（模板开关的选择 `{ key: true/false }`，模板没有开关时为 `{}`，T89 起） |
 | `paywall_view` | 浏览器：付费墙打开 | `trigger`（`insufficient_credits` / `pricing_page` / `account` / `graylum` / `tier_required`） |
 | `checkout_start` | 服务端：创建 Checkout Session 时 | `product_id`、`tier`、`interval`、`form`、`channel`、`method` |
 | `purchase` | 服务端：支付回调入账成功后 | 第 6.2 节 `purchase` 参数 |
@@ -1007,6 +1036,7 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 
 所有事件都带 `locale`（`en` / `zh`，浏览器端注册为公共属性，服务端发时从请求或 `user_metadata.locale` 取；Owner 2026-11-06）。钱和积分相关的事件（`signup`、`generate`、`checkout_start`、`purchase`）一律服务端发，保证不被广告拦截漏掉；发送失败只记日志，不影响业务。
 
+- **新增事件（T89，Owner 2026-11-08）**：`template_toggle`（浏览器：`template_id`、`key`、`action` = `confirm_shown`（弹出确认框）/ `confirmed`（勾选后点了开启）/ `cancelled`（取消或关掉确认框）/ `turned_off`（把带确认框的开关关掉）、`surface` = `workspace` / `create_dialog` / `home`）。后台试跑不发。
 - **新增事件（T74，Owner 2026-11-07）**：`template_view`（浏览器：打开模板详情或在选择器里选中模板，`template_id`、`category`、`surface`）、`paywall_select`（浏览器：付费墙里选中商品，`product_id`、`method`）、`checkout_cancel`（服务端：结账取消返回，`product_id`、`method`）、`upload_error`（浏览器：上传失败，`reason` 枚举，不含文件名）。PostHog 打开 `capture_pageleave`（停留时间、最大滚动深度）。
 - **新增事件（T90，Owner 2026-11-08）**：`app_update_prompt`（浏览器：新版本刷新提示条，`action`（`shown` / `refreshed` / `dismissed`）、`reason`（`version` 版本检查发现新版本 / `error` 旧页面找不到服务端函数或代码块）；每个新版本或每次出错只记一次 `shown`）。
 

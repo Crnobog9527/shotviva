@@ -22,6 +22,8 @@ export type TestRunView = {
   // The template's text fields and the note (first runs), or the words of an edit.
   copy: Record<string, string>
   note: string | null
+  // The template's toggles as run (T89), key → on; {} when it has none.
+  toggles: Record<string, boolean>
   instruction: string | null
   // A translation (T87): the cover it started from (null = the common cover) and the language
   // it was translated into.

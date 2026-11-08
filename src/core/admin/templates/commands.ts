@@ -5,7 +5,7 @@ import { z } from 'zod'
 
 import { AppError } from '@/core/errors'
 import { logger } from '@/core/logger'
-import { creditsBelowFloor, promptInputSchema, templateInputSchema, type CreditsFloor } from '@/core/templates'
+import { creditsBelowFloor, promptInputSchema, templateInputSchema, toggleSetupProblems, type CreditsFloor, type PromptInput } from '@/core/templates'
 
 import { describeBlockers, planActiveChange, type ActiveChangeOutcome } from './publish-rules'
 import * as repo from './repository'
@@ -35,6 +35,13 @@ function assertAboveFloor(template: z.infer<typeof templateInputSchema>, floor: 
   throw new AppError('INVALID_INPUT', `积分低于下限：${detail}`)
 }
 
+// T89: a toggle needs its {{key}} in the prompt body and both private fragments, or what the
+// user picks would never reach the model.
+function assertTogglesWired(template: z.infer<typeof templateInputSchema>, prompt: PromptInput): void {
+  const problems = toggleSetupProblems(template.fields.toggles, prompt.body, prompt.modelParams)
+  if (problems.length > 0) throw new AppError('INVALID_INPUT', `开关没接好：${problems.join('；')}`)
+}
+
 // `floor` is the image module's floor table (modules/image/credits-floor.ts); core cannot
 // import a module, so the server action passes it in.
 export async function saveTemplate(
@@ -46,6 +53,7 @@ export async function saveTemplate(
   const template = parseOrThrow(templateInputSchema, payload.template, 'template')
   const prompt = parseOrThrow(promptInputSchema, payload.prompt, 'prompt')
   assertAboveFloor(template, floor)
+  assertTogglesWired(template, prompt)
   const exists = await repo.templateExists(client, template.id)
   if (payload.isNew && exists) {
     throw new AppError('INVALID_INPUT', `id "${template.id}" is already taken`)

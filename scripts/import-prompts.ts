@@ -20,6 +20,7 @@ import { z } from 'zod'
 import { toUpsertArgs } from '../src/core/admin/templates/rpc-payload'
 import { creditsBelowFloor } from '../src/core/templates/pricing'
 import { templateWithPromptSchema } from '../src/core/templates/schema'
+import { toggleSetupProblems } from '../src/core/templates/toggles'
 import { CREDITS_FLOOR } from '../src/modules/image/credits-floor'
 
 const fileSchema = z.object({ templates: z.array(templateWithPromptSchema).min(1) })
@@ -41,6 +42,9 @@ function readTemplates(path: string) {
       const detail = low.map((v) => `${v.resolution} ${v.given} < floor ${v.floor}`).join(', ')
       throw new Error(`${template.id}: credits below the floor (${detail})`)
     }
+    // The admin save's T89 rule: names the toggle, never the prompt text.
+    const unwired = toggleSetupProblems(template.fields.toggles, template.prompt.body, template.prompt.modelParams)
+    if (unwired.length > 0) throw new Error(`${template.id}: ${unwired.join('; ')}`)
   }
   return parsed.data.templates
 }

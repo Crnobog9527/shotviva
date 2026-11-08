@@ -25,6 +25,10 @@ export const generateBodySchema = z.object({
         .max(NOTE_MAX_LENGTH)
         .transform((note) => note || undefined)
         .optional(),
+      // The template's on/off options (T89), key → on; absent keys are off.
+      toggles: z.record(z.string().max(64), z.boolean()).optional(),
+      // Toggles whose confirm dialog the user accepted; required for any of those that is on.
+      toggles_confirmed: z.array(z.string().max(64)).max(10).optional(),
     })
     .default({}),
   visibility: z.enum(JOB_VISIBILITIES).optional(),
@@ -44,6 +48,9 @@ export type GenerationRequest = {
   // Web only: the partner route is fixed at '1k' with no note (ARCHITECTURE §14.6).
   resolution?: Resolution
   note?: string
+  // Web only (T89): the partner route never sends toggles, so they stay off there (§14.6).
+  toggles?: Record<string, boolean>
+  togglesConfirmed?: string[]
   // Applies to paid works only; reserve_credits forces free works public.
   visibility?: JobVisibility | null
   // Partner callId (T7); a repeat returns the first job.
@@ -67,6 +74,8 @@ export function toGenerationRequest(userId: string, body: z.infer<typeof generat
     aspectRatio: body.inputs.aspect_ratio,
     resolution: body.inputs.resolution,
     note: body.inputs.note,
+    toggles: body.inputs.toggles,
+    togglesConfirmed: body.inputs.toggles_confirmed,
     visibility: body.visibility ?? null,
     batchSize: body.batch_size,
   }

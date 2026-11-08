@@ -18,6 +18,8 @@ describe('validateGenerationInputs', () => {
       copy: { dish: 'Ramen', note: '' },
       aspectRatio: '4:5',
       note: '',
+      toggles: {},
+      confirmed: [],
     })
   })
 
@@ -51,11 +53,74 @@ describe('validateGenerationInputs', () => {
 describe('renderPrompt', () => {
   it('substitutes copy and aspect ratio and blanks unknown placeholders', () => {
     const body = 'Studio shot of {{ dish }}. {{note}} Ratio {{aspect_ratio}}. {{secret}}'
-    expect(renderPrompt(body, { copy: { dish: 'Ramen', note: '' }, aspectRatio: '1:1', note: '' })).toBe('Studio shot of Ramen.  Ratio 1:1.')
+    expect(renderPrompt(body, { copy: { dish: 'Ramen', note: '' }, aspectRatio: '1:1', note: '', toggles: {}, confirmed: [] })).toBe('Studio shot of Ramen.  Ratio 1:1.')
   })
 
   it('appends the user note after the rendered template', () => {
-    const inputs = { copy: { dish: 'Ramen', note: '' }, aspectRatio: '1:1', note: 'Add a sprig of mint' }
+    const inputs = { copy: { dish: 'Ramen', note: '' }, aspectRatio: '1:1', note: 'Add a sprig of mint', toggles: {}, confirmed: [] }
     expect(renderPrompt('Studio shot of {{dish}}.', inputs)).toBe('Studio shot of Ramen.\n\nAdd a sprig of mint')
+  })
+})
+
+// T89: fake fragments only; real prompt text never enters the repo.
+const confirm = { title: 'Sure?', body: 'It may differ.', checkbox: 'I understand', accept: 'Turn on' }
+const toggled = templateFieldsSchema.parse({
+  images: { min: 1, max: 1 },
+  copy: [{ key: 'dish', label: 'Dish name' }],
+  aspectRatios: ['1:1'],
+  toggles: [
+    { key: 'replate', label: 'Upgrade plating', confirm },
+    { key: 'steam', label: 'Add steam' },
+  ],
+})
+const fragments = { replate: { on: 'FAKE-ON', off: 'FAKE-OFF' }, steam: { on: 'STEAM-ON', off: 'STEAM-OFF' } }
+
+describe('toggles (T89)', () => {
+  it('defaults every toggle to off', () => {
+    const inputs = validateGenerationInputs(toggled, { imageCount: 1 })
+    expect(inputs.toggles).toEqual({ replate: false, steam: false })
+    expect(inputs.confirmed).toEqual([])
+  })
+
+  it('refuses a confirm-required toggle turned on without the confirm flag', () => {
+    expect(() => validateGenerationInputs(toggled, { imageCount: 1, toggles: { replate: true } })).toThrow(
+      expect.objectContaining({ code: 'INVALID_INPUT' }),
+    )
+  })
+
+  it('takes it with the flag and lists it as confirmed; a toggle without a dialog needs none', () => {
+    const inputs = validateGenerationInputs(toggled, { imageCount: 1, toggles: { replate: true, steam: true }, togglesConfirmed: ['replate'] })
+    expect(inputs.toggles).toEqual({ replate: true, steam: true })
+    expect(inputs.confirmed).toEqual(['replate'])
+  })
+
+  it('does not count a confirm flag for a toggle left off', () => {
+    expect(validateGenerationInputs(toggled, { imageCount: 1, togglesConfirmed: ['replate'] }).confirmed).toEqual([])
+  })
+
+  it('ignores a key the template no longer has when it is off, refuses it when on', () => {
+    expect(validateGenerationInputs(toggled, { imageCount: 1, toggles: { removed: false } }).toggles).toEqual({ replate: false, steam: false })
+    expect(() => validateGenerationInputs(toggled, { imageCount: 1, toggles: { removed: true } })).toThrow(expect.objectContaining({ code: 'INVALID_INPUT' }))
+  })
+
+  it.each([
+    ['unknown key', { prompt: true }],
+    ['unknown key, not a boolean', { prompt: 'off' }],
+    ['non-boolean value', { steam: 'yes' }],
+  ])('rejects %s', (_, toggles) => {
+    expect(() => validateGenerationInputs(toggled, { imageCount: 1, toggles })).toThrow(expect.objectContaining({ code: 'INVALID_INPUT' }))
+  })
+
+  it('renders the off fragment by default and the on fragment when on, the note still last', () => {
+    const body = 'Shot of {{dish}}. {{ replate }} {{steam}}'
+    const off = validateGenerationInputs(toggled, { imageCount: 1, copy: { dish: 'Ramen' }, note: 'warmer light' })
+    expect(renderPrompt(body, off, fragments)).toBe('Shot of Ramen. FAKE-OFF STEAM-OFF\n\nwarmer light')
+    const on = validateGenerationInputs(toggled, { imageCount: 1, copy: { dish: 'Ramen' }, toggles: { replate: true }, togglesConfirmed: ['replate'] })
+    expect(renderPrompt(body, on, fragments)).toBe('Shot of Ramen. FAKE-ON STEAM-OFF')
+  })
+
+  it('renders a toggle without fragments as empty, never the raw placeholder', () => {
+    const inputs = validateGenerationInputs(toggled, { imageCount: 1, toggles: { steam: true } })
+    expect(renderPrompt('A {{steam}} B', inputs)).toBe('A  B')
   })
 })

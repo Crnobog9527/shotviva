@@ -447,6 +447,9 @@
         "add": "Add a photo",
         "remove": "Remove photo",
         "failed": "Couldn't upload. Remove it and try another."
+      },
+      "toggles": {
+        "cancel": "Cancel"
       }
     },
     "errors": {

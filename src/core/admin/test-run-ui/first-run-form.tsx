@@ -14,6 +14,7 @@ import { TEST_RUN_COPY as COPY } from './copy'
 import { firstRunLaunches } from './launches'
 import { PhotoPicker } from './photo-picker'
 import { RunOptions, type RunOptionValues } from './run-options'
+import { TestToggles } from './test-toggles'
 import type { Launch } from './use-test-panel'
 
 type Props = {
@@ -31,12 +32,13 @@ export function FirstRunForm({ template, photos, onLaunch, onPhotoUploaded, onEr
   const [picked, setPicked] = useState<string[]>([])
   const [copy, setCopy] = useState<Record<string, string>>({})
   const [note, setNote] = useState('')
+  const [toggles, setToggles] = useState<Record<string, boolean>>({})
   const [options, setOptions] = useState<RunOptionValues>({ resolution: DEFAULT_RESOLUTION, aspect: 'original', triple: false })
   const targets = usesPhoto ? picked : []
   const count = targets.length > 1 ? targets.length : options.triple ? 3 : 1
   const submit = () => {
     if (usesPhoto && template.fields.images.min > 0 && picked.length === 0) return onError(COPY.first.needPhoto)
-    onLaunch(firstRunLaunches(template.id, targets, { copy, note, options }))
+    onLaunch(firstRunLaunches(template.id, targets, { copy, note, toggles, options }))
   }
   return (
     <section aria-labelledby="test-first-title" className="grid gap-3 rounded-lg border p-3">
@@ -63,6 +65,7 @@ export function FirstRunForm({ template, photos, onLaunch, onPhotoUploaded, onEr
           />
         </div>
       ))}
+      <TestToggles toggles={template.fields.toggles ?? []} values={toggles} onChange={setToggles} />
       <div className="grid gap-1.5">
         <Label htmlFor="test-note">{COPY.first.note}</Label>
         <Textarea id="test-note" rows={2} maxLength={NOTE_MAX_LENGTH} placeholder={COPY.first.notePlaceholder} value={note} onChange={(event) => setNote(event.target.value)} />

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { creditsCostSchema, TEMPLATE_QUALITIES } from './pricing'
+import { RESERVED_KEYS, toggleFieldSchema, TOGGLES_MAX } from './toggles'
 
 // Template shapes shared by the admin page, the import script and (later) generation.
 // No `server-only` here: scripts/import-prompts.ts validates with the same schema.
@@ -30,6 +31,8 @@ export const templateFieldsSchema = z
     images: z.object({ min: z.number().int().min(0).max(4), max: z.number().int().min(0).max(4) }),
     copy: z.array(copyFieldSchema).max(10).default([]),
     aspectRatios: z.array(z.string().regex(/^\d{1,2}:\d{1,2}$/)).min(1),
+    // Optional on/off choices (T89), off by default; their prompt text is private.
+    toggles: z.array(toggleFieldSchema).max(TOGGLES_MAX).default([]),
   })
   .refine((fields) => fields.images.min <= fields.images.max, {
     message: 'images.min must not exceed images.max',
@@ -39,8 +42,19 @@ export const templateFieldsSchema = z
     message: 'copy field keys must be unique',
     path: ['copy'],
   })
+  // One placeholder namespace: {{key}} is either a copy field or a toggle, never both.
+  .refine((fields) => {
+    const keys = [...fields.copy.map((field) => field.key), ...fields.toggles.map((toggle) => toggle.key)]
+    const reserved = fields.toggles.some((toggle) => (RESERVED_KEYS as readonly string[]).includes(toggle.key))
+    return new Set(keys).size === keys.length && !reserved
+  }, {
+    message: 'toggle keys must be unique and differ from copy field keys and aspect_ratio',
+    path: ['toggles'],
+  })
 
 export type TemplateFields = z.infer<typeof templateFieldsSchema>
+// templates.fields as stored: rows written before T89 have no `toggles` (toTemplate fills []).
+export type StoredTemplateFields = Omit<TemplateFields, 'toggles'> & { toggles?: TemplateFields['toggles'] }
 
 const optionalUrl = z.union([z.url(), z.literal('')]).optional()
 
@@ -58,18 +72,31 @@ export const TEMPLATE_DESCRIPTION_MAX = 160
 
 // templates.translations (ARCHITECTURE §5): display text per extra language, English stays in
 // `name` / `fields`. Keys are the enabled languages only (the table check says the same).
+// A toggle's confirm dialog in another language (T89): each line falls back to English.
+const confirmTranslationSchema = z.object({
+  title: optionalText(80),
+  body: optionalText(1200),
+  checkbox: optionalText(120),
+  accept: optionalText(40),
+})
+
 export const templateTranslationSchema = z.object({
   name: optionalText(120),
   description: optionalText(300),
+  // Copy fields use label / placeholder; toggles label / hint / confirm (same key namespace).
   fields: z
-    .record(z.string().regex(/^[a-z][a-z0-9_]*$/), z.object({ label: optionalText(60), placeholder: optionalText(200) }))
+    .record(
+      z.string().regex(/^[a-z][a-z0-9_]*$/),
+      z.object({ label: optionalText(60), placeholder: optionalText(200), hint: optionalText(200), confirm: confirmTranslationSchema.optional() }),
+    )
     .optional(),
 })
+export type ConfirmTranslation = { title?: string; body?: string; checkbox?: string; accept?: string }
 // Stored shape: every item optional, a missing one falls back to English.
 export type TemplateTranslation = {
   name?: string
   description?: string
-  fields?: Record<string, { label?: string; placeholder?: string }>
+  fields?: Record<string, { label?: string; placeholder?: string; hint?: string; confirm?: ConfirmTranslation }>
 }
 
 export const templateTranslationsSchema = z.strictObject({ zh: templateTranslationSchema.optional() })

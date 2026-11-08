@@ -50,6 +50,7 @@ export type GenerateInput = {
   photoId: string | null
   copy: Record<string, string>
   note: string
+  toggles: Record<string, boolean>
   resolution: Resolution
   aspect: OutputAspect
 }
@@ -62,7 +63,7 @@ export const startGenerate = (input: GenerateInput) =>
       batch_id: input.batchId,
       template_id: input.templateId,
       photo_id: input.photoId,
-      inputs: { copy: input.copy, note: input.note, resolution: input.resolution, aspect_ratio: input.aspect },
+      inputs: { copy: input.copy, note: input.note, toggles: input.toggles, resolution: input.resolution, aspect_ratio: input.aspect },
     },
   })
 
