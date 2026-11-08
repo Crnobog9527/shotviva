@@ -28,8 +28,12 @@ export const zhFromCredits = '⟦积分起价⟧'
 // catalogue like offer.ts's freeImagesLabel (T91); 「最多」 goes when every template costs the same.
 export const zhFreeImages = '⟦免费标准图⟧'
 
+// Copy writes it after a space (「新用户送 ⟦…⟧」), right for 「送 3 张」; 「最多」 is a Chinese
+// word, so the space goes: 「送最多 6 张」.
+const zhFree = ({ from, same }: CreditFacts) => `${same ? '' : '最多 '}${freeStandardImages(from)} 张免费标准图`
 export const ZH_COUNT_MARKERS: readonly (readonly [string, (facts: CreditFacts) => string])[] = [
-  [zhFreeImages, ({ from, same }) => `${same ? '' : '最多 '}${freeStandardImages(from)} 张免费标准图`],
+  [` ${zhFreeImages}`, (facts) => `${facts.same ? ' ' : ''}${zhFree(facts)}`],
+  [zhFreeImages, zhFree],
 ]
 
 const FORMATS: Record<string, string> = { 'image/jpeg': 'JPG', 'image/png': 'PNG', 'image/webp': 'WebP' }

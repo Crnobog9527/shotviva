@@ -70,6 +70,10 @@ describe('image counts from the catalogue', () => {
     expect(fillCredits(freeImagesLabel, FALLBACK_CREDITS)).toBe('3 free Standard images')
     expect(fillCredits(zhFreeImages, FALLBACK_CREDITS)).toBe('3 张免费标准图')
     expect(fillCredits(FreeImagesTitle, { from: 6, same: true })).toBe('1 Free Standard Image')
+    // 「最多」 is a Chinese word: no space before it, a space before a bare number.
+    expect(fillCredits(`新用户送 ${zhFreeImages}。`, MIXED)).toBe('新用户送最多 6 张免费标准图。')
+    expect(fillCredits(`新用户送 ${zhFreeImages}。`, FALLBACK_CREDITS)).toBe('新用户送 3 张免费标准图。')
+    expect(JSON.stringify(fillCredits(homePageIn('zh'), MIXED))).not.toMatch(/[一-鿿] 最多/)
   })
 
   it('prices the home set and the menu at N credits a photo, Starter at $0.40 a credit', () => {
@@ -93,6 +97,7 @@ describe('what a credit buys on /pricing', () => {
     // A tie goes to the cheaper price.
     expect(withCatalogueTiers(block, [priced(2), priced(1)]).tiers.map((tier) => tier.credits)).toEqual([1, 2, 3])
     expect(withCatalogueTiers(block, []).tiers.map((tier) => tier.credits)).toEqual([2, 4, 6])
+    expect([block.unit, block.unitOne]).toEqual(['credits', 'credit'])
     expect(withCatalogueTiers(pricingPageIn('zh').creditBuys, live).tiers.map((tier) => tier.name)).toEqual(['标准', '高清', '超清'])
   })
 })

@@ -16,7 +16,7 @@
       "dockGenerate": "生成",
       "needsCopy": "去工作台填写文字",
       "noTemplates": "模板即将上线",
-      "gift": "新用户送 {images}",
+      "gift": "{images}，新用户专享",
       "pickerTitle": "选一个模板",
       "pickerText": "每个模板都保留你拍的主体，只换光线、场景或画风。",
       "pickTemplate": "选用{name}",

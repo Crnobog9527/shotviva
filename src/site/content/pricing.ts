@@ -40,6 +40,7 @@ const creditBuys: CreditBuysBlock = {
   heading: 'What a credit buys',
   tiers: OUTPUT_TIERS.map((tier) => ({ name: tier.name, credits: tier.credits })),
   unit: 'credits',
+  unitOne: 'credit',
   note: `Per photo on most templates, at ${pixels.slice(0, -1).join(', ')} or ${pixels.at(-1)} px. Every size and shape costs the same at a given resolution.`,
 }
 
