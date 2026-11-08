@@ -69,7 +69,7 @@ describe('openOptionsFor', () => {
     const starterYearly: MemberStanding = { subscription: 'starter_yearly', tier: 'starter' }
     expect(openOptionsFor({}, starterYearly)).toEqual({ period: 'year' })
     expect(openOptionsFor({ step: 'period', tier: 'max' }, starterYearly)).toEqual({ step: 'period', tier: 'max', period: 'year' })
-    expect(openOptionsFor({}, starterMonthly)).toEqual({})
+    expect(openOptionsFor({}, starterMonthly)).toEqual({ period: 'month' })
     // A one-time period has no interval: Monthly as for everyone.
     expect(openOptionsFor({}, { subscription: null, tier: 'starter' })).toEqual({})
     // A period asked for (the /pricing toggle) wins.
