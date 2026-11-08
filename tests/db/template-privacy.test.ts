@@ -85,6 +85,8 @@ describe('template privacy', () => {
       coverMediaType: 'image',
       coverVideoUrl: null,
       coverPosterUrl: null,
+      // T87: the per-language covers column is readable like the rest of the public row.
+      coverLocales: {},
     })
   })
 

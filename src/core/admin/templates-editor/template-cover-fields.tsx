@@ -1,56 +1,53 @@
 'use client'
 
-import { Button } from '@/core/ui/button'
+import { useState } from 'react'
 
-import { acceptFor } from '../covers/cover-rules'
-import type { AdminTemplate, TemplateAdminActions } from '../templates/types'
+import { Badge } from '@/core/ui/badge'
+import { cn } from '@/core/ui/cn'
 
-import { CoverSlot } from './cover-slot'
-import { useCoverUpload } from './use-cover-upload'
+import type { AdminTemplate, CoverLanguage, TemplateAdminActions } from '../templates/types'
+
+import { coverCopy as COPY } from './copy'
+import { CoverTab } from './cover-tab'
+import { coverSetOf, hasCover } from './cover-set'
 
 type Props = {
   // The latest saved row, so a finished upload shows its new file straight away.
   template: AdminTemplate
+  // 通用, each site language, then upcoming ones (ARCHITECTURE §8.3, T87).
+  languages: readonly CoverLanguage[]
   actions: Pick<TemplateAdminActions, 'requestCoverUpload' | 'applyCover'>
 }
 
-const still = (url: string | null) => (url ? { url, video: false } : null)
-
-// Cover media (ARCHITECTURE §8.3): before / after stills for static cards and the preview
-// drawer, plus an optional motion cover (animated WebP from GIF / WebP, or MP4 + first frame).
-export function TemplateCoverFields({ template, actions }: Props) {
-  const { pending, busy, message, upload, clearMotion } = useCoverUpload(template.id, actions)
-  const motion = template.coverMediaType !== 'image' && template.coverVideoUrl
-    ? { url: template.coverVideoUrl, video: template.coverMediaType === 'video', poster: template.coverPosterUrl }
-    : null
+// Cover media (ARCHITECTURE §8.3): per tab, before / after stills for static cards and the preview
+// drawer, plus an optional motion cover. The 通用 tab is the cover every language shows unless it
+// has its own; a language tab may stay empty. A dot marks tabs that hold a cover.
+export function TemplateCoverFields({ template, languages, actions }: Props) {
+  const [active, setActive] = useState(0)
+  const language = languages[active] ?? languages[0]!
   return (
     <fieldset className="grid gap-3">
-      <legend className="mb-1 text-sm font-semibold">封面（上传后立即生效，不随「保存」）</legend>
-      {/* Three cards on wide screens, two below ~1100px, one below ~700px. */}
-      <div className="grid grid-cols-1 gap-4 min-[700px]:grid-cols-2 min-[1100px]:grid-cols-3">
-        <CoverSlot id="cover-before" label="前图（手机原图）" accept={acceptFor('before')} hint="JPEG / PNG / WebP，≤20MB"
-          preview={still(template.coverBeforeUrl)} busy={busy === 'before'} disabled={pending}
-          onFile={(file) => upload('before', file)} />
-        <CoverSlot id="cover-after" label="后图（AI 成品）" accept={acceptFor('after')} hint="JPEG / PNG / WebP，≤20MB"
-          preview={still(template.coverAfterUrl)} busy={busy === 'after'} disabled={pending}
-          onFile={(file) => upload('after', file)} />
-        <CoverSlot id="cover-motion" label="动态封面（可选）" accept={acceptFor('motion')}
-          hint="GIF / 动态 WebP ≤20MB，或 MP4 ≤15MB ≤15 秒" preview={motion} busy={busy === 'motion'}
-          disabled={pending} onFile={(file) => upload('motion', file)} />
+      <legend className="mb-1 text-sm font-semibold">{COPY.legend}</legend>
+      <div role="tablist" aria-label={COPY.tabs} className="flex flex-wrap gap-1 border-b">
+        {languages.map((tab, index) => (
+          <button
+            key={tab.code ?? 'common'}
+            type="button"
+            role="tab"
+            aria-selected={index === active}
+            onClick={() => setActive(index)}
+            className={cn(
+              '-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm',
+              index === active ? 'border-primary text-foreground font-medium' : 'text-muted-foreground border-transparent',
+            )}
+          >
+            {tab.label}
+            {tab.upcoming ? <Badge variant="outline">{COPY.upcoming}</Badge> : null}
+            {hasCover(coverSetOf(template, tab.code)) ? <span className="bg-primary size-1.5 rounded-full" aria-label={COPY.hasCover} /> : null}
+          </button>
+        ))}
       </div>
-      <div className="flex items-center gap-3 text-sm">
-        <span className="text-muted-foreground">当前卡片类型：{template.coverMediaType}</span>
-        {template.coverMediaType !== 'image' ? (
-          <Button variant="outline" size="sm" disabled={pending} onClick={clearMotion}>
-            改回静态图卡片
-          </Button>
-        ) : null}
-      </div>
-      {message ? (
-        <p role={message.ok ? 'status' : 'alert'} className={message.ok ? 'text-sm text-emerald-700' : 'text-destructive text-sm'}>
-          {message.text}
-        </p>
-      ) : null}
+      <CoverTab key={language.code ?? 'common'} template={template} language={language} languages={languages} actions={actions} />
     </fieldset>
   )
 }

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { CategoriesPanel, listAdminCategories, listAdminTemplates, TemplatesEditor } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { CREDITS_FLOOR } from '@/modules/image'
+import { site } from '@/site/site.config'
 
 import {
   applyCoverAction,
@@ -26,6 +27,15 @@ export const instant = false
 
 export const metadata: Metadata = { title: '模板与提示词' }
 
+// The cover tabs (ARCHITECTURE §8.3, T87): the common cover, the site's languages, then the ones
+// registered as upcoming. Names in Chinese from the code, so a new language needs no copy.
+const zhName = new Intl.DisplayNames(['zh-Hans'], { type: 'language' })
+const COVER_LANGUAGES = [
+  { code: null, label: '通用', upcoming: false },
+  ...site.locales.enabled.map((code) => ({ code, label: zhName.of(code) ?? code, upcoming: false })),
+  ...(site.locales.upcoming ?? []).map((code) => ({ code, label: zhName.of(code) ?? code, upcoming: true })),
+]
+
 export default async function AdminTemplatesPage() {
   await requireAdmin()
   const db = createAdminSupabase()
@@ -47,6 +57,7 @@ export default async function AdminTemplatesPage() {
         templates={templates}
         categories={categories}
         floor={CREDITS_FLOOR}
+        coverLanguages={COVER_LANGUAGES}
         actions={{
           save: saveTemplateAction,
           setActive: setTemplateActiveAction,

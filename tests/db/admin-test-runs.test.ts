@@ -14,6 +14,7 @@ import { fakeClassifier, publishEditTemplate } from './edit-fixtures'
 import { seedTemplate } from './generation-fixtures'
 import { connectAdmin, createUser, profileOf } from './helpers'
 import { serviceSupabase } from './supabase-env'
+import { holdTestBudget } from './test-run-fixtures'
 
 // T85 admin template test runs (ARCHITECTURE §10.b): the user's generate and edit pipelines on
 // admin_test_runs, against the real local database (0780–0788) with in-memory buckets and fake
@@ -78,18 +79,22 @@ async function budgetLeft(usd: number) {
   await saveTestBudget(service, admin, Math.round((spentUsd + usd) * 100) / 100)
 }
 
+let releaseBudget: () => Promise<void>
+
 beforeAll(async () => {
   db = await connectAdmin()
+  releaseBudget = await holdTestBudget(db)
   admin = await createUser(db, { credits: 7, freeCredits: 3 })
   await db.query("update public.profiles set role = 'admin' where id = $1", [admin])
-})
+  // Waiting for the other test-run file to release the budget lock can take a while.
+}, 120_000)
 
 beforeEach(async () => {
   await saveTestBudget(service, admin, 1000)
 })
 
 afterAll(async () => {
-  await db.query("delete from public.system_settings where key = 'admin_test_daily_budget_usd'")
+  await releaseBudget()
   await db.end()
 })
 
@@ -247,7 +252,7 @@ describe('set as cover', () => {
     expect((await runRow(run.id)).cover_set_at).not.toBeNull()
   })
 
-  it('takes only the default language until per-language covers land (p_locale, T87)', async () => {
+  it('refuses a language code that is not one (p_locale; language covers themselves: template-cover-locales)', async () => {
     const { generate } = await setup()
     const run = await generate()
     const { error } = await service.rpc('admin_set_test_run_cover', {
@@ -255,7 +260,7 @@ describe('set as cover', () => {
       p_run_id: run.id,
       p_before_url: null,
       p_after_url: 'https://assets.test/covers/x/after-0.webp',
-      p_locale: 'zh',
+      p_locale: 'Chinese',
     })
     expect(error?.message).toBe('INVALID_INPUT')
     expect((await runRow(run.id)).cover_set_at).toBeNull()

@@ -18,6 +18,8 @@ function run(id: string, extra: Partial<TestRunView> = {}): TestRunView {
     copy: {},
     note: null,
     instruction: null,
+    sourceLocale: null,
+    targetLocale: null,
     editScope: null,
     promptVersion: 1,
     model: 'gpt-image-2.6',
@@ -63,6 +65,14 @@ describe('buildRunTree', () => {
     const tree = buildRunTree([old, fresh, orphan])
     expect(tree.map((node) => node.runs[0]!.id)).toEqual(['orphan', 'fresh', 'old'])
     expect(tree[0]!.orphan).toBe(true)
+  })
+})
+
+describe('translations (T87)', () => {
+  it('splits one translation click into a node per target language', () => {
+    const en = run('t-en', { kind: 'translate', batchId: 'tr', targetLocale: 'en' })
+    const ja = run('t-ja', { kind: 'translate', batchId: 'tr', targetLocale: 'ja' })
+    expect(buildRunTree([en, ja]).map((node) => node.runs.map((r) => r.id))).toEqual([['t-ja'], ['t-en']])
   })
 })
 

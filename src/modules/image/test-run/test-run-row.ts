@@ -8,7 +8,7 @@ import { RESOLUTIONS, type Resolution } from '@/core/templates'
 
 export type { TestBudget }
 
-export const TEST_RUN_KINDS = ['generate', 'edit'] as const
+export const TEST_RUN_KINDS = ['generate', 'edit', 'translate'] as const
 export const TEST_RUN_STATUSES = ['running', 'succeeded', 'failed'] as const
 
 export type TestRun = {

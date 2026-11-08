@@ -6,7 +6,8 @@ import type { Resolution } from '@/core/templates/output-options'
 
 export type TestBudget = { budgetUsd: number; spentUsd: number; runs: number; day: string }
 
-export type TestRunKind = 'generate' | 'edit'
+// 'translate': a cover's 「生成其他语言版本」 (T87), no parent run and no test photo.
+export type TestRunKind = 'generate' | 'edit' | 'translate'
 export type TestRunStatus = 'running' | 'succeeded' | 'failed'
 
 export type TestRunView = {
@@ -22,6 +23,10 @@ export type TestRunView = {
   copy: Record<string, string>
   note: string | null
   instruction: string | null
+  // A translation (T87): the cover it started from (null = the common cover) and the language
+  // it was translated into.
+  sourceLocale: string | null
+  targetLocale: string | null
   editScope: string | null
   promptVersion: number | null
   model: string | null

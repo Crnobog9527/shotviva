@@ -6,7 +6,8 @@ import type { NextResponse } from 'next/server'
 import type { PartnerSiteConfig } from '../config'
 import { findOwnJob } from '../jobs'
 import type { ObjectStore } from '../storage'
-import { listTemplates } from '../templates'
+import { DEFAULT_LOCALE, isLocale } from '../i18n/locales'
+import { listTemplates, withLocaleCover } from '../templates'
 import { exchangeLinkCode } from './link-code'
 import { assertPartnerKey, authenticatePartner, type PartnerKeyEnv } from './partner-auth'
 import { partnerErrorResponse, partnerJson, PartnerError } from './partner-error'
@@ -80,11 +81,15 @@ export async function handleAccount(request: Request, deps: PartnerRouteDeps): P
 }
 
 // Key only, no account: the catalogue is the same for everyone, so Graylum may cache it.
+// ?locale=zh (optional, T87) picks the covers that language's pages show (ARCHITECTURE §8.3);
+// absent or unknown means English, as before. Names and fields stay the English contract.
 export async function handleTemplates(request: Request, deps: PartnerRouteDeps): Promise<NextResponse> {
   try {
     assertPartnerKey(request.headers.get('authorization'), deps.env)
+    const asked = new URL(request.url).searchParams.get('locale')
+    const locale = isLocale(asked) ? asked : DEFAULT_LOCALE
     const templates = await listTemplates(deps.db, 'partner')
-    const response: TemplatesResponse = { templates: templates.map(toPartnerTemplate) }
+    const response: TemplatesResponse = { templates: templates.map((template) => toPartnerTemplate(withLocaleCover(template, locale))) }
     return partnerJson(response)
   } catch (error) {
     return partnerErrorResponse(error, { route: 'partner-templates' })

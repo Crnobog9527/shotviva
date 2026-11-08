@@ -4,6 +4,7 @@ import { Columns2, Pencil, X } from 'lucide-react'
 
 import { Button } from '@/core/ui/button'
 
+import type { CoverLanguage } from '../templates/types'
 import type { TestRunView } from '../test-runs'
 import { TEST_RUN_COPY as COPY } from './copy'
 import type { RunActions } from './run-card'
@@ -12,6 +13,7 @@ import { buildRunTree } from './run-tree'
 
 type Props = {
   runs: readonly TestRunView[]
+  languages: readonly CoverLanguage[]
   actions: RunActions
   onCompare: () => void
   onEditSelected: () => void
@@ -20,7 +22,7 @@ type Props = {
 
 // 记录和对比 (ARCHITECTURE §10.b): the template's last 50 runs as a tree, with a bar for what the
 // ticked results can do together: compare two, or edit up to three with one sentence.
-export function Records({ runs, actions, onCompare, onEditSelected, onClear }: Props) {
+export function Records({ runs, languages, actions, onCompare, onEditSelected, onClear }: Props) {
   const tree = buildRunTree(runs)
   const count = actions.selected.size
   return (
@@ -51,7 +53,7 @@ export function Records({ runs, actions, onCompare, onEditSelected, onClear }: P
       ) : (
         <ul className="grid gap-6">
           {tree.map((node) => (
-            <RunNodeView key={node.key} node={node} actions={actions} />
+            <RunNodeView key={node.key} node={node} actions={actions} languages={languages} />
           ))}
         </ul>
       )}

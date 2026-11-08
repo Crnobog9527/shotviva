@@ -1,3 +1,4 @@
+import { hasCompleteCoverSet } from '@/core/templates/cover-locales'
 import { EDIT_TEMPLATE_ID } from '@/core/templates/edit-params'
 import { RESOLUTIONS, type Resolution } from '@/core/templates/output-options'
 import { creditsBelowFloor, type CreditsCost, type CreditsFloor, type TemplateQuality } from '@/core/templates/pricing'
@@ -25,7 +26,7 @@ export type BulkEditOutcome = { changed: number; failures: BulkEditFailure[] }
 
 export type BulkEditCandidate = Pick<
   Template,
-  'id' | 'name' | 'quality' | 'creditsCost' | 'visibleIn' | 'isActive' | 'description' | 'coverBeforeUrl' | 'coverAfterUrl'
+  'id' | 'name' | 'quality' | 'creditsCost' | 'visibleIn' | 'isActive' | 'description' | 'coverBeforeUrl' | 'coverAfterUrl' | 'coverLocales'
 > & { categoryInfo?: { isSystem: boolean } }
 
 // The built-in templates: photo edit has its own page, and the partner API's free-prompt
@@ -46,7 +47,7 @@ const blank = (text: string | null) => !text || text.trim() === ''
 // A live template newly put on the web must already have what a web card shows (T60 rules).
 function webIncomplete(template: BulkEditCandidate, visibleIn: readonly TemplateSurface[]): boolean {
   if (!template.isActive || template.visibleIn.includes('web') || !visibleIn.includes('web')) return false
-  return blank(template.description) || blank(template.coverBeforeUrl) || blank(template.coverAfterUrl)
+  return blank(template.description) || !hasCompleteCoverSet(template)
 }
 
 // Each template as it would be after the edit, checked against the floor of its (possibly new)

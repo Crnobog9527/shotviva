@@ -33,6 +33,10 @@ export const editParamsSchema = z.object({
   // Added at the end when the edit asks for another size than the work's (T47, §5.2): extend
   // the picture to the new frame, the subject where it is. Optional, so older rows still parse.
   reframe: paragraph.optional(),
+  // 「生成其他语言版本」 of a template cover (ARCHITECTURE §8.3, T87): translate only the words in
+  // the picture, keep everything else. `{{language}}` becomes the target language's English name.
+  // Optional: until the Owner writes it, cover translation says it is not set up.
+  cover_translate: paragraph.optional(),
 })
 
 export type EditParams = z.infer<typeof editParamsSchema>

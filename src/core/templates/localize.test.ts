@@ -16,6 +16,7 @@ const base: Template = {
   coverMediaType: 'image',
   coverVideoUrl: null,
   coverPosterUrl: null,
+  coverLocales: {},
   fields: {
     images: { min: 1, max: 1 },
     copy: [

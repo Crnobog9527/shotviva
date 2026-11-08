@@ -6,6 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { AppError } from '@/core/errors'
+import { LOCALES } from '@/core/i18n/locales'
 import { logger } from '@/core/logger'
 import type { ObjectStore } from '@/core/storage'
 
@@ -24,6 +25,8 @@ export type CoverDeps = {
   uploads: ObjectStore
   assets: ObjectStore
   assetsBaseUrl: string | undefined
+  // Who uploads; needed for a language's cover (admin_set_template_locale_cover checks it, T87).
+  actorId?: string
 }
 
 const templateId = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).max(64)
@@ -51,10 +54,15 @@ export async function createCoverUpload(uploads: ObjectStore, input: unknown): P
 
 const stagedKey = (id: string) => z.string().regex(new RegExp(`^uploads-admin/${id}/[0-9a-f-]{36}\\.(jpg|png|webp|gif|mp4)$`))
 
+// null / absent: the common cover; a code: that language's own cover (ARCHITECTURE §8.3, T87).
+const locale = z.string().regex(/^[a-z]{2,3}(-[a-z0-9]{2,8})?$/).nullable().optional()
+
 const applySchema = z.discriminatedUnion('slot', [
-  z.object({ templateId, slot: z.enum(['before', 'after']), key: z.string() }),
-  z.object({ templateId, slot: z.literal('motion'), key: z.string(), posterKey: z.string().optional() }),
-  z.object({ templateId, slot: z.literal('clear-motion') }),
+  z.object({ templateId, locale, slot: z.enum(['before', 'after']), key: z.string() }),
+  z.object({ templateId, locale, slot: z.literal('motion'), key: z.string(), posterKey: z.string().optional() }),
+  z.object({ templateId, locale, slot: z.literal('clear-motion') }),
+  // A language tab's 「删除这个语言的封面」: its own cover goes, the page falls back (T87).
+  z.object({ templateId, locale: z.string().regex(/^[a-z]{2,3}(-[a-z0-9]{2,8})?$/), slot: z.literal('clear-locale') }),
 ])
 
 export type ApplyCoverInput = z.input<typeof applySchema>
@@ -92,6 +100,7 @@ async function planMotion(deps: CoverDeps, id: string, key: string, posterKey: s
 }
 
 async function plan(deps: CoverDeps, input: z.infer<typeof applySchema>): Promise<Plan> {
+  if (input.slot === 'clear-locale') return { files: [], row: () => ({}) }
   if (input.slot === 'clear-motion') {
     return { files: [], row: () => ({ cover_media_type: 'image', cover_video_url: null, cover_poster_url: null }) }
   }
@@ -114,19 +123,59 @@ export async function applyCover(deps: CoverDeps, input: ApplyCoverInput): Promi
   for (const { name, file } of files) {
     await deps.assets.put(keys.get(name) as string, file.bytes, file.contentType, { cacheControl: IMMUTABLE })
   }
-  const { data, error } = await deps.db
-    .from('templates')
-    .update(row((name) => `${deps.assetsBaseUrl}/${keys.get(name)}`))
-    .eq('id', id)
-    .select('id')
+  const columns = row((name) => `${deps.assetsBaseUrl}/${keys.get(name)}`)
+  if (parsed.data.locale) await writeLocaleCover(deps, parsed.data, columns)
+  else await writeCommonCover(deps.db, id, columns)
+  await removeStaged(deps.uploads, parsed.data)
+}
+
+async function writeCommonCover(db: SupabaseClient, id: string, columns: Record<string, unknown>) {
+  const { data, error } = await db.from('templates').update(columns).eq('id', id).select('id')
   if (error) throw new AppError('INTERNAL', `cover update failed: ${error.message}`)
   if (data.length === 0) throw new AppError('NOT_FOUND', `template ${id} not found`)
-  await removeStaged(deps.uploads, parsed.data)
+}
+
+// The common cover's column names → a language cover's keys (templates.cover_locales, 0820). A
+// static card type there means "no motion of its own".
+const LOCALE_KEY: Record<string, string> = {
+  cover_before_url: 'before',
+  cover_after_url: 'after',
+  cover_video_url: 'video',
+  cover_poster_url: 'poster',
+  cover_media_type: 'media',
+}
+
+export function localePatch(columns: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(columns).map(([column, value]) => [LOCALE_KEY[column] ?? column, column === 'cover_media_type' && value === 'image' ? null : value]),
+  )
+}
+
+// One language's cover through admin_set_template_locale_cover (0824): merged, never overwritten.
+async function writeLocaleCover(deps: CoverDeps, input: z.infer<typeof applySchema>, columns: Record<string, unknown>) {
+  if (!deps.actorId) throw new AppError('INTERNAL', 'a language cover needs the admin id')
+  const { error } = await deps.db.rpc('admin_set_template_locale_cover', {
+    p_actor: deps.actorId,
+    p_template_id: input.templateId,
+    p_locale: input.locale,
+    p_patch: localePatch(columns),
+    // Only our public assets origin is accepted; the launched languages decide what a live
+    // template may not lose (0824).
+    p_assets_base: deps.assetsBaseUrl,
+    p_locales: LOCALES,
+    p_clear: input.slot === 'clear-locale',
+  })
+  if (!error) return
+  if (error.message === 'TEMPLATE_NOT_FOUND') throw new AppError('NOT_FOUND', `template ${input.templateId} not found`)
+  if (error.message === 'COVER_STILL_NEEDED') {
+    throw new AppError('INVALID_INPUT', '这个模板已上架，删掉后就没有前图或后图可显示了。先给通用或其他已上线语言传好封面，或先下架再删。')
+  }
+  throw new AppError('INTERNAL', `language cover update failed: ${error.message}`)
 }
 
 // The staging copies are done with; the 7-day lifecycle would catch any we miss.
 async function removeStaged(uploads: ObjectStore, input: z.infer<typeof applySchema>) {
-  const keys = input.slot === 'clear-motion' ? [] : [input.key, input.slot === 'motion' ? input.posterKey : undefined]
+  const keys = input.slot === 'clear-motion' || input.slot === 'clear-locale' ? [] : [input.key, input.slot === 'motion' ? input.posterKey : undefined]
   for (const key of keys) {
     if (key) await uploads.delete(key).catch((error: unknown) => logger.warn('staged cover not deleted', { key, error }))
   }
