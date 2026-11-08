@@ -30,3 +30,11 @@ export async function requireApiBuyer(): Promise<SessionUser> {
   if (user.banned) throw new AppError('FORBIDDEN', 'This account is suspended')
   return user
 }
+
+// API counterpart of requireAdmin(): a non-admin gets the same 404 the admin pages give, so the
+// admin API does not reveal it exists (admin test runs, T85).
+export async function requireApiAdmin(): Promise<SessionUser> {
+  const user = await getSessionUser()
+  if (!user || !user.verified || user.role !== 'admin') throw new AppError('NOT_FOUND', 'Not found')
+  return user
+}

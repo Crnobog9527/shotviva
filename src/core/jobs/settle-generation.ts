@@ -9,7 +9,7 @@ import { keepJobInputs, type ObjectStore } from '../storage'
 import { classifyFailure, GenerationFailure, type FailureStage } from './generation-failure'
 import { jobCostUsd } from './job-cost'
 import type { Job } from './job-schema'
-import { ProviderError, type GenerationProvider, type ProviderInput, type ProviderPrices, type ProviderUsage } from './provider'
+import { ProviderError, type GenerationProvider, type ProviderInput, type ProviderOutput, type ProviderPrices, type ProviderUsage } from './provider'
 import { confirmJob, refundJob, type JobCost } from './settlement'
 
 // Vercel stops the function at maxDuration (300s). The provider gets less than that so a
@@ -80,16 +80,32 @@ async function storeOutput(deps: SettleDeps, job: Job, output: { key: string; by
 // decision: the photo-edit step's cost (T30). inputKeys: the job's own uploads, kept with it (T40).
 export type SettleExtras = { decision?: DecisionCost; inputKeys?: string[] }
 
-// Steps 2–3 of ARCHITECTURE §4 for a freshly reserved job: provider → write output → confirm.
-// Any failure, timeout included, refunds before the error reaches the client. A failure after
-// the provider answered still records what it reported using.
-export async function settleGeneration(
+// Who pays and where the result goes: a user's job (credits, generation_jobs, outputs/) or an
+// admin test run (nobody, admin_test_runs, admin-tests/; T85). The provider call, its deadline,
+// the failure codes and the cost are the same for both (settleProviderCall).
+export type SettleLedger<T> = {
+  // For logs and alerts only.
+  id: string
+  source: string
+  // Writes the result; what it returns is handed to confirm.
+  store(output: ProviderOutput): Promise<string[]>
+  confirm(stored: string[], cost: JobCost): Promise<T>
+  // Records the failure; whether the charge (if any) came back.
+  fail(jobCode: string, cost: JobCost): Promise<boolean>
+  // false: an admin test run, which stays out of Sentry's failure alert and the Owner's
+  // failure-rate check (ARCHITECTURE §10.b 「隔离」).
+  alerts: boolean
+}
+
+// Steps 2–3 of ARCHITECTURE §4 for a freshly started job: provider → write output → confirm.
+// Any failure, timeout included, is settled through the ledger before the error reaches the
+// client. A failure after the provider answered still records what it reported using.
+export async function settleProviderCall<T>(
   deps: SettleDeps,
-  job: Job,
+  ledger: SettleLedger<T>,
   call: Omit<ProviderInput, 'signal'>,
-  outputKey: string,
-  { decision, inputKeys = [] }: SettleExtras = {},
-): Promise<Job> {
+  decision?: DecisionCost,
+): Promise<T> {
   let stage: FailureStage = 'provider'
   let usage: ProviderUsage | null = null
   try {
@@ -99,23 +115,41 @@ export async function settleGeneration(
     )
     usage = output.usage ?? null
     stage = 'store_output'
-    const keptInputs = await storeOutput(deps, job, { key: outputKey, bytes: output.bytes, contentType: output.contentType }, inputKeys)
+    const stored = await ledger.store(output)
     stage = 'confirm'
-    return await confirmJob(deps.db, { jobId: job.id, outputKey, keptInputs, ...costOf(deps.provider, usage, decision) })
+    return await ledger.confirm(stored, costOf(deps.provider, usage, decision))
   } catch (error) {
     if (error instanceof ProviderError && error.usage) usage = error.usage
     const failure = classifyFailure(stage, error)
     // `error` is redacted by the logger and adapters never put prompts in messages.
-    logger.error('generation failed', { jobId: job.id, stage, jobCode: failure.jobCode, error })
+    logger.error('generation failed', { jobId: ledger.id, stage, jobCode: failure.jobCode, error })
     // A declined photo or text is the user's input, not an outage; it stays out of the
     // failure-rate alert and is still counted in the `generate` event's error_code.
-    if (failure.jobCode !== 'CONTENT_REJECTED') {
-      captureError(error, { alert: 'generation_failed', fields: { jobId: job.id, stage, jobCode: failure.jobCode, source: job.source } })
-    }
-    const refunded = await refundSafely(deps.db, job.id, failure.jobCode, costOf(deps.provider, usage, decision))
+    const alert = ledger.alerts && failure.jobCode !== 'CONTENT_REJECTED'
+    if (alert) captureError(error, { alert: 'generation_failed', fields: { jobId: ledger.id, stage, jobCode: failure.jobCode, source: ledger.source } })
+    const refunded = await ledger.fail(failure.jobCode, costOf(deps.provider, usage, decision))
     // After the refund, so this job counts as failed in the Owner's failure-rate check (T72); the
     // check itself runs after the response (after()), never on this request.
-    if (failure.jobCode !== 'CONTENT_REJECTED') noteGenerationFailure()
-    throw new GenerationFailure(failure.error, job.id, refunded, failure.jobCode)
+    if (alert) noteGenerationFailure()
+    throw new GenerationFailure(failure.error, ledger.id, refunded, failure.jobCode)
   }
+}
+
+// A user's job: output under outputs/, uploads kept next to it (T40), confirm_job or refund_job.
+export function settleGeneration(
+  deps: SettleDeps,
+  job: Job,
+  call: Omit<ProviderInput, 'signal'>,
+  outputKey: string,
+  { decision, inputKeys = [] }: SettleExtras = {},
+): Promise<Job> {
+  const ledger: SettleLedger<Job> = {
+    id: job.id,
+    source: job.source,
+    alerts: true,
+    store: (output) => storeOutput(deps, job, { key: outputKey, bytes: output.bytes, contentType: output.contentType }, inputKeys),
+    confirm: (keptInputs, cost) => confirmJob(deps.db, { jobId: job.id, outputKey, keptInputs, ...cost }),
+    fail: (errorCode, cost) => refundSafely(deps.db, job.id, errorCode, cost),
+  }
+  return settleProviderCall(deps, ledger, call, decision)
 }

@@ -39,6 +39,10 @@ const SQL_ERROR_CODES: Record<string, ErrorCode> = {
   DISPUTE_ALREADY_SUBMITTED: 'CONFLICT',
   // T71: the admin's clawback names a payment that does not exist.
   PAYMENT_NOT_FOUND: 'NOT_FOUND',
+  // Admin test runs (T85): the day's budget is spent; an edit's parent or a photo is gone.
+  TEST_BUDGET_EXCEEDED: 'TEST_BUDGET_EXCEEDED',
+  TEST_RUN_NOT_FOUND: 'NOT_FOUND',
+  TEST_PHOTO_NOT_FOUND: 'NOT_FOUND',
 }
 
 export function toRpcError(fn: string, error: { message: string; code?: string }): AppError {

@@ -10,6 +10,7 @@ import { logger } from '@/core/logger'
 import type { ObjectStore } from '@/core/storage'
 
 import { animatedCover, sniffCover, stillCover, videoCover, type CoverFile } from './cover-media'
+import { IMMUTABLE } from './cover-publish'
 import { allowedTypes, COVER_PURPOSES, COVER_UPLOAD_TTL_SECONDS, coverFileProblem, maxBytesFor } from './cover-rules'
 
 // Admin cover upload (ARCHITECTURE §8.3). Bytes never pass a function body: the browser PUTs
@@ -100,7 +101,6 @@ async function plan(deps: CoverDeps, input: z.infer<typeof applySchema>): Promis
   return { files: [{ name: input.slot, file: await stillCover(bytes) }], row: (url) => ({ [column]: url(input.slot) }) }
 }
 
-const IMMUTABLE = 'public, max-age=31536000, immutable'
 
 // Converts and publishes one cover, then points the template at it. Content-hashed names mean a
 // new upload is a new URL, so nothing needs purging; old files stay (a few hundred KB each).

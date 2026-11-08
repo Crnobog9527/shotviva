@@ -46,7 +46,7 @@ export function CostsView({ days, ours, billed, keyStatus, actions }: Props) {
       <DriftNotice drift={drift} />
       <div className="grid gap-3 md:grid-cols-3">
         <StatCard title={COPY.cards.billed} value={totals.billed === null ? COPY.dash : usdTotal.format(totals.billed)} hint={COPY.cards.scope(keyStatus.projectId)} />
-        <StatCard title={COPY.cards.ours} value={usdTotal.format(totals.ours)} hint={`${COPY.cards.oursScope}；${COPY.cards.oursHint(totals.uncosted, totals.noUsage)}`} />
+        <StatCard title={COPY.cards.ours} value={usdTotal.format(totals.ours)} hint={`${COPY.cards.oursScope}，${COPY.cards.tests(usdTotal.format(totals.tests))}；${COPY.cards.oursHint(totals.uncosted, totals.noUsage)}`} />
         <StatCard title={COPY.cards.difference} value={totals.difference === null ? COPY.dash : usdTotal.format(totals.difference)} />
       </div>
       <CostsTable rows={rows} />
