@@ -622,7 +622,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - `admin_begin_test_run(p_actor, p_run_id, p_template_id, p_kind, p_parent_id, p_photo_id, p_batch_id, p_resolution, p_inputs, p_prompt_version, p_provider, p_estimate_usd)`：按 `p_run_id` 幂等；advisory lock 串行化预算判断；当天（北京时间自然日）已花 = 已结束记录的 `cost_usd` 合计 + 10 分钟内仍在跑的记录的 `estimate_usd`；已花 + 本次估算 > 预算就抛 `TEST_BUDGET_EXCEEDED`（不调用供应商）。编辑时校验父记录、继承 `photo_id`；更新照片 `last_used_at`。返回新行。
 - `admin_finish_test_run(p_run_id, p_status, p_output_key, p_error_code, p_provider_usage, p_cost_usd, p_duration_ms)`：只从 `running` 结束，重复调用返回原行。
 - `admin_test_budget_status()`：返回预算、当天已花、当天试跑次数、北京时间日期。
-- `admin_set_test_run_cover(p_actor, p_run_id, p_before_url, p_after_url)`：同一事务里更新模板的前后封面地址、记 `cover_set_at`。WebP 转换和写公开桶在应用里先做（和现有封面上传同一套压缩规则）。
+- `admin_set_test_run_cover(p_actor, p_run_id, p_before_url, p_after_url, p_locale text default null)`：`p_locale` 为空时写通用封面，指定语言时写该语言的专属封面（T87 实现，此前传语言返回 `INVALID_INPUT`）；同一事务里更新模板的前后封面地址、记 `cover_set_at`。WebP 转换和写公开桶在应用里先做（和现有封面上传同一套压缩规则）。
 - `admin_cleanup_test_runs(p_actor)`：打开面板时调用。删掉 30 天前且没设成封面的记录；每个模板超出最近 50 条的（不含封面记录）；30 天没用过、也不是封面记录源照片的测试照片；10 分钟还在 `running` 的标成 `failed / TIMEOUT`。返回要从 R2 删除的 key 列表，应用尽力删除、失败只记日志。
 - `admin_test_daily_costs(p_days)`：成本对账页按 UTC 日返回试跑的 `cost_usd` 合计和次数，和 `admin_daily_costs` 并列显示为「后台试跑」，计入「我们记录的成本」。
 - 预算：`system_settings` 新键 `admin_test_daily_budget_usd`（数字，0～1000，默认 5），`admin_set_system_setting` 用 `create or replace` 加这个键。
