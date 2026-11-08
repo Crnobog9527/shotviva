@@ -107,9 +107,187 @@ $$;
 
 ALTER FUNCTION "public"."_apply_credit_change"("p_user_id" "uuid", "p_pool" "text", "p_kind" "text", "p_delta" integer, "p_reason" "text", "p_idempotency_key" "text", "p_job_id" "uuid", "p_product_id" "text", "p_paid_days" integer) OWNER TO "postgres";
 
+
+CREATE OR REPLACE FUNCTION "public"."_end_membership_after_refund"("p_user_id" "uuid") RETURNS timestamp with time zone
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_current timestamptz;
+  v_end timestamptz;
+  r record;
+begin
+  select paid_until into v_current from public.profiles where id = p_user_id for update;
+  if v_current is null or v_current <= now() then
+    return v_current;
+  end if;
+
+  for r in
+    select l.idempotency_key, l.created_at, l.paid_until_after, pr.days
+      from public.credit_ledger l
+      join public.products pr on pr.id = l.product_id
+     where l.user_id = p_user_id
+       and l.pool = 'paid'
+       and l.kind = 'purchase'
+       and l.delta > 0
+       and pr.days is not null
+       and not exists (
+         select 1 from public.payments p
+          where p.user_id = p_user_id
+            and p.status <> 'paid'
+            and l.idempotency_key in ('purchase:' || p.stripe_session_id, 'renewal:' || p.stripe_invoice_id, 'purchase:' || p.waffo_payment_id)
+       )
+     order by l.created_at, l.id
+  loop
+    if r.idempotency_key like 'renewal:%' then
+      v_end := greatest(v_end, least(r.paid_until_after, r.created_at + make_interval(days => r.days + 3)));
+    else
+      v_end := greatest(v_end, r.created_at) + make_interval(days => r.days);
+    end if;
+  end loop;
+
+  v_end := least(v_current, greatest(now(), coalesce(v_end, now())));
+  if v_end < v_current then
+    update public.profiles set paid_until = v_end where id = p_user_id;
+  end if;
+  return v_end;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_end_membership_after_refund"("p_user_id" "uuid") OWNER TO "postgres";
+
 SET default_tablespace = '';
 
 SET default_table_access_method = "heap";
+
+
+CREATE TABLE IF NOT EXISTS "public"."payment_disputes" (
+    "stripe_dispute_id" "text" NOT NULL,
+    "stripe_charge_id" "text" NOT NULL,
+    "payment_id" bigint,
+    "user_id" "uuid",
+    "amount" integer NOT NULL,
+    "currency" "text" NOT NULL,
+    "reason" "text" NOT NULL,
+    "responder" "text" NOT NULL,
+    "due_by" timestamp with time zone,
+    "auto_banned_at" timestamp with time zone,
+    "evidence_drafted_at" timestamp with time zone,
+    "submitted_at" timestamp with time zone,
+    "submitted_by" "uuid",
+    "reminded_at" timestamp with time zone,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "credits_clawed_back" integer DEFAULT 0 NOT NULL,
+    "clawback_shortfall" integer DEFAULT 0 NOT NULL,
+    "closed_status" "text",
+    "closed_at" timestamp with time zone,
+    "credits_restored" integer DEFAULT 0 NOT NULL,
+    CONSTRAINT "payment_disputes_amount_check" CHECK (("amount" >= 0)),
+    CONSTRAINT "payment_disputes_check" CHECK ((("submitted_by" IS NULL) OR ("submitted_at" IS NOT NULL))),
+    CONSTRAINT "payment_disputes_clawback_shortfall_check" CHECK (("clawback_shortfall" >= 0)),
+    CONSTRAINT "payment_disputes_closed_status_check" CHECK (("closed_status" ~ '^[a-z_]{1,40}$'::"text")),
+    CONSTRAINT "payment_disputes_credits_clawed_back_check" CHECK (("credits_clawed_back" >= 0)),
+    CONSTRAINT "payment_disputes_credits_restored_check" CHECK (("credits_restored" >= 0)),
+    CONSTRAINT "payment_disputes_currency_check" CHECK (("currency" ~ '^[a-z]{3}$'::"text")),
+    CONSTRAINT "payment_disputes_reason_check" CHECK (("length"("reason") > 0)),
+    CONSTRAINT "payment_disputes_responder_check" CHECK (("responder" = ANY (ARRAY['shotviva'::"text", 'stripe'::"text"]))),
+    CONSTRAINT "payment_disputes_stripe_charge_id_check" CHECK (("stripe_charge_id" ~ '^(ch|py)_'::"text")),
+    CONSTRAINT "payment_disputes_stripe_dispute_id_check" CHECK (("stripe_dispute_id" ~ '^(dp|du)_'::"text"))
+);
+
+
+ALTER TABLE "public"."payment_disputes" OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_payment_dispute_answer"("p_row" "public"."payment_disputes", "p_created" boolean) RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select jsonb_build_object(
+    'created', p_created,
+    'user_id', p_row.user_id,
+    'payment_id', p_row.payment_id,
+    'responder', p_row.responder,
+    'auto_banned', p_row.auto_banned_at is not null,
+    'drafted', p_row.evidence_drafted_at is not null,
+    'credits_clawed_back', (select p.credits_clawed_back from public.payments p where p.id = p_row.payment_id),
+    'clawback_shortfall', (select p.clawback_shortfall from public.payments p where p.id = p_row.payment_id)
+  );
+$$;
+
+
+ALTER FUNCTION "public"."_payment_dispute_answer"("p_row" "public"."payment_disputes", "p_created" boolean) OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."payments" (
+    "id" bigint NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "product_id" "text" NOT NULL,
+    "channel" "text" NOT NULL,
+    "stripe_session_id" "text",
+    "stripe_invoice_id" "text",
+    "stripe_charge_id" "text",
+    "waffo_order_id" "text",
+    "amount_total" integer NOT NULL,
+    "amount_tax" integer DEFAULT 0 NOT NULL,
+    "amount_refunded" integer DEFAULT 0 NOT NULL,
+    "currency" "text" NOT NULL,
+    "method" "text" NOT NULL,
+    "status" "text" DEFAULT 'paid'::"text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "waffo_payment_id" "text",
+    "purchase_ip" "inet",
+    "purchase_user_agent" "text",
+    "terms_accepted_at" timestamp with time zone,
+    "managed_payments" boolean,
+    "credits_clawed_back" integer DEFAULT 0 NOT NULL,
+    "clawback_shortfall" integer DEFAULT 0 NOT NULL,
+    CONSTRAINT "payments_amount_total_check" CHECK (("amount_total" >= 0)),
+    CONSTRAINT "payments_channel_check" CHECK (("channel" = ANY (ARRAY['stripe'::"text", 'waffo'::"text"]))),
+    CONSTRAINT "payments_check" CHECK ((("amount_tax" >= 0) AND ("amount_tax" <= "amount_total"))),
+    CONSTRAINT "payments_check1" CHECK ((("amount_refunded" >= 0) AND ("amount_refunded" <= "amount_total"))),
+    CONSTRAINT "payments_clawback_shortfall_check" CHECK (("clawback_shortfall" >= 0)),
+    CONSTRAINT "payments_credits_clawed_back_check" CHECK (("credits_clawed_back" >= 0)),
+    CONSTRAINT "payments_currency_check" CHECK (("currency" ~ '^[a-z]{3}$'::"text")),
+    CONSTRAINT "payments_method_check" CHECK (("method" = ANY (ARRAY['card'::"text", 'alipay'::"text", 'wechat_pay'::"text", 'cn_card'::"text"]))),
+    CONSTRAINT "payments_purchase_user_agent_check" CHECK ((("length"("purchase_user_agent") >= 1) AND ("length"("purchase_user_agent") <= 500))),
+    CONSTRAINT "payments_status_check" CHECK (("status" = ANY (ARRAY['paid'::"text", 'refunded'::"text", 'partially_refunded'::"text", 'disputed'::"text"]))),
+    CONSTRAINT "payments_stripe_charge_id_check" CHECK (("stripe_charge_id" ~ '^(ch|py)_'::"text")),
+    CONSTRAINT "payments_stripe_ids_check" CHECK ((("channel" <> 'stripe'::"text") OR ("stripe_session_id" IS NOT NULL) OR ("stripe_invoice_id" IS NOT NULL))),
+    CONSTRAINT "payments_stripe_invoice_id_check" CHECK (("stripe_invoice_id" ~~ 'in\_%'::"text")),
+    CONSTRAINT "payments_stripe_session_id_check" CHECK (("stripe_session_id" ~~ 'cs\_%'::"text")),
+    CONSTRAINT "payments_waffo_ids_check" CHECK ((("channel" <> 'waffo'::"text") OR ("waffo_order_id" IS NOT NULL))),
+    CONSTRAINT "payments_waffo_order_id_check" CHECK (("length"("waffo_order_id") > 0)),
+    CONSTRAINT "payments_waffo_payment_id_check" CHECK (("waffo_payment_id" ~ '^PAY_'::"text"))
+);
+
+
+ALTER TABLE "public"."payments" OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_payment_granted_credits"("p_payment" "public"."payments") RETURNS integer
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select coalesce(
+    (select l.delta
+       from public.credit_ledger l
+      where l.idempotency_key = case
+              when p_payment.stripe_session_id is not null then 'purchase:' || p_payment.stripe_session_id
+              when p_payment.stripe_invoice_id is not null then 'renewal:' || p_payment.stripe_invoice_id
+              when p_payment.waffo_payment_id is not null then 'purchase:' || p_payment.waffo_payment_id
+            end
+        and l.user_id = p_payment.user_id
+        and l.kind = 'purchase'
+        and l.pool = 'paid'),
+    (select pr.credits from public.products pr where pr.id = p_payment.product_id),
+    0
+  );
+$$;
+
+
+ALTER FUNCTION "public"."_payment_granted_credits"("p_payment" "public"."payments") OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."support_ticket_messages" (
@@ -551,6 +729,57 @@ $_$;
 
 
 ALTER FUNCTION "public"."admin_bulk_edit_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_clawback_payment"("p_payment_id" bigint, "p_actor" "uuid") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_payment public.payments;
+  v_granted integer;
+  v_balance integer;
+  v_take integer;
+  v_key text;
+begin
+  if p_actor is null or not exists (select 1 from public.profiles where id = p_actor and role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+
+  select * into v_payment from public.payments where id = p_payment_id for update;
+  if not found then
+    raise exception 'PAYMENT_NOT_FOUND';
+  end if;
+
+  v_granted := public._payment_granted_credits(v_payment);
+  select credits into v_balance from public.profiles where id = v_payment.user_id for update;
+  v_take := greatest(0, least(coalesce(v_balance, 0), v_granted - v_payment.credits_clawed_back - v_payment.clawback_shortfall));
+
+  if v_take > 0 then
+    v_key := 'clawback:' || p_payment_id || ':admin:' || (v_payment.credits_clawed_back + v_payment.clawback_shortfall);
+    if (public._apply_credit_change(v_payment.user_id, 'paid', 'clawback', -v_take,
+          '后台扣回付款 #' || p_payment_id || ' 的剩余积分 · 操作人 ' || p_actor::text, v_key)).applied then
+      update public.credit_ledger set payment_id = p_payment_id where idempotency_key = v_key;
+      update public.payments set credits_clawed_back = credits_clawed_back + v_take
+       where id = p_payment_id
+      returning * into v_payment;
+      insert into public.admin_audit_log (action, user_id, reason, target_id)
+      values ('clawback_payment', v_payment.user_id, '扣回 ' || v_take || ' 积分 · 操作人 ' || p_actor::text, p_payment_id::text);
+    else
+      v_take := 0;
+    end if;
+  end if;
+
+  return jsonb_build_object(
+    'taken', v_take,
+    'credits_clawed_back', v_payment.credits_clawed_back,
+    'clawback_shortfall', v_payment.clawback_shortfall
+  );
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_clawback_payment"("p_payment_id" bigint, "p_actor" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_daily_costs"("p_days" integer) RETURNS "jsonb"
@@ -2299,6 +2528,141 @@ $$;
 ALTER FUNCTION "public"."claim_dispute_reminders"("p_dispute_ids" "text"[]) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."clawback_payment_credits"("p_payment_id" bigint, "p_ref" "text", "p_reason" "text") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_payment public.payments;
+  v_granted integer;
+  v_due integer;
+  v_owed integer;
+  v_balance integer;
+  v_take integer := 0;
+  v_key text;
+begin
+  if p_payment_id is null or p_ref is null or length(p_ref) = 0 or p_reason is null or length(p_reason) = 0 then
+    raise exception 'INVALID_INPUT' using detail = 'payment id, ref and reason are required';
+  end if;
+
+  select * into v_payment from public.payments where id = p_payment_id for update;
+  if not found then
+    raise exception 'PAYMENT_NOT_FOUND';
+  end if;
+
+  v_granted := public._payment_granted_credits(v_payment);
+  v_due := case
+    when v_payment.status = 'disputed' then v_granted
+    when v_payment.amount_refunded >= v_payment.amount_total then
+      case when v_payment.amount_refunded > 0 or v_payment.status = 'refunded' then v_granted else 0 end
+    else (v_granted::bigint * v_payment.amount_refunded / v_payment.amount_total)::integer
+  end;
+  v_owed := greatest(0, v_due - v_payment.credits_clawed_back - v_payment.clawback_shortfall);
+
+  if v_owed > 0 then
+    select credits into v_balance from public.profiles where id = v_payment.user_id for update;
+    v_take := least(v_owed, greatest(coalesce(v_balance, 0), 0));
+    if v_take > 0 then
+      v_key := 'clawback:' || p_payment_id || ':' || p_ref;
+      if not (public._apply_credit_change(v_payment.user_id, 'paid', 'clawback', -v_take, p_reason, v_key)).applied then
+        -- This ref already settled its share (nothing left to do for it).
+        v_take := 0;
+        v_owed := 0;
+      else
+        update public.credit_ledger set payment_id = p_payment_id where idempotency_key = v_key;
+      end if;
+    end if;
+    update public.payments
+       set credits_clawed_back = credits_clawed_back + v_take,
+           clawback_shortfall = clawback_shortfall + (v_owed - v_take)
+     where id = p_payment_id
+    returning * into v_payment;
+  end if;
+
+  return jsonb_build_object(
+    'granted', v_granted,
+    'taken', v_take,
+    'written_off', v_owed - v_take,
+    'credits_clawed_back', v_payment.credits_clawed_back,
+    'clawback_shortfall', v_payment.clawback_shortfall
+  );
+end;
+$$;
+
+
+ALTER FUNCTION "public"."clawback_payment_credits"("p_payment_id" bigint, "p_ref" "text", "p_reason" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."close_payment_dispute"("p_dispute_id" "text", "p_status" "text") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_row public.payment_disputes;
+  v_payment public.payments;
+  v_first boolean := false;
+  v_kept boolean;
+  v_key text := 'clawback_restore:' || p_dispute_id;
+begin
+  if p_dispute_id is null or p_status is null or p_status !~ '^[a-z_]{1,40}$' then
+    raise exception 'INVALID_INPUT' using detail = 'dispute id and status are required';
+  end if;
+
+  select * into v_row from public.payment_disputes where stripe_dispute_id = p_dispute_id for update;
+  if not found then
+    return null;
+  end if;
+
+  if v_row.closed_at is null then
+    v_first := true;
+    v_kept := p_status in ('won', 'warning_closed');
+    update public.payment_disputes set closed_status = p_status, closed_at = now()
+     where stripe_dispute_id = p_dispute_id
+    returning * into v_row;
+
+    if v_kept and v_row.payment_id is not null then
+      select * into v_payment from public.payments where id = v_row.payment_id for update;
+      if v_row.credits_clawed_back > 0
+         and (public._apply_credit_change(v_payment.user_id, 'paid', 'clawback_restore', v_row.credits_clawed_back,
+                '拒付胜诉还回 ' || p_dispute_id, v_key)).applied then
+        update public.credit_ledger set payment_id = v_payment.id where idempotency_key = v_key;
+      end if;
+      update public.payments
+         set credits_clawed_back = greatest(0, credits_clawed_back - v_row.credits_clawed_back),
+             clawback_shortfall = greatest(0, clawback_shortfall - v_row.clawback_shortfall),
+             status = case
+               when status <> 'disputed' then status
+               when amount_total > 0 and amount_refunded >= amount_total then 'refunded'
+               when amount_refunded > 0 then 'partially_refunded'
+               else 'paid'
+             end
+       where id = v_payment.id;
+      update public.payment_disputes set credits_restored = v_row.credits_clawed_back
+       where stripe_dispute_id = p_dispute_id
+      returning * into v_row;
+      perform public.clawback_payment_credits(v_payment.id, 'dispute_closed:' || p_dispute_id, '退款扣回 ' || p_dispute_id);
+    end if;
+  end if;
+
+  select * into v_payment from public.payments where id = v_row.payment_id;
+  return jsonb_build_object(
+    'first_close', v_first,
+    'kept', v_row.closed_status in ('won', 'warning_closed'),
+    'closed_status', v_row.closed_status,
+    'credits_restored', v_row.credits_restored,
+    'user_id', v_row.user_id,
+    'payment_id', v_row.payment_id,
+    'product_id', v_payment.product_id,
+    'amount', v_row.amount,
+    'currency', v_row.currency
+  );
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."close_payment_dispute"("p_dispute_id" "text", "p_status" "text") OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."generation_jobs" (
     "id" "uuid" NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -2545,14 +2909,20 @@ begin
     return null;
   end if;
 
-  select product_id into v_product_id
-    from public.credit_ledger
-   where user_id = p_user_id
-     and pool = 'paid'
-     and delta > 0
-     and product_id is not null
-     and product_id not like 'pack_%'
-   order by created_at desc, id desc
+  select l.product_id into v_product_id
+    from public.credit_ledger l
+   where l.user_id = p_user_id
+     and l.pool = 'paid'
+     and l.delta > 0
+     and l.product_id is not null
+     and l.product_id not like 'pack_%'
+     and not exists (
+       select 1 from public.payments p
+        where p.user_id = p_user_id
+          and p.status in ('refunded', 'partially_refunded')
+          and l.idempotency_key in ('purchase:' || p.stripe_session_id, 'renewal:' || p.stripe_invoice_id, 'purchase:' || p.waffo_payment_id)
+     )
+   order by l.created_at desc, l.id desc
    limit 1;
 
   if v_product_id is null then
@@ -2791,6 +3161,7 @@ declare
   v_payment public.payments;
   v_managed boolean;
   v_profile public.profiles;
+  v_claw jsonb;
 begin
   if p_dispute_id is null or p_charge_id is null or p_amount is null or p_currency is null
      or p_reason is null or p_managed_default is null then
@@ -2799,8 +3170,7 @@ begin
 
   select * into v_row from public.payment_disputes where stripe_dispute_id = p_dispute_id;
   if found then
-    return jsonb_build_object('created', false, 'user_id', v_row.user_id, 'payment_id', v_row.payment_id,
-      'responder', v_row.responder, 'auto_banned', v_row.auto_banned_at is not null, 'drafted', v_row.evidence_drafted_at is not null);
+    return public._payment_dispute_answer(v_row, false);
   end if;
 
   select * into v_payment from public.payments where stripe_charge_id = p_charge_id;
@@ -2826,10 +3196,9 @@ begin
   on conflict (stripe_dispute_id) do nothing
   returning * into v_row;
   if not found then
-    -- A concurrent delivery inserted it first; that one bans.
+    -- A concurrent delivery inserted it first; that one bans and claws back.
     select * into v_row from public.payment_disputes where stripe_dispute_id = p_dispute_id;
-    return jsonb_build_object('created', false, 'user_id', v_row.user_id, 'payment_id', v_row.payment_id,
-      'responder', v_row.responder, 'auto_banned', v_row.auto_banned_at is not null, 'drafted', v_row.evidence_drafted_at is not null);
+    return public._payment_dispute_answer(v_row, false);
   end if;
 
   if v_row.user_id is not null then
@@ -2842,8 +3211,18 @@ begin
     end if;
   end if;
 
-  return jsonb_build_object('created', true, 'user_id', v_row.user_id, 'payment_id', v_row.payment_id,
-    'responder', v_row.responder, 'auto_banned', v_row.auto_banned_at is not null, 'drafted', v_row.evidence_drafted_at is not null);
+  if v_row.payment_id is not null then
+    -- record_payment_issue marks it first; set here too so the clawback asks for everything.
+    update public.payments set status = 'disputed' where id = v_row.payment_id and status <> 'disputed';
+    v_claw := public.clawback_payment_credits(v_row.payment_id, 'dispute:' || p_dispute_id, '拒付扣回 ' || p_dispute_id);
+    update public.payment_disputes
+       set credits_clawed_back = (v_claw ->> 'taken')::integer,
+           clawback_shortfall = (v_claw ->> 'written_off')::integer
+     where stripe_dispute_id = p_dispute_id
+    returning * into v_row;
+  end if;
+
+  return public._payment_dispute_answer(v_row, true);
 end;
 $$;
 
@@ -2861,6 +3240,38 @@ $$;
 
 
 ALTER FUNCTION "public"."openai_admin_key"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."payment_clawback_preview"("p_payment_id" bigint) RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_payment public.payments;
+  v_granted integer;
+  v_balance integer;
+begin
+  select * into v_payment from public.payments where id = p_payment_id;
+  if not found then
+    raise exception 'PAYMENT_NOT_FOUND';
+  end if;
+  v_granted := public._payment_granted_credits(v_payment);
+  select credits into v_balance from public.profiles where id = v_payment.user_id;
+  return jsonb_build_object(
+    'payment_id', v_payment.id,
+    'user_id', v_payment.user_id,
+    'product_id', v_payment.product_id,
+    'granted', v_granted,
+    'credits_clawed_back', v_payment.credits_clawed_back,
+    'clawback_shortfall', v_payment.clawback_shortfall,
+    'balance', coalesce(v_balance, 0),
+    'available', greatest(0, least(coalesce(v_balance, 0), v_granted - v_payment.credits_clawed_back - v_payment.clawback_shortfall))
+  );
+end;
+$$;
+
+
+ALTER FUNCTION "public"."payment_clawback_preview"("p_payment_id" bigint) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."provider_api_key"("p_id" "uuid") RETURNS "text"
@@ -3032,6 +3443,8 @@ CREATE OR REPLACE FUNCTION "public"."record_payment_issue"("p_charge_id" "text",
     AS $$
 declare
   v_payment public.payments;
+  v_membership boolean := false;
+  v_paid_until timestamptz;
 begin
   if p_charge_id is null or p_kind is null or p_kind not in ('refunded', 'disputed') then
     raise exception 'INVALID_INPUT' using detail = 'charge id and kind (refunded / disputed) are required';
@@ -3062,19 +3475,115 @@ begin
     return null;
   end if;
 
+  if p_kind = 'disputed' then
+    return jsonb_build_object(
+      'payment_id', v_payment.id,
+      'user_id', v_payment.user_id,
+      'product_id', v_payment.product_id,
+      'status', v_payment.status,
+      'amount_total', v_payment.amount_total,
+      'amount_refunded', v_payment.amount_refunded,
+      'currency', v_payment.currency
+    );
+  end if;
+
+  if v_payment.amount_refunded > 0 then
+    perform public.clawback_payment_credits(
+      v_payment.id, 'refund:' || p_charge_id || ':' || v_payment.amount_refunded, '退款扣回 ' || p_charge_id);
+    v_membership := exists (select 1 from public.products where id = v_payment.product_id and days is not null);
+    if v_membership then
+      v_paid_until := public._end_membership_after_refund(v_payment.user_id);
+    end if;
+    select * into v_payment from public.payments where id = v_payment.id;
+  end if;
+
   return jsonb_build_object(
+    'payment_id', v_payment.id,
     'user_id', v_payment.user_id,
     'product_id', v_payment.product_id,
     'status', v_payment.status,
     'amount_total', v_payment.amount_total,
     'amount_refunded', v_payment.amount_refunded,
-    'currency', v_payment.currency
+    'currency', v_payment.currency,
+    'credits_clawed_back', v_payment.credits_clawed_back,
+    'clawback_shortfall', v_payment.clawback_shortfall,
+    'membership_ended', v_membership,
+    'paid_until', v_paid_until,
+    'stripe_session_id', v_payment.stripe_session_id,
+    'stripe_invoice_id', v_payment.stripe_invoice_id
   );
 end;
 $$;
 
 
 ALTER FUNCTION "public"."record_payment_issue"("p_charge_id" "text", "p_kind" "text", "p_amount_refunded" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."record_waffo_refund"("p_payment_id" "text", "p_refund_ref" "text", "p_amount" integer DEFAULT NULL::integer) RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_payment public.payments;
+  v_amount integer;
+  v_membership boolean;
+  v_paid_until timestamptz;
+begin
+  if p_payment_id is null or p_refund_ref is null or length(p_refund_ref) = 0 or p_amount < 0 then
+    raise exception 'INVALID_INPUT' using detail = 'payment id and refund ref are required';
+  end if;
+
+  select * into v_payment from public.payments where waffo_payment_id = p_payment_id for update;
+  if not found then
+    return null;
+  end if;
+
+  v_amount := least(coalesce(p_amount, v_payment.amount_total - v_payment.amount_refunded), v_payment.amount_total);
+  insert into public.payment_refunds (refund_ref, payment_id, amount)
+  values (p_refund_ref, v_payment.id, v_amount)
+  on conflict (refund_ref) do nothing;
+  if found then
+    update public.payments
+       set amount_refunded = least(amount_total, amount_refunded + v_amount),
+           status = case
+             when status = 'disputed' then status
+             when least(amount_total, amount_refunded + v_amount) >= amount_total then 'refunded'
+             when amount_refunded + v_amount > 0 then 'partially_refunded'
+             else status
+           end
+     where id = v_payment.id
+    returning * into v_payment;
+  end if;
+
+  v_membership := v_payment.amount_refunded > 0
+    and exists (select 1 from public.products where id = v_payment.product_id and days is not null);
+  if v_payment.amount_refunded > 0 then
+    perform public.clawback_payment_credits(v_payment.id, 'refund:' || p_refund_ref, '退款扣回 ' || p_refund_ref);
+    if v_membership then
+      v_paid_until := public._end_membership_after_refund(v_payment.user_id);
+    end if;
+    select * into v_payment from public.payments where id = v_payment.id;
+  end if;
+
+  return jsonb_build_object(
+    'payment_id', v_payment.id,
+    'user_id', v_payment.user_id,
+    'product_id', v_payment.product_id,
+    'status', v_payment.status,
+    'amount_total', v_payment.amount_total,
+    'amount_refunded', v_payment.amount_refunded,
+    'currency', v_payment.currency,
+    'credits_clawed_back', v_payment.credits_clawed_back,
+    'clawback_shortfall', v_payment.clawback_shortfall,
+    'membership_ended', v_membership,
+    'paid_until', v_paid_until,
+    'waffo_order_id', v_payment.waffo_order_id
+  );
+end;
+$$;
+
+
+ALTER FUNCTION "public"."record_waffo_refund"("p_payment_id" "text", "p_refund_ref" "text", "p_amount" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."refund_eligibility"("p_payment_id" bigint, "p_asked_at" timestamp with time zone) RETURNS TABLE("first_purchase" boolean, "within_7_days" boolean, "no_credits_used" boolean, "suggested_cents" integer)
@@ -3833,7 +4342,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "target_id" "text",
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text"]))),
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text"]))),
     CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
     CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );
@@ -3899,9 +4408,10 @@ CREATE TABLE IF NOT EXISTS "public"."credit_ledger" (
     "product_id" "text",
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "pool" "text" NOT NULL,
+    "payment_id" bigint,
     CONSTRAINT "credit_ledger_balance_after_check" CHECK (("balance_after" >= 0)),
     CONSTRAINT "credit_ledger_delta_check" CHECK (("delta" <> 0)),
-    CONSTRAINT "credit_ledger_kind_check" CHECK (("kind" = ANY (ARRAY['grant'::"text", 'reserve'::"text", 'refund'::"text", 'purchase'::"text", 'admin_adjust'::"text"]))),
+    CONSTRAINT "credit_ledger_kind_check" CHECK (("kind" = ANY (ARRAY['grant'::"text", 'reserve'::"text", 'refund'::"text", 'purchase'::"text", 'admin_adjust'::"text", 'clawback'::"text", 'clawback_restore'::"text"]))),
     CONSTRAINT "credit_ledger_pool_check" CHECK (("pool" = ANY (ARRAY['free'::"text", 'paid'::"text"]))),
     CONSTRAINT "credit_ledger_reason_check" CHECK (("length"("reason") > 0))
 );
@@ -4007,75 +4517,17 @@ CREATE TABLE IF NOT EXISTS "public"."partner_links" (
 ALTER TABLE "public"."partner_links" OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."payment_disputes" (
-    "stripe_dispute_id" "text" NOT NULL,
-    "stripe_charge_id" "text" NOT NULL,
-    "payment_id" bigint,
-    "user_id" "uuid",
+CREATE TABLE IF NOT EXISTS "public"."payment_refunds" (
+    "refund_ref" "text" NOT NULL,
+    "payment_id" bigint NOT NULL,
     "amount" integer NOT NULL,
-    "currency" "text" NOT NULL,
-    "reason" "text" NOT NULL,
-    "responder" "text" NOT NULL,
-    "due_by" timestamp with time zone,
-    "auto_banned_at" timestamp with time zone,
-    "evidence_drafted_at" timestamp with time zone,
-    "submitted_at" timestamp with time zone,
-    "submitted_by" "uuid",
-    "reminded_at" timestamp with time zone,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    CONSTRAINT "payment_disputes_amount_check" CHECK (("amount" >= 0)),
-    CONSTRAINT "payment_disputes_check" CHECK ((("submitted_by" IS NULL) OR ("submitted_at" IS NOT NULL))),
-    CONSTRAINT "payment_disputes_currency_check" CHECK (("currency" ~ '^[a-z]{3}$'::"text")),
-    CONSTRAINT "payment_disputes_reason_check" CHECK (("length"("reason") > 0)),
-    CONSTRAINT "payment_disputes_responder_check" CHECK (("responder" = ANY (ARRAY['shotviva'::"text", 'stripe'::"text"]))),
-    CONSTRAINT "payment_disputes_stripe_charge_id_check" CHECK (("stripe_charge_id" ~ '^(ch|py)_'::"text")),
-    CONSTRAINT "payment_disputes_stripe_dispute_id_check" CHECK (("stripe_dispute_id" ~ '^(dp|du)_'::"text"))
+    CONSTRAINT "payment_refunds_amount_check" CHECK (("amount" >= 0)),
+    CONSTRAINT "payment_refunds_refund_ref_check" CHECK ((("length"("refund_ref") >= 1) AND ("length"("refund_ref") <= 160)))
 );
 
 
-ALTER TABLE "public"."payment_disputes" OWNER TO "postgres";
-
-
-CREATE TABLE IF NOT EXISTS "public"."payments" (
-    "id" bigint NOT NULL,
-    "user_id" "uuid" NOT NULL,
-    "product_id" "text" NOT NULL,
-    "channel" "text" NOT NULL,
-    "stripe_session_id" "text",
-    "stripe_invoice_id" "text",
-    "stripe_charge_id" "text",
-    "waffo_order_id" "text",
-    "amount_total" integer NOT NULL,
-    "amount_tax" integer DEFAULT 0 NOT NULL,
-    "amount_refunded" integer DEFAULT 0 NOT NULL,
-    "currency" "text" NOT NULL,
-    "method" "text" NOT NULL,
-    "status" "text" DEFAULT 'paid'::"text" NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "waffo_payment_id" "text",
-    "purchase_ip" "inet",
-    "purchase_user_agent" "text",
-    "terms_accepted_at" timestamp with time zone,
-    "managed_payments" boolean,
-    CONSTRAINT "payments_amount_total_check" CHECK (("amount_total" >= 0)),
-    CONSTRAINT "payments_channel_check" CHECK (("channel" = ANY (ARRAY['stripe'::"text", 'waffo'::"text"]))),
-    CONSTRAINT "payments_check" CHECK ((("amount_tax" >= 0) AND ("amount_tax" <= "amount_total"))),
-    CONSTRAINT "payments_check1" CHECK ((("amount_refunded" >= 0) AND ("amount_refunded" <= "amount_total"))),
-    CONSTRAINT "payments_currency_check" CHECK (("currency" ~ '^[a-z]{3}$'::"text")),
-    CONSTRAINT "payments_method_check" CHECK (("method" = ANY (ARRAY['card'::"text", 'alipay'::"text", 'wechat_pay'::"text", 'cn_card'::"text"]))),
-    CONSTRAINT "payments_purchase_user_agent_check" CHECK ((("length"("purchase_user_agent") >= 1) AND ("length"("purchase_user_agent") <= 500))),
-    CONSTRAINT "payments_status_check" CHECK (("status" = ANY (ARRAY['paid'::"text", 'refunded'::"text", 'partially_refunded'::"text", 'disputed'::"text"]))),
-    CONSTRAINT "payments_stripe_charge_id_check" CHECK (("stripe_charge_id" ~ '^(ch|py)_'::"text")),
-    CONSTRAINT "payments_stripe_ids_check" CHECK ((("channel" <> 'stripe'::"text") OR ("stripe_session_id" IS NOT NULL) OR ("stripe_invoice_id" IS NOT NULL))),
-    CONSTRAINT "payments_stripe_invoice_id_check" CHECK (("stripe_invoice_id" ~~ 'in\_%'::"text")),
-    CONSTRAINT "payments_stripe_session_id_check" CHECK (("stripe_session_id" ~~ 'cs\_%'::"text")),
-    CONSTRAINT "payments_waffo_ids_check" CHECK ((("channel" <> 'waffo'::"text") OR ("waffo_order_id" IS NOT NULL))),
-    CONSTRAINT "payments_waffo_order_id_check" CHECK (("length"("waffo_order_id") > 0)),
-    CONSTRAINT "payments_waffo_payment_id_check" CHECK (("waffo_payment_id" ~ '^PAY_'::"text"))
-);
-
-
-ALTER TABLE "public"."payments" OWNER TO "postgres";
+ALTER TABLE "public"."payment_refunds" OWNER TO "postgres";
 
 
 ALTER TABLE "public"."payments" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
@@ -4375,6 +4827,11 @@ ALTER TABLE ONLY "public"."partner_links"
 
 ALTER TABLE ONLY "public"."payment_disputes"
     ADD CONSTRAINT "payment_disputes_pkey" PRIMARY KEY ("stripe_dispute_id");
+
+
+
+ALTER TABLE ONLY "public"."payment_refunds"
+    ADD CONSTRAINT "payment_refunds_pkey" PRIMARY KEY ("refund_ref");
 
 
 
@@ -4742,6 +5199,11 @@ ALTER TABLE ONLY "public"."ai_providers"
 
 
 ALTER TABLE ONLY "public"."credit_ledger"
+    ADD CONSTRAINT "credit_ledger_payment_id_fkey" FOREIGN KEY ("payment_id") REFERENCES "public"."payments"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."credit_ledger"
     ADD CONSTRAINT "credit_ledger_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
 
@@ -4793,6 +5255,11 @@ ALTER TABLE ONLY "public"."payment_disputes"
 
 ALTER TABLE ONLY "public"."payment_disputes"
     ADD CONSTRAINT "payment_disputes_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."payment_refunds"
+    ADD CONSTRAINT "payment_refunds_payment_id_fkey" FOREIGN KEY ("payment_id") REFERENCES "public"."payments"("id") ON DELETE CASCADE;
 
 
 
@@ -4936,6 +5403,9 @@ CREATE POLICY "partner_links_select_own" ON "public"."partner_links" FOR SELECT 
 ALTER TABLE "public"."payment_disputes" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."payment_refunds" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."payments" ENABLE ROW LEVEL SECURITY;
 
 
@@ -5049,6 +5519,22 @@ REVOKE ALL ON FUNCTION "public"."_apply_credit_change"("p_user_id" "uuid", "p_po
 
 
 
+REVOKE ALL ON FUNCTION "public"."_end_membership_after_refund"("p_user_id" "uuid") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_payment_dispute_answer"("p_row" "public"."payment_disputes", "p_created" boolean) FROM PUBLIC;
+
+
+
+GRANT SELECT ON TABLE "public"."payments" TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."_payment_granted_credits"("p_payment" "public"."payments") FROM PUBLIC;
+
+
+
 GRANT SELECT ON TABLE "public"."support_ticket_messages" TO "authenticated";
 GRANT SELECT ON TABLE "public"."support_ticket_messages" TO "service_role";
 
@@ -5091,6 +5577,11 @@ GRANT ALL ON FUNCTION "public"."admin_batch_set_banned"("p_actor" "uuid", "p_use
 
 REVOKE ALL ON FUNCTION "public"."admin_bulk_edit_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_bulk_edit_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_clawback_payment"("p_payment_id" bigint, "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_clawback_payment"("p_payment_id" bigint, "p_actor" "uuid") TO "service_role";
 
 
 
@@ -5293,6 +5784,15 @@ GRANT ALL ON FUNCTION "public"."claim_dispute_reminders"("p_dispute_ids" "text"[
 
 
 
+REVOKE ALL ON FUNCTION "public"."clawback_payment_credits"("p_payment_id" bigint, "p_ref" "text", "p_reason" "text") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."close_payment_dispute"("p_dispute_id" "text", "p_status" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."close_payment_dispute"("p_dispute_id" "text", "p_status" "text") TO "service_role";
+
+
+
 GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."generation_jobs" TO "service_role";
 GRANT SELECT ON TABLE "public"."generation_jobs" TO "authenticated";
 
@@ -5371,6 +5871,11 @@ GRANT ALL ON FUNCTION "public"."openai_admin_key"() TO "service_role";
 
 
 
+REVOKE ALL ON FUNCTION "public"."payment_clawback_preview"("p_payment_id" bigint) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."payment_clawback_preview"("p_payment_id" bigint) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."provider_api_key"("p_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."provider_api_key"("p_id" "uuid") TO "service_role";
 
@@ -5408,6 +5913,11 @@ GRANT ALL ON FUNCTION "public"."record_payment_context"("p_session_id" "text", "
 
 REVOKE ALL ON FUNCTION "public"."record_payment_issue"("p_charge_id" "text", "p_kind" "text", "p_amount_refunded" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."record_payment_issue"("p_charge_id" "text", "p_kind" "text", "p_amount_refunded" integer) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."record_waffo_refund"("p_payment_id" "text", "p_refund_ref" "text", "p_amount" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."record_waffo_refund"("p_payment_id" "text", "p_refund_ref" "text", "p_amount" integer) TO "service_role";
 
 
 
@@ -5576,10 +6086,6 @@ GRANT SELECT("revoked_at") ON TABLE "public"."partner_links" TO "authenticated";
 
 
 GRANT SELECT("created_at") ON TABLE "public"."partner_links" TO "authenticated";
-
-
-
-GRANT SELECT ON TABLE "public"."payments" TO "service_role";
 
 
 
