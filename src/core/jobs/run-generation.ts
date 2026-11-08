@@ -62,6 +62,8 @@ async function prepare(deps: GenerationDeps, req: GenerationRequest) {
     copy: req.copy,
     aspectRatio: req.aspectRatio,
     note: req.note,
+    // Partner v1 takes no toggles: every one stays at its default, off (T89).
+    ...(req.source === 'web' ? { toggles: req.toggles, togglesConfirmed: req.togglesConfirmed } : {}),
     imageCount: req.inputKey ? 1 : 0,
     aspects: ASPECTS[req.source],
   })
@@ -91,14 +93,25 @@ function screenWords(deps: GenerationDeps, req: GenerationRequest, inputs: Gener
 
 type Prepared = Awaited<ReturnType<typeof prepare>>
 
+// The toggles the user chose (T89) and, for each confirmed one, the server's time: evidence that a
+// customer complaint followed an option the user turned on themselves. Nothing for a template
+// without toggles, so those jobs look as before.
+export function toggleInputs(inputs: GenerationInputs, now: Date) {
+  if (Object.keys(inputs.toggles).length === 0) return {}
+  const at = now.toISOString()
+  const confirmedAt = Object.fromEntries(inputs.confirmed.map((key) => [key, at]))
+  return { toggles: inputs.toggles, ...(inputs.confirmed.length > 0 ? { toggles_confirmed_at: confirmedAt } : {}) }
+}
+
 // User content only; the wrapped prompt stays in template_prompts (ARCHITECTURE §4).
 // reserve_credits charges templates.credits_cost[resolution] from this very object.
-function jobInputs(req: GenerationRequest, { inputs, prompt }: Prepared, resolution: Resolution, attemptId: string) {
+function jobInputs(req: GenerationRequest, { inputs, prompt }: Prepared, resolution: Resolution, attemptId: string, now: Date) {
   return {
     copy: inputs.copy,
     aspect_ratio: inputs.aspectRatio,
     resolution,
     ...(inputs.note ? { note: inputs.note } : {}),
+    ...toggleInputs(inputs, now),
     input_key: req.inputKey ?? null,
     prompt_version: prompt.version,
     attempt_id: attemptId,
@@ -138,7 +151,7 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
   // Marks which request created the row: two concurrent requests with one job id both get
   // the row back from reserve_credits (charged once), but only the creator calls the provider.
   const attemptId = randomUUID()
-  const job = await reserveJob(deps.db, { ...reserveFields(req), jobId, module: template.module, templateId: template.id, provider: deps.provider.id, inputs: jobInputs(req, prepared, resolution, attemptId) })
+  const job = await reserveJob(deps.db, { ...reserveFields(req), jobId, module: template.module, templateId: template.id, provider: deps.provider.id, inputs: jobInputs(req, prepared, resolution, attemptId, deps.now?.() ?? new Date()) })
   if (job.inputs.attempt_id !== attemptId) return toJobView(job)
   // Dispute evidence (T82): the IP that started this paid or free work.
   await recordJobClientIp(deps.db, { userId: req.userId, jobId: job.id, ip: req.clientIp })

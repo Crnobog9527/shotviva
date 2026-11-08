@@ -14,6 +14,7 @@ import { modelFromTag } from './provider-tag'
 const resolution = z.enum(['1k', '2k', '3k']).catch('1k')
 // Only edits carry a scope (T30); a template generation has none.
 const editScope = z.enum(EDIT_SCOPES).nullable().catch(null)
+const jobToggles = z.record(z.string(), z.boolean()).catch({})
 
 // The category as the event dictionary takes it (moved to events.ts in T74 so the browser's
 // template_view sends the same value). Re-exported for the existing callers and tests.
@@ -37,6 +38,8 @@ export function generateEventProps(job: Job, category: string, outcome: Outcome,
     // 1 for a single photo and every partner job (T28).
     batch_size: batchSize,
     edit_scope: editScope.parse(job.inputs.edit_scope ?? null),
+    // As stored on the job (T89); a template without toggles stores none.
+    toggles: jobToggles.parse(job.inputs.toggles ?? {}),
   }
 }
 

@@ -11,7 +11,7 @@ import type { Launch } from './use-test-panel'
 
 const uuid = () => crypto.randomUUID()
 
-type FirstRunValues = { copy: Record<string, string>; note: string; options: RunOptionValues }
+type FirstRunValues = { copy: Record<string, string>; note: string; toggles: Record<string, boolean>; options: RunOptionValues }
 
 export function firstRunLaunches(templateId: string, photoIds: readonly string[], values: FirstRunValues): Launch[] {
   const batchId = uuid()
@@ -20,8 +20,8 @@ export function firstRunLaunches(templateId: string, photoIds: readonly string[]
   return planBatch(photoIds, values.options.triple).map((photoId) => {
     const runId = uuid()
     return {
-      placeholder: { id: runId, batchId, kind: 'generate', parentId: null, photoId, resolution, aspect, note: values.note.trim() },
-      start: () => startGenerate({ runId, batchId, templateId, photoId, copy: values.copy, note: values.note, resolution, aspect }),
+      placeholder: { id: runId, batchId, kind: 'generate', parentId: null, photoId, resolution, aspect, note: values.note.trim(), toggles: values.toggles },
+      start: () => startGenerate({ runId, batchId, templateId, photoId, copy: values.copy, note: values.note, toggles: values.toggles, resolution, aspect }),
     }
   })
 }

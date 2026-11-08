@@ -31,6 +31,9 @@ export const TEST_RUN_COPY = {
     notePlaceholder: '和用户工作台的「Anything to change?」一样，拼在模板提示词后面',
     run: (count: number) => (count > 1 ? `试跑 ${count} 张` : '试跑'),
     needPhoto: '先选一张测试照片',
+    toggles: '开关（管理员试跑不弹确认框）',
+    toggleOn: '开',
+    toggleOff: '关',
   },
   options: {
     resolution: '清晰度',
@@ -62,6 +65,7 @@ export const TEST_RUN_COPY = {
     translateOf: (target: string, source: string) => `翻译成「${target}」（来源：${source}后图）`,
     orphan: '上一步已清理',
     note: (note: string) => `补充说明：${note}`,
+    toggles: (toggles: Record<string, boolean>) => `开关：${Object.entries(toggles).map(([key, on]) => `${key} ${on ? '开' : '关'}`).join('、')}`,
     onRun: (position: number) => `在第 ${position} 张上`,
   },
   run: {

@@ -6,17 +6,19 @@ import { useRef } from 'react'
 import { INSTRUCTION_MAX_LENGTH } from '@/core/templates/edit-params'
 import { cn } from '@/core/ui/cn'
 
-const TRIES = ['beach', 'background', 'brighter'] as const
+// Quick requests under the field (Owner 2026-11-08: three were too few). A tap adds the request to
+// what is already written, so several can be combined.
+export const TRIES = ['clutter', 'tidy', 'tags', 'sunny', 'evening', 'brighter', 'steam', 'background'] as const
 
 type Props = { value: string; showRequired: boolean; onChange(next: string): void }
 
 // "What would you like to change?" (T6 comp): required, 500 characters, a counter, the
-// "Say what to change first." line after an empty press, and three examples that fill it in.
+// "Say what to change first." line after an empty press, and quick requests that add to it.
 export function ChangeField({ value, showRequired, onChange }: Props) {
   const t = useTranslations('app.edit')
   const field = useRef<HTMLTextAreaElement>(null)
   const fill = (text: string) => {
-    onChange(text)
+    onChange(addRequest(value, text, INSTRUCTION_MAX_LENGTH))
     field.current?.focus()
   }
   return (
@@ -55,4 +57,14 @@ export function ChangeField({ value, showRequired, onChange }: Props) {
       </div>
     </section>
   )
+}
+
+// Joins a quick request onto the current text: unchanged if it is already there or would not fit.
+export function addRequest(current: string, request: string, max: number): string {
+  const text = current.trim()
+  if (text.length === 0) return request
+  if (text.includes(request)) return current
+  const separator = /[\p{Script=Han}]/u.test(request) ? '，' : ', '
+  const joined = `${text.replace(/[,，.。;；]+$/u, '')}${separator}${request}`
+  return joined.length > max ? current : joined
 }

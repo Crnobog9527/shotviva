@@ -13,6 +13,7 @@ const template = (cover: Partial<CatalogueTemplate['cover']>): CatalogueTemplate
   description: null,
   creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
   copyFields: [],
+  toggles: [],
   cover: { type: 'image', before: null, after: null, motion: null, poster: null, ...cover },
 })
 

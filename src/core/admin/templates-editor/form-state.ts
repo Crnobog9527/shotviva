@@ -1,7 +1,9 @@
 import { RESOLUTIONS, type Resolution } from '@/core/templates/output-options'
 import type { CreditsFloor, TemplateQuality } from '@/core/templates/pricing'
+import { toggleSetupProblems } from '@/core/templates/toggles'
 
 import type { AdminTemplate, SaveTemplatePayload } from '../templates/types'
+import { toFragments, toToggleFields, toToggleValues, toZhToggleText, withoutToggles, type ToggleFormValue } from './toggle-form-state'
 
 export type TemplateFormValues = {
   id: string
@@ -20,6 +22,8 @@ export type TemplateFormValues = {
   modelParamsJson: string
   // Chinese display text (templates.translations.zh); blank means "show the English".
   zh: ZhFormValues
+  // The 开关 cards (T89); fieldsJson and modelParamsJson leave their parts out.
+  toggles: ToggleFormValue[]
 }
 
 export type ZhFormValues = { name: string; description: string; fields: Record<string, { label: string; placeholder: string }> }
@@ -49,6 +53,7 @@ export function emptyFormValues(): TemplateFormValues {
     promptBody: '',
     modelParamsJson: '{}',
     zh: emptyZh(),
+    toggles: [],
   }
 }
 
@@ -77,7 +82,8 @@ export function copyKeys(fieldsJson: string): { key: string; label: string }[] {
 }
 
 // Only filled-in text, only for keys the fields still have; {} when nothing is translated.
-export function toTranslations(zh: ZhFormValues, keys: readonly string[]) {
+// Toggles (T89) add their own label / hint / confirm text under the same `fields`.
+export function toTranslations(zh: ZhFormValues, keys: readonly string[], toggles: readonly ToggleFormValue[] = []) {
   const fields = Object.fromEntries(
     keys.flatMap((key) => {
       const text = zh.fields[key]
@@ -86,6 +92,7 @@ export function toTranslations(zh: ZhFormValues, keys: readonly string[]) {
       return label || placeholder ? [[key, { ...(label ? { label } : {}), ...(placeholder ? { placeholder } : {}) }]] : []
     }),
   )
+  Object.assign(fields, toZhToggleText(toggles))
   const entry = {
     ...(zh.name.trim() ? { name: zh.name.trim() } : {}),
     ...(zh.description.trim() ? { description: zh.description.trim() } : {}),
@@ -109,10 +116,11 @@ export function toFormValues(template: AdminTemplate): TemplateFormValues {
     },
     visibleWeb: template.visibleIn.includes('web'),
     visiblePartner: template.visibleIn.includes('partner'),
-    fieldsJson: pretty(template.fields),
+    fieldsJson: pretty(withoutToggles(template.fields)),
     promptBody: template.prompt?.body ?? '',
-    modelParamsJson: pretty(template.prompt?.modelParams ?? {}),
+    modelParamsJson: pretty(withoutToggles(template.prompt?.modelParams ?? {})),
     zh: toZhValues(template),
+    toggles: toToggleValues(template),
   }
 }
 
@@ -142,6 +150,20 @@ export function creditProblems(values: TemplateFormValues, floor: CreditsFloor):
   return problems
 }
 
+const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
+
+// The 开关 cards folded into fields and model params (T89), with the save's own refusal said
+// before the round trip: a toggle without its {{key}} or a fragment (the server checks again).
+function withToggles(values: TemplateFormValues, fields: unknown, params: unknown) {
+  if (!isObject(fields)) return { ok: false as const, message: '字段定义要是一个 JSON 对象' }
+  if (!isObject(params)) return { ok: false as const, message: '模型参数要是一个 JSON 对象' }
+  const toggles = toToggleFields(values.toggles)
+  const modelParams = { ...withoutToggles(params), ...toFragments(values.toggles) }
+  const problems = toggleSetupProblems(toggles, values.promptBody, modelParams)
+  if (problems.length > 0) return { ok: false as const, message: problems.join('；') }
+  return { ok: true as const, fields: { ...withoutToggles(fields), toggles }, modelParams }
+}
+
 // Only shapes the payload; the server validates every field again with zod and the floor.
 export function buildPayload(values: TemplateFormValues, isNew: boolean, floor: CreditsFloor): BuildResult {
   const low = Object.entries(creditProblems(values, floor))
@@ -152,6 +174,8 @@ export function buildPayload(values: TemplateFormValues, isNew: boolean, floor: 
   if (!fields.ok) return fields
   const modelParams = parseJson(values.modelParamsJson, '模型参数')
   if (!modelParams.ok) return modelParams
+  const wired = withToggles(values, fields.value, modelParams.value)
+  if (!wired.ok) return wired
   const visibleIn = [values.visibleWeb && 'web', values.visiblePartner && 'partner'].filter(Boolean)
   if (visibleIn.length === 0) return { ok: false, message: '至少选择一个展示入口' }
   return {
@@ -172,10 +196,10 @@ export function buildPayload(values: TemplateFormValues, isNew: boolean, floor: 
           '3k': Number(values.credits['3k']),
         },
         visibleIn,
-        fields: fields.value,
-        translations: toTranslations(values.zh, copyKeys(values.fieldsJson).map((field) => field.key)),
+        fields: wired.fields,
+        translations: toTranslations(values.zh, copyKeys(values.fieldsJson).map((field) => field.key), values.toggles),
       },
-      prompt: { body: values.promptBody, modelParams: modelParams.value },
+      prompt: { body: values.promptBody, modelParams: wired.modelParams },
     },
   }
 }

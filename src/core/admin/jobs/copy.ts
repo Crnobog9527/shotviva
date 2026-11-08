@@ -18,6 +18,8 @@ export const JOBS_COPY = {
     dates: '日期按北京时间',
   },
   status: { running: '进行中', succeeded: '成功', failed: '失败' },
+  toggle: (key: string, on: boolean) => `${key} ${on ? '开' : '关'}`,
+  toggleConfirmed: (at: string) => `用户确认于 ${at}`,
   deletedByUser: '用户已删除',
   copyRef: '复制编号',
   copied: '已复制',

@@ -1206,3 +1206,49 @@ Owner 2026-11-06 发现中文页有功能缺失。逐页对比现有英文页和
 - 不改业务代码。
 
 **验收**：一个只改前端的 PR 不跑数据库测试也能合并；一个改了迁移但没更新快照的测试 PR，CI 自动补快照并通过；人为制造一次下载失败能自动重试；`pnpm qa:reset qa-free` 只动 qa-free。
+
+## T89 模板可选开关（首个：「优化摆盘和器皿」），开启前确认（可派）
+
+**目标**：Owner 2026-11-08：餐饮菜品模板在生成时可以选「优化摆盘和器皿」。默认关：沿用商家原来的盘子和摆盘，只改台面、光线、背景。开：模型参考用户照片重新摆盘、换更精致且和模板场景相配的器皿。用户打开时必须弹出提醒，说明成品可能和实物差别明显、可能引起客诉，由用户自己负责。只给菜品模板配（哪些模板配由后台定，代码里不写死分类）；饮品模板不加。
+
+**做法**：
+- **字段定义加开关**：`templates.fields.toggles`（可选，最多 3 个）。每个开关：`key`（小写字母、数字、下划线，不能和文案字段重名）、英文 `label`、可选英文 `hint`、`default`（只能是 `false`）、可选 `confirm: { title, body, checkbox, accept }`（英文）。中文放 `translations.zh.fields.<key>`（`label`、`hint`、`confirm` 同结构），缺了回退英文，和文案字段一致。后台模板编辑页可增删开关、填中英文。
+- **提示词**：提示词正文用占位符 `{{<key>}}`。开、关两种状态各一段文字，存在 `template_prompts.model_params.toggles.<key>.on` / `.off`（私有，不进公开表，不进仓库，模板制作窗口在后台录）。`renderPrompt` 按用户的选择替换；用户补充说明仍然排在最后。后台保存时：定义了开关但正文里没有对应占位符、或缺开 / 关任一段，拒绝保存并提示。
+- **工作台**：模板定义了开关才显示（放在文案字段下面、比例上面），默认关。
+  - 打开带 `confirm` 的开关时弹确认框：必须勾选复选框，「开启」才能点；点「取消」或关掉弹窗保持关闭。
+  - 同一浏览器会话里同一模板确认过一次就不再弹（sessionStorage）。
+  - 首页生成器、批量生成（整批共用一个选择）、「再来一张」（沿用原作品的选择，不再弹）都用同一套逻辑。手机和电脑都要做。
+  - T85 后台试跑面板也显示开关（管理员不弹确认），方便模板制作窗口分别实测开、关两种状态。
+- **服务端**：校验开关 key 属于该模板、值是布尔；带 `confirm` 的开关为开时，请求必须带确认标记，否则拒绝（`INVALID_INPUT`）。`generation_jobs.inputs` 记 `toggles: { "<key>": true/false }` 和 `toggles_confirmed_at: { "<key>": "<服务端时间>" }`，出了客诉能查到是用户主动开启的。后台作品详情（T77/T78 那页）显示开了哪些开关。
+- **不变的**：积分价格不变；伙伴接口 v1 不收开关，一律按默认（关）；作品编辑不受影响；开关不是用户写的文字，不送换脸判断。
+- **埋点**：`generate` 事件加 `toggles` 属性；新事件 `template_toggle`（`template_id`、`key`、`action = confirm_shown / confirmed / cancelled / turned_off`、`surface`），用来看开启率和取消率。
+- **条款**：使用条款「你的内容」一节加一句（中英文），初稿：「你对使用会改变产品外观的选项（例如 AI 优化摆盘和器皿）生成的图片负责，包括确保对外发布的图片与实际出品相符；因图片与实物不符引起的纠纷由你承担。」最终措辞由 Owner 或律师定，之后改文案按一级改动直接上线。
+- **迁移**：只有需要改后台保存函数的校验时才写，编号段 `0840`～`0859`，只加不改；数据定义写进 ARCHITECTURE §5（`fields.toggles`、`model_params.toggles`、`inputs.toggles`）和 §16（新事件），和代码同一个 PR。
+
+**确认框文案**（Owner 意思，模板制作窗口起草；数据里按模板存，这里是第一个开关的初始值）：
+- 开关名称：「优化摆盘和器皿」/ "Upgrade plating & tableware"
+- 说明：「AI 重新摆盘、换用更精致的器皿，成品可能和实物不同」/ "Re-plates your dish with finer tableware. The result may differ from what you serve."
+- 标题：「开启前请确认」/ "Before you turn this on"
+- 正文（中）：开启后，AI 会参考你的照片重新摆盘、换用更精致的器皿，生成的图可能和你实际出品的样子差别明显。顾客按图点单后发现实物不符，可能引起投诉或差评。建议只在你能按图出品时使用。开启后生成的图片如何使用由你自行负责，因图片与实物不符引起的纠纷与 Shotviva 无关。
+- 正文（英）：With this on, the AI re-plates your dish and uses finer tableware, so the photo may look noticeably different from what you actually serve. If customers order from the photo and get something different, it can lead to complaints or bad reviews. Use it only if you can serve the dish the way it looks. You are responsible for how you use photos made with this option; Shotviva is not responsible for disputes caused by differences between the photo and the real dish.
+- 复选框：「我已了解并自行承担」/ "I understand and take responsibility"
+- 按钮：「开启」/「取消」，"Turn on" / "Cancel"
+
+**验收**：给一个测试模板配上开关和开 / 关两段提示词；工作台默认关，出图用的是「关」那段；打开时弹确认框，不勾选不能开启，取消后仍是关；勾选开启后出图用「开」那段，作品记录里有 `toggles` 和确认时间，后台作品详情能看到；同一会话再打开不再弹；「再来一张」沿用开启状态；批量生成整批生效；伙伴接口不受影响；没配开关的模板界面不变；后台试跑能切换开关。属于二级（功能），交互验收交给 Codex。
+
+## T90 新版本刷新提示条（可派，一级）
+
+**目标**：Owner 2026-11-08：正式站发布新版本后，还开着旧页面的用户会在点「生成」等操作时报错（旧页面调用的服务端函数新版本不认识）。参照 AI 工具站的做法，发现有新版本时在页面底部提示用户刷新。
+
+**做法**：
+- **版本号**：构建时把部署 id（`VERCEL_DEPLOYMENT_ID`，没有时用提交 sha，本地开发为 `dev`）写进前端常量；新增 `GET /api/version`，返回当前提供服务的部署 id，`Cache-Control: no-store`，不读数据库、不需登录、限流宽松。提升（promote）不重新构建，所以同一个部署的前端常量和接口返回一致。
+- **检查时机**：页面切回前台时、以及页面在前台时每 10 分钟查一次；本地开发不查。版本不同就显示提示条。另外，前端捕获到「找不到服务端函数」或加载代码块失败（ChunkLoadError）时立即显示同一个提示条。
+- **提示条**：页面底部居中（手机在安全区上方，不挡底部按钮和悬浮上传按钮），文案「Shotviva 已更新，刷新后继续使用」/ "Shotviva has been updated. Refresh to keep going."，按钮「刷新」/ "Refresh"，右侧关闭 ×。点刷新整页重新加载；关掉后同一个新版本不再提示，下一个新版本再提示。不自动刷新。
+- **不打扰**：正在上传照片、正在生成、在付款流程（结账跳转前后）时先不显示，结束后再显示；创作页有已上传但还没生成的照片时，刷新按钮旁加一行小字「刷新后需要重新上传照片」/ "You'll need to upload your photos again."（如果当前已能保留上传状态就不加）。
+- 前台、创作页、作品页、后台都生效；中英文。
+- 埋点 `app_update_prompt`（`action = shown / refreshed / dismissed`、`reason = version / error`）。
+- 不改业务逻辑，不改数据库。
+
+**配套（Owner 操作）**：在 Vercel 项目设置里打开 Skew Protection（版本错位保护），让旧页面在一段时间内继续由旧版本服务，不报错。开发窗口要确认 `/api/version` 的请求不会被版本错位保护固定到旧版本（在预览环境连发两个部署实测）。
+
+**验收**：打开测试站页面，再部署一个新版本，切回页面后底部出现提示条，点刷新后提示消失且是新版本；关掉后同一版本不再出现；生成过程中部署新版本，生成结束后才出现提示；手机和电脑各看一次。属于一级：附截图、CI 通过即可上线，Codex 事后复查。

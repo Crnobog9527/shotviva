@@ -26,6 +26,13 @@ describe('proxy matcher', () => {
     expect(runsOn('/manifest.webmanifest')).toBe(false)
   })
 
+  // T90: the version check never touches the session.
+  it('skips /api/version but not the other API routes', () => {
+    expect(runsOn('/api/version')).toBe(false)
+    expect(runsOn('/api/versions')).toBe(true)
+    expect(runsOn('/api/generate')).toBe(true)
+  })
+
   it('still runs on pages', () => {
     expect(runsOn('/pricing')).toBe(true)
     expect(runsOn('/zh/pricing')).toBe(true)

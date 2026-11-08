@@ -1,3 +1,5 @@
+import type { JobToggle } from '../jobs/job-toggles-row'
+
 // /admin/users data shapes (ARCHITECTURE §10). credits = paid pool, freeCredits = free pool.
 
 export type LedgerEntry = {
@@ -20,6 +22,8 @@ export type UserJob = {
   errorCode: string | null
   // The user deleted this work (T41).
   deletedByUser: boolean
+  // Template toggles as chosen (T89), shown like 出图记录.
+  toggles: JobToggle[]
 }
 
 export type UserDetail = {

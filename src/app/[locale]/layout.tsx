@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from 'next'
+import { Suspense } from 'react'
 import { NextIntlClientProvider } from 'next-intl'
 import { getMessages } from 'next-intl/server'
 import { locale as rootLocale } from 'next/root-params'
 
 import { ConsentSlot } from '@/core/analytics/browser'
+import { UpdateSlot } from '@/core/app-update'
 import { clientMessages, htmlLang, isLocale } from '@/core/i18n'
 import { TranslatedPathsProvider } from '@/core/i18n/ui'
 import { rootMetadata, ShortcutTitleSync } from '@/core/seo'
@@ -50,6 +52,10 @@ export default async function RootLayout({ children }: LayoutProps<'/[locale]'>)
             {children}
             {/* The analytics cookie bar, for EU/EEA/UK/CH visitors who have not answered (T70). */}
             <ConsentSlot />
+            {/* "Shotviva has been updated" with Refresh, on every page (T90). */}
+            <Suspense fallback={null}>
+              <UpdateSlot />
+            </Suspense>
             {/* Huawei Browser names a home-screen shortcut after the live page title (core/seo/shortcut-title.ts). */}
             <ShortcutTitleSync name={site.brand.name} />
           </TranslatedPathsProvider>

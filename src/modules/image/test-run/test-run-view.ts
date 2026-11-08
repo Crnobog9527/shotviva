@@ -9,6 +9,11 @@ function copyOf(value: unknown): Record<string, string> {
   return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
 }
 
+function togglesOf(value: unknown): Record<string, boolean> {
+  if (!value || typeof value !== 'object') return {}
+  return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, boolean] => typeof entry[1] === 'boolean'))
+}
+
 // `model`: the model part of `<provider id>/<model>` (the address and id stay out of the panel).
 export function toTestRunView(run: TestRun, outputUrl: string | null): TestRunView {
   return {
@@ -22,6 +27,7 @@ export function toTestRunView(run: TestRun, outputUrl: string | null): TestRunVi
     aspectRatio: text(run.inputs.aspect_ratio),
     copy: copyOf(run.inputs.copy),
     note: text(run.inputs.note),
+    toggles: togglesOf(run.inputs.toggles),
     instruction: text(run.inputs.instruction),
     sourceLocale: text(run.inputs.source_locale),
     targetLocale: text(run.inputs.target_locale),

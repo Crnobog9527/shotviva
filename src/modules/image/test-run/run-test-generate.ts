@@ -37,6 +37,9 @@ async function prepare(deps: TestRunDeps, { body }: TestGenerateRequest) {
     copy: body.inputs.copy,
     aspectRatio: body.inputs.aspect_ratio,
     note: body.inputs.note,
+    // Admins test both states without the confirm dialog (T89): every toggle counts as accepted.
+    toggles: body.inputs.toggles,
+    togglesConfirmed: Object.keys(body.inputs.toggles ?? {}),
     imageCount: photo ? 1 : 0,
     aspects: OUTPUT_ASPECTS,
   })
@@ -60,7 +63,13 @@ export async function runTestGenerate(deps: TestRunDeps, req: TestGenerateReques
     photoId: photo?.id ?? null,
     batchId: req.body.batch_id,
     resolution,
-    inputs: { copy: inputs.copy, aspect_ratio: inputs.aspectRatio, ...(inputs.note ? { note: inputs.note } : {}), attempt_id: attemptId },
+    inputs: {
+      copy: inputs.copy,
+      aspect_ratio: inputs.aspectRatio,
+      ...(inputs.note ? { note: inputs.note } : {}),
+      ...(Object.keys(inputs.toggles).length > 0 ? { toggles: inputs.toggles } : {}),
+      attempt_id: attemptId,
+    },
     promptVersion: loaded.prompt.version,
     provider: deps.provider.id,
     estimateUsd: estimateRunUsd(resolution, loaded.template.quality, deps.provider.prices),

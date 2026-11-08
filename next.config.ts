@@ -2,7 +2,7 @@ import { withSentryConfig } from '@sentry/nextjs/config'
 import type { NextConfig } from 'next'
 import createNextIntlPlugin from 'next-intl/plugin'
 
-import { parseSentryBuildEnv } from './src/core/build-env'
+import { appVersion, parseSentryBuildEnv } from './src/core/build-env'
 import { indexingOpen, parseIndexingEnv, xRobotsTagRules } from './src/core/seo/indexing-env'
 import { legacyUserRedirects } from './src/core/admin/users/legacy-redirects'
 import { legacyHelpRedirects } from './src/core/support/legacy-redirects'
@@ -28,6 +28,8 @@ const assets = readAssetsEnv(process.env)
 
 const nextConfig: NextConfig = {
   cacheComponents: true,
+  // The build's version, read by the new-version banner and /api/version (T90, core/app-update).
+  env: { NEXT_PUBLIC_APP_VERSION: appVersion(process.env) },
   // Pages live under app/[locale]; an address matching no route at all has no root layout,
   // so app/global-not-found.tsx renders it (ARCHITECTURE §17).
   experimental: { globalNotFound: true },

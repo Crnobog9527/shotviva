@@ -14,6 +14,7 @@ import { buildPayload, emptyFormValues, toFormValues, type TemplateFormValues } 
 import { TemplateCoverFields } from './template-cover-fields'
 import { TemplatePromptFields } from './template-prompt-fields'
 import { TemplatePublicFields } from './template-public-fields'
+import { TemplateToggleFields } from './template-toggle-fields'
 import { TemplateTranslationFields } from './template-translation-fields'
 
 export type EditTarget = { mode: 'new' } | { mode: 'edit'; template: AdminTemplate }
@@ -105,6 +106,7 @@ function FormColumn({ target, values, isNew, floor, categories, coverLanguages, 
         <p className="text-muted-foreground text-xs">保存模板后再打开编辑，即可上传封面。</p>
       )}
       <TemplatePromptFields values={values} version={existing?.prompt?.version ?? null} onChange={onChange} />
+      <TemplateToggleFields values={values} onChange={onChange} />
       {isNew ? <p className="text-muted-foreground text-xs">新模板保存后默认是下架状态，保存后留在这里，右侧就能试跑。</p> : null}
       <FormFooter pending={pending} error={error} saved={saved} onCancel={onCancel} onSave={onSave} />
     </div>

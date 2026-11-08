@@ -28,6 +28,7 @@ const tpl = (category: string): CatalogueTemplate => ({
   description: null,
   creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
   copyFields: [],
+  toggles: [],
   cover: { type: 'image', before: 'https://assets.test/b.webp', after: 'https://assets.test/a.webp', motion: null, poster: null },
 })
 

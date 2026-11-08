@@ -16,6 +16,7 @@ export type Placeholder = {
   sourceLocale?: string | null
   targetLocale?: string
   note?: string
+  toggles?: Record<string, boolean>
 }
 
 export function placeholderRun(p: Placeholder, now = new Date()): TestRunView {
@@ -30,6 +31,7 @@ export function placeholderRun(p: Placeholder, now = new Date()): TestRunView {
     aspectRatio: p.aspect,
     copy: {},
     note: p.note || null,
+    toggles: p.toggles ?? {},
     instruction: p.instruction || null,
     sourceLocale: p.sourceLocale ?? null,
     targetLocale: p.targetLocale ?? null,

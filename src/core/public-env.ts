@@ -28,6 +28,8 @@ const publicEnvSchema = z.object({
     .url()
     .transform((url) => url.replace(/\/+$/, ''))
     .optional(),
+  // This build's version (T90): set by next.config.ts from the deployment id; `dev` locally.
+  NEXT_PUBLIC_APP_VERSION: z.string().min(1).default('dev'),
 })
 
 export type PublicEnv = z.infer<typeof publicEnvSchema>
@@ -44,4 +46,5 @@ export const publicEnv: PublicEnv = publicEnvSchema.parse({
   NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST || undefined,
   NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN || undefined,
   NEXT_PUBLIC_ASSETS_BASE_URL: process.env.NEXT_PUBLIC_ASSETS_BASE_URL || undefined,
+  NEXT_PUBLIC_APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION || undefined,
 })

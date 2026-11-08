@@ -27,7 +27,7 @@ const template: AdminTemplate = {
   coverVideoUrl: null,
   coverPosterUrl: null,
   coverLocales: {},
-  fields: { images: { min: 1, max: 1 }, copy: [], aspectRatios: ['1:1'] },
+  fields: { images: { min: 1, max: 1 }, copy: [], aspectRatios: ['1:1'], toggles: [] },
   quality: 'high',
   creditsCost: { '1k': 3, '2k': 4, '3k': 6 },
   sortOrder: 10,
@@ -108,5 +108,40 @@ describe('the English description (T52)', () => {
     expect(toFormValues({ ...template, description: null }).description).toBe('')
     const cleared = buildPayload({ ...toFormValues(template), description: '' }, false, FLOOR)
     expect(cleared).toMatchObject({ ok: true, payload: { template: { description: '' } } })
+  })
+})
+
+describe('the 开关 cards (T89)', () => {
+  const confirm = { title: 'Sure?', body: 'It may differ.', checkbox: 'I understand', accept: 'Turn on' }
+  const toggled: AdminTemplate = {
+    ...template,
+    fields: { ...template.fields, toggles: [{ key: 'replate', label: 'Upgrade plating', default: false, confirm }] },
+    translations: { zh: { fields: { replate: { label: '优化摆盘和器皿', confirm: { title: '开启前请确认' } } } } },
+    prompt: { body: 'FAKE BODY {{replate}}', version: 3, modelParams: { quality: 'high', toggles: { replate: { on: 'FAKE-ON', off: 'FAKE-OFF' } } } },
+  }
+
+  it('keeps toggles out of the JSON boxes and puts them back on save', () => {
+    const values = toFormValues(toggled)
+    expect(JSON.parse(values.fieldsJson)).not.toHaveProperty('toggles')
+    expect(JSON.parse(values.modelParamsJson)).toEqual({ quality: 'high' })
+    expect(values.toggles[0]).toMatchObject({ key: 'replate', labelZh: '优化摆盘和器皿', confirm: true, on: 'FAKE-ON', off: 'FAKE-OFF' })
+    const result = buildPayload(values, false, FLOOR)
+    expect(result).toMatchObject({
+      ok: true,
+      payload: {
+        template: {
+          fields: { toggles: [{ key: 'replate', label: 'Upgrade plating', default: false, confirm }] },
+          translations: { zh: { fields: { replate: { label: '优化摆盘和器皿', confirm: { title: '开启前请确认' } } } } },
+        },
+        prompt: { modelParams: { quality: 'high', toggles: { replate: { on: 'FAKE-ON', off: 'FAKE-OFF' } } } },
+      },
+    })
+  })
+
+  it('refuses a toggle without its placeholder or a fragment before calling the server', () => {
+    const values = toFormValues(toggled)
+    expect(buildPayload({ ...values, promptBody: 'FAKE BODY' }, false, FLOOR).ok).toBe(false)
+    const noOff = values.toggles.map((toggle) => ({ ...toggle, off: ' ' }))
+    expect(buildPayload({ ...values, toggles: noOff }, false, FLOOR).ok).toBe(false)
   })
 })

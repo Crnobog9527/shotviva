@@ -126,3 +126,27 @@ describe('admin template commands', () => {
     expect(after.indexOf(B)).toBeLessThan(after.indexOf(A))
   })
 })
+
+// T89: a toggle must be wired into the private prompt before the template can be saved.
+describe('admin template toggles', () => {
+  const client = serviceClient()
+  const T = 'test-admin-toggle'
+  const toggled = { ...template(T), fields: { ...template(T).fields, toggles: [{ key: 'replate', label: 'Upgrade plating' }] } }
+  const fragments = { toggles: { replate: { on: 'FAKE-ON', off: 'FAKE-OFF' } } }
+
+  afterAll(async () => {
+    const pg = await connectAdmin()
+    await pg.query('delete from public.templates where id = $1', [T])
+    await pg.end()
+  })
+
+  it('refuses a toggle without its placeholder or a fragment, and saves one wired in', async () => {
+    const save = (body: string, modelParams: Record<string, unknown>) => saveTemplate(client, ADMIN_ID, { isNew: true, template: toggled, prompt: { body, modelParams } }, CREDITS_FLOOR)
+    await expect(save('FAKE BODY', fragments)).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    await expect(save('FAKE BODY {{replate}}', { toggles: { replate: { on: 'FAKE-ON' } } })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    await save('FAKE BODY {{replate}}', fragments)
+    const saved = (await listAdminTemplates(client)).find((row) => row.id === T)
+    expect(saved?.fields.toggles).toEqual([{ key: 'replate', label: 'Upgrade plating', default: false }])
+    expect(saved?.prompt?.modelParams).toEqual(fragments)
+  })
+})
