@@ -5,6 +5,7 @@ export {
   onRouterTransitionStart,
   resetIdentity,
   track,
+  trackBusinessInquiry,
   trackContactSales,
   trackPaywallSelect,
   trackPaywallView,

@@ -18,6 +18,7 @@ export const privacyRightsSections: readonly [LegalSection, ...LegalSection[]] =
           'Account details (including your phone number, if you signed in with one), credit records and your list of works: kept while your account exists.',
           'Sign-in code requests (a one-way hash of the phone number, the IP address and the time): deleted after two days.',
           'Help & feedback tickets (your messages and our replies): kept until you delete your account.',
+          'Business inquiries: kept while we follow up on them, so we can see what was asked and agreed. Write to us to have yours deleted at any time; deleting your account does not delete an inquiry, because it may have been sent without one.',
           'Fraud-prevention and dispute records (the checkout IP address and browser, Terms acceptance time, and the IP addresses of image creation and downloads): kept with the purchase or the image they belong to, until you delete your account. A record already sent to a payment provider for a dispute is kept by that provider under its own rules.',
           'Payment records: kept by our payment providers (Stripe, Link and Waffo) under their own retention rules, including for tax and accounting purposes, also after you delete your account.',
           'Server logs, analytics and error reports: kept only as long as we need them to run, secure and improve the Service, and then deleted.',

@@ -1,5 +1,6 @@
 import { logger } from '../logger'
 import type { MarkerStore } from '../storage/marker-store'
+import type { AlertBudget } from './alert-kinds'
 
 // Owner alerts go out once per fact, or once per cooldown (ARCHITECTURE §16.4). Stripe redelivers
 // a failed event for up to three days and every attempt can land on a different function
@@ -14,6 +15,14 @@ const MEMORY_LIMIT = 500
 
 // Ticket alerts (new and replies together) per clock hour, across instances.
 export const TICKET_BUDGET_PER_HOUR = 10
+// Business inquiry alerts per clock hour (T86): the form's own limits are per IP and email, so
+// this keeps a spread-out burst from flooding the group. Past it the inquiry is still in the admin.
+export const INQUIRY_BUDGET_PER_HOUR = 10
+
+const BUDGETS: Record<AlertBudget, { perHour: number; marker: string }> = {
+  tickets: { perHour: TICKET_BUDGET_PER_HOUR, marker: 'ticket_budget' },
+  inquiries: { perHour: INQUIRY_BUDGET_PER_HOUR, marker: 'inquiry_budget' },
+}
 
 export type Dedupe = {
   // true: this caller owns the key (absent, or older than cooldownMs) and should send.
@@ -22,8 +31,8 @@ export type Dedupe = {
   held(key: string, cooldownMs?: number): boolean
   // The send definitely failed: free the key so a later event can try again.
   release(key: string): Promise<void>
-  // One of the hour's ticket-alert slots, or false when the hour's budget is used up.
-  takeTicketSlot(): Promise<boolean>
+  // One of the hour's slots of that budget, or false when the hour's budget is used up.
+  takeSlot(budget: AlertBudget): Promise<boolean>
 }
 
 export function markerKey(key: string): string {
@@ -51,8 +60,8 @@ function createMemory(now: Clock) {
 
 export function createDedupe(store: () => MarkerStore | null, now: Clock = Date.now): Dedupe {
   const memory = createMemory(now)
-  // This instance's next ticket slot in the current hour (slots are claimed in order).
-  const ticketCursor = { hour: '', next: 0 }
+  // This instance's next slot of each budget in the current hour (slots are claimed in order).
+  const cursors: Record<AlertBudget, { hour: string; next: number }> = { tickets: { hour: '', next: 0 }, inquiries: { hour: '', next: 0 } }
 
   async function markerClaim(key: string, cooldownMs?: number): Promise<boolean> {
     const markers = store()
@@ -80,13 +89,15 @@ export function createDedupe(store: () => MarkerStore | null, now: Clock = Date.
         logger.warn('owner alert marker not released', { key, error })
       }
     },
-    async takeTicketSlot() {
+    async takeSlot(budget) {
+      const { perHour, marker } = BUDGETS[budget]
+      const cursor = cursors[budget]
       const hour = new Date(now()).toISOString().slice(0, 13)
-      if (ticketCursor.hour !== hour) Object.assign(ticketCursor, { hour, next: 0 })
-      while (ticketCursor.next < TICKET_BUDGET_PER_HOUR) {
-        const slot = ticketCursor.next
-        ticketCursor.next += 1
-        if (await markerClaim(`ticket_budget:${hour}:${slot}`)) return true
+      if (cursor.hour !== hour) Object.assign(cursor, { hour, next: 0 })
+      while (cursor.next < perHour) {
+        const slot = cursor.next
+        cursor.next += 1
+        if (await markerClaim(`${marker}:${hour}:${slot}`)) return true
       }
       return false
     },

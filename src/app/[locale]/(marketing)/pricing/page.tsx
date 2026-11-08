@@ -9,9 +9,11 @@ import { localizePath } from '@/core/i18n'
 import { currentLocale } from '@/core/i18n/server'
 import { JsonLdScript, breadcrumbListLd, faqPageLd, pageMetadata } from '@/core/seo'
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
-import { BUSINESS_MAIL_SUBJECT, fillCredits, homePageIn, pricingFaqIn, pricingPageIn, startingCredits } from '@/site/content'
+import { fillCredits, homePageIn, pricingFaqIn, pricingPageIn, startingCredits } from '@/site/content'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { site } from '@/site/site.config'
+
+import { inquiryPrefillAction, submitInquiryAction } from './actions'
 
 // /pricing as comps-v3-b pricing.html (T37): hero, the plans and packs (core/billing/paywall,
 // prices from site.config), "For business", what a credit buys, how to pay, then the FAQ.
@@ -53,9 +55,8 @@ export default async function PricingPage() {
       </PaywallProvider>
       <BusinessSection
         block={page.business}
-        email={site.brand.contactEmail}
-        subject={BUSINESS_MAIL_SUBJECT}
         page={path === '/zh/pricing' ? '/zh/pricing' : '/pricing'}
+        actions={{ submit: submitInquiryAction, prefill: inquiryPrefillAction }}
       />
       <div className="mt-6 grid gap-6 md:mt-8 md:grid-cols-2 md:items-start md:gap-8">
         <CreditBuys block={page.creditBuys} />

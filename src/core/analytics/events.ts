@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { CREDIT_POOLS } from '../billing/pools'
 import { MAX_BATCH_SIZE } from '../billing/tier-limits'
 import { PRODUCT_IDS } from '../config/define-site'
+import { INQUIRY_USES, MONTHLY_VOLUMES } from '../inquiries/rules'
 import { EDIT_SCOPES } from '../templates/edit-params'
 import { findPii } from './pii'
 
@@ -74,6 +75,11 @@ export const eventSchemas = {
   paywall_view: z.strictObject({ trigger: z.enum(PAYWALL_TRIGGERS) }),
   // The pricing page's "For business" Contact us (DESIGN §6.9 item 8, T37).
   contact_sales_click: z.strictObject({ page: z.enum(CONTACT_SALES_PAGES) }),
+  // T86: the business inquiry form was stored. The volume band and uses only, never a contact.
+  business_inquiry_submit: z.strictObject({
+    volume: z.enum(MONTHLY_VOLUMES),
+    uses: z.array(z.enum(INQUIRY_USES)).min(1).max(INQUIRY_USES.length),
+  }),
   checkout_start: z.strictObject({ ...checkoutProps, method: z.enum(CHECKOUT_START_METHODS) }),
   // T74: the template workspace opened, or a template picked in the home generator's picker.
   template_view: z.strictObject({ template_id: slug, category: slug, surface: z.enum(TEMPLATE_VIEW_SURFACES) }),
@@ -102,7 +108,7 @@ export type EventProps<E extends EventName> = z.infer<(typeof eventSchemas)[E]>
 
 // §16.2: money and credit events go out from the server so ad blockers cannot drop them.
 export const SERVER_EVENTS = ['signup', 'generate', 'generate_refused', 'checkout_start', 'checkout_cancel', 'purchase'] as const
-export const BROWSER_EVENTS = ['upload', 'upload_error', 'paywall_view', 'paywall_select', 'template_view', 'template_favorite', 'contact_sales_click'] as const
+export const BROWSER_EVENTS = ['upload', 'upload_error', 'paywall_view', 'paywall_select', 'template_view', 'template_favorite', 'contact_sales_click', 'business_inquiry_submit'] as const
 export type ServerEventName = (typeof SERVER_EVENTS)[number]
 export type BrowserEventName = (typeof BROWSER_EVENTS)[number]
 

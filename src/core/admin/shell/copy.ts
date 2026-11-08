@@ -10,6 +10,7 @@ export const SHELL_COPY = {
     analytics: '流量与转化',
     users: '用户',
     tickets: '工单',
+    inquiries: '企业咨询',
     orders: '订单与收入',
     disputes: '拒付',
     jobs: '出图记录',

@@ -87,6 +87,11 @@ export function trackContactSales(page: EventProps<'contact_sales_click'>['page'
   track('contact_sales_click', { page })
 }
 
+// T86: sent once the server has stored the inquiry.
+export function trackBusinessInquiry(props: EventProps<'business_inquiry_submit'>): void {
+  track('business_inquiry_submit', props)
+}
+
 // T74 (ARCHITECTURE §16.2): a template looked at, a product picked in the paywall, a failed upload.
 // `category` is the template's category as stored (display name before T75, key after); it is
 // sent as categorySlug, the same value `generate` carries.

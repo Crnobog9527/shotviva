@@ -17,7 +17,7 @@ export function findContentPage(slug: string): ContentPage | undefined {
 }
 
 export { homePage }
-export { BUSINESS_MAIL_SUBJECT, pricingFaq, pricingPage } from './pricing'
+export { pricingFaq, pricingPage } from './pricing'
 export { freeImagesLabel, freeStandardImages } from './offer'
 export { featuredSections, featuredTemplates, tryTemplates } from './home-templates'
 export { fillCredits, startingCredits } from './credits'
