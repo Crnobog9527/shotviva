@@ -95,6 +95,31 @@ jobs:
       # Pinned CLI and the stack's images from the Actions cache; downloads, pulls and the start
       # itself are retried with backoff (.github/actions/supabase-start). Only the services DB
       # tests need; later cards drop names from this list as they need them.
+      # T88 demo only (PR never merged): a stand-in for the CLI release host that answers the
+      # first two requests with HTTP 504, then redirects to the real release.
+      - name: Flaky release host (demo)
+        run: |
+          cat > "$RUNNER_TEMP/flaky.py" <<'PY'
+          import http.server, sys
+          hits = 0
+          class Handler(http.server.BaseHTTPRequestHandler):
+              def do_GET(self):
+                  global hits
+                  hits += 1
+                  if hits <= 2:
+                      self.send_response(504)
+                      self.end_headers()
+                      self.wfile.write(b"gateway timeout (T88 demo)")
+                  else:
+                      self.send_response(302)
+                      self.send_header("Location", "https://github.com/supabase/cli/releases/download" + self.path)
+                      self.end_headers()
+                  sys.stderr.write("flaky host: request %d -> %s\n" % (hits, "504" if hits <= 2 else "302"))
+          http.server.HTTPServer(("127.0.0.1", 8504), Handler).serve_forever()
+          PY
+          nohup python3 "$RUNNER_TEMP/flaky.py" > "$RUNNER_TEMP/flaky.log" 2>&1 &
+          sleep 1
+          echo "SUPABASE_CLI_BASE_URL=http://127.0.0.1:8504" >> "$GITHUB_ENV"
       - if: steps.changes.outputs.db == 'true'
         uses: ./.github/actions/supabase-start
         with:
@@ -123,6 +148,9 @@ jobs:
           retention-days: 3
       - if: steps.changes.outputs.db == 'true'
         run: pnpm test:db
+      - name: Flaky host log (demo)
+        if: always()
+        run: cat "$RUNNER_TEMP/flaky.log" || true
 
   # T88: commits the schema.sql the db job regenerated to the PR branch, once both required jobs
   # have finished, and posts their results on the new commit (scripts/ci/schema-commit.sh). The
