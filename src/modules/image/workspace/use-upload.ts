@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react'
 
 import { track, trackUploadError } from '@/core/analytics/browser'
+import { useUpdateHold } from '@/core/app-update'
 
 import { compressImage, putWithProgress, requestTicket, UploadError, uploadPhoto, type UploadDeps, type UploadErrorCode, type UploadPhase } from '@/core/storage/upload'
 
@@ -24,6 +25,8 @@ export const uploadDeps: UploadDeps = {
 // belongs to the generation hook. A failed upload restarts from scratch (§8.2: no resume).
 export function useUpload() {
   const [state, setState] = useState<UploadState>({ phase: 'idle' })
+  // No new-version banner mid-upload (T90).
+  useUpdateHold('upload', state.phase === 'compressing' || state.phase === 'uploading')
 
   const upload = useCallback(async (file: File): Promise<string | null> => {
     try {

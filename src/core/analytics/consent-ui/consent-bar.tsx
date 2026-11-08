@@ -55,7 +55,7 @@ export default function ConsentBar({ mode }: { mode: Mode }) {
     <>
       {/* In-flow room at the end of the page: the footer and the last section scroll clear of the bar. */}
       <div aria-hidden="true" style={{ height }} />
-      <section ref={bar} aria-label={t('label')} className={cn(PLACE, 'consent-in rounded-tile bg-background/94 backdrop-blur-[24px] backdrop-saturate-[1.4] shadow-[inset_0_0_0_1px_var(--border),inset_0_1px_0_var(--edge-highlight),var(--shadow-sheet)] p-4 md:flex md:items-center md:gap-6 md:py-3 md:pr-3 md:pl-5')}>
+      <section ref={bar} aria-label={t('label')} data-consent-bar="" className={cn(PLACE, 'consent-in rounded-tile bg-background/94 backdrop-blur-[24px] backdrop-saturate-[1.4] shadow-[inset_0_0_0_1px_var(--border),inset_0_1px_0_var(--edge-highlight),var(--shadow-sheet)] p-4 md:flex md:items-center md:gap-6 md:py-3 md:pr-3 md:pl-5')}>
         {mode === 'settings' ? (
           <button type="button" onClick={close} aria-label={t('close')} className="press absolute top-1.5 right-1.5 grid size-11 place-items-center rounded-full md:hidden">
             <span className="grid size-[30px] place-items-center rounded-full bg-wash-strong">

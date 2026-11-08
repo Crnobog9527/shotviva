@@ -3,6 +3,8 @@
 import { useLocale } from "next-intl"
 import { useState } from "react"
 
+import { useUpdateHold } from "../../app-update/holds"
+
 import type { ProductId } from "../../config"
 import { loginPath } from "../../auth/redirect-target"
 import { localeOfPath, localizePath } from "../../i18n/paths"
@@ -18,6 +20,8 @@ export type CheckoutStatus = "idle" | "pending" | "error" | "refused"
 export function useCheckout() {
   const locale = useLocale()
   const [status, setStatus] = useState<CheckoutStatus>("idle")
+  // No new-version banner while the buyer is on the way to the hosted checkout (T90).
+  useUpdateHold("checkout", status === "pending")
 
   async function start(productId: ProductId, method: CheckoutMethod) {
     setStatus("pending")

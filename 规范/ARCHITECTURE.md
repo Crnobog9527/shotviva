@@ -1008,6 +1008,7 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 所有事件都带 `locale`（`en` / `zh`，浏览器端注册为公共属性，服务端发时从请求或 `user_metadata.locale` 取；Owner 2026-11-06）。钱和积分相关的事件（`signup`、`generate`、`checkout_start`、`purchase`）一律服务端发，保证不被广告拦截漏掉；发送失败只记日志，不影响业务。
 
 - **新增事件（T74，Owner 2026-11-07）**：`template_view`（浏览器：打开模板详情或在选择器里选中模板，`template_id`、`category`、`surface`）、`paywall_select`（浏览器：付费墙里选中商品，`product_id`、`method`）、`checkout_cancel`（服务端：结账取消返回，`product_id`、`method`）、`upload_error`（浏览器：上传失败，`reason` 枚举，不含文件名）。PostHog 打开 `capture_pageleave`（停留时间、最大滚动深度）。
+- **新增事件（T90，Owner 2026-11-08）**：`app_update_prompt`（浏览器：新版本刷新提示条，`action`（`shown` / `refreshed` / `dismissed`）、`reason`（`version` 版本检查发现新版本 / `error` 旧页面找不到服务端函数或代码块）；每个新版本或每次出错只记一次 `shown`）。
 
 ### 16.2a 后台「流量与转化」页（Owner 2026-11-07，T74）
 
