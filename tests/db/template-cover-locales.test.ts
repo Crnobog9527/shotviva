@@ -15,6 +15,7 @@ import { publishEditTemplate, setEditTemplate, TEST_EDIT_PARAMS, TEST_WRAPPER } 
 import { seedTemplate } from './generation-fixtures'
 import { connectAdmin, createUser } from './helpers'
 import { anonSupabase, serviceSupabase } from './supabase-env'
+import { holdTestBudget } from './test-run-fixtures'
 
 // T87 per-language covers (ARCHITECTURE §8.3 「封面按语言适配」): cover_locales (0820), the admin's
 // language-tab writes (0824), 「设为封面」 into a language (0823) and the cover translation run
@@ -25,14 +26,19 @@ let db: Client
 let admin: string
 const service = serviceSupabase()
 
+let releaseBudget: () => Promise<void>
+
 beforeAll(async () => {
   db = await connectAdmin()
+  releaseBudget = await holdTestBudget(db)
   admin = await createUser(db)
   await db.query("update public.profiles set role = 'admin' where id = $1", [admin])
   await saveTestBudget(service, admin, 1000)
-})
+  // Waiting for the other test-run file to release the budget lock can take a while.
+}, 120_000)
 
 afterAll(async () => {
+  await releaseBudget()
   await db.end()
 })
 
