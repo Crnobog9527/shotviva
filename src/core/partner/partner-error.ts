@@ -54,6 +54,8 @@ const FROM_APP: Record<ErrorCode, PartnerErrorCode> = {
   DOWNGRADE_NOT_ALLOWED: 'internal',
   // Saved templates are a web-only feature; no partner route saves templates.
   FAVORITES_LIMIT: 'internal',
+  // Admin-only (T85); never on a partner route.
+  TEST_BUDGET_EXCEEDED: 'internal',
   INTERNAL: 'internal',
 }
 

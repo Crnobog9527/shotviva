@@ -14,7 +14,9 @@ import type { IdentityEntry, IdentityJudgeUsage, RefusalMethod } from './judge'
 
 export const EXCERPT_MAX = 200
 
-export type RefusalDeps = { db: SupabaseClient; track?: ServerTrack }
+// quiet: an admin test run (T85) is refused exactly the same, but leaves no identity_refusals row
+// (the admin's own account would be flagged) and no event (§10.b keeps test runs out of PostHog).
+export type RefusalDeps = { db: SupabaseClient; track?: ServerTrack; quiet?: boolean }
 
 // usage: what the decision call that refused it cost; no job carries it, so the row does.
 export type Refusal = { userId: string; entry: IdentityEntry; method: RefusalMethod; text: string; locale?: Locale; usage?: IdentityJudgeUsage | null }
@@ -48,8 +50,8 @@ export class IdentitySwapRefused extends AppError {
 // Records, tracks, then throws: always before any credit is reserved, so nothing is charged.
 export async function refuseIdentitySwap(deps: RefusalDeps, refusal: Refusal): Promise<never> {
   // The user's words stay out of the log line; the row holds the excerpt for the Owner.
-  logger.info('identity swap refused', { userId: refusal.userId, entry: refusal.entry, method: refusal.method })
-  if (await record(deps.db, refusal)) {
+  logger.info('identity swap refused', { userId: refusal.userId, entry: refusal.entry, method: refusal.method, quiet: deps.quiet === true })
+  if (!deps.quiet && (await record(deps.db, refusal))) {
     const track = deps.track ?? defaultTrack
     track('generate_refused', { reason: 'identity_swap', source: refusal.entry }, { distinctId: refusal.userId, locale: refusal.locale ?? DEFAULT_LOCALE })
   }
