@@ -66,13 +66,13 @@ async function webSetup(judge: IdentityJudge | null = fakeJudge(false)) {
 }
 
 describe('workspace: note and text fields', () => {
-  it('refuses a keyword hit in the note before any credit moves', async () => {
-    const { userId, fake, track, run } = await webSetup()
+  it('refuses when the model says the note asks for a face swap, before any credit moves', async () => {
+    const { userId, fake, track, run } = await webSetup(fakeJudge(true))
     await expect(run({ note: '把他的脸换成第二张图的人' })).rejects.toMatchObject({ code: 'IDENTITY_SWAP_REFUSED', status: 422 })
     expect((await profileOf(db, userId)).credits).toBe(3)
     expect(await jobCount(db, userId)).toBe(0)
     expect(fake.generate).not.toHaveBeenCalled()
-    expect(await refusals(userId)).toEqual([{ entry: 'workspace', method: 'keyword', excerpt: '把他的脸换成第二张图的人' }])
+    expect(await refusals(userId)).toEqual([{ entry: 'workspace', method: 'model', excerpt: '把他的脸换成第二张图的人' }])
     expect(track).toHaveBeenCalledWith('generate_refused', { reason: 'identity_swap', source: 'workspace' }, expect.anything())
   })
 
@@ -116,10 +116,11 @@ describe('workspace: note and text fields', () => {
     expect(await refusals(userId)).toEqual([])
   })
 
-  it('lets the request through when the judge fails or is off (keywords still apply)', async () => {
+  // No keyword list (Owner 2026-11-08): without an answer from the model, even "face swap" passes.
+  it('lets the request through when the judge fails or is off', async () => {
     for (const judge of [fakeJudge('fail'), null]) {
       const { userId, run } = await webSetup(judge)
-      expect((await run({ note: 'make her look like Taylor Swift' })).status).toBe('succeeded')
+      expect((await run({ note: 'face swap me with the guy in photo 2' })).status).toBe('succeeded')
       expect(await refusals(userId)).toEqual([])
     }
   })
@@ -131,24 +132,24 @@ describe('partner API: freeform prompt', () => {
     const r2 = createMemoryStore()
     const fake = fakeProvider()
     const fetch = vi.fn<FetchLike>(async () => new Response((await png(1500, 1500)).slice()))
-    const deps = { ...routeDeps(r2.store), provider: fake.provider, providerTimeoutMs: 200, fetch, identityJudge: fakeJudge(false) }
+    const deps = { ...routeDeps(r2.store), provider: fake.provider, providerTimeoutMs: 200, fetch, identityJudge: fakeJudge(true) }
     const body = { template_id: 'freeform', inputs: { copy: { prompt: 'Face swap me with the guy in the second photo' } } }
     const response = await handleGenerate(partnerRequest('/api/partner/generate', { method: 'POST', account: userId, idempotencyKey: randomUUID(), body }), deps)
     expect(response.status).toBe(422)
     expect(await response.json()).toMatchObject({ code: 'IDENTITY_SWAP_REFUSED' })
     expect((await profileOf(db, userId)).credits).toBe(3)
     expect(fake.generate).not.toHaveBeenCalled()
-    expect(await refusals(userId)).toEqual([{ entry: 'partner', method: 'keyword', excerpt: 'Face swap me with the guy in the second photo' }])
+    expect(await refusals(userId)).toEqual([{ entry: 'partner', method: 'model', excerpt: 'Face swap me with the guy in the second photo' }])
   })
 })
 
 describe('photo edit: the scope call answers too', () => {
-  it('refuses a keyword hit without asking the classifier', async () => {
-    const { userId, decision, edit } = await editSetup(db, templateId)
+  it('asks the scope call even for an obvious request, and refuses on its answer', async () => {
+    const { userId, decision, edit } = await editSetup(db, templateId, { classifier: { identitySwap: true } })
     await expect(edit('Swap their faces')).rejects.toMatchObject({ code: 'IDENTITY_SWAP_REFUSED' })
-    expect(decision?.classify).not.toHaveBeenCalled()
+    expect(decision?.classify).toHaveBeenCalledTimes(1)
     expect((await profileOf(db, userId)).credits).toBe(10)
-    expect(await refusals(userId)).toEqual([{ entry: 'edit', method: 'keyword', excerpt: 'Swap their faces' }])
+    expect(await refusals(userId)).toEqual([{ entry: 'edit', method: 'model', excerpt: 'Swap their faces' }])
   })
 
   it('refuses on the scope call’s identity_swap, even at low confidence', async () => {
