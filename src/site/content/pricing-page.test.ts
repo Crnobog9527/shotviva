@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { PricingPayWith } from '@/core/billing/paywall'
-import { BusinessSection } from '@/core/content'
+import { BusinessSection } from '@/core/content/business'
 import messages from '@/site/messages/en.json'
 
 import { site } from '../site.config'

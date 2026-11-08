@@ -2,8 +2,7 @@
 // Keys only: the page's words come from site/content, the admin's from its copy.ts. The same
 // lists are check constraints in 0800, so changing one is a spec change and a migration.
 
-export const MONTHLY_VOLUMES = ['under_100', '100_500', '500_2000', '2000_10000', 'over_10000'] as const
-export const INQUIRY_USES = ['ecommerce', 'food_menu', 'social', 'real_estate', 'ads', 'other'] as const
+export { INQUIRY_USES, MONTHLY_VOLUMES, type InquiryUse, type MonthlyVolume } from './summary-choices'
 export const TEAM_SIZES = ['1_5', '6_20', '21_100', 'over_100'] as const
 export const INQUIRY_PLATFORMS = [
   'taobao_tmall',
@@ -24,8 +23,6 @@ export const INQUIRY_NEEDS = ['volume_pricing', 'custom_templates', 'bulk_proces
 export const START_TIMES = ['asap', 'within_1_month', '1_3_months', 'exploring'] as const
 export const INQUIRY_STATUSES = ['new', 'contacted', 'won', 'closed'] as const
 
-export type MonthlyVolume = (typeof MONTHLY_VOLUMES)[number]
-export type InquiryUse = (typeof INQUIRY_USES)[number]
 export type TeamSize = (typeof TEAM_SIZES)[number]
 export type InquiryPlatform = (typeof INQUIRY_PLATFORMS)[number]
 export type InquiryNeed = (typeof INQUIRY_NEEDS)[number]

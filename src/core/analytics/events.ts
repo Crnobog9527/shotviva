@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { CREDIT_POOLS } from '../billing/pools'
 import { MAX_BATCH_SIZE } from '../billing/tier-limits'
 import { PRODUCT_IDS } from '../config/define-site'
-import { INQUIRY_USES, MONTHLY_VOLUMES } from '../inquiries/rules'
+import { INQUIRY_USES, MONTHLY_VOLUMES } from '../inquiries/summary-choices'
 import { EDIT_SCOPES } from '../templates/edit-params'
 import { findPii } from './pii'
 

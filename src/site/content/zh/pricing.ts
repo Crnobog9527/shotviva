@@ -1,4 +1,5 @@
-import type { BusinessBlock, CreditBuysBlock, FaqItem } from '@/core/content'
+import type { CreditBuysBlock, FaqItem } from '@/core/content'
+import type { BusinessBlock } from '@/core/content/business'
 
 import { site } from '../../site.config'
 import type { PricingContent } from '../pricing'
