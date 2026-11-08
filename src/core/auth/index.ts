@@ -13,7 +13,7 @@ export { requestPasswordReset, resendSignupEmail, signUpWithPassword, updatePass
 export { IDLE, type FormState } from './flows/form-state'
 export { handleDeleteAccount } from './delete-account-route'
 export { handleAccountLocale } from './flows/account-locale'
-export { assertSameOrigin, requireApiBuyer, requireApiUser } from './api-guards'
+export { assertSameOrigin, requireApiAdmin, requireApiBuyer, requireApiUser } from './api-guards'
 export type { AccountStorage } from './account-deletion'
 export { signupGiftRefused } from './signup-gift'
 // T82: the request's IP for checkout and per-work dispute evidence.

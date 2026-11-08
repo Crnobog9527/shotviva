@@ -5,26 +5,26 @@ import { randomUUID } from 'node:crypto'
 import type { ServerTrack } from '../analytics'
 import { tierForBatch, type TierLimits } from '../billing/tier-limits'
 import { AppError, TierRequiredError } from '../errors'
-import { screenIdentityText, type IdentityJudge, type ScreenResult } from '../identity-guard'
+import { screenIdentityText, type IdentityJudge } from '../identity-guard'
 import { isOwnInputKey, loadInputImage, outputKeyFor, writeInputPreview } from '../storage'
 import {
   DEFAULT_RESOLUTION,
   loadGenerationTemplate,
   OUTPUT_ASPECTS,
-  renderPrompt,
   validateGenerationInputs,
   type GenerationInputs,
   type Resolution,
   type TemplateSurface,
 } from '../templates'
 import { settleTracked } from './generation-analytics'
+import { screenCost, templateCall, typedWords } from './generation-call'
 import type { GenerationRequest } from './generation-request'
 import { findOwnJob } from './job-lookup'
 import type { Job, JobSource } from './job-schema'
 import { toJobView, type JobView } from './job-view'
 import { accountLimits } from './account-limits'
 import { assertWithinRateLimit } from './rate-limit'
-import { settleGeneration, type DecisionCost, type SettleDeps } from './settle-generation'
+import { settleGeneration, type SettleDeps } from './settle-generation'
 import { recordJobClientIp } from './job-download'
 import { reserveJob } from './settlement'
 
@@ -84,21 +84,12 @@ function screenWords(deps: GenerationDeps, req: GenerationRequest, inputs: Gener
   return screenIdentityText(deps, {
     userId: req.userId,
     entry: req.source === 'graylum' ? 'partner' : 'workspace',
-    texts: [...Object.values(inputs.copy), inputs.note],
+    texts: typedWords(inputs),
     locale: req.locale,
   })
 }
 
 type Prepared = Awaited<ReturnType<typeof prepare>>
-
-// The screening call's tokens join the job's usage and cost like the edit decision's (T33).
-function screenCost(deps: GenerationDeps, screen: ScreenResult): DecisionCost | undefined {
-  if (!screen.usage) return undefined
-  return {
-    usage: { decision_input_tokens: screen.usage.inputTokens, decision_output_tokens: screen.usage.outputTokens },
-    prices: deps.identityJudge?.prices ?? null,
-  }
-}
 
 // User content only; the wrapped prompt stays in template_prompts (ARCHITECTURE §4).
 // reserve_credits charges templates.credits_cost[resolution] from this very object.
@@ -152,18 +143,11 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
   // Dispute evidence (T82): the IP that started this paid or free work.
   await recordJobClientIp(deps.db, { userId: req.userId, jobId: job.id, ip: req.clientIp })
 
-  const call = {
-    prompt: renderPrompt(prompt.body, inputs),
-    images: image ? [image] : [],
-    aspectRatio: inputs.aspectRatio,
-    resolution,
-    quality: template.quality,
-    params: prompt.modelParams,
-  }
+  const call = templateCall({ template, prompt }, inputs, image, resolution)
   const settle = () =>
     settleGeneration(deps, job, call, outputKeyFor(req.userId, job.id), {
       inputKeys: req.inputKey ? [req.inputKey] : [],
-      decision: screenCost(deps, prepared.screen),
+      decision: screenCost(deps.identityJudge, prepared.screen),
     })
   const settled = await settleTracked(job, template.category, settle, {
     track: deps.track,

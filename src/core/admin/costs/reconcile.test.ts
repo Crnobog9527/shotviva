@@ -21,6 +21,11 @@ describe('reconcile', () => {
     expect(totals.difference).toBeCloseTo(-0.3)
   })
 
+  it('totals admin test runs apart while counting them in ours (T85)', () => {
+    const { totals } = reconcile([{ ...day('2026-11-07', 1), test_cost_usd: 0.25 }, day('2026-11-08', 0.5)], null)
+    expect(totals).toMatchObject({ ours: 1.5, tests: 0.25 })
+  })
+
   it('shows only our side without a bill (no Admin key, or OpenAI failed)', () => {
     const { rows, totals } = reconcile([day('2026-11-06', 0.5)], null)
     expect(rows[0]).toMatchObject({ billed: null, difference: null, cost_usd: 0.5 })

@@ -9,7 +9,7 @@ export const COSTS_COPY = {
   scopeNote: [
     '两边算的范围不一样：',
     '「OpenAI 实际扣费」是这个 OpenAI 项目下的全部用量，测试站、本地开发只要用的是同一个项目的密钥，也会算进去。',
-    '「我们记录的成本」只算本站数据库里记下了成本的出图，正式站后台就只算正式站用户的出图。',
+    '「我们记录的成本」只算本站数据库里记下了成本的出图，正式站后台就只算正式站用户的出图和正式站后台的模板试跑（单独列在「其中后台试跑」）。',
     '所以测试多的日子差额会偏大，不一定是算错了。',
   ],
   cards: {
@@ -25,8 +25,9 @@ export const COSTS_COPY = {
     scope: (projectId: string | null) =>
       projectId ? `项目 ${projectId} 下的全部用量，含测试站和本地开发` : '整个 OpenAI 组织的全部用量（没填项目 ID），含测试站和本地开发',
     oursScope: '只算本站数据库里的出图',
+    tests: (usd: string) => `含后台试跑 ${usd}`,
   },
-  columns: { day: '日期（UTC）', billed: 'OpenAI 实际', ours: '我们记录', difference: '差额', costed: '有成本的单', missing: '算不出 / 无用量' },
+  columns: { day: '日期（UTC）', billed: 'OpenAI 实际', ours: '我们记录', tests: '其中后台试跑', difference: '差额', costed: '有成本的单', missing: '算不出 / 无用量' },
   noKey: '还没有填 OpenAI 管理员密钥，下面只显示我们自己记录的成本。在下方填入密钥后即可对账。',
   failed: (failure: CostsFailure, status: number | null) => {
     const reasons: Record<CostsFailure, string> = {

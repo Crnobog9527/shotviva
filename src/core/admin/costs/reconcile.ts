@@ -1,7 +1,9 @@
 // /admin/costs rows (ARCHITECTURE §10.0): per UTC day, what OpenAI billed next to what our jobs
 // add up to. Pure, so the page's numbers are tested without either side.
 
-export type OurDay = { day: string; cost_usd: number; costed: number; uncosted: number; no_usage: number }
+// cost_usd includes test_cost_usd: admin test runs (T85) are billed by OpenAI like any call, so
+// they count on our side too and are shown apart as 后台试跑.
+export type OurDay = { day: string; cost_usd: number; costed: number; uncosted: number; no_usage: number; test_cost_usd?: number; test_runs?: number }
 
 export type ReconcileRow = OurDay & {
   // null: no Admin key, or OpenAI could not be read.
@@ -16,7 +18,7 @@ export type PriceDrift = { days: number; from: string; to: string }
 
 export type Reconciliation = {
   rows: ReconcileRow[]
-  totals: { ours: number; billed: number | null; difference: number | null; uncosted: number; noUsage: number }
+  totals: { ours: number; tests: number; billed: number | null; difference: number | null; uncosted: number; noUsage: number }
   drift: PriceDrift | null
 }
 
@@ -66,6 +68,7 @@ export function reconcile(ours: readonly OurDay[], billed: Readonly<Record<strin
     rows,
     totals: {
       ours: oursTotal,
+      tests: sum((row) => row.test_cost_usd ?? 0),
       billed: billedTotal,
       difference: billedTotal === null ? null : billedTotal - oursTotal,
       uncosted: sum((row) => row.uncosted),

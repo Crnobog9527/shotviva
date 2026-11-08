@@ -527,6 +527,9 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 公开读（Owner 2026-11-07 改）：shotviva.com 的 DNS 在 Vercel，R2 绑不了自定义域名，所以**生产走本站同源路径**：`https://shotviva.com/assets/covers/...` 由 Next 的 rewrite 转到公开桶的 r2.dev 地址（服务端变量 `R2_PUBLIC_ORIGIN`，构建时读取），`/assets/*` 返回 `Cache-Control: public, max-age=31536000, immutable`（文件名带内容哈希），让 Vercel 的 CDN 缓存，r2.dev 本身几乎不被直接访问。生产 `NEXT_PUBLIC_ASSETS_BASE_URL = https://shotviva.com/assets`；预览可以直接填 r2.dev 地址。以后 DNS 迁到 Cloudflare 再绑 `assets.shotviva.com`，只改这两个变量，不改代码（T51）。
 - 公开地址的前缀放环境变量 `NEXT_PUBLIC_ASSETS_BASE_URL`，`templates.cover_before_url` / `cover_after_url` 存完整地址。
 - 写入只走后台：后台模板编辑页「上传前图 / 上传后图」→ 服务端校验（JPEG / PNG / WebP，≤20MB）→ `sharp` 转 WebP（长边 1600、质量 82）→ 写公开桶 → 更新模板行。和用户照片一样，图片字节不经 API 路由请求体（第 8.1 节）：浏览器先直传到私有桶的 `uploads-admin/` 临时前缀（7 天过期），服务端再读出处理后写公开桶。
+- **封面按语言适配（Owner 2026-11-08，T87）**：同一个模板可以给每种页面语言各配一套封面（前图、后图、动态封面），例如海报、菜单类模板的封面上有文字时，中文页显示中文字的封面，英文页显示英文字的封面。现有 `cover_before_url` / `cover_after_url` / 动态封面字段是**通用封面**（不属于任何语言，所有语言都能用）；新增 `cover_locales`（jsonb，默认 `{}`，结构 `{ "zh": { "before": "…", "after": "…", "video": "…" } }`，只加不改）。显示规则（Owner 2026-11-08 定，不写死任何语言）：按**页面语言**（`/zh` 是中文、根路径是英文，以后加的语言同理；页面语言本身已按 T217 规则跟随浏览器主语言提示切换）找该语言的专属封面，有就用；没有就用通用封面；通用封面也没有、只有某一种语言的封面时，**所有语言都显示这一张**（有多种语言封面时按后台语言页签的顺序取第一个）。也就是说只上传一套封面时，所有语言都显示它；只有给某种语言另外上传了封面，这种语言的用户才看到专属版本。是否做其他语言版本完全由 Owner 决定，有的海报英文排版更好看，就只用一套。所有展示封面的地方都按这个规则：首页和落地页模板区、创作页模板卡片和弹窗、收藏、伙伴接口（按请求的语言参数）。后台模板编辑页的封面区加语言页签（通用 / 中文 / 英文…，以后加语言自动多一个；每个页签都可以空着），每个语言单独上传、替换、删除；T85 试跑的「设为封面」先选设到哪个语言。封面压缩、公开桶和缓存规则不变。迁移编号段 `0820`～`0839`。
+  - **一键转成其他语言（Owner 2026-11-08）**：后台封面区在任意一张已定好的「后」封面上点「生成其他语言版本」，勾选目标语言（例如英文、日文），系统用出图模型做「只把图上的文字翻译成目标语言，版式、字体风格、颜色、画面其他内容都不变」的编辑，每种语言一张（可以重跑），结果先给 Owner 预览，满意再点「设为该语言封面」。走 T85 试跑的同一套记录和费用规则（不扣积分、计入成本对账「后台试跑」、受每日预算限制）。「前」图一般是没有文字的原照片，各语言共用，不翻译；动态封面不翻译，各语言单独上传或退回默认。翻译用的提示词放在 `template_prompts` 的系统参数里（后台可改，不进仓库）。
+  - **可配置的语言列表**：后台封面页签显示的语言 = 网站已上线的语言 + `site.config` 里登记的「准备中」语言（先登记日语 `ja`），所以可以在某种语言的页面上线之前先把封面准备好；准备中语言的封面在前台不显示，等那个语言的页面上线后自动生效。
 - **展示媒体支持三种**（Owner 2026-11-05，参考 Lovart）：静态图、动图、短视频。`templates` 增加 `cover_media_type`（`'image'` / `'animated'` / `'video'`）、`cover_video_url`、`cover_poster_url`（视频和动图的封面帧，静态图时为空）；前后对比图字段照旧，用于静态图模板和预览抽屉里的拖动对比。
   - 动图一律存动态 WebP：后台上传 GIF 也收，服务端转成动态 WebP（GIF 体积通常大 5～10 倍，拖慢首屏）。
   - 视频存 MP4（H.264）原文件，≤15MB、≤15 秒，服务端只做类型和大小校验，不转码；必须有封面帧：后台单独上传，或上传时浏览器从第一帧截图生成。
@@ -569,6 +572,80 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - **费用**：不扣任何积分；每次显示真实成本，计入成本对账并标「后台试跑」；默认每天 5 美元上限（后台可改），到上限后当天不能再试跑。
 - **隔离**：只有管理员能用；试跑结果不进管理员账号的作品、不计入出图统计、漏斗和 PostHog 事件（`source = admin_test`）；没设成封面的结果和测试照片 30 天后删除（打开试跑面板时顺带清理，不加定时任务）。
 - 迁移编号段 `0780`～`0799`，只加不改。
+
+**数据定义（T85，2026-11-08，开发窗口提案经总控确认）**
+
+#### 为什么不写进 `generation_jobs`
+
+`source = admin_test` 用独立的表实现，不往 `generation_jobs` 加行：
+- 旧代码 `jobRowSchema` 的 `source` 是 `web | graylum` 的严格枚举、`credits_cost` 要求正整数；迁移先于代码上线，正式站旧代码读到 `admin_test` 行会报错。
+- 作品页、创作库、限频、概览统计、出图记录、失败率告警、争议证据、删号清理都读 `generation_jobs`，每一处都得加排除条件，漏一处就泄露。独立表天然不进这些地方。
+- 共用的是流水线代码（提示词拼法、供应商、质量档、换脸判断、编辑范围判断和约束段落、出图调用、超时、成本计算），只有「谁付钱、存哪里」两处换成试跑自己的实现。
+
+#### 表 `admin_test_photos`（私有：开 RLS、无 policy，只有 service role 读写）
+
+| 字段 | 说明 |
+|---|---|
+| `id` | uuid |
+| `object_key` | 私有桶 `admin-tests/photos/{id}.{jpg,png,webp}`，唯一 |
+| `created_by` | 上传的管理员，`on delete set null` |
+| `created_at` / `last_used_at` | 「最近用过的测试照片」按 `last_used_at desc` 取 12 张；每次试跑更新 |
+
+索引 `(last_used_at desc)`。
+
+#### 表 `admin_test_runs`（私有，同上）
+
+| 字段 | 说明 |
+|---|---|
+| `id` | uuid（浏览器生成，重复请求返回同一行） |
+| `template_id` | 被试跑的模板，`on delete cascade` |
+| `kind` | `generate`（首次出图）/ `edit`（在某条结果上编辑） |
+| `parent_id` | 编辑时被编辑的那条试跑（同一模板、成功、有成品），`on delete set null`；首次出图为空。形成记录树 |
+| `photo_id` | 源测试照片；编辑继承父记录的，`on delete set null` |
+| `batch_id` | 同一次点击（一次 3 张共用一个） |
+| `status` | `running` → `succeeded` / `failed` |
+| `resolution` | `1k` / `2k` / `3k` |
+| `inputs` | jsonb：文字字段、比例、补充说明；编辑时用户原话、判出的范围、confidence、keep、change。不存封装提示词 |
+| `prompt_version` | 当时用的 `template_prompts.version`（编辑记 `edit` 模板的版本） |
+| `provider` | `<供应商 id 或 env>/<模型名>` |
+| `provider_usage` / `cost_usd` | 同 `generation_jobs`（§10.0），失败但供应商回了用量也记 |
+| `estimate_usd` | 开跑时为预算占用的估算（按清晰度的正方形输出 token × 输出单价，加输入余量） |
+| `output_key` | 私有桶 `admin-tests/outputs/{id}.png` |
+| `error_code` / `duration_ms` | |
+| `cover_set_at` | 设为封面的时间；不为空的记录和它的源照片不被 30 天清理 |
+| `created_by` / `created_at` / `finished_at` | |
+
+索引 `(template_id, created_at desc)`（面板列表，取 50 条）、`(created_at)`（当天预算、清理、成本对账）。
+
+#### 表 `admin_test_spend`（私有，同上；审查后新增，2026-11-08）
+
+每次试跑一行，**没有外键**（删模板、裁剪 50 条、30 天清理都不影响它），100 天后才清。字段：`run_id`（唯一）、`template_id`（只记值）、`day`（北京时间自然日）、`cost_usd`、`counted_as`（`actual` 真实成本 / `estimate` 调过出图模型但算不出成本时按估算 / `zero` 未调用模型或 10 分钟超时）、`created_at`。**每日预算和成本对账页的「后台试跑」都只读这张表。**预算判断和占用（`admin_begin_test_run`）在任何模型调用之前完成，包括换脸判断和编辑范围判断；超预算一个模型都不调。换脸被拒的试跑记为 `failed / IDENTITY_SWAP_REFUSED`，判断用掉的 token 计入成本。试跑不占管理员的换脸判断配额，也不计入「AI 供应商」页的用户统计。清理改为 `POST /api/admin/test-runs/cleanup`（同源校验）。
+
+#### 函数（普通 plpgsql，`search_path = ''`，只授权 `service_role`；带 `p_actor` 的在函数里再核对是管理员）
+
+- `admin_begin_test_run(p_actor, p_run_id, p_template_id, p_kind, p_parent_id, p_photo_id, p_batch_id, p_resolution, p_inputs, p_prompt_version, p_provider, p_estimate_usd)`：按 `p_run_id` 幂等；advisory lock 串行化预算判断；当天（北京时间自然日）已花 = 已结束记录的 `cost_usd` 合计 + 10 分钟内仍在跑的记录的 `estimate_usd`；已花 + 本次估算 > 预算就抛 `TEST_BUDGET_EXCEEDED`（不调用供应商）。编辑时校验父记录、继承 `photo_id`；更新照片 `last_used_at`。返回新行。
+- `admin_finish_test_run(p_run_id, p_status, p_output_key, p_error_code, p_provider_usage, p_cost_usd, p_duration_ms)`：只从 `running` 结束，重复调用返回原行。
+- `admin_test_budget_status()`：返回预算、当天已花、当天试跑次数、北京时间日期。
+- `admin_set_test_run_cover(p_actor, p_run_id, p_before_url, p_after_url, p_locale text default null)`：`p_locale` 为空时写通用封面，指定语言时写该语言的专属封面（T87 实现，此前传语言返回 `INVALID_INPUT`）；同一事务里更新模板的前后封面地址、记 `cover_set_at`。WebP 转换和写公开桶在应用里先做（和现有封面上传同一套压缩规则）。
+- `admin_cleanup_test_runs(p_actor)`：打开面板时调用。删掉 30 天前且没设成封面的记录；每个模板超出最近 50 条的（不含封面记录）；30 天没用过、也不是封面记录源照片的测试照片；10 分钟还在 `running` 的标成 `failed / TIMEOUT`。返回要从 R2 删除的 key 列表，应用尽力删除、失败只记日志。
+- `admin_test_daily_costs(p_days)`：成本对账页按 UTC 日返回试跑的 `cost_usd` 合计和次数，和 `admin_daily_costs` 并列显示为「后台试跑」，计入「我们记录的成本」。
+- 预算：`system_settings` 新键 `admin_test_daily_budget_usd`（数字，0～1000，默认 5），`admin_set_system_setting` 用 `create or replace` 加这个键。
+
+迁移 `0780`～`0789`，只加表、索引、函数；`admin_set_system_setting` 只多认一个键，旧代码不受影响。
+
+#### 其他实现口径（不涉及数据结构，供审查）
+
+- 接口：`/api/admin/test-runs`（首次出图）、`/api/admin/test-runs/edit`（编辑）、`/api/admin/test-photos`（预签名上传）；一次 3 张是浏览器并发 3 个请求（Server Action 在同一页面是串行的，所以不用 Server Action）。只有管理员能调，非管理员 404。
+- 换脸判断照常调用；试跑被拒不写 `identity_refusals`（否则管理员账号会被标红），不发 `generate` / `generate_refused` 事件。
+- 封面：结果设为「后」、源照片设为「前」，按 §8.3 封面规则转 WebP（长边 1600、质量 82）写公开桶，`revalidateTag('templates', 'max')`。
+
+### 10.c 企业咨询（Owner 2026-11-08，T86）
+
+价格页「联系我们」弹窗表单（字段见 DESIGN §6.9 第 8 条）提交到服务端，存进新表 `business_inquiries`（私有：开 RLS 无 policy，只有 service role 读写）：`id`、`created_at`、`locale`、`page`、`user_id`（已登录时，可空，`on delete set null`）、各表单字段（文本和多选数组，长度在服务端再校验）、`status`（`new` 新咨询 / `contacted` 已联系 / `won` 已成交 / `closed` 无效或关闭）、`admin_note`（Owner 备注）、`updated_at`、`ip_hash`（防刷用，不存明文 IP）。
+- 防刷：隐形 hCaptcha（正式站开启时）；同一 IP 每小时 3 条、每天 10 条，同一邮箱每天 3 条；超了提示「提交太频繁，请稍后再试」。
+- 后台新页「企业咨询」（`/admin/inquiries`，导航放在「工单」旁边）：列表按时间倒序，显示公司、姓名、邮箱、出图量、用途、状态，可按状态筛选；点开看全部字段，改状态、写备注；新咨询数在后台导航上显示角标。
+- 提交成功发飞书告警（T72 新增种类「新企业咨询」：公司名、出图量、用途，带后台链接，不带邮箱和电话）。
+- 隐私政策补一句：企业咨询表单收集的联系方式只用于回复本次咨询。迁移编号段 `0800`～`0819`，只加不改。
 
 ### 10.0 真实出图成本（Owner 2026-11-06，T33）
 
