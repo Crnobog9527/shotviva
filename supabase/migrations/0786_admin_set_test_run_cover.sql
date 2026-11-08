@@ -5,10 +5,11 @@
 -- covers are untouched. Only a succeeded run of the template with a result can be the cover.
 -- Returns the template id (for the caller's cache tag).
 --
--- p_locale: which language's cover (ARCHITECTURE §13 「封面按语言适配」, T87). null = the default
--- (English) columns, the only target until T87 adds templates.cover_locales; the parameter is in
--- the signature now so T87 changes the body with create or replace, not the signature. Until then
--- a language is refused.
+-- p_locale: which language's cover (ARCHITECTURE §13 「封面按语言适配」, T87). null = the common
+-- cover (the existing columns, admin tab 「通用」, shown for every language that has no cover of its
+-- own), the only target until T87 adds templates.cover_locales. The parameter is in the signature
+-- now so T87 changes the body with create or replace, not the signature; until then a language is
+-- refused.
 
 create function public.admin_set_test_run_cover(p_actor uuid, p_run_id uuid, p_before_url text, p_after_url text, p_locale text default null)
 returns text
