@@ -24,7 +24,7 @@ export function makeAgainHref(templateId: string, jobId: string): string {
   return `/generate/${encodeURIComponent(templateId)}?again=${encodeURIComponent(jobId)}`
 }
 
-const DEFAULTS: FormValues = { aspect: 'original', resolution: '1k', note: '', copy: {} }
+const DEFAULTS: FormValues = { aspect: 'original', resolution: '1k', note: '', copy: {}, toggles: {} }
 
 const isAspect = (value: unknown): value is OutputAspect => (OUTPUT_ASPECTS as readonly unknown[]).includes(value)
 const isResolution = (value: unknown): value is Resolution => (RESOLUTIONS as readonly unknown[]).includes(value)
@@ -40,6 +40,20 @@ function copyOf(raw: unknown, template: CatalogueTemplate): Record<string, strin
   )
 }
 
+const asRecord = (raw: unknown): Record<string, unknown> => (typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {})
+
+// The work's toggles as it was made (T89), for the template's toggles of today: Make again keeps
+// a choice on without asking again only when the user saw today's dialog for it, i.e. the work
+// recorded a confirmation (a toggle that gained `confirm` after the work starts off). A toggle the
+// template no longer has is dropped.
+function togglesOf(inputs: Record<string, unknown>, template: CatalogueTemplate): Record<string, boolean> {
+  const values = asRecord(inputs.toggles)
+  const confirmedAt = asRecord(inputs.toggles_confirmed_at)
+  // A template object without `toggles` (built before T89) has none.
+  const kept = (template.toggles ?? []).filter((toggle) => values[toggle.key] === true && (!toggle.confirm || typeof confirmedAt[toggle.key] === 'string'))
+  return Object.fromEntries(kept.map((toggle) => [toggle.key, true]))
+}
+
 // The old work's form, read back from its stored inputs and checked against what the template
 // offers today (a size or resolution it no longer has falls back to the default). Only fields
 // the user filled in are read; nothing of ours is in inputs (ARCHITECTURE §4).
@@ -50,6 +64,7 @@ export function againValues(inputs: Record<string, unknown>, template: Catalogue
     resolution,
     note: typeof inputs.note === 'string' ? inputs.note.slice(0, NOTE_MAX_LENGTH) : '',
     copy: copyOf(inputs.copy, template),
+    toggles: togglesOf(inputs, template),
   }
 }
 

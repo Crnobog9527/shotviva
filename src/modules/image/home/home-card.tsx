@@ -10,6 +10,7 @@ import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import { GroundedImg } from '../result/grounded-img'
 import { UPLOAD_FORMAT_NAMES, UPLOAD_MAX_MB } from '../workspace/upload-formats'
 import { notePlaceholder } from '../workspace/workspace-options'
+import { TemplateToggles } from '../toggles'
 import { HomeCtaButton } from './home-cta-button'
 import { thumbImage } from './thumb-image'
 import { ArrowIcon, GiftIcon, PlusIcon } from './home-icons'
@@ -131,6 +132,7 @@ export const HomeCard = forwardRef<HTMLElement, Props>(function HomeCard({ state
             </span>
             <NoteBox state={state} />
           </label>
+          <TemplateToggles className="mk-toggles" template={template} values={state.toggles} onChange={state.setToggles} surface="home" />
         </>
       ) : (
         <div className="mk-current">

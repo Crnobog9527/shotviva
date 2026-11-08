@@ -22,9 +22,11 @@ type Row = (TemplateRow | PreT75TemplateRow) & {
 // Needs the service-role client: template_prompts has no client grants (T3). The surface
 // filter keeps partner-only templates such as `freeform` out of the web generate route; null
 // means a built-in template such as `edit`, which is on no surface (ARCHITECTURE §5.2).
-async function loadTemplate(client: SupabaseClient, id: string, surface: TemplateSurface | null): Promise<GenerationTemplate> {
+// `drafts`: an admin test run (ARCHITECTURE §10.b, T85) also takes unpublished templates.
+async function loadTemplate(client: SupabaseClient, id: string, surface: TemplateSurface | null, drafts = false): Promise<GenerationTemplate> {
   const { data, error } = await selectTemplates((columns) => {
-    const query = client.from('templates').select(columns).eq('id', id).eq('is_active', true)
+    const all = client.from('templates').select(columns).eq('id', id)
+    const query = drafts ? all : all.eq('is_active', true)
     return (surface ? query.contains('visible_in', [surface]) : query).maybeSingle<Row>()
   }, ', template_prompts(body, version, model_params)')
   if (error) throw new AppError('INTERNAL', `loadGenerationTemplate failed: ${error.message}`)
@@ -49,4 +51,12 @@ export function loadGenerationTemplate(client: SupabaseClient, id: string, surfa
 // The built-in `edit` template, published or NOT_FOUND (editing is off until the Owner turns it on).
 export function loadEditTemplate(client: SupabaseClient): Promise<GenerationTemplate> {
   return loadTemplate(client, EDIT_TEMPLATE_ID, null)
+}
+
+// An admin test run (§10.b, T85): any template but the built-in edit one, published or not, on
+// whatever surface; the same prompt and fields a user's generation reads.
+// allowEdit: the cover translation (T87) runs on the edit template's own parameters.
+export function loadTestTemplate(client: SupabaseClient, id: string, options: { allowEdit?: boolean } = {}): Promise<GenerationTemplate> {
+  if (id === EDIT_TEMPLATE_ID && !options.allowEdit) throw new AppError('NOT_FOUND', 'Template not found')
+  return loadTemplate(client, id, null, true)
 }

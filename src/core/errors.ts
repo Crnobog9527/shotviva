@@ -47,6 +47,8 @@ export const ERROR_CODES = [
   'DOWNGRADE_NOT_ALLOWED',
   // Saved templates (ARCHITECTURE §5.1b, T83): the account already holds the most it may.
   'FAVORITES_LIMIT',
+  // Admin test runs (ARCHITECTURE §10.b, T85): today's test-run budget is spent; nothing was called.
+  'TEST_BUDGET_EXCEEDED',
   'INTERNAL',
 ] as const
 
@@ -80,6 +82,7 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   SUBSCRIPTION_CANCEL_FAILED: 502,
   DOWNGRADE_NOT_ALLOWED: 409,
   FAVORITES_LIMIT: 409,
+  TEST_BUDGET_EXCEEDED: 429,
   INTERNAL: 500,
 }
 

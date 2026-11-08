@@ -16,6 +16,7 @@ const base: Template = {
   coverMediaType: 'image',
   coverVideoUrl: null,
   coverPosterUrl: null,
+  coverLocales: {},
   fields: {
     images: { min: 1, max: 1 },
     copy: [
@@ -23,6 +24,7 @@ const base: Template = {
       { key: 'price', label: 'Price', required: false, maxLength: 12 },
     ],
     aspectRatios: ['1:1'],
+    toggles: [],
   },
   quality: 'high',
   creditsCost: { '1k': 2, '2k': 4, '3k': 6 },

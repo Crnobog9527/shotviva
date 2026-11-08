@@ -9,6 +9,7 @@ export {
   templateWithPromptSchema,
 } from './schema'
 export type {
+  ConfirmTranslation,
   CoverMediaType,
   PromptInput,
   TemplateFields,
@@ -19,6 +20,18 @@ export type {
 } from './schema'
 export { TEMPLATE_DESCRIPTION_MAX, templateTranslationsSchema } from './schema'
 export { localizeTemplate, type LocalizedTemplate } from './localize'
+export {
+  coverForLocale,
+  coverLocalesSchema,
+  hasCompleteCoverSet,
+  LOCALE_COVER_KEYS,
+  localeCoverSchema,
+  withLocaleCover,
+  type CoverLocales,
+  type CoverSource,
+  type LocaleCover,
+  type ResolvedCover,
+} from './cover-locales'
 export {
   DEFAULT_RESOLUTION,
   NOTE_MAX_LENGTH,
@@ -40,7 +53,7 @@ export { PRE_T75_TEMPLATE_COLUMNS, TEMPLATE_COLUMNS, toTemplate } from './types'
 export type { PreT75TemplateRow, Template, TemplateRow } from './types'
 export { selectTemplates } from './select-templates'
 export { TEMPLATES_CACHE_TAG } from './cache'
-export { loadEditTemplate, loadGenerationTemplate, type GenerationTemplate } from './generation-template'
+export { loadEditTemplate, loadGenerationTemplate, loadTestTemplate, type GenerationTemplate } from './generation-template'
 export { loadEditOffer } from './edit-offer'
 export {
   DECIDED_SCOPES,
@@ -60,3 +73,15 @@ export {
   type GenerationInputs,
   type RawGenerationInputs,
 } from './generation-inputs'
+export {
+  providerParams,
+  RESERVED_KEYS,
+  toggleConfirmSchema,
+  toggleFieldSchema,
+  toggleFragments,
+  TOGGLES_MAX,
+  toggleSetupProblems,
+  type ToggleConfirm,
+  type ToggleField,
+  type ToggleFragments,
+} from './toggles'

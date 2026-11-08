@@ -7,6 +7,7 @@ import { Link } from '@/core/i18n/ui'
 import { buttonVariants } from '@/core/ui/button'
 
 import { CompareSlider } from '../catalogue/compare-slider'
+import { EditHint } from '../edit-ui/edit-hint'
 import { editHref } from '../edit-ui/edit-link'
 import type { TrackedJob } from '../generation/job-model'
 import { SIDE_BY_SIDE } from '../result/action-styles'
@@ -124,6 +125,9 @@ function DoneActions({ jobId, editable, onAgain }: { jobId: string; editable: bo
         <Glyph d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4" />
         {t('makeAnother')}
       </button>
+      <div className="col-span-2">
+        <EditHint />
+      </div>
     </div>
   )
 }

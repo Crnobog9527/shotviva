@@ -54,6 +54,9 @@ export const site = defineSite({
       // The checkout return page (T43, noindex like every app page).
       '/checkout',
     ],
+    // Languages whose pages are not live yet but whose template covers can be prepared in the
+    // admin ahead of launch (ARCHITECTURE §8.3, T87). Never shown on the site until launched.
+    upcoming: ['ja'],
   },
   billing: {
     currency: 'usd',

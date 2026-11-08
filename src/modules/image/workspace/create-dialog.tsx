@@ -70,6 +70,7 @@ function CreateBody({ template, open, onClose, ...context }: BodyProps) {
           photos={draft.photos}
           values={draft.values}
           onChange={draft.change}
+          surface="create_dialog"
           photoExtra={batch ? <BatchLink templateId={template.id} onGo={onClose} /> : null}
         />
       }

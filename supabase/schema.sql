@@ -329,6 +329,20 @@ $$;
 ALTER FUNCTION "public"."_payment_granted_credits"("p_payment" "public"."payments") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_template_has_cover_parts"("p_before" "text", "p_after" "text", "p_locales_json" "jsonb", "p_locales" "text"[]) RETURNS boolean
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
+    AS $$
+  select (nullif(btrim(p_before), '') is not null or exists (
+            select 1 from unnest(coalesce(p_locales, '{}')) as l(code) where nullif(btrim(p_locales_json -> l.code ->> 'before'), '') is not null))
+     and (nullif(btrim(p_after), '') is not null or exists (
+            select 1 from unnest(coalesce(p_locales, '{}')) as l(code) where nullif(btrim(p_locales_json -> l.code ->> 'after'), '') is not null))
+$$;
+
+
+ALTER FUNCTION "public"."_template_has_cover_parts"("p_before" "text", "p_after" "text", "p_locales_json" "jsonb", "p_locales" "text"[]) OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."support_ticket_messages" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "ticket_id" "uuid" NOT NULL,
@@ -652,6 +666,93 @@ $$;
 ALTER FUNCTION "public"."admin_batch_set_banned"("p_actor" "uuid", "p_user_ids" "uuid"[], "p_banned" boolean, "p_reason" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_begin_test_run"("p_actor" "uuid", "p_run_id" "uuid", "p_template_id" "text", "p_kind" "text", "p_parent_id" "uuid", "p_photo_id" "uuid", "p_batch_id" "uuid", "p_resolution" "text", "p_inputs" "jsonb", "p_prompt_version" integer, "p_provider" "text", "p_estimate_usd" numeric) RETURNS "jsonb"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_existing public.admin_test_runs;
+  v_parent public.admin_test_runs;
+  v_photo uuid := p_photo_id;
+  v_status jsonb;
+  v_row public.admin_test_runs;
+begin
+  if p_actor is null or p_run_id is null or p_batch_id is null then
+    raise exception 'INVALID_INPUT' using detail = 'actor, run id and batch id are required';
+  end if;
+  if not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if p_kind is null or p_kind not in ('generate', 'edit', 'translate') then
+    raise exception 'INVALID_INPUT' using detail = 'kind must be generate, edit or translate';
+  end if;
+  if p_estimate_usd is null or p_estimate_usd < 0 then
+    raise exception 'INVALID_INPUT' using detail = 'estimate is required';
+  end if;
+
+  select * into v_existing from public.admin_test_runs r where r.id = p_run_id;
+  if found then
+    if v_existing.template_id <> p_template_id then
+      raise exception 'IDEMPOTENCY_CONFLICT';
+    end if;
+    return to_jsonb(v_existing);
+  end if;
+
+  if not exists (select 1 from public.templates t where t.id = p_template_id) then
+    raise exception 'TEMPLATE_NOT_FOUND';
+  end if;
+
+  if p_kind = 'edit' then
+    select * into v_parent from public.admin_test_runs r
+     where r.id = p_parent_id and r.template_id = p_template_id and r.status = 'succeeded' and r.output_key is not null;
+    if not found then
+      raise exception 'TEST_RUN_NOT_FOUND';
+    end if;
+    v_photo := v_parent.photo_id;
+  elsif p_parent_id is not null then
+    raise exception 'INVALID_INPUT' using detail = 'only an edit has a parent';
+  elsif p_kind = 'translate' and v_photo is not null then
+    raise exception 'INVALID_INPUT' using detail = 'a cover translation starts from the cover, not a test photo';
+  elsif v_photo is not null and not exists (select 1 from public.admin_test_photos ph where ph.id = v_photo) then
+    raise exception 'TEST_PHOTO_NOT_FOUND';
+  end if;
+
+  -- One budget decision at a time; held until commit, so the next request sees this row.
+  perform pg_advisory_xact_lock(hashtext('shotviva.admin_test_budget'));
+  v_status := public.admin_test_budget_status();
+  if (v_status ->> 'spent_usd')::numeric + p_estimate_usd > (v_status ->> 'budget_usd')::numeric then
+    raise exception 'TEST_BUDGET_EXCEEDED';
+  end if;
+
+  insert into public.admin_test_runs (
+    id, template_id, kind, parent_id, photo_id, batch_id, resolution, inputs, prompt_version, provider, estimate_usd, created_by
+  ) values (
+    p_run_id, p_template_id, p_kind, p_parent_id, v_photo, p_batch_id, p_resolution, coalesce(p_inputs, '{}'::jsonb),
+    p_prompt_version, p_provider, p_estimate_usd, p_actor
+  )
+  on conflict (id) do nothing
+  returning * into v_row;
+
+  if v_row.id is null then
+    -- A concurrent request with the same id won; hand back its row.
+    select * into v_row from public.admin_test_runs r where r.id = p_run_id;
+    return to_jsonb(v_row);
+  end if;
+
+  insert into public.admin_test_spend (run_id, template_id, estimate_usd)
+  values (p_run_id, p_template_id, p_estimate_usd);
+
+  if v_photo is not null then
+    update public.admin_test_photos set last_used_at = now() where id = v_photo;
+  end if;
+  return to_jsonb(v_row);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_begin_test_run"("p_actor" "uuid", "p_run_id" "uuid", "p_template_id" "text", "p_kind" "text", "p_parent_id" "uuid", "p_photo_id" "uuid", "p_batch_id" "uuid", "p_resolution" "text", "p_inputs" "jsonb", "p_prompt_version" integer, "p_provider" "text", "p_estimate_usd" numeric) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_bulk_edit_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid") RETURNS "jsonb"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -770,6 +871,129 @@ $_$;
 ALTER FUNCTION "public"."admin_bulk_edit_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_bulk_edit_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid", "p_locales" "text"[]) RETURNS "jsonb"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_ids text[] := array(select distinct u.id from unnest(coalesce(p_ids, '{}')) as u(id));
+  v_patch jsonb := coalesce(p_patch, '{}');
+  v_cost jsonb := coalesce(p_patch -> 'credits_cost', '{}');
+  v_visible text[];
+  v_category text := p_patch ->> 'category_key';
+  v_failures jsonb;
+  v_changed integer;
+begin
+  if p_actor is null then
+    raise exception 'INVALID_INPUT' using detail = 'actor is required';
+  end if;
+  if not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if cardinality(v_ids) = 0 or cardinality(v_ids) > 200 then
+    raise exception 'INVALID_INPUT' using detail = 'between 1 and 200 templates';
+  end if;
+  if jsonb_typeof(v_patch) <> 'object' or v_patch = '{}' or v_patch - 'credits_cost' - 'visible_in' - 'quality' - 'category_key' <> '{}' then
+    raise exception 'INVALID_INPUT' using detail = 'patch must name credits_cost, visible_in, quality or category_key';
+  end if;
+  if v_patch ? 'quality' and (v_patch ->> 'quality') is distinct from 'high' and (v_patch ->> 'quality') is distinct from 'medium' then
+    raise exception 'INVALID_INPUT' using detail = 'quality must be high or medium';
+  end if;
+  if jsonb_typeof(v_cost) <> 'object' then
+    raise exception 'INVALID_INPUT' using detail = 'credits_cost must be an object';
+  end if;
+  if exists (
+    select 1 from jsonb_each(v_cost) as e(key, value)
+    where e.key not in ('1k', '2k', '3k') or jsonb_typeof(e.value) <> 'number' or e.value::text !~ '^[1-9][0-9]{0,2}$'
+  ) then
+    raise exception 'INVALID_INPUT' using detail = 'credits_cost tiers must be whole numbers 1..999';
+  end if;
+  if v_patch ? 'visible_in' then
+    if jsonb_typeof(v_patch -> 'visible_in') <> 'array' then
+      raise exception 'INVALID_INPUT' using detail = 'visible_in must be an array';
+    end if;
+    v_visible := array(select distinct x from jsonb_array_elements_text(v_patch -> 'visible_in') as v(x) order by x desc);
+    if cardinality(v_visible) = 0 or not (v_visible <@ array['web', 'partner']) then
+      raise exception 'INVALID_INPUT' using detail = 'visible_in must be web, partner or both';
+    end if;
+  end if;
+  if v_patch ? 'category_key' then
+    -- Held until commit, so the category cannot be deleted under this write.
+    perform 1 from public.template_categories c where c.key = v_category and not c.is_system for share;
+    if not found then
+      raise exception 'CATEGORY_NOT_FOUND' using detail = 'category_key must name a category that is not a system one';
+    end if;
+  end if;
+  if p_floor is null or exists (
+    select 1 from unnest(array['high', 'medium']) as q(quality), unnest(array['1k', '2k', '3k']) as r(res)
+    where jsonb_typeof(p_floor -> q.quality -> r.res) is distinct from 'number'
+  ) then
+    raise exception 'INVALID_INPUT' using detail = 'floor table is incomplete';
+  end if;
+
+  -- The rows are checked and written under one lock, so no other save slips in between.
+  perform 1 from public.templates t where t.id = any (v_ids) for update;
+
+  with planned as (
+    select a.id, t.id is not null as found, coalesce(t.name, a.id) as name, t.is_active,
+           t.description, t.cover_before_url, t.cover_after_url, t.cover_locales, t.visible_in as old_visible,
+           coalesce(v_patch ->> 'quality', t.quality) as quality,
+           t.credits_cost || v_cost as credits_cost,
+           coalesce(v_visible, t.visible_in) as visible_in,
+           a.id in ('edit', 'freeform') or coalesce(c.is_system, false) as is_builtin
+    from unnest(v_ids) as a(id)
+    left join public.templates t on t.id = a.id
+    left join public.template_categories c on c.key = t.category_key
+  ),
+  failures as (
+    select jsonb_build_object('id', p.id, 'name', p.name, 'reason', case when p.found then 'system' else 'not_found' end) as failure
+    from planned p
+    where not p.found or p.is_builtin
+    union all
+    select jsonb_build_object(
+      'id', p.id, 'name', p.name, 'reason', 'below_floor', 'resolution', r.res,
+      'floor', (p_floor -> p.quality ->> r.res)::integer, 'given', (p.credits_cost ->> r.res)::integer
+    )
+    from planned p
+    cross join unnest(array['1k', '2k', '3k']) as r(res)
+    where p.found and not p.is_builtin and (p.credits_cost ->> r.res)::integer < (p_floor -> p.quality ->> r.res)::integer
+    union all
+    select jsonb_build_object('id', p.id, 'name', p.name, 'reason', 'web_incomplete')
+    from planned p
+    where p.found and not p.is_builtin and p.is_active
+      and 'web' = any (p.visible_in) and not ('web' = any (p.old_visible))
+      and (nullif(btrim(p.description), '') is null
+           or not (nullif(btrim(p.cover_before_url), '') is not null or exists (
+             select 1 from unnest(coalesce(p_locales, '{}')) as l(code)
+             where nullif(btrim(p.cover_locales -> l.code ->> 'before'), '') is not null))
+           or not (nullif(btrim(p.cover_after_url), '') is not null or exists (
+             select 1 from unnest(coalesce(p_locales, '{}')) as l(code)
+             where nullif(btrim(p.cover_locales -> l.code ->> 'after'), '') is not null)))
+  )
+  select coalesce(jsonb_agg(f.failure), '[]'::jsonb) into v_failures from failures f;
+
+  if jsonb_array_length(v_failures) > 0 then
+    return jsonb_build_object('failures', v_failures);
+  end if;
+
+  update public.templates t
+  set quality = coalesce(v_patch ->> 'quality', t.quality),
+      credits_cost = t.credits_cost || v_cost,
+      visible_in = coalesce(v_visible, t.visible_in),
+      -- templates.category (the English name) follows through T75's trigger.
+      category_key = coalesce(v_category, t.category_key),
+      featured_rank = case when v_visible is not null and not ('web' = any (v_visible)) then null else t.featured_rank end
+  where t.id = any (v_ids);
+  get diagnostics v_changed = row_count;
+
+  return jsonb_build_object('failures', '[]'::jsonb, 'changed', v_changed);
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."admin_bulk_edit_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid", "p_locales" "text"[]) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_clawback_payment"("p_payment_id" bigint, "p_actor" "uuid") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -819,6 +1043,57 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_clawback_payment"("p_payment_id" bigint, "p_actor" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_cleanup_test_runs"("p_actor" "uuid") RETURNS "jsonb"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_run_keys text[];
+  v_photo_keys text[];
+begin
+  if p_actor is null or not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+
+  update public.admin_test_runs r
+     set status = 'failed', error_code = 'TIMEOUT', finished_at = now()
+   where r.status = 'running' and r.created_at < now() - interval '10 minutes';
+  update public.admin_test_spend x
+     set counted_usd = 0, finished_at = now()
+   where x.counted_usd is null and x.started_at < now() - interval '10 minutes';
+  delete from public.admin_test_spend x where x.started_at < now() - interval '100 days';
+
+  with ranked as (
+    select r.id, r.created_at, r.cover_set_at,
+           row_number() over (partition by r.template_id order by r.created_at desc, r.id desc) as n
+      from public.admin_test_runs r
+  ),
+  doomed as (
+    delete from public.admin_test_runs r
+     using ranked k
+     where r.id = k.id
+       and k.cover_set_at is null
+       and (k.created_at < now() - interval '30 days' or k.n > 50)
+    returning r.output_key
+  )
+  select coalesce(array_agg(d.output_key) filter (where d.output_key is not null), '{}') into v_run_keys from doomed d;
+
+  with doomed as (
+    delete from public.admin_test_photos ph
+     where ph.last_used_at < now() - interval '30 days'
+       and not exists (select 1 from public.admin_test_runs r where r.photo_id = ph.id and r.cover_set_at is not null)
+    returning ph.object_key
+  )
+  select coalesce(array_agg(d.object_key), '{}') into v_photo_keys from doomed d;
+
+  return jsonb_build_object('keys', to_jsonb(v_run_keys || v_photo_keys));
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_cleanup_test_runs"("p_actor" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_daily_costs"("p_days" integer) RETURNS "jsonb"
@@ -1139,6 +1414,55 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_finish_test_run"("p_run_id" "uuid", "p_status" "text", "p_output_key" "text", "p_error_code" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric, "p_duration_ms" integer) RETURNS "jsonb"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_row public.admin_test_runs;
+begin
+  if p_status is null or p_status not in ('succeeded', 'failed') then
+    raise exception 'INVALID_INPUT' using detail = 'status must be succeeded or failed';
+  end if;
+  if p_status = 'succeeded' and p_output_key is null then
+    raise exception 'INVALID_INPUT' using detail = 'a succeeded run needs its output';
+  end if;
+
+  update public.admin_test_runs r
+     set status = p_status,
+         output_key = case when p_status = 'succeeded' then p_output_key end,
+         error_code = case when p_status = 'failed' then coalesce(p_error_code, 'GENERATION_FAILED') end,
+         provider_usage = p_provider_usage,
+         cost_usd = p_cost_usd,
+         duration_ms = p_duration_ms,
+         finished_at = now()
+   where r.id = p_run_id and r.status = 'running'
+  returning * into v_row;
+
+  if v_row.id is null then
+    select * into v_row from public.admin_test_runs r where r.id = p_run_id;
+    if not found then
+      raise exception 'TEST_RUN_NOT_FOUND';
+    end if;
+    return to_jsonb(v_row);
+  end if;
+
+  update public.admin_test_spend x
+     set cost_usd = p_cost_usd,
+         counted_usd = coalesce(
+           p_cost_usd,
+           case when p_status = 'succeeded' or (p_provider_usage ->> 'output_tokens') is not null then x.estimate_usd else 0 end
+         ),
+         finished_at = now()
+   where x.run_id = p_run_id;
+  return to_jsonb(v_row);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_finish_test_run"("p_run_id" "uuid", "p_status" "text", "p_output_key" "text", "p_error_code" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric, "p_duration_ms" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_get_dispute"("p_dispute_id" "text") RETURNS TABLE("stripe_dispute_id" "text", "stripe_charge_id" "text", "payment_id" bigint, "user_id" "uuid", "email" "text", "product_id" "text", "amount" integer, "currency" "text", "reason" "text", "responder" "text", "due_by" timestamp with time zone, "auto_banned_at" timestamp with time zone, "evidence_drafted_at" timestamp with time zone, "submitted_at" timestamp with time zone, "reminded_at" timestamp with time zone, "created_at" timestamp with time zone)
@@ -2033,6 +2357,11 @@ begin
       if p_value is null or jsonb_typeof(p_value) <> 'boolean' then
         raise exception 'INVALID_INPUT' using detail = 'wishlist_enabled must be a boolean';
       end if;
+    when 'admin_test_daily_budget_usd' then
+      if p_value is null or jsonb_typeof(p_value) <> 'number'
+         or (p_value #>> '{}')::numeric < 0 or (p_value #>> '{}')::numeric > 1000 then
+        raise exception 'INVALID_INPUT' using detail = 'admin_test_daily_budget_usd must be a number from 0 to 1000';
+      end if;
     else
       raise exception 'INVALID_INPUT' using detail = 'unknown setting';
   end case;
@@ -2048,6 +2377,74 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_set_system_setting"("p_key" "text", "p_value" "jsonb", "p_actor" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_set_template_locale_cover"("p_actor" "uuid", "p_template_id" "text", "p_locale" "text", "p_patch" "jsonb", "p_assets_base" "text", "p_locales" "text"[], "p_clear" boolean DEFAULT false) RETURNS "jsonb"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_row public.templates;
+  v_live boolean;
+  v_next jsonb;
+  v_result jsonb;
+  v_key text;
+  v_value jsonb;
+begin
+  if p_actor is null or not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if p_locale is null or p_locale !~ '^[a-z]{2,3}(-[a-z0-9]{2,8})?$' then
+    raise exception 'INVALID_INPUT' using detail = 'unknown language code';
+  end if;
+  if p_assets_base is null or p_assets_base !~ '^https://[^/]+(/[^?#]*)?$' then
+    raise exception 'INVALID_INPUT' using detail = 'assets base must be an https URL';
+  end if;
+  if p_patch is null or jsonb_typeof(p_patch) <> 'object' then
+    raise exception 'INVALID_INPUT' using detail = 'patch must be an object';
+  end if;
+  for v_key, v_value in select e.key, e.value from jsonb_each(p_patch) as e(key, value) loop
+    if v_key not in ('before', 'after', 'video', 'poster', 'media') then
+      raise exception 'INVALID_INPUT' using detail = 'unknown cover key';
+    end if;
+    if jsonb_typeof(v_value) = 'null' then
+      continue;
+    end if;
+    if v_key = 'media' and (v_value #>> '{}') not in ('animated', 'video') then
+      raise exception 'INVALID_INPUT' using detail = 'media must be animated or video';
+    end if;
+    if v_key <> 'media' and (jsonb_typeof(v_value) <> 'string'
+        or left(v_value #>> '{}', length(rtrim(p_assets_base, '/')) + 1) <> rtrim(p_assets_base, '/') || '/') then
+      raise exception 'INVALID_INPUT' using detail = 'cover URLs must be on the assets origin';
+    end if;
+  end loop;
+
+  select * into v_row from public.templates t where t.id = p_template_id for update;
+  if not found then
+    raise exception 'TEMPLATE_NOT_FOUND';
+  end if;
+
+  if p_clear then
+    v_next := '{}'::jsonb;
+  else
+    v_next := jsonb_strip_nulls(coalesce(v_row.cover_locales -> p_locale, '{}'::jsonb) || p_patch);
+  end if;
+  v_result := case when v_next = '{}'::jsonb then v_row.cover_locales - p_locale else jsonb_set(v_row.cover_locales, array[p_locale], v_next) end;
+
+  -- The publish rule, for a template visitors can see: some "before" and some "after" left.
+  v_live := v_row.is_active and 'web' = any (v_row.visible_in);
+  if v_live and public._template_has_cover_parts(v_row.cover_before_url, v_row.cover_after_url, v_row.cover_locales, p_locales)
+     and not public._template_has_cover_parts(v_row.cover_before_url, v_row.cover_after_url, v_result, p_locales) then
+    raise exception 'COVER_STILL_NEEDED';
+  end if;
+
+  update public.templates t set cover_locales = v_result where t.id = p_template_id;
+  return v_result;
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."admin_set_template_locale_cover"("p_actor" "uuid", "p_template_id" "text", "p_locale" "text", "p_patch" "jsonb", "p_assets_base" "text", "p_locales" "text"[], "p_clear" boolean) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_set_template_order"("p_group" "text", "p_ids" "text"[], "p_actor" "uuid") RETURNS "void"
@@ -2107,6 +2504,62 @@ $$;
 ALTER FUNCTION "public"."admin_set_template_order"("p_group" "text", "p_ids" "text"[], "p_actor" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_set_test_run_cover"("p_actor" "uuid", "p_run_id" "uuid", "p_before_url" "text", "p_after_url" "text", "p_locale" "text" DEFAULT NULL::"text") RETURNS "text"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_template text;
+  v_run public.admin_test_runs;
+begin
+  if p_actor is null or not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if p_locale is not null and p_locale !~ '^[a-z]{2,3}(-[a-z0-9]{2,8})?$' then
+    raise exception 'INVALID_INPUT' using detail = 'unknown language code';
+  end if;
+  if p_after_url is null or p_after_url !~ '^https://' or (p_before_url is not null and p_before_url !~ '^https://') then
+    raise exception 'INVALID_INPUT' using detail = 'cover URLs must be https';
+  end if;
+
+  select * into v_run from public.admin_test_runs r
+   where r.id = p_run_id and r.status = 'succeeded' and r.output_key is not null
+   for update;
+  if not found then
+    raise exception 'TEST_RUN_NOT_FOUND';
+  end if;
+  if v_run.kind = 'translate'
+     and (p_locale is distinct from (v_run.inputs ->> 'target_locale') or p_before_url is not null) then
+    raise exception 'TRANSLATE_TARGET_ONLY';
+  end if;
+
+  update public.admin_test_runs r set cover_set_at = now() where r.id = p_run_id;
+  v_template := v_run.template_id;
+
+  if p_locale is null then
+    update public.templates t
+       set cover_after_url = p_after_url,
+           cover_before_url = coalesce(p_before_url, t.cover_before_url)
+     where t.id = v_template;
+  else
+    update public.templates t
+       set cover_locales = jsonb_set(
+             t.cover_locales,
+             array[p_locale],
+             coalesce(t.cover_locales -> p_locale, '{}'::jsonb)
+               || jsonb_build_object('after', p_after_url)
+               || case when p_before_url is null or t.cover_before_url is not null then '{}'::jsonb
+                       else jsonb_build_object('before', p_before_url) end)
+     where t.id = v_template;
+  end if;
+  return v_template;
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."admin_set_test_run_cover"("p_actor" "uuid", "p_run_id" "uuid", "p_before_url" "text", "p_after_url" "text", "p_locale" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_signup_ip_clusters"("p_days" integer) RETURNS TABLE("signup_ip" "inet", "accounts" integer, "last_signup_at" timestamp with time zone, "members" "jsonb")
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -2155,6 +2608,81 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_signup_ip_clusters"("p_days" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_test_budget_status"() RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_start timestamptz := date_trunc('day', now() at time zone 'Asia/Shanghai') at time zone 'Asia/Shanghai';
+  v_budget numeric;
+  v_spent numeric;
+  v_runs integer;
+begin
+  select case when jsonb_typeof(s.value) = 'number' then (s.value #>> '{}')::numeric end
+    into v_budget
+    from public.system_settings s
+   where s.key = 'admin_test_daily_budget_usd';
+
+  select coalesce(sum(case
+           when x.counted_usd is not null then x.counted_usd
+           when x.started_at > now() - interval '10 minutes' then x.estimate_usd
+           else 0
+         end), 0),
+         count(*)
+    into v_spent, v_runs
+    from public.admin_test_spend x
+   where x.started_at >= v_start;
+
+  return jsonb_build_object(
+    'budget_usd', coalesce(v_budget, 5),
+    'spent_usd', round(v_spent, 6),
+    'runs', v_runs,
+    'day', to_char(now() at time zone 'Asia/Shanghai', 'YYYY-MM-DD')
+  );
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_test_budget_status"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_test_daily_costs"("p_days" integer) RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_today timestamptz;
+  v_start timestamptz;
+begin
+  if p_days is null or p_days < 1 or p_days > 90 then
+    raise exception 'INVALID_INPUT' using detail = 'p_days must be between 1 and 90';
+  end if;
+
+  v_today := date_trunc('day', now() at time zone 'UTC') at time zone 'UTC';
+  v_start := v_today - make_interval(days => p_days - 1);
+
+  return (
+    select coalesce(jsonb_agg(jsonb_build_object(
+             'day', to_char(p.day, 'YYYY-MM-DD'),
+             'cost_usd', p.cost_usd,
+             'runs', p.runs
+           ) order by p.day), '[]'::jsonb)
+      from (
+        select date_trunc('day', x.started_at at time zone 'UTC') as day,
+               coalesce(sum(x.cost_usd), 0) as cost_usd,
+               count(*) as runs
+          from public.admin_test_spend x
+         where x.started_at >= v_start
+         group by 1
+      ) p
+  );
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_test_daily_costs"("p_days" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_todo_counts"() RETURNS "jsonb"
@@ -4468,6 +4996,72 @@ ALTER TABLE "public"."admin_audit_log" ALTER COLUMN "id" ADD GENERATED ALWAYS AS
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."admin_test_photos" (
+    "id" "uuid" NOT NULL,
+    "object_key" "text" NOT NULL,
+    "created_by" "uuid",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "last_used_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "admin_test_photos_object_key_check" CHECK (("object_key" ~ '^admin-tests/photos/[0-9a-f-]{36}\.(jpg|png|webp)$'::"text"))
+);
+
+
+ALTER TABLE "public"."admin_test_photos" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."admin_test_runs" (
+    "id" "uuid" NOT NULL,
+    "template_id" "text" NOT NULL,
+    "kind" "text" NOT NULL,
+    "parent_id" "uuid",
+    "photo_id" "uuid",
+    "batch_id" "uuid" NOT NULL,
+    "status" "text" DEFAULT 'running'::"text" NOT NULL,
+    "resolution" "text" NOT NULL,
+    "inputs" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "prompt_version" integer,
+    "provider" "text",
+    "provider_usage" "jsonb",
+    "cost_usd" numeric(10,6),
+    "estimate_usd" numeric(10,6) NOT NULL,
+    "output_key" "text",
+    "error_code" "text",
+    "duration_ms" integer,
+    "cover_set_at" timestamp with time zone,
+    "created_by" "uuid",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "finished_at" timestamp with time zone,
+    CONSTRAINT "admin_test_runs_check" CHECK ((("kind" = 'edit'::"text") OR ("parent_id" IS NULL))),
+    CONSTRAINT "admin_test_runs_cost_usd_check" CHECK (("cost_usd" >= (0)::numeric)),
+    CONSTRAINT "admin_test_runs_duration_ms_check" CHECK (("duration_ms" >= 0)),
+    CONSTRAINT "admin_test_runs_estimate_usd_check" CHECK (("estimate_usd" >= (0)::numeric)),
+    CONSTRAINT "admin_test_runs_kind_check" CHECK (("kind" = ANY (ARRAY['generate'::"text", 'edit'::"text", 'translate'::"text"]))),
+    CONSTRAINT "admin_test_runs_output_key_check" CHECK (("output_key" ~ '^admin-tests/outputs/[0-9a-f-]{36}\.png$'::"text")),
+    CONSTRAINT "admin_test_runs_resolution_check" CHECK (("resolution" = ANY (ARRAY['1k'::"text", '2k'::"text", '3k'::"text"]))),
+    CONSTRAINT "admin_test_runs_status_check" CHECK (("status" = ANY (ARRAY['running'::"text", 'succeeded'::"text", 'failed'::"text"])))
+);
+
+
+ALTER TABLE "public"."admin_test_runs" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."admin_test_spend" (
+    "run_id" "uuid" NOT NULL,
+    "template_id" "text" NOT NULL,
+    "started_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "estimate_usd" numeric(10,6) NOT NULL,
+    "cost_usd" numeric(10,6),
+    "counted_usd" numeric(10,6),
+    "finished_at" timestamp with time zone,
+    CONSTRAINT "admin_test_spend_cost_usd_check" CHECK (("cost_usd" >= (0)::numeric)),
+    CONSTRAINT "admin_test_spend_counted_usd_check" CHECK (("counted_usd" >= (0)::numeric)),
+    CONSTRAINT "admin_test_spend_estimate_usd_check" CHECK (("estimate_usd" >= (0)::numeric))
+);
+
+
+ALTER TABLE "public"."admin_test_spend" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."ai_providers" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "module" "text" DEFAULT 'image'::"text" NOT NULL,
@@ -4867,7 +5461,9 @@ CREATE TABLE IF NOT EXISTS "public"."templates" (
     "description" "text",
     "featured_rank" smallint,
     "category_key" "text" NOT NULL,
+    "cover_locales" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
     CONSTRAINT "templates_category_check" CHECK ((("char_length"("category") >= 1) AND ("char_length"("category") <= 60))),
+    CONSTRAINT "templates_cover_locales_object" CHECK (("jsonb_typeof"("cover_locales") = 'object'::"text")),
     CONSTRAINT "templates_cover_media_type_check" CHECK (("cover_media_type" = ANY (ARRAY['image'::"text", 'animated'::"text", 'video'::"text"]))),
     CONSTRAINT "templates_cover_motion_complete" CHECK ((("cover_media_type" = 'image'::"text") OR (("cover_video_url" IS NOT NULL) AND ("cover_poster_url" IS NOT NULL)))),
     CONSTRAINT "templates_credits_cost_check" CHECK ((("jsonb_typeof"("credits_cost") = 'object'::"text") AND ("credits_cost" ?& ARRAY['1k'::"text", '2k'::"text", '3k'::"text"]) AND (((("credits_cost" - '1k'::"text") - '2k'::"text") - '3k'::"text") = '{}'::"jsonb") AND ("jsonb_typeof"(("credits_cost" -> '1k'::"text")) = 'number'::"text") AND (("credits_cost" ->> '1k'::"text") ~ '^[1-9][0-9]{0,2}$'::"text") AND ("jsonb_typeof"(("credits_cost" -> '2k'::"text")) = 'number'::"text") AND (("credits_cost" ->> '2k'::"text") ~ '^[1-9][0-9]{0,2}$'::"text") AND ("jsonb_typeof"(("credits_cost" -> '3k'::"text")) = 'number'::"text") AND (("credits_cost" ->> '3k'::"text") ~ '^[1-9][0-9]{0,2}$'::"text"))),
@@ -4889,6 +5485,26 @@ ALTER TABLE "public"."templates" OWNER TO "postgres";
 
 ALTER TABLE ONLY "public"."admin_audit_log"
     ADD CONSTRAINT "admin_audit_log_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."admin_test_photos"
+    ADD CONSTRAINT "admin_test_photos_object_key_key" UNIQUE ("object_key");
+
+
+
+ALTER TABLE ONLY "public"."admin_test_photos"
+    ADD CONSTRAINT "admin_test_photos_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."admin_test_runs"
+    ADD CONSTRAINT "admin_test_runs_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."admin_test_spend"
+    ADD CONSTRAINT "admin_test_spend_pkey" PRIMARY KEY ("run_id");
 
 
 
@@ -5064,6 +5680,30 @@ ALTER TABLE ONLY "public"."template_requests"
 
 ALTER TABLE ONLY "public"."templates"
     ADD CONSTRAINT "templates_pkey" PRIMARY KEY ("id");
+
+
+
+CREATE INDEX "admin_test_photos_last_used_at_idx" ON "public"."admin_test_photos" USING "btree" ("last_used_at" DESC);
+
+
+
+CREATE INDEX "admin_test_runs_created_at_idx" ON "public"."admin_test_runs" USING "btree" ("created_at");
+
+
+
+CREATE INDEX "admin_test_runs_parent_id_idx" ON "public"."admin_test_runs" USING "btree" ("parent_id") WHERE ("parent_id" IS NOT NULL);
+
+
+
+CREATE INDEX "admin_test_runs_photo_id_idx" ON "public"."admin_test_runs" USING "btree" ("photo_id") WHERE ("photo_id" IS NOT NULL);
+
+
+
+CREATE INDEX "admin_test_runs_template_created_idx" ON "public"."admin_test_runs" USING "btree" ("template_id", "created_at" DESC);
+
+
+
+CREATE INDEX "admin_test_spend_started_at_idx" ON "public"."admin_test_spend" USING "btree" ("started_at");
 
 
 
@@ -5300,6 +5940,31 @@ ALTER TABLE ONLY "public"."admin_audit_log"
 
 
 
+ALTER TABLE ONLY "public"."admin_test_photos"
+    ADD CONSTRAINT "admin_test_photos_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."admin_test_runs"
+    ADD CONSTRAINT "admin_test_runs_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."admin_test_runs"
+    ADD CONSTRAINT "admin_test_runs_parent_id_fkey" FOREIGN KEY ("parent_id") REFERENCES "public"."admin_test_runs"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."admin_test_runs"
+    ADD CONSTRAINT "admin_test_runs_photo_id_fkey" FOREIGN KEY ("photo_id") REFERENCES "public"."admin_test_photos"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."admin_test_runs"
+    ADD CONSTRAINT "admin_test_runs_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."ai_providers"
     ADD CONSTRAINT "ai_providers_updated_by_fkey" FOREIGN KEY ("updated_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
@@ -5478,6 +6143,15 @@ ALTER TABLE ONLY "public"."templates"
 ALTER TABLE "public"."admin_audit_log" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."admin_test_photos" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."admin_test_runs" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."admin_test_spend" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."ai_providers" ENABLE ROW LEVEL SECURITY;
 
 
@@ -5646,6 +6320,11 @@ REVOKE ALL ON FUNCTION "public"."_payment_granted_credits"("p_payment" "public".
 
 
 
+REVOKE ALL ON FUNCTION "public"."_template_has_cover_parts"("p_before" "text", "p_after" "text", "p_locales_json" "jsonb", "p_locales" "text"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."_template_has_cover_parts"("p_before" "text", "p_after" "text", "p_locales_json" "jsonb", "p_locales" "text"[]) TO "service_role";
+
+
+
 GRANT SELECT ON TABLE "public"."support_ticket_messages" TO "authenticated";
 GRANT SELECT ON TABLE "public"."support_ticket_messages" TO "service_role";
 
@@ -5686,13 +6365,28 @@ GRANT ALL ON FUNCTION "public"."admin_batch_set_banned"("p_actor" "uuid", "p_use
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_begin_test_run"("p_actor" "uuid", "p_run_id" "uuid", "p_template_id" "text", "p_kind" "text", "p_parent_id" "uuid", "p_photo_id" "uuid", "p_batch_id" "uuid", "p_resolution" "text", "p_inputs" "jsonb", "p_prompt_version" integer, "p_provider" "text", "p_estimate_usd" numeric) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_begin_test_run"("p_actor" "uuid", "p_run_id" "uuid", "p_template_id" "text", "p_kind" "text", "p_parent_id" "uuid", "p_photo_id" "uuid", "p_batch_id" "uuid", "p_resolution" "text", "p_inputs" "jsonb", "p_prompt_version" integer, "p_provider" "text", "p_estimate_usd" numeric) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_bulk_edit_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_bulk_edit_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid") TO "service_role";
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_bulk_edit_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid", "p_locales" "text"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_bulk_edit_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid", "p_locales" "text"[]) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_clawback_payment"("p_payment_id" bigint, "p_actor" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_clawback_payment"("p_payment_id" bigint, "p_actor" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_cleanup_test_runs"("p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_cleanup_test_runs"("p_actor" "uuid") TO "service_role";
 
 
 
@@ -5723,6 +6417,11 @@ GRANT ALL ON FUNCTION "public"."admin_delete_provider"("p_id" "uuid") TO "servic
 
 REVOKE ALL ON FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_finish_test_run"("p_run_id" "uuid", "p_status" "text", "p_output_key" "text", "p_error_code" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric, "p_duration_ms" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_finish_test_run"("p_run_id" "uuid", "p_status" "text", "p_output_key" "text", "p_error_code" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric, "p_duration_ms" integer) TO "service_role";
 
 
 
@@ -5846,13 +6545,33 @@ GRANT ALL ON FUNCTION "public"."admin_set_system_setting"("p_key" "text", "p_val
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_set_template_locale_cover"("p_actor" "uuid", "p_template_id" "text", "p_locale" "text", "p_patch" "jsonb", "p_assets_base" "text", "p_locales" "text"[], "p_clear" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_template_locale_cover"("p_actor" "uuid", "p_template_id" "text", "p_locale" "text", "p_patch" "jsonb", "p_assets_base" "text", "p_locales" "text"[], "p_clear" boolean) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_set_template_order"("p_group" "text", "p_ids" "text"[], "p_actor" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_set_template_order"("p_group" "text", "p_ids" "text"[], "p_actor" "uuid") TO "service_role";
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_set_test_run_cover"("p_actor" "uuid", "p_run_id" "uuid", "p_before_url" "text", "p_after_url" "text", "p_locale" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_test_run_cover"("p_actor" "uuid", "p_run_id" "uuid", "p_before_url" "text", "p_after_url" "text", "p_locale" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_signup_ip_clusters"("p_days" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_signup_ip_clusters"("p_days" integer) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_test_budget_status"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_test_budget_status"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_test_daily_costs"("p_days" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_test_daily_costs"("p_days" integer) TO "service_role";
 
 
 
@@ -6145,6 +6864,18 @@ GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."admin_audit
 GRANT UPDATE ON SEQUENCE "public"."admin_audit_log_id_seq" TO "anon";
 GRANT UPDATE ON SEQUENCE "public"."admin_audit_log_id_seq" TO "authenticated";
 GRANT UPDATE ON SEQUENCE "public"."admin_audit_log_id_seq" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."admin_test_photos" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."admin_test_runs" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."admin_test_spend" TO "service_role";
 
 
 

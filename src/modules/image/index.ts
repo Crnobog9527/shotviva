@@ -42,3 +42,23 @@ export { HomeGenerator, type HomeGeneratorProps } from './home/home-generator'
 export { HomeDraftNote } from './home/home-draft-note'
 export type { HomeViewer } from './home/home-cta'
 export { UPLOAD_FORMAT_NAMES, UPLOAD_MAX_MB } from './workspace/upload-formats'
+// Admin template test runs (ARCHITECTURE §10.b, T85), server only: the /api/admin/test-* routes.
+export {
+  cleanupOnOpen,
+  confirmTestPhoto,
+  createTestPhotoUpload,
+  loadTestBudget,
+  loadTestPanel,
+  runTestEdit,
+  runTestGenerate,
+  runTestTranslate,
+  saveTestBudget,
+  setTestRunCover,
+  signRun,
+  testBudgetBodySchema,
+  testCoverBodySchema,
+  testEditBodySchema,
+  testGenerateBodySchema,
+  testPhotoConfirmSchema,
+  testTranslateBodySchema,
+} from './test-run'

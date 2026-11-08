@@ -84,3 +84,75 @@ export const bulkEditCopy = {
   skipped: (names: string) => `${names} 是系统模板（作品编辑 / 伙伴自由生成），不参与批量编辑，已跳过。`,
   noneEditable: '选中的都是系统模板，没有可批量编辑的模板。',
 } as const
+
+// Cover area with language tabs (ARCHITECTURE §8.3 「封面按语言适配」, T87).
+export const coverCopy = {
+  legend: '封面（上传后立即生效，不随「保存」）',
+  tabs: '封面语言',
+  upcoming: '准备中',
+  hasCover: '已有封面',
+  before: '前图（手机原图）',
+  after: '后图（AI 成品）',
+  motion: '动态封面（可选）',
+  stillHint: 'JPEG / PNG / WebP，≤20MB',
+  motionHint: 'GIF / 动态 WebP ≤20MB，或 MP4 ≤15MB ≤15 秒',
+  cardType: (type: string) => `当前卡片类型：${type}`,
+  backToStill: '改回静态图卡片',
+  commonNote: '通用封面：没有专属封面的语言都显示它。只传这一套，所有语言就都用它。',
+  languageNote: (label: string) =>
+    `「${label}」页面的专属封面，可以空着：空着的部分显示通用封面（没有通用封面时，按页签顺序取第一个有封面的语言）。前图一般各语言共用，只换后图即可。`,
+  upcomingNote: (label: string) => `「${label}」页面还没上线：可以先准备封面，前台暂不显示，上线后自动生效。`,
+  clearLanguage: (label: string) => `删除「${label}」的专属封面`,
+  confirmClear: (label: string) => `删除「${label}」的专属封面？这个语言的页面会改回显示通用封面。`,
+  translate: '生成其他语言版本',
+  cancel: '取消',
+  confirmDelete: '删除',
+} as const
+
+// 开关 (T89): optional on/off choices of a template, e.g. 优化摆盘和器皿.
+export const toggleCopy = {
+  legend: '开关（选填，最多 3 个）',
+  hint: '用户在工作台看到的开关，默认关。提示词正文里放 {{key}}，下面「开」「关」两段是私有的，只存服务端。饮品等不需要的模板不要加。',
+  add: '添加开关',
+  addPreset: '添加「优化摆盘和器皿」',
+  remove: '删除这个开关',
+  key: 'key（小写字母、数字、下划线）',
+  label: '英文名称',
+  labelZh: '中文名称',
+  hint_: '英文说明（选填）',
+  hintZh: '中文说明（选填）',
+  confirm: '开启前弹确认框（用户必须勾选才能开启）',
+  confirmEn: '确认框（英文）',
+  confirmZh: '确认框（中文，留空显示英文）',
+  title: '标题',
+  body: '正文',
+  checkbox: '复选框文字',
+  accept: '开启按钮文字',
+  on: '「开」时放进 {{key}} 的文字（私有）',
+  off: '「关」时放进 {{key}} 的文字（私有）',
+} as const
+
+// The first toggle's initial text (TASKS T89, the Owner's wording); the template studio window
+// writes the on / off fragments in the admin, they are never in the repository.
+export const REPLATE_PRESET = {
+  key: 'replate',
+  label: 'Upgrade plating & tableware',
+  hint: 'Re-plates your dish with finer tableware. The result may differ from what you serve.',
+  labelZh: '优化摆盘和器皿',
+  hintZh: 'AI 重新摆盘、换用更精致的器皿，成品可能和实物不同',
+  confirm: true,
+  confirmEn: {
+    title: 'Before you turn this on',
+    body: 'With this on, the AI re-plates your dish and uses finer tableware, so the photo may look noticeably different from what you actually serve. If customers order from the photo and get something different, it can lead to complaints or bad reviews. Use it only if you can serve the dish the way it looks. You are responsible for how you use photos made with this option; Shotviva is not responsible for disputes caused by differences between the photo and the real dish.',
+    checkbox: 'I understand and take responsibility',
+    accept: 'Turn on',
+  },
+  confirmZh: {
+    title: '开启前请确认',
+    body: '开启后，AI 会参考你的照片重新摆盘、换用更精致的器皿，生成的图可能和你实际出品的样子差别明显。顾客按图点单后发现实物不符，可能引起投诉或差评。建议只在你能按图出品时使用。开启后生成的图片如何使用由你自行负责，因图片与实物不符引起的纠纷与 Shotviva 无关。',
+    checkbox: '我已了解并自行承担',
+    accept: '开启',
+  },
+  on: '',
+  off: '',
+} as const

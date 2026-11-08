@@ -14,7 +14,10 @@ import type { IdentityEntry, IdentityJudgeUsage, RefusalMethod } from './judge'
 
 export const EXCERPT_MAX = 200
 
-export type RefusalDeps = { db: SupabaseClient; track?: ServerTrack }
+// quiet: an admin test run (T85) is judged exactly the same, but leaves no identity_refusals row
+// (the admin's own account would be flagged), no event (§10.b keeps test runs out of PostHog), and
+// takes no judge slot (the admin's hourly quota and /admin/providers' counts are users' only).
+export type RefusalDeps = { db: SupabaseClient; track?: ServerTrack; quiet?: boolean }
 
 // usage: what the decision call that refused it cost; no job carries it, so the row does.
 export type Refusal = { userId: string; entry: IdentityEntry; method: RefusalMethod; text: string; locale?: Locale; usage?: IdentityJudgeUsage | null }
@@ -40,18 +43,22 @@ async function record(db: SupabaseClient, refusal: Refusal): Promise<boolean> {
 }
 
 export class IdentitySwapRefused extends AppError {
-  constructor() {
+  // What the call that refused it used, for an admin test run's cost (T85); null when unknown.
+  readonly usage: IdentityJudgeUsage | null
+
+  constructor(usage: IdentityJudgeUsage | null = null) {
     super('IDENTITY_SWAP_REFUSED', 'Shotviva cannot swap faces or turn a person into someone else')
+    this.usage = usage
   }
 }
 
 // Records, tracks, then throws: always before any credit is reserved, so nothing is charged.
 export async function refuseIdentitySwap(deps: RefusalDeps, refusal: Refusal): Promise<never> {
   // The user's words stay out of the log line; the row holds the excerpt for the Owner.
-  logger.info('identity swap refused', { userId: refusal.userId, entry: refusal.entry, method: refusal.method })
-  if (await record(deps.db, refusal)) {
+  logger.info('identity swap refused', { userId: refusal.userId, entry: refusal.entry, method: refusal.method, quiet: deps.quiet === true })
+  if (!deps.quiet && (await record(deps.db, refusal))) {
     const track = deps.track ?? defaultTrack
     track('generate_refused', { reason: 'identity_swap', source: refusal.entry }, { distinctId: refusal.userId, locale: refusal.locale ?? DEFAULT_LOCALE })
   }
-  throw new IdentitySwapRefused()
+  throw new IdentitySwapRefused(refusal.usage ?? null)
 }

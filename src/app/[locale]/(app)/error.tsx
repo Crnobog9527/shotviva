@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl'
 import { useEffect } from 'react'
 
 import { captureError } from '@/core/analytics/browser'
+import { reportIfStaleBuild } from '@/core/app-update'
 import { EmptyState, STATE_GHOST } from '@/core/ui/empty-state'
 import { site } from '@/site/site.config'
 
@@ -12,7 +13,11 @@ import { site } from '@/site/site.config'
 // not this; they live in the workspace.
 export default function AppError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   const t = useTranslations('app.states.error')
-  useEffect(() => captureError(error), [error])
+  useEffect(() => {
+    captureError(error)
+    // A chunk or Server Action of an older build: the new-version banner offers the reload (T90).
+    reportIfStaleBuild(error)
+  }, [error])
   const email = site.brand.contactEmail
   return (
     <EmptyState

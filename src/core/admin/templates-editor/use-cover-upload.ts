@@ -12,6 +12,8 @@ type CoverActions = Pick<TemplateAdminActions, 'requestCoverUpload' | 'applyCove
 
 class UploadProblem extends Error {}
 
+const COVER_SAVED = '封面已更新，首页下次打开即生效'
+
 async function stage(actions: CoverActions, templateId: string, purpose: CoverPurpose, body: Blob): Promise<string> {
   const ticket = await actions.requestCoverUpload({ templateId, purpose, contentType: body.type, size: body.size })
   if (!ticket.ok) throw new UploadProblem(ticket.message)
@@ -21,27 +23,28 @@ async function stage(actions: CoverActions, templateId: string, purpose: CoverPu
 
 // Video: checked for length here (the server checks again from the MP4 header) and its first
 // frame uploaded as the poster.
-async function stageMotion(actions: CoverActions, templateId: string, file: File): Promise<ApplyCoverRequest> {
-  if (file.type !== 'video/mp4') return { templateId, slot: 'motion', key: await stage(actions, templateId, 'motion', file) }
+async function stageMotion(actions: CoverActions, templateId: string, file: File, locale: string | null): Promise<ApplyCoverRequest> {
+  if (file.type !== 'video/mp4') return { templateId, locale, slot: 'motion', key: await stage(actions, templateId, 'motion', file) }
   const { seconds, poster } = await readVideo(file)
   if (seconds > MAX_COVER_VIDEO_SECONDS) throw new UploadProblem(`视频不能超过 ${MAX_COVER_VIDEO_SECONDS} 秒`)
   const key = await stage(actions, templateId, 'motion', file)
-  return { templateId, slot: 'motion', key, posterKey: await stage(actions, templateId, 'poster', poster) }
+  return { templateId, locale, slot: 'motion', key, posterKey: await stage(actions, templateId, 'poster', poster) }
 }
 
 // One cover operation at a time: browser checks → presigned PUT → server conversion + publish.
-export function useCoverUpload(templateId: string, actions: CoverActions) {
+// locale: null for the common cover, a code for that language's tab (T87).
+export function useCoverUpload(templateId: string, actions: CoverActions, locale: string | null = null) {
   const [pending, startTransition] = useTransition()
-  const [busy, setBusy] = useState<CoverSlot | 'clear' | null>(null)
+  const [busy, setBusy] = useState<CoverSlot | 'clear' | 'clear-locale' | null>(null)
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
 
-  const run = (slot: CoverSlot | 'clear', work: () => Promise<ApplyCoverRequest>) => {
+  const run = (slot: CoverSlot | 'clear' | 'clear-locale', work: () => Promise<ApplyCoverRequest>) => {
     setBusy(slot)
     setMessage(null)
     startTransition(async () => {
       try {
         const result = await actions.applyCover(await work())
-        setMessage(result.ok ? { ok: true, text: '封面已更新，首页下次打开即生效' } : { ok: false, text: result.message })
+        setMessage(result.ok ? { ok: true, text: COVER_SAVED } : { ok: false, text: result.message })
       } catch (error) {
         setMessage({ ok: false, text: error instanceof UploadProblem ? error.message : '上传失败，请重试' })
       } finally {
@@ -55,12 +58,16 @@ export function useCoverUpload(templateId: string, actions: CoverActions) {
     if (problem) return setMessage({ ok: false, text: problem })
     run(slot, async () =>
       slot === 'motion'
-        ? stageMotion(actions, templateId, file)
-        : { templateId, slot, key: await stage(actions, templateId, slot, file) },
+        ? stageMotion(actions, templateId, file, locale)
+        : { templateId, locale, slot, key: await stage(actions, templateId, slot, file) },
     )
   }
 
-  const clearMotion = () => run('clear', async () => ({ templateId, slot: 'clear-motion' }))
+  const clearMotion = () => run('clear', async () => ({ templateId, locale, slot: 'clear-motion' }))
+  // A language tab's own cover goes; its pages fall back (T87). The common cover has no such step.
+  const clearLocale = () => {
+    if (locale) run('clear-locale', async () => ({ templateId, locale, slot: 'clear-locale' }))
+  }
 
-  return { pending, busy, message, upload, clearMotion }
+  return { pending, busy, message, upload, clearMotion, clearLocale }
 }

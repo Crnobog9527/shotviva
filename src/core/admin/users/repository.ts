@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { AppError } from '@/core/errors'
 
 import { afterCursor, decodeCursor, PAGE_SIZE, toPage, type Page } from '../cursor'
+import { TOGGLE_COLUMNS, toggleColumnsSchema, toJobToggles } from '../jobs/job-toggles-row'
 import { RECENT_JOBS, type LedgerEntry, type UserDetail, type UserJob } from './types'
 
 // Reads for the user detail (T77: a dialog), service-role client only. Indexes: profiles primary
@@ -97,9 +98,10 @@ const jobRow = z.object({
   credit_pool: z.enum(['free', 'paid']),
   error_code: z.string().nullable(),
   deleted_at: z.string().nullable().optional(),
+  ...toggleColumnsSchema,
 })
 
-const JOB_COLUMNS = 'id, created_at, template_id, status, credits_cost, credit_pool, error_code, deleted_at'
+const JOB_COLUMNS = `id, created_at, template_id, status, credits_cost, credit_pool, error_code, deleted_at, ${TOGGLE_COLUMNS}`
 
 const toUserJob = (row: z.infer<typeof jobRow>): UserJob => ({
   id: row.id,
@@ -110,6 +112,7 @@ const toUserJob = (row: z.infer<typeof jobRow>): UserJob => ({
   creditPool: row.credit_pool,
   errorCode: row.error_code,
   deletedByUser: Boolean(row.deleted_at),
+  toggles: toJobToggles(row),
 })
 
 // The job a lookup landed on (?job=), by primary key, and only if it belongs to this user.

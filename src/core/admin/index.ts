@@ -23,7 +23,7 @@ export type {
   TemplateAdminActions,
   TemplateOrderGroup,
 } from './templates'
-export { applyCover, createCoverUpload, type ApplyCoverInput, type CoverDeps, type CoverUploadTicket } from './covers'
+export { applyCover, createCoverUpload, publishStillCover, type ApplyCoverInput, type CoverDeps, type CoverUploadTicket } from './covers'
 export { TemplatesEditor } from './templates-editor'
 export {
   deleteTemplateCategory,

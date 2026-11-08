@@ -447,6 +447,9 @@
         "add": "Add a photo",
         "remove": "Remove photo",
         "failed": "Couldn't upload. Remove it and try another."
+      },
+      "toggles": {
+        "cancel": "Cancel"
       }
     },
     "errors": {
@@ -840,15 +843,21 @@
       "meta": "{name} · {size} · {tier}",
       "thisPhoto": "This photo",
       "hint": "Say what to change. Everything else stays as it is.",
+      "discover": "You can keep editing this photo: remove clutter, tidy the table, change the weather or the light. The original is kept.",
       "label": "What would you like to change?",
       "placeholder": "e.g. Make the sofa blue, put it on a beach, remove the price tag",
       "counter": "{count} / {max}",
       "required": "Say what to change first.",
       "examples": "Examples",
       "tries": {
-        "beach": "Put it on a beach",
-        "background": "Make the background pale blue",
-        "brighter": "Make it brighter"
+        "clutter": "Remove the clutter",
+        "tidy": "Tidy up the table",
+        "tags": "Remove price tags and stickers",
+        "sunny": "Make it a sunny day",
+        "evening": "Warm evening light",
+        "brighter": "Make it brighter",
+        "steam": "Add a little steam",
+        "background": "Make the background light"
       },
       "size": "Size",
       "sizeFrom": "{size} · from {from}",
@@ -1049,6 +1058,13 @@
     "accept": "Accept",
     "necessary": "Necessary only",
     "close": "Close cookie settings"
+  },
+  "appUpdate": {
+    "label": "New version",
+    "body": "Shotviva has been updated. Refresh to keep going.",
+    "refresh": "Refresh",
+    "close": "Close",
+    "photosLost": "You'll need to upload your photos again."
   },
   "notFound": {
     "title": "Page not found",

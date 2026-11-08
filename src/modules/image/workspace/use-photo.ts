@@ -2,6 +2,8 @@
 
 import { useCallback, useState } from 'react'
 
+import { useUpdateHold } from '@/core/app-update'
+
 import { naturalSize, nearestRatio } from './photo-ratio'
 import { useUpload, type UploadState } from './use-upload'
 
@@ -14,6 +16,8 @@ export type PhotoStatus = 'none' | 'uploading' | 'ready' | 'error'
 export function usePhoto() {
   const { state, upload, reset } = useUpload()
   const [photo, setPhoto] = useState<PickedPhoto | null>(null)
+  // A refresh would drop it (memory only): the new-version banner says so (T90).
+  useUpdateHold('photos', photo !== null)
 
   const pick = useCallback(
     async (file: File) => {

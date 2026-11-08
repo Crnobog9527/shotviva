@@ -5,6 +5,7 @@ import { z } from 'zod'
 
 import { callRpc, type RpcClient } from '@/core/billing'
 import { AppError } from '@/core/errors'
+import { logger } from '@/core/logger'
 
 import type { OurDay } from './reconcile'
 
@@ -18,8 +19,27 @@ const daysSchema = z.array(
   z.object({ day: z.string(), cost_usd: z.coerce.number().nonnegative(), costed: count, uncosted: count, no_usage: count }),
 )
 
-export function loadOurDailyCosts(db: RpcClient, days: number = COSTS_DAYS): Promise<OurDay[]> {
-  return callRpc(db, 'admin_daily_costs', { p_days: days }, daysSchema)
+const testDaysSchema = z.array(z.object({ day: z.string(), cost_usd: z.coerce.number().nonnegative(), runs: count }))
+
+// Admin test runs (T85, 0788) by the same UTC days. A failed read leaves them out (logged) rather
+// than taking the page down; the jobs side is what the page is for.
+async function loadTestDailyCosts(db: RpcClient, days: number): Promise<Map<string, { cost: number; runs: number }>> {
+  try {
+    const rows = await callRpc(db, 'admin_test_daily_costs', { p_days: days }, testDaysSchema)
+    return new Map(rows.map((row) => [row.day, { cost: row.cost_usd, runs: row.runs }]))
+  } catch (error) {
+    logger.error('admin test daily costs unavailable', { error })
+    return new Map()
+  }
+}
+
+// Our side per day: users' jobs (0284) plus admin test runs, which are added in and kept apart.
+export async function loadOurDailyCosts(db: RpcClient, days: number = COSTS_DAYS): Promise<OurDay[]> {
+  const [jobs, tests] = await Promise.all([callRpc(db, 'admin_daily_costs', { p_days: days }, daysSchema), loadTestDailyCosts(db, days)])
+  return jobs.map((day) => {
+    const test = tests.get(day.day)
+    return { ...day, cost_usd: day.cost_usd + (test?.cost ?? 0), test_cost_usd: test?.cost ?? 0, test_runs: test?.runs ?? 0 }
+  })
 }
 
 export type AdminKeyStatus = { keyLast4: string | null; projectId: string | null }

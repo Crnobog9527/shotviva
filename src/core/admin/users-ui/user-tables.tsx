@@ -1,5 +1,6 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/core/ui/table'
 
+import { JobToggles } from '../jobs/job-toggles'
 import { formatBeijing } from '../shell/format'
 import { JobActions, type JobSupportActions } from '../support-ui'
 import type { LedgerEntry, UserJob } from '../users/types'
@@ -29,7 +30,10 @@ export function UserJobsTable({ jobs, actions, highlight }: { jobs: UserJob[]; a
         {jobs.map((job) => (
           <TableRow key={job.id} data-state={job.id === highlight ? 'selected' : undefined}>
             <TableCell className="font-mono text-xs whitespace-nowrap">{formatBeijing(job.createdAt)}</TableCell>
-            <TableCell className="font-mono text-xs">{job.templateId}</TableCell>
+            <TableCell>
+              <div className="font-mono text-xs">{job.templateId}</div>
+              <JobToggles toggles={job.toggles} />
+            </TableCell>
             <TableCell>
               {COPY.jobStatus[job.status]}
               {job.deletedByUser ? <span className="ml-1 text-xs whitespace-nowrap text-muted-foreground">{COPY.jobDeletedByUser}</span> : null}

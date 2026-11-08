@@ -38,12 +38,15 @@ const valid: { [E in EventName]: unknown } = {
   purchase: { ...checkout, product_id: 'pack_s', tier: 'pack', interval: null, form: 'one_time', amount_usd: 9.9, credits: 20 },
   template_view: { template_id: 'ramen-studio', category: 'food', surface: 'workspace' },
   template_favorite: { template_id: 'ramen-studio', category: 'food-drink', action: 'add', surface: 'create_card' },
+  template_toggle: { template_id: 'ramen-studio', key: 'replate', action: 'confirmed', surface: 'workspace' },
   paywall_select: { product_id: 'pro_yearly', method: 'cn_card' },
   checkout_cancel: { product_id: 'pack_m', method: 'alipay' },
   upload_error: { reason: 'transfer_failed' },
+  app_update_prompt: { action: 'shown', reason: 'version' },
 }
 
 const EVENT_NAMES = [
+      'app_update_prompt',
       'business_inquiry_submit',
       'checkout_cancel',
       'checkout_start',
@@ -55,13 +58,14 @@ const EVENT_NAMES = [
       'purchase',
       'signup',
       'template_favorite',
+      'template_toggle',
       'template_view',
       'upload',
       'upload_error',
 ]
 
 describe('event dictionary (ARCHITECTURE §16.2)', () => {
-  it('covers exactly the fourteen named events', () => {
+  it('covers exactly the sixteen named events', () => {
     expect(Object.keys(eventSchemas).sort()).toEqual(EVENT_NAMES)
   })
 
@@ -116,6 +120,16 @@ describe('event dictionary (ARCHITECTURE §16.2)', () => {
     expect(validateEvent('checkout_start', { ...checkout, method: 'cn_card' }).ok).toBe(true)
     expect(validateEvent('purchase', { ...valid.purchase as object, method: 'cn_card' }).ok).toBe(true)
     expect(validateEvent('checkout_start', { ...checkout, method: 'wechat' }).ok).toBe(false)
+  })
+})
+
+describe('app_update_prompt (T90)', () => {
+  // T90: the new-version banner, enums only.
+  it('keeps app_update_prompt to its enums', () => {
+    expect(BROWSER_EVENTS).toContain('app_update_prompt')
+    expect(validateEvent('app_update_prompt', { action: 'refreshed', reason: 'error' }).ok).toBe(true)
+    expect(validateEvent('app_update_prompt', { action: 'clicked', reason: 'version' }).ok).toBe(false)
+    expect(validateEvent('app_update_prompt', { action: 'shown', reason: 'version', version: 'dpl_1' }).ok).toBe(false)
   })
 })
 

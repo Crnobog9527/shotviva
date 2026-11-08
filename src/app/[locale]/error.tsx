@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl'
 import { useEffect } from 'react'
 
 import { captureError } from '@/core/analytics/browser'
+import { reportIfStaleBuild } from '@/core/app-update'
 import { PROBLEM_GHOST, PROBLEM_PRIMARY, ProblemView } from '@/core/content'
 import { Link } from '@/core/i18n/ui'
 import { site } from '@/site/site.config'
@@ -13,7 +14,11 @@ import { site } from '@/site/site.config'
 // error state inside the app shell. app/global-error.tsx only covers a failing root layout.
 export default function PageError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   const t = useTranslations('pageError')
-  useEffect(() => captureError(error), [error])
+  useEffect(() => {
+    captureError(error)
+    // A chunk or Server Action of an older build: the new-version banner offers the reload (T90).
+    reportIfStaleBuild(error)
+  }, [error])
   return (
     <main className="flex flex-1 flex-col pb-16">
       <ProblemView

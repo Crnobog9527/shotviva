@@ -169,7 +169,7 @@ interface GenerationProvider {
 | module | 'image' / 'video' |
 | template_id | 用的模板（作品编辑用内置模板 `edit`，§5.2） |
 | parent_job_id | 作品编辑时，被编辑的那张作品的 id（同一用户的成功作品）；模板出图为空。外键 `on delete set null`（T30） |
-| inputs | 用户填的内容（文案、比例、**分辨率 `resolution`：`'1k'` / `'2k'` / `'3k'`**、可选补充说明 `note`（≤300 字符，工作台「Anything to change?」，服务端拼在模板提示词之后，作为用户内容存档）、输入图在 R2 的 key），**不含封装提示词**。伙伴接口（第 14 节）v1 固定 `'1k'`，契约不加字段 |
+| inputs | 用户填的内容（文案、比例、**分辨率 `resolution`：`'1k'` / `'2k'` / `'3k'`**、可选补充说明 `note`（≤300 字符，工作台「Anything to change?」，服务端拼在模板提示词之后，作为用户内容存档）、模板开关 `toggles` / `toggles_confirmed_at`（T89，见 §5.1c）、输入图在 R2 的 key），**不含封装提示词**。伙伴接口（第 14 节）v1 固定 `'1k'`，契约不加字段 |
 | provider | 实际调用的供应商和模型：`<ai_providers.id 或 env>/<模型名>`（第 3.3 节） |
 | provider_usage | 供应商返回的用量（jsonb）：出图的 `input_text_tokens`、`input_image_tokens`、`output_tokens`；作品编辑另记判断那一步的 `decision_input_tokens`。供应商没返回就为空（T33） |
 | cost_usd | 这一单的真实成本（`numeric(10,6)`）= 用量 × 结算时在用供应商的单价快照；以后改单价不影响历史。没有用量或单价没填就为空，后台标「无法计算」（T33） |
@@ -211,6 +211,35 @@ v1 不写回调解析、定时轮询、超时清理这类定时任务。视频�
 - **数据**：新表 `template_favorites(user_id, template_id, created_at)`，主键 `(user_id, template_id)`，RLS 只能读写自己的行，每人最多 200 个；模板下架或改成只给伙伴用时不在收藏里显示（行保留，重新上架后回来）；模板删除时级联删除；删号时随账号删除。
 - 收藏只影响登录用户自己的页面，模板目录和首页的服务端缓存不变（收藏列表在客户端或按用户单独读取，不进公共缓存）。
 - 埋点 `template_favorite`（`template_id`、`category`、`action = add / remove`、`surface`）。迁移编号段 `0740`～`0759`。
+
+### 5.1c 模板开关（Owner 2026-11-08，T89）
+
+模板可以给用户几个开 / 关选项，第一个是餐饮菜品的「优化摆盘和器皿」/ "Upgrade plating & tableware"。哪些模板配由后台定，代码里不按分类写死。
+
+**数据定义**
+
+- `templates.fields.toggles`（公开，可选，默认 `[]`，最多 3 个）：每项 `{ key, label, hint?, default, confirm? }`。
+  - `key`：`^[a-z][a-z0-9_]*$`，不能和 `fields.copy` 的 key 重名，也不能是 `aspect_ratio`（同一套 `{{key}}` 占位符）。
+  - `label`（英文，≤60）、`hint`（英文，≤200，可选）。
+  - `default`：只能是 `false`。
+  - `confirm`（可选）：开启前的确认框 `{ title ≤80, body ≤1200, checkbox ≤120, accept ≤40 }`，英文。确认框文字是模板数据，不写死在代码里。
+  - 旧模板的 `fields` 没有 `toggles`，读出时按 `[]` 处理。
+- `templates.translations.zh.fields.<key>`：开关的中文 `label`、`hint`、`confirm: { title, body, checkbox, accept }`，每一项缺了就回退英文，和文案字段同一个 `fields` 对象（文案字段用 `label` / `placeholder`）。
+- `template_prompts.model_params.toggles.<key>`（私有）：`{ on, off }` 两段文字。`renderPrompt` 按用户的选择把对应一段放进正文的 `{{<key>}}`；没录的按空串（不会把占位符原样发给模型）。这两段只用来拼提示词，`model_params` 其余的键照旧交给出图供应商，`toggles` 不传过去。提示词片段不进仓库（测试用假片段）。
+- 后台保存（`saveTemplate` 和导入脚本）：定义了开关却在提示词正文里没有 `{{<key>}}`，或缺 `on` / `off` 任一段（空白也算缺），拒绝保存（`INVALID_INPUT`，提示是哪个开关缺什么）。数据库函数 `admin_upsert_template` 不变，没有迁移。
+- `generation_jobs.inputs`（只在模板有开关时写）：
+  - `toggles: { "<key>": true | false }`：模板的每个开关都记，没开的记 `false`。
+  - `toggles_confirmed_at: { "<key>": "<ISO 时间>" }`：带 `confirm` 的开关为开时，记服务端收到请求的时间。没有这样的开关时不写这个键。
+- `admin_test_runs.inputs.toggles`：后台试跑的开关选择，结构同上（不记确认时间）。
+
+**请求和规则**
+
+- `/api/generate` 的 `inputs` 加 `toggles: { key: boolean }`（可选，缺的 key 按关）和 `toggles_confirmed: string[]`（用户在确认框里确认过的 key）。
+- 服务端校验：key 必须属于该模板、值必须是布尔。带 `confirm` 的开关为开时，`toggles_confirmed` 里必须有它，否则 `INVALID_INPUT`，在扣积分之前拒绝。
+- 浏览器只有在用户勾选并点了确认（或同一浏览器会话里这个模板确认过，sessionStorage；或「再来一张」沿用原作品已开启的选择）后才会把开关打开，所以会把开着的这类开关都放进 `toggles_confirmed`。
+- 伙伴接口 v1 不收开关：请求里带了也丢掉，一律按关（§14.6 契约不变）。
+- 后台试跑（§10.b）的开关直接开或关，管理员不弹确认框。
+- 积分价格不变。开关不是用户写的文字，不送换脸判断（§5.1a）。作品编辑（§5.2）不受影响。
 
 ### 5.1a 禁止换脸：按用户输入的文字判断意图（Owner 2026-11-08，T81）
 
@@ -527,6 +556,38 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 公开读（Owner 2026-11-07 改）：shotviva.com 的 DNS 在 Vercel，R2 绑不了自定义域名，所以**生产走本站同源路径**：`https://shotviva.com/assets/covers/...` 由 Next 的 rewrite 转到公开桶的 r2.dev 地址（服务端变量 `R2_PUBLIC_ORIGIN`，构建时读取），`/assets/*` 返回 `Cache-Control: public, max-age=31536000, immutable`（文件名带内容哈希），让 Vercel 的 CDN 缓存，r2.dev 本身几乎不被直接访问。生产 `NEXT_PUBLIC_ASSETS_BASE_URL = https://shotviva.com/assets`；预览可以直接填 r2.dev 地址。以后 DNS 迁到 Cloudflare 再绑 `assets.shotviva.com`，只改这两个变量，不改代码（T51）。
 - 公开地址的前缀放环境变量 `NEXT_PUBLIC_ASSETS_BASE_URL`，`templates.cover_before_url` / `cover_after_url` 存完整地址。
 - 写入只走后台：后台模板编辑页「上传前图 / 上传后图」→ 服务端校验（JPEG / PNG / WebP，≤20MB）→ `sharp` 转 WebP（长边 1600、质量 82）→ 写公开桶 → 更新模板行。和用户照片一样，图片字节不经 API 路由请求体（第 8.1 节）：浏览器先直传到私有桶的 `uploads-admin/` 临时前缀（7 天过期），服务端再读出处理后写公开桶。
+- **封面按语言适配（Owner 2026-11-08，T87）**：同一个模板可以给每种页面语言各配一套封面（前图、后图、动态封面），例如海报、菜单类模板的封面上有文字时，中文页显示中文字的封面，英文页显示英文字的封面。现有 `cover_before_url` / `cover_after_url` / 动态封面字段是**通用封面**（不属于任何语言，所有语言都能用）；新增 `cover_locales`（jsonb，默认 `{}`，结构 `{ "zh": { "before": "…", "after": "…", "video": "…" } }`，只加不改）。显示规则（Owner 2026-11-08 定，不写死任何语言）：按**页面语言**（`/zh` 是中文、根路径是英文，以后加的语言同理；页面语言本身已按 T217 规则跟随浏览器主语言提示切换）找该语言的专属封面，有就用；没有就用通用封面；通用封面也没有、只有某一种语言的封面时，**所有语言都显示这一张**（有多种语言封面时按后台语言页签的顺序取第一个）。也就是说只上传一套封面时，所有语言都显示它；只有给某种语言另外上传了封面，这种语言的用户才看到专属版本。是否做其他语言版本完全由 Owner 决定，有的海报英文排版更好看，就只用一套。所有展示封面的地方都按这个规则：首页和落地页模板区、创作页模板卡片和弹窗、收藏、伙伴接口（按请求的语言参数）。后台模板编辑页的封面区加语言页签（通用 / 中文 / 英文…，以后加语言自动多一个；每个页签都可以空着），每个语言单独上传、替换、删除；T85 试跑的「设为封面」先选设到哪个语言。封面压缩、公开桶和缓存规则不变。迁移编号段 `0820`～`0839`。
+  - **一键转成其他语言（Owner 2026-11-08）**：后台封面区在任意一张已定好的「后」封面上点「生成其他语言版本」，勾选目标语言（例如英文、日文），系统用出图模型做「只把图上的文字翻译成目标语言，版式、字体风格、颜色、画面其他内容都不变」的编辑，每种语言一张（可以重跑），结果先给 Owner 预览，满意再点「设为该语言封面」。走 T85 试跑的同一套记录和费用规则（不扣积分、计入成本对账「后台试跑」、受每日预算限制）。「前」图一般是没有文字的原照片，各语言共用，不翻译；动态封面不翻译，各语言单独上传或退回默认。翻译用的提示词放在 `template_prompts` 的系统参数里（后台可改，不进仓库）。
+  - **可配置的语言列表**：后台封面页签显示的语言 = 网站已上线的语言 + `site.config` 里登记的「准备中」语言（先登记日语 `ja`），所以可以在某种语言的页面上线之前先把封面准备好；准备中语言的封面在前台不显示，等那个语言的页面上线后自动生效。
+  - **数据定义（T87，2026-11-08，开发窗口提案经总控确认，迁移 `0820`～`0824` 起）**：
+
+###### 表
+
+- `templates.cover_locales`（0820）：jsonb，非空，默认 `{}`，约束 `jsonb_typeof = 'object'`。每种语言一项，键都可选：`before`、`after`（静态图地址）、`media`（`animated` / `video`）、`video`、`poster`（动态封面和封面帧）。语言码是短小写标签（`en`、`zh`、`ja`、`pt-br`），已上线和「准备中」的语言都能存。
+- `admin_test_runs.kind`（0821）：允许值加 `translate`（「生成其他语言版本」）。这类试跑没有父记录、没有测试照片；来源封面、来源语言（null = 通用）、目标语言记在 `inputs`。
+
+###### 函数（都只授权 service_role，函数里核对管理员）
+
+- `admin_begin_test_run`（0822，`create or replace`，签名不变）：另外接受 `kind = 'translate'`（`parent` 和 `photo` 都必须为空）；预算、锁、花费账本、幂等都和 0784 相同。
+- `admin_set_test_run_cover`（0823，`create or replace`，签名不变）：
+  - `p_locale` 为 null：写通用封面，和原来一样。
+  - `p_locale` 为语言码：写 `cover_locales -> 语言 -> after`。只有模板还没有通用前图时，才同时写该语言的 `before`（前图各语言共用）。翻译出来的试跑没有测试照片，所以只会写后图。
+- `admin_set_template_locale_cover(p_actor, p_template_id, p_locale, p_patch jsonb, p_assets_base text, p_locales text[], p_clear boolean default false)`（0824，新；审查后加 `p_assets_base`：地址必须在本站资源域名下；`p_locales`：服务端传入已上线语言，用于判断改动后已上架的站内模板是否仍有前图和后图，失去最后一张时抛 `COVER_STILL_NEEDED`，本来就不完整的模板允许补传；辅助函数 `_template_has_cover_parts`）：后台语言页签的上传、替换和删除，一次调用、一个事务。
+  - 把 `p_patch` 合并进该语言：值为 null 表示删掉这个键；某个语言删空后整项去掉。
+  - `p_clear` 为 true 时删掉整个语言。
+  - 校验：键只能是上面五个，地址必须是 https，`media` 只能是两个值。
+  - 返回新的 `cover_locales`。
+
+###### 其他口径（不涉及数据结构）
+
+- **前台怎么取封面**：前图、后图、动态封面三部分各自独立取。先看页面语言自己的；没有就用通用的；通用的也没有，就按已上线语言的顺序（`LOCALES`，即后台页签顺序）取第一个有的。准备中的语言前台永远不读。代码在 `core/templates/cover-locales.ts`，由 `localizeTemplate` 统一套用，所以首页、落地页、创作页卡片和弹窗、收藏、作品页都一致。
+- **伙伴接口**：`GET /api/partner/templates?locale=zh` 返回该语言页面显示的封面。不带或不认识的值按英文处理，响应结构不变。
+- **「准备中」语言**：`site.config.locales.upcoming = ['ja']`（`defineSite` 里是可选字段）。后台封面页签依次是：通用、已上线语言、准备中语言。中文名用 `Intl.DisplayNames` 生成，加语言不用写文案。
+- **翻译提示词**：放在 `edit` 模板 `model_params.cover_translate`（`editParamsSchema` 的可选键），在「作品编辑的判断题和约束段落」页编辑。`{{language}}` 会换成目标语言的英文名（`Intl.DisplayNames`）。没填时翻译不可用，提示去填。
+  - 出图参数：输入是来源后图（从公开桶按地址取）；尺寸跟随原图（`original`）；清晰度默认 2K；质量档和 `input_fidelity` 用 edit 模板的。
+  - 没有用户输入的文字，所以不走换脸判断。
+- **上架条件（总控 2026-11-08 按 Owner「只传一套封面所有语言都用它」改）**：站内模板上架要求「前图和后图各至少有一张」，可以来自不同地方（例如通用前图 + 中文后图），因为前台按部分各自取封面，每种语言都能取到前后图；只有「准备中」语言的封面不算。T87 一并修改 `publish-rules` 和批量编辑的校验：批量编辑新增 5 参数重载 `admin_bulk_edit_templates(…, p_locales text[])`（0825，由服务端传入已上线语言，不设默认值），旧的 4 参数版本（0640）保留给已部署的旧代码，T87 上线稳定后由收尾卡删除。语言页签删除封面时，如果会让已上架的站内模板缺前图或后图，拒绝并提示。封面地址只接受本站资源桶的地址。翻译生成的结果只能设为它的目标语言的后图（`admin_set_test_run_cover` 遇到其他情况抛 `TRANSLATE_TARGET_ONLY`）；翻译试跑的 `prompt_version` 记为空，翻译提示词及其版本记在 `inputs`。
+
 - **展示媒体支持三种**（Owner 2026-11-05，参考 Lovart）：静态图、动图、短视频。`templates` 增加 `cover_media_type`（`'image'` / `'animated'` / `'video'`）、`cover_video_url`、`cover_poster_url`（视频和动图的封面帧，静态图时为空）；前后对比图字段照旧，用于静态图模板和预览抽屉里的拖动对比。
   - 动图一律存动态 WebP：后台上传 GIF 也收，服务端转成动态 WebP（GIF 体积通常大 5～10 倍，拖慢首屏）。
   - 视频存 MP4（H.264）原文件，≤15MB、≤15 秒，服务端只做类型和大小校验，不转码；必须有封面帧：后台单独上传，或上传时浏览器从第一帧截图生成。
@@ -614,23 +675,36 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 
 索引 `(template_id, created_at desc)`（面板列表，取 50 条）、`(created_at)`（当天预算、清理、成本对账）。
 
+#### 表 `admin_test_spend`（私有，同上；审查后新增，2026-11-08）
+
+每次试跑一行，**没有外键**（删模板、裁剪 50 条、30 天清理都不影响它），100 天后才清。字段：`run_id`（唯一）、`template_id`（只记值）、`day`（北京时间自然日）、`cost_usd`、`counted_as`（`actual` 真实成本 / `estimate` 调过出图模型但算不出成本时按估算 / `zero` 未调用模型或 10 分钟超时）、`created_at`。**每日预算和成本对账页的「后台试跑」都只读这张表。**预算判断和占用（`admin_begin_test_run`）在任何模型调用之前完成，包括换脸判断和编辑范围判断；超预算一个模型都不调。换脸被拒的试跑记为 `failed / IDENTITY_SWAP_REFUSED`，判断用掉的 token 计入成本。试跑不占管理员的换脸判断配额，也不计入「AI 供应商」页的用户统计。清理改为 `POST /api/admin/test-runs/cleanup`（同源校验）。
+
 #### 函数（普通 plpgsql，`search_path = ''`，只授权 `service_role`；带 `p_actor` 的在函数里再核对是管理员）
 
 - `admin_begin_test_run(p_actor, p_run_id, p_template_id, p_kind, p_parent_id, p_photo_id, p_batch_id, p_resolution, p_inputs, p_prompt_version, p_provider, p_estimate_usd)`：按 `p_run_id` 幂等；advisory lock 串行化预算判断；当天（北京时间自然日）已花 = 已结束记录的 `cost_usd` 合计 + 10 分钟内仍在跑的记录的 `estimate_usd`；已花 + 本次估算 > 预算就抛 `TEST_BUDGET_EXCEEDED`（不调用供应商）。编辑时校验父记录、继承 `photo_id`；更新照片 `last_used_at`。返回新行。
 - `admin_finish_test_run(p_run_id, p_status, p_output_key, p_error_code, p_provider_usage, p_cost_usd, p_duration_ms)`：只从 `running` 结束，重复调用返回原行。
 - `admin_test_budget_status()`：返回预算、当天已花、当天试跑次数、北京时间日期。
-- `admin_set_test_run_cover(p_actor, p_run_id, p_before_url, p_after_url)`：同一事务里更新模板的前后封面地址、记 `cover_set_at`。WebP 转换和写公开桶在应用里先做（和现有封面上传同一套压缩规则）。
+- `admin_set_test_run_cover(p_actor, p_run_id, p_before_url, p_after_url, p_locale text default null)`：`p_locale` 为空时写通用封面，指定语言时写该语言的专属封面（T87 实现，此前传语言返回 `INVALID_INPUT`）；同一事务里更新模板的前后封面地址、记 `cover_set_at`。WebP 转换和写公开桶在应用里先做（和现有封面上传同一套压缩规则）。
 - `admin_cleanup_test_runs(p_actor)`：打开面板时调用。删掉 30 天前且没设成封面的记录；每个模板超出最近 50 条的（不含封面记录）；30 天没用过、也不是封面记录源照片的测试照片；10 分钟还在 `running` 的标成 `failed / TIMEOUT`。返回要从 R2 删除的 key 列表，应用尽力删除、失败只记日志。
 - `admin_test_daily_costs(p_days)`：成本对账页按 UTC 日返回试跑的 `cost_usd` 合计和次数，和 `admin_daily_costs` 并列显示为「后台试跑」，计入「我们记录的成本」。
 - 预算：`system_settings` 新键 `admin_test_daily_budget_usd`（数字，0～1000，默认 5），`admin_set_system_setting` 用 `create or replace` 加这个键。
 
-迁移 `0780`～`0788`，只加表、索引、函数；`admin_set_system_setting` 只多认一个键，旧代码不受影响。
+迁移 `0780`～`0789`，只加表、索引、函数；`admin_set_system_setting` 只多认一个键，旧代码不受影响。
 
 #### 其他实现口径（不涉及数据结构，供审查）
 
 - 接口：`/api/admin/test-runs`（首次出图）、`/api/admin/test-runs/edit`（编辑）、`/api/admin/test-photos`（预签名上传）；一次 3 张是浏览器并发 3 个请求（Server Action 在同一页面是串行的，所以不用 Server Action）。只有管理员能调，非管理员 404。
 - 换脸判断照常调用；试跑被拒不写 `identity_refusals`（否则管理员账号会被标红），不发 `generate` / `generate_refused` 事件。
 - 封面：结果设为「后」、源照片设为「前」，按 §8.3 封面规则转 WebP（长边 1600、质量 82）写公开桶，`revalidateTag('templates', 'max')`。
+
+### 10.c 企业咨询（Owner 2026-11-08，T86）
+
+价格页「联系我们」弹窗表单（字段见 DESIGN §6.9 第 8 条）提交到服务端，存进新表 `business_inquiries`（私有：开 RLS 无 policy，只有 service role 读写）：`id`、`created_at`、`locale`、`page`、`user_id`（已登录时，可空，`on delete set null`）、各表单字段（文本和多选数组，长度在服务端再校验）、`status`（`new` 新咨询 / `contacted` 已联系 / `won` 已成交 / `closed` 无效或关闭）、`admin_note`（Owner 备注）、`updated_at`、`ip_hash`（防刷用，不存明文 IP）。
+- 防刷：隐形 hCaptcha（正式站开启时）；同一 IP 每小时 3 条、每天 10 条，同一邮箱每天 3 条；超了提示「提交太频繁，请稍后再试」。
+- 提交函数 `submit_business_inquiry(p_inquiry jsonb, p_ip_hash text) returns jsonb`（只给 service role）：服务端校验通过后调用，一次往返里先按 IP 哈希、再按邮箱加 advisory 锁数限额，未超就插入一行（邮箱去空格转小写），返回 `{status, id}`：`status` 为 `ok`（带新 `id`）或 `ip_hourly` / `ip_daily` / `email_daily`（`id` 为空）。`ip_hash` 是服务端用 HMAC-SHA256 算的（密钥由 service-role key 派生），不存明文 IP。迁移 `0800`（表、索引、RLS）、`0801`（函数）。
+- 后台新页「企业咨询」（`/admin/inquiries`，导航放在「工单」旁边）：列表按时间倒序，显示公司、姓名、邮箱、出图量、用途、状态，可按状态筛选；点开看全部字段，改状态、写备注；新咨询数在后台导航上显示角标。
+- 提交成功发飞书告警（T72 新增种类「新企业咨询」：公司名、出图量、用途，带后台链接，不带邮箱和电话）。
+- 隐私政策补一句：企业咨询表单收集的联系方式只用于回复本次咨询。迁移编号段 `0800`～`0819`，只加不改。
 
 ### 10.0 真实出图成本（Owner 2026-11-06，T33）
 
@@ -954,7 +1028,7 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 |---|---|---|
 | `signup` | 服务端：邮箱验证完成 / 首次 Google 登录时（和注册赠送同一处） | `method`（`email` / `google`） |
 | `upload` | 浏览器：直传 R2 成功后 | `size_bucket`（`<1MB` / `1-5MB` / `>5MB`）、`compressed`（是否走了浏览器压缩） |
-| `generate` | 服务端：任务结算后（成功或失败都发） | `template_id`、`category`、`resolution`、`credits_cost`、`credit_pool`、`status`、`error_code`、`source`（`web` / `graylum`）、`duration_ms`、`model`（实际调用的模型名，不含密钥和地址）、`batch_size`（单张为 1，T28 起）、`edit_scope`（作品编辑时的范围或 `fallback`，模板出图为空，T30 起） |
+| `generate` | 服务端：任务结算后（成功或失败都发） | `template_id`、`category`、`resolution`、`credits_cost`、`credit_pool`、`status`、`error_code`、`source`（`web` / `graylum`）、`duration_ms`、`model`（实际调用的模型名，不含密钥和地址）、`batch_size`（单张为 1，T28 起）、`edit_scope`（作品编辑时的范围或 `fallback`，模板出图为空，T30 起）、`toggles`（模板开关的选择 `{ key: true/false }`，模板没有开关时为 `{}`，T89 起） |
 | `paywall_view` | 浏览器：付费墙打开 | `trigger`（`insufficient_credits` / `pricing_page` / `account` / `graylum` / `tier_required`） |
 | `checkout_start` | 服务端：创建 Checkout Session 时 | `product_id`、`tier`、`interval`、`form`、`channel`、`method` |
 | `purchase` | 服务端：支付回调入账成功后 | 第 6.2 节 `purchase` 参数 |
@@ -963,7 +1037,9 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 
 所有事件都带 `locale`（`en` / `zh`，浏览器端注册为公共属性，服务端发时从请求或 `user_metadata.locale` 取；Owner 2026-11-06）。钱和积分相关的事件（`signup`、`generate`、`checkout_start`、`purchase`）一律服务端发，保证不被广告拦截漏掉；发送失败只记日志，不影响业务。
 
+- **新增事件（T89，Owner 2026-11-08）**：`template_toggle`（浏览器：`template_id`、`key`、`action` = `confirm_shown`（弹出确认框）/ `confirmed`（勾选后点了开启）/ `cancelled`（取消或关掉确认框）/ `turned_off`（把带确认框的开关关掉）、`surface` = `workspace` / `create_dialog` / `home`）。后台试跑不发。
 - **新增事件（T74，Owner 2026-11-07）**：`template_view`（浏览器：打开模板详情或在选择器里选中模板，`template_id`、`category`、`surface`）、`paywall_select`（浏览器：付费墙里选中商品，`product_id`、`method`）、`checkout_cancel`（服务端：结账取消返回，`product_id`、`method`）、`upload_error`（浏览器：上传失败，`reason` 枚举，不含文件名）。PostHog 打开 `capture_pageleave`（停留时间、最大滚动深度）。
+- **新增事件（T90，Owner 2026-11-08）**：`app_update_prompt`（浏览器：新版本刷新提示条，`action`（`shown` / `refreshed` / `dismissed`）、`reason`（`version` 版本检查发现新版本 / `error` 旧页面找不到服务端函数或代码块）；每个新版本或每次出错只记一次 `shown`）。
 
 ### 16.2a 后台「流量与转化」页（Owner 2026-11-07，T74）
 

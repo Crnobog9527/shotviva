@@ -1,6 +1,7 @@
+import { coverLocalesSchema, type CoverLocales } from './cover-locales'
 import { CATEGORY_COLUMNS, preT75Category, toCategory, type Category, type CategoryRow } from './categories'
 import type { CreditsCost, TemplateQuality } from './pricing'
-import type { CoverMediaType, TemplateFields, TemplateSurface, TemplateTranslations } from './schema'
+import type { CoverMediaType, StoredTemplateFields, TemplateFields, TemplateSurface, TemplateTranslations } from './schema'
 
 export type Template = {
   id: string
@@ -18,6 +19,9 @@ export type Template = {
   coverMediaType: CoverMediaType
   coverVideoUrl: string | null
   coverPosterUrl: string | null
+  // Each language's own cover (T87); the five fields above are the common one. Read through
+  // localizeTemplate / coverForLocale, never shown as is.
+  coverLocales: CoverLocales
   fields: TemplateFields
   // Sent to the model as `quality`; with the resolution it decides the price.
   quality: TemplateQuality
@@ -44,7 +48,9 @@ type TemplateRowBase = {
   cover_media_type: CoverMediaType
   cover_video_url: string | null
   cover_poster_url: string | null
-  fields: TemplateFields
+  // Absent on a database before migration 0820 (T87).
+  cover_locales?: unknown
+  fields: StoredTemplateFields
   quality: TemplateQuality
   // The table check guarantees exactly the three keys, each a positive integer.
   credits_cost: CreditsCost
@@ -65,7 +71,7 @@ export type TemplateRow = TemplateRowBase & { category_key: string; template_cat
 export type PreT75TemplateRow = TemplateRowBase & { category: string }
 
 const BASE_COLUMNS =
-  'id, module, name, description, cover_before_url, cover_after_url, cover_media_type, cover_video_url, cover_poster_url, fields, quality, credits_cost, sort_order, is_active, visible_in, translations, featured_rank, created_at, updated_at'
+  'id, module, name, description, cover_before_url, cover_after_url, cover_media_type, cover_video_url, cover_poster_url, cover_locales, fields, quality, credits_cost, sort_order, is_active, visible_in, translations, featured_rank, created_at, updated_at'
 export const TEMPLATE_COLUMNS = `${BASE_COLUMNS}, category_key, template_categories(${CATEGORY_COLUMNS})`
 export const PRE_T75_TEMPLATE_COLUMNS = `${BASE_COLUMNS}, category`
 
@@ -87,7 +93,9 @@ export function toTemplate(row: TemplateRow | PreT75TemplateRow): Template {
     coverMediaType: row.cover_media_type,
     coverVideoUrl: row.cover_video_url,
     coverPosterUrl: row.cover_poster_url,
-    fields: row.fields,
+    coverLocales: coverLocalesSchema.parse(row.cover_locales ?? {}),
+    // Templates saved before T89 have no toggles.
+    fields: { ...row.fields, toggles: row.fields.toggles ?? [] },
     quality: row.quality,
     creditsCost: row.credits_cost,
     sortOrder: row.sort_order,

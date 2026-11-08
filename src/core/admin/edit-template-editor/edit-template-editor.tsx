@@ -45,6 +45,11 @@ export function EditTemplateEditor({ settings, floor, save }: Props) {
         <Textarea id="edit-reframe" className="min-h-20 font-mono text-xs" value={form.reframe} onChange={(event) => patch({ reframe: event.target.value })} />
         <p className="text-muted-foreground text-xs">{COPY.reframeHint}</p>
       </div>
+      <div className="grid gap-1.5 rounded-md border border-dashed p-3">
+        <Label htmlFor="edit-cover-translate">{COPY.coverTranslate}</Label>
+        <Textarea id="edit-cover-translate" className="min-h-20 font-mono text-xs" value={form.coverTranslate} onChange={(event) => patch({ coverTranslate: event.target.value })} />
+        <p className="text-muted-foreground text-xs">{COPY.coverTranslateHint}</p>
+      </div>
       {notice ? <p className="text-sm text-emerald-700">{notice}</p> : null}
       {error ? <p role="alert" className="text-destructive text-sm">{error}</p> : null}
       <div className="flex">

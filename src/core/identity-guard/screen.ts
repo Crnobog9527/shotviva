@@ -6,7 +6,7 @@ import { logger } from '../logger'
 import type { IdentityEntry, IdentityJudge, IdentityJudgeAnswer, IdentityJudgeUsage } from './judge'
 import { IDENTITY_JUDGE_TIMEOUT_MS, JudgeFailure, judgeWithRetry } from './judge-call'
 import { FAIL_OPEN_LOG, keepVerdict, markJudgeFailed, takeJudgeSlot, textHash, type JudgeSlot } from './judge-slots'
-import { refuseIdentitySwap, type RefusalDeps } from './refuse'
+import { refuseIdentitySwap, type Refusal, type RefusalDeps } from './refuse'
 
 // ARCHITECTURE §5.1a for the workspace note, template text fields and the partner prompt: one
 // text-only decision call on all of them, before reserve_credits. There is no keyword step: the
@@ -44,6 +44,20 @@ async function ask(deps: ScreenDeps, judge: IdentityJudge, text: string, entry: 
   }
 }
 
+// An admin test run (deps.quiet, T85): the same judgement, without a slot (no hourly quota, no
+// cached verdict, not counted on /admin/providers) and failing open the same way.
+async function screenQuietly(deps: ScreenDeps, judge: IdentityJudge, refusal: Omit<Refusal, 'method'>): Promise<ScreenResult> {
+  let answer: IdentityJudgeAnswer
+  try {
+    answer = (await judgeWithRetry(judge, refusal.text, deps.identityJudgeTimeoutMs ?? IDENTITY_JUDGE_TIMEOUT_MS)).answer
+  } catch (error) {
+    logger.warn(FAIL_OPEN_LOG, { provider: judge.tag, entry: refusal.entry, adminTest: true, error })
+    return { usage: null }
+  }
+  if (answer.identitySwap) return refuseIdentitySwap(deps, { ...refusal, method: 'model', usage: answer.usage })
+  return { usage: answer.usage }
+}
+
 export async function screenIdentityText(deps: ScreenDeps, input: ScreenInput): Promise<ScreenResult> {
   const fields = userFields(input.texts)
   if (fields.length === 0) return { usage: null }
@@ -51,6 +65,7 @@ export async function screenIdentityText(deps: ScreenDeps, input: ScreenInput): 
   const refusal = { userId: input.userId, entry: input.entry, text, locale: input.locale }
   const judge = deps.identityJudge
   if (!judge) return { usage: null }
+  if (deps.quiet) return screenQuietly(deps, judge, refusal)
   const slot = await takeJudgeSlot(deps.db, input.userId, textHash(text))
   if (slot.status === 'limited') throw tooManyJudgeCalls()
   if (slot.status === 'cached') return slot.identitySwap ? refuseIdentitySwap(deps, { ...refusal, method: 'model' }) : { usage: null }

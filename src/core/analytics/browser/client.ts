@@ -107,6 +107,11 @@ export function trackTemplateFavorite(
   track('template_favorite', { template_id: template.id, category: categorySlug(template.category), action, surface })
 }
 
+// T89: the confirm dialog of a template toggle, or the toggle turned off.
+export function trackTemplateToggle(props: EventProps<'template_toggle'>): void {
+  track('template_toggle', props)
+}
+
 export function trackPaywallSelect(props: EventProps<'paywall_select'>): void {
   track('paywall_select', props)
 }
