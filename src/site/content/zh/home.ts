@@ -137,7 +137,7 @@ export const zhHomePage = defineHomePage({
     note: '模板图片均为示意图。',
   },
   facts: zhSharedFacts(),
-  factsIntro: `很多 AI改图工具会把整张图重画一遍。${brand} 的模板专门保留你拍的东西，比如商品、菜品、房间或宠物，只改它周围的样子。下面这些信息在本站每一页都一样。`,
+  factsIntro: `很多 AI改图工具给你的是一张新图。你要的其实是自己那张图，只是更好看：还是那件商品、那道菜、那个房间，光线更好，画面更干净。${brand} 就是为这个做的。下面的价格和尺寸在本站每一页都一样。`,
   freeOffer: {
     heading: '免费 AI改图：你能得到什么',
     points: [
@@ -218,7 +218,7 @@ export const zhHomePage = defineHomePage({
     { href: '/pricing', anchor: `${brand} 价格`, note: '店主、卖家和房东在月付、年付套餐和一次性积分包之间比较。' },
   ],
   headings: {
-    facts: 'AI改图：哪些保持不变',
+    facts: `AI改图为什么选 ${brand}`,
     faq: 'AI改图常见问题',
     related: 'AI改图：餐饮、商品、房间等场景',
   },
