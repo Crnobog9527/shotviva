@@ -37,7 +37,7 @@ describe('home page skeleton', () => {
     ]).toEqual([
       'How Image to Image AI Works in 3 Steps',
       'Img to Img Templates: No Prompts to Write',
-      'AI Image to Image: What Stays the Same',
+      'Why Choose Shotviva for AI Image to Image',
       'Free Image to Image AI: What You Get',
       'Image to Image AI FAQ',
       'Image to Image AI for Food, Products, Rooms and More',
