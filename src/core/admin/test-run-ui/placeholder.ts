@@ -13,6 +13,8 @@ export type Placeholder = {
   resolution: Resolution
   aspect: OutputAspect | null
   instruction?: string
+  sourceLocale?: string | null
+  targetLocale?: string
   note?: string
 }
 
@@ -29,6 +31,8 @@ export function placeholderRun(p: Placeholder, now = new Date()): TestRunView {
     copy: {},
     note: p.note || null,
     instruction: p.instruction || null,
+    sourceLocale: p.sourceLocale ?? null,
+    targetLocale: p.targetLocale ?? null,
     editScope: null,
     promptVersion: null,
     model: null,

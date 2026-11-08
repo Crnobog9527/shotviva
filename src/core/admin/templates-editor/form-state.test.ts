@@ -26,6 +26,7 @@ const template: AdminTemplate = {
   coverMediaType: 'image',
   coverVideoUrl: null,
   coverPosterUrl: null,
+  coverLocales: {},
   fields: { images: { min: 1, max: 1 }, copy: [], aspectRatios: ['1:1'] },
   quality: 'high',
   creditsCost: { '1k': 3, '2k': 4, '3k': 6 },

@@ -19,6 +19,9 @@ export const EDIT_TEMPLATE_COPY = {
   constraints: '约束段落（可以留空，留空就不加）',
   reframe: '换尺寸时的段落（可以留空）',
   reframeHint: '用户编辑时选了和原作品不同的尺寸，就把这段加在用户原话后面，例如「把画面延展到新画幅，主体位置和大小不变」。',
+  coverTranslate: '封面翻译提示词（「生成其他语言版本」用，可以留空）',
+  coverTranslateHint:
+    '后台模板封面区点「生成其他语言版本」时发给出图模型：只翻译图上的文字，版式、字体风格、颜色、画面其他内容都不变。写 {{language}} 的地方会换成目标语言的英文名（如 Japanese）。留空时封面翻译不可用。',
   save: '保存',
   saved: '已保存',
   version: (v: number) => `当前 v${v}`,

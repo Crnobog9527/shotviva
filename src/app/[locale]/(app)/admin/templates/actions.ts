@@ -134,9 +134,10 @@ export async function requestCoverUploadAction(input: CoverUploadRequest): Promi
 
 // Step 2: convert the staged file, publish it to the public bucket, point the template at it.
 export async function applyCoverAction(input: ApplyCoverRequest): Promise<ActionResult> {
-  await requireAdmin()
+  const admin = await requireAdmin()
   return runAdminAction(async () => {
     const deps = {
+      actorId: admin.id,
       db: createAdminSupabase(),
       uploads: r2Store(),
       assets: r2PublicStore(),

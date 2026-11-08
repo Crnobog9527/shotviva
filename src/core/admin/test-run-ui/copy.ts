@@ -59,6 +59,7 @@ export const TEST_RUN_COPY = {
     clear: '清空选择',
     first: '首次出图',
     editOf: (instruction: string) => `编辑：「${instruction}」`,
+    translateOf: (target: string, source: string) => `翻译成「${target}」（来源：${source}后图）`,
     orphan: '上一步已清理',
     note: (note: string) => `补充说明：${note}`,
     onRun: (position: number) => `在第 ${position} 张上`,
@@ -87,6 +88,20 @@ export const TEST_RUN_COPY = {
     done: '封面已更新，首页下次打开即生效',
   },
   compare: { title: '并排对比', close: '关闭', source: '测试照片' },
+  // 「生成其他语言版本」 (ARCHITECTURE §8.3, T87).
+  translate: {
+    title: (source: string) => `把「${source}」的后图生成其他语言版本`,
+    body: '只把图上的文字翻译成目标语言，版式、字体风格、颜色和画面其他内容都不变。走试跑的记录和预算，不扣积分。满意再设为该语言的封面；前图各语言共用，不翻译。',
+    targets: '目标语言',
+    run: (count: number) => (count > 1 ? `生成 ${count} 种语言` : '生成'),
+    rerun: '重跑',
+    setAs: (label: string) => `设为「${label}」封面`,
+    done: (label: string) => `已设为「${label}」封面`,
+    close: '关闭',
+    pick: '先勾选目标语言',
+    upcoming: '（准备中，前台暂不显示）',
+  },
+  coverTarget: '设到哪个封面',
   errors: {
     TEST_BUDGET_EXCEEDED: '今天的试跑预算用完了（北京时间 0 点重置），可以在上面调高预算。',
     IDENTITY_SWAP_REFUSED: '换脸判断拒绝了这段文字：和用户一样，不能换脸或换成另一个人。',

@@ -23,6 +23,8 @@ export function toTestRunView(run: TestRun, outputUrl: string | null): TestRunVi
     copy: copyOf(run.inputs.copy),
     note: text(run.inputs.note),
     instruction: text(run.inputs.instruction),
+    sourceLocale: text(run.inputs.source_locale),
+    targetLocale: text(run.inputs.target_locale),
     editScope: text(run.inputs.edit_scope),
     promptVersion: run.promptVersion,
     model: run.provider ? run.provider.slice(run.provider.indexOf('/') + 1) : null,

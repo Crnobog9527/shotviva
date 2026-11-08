@@ -18,7 +18,10 @@ import { findTestPhoto, findTestRun, markTestRunCover } from './test-run-store'
 
 export type TestCoverDeps = { db: SupabaseClient; store: ObjectStore; assets: ObjectStore; assetsBaseUrl: string | undefined }
 
-export async function setTestRunCover(deps: TestCoverDeps, actorId: string, runId: string): Promise<string> {
+// locale: null sets the common cover; a code sets that language's own (T87). For a language the
+// "before" is written only when the template has no common one (the photo side is shared, 0823);
+// a translation run has no test photo, so it only ever sets "after".
+export async function setTestRunCover(deps: TestCoverDeps, actorId: string, runId: string, locale: string | null = null): Promise<string> {
   if (!deps.assetsBaseUrl) throw new AppError('INTERNAL', 'NEXT_PUBLIC_ASSETS_BASE_URL is not configured')
   const baseUrl = deps.assetsBaseUrl
   const run = await findTestRun(deps.db, runId)
@@ -29,5 +32,5 @@ export async function setTestRunCover(deps: TestCoverDeps, actorId: string, runI
     deps.store.get(run.outputKey).then((bytes) => publishStillCover(deps.assets, baseUrl, target('after'), bytes)),
     photo ? deps.store.get(photo.objectKey).then((bytes) => publishStillCover(deps.assets, baseUrl, target('before'), bytes)) : null,
   ])
-  return markTestRunCover(deps.db, { actorId, runId, beforeUrl, afterUrl })
+  return markTestRunCover(deps.db, { actorId, runId, beforeUrl, afterUrl, locale })
 }
