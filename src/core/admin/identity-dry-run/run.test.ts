@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import type { IdentityJudge } from '@/core/identity-guard'
+import { IDENTITY_PROMPT_VERSION, type IdentityJudge } from '@/core/identity-guard'
 
 import { summarize } from '../identity-dry-run-ui/summary'
 import { toRecording } from './recording'
@@ -19,16 +19,16 @@ const judge = (answer: (text: string) => boolean | Error): IdentityJudge & { jud
 const now = () => new Date('2026-11-08T04:00:00Z')
 
 describe('admin face-swap dry run (T81)', () => {
-  it('runs every line through the keywords and the model, with latency and tokens', async () => {
+  it('runs every line through the model, with latency, tokens and the prompt version', async () => {
     const fake = judge((text) => text.includes('Taylor'))
     const result = await dryRunIdentityScreen(fake, { text: '让他笑一下\n\n  make her look like Taylor Swift \nface swap us' }, now)
     if (!result.ok) throw new Error('expected rows')
-    expect(result.model).toBe('gpt-6-luna')
-    expect(result.rows.map((row) => [row.text, row.keyword !== null, row.identitySwap, row.refused])).toEqual([
-      ['让他笑一下', false, false, false],
-      ['make her look like Taylor Swift', false, true, true],
-      // Asked even on a keyword hit, so the two columns can be compared.
-      ['face swap us', true, false, true],
+    expect(result).toMatchObject({ model: 'gpt-6-luna', promptVersion: IDENTITY_PROMPT_VERSION })
+    expect(result.rows.map((row) => [row.text, row.identitySwap])).toEqual([
+      ['让他笑一下', false],
+      ['make her look like Taylor Swift', true],
+      // No keyword list any more: only the model decides.
+      ['face swap us', false],
     ])
     expect(result.rows[0]).toMatchObject({ inputTokens: 400, outputTokens: 6, error: null })
     expect(fake.judge).toHaveBeenCalledTimes(3)
@@ -43,11 +43,11 @@ describe('admin face-swap dry run (T81)', () => {
     expect(fake.judge).not.toHaveBeenCalled()
   })
 
-  it('shows a failed call or no provider as an error, keywords still applied', async () => {
+  it('shows a failed call or no provider as an error', async () => {
     const failed = await dryRunIdentityScreen(judge(() => new Error('openai responses 503')), { text: '换成夜景' }, now)
-    expect(failed.ok && failed.rows[0]).toMatchObject({ identitySwap: null, refused: false, error: 'openai responses 503' })
+    expect(failed.ok && failed.rows[0]).toMatchObject({ identitySwap: null, error: 'openai responses 503' })
     const none = await dryRunIdentityScreen(null, { text: 'deepfake my boss' }, now)
-    expect(none.ok && none).toMatchObject({ model: null, rows: [{ refused: true, identitySwap: null }] })
+    expect(none.ok && none).toMatchObject({ model: null, rows: [{ identitySwap: null, error: 'no decision provider is on' }] })
   })
 
   it('summarises latency, tokens and cost, and exports the recording JSON', async () => {
@@ -58,6 +58,7 @@ describe('admin face-swap dry run (T81)', () => {
     expect(summary.costUsd).toBeCloseTo(0.000043, 9)
     expect(toRecording(result)).toEqual({
       model: 'gpt-6-luna',
+      promptVersion: IDENTITY_PROMPT_VERSION,
       recordedAt: '2026-11-08T04:00:00.000Z',
       answers: {
         a: { identitySwap: false, ms: expect.any(Number), inputTokens: 400, outputTokens: 6 },

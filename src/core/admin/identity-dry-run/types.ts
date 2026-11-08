@@ -8,13 +8,9 @@ export const DRY_RUN_MAX_CHARS = 300
 
 export type DryRunRow = {
   text: string
-  // The keyword pattern that matched, or null. A hit refuses in production without a model call;
-  // the dry run asks the model anyway so both columns can be compared.
-  keyword: string | null
-  // The decision model's answer; null when it failed or no decision provider is on.
+  // The decision model's answer, which is the production verdict; null when it failed or no
+  // decision provider is on (production then lets the request through).
   identitySwap: boolean | null
-  // Refused in production: a keyword hit, or the model said so.
-  refused: boolean
   ms: number | null
   inputTokens: number | null
   outputTokens: number | null
@@ -23,5 +19,5 @@ export type DryRunRow = {
 }
 
 export type DryRunResult =
-  | { ok: true; model: string | null; prices: ProviderPrices | null; ranAt: string; rows: DryRunRow[] }
+  | { ok: true; model: string | null; promptVersion: string; prices: ProviderPrices | null; ranAt: string; rows: DryRunRow[] }
   | { ok: false; reason: 'too_many_lines' | 'line_too_long' | 'empty' }

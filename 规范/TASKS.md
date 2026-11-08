@@ -1038,7 +1038,7 @@ Owner 2026-11-06 发现中文页有功能缺失。逐页对比现有英文页和
 **目标**：Owner 2026-11-07：退款后用户不能留着积分。规则见 ARCHITECTURE §6.2「退款自动扣回积分」。
 
 **范围**：
-- 迁移（编号段 `0520`～`0539`，只加不改）：付款行记 `credits_clawed_back`、`clawback_shortfall`；一个 `clawback_payment_credits(payment_id, event_id, refunded_ratio, reason)` 函数按「发放 × 累计退款比例 − 已扣回，封顶付费余额，不为负」扣回并写流水，幂等；会员退款把 `paid_until` 回退到退款时刻（不早于其他有效购买）；拒付胜诉的「还回」函数；管理员「扣回这笔付款剩余积分」函数（记到该付款名下）。
+- 迁移（编号段 `0760`～`0779`，只加不改）：付款行记 `credits_clawed_back`、`clawback_shortfall`；一个 `clawback_payment_credits(payment_id, event_id, refunded_ratio, reason)` 函数按「发放 × 累计退款比例 − 已扣回，封顶付费余额，不为负」扣回并写流水，幂等；会员退款把 `paid_until` 回退到退款时刻（不早于其他有效购买）；拒付胜诉的「还回」函数；管理员「扣回这笔付款剩余积分」函数（记到该付款名下）。
 - 回调：Stripe `charge.refunded`、`charge.dispute.created`、`charge.dispute.closed`（won）；Waffo `refund.succeeded`；会员退款时取消仍在续费的订阅（复用 T66 的取消逻辑）。
 - 后台：退款工单和订单页加「扣回这笔付款的剩余积分」按钮（确认弹窗写清数量）；订单页、用户详情显示已扣回 / 欠扣；Sentry 告警含欠扣。
 - 条款：英文退款政策 / 条款里的退款一节与新规则一致（7 天内未用积分全额退款；用过积分的个案人工处理、按剩余比例退款；退款会扣回积分）；列入律师审阅清单。

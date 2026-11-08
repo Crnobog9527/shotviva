@@ -19,7 +19,7 @@ export type EditClassification = {
   // Tokens the step used, for the job's cost (T33); null when nothing was billed or reported.
   usage: ClassifierUsage | null
   // ARCHITECTURE §5.1a: the words ask for a face swap. Taken whatever the confidence; false when
-  // the model never answered (the edit is then let through, the keywords having run first).
+  // the model never answered (the edit is then let through: fail open).
   identitySwap: boolean
 }
 
