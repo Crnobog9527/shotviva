@@ -5,7 +5,7 @@ import { COSTS_COPY } from './copy'
 import type { ReconcileRow } from './reconcile'
 
 const COPY = COSTS_COPY
-const COLUMNS = ['day', 'billed', 'ours', 'difference', 'costed', 'missing'] as const
+const COLUMNS = ['day', 'billed', 'ours', 'tests', 'difference', 'costed', 'missing'] as const
 
 const money = (value: number | null) => (value === null ? COPY.dash : usdFine.format(value))
 
@@ -28,6 +28,7 @@ export function CostsTable({ rows }: { rows: ReconcileRow[] }) {
             <TableCell className="font-mono text-xs whitespace-nowrap">{row.day}</TableCell>
             <TableCell className="font-mono text-xs">{money(row.billed)}</TableCell>
             <TableCell className="font-mono text-xs">{money(row.cost_usd)}</TableCell>
+            <TableCell className="text-muted-foreground font-mono text-xs">{row.test_cost_usd ? money(row.test_cost_usd) : COPY.dash}</TableCell>
             <TableCell className={`font-mono text-xs ${differenceClass(row.difference)}`}>{money(row.difference)}</TableCell>
             <TableCell className="font-mono text-xs">{row.costed}</TableCell>
             <TableCell className={`font-mono text-xs ${row.uncosted > 0 ? 'text-destructive' : ''}`}>
