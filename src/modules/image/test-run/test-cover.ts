@@ -2,7 +2,9 @@ import 'server-only'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-import { publishStillCover } from '@/core/admin'
+// The covers folder only: the @/core/admin barrel would pull the admin editors' client code into
+// every page that imports @/modules/image (JS budget).
+import { publishStillCover } from '@/core/admin/covers'
 import { AppError } from '@/core/errors'
 import type { ObjectStore } from '@/core/storage'
 
