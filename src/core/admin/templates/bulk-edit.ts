@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { AppError } from '@/core/errors'
+import { LOCALES } from '@/core/i18n/locales'
 import { logger } from '@/core/logger'
 import { TEMPLATE_QUALITIES, type CreditsFloor } from '@/core/templates/pricing'
 import { TEMPLATE_SURFACES } from '@/core/templates/schema'
@@ -80,6 +81,8 @@ export async function bulkEditTemplates(
     p_patch: toSqlPatch(patch),
     p_floor: floor,
     p_actor: adminId,
+    // The launched languages, whose own complete cover set also lets a template onto the web (0825).
+    p_locales: LOCALES,
   })
   if (error) {
     const known = SQL_ERRORS[error.message]

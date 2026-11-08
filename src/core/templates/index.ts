@@ -22,6 +22,7 @@ export { localizeTemplate, type LocalizedTemplate } from './localize'
 export {
   coverForLocale,
   coverLocalesSchema,
+  hasCompleteCoverSet,
   LOCALE_COVER_KEYS,
   localeCoverSchema,
   withLocaleCover,

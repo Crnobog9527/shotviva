@@ -3,9 +3,10 @@ import { randomUUID } from 'node:crypto'
 import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
-import { applyCover, createCoverUpload } from '@/core/admin'
+import { applyCover, bulkEditTemplates, createCoverUpload } from '@/core/admin'
 import type { GenerationProvider, ProviderInput } from '@/core/jobs'
 import { listTemplatesIn } from '@/core/templates'
+import { CREDITS_FLOOR } from '@/modules/image/credits-floor'
 import { confirmTestPhoto, runTestGenerate, runTestTranslate, saveTestBudget, setTestRunCover } from '@/modules/image'
 
 import { jpeg, png } from '../fakes/images'
@@ -166,5 +167,19 @@ describe('test runs into language covers', () => {
     } finally {
       await restore()
     }
+  })
+})
+
+describe('publishing with only a language’s covers (0825)', () => {
+  it('a live partner template goes on the web with a launched language’s complete set, not an upcoming one’s', async () => {
+    const zhOnly = await seedTemplate(db, { visibleIn: ['partner'] })
+    const jaOnly = await seedTemplate(db, { visibleIn: ['partner'] })
+    await db.query("update public.templates set description = 'One line.' where id = any($1)", [[zhOnly, jaOnly]])
+    await setLocale({ p_template_id: zhOnly, p_locale: 'zh', p_patch: { before: 'https://a.test/zb.webp', after: 'https://a.test/za.webp' } })
+    await setLocale({ p_template_id: jaOnly, p_locale: 'ja', p_patch: { before: 'https://a.test/jb.webp', after: 'https://a.test/ja.webp' } })
+    const outcome = await bulkEditTemplates(service, admin, { ids: [zhOnly, jaOnly], patch: { visibleIn: ['web', 'partner'] } }, CREDITS_FLOOR)
+    expect(outcome.failures).toEqual([{ id: jaOnly, name: 'T4 test', reason: 'web_incomplete' }])
+    const ok = await bulkEditTemplates(service, admin, { ids: [zhOnly], patch: { visibleIn: ['web', 'partner'] } }, CREDITS_FLOOR)
+    expect(ok).toMatchObject({ failures: [], changed: 1 })
   })
 })

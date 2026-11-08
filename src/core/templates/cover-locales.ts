@@ -71,6 +71,15 @@ export function coverForLocale(t: CoverSource, locale: string): ResolvedCover {
   }
 }
 
+// Whether a web card has something to show (the publish rule, Owner 2026-11-08: one uploaded set
+// shows for every language): at least one complete before + after set, the common one or a
+// launched language's own. Languages not launched yet never count.
+export function hasCompleteCoverSet(t: Pick<CoverSource, 'coverBeforeUrl' | 'coverAfterUrl' | 'coverLocales'>, launched: readonly string[] = LOCALES): boolean {
+  const filled = (url: string | null | undefined) => Boolean(url && url.trim() !== '')
+  if (filled(t.coverBeforeUrl) && filled(t.coverAfterUrl)) return true
+  return launched.some((code) => filled(t.coverLocales[code]?.before) && filled(t.coverLocales[code]?.after))
+}
+
 // The template as seen in `locale`: its cover columns replaced by what that page shows, so every
 // reader of the cover fields (cards, dialog, home, landing, favorites, photos) follows the rule.
 export function withLocaleCover<T extends CoverSource>(t: T, locale: string): T {

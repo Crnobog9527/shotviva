@@ -25,6 +25,7 @@ const row = (id: string, over: Partial<PublishCandidate> = {}): PublishCandidate
   visibleIn: ['web'],
   coverBeforeUrl: 'https://assets.test/b.webp',
   coverAfterUrl: 'https://assets.test/a.webp',
+  coverLocales: {},
   quality: 'high',
   creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
   isActive: false,
