@@ -8,6 +8,7 @@ import type { OutputAspect } from '@/core/templates/output-options'
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import { enqueueJobs, setWorkspaceJobs } from '../generation/job-store'
 import { useJobs } from '../generation/use-jobs'
+import type { ToggleValues } from '../toggles'
 import { startInputs } from '../workspace/batch-request'
 import { homeCta, type HomeViewer } from './home-cta'
 import { clearDraft, loadDraft, saveDraft } from './home-draft'
@@ -50,11 +51,11 @@ function useRestoreDraft({ signedIn, known, apply, pick }: Restore) {
 function useStart(viewer: HomeViewer | null, template: CatalogueTemplate | null, photo: HomePhoto) {
   const router = useRouter()
   return useCallback(
-    (aspect: OutputAspect, note: string) => {
+    (aspect: OutputAspect, note: string, toggles: ToggleValues) => {
       if (!viewer || !template || !photo.inputKey || !photo.url) return
       const upload = { phase: 'done' as const, inputKey: photo.inputKey }
       const ready = [{ photo: { id: 'home', url: photo.url, bytes: photo.file?.size ?? 0, ratio: null, upload }, inputKey: photo.inputKey }]
-      const ids = enqueueJobs(startInputs(template, { aspect, resolution: '1k', note, copy: {} }, ready), viewer.concurrency.limit)
+      const ids = enqueueJobs(startInputs(template, { aspect, resolution: '1k', note, copy: {}, toggles }, ready), viewer.concurrency.limit)
       setWorkspaceJobs(template.id, ids)
       router.push(`/generate/${template.id}`)
     },
@@ -67,6 +68,11 @@ export function useHomeGenerator({ templates, defaultId, viewer }: Args) {
   const template = templates.find((candidate) => candidate.id === templateId) ?? templates[0] ?? null
   const [aspect, setAspect] = useState<OutputAspect>('original')
   const [note, setNote] = useState('')
+  // The chosen template's toggles (T89): a choice belongs to the template it was made on, so
+  // picking another template starts from all off (and its own confirm dialog).
+  const [chosen, setChosen] = useState<{ templateId: string | null; values: ToggleValues }>({ templateId: null, values: {} })
+  const toggles = template && chosen.templateId === template.id ? chosen.values : {}
+  const setToggles = useCallback((values: ToggleValues) => setChosen({ templateId: template?.id ?? null, values }), [template])
   const photo = useHomePhoto(viewer !== null)
   const known = useCallback((id: string) => templates.some((candidate) => candidate.id === id), [templates])
   const apply = useCallback((id: string | null, nextAspect: OutputAspect, nextNote: string) => {
@@ -92,9 +98,11 @@ export function useHomeGenerator({ templates, defaultId, viewer }: Args) {
     setAspect,
     note,
     setNote,
+    toggles,
+    setToggles,
     photo,
     cta,
-    generate: () => start(aspect, note.trim()),
+    generate: () => start(aspect, note.trim(), toggles),
     // Before the sign-up prompt: what to bring back afterwards.
     keepDraft: () => (template ? saveDraft({ templateId: template.id, aspect, note }, photo.file) : Promise.resolve()),
   }

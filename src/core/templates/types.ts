@@ -1,7 +1,7 @@
 import { coverLocalesSchema, type CoverLocales } from './cover-locales'
 import { CATEGORY_COLUMNS, preT75Category, toCategory, type Category, type CategoryRow } from './categories'
 import type { CreditsCost, TemplateQuality } from './pricing'
-import type { CoverMediaType, TemplateFields, TemplateSurface, TemplateTranslations } from './schema'
+import type { CoverMediaType, StoredTemplateFields, TemplateFields, TemplateSurface, TemplateTranslations } from './schema'
 
 export type Template = {
   id: string
@@ -50,7 +50,7 @@ type TemplateRowBase = {
   cover_poster_url: string | null
   // Absent on a database before migration 0820 (T87).
   cover_locales?: unknown
-  fields: TemplateFields
+  fields: StoredTemplateFields
   quality: TemplateQuality
   // The table check guarantees exactly the three keys, each a positive integer.
   credits_cost: CreditsCost
@@ -94,7 +94,8 @@ export function toTemplate(row: TemplateRow | PreT75TemplateRow): Template {
     coverVideoUrl: row.cover_video_url,
     coverPosterUrl: row.cover_poster_url,
     coverLocales: coverLocalesSchema.parse(row.cover_locales ?? {}),
-    fields: row.fields,
+    // Templates saved before T89 have no toggles.
+    fields: { ...row.fields, toggles: row.fields.toggles ?? [] },
     quality: row.quality,
     creditsCost: row.credits_cost,
     sortOrder: row.sort_order,

@@ -24,6 +24,7 @@ const base: Template = {
       { key: 'price', label: 'Price', required: false, maxLength: 12 },
     ],
     aspectRatios: ['1:1'],
+    toggles: [],
   },
   quality: 'high',
   creditsCost: { '1k': 2, '2k': 4, '3k': 6 },

@@ -36,6 +36,7 @@ function Heading({ node, languages }: { node: RunNode; languages: readonly Cover
       </p>
       <p className="text-muted-foreground text-xs">{facts.join(' · ')}</p>
       {first.note ? <p className="text-muted-foreground text-xs break-words">{COPY.records.note(first.note)}</p> : null}
+      {Object.keys(first.toggles).length > 0 ? <p className="text-muted-foreground text-xs">{COPY.records.toggles(first.toggles)}</p> : null}
     </header>
   )
 }

@@ -13,6 +13,8 @@ import { findPii } from './pii'
 // Template ids, categories and error codes are all lowercase/uppercase slugs in the database.
 const slug = z.string().regex(/^[a-z0-9]+(?:[-_][a-z0-9]+)*$/).max(64)
 const errorCode = z.string().regex(/^[A-Z][A-Z0-9_]*$/).max(64)
+// A template toggle's key (templates.fields.toggles, T89).
+const toggleKey = z.string().regex(/^[a-z][a-z0-9_]*$/).max(64)
 
 export const UPLOAD_SIZE_BUCKETS = ['<1MB', '1-5MB', '>5MB'] as const
 export const RESOLUTIONS = ['1k', '2k', '3k'] as const
@@ -38,6 +40,9 @@ export const CONTACT_SALES_PAGES = ['/pricing', '/zh/pricing'] as const
 export const TEMPLATE_VIEW_SURFACES = ['workspace', 'home_picker'] as const
 // T83 (ARCHITECTURE §5.1b): where a template was saved or unsaved.
 export const TEMPLATE_FAVORITE_SURFACES = ['create_card', 'create_dialog', 'home_picker'] as const
+// T89 (ARCHITECTURE §16.2): a template toggle's confirm dialog and turning one off, and where.
+export const TEMPLATE_TOGGLE_ACTIONS = ['confirm_shown', 'confirmed', 'cancelled', 'turned_off'] as const
+export const TEMPLATE_TOGGLE_SURFACES = ['workspace', 'create_dialog', 'home'] as const
 export const UPLOAD_ERROR_REASONS = ['too_large', 'unsupported', 'ticket_failed', 'transfer_failed', 'unknown'] as const
 
 const checkoutProps = {
@@ -68,6 +73,8 @@ export const eventSchemas = {
     edit_scope: z.enum(EDIT_SCOPES).nullable(),
     // Photos in the workspace batch this one belonged to; 1 for a single photo (T28).
     batch_size: z.number().int().min(1).max(MAX_BATCH_SIZE),
+    // The template's toggles as chosen (T89), key → on; {} for a template without any.
+    toggles: z.record(toggleKey, z.boolean()).optional(),
   }),
   // A request refused before charging (ARCHITECTURE §5.1a, T81): which entry, never the words.
   generate_refused: z.strictObject({ reason: z.enum(['identity_swap']), source: z.enum(IDENTITY_SOURCES) }),
@@ -83,6 +90,13 @@ export const eventSchemas = {
     category: slug,
     action: z.enum(['add', 'remove']),
     surface: z.enum(TEMPLATE_FAVORITE_SURFACES),
+  }),
+  // T89: a toggle's confirm dialog shown, accepted or cancelled, or the toggle turned off.
+  template_toggle: z.strictObject({
+    template_id: slug,
+    key: toggleKey,
+    action: z.enum(TEMPLATE_TOGGLE_ACTIONS),
+    surface: z.enum(TEMPLATE_TOGGLE_SURFACES),
   }),
   // T74: a product picked inside the paywall (a tier, a pack, or Monthly / Yearly moving the pick).
   paywall_select: z.strictObject({ product_id: z.enum(PRODUCT_IDS), method: z.enum(PAYMENT_METHODS) }),
@@ -102,7 +116,7 @@ export type EventProps<E extends EventName> = z.infer<(typeof eventSchemas)[E]>
 
 // §16.2: money and credit events go out from the server so ad blockers cannot drop them.
 export const SERVER_EVENTS = ['signup', 'generate', 'generate_refused', 'checkout_start', 'checkout_cancel', 'purchase'] as const
-export const BROWSER_EVENTS = ['upload', 'upload_error', 'paywall_view', 'paywall_select', 'template_view', 'template_favorite', 'contact_sales_click'] as const
+export const BROWSER_EVENTS = ['upload', 'upload_error', 'paywall_view', 'paywall_select', 'template_view', 'template_favorite', 'template_toggle', 'contact_sales_click'] as const
 export type ServerEventName = (typeof SERVER_EVENTS)[number]
 export type BrowserEventName = (typeof BROWSER_EVENTS)[number]
 

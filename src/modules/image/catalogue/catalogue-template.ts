@@ -1,4 +1,4 @@
-import type { CoverMediaType, CreditsCost, LocalizedTemplate } from '@/core/templates'
+import type { CoverMediaType, CreditsCost, LocalizedTemplate, ToggleConfirm } from '@/core/templates'
 
 // What the browser needs of a template to draw its card, preview and workspace header. Plain
 // data so server pages can hand it to client components; prompts never reach it.
@@ -16,6 +16,8 @@ export type CatalogueTemplate = {
   creditsCost: CreditsCost
   // Text the template asks for (a headline, a price); most templates have none (DESIGN §4.3).
   copyFields: { key: string; label: string; placeholder?: string; required: boolean; maxLength: number }[]
+  // On/off options (T89), off by default, in the page's language; [] for most templates.
+  toggles: CatalogueToggle[]
   cover: {
     type: CoverMediaType
     before: string | null
@@ -25,6 +27,8 @@ export type CatalogueTemplate = {
     poster: string | null
   }
 }
+
+export type CatalogueToggle = { key: string; label: string; hint?: string; confirm?: ToggleConfirm }
 
 // Pass a template already through localizeTemplate (core/templates) for the page's language.
 export function toCatalogueTemplate(template: LocalizedTemplate): CatalogueTemplate {
@@ -44,6 +48,7 @@ export function toCatalogueTemplate(template: LocalizedTemplate): CatalogueTempl
       required,
       maxLength,
     })),
+    toggles: (template.fields.toggles ?? []).map(({ key, label, hint, confirm }) => ({ key, label, ...(hint ? { hint } : {}), ...(confirm ? { confirm } : {}) })),
     cover: {
       type: template.coverMediaType,
       before: template.coverBeforeUrl,

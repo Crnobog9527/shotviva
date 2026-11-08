@@ -447,6 +447,9 @@
         "add": "添加照片",
         "remove": "删除照片",
         "failed": "没能上传，删掉后换一张试试。"
+      },
+      "toggles": {
+        "cancel": "取消"
       }
     },
     "errors": {

@@ -97,6 +97,8 @@ export const termsServiceSections: readonly [LegalSection, ...LegalSection[]] = 
         legalLinks.acceptableUse,
         '.',
       ],
+      // T89 (Owner 2026-11-08): draft wording; the Owner or a lawyer may still change it.
+      'You are responsible for images you create with options that change how your product looks (for example, AI upgraded plating and tableware), including making sure that the images you publish match what you actually sell or serve. Disputes caused by differences between such an image and the real product are your responsibility.',
       'We do not use your photos or Outputs to train AI models.',
     ],
   },

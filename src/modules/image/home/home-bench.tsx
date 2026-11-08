@@ -9,6 +9,7 @@ import { NOTE_MAX_LENGTH } from '@/core/templates/output-options'
 import { GroundedImg } from '../result/grounded-img'
 import { thumbImage } from './thumb-image'
 import { sizeLabel } from '../workspace/workspace-options'
+import { TemplateToggles } from '../toggles'
 import { HomeCtaButton } from './home-cta-button'
 import { ChevronIcon, GiftIcon, PlusIcon } from './home-icons'
 import { SizeMenu } from './size-menu'
@@ -66,6 +67,7 @@ export const HomeBench = forwardRef<HTMLDivElement, Props>(function HomeBench({ 
         />
         <HomeCtaButton cta={state.cta} templateId={template?.id ?? null} place="bench" onPickPhoto={onPickPhoto} onSignUp={onSignUp} onGenerate={state.generate} />
       </section>
+      <TemplateToggles className="mk-bench-toggles" template={template} values={state.toggles} onChange={state.setToggles} surface="home" compact />
       {photo.error ? (
         <p role="alert" className="mk-bench-error">
           {app(`errors.${photo.error}`)}

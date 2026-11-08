@@ -22,6 +22,8 @@ export const testGenerateBodySchema = z.object({
         .max(NOTE_MAX_LENGTH)
         .transform((note) => note || undefined)
         .optional(),
+      // The template's toggles (T89); an admin turns one on without the user's confirm dialog.
+      toggles: z.record(z.string().max(64), z.boolean()).optional(),
     })
     .default({}),
 })

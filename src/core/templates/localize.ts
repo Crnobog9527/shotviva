@@ -1,6 +1,8 @@
 import type { Locale } from '../i18n/locales'
 import { localizeCategory, type LocalizedCategory } from './categories'
 import { withLocaleCover } from './cover-locales'
+import type { TemplateTranslation } from './schema'
+import type { ToggleField } from './toggles'
 import type { Template } from './types'
 
 // A template as shown in one language: the translated name, description and copy-field labels
@@ -13,6 +15,25 @@ export type LocalizedTemplate = Template & {
   description: string | null
   // Its category's name, intro and card style in the page's language (T75).
   categoryView: LocalizedCategory
+}
+
+type ConfirmText = NonNullable<ToggleField['confirm']>
+
+function localizeConfirm(english: ConfirmText, own: Partial<ConfirmText> = {}): ConfirmText {
+  return {
+    title: own.title || english.title,
+    body: own.body || english.body,
+    checkbox: own.checkbox || english.checkbox,
+    accept: own.accept || english.accept,
+  }
+}
+
+// A toggle's label, hint and confirm dialog (T89), line by line, falling back to English.
+function localizeToggle(toggle: ToggleField, text: TemplateTranslation): ToggleField {
+  const own = text.fields?.[toggle.key] ?? {}
+  const hint = own.hint || toggle.hint
+  const confirm = toggle.confirm ? { confirm: localizeConfirm(toggle.confirm, own.confirm) } : {}
+  return { ...toggle, label: own.label || toggle.label, ...(hint ? { hint } : {}), ...confirm }
 }
 
 export function localizeTemplate(template: Template, locale: Locale): LocalizedTemplate {
@@ -29,6 +50,6 @@ export function localizeTemplate(template: Template, locale: Locale): LocalizedT
     categoryView,
     name: text.name || template.name,
     description: text.description || template.description,
-    fields: { ...template.fields, copy },
+    fields: { ...template.fields, copy, toggles: template.fields.toggles.map((toggle) => localizeToggle(toggle, text)) },
   }
 }

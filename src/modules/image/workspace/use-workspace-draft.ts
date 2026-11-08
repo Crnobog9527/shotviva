@@ -32,7 +32,7 @@ export type DraftInput = {
   single?: boolean
 }
 
-const DEFAULTS: FormValues = { aspect: 'original', resolution: '1k', note: '', copy: {} }
+const DEFAULTS: FormValues = { aspect: 'original', resolution: '1k', note: '', copy: {}, toggles: {} }
 
 // The creation form's state, one source for its two frames (T38, DESIGN §6.9 item 2): the
 // dialog Create opens and the workspace page. Photos upload as they are picked; start() queues

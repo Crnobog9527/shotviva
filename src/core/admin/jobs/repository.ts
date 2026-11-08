@@ -13,10 +13,11 @@ import { beijingDayStart, refFilter, type JobFilters } from './filters'
 // (0160) drives the order, the keyset and the date range; status / template / source / model
 // are filters on that walk; a reference number (T78) is a range on generation_jobs_pkey. Only list columns are read: inputs is a jsonb, so just its
 // resolution key is selected. provider_usage (T33) is at most four integers, read only to tell
-// 「无法计算」 (usage, no price) from a pre-T33 job (neither).
+// 「无法计算」 (usage, no price) from a pre-T33 job (neither). The template toggles (T89) are two
+// small objects of at most three keys each, read so 客诉 can see the user turned one on.
 
 const COLUMNS =
-  'id, created_at, finished_at, user_id, template_id, status, source, provider, credit_pool, credits_cost, error_code, resolution:inputs->>resolution, cost_usd, provider_usage, deleted_at'
+  'id, created_at, finished_at, user_id, template_id, status, source, provider, credit_pool, credits_cost, error_code, resolution:inputs->>resolution, toggles:inputs->toggles, toggles_confirmed_at:inputs->toggles_confirmed_at, cost_usd, provider_usage, deleted_at'
 
 const rowSchema = z.object({
   id: z.uuid(),
@@ -35,6 +36,9 @@ const rowSchema = z.object({
   provider_usage: z.record(z.string(), z.unknown()).nullable(),
   // Absent before T41's migration.
   deleted_at: z.string().nullable().optional(),
+  // T89; null on jobs of templates without toggles. Anything odd reads as none.
+  toggles: z.record(z.string(), z.boolean()).nullable().optional().catch(null),
+  toggles_confirmed_at: z.record(z.string(), z.string()).nullable().optional().catch(null),
 })
 
 export type AdminJob = {
@@ -56,6 +60,8 @@ export type AdminJob = {
   hasUsage: boolean
   // The user deleted this work (T41): the row stays for the ledger and costs, the files are gone.
   deletedByUser: boolean
+  // Template toggles as chosen (T89), each with when the user accepted its confirm dialog.
+  toggles: { key: string; on: boolean; confirmedAt: string | null }[]
 }
 
 function toJob(row: z.infer<typeof rowSchema>): AdminJob {
@@ -77,6 +83,7 @@ function toJob(row: z.infer<typeof rowSchema>): AdminJob {
     costUsd: row.cost_usd,
     hasUsage: row.provider_usage !== null,
     deletedByUser: Boolean(row.deleted_at),
+    toggles: Object.entries(row.toggles ?? {}).map(([key, on]) => ({ key, on, confirmedAt: row.toggles_confirmed_at?.[key] ?? null })),
   }
 }
 

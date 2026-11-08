@@ -13,6 +13,7 @@ import { AgainNote } from '../again/again-note'
 import type { AgainStart } from '../again/again-start'
 import { MissingPhoto } from '../again/missing-photo'
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
+import { TemplateToggles, type ToggleSurface } from '../toggles'
 import { BatchHint } from './batch-hint'
 import { BatchPhotos } from './batch-photos'
 import { ResolutionPicker, SizePicker } from './option-pickers'
@@ -22,7 +23,8 @@ import { CopyFields, NoteField } from './text-fields'
 import type { PhotoBatch } from './use-photo-batch'
 import { notePlaceholder, SIZE_OPTIONS } from './workspace-options'
 
-export type FormValues = { aspect: OutputAspect; resolution: Resolution; note: string; copy: Record<string, string> }
+// toggles (T89): the template's on/off options, key → on; {} is every one off.
+export type FormValues = { aspect: OutputAspect; resolution: Resolution; note: string; copy: Record<string, string>; toggles: Record<string, boolean> }
 
 type Props = {
   template: CatalogueTemplate
@@ -35,13 +37,15 @@ type Props = {
   again?: AgainStart | null
   // Under the photo slot: the creation dialog's way to a batch on the workspace page.
   photoExtra?: ReactNode
+  // Which frame renders the form, for the template_toggle event (T89).
+  surface?: Exclude<ToggleSurface, 'home'>
 }
 
-// One column, one scroll, no wizard (DESIGN §4.3): photo → text the template needs → the
-// optional note → size → resolution, then the balance line above the action bar. The one form
+// One column, one scroll, no wizard (DESIGN §4.3): photo → text the template needs → its on/off
+// options (T89) → the optional note → size → resolution, then the balance line above the action bar. The one form
 // source (T38): the workspace page and the creation dialog both render it, and their frames
 // set the side padding.
-export function WorkspaceForm({ template, balance, tier, photos, values, onChange, again, photoExtra }: Props) {
+export function WorkspaceForm({ template, balance, tier, photos, values, onChange, again, photoExtra, surface = 'workspace' }: Props) {
   const t = useTranslations('app')
   const balanceT = useTranslations('app.balance')
   const noteT = useTranslations('app.workspace.notePlaceholder')
@@ -59,6 +63,7 @@ export function WorkspaceForm({ template, balance, tier, photos, values, onChang
           <CopyFields fields={template.copyFields} values={values.copy} onChange={(copy) => onChange({ copy })} />
         </div>
       ) : null}
+      <TemplateToggles className="pt-6" template={template} values={values.toggles} onChange={(toggles) => onChange({ toggles })} surface={surface} />
       <div className="pt-6">
         <NoteField value={values.note} placeholder={notePlaceholder(template.category, noteT)} onChange={(note) => onChange({ note })} />
       </div>
