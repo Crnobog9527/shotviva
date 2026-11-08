@@ -6,7 +6,7 @@ import { trackPurchase } from '../../analytics/funnel'
 import type { ProductId, SiteProduct } from '../../config'
 import { AppError } from '../../errors'
 import { creditChangeSchema, type CreditChange } from '../credits'
-import type { CancelOthers } from '../subscription/cancel-others'
+import type { CancelOthers, CancelRefunded } from '../subscription/cancel-others'
 import type { RefuseEnded } from '../subscription/ended-order'
 import { callRpc, type RpcClient } from '../rpc'
 import { paymentFacts, readWaffoOrder, type WaffoOrder, type WaffoPaymentFacts } from './payment-facts'
@@ -26,6 +26,8 @@ export type WaffoFulfilDeps = {
   trackBuy?: typeof trackPurchase
   // The upgrade step (T66, same as Stripe's): cancel the buyer's other renewing subscriptions.
   cancelOthers?: CancelOthers
+  // T71: a refunded membership's own card subscription is cancelled. Wired by the webhook route.
+  cancelRefunded?: CancelRefunded
   // T66: a charge on an order an upgrade already ended is refused (no credits, alert).
   refuseEnded?: RefuseEnded
 }

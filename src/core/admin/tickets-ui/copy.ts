@@ -75,7 +75,7 @@ export const TICKETS_COPY = {
     waffoHint: (id: string) => `到 Waffo 后台按订单号 ${id} 搜索并退款`,
     // T50：订阅订单每期一笔扣款，退款要退到具体那一笔。
     waffoChargeHint: (payment: string, order: string) => `到 Waffo 后台按扣款号 ${payment}（订单 ${order}）找到这笔扣款并退款`,
-    waffoSubscriptionNote: '退款不会停止 Waffo 订阅；要停止续费，请同时在 Waffo 后台取消这个订阅。',
+    waffoSubscriptionNote: '退款回调到达后，系统会自动取消这个 Waffo 订阅（Waffo 只能期末停止，它的后台会显示「取消中」）；飞书提醒「订阅没取消」时，请到 Waffo 后台手动取消。',
     missing: '这笔付款已不存在。',
   },
   refund: {
@@ -94,7 +94,9 @@ export const TICKETS_COPY = {
     replyLabel: '给用户的回复',
     submit: '提交决定',
     decided: (label: string, amount: string | null) => `当前决定：${label}${amount ? `，${amount}` : ''}`,
-    afterApprove: '同意后请到 Stripe / Waffo 后台完成退款；退款回调会更新付款状态，扣回积分后再关闭工单。',
+    afterApprove: '同意后请到 Stripe / Waffo 后台完成退款；退款回调会更新付款状态，并按退款比例自动扣回这笔发放的积分。',
+    clawbackLabel: '这笔的积分扣回：',
+    clawbackHint: '用过积分、要按剩余比例退款的：先点「扣回剩余积分」，扣掉用户手上这笔剩下的付费积分（记到这笔付款名下），再去按比例退款；退款回调不会再重复扣。',
     done: '已记录决定',
   },
   errors: {

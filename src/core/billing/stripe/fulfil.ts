@@ -7,7 +7,7 @@ import { trackPurchase } from '../../analytics/funnel'
 import type { SiteProduct } from '../../config'
 import { AppError } from '../../errors'
 import type { RpcClient } from '../rpc'
-import type { CancelOthers } from '../subscription/cancel-others'
+import type { CancelOthers, CancelRefunded } from '../subscription/cancel-others'
 import { CHECKOUT_METHODS, lookupKey, type CheckoutMethod, type RecordedMethod } from './catalog'
 import type { StripeApi } from './client'
 import type { DisputeEvidenceConfig } from './disputes/config'
@@ -30,6 +30,8 @@ export type FulfilDeps = {
   // The upgrade step (T66): after a membership is paid, cancel the buyer's other renewing
   // subscriptions. Wired by the webhook route and the admin replay; absent in tests that only settle.
   cancelOthers?: CancelOthers
+  // T71: a refunded membership's own subscription is cancelled at once. Wired by the webhook route.
+  cancelRefunded?: CancelRefunded
   // T82: the dispute evidence wiring (site facts, admin link). Wired by the webhook route; absent
   // in the admin replay, which never sees a dispute.
   evidence?: DisputeEvidenceConfig

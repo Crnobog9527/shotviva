@@ -96,8 +96,7 @@ describe('handleWaffoWebhook', () => {
     expect(deps.trackBuy).toHaveBeenCalledWith(USER, expect.objectContaining({ channel: 'waffo', form: 'one_time', method: 'alipay', amount_usd: 19.9 }), 'en')
   })
 
-  it('records a refund without touching credits, and ignores other events', async () => {
-    expect((await deliver(refundSucceeded('PAY_1'))).status).toBe(200)
+  it('ignores events this site never starts', async () => {
     // Plan changes are never started from this site: acknowledged, nothing applied.
     expect((await deliver({ ...refundSucceeded('PAY_1'), eventType: 'subscription.plan_change_scheduled' })).status).toBe(200)
     expect(rpc).not.toHaveBeenCalled()
@@ -112,6 +111,51 @@ describe('handleWaffoWebhook', () => {
   it('answers 500 when the database fails, so the retry can grant', async () => {
     rpc.mockResolvedValueOnce({ data: null, error: { message: 'connection reset' } })
     expect((await deliver(orderCompleted({ userId: USER, productId: 'pack_s' }))).status).toBe(500)
+  })
+})
+
+describe('handleWaffoWebhook, refunds (T71)', () => {
+  const deliver = (event: unknown) => {
+    const raw = body(event)
+    return handleWaffoWebhook(deps, { body: raw, signature: signWaffo(raw, keys.privateKey, NOW) })
+  }
+
+  it('a refund goes to record_waffo_refund, keyed by its event id, with its own amount in cents (T71)', async () => {
+    const event = refundSucceeded('PAY_1')
+    const withAmount = { ...event, data: { ...event.data, refundedAmount: '10.00', amount: '9.00' } }
+    rpc.mockResolvedValueOnce({ data: null, error: null })
+    expect(await deliver(withAmount)).toMatchObject({ status: 200, body: { outcome: 'unknown_payment' } })
+    expect(rpc).toHaveBeenCalledWith('record_waffo_refund', { p_payment_id: 'PAY_1', p_refund_ref: event.eventId, p_amount: 1000 })
+  })
+
+  it('a refund with no amount counts as the rest (null), and a refund.failed-shaped body is skipped', async () => {
+    rpc.mockResolvedValueOnce({ data: null, error: null })
+    const event = refundSucceeded('PAY_1')
+    await deliver(event)
+    expect(rpc).toHaveBeenCalledWith('record_waffo_refund', expect.objectContaining({ p_amount: null }))
+    rpc.mockClear()
+    expect(await deliver({ ...event, data: { ...event.data, refundStatus: 'failed' } })).toMatchObject({ status: 200, body: { outcome: 'not_succeeded' } })
+    expect(rpc).not.toHaveBeenCalled()
+  })
+
+  it('a refunded membership cancels its own card subscription (T71)', async () => {
+    const cancelRefunded = vi.fn(async () => 'cancelled' as const)
+    rpc.mockResolvedValueOnce({
+      data: {
+        payment_id: 7, user_id: USER, product_id: 'pro_monthly', status: 'refunded', amount_total: 4990, amount_refunded: 4990,
+        currency: 'usd', credits_clawed_back: 135, clawback_shortfall: 0, membership_ended: true, waffo_order_id: 'ORD_sub1',
+      },
+      error: null,
+    })
+    const raw = body(refundSucceeded('PAY_1'))
+    const result = await handleWaffoWebhook({ ...deps, cancelRefunded }, { body: raw, signature: signWaffo(raw, keys.privateKey, NOW) })
+    expect(result).toMatchObject({ status: 200, body: { outcome: 'recorded' } })
+    expect(cancelRefunded).toHaveBeenCalledWith(USER, { waffoOrderId: 'ORD_sub1' })
+  })
+
+  it('a refund the database cannot record answers 500, so Waffo redelivers it', async () => {
+    rpc.mockResolvedValueOnce({ data: null, error: { message: 'connection reset' } })
+    expect((await deliver(refundSucceeded('PAY_1'))).status).toBe(500)
   })
 })
 

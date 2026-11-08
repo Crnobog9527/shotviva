@@ -9,8 +9,10 @@ import { connectAdmin, createUser, ledgerOf, profileOf } from './helpers'
 import { serviceSupabase } from './supabase-env'
 import { chargeObject, checkoutSession, eventFor, paymentsOf, signed, stripeHarness, type Harness } from './stripe-fixtures'
 
-// AGENTS §7 test 2 (Stripe): charge.refunded and charge.dispute.created only record on the
-// payment and alert in Sentry; credits are never clawed back (ARCHITECTURE §6.2).
+// AGENTS §7 test 2 (Stripe): charge.refunded and charge.dispute.created record on the payment
+// and alert in Sentry. Since T71 a refund also takes the credits back (the amounts and edge cases
+// are in clawback.test.ts); a dispute's clawback runs in the dispute flow, which this harness
+// leaves out (no evidence config), so here a dispute only records.
 
 vi.mock('@/core/analytics/capture-error', () => ({ captureAlert: vi.fn(), captureError: vi.fn() }))
 
@@ -64,7 +66,7 @@ describe('one-time payments are recorded with their charge', () => {
 })
 
 describe('charge.refunded', () => {
-  it('a full refund marks the payment refunded, alerts, and keeps the credits', async () => {
+  it('a full refund marks the payment refunded, alerts, and takes the credits back once (T71)', async () => {
     const { userId, charge } = await buyPack()
     const before = await profileOf(db, userId)
     const ledger = await ledgerOf(db, userId)
@@ -74,8 +76,8 @@ describe('charge.refunded', () => {
     await deliver(event)
 
     expect(await paymentsOf(db, userId)).toEqual([expect.objectContaining({ status: 'refunded', amount_refunded: 990 })])
-    expect(await profileOf(db, userId)).toEqual(before)
-    expect(await ledgerOf(db, userId)).toEqual(ledger)
+    expect(await profileOf(db, userId)).toEqual({ ...before, credits: before.credits - 20 })
+    expect(await ledgerOf(db, userId)).toEqual([...ledger, expect.objectContaining({ kind: 'clawback', delta: -20 })])
     expect(captureAlert).toHaveBeenCalledWith(
       'charge_refunded',
       expect.stringContaining(charge.id),
@@ -111,7 +113,7 @@ describe('charge.refunded', () => {
 })
 
 describe('charge.dispute.created', () => {
-  it('marks the payment disputed, alerts, keeps the credits; a later refund keeps it disputed', async () => {
+  it('marks the payment disputed and alerts; a later refund keeps it disputed (and settles everything)', async () => {
     const { userId, charge } = await buyPack()
     const before = await profileOf(db, userId)
 
@@ -122,7 +124,8 @@ describe('charge.dispute.created', () => {
     await deliver(refund(charge, 990))
 
     expect(await paymentsOf(db, userId)).toEqual([expect.objectContaining({ status: 'disputed', amount_refunded: 990 })])
-    expect(await profileOf(db, userId)).toEqual(before)
+    // A disputed payment owes all of its credits (T71).
+    expect(await profileOf(db, userId)).toEqual({ ...before, credits: before.credits - 20 })
   })
 })
 

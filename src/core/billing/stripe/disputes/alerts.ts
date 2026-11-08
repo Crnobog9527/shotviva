@@ -37,6 +37,13 @@ const fields = (f: Omit<DisputeAlertFacts, 'draft'> & { draft?: DisputeAlertFact
 // `base` is the payment-side alert payment-issues.ts built (amount, product, T71 clawback).
 export function alertDisputeOpened(f: DisputeAlertFacts, base: DisputeOpenedAlert): void {
   captureAlert('dispute_opened', `Stripe dispute ${f.disputeId}: evidence ${f.draft} (${f.responder})`, { fields: fields(f) })
+  // T71: the clawback could not take everything back (the credits were spent).
+  const shortfall = base.credits?.shortfall ?? 0
+  if (shortfall > 0) {
+    captureAlert('clawback_shortfall', `Stripe dispute ${f.disputeId}: ${shortfall} credits could not be clawed back (already spent)`, {
+      fields: { ...fields(f), credits_clawed_back: base.credits?.clawedBack ?? null, clawback_shortfall: shortfall },
+    })
+  }
   notifyOwner({ ...base, evidence: { dueBy: f.dueBy?.toISOString() ?? null, responder: f.responder, autoBanned: f.autoBanned, draft: f.draft } })
 }
 

@@ -5,25 +5,28 @@ import type Stripe from 'stripe'
 import { notifyOwner } from '../../alerts'
 import { captureAlert, captureError } from '../../analytics/capture-error'
 import { logger } from '../../logger'
+import { closeDispute } from './disputes/close'
 import { stripeFailureAlert } from './failure-alert'
 import { fulfilCheckoutSession, type FulfilDeps } from './fulfil'
 import { recordDispute, recordRefund } from './payment-issues'
 import { renewFromInvoice } from './renewal'
 import { syncSubscription } from './subscription-sync'
+import type { StripeWebhookEvent } from './webhook-events'
 
 // POST /api/webhooks/stripe (ARCHITECTURE §6.3, AGENTS §6): verify the signature first (bad
 // signature → 400, nothing applied), then handle; a processing failure → 500 so Stripe retries.
 // Every handler re-reads its object from Stripe (the event body is only a notification), so
 // redelivered and out-of-order events act on Stripe's current state, and each write is keyed so
 // a replay changes nothing: settle_checkout by session id, apply_subscription_renewal by invoice
-// id, sync_subscription and record_payment_issue write absolute state.
+// id, sync_subscription and record_payment_issue write absolute state (its clawback is keyed by
+// the refunded total), open_payment_dispute and close_payment_dispute act once per dispute.
 
 type Handler = (deps: FulfilDeps, objectId: string) => Promise<string>
 
-// The seven events the Stripe endpoint subscribes to. Anything else answers 200 untouched.
-// async_payment_succeeded: a delayed method completes the session unpaid and confirms later;
-// both session events settle the same session id.
-const HANDLERS: Record<string, Handler> = {
+// The eight events the Stripe endpoint subscribes to (webhook-events.ts). Anything else answers
+// 200 untouched. async_payment_succeeded: a delayed method completes the session unpaid and
+// confirms later; both session events settle the same session id.
+const HANDLERS: Record<StripeWebhookEvent, Handler> = {
   'checkout.session.completed': fulfilCheckoutSession,
   'checkout.session.async_payment_succeeded': fulfilCheckoutSession,
   'invoice.paid': renewFromInvoice,
@@ -31,6 +34,7 @@ const HANDLERS: Record<string, Handler> = {
   'customer.subscription.deleted': syncSubscription,
   'charge.refunded': recordRefund,
   'charge.dispute.created': recordDispute,
+  'charge.dispute.closed': closeDispute,
 }
 
 export type WebhookDeps = FulfilDeps & { webhookSecret: string }
@@ -55,7 +59,7 @@ export async function handleStripeWebhook(
     captureAlert('payment_webhook_signature', 'Stripe webhook signature rejected')
     return { status: 400, body: { code: 'INVALID_SIGNATURE' } }
   }
-  const handler = HANDLERS[event.type]
+  const handler = (HANDLERS as Record<string, Handler | undefined>)[event.type]
   if (!handler) return { status: 200, body: { received: true } }
 
   const objectId = (event.data.object as { id: string }).id

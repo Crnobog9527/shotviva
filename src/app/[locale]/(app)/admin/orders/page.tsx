@@ -4,7 +4,7 @@ import { AdminPage, DASHBOARD_DAYS, listPurchases, listSubscriptions, loadRevenu
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { serverEnv } from '@/core/env'
 
-import { applyReplayAction, previewReplayAction } from './actions'
+import { applyClawbackAction, applyReplayAction, previewClawbackAction, previewReplayAction } from './actions'
 
 // /admin/orders (ARCHITECTURE §10, Plan A): list-price revenue from admin_revenue_stats, the
 // purchase ledger and T9's subscription mirror. Stripe links use test paths outside production.
@@ -34,6 +34,7 @@ export default async function AdminOrdersPage({ searchParams }: PageProps<'/[loc
         subscriptions={subscriptions}
         cursors={cursors}
         stripeLive={serverEnv().VERCEL_ENV === 'production'}
+        clawback={{ preview: previewClawbackAction, apply: applyClawbackAction }}
       />
     </AdminPage>
   )

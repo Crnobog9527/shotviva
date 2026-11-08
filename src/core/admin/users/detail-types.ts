@@ -17,6 +17,9 @@ export type UserPayment = {
   currency: string
   method: string
   status: string
+  // T71: credits taken back for this payment, and those already spent (「欠扣」).
+  creditsClawedBack: number
+  clawbackShortfall: number
 }
 
 export type UserSubscription = {

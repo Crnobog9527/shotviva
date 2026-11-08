@@ -8,25 +8,33 @@ import { logger } from '../../logger'
 import { callRpc } from '../rpc'
 import { openDispute } from './disputes/open'
 import type { FulfilDeps } from './fulfil'
+import { cancelRefundedMembership } from './refund-subscription'
 
-// charge.refunded and charge.dispute.created (ARCHITECTURE §6.2, §6.3): record on the payment
-// and alert the Owner in Sentry and in Feishu (T72, plain Chinese). Credits are never clawed back
-// here yet: Link support can refund without us, and the Owner decides by hand (admin_adjust_credits)
-// until T71. Amounts are re-read from Stripe.
+// charge.refunded and charge.dispute.created (ARCHITECTURE §6.2 「退款自动扣回积分」, §6.3), with
+// amounts re-read from Stripe. record_payment_issue records the refund, takes the payment's
+// credits back (granted × refunded share, capped at the paid balance, the rest written off as a
+// shortfall) and ends a refunded membership, in one transaction; this side then cancels that
+// membership's subscription and tells the Owner what was taken back (Sentry, and Feishu, T72).
+// A dispute is recorded here; open_payment_dispute (T82's dispute flow) takes everything back and
+// sends the one alert.
 
 export type IssueOutcome = 'recorded' | 'unknown_charge'
 
 const issueSchema = z
   .object({
+    payment_id: z.number().int().optional(),
     user_id: z.uuid(),
     product_id: z.string(),
     status: z.string(),
     amount_total: z.number().int(),
     amount_refunded: z.number().int(),
     currency: z.string(),
-    // T71's clawback totals on the payment row; absent until record_payment_issue returns them.
+    // T71's clawback totals on the payment row (refunds only; a dispute's come from open_payment_dispute).
     credits_clawed_back: z.number().int().optional(),
     clawback_shortfall: z.number().int().optional(),
+    membership_ended: z.boolean().optional(),
+    stripe_session_id: z.string().nullable().optional(),
+    stripe_invoice_id: z.string().nullable().optional(),
   })
   .nullable()
 
@@ -34,10 +42,10 @@ type Issue = { kind: 'refunded' | 'disputed'; chargeId: string; amountRefunded: 
 
 const ALERT: Record<Issue['kind'], AlertKind> = { refunded: 'charge_refunded', disputed: 'charge_disputed' }
 
-type Payment = z.infer<typeof issueSchema>
+export type IssuePayment = z.infer<typeof issueSchema>
 
 // Ids and amounts only (no email), for the log line and the Sentry alert.
-function alertFields(issue: Issue, payment: Payment): Record<string, string | number | boolean | null> {
+function alertFields(issue: Issue, payment: IssuePayment): Record<string, string | number | boolean | null> {
   if (!payment) {
     return { charge_id: issue.chargeId, source_id: issue.sourceId, known_payment: false, amount_refunded: issue.amountRefunded }
   }
@@ -45,31 +53,41 @@ function alertFields(issue: Issue, payment: Payment): Record<string, string | nu
     charge_id: issue.chargeId,
     source_id: issue.sourceId,
     known_payment: true,
+    payment_id: payment.payment_id ?? null,
     user_id: payment.user_id,
     product_id: payment.product_id,
     status: payment.status,
     amount_refunded: payment.amount_refunded,
     amount_total: payment.amount_total,
     currency: payment.currency,
+    credits_clawed_back: payment.credits_clawed_back ?? null,
+    clawback_shortfall: payment.clawback_shortfall ?? null,
+    membership_ended: payment.membership_ended ?? null,
   }
 }
 
-// T71's totals, once record_payment_issue returns them.
-function clawback(payment: NonNullable<Payment>): Clawback | null {
-  if (payment.credits_clawed_back === undefined) return null
-  return { clawedBack: payment.credits_clawed_back, shortfall: payment.clawback_shortfall ?? 0 }
+export function clawbackOf(row: { credits_clawed_back?: number; clawback_shortfall?: number } | null): Clawback | null {
+  if (row?.credits_clawed_back === undefined) return null
+  return { clawedBack: row.credits_clawed_back, shortfall: row.clawback_shortfall ?? 0 }
 }
 
-function ownerAlert(issue: Issue, payment: Payment): OwnerAlert {
+function ownerAlert(issue: Issue, payment: IssuePayment): OwnerAlert {
   const facts = payment
-    ? { userId: payment.user_id, productId: payment.product_id, amount: { cents: payment.amount_total, currency: payment.currency }, credits: clawback(payment) }
+    ? { userId: payment.user_id, productId: payment.product_id, amount: { cents: payment.amount_total, currency: payment.currency }, credits: clawbackOf(payment) }
     : { userId: null, productId: null, amount: null, credits: null }
   if (issue.kind === 'disputed') return { kind: 'dispute_opened', disputeId: issue.sourceId, ...facts }
   const refunded = payment ? { cents: payment.amount_refunded, currency: payment.currency } : null
   return { kind: 'refund', channel: 'stripe', refundId: issue.chargeId, refunded, ...facts }
 }
 
-async function recordIssue(deps: FulfilDeps, issue: Issue): Promise<Payment> {
+// The Owner hears about every credit that could not be taken back (spent already): written off,
+// shown as 「欠扣」 in the admin.
+export function alertShortfall(fields: Record<string, string | number | boolean | null>, shortfall: number | undefined, what: string): void {
+  if (!shortfall) return
+  captureAlert('clawback_shortfall', `${what}: ${shortfall} credits could not be clawed back (already spent)`, { fields })
+}
+
+async function recordIssue(deps: FulfilDeps, issue: Issue): Promise<IssuePayment> {
   const payment = await callRpc(
     deps.db,
     'record_payment_issue',
@@ -78,33 +96,35 @@ async function recordIssue(deps: FulfilDeps, issue: Issue): Promise<Payment> {
   )
   const fields = alertFields(issue, payment)
   logger.warn(`stripe charge ${issue.kind} recorded`, fields)
-  // The Owner reviews every one, recorded or not: credits were not taken back.
-  captureAlert(ALERT[issue.kind], `Stripe charge ${issue.chargeId} ${issue.kind}: credits not clawed back`, { fields })
+  const taken = issue.kind === 'refunded' && payment ? `${payment.credits_clawed_back ?? 0} credits clawed back` : 'see the dispute'
+  captureAlert(ALERT[issue.kind], `Stripe charge ${issue.chargeId} ${issue.kind}: ${taken}`, { fields })
+  if (issue.kind === 'refunded') alertShortfall(fields, payment?.clawback_shortfall, `Stripe charge ${issue.chargeId} refunded`)
   return payment
-}
-
-async function record(deps: FulfilDeps, issue: Issue): Promise<IssueOutcome> {
-  const payment = await recordIssue(deps, issue)
-  notifyOwner(ownerAlert(issue, payment))
-  return payment ? 'recorded' : 'unknown_charge'
 }
 
 export async function recordRefund(deps: FulfilDeps, chargeId: string): Promise<IssueOutcome> {
   const charge = await deps.stripe.charges.retrieve(chargeId)
-  return record(deps, { kind: 'refunded', chargeId: charge.id, amountRefunded: charge.amount_refunded, sourceId: charge.id })
+  const issue: Issue = { kind: 'refunded', chargeId: charge.id, amountRefunded: charge.amount_refunded, sourceId: charge.id }
+  const payment = await recordIssue(deps, issue)
+  // Never throws: a cancel that fails is alerted for the Owner to finish by hand.
+  if (payment?.membership_ended) await cancelRefundedMembership(deps, payment)
+  notifyOwner(ownerAlert(issue, payment))
+  return payment ? 'recorded' : 'unknown_charge'
 }
 
 export async function recordDispute(deps: FulfilDeps, disputeId: string): Promise<IssueOutcome> {
   const dispute = await deps.stripe.disputes.retrieve(disputeId)
   const chargeId = typeof dispute.charge === 'string' ? dispute.charge : dispute.charge.id
   const issue: Issue = { kind: 'disputed', chargeId, amountRefunded: null, sourceId: dispute.id }
-  if (!deps.evidence) {
-    logger.warn('stripe dispute: no evidence config wired, draft skipped', { dispute_id: dispute.id })
-    return record(deps, issue)
-  }
-  // T82: the dispute row, the ban and the evidence draft; the Owner's alert goes out from there,
-  // once, with the deadline and the admin link (core/billing/stripe/disputes).
   const payment = await recordIssue(deps, issue)
+  if (!deps.evidence) {
+    // Only the admin replay and tests build deps without it; the webhook route always wires it.
+    logger.warn('stripe dispute: no evidence config wired, dispute flow skipped', { dispute_id: dispute.id })
+    notifyOwner(ownerAlert(issue, payment))
+    return payment ? 'recorded' : 'unknown_charge'
+  }
+  // T82 + T71: the dispute row, the ban, the full clawback and the evidence draft; the Owner's
+  // alert goes out from there, once, with the deadline, the admin link and what was taken back.
   const owner = ownerAlert(issue, payment) as DisputeOpenedAlert
   await openDispute({ stripe: deps.stripe, db: deps.db, evidence: deps.evidence }, dispute.id, owner)
   return payment ? 'recorded' : 'unknown_charge'

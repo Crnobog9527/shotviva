@@ -9,6 +9,7 @@ import { serverEnv } from '@/core/env'
 import { r2Store } from '@/core/storage'
 import { loadAdminTicket, showMessages } from '@/core/support'
 
+import { applyClawbackAction, previewClawbackAction } from '../../orders/actions'
 import { decideRefundAction, replyTicketAction } from '../actions'
 
 export const instant = false
@@ -37,7 +38,7 @@ export default async function AdminTicketPage({ params }: PageProps<'/[locale]/a
         user={user}
         jobRef={jobRef}
         stripeLive={serverEnv().VERCEL_ENV === 'production'}
-        actions={{ reply: replyTicketAction, decide: decideRefundAction }}
+        actions={{ reply: replyTicketAction, decide: decideRefundAction, clawback: { preview: previewClawbackAction, apply: applyClawbackAction } }}
       />
     </AdminPage>
   )

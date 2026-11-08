@@ -15,7 +15,8 @@ import { evidenceFactsSchema } from './facts'
 import { isRespondable } from './labels'
 
 // charge.dispute.created, after record_payment_issue (ARCHITECTURE §6.3 「拒付申诉证据」, T82):
-// record the dispute and ban the buyer (open_payment_dispute, idempotent by dispute id), stage
+// record the dispute, ban the buyer and take the purchase's credits back in full (T71; all in
+// open_payment_dispute, idempotent by dispute id), stage
 // the evidence draft on Stripe with submit = false, alert the Owner once. A draft that fails
 // throws, so the webhook answers 500 and Stripe's redelivery drafts again (the row says
 // whether it is drafted); the ban and the alert are not repeated.
@@ -29,6 +30,10 @@ const openedSchema = z.object({
   responder: z.enum(['shotviva', 'stripe']),
   auto_banned: z.boolean(),
   drafted: z.boolean(),
+  // T71: the payment's clawback totals once the dispute took everything back (null: no payment
+  // row; absent from a database without T71).
+  credits_clawed_back: z.number().int().nullable().optional(),
+  clawback_shortfall: z.number().int().nullable().optional(),
 })
 
 type Opened = z.infer<typeof openedSchema>
@@ -89,11 +94,17 @@ export async function openDispute(deps: DisputeDeps, disputeId: string, owner: D
   const opened = await open(deps, dispute)
   const stage = !opened.drafted && canStage(dispute)
   const failure = stage ? await draft(deps, dispute).then(() => null, (error: unknown) => ({ error })) : null
-  if (opened.created) alertDisputeOpened(alertFacts(dispute, opened, owner, draftState(stage, failure !== null)), owner)
+  if (opened.created) alertDisputeOpened(alertFacts(dispute, opened, owner, draftState(stage, failure !== null)), withClawback(owner, opened))
   logger.info('stripe dispute opened', { dispute_id: dispute.id, created: opened.created, staged: stage, failed: failure !== null, responder: opened.responder })
   if (failure) throw failure.error
   if (stage) return 'drafted'
   return opened.created ? 'recorded' : 'replayed'
+}
+
+// What open_payment_dispute took back replaces the payment-side numbers (taken before the dispute).
+function withClawback(owner: DisputeOpenedAlert, opened: Opened): DisputeOpenedAlert {
+  if (opened.credits_clawed_back === undefined || opened.credits_clawed_back === null) return owner
+  return { ...owner, credits: { clawedBack: opened.credits_clawed_back, shortfall: opened.clawback_shortfall ?? 0 } }
 }
 
 const draftState = (stage: boolean, failed: boolean) => (failed ? 'failed' : stage ? 'staged' : 'skipped')

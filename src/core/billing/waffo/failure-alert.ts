@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import type { OwnerAlert, PaymentStep } from '../../alerts'
+import type { OwnerAlert, PaymentStep, RefundAlert } from '../../alerts'
 import { metadataSchema, toCents } from './payment-facts'
 import type { WaffoEvent } from './webhook'
 
@@ -18,6 +18,7 @@ function stepOf(eventType: string): PaymentStep {
   if (eventType === 'order.completed') return 'purchase'
   if (eventType === 'subscription.payment_succeeded') return 'renewal'
   if (eventType.startsWith('subscription.')) return 'subscription'
+  if (eventType.startsWith('refund.')) return 'refund'
   return 'other'
 }
 
@@ -41,7 +42,7 @@ const refundSchema = z.object({ paymentId: z.string().min(1).optional() })
 
 // refund.succeeded names the payment; the notifier reads user, product and amount from its row.
 // The refunded amount is not in the payload we rely on, so the message gives the payment's.
-export function waffoRefundAlert(event: WaffoEvent): OwnerAlert {
+export function waffoRefundAlert(event: WaffoEvent): RefundAlert {
   const refund = refundSchema.safeParse(event.data)
   return {
     kind: 'refund',
