@@ -21,6 +21,13 @@ type Props = {
   onError: (message: string) => void
 }
 
+// What this choice will change: a language's own "after", or the common cover (with the test
+// photo as "before" when the run has one; a translation has none).
+function describe(run: TestRunView | null, chosen: string, languages: readonly CoverLanguage[]): string {
+  if (chosen) return COPY.cover.bodyLocale(languages.find((language) => language.code === chosen)?.label ?? chosen)
+  return run?.photoId ? COPY.cover.body : COPY.cover.bodyAfterOnly
+}
+
 // 设为封面 (ARCHITECTURE §10.b): it changes what visitors see, so it asks first.
 export function CoverDialog({ run, languages, onClose, onDone, onError }: Props) {
   const [saving, setSaving] = useState(false)
@@ -46,7 +53,7 @@ export function CoverDialog({ run, languages, onClose, onDone, onError }: Props)
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{COPY.cover.title}</DialogTitle>
-          <DialogDescription>{COPY.cover.body}</DialogDescription>
+          <DialogDescription>{describe(run, chosen, languages)}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-1.5">
           <Label htmlFor="test-cover-locale">{COPY.coverTarget}</Label>

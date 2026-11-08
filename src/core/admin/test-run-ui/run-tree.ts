@@ -21,7 +21,8 @@ const byTime = (a: TestRunView, b: TestRunView) => a.createdAt.localeCompare(b.c
 function groups(runs: readonly TestRunView[]): Map<string, TestRunView[]> {
   const map = new Map<string, TestRunView[]>()
   for (const run of [...runs].sort(byTime)) {
-    const key = `${run.batchId}:${run.parentId ?? 'root'}`
+    // A translation batch covers several languages; each language is its own node (T87).
+    const key = `${run.batchId}:${run.parentId ?? 'root'}:${run.kind === 'translate' ? run.targetLocale : ''}`
     map.set(key, [...(map.get(key) ?? []), run])
   }
   return map

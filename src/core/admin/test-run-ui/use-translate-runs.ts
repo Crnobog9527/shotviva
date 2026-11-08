@@ -6,6 +6,7 @@ import type { Resolution } from '@/core/templates/output-options'
 
 import { setCover, startTranslate } from './api'
 import { failureMessage } from './messages'
+import { announceRunsChanged } from './runs-changed'
 import type { TranslateState } from './translate-result'
 
 // The translation runs of one 「生成其他语言版本」 dialog, by target language: each runs as its own
@@ -23,6 +24,7 @@ export function useTranslateRuns(templateId: string, sourceLocale: string | null
       put(code, { status: 'running' })
       startTranslate({ runId: crypto.randomUUID(), batchId, templateId, sourceLocale, targetLocale: code, resolution })
         .then((run) => put(code, { status: 'done', run, coverSet: false }))
+        .then(announceRunsChanged)
         .catch((failure: unknown) => {
           setByTarget((current) => Object.fromEntries(Object.entries(current).filter(([other]) => other !== code)))
           setError(failureMessage(failure))
@@ -37,6 +39,7 @@ export function useTranslateRuns(templateId: string, sourceLocale: string | null
     try {
       await setCover(state.run.id, code)
       put(code, { ...state, coverSet: true, saving: false })
+      announceRunsChanged()
       onCoverSet()
     } catch (failure) {
       put(code, { ...state, saving: false })

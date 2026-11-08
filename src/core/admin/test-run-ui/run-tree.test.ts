@@ -68,6 +68,14 @@ describe('buildRunTree', () => {
   })
 })
 
+describe('translations (T87)', () => {
+  it('splits one translation click into a node per target language', () => {
+    const en = run('t-en', { kind: 'translate', batchId: 'tr', targetLocale: 'en' })
+    const ja = run('t-ja', { kind: 'translate', batchId: 'tr', targetLocale: 'ja' })
+    expect(buildRunTree([en, ja]).map((node) => node.runs.map((r) => r.id))).toEqual([['t-ja'], ['t-en']])
+  })
+})
+
 describe('planBatch', () => {
   it('runs several targets once each, one target once or three times', () => {
     expect(planBatch(['p1', 'p2'], true)).toEqual(['p1', 'p2'])
