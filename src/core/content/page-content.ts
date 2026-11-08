@@ -88,9 +88,9 @@ type Nine<T> = readonly [T, T, T, T, T, T, T, T, T]
 export type HomeFaq = Nine<FaqItem>
 
 // One featured template as a card (T53): `id` is its id in the templates table, picked into the
-// home generator; name and use (its description) in the page's language (建站规格 R5);
-// `credits`: its own Standard (1K) price, shown as "from N credits" (建站规格 G4).
-export type TemplateCard = { id: string; name: string; use: string; credits: number }
+// home generator; name and use (its description) in the page's language (建站规格 R5). No
+// price: the cards don't show one (DESIGN, Owner 2026-11-08).
+export type TemplateCard = { id: string; name: string; use: string }
 
 // One H3 per category with its featured templates, as rendered (建站规格 §4 H2-2). Name, intro
 // and order come from template_categories, managed in admin (T75); `drag`: its card style is

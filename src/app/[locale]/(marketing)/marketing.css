@@ -359,11 +359,9 @@
   .mk-tpl-meta { display: block; padding: 8px 2px 2px; }
   .mk-tpl-meta b { display: block; font: 600 16px/1.25 var(--font-sans); letter-spacing: -0.015em; }
   .mk-use { display: block; margin-top: 2px; font-size: 14px; line-height: 1.35; color: var(--muted-foreground); }
-  .mk-tpl-meta .mk-cost { margin-top: 8px; }
   .mk-solo { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: center; }
   .mk-solo-meta { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding-bottom: 4px; }
   .mk-solo-meta b { margin-top: 4px; font: 400 24px/1.05 var(--font-display); letter-spacing: -0.01em; }
-  .mk-solo-meta .mk-cost { margin-top: 4px; }
   .mk-solo-meta .mk-ghost-pill { margin-top: 12px; cursor: pointer; border: 0; }
   .mk-solo .mk-tpl .mk-tpl-meta { display: none; }
 

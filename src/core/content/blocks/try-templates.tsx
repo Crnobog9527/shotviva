@@ -6,8 +6,8 @@ import { useSyncExternalStore } from 'react'
 import { Link } from '../../i18n/ui'
 import { PhotoPair } from './photo-pair'
 
-// `credits`: the template's own Standard price (建站规格 G4).
-export type TryTemplate = { id: string; name: string; use: string; credits: number; before: string; after: string }
+// No price on the cards, like the home grid (DESIGN, Owner 2026-11-08).
+export type TryTemplate = { id: string; name: string; use: string; before: string; after: string }
 
 const SIZE = { width: 900, height: 1125 }
 
@@ -35,7 +35,6 @@ export function pickThree<T>(items: readonly T[], seed: number): T[] {
 // the home page with that template's picker (?open=).
 export function TryTemplates({ templates }: { templates: readonly TryTemplate[] }) {
   const t = useTranslations('notFound')
-  const cost = useTranslations('app.template')
   const home = useTranslations('marketing.home')
   const picked = pickThree(templates, useSeed())
   // No featured template with covers yet: the 404 keeps just its message and the way home.
@@ -56,7 +55,6 @@ export function TryTemplates({ templates }: { templates: readonly TryTemplate[] 
             <span className="mk-tpl-meta">
               <b>{card.name}</b>
               <span className="mk-use">{card.use}</span>
-              <span className="mk-cost">{cost('fromCredits', { count: card.credits })}</span>
             </span>
           </Link>
         ))}
