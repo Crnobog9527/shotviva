@@ -13,6 +13,7 @@ const template = (id: string, over: Partial<BulkEditCandidate> = {}): BulkEditCa
   isActive: true,
   description: 'A template.',
   coverBeforeUrl: 'https://assets.test/b.webp',
+  coverLocales: {},
   coverAfterUrl: 'https://assets.test/a.webp',
   ...over,
 })

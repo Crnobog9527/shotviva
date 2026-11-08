@@ -14,6 +14,7 @@ const ready = (id: string, over: Partial<PublishCandidate> = {}): PublishCandida
   visibleIn: ['web', 'partner'],
   coverBeforeUrl: `https://assets.test/covers/${id}/before.webp`,
   coverAfterUrl: `https://assets.test/covers/${id}/after.webp`,
+  coverLocales: {},
   quality: 'high',
   creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
   isActive: false,
@@ -73,5 +74,22 @@ describe('planActiveChange', () => {
 })
 
 it('describes blockers in the admin language', () => {
-  expect(describeBlockers(['no_cover', 'below_floor'])).toBe('缺前后对比封面（站内模板必填）、积分低于下限')
+  expect(describeBlockers(['no_cover', 'below_floor'])).toBe('缺前后对比封面（通用或任一已上线语言里要有前图和后图，站内模板必填）、积分低于下限')
+})
+
+describe('publish rule with per-language covers (T87)', () => {
+  const bare = (over: Partial<PublishCandidate> = {}) => ready('t', { coverBeforeUrl: null, coverAfterUrl: null, ...over })
+
+  it('a launched language’s own complete set is enough for the web', () => {
+    expect(publishBlockers(bare({ coverLocales: { zh: { before: 'https://a/zb.webp', after: 'https://a/za.webp' } } }), CREDITS_FLOOR)).toEqual([])
+  })
+
+  it('a common "before" with a launched language’s "after" is complete, as every page shows both', () => {
+    expect(publishBlockers(bare({ coverBeforeUrl: 'https://a/b.webp', coverLocales: { zh: { after: 'https://a/za.webp' } } }), CREDITS_FLOOR)).toEqual([])
+  })
+
+  it('an incomplete set, or one of a language not launched yet, is not', () => {
+    expect(publishBlockers(bare({ coverLocales: { zh: { after: 'https://a/za.webp' } } }), CREDITS_FLOOR)).toEqual(['no_cover'])
+    expect(publishBlockers(bare({ coverLocales: { ja: { before: 'https://a/jb.webp', after: 'https://a/ja.webp' } } }), CREDITS_FLOOR)).toEqual(['no_cover'])
+  })
 })

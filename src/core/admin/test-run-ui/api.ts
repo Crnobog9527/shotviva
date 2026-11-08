@@ -81,7 +81,25 @@ export const startEdit = (input: EditInput) =>
     },
   })
 
-export const setCover = (runId: string) => call<{ template_id: string }>(`/api/admin/test-runs/${runId}/cover`, { method: 'POST', body: {} })
+// locale: null = the common cover, a code = that language's own (T87).
+export const setCover = (runId: string, locale: string | null = null) =>
+  call<{ template_id: string }>(`/api/admin/test-runs/${runId}/cover`, { method: 'POST', body: { locale } })
+
+export type TranslateInput = { runId: string; batchId: string; templateId: string; sourceLocale: string | null; targetLocale: string; resolution: Resolution }
+
+// 「生成其他语言版本」 (T87): one language per request.
+export const startTranslate = (input: TranslateInput) =>
+  call<TestRunView>('/api/admin/test-runs/translate', {
+    method: 'POST',
+    body: {
+      run_id: input.runId,
+      batch_id: input.batchId,
+      template_id: input.templateId,
+      source_locale: input.sourceLocale,
+      target_locale: input.targetLocale,
+      resolution: input.resolution,
+    },
+  })
 
 export const saveBudget = (budgetUsd: number) => call<TestBudget>('/api/admin/test-runs/budget', { method: 'POST', body: { budget_usd: budgetUsd } })
 

@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { AppError, type ErrorCode } from '@/core/errors'
 import {
+  coverLocalesSchema,
   EDIT_TEMPLATE_ID,
   selectTemplates,
   toTemplate,
@@ -71,14 +72,14 @@ export async function upsertTemplate(
 
 type CandidateRow = Pick<
   TemplateRow,
-  'id' | 'name' | 'description' | 'visible_in' | 'cover_before_url' | 'cover_after_url' | 'quality' | 'credits_cost' | 'is_active'
+  'id' | 'name' | 'description' | 'visible_in' | 'cover_before_url' | 'cover_after_url' | 'cover_locales' | 'quality' | 'credits_cost' | 'is_active'
 > & { template_prompts: { version: number } | null }
 
 // Only what the publish rules read (T60); one query for the whole batch, by primary key.
 export async function loadPublishCandidates(client: SupabaseClient, ids: readonly string[]): Promise<PublishCandidate[]> {
   const { data, error } = await client
     .from('templates')
-    .select('id, name, description, visible_in, cover_before_url, cover_after_url, quality, credits_cost, is_active, template_prompts(version)')
+    .select('id, name, description, visible_in, cover_before_url, cover_after_url, cover_locales, quality, credits_cost, is_active, template_prompts(version)')
     .in('id', ids)
     .returns<CandidateRow[]>()
   if (error) throw new AppError('INTERNAL', `loadPublishCandidates failed: ${error.message}`)
@@ -89,6 +90,8 @@ export async function loadPublishCandidates(client: SupabaseClient, ids: readonl
     visibleIn: row.visible_in,
     coverBeforeUrl: row.cover_before_url,
     coverAfterUrl: row.cover_after_url,
+    // A launched language's own complete set also counts (T87).
+    coverLocales: coverLocalesSchema.parse(row.cover_locales ?? {}),
     quality: row.quality,
     creditsCost: row.credits_cost,
     isActive: row.is_active,

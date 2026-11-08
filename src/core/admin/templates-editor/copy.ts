@@ -84,3 +84,27 @@ export const bulkEditCopy = {
   skipped: (names: string) => `${names} 是系统模板（作品编辑 / 伙伴自由生成），不参与批量编辑，已跳过。`,
   noneEditable: '选中的都是系统模板，没有可批量编辑的模板。',
 } as const
+
+// Cover area with language tabs (ARCHITECTURE §8.3 「封面按语言适配」, T87).
+export const coverCopy = {
+  legend: '封面（上传后立即生效，不随「保存」）',
+  tabs: '封面语言',
+  upcoming: '准备中',
+  hasCover: '已有封面',
+  before: '前图（手机原图）',
+  after: '后图（AI 成品）',
+  motion: '动态封面（可选）',
+  stillHint: 'JPEG / PNG / WebP，≤20MB',
+  motionHint: 'GIF / 动态 WebP ≤20MB，或 MP4 ≤15MB ≤15 秒',
+  cardType: (type: string) => `当前卡片类型：${type}`,
+  backToStill: '改回静态图卡片',
+  commonNote: '通用封面：没有专属封面的语言都显示它。只传这一套，所有语言就都用它。',
+  languageNote: (label: string) =>
+    `「${label}」页面的专属封面，可以空着：空着的部分显示通用封面（没有通用封面时，按页签顺序取第一个有封面的语言）。前图一般各语言共用，只换后图即可。`,
+  upcomingNote: (label: string) => `「${label}」页面还没上线：可以先准备封面，前台暂不显示，上线后自动生效。`,
+  clearLanguage: (label: string) => `删除「${label}」的专属封面`,
+  confirmClear: (label: string) => `删除「${label}」的专属封面？这个语言的页面会改回显示通用封面。`,
+  translate: '生成其他语言版本',
+  cancel: '取消',
+  confirmDelete: '删除',
+} as const

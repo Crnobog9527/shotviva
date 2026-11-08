@@ -10,8 +10,9 @@ import { anonClient, connectAdmin, createUser, retryAuth, serviceClient } from '
 import { anonSupabase, serviceSupabase } from './supabase-env'
 
 // T62: system_settings and admin_set_system_setting (ARCHITECTURE §15.6), through the same
-// command the /admin/features card calls. The table is global and holds one key, so each
-// test starts from "never saved".
+// command the /admin/features card calls. The table is global and other test files write their
+// own keys in parallel (the test-run budget, T85), so these tests count only wishlist_enabled and
+// each starts from "never saved".
 
 let db: Client
 let admin: string
@@ -60,7 +61,7 @@ describe('admin_set_system_setting', () => {
 
     await save(admin, false)
     expect(await rowOf()).toEqual({ value: false, updated_by: admin })
-    expect((await db.query(`select count(*)::int as n from public.system_settings`)).rows[0].n).toBe(1)
+    expect((await db.query(`select count(*)::int as n from public.system_settings where key = 'wishlist_enabled'`)).rows[0].n).toBe(1)
   })
 
   it('refuses an actor who is not an admin, and a missing actor', async () => {
@@ -73,7 +74,7 @@ describe('admin_set_system_setting', () => {
     expect((await rpc({ p_key: 'not_registered', p_value: true, p_actor: admin })).error?.message).toBe('INVALID_INPUT')
     expect((await rpc({ p_key: 'wishlist_enabled', p_value: 'true', p_actor: admin })).error?.message).toBe('INVALID_INPUT')
     expect((await rpc({ p_key: 'wishlist_enabled', p_value: null, p_actor: admin })).error?.message).toBe('INVALID_INPUT')
-    expect((await db.query(`select count(*)::int as n from public.system_settings`)).rows[0].n).toBe(0)
+    expect((await db.query(`select count(*)::int as n from public.system_settings where key = 'wishlist_enabled'`)).rows[0].n).toBe(0)
   })
 })
 

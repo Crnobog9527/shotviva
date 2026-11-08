@@ -4,7 +4,7 @@ import { useState } from 'react'
 
 import type { CreditsFloor } from '@/core/templates/pricing'
 
-import type { AdminTemplate, SaveTemplatePayload, TemplateAdminActions, TemplateOrderGroup } from '../templates/types'
+import type { AdminTemplate, CoverLanguage, SaveTemplatePayload, TemplateAdminActions, TemplateOrderGroup } from '../templates/types'
 
 import { BulkPublish } from './bulk-publish'
 import type { CategoryOption } from './category-field'
@@ -19,7 +19,14 @@ import { TemplatesTable } from './templates-table'
 import { UnpublishDialog } from './unpublish-dialog'
 import { useTemplateActions } from './use-template-actions'
 
-type Props = { templates: AdminTemplate[]; categories: readonly CategoryOption[]; floor: CreditsFloor; actions: TemplateAdminActions }
+type Props = {
+  templates: AdminTemplate[]
+  categories: readonly CategoryOption[]
+  floor: CreditsFloor
+  // The cover tabs (T87): common, launched languages, upcoming ones.
+  coverLanguages: readonly CoverLanguage[]
+  actions: TemplateAdminActions
+}
 
 // 'saved': a new template just saved, shown in edit mode (with the test-run panel, T85) as soon as
 // the refreshed list has it.
@@ -40,7 +47,7 @@ function afterSave(payload: SaveTemplatePayload): Editing {
   return { mode: 'saved', id: typeof id === 'string' ? id : '' }
 }
 
-export function TemplatesEditor({ templates, categories, floor, actions }: Props) {
+export function TemplatesEditor({ templates, categories, floor, coverLanguages, actions }: Props) {
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState<Editing | null>(null)
   const [unpublishing, setUnpublishing] = useState<AdminTemplate | null>(null)
@@ -114,6 +121,7 @@ export function TemplatesEditor({ templates, categories, floor, actions }: Props
           target={target}
           floor={floor}
           categories={categories}
+          coverLanguages={coverLanguages}
           coverActions={actions}
           pending={pending}
           error={error}

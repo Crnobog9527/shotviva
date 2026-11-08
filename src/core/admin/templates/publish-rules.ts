@@ -1,3 +1,4 @@
+import { hasCompleteCoverSet } from '@/core/templates/cover-locales'
 import { EDIT_TEMPLATE_ID } from '@/core/templates/edit-params'
 import { creditsBelowFloor, type CreditsFloor } from '@/core/templates/pricing'
 import type { Template } from '@/core/templates/types'
@@ -23,13 +24,13 @@ export const PUBLISH_BLOCKER_LABEL: Record<PublishBlocker, string> = {
   no_prompt: '缺提示词',
   no_name: '缺英文名称',
   no_description: '缺英文说明（站内模板必填）',
-  no_cover: '缺前后对比封面（站内模板必填）',
+  no_cover: '缺前后对比封面（通用或任一已上线语言里要有前图和后图，站内模板必填）',
   below_floor: '积分低于下限',
 }
 
 export type PublishCandidate = Pick<
   Template,
-  'id' | 'name' | 'description' | 'visibleIn' | 'coverBeforeUrl' | 'coverAfterUrl' | 'quality' | 'creditsCost' | 'isActive'
+  'id' | 'name' | 'description' | 'visibleIn' | 'coverBeforeUrl' | 'coverAfterUrl' | 'coverLocales' | 'quality' | 'creditsCost' | 'isActive'
 > & { hasPrompt: boolean }
 
 // The built-in photo-edit template (ARCHITECTURE §5.2) is switched on its own page; the editor
@@ -49,7 +50,8 @@ export function publishBlockers(template: PublishCandidate, floor: CreditsFloor)
     ['no_prompt', !template.hasPrompt],
     ['no_name', blank(template.name)],
     ['no_description', onWeb && blank(template.description)],
-    ['no_cover', onWeb && (blank(template.coverBeforeUrl) || blank(template.coverAfterUrl))],
+    // A before and an after every launched page can show under the cover fallback (T87).
+    ['no_cover', onWeb && !hasCompleteCoverSet(template)],
     ['below_floor', creditsBelowFloor(template.quality, template.creditsCost, floor).length > 0],
   ]
   return checks.filter(([, failed]) => failed).map(([blocker]) => blocker)

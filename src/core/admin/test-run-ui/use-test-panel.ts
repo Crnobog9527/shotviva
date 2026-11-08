@@ -6,6 +6,7 @@ import type { TestPanelData, TestRunView } from '../test-runs'
 import { loadPanel } from './api'
 import { failureMessage } from './messages'
 import { mergeRuns, placeholderRun, type Placeholder } from './placeholder'
+import { onRunsChanged } from './runs-changed'
 
 export type Launch = { placeholder: Placeholder; start: () => Promise<TestRunView> }
 
@@ -35,6 +36,9 @@ export function useTestPanel(templateId: string) {
       setError(failureMessage(failure))
     }
   }, [templateId])
+
+  // A cover translation finished elsewhere on the page (T87): show it and the new spend.
+  useEffect(() => onRunsChanged(() => void reload()), [reload])
 
   const launch = useCallback(
     async (launches: Launch[]) => {

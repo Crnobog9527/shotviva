@@ -25,10 +25,16 @@ export type TemplateOrderGroup = 'catalogue' | 'featured'
 
 export type CoverUploadRequest = { templateId: string; purpose: CoverPurpose; contentType: string; size: number }
 export type CoverTicket = { key: string; putUrl: string; headers: { 'Content-Type': string } }
+// locale: null / absent = the common cover; a code = that language's own (ARCHITECTURE §8.3, T87).
 export type ApplyCoverRequest =
-  | { templateId: string; slot: 'before' | 'after'; key: string }
-  | { templateId: string; slot: 'motion'; key: string; posterKey?: string }
-  | { templateId: string; slot: 'clear-motion' }
+  | { templateId: string; locale?: string | null; slot: 'before' | 'after'; key: string }
+  | { templateId: string; locale?: string | null; slot: 'motion'; key: string; posterKey?: string }
+  | { templateId: string; locale?: string | null; slot: 'clear-motion' }
+  | { templateId: string; locale: string; slot: 'clear-locale' }
+
+// A tab of the cover area (T87): the common cover (code null), each launched language, then the
+// languages registered as upcoming in site.config (prepared ahead, never shown on the site yet).
+export type CoverLanguage = { code: string | null; label: string; upcoming: boolean }
 
 export type TemplateAdminActions = {
   save: (payload: SaveTemplatePayload) => Promise<ActionResult>

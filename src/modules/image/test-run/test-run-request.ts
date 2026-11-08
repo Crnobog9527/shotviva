@@ -35,6 +35,21 @@ export const testEditBodySchema = z.object({
   aspect_ratio: z.enum(OUTPUT_ASPECTS).optional(),
 })
 
+// 「生成其他语言版本」 (T87): one target language per request; a batch of languages is several.
+const localeCode = z.string().regex(/^[a-z]{2,3}(-[a-z0-9]{2,8})?$/)
+export const testTranslateBodySchema = z.object({
+  run_id: z.uuid(),
+  batch_id: z.uuid(),
+  template_id: z.string().min(1).max(64),
+  // null: translate the common cover's "after".
+  source_locale: localeCode.nullable(),
+  target_locale: localeCode,
+  resolution: z.enum(RESOLUTIONS).optional(),
+})
+
+// 「设为封面」: null / absent sets the common cover, a code that language's own (T87).
+export const testCoverBodySchema = z.object({ locale: localeCode.nullable().optional() })
+
 export const testPhotoTicketSchema = z.object({ content_type: z.string(), size: z.number().int().positive() })
 export const testPhotoConfirmSchema = z.object({ key: z.string().min(1).max(200) })
 export const testBudgetBodySchema = z.object({ budget_usd: z.number().min(0).max(1000) })

@@ -39,7 +39,8 @@ export type BeginTestRun = {
   batchId: string
   resolution: Resolution
   inputs: Record<string, unknown>
-  promptVersion: number
+  // null for a translation: its prompt is the edit template's, recorded in inputs (T87).
+  promptVersion: number | null
   provider: string
   estimateUsd: number
 }
@@ -148,12 +149,15 @@ export function cleanupTestRuns(db: SupabaseClient, actorId: string): Promise<st
   return callRpc(db, 'admin_cleanup_test_runs', { p_actor: actorId }, z.object({ keys: z.array(z.string()) }).transform((row) => row.keys))
 }
 
-export function markTestRunCover(db: SupabaseClient, input: { actorId: string; runId: string; beforeUrl: string | null; afterUrl: string }): Promise<string> {
+export function markTestRunCover(
+  db: SupabaseClient,
+  input: { actorId: string; runId: string; beforeUrl: string | null; afterUrl: string; locale: string | null },
+): Promise<string> {
   return callRpc(
     db,
     'admin_set_test_run_cover',
-    // p_locale null: the common cover (every language without its own); per-language covers: T87.
-    { p_actor: input.actorId, p_run_id: input.runId, p_before_url: input.beforeUrl, p_after_url: input.afterUrl, p_locale: null },
+    // p_locale null: the common cover (every language without its own); a code: that language's (0823).
+    { p_actor: input.actorId, p_run_id: input.runId, p_before_url: input.beforeUrl, p_after_url: input.afterUrl, p_locale: input.locale },
     z.string(),
   )
 }

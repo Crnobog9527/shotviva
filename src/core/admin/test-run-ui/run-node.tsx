@@ -2,13 +2,24 @@
 
 import { CornerDownRight } from 'lucide-react'
 
+import type { CoverLanguage } from '../templates/types'
 import { ASPECT_LABEL, RESOLUTION_LABEL, TEST_RUN_COPY as COPY } from './copy'
 import { RunCard, type RunActions } from './run-card'
 import type { RunNode } from './run-tree'
 
-function Heading({ node }: { node: RunNode }) {
+// The label of a language code from the cover tabs; the code itself when it is not listed.
+const labelOf = (languages: readonly CoverLanguage[], code: string | null) => languages.find((language) => language.code === code)?.label ?? code ?? ''
+
+function titleOf(node: RunNode, languages: readonly CoverLanguage[]): string {
   const first = node.runs[0]!
-  const title = node.kind === 'generate' ? COPY.records.first : COPY.records.editOf(first.instruction ?? '')
+  if (node.kind === 'generate') return COPY.records.first
+  if (node.kind === 'translate') return COPY.records.translateOf(labelOf(languages, first.targetLocale), labelOf(languages, first.sourceLocale))
+  return COPY.records.editOf(first.instruction ?? '')
+}
+
+function Heading({ node, languages }: { node: RunNode; languages: readonly CoverLanguage[] }) {
+  const first = node.runs[0]!
+  const title = titleOf(node, languages)
   const facts = [
     RESOLUTION_LABEL[first.resolution],
     first.aspectRatio ? (ASPECT_LABEL[first.aspectRatio] ?? first.aspectRatio) : null,
@@ -31,11 +42,11 @@ function Heading({ node }: { node: RunNode }) {
 
 // One click's runs side by side, then, for each of them, the edits made on it, indented: the
 // chain 首次出图 → 编辑 → 再编辑 reads top to bottom (ARCHITECTURE §10.b 「记录树」).
-export function RunNodeView({ node, actions }: { node: RunNode; actions: RunActions }) {
+export function RunNodeView({ node, actions, languages }: { node: RunNode; actions: RunActions; languages: readonly CoverLanguage[] }) {
   const position = (runId: string) => node.runs.findIndex((run) => run.id === runId) + 1
   return (
     <li className="grid gap-2">
-      <Heading node={node} />
+      <Heading node={node} languages={languages} />
       <div className="grid grid-cols-3 gap-2">
         {node.runs.map((run) => (
           <RunCard key={run.id} run={run} actions={actions} />
@@ -51,7 +62,7 @@ export function RunNodeView({ node, actions }: { node: RunNode; actions: RunActi
           ) : null}
           <ul className="grid gap-4">
             {children.map((child) => (
-              <RunNodeView key={child.key} node={child} actions={actions} />
+              <RunNodeView key={child.key} node={child} actions={actions} languages={languages} />
             ))}
           </ul>
         </div>

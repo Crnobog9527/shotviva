@@ -91,6 +91,8 @@ export type SiteConfig = {
     // (ARCHITECTURE §17). Every other /zh address 404s, emits no zh hreflang, shows no switch
     // banner, and the switcher points at /zh.
     zhPaths: readonly `/${string}`[]
+    // Not launched yet: only the admin's cover tabs list them (T87). Short lowercase codes.
+    upcoming?: readonly string[]
   }
   billing: {
     currency: 'usd'

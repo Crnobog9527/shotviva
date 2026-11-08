@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
-import type { AdminTemplate } from '../templates/types'
+import type { AdminTemplate, CoverLanguage } from '../templates/types'
 import type { TestRunView } from '../test-runs'
 import { BudgetBar } from './budget-bar'
 import { CompareDialog } from './compare-dialog'
@@ -23,7 +23,8 @@ function Status({ error, notice }: { error: string | null; notice: string | null
 // 试跑面板 (ARCHITECTURE §10.b, T85), beside the template form: today's budget, 首次出图, the edit
 // composer when a result is being edited, then the record tree. Everything runs on the saved
 // template through /api/admin/test-*; a new cover refreshes the page so the form shows it.
-export function TestRunPanel({ template }: { template: AdminTemplate }) {
+// languages: the cover tabs (T87), so 「设为封面」 can pick which one.
+export function TestRunPanel({ template, languages }: { template: AdminTemplate; languages: readonly CoverLanguage[] }) {
   const router = useRouter()
   const panel = useTestPanel(template.id)
   const selection = useRunSelection(panel.runs)
@@ -50,13 +51,14 @@ export function TestRunPanel({ template }: { template: AdminTemplate }) {
       {editing ? <EditComposer key={editing.map((run) => run.id).join()} targets={editing} onLaunch={(launches) => void panel.launch(launches)} onClose={() => setEditing(null)} /> : null}
       <Records
         runs={panel.runs}
+        languages={languages}
         actions={{ selected: selection.selected, onSelect: selection.onSelect, onEdit: (run) => setEditing([run]), onCover: setCovering }}
         onCompare={() => selection.picked.length === 2 && setComparing([selection.picked[0]!, selection.picked[1]!])}
         onEditSelected={() => setEditing(selection.picked.slice(0, 3))}
         onClear={selection.clear}
       />
       <CompareDialog pair={comparing} photoUrls={panel.data?.photoUrls ?? {}} onClose={() => setComparing(null)} />
-      <CoverDialog run={covering} onClose={() => setCovering(null)} onDone={coverDone} onError={panel.setError} />
+      <CoverDialog run={covering} languages={languages} onClose={() => setCovering(null)} onDone={coverDone} onError={panel.setError} />
     </section>
   )
 }

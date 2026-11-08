@@ -11,6 +11,8 @@ export type EditTemplateForm = {
   classifier: string
   constraints: Record<EditScope, string>
   reframe: string
+  // 「生成其他语言版本」 of a cover (T87); blank turns cover translation off.
+  coverTranslate: string
 }
 
 const text = (value: unknown) => (typeof value === 'string' ? value : '')
@@ -29,6 +31,7 @@ export function formFor(settings: EditTemplateSettings): EditTemplateForm {
     classifier: text(settings.params.classifier),
     constraints: Object.fromEntries(EDIT_SCOPES.map((s) => [s, text(constraints[s])])) as Record<EditScope, string>,
     reframe: text(settings.params.reframe),
+    coverTranslate: text(settings.params.cover_translate),
   }
 }
 
@@ -42,6 +45,7 @@ export function toSaveInput(form: EditTemplateForm): SaveEditTemplateInput {
       classifier: form.classifier,
       constraints: form.constraints,
       ...(form.reframe.trim() ? { reframe: form.reframe } : {}),
+      ...(form.coverTranslate.trim() ? { cover_translate: form.coverTranslate } : {}),
     },
   }
 }
