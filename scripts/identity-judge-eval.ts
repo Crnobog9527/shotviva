@@ -1,6 +1,6 @@
 /**
- * Runs the T81 example sentences (src/core/identity-guard/examples.test-data.ts) through the
- * keyword list and the real decision model, and prints the results table, latency and tokens
+ * Runs the T81 evaluation set (src/core/identity-guard/examples.test-data.ts) through the real
+ * decision model, and prints the results table, latency and tokens
  * for the PR (ARCHITECTURE §5.1a).
  *
  *   OPENAI_API_KEY=… pnpm eval:identity              # gpt-6-luna on api.openai.com
@@ -13,8 +13,7 @@
 import { z } from 'zod'
 
 import { ALLOW_EXAMPLES, REFUSE_EXAMPLES, type IdentityExample } from '../src/core/identity-guard/examples.test-data'
-import { matchIdentitySwapKeyword } from '../src/core/identity-guard/keywords'
-import { IDENTITY_EDIT_ADDENDUM, IDENTITY_JUDGE_INSTRUCTIONS } from '../src/core/identity-guard/question'
+import { IDENTITY_EDIT_ADDENDUM, IDENTITY_JUDGE_INSTRUCTIONS, IDENTITY_PROMPT_VERSION } from '../src/core/identity-guard/question'
 import { MODEL_PRICES } from '../src/core/jobs/model-prices'
 import { createOpenAIIdentityJudge } from '../src/modules/image/edit/openai-identity-judge'
 
@@ -28,7 +27,7 @@ const env = z
 
 const judge = createOpenAIIdentityJudge({ apiKey: env.OPENAI_API_KEY, model: env.IDENTITY_MODEL, baseUrl: env.OPENAI_BASE_URL }, `eval/${env.IDENTITY_MODEL}`)
 
-type Row = IdentityExample & { kw: boolean; model: boolean | 'error'; ms: number; inTok: number; outTok: number }
+type Row = IdentityExample & { model: boolean | 'error'; ms: number; inTok: number; outTok: number }
 
 async function ask(text: string, instructions = IDENTITY_JUDGE_INSTRUCTIONS) {
   const started = performance.now()
@@ -37,12 +36,11 @@ async function ask(text: string, instructions = IDENTITY_JUDGE_INSTRUCTIONS) {
 }
 
 async function run(example: IdentityExample): Promise<Row> {
-  const kw = matchIdentitySwapKeyword(example.text) !== null
   try {
     const answer = await ask(example.text)
-    return { ...example, kw, model: answer.identitySwap, ms: answer.ms, inTok: answer.usage?.inputTokens ?? 0, outTok: answer.usage?.outputTokens ?? 0 }
+    return { ...example, model: answer.identitySwap, ms: answer.ms, inTok: answer.usage?.inputTokens ?? 0, outTok: answer.usage?.outputTokens ?? 0 }
   } catch {
-    return { ...example, kw, model: 'error', ms: 0, inTok: 0, outTok: 0 }
+    return { ...example, model: 'error', ms: 0, inTok: 0, outTok: 0 }
   }
 }
 
@@ -50,7 +48,7 @@ const pct = (values: number[], p: number) => [...values].sort((a, b) => a - b)[M
 const cell = (value: string) => value.replace(/\|/g, '\\|')
 
 function verdict(row: Row) {
-  const refused = row.kw || row.model === true
+  const refused = row.model === true
   return (refused ? 'refuse' : 'allow') === row.expect ? '✅' : '❌'
 }
 
@@ -59,11 +57,11 @@ async function main() {
   // One at a time, so the latencies are those of a single request.
   for (const example of [...REFUSE_EXAMPLES, ...ALLOW_EXAMPLES]) rows.push(await run(example))
 
-  console.log('| # | Sentence | Lang | Expected | Keyword | Model | Final | ms |')
-  console.log('|---|---|---|---|---|---|---|---|')
+  console.log('| # | Sentence | Lang | Expected | Model | Final | ms |')
+  console.log('|---|---|---|---|---|---|---|')
   rows.forEach((row, i) => {
     const model = row.model === 'error' ? 'error' : row.model ? 'refuse' : 'allow'
-    console.log(`| ${i + 1} | ${cell(row.text)} | ${row.lang} | ${row.expect} | ${row.kw ? 'refuse' : '—'} | ${model} | ${verdict(row)} | ${row.ms} |`)
+    console.log(`| ${i + 1} | ${cell(row.text)} | ${row.lang} | ${row.expect} | ${model} | ${verdict(row)} | ${row.ms} |`)
   })
 
   const answered = rows.filter((row) => row.model !== 'error')
@@ -91,7 +89,7 @@ async function main() {
 // The shape of src/core/identity-guard/examples.recorded.json, replayed by examples.test.ts.
 function recordingOf(rows: Row[]) {
   const answers = Object.fromEntries(rows.map((row) => [row.text, { identitySwap: row.model === true, ms: row.ms, inputTokens: row.inTok, outputTokens: row.outTok }]))
-  return { model: env.IDENTITY_MODEL, recordedAt: new Date().toISOString(), answers }
+  return { model: env.IDENTITY_MODEL, promptVersion: IDENTITY_PROMPT_VERSION, recordedAt: new Date().toISOString(), answers }
 }
 
 void main()

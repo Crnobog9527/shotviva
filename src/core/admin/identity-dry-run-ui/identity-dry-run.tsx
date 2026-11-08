@@ -20,7 +20,7 @@ function Summary({ result }: { result: Done }) {
     COPY.summary(result.rows.length, s.refused, s.p50, s.p95),
     COPY.tokens(s.inputTokens, s.outputTokens),
     s.costUsd === null ? null : COPY.cost(s.costUsd.toFixed(6)),
-    result.model ? COPY.model(result.model) : COPY.noProvider,
+    result.model ? COPY.model(result.model, result.promptVersion) : COPY.noProvider,
   ].filter(Boolean)
   return <p className="text-sm text-muted-foreground">{parts.join(' · ')}</p>
 }
@@ -39,8 +39,8 @@ function Results({ result }: { result: Done }) {
   )
 }
 
-// The face-swap dry run (ARCHITECTURE §5.1a, T81): lines in, the keyword and model verdicts with
-// latency and tokens out, plus the JSON that examples.recorded.json takes. `run` is the server
+// The face-swap dry run (ARCHITECTURE §5.1a, T81): lines in, the model's verdicts with latency
+// and tokens out, plus the JSON that examples.recorded.json takes. `run` is the server
 // action, which re-checks the admin role.
 export function IdentityDryRun({ run }: { run: (input: { text: string }) => Promise<DryRunResult> }) {
   const [text, setText] = useState('')

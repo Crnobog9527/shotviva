@@ -23,7 +23,7 @@ export type PartnerGenerateRouteDeps = PartnerRouteDeps & {
   provider: GenerationProvider
   providerTimeoutMs?: number
   fetch?: FetchLike
-  // The face-swap screen's decision call (ARCHITECTURE §5.1a); absent means keywords only.
+  // The face-swap screen's decision call (ARCHITECTURE §5.1a); absent means no screening (fail open).
   identityJudge?: IdentityJudge | null
 }
 

@@ -5,15 +5,14 @@ import type { Locale } from '../i18n/locales'
 import { logger } from '../logger'
 import type { IdentityEntry, IdentityJudge, IdentityJudgeAnswer, IdentityJudgeUsage } from './judge'
 import { keepVerdict, takeJudgeSlot, textHash } from './judge-slots'
-import { matchAnyField } from './keywords'
 import { IDENTITY_JUDGE_INSTRUCTIONS } from './question'
 import { refuseIdentitySwap, type RefusalDeps } from './refuse'
 
-// ARCHITECTURE §5.1a for the workspace note, template text fields and the partner prompt: the
-// keyword list on each field, then one text-only decision call on all of them. Runs before
-// reserve_credits. A judge that errors, times out or is not switched on lets the request through
-// and logs it: the keywords already caught the unambiguous requests, and generation must not
-// depend on the decision model. Calls are capped per account (judge-slots.ts).
+// ARCHITECTURE §5.1a for the workspace note, template text fields and the partner prompt: one
+// text-only decision call on all of them, before reserve_credits. There is no keyword step: the
+// model judges the intent in any language (question.ts). A judge that errors, times out or is
+// not switched on lets the request through and logs it, so generation never depends on the
+// decision model. Calls are capped per account and reuse a recent verdict (judge-slots.ts).
 
 export const IDENTITY_JUDGE_TIMEOUT_MS = 3_000
 
@@ -64,7 +63,6 @@ export async function screenIdentityText(deps: ScreenDeps, input: ScreenInput): 
   if (fields.length === 0) return { usage: null }
   const text = fields.join('\n')
   const refusal = { userId: input.userId, entry: input.entry, text, locale: input.locale }
-  if (matchAnyField(fields)) return refuseIdentitySwap(deps, { ...refusal, method: 'keyword' })
   const judge = deps.identityJudge
   if (!judge) return { usage: null }
   const slot = await takeJudgeSlot(deps.db, input.userId, textHash(text))

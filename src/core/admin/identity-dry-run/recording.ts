@@ -8,5 +8,5 @@ export function toRecording(result: Extract<DryRunResult, { ok: true }>) {
       .filter((row) => row.identitySwap !== null)
       .map((row) => [row.text, { identitySwap: row.identitySwap, ms: row.ms ?? 0, inputTokens: row.inputTokens, outputTokens: row.outputTokens }]),
   )
-  return { model: result.model, recordedAt: result.ranAt, answers }
+  return { model: result.model, promptVersion: result.promptVersion, recordedAt: result.ranAt, answers }
 }

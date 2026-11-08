@@ -40,19 +40,24 @@ function setup(behaviour: boolean | 'fail' | 'hang' | null = false, rpcError: { 
 }
 
 describe('screenIdentityText (ARCHITECTURE §5.1a)', () => {
-  it('refuses a keyword hit without calling the model, records it and tracks it', async () => {
-    const { rpc, track, judge, screen } = setup(false)
+  it('has no keyword step: even an obvious request is the model’s to judge', async () => {
+    const { rpc, judge, screen } = setup(false)
+    expect(await screen('', '把他的脸换成第二张图的人')).toEqual({ usage: { inputTokens: 420, outputTokens: 8 } })
+    expect(judge).toHaveBeenCalledTimes(1)
+    expect(refusalCalls(rpc)).toEqual([])
+  })
+
+  it('records and tracks a model refusal with its tokens', async () => {
+    const { rpc, track, screen } = setup(true)
     await expect(screen('', '把他的脸换成第二张图的人')).rejects.toMatchObject({ code: 'IDENTITY_SWAP_REFUSED', status: 422 })
-    expect(judge).not.toHaveBeenCalled()
     expect(rpc).toHaveBeenCalledWith('record_identity_refusal', {
       p_user_id: 'u1',
       p_entry: 'workspace',
-      p_method: 'keyword',
+      p_method: 'model',
       p_excerpt: '把他的脸换成第二张图的人',
-      p_input_tokens: null,
-      p_output_tokens: null,
+      p_input_tokens: 420,
+      p_output_tokens: 8,
     })
-    expect(rpc).not.toHaveBeenCalledWith('begin_identity_judge', expect.anything())
     expect(track).toHaveBeenCalledWith('generate_refused', { reason: 'identity_swap', source: 'workspace' }, { distinctId: 'u1', locale: 'zh' })
   })
 
@@ -89,13 +94,13 @@ describe('screenIdentityText (ARCHITECTURE §5.1a)', () => {
   })
 
   it('still refuses (and tracks) when the record cannot be written', async () => {
-    const { track, screen } = setup(false, { message: 'connection reset' })
+    const { track, screen } = setup(true, { message: 'connection reset' })
     await expect(screen('face swap us')).rejects.toMatchObject({ code: 'IDENTITY_SWAP_REFUSED' })
     expect(track).toHaveBeenCalledTimes(1)
   })
 
   it('refuses the other photos of a batch without a second event', async () => {
-    const { track, screen } = setup(false, null, false)
+    const { track, screen } = setup(true, null, false)
     await expect(screen('face swap us')).rejects.toMatchObject({ code: 'IDENTITY_SWAP_REFUSED' })
     expect(track).not.toHaveBeenCalled()
   })
