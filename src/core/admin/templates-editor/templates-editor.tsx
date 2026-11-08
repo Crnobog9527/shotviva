@@ -4,7 +4,7 @@ import { useState } from 'react'
 
 import type { CreditsFloor } from '@/core/templates/pricing'
 
-import type { AdminTemplate, TemplateAdminActions, TemplateOrderGroup } from '../templates/types'
+import type { AdminTemplate, SaveTemplatePayload, TemplateAdminActions, TemplateOrderGroup } from '../templates/types'
 
 import { BulkPublish } from './bulk-publish'
 import type { CategoryOption } from './category-field'
@@ -21,19 +21,34 @@ import { useTemplateActions } from './use-template-actions'
 
 type Props = { templates: AdminTemplate[]; categories: readonly CategoryOption[]; floor: CreditsFloor; actions: TemplateAdminActions }
 
+// 'saved': a new template just saved, shown in edit mode (with the test-run panel, T85) as soon as
+// the refreshed list has it.
+type Editing = EditTarget | { mode: 'saved'; id: string }
+
+// After a save the page refreshes; the dialog shows the fresh row, not the snapshot.
+function currentTarget(editing: Editing | null, templates: readonly AdminTemplate[]): EditTarget | null {
+  if (!editing || editing.mode === 'new') return editing
+  const id = editing.mode === 'saved' ? editing.id : editing.template.id
+  const fresh = templates.find((t) => t.id === id)
+  if (editing.mode === 'saved') return fresh ? { mode: 'edit', template: fresh } : null
+  return { mode: 'edit', template: fresh ?? editing.template }
+}
+
+// A save keeps the dialog open so the prompt can be tried right away (ARCHITECTURE §10.b 「入口」).
+function afterSave(payload: SaveTemplatePayload): Editing {
+  const id = (payload.template as { id?: unknown }).id
+  return { mode: 'saved', id: typeof id === 'string' ? id : '' }
+}
+
 export function TemplatesEditor({ templates, categories, floor, actions }: Props) {
   const [query, setQuery] = useState('')
-  const [editing, setEditing] = useState<EditTarget | null>(null)
+  const [editing, setEditing] = useState<Editing | null>(null)
   const [unpublishing, setUnpublishing] = useState<AdminTemplate | null>(null)
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set())
   const { pending, error, notice, run, clearError } = useTemplateActions()
   const visible = templates.filter((template) => matchesSearch(template, query))
   const visibleIds = visible.map((template) => template.id)
-  // After a cover upload the page refreshes; show the dialog the fresh row, not the snapshot.
-  const target: EditTarget | null =
-    editing?.mode === 'edit'
-      ? { mode: 'edit', template: templates.find((t) => t.id === editing.template.id) ?? editing.template }
-      : editing
+  const target = currentTarget(editing, templates)
 
   const openEditor = (target: EditTarget) => {
     clearError()
@@ -58,7 +73,7 @@ export function TemplatesEditor({ templates, categories, floor, actions }: Props
     <div className="grid min-w-0 grid-cols-1 gap-4">
       <Toolbar query={query} onQuery={setQuery} onNew={() => openEditor({ mode: 'new' })} />
       {notice ? <p className="text-sm text-emerald-700">{notice}</p> : null}
-      {error && !editing ? (
+      {error && !target ? (
         <p role="alert" className="text-destructive text-sm">
           {error}
         </p>
@@ -103,7 +118,8 @@ export function TemplatesEditor({ templates, categories, floor, actions }: Props
           pending={pending}
           error={error}
           onCancel={() => setEditing(null)}
-          onSubmit={(payload) => run(() => actions.save(payload), '已保存', () => setEditing(null))}
+          notice={notice}
+          onSubmit={(payload) => run(() => actions.save(payload), '已保存', () => setEditing(afterSave(payload)))}
         />
       ) : null}
       <UnpublishDialog
