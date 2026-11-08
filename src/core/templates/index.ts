@@ -20,6 +20,17 @@ export type {
 export { TEMPLATE_DESCRIPTION_MAX, templateTranslationsSchema } from './schema'
 export { localizeTemplate, type LocalizedTemplate } from './localize'
 export {
+  coverForLocale,
+  coverLocalesSchema,
+  LOCALE_COVER_KEYS,
+  localeCoverSchema,
+  withLocaleCover,
+  type CoverLocales,
+  type CoverSource,
+  type LocaleCover,
+  type ResolvedCover,
+} from './cover-locales'
+export {
   DEFAULT_RESOLUTION,
   NOTE_MAX_LENGTH,
   OUTPUT_ASPECTS,

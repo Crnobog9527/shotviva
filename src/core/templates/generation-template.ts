@@ -55,7 +55,8 @@ export function loadEditTemplate(client: SupabaseClient): Promise<GenerationTemp
 
 // An admin test run (§10.b, T85): any template but the built-in edit one, published or not, on
 // whatever surface; the same prompt and fields a user's generation reads.
-export function loadTestTemplate(client: SupabaseClient, id: string): Promise<GenerationTemplate> {
-  if (id === EDIT_TEMPLATE_ID) throw new AppError('NOT_FOUND', 'Template not found')
+// allowEdit: the cover translation (T87) runs on the edit template's own parameters.
+export function loadTestTemplate(client: SupabaseClient, id: string, options: { allowEdit?: boolean } = {}): Promise<GenerationTemplate> {
+  if (id === EDIT_TEMPLATE_ID && !options.allowEdit) throw new AppError('NOT_FOUND', 'Template not found')
   return loadTemplate(client, id, null, true)
 }

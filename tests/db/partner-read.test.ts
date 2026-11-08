@@ -40,6 +40,20 @@ describe('GET /api/partner/templates', () => {
     expect(freeform.fields).toMatchObject({ images: { min: 0, max: 1 }, copy: [{ key: 'prompt', required: true, max_length: 2000 }] })
   })
 
+  it('returns the covers of the asked language (?locale=zh), English ones otherwise (T87)', async () => {
+    await db.query(
+      `update public.templates set cover_after_url = 'https://a.test/common.webp', cover_locales = '{"zh": {"after": "https://a.test/zh.webp"}}' where id = $1`,
+      [partnerTemplate],
+    )
+    const after = async (path: string) => {
+      const body = (await (await handleTemplates(partnerRequest(path), routeDeps())).json()) as { templates: { id: string; cover_after_url: string | null }[] }
+      return body.templates.find((t) => t.id === partnerTemplate)?.cover_after_url
+    }
+    expect(await after('/api/partner/templates?locale=zh')).toBe('https://a.test/zh.webp')
+    expect(await after('/api/partner/templates')).toBe('https://a.test/common.webp')
+    expect(await after('/api/partner/templates?locale=xx')).toBe('https://a.test/common.webp')
+  })
+
   it('401s without the partner key', async () => {
     expect((await handleTemplates(partnerRequest('/api/partner/templates', { key: null }), routeDeps())).status).toBe(401)
   })
