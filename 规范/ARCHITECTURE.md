@@ -570,6 +570,68 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - **隔离**：只有管理员能用；试跑结果不进管理员账号的作品、不计入出图统计、漏斗和 PostHog 事件（`source = admin_test`）；没设成封面的结果和测试照片 30 天后删除（打开试跑面板时顺带清理，不加定时任务）。
 - 迁移编号段 `0780`～`0799`，只加不改。
 
+**数据定义（T85，2026-11-08，开发窗口提案经总控确认）**
+
+#### 为什么不写进 `generation_jobs`
+
+`source = admin_test` 用独立的表实现，不往 `generation_jobs` 加行：
+- 旧代码 `jobRowSchema` 的 `source` 是 `web | graylum` 的严格枚举、`credits_cost` 要求正整数；迁移先于代码上线，正式站旧代码读到 `admin_test` 行会报错。
+- 作品页、创作库、限频、概览统计、出图记录、失败率告警、争议证据、删号清理都读 `generation_jobs`，每一处都得加排除条件，漏一处就泄露。独立表天然不进这些地方。
+- 共用的是流水线代码（提示词拼法、供应商、质量档、换脸判断、编辑范围判断和约束段落、出图调用、超时、成本计算），只有「谁付钱、存哪里」两处换成试跑自己的实现。
+
+#### 表 `admin_test_photos`（私有：开 RLS、无 policy，只有 service role 读写）
+
+| 字段 | 说明 |
+|---|---|
+| `id` | uuid |
+| `object_key` | 私有桶 `admin-tests/photos/{id}.{jpg,png,webp}`，唯一 |
+| `created_by` | 上传的管理员，`on delete set null` |
+| `created_at` / `last_used_at` | 「最近用过的测试照片」按 `last_used_at desc` 取 12 张；每次试跑更新 |
+
+索引 `(last_used_at desc)`。
+
+#### 表 `admin_test_runs`（私有，同上）
+
+| 字段 | 说明 |
+|---|---|
+| `id` | uuid（浏览器生成，重复请求返回同一行） |
+| `template_id` | 被试跑的模板，`on delete cascade` |
+| `kind` | `generate`（首次出图）/ `edit`（在某条结果上编辑） |
+| `parent_id` | 编辑时被编辑的那条试跑（同一模板、成功、有成品），`on delete set null`；首次出图为空。形成记录树 |
+| `photo_id` | 源测试照片；编辑继承父记录的，`on delete set null` |
+| `batch_id` | 同一次点击（一次 3 张共用一个） |
+| `status` | `running` → `succeeded` / `failed` |
+| `resolution` | `1k` / `2k` / `3k` |
+| `inputs` | jsonb：文字字段、比例、补充说明；编辑时用户原话、判出的范围、confidence、keep、change。不存封装提示词 |
+| `prompt_version` | 当时用的 `template_prompts.version`（编辑记 `edit` 模板的版本） |
+| `provider` | `<供应商 id 或 env>/<模型名>` |
+| `provider_usage` / `cost_usd` | 同 `generation_jobs`（§10.0），失败但供应商回了用量也记 |
+| `estimate_usd` | 开跑时为预算占用的估算（按清晰度的正方形输出 token × 输出单价，加输入余量） |
+| `output_key` | 私有桶 `admin-tests/outputs/{id}.png` |
+| `error_code` / `duration_ms` | |
+| `cover_set_at` | 设为封面的时间；不为空的记录和它的源照片不被 30 天清理 |
+| `created_by` / `created_at` / `finished_at` | |
+
+索引 `(template_id, created_at desc)`（面板列表，取 50 条）、`(created_at)`（当天预算、清理、成本对账）。
+
+#### 函数（普通 plpgsql，`search_path = ''`，只授权 `service_role`；带 `p_actor` 的在函数里再核对是管理员）
+
+- `admin_begin_test_run(p_actor, p_run_id, p_template_id, p_kind, p_parent_id, p_photo_id, p_batch_id, p_resolution, p_inputs, p_prompt_version, p_provider, p_estimate_usd)`：按 `p_run_id` 幂等；advisory lock 串行化预算判断；当天（北京时间自然日）已花 = 已结束记录的 `cost_usd` 合计 + 10 分钟内仍在跑的记录的 `estimate_usd`；已花 + 本次估算 > 预算就抛 `TEST_BUDGET_EXCEEDED`（不调用供应商）。编辑时校验父记录、继承 `photo_id`；更新照片 `last_used_at`。返回新行。
+- `admin_finish_test_run(p_run_id, p_status, p_output_key, p_error_code, p_provider_usage, p_cost_usd, p_duration_ms)`：只从 `running` 结束，重复调用返回原行。
+- `admin_test_budget_status()`：返回预算、当天已花、当天试跑次数、北京时间日期。
+- `admin_set_test_run_cover(p_actor, p_run_id, p_before_url, p_after_url)`：同一事务里更新模板的前后封面地址、记 `cover_set_at`。WebP 转换和写公开桶在应用里先做（和现有封面上传同一套压缩规则）。
+- `admin_cleanup_test_runs(p_actor)`：打开面板时调用。删掉 30 天前且没设成封面的记录；每个模板超出最近 50 条的（不含封面记录）；30 天没用过、也不是封面记录源照片的测试照片；10 分钟还在 `running` 的标成 `failed / TIMEOUT`。返回要从 R2 删除的 key 列表，应用尽力删除、失败只记日志。
+- `admin_test_daily_costs(p_days)`：成本对账页按 UTC 日返回试跑的 `cost_usd` 合计和次数，和 `admin_daily_costs` 并列显示为「后台试跑」，计入「我们记录的成本」。
+- 预算：`system_settings` 新键 `admin_test_daily_budget_usd`（数字，0～1000，默认 5），`admin_set_system_setting` 用 `create or replace` 加这个键。
+
+迁移 `0780`～`0788`，只加表、索引、函数；`admin_set_system_setting` 只多认一个键，旧代码不受影响。
+
+#### 其他实现口径（不涉及数据结构，供审查）
+
+- 接口：`/api/admin/test-runs`（首次出图）、`/api/admin/test-runs/edit`（编辑）、`/api/admin/test-photos`（预签名上传）；一次 3 张是浏览器并发 3 个请求（Server Action 在同一页面是串行的，所以不用 Server Action）。只有管理员能调，非管理员 404。
+- 换脸判断照常调用；试跑被拒不写 `identity_refusals`（否则管理员账号会被标红），不发 `generate` / `generate_refused` 事件。
+- 封面：结果设为「后」、源照片设为「前」，按 §8.3 封面规则转 WebP（长边 1600、质量 82）写公开桶，`revalidateTag('templates', 'max')`。
+
 ### 10.0 真实出图成本（Owner 2026-11-06，T33）
 
 后台的成本一律用供应商回传的真实用量算，不再用固定单价估算。
