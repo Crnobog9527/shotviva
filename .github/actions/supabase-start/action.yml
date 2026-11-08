@@ -4,7 +4,7 @@ description: >
   checkout (T88). The stack's Docker images come from the Actions cache when it has them, so the
   registry, whose 5xx used to fail this job, is usually not contacted at all. The cache key is
   the CLI version, supabase/config.toml, the excluded services, and the list of image ids the
-  stack actually ran; a run whose list differs from what it restored saves a new entry (after a
+  CLI pulled; a run whose list differs from what it restored saves a new entry (after a
   CLI bump, or the first run of all). Missing images are pulled with retries, and a failed start
   is stopped and retried with backoff (scripts/ci/supabase-start.sh), up to 5 attempts.
 
@@ -27,12 +27,7 @@ runs:
         EXCLUDE: ${{ inputs.exclude }}
       run: |
         inputs=$(printf '%s\n%s\n' "$CONFIG_HASH" "$EXCLUDE" | sha256sum | cut -c1-16)
-        project=$(sed -n 's/^project_id *= *"\(.*\)"/\1/p' supabase/config.toml | head -n1)
-        [ -n "$project" ] || { echo "::error file=supabase/config.toml::No project_id"; exit 1; }
-        {
-          echo "prefix=supabase-images-v1-$RUNNER_OS-$RUNNER_ARCH-cli$CLI_VERSION-$inputs"
-          echo "project=$project"
-        } >> "$GITHUB_OUTPUT"
+        echo "prefix=supabase-images-v2-$RUNNER_OS-$RUNNER_ARCH-cli$CLI_VERSION-$inputs" >> "$GITHUB_OUTPUT"
 
     - id: restore
       uses: actions/cache/restore@v4
@@ -61,10 +56,9 @@ runs:
       env:
         PREFIX: ${{ steps.key.outputs.prefix }}
         MATCHED: ${{ steps.restore.outputs.cache-matched-key }}
-        PROJECT: ${{ steps.key.outputs.project }}
       run: |
         list="$RUNNER_TEMP/supabase-images.txt"
-        "$GITHUB_WORKSPACE/scripts/ci/supabase-images.sh" list "$PROJECT" > "$list"
+        "$GITHUB_WORKSPACE/scripts/ci/supabase-images.sh" list > "$list"
         cat "$list"
         key="$PREFIX-$(sha256sum < "$list" | cut -c1-16)"
         echo "key=$key" >> "$GITHUB_OUTPUT"

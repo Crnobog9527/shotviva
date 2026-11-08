@@ -59,6 +59,9 @@ runs:
         DIR: ${{ steps.pin.outputs.dir }}
       run: |
         echo "$DIR" >> "$GITHUB_PATH"
+        # The CLI asks api.github.com for its latest release after commands; when GitHub is slow
+        # that held one run for 93 s after `supabase start` had finished.
+        echo "SUPABASE_NO_UPDATE_NOTIFIER=1" >> "$GITHUB_ENV"
         # A broken install fails here, not later inside the `supabase start` retry loop.
         [ -x "$DIR/supabase-go" ] || { echo "::error::supabase-go is missing from $DIR"; exit 1; }
         "$DIR/supabase" --version
