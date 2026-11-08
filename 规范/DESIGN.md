@@ -130,6 +130,7 @@ Owner 2026-11-05 定稿：**B 版「暗房」（Darkroom）**，取代此前的�
   2. **第二屏：选周期**。顶部分段控件 **Monthly / Yearly**（Yearly 段上标 "Save 40%"，折扣数从配置算），下面是所选档位的价格、credits 总数（年付写 "600 credits upfront"）和每 credit 单价；再往下是两组付款方式。从积分包入口进来的第二屏是 S / M / L 三项（"20 credits · $9.90" 并标 "One-time · no subscription"），再往下同样两组付款方式。
 - **两组付款方式**：「Card · Apple Pay · Google Pay」和「Alipay」；开关 `STRIPE_WECHAT_PAY` 打开后这一组改名「Alipay / WeChat Pay」（中文「支付宝 / 微信支付」，T73，Owner 2026-11-07；原「不接微信支付」作废）。会员商品下，卡那组小字 "Renews automatically, cancel anytime"，钱包那组小字 "One-time payment, 30 days / 1 year, no auto-renew"；积分包在两组下都是单笔，小字只写 "One-time payment"。走 Waffo 时全部单笔。
 - `/pricing` 页用同一套信息，桌面三栏并排（Starter / Pro / Max，顶部 Monthly / Yearly 切换），积分包一行三项放在下面；手机上退化成和付费墙一样的竖排。
+- **营销页的模板卡片不显示积分价（Owner 2026-11-08）**：首页和各落地页模板区里，每个模板下面不再显示「N 积分起 / from N credits」小标签；价格只在价格页、付费墙和创作页的生成按钮上出现。
 - **默认显示按月（Owner 2026-11-08）**：`/pricing` 页和付费墙打开时 Monthly / Yearly 切换都默认选 **Monthly**，价格先显示月付原价；用户点 Yearly 才看到年付折算价、划线价和「每年省」。Yearly 段上的「最多省 40%」标签照常显示，吸引点击。原因：默认年付时，粗心的用户会把年付折算的月价当成单月价格。服务端渲染的 HTML 也以月付为准（SEO 页面里写的价格是月付价）。
 - 账号页「Subscription」区块：当前档位和周期（"Pro · Yearly"）、状态（Active / Cancels on … / Past due / Free）、下次续费日，一个「Manage subscription」按钮打开 Stripe Customer Portal；钱包用户显示 "Paid until …" 和「Renew」按钮。
 - 付款方式图标：卡、支付宝，按当前通道可用的方式显示。
