@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { ALLOW_EXAMPLES, REFUSE_EXAMPLES } from './examples.test-data'
+import { ALLOW_EXAMPLES, REFUSE_EXAMPLES, type IdentityExample } from './examples.test-data'
 import recorded from './examples.recorded.json'
 import { IDENTITY_PROMPT_VERSION } from './question'
 import { recordingSchema } from './recording'
@@ -22,7 +22,7 @@ const current = recording.promptVersion === IDENTITY_PROMPT_VERSION
 const MAX_FALSE_REFUSALS = 2
 const KNOWN_FALSE_REFUSALS: readonly string[] = ['换脸谱']
 
-const answered = (list: typeof examples) => (current ? list.filter((e) => recording.answers[e.text]) : [])
+const answered = (list: readonly IdentityExample[]) => (current ? list.filter((e) => recording.answers[e.text]) : [])
 const refusedAllows = () => answered(ALLOW_EXAMPLES).filter((e) => recording.answers[e.text]!.identitySwap).map((e) => e.text)
 
 describe(`evaluation set, recorded answers for prompt ${IDENTITY_PROMPT_VERSION}`, () => {
