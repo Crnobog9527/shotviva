@@ -107,7 +107,7 @@ describe('version check (T90)', () => {
     const stop = t.updates.start()
     expect(t.hasInterval()).toBe(false)
     await t.show()
-    t.updates.staleBuild()
+    t.updates.staleBuild('action')
     expect(t.deps.fetchServed).not.toHaveBeenCalled()
     expect(t.updates.getView()).toEqual({ show: false })
     stop()
@@ -199,10 +199,10 @@ describe('dismiss per version (T90)', () => {
 })
 
 describe('error trigger (T90)', () => {
-  it('shows at once on a stale-build error, then asks which version is live', async () => {
+  it('shows at once on an unknown Server Action, then asks which version is live', async () => {
     const t = tab()
     t.deploy('dpl_new')
-    t.updates.staleBuild()
+    t.updates.staleBuild('action')
     expect(t.updates.getView()).toEqual({ show: true, reason: 'error', photosHeld: false })
     expect(t.deps.track).toHaveBeenCalledWith('shown', 'error')
     await new Promise((resolve) => setTimeout(resolve, 0))
@@ -219,7 +219,7 @@ describe('error trigger (T90)', () => {
     t.deploy('dpl_new')
     await t.updates.check(true)
     t.updates.dismiss()
-    t.updates.staleBuild()
+    t.updates.staleBuild('action')
     expect(t.updates.getView()).toEqual({ show: true, reason: 'error', photosHeld: false })
     expect(t.deps.track).toHaveBeenLastCalledWith('shown', 'error')
   })
@@ -227,7 +227,7 @@ describe('error trigger (T90)', () => {
   it('still waits for a running generation', () => {
     const t = tab()
     t.updates.setHolds({ busy: true, photos: false })
-    t.updates.staleBuild()
+    t.updates.staleBuild('action')
     expect(t.updates.getView()).toEqual({ show: false })
     t.updates.setHolds({ busy: false, photos: false })
     expect(t.updates.getView()).toEqual({ show: true, reason: 'error', photosHeld: false })
@@ -236,9 +236,57 @@ describe('error trigger (T90)', () => {
   it('a dismissed error with no version known is remembered against this build', () => {
     const t = tab()
     t.deploy(null)
-    t.updates.staleBuild()
+    t.updates.staleBuild('action')
     t.updates.dismiss()
     expect(t.stored.value).toBe('error:dpl_old')
     expect(t.updates.getView()).toEqual({ show: false })
+  })
+
+  // Review #349: a dismissed error banner must not hide the next real release.
+  it('offers a newer version after an error banner was dismissed', async () => {
+    const t = tab()
+    t.deploy('dpl_new')
+    t.updates.staleBuild('action')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    t.updates.dismiss()
+    expect(t.updates.getView()).toEqual({ show: false })
+    t.deploy('dpl_newer')
+    await t.updates.check(true)
+    expect(t.updates.getView()).toEqual({ show: true, reason: 'version', photosHeld: false })
+    expect(t.deps.track).toHaveBeenLastCalledWith('shown', 'version')
+  })
+})
+
+describe('chunk failures wait for the server (T90)', () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+  it('offline: the check fails, nothing shows', async () => {
+    const t = tab()
+    t.deploy(null)
+    t.updates.staleBuild('chunk')
+    expect(t.updates.getView()).toEqual({ show: false })
+    await settle()
+    expect(t.deps.fetchServed).toHaveBeenCalledTimes(1)
+    expect(t.updates.getView()).toEqual({ show: false })
+  })
+
+  it('a flaky link on the current build: nothing shows, and a later plain check is not an error', async () => {
+    const t = tab()
+    t.updates.staleBuild('chunk')
+    await settle()
+    expect(t.updates.getView()).toEqual({ show: false })
+    t.deploy('dpl_new')
+    await t.updates.check(true)
+    expect(t.updates.getView()).toEqual({ show: true, reason: 'version', photosHeld: false })
+  })
+
+  it('a newer build confirmed: shows as an error, even for a dismissed version', async () => {
+    const t = tab({ dismissed: 'dpl_new' })
+    t.deploy('dpl_new')
+    t.updates.staleBuild('chunk')
+    expect(t.updates.getView()).toEqual({ show: false })
+    await settle()
+    expect(t.updates.getView()).toEqual({ show: true, reason: 'error', photosHeld: false })
+    expect(t.deps.track).toHaveBeenCalledWith('shown', 'error')
   })
 })

@@ -1,8 +1,10 @@
 'use client'
 
+import { addHold } from '@/core/app-update'
+
 import { readJob, submitJob, type JobBody, type SubmitOutcome } from './job-api'
 import { applyError, applyView, type TrackedJob } from './job-model'
-import { markSent, nextToSend, requeue } from './scheduler'
+import { isActive, markSent, nextToSend, requeue } from './scheduler'
 import { loadState, saveState, type WorkspaceViews } from './store-persistence'
 
 // Module-level store, so a generation outlives the page that started it: navigating from the
@@ -28,7 +30,20 @@ function set(next: TrackedJob[], nextViews: WorkspaceViews = views) {
   jobs = next
   views = nextViews
   saveState({ limit, jobs, views })
+  syncUpdateHold()
   listeners.forEach((listener) => listener())
+}
+
+// The new-version banner waits while this tab has photos queued or developing (T90). Held from
+// the store itself, so it holds on every page the tab moves to, marketing pages included.
+let releaseHold: (() => void) | null = null
+function syncUpdateHold() {
+  const busy = jobs.some(isActive)
+  if (busy && !releaseHold) releaseHold = addHold('generate')
+  else if (!busy && releaseHold) {
+    releaseHold()
+    releaseHold = null
+  }
 }
 
 function update(id: string, change: (job: TrackedJob) => TrackedJob) {
@@ -45,7 +60,10 @@ export function getJobs(): TrackedJob[] {
       views = back.views
       // Jobs that were in flight before the reload are queued again; send them once the
       // store is read (a microtask, so React is not updated mid-render).
-      queueMicrotask(pump)
+      queueMicrotask(() => {
+        syncUpdateHold()
+        pump()
+      })
     }
   }
   return jobs

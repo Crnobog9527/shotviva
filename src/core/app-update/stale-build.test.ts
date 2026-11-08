@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { ACTION_NOT_FOUND_HEADER, isStaleBuildError, onStaleBuild, resetStaleBuildWatchForTests, signalStaleBuild, watchStaleBuild } from './stale-build'
+import { ACTION_NOT_FOUND_HEADER, isStaleBuildError, onStaleBuild, resetStaleBuildWatchForTests, signalStaleBuild, staleBuildKind, watchStaleBuild } from './stale-build'
 
 afterEach(() => resetStaleBuildWatchForTests())
 
@@ -12,14 +12,15 @@ function named(name: string, message = '') {
 
 describe('stale-build errors (T90)', () => {
   it.each([
-    ['webpack ChunkLoadError', named('ChunkLoadError', 'Loading chunk 123 failed.')],
-    ['Turbopack chunk', new Error('Failed to load chunk /_next/static/chunks/abc.js from module 42')],
-    ['Chrome dynamic import', new TypeError('Failed to fetch dynamically imported module: https://shotviva.com/_next/x.js')],
-    ['Safari dynamic import', new TypeError('Importing a module script failed.')],
-    ['Next unknown Server Action', named('UnrecognizedActionError', 'Server Action "7f3a" was not found on the server.')],
-    ['the same, renamed by a bundler', new Error('Server Action "7f3a" was not found on the server. \nRead more: …')],
-  ])('recognises %s', (_, error) => {
+    ['webpack ChunkLoadError', named('ChunkLoadError', 'Loading chunk 123 failed.'), 'chunk'],
+    ['Turbopack chunk', new Error('Failed to load chunk /_next/static/chunks/abc.js from module 42'), 'chunk'],
+    ['Chrome dynamic import', new TypeError('Failed to fetch dynamically imported module: https://shotviva.com/_next/x.js'), 'chunk'],
+    ['Safari dynamic import', new TypeError('Importing a module script failed.'), 'chunk'],
+    ['Next unknown Server Action', named('UnrecognizedActionError', 'Server Action "7f3a" was not found on the server.'), 'action'],
+    ['the same, renamed by a bundler', new Error('Server Action "7f3a" was not found on the server. \nRead more: …'), 'action'],
+  ])('recognises %s', (_, error, kind) => {
     expect(isStaleBuildError(error)).toBe(true)
+    expect(staleBuildKind(error)).toBe(kind)
   })
 
   it.each([
@@ -31,11 +32,13 @@ describe('stale-build errors (T90)', () => {
     expect(isStaleBuildError(error)).toBe(false)
   })
 
-  it('keeps a signal sent before anyone listens for the first listener', () => {
-    signalStaleBuild()
+  it('keeps a signal sent before anyone listens for the first listener, the certain kind first', () => {
+    signalStaleBuild('action')
+    signalStaleBuild('chunk')
     const listener = vi.fn()
     onStaleBuild(listener)
     expect(listener).toHaveBeenCalledTimes(1)
+    expect(listener).toHaveBeenCalledWith('action')
     const later = vi.fn()
     onStaleBuild(later)
     expect(later).not.toHaveBeenCalled()
@@ -60,6 +63,7 @@ describe('watchStaleBuild (T90)', () => {
     onStaleBuild(listener)
     await expect(win.fetch('/generate', { method: 'POST' })).resolves.toBe(response)
     expect(listener).toHaveBeenCalledTimes(1)
+    expect(listener).toHaveBeenCalledWith('action')
   })
 
   it('stays quiet on ordinary responses', async () => {
@@ -78,5 +82,6 @@ describe('watchStaleBuild (T90)', () => {
     handlers.get('error')?.({ error: new Error('Something else') })
     handlers.get('error')?.({ error: new TypeError('Importing a module script failed.') })
     expect(listener).toHaveBeenCalledTimes(2)
+    expect(listener).toHaveBeenNthCalledWith(1, 'chunk')
   })
 })

@@ -1,5 +1,6 @@
 import { DEV_APP_VERSION } from '../build-env'
 import type { Holds } from './holds'
+import type { StaleKind } from './stale-build'
 
 // The new-version banner's logic (T90), free of React and the DOM so it can be tested: when to
 // ask the server for its version, when the banner shows, and what a dismissal covers.
@@ -53,6 +54,8 @@ export class UpdateController {
   // visitor is stuck until they reload. Dismissing that one hides it until the next failure.
   private errorHidden = false
   private errors = 0
+  // A chunk failed to load: shown only if the next answer names a newer build (it may be offline).
+  private chunkFailed = false
   private shownEpisode: string | null = null
   private view: UpdateView = { show: false }
   private readonly listeners = new Set<() => void>()
@@ -94,13 +97,16 @@ export class UpdateController {
     this.served(await this.deps.fetchServed().catch(() => null))
   }
 
-  // A missing chunk or Server Action: show now, then learn which version is live.
-  staleBuild(): void {
+  // An unknown Server Action shows at once, then learns which version is live; a failed chunk
+  // asks the server first and shows only if a newer build is there (offline, nothing shows).
+  staleBuild(kind: StaleKind): void {
     if (!this.enabled) return
-    this.pending = { reason: 'error', version: this.pending?.version ?? null }
-    this.errorHidden = false
-    this.errors += 1
-    this.publish()
+    if (kind === 'chunk') {
+      this.chunkFailed = true
+    } else {
+      this.newFailure(this.pending?.version ?? null)
+      this.publish()
+    }
     void this.check(true)
   }
 
@@ -125,10 +131,26 @@ export class UpdateController {
   }
 
   private served(version: string | null): void {
+    const chunkFailed = this.chunkFailed
+    this.chunkFailed = false
     if (!version || version === this.deps.current || version === DEV_APP_VERSION) return
+    const { pending } = this
+    if (chunkFailed) this.newFailure(version)
     // An error banner learns which version it is about; the reason it showed stays.
-    this.pending = { reason: this.pending?.reason ?? 'version', version }
+    else if (pending?.reason === 'error' && pending.version === null) this.pending = { ...pending, version }
+    // A version the tab has not been told about yet: a fresh offer, whatever came before
+    // (a dismissed error banner does not hide the next release).
+    else if (pending?.version !== version) {
+      this.pending = { reason: 'version', version }
+      this.errorHidden = false
+    }
     this.publish()
+  }
+
+  private newFailure(version: string | null): void {
+    this.pending = { reason: 'error', version }
+    this.errorHidden = false
+    this.errors += 1
   }
 
   private compute(): UpdateView {

@@ -70,7 +70,7 @@ export function useAppUpdate() {
     const updates = getController()
     updates.setHolds(getHolds())
     const stopHolds = subscribeHolds(() => updates.setHolds(getHolds()))
-    const stopErrors = onStaleBuild(() => updates.staleBuild())
+    const stopErrors = onStaleBuild((kind) => updates.staleBuild(kind))
     const stopChecks = updates.start()
     return () => {
       stopHolds()

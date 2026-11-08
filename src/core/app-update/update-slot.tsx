@@ -1,16 +1,16 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { lazy, Suspense } from 'react'
 
 import { usePathname } from '../i18n/navigation'
+import { BarBoundary } from './bar-boundary'
 import { ADMIN_COPY } from './copy'
 import { useUpdateHold } from './holds'
-import type { UpdateCopy } from './update-bar'
+import UpdateBar, { type UpdateCopy } from './update-bar'
 import { useAppUpdate } from './use-app-update'
 
-// Only a visitor who sees the banner downloads it (as the cookie bar, T70).
-const UpdateBar = lazy(() => import('./update-bar'))
+// The bar is imported statically, unlike the cookie bar: it shows exactly when this tab's build
+// may be gone from the server, and a lazy chunk fetched then could be missing too (T90).
 
 // The payment return page is part of the checkout flow: no banner there (T90).
 const CHECKOUT_PATH = /^\/checkout(?:\/|$)/
@@ -32,8 +32,8 @@ export function UpdateSlot() {
   const { view, refresh, dismiss } = useAppUpdate()
   if (!view.show) return null
   return (
-    <Suspense fallback={null}>
+    <BarBoundary label={copy.refresh}>
       <UpdateBar copy={copy} photosHeld={view.photosHeld} onRefresh={refresh} onDismiss={dismiss} />
-    </Suspense>
+    </BarBoundary>
   )
 }

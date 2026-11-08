@@ -5,40 +5,53 @@
 // Next answers an unknown Server Action with this header and throws UnrecognizedActionError.
 export const ACTION_NOT_FOUND_HEADER = 'x-nextjs-action-not-found'
 
-const STALE_NAMES = new Set(['ChunkLoadError', 'UnrecognizedActionError'])
+// 'action': the server told us it does not know this tab's Server Action — certain, shown at
+// once. 'chunk': a code chunk failed to load, which an offline or flaky connection also causes,
+// so the banner waits until /api/version confirms a newer build.
+export type StaleKind = 'action' | 'chunk'
+
+const ACTION_MESSAGE = /Server Action "[^"]*" was not found on the server/i
 // webpack, Turbopack, and the browsers' own dynamic import() failures.
-const STALE_MESSAGE =
-  /Loading (?:CSS )?chunk [^\s]+ failed|Failed to load chunk|Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|Server Action "[^"]*" was not found on the server/i
+const CHUNK_MESSAGE =
+  /Loading (?:CSS )?chunk [^\s]+ failed|Failed to load chunk|Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed/i
 
-export function isStaleBuildError(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false
+export function staleBuildKind(error: unknown): StaleKind | null {
+  if (typeof error !== 'object' || error === null) return null
   const { name, message } = error as { name?: unknown; message?: unknown }
-  if (typeof name === 'string' && STALE_NAMES.has(name)) return true
-  return typeof message === 'string' && STALE_MESSAGE.test(message)
+  const text = typeof message === 'string' ? message : ''
+  if (name === 'UnrecognizedActionError' || ACTION_MESSAGE.test(text)) return 'action'
+  if (name === 'ChunkLoadError' || CHUNK_MESSAGE.test(text)) return 'chunk'
+  return null
 }
 
-const listeners = new Set<() => void>()
+export const isStaleBuildError = (error: unknown): boolean => staleBuildKind(error) !== null
+
+type Listener = (kind: StaleKind) => void
+
+const listeners = new Set<Listener>()
 // A failure before the banner's slot has mounted (during hydration) is not lost: the first
-// listener hears it on subscribing.
-let missed = false
+// listener hears it on subscribing (the more certain kind wins).
+let missed: StaleKind | null = null
 
-export function signalStaleBuild(): void {
-  if (listeners.size === 0) missed = true
-  listeners.forEach((listener) => listener())
+export function signalStaleBuild(kind: StaleKind): void {
+  if (listeners.size === 0 && missed !== 'action') missed = kind
+  listeners.forEach((listener) => listener(kind))
 }
 
-export function onStaleBuild(listener: () => void): () => void {
+export function onStaleBuild(listener: Listener): () => void {
   listeners.add(listener)
   if (missed) {
-    missed = false
-    listener()
+    const kind = missed
+    missed = null
+    listener(kind)
   }
   return () => listeners.delete(listener)
 }
 
 // For error boundaries and catch blocks that swallow the error the global listeners never see.
 export function reportIfStaleBuild(error: unknown): void {
-  if (isStaleBuildError(error)) signalStaleBuild()
+  const kind = staleBuildKind(error)
+  if (kind) signalStaleBuild(kind)
 }
 
 type WatchedWindow = Pick<Window, 'addEventListener'> & { fetch: typeof fetch }
@@ -57,13 +70,13 @@ export function watchStaleBuild(win: WatchedWindow): void {
   const original = win.fetch.bind(win)
   win.fetch = async (...args: Parameters<typeof fetch>) => {
     const response = await original(...args)
-    if (response.headers.get(ACTION_NOT_FOUND_HEADER) === '1') signalStaleBuild()
+    if (response.headers.get(ACTION_NOT_FOUND_HEADER) === '1') signalStaleBuild('action')
     return response
   }
 }
 
 export function resetStaleBuildWatchForTests(): void {
   watching = false
-  missed = false
+  missed = null
   listeners.clear()
 }
