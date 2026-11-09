@@ -1,8 +1,8 @@
 import { hasCompleteCoverSet } from '@/core/templates/cover-locales'
 import { EDIT_TEMPLATE_ID } from '@/core/templates/edit-params'
 import { RESOLUTIONS, type Resolution } from '@/core/templates/output-options'
-import { MISSING_COST, floorGuidance, providerFloor } from '@/core/templates/provider-pricing'
-import { creditsBelowFloor, type CreditsCost, type CreditsFloor, type TemplateQuality } from '@/core/templates/pricing'
+import { MISSING_COST, floorGuidance, providerFloor, type ProviderFloors } from '@/core/templates/provider-pricing'
+import { creditsBelowFloor, type CreditsCost, type TemplateQuality } from '@/core/templates/pricing'
 import type { TemplateSurface } from '@/core/templates/schema'
 import type { Template } from '@/core/templates/types'
 
@@ -56,7 +56,7 @@ function webIncomplete(template: BulkEditCandidate, visibleIn: readonly Template
 export function bulkEditFailures(
   templates: readonly BulkEditCandidate[],
   patch: BulkEditPatch,
-  floor: CreditsFloor,
+  floor: ProviderFloors,
 ): BulkEditFailure[] {
   return templates.flatMap((template): BulkEditFailure[] => {
     if (!isBulkEditable(template)) return [{ id: template.id, name: template.name, reason: 'system' }]

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-import type { CreditsFloor } from '@/core/templates/pricing'
+import type { ProviderFloors } from '@/core/templates/provider-pricing'
 
 import { isBulkEditable } from '../templates/bulk-edit-rules'
 import type { AdminTemplate, TemplateAdminActions } from '../templates/types'
@@ -21,7 +21,7 @@ type Props = {
   setActiveMany: TemplateAdminActions['setActiveMany']
   // Batch edit (T79) and the floor its dialog checks against.
   editMany: TemplateAdminActions['editMany']
-  floor: CreditsFloor
+  floor: ProviderFloors
   categories: readonly CategoryOption[]
   onClear: () => void
 }

@@ -1,11 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { providerFloor } from '@/core/templates/provider-pricing'
+import { providerFloor, type ProviderFloors } from '@/core/templates/provider-pricing'
 
 import { Button } from '@/core/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/core/ui/dialog'
-import type { CreditsFloor } from '@/core/templates/pricing'
 
 import { ImageProviderField, type ImageProviderOption } from '../image-provider-field'
 import type { AdminTemplate, CoverLanguage, SaveTemplatePayload, TemplateAdminActions } from '../templates/types'
@@ -24,7 +23,7 @@ export type EditTarget = { mode: 'new' } | { mode: 'edit'; template: AdminTempla
 type Props = {
   providers: readonly ImageProviderOption[]
   target: EditTarget
-  floor: CreditsFloor
+  floor: ProviderFloors
   categories: readonly CategoryOption[]
   coverLanguages: readonly CoverLanguage[]
   coverActions: Pick<TemplateAdminActions, 'requestCoverUpload' | 'applyCover'>

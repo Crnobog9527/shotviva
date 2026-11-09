@@ -30,7 +30,9 @@ export const SIZE_OPTIONS: readonly SizeOption[] = SIZE_ORDER.map((id) => ({
 export function sizeChoices(options: ImageOptions, ratio?: number | null) {
   const nearest = !options.originalRatio ? closestAspect(ratio, options) : null
   return SIZE_OPTIONS.filter(({ id }) => id === 'original' ? options.originalRatio || nearest !== null : options.aspectRatios.includes(id))
-    .map((size) => ({ ...size, nearest: size.id === 'original' ? nearest : null }))
+    .map((size) => size.id === 'original' && nearest
+      ? { ...size, nearest, glyph: { ...glyphFor(nearest), dashed: true } }
+      : { ...size, nearest: null })
 }
 
 export type TierOption = { id: Resolution; px: number }

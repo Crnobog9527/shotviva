@@ -1,7 +1,7 @@
 import { hasCompleteCoverSet } from '@/core/templates/cover-locales'
 import { EDIT_TEMPLATE_ID } from '@/core/templates/edit-params'
-import { providerFloor } from '@/core/templates/provider-pricing'
-import { creditsBelowFloor, type CreditsFloor } from '@/core/templates/pricing'
+import { providerFloor, type ProviderFloors } from '@/core/templates/provider-pricing'
+import { creditsBelowFloor } from '@/core/templates/pricing'
 import type { Template } from '@/core/templates/types'
 
 // When a template may go live (T60). The single 上架 switch and the bulk bar both run these
@@ -44,7 +44,7 @@ const blank = (text: string | null) => !text || text.trim() === ''
 // which read the name, the English description and both covers (site/content/home-templates).
 // Partner-only rows such as `freeform` never render a card, so they only need a prompt, a name
 // and a price at or above the floor.
-export function publishBlockers(template: PublishCandidate, floor: CreditsFloor): PublishBlocker[] {
+export function publishBlockers(template: PublishCandidate, floor: ProviderFloors): PublishBlocker[] {
   if (SYSTEM_TEMPLATE_IDS.has(template.id)) return ['system']
   const onWeb = template.visibleIn.includes('web')
   const checks: [PublishBlocker, boolean][] = [
@@ -76,7 +76,7 @@ export function planActiveChange(
   ids: readonly string[],
   rows: readonly PublishCandidate[],
   active: boolean,
-  floor: CreditsFloor,
+  floor: ProviderFloors,
 ): ActiveChangeOutcome {
   const byId = new Map(rows.map((row) => [row.id, row]))
   const outcome: ActiveChangeOutcome = { active, changed: [], unchanged: [], skipped: [] }

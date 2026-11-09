@@ -1,12 +1,14 @@
 import 'server-only'
 
+import type { ProviderFloors } from '@/core/templates/provider-pricing'
+
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { AppError } from '@/core/errors'
 import { LOCALES } from '@/core/i18n/locales'
 import { logger } from '@/core/logger'
-import { TEMPLATE_QUALITIES, type CreditsFloor } from '@/core/templates/pricing'
+import { TEMPLATE_QUALITIES } from '@/core/templates/pricing'
 import { TEMPLATE_SURFACES } from '@/core/templates/schema'
 
 import { isEmptyPatch, type BulkEditFailure, type BulkEditOutcome, type BulkEditPatch } from './bulk-edit-rules'
@@ -72,7 +74,7 @@ export async function bulkEditTemplates(
   client: SupabaseClient,
   adminId: string,
   input: unknown,
-  floor: CreditsFloor,
+  floor: ProviderFloors,
 ): Promise<BulkEditOutcome> {
   const parsed = inputSchema.safeParse(input)
   if (!parsed.success) throw new AppError('INVALID_INPUT', parsed.error.issues.map((issue) => issue.message).join('; '))

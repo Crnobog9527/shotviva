@@ -34,7 +34,7 @@ export function SizePicker({ value, onChange, options, photoRatio, name = 'size'
               />
             </span>
             <b className="text-caption leading-none font-semibold tracking-[-0.02em]">{size.nearest ? t('closest', { ratio: size.nearest }) : t(size.id)}</b>
-            <small className={cn('text-caption leading-none text-muted-foreground', size.ratio && 'font-mono tracking-[-0.03em]')}>{size.nearest ? null : size.ratio ?? t('asShot')}</small>
+            {!size.nearest && <small className={cn('text-caption leading-none text-muted-foreground', size.ratio && 'font-mono tracking-[-0.03em]')}>{size.ratio ?? t('asShot')}</small>}
           </span>
         </label>
       ))}

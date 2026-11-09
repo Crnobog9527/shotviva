@@ -91,9 +91,9 @@ export function MobileSizeMenu({ value, onChange, options, photoRatio }: Props) 
     <label className="mk-field">
       <span className="mk-field-label">{t('workspace.size')}</span>
       <select className="hairline min-h-11 w-full rounded-control bg-card px-3 text-body" disabled={!choices.length}
-        value={selected?.id ?? ''} onChange={(event) => onChange(event.target.value as OutputAspect)}>
+        value={selected?.nearest ? 'closest' : selected?.id ?? ''} onChange={(event) => onChange(event.target.value === 'closest' ? 'original' : event.target.value as OutputAspect)}>
         {!selected ? <option value="" disabled>{t('workspace.pickSize')}</option> : null}
-        {choices.map((choice) => <option key={choice.id} value={choice.id}>
+        {choices.map((choice) => <option key={choice.id} value={choice.nearest ? 'closest' : choice.id}>
           {choice.nearest ? t('sizes.closest', { ratio: choice.nearest }) : sizeLabel(choice.id, t)}
         </option>)}
       </select>
