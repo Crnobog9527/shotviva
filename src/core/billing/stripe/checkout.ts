@@ -194,7 +194,7 @@ type CheckoutInput = { userId: string; body: CheckoutBody; client?: CheckoutClie
 type CheckoutResult = { url: string; cancelReceipt?: string }
 
 async function startSession(deps: CheckoutDeps, body: CheckoutBody, user: string, token: string, params: Stripe.Checkout.SessionCreateParams) {
-  const claim = await reserveDiscount(deps.codes, user, body, token)
+  const claim = await reserveDiscount(deps.codes, user, body, token, deps.products)
   const args = claim ? discountedParams(params, claim) : params
   try {
     const created = await deps.stripe.checkout.sessions.create(args, { idempotencyKey: token })

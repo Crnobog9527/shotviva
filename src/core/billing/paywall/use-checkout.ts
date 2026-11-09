@@ -14,7 +14,7 @@ import { refreshDiscount } from "./discount-context"
 // "refused": the server refused a membership as the same plan or a lower one than the buyer
 // holds (409 DOWNGRADE_NOT_ALLOWED, T66), say from a page opened before the plan changed; the
 // paywall says plans only go up and points to Account.
-export type CheckoutStatus = "idle" | "pending" | "error" | "refused" | "in_use" | "offer_changed"
+export type CheckoutStatus = "idle" | "pending" | "error" | "refused" | "in_use" | "offer_changed" | "floor"
 
 // Asks the server for a Stripe Checkout Session and goes there. Signed-out buyers (the public
 // /pricing page) go to sign-in first and come back to the same page.
@@ -63,20 +63,24 @@ export function checkoutAttempt(body: string, previous: CheckoutAttempt | null, 
   return { body, id: crypto.randomUUID(), created: now }
 }
 
-type Answer = { kind: "url"; url: string } | { kind: "refused" | "in_use" | "offer_changed" }
+type Answer = { kind: "url"; url: string } | { kind: "refused" | "in_use" | "offer_changed" | "floor" }
 
 // The checkout URL, or 409 DOWNGRADE_NOT_ALLOWED (only upgrades while a membership runs);
 // anything else throws and shows the generic error.
 export function readAnswer(status: number, body: unknown): Answer {
   const record = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {}
-  if (status === 409) {
-    if (record.code === "CODE_CHECKOUT_IN_PROGRESS") return { kind: "in_use" }
-    if (record.code === "CODE_CHECKOUT_OFFER_CHANGED") return { kind: "offer_changed" }
-    if (record.code === "DOWNGRADE_NOT_ALLOWED") return { kind: "refused" }
+  if (status === 409 && typeof record.code === "string") {
+    const kind = conflicts.get(record.code)
+    if (kind) return { kind }
   }
   if (status < 200 || status >= 300 || typeof record.url !== "string") throw new Error("no checkout url")
   return { kind: "url", url: record.url }
 }
+
+const conflicts = new Map<string, "refused" | "in_use" | "offer_changed" | "floor">([
+  ["CODE_CHECKOUT_IN_PROGRESS", "in_use"], ["CODE_CHECKOUT_OFFER_CHANGED", "offer_changed"],
+  ["DOWNGRADE_NOT_ALLOWED", "refused"], ["CODE_CHECKOUT_FLOOR", "floor"],
+])
 
 // A Graylum top-up arrives as /pricing?from=graylum&return_to=…; the server checks the host.
 function partnerReturn(): { return_to?: string } {

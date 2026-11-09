@@ -1123,8 +1123,10 @@
     "codeOnce": "仅本次付款",
     "codeFirstMonth": "首月",
     "codeFirstYear": "首年",
+    "codeAnnualPayments": "{count, plural, =1 {首笔年费} other {前 # 笔年费}}",
     "codeMonths": "前 {months} 个月",
     "codeEvery": "每期",
+    "codeCheckoutFloor": "按当前价格，这个商品不能使用此优惠。请选择其他适用商品。",
     "codeCheckoutChanged": "你的优惠已变更，请确认最新价格后重试。",
     "codeCheckoutInUse": "这份优惠正在另一个结账页面使用。请返回原页面完成或取消付款，再重试。",
     "fineDiscount": "{term} {price}，之后每{period, select, year {年} other {月}} {original} · 可随时取消 · 美元"

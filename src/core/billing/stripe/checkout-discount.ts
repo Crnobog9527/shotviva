@@ -4,12 +4,13 @@ import { createHash, randomUUID } from 'node:crypto'
 import type Stripe from 'stripe'
 import { z } from 'zod'
 
+import { checkoutUnitPriceDifference, type CatalogInput } from '../../codes/admin'
 import { AppError } from '../../errors'
 import type { RpcClient } from '../rpc'
 import type { CheckoutBody } from './checkout'
 import type { StripeApi } from './client'
 
-const reserved = z.object({ status: z.literal('reserved'), code_id: z.uuid(), code: z.string(), percent: z.number().int(),
+const reserved = z.object({ status: z.literal('reserved'), code_id: z.uuid(), code: z.string(), percent: z.int().min(1).max(90),
   stripe_coupon_id: z.string().min(1), prepared: z.boolean() })
 const reservation = z.discriminatedUnion('status', [reserved, z.object({ status: z.literal('in_use') }), z.object({ status: z.literal('expired') })])
 export type Discount = z.infer<typeof reserved> & { token: string; expiresAt: number }
@@ -38,16 +39,26 @@ async function claimDiscount(db: RpcClient, user: string, body: CheckoutBody, to
   const claim = reservation.parse(slot.data)
   if (claim.status === 'in_use') throw new AppError('CODE_CHECKOUT_IN_PROGRESS', 'Another checkout is using this discount')
   if (claim.status === 'expired') throw new AppError('CONFLICT', 'This checkout attempt has expired')
-  if (body.expected_code && claim.code !== body.expected_code) {
-    if (!claim.prepared) await releaseDiscount(db, user, token)
-    throw new AppError('CODE_CHECKOUT_OFFER_CHANGED', 'Discount offer has changed')
-  }
   return claim
 }
 
-export async function reserveDiscount(db: RpcClient, user: string, body: CheckoutBody, token: string): Promise<Discount | null> {
+function checkOffer(body: CheckoutBody, claim: z.infer<typeof reserved>, products: readonly CatalogInput[]) {
+  if (body.expected_code && claim.code !== body.expected_code) throw new AppError('CODE_CHECKOUT_OFFER_CHANGED', 'Discount offer has changed')
+  if (checkoutUnitPriceDifference(products, body.product_id, claim.percent) < BigInt(0)) {
+    throw new AppError('CODE_CHECKOUT_FLOOR', 'Discounted price is below the current subscription price per credit')
+  }
+}
+
+export async function reserveDiscount(db: RpcClient, user: string, body: CheckoutBody, token: string, products: readonly CatalogInput[]): Promise<Discount | null> {
   const claim = await claimDiscount(db, user, body, token)
   if (!claim) return null
+  try {
+    checkOffer(body, claim, products)
+  } catch (error) {
+    // A prepared retry may refer to a still-payable Session under the preceding catalogue.
+    if (!claim.prepared) await releaseDiscount(db, user, token)
+    throw error
+  }
   // Stripe measures its 30-minute minimum at receipt. The five-second allowance fits the
   // SQL clock/transport window. On retry, prepare returns the original persisted deadline.
   const prepared = await db.rpc('prepare_checkout_discount', { p_user: user, p_token: token, p_expires_at: Math.ceil(Date.now() / 1000) + 1805 })

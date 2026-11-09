@@ -1,6 +1,7 @@
 import type Stripe from 'stripe'
 import { describe, expect, it, vi } from 'vitest'
 
+import { discountedPriceCents } from '../../codes'
 import type { CheckoutBody } from './checkout'
 import { createCheckout } from './checkout'
 import { checkoutToken, discountedCancelSession, expireAndRelease } from './checkout-discount'
@@ -106,6 +107,26 @@ describe('discount reservation, retries and failure handling', () => {
     expect(c.retrieve).toHaveBeenCalledWith('cs_test_123')
     expect(c.expire).not.toHaveBeenCalled()
     expect(c.rpc.mock.calls.some(([name]) => name === 'release_checkout_discount')).toBe(status === 'expired')
+  })
+})
+
+describe('checkout applies the current configured price floor', () => {
+  it.each([
+    { delta: -1, prepared: false }, { delta: 0, prepared: false }, { delta: 1, prepared: false }, { delta: 1, prepared: true },
+  ])('compares the collectible subtotal with a floor offset of $delta cents (prepared: $prepared)', async ({ delta, prepared }) => {
+    const c = setup({ ...claim, prepared })
+    const target = c.d.products.find(p => p.id === pack.product_id)!
+    const paidCents = discountedPriceCents(Math.round(target.priceUsd * 100), claim.percent)
+    c.d.products = c.d.products.map(p => p.tier === 'pack' ? p : { ...p, priceUsd: (paidCents + delta) / 100, credits: target.credits })
+    if (delta <= 0) {
+      expect(await c.start()).toHaveProperty('cancelReceipt')
+      expect(c.create).toHaveBeenCalledOnce()
+    } else {
+      await expect(c.start()).rejects.toMatchObject({ code: 'CODE_CHECKOUT_FLOOR' })
+      expect(c.create).not.toHaveBeenCalled()
+      expect(c.rpc.mock.calls.some(([name]) => name === 'prepare_checkout_discount')).toBe(false)
+      expect(c.rpc.mock.calls.some(([name]) => name === 'release_checkout_discount')).toBe(!prepared)
+    }
   })
 })
 

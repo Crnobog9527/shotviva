@@ -8,7 +8,8 @@ import type { BlockReason } from "../subscription/upgrade-rule"
 import { perCreditUsd, perMonthUsd, productFor, yearlySavingUsd, type Period, type TierOffer } from "./offer"
 import { PerkList } from "./perk-list"
 import type { TierPerks } from "./perks"
-import { discountTerm, useProductDiscount } from "./discount-context"
+import { discountTerm } from "./copy"
+import { useProductDiscount } from "./discount-context"
 import { useMoney } from "./use-money"
 
 const FLAGS = { starter: null, pro: "recommended", max: "bestValue" } as const
@@ -64,6 +65,7 @@ function Price({ offer, period, singlePayment }: { offer: TierOffer; period: Per
   const money = useMoney()
   const product = productFor(offer, period)
   const discount = useProductDiscount(product)
+  const term = discount && discountTerm(discount.offer, singlePayment, period)
   const original = perMonthUsd(offer, period)
   const monthly = discount ? discount.priceUsd / (period === "year" ? 12 : 1) : original
   return (
@@ -76,7 +78,7 @@ function Price({ offer, period, singlePayment }: { offer: TierOffer; period: Per
         ),
         per: (chunks) => <span className="text-caption text-muted-foreground">{chunks}</span>,
       })}
-      {discount && <span className="text-caption text-bone-dim">{t(discountTerm(discount.offer.duration, singlePayment, period), { months: discount.offer.months ?? 0 })}</span>}
+      {term && <span className="text-caption text-bone-dim">{t(term.key, term.values)}</span>}
       {!discount && period === "year" ? (
         <s className="ml-1 font-mono text-caption text-muted-foreground" aria-label={t("wasMonthly", { price: money(offer.monthly.priceUsd) })}>
           {money(offer.monthly.priceUsd)}

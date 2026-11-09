@@ -53,7 +53,6 @@ export function DiscountProvider({ children, active = true }: { children: ReactN
       const remaining = Date.parse(expiresAt) - Date.now()
       if (remaining <= 0) {
         setState(previous => ({ ...previous, pending: null }))
-        refreshDiscount()
       } else timer = window.setTimeout(schedule, Math.min(2_147_483_647, remaining))
     }
     schedule()
@@ -72,10 +71,4 @@ export function useProductDiscount(product: SiteProduct) {
   if (channel !== 'stripe' || !pending?.products.includes(product.id)) return null
   const cents = priceCents(product)
   return { offer: pending, priceUsd: discountedPriceCents(cents, pending.percent) / 100 }
-}
-
-export function discountTerm(duration: PendingDiscount['duration'], singlePayment: boolean, period: 'month' | 'year') {
-  if (singlePayment) return 'codeOnce'
-  if (duration === 'once') return period === 'month' ? 'codeFirstMonth' : 'codeFirstYear'
-  return duration === 'repeating' ? 'codeMonths' : 'codeEvery'
 }

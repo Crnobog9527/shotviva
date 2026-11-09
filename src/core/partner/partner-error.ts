@@ -43,6 +43,8 @@ const FROM_APP: Record<ErrorCode, PartnerErrorCode> = {
   CODE_ALREADY_INVITED: 'internal',
   CODE_NEEDS_CONFIRM: 'internal',
   CODE_CHECKOUT_IN_PROGRESS: 'internal',
+  CODE_CHECKOUT_OFFER_CHANGED: 'internal',
+  CODE_CHECKOUT_FLOOR: 'internal',
   CODE_INVITE_INELIGIBLE: 'internal',
   AUTH_PHONE_INVALID: 'internal',
   AUTH_CONSENT_REQUIRED: 'internal',

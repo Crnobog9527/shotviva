@@ -2,10 +2,10 @@
 
 import { useTranslations } from "next-intl"
 
-import { discountTerm, useProductDiscount } from "./discount-context"
+import { useProductDiscount } from "./discount-context"
 import { usePaymentChannel } from "./channel-context"
 import { CheckoutBar } from "./checkout-bar"
-import { planFinePrint } from "./copy"
+import { discountTerm, planFinePrint } from "./copy"
 import { checkoutTone, type ResolvedPick } from "./pick"
 import { useStanding } from "./standing-context"
 import { planStanding } from "./standing-pick"
@@ -49,7 +49,8 @@ function useCheckoutPrice(resolved: ResolvedPick, choice: PaywallChoice, discoun
   const price = money(discount?.priceUsd ?? resolved.product.priceUsd)
   if (resolved.kind !== "plan") return { price, fine: t("finePack", { price }) }
   if (discount && choice.method !== "alipay" && discount.offer.duration !== "forever") {
-    const term = t(discountTerm(discount.offer.duration, false, choice.period), { months: discount.offer.months ?? 0 })
+    const duration = discountTerm(discount.offer, false, choice.period)
+    const term = t(duration.key, duration.values)
     return { price, fine: t("fineDiscount", { price, original: money(resolved.product.priceUsd), period: choice.period, term }) }
   }
   const line = planFinePrint(channel, { method: choice.method, period: choice.period, price })

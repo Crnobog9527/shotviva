@@ -1,8 +1,12 @@
 import { randomUUID } from 'node:crypto'
 
 import type { Client } from 'pg'
-import { afterAll, beforeAll, expect, it } from 'vitest'
+import type Stripe from 'stripe'
+import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 
+import { createCheckout, expireAndRelease } from '@/core/billing/stripe'
+import { deps, fakeStripe } from '@/core/billing/stripe/test-checkout'
+import { site } from '@/site/site.config'
 import { benefits, invite, pack } from '../t94-config'
 
 import { anonClient, connectAdmin, createUser, ledgerOf, profileOf, serviceClient } from './helpers'
@@ -104,6 +108,39 @@ it('one live Checkout wins, repeats keep the deadline, and a stale release canno
   expect(await reserve(user, tokens[other])).toEqual({ status: 'expired' })
   expect(await reserve(user, randomUUID())).toMatchObject({ status: 'reserved' })
   expect(await release(user, tokens[other])).toBe(false)
+})
+
+it('opens only one discounted checkout across tabs, then immediately accepts a new one after cancellation', async () => {
+  const user = await createUser(db)
+  const codeId = await addDiscount(user)
+  const { stripe } = fakeStripe()
+  const codes = serviceClient()
+  const create = vi.fn(async (params: Stripe.Checkout.SessionCreateParams) => ({
+    id: 'cs_test_' + randomUUID().replaceAll('-', ''), status: 'open' as const, url: 'https://checkout.example/test',
+    metadata: { user_id: user, checkout_token: String(params.metadata?.checkout_token), code_id: String(params.metadata?.code_id) },
+    expires_at: params.expires_at!, payment_method_types: ['card'],
+  }))
+  const expire = vi.fn(async () => ({ status: 'expired' }))
+  Object.assign(stripe.checkout.sessions, { create, expire })
+  const config = deps(stripe, { codes, products: site.billing.products })
+  const body = { product_id: pack.id, locale: 'en', method: 'card' } as const
+  const start = () => createCheckout(config, { userId: user, body, token: randomUUID() })
+  const before = Math.floor(Date.now() / 1000)
+  const results = await Promise.allSettled([start(), start()])
+  expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1)
+  expect(results.find(result => result.status === 'rejected')?.reason).toMatchObject({ code: 'CODE_CHECKOUT_IN_PROGRESS' })
+  expect(create).toHaveBeenCalledTimes(1)
+  const session = (await create.mock.results[0].value)
+  expect(session.metadata.code_id).toBe(codeId)
+  expect(session.expires_at).toBeGreaterThanOrEqual(before + 1800)
+  expect(session.expires_at).toBeLessThanOrEqual(Math.ceil(Date.now() / 1000) + 1810)
+  const { rows: [lock] } = await db.query('select checkout_token, extract(epoch from checkout_expires_at)::bigint as expiry from code_redemptions where code_id=$1', [codeId])
+  expect(lock.checkout_token).toBe(session.metadata.checkout_token)
+  expect(Number(lock.expiry)).toBe(session.expires_at)
+  await expireAndRelease(stripe, codes, user, lock.checkout_token, session)
+  expect(expire).toHaveBeenCalledWith(session.id)
+  expect(await start()).toHaveProperty('cancelReceipt')
+  expect(create).toHaveBeenCalledTimes(2)
 })
 
 it('two successful discounted payments both settle, one consumes the claim and the other is flagged', async () => {
