@@ -2,10 +2,10 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { AppError } from '@/core/errors'
-import { estimatedImageCostsSchema, imageCapabilitiesSchema } from '@/core/templates/image-capabilities'
-import { creditsCostSchema, TEMPLATE_QUALITIES } from '@/core/templates/pricing'
-import { RESOLUTIONS } from '@/core/templates/output-options'
-import { imageCostBudget, modelCreditFloor, UNPRICED, type ProviderFloors } from '@/core/templates/provider-pricing'
+import {
+  creditsCostSchema, estimatedImageCostsSchema, imageCapabilitiesSchema, imageCostBudget, modelCreditFloor,
+  RESOLUTIONS, TEMPLATE_QUALITIES, UNPRICED, type ProviderFloors,
+} from '@/core/templates'
 import type { ImageProviderOption } from '../image-provider-field'
 
 const rowSchema = z.object({
