@@ -435,7 +435,10 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 这张表是 §15.6「不做后台开关」的例外，只管档位门槛，不管功能开不开（功能开关仍在 `site.config` 的 `features`）。
 - 保存函数签名是 `admin_set_feature_access(p_key, p_min_tier, p_open_to_all_at, p_actor)`：服务端用 service role 调用时拿不到 `auth.uid()`，所以由服务端传管理员 id 写进 `updated_by`（和 `admin_activate_announcement` 同一做法，T29）。
 
-#### 联盟返佣（Owner 2026-11-07 定，尚未接入）
+#### 联盟返佣（Owner 2026-11-07 定，2026-11-09 改为自建联盟中心，T95）
+
+> **2026-11-09 更新（Owner 确认，替代下面「不自己开发、用第三方工具」）**：第三方工具月费太高，改为自建精简版联盟中心（独立应用 `partners.graylum.com`，私有仓库 `partners-hub`，独立 Supabase），以后 Graylum 等产品也接入同一个中心。Shotviva 只负责：用 `?ref=` + cookie `sv_ref`（60 天，先到先得）记录推广码，注册时绑定到 `profiles`（终身有效，首次付费时可补绑），并通过签名的服务器对服务器事件（`customer.bound`、`payment.upsert` 状态快照）上报给中心；中心不回调 Shotviva，不动钱，Owner 每月手工打款。佣金：积分包和月付 15%、年付 10%，终身；团队奖励（二级，Owner 逐个开通）积分包和月付 5%、年付 3%；确认期 30 天，按实付减税计算，退款按比例重算，争议冻结、败诉归零。规格全文 `.local/affiliate/spec.md`。
+> **有意的例外**：发件箱 `affiliate_outbox` 由挂在 `payments` 和 `payment_disputes` 上的触发器写入（不改现有各个计费函数）；这些触发器只写发件箱，不改积分和订单。数据定义由 T95 的开发 PR 和迁移一起写进本节。和 T94 邀请码互不排斥，佣金按折后实付算。
 
 - **不自己开发联盟系统**，用第三方联盟工具接入（选型待 Owner 定；接入前核对：能否追踪 Managed Payments 订阅、支付宝单笔和 Waffo 订单怎么记）。网站这边只做记录推广码、结账时把推广码传给支付平台，届时另开任务卡。
 - **返佣比例**：代理绑定自己推荐的客户，按该客户每一笔付款**终身**返佣：
