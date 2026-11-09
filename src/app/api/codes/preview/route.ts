@@ -12,8 +12,10 @@ import { AppError } from '@/core/errors'
 import { site } from '@/site/site.config'
 
 export async function GET(request: NextRequest) {
+  // Access the incoming request before the API error handler so Next can defer prerendering.
+  const ip = clientIp(request.headers)
   try {
-    checkPreviewLimit(clientIp(request.headers))
+    checkPreviewLimit(ip)
     const values = z.tuple([z.string()]).safeParse(request.nextUrl.searchParams.getAll('code'))
     const code = values.success ? normalizeCode(values.data[0]) : null
     if (!code) throw new AppError('INVALID_INPUT', 'Enter a valid code')

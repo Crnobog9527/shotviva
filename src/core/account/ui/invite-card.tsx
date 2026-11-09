@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useFormatter, useLocale, useTranslations } from 'next-intl'
 import { ChevronDown, UserRoundPlus } from 'lucide-react'
 
-import type { InviteSummary, LoadInvites } from '../codes/invite-summary'
+import type { InviteSummary, LoadInvites } from '../codes'
 import { localizePath } from '../../i18n/paths'
 import type { Locale } from '../../i18n/locales'
 import { Button } from '../../ui/button'

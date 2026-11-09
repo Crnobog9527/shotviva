@@ -5,7 +5,7 @@ import { getMessages } from 'next-intl/server'
 import { locale as rootLocale } from 'next/root-params'
 
 import { ConsentSlot } from '@/core/analytics/browser'
-import { SignupCodeResult } from '@/core/auth/ui'
+import { SignupCodeResult } from '@/core/auth/signup-result'
 import { UpdateSlot } from '@/core/app-update'
 import { clientMessages, htmlLang, isLocale } from '@/core/i18n'
 import { TranslatedPathsProvider } from '@/core/i18n/ui'

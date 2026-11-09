@@ -1,12 +1,9 @@
-import { z } from 'zod'
-
 export const CODE_COOKIE = 'sv_code'
 export const codeCookieOptions = { path: '/', maxAge: 30 * 24 * 60 * 60, httpOnly: true, sameSite: 'lax', secure: true } as const
 
-const codeInput = z.string().min(4).max(20).regex(/^[A-Za-z0-9]+$/)
+const codeInput = /^[A-Za-z0-9]{4,20}$/
 export function normalizeCode(input: unknown): string | null {
-  const parsed = codeInput.safeParse(input)
-  return parsed.success ? parsed.data.toUpperCase() : null
+  return typeof input === 'string' && codeInput.test(input) ? input.toUpperCase() : null
 }
 
 // Chinese discount names express the fraction paid. 25% off is 七五折.

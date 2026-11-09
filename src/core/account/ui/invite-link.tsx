@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Check, Copy, Share2 } from 'lucide-react'
 
-import { REPLAY_BLOCK_CLASS, track } from '../../analytics/browser'
+import { REPLAY_BLOCK_CLASS } from '../../analytics/replay'
 import { Button } from '../../ui/button'
 import { useMediaQuery } from '../../ui/use-media-query'
 
@@ -16,7 +16,7 @@ export function InviteLink({ url }: { url: string }) {
     try {
       if (action === 'copy') await navigator.clipboard.writeText(url)
       else await navigator.share({ url })
-      track('invite_share', { action, surface: 'account' })
+      void import('../../analytics/browser').then(({ track }) => track('invite_share', { action, surface: 'account' })).catch(() => undefined)
       setNotice(action === 'copy' ? 'copied' : null)
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return

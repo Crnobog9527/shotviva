@@ -13,7 +13,7 @@ import { lastMembership, readMemberSince, readSubscriptionSummary } from '@/core
 import { listMonthWorks } from '@/core/jobs'
 import { readLinkStatus } from '@/core/partner'
 import { formatMoney, hasUnreadReply, listPaymentOptions, paymentChoices, PICKER_LIMIT, ReplyTime } from '@/core/support'
-import { HelpDialog } from '@/core/support/ui'
+import { AccountHelp } from '@/core/support/ui/account'
 import { currentLocale } from '@/core/i18n/server'
 import type { Translate } from '@/core/translate'
 import { site } from '@/site/site.config'
@@ -63,7 +63,7 @@ async function Account() {
         <InviteCard load={loadMyInvites} reward={site.growth.invite} />
         <RedeemCard pending={discount} />
       </AccountView>
-      <HelpDialog actions={helpActions} payments={purchases} replyTime={<ReplyTime userId={user.id} />} brand={site.brand.name} unread={helpUnread} />
+      <AccountHelp actions={helpActions} payments={purchases} replyTime={<ReplyTime userId={user.id} />} brand={site.brand.name} unread={helpUnread} />
     </>
   )
 }

@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 
-import { parseSignupResult } from './signup-code-result'
+import { parseSignupResult } from './use-signup-result'
 
 it('accepts only bounded numeric effects from the display cookie', () => {
   const combined = { credits: 50, pool: 'paid', percent: 25 }

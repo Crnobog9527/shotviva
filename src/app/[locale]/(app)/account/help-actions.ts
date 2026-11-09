@@ -12,6 +12,9 @@ import { r2Store } from '@/core/storage'
 import {
   addTicketMessage,
   createTicket,
+  formError,
+  type Choice,
+  type FormState,
   imageKeysSchema,
   listMyTickets,
   listWorkOptions,
@@ -24,7 +27,6 @@ import {
   type ShownThread,
   type TicketSummary,
 } from '@/core/support'
-import { formError, type Choice, type FormState } from '@/core/support/ui'
 import type { Translate } from '@/core/translate'
 
 // Help & feedback in the account page's dialog (ARCHITECTURE §10 「站内工单」「在弹窗里完成」,
