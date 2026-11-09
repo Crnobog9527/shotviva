@@ -544,7 +544,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 | `created_by` | uuid null | 管理员 id |
 | `created_at` / `updated_at` | timestamptz | |
 
-约束：`campaign` 行的「送积分」和「打折」至少有一项；`invitee_pool = 'paid'` 时 `max_redemptions` 必填。
+约束：`campaign` 行的「送积分」和「打折」至少有一项。后台送积分码每次赠送的上限，以及付费池送积分码是否必须填写总名额，由 `system_settings` 的 `code_gift_policy` 配置。创建或修改赠送条款时数据库校验；既有兑换记录保留实际发放量。
 索引：`code` 唯一索引供兑换查询；后台列表按 `(created_at desc, id desc)` 分页，按类型筛选时使用带 `kind` 前缀的索引。
 
 #### 表 `code_redemptions`（私有，同上）
@@ -587,12 +587,12 @@ check 约束换成原来的集合再加上 `code_grant`（兑换送的积分）�
 | `get_or_create_invite_code(p_user)` | 有就返回，没有就生成 8 位码（撞了重试） |
 | `redeem_code(p_user, p_code, p_context, p_invitee_credits, p_invite_window_days, p_replace=false)` | 一个事务里做完：查码并锁行 → 校验（启用、时间、名额、新用户、封禁、自己的码、同 IP、已用过、只能被邀请一次、邀请码 7 天窗口、注册赠送是否已发）→ 写兑换记录 → `redemption_count + 1` → 送积分（`_apply_credit_change`，kind `code_grant`）→ 有折扣时作废旧的待用折扣。返回 `{status, credits_granted, discount_percent, discount_products, discount_expires_at, replaced}`；有待用折扣、没传 `p_replace = true` 时返回 `needs_confirm`，不写任何东西 |
 | `checkout_discount(p_user, p_product_id)` | 只读：返回这个账号针对这个商品可用的待用折扣（`code_id`、`stripe_coupon_id`、`percent`），没有就返回空 |
-| `apply_payment_code_effects(p_user, p_payment_id, p_code_id, p_amount_discount, p_inviter_credits, p_inviter_cap)` | 付款入账后由回调调用，幂等：① 把 `code_id` / `amount_discount` 写进这笔 `payments`，把对应的折扣标记为用掉；② 这个用户是被邀请来的、这是他第一笔成功付款、邀请人没封禁、30 天内没超上限，就给邀请人发付费积分（kind `invite_reward`）。Stripe 首付、单笔和 Waffo 单笔都调；续费不调 |
-| `admin_save_code(p_actor, p_code_id, p_fields)` | 新建 / 编辑后台码；校验毛利底线（商品价格从 `products` 表读）；折扣参数建好后不能改 |
+| `apply_payment_code_effects(p_user, p_payment_id, p_code_id, p_amount_discount, p_inviter_credits, p_inviter_cap)` | 付款入账后由回调调用，幂等：① 把 `code_id` / `amount_discount` 写进这笔 `payments`，把对应的折扣标记为用掉；② 这个用户是被邀请来的、这是他第一笔成功付款、邀请人没封禁、配置的奖励窗口内没超上限，就给邀请人发付费积分（kind `invite_reward`）。Stripe 首付、单笔和 Waffo 单笔都调；续费不调 |
+| `admin_save_code(p_actor, p_code_id, p_fields, p_catalog, p_floor_product_id)` | 新建 / 编辑后台码；服务端从 site.config 的商品目录传入价格、积分和最便宜订阅的原价及积分数做精确比较。三参数旧入口使用数据库商品目录镜像。折扣参数建好后不能改 |
 | `admin_set_code_active(p_actor, p_code_id, p_active)` | 启用 / 停用 |
 | `admin_list_codes(p_actor, p_cursor, p_kind, p_code_id)` / `admin_code_redemptions(p_actor, p_code_id, p_cursor)` | 后台列表，按游标分页、每页 30 条；码列表一并带出统计：兑换数、付款人数、净收入（`amount_total − amount_tax − amount_refunded` 的合计）、折扣总额 |
 | `admin_top_inviters(p_actor, p_days)` | 前 50 名邀请人：邀请数、付款人数、拿到的奖励 |
-| `my_invite_summary(p_user, p_inviter_cap, p_cursor)` | 账号页用：我的码、邀请人数、付款人数、已得积分、本 30 天剩余次数 |
+| `my_invite_summary(p_user, p_inviter_cap, p_cursor)` | 账号页用：我的码、邀请人数、付款人数、已得积分、当前奖励窗口的天数及剩余次数 |
 
 后台函数均带管理员参数 `p_actor`，函数内校验身份。`admin_audit_log_action_check` 保留全部现有操作并加入以下两项。写操作在同一事务记录 `save_code` 或 `set_code_active`。
 
@@ -602,11 +602,11 @@ check 约束换成原来的集合再加上 `code_grant`（兑换送的积分）�
 
 #### 折扣占用和并发入账（Owner 2026-11-09）
 
-- 每个账号同时最多一份待用折扣。兑换、替换、占用与核销按账号串行，兑换名额按码锁定。积分入账键基于兑换记录，滚动 30 天奖励上限按邀请人串行，按邀请人的 invite_reward 流水计数，被邀请人删号不会返还奖励名额。邀请窗口、赠送数和奖励次数由服务端从 `site.config.ts` 传入。
+- 每个账号同时最多一份待用折扣。兑换、替换、占用与核销按账号串行，兑换名额按码锁定。积分入账键基于兑换记录，滚动窗口的奖励上限按邀请人串行，按邀请人的 invite_reward 流水计数，被邀请人删号不会返还奖励名额。受邀人免费积分、邀请人首付奖励积分、补填窗口和奖励次数上限由服务端从 `site.growth.invite` 传入。滚动奖励窗口天数读取 `system_settings.code_inviter_window_days`（当前 30），原签名将天数传给支付、邀请统计的带参重载，后者返回窗口天数供双语文案使用。两项 T94 运行时设置均可经现有管理员设置 RPC 修改。
 - 在兑换行增加 `checkout_token uuid`、`checkout_expires_at timestamptz`（均可空）以及 `checkout_prepared boolean not null default false`。服务端生成一次尝试专用的 UUID。在创建带折扣的 Stripe Session 前调用 `reserve_checkout_discount(p_user,p_product_id,p_token)`，原子查询并占用，返回折扣和截止时刻。预占建单窗口 60 秒。发起 Stripe 请求前调用 `prepare_checkout_discount(p_user,p_token,p_expires_at)`，原子固定并返回要发给 Stripe 的 Unix 截止秒数。同一尝试可幂等重试，沿用此值。其他尝试收到占用状态；存在占用时不能替换。阶段 3 建单按发起 Stripe 请求的时间设 30 分钟有效期；数据库校验传入的 Unix 秒允许最多 10 秒的时钟与传输余量，锁和 Stripe 共用同一绝对截止时间。Stripe 建单用 token 作幂等键；创建结果不确定时仅重试原尝试。阶段 3 必须对齐 Stripe 实际截止时间，不能让本地占用先于仍可付款的 Session 到期。
 - 到期即可重新占用，无需定时清理。用户放弃时服务端先确认 Stripe Session 已过期或主动关闭成功，再调用 `release_checkout_discount(p_user,p_token)`；确定未建单也立即释放。释放须匹配原 token，延迟的取消或过期通知不能释放新占用。异步付款处理中不能因浏览器返回就认定为放弃。
 - 核销以成功付款为准；从 Stripe 可信 metadata 取得码，按用户和码定位兑换，允许处理关闭或替换后迟到的成功通知。第一笔成功核销后保留其付款 id。第二笔不同付款命中同一份折扣也正常入账，保留实付和折扣金额，标记该笔 `code_discount_conflict`。首次处理后记 `code_effects_applied_at`，封顶或封禁时确定的未发奖结果同样不随回调重放改变。RPC 返回冲突标记供回调记 warning，后台兑换明细列出异常付款；不追收差价。重放同一笔付款不重复发奖。
-- 后台码按付款行的 code_id 归因；邀请码按成功邀请后该用户的付款归因。每个码内按付款行去重，金额按币种分别汇总。邀请付款人数以实际已付款账号计（含因封顶未领奖者）。注册同 IP 或无注册赠送被拦记录保留原因，不计成功名额和邀请数。折后每积分价格从 `products.price_usd / credits` 按原始精度校验，底线为 $0.208。已创建码的折扣条款不可改。
+- 后台码按付款行的 code_id 归因；邀请码按成功邀请后该用户的付款归因。每个码内按付款行去重，金额按币种分别汇总。邀请付款人数以实际已付款账号计（含因封顶未领奖者）。注册同 IP 或无注册赠送被拦记录保留原因，不计成功名额和邀请数。折扣底线取当前订阅商品中最低的美元实收价除以该商品积分数，积分包只作为折扣目标。服务端使用 `site.billing.products` 中的标价与积分，不先舍入每积分价格。逐一校验每个目标的折后美元实收除以积分数大于或等于底线。已创建码的折扣条款不可改。
 
 ## 7. 登录
 

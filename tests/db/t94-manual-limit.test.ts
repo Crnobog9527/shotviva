@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto'
 import type { Client } from 'pg'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
+import { benefits, invite } from '../t94-config'
+
 import { anonClient, connectAdmin, createUser, profileOf, serviceClient } from './helpers'
 
 let db: Client
@@ -10,7 +12,7 @@ beforeAll(async () => { db = await connectAdmin() })
 afterAll(async () => { await db.end() })
 
 const args = (user: string, code: string | null, context = 'account') => ({
-  p_user: user, p_code: code, p_context: context, p_invitee_credits: 6, p_invite_window_days: 7,
+  p_user: user, p_code: code, p_context: context, p_invitee_credits: invite.inviteeCredits, p_invite_window_days: invite.windowDays,
 })
 async function attempt(user: string, code: string | null, context = 'account') {
   const response = await serviceClient().rpc('redeem_limited_code', args(user, code, context))
@@ -45,7 +47,7 @@ it('the eleventh request cannot grant a valid gift, while signup remains indepen
 
 it('handles simultaneous reciprocal invites without taking the quota profile locks in the wrong order', async () => {
   const users = [await createUser(db), await createUser(db)]
-  for (const user of users) await db.query("select public.grant_credits($1,6,'signup',$2,'free')", [user, 'signup:' + user])
+  for (const user of users) await db.query("select public.grant_credits($1,$3,'signup',$2,'free')", [user, 'signup:' + user, benefits.freeCredits])
   const codes = await Promise.all(users.map((user) => serviceClient().rpc('get_or_create_invite_code', { p_user: user })))
   const results = await Promise.all(users.map((user, i) => attempt(user, String(codes[1 - i].data))))
   expect(results).toEqual([expect.objectContaining({ status: 'ok' }), expect.objectContaining({ status: 'ok' })])

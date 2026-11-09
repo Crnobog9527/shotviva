@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const benefits = { freeCredits: 6, invite: { inviteeCredits: 13, inviterCredits: 19, windowDays: 7, inviterCapPer30d: 20 } }
+import { benefits } from '../../../../tests/t94-config'
 
 // Phone sign-in server steps (T63): consent and +86 first, our limits before Supabase, a
 // Supabase refusal before the hook gives the request back, a verified code signs in as 'phone'.

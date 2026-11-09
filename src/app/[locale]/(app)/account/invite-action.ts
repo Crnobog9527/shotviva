@@ -6,5 +6,5 @@ import { site } from '@/site/site.config'
 
 export async function loadMyInvites(cursor?: InviteCursor) {
   const user = await requireUser('/account')
-  return readInviteSummary(createAdminSupabase(), user.id, site.growth.invite.inviterCapPer30d, inviteCursor.optional().parse(cursor))
+  return readInviteSummary(createAdminSupabase(), user.id, site.growth.invite.inviterRewardCap, inviteCursor.optional().parse(cursor))
 }

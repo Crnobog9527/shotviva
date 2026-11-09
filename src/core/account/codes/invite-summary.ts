@@ -12,6 +12,7 @@ const summary = z.object({
   invited: z.number().int().nonnegative(),
   purchasers: z.number().int().nonnegative(),
   earned: z.number().int().nonnegative(),
+  reward_window_days: z.number().int().positive().optional(),
   rewards_left: z.number().int().nonnegative(),
   friends: z.array(friend).max(30),
 })

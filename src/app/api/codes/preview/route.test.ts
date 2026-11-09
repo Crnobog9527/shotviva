@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
+import { invite } from '../../../../../tests/t94-config'
+
 import { GET, HEAD } from './route'
 
 const mocks = vi.hoisted(() => ({ preview: vi.fn(), admin: vi.fn(() => ({})) }))
@@ -14,12 +16,12 @@ beforeEach(() => { vi.clearAllMocks() })
 afterEach(() => { vi.useRealTimers() })
 
 it('returns a public normalized preview with no cache and no account session', async () => {
-  const offer = { kind: 'invite', credits: 6, pool: 'free', percent: null }
+  const offer = { kind: 'invite', credits: invite.inviteeCredits, pool: 'free', percent: null }
   mocks.preview.mockResolvedValue(offer)
   const response = await get('code=aBc4')
   expect(response.status).toBe(200)
   expect(await response.json()).toEqual({ preview: offer })
-  expect(mocks.preview).toHaveBeenCalledExactlyOnceWith(expect.anything(), 'ABC4', expect.anything())
+  expect(mocks.preview).toHaveBeenCalledExactlyOnceWith(expect.anything(), 'ABC4', invite)
   expect(response.headers.get('cache-control')).toContain('no-store')
 })
 

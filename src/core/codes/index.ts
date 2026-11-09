@@ -16,5 +16,5 @@ export type InviteConfig = {
   inviteeCredits: number
   inviterCredits: number
   windowDays: number
-  inviterCapPer30d: number
+  inviterRewardCap: number
 }

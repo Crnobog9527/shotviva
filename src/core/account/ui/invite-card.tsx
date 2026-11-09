@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { useFormatter, useLocale, useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { ChevronDown, UserRoundPlus } from 'lucide-react'
 
 import type { InviteSummary, LoadInvites } from '../codes'
@@ -10,6 +10,7 @@ import type { Locale } from '../../i18n/locales'
 import { Button } from '../../ui/button'
 import { Group } from './rows'
 import { InviteLink } from './invite-link'
+import { InviteProgress } from './invite-progress'
 
 type Props = { load: LoadInvites; reward: { inviteeCredits: number; inviterCredits: number } }
 
@@ -46,9 +47,7 @@ export function InviteCard({ load, reward }: Props) {
           <p className="text-label text-muted-foreground">{t('rule', { invitee: reward.inviteeCredits, inviter: reward.inviterCredits })}</p>
           {summary && <>
             <InviteLink url={new URL(localizePath('/?code=' + summary.code, locale), window.location.origin).href} />
-            <p className="text-body font-medium">{t('stats', { joined: summary.invited, paid: summary.purchasers, earned: summary.earned })}</p>
-            <p className="text-caption text-muted-foreground">{t('cap', { left: summary.rewards_left })}</p>
-            <InviteFriends friends={summary.friends} />
+            <InviteProgress summary={summary} />
           </>}
           {busy && <p role="status" className="text-caption">{t('loading')}</p>}
           {failed && <p role="alert">{t('failed')}</p>}
@@ -57,19 +56,5 @@ export function InviteCard({ load, reward }: Props) {
         </div>}
       </div>
     </Group>
-  )
-}
-
-function InviteFriends({ friends }: { friends: InviteSummary['friends'] }) {
-  const t = useTranslations('app.accountCodes.invite')
-  const format = useFormatter()
-  if (!friends.length) return null
-  return (
-    <ul aria-label={t('friends')} className="divide-y divide-hairline">
-      {friends.map(f => <li key={f.id} className="flex flex-wrap justify-between gap-2 py-2 text-label">
-        <time dateTime={f.registered_at}>{format.dateTime(new Date(f.registered_at), { dateStyle: 'medium' })}</time>
-        <span className="text-muted-foreground">{t(f.purchased ? 'purchased' : 'joined')}</span>
-      </li>)}
-    </ul>
   )
 }

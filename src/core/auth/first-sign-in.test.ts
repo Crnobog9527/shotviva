@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const benefits = { freeCredits: 6, invite: { inviteeCredits: 13, inviterCredits: 19, windowDays: 7, inviterCapPer30d: 20 } }
+import { benefits } from '../../../tests/t94-config'
 
 const mocks = vi.hoisted(() => ({
   headers: vi.fn(),
