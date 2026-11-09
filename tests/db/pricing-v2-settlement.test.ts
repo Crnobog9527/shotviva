@@ -63,8 +63,21 @@ it('retains the original annual price after the unit switch and grants in wallet
   expect((await db.query("select amount_total from public.payments where stripe_invoice_id='in_legacy_next'")).rows[0].amount_total).toBe(71300)
 })
 
-it('quarantines a late version-two payment when the wallet has rolled back', async () => {
-  await expect(db.query("select public.settle_checkout_v2($1,'pack_s','cs_late',990,'usd',0,'card')",[buyer])).rejects.toThrow('PRICING_VERSION_RECONCILIATION_REQUIRED')
+it.each([
+  ['Stripe checkout', "public.settle_checkout_v2($1,'pack_s',$2,990,'usd',0,'card')", 'cs_'],
+  ['Stripe renewal', "public.apply_subscription_renewal_v2($1,'max_yearly',$2,now()+interval '1 year',89100,'usd',0,'card')", 'in_'],
+  ['Waffo order', "public.settle_waffo_order_v2($1,'pack_s',$2,'ORD_1',990,'usd',0,'card')", 'PAY_'],
+])('allows replay but quarantines a new late %s payment on a v1 wallet', async (_label, rpc, prefix) => {
+  const settle = (id: string) => db.query('select * from ' + rpc, [buyer, prefix + id])
+  await activate()
+  const original = (await settle('paid')).rows[0]
+  await db.query("delete from public.system_settings where key='pricing_catalog_version'")
+  expect((await settle('paid')).rows[0]).toMatchObject({ applied: false, credits: original.credits })
+  await db.query('savepoint late')
+  await expect(settle('late')).rejects.toThrow('PRICING_VERSION_RECONCILIATION_REQUIRED')
+  await db.query('rollback to late')
+  expect((await profileOf(db, buyer)).credits).toBe(original.credits)
+  expect((await db.query('select count(*)::int as n from payments where user_id=$1', [buyer])).rows[0].n).toBe(1)
 })
 
 it('exposes no grant or second catalog to anonymous or authenticated clients', async () => {

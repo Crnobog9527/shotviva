@@ -44,6 +44,10 @@ describe('credit dials', () => {
     expect(noPlan.html).toContain('aria-label="0 paid credits left"')
   })
 
+  it('shows only the actual balance when the account has no signup grant', () => {
+    expect(dialFigures({ paid: 0, free: 0 }, null, 0, false).freeOf).toBeNull()
+  })
+
   it('speaks Chinese', async () => {
     const { text } = await render(dials(500, 2, { credits: 600, interval: 'year' }), 'zh')
     expect(text).toContain('500 / 600 付费 私密、无水印')

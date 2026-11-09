@@ -72,7 +72,11 @@ describe('activated template prices', () => {
   it('retains existing quotes until activation and charges the exact web, partner and edit offers', async () => {
     await refuses(() => db.query('select admin.activate_template_price_catalog_v2()'),'TEMPLATE_CATALOG_VERSION_NOT_ACTIVE')
     expect((await reserve('promo-poster',null,'1k')).rows[0].credits_cost).toBe(2)
+    const unitPrice = async () => Number((await db.query(
+      "select public.admin_image_pricing_catalog('fallback')->>'unit_price' as unit_price")).rows[0].unit_price)
+    expect(await unitPrice()).toBeCloseTo(713 / 3360, 9)
     await activate()
+    expect(await unitPrice()).toBeCloseTo(891 / 168000, 9)
     await activate()
     const quote = await db.query("select quality,credits_cost from public.templates where id='promo-poster' and is_active")
     expect(quote.rows[0]).toEqual({ quality:'medium', credits_cost:costs })
@@ -94,7 +98,6 @@ describe('activated template prices', () => {
   })
 
   it('requires normal T96 pricing on a substitute provider', async () => {
-    await db.query("update public.products set price_usd=891,credits=168000 where id='max_yearly'")
     const other = randomUUID()
     await db.query(`insert into public.ai_providers(id,label,model,adapter,resolutions,estimated_image_costs)
       values($1,'Alternate','alternate-model','openai_images','{1k,2k,3k}','{"1k":1.00}')`,[other])

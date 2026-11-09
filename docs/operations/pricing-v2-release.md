@@ -1,6 +1,6 @@
 # New credit release
 
-0960–0964 are inactive compatibility migrations. Installing them does not clear a wallet,
+0960–0964 and 0970–0975 are inactive compatibility migrations. Installing them does not clear a wallet,
 change a template, enable an affiliate program, create provider prices, or promote a site.
 
 1. For this release the Owner requested the configured script and waived another end-to-end
@@ -43,3 +43,23 @@ change a template, enable an affiliate program, create provider prices, or promo
    Reverse adjustments reproduce the approved wallet digest. A failed check rolls back all
    three parts. After new transactions, pause new business and reconcile by original order;
    never apply a blanket reversal or restore a stale backup.
+
+
+## Repeatable local checks
+
+With a running local Supabase stack, run `pnpm exec vitest run --project pricing-release`.
+For a nondefault local project set `SUPABASE_WORKDIR` to its directory. The test copies the
+local database to a disposable database in the same Docker container. It observes the waiting
+Postgres backend in both arrival orders, executes the checked-in preview SQL, checks replay,
+refusal to undo a subsequent payment, and concurrent signup limits, then drops the copy.
+CI runs it before the regular DB suite. The DB suite separately exercises the production
+transaction against a synthetic approved cohort and tests late v2 payments on all settlement RPCs.
+
+The two database workflows run pending migrations for normal pushes and a manual operation
+of `none`. Selecting `activate` or `rollback` verifies migration history, main SHA and project
+ref before executing only the corresponding release SQL. After merging, inspect both automatic
+migration runs before authorizing the first data operation.
+
+The two-argument `admin_upsert_template(jsonb,jsonb)` remains the pricing and prompt writer.
+Its column list preserves additional private prompt fields. T97's three-argument overload
+must call this writer and update its own field within the same transaction.

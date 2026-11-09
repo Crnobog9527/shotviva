@@ -13,10 +13,21 @@ $$;
 revoke all on function admin.template_approved_prices(uuid) from public,anon,authenticated;
 grant execute on function admin.template_approved_prices(uuid) to service_role;
 
+-- Both editor guidance and fallback reservation must price the same active wallet unit.
+create function admin.lowest_credit_price() returns numeric
+language sql stable security definer set search_path='' as $$
+  select case when admin.is_template_catalog_v2() then
+      (select min(t.usd_cents::numeric / (100 * t.credits)) from admin.product_terms_v2 t
+        join public.products p on p.id=t.product_id where p.active)
+      else (select min(price_usd/credits) from public.products where active and credits>0) end
+$$;
+revoke all on function admin.lowest_credit_price() from public,anon,authenticated;
+grant execute on function admin.lowest_credit_price() to service_role;
+
 create function public.admin_image_pricing_catalog(p_env_model text) returns jsonb
 language sql stable security invoker set search_path='' as $$
   select jsonb_build_object('version',case when admin.is_template_catalog_v2() then 'v2' else 'v1' end,
-    'unit_price',(select min(price_usd/credits) from public.products where active and credits>0),
+    'unit_price',admin.lowest_credit_price(),
     'providers',coalesce((select jsonb_agg(to_jsonb(p)||jsonb_build_object('approved',admin.template_approved_prices(p.provider_id)))
        from public.admin_image_provider_pricing(p_env_model) p),'[]'))
 $$;

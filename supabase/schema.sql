@@ -110,7 +110,7 @@ CREATE OR REPLACE FUNCTION "admin"."alternate_route_meets_floor"("p_tag" "text",
                     else '{"1k":0.081,"2k":0.135,"3k":0.206}' end)::jsonb->>p_resolution)::numeric end) as usd
     from route
   ), budget as (
-    select min(price_usd/credits)*0.761*0.4 as usd from public.products where active and credits>0
+    select admin.lowest_credit_price()*0.761*0.4 as usd
   )
   select coalesce((select p_price >= ceil(priced.usd*1.10/nullif(budget.usd,0))
     and (priced.adapter<>'openai_images' or p_price>=(case when p_quality='medium' then
@@ -232,6 +232,20 @@ $$;
 
 
 ALTER FUNCTION "admin"."is_template_catalog_v2"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."lowest_credit_price"() RETURNS numeric
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select case when admin.is_template_catalog_v2() then
+      (select min(t.usd_cents::numeric / (100 * t.credits)) from admin.product_terms_v2 t
+        join public.products p on p.id=t.product_id where p.active)
+      else (select min(price_usd/credits) from public.products where active and credits>0) end
+$$;
+
+
+ALTER FUNCTION "admin"."lowest_credit_price"() OWNER TO "postgres";
 
 SET default_tablespace = '';
 
@@ -2726,7 +2740,7 @@ CREATE OR REPLACE FUNCTION "public"."admin_image_pricing_catalog"("p_env_model" 
     SET "search_path" TO ''
     AS $$
   select jsonb_build_object('version',case when admin.is_template_catalog_v2() then 'v2' else 'v1' end,
-    'unit_price',(select min(price_usd/credits) from public.products where active and credits>0),
+    'unit_price',admin.lowest_credit_price(),
     'providers',coalesce((select jsonb_agg(to_jsonb(p)||jsonb_build_object('approved',admin.template_approved_prices(p.provider_id)))
        from public.admin_image_provider_pricing(p_env_model) p),'[]'))
 $$;
@@ -9561,6 +9575,11 @@ REVOKE ALL ON FUNCTION "admin"."clear_approved_wallets_v2"("p_digest" "text", "p
 
 REVOKE ALL ON FUNCTION "admin"."is_template_catalog_v2"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."is_template_catalog_v2"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."lowest_credit_price"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."lowest_credit_price"() TO "service_role";
 
 
 

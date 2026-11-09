@@ -359,7 +359,7 @@
       "paid": "你有 {paid} 积分。",
       "getCredits": "获取积分",
       "panelTitle": "积分",
-      "signupGiftRefused": "这个账号没有拿到注册赠送的免费积分：同一网络下的另一个账号在你注册前 24 小时内已经领取过。你仍然可以购买积分。"
+      "signupGiftRefused": "这个账号没有注册赠分记录。同一网络在 24 小时内限领一次。"
     },
     "create": {
       "title": "创作",

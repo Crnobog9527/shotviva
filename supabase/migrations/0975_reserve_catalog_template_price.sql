@@ -14,7 +14,7 @@ returns boolean language sql stable set search_path='' as $$
                     else '{"1k":0.081,"2k":0.135,"3k":0.206}' end)::jsonb->>p_resolution)::numeric end) as usd
     from route
   ), budget as (
-    select min(price_usd/credits)*0.761*0.4 as usd from public.products where active and credits>0
+    select admin.lowest_credit_price()*0.761*0.4 as usd
   )
   select coalesce((select p_price >= ceil(priced.usd*1.10/nullif(budget.usd,0))
     and (priced.adapter<>'openai_images' or p_price>=(case when p_quality='medium' then

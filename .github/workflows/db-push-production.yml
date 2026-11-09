@@ -61,8 +61,10 @@ jobs:
       # --include-all: cards own numbering ranges (TASKS), so a lower-numbered migration can
       # merge after a higher one. Versions on the database but not in the repo still abort.
       - name: Pending migrations
+        if: github.event_name == 'push' || inputs.pricing_operation == 'none'
         run: supabase db push --include-all --dry-run
       - name: Apply
+        if: github.event_name == 'push' || inputs.pricing_operation == 'none'
         run: supabase db push --include-all --yes
       - name: Verify history matches the repo
         run: scripts/check-migration-drift.sh --linked
