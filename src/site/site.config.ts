@@ -1,5 +1,5 @@
 import { affiliateDefault } from '@/core/affiliate/defaults'
-import { defineSite } from '@/core/config/define-site'
+import { defineSite } from '@/core/config'
 
 import { SITE_DOMAIN } from './domain'
 

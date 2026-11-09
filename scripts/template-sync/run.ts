@@ -1,25 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
-import { z } from 'zod'
 
+import { templateSyncEnv } from '../../src/core/env'
 import { createR2Client, createR2Store } from '../../src/core/storage/r2-store'
 import { SyncError } from './covers'
 import { targetFloors } from './pricing'
 import { parseIds, syncTemplate } from './sync'
 
 // Pin the direction independently of the credentials. Only public covers buckets are reachable.
-const config = z.object({
-  serviceKey: z.string().min(1), accountId: z.string().regex(/^[0-9a-f]{32}$/),
-  accessKeyId: z.string().min(1), secretAccessKey: z.string().min(1),
-  base: z.url({ protocol: /^https$/ }).transform(s => s.replace(/\/+$/, '')),
-})
-function endpoint(preview: boolean) {
-  const prefix = preview ? 'SYNC_PREVIEW_' : 'SYNC_PRODUCTION_'
-  const variable = (name: string) => process.env[prefix + name]
-  const settings = config.parse({
-    serviceKey: variable('SERVICE_KEY'), accountId: variable('R2_ACCOUNT_ID'),
-    accessKeyId: variable('R2_ACCESS_KEY_ID'), secretAccessKey: variable('R2_SECRET_ACCESS_KEY'),
-    base: preview ? variable('ASSETS_BASE') : 'https://shotviva.com/assets',
-  })
+function endpoint(preview: boolean, settings: ReturnType<typeof templateSyncEnv>['preview']) {
   const project = preview ? 'pnzkiqvktkzznfbyhphe' : 'irbqamjuazkkyvnnzupf'
   const bucket = preview ? 'shotviva-assets-preview' : 'shotviva-assets'
   return {
@@ -29,10 +17,10 @@ function endpoint(preview: boolean) {
 }
 
 async function run() {
-  const ids = parseIds(process.env.SYNC_IDS ?? '')
-  const runId = z.string().regex(/^\d+$/).parse(process.env.GITHUB_RUN_ID)
-  const source = endpoint(true)
-  const target = endpoint(false)
+  const { ids: input, runId, preview, production } = templateSyncEnv()
+  const ids = parseIds(input)
+  const source = endpoint(true, preview)
+  const target = endpoint(false, production)
   const floors = await targetFloors(target.db)
   for (const id of ids) {
     try {

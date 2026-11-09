@@ -41,6 +41,7 @@ export { loadEditTemplateSettings, saveEditTemplate, type EditTemplateSettings, 
 export { EDIT_TEMPLATE_COPY, EditTemplateEditor } from './edit-template-editor'
 export {
   activate as activateProvider,
+  refreshProviderCapabilities,
   lookupProviderModel,
   removeProvider,
   runProviderAction,

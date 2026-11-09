@@ -18,7 +18,7 @@ import {
   type SettleDeps,
 } from '@/core/jobs'
 import { loadOutputImage, outputKeyFor } from '@/core/storage'
-import { DEFAULT_RESOLUTION, instructionSchema, RESOLUTIONS, type Resolution } from '@/core/templates'
+import { allowedWebAspects, DEFAULT_RESOLUTION, instructionSchema, RESOLUTIONS, type Resolution } from '@/core/templates'
 
 import type { ScopeClassifier } from './classifier'
 import type { EditClassification } from './classify-scope'
@@ -53,12 +53,16 @@ async function prepare(deps: EditDeps, req: EditRequest) {
   const source = await findOwnJob(deps.db, req.userId, req.sourceJobId)
   if (!source || source.status !== 'succeeded' || !source.outputKey) throw new AppError('NOT_FOUND', 'Photo not found')
   const pipeline = await loadEditPipeline(deps.db)
+  const aspect = req.aspect ?? sourceAspect(source)
+  const resolution = req.resolution ?? sourceResolution(source)
+  if (!allowedWebAspects(pipeline.template.imageOptions, resolution).includes(aspect)) {
+    throw new AppError('INVALID_INPUT', 'Unsupported edit aspect ratio')
+  }
   const limits = await accountLimits(deps.db, req.userId)
   await assertWithinRateLimit(deps.db, req.userId, deps.now?.() ?? new Date(), limits, { jobId: req.jobId })
   const image = await loadOutputImage(deps.store, source.outputKey)
   // The size asked for (T47: the panel offers the eight), else the work's own; another size
   // than the work's ends the prompt with the reframe paragraph.
-  const aspect = req.aspect ?? sourceAspect(source)
   const reframed = aspect !== sourceAspect(source)
   return { instruction: instruction.data, source, pipeline, image, aspect, reframed }
 }

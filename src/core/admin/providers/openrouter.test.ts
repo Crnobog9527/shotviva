@@ -16,13 +16,10 @@ function fakeDb() {
     id, adapter: input.adapter, model, base_url: baseUrl, resolutions: ['2k', '3k'],
     price_input_text_per_m: null, price_input_image_per_m: null, price_output_per_m: null,
   }
-  const changed = { eq: () => changed, select: async () => ({ data: [{ id }] }) }
-  const update = vi.fn(() => changed)
-  const insert = vi.fn(() => ({ select: () => ({ single: async () => ({ data: { id } }) }) }))
   const select = () => ({ eq: () => ({ maybeSingle: async () => ({ data: row }) }) })
-  const from = vi.fn(() => ({ insert, update, select }))
-  const rpc = vi.fn(async () => ({ data: input.apiKey, error: null }))
-  return { db: { from, rpc } as unknown as SupabaseClient, insert, update, from, rpc }
+  const from = vi.fn(() => ({ select }))
+  const rpc = vi.fn(async (fn: string) => ({ data: fn === 'admin_save_provider' ? id : input.apiKey, error: null }))
+  return { db: { from, rpc } as unknown as SupabaseClient, from, rpc }
 }
 
 describe('OpenRouter provider administration', () => {
@@ -35,25 +32,20 @@ describe('OpenRouter provider administration', () => {
     expect(rpc).not.toHaveBeenCalled()
   })
 
-  it('maps the catalogue values to site tiers on insert and respects explicit overrides', async () => {
-    const { db, insert } = fakeDb()
-    const deps = { db, fetch: async () => Response.json(catalogue), resolveHost }
-    await saveProvider(deps, id, input)
-    expect(insert).toHaveBeenLastCalledWith(expect.objectContaining({ resolutions: ['2k', '3k'] }))
-    await saveProvider(deps, id, { ...input, resolutions: ['1k'] })
-    expect(insert).toHaveBeenLastCalledWith(expect.objectContaining({ resolutions: ['1k'] }))
+  it('saves verified capabilities and the write-only key in one call, even with stale editor tiers', async () => {
+    const { db, rpc } = fakeDb()
+    await saveProvider({ db, fetch: async () => Response.json(catalogue), resolveHost }, id, { ...input, resolutions: ['1k'] })
+    expect(rpc).toHaveBeenCalledExactlyOnceWith('admin_save_provider', expect.objectContaining({
+      p_capabilities: expect.objectContaining({ resolutions: ['2k', '3k'] }), p_key: input.apiKey,
+    }))
   })
 
-  it('does not replace an existing manual override when a legacy editor omits tiers', async () => {
-    const { db, update } = fakeDb()
-    await saveProvider({ db, resolveHost, fetch: async () => Response.json(catalogue) }, id, { ...input, id })
-    expect(update).toHaveBeenCalledWith(expect.objectContaining({ resolutions: undefined }))
-  })
-
-  it('keeps the default when a listed model has no resolution enumeration', async () => {
-    const { db, insert } = fakeDb()
+  it('assigns the standard tier if the catalogue declares no resolution parameter', async () => {
+    const { db, rpc } = fakeDb()
     await saveProvider({ db, resolveHost, fetch: async () => Response.json({ data: [{ id: model }] }) }, id, input)
-    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ resolutions: undefined }))
+    expect(rpc).toHaveBeenCalledWith('admin_save_provider', expect.objectContaining({
+      p_capabilities: expect.objectContaining({ resolutions: ['1k'] }),
+    }))
   })
 
   it('distinguishes an unavailable catalogue from a missing model without leaking vendor text', async () => {

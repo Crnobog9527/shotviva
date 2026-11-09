@@ -80,6 +80,7 @@ export function ProvidersEditor({ providers, actions }: Props) {
           pending={pending}
           onAdd={(m) => open(null, m)}
           onEdit={(provider) => open(provider)}
+          onRefresh={(provider) => run(() => actions.refresh({ id: provider.id }), () => COPY.refreshed)}
           onTest={test}
           onActivate={setActivating}
           onDelete={setDeleting}

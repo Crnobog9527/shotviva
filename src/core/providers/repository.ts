@@ -3,8 +3,9 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
-import { RESOLUTIONS, type Resolution } from '../templates/output-options'
+import { RESOLUTIONS } from '../templates/output-options'
 import { AppError } from '../errors'
+import { estimatedImageCostsSchema, imageCapabilitiesSchema, type ImageCapabilities } from '../templates/image-capabilities'
 import type { ProviderPrices } from '../jobs'
 import { ProviderSettingError } from './setting-error'
 import { PROVIDER_ADAPTERS, PROVIDER_MODULES, type ActiveProviderRow, type AdminProvider, type ProviderModule } from './types'
@@ -14,7 +15,12 @@ import { PROVIDER_ADAPTERS, PROVIDER_MODULES, type ActiveProviderRow, type Admin
 
 const PRICE_COLUMNS = 'price_input_text_per_m, price_input_image_per_m, price_output_per_m'
 
-const LIST_COLUMNS = `id, module, adapter, label, base_url, resolutions, model, api_key_last4, is_active, notes, updated_at, ${PRICE_COLUMNS}`
+const capsColumns = {
+  capabilities: z.union([imageCapabilitiesSchema, z.strictObject({}).transform(() => null)]).optional(),
+  estimated_image_costs: estimatedImageCostsSchema.optional(),
+}
+
+const LIST_COLUMNS = `id, module, adapter, label, base_url, resolutions, capabilities, estimated_image_costs, model, api_key_last4, is_active, notes, updated_at, ${PRICE_COLUMNS}`
 
 // numeric comes back from PostgREST as a JSON number; null when not filled in.
 const price = z.coerce.number().nonnegative().nullable()
@@ -39,9 +45,10 @@ const listRowSchema = z.object({
   notes: z.string().nullable(),
   updated_at: z.string(),
   ...priceColumns,
+  ...capsColumns,
 })
 
-const ROW_COLUMNS = `id, adapter, base_url, resolutions, model, ${PRICE_COLUMNS}`
+const ROW_COLUMNS = `id, adapter, base_url, resolutions, capabilities, estimated_image_costs, model, ${PRICE_COLUMNS}`
 
 const rowSchema = z.object({
   id: z.uuid(),
@@ -50,6 +57,7 @@ const rowSchema = z.object({
   resolutions: z.array(z.enum(RESOLUTIONS)),
   model: z.string(),
   ...priceColumns,
+  ...capsColumns,
 })
 
 function fail(what: string, error: { message: string }): never {
@@ -64,6 +72,8 @@ function toAdminProvider(row: z.infer<typeof listRowSchema>): AdminProvider {
     label: row.label,
     baseUrl: row.base_url,
     resolutions: row.resolutions,
+    capabilities: row.capabilities,
+    estimatedImageCosts: row.estimated_image_costs,
     model: row.model,
     apiKeyLast4: row.api_key_last4,
     isActive: row.is_active,
@@ -74,7 +84,8 @@ function toAdminProvider(row: z.infer<typeof listRowSchema>): AdminProvider {
 }
 
 function toActiveRow(row: z.infer<typeof rowSchema>): ActiveProviderRow {
-  return { id: row.id, adapter: row.adapter, baseUrl: row.base_url, resolutions: row.resolutions, model: row.model, prices: toPrices(row) }
+  return { id: row.id, adapter: row.adapter, baseUrl: row.base_url, resolutions: row.resolutions, model: row.model,
+    capabilities: row.capabilities, estimatedImageCosts: row.estimated_image_costs, prices: toPrices(row) }
 }
 
 export async function listProviders(db: SupabaseClient): Promise<AdminProvider[]> {
@@ -108,53 +119,13 @@ export async function loadActiveProviderRow(db: SupabaseClient, module: Provider
   return data ? toActiveRow(rowSchema.parse(data)) : null
 }
 
-export type ProviderWrite = {
-  module: ProviderModule
-  adapter: (typeof PROVIDER_ADAPTERS)[number]
-  label: string
-  baseUrl: string
-  model: string
-  notes: string | null
-  prices: ProviderPrices
-  resolutions?: Resolution[]
-  updatedBy: string
-}
-
-function toColumns(write: ProviderWrite) {
-  return {
-    module: write.module,
-    adapter: write.adapter,
-    label: write.label,
-    base_url: write.baseUrl,
-    resolutions: write.resolutions,
-    model: write.model,
-    notes: write.notes,
-    price_input_text_per_m: write.prices.inputTextPerM,
-    price_input_image_per_m: write.prices.inputImagePerM,
-    price_output_per_m: write.prices.outputPerM,
-    updated_by: write.updatedBy,
-  }
-}
-
-// New rows start inactive and keyless; the caller sets the key next (keys.ts). Switching is
-// admin_activate_provider's job alone.
-export async function insertProvider(db: SupabaseClient, write: ProviderWrite): Promise<string> {
-  const { data, error } = await db.from('ai_providers').insert({ ...toColumns(write), is_active: false }).select('id').single()
-  if (error) fail('insert', error)
-  return z.object({ id: z.uuid() }).parse(data).id
-}
-
-export async function updateProvider(db: SupabaseClient, id: string, write: ProviderWrite): Promise<void> {
-  // Keep the protocol fixed for this Vault key, including stale or forged admin submissions.
-  const { data, error } = await db.from('ai_providers').update(toColumns(write)).eq('id', id).eq('adapter', write.adapter).select('id')
-  if (error) fail('update', error)
-  if (!data || data.length === 0) throw new ProviderSettingError('not_found', `provider ${id} not found`)
-}
-
-// Deleting also deletes the row's Vault secret (trigger in the same transaction).
-export async function deleteProvider(db: SupabaseClient, id: string): Promise<void> {
-  const { error } = await db.from('ai_providers').delete().eq('id', id)
-  if (error) fail('delete', error)
+// An overlapping admin save or refresh wins over a stale catalogue response.
+export async function persistRefreshedCapabilities(db: SupabaseClient, row: AdminProvider, capabilities: ImageCapabilities) {
+  const { data, error } = await db.from('ai_providers')
+    .update({ capabilities, resolutions: capabilities.resolutions })
+    .eq('id', row.id).eq('updated_at', row.updatedAt).select('id')
+  if (error) fail('refresh capabilities', error)
+  if (!data?.length) throw new ProviderSettingError('invalid_input', 'Provider changed during refresh')
 }
 
 // The admin's delete (§3.3): admin_delete_provider refuses the active row and removes the Vault
