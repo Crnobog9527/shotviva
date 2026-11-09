@@ -111,3 +111,31 @@ describe('OpenRouter image responses', () => {
       .rejects.toMatchObject({ kind: 'timeout', message: expect.not.stringContaining('SENSITIVE') })
   })
 })
+
+describe('FLUX 3 on the dedicated OpenRouter Image API', () => {
+  const model = 'black-forest-labs/flux-3-image-klein'
+
+  it('sends a reference photo with the original ratio and accepts a billed raster response', async () => {
+    const raw = (await imageURL('png')).split(',')[1]!
+    const fetch = fake({ data: [{ b64_json: raw }], usage })
+    const result = await createOpenRouterImageProvider({ ...config, model, fetch }).generate(input({ aspectRatio: 'original' }))
+    const [url, request] = fetch.mock.calls[0]!
+    expect(url).toBe('https://openrouter.ai/api/v1/images')
+    expect(JSON.parse(String(request?.body))).toEqual({
+      model, prompt: 'fixture', resolution: '1K', aspect_ratio: 'auto', output_format: 'png',
+      input_references: [{ type: 'image_url', image_url: { url: 'data:image/jpeg;base64,AQI=' } }],
+    })
+    expect(await sharp(result.bytes).metadata()).toMatchObject({ format: 'png', width: 2, height: 2 })
+    expect(result.usage).toEqual(usage)
+  })
+
+  it('maps Max to 4K and keeps billed failure usage without resubmitting', async () => {
+    const fetch = fake({ data: [], usage })
+    const provider = createOpenRouterImageProvider({ ...config, model: 'black-forest-labs/flux-3-image', fetch })
+    await expect(provider.generate(input({ images: [], resolution: '3k' }))).rejects.toMatchObject({ kind: 'failed', usage })
+    expect(fetch).toHaveBeenCalledTimes(1)
+    const body = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))
+    expect(body).toMatchObject({ aspect_ratio: '4:3', resolution: '4K' })
+    expect(body).not.toHaveProperty('input_references')
+  })
+})

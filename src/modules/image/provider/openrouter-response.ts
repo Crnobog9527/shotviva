@@ -27,6 +27,7 @@ const choiceSchema = z.object({
 const responseSchema = z.object({
   usage: usageSchema.nullish().catch(undefined),
   error: errorSchema.nullish(),
+  data: z.array(z.object({ b64_json: z.string().min(1), media_type: z.enum(['image/png', 'image/jpeg', 'image/webp']).optional() })).nullish().catch(undefined),
   choices: z.array(choiceSchema).nullish().catch(undefined),
 })
 const REFUSALS = new Set(['moderation_blocked', 'content_policy_violation', 'image_content_policy_violation', 'refusal'])
@@ -54,6 +55,13 @@ function imageURL(choice: z.infer<typeof choiceSchema> | undefined, usage: Provi
   return url
 }
 
+// The dedicated Image API returns raw base64. PNG is explicitly requested.
+function outputURL(parsed: UpstreamResponse) {
+  const image = parsed.data?.[0]
+  if (image) return `data:${image.media_type ?? 'image/png'};base64,${image.b64_json}`
+  return imageURL(parsed.choices?.[0], parsed.usage)
+}
+
 function extractImage(response: Response, parsed: UpstreamResponse, model: string) {
   const usage = parsed.usage
   const choice = parsed.choices?.[0]
@@ -63,7 +71,7 @@ function extractImage(response: Response, parsed: UpstreamResponse, model: strin
     logger.warn('openrouter omitted cost; using token pricing when available', { model })
   }
   if (!response.ok || error) throw providerFailure(response.status, error, usage)
-  return { usage, url: imageURL(choice, usage) }
+  return { usage, url: outputURL(parsed) }
 }
 
 async function normalizeOutput(url: string, input: ProviderInput) {
