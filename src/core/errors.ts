@@ -44,6 +44,8 @@ export const ERROR_CODES = [
   // Upload checks (ARCHITECTURE §8.2): over 20MB, or not a JPEG/PNG/WebP we can decode.
   'IMAGE_TOO_LARGE',
   'IMAGE_UNSUPPORTED',
+  'REFERENCE_IMAGE_LIMIT',
+  'MODEL_INPUT_UNSUPPORTED',
   // The provider's own safety refusal; credits are refunded.
   'CONTENT_REJECTED',
   // The user's words ask to swap a face or turn someone into a real person (ARCHITECTURE §5.1a,
@@ -100,6 +102,8 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   TIER_REQUIRED: 403,
   IMAGE_TOO_LARGE: 422,
   IMAGE_UNSUPPORTED: 422,
+  REFERENCE_IMAGE_LIMIT: 422,
+  MODEL_INPUT_UNSUPPORTED: 422,
   CONTENT_REJECTED: 422,
   IDENTITY_SWAP_REFUSED: 422,
   GENERATION_FAILED: 502,

@@ -48,7 +48,12 @@ async function setup() {
   const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json({ data: [{ b64_json }], usage }))
   const adapters: ProviderAdapters = {
     ...openai.adapters,
-    openrouter_images: (config) => createOpenRouterImageProvider({ ...config, fetch }),
+    openrouter_images: (config) => createOpenRouterImageProvider({
+      ...config,
+      fetch: (url, options) => String(url).endsWith('/images/models')
+        ? Promise.resolve(Response.json({ data: [{ id: model, supported_parameters: {} }] }))
+        : fetch(url, options),
+    }),
   }
   // Share the real resolver and query. Inject our private default row so the tests never
   // switch the global active provider while the other DB suites are running.

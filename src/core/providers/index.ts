@@ -2,7 +2,7 @@
 export { templateImageProvider } from './template-image-provider'
 export { activeCredentials, activeProvider, PROVIDERS_CACHE_TAG, type ProviderCredentials } from './active-provider'
 export { assertPublicBaseUrl, isBlockedAddress, parseBaseUrl, type HostResolver } from './base-url'
-export { openRouterModelTiers } from './openrouter-catalog'
+export { openRouterImageParameters, openRouterModelTiers, type OpenRouterImageParameters } from './openrouter-catalog'
 export { testConnection, type ConnectionResult } from './connection-test'
 export {
   activateProvider,

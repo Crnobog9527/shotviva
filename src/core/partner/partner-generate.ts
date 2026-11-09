@@ -21,6 +21,12 @@ export type PartnerGenerateOutcome = Pick<Job, 'id' | 'status' | 'creditsCost' |
 
 // A replayed key whose job failed answers with that failure again (already refunded).
 function replayFailure(job: Job): GenerationFailure {
+  if (job.errorCode === 'REFERENCE_IMAGE_LIMIT' || job.errorCode === 'MODEL_INPUT_UNSUPPORTED') {
+    const message = job.errorCode === 'REFERENCE_IMAGE_LIMIT'
+      ? 'This request exceeds the image model’s reference image limit.'
+      : 'This image model does not support the requested inputs.'
+    return new GenerationFailure(new AppError(job.errorCode, message), job.id, true)
+  }
   const code = partnerFailureCode(job.errorCode)
   const source =
     code === 'content_rejected'

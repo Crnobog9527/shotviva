@@ -59,6 +59,8 @@ const FROM_APP: Record<ErrorCode, PartnerErrorCode> = {
   TIER_REQUIRED: 'internal',
   IMAGE_TOO_LARGE: 'invalid_input',
   IMAGE_UNSUPPORTED: 'invalid_input',
+  REFERENCE_IMAGE_LIMIT: 'invalid_input',
+  MODEL_INPUT_UNSUPPORTED: 'invalid_input',
   CONTENT_REJECTED: 'content_rejected',
   IDENTITY_SWAP_REFUSED: 'IDENTITY_SWAP_REFUSED',
   GENERATION_FAILED: 'generation_failed',
