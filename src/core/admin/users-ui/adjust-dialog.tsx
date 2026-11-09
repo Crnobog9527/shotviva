@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useLayoutEffect, useState } from 'react'
 
 import { Button } from '@/core/ui/button'
 import { DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/core/ui/dialog'
@@ -30,6 +30,18 @@ export function AdjustDialog({ balances, pending, error, onCancel, onConfirm }: 
   const [pool, setPool] = useState<'free' | 'paid'>('free')
   const [amount, setAmount] = useState('')
   const [reason, setReason] = useState('')
+  // Radix updates the top dismissable layer in a passive effect. An immediate Escape
+  // after reopening must dismiss this form even while the profile still owns that listener.
+  useLayoutEffect(() => {
+    const dismiss = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.isComposing) return
+      event.stopPropagation()
+      event.preventDefault()
+      onCancel()
+    }
+    window.addEventListener('keydown', dismiss, true)
+    return () => window.removeEventListener('keydown', dismiss, true)
+  }, [onCancel])
   const value = Number(amount)
   const after = balances[pool] + (Number.isInteger(value) ? value : 0)
   const valid = Number.isInteger(value) && value !== 0 && Math.abs(value) <= 100_000 && reason.trim().length > 0 && after >= 0
@@ -49,7 +61,7 @@ export function AdjustDialog({ balances, pending, error, onCancel, onConfirm }: 
         </label>
         <label className="grid gap-1">
           <span className="font-medium">{COPY.amount}</span>
-          <Input type="number" step={1} inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          <Input type="number" step={1} inputMode="text" value={amount} onChange={(e) => setAmount(e.target.value)} />
         </label>
         <p className={after < 0 ? 'text-destructive' : 'text-muted-foreground'}>
           {COPY.preview(balances[pool], after)}
