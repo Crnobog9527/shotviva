@@ -330,7 +330,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 订阅续费走 T10 新增的 `apply_subscription_renewal(user, product_id, invoice_id, period_end)`：`credits += 商品积分`，`paid_until = greatest(paid_until, period_end)`（直接对齐 Stripe 的本期结束日，不按天数累加，避免大小月漂移）；同样写流水、按 invoice id 幂等，内部复用 `_apply_credit_change`（总控 2026-11-05 补）。
 - 没用完的积分在续费时自然结转（积分不过期），不做「本期 / 结转」两本账。
 - **计价单位是 credit，不是「张」。**（唯一例外：新用户赠送对外说 "3 free Standard images"，即 6 个免费 credit，见建站规格 G3。） 一次出图扣多少 = 模板在用户所选分辨率的配置值 `templates.credits_cost[resolution]`（第 5 节：`high` 模板默认 1K 2 / 2K 4 / 3K 6，`medium` 1 / 2 / 3），后台模板编辑页可改；会员每月发多少 credit、积分包多少 credit 写在 `site.config.ts`。前台后台都叫 credits，余额显示为 "30 credits + 3 free"。「重新生成」按同一模板、同一分辨率再扣一次。
-- **配置下限（Owner 2026-11-05 定的毛利口径）**：每个质量档 × 分辨率的 credit 数 ≥ `ceil(该档 p95 单次真实成本 ÷ $0.06)`，后台可以往上加价，不能低于下限。下限表是 `modules/image` 里的常量，后台保存模板时在服务端校验，低于下限拒绝保存。$0.06 的来历：最便宜的 credit 是 Max 年付（定下限时 $0.208；2026-11-06 改价后 $0.212，下限按 $0.208 算更保守，不变），扣最坏手续费（国际卡 + Managed Payments：2.9% + 3.5% + 1.5% + $0.30）和 3% 退款预留后，守 **60% 毛利**（不含注册赠送的 3 个免费 credit，按最坏情况：credits 全部用完）每 credit 的成本上限约 $0.060。成本依据：OpenAI 官方价（图像输入 $8/M、输出 $30/M token），high 质量正方形单张输出 1K $0.053、2K $0.107、3K $0.178，加输入图约 $0.012～$0.021、提示词约 $0.005、失败退回损耗 10%、R2 + Vercel 约 $0.002；输入图 token 上线前按 LAUNCH §5 实测后更新下限表（定稿全文见共享笔记 `pricing-final-2026-11-05.md`）。
+- **配置下限（Owner 2026-11-05 定的毛利口径）**：每个质量档 × 分辨率的 credit 数 ≥ `ceil(该档 p95 单次真实成本 ÷ $0.06)`，后台可以往上加价，不能低于下限。下限表是 `modules/image` 里的常量，后台保存模板时在服务端校验，低于下限拒绝保存。$0.06 的来历：最便宜的 credit 是 Max 年付（定下限时 $0.208；2026-11-06 改价后 $0.212，下限按 $0.208 算更保守，不变），扣最坏手续费（国际卡 + Managed Payments：2.9% + 3.5% + 1.5% + $0.30）和 3% 退款预留后，守 **60% 毛利**（不含注册赠送的 6 个免费 credit，按最坏情况：credits 全部用完）每 credit 的成本上限约 $0.060。成本依据：OpenAI 官方价（图像输入 $8/M、输出 $30/M token），high 质量正方形单张输出 1K $0.053、2K $0.107、3K $0.178，加输入图约 $0.012～$0.021、提示词约 $0.005、失败退回损耗 10%、R2 + Vercel 约 $0.002；输入图 token 上线前按 LAUNCH §5 实测后更新下限表（定稿全文见共享笔记 `pricing-final-2026-11-05.md`）。
 - 余额只能通过 SQL 函数改：发放（`grant_credits` 带 `pool` 参数，注册赠送和活动赠送用 `'free'`）、预扣、确认、退回、管理员调整（`admin_adjust_credits` 带 `pool` 参数）。前端和普通接口都不能直接写余额。
 - 每一笔变动都写进流水表，记录动的是哪个池，带幂等键。
 
@@ -350,7 +350,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 | `pack_m` | 积分包 | $24.90 | 55 | $0.453 | 不变 | 单笔 | 单笔 |
 | `pack_l` | 积分包 | $49.90 | 115 | $0.434 | 不变 | 单笔 | 单笔 |
 
-- 年付积分 = 12 × 月付积分，一次发完。**年付折扣（Owner 2026-11-06 改价）**：Starter、Pro 按月价 × 12 打 8 折，Max 打 6 折，金额取整到美元：$191（省 20%）、$479（省 20%）、$713（省 40%）。年付最多省 40%，不得超过。改价在 Stripe 上是新建 Price 并用 `transfer_lookup_key` 接过 lookup key（Price 金额不可改），旧 Price 归档；Waffo 商品价格同步改。积分包每 credit 都高于所有订阅，**所有人可买，包括没买会员的**，所有通道都是单笔，不改 `paid_until`。注册赠送仍是 3 个免费 credit（`billing.freeCredits`），不计入毛利。
+- 年付积分 = 12 × 月付积分，一次发完。**年付折扣（Owner 2026-11-06 改价）**：Starter、Pro 按月价 × 12 打 8 折，Max 打 6 折，金额取整到美元：$191（省 20%）、$479（省 20%）、$713（省 40%）。年付最多省 40%，不得超过。改价在 Stripe 上是新建 Price 并用 `transfer_lookup_key` 接过 lookup key（Price 金额不可改），旧 Price 归档；Waffo 商品价格同步改。积分包每 credit 都高于所有订阅，**所有人可买，包括没买会员的**，所有通道都是单笔，不改 `paid_until`。注册赠送为 6 个免费 credit（以 `site.config.ts` 的 `billing.freeCredits` 为准），不计入毛利。
 - 积分包不改会员期，但它发的是付费积分，用它生成的作品就是付费作品（无水印、私密、可商用），所以非会员买包也拿到完整权益——这正是「按作品判付费」要解决的事。
 - 价格数字只写在 `site.config.ts`（第 2 节），付费墙、`/pricing`、FAQ、结构化数据都从配置读；建站规格 G3 同步。送 Stripe 时用整数分（`1990`）。
 - **Stripe Product / Price 映射**：Starter、Pro、Max 各一个 Product（税码 `txcd_10105001`），每个 Product 挂 4 个 Price：月付 recurring、月付 one-time、年付 recurring、年付 one-time（同 id 的 recurring 和 one-time 价格相同）；三个积分包各一个 Product，只有 one-time Price。Price 的 `lookup_key` 固定为 `<product_id>`（one-time）和 `<product_id>_recurring`（订阅），服务端按 lookup key 取 Price，不把 Price id 写进代码或配置；每个 Price 的 `metadata.product_id` 也写上，回调反查用。
@@ -461,6 +461,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 
 - `affiliate_bind/count_click/apply/save_profile` 负责归属、点击、申请及设置。团队邀请只接受有效的已开团队推广员。申请门槛以未全额退款的会员付款为准。
 - `affiliate_recompute_payment` 由付款新增、退款金额或状态变化、争议新增或结案触发。对税后退款比例使用精确整数除法。付款与积分事务独立于佣金成败。每日 `affiliate_daily(UTC 日期)` 重试错误、确认到期佣金并在结算日生成结算单。
+- 关闭计划后，旧佣金继续按退款和争议结果重算；关闭期间发生的付款，重开也不补发佣金。直接推广员在付款时已暂停或封禁，本人佣金作废，该笔付款也不产生上级团队奖励。
 - `admin_affiliate_decide/create/set/adjust/commission_release/rebind/payout_decide/settings/recompute` 写审计。后台财务汇总及邮箱查询、推广员概览及已脱敏推荐用户列表通过服务端读取函数返回。短码唯一索引支持绑定，推广员与时间索引支持私有明细分页，状态与确认时间索引支持每日确认，未解决错误及争议按付款检索。
 
 - **不自己开发联盟系统**，用第三方联盟工具接入（选型待 Owner 定；接入前核对：能否追踪 Managed Payments 订阅、支付宝单笔和 Waffo 订单怎么记）。网站这边只做记录推广码、结账时把推广码传给支付平台，届时另开任务卡。
@@ -514,7 +515,94 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 通过环境变量指定当前用哪条通道：默认 Stripe；切到 Waffo 时付费墙全部方式都走 Waffo（卡订阅、支付宝单笔、积分包单笔）。**不做自动故障切换**，出问题时人工改开关。
 - 回调规则和 Stripe 相同：先验签，再按事件 id 去重，最后 `apply_purchase`。
 
-**开发顺序**：先 Stripe（T9 结账 + 首付、T10 续费），再 Waffo 兜底（T13）。做法参照 Graylum **staging 分支**的支付规则，但不复制它的代码：staging 的支付目录约 8900 行，带着首月优惠券、升级、宽限、测试时钟，Shotviva 一项都不要。
+**开发顺序**：先 Stripe（T9 结账 + 首付、T10 续费），再 Waffo 兜底（T13）。做法参照 Graylum **staging 分支**的支付规则，但不复制它的代码：staging 的支付目录约 8900 行，具体商品、升级和折扣规则见 §6.2、§6.4。
+
+### 6.4 邀请码、优惠码与送积分码（T94）
+
+#### 表 `codes`（私有：开 RLS、不建 policy，只经 service role 读写）
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `id` | uuid pk | |
+| `code` | text unique not null | 大写；check `^[A-Z0-9]{4,20}$` |
+| `kind` | text not null | `invite` / `campaign` |
+| `owner_user_id` | uuid null → profiles on delete cascade | 只有 `invite` 有；`unique(owner_user_id) where kind='invite'` |
+| `invitee_credits` | int null | 被兑换时送的积分；`invite` 行为空（数字来自 config） |
+| `invitee_pool` | text null | `free` / `paid` |
+| `discount_percent` | int null | 1～90；空 = 不打折 |
+| `discount_products` | text[] null | 9 个商品 id 的子集；有折扣时必填、非空 |
+| `discount_duration` | text null | `once` / `repeating` / `forever` |
+| `discount_months` | int null | 只有 `repeating` 时必填 |
+| `discount_valid_days` | int null | 兑换后 N 天内可用 |
+| `stripe_coupon_id` | text null | 后台保存时建的 Stripe 优惠券；预览库、生产库各自对应 Stripe 测试模式 / 正式模式 |
+| `starts_at` / `expires_at` | timestamptz null | |
+| `max_redemptions` | int null | |
+| `redemption_count` | int not null default 0 | 兑换函数加锁自增 |
+| `new_users_only` | bool not null default false | |
+| `active` | bool not null default true | |
+| `note` | text null | 后台备注（例如「Product Hunt 首发」） |
+| `created_by` | uuid null | 管理员 id |
+| `created_at` / `updated_at` | timestamptz | |
+
+约束：`campaign` 行的「送积分」和「打折」至少有一项；`invitee_pool = 'paid'` 时 `max_redemptions` 必填。
+索引：`code` 唯一索引供兑换查询；后台列表按 `(created_at desc, id desc)` 分页，按类型筛选时使用带 `kind` 前缀的索引。
+
+#### 表 `code_redemptions`（私有，同上）
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `id` | uuid pk | |
+| `code_id` | uuid → codes on delete set null | 邀请人删号后保留已被邀请的事实，不能再次领邀请积分。 |
+| `kind` | text | 冗余存 `codes.kind`，给唯一索引用 |
+| `user_id` | uuid → profiles on delete cascade | 兑换人 |
+| `inviter_user_id` | uuid null → profiles on delete set null | 只有 `invite` 有 |
+| `context` | text | `signup` / `account` / `paywall` |
+| `status` | text | `ok` / `blocked_same_ip` / `blocked_no_signup_grant` |
+| `credits_granted` | int default 0 | 实际送给兑换人的 |
+| `inviter_rewarded_at` | timestamptz null | |
+| `inviter_reward_payment_id` | bigint null → payments | 触发邀请人奖励的那笔付款 |
+| `discount_expires_at` | timestamptz null | 兑换时算好：`least(code.expires_at, now() + valid_days)` |
+| `discount_used_payment_id` | bigint null → payments | 用掉折扣的那笔付款 |
+| `discount_void_at` | timestamptz null | 被新折扣替换时写 |
+| `created_at` | timestamptz | |
+
+唯一：`(code_id, user_id)`；`(user_id) where kind = 'invite'`（只能被邀请一次）。
+索引：`(code_id, created_at desc, id desc)`（后台看某个码的兑换记录）；`(inviter_user_id, created_at desc) where inviter_user_id is not null`（我的邀请）；`(user_id) where discount_percent 待用`，即部分索引 `(user_id) where discount_used_payment_id is null and discount_void_at is null`（结账查待用折扣）。
+
+#### `payments` 的新增字段
+
+- `code_id uuid null → codes`
+- `amount_discount int not null default 0`（分；来自 Stripe session `total_details.amount_discount`）
+- `code_discount_conflict boolean not null default false` 标记重复消费同一折扣的付款。
+- `code_effects_applied_at timestamptz null` 记录首次完成核销与奖励判断的时间。
+
+#### `credit_ledger.kind` 扩两种
+
+check 约束换成原来的集合再加上 `code_grant`（兑换送的积分）和 `invite_reward`（邀请人奖励）。删掉旧约束、加新约束，放在同一个迁移里，只会变宽。幂等键：`code:<redemption_id>`、`invite:<redemption_id>`。
+
+#### 函数（plpgsql，`search_path = ''`，只授权 `service_role`）
+
+| 函数 | 做什么 |
+|---|---|
+| `get_or_create_invite_code(p_user)` | 有就返回，没有就生成 8 位码（撞了重试） |
+| `redeem_code(p_user, p_code, p_context, p_invitee_credits, p_invite_window_days, p_replace=false)` | 一个事务里做完：查码并锁行 → 校验（启用、时间、名额、新用户、封禁、自己的码、同 IP、已用过、只能被邀请一次、邀请码 7 天窗口、注册赠送是否已发）→ 写兑换记录 → `redemption_count + 1` → 送积分（`_apply_credit_change`，kind `code_grant`）→ 有折扣时作废旧的待用折扣。返回 `{status, credits_granted, discount_percent, discount_products, discount_expires_at, replaced}`；有待用折扣、没传 `p_replace = true` 时返回 `needs_confirm`，不写任何东西 |
+| `checkout_discount(p_user, p_product_id)` | 只读：返回这个账号针对这个商品可用的待用折扣（`code_id`、`stripe_coupon_id`、`percent`），没有就返回空 |
+| `apply_payment_code_effects(p_user, p_payment_id, p_code_id, p_amount_discount, p_inviter_credits, p_inviter_cap)` | 付款入账后由回调调用，幂等：① 把 `code_id` / `amount_discount` 写进这笔 `payments`，把对应的折扣标记为用掉；② 这个用户是被邀请来的、这是他第一笔成功付款、邀请人没封禁、30 天内没超上限，就给邀请人发付费积分（kind `invite_reward`）。Stripe 首付、单笔和 Waffo 单笔都调；续费不调 |
+| `admin_save_code(p_actor, p_code_id, p_fields)` | 新建 / 编辑后台码；校验毛利底线（商品价格从 `products` 表读）；折扣参数建好后不能改 |
+| `admin_set_code_active(p_actor, p_code_id, p_active)` | 启用 / 停用 |
+| `admin_list_codes(p_actor, p_cursor, p_kind, p_code_id)` / `admin_code_redemptions(p_actor, p_code_id, p_cursor)` | 后台列表，按游标分页、每页 30 条；码列表一并带出统计：兑换数、付款人数、净收入（`amount_total − amount_tax − amount_refunded` 的合计）、折扣总额 |
+| `admin_top_inviters(p_actor, p_days)` | 前 50 名邀请人：邀请数、付款人数、拿到的奖励 |
+| `my_invite_summary(p_user, p_inviter_cap, p_cursor)` | 账号页用：我的码、邀请人数、付款人数、已得积分、本 30 天剩余次数 |
+
+后台函数均带管理员参数 `p_actor`，函数内校验身份。`admin_audit_log_action_check` 保留全部现有操作并加入以下两项。写操作在同一事务记录 `save_code` 或 `set_code_active`。
+
+#### 折扣占用和并发入账（Owner 2026-11-09）
+
+- 每个账号同时最多一份待用折扣。兑换、替换、占用与核销按账号串行，兑换名额按码锁定。积分入账键基于兑换记录，滚动 30 天奖励上限按邀请人串行，按邀请人的 invite_reward 流水计数，被邀请人删号不会返还奖励名额。邀请窗口、赠送数和奖励次数由服务端从 `site.config.ts` 传入。
+- 在兑换行增加 `checkout_token uuid`、`checkout_expires_at timestamptz`（均可空）以及 `checkout_prepared boolean not null default false`。服务端生成一次尝试专用的 UUID。在创建带折扣的 Stripe Session 前调用 `reserve_checkout_discount(p_user,p_product_id,p_token)`，原子查询并占用，返回折扣和截止时刻。预占建单窗口 60 秒。发起 Stripe 请求前调用 `prepare_checkout_discount(p_user,p_token,p_expires_at)`，原子固定并返回要发给 Stripe 的 Unix 截止秒数。同一尝试可幂等重试，沿用此值。其他尝试收到占用状态；存在占用时不能替换。阶段 3 建单按发起 Stripe 请求的时间设 30 分钟有效期；数据库校验传入的 Unix 秒允许最多 10 秒的时钟与传输余量，锁和 Stripe 共用同一绝对截止时间。Stripe 建单用 token 作幂等键；创建结果不确定时仅重试原尝试。阶段 3 必须对齐 Stripe 实际截止时间，不能让本地占用先于仍可付款的 Session 到期。
+- 到期即可重新占用，无需定时清理。用户放弃时服务端先确认 Stripe Session 已过期或主动关闭成功，再调用 `release_checkout_discount(p_user,p_token)`；确定未建单也立即释放。释放须匹配原 token，延迟的取消或过期通知不能释放新占用。异步付款处理中不能因浏览器返回就认定为放弃。
+- 核销以成功付款为准；从 Stripe 可信 metadata 取得码，按用户和码定位兑换，允许处理关闭或替换后迟到的成功通知。第一笔成功核销后保留其付款 id。第二笔不同付款命中同一份折扣也正常入账，保留实付和折扣金额，标记该笔 `code_discount_conflict`。首次处理后记 `code_effects_applied_at`，封顶或封禁时确定的未发奖结果同样不随回调重放改变。RPC 返回冲突标记供回调记 warning，后台兑换明细列出异常付款；不追收差价。重放同一笔付款不重复发奖。
+- 后台码按付款行的 code_id 归因；邀请码按成功邀请后该用户的付款归因。每个码内按付款行去重，金额按币种分别汇总。邀请付款人数以实际已付款账号计（含因封顶未领奖者）。注册同 IP 或无注册赠送被拦记录保留原因，不计成功名额和邀请数。折后每积分价格从 `products.price_usd / credits` 按原始精度校验，底线为 $0.208。已创建码的折扣条款不可改。
 
 ## 7. 登录
 
@@ -748,6 +836,7 @@ v1 后台（Owner 2026-11-06 扩充；T23 做外壳和运营页）：**一个后
 |---|---|---|
 | 概览 | `/admin` | 今日 / 近 7 天 / 近 30 天：注册数、出图数、出图成功率、消耗积分（免费 / 付费分开）、新增付费用户、收入；近 30 天出图和收入趋势图。非收入部分由 `admin_dashboard_stats(p_days)` 一次算完；收入由 `admin_revenue_stats(p_days)` 算（T9 之后才有） |
 | 用户 | `/admin/users` | 按邮箱搜（读 `admin.users_overview`，最多返回 50 条）。用户详情：积分两池、会员到期、最近出图、积分流水（分页）。操作：调积分（`admin_adjust_credits`，选池、填原因）、封禁 / 解封（`admin_ban_user` / `admin_unban_user`，填原因） |
+| 邀请与兑换码 | `/admin/codes` | 码管理、毛利校验、兑换明细（含重复折扣付款）、邀请统计与同 IP 拦截。后台只用中文。 |
 | 订单与收入 | `/admin/orders` | 付款记录（时间、用户邮箱、商品、金额、付款方式、渠道、状态）和订阅状态，按商品和渠道汇总收入；每行链接到 Stripe 后台对应记录。退款仍在 Stripe 后台操作。数据来自 T9 的表，T9 合并后才有 |
 | 出图记录 | `/admin/jobs` | 全部出图任务，按状态、模板、供应商 / 模型、来源（web / graylum）、日期筛选，游标分页；失败任务显示 `error_code`；每单显示真实成本 `cost_usd`；按模型和清晰度统计次数和真实成本合计（T33 起；T33 之前的老任务没有用量，按旧的代码常量估算并标「估算」） |
 | 模板 | `/admin/templates` | 见下面第 1 条 |
@@ -1061,6 +1150,8 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 | `contact_sales_click` | 浏览器：定价页「For business」的 Contact us 按钮（DESIGN §6.9 第 8 条） | `page`（`/pricing` 或 `/zh/pricing`） |
 | `business_inquiry_submit` | 浏览器：企业咨询表单提交成功（服务端已存下）后（T86，ARCHITECTURE §10.c） | `volume`（每月出图量档：`under_100` / `100_500` / `500_2000` / `2000_10000` / `over_10000`）、`uses`（主要用途数组，至少 1 个：`ecommerce` / `food_menu` / `social` / `real_estate` / `ads` / `other`）；不含任何联系方式或填写的文字 |
 | `$pageview` | 浏览器：自动 | — |
+
+T94 新增 `code_redeem`（服务端：kind、context、status、credits、pool、discount_percent，仅 campaign 传明文 code）、`invite_reward`（服务端：credits、product_id）、`invite_share`（浏览器：action 为 copy/share、surface）。`signup` 增加 code_kind，`checkout_start` 增加 code、discount_percent，`purchase` 增加 code、amount_discount_usd。用户邀请码不进分析事件。
 
 所有事件都带 `locale`（`en` / `zh`，浏览器端注册为公共属性，服务端发时从请求或 `user_metadata.locale` 取；Owner 2026-11-06）。钱和积分相关的事件（`signup`、`generate`、`checkout_start`、`purchase`）一律服务端发，保证不被广告拦截漏掉；发送失败只记日志，不影响业务。
 

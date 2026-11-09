@@ -1,6 +1,6 @@
 import type { Client } from 'pg'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest'
-import { available, bind, commission, dispute, promoter, row, sale, setupAffiliate } from './affiliate-fixtures'
+import { available, bind, commission, dispute, promoter, refund, row, sale, setupAffiliate } from './affiliate-fixtures'
 import { connectAdmin, createUser } from './helpers'
 
 let db: Client
@@ -93,12 +93,36 @@ it('rejects self and transitive parent cycles', async () => {
   }
 })
 
-it('closing the program prevents new bindings and commissions, including replay after reopening', async () => {
+it('when closed, refunds and lost disputes still debit old commissions and new sales never earn', async () => {
+  await db.query('update affiliate_settings set hold_days=0')
+  const original = await sale(db, f.buyer, 'pack_m', 2490)
+  expect(await available(db, f.owner.id)).toBe(373)
   await db.query('update affiliate_settings set enabled=false')
   expect(await bind(db, await createUser(db), f.owner.slug)).toBe(false)
+  await refund(db, original.charge, 1245)
+  expect(await available(db, f.owner.id)).toBe(186)
+  const d = await dispute(db, original.charge, 1245)
+  await db.query("select close_payment_dispute($1,'lost')", [d])
+  expect(await commission(db, original.id)).toMatchObject({ status: 'void', void_reason: 'dispute_lost', amount: 0 })
+  expect(await available(db, f.owner.id)).toBe(0)
+
   const p = await sale(db, f.buyer, 'pack_m', 2490)
   expect(await commission(db, p.id)).toBeUndefined()
   await db.query('update affiliate_settings set enabled=true')
+  await refund(db, p.charge, 10)
   await db.query('select affiliate_recompute_payment($1)', [p.id])
   expect(await commission(db, p.id)).toBeUndefined()
+})
+
+it.each(['suspended', 'banned'])('a %s promoter and their eligible parent earn nothing from that sale', async (status) => {
+  const parent = await promoter(db)
+  await db.query('update affiliates set team_enabled=true where user_id=$1', [parent.id])
+  await db.query('update affiliates set status=$2,parent_user_id=$3 where user_id=$1', [f.owner.id, status, parent.id])
+  const p = await sale(db, f.buyer, 'pack_m', 2490)
+  expect(await commission(db, p.id)).toMatchObject({ amount: 0, status: 'void', void_reason: 'affiliate_inactive' })
+  expect(await commission(db, p.id, 2)).toBeUndefined()
+  await db.query("update affiliates set status='active' where user_id=$1", [f.owner.id])
+  await refund(db, p.charge, 10)
+  expect((await commission(db, p.id)).amount).toBe(0)
+  expect(await commission(db, p.id, 2)).toBeUndefined()
 })
