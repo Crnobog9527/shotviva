@@ -1,11 +1,18 @@
 import { readFileSync } from 'node:fs'
 import type { Client } from 'pg'
 import { afterAll, beforeAll, expect, it } from 'vitest'
-import { connectAdmin, createUser, profileOf } from './helpers'
+import { createUser, profileOf } from '../db/helpers'
+import { cloneLocalPricingDb } from './local-pricing-clone'
 
 let db: Client
-beforeAll(async () => { db = await connectAdmin() })
-afterAll(async () => { await db.end() })
+let clone: ReturnType<typeof cloneLocalPricingDb>
+beforeAll(async () => {
+  clone = cloneLocalPricingDb()
+  db = await clone.connect()
+}, 30000)
+afterAll(async () => {
+  try { await db?.end() } finally { clone?.drop() }
+})
 
 // Run the same bounded transaction body used by the protected workflow. Substituting
 // ONLY the approved cohort identifies the isolated local fixture instead of real users.

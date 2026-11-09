@@ -52,8 +52,8 @@ For a nondefault local project set `SUPABASE_WORKDIR` to its directory. The test
 local database to a disposable database in the same Docker container. It observes the waiting
 Postgres backend in both arrival orders, executes the checked-in preview SQL, checks replay,
 refusal to undo a subsequent payment, and concurrent signup limits, then drops the copy.
-CI runs it before the regular DB suite. The DB suite separately exercises the production
-transaction against a synthetic approved cohort and tests late v2 payments on all settlement RPCs.
+CI runs it before the regular DB suite. A separate disposable copy exercises the production transaction against a synthetic approved cohort.
+The DB suite tests late v2 payments on all settlement RPCs.
 
 The two database workflows run pending migrations for normal pushes and a manual operation
 of `none`. Selecting `activate` or `rollback` verifies migration history, main SHA and project
