@@ -49,13 +49,13 @@ describe('checkout evidence params', () => {
     }
   })
 
-  it('with the switch on, plain routes get the Terms box with both links in the buyer’s language', async () => {
+  it('with the switch on, plain routes get the Terms box with Chinese text linking to the shared legal pages', async () => {
     const { stripe: s, create } = stripe()
     await createCheckout(deps(s, { termsConsent: true }), { userId: USER, body: { product_id: 'pack_s', method: 'cn_card', locale: 'zh' }, client })
     expect(sent(create)).toMatchObject({
       consent_collection: { terms_of_service: 'required' },
       custom_text: {
-        terms_of_service_acceptance: { message: '我同意[服务条款](https://pr-1.example.app/zh/terms)和[退款政策](https://pr-1.example.app/zh/refund-policy)。' },
+        terms_of_service_acceptance: { message: '我同意[服务条款](https://pr-1.example.app/terms)和[退款政策](https://pr-1.example.app/refund-policy)。' },
       },
     })
   })
