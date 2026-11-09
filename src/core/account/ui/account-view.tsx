@@ -75,7 +75,7 @@ const pair = 'md:mx-0 md:mt-0 md:max-w-none'
 export function AccountView({ data, actions, site, children }: Props) {
   const t = useTranslations('app.account')
   const facts = { since: data.since, email: data.email, brand: site.brand, last: data.lastMembership }
-  const allowance = planAllowance(data.subscription, data.lastMembership, site.products)
+  const allowance = planAllowance(data.subscription, data.lastMembership)
   return (
     <>
       <AccountHeader email={data.email ?? data.phone} />

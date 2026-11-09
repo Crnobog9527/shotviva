@@ -22,9 +22,7 @@ type Props = {
   googleAction: FormAction
   resendAction: FormAction
   next: string
-  // The free Standard images of the sign-up gift at the catalogue's cheapest Standard price,
-  // through the page; `upTo` when templates cost different amounts (T91).
-  freeImages: { count: number; upTo: boolean }
+  giftCredits: number
   arrived?: ReactNode
   sender: string
   // Chinese pages only (T63): the 手机号 tab, shown first.
@@ -35,7 +33,7 @@ const addr = (chunks: ReactNode) => <span className="au-addr">{chunks}</span>
 
 // /signup (design/comps-v3-b/auth.html `?v=signup|verify`, `?err=weak`; a registered address gets the same
 // neutral "check your email" view, never `?err=exists`: control 2026-11-06).
-export function SignupForm({ action, googleAction, resendAction, next, freeImages, arrived, sender, phone }: Props) {
+export function SignupForm({ action, googleAction, resendAction, next, giftCredits, arrived, sender, phone }: Props) {
   const t = useTranslations('auth')
   const form = useAuthForm(action, { captcha: true, validate: validateSignup })
   // "Use a different email" puts this answer aside; the next submit brings a new one.
@@ -74,7 +72,7 @@ export function SignupForm({ action, googleAction, resendAction, next, freeImage
           <GiftGlyph />
         </span>
         <span>
-          <b>{t('signup.gift', { count: freeImages.count, upTo: String(freeImages.upTo) })}</b>
+          <b>{t('signup.gift', { count: giftCredits })}</b>
           <span>{t('signup.giftNote')}</span>
         </span>
       </div>

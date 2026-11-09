@@ -86,7 +86,6 @@ describe('checkout.session.completed', () => {
       channel: 'stripe',
       method: 'card',
       amount_usd: 19.9,
-      credits: 50,
     }, 'en')
   })
 

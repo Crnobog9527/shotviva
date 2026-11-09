@@ -41,6 +41,87 @@ CREATE TYPE "public"."credit_change" AS (
 ALTER TYPE "public"."credit_change" OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."activate_template_price_catalog_v2"() RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  batch bigint;
+  problems text;
+begin
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.template_catalog',0));
+  if not admin.is_template_catalog_v2() then raise exception 'TEMPLATE_CATALOG_VERSION_NOT_ACTIVE'; end if;
+  if exists (select 1 from admin.template_price_batches where reverted_at is null) then return; end if;
+  lock table public.templates, public.template_prompts, public.ai_providers in share row exclusive mode nowait;
+
+  select string_agg(t.id,', ' order by t.id) into problems from public.templates t
+    left join admin.template_tariffs_v2 c on c.id=t.id
+    where t.is_active and c.id is null and t.category_key<>'art-styles'
+      and t.id not in ('bright-listing','evening-glow') and t.id not like 'qa-%';
+  if problems is not null then raise exception 'UNMAPPED_ACTIVE_TEMPLATES: %', problems; end if;
+
+  -- Edit and partner requests run on the active provider; a web-only template may pin its own.
+  select string_agg(t.id,', ' order by t.id) into problems from admin.template_tariffs_v2 c
+    join public.templates t on t.id=c.id
+    left join public.template_prompts tp on tp.template_id=t.id
+    left join public.ai_providers a on a.module='image' and a.is_active
+    left join public.ai_providers p on p.id=coalesce(case when t.id<>'edit' then tp.provider_id end,a.id)
+    where tp.template_id is null or p.id is null or p.adapter<>'openai_images' or p.model<>'gpt-image-2.6-sunburst'
+      or rtrim(p.base_url,'/')<>'https://api.openai.com/v1'
+      or ('partner'=any(t.visible_in) and a.id is distinct from p.id)
+      or not coalesce((p.capabilities->'resolutions') ?& array['1k','2k','3k'],false)
+      or not coalesce((t.fields#>>'{images,min}')::int >= (p.capabilities->>'minReferences')::int
+          and (t.fields#>>'{images,max}')::int <= (p.capabilities->>'maxReferences')::int,false);
+  if problems is not null then raise exception 'TEMPLATE_MODEL_NOT_READY: %', problems; end if;
+
+  insert into admin.template_price_batches default values returning id into batch;
+  insert into admin.template_price_snapshots (batch_id,template_id,previous,applied,provider_id,provider_endpoint_hash)
+    select batch,t.id,admin.template_price_state(t),
+      case when c.id is null then admin.template_price_state(t)||'{"active":false,"featured":null}'::jsonb
+        else admin.template_price_state(t)||jsonb_build_object('quality',c.quality,'costs',c.costs) end,
+      case when c.id is not null then p.id end, case when c.id is not null then md5(p.base_url) end
+    from public.templates t left join admin.template_tariffs_v2 c on c.id=t.id
+    left join public.template_prompts tp on tp.template_id=t.id
+    left join public.ai_providers a on a.module='image' and a.is_active
+    left join public.ai_providers p on p.id=coalesce(case when t.id<>'edit' then tp.provider_id end,a.id)
+    where c.id is not null or t.is_active;
+  update public.templates t set quality=s.applied->>'quality',credits_cost=s.applied->'costs',
+    is_active=(s.applied->>'active')::boolean,featured_rank=(s.applied->>'featured')::smallint
+    from admin.template_price_snapshots s where s.batch_id=batch and s.template_id=t.id;
+end;
+$$;
+
+
+ALTER FUNCTION "admin"."activate_template_price_catalog_v2"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."alternate_route_meets_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text", "p_price" integer) RETURNS boolean
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  with route as (
+    select p.* from public.admin_image_provider_pricing('') p
+    where p.provider_id::text||'/'||p.model=p_tag
+      and p.resolutions @> array[p_resolution] and p.capabilities<>'{}'::jsonb
+  ), priced as (
+    select adapter,coalesce((p95->>p_resolution)::numeric,(estimated_image_costs->>p_resolution)::numeric,
+      case when adapter='openai_images' then
+        ((case when p_quality='medium' then '{"1k":0.055,"2k":0.095,"3k":0.135}'
+                    else '{"1k":0.081,"2k":0.135,"3k":0.206}' end)::jsonb->>p_resolution)::numeric end) as usd
+    from route
+  ), budget as (
+    select admin.lowest_credit_price()*0.761*0.4 as usd
+  )
+  select coalesce((select p_price >= ceil(priced.usd*1.10/nullif(budget.usd,0))
+    and (priced.adapter<>'openai_images' or p_price>=(case when p_quality='medium' then
+      '{"1k":1,"2k":2,"3k":3}' else '{"1k":2,"2k":4,"3k":6}' end::jsonb->>p_resolution)::int)
+    from priced,budget),false)
+$$;
+
+
+ALTER FUNCTION "admin"."alternate_route_meets_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text", "p_price" integer) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."apply_style_refs"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -117,6 +198,132 @@ $$;
 
 ALTER FUNCTION "admin"."check_template_style_ref_limit"() OWNER TO "postgres";
 
+
+CREATE OR REPLACE FUNCTION "admin"."checkout_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_session_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_invoice_id" "text" DEFAULT NULL::"text", "p_charge_id" "text" DEFAULT NULL::"text", "p_subscription_id" "text" DEFAULT NULL::"text", "p_subscription_status" "text" DEFAULT NULL::"text", "p_current_period_end" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_cancel_at_period_end" boolean DEFAULT NULL::boolean) RETURNS "public"."credit_change"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_change public.credit_change;
+begin
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.template_catalog',0));
+  if p_amount_total is null or p_amount_tax is null or p_currency is null or p_method is null then
+    raise exception 'INVALID_INPUT' using detail = 'payment fields are all required';
+  end if;
+
+  if p_subscription_id is not null then
+    if p_subscription_status is null or p_current_period_end is null or p_cancel_at_period_end is null then
+      raise exception 'INVALID_INPUT' using detail = 'subscription fields are all required';
+    end if;
+    insert into public.subscriptions
+      (stripe_subscription_id, user_id, product_id, status, current_period_end, cancel_at_period_end)
+    values
+      (p_subscription_id, p_user_id, p_product_id, p_subscription_status, p_current_period_end, p_cancel_at_period_end)
+    on conflict (stripe_subscription_id) do update
+       set status = excluded.status,
+           current_period_end = excluded.current_period_end,
+           cancel_at_period_end = excluded.cancel_at_period_end,
+           updated_at = now()
+     where public.subscriptions.user_id = excluded.user_id
+       and public.subscriptions.product_id = excluded.product_id;
+    if not found then
+      raise exception 'IDEMPOTENCY_CONFLICT' using detail = 'subscription belongs to another user or product';
+    end if;
+  end if;
+
+  v_change := admin.purchase_terms(p_v2, p_user_id, p_product_id, p_session_id);
+
+  if v_change.applied then
+    insert into public.payments
+      (user_id, product_id, channel, stripe_session_id, stripe_invoice_id, stripe_charge_id,
+       amount_total, amount_tax, currency, method)
+    values
+      (p_user_id, p_product_id, 'stripe', p_session_id, p_invoice_id, p_charge_id,
+       p_amount_total, p_amount_tax, lower(p_currency), p_method);
+  end if;
+
+  return v_change;
+end;
+$$;
+
+
+ALTER FUNCTION "admin"."checkout_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_session_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_invoice_id" "text", "p_charge_id" "text", "p_subscription_id" "text", "p_subscription_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."clear_approved_wallets_v2"("p_digest" "text", "p_last_ledger" bigint, "p_payments" bigint) RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare rec record; prior admin.pricing_wallet_cutover; stamp timestamptz; waivers jsonb := '[]'; waived jsonb;
+begin
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.template_catalog',0));
+  lock table public.profiles, public.generation_jobs, public.credit_ledger, public.payments, public.subscriptions in share row exclusive mode;
+  select * into prior from admin.pricing_wallet_cutover where version='v2';
+  if found then
+    if prior.digest_before is distinct from p_digest or prior.rolled_back_at is not null then raise exception 'CUTOVER_BATCH_MISMATCH'; end if;
+    return;
+  end if;
+  if admin.wallet_digest_v2() is distinct from p_digest or
+     (select coalesce(max(id),0) from public.credit_ledger) is distinct from p_last_ledger or
+     (select count(*) from public.payments) is distinct from p_payments or
+     exists(select from public.payments where status <> 'refunded' or amount_refunded <> amount_total) or
+     exists(select from public.payment_disputes where closed_at is null) or
+     exists(select from public.profiles where paid_until > now()) or
+     exists(select from public.subscriptions where status not in ('canceled','incomplete_expired')) or
+     exists(select from public.generation_jobs where status='running') then
+    raise exception 'CUTOVER_BASELINE_CHANGED';
+  end if;
+  stamp := clock_timestamp();
+  for rec in select id,credits,free_credits from public.profiles where credits<>0 or free_credits<>0 order by id loop
+    if rec.credits>0 then
+      perform public.admin_adjust_credits(rec.id,-rec.credits,'Legacy balance closed at pricing switch','paid','pricing:v2:close:paid:'||rec.id);
+    end if;
+    if rec.free_credits>0 then
+      perform public.admin_adjust_credits(rec.id,-rec.free_credits,'Legacy balance closed at pricing switch','free','pricing:v2:close:free:'||rec.id);
+    end if;
+  end loop;
+  -- All approved balances are now zero. Record uncollected old refunds as waived, so
+  -- a replay cannot collect the old debt from a later purchase in the new denomination.
+  for rec in select id,clawback_shortfall from public.payments where status='refunded' order by id loop
+    waived := public.clawback_payment_credits(rec.id,'cutover_v2','Legacy refund waived at pricing switch');
+    if (waived->>'taken')::int<>0 then raise exception 'UNEXPECTED_CUTOVER_DEBIT'; end if;
+    if (waived->>'written_off')::int>0 then
+      waivers := waivers || jsonb_build_array(jsonb_build_object('id',rec.id,'before',rec.clawback_shortfall,'after',waived->'clawback_shortfall'));
+    end if;
+  end loop;
+  insert into admin.pricing_wallet_cutover(version,started_at,digest_before,waived_refunds,last_ledger_after)
+    select 'v2',stamp,p_digest,waivers,coalesce(max(id),0) from public.credit_ledger;
+end;
+$$;
+
+
+ALTER FUNCTION "admin"."clear_approved_wallets_v2"("p_digest" "text", "p_last_ledger" bigint, "p_payments" bigint) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."is_template_catalog_v2"() RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+ select exists (select 1 from public.system_settings where key='pricing_catalog_version' and value='"v2"'::jsonb)
+$$;
+
+
+ALTER FUNCTION "admin"."is_template_catalog_v2"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."lowest_credit_price"() RETURNS numeric
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select case when admin.is_template_catalog_v2() then
+      (select min(t.usd_cents::numeric / (100 * t.credits)) from admin.product_terms_v2 t
+        join public.products p on p.id=t.product_id where p.active)
+      else (select min(price_usd/credits) from public.products where active and credits>0) end
+$$;
+
+
+ALTER FUNCTION "admin"."lowest_credit_price"() OWNER TO "postgres";
+
 SET default_tablespace = '';
 
 SET default_table_access_method = "heap";
@@ -187,6 +394,315 @@ $_$;
 ALTER FUNCTION "admin"."partner_image_aspects"("public"."templates") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."pricing_activity_fingerprint"() RETURNS "text"
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select md5(jsonb_build_array(
+    (select jsonb_agg(jsonb_build_array(id,credits,free_credits,paid_until) order by id) from public.profiles),
+    (select coalesce(max(id),0) from public.credit_ledger),
+    (select jsonb_agg(to_jsonb(p) order by id) from public.payments p),
+    -- A duplicate callback can refresh updated_at without changing contract terms.
+    (select jsonb_agg(to_jsonb(s)-'updated_at' order by id) from public.subscriptions s),
+    (select jsonb_agg(to_jsonb(d) order by stripe_dispute_id) from public.payment_disputes d),
+    (select max(created_at) from public.generation_jobs)
+  )::text)
+$$;
+
+
+ALTER FUNCTION "admin"."pricing_activity_fingerprint"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."pricing_checkpoint_v2"("p_rollback" boolean) RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare current_digest text;
+begin
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.template_catalog',0));
+  lock table public.profiles,public.generation_jobs,public.credit_ledger,public.payments,public.subscriptions,public.payment_disputes in share row exclusive mode;
+  current_digest := admin.pricing_activity_fingerprint();
+  if p_rollback then
+    delete from admin.pricing_release_checkpoint where version='v2' and fingerprint=current_digest;
+    if not found then raise exception 'ECONOMIC_ACTIVITY_AFTER_CUTOVER'; end if;
+  else
+    insert into admin.pricing_release_checkpoint values('v2',current_digest) on conflict do nothing;
+  end if;
+end;
+$$;
+
+
+ALTER FUNCTION "admin"."pricing_checkpoint_v2"("p_rollback" boolean) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."protect_retired_template"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if new.is_active and admin.is_template_catalog_v2() and exists(
+    select 1 from admin.template_price_batches where reverted_at is null
+  ) and (new.category_key='art-styles' or new.id in ('bright-listing','evening-glow')
+    or exists(select 1 from admin.template_price_snapshots s join admin.template_price_batches b on b.id=s.batch_id
+      where b.reverted_at is null and s.template_id=new.id and s.provider_id is null)) then
+    raise exception 'TEMPLATE_RETIRED' using detail='此模板未加入已批准的新目录，不能上架';
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "admin"."protect_retired_template"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."purchase_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_event_id" "text") RETURNS "public"."credit_change"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_product public.products;
+  v_change public.credit_change;
+  v_paid_until timestamptz;
+  v_held text;
+  v_key text := 'purchase:' || p_event_id;
+  v_ranks constant text[] := array['starter_monthly', 'starter_yearly', 'pro_monthly', 'pro_yearly', 'max_monthly', 'max_yearly'];
+begin
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.template_catalog',0));
+  if p_event_id is null or length(p_event_id) = 0 then
+    raise exception 'INVALID_INPUT' using detail = 'event_id is required';
+  end if;
+
+  select * into v_product from public.products where id = p_product_id and active;
+  if not found then
+    raise exception 'PRODUCT_NOT_FOUND';
+  end if;
+  -- After rollback even a correctly signed v2 checkout can settle late. Let previously
+  -- applied events replay; never credit new units to a legacy wallet. Returning an error
+  -- keeps the provider webhook retryable for reconciliation.
+  if p_v2 and not exists(select from public.system_settings where key='pricing_catalog_version' and value='"v2"'::jsonb)
+    and not exists(select from public.credit_ledger where idempotency_key=v_key and user_id=p_user_id and product_id=p_product_id) then
+    raise exception 'PRICING_VERSION_RECONCILIATION_REQUIRED';
+  end if;
+  -- A grandfathered contract keeps its price and period. Once the wallet is denominated
+  -- in new credits, a genuinely new payment must also grant in those units; a replay
+  -- remains a no-op under the original payment key.
+  if p_v2 or exists(select from public.system_settings where key='pricing_catalog_version' and value='"v2"'::jsonb) then
+    select credits into strict v_product.credits from admin.product_terms_v2 where product_id = p_product_id;
+  end if;
+
+
+  if v_product.days is not null then
+    -- Locked now so the read and the write below see the same paid_until.
+    select paid_until into v_paid_until from public.profiles where id = p_user_id for update;
+    if v_paid_until > now() then
+      select product_id into v_held
+        from public.credit_ledger
+       where user_id = p_user_id
+         and pool = 'paid'
+         and delta > 0
+         and product_id is not null
+         and product_id not like 'pack_%'
+         and not exists (
+           select 1 from public.payments p
+            where p.user_id = p_user_id
+              and p.status in ('refunded', 'partially_refunded')
+              and idempotency_key in ('purchase:' || p.stripe_session_id, 'renewal:' || p.stripe_invoice_id, 'purchase:' || p.waffo_payment_id)
+         )
+       order by created_at desc, id desc
+       limit 1;
+    end if;
+  end if;
+
+  if v_held is null
+     or coalesce(array_position(v_ranks, v_product.id), 0) <= coalesce(array_position(v_ranks, v_held), 0) then
+    return public._apply_credit_change(
+      p_user_id, 'paid', 'purchase', v_product.credits, 'purchase ' || v_product.id,
+      v_key, null, v_product.id, v_product.days
+    );
+  end if;
+
+  -- The upgrade: grant without days, then set paid_until from the payment.
+  v_change := public._apply_credit_change(
+    p_user_id, 'paid', 'purchase', v_product.credits, 'purchase ' || v_product.id,
+    v_key, null, v_product.id, null
+  );
+  if not v_change.applied then
+    return v_change;
+  end if;
+
+  update public.profiles
+     set paid_until = greatest(paid_until, now() + make_interval(days => v_product.days))
+   where id = p_user_id
+  returning paid_until into v_change.paid_until;
+
+  -- The row was inserted just above in this transaction; record where paid_until landed, as
+  -- every membership grant does (apply_subscription_renewal does the same).
+  update public.credit_ledger
+     set paid_until_after = v_change.paid_until
+   where idempotency_key = v_key;
+
+  return v_change;
+end;
+$$;
+
+
+ALTER FUNCTION "admin"."purchase_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_event_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."renewal_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_invoice_id" "text", "p_period_end" timestamp with time zone, "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_charge_id" "text" DEFAULT NULL::"text") RETURNS "public"."credit_change"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_product public.products;
+  v_change public.credit_change;
+  v_key text := 'renewal:' || p_invoice_id;
+begin
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.template_catalog',0));
+  if p_invoice_id is null or p_invoice_id not like 'in\_%' then
+    raise exception 'INVALID_INPUT' using detail = 'invoice id is required';
+  end if;
+  if p_period_end is null then
+    raise exception 'INVALID_INPUT' using detail = 'period end is required';
+  end if;
+  if p_amount_total is null or p_amount_tax is null or p_currency is null or p_method is null then
+    raise exception 'INVALID_INPUT' using detail = 'payment fields are all required';
+  end if;
+
+  -- Only memberships renew; packs are always one-time.
+  select * into v_product from public.products
+   where id = p_product_id and active and days is not null;
+  if not found then
+    raise exception 'PRODUCT_NOT_FOUND';
+  end if;
+  -- After rollback even a correctly signed v2 checkout can settle late. Let previously
+  -- applied events replay; never credit new units to a legacy wallet. Returning an error
+  -- keeps the provider webhook retryable for reconciliation.
+  if p_v2 and not exists(select from public.system_settings where key='pricing_catalog_version' and value='"v2"'::jsonb)
+    and not exists(select from public.credit_ledger where idempotency_key=v_key and user_id=p_user_id and product_id=p_product_id) then
+    raise exception 'PRICING_VERSION_RECONCILIATION_REQUIRED';
+  end if;
+  -- A grandfathered contract keeps its price and period. Once the wallet is denominated
+  -- in new credits, a genuinely new payment must also grant in those units; a replay
+  -- remains a no-op under the original payment key.
+  if p_v2 or exists(select from public.system_settings where key='pricing_catalog_version' and value='"v2"'::jsonb) then
+    select credits into strict v_product.credits from admin.product_terms_v2 where product_id = p_product_id;
+  end if;
+
+
+  -- No days here: paid_until is set below from the period end, not by adding days.
+  v_change := public._apply_credit_change(
+    p_user_id, 'paid', 'purchase', v_product.credits, 'renewal ' || v_product.id,
+    v_key, null, v_product.id, null
+  );
+  if not v_change.applied then
+    return v_change;
+  end if;
+
+  update public.profiles
+     set paid_until = greatest(paid_until, p_period_end)
+   where id = p_user_id
+  returning paid_until into v_change.paid_until;
+
+  -- The row was inserted just above in this transaction; record where paid_until landed, as
+  -- membership purchases do.
+  update public.credit_ledger
+     set paid_until_after = v_change.paid_until
+   where idempotency_key = v_key;
+
+  insert into public.payments
+    (user_id, product_id, channel, stripe_invoice_id, stripe_charge_id,
+     amount_total, amount_tax, currency, method)
+  values
+    (p_user_id, p_product_id, 'stripe', p_invoice_id, p_charge_id,
+     p_amount_total, p_amount_tax, lower(p_currency), p_method);
+
+  return v_change;
+end;
+$$;
+
+
+ALTER FUNCTION "admin"."renewal_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_invoice_id" "text", "p_period_end" timestamp with time zone, "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_charge_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."restore_approved_wallets_v2"() RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare rec record; batch admin.pricing_wallet_cutover;
+begin
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.template_catalog',0));
+  lock table public.profiles, public.generation_jobs, public.credit_ledger, public.payments, public.subscriptions in share row exclusive mode;
+  select * into strict batch from admin.pricing_wallet_cutover where version='v2';
+  if batch.rolled_back_at is not null then return; end if;
+  if (select coalesce(max(id),0) from public.credit_ledger)<>batch.last_ledger_after or
+     exists(select from public.profiles where created_at >= batch.started_at) or
+     exists(select from public.payments where created_at >= batch.started_at) or
+     exists(select from public.generation_jobs where created_at >= batch.started_at or status='running') then
+    raise exception 'ECONOMIC_ACTIVITY_AFTER_CUTOVER';
+  end if;
+  for rec in select * from jsonb_to_recordset(batch.waived_refunds) as x(id bigint,"before" integer,"after" integer) loop
+    update public.payments set clawback_shortfall=rec.before where id=rec.id and clawback_shortfall=rec.after and status='refunded';
+    if not found then raise exception 'REFUND_CHANGED_AFTER_CUTOVER'; end if;
+  end loop;
+  for rec in select user_id,pool,delta from public.credit_ledger where idempotency_key like 'pricing:v2:close:%' order by id loop
+    perform public.admin_adjust_credits(rec.user_id,-rec.delta,'Pricing rollback restores legacy balance',rec.pool,'pricing:v2:restore:'||rec.pool||':'||rec.user_id);
+  end loop;
+  if admin.wallet_digest_v2()<>batch.digest_before then raise exception 'RESTORED_WALLET_MISMATCH'; end if;
+  update admin.pricing_wallet_cutover set rolled_back_at=clock_timestamp() where version='v2';
+end;
+$$;
+
+
+ALTER FUNCTION "admin"."restore_approved_wallets_v2"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."rollback_template_price_catalog_v2"() RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare batch bigint; problems text;
+begin
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.template_catalog',0));
+  select id into batch from admin.template_price_batches where reverted_at is null for update;
+  if not found then return; end if;
+  lock table public.templates in share row exclusive mode nowait;
+  if exists (select 1 from public.generation_jobs g where g.inputs->>'pricing_catalog_version'='v2') then
+    raise exception 'TEMPLATE_CATALOG_HAS_NEW_JOBS';
+  end if;
+  select string_agg(s.template_id,', ' order by s.template_id) into problems from admin.template_price_snapshots s
+    left join public.templates t on t.id=s.template_id
+    where s.batch_id=batch and (t.id is null or admin.template_price_state(t) is distinct from s.applied);
+  if problems is not null then raise exception 'TEMPLATE_CATALOG_CHANGED: %',problems; end if;
+  update admin.template_price_batches set reverted_at=clock_timestamp() where id=batch;
+  update public.templates t set quality=s.previous->>'quality',credits_cost=s.previous->'costs',
+    is_active=(s.previous->>'active')::boolean,featured_rank=(s.previous->>'featured')::smallint
+    from admin.template_price_snapshots s where s.batch_id=batch and s.template_id=t.id;
+end;
+$$;
+
+
+ALTER FUNCTION "admin"."rollback_template_price_catalog_v2"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."template_approved_prices"("p_provider" "uuid") RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select coalesce(jsonb_object_agg(s.template_id,jsonb_build_object('quality',c.quality,'costs',c.costs)), '{}')
+  from admin.template_price_batches b join admin.template_price_snapshots s on s.batch_id=b.id
+  join admin.template_tariffs_v2 c on c.id=s.template_id
+  join public.ai_providers p on p.id=s.provider_id
+  where b.reverted_at is null and admin.is_template_catalog_v2() and p.id=p_provider
+    and p.module='image' and p.adapter='openai_images' and p.model='gpt-image-2.6-sunburst'
+    and md5(p.base_url) is not distinct from s.provider_endpoint_hash
+    and (p.capabilities->'resolutions') ?& array['1k','2k','3k']
+$$;
+
+
+ALTER FUNCTION "admin"."template_approved_prices"("p_provider" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."template_image_options"("public"."templates") RETURNS "jsonb"
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -206,6 +722,42 @@ $_$;
 
 
 ALTER FUNCTION "admin"."template_image_options"("public"."templates") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."template_price_state"("t" "public"."templates") RETURNS "jsonb"
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
+    AS $$
+ select jsonb_build_object('quality',t.quality,'costs',t.credits_cost,'active',t.is_active,'featured',t.featured_rank)
+$$;
+
+
+ALTER FUNCTION "admin"."template_price_state"("t" "public"."templates") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."template_sync_catalog"() RETURNS "text"
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select coalesce((select case when value = '"v2"'::jsonb then 'v2' else 'unknown' end
+    from public.system_settings where key = 'pricing_catalog_version'), 'v1')
+$$;
+
+
+ALTER FUNCTION "admin"."template_sync_catalog"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."template_sync_quote"("p_receipt" "jsonb", "p_provider" "uuid", "p_edit" boolean) RETURNS "jsonb"
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
+    AS $$
+  select jsonb_build_array(p_receipt->'terms',
+    p_receipt->'routes'->p_provider::text,
+    case when p_provider is null or p_edit then p_receipt->'routes'->(p_receipt->>'active') end)
+$$;
+
+
+ALTER FUNCTION "admin"."template_sync_quote"("p_receipt" "jsonb", "p_provider" "uuid", "p_edit" boolean) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."valid_style_refs"("p_template_id" "text", "p_refs" "jsonb") RETURNS boolean
@@ -244,6 +796,47 @@ $_$;
 
 
 ALTER FUNCTION "admin"."valid_style_refs"("p_template_id" "text", "p_refs" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."waffo_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") RETURNS "public"."credit_change"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_change public.credit_change;
+begin
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.template_catalog',0));
+  if p_order_id is null or p_amount_total is null or p_amount_tax is null or p_currency is null or p_method is null then
+    raise exception 'INVALID_INPUT' using detail = 'payment fields are all required';
+  end if;
+
+  v_change := admin.purchase_terms(p_v2, p_user_id, p_product_id, p_payment_id);
+
+  if v_change.applied then
+    insert into public.payments
+      (user_id, product_id, channel, waffo_order_id, waffo_payment_id, amount_total, amount_tax, currency, method)
+    values
+      (p_user_id, p_product_id, 'waffo', p_order_id, p_payment_id, p_amount_total, p_amount_tax, lower(p_currency), p_method);
+  end if;
+
+  return v_change;
+end;
+$$;
+
+
+ALTER FUNCTION "admin"."waffo_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."wallet_digest_v2"() RETURNS "text"
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select encode(sha256(convert_to(coalesce(string_agg(id::text||':'||credits::text||':'||free_credits::text,',' order by id),''),'UTF8')),'hex')
+  from public.profiles;
+$$;
+
+
+ALTER FUNCTION "admin"."wallet_digest_v2"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."_affiliate_accept_invite"() RETURNS "trigger"
@@ -1565,118 +2158,11 @@ ALTER FUNCTION "public"."admin_begin_test_run"("p_actor" "uuid", "p_run_id" "uui
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_bulk_edit_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid") RETURNS "jsonb"
-    LANGUAGE "plpgsql"
+    LANGUAGE "sql"
     SET "search_path" TO ''
-    AS $_$
-declare
-  v_ids text[] := array(select distinct u.id from unnest(coalesce(p_ids, '{}')) as u(id));
-  v_patch jsonb := coalesce(p_patch, '{}');
-  v_cost jsonb := coalesce(p_patch -> 'credits_cost', '{}');
-  v_visible text[];
-  v_category text := p_patch ->> 'category_key';
-  v_failures jsonb;
-  v_changed integer;
-begin
-  if p_actor is null then
-    raise exception 'INVALID_INPUT' using detail = 'actor is required';
-  end if;
-  if not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
-    raise exception 'NOT_ADMIN';
-  end if;
-  if cardinality(v_ids) = 0 or cardinality(v_ids) > 200 then
-    raise exception 'INVALID_INPUT' using detail = 'between 1 and 200 templates';
-  end if;
-  if jsonb_typeof(v_patch) <> 'object' or v_patch = '{}' or v_patch - 'credits_cost' - 'visible_in' - 'quality' - 'category_key' <> '{}' then
-    raise exception 'INVALID_INPUT' using detail = 'patch must name credits_cost, visible_in, quality or category_key';
-  end if;
-  if v_patch ? 'quality' and (v_patch ->> 'quality') is distinct from 'high' and (v_patch ->> 'quality') is distinct from 'medium' then
-    raise exception 'INVALID_INPUT' using detail = 'quality must be high or medium';
-  end if;
-  if jsonb_typeof(v_cost) <> 'object' then
-    raise exception 'INVALID_INPUT' using detail = 'credits_cost must be an object';
-  end if;
-  if exists (
-    select 1 from jsonb_each(v_cost) as e(key, value)
-    where e.key not in ('1k', '2k', '3k') or jsonb_typeof(e.value) <> 'number' or e.value::text !~ '^[1-9][0-9]{0,2}$'
-  ) then
-    raise exception 'INVALID_INPUT' using detail = 'credits_cost tiers must be whole numbers 1..999';
-  end if;
-  if v_patch ? 'visible_in' then
-    if jsonb_typeof(v_patch -> 'visible_in') <> 'array' then
-      raise exception 'INVALID_INPUT' using detail = 'visible_in must be an array';
-    end if;
-    v_visible := array(select distinct x from jsonb_array_elements_text(v_patch -> 'visible_in') as v(x) order by x desc);
-    if cardinality(v_visible) = 0 or not (v_visible <@ array['web', 'partner']) then
-      raise exception 'INVALID_INPUT' using detail = 'visible_in must be web, partner or both';
-    end if;
-  end if;
-  if v_patch ? 'category_key' then
-    -- Held until commit, so the category cannot be deleted under this write.
-    perform 1 from public.template_categories c where c.key = v_category and not c.is_system for share;
-    if not found then
-      raise exception 'CATEGORY_NOT_FOUND' using detail = 'category_key must name a category that is not a system one';
-    end if;
-  end if;
-  if p_floor is null or exists (
-    select 1 from unnest(array['high', 'medium']) as q(quality), unnest(array['1k', '2k', '3k']) as r(res)
-    where jsonb_typeof(p_floor -> q.quality -> r.res) is distinct from 'number'
-  ) then
-    raise exception 'INVALID_INPUT' using detail = 'floor table is incomplete';
-  end if;
-
-  -- The rows are checked and written under one lock, so no other save slips in between.
-  perform 1 from public.templates t where t.id = any (v_ids) for update;
-
-  with planned as (
-    select a.id, t.id is not null as found, coalesce(t.name, a.id) as name, t.is_active,
-           t.description, t.cover_before_url, t.cover_after_url, t.visible_in as old_visible,
-           coalesce(v_patch ->> 'quality', t.quality) as quality,
-           t.credits_cost || v_cost as credits_cost,
-           coalesce(v_visible, t.visible_in) as visible_in,
-           a.id in ('edit', 'freeform') or coalesce(c.is_system, false) as is_builtin
-    from unnest(v_ids) as a(id)
-    left join public.templates t on t.id = a.id
-    left join public.template_categories c on c.key = t.category_key
-  ),
-  failures as (
-    select jsonb_build_object('id', p.id, 'name', p.name, 'reason', case when p.found then 'system' else 'not_found' end) as failure
-    from planned p
-    where not p.found or p.is_builtin
-    union all
-    select jsonb_build_object(
-      'id', p.id, 'name', p.name, 'reason', 'below_floor', 'resolution', r.res,
-      'floor', (p_floor -> p.quality ->> r.res)::integer, 'given', (p.credits_cost ->> r.res)::integer
-    )
-    from planned p
-    cross join unnest(array['1k', '2k', '3k']) as r(res)
-    where p.found and not p.is_builtin and (p.credits_cost ->> r.res)::integer < (p_floor -> p.quality ->> r.res)::integer
-    union all
-    select jsonb_build_object('id', p.id, 'name', p.name, 'reason', 'web_incomplete')
-    from planned p
-    where p.found and not p.is_builtin and p.is_active
-      and 'web' = any (p.visible_in) and not ('web' = any (p.old_visible))
-      and (nullif(btrim(p.description), '') is null or nullif(btrim(p.cover_before_url), '') is null
-           or nullif(btrim(p.cover_after_url), '') is null)
-  )
-  select coalesce(jsonb_agg(f.failure), '[]'::jsonb) into v_failures from failures f;
-
-  if jsonb_array_length(v_failures) > 0 then
-    return jsonb_build_object('failures', v_failures);
-  end if;
-
-  update public.templates t
-  set quality = coalesce(v_patch ->> 'quality', t.quality),
-      credits_cost = t.credits_cost || v_cost,
-      visible_in = coalesce(v_visible, t.visible_in),
-      -- templates.category (the English name) follows through T75's trigger.
-      category_key = coalesce(v_category, t.category_key),
-      featured_rank = case when v_visible is not null and not ('web' = any (v_visible)) then null else t.featured_rank end
-  where t.id = any (v_ids);
-  get diagnostics v_changed = row_count;
-
-  return jsonb_build_object('failures', '[]'::jsonb, 'changed', v_changed);
-end;
-$_$;
+    AS $$
+  select public.admin_bulk_edit_templates(p_ids,p_patch,p_floor,p_actor,'{}'::text[])
+$$;
 
 
 ALTER FUNCTION "public"."admin_bulk_edit_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid") OWNER TO "postgres";
@@ -1745,6 +2231,9 @@ begin
   -- The rows are checked and written under one lock, so no other save slips in between.
   perform 1 from public.templates t where t.id = any (v_ids) for update;
 
+  if admin.is_template_catalog_v2() and (p_floor->>'version') is distinct from 'v2' then
+    raise exception 'MODEL_CHANGED' using detail='请刷新模板报价后再保存';
+  end if;
   -- A supplier may have switched since the admin action read costs. Re-read the effective
   -- binding under the template lock; a missing/different model requires a fresh preview.
   if p_floor ? 'models' and exists (
@@ -1762,6 +2251,7 @@ begin
            t.description, t.cover_before_url, t.cover_after_url, t.cover_locales, t.visible_in as old_visible,
            coalesce(v_patch ->> 'quality', t.quality) as quality,
            coalesce(p_floor -> 'providers' -> coalesce(tp.provider_id::text, active.id::text, 'env'), p_floor) as floor,
+           admin.template_approved_prices(coalesce(tp.provider_id,active.id))->t.id as approved,
            t.credits_cost || v_cost as credits_cost,
            coalesce(v_visible, t.visible_in) as visible_in,
            a.id in ('edit', 'freeform') or coalesce(c.is_system, false) as is_builtin
@@ -1783,6 +2273,7 @@ begin
     from planned p
     cross join unnest(array['1k', '2k', '3k']) as r(res)
     where p.found and not p.is_builtin and (p.credits_cost ->> r.res)::integer < (p.floor -> p.quality ->> r.res)::integer
+      and not coalesce(p.approved->>'quality'=p.quality and p.approved->'costs'->r.res=p.credits_cost->r.res,false)
     union all
     select jsonb_build_object('id', p.id, 'name', p.name, 'reason', 'web_incomplete')
     from planned p
@@ -2383,6 +2874,20 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_image_pricing_catalog"("p_env_model" "text") RETURNS "jsonb"
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select jsonb_build_object('version',case when admin.is_template_catalog_v2() then 'v2' else 'v1' end,
+    'unit_price',admin.lowest_credit_price(),
+    'providers',coalesce((select jsonb_agg(to_jsonb(p)||jsonb_build_object('approved',admin.template_approved_prices(p.provider_id)))
+       from public.admin_image_provider_pricing(p_env_model) p),'[]'))
+$$;
+
+
+ALTER FUNCTION "public"."admin_image_pricing_catalog"("p_env_model" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_image_provider_pricing"("p_env_model" "text") RETURNS TABLE("provider_id" "uuid", "label" "text", "model" "text", "adapter" "text", "is_active" boolean, "capabilities" "jsonb", "resolutions" "text"[], "estimated_image_costs" "jsonb", "p95" "jsonb")
@@ -3148,6 +3653,33 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_save_code"("p_actor" "uuid", "p_code_id" "uuid", "p_fields" "jsonb", "p_catalog" "jsonb", "p_floor_product_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_save_invite_rewards"("p_actor" "uuid", "p_invitee" integer, "p_inviter" integer, "p_expected" "jsonb") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  previous jsonb;
+  updated jsonb := jsonb_build_object('inviteeCredits', p_invitee, 'inviterCredits', p_inviter);
+begin
+  if not exists (select 1 from public.profiles where id = p_actor and role = 'admin' and banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if p_invitee is null or p_invitee not between 0 and 10000
+     or p_inviter is null or p_inviter not between 0 and 10000 then raise exception 'INVALID_INPUT'; end if;
+  select value into strict previous from public.system_settings where key = 'code_invite_rewards' for update;
+  if previous is distinct from p_expected then raise exception 'INVITE_SETTINGS_CHANGED'; end if;
+  if previous = updated then return; end if;
+  update public.system_settings set value = updated, updated_at = now(), updated_by = p_actor
+    where key = 'code_invite_rewards';
+  insert into public.admin_audit_log(action, user_id, target_id, reason)
+    values ('save_code', p_actor, 'code_invite_rewards', jsonb_build_object('before', previous, 'after', updated)::text);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_save_invite_rewards"("p_actor" "uuid", "p_invitee" integer, "p_inviter" integer, "p_expected" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_save_provider"("p_actor" "uuid", "p_id" "uuid", "p_settings" "jsonb", "p_capabilities" "jsonb", "p_key" "text" DEFAULT NULL::"text") RETURNS "uuid"
@@ -3917,9 +4449,11 @@ declare
   v_model text;
   v_floor jsonb;
   v_resolution text;
+  v_approved jsonb;
 begin
   perform 1 from public.templates where id = v_id for update;
-  if p_prompt ? 'provider_id' then
+  if v_id='edit' then v_provider:=null;
+  elsif p_prompt ? 'provider_id' then
     v_provider := (p_prompt ->> 'provider_id')::uuid;
   else
     select provider_id into v_provider from public.template_prompts where template_id = v_id;
@@ -3929,15 +4463,21 @@ begin
 
   -- Older deployments send no pricing snapshot. New code derives it from site products and
   -- measured costs on the server; callers without the service role cannot invoke this RPC.
+  if admin.is_template_catalog_v2() and (p_template#>>'{price_floors,version}') is distinct from 'v2' then
+    raise exception 'MODEL_CHANGED' using detail='请刷新模板报价后再保存';
+  end if;
   if p_template ? 'price_floors' then
     v_floor := p_template->'price_floors'->'providers'->coalesce(v_provider::text, 'env');
     if v_floor is null or (v_provider is not null and p_template->'price_floors' ? 'models'
         and v_model is distinct from (p_template->'price_floors'->'models'->>v_provider::text)) then
       raise exception 'MODEL_CHANGED';
     end if;
+    v_approved := admin.template_approved_prices(v_provider)->v_id;
     foreach v_resolution in array array['1k','2k','3k'] loop
       if (p_template->'credits_cost'->>v_resolution)::integer <
-          (v_floor->coalesce(p_template->>'quality','high')->>v_resolution)::integer then
+          (v_floor->coalesce(p_template->>'quality','high')->>v_resolution)::integer
+        and not coalesce(v_approved->>'quality'=p_template->>'quality'
+          and v_approved->'costs'->v_resolution=p_template->'credits_cost'->v_resolution,false) then
         raise exception 'MODEL_CREDIT_FLOOR' using detail = format('%s 积分低于所选模型下限，请检查该档建议积分和成本估价', v_resolution);
       end if;
     end loop;
@@ -4002,7 +4542,6 @@ begin
       model_params = excluded.model_params,
       provider_id = case when p_prompt ? 'provider_id' then excluded.provider_id else tp.provider_id end;
   else
-    -- With a null prompt the immediate prompt trigger never runs (including on create).
     perform admin.assert_template_reference_range(v_id);
   end if;
 end;
@@ -4269,12 +4808,14 @@ CREATE OR REPLACE FUNCTION "public"."affiliate_save_profile"("p_user" "uuid", "p
 declare v_version text;
 begin
   select terms_version into strict v_version from public.affiliate_settings where singleton and enabled for share;
-  if p_terms_version is distinct from v_version then raise exception 'AFFILIATE_TERMS_CHANGED'; end if;
+  if p_terms_version is not null and p_terms_version is distinct from v_version then raise exception 'AFFILIATE_TERMS_CHANGED'; end if;
   if (p_payout_method is null) <> (nullif(trim(p_payout_details),'') is null) then raise exception 'INVALID_INPUT'; end if;
   update public.affiliates set payout_method=p_payout_method,payout_details=nullif(trim(p_payout_details),''),
     us_person=p_us_person,terms_version=v_version,
     terms_accepted_at=case when terms_version is distinct from v_version then now() else coalesce(terms_accepted_at,now()) end
-    where user_id=p_user;
+    where user_id=p_user and status='active'
+      -- A maintenance-only save requires consent already recorded for the locked current version.
+      and (p_terms_version is not null or (terms_version=v_version and terms_accepted_at is not null));
   if not found then raise exception 'AFFILIATE_NOT_FOUND'; end if;
 end;
 $$;
@@ -4307,9 +4848,10 @@ declare
   v_conflict boolean := false;
   v_rewarded boolean := false;
   v_reward_time timestamptz;
+  reward_credits integer;
 begin
   if p_amount_discount is null or p_amount_discount < 0 or (p_code_id is null and p_amount_discount <> 0)
-     or p_inviter_credits is null or p_inviter_credits <= 0 or p_inviter_cap is null or p_inviter_cap <= 0
+     or p_inviter_cap is null or p_inviter_cap <= 0
      or p_reward_window_days is null or p_reward_window_days <= 0 then
     raise exception 'INVALID_INPUT';
   end if;
@@ -4351,7 +4893,10 @@ begin
   end if;
 
   v_reward_time := clock_timestamp();
-  if v_invite.inviter_user_id is not null and v_invite.inviter_rewarded_at is null
+  if v_invite.inviter_user_id is not null then
+    select (value->>'inviterCredits')::integer into strict reward_credits from public.system_settings where key = 'code_invite_rewards';
+  end if;
+  if reward_credits > 0 and v_invite.inviter_rewarded_at is null
      and not exists (select 1 from public.payments where user_id = p_user and id < p_payment_id)
      and exists (select 1 from public.profiles where id = v_invite.inviter_user_id and banned_at is null)
      -- Rewards survive the invitee deleting their profile and redemption.
@@ -4359,14 +4904,15 @@ begin
            and kind = 'invite_reward' and created_at > v_reward_time - make_interval(days => p_reward_window_days)) < p_inviter_cap then
     -- The reward has no membership product/days and never changes current_tier.
     v_rewarded := (public._apply_credit_change(v_invite.inviter_user_id, 'paid', 'invite_reward',
-                    p_inviter_credits, '邀请首付奖励', 'invite:' || v_invite.id)).applied;
+                    reward_credits, '邀请首付奖励', 'invite:' || v_invite.id)).applied;
     update public.code_redemptions set inviter_rewarded_at = v_reward_time, inviter_reward_payment_id = p_payment_id
       where id = v_invite.id;
   end if;
   update public.payments set code_id = p_code_id, amount_discount = p_amount_discount,
          code_discount_conflict = v_conflict, code_effects_applied_at = clock_timestamp()
     where id = p_payment_id;
-  return jsonb_build_object('applied', true, 'rewarded', v_rewarded, 'conflict', v_conflict);
+  return jsonb_build_object('applied', true, 'rewarded', v_rewarded, 'conflict', v_conflict)
+    || case when v_rewarded then jsonb_build_object('reward_credits', reward_credits, 'inviter_id', v_invite.inviter_user_id) else '{}'::jsonb end;
 end;
 $$;
 
@@ -4375,143 +4921,30 @@ ALTER FUNCTION "public"."apply_payment_code_effects"("p_user" "uuid", "p_payment
 
 
 CREATE OR REPLACE FUNCTION "public"."apply_purchase"("p_user_id" "uuid", "p_product_id" "text", "p_event_id" "text") RETURNS "public"."credit_change"
-    LANGUAGE "plpgsql" SECURITY DEFINER
+    LANGUAGE "sql" SECURITY DEFINER
     SET "search_path" TO ''
-    AS $$
-declare
-  v_product public.products;
-  v_change public.credit_change;
-  v_paid_until timestamptz;
-  v_held text;
-  v_key text := 'purchase:' || p_event_id;
-  v_ranks constant text[] := array['starter_monthly', 'starter_yearly', 'pro_monthly', 'pro_yearly', 'max_monthly', 'max_yearly'];
-begin
-  if p_event_id is null or length(p_event_id) = 0 then
-    raise exception 'INVALID_INPUT' using detail = 'event_id is required';
-  end if;
-
-  select * into v_product from public.products where id = p_product_id and active;
-  if not found then
-    raise exception 'PRODUCT_NOT_FOUND';
-  end if;
-
-  if v_product.days is not null then
-    -- Locked now so the read and the write below see the same paid_until.
-    select paid_until into v_paid_until from public.profiles where id = p_user_id for update;
-    if v_paid_until > now() then
-      select product_id into v_held
-        from public.credit_ledger
-       where user_id = p_user_id
-         and pool = 'paid'
-         and delta > 0
-         and product_id is not null
-         and product_id not like 'pack_%'
-         and not exists (
-           select 1 from public.payments p
-            where p.user_id = p_user_id
-              and p.status in ('refunded', 'partially_refunded')
-              and idempotency_key in ('purchase:' || p.stripe_session_id, 'renewal:' || p.stripe_invoice_id, 'purchase:' || p.waffo_payment_id)
-         )
-       order by created_at desc, id desc
-       limit 1;
-    end if;
-  end if;
-
-  if v_held is null
-     or coalesce(array_position(v_ranks, v_product.id), 0) <= coalesce(array_position(v_ranks, v_held), 0) then
-    return public._apply_credit_change(
-      p_user_id, 'paid', 'purchase', v_product.credits, 'purchase ' || v_product.id,
-      v_key, null, v_product.id, v_product.days
-    );
-  end if;
-
-  -- The upgrade: grant without days, then set paid_until from the payment.
-  v_change := public._apply_credit_change(
-    p_user_id, 'paid', 'purchase', v_product.credits, 'purchase ' || v_product.id,
-    v_key, null, v_product.id, null
-  );
-  if not v_change.applied then
-    return v_change;
-  end if;
-
-  update public.profiles
-     set paid_until = greatest(paid_until, now() + make_interval(days => v_product.days))
-   where id = p_user_id
-  returning paid_until into v_change.paid_until;
-
-  -- The row was inserted just above in this transaction; record where paid_until landed, as
-  -- every membership grant does (apply_subscription_renewal does the same).
-  update public.credit_ledger
-     set paid_until_after = v_change.paid_until
-   where idempotency_key = v_key;
-
-  return v_change;
-end;
-$$;
+    AS $$ select * from admin.purchase_terms(false, p_user_id, p_product_id, p_event_id); $$;
 
 
 ALTER FUNCTION "public"."apply_purchase"("p_user_id" "uuid", "p_product_id" "text", "p_event_id" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."apply_subscription_renewal"("p_user_id" "uuid", "p_product_id" "text", "p_invoice_id" "text", "p_period_end" timestamp with time zone, "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_charge_id" "text" DEFAULT NULL::"text") RETURNS "public"."credit_change"
-    LANGUAGE "plpgsql" SECURITY DEFINER
+    LANGUAGE "sql" SECURITY DEFINER
     SET "search_path" TO ''
-    AS $$
-declare
-  v_product public.products;
-  v_change public.credit_change;
-  v_key text := 'renewal:' || p_invoice_id;
-begin
-  if p_invoice_id is null or p_invoice_id not like 'in\_%' then
-    raise exception 'INVALID_INPUT' using detail = 'invoice id is required';
-  end if;
-  if p_period_end is null then
-    raise exception 'INVALID_INPUT' using detail = 'period end is required';
-  end if;
-  if p_amount_total is null or p_amount_tax is null or p_currency is null or p_method is null then
-    raise exception 'INVALID_INPUT' using detail = 'payment fields are all required';
-  end if;
-
-  -- Only memberships renew; packs are always one-time.
-  select * into v_product from public.products
-   where id = p_product_id and active and days is not null;
-  if not found then
-    raise exception 'PRODUCT_NOT_FOUND';
-  end if;
-
-  -- No days here: paid_until is set below from the period end, not by adding days.
-  v_change := public._apply_credit_change(
-    p_user_id, 'paid', 'purchase', v_product.credits, 'renewal ' || v_product.id,
-    v_key, null, v_product.id, null
-  );
-  if not v_change.applied then
-    return v_change;
-  end if;
-
-  update public.profiles
-     set paid_until = greatest(paid_until, p_period_end)
-   where id = p_user_id
-  returning paid_until into v_change.paid_until;
-
-  -- The row was inserted just above in this transaction; record where paid_until landed, as
-  -- membership purchases do.
-  update public.credit_ledger
-     set paid_until_after = v_change.paid_until
-   where idempotency_key = v_key;
-
-  insert into public.payments
-    (user_id, product_id, channel, stripe_invoice_id, stripe_charge_id,
-     amount_total, amount_tax, currency, method)
-  values
-    (p_user_id, p_product_id, 'stripe', p_invoice_id, p_charge_id,
-     p_amount_total, p_amount_tax, lower(p_currency), p_method);
-
-  return v_change;
-end;
-$$;
+    AS $$ select * from admin.renewal_terms(false, p_user_id, p_product_id, p_invoice_id, p_period_end, p_amount_total, p_currency, p_amount_tax, p_method, p_charge_id); $$;
 
 
 ALTER FUNCTION "public"."apply_subscription_renewal"("p_user_id" "uuid", "p_product_id" "text", "p_invoice_id" "text", "p_period_end" timestamp with time zone, "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_charge_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."apply_subscription_renewal_v2"("p_user_id" "uuid", "p_product_id" "text", "p_invoice_id" "text", "p_period_end" timestamp with time zone, "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_charge_id" "text" DEFAULT NULL::"text") RETURNS "public"."credit_change"
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$ select * from admin.renewal_terms(true, p_user_id, p_product_id, p_invoice_id, p_period_end, p_amount_total, p_currency, p_amount_tax, p_method, p_charge_id); $$;
+
+
+ALTER FUNCTION "public"."apply_subscription_renewal_v2"("p_user_id" "uuid", "p_product_id" "text", "p_invoice_id" "text", "p_period_end" timestamp with time zone, "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_charge_id" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."attach_ticket_images"("p_ticket_id" "uuid", "p_owner_id" "uuid", "p_message_id" "uuid", "p_images" "jsonb") RETURNS "void"
@@ -4611,7 +5044,8 @@ CREATE OR REPLACE FUNCTION "public"."bump_template_prompt_version"() RETURNS "tr
     SET "search_path" TO ''
     AS $$
 begin
-  if new.body is distinct from old.body or new.model_params is distinct from old.model_params then
+  if new.body is distinct from old.body or new.model_params is distinct from old.model_params
+      or new.version = old.version + 1 then
     new.version := old.version + 1;
     new.updated_at := now();
   else
@@ -4870,6 +5304,69 @@ $_$;
 
 
 ALTER FUNCTION "public"."close_payment_dispute"("p_dispute_id" "text", "p_status" "text") OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."codes" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "code" "text" NOT NULL,
+    "kind" "text" NOT NULL,
+    "owner_user_id" "uuid",
+    "invitee_credits" integer,
+    "invitee_pool" "text",
+    "discount_percent" integer,
+    "discount_products" "text"[],
+    "discount_duration" "text",
+    "discount_months" integer,
+    "discount_valid_days" integer,
+    "stripe_coupon_id" "text",
+    "starts_at" timestamp with time zone,
+    "expires_at" timestamp with time zone,
+    "max_redemptions" integer,
+    "redemption_count" integer DEFAULT 0 NOT NULL,
+    "new_users_only" boolean DEFAULT false NOT NULL,
+    "active" boolean DEFAULT true NOT NULL,
+    "note" "text",
+    "created_by" "uuid",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "codes_check" CHECK ((("kind" = 'invite'::"text") = ("owner_user_id" IS NOT NULL))),
+    CONSTRAINT "codes_check1" CHECK ((("kind" <> 'invite'::"text") OR (("invitee_credits" IS NULL) AND ("discount_percent" IS NULL)))),
+    CONSTRAINT "codes_check2" CHECK ((("kind" <> 'campaign'::"text") OR ("invitee_credits" IS NOT NULL) OR ("discount_percent" IS NOT NULL))),
+    CONSTRAINT "codes_check3" CHECK ((("invitee_credits" IS NULL) = ("invitee_pool" IS NULL))),
+    CONSTRAINT "codes_check4" CHECK ((("invitee_pool" <> 'paid'::"text") OR ("max_redemptions" IS NULL) OR ("max_redemptions" > 0))),
+    CONSTRAINT "codes_check5" CHECK ((("discount_percent" IS NULL) = ("discount_products" IS NULL))),
+    CONSTRAINT "codes_check6" CHECK ((("discount_percent" IS NULL) = ("discount_duration" IS NULL))),
+    CONSTRAINT "codes_check7" CHECK ((("discount_percent" IS NOT NULL) OR (("discount_valid_days" IS NULL) AND ("stripe_coupon_id" IS NULL)))),
+    CONSTRAINT "codes_check8" CHECK ((("discount_months" IS NOT NULL) = (NOT ("discount_duration" IS DISTINCT FROM 'repeating'::"text")))),
+    CONSTRAINT "codes_check9" CHECK (("expires_at" > "starts_at")),
+    CONSTRAINT "codes_code_check" CHECK (("code" ~ '^[A-Z0-9]{4,20}$'::"text")),
+    CONSTRAINT "codes_discount_duration_check" CHECK (("discount_duration" = ANY (ARRAY['once'::"text", 'repeating'::"text", 'forever'::"text"]))),
+    CONSTRAINT "codes_discount_months_check" CHECK (("discount_months" > 0)),
+    CONSTRAINT "codes_discount_percent_check" CHECK ((("discount_percent" >= 1) AND ("discount_percent" <= 90))),
+    CONSTRAINT "codes_discount_products_check" CHECK ((("discount_products" IS NULL) OR (("cardinality"("discount_products") > 0) AND ("discount_products" <@ ARRAY['starter_monthly'::"text", 'starter_yearly'::"text", 'pro_monthly'::"text", 'pro_yearly'::"text", 'max_monthly'::"text", 'max_yearly'::"text", 'pack_s'::"text", 'pack_m'::"text", 'pack_l'::"text"])))),
+    CONSTRAINT "codes_discount_valid_days_check" CHECK (("discount_valid_days" > 0)),
+    CONSTRAINT "codes_invitee_credits_check" CHECK (("invitee_credits" > 0)),
+    CONSTRAINT "codes_invitee_pool_check" CHECK (("invitee_pool" = ANY (ARRAY['free'::"text", 'paid'::"text"]))),
+    CONSTRAINT "codes_kind_check" CHECK (("kind" = ANY (ARRAY['invite'::"text", 'campaign'::"text"]))),
+    CONSTRAINT "codes_max_redemptions_check" CHECK (("max_redemptions" > 0)),
+    CONSTRAINT "codes_redemption_count_check" CHECK (("redemption_count" >= 0))
+);
+
+
+ALTER TABLE "public"."codes" OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."code_preview_credits"("offer" "public"."codes") RETURNS integer
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select case when offer.kind = 'invite' then
+    (select (value->>'inviteeCredits')::integer from public.system_settings where key = 'code_invite_rewards')
+    else coalesce(offer.invitee_credits, 0) end;
+$$;
+
+
+ALTER FUNCTION "public"."code_preview_credits"("offer" "public"."codes") OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."generation_jobs" (
@@ -5334,14 +5831,29 @@ CREATE OR REPLACE FUNCTION "public"."grant_credits"("p_user_id" "uuid", "p_amoun
     AS $$
 declare
   v_profile public.profiles;
+  cutoff timestamptz;
 begin
   if p_amount is null or p_amount <= 0 then
     raise exception 'INVALID_INPUT' using detail = 'amount must be positive';
   end if;
 
   if p_idempotency_key = 'signup:' || p_user_id::text then
+    perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.template_catalog',0));
+    lock table public.profiles in row exclusive mode;
     select * into v_profile from public.profiles where id = p_user_id;
-    if found and v_profile.signup_ip is not null then
+    -- Read the committed version, not the app bundle: a stale tab must not award six
+    -- old credits after cutover, nor may an old account claim a second registration gift.
+    select updated_at into cutoff from public.system_settings
+     where key='pricing_catalog_version' and value='"v2"'::jsonb;
+    if cutoff is not null then
+      if v_profile.created_at < cutoff then
+        return row(false,v_profile.credits,v_profile.free_credits,v_profile.paid_until)::public.credit_change;
+      end if;
+      p_amount := 100;
+    else
+      p_amount := 6;
+    end if;
+    if v_profile.signup_ip is not null then
       perform pg_advisory_xact_lock(hashtextextended('shotviva.signup_ip:' || host(v_profile.signup_ip), 0));
       if not exists (select 1 from public.credit_ledger where idempotency_key = p_idempotency_key)
          and exists (
@@ -5411,7 +5923,8 @@ CREATE OR REPLACE FUNCTION "public"."my_invite_summary"("p_user" "uuid", "p_invi
     SET "search_path" TO ''
     AS $$
   select public.my_invite_summary(p_user, p_inviter_cap, p_cursor,
-    (select s.value::text::integer from public.system_settings s where s.key = 'code_inviter_window_days'));
+    (select s.value::text::integer from public.system_settings s where s.key = 'code_inviter_window_days'))
+    || jsonb_build_object('rewards', (select value from public.system_settings where key = 'code_invite_rewards'));
 $$;
 
 
@@ -5666,6 +6179,40 @@ $$;
 
 
 ALTER FUNCTION "public"."purge_identity_refusals"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."read_template_sync_source"("p_id" "text") RETURNS "jsonb"
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select jsonb_build_object('catalog', admin.template_sync_catalog(), 'template', to_jsonb(t),
+    'prompt', to_jsonb(p), 'provider', to_jsonb(a))
+  from (select id,module,name,description,category_key,translations,fields,quality,credits_cost,visible_in,
+          cover_before_url,cover_after_url,cover_media_type,cover_video_url,cover_poster_url,cover_locales
+          from public.templates where id=p_id) t
+  left join lateral (select body,version,model_params,provider_id from public.template_prompts
+    where template_id=t.id) p on true
+  left join lateral (select adapter,model,base_url from public.ai_providers
+    where id=p.provider_id and module='image') a on true
+$$;
+
+
+ALTER FUNCTION "public"."read_template_sync_source"("p_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."read_template_sync_target"("p_id" "text", "p_run_id" "text") RETURNS "jsonb"
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select jsonb_build_object(
+    'token', coalesce((select t.xmin::text || '/' || coalesce(p.xmin::text,'-')
+      from public.templates t left join public.template_prompts p on p.template_id=t.id
+      where t.id=p_id), 'missing'),
+    'version', (select synced_version from public.template_sync_history where template_id=p_id and run_id=p_run_id))
+$$;
+
+
+ALTER FUNCTION "public"."read_template_sync_target"("p_id" "text", "p_run_id" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."reconcile_dispute_submitted"("p_dispute_id" "text") RETURNS timestamp with time zone
@@ -5961,7 +6508,6 @@ declare
   replaced boolean := false;
 begin
   if p_context is null or p_context not in ('signup','account','paywall')
-     or p_invitee_credits is null or p_invitee_credits <= 0
      or p_invite_window_days is null or p_invite_window_days <= 0 then
     raise exception 'INVALID_INPUT';
   end if;
@@ -6035,7 +6581,9 @@ begin
     deadline := least(offer.expires_at, checked_at + make_interval(days => offer.discount_valid_days));
   end if;
 
-  credits := case when offer.kind = 'invite' then p_invitee_credits else coalesce(offer.invitee_credits, 0) end;
+  credits := case when offer.kind = 'invite' then
+    (select (value->>'inviteeCredits')::integer from public.system_settings where key = 'code_invite_rewards')
+    else coalesce(offer.invitee_credits, 0) end;
   grant_pool := case when offer.kind = 'invite' then 'free' else offer.invitee_pool end;
   insert into public.code_redemptions
     (id, code_id, kind, user_id, inviter_user_id, context, status, credits_granted, discount_expires_at)
@@ -6235,7 +6783,10 @@ declare
   v_pool text;
   v_resolution text := coalesce(p_inputs ->> 'resolution', '1k');
   v_cost integer;
+  v_v2 boolean;
+  v_template public.templates;
 begin
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.template_catalog',0));
   if v_resolution not in ('1k', '2k', '3k') then
     raise exception 'INVALID_INPUT' using detail = 'resolution must be 1k, 2k or 3k';
   end if;
@@ -6280,13 +6831,31 @@ begin
     end if;
   end if;
 
-  select (t.credits_cost ->> v_resolution)::integer into v_cost
-    from public.templates t
-   where t.id = p_template_id;
+  v_v2 := admin.is_template_catalog_v2();
+  select t.* into v_template from public.templates t where t.id=p_template_id for share;
+  v_cost := (v_template.credits_cost->>v_resolution)::integer;
   if not found then
     raise exception 'TEMPLATE_NOT_FOUND';
   end if;
 
+  if v_v2 then
+    if not v_template.is_active or (p_template_id<>'edit' and not
+        (case when p_source='graylum' then 'partner' else 'web' end=any(v_template.visible_in))) then
+      raise exception 'TEMPLATE_NOT_FOUND';
+    end if;
+    if p_credits_cost is distinct from v_cost then raise exception 'TEMPLATE_QUOTE_CHANGED'; end if;
+    if exists (
+      select 1 from admin.template_price_snapshots s join admin.template_price_batches b on b.id=s.batch_id
+      join admin.template_tariffs_v2 c on c.id=s.template_id
+      where b.reverted_at is null and s.template_id=p_template_id and c.quality=v_template.quality
+        and c.costs->v_resolution=v_template.credits_cost->v_resolution
+        and (p_provider is distinct from (s.provider_id::text||'/gpt-image-2.6-sunburst')
+          or not (admin.template_approved_prices(s.provider_id) ? p_template_id))
+    ) then
+      if not admin.alternate_route_meets_floor(p_provider,v_resolution,v_template.quality,v_cost)
+      then raise exception 'TEMPLATE_QUOTE_CHANGED'; end if;
+    end if;
+  end if;
   if v_profile.credits >= v_cost then
     v_pool := 'paid';
   elsif v_profile.free_credits >= v_cost then
@@ -6305,7 +6874,8 @@ begin
      credit_pool, visibility, credits_cost, parent_job_id)
   values
     (p_job_id, p_user_id, p_module, p_template_id,
-     coalesce(p_inputs, '{}'::jsonb) || jsonb_build_object('resolution', v_resolution),
+     (coalesce(p_inputs, '{}'::jsonb)-'pricing_catalog_version') || jsonb_build_object('resolution',v_resolution)
+       || case when v_v2 then '{"pricing_catalog_version":"v2"}'::jsonb else '{}'::jsonb end,
      p_provider, p_source,
      p_idempotency_key,
      v_pool,
@@ -6370,81 +6940,39 @@ ALTER FUNCTION "public"."set_updated_at"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."settle_checkout"("p_user_id" "uuid", "p_product_id" "text", "p_session_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_invoice_id" "text" DEFAULT NULL::"text", "p_charge_id" "text" DEFAULT NULL::"text", "p_subscription_id" "text" DEFAULT NULL::"text", "p_subscription_status" "text" DEFAULT NULL::"text", "p_current_period_end" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_cancel_at_period_end" boolean DEFAULT NULL::boolean) RETURNS "public"."credit_change"
-    LANGUAGE "plpgsql" SECURITY DEFINER
+    LANGUAGE "sql" SECURITY DEFINER
     SET "search_path" TO ''
-    AS $$
-declare
-  v_change public.credit_change;
-begin
-  if p_amount_total is null or p_amount_tax is null or p_currency is null or p_method is null then
-    raise exception 'INVALID_INPUT' using detail = 'payment fields are all required';
-  end if;
-
-  if p_subscription_id is not null then
-    if p_subscription_status is null or p_current_period_end is null or p_cancel_at_period_end is null then
-      raise exception 'INVALID_INPUT' using detail = 'subscription fields are all required';
-    end if;
-    insert into public.subscriptions
-      (stripe_subscription_id, user_id, product_id, status, current_period_end, cancel_at_period_end)
-    values
-      (p_subscription_id, p_user_id, p_product_id, p_subscription_status, p_current_period_end, p_cancel_at_period_end)
-    on conflict (stripe_subscription_id) do update
-       set status = excluded.status,
-           current_period_end = excluded.current_period_end,
-           cancel_at_period_end = excluded.cancel_at_period_end,
-           updated_at = now()
-     where public.subscriptions.user_id = excluded.user_id
-       and public.subscriptions.product_id = excluded.product_id;
-    if not found then
-      raise exception 'IDEMPOTENCY_CONFLICT' using detail = 'subscription belongs to another user or product';
-    end if;
-  end if;
-
-  v_change := public.apply_purchase(p_user_id, p_product_id, p_session_id);
-
-  if v_change.applied then
-    insert into public.payments
-      (user_id, product_id, channel, stripe_session_id, stripe_invoice_id, stripe_charge_id,
-       amount_total, amount_tax, currency, method)
-    values
-      (p_user_id, p_product_id, 'stripe', p_session_id, p_invoice_id, p_charge_id,
-       p_amount_total, p_amount_tax, lower(p_currency), p_method);
-  end if;
-
-  return v_change;
-end;
-$$;
+    AS $$ select * from admin.checkout_terms(false, p_user_id, p_product_id, p_session_id, p_amount_total, p_currency, p_amount_tax, p_method, p_invoice_id, p_charge_id, p_subscription_id, p_subscription_status, p_current_period_end, p_cancel_at_period_end); $$;
 
 
 ALTER FUNCTION "public"."settle_checkout"("p_user_id" "uuid", "p_product_id" "text", "p_session_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_invoice_id" "text", "p_charge_id" "text", "p_subscription_id" "text", "p_subscription_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."settle_waffo_order"("p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") RETURNS "public"."credit_change"
-    LANGUAGE "plpgsql" SECURITY DEFINER
+CREATE OR REPLACE FUNCTION "public"."settle_checkout_v2"("p_user_id" "uuid", "p_product_id" "text", "p_session_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_invoice_id" "text" DEFAULT NULL::"text", "p_charge_id" "text" DEFAULT NULL::"text", "p_subscription_id" "text" DEFAULT NULL::"text", "p_subscription_status" "text" DEFAULT NULL::"text", "p_current_period_end" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_cancel_at_period_end" boolean DEFAULT NULL::boolean) RETURNS "public"."credit_change"
+    LANGUAGE "sql" SECURITY DEFINER
     SET "search_path" TO ''
-    AS $$
-declare
-  v_change public.credit_change;
-begin
-  if p_order_id is null or p_amount_total is null or p_amount_tax is null or p_currency is null or p_method is null then
-    raise exception 'INVALID_INPUT' using detail = 'payment fields are all required';
-  end if;
+    AS $$ select * from admin.checkout_terms(true, p_user_id, p_product_id, p_session_id, p_amount_total, p_currency, p_amount_tax, p_method, p_invoice_id, p_charge_id, p_subscription_id, p_subscription_status, p_current_period_end, p_cancel_at_period_end); $$;
 
-  v_change := public.apply_purchase(p_user_id, p_product_id, p_payment_id);
 
-  if v_change.applied then
-    insert into public.payments
-      (user_id, product_id, channel, waffo_order_id, waffo_payment_id, amount_total, amount_tax, currency, method)
-    values
-      (p_user_id, p_product_id, 'waffo', p_order_id, p_payment_id, p_amount_total, p_amount_tax, lower(p_currency), p_method);
-  end if;
+ALTER FUNCTION "public"."settle_checkout_v2"("p_user_id" "uuid", "p_product_id" "text", "p_session_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_invoice_id" "text", "p_charge_id" "text", "p_subscription_id" "text", "p_subscription_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) OWNER TO "postgres";
 
-  return v_change;
-end;
-$$;
+
+CREATE OR REPLACE FUNCTION "public"."settle_waffo_order"("p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") RETURNS "public"."credit_change"
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$ select * from admin.waffo_terms(false, p_user_id, p_product_id, p_payment_id, p_order_id, p_amount_total, p_currency, p_amount_tax, p_method); $$;
 
 
 ALTER FUNCTION "public"."settle_waffo_order"("p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."settle_waffo_order_v2"("p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") RETURNS "public"."credit_change"
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$ select * from admin.waffo_terms(true, p_user_id, p_product_id, p_payment_id, p_order_id, p_amount_total, p_currency, p_amount_tax, p_method); $$;
+
+
+ALTER FUNCTION "public"."settle_waffo_order_v2"("p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."sms_authorize_send"("p_phone_key" "text") RETURNS "text"
@@ -6683,6 +7211,112 @@ $$;
 ALTER FUNCTION "public"."sync_image_capabilities"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."sync_preview_template"("p_template" "jsonb", "p_prompt" "jsonb", "p_provider" "jsonb", "p_floors" "jsonb", "p_run_id" "text", "p_locales" "text"[], "p_target_token" "text", "p_catalog_version" "text", "p_validate_only" boolean DEFAULT false) RETURNS integer
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_id text := p_template->>'id';
+  v_provider uuid;
+  v_catalog text;
+  v_quote jsonb;
+  v_inserted boolean;
+  v_template_xmin text;
+  v_prompt_xmin text;
+  v_previous public.template_prompts;
+  v_version integer;
+  v_live boolean;
+  v_featured smallint;
+begin
+  if nullif(p_run_id,'') is null or nullif(btrim(p_prompt->>'body'),'') is null then
+    raise exception 'INVALID_SYNC';
+  end if;
+  -- Serialize dispatches even before the first template row exists.
+  -- Same lock and lock order as #385 cutover and rollback. The subsequent read sees a
+  -- cutover that won the lock; one that comes later must wait for the entire write.
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.template_catalog',0));
+  perform pg_advisory_xact_lock(hashtextextended('template-sync:' || v_id, 0));
+  select synced_version into v_version from public.template_sync_history
+    where template_id = v_id and run_id = p_run_id;
+  if found then return v_version; end if;
+  v_catalog := admin.template_sync_catalog();
+  if v_catalog not in ('v1','v2') or p_catalog_version is distinct from v_catalog
+      or coalesce(p_floors->>'version','v1') <> v_catalog then raise exception 'CATALOG_MISMATCH'; end if;
+  perform 1 from public.template_categories where key = p_template->>'category_key' for share;
+  if not found then raise exception 'CATEGORY_MISSING'; end if;
+
+  if p_provider is not null and p_provider <> 'null'::jsonb then
+    begin
+      select id into strict v_provider from public.ai_providers
+        where module = 'image' and adapter = p_provider->>'adapter'
+          and model = p_provider->>'model' and base_url = p_provider->>'base_url' for share;
+    exception when no_data_found or too_many_rows then raise exception 'PROVIDER_NOT_UNIQUE';
+    end;
+  end if;
+  -- The editor RPC resolves the effective provider and checks its floor and exact tariff.
+  -- Refuse incomplete input: the editor's comparison with a missing numeric tier is SQL NULL.
+  if jsonb_typeof(p_floors->'providers') is distinct from 'object' or exists (
+    select from jsonb_each(p_floors->'providers') f cross join unnest(array['1k','2k','3k']) r
+      where jsonb_typeof(f.value->(p_template->>'quality')->r) is distinct from 'number'
+         or (f.value->(p_template->>'quality')->>r)::numeric < 1
+  ) then raise exception 'MODEL_CHANGED'; end if;
+
+  -- Acquire the same row lock as normal editor saves, including racing first-time inserts.
+  insert into public.templates (id, name, category_key, credits_cost, sort_order)
+    values (v_id, p_template->>'name', p_template->>'category_key', p_template->'credits_cost',
+      (select coalesce(max(sort_order),0) + 10 from public.templates))
+    on conflict (id) do nothing returning true into v_inserted;
+  select xmin::text, is_active, featured_rank into strict v_template_xmin, v_live, v_featured from public.templates where id = v_id for update;
+  select tp.xmin::text into v_prompt_xmin from public.template_prompts tp where template_id=v_id for update;
+  if p_target_token is distinct from (case when v_inserted then 'missing'
+      else v_template_xmin || '/' || coalesce(v_prompt_xmin,'-') end) then raise exception 'STALE_TARGET'; end if;
+  if v_featured is not null and not (p_template->'visible_in' ? 'web') then raise exception 'FEATURED_WEB_REQUIRED'; end if;
+  if v_live and p_template->'visible_in' ? 'web' and
+      (nullif(btrim(p_template->>'description'),'') is null or not public._template_has_cover_parts(
+        p_template->>'cover_before_url', p_template->>'cover_after_url', p_template->'cover_locales', p_locales))
+    then raise exception 'LIVE_TEMPLATE_INCOMPLETE'; end if;
+
+  select tp.* into v_previous from public.template_prompts tp where template_id = v_id;
+  -- Keep publication, feature rank and sort order under production control. The normal editor
+  -- RPC also enforces production's model constraints when the T96 migration is present.
+  perform public.admin_upsert_template(
+    (p_template - array['sort_order','is_active','featured_rank','category','price_floors'])
+      || jsonb_build_object('price_floors',p_floors),
+    (p_prompt - 'provider_id') || jsonb_build_object('provider_id',v_provider));
+  -- The editor writer now holds the effective model lock. Compare the exact response used
+  -- by its calculator with the current inputs (including p95, approved tariffs and unit).
+  -- A quote changed between the last HTTP read and this transaction rolls back the upsert.
+  if nullif(p_floors->>'env_model','') is null or jsonb_typeof(p_floors->'quote_receipt') is distinct from 'object' then
+    raise exception 'PRICE_QUOTE_CHANGED';
+  end if;
+  v_quote := public.template_sync_pricing_input(p_floors->>'env_model')->'receipt';
+  if admin.template_sync_quote(v_quote,v_provider,v_id='edit') is distinct from
+     admin.template_sync_quote(p_floors->'quote_receipt',v_provider,v_id='edit') then
+    raise exception 'PRICE_QUOTE_CHANGED';
+  end if;
+  update public.templates set cover_media_type = p_template->>'cover_media_type',
+    cover_video_url = p_template->>'cover_video_url', cover_poster_url = p_template->>'cover_poster_url',
+    cover_locales = p_template->'cover_locales' where id = v_id;
+
+  update public.template_prompts set version = version + 1
+    where template_id = v_id and version = v_previous.version;
+  select version into strict v_version from public.template_prompts where template_id = v_id;
+  insert into public.template_sync_history(template_id, run_id, source_version, synced_version,
+      previous_version, previous_body, previous_model_params, previous_provider_id)
+    values (v_id, p_run_id, (p_prompt->>'version')::int, v_version,
+      v_previous.version, v_previous.body, v_previous.model_params, v_previous.provider_id);
+  -- The same constraints and T96 RPC are exercised before publishing any cover bytes.
+  -- This private SQLSTATE rolls back all changes inside the function's exception block.
+  if p_validate_only then raise exception using errcode = 'Z9301'; end if;
+  return v_version;
+exception when sqlstate 'Z9301' then return v_version;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."sync_preview_template"("p_template" "jsonb", "p_prompt" "jsonb", "p_provider" "jsonb", "p_floors" "jsonb", "p_run_id" "text", "p_locales" "text"[], "p_target_token" "text", "p_catalog_version" "text", "p_validate_only" boolean) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."sync_subscription"("p_subscription_id" "text", "p_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -6894,6 +7528,36 @@ $$;
 ALTER FUNCTION "public"."template_request_votes_count"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."template_sync_pricing_input"("p_env_model" "text") RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE
+    SET "search_path" TO ''
+    AS $$
+declare
+  price_input jsonb;
+  terms jsonb;
+  receipt jsonb;
+begin
+  if to_regprocedure('public.admin_image_pricing_catalog(text)') is not null then
+    select public.admin_image_pricing_catalog(p_env_model) into price_input;
+    terms := price_input - 'providers';
+  else
+    select jsonb_agg(to_jsonb(p)) into price_input from public.admin_image_provider_pricing(p_env_model) p;
+    terms := '"v1"'::jsonb;
+  end if;
+  select jsonb_build_object(
+    'terms', encode(sha256(convert_to(terms::text,'UTF8')),'hex'),
+    'routes', jsonb_object_agg(coalesce(r->>'provider_id','env'),
+      encode(sha256(convert_to((r - 'label')::text,'UTF8')),'hex')),
+    'active', max(coalesce(r->>'provider_id','env')) filter (where (r->>'is_active')::boolean)
+  ) into receipt from jsonb_array_elements(coalesce(price_input->'providers', price_input)) r;
+  return jsonb_build_object('input',price_input,'receipt',receipt);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."template_sync_pricing_input"("p_env_model" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."templates_sync_category"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -6978,6 +7642,89 @@ $$;
 
 
 ALTER FUNCTION "public"."wishlist_eligible"("p_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "admin"."pricing_release_checkpoint" (
+    "version" "text" NOT NULL,
+    "fingerprint" "text" NOT NULL
+);
+
+
+ALTER TABLE "admin"."pricing_release_checkpoint" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "admin"."pricing_wallet_cutover" (
+    "version" "text" NOT NULL,
+    "started_at" timestamp with time zone NOT NULL,
+    "digest_before" "text" NOT NULL,
+    "waived_refunds" "jsonb" NOT NULL,
+    "last_ledger_after" bigint NOT NULL,
+    "rolled_back_at" timestamp with time zone,
+    CONSTRAINT "pricing_wallet_cutover_version_check" CHECK (("version" = 'v2'::"text"))
+);
+
+
+ALTER TABLE "admin"."pricing_wallet_cutover" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "admin"."product_terms_v2" (
+    "product_id" "text" NOT NULL,
+    "credits" integer NOT NULL,
+    "usd_cents" integer NOT NULL,
+    CONSTRAINT "product_terms_v2_credits_check" CHECK (("credits" > 0)),
+    CONSTRAINT "product_terms_v2_usd_cents_check" CHECK (("usd_cents" > 0))
+);
+
+
+ALTER TABLE "admin"."product_terms_v2" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "admin"."template_price_batches" (
+    "id" bigint NOT NULL,
+    "applied_at" timestamp with time zone DEFAULT "clock_timestamp"() NOT NULL,
+    "reverted_at" timestamp with time zone
+);
+
+
+ALTER TABLE "admin"."template_price_batches" OWNER TO "postgres";
+
+
+ALTER TABLE "admin"."template_price_batches" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "admin"."template_price_batches_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
+CREATE TABLE IF NOT EXISTS "admin"."template_price_snapshots" (
+    "batch_id" bigint NOT NULL,
+    "template_id" "text" NOT NULL,
+    "previous" "jsonb" NOT NULL,
+    "applied" "jsonb" NOT NULL,
+    "provider_id" "uuid",
+    "provider_endpoint_hash" "text"
+);
+
+
+ALTER TABLE "admin"."template_price_snapshots" OWNER TO "postgres";
+
+
+CREATE OR REPLACE VIEW "admin"."template_tariffs_v2" AS
+ SELECT "id",
+    'medium'::"text" AS "quality",
+        CASE
+            WHEN ("id" = 'edit'::"text") THEN '{"1k": 20, "2k": 37, "3k": 58}'::"jsonb"
+            WHEN ("id" = ANY (ARRAY['promo-poster'::"text", 'pet-studio'::"text", 'freeform'::"text"])) THEN '{"1k": 45, "2k": 120, "3k": 190}'::"jsonb"
+            ELSE '{"1k": 74, "2k": 150, "3k": 225}'::"jsonb"
+        END AS "costs"
+   FROM "unnest"(ARRAY['dark-dining'::"text", 'delivery-menu'::"text", 'white-background'::"text", 'lifestyle-table'::"text", 'spa-podium'::"text", 'promo-poster'::"text", 'pet-studio'::"text", 'freeform'::"text", 'edit'::"text"]) "id"("id");
+
+
+ALTER VIEW "admin"."template_tariffs_v2" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."profiles" (
@@ -7502,56 +8249,6 @@ CREATE TABLE IF NOT EXISTS "public"."code_redemptions" (
 ALTER TABLE "public"."code_redemptions" OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."codes" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "code" "text" NOT NULL,
-    "kind" "text" NOT NULL,
-    "owner_user_id" "uuid",
-    "invitee_credits" integer,
-    "invitee_pool" "text",
-    "discount_percent" integer,
-    "discount_products" "text"[],
-    "discount_duration" "text",
-    "discount_months" integer,
-    "discount_valid_days" integer,
-    "stripe_coupon_id" "text",
-    "starts_at" timestamp with time zone,
-    "expires_at" timestamp with time zone,
-    "max_redemptions" integer,
-    "redemption_count" integer DEFAULT 0 NOT NULL,
-    "new_users_only" boolean DEFAULT false NOT NULL,
-    "active" boolean DEFAULT true NOT NULL,
-    "note" "text",
-    "created_by" "uuid",
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    CONSTRAINT "codes_check" CHECK ((("kind" = 'invite'::"text") = ("owner_user_id" IS NOT NULL))),
-    CONSTRAINT "codes_check1" CHECK ((("kind" <> 'invite'::"text") OR (("invitee_credits" IS NULL) AND ("discount_percent" IS NULL)))),
-    CONSTRAINT "codes_check2" CHECK ((("kind" <> 'campaign'::"text") OR ("invitee_credits" IS NOT NULL) OR ("discount_percent" IS NOT NULL))),
-    CONSTRAINT "codes_check3" CHECK ((("invitee_credits" IS NULL) = ("invitee_pool" IS NULL))),
-    CONSTRAINT "codes_check4" CHECK ((("invitee_pool" <> 'paid'::"text") OR ("max_redemptions" IS NULL) OR ("max_redemptions" > 0))),
-    CONSTRAINT "codes_check5" CHECK ((("discount_percent" IS NULL) = ("discount_products" IS NULL))),
-    CONSTRAINT "codes_check6" CHECK ((("discount_percent" IS NULL) = ("discount_duration" IS NULL))),
-    CONSTRAINT "codes_check7" CHECK ((("discount_percent" IS NOT NULL) OR (("discount_valid_days" IS NULL) AND ("stripe_coupon_id" IS NULL)))),
-    CONSTRAINT "codes_check8" CHECK ((("discount_months" IS NOT NULL) = (NOT ("discount_duration" IS DISTINCT FROM 'repeating'::"text")))),
-    CONSTRAINT "codes_check9" CHECK (("expires_at" > "starts_at")),
-    CONSTRAINT "codes_code_check" CHECK (("code" ~ '^[A-Z0-9]{4,20}$'::"text")),
-    CONSTRAINT "codes_discount_duration_check" CHECK (("discount_duration" = ANY (ARRAY['once'::"text", 'repeating'::"text", 'forever'::"text"]))),
-    CONSTRAINT "codes_discount_months_check" CHECK (("discount_months" > 0)),
-    CONSTRAINT "codes_discount_percent_check" CHECK ((("discount_percent" >= 1) AND ("discount_percent" <= 90))),
-    CONSTRAINT "codes_discount_products_check" CHECK ((("discount_products" IS NULL) OR (("cardinality"("discount_products") > 0) AND ("discount_products" <@ ARRAY['starter_monthly'::"text", 'starter_yearly'::"text", 'pro_monthly'::"text", 'pro_yearly'::"text", 'max_monthly'::"text", 'max_yearly'::"text", 'pack_s'::"text", 'pack_m'::"text", 'pack_l'::"text"])))),
-    CONSTRAINT "codes_discount_valid_days_check" CHECK (("discount_valid_days" > 0)),
-    CONSTRAINT "codes_invitee_credits_check" CHECK (("invitee_credits" > 0)),
-    CONSTRAINT "codes_invitee_pool_check" CHECK (("invitee_pool" = ANY (ARRAY['free'::"text", 'paid'::"text"]))),
-    CONSTRAINT "codes_kind_check" CHECK (("kind" = ANY (ARRAY['invite'::"text", 'campaign'::"text"]))),
-    CONSTRAINT "codes_max_redemptions_check" CHECK (("max_redemptions" > 0)),
-    CONSTRAINT "codes_redemption_count_check" CHECK (("redemption_count" >= 0))
-);
-
-
-ALTER TABLE "public"."codes" OWNER TO "postgres";
-
-
 CREATE TABLE IF NOT EXISTS "public"."credit_ledger" (
     "id" bigint NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -7909,6 +8606,48 @@ CREATE TABLE IF NOT EXISTS "public"."template_request_votes" (
 ALTER TABLE "public"."template_request_votes" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."template_sync_history" (
+    "template_id" "text" NOT NULL,
+    "run_id" "text" NOT NULL,
+    "source_version" integer NOT NULL,
+    "synced_version" integer NOT NULL,
+    "previous_version" integer,
+    "previous_body" "text",
+    "previous_model_params" "jsonb",
+    "previous_provider_id" "uuid",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "template_sync_history_source_version_check" CHECK (("source_version" > 0))
+);
+
+
+ALTER TABLE "public"."template_sync_history" OWNER TO "postgres";
+
+
+ALTER TABLE ONLY "admin"."pricing_release_checkpoint"
+    ADD CONSTRAINT "pricing_release_checkpoint_pkey" PRIMARY KEY ("version");
+
+
+
+ALTER TABLE ONLY "admin"."pricing_wallet_cutover"
+    ADD CONSTRAINT "pricing_wallet_cutover_pkey" PRIMARY KEY ("version");
+
+
+
+ALTER TABLE ONLY "admin"."product_terms_v2"
+    ADD CONSTRAINT "product_terms_v2_pkey" PRIMARY KEY ("product_id");
+
+
+
+ALTER TABLE ONLY "admin"."template_price_batches"
+    ADD CONSTRAINT "template_price_batches_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "admin"."template_price_snapshots"
+    ADD CONSTRAINT "template_price_snapshots_pkey" PRIMARY KEY ("batch_id", "template_id");
+
+
+
 ALTER TABLE ONLY "public"."admin_audit_log"
     ADD CONSTRAINT "admin_audit_log_pkey" PRIMARY KEY ("id");
 
@@ -8204,8 +8943,17 @@ ALTER TABLE ONLY "public"."template_requests"
 
 
 
+ALTER TABLE ONLY "public"."template_sync_history"
+    ADD CONSTRAINT "template_sync_history_pkey" PRIMARY KEY ("template_id", "run_id");
+
+
+
 ALTER TABLE ONLY "public"."templates"
     ADD CONSTRAINT "templates_pkey" PRIMARY KEY ("id");
+
+
+
+CREATE UNIQUE INDEX "template_price_one_batch" ON "admin"."template_price_batches" USING "btree" ((true)) WHERE ("reverted_at" IS NULL);
 
 
 
@@ -8286,6 +9034,10 @@ CREATE INDEX "affiliates_parent_created_idx" ON "public"."affiliates" USING "btr
 
 
 CREATE INDEX "affiliates_status_created_idx" ON "public"."affiliates" USING "btree" ("status", "created_at" DESC, "user_id" DESC);
+
+
+
+CREATE INDEX "ai_providers_image_sync_identity" ON "public"."ai_providers" USING "btree" ("adapter", "model", "base_url") WHERE ("module" = 'image'::"text");
 
 
 
@@ -8645,6 +9397,10 @@ CREATE OR REPLACE TRIGGER "template_request_votes_count" AFTER INSERT OR DELETE 
 
 
 
+CREATE OR REPLACE TRIGGER "template_retirement_check" BEFORE INSERT OR UPDATE OF "is_active", "category_key" ON "public"."templates" FOR EACH ROW WHEN ("new"."is_active") EXECUTE FUNCTION "admin"."protect_retired_template"();
+
+
+
 CREATE CONSTRAINT TRIGGER "template_style_ref_limit" AFTER UPDATE OF "fields" ON "public"."templates" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (("old"."fields" IS DISTINCT FROM "new"."fields")) EXECUTE FUNCTION "admin"."check_template_style_ref_limit"();
 
 
@@ -8654,6 +9410,16 @@ CREATE OR REPLACE TRIGGER "templates_set_updated_at" BEFORE UPDATE ON "public"."
 
 
 CREATE OR REPLACE TRIGGER "templates_sync_category" BEFORE INSERT OR UPDATE OF "category", "category_key" ON "public"."templates" FOR EACH ROW EXECUTE FUNCTION "public"."templates_sync_category"();
+
+
+
+ALTER TABLE ONLY "admin"."product_terms_v2"
+    ADD CONSTRAINT "product_terms_v2_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id");
+
+
+
+ALTER TABLE ONLY "admin"."template_price_snapshots"
+    ADD CONSTRAINT "template_price_snapshots_batch_id_fkey" FOREIGN KEY ("batch_id") REFERENCES "admin"."template_price_batches"("id");
 
 
 
@@ -8987,9 +9753,29 @@ ALTER TABLE ONLY "public"."template_requests"
 
 
 
+ALTER TABLE ONLY "public"."template_sync_history"
+    ADD CONSTRAINT "template_sync_history_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."templates"
     ADD CONSTRAINT "templates_category_key_fkey" FOREIGN KEY ("category_key") REFERENCES "public"."template_categories"("key");
 
+
+
+ALTER TABLE "admin"."pricing_release_checkpoint" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "admin"."pricing_wallet_cutover" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "admin"."product_terms_v2" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "admin"."template_price_batches" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "admin"."template_price_snapshots" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."admin_audit_log" ENABLE ROW LEVEL SECURITY;
@@ -9176,6 +9962,9 @@ CREATE POLICY "template_requests_select_visible" ON "public"."template_requests"
 
 
 
+ALTER TABLE "public"."template_sync_history" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."templates" ENABLE ROW LEVEL SECURITY;
 
 
@@ -9194,6 +9983,14 @@ GRANT USAGE ON SCHEMA "public" TO "service_role";
 
 
 
+REVOKE ALL ON FUNCTION "admin"."activate_template_price_catalog_v2"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."alternate_route_meets_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text", "p_price" integer) FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "admin"."apply_style_refs"() FROM PUBLIC;
 
 
@@ -9204,6 +10001,24 @@ GRANT ALL ON FUNCTION "admin"."assert_template_reference_range"("p_id" "text") T
 
 
 REVOKE ALL ON FUNCTION "admin"."check_template_style_ref_limit"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."checkout_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_session_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_invoice_id" "text", "p_charge_id" "text", "p_subscription_id" "text", "p_subscription_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."clear_approved_wallets_v2"("p_digest" "text", "p_last_ledger" bigint, "p_payments" bigint) FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."is_template_catalog_v2"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."is_template_catalog_v2"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."lowest_credit_price"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."lowest_credit_price"() TO "service_role";
 
 
 
@@ -9220,6 +10035,39 @@ GRANT ALL ON FUNCTION "admin"."partner_image_aspects"("public"."templates") TO "
 
 
 
+REVOKE ALL ON FUNCTION "admin"."pricing_activity_fingerprint"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."pricing_checkpoint_v2"("p_rollback" boolean) FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."protect_retired_template"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."purchase_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_event_id" "text") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."renewal_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_invoice_id" "text", "p_period_end" timestamp with time zone, "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_charge_id" "text") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."restore_approved_wallets_v2"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."rollback_template_price_catalog_v2"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."template_approved_prices"("p_provider" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."template_approved_prices"("p_provider" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "admin"."template_image_options"("public"."templates") FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."template_image_options"("public"."templates") TO "anon";
 GRANT ALL ON FUNCTION "admin"."template_image_options"("public"."templates") TO "authenticated";
@@ -9227,8 +10075,30 @@ GRANT ALL ON FUNCTION "admin"."template_image_options"("public"."templates") TO 
 
 
 
+REVOKE ALL ON FUNCTION "admin"."template_price_state"("t" "public"."templates") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."template_sync_catalog"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."template_sync_catalog"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."template_sync_quote"("p_receipt" "jsonb", "p_provider" "uuid", "p_edit" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."template_sync_quote"("p_receipt" "jsonb", "p_provider" "uuid", "p_edit" boolean) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "admin"."valid_style_refs"("p_template_id" "text", "p_refs" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."valid_style_refs"("p_template_id" "text", "p_refs" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."waffo_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."wallet_digest_v2"() FROM PUBLIC;
 
 
 
@@ -9488,6 +10358,11 @@ GRANT ALL ON FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uui
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_image_pricing_catalog"("p_env_model" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_image_pricing_catalog"("p_env_model" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_image_provider_pricing"("p_env_model" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_image_provider_pricing"("p_env_model" "text") TO "service_role";
 
@@ -9570,6 +10445,11 @@ GRANT ALL ON FUNCTION "public"."admin_save_code"("p_actor" "uuid", "p_code_id" "
 
 REVOKE ALL ON FUNCTION "public"."admin_save_code"("p_actor" "uuid", "p_code_id" "uuid", "p_fields" "jsonb", "p_catalog" "jsonb", "p_floor_product_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_save_code"("p_actor" "uuid", "p_code_id" "uuid", "p_fields" "jsonb", "p_catalog" "jsonb", "p_floor_product_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_save_invite_rewards"("p_actor" "uuid", "p_invitee" integer, "p_inviter" integer, "p_expected" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_save_invite_rewards"("p_actor" "uuid", "p_invitee" integer, "p_inviter" integer, "p_expected" "jsonb") TO "service_role";
 
 
 
@@ -9748,6 +10628,11 @@ GRANT ALL ON FUNCTION "public"."apply_subscription_renewal"("p_user_id" "uuid", 
 
 
 
+REVOKE ALL ON FUNCTION "public"."apply_subscription_renewal_v2"("p_user_id" "uuid", "p_product_id" "text", "p_invoice_id" "text", "p_period_end" timestamp with time zone, "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_charge_id" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."apply_subscription_renewal_v2"("p_user_id" "uuid", "p_product_id" "text", "p_invoice_id" "text", "p_period_end" timestamp with time zone, "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_charge_id" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."attach_ticket_images"("p_ticket_id" "uuid", "p_owner_id" "uuid", "p_message_id" "uuid", "p_images" "jsonb") FROM PUBLIC;
 
 
@@ -9781,6 +10666,15 @@ REVOKE ALL ON FUNCTION "public"."clawback_payment_credits"("p_payment_id" bigint
 
 REVOKE ALL ON FUNCTION "public"."close_payment_dispute"("p_dispute_id" "text", "p_status" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."close_payment_dispute"("p_dispute_id" "text", "p_status" "text") TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "public"."codes" TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."code_preview_credits"("offer" "public"."codes") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."code_preview_credits"("offer" "public"."codes") TO "service_role";
 
 
 
@@ -9909,6 +10803,16 @@ GRANT ALL ON FUNCTION "public"."purge_identity_refusals"() TO "service_role";
 
 
 
+REVOKE ALL ON FUNCTION "public"."read_template_sync_source"("p_id" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."read_template_sync_source"("p_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."read_template_sync_target"("p_id" "text", "p_run_id" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."read_template_sync_target"("p_id" "text", "p_run_id" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."reconcile_dispute_submitted"("p_dispute_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."reconcile_dispute_submitted"("p_dispute_id" "text") TO "service_role";
 
@@ -9989,8 +10893,18 @@ GRANT ALL ON FUNCTION "public"."settle_checkout"("p_user_id" "uuid", "p_product_
 
 
 
+REVOKE ALL ON FUNCTION "public"."settle_checkout_v2"("p_user_id" "uuid", "p_product_id" "text", "p_session_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_invoice_id" "text", "p_charge_id" "text", "p_subscription_id" "text", "p_subscription_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."settle_checkout_v2"("p_user_id" "uuid", "p_product_id" "text", "p_session_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_invoice_id" "text", "p_charge_id" "text", "p_subscription_id" "text", "p_subscription_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."settle_waffo_order"("p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."settle_waffo_order"("p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."settle_waffo_order_v2"("p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."settle_waffo_order_v2"("p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") TO "service_role";
 
 
 
@@ -10027,6 +10941,11 @@ REVOKE ALL ON FUNCTION "public"."sync_image_capabilities"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "public"."sync_preview_template"("p_template" "jsonb", "p_prompt" "jsonb", "p_provider" "jsonb", "p_floors" "jsonb", "p_run_id" "text", "p_locales" "text"[], "p_target_token" "text", "p_catalog_version" "text", "p_validate_only" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."sync_preview_template"("p_template" "jsonb", "p_prompt" "jsonb", "p_provider" "jsonb", "p_floors" "jsonb", "p_run_id" "text", "p_locales" "text"[], "p_target_token" "text", "p_catalog_version" "text", "p_validate_only" boolean) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."sync_subscription"("p_subscription_id" "text", "p_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."sync_subscription"("p_subscription_id" "text", "p_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) TO "service_role";
 
@@ -10054,6 +10973,11 @@ GRANT ALL ON FUNCTION "public"."template_image_options"("public"."templates") TO
 
 
 REVOKE ALL ON FUNCTION "public"."template_request_votes_count"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."template_sync_pricing_input"("p_env_model" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."template_sync_pricing_input"("p_env_model" "text") TO "service_role";
 
 
 
@@ -10155,10 +11079,6 @@ GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public
 
 
 GRANT SELECT ON TABLE "public"."code_redemptions" TO "service_role";
-
-
-
-GRANT SELECT ON TABLE "public"."codes" TO "service_role";
 
 
 
@@ -10284,6 +11204,10 @@ GRANT ALL ON TABLE "public"."template_prompts" TO "service_role";
 
 GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."template_request_votes" TO "service_role";
 GRANT SELECT ON TABLE "public"."template_request_votes" TO "authenticated";
+
+
+
+GRANT SELECT,INSERT ON TABLE "public"."template_sync_history" TO "service_role";
 
 
 

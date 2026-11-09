@@ -1,6 +1,7 @@
 import type { CreditBuysBlock, FaqItem } from '@/core/content'
 import type { BusinessBlock } from '@/core/content/business'
 
+import { perCredit } from '../offer'
 import { site } from '../../site.config'
 import type { PricingContent } from '../pricing'
 import { zhBusinessForm } from './business-form'
@@ -13,9 +14,9 @@ const brand = site.brand.name
 
 const creditBuys: CreditBuysBlock = {
   heading: '一个积分能买什么',
-  tiers: ZH_TIERS.map((tier) => ({ name: tier.name, credits: tier.credits })),
+  tiers: ZH_TIERS.map((tier) => ({ name: tier.name })),
   unit: '积分',
-  note: `大多数模板每张图的消耗，分别对应 ${ZH_TIERS.map((tier) => tier.px).join('、')} px。同一清晰度下，任何尺寸和比例的价格都一样。`,
+  note: `当前上架模板的常见单张消耗，分别对应 ${ZH_TIERS.map((tier) => tier.px).join('、')} px。同一清晰度下，任何尺寸和比例的价格都一样。`,
 }
 
 // 能为企业安排的事，不是现成功能（Owner 2026-11-06：还没有后台和代码），所以不写 SLA、单点登录、团队账号。
@@ -47,7 +48,8 @@ const faq: readonly FaqItem[] = [
   },
   {
     question: '不订阅能单买积分吗？',
-    answer: '可以。积分包是一次性付款，所有人都能买，得到的付费积分和套餐里的一样。',
+    answer: site.billing.pricingVersion ? `可以。积分包是一次性付款，所有人都能买，得到的付费积分和套餐里的一样。积分包标价每积分 ${perCredit('pack_s')}。小包按原价购买。中包和大包按当前会员等级享折扣，入门版 95 折、专业版 9 折、旗舰版 85 折。每包积分数量相同。`
+      : '可以。积分包是一次性付款，所有人都能买，得到的付费积分和套餐里的一样。',
   },
   {
     question: ALIPAY_QUESTION,

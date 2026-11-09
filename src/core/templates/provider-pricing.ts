@@ -1,8 +1,14 @@
 import { RESOLUTIONS, type Resolution } from './output-options'
-import { TEMPLATE_QUALITIES, type CreditsCost, type CreditsFloor } from './pricing'
+import { TEMPLATE_QUALITIES, type ApprovedTariff, type CreditsCost, type CreditsFloor } from './pricing'
 
 type Costs = Partial<Record<Resolution, number>>
-export type ProviderFloors = CreditsFloor & { providers?: Record<string, CreditsFloor>; models?: Record<string, string> }
+export type ProviderFloors = CreditsFloor & {
+  providers?: Record<string, CreditsFloor>
+  models?: Record<string, string>
+  activeProvider?: string
+  version?: 'v1' | 'v2'
+  approvals?: Record<string, Record<string, ApprovedTariff>>
+}
 export const MISSING_COST = 2147483647
 const unknownTiers = { '1k': MISSING_COST, '2k': MISSING_COST, '3k': MISSING_COST }
 export const UNPRICED: CreditsFloor = { high: unknownTiers, medium: unknownTiers }
@@ -23,7 +29,10 @@ const OPENAI_ESTIMATES: CreditsFloor = {
 }
 
 export function maxCostPerCredit(products: readonly { priceUsd: number; credits: number }[]): number {
-  const cheapest = Math.min(...products.map(product => product.priceUsd / product.credits))
+  return imageCostBudget(Math.min(...products.map(product => product.priceUsd / product.credits)))
+}
+
+export function imageCostBudget(cheapest: number): number {
   if (!(cheapest > 0 && Number.isFinite(cheapest))) throw new Error('Cannot price images without a positive product price per credit')
   // Pricing framework: 7.9% payment, 3% refund provision, 10% annual affiliate + 3% team, 60% margin.
   return cheapest * (1 - 0.239) * (1 - 0.60)
@@ -49,7 +58,9 @@ export function modelCreditFloor(model: ModelCosts, budget: number): CreditsFloo
   return floor
 }
 
-export function providerFloor(floors: ProviderFloors, id: string | null | undefined): CreditsFloor {
-  if (!id || !floors.providers) return floors
-  return floors.providers[id] ?? UNPRICED
+export function providerFloor(floors: ProviderFloors, id: string | null | undefined, templateId?: string): CreditsFloor {
+  const selected = id ?? floors.activeProvider
+  const base = selected && floors.providers ? floors.providers[selected] ?? UNPRICED : floors
+  const approved = selected && templateId ? floors.approvals?.[selected]?.[templateId] : undefined
+  return approved ? { ...base, approved } : base
 }

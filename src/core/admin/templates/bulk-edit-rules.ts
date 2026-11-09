@@ -63,7 +63,7 @@ export function bulkEditFailures(
     const quality = patch.quality ?? template.quality
     const cost = { ...template.creditsCost, ...patch.creditsCost }
     const { id, name } = template
-    const low = creditsBelowFloor(quality, cost, providerFloor(floor, template.prompt?.providerId)).map((v) => ({ id, name, reason: 'below_floor' as const, ...v }))
+    const low = creditsBelowFloor(quality, cost, providerFloor(floor, template.prompt?.providerId, template.id)).map((v) => ({ id, name, reason: 'below_floor' as const, ...v }))
     const web = webIncomplete(template, patch.visibleIn ?? template.visibleIn)
     return web ? [...low, { id, name, reason: 'web_incomplete' }] : low
   })

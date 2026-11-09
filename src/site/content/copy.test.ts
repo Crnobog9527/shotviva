@@ -21,15 +21,15 @@ describe('home page skeleton', () => {
     // T91: the free-image count follows the catalogue, so "that" and "to write" went to keep
     // "Up to 6" within 155 characters and 60 words.
     expect(home.description).toBe(
-      'Image to image AI turns a phone photo into a studio shot or a new art style. Pick a template, no prompts, the subject stays as shot. Up to 6 free images.',
+      'Image to image AI turns a phone photo into a studio shot or a new art style. Pick a template, no prompts, the subject stays as shot. 100 free credits.',
     )
-    expect(fillCredits(homePage.description, FALLBACK_CREDITS)).toMatch(/ 3 free images\.$/)
+    expect(fillCredits(homePage.description, FALLBACK_CREDITS)).toMatch(/ 100 free credits\.$/)
     expect(homePage.h1).toBe('Image to Image AI: Restyle a Photo, Keep the Subject')
     expect(homePage.subtitle).toBe(
       'The AI photo studio that starts from your real photo. What you shot stays; the template changes the light, the scene or the art style.',
     )
     expect(home.answerBlock).toBe(
-      'Image to image AI takes a photo you already have and gives it a new look while the subject stays as shot. With Shotviva you upload one phone photo, pick a template for food, products, rooms, pets or an art style, and download it in Standard, HD or Max. No prompts. New users get up to 6 free Standard images.',
+      'Image to image AI takes a photo you already have and gives it a new look while the subject stays as shot. With Shotviva you upload one phone photo, pick a template for food, products, rooms, pets or an art style, and download it in Standard, HD or Max. No prompts. New users get 100 free credits.',
     )
   })
 
@@ -54,16 +54,16 @@ describe('home page skeleton', () => {
       'Pick a Template',
       'Download in Standard, HD or Max',
     ])
-    expect(home.freeOffer.points[0].heading).toBe('Up to 6 Free Standard Images When You Sign Up')
-    expect(fillCredits(homePage, FALLBACK_CREDITS).freeOffer.points[0].heading).toBe('3 Free Standard Images When You Sign Up')
+    expect(home.freeOffer.points[0].heading).toBe('100 Free Credits When You Sign Up')
+    expect(fillCredits(homePage, FALLBACK_CREDITS).freeOffer.points[0].heading).toBe('100 Free Credits When You Sign Up')
   })
 })
 
 describe('public numbers', () => {
   it('counts the 6 free credits in Standard images at the catalogue price (建站规格 G3, T91)', () => {
-    expect(site.billing.freeCredits).toBe(6)
+    expect(site.billing.freeCredits).toBe(100)
     // Filled from the catalogue at render time (credits.test.ts).
-    expect(fillCredits(freeImagesLabel, LIVE)).toBe('up to 6 free Standard images')
+    expect(fillCredits(freeImagesLabel, LIVE)).toBe('100 free credits')
     expect(fillCredits(fromCredits, LIVE)).toBe('from 1 credit')
     expect(tierList).toBe('Standard, HD or Max')
     expect(tierPixels).toBe('Standard 1024 px, HD 2048 px, Max 2880 px')

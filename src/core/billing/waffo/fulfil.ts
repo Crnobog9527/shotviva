@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { trackPurchase } from '../../analytics/funnel'
 import type { ProductId, SiteProduct } from '../../config'
 import { AppError } from '../../errors'
+import { readQuote } from '../checkout-price'
 import { creditChangeSchema, type CreditChange } from '../credits'
 import type { ApplyPaymentCodes } from '../payment-code-effects'
 import type { CancelOthers, CancelRefunded } from '../subscription/cancel-others'
@@ -41,12 +42,12 @@ const inputSchema = z.object({ userId: z.uuid(), paymentId: z.string().min(1), o
 
 export async function settleWaffoOrder(
   client: RpcClient,
-  input: { userId: string; productId: ProductId; paymentId: string; facts: WaffoPaymentFacts },
+  input: { userId: string; productId: ProductId; paymentId: string; facts: WaffoPaymentFacts; version?: 'v2' },
 ): Promise<CreditChange> {
   const args = inputSchema.parse({ userId: input.userId, paymentId: input.paymentId, orderId: input.facts.orderId })
   return callRpc(
     client,
-    'settle_waffo_order',
+    input.version ? 'settle_waffo_order_v2' : 'settle_waffo_order',
     {
       p_user_id: args.userId,
       p_product_id: input.productId,
@@ -65,7 +66,7 @@ export async function settleWaffoOrder(
 export type WaffoChargeForm = 'one_time' | 'subscription'
 
 // The page language the checkout was opened in, carried in the order metadata.
-function track(deps: WaffoFulfilDeps, userId: string, product: SiteProduct, facts: WaffoPaymentFacts, meta: { locale: 'en' | 'zh'; form: WaffoChargeForm }): void {
+function track(deps: WaffoFulfilDeps, userId: string, product: SiteProduct, facts: WaffoPaymentFacts, meta: { locale: 'en' | 'zh'; form: WaffoChargeForm; credits?: number }): void {
   ;(deps.trackBuy ?? trackPurchase)(userId, {
     product_id: product.id,
     tier: product.tier,
@@ -74,7 +75,7 @@ function track(deps: WaffoFulfilDeps, userId: string, product: SiteProduct, fact
     channel: 'waffo',
     method: facts.method,
     amount_usd: facts.subtotalUsd,
-    credits: product.credits,
+    ...(meta.credits !== undefined && { credits: meta.credits }),
   }, meta.locale)
 }
 
@@ -92,9 +93,10 @@ export async function fulfilWaffoOrder(
   const { user_id: userId, product_id: productId, locale } = order.orderMetadata
   const product = deps.products.find((p) => p.id === productId)
   if (!product) throw new AppError('INVALID_INPUT', `waffo order ${event.eventId}: unknown product`)
-  const facts = paymentFacts(order, product)
-  const change = await settleWaffoOrder(deps.db, { userId, productId, paymentId: event.eventId, facts })
-  if (change.applied) track(deps, userId, product, facts, { locale, form })
+  const quote = readQuote(order.orderMetadata, product)
+  const facts = paymentFacts(order, product, quote)
+  const change = await settleWaffoOrder(deps.db, { userId, productId, paymentId: event.eventId, facts, version: quote && 'v2' })
+  if (change.applied) track(deps, userId, product, facts, { locale, form, credits: quote?.credits })
   await afterSettlement(deps, order, product, event.eventId, form)
   return change.applied ? 'applied' : 'replayed'
 }

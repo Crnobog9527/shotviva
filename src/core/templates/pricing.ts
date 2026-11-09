@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { AppError } from '../errors'
 
 import { RESOLUTIONS, type Resolution } from './output-options'
 
@@ -17,13 +18,24 @@ export type CreditsCost = z.infer<typeof creditsCostSchema>
 
 // Minimum credits per quality × resolution (the floor table lives in modules/image, which
 // knows the model's cost; core only applies it).
-export type CreditsFloor = Record<TemplateQuality, CreditsCost>
+export type ApprovedTariff = { quality: TemplateQuality; costs: CreditsCost }
+export type CreditsFloor = Record<TemplateQuality, CreditsCost> & { approved?: ApprovedTariff }
+
+export function approvedCredit(floor: CreditsFloor, quality: TemplateQuality, resolution: Resolution) {
+  return floor.approved?.quality === quality ? floor.approved.costs[resolution] : undefined
+}
+
+export function assertTemplateQuote(expected: number | undefined, current: number): void {
+  if (expected !== undefined && expected !== current) {
+    throw new AppError('TEMPLATE_QUOTE_CHANGED', 'Refresh the template price before generating.')
+  }
+}
 
 export type FloorViolation = { resolution: Resolution; floor: number; given: number }
 
 export function creditsBelowFloor(quality: TemplateQuality, cost: CreditsCost, floor: CreditsFloor): FloorViolation[] {
   return RESOLUTIONS.flatMap((resolution) => {
     const min = floor[quality][resolution]
-    return cost[resolution] < min ? [{ resolution, floor: min, given: cost[resolution] }] : []
+    return cost[resolution] < min && cost[resolution] !== approvedCredit(floor, quality, resolution) ? [{ resolution, floor: min, given: cost[resolution] }] : []
   })
 }

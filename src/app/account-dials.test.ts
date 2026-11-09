@@ -29,9 +29,9 @@ describe('credit dials', () => {
     const { html, text } = await render(dials(38, 3, { credits: 50, interval: 'month' }))
     // "of N" sits next to the count; the line under it is one short phrase (Owner 2026-11-08).
     expect(text).toContain('38 / 50 paid private, no watermark')
-    expect(text).toContain('3 / 6 free public, watermarked')
+    expect(text).toContain('3 / 100 free public, watermarked')
     expect(ring(html, 'paid')).toBe('76')
-    expect(ring(html, 'free')).toBe('50')
+    expect(ring(html, 'free')).toBe('3')
     expect(html).toContain('aria-label="38 of 50 paid credits left"')
   })
 
@@ -44,10 +44,14 @@ describe('credit dials', () => {
     expect(noPlan.html).toContain('aria-label="0 paid credits left"')
   })
 
+  it('shows only the actual balance when the account has no signup grant', () => {
+    expect(dialFigures({ paid: 0, free: 0 }, null, 0, false).freeOf).toBeNull()
+  })
+
   it('speaks Chinese', async () => {
     const { text } = await render(dials(500, 2, { credits: 600, interval: 'year' }), 'zh')
     expect(text).toContain('500 / 600 付费 私密、无水印')
-    expect(text).toContain('2 / 6 免费 公开、带水印')
+    expect(text).toContain('2 / 100 免费 公开、带水印')
   })
 
   it('drops "/ 6" when the signup gift was withheld (same-IP rule), in both languages', async () => {

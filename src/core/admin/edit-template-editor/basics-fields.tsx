@@ -17,11 +17,12 @@ type Props = {
   form: EditTemplateForm
   // The floor for the template's own quality tier.
   floor: CreditsFloor['high']
+  approved?: CreditsFloor['high']
   version: number
   onChange: (patch: Partial<EditTemplateForm>) => void
 }
 
-export function BasicsFields({ form, floor, version, onChange }: Props) {
+export function BasicsFields({ form, floor, approved, version, onChange }: Props) {
   return (
     <div className="grid gap-4 rounded-md border p-3">
       <div className="flex items-center gap-3">
@@ -37,7 +38,7 @@ export function BasicsFields({ form, floor, version, onChange }: Props) {
               <Label htmlFor={`edit-credits-${r}`}>{TIER_LABEL[r]}</Label>
               <Input id={`edit-credits-${r}`} inputMode="numeric" value={form.credits[r]}
                 onChange={(event) => onChange({ credits: { ...form.credits, [r]: event.target.value } })} />
-              <p className={Number(form.credits[r]) < floor[r] ? 'text-xs text-destructive' : 'text-muted-foreground text-xs'}>{floorGuidance(floor[r])}</p>
+              <p className={Number(form.credits[r]) < floor[r] && Number(form.credits[r]) !== approved?.[r] ? 'text-xs text-destructive' : 'text-muted-foreground text-xs'}>{floorGuidance(floor[r])}{approved && `，目录批准价 ${approved[r]}`}</p>
             </div>
           ))}
         </div>

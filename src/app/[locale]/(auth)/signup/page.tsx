@@ -6,8 +6,7 @@ import { nextIn } from '@/core/auth'
 import { readSignupCode } from '@/core/auth/signup-code-actions'
 import { SignupCodeProvider, SignupForm } from '@/core/auth/ui'
 import { currentLocale } from '@/core/i18n/server'
-import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
-import { creditFacts, freeStandardImages } from '@/site/content'
+import { site } from '@/site/site.config'
 
 import { googleAction, phoneSendAction, phoneVerifyAction, resendSignupAction, signupAction } from '@/app/auth/actions'
 
@@ -30,8 +29,6 @@ async function Signup({ searchParams }: PageProps<'/[locale]/signup'>) {
   const locale = await currentLocale()
   await redirectIfSignedIn(rawNext, locale)
   const next = nextIn(rawNext, locale)
-  // The gift in Standard images at the catalogue's cheapest Standard price (建站规格 G3, T91).
-  const facts = creditFacts(await cachedWebCatalogue(locale))
   return (
     <SignupCodeProvider initial={await readSignupCode()}>
       <SignupForm
@@ -39,7 +36,7 @@ async function Signup({ searchParams }: PageProps<'/[locale]/signup'>) {
         googleAction={googleAction}
         resendAction={resendSignupAction}
         next={next}
-        freeImages={{ count: freeStandardImages(facts.from), upTo: !facts.same }}
+        giftCredits={site.billing.freeCredits}
         arrived={<Arrived next={next} page="signup" />}
         sender={sender}
         phone={locale === 'zh' ? phone : undefined}

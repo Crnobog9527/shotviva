@@ -21,9 +21,7 @@ export function PendingReturn({ view, again, email, wechatPay }: Props) {
   const t = useTranslations('app.checkout')
   const tiers = useTranslations('paywall.tiers')
   const money = useChargedMoney()
-  const order = view.tier
-    ? t('orderPlan', { tier: tiers(view.tier), period: view.interval ?? 'month', count: view.credits })
-    : t('orderPack', { count: view.credits })
+  const order = view.tier ? t('pendingPlan', { tier: tiers(view.tier), period: view.interval ?? 'month' }) : t('pendingPack')
   return (
     <ReturnPlate pending>
       <Glyph pending />

@@ -122,6 +122,8 @@ jobs:
           path: ${{ runner.temp }}/schema-fix/schema.sql
           retention-days: 3
       - if: steps.changes.outputs.db == 'true'
+        run: pnpm exec vitest run --project pricing-release
+      - if: steps.changes.outputs.db == 'true'
         run: pnpm test:db
 
   # T88: commits the schema.sql the db job regenerated to the PR branch, once both required jobs

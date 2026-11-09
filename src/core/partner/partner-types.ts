@@ -120,6 +120,7 @@ export const templatesResponseSchema = z.object({ templates: z.array(partnerTemp
 // Synchronous (up to ~300s). Requires the Idempotency-Key header.
 
 export const generateRequestSchema = z.object({
+  expected_credits: z.int().positive().optional(),
   template_id: z.string().min(1).max(64),
   inputs: z
     .object({

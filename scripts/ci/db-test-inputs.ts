@@ -23,12 +23,12 @@ import { fileURLToPath } from 'node:url'
 const ALWAYS = [
   /^supabase\//,
   /\.sql$/,
-  /^tests\/db\//,
+  /^tests\/(db|release)\//,
   /^\.github\/actions\//,
   /^\.github\/workflows\/ci\.yml$/,
   /^scripts\/ci\//,
   /^scripts\/db-schema\.ts$/,
-  /^(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|\.nvmrc|tsconfig\.json|vitest\.config\.ts)$/,
+  /^(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|\.nvmrc|tsconfig\.json|vitest\.config\.m?ts)$/,
 ]
 
 const EXTENSIONS = ['', '.ts', '.tsx', '.js', '.mjs', '.cjs', '.json', '/index.ts', '/index.tsx', '/index.js']

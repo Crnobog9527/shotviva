@@ -105,7 +105,7 @@
     },
     "signup": {
       "title": "注册账号",
-      "gift": "{upTo, select, true {最多 } other {}}{count, plural, other {# 张标准清晰度免费图}}",
+      "gift": "{count, number} 个免费积分",
       "giftNote": "会公开展示，并带水印",
       "submit": "注册",
       "fine": "继续即表示你同意<terms>服务条款</terms>和<privacy>隐私政策</privacy>。",
@@ -241,6 +241,7 @@
   },
   "app": {
     "signupCodes": {
+      "noInviteGift": "邀请码有效，当前无额外注册赠分。",
       "toggle": "有邀请码或优惠码？",
       "label": "邀请码或优惠码",
       "checking": "正在核对这个码…",
@@ -268,7 +269,7 @@
       "invite": {
         "title": "邀请好友",
         "showLink": "我的邀请链接与奖励",
-        "rule": "好友注册时多得 {invitee} 个免费积分。好友首次付款后，你得 {inviter} 个付费积分。",
+        "rule": "{invitee, plural, =0 {好友可用链接注册，当前无邀请注册奖励。} other {好友注册时多得 # 个免费积分。}}{inviter, plural, =0 {当前未开启好友首付奖励。} other {好友首次付款后，你得 # 个付费积分。}}",
         "copy": "复制链接",
         "share": "分享链接",
         "copied": "链接已复制。",
@@ -286,6 +287,7 @@
         "more": "查看更多好友"
       },
       "redeem": {
+        "inviteLinked": "已绑定邀请，本次无额外注册赠分。",
         "title": "兑换码",
         "label": "邀请码、优惠码或赠分码",
         "button": "兑换",
@@ -359,7 +361,7 @@
       "paid": "你有 {paid} 积分。",
       "getCredits": "获取积分",
       "panelTitle": "积分",
-      "signupGiftRefused": "这个账号没有拿到注册赠送的免费积分：同一网络下的另一个账号在你注册前 24 小时内已经领取过。你仍然可以购买积分。"
+      "signupGiftRefused": "这个账号没有注册赠分记录。同一网络在 24 小时内限领一次。"
     },
     "create": {
       "title": "创作",
@@ -556,6 +558,7 @@
       "CONTENT_REJECTED": "照片或补充说明没有通过安全审核。请换一张照片，或改一下说明。",
       "IDENTITY_SWAP_REFUSED": "为保护每个人的肖像权，Shotviva 不能把人换成另一个人或换脸。可以改表情、妆容、光线和背景。",
       "REFERENCE_IMAGE_LIMIT": "参考图超过模型上限，请减少照片或换个模板。",
+      "TEMPLATE_QUOTE_CHANGED": "模板或积分价格已更新，请刷新页面查看最新报价。",
       "MODEL_INPUT_UNSUPPORTED": "请检查参考图、清晰度和尺寸，或换个模板。",
       "GENERATION_FAILED": "这张照片没能生成，通常再试一次就好。",
       "PROVIDER_FAILED": "这张照片没能生成，通常再试一次就好。",
@@ -741,6 +744,7 @@
       "metaTitle": "我的",
       "plan": {
         "title": "会员",
+        "lastGrant": "上次付款 · {credits, number} 积分 · {method}",
         "perPeriod": "每{interval, select, year {年} other {月}} <mono>{credits}</mono> 积分 · <mono>{price}</mono>/{interval, select, year {年} other {月}}",
         "perPeriodMethod": "每{interval, select, year {年} other {月}} <mono>{credits}</mono> 积分 · <mono>{price}</mono>/{interval, select, year {年} other {月}} · {method}",
         "member": "会员",
@@ -872,6 +876,7 @@
       },
       "product": {
         "plan": "{tier} · {interval, select, year {按年} other {按月}}",
+        "packUnknown": "积分包",
         "pack": "积分包 · {credits} 积分",
         "option": "{product} · {amount} · {date, date, medium}"
       },
@@ -1004,6 +1009,10 @@
     "checkout": {
       "metaTitle": "付款结果",
       "titlePlan": "你已开通{tier}",
+      "packPaid": "付款成功",
+      "renewsDate": "{date, date, medium}",
+      "pendingPlan": "{tier} · {period, select, year {一年} other {一个月}}",
+      "pendingPack": "积分包",
       "titlePack": "已到账 {count} 积分",
       "subPlan": "{count} 积分已到账，去做张图吧。",
       "subPack": "积分已经在你的账号里了，去做张图吧。",
@@ -1111,7 +1120,10 @@
     "savingLabel": "<vs>比按月付</vs>每年省",
     "savingAmount": "{amount}",
     "mostPopular": "最受欢迎",
+    "memberPrice": "会员价",
+    "memberCodeKept": "已选会员价，优惠码留待下次使用。",
     "packsNote": "一次性买积分，不用订阅",
+    "packsNoteV2": "小包不打折。中包和大包按当前会员等级计价：入门版 95 折、专业版 9 折、旗舰版 85 折，各档收到的包内积分相同。",
     "buy": "购买",
     "buyPackLabel": "用 {price} 购买 {count} 积分",
     "payNoteCard": "套餐自动续费，随时可取消",
@@ -1257,19 +1269,22 @@
     "label": "管理后台"
   },
   "affiliate": {
-    "kind": {
-      "monthly": "月付会员",
-      "yearly": "年付会员",
-      "pack": "积分包"
-    },
-    "payoutSchedule": "正常佣金在 {days} 天后确认。每月 {day} 日（UTC）结算，已开通的推广员需余额达到 {threshold} 并填写收款方式。",
+    "closed": "联盟营销暂未开放申请。",
+    "programName": "联盟营销",
+    "whatTitle": "什么是联盟营销？",
+    "intro": "把 Shotviva 推荐给需要做图的人。成为联盟会员后，你会获得专属推广链接，可以放在教程、作品分享或社群推荐里。",
+    "apply": "申请成为联盟会员",
+    "formIntro": "告诉我们你在哪里分享内容，以及希望把 Shotviva 推荐给谁。",
+    "benefitsTitle": "推广 Shotviva 有什么好处？",
+    "benefits": "通过你的链接加入的用户购买会员或积分包时，你可以获得佣金。你可以在会员后台查看推荐成效、佣金明细和结算记录。具体合作条件由我们与你单独沟通。",
+    "memberLogin": "联盟会员登录",
+    "loginToSubmit": "登录或注册，继续申请",
     "title": "推广员计划",
-    "intro": "分享推广链接，你推荐的用户今后每次购买都可以为你带来佣金。佣金按不含税的实付金额计算，退款后会相应调整。达到门槛并填写收款方式后按月结算。",
-    "apply": "申请成为推广员",
     "terms": "推广员条款",
     "back": "返回推广员计划",
     "pendingReview": "已收到申请，审核结果会显示在这里。",
     "version": "版本 {version}",
+    "settingsReadOnly": "你可以查看现有收款资料。当前版本的推广员条款公布后，阅读并同意即可修改。",
     "termsPlaceholder": "正式条款将由运营方在上线前公布。",
     "agree": "我已阅读并同意",
     "termsLink": "推广员条款（版本 {version}）",

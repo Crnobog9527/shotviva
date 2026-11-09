@@ -55,7 +55,7 @@ export async function saveTemplate(
   const template = parseOrThrow(templateInputSchema, payload.template, 'template')
   const prompt = parseOrThrow(promptInputSchema, payload.prompt, 'prompt')
   if (prompt.styleRefs?.some(ref => !isStyleRefKey(template.id, ref.key))) throw new AppError('INVALID_INPUT', '画风参考图不属于这个模板')
-  assertAboveFloor(template, providerFloor(floor, prompt.providerId))
+  assertAboveFloor(template, providerFloor(floor, prompt.providerId, template.id))
   assertTogglesWired(template, prompt)
   const exists = await repo.templateExists(client, template.id)
   if (payload.isNew && exists) {

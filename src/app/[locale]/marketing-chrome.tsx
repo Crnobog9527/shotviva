@@ -57,11 +57,13 @@ export async function MarketingHeader({ locale }: { locale: Locale }) {
 }
 
 // Footer: contact, copyright, legal links and the text language switch (ARCHITECTURE §17).
-export function MarketingFooter({ locale }: { locale: Locale }) {
+export async function MarketingFooter({ locale }: { locale: Locale }) {
+  const t = await getTranslations({ locale, namespace: 'affiliate' })
   return (
     <SiteFooter
       brand={site.brand}
       links={footerLinksIn(locale)}
+      programLink={<nav aria-label={t('programName')}><Link href="/partners/join">{t('programName')}</Link></nav>}
       languageSwitch={
         <Suspense fallback={<FooterLocalesFallback />}>
           <FooterLocales translatedPaths={zhPaths} />

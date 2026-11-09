@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { checkoutUnitPriceDifference, type CatalogInput } from '../../codes/admin'
 import { AppError } from '../../errors'
 import type { RpcClient } from '../rpc'
+import type { BuyerQuote, SelectedCode } from '../buyer-quote'
 import type { CheckoutBody } from './checkout'
 import type { StripeApi } from './client'
 
@@ -18,13 +19,13 @@ export const DISCOUNT_CANCEL_COOKIE = 'sv_code_checkout'
 
 // A browser nonce identifies one retryable purchase. The Stripe key/DB token is namespaced by
 // the authenticated account and purchase so a reused nonce cannot acquire a different purchase's lock.
-export function checkoutToken(userId: string, body: CheckoutBody, nonce: string | null, products: readonly CatalogInput[]) {
+export function checkoutToken(userId: string, body: CheckoutBody, nonce: string | null, products: readonly CatalogInput[], quote?: BuyerQuote) {
   if (nonce === null) return randomUUID()
   if (!z.uuid().safeParse(nonce).success) throw new AppError('INVALID_INPUT', 'Invalid checkout attempt')
   // Adjacent deployments may serve different prices concurrently. A rejected quote in
   // one must never release the other deployment's in-flight request under the same nonce.
   const economics = products.map(p => [p.id, p.tier, p.priceUsd, p.credits])
-  const identity = JSON.stringify(['shotviva:checkout', userId, body.product_id, body.method, body.locale, body.return_to, body.expected_code, nonce, economics])
+  const identity = JSON.stringify(['shotviva:checkout', userId, body.product_id, body.method, body.locale, body.return_to, body.expected_code, nonce, economics, ...(quote ? ['v2', quote.price.cents, quote.price.memberTier, quote.selectedCode?.code, quote.selectedCode?.percent] : [])])
   const bytes = createHash('sha256').update(identity).digest().subarray(0, 16)
   bytes[6] = (bytes[6] & 0x0f) | 0x50
   bytes[8] = (bytes[8] & 0x3f) | 0x80
@@ -52,10 +53,11 @@ function checkOffer(body: CheckoutBody, claim: z.infer<typeof reserved>, product
   }
 }
 
-export async function reserveDiscount(db: RpcClient, user: string, body: CheckoutBody, token: string, products: readonly CatalogInput[]): Promise<Discount | null> {
-  const claim = await claimDiscount(db, user, body, token)
+export async function reserveDiscount(db: RpcClient, user: string, body: CheckoutBody, token: string, products: readonly CatalogInput[], expected?: SelectedCode): Promise<Discount | null> {
+  const claim = await claimDiscount(db, user, expected ? { ...body, expected_code: expected.code } : body, token)
   if (!claim) return null
   try {
+    if (expected && (claim.code !== expected.code || claim.percent !== expected.percent)) throw new AppError('CODE_CHECKOUT_OFFER_CHANGED', 'Discount code changed')
     checkOffer(body, claim, products)
   } catch (error) {
     // A prepared retry may refer to a still-payable Session under the preceding catalogue.

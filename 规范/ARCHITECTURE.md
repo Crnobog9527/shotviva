@@ -62,17 +62,17 @@ export const site = defineSite({
   locales: { default: 'en', enabled: ['en', 'zh'] }, // next-intl：英文不带前缀，简体中文 /zh（Owner 2026-11-06，见第 17 节）
   billing: {
     currency: 'usd',
-    freeCredits: 6,                               // 进 profiles.free_credits，只能生成免费作品（第 6.1 节）；= 3 张 Standard 档标准模板图，对外说 "3 free Standard images"（Owner 2026-11-05）
-    products: [                                   // 9 个商品，价格 Owner 2026-11-05 定稿（第 6.2 节）
-      { id: 'starter_monthly', tier: 'starter', interval: 'month', credits: 50,   paidDays: 30,   priceUsd: 19.9 },
-      { id: 'starter_yearly',  tier: 'starter', interval: 'year',  credits: 600,  paidDays: 365,  priceUsd: 191 },
-      { id: 'pro_monthly',     tier: 'pro',     interval: 'month', credits: 135,  paidDays: 30,   priceUsd: 49.9 },
-      { id: 'pro_yearly',      tier: 'pro',     interval: 'year',  credits: 1620, paidDays: 365,  priceUsd: 479 },
-      { id: 'max_monthly',     tier: 'max',     interval: 'month', credits: 280,  paidDays: 30,   priceUsd: 99 },
-      { id: 'max_yearly',      tier: 'max',     interval: 'year',  credits: 3360, paidDays: 365,  priceUsd: 713 },
-      { id: 'pack_s', tier: 'pack', interval: null, credits: 20,  paidDays: null, priceUsd: 9.9 },   // 积分包：不改会员期，所有人可买
-      { id: 'pack_m', tier: 'pack', interval: null, credits: 55,  paidDays: null, priceUsd: 24.9 },
-      { id: 'pack_l', tier: 'pack', interval: null, credits: 115, paidDays: null, priceUsd: 49.9 },
+    freeCredits: 100,  // 一次性注册赠送，进入免费池；不承诺固定张数。
+    products: [                                   // 9 个商品，价格 Owner 2026-11-09 定稿（第 6.2 节）
+      { id: 'starter_monthly', tier: 'starter', interval: 'month', credits: 1990,   paidDays: 30,   priceUsd: 19.9 },
+      { id: 'starter_yearly',  tier: 'starter', interval: 'year',  credits: 23880,  paidDays: 365,  priceUsd: 191.04 },
+      { id: 'pro_monthly',     tier: 'pro',     interval: 'month', credits: 6000,  paidDays: 30,   priceUsd: 49.9 },
+      { id: 'pro_yearly',      tier: 'pro',     interval: 'year',  credits: 72000, paidDays: 365,  priceUsd: 479.04 },
+      { id: 'max_monthly',     tier: 'max',     interval: 'month', credits: 14000,  paidDays: 30,   priceUsd: 99 },
+      { id: 'max_yearly',      tier: 'max',     interval: 'year',  credits: 168000, paidDays: 365,  priceUsd: 891 },
+      { id: 'pack_s', tier: 'pack', interval: null, credits: 990,  paidDays: null, priceUsd: 9.9 },   // 积分包：不改会员期，所有人可买
+      { id: 'pack_m', tier: 'pack', interval: null, credits: 2490,  paidDays: null, priceUsd: 24.9 },
+      { id: 'pack_l', tier: 'pack', interval: null, credits: 4990, paidDays: null, priceUsd: 49.9 },
     ],
     channels: { primary: 'stripe', fallback: 'waffo' },   // 第 6.3 节：Waffo 兜底，卡订阅 + 支付宝单笔
   },
@@ -151,6 +151,7 @@ interface GenerationProvider {
 - 新增 / 编辑：密钥框只写不读，留空表示不改；保存后浏览器拿不到明文。OpenRouter 保存供应商时读取 `GET {base_url}/images/models` 更新能力。目录中的 1K、2K、4K 映射为本站 1k、2k、3k，未声明清晰度参数时只提供标准档。只有声明 auto 才支持原图比例。OpenAI 图片适配器提供全套站内选项。手动「刷新能力」和每日带 CRON_SECRET 的刷新均同步旧 resolutions 字段，失败保留最后成功的能力及时间。
 - 「测试连接」：OpenRouter 查询同一图片目录并用该行密钥调用免费的鉴权接口；其他适配器沿用 `GET {base_url}/models`。测试连接不产生出图费用。
 - 「设为当前使用」：弹窗确认「从 A 换到 B」，写一条日志（logger，不含密钥）。
+- 换模型时重新核对能力、实测成本与第 6.1 节；不把预算估价当实测。
 - 模板编辑页展示当前所选模型的能力、参考图上限与最后刷新时间。
 
 **密钥读写函数**（全部 `security definer`，只授权 `service_role`）：
@@ -208,6 +209,8 @@ v1 不写回调解析、定时轮询、超时清理这类定时任务。视频�
 
 
 站内固定比例取第 4.3 节选择器和模型能力的交集。缺少原图比例时按输入图片尺寸选最近比例，只有一档清晰度时隐藏选择器。首次刷新前没有可用能力的 OpenRouter 模板暂时无法出图。伙伴请求固定标准档，比例取模板 `fields.aspectRatios` 与可用模型比例的交集，保留模板顺序。交集为空时目录隐藏该模板，直接生成返回已有的不支持错误。
+
+T93 模板同步由 GitHub 手动工作流执行，审批后先读目标模板、提示词的行版本及本次回执，再用一条查询读取预览价格目录版本、模板、提示词和模型绑定。源数据只选同步字段，私有画风图由各环境管理。封面先按内容哈希复制到正式公开桶；`sync_preview_template` 逐个模板在正式库事务内按分类 key、供应商的 adapter / model / base_url 和正式积分下限校验，复用后台保存函数和目标定价规则。报价读取在同一快照中为目录条款和每个模型的报价输入计算摘要；最终事务在后台写函数取得模型锁后重验相关摘要，估价、成本统计或适用特价变化则回滚。预检与最终事务均持有切价流程共用的目录锁并比对源、目标和定价快照的目录版本；锁住目标模板和提示词后比对行版本（含首建时目标不存在），中途变化则拒绝。指定模型必须唯一匹配；跟随默认的模板在正式库也跟随默认。新增模板不上架，更新保留正式上架状态、排序、精选位。重复执行同一个 GitHub run id 对同一模板只提交一次；新的同步从正式提示词当前版本加一（首次为 1）。私有表 `template_sync_history` 以 (template_id, run_id) 为主键，记来源版本、写入版本、上一次正文、参数、模型绑定和版本，记录随模板删除，RLS 拒绝客户端访问。
 
 内置一条 `freeform` 模板：字段定义只有 `prompt`（加可选参考图），`template_prompts` 里的提示词是直通。它让「自由文字出图」和「模板出图」走同一条代码路径；`visible_in = ['partner']`，Shotviva 自己的前台不展示（DESIGN.md 禁止出现 prompt）。
 
@@ -268,7 +271,7 @@ v1 不写回调解析、定时轮询、超时清理这类定时任务。视频�
 
 - **入口和界面**：作品详情页「Edit」按钮，打开编辑面板（手机底部弹出，电脑和创作面板同一个组件，设计由 T6 出稿）：一个输入框（标签 "What would you like to change?"，1～500 字符，任何语言）、清晰度（默认和原作品同一档）、本次花费；比例固定和原作品一样。只能编辑自己的、成功的作品；免费作品也能编辑。
 - **编辑时可以换尺寸**（Owner 2026-11-06 签收 v3-b 稿，覆盖上面「比例固定」的说法）：编辑面板有和工作台相同的 8 个尺寸格，默认是原作品的尺寸；选了别的比例时 `/api/edit` 带 `aspect_ratio`，出图按新比例，提示词末尾加一段「把画面延展到新画幅，主体位置不变」的约束（同样放在 `edit` 模板参数里，后台可调，不进仓库）。价格不变，不加迁移（T47）。
-- **一单 = 一次普通出图**：走内置模板 `edit`（`visible_in` 为空，不在目录里出现），`reserve_credits` 照常预扣，扣 `templates.credits_cost[resolution]`，默认和标准模板同价 2 / 4 / 6（Owner 2026-11-06，后台可改，不低于下限）；先付费池后免费池、按作品判水印的规则不变。新作品是一张独立作品，`parent_job_id` 指向原作品；原作品不动。编辑出来的作品可以再编辑。
+- **一单 = 一次普通出图**：走内置模板 `edit`（`visible_in` 为空，不在目录里出现），`reserve_credits` 照常预扣，扣 `templates.credits_cost[resolution]`，按 medium 收 20 / 37 / 58 个新积分（含范围判断；按第 5 节）；先付费池后免费池、按作品判水印的规则不变。新作品是一张独立作品，`parent_job_id` 指向原作品；原作品不动。编辑出来的作品可以再编辑。
 - **第一步：判断范围**（`ai_providers` 里 `module = 'decision'` 的在用供应商；Owner 2026-11-06 定用 **GPT-6 Luna**（OpenAI Responses API，便宜、和出图同一个账户），不用 Decisions API，因为它写不出要保留的元素清单）：把原作品（低清晰度）、用户原话和判断指令送进去，用结构化输出拿回 `{ scope, confidence, keep, change }`：`scope` 是五种范围之一（只改某个物件或细节 `object` / 换背景或场景 `background` / 换风格、光线或色调 `style` / 换主体 `subject` / 整体重做 `global`），`confidence` 0～1，`keep` 是图里必须保持不变的具体元素（最多 8 个英文短语），`change` 是一句英文概括。推理用模型允许的最低档，每次 5 秒，超时、5xx 或连接中断时重试一次，仍失败用兜底并放行（Owner 2026-11-08，T81；放行次数在后台「AI 供应商」页统计）。`confidence` ≥ 0.5 才采用；否则、调用失败或超时，用「兜底」。判断指令放在 `template_prompts` 里 `edit` 模板的参数中，后台可改，不进仓库。判断这一步做成统一接口，按在用供应商的 `adapter` 选实现，以后换模型（例如 Claude Haiku）只加适配器、在后台切换。
 - **第二步：出图**：`/v1/images/edits`，输入图是原作品在 R2 的无水印原图（服务端直接读，不经用户上传），提示词 = `edit` 模板的封装提示词 + 该范围的约束段落（`object` 和 `background` 两种范围把 `keep` 清单写进去，例如「Keep unchanged: …」；`subject` 和 `global` 不写）+ 用户原话（原文，不翻译）。约束段落一共六段（五种范围 + 兜底），也放在 `edit` 模板的参数里，Owner 在后台调，**不进仓库**。约束的意思举例：只改物件时「只改用户说的那个东西，其余所有元素保持一致」；换背景时「保留产品的形状、颜色、logo 和文字，背景按要求换」；换主体时「不要保留原主体」。模型支持时带 `input_fidelity: 'high'`（参数也在 `template_prompts`）。
 - **存档**：`generation_jobs.inputs` 记 `instruction`（用户原话）、`edit_scope`（判出的范围或 `fallback`）、`confidence`、`keep`、`change`，供 Owner 调约束时看；不存封装提示词。判断这一步的 token 记进 `provider_usage.decision_input_tokens` / `decision_output_tokens`，按判断供应商的输入、输出单价算进这一单的 `cost_usd`（§10.0）。
@@ -294,14 +297,18 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 | Pets | Pet Studio | 宠物写真 |
 | Art Styles | Korean Manhwa | 照片转精致韩漫画风，构图和主体不变 |
 
-- 每个模板消耗多少 credit 按「质量档 × 用户选的分辨率」定，写在 `templates.credits_cost`，后台可改，不低于第 6.1 节的下限。默认值：
+新单位启用后，按一次一张、用途和分辨率收费；不按会员等级改变扣点。展示、预扣、确认、退款与伙伴接口使用同一份已发布模板价格。 v2 模板保存沿用 T97 对用户照片与私有参考图总数的校验，同时检查当前报价版本、模型和各档积分下限。
 
-| 模板质量档 | 1K | 2K | 3K |
-|---|---|---|---|
-| `high`（默认） | 2 | 4 | 6 |
-| `medium`（效果够用的模板，需逐个实测后才能降档） | 1 | 2 | 3 |
+| 用途 | 出图要求 | 1K | 2K | 3K |
+|---|---|---:|---:|---:|
+| 画风迁移 | 便宜模型待验证；目标 medium | 20（规划） | 未定 | 未定 |
+| 菜品、产品 | GPT Image 2.6 Sunburst，medium | 74 | 150 | 225 |
+| 普通海报、宠物和伙伴自由创作 | 同模型，medium | 45 | 120 | 190 |
+| 精细文字海报 | 同模型，high | 120 | 240 | 360 |
+| 作品编辑 | 同模型，medium，含范围判断 | 20 | 37 | 58 |
 
-- 分辨率由用户在工作台选，模板不限制档位；三个档位的像素定义见第 8.1 节。`freeform` 模板同样三档都配（默认同 `high`）。
+切换时下架房间模板 Bright Listing、Evening Glow。Pet Studio 与伙伴 freeform 按普通海报价，Promo Poster 属普通海报。逐个核实模板用途；不从分类推断质量。保留既有本地高分辨率方案，不启用放大替代。画风迁移尚无已批准模型，能力、效果、费用验证前不承诺可用，不以 GPT 代替；未定档位不可购买。分辨率沿用第 8.1 节，3K 方图 2880×2880。换模型后仅开放模型实际支持的规格。
+
 - **画风模板的版权规则**：模板名、说明、提示词里只能用通用风格描述（如 "Korean manhwa style"），不准出现具体作品、作者、角色、工作室或品牌的名字；示例图不能模仿可辨认的作品。
 - **海报类只做单张、短文字**：标题和价格由用户在工作台的文案字段里填。多行菜单、价格单这类需要逐行排版的物料不交给 AI 画字，放到物料期用代码排版做。
 - 模板质量由 Owner 调提示词时把关，不设统一的实测门槛（Owner 2026-11-05）。
@@ -333,35 +340,42 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
   - **`record_payment_issue(charge_id, kind, amount_refunded)`**：`kind` 为 `refunded` / `disputed`，按 charge id 更新 `payments.status` 和 `amount_refunded`（全退为 `refunded`，部分退为 `partially_refunded`，争议为 `disputed`），不动积分。charge 不在表里时不写行，只发 Sentry 告警，回 200。
   - **`settle_waffo_order(user, product_id, payment_id, order_id, amount_total, currency, amount_tax, method)`**（T13，总控 2026-11-06 补）：在同一事务里完成两步。先调用 `apply_purchase(user, product_id, payment_id)`，用 Waffo 的 payment id 做幂等键；入账生效时再插入一行 `payments`，其中 `channel = 'waffo'`，`waffo_order_id` 取 Waffo 订单号，金额和税额取自 `order.completed` 事件，单位换算为分。重复事件不写第二行。**T50 起**：签名不变，同时写 `waffo_payment_id`；单笔和订阅的每一期扣款（含首付）都走它，幂等键是 `PAY_` 扣款号，所以续费不会重复入账，续费失败没有扣款事件、不入账。
   - 以上函数都只授权 `service_role`。
+- **版本化结账（新积分）**：私有 `admin.product_terms_v2(product_id primary key,credits,usd_cents)` 保存九项已核准报价，启用 RLS，不对客户端开放。调用方从已验签的 Stripe/Waffo 订单或合同取得价格版本；新合同走仅 service_role 可执行的 `settle_checkout_v2`、`settle_waffo_order_v2`、`apply_subscription_renewal_v2`，旧合同和旧在途单保持原端点与原价。切换后首次入账的真实旧合约款按等档新积分发放（保持签约费用和周期），重复回调只认原流水。共用事务、索引和付款幂等键。不得因缺失或非法的新版本信息把新单当旧单。退款、争议按对应时间的入账流水折算，不能按今日套餐目录回推。加这些函数本身不激活新 UI，不改余额或第三方合同。
+- **旧单位结清**：生产切换只针对 Owner 核实的旧账号付费与免费两个池；授权时 6 个账号，124 付费、26 免费。私有 `admin.pricing_wallet_cutover` 记录版本、时点、原余额摘要和结清后流水位点。仅由受保护工作流在库内校验摘要、付款数、流水、有效合同和未完任务后调用 `admin.clear_approved_wallets_v2`，逐池写唯一冲销流水，不删订单或历史记录。恢复函数仅在无新经济活动且能复原原摘要时写逆向流水。新价格启用事务同时设置 `system_settings.pricing_catalog_version` 为 JSON 字符串 `v2`；其写入时间是注册赠分界线，旧账号不补领，新账号获 100 免费积分，沿用原同 IP 限制和幂等键。迁移本身不执行切换。
+- 激活事务在目录、模型、价格和钱包共同可用后记录私有 `admin.pricing_release_checkpoint(version,fingerprint)`。测试库和正式库的回滚都检查余额、注册、流水、付款、合同、拒付和生成；期间有新业务则停止。回滚前关闭新收银、到期或关闭可付款会话、排清两通道在途凭证。回滚后才首次收到的新报价付款不得入旧钱包，返回可重试的结算错误并核对渠道款项。注册和支付先取得公共读锁再读版本；切换独占该锁，避免同时读旧版写新版。
 - **首付的 `paid_until`**：首付走 `apply_purchase`，按商品天数累加（月付 +30 天，年付 +365 天），和 Stripe 本期结束日可能差一两天。从第一次续费起，由 `apply_subscription_renewal` 对齐 `period_end`，见下一条。
 - 订阅续费走 T10 新增的 `apply_subscription_renewal(user, product_id, invoice_id, period_end)`：`credits += 商品积分`，`paid_until = greatest(paid_until, period_end)`（直接对齐 Stripe 的本期结束日，不按天数累加，避免大小月漂移）；同样写流水、按 invoice id 幂等，内部复用 `_apply_credit_change`（总控 2026-11-05 补）。
 - 没用完的积分在续费时自然结转（积分不过期），不做「本期 / 结转」两本账。
-- **计价单位是 credit，不是「张」。**（唯一例外：新用户赠送对外说 "3 free Standard images"，即 6 个免费 credit，见建站规格 G3。） 一次出图扣多少 = 模板在用户所选分辨率的配置值 `templates.credits_cost[resolution]`（第 5 节：`high` 模板默认 1K 2 / 2K 4 / 3K 6，`medium` 1 / 2 / 3），后台模板编辑页可改；会员每月发多少 credit、积分包多少 credit 写在 `site.config.ts`。前台后台都叫 credits，余额显示为 "30 credits + 3 free"。「重新生成」按同一模板、同一分辨率再扣一次。
-- **配置下限（T96）**：按实际供应商配置、模型名和清晰度，取近 30 天成功出图中有成本记录的 p95。至少 10 个样本时使用实测值，样本不足时使用后台每档单张美元估价；OpenAI 可使用保守估价，并保留原质量档下限。最低积分为 `ceil(单张成本 × 1.10 ÷ C_max)`。C_max 由当前商品的最低每积分实收乘以 76.1%（扣除预计手续费、退款和返佣）和 40%（目标毛利 60%）得出。后台显示建议下限，保存或批量变更时按模型核对支持的档位。该计算不会修改已有模板的售价、用户积分或套餐。
+- **计价单位是 credit**：标价 1 积分 = $0.01；成交每积分实价随套餐或优惠不同。注册赠送 100 免费积分，不承诺固定张数。每次生成（含重新生成）按该模板、该清晰度的当前报价预扣，既有订单和任务按成交或预扣时的数量结算。
+- **成本控制**：保留供应商能力检查，跟踪真实 p95、失败计费、费税与渠道组合。以综合用量评估毛利；已批准用途价格不得被单项毛利目标自动抬高或阻断。未批准的新价格、新模型仍需单独核验。预算和样本不足的估算不能标记为实测。
+
+- 未列入经批准的模板／模型／质量／档位组合时，仍执行 T96 的成本下限。以同供应商型号、清晰度近 30 日至少十张实测 p95 为先，样本不足取估价；成本乘 1.10，除以当前最低每积分实收 ×76.1% ×40%，向上取整。后台保存和备用模型预扣共用数据库的现行目录单价。v1 取旧商品，v2 取已启用商品对应的新合同价目，最低为 Max 年付 $891 / 168,000。
 - 余额只能通过 SQL 函数改：发放（`grant_credits` 带 `pool` 参数，注册赠送和活动赠送用 `'free'`）、预扣、确认、退回、管理员调整（`admin_adjust_credits` 带 `pool` 参数）。前端和普通接口都不能直接写余额。
 - 每一笔变动都写进流水表，记录动的是哪个池，带幂等键。
 
-### 6.2 商品（Owner 2026-11-05 定稿）
+### 6.2 商品（Owner 2026-11-09 定稿，按三级流程切换）
 
 **三档会员 × 月付 / 年付 + 三个积分包，共 9 个商品。** 商品 id 固定如下（总控定），Stripe / Waffo 映射、PostHog 事件、付费墙和 `/pricing` 文案都按这些 id 写：
 
-| id | 档位 | 价格 | 付费积分 | 每 credit | 会员期 `paid_until` | 卡 / Apple Pay / Google Pay | 支付宝 |
-|---|---|---|---|---|---|---|---|
-| `starter_monthly` | Starter | $19.90 / 月 | 50 / 月 | $0.398 | +30 天 | Stripe **订阅**，每期 +50 | Stripe **单笔**一期会员 |
-| `starter_yearly` | Starter | $191 / 年（合 $15.92/月） | 600，一次发完 | $0.318 | +365 天 | Stripe **订阅**，每年 +600 | Stripe **单笔** |
-| `pro_monthly` | Pro | $49.90 / 月 | 135 / 月 | $0.370 | +30 天 | 订阅 | 单笔 |
-| `pro_yearly` | Pro | $479 / 年（合 $39.92/月） | 1,620，一次发完 | $0.296 | +365 天 | 订阅 | 单笔 |
-| `max_monthly` | Max | $99 / 月 | 280 / 月 | $0.354 | +30 天 | 订阅 | 单笔 |
-| `max_yearly` | Max | $713 / 年（合 $59.42/月） | 3,360，一次发完 | $0.212 | +365 天 | 订阅 | 单笔 |
-| `pack_s` | 积分包 | $9.90 | 20 | $0.495 | 不变 | Stripe Managed Payments **单笔** | Stripe **单笔** |
-| `pack_m` | 积分包 | $24.90 | 55 | $0.453 | 不变 | 单笔 | 单笔 |
-| `pack_l` | 积分包 | $49.90 | 115 | $0.434 | 不变 | 单笔 | 单笔 |
+| 商品 ID | 美元实价 | 付费积分 | 权益 |
+|---|---:|---:|---|
+| `starter_monthly` | $19.90 | 1,990 | 一期 30 天 |
+| `starter_yearly` | $191.04 | 23,880 | 一期 365 天，一次发完 |
+| `pro_monthly` | $49.90 | 6,000 | 一期 30 天 |
+| `pro_yearly` | $479.04 | 72,000 | 一期 365 天，一次发完 |
+| `max_monthly` | $99.00 | 14,000 | 一期 30 天 |
+| `max_yearly` | $891.00 | 168,000 | 一期 365 天，一次发完 |
+| `pack_s` | $9.90 | 990 | 单笔，不改会员期 |
+| `pack_m` | $24.90 | 2,490 | 单笔，不改会员期 |
+| `pack_l` | $49.90 | 4,990 | 单笔，不改会员期 |
 
-- 年付积分 = 12 × 月付积分，一次发完。**年付折扣（Owner 2026-11-06 改价）**：Starter、Pro 按月价 × 12 打 8 折，Max 打 6 折，金额取整到美元：$191（省 20%）、$479（省 20%）、$713（省 40%）。年付最多省 40%，不得超过。改价在 Stripe 上是新建 Price 并用 `transfer_lookup_key` 接过 lookup key（Price 金额不可改），旧 Price 归档；Waffo 商品价格同步改。积分包每 credit 都高于所有订阅，**所有人可买，包括没买会员的**，所有通道都是单笔，不改 `paid_until`。注册赠送为 6 个免费 credit（以 `site.config.ts` 的 `billing.freeCredits` 为准），不计入毛利。
+- 无首月折扣、活动赠分或年付额外赠分。年付基础积分恰好等于月付 ×12；按正常月价 ×12，Starter/Pro 八折、Max 七五折，精确到美分。会员各支付方式、续费与升级时点见下文。
+- 按结账时有效会员给 M/L 会员价。无会员和 Starter/Pro/Max 的 M 包分别为 $24.90/$23.66/$22.41/$21.17；L 包为 $49.90/$47.41/$44.91/$42.42；S 包一律 $9.90。以整数分四舍五入；会员价与有效专项码仅取更低者，不叠加。会员价相等或更低时不占用、不核销码；订阅无自动首月优惠，专项码按原条款。折扣不减少包内积分。实付、税款、退款、佣金以真实订单为准。
+- 切换前先盘点旧余额及各池、负债、年付合同、未完成任务、在途支付/优惠与退款，以可重放的账本对账。保留既有合同金额、到期日、历史订单及作品权益。不能按商品现值重算旧订单。Owner 确认本次盘点内的生产付费余额来自给朋友的赠送。切换时原付费与免费两池全部清零，不作购买力补偿；只给切换后新注册用户赠送 100 免费积分，旧账号不重领；不删历史流水、不追扣已结退款。只处理经核对的旧账号；切换前若出现新付款、未完结任务或新合同，须停止重审。切换批次、差额舍入、回滚与扩展后的兼容期须在实际执行前审阅。
 - 积分包不改会员期，但它发的是付费积分，用它生成的作品就是付费作品（无水印、私密、可商用），所以非会员买包也拿到完整权益——这正是「按作品判付费」要解决的事。
 - 价格数字只写在 `site.config.ts`（第 2 节），付费墙、`/pricing`、FAQ、结构化数据都从配置读；建站规格 G3 同步。送 Stripe 时用整数分（`1990`）。
 - **Stripe Product / Price 映射**：Starter、Pro、Max 各一个 Product（税码 `txcd_10105001`），每个 Product 挂 4 个 Price：月付 recurring、月付 one-time、年付 recurring、年付 one-time（同 id 的 recurring 和 one-time 价格相同）；三个积分包各一个 Product，只有 one-time Price。Price 的 `lookup_key` 固定为 `<product_id>`（one-time）和 `<product_id>_recurring`（订阅），服务端按 lookup key 取 Price，不把 Price id 写进代码或配置；每个 Price 的 `metadata.product_id` 也写上，回调反查用。
-- **支付宝和微信支付放在同一个结账页**（Owner 2026-11-07 改，T73；原「不接微信支付」作废）：用户选「支付宝 / 微信支付」后进 Stripe 结账页，两种都列出，自己选。支付宝和微信支付在 Stripe 普通模式下都不支持订阅，所以钱包用户买会员买的是「一期」（`starter_monthly` 的单笔形态 = 30 天 50 credits），`paid_until` 到了自己再买。这不是功能缺失，是 Stripe 的限制，付费墙文案要说清楚（"Renews automatically" vs "30 days, no auto-renew"）。
+- **支付宝和微信支付放在同一个结账页**（Owner 2026-11-07 改，T73；原「不接微信支付」作废）：用户选「支付宝 / 微信支付」后进 Stripe 结账页，两种都列出，自己选。支付宝和微信支付在 Stripe 普通模式下都不支持订阅，所以钱包用户买会员买的是「一期」（`starter_monthly` 的单笔形态 = 30 天，按该订单报价发放），`paid_until` 到了自己再买。这不是功能缺失，是 Stripe 的限制，付费墙文案要说清楚（"Renews automatically" vs "30 days, no auto-renew"）。
 - **PostHog `purchase` 事件参数**：`product_id`、`tier`（`starter` / `pro` / `max` / `pack`）、`interval`（`month` / `year` / 空）、`form`（`subscription` / `one_time`）、`channel`（`stripe` / `waffo`）、`method`（`card` / `alipay` / `wechat_pay` / `cn_card`）、`amount_usd`、`credits`。`generate` 事件加 `resolution` 和 `credits_cost`。
 
 已经确定的规则：
@@ -411,7 +425,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 
 #### 会员档位权益（Owner 2026-11-05 定档位差异；上线范围由总控 2026-11-05 按「没做出来的不能写成现有功能」裁定）
 
-**当前档位**：`paid_until > now()` 时，取最近一次会员购买（订阅或钱包单期）的档位 `starter` / `pro` / `max`；只买过积分包或没付过费的账号没有档位，按 Starter 的生成限制处理（但用免费积分生成的仍是免费作品，规则不变）。档位只决定下表的「会员权益」，**不改变按作品判付费**（水印、私密、可商用仍只看作品用的是哪个池的积分，§6.1）。由 SQL 函数 `current_tier(user_id)`（实现：`paid_until > now()` 时，取付费池里最近一条带会员商品 id 的入账流水的档位；积分包和后台调积分不决定档位；返回 null 视同 Starter） 统一给出，代码不各自判断。
+**当前档位**：`paid_until > now()` 时，取最近一次会员购买（订阅或钱包单期）的档位 `starter` / `pro` / `max`；只买过积分包或没付过费的账号没有档位，按 Starter 的生成限制处理（但用免费积分生成的仍是免费作品，规则不变）。档位决定积分包折扣和下表的「会员权益」，**不改变按作品判付费**（水印、私密、可商用仍只看作品用的是哪个池的积分，§6.1）。由 SQL 函数 `current_tier(user_id)`（实现：`paid_until > now()` 时，取付费池里最近一条带会员商品 id 的入账流水的档位；积分包和后台调积分不决定档位；返回 null 视同 Starter） 统一给出，代码不各自判断。
 
 | 权益 | Starter | Pro | Max | v1 状态 |
 |---|---|---|---|---|
@@ -472,12 +486,12 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 关闭计划后，旧佣金继续按退款和争议结果重算；关闭期间发生的付款，重开也不补发佣金。直接推广员在付款时已暂停或封禁，本人佣金作废，该笔付款也不产生上级团队奖励。
 - `admin_affiliate_decide/create/set/adjust/commission_release/rebind/payout_decide/settings/recompute` 写审计。后台财务汇总及邮箱查询、推广员概览及已脱敏推荐用户列表通过服务端读取函数返回。短码唯一索引支持绑定，推广员与时间索引支持私有明细分页，状态与确认时间索引支持每日确认，未解决错误及争议按付款检索。
 
-- **不自己开发联盟系统**，用第三方联盟工具接入（选型待 Owner 定；接入前核对：能否追踪 Managed Payments 订阅、支付宝单笔和 Waffo 订单怎么记）。网站这边只做记录推广码、结账时把推广码传给支付平台，届时另开任务卡。
+- 联盟使用 Shotviva 内置系统。直销无佣金；团队奖励只在付款时满足既有团队资格才产生。
 - **返佣比例**：代理绑定自己推荐的客户，按该客户每一笔付款**终身**返佣：
-  - 积分包（`pack_s` / `pack_m` / `pack_l`）和月付会员（`*_monthly`）：**15%**；
-  - 年付会员（`*_yearly`）：**10%**（年付折扣更大，Owner 定）。
+  - 积分包及月付：本人 15%，符合资格的团队上级另得 5%；
+  - 年付：本人 10%，符合资格的团队上级另得 3%，最高合计 13%。不回溯修改已产生的佣金快照。
 - **返佣基数**：该笔付款不含税的实付金额（`payments.amount_total − payments.amount_tax`）；退款的付款不返或追回。
-- **毛利核算**（`.local/affiliate-margin-2026-11-07.md`，2026-11-07）：按实测出图成本（约 $0.03 / 积分），返佣后所有商品毛利率在 65% 以上；按规范最坏成本（$0.06 / 积分、积分全部用完），最低是 Max 年付走 Managed Payments 国际卡，约 51%。未计第三方工具月费和给代理打款的手续费（约再少 1～3 个百分点）。
+- 成本监控区分实测与预测，按模板、编辑、分辨率与真实渠道占比汇总毛利和净利；直销不计联盟支出。
 
 ### 6.3 通道
 
@@ -610,7 +624,7 @@ check 约束换成原来的集合再加上 `code_grant`（兑换送的积分）�
 
 #### 折扣占用和并发入账（Owner 2026-11-09）
 
-- 每个账号同时最多一份待用折扣。兑换、替换、占用与核销按账号串行，兑换名额按码锁定。积分入账键基于兑换记录，滚动窗口的奖励上限按邀请人串行，按邀请人的 invite_reward 流水计数，被邀请人删号不会返还奖励名额。受邀人免费积分、邀请人首付奖励积分、补填窗口和奖励次数上限由服务端从 `site.growth.invite` 传入。滚动奖励窗口天数读取 `system_settings.code_inviter_window_days`（当前 30），原签名将天数传给支付、邀请统计的带参重载，后者返回窗口天数供双语文案使用。两项 T94 运行时设置均可经现有管理员设置 RPC 修改。
+- 每个账号同时最多一份待用折扣。兑换、替换、占用与核销按账号串行，兑换名额按码锁定。积分入账键基于兑换记录，滚动窗口的奖励上限按邀请人串行，按邀请人的 invite_reward 流水计数，被邀请人删号不会返还奖励名额。补填窗口和奖励次数上限由服务端从 `site.growth.invite` 传入。滚动奖励窗口天数读取 `system_settings.code_inviter_window_days`（当前 30），原签名将天数传给支付、邀请统计的带参重载，后者返回窗口天数供双语文案使用。个人邀请奖励另存于 system_settings 的 code_invite_rewards（inviteeCredits 默认 6、inviterCredits 默认 10，各为 0～10000 的整数，以当前积分计，不自动换算）。仅未封禁管理员可经服务端 admin_save_invite_rewards 原子更新两项，校验之前读到的值，并在 admin_audit_log 记录操作人、时间和前后值。邀请码预览、账号卡与后台显示当前设置；兑换成功时按当时设置发免费积分，首次付款处理邀请奖励时按当时设置发付费积分，旧 RPC 保留金额参数但忽略其值。0 仅关闭该项发奖，邀请绑定和支付照常，重复事件不补发。已发流水、普通注册赠分、活动码和联盟结算独立。
 - 在兑换行增加 `checkout_token uuid`、`checkout_expires_at timestamptz`（均可空）以及 `checkout_prepared boolean not null default false`。服务端生成一次尝试专用的 UUID。在创建带折扣的 Stripe Session 前调用 `reserve_checkout_discount(p_user,p_product_id,p_token)`，原子查询并占用，返回折扣和截止时刻。预占建单窗口 60 秒。发起 Stripe 请求前调用 `prepare_checkout_discount(p_user,p_token,p_expires_at)`，原子固定并返回要发给 Stripe 的 Unix 截止秒数。同一尝试可幂等重试，沿用此值。其他尝试收到占用状态；存在占用时不能替换。阶段 3 建单按发起 Stripe 请求的时间设 30 分钟有效期；数据库校验传入的 Unix 秒允许最多 10 秒的时钟与传输余量，锁和 Stripe 共用同一绝对截止时间。Stripe 建单用 token 作幂等键；创建结果不确定时仅重试原尝试。阶段 3 必须对齐 Stripe 实际截止时间，不能让本地占用先于仍可付款的 Session 到期。
 - 到期即可重新占用，无需定时清理。用户放弃时服务端先确认 Stripe Session 已过期或主动关闭成功，再调用 `release_checkout_discount(p_user,p_token)`；确定未建单也立即释放。释放须匹配原 token，延迟的取消或过期通知不能释放新占用。异步付款处理中不能因浏览器返回就认定为放弃。
 - 核销以成功付款为准；从 Stripe 可信 metadata 取得码，按用户和码定位兑换，允许处理关闭或替换后迟到的成功通知。第一笔成功核销后保留其付款 id。第二笔不同付款命中同一份折扣也正常入账，保留实付和折扣金额，标记该笔 `code_discount_conflict`。首次处理后记 `code_effects_applied_at`，封顶或封禁时确定的未发奖结果同样不随回调重放改变。RPC 返回冲突标记供回调记 warning，后台兑换明细列出异常付款；不追收差价。重放同一笔付款不重复发奖。

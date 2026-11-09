@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { testSite, withImageOff } from '../seo/test-site'
-import { isPathEnabled, moduleForPath, requireModule } from './modules'
+import { isPathEnabled, moduleForPath } from './modules'
+import { requireModule } from './navigation'
 
 // AGENTS §7 item 5: a disabled module's routes 404.
 describe('module switch', () => {

@@ -19,8 +19,6 @@ import { z } from 'zod'
 
 import { toUpsertArgs } from '../src/core/admin/templates/rpc-payload'
 import { listImageProviderOptions, pricingFromOptions } from '../src/core/admin/templates/provider-pricing'
-import { maxCostPerCredit } from '../src/core/templates/provider-pricing'
-import { site } from '../src/site/site.config'
 import { templateWithPromptSchema } from '../src/core/templates/schema'
 import { toggleSetupProblems } from '../src/core/templates/toggles'
 
@@ -53,7 +51,7 @@ async function main() {
     auth: { persistSession: false, autoRefreshToken: false },
   })
   const templates = readTemplates(path)
-  const pricing = await listImageProviderOptions(client, maxCostPerCredit(site.billing.products), env.OPENAI_IMAGE_MODEL)
+  const pricing = await listImageProviderOptions(client, env.OPENAI_IMAGE_MODEL)
   const floors = pricingFromOptions(pricing)
   for (const { prompt, ...template } of templates) {
     const { error } = await client.rpc('admin_upsert_template', toUpsertArgs(template, prompt, { categoryByName: true, floors }))

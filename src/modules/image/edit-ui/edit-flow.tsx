@@ -64,7 +64,7 @@ export function EditFlow({ source, balance, creditsCost, imageOptions, concurren
         credits: creditsCost[next.resolution],
         inputKey: null,
         previewUrl: source.fileUrl,
-        body: { source_job_id: source.id, instruction: next.text, resolution: next.resolution, aspect_ratio: next.aspect },
+        body: { expected_credits: creditsCost[next.resolution], source_job_id: source.id, instruction: next.text, resolution: next.resolution, aspect_ratio: next.aspect },
       },
       concurrency,
     )

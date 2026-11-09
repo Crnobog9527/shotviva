@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl"
 
-import { useProductDiscount } from "./discount-context"
+import { useProductQuote } from "./discount-context"
 import { usePaymentChannel } from "./channel-context"
 import { CheckoutBar } from "./checkout-bar"
 import { discountTerm, planFinePrint } from "./copy"
@@ -21,8 +21,9 @@ export function PaywallCheckout({ resolved, choice }: { resolved: ResolvedPick; 
   const t = useTranslations("paywall")
   const checkout = useCheckout()
   const standing = useStanding()
-  const discount = useProductDiscount(resolved.product)
-  const { price, fine } = useCheckoutPrice(resolved, choice, discount)
+  const quote = useProductQuote(resolved.product)
+  const { discount } = quote
+  const { price, fine } = useCheckoutPrice(resolved, choice, quote)
   const plan = resolved.kind === "plan" ? resolved : null
   const member = plan ? planStanding(standing, plan.offer.tier, choice.period) : { upgrade: false, lock: null }
   const note = member.upgrade ? t(standing.subscription ? "upgradeNoteCancels" : "upgradeNote") : null
@@ -37,16 +38,16 @@ export function PaywallCheckout({ resolved, choice }: { resolved: ResolvedPick; 
       tone={checkoutTone(resolved)}
       status={checkout.status}
       locked={member.lock === "current" ? t("lockCurrentNote") : member.lock ? t("lockLower") : null}
-      onClick={() => void checkout.start(resolved.product.id, choice.method, discount?.offer.code)}
+      onClick={() => void checkout.start(resolved.product.id, choice.method, quote.cents, discount?.offer.code)}
     />
   )
 }
 
-function useCheckoutPrice(resolved: ResolvedPick, choice: PaywallChoice, discount: ReturnType<typeof useProductDiscount>) {
+function useCheckoutPrice(resolved: ResolvedPick, choice: PaywallChoice, { discount, priceUsd }: ReturnType<typeof useProductQuote>) {
   const t = useTranslations("paywall")
   const money = useMoney()
   const channel = usePaymentChannel()
-  const price = money(discount?.priceUsd ?? resolved.product.priceUsd)
+  const price = money(priceUsd)
   if (resolved.kind !== "plan") return { price, fine: t("finePack", { price }) }
   if (discount && choice.method !== "alipay" && discount.offer.duration !== "forever") {
     const duration = discountTerm(discount.offer, false, choice.period)

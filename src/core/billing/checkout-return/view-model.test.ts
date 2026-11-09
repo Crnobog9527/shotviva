@@ -12,6 +12,7 @@ const product = (id: string) => {
 const settled = (overrides: Partial<CheckoutFacts> = {}): CheckoutFacts => ({
   productId: 'pro_monthly',
   settled: true,
+  grantedCredits: 135,
   abandoned: false,
   method: 'card',
   amount: { minor: 4990, currency: 'usd' },
@@ -29,7 +30,7 @@ describe('checkout return view', () => {
   it('adds the product credits and shows the whole balance', () => {
     const view = returnView(settled(), product('pro_monthly'), balance)
     expect(view).toMatchObject({ state: 'success', kind: 'plan', tier: 'pro', credits: 135, balance: 138, fine: 'fineMonthly' })
-    expect(view.state === 'success' && view.renews).toEqual({ at: '2026-12-06T00:00:00.000Z', priceUsd: 49.9 })
+    expect(view.state === 'success' && view.renews).toEqual({ at: '2026-12-06T00:00:00.000Z' })
   })
 
   it.each([
@@ -45,7 +46,7 @@ describe('checkout return view', () => {
   ] as const)('%s: +%i credits, %s', (id, credits, fine) => {
     const p = product(id)
     const pack = p.tier === 'pack'
-    const view = returnView(settled({ productId: id, recurring: !pack, renewsAt: pack ? null : '2027-11-06T00:00:00.000Z' }), p, balance)
+    const view = returnView(settled({ productId: id, grantedCredits: credits, recurring: !pack, renewsAt: pack ? null : '2027-11-06T00:00:00.000Z' }), p, balance)
     expect(view).toMatchObject({ state: 'success', credits, fine, kind: pack ? 'pack' : 'plan' })
     expect(view.state === 'success' && view.renews === null).toBe(pack)
   })
@@ -63,9 +64,9 @@ describe('checkout return view', () => {
 
   it('pending until the payments row exists, with the session amount or the list price', () => {
     const view = returnView(settled({ settled: false, method: 'alipay' }), product('pro_monthly'), balance)
-    expect(view).toEqual({ state: 'pending', kind: 'plan', tier: 'pro', interval: 'month', credits: 135, amount: { minor: 4990, currency: 'usd' }, method: 'alipay' })
+    expect(view).toEqual({ state: 'pending', kind: 'plan', tier: 'pro', interval: 'month', credits: null, amount: { minor: 4990, currency: 'usd' }, method: 'alipay' })
     const waffo = returnView(settled({ settled: false, amount: null, method: null }), product('pack_m'), balance)
-    expect(waffo).toMatchObject({ state: 'pending', kind: 'pack', amount: { minor: 2490, currency: 'usd' } })
+    expect(waffo).toMatchObject({ state: 'pending', kind: 'pack', amount: null })
   })
 
   it('formats amounts in their own currency and names the card brand', () => {

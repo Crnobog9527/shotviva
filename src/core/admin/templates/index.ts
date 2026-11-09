@@ -1,6 +1,6 @@
 export { FEATURED_MAX, saveTemplate, setFeaturedTemplates, setTemplateActive, setTemplateOrder, setTemplatesActive } from './commands'
 export { listAdminTemplates } from './repository'
-export { listImageProviderOptions } from './provider-pricing'
+export { listImageProviderOptions, pricingFromOptions, readImageProviderQuote } from './provider-pricing'
 export { bulkEditTemplates } from './bulk-edit'
 export {
   bulkEditFailures,

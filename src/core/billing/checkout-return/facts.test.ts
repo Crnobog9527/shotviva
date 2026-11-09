@@ -19,6 +19,8 @@ function fakeDb(row: Row, mirror: Row = null) {
     gte: (...args: unknown[]) => (calls.push(['gte', ...args]), query),
     order: (...args: unknown[]) => (calls.push(['order', ...args]), query),
     limit: (...args: unknown[]) => (calls.push(['limit', ...args]), query),
+    in: () => query,
+    returns: async () => ({ data: [{ idempotency_key: 'purchase:PAY_first', delta: 135 }], error: null }),
     maybeSingle: async () => ({ data: table === 'subscriptions' ? mirror : row, error: null }),
   }
   const db = { from: (name: string) => ((table = name), calls.push(['from', name]), query) } as unknown as SupabaseClient
@@ -58,6 +60,7 @@ describe('checkout return facts (read only)', () => {
     expect(facts).toEqual({
       productId: 'pro_monthly',
       settled: true,
+      grantedCredits: null,
       abandoned: false,
       method: 'card',
       amount: { minor: 4990, currency: 'usd' },
@@ -117,7 +120,7 @@ describe('checkout return facts, Waffo', () => {
     const mirror = { current_period_end: '2026-12-06T00:00:00+00:00', cancel_at_period_end: false, status: 'active' }
     const { db, calls } = fakeDb(payment, mirror)
     const facts = await readCheckoutFacts({ stripe, db }, USER, { channel: 'waffo', productId: 'pro_monthly' })
-    expect(facts).toMatchObject({ settled: true, recurring: true, renewsAt: '2026-12-06T00:00:00.000Z', paymentKey: 'PAY_first' })
+    expect(facts).toMatchObject({ settled: true, grantedCredits: 135, recurring: true, renewsAt: '2026-12-06T00:00:00.000Z', paymentKey: 'PAY_first' })
     expect(calls).toContainEqual(['eq', 'waffo_order_id', 'ORD_sub1'])
     // activated not in yet: still a subscription, date unknown.
     const early = await readCheckoutFacts({ stripe, db: fakeDb(payment, null).db }, USER, { channel: 'waffo', productId: 'pro_monthly' })

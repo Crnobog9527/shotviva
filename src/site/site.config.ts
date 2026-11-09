@@ -1,4 +1,5 @@
 import { affiliateDefault } from '@/core/affiliate/defaults'
+import { pricingV2 } from '@/core/public-env'
 import { defineSite } from '@/core/config'
 
 import { SITE_DOMAIN } from './domain'
@@ -38,6 +39,7 @@ export const site = defineSite({
       '/pricing',
       '/partners',
       '/partners/apply',
+      '/partners/join',
       '/partners/terms',
       '/signup',
       '/login',
@@ -65,22 +67,22 @@ export const site = defineSite({
   growth: { invite: { inviteeCredits: 6, inviterCredits: 10, windowDays: 7, inviterRewardCap: 20 } },
   billing: {
     currency: 'usd',
-    // = 3 free Standard images at 2 credits each; public copy says "3 free Standard images" (建站规格 G3).
-    freeCredits: 6,
+    pricingVersion: pricingV2 ? 'v2' : undefined,
+    freeCredits: pricingV2 ? 100 : 6,
     // The nine products, prices final (Owner 2026-11-05, ARCHITECTURE §6.2). Credits and days
     // also live in the products table for apply_purchase; tests/db/stripe-catalog.test.ts keeps
     // them equal. Stripe Prices are looked up by lookup_key, never stored here.
     products: [
-      { id: 'starter_monthly', tier: 'starter', interval: 'month', credits: 50, paidDays: 30, priceUsd: 19.9 },
-      { id: 'starter_yearly', tier: 'starter', interval: 'year', credits: 600, paidDays: 365, priceUsd: 191 },
-      { id: 'pro_monthly', tier: 'pro', interval: 'month', credits: 135, paidDays: 30, priceUsd: 49.9 },
-      { id: 'pro_yearly', tier: 'pro', interval: 'year', credits: 1620, paidDays: 365, priceUsd: 479 },
-      { id: 'max_monthly', tier: 'max', interval: 'month', credits: 280, paidDays: 30, priceUsd: 99 },
-      { id: 'max_yearly', tier: 'max', interval: 'year', credits: 3360, paidDays: 365, priceUsd: 713 },
+      { id: 'starter_monthly', tier: 'starter', interval: 'month', credits: pricingV2 ? 1990 : 50, paidDays: 30, priceUsd: 19.9 },
+      { id: 'starter_yearly', tier: 'starter', interval: 'year', credits: pricingV2 ? 23880 : 600, paidDays: 365, priceUsd: pricingV2 ? 191.04 : 191 },
+      { id: 'pro_monthly', tier: 'pro', interval: 'month', credits: pricingV2 ? 6000 : 135, paidDays: 30, priceUsd: 49.9 },
+      { id: 'pro_yearly', tier: 'pro', interval: 'year', credits: pricingV2 ? 72000 : 1620, paidDays: 365, priceUsd: pricingV2 ? 479.04 : 479 },
+      { id: 'max_monthly', tier: 'max', interval: 'month', credits: pricingV2 ? 14000 : 280, paidDays: 30, priceUsd: 99 },
+      { id: 'max_yearly', tier: 'max', interval: 'year', credits: pricingV2 ? 168000 : 3360, paidDays: 365, priceUsd: pricingV2 ? 891 : 713 },
       // Packs: anyone can buy them, they never change paid_until.
-      { id: 'pack_s', tier: 'pack', interval: null, credits: 20, paidDays: null, priceUsd: 9.9 },
-      { id: 'pack_m', tier: 'pack', interval: null, credits: 55, paidDays: null, priceUsd: 24.9 },
-      { id: 'pack_l', tier: 'pack', interval: null, credits: 115, paidDays: null, priceUsd: 49.9 },
+      { id: 'pack_s', tier: 'pack', interval: null, credits: pricingV2 ? 990 : 20, paidDays: null, priceUsd: 9.9 },
+      { id: 'pack_m', tier: 'pack', interval: null, credits: pricingV2 ? 2490 : 55, paidDays: null, priceUsd: 24.9 },
+      { id: 'pack_l', tier: 'pack', interval: null, credits: pricingV2 ? 4990 : 115, paidDays: null, priceUsd: 49.9 },
     ],
     channels: { primary: 'stripe', fallback: 'waffo' },
   },
@@ -124,5 +126,6 @@ export const site = defineSite({
       foodHalfDayUsd: { low: 400, high: 2500 },
     },
     photoSecondsApprox: 60,
+    examplePhotoCredits: { product: 74, menu: 74, poster: 45 },
   },
 })

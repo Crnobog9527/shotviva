@@ -58,7 +58,7 @@ type Props = { balance: Balance; giftRefused: boolean; allowance: Allowance | nu
 export function dialFigures(balance: Balance, allowance: Allowance | null, freeGift: number, giftRefused: boolean): DialFigures {
   return {
     paidOf: allowance && balance.paid <= allowance.credits ? allowance.credits : null,
-    freeOf: !giftRefused && balance.free <= freeGift ? freeGift : null,
+    freeOf: !giftRefused && freeGift > 0 && balance.free <= freeGift ? freeGift : null,
   }
 }
 

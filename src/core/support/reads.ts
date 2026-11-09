@@ -1,3 +1,4 @@
+import { paymentGrantKey, paymentGrants } from '../billing/payment-grants'
 import 'server-only'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -120,6 +121,8 @@ const paymentRow = z.object({
   channel: z.enum(['stripe', 'waffo']),
   status: z.enum(['paid', 'refunded', 'partially_refunded', 'disputed']),
   stripe_invoice_id: z.string().nullable(),
+  stripe_session_id: z.string().nullable().optional(),
+  waffo_payment_id: z.string().nullable().optional(),
 })
 
 // The author's latest payments for the billing / refund picker and the account page's
@@ -127,12 +130,16 @@ const paymentRow = z.object({
 export async function listPaymentOptions(db: SupabaseClient, userId: string): Promise<PaymentOption[]> {
   const { data, error } = await db
     .from('payments')
-    .select('id, product_id, amount_total, currency, method, created_at, channel, status, stripe_invoice_id')
+    .select('id, product_id, amount_total, currency, method, created_at, channel, status, stripe_invoice_id, stripe_session_id, waffo_payment_id')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(PICKER_LIMIT)
   if (error) readFailed('listPaymentOptions', error)
-  return paymentRow.array().parse(data).map((row) => ({
+  const rows = paymentRow.array().parse(data)
+  const keys = rows.map(paymentGrantKey)
+  const grants = await paymentGrants(db, userId, keys)
+  return rows.map((row, index) => ({
+    grantedCredits: grants.get(keys[index] ?? '') ?? null,
     id: row.id,
     productId: row.product_id,
     amountTotal: row.amount_total,
