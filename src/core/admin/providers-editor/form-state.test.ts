@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
+import { saveProviderSchema } from '../providers/schema'
 import type { AdminProvider } from '../providers/types'
 
-import { canSave, DEFAULT_FORM, formFor, missingPrices, priceOrigin, pricesFromTable, toSaveInput, withModel } from './form-state'
+import { canSave, DEFAULT_FORM, formFor, missingPrices, priceOrigin, pricesFromTable, toSaveInput, withAdapter, withModel } from './form-state'
 
 const provider: AdminProvider = {
   id: '6f1c2f9e-6a52-4c39-9a51-0a9f6b0c1d2e',
   module: 'image',
   adapter: 'openai_images',
+  resolutions: ['1k', '2k', '3k'],
   label: 'OpenAI 官方',
   baseUrl: 'https://api.openai.com/v1',
   model: 'gpt-image-2.6',
@@ -24,6 +26,21 @@ describe('provider form state', () => {
     expect(form.apiKey).toBe('')
     expect(toSaveInput(form, provider)).toMatchObject({ id: provider.id, apiKey: '', model: 'gpt-image-2.6' })
     expect(canSave(form, false)).toBe(true)
+  })
+
+  it('uses the selected adapter endpoint and saves the model’s supported tiers', () => {
+    const router = withAdapter(formFor(null), 'openrouter_images')
+    expect(router.baseUrl).toBe('https://openrouter.ai/api/v1')
+    expect(toSaveInput({ ...router, resolutions: ['1k'] }, provider)).toMatchObject({ adapter: 'openrouter_images', resolutions: ['1k'] })
+    expect(canSave({ ...router, resolutions: [] }, false)).toBe(false)
+    expect(withAdapter(router, 'openai_images').baseUrl).toBe('https://api.openai.com/v1')
+  })
+
+  it('keeps a legacy submission without tiers distinct from an explicit change', () => {
+    const input = toSaveInput(formFor(provider), provider)
+    const legacy = { ...input, resolutions: undefined }
+    expect(saveProviderSchema.parse(legacy).resolutions).toBeUndefined()
+    expect(saveProviderSchema.safeParse({ ...input, resolutions: [] }).success).toBe(false)
   })
 
   it('requires a key for a new provider', () => {

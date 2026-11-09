@@ -11,7 +11,7 @@ type Props = { pair: readonly [TestRunView, TestRunView] | null; photoUrls: Read
 function Side({ run, photoUrl }: { run: TestRunView; photoUrl: string | null }) {
   const title = run.kind === 'generate' ? COPY.records.first : COPY.records.editOf(run.instruction ?? '')
   const aspect = run.aspectRatio ? (ASPECT_LABEL[run.aspectRatio] ?? run.aspectRatio) : null
-  const facts = [RESOLUTION_LABEL[run.resolution], aspect, run.editScope ? COPY.run.scope(run.editScope) : null, run.costUsd === null ? null : usd.format(run.costUsd)]
+  const facts = [run.model, RESOLUTION_LABEL[run.resolution], aspect, run.editScope ? COPY.run.scope(run.editScope) : null, run.costUsd === null ? null : usd.format(run.costUsd)]
   return (
     <figure className="grid min-w-0 content-start gap-2">
       <div className="bg-muted flex aspect-[4/5] items-center justify-center overflow-hidden rounded-md border">
@@ -20,7 +20,7 @@ function Side({ run, photoUrl }: { run: TestRunView; photoUrl: string | null }) 
       </div>
       <figcaption className="grid gap-0.5">
         <span className="text-sm font-medium break-words">{title}</span>
-        <span className="text-muted-foreground text-xs">{facts.filter(Boolean).join(' · ')}</span>
+        <span className="text-muted-foreground break-all text-xs">{facts.filter(Boolean).join(' · ')}</span>
         {photoUrl ? (
           <a href={photoUrl} target="_blank" rel="noreferrer" className="text-muted-foreground text-xs underline underline-offset-4">
             {COPY.compare.source}

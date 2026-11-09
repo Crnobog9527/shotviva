@@ -63,6 +63,7 @@ export async function saveProvider(deps: ProviderCommandDeps, adminId: string, i
   const write: ProviderWrite = {
     module: parsed.module,
     adapter: parsed.adapter,
+    resolutions: parsed.resolutions,
     label: parsed.label,
     baseUrl,
     model: parsed.model,
@@ -110,7 +111,7 @@ export async function removeProvider(deps: ProviderCommandDeps, adminId: string,
   logger.info('admin.provider.deleted', { adminId, providerId: id, module: target.module, model: target.model })
 }
 
-// GET {base_url}/models with the row's stored key. Re-checks the host first, since DNS can
+// Check the row's stored key without generating an image. Re-checks the host first, since DNS can
 // change after the row was saved.
 export async function testProvider(deps: ProviderCommandDeps, input: unknown): Promise<ConnectionResult> {
   const { id } = parseOrThrow(providerIdSchema, input)
@@ -118,7 +119,7 @@ export async function testProvider(deps: ProviderCommandDeps, input: unknown): P
   const apiKey = await readProviderKey(deps.db, id)
   if (!apiKey) throw new ProviderSettingError('api_key_missing', `provider ${id} has no API key`)
   const baseUrl = await assertPublicBaseUrl(row.baseUrl, deps.resolveHost)
-  const result = await testConnection({ baseUrl, apiKey }, deps.fetch)
+  const result = await testConnection({ baseUrl, apiKey, adapter: row.adapter }, deps.fetch)
   logger.info('admin.provider.tested', { providerId: id, ok: result.ok, status: result.status ?? null })
   return result
 }

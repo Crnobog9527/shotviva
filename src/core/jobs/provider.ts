@@ -26,6 +26,10 @@ export type ProviderInput = {
 // T33). A field the provider did not report is left out, never guessed; cost then stays null.
 // decision_* are the photo-edit decision step's tokens (T30, §5), added by that flow.
 export type ProviderUsage = {
+  // Raw OpenRouter usage; cost is USD before the top-up fee.
+  prompt_tokens?: number
+  completion_tokens?: number
+  cost?: number
   input_text_tokens?: number
   input_image_tokens?: number
   output_tokens?: number
@@ -48,6 +52,13 @@ export type GenerationProvider = {
   // empty ones filled from MODEL_PRICES; null when neither has any (the job then has no cost).
   prices?: ProviderPrices | null
   generate(input: ProviderInput): Promise<ProviderOutput>
+}
+
+// Web and admin first-generation resolve the saved provider after loading the template.
+export type TemplateProvider = GenerationProvider | ((id: string | null, resolution: Resolution) => Promise<GenerationProvider>)
+
+export function resolveTemplateProvider(provider: TemplateProvider, id: string | null, resolution: Resolution) {
+  return typeof provider === 'function' ? provider(id, resolution) : provider
 }
 
 // Why a provider call failed, in the terms settlement needs. Every kind is refunded.

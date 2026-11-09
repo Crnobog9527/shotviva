@@ -6,7 +6,7 @@ import type { ActiveChangeOutcome } from './publish-rules'
 
 export type AdminTemplate = Template & {
   // null only if a template was created outside the admin flow without a prompt.
-  prompt: { body: string; version: number; modelParams: Record<string, unknown> } | null
+  prompt: { providerId: string | null; body: string; version: number; modelParams: Record<string, unknown> } | null
 }
 
 // What the editor sends back; validated again on the server before it reaches the database.

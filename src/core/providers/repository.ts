@@ -3,6 +3,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
+import { RESOLUTIONS, type Resolution } from '../templates/output-options'
 import { AppError } from '../errors'
 import type { ProviderPrices } from '../jobs'
 import { ProviderSettingError } from './setting-error'
@@ -13,7 +14,7 @@ import { PROVIDER_ADAPTERS, PROVIDER_MODULES, type ActiveProviderRow, type Admin
 
 const PRICE_COLUMNS = 'price_input_text_per_m, price_input_image_per_m, price_output_per_m'
 
-const LIST_COLUMNS = `id, module, adapter, label, base_url, model, api_key_last4, is_active, notes, updated_at, ${PRICE_COLUMNS}`
+const LIST_COLUMNS = `id, module, adapter, label, base_url, resolutions, model, api_key_last4, is_active, notes, updated_at, ${PRICE_COLUMNS}`
 
 // numeric comes back from PostgREST as a JSON number; null when not filled in.
 const price = z.coerce.number().nonnegative().nullable()
@@ -31,6 +32,7 @@ const listRowSchema = z.object({
   adapter: z.enum(PROVIDER_ADAPTERS),
   label: z.string(),
   base_url: z.string(),
+  resolutions: z.array(z.enum(RESOLUTIONS)),
   model: z.string(),
   api_key_last4: z.string().nullable(),
   is_active: z.boolean(),
@@ -39,12 +41,13 @@ const listRowSchema = z.object({
   ...priceColumns,
 })
 
-const ROW_COLUMNS = `id, adapter, base_url, model, ${PRICE_COLUMNS}`
+const ROW_COLUMNS = `id, adapter, base_url, resolutions, model, ${PRICE_COLUMNS}`
 
 const rowSchema = z.object({
   id: z.uuid(),
   adapter: z.enum(PROVIDER_ADAPTERS),
   base_url: z.string(),
+  resolutions: z.array(z.enum(RESOLUTIONS)),
   model: z.string(),
   ...priceColumns,
 })
@@ -60,6 +63,7 @@ function toAdminProvider(row: z.infer<typeof listRowSchema>): AdminProvider {
     adapter: row.adapter,
     label: row.label,
     baseUrl: row.base_url,
+    resolutions: row.resolutions,
     model: row.model,
     apiKeyLast4: row.api_key_last4,
     isActive: row.is_active,
@@ -70,7 +74,7 @@ function toAdminProvider(row: z.infer<typeof listRowSchema>): AdminProvider {
 }
 
 function toActiveRow(row: z.infer<typeof rowSchema>): ActiveProviderRow {
-  return { id: row.id, adapter: row.adapter, baseUrl: row.base_url, model: row.model, prices: toPrices(row) }
+  return { id: row.id, adapter: row.adapter, baseUrl: row.base_url, resolutions: row.resolutions, model: row.model, prices: toPrices(row) }
 }
 
 export async function listProviders(db: SupabaseClient): Promise<AdminProvider[]> {
@@ -112,6 +116,7 @@ export type ProviderWrite = {
   model: string
   notes: string | null
   prices: ProviderPrices
+  resolutions?: Resolution[]
   updatedBy: string
 }
 
@@ -121,6 +126,7 @@ function toColumns(write: ProviderWrite) {
     adapter: write.adapter,
     label: write.label,
     base_url: write.baseUrl,
+    resolutions: write.resolutions,
     model: write.model,
     notes: write.notes,
     price_input_text_per_m: write.prices.inputTextPerM,
@@ -139,7 +145,8 @@ export async function insertProvider(db: SupabaseClient, write: ProviderWrite): 
 }
 
 export async function updateProvider(db: SupabaseClient, id: string, write: ProviderWrite): Promise<void> {
-  const { data, error } = await db.from('ai_providers').update(toColumns(write)).eq('id', id).select('id')
+  // Keep the protocol fixed for this Vault key, including stale or forged admin submissions.
+  const { data, error } = await db.from('ai_providers').update(toColumns(write)).eq('id', id).eq('adapter', write.adapter).select('id')
   if (error) fail('update', error)
   if (!data || data.length === 0) throw new ProviderSettingError('not_found', `provider ${id} not found`)
 }
@@ -155,6 +162,7 @@ export async function deleteProvider(db: SupabaseClient, id: string): Promise<vo
 export async function adminDeleteProvider(db: SupabaseClient, id: string): Promise<void> {
   const { error } = await db.rpc('admin_delete_provider', { p_id: id })
   if (error?.message.includes('PROVIDER_NOT_FOUND')) throw new ProviderSettingError('not_found', `provider ${id} not found`)
+  if (error?.message.includes('PROVIDER_REFERENCED')) throw new ProviderSettingError('provider_referenced', 'provider is used by a template')
   if (error?.message.includes('PROVIDER_ACTIVE')) throw new ProviderSettingError('provider_active', `provider ${id} is in use`)
   if (error) fail('delete', error)
 }

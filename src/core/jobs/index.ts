@@ -1,3 +1,4 @@
+export { resolveTemplateProvider, type TemplateProvider } from './provider'
 export {
   JOB_MODULES,
   JOB_SOURCES,

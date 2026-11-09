@@ -39,6 +39,14 @@ describe('toUpsertArgs', () => {
     expect(imported).not.toHaveProperty('category_key')
   })
 
+  it('preserves omitted provider settings and allows explicit assignment or clearing', () => {
+    const prompt = { body: 'x', modelParams: {} }
+    expect(toUpsertArgs(template, prompt).p_prompt).not.toHaveProperty('provider_id')
+    const providerId = '328576a9-f5b8-4c5d-b180-fe7b15deb02c'
+    expect(toUpsertArgs(template, { ...prompt, providerId }).p_prompt.provider_id).toBe(providerId)
+    expect(toUpsertArgs(template, { ...prompt, providerId: null }).p_prompt.provider_id).toBeNull()
+  })
+
   it('passes them through when given', () => {
     const args = toUpsertArgs({ ...template, sortOrder: 30, isActive: true }, { body: 'x', modelParams: {} })
     expect(args.p_template).toMatchObject({ sort_order: 30, is_active: true })

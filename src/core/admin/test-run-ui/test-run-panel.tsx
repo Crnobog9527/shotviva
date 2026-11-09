@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
+import type { ImageProviderOption } from '@/core/admin/image-provider-field'
+
 import type { AdminTemplate, CoverLanguage } from '../templates/types'
 import type { TestRunView } from '../test-runs'
 import { BudgetBar } from './budget-bar'
@@ -20,11 +22,13 @@ function Status({ error, notice }: { error: string | null; notice: string | null
   return notice ? <p role="status" className="text-sm text-emerald-700 dark:text-emerald-400">{notice}</p> : null
 }
 
+const savedProvider = (template: AdminTemplate) => template.prompt?.providerId ?? 'default'
+
 // 试跑面板 (ARCHITECTURE §10.b, T85), beside the template form: today's budget, 首次出图, the edit
 // composer when a result is being edited, then the record tree. Everything runs on the saved
 // template through /api/admin/test-*; a new cover refreshes the page so the form shows it.
 // languages: the cover tabs (T87), so 「设为封面」 can pick which one.
-export function TestRunPanel({ template, languages }: { template: AdminTemplate; languages: readonly CoverLanguage[] }) {
+export function TestRunPanel({ template, languages, providers }: { providers: readonly ImageProviderOption[]; template: AdminTemplate; languages: readonly CoverLanguage[] }) {
   const router = useRouter()
   const panel = useTestPanel(template.id)
   const selection = useRunSelection(panel.runs)
@@ -47,7 +51,7 @@ export function TestRunPanel({ template, languages }: { template: AdminTemplate;
       </header>
       <BudgetBar budget={panel.data?.budget ?? null} onSaved={() => void panel.reload()} onError={panel.setError} />
       <Status error={panel.error} notice={panel.notice} />
-      <FirstRunForm template={template} photos={panel.data?.recentPhotos ?? []} onLaunch={(launches) => void panel.launch(launches)} onPhotoUploaded={() => void panel.reload()} onError={panel.setError} />
+      <FirstRunForm key={savedProvider(template)} providers={providers} template={template} photos={panel.data?.recentPhotos ?? []} onLaunch={(launches) => void panel.launch(launches)} onPhotoUploaded={() => void panel.reload()} onError={panel.setError} />
       {editing ? <EditComposer key={editing.map((run) => run.id).join()} targets={editing} onLaunch={(launches) => void panel.launch(launches)} onClose={() => setEditing(null)} /> : null}
       <Records
         runs={panel.runs}

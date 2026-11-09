@@ -9,6 +9,7 @@ const provider = (isActive: boolean): AdminProvider => ({
   id: '6f1c2f9e-6a52-4c39-9a51-0a9f6b0c1d2e',
   module: 'image',
   adapter: 'openai_images',
+  resolutions: ['1k', '2k', '3k'],
   label: '验收 OpenAI',
   baseUrl: 'https://api.openai.com/v1',
   model: 'gpt-image-2.6-sunburst',

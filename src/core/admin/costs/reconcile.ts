@@ -1,9 +1,15 @@
-// /admin/costs rows (ARCHITECTURE §10.0): per UTC day, what OpenAI billed next to what our jobs
-// add up to. Pure, so the page's numbers are tested without either side.
-
-// cost_usd includes test_cost_usd: admin test runs (T85) are billed by OpenAI like any call, so
-// they count on our side too and are shown apart as 后台试跑.
-export type OurDay = { day: string; cost_usd: number; costed: number; uncosted: number; no_usage: number; test_cost_usd?: number; test_runs?: number }
+// UTC-day reconciliation against OpenAI's invoice. Our totals include every provider.
+export type OurDay = {
+  day: string
+  cost_usd: number
+  costed: number
+  uncosted: number
+  no_usage: number
+  test_cost_usd?: number
+  test_runs?: number
+  has_openrouter?: boolean
+  by_provider?: { provider: string; cost_usd: number; runs: number }[]
+}
 
 export type ReconcileRow = OurDay & {
   // null: no Admin key, or OpenAI could not be read.
@@ -28,7 +34,7 @@ export const STALE_DAYS = 3
 const DRIFT_FLOOR_USD = 0.05
 
 function drifts(row: ReconcileRow): boolean | null {
-  if (row.billed === null) return false
+  if (row.billed === null || row.has_openrouter) return false
   const larger = Math.max(row.billed, row.cost_usd)
   if (larger < DRIFT_FLOOR_USD) return null
   return Math.abs(row.billed - row.cost_usd) / larger > STALE_DRIFT
@@ -59,7 +65,7 @@ export function reconcile(ours: readonly OurDay[], billed: Readonly<Record<strin
   // Newest day first, like every admin list.
   const rows = [...ours].reverse().map((day): ReconcileRow => {
     const value = billed === null ? null : (billed[day.day] ?? 0)
-    return { ...day, billed: value, difference: value === null ? null : value - day.cost_usd }
+    return { ...day, billed: value, difference: value === null || day.has_openrouter ? null : value - day.cost_usd }
   })
   const sum = (pick: (row: ReconcileRow) => number) => rows.reduce((total, row) => total + pick(row), 0)
   const oursTotal = sum((row) => row.cost_usd)
@@ -70,7 +76,7 @@ export function reconcile(ours: readonly OurDay[], billed: Readonly<Record<strin
       ours: oursTotal,
       tests: sum((row) => row.test_cost_usd ?? 0),
       billed: billedTotal,
-      difference: billedTotal === null ? null : billedTotal - oursTotal,
+      difference: billedTotal === null || rows.some((row) => row.has_openrouter) ? null : billedTotal - oursTotal,
       uncosted: sum((row) => row.uncosted),
       noUsage: sum((row) => row.no_usage),
     },

@@ -24,3 +24,7 @@ pnpm dev
 pnpm lint && pnpm typecheck && pnpm test && pnpm build
 pnpm db:start && pnpm test:db   # needs Docker
 ```
+
+## License
+
+Proprietary. The source is public to read, but it is not open source: using, copying, modifying or hosting it needs a written commercial license from Grayscale Luminary LLC. See [LICENSE](LICENSE).

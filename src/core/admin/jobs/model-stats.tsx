@@ -20,7 +20,7 @@ function CostCells({ cost, uncosted }: { cost: CostSummary; uncosted: number }) 
   )
 }
 
-const HEADERS = [COPY.model, COPY.resolution, COPY.jobs, COPY.succeeded, COPY.cost, COPY.estimate, COPY.perImage, COPY.uncosted]
+const HEADERS = [COPY.provider, COPY.model, COPY.resolution, COPY.jobs, COPY.succeeded, COPY.cost, COPY.estimate, COPY.perImage, COPY.uncosted]
 
 // Count and real cost per model × resolution over the overview's period (admin_dashboard_stats,
 // T33). Pre-T33 jobs carry no usage and are estimated in their own column, labelled 「估算」.
@@ -44,7 +44,8 @@ export function ModelStats({ usage, days, unitCost }: Props) {
           </TableHeader>
           <TableBody>
             {rows.map((row) => (
-              <TableRow key={`${row.model}/${row.resolution}`}>
+              <TableRow key={`${row.provider}/${row.model}/${row.resolution}`}>
+                <TableCell className="font-mono text-xs">{row.provider}</TableCell>
                 <TableCell className="font-mono text-xs">{row.model}</TableCell>
                 <TableCell className="font-mono text-xs uppercase">{row.resolution}</TableCell>
                 <TableCell className="font-mono">{row.jobs}</TableCell>
@@ -53,7 +54,7 @@ export function ModelStats({ usage, days, unitCost }: Props) {
               </TableRow>
             ))}
             <TableRow>
-              <TableCell colSpan={4} className="font-semibold">
+              <TableCell colSpan={5} className="font-semibold">
                 {COPY.total}
               </TableCell>
               <CostCells cost={total} uncosted={uncosted} />

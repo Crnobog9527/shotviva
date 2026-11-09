@@ -29,8 +29,8 @@ export async function POST(request: NextRequest) {
     const admin = await requireApiAdmin()
     const body = testGenerateBodySchema.safeParse(await request.json().catch(() => null))
     if (!body.success) throw new AppError('INVALID_INPUT', 'run_id, batch_id and template_id are required')
-    const [provider, judge] = await Promise.all([imageProvider(), identityJudge()])
-    const deps = { db: createAdminSupabase(), store: r2Store(), provider, identityJudge: judge }
+    const judge = await identityJudge()
+    const deps = { db: createAdminSupabase(), store: r2Store(), provider: imageProvider, identityJudge: judge }
     return jsonResponse(await signRun(deps.store, await runTestGenerate(deps, { actorId: admin.id, body: body.data })))
   } catch (error) {
     return errorResponse(error, 'admin-test-runs')

@@ -16,6 +16,7 @@ const row = (isActive: boolean) => ({
   id: ID,
   module: 'image',
   adapter: 'openai_images',
+  resolutions: ['1k', '2k', '3k'],
   label: 'Old relay',
   base_url: 'https://relay.example.com/v1',
   model: 'gpt-image-2.6',
@@ -54,6 +55,7 @@ describe('removeProvider', () => {
   })
 
   it('maps SQL refusals: switched on meanwhile, or already gone', async () => {
+    expect(await remove(fakeDb(row(false), 'PROVIDER_REFERENCED').db)).toEqual({ ok: false, reason: 'provider_referenced' })
     expect(await remove(fakeDb(row(false), 'PROVIDER_ACTIVE').db)).toEqual({ ok: false, reason: 'provider_active' })
     expect(await remove(fakeDb(row(false), 'PROVIDER_NOT_FOUND').db)).toEqual({ ok: false, reason: 'not_found' })
     expect(await remove(fakeDb(null).db)).toEqual({ ok: false, reason: 'not_found' })

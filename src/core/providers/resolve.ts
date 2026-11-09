@@ -50,5 +50,5 @@ export async function resolveProvider(
   // No silent fallback to env: a provider the Owner switched to must be the one that runs.
   const apiKey = await readKey(row.id)
   if (!apiKey) throw new AppError('INTERNAL', `active provider ${row.id} has no API key; set it in /admin/providers`)
-  return build(adapters, row.adapter, row.id, { baseUrl: row.baseUrl, model: row.model, apiKey }, row.prices)
+  return build(adapters, row.adapter, row.id, { baseUrl: row.baseUrl, model: row.model, apiKey, resolutions: row.resolutions }, row.prices)
 }

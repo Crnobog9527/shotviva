@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
+import { RESOLUTIONS } from '../templates/output-options'
 import { parseServerEnv } from '../env'
 import { modelFromTag } from '../jobs/provider-tag'
 import { resolveProvider } from './resolve'
@@ -21,7 +22,7 @@ function recordingAdapters() {
 }
 
 const PRICES = { inputTextPerM: 5, inputImagePerM: 8, outputPerM: 30 }
-const row = { id: ROW_ID, adapter: 'openai_images' as const, baseUrl: 'https://relay.example.com/v1', model: 'gpt-image-2.6', prices: PRICES }
+const row = { id: ROW_ID, resolutions: [...RESOLUTIONS], adapter: 'openai_images' as const, baseUrl: 'https://relay.example.com/v1', model: 'gpt-image-2.6', prices: PRICES }
 
 describe('resolveProvider', () => {
   it("builds the adapter from the active row and its Vault key, and tags jobs <id>/<model>", async () => {
@@ -33,7 +34,7 @@ describe('resolveProvider', () => {
     // The row's prices travel with the provider so settlement can cost the job (T33).
     expect(provider.prices).toEqual(PRICES)
     expect(readKey).toHaveBeenCalledWith(ROW_ID)
-    expect(configs).toEqual([{ baseUrl: 'https://relay.example.com/v1', model: 'gpt-image-2.6', apiKey: RELAY_KEY }])
+    expect(configs).toEqual([{ baseUrl: 'https://relay.example.com/v1', model: 'gpt-image-2.6', apiKey: RELAY_KEY, resolutions: [...RESOLUTIONS] }])
   })
 
   it('falls back to OPENAI_* when no provider is active, without reading Vault', async () => {
