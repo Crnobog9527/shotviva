@@ -2,7 +2,6 @@
 
 import { useTranslations } from "next-intl"
 
-import { pricingV2 } from '../../public-env'
 import { useProductQuote } from "./discount-context"
 import { usePaymentChannel } from "./channel-context"
 import { CheckoutBar } from "./checkout-bar"
@@ -39,7 +38,7 @@ export function PaywallCheckout({ resolved, choice }: { resolved: ResolvedPick; 
       tone={checkoutTone(resolved)}
       status={checkout.status}
       locked={member.lock === "current" ? t("lockCurrentNote") : member.lock ? t("lockLower") : null}
-      onClick={() => void checkout.start(resolved.product.id, choice.method, discount?.offer.code, pricingV2 && resolved.kind === "pack" ? quote.cents : undefined)}
+      onClick={() => void checkout.start(resolved.product.id, choice.method, quote.cents, discount?.offer.code)}
     />
   )
 }
