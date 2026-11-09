@@ -2,7 +2,7 @@
 
 import { refresh } from 'next/cache'
 import { runAdminQuery } from '@/core/admin'
-import { listVersions, readVersion } from '@/core/admin/templates/history'
+import { listVersions, readVersion } from '@/core/admin/templates'
 import { duplicateTemplate } from '@/core/admin/template-copy'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { publicEnv } from '@/core/public-env'
