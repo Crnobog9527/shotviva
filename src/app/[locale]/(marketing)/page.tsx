@@ -6,18 +6,18 @@ import { currentLocale } from '@/core/i18n/server'
 import { JsonLdScript, faqPageLd, organizationLd, pageMetadata, softwareApplicationLd } from '@/core/seo'
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
 import { toCatalogueTemplate } from '@/modules/image/marketing'
-import { featuredSections, fillCredits, freeImagesLabel, homePageIn, isLinkEnabled, startingCredits } from '@/site/content'
-import { zhFreeImages } from '@/site/content/zh/offer'
+import { creditFacts, featuredSections, fillCredits, freeImagesIn, homePageIn, isLinkEnabled } from '@/site/content'
 import { site } from '@/site/site.config'
 
 import { HomeGeneratorSlot } from './home-generator-slot'
 
-// The copy with "from N credits" filled from the live catalogue (建站规格 G4).
+// The copy with "from N credits" and the image counts filled from the live catalogue (建站规格 G3, G4).
 async function load() {
   const locale = await currentLocale()
   const live = await cachedWebCatalogue(locale)
-  const page = fillCredits(homePageIn(locale), startingCredits(live))
-  return { locale, live, page, meta: { path: '/', title: page.title, description: page.description } }
+  const facts = creditFacts(live)
+  const page = fillCredits(homePageIn(locale), facts)
+  return { locale, live, page, free: fillCredits(freeImagesIn(locale), facts), meta: { path: '/', title: page.title, description: page.description } }
 }
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -29,8 +29,7 @@ export async function generateMetadata(): Promise<Metadata> {
 // The live catalogue is a cached read (expired by every admin save, featured list included);
 // only the generator's visitor half waits for the request.
 export default async function HomePage() {
-  const { locale, live, page, meta } = await load()
-  const free = locale === 'zh' ? zhFreeImages : freeImagesLabel
+  const { locale, live, page, free, meta } = await load()
   const ldMeta = { ...meta, path: localizePath(meta.path, locale) }
   const catalogue = live.map(toCatalogueTemplate)
   const { defaultId, ...sections } = featuredSections(live)

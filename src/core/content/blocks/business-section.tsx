@@ -1,28 +1,26 @@
-import type { EventProps } from '../../analytics/events'
-import { businessMailto } from './business-mailto'
+import type { InquiryPage } from '../../inquiries/rules'
+import { ContactButton, type InquiryCopy, type InquiryDialogActions } from '../../inquiries/ui'
 import { BusinessIcon, MailIcon } from './business-icons'
-import { ContactSalesLink } from './contact-sales-link'
 
 // The pricing page's "For business" plate (DESIGN §6.9 item 8), drawn as the studio's order slip
 // (comps-v3-b pricing.html, T43; materials in business-slip.css): a "Made to order" tag, who it
-// is for, what we can set up on request, and one solid "Contact us". No price, no fourth tier, no
-// SLA, SSO or seats: none of this is built yet, so every line reads as something we arrange.
+// is for, what we can set up on request, and one solid "Contact us", which opens the inquiry form
+// (T86). No price, no fourth tier, no SLA, SSO or seats: none of this is built yet, so every line
+// reads as something we arrange.
 export type BusinessBlock = {
   heading: string
   tag: string
   who: string
   items: readonly { title: string; detail: string }[]
   cta: string
-  // The line beside the button, before and after the address (the address is the config's).
-  aside: readonly [string, string]
-  // The mail body: one prompt a line, for the sender to fill in.
-  prompts: readonly string[]
+  // The inquiry dialog's words (DESIGN §6.9 item 8).
+  form: InquiryCopy
 }
 
-// `subject` is the same English line on every language so the Owner can filter on it.
-type Props = { block: BusinessBlock; email: string; subject: string; page: EventProps<'contact_sales_click'>['page'] }
+// actions: the pricing page's server actions (store the inquiry, read a signed-in email).
+type Props = { block: BusinessBlock; page: InquiryPage; actions: InquiryDialogActions }
 
-export function BusinessSection({ block, email, subject, page }: Props) {
+export function BusinessSection({ block, page, actions }: Props) {
   return (
     <section
       aria-labelledby="business-h"
@@ -45,20 +43,16 @@ export function BusinessSection({ block, email, subject, page }: Props) {
           </li>
         ))}
       </ul>
-      <div className="mt-[18px] flex flex-wrap items-center gap-x-4 gap-y-2 md:mt-[22px]">
-        <ContactSalesLink
-          href={businessMailto(email, subject, block.prompts)}
+      <div className="mt-[18px] md:mt-[22px]">
+        <ContactButton
+          copy={block.form}
           page={page}
+          actions={actions}
           className="press inline-flex min-h-12 w-full items-center justify-center gap-1.5 rounded-control bg-foreground px-5 text-label font-semibold text-background shadow-[inset_0_1px_0_rgba(255,255,255,.5),0_12px_24px_-14px_rgba(0,0,0,.9)] md:w-auto md:min-w-[200px]"
         >
           <MailIcon />
           {block.cta}
-        </ContactSalesLink>
-        <small className="text-caption text-muted-foreground">
-          {block.aside[0]}
-          {email}
-          {block.aside[1]}
-        </small>
+        </ContactButton>
       </div>
     </section>
   )

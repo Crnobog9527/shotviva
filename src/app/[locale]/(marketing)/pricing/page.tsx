@@ -4,14 +4,17 @@ import { CheckoutCancelToast, PaywallProvider, PricingPayWith, PricingPlans } fr
 import { wechatPayEnabled } from '@/core/billing/stripe'
 import { StandingSlot } from '@/core/billing/standing'
 import { paymentChannel } from '@/core/billing/waffo'
-import { BusinessSection, CreditBuys, FaqSection, PricingHero } from '@/core/content'
+import { CreditBuys, FaqSection, PricingHero } from '@/core/content'
+import { BusinessSection } from '@/core/content/business'
 import { localizePath } from '@/core/i18n'
 import { currentLocale } from '@/core/i18n/server'
 import { JsonLdScript, breadcrumbListLd, faqPageLd, pageMetadata } from '@/core/seo'
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
-import { BUSINESS_MAIL_SUBJECT, fillCredits, homePageIn, pricingFaqIn, pricingPageIn, startingCredits } from '@/site/content'
+import { creditFacts, fillCredits, homePageIn, pricingFaqIn, pricingPageIn, withCatalogueTiers } from '@/site/content'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { site } from '@/site/site.config'
+
+import { inquiryPrefillAction, submitInquiryAction } from './actions'
 
 // /pricing as comps-v3-b pricing.html (T37): hero, the plans and packs (core/billing/paywall,
 // prices from site.config), "For business", what a credit buys, how to pay, then the FAQ.
@@ -25,14 +28,15 @@ import { site } from '@/site/site.config'
 // plus a redeploy, which re-renders this page with the matching payment copy.
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await currentLocale()
-  return pageMetadata(site, pricingPageIn(locale), locale)
+  const page = fillCredits(pricingPageIn(locale), creditFacts(await cachedWebCatalogue(locale)))
+  return pageMetadata(site, page, locale)
 }
 
 export default async function PricingPage() {
   const locale = await currentLocale()
-  // "from N credits" filled from the live catalogue (建站规格 G4).
+  // "from N credits" and the image counts filled from the live catalogue (建站规格 G3, G4).
   const [catalogue, wishlistLive] = await Promise.all([cachedWebCatalogue(locale), isWishlistEnabled(site)])
-  const credits = startingCredits(catalogue)
+  const credits = creditFacts(catalogue)
   const page = fillCredits(pricingPageIn(locale), credits)
   const channel = paymentChannel()
   const wechatPay = wechatPayEnabled()
@@ -53,12 +57,11 @@ export default async function PricingPage() {
       </PaywallProvider>
       <BusinessSection
         block={page.business}
-        email={site.brand.contactEmail}
-        subject={BUSINESS_MAIL_SUBJECT}
         page={path === '/zh/pricing' ? '/zh/pricing' : '/pricing'}
+        actions={{ submit: submitInquiryAction, prefill: inquiryPrefillAction }}
       />
       <div className="mt-6 grid gap-6 md:mt-8 md:grid-cols-2 md:items-start md:gap-8">
-        <CreditBuys block={page.creditBuys} />
+        <CreditBuys block={withCatalogueTiers(page.creditBuys, catalogue)} />
         <PricingPayWith channel={channel} wechatPay={wechatPay} />
       </div>
       {/* The home page's accordion (gap audit B8); every answer stays in the server HTML. */}

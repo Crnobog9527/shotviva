@@ -5,7 +5,8 @@ import {
   creditFrom,
   fromCredits,
   freeImagesLabel,
-  freeStandardImages,
+  FreeImagesShort,
+  FreeImagesTitle,
   packshotUsd,
   photoSeconds,
   photosLeftInPlan,
@@ -96,8 +97,8 @@ export function productBills(heading: string, intro: string, moreFine = ''): Cos
       total: { prefix: 'from', amount: plan, suffix: '/month', when: `about ${photoSeconds} seconds a photo` },
       lines: [
         { label: `Starter plan, ${planFrom?.credits ?? ''} credits a month`, value: plan },
-        { label: `These ${SET_PHOTOS} photos, ${standard.name}`, value: `${setCredits} credits ≈ ${setCostUsd ?? ''}` },
-        { label: 'Left for the rest of the month', value: `${photosLeftInPlan ?? ''} more photos` },
+        { label: `These ${SET_PHOTOS} photos, ${standard.name}`, value: `${setCredits} credits ≈ ${setCostUsd}` },
+        { label: 'Left for the rest of the month', value: `${photosLeftInPlan} more photos` },
       ],
       fine: `Styling and retouching are in the template, and your subject stays as you shot it. Start with ${freeImagesLabel}, no card needed.`,
     },
@@ -130,11 +131,11 @@ export const homePage = defineHomePage({
   keyword: 'image to image ai',
   label: 'AI image to image',
   title: 'Image to Image AI: Restyle a Photo, Keep the Subject (2026)',
-  description: `Image to image AI that turns a phone photo into a studio shot or a new art style. Pick a template, no prompts, the subject stays as shot. ${freeStandardImages} free images.`,
+  description: `Image to image AI turns a phone photo into a studio shot or a new art style. Pick a template, no prompts, the subject stays as shot. ${FreeImagesShort}.`,
   h1: 'Image to Image AI: Restyle a Photo, Keep the Subject',
   subtitle:
     'The AI photo studio that starts from your real photo. What you shot stays; the template changes the light, the scene or the art style.',
-  answerBlock: `Image to image AI takes a photo you already have and gives it a new look while the subject stays as shot. With ${brand} you upload one phone photo, pick a template for food, products, rooms, pets or an art style, and download it in ${tierList}. No prompts to write. New users get ${freeImagesLabel}.`,
+  answerBlock: `Image to image AI takes a photo you already have and gives it a new look while the subject stays as shot. With ${brand} you upload one phone photo, pick a template for food, products, rooms, pets or an art style, and download it in ${tierList}. No prompts. New users get ${freeImagesLabel}.`,
   hero: {
     before: phoneShot,
     after: listingShot,
@@ -154,8 +155,8 @@ export const homePage = defineHomePage({
     heading: 'Free Image to Image AI: What You Get',
     points: [
       {
-        heading: `${freeStandardImages} Free ${standard.name} Images When You Sign Up`,
-        text: `Every new account gets ${site.billing.freeCredits} free credits, once. That covers ${freeImagesLabel} on most templates. They do not refill every day or every month.`,
+        heading: `${FreeImagesTitle} When You Sign Up`,
+        text: `Every new account gets ${site.billing.freeCredits} free credits, once. That covers ${freeImagesLabel}. They do not refill every day or every month.`,
       },
       {
         heading: 'Free Photos Are Public and Watermarked, Paid Photos Are Private',

@@ -3,6 +3,7 @@ import { Suspense } from 'react'
 import { AdminShell, adminNavItems, UserDialogHost } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { serverEnv } from '@/core/env'
+import { newInquiryCount } from '@/core/inquiries'
 import { logger } from '@/core/logger'
 import { openTicketCount } from '@/core/support'
 import { isWishlistEnabled } from '@/core/wishlist'
@@ -28,6 +29,16 @@ async function ticketCount(): Promise<number> {
   }
 }
 
+// The new-inquiry count beside 「企业咨询」 (T86), the same way.
+async function inquiryCount(): Promise<number> {
+  try {
+    return await newInquiryCount(createAdminSupabase())
+  } catch (error) {
+    logger.warn('admin.inquiries.count.failed', { error })
+    return 0
+  }
+}
+
 // The user detail dialog (T77) opens over whichever admin page has ?user=<id>.
 const userDialogActions = {
   load: userDetailAction,
@@ -37,9 +48,9 @@ const userDialogActions = {
 
 export default async function AdminLayout({ children }: LayoutProps<'/[locale]/admin'>) {
   const admin = await requireAdmin()
-  const [tickets, wishlist] = await Promise.all([ticketCount(), isWishlistEnabled(site)])
+  const [tickets, inquiries, wishlist] = await Promise.all([ticketCount(), inquiryCount(), isWishlistEnabled(site)])
   return (
-    <AdminShell items={adminNavItems({ wishlist }, { tickets })} email={admin.email}>
+    <AdminShell items={adminNavItems({ wishlist }, { tickets, inquiries })} email={admin.email}>
       {children}
       <Suspense fallback={null}>
         <UserDialogHost actions={userDialogActions} stripeLive={serverEnv().VERCEL_ENV === 'production'} />

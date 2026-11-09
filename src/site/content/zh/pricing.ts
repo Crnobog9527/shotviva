@@ -1,7 +1,9 @@
-import type { BusinessBlock, CreditBuysBlock, FaqItem } from '@/core/content'
+import type { CreditBuysBlock, FaqItem } from '@/core/content'
+import type { BusinessBlock } from '@/core/content/business'
 
 import { site } from '../../site.config'
 import type { PricingContent } from '../pricing'
+import { zhBusinessForm } from './business-form'
 import { ZH_TIERS, zhFreeImages, zhFromCredits, zhPackFrom, zhTierList, zhYearlySaving } from './offer'
 
 // /zh/pricing (T21, laid out as comps-v3-b pricing.html in T37). Keyword 「Shotviva 价格」;
@@ -30,8 +32,7 @@ const business: BusinessBlock = {
     { title: '专人对接', detail: '一位专人负责上手培训和优先支持。' },
   ],
   cta: '联系我们',
-  aside: ['也可以直接写信到 ', '，附上每月出图量和使用的平台。'],
-  prompts: ['公司名称：', '每月大概出图量：', '用在哪些平台（电商平台、外卖平台、自己的网站）：', '想定制什么（模板、API、发票付款）：'],
+  form: zhBusinessForm,
 }
 
 const yearly = zhYearlySaving ? `${zhYearlySaving}。` : ''

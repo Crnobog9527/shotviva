@@ -4,7 +4,7 @@ import { site } from '../../site.config'
 import { productBills } from '../home'
 import { pairImage, sizeCountWord } from '../landing-shared'
 import { pricingRelated } from '../shared'
-import { freeImagesLabel, fromCredits, photoSeconds, plansSentence, SET_PHOTOS, tierList, tierPixels, uploadLimits } from '../offer'
+import { freeImagesLabel, FreeImagesLabel, fromCredits, photoSeconds, plansSentence, SET_PHOTOS, tierList, tierPixels, uploadLimits } from '../offer'
 
 // Final SEO copy (T11): Title, H1, answer and FAQ own "image to image generator" so the home
 // page never targets it (建站规格 R1). Layout and the facts / bills / links blocks follow the
@@ -17,7 +17,7 @@ export const imageToImageGenerator = defineContentPage({
   label: 'Image to image generator',
   module: 'image',
   title: `Image to Image Generator: No Prompts (2026) | ${brand}`,
-  description: `Image to image generator with templates for food, products, rooms, pets and art styles. Upload a photo, no prompts. ${freeImagesLabel}.`,
+  description: `Image to image generator with templates for food, products, rooms, pets and art styles. Upload a photo, no prompts. ${FreeImagesLabel}.`,
   h1: 'Image to Image Generator With Ready-Made Templates',
   subtitle: 'Start from your own photo, not a blank text box. The subject stays as shot.',
   answerBlock: `Image to image generator tools make a new picture from a photo you upload. The ${brand} generator works with templates: pick one for food, products, beauty, rooms, pets or an art style, and it sets the light, the scene or the style for you. The subject stays as shot, and new users get ${freeImagesLabel}.`,

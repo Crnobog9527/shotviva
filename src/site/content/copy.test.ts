@@ -5,8 +5,12 @@ import { describe, expect, it } from 'vitest'
 
 import { site } from '../site.config'
 import { contentPages, homePage, pricingPage } from './index'
-import { fillCredits } from './credits'
+import { FALLBACK_CREDITS, fillCredits } from './credits'
 import { freeImagesLabel, fromCredits, tierList, tierPixels, uploadLimits } from './offer'
+
+// The live catalogue on 2026-11-09: Standard costs 1 credit on the cheapest template, more on others.
+const LIVE = { from: 1, same: false }
+const home = fillCredits(homePage, LIVE)
 
 const allPages = [homePage, ...contentPages]
 
@@ -14,15 +18,18 @@ const allPages = [homePage, ...contentPages]
 describe('home page skeleton', () => {
   it('fixes the home TDK, H1, subtitle and direct answer to 建站规格 §4 / G1', () => {
     expect(homePage.title).toBe('Image to Image AI: Restyle a Photo, Keep the Subject (2026)')
-    expect(homePage.description).toBe(
-      'Image to image AI that turns a phone photo into a studio shot or a new art style. Pick a template, no prompts, the subject stays as shot. 3 free images.',
+    // T91: the free-image count follows the catalogue, so "that" and "to write" went to keep
+    // "Up to 6" within 155 characters and 60 words.
+    expect(home.description).toBe(
+      'Image to image AI turns a phone photo into a studio shot or a new art style. Pick a template, no prompts, the subject stays as shot. Up to 6 free images.',
     )
+    expect(fillCredits(homePage.description, FALLBACK_CREDITS)).toMatch(/ 3 free images\.$/)
     expect(homePage.h1).toBe('Image to Image AI: Restyle a Photo, Keep the Subject')
     expect(homePage.subtitle).toBe(
       'The AI photo studio that starts from your real photo. What you shot stays; the template changes the light, the scene or the art style.',
     )
-    expect(homePage.answerBlock).toBe(
-      'Image to image AI takes a photo you already have and gives it a new look while the subject stays as shot. With Shotviva you upload one phone photo, pick a template for food, products, rooms, pets or an art style, and download it in Standard, HD or Max. No prompts to write. New users get 3 free Standard images.',
+    expect(home.answerBlock).toBe(
+      'Image to image AI takes a photo you already have and gives it a new look while the subject stays as shot. With Shotviva you upload one phone photo, pick a template for food, products, rooms, pets or an art style, and download it in Standard, HD or Max. No prompts. New users get up to 6 free Standard images.',
     )
   })
 
@@ -47,16 +54,17 @@ describe('home page skeleton', () => {
       'Pick a Template',
       'Download in Standard, HD or Max',
     ])
-    expect(homePage.freeOffer.points[0].heading).toBe('3 Free Standard Images When You Sign Up')
+    expect(home.freeOffer.points[0].heading).toBe('Up to 6 Free Standard Images When You Sign Up')
+    expect(fillCredits(homePage, FALLBACK_CREDITS).freeOffer.points[0].heading).toBe('3 Free Standard Images When You Sign Up')
   })
 })
 
 describe('public numbers', () => {
-  it('counts the 6 free credits as "3 free Standard images" (建站规格 G3)', () => {
+  it('counts the 6 free credits in Standard images at the catalogue price (建站规格 G3, T91)', () => {
     expect(site.billing.freeCredits).toBe(6)
-    expect(freeImagesLabel).toBe('3 free Standard images')
     // Filled from the catalogue at render time (credits.test.ts).
-    expect(fillCredits(fromCredits, 2)).toBe('from 2 credits')
+    expect(fillCredits(freeImagesLabel, LIVE)).toBe('up to 6 free Standard images')
+    expect(fillCredits(fromCredits, LIVE)).toBe('from 1 credit')
     expect(tierList).toBe('Standard, HD or Max')
     expect(tierPixels).toBe('Standard 1024 px, HD 2048 px, Max 2880 px')
     expect(uploadLimits).toBe('JPG, PNG or WebP, up to 20MB')
@@ -64,7 +72,7 @@ describe('public numbers', () => {
 
   it('keeps the TDK limits on /pricing and audiences out of general Titles and H1s', () => {
     expect(pricingPage.title.length).toBeLessThanOrEqual(60)
-    expect(pricingPage.description.length).toBeLessThanOrEqual(155)
+    expect(fillCredits(pricingPage.description, LIVE).length).toBeLessThanOrEqual(155)
     // Vertical pages (建站规格 §4: /ai-restaurant-menu) may name their audience; general pages may not.
     for (const page of allPages.filter((p) => !p.keyword.includes('restaurant'))) expect(`${page.title} ${page.h1}`).not.toMatch(/restaurant/i)
   })

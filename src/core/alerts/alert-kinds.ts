@@ -1,3 +1,5 @@
+import type { InquiryUse, MonthlyVolume } from '../inquiries/rules'
+
 // What notifyOwner is told (ARCHITECTURE §16.4, T72): facts only, ids and amounts. The notifier
 // looks up who the user is (masked) and renders the Chinese text; call sites never write copy.
 
@@ -72,6 +74,16 @@ export type CancelFailedAlert = {
   cause?: 'upgrade' | 'refund'
 }
 
+// T86 (ARCHITECTURE §10.c): someone sent the pricing page's business inquiry form. Company,
+// volume and uses only: the email and phone stay in the admin.
+export type BusinessInquiryAlert = {
+  kind: 'business_inquiry'
+  inquiryId: string
+  company: string
+  volume: MonthlyVolume
+  uses: readonly InquiryUse[]
+}
+
 // Where on the site a server error happened, for 「网站报错异常」.
 export type ErrorArea = 'payment' | 'auth' | 'generate' | 'admin' | 'site'
 
@@ -98,6 +110,7 @@ export type OwnerAlert =
   | TicketAlert
   | CancelFailedAlert
   | SiteErrorsAlert
+  | BusinessInquiryAlert
 
 export type OwnerAlertKind = OwnerAlert['kind']
 
@@ -106,11 +119,12 @@ const MINUTE = 60_000
 // How a kind is sent (ARCHITECTURE §16.4; control review 2026-11-08):
 // - key: one message per key. With cooldownMs the key can fire again once that long has passed
 //   since it last fired (a sliding window, kept in the R2 mark); without, never again.
-// - budget 'tickets': ticket alerts share an hourly cap, so a burst of tickets or replies can never
-//   flood the group or use up Feishu's own rate limit.
+// - budget: ticket alerts share an hourly cap, so a burst of tickets or replies can never flood
+//   the group or use up Feishu's own rate limit; business inquiries have their own (T86).
 // - money: refunds, disputes and payments that did not land are never capped, are tried even
 //   while sending is backing off, and are retried when Feishu says it is rate limiting.
-export type AlertPolicy = { key: string; cooldownMs?: number; budget?: 'tickets'; money: boolean }
+export type AlertPolicy = { key: string; cooldownMs?: number; budget?: AlertBudget; money: boolean }
+export type AlertBudget = 'tickets' | 'inquiries'
 
 const POLICIES: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K }>) => AlertPolicy } = {
   // Keyed by the refunded total, so a second partial refund on the same charge is a new message.
@@ -127,6 +141,7 @@ const POLICIES: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K }
       : { key: `ticket:${a.ticketId}`, budget: 'tickets', money: false },
   subscription_cancel_failed: (a) => ({ key: `subscription_cancel_failed:${a.userId}:${a.subscriptionRef ?? 'read'}`, money: false }),
   site_errors: () => ({ key: 'site_errors', cooldownMs: 30 * MINUTE, money: false }),
+  business_inquiry: (a) => ({ key: `business_inquiry:${a.inquiryId}`, budget: 'inquiries', money: false }),
 }
 
 // A redelivered webhook, a retried handler or a second instance builds the same key.
