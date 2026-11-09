@@ -22,6 +22,7 @@ export type PricingContent = {
   h1: string
   h1Em: string
   intro: string
+  currencyNote?: string
   gift: string
   creditBuys: CreditBuysBlock
   business: BusinessBlock

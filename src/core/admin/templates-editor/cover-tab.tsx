@@ -50,11 +50,11 @@ export function CoverTab({ template, language, languages, actions }: Props) {
       {/* Three cards on wide screens, two below ~1100px, one below ~700px. */}
       <div className="grid grid-cols-1 gap-4 min-[700px]:grid-cols-2 min-[1100px]:grid-cols-3">
         <CoverSlot id={`${id}-before`} label={COPY.before} accept={acceptFor('before')} hint={COPY.stillHint}
-          {...stillSlot(template, language.code, 'before')} busy={busy === 'before'} disabled={pending} onFile={(file) => upload('before', file)} />
+          media={stillSlot(template, language.code, 'before')} busy={busy === 'before'} disabled={pending} onFile={(file) => upload('before', file)} />
         <CoverSlot id={`${id}-after`} label={COPY.after} accept={acceptFor('after')} hint={COPY.stillHint}
-          {...stillSlot(template, language.code, 'after')} busy={busy === 'after'} disabled={pending} onFile={(file) => upload('after', file)} />
+          media={stillSlot(template, language.code, 'after')} busy={busy === 'after'} disabled={pending} onFile={(file) => upload('after', file)} />
         <CoverSlot id={`${id}-motion`} label={COPY.motion} accept={acceptFor('motion')} hint={COPY.motionHint}
-          preview={motion} busy={busy === 'motion'} disabled={pending} onFile={(file) => upload('motion', file)} />
+          media={{ preview: motion }} busy={busy === 'motion'} disabled={pending} onFile={(file) => upload('motion', file)} />
       </div>
       <CoverTabActions set={set} language={language} pending={pending} onBackToStill={clearMotion} onTranslate={() => setTranslating(true)} onClear={clearLocale} />
       {message ? (

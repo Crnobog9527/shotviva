@@ -1,11 +1,11 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 import { AppError } from '@/core/errors'
 
-const deps = vi.hoisted(() => ({ enabled: vi.fn(), user: vi.fn(), account: vi.fn(), terms: vi.fn(), settings: vi.fn(), canApply: vi.fn() }))
+const deps = vi.hoisted(() => ({ enabled: vi.fn(), user: vi.fn(), account: vi.fn(), terms: vi.fn(), settings: vi.fn(), openSettings: vi.fn(), canApply: vi.fn() }))
 vi.mock('./terms', () => ({ publishedTerms: deps.terms }))
 vi.mock('../feature', () => ({ isAffiliateEnabled: deps.enabled }))
 vi.mock('@/core/auth', () => ({ getSessionUser: deps.user, requireApiUser: deps.user, loginPath: (next: string) => '/login?next=' + encodeURIComponent(next) }))
-vi.mock('./repository', () => ({ readAccount: deps.account, readSettings: deps.settings, canApply: deps.canApply }))
+vi.mock('./repository', () => ({ readAccount: deps.account, readSettings: deps.settings, readOpenEnrollmentSettings: deps.openSettings, canApply: deps.canApply }))
 vi.mock('next/server', async (original) => ({
   ...(await original<typeof import('next/server')>()),
   connection: async () => {},
@@ -18,9 +18,13 @@ import { EnrollmentScreen } from './enrollment'
 import { PartnerScreen, TermsScreen } from './screen'
 import { exportCommissions } from './csv'
 
-beforeEach(() => vi.resetAllMocks())
+beforeEach(() => {
+  vi.resetAllMocks()
+  deps.openSettings.mockResolvedValue({ terms_version: '1', apply_min_level: 'none' })
+})
 it('keeps the intro public while guarding application, portal and export with operations off', async () => {
   deps.enabled.mockResolvedValue(false)
+  deps.openSettings.mockResolvedValue(null)
   const props = { search: Promise.resolve({}) }
   const intro = await EnrollmentScreen(props)
   expect(intro.props.children).toBeUndefined()
@@ -66,7 +70,22 @@ it.each([null, { id: 'unverified', verified: false }])('keeps an unverified sess
 
 it.each([false, true])('keeps the application accessible without published terms (deep link: %s)', async (openForm) => {
   deps.enabled.mockResolvedValue(true)
-  deps.settings.mockResolvedValue({ terms_version: 'unpublished' })
+  deps.openSettings.mockResolvedValue({ terms_version: 'unpublished', apply_min_level: 'none' })
   const intro = await EnrollmentScreen({ search: Promise.resolve({ by: 'qa-team' }), openForm })
   expect(intro.props.children.props).toMatchObject({ openForm, parent: 'qa-team' })
+})
+
+it.each([
+  ['none', false],
+  ['any_paid', true],
+  ['pro', true],
+] as const)('consults payment history only when enrollment requires it (%s)', async (level, needsHistory) => {
+  const { ApplicationEntry } = await import('./application-entry')
+  deps.canApply.mockResolvedValue(false)
+  const entry = await ApplicationEntry({
+    userId: 'test-user', parent: 'qa-team', openForm: true,
+    settings: { terms_version: '1', apply_min_level: level },
+  })
+  expect(deps.canApply).toHaveBeenCalledTimes(needsHistory ? 1 : 0)
+  expect(entry.props.children[0].props.children.props.eligible).toBe(!needsHistory)
 })

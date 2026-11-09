@@ -1,6 +1,7 @@
 import 'server-only'
 import { z } from 'zod'
 import { createAdminSupabase } from '@/core/auth'
+import { logger } from '@/core/logger'
 import { AppError } from '@/core/errors'
 import { afterCursor, decodeCursor, PAGE_SIZE, toPage, type Page } from '@/core/admin/cursor'
 import {
@@ -36,6 +37,21 @@ export async function readSettings() {
     .select('hold_days,payout_min_usd,settlement_day,apply_min_level,terms_version')
     .single()
   return parse(settingsSchema, result)
+}
+
+const enrollmentSettings = settingsSchema.pick({ apply_min_level: true, terms_version: true })
+
+// Read the live switch and the application settings together; a closed or unavailable program has no entry.
+export async function readOpenEnrollmentSettings() {
+  try {
+    const { data, error } = await createAdminSupabase().from('affiliate_settings')
+      .select('apply_min_level,terms_version').eq('singleton', true).eq('enabled', true).maybeSingle()
+    if (!error) return enrollmentSettings.nullable().parse(data)
+    logger.warn('affiliate enrollment settings unavailable', { code: error.code })
+  } catch {
+    logger.warn('affiliate enrollment settings unavailable')
+  }
+  return null
 }
 
 export async function canApply(user: string) {
