@@ -3,7 +3,7 @@
 import { useState } from 'react'
 
 import { Button } from '@/core/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/core/ui/dialog'
+import { DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/core/ui/dialog'
 import { Input } from '@/core/ui/input'
 import { Textarea } from '@/core/ui/textarea'
 
@@ -32,44 +32,42 @@ export function AdjustDialog({ balances, pending, error, onCancel, onConfirm }: 
   const [reason, setReason] = useState('')
   const value = Number(amount)
   const after = balances[pool] + (Number.isInteger(value) ? value : 0)
-  const valid = Number.isInteger(value) && value !== 0 && reason.trim().length > 0 && after >= 0
+  const valid = Number.isInteger(value) && value !== 0 && Math.abs(value) <= 100_000 && reason.trim().length > 0 && after >= 0
   return (
-    <Dialog open onOpenChange={(open) => !open && onCancel()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{COPY.adjustTitle}</DialogTitle>
-          <DialogDescription>{COPY.adjustBody}</DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-3 text-sm">
-          <label className="grid gap-1">
-            <span className="font-medium">{COPY.pool}</span>
-            <select className="h-9 rounded-md border border-input bg-transparent px-3" value={pool} onChange={(e) => setPool(e.target.value === 'paid' ? 'paid' : 'free')}>
-              <option value="free">{USERS_COPY.pools.free}</option>
-              <option value="paid">{USERS_COPY.pools.paid}</option>
-            </select>
-          </label>
-          <label className="grid gap-1">
-            <span className="font-medium">{COPY.amount}</span>
-            <Input type="number" step={1} inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} />
-          </label>
-          <p className={after < 0 ? 'text-destructive' : 'text-muted-foreground'}>
-            {COPY.preview(balances[pool], after)}
-          </p>
-          <label className="grid gap-1">
-            <span className="font-medium">{COPY.reason}</span>
-            <Textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />
-          </label>
-        </div>
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        <DialogFooter>
-          <Button variant="outline" onClick={onCancel} disabled={pending}>
-            {COPY.cancel}
-          </Button>
-          <Button disabled={pending || !valid} onClick={() => onConfirm({ pool, amount: value, reason: reason.trim(), idempotencyKey: key })}>
-            {valid ? COPY.adjustConfirm(value, USERS_COPY.pools[pool]) : COPY.adjust}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>{COPY.adjustTitle}</DialogTitle>
+        <DialogDescription>{COPY.adjustBody}</DialogDescription>
+      </DialogHeader>
+      <div className="grid gap-3 text-sm">
+        <label className="grid gap-1">
+          <span className="font-medium">{COPY.pool}</span>
+          <select className="h-9 rounded-md border border-input bg-transparent px-3" value={pool} onChange={(e) => setPool(e.target.value === 'paid' ? 'paid' : 'free')}>
+            <option value="free">{USERS_COPY.pools.free}</option>
+            <option value="paid">{USERS_COPY.pools.paid}</option>
+          </select>
+        </label>
+        <label className="grid gap-1">
+          <span className="font-medium">{COPY.amount}</span>
+          <Input type="number" step={1} inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} />
+        </label>
+        <p className={after < 0 ? 'text-destructive' : 'text-muted-foreground'}>
+          {COPY.preview(balances[pool], after)}
+        </p>
+        <label className="grid gap-1">
+          <span className="font-medium">{COPY.reason}</span>
+          <Textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />
+        </label>
+      </div>
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      <DialogFooter>
+        <Button variant="outline" onClick={onCancel} disabled={pending}>
+          {COPY.cancel}
+        </Button>
+        <Button disabled={pending || !valid} onClick={() => onConfirm({ pool, amount: value, reason: reason.trim(), idempotencyKey: key })}>
+          {valid ? COPY.adjustConfirm(value, USERS_COPY.pools[pool]) : COPY.adjust}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
   )
 }
