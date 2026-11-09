@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from '@/core/i18n'
 import type { OutputAspect } from '@/core/templates/output-options'
 
-import type { CatalogueTemplate } from '../catalogue/catalogue-template'
+import { allowsNoPhoto, type CatalogueTemplate } from '../catalogue/catalogue-template'
 import { enqueueJobs, setWorkspaceJobs } from '../generation/job-store'
 import { useJobs } from '../generation/use-jobs'
 import { draftToggles, rememberConfirmed, restoreToggles, type ToggleValues } from '../toggles'
@@ -29,7 +29,7 @@ function useRunning(serverIds: readonly string[]): number {
   return ids.size
 }
 
-type Restore = { signedIn: boolean; apply(draft: HomeDraft): void; pick(file: File): void }
+type Restore = { signedIn: boolean; apply(draft: HomeDraft): boolean; pick(file: File): void }
 
 // Brings back what a signed-out visitor set up before sign-up, once. Signed in, the photo now
 // uploads and the draft is spent.
@@ -40,8 +40,8 @@ function useRestoreDraft({ signedIn, apply, pick }: Restore) {
     done.current = true
     void loadDraft().then((found) => {
       if (!found) return
-      apply(found.draft)
-      if (found.photo) pick(found.photo)
+      const acceptsPhoto = apply(found.draft)
+      if (acceptsPhoto && found.photo) pick(found.photo)
       if (signedIn) void clearDraft()
     })
   }, [signedIn, apply, pick])
@@ -50,13 +50,19 @@ function useRestoreDraft({ signedIn, apply, pick }: Restore) {
 // Starts the photo exactly as the workspace does (DESIGN §6.9 item 9): one job in the
 // generation store (reserve → generate on /api/generate), shown by that template's workspace,
 // which is where the visitor lands, on the same job id.
+function readyHomePhoto(photo: HomePhoto) {
+  if (!photo.inputKey || !photo.url || photo.status !== 'ready') return []
+  const upload = { phase: 'done' as const, inputKey: photo.inputKey }
+  return [{ photo: { id: 'home', url: photo.url, bytes: photo.file?.size ?? 0, ratio: null, upload }, inputKey: photo.inputKey }]
+}
+
 function useStart(viewer: HomeViewer | null, template: CatalogueTemplate | null, photo: HomePhoto) {
   const router = useRouter()
   return useCallback(
     (aspect: OutputAspect | null, note: string, toggles: ToggleValues) => {
-      if (!viewer || !template || !aspect || !photo.inputKey || !photo.url) return
-      const upload = { phase: 'done' as const, inputKey: photo.inputKey }
-      const ready = [{ photo: { id: 'home', url: photo.url, bytes: photo.file?.size ?? 0, ratio: null, upload }, inputKey: photo.inputKey }]
+      if (!viewer || !template || !aspect) return
+      const ready = readyHomePhoto(photo)
+      if (!ready.length && !(allowsNoPhoto(template) && photo.status === 'none')) return
       const ids = enqueueJobs(startInputs(template, { aspect, resolution: '1k', note, copy: {}, toggles }, ready), viewer.concurrency.limit)
       setWorkspaceJobs(template.id, ids)
       router.push(`/generate/${template.id}`)
@@ -75,7 +81,9 @@ export function useHomeGenerator({ templates, defaultId, viewer }: Args) {
   const [chosen, setChosen] = useState<{ templateId: string | null; values: ToggleValues }>({ templateId: null, values: {} })
   const toggles = template && chosen.templateId === template.id ? chosen.values : {}
   const setToggles = useCallback((values: ToggleValues) => setChosen({ templateId: template?.id ?? null, values }), [template])
-  const photo = useHomePhoto(viewer !== null)
+  const pickedPhoto = useHomePhoto(viewer !== null)
+  const photo: HomePhoto = template?.photoInput === 'none'
+    ? { ...pickedPhoto, url: null, inputKey: null, file: null, error: null, status: 'none' } : pickedPhoto
   const apply = useCallback(
     (draft: HomeDraft) => {
       const saved = templates.find((candidate) => candidate.id === draft.templateId)
@@ -88,6 +96,7 @@ export function useHomeGenerator({ templates, defaultId, viewer }: Args) {
       }
       setAspect(draft.aspect)
       setNote(draft.note)
+      return saved !== undefined && saved.photoInput !== 'none'
     },
     [templates],
   )
@@ -117,7 +126,8 @@ export function useHomeGenerator({ templates, defaultId, viewer }: Args) {
 
 function useHomeOutput(template: CatalogueTemplate | null, aspect: OutputAspect, photo: HomePhoto) {
   const options = templateOptions(template)
-  const photoRatio = useOriginalRatio(!options.originalRatio ? photo.url : null)
+  const measured = useOriginalRatio(!options.originalRatio ? photo.url : null)
+  const photoRatio = photo.status === 'none' && allowsNoPhoto(template) ? 1 : measured
   const outputAspect = chosenAspect(aspect, options, photoRatio)
   const resolution = closestResolution('1k', options)
   const cost = template && resolution && hasOutputOptions(options) ? template.creditsCost[resolution] : null
@@ -127,7 +137,7 @@ function useHomeOutput(template: CatalogueTemplate | null, aspect: OutputAspect,
 function generatorCta(template: CatalogueTemplate | null, viewer: HomeViewer | null, photo: HomePhoto, running: number, cost: number | null, outputAspect: OutputAspect | null): HomeCta {
   if (template && cost === null) return { kind: 'no-options' }
   if (photo.status === 'ready' && !outputAspect) return { kind: 'need-size' }
-  return homeCta({ viewer, cost, photo: photo.status, running, needsCopy: template?.copyFields.some((field) => field.required) ?? false })
+  return homeCta({ viewer, cost, photo: photo.status, photoOptional: allowsNoPhoto(template), running, needsCopy: template?.copyFields.some((field) => field.required) ?? false })
 }
 
 export type HomeGeneratorState = ReturnType<typeof useHomeGenerator>

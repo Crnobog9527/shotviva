@@ -14,7 +14,7 @@ import { ProviderSettingError } from './setting-error'
 import { defaultTemplateProvider, PROVIDERS_CACHE_TAG } from './active-provider'
 import { readProviderKey } from './keys'
 import { findProviderRow } from './repository'
-import { effectiveReferenceLimit, resolveProvider } from './resolve'
+import { effectiveReferenceRange, resolveProvider } from './resolve'
 import type { ActiveProviderRow, ProviderAdapters } from './types'
 
 async function cachedRow(id: string) {
@@ -54,7 +54,7 @@ async function checkTemplateRow(
   row: ActiveProviderRow, request: ImageRequestOptions, load: typeof openRouterImageParameters,
 ): Promise<{ reason: string } | { parameters?: OpenRouterImageParameters }> {
   if (!row.resolutions.includes(request.resolution)) return { reason: 'unsupported_resolution' }
-  const max = effectiveReferenceLimit(row)
+  const { maxReferences: max } = effectiveReferenceRange(row)
   if (max !== undefined && referenceCount(request) > max) return { reason: 'reference_image_limit' }
   if (row.adapter !== 'openrouter_images') return {}
   let parameters: OpenRouterImageParameters
@@ -77,7 +77,7 @@ export async function templateImageProvider(
   adapters: ProviderAdapters,
   id?: string | null,
   request?: ImageRequestOptions,
-  { lookup = cachedRow, fallback = () => defaultTemplateProvider(adapters, request?.styleRefCount),
+  { lookup = cachedRow, fallback = () => defaultTemplateProvider(adapters, request !== undefined),
     readKey = (keyId) => readProviderKey(createAdminSupabase(), keyId),
     parameters: loadParameters = openRouterImageParameters }: RoutingDeps = {},
 ) {

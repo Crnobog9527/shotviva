@@ -1,5 +1,5 @@
 import { chosenAspect, closestResolution, templateOptions } from './output-choice'
-import type { CatalogueTemplate } from '../catalogue/catalogue-template'
+import { allowsNoPhoto, type CatalogueTemplate } from '../catalogue/catalogue-template'
 import type { StartInput } from '../generation/job-store'
 import type { ReadyPhoto } from './photo-batch'
 import { toggleRequest } from '../toggles'
@@ -12,11 +12,14 @@ export function startInputs(template: CatalogueTemplate, values: FormValues, pho
   const note = values.note.trim()
   const options = templateOptions(template)
   const resolution = closestResolution(values.resolution, options)
-  if (!resolution) return []
-  const aspects = photos.map(({ photo }) => chosenAspect(values.aspect, options, photo.originalRatio))
+  if (!resolution || (template.photoInput === 'none' && photos.length)) return []
+  // An explicitly photo-optional template still queues one job when the user leaves the tray empty.
+  const sources = photos.length ? photos : allowsNoPhoto(template) ? [null] : []
+  const aspects = sources.map((source) => chosenAspect(values.aspect, options, source ? source.photo.originalRatio : 1))
   if (aspects.some((aspect) => aspect === null)) return []
   const inputs = { copy: values.copy, resolution, ...(note ? { note } : {}), ...toggleRequest(template.toggles, values.toggles) }
-  return photos.map(({ photo, inputKey }, index) => {
+  return sources.map((source, index) => {
+    const inputKey = source?.inputKey ?? null
     const aspect = aspects[index]!
     return {
       templateId: template.id,
@@ -25,7 +28,7 @@ export function startInputs(template: CatalogueTemplate, values: FormValues, pho
       aspect,
       credits: template.creditsCost[resolution],
       inputKey,
-      previewUrl: photo.url,
+      previewUrl: source?.photo.url,
       body: { template_id: template.id, input_key: inputKey, inputs: { ...inputs, aspect_ratio: aspect } },
     }
   })

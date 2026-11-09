@@ -33,20 +33,7 @@ export const HomeBench = forwardRef<HTMLDivElement, Props>(function HomeBench({ 
   return (
     <div className="mk-bench-wrap" ref={ref}>
       <section className={photo.url ? 'mk-bench mk-has-photo' : 'mk-bench'} aria-label={t('label')}>
-        <button type="button" className="mk-tile" onClick={onPickPhoto} aria-label={photo.url ? t('replaceAria') : t('addPhoto')}>
-          <span className="mk-vf" aria-hidden>
-            <i />
-            <i />
-            <i />
-            <i />
-          </span>
-          <PlusIcon className="mk-plus" />
-          {/* eslint-disable-next-line @next/next/no-img-element -- a local object URL, not an optimisable asset */}
-          {photo.url ? <img className={`${REPLAY_BLOCK_CLASS} mk-shot`} src={photo.url} alt="" /> : null}
-          <span className="mk-replace" aria-hidden>
-            {t('replace')}
-          </span>
-        </button>
+        {template?.photoInput !== 'none' ? <PhotoTile url={photo.url} onPick={onPickPhoto} /> : null}
         <button type="button" className="mk-bchip" onClick={onOpenPicker} aria-haspopup="dialog" aria-label={t('changeTemplate', { name })} disabled={!template}>
           {thumb ? <GroundedImg className="mk-thumb" ground="white" {...thumbImage(thumb, 44)} alt="" /> : <span className="mk-thumb" aria-hidden />}
           <span className="mk-k">{t('template')}</span>
@@ -80,3 +67,23 @@ export const HomeBench = forwardRef<HTMLDivElement, Props>(function HomeBench({ 
     </div>
   )
 })
+
+function PhotoTile({ url, onPick }: { url: string | null; onPick(): void }) {
+  const t = useTranslations('home.generator')
+  return (
+    <button type="button" className="mk-tile" onClick={onPick} aria-label={url ? t('replaceAria') : t('addPhoto')}>
+      <span className="mk-vf" aria-hidden>
+        <i />
+        <i />
+        <i />
+        <i />
+      </span>
+      <PlusIcon className="mk-plus" />
+      {/* eslint-disable-next-line @next/next/no-img-element -- a local object URL, not an optimisable asset */}
+      {url ? <img className={`${REPLAY_BLOCK_CLASS} mk-shot`} src={url} alt="" /> : null}
+      <span className="mk-replace" aria-hidden>
+        {t('replace')}
+      </span>
+    </button>
+  )
+}
