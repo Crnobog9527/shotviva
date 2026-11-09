@@ -91,6 +91,45 @@ $$;
 ALTER FUNCTION "admin"."checkout_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_session_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_invoice_id" "text", "p_charge_id" "text", "p_subscription_id" "text", "p_subscription_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."clear_approved_wallets_v2"("p_digest" "text", "p_last_ledger" bigint, "p_payments" bigint) RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare rec record; prior admin.pricing_wallet_cutover; stamp timestamptz;
+begin
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.template_catalog',0));
+  lock table public.profiles, public.generation_jobs, public.credit_ledger, public.payments, public.subscriptions in share row exclusive mode;
+  select * into prior from admin.pricing_wallet_cutover where version='v2';
+  if found then
+    if prior.digest_before is distinct from p_digest or prior.rolled_back_at is not null then raise exception 'CUTOVER_BATCH_MISMATCH'; end if;
+    return;
+  end if;
+  if admin.wallet_digest_v2() is distinct from p_digest or
+     (select coalesce(max(id),0) from public.credit_ledger) is distinct from p_last_ledger or
+     (select count(*) from public.payments) is distinct from p_payments or
+     exists(select from public.profiles where paid_until > now()) or
+     exists(select from public.subscriptions where status not in ('canceled','incomplete_expired')) or
+     exists(select from public.generation_jobs where status='running') then
+    raise exception 'CUTOVER_BASELINE_CHANGED';
+  end if;
+  stamp := clock_timestamp();
+  for rec in select id,credits,free_credits from public.profiles where credits<>0 or free_credits<>0 order by id loop
+    if rec.credits>0 then
+      perform public.admin_adjust_credits(rec.id,-rec.credits,'Legacy balance closed at pricing switch','paid','pricing:v2:close:paid:'||rec.id);
+    end if;
+    if rec.free_credits>0 then
+      perform public.admin_adjust_credits(rec.id,-rec.free_credits,'Legacy balance closed at pricing switch','free','pricing:v2:close:free:'||rec.id);
+    end if;
+  end loop;
+  insert into admin.pricing_wallet_cutover(version,started_at,digest_before,last_ledger_after)
+    select 'v2',stamp,p_digest,coalesce(max(id),0) from public.credit_ledger;
+end;
+$$;
+
+
+ALTER FUNCTION "admin"."clear_approved_wallets_v2"("p_digest" "text", "p_last_ledger" bigint, "p_payments" bigint) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."purchase_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_event_id" "text") RETURNS "public"."credit_change"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -239,6 +278,34 @@ $$;
 ALTER FUNCTION "admin"."renewal_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_invoice_id" "text", "p_period_end" timestamp with time zone, "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_charge_id" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."restore_approved_wallets_v2"() RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare rec record; batch admin.pricing_wallet_cutover;
+begin
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.template_catalog',0));
+  lock table public.profiles, public.generation_jobs, public.credit_ledger, public.payments, public.subscriptions in share row exclusive mode;
+  select * into strict batch from admin.pricing_wallet_cutover where version='v2';
+  if batch.rolled_back_at is not null then return; end if;
+  if (select coalesce(max(id),0) from public.credit_ledger)<>batch.last_ledger_after or
+     exists(select from public.profiles where created_at >= batch.started_at) or
+     exists(select from public.payments where created_at >= batch.started_at) or
+     exists(select from public.generation_jobs where created_at >= batch.started_at or status='running') then
+    raise exception 'ECONOMIC_ACTIVITY_AFTER_CUTOVER';
+  end if;
+  for rec in select user_id,pool,delta from public.credit_ledger where idempotency_key like 'pricing:v2:close:%' order by id loop
+    perform public.admin_adjust_credits(rec.user_id,-rec.delta,'Pricing rollback restores legacy balance',rec.pool,'pricing:v2:restore:'||rec.pool||':'||rec.user_id);
+  end loop;
+  if admin.wallet_digest_v2()<>batch.digest_before then raise exception 'RESTORED_WALLET_MISMATCH'; end if;
+  update admin.pricing_wallet_cutover set rolled_back_at=clock_timestamp() where version='v2';
+end;
+$$;
+
+
+ALTER FUNCTION "admin"."restore_approved_wallets_v2"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."waffo_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") RETURNS "public"."credit_change"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -265,6 +332,18 @@ $$;
 
 
 ALTER FUNCTION "admin"."waffo_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."wallet_digest_v2"() RETURNS "text"
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select encode(sha256(convert_to(coalesce(string_agg(id::text||':'||credits::text||':'||free_credits::text,',' order by id),''),'UTF8')),'hex')
+  from public.profiles;
+$$;
+
+
+ALTER FUNCTION "admin"."wallet_digest_v2"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."_affiliate_accept_invite"() RETURNS "trigger"
@@ -5105,14 +5184,26 @@ CREATE OR REPLACE FUNCTION "public"."grant_credits"("p_user_id" "uuid", "p_amoun
     AS $$
 declare
   v_profile public.profiles;
+  cutoff timestamptz;
 begin
   if p_amount is null or p_amount <= 0 then
     raise exception 'INVALID_INPUT' using detail = 'amount must be positive';
   end if;
 
   if p_idempotency_key = 'signup:' || p_user_id::text then
+    lock table public.profiles in row exclusive mode;
     select * into v_profile from public.profiles where id = p_user_id;
-    if found and v_profile.signup_ip is not null then
+    -- Read the committed version, not the app bundle: a stale tab must not award six
+    -- old credits after cutover, nor may an old account claim a second registration gift.
+    select updated_at into cutoff from public.system_settings
+     where key='pricing_catalog_version' and value='"v2"'::jsonb;
+    if cutoff is not null then
+      if v_profile.created_at < cutoff then
+        return row(false,v_profile.credits,v_profile.free_credits,v_profile.paid_until)::public.credit_change;
+      end if;
+      p_amount := 100;
+    end if;
+    if v_profile.signup_ip is not null then
       perform pg_advisory_xact_lock(hashtextextended('shotviva.signup_ip:' || host(v_profile.signup_ip), 0));
       if not exists (select 1 from public.credit_ledger where idempotency_key = p_idempotency_key)
          and exists (
@@ -6659,6 +6750,19 @@ $$;
 ALTER FUNCTION "public"."wishlist_eligible"("p_user_id" "uuid") OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "admin"."pricing_wallet_cutover" (
+    "version" "text" NOT NULL,
+    "started_at" timestamp with time zone NOT NULL,
+    "digest_before" "text" NOT NULL,
+    "last_ledger_after" bigint NOT NULL,
+    "rolled_back_at" timestamp with time zone,
+    CONSTRAINT "pricing_wallet_cutover_version_check" CHECK (("version" = 'v2'::"text"))
+);
+
+
+ALTER TABLE "admin"."pricing_wallet_cutover" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "admin"."product_terms_v2" (
     "product_id" "text" NOT NULL,
     "credits" integer NOT NULL,
@@ -7637,6 +7741,11 @@ CREATE TABLE IF NOT EXISTS "public"."templates" (
 
 
 ALTER TABLE "public"."templates" OWNER TO "postgres";
+
+
+ALTER TABLE ONLY "admin"."pricing_wallet_cutover"
+    ADD CONSTRAINT "pricing_wallet_cutover_pkey" PRIMARY KEY ("version");
+
 
 
 ALTER TABLE ONLY "admin"."product_terms_v2"
@@ -8716,6 +8825,9 @@ ALTER TABLE ONLY "public"."templates"
 
 
 
+ALTER TABLE "admin"."pricing_wallet_cutover" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "admin"."product_terms_v2" ENABLE ROW LEVEL SECURITY;
 
 
@@ -8921,6 +9033,10 @@ REVOKE ALL ON FUNCTION "admin"."checkout_terms"("p_v2" boolean, "p_user_id" "uui
 
 
 
+REVOKE ALL ON FUNCTION "admin"."clear_approved_wallets_v2"("p_digest" "text", "p_last_ledger" bigint, "p_payments" bigint) FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "admin"."purchase_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_event_id" "text") FROM PUBLIC;
 
 
@@ -8929,7 +9045,15 @@ REVOKE ALL ON FUNCTION "admin"."renewal_terms"("p_v2" boolean, "p_user_id" "uuid
 
 
 
+REVOKE ALL ON FUNCTION "admin"."restore_approved_wallets_v2"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "admin"."waffo_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."wallet_digest_v2"() FROM PUBLIC;
 
 
 
