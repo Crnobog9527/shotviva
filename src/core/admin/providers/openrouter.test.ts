@@ -1,0 +1,80 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { describe, expect, it, vi } from 'vitest'
+
+import { saveProvider, testProvider } from './commands'
+import { runProviderAction } from './run'
+
+const id = '6f1c2f9e-6a52-4c39-9a51-0a9f6b0c1d2e'
+const baseUrl = 'https://relay.example.com/v1'
+const model = 'vendor/new-image-model'
+const input = { baseUrl, model, adapter: 'openrouter_images', label: 'Test relay', apiKey: 'test-key-for-unit-fixture' }
+const resolveHost = async () => ['1.1.1.1']
+const catalogue = { data: [{ id: model, supported_parameters: { resolution: { type: 'enum', values: ['768', '2K', '4K'] } } }] }
+
+function fakeDb() {
+  const row = {
+    id, adapter: input.adapter, model, base_url: baseUrl, resolutions: ['2k', '3k'],
+    price_input_text_per_m: null, price_input_image_per_m: null, price_output_per_m: null,
+  }
+  const changed = { eq: () => changed, select: async () => ({ data: [{ id }] }) }
+  const update = vi.fn(() => changed)
+  const insert = vi.fn(() => ({ select: () => ({ single: async () => ({ data: { id } }) }) }))
+  const select = () => ({ eq: () => ({ maybeSingle: async () => ({ data: row }) }) })
+  const from = vi.fn(() => ({ insert, update, select }))
+  const rpc = vi.fn(async () => ({ data: input.apiKey, error: null }))
+  return { db: { from, rpc } as unknown as SupabaseClient, insert, update, from, rpc }
+}
+
+describe('OpenRouter provider administration', () => {
+  it('refuses a model absent from the image catalogue before writing a row or key', async () => {
+    const { db, from, rpc } = fakeDb()
+    const fetch = vi.fn(async () => Response.json(catalogue))
+    const result = await runProviderAction(() => saveProvider({ db, fetch, resolveHost }, id, { ...input, model: 'vendor/missing' }))
+    expect(result).toEqual({ ok: false, reason: 'openrouter_model_missing' })
+    expect(from).not.toHaveBeenCalled()
+    expect(rpc).not.toHaveBeenCalled()
+  })
+
+  it('maps the catalogue values to site tiers on insert and respects explicit overrides', async () => {
+    const { db, insert } = fakeDb()
+    const deps = { db, fetch: async () => Response.json(catalogue), resolveHost }
+    await saveProvider(deps, id, input)
+    expect(insert).toHaveBeenLastCalledWith(expect.objectContaining({ resolutions: ['2k', '3k'] }))
+    await saveProvider(deps, id, { ...input, resolutions: ['1k'] })
+    expect(insert).toHaveBeenLastCalledWith(expect.objectContaining({ resolutions: ['1k'] }))
+  })
+
+  it('does not replace an existing manual override when a legacy editor omits tiers', async () => {
+    const { db, update } = fakeDb()
+    await saveProvider({ db, resolveHost, fetch: async () => Response.json(catalogue) }, id, { ...input, id })
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ resolutions: undefined }))
+  })
+
+  it('keeps the default when a listed model has no resolution enumeration', async () => {
+    const { db, insert } = fakeDb()
+    await saveProvider({ db, resolveHost, fetch: async () => Response.json({ data: [{ id: model }] }) }, id, input)
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ resolutions: undefined }))
+  })
+
+  it('distinguishes an unavailable catalogue from a missing model without leaking vendor text', async () => {
+    const { db, from } = fakeDb()
+    const fetch = async () => new Response('sensitive upstream detail', { status: 502 })
+    expect(await runProviderAction(() => saveProvider({ db, fetch, resolveHost }, id, input)))
+      .toEqual({ ok: false, reason: 'openrouter_catalog_unavailable' })
+    expect(from).not.toHaveBeenCalled()
+  })
+
+  it('tests a stored row using only free GETs and sends the Vault key only to /key', async () => {
+    const { db } = fakeDb()
+    const fetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(Response.json(catalogue))
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+    expect(await testProvider({ db, resolveHost, fetch }, { id })).toEqual({ ok: false, failure: 'unauthorized', status: 401 })
+    expect(fetch.mock.calls.map(([url, options]) => [url, options?.method])).toEqual([
+      [baseUrl + '/images/models', 'GET'], [baseUrl + '/key', 'GET'],
+    ])
+    expect(fetch.mock.calls[0][1]).toMatchObject({ redirect: 'error' })
+    expect(fetch.mock.calls[0][1]?.headers).toBeUndefined()
+    expect(fetch.mock.calls[1][1]?.headers).toEqual({ Authorization: 'Bearer ' + input.apiKey })
+  })
+})

@@ -26,7 +26,11 @@ const KEY = 'sk-t17-table-secret-0123456789'
 let pg: Client
 let adminId: string
 
-const deps = () => ({ db: serviceSupabase(), resolveHost: publicHost })
+const deps = () => ({
+  db: serviceSupabase(),
+  resolveHost: publicHost,
+  fetch: async () => Response.json({ data: [{ id: 'gpt-image-2.6' }] }),
+})
 const save = (input: Record<string, unknown>) =>
   saveProvider(deps(), adminId, { label: `${PREFIX} ${randomUUID().slice(0, 6)}`, baseUrl: 'https://api.openai.com/v1', model: 'gpt-image-2.6', apiKey: KEY, ...input })
 

@@ -44,8 +44,8 @@ afterAll(async () => {
 async function setup() {
   const db = serviceSupabase()
   const openai = await recordingAdapters()
-  const dataURL = 'data:image/png;base64,' + Buffer.from(await png(48, 48)).toString('base64')
-  const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json({ choices: [{ message: { images: [{ image_url: { url: dataURL } }] } }], usage }))
+  const b64_json = Buffer.from(await png(48, 48)).toString('base64')
+  const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json({ data: [{ b64_json }], usage }))
   const adapters: ProviderAdapters = {
     ...openai.adapters,
     openrouter_images: (config) => createOpenRouterImageProvider({ ...config, fetch }),
@@ -85,7 +85,7 @@ describe('T92 per-template generation routing', () => {
     const { deps, fetch } = await setup()
     const userId = await createUser(pg, { credits: 2 })
     const jobId = randomUUID()
-    fetch.mockResolvedValueOnce(Response.json({ choices: [{ message: { content: 'no image' } }], usage }))
+    fetch.mockResolvedValueOnce(Response.json({ data: [], usage }))
     await expect(runGeneration(deps, { jobId, userId, templateId, source: 'web' })).rejects.toMatchObject({ refunded: true })
     expect(await jobRow(jobId)).toMatchObject({ provider: routerTag, status: 'failed', provider_usage: usage, cost_usd: chargedUsd })
     expect((await profileOf(pg, userId)).credits).toBe(2)

@@ -13,6 +13,7 @@ import {
   findProviderRow,
   insertProvider,
   listProviders,
+  openRouterModelTiers,
   ProviderSettingError,
   readProviderKey,
   setProviderKey,
@@ -23,7 +24,7 @@ import {
   type ProviderWrite,
 } from '@/core/providers'
 
-import { providerIdSchema, saveProviderSchema } from './schema'
+import { lookupModelSchema, providerIdSchema, saveProviderSchema } from './schema'
 
 // Business rules for /admin/providers. Callers pass a service-role client and the admin's id
 // after requireAdmin(). Keys go straight into Vault and never come back to the browser.
@@ -56,6 +57,19 @@ async function insertWithKey(db: SupabaseClient, write: ProviderWrite, apiKey: s
   return id
 }
 
+// Previews the same catalogue entry save validates, without ever reading a Vault key.
+export async function lookupProviderModel(input: unknown) {
+  const { baseUrl, model } = parseOrThrow(lookupModelSchema, input)
+  return openRouterModelTiers(await assertPublicBaseUrl(baseUrl), model)
+}
+
+async function saveResolutions(input: z.output<typeof saveProviderSchema>, baseUrl: string, fetchImpl?: typeof fetch) {
+  if (input.adapter !== 'openrouter_images') return input.resolutions
+  const suggested = await openRouterModelTiers(baseUrl, input.model, fetchImpl)
+  // An older editor omitting this field on edit must retain the Owner's saved override.
+  return input.resolutions ?? (input.id ? undefined : suggested ?? undefined)
+}
+
 // Insert or update. A new row needs a key; an edit with a blank key keeps the stored one.
 export async function saveProvider(deps: ProviderCommandDeps, adminId: string, input: unknown): Promise<string> {
   const parsed = parseOrThrow(saveProviderSchema, input)
@@ -63,7 +77,7 @@ export async function saveProvider(deps: ProviderCommandDeps, adminId: string, i
   const write: ProviderWrite = {
     module: parsed.module,
     adapter: parsed.adapter,
-    resolutions: parsed.resolutions,
+    resolutions: await saveResolutions(parsed, baseUrl, deps.fetch),
     label: parsed.label,
     baseUrl,
     model: parsed.model,
@@ -119,6 +133,7 @@ export async function testProvider(deps: ProviderCommandDeps, input: unknown): P
   const apiKey = await readProviderKey(deps.db, id)
   if (!apiKey) throw new ProviderSettingError('api_key_missing', `provider ${id} has no API key`)
   const baseUrl = await assertPublicBaseUrl(row.baseUrl, deps.resolveHost)
+  if (row.adapter === 'openrouter_images') await openRouterModelTiers(baseUrl, row.model, deps.fetch)
   const result = await testConnection({ baseUrl, apiKey, adapter: row.adapter }, deps.fetch)
   logger.info('admin.provider.tested', { providerId: id, ok: result.ok, status: result.status ?? null })
   return result
