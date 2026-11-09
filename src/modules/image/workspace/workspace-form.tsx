@@ -12,7 +12,7 @@ import type { MembershipTier } from '@/core/config'
 import { AgainNote } from '../again/again-note'
 import type { AgainStart } from '../again/again-start'
 import { MissingPhoto } from '../again/missing-photo'
-import type { CatalogueTemplate } from '../catalogue/catalogue-template'
+import { allowsNoPhoto, type CatalogueTemplate } from '../catalogue/catalogue-template'
 import { TemplateToggles, type ToggleSurface } from '../toggles'
 import { BatchHint } from './batch-hint'
 import { BatchPhotos } from './batch-photos'
@@ -52,15 +52,12 @@ export function WorkspaceForm({ template, balance, tier, photos, values, onChang
   const noteT = useTranslations('app.workspace.notePlaceholder')
   const options = templateOptions(template)
   const ratio = photos.photos[0]?.originalRatio
-  const aspect = chosenAspect(values.aspect, options, ratio)
+  const ratioForSize = photos.photos.length === 0 && allowsNoPhoto(template) ? 1 : ratio
+  const aspect = chosenAspect(values.aspect, options, ratioForSize)
   return (
     <>
-      {again ? <AgainNote again={again} template={template} photoRatio={ratio} /> : null}
-      <Section id="photo-h" title={t(photos.batchMax > 1 ? 'workspace.yourPhotos' : 'workspace.yourPhoto')} aside={<PhotoAside photos={photos} />}>
-        <PhotoField photos={photos} missing={again?.missing ?? null} tier={tier} />
-        <BatchHint tier={tier} dropped={photos.dropped} />
-        {photoExtra}
-      </Section>
+      {again ? <AgainNote again={again} template={template} photoRatio={ratioForSize} /> : null}
+      <PhotoSection template={template} photos={photos} again={again} tier={tier} photoExtra={photoExtra} />
       {template.copyFields.length > 0 ? (
         <div className="pt-6">
           <CopyFields fields={template.copyFields} values={values.copy} onChange={(copy) => onChange({ copy })} />
@@ -79,7 +76,7 @@ export function WorkspaceForm({ template, balance, tier, photos, values, onChang
           </span>
         }
       >
-        <SizePicker options={options} photoRatio={ratio} value={values.aspect} onChange={(aspect) => onChange({ aspect })} />
+        <SizePicker options={options} photoRatio={ratioForSize} value={values.aspect} onChange={(aspect) => onChange({ aspect })} />
       </Section>
       {options.resolutions.length > 1 ? <Section id="res-h" title={t('workspace.resolution')}>
         <ResolutionPicker options={options} value={values.resolution} costs={template.creditsCost} balance={balance} onChange={(resolution) => onChange({ resolution })} />
@@ -95,13 +92,27 @@ export function WorkspaceForm({ template, balance, tier, photos, values, onChang
   )
 }
 
+function PhotoSection({ template, photos, again, tier, photoExtra }: Pick<Props, 'template' | 'photos' | 'again' | 'tier' | 'photoExtra'>) {
+  const t = useTranslations('app')
+  if (template.photoInput === 'none') return null
+  const optional = template.photoInput === 'optional'
+  const label = t(photos.batchMax > 1 ? 'workspace.yourPhotos' : 'workspace.yourPhoto')
+  return (
+    <Section id="photo-h" title={optional ? `${label} ${t('workspace.optional')}` : label} aside={<PhotoAside photos={photos} />}>
+      <PhotoField optional={optional} photos={photos} missing={again?.missing ?? null} tier={tier} />
+      <BatchHint tier={tier} dropped={photos.dropped} />
+      {photoExtra}
+    </Section>
+  )
+}
+
 // Single-photo tiers keep the one-photo card with Replace; Pro and Max get the batch list. Make
 // again without its photo asks for it again in the empty slot.
-function PhotoField({ photos, missing, tier }: { photos: PhotoBatch; missing: 'old' | 'failed' | null; tier: MembershipTier | null }) {
+function PhotoField({ photos, missing, tier, optional }: { optional: boolean; photos: PhotoBatch; missing: 'old' | 'failed' | null; tier: MembershipTier | null }) {
   const [first] = photos.photos
   if (!first && missing) return <MissingPhoto reason={missing} multiple={photos.batchMax > 1} onPick={photos.add} />
   if (photos.batchMax <= 1) {
-    return first ? <PhotoCard photo={first} upload={first.upload} onPick={(file) => photos.add([file])} /> : <PhotoPickers onPick={photos.add} />
+    return first ? <PhotoCard onRemove={optional ? () => photos.remove(first.id) : undefined} photo={first} upload={first.upload} onPick={(file) => photos.add([file])} /> : <PhotoPickers onPick={photos.add} />
   }
   if (!first) return <PhotoPickers onPick={photos.add} multiple />
   return <BatchPhotos photos={photos.photos} max={photos.batchMax} tier={tier} onAdd={photos.add} onRemove={photos.remove} />

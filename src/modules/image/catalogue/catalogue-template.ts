@@ -14,6 +14,7 @@ export type CatalogueTemplate = {
   compare: boolean
   // The translated one-liner (templates.translations), when the page's language has one.
   description: string | null
+  photoInput?: 'required' | 'optional' | 'none'
   imageOptions?: ImageOptions
   creditsCost: CreditsCost
   // Text the template asks for (a headline, a price); most templates have none (DESIGN §4.3).
@@ -42,6 +43,7 @@ export function toCatalogueTemplate(template: LocalizedTemplate): CatalogueTempl
     categoryOrder: template.categoryView.sortOrder,
     compare: template.categoryView.compare,
     description: template.description ?? null,
+    photoInput: template.fields.images.max === 0 ? 'none' : template.fields.images.min === 0 ? 'optional' : 'required',
     imageOptions: template.imageOptions ?? FULL_IMAGE_OPTIONS,
     creditsCost: template.creditsCost,
     copyFields: template.fields.copy.map(({ key, label, placeholder, required, maxLength }) => ({
@@ -61,6 +63,8 @@ export function toCatalogueTemplate(template: LocalizedTemplate): CatalogueTempl
     },
   }
 }
+
+export const allowsNoPhoto = (template: CatalogueTemplate | null) => template?.photoInput === 'optional' || template?.photoInput === 'none'
 
 export type CatalogueCategory = { key: string; name: string }
 

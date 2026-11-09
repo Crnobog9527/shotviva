@@ -16,6 +16,7 @@ import { TEST_RUN_COPY as COPY } from './copy'
 import { firstRunLaunches } from './launches'
 import { PhotoPicker } from './photo-picker'
 import { RunOptions, type RunOptionValues } from './run-options'
+import { planBatch } from './run-tree'
 import { TestToggles } from './test-toggles'
 import type { Launch } from './use-test-panel'
 
@@ -28,7 +29,7 @@ type Props = {
   onError: (message: string) => void
 }
 
-const noSizes = { aspects: [], resolutions: [] }
+const noSizes = { aspects: [], resolutions: [], minReferences: 0 }
 
 function trialSizes(providers: readonly ImageProviderOption[], id: string | null) {
   const selected = providers.find(p => id ? p.id === id : p.isActive)
@@ -36,11 +37,18 @@ function trialSizes(providers: readonly ImageProviderOption[], id: string | null
   const options = selected.capabilities ?? (selected.openAI ? FULL_IMAGE_OPTIONS : null)
   if (!options) return noSizes
   const aspects = options.originalRatio ? ['original' as const, ...options.aspectRatios] : options.aspectRatios
-  return { aspects, resolutions: options.resolutions }
+  return { aspects, resolutions: options.resolutions, minReferences: selected.capabilities?.minReferences ?? 0 }
 }
 
 function availableValue<T extends string>(wanted: T | '', values: readonly T[]): T | '' {
   return values.find(value => value === wanted) ?? values[0] ?? ''
+}
+
+function trialInputCount(template: AdminTemplate, targets: readonly string[], omitStyleRefs: boolean) {
+  // Each selected test photo starts a separate run with the same saved styles.
+  const photoCount = targets.length > 0 ? 1 : 0
+  const styleCount = omitStyleRefs ? 0 : template.prompt?.styleRefs.length ?? 0
+  return photoCount + styleCount
 }
 
 // 首次出图 (ARCHITECTURE §10.b): a test photo (or up to three), the template's own text fields,
@@ -61,7 +69,8 @@ export function FirstRunForm({ template, providers, photos, onLaunch, onPhotoUpl
     aspect: availableValue(wanted.aspect, sizes.aspects),
   }
   const targets = usesPhoto ? picked : []
-  const count = targets.length > 1 ? targets.length : options.triple ? 3 : 1
+  const belowMinimum = trialInputCount(template, targets, omitStyleRefs) < sizes.minReferences
+  const count = planBatch(targets, options.triple).length
   const submit = () => {
     if (usesPhoto && template.fields.images.min > 0 && picked.length === 0) return onError(COPY.first.needPhoto)
     onLaunch(firstRunLaunches(template.id, targets, { providerId, copy, note, toggles, options, omitStyleRefs }))
@@ -102,7 +111,8 @@ export function FirstRunForm({ template, providers, photos, onLaunch, onPhotoUpl
         {COPY.first.omitStyleRefs}
       </label>
       <RunOptions sizes={sizes} id="test-first" values={options} onChange={(patch) => setOptions((current) => ({ ...current, ...patch }))} tripleAvailable={targets.length <= 1} />
-      <Button disabled={!options.aspect || !options.resolution} onClick={submit} className="justify-self-start">
+      {belowMinimum ? <p role="status" className="text-sm text-muted-foreground">{COPY.first.needInputs(sizes.minReferences)}</p> : null}
+      <Button disabled={belowMinimum || !options.aspect || !options.resolution} onClick={submit} className="justify-self-start">
         {COPY.first.run(count)}
       </Button>
     </section>

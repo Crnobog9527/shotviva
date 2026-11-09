@@ -59,6 +59,20 @@ describe('template form state', () => {
     })
   })
 
+  it('saves a new style-only template with zero user photos and the private reference on its first save', () => {
+    const ref = { key: 'style-refs/style-only/abcdef00-1234-4567-89ab-0123456789ab.webp', width: 300, height: 200, uploadedAt: '2026-01-01T00:00:00Z' }
+    const values = {
+      ...emptyFormValues(), id: 'style-only', name: 'Style only', category: 'art', promptBody: 'Unit test',
+      fieldsJson: '{"images":{"min":0,"max":0},"copy":[],"aspectRatios":["1:1"]}',
+      styleRefsEdited: true, styleRefs: [ref],
+    }
+    const result = buildPayload(values, true, FLOOR)
+    expect(result).toMatchObject({
+      ok: true, payload: { isNew: true, template: { fields: { images: { min: 0, max: 0 } } }, prompt: { styleRefs: [ref] } },
+    })
+    if (result.ok) expect(JSON.stringify(result.payload.template)).not.toContain(ref.key)
+  })
+
   it('rejects invalid JSON and empty surfaces before calling the server', () => {
     expect(buildPayload({ ...emptyFormValues(), fieldsJson: '{' }, true, FLOOR)).toMatchObject({ ok: false })
     const noSurface = { ...emptyFormValues(), visibleWeb: false, visiblePartner: false }

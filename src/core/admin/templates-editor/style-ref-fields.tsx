@@ -48,7 +48,7 @@ export function StyleRefFields({ templateId, refs, budget, busy, onBusy, onChang
       <legend className="px-1 font-medium">{copy.title}</legend>
       <p className="text-xs text-muted-foreground">{copy.orderHint}</p>
       <p className="text-xs text-muted-foreground">{copy.rightsHint}</p>
-      <p>{copy.limit(budget.users, refs.length, budget.max)}</p>
+      <p>{copy.limit(budget.users, refs.length, budget.total, budget.model)}</p>
       <SortableList ids={keys} labelOf={key => copy.label(keys.indexOf(key) + 1)} onReorder={reorder} disabled={busy}>
         {order => <ol className="grid gap-1">{order.map((key, i) => (
           <RefRow key={key} refKey={key} label={copy.label(i + 1)} pick={pick} remove={() => onChange(refs.filter(r => r.key !== key))} />
@@ -63,7 +63,7 @@ export function StyleRefFields({ templateId, refs, budget, busy, onBusy, onChang
         <Button type="button" variant="outline" size="sm" className="justify-self-start" onClick={() => pick(null)} disabled={busy || refs.length >= MAX_STYLE_REFS}>
           {copy.add}
         </Button>
-      ) : <p className="text-xs">{copy.needSave}</p>}
+      ) : <p className="text-xs">{copy.needId}</p>}
       {busy && <p role="status">{copy.uploading}</p>}
       {(error || budget.problem) && <p role="alert" className="text-destructive">{error || budget.problem}</p>}
     </fieldset>

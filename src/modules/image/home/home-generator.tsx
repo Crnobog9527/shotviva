@@ -8,7 +8,7 @@ import { trackTemplateView } from '@/core/analytics/browser'
 import type { FormAction } from '@/core/auth/ui'
 import { UPLOAD_ACCEPT } from '@/core/storage/rules'
 
-import type { CatalogueTemplate } from '../catalogue/catalogue-template'
+import { allowsNoPhoto, type CatalogueTemplate } from '../catalogue/catalogue-template'
 import { FavoritesProvider } from '../favorites/favorites-provider'
 import { FavoriteReturn } from '../favorites/favorite-return-effect'
 import { HomeBench } from './home-bench'
@@ -71,7 +71,7 @@ export function HomeGenerator({ templates, defaultId, viewer, googleAction, home
     shown?.scrollIntoView({ behavior: smooth(), block: 'center' })
   }, [])
   const { away, past, footer } = useGeneratorAway(watch)
-  const hasPhoto = state.photo.url !== null
+  const canStartWithoutPicking = state.photo.url !== null || allowsNoPhoto(state.template)
   // The header's stand-in (768px up): "Upload photo" opens the picker straight from the click
   // (browsers allow it only inside the user's gesture) while the page scrolls back behind it;
   // with a photo in, "Generate" just brings the generator back.
@@ -82,7 +82,7 @@ export function HomeGenerator({ templates, defaultId, viewer, googleAction, home
     },
     [bring],
   )
-  useHeaderUpload(past ? (hasPhoto ? 'generate' : 'upload') : null, fromHeader)
+  useHeaderUpload(past ? (canStartWithoutPicking ? 'generate' : 'upload') : null, fromHeader)
   const { choose } = state
   const onPick = useCallback(
     (id: string) => {
@@ -135,7 +135,7 @@ export function HomeGenerator({ templates, defaultId, viewer, googleAction, home
         thumbOf={thumbFor}
       />
       {viewer ? null : <SignupSheet open={signUp} onOpenChange={setSignUp} googleAction={googleAction} next={homePath} gift={freeImages} />}
-      <HomeDock show={away && !footer} hasPhoto={hasPhoto} cost={state.cost} onClick={bring} />
+      <HomeDock show={away && !footer} canStartWithoutPicking={canStartWithoutPicking} cost={state.cost} onClick={bring} />
     </div>
     </FavoritesProvider>
   )

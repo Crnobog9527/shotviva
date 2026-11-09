@@ -46,6 +46,14 @@ describe('template output choices', () => {
     const photos = [0.75, 2].map((originalRatio, i) => ({
       photo: { id: String(i), url: 'blob:photo', bytes: 123, ratio: null, upload: { phase: 'done' as const, inputKey: 'key' }, originalRatio }, inputKey: 'key',
     }))
+    expect(startInputs(template, values, [])).toEqual([])
+    for (const photoInput of ['optional', 'none'] as const) {
+      const jobs = startInputs({ ...template, photoInput }, values, [])
+      expect(jobs).toHaveLength(1)
+      expect(jobs[0]).toMatchObject({ credits: 2, inputKey: null, body: { input_key: null, inputs: { aspect_ratio: '1:1' } } })
+      expect(jobs[0]?.previewUrl).toBeUndefined()
+    }
+    expect(startInputs({ ...template, photoInput: 'none' }, values, photos)).toEqual([])
     const jobs = startInputs(template, values, photos)
     expect(jobs.map((job) => job.aspect)).toEqual(['4:5', '16:9'])
     for (const job of jobs) expect(job).toMatchObject({ resolution: '1k', credits: 2, body: { inputs: { resolution: '1k', aspect_ratio: job.aspect } } })

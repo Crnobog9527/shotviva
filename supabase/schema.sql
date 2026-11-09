@@ -64,32 +64,52 @@ $$;
 ALTER FUNCTION "admin"."apply_style_refs"() OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "admin"."check_template_style_ref_limit"() RETURNS "trigger"
+CREATE OR REPLACE FUNCTION "admin"."assert_template_reference_range"("p_id" "text") RETURNS "void"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $$
 declare
-  v_id text;
+  v_images jsonb;
   v_count integer;
   v_provider uuid;
-  v_limit integer;
-  v_photos integer;
+  v_min integer;
+  v_max integer;
 begin
-  if tg_table_name = 'templates' then v_id := new.id; else v_id := new.template_id; end if;
-  select jsonb_array_length(tp.style_refs), tp.provider_id, coalesce((t.fields#>>'{images,max}')::integer, 0)
-    into v_count, v_provider, v_photos from public.template_prompts tp
-    join public.templates t on t.id = tp.template_id where tp.template_id = v_id;
-  if not found or v_count = 0 then return null; end if;
-  select coalesce((p.capabilities->>'maxReferences')::integer, case when p.adapter = 'openai_images' then 4 end) into v_limit
-    from public.ai_providers p where p.module = 'image'
-      and (p.id = v_provider or (v_provider is null and p.is_active)) for share;
-  -- With no DB provider, T96's environment OpenAI Images adapter supports four inputs.
-  if not found then v_limit := 4; end if;
-  if v_limit is null or v_photos + v_count > v_limit then
-    raise exception 'MODEL_REFERENCE_LIMIT' using detail =
-      format('模板最多 %s 张用户照片，加上 %s 张画风参考图，模型上限为 %s',
-        v_photos,v_count,coalesce(v_limit::text,'未知'));
+  select t.fields->'images',coalesce(jsonb_array_length(tp.style_refs),0),
+         case when t.id <> 'edit' then tp.provider_id end
+    into v_images,v_count,v_provider from public.templates t
+    left join public.template_prompts tp on tp.template_id=t.id where t.id=p_id and t.module='image';
+  if not found then return; end if;
+  -- Edits use the source work and never attach template style references.
+  if p_id='edit' then v_count := 0; end if;
+  select coalesce((p.capabilities->>'minReferences')::integer,0),
+         coalesce((p.capabilities->>'maxReferences')::integer,case when p.adapter='openai_images' then 4 end)
+    into v_min,v_max from public.ai_providers p where p.module='image'
+      and (p.id=v_provider or (v_provider is null and p.is_active)) for share;
+  if not found then v_min:=0; v_max:=4; end if;
+  -- A legacy OpenRouter row without a catalog snapshot still supports legacy saves.
+  -- Configuring private images requires a known upper bound as in 0941.
+  if (v_count > 0 and v_max is null)
+     or coalesce((v_images->>'min')::integer,case when v_count>0 then 0 end) + v_count < v_min
+     or coalesce((v_images->>'max')::integer,case when v_count>0 then 0 end) + v_count > v_max then
+    raise exception 'MODEL_REFERENCE_LIMIT' using detail=format(
+      '模型支持 %s–%s 张输入图，模板设置为 %s–%s 张用户照片，加上 %s 张画风参考图',
+      v_min,coalesce(v_max::text,'未知'),v_images->>'min',v_images->>'max',v_count);
   end if;
+end;
+$$;
+
+
+ALTER FUNCTION "admin"."assert_template_reference_range"("p_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."check_template_style_ref_limit"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if tg_table_name='templates' then perform admin.assert_template_reference_range(new.id);
+  else perform admin.assert_template_reference_range(new.template_id); end if;
   return null;
 end;
 $$;
@@ -3894,10 +3914,8 @@ CREATE OR REPLACE FUNCTION "public"."admin_upsert_template"("p_template" "jsonb"
 declare
   v_id text := p_template ->> 'id';
   v_provider uuid;
-  v_caps jsonb;
   v_model text;
   v_floor jsonb;
-  v_refs jsonb := p_template #> '{fields,images}';
   v_resolution text;
 begin
   perform 1 from public.templates where id = v_id for update;
@@ -3906,13 +3924,8 @@ begin
   else
     select provider_id into v_provider from public.template_prompts where template_id = v_id;
   end if;
-  select p.id, p.capabilities, p.model into v_provider, v_caps, v_model from public.ai_providers p
+  select p.id, p.model into v_provider, v_model from public.ai_providers p
     where p.module = 'image' and (p.id = v_provider or (v_provider is null and p.is_active)) for share;
-  if (v_refs->>'min')::integer < (v_caps->>'minReferences')::integer
-    or (v_refs->>'max')::integer > (v_caps->>'maxReferences')::integer then
-    raise exception 'MODEL_REFERENCE_LIMIT' using detail = format('所选模型支持 %s–%s 张参考图，模板设置为 %s–%s 张',
-      v_caps->>'minReferences', v_caps->>'maxReferences', v_refs->>'min', v_refs->>'max');
-  end if;
 
   -- Older deployments send no pricing snapshot. New code derives it from site products and
   -- measured costs on the server; callers without the service role cannot invoke this RPC.
@@ -3988,6 +4001,9 @@ begin
       body = excluded.body,
       model_params = excluded.model_params,
       provider_id = case when p_prompt ? 'provider_id' then excluded.provider_id else tp.provider_id end;
+  else
+    -- With a null prompt the immediate prompt trigger never runs (including on create).
+    perform admin.assert_template_reference_range(v_id);
   end if;
 end;
 $$;
@@ -9179,6 +9195,11 @@ GRANT USAGE ON SCHEMA "public" TO "service_role";
 
 
 REVOKE ALL ON FUNCTION "admin"."apply_style_refs"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."assert_template_reference_range"("p_id" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."assert_template_reference_range"("p_id" "text") TO "service_role";
 
 
 
