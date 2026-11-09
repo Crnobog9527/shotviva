@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import type { CodeProduct } from '../../codes/admin'
+import { belowDiscountFloor, type CodeProduct } from '../../codes/admin'
 import { COPY, PRODUCTS } from './copy'
-import { emptyCode, formPatch, giftChanged, localDate, offerError, productGroup, tooLow } from './model'
+import { emptyCode, formPatch, giftChanged, localDate, offerError, productGroup } from './model'
 
 const target: CodeProduct = { id: 'starter_yearly', subscription: true, priceCents: 151, credits: 1 }
 const floor: CodeProduct = { id: 'max_yearly', subscription: true, priceCents: 151, credits: 2 }
@@ -11,9 +11,9 @@ describe('campaign editor', () => {
     const percent = 50
     for (const multiplier of [1, 100]) {
       const p = { ...target, credits: target.credits * multiplier }, f = { ...floor, credits: floor.credits * multiplier }
-      expect(tooLow(p,f,percent)).toBe(true)
+      expect(belowDiscountFloor(p,f,percent)).toBe(true)
       expect(offerError({catalog:[p,f], floor:f},percent,[p.id])).toBe(COPY.invalidTargets([PRODUCTS[p.id]]))
-      expect(tooLow({...p,priceCents:152},f,percent)).toBe(false)
+      expect(belowDiscountFloor({...p,priceCents:152},f,percent)).toBe(false)
     }
   })
 

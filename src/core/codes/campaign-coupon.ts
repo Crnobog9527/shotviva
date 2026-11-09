@@ -6,6 +6,7 @@ import type Stripe from 'stripe'
 
 import { AppError } from '../errors'
 import { campaignCatalog, type CatalogInput } from './admin'
+import { readGiftPolicy } from './gift-policy'
 import { codePatch, invalidDiscountProducts, saveCode } from './save-code'
 
 type Coupons = Pick<Stripe['coupons'], 'create' | 'retrieve'>
@@ -43,6 +44,23 @@ function newCouponTerms(fields: ReturnType<typeof codePatch>, products: readonly
     ...(discount_months != null && { duration_in_months: discount_months }) }
 }
 
+// Reject known invalid terms before provisioning an external coupon. The database
+// rechecks the constraints and policy atomically in case an administrator changed them.
+async function checkNewCampaign(db: SupabaseClient, fields: ReturnType<typeof codePatch>) {
+  if (fields.starts_at && fields.expires_at && Date.parse(fields.starts_at) >= Date.parse(fields.expires_at)) {
+    throw new AppError('INVALID_INPUT', 'INVALID_CODE_FIELDS')
+  }
+  if (fields.invitee_credits == null) {
+    if (fields.invitee_pool) throw new AppError('INVALID_INPUT', 'INVALID_CODE_FIELDS')
+    return
+  }
+  const policy = await readGiftPolicy(db)
+  if (fields.invitee_credits > policy.maxCreditsPerCode) throw new AppError('INVALID_INPUT', 'CODE_GIFT_LIMIT')
+  if (fields.invitee_pool === 'paid' && policy.requirePaidGiftCap && !fields.max_redemptions) {
+    throw new AppError('INVALID_INPUT', 'CODE_GIFT_CAP_REQUIRED')
+  }
+}
+
 export async function saveCampaignWithCoupon(db: SupabaseClient, actor: string, codeId: string, input: unknown,
   products: readonly CatalogInput[], coupons: () => Coupons) {
   const fields = codePatch(codeId, input)
@@ -53,6 +71,7 @@ export async function saveCampaignWithCoupon(db: SupabaseClient, actor: string, 
     if (error) throw new AppError('INTERNAL', 'Could not read campaign')
     if (!data) {
       const terms = newCouponTerms(fields, products)
+      await checkNewCampaign(db, fields)
       fields.stripe_coupon_id = await ensureCoupon(coupons(), codeId.toLowerCase(), terms)
     }
   }

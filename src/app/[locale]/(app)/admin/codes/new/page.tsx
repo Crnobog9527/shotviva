@@ -2,9 +2,9 @@ import { randomUUID } from 'node:crypto'
 
 import { AdminPage } from '@/core/admin'
 import { CODE_EDITOR_COPY, CodeEditor } from '@/core/admin/code-editor'
-import { readGiftPolicy } from '@/core/admin/code-editor/read'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { campaignCatalog } from '@/core/codes/admin'
+import { readGiftPolicy } from '@/core/codes/server'
 import { site } from '@/site/site.config'
 import { submitCampaignCode } from '../save'
 

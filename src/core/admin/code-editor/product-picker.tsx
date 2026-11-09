@@ -1,8 +1,9 @@
 import { discountedPriceCents } from '../../codes'
+import { belowDiscountFloor } from '../../codes/admin'
 import type { ProductId } from '../../config'
 import { Button } from '../../ui/button'
 import { COPY, PRODUCTS } from './copy'
-import { type Catalog, pricePerCredit, productGroup, tooLow } from './model'
+import { type Catalog, pricePerCredit, productGroup } from './model'
 
 type Props = { prices: Catalog; percent: number; chosen: ProductId[]; change: (ids: ProductId[]) => void; locked: boolean }
 const groupNames = ['monthly','yearly','packs','all'] as const
@@ -17,9 +18,9 @@ export function ProductPicker({ prices: { catalog, floor }, percent, chosen, cha
     <table className="w-full text-left text-sm"><thead><tr className="border-b">
       {[COPY.target,COPY.unit,COPY.maxOff].map(title => <th key={title} className="py-2 font-medium">{title}</th>)}
     </tr></thead><tbody>{catalog.map(p => {
-      const bad = valid && tooLow(p,floor,percent)
+      const bad = valid && belowDiscountFloor(p,floor,percent)
       let max = 0
-      while (max < 90 && !tooLow(p,floor,max + 1)) max++
+      while (max < 90 && !belowDiscountFloor(p,floor,max + 1)) max++
       return <tr key={p.id} className={'border-b' + (bad ? ' text-destructive' : '')}><td className="py-2">
         <label className="flex items-center gap-2"><input type="checkbox" name="products" value={p.id} checked={chosen.includes(p.id)}
           onChange={e => change(e.target.checked ? [...chosen,p.id] : chosen.filter(id => id !== p.id))} />{PRODUCTS[p.id]}</label></td>

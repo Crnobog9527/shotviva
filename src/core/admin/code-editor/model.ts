@@ -1,6 +1,5 @@
 import { z } from 'zod'
 
-import { discountedPriceCents } from '../../codes'
 import { belowDiscountFloor, type CodeProduct } from '../../codes/admin'
 import { PRODUCT_IDS, type ProductId } from '../../config'
 import { beijingLocalToIso, toBeijingLocal } from '../shell/format'
@@ -14,9 +13,8 @@ export const editable = z.object({
   starts_at: z.string().nullable(), expires_at: z.string().nullable(), max_redemptions: z.number().int().nullable(),
   new_users_only: z.boolean(), redemption_count: z.number().int().nonnegative(),
 })
-export const giftPolicy = z.object({ maxCreditsPerCode: z.int32().positive(), requirePaidGiftCap: z.boolean() })
 export type Existing = z.infer<typeof editable>
-export type Policy = z.infer<typeof giftPolicy>
+export type { GiftPolicy as Policy } from '../../codes/server'
 export type Catalog = { catalog: CodeProduct[]; floor: CodeProduct }
 export type Duration = NonNullable<Existing['discount_duration']>
 export type Preset = 'promo' | 'gift' | 'both'
@@ -26,12 +24,6 @@ export function productGroup(ids: ProductId[], group: 'monthly' | 'yearly' | 'pa
   return ids.filter(id => group === 'packs' ? id.startsWith('pack_') : id.endsWith('_' + group))
 }
 
-// The save RPC compares the exact ratio. Also check collectible cents so half-cent
-// rounding cannot create a new offer which checkout would immediately reject.
-export function tooLow(p: CodeProduct, floor: CodeProduct, percent: number) {
-  return belowDiscountFloor(p, floor, percent)
-    || BigInt(discountedPriceCents(p.priceCents, percent)) * BigInt(floor.credits) < BigInt(floor.priceCents) * BigInt(p.credits)
-}
 export function pricePerCredit(cents: number, credits: number) {
   return new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol',
     maximumSignificantDigits: 6 }).format(cents / (100 * credits))
@@ -59,7 +51,7 @@ export function formPatch(form: FormData, existing: Existing | null) {
 export function offerError({catalog, floor}: Catalog, percent: number, ids: ProductId[]) {
   if (!Number.isInteger(percent) || percent < 1 || percent > 90) return COPY.invalidPercent
   if (!ids.length) return COPY.noTargets
-  const bad = catalog.filter(p => ids.includes(p.id) && tooLow(p,floor,percent))
+  const bad = catalog.filter(p => ids.includes(p.id) && belowDiscountFloor(p, floor, percent))
   return bad.length ? COPY.invalidTargets(bad.map(p => PRODUCTS[p.id])) : null
 }
 

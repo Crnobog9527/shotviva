@@ -4,13 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { AppError } from '../../errors'
-import { editable, giftPolicy } from './model'
-
-export async function readGiftPolicy(db: SupabaseClient) {
-  const { data, error } = await db.from('system_settings').select('value').eq('key','code_gift_policy').single()
-  if (error) throw new AppError('INTERNAL','Could not load gift policy')
-  return giftPolicy.parse(data.value)
-}
+import { editable } from './model'
 
 export async function readEditableCode(db: SupabaseClient, id: string) {
   if (!z.uuid().safeParse(id).success) return null

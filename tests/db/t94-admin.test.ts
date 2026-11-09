@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { listCodes, loadCode, redemptions, topInviters } from '@/core/admin/code-reports'
 import { saveCode } from '@/core/codes/server'
 import { site } from '@/site/site.config'
 
@@ -104,12 +105,12 @@ describe('admin code reports', () => {
     const duplicate = await payment(buyer, id, true)
     await payment(buyer, id, false, 'cny')
     await payment(buyer, null, false)
-    const result = await service.rpc('admin_list_codes', { p_actor: actor, p_code_id: id })
-    expect(result).toMatchObject({ data: [{ purchasers: 1, amounts: {
+    const report = await loadCode(serviceSupabase(), actor, id)
+    expect(report).toMatchObject({ purchasers: 1, amounts: {
       usd: { net: 260, discount: 80 }, cny: { net: 130, discount: 40 },
-    } }], error: null })
-    const detail = await service.rpc('admin_code_redemptions', { p_actor: actor, p_code_id: id })
-    expect(detail).toMatchObject({ data: [{ discount_conflict_payments: [duplicate] }], error: null })
+    } })
+    const detail = await redemptions(serviceSupabase(), actor, id)
+    expect(detail.items).toMatchObject([{ discount_conflict_payments: [duplicate] }])
   })
 
   it('counts a buyer even without a reward and excludes blocked invites from private stats', async () => {
@@ -123,23 +124,45 @@ describe('admin code reports', () => {
     const blockedId = await redemption(rows[0].id, blocked, inviter, 'blocked_same_ip')
     await payment(buyer, null, false)
     expect(await summary()).toMatchObject({ data: { invited: 1, purchasers: 1, earned: 0, rewards_left: invite.inviterRewardCap, friends: [{ purchased: true }] } })
-    const ranking = await service.rpc('admin_top_inviters', { p_actor: actor, p_days: null })
-    expect(ranking.data).toEqual(expect.arrayContaining([expect.objectContaining({ inviter_user_id: inviter, invited: 1, purchasers: 1 })]))
-    const rejected = await service.rpc('admin_code_redemptions', { p_actor: actor })
-    expect(rejected.data).toEqual(expect.arrayContaining([expect.objectContaining({ id: blockedId, status: 'blocked_same_ip' })]))
+    const ranking = await topInviters(serviceSupabase(), actor, true)
+    expect(ranking).toEqual(expect.arrayContaining([expect.objectContaining({ inviter_user_id: inviter, invited: 1, purchasers: 1 })]))
+    const rejected = await redemptions(serviceSupabase(), actor, null)
+    expect(rejected.items).toEqual(expect.arrayContaining([expect.objectContaining({ id: blockedId, status: 'blocked_same_ip' })]))
+  })
+
+  it('shows the actual first-payment reward and subsequent refund status in the invite report', async () => {
+    const inviter = await createUser(db)
+    const buyer = await createUser(db)
+    const { data: code } = await service.rpc('get_or_create_invite_code', { p_user: inviter })
+    const { rows: [offer] } = await db.query('select id from public.codes where code=$1', [code])
+    await redemption(offer.id, buyer, inviter)
+    const first = await payment(buyer, null, false)
+    const effect = await service.rpc('apply_payment_code_effects', {
+      p_user: buyer, p_payment_id: first, p_code_id: null, p_amount_discount: 0,
+      p_inviter_credits: invite.inviterCredits, p_inviter_cap: invite.inviterRewardCap,
+    })
+    expect(effect).toMatchObject({ data: { rewarded: true }, error: null })
+    await db.query("update public.payments set status='partially_refunded' where id=$1", [first])
+    const detail = await redemptions(serviceSupabase(), actor, offer.id)
+    expect(detail.items).toMatchObject([{ user_id: buyer, inviter_reward_payment_id: first,
+      reward_payment_status: 'partially_refunded', reward_payment_refunded: 50 }])
+    const leaders = await topInviters(serviceSupabase(), actor, false)
+    expect(leaders).toContainEqual({ inviter_user_id: inviter, invited: 1, purchasers: 1, earned: invite.inviterCredits })
   })
 
   it('uses created_at and id to page 31 redemptions with the same timestamp', async () => {
     const id = randomUUID()
-    expect(await save(id, { code: codeName(), invitee_credits: 1 })).toMatchObject({ data: id })
+    expect(await save(id, { code: codeName(), invitee_credits: invite.inviteeCredits })).toMatchObject({ data: id })
+    const list = await listCodes(serviceSupabase(), actor, 'campaign')
+    expect(list.items).toEqual(expect.arrayContaining([expect.objectContaining({ id, invitee_credits: invite.inviteeCredits, invitee_pool: 'free' })]))
     const ids = []
     for (let i = 0; i < 31; i++) ids.push(await redemption(id, await createUser(db), null))
     await db.query('update public.code_redemptions set created_at=$1 where code_id=$2', ['2026-01-01', id])
-    const args = { p_actor: actor, p_code_id: id }
-    const first = await service.rpc('admin_code_redemptions', args)
-    expect(first.data).toHaveLength(30)
-    const cursor = { created_at: '2026-01-01T00:00:00Z', id: ids.sort().reverse()[29] }
-    const rest = await service.rpc('admin_code_redemptions', { ...args, p_cursor: cursor })
-    expect(rest.data).toMatchObject([{ id: ids[30] }])
+    const first = await redemptions(serviceSupabase(), actor, id)
+    expect(first.items).toHaveLength(30)
+    expect(first.nextCursor).toBeTruthy()
+    const rest = await redemptions(serviceSupabase(), actor, id, first.nextCursor!)
+    expect(rest.items).toMatchObject([{ id: ids.sort().reverse()[30] }])
+    expect(rest.nextCursor).toBeNull()
   })
 })
