@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { styleRefsSchema } from './style-refs'
 import { creditsCostSchema, TEMPLATE_QUALITIES } from './pricing'
 import { RESERVED_KEYS, toggleFieldSchema, TOGGLES_MAX } from './toggles'
 
@@ -45,10 +46,10 @@ export const templateFieldsSchema = z
   // One placeholder namespace: {{key}} is either a copy field or a toggle, never both.
   .refine((fields) => {
     const keys = [...fields.copy.map((field) => field.key), ...fields.toggles.map((toggle) => toggle.key)]
-    const reserved = fields.toggles.some((toggle) => (RESERVED_KEYS as readonly string[]).includes(toggle.key))
+    const reserved = keys.some((key) => (RESERVED_KEYS as readonly string[]).includes(key))
     return new Set(keys).size === keys.length && !reserved
   }, {
-    message: 'toggle keys must be unique and differ from copy field keys and aspect_ratio',
+    message: 'copy and toggle keys must be unique and differ from reserved placeholders',
     path: ['toggles'],
   })
 
@@ -138,6 +139,7 @@ export type TemplateInput = z.infer<typeof templateInputSchema>
 
 // Private part (the `template_prompts` row). Never sent to non-admin clients.
 export const promptInputSchema = z.object({
+  styleRefs: styleRefsSchema.optional(),
   providerId: z.uuid().nullable().optional(),
   body: z.string().min(1).max(20000),
   modelParams: z.record(z.string(), z.unknown()).default({}),

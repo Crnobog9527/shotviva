@@ -8,6 +8,7 @@ import type { PromptInput, TemplateInput } from '@/core/templates'
 // unknown one fails on the foreign key (T75). With `categoryByName` (the prompt import) it is
 // sent as `category` instead: a key or an English / Chinese category name, resolved in the
 // database (0581 trigger), and a value no category has gets a category of its own.
+const referencePatch = (prompt: PromptInput) => prompt.styleRefs === undefined ? {} : { p_style_refs: prompt.styleRefs }
 const pricing = (floors?: ProviderFloors) => floors?.providers ? { price_floors: floors } : {}
 
 export function toUpsertArgs(template: TemplateInput, prompt: PromptInput, options: { categoryByName?: boolean; floors?: ProviderFloors } = {}) {
@@ -29,6 +30,7 @@ export function toUpsertArgs(template: TemplateInput, prompt: PromptInput, optio
       ...(template.sortOrder === undefined ? {} : { sort_order: template.sortOrder }),
       ...(template.isActive === undefined ? {} : { is_active: template.isActive }),
     },
+    ...referencePatch(prompt),
     p_prompt: {
       body: prompt.body,
       model_params: prompt.modelParams,

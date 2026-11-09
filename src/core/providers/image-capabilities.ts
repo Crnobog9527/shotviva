@@ -1,4 +1,4 @@
-import { imageCapabilitiesSchema, type ImageCapabilities } from '../templates/image-capabilities'
+import { OPENAI_MAX_REFERENCES, imageCapabilitiesSchema, type ImageCapabilities } from '../templates/image-capabilities'
 import { availableImageOptions, FULL_IMAGE_OPTIONS } from '../templates/image-options'
 import { RESOLUTIONS } from '../templates/output-options'
 import { openRouterImageParameters, type OpenRouterImageParameters } from './openrouter-catalog'
@@ -27,7 +27,7 @@ export async function fetchImageCapabilities(adapter: ProviderAdapterId, baseUrl
   if (adapter === 'openai_responses') return null
   const fetchedAt = new Date().toISOString()
   if (adapter === 'openai_images') return {
-    ...FULL_IMAGE_OPTIONS, providerAspectRatios: FULL_IMAGE_OPTIONS.aspectRatios, minReferences: 0, maxReferences: 4, fetchedAt,
+    ...FULL_IMAGE_OPTIONS, providerAspectRatios: FULL_IMAGE_OPTIONS.aspectRatios, minReferences: 0, maxReferences: OPENAI_MAX_REFERENCES, fetchedAt,
   }
   const parameters = await openRouterImageParameters(baseUrl, model, fetchImpl ?? fetch)
   return catalogCapabilities(parameters, fetchedAt)

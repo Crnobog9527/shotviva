@@ -36,6 +36,7 @@ export function placeholderRun(p: Placeholder, now = new Date()): TestRunView {
     sourceLocale: p.sourceLocale ?? null,
     targetLocale: p.targetLocale ?? null,
     editScope: null,
+    styleRefCount: 0,
     promptVersion: null,
     model: null,
     costUsd: null,
