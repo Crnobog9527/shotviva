@@ -34,10 +34,16 @@ export function campaignCatalog(products: readonly CatalogInput[]) {
   return { catalog, floor }
 }
 
+function collectibleDifference(product: CodeProduct, floor: CodeProduct, percent: number) {
+  return compareUnitPrice({ ...product, priceCents: discountedPriceCents(product.priceCents, percent) }, floor)
+}
+
+// New offers must pass the database's exact ratio and the amount Stripe can actually collect.
 export function belowDiscountFloor(product: CodeProduct, floor: CodeProduct, percent: number): boolean {
   if (!Number.isInteger(percent) || percent < 1 || percent > 90) throw new AppError('INVALID_INPUT', 'INVALID_DISCOUNT')
-  return BigInt(product.priceCents) * BigInt(100 - percent) * BigInt(floor.credits)
+  const exactBelow = BigInt(product.priceCents) * BigInt(100 - percent) * BigInt(floor.credits)
     < BigInt(floor.priceCents) * BigInt(100) * BigInt(product.credits)
+  return exactBelow || collectibleDifference(product, floor, percent) < BigInt(0)
 }
 
 // Compare the collectible USD cents on this checkout against today's lowest subscription
@@ -46,5 +52,5 @@ export function checkoutUnitPriceDifference(products: readonly CatalogInput[], i
   const { catalog, floor } = campaignCatalog(products)
   const product = catalog.find(item => item.id === id)
   if (!product) throw new AppError('INTERNAL', 'Missing checkout product in campaign catalog')
-  return compareUnitPrice({ ...product, priceCents: discountedPriceCents(product.priceCents, percent) }, floor)
+  return collectibleDifference(product, floor, percent)
 }

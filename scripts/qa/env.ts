@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { parseEnv } from 'node:util'
 
+import type { PersonaId } from './personas'
 import { assertQaTarget, QaGuardError, resolveSiteUrl } from './target'
 
 export const ENV_FILE = '.env.local'
@@ -42,12 +43,12 @@ function r2FromEnv(): R2Config | null {
   return { accountId: R2_ACCOUNT_ID, accessKeyId: R2_ACCESS_KEY_ID, secretAccessKey: R2_SECRET_ACCESS_KEY, bucket: R2_BUCKET }
 }
 
-export function loadQaEnv(path = ENV_FILE): QaEnv {
+export function loadQaEnv(ids: readonly PersonaId[], path = ENV_FILE): QaEnv {
   const file = fromFile(path)
   const ref = assertQaTarget({
     supabaseUrl: file.NEXT_PUBLIC_SUPABASE_URL,
     serviceKey: file.SUPABASE_SERVICE_ROLE_KEY,
-    extraRefs: process.env.QA_EXTRA_SUPABASE_REFS,
+    extraRefs: ids.includes('qa-invitee') ? undefined : process.env.QA_EXTRA_SUPABASE_REFS,
   })
   return {
     ref,

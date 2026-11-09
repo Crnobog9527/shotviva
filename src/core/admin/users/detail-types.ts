@@ -35,6 +35,7 @@ export type SameIpAccount = { id: string; createdAt: string; freeCredits: number
 export type UserRequest = { id: string; createdAt: string; status: string; description: string; votes: number }
 
 export type UserExtras = {
+  codeHistory: Awaited<ReturnType<typeof import('./code-history').userCodeHistory>>
   signupIp: string | null
   payments: UserPayment[]
   subscription: UserSubscription

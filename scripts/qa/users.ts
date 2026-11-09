@@ -46,7 +46,7 @@ export async function createPersonaUser(db: SupabaseClient, persona: Persona): P
   if (data.user) return data.user
   // A timed-out attempt may still have created the user before the retry.
   const existing = /already/i.test(error?.message ?? '') ? await findUserByEmail(db, persona.email) : null
-  if (existing) return existing
+  if (existing && (persona.id !== 'qa-invitee' || existing.user_metadata.qa_persona === persona.id)) return existing
   throw new Error(`createUser ${persona.id} failed: ${error?.message ?? 'no user'}`)
 }
 

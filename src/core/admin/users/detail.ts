@@ -15,6 +15,7 @@ const inputSchema = z.object({
   userId: z.string().max(64),
   // The job a lookup landed on, highlighted in the jobs table.
   jobId: z.string().max(64).nullish(),
+  codesCursor: z.string().max(400).nullish(),
   cursor: z.string().max(400).nullish(),
 })
 
@@ -26,6 +27,6 @@ export async function loadUserDetail(db: SupabaseClient, input: unknown, affilia
   const { userId, jobId, cursor } = parsed.data
   const [user, jobs, ledger] = await Promise.all([loadUser(db, userId, affiliate), recentJobs(db, userId, jobId), ledgerPage(db, userId, cursor)])
   if (!user) return null
-  const extras = await loadUserExtras(db, user)
+  const extras = await loadUserExtras(db, user, parsed.data.codesCursor)
   return { user, jobs, ledger, ledgerPaged: Boolean(cursor), extras }
 }

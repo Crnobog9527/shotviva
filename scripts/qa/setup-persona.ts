@@ -1,8 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+import { recordSignupIp } from '../../src/core/auth/signup-ip'
 import { ensureCreatorWork } from './creator-work'
 import { currentTier, grantSignup, purchaseMax, readProfile, resetPool, unban } from './ledger'
-import { needsRecreate, type Persona } from './personas'
+import { INVITEE_SIGNUP_IP, needsRecreate, type Persona } from './personas'
 import type { QaStorage } from './storage'
 import { createPersonaUser, deletePersonaUser, findUserByEmail } from './users'
 
@@ -15,6 +16,9 @@ type Ctx = { db: SupabaseClient; storage: QaStorage }
 async function ensureUser({ db, storage }: Ctx, persona: Persona): Promise<{ userId: string; outcome: Outcome | null }> {
   const existing = await findUserByEmail(db, persona.email)
   if (existing) {
+    if (persona.id === 'qa-invitee' && existing.user_metadata.qa_persona !== persona.id) {
+      throw new Error('qa-invitee email belongs to an account not created by the QA script.')
+    }
     const profile = await readProfile(db, existing.id)
     const snapshot = { credits: profile.credits, paidUntil: profile.paid_until, tier: await currentTier(db, existing.id) }
     if (!needsRecreate(persona, snapshot)) return { userId: existing.id, outcome: null }
@@ -26,6 +30,12 @@ async function ensureUser({ db, storage }: Ctx, persona: Persona): Promise<{ use
 
 // Each step is a no-op when the state is already right; the flags say whether any wrote.
 async function applyState({ db, storage }: Ctx, persona: Persona, userId: string): Promise<boolean> {
+  if (persona.id === 'qa-fresh') return false
+  if (persona.id === 'qa-invitee') {
+    if (!(await recordSignupIp(db, userId, INVITEE_SIGNUP_IP))) throw new Error('Could not set the QA invitee signup IP.')
+    if (!(await grantSignup(db, userId))) throw new Error('QA invitee did not receive the signup grant.')
+    return true
+  }
   const steps: boolean[] = [await grantSignup(db, userId)]
   if (persona.tier === 'max') steps.push(await purchaseMax(db, userId))
   if (persona.succeededWork && persona.paidCredits !== null) {
@@ -50,8 +60,7 @@ async function adminStep(db: SupabaseClient, persona: Persona, userId: string): 
 
 export async function setupPersona(ctx: Ctx, persona: Persona): Promise<SetupResult> {
   const { userId, outcome } = await ensureUser(ctx, persona)
-  // qa-fresh stays exactly as created: its first sign-in grants the signup credits for real.
-  const wrote = persona.alwaysRecreate ? false : await applyState(ctx, persona, userId)
+  const wrote = await applyState(ctx, persona, userId)
   return {
     userId,
     outcome: outcome ?? (wrote ? 'reset' : 'unchanged'),
