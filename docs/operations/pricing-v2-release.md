@@ -1,6 +1,6 @@
 # New credit release
 
-0960–0963 are inactive compatibility migrations. Installing them does not clear a wallet,
+0960–0964 are inactive compatibility migrations. Installing them does not clear a wallet,
 change a template, enable an affiliate program, create provider prices, or promote a site.
 
 1. For this release the Owner requested the configured script and waived another end-to-end
@@ -28,16 +28,13 @@ change a template, enable an affiliate program, create provider prices, or promo
    lock timeout and abort if the baseline changes. The production arguments below identify the
    reviewed snapshot; never substitute newly computed values without checking the difference.
 
-       begin;
-       set local lock_timeout='5s';
-       select pg_advisory_xact_lock(hashtextextended('shotviva.template_catalog',0));
-       select admin.clear_approved_wallets_v2('d89a0d8be56fbceac43c362466620f5d53c150266f56eee1cf806d6a6b94d8b4',37,1);
-       insert into public.system_settings(key,value,updated_at)
-         values('pricing_catalog_version','"v2"',clock_timestamp());
-       select admin.activate_template_price_catalog_v2();
-       commit;
+   Run the checked-in production or preview SQL selected by the workflow. The release
+   also records the economic checkpoint used to refuse unsafe rollbacks; do not reproduce
+   these steps as individual SQL statements.
 
-5. Revalidate template caches and open checkout and generation only on the verified version.
+5. Before promoting, use the target project environment to run
+   `pnpm pricing:prepromote <immutable-production-candidate-url> v2`. Promote only when
+   the candidate build, database host and active catalogue match. Revalidate template caches and open checkout and generation only on the verified version.
    Confirm exact version on all domains, new signup = 100, paid/free pools and historical
    documents unchanged except for the recorded closing entries. Compare checkout and job
    quotes, actual payment/credits, and new ledger totals.
