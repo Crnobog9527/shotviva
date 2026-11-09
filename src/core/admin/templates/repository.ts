@@ -2,6 +2,7 @@ import 'server-only'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+import { styleRefsSchema, type StyleRef } from '@/core/templates/style-refs'
 import type { ProviderFloors } from '@/core/templates/provider-pricing'
 import { AppError, type ErrorCode } from '@/core/errors'
 import {
@@ -21,7 +22,7 @@ import type { AdminTemplate } from './types'
 
 // Every function expects a service-role client; callers must have passed requireAdmin().
 
-type PromptRow = { provider_id: string | null; body: string; version: number; model_params: Record<string, unknown> }
+type PromptRow = { style_refs: StyleRef[]; provider_id: string | null; body: string; version: number; model_params: Record<string, unknown> }
 type AdminRow = (TemplateRow | PreT75TemplateRow) & { template_prompts: PromptRow | null }
 
 export async function listAdminTemplates(client: SupabaseClient): Promise<AdminTemplate[]> {
@@ -36,13 +37,14 @@ export async function listAdminTemplates(client: SupabaseClient): Promise<AdminT
         .order('sort_order', { ascending: true })
         .order('id', { ascending: true })
         .returns<AdminRow[]>(),
-    ', template_prompts(body, version, model_params, provider_id)',
+    ', template_prompts(body, version, model_params, provider_id, style_refs)',
   )
   if (error || !data) throw new AppError('INTERNAL', `listAdminTemplates failed: ${error?.message ?? 'no data'}`)
   return data.map((row) => ({
     ...toTemplate(row),
     prompt: row.template_prompts
       ? {
+          styleRefs: styleRefsSchema.parse(row.template_prompts.style_refs),
           providerId: row.template_prompts.provider_id,
           body: row.template_prompts.body,
           version: row.template_prompts.version,

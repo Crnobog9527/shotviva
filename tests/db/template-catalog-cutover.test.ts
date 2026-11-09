@@ -108,6 +108,23 @@ describe('activated template prices', () => {
     expect((await request()).rows[0].credits_cost).toBe(45)
   })
 
+  it('preserves private references on legacy saves and applies the v2 price floor to a reference update', async () => {
+    await activate()
+    const refs = [{ key: 'style-refs/promo-poster/' + randomUUID() + '.webp', width: 20, height: 20,
+      uploadedAt: new Date().toISOString() }]
+    const floor = { high: costs, medium: costs }
+    const template = { id: 'promo-poster', name: 'Poster', category: 'pets', quality: 'medium',
+      fields: { images: { min: 1, max: 1 } }, credits_cost: costs,
+      price_floors: { providers: { [provider]: floor }, models: { [provider]: model }, version: 'v2' } }
+    const prompt = { body: 'fixture' }
+    const withRefs = (price: number, next: typeof refs) => db.query('select public.admin_upsert_template($1,$2,$3)',
+      [{ ...template, credits_cost: { ...costs, '1k': price } }, prompt, JSON.stringify(next)])
+    await withRefs(45, refs)
+    await db.query('select public.admin_upsert_template($1,$2)', [template, prompt])
+    await refuses(() => withRefs(44, []), 'MODEL_CREDIT_FLOOR')
+    expect((await db.query("select style_refs from template_prompts where template_id='promo-poster'")).rows[0].style_refs).toEqual(refs)
+  })
+
   it('rejects unclassified templates and missing model tiers; rolls the snapshot back only when unchanged', async () => {
     await sample('pending-rule')
     await refuses(activate,'UNMAPPED_ACTIVE_TEMPLATES: pending-rule')

@@ -11,6 +11,8 @@ export type ProviderInput = {
   // Rendered wrapped prompt. Adapters must never log it (AGENTS §4, T4 card).
   prompt: string
   images: ProviderImage[]
+  // Style-only requests have no source photo to determine the original output ratio.
+  photoCount?: number
   // A width:height ratio, or 'original' to follow the first image (square without one).
   aspectRatio: string
   // Output tier; the adapter turns tier × ratio into a pixel size (ARCHITECTURE §8.1).
@@ -48,6 +50,7 @@ export type ProviderPrices = {
 
 export type GenerationProvider = {
   id: string
+  maxReferences?: number
   // Price snapshot taken when the provider was resolved for this request: the row's prices with
   // empty ones filled from MODEL_PRICES; null when neither has any (the job then has no cost).
   prices?: ProviderPrices | null
@@ -55,7 +58,10 @@ export type GenerationProvider = {
 }
 
 // Web and admin first-generation resolve the saved provider after loading the template.
-export type ImageRequestOptions = Pick<ProviderInput, 'resolution' | 'aspectRatio' | 'images'>
+export type ImageRequestOptions = Pick<ProviderInput, 'resolution' | 'aspectRatio' | 'images'> & { styleRefCount?: number }
+
+// Routing uses reference metadata, before any private reference bytes are fetched.
+export const referenceCount = (request: ImageRequestOptions) => request.images.length + (request.styleRefCount ?? 0)
 
 export type TemplateProvider = GenerationProvider | ((id: string | null, request: ImageRequestOptions) => Promise<GenerationProvider>)
 

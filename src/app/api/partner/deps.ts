@@ -24,8 +24,7 @@ function partnerDeps(): PartnerRouteDeps {
 
 // Same provider resolution and face-swap screening (§5.1a) as /api/generate.
 async function partnerGenerateDeps(): Promise<PartnerGenerateRouteDeps> {
-  const [provider, judge] = await Promise.all([imageProvider(), identityJudge()])
-  return { ...partnerDeps(), provider, identityJudge: judge }
+  return { ...partnerDeps(), provider: imageProvider, identityJudge: await identityJudge() }
 }
 
 // A missing secret throws while wiring; answer that in the partner error shape too.

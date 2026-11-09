@@ -7,7 +7,7 @@ import { AppPage, BalanceChip, FlowNav } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
 import { currentTier, limitsFor, readBalance } from '@/core/billing'
 import { currentLocale } from '@/core/i18n/server'
-import { listOwnJobs } from '@/core/jobs'
+import { listRunningJobIds } from '@/core/jobs'
 import { listTemplatesIn, loadEditOffer } from '@/core/templates'
 import { r2Store } from '@/core/storage'
 import { ImageWorkspace, loadAgain, toCatalogueTemplate, WorkspaceHead } from '@/modules/image'
@@ -30,12 +30,13 @@ async function Workspace({ params, searchParams }: RouteProps) {
   if (!found) notFound()
   const template = toCatalogueTemplate(found)
   const againId = typeof query.again === 'string' ? query.again : undefined
-  const [balance, tier, own, again, editOffer] = await Promise.all([
+  const admin = createAdminSupabase()
+  const [balance, tier, runningIds, again, editOffer] = await Promise.all([
     readBalance(supabase, user.id),
     // current_tier() is service-role only; the user's own id comes from the session.
-    currentTier(createAdminSupabase(), user.id),
-    listOwnJobs(supabase, user.id, new Date()),
-    loadAgain({ db: supabase, store: r2Store }, { userId: user.id, jobId: againId, template }),
+    currentTier(admin, user.id),
+    listRunningJobIds(admin, user.id, new Date()),
+    loadAgain({ db: admin, store: r2Store }, { userId: user.id, jobId: againId, template }),
     // "Edit this photo" on the done view only when editing is on (T30).
     loadEditOffer(supabase),
   ])
@@ -48,7 +49,7 @@ async function Workspace({ params, searchParams }: RouteProps) {
         template={template}
         balance={balance}
         tier={tier}
-        concurrency={{ limit: limitsFor(tier).concurrency, runningIds: own.running.map((job) => job.id) }}
+        concurrency={{ limit: limitsFor(tier).concurrency, runningIds }}
         again={again}
         editable={editOffer !== null}
         shareText={t('shareText', { brand: site.brand.name, url: `https://${site.brand.domain}/?utm_source=share&utm_medium=web_share` })}

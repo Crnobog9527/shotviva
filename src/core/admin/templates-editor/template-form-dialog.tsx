@@ -12,6 +12,8 @@ import { TEST_RUN_COPY, TestRunPanel } from '../test-run-ui'
 
 import type { CategoryOption } from './category-field'
 import { buildPayload, emptyFormValues, toFormValues, type TemplateFormValues } from './form-state'
+import { referenceBudget } from './style-ref-state'
+import { StyleRefFields } from './style-ref-fields'
 import { TemplateCoverFields } from './template-cover-fields'
 import { TemplatePromptFields } from './template-prompt-fields'
 import { TemplatePublicFields } from './template-public-fields'
@@ -32,7 +34,7 @@ type Props = {
   // The last save's success line, shown by the save button (the dialog stays open after a save).
   notice?: string | null
   onCancel: () => void
-  onSubmit: (payload: SaveTemplatePayload) => void
+  onSubmit: (payload: SaveTemplatePayload, saved: () => void) => void
 }
 
 // Mounted fresh per target (keyed by the container), so initial state comes straight from props.
@@ -55,7 +57,7 @@ export function TemplateFormDialog({ target, providers, floor: allFloors, catego
     }
     setLocalError(null)
     setSubmitted(true)
-    onSubmit(result.payload)
+    onSubmit(result.payload, () => setValues(now => now.styleRefs === values.styleRefs ? { ...now, styleRefsEdited: false } : now))
   }
 
   const shownError = localError ?? error ?? null
@@ -95,6 +97,8 @@ type FormColumnProps = Pick<Props, 'target' | 'providers' | 'floor' | 'categorie
 }
 
 function FormColumn({ target, providers, values, isNew, floor, categories, coverLanguages, coverActions, pending, error, saved, onChange, onCancel, onSave }: FormColumnProps) {
+  const [uploading, setUploading] = useState(false)
+  const budget = referenceBudget(providers, values.providerId, values.fieldsJson, values.styleRefs.length)
   const existing = target.mode === 'edit' ? target.template : null
   return (
     <div className="grid min-h-0 content-start gap-4 p-6 lg:overflow-y-auto">
@@ -111,15 +115,28 @@ function FormColumn({ target, providers, values, isNew, floor, categories, cover
       {values.module === 'image' && (
         <ImageProviderField id="tpl-provider" providers={providers} value={values.providerId} onChange={(providerId) => onChange({ providerId })} />
       )}
+      <StyleSection values={values} existing={existing} budget={budget} uploading={uploading} setUploading={setUploading} onChange={onChange} />
       <TemplatePromptFields values={values} version={existing?.prompt?.version ?? null} onChange={onChange} />
       <TemplateToggleFields values={values} onChange={onChange} />
       {isNew ? <p className="text-muted-foreground text-xs">新模板保存后默认是下架状态，保存后留在这里，右侧就能试跑。</p> : null}
-      <FormFooter pending={pending} error={error} saved={saved} onCancel={onCancel} onSave={onSave} />
+      <FormFooter saveDisabled={styleSaveBlocked(uploading, values.module, budget.problem)} pending={pending} error={error} saved={saved} onCancel={onCancel} onSave={onSave} />
     </div>
   )
 }
 
-function FormFooter({ pending, error, saved, onCancel, onSave }: Pick<FormColumnProps, 'pending' | 'error' | 'saved' | 'onCancel' | 'onSave'>) {
+function styleSaveBlocked(uploading: boolean, module: string, problem: string | null) {
+  return uploading || (module === 'image' && !!problem)
+}
+
+function StyleSection({ values, existing, budget, uploading, setUploading, onChange }: Pick<FormColumnProps, 'values' | 'onChange'> & {
+  existing: AdminTemplate | null; budget: ReturnType<typeof referenceBudget>; uploading: boolean; setUploading: (value: boolean) => void
+}) {
+  if (values.module !== 'image') return null
+  return <StyleRefFields templateId={existing?.id ?? null} refs={values.styleRefs} budget={budget}
+    busy={uploading} onBusy={setUploading} onChange={styleRefs => onChange({ styleRefs, styleRefsEdited: true })} />
+}
+
+function FormFooter({ pending, error, saved, onCancel, onSave, saveDisabled }: Pick<FormColumnProps, 'pending' | 'error' | 'saved' | 'onCancel' | 'onSave'> & { saveDisabled: boolean }) {
   return (
     <>
       {error ? (
@@ -132,7 +149,7 @@ function FormFooter({ pending, error, saved, onCancel, onSave }: Pick<FormColumn
         <Button variant="outline" onClick={onCancel} disabled={pending}>
           关闭
         </Button>
-        <Button onClick={onSave} disabled={pending}>
+        <Button onClick={onSave} disabled={pending || saveDisabled}>
           {pending ? '保存中…' : '保存'}
         </Button>
       </DialogFooter>

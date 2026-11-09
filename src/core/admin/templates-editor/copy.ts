@@ -155,3 +155,16 @@ export const REPLATE_PRESET = {
   on: '',
   off: '',
 } as const
+
+export const styleRefCopy = {
+  title: '画风参考图（不对用户显示）',
+  orderHint: '出图时按顺序附在用户照片之后。提示词里请写明：前面的图是要重画的照片，最后 N 张只参考画风。',
+  rightsHint: '请用没有真人正脸、或已获授权的图做参考，避免模型把参考图里的人脸画进用户的图里。',
+  add: '上传参考图', replace: '替换', remove: '移除', uploading: '上传处理中…',
+  label: (n: number) => `画风参考图 ${n}`,
+  limit: (users: number | null, refs: number, max: number | null) =>
+    `用户最多 ${users ?? '—'} 张 + 画风参考图 ${refs} 张；模型上限 ${max ?? '未知'} 张。`,
+  over: '输入图片总数超过模型上限。请减少参考图或用户上传张数，或更换模型。',
+  missingCap: '无法读取所选模型的参考图上限，请先刷新模型能力。',
+  needSave: '先保存新模板，再上传参考图。', invalidUpload: '上传失败，请重试。', decodeFailed: '无法读取图片，请换一个文件。',
+} as const

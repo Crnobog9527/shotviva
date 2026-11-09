@@ -32,7 +32,7 @@ async function loadAround(supabase: Awaited<ReturnType<typeof createServerSupaba
     listTemplatesIn(supabase, locale),
     // An edit has no upload of its own (T30).
     job.templateId === EDIT_TEMPLATE_ID ? false : hasInputPreview(r2Store(), job),
-    job.parentJobId ? findOwnJob(supabase, userId, job.parentJobId) : null,
+    job.parentJobId ? findOwnJob(admin, userId, job.parentJobId) : null,
     loadEditOffer(supabase),
     readBalance(supabase, userId),
     // current_tier() is service-role only; the user's own id comes from the session.
@@ -50,7 +50,7 @@ async function Result({ params, searchParams }: Pick<PageProps<'/[locale]/photos
   const [{ jobId }, query] = await Promise.all([params, searchParams])
   const user = await requireUser(`/photos/${jobId}`)
   const supabase = await createServerSupabase()
-  const job = await findOwnJob(supabase, user.id, jobId)
+  const job = await findOwnJob(createAdminSupabase(), user.id, jobId)
   if (!job || job.status !== 'succeeded') notFound()
   const { templates, kept, parent, offer, balance, tier, reference } = await loadAround(supabase, user.id, job)
   const t = await getTranslations('app')

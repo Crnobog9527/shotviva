@@ -28,7 +28,7 @@ import { accountLimits } from './account-limits'
 import { assertWithinRateLimit } from './rate-limit'
 import { settleGeneration, type SettleDeps } from './settle-generation'
 import { recordJobClientIp } from './job-download'
-import { resolveTemplateProvider, type TemplateProvider } from './provider'
+import type { TemplateProvider } from './provider'
 import { reserveJob } from './settlement'
 
 // `track` is injectable so tests can assert the `generate` event without PostHog.
@@ -158,15 +158,16 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
 
   const jobId = req.jobId ?? randomUUID()
   const resolution = req.resolution ?? DEFAULT_RESOLUTION
-  const call = templateCall({ template, prompt }, inputs, image, resolution)
-  const provider = await resolveTemplateProvider(deps.provider, req.source === 'web' ? prompt.providerId : null, call)
+  const { call, provider, styleRefKeys } = await templateCall(deps, { template, prompt }, inputs, image, {
+    resolution, providerId: req.source === 'web' ? prompt.providerId : null,
+  })
   // Marks which request created the row: two concurrent requests with one job id both get
   // the row back from reserve_credits (charged once), but only the creator calls the provider.
   const attemptId = randomUUID()
   const job = await reserveJob(deps.db, {
     ...reserveFields(req), jobId, module: template.module, templateId: template.id, provider: provider.id,
     expectedCredits: expectedPrice(req, template, resolution),
-    inputs: jobInputs(req, prepared, resolution, attemptId, deps.now?.() ?? new Date()),
+    inputs: { ...jobInputs(req, prepared, resolution, attemptId, deps.now?.() ?? new Date()), style_ref_keys: styleRefKeys },
   })
   if (job.inputs.attempt_id !== attemptId) return toJobView(job)
   // Dispute evidence (T82): the IP that started this paid or free work.

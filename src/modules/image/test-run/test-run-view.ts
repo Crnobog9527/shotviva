@@ -24,6 +24,7 @@ export function toTestRunView(run: TestRun, outputUrl: string | null): TestRunVi
     batchId: run.batchId,
     status: run.status,
     resolution: run.resolution,
+    styleRefCount: typeof run.inputs.style_ref_count === 'number' ? run.inputs.style_ref_count : 0,
     aspectRatio: text(run.inputs.aspect_ratio),
     copy: copyOf(run.inputs.copy),
     note: text(run.inputs.note),

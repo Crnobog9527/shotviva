@@ -50,6 +50,7 @@ export function FirstRunForm({ template, providers, photos, onLaunch, onPhotoUpl
   const [picked, setPicked] = useState<string[]>([])
   const [copy, setCopy] = useState<Record<string, string>>({})
   const [providerId, setProviderId] = useState(template.prompt?.providerId ?? null)
+  const [omitStyleRefs, setOmitStyleRefs] = useState(false)
   const [note, setNote] = useState('')
   const [toggles, setToggles] = useState<Record<string, boolean>>({})
   const [wanted, setOptions] = useState<RunOptionValues>({ resolution: DEFAULT_RESOLUTION, aspect: 'original', triple: false })
@@ -63,7 +64,7 @@ export function FirstRunForm({ template, providers, photos, onLaunch, onPhotoUpl
   const count = targets.length > 1 ? targets.length : options.triple ? 3 : 1
   const submit = () => {
     if (usesPhoto && template.fields.images.min > 0 && picked.length === 0) return onError(COPY.first.needPhoto)
-    onLaunch(firstRunLaunches(template.id, targets, { providerId, copy, note, toggles, options }))
+    onLaunch(firstRunLaunches(template.id, targets, { providerId, copy, note, toggles, options, omitStyleRefs }))
   }
   return (
     <section aria-labelledby="test-first-title" className="grid gap-3 rounded-lg border p-3">
@@ -96,6 +97,10 @@ export function FirstRunForm({ template, providers, photos, onLaunch, onPhotoUpl
         <Textarea id="test-note" rows={2} maxLength={NOTE_MAX_LENGTH} placeholder={COPY.first.notePlaceholder} value={note} onChange={(event) => setNote(event.target.value)} />
       </div>
       <ImageProviderField id="test-image-provider" providers={providers} value={providerId} onChange={setProviderId} />
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={omitStyleRefs} onChange={event => setOmitStyleRefs(event.target.checked)} />
+        {COPY.first.omitStyleRefs}
+      </label>
       <RunOptions sizes={sizes} id="test-first" values={options} onChange={(patch) => setOptions((current) => ({ ...current, ...patch }))} tripleAvailable={targets.length <= 1} />
       <Button disabled={!options.aspect || !options.resolution} onClick={submit} className="justify-self-start">
         {COPY.first.run(count)}
