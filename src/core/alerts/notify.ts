@@ -9,7 +9,7 @@ import { serverEnv } from '../env'
 import { logger, redactString } from '../logger'
 import { appOrigin } from '../site-url'
 import { r2MarkerStore } from '../storage/r2-store'
-import { alertPolicy, type OwnerAlert } from './alert-kinds'
+import { alertPolicy, type AlertBudget, type OwnerAlert } from './alert-kinds'
 import { feishuConfig, type FeishuConfig } from './alerts-env'
 import { createBackoff, type Backoff } from './backoff'
 import { createDedupe, type Dedupe } from './dedupe'
@@ -73,11 +73,11 @@ async function deliver(deps: NotifyDeps & { config: FeishuConfig }, alert: Owner
 // the Owner never gets it twice. Only a definite refusal (or a failure before sending) frees it.
 const mayHaveArrived = (error: unknown) => error instanceof FeishuError && !error.definite
 
-// Ticket alerts share an hourly budget; past it the ticket's own mark is freed for later.
-async function withinBudget(deps: NotifyDeps, key: string, budget: 'tickets' | undefined): Promise<boolean> {
-  if (!budget || (await deps.dedupe.takeTicketSlot())) return true
+// Ticket (and inquiry) alerts share an hourly budget; past it the alert's own mark is freed for later.
+async function withinBudget(deps: NotifyDeps, key: string, budget: AlertBudget | undefined): Promise<boolean> {
+  if (!budget || (await deps.dedupe.takeSlot(budget))) return true
   await deps.dedupe.release(key)
-  logger.warn('owner ticket alerts: hourly budget used up', { key })
+  logger.warn('owner alerts: hourly budget used up', { key, budget })
   return false
 }
 

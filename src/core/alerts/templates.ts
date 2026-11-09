@@ -1,4 +1,7 @@
+import { INQUIRIES_COPY } from '../admin/inquiries-ui/copy'
+import { visitorText } from './visitor-text'
 import type {
+  BusinessInquiryAlert,
   CancelFailedAlert,
   Clawback,
   DisputeClosedAlert,
@@ -223,6 +226,17 @@ function siteErrors(alert: SiteErrorsAlert): Rendered {
   }
 }
 
+// T86: company, volume and uses only; the contact details are in the admin. The company name is
+// the visitor's own words: made safe for a Feishu text message (visitor-text.ts) and cut short.
+function businessInquiry(alert: BusinessInquiryAlert): Rendered {
+  const name = visitorText(alert.company, 40)
+  const uses = alert.uses.map((use) => INQUIRIES_COPY.uses[use]).join('、')
+  return {
+    line: `【新企业咨询】「${name}」想合作，每月预计出图 ${INQUIRIES_COPY.volumes[alert.volume]}，用途：${uses}。请到后台查看联系方式并跟进。`,
+    path: `/admin/inquiries/${alert.inquiryId}`,
+  }
+}
+
 const RENDERERS: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K }>, who: string) => Rendered } = {
   refund,
   dispute_opened: disputeOpened,
@@ -233,6 +247,7 @@ const RENDERERS: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K 
   ticket,
   subscription_cancel_failed: cancelFailed,
   site_errors: siteErrors,
+  business_inquiry: businessInquiry,
 }
 
 export type RenderedAlert = { sentence: string; link: string }

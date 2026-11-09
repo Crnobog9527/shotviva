@@ -701,6 +701,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 
 价格页「联系我们」弹窗表单（字段见 DESIGN §6.9 第 8 条）提交到服务端，存进新表 `business_inquiries`（私有：开 RLS 无 policy，只有 service role 读写）：`id`、`created_at`、`locale`、`page`、`user_id`（已登录时，可空，`on delete set null`）、各表单字段（文本和多选数组，长度在服务端再校验）、`status`（`new` 新咨询 / `contacted` 已联系 / `won` 已成交 / `closed` 无效或关闭）、`admin_note`（Owner 备注）、`updated_at`、`ip_hash`（防刷用，不存明文 IP）。
 - 防刷：隐形 hCaptcha（正式站开启时）；同一 IP 每小时 3 条、每天 10 条，同一邮箱每天 3 条；超了提示「提交太频繁，请稍后再试」。
+- 提交函数 `submit_business_inquiry(p_inquiry jsonb, p_ip_hash text) returns jsonb`（只给 service role）：服务端校验通过后调用，一次往返里先按 IP 哈希、再按邮箱加 advisory 锁数限额，未超就插入一行（邮箱去空格转小写），返回 `{status, id}`：`status` 为 `ok`（带新 `id`）或 `ip_hourly` / `ip_daily` / `email_daily`（`id` 为空）。`ip_hash` 是服务端用 HMAC-SHA256 算的（密钥由 service-role key 派生），不存明文 IP。迁移 `0800`（表、索引、RLS）、`0801`（函数）。
 - 后台新页「企业咨询」（`/admin/inquiries`，导航放在「工单」旁边）：列表按时间倒序，显示公司、姓名、邮箱、出图量、用途、状态，可按状态筛选；点开看全部字段，改状态、写备注；新咨询数在后台导航上显示角标。
 - 提交成功发飞书告警（T72 新增种类「新企业咨询」：公司名、出图量、用途，带后台链接，不带邮箱和电话）。
 - 隐私政策补一句：企业咨询表单收集的联系方式只用于回复本次咨询。迁移编号段 `0800`～`0819`，只加不改。
@@ -1032,6 +1033,7 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 | `checkout_start` | 服务端：创建 Checkout Session 时 | `product_id`、`tier`、`interval`、`form`、`channel`、`method` |
 | `purchase` | 服务端：支付回调入账成功后 | 第 6.2 节 `purchase` 参数 |
 | `contact_sales_click` | 浏览器：定价页「For business」的 Contact us 按钮（DESIGN §6.9 第 8 条） | `page`（`/pricing` 或 `/zh/pricing`） |
+| `business_inquiry_submit` | 浏览器：企业咨询表单提交成功（服务端已存下）后（T86，ARCHITECTURE §10.c） | `volume`（每月出图量档：`under_100` / `100_500` / `500_2000` / `2000_10000` / `over_10000`）、`uses`（主要用途数组，至少 1 个：`ecommerce` / `food_menu` / `social` / `real_estate` / `ads` / `other`）；不含任何联系方式或填写的文字 |
 | `$pageview` | 浏览器：自动 | — |
 
 所有事件都带 `locale`（`en` / `zh`，浏览器端注册为公共属性，服务端发时从请求或 `user_metadata.locale` 取；Owner 2026-11-06）。钱和积分相关的事件（`signup`、`generate`、`checkout_start`、`purchase`）一律服务端发，保证不被广告拦截漏掉；发送失败只记日志，不影响业务。

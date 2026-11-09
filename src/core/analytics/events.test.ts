@@ -33,6 +33,7 @@ const valid: { [E in EventName]: unknown } = {
   generate_refused: { reason: 'identity_swap', source: 'partner' },
   paywall_view: { trigger: 'insufficient_credits' },
   contact_sales_click: { page: '/zh/pricing' },
+  business_inquiry_submit: { volume: '500_2000', uses: ['ecommerce', 'social'] },
   checkout_start: checkout,
   purchase: { ...checkout, product_id: 'pack_s', tier: 'pack', interval: null, form: 'one_time', amount_usd: 9.9, credits: 20 },
   template_view: { template_id: 'ramen-studio', category: 'food', surface: 'workspace' },
@@ -46,6 +47,7 @@ const valid: { [E in EventName]: unknown } = {
 
 const EVENT_NAMES = [
       'app_update_prompt',
+      'business_inquiry_submit',
       'checkout_cancel',
       'checkout_start',
       'contact_sales_click',
@@ -63,7 +65,7 @@ const EVENT_NAMES = [
 ]
 
 describe('event dictionary (ARCHITECTURE §16.2)', () => {
-  it('covers exactly the fifteen named events', () => {
+  it('covers exactly the sixteen named events', () => {
     expect(Object.keys(eventSchemas).sort()).toEqual(EVENT_NAMES)
   })
 
@@ -150,6 +152,17 @@ describe('no personal data in events (ARCHITECTURE §16.1)', () => {
     expect(validateEvent('generate', { ...generate, category: 'https://evil.example' }).ok).toBe(false)
     expect(validateEvent('checkout_start', { ...checkout, product_id: 'Starter Monthly for a@b.co' }).ok).toBe(false)
     expect(validateEvent('generate', { ...generate, error_code: 'failed for a@b.co' }).ok).toBe(false)
+  })
+})
+
+// T86 (DESIGN §6.9 item 8): the volume band and uses, and nothing a person typed.
+describe('business_inquiry_submit', () => {
+  it('takes known choices only and refuses contact details', () => {
+    expect(validateEvent('business_inquiry_submit', { volume: 'over_10000', uses: ['ads'] }).ok).toBe(true)
+    expect(validateEvent('business_inquiry_submit', { volume: 'over_10000', uses: [] }).ok).toBe(false)
+    expect(validateEvent('business_inquiry_submit', { volume: 'lots', uses: ['ads'] }).ok).toBe(false)
+    expect(validateEvent('business_inquiry_submit', { volume: 'over_10000', uses: ['ads'], email: 'a@b.co' }).ok).toBe(false)
+    expect(validateEvent('business_inquiry_submit', { volume: 'over_10000', uses: ['ads'], company: 'Acme' }).ok).toBe(false)
   })
 })
 

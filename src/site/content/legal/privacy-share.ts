@@ -15,7 +15,7 @@ const providers = [
   'Sentry: error reports, with email addresses, phone numbers and access tokens removed before they are sent.',
   'Resend: delivers account emails such as email confirmation and password reset.',
   'Vercel: hosts the website and runs our servers.',
-  'hCaptcha: bot protection on sign-up, sign-in and password reset. It processes device and interaction data under hCaptcha’s own privacy policy.',
+  'hCaptcha: bot protection on sign-up, sign-in, password reset and the business inquiry form. It processes device and interaction data under hCaptcha’s own privacy policy.',
   'Google: sign-in, if you choose "Continue with Google".',
   'An SMS service provider: delivers sign-in codes by text message to mainland China mobile numbers. It receives the phone number and the code.',
 ] as const

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { createMemoryMarkers } from '../../../tests/fakes/memory-markers'
 import { alertPolicy } from './alert-kinds'
-import { createDedupe, markerKey, TICKET_BUDGET_PER_HOUR } from './dedupe'
+import { createDedupe, INQUIRY_BUDGET_PER_HOUR, markerKey, TICKET_BUDGET_PER_HOUR } from './dedupe'
 
 const MINUTE = 60_000
 
@@ -64,14 +64,27 @@ describe('createDedupe', () => {
     const a = createDedupe(() => store, now)
     const b = createDedupe(() => store, now)
     const taken = []
-    for (let i = 0; i < TICKET_BUDGET_PER_HOUR + 3; i += 1) taken.push(await (i % 2 ? a : b).takeTicketSlot())
+    for (let i = 0; i < TICKET_BUDGET_PER_HOUR + 3; i += 1) taken.push(await (i % 2 ? a : b).takeSlot('tickets'))
     expect(taken.filter(Boolean)).toHaveLength(TICKET_BUDGET_PER_HOUR)
     time.now += 60 * MINUTE
-    expect(await a.takeTicketSlot()).toBe(true)
+    expect(await a.takeSlot('tickets')).toBe(true)
   })
 
   it('keeps marker keys to safe characters', () => {
     expect(markerKey('ticket:a/b c')).toBe('ops/alerts/ticket:a_b_c')
+  })
+})
+
+describe('alert budgets (T86)', () => {
+  it('keeps business inquiry alerts on a budget of their own (T86)', async () => {
+    const { now } = clock()
+    const { store } = createMemoryMarkers(now)
+    const dedupe = createDedupe(() => store, now)
+    for (let i = 0; i < TICKET_BUDGET_PER_HOUR; i += 1) await dedupe.takeSlot('tickets')
+    expect(await dedupe.takeSlot('tickets')).toBe(false)
+    const taken = []
+    for (let i = 0; i < INQUIRY_BUDGET_PER_HOUR + 2; i += 1) taken.push(await dedupe.takeSlot('inquiries'))
+    expect(taken.filter(Boolean)).toHaveLength(INQUIRY_BUDGET_PER_HOUR)
   })
 })
 
@@ -83,6 +96,11 @@ describe('alertPolicy', () => {
     const ticket = { kind: 'ticket', ticketId: 't', userId: 'u', ticketType: null, pending: null } as const
     expect(alertPolicy({ ...ticket, reply: false })).toEqual({ key: 'ticket:t', budget: 'tickets', money: false })
     expect(alertPolicy({ ...ticket, reply: true })).toEqual({ key: 'ticket_reply:t', cooldownMs: 30 * MINUTE, budget: 'tickets', money: false })
+    expect(alertPolicy({ kind: 'business_inquiry', inquiryId: 'i', company: 'Acme', volume: '100_500', uses: ['ecommerce'] })).toEqual({
+      key: 'business_inquiry:i',
+      budget: 'inquiries',
+      money: false,
+    })
     expect(alertPolicy({ kind: 'generation_spike', failed: 5, total: 9, windowMinutes: 60 })).toEqual({ key: 'generation_spike', cooldownMs: 60 * MINUTE, money: false })
   })
 })
