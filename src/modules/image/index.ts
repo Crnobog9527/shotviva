@@ -37,10 +37,7 @@ export { toPhotoDetail, type PhotoDetail } from './detail/photo-detail'
 export { EditFlow, EditTrigger, opensEdit, type EditSource } from './edit-ui'
 // Wishlist post form (T12): one upload field, same zone and stages as the workspace.
 export { PhotoTile, type PhotoTileProps } from './workspace/photo-tile'
-// Home first-screen generator (T36): same pipeline as the workspace (DESIGN §6.9 item 9).
-export { HomeGenerator, type HomeGeneratorProps } from './home/home-generator'
-export { HomeDraftNote } from './home/home-draft-note'
-export type { HomeViewer } from './home/home-cta'
+// Marketing and sign-in render the home generator through the narrow marketing.ts entry.
 export { UPLOAD_FORMAT_NAMES, UPLOAD_MAX_MB } from './workspace/upload-formats'
 // Admin template test runs (ARCHITECTURE §10.b, T85), server only: the /api/admin/test-* routes.
 export {
