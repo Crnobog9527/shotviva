@@ -3,13 +3,14 @@
 # with `[baseline]` in the PR title; `edited` reruns the check when the title changes.
 name: DB migrations append-only
 
-# Only PRs that touch a migration (a modified, renamed or deleted file there is in the PR's
-# changed files). Not a required check, so path filtering cannot leave anything pending.
+# Also exercise the trusted checkout and PR fetch when this check itself changes.
 on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
     paths:
       - 'supabase/migrations/**'
+      - '.github/workflows/db-migrations-append-only.yml'
+      - 'scripts/check-migrations-append-only.sh'
 
 concurrency:
   group: db-append-only-${{ github.event.pull_request.number }}

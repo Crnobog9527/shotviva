@@ -23,13 +23,14 @@
 # when the title changes.
 name: DB migrations expand-only
 
-# Only PRs that touch a migration. Not a required check, so path filtering cannot leave anything
-# pending.
+# Also exercise the trusted checkout and PR fetch when this check itself changes.
 on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
     paths:
       - 'supabase/migrations/**'
+      - '.github/workflows/db-migrations-expand-only.yml'
+      - 'scripts/check-migrations-destructive.ts'
 
 concurrency:
   group: db-expand-only-${{ github.event.pull_request.number }}
