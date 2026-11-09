@@ -1,8 +1,7 @@
 import 'server-only'
 
-import type { GenerationProvider } from '@/core/jobs'
+import type { GenerationProvider, ImageRequestOptions } from '@/core/jobs'
 import { templateImageProvider, type ProviderAdapters } from '@/core/providers'
-import type { Resolution } from '@/core/templates'
 
 import { createOpenAIImageProvider } from './openai-image-provider'
 import { createOpenRouterImageProvider } from './openrouter-image-provider'
@@ -17,7 +16,7 @@ export const IMAGE_ADAPTERS: ProviderAdapters = {
   openai_images: (config) => createOpenAIImageProvider(config),
 }
 
-// A template override applies only to callers supplying its id and the requested resolution.
-export function imageProvider(providerId?: string | null, resolution?: Resolution): Promise<GenerationProvider> {
-  return templateImageProvider(IMAGE_ADAPTERS, providerId, resolution)
+// A template override applies only to callers supplying its id and the image request.
+export function imageProvider(providerId?: string | null, request?: ImageRequestOptions): Promise<GenerationProvider> {
+  return templateImageProvider(IMAGE_ADAPTERS, providerId, request)
 }

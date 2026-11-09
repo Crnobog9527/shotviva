@@ -4,6 +4,7 @@ import { cacheLife } from 'next/cache'
 import { z } from 'zod'
 
 import { RESOLUTIONS, type Resolution } from '../templates/output-options'
+import { OPENROUTER_IMAGE_SIZE } from './openrouter-input'
 import { ProviderSettingError } from './setting-error'
 
 const enumParameter = z.object({ type: z.literal('enum'), values: z.array(z.string()) })
@@ -26,7 +27,6 @@ const modelList = z.object({
     supported_parameters: z.unknown().optional(),
   })),
 })
-const upstreamTiers = { '1k': '1K', '2k': '2K', '3k': '4K' } as const
 
 async function fetchCatalog(baseUrl: string, fetchImpl: typeof fetch) {
   const response = await fetchImpl(`${baseUrl}/images/models`, {
@@ -64,6 +64,6 @@ export async function openRouterImageParameters(baseUrl: string, model: string, 
 
 export async function openRouterModelTiers(baseUrl: string, model: string, fetchImpl?: typeof fetch): Promise<Resolution[] | null> {
   const { resolution } = await openRouterImageParameters(baseUrl, model, fetchImpl)
-  const tiers = RESOLUTIONS.filter((tier) => resolution?.values.includes(upstreamTiers[tier]))
+  const tiers = RESOLUTIONS.filter((tier) => resolution?.values.includes(OPENROUTER_IMAGE_SIZE[tier]))
   return tiers.length ? tiers : null
 }

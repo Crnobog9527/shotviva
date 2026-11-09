@@ -150,7 +150,8 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
 
   const jobId = req.jobId ?? randomUUID()
   const resolution = req.resolution ?? DEFAULT_RESOLUTION
-  const provider = await resolveTemplateProvider(deps.provider, req.source === 'web' ? prompt.providerId : null, resolution)
+  const call = templateCall({ template, prompt }, inputs, image, resolution)
+  const provider = await resolveTemplateProvider(deps.provider, req.source === 'web' ? prompt.providerId : null, call)
   // Marks which request created the row: two concurrent requests with one job id both get
   // the row back from reserve_credits (charged once), but only the creator calls the provider.
   const attemptId = randomUUID()
@@ -159,7 +160,6 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
   // Dispute evidence (T82): the IP that started this paid or free work.
   await recordJobClientIp(deps.db, { userId: req.userId, jobId: job.id, ip: req.clientIp })
 
-  const call = templateCall({ template, prompt }, inputs, image, resolution)
   const settle = () =>
     settleGeneration({ ...deps, provider }, job, call, outputKeyFor(req.userId, job.id), {
       inputKeys: req.inputKey ? [req.inputKey] : [],
