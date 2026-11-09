@@ -108,21 +108,31 @@ describe('activated template prices', () => {
     expect((await request()).rows[0].credits_cost).toBe(45)
   })
 
-  it('preserves private references on legacy saves and applies the v2 price floor to a reference update', async () => {
+  it('counts private references toward the model minimum on new and legacy saves while enforcing v2 prices', async () => {
     await activate()
+    await db.query(`update public.ai_providers set capabilities=capabilities || '{"minReferences":1,"maxReferences":2}' where id=$1`, [provider])
     const refs = [{ key: 'style-refs/promo-poster/' + randomUUID() + '.webp', width: 20, height: 20,
       uploadedAt: new Date().toISOString() }]
-    const floor = { high: costs, medium: costs }
+    // The approved 45-credit price is legal even below the ordinary 1K floor.
+    const floor = { medium: { ...costs, '1k': 50 } }
     const template = { id: 'promo-poster', name: 'Poster', category: 'pets', quality: 'medium',
-      fields: { images: { min: 1, max: 1 } }, credits_cost: costs,
+      fields: { images: { min: 0, max: 0 } }, credits_cost: costs,
       price_floors: { providers: { [provider]: floor }, models: { [provider]: model }, version: 'v2' } }
     const prompt = { body: 'fixture' }
     const withRefs = (price: number, next: typeof refs) => db.query('select public.admin_upsert_template($1,$2,$3)',
       [{ ...template, credits_cost: { ...costs, '1k': price } }, prompt, JSON.stringify(next)])
     await withRefs(45, refs)
     await db.query('select public.admin_upsert_template($1,$2)', [template, prompt])
-    await refuses(() => withRefs(44, []), 'MODEL_CREDIT_FLOOR')
-    expect((await db.query("select style_refs from template_prompts where template_id='promo-poster'")).rows[0].style_refs).toEqual(refs)
+    await db.query('select public.admin_upsert_template($1,null)', [template])
+    await refuses(() => withRefs(45, []), 'MODEL_REFERENCE_LIMIT')
+    const tooMany = { ...template, fields: { images: { min: 0, max: 2 } } }
+    await refuses(() => db.query('select public.admin_upsert_template($1,null)', [tooMany]), 'MODEL_REFERENCE_LIMIT')
+    await refuses(() => withRefs(44, refs), 'MODEL_CREDIT_FLOOR')
+    const stale = { ...template, price_floors: { ...template.price_floors, version: 'v1' } }
+    await refuses(() => db.query('select public.admin_upsert_template($1,$2)', [stale, prompt]), 'MODEL_CHANGED')
+    const { rows } = await db.query(`select t.fields->'images' as images, t.credits_cost, p.style_refs
+      from public.templates t join public.template_prompts p on p.template_id=t.id where t.id=$1`, [template.id])
+    expect(rows[0]).toEqual({ images: template.fields.images, credits_cost: costs, style_refs: refs })
   })
 
   it('rejects unclassified templates and missing model tiers; rolls the snapshot back only when unchanged', async () => {

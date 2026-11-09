@@ -7,10 +7,8 @@ as $$
 declare
   v_id text := p_template ->> 'id';
   v_provider uuid;
-  v_caps jsonb;
   v_model text;
   v_floor jsonb;
-  v_refs jsonb := p_template #> '{fields,images}';
   v_resolution text;
   v_approved jsonb;
 begin
@@ -21,13 +19,8 @@ begin
   else
     select provider_id into v_provider from public.template_prompts where template_id = v_id;
   end if;
-  select p.id, p.capabilities, p.model into v_provider, v_caps, v_model from public.ai_providers p
+  select p.id, p.model into v_provider, v_model from public.ai_providers p
     where p.module = 'image' and (p.id = v_provider or (v_provider is null and p.is_active)) for share;
-  if (v_refs->>'min')::integer < (v_caps->>'minReferences')::integer
-    or (v_refs->>'max')::integer > (v_caps->>'maxReferences')::integer then
-    raise exception 'MODEL_REFERENCE_LIMIT' using detail = format('所选模型支持 %s–%s 张参考图，模板设置为 %s–%s 张',
-      v_caps->>'minReferences', v_caps->>'maxReferences', v_refs->>'min', v_refs->>'max');
-  end if;
 
   -- Older deployments send no pricing snapshot. New code derives it from site products and
   -- measured costs on the server; callers without the service role cannot invoke this RPC.
@@ -109,6 +102,8 @@ begin
       body = excluded.body,
       model_params = excluded.model_params,
       provider_id = case when p_prompt ? 'provider_id' then excluded.provider_id else tp.provider_id end;
+  else
+    perform admin.assert_template_reference_range(v_id);
   end if;
 end;
 $$;
