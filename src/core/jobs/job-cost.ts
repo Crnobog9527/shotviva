@@ -1,3 +1,4 @@
+import { OPENROUTER_TOP_UP_FACTOR } from './openrouter-fee'
 import type { ProviderPrices, ProviderUsage } from './provider'
 
 // A job's real cost (ARCHITECTURE §10.0, T33): reported tokens × the per-million price snapshot.
@@ -27,19 +28,19 @@ function partCost(tokens: number | undefined, pricePerM: number | null | undefin
 
 // OpenRouter charges 5.5% when adding credits. Apply this only to its image charge;
 // a separately billed decision call uses its own provider's prices.
-const OPENROUTER_TOP_UP_FACTOR = 1.055
-
-function estimatedRouterCost(usage: ProviderUsage, prices: ProviderPrices | null | undefined) {
+export function estimatedRouterCost(usage: ProviderUsage, prices: ProviderPrices | null | undefined) {
   const input = partCost(usage.prompt_tokens, prices?.inputTextPerM)
   const output = partCost(usage.completion_tokens, prices?.outputPerM)
   return input === null || output === null ? null : ((input + output) / 1e6) * OPENROUTER_TOP_UP_FACTOR
 }
 
+function routerCharge(usage: ProviderUsage): number | null {
+  if (usage.is_byok !== false || usage.cost == null) return null
+  return usage.cost * OPENROUTER_TOP_UP_FACTOR
+}
+
 function imageCost(usage: ProviderUsage, prices: ProviderPrices | null | undefined): number | null {
-  if (usage.cost !== undefined) return usage.cost * OPENROUTER_TOP_UP_FACTOR
-  if (usage.prompt_tokens !== undefined || usage.completion_tokens !== undefined) {
-    return estimatedRouterCost(usage, prices)
-  }
+  if ('cost' in usage || usage.prompt_tokens !== undefined || usage.completion_tokens !== undefined) return routerCharge(usage)
   if (!prices) return null
   let total = 0
   for (const [field, price] of PART_PRICES) {

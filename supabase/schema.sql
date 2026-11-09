@@ -105,6 +105,9 @@ CREATE OR REPLACE FUNCTION "admin"."alternate_route_meets_floor"("p_tag" "text",
       and p.resolutions @> array[p_resolution] and p.capabilities<>'{}'::jsonb
   ), priced as (
     select adapter,coalesce((p95->>p_resolution)::numeric,(estimated_image_costs->>p_resolution)::numeric,
+      case when adapter='openrouter_images' and jsonb_typeof(capabilities->'catalogImageCosts'->p_resolution)='number'
+        and (capabilities->'catalogImageCosts'->>p_resolution)::numeric > 0
+        then (capabilities->'catalogImageCosts'->>p_resolution)::numeric end,
       case when adapter='openai_images' then
         ((case when p_quality='medium' then '{"1k":0.055,"2k":0.095,"3k":0.135}'
                     else '{"1k":0.081,"2k":0.135,"3k":0.206}' end)::jsonb->>p_resolution)::numeric end) as usd
@@ -182,6 +185,36 @@ $$;
 
 
 ALTER FUNCTION "admin"."assert_template_reference_range"("p_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."check_catalog_minimums"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare tariff jsonb; tier text;
+begin
+  if not admin.is_template_catalog_v2() then return new; end if;
+  if new.category_key='art-styles' and exists(select 1 from admin.template_price_batches where reverted_at is null)
+      and (new.credits_cost->>'1k')::int is distinct from 20 then
+    -- The original cutover retires style rows without rewriting their historic prices.
+    if tg_op='INSERT' or not (old.is_active and not new.is_active and old.credits_cost=new.credits_cost) then
+      raise exception 'MODEL_CREDIT_FLOOR' using detail='画风草稿 Standard 规划收费为 20 积分';
+    end if;
+  end if;
+  tariff := admin.template_catalog_minimums()->new.id;
+  if tariff->>'quality'=new.quality then
+    foreach tier in array array['1k','2k','3k'] loop
+      if (new.credits_cost->>tier)::int < (tariff->'costs'->>tier)::int then
+        raise exception 'MODEL_CREDIT_FLOOR' using detail=format('%s %s 不能低于目录收费 %s 积分',new.name,tier,tariff->'costs'->>tier);
+      end if;
+    end loop;
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "admin"."check_catalog_minimums"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."check_template_style_ref_limit"() RETURNS "trigger"
@@ -701,6 +734,21 @@ $$;
 
 
 ALTER FUNCTION "admin"."template_approved_prices"("p_provider" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."template_catalog_minimums"() RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select coalesce(jsonb_object_agg(c.id,jsonb_build_object('quality',c.quality,'costs',c.costs)), '{}')
+    from admin.template_tariffs_v2 c
+    join admin.template_price_snapshots s on s.template_id=c.id and s.provider_id is not null
+    join admin.template_price_batches b on b.id=s.batch_id
+    where b.reverted_at is null and admin.is_template_catalog_v2()
+$$;
+
+
+ALTER FUNCTION "admin"."template_catalog_minimums"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."template_image_options"("public"."templates") RETURNS "jsonb"
@@ -2811,7 +2859,7 @@ begin
      set cost_usd = p_cost_usd,
          counted_usd = coalesce(
            p_cost_usd,
-           case when p_status = 'succeeded' or p_provider_usage ?| array['output_tokens', 'completion_tokens'] then x.estimate_usd else 0 end
+           case when p_status = 'succeeded' or p_provider_usage ?| array['output_tokens', 'completion_tokens', 'cost'] then x.estimate_usd else 0 end
          ),
          finished_at = now()
    where x.run_id = p_run_id;
@@ -2881,7 +2929,7 @@ CREATE OR REPLACE FUNCTION "public"."admin_image_pricing_catalog"("p_env_model" 
     SET "search_path" TO ''
     AS $$
   select jsonb_build_object('version',case when admin.is_template_catalog_v2() then 'v2' else 'v1' end,
-    'unit_price',admin.lowest_credit_price(),
+    'unit_price',admin.lowest_credit_price(),'tariffs',admin.template_catalog_minimums(),
     'providers',coalesce((select jsonb_agg(to_jsonb(p)||jsonb_build_object('approved',admin.template_approved_prices(p.provider_id)))
        from public.admin_image_provider_pricing(p_env_model) p),'[]'))
 $$;
@@ -9369,6 +9417,10 @@ CREATE OR REPLACE TRIGGER "site_announcements_set_updated_at" BEFORE UPDATE ON "
 
 
 
+CREATE OR REPLACE TRIGGER "template_catalog_minimum" AFTER INSERT OR UPDATE OF "quality", "credits_cost", "category_key" ON "public"."templates" FOR EACH ROW EXECUTE FUNCTION "admin"."check_catalog_minimums"();
+
+
+
 CREATE OR REPLACE TRIGGER "template_categories_set_updated_at" BEFORE UPDATE ON "public"."template_categories" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
 
 
@@ -10000,6 +10052,10 @@ GRANT ALL ON FUNCTION "admin"."assert_template_reference_range"("p_id" "text") T
 
 
 
+REVOKE ALL ON FUNCTION "admin"."check_catalog_minimums"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "admin"."check_template_style_ref_limit"() FROM PUBLIC;
 
 
@@ -10065,6 +10121,11 @@ REVOKE ALL ON FUNCTION "admin"."rollback_template_price_catalog_v2"() FROM PUBLI
 
 REVOKE ALL ON FUNCTION "admin"."template_approved_prices"("p_provider" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."template_approved_prices"("p_provider" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."template_catalog_minimums"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."template_catalog_minimums"() TO "service_role";
 
 
 

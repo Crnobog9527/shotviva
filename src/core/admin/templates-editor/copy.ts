@@ -65,7 +65,7 @@ export const bulkEditCopy = {
   creditsLegend: '积分（每档单独填，留空不改）',
   surfaces: '展示入口',
   surfaceOptions: { '': '不改', web: '只在站内', partner: '只给伙伴', both: '站内 + 伙伴' },
-  quality: '出图质量（送给模型的 quality）',
+  quality: '模板质量档',
   qualityOptions: { '': '不改', high: 'high', medium: 'medium' },
   category: '分类',
   categoryKeep: '不改',
@@ -172,6 +172,6 @@ export const styleRefCopy = {
     `用户照片 ${refRange(users)} 张 + 画风参考图 ${refs} 张，共 ${refRange(total)} 张。所选模型支持 ${refRange(model)} 张。`,
   under: '输入图片总数可能低于模型下限。请添加参考图、提高用户最少上传张数，或更换模型。',
   over: '输入图片总数超过模型上限。请减少参考图或用户上传张数，或更换模型。',
-  missingCap: '无法读取所选模型的参考图张数范围，请先刷新模型能力。',
+  missingCap: '尚无可靠的参考图张数范围，暂不能保存带参考图的配置。',
   needId: '先填写有效的模板 ID，再上传参考图。', idLocked: '移除已上传的参考图后可修改模板 ID。', invalidUpload: '上传失败，请重试。', decodeFailed: '无法读取图片，请换一个文件。',
 } as const

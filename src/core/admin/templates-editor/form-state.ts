@@ -1,7 +1,8 @@
+import { draftCredits } from './tier-price'
 import type { StyleRef } from '@/core/templates/style-refs'
 import { MISSING_COST, floorGuidance } from '@/core/templates/provider-pricing'
 import { RESOLUTIONS, type Resolution } from '@/core/templates/output-options'
-import { approvedCredit, type CreditsFloor, type TemplateQuality } from '@/core/templates/pricing'
+import { approvedCredit, creditMinimum, type CreditsFloor, type TemplateQuality } from '@/core/templates/pricing'
 import { toggleSetupProblems } from '@/core/templates/toggles'
 
 import type { AdminTemplate, SaveTemplatePayload } from '../templates/types'
@@ -152,12 +153,13 @@ export const TIER_LABEL: Record<Resolution, string> = { '1k': 'Standard', '2k': 
 export function creditProblems(values: TemplateFormValues, floor: CreditsFloor): Partial<Record<Resolution, string>> {
   const problems: Partial<Record<Resolution, string>> = {}
   for (const resolution of RESOLUTIONS) {
-    const text = values.credits[resolution].trim()
+    const text = draftCredits(floor, values.quality, resolution, values.credits[resolution]).trim()
     const value = Number(text)
-    const min = floor[values.quality][resolution]
+    const min = creditMinimum(floor, values.quality, resolution)
     if (!/^\d+$/.test(text)) problems[resolution] = '请填正整数'
     else if (value === approvedCredit(floor, values.quality, resolution)) continue
-    else if (min === MISSING_COST) problems[resolution] = floorGuidance(min)
+    else if (min === MISSING_COST) problems[resolution] = floorGuidance(min, floor.unknownCapabilities)
+    else if (value < 1 || value > 999) problems[resolution] = '请填 1–999 的整数'
     else if (value < min) problems[resolution] = `不能低于下限 ${min}`
   }
   return problems
@@ -204,9 +206,9 @@ export function buildPayload(values: TemplateFormValues, isNew: boolean, floor: 
         category: values.category,
         quality: values.quality,
         creditsCost: {
-          '1k': Number(values.credits['1k']),
-          '2k': Number(values.credits['2k']),
-          '3k': Number(values.credits['3k']),
+          '1k': Number(draftCredits(floor, values.quality, '1k', values.credits['1k'])),
+          '2k': Number(draftCredits(floor, values.quality, '2k', values.credits['2k'])),
+          '3k': Number(draftCredits(floor, values.quality, '3k', values.credits['3k'])),
         },
         visibleIn,
         fields: wired.fields,

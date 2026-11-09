@@ -5,6 +5,8 @@ import { CategoriesPanel, listAdminCategories, listAdminTemplates, TemplatesEdit
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { pricingFromOptions } from '@/core/admin/templates/provider-pricing'
 import { readPricingOptions } from '@/site/template-pricing'
+import { ModelSyncProvider } from '@/core/admin/image-provider-field/model-sync'
+import { syncTemplateModel } from './sync-model-action'
 import { site } from '@/site/site.config'
 
 import {
@@ -54,6 +56,7 @@ export default async function AdminTemplatesPage() {
         categories={categories}
         actions={{ save: saveTemplateCategoryAction, reorder: reorderTemplateCategoriesAction, remove: deleteTemplateCategoryAction }}
       />
+      <ModelSyncProvider action={syncTemplateModel}>
       <TemplatesEditor
         templates={templates}
         providers={providers}
@@ -71,6 +74,7 @@ export default async function AdminTemplatesPage() {
           applyCover: applyCoverAction,
         }}
       />
+      </ModelSyncProvider>
     </div>
   )
 }

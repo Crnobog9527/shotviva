@@ -6,15 +6,16 @@ export type ProviderFloors = CreditsFloor & {
   providers?: Record<string, CreditsFloor>
   models?: Record<string, string>
   activeProvider?: string
-  version?: 'v1' | 'v2'
+  tariffs?: Record<string, ApprovedTariff>
   approvals?: Record<string, Record<string, ApprovedTariff>>
 }
 export const MISSING_COST = 2147483647
 const unknownTiers = { '1k': MISSING_COST, '2k': MISSING_COST, '3k': MISSING_COST }
-export const UNPRICED: CreditsFloor = { high: unknownTiers, medium: unknownTiers }
+export const UNPRICED: CreditsFloor = { high: unknownTiers, medium: unknownTiers, unknownCapabilities: true }
 
-export function floorGuidance(min: number): string {
-  return min === MISSING_COST ? '先刷新供应商能力并填写该档每张成本估价' : `建议积分 ≥ ${min}`
+export function floorGuidance(min: number, unknownCapabilities?: boolean): string {
+  if (unknownCapabilities) return '所选模型的能力尚未确认，暂不能校验此档成本'
+  return min === MISSING_COST ? '缺少该档单张成本报价，且实测样本不足；请在供应商配置补充估价' : `成本保护下限 ${min} 积分`
 }
 
 // The OpenAI safeguard stays in force when measured costs fall. Its conservative dollar estimates
@@ -45,7 +46,7 @@ export function minimumCredits(costUsd: number, budget: number): number {
 type ModelCosts = { openAI: boolean; resolutions: readonly Resolution[]; p95: Costs; estimates: Costs }
 
 export function modelCreditFloor(model: ModelCosts, budget: number): CreditsFloor {
-  const floor: CreditsFloor = { high: {} as CreditsCost, medium: {} as CreditsCost }
+  const floor: CreditsFloor = { high: {} as CreditsCost, medium: {} as CreditsCost, resolutions: model.resolutions }
   for (const quality of TEMPLATE_QUALITIES) {
     for (const resolution of RESOLUTIONS) {
       const fallback = model.openAI ? OPENAI_ESTIMATES[quality][resolution] : undefined
@@ -58,9 +59,16 @@ export function modelCreditFloor(model: ModelCosts, budget: number): CreditsFloo
   return floor
 }
 
-export function providerFloor(floors: ProviderFloors, id: string | null | undefined, templateId?: string): CreditsFloor {
+function selectedFloor(floors: ProviderFloors, selected?: string): CreditsFloor {
+  if (!selected || !floors.providers) return floors
+  return floors.providers[selected] ?? UNPRICED
+}
+
+export function providerFloor(floors: ProviderFloors, id: string | null | undefined, templateId = '', category?: string): CreditsFloor {
   const selected = id ?? floors.activeProvider
-  const base = selected && floors.providers ? floors.providers[selected] ?? UNPRICED : floors
-  const approved = selected && templateId ? floors.approvals?.[selected]?.[templateId] : undefined
-  return approved ? { ...base, approved } : base
+  const approved = selected ? floors.approvals?.[selected]?.[templateId] : undefined
+  const tariff = floors.tariffs?.[templateId] ?? approved
+  const v2 = floors.version === 'v2'
+  return { ...selectedFloor(floors, selected), approved, tariff, version: floors.version,
+    styleDraft: v2 && category === 'art-styles', retiredRoom: v2 && ['bright-listing', 'evening-glow'].includes(templateId) }
 }

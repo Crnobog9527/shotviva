@@ -6,9 +6,10 @@ import { PROVIDERS_COPY } from './copy'
 
 const COPY = PROVIDERS_COPY.form
 
-export function ImageCostFields({ tiers, values, onChange }: {
+export function ImageCostFields({ tiers, values, estimates, onChange }: {
   tiers: Resolution[]
   values: Partial<Record<Resolution, string>>
+  estimates?: Partial<Record<Resolution, number>>
   onChange: (tier: Resolution, value: string) => void
 }) {
   return <fieldset className="grid gap-2">
@@ -17,7 +18,7 @@ export function ImageCostFields({ tiers, values, onChange }: {
     <div className="grid grid-cols-3 gap-2">
       {tiers.map((tier) => <div key={tier} className="grid gap-1">
         <Label htmlFor={`cost-${tier}`}>{tier.toUpperCase()}</Label>
-        <Input id={`cost-${tier}`} inputMode="decimal" value={values[tier] ?? ''} onChange={(e) => onChange(tier, e.target.value)} />
+        <Input id={`cost-${tier}`} inputMode="decimal" placeholder={estimates?.[tier] ? String(Number(estimates[tier].toPrecision(12))) : undefined} value={values[tier] ?? ''} onChange={(e) => onChange(tier, e.target.value)} />
       </div>)}
     </div>
   </fieldset>

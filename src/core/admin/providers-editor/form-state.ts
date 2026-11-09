@@ -95,6 +95,7 @@ function officialText(module: ProviderModule, model: string): Partial<Record<Pri
 
 // Opening a row whose prices are blank: pre-fill them from the price table (§10.0).
 function fillOfficial(form: ProviderForm): ProviderForm {
+  if (form.adapter === 'openrouter_images') return form
   const official = officialText(form.module, form.model)
   const filled = { ...form }
   for (const field of MODULE_PRICE_FIELDS[form.module]) {
@@ -106,6 +107,7 @@ function fillOfficial(form: ProviderForm): ProviderForm {
 // Typing a model name: a price field that is blank or still shows the previous model's official
 // price follows the new model's (blank when the table has none). One the Owner typed stays.
 export function withModel(form: ProviderForm, model: string): ProviderForm {
+  if (form.adapter === 'openrouter_images' && model !== form.model) return { ...clearPrices(form), model }
   const before = officialText(form.module, form.model)
   const after = officialText(form.module, model)
   const next = { ...form, model, imageCosts: model === form.model ? form.imageCosts : {} }
@@ -139,10 +141,19 @@ export function priceOrigin(form: ProviderForm): PriceOrigin {
 // Blank or a non-negative decimal; anything else keeps Save disabled.
 const PRICE_PATTERN = /^\s*(\d+(\.\d+)?)?\s*$/
 
+function clearPrices(form: ProviderForm): ProviderForm {
+  return { ...form, imageCosts: {}, priceInputTextPerM: '', priceInputImagePerM: '', priceOutputPerM: '' }
+}
+
+export function withBaseUrl(form: ProviderForm, baseUrl: string): ProviderForm {
+  const clear = baseUrl.trim() !== form.baseUrl.trim() && form.adapter === 'openrouter_images'
+  return { ...(clear ? clearPrices(form) : form), baseUrl }
+}
+
 // New rows offer the standard endpoint for the selected protocol. Stored rows cannot switch.
 export function withAdapter(form: ProviderForm, adapter: ProviderAdapterId): ProviderForm {
   const baseUrl = adapter === 'openrouter_images' ? OPENROUTER_BASE_URL : DEFAULT_BASE_URL
-  return { ...form, adapter, baseUrl, imageCosts: {}, resolutions: [...RESOLUTIONS] }
+  return { ...clearPrices(form), adapter, baseUrl, resolutions: [...RESOLUTIONS] }
 }
 
 export function toSaveInput(form: ProviderForm, provider: AdminProvider | null): SaveProviderInput {

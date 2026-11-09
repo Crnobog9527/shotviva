@@ -4,17 +4,11 @@ import sharp from 'sharp'
 import { z } from 'zod'
 
 import { ProviderError, type ProviderInput, type ProviderOutput, type ProviderUsage } from '@/core/jobs'
-import { logger } from '@/core/logger'
+import { reportedUsage } from './openrouter-receipt'
 import { sniffImageType } from '@/core/storage'
 
 import { outputSize, sourcePhoto } from './output-size'
 
-const tokens = z.number().int().nonnegative().optional().catch(undefined)
-const usageSchema = z.object({
-  prompt_tokens: tokens,
-  completion_tokens: tokens,
-  cost: z.number().nonnegative().optional().catch(undefined),
-})
 const errorSchema = z.object({
   code: z.union([z.number(), z.string()]).optional(),
   metadata: z.object({ error_type: z.string().optional(), reasons: z.array(z.string()).optional() }).nullish(),
@@ -24,8 +18,7 @@ const imageSchema = z.object({
   media_type: z.enum(['image/png', 'image/jpeg', 'image/webp']).nullish(),
 })
 const responseSchema = z.object({
-  usage: usageSchema.nullish().catch(undefined),
-  error: errorSchema.nullish(),
+  error: errorSchema.nullish().catch({}),
   data: z.array(imageSchema).nullish().catch(undefined),
 })
 const REFUSALS = new Set(['moderation_blocked', 'content_policy_violation', 'image_content_policy_violation', 'refusal'])
@@ -46,18 +39,6 @@ function providerFailure(status: number, error: UpstreamError | null | undefined
   return new ProviderError(timeout ? 'timeout' : 'failed', `openrouter image request failed (HTTP ${httpCode})`, { usage })
 }
 
-function extractImage(response: Response, parsed: UpstreamResponse, model: string) {
-  const { usage, error } = parsed
-  // Error responses can also report billable usage (e.g. a late provider failure).
-  if (usage?.cost === undefined && (usage || response.ok)) {
-    logger.warn('openrouter omitted cost; using token pricing when available', { model })
-  }
-  if (!response.ok || error) throw providerFailure(response.status, error, usage)
-  const image = parsed.data?.[0]
-  if (!image) throw new ProviderError('failed', 'openrouter returned no image', { usage })
-  return { usage, image }
-}
-
 async function normalizeOutput({ b64_json, media_type }: z.infer<typeof imageSchema>, input: ProviderInput) {
   if (!/^[A-Za-z0-9+/]+={0,2}$/.test(b64_json)) throw new Error('invalid base64 image')
   const bytes = Buffer.from(b64_json, 'base64')
@@ -71,13 +52,18 @@ async function normalizeOutput({ b64_json, media_type }: z.infer<typeof imageSch
   return image.png().toBuffer()
 }
 
-export async function readOpenRouterOutput(response: Response, input: ProviderInput, model: string): Promise<ProviderOutput> {
+export async function readOpenRouterOutput(response: Response, input: ProviderInput): Promise<ProviderOutput> {
+  input.noteUsage?.(reportedUsage({}, response.headers))
   const body: unknown = await response.json().catch(() => null)
-  if (input.signal.aborted) throw new ProviderError('timeout', 'openrouter request aborted at deadline')
-  const parsed = responseSchema.safeParse(body).data ?? {}
-  const { usage, image } = extractImage(response, parsed, model)
+  const usage = reportedUsage(body, response.headers)
+  input.noteUsage?.(usage)
+  if (input.signal.aborted) throw new ProviderError('timeout', 'openrouter request aborted at deadline', { usage })
+  const parsed: UpstreamResponse = responseSchema.safeParse(body).data ?? {}
+  if (!response.ok || parsed.error) throw providerFailure(response.status, parsed.error, usage)
+  const image = parsed.data?.[0]
+  if (!image) throw new ProviderError('failed', 'openrouter returned no image', { usage })
   try {
-    return { bytes: await normalizeOutput(image, input), contentType: 'image/png', usage: usage ?? null }
+    return { bytes: await normalizeOutput(image, input), contentType: 'image/png', usage }
   } catch {
     throw new ProviderError('failed', 'openrouter returned an unusable image', { usage })
   }

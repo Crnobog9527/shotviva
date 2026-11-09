@@ -15,6 +15,7 @@ import { UserLink } from '../users-ui/user-link'
 const COLUMNS = ['createdAt', 'ref', 'user', 'template', 'status', 'model', 'resolution', 'credits', 'cost', 'source', 'duration', 'actions'] as const
 
 function CostCell({ job, unitCost }: { job: AdminJob; unitCost: UnitCost }) {
+  if (job.receiptDetail) return <span className="text-xs">{job.receiptDetail}</span>
   const cell = jobCostCell(job, unitCost)
   if (cell.kind === 'real') return <span className="font-mono text-xs">{usdFine.format(cell.usd)}</span>
   if (cell.kind === 'uncosted') {

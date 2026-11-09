@@ -1,9 +1,11 @@
 import 'server-only'
 
-import { cacheLife } from 'next/cache'
 import { z } from 'zod'
 
 import { RESOLUTIONS, type Resolution } from '../templates/output-options'
+import type { CatalogPricing } from '../templates/catalog-pricing'
+import { getCatalogJson } from './catalog-request'
+import { parseEndpointPrices } from './openrouter-pricing'
 import { OPENROUTER_IMAGE_SIZE } from './openrouter-input'
 import { ProviderSettingError } from './setting-error'
 
@@ -13,52 +15,40 @@ const referenceRange = z.object({
   min: z.number().int().nonnegative(),
   max: z.number().int().nonnegative(),
 })
-const imageParameters = z.object({
+const declaredParameters = z.record(z.string(), z.unknown()).refine(value => Object.keys(value).length > 0)
+const imageParameters = declaredParameters.pipe(z.object({
   resolution: enumParameter.optional(),
   aspect_ratio: enumParameter.optional(),
   output_format: enumParameter.optional(),
   input_references: referenceRange.optional(),
-})
+}))
 export type OpenRouterImageParameters = z.infer<typeof imageParameters>
 
 const modelList = z.object({
   data: z.array(z.object({
     id: z.string(),
+    architecture: z.unknown().optional(),
     supported_parameters: z.unknown().optional(),
   })),
 })
-
-async function fetchCatalog(baseUrl: string, fetchImpl: typeof fetch) {
-  const response = await fetchImpl(`${baseUrl}/images/models`, {
-    method: 'GET', redirect: 'error', signal: AbortSignal.timeout(10_000), cache: 'no-store',
-  })
-  if (!response.ok) {
-    await response.body?.cancel()
-    throw new Error('Image model catalogue unavailable')
-  }
-  const { data } = modelList.parse(await response.json())
-  return data
-}
-
-async function cachedCatalog(baseUrl: string) {
-  'use cache'
-  cacheLife({ revalidate: 3599, expire: 3600 })
-  return fetchCatalog(baseUrl, fetch)
-}
 
 // Callers validate the public base URL first. Only public model metadata enters the
 // cache. A missing model is distinct from an unreachable or malformed catalogue.
 export async function openRouterImageParameters(baseUrl: string, model: string, fetchImpl?: typeof fetch): Promise<OpenRouterImageParameters> {
   let entries
   try {
-    entries = fetchImpl ? await fetchCatalog(baseUrl, fetchImpl) : await cachedCatalog(baseUrl)
+    entries = modelList.parse(await getCatalogJson(`${baseUrl}/images/models`, fetchImpl)).data
   } catch {
     throw new ProviderSettingError('openrouter_catalog_unavailable', 'Cannot load the OpenRouter image catalogue')
   }
   const entry = entries.find((candidate) => candidate.id === model)
   if (!entry) throw new ProviderSettingError('openrouter_model_missing', 'Unknown OpenRouter image model')
-  const parsed = imageParameters.safeParse(entry.supported_parameters ?? {})
+  const parsed = imageParameters.safeParse(entry.supported_parameters)
   if (!parsed.success) throw new ProviderSettingError('openrouter_catalog_unavailable', 'Invalid OpenRouter image parameters')
+  const modalities = z.object({ input_modalities: z.array(z.string()) }).safeParse(entry.architecture).data
+  if (modalities?.input_modalities.includes('image') && !parsed.data.input_references) {
+    throw new ProviderSettingError('openrouter_catalog_unavailable', 'Image input advertised without a reference range')
+  }
   return parsed.data
 }
 
@@ -66,4 +56,20 @@ export async function openRouterModelTiers(baseUrl: string, model: string, fetch
   const { resolution } = await openRouterImageParameters(baseUrl, model, fetchImpl)
   const tiers = RESOLUTIONS.filter((tier) => resolution?.values.includes(OPENROUTER_IMAGE_SIZE[tier]))
   return tiers.length ? tiers : null
+}
+
+// Only derive paths on the configured host. Never follow a URL found in a catalogue.
+export async function openRouterCatalogPricing(baseUrl: string, model: string, fetchImpl?: typeof fetch): Promise<CatalogPricing> {
+  const parts = model.split('/')
+  if (!parts.every(part => /^[a-zA-Z0-9_:@+-][a-zA-Z0-9._:@+-]*$/.test(part))) {
+    return { status: 'unavailable', endpoints: [] }
+  }
+  try {
+    const path = parts.map(encodeURIComponent).join('/')
+    const result = await getCatalogJson(`${baseUrl}/images/models/${path}/endpoints`, fetchImpl)
+    return parseEndpointPrices(model, result)
+  } catch {
+    // A relay may serve capabilities without the optional pricing endpoint.
+    return { status: 'unavailable', endpoints: [] }
+  }
 }

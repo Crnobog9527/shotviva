@@ -3,6 +3,7 @@ import 'server-only'
 import type { ServerEnv } from '../env'
 import { AppError } from '../errors'
 import { effectivePrices, ENV_PROVIDER_SOURCE, providerTag, type GenerationProvider, type ProviderPrices } from '../jobs'
+import { catalogTokenPrices } from '../templates/catalog-pricing'
 import { OPENAI_MAX_REFERENCES } from '../templates/image-capabilities'
 import { DEFAULT_BASE_URL, type ActiveProviderRow, type ProviderAdapters, type ProviderConfig, type ProviderModule } from './types'
 
@@ -33,8 +34,8 @@ function build(
   if (!adapter) throw new AppError('INTERNAL', `provider adapter ${adapterId} is not registered`)
   const provider = adapter(config)
   // Row prices first, then the official price table for the model (ARCHITECTURE §10.0).
-  const snapshot = effectivePrices(config.model, prices)
-  return { id: providerTag(source, config.model), prices: snapshot, ...references, generate: provider.generate.bind(provider) } satisfies GenerationProvider
+  const snapshot = adapterId === 'openrouter_images' ? prices : effectivePrices(config.model, prices)
+  return { id: providerTag(source, config.model), prices: snapshot, ...references, completeUsage: provider.completeUsage?.bind(provider), generate: provider.generate.bind(provider) } satisfies GenerationProvider
 }
 
 function savedMaximum(row: ActiveProviderRow) {
@@ -47,6 +48,16 @@ export function effectiveReferenceRange(row: ActiveProviderRow, parameters?: Pro
   const storedMax = savedMaximum(row)
   const maxReferences = parameters ? Math.min(storedMax ?? Infinity, parameters.input_references?.max ?? 0) : storedMax
   return { minReferences, maxReferences }
+}
+
+function rowPrices(row: ActiveProviderRow) {
+  if (row.adapter !== 'openrouter_images') return row.prices
+  const automatic = catalogTokenPrices(row.capabilities?.catalogPricing)
+  return {
+    inputTextPerM: row.prices.inputTextPerM ?? automatic.inputTextPerM ?? null,
+    inputImagePerM: row.prices.inputImagePerM,
+    outputPerM: row.prices.outputPerM ?? automatic.outputPerM ?? null,
+  }
 }
 
 export async function resolveProvider(
@@ -66,5 +77,5 @@ export async function resolveProvider(
   const apiKey = await readKey(row.id)
   if (!apiKey) throw new AppError('INTERNAL', `active provider ${row.id} has no API key; set it in /admin/providers`)
   const references = effectiveReferenceRange(row, imageParameters)
-  return build(adapters, row.adapter, row.id, { baseUrl: row.baseUrl, model: row.model, apiKey, resolutions: row.resolutions, imageParameters }, row.prices, references)
+  return build(adapters, row.adapter, row.id, { baseUrl: row.baseUrl, model: row.model, apiKey, resolutions: row.resolutions, imageParameters }, rowPrices(row), references)
 }

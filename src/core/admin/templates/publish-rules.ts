@@ -11,6 +11,7 @@ import type { Template } from '@/core/templates/types'
 export const PUBLISH_BLOCKERS = [
   'not_found',
   'system',
+  'retired',
   'no_prompt',
   'no_name',
   'no_description',
@@ -22,6 +23,7 @@ export type PublishBlocker = (typeof PUBLISH_BLOCKERS)[number]
 export const PUBLISH_BLOCKER_LABEL: Record<PublishBlocker, string> = {
   not_found: '模板不存在',
   system: '系统模板，在「作品编辑」页单独管理',
+  retired: '当前目录未开放此模板销售',
   no_prompt: '缺提示词',
   no_name: '缺英文名称',
   no_description: '缺英文说明（站内模板必填）',
@@ -32,7 +34,7 @@ export const PUBLISH_BLOCKER_LABEL: Record<PublishBlocker, string> = {
 export type PublishCandidate = Pick<
   Template,
   'id' | 'name' | 'description' | 'visibleIn' | 'coverBeforeUrl' | 'coverAfterUrl' | 'coverLocales' | 'quality' | 'creditsCost' | 'isActive'
-> & { hasPrompt: boolean; providerId?: string | null }
+> & { hasPrompt: boolean; category?: string; providerId?: string | null }
 
 // The built-in photo-edit template (ARCHITECTURE §5.2) is switched on its own page; the editor
 // list never shows it. Deep imports keep this file free of the server-side templates barrel.
@@ -46,6 +48,8 @@ const blank = (text: string | null) => !text || text.trim() === ''
 // and a price at or above the floor.
 export function publishBlockers(template: PublishCandidate, floor: ProviderFloors): PublishBlocker[] {
   if (SYSTEM_TEMPLATE_IDS.has(template.id)) return ['system']
+  const prices = providerFloor(floor, template.providerId, template.id, template.category)
+  if (prices.styleDraft || prices.retiredRoom) return ['retired']
   const onWeb = template.visibleIn.includes('web')
   const checks: [PublishBlocker, boolean][] = [
     ['no_prompt', !template.hasPrompt],
@@ -53,7 +57,7 @@ export function publishBlockers(template: PublishCandidate, floor: ProviderFloor
     ['no_description', onWeb && blank(template.description)],
     // A before and an after every launched page can show under the cover fallback (T87).
     ['no_cover', onWeb && !hasCompleteCoverSet(template)],
-    ['below_floor', creditsBelowFloor(template.quality, template.creditsCost, providerFloor(floor, template.providerId, template.id)).length > 0],
+    ['below_floor', creditsBelowFloor(template.quality, template.creditsCost, prices).length > 0],
   ]
   return checks.filter(([, failed]) => failed).map(([blocker]) => blocker)
 }

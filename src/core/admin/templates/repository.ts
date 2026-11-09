@@ -81,14 +81,14 @@ export async function upsertTemplate(
 
 type CandidateRow = Pick<
   TemplateRow,
-  'id' | 'name' | 'description' | 'visible_in' | 'cover_before_url' | 'cover_after_url' | 'cover_locales' | 'quality' | 'credits_cost' | 'is_active'
+  'id' | 'name' | 'category_key' | 'description' | 'visible_in' | 'cover_before_url' | 'cover_after_url' | 'cover_locales' | 'quality' | 'credits_cost' | 'is_active'
 > & { template_prompts: { version: number; provider_id: string | null } | null }
 
 // Only what the publish rules read (T60); one query for the whole batch, by primary key.
 export async function loadPublishCandidates(client: SupabaseClient, ids: readonly string[]): Promise<PublishCandidate[]> {
   const { data, error } = await client
     .from('templates')
-    .select('id, name, description, visible_in, cover_before_url, cover_after_url, cover_locales, quality, credits_cost, is_active, template_prompts(version, provider_id)')
+    .select('id, name, category_key, description, visible_in, cover_before_url, cover_after_url, cover_locales, quality, credits_cost, is_active, template_prompts(version, provider_id)')
     .in('id', ids)
     .returns<CandidateRow[]>()
   if (error) throw new AppError('INTERNAL', `loadPublishCandidates failed: ${error.message}`)
@@ -105,6 +105,7 @@ export async function loadPublishCandidates(client: SupabaseClient, ids: readonl
     creditsCost: row.credits_cost,
     isActive: row.is_active,
     hasPrompt: row.template_prompts !== null,
+    category: row.category_key,
     providerId: row.template_prompts?.provider_id,
   }))
 }
@@ -116,6 +117,7 @@ export async function setTemplatesActive(client: SupabaseClient, ids: readonly s
     .from('templates')
     .update(active ? { is_active: true } : { is_active: false, featured_rank: null })
     .in('id', ids)
+  if (error?.message === 'TEMPLATE_RETIRED') throw new AppError('INVALID_INPUT', error.details)
   if (error) throw new AppError('INTERNAL', `setTemplatesActive failed: ${error.message}`)
 }
 

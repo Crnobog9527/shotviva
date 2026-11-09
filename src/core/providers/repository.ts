@@ -16,7 +16,7 @@ import { PROVIDER_ADAPTERS, PROVIDER_MODULES, type ActiveProviderRow, type Admin
 const PRICE_COLUMNS = 'price_input_text_per_m, price_input_image_per_m, price_output_per_m'
 
 const capsColumns = {
-  capabilities: z.union([imageCapabilitiesSchema, z.strictObject({}).transform(() => null)]).optional(),
+  capabilities: imageCapabilitiesSchema.nullable().catch(null).optional(),
   estimated_image_costs: estimatedImageCostsSchema.optional(),
 }
 
@@ -58,6 +58,9 @@ const rowSchema = z.object({
   model: z.string(),
   ...priceColumns,
   ...capsColumns,
+  // Never relax a malformed stored limit on a generation path. Only the admin reader
+  // tolerates legacy/malformed snapshots so it can repair them from the catalogue.
+  capabilities: z.union([imageCapabilitiesSchema, z.strictObject({}).transform(() => null)]).optional(),
 })
 
 function fail(what: string, error: { message: string }): never {
@@ -119,13 +122,17 @@ export async function loadActiveProviderRow(db: SupabaseClient, module: Provider
   return data ? toActiveRow(rowSchema.parse(data)) : null
 }
 
+export class CapabilityWriteConflict extends ProviderSettingError {
+  constructor() { super('invalid_input', 'Provider changed during refresh') }
+}
+
 // An overlapping admin save or refresh wins over a stale catalogue response.
 export async function persistRefreshedCapabilities(db: SupabaseClient, row: AdminProvider, capabilities: ImageCapabilities) {
   const { data, error } = await db.from('ai_providers')
     .update({ capabilities, resolutions: capabilities.resolutions })
     .eq('id', row.id).eq('updated_at', row.updatedAt).select('id')
   if (error) fail('refresh capabilities', error)
-  if (!data?.length) throw new ProviderSettingError('invalid_input', 'Provider changed during refresh')
+  if (!data?.length) throw new CapabilityWriteConflict()
 }
 
 // The admin's delete (§3.3): admin_delete_provider refuses the active row and removes the Vault

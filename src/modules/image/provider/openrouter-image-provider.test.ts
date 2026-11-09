@@ -121,8 +121,9 @@ describe('OpenRouter image responses', () => {
     try {
       const tokens = { prompt_tokens: 12, completion_tokens: 0 }
       const fetch = fake({ ...reply(await imageData('png')), usage: { ...tokens, cost: null, total_tokens: 12 } })
-      const image = await createOpenRouterImageProvider({ ...config, fetch }).generate(input())
-      expect(image.usage).toEqual(tokens)
+      const provider = createOpenRouterImageProvider({ ...config, fetch })
+      const image = await provider.generate(input())
+      expect(await provider.completeUsage!(image.usage!)).toMatchObject({ ...tokens, cost: null })
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('omitted cost'), { model: config.model })
     } finally {
       warn.mockRestore()

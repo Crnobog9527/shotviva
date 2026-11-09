@@ -21,6 +21,8 @@ export type ProviderInput = {
   quality: TemplateQuality
   // template_prompts.model_params; adapters pick the keys they understand.
   params: Record<string, unknown>
+  // Preserve billing evidence when the generation deadline wins before the adapter returns.
+  noteUsage?(usage: ProviderUsage): void
   signal: AbortSignal
 }
 
@@ -31,7 +33,12 @@ export type ProviderUsage = {
   // Raw OpenRouter usage; cost is USD before the top-up fee.
   prompt_tokens?: number
   completion_tokens?: number
-  cost?: number
+  cost?: number | null
+  is_byok?: boolean
+  upstream_inference_cost?: number
+  generation_id?: string
+  cost_source?: 'generation'
+  estimated_cost_usd?: number
   input_text_tokens?: number
   input_image_tokens?: number
   output_tokens?: number
@@ -55,6 +62,8 @@ export type GenerationProvider = {
   // Price snapshot taken when the provider was resolved for this request: the row's prices with
   // empty ones filled from MODEL_PRICES; null when neither has any (the job then has no cost).
   prices?: ProviderPrices | null
+  // Optional bounded, read-only invoice lookup after the generation deadline has stopped.
+  completeUsage?(usage: ProviderUsage): Promise<ProviderUsage>
   generate(input: ProviderInput): Promise<ProviderOutput>
 }
 

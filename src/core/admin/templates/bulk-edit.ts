@@ -88,6 +88,7 @@ export async function bulkEditTemplates(
     p_locales: LOCALES,
   })
   if (error) {
+    if (error.message === 'MODEL_CREDIT_FLOOR') throw new AppError('INVALID_INPUT', error.details)
     const known = SQL_ERRORS[error.message]
     if (known) throw new AppError(known[0], known[1])
     throw new AppError('INTERNAL', `bulkEditTemplates failed: ${error.message}`)
