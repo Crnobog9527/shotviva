@@ -5,7 +5,7 @@ import { pairImage, SIZE_COUNT } from '../../landing-shared'
 import { zhPricingRelated } from '../shared'
 import { photoSeconds, SET_PHOTOS } from '../../offer'
 import { productBills } from '../home'
-import { zhFreeImages, zhFromCredits, zhPlansSentence, zhTierList, zhTierPixels, zhUploadLimits } from '../offer'
+import { zhFreeImages, zhFromCredits, zhTierList, zhTierPixels, zhUploadLimits } from '../offer'
 
 // /zh/image-to-image-generator (T21). Keyword 「图生图」 with its family (ai图生图, 图生图ai,
 // 以图生图, 图生图 在线) in the headings. People who search 图生图 are often after open-source
@@ -38,7 +38,7 @@ export const zhImageToImageGenerator = defineContentPage({
   faq: [
     {
       question: '图生图有免费的吗？',
-      answer: `有。新用户送 ${zhFreeImages}，之后每张${zhFromCredits}。${zhPlansSentence()}`,
+      answer: `新用户送 ${zhFreeImages}。`,
     },
     {
       question: '以图生图用哪个 AI 工具好？',
