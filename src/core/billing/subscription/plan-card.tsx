@@ -61,6 +61,8 @@ function SinceFoot({ facts, withEmail = false, children }: { facts: PassFacts; w
   )
 }
 
+const METHOD_KEYS = { card: 'card', alipay: 'alipay', wechat_pay: 'wechatPay', cn_card: 'cnCard' } as const
+
 // Historical grants come from the matched ledger entry.
 function PerPeriod({ summary, ctx }: { summary: Subscribed; ctx: Ctx }) {
   const t = useTranslations('app.account.plan')
