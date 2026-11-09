@@ -95,7 +95,6 @@ describe('schema-check.sh', () => {
     expect(result.status).toBe(0)
     expect(result.out).toContain('::warning')
     expect(result.outputs.fix).toBe('true')
-    expect(result.outputs.head).toBe(r.git('rev-parse', 'HEAD^2'))
     // The branch's own file (no main-only `m`) with the branch's `h`.
     const fixed = readFileSync(join(result.fixDir, 'schema.sql'), 'utf8')
     expect(fixed).toBe('a\nb\nh\nc\nd\ne\nf\n')

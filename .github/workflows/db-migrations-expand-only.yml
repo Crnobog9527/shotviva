@@ -44,13 +44,16 @@ jobs:
     # `edited` matters only for the title ([contract]); a description edit skips the job.
     if: github.event.action != 'edited' || github.event.changes.title != null
     runs-on: ubuntu-latest
+    env:
+      PR_HEAD: ${{ github.event.pull_request.head.sha }}
     steps:
-      # The PR head itself, not the merge ref, with full history so origin/main and the merge
-      # base are available.
+      # Only main supplies executable files (including .nvmrc). Read the PR as Git objects.
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: refs/heads/main
           fetch-depth: 0
+      - name: Fetch the exact PR commit, including for forks
+        run: git fetch --no-tags origin "$PR_HEAD"
       # Node runs the TypeScript scanner directly (type stripping); it imports only built-ins, so
       # no install.
       - uses: actions/setup-node@v4
@@ -60,4 +63,4 @@ jobs:
         env:
           # Through env, never interpolated into the script: titles are untrusted input.
           PR_TITLE: ${{ github.event.pull_request.title }}
-        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-migrations-destructive.ts origin/main HEAD
+        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-migrations-destructive.ts HEAD "$PR_HEAD"
