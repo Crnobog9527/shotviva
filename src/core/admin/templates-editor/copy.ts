@@ -63,7 +63,6 @@ export const bulkEditCopy = {
   title: (count: number) => `批量编辑 ${count} 个模板`,
   hint: '只改填了或选了的项，留空 / 「不改」的保持每个模板原来的值。保存前逐个按积分下限检查，有一个不合格就整批不保存。',
   creditsLegend: '积分（每档单独填，留空不改）',
-  floorHint: (high: number, medium: number) => `下限 high ${high} / medium ${medium}`,
   surfaces: '展示入口',
   surfaceOptions: { '': '不改', web: '只在站内', partner: '只给伙伴', both: '站内 + 伙伴' },
   quality: '出图质量（送给模型的 quality）',

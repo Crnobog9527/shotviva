@@ -12,8 +12,7 @@ export type ProviderForm = {
   module: ProviderModule
   adapter: ProviderAdapterId
   resolutions: Resolution[]
-  // The last manually chosen tiers belong to this endpoint and model.
-  resolutionOverride?: string
+  imageCosts: Partial<Record<Resolution, string>>
   label: string
   baseUrl: string
   model: string
@@ -34,6 +33,7 @@ export const DEFAULT_FORM: ProviderForm = {
   baseUrl: DEFAULT_BASE_URL,
   adapter: 'openai_images',
   resolutions: [...RESOLUTIONS],
+  imageCosts: {},
   model: '',
   apiKey: '',
   notes: '',
@@ -50,6 +50,7 @@ export function formFor(provider: AdminProvider | null, module: ProviderModule =
     module: provider.module,
     adapter: provider.adapter,
     resolutions: provider.resolutions,
+    imageCosts: Object.fromEntries(Object.entries(provider.estimatedImageCosts ?? {}).map(([tier, cost]) => [tier, String(cost)])),
     label: provider.label,
     baseUrl: provider.baseUrl,
     model: provider.model,
@@ -107,7 +108,7 @@ function fillOfficial(form: ProviderForm): ProviderForm {
 export function withModel(form: ProviderForm, model: string): ProviderForm {
   const before = officialText(form.module, form.model)
   const after = officialText(form.module, model)
-  const next = { ...form, model }
+  const next = { ...form, model, imageCosts: model === form.model ? form.imageCosts : {} }
   for (const field of MODULE_PRICE_FIELDS[form.module]) {
     const value = form[field].trim()
     if (value === '' || value === before[field]) next[field] = after[field] ?? ''
@@ -141,19 +142,7 @@ const PRICE_PATTERN = /^\s*(\d+(\.\d+)?)?\s*$/
 // New rows offer the standard endpoint for the selected protocol. Stored rows cannot switch.
 export function withAdapter(form: ProviderForm, adapter: ProviderAdapterId): ProviderForm {
   const baseUrl = adapter === 'openrouter_images' ? OPENROUTER_BASE_URL : DEFAULT_BASE_URL
-  return { ...form, adapter, baseUrl }
-}
-
-// Store manual tier choices separately from catalogue suggestions. An in-flight lookup
-// cannot undo an edit, and re-opening the same row preserves its saved selection.
-export function resolutionKey({ baseUrl, model, adapter }: Pick<ProviderForm, 'baseUrl' | 'model' | 'adapter'>): string {
-  return JSON.stringify([adapter, baseUrl.trim(), model.trim()])
-}
-
-export function withSuggestedResolutions(form: ProviderForm, saved: AdminProvider | null, suggested: Resolution[] | null): ProviderForm {
-  if (form.adapter !== 'openrouter_images' || form.resolutionOverride === resolutionKey(form)) return form
-  if (saved && resolutionKey(saved) === resolutionKey(form)) return { ...form, resolutions: saved.resolutions }
-  return suggested ? { ...form, resolutions: suggested } : form
+  return { ...form, adapter, baseUrl, imageCosts: {}, resolutions: [...RESOLUTIONS] }
 }
 
 export function toSaveInput(form: ProviderForm, provider: AdminProvider | null): SaveProviderInput {
@@ -162,6 +151,7 @@ export function toSaveInput(form: ProviderForm, provider: AdminProvider | null):
     module: form.module,
     adapter: form.adapter,
     resolutions: form.resolutions,
+    estimatedImageCosts: Object.fromEntries(form.resolutions.filter((tier) => form.imageCosts[tier]?.trim()).map((tier) => [tier, Number(form.imageCosts[tier])])),
     label: form.label,
     baseUrl: form.baseUrl,
     model: form.model,
@@ -178,5 +168,9 @@ export function toSaveInput(form: ProviderForm, provider: AdminProvider | null):
 export function canSave(form: ProviderForm, needsKey: boolean): boolean {
   const filled = [form.label, form.baseUrl, form.model].every((value) => value.trim() !== '')
   const pricesOk = PRICE_FIELDS.every((field) => PRICE_PATTERN.test(form[field]))
-  return filled && form.resolutions.length > 0 && pricesOk && (!needsKey || form.apiKey.trim() !== '')
+  const estimatesOk = form.resolutions.every((tier) => {
+    const cost = form.imageCosts[tier]?.trim()
+    return !cost || (PRICE_PATTERN.test(cost) && Number(cost) > 0 && Number.isFinite(Number(cost)))
+  })
+  return filled && estimatesOk && form.resolutions.length > 0 && pricesOk && (!needsKey || form.apiKey.trim() !== '')
 }

@@ -135,7 +135,7 @@ export function HomeGenerator({ templates, defaultId, viewer, googleAction, home
         thumbOf={thumbFor}
       />
       {viewer ? null : <SignupSheet open={signUp} onOpenChange={setSignUp} googleAction={googleAction} next={homePath} gift={freeImages} />}
-      <HomeDock show={away && !footer} hasPhoto={hasPhoto} cost={state.template?.creditsCost['1k'] ?? null} onClick={bring} />
+      <HomeDock show={away && !footer} hasPhoto={hasPhoto} cost={state.cost} onClick={bring} />
     </div>
     </FavoritesProvider>
   )
