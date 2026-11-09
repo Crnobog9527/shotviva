@@ -76,8 +76,8 @@ DESIGN.md §1.4 现在只有一句「先按 375px 宽设计，再适配桌面」
 ### 1.8 图片与下载
 
 - 结果图全宽展示，宽高比按生成比例，不裁切。
-- 「Download」优先走 **Web Share API**（`navigator.share({ files })`）：iOS / Android 直接弹系统分享面板，可存相册、可发给微信 / WhatsApp，这是最像 app 的一步；不支持时回退 `<a download>`。
-- 图片下方给一行小字「Long-press to save」作为 iOS 的兜底提示。
+- iPhone 和 iPad 的结果页、作品详情页提供「存入相册」，主按钮直接调起系统面板。用户选「存储图像」后，到「照片」中查看。两种设备在任意布局下均只有这一项保存操作。
+- 无法分享图片文件时，提供可操作的保存原图方式并说明操作。桌面和 Android 继续使用各自的下载与分享入口。
 
 #### 1.8.1 分享面板能做到什么（Owner 2026-11-05 问）
 
@@ -102,8 +102,8 @@ DESIGN.md §1.4 现在只有一句「先按 375px 宽设计，再适配桌面」
 实现规则：
 
 1. 结果页加载时先把结果图 `fetch` 成 `File`（`image/jpeg`）放在内存里；点击时同步调用 `navigator.share`。iOS 对「点击后再去 fetch 再 share」会判定失去用户激活而拒绝。
-2. 先 `navigator.canShare({ files })` 判断，不支持就显示「Download」而不是「Share」，按钮文案跟着变。
-3. `text` 里放一句短文案 + 带 utm 的站点链接，能带的 app（X、Telegram、Messages）会带上，不能带的（WhatsApp、Instagram）自动丢弃，不用分 app 处理。
+2. 用 `navigator.canShare({ files })` 检查实际图片。iPhone 或 iPad 无法分享时，点「存入相册」在当前页面打开可长按的原图。其他平台沿用下载入口。
+3. iPhone 和 iPad 的「存入相册」只传图片文件，让系统呈现「存储图像」。网页无法指定分享目标或得知最终保存结果。关闭面板后允许重试，不显示「已存入相册」。其他平台的通用分享在 `text` 里放一句短文案 + 带 utm 的站点链接，能带的 app（X、Telegram、Messages）会带上，不能带的（WhatsApp、Instagram）自动丢弃，不用分 app 处理。
 4. 一张图一个 `File`，类型 `image/jpeg`；不要传 PNG 大文件，部分 app 对 >10MB 的分享会静默失败。
 
 ### 1.9 状态反馈
