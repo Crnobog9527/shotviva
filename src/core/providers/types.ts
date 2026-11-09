@@ -1,3 +1,4 @@
+import type { OpenRouterImageParameters } from './openrouter-catalog'
 import type { Resolution } from '../templates/output-options'
 import type { GenerationProvider, ProviderPrices } from '../jobs'
 
@@ -28,7 +29,7 @@ export const DEFAULT_BASE_URL = 'https://api.openai.com/v1'
 
 // What an adapter needs to call its vendor. The key is plaintext, read from Vault per request:
 // never keep, log or return it.
-export type ProviderConfig = { baseUrl: string; model: string; apiKey: string; resolutions?: readonly Resolution[] }
+export type ProviderConfig = { baseUrl: string; model: string; apiKey: string; resolutions?: readonly Resolution[]; imageParameters?: OpenRouterImageParameters }
 
 export type ProviderAdapter = (config: ProviderConfig) => GenerationProvider
 

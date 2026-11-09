@@ -55,7 +55,8 @@ export async function runTestGenerate(deps: FirstRunDeps, req: TestGenerateReque
   if (existing) return existing
   const { loaded, photo, inputs, image, providerId } = await prepare(deps, req)
   const resolution = req.body.inputs.resolution ?? DEFAULT_RESOLUTION
-  const provider = await resolveTemplateProvider(deps.provider, providerId, resolution)
+  const call = templateCall(loaded, inputs, image, resolution)
+  const provider = await resolveTemplateProvider(deps.provider, providerId, call)
   // Marks the request that created the row; a concurrent repeat gets the row and calls nothing.
   const attemptId = randomUUID()
   const run = await beginTestRun(deps.db, {
@@ -82,7 +83,7 @@ export async function runTestGenerate(deps: FirstRunDeps, req: TestGenerateReque
   // The face-swap judge (§5.1a) only now, with the budget held: a click over the budget calls nothing.
   const step = async () => {
     const screen = await screenIdentityText({ ...deps, quiet: true }, { userId: req.actorId, entry: 'workspace', texts: typedWords(inputs) })
-    return { call: templateCall(loaded, inputs, image, resolution), decision: screenCost(deps.identityJudge, screen) }
+    return { call, decision: screenCost(deps.identityJudge, screen) }
   }
   return continueTestRun({ ...deps, provider }, run, step, deps.identityJudge?.prices)
 }

@@ -41,6 +41,7 @@ export async function resolveProvider(
   env: ServerEnv,
   adapters: ProviderAdapters,
   readKey: ReadProviderKey,
+  imageParameters?: ProviderConfig['imageParameters'],
 ): Promise<GenerationProvider> {
   if (!row) {
     const fallback = envFallback(module, env)
@@ -50,5 +51,5 @@ export async function resolveProvider(
   // No silent fallback to env: a provider the Owner switched to must be the one that runs.
   const apiKey = await readKey(row.id)
   if (!apiKey) throw new AppError('INTERNAL', `active provider ${row.id} has no API key; set it in /admin/providers`)
-  return build(adapters, row.adapter, row.id, { baseUrl: row.baseUrl, model: row.model, apiKey, resolutions: row.resolutions }, row.prices)
+  return build(adapters, row.adapter, row.id, { baseUrl: row.baseUrl, model: row.model, apiKey, resolutions: row.resolutions, imageParameters }, row.prices)
 }

@@ -1,4 +1,4 @@
-export { resolveTemplateProvider, type TemplateProvider } from './provider'
+export { resolveTemplateProvider, type ImageRequestOptions, type TemplateProvider } from './provider'
 export {
   JOB_MODULES,
   JOB_SOURCES,

@@ -20,42 +20,91 @@ async function imageData(format: 'jpeg' | 'png', edge = 2) {
 }
 
 const reply = (image: { b64_json: string; media_type?: string }) => ({ data: [image], usage })
-const fake = (body: unknown, status = 200) => vi.fn<typeof fetch>().mockResolvedValue(Response.json(body, { status }))
+const gemini = config.model
+const flux = 'black-forest-labs/flux-3-image-klein'
+const seedream = 'bytedance-seed/seedream-5-0-lite'
+const enumOf = (...values: string[]) => ({ type: 'enum', values })
+const range = (max: number) => ({ type: 'range', min: 0, max })
+const catalogue = { data: [
+  { id: gemini, supported_parameters: { aspect_ratio: enumOf('1:1', '4:3'), input_references: range(3) } },
+  { id: flux, supported_parameters: {
+    resolution: enumOf('1K', '2K', '4K'), aspect_ratio: enumOf('auto', '4:3', '1:1'),
+    output_format: enumOf('jpeg', 'png'), input_references: range(10),
+  } },
+  { id: seedream, supported_parameters: {
+    resolution: enumOf('2K', '4K'), aspect_ratio: enumOf('auto', '4:3'), input_references: range(14),
+  } },
+  { id: 'openai/gpt-image', supported_parameters: { output_format: enumOf('png'), input_references: range(16) } },
+] }
+
+const fake = (body: unknown, status = 200) => vi.fn<typeof fetch>(async (url) =>
+  String(url).endsWith('/images/models') ? Response.json(catalogue) : Response.json(body, { status }))
 
 describe('OpenRouter image requests', () => {
   it.each([
-    'google/gemini-3.1-flash-image', 'openai/gpt-image-2.6-flare',
-    'black-forest-labs/flux-3-image-klein', 'bytedance-seed/seedream-5-0-lite',
-  ])('uses the same Image API contract for %s including ordered references and attribution', async (model) => {
+    [gemini, 'original', {}],
+    [gemini, '4:3', { aspect_ratio: '4:3' }],
+    [flux, 'original', { aspect_ratio: 'auto', resolution: '2K', output_format: 'png' }],
+    [seedream, 'original', { aspect_ratio: 'auto', resolution: '2K' }],
+    ['openai/gpt-image', 'original', { output_format: 'png' }],
+  ] as const)('uses only supported parameters for %s (%s)', async (model, aspectRatio, params) => {
     const fetch = fake(reply(await imageData('jpeg')))
     const result = await createOpenRouterImageProvider({ ...config, model, fetch }).generate(input({
       images: [photo, { bytes: new Uint8Array([3, 4]), contentType: 'image/png' }],
-      params: { quality: 'low', input_fidelity: 'high', background: 'transparent' },
+      aspectRatio, resolution: model === gemini ? '1k' : '2k', params: { output_format: 'png' },
     }))
-    const [url, request] = fetch.mock.calls[0]!
+    expect(fetch.mock.calls[0]).toMatchObject(['https://openrouter.ai/api/v1/images/models', { method: 'GET' }])
+    const [url, request] = fetch.mock.calls[1]!
     expect(url).toBe('https://openrouter.ai/api/v1/images')
     expect(request).toMatchObject({ method: 'POST', headers: {
       Authorization: 'Bearer test-key', 'HTTP-Referer': 'https://shotviva.com', 'X-Title': 'Shotviva', 'Content-Type': 'application/json',
     } })
     expect(JSON.parse(String(request?.body))).toEqual({
-      model, prompt: 'fixture', resolution: '1K', aspect_ratio: '4:3', output_format: 'png',
+      model, prompt: 'fixture', ...params,
       input_references: [
         { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,AQI=' } },
         { type: 'image_url', image_url: { url: 'data:image/png;base64,AwQ=' } },
       ],
     })
     expect(result.usage).toEqual(usage)
-    expect(result.contentType).toBe('image/png')
     expect((await sharp(result.bytes).metadata()).format).toBe('png')
   })
 
-  it.each([['1k', '1K'], ['2k', '2K'], ['3k', '4K']] as const)('maps %s to %s with the original ratio and no input photo', async (resolution, size) => {
+})
+
+describe('OpenRouter model limits', () => {
+  it('accepts three Gemini references and refuses four before a paid request', async () => {
     const fetch = fake(reply(await imageData('png')))
-    const provider = createOpenRouterImageProvider({ ...config, baseUrl: 'https://relay.example/v1', fetch })
+    const provider = createOpenRouterImageProvider({ ...config, fetch })
+    await provider.generate(input({ images: Array(3).fill(photo) }))
+    await expect(provider.generate(input({ images: Array(4).fill(photo) }))).rejects.toMatchObject({
+      code: 'REFERENCE_IMAGE_LIMIT', message: expect.stringMatching(/3.*4/),
+    })
+    expect(fetch.mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(1)
+  })
+
+  it('fails before sending photos when the catalogue is unavailable', async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>(async () => new Response('SENSITIVE', { status: 503 }))
+    await expect(createOpenRouterImageProvider({ ...config, fetch }).generate(input()))
+      .rejects.toMatchObject({ kind: 'failed', message: expect.not.stringContaining('SENSITIVE') })
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(fetch.mock.calls[0]?.[1]?.method).toBe('GET')
+  })
+
+  it('does not submit an undeclared Seedream resolution', async () => {
+    const fetch = fake({})
+    await expect(createOpenRouterImageProvider({ ...config, model: seedream, fetch }).generate(input()))
+      .rejects.toMatchObject({ code: 'MODEL_INPUT_UNSUPPORTED' })
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([['1k', '1K'], ['2k', '2K'], ['3k', '4K']] as const)('maps FLUX %s to %s without a reference', async (resolution, size) => {
+    const fetch = fake(reply(await imageData('png')))
+    const provider = createOpenRouterImageProvider({ ...config, model: flux, baseUrl: 'https://relay.example/v1', fetch })
     await provider.generate(input({ resolution, aspectRatio: 'original', images: [] }))
-    expect(fetch.mock.calls[0]?.[0]).toBe('https://relay.example/v1/images')
-    expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))).toEqual({
-      model: config.model, prompt: 'fixture', aspect_ratio: 'auto', resolution: size, output_format: 'png',
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual(['https://relay.example/v1/images/models', 'https://relay.example/v1/images'])
+    expect(JSON.parse(String(fetch.mock.calls[1]?.[1]?.body))).toEqual({
+      model: flux, prompt: 'fixture', aspect_ratio: 'auto', resolution: size, output_format: 'png',
     })
   })
 
@@ -99,7 +148,7 @@ describe('OpenRouter image responses', () => {
   it.each(['https://example.com/file.png', '----', 'YWJj'])('rejects unusable data without fetching it', async (b64_json) => {
     const fetch = fake(reply({ b64_json }))
     await expect(createOpenRouterImageProvider({ ...config, fetch }).generate(input())).rejects.toMatchObject({ kind: 'failed', usage })
-    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(fetch).toHaveBeenCalledTimes(2)
   })
 
   it('uses the image signature when the server omits media_type', async () => {

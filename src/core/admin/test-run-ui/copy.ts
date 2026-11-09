@@ -119,6 +119,8 @@ export const TEST_RUN_COPY = {
   failures: {
     PROVIDER_TIMEOUT: '供应商超时',
     PROVIDER_FAILED: '供应商出错',
+    REFERENCE_IMAGE_LIMIT: '参考图超过模型上限，请减少参考图或更换模型',
+    MODEL_INPUT_UNSUPPORTED: '模型不支持当前输入，请检查参考图、清晰度和尺寸',
     CONTENT_REJECTED: '被出图模型的安全审核拒绝',
     OUTPUT_WRITE_FAILED: '结果没写进存储',
     CONFIRM_FAILED: '结算失败',
