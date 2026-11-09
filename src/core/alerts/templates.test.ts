@@ -115,6 +115,14 @@ describe('renderAlert: operations', () => {
     )
   })
 
+  it('a new business inquiry (T86): company, volume and uses, no email or phone, the admin link', () => {
+    const inquiry = { kind: 'business_inquiry', inquiryId: TICKET, company: '  Acme   Foods ', volume: '500_2000', uses: ['ecommerce', 'social'] } as const
+    expect(text(inquiry)).toBe(
+      `【新企业咨询】「Acme Foods」想合作，每月预计出图 500–2,000 张，用途：电商商品图、社交媒体内容。请到后台查看联系方式并跟进。\n去后台看：https://shotviva.com/admin/inquiries/${TICKET}`,
+    )
+    expect(text({ ...inquiry, company: 'x'.repeat(60) })).toContain(`「${'x'.repeat(40)}…」`)
+  })
+
   it('marks the test site, and puts no ids, codes or event names in the sentence', () => {
     const { sentence } = renderAlert(refund(), { ...ctx, origin: 'https://validation.example', testSite: true })
     expect(sentence.startsWith('（测试站）【退款】')).toBe(true)

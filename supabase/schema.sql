@@ -4693,6 +4693,73 @@ $$;
 ALTER FUNCTION "public"."snapshot_test_spend_provider"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."submit_business_inquiry"("p_inquiry" "jsonb", "p_ip_hash" "text") RETURNS "jsonb"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_email text := lower(btrim(p_inquiry ->> 'email'));
+  v_id uuid;
+begin
+  if v_email is null or v_email = '' then
+    raise exception 'INVALID_INPUT' using detail = 'email is required';
+  end if;
+  if p_ip_hash is not null and p_ip_hash !~ '^[0-9a-f]{64}$' then
+    raise exception 'INVALID_INPUT' using detail = 'ip_hash must be a sha256 hex digest';
+  end if;
+
+  if p_ip_hash is not null then
+    perform pg_advisory_xact_lock(hashtextextended('inquiry:ip:' || p_ip_hash, 0));
+    if (select count(*) from public.business_inquiries b
+         where b.ip_hash = p_ip_hash and b.created_at > now() - interval '1 hour') >= 3 then
+      return jsonb_build_object('status', 'ip_hourly', 'id', null);
+    end if;
+    if (select count(*) from public.business_inquiries b
+         where b.ip_hash = p_ip_hash and b.created_at > now() - interval '24 hours') >= 10 then
+      return jsonb_build_object('status', 'ip_daily', 'id', null);
+    end if;
+  end if;
+
+  perform pg_advisory_xact_lock(hashtextextended('inquiry:email:' || v_email, 0));
+  if (select count(*) from public.business_inquiries b
+       where lower(b.email) = v_email and b.created_at > now() - interval '24 hours') >= 3 then
+    return jsonb_build_object('status', 'email_daily', 'id', null);
+  end if;
+
+  insert into public.business_inquiries (
+    locale, page, user_id, name, email, company, monthly_volume, uses, message,
+    job_title, website, wechat, phone, team_size, country, platforms, needs, start_time, ip_hash
+  ) values (
+    p_inquiry ->> 'locale',
+    p_inquiry ->> 'page',
+    (p_inquiry ->> 'user_id')::uuid,
+    p_inquiry ->> 'name',
+    v_email,
+    p_inquiry ->> 'company',
+    p_inquiry ->> 'monthly_volume',
+    array(select jsonb_array_elements_text(coalesce(p_inquiry -> 'uses', '[]'::jsonb))),
+    p_inquiry ->> 'message',
+    p_inquiry ->> 'job_title',
+    p_inquiry ->> 'website',
+    p_inquiry ->> 'wechat',
+    p_inquiry ->> 'phone',
+    p_inquiry ->> 'team_size',
+    p_inquiry ->> 'country',
+    array(select jsonb_array_elements_text(coalesce(p_inquiry -> 'platforms', '[]'::jsonb))),
+    array(select jsonb_array_elements_text(coalesce(p_inquiry -> 'needs', '[]'::jsonb))),
+    p_inquiry ->> 'start_time',
+    p_ip_hash
+  )
+  returning id into v_id;
+
+  return jsonb_build_object('status', 'ok', 'id', v_id);
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."submit_business_inquiry"("p_inquiry" "jsonb", "p_ip_hash" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."support_reply_hours"("p_tier" "text") RETURNS integer
     LANGUAGE "sql" IMMUTABLE
     SET "search_path" TO ''
@@ -5169,6 +5236,57 @@ CREATE TABLE IF NOT EXISTS "public"."ai_providers" (
 ALTER TABLE "public"."ai_providers" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."business_inquiries" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "locale" "text" NOT NULL,
+    "page" "text" NOT NULL,
+    "user_id" "uuid",
+    "name" "text" NOT NULL,
+    "email" "text" NOT NULL,
+    "company" "text" NOT NULL,
+    "monthly_volume" "text" NOT NULL,
+    "uses" "text"[] NOT NULL,
+    "message" "text" NOT NULL,
+    "job_title" "text",
+    "website" "text",
+    "wechat" "text",
+    "phone" "text",
+    "team_size" "text",
+    "country" "text",
+    "platforms" "text"[] DEFAULT '{}'::"text"[] NOT NULL,
+    "needs" "text"[] DEFAULT '{}'::"text"[] NOT NULL,
+    "start_time" "text",
+    "status" "text" DEFAULT 'new'::"text" NOT NULL,
+    "admin_note" "text",
+    "ip_hash" "text",
+    CONSTRAINT "business_inquiries_admin_note_check" CHECK (("char_length"("admin_note") <= 2000)),
+    CONSTRAINT "business_inquiries_company_check" CHECK ((("char_length"("btrim"("company")) >= 1) AND ("char_length"("btrim"("company")) <= 200))),
+    CONSTRAINT "business_inquiries_country_check" CHECK ((("char_length"("country") >= 1) AND ("char_length"("country") <= 100))),
+    CONSTRAINT "business_inquiries_email_check" CHECK (((("char_length"("email") >= 3) AND ("char_length"("email") <= 254)) AND ("email" ~~ '%_@_%'::"text"))),
+    CONSTRAINT "business_inquiries_ip_hash_check" CHECK (("ip_hash" ~ '^[0-9a-f]{64}$'::"text")),
+    CONSTRAINT "business_inquiries_job_title_check" CHECK ((("char_length"("job_title") >= 1) AND ("char_length"("job_title") <= 100))),
+    CONSTRAINT "business_inquiries_locale_check" CHECK (("locale" = ANY (ARRAY['en'::"text", 'zh'::"text"]))),
+    CONSTRAINT "business_inquiries_message_check" CHECK ((("char_length"("btrim"("message")) >= 10) AND ("char_length"("btrim"("message")) <= 1000))),
+    CONSTRAINT "business_inquiries_monthly_volume_check" CHECK (("monthly_volume" = ANY (ARRAY['under_100'::"text", '100_500'::"text", '500_2000'::"text", '2000_10000'::"text", 'over_10000'::"text"]))),
+    CONSTRAINT "business_inquiries_name_check" CHECK ((("char_length"("btrim"("name")) >= 1) AND ("char_length"("btrim"("name")) <= 100))),
+    CONSTRAINT "business_inquiries_needs_check" CHECK (("needs" <@ ARRAY['volume_pricing'::"text", 'custom_templates'::"text", 'bulk_processing'::"text", 'api'::"text", 'brand_kit'::"text", 'invoicing'::"text"])),
+    CONSTRAINT "business_inquiries_page_check" CHECK (("page" = ANY (ARRAY['/pricing'::"text", '/zh/pricing'::"text"]))),
+    CONSTRAINT "business_inquiries_phone_check" CHECK ((("char_length"("phone") >= 1) AND ("char_length"("phone") <= 32))),
+    CONSTRAINT "business_inquiries_platforms_check" CHECK (("platforms" <@ ARRAY['taobao_tmall'::"text", 'jd'::"text", 'pinduoduo'::"text", 'douyin'::"text", 'xiaohongshu'::"text", 'meituan_eleme'::"text", 'amazon'::"text", 'shopify'::"text", 'etsy'::"text", 'ebay'::"text", 'instagram'::"text", 'tiktok'::"text", 'other'::"text"])),
+    CONSTRAINT "business_inquiries_start_time_check" CHECK (("start_time" = ANY (ARRAY['asap'::"text", 'within_1_month'::"text", '1_3_months'::"text", 'exploring'::"text"]))),
+    CONSTRAINT "business_inquiries_status_check" CHECK (("status" = ANY (ARRAY['new'::"text", 'contacted'::"text", 'won'::"text", 'closed'::"text"]))),
+    CONSTRAINT "business_inquiries_team_size_check" CHECK (("team_size" = ANY (ARRAY['1_5'::"text", '6_20'::"text", '21_100'::"text", 'over_100'::"text"]))),
+    CONSTRAINT "business_inquiries_uses_check" CHECK (((("cardinality"("uses") >= 1) AND ("cardinality"("uses") <= 6)) AND ("uses" <@ ARRAY['ecommerce'::"text", 'food_menu'::"text", 'social'::"text", 'real_estate'::"text", 'ads'::"text", 'other'::"text"]))),
+    CONSTRAINT "business_inquiries_website_check" CHECK ((("char_length"("website") >= 1) AND ("char_length"("website") <= 300))),
+    CONSTRAINT "business_inquiries_wechat_check" CHECK ((("char_length"("wechat") >= 1) AND ("char_length"("wechat") <= 64)))
+);
+
+
+ALTER TABLE "public"."business_inquiries" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."credit_ledger" (
     "id" bigint NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -5588,6 +5706,11 @@ ALTER TABLE ONLY "public"."ai_providers"
 
 
 
+ALTER TABLE ONLY "public"."business_inquiries"
+    ADD CONSTRAINT "business_inquiries_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."credit_ledger"
     ADD CONSTRAINT "credit_ledger_idempotency_key_key" UNIQUE ("idempotency_key");
 
@@ -5783,6 +5906,26 @@ CREATE INDEX "admin_test_spend_started_at_idx" ON "public"."admin_test_spend" US
 
 
 CREATE UNIQUE INDEX "ai_providers_one_active_per_module" ON "public"."ai_providers" USING "btree" ("module") WHERE "is_active";
+
+
+
+CREATE INDEX "business_inquiries_created_at_idx" ON "public"."business_inquiries" USING "btree" ("created_at" DESC, "id" DESC);
+
+
+
+CREATE INDEX "business_inquiries_email_created_at_idx" ON "public"."business_inquiries" USING "btree" ("lower"("email"), "created_at" DESC);
+
+
+
+CREATE INDEX "business_inquiries_ip_hash_created_at_idx" ON "public"."business_inquiries" USING "btree" ("ip_hash", "created_at" DESC) WHERE ("ip_hash" IS NOT NULL);
+
+
+
+CREATE INDEX "business_inquiries_status_created_at_idx" ON "public"."business_inquiries" USING "btree" ("status", "created_at" DESC, "id" DESC);
+
+
+
+CREATE INDEX "business_inquiries_user_id_idx" ON "public"."business_inquiries" USING "btree" ("user_id") WHERE ("user_id" IS NOT NULL);
 
 
 
@@ -6061,6 +6204,11 @@ ALTER TABLE ONLY "public"."ai_providers"
 
 
 
+ALTER TABLE ONLY "public"."business_inquiries"
+    ADD CONSTRAINT "business_inquiries_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
 ALTER TABLE ONLY "public"."credit_ledger"
     ADD CONSTRAINT "credit_ledger_payment_id_fkey" FOREIGN KEY ("payment_id") REFERENCES "public"."payments"("id") ON DELETE SET NULL;
 
@@ -6249,6 +6397,9 @@ ALTER TABLE "public"."admin_test_spend" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."ai_providers" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."business_inquiries" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."credit_ledger" ENABLE ROW LEVEL SECURITY;
@@ -6914,6 +7065,11 @@ REVOKE ALL ON FUNCTION "public"."snapshot_test_spend_provider"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "public"."submit_business_inquiry"("p_inquiry" "jsonb", "p_ip_hash" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."submit_business_inquiry"("p_inquiry" "jsonb", "p_ip_hash" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."support_reply_hours"("p_tier" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."support_reply_hours"("p_tier" "text") TO "service_role";
 
@@ -6988,6 +7144,10 @@ GRANT ALL ON TABLE "public"."admin_test_spend" TO "service_role";
 
 
 GRANT ALL ON TABLE "public"."ai_providers" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."business_inquiries" TO "service_role";
 
 
 

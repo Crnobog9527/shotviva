@@ -9,6 +9,7 @@ describe('admin nav', () => {
       'analytics',
       'users',
       'tickets',
+      'inquiries',
       'orders',
       'disputes',
       'jobs',
@@ -27,6 +28,13 @@ describe('admin nav', () => {
     expect(items.find((item) => item.key === 'tickets')?.count).toBe(4)
     expect(items.filter((item) => item.count !== undefined)).toHaveLength(1)
     expect(adminNavItems({ wishlist: false }, { tickets: 0 }).find((item) => item.key === 'tickets')?.count).toBeUndefined()
+  })
+
+  it('shows the new-inquiry count on 企业咨询, beside 工单 (T86)', () => {
+    const items = adminNavItems({ wishlist: false }, { tickets: 2, inquiries: 3 })
+    expect(items.find((item) => item.key === 'inquiries')).toMatchObject({ href: '/admin/inquiries', label: '企业咨询', count: 3 })
+    expect(items.find((item) => item.key === 'tickets')?.count).toBe(2)
+    expect(adminNavItems({ wishlist: false }, { inquiries: 0 }).find((item) => item.key === 'inquiries')?.count).toBeUndefined()
   })
 
   it('highlights the overview only on /admin and other entries on their sub-pages', () => {

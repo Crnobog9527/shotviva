@@ -9,7 +9,8 @@ const text = (value: unknown) => JSON.stringify(value)
 
 describe('legal copy and STRIPE_WECHAT_PAY', () => {
   it('off: no page names WeChat Pay', () => {
-    for (const page of legalPages) expect(text(page)).not.toMatch(/wechat/i)
+    // "WeChat ID" (the business inquiry form's optional field, T86) is not a way to pay.
+    for (const page of legalPages) expect(text(page)).not.toMatch(/wechat(?! id)/i)
   })
 
   it('every edited phrase is still in the pages, exactly once', () => {

@@ -1,7 +1,9 @@
 import type { PaymentChannel } from '@/core/config'
-import type { BusinessBlock, CreditBuysBlock, FaqItem } from '@/core/content'
+import type { CreditBuysBlock, FaqItem } from '@/core/content'
+import type { BusinessBlock } from '@/core/content/business'
 
 import { site } from '../site.config'
+import { businessForm } from './business-form'
 import { OUTPUT_TIERS, freeImagesLabel, fromCredits, packFrom, planFrom, tierList, usd, yearlySaving } from './offer'
 
 // Final /pricing copy (T11, laid out as comps-v3-b pricing.html in T37). Every number is read
@@ -30,10 +32,6 @@ export type PricingContent = {
   waffo: { faq: readonly FaqItem[] }
 }
 
-// The business inquiry subject is English on every language, so the Owner can filter on it
-// (DESIGN §6.9 item 8).
-export const BUSINESS_MAIL_SUBJECT = `Business inquiry — ${brand}`
-
 const pixels = OUTPUT_TIERS.map((tier) => tier.px)
 
 const creditBuys: CreditBuysBlock = {
@@ -59,13 +57,7 @@ const business: BusinessBlock = {
     { title: 'A dedicated contact', detail: 'One person for onboarding and priority help.' },
   ],
   cta: 'Contact us',
-  aside: ['Or write to ', ' with your volume and platforms.'],
-  prompts: [
-    'Company:',
-    'Monthly photo volume:',
-    'Platforms (marketplaces, delivery apps, your site):',
-    'What you would like us to set up (templates, API, invoicing):',
-  ],
+  form: businessForm,
 }
 
 const titlePrice = planFrom ? `Plans From ${usd(planFrom.priceUsd)} a Month` : 'Plans and Credit Packs'

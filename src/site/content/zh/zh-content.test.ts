@@ -43,8 +43,8 @@ function strings(value: unknown): string[] {
 // Latin words allowed on a Chinese page (建站规格 §6.1 rule 3): the brand, AI, payment, phone,
 // browser and file-format names, units, and API (the For business plate, T37). Image paths and alt text of the shared placeholders are skipped.
 // Proper nouns the landing pages cite (T44): the platforms whose photo rules they quote and the
-// price guides behind the bills.
-const LATIN_OK = new Set(['Shotviva', 'Shopify', 'Amazon', 'Etsy', 'DoorDash', 'Uber', 'Eats', 'Grubhub', 'PricingLink', 'Jobbers', 'FoodShot', 'AI', 'Apple', 'Pay', 'Google', 'iPhone', 'Safari', 'Chrome', 'JPG', 'PNG', 'WebP', 'MB', 'px', 'shotviva', 'API', 'PS'])
+// price guides behind the bills. The business inquiry form's platform choices (T86).
+const LATIN_OK = new Set(['Shotviva', 'Shopify', 'Amazon', 'Etsy', 'eBay', 'Instagram', 'TikTok', 'DoorDash', 'Uber', 'Eats', 'Grubhub', 'PricingLink', 'Jobbers', 'FoodShot', 'AI', 'Apple', 'Pay', 'Google', 'iPhone', 'Safari', 'Chrome', 'JPG', 'PNG', 'WebP', 'MB', 'px', 'shotviva', 'API', 'PS'])
 const PAGES = {
   '/zh': zhHomePage,
   '/zh/image-to-image-generator': zhImageToImageGenerator,

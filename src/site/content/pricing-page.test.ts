@@ -4,11 +4,11 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { PricingPayWith } from '@/core/billing/paywall'
-import { BusinessSection } from '@/core/content'
+import { BusinessSection } from '@/core/content/business'
 import messages from '@/site/messages/en.json'
 
 import { site } from '../site.config'
-import { BUSINESS_MAIL_SUBJECT, pricingPage } from './pricing'
+import { pricingPage } from './pricing'
 import { zhPricingPage } from './zh/pricing'
 
 const pages = { en: pricingPage, zh: zhPricingPage }
@@ -29,7 +29,6 @@ describe('/pricing page copy', () => {
     expect(business.items).toHaveLength(6)
     const text = JSON.stringify(business)
     expect(text).not.toMatch(/\$\d|SLA|SSO|single sign-on|seat|team account|单点登录|团队账号|席位/i)
-    expect(business.prompts.length).toBeGreaterThanOrEqual(4)
   })
 
   it('tags the order slip in each language', () => {
@@ -37,22 +36,33 @@ describe('/pricing page copy', () => {
     expect(zhPricingPage.business.tag).toBe('按需定制')
   })
 
-  it('mails support with the English subject on both languages', () => {
-    expect(BUSINESS_MAIL_SUBJECT).toBe('Business inquiry — Shotviva')
+  // T86 (Owner 2026-11-08): Contact us opens the inquiry dialog; no mailto and no "or write to"
+  // line beside it. The dialog's code is not in the page until the button is used.
+  it('opens the inquiry form instead of a mailto, with no address beside the button', () => {
+    const actions = { submit: async () => ({ ok: true as const }), prefill: async () => ({ email: null, phone: null }) }
     for (const page of Object.values(pages)) {
-      const html = renderToStaticMarkup(
-        createElement(BusinessSection, { block: page.business, email: site.brand.contactEmail, subject: BUSINESS_MAIL_SUBJECT, page: '/pricing' }),
-      )
-      expect(html).toContain('href="mailto:support@shotviva.com?subject=Business%20inquiry%20%E2%80%94%20Shotviva&amp;body=')
+      const html = renderToStaticMarkup(createElement(BusinessSection, { block: page.business, page: '/pricing', actions }))
+      expect(html).toContain('aria-haspopup="dialog"')
       expect(html).toContain(page.business.cta)
+      expect(html).not.toContain('mailto:')
+      expect(html).not.toContain(site.brand.contactEmail)
       // The order slip (T43): the "Made to order" tag and the slip material.
       expect(html).toContain(page.business.tag)
       expect(html).toContain('biz-slip')
       for (const item of page.business.items) expect(html).toContain(item.title)
-      // The address beside the button is the config's, never typed into the copy.
-      expect(html).toContain(`${page.business.aside[0]}${site.brand.contactEmail}${page.business.aside[1]}`)
-      expect(JSON.stringify(page.business)).not.toContain('@')
+      expect(html).not.toContain(page.business.form.fields.message.label)
     }
+  })
+
+  it.each(Object.entries(pages))('%s: the form names every choice and says the reply comes within 2 business days', (_, page) => {
+    const { form } = page.business
+    for (const group of Object.values(form.choices)) for (const label of Object.values(group)) expect(label).not.toBe('')
+    expect(form.success.body).toMatch(/2 business days|2 个工作日/)
+    expect(form.consent.link.href).toBe('/privacy')
+  })
+
+  it('says the zh success line in the Owner\'s words', () => {
+    expect(zhPricingPage.business.form.success.body).toBe('已收到，我们会在 2 个工作日内通过邮件联系你。')
   })
 })
 

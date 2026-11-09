@@ -67,6 +67,10 @@ const serverEnvSchema = z.object({
   // Query Read permission, and the project it reads. Both unset → the page asks to configure them.
   POSTHOG_PERSONAL_API_KEY: optionalSecret,
   POSTHOG_PROJECT_ID: z.preprocess(blankAsUnset, z.string().regex(/^\d+$/).optional()),
+  // hCaptcha's secret, the same one Supabase Auth holds (T86): the business inquiry form checks
+  // its invisible token on our server when NEXT_PUBLIC_HCAPTCHA_SITEKEY is set too. Production with
+  // the site key but no secret refuses every inquiry (core/inquiries/captcha captchaMode).
+  HCAPTCHA_SECRET: optionalSecret,
 })
   .extend(sentryBuildEnvSchema.shape)
   // SITE_INDEXING: the pre-launch indexing switch (ARCHITECTURE §12.0), default off.
