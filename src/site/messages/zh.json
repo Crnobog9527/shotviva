@@ -105,7 +105,7 @@
     },
     "signup": {
       "title": "注册账号",
-      "gift": "{upTo, select, true {最多 } other {}}{count, plural, other {# 张标准清晰度免费图}}",
+      "gift": "{count, number} 个免费积分",
       "giftNote": "会公开展示，并带水印",
       "submit": "注册",
       "fine": "继续即表示你同意<terms>服务条款</terms>和<privacy>隐私政策</privacy>。",
@@ -737,6 +737,7 @@
       "metaTitle": "我的",
       "plan": {
         "title": "会员",
+        "lastGrant": "上次付款 · {credits, number} 积分 · {method}",
         "perPeriod": "每{interval, select, year {年} other {月}} <mono>{credits}</mono> 积分 · <mono>{price}</mono>/{interval, select, year {年} other {月}}",
         "perPeriodMethod": "每{interval, select, year {年} other {月}} <mono>{credits}</mono> 积分 · <mono>{price}</mono>/{interval, select, year {年} other {月}} · {method}",
         "member": "会员",
@@ -868,6 +869,7 @@
       },
       "product": {
         "plan": "{tier} · {interval, select, year {按年} other {按月}}",
+        "packUnknown": "积分包",
         "pack": "积分包 · {credits} 积分",
         "option": "{product} · {amount} · {date, date, medium}"
       },
@@ -1000,6 +1002,10 @@
     "checkout": {
       "metaTitle": "付款结果",
       "titlePlan": "你已开通{tier}",
+      "packPaid": "付款成功",
+      "renewsDate": "{date, date, medium}",
+      "pendingPlan": "{tier} · {period, select, year {一年} other {一个月}}",
+      "pendingPack": "积分包",
       "titlePack": "已到账 {count} 积分",
       "subPlan": "{count} 积分已到账，去做张图吧。",
       "subPack": "积分已经在你的账号里了，去做张图吧。",
@@ -1107,7 +1113,10 @@
     "savingLabel": "<vs>比按月付</vs>每年省",
     "savingAmount": "{amount}",
     "mostPopular": "最受欢迎",
+    "memberPrice": "会员价",
+    "memberCodeKept": "已选会员价，优惠码留待下次使用。",
     "packsNote": "一次性买积分，不用订阅",
+    "packsNoteV2": "小包不打折。中包和大包按当前会员等级计价：入门版 95 折、专业版 9 折、旗舰版 85 折，各档收到的包内积分相同。",
     "buy": "购买",
     "buyPackLabel": "用 {price} 购买 {count} 积分",
     "payNoteCard": "套餐自动续费，随时可取消",

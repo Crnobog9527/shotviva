@@ -105,7 +105,7 @@
     },
     "signup": {
       "title": "Create your account",
-      "gift": "{upTo, select, true {Up to } other {}}{count, plural, one {# free Standard image} other {# free Standard images}}",
+      "gift": "{count, plural, one {# free credit} other {# free credits}}",
       "giftNote": "Shown publicly with a watermark",
       "submit": "Create account",
       "fine": "By continuing you agree to the <terms>Terms</terms> and <privacy>Privacy Policy</privacy>.",
@@ -737,6 +737,7 @@
       "metaTitle": "Account",
       "plan": {
         "title": "Plan",
+        "lastGrant": "Last payment · {credits, number} credits · {method}",
         "perPeriod": "<mono>{credits, plural, one {# credit} other {# credits}}</mono> a {interval, select, year {year} other {month}} · <mono>{price}</mono>/{interval, select, year {yr} other {mo}}",
         "perPeriodMethod": "<mono>{credits, plural, one {# credit} other {# credits}}</mono> a {interval, select, year {year} other {month}} · <mono>{price}</mono>/{interval, select, year {yr} other {mo}} · {method}",
         "member": "Member",
@@ -868,6 +869,7 @@
       },
       "product": {
         "plan": "{tier} · {interval, select, year {Yearly} other {Monthly}}",
+        "packUnknown": "Credit pack",
         "pack": "Credit pack · {credits} credits",
         "option": "{product} · {amount} · {date, date, medium}"
       },
@@ -1000,6 +1002,10 @@
     "checkout": {
       "metaTitle": "Payment",
       "titlePlan": "You're on {tier}",
+      "packPaid": "Payment received",
+      "renewsDate": "{date, date, medium}",
+      "pendingPlan": "{tier} · {period, select, year {1 year} other {1 month}}",
+      "pendingPack": "Credit pack",
       "titlePack": "{count, plural, one {# credit} other {# credits}} added",
       "subPlan": "{count, plural, one {# credit is} other {# credits are}} in your account. Make something.",
       "subPack": "They're in your account now. Make something.",
@@ -1107,7 +1113,10 @@
     "savingLabel": "You save<vs> vs monthly</vs>",
     "savingAmount": "{amount} a year",
     "mostPopular": "Most popular",
+    "memberPrice": "Member price",
+    "memberCodeKept": "Member price. Your discount code is saved for another purchase.",
     "packsNote": "Buy credits once, no subscription",
+    "packsNoteV2": "Small packs are full price. On medium and large packs, Starter saves 5%, Pro 10% and Max 15%. Each pack includes the same credits for everyone.",
     "buy": "Buy",
     "buyPackLabel": "Buy {count, plural, one {# credit} other {# credits}} for {price}",
     "payNoteCard": "Plans renew automatically, cancel anytime",

@@ -15,6 +15,6 @@ export { handleDeleteAccount } from './delete-account-route'
 export { handleAccountLocale } from './flows/account-locale'
 export { assertSameOrigin, requireApiAdmin, requireApiBuyer, requireApiUser } from './api-guards'
 export type { AccountStorage } from './account-deletion'
-export { signupGiftRefused } from './signup-gift'
+export { readSignupGift, signupGiftRefused } from './signup-gift'
 // T82: the request's IP for checkout and per-work dispute evidence.
 export { clientIp } from './signup-ip'

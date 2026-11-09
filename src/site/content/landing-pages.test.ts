@@ -46,14 +46,14 @@ describe('landing pages', () => {
   })
 
   it('bills the menu from config: a half day $400–$2,500 against 10 dishes at Standard', () => {
-    // 10 dishes at the catalogue's cheapest Standard price (T91): 1 credit → 10 credits ≈ $4 and
+    // 10 dishes at the catalogue's cheapest Standard price (T91): 1 credit → 740 credits ≈ $7.40 and
     // (50 − 10) ÷ 1 left; with no catalogue, 2 credits a dish.
     const { photographer, site: us } = fillCredits(aiRestaurantMenu.costBills, { from: 1, same: false })
     expect(photographer.total.amount).toBe('$400–$2,500')
     expect(photographer.lines.map((line) => line.label).join(' ')).not.toMatch(/retouch/i)
-    expect(us.lines.map((line) => line.value)).toEqual(['$19.90', '10 credits ≈ $4', '40 more photos'])
+    expect(us.lines.map((line) => line.value)).toEqual(['$19.90', '740 credits ≈ $7.40', '16 more photos'])
     const fallback = fillCredits(aiRestaurantMenu.costBills, FALLBACK_CREDITS).site
-    expect(fallback.lines.map((line) => line.value)).toEqual(['$19.90', '20 credits ≈ $8', '15 more photos'])
+    expect(fallback.lines.map((line) => line.value)).toEqual(['$19.90', '740 credits ≈ $7.40', '16 more photos'])
     expect(us.total.when).toBe(`about ${site.marketing.photoSecondsApprox} seconds a photo`)
   })
 

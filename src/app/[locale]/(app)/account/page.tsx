@@ -4,7 +4,7 @@ import { getTranslations } from 'next-intl/server'
 
 import { AppPage } from '@/core/app-shell'
 import { AccountHeader, AccountView, InviteCard, RedeemCard, STRIP_FRAMES } from '@/core/account/ui'
-import { createAdminSupabase, createServerSupabase, requireUser, signupGiftRefused } from '@/core/auth'
+import { createAdminSupabase, createServerSupabase, requireUser, readSignupGift } from '@/core/auth'
 import { maskPhone } from '@/core/auth/phone'
 import { readPendingDiscount } from '@/core/codes/server'
 import { readBalance } from '@/core/billing'
@@ -37,11 +37,11 @@ async function Account() {
   const user = await requireUser('/account')
   const supabase = await createServerSupabase()
   const admin = createAdminSupabase()
-  const [graylum, balance, subscription, giftRefused, helpUnread, payments, since, works, t, locale, discount] = await Promise.all([
+  const [graylum, balance, subscription, signupGift, helpUnread, payments, since, works, t, locale, discount] = await Promise.all([
     readLinkStatus(supabase, user.id),
     readBalance(supabase, user.id),
     readSubscriptionSummary(admin, user.id, site.billing.products),
-    signupGiftRefused(admin, user.id, site.billing.freeCredits),
+    readSignupGift(admin, user.id, site.billing.freeCredits),
     hasUnreadReply(supabase, user.id),
     listPaymentOptions(admin, user.id),
     readMemberSince(admin, user.id),
@@ -55,11 +55,11 @@ async function Account() {
   const more = payments.length >= PICKER_LIMIT
   // Each line with its receipt / invoice links (T80); the support picker keeps the plain labels.
   const lines = purchaseLines(payments, purchases, locale)
-  const data = { email: user.email, phone: maskPhone(user.phone) || null, balance, giftRefused, subscription, since, lastMembership: last, works, purchases: lines, morePurchases: more, helpUnread, graylum, admin: user.role === 'admin' }
+  const data = { email: user.email, phone: maskPhone(user.phone) || null, balance, giftRefused: signupGift.refused, subscription, since, lastMembership: last, works, purchases: lines, morePurchases: more, helpUnread, graylum, admin: user.role === 'admin' }
   // Help & feedback opens over the page (?help=…, T68); its payments picker is the Purchases list.
   return (
     <>
-      <AccountView data={data} actions={actions} site={accountSite}>
+      <AccountView data={data} actions={actions} site={{ ...accountSite, freeCredits: signupGift.granted }}>
         <InviteCard load={loadMyInvites} reward={site.growth.invite} />
         <RedeemCard pending={discount} />
       </AccountView>

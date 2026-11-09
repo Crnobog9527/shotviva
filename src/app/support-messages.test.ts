@@ -15,7 +15,7 @@ describe('submit form pickers', () => {
     const [plan, pack] = paymentChoices(
       [
         { id: '7', productId: 'pro_yearly', amountTotal: 34900, currency: 'usd', method: 'card', createdAt: '2026-11-01T12:00:00Z', channel: 'stripe', status: 'paid', hasInvoice: true },
-        { id: '8', productId: 'pack_m', amountTotal: 2490, currency: 'usd', method: 'card', createdAt: '2026-11-02T12:00:00Z', channel: 'stripe', status: 'paid', hasInvoice: false },
+        { id: '8', productId: 'pack_m', grantedCredits: 55, amountTotal: 2490, currency: 'usd', method: 'card', createdAt: '2026-11-02T12:00:00Z', channel: 'stripe', status: 'paid', hasInvoice: false },
       ],
       site.billing.products,
       t,

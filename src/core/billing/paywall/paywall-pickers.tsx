@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl"
 
+import { pricingV2 } from '../../public-env'
 import type { PackProduct } from "../../config"
 import { cn } from "../../ui/cn"
 import { packLooks, type TierOffer } from "./offer"
@@ -66,7 +67,7 @@ export function PackPicker({ packs, state }: { packs: PackProduct[]; state: Payw
     <>
       <div className="mt-6 mb-2 flex flex-wrap items-baseline justify-between gap-x-3 px-0.5">
         <h3 className="text-headline font-semibold">{t("packsTitle")}</h3>
-        <span className="text-caption text-muted-foreground">{t("packsNote")}</span>
+        <span className="text-caption text-muted-foreground">{t(pricingV2 ? "packsNoteV2" : "packsNote")}</span>
       </div>
       <div role="radiogroup" aria-label={t("packsLabel")} className="grid gap-2 md:grid-cols-3 md:gap-3">
         {packs.map((pack, i) => {

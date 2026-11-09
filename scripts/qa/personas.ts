@@ -11,7 +11,7 @@ export const SIGNUP_FREE_CREDITS = site.billing.freeCredits
 // A yearly membership so the fixed purchase key keeps the tier active for a whole year of
 // validation rounds; a monthly one would lapse after 30 days and the key could not renew it.
 export const MAX_PRODUCT_ID = 'max_yearly'
-export const MAX_PRODUCT_CREDITS = 3360
+export const MAX_PRODUCT_CREDITS = site.billing.products.find((product) => product.id === MAX_PRODUCT_ID)!.credits
 
 export type Persona = {
   id: PersonaId

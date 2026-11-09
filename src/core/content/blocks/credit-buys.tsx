@@ -3,7 +3,7 @@
 // published templates (T91); the content's own config numbers stand in when there are none.
 export type CreditBuysBlock = {
   heading: string
-  tiers: readonly { name: string; credits: number }[]
+  tiers: readonly { name: string; credits?: number }[]
   unit: string
   // The unit after 1 ("1 credit"); languages without a singular leave it out.
   unitOne?: string
@@ -11,13 +11,15 @@ export type CreditBuysBlock = {
 }
 
 export function CreditBuys({ block }: { block: CreditBuysBlock }) {
+  const tiers = block.tiers.filter((tier) => tier.credits !== undefined)
+  if (!tiers.length) return null
   return (
     <section aria-labelledby="credit-buys-h" className="rounded-[20px] bg-card p-4 shadow-[inset_0_0_0_1px_var(--border)]">
       <h2 id="credit-buys-h" className="text-headline leading-[1.3] font-semibold tracking-[-0.015em]">
         {block.heading}
       </h2>
       <dl className="mt-3 grid grid-cols-3 border-y border-hairline">
-        {block.tiers.map((tier, i) => (
+        {tiers.map((tier, i) => (
           <div key={tier.name} className={i > 0 ? 'border-l border-hairline py-3 pl-4' : 'py-3'}>
             <dt className="text-caption text-muted-foreground">{tier.name}</dt>
             <dd className="mt-1 font-display text-[24px] leading-none">

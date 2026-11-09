@@ -99,7 +99,7 @@ function Facts({ offer, period }: { offer: TierOffer; period: Period }) {
     <>
       <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-caption text-bone-dim">
         <span>{period === "year" ? t("creditsYear", { count: product.credits, price: money(effective.priceUsd) }) : t("creditsMonth", { count: product.credits })}</span>
-        <span className="font-mono text-muted-foreground">{t("perCredit", { price: money(perCreditUsd(effective)) })}</span>
+        <span className="font-mono text-muted-foreground">{t("perCredit", { price: money(perCreditUsd(effective), true) })}</span>
       </p>
       {!discount && period === "year" ? (
         <p className="tier-plate mt-2 flex items-center justify-between gap-2 rounded-inner bg-[var(--tier-plate)] py-2 pr-2 pl-3 text-caption text-[var(--tier-plate-ink)]">

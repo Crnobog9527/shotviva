@@ -17,24 +17,24 @@ export function SuccessReturn({ view, back }: Props) {
   const t = useTranslations('app.checkout')
   const tiers = useTranslations('paywall.tiers')
   const money = useChargedMoney()
-  const count = view.credits.toLocaleString()
+  const count = view.credits?.toLocaleString()
   const level = levelOf(view.productId)
   return (
     <ReturnPlate pending={false} material={plateMaterial(level)}>
       <CelebrationLoader level={level} paymentKey={view.paymentKey} />
       <Glyph pending={false} />
-      <h1 data-title="" className={titleClass}>{view.tier ? t('titlePlan', { tier: tiers(view.tier) }) : t('titlePack', { count: view.credits })}</h1>
-      <p className={subClass}>{view.kind === 'plan' ? t('subPlan', { count: view.credits }) : t('subPack')}</p>
+      <h1 data-title="" className={titleClass}>{view.tier ? t('titlePlan', { tier: tiers(view.tier) }) : view.credits === null ? t('packPaid') : t('titlePack', { count: view.credits })}</h1>
+      <p className={subClass}>{view.kind === 'plan' && view.credits !== null ? t('subPlan', { count: view.credits }) : t('subPack')}</p>
       <Rows>
-        <Row label={t('added')}>
+        {view.credits !== null ? <Row label={t('added')}>
           <Credits count={`+${count}`} unit={t('unit')} added={view.credits} />
-        </Row>
+        </Row> : null}
         <Row label={t('balance')}>
           <Credits count={view.balance.toLocaleString()} unit={t('unit')} />
         </Row>
         {view.renews ? (
           <Row label={t('renews')}>
-            {t('renewsValue', { date: new Date(view.renews.at), price: money({ minor: Math.round(view.renews.priceUsd * 100), currency: 'usd' }) })}
+            {t('renewsDate', { date: new Date(view.renews.at) })}
           </Row>
         ) : null}
         {view.paid ? <Row label={t('paid')}>{paidLine(t, money(view.paid), view.paid)}</Row> : null}
