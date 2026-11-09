@@ -6,7 +6,7 @@ import type { z } from 'zod'
 
 import { AppError } from '@/core/errors'
 import { screenIdentityText, type IdentityJudge } from '@/core/identity-guard'
-import { resolveTemplateProvider, screenCost, templateCall, typedWords, type SettleDeps, type TemplateProvider } from '@/core/jobs'
+import { screenCost, templateCall, typedWords, type SettleDeps, type TemplateProvider } from '@/core/jobs'
 import { loadInputImage } from '@/core/storage'
 import { DEFAULT_RESOLUTION, loadTestTemplate, OUTPUT_ASPECTS, validateGenerationInputs } from '@/core/templates'
 
@@ -55,8 +55,9 @@ export async function runTestGenerate(deps: FirstRunDeps, req: TestGenerateReque
   if (existing) return existing
   const { loaded, photo, inputs, image, providerId } = await prepare(deps, req)
   const resolution = req.body.inputs.resolution ?? DEFAULT_RESOLUTION
-  const call = templateCall(loaded, inputs, image, resolution)
-  const provider = await resolveTemplateProvider(deps.provider, providerId, call)
+  const { call, provider, styleRefKeys } = await templateCall(deps, loaded, inputs, image, {
+    resolution, providerId, omitStyleRefs: req.body.omit_style_refs,
+  })
   // Marks the request that created the row; a concurrent repeat gets the row and calls nothing.
   const attemptId = randomUUID()
   const run = await beginTestRun(deps.db, {
@@ -73,6 +74,7 @@ export async function runTestGenerate(deps: FirstRunDeps, req: TestGenerateReque
       aspect_ratio: inputs.aspectRatio,
       ...(inputs.note ? { note: inputs.note } : {}),
       ...(Object.keys(inputs.toggles).length > 0 ? { toggles: inputs.toggles } : {}),
+      style_ref_count: styleRefKeys.length,
       attempt_id: attemptId,
     },
     promptVersion: loaded.prompt.version,

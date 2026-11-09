@@ -18,6 +18,7 @@ export const TEST_RUN_COPY = {
   },
   first: {
     title: '首次出图',
+    omitStyleRefs: '本次不带参考图',
     photos: '测试照片',
     photosHint: '最多选 3 张。选 1 张并勾「一次跑 3 张」= 同一张跑 3 次；选 2～3 张 = 每张各跑 1 次。',
     noPhotos: '这个模板不用照片。',
@@ -69,6 +70,7 @@ export const TEST_RUN_COPY = {
     onRun: (position: number) => `在第 ${position} 张上`,
   },
   run: {
+    styleRefs: (count: number) => `带了 ${count} 张参考图`,
     running: '生成中，通常 30～90 秒',
     failed: (reason: string) => `失败：${reason}`,
     edit: '编辑',

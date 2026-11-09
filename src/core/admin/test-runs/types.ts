@@ -30,6 +30,7 @@ export type TestRunView = {
   sourceLocale: string | null
   targetLocale: string | null
   editScope: string | null
+  styleRefCount: number
   promptVersion: number | null
   model: string | null
   costUsd: number | null

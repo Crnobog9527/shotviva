@@ -152,8 +152,8 @@ const workRow = z.object({
   templates: z.object({ name: z.string() }).nullable(),
 })
 
-// The author's latest finished works for the image-issue picker, read with their own session
-// (generation_jobs_select_own) on generation_jobs_user_id_created_at_idx.
+// The author's latest finished works, scoped to the authenticated owner on the server.
+// The picker needs identifiers and names only (generation_jobs_user_id_created_at_idx).
 const toWorkOption = (row: z.infer<typeof workRow>): WorkOption => ({
   id: row.id,
   templateName: row.templates?.name ?? row.template_id,

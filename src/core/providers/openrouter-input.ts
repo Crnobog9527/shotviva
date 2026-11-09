@@ -1,4 +1,4 @@
-import type { ImageRequestOptions } from '../jobs/provider'
+import { referenceCount, type ImageRequestOptions } from '../jobs/provider'
 import type { OpenRouterImageParameters } from './openrouter-catalog'
 
 export const OPENROUTER_IMAGE_SIZE = { '1k': '1K', '2k': '2K', '3k': '4K' } as const
@@ -23,5 +23,5 @@ export function openRouterInputMismatch(input: ImageRequestOptions, parameters: 
   if (input.aspectRatio !== 'original' && !parameters.aspect_ratio?.values.includes(input.aspectRatio)) {
     return { reason: 'unsupported_aspect_ratio', message: 'This model does not support the selected aspect ratio.' }
   }
-  return referenceMismatch(input.images.length, parameters.input_references)
+  return referenceMismatch(referenceCount(input), parameters.input_references)
 }

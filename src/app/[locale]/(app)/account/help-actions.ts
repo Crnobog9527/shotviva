@@ -98,11 +98,11 @@ export async function loadTicketThread(ticketId: string): Promise<ShownThread | 
 
 // The image-issue picker's works, read when the New ticket tab first opens rather than on
 // every account page load; plus the one "Problem with this photo?" sent along (T78), read
-// through RLS like the rest, so another user's id finds nothing.
+// with an explicit session-owner filter, so another user's id finds nothing.
 export async function loadWorkChoices(jobId?: string | null): Promise<Choice[]> {
   const user = await requireApiUser()
   const include = typeof jobId === 'string' && UUID.test(jobId) ? jobId : null
-  const [works, t] = await Promise.all([listWorkOptions(await createServerSupabase(), user.id, include), getTranslations('app.support')])
+  const [works, t] = await Promise.all([listWorkOptions(createAdminSupabase(), user.id, include), getTranslations('app.support')])
   // Whether another job shares a work's first 8 characters is a service-role question (ids only).
   const refs = await jobRefsOrShort(createAdminSupabase(), works.map((work) => work.id))
   return workChoices(works, t as unknown as Translate, refs)

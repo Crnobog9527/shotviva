@@ -22,6 +22,7 @@ function run(id: string, extra: Partial<TestRunView> = {}): TestRunView {
     sourceLocale: null,
     targetLocale: null,
     editScope: null,
+    styleRefCount: 0,
     promptVersion: 1,
     model: 'gpt-image-2.6',
     costUsd: 0.05,

@@ -102,9 +102,15 @@ export function validateGenerationInputs(fields: TemplateFields, raw: RawGenerat
 // template edit can never leak a raw placeholder to the model. The user's note goes after the
 // rendered template, never inside it, so it cannot reorder the template's own text
 // (ARCHITECTURE §4 inputs.note).
-export function renderPrompt(body: string, inputs: GenerationInputs, fragments: ToggleFragments = {}): string {
+export function renderPrompt(
+  body: string, inputs: GenerationInputs, fragments: ToggleFragments = {},
+  counts = { photo_count: 0, style_ref_count: 0 },
+): string {
   const chosen = Object.entries(inputs.toggles).map(([key, on]) => [key, fragments[key]?.[on ? 'on' : 'off'].trim() ?? ''])
-  const values: Record<string, string> = { ...Object.fromEntries(chosen), ...inputs.copy, aspect_ratio: inputs.aspectRatio }
+  const values: Record<string, string> = {
+    ...Object.fromEntries(chosen), ...inputs.copy, aspect_ratio: inputs.aspectRatio,
+    photo_count: String(counts.photo_count), style_ref_count: String(counts.style_ref_count),
+  }
   const rendered = body.replace(/\{\{\s*([a-z][a-z0-9_]*)\s*\}\}/g, (_, key: string) => values[key] ?? '').trim()
   return inputs.note ? `${rendered}\n\n${inputs.note}` : rendered
 }

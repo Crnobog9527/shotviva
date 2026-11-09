@@ -44,6 +44,7 @@ export async function loadPanel(templateId: string, cleanup: boolean): Promise<T
 }
 
 export type GenerateInput = {
+  omitStyleRefs: boolean
   runId: string
   batchId: string
   templateId: string
@@ -65,6 +66,7 @@ export const startGenerate = (input: GenerateInput) =>
       template_id: input.templateId,
       photo_id: input.photoId,
       provider_id: input.providerId,
+      omit_style_refs: input.omitStyleRefs,
       inputs: { copy: input.copy, note: input.note, toggles: input.toggles, resolution: input.resolution, aspect_ratio: input.aspect },
     },
   })
