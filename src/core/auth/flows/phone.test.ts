@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+const benefits = { freeCredits: 6, invite: { inviteeCredits: 13, inviterCredits: 19, windowDays: 7, inviterCapPer30d: 20 } }
+
 // Phone sign-in server steps (T63): consent and +86 first, our limits before Supabase, a
 // Supabase refusal before the hook gives the request back, a verified code signs in as 'phone'.
 const mocks = vi.hoisted(() => ({
@@ -78,15 +80,15 @@ describe('sendPhoneCode', () => {
 describe('verifyPhoneCode', () => {
   it('signs in with the code, runs the first-sign-in grant as phone, and lands on next', async () => {
     mocks.verifyOtp.mockResolvedValueOnce({ data: { user: { id: 'u1', user_metadata: { locale: 'zh' } } }, error: null })
-    await expect(verifyPhoneCode(form({ phone: '+8614000000001', code: '402913', next: '/zh/generate' }), { freeCredits: 6 })).rejects.toThrow('redirect:/zh/generate')
+    await expect(verifyPhoneCode(form({ phone: '+8614000000001', code: '402913', next: '/zh/generate' }), benefits)).rejects.toThrow('redirect:/zh/generate')
     expect(mocks.verifyOtp).toHaveBeenCalledWith({ phone: '+8614000000001', token: '402913', type: 'sms' })
-    expect(mocks.onVerifiedSignIn).toHaveBeenCalledWith('u1', 6, 'phone', 'zh')
+    expect(mocks.onVerifiedSignIn).toHaveBeenCalledWith('u1', benefits, 'phone', 'zh')
   })
 
   it('says a wrong or expired code plainly and signs nobody in', async () => {
     mocks.verifyOtp.mockResolvedValueOnce({ data: { user: null }, error: { code: 'otp_expired', status: 403 } })
-    expect(await verifyPhoneCode(form({ phone: '+8614000000001', code: '000000' }), { freeCredits: 6 })).toEqual({ status: 'error', code: 'AUTH_OTP_INVALID' })
-    expect(await verifyPhoneCode(form({ phone: '+8614000000001', code: '12' }), { freeCredits: 6 })).toEqual({ status: 'error', code: 'AUTH_OTP_INVALID' })
+    expect(await verifyPhoneCode(form({ phone: '+8614000000001', code: '000000' }), benefits)).toEqual({ status: 'error', code: 'AUTH_OTP_INVALID' })
+    expect(await verifyPhoneCode(form({ phone: '+8614000000001', code: '12' }), benefits)).toEqual({ status: 'error', code: 'AUTH_OTP_INVALID' })
     expect(mocks.onVerifiedSignIn).not.toHaveBeenCalled()
   })
 })

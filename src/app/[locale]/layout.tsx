@@ -5,6 +5,7 @@ import { getMessages } from 'next-intl/server'
 import { locale as rootLocale } from 'next/root-params'
 
 import { ConsentSlot } from '@/core/analytics/browser'
+import { SignupCodeResult } from '@/core/auth/ui'
 import { UpdateSlot } from '@/core/app-update'
 import { clientMessages, htmlLang, isLocale } from '@/core/i18n'
 import { TranslatedPathsProvider } from '@/core/i18n/ui'
@@ -54,6 +55,7 @@ export default async function RootLayout({ children }: LayoutProps<'/[locale]'>)
             <ConsentSlot />
             {/* "Shotviva has been updated" with Refresh, on every page (T90). */}
             <Suspense fallback={null}>
+              <SignupCodeResult />
               <UpdateSlot />
             </Suspense>
             {/* Huawei Browser names a home-screen shortcut after the live page title (core/seo/shortcut-title.ts). */}

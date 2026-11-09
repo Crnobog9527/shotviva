@@ -27,6 +27,8 @@ const checkout = {
 } as const
 
 const valid: { [E in EventName]: unknown } = {
+  code_redeem: { kind: 'invite', context: 'signup', status: 'ok', credits: 4, pool: 'free', discount_percent: null },
+  invite_share: { action: 'copy', surface: 'account' },
   signup: { method: 'google' },
   upload: { size_bucket: '1-5MB', compressed: true },
   generate,
@@ -50,9 +52,11 @@ const EVENT_NAMES = [
       'business_inquiry_submit',
       'checkout_cancel',
       'checkout_start',
+      'code_redeem',
       'contact_sales_click',
       'generate',
       'generate_refused',
+      'invite_share',
       'paywall_select',
       'paywall_view',
       'purchase',
@@ -65,7 +69,7 @@ const EVENT_NAMES = [
 ]
 
 describe('event dictionary (ARCHITECTURE §16.2)', () => {
-  it('covers exactly the sixteen named events', () => {
+  it('covers exactly the named events', () => {
     expect(Object.keys(eventSchemas).sort()).toEqual(EVENT_NAMES)
   })
 

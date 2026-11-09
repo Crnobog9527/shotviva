@@ -5459,6 +5459,42 @@ $_$;
 ALTER FUNCTION "public"."redeem_code"("p_user" "uuid", "p_code" "text", "p_context" "text", "p_invitee_credits" integer, "p_invite_window_days" integer, "p_replace" boolean) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."redeem_limited_code"("p_user" "uuid", "p_code" "text", "p_context" "text", "p_invitee_credits" integer, "p_invite_window_days" integer, "p_replace" boolean DEFAULT false) RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  checked_at timestamptz;
+  attempts timestamptz[];
+  result jsonb;
+begin
+  if p_user is null or p_context is null or p_context not in ('account','paywall') then
+    raise exception 'INVALID_INPUT';
+  end if;
+  -- Serialize this quota without taking a profile lock ahead of redeem_code: reciprocal
+  -- invites lock both profiles in sorted order, which must remain the first profile locks.
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.code_redeem:' || p_user::text, 0));
+  checked_at := clock_timestamp();
+  select array(select t from unnest(p.code_redeem_attempts) as a(t)
+                where t > checked_at - interval '1 hour')
+    into attempts from public.profiles p where id = p_user;
+  if not found then raise exception 'PROFILE_NOT_FOUND'; end if;
+  if cardinality(attempts) >= 10 then return jsonb_build_object('status', 'rate_limited'); end if;
+
+  if p_code is null or p_code !~ '^[A-Za-z0-9]{4,20}$' then
+    result := jsonb_build_object('status', 'invalid_input');
+  else
+    result := public.redeem_code(p_user,p_code,p_context,p_invitee_credits,p_invite_window_days,p_replace);
+  end if;
+  update public.profiles set code_redeem_attempts = array_append(attempts, checked_at) where id = p_user;
+  return result;
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."redeem_limited_code"("p_user" "uuid", "p_code" "text", "p_context" "text", "p_invitee_credits" integer, "p_invite_window_days" integer, "p_replace" boolean) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."refund_eligibility"("p_payment_id" bigint, "p_asked_at" timestamp with time zone) RETURNS TABLE("first_purchase" boolean, "within_7_days" boolean, "no_credits_used" boolean, "suggested_cents" integer)
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -6317,6 +6353,7 @@ CREATE TABLE IF NOT EXISTS "public"."profiles" (
     "banned_at" timestamp with time zone,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "free_credits" integer DEFAULT 0 NOT NULL,
+    "code_redeem_attempts" timestamp with time zone[] DEFAULT '{}'::timestamp with time zone[] NOT NULL,
     "referred_by" "uuid",
     "referred_at" timestamp with time zone,
     "referred_source" "text",
@@ -9149,6 +9186,11 @@ GRANT ALL ON FUNCTION "public"."record_waffo_refund"("p_payment_id" "text", "p_r
 
 REVOKE ALL ON FUNCTION "public"."redeem_code"("p_user" "uuid", "p_code" "text", "p_context" "text", "p_invitee_credits" integer, "p_invite_window_days" integer, "p_replace" boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."redeem_code"("p_user" "uuid", "p_code" "text", "p_context" "text", "p_invitee_credits" integer, "p_invite_window_days" integer, "p_replace" boolean) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."redeem_limited_code"("p_user" "uuid", "p_code" "text", "p_context" "text", "p_invitee_credits" integer, "p_invite_window_days" integer, "p_replace" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."redeem_limited_code"("p_user" "uuid", "p_code" "text", "p_context" "text", "p_invitee_credits" integer, "p_invite_window_days" integer, "p_replace" boolean) TO "service_role";
 
 
 

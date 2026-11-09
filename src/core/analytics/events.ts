@@ -59,7 +59,13 @@ const checkoutProps = {
 }
 
 export const eventSchemas = {
-  signup: z.strictObject({ method: z.enum(['email', 'google', 'phone']) }),
+  signup: z.strictObject({ method: z.enum(['email', 'google', 'phone']), code_kind: z.enum(['invite', 'campaign']).nullable().optional() }),
+  code_redeem: z.strictObject({
+    kind: z.enum(['invite', 'campaign']).nullable(), code: z.string().regex(/^[A-Z0-9]{4,20}$/).optional(),
+    context: z.enum(['signup', 'account', 'paywall']), status: slug, credits: z.number().int().nonnegative(),
+    pool: z.enum(CREDIT_POOLS).nullable(), discount_percent: z.number().int().min(1).max(90).nullable(),
+  }).refine((r) => !r.code || r.kind === 'campaign'),
+  invite_share: z.strictObject({ action: z.enum(['copy', 'share']), surface: z.literal('account') }),
   upload: z.strictObject({ size_bucket: z.enum(UPLOAD_SIZE_BUCKETS), compressed: z.boolean() }),
   generate: z.strictObject({
     template_id: slug,
@@ -125,8 +131,9 @@ export type EventName = keyof typeof eventSchemas
 export type EventProps<E extends EventName> = z.infer<(typeof eventSchemas)[E]>
 
 // §16.2: money and credit events go out from the server so ad blockers cannot drop them.
-export const SERVER_EVENTS = ['signup', 'generate', 'generate_refused', 'checkout_start', 'checkout_cancel', 'purchase'] as const
+export const SERVER_EVENTS = ['code_redeem', 'signup', 'generate', 'generate_refused', 'checkout_start', 'checkout_cancel', 'purchase'] as const
 export const BROWSER_EVENTS = [
+  'invite_share',
   'upload',
   'upload_error',
   'paywall_view',

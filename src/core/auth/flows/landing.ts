@@ -1,4 +1,5 @@
 import 'server-only'
+import type { SignupBenefits } from '../signup-code'
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
@@ -35,7 +36,7 @@ export type RequestClient = ReturnType<typeof requestClient>
 export async function landOnSession(
   supabase: RequestClient,
   flow: CallbackFlow,
-  freeCredits: number,
+  benefits: SignupBenefits,
   nextParam: string | null,
 ): Promise<CallbackOutcome> {
   const { data } = await supabase.auth.getUser()
@@ -46,7 +47,7 @@ export async function landOnSession(
   // Google accounts never pass through signUp, so their auth emails would stay English: store
   // the language the sign-in started in, once (ARCHITECTURE §7). Email sign-ups already have it.
   if (flow === 'oauth' && !stored) await rememberAccountLocale(supabase, locale)
-  if (verified) await onVerifiedSignIn(data.user.id, freeCredits, flow === 'oauth' ? 'google' : 'email', locale)
+  if (verified) await onVerifiedSignIn(data.user.id, benefits, flow === 'oauth' ? 'google' : 'email', locale)
   return { kind: 'signed_in', verified, userId: data.user.id, flow }
 }
 

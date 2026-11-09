@@ -596,6 +596,10 @@ check 约束换成原来的集合再加上 `code_grant`（兑换送的积分）�
 
 后台函数均带管理员参数 `p_actor`，函数内校验身份。`admin_audit_log_action_check` 保留全部现有操作并加入以下两项。写操作在同一事务记录 `save_code` 或 `set_code_active`。
 
+#### 注册与手动兑换的限频（阶段 2）
+
+注册由首次验证登录调用 `redeem_code`。账号页、付费墙经 `redeem_limited_code` 在一次数据库请求中完成限频与兑换，只授权 service_role。每个账号滚动一小时最多受理 10 次手动请求，错误码、格式错误和替换确认请求均占次数。新增 `profiles.code_redeem_attempts timestamptz[] not null default '{}'` 仅保留最近最多 10 个时间戳；按账号串行检查，不记录输入的码。达到上限返回 rate_limited。公共效果预览只读，IP 限频由 Vercel Firewall 处理。
+
 #### 折扣占用和并发入账（Owner 2026-11-09）
 
 - 每个账号同时最多一份待用折扣。兑换、替换、占用与核销按账号串行，兑换名额按码锁定。积分入账键基于兑换记录，滚动 30 天奖励上限按邀请人串行，按邀请人的 invite_reward 流水计数，被邀请人删号不会返还奖励名额。邀请窗口、赠送数和奖励次数由服务端从 `site.config.ts` 传入。

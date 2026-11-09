@@ -5,6 +5,7 @@ import { useActionState } from 'react'
 
 import { cn } from '../../ui/cn'
 import { IDLE } from '../flows/form-state'
+import { SignupCodeHiddenInput } from './signup-code-context'
 import { GoogleMark } from './icons'
 import type { FormAction } from './use-auth-form'
 
@@ -25,6 +26,7 @@ export function GoogleButton({ action, next, appearance = 'plain', className }: 
   const auth = appearance === 'auth'
   return (
     <form action={formAction} className="flex flex-col gap-2">
+      <SignupCodeHiddenInput />
       <input type="hidden" name="next" value={next} />
       <button
         type="submit"

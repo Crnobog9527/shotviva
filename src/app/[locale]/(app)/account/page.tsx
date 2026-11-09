@@ -1,26 +1,25 @@
 import type { Metadata } from 'next'
-import { getTranslations } from 'next-intl/server'
 import { Suspense } from 'react'
+import { getTranslations } from 'next-intl/server'
 
-import { AccountHeader, AccountView, STRIP_FRAMES } from '@/core/account/ui'
 import { AppPage } from '@/core/app-shell'
+import { AccountHeader, AccountView, InviteCard, RedeemCard, STRIP_FRAMES } from '@/core/account/ui'
 import { createAdminSupabase, createServerSupabase, requireUser, signupGiftRefused } from '@/core/auth'
 import { maskPhone } from '@/core/auth/phone'
+import { readPendingDiscount } from '@/core/codes/server'
 import { readBalance } from '@/core/billing'
 import { purchaseLines } from '@/core/billing/documents'
 import { lastMembership, readMemberSince, readSubscriptionSummary } from '@/core/billing/subscription'
 import { listMonthWorks } from '@/core/jobs'
 import { readLinkStatus } from '@/core/partner'
 import { formatMoney, hasUnreadReply, listPaymentOptions, paymentChoices, PICKER_LIMIT, ReplyTime } from '@/core/support'
-import { HelpDialog, type HelpActions } from '@/core/support/ui'
+import { HelpDialog } from '@/core/support/ui'
 import { currentLocale } from '@/core/i18n/server'
 import type { Translate } from '@/core/translate'
 import { site } from '@/site/site.config'
 
-import { signOutAction } from '@/app/auth/actions'
-import { addMessageAction, createTicketAction, loadMyTicketsPage, loadTicketThread, loadWorkChoices } from './help-actions'
-import { disconnectGraylumAction } from './partner-actions'
-import { cancelWaffoSubscriptionAction, manageSubscriptionAction } from './subscription-actions'
+import { actions, helpActions } from './account-actions'
+import { loadMyInvites } from './invite-action'
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('app.account'))('metaTitle') }
@@ -32,28 +31,13 @@ const accountSite = {
   freeCredits: site.billing.freeCredits,
 }
 
-const actions = {
-  manageSubscription: manageSubscriptionAction,
-  cancelWaffoSubscription: cancelWaffoSubscriptionAction,
-  disconnectGraylum: disconnectGraylumAction,
-  signOut: signOutAction,
-}
-
-const helpActions: HelpActions = {
-  create: createTicketAction,
-  addMessage: addMessageAction,
-  loadTickets: loadMyTicketsPage,
-  loadThread: loadTicketThread,
-  loadWorks: loadWorkChoices,
-}
-
 // One parallel round of reads: private tables (subscriptions, payments, the gift check) with
 // the admin client filtered to this user, the rest with the user's own session.
 async function Account() {
   const user = await requireUser('/account')
   const supabase = await createServerSupabase()
   const admin = createAdminSupabase()
-  const [graylum, balance, subscription, giftRefused, helpUnread, payments, since, works, t, locale] = await Promise.all([
+  const [graylum, balance, subscription, giftRefused, helpUnread, payments, since, works, t, locale, discount] = await Promise.all([
     readLinkStatus(supabase, user.id),
     readBalance(supabase, user.id),
     readSubscriptionSummary(admin, user.id, site.billing.products),
@@ -64,6 +48,7 @@ async function Account() {
     listMonthWorks(supabase, user.id, new Date(), STRIP_FRAMES),
     getTranslations('app.support'),
     currentLocale(),
+    readPendingDiscount(admin, user.id),
   ])
   const purchases = paymentChoices(payments, site.billing.products, t as unknown as Translate, { money: formatMoney(locale) })
   const last = lastMembership(payments, site.billing.products)
@@ -74,7 +59,10 @@ async function Account() {
   // Help & feedback opens over the page (?help=…, T68); its payments picker is the Purchases list.
   return (
     <>
-      <AccountView data={data} actions={actions} site={accountSite} />
+      <AccountView data={data} actions={actions} site={accountSite}>
+        <InviteCard load={loadMyInvites} reward={site.growth.invite} />
+        <RedeemCard pending={discount} />
+      </AccountView>
       <HelpDialog actions={helpActions} payments={purchases} replyTime={<ReplyTime userId={user.id} />} brand={site.brand.name} unread={helpUnread} />
     </>
   )

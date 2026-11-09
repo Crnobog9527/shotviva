@@ -3,7 +3,8 @@ import { getTranslations } from 'next-intl/server'
 import { Suspense } from 'react'
 
 import { nextIn } from '@/core/auth'
-import { SignupForm } from '@/core/auth/ui'
+import { readSignupCode } from '@/core/auth/signup-code-actions'
+import { SignupCodeProvider, SignupForm } from '@/core/auth/ui'
 import { currentLocale } from '@/core/i18n/server'
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
 import { creditFacts, freeStandardImages } from '@/site/content'
@@ -32,16 +33,18 @@ async function Signup({ searchParams }: PageProps<'/[locale]/signup'>) {
   // The gift in Standard images at the catalogue's cheapest Standard price (建站规格 G3, T91).
   const facts = creditFacts(await cachedWebCatalogue(locale))
   return (
-    <SignupForm
-      action={signupAction}
-      googleAction={googleAction}
-      resendAction={resendSignupAction}
-      next={next}
-      freeImages={{ count: freeStandardImages(facts.from), upTo: !facts.same }}
-      arrived={<Arrived next={next} page="signup" />}
-      sender={sender}
-      phone={locale === 'zh' ? phone : undefined}
-    />
+    <SignupCodeProvider initial={await readSignupCode()}>
+      <SignupForm
+        action={signupAction}
+        googleAction={googleAction}
+        resendAction={resendSignupAction}
+        next={next}
+        freeImages={{ count: freeStandardImages(facts.from), upTo: !facts.same }}
+        arrived={<Arrived next={next} page="signup" />}
+        sender={sender}
+        phone={locale === 'zh' ? phone : undefined}
+      />
+    </SignupCodeProvider>
   )
 }
 

@@ -5,6 +5,7 @@ import { bindReferral } from '../affiliate/referral'
 import { track } from '../analytics'
 import type { Locale } from '../i18n/locales'
 import { billingGrant, grantSignupCredits } from './free-credits'
+import { consumeSignupCode, type SignupBenefits } from './signup-code'
 import { clientIp, recordSignupIp } from './signup-ip'
 import { createAdminSupabase } from './supabase-admin'
 
@@ -19,16 +20,18 @@ export type SignInMethod = 'email' | 'google' | 'phone'
 // `locale` is the language the account signed up in (user_metadata) or else the page's.
 export async function onVerifiedSignIn(
   userId: string,
-  freeCredits: number,
+  benefits: SignupBenefits,
   method: SignInMethod,
   locale: Locale,
 ): Promise<void> {
   const admin = createAdminSupabase()
   const address = clientIp(await headers())
   const ipStored = await recordSignupIp(admin, userId, address)
-  const granted = await grantSignupCredits(billingGrant(admin), userId, freeCredits)
-  if (address ? ipStored : granted) {
-    track('signup', { method }, { distinctId: userId, locale })
+  const granted = await grantSignupCredits(billingGrant(admin), userId, benefits.freeCredits)
+  const first = address ? ipStored : granted
+  const kind = await consumeSignupCode(admin, userId, first, benefits.invite, locale)
+  if (first) {
+    track('signup', { method, code_kind: kind }, { distinctId: userId, locale })
     await bindReferral(userId, (await cookies()).get('sv_ref')?.value, 'signup')
   }
 }

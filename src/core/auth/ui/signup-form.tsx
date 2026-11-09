@@ -9,6 +9,8 @@ import { PASSWORD_MIN } from '../flows/schemas'
 import { AuthTabs } from './auth-tabs'
 import { CheckEmail } from './check-email'
 import { CaptchaFailed, Divider, EmailField, hcaptchaLink, Notice, PasswordField, SubmitButton } from './form-parts'
+import { SignupCodeHiddenInput } from './signup-code-context'
+import { SignupCodeField } from './signup-code-field'
 import { GoogleButton } from './google-button'
 import { GiftGlyph } from './icons'
 import { PhoneSignIn, type PhoneActions } from './phone-sign-in'
@@ -76,6 +78,7 @@ export function SignupForm({ action, googleAction, resendAction, next, freeImage
           <span>{t('signup.giftNote')}</span>
         </span>
       </div>
+      <SignupCodeField />
       {phone ? (
         <AuthTabs
           initial="phone"
@@ -108,6 +111,7 @@ function EmailSignup({ form, googleAction, next }: { form: AuthForm; googleActio
       <GoogleButton action={googleAction} next={next} appearance="auth" />
       <Divider />
       <form onSubmit={form.onSubmit} noValidate className="au-form">
+        <SignupCodeHiddenInput />
         <input type="hidden" name="next" value={next} />
         <EmailField
           form={form}

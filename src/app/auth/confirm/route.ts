@@ -6,5 +6,5 @@ import { handleAuthConfirm } from '@/core/auth'
 import { site } from '@/site/site.config'
 
 export async function GET(request: NextRequest) {
-  return handleAuthConfirm(request, { freeCredits: site.billing.freeCredits })
+  return handleAuthConfirm(request, { freeCredits: site.billing.freeCredits, invite: site.growth.invite })
 }

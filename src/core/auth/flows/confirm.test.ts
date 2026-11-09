@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+const benefits = { freeCredits: 6, invite: { inviteeCredits: 13, inviterCredits: 19, windowDays: 7, inviterCapPer30d: 20 } }
+
 type SetAll = (cookies: { name: string; value: string; options: object }[]) => void
 
 const mocks = vi.hoisted(() => ({
@@ -27,7 +29,7 @@ const TOKEN = 'pkce_0123456789abcdef0123456789abcdef'
 const VERIFIED = { id: 'u1', email_confirmed_at: '2026-11-05T00:00:00Z', app_metadata: { provider: 'email' } }
 
 function confirm(query: string) {
-  return handleAuthConfirm(new NextRequest(`${ORIGIN}/auth/confirm?${query}`), { freeCredits: 3 })
+  return handleAuthConfirm(new NextRequest(`${ORIGIN}/auth/confirm?${query}`), benefits)
 }
 
 function target(response: Response) {
@@ -63,7 +65,7 @@ describe('GET /auth/confirm: signup links', () => {
     expect(response.status).toBe(307)
     expect(target(response)).toBe('/account')
     expect(response.headers.get('set-cookie')).toContain('sb-access-token=session')
-    expect(mocks.onVerifiedSignIn).toHaveBeenCalledExactlyOnceWith('u1', 3, 'email', 'en')
+    expect(mocks.onVerifiedSignIn).toHaveBeenCalledExactlyOnceWith('u1', benefits, 'email', 'en')
   })
 
   it('lets an invited promoter choose a password when the program is open', async () => {
