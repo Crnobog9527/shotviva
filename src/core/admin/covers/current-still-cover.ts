@@ -3,7 +3,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { AppError } from '@/core/errors'
-import { coverLocalesSchema, effectiveStillCover } from '@/core/templates/cover-locales'
+import { coverLocalesSchema, effectiveStillCover } from '@/core/templates'
 import { stillCoverKey } from './still-cover-key'
 
 export async function requireCurrentStillCover(db: SupabaseClient, id: string, locale: string | null, slot: 'before' | 'after', hash: string) {

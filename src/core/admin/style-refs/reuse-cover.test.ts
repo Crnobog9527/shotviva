@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { styleRefsSchema } from '@/core/templates/style-refs'
 import { createMemoryStore } from '../../../../tests/fakes/memory-store'
-import { isRefFromAfterCover } from '../covers/after-cover-source'
+import { isRefFromAfterCover } from '../covers/client'
 import { reuseCoverStyleRef } from './index'
 
 vi.mock('@/core/public-env', () => ({ publicEnv: { NEXT_PUBLIC_ASSETS_BASE_URL: 'https://assets.test' } }))

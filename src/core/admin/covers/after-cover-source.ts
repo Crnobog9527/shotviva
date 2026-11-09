@@ -1,4 +1,4 @@
-import { effectiveStillCover, type CoverLocales } from '@/core/templates/cover-locales'
+import { effectiveStillCover, type CoverLocales } from '@/core/templates/client'
 
 import { stillCoverKey } from './still-cover-key'
 

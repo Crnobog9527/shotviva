@@ -2,10 +2,8 @@
 
 import { useState } from 'react'
 
-
-import { effectiveStillCover } from '@/core/templates/cover-locales'
-import { stillCoverKey } from '../covers/still-cover-key'
-import { acceptFor } from '../covers/cover-rules'
+import { effectiveStillCover } from '@/core/templates/client'
+import { acceptFor, stillCoverKey } from '../covers/client'
 import type { AdminTemplate, CoverLanguage, TemplateAdminActions } from '../templates/types'
 import { TranslateCoverDialog } from '../test-run-ui'
 

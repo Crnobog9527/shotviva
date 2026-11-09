@@ -5,7 +5,7 @@ import { z } from 'zod'
 
 import { AppError } from '@/core/errors'
 import type { ObjectStore } from '@/core/storage'
-import { templateInputSchema } from '@/core/templates/schema'
+import { templateInputSchema } from '@/core/templates'
 
 import { requireCurrentStillCover } from './current-still-cover'
 

@@ -12,7 +12,7 @@ import { TEST_RUN_COPY, TestRunPanel } from '../test-run-ui'
 
 import type { CategoryOption } from './category-field'
 import { buildPayload, emptyFormValues, toFormValues, type TemplateFormValues } from './form-state'
-import { afterCoverSource, type AfterCover } from '../covers/after-cover-source'
+import { afterCoverSource, type AfterCover } from '../covers/client'
 import { referenceBudget, refUploadId } from './style-ref-state'
 import { StyleRefFields } from './style-ref-fields'
 import { TemplateCoverFields } from './template-cover-fields'

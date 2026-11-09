@@ -1,5 +1,4 @@
-import type { AfterCover } from '../covers/after-cover-source'
-import { coverFileProblem } from '../covers/cover-rules'
+import { coverFileProblem, type AfterCover } from '../covers/client'
 import { compressImage } from '@/core/storage/upload'
 import { STYLE_REF_EDGE, type StyleRef } from '@/core/templates/style-refs'
 import { styleRefCopy } from './copy'

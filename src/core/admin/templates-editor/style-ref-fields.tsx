@@ -8,7 +8,7 @@ import { cn } from '@/core/ui/cn'
 import { DragHandle, MoveButtons, SortableList, sortableRowClass, useSortableItem } from '../ui/sortable'
 import { styleRefCopy as copy } from './copy'
 import type { referenceBudget } from './style-ref-state'
-import { isRefFromAfterCover, type AfterCover } from '../covers/after-cover-source'
+import { isRefFromAfterCover, type AfterCover } from '../covers/client'
 import { reuseAfterCover, uploadStyleRef } from './style-ref-upload'
 
 type Props = {

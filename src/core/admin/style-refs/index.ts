@@ -8,9 +8,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { AppError } from '@/core/errors'
 import { sniffImageType, type ObjectHead, type ObjectStore } from '@/core/storage'
 import { STYLE_REF_EDGE, type StyleRef } from '@/core/templates/style-refs'
-import { requireCurrentStillCover } from '../covers/current-still-cover'
-import { afterCoverRefId } from '../covers/after-cover-source'
-import { COVER_STILL_TYPES, MAX_COVER_IMAGE_BYTES } from '../covers/cover-rules'
+import { afterCoverRefId, COVER_STILL_TYPES, MAX_COVER_IMAGE_BYTES, requireCurrentStillCover } from '../covers'
 
 const templateId = z.string().max(64).regex(/^[a-z0-9]+(-[a-z0-9]+)*$/)
 const upload = z.object({ templateId, contentType: z.enum(COVER_STILL_TYPES), size: z.int().positive().max(MAX_COVER_IMAGE_BYTES) })
