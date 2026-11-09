@@ -6,6 +6,7 @@ import { useRef, useState } from "react"
 
 import { useUpdateHold } from "../../app-update/holds"
 
+import { pricingV2 } from "../../public-env"
 import type { ProductId } from "../../config"
 import { loginPath } from "../../auth/redirect-target"
 import { localeOfPath, localizePath } from "../../i18n/paths"
@@ -17,6 +18,11 @@ import { refreshDiscount } from "./discount-context"
 // paywall says plans only go up and points to Account.
 export type CheckoutStatus = "idle" | "pending" | "error" | "refused" | "in_use" | "offer_changed" | "floor"
 
+// The quote identifies what the tab displayed, including tabs opened before a catalogue switch.
+export function displayedTerms(cents: number, version: "v1" | "v2") {
+  return { pricing_version: version, expected_price_cents: version === "v2" ? cents : undefined }
+}
+
 // Asks the server for a Stripe Checkout Session and goes there. Signed-out buyers (the public
 // /pricing page) go to sign-in first and come back to the same page.
 export function useCheckout() {
@@ -27,9 +33,9 @@ export function useCheckout() {
   // No new-version banner while the buyer is on the way to the hosted checkout (T90).
   useUpdateHold("checkout", status === "pending")
 
-  async function start(productId: ProductId, method: CheckoutMethod, expectedCode?: string, expectedPriceCents?: number) {
+  async function start(productId: ProductId, method: CheckoutMethod, displayedCents: number, expectedCode?: string) {
     setStatus("pending")
-    const body = JSON.stringify({ product_id: productId, method, locale: locale.startsWith("zh") ? "zh" : "en", expected_code: expectedCode, expected_price_cents: expectedPriceCents, ...partnerReturn() })
+    const body = JSON.stringify({ product_id: productId, method, locale: locale.startsWith("zh") ? "zh" : "en", expected_code: expectedCode, ...displayedTerms(displayedCents, pricingV2 ? "v2" : "v1"), ...partnerReturn() })
     const attempt = checkoutAttempt(body, lastAttempt.current)
     lastAttempt.current = attempt
     try {
