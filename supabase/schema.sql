@@ -3036,7 +3036,7 @@ ALTER FUNCTION "public"."admin_save_code"("p_actor" "uuid", "p_code_id" "uuid", 
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_save_invite_rewards"("p_actor" "uuid", "p_invitee" integer, "p_inviter" integer, "p_expected" "jsonb") RETURNS "void"
-    LANGUAGE "plpgsql"
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
 declare

@@ -3,7 +3,7 @@ insert into public.system_settings (key, value)
 values ('code_invite_rewards', '{"inviteeCredits":6,"inviterCredits":10}');
 
 create function public.admin_save_invite_rewards(p_actor uuid, p_invitee integer, p_inviter integer, p_expected jsonb)
-returns void language plpgsql set search_path = '' as $$
+returns void language plpgsql security definer set search_path = '' as $$
 declare
   previous jsonb;
   updated jsonb := jsonb_build_object('inviteeCredits', p_invitee, 'inviterCredits', p_inviter);

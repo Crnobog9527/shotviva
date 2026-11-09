@@ -68,8 +68,11 @@ it('restricts saves to active admins, rejects stale/invalid updates and audits t
     const signature = 'public.admin_save_invite_rewards(uuid,integer,integer,jsonb)'
     expect((await db.query("select has_function_privilege($1,$2,'EXECUTE') as allowed", [role, signature])).rows[0].allowed).toBe(false)
   }
+  // Exercise the same database role the authenticated admin action uses through PostgREST.
+  await db.query('set local role service_role')
   await save(0, 10000)
   await rejected(() => save(11, 12), 'INVITE_SETTINGS_CHANGED')
+  await db.query('reset role')
   const audit = await db.query("select reason::jsonb from public.admin_audit_log where user_id=$1 and target_id='code_invite_rewards'", [actor])
   expect(audit.rows).toEqual([{ reason: { before: defaults, after: { inviteeCredits: 0, inviterCredits: 10000 } } }])
 })
