@@ -8,6 +8,7 @@ import type { ProductId } from '@/core/config'
 import { handleStripeWebhook, priceCents } from '@/core/billing/stripe'
 import { cancelRefundedSubscription } from '@/core/billing/subscription'
 import { handleWaffoWebhook, type WaffoWebhookDeps } from '@/core/billing/waffo'
+import { paymentCodeEffects } from '@/core/billing'
 import { site } from '@/site/site.config'
 
 import { WAFFO_STORE, orderCompleted, refundSucceeded, signWaffo, waffoKeys } from '../fakes/waffo'
@@ -222,7 +223,8 @@ describe('Waffo refund.succeeded', () => {
   const keys = waffoKeys()
   let deps: WaffoWebhookDeps
   beforeEach(() => {
-    deps = { db: serviceSupabase(), products: site.billing.products, publicKey: keys.publicKey, storeId: WAFFO_STORE, mode: 'test', trackBuy: vi.fn() }
+    const admin = serviceSupabase()
+    deps = { db: admin, applyCodes: paymentCodeEffects(admin, site.growth.invite), products: site.billing.products, publicKey: keys.publicKey, storeId: WAFFO_STORE, mode: 'test', trackBuy: vi.fn() }
   })
   const send = (event: unknown) => {
     const body = JSON.stringify(event)

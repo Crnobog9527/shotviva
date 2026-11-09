@@ -3,12 +3,12 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 
-import { normalizeCode } from '../../codes'
+import { normalizeCode } from '../index'
 import { redeemResult, type RedeemResult } from './redeem-result'
 
 type Confirmation = { old: string | null; code: string }
 
-export function useRedeemCode(pendingCode: string | null) {
+export function useRedeemCode(pendingCode: string | null, context: 'account' | 'paywall', onRedeemed?: () => void) {
   const router = useRouter()
   const [input, setInput] = useState('')
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null)
@@ -23,11 +23,11 @@ export function useRedeemCode(pendingCode: string | null) {
     start(async () => {
       try {
         const response = await fetch('/api/codes/redeem', { method: 'POST', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ code, context: 'account', replace: Boolean(replacement) }) })
+          body: JSON.stringify({ code, context, replace: Boolean(replacement) }) })
         const outcome = redeemResult(response.ok, await response.json().catch(() => null))
         if (outcome.kind === 'confirm') setConfirmation({ old: outcome.old ?? pendingCode, code })
         else setResult(outcome)
-        if (outcome.kind === 'ok') { setInput(''); router.refresh() }
+        if (outcome.kind === 'ok') { setInput(''); onRedeemed?.(); router.refresh() }
       } catch { setResult({ kind: 'error', key: 'unknown' }) }
     })
   }

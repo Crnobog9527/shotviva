@@ -1,5 +1,6 @@
 import type { SiteProduct } from '../../config'
 import { AppError } from '../../errors'
+import { discountedPriceCents } from '../index'
 
 export type CatalogInput = Pick<SiteProduct, 'id' | 'priceUsd' | 'credits' | 'tier'>
 export type CodeProduct = { id: SiteProduct['id']; priceCents: number; credits: number; subscription: boolean }
@@ -37,4 +38,13 @@ export function belowDiscountFloor(product: CodeProduct, floor: CodeProduct, per
   if (!Number.isInteger(percent) || percent < 1 || percent > 90) throw new AppError('INVALID_INPUT', 'INVALID_DISCOUNT')
   return BigInt(product.priceCents) * BigInt(100 - percent) * BigInt(floor.credits)
     < BigInt(floor.priceCents) * BigInt(100) * BigInt(product.credits)
+}
+
+// Compare the collectible USD cents on this checkout against today's lowest subscription
+// unit price. Only the currency amount is rounded, never either price per credit.
+export function checkoutUnitPriceDifference(products: readonly CatalogInput[], id: SiteProduct['id'], percent: number): bigint {
+  const { catalog, floor } = campaignCatalog(products)
+  const product = catalog.find(item => item.id === id)
+  if (!product) throw new AppError('INTERNAL', 'Missing checkout product in campaign catalog')
+  return compareUnitPrice({ ...product, priceCents: discountedPriceCents(product.priceCents, percent) }, floor)
 }

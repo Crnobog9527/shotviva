@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import en from '@/site/messages/en.json'
 import zh from '@/site/messages/zh.json'
-import { redeemResult } from '@/core/account/ui/redeem-result'
+import { redeemResult } from '@/core/codes/ui'
 
 const failures = {
   CODE_NOT_FOUND: 'notFound', CODE_EXPIRED: 'expired', CODE_FULL: 'full', CODE_USED: 'used',

@@ -58,6 +58,16 @@ describe('POST /api/checkout', () => {
     expect(mocks.createCheckout).toHaveBeenCalledOnce()
   })
 
+  it('keeps the discounted-session cancellation receipt in an HttpOnly cookie only', async () => {
+    mocks.getSessionUser.mockResolvedValue(USER)
+    const receipt = '1e1b00f8-eaa9-4b82-a558-5a1072d922aa:cs_test_one'
+    mocks.createCheckout.mockResolvedValueOnce({ url: 'https://checkout.stripe.test/1', cancelReceipt: receipt })
+    const response = await POST(request())
+    expect(await response.json()).toEqual({ url: 'https://checkout.stripe.test/1' })
+    expect(response.cookies.get('sv_code_checkout')).toMatchObject({ value: receipt, path: '/api/checkout/cancel',
+      httpOnly: true, secure: true, sameSite: 'lax' })
+  })
+
   it.each(['stripe', 'waffo'])('answers 403 for a banned account on the %s channel', async (channel) => {
     mocks.channel.mockReturnValue(channel)
     mocks.getSessionUser.mockResolvedValue({ ...USER, banned: true })
@@ -148,6 +158,17 @@ describe('POST /api/checkout for a member, Waffo and ended subscriptions', () =>
     mocks.getSessionUser.mockResolvedValue(USER)
     mocks.mirror.mockResolvedValue([liveRow('canceled'), liveRow('incomplete_expired')])
     expect((await POST(request('pro_yearly'))).status).toBe(200)
+  })
+
+  it('asks the buyer to review a Stripe discount quote after the channel switches to Waffo', async () => {
+    mocks.channel.mockReturnValue('waffo')
+    mocks.getSessionUser.mockResolvedValue(USER)
+    const req = new NextRequest(`${ORIGIN}/api/checkout`, { method: 'POST', headers: { origin: ORIGIN, 'content-type': 'application/json' },
+      body: JSON.stringify({ product_id: 'pack_s', method: 'card', expected_code: 'OFFER20' }) })
+    const response = await POST(req)
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({ code: 'CODE_CHECKOUT_OFFER_CHANGED' })
+    expect(mocks.createWaffoCheckout).not.toHaveBeenCalled()
   })
 
 })

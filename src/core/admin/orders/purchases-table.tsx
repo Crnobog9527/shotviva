@@ -11,7 +11,7 @@ import { UserLink } from '../users-ui/user-link'
 
 // ARCHITECTURE §10: time, buyer, product, amount, method, channel, status, link. Amounts are
 // what was charged (payments, T10), in the charge's own currency.
-const COLUMNS = ['createdAt', 'email', 'product', 'amount', 'tax', 'refunded', 'credits', 'method', 'form', 'channel', 'status', 'link'] as const
+const COLUMNS = ['createdAt', 'email', 'product', 'amount', 'discount', 'tax', 'refunded', 'credits', 'method', 'form', 'channel', 'status', 'link'] as const
 
 function ProviderLink({ row, stripeLive }: { row: AdminPurchase; stripeLive: boolean }) {
   if (row.channel !== 'stripe' || !row.providerId) return <span className="font-mono text-xs">{row.providerId ?? COPY.noLink}</span>
@@ -34,6 +34,7 @@ function PurchaseRow({ row, stripeLive, clawback }: RowProps) {
       </TableCell>
       <TableCell className="font-mono text-xs">{row.productId}</TableCell>
       <TableCell className="font-mono">{money(row.amountTotal)}</TableCell>
+      <TableCell className="font-mono text-xs">{money(row.amountDiscount)}</TableCell>
       <TableCell className="font-mono text-xs">{money(row.amountTax)}</TableCell>
       <TableCell className="font-mono text-xs">{row.amountRefunded > 0 ? money(row.amountRefunded) : COPY.noLink}</TableCell>
       <TableCell>

@@ -6,6 +6,7 @@ import { trackPurchase } from '../../analytics/funnel'
 import type { ProductId, SiteProduct } from '../../config'
 import { AppError } from '../../errors'
 import { creditChangeSchema, type CreditChange } from '../credits'
+import type { ApplyPaymentCodes } from '../payment-code-effects'
 import type { CancelOthers, CancelRefunded } from '../subscription/cancel-others'
 import type { RefuseEnded } from '../subscription/ended-order'
 import { callRpc, type RpcClient } from '../rpc'
@@ -23,6 +24,7 @@ export type WaffoFulfilDeps = {
   // Service-role client: settle_waffo_order is not callable by the client roles.
   db: RpcClient
   products: readonly SiteProduct[]
+  applyCodes: ApplyPaymentCodes
   trackBuy?: typeof trackPurchase
   // The upgrade step (T66, same as Stripe's): cancel the buyer's other renewing subscriptions.
   cancelOthers?: CancelOthers
@@ -92,12 +94,20 @@ export async function fulfilWaffoOrder(
   if (!product) throw new AppError('INVALID_INPUT', `waffo order ${event.eventId}: unknown product`)
   const facts = paymentFacts(order, product)
   const change = await settleWaffoOrder(deps.db, { userId, productId, paymentId: event.eventId, facts })
+  if (change.applied) track(deps, userId, product, facts, { locale, form })
+  await afterSettlement(deps, order, product, event.eventId, form)
+  return change.applied ? 'applied' : 'replayed'
+}
+
+// Repeat post-settlement effects on webhook redelivery to recover after a partial failure.
+async function afterSettlement(deps: WaffoFulfilDeps, order: WaffoOrder, product: SiteProduct, paymentId: string, form: WaffoChargeForm) {
+  const { user_id: userId, locale } = order.orderMetadata
+  if (form === 'one_time' || order.periodNumber === 1) {
+    await deps.applyCodes({ channel: 'waffo', reference: paymentId, userId, productId: product.id, locale, codeId: null, amountDiscount: 0 })
+  }
   // A membership's charge (first payment or renewal): any other renewing subscription is the
   // plan this one upgraded from (T66). A renewal finds nothing to cancel. Replays too, as on Stripe.
-  if (product.tier !== 'pack') await deps.cancelOthers?.(userId, { waffoOrderId: form === 'subscription' ? facts.orderId : null })
-  if (!change.applied) return 'replayed'
-  track(deps, userId, product, facts, { locale, form })
-  return 'applied'
+  if (product.tier !== 'pack') await deps.cancelOthers?.(userId, { waffoOrderId: form === 'subscription' ? order.orderId : null })
 }
 
 // A subscription charge taken after an upgrade ended its order. When it was taken: the event's

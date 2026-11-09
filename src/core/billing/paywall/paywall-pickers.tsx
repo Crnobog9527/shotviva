@@ -44,6 +44,7 @@ export function TierPicker({ offers, wishlistLive, state }: TierProps) {
             />
             <TierCard
               offer={offer}
+              singlePayment={choice.method === "alipay"}
               period={choice.period}
               selected={selected}
               perks={tierPerks(offer.tier, { wishlistLive })}

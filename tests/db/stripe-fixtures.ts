@@ -6,6 +6,7 @@ import { vi } from 'vitest'
 
 import type { ProductId } from '@/core/config'
 import { lookupKey, priceCents, type CheckoutMethod, type StripeApi, type WebhookDeps } from '@/core/billing/stripe'
+import { paymentCodeEffects } from '@/core/billing'
 import { site } from '@/site/site.config'
 
 import { serviceSupabase } from './supabase-env'
@@ -61,9 +62,11 @@ export function stripeHarness() {
     billingPortal: { sessions: { create: vi.fn() } },
   } as unknown as StripeApi
   const trackBuy = vi.fn()
+  const admin = serviceSupabase()
   const deps: WebhookDeps = {
     stripe,
-    db: serviceSupabase(),
+    db: admin,
+    applyCodes: paymentCodeEffects(admin, site.growth.invite),
     products: site.billing.products,
     webhookSecret: WEBHOOK_SECRET,
     trackBuy,

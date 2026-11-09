@@ -12,6 +12,7 @@ import {
   type ClawbackPreview,
   type ClawbackResult,
 } from '@/core/admin'
+import { paymentCodeEffects } from '@/core/billing'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { stripeClient, type ReplayOutcome, type ReplayPreview } from '@/core/billing/stripe'
 import { cancelOtherSubscriptions, type KeepSubscription } from '@/core/billing/subscription'
@@ -27,7 +28,7 @@ function deps() {
   const stripe = stripeClient()
   const cancelOthers = (userId: string, keep: KeepSubscription) =>
     cancelOtherSubscriptions({ admin, stripe: () => stripe, waffo: () => waffoClient() }, userId, keep)
-  return { stripe, db: admin, admin, products: site.billing.products, cancelOthers }
+  return { stripe, db: admin, admin, applyCodes: paymentCodeEffects(admin, site.growth.invite), products: site.billing.products, cancelOthers }
 }
 
 export async function previewReplayAction(input: { id?: unknown }): Promise<ActionValue<ReplayPreview>> {

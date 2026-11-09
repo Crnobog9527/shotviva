@@ -21,6 +21,7 @@ beforeEach(() => {
   deps = {
     db: { rpc } as unknown as WaffoWebhookDeps['db'],
     products: TEST_PRODUCTS,
+    applyCodes: vi.fn(),
     publicKey: keys.publicKey,
     storeId: WAFFO_STORE,
     mode: 'test',

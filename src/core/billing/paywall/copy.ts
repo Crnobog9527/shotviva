@@ -1,3 +1,4 @@
+import type { PendingDiscount } from "../../codes"
 import type { PaymentChannel } from "../../config"
 import type { CheckoutMethod } from "../stripe/catalog"
 import type { Period } from "./offer"
@@ -40,4 +41,17 @@ export function planFinePrint(
 // /pricing's "Pay with" rows cover plans and packs at once (comps-v3-b pricing.html).
 export function pricingMethodNote(_channel: PaymentChannel, method: CheckoutMethod): PaywallMessage {
   return { key: method === "alipay" ? "payNoteWallet" : "payNoteCard" }
+}
+
+// Stripe repeating windows run from the first payment in calendar months. A yearly invoice
+// is discounted in full if its billing date falls inside the window.
+export function discountTerm(
+  offer: Pick<PendingDiscount, "duration" | "months">, singlePayment: boolean, period: Period,
+): { key: string; values?: Record<string, number> } {
+  if (singlePayment) return { key: "codeOnce" }
+  if (offer.duration === "once") return { key: period === "year" ? "codeFirstYear" : "codeFirstMonth" }
+  if (offer.duration === "forever") return { key: "codeEvery" }
+  const months = offer.months ?? 0
+  if (period === "year") return { key: "codeAnnualPayments", values: { count: Math.ceil(months / 12) } }
+  return { key: "codeMonths", values: { months } }
 }

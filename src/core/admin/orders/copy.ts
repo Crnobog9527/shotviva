@@ -12,6 +12,7 @@ export const ORDERS_COPY = {
     product: '商品',
     amount: '实付（含税）',
     tax: '税',
+    discount: '优惠金额',
     refunded: '已退',
     credits: '积分扣回',
     method: '付款方式',

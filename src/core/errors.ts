@@ -22,6 +22,8 @@ export const ERROR_CODES = [
   'CODE_ALREADY_INVITED',
   'CODE_NEEDS_CONFIRM',
   'CODE_CHECKOUT_IN_PROGRESS',
+  'CODE_CHECKOUT_OFFER_CHANGED',
+  'CODE_CHECKOUT_FLOOR',
   'CODE_INVITE_INELIGIBLE',
   // Phone sign-in (T63): not a mainland +86 mobile number; the consent box was not ticked; the
   // number's 60-second gap or a daily limit (number or network); the SMS did not go out; a wrong
@@ -84,6 +86,8 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   CODE_ALREADY_INVITED: 409,
   CODE_NEEDS_CONFIRM: 409,
   CODE_CHECKOUT_IN_PROGRESS: 409,
+  CODE_CHECKOUT_OFFER_CHANGED: 409,
+  CODE_CHECKOUT_FLOOR: 409,
   CODE_INVITE_INELIGIBLE: 403,
   AUTH_PHONE_INVALID: 422,
   AUTH_CONSENT_REQUIRED: 422,

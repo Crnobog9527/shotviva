@@ -1,7 +1,7 @@
 "use client"
 
 import { useLocale } from "next-intl"
-import { useState } from "react"
+import { useRef, useState } from "react"
 
 import { useUpdateHold } from "../../app-update/holds"
 
@@ -9,28 +9,35 @@ import type { ProductId } from "../../config"
 import { loginPath } from "../../auth/redirect-target"
 import { localeOfPath, localizePath } from "../../i18n/paths"
 import type { CheckoutMethod } from "../stripe/catalog"
+import { refreshDiscount } from "./discount-context"
 
 // "refused": the server refused a membership as the same plan or a lower one than the buyer
 // holds (409 DOWNGRADE_NOT_ALLOWED, T66), say from a page opened before the plan changed; the
 // paywall says plans only go up and points to Account.
-export type CheckoutStatus = "idle" | "pending" | "error" | "refused"
+export type CheckoutStatus = "idle" | "pending" | "error" | "refused" | "in_use" | "offer_changed" | "floor"
 
 // Asks the server for a Stripe Checkout Session and goes there. Signed-out buyers (the public
 // /pricing page) go to sign-in first and come back to the same page.
 export function useCheckout() {
   const locale = useLocale()
+  const lastAttempt = useRef<CheckoutAttempt | null>(null)
   const [status, setStatus] = useState<CheckoutStatus>("idle")
   // No new-version banner while the buyer is on the way to the hosted checkout (T90).
   useUpdateHold("checkout", status === "pending")
 
-  async function start(productId: ProductId, method: CheckoutMethod) {
+  async function start(productId: ProductId, method: CheckoutMethod, expectedCode?: string) {
     setStatus("pending")
+    const body = JSON.stringify({ product_id: productId, method, locale: locale.startsWith("zh") ? "zh" : "en", expected_code: expectedCode, ...partnerReturn() })
+    const attempt = checkoutAttempt(body, lastAttempt.current)
+    lastAttempt.current = attempt
     try {
       const response = await fetch("/api/checkout", {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ product_id: productId, method, locale: locale.startsWith("zh") ? "zh" : "en", ...partnerReturn() }),
+        headers: { "content-type": "application/json", "idempotency-key": attempt.id }, body,
       })
+      // Network/5xx and unreadable success replies can hide a created session. Retry the
+      // same purchase with the same key. A definitive client error starts a fresh attempt.
+      if (response.status >= 400 && response.status < 500 && lastAttempt.current === attempt) lastAttempt.current = null
       if (response.status === 401) {
         // The login page of the page's own language; `next` is the address as it stands.
         const here = `${window.location.pathname}${window.location.search}`
@@ -38,7 +45,8 @@ export function useCheckout() {
         return
       }
       const answer = readAnswer(response.status, await response.json().catch(() => null))
-      if (answer.kind === "refused") setStatus("refused")
+      if (answer.kind === "offer_changed") refreshDiscount()
+      if (answer.kind !== "url") setStatus(answer.kind)
       else window.location.assign(answer.url)
     } catch {
       setStatus("error")
@@ -48,16 +56,31 @@ export function useCheckout() {
   return { status, start }
 }
 
-type Answer = { kind: "url"; url: string } | { kind: "refused" }
+type CheckoutAttempt = { body: string; id: string; created: number }
+
+export function checkoutAttempt(body: string, previous: CheckoutAttempt | null, now = Date.now()): CheckoutAttempt {
+  if (previous?.body === body && now - previous.created < 30 * 60_000) return previous
+  return { body, id: crypto.randomUUID(), created: now }
+}
+
+type Answer = { kind: "url"; url: string } | { kind: "refused" | "in_use" | "offer_changed" | "floor" }
 
 // The checkout URL, or 409 DOWNGRADE_NOT_ALLOWED (only upgrades while a membership runs);
 // anything else throws and shows the generic error.
 export function readAnswer(status: number, body: unknown): Answer {
   const record = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {}
-  if (status === 409 && record.code === "DOWNGRADE_NOT_ALLOWED") return { kind: "refused" }
+  if (status === 409 && typeof record.code === "string") {
+    const kind = conflicts.get(record.code)
+    if (kind) return { kind }
+  }
   if (status < 200 || status >= 300 || typeof record.url !== "string") throw new Error("no checkout url")
   return { kind: "url", url: record.url }
 }
+
+const conflicts = new Map<string, "refused" | "in_use" | "offer_changed" | "floor">([
+  ["CODE_CHECKOUT_IN_PROGRESS", "in_use"], ["CODE_CHECKOUT_OFFER_CHANGED", "offer_changed"],
+  ["DOWNGRADE_NOT_ALLOWED", "refused"], ["CODE_CHECKOUT_FLOOR", "floor"],
+])
 
 // A Graylum top-up arrives as /pricing?from=graylum&return_to=…; the server checks the host.
 function partnerReturn(): { return_to?: string } {
