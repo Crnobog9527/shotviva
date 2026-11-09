@@ -70,6 +70,27 @@ it('refuses payout detail changes after suspension in the database write', async
     .toMatchObject({ status: 'suspended', payout_details: 'original' })
 })
 
+it('only maintains payout details with a dated acceptance of the current version', async () => {
+  const partner = await promoter(db)
+  await settings({ terms_version: 'v1' })
+  const save = (details: string) => db.query("select affiliate_save_profile($1,'wise',$2,false,null)", [partner.id, details])
+  const read = () => row(db, 'select payout_details,terms_version,terms_accepted_at::text from affiliates where user_id=$1', [partner.id])
+  await rejects(() => save('new account'), 'AFFILIATE_NOT_FOUND')
+  expect(await read()).toMatchObject({ terms_version: null, terms_accepted_at: null, payout_details: null })
+
+  await db.query("update affiliates set terms_version='v1' where user_id=$1", [partner.id])
+  await rejects(() => save('undated'), 'AFFILIATE_NOT_FOUND')
+  expect((await read()).terms_accepted_at).toBeNull()
+  await db.query("update affiliates set terms_accepted_at='2025-01-01T00:00Z' where user_id=$1", [partner.id])
+  const before = await read()
+  await save('changed')
+  expect(await read()).toEqual({ ...before, payout_details: 'changed' })
+
+  await settings({ terms_version: 'v2' })
+  await rejects(() => save('stale consent'), 'AFFILIATE_NOT_FOUND')
+  expect(await read()).toEqual({ ...before, payout_details: 'changed' })
+})
+
 it('activates a reserved admin invite only after Auth confirms that email', async () => {
   await db.query('update auth.users set invited_at=now() where id=$1', [user])
   const slug = 'qa-invited'

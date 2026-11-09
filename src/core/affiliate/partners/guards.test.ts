@@ -44,7 +44,7 @@ it.each(['pending', 'rejected', 'suspended', 'banned'])('limits %s members to th
   await expect(PartnerScreen(props)).rejects.toMatchObject({ digest: expect.stringContaining('/zh/partners/join;') })
   await expect(exportCommissions('en')).rejects.toMatchObject({ code: 'NOT_FOUND' })
   const screen = await EnrollmentScreen(props)
-  expect(screen.props.role).toBe('status')
+  expect(screen.props.account.status).toBe(status)
   expect(deps.settings).not.toHaveBeenCalled()
 })
 it('routes an active affiliate to their dashboard even on a team invitation', async () => {

@@ -1272,6 +1272,7 @@
     "back": "返回推广员计划",
     "pendingReview": "已收到申请，审核结果会显示在这里。",
     "version": "版本 {version}",
+    "settingsReadOnly": "你可以查看现有收款资料。当前版本的推广员条款公布后，阅读并同意即可修改。",
     "termsPlaceholder": "正式条款将由运营方在上线前公布。",
     "agree": "我已阅读并同意",
     "termsLink": "推广员条款（版本 {version}）",
