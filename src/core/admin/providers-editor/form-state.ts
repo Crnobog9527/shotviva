@@ -12,6 +12,8 @@ export type ProviderForm = {
   module: ProviderModule
   adapter: ProviderAdapterId
   resolutions: Resolution[]
+  // The last manually chosen tiers belong to this endpoint and model.
+  resolutionOverride?: string
   label: string
   baseUrl: string
   model: string
@@ -140,6 +142,18 @@ const PRICE_PATTERN = /^\s*(\d+(\.\d+)?)?\s*$/
 export function withAdapter(form: ProviderForm, adapter: ProviderAdapterId): ProviderForm {
   const baseUrl = adapter === 'openrouter_images' ? OPENROUTER_BASE_URL : DEFAULT_BASE_URL
   return { ...form, adapter, baseUrl }
+}
+
+// Store manual tier choices separately from catalogue suggestions. An in-flight lookup
+// cannot undo an edit, and re-opening the same row preserves its saved selection.
+export function resolutionKey({ baseUrl, model, adapter }: Pick<ProviderForm, 'baseUrl' | 'model' | 'adapter'>): string {
+  return JSON.stringify([adapter, baseUrl.trim(), model.trim()])
+}
+
+export function withSuggestedResolutions(form: ProviderForm, saved: AdminProvider | null, suggested: Resolution[] | null): ProviderForm {
+  if (form.adapter !== 'openrouter_images' || form.resolutionOverride === resolutionKey(form)) return form
+  if (saved && resolutionKey(saved) === resolutionKey(form)) return { ...form, resolutions: saved.resolutions }
+  return suggested ? { ...form, resolutions: suggested } : form
 }
 
 export function toSaveInput(form: ProviderForm, provider: AdminProvider | null): SaveProviderInput {

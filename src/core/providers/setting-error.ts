@@ -13,6 +13,8 @@ export const PROVIDER_SETTING_REASONS = [
   'api_key_invalid',
   // The row has no usable key in Vault (never set, cleared, or the Vault entry is gone).
   'api_key_missing',
+  'openrouter_model_missing',
+  'openrouter_catalog_unavailable',
   'not_found',
   // Deleting the row in use (ARCHITECTURE §3.3): switch to another one first.
   'provider_active',

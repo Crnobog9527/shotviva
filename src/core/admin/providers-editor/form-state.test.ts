@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { saveProviderSchema } from '../providers/schema'
 import type { AdminProvider } from '../providers/types'
 
-import { canSave, DEFAULT_FORM, formFor, missingPrices, priceOrigin, pricesFromTable, toSaveInput, withAdapter, withModel } from './form-state'
+import { canSave, DEFAULT_FORM, formFor, missingPrices, priceOrigin, pricesFromTable, resolutionKey, toSaveInput, withAdapter, withModel, withSuggestedResolutions } from './form-state'
 
 const provider: AdminProvider = {
   id: '6f1c2f9e-6a52-4c39-9a51-0a9f6b0c1d2e',
@@ -73,6 +73,27 @@ describe('provider form state', () => {
     expect(canSave({ ...form, priceOutputPerM: '0.25' }, false)).toBe(true)
     expect(canSave({ ...form, priceOutputPerM: '-1' }, false)).toBe(false)
     expect(canSave({ ...form, priceOutputPerM: '3o' }, false)).toBe(false)
+  })
+})
+
+describe('OpenRouter resolution suggestions', () => {
+  const saved: AdminProvider = { ...provider, adapter: 'openrouter_images', baseUrl: 'https://openrouter.ai/api/v1', model: 'first', resolutions: ['2k'] }
+
+  it('preserves saved choices and prefills the catalog tiers when the model changes', () => {
+    const original = formFor(saved)
+    expect(withSuggestedResolutions(original, saved, ['1k', '2k', '3k']).resolutions).toEqual(['2k'])
+    const changed = withModel(original, 'second')
+    const suggested = withSuggestedResolutions(changed, saved, ['1k', '3k'])
+    expect(toSaveInput(suggested, saved).resolutions).toEqual(['1k', '3k'])
+    expect(withSuggestedResolutions(changed, saved, null).resolutions).toEqual(changed.resolutions)
+  })
+
+  it('keeps a manual edit even when a catalog lookup for that model completes afterwards', () => {
+    const form = withModel(formFor(saved), 'second')
+    const draft: typeof form = { ...form, resolutions: ['1k'], resolutionOverride: resolutionKey(form) }
+    expect(withSuggestedResolutions(draft, saved, ['1k', '2k']).resolutions).toEqual(['1k'])
+    expect(withSuggestedResolutions(withModel(draft, saved.model), saved, ['3k']).resolutions).toEqual(saved.resolutions)
+    expect(withSuggestedResolutions(withModel(draft, 'third'), saved, ['3k']).resolutions).toEqual(['3k'])
   })
 })
 

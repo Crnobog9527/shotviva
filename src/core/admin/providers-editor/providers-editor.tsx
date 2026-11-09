@@ -93,6 +93,7 @@ export function ProvidersEditor({ providers, actions }: Props) {
           pending={pending}
           error={error}
           onCancel={() => setEditing(null)}
+          lookupModel={actions.lookupModel}
           onSubmit={save}
         />
       ) : null}
