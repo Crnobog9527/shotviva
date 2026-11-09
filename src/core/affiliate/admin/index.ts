@@ -1,6 +1,10 @@
+import 'server-only'
+
 export { COPY } from './copy'
 export { execute } from './commands'
 export { requireAffiliateAdmin } from './access'
 export { AffiliateAdminView } from './admin-view'
 export { parseFilters } from './query'
 export { exportCsv } from './export'
+export { enrollAffiliate } from './create-action'
+export { enrollmentLabel } from './enrollment'
