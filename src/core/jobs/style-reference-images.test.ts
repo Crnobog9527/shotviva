@@ -16,18 +16,22 @@ const request = { resolution: '1k' as const, providerId: 'router' }
 const template = { id: 'example', quality: 'medium' as const }
 const prompt = { body: '{{photo_count}}|{{style_ref_count}}', modelParams: {}, version: 1, providerId: 'router', styleRefs: refs }
 
-function setup(limit = 4) {
+function setup(limit = 4, minimum = 0) {
   const { store, upload } = createMemoryStore()
   refs.forEach((ref, i) => upload(ref.key, Uint8Array.of(21 + 10 * i), 'image/webp'))
   const get = vi.spyOn(store, 'get')
-  const fallback = vi.fn(async () => ({ id: 'default', maxReferences: limit, generate: vi.fn() }))
+  const fallback = vi.fn(async () => ({ id: 'default', minReferences: minimum, maxReferences: limit, generate: vi.fn() }))
   const lookup = async () => ({
     id: 'router', adapter: 'openrouter_images' as const, model: 'fixture', baseUrl: 'https://example.com',
-    capabilities: { ...FULL_IMAGE_OPTIONS, minReferences: 0, maxReferences: 2, fetchedAt: '' },
+    capabilities: { ...FULL_IMAGE_OPTIONS, minReferences: minimum, maxReferences: 2, fetchedAt: '' },
     resolutions: ['1k' as const], prices: { inputTextPerM: null, inputImagePerM: null, outputPerM: null },
   })
+  const parameters = async () => ({
+    aspect_ratio: { type: 'enum' as const, values: ['1:1'] }, input_references: { type: 'range' as const, min: minimum, max: 2 },
+  })
+  const adapter = () => ({ id: 'router', generate: vi.fn() })
   const provider = (id: string | null, options: ImageRequestOptions) =>
-    templateImageProvider({}, id, options, { lookup, fallback })
+    templateImageProvider({ openrouter_images: adapter }, id, options, { lookup, fallback, parameters, readKey: async () => 'fixture' })
   return { deps: { store, provider }, fallback, get }
 }
 
@@ -65,4 +69,31 @@ it('loads once per version including concurrent requests and retries failed stor
   await expect(invoke(2)).rejects.toThrow('Template reference unavailable')
   await invoke(2)
   expect(get).toHaveBeenCalledTimes(5)
+})
+
+it('uses one saved style for a zero-photo request to the selected min-one model, with opt-out checked before reading styles', async () => {
+  const { deps, fallback, get } = setup(2, 1)
+  const saved = { template, prompt: { ...prompt, styleRefs: refs.slice(0, 1) } }
+  const omitted = { ...request, omitStyleRefs: true }
+  await expect(templateCall(deps, saved, inputs, null, omitted)).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+  expect(get).not.toHaveBeenCalled()
+  const run = await templateCall(deps, saved, inputs, null, request)
+  expect(run.provider.id).toBe('router/fixture')
+  expect(run.call).toMatchObject({ prompt: '0|1', photoCount: 0, images: [{ bytes: Uint8Array.of(21) }] })
+  expect(run.styleRefKeys).toEqual([refs[0]!.key])
+  const photoOnly = await templateCall(deps, saved, inputs, photo, omitted)
+  expect(photoOnly.call).toMatchObject({ prompt: '1|0', photoCount: 1, images: [photo] })
+  expect(photoOnly.styleRefKeys).toEqual([])
+  expect(fallback).not.toHaveBeenCalled()
+  expect(get).toHaveBeenCalledTimes(1)
+})
+
+it('rejects an empty effective input after opt-out or reference overflow on a min-one default', async () => {
+  const { deps, get } = setup(1, 1)
+  const followDefault = { ...request, providerId: null }
+  for (const omitStyleRefs of [true, false]) {
+    await expect(templateCall(deps, { template, prompt }, inputs, null, { ...followDefault, omitStyleRefs }))
+      .rejects.toMatchObject({ code: 'MODEL_INPUT_UNSUPPORTED' })
+  }
+  expect(get).not.toHaveBeenCalled()
 })

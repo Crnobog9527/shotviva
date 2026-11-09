@@ -7,14 +7,14 @@ import { limitsFor } from '@/core/billing/tier-limits'
 import type { MembershipTier } from '@/core/config'
 
 import type { AgainStart } from '../again/again-start'
-import type { CatalogueTemplate } from '../catalogue/catalogue-template'
+import { allowsNoPhoto, type CatalogueTemplate } from '../catalogue/catalogue-template'
 import { enqueueJobs, setWorkspaceJobs } from '../generation/job-store'
 import { useJobs } from '../generation/use-jobs'
 import { startInputs } from './batch-request'
 import { chosenAspect, closestResolution, hasOutputOptions, selectedAspect, templateOptions } from './output-choice'
 import { ctaState, type CtaState } from './cta-state'
 import { missingRequiredCopy } from './text-fields'
-import { usePhotoBatch } from './use-photo-batch'
+import { usePhotoBatch, type PhotoBatch } from './use-photo-batch'
 import type { FormValues } from './workspace-form'
 
 export type DraftInput = {
@@ -40,7 +40,8 @@ const DEFAULTS: FormValues = { aspect: 'original', resolution: '1k', note: '', c
 // one job per ready photo in the generation store and makes them this template's workspace
 // jobs, so the workspace page shows them developing (and after a refresh).
 export function useWorkspaceDraft({ template, balance, tier, concurrency, again = null, single = false }: DraftInput) {
-  const photos = usePhotoBatch(single ? 1 : limitsFor(tier).batchMax, again ? { photos: again.photos, madeAt: again.madeAt } : undefined)
+  const batchMax = single ? 1 : limitsFor(tier).batchMax
+  const photos = usePhotoBatch(template.photoInput === 'none' ? 0 : batchMax, again ? { photos: again.photos, madeAt: again.madeAt } : undefined)
   const { options, values, change } = useOutputValues(template, again)
   useAgainOpensForm(template.id, again?.jobId)
   const running = useRunningCount(concurrency.runningIds)
@@ -51,7 +52,7 @@ export function useWorkspaceDraft({ template, balance, tier, concurrency, again 
     cost: template.creditsCost[values.resolution],
     running,
     limit: concurrency.limit,
-    photo: summary.photo,
+    photo: draftPhotoStatus(template, photos, again),
     count: summary.planned,
     copyMissing: missingRequiredCopy(template.copyFields, values.copy),
   })
@@ -74,6 +75,11 @@ function useOutputValues(template: CatalogueTemplate, again: AgainStart | null) 
   }
   const change = (next: Partial<FormValues>) => setValues((current) => ({ ...current, ...next }))
   return { options, values, change }
+}
+
+function draftPhotoStatus(template: CatalogueTemplate, photos: PhotoBatch, again: AgainStart | null) {
+  if (allowsNoPhoto(template) && photos.photos.length === 0 && !again?.missing) return 'ready'
+  return photos.summary.photo
 }
 
 export type WorkspaceDraft = ReturnType<typeof useWorkspaceDraft>

@@ -34,6 +34,9 @@ export async function templateCall(
   }
   if (photos.length > limit) throw new AppError('REFERENCE_IMAGE_LIMIT', 'This model cannot accept the supplied photos')
   const refs = dropRefs ? [] : requested
+  if (photos.length + refs.length < (provider.minReferences ?? 0)) {
+    throw new AppError('MODEL_INPUT_UNSUPPORTED', 'This model requires more input images')
+  }
   const refImages = await readStyleImages(deps.store, prompt.version, refs)
   const counts = { photo_count: photos.length, style_ref_count: refs.length }
   const call: Omit<ProviderInput, 'signal'> = {

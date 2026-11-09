@@ -37,10 +37,11 @@ export async function activeProvider(
   return resolveProvider(module, await loadRow(module), serverEnv(), adapters, readKey)
 }
 
-// With style references, freeze the default model's current reference limit before billing.
-export async function defaultTemplateProvider(adapters: ProviderAdapters, styleRefCount = 0): Promise<GenerationProvider> {
+// Freeze the default model’s live range before a template job reserves credits or trial budget.
+// A trial can explicitly omit all references, so zero-input requests also need this check.
+export async function defaultTemplateProvider(adapters: ProviderAdapters, checkReferences: boolean): Promise<GenerationProvider> {
   const row = await cachedActiveRow('image')
-  const parameters = styleRefCount > 0 && row?.adapter === 'openrouter_images'
+  const parameters = checkReferences && row?.adapter === 'openrouter_images'
     ? await openRouterImageParameters(row.baseUrl, row.model) : undefined
   return resolveProvider('image', row, serverEnv(), adapters, (id) => readProviderKey(createAdminSupabase(), id), parameters)
 }

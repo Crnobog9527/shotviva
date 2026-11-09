@@ -50,6 +50,7 @@ export type ProviderPrices = {
 
 export type GenerationProvider = {
   id: string
+  minReferences?: number
   maxReferences?: number
   // Price snapshot taken when the provider was resolved for this request: the row's prices with
   // empty ones filled from MODEL_PRICES; null when neither has any (the job then has no cost).
