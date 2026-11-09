@@ -7,6 +7,7 @@ import { normalizeCode, percentZh } from '../../codes'
 import type { ProductId } from '../../config'
 
 type Preview = {
+  kind: 'invite' | 'campaign'
   credits: number; pool: 'free' | 'paid' | null; percent: number | null
   products: ProductId[] | null; duration: 'once' | 'repeating' | 'forever' | null; months: number | null
 }
@@ -50,15 +51,23 @@ function previewMessage(code: string | null, reply: Reply | null) {
 
 function PreviewEffects({ preview }: { preview: Preview }) {
   const t = useTranslations('app.signupCodes')
-  const format = useFormatter()
-  const locale = useLocale()
-  const { credits, pool, percent, products, duration, months } = preview
-  const targets = format.list((products ?? []).map(id => t(`products.${id}`)), { type: 'conjunction' })
+  const { credits, pool, percent } = preview
   return (
     <div className="mt-1 space-y-1 text-success">
+      {preview.kind === 'invite' && credits === 0 && <p>{t('noInviteGift')}</p>}
       {credits > 0 && <p>{t('gift', { credits, pool: pool ?? 'free' })}</p>}
-      {percent && <p>{t('discount', { percent: locale === 'zh' ? percentZh(percent) : percent, targets })}{' '}
-        {t(`period.${products?.every(id => id.startsWith('pack_')) ? 'once' : duration ?? 'once'}`, { months: months ?? 0 })}</p>}
+      {percent && <DiscountPreview preview={preview} percent={percent} />}
     </div>
   )
+}
+
+function DiscountPreview({ preview, percent }: { preview: Preview; percent: number }) {
+  const t = useTranslations('app.signupCodes')
+  const format = useFormatter()
+  const locale = useLocale()
+  const { products, duration, months } = preview
+  const targets = format.list((products ?? []).map(id => t(`products.${id}`)), { type: 'conjunction' })
+  const period = products?.every(id => id.startsWith('pack_')) ? 'once' : duration ?? 'once'
+  return <p>{t('discount', { percent: locale === 'zh' ? percentZh(percent) : percent, targets })}{' '}
+    {t(`period.${period}`, { months: months ?? 0 })}</p>
 }

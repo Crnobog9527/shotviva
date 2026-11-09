@@ -3130,6 +3130,33 @@ $$;
 ALTER FUNCTION "public"."admin_save_code"("p_actor" "uuid", "p_code_id" "uuid", "p_fields" "jsonb", "p_catalog" "jsonb", "p_floor_product_id" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_save_invite_rewards"("p_actor" "uuid", "p_invitee" integer, "p_inviter" integer, "p_expected" "jsonb") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  previous jsonb;
+  updated jsonb := jsonb_build_object('inviteeCredits', p_invitee, 'inviterCredits', p_inviter);
+begin
+  if not exists (select 1 from public.profiles where id = p_actor and role = 'admin' and banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if p_invitee is null or p_invitee not between 0 and 10000
+     or p_inviter is null or p_inviter not between 0 and 10000 then raise exception 'INVALID_INPUT'; end if;
+  select value into strict previous from public.system_settings where key = 'code_invite_rewards' for update;
+  if previous is distinct from p_expected then raise exception 'INVITE_SETTINGS_CHANGED'; end if;
+  if previous = updated then return; end if;
+  update public.system_settings set value = updated, updated_at = now(), updated_by = p_actor
+    where key = 'code_invite_rewards';
+  insert into public.admin_audit_log(action, user_id, target_id, reason)
+    values ('save_code', p_actor, 'code_invite_rewards', jsonb_build_object('before', previous, 'after', updated)::text);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_save_invite_rewards"("p_actor" "uuid", "p_invitee" integer, "p_inviter" integer, "p_expected" "jsonb") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_save_provider"("p_actor" "uuid", "p_id" "uuid", "p_settings" "jsonb", "p_capabilities" "jsonb", "p_key" "text" DEFAULT NULL::"text") RETURNS "uuid"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -4293,9 +4320,10 @@ declare
   v_conflict boolean := false;
   v_rewarded boolean := false;
   v_reward_time timestamptz;
+  reward_credits integer;
 begin
   if p_amount_discount is null or p_amount_discount < 0 or (p_code_id is null and p_amount_discount <> 0)
-     or p_inviter_credits is null or p_inviter_credits <= 0 or p_inviter_cap is null or p_inviter_cap <= 0
+     or p_inviter_cap is null or p_inviter_cap <= 0
      or p_reward_window_days is null or p_reward_window_days <= 0 then
     raise exception 'INVALID_INPUT';
   end if;
@@ -4337,7 +4365,10 @@ begin
   end if;
 
   v_reward_time := clock_timestamp();
-  if v_invite.inviter_user_id is not null and v_invite.inviter_rewarded_at is null
+  if v_invite.inviter_user_id is not null then
+    select (value->>'inviterCredits')::integer into strict reward_credits from public.system_settings where key = 'code_invite_rewards';
+  end if;
+  if reward_credits > 0 and v_invite.inviter_rewarded_at is null
      and not exists (select 1 from public.payments where user_id = p_user and id < p_payment_id)
      and exists (select 1 from public.profiles where id = v_invite.inviter_user_id and banned_at is null)
      -- Rewards survive the invitee deleting their profile and redemption.
@@ -4345,14 +4376,15 @@ begin
            and kind = 'invite_reward' and created_at > v_reward_time - make_interval(days => p_reward_window_days)) < p_inviter_cap then
     -- The reward has no membership product/days and never changes current_tier.
     v_rewarded := (public._apply_credit_change(v_invite.inviter_user_id, 'paid', 'invite_reward',
-                    p_inviter_credits, '邀请首付奖励', 'invite:' || v_invite.id)).applied;
+                    reward_credits, '邀请首付奖励', 'invite:' || v_invite.id)).applied;
     update public.code_redemptions set inviter_rewarded_at = v_reward_time, inviter_reward_payment_id = p_payment_id
       where id = v_invite.id;
   end if;
   update public.payments set code_id = p_code_id, amount_discount = p_amount_discount,
          code_discount_conflict = v_conflict, code_effects_applied_at = clock_timestamp()
     where id = p_payment_id;
-  return jsonb_build_object('applied', true, 'rewarded', v_rewarded, 'conflict', v_conflict);
+  return jsonb_build_object('applied', true, 'rewarded', v_rewarded, 'conflict', v_conflict)
+    || case when v_rewarded then jsonb_build_object('reward_credits', reward_credits, 'inviter_id', v_invite.inviter_user_id) else '{}'::jsonb end;
 end;
 $$;
 
@@ -4856,6 +4888,69 @@ $_$;
 
 
 ALTER FUNCTION "public"."close_payment_dispute"("p_dispute_id" "text", "p_status" "text") OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."codes" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "code" "text" NOT NULL,
+    "kind" "text" NOT NULL,
+    "owner_user_id" "uuid",
+    "invitee_credits" integer,
+    "invitee_pool" "text",
+    "discount_percent" integer,
+    "discount_products" "text"[],
+    "discount_duration" "text",
+    "discount_months" integer,
+    "discount_valid_days" integer,
+    "stripe_coupon_id" "text",
+    "starts_at" timestamp with time zone,
+    "expires_at" timestamp with time zone,
+    "max_redemptions" integer,
+    "redemption_count" integer DEFAULT 0 NOT NULL,
+    "new_users_only" boolean DEFAULT false NOT NULL,
+    "active" boolean DEFAULT true NOT NULL,
+    "note" "text",
+    "created_by" "uuid",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "codes_check" CHECK ((("kind" = 'invite'::"text") = ("owner_user_id" IS NOT NULL))),
+    CONSTRAINT "codes_check1" CHECK ((("kind" <> 'invite'::"text") OR (("invitee_credits" IS NULL) AND ("discount_percent" IS NULL)))),
+    CONSTRAINT "codes_check2" CHECK ((("kind" <> 'campaign'::"text") OR ("invitee_credits" IS NOT NULL) OR ("discount_percent" IS NOT NULL))),
+    CONSTRAINT "codes_check3" CHECK ((("invitee_credits" IS NULL) = ("invitee_pool" IS NULL))),
+    CONSTRAINT "codes_check4" CHECK ((("invitee_pool" <> 'paid'::"text") OR ("max_redemptions" IS NULL) OR ("max_redemptions" > 0))),
+    CONSTRAINT "codes_check5" CHECK ((("discount_percent" IS NULL) = ("discount_products" IS NULL))),
+    CONSTRAINT "codes_check6" CHECK ((("discount_percent" IS NULL) = ("discount_duration" IS NULL))),
+    CONSTRAINT "codes_check7" CHECK ((("discount_percent" IS NOT NULL) OR (("discount_valid_days" IS NULL) AND ("stripe_coupon_id" IS NULL)))),
+    CONSTRAINT "codes_check8" CHECK ((("discount_months" IS NOT NULL) = (NOT ("discount_duration" IS DISTINCT FROM 'repeating'::"text")))),
+    CONSTRAINT "codes_check9" CHECK (("expires_at" > "starts_at")),
+    CONSTRAINT "codes_code_check" CHECK (("code" ~ '^[A-Z0-9]{4,20}$'::"text")),
+    CONSTRAINT "codes_discount_duration_check" CHECK (("discount_duration" = ANY (ARRAY['once'::"text", 'repeating'::"text", 'forever'::"text"]))),
+    CONSTRAINT "codes_discount_months_check" CHECK (("discount_months" > 0)),
+    CONSTRAINT "codes_discount_percent_check" CHECK ((("discount_percent" >= 1) AND ("discount_percent" <= 90))),
+    CONSTRAINT "codes_discount_products_check" CHECK ((("discount_products" IS NULL) OR (("cardinality"("discount_products") > 0) AND ("discount_products" <@ ARRAY['starter_monthly'::"text", 'starter_yearly'::"text", 'pro_monthly'::"text", 'pro_yearly'::"text", 'max_monthly'::"text", 'max_yearly'::"text", 'pack_s'::"text", 'pack_m'::"text", 'pack_l'::"text"])))),
+    CONSTRAINT "codes_discount_valid_days_check" CHECK (("discount_valid_days" > 0)),
+    CONSTRAINT "codes_invitee_credits_check" CHECK (("invitee_credits" > 0)),
+    CONSTRAINT "codes_invitee_pool_check" CHECK (("invitee_pool" = ANY (ARRAY['free'::"text", 'paid'::"text"]))),
+    CONSTRAINT "codes_kind_check" CHECK (("kind" = ANY (ARRAY['invite'::"text", 'campaign'::"text"]))),
+    CONSTRAINT "codes_max_redemptions_check" CHECK (("max_redemptions" > 0)),
+    CONSTRAINT "codes_redemption_count_check" CHECK (("redemption_count" >= 0))
+);
+
+
+ALTER TABLE "public"."codes" OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."code_preview_credits"("offer" "public"."codes") RETURNS integer
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select case when offer.kind = 'invite' then
+    (select (value->>'inviteeCredits')::integer from public.system_settings where key = 'code_invite_rewards')
+    else coalesce(offer.invitee_credits, 0) end;
+$$;
+
+
+ALTER FUNCTION "public"."code_preview_credits"("offer" "public"."codes") OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."generation_jobs" (
@@ -5397,7 +5492,8 @@ CREATE OR REPLACE FUNCTION "public"."my_invite_summary"("p_user" "uuid", "p_invi
     SET "search_path" TO ''
     AS $$
   select public.my_invite_summary(p_user, p_inviter_cap, p_cursor,
-    (select s.value::text::integer from public.system_settings s where s.key = 'code_inviter_window_days'));
+    (select s.value::text::integer from public.system_settings s where s.key = 'code_inviter_window_days'))
+    || jsonb_build_object('rewards', (select value from public.system_settings where key = 'code_invite_rewards'));
 $$;
 
 
@@ -5947,7 +6043,6 @@ declare
   replaced boolean := false;
 begin
   if p_context is null or p_context not in ('signup','account','paywall')
-     or p_invitee_credits is null or p_invitee_credits <= 0
      or p_invite_window_days is null or p_invite_window_days <= 0 then
     raise exception 'INVALID_INPUT';
   end if;
@@ -6021,7 +6116,9 @@ begin
     deadline := least(offer.expires_at, checked_at + make_interval(days => offer.discount_valid_days));
   end if;
 
-  credits := case when offer.kind = 'invite' then p_invitee_credits else coalesce(offer.invitee_credits, 0) end;
+  credits := case when offer.kind = 'invite' then
+    (select (value->>'inviteeCredits')::integer from public.system_settings where key = 'code_invite_rewards')
+    else coalesce(offer.invitee_credits, 0) end;
   grant_pool := case when offer.kind = 'invite' then 'free' else offer.invitee_pool end;
   insert into public.code_redemptions
     (id, code_id, kind, user_id, inviter_user_id, context, status, credits_granted, discount_expires_at)
@@ -7486,56 +7583,6 @@ CREATE TABLE IF NOT EXISTS "public"."code_redemptions" (
 
 
 ALTER TABLE "public"."code_redemptions" OWNER TO "postgres";
-
-
-CREATE TABLE IF NOT EXISTS "public"."codes" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "code" "text" NOT NULL,
-    "kind" "text" NOT NULL,
-    "owner_user_id" "uuid",
-    "invitee_credits" integer,
-    "invitee_pool" "text",
-    "discount_percent" integer,
-    "discount_products" "text"[],
-    "discount_duration" "text",
-    "discount_months" integer,
-    "discount_valid_days" integer,
-    "stripe_coupon_id" "text",
-    "starts_at" timestamp with time zone,
-    "expires_at" timestamp with time zone,
-    "max_redemptions" integer,
-    "redemption_count" integer DEFAULT 0 NOT NULL,
-    "new_users_only" boolean DEFAULT false NOT NULL,
-    "active" boolean DEFAULT true NOT NULL,
-    "note" "text",
-    "created_by" "uuid",
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    CONSTRAINT "codes_check" CHECK ((("kind" = 'invite'::"text") = ("owner_user_id" IS NOT NULL))),
-    CONSTRAINT "codes_check1" CHECK ((("kind" <> 'invite'::"text") OR (("invitee_credits" IS NULL) AND ("discount_percent" IS NULL)))),
-    CONSTRAINT "codes_check2" CHECK ((("kind" <> 'campaign'::"text") OR ("invitee_credits" IS NOT NULL) OR ("discount_percent" IS NOT NULL))),
-    CONSTRAINT "codes_check3" CHECK ((("invitee_credits" IS NULL) = ("invitee_pool" IS NULL))),
-    CONSTRAINT "codes_check4" CHECK ((("invitee_pool" <> 'paid'::"text") OR ("max_redemptions" IS NULL) OR ("max_redemptions" > 0))),
-    CONSTRAINT "codes_check5" CHECK ((("discount_percent" IS NULL) = ("discount_products" IS NULL))),
-    CONSTRAINT "codes_check6" CHECK ((("discount_percent" IS NULL) = ("discount_duration" IS NULL))),
-    CONSTRAINT "codes_check7" CHECK ((("discount_percent" IS NOT NULL) OR (("discount_valid_days" IS NULL) AND ("stripe_coupon_id" IS NULL)))),
-    CONSTRAINT "codes_check8" CHECK ((("discount_months" IS NOT NULL) = (NOT ("discount_duration" IS DISTINCT FROM 'repeating'::"text")))),
-    CONSTRAINT "codes_check9" CHECK (("expires_at" > "starts_at")),
-    CONSTRAINT "codes_code_check" CHECK (("code" ~ '^[A-Z0-9]{4,20}$'::"text")),
-    CONSTRAINT "codes_discount_duration_check" CHECK (("discount_duration" = ANY (ARRAY['once'::"text", 'repeating'::"text", 'forever'::"text"]))),
-    CONSTRAINT "codes_discount_months_check" CHECK (("discount_months" > 0)),
-    CONSTRAINT "codes_discount_percent_check" CHECK ((("discount_percent" >= 1) AND ("discount_percent" <= 90))),
-    CONSTRAINT "codes_discount_products_check" CHECK ((("discount_products" IS NULL) OR (("cardinality"("discount_products") > 0) AND ("discount_products" <@ ARRAY['starter_monthly'::"text", 'starter_yearly'::"text", 'pro_monthly'::"text", 'pro_yearly'::"text", 'max_monthly'::"text", 'max_yearly'::"text", 'pack_s'::"text", 'pack_m'::"text", 'pack_l'::"text"])))),
-    CONSTRAINT "codes_discount_valid_days_check" CHECK (("discount_valid_days" > 0)),
-    CONSTRAINT "codes_invitee_credits_check" CHECK (("invitee_credits" > 0)),
-    CONSTRAINT "codes_invitee_pool_check" CHECK (("invitee_pool" = ANY (ARRAY['free'::"text", 'paid'::"text"]))),
-    CONSTRAINT "codes_kind_check" CHECK (("kind" = ANY (ARRAY['invite'::"text", 'campaign'::"text"]))),
-    CONSTRAINT "codes_max_redemptions_check" CHECK (("max_redemptions" > 0)),
-    CONSTRAINT "codes_redemption_count_check" CHECK (("redemption_count" >= 0))
-);
-
-
-ALTER TABLE "public"."codes" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."credit_ledger" (
@@ -9554,6 +9601,11 @@ GRANT ALL ON FUNCTION "public"."admin_save_code"("p_actor" "uuid", "p_code_id" "
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_save_invite_rewards"("p_actor" "uuid", "p_invitee" integer, "p_inviter" integer, "p_expected" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_save_invite_rewards"("p_actor" "uuid", "p_invitee" integer, "p_inviter" integer, "p_expected" "jsonb") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_save_provider"("p_actor" "uuid", "p_id" "uuid", "p_settings" "jsonb", "p_capabilities" "jsonb", "p_key" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_save_provider"("p_actor" "uuid", "p_id" "uuid", "p_settings" "jsonb", "p_capabilities" "jsonb", "p_key" "text") TO "service_role";
 
@@ -9762,6 +9814,15 @@ REVOKE ALL ON FUNCTION "public"."clawback_payment_credits"("p_payment_id" bigint
 
 REVOKE ALL ON FUNCTION "public"."close_payment_dispute"("p_dispute_id" "text", "p_status" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."close_payment_dispute"("p_dispute_id" "text", "p_status" "text") TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "public"."codes" TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."code_preview_credits"("offer" "public"."codes") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."code_preview_credits"("offer" "public"."codes") TO "service_role";
 
 
 
@@ -10136,10 +10197,6 @@ GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public
 
 
 GRANT SELECT ON TABLE "public"."code_redemptions" TO "service_role";
-
-
-
-GRANT SELECT ON TABLE "public"."codes" TO "service_role";
 
 
 

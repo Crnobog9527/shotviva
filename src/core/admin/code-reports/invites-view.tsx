@@ -1,5 +1,7 @@
 import Link from 'next/link'
 
+import type { InviteRewards } from '../../codes'
+import { InviteRewardsForm, type SaveRewards } from './invite-rewards-form'
 import { TableCell, TableRow } from '../../ui/table'
 import type { Page } from '../cursor'
 import { AdminPage, formatBeijing } from '../shell'
@@ -7,11 +9,12 @@ import { COPY } from './copy'
 import { NavLink, Pager, Person, ReportTable } from './report-table'
 import type { InviterRow, RedemptionRow } from './schemas'
 
-type Props = { leaders: InviterRow[]; blocked: Page<RedemptionRow>; allTime: boolean; cursor?: string }
+type Props = { leaders: InviterRow[]; blocked: Page<RedemptionRow>; allTime: boolean; cursor?: string; rewards: InviteRewards; save: SaveRewards }
 
-export function InvitesReport({ leaders, blocked, allTime, cursor }: Props) {
+export function InvitesReport({ leaders, blocked, allTime, cursor, rewards, save }: Props) {
   const path = '/admin/codes/invites'
   return <AdminPage title={COPY.invites} actions={<NavLink href="/admin/codes">{COPY.list}</NavLink>}>
+    <InviteRewardsForm rewards={rewards} save={save} />
     <section className="grid gap-3">
       <h2 className="font-semibold">{COPY.rank}</h2>
       <nav className="flex gap-2"><NavLink href={path} current={!allTime}>{COPY.month}</NavLink>

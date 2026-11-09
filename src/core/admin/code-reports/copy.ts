@@ -1,4 +1,8 @@
 export const COPY = {
+  settings: '个人邀请奖励设置', signupReward: '受邀好友注册奖励（免费积分）', firstPaymentReward: '好友首次付款后，邀请人所得奖励（付费积分）',
+  settingsNote: '适用于全站个人邀请码。保存后，好友成功兑换邀请码时领取注册奖励，首次付款结算邀请奖励时按当时额度发放。已入账积分保留原数。',
+  settingsRange: '每项可填 0 至 10000 的整数。填 0 可单独关闭该项，好友仍可注册、绑定邀请和付款。',
+  saveRewards: '保存邀请奖励', savedRewards: '已保存邀请奖励。', staleRewards: '设置已被修改，请刷新页面后重新填写。',
   title: '码管理', details: '兑换明细', invites: '邀请统计', create: '新建后台码', edit: '编辑', list: '码列表',
   all: '全部', kind: { invite: '邀请码', campaign: '后台码' }, code: '码', type: '类型', effect: '兑换效果',
   limit: '已兑 / 名额', expires: '兑换截止（北京时间）', active: '已启用', inactive: '已停用', status: '状态',
