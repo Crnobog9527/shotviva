@@ -1,3 +1,4 @@
+import type { Enrollment } from '@/core/affiliate/admin/enrollment'
 import type { JobToggle } from '../jobs/job-toggles-row'
 
 // /admin/users data shapes (ARCHITECTURE §10). credits = paid pool, freeCredits = free pool.
@@ -36,6 +37,7 @@ export type UserDetail = {
   freeCredits: number
   paidUntil: string | null
   bannedAt: string | null
+  membership?: Enrollment | null
   referrer?: string | null
   signupIp: string | null
 }

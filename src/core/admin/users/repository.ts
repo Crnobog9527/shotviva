@@ -3,6 +3,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
+import { enrollmentRow } from '@/core/affiliate/admin/enrollment'
 import { AppError } from '@/core/errors'
 
 import { afterCursor, decodeCursor, PAGE_SIZE, toPage, type Page } from '../cursor'
@@ -29,6 +30,7 @@ const profileRow = z.object({
   banned_at: z.string().nullable(),
   created_at: z.string(),
   signup_ip: z.string().nullable(),
+  membership: enrollmentRow.nullable().optional(),
   referrer: z.object({ slug: z.string() }).nullable().optional(),
 })
 
@@ -42,7 +44,7 @@ function referrerFact({ referrer }: Referrer): Pick<UserDetail, 'referrer'> {
 export async function loadUser(db: SupabaseClient, id: string, affiliate = false): Promise<UserDetail | null> {
   if (!isUuid(id)) return null
   const fields = 'id, role, credits, free_credits, paid_until, banned_at, created_at, signup_ip'
-    + (affiliate ? ',referrer:affiliates!profiles_referred_by_fkey(slug)' : '')
+    + (affiliate ? ',referrer:affiliates!profiles_referred_by_fkey(slug),membership:affiliates!affiliates_user_id_fkey(slug,status,source:application->>source)' : '')
   const [profile, auth] = await Promise.all([
     db.from('profiles').select(fields).eq('id', id).maybeSingle(),
     db.auth.admin.getUserById(id),
@@ -61,6 +63,7 @@ export async function loadUser(db: SupabaseClient, id: string, affiliate = false
     paidUntil: row.paid_until,
     bannedAt: row.banned_at,
     signupIp: row.signup_ip,
+    membership: row.membership,
     ...referrerFact(row),
   }
 }

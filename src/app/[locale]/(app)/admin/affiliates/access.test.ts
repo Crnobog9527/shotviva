@@ -12,11 +12,13 @@ vi.mock('@/core/affiliate/admin', async () => ({
   AffiliateAdminView: () => null,
 }))
 const { default: page } = await import('./page')
+const { enrollAffiliate } = await import('@/core/affiliate/admin/create-action')
 const { saveAffiliate } = await import('./actions')
 const { GET } = await import('@/app/api/admin/affiliates/export/route')
 const endpoints = [
   () => page({ searchParams: Promise.resolve({}), params: Promise.resolve({ locale: 'en' }) }),
   () => saveAffiliate('', new FormData()),
+  () => enrollAffiliate(new FormData()),
   () => GET(new Request('http://localhost/api/admin/affiliates/export?tab=commissions')),
 ]
 describe('affiliate admin endpoints', () => {

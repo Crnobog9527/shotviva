@@ -1,7 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { COPY, STATUS, money } from './copy'
 import type { SaveAction } from './form'
-import { CreateMember, DecideMember, SetMember, Adjust } from './member-forms'
+import { enrollmentLabel } from './enrollment'
+import { CreateMember } from './create-member'
+import { DecideMember, SetMember, Adjust } from './member-forms'
 import { Field, FiltersForm, GridTable, LinkTo, NextPage, Section } from './parts'
 import type { Filters } from './query'
 import { loadMember, members, referred, adjustments, type Member } from './read'
@@ -12,7 +14,7 @@ export async function MembersView({ db, filters, action }: ViewProps) {
   const result = await members(db, filters)
   return (
     <>
-      {filters.tab === 'affiliates' && <CreateMember action={action} />}
+      {filters.tab === 'affiliates' && <CreateMember />}
       <FiltersForm tab={filters.tab}>
         <Field label={COPY.search} name="q" defaultValue={filters.q} />
       </FiltersForm>
@@ -25,7 +27,7 @@ export async function MembersView({ db, filters, action }: ViewProps) {
               {r.slug}
             </LinkTo>,
             r.user_id,
-            STATUS[r.status],
+            enrollmentLabel(r),
             r.created_at.slice(0, 10),
           ],
         }))}
@@ -38,7 +40,7 @@ function ProfileFacts({ member: m }: { member: Member }) {
   const app = m.application ?? {}
   const rows = [
     [COPY.account, m.user_id],
-    [COPY.status, STATUS[m.status]],
+    [COPY.status, enrollmentLabel({ status: m.status, source: app.source })],
     [COPY.name, app.name],
     [COPY.country, m.country],
     [COPY.channels, app.channel],

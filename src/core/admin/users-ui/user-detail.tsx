@@ -1,3 +1,4 @@
+import dynamic from 'next/dynamic'
 import { Button } from '@/core/ui/button'
 
 import { StatCard } from '../shell/admin-blocks'
@@ -11,6 +12,8 @@ import { UserCodesRow } from './user-codes-row'
 import { PaymentsBlock } from './payments-block'
 import { UserActions, type UserAdminActions } from './user-actions'
 import { LedgerTable, UserJobsTable } from './user-tables'
+
+const CreateMember = dynamic(() => import('@/core/affiliate/admin/create-member').then((m) => m.CreateMember))
 
 type Props = {
   data: UserDetailData
@@ -29,6 +32,7 @@ export function UserDetailView({ data, actions, support, onLedgerPage, onCodesPa
   const { user, jobs, ledger, extras } = data
   return (
     <div className="grid gap-6">
+      {user.membership !== undefined && <CreateMember userId={user.id} member={user.membership} />}
       {/* Two cards a row on a phone leave ~130px: the figures step down a size so dates stay on one line. */}
       <div className="grid grid-cols-2 gap-3 max-sm:[&_p.font-mono]:text-lg md:grid-cols-4">
         <StatCard title={COPY.detail.paid} value={String(user.credits)} />
