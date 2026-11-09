@@ -1,9 +1,10 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
-import { CategoriesPanel, listAdminCategories, listAdminTemplates, listImageProviderOptions, TemplatesEditor } from '@/core/admin'
+import { CategoriesPanel, listAdminCategories, listAdminTemplates, TemplatesEditor } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
-import { CREDITS_FLOOR } from '@/modules/image'
+import { pricingFromOptions } from '@/core/admin/templates/provider-pricing'
+import { readPricingOptions } from './pricing'
 import { site } from '@/site/site.config'
 
 import {
@@ -39,7 +40,7 @@ const COVER_LANGUAGES = [
 export default async function AdminTemplatesPage() {
   await requireAdmin()
   const db = createAdminSupabase()
-  const [templates, categories, providers] = await Promise.all([listAdminTemplates(db), listAdminCategories(db), listImageProviderOptions(db)])
+  const [templates, categories, providers] = await Promise.all([listAdminTemplates(db), listAdminCategories(db), readPricingOptions(db)])
   return (
     <div className="mx-auto grid w-full max-w-6xl gap-6 p-6">
       <div className="flex items-center gap-3">
@@ -57,7 +58,7 @@ export default async function AdminTemplatesPage() {
         templates={templates}
         providers={providers}
         categories={categories}
-        floor={CREDITS_FLOOR}
+        floor={pricingFromOptions(providers)}
         coverLanguages={COVER_LANGUAGES}
         actions={{
           save: saveTemplateAction,

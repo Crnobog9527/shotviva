@@ -3,7 +3,6 @@
 import { Input } from '@/core/ui/input'
 import { Label } from '@/core/ui/label'
 import { RESOLUTIONS } from '@/core/templates/output-options'
-import type { CreditsFloor } from '@/core/templates/pricing'
 
 import type { BulkEditValues, SurfaceChoice } from './bulk-edit-state'
 import type { CategoryOption } from './category-field'
@@ -15,14 +14,13 @@ const SELECT = 'border-input h-9 rounded-md border bg-transparent px-3 text-sm'
 type Props = {
   values: BulkEditValues
   problems: Partial<Record<keyof BulkEditValues['credits'], string>>
-  floor: CreditsFloor
   // T75's categories; system ones (photo edit, freeform) are never offered as a target.
   categories: readonly CategoryOption[]
   onChange: (values: BulkEditValues) => void
 }
 
 // The batch-edit form: three optional credit boxes, entry points, quality. Each starts on 不改.
-export function BulkEditFields({ values, problems, floor, categories, onChange }: Props) {
+export function BulkEditFields({ values, problems, categories, onChange }: Props) {
   return (
     <div className="grid gap-4">
       <fieldset className="grid gap-2">
@@ -40,7 +38,7 @@ export function BulkEditFields({ values, problems, floor, categories, onChange }
                 onChange={(event) => onChange({ ...values, credits: { ...values.credits, [resolution]: event.target.value } })}
               />
               <p className={problems[resolution] ? 'text-destructive text-xs' : 'text-muted-foreground text-xs'}>
-                {problems[resolution] ?? COPY.floorHint(floor.high[resolution], floor.medium[resolution])}
+                {problems[resolution] ?? '核对时按各模板所用模型检查下限'}
               </p>
             </div>
           ))}

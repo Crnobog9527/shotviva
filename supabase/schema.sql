@@ -140,6 +140,75 @@ $$;
 
 ALTER FUNCTION "admin"."clear_approved_wallets_v2"("p_digest" "text", "p_last_ledger" bigint, "p_payments" bigint) OWNER TO "postgres";
 
+SET default_tablespace = '';
+
+SET default_table_access_method = "heap";
+
+
+CREATE TABLE IF NOT EXISTS "public"."templates" (
+    "id" "text" NOT NULL,
+    "module" "text" DEFAULT 'image'::"text" NOT NULL,
+    "name" "text" NOT NULL,
+    "category" "text" NOT NULL,
+    "cover_before_url" "text",
+    "cover_after_url" "text",
+    "fields" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "credits_cost" "jsonb" DEFAULT '{"1k": 2, "2k": 4, "3k": 6}'::"jsonb" NOT NULL,
+    "sort_order" integer DEFAULT 0 NOT NULL,
+    "is_active" boolean DEFAULT false NOT NULL,
+    "visible_in" "text"[] DEFAULT ARRAY['web'::"text"] NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "quality" "text" DEFAULT 'high'::"text" NOT NULL,
+    "cover_media_type" "text" DEFAULT 'image'::"text" NOT NULL,
+    "cover_video_url" "text",
+    "cover_poster_url" "text",
+    "translations" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "description" "text",
+    "featured_rank" smallint,
+    "category_key" "text" NOT NULL,
+    "cover_locales" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    CONSTRAINT "templates_category_check" CHECK ((("char_length"("category") >= 1) AND ("char_length"("category") <= 60))),
+    CONSTRAINT "templates_cover_locales_object" CHECK (("jsonb_typeof"("cover_locales") = 'object'::"text")),
+    CONSTRAINT "templates_cover_media_type_check" CHECK (("cover_media_type" = ANY (ARRAY['image'::"text", 'animated'::"text", 'video'::"text"]))),
+    CONSTRAINT "templates_cover_motion_complete" CHECK ((("cover_media_type" = 'image'::"text") OR (("cover_video_url" IS NOT NULL) AND ("cover_poster_url" IS NOT NULL)))),
+    CONSTRAINT "templates_credits_cost_check" CHECK ((("jsonb_typeof"("credits_cost") = 'object'::"text") AND ("credits_cost" ?& ARRAY['1k'::"text", '2k'::"text", '3k'::"text"]) AND (((("credits_cost" - '1k'::"text") - '2k'::"text") - '3k'::"text") = '{}'::"jsonb") AND ("jsonb_typeof"(("credits_cost" -> '1k'::"text")) = 'number'::"text") AND (("credits_cost" ->> '1k'::"text") ~ '^[1-9][0-9]{0,2}$'::"text") AND ("jsonb_typeof"(("credits_cost" -> '2k'::"text")) = 'number'::"text") AND (("credits_cost" ->> '2k'::"text") ~ '^[1-9][0-9]{0,2}$'::"text") AND ("jsonb_typeof"(("credits_cost" -> '3k'::"text")) = 'number'::"text") AND (("credits_cost" ->> '3k'::"text") ~ '^[1-9][0-9]{0,2}$'::"text"))),
+    CONSTRAINT "templates_description_check" CHECK ((("description" IS NULL) OR (("char_length"("description") >= 1) AND ("char_length"("description") <= 160)))),
+    CONSTRAINT "templates_featured_live_check" CHECK ((("featured_rank" IS NULL) OR ("is_active" AND ('web'::"text" = ANY ("visible_in"))))),
+    CONSTRAINT "templates_featured_rank_check" CHECK ((("featured_rank" IS NULL) OR (("featured_rank" >= 1) AND ("featured_rank" <= 12)))),
+    CONSTRAINT "templates_fields_check" CHECK (("jsonb_typeof"("fields") = 'object'::"text")),
+    CONSTRAINT "templates_id_check" CHECK ((("id" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text") AND ("char_length"("id") <= 64))),
+    CONSTRAINT "templates_module_check" CHECK (("module" = ANY (ARRAY['image'::"text", 'video'::"text"]))),
+    CONSTRAINT "templates_name_check" CHECK ((("char_length"("name") >= 1) AND ("char_length"("name") <= 120))),
+    CONSTRAINT "templates_quality_check" CHECK (("quality" = ANY (ARRAY['high'::"text", 'medium'::"text"]))),
+    CONSTRAINT "templates_translations_check" CHECK ((("jsonb_typeof"("translations") = 'object'::"text") AND (("translations" - 'zh'::"text") = '{}'::"jsonb") AND ((NOT ("translations" ? 'zh'::"text")) OR ("jsonb_typeof"(("translations" -> 'zh'::"text")) = 'object'::"text")))),
+    CONSTRAINT "templates_visible_in_check" CHECK (("visible_in" <@ ARRAY['web'::"text", 'partner'::"text"]))
+);
+
+
+ALTER TABLE "public"."templates" OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."partner_image_aspects"("public"."templates") RETURNS "text"[]
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+  select array(
+    select r.ratio from public.templates t
+    cross join lateral jsonb_array_elements_text(t.fields->'aspectRatios') with ordinality r(ratio, ord)
+    where t.id = $1.id and t.is_active and t.visible_in @> array['partner']
+      and not exists (
+        select 1 from public.ai_providers p
+        where p.module = 'image' and p.adapter = 'openrouter_images'
+          and (p.is_active or p.id = (select tp.provider_id from public.template_prompts tp where tp.template_id = t.id))
+          and not coalesce((p.capabilities->'resolutions') ? '1k'
+            and coalesce(p.capabilities->'providerAspectRatios', p.capabilities->'aspectRatios') ? r.ratio, false))
+    order by r.ord)
+$_$;
+
+
+ALTER FUNCTION "admin"."partner_image_aspects"("public"."templates") OWNER TO "postgres";
+
 
 CREATE OR REPLACE FUNCTION "admin"."purchase_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_event_id" "text") RETURNS "public"."credit_change"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -327,6 +396,27 @@ $$;
 ALTER FUNCTION "admin"."restore_approved_wallets_v2"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."template_image_options"("public"."templates") RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+  select case when p.adapter = 'openrouter_images' then jsonb_build_object(
+      'aspectRatios', coalesce(p.capabilities->'aspectRatios','[]'::jsonb),
+      'resolutions', coalesce(p.capabilities->'resolutions','[]'::jsonb),
+      'originalRatio', coalesce(p.capabilities->'originalRatio','false'::jsonb))
+    else '{"aspectRatios":["16:9","4:5","1:1","9:16","3:2","4:3","2:3"],"resolutions":["1k","2k","3k"],"originalRatio":true}'::jsonb end
+  from public.templates t
+  left join public.template_prompts tp on tp.template_id = t.id
+  left join public.ai_providers p on p.id = coalesce(
+    case when t.id <> 'edit' then tp.provider_id end,
+    (select a.id from public.ai_providers a where a.module = 'image' and a.is_active))
+  where t.id = $1.id and (t.is_active or current_setting('role',true) = 'service_role')
+$_$;
+
+
+ALTER FUNCTION "admin"."template_image_options"("public"."templates") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."waffo_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") RETURNS "public"."credit_change"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -391,10 +481,6 @@ $$;
 
 
 ALTER FUNCTION "public"."_affiliate_audit"("p_actor" "uuid", "p_action" "text", "p_target" "text", "p_reason" "text") OWNER TO "postgres";
-
-SET default_tablespace = '';
-
-SET default_table_access_method = "heap";
 
 
 CREATE TABLE IF NOT EXISTS "public"."payments" (
@@ -1870,16 +1956,31 @@ begin
   -- The rows are checked and written under one lock, so no other save slips in between.
   perform 1 from public.templates t where t.id = any (v_ids) for update;
 
+  -- A supplier may have switched since the admin action read costs. Re-read the effective
+  -- binding under the template lock; a missing/different model requires a fresh preview.
+  if p_floor ? 'models' and exists (
+    select 1 from public.templates t
+      left join public.template_prompts tp on tp.template_id = t.id
+      left join public.ai_providers active on active.is_active and active.module = 'image'
+      left join public.ai_providers p on p.id = coalesce(tp.provider_id, active.id)
+     where t.id = any(v_ids) and (
+       not (p_floor->'providers' ? coalesce(p.id::text, 'env'))
+       or (p.id is not null and p.model is distinct from (p_floor->'models'->>p.id::text)))
+  ) then raise exception 'MODEL_CHANGED'; end if;
+
   with planned as (
     select a.id, t.id is not null as found, coalesce(t.name, a.id) as name, t.is_active,
            t.description, t.cover_before_url, t.cover_after_url, t.cover_locales, t.visible_in as old_visible,
            coalesce(v_patch ->> 'quality', t.quality) as quality,
+           coalesce(p_floor -> 'providers' -> coalesce(tp.provider_id::text, active.id::text, 'env'), p_floor) as floor,
            t.credits_cost || v_cost as credits_cost,
            coalesce(v_visible, t.visible_in) as visible_in,
            a.id in ('edit', 'freeform') or coalesce(c.is_system, false) as is_builtin
     from unnest(v_ids) as a(id)
     left join public.templates t on t.id = a.id
     left join public.template_categories c on c.key = t.category_key
+    left join public.template_prompts tp on tp.template_id = t.id
+    left join public.ai_providers active on active.module = 'image' and active.is_active
   ),
   failures as (
     select jsonb_build_object('id', p.id, 'name', p.name, 'reason', case when p.found then 'system' else 'not_found' end) as failure
@@ -1888,11 +1989,11 @@ begin
     union all
     select jsonb_build_object(
       'id', p.id, 'name', p.name, 'reason', 'below_floor', 'resolution', r.res,
-      'floor', (p_floor -> p.quality ->> r.res)::integer, 'given', (p.credits_cost ->> r.res)::integer
+      'floor', (p.floor -> p.quality ->> r.res)::integer, 'given', (p.credits_cost ->> r.res)::integer
     )
     from planned p
     cross join unnest(array['1k', '2k', '3k']) as r(res)
-    where p.found and not p.is_builtin and (p.credits_cost ->> r.res)::integer < (p_floor -> p.quality ->> r.res)::integer
+    where p.found and not p.is_builtin and (p.credits_cost ->> r.res)::integer < (p.floor -> p.quality ->> r.res)::integer
     union all
     select jsonb_build_object('id', p.id, 'name', p.name, 'reason', 'web_incomplete')
     from planned p
@@ -2493,6 +2594,38 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uuid"[]) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_image_provider_pricing"("p_env_model" "text") RETURNS TABLE("provider_id" "uuid", "label" "text", "model" "text", "adapter" "text", "is_active" boolean, "capabilities" "jsonb", "resolutions" "text"[], "estimated_image_costs" "jsonb", "p95" "jsonb")
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  with samples as (
+    select g.provider, coalesce(g.inputs->>'resolution', '1k') as resolution,
+           percentile_cont(0.95) within group (order by g.cost_usd) as cost
+      from public.generation_jobs g
+     where g.created_at >= now() - interval '30 days'
+       and coalesce(g.inputs->>'resolution', '1k') in ('1k','2k','3k')
+       and g.status = 'succeeded' and g.cost_usd is not null
+     group by 1, 2 having count(*) >= 10
+  ), costs as (
+    select provider, jsonb_object_agg(resolution, cost) as p95 from samples group by provider
+  )
+  select p.id, p.label, p.model, p.adapter, p.is_active, p.capabilities, p.resolutions,
+         p.estimated_image_costs, coalesce(c.p95, '{}'::jsonb)
+    from public.ai_providers p
+    left join costs c on c.provider = p.id::text || '/' || p.model
+   where p.module = 'image'
+  union all
+  select null::uuid, '环境默认'::text, p_env_model, 'openai_images'::text, true, '{}'::jsonb,
+         array['1k', '2k', '3k'], '{}'::jsonb, coalesce(c.p95, '{}'::jsonb)
+    from (values (1)) as fallback(dummy) left join costs c on c.provider = 'env/' || p_env_model
+   where not exists (select 1 from public.ai_providers where module = 'image' and is_active)
+   order by 2, 1
+$$;
+
+
+ALTER FUNCTION "public"."admin_image_provider_pricing"("p_env_model" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_list_codes"("p_actor" "uuid", "p_cursor" "jsonb" DEFAULT NULL::"jsonb", "p_kind" "text" DEFAULT NULL::"text", "p_code_id" "uuid" DEFAULT NULL::"uuid") RETURNS SETOF "jsonb"
@@ -3228,6 +3361,50 @@ $$;
 ALTER FUNCTION "public"."admin_save_code"("p_actor" "uuid", "p_code_id" "uuid", "p_fields" "jsonb", "p_catalog" "jsonb", "p_floor_product_id" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_save_provider"("p_actor" "uuid", "p_id" "uuid", "p_settings" "jsonb", "p_capabilities" "jsonb", "p_key" "text" DEFAULT NULL::"text") RETURNS "uuid"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_id uuid;
+  v_tiers text[] := array(select jsonb_array_elements_text(p_capabilities->'resolutions'));
+begin
+  if not exists (select 1 from public.profiles where id=p_actor and role='admin' and banned_at is null) then
+    raise exception 'ADMIN_REQUIRED' using errcode='42501';
+  end if;
+  if p_settings->>'module'='image' and (jsonb_typeof(p_capabilities->'originalRatio') is distinct from 'boolean'
+     or jsonb_typeof(p_capabilities->'aspectRatios') is distinct from 'array'
+     or jsonb_typeof(p_capabilities->'maxReferences') is distinct from 'number'
+     or jsonb_typeof(p_capabilities->'minReferences') is distinct from 'number'
+     or (p_capabilities->>'fetchedAt')::timestamptz is null) then
+    raise exception 'INVALID_PROVIDER_CAPABILITIES' using errcode='23514';
+  end if;
+  if p_settings->>'module'='decision' then v_tiers := array['1k','2k','3k']; end if;
+  if p_id is null then
+    if p_key is null then raise exception 'PROVIDER_KEY_REQUIRED'; end if;
+    insert into public.ai_providers (module,adapter,label,base_url,model,notes,updated_by,capabilities,resolutions,
+      price_input_text_per_m,price_input_image_per_m,price_output_per_m,estimated_image_costs)
+    values (p_settings->>'module',p_settings->>'adapter',p_settings->>'label',p_settings->>'base_url',p_settings->>'model',p_settings->>'notes',p_actor,
+      p_capabilities,v_tiers,(p_settings->>'price_input_text_per_m')::numeric,(p_settings->>'price_input_image_per_m')::numeric,
+      (p_settings->>'price_output_per_m')::numeric,coalesce(p_settings->'estimated_image_costs','{}')) returning id into v_id;
+  else
+    update public.ai_providers set label=p_settings->>'label',base_url=p_settings->>'base_url',model=p_settings->>'model',
+      notes=p_settings->>'notes',updated_by=p_actor,capabilities=p_capabilities,resolutions=v_tiers,
+      estimated_image_costs=coalesce(p_settings->'estimated_image_costs', case when model=p_settings->>'model' and base_url=p_settings->>'base_url' then estimated_image_costs else '{}'::jsonb end),
+      price_input_text_per_m=(p_settings->>'price_input_text_per_m')::numeric,
+      price_input_image_per_m=(p_settings->>'price_input_image_per_m')::numeric,price_output_per_m=(p_settings->>'price_output_per_m')::numeric
+    where id=p_id and module=p_settings->>'module' and adapter=p_settings->>'adapter' returning id into v_id;
+    if not found then raise exception 'PROVIDER_NOT_FOUND'; end if;
+  end if;
+  if p_key is not null then perform public.admin_set_provider_key(v_id,p_key); end if;
+  return v_id;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_save_provider"("p_actor" "uuid", "p_id" "uuid", "p_settings" "jsonb", "p_capabilities" "jsonb", "p_key" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_save_template_category"("p_category" "jsonb", "p_is_new" boolean, "p_actor" "uuid") RETURNS "void"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -3947,7 +4124,42 @@ CREATE OR REPLACE FUNCTION "public"."admin_upsert_template"("p_template" "jsonb"
     AS $$
 declare
   v_id text := p_template ->> 'id';
+  v_provider uuid;
+  v_caps jsonb;
+  v_model text;
+  v_floor jsonb;
+  v_refs jsonb := p_template #> '{fields,images}';
+  v_resolution text;
 begin
+  perform 1 from public.templates where id = v_id for update;
+  if p_prompt ? 'provider_id' then
+    v_provider := (p_prompt ->> 'provider_id')::uuid;
+  else
+    select provider_id into v_provider from public.template_prompts where template_id = v_id;
+  end if;
+  select p.id, p.capabilities, p.model into v_provider, v_caps, v_model from public.ai_providers p
+    where p.module = 'image' and (p.id = v_provider or (v_provider is null and p.is_active)) for share;
+  if (v_refs->>'min')::integer < (v_caps->>'minReferences')::integer
+    or (v_refs->>'max')::integer > (v_caps->>'maxReferences')::integer then
+    raise exception 'MODEL_REFERENCE_LIMIT' using detail = format('所选模型支持 %s–%s 张参考图，模板设置为 %s–%s 张',
+      v_caps->>'minReferences', v_caps->>'maxReferences', v_refs->>'min', v_refs->>'max');
+  end if;
+
+  -- Older deployments send no pricing snapshot. New code derives it from site products and
+  -- measured costs on the server; callers without the service role cannot invoke this RPC.
+  if p_template ? 'price_floors' then
+    v_floor := p_template->'price_floors'->'providers'->coalesce(v_provider::text, 'env');
+    if v_floor is null or (v_provider is not null and p_template->'price_floors' ? 'models'
+        and v_model is distinct from (p_template->'price_floors'->'models'->>v_provider::text)) then
+      raise exception 'MODEL_CHANGED';
+    end if;
+    foreach v_resolution in array array['1k','2k','3k'] loop
+      if (p_template->'credits_cost'->>v_resolution)::integer <
+          (v_floor->coalesce(p_template->>'quality','high')->>v_resolution)::integer then
+        raise exception 'MODEL_CREDIT_FLOOR' using detail = format('%s 积分低于所选模型下限，请检查该档建议积分和成本估价', v_resolution);
+      end if;
+    end loop;
+  end if;
   insert into public.templates as t (
     id, module, name, category, category_key, cover_before_url, cover_after_url,
     fields, quality, credits_cost, sort_order, is_active, visible_in, translations, description, featured_rank
@@ -5433,6 +5645,15 @@ $$;
 ALTER FUNCTION "public"."openai_admin_key"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."partner_image_aspects"("public"."templates") RETURNS "text"[]
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    RETURN "admin"."partner_image_aspects"($1);
+
+
+ALTER FUNCTION "public"."partner_image_aspects"("public"."templates") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."payment_clawback_preview"("p_payment_id" bigint) RETURNS "jsonb"
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -6483,6 +6704,38 @@ $$;
 ALTER FUNCTION "public"."support_reply_hours"("p_tier" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."sync_image_capabilities"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if tg_op = 'UPDATE' and (new.adapter,new.base_url,new.model) is distinct from (old.adapter,old.base_url,old.model) then
+    if new.capabilities = old.capabilities then
+      new.capabilities := '{}';
+      new.estimated_image_costs := '{}';
+    end if;
+  end if;
+  if new.adapter = 'openai_images' and new.capabilities = '{}' then
+    new.capabilities := jsonb_build_object(
+      'resolutions',to_jsonb(new.resolutions),'aspectRatios','["16:9","4:5","1:1","9:16","3:2","4:3","2:3"]'::jsonb,
+      'originalRatio',true,'minReferences',0,'maxReferences',4,'fetchedAt',now()
+    );
+  end if;
+  if new.capabilities <> '{}' and new.capabilities->'resolutions' is distinct from to_jsonb(new.resolutions) then
+    if tg_op = 'UPDATE' and new.capabilities = old.capabilities then
+      new.capabilities := case when new.adapter = 'openai_images' then
+        jsonb_set(new.capabilities,'{resolutions}',to_jsonb(new.resolutions)) else '{}'::jsonb end;
+    else raise exception 'INVALID_PROVIDER_CAPABILITIES' using errcode='23514';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."sync_image_capabilities"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."sync_subscription"("p_subscription_id" "text", "p_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -6665,6 +6918,15 @@ $$;
 
 
 ALTER FUNCTION "public"."template_favorites_guard"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."template_image_options"("public"."templates") RETURNS "jsonb"
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    RETURN "admin"."template_image_options"($1);
+
+
+ALTER FUNCTION "public"."template_image_options"("public"."templates") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."template_request_votes_count"() RETURNS "trigger"
@@ -7218,9 +7480,13 @@ CREATE TABLE IF NOT EXISTS "public"."ai_providers" (
     "price_input_image_per_m" numeric(12,6),
     "price_output_per_m" numeric(12,6),
     "resolutions" "text"[] DEFAULT '{1k,2k,3k}'::"text"[] NOT NULL,
+    "capabilities" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "estimated_image_costs" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
     CONSTRAINT "ai_providers_adapter_check" CHECK (("adapter" = ANY (ARRAY['openai_images'::"text", 'openrouter_images'::"text", 'openai_responses'::"text"]))),
     CONSTRAINT "ai_providers_api_key_last4_check" CHECK ((("char_length"("api_key_last4") >= 1) AND ("char_length"("api_key_last4") <= 4))),
     CONSTRAINT "ai_providers_base_url_check" CHECK ((("base_url" ~ '^https://[^\s/?#@]+(/[^\s?#]*)?$'::"text") AND ("char_length"("base_url") <= 300))),
+    CONSTRAINT "ai_providers_capabilities_check" CHECK (("jsonb_typeof"("capabilities") = 'object'::"text")),
+    CONSTRAINT "ai_providers_estimated_image_costs_check" CHECK ((("jsonb_typeof"("estimated_image_costs") = 'object'::"text") AND (("estimated_image_costs" - ARRAY['1k'::"text", '2k'::"text", '3k'::"text"]) = '{}'::"jsonb") AND (NOT "jsonb_path_exists"("estimated_image_costs", '$.*?(@.type() != "number" || @ <= 0)'::"jsonpath")))),
     CONSTRAINT "ai_providers_key_pair" CHECK ((("vault_secret_id" IS NULL) = ("api_key_last4" IS NULL))),
     CONSTRAINT "ai_providers_label_check" CHECK ((("char_length"("label") >= 1) AND ("char_length"("label") <= 80))),
     CONSTRAINT "ai_providers_model_check" CHECK ((("char_length"("model") >= 1) AND ("char_length"("model") <= 120))),
@@ -7719,50 +7985,6 @@ CREATE TABLE IF NOT EXISTS "public"."template_request_votes" (
 
 
 ALTER TABLE "public"."template_request_votes" OWNER TO "postgres";
-
-
-CREATE TABLE IF NOT EXISTS "public"."templates" (
-    "id" "text" NOT NULL,
-    "module" "text" DEFAULT 'image'::"text" NOT NULL,
-    "name" "text" NOT NULL,
-    "category" "text" NOT NULL,
-    "cover_before_url" "text",
-    "cover_after_url" "text",
-    "fields" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
-    "credits_cost" "jsonb" DEFAULT '{"1k": 2, "2k": 4, "3k": 6}'::"jsonb" NOT NULL,
-    "sort_order" integer DEFAULT 0 NOT NULL,
-    "is_active" boolean DEFAULT false NOT NULL,
-    "visible_in" "text"[] DEFAULT ARRAY['web'::"text"] NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "quality" "text" DEFAULT 'high'::"text" NOT NULL,
-    "cover_media_type" "text" DEFAULT 'image'::"text" NOT NULL,
-    "cover_video_url" "text",
-    "cover_poster_url" "text",
-    "translations" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
-    "description" "text",
-    "featured_rank" smallint,
-    "category_key" "text" NOT NULL,
-    "cover_locales" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
-    CONSTRAINT "templates_category_check" CHECK ((("char_length"("category") >= 1) AND ("char_length"("category") <= 60))),
-    CONSTRAINT "templates_cover_locales_object" CHECK (("jsonb_typeof"("cover_locales") = 'object'::"text")),
-    CONSTRAINT "templates_cover_media_type_check" CHECK (("cover_media_type" = ANY (ARRAY['image'::"text", 'animated'::"text", 'video'::"text"]))),
-    CONSTRAINT "templates_cover_motion_complete" CHECK ((("cover_media_type" = 'image'::"text") OR (("cover_video_url" IS NOT NULL) AND ("cover_poster_url" IS NOT NULL)))),
-    CONSTRAINT "templates_credits_cost_check" CHECK ((("jsonb_typeof"("credits_cost") = 'object'::"text") AND ("credits_cost" ?& ARRAY['1k'::"text", '2k'::"text", '3k'::"text"]) AND (((("credits_cost" - '1k'::"text") - '2k'::"text") - '3k'::"text") = '{}'::"jsonb") AND ("jsonb_typeof"(("credits_cost" -> '1k'::"text")) = 'number'::"text") AND (("credits_cost" ->> '1k'::"text") ~ '^[1-9][0-9]{0,2}$'::"text") AND ("jsonb_typeof"(("credits_cost" -> '2k'::"text")) = 'number'::"text") AND (("credits_cost" ->> '2k'::"text") ~ '^[1-9][0-9]{0,2}$'::"text") AND ("jsonb_typeof"(("credits_cost" -> '3k'::"text")) = 'number'::"text") AND (("credits_cost" ->> '3k'::"text") ~ '^[1-9][0-9]{0,2}$'::"text"))),
-    CONSTRAINT "templates_description_check" CHECK ((("description" IS NULL) OR (("char_length"("description") >= 1) AND ("char_length"("description") <= 160)))),
-    CONSTRAINT "templates_featured_live_check" CHECK ((("featured_rank" IS NULL) OR ("is_active" AND ('web'::"text" = ANY ("visible_in"))))),
-    CONSTRAINT "templates_featured_rank_check" CHECK ((("featured_rank" IS NULL) OR (("featured_rank" >= 1) AND ("featured_rank" <= 12)))),
-    CONSTRAINT "templates_fields_check" CHECK (("jsonb_typeof"("fields") = 'object'::"text")),
-    CONSTRAINT "templates_id_check" CHECK ((("id" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text") AND ("char_length"("id") <= 64))),
-    CONSTRAINT "templates_module_check" CHECK (("module" = ANY (ARRAY['image'::"text", 'video'::"text"]))),
-    CONSTRAINT "templates_name_check" CHECK ((("char_length"("name") >= 1) AND ("char_length"("name") <= 120))),
-    CONSTRAINT "templates_quality_check" CHECK (("quality" = ANY (ARRAY['high'::"text", 'medium'::"text"]))),
-    CONSTRAINT "templates_translations_check" CHECK ((("jsonb_typeof"("translations") = 'object'::"text") AND (("translations" - 'zh'::"text") = '{}'::"jsonb") AND ((NOT ("translations" ? 'zh'::"text")) OR ("jsonb_typeof"(("translations" -> 'zh'::"text")) = 'object'::"text")))),
-    CONSTRAINT "templates_visible_in_check" CHECK (("visible_in" <@ ARRAY['web'::"text", 'partner'::"text"]))
-);
-
-
-ALTER TABLE "public"."templates" OWNER TO "postgres";
 
 
 ALTER TABLE ONLY "admin"."pricing_wallet_cutover"
@@ -8455,6 +8677,10 @@ CREATE OR REPLACE TRIGGER "ai_providers_set_updated_at" BEFORE UPDATE ON "public
 
 
 
+CREATE OR REPLACE TRIGGER "ai_providers_sync_capabilities" BEFORE INSERT OR UPDATE ON "public"."ai_providers" FOR EACH ROW EXECUTE FUNCTION "public"."sync_image_capabilities"();
+
+
+
 CREATE OR REPLACE TRIGGER "codes_enforce_gift_policy" BEFORE INSERT OR UPDATE OF "invitee_credits", "invitee_pool", "max_redemptions" ON "public"."codes" FOR EACH ROW EXECUTE FUNCTION "public"."_enforce_code_gift_policy"();
 
 
@@ -9059,6 +9285,19 @@ REVOKE ALL ON FUNCTION "admin"."clear_approved_wallets_v2"("p_digest" "text", "p
 
 
 
+GRANT ALL ON TABLE "public"."templates" TO "service_role";
+GRANT SELECT ON TABLE "public"."templates" TO "anon";
+GRANT SELECT ON TABLE "public"."templates" TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."partner_image_aspects"("public"."templates") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."partner_image_aspects"("public"."templates") TO "anon";
+GRANT ALL ON FUNCTION "admin"."partner_image_aspects"("public"."templates") TO "authenticated";
+GRANT ALL ON FUNCTION "admin"."partner_image_aspects"("public"."templates") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "admin"."purchase_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_event_id" "text") FROM PUBLIC;
 
 
@@ -9068,6 +9307,13 @@ REVOKE ALL ON FUNCTION "admin"."renewal_terms"("p_v2" boolean, "p_user_id" "uuid
 
 
 REVOKE ALL ON FUNCTION "admin"."restore_approved_wallets_v2"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."template_image_options"("public"."templates") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."template_image_options"("public"."templates") TO "anon";
+GRANT ALL ON FUNCTION "admin"."template_image_options"("public"."templates") TO "authenticated";
+GRANT ALL ON FUNCTION "admin"."template_image_options"("public"."templates") TO "service_role";
 
 
 
@@ -9335,6 +9581,11 @@ GRANT ALL ON FUNCTION "public"."admin_identity_refusal_counts"("p_user_ids" "uui
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_image_provider_pricing"("p_env_model" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_image_provider_pricing"("p_env_model" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_list_codes"("p_actor" "uuid", "p_cursor" "jsonb", "p_kind" "text", "p_code_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_list_codes"("p_actor" "uuid", "p_cursor" "jsonb", "p_kind" "text", "p_code_id" "uuid") TO "service_role";
 
@@ -9412,6 +9663,11 @@ GRANT ALL ON FUNCTION "public"."admin_save_code"("p_actor" "uuid", "p_code_id" "
 
 REVOKE ALL ON FUNCTION "public"."admin_save_code"("p_actor" "uuid", "p_code_id" "uuid", "p_fields" "jsonb", "p_catalog" "jsonb", "p_floor_product_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_save_code"("p_actor" "uuid", "p_code_id" "uuid", "p_fields" "jsonb", "p_catalog" "jsonb", "p_floor_product_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_save_provider"("p_actor" "uuid", "p_id" "uuid", "p_settings" "jsonb", "p_capabilities" "jsonb", "p_key" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_save_provider"("p_actor" "uuid", "p_id" "uuid", "p_settings" "jsonb", "p_capabilities" "jsonb", "p_key" "text") TO "service_role";
 
 
 
@@ -9719,6 +9975,13 @@ GRANT ALL ON FUNCTION "public"."openai_admin_key"() TO "service_role";
 
 
 
+REVOKE ALL ON FUNCTION "public"."partner_image_aspects"("public"."templates") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."partner_image_aspects"("public"."templates") TO "anon";
+GRANT ALL ON FUNCTION "public"."partner_image_aspects"("public"."templates") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."partner_image_aspects"("public"."templates") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."payment_clawback_preview"("p_payment_id" bigint) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."payment_clawback_preview"("p_payment_id" bigint) TO "service_role";
 
@@ -9863,6 +10126,10 @@ GRANT ALL ON FUNCTION "public"."support_reply_hours"("p_tier" "text") TO "servic
 
 
 
+REVOKE ALL ON FUNCTION "public"."sync_image_capabilities"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."sync_subscription"("p_subscription_id" "text", "p_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."sync_subscription"("p_subscription_id" "text", "p_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) TO "service_role";
 
@@ -9879,6 +10146,13 @@ GRANT ALL ON FUNCTION "public"."template_category_for"("p_value" "text") TO "ser
 
 
 REVOKE ALL ON FUNCTION "public"."template_favorites_guard"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."template_image_options"("public"."templates") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."template_image_options"("public"."templates") TO "anon";
+GRANT ALL ON FUNCTION "public"."template_image_options"("public"."templates") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."template_image_options"("public"."templates") TO "service_role";
 
 
 
@@ -10113,12 +10387,6 @@ GRANT ALL ON TABLE "public"."template_prompts" TO "service_role";
 
 GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."template_request_votes" TO "service_role";
 GRANT SELECT ON TABLE "public"."template_request_votes" TO "authenticated";
-
-
-
-GRANT ALL ON TABLE "public"."templates" TO "service_role";
-GRANT SELECT ON TABLE "public"."templates" TO "anon";
-GRANT SELECT ON TABLE "public"."templates" TO "authenticated";
 
 
 

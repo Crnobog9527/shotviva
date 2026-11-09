@@ -1,4 +1,5 @@
 // Image (later video) provider settings and per-request resolution (ARCHITECTURE §3.3).
+export { fetchImageCapabilities } from './image-capabilities'
 export { templateImageProvider } from './template-image-provider'
 export { activeCredentials, activeProvider, PROVIDERS_CACHE_TAG, type ProviderCredentials } from './active-provider'
 export { assertPublicBaseUrl, isBlockedAddress, parseBaseUrl, type HostResolver } from './base-url'
@@ -9,13 +10,10 @@ export {
   activateProvider,
   adminDeleteProvider,
   findProvider,
-  deleteProvider,
+  persistRefreshedCapabilities,
   findProviderRow,
-  insertProvider,
   listProviders,
   loadActiveProviderRow,
-  updateProvider,
-  type ProviderWrite,
 } from './repository'
 export { apiKeySchema, readProviderKey, setProviderKey } from './keys'
 export { resolveProvider, type ReadProviderKey } from './resolve'

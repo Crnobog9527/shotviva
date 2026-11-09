@@ -22,7 +22,7 @@ vi.mock('@/core/admin', () => ({
 vi.mock('@/core/public-env', () => ({ publicEnv: {} }))
 vi.mock('@/core/storage', () => ({ r2Store: vi.fn(), r2PublicStore: vi.fn() }))
 vi.mock('@/core/templates', () => ({ TEMPLATES_CACHE_TAG: 'templates' }))
-vi.mock('@/modules/image', () => ({ CREDITS_FLOOR: {} }))
+vi.mock('./pricing', () => ({ readTemplateFloors: async () => ({}) }))
 
 const { bulkEditTemplatesAction, setTemplateOrderAction, setTemplatesActiveAction } = await import('./actions')
 

@@ -2,6 +2,7 @@ import 'server-only'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+import type { ProviderFloors } from '@/core/templates/provider-pricing'
 import { AppError, type ErrorCode } from '@/core/errors'
 import {
   coverLocalesSchema,
@@ -14,7 +15,6 @@ import {
   type TemplateRow,
 } from '@/core/templates'
 
-import type { ImageProviderOption } from '../image-provider-field'
 import type { PublishCandidate } from './publish-rules'
 import { toUpsertArgs } from './rpc-payload'
 import type { AdminTemplate } from './types'
@@ -52,12 +52,6 @@ export async function listAdminTemplates(client: SupabaseClient): Promise<AdminT
   }))
 }
 
-export async function listImageProviderOptions(client: SupabaseClient): Promise<ImageProviderOption[]> {
-  const { data, error } = await client.from('ai_providers').select('id, label, model').eq('module', 'image').order('label')
-  if (error) throw new AppError('INTERNAL', `listImageProviderOptions failed: ${error.message}`)
-  return data
-}
-
 // A plain GET, not `head: true`: PostgREST answers HEAD without Content-Length and then
 // closes the connection, and Kong reuses that dead connection for the next request. The
 // POST that follows here (admin_upsert_template) then fails with a 502 (see eslint config).
@@ -71,24 +65,28 @@ export async function upsertTemplate(
   client: SupabaseClient,
   template: TemplateInput,
   prompt: PromptInput,
+  floors?: ProviderFloors,
 ): Promise<void> {
-  const { error } = await client.rpc('admin_upsert_template', toUpsertArgs(template, prompt))
-  if (error?.message.includes('PROVIDER_NOT_IMAGE')) throw new AppError('INVALID_INPUT', '所选出图模型已不可用，请重新选择')
+  const { error } = await client.rpc('admin_upsert_template', toUpsertArgs(template, prompt, { floors }))
+  if (!error) return
+  if (['MODEL_REFERENCE_LIMIT', 'MODEL_CREDIT_FLOOR'].includes(error.message)) throw new AppError('INVALID_INPUT', error.details)
+  if (error.message === 'MODEL_CHANGED') throw new AppError('INVALID_INPUT', '出图供应商有变化，请刷新后重新保存')
+  if (error.message.includes('PROVIDER_NOT_IMAGE')) throw new AppError('INVALID_INPUT', '所选出图模型已不可用，请重新选择')
   // templates_category_key_fkey (T75): the category was deleted while the form was open.
-  if (error?.code === '23503') throw new AppError('INVALID_INPUT', '所选分类已经不存在了，请重新选择分类')
-  if (error) throw new AppError('INTERNAL', `upsertTemplate failed: ${error.message}`)
+  if (error.code === '23503') throw new AppError('INVALID_INPUT', '所选分类已经不存在了，请重新选择分类')
+  throw new AppError('INTERNAL', `upsertTemplate failed: ${error.message}`)
 }
 
 type CandidateRow = Pick<
   TemplateRow,
   'id' | 'name' | 'description' | 'visible_in' | 'cover_before_url' | 'cover_after_url' | 'cover_locales' | 'quality' | 'credits_cost' | 'is_active'
-> & { template_prompts: { version: number } | null }
+> & { template_prompts: { version: number; provider_id: string | null } | null }
 
 // Only what the publish rules read (T60); one query for the whole batch, by primary key.
 export async function loadPublishCandidates(client: SupabaseClient, ids: readonly string[]): Promise<PublishCandidate[]> {
   const { data, error } = await client
     .from('templates')
-    .select('id, name, description, visible_in, cover_before_url, cover_after_url, cover_locales, quality, credits_cost, is_active, template_prompts(version)')
+    .select('id, name, description, visible_in, cover_before_url, cover_after_url, cover_locales, quality, credits_cost, is_active, template_prompts(version, provider_id)')
     .in('id', ids)
     .returns<CandidateRow[]>()
   if (error) throw new AppError('INTERNAL', `loadPublishCandidates failed: ${error.message}`)
@@ -105,6 +103,7 @@ export async function loadPublishCandidates(client: SupabaseClient, ids: readonl
     creditsCost: row.credits_cost,
     isActive: row.is_active,
     hasPrompt: row.template_prompts !== null,
+    providerId: row.template_prompts?.provider_id,
   }))
 }
 

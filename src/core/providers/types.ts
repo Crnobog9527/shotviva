@@ -1,3 +1,4 @@
+import type { ImageCapabilities, EstimatedImageCosts } from '../templates/image-capabilities'
 import type { OpenRouterImageParameters } from './openrouter-catalog'
 import type { Resolution } from '../templates/output-options'
 import type { GenerationProvider, ProviderPrices } from '../jobs'
@@ -44,6 +45,8 @@ export type AdminProvider = {
   label: string
   baseUrl: string
   resolutions: Resolution[]
+  capabilities?: ImageCapabilities | null
+  estimatedImageCosts?: EstimatedImageCosts
   model: string
   apiKeyLast4: string | null
   isActive: boolean
@@ -60,6 +63,8 @@ export type ActiveProviderRow = {
   adapter: ProviderAdapterId
   baseUrl: string
   resolutions: Resolution[]
+  capabilities?: ImageCapabilities | null
+  estimatedImageCosts?: EstimatedImageCosts
   model: string
   // Snapshot used to cost each job (T33). Cached with the row; a save expires the tag.
   prices: ProviderPrices

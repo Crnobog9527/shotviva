@@ -1,3 +1,4 @@
+import type { ProviderFloors } from '@/core/templates/provider-pricing'
 import type { PromptInput, TemplateInput } from '@/core/templates'
 
 // Maps validated input onto the snake_case JSON the admin_upsert_template SQL function reads.
@@ -7,10 +8,13 @@ import type { PromptInput, TemplateInput } from '@/core/templates'
 // unknown one fails on the foreign key (T75). With `categoryByName` (the prompt import) it is
 // sent as `category` instead: a key or an English / Chinese category name, resolved in the
 // database (0581 trigger), and a value no category has gets a category of its own.
-export function toUpsertArgs(template: TemplateInput, prompt: PromptInput, options: { categoryByName?: boolean } = {}) {
+const pricing = (floors?: ProviderFloors) => floors?.providers ? { price_floors: floors } : {}
+
+export function toUpsertArgs(template: TemplateInput, prompt: PromptInput, options: { categoryByName?: boolean; floors?: ProviderFloors } = {}) {
   return {
     p_template: {
       id: template.id,
+      ...pricing(options.floors),
       module: template.module,
       name: template.name,
       ...(options.categoryByName ? { category: template.category } : { category_key: template.category }),

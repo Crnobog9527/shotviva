@@ -1,3 +1,5 @@
+import type { ImageOptions } from '@/core/templates/image-options'
+import { closestAspect } from './output-choice'
 import type { Translate } from '@/core/translate'
 import type { OutputAspect, Resolution } from '@/core/templates/output-options'
 
@@ -22,6 +24,16 @@ export const SIZE_OPTIONS: readonly SizeOption[] = SIZE_ORDER.map((id) => ({
   ratio: id === 'original' ? null : id,
   glyph: glyphFor(id),
 }))
+
+// The nearest-size tile follows each source photo. Fixed tiles stay available so a batch
+// can also request a single size for all photos.
+export function sizeChoices(options: ImageOptions, ratio?: number | null) {
+  const nearest = !options.originalRatio ? closestAspect(ratio, options) : null
+  return SIZE_OPTIONS.filter(({ id }) => id === 'original' ? options.originalRatio || nearest !== null : options.aspectRatios.includes(id))
+    .map((size) => size.id === 'original' && nearest
+      ? { ...size, nearest, glyph: { ...glyphFor(nearest), dashed: true } }
+      : { ...size, nearest: null })
+}
 
 export type TierOption = { id: Resolution; px: number }
 

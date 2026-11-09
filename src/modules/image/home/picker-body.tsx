@@ -5,13 +5,12 @@ import type { ReactNode } from 'react'
 
 import { coverImage } from '@/core/ui/cover-image'
 
-import type { CatalogueTemplate } from '../catalogue/catalogue-template'
+import { cardPrice, categoriesOf, type CatalogueTemplate } from '../catalogue/catalogue-template'
 import { FavoriteButton } from '../favorites/favorite-button'
 import { useFavorites } from '../favorites/favorites-provider'
 import { savedIn } from '../favorites/favorites-store'
 import { GroundedImg } from '../result/grounded-img'
 import { thumbImage } from './thumb-image'
-import { categoriesOf } from '../catalogue/catalogue-template'
 import type { TemplateSample } from './home-samples'
 
 type Props = {
@@ -102,6 +101,7 @@ function PickerGroup({ name, children }: { name: string; children: ReactNode }) 
 type RowProps = { template: CatalogueTemplate; chosen: boolean; onSelect(id: string): void; thumb: string | null }
 
 function PickerRow({ template, chosen, onSelect, thumb }: RowProps) {
+  const cost = cardPrice(template)
   const t = useTranslations('app.template')
   return (
     <button type="button" role="radio" aria-checked={chosen} className="mk-pk-row" onClick={() => onSelect(template.id)}>
@@ -110,7 +110,7 @@ function PickerRow({ template, chosen, onSelect, thumb }: RowProps) {
         <b>{template.name}</b>
         {template.description ? <small>{template.description}</small> : null}
       </span>
-      <span className="mk-cost">{t('fromCredits', { count: template.creditsCost['1k'] })}</span>
+      {cost !== null ? <span className="mk-cost">{t('fromCredits', { count: cost })}</span> : null}
     </button>
   )
 }

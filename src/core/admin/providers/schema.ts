@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { apiKeySchema } from '@/core/providers/keys'
+import { estimatedImageCostsSchema } from '@/core/templates/image-capabilities'
 import { RESOLUTIONS } from '@/core/templates/output-options'
 import { MODULE_ADAPTERS, PROVIDER_ADAPTERS, PROVIDER_MODULES } from '@/core/providers/types'
 
@@ -33,6 +34,7 @@ export const saveProviderSchema = z.object({
   // Older editors omit tiers. Inserts use the database default; edits keep the saved set.
   resolutions: z.array(z.enum(RESOLUTIONS)).min(1).max(RESOLUTIONS.length)
     .refine((values) => new Set(values).size === values.length).optional(),
+  estimatedImageCosts: estimatedImageCostsSchema.optional(),
   label: z.string().trim().min(1).max(80),
   ...lookupModelSchema.shape,
   // Write-only: blank keeps the stored key (ARCHITECTURE §3.3).

@@ -8,7 +8,6 @@ import { NOTE_MAX_LENGTH } from '@/core/templates/output-options'
 
 import { GroundedImg } from '../result/grounded-img'
 import { thumbImage } from './thumb-image'
-import { sizeLabel } from '../workspace/workspace-options'
 import { TemplateToggles } from '../toggles'
 import { HomeCtaButton } from './home-cta-button'
 import { ChevronIcon, GiftIcon, PlusIcon } from './home-icons'
@@ -54,7 +53,7 @@ export const HomeBench = forwardRef<HTMLDivElement, Props>(function HomeBench({ 
           <span className="mk-chip-name">{name}</span>
           <ChevronIcon />
         </button>
-        <SizeMenu value={state.aspect} onChange={state.setAspect} label={sizeLabel(state.aspect, app)} />
+        <SizeMenu value={state.aspect} onChange={state.setAspect} options={state.options} photoRatio={state.photoRatio} />
         <input
           className="mk-bench-note"
           type="text"
