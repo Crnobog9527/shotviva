@@ -3,8 +3,8 @@
 import { useTranslations } from "next-intl"
 import type { ReactNode } from "react"
 
-import type { PackProduct } from "../../config"
-import { perCreditUsd, type PackLook } from "./offer"
+import { usdPerHundredCredits, type PackProduct } from "../../config"
+import type { PackLook } from "./offer"
 import { useProductQuote } from "./discount-context"
 import { useMoney } from "./use-money"
 
@@ -37,7 +37,7 @@ export function PackCard({ pack, look, selected = false, action }: Props) {
         {money(effective.priceUsd)}
         {hasDiscount && <small className="mt-1 block text-caption font-normal text-bone-dim">{t(quote.keptCode ? "memberCodeKept" : quote.member ? "memberPrice" : "codeOnce")}</small>}
       </span>
-      <span className="pack-each font-mono text-caption leading-none font-medium">{t("perCreditShort", { price: money(perCreditUsd(effective), true) })}</span>
+      <span className="pack-each font-mono text-caption leading-none font-medium">{t("perHundredCredits", { price: money(usdPerHundredCredits(effective), true) })}</span>
       {action ? <span className="pack-act block">{action}</span> : null}
     </span>
   )
