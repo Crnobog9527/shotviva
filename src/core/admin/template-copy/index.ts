@@ -7,6 +7,7 @@ import { AppError } from '@/core/errors'
 import type { ObjectStore } from '@/core/storage'
 import { executeCopies, planCopies, removeCopies, templateId } from './assets'
 
+const receipt = z.object({ id: templateId, previousStandard: z.int().positive().nullable() })
 const request = z.object({ source: templateId, requestId: z.uuidv4() })
 type Deps = { db: SupabaseClient; stores: { public: ObjectStore; private: ObjectStore }; base?: string }
 const errors: Record<string, string> = {
@@ -27,7 +28,7 @@ export async function duplicateTemplate(deps: Deps, actor: string, input: unknow
   const manifest = await deps.db.rpc('admin_template_copy_source', args)
   if (manifest.error) throw refusal(manifest.error.message)
   const result = z.union([
-    z.object({ existing: templateId }), z.object({ assets: z.unknown(), token: z.string().min(1) }),
+    z.object({ existing: receipt }), z.object({ assets: z.unknown(), token: z.string().min(1) }),
   ]).parse(manifest.data)
   if ('existing' in result) return result.existing
   const target = `${source.slice(0, 22).replace(/-$/, '')}-copy-${randomUUID()}`
@@ -38,12 +39,12 @@ export async function duplicateTemplate(deps: Deps, actor: string, input: unknow
   })
   if (error) {
     // These are known transaction rollbacks. Never delete on an ambiguous commit/transport error.
-    if (Object.hasOwn(errors, error.message) || /^[0-9A-Z]{5}$/.test(error.code) && !error.code.startsWith('08')) {
+    if (/^(22|23)/.test(error.code) || ['P0001', '40001', '40P01'].includes(error.code)) {
       await removeCopies(deps.stores, plan.copies)
     }
     throw refusal(error.message)
   }
-  const id = templateId.parse(data)
-  if (target !== id) await removeCopies(deps.stores, plan.copies)
-  return id
+  const committed = receipt.parse(data)
+  if (target !== committed.id) await removeCopies(deps.stores, plan.copies)
+  return committed
 }

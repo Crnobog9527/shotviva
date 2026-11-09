@@ -2492,18 +2492,18 @@ $$;
 ALTER FUNCTION "public"."admin_code_redemptions"("p_actor" "uuid", "p_code_id" "uuid", "p_cursor" "jsonb") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."admin_commit_template_copy"("p_actor" "uuid", "p_source" "text", "p_request" "uuid", "p_target" "text", "p_token" "text", "p_assets" "jsonb") RETURNS "text"
+CREATE OR REPLACE FUNCTION "public"."admin_commit_template_copy"("p_actor" "uuid", "p_source" "text", "p_request" "uuid", "p_target" "text", "p_token" "text", "p_assets" "jsonb") RETURNS "jsonb"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $_$
-declare t public.templates%rowtype; p public.template_prompts%rowtype; m jsonb; translated jsonb;
+declare t public.templates%rowtype; p public.template_prompts%rowtype; m jsonb; translated jsonb; old_standard integer;
 begin
   -- Serialize only retries of this specific request; unrelated templates copy concurrently.
   perform pg_advisory_xact_lock(hashtextextended(p_request::text,400));
   perform 1 from public.templates where id=p_source for share;
   perform 1 from public.template_prompts where template_id=p_source for share;
   m:=public.admin_template_copy_source(p_actor,p_source,p_request);
-  if m ? 'existing' then return m->>'existing'; end if;
+  if m ? 'existing' then return m->'existing'; end if;
   if p_token is distinct from m->>'token' then raise exception 'SOURCE_CHANGED'; end if;
   if p_target=p_source or p_target !~ '^[a-z0-9-]+-copy-[0-9a-f-]{36}$' or
     p_assets is distinct from replace(replace((m->'assets')::text,'/covers/'||p_source||'/','/covers/'||p_target||'/'),
@@ -2511,6 +2511,12 @@ begin
 
   select * into strict t from public.templates where id=p_source;
   select * into strict p from public.template_prompts where template_id=p_source;
+  if t.category_key='art-styles' and admin.is_template_catalog_v2() and (t.credits_cost->>'1k')::integer<>20 then
+    -- A new id has no sale approval. Only Standard has an approved draft price; keep the
+    -- stored HD/Max placeholders without marking either tier sellable (#399, Owner decision).
+    old_standard:=(t.credits_cost->>'1k')::integer;
+    t.credits_cost:=jsonb_set(t.credits_cost,'{1k}','20');
+  end if;
   translated:=t.translations;
   if nullif(translated#>>'{zh,name}','') is not null then
     translated:=jsonb_set(translated,'{zh,name}',to_jsonb(left(translated#>>'{zh,name}',115)||'（副本）'));
@@ -2522,8 +2528,8 @@ begin
     p_assets->>'cover_before_url',p_assets->>'cover_after_url',p_assets->>'cover_video_url',p_assets->>'cover_poster_url',p_assets->'cover_locales');
   insert into public.template_prompts(template_id,body,model_params,provider_id,style_refs)
     values(p_target,p.body,p.model_params,p.provider_id,p_assets->'style_refs');
-  insert into admin.template_copy_requests values(p_request,p_actor,p_source,p_target);
-  return p_target;
+  insert into admin.template_copy_requests values(p_request,p_actor,p_source,p_target,old_standard);
+  return jsonb_build_object('id',p_target,'previousStandard',old_standard);
 end $_$;
 
 
@@ -3886,6 +3892,8 @@ begin
       if not found then raise exception 'HISTORICAL_PROVIDER_UNAVAILABLE'; end if;
     end if;
   end if;
+  -- Listing, ranking and cover uploads are different admin operations with their own guards.
+  p_template := p_template - array['is_active','featured_rank','sort_order','cover_before_url','cover_after_url'];
   perform set_config('shotviva.restore_prompt_version',coalesce(p_selected::text,''),true);
   if p_style_refs is null then perform public.admin_upsert_template(p_template,p_prompt);
   else perform public.admin_upsert_template(p_template,p_prompt,p_style_refs); end if;
@@ -4392,7 +4400,7 @@ begin
   select * into receipt from admin.template_copy_requests where request_id=p_request;
   if found then
     if (receipt.actor_id,receipt.source_id) is distinct from (p_actor,p_source) then raise exception 'REQUEST_MISMATCH'; end if;
-    return jsonb_build_object('existing',receipt.target_id);
+    return jsonb_build_object('existing',jsonb_build_object('id',receipt.target_id,'previousStandard',receipt.previous_standard));
   end if;
   select jsonb_build_object('token',t.xmin::text||'/'||p.xmin::text,'assets',jsonb_build_object(
     'cover_before_url',t.cover_before_url,'cover_after_url',t.cover_after_url,'cover_poster_url',t.cover_poster_url,
@@ -7825,7 +7833,8 @@ CREATE TABLE IF NOT EXISTS "admin"."template_copy_requests" (
     "request_id" "uuid" NOT NULL,
     "actor_id" "uuid" NOT NULL,
     "source_id" "text" NOT NULL,
-    "target_id" "text" NOT NULL
+    "target_id" "text" NOT NULL,
+    "previous_standard" integer
 );
 
 

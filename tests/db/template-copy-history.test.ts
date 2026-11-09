@@ -46,8 +46,8 @@ it('copies once across simultaneous requests; does not transfer history or publi
   await pg.query('update public.template_prompts set body=$2 where template_id=$1',[source,'Fixture source v2'])
   const run = () => duplicateTemplate({ db: serviceSupabase(), stores, base },actor,{ source,requestId })
   const [a,b] = await Promise.all([run(),run()])
-  copy = a
-  expect(a).toBe(b)
+  copy = a.id
+  expect(a).toEqual(b)
   const draft = await loadTestTemplate(serviceSupabase(),copy)
   expect(draft.template).toMatchObject({ isActive:false, featuredRank:null, name:'Source (Copy)', coverBeforeUrl: `${base}/covers/${copy}/before.webp`,
     coverLocales: { zh: { after: `${base}/covers/${copy}/after.webp` } } })
@@ -95,4 +95,23 @@ it('rejects a changed source before insert and limits prompt history and copy en
     const {rows} = await pg.query("select has_table_privilege($1,'public.template_prompt_versions','select') as r, has_table_privilege($1,'public.template_prompt_versions','update') as w",[role])
     expect(rows[0]).toEqual({r:role==='service_role', w:false})
   }
+})
+
+it('records the old Standard on v2 style copies and leaves the source and HD/Max untouched', async () => {
+  await pg.query('begin')
+  try {
+    await pg.query("update public.templates set category_key='art-styles',credits_cost=$2 where id=$1",[source,{'1k':26,'2k':55,'3k':85}])
+    await pg.query(`insert into public.system_settings(key,value) values ('pricing_catalog_version','"v2"')
+      on conflict(key) do update set value=excluded.value`)
+    const req=randomUUID(), dest='qa-copy-'+randomUUID()
+    const manifest=async ()=>(await pg.query('select public.admin_template_copy_source($1,$2,$3) m',[actor,source,req])).rows[0].m
+    const {token,assets: old}=await manifest()
+    const moved=JSON.stringify(old).replaceAll('/'+source+'/', '/'+dest+'/')
+    const saved=await pg.query('select public.admin_commit_template_copy($1,$2,$3,$4,$5,$6) r',[actor,source,req,dest,token,moved])
+    expect(saved.rows[0].r).toEqual({id:dest,previousStandard:26})
+    expect((await manifest()).existing).toEqual(saved.rows[0].r)
+    const prices=async(id:string)=>(await pg.query('select credits_cost,is_active from public.templates where id=$1',[id])).rows[0]
+    expect(await prices(dest)).toEqual({credits_cost:{'1k':20,'2k':55,'3k':85},is_active:false})
+    expect(await prices(source)).toEqual({credits_cost:{'1k':26,'2k':55,'3k':85},is_active:true})
+  } finally { await pg.query('rollback') }
 })

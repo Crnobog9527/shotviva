@@ -47,6 +47,7 @@ describe('template form state', () => {
       ok: true,
       payload: {
         isNew: false,
+        revision: { expected: template.prompt?.version },
         template: expect.objectContaining({
           id: 'burger-hero',
           description: 'Stacked burger, studio light',

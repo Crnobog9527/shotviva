@@ -19,6 +19,8 @@ begin
       if not found then raise exception 'HISTORICAL_PROVIDER_UNAVAILABLE'; end if;
     end if;
   end if;
+  -- Listing, ranking and cover uploads are different admin operations with their own guards.
+  p_template := p_template - array['is_active','featured_rank','sort_order','cover_before_url','cover_after_url'];
   perform set_config('shotviva.restore_prompt_version',coalesce(p_selected::text,''),true);
   if p_style_refs is null then perform public.admin_upsert_template(p_template,p_prompt);
   else perform public.admin_upsert_template(p_template,p_prompt,p_style_refs); end if;

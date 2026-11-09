@@ -15,13 +15,14 @@ import { buildPayload, emptyFormValues, toFormValues, type TemplateFormValues } 
 import { referenceBudget, refUploadId } from './style-ref-state'
 import { StyleRefFields } from './style-ref-fields'
 import { TemplateCoverFields } from './template-cover-fields'
+import { versionCopy } from './version-copy'
 import { TemplateHistory, type VersionActions } from './prompt-history'
 import { TemplatePromptFields } from './template-prompt-fields'
 import { TemplatePublicFields } from './template-public-fields'
 import { TemplateToggleFields } from './template-toggle-fields'
 import { TemplateTranslationFields } from './template-translation-fields'
 
-export type EditTarget = { mode: 'new' } | { mode: 'edit'; template: AdminTemplate }
+export type EditTarget = { mode: 'new' } | { mode: 'edit'; template: AdminTemplate; previousStandard?: number | null }
 
 type Props = {
   providers: readonly ImageProviderOption[]
@@ -110,6 +111,7 @@ function FormColumn({ target, providers, values, isNew, floor, categories, cover
       <DialogHeader>
         <DialogTitle>{existing ? `编辑「${existing.name}」` : '新建模板'}</DialogTitle>
       </DialogHeader>
+      <CopyPriceNotice target={target} />
       <TemplatePublicFields values={values} isNew={isNew} uploading={uploading} floor={floor} categories={categories} onChange={onChange} />
       <TemplateTranslationFields values={values} onChange={onChange} />
       {existing ? (
@@ -121,14 +123,19 @@ function FormColumn({ target, providers, values, isNew, floor, categories, cover
         <ImageProviderField id="tpl-provider" providers={providers} value={values.providerId} onChange={(providerId) => onChange({ providerId })} />
       )}
       <StyleSection values={values} budget={budget} uploading={uploading} setUploading={setUploading} onChange={onChange} />
+      <TemplatePromptFields values={values} version={existing?.prompt?.version ?? null} onChange={onChange} />
       <TemplateHistory template={existing} values={values} disabled={pending || uploading}
         actions={coverActions} providers={providers} onChange={onChange} />
-      <TemplatePromptFields values={values} version={existing?.prompt?.version ?? null} onChange={onChange} />
       <TemplateToggleFields values={values} onChange={onChange} />
       {isNew ? <p className="text-muted-foreground text-xs">新模板保存后默认是下架状态，保存后留在这里，右侧就能试跑。</p> : null}
       <FormFooter saveDisabled={styleSaveBlocked(uploading, values.module, budget.problem)} pending={pending} error={error} saved={saved} onCancel={onCancel} onSave={onSave} />
     </div>
   )
+}
+
+function CopyPriceNotice({ target }: { target: EditTarget }) {
+  if (target.mode !== 'edit' || !target.previousStandard) return null
+  return <p role="status" className="text-sm">{versionCopy.priceChanged(target.previousStandard)}</p>
 }
 
 function styleSaveBlocked(uploading: boolean, module: string, problem: string | null) {
