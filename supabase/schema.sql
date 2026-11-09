@@ -375,6 +375,41 @@ $$;
 ALTER FUNCTION "public"."_end_membership_after_refund"("p_user_id" "uuid", "p_payment" "public"."payments") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_enforce_code_gift_policy"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  policy jsonb;
+  max_credits numeric;
+begin
+  if new.invitee_credits is null then return new; end if;
+  if tg_op = 'UPDATE' then
+    if row(old.invitee_credits, old.invitee_pool, old.max_redemptions) is not distinct from
+       row(new.invitee_credits, new.invitee_pool, new.max_redemptions) then return new; end if;
+  end if;
+
+  select value into policy from public.system_settings where key = 'code_gift_policy' for share;
+  if jsonb_typeof(policy->'maxCreditsPerCode') is distinct from 'number'
+    or jsonb_typeof(policy->'requirePaidGiftCap') is distinct from 'boolean' then
+    raise exception 'INVALID_CODE_GIFT_POLICY';
+  end if;
+  max_credits := (policy->>'maxCreditsPerCode')::numeric;
+  if max_credits <= 0 or max_credits <> trunc(max_credits) or max_credits > 2147483647 then
+    raise exception 'INVALID_CODE_GIFT_POLICY';
+  end if;
+  if new.invitee_credits > max_credits then raise exception 'CODE_GIFT_LIMIT'; end if;
+  if new.invitee_pool = 'paid' and new.max_redemptions is null and (policy->>'requirePaidGiftCap')::boolean then
+    raise exception 'CODE_GIFT_CAP_REQUIRED';
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_enforce_code_gift_policy"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_membership_end_without_refunded"("p_user_id" "uuid") RETURNS timestamp with time zone
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -514,6 +549,72 @@ $$;
 
 
 ALTER FUNCTION "public"."_template_has_cover_parts"("p_before" "text", "p_after" "text", "p_locales_json" "jsonb", "p_locales" "text"[]) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_validate_code_discount"("p_products" "text"[], "p_percent" integer, "p_catalog" "jsonb", "p_floor_product_id" "text") RETURNS "void"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  entry record;
+  cents numeric;
+  credits numeric;
+  active_rates jsonb := '{}';
+  floor_cents numeric;
+  floor_credits numeric;
+  invalid_products text[];
+begin
+  if jsonb_typeof(p_catalog) is distinct from 'array' or p_floor_product_id is null then
+    raise exception 'INVALID_CODE_CATALOG';
+  end if;
+  if jsonb_array_length(p_catalog) > (select count(*) from public.products) then
+    raise exception 'INVALID_CODE_CATALOG';
+  end if;
+
+  for entry in
+    select data.item, p.id, p.active, (p.days is not null) as subscription
+      from jsonb_array_elements(p_catalog) as data(item)
+      left join public.products p on p.id = data.item->>'id'
+  loop
+    if entry.id is null or active_rates ? entry.id
+      or jsonb_typeof(entry.item->'priceCents') is distinct from 'number'
+      or jsonb_typeof(entry.item->'credits') is distinct from 'number'
+      or entry.item->'subscription' is distinct from to_jsonb(entry.subscription) then
+      raise exception 'INVALID_CODE_CATALOG';
+    end if;
+    cents := (entry.item->>'priceCents')::numeric;
+    credits := (entry.item->>'credits')::numeric;
+    if cents <= 0 or cents <> trunc(cents) or cents > 9007199254740991
+      or credits <= 0 or credits <> trunc(credits) or credits > 2147483647 then
+      raise exception 'INVALID_CODE_CATALOG';
+    end if;
+    -- Keep an inactive ID as JSON null so duplicates are still rejected but the product
+    -- cannot be either a floor or a discount target.
+    active_rates := active_rates || jsonb_build_object(entry.id, case when entry.active then entry.item end);
+  end loop;
+
+  floor_cents := (active_rates->p_floor_product_id->>'priceCents')::numeric;
+  floor_credits := (active_rates->p_floor_product_id->>'credits')::numeric;
+  if active_rates->p_floor_product_id->'subscription' is distinct from 'true'::jsonb
+     or exists (select 1 from public.products p where p.active and p.days is not null and
+          (not (active_rates ? p.id) or
+           (active_rates->p.id->>'priceCents')::numeric * floor_credits
+             < floor_cents * (active_rates->p.id->>'credits')::numeric)) then
+    raise exception 'INVALID_CODE_CATALOG';
+  end if;
+
+  select array_agg(t.id order by t.id) into invalid_products from unnest(p_products) t(id)
+    where (active_rates->t.id->>'credits') is null
+       or (active_rates->t.id->>'priceCents')::numeric * (100 - p_percent) * floor_credits
+          < floor_cents * (active_rates->t.id->>'credits')::numeric * 100;
+  if invalid_products is not null then
+    raise exception 'CODE_DISCOUNT_PRODUCTS' using detail = to_json(invalid_products)::text;
+  end if;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_validate_code_discount"("p_products" "text"[], "p_percent" integer, "p_catalog" "jsonb", "p_floor_product_id" "text") OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."support_ticket_messages" (
@@ -2639,9 +2740,34 @@ CREATE OR REPLACE FUNCTION "public"."admin_save_code"("p_actor" "uuid", "p_code_
     SET "search_path" TO ''
     AS $$
 declare
+  catalog jsonb;
+  floor_id text;
+begin
+  if not exists (select 1 from public.profiles where id = p_actor and role = 'admin' and banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+  select jsonb_agg(jsonb_build_object('id', p.id, 'priceCents', p.price_usd * 100,
+                 'credits', p.credits, 'subscription', p.days is not null) order by p.id)
+    into catalog from public.products p where p.active;
+  select p.id into floor_id from public.products p where p.active and p.days is not null and
+      not exists (select 1 from public.products s where s.active and s.days is not null and
+                    s.price_usd * p.credits < p.price_usd * s.credits)
+    order by p.id limit 1;
+  return public.admin_save_code(p_actor, p_code_id, p_fields, catalog, floor_id);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_save_code"("p_actor" "uuid", "p_code_id" "uuid", "p_fields" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_save_code"("p_actor" "uuid", "p_code_id" "uuid", "p_fields" "jsonb", "p_catalog" "jsonb", "p_floor_product_id" "text") RETURNS "uuid"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
   v_old public.codes;
   v_new public.codes;
-  v_invalid text[];
 begin
   if not exists (select 1 from public.profiles where id = p_actor and role = 'admin' and banned_at is null) then
     raise exception 'NOT_ADMIN';
@@ -2652,6 +2778,8 @@ begin
        'expires_at','max_redemptions','new_users_only','active'] <> '{}' then
     raise exception 'INVALID_INPUT';
   end if;
+  -- A repeated create request can arrive before the first transaction has inserted its row.
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.admin_code:' || p_code_id::text, 0));
   select c.* into v_old from public.codes c where c.id = p_code_id for update;
   if v_old.id is not null and v_old.kind <> 'campaign' then raise exception 'INVALID_CODE_KIND'; end if;
 
@@ -2670,20 +2798,15 @@ begin
   if v_new.max_redemptions < coalesce(v_old.redemption_count, 0) then
     raise exception 'CODE_QUOTA_BELOW_CLAIMED';
   end if;
-  if v_new.discount_percent is not null then
+  -- Existing discount terms are immutable. Editing metadata must still work after a reprice.
+  if v_old.id is null and v_new.discount_percent is not null then
     if nullif(btrim(v_new.stripe_coupon_id), '') is null or coalesce(cardinality(v_new.discount_products), 0) = 0 then
       raise exception 'INVALID_DISCOUNT';
     end if;
-    select array_agg(t.id order by t.id) into v_invalid
-      from unnest(v_new.discount_products) as t(id)
-      left join public.products p on p.id = t.id
-      where p.id is null or not p.active
-        or p.price_usd * (100 - v_new.discount_percent) < 100 * p.credits * 0.208;
-    if v_invalid is not null then
-      raise exception 'CODE_DISCOUNT_PRODUCTS' using detail = to_json(v_invalid)::text;
-    end if;
+    perform public._validate_code_discount(v_new.discount_products, v_new.discount_percent, p_catalog, p_floor_product_id);
   end if;
 
+  if v_old.id is not null and v_old is not distinct from v_new then return v_old.id; end if;
   if v_old.id is null then
     insert into public.codes(id, code, kind, note, invitee_credits, invitee_pool, discount_percent,
       discount_products, discount_duration, discount_months, discount_valid_days, stripe_coupon_id,
@@ -2705,7 +2828,7 @@ end;
 $$;
 
 
-ALTER FUNCTION "public"."admin_save_code"("p_actor" "uuid", "p_code_id" "uuid", "p_fields" "jsonb") OWNER TO "postgres";
+ALTER FUNCTION "public"."admin_save_code"("p_actor" "uuid", "p_code_id" "uuid", "p_fields" "jsonb", "p_catalog" "jsonb", "p_floor_product_id" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_save_template_category"("p_category" "jsonb", "p_is_new" boolean, "p_actor" "uuid") RETURNS "void"
@@ -2966,12 +3089,13 @@ ALTER FUNCTION "public"."admin_set_provider_key"("p_id" "uuid", "p_key" "text") 
 CREATE OR REPLACE FUNCTION "public"."admin_set_system_setting"("p_key" "text", "p_value" "jsonb", "p_actor" "uuid") RETURNS "void"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
-    AS $$
+    AS $_$
 begin
   if p_actor is null then
     raise exception 'INVALID_INPUT' using detail = 'actor is required';
   end if;
-  if not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
+  if not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin'
+      and (p_key not in ('code_gift_policy','code_inviter_window_days') or p.banned_at is null)) then
     raise exception 'NOT_ADMIN';
   end if;
 
@@ -2985,6 +3109,20 @@ begin
          or (p_value #>> '{}')::numeric < 0 or (p_value #>> '{}')::numeric > 1000 then
         raise exception 'INVALID_INPUT' using detail = 'admin_test_daily_budget_usd must be a number from 0 to 1000';
       end if;
+    when 'code_inviter_window_days' then
+      if jsonb_typeof(p_value) is distinct from 'number' or
+         (p_value #>> '{}') !~ '^[1-9][0-9]*$' or (p_value #>> '{}')::numeric > 2147483647 then
+        raise exception 'INVALID_INPUT' using detail = 'reward window must be a positive integer';
+      end if;
+    when 'code_gift_policy' then
+      if jsonb_typeof(p_value) is distinct from 'object' or
+         jsonb_typeof(p_value->'requirePaidGiftCap') is distinct from 'boolean' or
+         jsonb_typeof(p_value->'maxCreditsPerCode') is distinct from 'number' or
+         (p_value->>'maxCreditsPerCode') !~ '^[1-9][0-9]*$' or
+         (p_value->>'maxCreditsPerCode')::numeric > 2147483647 or
+         p_value - array['requirePaidGiftCap','maxCreditsPerCode'] <> '{}'::jsonb then
+        raise exception 'INVALID_INPUT' using detail = 'invalid gift code policy';
+      end if;
     else
       raise exception 'INVALID_INPUT' using detail = 'unknown setting';
   end case;
@@ -2996,7 +3134,7 @@ begin
         updated_at = excluded.updated_at,
         updated_by = excluded.updated_by;
 end;
-$$;
+$_$;
 
 
 ALTER FUNCTION "public"."admin_set_system_setting"("p_key" "text", "p_value" "jsonb", "p_actor" "uuid") OWNER TO "postgres";
@@ -3731,6 +3869,19 @@ ALTER FUNCTION "public"."affiliate_save_profile"("p_user" "uuid", "p_payout_meth
 
 
 CREATE OR REPLACE FUNCTION "public"."apply_payment_code_effects"("p_user" "uuid", "p_payment_id" bigint, "p_code_id" "uuid", "p_amount_discount" integer, "p_inviter_credits" integer, "p_inviter_cap" integer) RETURNS "jsonb"
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select public.apply_payment_code_effects(p_user, p_payment_id, p_code_id, p_amount_discount,
+    p_inviter_credits, p_inviter_cap,
+    (select s.value::text::integer from public.system_settings s where s.key = 'code_inviter_window_days'));
+$$;
+
+
+ALTER FUNCTION "public"."apply_payment_code_effects"("p_user" "uuid", "p_payment_id" bigint, "p_code_id" "uuid", "p_amount_discount" integer, "p_inviter_credits" integer, "p_inviter_cap" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."apply_payment_code_effects"("p_user" "uuid", "p_payment_id" bigint, "p_code_id" "uuid", "p_amount_discount" integer, "p_inviter_credits" integer, "p_inviter_cap" integer, "p_reward_window_days" integer) RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
@@ -3743,7 +3894,8 @@ declare
   v_reward_time timestamptz;
 begin
   if p_amount_discount is null or p_amount_discount < 0 or (p_code_id is null and p_amount_discount <> 0)
-     or p_inviter_credits is null or p_inviter_credits <= 0 or p_inviter_cap is null or p_inviter_cap <= 0 then
+     or p_inviter_credits is null or p_inviter_credits <= 0 or p_inviter_cap is null or p_inviter_cap <= 0
+     or p_reward_window_days is null or p_reward_window_days <= 0 then
     raise exception 'INVALID_INPUT';
   end if;
 
@@ -3789,7 +3941,7 @@ begin
      and exists (select 1 from public.profiles where id = v_invite.inviter_user_id and banned_at is null)
      -- Rewards survive the invitee deleting their profile and redemption.
      and (select count(*) from public.credit_ledger where user_id = v_invite.inviter_user_id
-           and kind = 'invite_reward' and created_at > v_reward_time - interval '30 days') < p_inviter_cap then
+           and kind = 'invite_reward' and created_at > v_reward_time - make_interval(days => p_reward_window_days)) < p_inviter_cap then
     -- The reward has no membership product/days and never changes current_tier.
     v_rewarded := (public._apply_credit_change(v_invite.inviter_user_id, 'paid', 'invite_reward',
                     p_inviter_credits, '邀请首付奖励', 'invite:' || v_invite.id)).applied;
@@ -3804,7 +3956,7 @@ end;
 $$;
 
 
-ALTER FUNCTION "public"."apply_payment_code_effects"("p_user" "uuid", "p_payment_id" bigint, "p_code_id" "uuid", "p_amount_discount" integer, "p_inviter_credits" integer, "p_inviter_cap" integer) OWNER TO "postgres";
+ALTER FUNCTION "public"."apply_payment_code_effects"("p_user" "uuid", "p_payment_id" bigint, "p_code_id" "uuid", "p_amount_discount" integer, "p_inviter_credits" integer, "p_inviter_cap" integer, "p_reward_window_days" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."apply_purchase"("p_user_id" "uuid", "p_product_id" "text", "p_event_id" "text") RETURNS "public"."credit_change"
@@ -4834,6 +4986,18 @@ ALTER FUNCTION "public"."mark_ticket_seen"("p_ticket_id" "uuid", "p_user_id" "uu
 
 
 CREATE OR REPLACE FUNCTION "public"."my_invite_summary"("p_user" "uuid", "p_inviter_cap" integer, "p_cursor" "jsonb" DEFAULT NULL::"jsonb") RETURNS "jsonb"
+    LANGUAGE "sql"
+    SET "search_path" TO ''
+    AS $$
+  select public.my_invite_summary(p_user, p_inviter_cap, p_cursor,
+    (select s.value::text::integer from public.system_settings s where s.key = 'code_inviter_window_days'));
+$$;
+
+
+ALTER FUNCTION "public"."my_invite_summary"("p_user" "uuid", "p_inviter_cap" integer, "p_cursor" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."my_invite_summary"("p_user" "uuid", "p_inviter_cap" integer, "p_cursor" "jsonb", "p_reward_window_days" integer) RETURNS "jsonb"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $$
@@ -4841,7 +5005,7 @@ declare
   v_code text;
   v_result jsonb;
 begin
-  if p_inviter_cap is null or p_inviter_cap < 0 then raise exception 'INVALID_INPUT'; end if;
+  if p_inviter_cap is null or p_inviter_cap < 0 or p_reward_window_days is null or p_reward_window_days <= 0 then raise exception 'INVALID_INPUT'; end if;
   v_code := public.get_or_create_invite_code(p_user);
   with invited as materialized (
     select r.id, r.user_id, r.created_at,
@@ -4856,11 +5020,12 @@ begin
   ),
   rewards as (
     select coalesce(sum(l.delta),0) as earned,
-      count(*) filter (where l.created_at > now() - interval '30 days') as used
+      count(*) filter (where l.created_at > now() - make_interval(days => p_reward_window_days)) as used
     from public.credit_ledger l where l.user_id = p_user and l.kind = 'invite_reward'
   )
   select jsonb_build_object('code', v_code, 'invited', count(*),
     'purchasers', count(*) filter (where i.purchased), 'earned', (select earned from rewards),
+    'reward_window_days', p_reward_window_days,
     'rewards_left', greatest(0, p_inviter_cap - (select used from rewards)),
     'friends', coalesce((select jsonb_agg(to_jsonb(p) order by p.created_at desc, p.id desc) from page p), '[]'::jsonb))
   into v_result from invited i;
@@ -4869,7 +5034,7 @@ end;
 $$;
 
 
-ALTER FUNCTION "public"."my_invite_summary"("p_user" "uuid", "p_inviter_cap" integer, "p_cursor" "jsonb") OWNER TO "postgres";
+ALTER FUNCTION "public"."my_invite_summary"("p_user" "uuid", "p_inviter_cap" integer, "p_cursor" "jsonb", "p_reward_window_days" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."open_payment_dispute"("p_dispute_id" "text", "p_charge_id" "text", "p_amount" integer, "p_currency" "text", "p_reason" "text", "p_due_by" timestamp with time zone, "p_managed_default" boolean) RETURNS "jsonb"
@@ -5457,6 +5622,42 @@ $_$;
 
 
 ALTER FUNCTION "public"."redeem_code"("p_user" "uuid", "p_code" "text", "p_context" "text", "p_invitee_credits" integer, "p_invite_window_days" integer, "p_replace" boolean) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."redeem_limited_code"("p_user" "uuid", "p_code" "text", "p_context" "text", "p_invitee_credits" integer, "p_invite_window_days" integer, "p_replace" boolean DEFAULT false) RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  checked_at timestamptz;
+  attempts timestamptz[];
+  result jsonb;
+begin
+  if p_user is null or p_context is null or p_context not in ('account','paywall') then
+    raise exception 'INVALID_INPUT';
+  end if;
+  -- Serialize this quota without taking a profile lock ahead of redeem_code: reciprocal
+  -- invites lock both profiles in sorted order, which must remain the first profile locks.
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.code_redeem:' || p_user::text, 0));
+  checked_at := clock_timestamp();
+  select array(select t from unnest(p.code_redeem_attempts) as a(t)
+                where t > checked_at - interval '1 hour')
+    into attempts from public.profiles p where id = p_user;
+  if not found then raise exception 'PROFILE_NOT_FOUND'; end if;
+  if cardinality(attempts) >= 10 then return jsonb_build_object('status', 'rate_limited'); end if;
+
+  if p_code is null or p_code !~ '^[A-Za-z0-9]{4,20}$' then
+    result := jsonb_build_object('status', 'invalid_input');
+  else
+    result := public.redeem_code(p_user,p_code,p_context,p_invitee_credits,p_invite_window_days,p_replace);
+  end if;
+  update public.profiles set code_redeem_attempts = array_append(attempts, checked_at) where id = p_user;
+  return result;
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."redeem_limited_code"("p_user" "uuid", "p_code" "text", "p_context" "text", "p_invitee_credits" integer, "p_invite_window_days" integer, "p_replace" boolean) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."refund_eligibility"("p_payment_id" bigint, "p_asked_at" timestamp with time zone) RETURNS TABLE("first_purchase" boolean, "within_7_days" boolean, "no_credits_used" boolean, "suggested_cents" integer)
@@ -6317,6 +6518,7 @@ CREATE TABLE IF NOT EXISTS "public"."profiles" (
     "banned_at" timestamp with time zone,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "free_credits" integer DEFAULT 0 NOT NULL,
+    "code_redeem_attempts" timestamp with time zone[] DEFAULT '{}'::timestamp with time zone[] NOT NULL,
     "referred_by" "uuid",
     "referred_at" timestamp with time zone,
     "referred_source" "text",
@@ -6852,7 +7054,7 @@ CREATE TABLE IF NOT EXISTS "public"."codes" (
     CONSTRAINT "codes_check1" CHECK ((("kind" <> 'invite'::"text") OR (("invitee_credits" IS NULL) AND ("discount_percent" IS NULL)))),
     CONSTRAINT "codes_check2" CHECK ((("kind" <> 'campaign'::"text") OR ("invitee_credits" IS NOT NULL) OR ("discount_percent" IS NOT NULL))),
     CONSTRAINT "codes_check3" CHECK ((("invitee_credits" IS NULL) = ("invitee_pool" IS NULL))),
-    CONSTRAINT "codes_check4" CHECK ((("invitee_pool" <> 'paid'::"text") OR ("max_redemptions" IS NOT NULL))),
+    CONSTRAINT "codes_check4" CHECK ((("invitee_pool" <> 'paid'::"text") OR ("max_redemptions" IS NULL) OR ("max_redemptions" > 0))),
     CONSTRAINT "codes_check5" CHECK ((("discount_percent" IS NULL) = ("discount_products" IS NULL))),
     CONSTRAINT "codes_check6" CHECK ((("discount_percent" IS NULL) = ("discount_duration" IS NULL))),
     CONSTRAINT "codes_check7" CHECK ((("discount_percent" IS NOT NULL) OR (("discount_valid_days" IS NULL) AND ("stripe_coupon_id" IS NULL)))),
@@ -6864,7 +7066,7 @@ CREATE TABLE IF NOT EXISTS "public"."codes" (
     CONSTRAINT "codes_discount_percent_check" CHECK ((("discount_percent" >= 1) AND ("discount_percent" <= 90))),
     CONSTRAINT "codes_discount_products_check" CHECK ((("discount_products" IS NULL) OR (("cardinality"("discount_products") > 0) AND ("discount_products" <@ ARRAY['starter_monthly'::"text", 'starter_yearly'::"text", 'pro_monthly'::"text", 'pro_yearly'::"text", 'max_monthly'::"text", 'max_yearly'::"text", 'pack_s'::"text", 'pack_m'::"text", 'pack_l'::"text"])))),
     CONSTRAINT "codes_discount_valid_days_check" CHECK (("discount_valid_days" > 0)),
-    CONSTRAINT "codes_invitee_credits_check" CHECK ((("invitee_credits" >= 1) AND ("invitee_credits" <= 1000))),
+    CONSTRAINT "codes_invitee_credits_check" CHECK (("invitee_credits" > 0)),
     CONSTRAINT "codes_invitee_pool_check" CHECK (("invitee_pool" = ANY (ARRAY['free'::"text", 'paid'::"text"]))),
     CONSTRAINT "codes_kind_check" CHECK (("kind" = ANY (ARRAY['invite'::"text", 'campaign'::"text"]))),
     CONSTRAINT "codes_max_redemptions_check" CHECK (("max_redemptions" > 0)),
@@ -7927,6 +8129,10 @@ CREATE OR REPLACE TRIGGER "ai_providers_set_updated_at" BEFORE UPDATE ON "public
 
 
 
+CREATE OR REPLACE TRIGGER "codes_enforce_gift_policy" BEFORE INSERT OR UPDATE OF "invitee_credits", "invitee_pool", "max_redemptions" ON "public"."codes" FOR EACH ROW EXECUTE FUNCTION "public"."_enforce_code_gift_policy"();
+
+
+
 CREATE OR REPLACE TRIGGER "site_announcements_set_updated_at" BEFORE UPDATE ON "public"."site_announcements" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
 
 
@@ -8536,6 +8742,10 @@ REVOKE ALL ON FUNCTION "public"."_end_membership_after_refund"("p_user_id" "uuid
 
 
 
+REVOKE ALL ON FUNCTION "public"."_enforce_code_gift_policy"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."_membership_end_without_refunded"("p_user_id" "uuid") FROM PUBLIC;
 
 
@@ -8550,6 +8760,10 @@ REVOKE ALL ON FUNCTION "public"."_payment_granted_credits"("p_payment" "public".
 
 REVOKE ALL ON FUNCTION "public"."_template_has_cover_parts"("p_before" "text", "p_after" "text", "p_locales_json" "jsonb", "p_locales" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."_template_has_cover_parts"("p_before" "text", "p_after" "text", "p_locales_json" "jsonb", "p_locales" "text"[]) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."_validate_code_discount"("p_products" "text"[], "p_percent" integer, "p_catalog" "jsonb", "p_floor_product_id" "text") FROM PUBLIC;
 
 
 
@@ -8803,6 +9017,11 @@ GRANT ALL ON FUNCTION "public"."admin_save_code"("p_actor" "uuid", "p_code_id" "
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_save_code"("p_actor" "uuid", "p_code_id" "uuid", "p_fields" "jsonb", "p_catalog" "jsonb", "p_floor_product_id" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_save_code"("p_actor" "uuid", "p_code_id" "uuid", "p_fields" "jsonb", "p_catalog" "jsonb", "p_floor_product_id" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_save_template_category"("p_category" "jsonb", "p_is_new" boolean, "p_actor" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_save_template_category"("p_category" "jsonb", "p_is_new" boolean, "p_actor" "uuid") TO "service_role";
 
@@ -8953,6 +9172,11 @@ GRANT ALL ON FUNCTION "public"."apply_payment_code_effects"("p_user" "uuid", "p_
 
 
 
+REVOKE ALL ON FUNCTION "public"."apply_payment_code_effects"("p_user" "uuid", "p_payment_id" bigint, "p_code_id" "uuid", "p_amount_discount" integer, "p_inviter_credits" integer, "p_inviter_cap" integer, "p_reward_window_days" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."apply_payment_code_effects"("p_user" "uuid", "p_payment_id" bigint, "p_code_id" "uuid", "p_amount_discount" integer, "p_inviter_credits" integer, "p_inviter_cap" integer, "p_reward_window_days" integer) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."apply_purchase"("p_user_id" "uuid", "p_product_id" "text", "p_event_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."apply_purchase"("p_user_id" "uuid", "p_product_id" "text", "p_event_id" "text") TO "service_role";
 
@@ -9082,6 +9306,11 @@ GRANT ALL ON FUNCTION "public"."my_invite_summary"("p_user" "uuid", "p_inviter_c
 
 
 
+REVOKE ALL ON FUNCTION "public"."my_invite_summary"("p_user" "uuid", "p_inviter_cap" integer, "p_cursor" "jsonb", "p_reward_window_days" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."my_invite_summary"("p_user" "uuid", "p_inviter_cap" integer, "p_cursor" "jsonb", "p_reward_window_days" integer) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."open_payment_dispute"("p_dispute_id" "text", "p_charge_id" "text", "p_amount" integer, "p_currency" "text", "p_reason" "text", "p_due_by" timestamp with time zone, "p_managed_default" boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."open_payment_dispute"("p_dispute_id" "text", "p_charge_id" "text", "p_amount" integer, "p_currency" "text", "p_reason" "text", "p_due_by" timestamp with time zone, "p_managed_default" boolean) TO "service_role";
 
@@ -9149,6 +9378,11 @@ GRANT ALL ON FUNCTION "public"."record_waffo_refund"("p_payment_id" "text", "p_r
 
 REVOKE ALL ON FUNCTION "public"."redeem_code"("p_user" "uuid", "p_code" "text", "p_context" "text", "p_invitee_credits" integer, "p_invite_window_days" integer, "p_replace" boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."redeem_code"("p_user" "uuid", "p_code" "text", "p_context" "text", "p_invitee_credits" integer, "p_invite_window_days" integer, "p_replace" boolean) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."redeem_limited_code"("p_user" "uuid", "p_code" "text", "p_context" "text", "p_invitee_credits" integer, "p_invite_window_days" integer, "p_replace" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."redeem_limited_code"("p_user" "uuid", "p_code" "text", "p_context" "text", "p_invitee_credits" integer, "p_invite_window_days" integer, "p_replace" boolean) TO "service_role";
 
 
 

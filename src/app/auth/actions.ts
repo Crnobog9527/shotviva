@@ -15,17 +15,24 @@ import {
   verifyPhoneCode,
   type FormState,
 } from '@/core/auth'
+import { saveSignupCode } from '@/core/auth/signup-code-actions'
 import { site } from '@/site/site.config'
 
+async function storeSubmittedCode(form: FormData) {
+  if (form.has('signupCode')) await saveSignupCode(form.get('signupCode'))
+}
+
 export async function loginAction(_: FormState, form: FormData) {
-  return signInWithPassword(form, { freeCredits: site.billing.freeCredits })
+  return signInWithPassword(form, { freeCredits: site.billing.freeCredits, invite: site.growth.invite })
 }
 
 export async function googleAction(_: FormState, form: FormData) {
+  await storeSubmittedCode(form)
   return signInWithGoogle(form)
 }
 
 export async function signupAction(_: FormState, form: FormData) {
+  await storeSubmittedCode(form)
   return signUpWithPassword(form)
 }
 
@@ -35,11 +42,13 @@ export async function resendSignupAction(_: FormState, form: FormData) {
 
 // Phone sign-in (T63), Chinese pages only: ask for the SMS code, then enter it.
 export async function phoneSendAction(_: FormState, form: FormData) {
+  await storeSubmittedCode(form)
   return sendPhoneCode(form)
 }
 
 export async function phoneVerifyAction(_: FormState, form: FormData) {
-  return verifyPhoneCode(form, { freeCredits: site.billing.freeCredits })
+  await storeSubmittedCode(form)
+  return verifyPhoneCode(form, { freeCredits: site.billing.freeCredits, invite: site.growth.invite })
 }
 
 export async function resetRequestAction(_: FormState, form: FormData) {

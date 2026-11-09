@@ -240,6 +240,101 @@
     }
   },
   "app": {
+    "signupCodes": {
+      "toggle": "有邀请码或优惠码？",
+      "label": "邀请码或优惠码",
+      "checking": "正在核对这个码…",
+      "invalid": "这个码无效，你仍可继续注册。",
+      "unavailable": "暂时无法核对这个码，你仍可继续注册。",
+      "gift": "注册可多得 {credits} 个{pool, select, paid {付费} other {免费}}积分。",
+      "discount": "{targets}享 {percent}。",
+      "period": {"once": "仅限首笔付款。", "repeating": "订阅的前 {months} 个月有效。", "forever": "订阅续费也享受折扣。"},
+      "received": "兑换码已为你的账号添加 {credits} 个{pool, select, paid {付费} other {免费}}积分。",
+      "saved": "你的 {percent} 优惠已可使用。",
+      "dismiss": "关闭",
+      "products": {
+        "starter_monthly": "Starter 月付",
+        "pro_monthly": "Pro 月付",
+        "max_monthly": "Max 月付",
+        "starter_yearly": "Starter 年付",
+        "pro_yearly": "Pro 年付",
+        "max_yearly": "Max 年付",
+        "pack_s": "小积分包",
+        "pack_m": "中积分包",
+        "pack_l": "大积分包"
+      }
+    },
+    "accountCodes": {
+      "invite": {
+        "title": "邀请好友",
+        "showLink": "我的邀请链接与奖励",
+        "rule": "好友注册时多得 {invitee} 个免费积分。好友首次付款后，你得 {inviter} 个付费积分。",
+        "copy": "复制链接",
+        "share": "分享链接",
+        "copied": "链接已复制。",
+        "copyFailed": "请选择并复制上方链接。",
+        "shareFailed": "分享失败，你仍可复制链接。",
+        "stats": "已邀请 {joined} 人 · 已付款 {paid} 人 · 已得 {earned} 个积分",
+        "cap": "按最近 {days} 天计算，还可领取 {left} 次奖励",
+        "remaining": "还可领取 {left} 次奖励",
+        "friends": "已邀请的好友",
+        "joined": "尚未付款",
+        "purchased": "已付款",
+        "loading": "正在加载邀请记录…",
+        "failed": "邀请记录加载失败。",
+        "retry": "重试",
+        "more": "查看更多好友"
+      },
+      "redeem": {
+        "title": "兑换码",
+        "label": "邀请码、优惠码或赠分码",
+        "button": "兑换",
+        "working": "兑换中…",
+        "paidGift": "已到账 {credits} 个付费积分。",
+        "freeGift": "已到账 {credits} 个免费积分。",
+        "saved": "优惠已保存。",
+        "current": "当前优惠",
+        "confirmTitle": "替换现有折扣？",
+        "confirmBody": "确认用 {code} 替换 {old}？替换后原折扣将失效。",
+        "keep": "保留原折扣",
+        "replace": "替换折扣",
+        "errors": {
+          "notFound": "没有这个码。",
+          "expired": "这个码已停用，或不在兑换有效期内。",
+          "full": "这个码已经被领完了。",
+          "used": "你已经用过这个码了。",
+          "newOnly": "这个码只限新用户。",
+          "own": "不能使用自己的邀请码。",
+          "invited": "你已经用过邀请码了。",
+          "checkout": "当前折扣正在结账，请先完成或取消该笔结账，再替换折扣。",
+          "ineligible": "这个账号不符合邀请奖励条件。",
+          "forbidden": "这个账号暂时无法兑换。",
+          "auth": "请重新登录后兑换。",
+          "rate": "尝试次数过多，请稍后再试。",
+          "invalid": "请输入 4 到 20 位英文字母或数字组成的码。",
+          "unknown": "暂时无法确认兑换结果。请先刷新账号页，再重试。"
+        }
+      },
+      "discount": {
+        "current": "当前折扣 · {code} · {percent}",
+        "once": "首期付款",
+        "repeating": "订阅前 {months} 个月",
+        "forever": "订阅每期",
+        "oneTime": "单次付款",
+        "expires": "{date} 前有效",
+        "products": {
+          "starter_monthly": "Starter 月付",
+          "starter_yearly": "Starter 年付",
+          "pro_monthly": "Pro 月付",
+          "pro_yearly": "Pro 年付",
+          "max_monthly": "Max 月付",
+          "max_yearly": "Max 年付",
+          "pack_s": "小积分包",
+          "pack_m": "中积分包",
+          "pack_l": "大积分包"
+        }
+      }
+    },
     "tabs": {
       "label": "主导航",
       "create": "创作",

@@ -2,6 +2,11 @@ import { randomUUID } from 'node:crypto'
 import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { saveCode } from '@/core/codes/server'
+import { site } from '@/site/site.config'
+
+import { invite } from '../t94-config'
+
 import { anonClient, connectAdmin, createUser, serviceClient } from './helpers'
 import { serviceSupabase } from './supabase-env'
 
@@ -30,7 +35,7 @@ describe('admin campaign writes', () => {
   it('saves a 20% monthly campaign, refuses all edits to discount terms and audits successful writes', async () => {
     const id = randomUUID()
     const fields = discount(['starter_monthly', 'pro_monthly', 'max_monthly'], 20)
-    expect(await save(id, { ...fields, code: fields.code.toLowerCase() })).toMatchObject({ data: id, error: null })
+    expect(await saveCode(service, actor, id, { ...fields, code: fields.code.toLowerCase() }, site.billing.products)).toBe(id)
     expect(await save(id, { discount_percent: 21 })).toMatchObject({ error: { message: 'CODE_DISCOUNT_IMMUTABLE' } })
     expect(await save(id, { discount_products: ['pro_monthly'] })).toMatchObject({ error: { message: 'CODE_DISCOUNT_IMMUTABLE' } })
     expect(await save(id, { stripe_coupon_id: 'another' })).toMatchObject({ error: { message: 'CODE_DISCOUNT_IMMUTABLE' } })
@@ -49,7 +54,7 @@ describe('admin campaign writes', () => {
       message: 'CODE_DISCOUNT_PRODUCTS', detail: '["max_yearly","pro_yearly"]',
     })
     expect(await save(id, discount(['max_yearly'], 2))).toMatchObject({ error: { message: 'CODE_DISCOUNT_PRODUCTS' } })
-    expect(await save(id, discount(['max_yearly'], 1))).toMatchObject({ data: id, error: null })
+    expect(await save(id, discount(['max_yearly'], 1))).toMatchObject({ error: { message: 'CODE_DISCOUNT_PRODUCTS' } })
   })
 
   it('requires a cap on paid gifts and an admin for all administrative calls', async () => {
@@ -111,13 +116,13 @@ describe('admin code reports', () => {
     const inviter = await createUser(db)
     const buyer = await createUser(db)
     const blocked = await createUser(db)
-    const summary = () => service.rpc('my_invite_summary', { p_user: inviter, p_inviter_cap: 20 })
-    expect(await summary()).toMatchObject({ data: { invited: 0, purchasers: 0, rewards_left: 20 } })
+    const summary = () => service.rpc('my_invite_summary', { p_user: inviter, p_inviter_cap: invite.inviterRewardCap })
+    expect(await summary()).toMatchObject({ data: { invited: 0, purchasers: 0, rewards_left: invite.inviterRewardCap } })
     const { rows } = await db.query('select id from public.codes where owner_user_id=$1', [inviter])
     await redemption(rows[0].id, buyer, inviter)
     const blockedId = await redemption(rows[0].id, blocked, inviter, 'blocked_same_ip')
     await payment(buyer, null, false)
-    expect(await summary()).toMatchObject({ data: { invited: 1, purchasers: 1, earned: 0, rewards_left: 20, friends: [{ purchased: true }] } })
+    expect(await summary()).toMatchObject({ data: { invited: 1, purchasers: 1, earned: 0, rewards_left: invite.inviterRewardCap, friends: [{ purchased: true }] } })
     const ranking = await service.rpc('admin_top_inviters', { p_actor: actor, p_days: null })
     expect(ranking.data).toEqual(expect.arrayContaining([expect.objectContaining({ inviter_user_id: inviter, invited: 1, purchasers: 1 })]))
     const rejected = await service.rpc('admin_code_redemptions', { p_actor: actor })

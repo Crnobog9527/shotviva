@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto'
 import type { Client } from 'pg'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
+import { benefits, invite, pack } from '../t94-config'
+
 import { anonClient, connectAdmin, createUser, ledgerOf, profileOf, serviceClient } from './helpers'
 
 let db: Client
@@ -22,17 +24,17 @@ async function addDiscount(user: string) {
     `insert into public.codes(code,kind,discount_percent,discount_products,discount_duration,stripe_coupon_id)
      values($1,'campaign',20,'{pack_s}','once',$2) returning id,code`, [codeText(), randomUUID()])
   const result = await rpc('redeem_code', {
-    p_user: user, p_code: code.code, p_context: 'account', p_invitee_credits: 6, p_invite_window_days: 7, p_replace: true,
+    p_user: user, p_code: code.code, p_context: 'account', p_invitee_credits: invite.inviteeCredits, p_invite_window_days: invite.windowDays, p_replace: true,
   })
   expect(result).toMatchObject({ status: 'ok' })
   return code.id
 }
 
 async function addInvite(buyer: string, inviter: string) {
-  await db.query("select public.grant_credits($1,6,'signup',$2,'free')", [buyer, 'signup:' + buyer])
+  await db.query("select public.grant_credits($1,$3,'signup',$2,'free')", [buyer, 'signup:' + buyer, benefits.freeCredits])
   const { rows: [offer] } = await db.query<{ code: string }>('select public.get_or_create_invite_code($1) as code', [inviter])
   expect(await rpc('redeem_code', {
-    p_user: buyer, p_code: offer.code, p_context: 'signup', p_invitee_credits: 6, p_invite_window_days: 7,
+    p_user: buyer, p_code: offer.code, p_context: 'signup', p_invitee_credits: invite.inviteeCredits, p_invite_window_days: invite.windowDays,
   })).toMatchObject({ status: 'ok' })
 }
 
@@ -55,7 +57,7 @@ type Purchase = Awaited<ReturnType<typeof buy>>
 function effects(payment: Purchase, code: string | null = null, amount = 0) {
   return rpc('apply_payment_code_effects', {
     p_user: payment.buyer, p_payment_id: payment.id, p_code_id: code, p_amount_discount: amount,
-    p_inviter_credits: 10, p_inviter_cap: 20,
+    p_inviter_credits: invite.inviterCredits, p_inviter_cap: invite.inviterRewardCap,
   })
 }
 
@@ -120,7 +122,7 @@ it('two successful discounted payments both settle, one consumes the claim and t
   expect((await db.query('select discount_used_payment_id from public.code_redemptions where code_id = $1', [code])).rows)
     .toEqual([{ discount_used_payment_id: rows[0].id }])
   expect(await effects({ ...a, id: rows[1].id }, code, 198)).toEqual({ applied: false, rewarded: false, conflict: true })
-  expect((await profileOf(db, user)).credits).toBe(40)
+  expect((await profileOf(db, user)).credits).toBe(pack.credits * 2)
   expect(await lookup(user)).toBeNull()
 })
 
@@ -143,8 +145,8 @@ it('rewards only the first settled payment even when callbacks run in reverse or
   const replay = await Promise.all([effects(first), effects(first)])
   expect(replay.map((row) => (row as { rewarded: boolean }).rewarded).sort()).toEqual([false, true])
   expect(await lookup(buyer)).toMatchObject({ code_id: code })
-  expect((await profileOf(db, inviter)).credits).toBe(10)
-  expect(await ledgerOf(db, inviter)).toEqual([expect.objectContaining({ kind: 'invite_reward', pool: 'paid', delta: 10 })])
+  expect((await profileOf(db, inviter)).credits).toBe(invite.inviterCredits)
+  expect(await ledgerOf(db, inviter)).toEqual([expect.objectContaining({ kind: 'invite_reward', pool: 'paid', delta: invite.inviterCredits })])
   expect((await db.query('select public.current_tier($1) as tier', [inviter])).rows[0].tier).toBeNull()
 })
 
@@ -160,24 +162,27 @@ it('a banned inviter receives no reward, including on replay after unban', async
   expect(await ledgerOf(db, inviter)).toEqual([])
 })
 
-it('concurrent first purchases stop at 20 actual rewards in a rolling 30 days', async () => {
+it('concurrent first purchases stop at the configured reward cap within its rolling window', async () => {
   const inviter = await createUser(db)
   const payments = []
-  for (let i = 0; i < 21; i++) {
+  for (let i = 0; i <= invite.inviterRewardCap; i++) {
     const buyer = await createUser(db)
     await addInvite(buyer, inviter)
     payments.push(await buy(buyer))
   }
   const awarded = await Promise.all(payments.map((payment) => effects(payment)))
   const winners = awarded.filter((v) => (v as { rewarded: boolean }).rewarded)
-  expect(winners).toHaveLength(20)
-  expect((await profileOf(db, inviter)).credits).toBe(200)
+  expect(winners).toHaveLength(invite.inviterRewardCap)
+  expect((await profileOf(db, inviter)).credits).toBe(invite.inviterRewardCap * invite.inviterCredits)
   const winner = awarded.findIndex((v) => (v as { rewarded: boolean }).rewarded)
   await db.query('delete from auth.users where id = $1', [payments[winner].buyer])
   const afterDeletion = await createUser(db)
   await addInvite(afterDeletion, inviter)
   expect(await effects(await buy(afterDeletion))).toMatchObject({ rewarded: false })
-  await db.query("update public.credit_ledger set created_at = now() - interval '31 days' where user_id = $1 and kind = 'invite_reward'", [inviter])
+  const { rows: [summary] } = await db.query(
+    'select public.my_invite_summary($1,$2) as result', [inviter, invite.inviterRewardCap])
+  await db.query("update public.credit_ledger set created_at = now() - make_interval(days => $2) where user_id = $1 and kind = 'invite_reward'",
+    [inviter, summary.result.reward_window_days + 1])
   const blocked = awarded.findIndex((v) => !(v as { rewarded: boolean }).rewarded)
   expect(await effects(payments[blocked])).toMatchObject({ applied: false, rewarded: false })
   const next = await createUser(db)
@@ -191,7 +196,7 @@ it('T71 calculates full clawback against the discounted amount and leaves the di
   const purchase = await buy(buyer, 792)
   await effects(purchase, code, 198)
   const { rows: [refund] } = await db.query("select public.record_payment_issue($1,'refunded',792) as result", [purchase.charge])
-  expect(refund.result).toMatchObject({ status: 'refunded', amount_refunded: 792, credits_clawed_back: 20 })
+  expect(refund.result).toMatchObject({ status: 'refunded', amount_refunded: 792, credits_clawed_back: pack.credits })
   expect((await profileOf(db, buyer)).credits).toBe(0)
   expect(await lookup(buyer)).toBeNull()
 })

@@ -62,6 +62,7 @@ export const site = defineSite({
     // admin ahead of launch (ARCHITECTURE §8.3, T87). Never shown on the site until launched.
     upcoming: ['ja'],
   },
+  growth: { invite: { inviteeCredits: 6, inviterCredits: 10, windowDays: 7, inviterRewardCap: 20 } },
   billing: {
     currency: 'usd',
     // = 3 free Standard images at 2 credits each; public copy says "3 free Standard images" (建站规格 G3).

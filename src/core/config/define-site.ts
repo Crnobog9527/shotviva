@@ -1,3 +1,4 @@
+import type { InviteConfig } from '../codes'
 import type { Locale } from '../i18n/locales'
 
 // Shape of site/site.config.ts. Core reads the site only through this type,
@@ -94,6 +95,7 @@ export type SiteConfig = {
     // Not launched yet: only the admin's cover tabs list them (T87). Short lowercase codes.
     upcoming?: readonly string[]
   }
+  growth: { invite: InviteConfig }
   billing: {
     currency: 'usd'
     freeCredits: number

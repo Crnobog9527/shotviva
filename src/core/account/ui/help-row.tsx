@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl'
 
-import { openHelp, UnreadDot } from '../../support/ui'
+import { openHelp, UnreadDot } from '../../support/ui/account'
 import { RowValue, rowClass } from './rows'
 
 // Support → Open a ticket (comps-v3-b/account.html): opens the Help & feedback dialog over the

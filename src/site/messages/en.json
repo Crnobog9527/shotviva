@@ -240,6 +240,101 @@
     }
   },
   "app": {
+    "signupCodes": {
+      "toggle": "Have an invite or promo code?",
+      "label": "Invite or promo code",
+      "checking": "Checking your code…",
+      "invalid": "This code isn’t valid. You can still sign up.",
+      "unavailable": "We can’t check this code right now. You can still sign up.",
+      "gift": "Sign up to get {credits} extra {pool, select, paid {paid} other {free}} credits.",
+      "discount": "{percent}% off {targets}.",
+      "period": {"once": "Applies to your first payment.", "repeating": "Applies for the first {months} months of your subscription.", "forever": "Also applies to subscription renewals."},
+      "received": "Your code added {credits} {pool, select, paid {paid} other {free}} credits to your account.",
+      "saved": "Your {percent}% discount is ready to use.",
+      "dismiss": "Dismiss",
+      "products": {
+        "starter_monthly": "Starter monthly",
+        "pro_monthly": "Pro monthly",
+        "max_monthly": "Max monthly",
+        "starter_yearly": "Starter yearly",
+        "pro_yearly": "Pro yearly",
+        "max_yearly": "Max yearly",
+        "pack_s": "the small credit pack",
+        "pack_m": "the medium credit pack",
+        "pack_l": "the large credit pack"
+      }
+    },
+    "accountCodes": {
+      "invite": {
+        "title": "Invite friends",
+        "showLink": "Your invite link and rewards",
+        "rule": "Friends get {invitee} extra free credits when they join. You get {inviter} paid credits after their first purchase.",
+        "copy": "Copy link",
+        "share": "Share link",
+        "copied": "Link copied.",
+        "copyFailed": "Select and copy the link above.",
+        "shareFailed": "Sharing failed. You can still copy the link.",
+        "stats": "{joined} joined · {paid} purchased · {earned} credits earned",
+        "cap": "{left} rewards left in the rolling {days}-day window",
+        "remaining": "{left} rewards left",
+        "friends": "Friends you invited",
+        "joined": "No purchase yet",
+        "purchased": "Purchased",
+        "loading": "Loading invites…",
+        "failed": "Your invitations couldn’t be loaded.",
+        "retry": "Try again",
+        "more": "Show more friends"
+      },
+      "redeem": {
+        "title": "Redeem a code",
+        "label": "Invite, promo or gift code",
+        "button": "Redeem",
+        "working": "Redeeming…",
+        "paidGift": "Added {credits} paid credits.",
+        "freeGift": "Added {credits} free credits.",
+        "saved": "Discount saved.",
+        "current": "your current discount",
+        "confirmTitle": "Replace your discount?",
+        "confirmBody": "{code} will replace {old}. Your previous discount will no longer be available.",
+        "keep": "Keep current discount",
+        "replace": "Replace discount",
+        "errors": {
+          "notFound": "This code doesn’t exist.",
+          "expired": "This code is inactive or outside its redemption period.",
+          "full": "This code has been fully claimed.",
+          "used": "You’ve already used this code.",
+          "newOnly": "This code is for new accounts only.",
+          "own": "You can’t use your own invite code.",
+          "invited": "You’ve already used an invite code.",
+          "checkout": "You have a checkout open with your current discount. Finish or cancel it before replacing the discount.",
+          "ineligible": "This account isn’t eligible for the invitation reward.",
+          "forbidden": "This account can’t redeem codes.",
+          "auth": "Sign in again to redeem a code.",
+          "rate": "Too many attempts. Please try again later.",
+          "invalid": "Enter a 4–20 character code using letters and numbers.",
+          "unknown": "We couldn’t confirm the result. Refresh your account before trying again."
+        }
+      },
+      "discount": {
+        "current": "Current discount · {code} · {percent}% off",
+        "once": "First payment",
+        "repeating": "First {months} months on a subscription",
+        "forever": "Every payment on a subscription",
+        "oneTime": "One-time payment",
+        "expires": "Use by {date}",
+        "products": {
+          "starter_monthly": "Starter monthly",
+          "starter_yearly": "Starter yearly",
+          "pro_monthly": "Pro monthly",
+          "pro_yearly": "Pro yearly",
+          "max_monthly": "Max monthly",
+          "max_yearly": "Max yearly",
+          "pack_s": "Small credit pack",
+          "pack_m": "Medium credit pack",
+          "pack_l": "Large credit pack"
+        }
+      }
+    },
     "tabs": {
       "label": "Main",
       "create": "Create",
