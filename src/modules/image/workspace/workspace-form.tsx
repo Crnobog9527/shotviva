@@ -21,7 +21,8 @@ import { PhotoCard } from './photo-card'
 import { PhotoPickers } from './photo-pickers'
 import { CopyFields, NoteField } from './text-fields'
 import type { PhotoBatch } from './use-photo-batch'
-import { notePlaceholder, SIZE_OPTIONS } from './workspace-options'
+import { chosenAspect, templateOptions } from './output-choice'
+import { notePlaceholder, sizeLabel } from './workspace-options'
 
 // toggles (T89): the template's on/off options, key → on; {} is every one off.
 export type FormValues = { aspect: OutputAspect; resolution: Resolution; note: string; copy: Record<string, string>; toggles: Record<string, boolean> }
@@ -49,10 +50,12 @@ export function WorkspaceForm({ template, balance, tier, photos, values, onChang
   const t = useTranslations('app')
   const balanceT = useTranslations('app.balance')
   const noteT = useTranslations('app.workspace.notePlaceholder')
-  const size = SIZE_OPTIONS.find((option) => option.id === values.aspect)
+  const options = templateOptions(template)
+  const ratio = photos.photos[0]?.originalRatio
+  const aspect = chosenAspect(values.aspect, options, ratio)
   return (
     <>
-      {again ? <AgainNote again={again} template={template} /> : null}
+      {again ? <AgainNote again={again} template={template} photoRatio={ratio} /> : null}
       <Section id="photo-h" title={t(photos.batchMax > 1 ? 'workspace.yourPhotos' : 'workspace.yourPhoto')} aside={<PhotoAside photos={photos} />}>
         <PhotoField photos={photos} missing={again?.missing ?? null} tier={tier} />
         <BatchHint tier={tier} dropped={photos.dropped} />
@@ -72,16 +75,15 @@ export function WorkspaceForm({ template, balance, tier, photos, values, onChang
         title={t('workspace.size')}
         aside={
           <span className="text-caption text-muted-foreground">
-            {size ? t(`sizes.${size.id}`) : null}
-            {size?.ratio ? <span className="font-mono"> · {size.ratio}</span> : null}
+            {aspect ? sizeLabel(aspect, t) : null}
           </span>
         }
       >
-        <SizePicker value={values.aspect} onChange={(aspect) => onChange({ aspect })} />
+        <SizePicker options={options} photoRatio={ratio} value={values.aspect} onChange={(aspect) => onChange({ aspect })} />
       </Section>
-      <Section id="res-h" title={t('workspace.resolution')}>
-        <ResolutionPicker value={values.resolution} costs={template.creditsCost} balance={balance} onChange={(resolution) => onChange({ resolution })} />
-      </Section>
+      {options.resolutions.length > 1 ? <Section id="res-h" title={t('workspace.resolution')}>
+        <ResolutionPicker options={options} value={values.resolution} costs={template.creditsCost} balance={balance} onChange={(resolution) => onChange({ resolution })} />
+      </Section> : null}
       <p className="flex items-center gap-2 pt-5 text-caption text-muted-foreground">
         <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 flex-none text-primary" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round">
           <circle cx="12" cy="12" r="8.5" />

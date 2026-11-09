@@ -1,5 +1,6 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { useState, useTransition } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { ChevronDown, UserRoundPlus } from 'lucide-react'
@@ -9,8 +10,9 @@ import { localizePath } from '../../i18n/paths'
 import type { Locale } from '../../i18n/locales'
 import { Button } from '../../ui/button'
 import { Group } from './rows'
-import { InviteLink } from './invite-link'
-import { InviteProgress } from './invite-progress'
+
+const InviteLink = dynamic(() => import('./invite-link').then((m) => m.InviteLink), { ssr: false })
+const InviteProgress = dynamic(() => import('./invite-progress').then((m) => m.InviteProgress), { ssr: false })
 
 type Props = { load: LoadInvites; reward: { inviteeCredits: number; inviterCredits: number } }
 

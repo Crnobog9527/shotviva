@@ -6,6 +6,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import type { Balance } from '@/core/billing/pools'
 import { useRouter } from '@/core/i18n'
 import { EDIT_TEMPLATE_ID } from '@/core/templates/edit-params'
+import type { ImageOptions } from '@/core/templates/image-options'
 import type { CreditsCost } from '@/core/templates/pricing'
 import { navTypesFor } from '@/core/ui/nav-motion'
 
@@ -24,6 +25,7 @@ export const useOpenEdit = () => useContext(OpenEdit)
 type Props = {
   source: EditSource
   balance: Balance
+  imageOptions: ImageOptions
   creditsCost: CreditsCost
   concurrency: number
   // Opened by "Edit this photo" on the workspace's done view (edit-link.ts): the panel starts open.
@@ -34,7 +36,7 @@ type Props = {
 // A photo edit from the detail page (ARCHITECTURE §5.2, T6 comp photo.html): panel → developing
 // → the new photo's own page, or the failure with Retry and "Change the request". The job runs
 // in the generation store like any other, so leaving the page does not stop it.
-export function EditFlow({ source, balance, creditsCost, concurrency, openOnLoad = false, children }: Props) {
+export function EditFlow({ source, balance, creditsCost, imageOptions, concurrency, openOnLoad = false, children }: Props) {
   const t = useTranslations('app.edit')
   const router = useRouter()
   const [open, setOpen] = useState(openOnLoad)
@@ -87,6 +89,7 @@ export function EditFlow({ source, balance, creditsCost, concurrency, openOnLoad
         source={source}
         balance={balance}
         creditsCost={creditsCost}
+        imageOptions={imageOptions}
         draft={draft}
         onDraft={(next) => setDraft((current) => ({ ...current, ...next }))}
         onGenerate={generate}
