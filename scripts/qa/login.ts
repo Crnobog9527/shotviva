@@ -12,7 +12,7 @@ async function main() {
   const { persona: id, next } = parseLoginArgs(process.argv.slice(2))
   if (!isPersonaId(id)) throw new Error(`Unknown persona ${id}; one of ${PERSONA_IDS.join(', ')}`)
   const path = checkNext(next)
-  const env = loadQaEnv()
+  const env = loadQaEnv([id])
   const db = adminClient(env)
   const persona = PERSONAS[id]
 

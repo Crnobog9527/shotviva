@@ -1,6 +1,6 @@
 export { applyClawback, previewClawback, type ClawbackPreview, type ClawbackResult } from './clawback'
 export { ORDERS_COPY } from './copy'
-export { usd } from './money'
+export { formatMinor, usd } from './money'
 export { OrdersView } from './orders-view'
 export { listPurchases, listSubscriptions, type AdminPurchase, type AdminSubscription } from './repository'
 export { loadRevenueStats, type RevenueStats } from './revenue'

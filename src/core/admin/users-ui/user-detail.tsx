@@ -7,6 +7,7 @@ import type { UserDetailData } from '../users/detail-types'
 import { RECENT_JOBS } from '../users/types'
 import { GraylumBlock, RequestsBlock, SameIpBlock, SubscriptionBlock } from './account-blocks'
 import { USERS_COPY as COPY } from './copy'
+import { UserCodesRow } from './user-codes-row'
 import { PaymentsBlock } from './payments-block'
 import { UserActions, type UserAdminActions } from './user-actions'
 import { LedgerTable, UserJobsTable } from './user-tables'
@@ -17,13 +18,14 @@ type Props = {
   // T25 support; focusJobId is the job a lookup landed on, highlighted in the jobs table.
   support: { stripeLive: boolean; jobActions: JobSupportActions; focusJobId: string | null }
   // Another ledger page; null is the first.
+  onCodesPage: (cursor: string | null) => void
   onLedgerPage: (cursor: string | null) => void
 }
 
 // The user detail dialog's body (T77; the old /admin/users/[id] page): both pools, membership,
 // the actions, recent jobs, payments, the account blocks (subscription, Graylum, same IP,
 // requests), the ledger.
-export function UserDetailView({ data, actions, support, onLedgerPage }: Props) {
+export function UserDetailView({ data, actions, support, onLedgerPage, onCodesPage }: Props) {
   const { user, jobs, ledger, extras } = data
   return (
     <div className="grid gap-6">
@@ -34,6 +36,7 @@ export function UserDetailView({ data, actions, support, onLedgerPage }: Props) 
         <StatCard title={COPY.detail.paidUntil} value={formatBeijing(user.paidUntil)?.slice(0, 10) ?? COPY.never} hint={formatBeijing(user.paidUntil) ?? undefined} />
         <StatCard title={COPY.detail.registered} value={formatBeijing(user.createdAt)?.slice(0, 10) ?? COPY.never} />
       </div>
+      <UserCodesRow history={extras.codeHistory} onPage={onCodesPage} />
       <UserActions userId={user.id} banned={user.bannedAt !== null} balances={{ free: user.freeCredits, paid: user.credits }} actions={actions} />
       <section className="grid gap-2">
         <h3 className="font-semibold">{COPY.detail.recentJobs(RECENT_JOBS)}</h3>

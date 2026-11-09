@@ -1,7 +1,7 @@
 # QA personas and one-click login (T24)
 
-Two local scripts for browser validation on the preview site. One sets up five fixed test
-identities. The other prints a one-time sign-in link for any of them, so nobody has to type an
+Local scripts for browser validation on the preview site set up fixed test identities and
+create a one-time sign-in link for each, so nobody has to type an
 email, solve the hCaptcha or go through Google to switch accounts.
 
 They only ever run against the preview Supabase project `shotviva-preview`
@@ -31,8 +31,8 @@ They only ever run against the preview Supabase project `shotviva-preview`
 
 ## Personas
 
-`pnpm qa:accounts` creates any that are missing and resets the rest to this state. Running it
-twice in a row changes nothing the second time.
+`pnpm qa:accounts` prepares the five shared QA personas. Use `pnpm qa:reset qa-invitee`
+to prepare the separate invitation acceptance account.
 
 | Persona | Email | Starting state |
 |---|---|---|
@@ -41,6 +41,13 @@ twice in a row changes nothing the second time.
 | `qa-fresh` | qa-fresh@shotviva.com | Deleted and recreated every run: no credits, no works, no ledger. Its first sign-in grants the 6 signup credits through the real first-sign-in path |
 | `qa-max` | qa-max@shotviva.com | Max tier from a `max_yearly` purchase (paid until a year after the first run), 6 free + 3360 paid credits |
 | `qa-free` | qa-free@shotviva.com | Signup credits only: 6 free, 0 paid, no tier |
+| `qa-invitee` | qa-invitee@shotviva.com | Created by its own reset with a fixed test signup IP, the configured signup grant in the free pool and no prior payment or invitation |
+
+For invitation acceptance, reset `qa-invitee` before the first purchase and use
+`pnpm qa:login qa-invitee`. Resetting recreates this test identity, records `192.0.2.94`
+as its signup IP, and calls the standard signup grant with `site.billing.freeCredits`.
+Use a different QA persona as the inviter. Keep the same invitee for both purchases to
+check that the second payment gives no repeat reward.
 
 How it gets there:
 
@@ -69,8 +76,7 @@ what this run did (`created`, `recreated`, `reset` or `unchanged`).
 pnpm qa:reset qa-free
 ```
 
-This puts one persona back into its starting state from the table above, exactly as
-`pnpm qa:accounts` would, and does not touch the other four. It takes exactly one persona;
+This puts the named persona back into its starting state from the table above. It takes exactly one persona;
 anything else (`all`, a typo, two names) is refused before it reads `.env.local`. It ends with the
 same state table, with one row.
 
@@ -106,7 +112,7 @@ lands on `next` (default `/account`).
 > From the repo root, which has the preview `.env.local`. For each browser window, run
 > `pnpm qa:login <persona>` (add `--next /path` to land on a specific page) and open the
 > printed link in that window only. Personas: `qa-admin`, `qa-creator`, `qa-fresh`, `qa-max`,
-> `qa-free`. Never paste the links anywhere; each works once. The window must already be through
+> `qa-free`, `qa-invitee`. Never paste the links anywhere; each works once. The window must already be through
 > Vercel's deployment protection.
 >
 > If your persona is not in its starting state, run `pnpm qa:reset <persona>` for **your own
@@ -139,6 +145,7 @@ a number with a fixed code, for which Supabase sends no SMS and does not call th
   can add others, for example `local` for a `supabase start` stack. Refs listed in
   `PRODUCTION_REFS` (`target.ts`) are always refused, and so is anything that isn't a
   `<ref>.supabase.co` URL.
+- Reset and login for `qa-invitee` always require the named preview project, even if extra refs are configured.
 - A JWT service key must carry `role: service_role` and the same `ref` as the URL.
 - The service key is never printed.
 

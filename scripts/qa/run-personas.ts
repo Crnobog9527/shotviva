@@ -11,7 +11,7 @@ import { adminClient } from './users'
  * in exactly the same state.
  */
 export async function runPersonas(command: string, ids: readonly PersonaId[]): Promise<void> {
-  const env = loadQaEnv()
+  const env = loadQaEnv(ids)
   const db = adminClient(env)
   const storage = qaStorage(env.ref, env.r2)
   process.stdout.write(`${command} → Supabase ${env.ref}\n`)

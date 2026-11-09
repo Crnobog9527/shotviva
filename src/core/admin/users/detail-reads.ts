@@ -5,6 +5,7 @@ import { z } from 'zod'
 
 import { AppError } from '@/core/errors'
 
+import { userCodeHistory } from './code-history'
 import { pageRefusals } from './list'
 import { DETAIL_ROWS, SAME_IP_ROWS, type GraylumLink, type SameIpAccount, type UserExtras, type UserPayment, type UserRequest, type UserSubscription } from './detail-types'
 
@@ -157,15 +158,16 @@ export async function userRequests(db: SupabaseClient, userId: string): Promise<
 }
 
 // All five blocks at once; the signup IP comes from the profile the page already read.
-export async function loadUserExtras(db: SupabaseClient, user: { id: string; signupIp: string | null }): Promise<UserExtras> {
-  const [payments, subscription, graylum, sameIp, requests, refusals] = await Promise.all([
+export async function loadUserExtras(db: SupabaseClient, user: { id: string; signupIp: string | null }, codesCursor?: string | null): Promise<UserExtras> {
+  const [payments, subscription, graylum, sameIp, requests, refusals, codeHistory] = await Promise.all([
     userPayments(db, user.id),
     userSubscription(db, user.id),
     userGraylumLink(db, user.id),
     sameIpAccounts(db, user.id, user.signupIp),
     userRequests(db, user.id),
     pageRefusals(db, [user.id]),
+    userCodeHistory(db, user.id, codesCursor),
   ])
   const identityRefusals = refusals.get(user.id) ?? { total: 0, last24h: 0, flagged: false }
-  return { signupIp: user.signupIp, payments, subscription, graylum, sameIp, requests, identityRefusals }
+  return { signupIp: user.signupIp, payments, subscription, graylum, sameIp, requests, identityRefusals, codeHistory }
 }

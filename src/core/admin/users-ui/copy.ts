@@ -78,6 +78,10 @@ export const USERS_COPY = {
   },
   dialog: {
     referrer: '推荐人',
+    inviter: '邀请人',
+    redeemedCodes: '用过的码',
+    firstCodes: '回到首批',
+    moreCodes: '下一批兑换码',
     close: '关闭',
     loading: '正在读取用户…',
     missing: '这个用户不存在，可能已经删号。',
