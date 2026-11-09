@@ -18,10 +18,13 @@ export const DISCOUNT_CANCEL_COOKIE = 'sv_code_checkout'
 
 // A browser nonce identifies one retryable purchase. The Stripe key/DB token is namespaced by
 // the authenticated account and purchase so a reused nonce cannot acquire a different purchase's lock.
-export function checkoutToken(userId: string, body: CheckoutBody, nonce: string | null) {
+export function checkoutToken(userId: string, body: CheckoutBody, nonce: string | null, products: readonly CatalogInput[]) {
   if (nonce === null) return randomUUID()
   if (!z.uuid().safeParse(nonce).success) throw new AppError('INVALID_INPUT', 'Invalid checkout attempt')
-  const identity = JSON.stringify(['shotviva:checkout', userId, body.product_id, body.method, body.locale, body.return_to, body.expected_code, nonce])
+  // Adjacent deployments may serve different prices concurrently. A rejected quote in
+  // one must never release the other deployment's in-flight request under the same nonce.
+  const economics = products.map(p => [p.id, p.tier, p.priceUsd, p.credits])
+  const identity = JSON.stringify(['shotviva:checkout', userId, body.product_id, body.method, body.locale, body.return_to, body.expected_code, nonce, economics])
   const bytes = createHash('sha256').update(identity).digest().subarray(0, 16)
   bytes[6] = (bytes[6] & 0x0f) | 0x50
   bytes[8] = (bytes[8] & 0x3f) | 0x80

@@ -6,6 +6,7 @@ import type { CheckoutBody } from './checkout'
 import { createCheckout } from './checkout'
 import { checkoutToken, discountedCancelSession, expireAndRelease } from './checkout-discount'
 import { deps, fakeStripe, USER } from './test-checkout'
+import { TEST_PRODUCTS } from './test-products'
 
 const token = '1e1b00f8-eaa9-4b82-a558-5a1072d922aa'
 const codeId = '558f255c-4718-41fa-a38c-5247c18cdbf2'
@@ -159,11 +160,13 @@ describe('return from abandoned Stripe Checkout', () => {
 })
 
 it('derives idempotency keys per account and purchase, still accepting deployed callers without a nonce', () => {
-  const original = checkoutToken(USER, pack, token)
-  expect(checkoutToken(USER, { ...pack }, token)).toBe(original)
-  expect(checkoutToken(codeId, pack, token)).not.toBe(original)
-  expect(checkoutToken(USER, { ...pack, product_id: 'pack_l' }, token)).not.toBe(original)
-  expect(checkoutToken(USER, { ...pack, method: 'alipay' }, token)).not.toBe(original)
-  expect(checkoutToken(USER, pack, null)).not.toBe(checkoutToken(USER, pack, null))
-  expect(() => checkoutToken(USER, pack, 'hello')).toThrow('Invalid checkout attempt')
+  const original = checkoutToken(USER, pack, token, TEST_PRODUCTS)
+  expect(checkoutToken(USER, { ...pack }, token, TEST_PRODUCTS)).toBe(original)
+  expect(checkoutToken(codeId, pack, token, TEST_PRODUCTS)).not.toBe(original)
+  expect(checkoutToken(USER, { ...pack, product_id: 'pack_l' }, token, TEST_PRODUCTS)).not.toBe(original)
+  expect(checkoutToken(USER, { ...pack, method: 'alipay' }, token, TEST_PRODUCTS)).not.toBe(original)
+  const repriced = TEST_PRODUCTS.map(p => ({ ...p, credits: p.credits * 100 }))
+  expect(checkoutToken(USER, pack, token, repriced)).not.toBe(original)
+  expect(checkoutToken(USER, pack, null, TEST_PRODUCTS)).not.toBe(checkoutToken(USER, pack, null, TEST_PRODUCTS))
+  expect(() => checkoutToken(USER, pack, 'hello', TEST_PRODUCTS)).toThrow('Invalid checkout attempt')
 })

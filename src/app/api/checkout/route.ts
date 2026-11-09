@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     if (channel === 'waffo') return jsonResponse(await startWaffo(user.id, body.data))
     // Dispute evidence (T82): who opened checkout, from where.
     const client = { ip: clientIp(request.headers), userAgent: request.headers.get('user-agent') }
-    const token = checkoutToken(user.id, body.data, request.headers.get('idempotency-key'))
+    const token = checkoutToken(user.id, body.data, request.headers.get('idempotency-key'), site.billing.products)
     const { url, cancelReceipt } = await startStripe(user.id, body.data, client, token)
     const response = jsonResponse({ url })
     if (cancelReceipt) response.cookies.set(DISCOUNT_CANCEL_COOKIE, cancelReceipt, {

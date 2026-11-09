@@ -1,4 +1,4 @@
-import { createTranslator, type AbstractIntlMessages } from 'next-intl'
+import { createTranslator } from 'next-intl'
 import { expect, it } from 'vitest'
 
 import { discountTerm } from '@/core/billing/paywall'
@@ -11,10 +11,9 @@ it.each([
   [13, 'First 2 annual payments', '前 2 笔年费'],
 ] as const)('names the annual invoices covered by a %i-month window', (months, english, chinese) => {
   const term = discountTerm({ duration: 'repeating', months }, false, 'year')
-  const translate = (locale: 'en' | 'zh') => {
-    const messages: AbstractIntlMessages = locale === 'zh' ? zh.paywall : en.paywall
-    return createTranslator({ locale, messages })(term.key, term.values)
-  }
+  expect(term.key).toBe('codeAnnualPayments')
+  const translate = (locale: 'en' | 'zh') =>
+    createTranslator({ locale, messages: locale === 'zh' ? zh.paywall : en.paywall })('codeAnnualPayments', { count: term.values?.count ?? 0 })
   expect(translate('en')).toBe(english)
   expect(translate('zh')).toBe(chinese)
 })
