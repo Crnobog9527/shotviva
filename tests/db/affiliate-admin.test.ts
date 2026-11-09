@@ -59,6 +59,17 @@ it('checks membership purchase tier and refunds, captures the accepted version, 
   expect((await row(db, 'select parent_user_id from affiliates where user_id=$1', [member])).parent_user_id).toBe(leader.id)
 })
 
+it('refuses payout detail changes after suspension in the database write', async () => {
+  const partner = await promoter(db)
+  await settings({ terms_version: 'qa' })
+  const save = (details: string) => db.query("select affiliate_save_profile($1,'paypal',$2,false,'qa')", [partner.id, details])
+  await save('original')
+  await db.query('select admin_affiliate_set($1,$2)', [admin, { user_id: partner.id, status: 'suspended', reason: 'QA' }])
+  await rejects(() => save('replacement'), 'AFFILIATE_NOT_FOUND')
+  expect(await row(db, 'select status,payout_details from affiliates where user_id=$1', [partner.id]))
+    .toMatchObject({ status: 'suspended', payout_details: 'original' })
+})
+
 it('activates a reserved admin invite only after Auth confirms that email', async () => {
   await db.query('update auth.users set invited_at=now() where id=$1', [user])
   const slug = 'qa-invited'

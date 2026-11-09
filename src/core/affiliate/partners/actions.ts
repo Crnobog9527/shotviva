@@ -1,12 +1,12 @@
 'use server'
 
-import { notFound, redirect } from 'next/navigation'
+import { notFound } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createAdminSupabase, requireUser } from '@/core/auth'
 import { localized } from '@/core/i18n/server'
 import { isAffiliateEnabled } from '../feature'
-import { readAccount } from './repository'
+import { publishedTerms } from './terms'
 import { applicationSchema, payoutMethods, slugSchema } from './models'
 
 export type PartnerFormState = '' | 'invalid' | 'failed' | 'saved'
@@ -25,10 +25,11 @@ const profileSchema = acceptance
 
 export async function applyAction(_: PartnerFormState, form: FormData): Promise<PartnerFormState> {
   if (!(await isAffiliateEnabled())) notFound()
-  const user = await requireUser('/partners/apply')
   const fields = applySchema.safeParse(Object.fromEntries(form))
   if (!fields.success) return 'invalid'
   const { parent, termsVersion, ...input } = fields.data
+  if (!(await publishedTerms(termsVersion))) return 'failed'
+  const user = await requireUser('/partners/apply' + (parent ? '?by=' + parent : ''))
   const { error } = await createAdminSupabase().rpc('affiliate_apply', {
     p_user: user.id,
     p_application: applicationSchema.parse(input),
@@ -36,18 +37,16 @@ export async function applyAction(_: PartnerFormState, form: FormData): Promise<
     p_terms_version: termsVersion,
   })
   if (error) return 'failed'
-  const path = await localized('/partners/join')
-  revalidatePath(path)
-  redirect(path)
+  return 'saved'
 }
 
 export async function saveAction(_: PartnerFormState, form: FormData): Promise<PartnerFormState> {
   if (!(await isAffiliateEnabled())) notFound()
   const user = await requireUser('/partners?view=settings')
-  if ((await readAccount(user.id))?.status !== 'active') notFound()
   const fields = profileSchema.safeParse(Object.fromEntries(form))
   if (!fields.success) return 'invalid'
   const { method, details, us, termsVersion } = fields.data
+  if (!(await publishedTerms(termsVersion))) return 'failed'
   const { error } = await createAdminSupabase().rpc('affiliate_save_profile', {
     p_user: user.id,
     p_payout_method: method || null,

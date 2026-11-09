@@ -5,6 +5,7 @@ import { getSessionUser } from '@/core/auth'
 import { localized } from '@/core/i18n/server'
 import { Link } from '@/core/i18n/ui'
 import { isAffiliateEnabled } from '../feature'
+import { publishedTerms } from './terms'
 import { CommissionList } from './commission-list'
 import { viewHref } from './format'
 import { SettingsForm } from './forms'
@@ -61,11 +62,12 @@ export async function PartnerScreen({ search }: { search: Promise<SearchParams> 
 export async function TermsScreen() {
   await guard()
   const [t, settings] = await Promise.all([getTranslations('affiliate'), readSettings()])
+  const body = await publishedTerms(settings.terms_version)
   return (
     <section className="af-intro">
       <h1>{t('terms')}</h1>
-      <p>{t('version', { version: settings.terms_version })}</p>
-      <div className="af-panel">{t('termsPlaceholder')}</div>
+      {body && <p>{t('version', { version: settings.terms_version })}</p>}
+      <div className="af-panel whitespace-pre-line">{body ?? t('termsPlaceholder')}</div>
       <Link className="af-link" href="/partners">
         {t('back')}
       </Link>

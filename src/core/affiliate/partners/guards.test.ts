@@ -1,7 +1,8 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 import { AppError } from '@/core/errors'
 
-const deps = vi.hoisted(() => ({ enabled: vi.fn(), user: vi.fn(), account: vi.fn(), settings: vi.fn(), canApply: vi.fn() }))
+const deps = vi.hoisted(() => ({ enabled: vi.fn(), user: vi.fn(), account: vi.fn(), terms: vi.fn(), settings: vi.fn(), canApply: vi.fn() }))
+vi.mock('./terms', () => ({ publishedTerms: deps.terms }))
 vi.mock('../feature', () => ({ isAffiliateEnabled: deps.enabled }))
 vi.mock('@/core/auth', () => ({ getSessionUser: deps.user, requireApiUser: deps.user, loginPath: (next: string) => '/login?next=' + encodeURIComponent(next) }))
 vi.mock('./repository', () => ({ readAccount: deps.account, readSettings: deps.settings, canApply: deps.canApply }))
@@ -18,10 +19,12 @@ import { PartnerScreen, TermsScreen } from './screen'
 import { exportCommissions } from './csv'
 
 beforeEach(() => vi.resetAllMocks())
-it('hides every partner page and export before accessing a session when the switch is off', async () => {
+it('keeps the intro public while guarding application, portal and export with operations off', async () => {
   deps.enabled.mockResolvedValue(false)
   const props = { search: Promise.resolve({}) }
-  for (const load of [() => PartnerScreen(props), () => EnrollmentScreen(props), () => EnrollmentScreen({ ...props, openForm: true }), () => TermsScreen()]) {
+  const intro = await EnrollmentScreen(props)
+  expect(intro.props.children).toBeUndefined()
+  for (const load of [() => PartnerScreen(props), () => EnrollmentScreen({ ...props, openForm: true }), () => TermsScreen()]) {
     await expect(load()).rejects.toMatchObject({ digest: 'NEXT_HTTP_ERROR_FALLBACK;404' })
   }
   await expect(exportCommissions('en')).rejects.toMatchObject({ code: 'NOT_FOUND' })
@@ -59,4 +62,16 @@ it.each([null, { id: 'unverified', verified: false }])('keeps an unverified sess
     digest: expect.stringContaining('/zh/partners/join;'),
   })
   expect(deps.account).not.toHaveBeenCalled()
+})
+
+it('requires matching published terms before opening the application', async () => {
+  deps.enabled.mockResolvedValue(true)
+  deps.settings.mockResolvedValue({ terms_version: 'next' })
+  const props = { search: Promise.resolve({ by: 'qa-team' }) }
+  expect((await EnrollmentScreen(props)).props.children).toBeUndefined()
+  await expect(EnrollmentScreen({ ...props, openForm: true })).rejects.toMatchObject({ digest: 'NEXT_HTTP_ERROR_FALLBACK;404' })
+  expect(deps.canApply).not.toHaveBeenCalled()
+  deps.terms.mockResolvedValue('QA')
+  expect((await EnrollmentScreen({ ...props, openForm: true })).props.children.props)
+    .toMatchObject({ openForm: true, parent: 'qa-team' })
 })

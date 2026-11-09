@@ -4144,7 +4144,7 @@ begin
   update public.affiliates set payout_method=p_payout_method,payout_details=nullif(trim(p_payout_details),''),
     us_person=p_us_person,terms_version=v_version,
     terms_accepted_at=case when terms_version is distinct from v_version then now() else coalesce(terms_accepted_at,now()) end
-    where user_id=p_user;
+    where user_id=p_user and status='active';
   if not found then raise exception 'AFFILIATE_NOT_FOUND'; end if;
 end;
 $$;

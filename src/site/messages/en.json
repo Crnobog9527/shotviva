@@ -1257,6 +1257,7 @@
     "label": "Admin"
   },
   "affiliate": {
+    "closed": "Applications are not open yet.",
     "programName": "Affiliate program",
     "whatTitle": "How does the affiliate program work?",
     "intro": "Introduce Shotviva to people who need images. Once approved, you’ll get a personal referral link to share in tutorials, alongside your work, or with your community.",

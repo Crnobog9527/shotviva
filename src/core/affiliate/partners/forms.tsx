@@ -1,8 +1,9 @@
 import { getTranslations } from 'next-intl/server'
 import { Link } from '@/core/i18n/ui'
-import { currentLocale } from '@/core/i18n/server'
+import { currentLocale, localized } from '@/core/i18n/server'
 import type { Translate } from '@/core/translate'
 import { ApplicationFields } from './application-fields'
+import { publishedTerms } from './terms'
 import { saveAction } from './actions'
 import { PartnerForm } from './interactive'
 import { payoutMethods, type Account, type Settings } from './models'
@@ -35,7 +36,7 @@ export async function ApplicationForm({
   eligible: boolean
   loginUrl?: string
 }) {
-  const t = await getTranslations('affiliate')
+  const [t, successUrl] = await Promise.all([getTranslations('affiliate'), localized('/partners/join')])
   if (!eligible)
     return (
       <section className="af-panel">
@@ -46,7 +47,7 @@ export async function ApplicationForm({
       </section>
     )
   return (
-    <ApplicationFields parent={parent} loginUrl={loginUrl} loginLabel={t('loginToSubmit')} labels={labels(t, 'submit')}>
+    <ApplicationFields successUrl={successUrl} parent={parent} loginUrl={loginUrl} loginLabel={t('loginToSubmit')} labels={labels(t, 'submit')}>
       <input name="parent" type="hidden" value={parent} />
       <label>
         {t('name')}
@@ -75,6 +76,7 @@ export async function ApplicationForm({
 
 export async function SettingsForm({ account, settings }: { account: Account; settings: Settings }) {
   const [t, locale] = await Promise.all([getTranslations('affiliate'), currentLocale()])
+  if (!(await publishedTerms(settings.terms_version))) return <p>{t('termsPlaceholder')}</p>
   return (
     <PartnerForm labels={labels(t, 'save')} action={saveAction}>
       <label>

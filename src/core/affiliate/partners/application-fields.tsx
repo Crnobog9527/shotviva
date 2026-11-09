@@ -1,24 +1,21 @@
 'use client'
 
-import { useRef, type FormEvent, type ReactNode } from 'react'
-import { applyAction } from './actions'
-import { PartnerForm } from './interactive'
+import { useActionState, useRef, startTransition, type FormEvent, type ReactNode } from 'react'
+import { applyAction, type PartnerFormState } from './actions'
 import type { PartnerFormLabels } from './interactive'
 
 const draftKey = 'shotviva.affiliate.application'
 const fields = ['name', 'country', 'channel', 'audience', 'plan'] as const
 
-// Keep the applicant's typed answers across sign-in in this tab. Terms must be accepted
-// by the signed-in user, and eligibility is checked again before submission.
-function saveDraft(form: HTMLFormElement, parent: string) {
-  const values = new FormData(form)
+// Consent is always obtained from the signed-in user, never restored from a draft.
+function saveDraft(values: FormData) {
   const answers = Object.fromEntries(fields.map((key) => [key, values.get(key)]))
   try {
-    sessionStorage.setItem(draftKey, JSON.stringify({ parent, answers, expires: Date.now() + 30 * 60_000 }))
-  } catch { /* Sign-in remains available with browser storage disabled. */ }
+    sessionStorage.setItem(draftKey, JSON.stringify({ parent: values.get('parent'), answers, expires: Date.now() + 30 * 60_000 }))
+  } catch { /* The form also works without storage. */ }
 }
 
-function restoreDraft(container: HTMLDivElement, parent: string) {
+function restoreDraft(form: HTMLFormElement, parent: string) {
   try {
     const raw = sessionStorage.getItem(draftKey)
     if (!raw) return
@@ -27,38 +24,50 @@ function restoreDraft(container: HTMLDivElement, parent: string) {
       sessionStorage.removeItem(draftKey)
       return
     }
-    if (draft.parent !== parent) return
-    for (const key of fields) {
-      const input = container.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[name="${key}"]`)
-      if (input && typeof draft.answers?.[key] === 'string') input.value = draft.answers[key]
-    }
-  } catch { /* A missing or expired draft leaves the form empty. */ }
+    if (parent && draft.parent !== parent) return
+    restoreValue(form, 'parent', draft.parent)
+    for (const key of fields) restoreValue(form, key, draft.answers?.[key])
+  } catch { /* An unavailable draft leaves the form usable. */ }
 }
 
-type Props = { parent: string; loginUrl?: string; loginLabel: string; labels: PartnerFormLabels; children: ReactNode }
-export function ApplicationFields({ parent, loginUrl, loginLabel, labels, children }: Props) {
-  const restored = useRef(false)
-  function signIn(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    saveDraft(event.currentTarget, parent)
-    if (loginUrl) window.location.assign(loginUrl)
+function restoreValue(form: HTMLFormElement, name: string, value: unknown) {
+  const input = form.elements.namedItem(name)
+  if ((input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement) && typeof value === 'string') {
+    input.value = value
   }
-  if (loginUrl) return (
-    <form className="af-form" onSubmit={signIn}>
-      {children}
-      <button className="af-button" type="submit">{loginLabel}</button>
-    </form>
-  )
-  return (
-    <div onSubmitCapture={() => {
+}
+
+type Props = {
+  parent: string; loginUrl?: string; successUrl: string; loginLabel: string; labels: PartnerFormLabels; children: ReactNode
+}
+export function ApplicationFields({ parent, loginUrl, successUrl, loginLabel, labels, children }: Props) {
+  const restored = useRef(false)
+  const [state, dispatch, pending] = useActionState(async (previous: PartnerFormState, data: FormData) => {
+    const result = await applyAction(previous, data)
+    if (result === 'saved') {
       try { sessionStorage.removeItem(draftKey) } catch { /* Storage may be disabled. */ }
-    }} ref={(node) => {
-      if (node && !restored.current) {
-        restoreDraft(node, parent)
-        restored.current = true
-      }
-    }}>
-      <PartnerForm action={applyAction} labels={labels}>{children}</PartnerForm>
-    </div>
+      window.location.replace(successUrl)
+    }
+    return result
+  }, '')
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const data = new FormData(event.currentTarget)
+    saveDraft(data)
+    if (loginUrl) window.location.assign(loginUrl)
+    else startTransition(() => dispatch(data))
+  }
+  return (
+    <form className="af-form" onSubmit={submit} onChange={(event) => saveDraft(new FormData(event.currentTarget))}
+      ref={(form) => {
+        if (form && !restored.current) {
+          restoreDraft(form, parent)
+          restored.current = true
+        }
+      }}>
+      {children}
+      {state && <p role="status">{labels[state]}</p>}
+      <button className="af-button" type="submit" disabled={pending}>{loginUrl ? loginLabel : labels.submit}</button>
+    </form>
   )
 }
