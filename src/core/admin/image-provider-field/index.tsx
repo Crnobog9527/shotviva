@@ -1,7 +1,7 @@
 'use client'
 
-import type { CreditsFloor } from '@/core/templates/pricing'
-import { type ImageCapabilities } from '@/core/templates/image-capabilities'
+import type { ApprovedTariff, CreditsFloor } from '@/core/templates/pricing'
+import { OPENAI_MAX_REFERENCES, type ImageCapabilities } from '@/core/templates/image-capabilities'
 import { FULL_IMAGE_OPTIONS } from '@/core/templates/image-options'
 import { Label } from '@/core/ui/label'
 
@@ -10,6 +10,7 @@ import { copy } from './copy'
 export type ImageProviderOption = {
   id: string; label: string; model: string; isActive: boolean; openAI: boolean
   capabilities: ImageCapabilities | null; floor: CreditsFloor
+  version?: 'v1' | 'v2'; approved?: Record<string, ApprovedTariff>
 }
 
 type Props = {
@@ -38,7 +39,7 @@ export function ImageProviderField({ id, providers, value, onChange }: Props) {
 
 function capabilitySummary(provider: ImageProviderOption) {
   if (!provider.capabilities && !provider.openAI) return copy.pending
-  const caps = provider.capabilities ?? { ...FULL_IMAGE_OPTIONS, minReferences: 0, maxReferences: 4, fetchedAt: null, providerAspectRatios: undefined }
+  const caps = provider.capabilities ?? { ...FULL_IMAGE_OPTIONS, minReferences: 0, maxReferences: OPENAI_MAX_REFERENCES, fetchedAt: null, providerAspectRatios: undefined }
   const ratios = caps.providerAspectRatios ?? caps.aspectRatios
   const time = caps.fetchedAt ? new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', dateStyle: 'short', timeStyle: 'short' }).format(new Date(caps.fetchedAt)) : '固定能力'
   return [provider.model, caps.resolutions.map(r => r.toUpperCase()).join(' / '),

@@ -1,10 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
-import { LOCALES } from '../../src/core/i18n/locales'
-import type { CreditsFloor } from '../../src/core/templates/pricing'
-import { templateFieldsSchema } from '../../src/core/templates/schema'
-import { toggleSetupProblems } from '../../src/core/templates/toggles'
+import { site } from '../../src/site/site.config'
+import { templateFieldsSchema, toggleSetupProblems } from '../../src/core/templates'
+import { readTemplateQuote } from '../../src/site/template-pricing'
 import { copyCovers, SyncError, type Assets } from './covers'
 
 export const slug = z.string().max(64).regex(/^[a-z0-9]+(-[a-z0-9]+)*$/)
@@ -18,9 +17,8 @@ const prompt = z.object({
 })
 
 export type SyncTarget = { db: SupabaseClient; assets: Assets }
-type Floors = CreditsFloor & { providers?: Record<string, CreditsFloor> }
 
-export async function syncTemplate(id: string, runId: string, source: SyncTarget, target: SyncTarget, floors: Floors) {
+export async function syncTemplate(id: string, runId: string, source: SyncTarget, target: SyncTarget) {
   // Pin the destination before reading the source: even a delayed source read must not
   // let an old run adopt a newer destination as its precondition.
   const current = await target.db.rpc('read_template_sync_target', { p_id: id, p_run_id: runId })
@@ -45,13 +43,16 @@ export async function syncTemplate(id: string, runId: string, source: SyncTarget
     throw new SyncError('INVALID_FIELDS_OR_TOGGLES')
   }
   async function apply(template: Record<string, unknown>, validate: boolean) {
+    // An upload can outlast a model estimate or p95 update. Price again at the write,
+    // through exactly the editor's read-and-save path, including its approved exceptions.
+    const { floors, receipt, envModel } = await readTemplateQuote(target.db)
     const write = await target.db.rpc('sync_preview_template', {
-      p_template: template, p_prompt: revision, p_provider: provider, p_floors: floors,
-      p_run_id: runId, p_locales: LOCALES, p_target_token: token, p_catalog_version: catalog, p_validate_only: validate,
+      p_template: template, p_prompt: revision, p_provider: provider, p_floors: { ...floors, quote_receipt: receipt, env_model: envModel },
+      p_run_id: runId, p_locales: site.locales.enabled, p_target_token: token, p_catalog_version: catalog, p_validate_only: validate,
     })
     if (write.error) {
       const known = ['CATEGORY_MISSING', 'MODEL_CREDIT_FLOOR', 'MODEL_CHANGED', 'MODEL_REFERENCE_LIMIT',
-        'STALE_TARGET', 'CATALOG_MISMATCH', 'TEMPLATE_RETIRED', 'FEATURED_WEB_REQUIRED', 'LIVE_TEMPLATE_INCOMPLETE', 'PROVIDER_NOT_UNIQUE']
+        'STALE_TARGET', 'PRICE_QUOTE_CHANGED', 'CATALOG_MISMATCH', 'TEMPLATE_RETIRED', 'FEATURED_WEB_REQUIRED', 'LIVE_TEMPLATE_INCOMPLETE', 'PROVIDER_NOT_UNIQUE']
       throw new SyncError(known.includes(write.error.message) ? write.error.message : 'TARGET_WRITE_FAILED')
     }
     return z.int().positive().parse(write.data)

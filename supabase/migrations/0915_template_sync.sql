@@ -71,6 +71,44 @@ $$;
 revoke all on function public.read_template_sync_target(text,text) from public, anon, authenticated;
 grant execute on function public.read_template_sync_target(text,text) to service_role;
 
+-- Sign the inputs before PostgREST converts PG numeric to JavaScript numbers. Both the
+-- calculator and the revision proof refer to this one pricing read, including on #385.
+create function public.template_sync_pricing_input(p_env_model text) returns jsonb
+language plpgsql stable set search_path = '' as $$
+declare
+  price_input jsonb;
+  terms jsonb;
+  receipt jsonb;
+begin
+  if to_regprocedure('public.admin_image_pricing_catalog(text)') is not null then
+    select public.admin_image_pricing_catalog(p_env_model) into price_input;
+    terms := price_input - 'providers';
+  else
+    select jsonb_agg(to_jsonb(p)) into price_input from public.admin_image_provider_pricing(p_env_model) p;
+    terms := '"v1"'::jsonb;
+  end if;
+  select jsonb_build_object(
+    'terms', encode(sha256(convert_to(terms::text,'UTF8')),'hex'),
+    'routes', jsonb_object_agg(coalesce(r->>'provider_id','env'),
+      encode(sha256(convert_to((r - 'label')::text,'UTF8')),'hex')),
+    'active', max(coalesce(r->>'provider_id','env')) filter (where (r->>'is_active')::boolean)
+  ) into receipt from jsonb_array_elements(coalesce(price_input->'providers', price_input)) r;
+  return jsonb_build_object('input',price_input,'receipt',receipt);
+end;
+$$;
+revoke all on function public.template_sync_pricing_input(text) from public, anon, authenticated;
+grant execute on function public.template_sync_pricing_input(text) to service_role;
+
+-- Compare the relevant routes only. A different template's provider may change freely.
+create function admin.template_sync_quote(p_receipt jsonb, p_provider uuid, p_edit boolean)
+returns jsonb language sql immutable set search_path = '' as $$
+  select jsonb_build_array(p_receipt->'terms',
+    p_receipt->'routes'->p_provider::text,
+    case when p_provider is null or p_edit then p_receipt->'routes'->(p_receipt->>'active') end)
+$$;
+revoke all on function admin.template_sync_quote(jsonb,uuid,boolean) from public, anon, authenticated;
+grant execute on function admin.template_sync_quote(jsonb,uuid,boolean) to service_role;
+
 create or replace function public.sync_preview_template(
   p_template jsonb, p_prompt jsonb, p_provider jsonb, p_floors jsonb, p_run_id text, p_locales text[],
   p_target_token text, p_catalog_version text, p_validate_only boolean default false
@@ -79,6 +117,7 @@ declare
   v_id text := p_template->>'id';
   v_provider uuid;
   v_catalog text;
+  v_quote jsonb;
   v_inserted boolean;
   v_template_xmin text;
   v_prompt_xmin text;
@@ -142,6 +181,17 @@ begin
     (p_template - array['sort_order','is_active','featured_rank','category','price_floors'])
       || jsonb_build_object('price_floors',p_floors),
     (p_prompt - 'provider_id') || jsonb_build_object('provider_id',v_provider));
+  -- The editor writer now holds the effective model lock. Compare the exact response used
+  -- by its calculator with the current inputs (including p95, approved tariffs and unit).
+  -- A quote changed between the last HTTP read and this transaction rolls back the upsert.
+  if nullif(p_floors->>'env_model','') is null or jsonb_typeof(p_floors->'quote_receipt') is distinct from 'object' then
+    raise exception 'PRICE_QUOTE_CHANGED';
+  end if;
+  v_quote := public.template_sync_pricing_input(p_floors->>'env_model')->'receipt';
+  if admin.template_sync_quote(v_quote,v_provider,v_id='edit') is distinct from
+     admin.template_sync_quote(p_floors->'quote_receipt',v_provider,v_id='edit') then
+    raise exception 'PRICE_QUOTE_CHANGED';
+  end if;
   update public.templates set cover_media_type = p_template->>'cover_media_type',
     cover_video_url = p_template->>'cover_video_url', cover_poster_url = p_template->>'cover_poster_url',
     cover_locales = p_template->'cover_locales' where id = v_id;

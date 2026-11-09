@@ -2,12 +2,12 @@ import { randomUUID } from 'node:crypto'
 
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 
-import { CREDITS_FLOOR } from '../../src/modules/image/credits-floor'
+import { readTemplateQuote } from '../../src/site/template-pricing'
 import { anonClient, connectAdmin, serviceClient } from './helpers'
+import { serviceSupabase } from './supabase-env'
 
 const providerId = randomUUID()
 const binding = { adapter: 'openai_images', model: providerId, base_url: 'https://model.example.test' }
-const floors = { ...CREDITS_FLOOR, providers: { [providerId]: CREDITS_FLOOR }, models: { [providerId]: binding.model } }
 const prompt = { body: 'QA fixture', version: 77, model_params: { test: true } }
 const templateIds: string[] = []
 let db: Awaited<ReturnType<typeof connectAdmin>>
@@ -33,7 +33,9 @@ async function target(id: string, run: string) {
 
 async function prepare(template: ReturnType<typeof fixture>, run: string) {
   const { token } = await target(template.id, run)
-  return { p_template: template, p_prompt: prompt, p_provider: binding, p_floors: floors, p_run_id: run,
+  const { floors, receipt, envModel } = await readTemplateQuote(serviceSupabase())
+  return { p_template: template, p_prompt: prompt, p_provider: binding,
+    p_floors: { ...floors, quote_receipt: receipt, env_model: envModel }, p_run_id: run,
     p_locales: ['en', 'zh'], p_target_token: token, p_catalog_version: 'v1' }
 }
 const write = (args: Record<string, unknown>) => serviceClient().rpc('sync_preview_template', args)
@@ -139,6 +141,22 @@ it('preserves a concurrent manual insert that was uncommitted when the final wri
   }
 })
 
+it('keeps destination style references private and intact across sync and a racing admin edit', async () => {
+  const template = fixture()
+  expect(await write(await prepare(template, 'seed'))).toEqual(ok(1))
+  const args = await prepare(template, 'A')
+  const refs = [{ key: `style-refs/${template.id}/${randomUUID()}.webp`, width: 32, height: 32, uploadedAt: new Date().toISOString() }]
+  await db.query('update public.template_prompts set style_refs=$2 where template_id=$1', [template.id, JSON.stringify(refs)])
+  expect((await write(args)).error?.message).toBe('STALE_TARGET')
+  const snapshot = await source(template.id)
+  expect(snapshot.error).toBeNull()
+  expect(snapshot.data).not.toHaveProperty('prompt.style_refs')
+  expect(JSON.stringify(snapshot.data)).not.toContain(refs[0].key)
+  const fresh = await prepare(template, 'B')
+  expect((await write(fresh)).error).toBeNull()
+  expect((await db.query('select style_refs from public.template_prompts where template_id=$1', [template.id])).rows[0].style_refs).toEqual(refs)
+})
+
 it('reads the source catalogue, private prompt and binding together; rejects both directions of a version mismatch', async () => {
   const template = fixture()
   expect(await write(await prepare(template, 'seed'))).toEqual(ok(1))
@@ -164,6 +182,30 @@ it('reads the source catalogue, private prompt and binding together; rejects bot
     await db.query('rollback')
   }
   expect((await target(template.id, 'A')).version).toBeNull()
+})
+
+it('rechecks the quoted model at commit without rejecting another model’s cost update', async () => {
+  const template = fixture()
+  const otherId = randomUUID()
+  await db.query("insert into public.ai_providers(id,adapter,model,label) values ($1,'openai_images',$2,'other sync fixture')", [otherId, otherId])
+  try {
+    const seed = await prepare(template, 'seed')
+    await db.query('update public.ai_providers set estimated_image_costs=$1 where id=$2', [{ '1k': 2 }, otherId])
+    expect(await write(seed)).toEqual(ok(1))
+
+    const before = await source(template.id)
+    const args = await prepare({ ...template, name: 'should not commit' }, 'A')
+    expect(await write({ ...args, p_validate_only: true })).toEqual(ok(2))
+    await db.query('update public.ai_providers set estimated_image_costs=$1 where id=$2', [{ '1k': 2 }, providerId])
+    expect((await write(args)).error?.message).toBe('PRICE_QUOTE_CHANGED')
+    expect(await source(template.id)).toEqual(before)
+    expect((await target(template.id, 'A')).version).toBeNull()
+    const repriced = await prepare(template, 'retry')
+    expect((await write(repriced)).error?.message).toBe('MODEL_CREDIT_FLOOR')
+  } finally {
+    await db.query("update public.ai_providers set estimated_image_costs='{}' where id=$1", [providerId])
+    await db.query('delete from public.ai_providers where id=$1', [otherId])
+  }
 })
 
 it('holds the catalogue lock through final commit so the cutover cannot leapfrog a validated write', async () => {
@@ -200,19 +242,21 @@ it('refuses invalid destination data without committing any row', async () => {
   expect((await db.query('select 1 from public.templates where id=$1', [invalid.id])).rowCount).toBe(0)
 })
 
-it('denies client access to both snapshot reads, the write RPC and private history', async () => {
+it('denies client access to snapshots, pricing receipts, the write RPC and private history', async () => {
   const template = fixture()
   const args = await prepare(template, '1')
   const anon = anonClient()
   expect((await anon.rpc('sync_preview_template', args)).error).toBeTruthy()
   expect((await anon.rpc('read_template_sync_source', { p_id: template.id })).error).toBeTruthy()
   expect((await anon.rpc('read_template_sync_target', { p_id: template.id, p_run_id: '1' })).error).toBeTruthy()
+  expect((await anon.rpc('template_sync_pricing_input', { p_env_model: binding.model })).error).toBeTruthy()
   expect((await anon.select('template_sync_history')).ok).toBe(false)
   for (const role of ['anon', 'authenticated']) {
     const { rows } = await db.query(`select has_table_privilege($1, 'public.template_sync_history','SELECT') as read,
       has_function_privilege($1,'public.read_template_sync_source(text)','EXECUTE') as source,
       has_function_privilege($1,'public.read_template_sync_target(text,text)','EXECUTE') as target,
+      has_function_privilege($1,'public.template_sync_pricing_input(text)','EXECUTE') as quote,
       has_function_privilege($1,$2,'EXECUTE') as write`, [role, signature])
-    expect(rows[0]).toEqual({ read: false, source: false, target: false, write: false })
+    expect(rows[0]).toEqual({ read: false, source: false, target: false, quote: false, write: false })
   }
 })

@@ -3,7 +3,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { AppError } from '../errors'
-import { jobRowSchema, type Job } from './job-schema'
+import { JOB_COLUMNS, jobRowSchema, type Job } from './job-schema'
 
 const isUuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
 
@@ -15,7 +15,7 @@ export async function findOwnJob(client: SupabaseClient, userId: string, jobId: 
   if (!isUuid(jobId)) return null
   const { data, error } = await client
     .from('generation_jobs')
-    .select('*')
+    .select(JOB_COLUMNS)
     .eq('id', jobId)
     .eq('user_id', userId)
     .is('deleted_at', null)
@@ -29,7 +29,7 @@ export async function findOwnJob(client: SupabaseClient, userId: string, jobId: 
 export async function findJobByIdempotencyKey(client: SupabaseClient, userId: string, key: string): Promise<Job | null> {
   const { data, error } = await client
     .from('generation_jobs')
-    .select('*')
+    .select(JOB_COLUMNS)
     .eq('user_id', userId)
     .eq('idempotency_key', key)
     .is('deleted_at', null)

@@ -1,9 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 
 import { templateSyncEnv } from '../../src/core/env'
-import { createR2Client, createR2Store } from '../../src/core/storage/r2-store'
+import { createR2Client, createR2Store } from '../../src/core/storage'
 import { SyncError } from './covers'
-import { targetFloors } from './pricing'
 import { parseIds, syncTemplate } from './sync'
 
 // Pin the direction independently of the credentials. Only public covers buckets are reachable.
@@ -21,10 +20,9 @@ async function run() {
   const ids = parseIds(input)
   const source = endpoint(true, preview)
   const target = endpoint(false, production)
-  const floors = await targetFloors(target.db)
   for (const id of ids) {
     try {
-      const version = await syncTemplate(id, runId, source, target, floors)
+      const version = await syncTemplate(id, runId, source, target)
       process.stdout.write(`${id} OK v${version}\n`)
     } catch (error) {
       // Never log PostgREST detail, stack traces, arbitrary thrown messages or source data.

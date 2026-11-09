@@ -28,12 +28,13 @@ function Header({ aside }: { aside?: ReactNode }) {
 async function Create() {
   const user = await requireUser('/generate')
   const supabase = await createServerSupabase()
+  const admin = createAdminSupabase()
   const [templates, balance, tier, runningIds, favoriteIds] = await Promise.all([
     listTemplatesIn(supabase, await currentLocale()),
     readBalance(supabase, user.id),
     // current_tier() is service-role only; the user's own id comes from the session.
-    currentTier(createAdminSupabase(), user.id),
-    listRunningJobIds(supabase, user.id, new Date()),
+    currentTier(admin, user.id),
+    listRunningJobIds(admin, user.id, new Date()),
     // A failed read degrades to no favorites (logged), never to an error page or signed-out home.
     listFavoriteIdsOrEmpty(supabase, user.id),
   ])

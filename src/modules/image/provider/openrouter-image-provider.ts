@@ -22,12 +22,18 @@ function referenceImages(images: ProviderInput['images']) {
   }))
 }
 
+function requestedAspect(input: ProviderInput, supported: OpenRouterImageParameters) {
+  if (input.aspectRatio !== 'original') return input.aspectRatio
+  if (input.photoCount === 0 && input.images.length && supported.aspect_ratio?.values.includes('1:1')) return '1:1'
+  return 'auto'
+}
+
 function imageRequest(model: string, input: ProviderInput, supported: OpenRouterImageParameters) {
   const mismatch = openRouterInputMismatch(input, supported)
   if (mismatch) {
     throw new AppError(mismatch.reason === 'reference_image_limit' ? 'REFERENCE_IMAGE_LIMIT' : 'MODEL_INPUT_UNSUPPORTED', mismatch.message)
   }
-  const aspect = input.aspectRatio === 'original' ? 'auto' : input.aspectRatio
+  const aspect = requestedAspect(input, supported)
   return {
     model,
     prompt: input.prompt,

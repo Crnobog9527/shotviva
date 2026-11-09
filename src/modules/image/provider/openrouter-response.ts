@@ -7,7 +7,7 @@ import { ProviderError, type ProviderInput, type ProviderOutput, type ProviderUs
 import { logger } from '@/core/logger'
 import { sniffImageType } from '@/core/storage'
 
-import { outputSize } from './output-size'
+import { outputSize, sourcePhoto } from './output-size'
 
 const tokens = z.number().int().nonnegative().optional().catch(undefined)
 const usageSchema = z.object({
@@ -66,7 +66,7 @@ async function normalizeOutput({ b64_json, media_type }: z.infer<typeof imageSch
   // All downstream outputs are PNG. Limit decode memory and preserve framing on the 4K → 3K conversion.
   const image = sharp(bytes, { limitInputPixels: 32_000_000 }).rotate()
   if (input.resolution === '3k') {
-    image.resize({ ...outputSize('3k', input.aspectRatio, input.images[0]), fit: 'inside', withoutEnlargement: true })
+    image.resize({ ...outputSize('3k', input.aspectRatio, sourcePhoto(input)), fit: 'inside', withoutEnlargement: true })
   }
   return image.png().toBuffer()
 }

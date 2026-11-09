@@ -3,11 +3,11 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { AppError } from '../errors'
-import { jobRowSchema, type Job } from './job-schema'
+import { JOB_COLUMNS, jobRowSchema, type Job } from './job-schema'
 import { isLiveRunning, RATE_LIMIT } from './rate-limit'
 
-// What Photos shows, newest first, read with the user's own session (RLS
-// generation_jobs_select_own, which also hides works the user deleted, T41). Failed jobs are refunded and left out; a 'running' row older
+// Photos reads on the server: the raw row may contain private template references.
+// Scope every query to the signed-in owner and undeleted works. A 'running' row older
 // than the function limit died with its function and is left out too (v1 has no sweeper).
 export type OwnJobs = { running: Job[]; done: Job[] }
 
@@ -18,7 +18,7 @@ const RUNNING_LIMIT = 30
 export async function listOwnJobs(client: SupabaseClient, userId: string, now: Date): Promise<OwnJobs> {
   const { data, error } = await client
     .from('generation_jobs')
-    .select('*')
+    .select(JOB_COLUMNS)
     .eq('user_id', userId)
     .in('status', ['running', 'succeeded'])
     .is('deleted_at', null)
@@ -40,6 +40,7 @@ export async function listRunningJobIds(client: SupabaseClient, userId: string, 
     .select('id')
     .eq('user_id', userId)
     .eq('status', 'running')
+    .is('deleted_at', null)
     .gt('created_at', since)
     .order('created_at', { ascending: false })
     .limit(RUNNING_LIMIT)

@@ -13,7 +13,7 @@ vi.mock('@/core/admin', () => ({
   TemplatesEditor: () => null,
   CategoriesPanel: () => null,
 }))
-vi.mock('./pricing', () => ({ readPricingOptions: (client: unknown) => readPricingOptions(client) }))
+vi.mock('@/site/template-pricing', () => ({ readPricingOptions: (client: unknown) => readPricingOptions(client) }))
 vi.mock('./actions', () => ({
   saveTemplateAction: vi.fn(),
   setTemplateActiveAction: vi.fn(),

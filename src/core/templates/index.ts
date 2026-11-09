@@ -87,3 +87,4 @@ export {
 } from './toggles'
 
 export { allowedWebAspects } from './allowed-web-aspects'
+export { maxCostPerCredit } from './provider-pricing'

@@ -47,6 +47,16 @@ describe('toUpsertArgs', () => {
     expect(toUpsertArgs(template, { ...prompt, providerId: null }).p_prompt.provider_id).toBeNull()
   })
 
+  it('leaves references untouched for old clients and imports; explicit empty clears them', () => {
+    const old = { body: 'x', modelParams: {} }
+    expect(toUpsertArgs(template, old)).not.toHaveProperty('p_style_refs')
+    expect(toUpsertArgs(template, { ...old, styleRefs: [] })).toMatchObject({ p_style_refs: [] })
+    const ref = { key: 'style-refs/salad-bowl/abcdef00-1234-4567-89ab-0123456789ab.webp', width: 300, height: 200, uploadedAt: '2026-01-01T00:00:00Z' }
+    const args = toUpsertArgs(template, { ...old, styleRefs: [ref] })
+    expect(args.p_style_refs).toEqual([ref])
+    expect(JSON.stringify(args.p_template)).not.toContain(ref.key)
+  })
+
   it('passes them through when given', () => {
     const args = toUpsertArgs({ ...template, sortOrder: 30, isActive: true }, { body: 'x', modelParams: {} })
     expect(args.p_template).toMatchObject({ sort_order: 30, is_active: true })

@@ -7,7 +7,7 @@ import { logger } from '@/core/logger'
 import { FIDELITY_REJECTED_CODE, fidelityFor } from './input-fidelity'
 import { failureToProviderError, readOpenAIFailure } from './openai-errors'
 import { parseOpenAIUsage } from './openai-usage'
-import { formatSize, outputSize } from './output-size'
+import { formatSize, outputSize, sourcePhoto } from './output-size'
 
 // The 'openai_images' adapter (ARCHITECTURE §3.2–3.3): OpenAI's Images API shape, at the official
 // address or any relay that speaks it. /images/edits when the template takes a photo (the normal
@@ -40,7 +40,7 @@ function buildRequest(config: OpenAIImageConfig, input: ProviderInput, params: P
   const fields: Record<string, string> = {
     model: config.model,
     prompt: input.prompt,
-    size: formatSize(outputSize(input.resolution, input.aspectRatio, input.images[0])),
+    size: formatSize(outputSize(input.resolution, input.aspectRatio, sourcePhoto(input))),
     quality: input.quality,
     n: '1',
     output_format: 'png',
@@ -58,7 +58,8 @@ function buildRequest(config: OpenAIImageConfig, input: ProviderInput, params: P
   if (params.input_fidelity) form.append('input_fidelity', params.input_fidelity)
   const imageField = input.images.length === 1 ? 'image' : 'image[]'
   input.images.forEach((image, index) => {
-    form.append(imageField, new Blob([image.bytes as BlobPart], { type: image.contentType }), `input-${index}.jpg`)
+    const extension = image.contentType === 'image/webp' ? 'webp' : image.contentType === 'image/png' ? 'png' : 'jpg'
+    form.append(imageField, new Blob([image.bytes as BlobPart], { type: image.contentType }), `input-${index}.${extension}`)
   })
   return { path: '/images/edits', init: { method: 'POST', headers, body: form } }
 }

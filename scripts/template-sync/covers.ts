@@ -2,11 +2,9 @@ import { createHash } from 'node:crypto'
 
 import { z } from 'zod'
 
-import { sniffCover } from '../../src/core/admin/covers/cover-media'
-import { maxBytesFor } from '../../src/core/admin/covers/cover-rules'
-import { ASSETS_CACHE_CONTROL } from '../../src/core/storage/assets-env'
-import type { ObjectStore } from '../../src/core/storage/object-store'
-import { localeCoverSchema } from '../../src/core/templates/cover-locales'
+import { maxBytesFor, sniffCover } from '../../src/core/admin/covers'
+import { ASSETS_CACHE_CONTROL, type ObjectStore } from '../../src/core/storage'
+import { localeCoverSchema } from '../../src/core/templates'
 
 export type Assets = { store: Pick<ObjectStore, 'head' | 'get' | 'put'>; base: string }
 const localeCovers = z.record(z.string().regex(/^[a-z]{2,3}(-[a-z0-9]{2,8})?$/), localeCoverSchema.strict())

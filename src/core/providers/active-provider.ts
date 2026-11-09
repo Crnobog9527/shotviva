@@ -6,6 +6,7 @@ import { createAdminSupabase } from '../auth/supabase-admin'
 import { serverEnv } from '../env'
 import { AppError } from '../errors'
 import { effectivePrices, providerTag, type GenerationProvider, type ProviderPrices } from '../jobs'
+import { openRouterImageParameters } from './openrouter-catalog'
 import { PROVIDERS_CACHE_TAG } from './cache-tag'
 import { readProviderKey } from './keys'
 import { loadActiveProviderRow } from './repository'
@@ -34,6 +35,14 @@ export async function activeProvider(
   readKey: ReadProviderKey = (id) => readProviderKey(createAdminSupabase(), id),
 ): Promise<GenerationProvider> {
   return resolveProvider(module, await loadRow(module), serverEnv(), adapters, readKey)
+}
+
+// With style references, freeze the default model's current reference limit before billing.
+export async function defaultTemplateProvider(adapters: ProviderAdapters, styleRefCount = 0): Promise<GenerationProvider> {
+  const row = await cachedActiveRow('image')
+  const parameters = styleRefCount > 0 && row?.adapter === 'openrouter_images'
+    ? await openRouterImageParameters(row.baseUrl, row.model) : undefined
+  return resolveProvider('image', row, serverEnv(), adapters, (id) => readProviderKey(createAdminSupabase(), id), parameters)
 }
 
 // `prices`: the row's own, empty ones filled from MODEL_PRICES; null when neither has any.

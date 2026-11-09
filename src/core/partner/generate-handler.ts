@@ -4,7 +4,7 @@ import type { NextResponse } from 'next/server'
 import type { z } from 'zod'
 
 import type { IdentityJudge } from '../identity-guard'
-import type { GenerationProvider } from '../jobs'
+import type { TemplateProvider } from '../jobs'
 import type { FetchLike } from './fetch-image'
 import { checkedReturnTo, type PartnerRouteDeps } from './handlers'
 import { authenticatePartner } from './partner-auth'
@@ -20,7 +20,7 @@ import { partnerImageUrl, partnerProfile } from './partner-views'
 import { topUpUrl } from './return-to'
 
 export type PartnerGenerateRouteDeps = PartnerRouteDeps & {
-  provider: GenerationProvider
+  provider: TemplateProvider
   providerTimeoutMs?: number
   fetch?: FetchLike
   // The face-swap screen's decision call (ARCHITECTURE §5.1a); absent means no screening (fail open).

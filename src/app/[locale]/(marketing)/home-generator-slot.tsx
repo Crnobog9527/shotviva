@@ -9,7 +9,7 @@ import { wechatPayEnabled } from '@/core/billing/stripe'
 import { StandingSlot } from '@/core/billing/standing'
 import { paymentChannel } from '@/core/billing/waffo'
 import { listFavoriteIdsOrEmpty } from '@/core/favorites'
-import { listOwnJobs } from '@/core/jobs'
+import { listRunningJobIds } from '@/core/jobs'
 import { logger } from '@/core/logger'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { HomeGenerator, type HomeGeneratorProps, type HomeViewer } from '@/modules/image/marketing'
@@ -23,15 +23,16 @@ async function viewerOf(): Promise<HomeViewer | null> {
   const user = await getSessionUser()
   if (!user?.verified) return null
   const supabase = await createServerSupabase()
-  const [balance, tier, own, favoriteIds] = await Promise.all([
+  const admin = createAdminSupabase()
+  const [balance, tier, runningIds, favoriteIds] = await Promise.all([
     readBalance(supabase, user.id),
     // current_tier() is service-role only; the user's own id comes from the session.
-    currentTier(createAdminSupabase(), user.id),
-    listOwnJobs(supabase, user.id, new Date()),
+    currentTier(admin, user.id),
+    listRunningJobIds(admin, user.id, new Date()),
     // A failed read degrades to no favorites (logged), never to an error page or signed-out home.
     listFavoriteIdsOrEmpty(supabase, user.id),
   ])
-  return { balance, concurrency: { limit: limitsFor(tier).concurrency, runningIds: own.running.map((job) => job.id) }, favoriteIds }
+  return { balance, concurrency: { limit: limitsFor(tier).concurrency, runningIds }, favoriteIds }
 }
 
 // The home page is everyone's first page: an auth or database hiccup shows the signed-out

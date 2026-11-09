@@ -171,3 +171,20 @@ describe('openai image provider usage (T33)', () => {
     expect(error).toMatchObject({ kind: 'failed', usage: { input_text_tokens: 100, output_tokens: 4160 } })
   })
 })
+
+it('sends the user photo first and private WebP styles after it with matching filenames', async () => {
+  const fetch = vi.fn<typeof globalThis.fetch>(async () => json({ data: [{ b64_json: PNG_B64 }] }))
+  const images = [input().images[0]!, { bytes: Uint8Array.of(41), contentType: 'image/webp' }]
+  await provider(fetch).generate(input({ images }))
+  const form = fetch.mock.calls[0]?.[1]?.body as FormData
+  const files = form.getAll('image[]') as File[]
+  expect(files.map((file) => [file.type, file.name])).toEqual([['image/jpeg', 'input-0.jpg'], ['image/webp', 'input-1.webp']])
+  expect(await Promise.all(files.map(async (file) => new Uint8Array(await file.arrayBuffer())))).toEqual(images.map((image) => image.bytes))
+})
+
+it('keeps the square original size on a text-only template with a portrait style reference', async () => {
+  const fetch = vi.fn<typeof globalThis.fetch>(async () => json({ data: [{ b64_json: PNG_B64 }] }))
+  const images = [{ bytes: Uint8Array.of(41), contentType: 'image/webp', width: 600, height: 900 }]
+  await provider(fetch).generate(input({ images, photoCount: 0, aspectRatio: 'original' }))
+  expect((fetch.mock.calls[0]?.[1]?.body as FormData).get('size')).toBe('1024x1024')
+})
