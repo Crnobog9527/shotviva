@@ -3,13 +3,14 @@
 # with `[baseline]` in the PR title; `edited` reruns the check when the title changes.
 name: DB migrations append-only
 
-# Only PRs that touch a migration (a modified, renamed or deleted file there is in the PR's
-# changed files). Not a required check, so path filtering cannot leave anything pending.
+# Also exercise the trusted checkout and PR fetch when this check itself changes.
 on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
     paths:
       - 'supabase/migrations/**'
+      - '.github/workflows/db-migrations-append-only.yml'
+      - 'scripts/check-migrations-append-only.sh'
 
 concurrency:
   group: db-append-only-${{ github.event.pull_request.number }}
@@ -24,15 +25,18 @@ jobs:
     # `edited` matters only for the title ([baseline]); a description edit skips the job.
     if: github.event.action != 'edited' || github.event.changes.title != null
     runs-on: ubuntu-latest
+    env:
+      PR_HEAD: ${{ github.event.pull_request.head.sha }}
     steps:
-      # The PR head itself, not the merge ref, with full history so origin/main and the
-      # merge base are available.
+      # Only main supplies executable files (including .nvmrc). Read the PR as Git objects.
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: refs/heads/main
           fetch-depth: 0
+      - name: Fetch the exact PR commit, including for forks
+        run: git fetch --no-tags origin "$PR_HEAD"
       - name: Check migrations on main are untouched
         env:
           # Through env, never interpolated into the script: titles are untrusted input.
           PR_TITLE: ${{ github.event.pull_request.title }}
-        run: scripts/check-migrations-append-only.sh origin/main HEAD
+        run: scripts/check-migrations-append-only.sh HEAD "$PR_HEAD"

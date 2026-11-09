@@ -8,7 +8,7 @@ import type { Template } from '@/core/templates/types'
 
 // Batch edit (T79, ARCHITECTURE §10 「模板批量编辑」): what one save changes, and which ticked
 // templates it would leave below the price floor or half-ready on the web. Pure, so the dialog
-// shows the same verdict before saving that admin_bulk_edit_templates (0640) gives after.
+// shows the same verdict before saving as the five-argument admin_bulk_edit_templates RPC.
 
 export type BulkEditPatch = {
   // Only the tiers that change; the rest keep each template's own price.
@@ -32,7 +32,7 @@ export type BulkEditCandidate = Pick<
 
 // The built-in templates: photo edit has its own page, and the partner API's free-prompt
 // `freeform` must not pick up a web template's prices, entry points or category from a 「全选」.
-// T75 puts both in system categories; the ids are kept too, as 0640 does. The dialog leaves them
+// T75 puts both in system categories; the ids are kept too, as the RPC does. The dialog leaves them
 // out; the SQL function refuses them as `system`.
 export const BULK_EDIT_SYSTEM_IDS: ReadonlySet<string> = new Set([EDIT_TEMPLATE_ID, 'freeform'])
 export const isBulkEditable = (template: { id: string; categoryInfo?: { isSystem: boolean }; prompt?: { providerId: string | null } | null }) =>

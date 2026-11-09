@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { bulkEditTemplates, saveTemplate, setTemplateActive } from '@/core/admin'
 
+import { LOCALES } from '@/core/i18n/locales'
 import { CREDITS_FLOOR } from '@/modules/image/credits-floor'
 
 import { connectAdmin, createUser } from './helpers'
@@ -122,16 +123,33 @@ describe('batch edit of templates', () => {
     expect(missing.failures.map((failure) => failure.reason).sort()).toEqual(['not_found', 'system'])
     await expect(bulkEditTemplates(client, admin, { ids, patch: {} }, CREDITS_FLOOR)).rejects.toMatchObject({ code: 'INVALID_INPUT' })
     await expect(
-      pg.query('select public.admin_bulk_edit_templates($1, $2, $3, $4)', [ids, { credits_cost: { '2k': 0 } }, CREDITS_FLOOR, admin]),
+      pg.query('select public.admin_bulk_edit_templates($1, $2, $3, $4, $5)', [ids, { credits_cost: { '2k': 0 } }, CREDITS_FLOOR, admin, LOCALES]),
     ).rejects.toThrow(/INVALID_INPUT/)
     const visitor = await createUser(pg)
     await expect(bulkEditTemplates(client, visitor, { ids, patch: { quality: 'high' } }, CREDITS_FLOOR)).rejects.toMatchObject({
       code: 'FORBIDDEN',
     })
-    const { rows: grants } = await pg.query<{ auth: boolean; anon: boolean }>(
-      `select has_function_privilege('authenticated', 'public.admin_bulk_edit_templates(text[], jsonb, jsonb, uuid)', 'execute') as auth,
-              has_function_privilege('anon', 'public.admin_bulk_edit_templates(text[], jsonb, jsonb, uuid)', 'execute') as anon`,
+  })
+
+  it('still resolves the four named arguments sent by the T85 admin server', async () => {
+    const id = 'test-bulkedit-nope'
+    const { data, error } = await client.rpc('admin_bulk_edit_templates', {
+      p_ids: [id], p_patch: { quality: 'high' }, p_floor: CREDITS_FLOOR, p_actor: admin,
+    })
+    expect(error).toBeNull()
+    expect(data).toMatchObject({ failures: [{ id, reason: 'not_found' }] })
+  })
+
+  it.each([
+    'text[], jsonb, jsonb, uuid',
+    'text[], jsonb, jsonb, uuid, text[]',
+  ])('restricts bulk edit (%s) to the service role', async (args) => {
+    const { rows: grants } = await pg.query(
+      `select has_function_privilege('authenticated', $1::text, 'execute') as auth,
+              has_function_privilege('anon', $1::text, 'execute') as anon,
+              has_function_privilege('service_role', $1::text, 'execute') as service`,
+      [`public.admin_bulk_edit_templates(${args})`],
     )
-    expect(grants[0]).toEqual({ auth: false, anon: false })
+    expect(grants[0]).toEqual({ auth: false, anon: false, service: true })
   })
 })

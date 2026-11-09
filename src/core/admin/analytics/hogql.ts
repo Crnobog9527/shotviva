@@ -24,6 +24,11 @@ export function periodColumn(window: Window, column = 'timestamp'): string {
 // One row per page, not per photo or work: ids in a path become :id. Template workspaces keep
 // their slug (/generate/ramen-studio), which is the page.
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
-export const pagePath = (expr: string) => `replaceRegexpAll(coalesce(toString(${expr}), ''), '${UUID}', ':id')`
+export function pagePath(expr: string): string {
+  const path = `replaceRegexpOne(coalesce(toString(${expr}), ''), '[?#].*$', '')`
+  // Suppress email-like, IP-like and numeric path segments before sending rows to the UI.
+  const privateSegment = '[^/]*(@|%40|:)[^/]*|[0-9]{1,3}([.][0-9]{1,3}){3}|[+0-9-]{7,}'
+  return `replaceRegexpAll(replaceRegexpAll(${path}, '(?i)/(${privateSegment})(/|$)', '/:id/'), '(?i)${UUID}', ':id')`
+}
 
 export const eventList = (events: readonly string[]) => events.map((event) => `'${event.replace(/[^a-z0-9_$]/gi, '')}'`).join(', ')

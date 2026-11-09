@@ -9,11 +9,8 @@ import {
   FreeImagesShort,
   fromCredits,
   MENU_DISHES,
-  menuCostUsd,
-  menuCredits,
   OUTPUT_TIERS,
   photoSeconds,
-  photosLeftAfterMenu,
   planFrom,
   tierList,
   usd,
@@ -27,7 +24,7 @@ import { PLATFORM_SPECS, px } from '../platform-specs'
 // site.config. None of the three apps' help pages says anything about AI photos, so the page
 // claims nothing either way: it says the photo is of the dish you serve.
 const brand = site.brand.name
-const [standard, hd] = OUTPUT_TIERS
+const [, hd] = OUTPUT_TIERS
 const { doordash, uberEats, grubhub } = PLATFORM_SPECS
 
 function menuBills(): CostBills {
@@ -50,8 +47,8 @@ function menuBills(): CostBills {
       total: { prefix: 'from', amount: plan, suffix: '/month', when: `about ${photoSeconds} seconds a photo` },
       lines: [
         { label: `Starter plan, ${planFrom?.credits ?? ''} credits a month`, value: plan },
-        { label: `${MENU_DISHES} dishes, ${standard.name}`, value: `${menuCredits} credits ≈ ${menuCostUsd}` },
-        { label: 'Left for the rest of the month', value: `${photosLeftAfterMenu} more photos` },
+        { label: 'Start with', value: 'One phone photo per dish' },
+        { label: 'Make', value: 'Menu photos, delivery listings and promo posters' },
       ],
       fine: `Shoot each dish on the pass with a phone; the template does the light and the styling. Start with ${freeImagesLabel}, no card needed.`,
     },

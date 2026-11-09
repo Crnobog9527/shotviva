@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { FALLBACK_CREDITS, creditFacts, fillCredits, hasCreditMarkers, withCatalogueTiers } from './credits'
+import { FALLBACK_CREDITS, creditFacts, fillCredits, hasCreditMarkers } from './credits'
 import { contentPagesIn, freeImagesIn, homePageIn, pricingFaqIn, pricingPageIn } from './localized'
-import { FreeImagesLabel, FreeImagesShort, FreeImagesTitle, FromCredits, freeImagesLabel, fromCredits, menuCostUsd, menuCredits, photosLeftAfterMenu, photosLeftInPlan, setCostUsd, setCredits } from './offer'
+import { FreeImagesLabel, FreeImagesShort, FreeImagesTitle, FromCredits, freeImagesLabel, fromCredits } from './offer'
 import { zhFreeImages, zhFromCredits } from './zh/offer'
 
 const priced = (credits: number) => ({ creditsCost: { '1k': credits, '2k': credits * 2, '3k': credits * 3 } })
@@ -55,29 +55,6 @@ describe('image counts from the catalogue', () => {
       expect([freeImagesLabel, FreeImagesLabel, FreeImagesTitle, FreeImagesShort, zhFreeImages].map((label) => fillCredits(label, facts)))
         .toEqual(['100 free credits', '100 free credits', '100 Free Credits', '100 free credits', '100 个免费积分'])
     }
-  })
-
-  it('prices each example by its actual use case, independently of the cheapest template', () => {
-    const bills = [setCredits, setCostUsd, photosLeftInPlan, menuCredits, menuCostUsd, photosLeftAfterMenu]
-    expect(bills.map((marker) => fillCredits(marker, MIXED))).toEqual(['193', '$1.93', '24', '740', '$7.40', '16'])
-  })
-
-})
-
-describe('what a credit buys on /pricing', () => {
-  it('shows the most common price per resolution, the config numbers with no catalogue', () => {
-    const block = pricingPageIn('en').creditBuys
-    const live = [priced(1), priced(1), priced(2), priced(4)]
-    expect(withCatalogueTiers(block, live).tiers).toEqual([
-      { name: 'Standard', credits: 1 },
-      { name: 'HD', credits: 2 },
-      { name: 'Max', credits: 3 },
-    ])
-    // A tie goes to the cheaper price.
-    expect(withCatalogueTiers(block, [priced(2), priced(1)]).tiers.map((tier) => tier.credits)).toEqual([1, 2, 3])
-    expect(withCatalogueTiers(block, []).tiers).toEqual([])
-    expect([block.unit, block.unitOne]).toEqual(['credits', 'credit'])
-    expect(withCatalogueTiers(pricingPageIn('zh').creditBuys, live).tiers.map((tier) => tier.name)).toEqual(['标准', '高清', '超清'])
   })
 })
 

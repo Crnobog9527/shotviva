@@ -5,7 +5,7 @@
 #   - on a pull request from a branch of this repo, prepares the fix instead of failing: works
 #     out the branch's own schema.sql (its file plus exactly the change the regeneration made),
 #     checks that the branch with that file merges with main into the very tree this job is
-#     about to test, writes the file to $FIX_DIR and sets the step outputs `fix=true`, `head`
+#     about to test, writes the file to $FIX_DIR and sets the step outputs `fix=true`
 #     and `tree`. The job then runs the tests, and the `schema-sql` job in ci.yml commits the file
 #     to the branch afterwards;
 #   - otherwise (a fork, a push to main, a branch whose head commit is already the automatic
@@ -75,7 +75,6 @@ mkdir -p "$FIX_DIR"
 cp "$work/fixed.sql" "$FIX_DIR/schema.sql"
 {
   echo "fix=true"
-  echo "head=$head"
   echo "tree=$fixed_tree"
 } >> "$GITHUB_OUTPUT"
 echo "::warning file=$FILE::schema.sql was out of date with supabase/migrations. Testing with the regenerated file; the \"commit regenerated schema.sql\" job commits it to the branch when this run's checks finish."

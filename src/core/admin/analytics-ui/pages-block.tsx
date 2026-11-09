@@ -69,8 +69,8 @@ export function PagesTable({ rows, query }: { rows: PageRow[]; query: AnalyticsQ
   )
 }
 
-export async function PagesBlock({ query, projectId }: { query: AnalyticsQuery; projectId: string }) {
-  const block = await readPages(query.range)
+export async function PagesBlock({ query, projectId, end }: { query: AnalyticsQuery; projectId: string; end: number }) {
+  const block = await readPages(query.range, end)
   const links =
     block.status === 'ok'
       ? [
