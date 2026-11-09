@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl"
 
+import { discountTerm, useProductDiscount } from "./discount-context"
 import { usePaymentChannel } from "./channel-context"
 import { CheckoutBar } from "./checkout-bar"
 import { planFinePrint } from "./copy"
@@ -18,14 +19,12 @@ import { useMoney } from "./use-money"
 // upgrade does; the member's own or a lower plan cannot be bought and says why.
 export function PaywallCheckout({ resolved, choice }: { resolved: ResolvedPick; choice: PaywallChoice }) {
   const t = useTranslations("paywall")
-  const money = useMoney()
   const checkout = useCheckout()
-  const channel = usePaymentChannel()
   const standing = useStanding()
-  const price = money(resolved.product.priceUsd)
+  const discount = useProductDiscount(resolved.product)
+  const { price, fine } = useCheckoutPrice(resolved, choice, discount)
   const plan = resolved.kind === "plan" ? resolved : null
   const member = plan ? planStanding(standing, plan.offer.tier, choice.period) : { upgrade: false, lock: null }
-  const fine = plan ? planFinePrint(channel, { method: choice.method, period: choice.period, price }) : { key: "finePack", values: { price } }
   const note = member.upgrade ? t(standing.subscription ? "upgradeNoteCancels" : "upgradeNote") : null
   const label = plan
     ? t(member.upgrade ? "ctaUpgrade" : "ctaPlan", { tier: t(`tiers.${plan.offer.tier}`), price, period: choice.period })
@@ -33,12 +32,26 @@ export function PaywallCheckout({ resolved, choice }: { resolved: ResolvedPick; 
   return (
     <CheckoutBar
       label={label}
-      fine={t(fine.key, fine.values)}
+      fine={fine}
       note={note}
       tone={checkoutTone(resolved)}
       status={checkout.status}
       locked={member.lock === "current" ? t("lockCurrentNote") : member.lock ? t("lockLower") : null}
-      onClick={() => void checkout.start(resolved.product.id, choice.method)}
+      onClick={() => void checkout.start(resolved.product.id, choice.method, discount?.offer.code)}
     />
   )
+}
+
+function useCheckoutPrice(resolved: ResolvedPick, choice: PaywallChoice, discount: ReturnType<typeof useProductDiscount>) {
+  const t = useTranslations("paywall")
+  const money = useMoney()
+  const channel = usePaymentChannel()
+  const price = money(discount?.priceUsd ?? resolved.product.priceUsd)
+  if (resolved.kind !== "plan") return { price, fine: t("finePack", { price }) }
+  if (discount && choice.method !== "alipay" && discount.offer.duration !== "forever") {
+    const term = t(discountTerm(discount.offer.duration, false, choice.period), { months: discount.offer.months ?? 0 })
+    return { price, fine: t("fineDiscount", { price, original: money(resolved.product.priceUsd), period: choice.period, term }) }
+  }
+  const line = planFinePrint(channel, { method: choice.method, period: choice.period, price })
+  return { price, fine: t(line.key, line.values) }
 }

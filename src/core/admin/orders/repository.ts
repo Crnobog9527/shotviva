@@ -18,7 +18,7 @@ const fail = (what: string, error: { message: string }): never => {
 
 const PAYMENT_COLUMNS =
   'id, created_at, user_id, product_id, channel, stripe_session_id, stripe_invoice_id, stripe_charge_id, waffo_order_id, ' +
-  'amount_total, amount_tax, amount_refunded, currency, method, status, credits_clawed_back, clawback_shortfall'
+  'amount_total, amount_tax, amount_discount, amount_refunded, currency, method, status, credits_clawed_back, clawback_shortfall'
 
 const nullableId = z.string().nullable()
 
@@ -34,6 +34,7 @@ const paymentRow = z.object({
   waffo_order_id: nullableId,
   amount_total: z.number().int(),
   amount_tax: z.number().int(),
+  amount_discount: z.number().int().nonnegative(),
   amount_refunded: z.number().int(),
   currency: z.string(),
   method: z.enum(['card', 'alipay', 'wechat_pay', 'cn_card']),
@@ -53,6 +54,7 @@ export type AdminPurchase = PurchaseSource & {
   // Smallest currency unit, as charged (tax included); the currency may be the buyer's.
   amountTotal: number
   amountTax: number
+  amountDiscount: number
   amountRefunded: number
   currency: string
   // card = Managed Payments card, cn_card = plain Stripe card (中国银行卡, T64), alipay,
@@ -93,6 +95,7 @@ export async function listPurchases(db: SupabaseClient, cursor?: string | null):
     productId: row.product_id,
     amountTotal: row.amount_total,
     amountTax: row.amount_tax,
+    amountDiscount: row.amount_discount,
     amountRefunded: row.amount_refunded,
     currency: row.currency,
     method: row.method,

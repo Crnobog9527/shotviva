@@ -49,6 +49,8 @@ export const APP_UPDATE_ACTIONS = ['shown', 'refreshed', 'dismissed'] as const
 export const APP_UPDATE_REASONS = ['version', 'error'] as const
 export const UPLOAD_ERROR_REASONS = ['too_large', 'unsupported', 'ticket_failed', 'transfer_failed', 'unknown'] as const
 
+const campaignCode = z.string().regex(/^[A-Z0-9]{4,20}$/)
+
 const checkoutProps = {
   product_id: z.enum(PRODUCT_IDS),
   tier: z.enum(PRODUCT_TIERS),
@@ -61,10 +63,11 @@ const checkoutProps = {
 export const eventSchemas = {
   signup: z.strictObject({ method: z.enum(['email', 'google', 'phone']), code_kind: z.enum(['invite', 'campaign']).nullable().optional() }),
   code_redeem: z.strictObject({
-    kind: z.enum(['invite', 'campaign']).nullable(), code: z.string().regex(/^[A-Z0-9]{4,20}$/).optional(),
+    kind: z.enum(['invite', 'campaign']).nullable(), code: campaignCode.optional(),
     context: z.enum(['signup', 'account', 'paywall']), status: slug, credits: z.number().int().nonnegative(),
     pool: z.enum(CREDIT_POOLS).nullable(), discount_percent: z.number().int().min(1).max(90).nullable(),
   }).refine((r) => !r.code || r.kind === 'campaign'),
+  invite_reward: z.strictObject({ credits: z.number().int().positive(), product_id: z.enum(PRODUCT_IDS) }),
   invite_share: z.strictObject({ action: z.enum(['copy', 'share']), surface: z.literal('account') }),
   upload: z.strictObject({ size_bucket: z.enum(UPLOAD_SIZE_BUCKETS), compressed: z.boolean() }),
   generate: z.strictObject({
@@ -96,7 +99,8 @@ export const eventSchemas = {
     volume: z.enum(MONTHLY_VOLUMES),
     uses: z.array(z.enum(INQUIRY_USES)).min(1).max(INQUIRY_USES.length),
   }),
-  checkout_start: z.strictObject({ ...checkoutProps, method: z.enum(CHECKOUT_START_METHODS) }),
+  checkout_start: z.strictObject({ ...checkoutProps, method: z.enum(CHECKOUT_START_METHODS),
+    code: campaignCode.optional(), discount_percent: z.number().int().min(1).max(90).optional() }),
   // T74: the template workspace opened, or a template picked in the home generator's picker.
   template_view: z.strictObject({ template_id: slug, category: slug, surface: z.enum(TEMPLATE_VIEW_SURFACES) }),
   // T83: a template saved or unsaved (sent once the server has it, so a rolled-back tap is not counted).
@@ -123,6 +127,7 @@ export const eventSchemas = {
     ...checkoutProps,
     method: z.enum(PAYMENT_METHODS),
     amount_usd: z.number().nonnegative(),
+    code: campaignCode.optional(), amount_discount_usd: z.number().nonnegative().optional(),
     credits: z.number().int().nonnegative(),
   }),
 } as const
@@ -131,7 +136,7 @@ export type EventName = keyof typeof eventSchemas
 export type EventProps<E extends EventName> = z.infer<(typeof eventSchemas)[E]>
 
 // §16.2: money and credit events go out from the server so ad blockers cannot drop them.
-export const SERVER_EVENTS = ['code_redeem', 'signup', 'generate', 'generate_refused', 'checkout_start', 'checkout_cancel', 'purchase'] as const
+export const SERVER_EVENTS = ['code_redeem', 'invite_reward', 'signup', 'generate', 'generate_refused', 'checkout_start', 'checkout_cancel', 'purchase'] as const
 export const BROWSER_EVENTS = [
   'invite_share',
   'upload',

@@ -8,6 +8,7 @@ import type { BlockReason } from "../subscription/upgrade-rule"
 import { perCreditUsd, perMonthUsd, productFor, yearlySavingUsd, type Period, type TierOffer } from "./offer"
 import { PerkList } from "./perk-list"
 import type { TierPerks } from "./perks"
+import { discountTerm, useProductDiscount } from "./discount-context"
 import { useMoney } from "./use-money"
 
 const FLAGS = { starter: null, pro: "recommended", max: "bestValue" } as const
@@ -16,6 +17,7 @@ type Props = {
   offer: TierOffer
   period: Period
   perks: TierPerks
+  singlePayment?: boolean
   selected: boolean
   // The paywall's radio check, top right.
   check?: ReactNode
@@ -28,7 +30,7 @@ type Props = {
 // One tier in its material (DESIGN §4.5, comps-v3-b tiers.css): price a month, credits, price
 // per credit, the yearly saving only on Yearly, then its perks. Same card on /pricing and in
 // the paywall, so both say exactly the same thing.
-export function TierCard({ offer, period, perks, selected, check, footer, lock }: Props) {
+export function TierCard({ offer, period, perks, selected, check, footer, lock, singlePayment = false }: Props) {
   const t = useTranslations("paywall")
   // The member's own plan wears "Your plan" where the sales flag would be.
   const flag = lock === "current" ? "yourPlan" : lock ? null : FLAGS[offer.tier]
@@ -48,7 +50,7 @@ export function TierCard({ offer, period, perks, selected, check, footer, lock }
       {lock === "lower" ? <LockNote /> : null}
       {/* Keyed on the period: the numbers fade in when the toggle changes them. */}
       <div key={period} className="tier-swap">
-        <Price offer={offer} period={period} />
+        <Price offer={offer} period={period} singlePayment={singlePayment} />
         <Facts offer={offer} period={period} />
       </div>
       <PerkList perks={perks} />
@@ -57,19 +59,25 @@ export function TierCard({ offer, period, perks, selected, check, footer, lock }
   )
 }
 
-function Price({ offer, period }: { offer: TierOffer; period: Period }) {
+function Price({ offer, period, singlePayment }: { offer: TierOffer; period: Period; singlePayment: boolean }) {
   const t = useTranslations("paywall")
   const money = useMoney()
+  const product = productFor(offer, period)
+  const discount = useProductDiscount(product)
+  const original = perMonthUsd(offer, period)
+  const monthly = discount ? discount.priceUsd / (period === "year" ? 12 : 1) : original
   return (
     <p className="mt-2 flex flex-wrap items-baseline gap-1.5">
+      {discount && <s className="text-label text-muted-foreground" aria-label={t("wasMonthly", { price: money(original) })}>{money(original)}</s>}
       {t.rich("perMonth", {
-        price: money(perMonthUsd(offer, period)),
+        price: money(monthly),
         amt: (chunks) => (
           <span className={cn("font-display text-[40px] leading-[.9] tracking-[-0.02em]", offer.tier === "max" && "text-[var(--tier-max-gold)]")}>{chunks}</span>
         ),
         per: (chunks) => <span className="text-caption text-muted-foreground">{chunks}</span>,
       })}
-      {period === "year" ? (
+      {discount && <span className="text-caption text-bone-dim">{t(discountTerm(discount.offer.duration, singlePayment, period), { months: discount.offer.months ?? 0 })}</span>}
+      {!discount && period === "year" ? (
         <s className="ml-1 font-mono text-caption text-muted-foreground" aria-label={t("wasMonthly", { price: money(offer.monthly.priceUsd) })}>
           {money(offer.monthly.priceUsd)}
         </s>
@@ -83,13 +91,15 @@ function Facts({ offer, period }: { offer: TierOffer; period: Period }) {
   const t = useTranslations("paywall")
   const money = useMoney()
   const product = productFor(offer, period)
+  const discount = useProductDiscount(product)
+  const effective = discount ? { ...product, priceUsd: discount.priceUsd } : product
   return (
     <>
       <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-caption text-bone-dim">
-        <span>{period === "year" ? t("creditsYear", { count: product.credits, price: money(product.priceUsd) }) : t("creditsMonth", { count: product.credits })}</span>
-        <span className="font-mono text-muted-foreground">{t("perCredit", { price: money(perCreditUsd(product)) })}</span>
+        <span>{period === "year" ? t("creditsYear", { count: product.credits, price: money(effective.priceUsd) }) : t("creditsMonth", { count: product.credits })}</span>
+        <span className="font-mono text-muted-foreground">{t("perCredit", { price: money(perCreditUsd(effective)) })}</span>
       </p>
-      {period === "year" ? (
+      {!discount && period === "year" ? (
         <p className="tier-plate mt-2 flex items-center justify-between gap-2 rounded-inner bg-[var(--tier-plate)] py-2 pr-2 pl-3 text-caption text-[var(--tier-plate-ink)]">
           {/* The label may wrap and the amount may not: at 320px the Max plate is wider than its card. */}
           <span className="min-w-0">{t.rich("savingLabel", { vs: (chunks) => <span className="tier-saving-vs">{chunks}</span> })}</span>

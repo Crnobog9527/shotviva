@@ -6,6 +6,8 @@ import { useState } from "react"
 import type { PackProduct, SiteProduct } from "../../config"
 import { buttonVariants } from "../../ui/button"
 import { cn } from "../../ui/cn"
+import { DiscountProvider, useProductDiscount } from "./discount-context"
+import { DiscountBanner, DiscountEntry } from "./discount-controls"
 import { BillingToggle } from "./billing-toggle"
 import { packLooks, packOffers, tierOffers, yearlySavingPct, type Period, type TierOffer } from "./offer"
 import { PackCard } from "./pack-card"
@@ -27,7 +29,13 @@ const ghost = "w-full min-h-12 rounded-control"
 // the server, Monthly first (DESIGN §4.5 「默认显示按月」), so they are in the static HTML
 // (建站规格 R5). A signed-in member with a yearly plan sees Yearly once their standing streams in,
 // so their own plan reads "Your plan"; a period the visitor picks always wins.
-export function PricingPlans({ products, wishlistLive }: { products: readonly SiteProduct[]; wishlistLive: boolean }) {
+type PricingProps = { products: readonly SiteProduct[]; wishlistLive: boolean }
+
+export function PricingPlans(props: PricingProps) {
+  return <DiscountProvider><Plans {...props} /></DiscountProvider>
+}
+
+function Plans({ products, wishlistLive }: PricingProps) {
   const t = useTranslations("paywall")
   const paywall = usePaywall()
   const readPlan = usePlanReader()
@@ -37,6 +45,7 @@ export function PricingPlans({ products, wishlistLive }: { products: readonly Si
   const offers = tierOffers(products)
   return (
     <section aria-label={t("plansLabel")}>
+      <DiscountBanner />
       <BillingToggle period={period} onChange={setPeriod} savePct={yearlySavingPct(offers)} className="mt-6 md:mt-8 md:w-[400px]" />
       <div className="mt-3 grid gap-2 md:mt-8 md:grid-cols-3 md:gap-4">
         {offers.map((offer) => {
@@ -56,6 +65,7 @@ export function PricingPlans({ products, wishlistLive }: { products: readonly Si
         })}
       </div>
       <PackRow packs={packOffers(products)} onPick={(packId) => paywall.open(pricingTrigger(), { step: "packs", packId })} />
+      <DiscountEntry />
     </section>
   )
 }
@@ -95,7 +105,6 @@ function pricingTrigger(): PaywallTrigger {
 
 function PackRow({ packs, onPick }: { packs: PackProduct[]; onPick(id: PackProduct["id"]): void }) {
   const t = useTranslations("paywall")
-  const money = useMoney()
   const looks = packLooks(packs)
   return (
     <>
@@ -110,14 +119,7 @@ function PackRow({ packs, onPick }: { packs: PackProduct[]; onPick(id: PackProdu
               pack={pack}
               look={looks[i] ?? { tone: "graphite", flag: null }}
               action={
-                <button
-                  type="button"
-                  onClick={() => onPick(pack.id)}
-                  aria-label={t("buyPackLabel", { count: pack.credits, price: money(pack.priceUsd) })}
-                  className={buttonVariants({ variant: "glass", size: "touch", className: "w-full rounded-full" })}
-                >
-                  {t("buy")}
-                </button>
+                <BuyPack pack={pack} onPick={onPick} />
               }
             />
           </div>
@@ -125,4 +127,13 @@ function PackRow({ packs, onPick }: { packs: PackProduct[]; onPick(id: PackProdu
       </div>
     </>
   )
+}
+
+function BuyPack({ pack, onPick }: { pack: PackProduct; onPick(id: PackProduct["id"]): void }) {
+  const t = useTranslations("paywall")
+  const money = useMoney()
+  const discount = useProductDiscount(pack)
+  return <button type="button" onClick={() => onPick(pack.id)}
+    aria-label={t("buyPackLabel", { count: pack.credits, price: money(discount?.priceUsd ?? pack.priceUsd) })}
+    className={buttonVariants({ variant: "glass", size: "touch", className: "w-full rounded-full" })}>{t("buy")}</button>
 }

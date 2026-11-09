@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
 import { errorResponse } from '@/core/api-response'
+import { paymentCodeEffects } from '@/core/billing'
 import { createAdminSupabase } from '@/core/auth'
 import { handleStripeWebhook, managedPaymentsEnabled, stripeClient, stripeWebhookSecret } from '@/core/billing/stripe'
 import { cancelOtherSubscriptions, cancelRefundedSubscription, type KeepSubscription } from '@/core/billing/subscription'
@@ -20,6 +21,7 @@ export async function POST(request: NextRequest) {
     deps = {
       stripe,
       db,
+      applyCodes: paymentCodeEffects(db, site.growth.invite),
       products: site.billing.products,
       webhookSecret: stripeWebhookSecret(),
       // An upgrade cancels the old subscription, whichever channel bills it (T66).

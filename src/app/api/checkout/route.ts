@@ -6,6 +6,8 @@ import { assertSameOrigin, clientIp, createAdminSupabase, requireApiBuyer } from
 import {
   assertOffered,
   checkoutBodySchema,
+  checkoutToken,
+  DISCOUNT_CANCEL_COOKIE,
   createCheckout,
   managedPaymentsEnabled,
   wechatPayEnabled,
@@ -43,7 +45,13 @@ export async function POST(request: NextRequest) {
     if (channel === 'waffo') return jsonResponse(await startWaffo(user.id, body.data))
     // Dispute evidence (T82): who opened checkout, from where.
     const client = { ip: clientIp(request.headers), userAgent: request.headers.get('user-agent') }
-    return jsonResponse(await startStripe(user.id, body.data, client))
+    const token = checkoutToken(user.id, body.data, request.headers.get('idempotency-key'))
+    const { url, cancelReceipt } = await startStripe(user.id, body.data, client, token)
+    const response = jsonResponse({ url })
+    if (cancelReceipt) response.cookies.set(DISCOUNT_CANCEL_COOKIE, cancelReceipt, {
+      path: '/api/checkout/cancel', httpOnly: true, secure: true, sameSite: 'lax', maxAge: 3600,
+    })
+    return response
   } catch (error) {
     return errorResponse(error, 'checkout')
   }
@@ -51,12 +59,13 @@ export async function POST(request: NextRequest) {
 
 const shared = { products: site.billing.products, origin: appOrigin, returnToHosts: site.partners.graylum.returnToHosts }
 
-function startStripe(userId: string, body: CheckoutBody, client: CheckoutClient) {
-  const deps = { ...shared, stripe: stripeClient(), managedPayments: managedPaymentsEnabled(), wechatPay: wechatPayEnabled(), termsConsent: termsConsentEnabled() }
-  return createCheckout(deps, { userId, body, client })
+function startStripe(userId: string, body: CheckoutBody, client: CheckoutClient, token: string) {
+  const deps = { ...shared, stripe: stripeClient(), codes: createAdminSupabase(), managedPayments: managedPaymentsEnabled(), wechatPay: wechatPayEnabled(), termsConsent: termsConsentEnabled() }
+  return createCheckout(deps, { userId, body, client, token })
 }
 
 function startWaffo(userId: string, body: CheckoutBody) {
+  if (body.expected_code) throw new AppError('CODE_CHECKOUT_OFFER_CHANGED', 'Discount is unavailable on this payment channel')
   const config = waffoConfig()
   const deps = { ...shared, waffo: waffoClient(), productIds: config.productIds, subscriptionProductIds: config.subscriptionProductIds }
   return createWaffoCheckout(deps, { userId, body })

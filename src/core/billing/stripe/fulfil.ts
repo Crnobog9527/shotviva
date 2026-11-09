@@ -6,11 +6,13 @@ import { z } from 'zod'
 import { trackPurchase } from '../../analytics/funnel'
 import type { SiteProduct } from '../../config'
 import { AppError } from '../../errors'
+import type { ApplyPaymentCodes } from '../payment-code-effects'
 import type { RpcClient } from '../rpc'
 import type { CancelOthers, CancelRefunded } from '../subscription/cancel-others'
 import { CHECKOUT_METHODS, lookupKey, type CheckoutMethod, type RecordedMethod } from './catalog'
 import type { StripeApi } from './client'
 import type { DisputeEvidenceConfig } from './disputes/config'
+import { sessionDiscount } from './discount-facts'
 import { recordPaymentContext } from './payment-context'
 import { SESSION_EXPAND, sessionFacts } from './payment-facts'
 import { settleCheckout, subscriptionState } from './settle'
@@ -26,6 +28,7 @@ export type FulfilDeps = {
   // Service-role client: settle_checkout is not callable by the client roles.
   db: RpcClient
   products: readonly SiteProduct[]
+  applyCodes: ApplyPaymentCodes
   trackBuy?: typeof trackPurchase
   // The upgrade step (T66): after a membership is paid, cancel the buyer's other renewing
   // subscriptions. Wired by the webhook route and the admin replay; absent in tests that only settle.
@@ -80,7 +83,7 @@ export function readPurchase(session: Stripe.Checkout.Session, products: readonl
 }
 
 // The webhook has no page: the language is the one the Checkout Session was opened in.
-function track(deps: FulfilDeps, session: Stripe.Checkout.Session, purchase: SessionPurchase, method: RecordedMethod): void {
+function track(deps: FulfilDeps, session: Stripe.Checkout.Session, purchase: SessionPurchase, method: RecordedMethod, discount: ReturnType<typeof sessionDiscount>): void {
   const { product } = purchase
   ;(deps.trackBuy ?? trackPurchase)(purchase.userId, {
     product_id: product.id,
@@ -91,7 +94,8 @@ function track(deps: FulfilDeps, session: Stripe.Checkout.Session, purchase: Ses
     // What paid, as payments.method records it: on the wallet line Alipay or WeChat Pay.
     method,
     // Before tax: Managed Payments adds tax on top and keeps it.
-    amount_usd: (session.amount_subtotal ?? Math.round(product.priceUsd * 100)) / 100,
+    amount_usd: discount.amountUsd,
+    ...discount.props,
     credits: product.credits,
   }, session.locale === 'zh' ? 'zh' : 'en')
 }
@@ -110,6 +114,12 @@ export async function fulfilCheckoutSession(deps: FulfilDeps, sessionId: string)
     subscription: purchase.subscription ? subscriptionState(purchase.subscription) : null,
     payment,
   })
+  const discount = sessionDiscount(session, purchase.product)
+  if (change.applied) track(deps, session, purchase, payment.method, discount)
+  await deps.applyCodes({
+    channel: 'stripe', reference: session.id, userId: purchase.userId, productId: purchase.product.id,
+    codeId: discount.codeId, amountDiscount: discount.amountDiscount, locale: session.locale === 'zh' ? 'zh' : 'en',
+  })
   // Dispute evidence (T82): the checkout IP, browser and Terms consent on the payment row. Also on
   // a replay, so a crash between the two calls is mended by Stripe's redelivery. Best effort: a
   // failure is logged and alerted, never fails this webhook or skips the step below.
@@ -117,7 +127,5 @@ export async function fulfilCheckoutSession(deps: FulfilDeps, sessionId: string)
   // Also on a replay: a crash after settling would otherwise leave the old plan billing. The
   // step is idempotent (ended rows are skipped).
   if (purchase.product.tier !== 'pack') await deps.cancelOthers?.(purchase.userId, { stripeSubscriptionId: purchase.subscription?.id ?? null })
-  if (!change.applied) return 'replayed'
-  track(deps, session, purchase, payment.method)
-  return 'applied'
+  return change.applied ? 'applied' : 'replayed'
 }

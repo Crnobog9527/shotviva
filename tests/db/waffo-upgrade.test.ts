@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 
 import { cancelOtherSubscriptions, readSubscriptionSummary, refuseEndedOrder } from '@/core/billing/subscription'
 import { handleWaffoWebhook, type WaffoWebhookDeps } from '@/core/billing/waffo'
+import { paymentCodeEffects } from '@/core/billing'
 import { site } from '@/site/site.config'
 
 import { WAFFO_STORE, signWaffo, subscriptionPaid, subscriptionState, waffoKeys } from '../fakes/waffo'
@@ -33,6 +34,7 @@ beforeEach(() => {
   waffo = { cancelSubscription: vi.fn<Cancel>(async (orderId) => ({ orderId, status: 'canceling', currentPeriodEnd: '2026-12-07' })) }
   deps = {
     db: admin,
+    applyCodes: paymentCodeEffects(admin, site.growth.invite),
     products: site.billing.products,
     publicKey: keys.publicKey,
     storeId: WAFFO_STORE,

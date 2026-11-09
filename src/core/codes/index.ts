@@ -18,3 +18,5 @@ export type InviteConfig = {
   windowDays: number
   inviterRewardCap: number
 }
+
+export type PendingDiscount = NonNullable<Awaited<ReturnType<typeof import('./read').readPendingDiscount>>>

@@ -332,7 +332,8 @@
           "pack_s": "Small credit pack",
           "pack_m": "Medium credit pack",
           "pack_l": "Large credit pack"
-        }
+        },
+        "packsOnce": "Credit packs: this payment only"
       }
     },
     "tabs": {
@@ -1115,7 +1116,18 @@
     "lockLower": "Can't switch down. Cancel, then buy it after your plan ends.",
     "lockCurrentNote": "This is your plan. Manage or cancel it in Account.",
     "upgradeNote": "Starts now, all its credits at once; your credits stay.",
-    "upgradeNoteCancels": "Starts now, all its credits at once; your current subscription ends today and your credits stay."
+    "upgradeNoteCancels": "Starts now, all its credits at once; your current subscription ends today and your credits stay.",
+    "guestDiscount": "Sign up to use your code.",
+    "waffoNoDiscount": "Promo codes are unavailable with this payment provider. Your discount is saved for later.",
+    "codeEntry": "Have a promo code?",
+    "codeOnce": "This payment only",
+    "codeFirstMonth": "First month",
+    "codeFirstYear": "First year",
+    "codeMonths": "First {months} months",
+    "codeEvery": "Every billing period",
+    "codeCheckoutChanged": "Your discount has changed. Check the updated price before trying again.",
+    "codeCheckoutInUse": "This discount is in use in another checkout. Return to that checkout to finish or cancel it, then try again.",
+    "fineDiscount": "{term} at {price}, then {original} per {period, select, year {year} other {month}} · cancel anytime · USD"
   },
   "announcement": {
     "dismiss": "Dismiss announcement"

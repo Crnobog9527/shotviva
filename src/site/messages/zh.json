@@ -332,7 +332,8 @@
           "pack_s": "小积分包",
           "pack_m": "中积分包",
           "pack_l": "大积分包"
-        }
+        },
+        "packsOnce": "积分包仅限本次付款"
       }
     },
     "tabs": {
@@ -1115,7 +1116,18 @@
     "lockLower": "不能降级，可先取消，到期后重新订。",
     "lockCurrentNote": "这是你当前的套餐，可在「我的」里管理或取消。",
     "upgradeNote": "立即生效，积分一次到账，已有积分保留。",
-    "upgradeNoteCancels": "立即生效，积分一次到账；原订阅今天取消，已有积分保留。"
+    "upgradeNoteCancels": "立即生效，积分一次到账；原订阅今天取消，已有积分保留。",
+    "guestDiscount": "注册后可用优惠。",
+    "waffoNoDiscount": "当前付款通道暂不支持优惠码，你的优惠会保留。",
+    "codeEntry": "有优惠码？",
+    "codeOnce": "仅本次付款",
+    "codeFirstMonth": "首月",
+    "codeFirstYear": "首年",
+    "codeMonths": "前 {months} 个月",
+    "codeEvery": "每期",
+    "codeCheckoutChanged": "你的优惠已变更，请确认最新价格后重试。",
+    "codeCheckoutInUse": "这份优惠正在另一个结账页面使用。请返回原页面完成或取消付款，再重试。",
+    "fineDiscount": "{term} {price}，之后每{period, select, year {年} other {月}} {original} · 可随时取消 · 美元"
   },
   "announcement": {
     "dismiss": "关闭公告"

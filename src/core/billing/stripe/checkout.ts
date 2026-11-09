@@ -6,6 +6,9 @@ import { z } from 'zod'
 import type { CheckoutStartMethod } from '../../analytics/events'
 import { trackCheckoutStart } from '../../analytics/funnel'
 import { PRODUCT_IDS, type PaymentChannel, type ProductId, type SiteProduct } from '../../config'
+import type { RpcClient } from '../rpc'
+import { definitelyRejected, discountedParams, expireAndRelease, releaseDiscount, reserveDiscount, type Discount } from './checkout-discount'
+import { logger } from '../../logger'
 import { AppError } from '../../errors'
 import { localizePath } from '../../i18n/paths'
 import { allowlistedUrl } from '../../partner/return-to'
@@ -26,6 +29,9 @@ export const checkoutBodySchema = z.strictObject({
   product_id: z.enum(PRODUCT_IDS),
   method: z.enum(CHECKOUT_METHODS),
   locale: z.enum(CHECKOUT_LOCALES).default('en'),
+  // A displayed discount may have expired or been consumed in another tab. Its name is
+  // only a quote precondition; the authenticated reservation supplies the actual coupon.
+  expected_code: z.string().regex(/^[A-Z0-9]{4,20}$/).optional(),
   // Graylum top-up (ARCHITECTURE §14.5): where the success page offers to send the buyer back.
   // Kept only when its host is allowlisted; anything else is dropped, never echoed.
   return_to: z.string().max(2048).optional(),
@@ -34,6 +40,7 @@ export type CheckoutBody = z.infer<typeof checkoutBodySchema>
 
 export type CheckoutDeps = {
   stripe: StripeApi
+  codes: RpcClient
   products: readonly SiteProduct[]
   managedPayments: boolean
   // STRIPE_WECHAT_PAY (T73): WeChat Pay beside Alipay on the wallet line.
@@ -135,6 +142,7 @@ type SessionInput = {
   cardOnlyConfig: string | null
   termsConsent: boolean
   client: CheckoutClient
+  token: string
 }
 
 function sessionParams(route: CheckoutRoute, priceId: string, metadata: Metadata, input: SessionInput): Stripe.Checkout.SessionCreateParams {
@@ -147,7 +155,7 @@ function sessionParams(route: CheckoutRoute, priceId: string, metadata: Metadata
     // Back to the return page / pricing in the language the buyer checked out in.
     success_url: `${input.origin}${localizePath(input.successPath, input.locale)}`,
     // Through /api/checkout/cancel, which counts the cancel and lands on pricing (T74).
-    cancel_url: cancelReturnUrl(input.origin, { product_id: metadata.product_id, method: metadata.method, locale: input.locale }),
+    cancel_url: cancelReturnUrl(input.origin, { product_id: metadata.product_id, method: metadata.method, locale: input.locale }, input.token),
     ...methodParams(route, input.cardOnlyConfig),
     ...evidenceParams(route, metadata.method, input),
     ...(route.mode === 'subscription' ? { subscription_data: { metadata } } : { payment_intent_data: { metadata } }),
@@ -182,36 +190,59 @@ export function assertOffered(body: Pick<CheckoutBody, 'method' | 'locale'>, cha
   throw new AppError('INVALID_INPUT', `${body.method} is not offered on ${channel} for locale ${body.locale}`)
 }
 
-export async function createCheckout(
-  deps: CheckoutDeps,
-  input: { userId: string; body: CheckoutBody; client?: CheckoutClient },
-): Promise<{ url: string }> {
+type CheckoutInput = { userId: string; body: CheckoutBody; client?: CheckoutClient; token?: string }
+type CheckoutResult = { url: string; cancelReceipt?: string }
+
+async function startSession(deps: CheckoutDeps, body: CheckoutBody, user: string, token: string, params: Stripe.Checkout.SessionCreateParams) {
+  const claim = await reserveDiscount(deps.codes, user, body, token)
+  const args = claim ? discountedParams(params, claim) : params
+  try {
+    const created = await deps.stripe.checkout.sessions.create(args, { idempotencyKey: token })
+    // An idempotent POST replays the original response, including its original open status.
+    const session = claim?.prepared ? await deps.stripe.checkout.sessions.retrieve(created.id) : created
+    return { session, claim }
+  } catch (error) {
+    if (claim && !claim.prepared && definitelyRejected(error)) {
+      logger.warn('Stripe rejected discounted checkout parameters', { product_id: body.product_id, mode: params.mode })
+      await releaseDiscount(deps.codes, user, token)
+      throw new AppError('CONFLICT', 'Stripe refused the checkout parameters; start a new attempt')
+    }
+    throw error
+  }
+}
+
+async function validatedUrl(deps: CheckoutDeps, session: Stripe.Checkout.Session, claim: Discount | null, route: CheckoutRoute, userId: string) {
+  try {
+    if (claim && session.status !== 'open') throw new AppError('CONFLICT', 'Discounted checkout is already closed')
+    if (!session.url) throw new AppError('INTERNAL', 'Stripe returned a session without a URL')
+    if (claim && session.expires_at !== claim.expiresAt) throw new AppError('INTERNAL', 'Discount deadline differs from Stripe')
+    assertMethodOffered(route, session)
+    return session.url
+  } catch (error) {
+    if (claim) await expireAndRelease(deps.stripe, deps.codes, userId, claim.token, session)
+    throw error
+  }
+}
+
+export async function createCheckout(deps: CheckoutDeps, input: CheckoutInput): Promise<CheckoutResult> {
   const { body } = input
   const product = deps.products.find((p) => p.id === body.product_id)
   if (!product || product.priceUsd <= 0) throw new AppError('NOT_FOUND', 'Unknown product')
   const route = checkoutRoute(product, body.method, deps.managedPayments, deps.wechatPay)
   const priceId = await resolvePriceId(deps.stripe, product, route)
   const cardOnlyConfig = isPlainCard(route) ? await cardOnlyConfigId(deps.stripe) : null
+  const token = input.token ?? crypto.randomUUID()
   const metadata = { user_id: input.userId, product_id: product.id, method: body.method, locale: body.locale }
-  const session = await deps.stripe.checkout.sessions.create(
-    sessionParams(route, priceId, metadata, {
-      locale: body.locale,
-      origin: deps.origin,
-      successPath: successPath(CHECKOUT_RETURN.stripe, body.return_to, deps.returnToHosts),
-      cardOnlyConfig,
-      termsConsent: deps.termsConsent,
-      client: input.client ?? { ip: null, userAgent: null },
-    }),
-  )
-  if (!session.url) throw new AppError('INTERNAL', 'Stripe returned a session without a URL')
-  assertMethodOffered(route, session)
+  const params = sessionParams(route, priceId, metadata, {
+    locale: body.locale, origin: deps.origin, token, cardOnlyConfig, termsConsent: deps.termsConsent,
+    successPath: successPath(CHECKOUT_RETURN.stripe, body.return_to, deps.returnToHosts),
+    client: input.client ?? { ip: null, userAgent: null },
+  })
+  const { session, claim } = await startSession(deps, body, input.userId, token, params)
+  const url = await validatedUrl(deps, session, claim, route, input.userId)
   ;(deps.trackStart ?? trackCheckoutStart)(input.userId, {
-    product_id: product.id,
-    tier: product.tier,
-    interval: product.interval,
-    form: route.form,
-    channel: 'stripe',
-    method: startedMethod(body.method, route),
+    product_id: product.id, tier: product.tier, interval: product.interval, form: route.form, channel: 'stripe',
+    method: startedMethod(body.method, route), ...(claim && { code: claim.code, discount_percent: claim.percent }),
   }, body.locale)
-  return { url: session.url }
+  return { url, ...(claim && { cancelReceipt: token + ':' + session.id }) }
 }

@@ -21,26 +21,34 @@ const patchSchema = z.strictObject({
 const inputErrors = new Set(['INVALID_CODE_KIND', 'INVALID_DISCOUNT', 'CODE_DISCOUNT_IMMUTABLE',
   'CODE_QUOTA_BELOW_CLAIMED', 'CODE_GIFT_LIMIT', 'CODE_GIFT_CAP_REQUIRED'])
 
-function discountError(fields: z.infer<typeof patchSchema>, catalog: CodeProduct[], floor: CodeProduct) {
+export function invalidDiscountProducts(fields: z.infer<typeof patchSchema>, catalog: CodeProduct[], floor: CodeProduct) {
   const { discount_percent: percent, discount_products: targets } = fields
   const invalid = percent && targets ? targets.filter(id => {
     const product = catalog.find(item => item.id === id)
     return !product || belowDiscountFloor(product, floor, percent)
   }) : []
-  return new AppError('INVALID_INPUT', invalid.length ? 'CODE_DISCOUNT_PRODUCTS: ' + invalid.join(', ') : 'CODE_DISCOUNT_PRODUCTS')
+  return invalid
+}
+
+export function codePatch(codeId: string, fields: unknown) {
+  const patch = patchSchema.safeParse(fields)
+  if (!z.uuid().safeParse(codeId).success || !patch.success) throw new AppError('INVALID_INPUT', 'INVALID_CODE_FIELDS')
+  return patch.data
 }
 
 export async function saveCode(db: RpcClient, actor: string, codeId: string, fields: unknown, products: readonly CatalogInput[]) {
-  const patch = patchSchema.safeParse(fields)
-  if (!z.uuid().safeParse(codeId).success || !patch.success) throw new AppError('INVALID_INPUT', 'INVALID_CODE_FIELDS')
+  const patch = codePatch(codeId, fields)
   const { catalog, floor } = campaignCatalog(products)
   const { data, error } = await db.rpc('admin_save_code', {
-    p_actor: actor, p_code_id: codeId, p_fields: patch.data, p_catalog: catalog, p_floor_product_id: floor.id,
+    p_actor: actor, p_code_id: codeId, p_fields: patch, p_catalog: catalog, p_floor_product_id: floor.id,
   })
   if (error) {
     // The locked row determines whether the submitted terms belong to an existing campaign.
     // Its unchanged terms stay valid for metadata edits even after a catalog reprice.
-    if (error.message === 'CODE_DISCOUNT_PRODUCTS') throw discountError(patch.data, catalog, floor)
+    if (error.message === 'CODE_DISCOUNT_PRODUCTS') {
+      const invalid = invalidDiscountProducts(patch, catalog, floor)
+      throw new AppError('INVALID_INPUT', ['CODE_DISCOUNT_PRODUCTS', invalid.join(', ')].filter(Boolean).join(': '))
+    }
     if (inputErrors.has(error.message)) throw new AppError('INVALID_INPUT', error.message)
     throw toRpcError('admin_save_code', error)
   }

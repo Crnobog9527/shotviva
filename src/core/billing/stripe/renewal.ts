@@ -9,6 +9,7 @@ import { AppError } from '../../errors'
 import { creditChangeSchema } from '../credits'
 import { callRpc } from '../rpc'
 import { lookupKey } from './catalog'
+import { renewalAmounts } from './discount-facts'
 import type { FulfilDeps } from './fulfil'
 import { INVOICE_EXPAND, invoiceFacts } from './payment-facts'
 
@@ -60,7 +61,7 @@ function periodEndOf(invoice: Stripe.Invoice): Date {
 }
 
 export async function renewFromInvoice(deps: FulfilDeps, invoiceId: string): Promise<RenewalOutcome> {
-  const invoice = await deps.stripe.invoices.retrieve(invoiceId, { expand: INVOICE_EXPAND })
+  const invoice = await deps.stripe.invoices.retrieve(invoiceId, { expand: [...INVOICE_EXPAND, 'discounts.source.coupon'] })
   if (invoice.billing_reason !== 'subscription_cycle') return 'ignored'
   if (invoice.status !== 'paid') return 'unpaid'
   const sub = await deps.stripe.subscriptions.retrieve(subscriptionIdOf(invoice))
@@ -91,8 +92,7 @@ export async function renewFromInvoice(deps: FulfilDeps, invoiceId: string): Pro
     channel: 'stripe',
     // The card route the subscription was opened on: a 中国银行卡 subscription renews as cn_card.
     method: facts.method,
-    // List price in USD: with Adaptive Pricing the invoice may be in the buyer's currency.
-    amount_usd: product.priceUsd,
+    ...renewalAmounts(invoice, sub, product),
     credits: product.credits,
   }, sub.metadata?.locale === 'zh' ? 'zh' : 'en')
   return 'applied'
