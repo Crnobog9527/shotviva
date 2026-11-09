@@ -108,3 +108,10 @@ describe('account Settings for a phone sign-up (T63)', () => {
     expect(html).toContain('a@example.test')
   })
 })
+
+it.each(['en', 'zh'] as const)('only shows the affiliate dashboard to active members in %s', async (locale) => {
+  const props = { email: null, phone: null, purchases: [], morePurchases: false, helpUnread: false, admin: false }
+  const label = locale === 'en' ? 'My affiliate dashboard' : '我的联盟后台'
+  expect(await render(createElement(SettingsRows, { ...props, affiliate: true }), locale)).toContain(label)
+  expect(await render(createElement(SettingsRows, { ...props, affiliate: false }), locale)).not.toContain('/partners')
+})

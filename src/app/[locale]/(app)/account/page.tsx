@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import { getTranslations } from 'next-intl/server'
 
+import { hasAffiliateDashboard } from '@/core/affiliate/feature'
 import { AppPage } from '@/core/app-shell'
 import { AccountHeader, AccountView, InviteCard, RedeemCard, STRIP_FRAMES } from '@/core/account/ui'
 import { createAdminSupabase, createServerSupabase, requireUser, readSignupGift } from '@/core/auth'
@@ -37,7 +38,7 @@ async function Account() {
   const user = await requireUser('/account')
   const supabase = await createServerSupabase()
   const admin = createAdminSupabase()
-  const [graylum, balance, subscription, signupGift, helpUnread, payments, since, works, t, locale, discount] = await Promise.all([
+  const [graylum, balance, subscription, signupGift, helpUnread, payments, since, works, t, locale, discount, affiliate] = await Promise.all([
     readLinkStatus(supabase, user.id),
     readBalance(supabase, user.id),
     readSubscriptionSummary(admin, user.id, site.billing.products),
@@ -49,13 +50,14 @@ async function Account() {
     getTranslations('app.support'),
     currentLocale(),
     readPendingDiscount(admin, user.id),
+    hasAffiliateDashboard(user.id),
   ])
   const purchases = paymentChoices(payments, site.billing.products, t as unknown as Translate, { money: formatMoney(locale) })
   const last = lastMembership(payments, site.billing.products)
   const more = payments.length >= PICKER_LIMIT
   // Each line with its receipt / invoice links (T80); the support picker keeps the plain labels.
   const lines = purchaseLines(payments, purchases, locale)
-  const data = { email: user.email, phone: maskPhone(user.phone) || null, balance, giftRefused: signupGift.refused, subscription, since, lastMembership: last, works, purchases: lines, morePurchases: more, helpUnread, graylum, admin: user.role === 'admin' }
+  const data = { email: user.email, phone: maskPhone(user.phone) || null, balance, giftRefused: signupGift.refused, subscription, since, lastMembership: last, works, purchases: lines, morePurchases: more, helpUnread, graylum, affiliate, admin: user.role === 'admin' }
   // Help & feedback opens over the page (?help=…, T68); its payments picker is the Purchases list.
   return (
     <>

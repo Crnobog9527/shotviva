@@ -3,6 +3,7 @@ import { localized } from '@/core/i18n/server'
 import { Link } from '@/core/i18n/ui'
 import { ApplicationFields } from './application-fields'
 import { formLabels } from './form-labels'
+import { publishedTerms } from './terms'
 import { TermsConsent } from './terms-consent'
 import type { Settings } from './models'
 
@@ -17,10 +18,14 @@ export async function ApplicationForm({
   eligible: boolean
   loginUrl?: string
 }) {
-  const [t, successUrl] = await Promise.all([getTranslations('affiliate'), localized('/partners/join')])
+  const [t, successUrl, body] = await Promise.all([
+    getTranslations('affiliate'), localized('/partners/join'), publishedTerms(settings.terms_version),
+  ])
+  const notice = !body && <p role="status">{t('applicationTermsPending')}</p>
   if (!eligible)
     return (
       <section className="af-panel">
+        {!body && <p role="status">{t('termsPlaceholder')}</p>}
         <p>{t('needsPlan', { plan: t('tier.' + settings.apply_min_level) })}</p>
         <Link className="af-button" href="/pricing">
           {t('seePricing')}
@@ -28,7 +33,8 @@ export async function ApplicationForm({
       </section>
     )
   return (
-    <ApplicationFields successUrl={successUrl} parent={parent} loginUrl={loginUrl} loginLabel={t('loginToSubmit')} labels={formLabels(t, 'submit')}>
+    <ApplicationFields canSubmit={Boolean(body)} successUrl={successUrl} parent={parent} loginUrl={loginUrl} loginLabel={t('loginToSubmit')} labels={formLabels(t, 'submit')}>
+      {notice}
       <input name="parent" type="hidden" value={parent} />
       <label>
         {t('name')}
@@ -50,7 +56,7 @@ export async function ApplicationForm({
         {t('plan')}
         <textarea name="plan" rows={4} required maxLength={4000} />
       </label>
-      {!loginUrl && <TermsConsent t={t} version={settings.terms_version} />}
+      {!loginUrl && body && <TermsConsent t={t} version={settings.terms_version} />}
     </ApplicationFields>
   )
 }

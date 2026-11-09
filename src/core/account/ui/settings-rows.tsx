@@ -14,10 +14,11 @@ import { LanguageRow } from './sheet-rows'
 // decided here on the server, so a normal user's HTML and client props never carry it. It is
 // only a way in; /admin checks the role itself.
 
-type Props = { email: string | null; phone: string | null; purchases: readonly PurchaseLine[]; morePurchases: boolean; helpUnread: boolean; admin: boolean }
+type Props = { email: string | null; phone: string | null; purchases: readonly PurchaseLine[]; morePurchases: boolean; helpUnread: boolean; admin: boolean; affiliate?: boolean }
 
-export function SettingsRows({ email, phone, purchases, morePurchases, helpUnread, admin }: Props) {
+export function SettingsRows({ email, phone, purchases, morePurchases, helpUnread, admin, affiliate }: Props) {
   const t = useTranslations('app.account.settings')
+  const affiliateT = useTranslations('affiliate')
   const adminT = useTranslations('adminEntry')
   return (
     <RowsPanel>
@@ -27,6 +28,12 @@ export function SettingsRows({ email, phone, purchases, morePurchases, helpUnrea
           <RowValue />
         </Link>
       ) : null}
+      {affiliate && (
+        <Link href="/partners" className={rowClass}>
+          {affiliateT('dashboardLink')}
+          <RowValue />
+        </Link>
+      )}
       {phone ? <FactRow label={t('phone')} value={phone} /> : null}
       {email || !phone ? <FactRow label={t('email')} value={email} /> : null}
       <LanguageRow />

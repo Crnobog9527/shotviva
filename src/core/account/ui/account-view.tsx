@@ -37,6 +37,7 @@ export type AccountData = {
   helpUnread: boolean
   graylum: LinkStatus
   // profiles.role = 'admin': the "Admin" row (spec #186).
+  affiliate: boolean
   admin: boolean
 }
 
@@ -90,7 +91,7 @@ export function AccountView({ data, actions, site, children }: Props) {
       </div>
       {children}
       <Group title={t('settings.title')}>
-        <SettingsRows email={data.email} phone={data.phone} purchases={data.purchases} morePurchases={data.morePurchases} helpUnread={data.helpUnread} admin={data.admin} />
+        <SettingsRows email={data.email} phone={data.phone} purchases={data.purchases} morePurchases={data.morePurchases} helpUnread={data.helpUnread} admin={data.admin} affiliate={data.affiliate} />
       </Group>
       <IntegrationsPanel graylum={data.graylum} disconnect={actions.disconnectGraylum} />
       <Group title={t('session.title')} hideTitle>

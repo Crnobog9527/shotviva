@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { ConsumerReferral } from './consumer-referral'
 import { COPY, STATUS, money } from './copy'
 import type { SaveAction } from './form'
 import { enrollmentLabel } from './enrollment'
@@ -73,6 +74,7 @@ async function MemberView({ db, filters, action, id }: ViewProps & { id: string 
       <LinkTo filters={{ tab: filters.tab }}>{COPY.previous}</LinkTo>
       <Section title={member.slug}>
         <ProfileFacts member={member} />
+        {member.status === 'active' && <ConsumerReferral slug={member.slug} />}
       </Section>
       {member.status === 'pending' && <DecideMember member={member} action={action} />}
       {['active', 'suspended', 'banned'].includes(member.status) && <SetMember member={member} rates={rates} action={action} />}
