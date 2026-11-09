@@ -2,3 +2,4 @@ export { applyCover, createCoverUpload, type ApplyCoverInput, type CoverDeps, ty
 export { publishStillCover } from './cover-publish'
 export { sniffCover } from './cover-media'
 export { maxBytesFor } from './cover-rules'
+export { signCoverDownload } from './cover-download'

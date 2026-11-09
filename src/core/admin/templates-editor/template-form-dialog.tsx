@@ -12,6 +12,7 @@ import { TEST_RUN_COPY, TestRunPanel } from '../test-run-ui'
 
 import type { CategoryOption } from './category-field'
 import { buildPayload, emptyFormValues, toFormValues, type TemplateFormValues } from './form-state'
+import { afterCoverSource, type AfterCover } from '../covers/after-cover-source'
 import { referenceBudget, refUploadId } from './style-ref-state'
 import { StyleRefFields } from './style-ref-fields'
 import { TemplateCoverFields } from './template-cover-fields'
@@ -97,9 +98,11 @@ type FormColumnProps = Pick<Props, 'target' | 'providers' | 'floor' | 'categorie
 }
 
 function FormColumn({ target, providers, values, isNew, floor, categories, coverLanguages, coverActions, pending, error, saved, onChange, onCancel, onSave }: FormColumnProps) {
+  const [activeCover, setActiveCover] = useState(0)
   const [uploading, setUploading] = useState(false)
   const budget = referenceBudget(providers, values.providerId, values.fieldsJson, values.styleRefs.length)
   const existing = target.mode === 'edit' ? target.template : null
+  const cover = afterCoverSource(existing, coverLanguages[activeCover].code)
   return (
     <div className="grid min-h-0 content-start gap-4 p-6 lg:overflow-y-auto">
       <DialogHeader>
@@ -108,14 +111,14 @@ function FormColumn({ target, providers, values, isNew, floor, categories, cover
       <TemplatePublicFields values={values} isNew={isNew} uploading={uploading} floor={floor} categories={categories} onChange={onChange} />
       <TemplateTranslationFields values={values} onChange={onChange} />
       {existing ? (
-        <TemplateCoverFields template={existing} languages={coverLanguages} actions={coverActions} />
+        <TemplateCoverFields template={existing} languages={coverLanguages} actions={coverActions} active={activeCover} onSelect={setActiveCover} />
       ) : (
         <p className="text-muted-foreground text-xs">保存模板后再打开编辑，即可上传封面。</p>
       )}
       {values.module === 'image' && (
         <ImageProviderField id="tpl-provider" providers={providers} value={values.providerId} onChange={(providerId) => onChange({ providerId })} />
       )}
-      <StyleSection values={values} budget={budget} uploading={uploading} setUploading={setUploading} onChange={onChange} />
+      <StyleSection cover={cover} values={values} budget={budget} uploading={uploading} setUploading={setUploading} onChange={onChange} />
       <TemplatePromptFields values={values} version={existing?.prompt?.version ?? null} onChange={onChange} />
       <TemplateToggleFields values={values} onChange={onChange} />
       {isNew ? <p className="text-muted-foreground text-xs">新模板保存后默认是下架状态，保存后留在这里，右侧就能试跑。</p> : null}
@@ -128,11 +131,11 @@ function styleSaveBlocked(uploading: boolean, module: string, problem: string | 
   return uploading || (module === 'image' && !!problem)
 }
 
-function StyleSection({ values, budget, uploading, setUploading, onChange }: Pick<FormColumnProps, 'values' | 'onChange'> & {
-  budget: ReturnType<typeof referenceBudget>; uploading: boolean; setUploading: (value: boolean) => void
+function StyleSection({ cover, values, budget, uploading, setUploading, onChange }: Pick<FormColumnProps, 'values' | 'onChange'> & {
+  cover: AfterCover | null; budget: ReturnType<typeof referenceBudget>; uploading: boolean; setUploading: (value: boolean) => void
 }) {
   if (values.module !== 'image') return null
-  return <StyleRefFields templateId={refUploadId(values.id)} refs={values.styleRefs} budget={budget}
+  return <StyleRefFields cover={cover} templateId={refUploadId(values.id)} refs={values.styleRefs} budget={budget}
     busy={uploading} onBusy={setUploading} onChange={styleRefs => onChange({ styleRefs, styleRefsEdited: true })} />
 }
 

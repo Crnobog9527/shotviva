@@ -8,9 +8,11 @@ import { cn } from '@/core/ui/cn'
 import { DragHandle, MoveButtons, SortableList, sortableRowClass, useSortableItem } from '../ui/sortable'
 import { styleRefCopy as copy } from './copy'
 import type { referenceBudget } from './style-ref-state'
-import { uploadStyleRef } from './style-ref-upload'
+import { isRefFromAfterCover, type AfterCover } from '../covers/after-cover-source'
+import { reuseAfterCover, uploadStyleRef } from './style-ref-upload'
 
 type Props = {
+  cover: AfterCover | null
   templateId: string | null
   refs: StyleRef[]
   budget: ReturnType<typeof referenceBudget>
@@ -19,7 +21,13 @@ type Props = {
   onChange: (refs: StyleRef[]) => void
 }
 
-export function StyleRefFields({ templateId, refs, budget, busy, onBusy, onChange }: Props) {
+function reuseHint(cover: AfterCover | null, refs: StyleRef[]) {
+  if (refs.length >= MAX_STYLE_REFS) return copy.full
+  if (!cover) return copy.noAfter
+  return refs.some(ref => isRefFromAfterCover(ref.key, cover.hash)) ? copy.alreadyAdded : ''
+}
+
+export function StyleRefFields({ cover, templateId, refs, budget, busy, onBusy, onChange }: Props) {
   const [error, setError] = useState('')
   const picker = useRef<HTMLInputElement>(null)
   const replacing = useRef<string | null>(null)
@@ -27,17 +35,21 @@ export function StyleRefFields({ templateId, refs, budget, busy, onBusy, onChang
     replacing.current = key
     picker.current?.click()
   }
-  const upload = async (file: File) => {
-    if (!templateId) return
-    const replaced = replacing.current
+  const inFlight = useRef(false)
+  const full = refs.length >= MAX_STYLE_REFS
+  const hint = reuseHint(cover, refs)
+  const add = async (load: () => Promise<StyleRef>, replaced: string | null) => {
+    if (inFlight.current) return
+    inFlight.current = true
     onBusy(true)
     setError('')
     try {
-      const ref = await uploadStyleRef(templateId, file)
+      const ref = await load()
       onChange(replaced ? refs.map(old => old.key === replaced ? ref : old) : [...refs, ref])
     } catch (error) {
       setError(error instanceof Error ? error.message : copy.invalidUpload)
     } finally {
+      inFlight.current = false
       onBusy(false)
     }
   }
@@ -57,13 +69,16 @@ export function StyleRefFields({ templateId, refs, budget, busy, onBusy, onChang
       <input ref={picker} hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={event => {
         const file = event.target.files?.[0]
         event.target.value = ''
-        if (file) void upload(file)
+        if (file && templateId) void add(() => uploadStyleRef(templateId, file), replacing.current)
       }} />
       {templateId ? (
-        <Button type="button" variant="outline" size="sm" className="justify-self-start" onClick={() => pick(null)} disabled={busy || refs.length >= MAX_STYLE_REFS}>
-          {copy.add}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={() => pick(null)} disabled={busy || full}>{copy.add}</Button>
+          <Button type="button" variant="outline" size="sm" disabled={busy || !!hint}
+            onClick={() => cover && void add(() => reuseAfterCover(templateId, cover), null)}>{copy.reuse}</Button>
+        </div>
       ) : <p className="text-xs">{copy.needId}</p>}
+      {templateId && hint && <p className="text-xs text-muted-foreground">{hint}</p>}
       {busy && <p role="status">{copy.uploading}</p>}
       {(error || budget.problem) && <p role="alert" className="text-destructive">{error || budget.problem}</p>}
     </fieldset>

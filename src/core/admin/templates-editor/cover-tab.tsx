@@ -3,6 +3,8 @@
 import { useState } from 'react'
 
 
+import { effectiveStillCover } from '@/core/templates/cover-locales'
+import { stillCoverKey } from '../covers/still-cover-key'
 import { acceptFor } from '../covers/cover-rules'
 import type { AdminTemplate, CoverLanguage, TemplateAdminActions } from '../templates/types'
 import { TranslateCoverDialog } from '../test-run-ui'
@@ -20,7 +22,16 @@ type Props = {
   actions: Pick<TemplateAdminActions, 'requestCoverUpload' | 'applyCover'>
 }
 
-const still = (url: string | null) => (url ? { url, video: false } : null)
+function stillSlot(template: AdminTemplate, code: string | null, slot: 'before' | 'after') {
+  const common = slot === 'before' ? template.coverBeforeUrl : template.coverAfterUrl
+  const url = effectiveStillCover(template.coverLocales, code, slot, common)
+  const source = stillCoverKey(template.id, slot, url)
+  const own = code === null ? common : template.coverLocales[code]?.[slot]
+  const preview = url ? { url, video: false, inherited: !own } : null
+  if (!source) return { preview }
+  const query = new URLSearchParams({ templateId: template.id, slot, locale: code ?? 'common', hash: source.hash })
+  return { preview, download: { href: `/api/admin/template-download?${query}`, label: COPY.download(slot) } }
+}
 
 function Note({ language }: { language: CoverLanguage }) {
   const text = language.code === null ? COPY.commonNote : language.upcoming ? COPY.upcomingNote(language.label) : COPY.languageNote(language.label)
@@ -41,9 +52,9 @@ export function CoverTab({ template, language, languages, actions }: Props) {
       {/* Three cards on wide screens, two below ~1100px, one below ~700px. */}
       <div className="grid grid-cols-1 gap-4 min-[700px]:grid-cols-2 min-[1100px]:grid-cols-3">
         <CoverSlot id={`${id}-before`} label={COPY.before} accept={acceptFor('before')} hint={COPY.stillHint}
-          preview={still(set.before)} busy={busy === 'before'} disabled={pending} onFile={(file) => upload('before', file)} />
+          {...stillSlot(template, language.code, 'before')} busy={busy === 'before'} disabled={pending} onFile={(file) => upload('before', file)} />
         <CoverSlot id={`${id}-after`} label={COPY.after} accept={acceptFor('after')} hint={COPY.stillHint}
-          preview={still(set.after)} busy={busy === 'after'} disabled={pending} onFile={(file) => upload('after', file)} />
+          {...stillSlot(template, language.code, 'after')} busy={busy === 'after'} disabled={pending} onFile={(file) => upload('after', file)} />
         <CoverSlot id={`${id}-motion`} label={COPY.motion} accept={acceptFor('motion')} hint={COPY.motionHint}
           preview={motion} busy={busy === 'motion'} disabled={pending} onFile={(file) => upload('motion', file)} />
       </div>
