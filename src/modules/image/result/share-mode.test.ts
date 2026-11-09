@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { canShareFile, mayShareFiles, resolveShareMode, shareFileFor } from './share-mode'
+import { canShareFile, handPhotoToSystem, mayShareFiles, resolveShareMode, shareFileFor } from './share-mode'
 
 const jpeg = () => new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: 'image/jpeg' })
 const prepared = () => Promise.resolve({ shareBlob: jpeg(), transparent: false })
@@ -42,5 +42,22 @@ describe('Share or Download (MOBILE_UI_rules §1.8.1)', () => {
     const file = shareFileFor(new Blob([new Uint8Array([1])], { type: 'image/png' }), 'shotviva-qa')
     expect([file.name, file.type]).toEqual(['shotviva-qa.png', 'image/png'])
     expect(mayShareFiles({ share: () => undefined, canShare: () => true })).toBe(true)
+  })
+})
+
+describe('saving a photo on iOS', () => {
+  it('hands only the prepared file to the system on the same click stack', async () => {
+    const file = shareFileFor(jpeg(), 'photo')
+    const share = vi.fn().mockResolvedValue(undefined)
+    const result = handPhotoToSystem({ share }, file)
+    expect(share).toHaveBeenCalledExactlyOnceWith({ files: [file] })
+    await expect(result).resolves.toBe('closed')
+  })
+
+  it('keeps Save available after cancellation and offers the original if sharing is denied', async () => {
+    for (const [name, outcome] of [['AbortError', 'closed'], ['NotAllowedError', 'unavailable']]) {
+      const share = vi.fn().mockRejectedValue(new DOMException('Cannot share', name))
+      await expect(handPhotoToSystem({ share }, shareFileFor(jpeg(), 'photo'))).resolves.toBe(outcome)
+    }
   })
 })

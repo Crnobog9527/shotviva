@@ -41,3 +41,14 @@ export async function resolveShareMode(sharer: FileSharer | undefined, prepared:
   const file = shareFileFor(result.shareBlob, name)
   return canShareFile(sharer, file) ? { kind: 'share', file } : DOWNLOAD
 }
+
+// Invoke share inside the tap, before any await. The OS owns the destination and can report
+// cancellation; resolving the promise does not prove the photo was saved.
+export async function handPhotoToSystem(sharer: Pick<Navigator, 'share'>, file: File): Promise<'closed' | 'unavailable'> {
+  try {
+    await sharer.share({ files: [file] })
+    return 'closed'
+  } catch (error) {
+    return error instanceof Error && error.name === 'AbortError' ? 'closed' : 'unavailable'
+  }
+}

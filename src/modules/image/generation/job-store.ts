@@ -15,6 +15,8 @@ const EMPTY: TrackedJob[] = []
 const NO_IDS: readonly string[] = []
 // A job the server never saw (404) is given up after this long; its POST died pre-reserve.
 const MISSING_GRACE_MS = 30_000
+// The POST screens the input before creating a row; an early GET would return a spurious 404.
+const pendingPosts = new Set<string>()
 
 let jobs: TrackedJob[] = EMPTY
 // The account's concurrency (TIER_LIMITS), handed over by the workspace; persisted with the
@@ -157,20 +159,29 @@ export function pump() {
     const job = jobs.find((candidate) => candidate.id === id)
     if (!job?.body) continue
     const { body } = job
+    pendingPosts.add(id)
     update(id, (current) => markSent(current, now))
-    void submitJob(id, body).then((outcome) => settle(id, outcome))
+    void submitJob(id, body).then((outcome) => {
+      pendingPosts.delete(id)
+      settle(id, outcome)
+    })
   }
 }
 
 // One polling pass over every running job (GenerationRunner calls it every few seconds), then
 // a pump for queued jobs whose rate-limit wait is over.
 export async function pollRunning(): Promise<void> {
-  const running = getJobs().filter((job) => job.status === 'running')
+  const now = Date.now()
+  const running = getJobs().filter((job) => job.status === 'running' &&
+    (!pendingPosts.has(job.id) || now - (job.sentAt ?? job.startedAt) >= MISSING_GRACE_MS))
   await Promise.all(
     running.map(async (job) => {
       const view = await readJob(job.id)
       if (view === 'missing') {
-        if (Date.now() - (job.sentAt ?? job.startedAt) > MISSING_GRACE_MS) update(job.id, (current) => applyError(current, { code: 'INTERNAL' }))
+        if (!pendingPosts.has(job.id) && Date.now() - (job.sentAt ?? job.startedAt) > MISSING_GRACE_MS) {
+          update(job.id, (current) => current.status === 'running' && current.sentAt === job.sentAt
+            ? applyError(current, { code: 'INTERNAL' }) : current)
+        }
       } else if (view) {
         update(job.id, (current) => (current.status === 'running' ? applyView(current, view) : current))
       }
