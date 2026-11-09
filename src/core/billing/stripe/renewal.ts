@@ -4,11 +4,11 @@ import type Stripe from 'stripe'
 import { z } from 'zod'
 
 import { trackPurchase } from '../../analytics/funnel'
-import type { SiteProduct } from '../../config'
 import { AppError } from '../../errors'
+import { readQuote } from '../checkout-price'
 import { creditChangeSchema } from '../credits'
 import { callRpc } from '../rpc'
-import { lookupKey } from './catalog'
+import { matchesContractPrice } from './prices'
 import { renewalAmounts } from './discount-facts'
 import type { FulfilDeps } from './fulfil'
 import { INVOICE_EXPAND, invoiceFacts } from './payment-facts'
@@ -36,19 +36,37 @@ function subscriptionIdOf(invoice: Stripe.Invoice): string {
 
 // The subscription's metadata (set at checkout, T9) says who and what; the subscribed Price's
 // metadata and lookup key must agree, so a renewal never grants another product.
-function readOwner(invoiceId: string, sub: Stripe.Subscription, products: readonly SiteProduct[]) {
-  const meta = ownerSchema.safeParse(sub.metadata ?? {})
-  if (!meta.success) throw invalid(invoiceId, 'subscription metadata')
-  const product = products.find((p) => p.id === meta.data.product_id)
-  if (!product || product.tier === 'pack') throw invalid(invoiceId, 'unknown product')
-  if (!pricedAs(sub, product.id)) throw invalid(invoiceId, 'subscription price')
-  return { userId: meta.data.user_id, product }
+async function readOwner(invoice: Stripe.Invoice, sub: Stripe.Subscription, deps: FulfilDeps) {
+  const metadata = invoice.parent?.subscription_details?.metadata ?? sub.metadata
+  const meta = ownerSchema.safeParse(metadata)
+  if (!meta.success) throw invalid(invoice.id, 'subscription metadata')
+  const product = deps.products.find(p => p.id === meta.data.product_id)
+  if (!product || product.tier === 'pack') throw invalid(invoice.id, 'unknown product')
+  const quote = readQuote(metadata, product)
+  const price = await billedPrice(invoice, sub, deps, !!quote)
+  if (!price || !matchesContractPrice(price, product, 'subscription', quote)) throw invalid(invoice.id, 'subscription price')
+  return { userId: meta.data.user_id, product, quote, metadata, price }
 }
 
-function pricedAs(sub: Stripe.Subscription, productId: SiteProduct['id']): boolean {
-  const items = sub.items.data
-  const price = items.length === 1 ? items[0]?.price : undefined
-  return price?.metadata?.product_id === productId && price.lookup_key === lookupKey(productId, 'subscription')
+function completeLine(lines: Stripe.InvoiceLineItem[], hasMore: boolean): boolean {
+  const line = lines[0]
+  return lines.length === 1 && !hasMore && !!line?.pricing?.price_details?.price && line.quantity === 1
+}
+
+async function billedPrice(invoice: Stripe.Invoice, sub: Stripe.Subscription, deps: FulfilDeps, versioned: boolean) {
+  const lines = invoice.lines.data.filter(l => l.parent?.type === 'subscription_item_details')
+  const line = lines[0]
+  const billed = line?.pricing?.price_details?.price
+  if (versioned && !completeLine(lines, invoice.lines.has_more)) throw invalid(invoice.id, 'incomplete subscription line')
+  const item = sub.items.data.length === 1 ? sub.items.data[0] : undefined
+  // Replayed after the subscription changed: the invoice's frozen Price is authoritative.
+  return resolveBilled(deps, billed, item?.price)
+}
+
+function resolveBilled(deps: FulfilDeps, billed?: string | Stripe.Price, current?: Stripe.Price) {
+  if (!billed) return current
+  if (typeof billed !== 'string') return billed
+  return billed === current?.id ? current : deps.stripe.prices.retrieve(billed)
 }
 
 // The period this invoice pays for is on its subscription line, not invoice.period_end (that
@@ -65,11 +83,11 @@ export async function renewFromInvoice(deps: FulfilDeps, invoiceId: string): Pro
   if (invoice.billing_reason !== 'subscription_cycle') return 'ignored'
   if (invoice.status !== 'paid') return 'unpaid'
   const sub = await deps.stripe.subscriptions.retrieve(subscriptionIdOf(invoice))
-  const { userId, product } = readOwner(invoice.id, sub, deps.products)
-  const facts = invoiceFacts(invoice, sub.metadata?.method)
+  const { userId, product, quote, metadata, price } = await readOwner(invoice, sub, deps)
+  const facts = invoiceFacts(invoice, metadata.method)
   const change = await callRpc(
     deps.db,
-    'apply_subscription_renewal',
+    quote ? 'apply_subscription_renewal_v2' : 'apply_subscription_renewal',
     {
       p_user_id: userId,
       p_product_id: product.id,
@@ -92,8 +110,8 @@ export async function renewFromInvoice(deps: FulfilDeps, invoiceId: string): Pro
     channel: 'stripe',
     // The card route the subscription was opened on: a 中国银行卡 subscription renews as cn_card.
     method: facts.method,
-    ...renewalAmounts(invoice, sub, product),
-    credits: product.credits,
-  }, sub.metadata?.locale === 'zh' ? 'zh' : 'en')
+    ...renewalAmounts(invoice, metadata, price, product),
+    ...(quote && { credits: quote.credits }),
+  }, metadata.locale === 'zh' ? 'zh' : 'en')
   return 'applied'
 }

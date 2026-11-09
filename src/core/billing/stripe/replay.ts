@@ -28,7 +28,7 @@ export type ReplayPreview =
       id: string
       userId: string
       productId: string
-      credits: number
+      credits: number | null
       amountTotal: number | null
       currency: string | null
       settled: boolean
@@ -75,7 +75,7 @@ async function previewCheckout(deps: FulfilDeps, id: string): Promise<ReplayPrev
     id,
     userId: purchase.userId,
     productId: purchase.product.id,
-    credits: purchase.product.credits,
+    credits: purchase.quote?.credits ?? null,
     amountTotal: session.amount_total,
     currency: session.currency,
     settled: await known(deps, id),

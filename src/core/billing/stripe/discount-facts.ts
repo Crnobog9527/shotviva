@@ -40,10 +40,10 @@ function discountsForCode(invoice: Stripe.Invoice, codeId: string) {
   return ids
 }
 
-export function renewalAmounts(invoice: Stripe.Invoice, sub: Stripe.Subscription, product: SiteProduct) {
-  const listedUsd = priceUsd(sub.items.data[0]?.price, product)
+export function renewalAmounts(invoice: Stripe.Invoice, metadata: Stripe.Metadata, billedPrice: Stripe.Price, product: SiteProduct) {
+  const listedUsd = priceUsd(billedPrice, product)
   const toUsd = (minor: number) => usd(minor, invoice.currency, invoice.subtotal, listedUsd)
-  const { code, code_id: codeId } = sub.metadata
+  const { code, code_id: codeId } = metadata
   const discounts = invoice.total_discount_amounts ?? []
   const allDiscounts = discounts.reduce((sum, item) => sum + item.amount, 0)
   const net = invoice.total_excluding_tax ?? (invoice.subtotal != null ? invoice.subtotal - allDiscounts : null)

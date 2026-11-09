@@ -1,11 +1,18 @@
 import { NextRequest } from 'next/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({ getSessionUser: vi.fn(), createCheckout: vi.fn(), createWaffoCheckout: vi.fn(), channel: vi.fn(), mirror: vi.fn(), tier: vi.fn() }))
+const mocks = vi.hoisted(() => ({ getSessionUser: vi.fn(), createCheckout: vi.fn(), createWaffoCheckout: vi.fn(), channel: vi.fn(), mirror: vi.fn(), tier: vi.fn(), pricing: vi.fn() }))
 
 vi.mock('@/core/auth/session', () => ({ getSessionUser: mocks.getSessionUser }))
 vi.mock('@/core/auth/supabase-admin', () => ({ createAdminSupabase: () => ({}) }))
 vi.mock('@/core/billing/subscription/read-summary', () => ({ readMirrorRows: mocks.mirror }))
+vi.mock('@/core/billing/active-pricing', async () => {
+  const { site } = await import('@/site/site.config')
+  const { configuredPricing } = await import('@/core/billing/checkout-price')
+  mocks.pricing.mockResolvedValue(configuredPricing(site.billing))
+  return { readActivePricing: mocks.pricing }
+})
+vi.mock('@/core/codes/read', () => ({ readPendingDiscount: vi.fn(async () => null) }))
 vi.mock('@/core/billing/tier', () => ({ currentTier: mocks.tier }))
 vi.mock('@/core/billing/stripe', async (original) => ({
   ...(await original<typeof import('@/core/billing/stripe')>()),
@@ -201,4 +208,19 @@ describe('POST /api/checkout cn_card', () => {
     expect((await POST(request('pack_s', 'cn_card', 'zh'))).status).toBe(422)
     expect(mocks.createWaffoCheckout).not.toHaveBeenCalled()
   })
+})
+
+it('refuses to open either channel when the database catalog differs from this build', async () => {
+  const { configuredPricing } = await import('@/core/billing/checkout-price')
+  const { site } = await import('@/site/site.config')
+  const other = configuredPricing(site.billing) === 'v2' ? undefined : 'v2'
+  for (const channel of ['stripe', 'waffo']) {
+    resetMember()
+    mocks.getSessionUser.mockResolvedValue(USER)
+    mocks.channel.mockReturnValue(channel)
+    mocks.pricing.mockResolvedValueOnce(other)
+    expect((await POST(request())).status).toBe(409)
+    expect(mocks.createCheckout).not.toHaveBeenCalled()
+    expect(mocks.createWaffoCheckout).not.toHaveBeenCalled()
+  }
 })
