@@ -15,6 +15,7 @@ const optionalSecret = z.preprocess(blankAsUnset, z.string().min(1).optional())
 // Server-side variables. Later task cards add their keys here; nothing else
 // in the codebase may read process.env directly (enforced by ESLint).
 const serverEnvSchema = z.object({
+  CRON_SECRET: optionalSecret,
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   // Optional at parse time so `next build` runs without secrets; createAdminSupabase() requires it.
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),

@@ -54,7 +54,7 @@ beforeAll(async () => {
   const { proxyGate: gate, forwardRequest } = await import('@/core/auth/proxy')
   proxyGate = (request) => gate(request, { translatedPaths: [], forward: forwardRequest })
   const { adminNavItems } = await import('@/core/admin')
-  const nav = adminNavItems({ wishlist: true }).map((item) => item.href)
+  const nav = adminNavItems({ wishlist: true, affiliate: true }).map((item) => item.href)
   adminPaths = [...nav, `/admin/users/${randomUUID()}`, `/admin/inquiries/${randomUUID()}`, '/admin/jobs?status=failed', '/admin/announcements?cursor=x', '/admin/']
   cookies.user = await signedInCookie('user')
   cookies.admin = await signedInCookie('admin')

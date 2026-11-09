@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
 
+import { isAffiliateEnabled } from '@/core/affiliate/feature'
 import { AdminShell, adminNavItems, UserDialogHost } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { serverEnv } from '@/core/env'
@@ -48,9 +49,9 @@ const userDialogActions = {
 
 export default async function AdminLayout({ children }: LayoutProps<'/[locale]/admin'>) {
   const admin = await requireAdmin()
-  const [tickets, inquiries, wishlist] = await Promise.all([ticketCount(), inquiryCount(), isWishlistEnabled(site)])
+  const [tickets, inquiries, wishlist, affiliate] = await Promise.all([ticketCount(), inquiryCount(), isWishlistEnabled(site), isAffiliateEnabled()])
   return (
-    <AdminShell items={adminNavItems({ wishlist }, { tickets, inquiries })} email={admin.email}>
+    <AdminShell items={adminNavItems({ wishlist, affiliate }, { tickets, inquiries })} email={admin.email}>
       {children}
       <Suspense fallback={null}>
         <UserDialogHost actions={userDialogActions} stripeLive={serverEnv().VERCEL_ENV === 'production'} />

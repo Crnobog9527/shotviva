@@ -47,13 +47,14 @@ describe('account page Admin row', () => {
 })
 
 describe('messages handed to the client', () => {
-  it('leave out the admin entry label in both languages, and keep everything else', async () => {
+  it('leave out the admin entry and server-rendered affiliate messages in both languages', async () => {
     for (const locale of ['en', 'zh'] as const) {
       const all = await loadMessages(locale)
       const client = clientMessages(all)
       expect(all).toHaveProperty('adminEntry')
       expect(client).not.toHaveProperty('adminEntry')
-      expect(Object.keys(client)).toEqual(Object.keys(all).filter((key) => key !== 'adminEntry'))
+      expect(client).not.toHaveProperty('affiliate')
+      expect(Object.keys(client)).toEqual(Object.keys(all).filter((key) => key !== 'adminEntry' && key !== 'affiliate'))
       expect(JSON.stringify(client)).not.toContain('管理后台')
     }
   })

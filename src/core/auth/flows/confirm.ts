@@ -1,6 +1,7 @@
 import 'server-only'
 import type { NextRequest } from 'next/server'
 
+import { isAffiliateEnabled } from '../../affiliate/feature'
 import { logger } from '../../logger'
 import type { CallbackOutcome } from './callback-target'
 import { flowFromRawType, parseConfirmParams, verifyError } from './confirm-params'
@@ -9,7 +10,7 @@ import { landingResponse, landOnSession, requestClient, type CookieToSet } from 
 async function resolveOutcome(request: NextRequest, jar: CookieToSet[], freeCredits: number): Promise<CallbackOutcome> {
   const params = request.nextUrl.searchParams
   const confirm = parseConfirmParams(params)
-  if (!confirm) return { kind: 'error', error: 'callback_failed', flow: flowFromRawType(params.get('type')) }
+  if (!confirm || (confirm.type === 'invite' && !(await isAffiliateEnabled()))) return { kind: 'error', error: 'callback_failed', flow: flowFromRawType(params.get('type')) }
 
   const supabase = requestClient(request, jar)
   const { error } = await supabase.auth.verifyOtp({ token_hash: confirm.tokenHash, type: confirm.type })

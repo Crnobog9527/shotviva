@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server'
 
+import { bindReferral } from '@/core/affiliate/referral'
 import { errorResponse, jsonResponse } from '@/core/api-response'
 import { assertSameOrigin, clientIp, createAdminSupabase, requireApiBuyer } from '@/core/auth'
 import {
@@ -38,6 +39,7 @@ export async function POST(request: NextRequest) {
     // an ordinary checkout at full price; the payment webhook cancels the old subscription.
     const product = site.billing.products.find((p) => p.id === body.data.product_id)
     if (product) await assertCanBuy(createAdminSupabase(), user.id, product)
+    await bindReferral(user.id, request.cookies.get('sv_ref')?.value, 'first_checkout')
     if (channel === 'waffo') return jsonResponse(await startWaffo(user.id, body.data))
     // Dispute evidence (T82): who opened checkout, from where.
     const client = { ip: clientIp(request.headers), userAgent: request.headers.get('user-agent') }

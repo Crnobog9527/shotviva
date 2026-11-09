@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 type SetAll = (cookies: { name: string; value: string; options: object }[]) => void
 
 const mocks = vi.hoisted(() => ({
+  isAffiliateEnabled: vi.fn(),
   verifyOtp: vi.fn(),
   getUser: vi.fn(),
   onVerifiedSignIn: vi.fn(),
@@ -16,6 +17,7 @@ vi.mock('@supabase/ssr', () => ({
     return { auth: { verifyOtp: mocks.verifyOtp, getUser: mocks.getUser } }
   },
 }))
+vi.mock('../../affiliate/feature', () => ({ isAffiliateEnabled: mocks.isAffiliateEnabled }))
 vi.mock('../first-sign-in', () => ({ onVerifiedSignIn: mocks.onVerifiedSignIn }))
 
 const { handleAuthConfirm } = await import('./confirm')
@@ -62,6 +64,12 @@ describe('GET /auth/confirm: signup links', () => {
     expect(target(response)).toBe('/account')
     expect(response.headers.get('set-cookie')).toContain('sb-access-token=session')
     expect(mocks.onVerifiedSignIn).toHaveBeenCalledExactlyOnceWith('u1', 3, 'email', 'en')
+  })
+
+  it('lets an invited promoter choose a password when the program is open', async () => {
+    mocks.isAffiliateEnabled.mockResolvedValueOnce(true)
+    expect(target(await confirm(`next=%2Fpartners&token_hash=${TOKEN}&type=invite`))).toBe('/reset/update')
+    expect(mocks.verifyOtp).toHaveBeenCalledWith({ token_hash: TOKEN, type: 'invite' })
   })
 
   it('keeps a safe next path and drops an off-site one', async () => {

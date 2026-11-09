@@ -20,11 +20,11 @@ const inputSchema = z.object({
 
 export type UserDetailRequest = z.infer<typeof inputSchema>
 
-export async function loadUserDetail(db: SupabaseClient, input: unknown): Promise<UserDetailData | null> {
+export async function loadUserDetail(db: SupabaseClient, input: unknown, affiliate = false): Promise<UserDetailData | null> {
   const parsed = inputSchema.safeParse(input)
   if (!parsed.success) return null
   const { userId, jobId, cursor } = parsed.data
-  const [user, jobs, ledger] = await Promise.all([loadUser(db, userId), recentJobs(db, userId, jobId), ledgerPage(db, userId, cursor)])
+  const [user, jobs, ledger] = await Promise.all([loadUser(db, userId, affiliate), recentJobs(db, userId, jobId), ledgerPage(db, userId, cursor)])
   if (!user) return null
   const extras = await loadUserExtras(db, user)
   return { user, jobs, ledger, ledgerPaged: Boolean(cursor), extras }

@@ -1,6 +1,9 @@
 import createMiddleware from 'next-intl/middleware'
 import type { NextRequest } from 'next/server'
 
+import { isAffiliateEnabled } from '@/core/affiliate/feature'
+import { notFoundResponse } from '@/core/auth/proxy-gates'
+import { recordReferral } from '@/core/affiliate/referral'
 import { withAnalyticsRegion } from '@/core/analytics/consent'
 import { proxyGate } from '@/core/auth/proxy'
 import { serverEnv } from '@/core/env'
@@ -23,6 +26,9 @@ const localeRouter = createMiddleware(routing)
 export async function proxy(request: NextRequest) {
   const redirect = canonicalRedirectResponse(request, hosts)
   if (redirect) return redirect
+  if (/^\/(?:zh\/|en\/)?partners(?:\/|$)/i.test(request.nextUrl.pathname) && !(await isAffiliateEnabled())) {
+    return notFoundResponse()
+  }
   const env = serverEnv()
   const response = await proxyGate(request, {
     translatedPaths: site.locales.zhPaths,
@@ -33,6 +39,7 @@ export async function proxy(request: NextRequest) {
   // Whether analytics may use cookies for this visitor (ARCHITECTURE §16.1, T70); the test
   // site and local dev accept ?sv_country=XX to act as a visitor from that country.
   withAnalyticsRegion(response, request, { testOverride: env.VERCEL_ENV !== 'production' })
+  await recordReferral(request, response)
   return withHostNoindex(response, request, hosts.canonicalHost)
 }
 

@@ -253,6 +253,10 @@ otp_expiry = 3600
 # The hosted projects get the same files pasted into Dashboard -> Authentication -> Email Templates.
 # Subjects switch on user_metadata.locale like the bodies (T21, ARCHITECTURE §7); checked on
 # local Supabase Auth + Mailpit: a zh account gets the Chinese subject, no locale gets English.
+[auth.email.template.invite]
+subject = '{{ if eq .Data.locale "zh" }}加入 Shotviva 推广员计划{{ else }}Join the Shotviva partner program{{ end }}'
+content_path = "./supabase/templates/affiliate-invite.html"
+
 [auth.email.template.confirmation]
 subject = '{{ if eq .Data.locale "zh" }}确认你的 Shotviva 账号{{ else }}Confirm your Shotviva account{{ end }}'
 content_path = "./supabase/templates/confirm-signup.html"

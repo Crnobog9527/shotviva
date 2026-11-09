@@ -1,5 +1,6 @@
 'use server'
 
+import { z } from 'zod'
 import { refresh, updateTag } from 'next/cache'
 
 import { runAdminAction, saveFeatureAccess, saveWishlistSwitch, type ActionResult } from '@/core/admin'
@@ -28,4 +29,16 @@ export async function saveFeatureAccessAction(input: unknown): Promise<ActionRes
 export async function saveWishlistSwitchAction(input: unknown): Promise<ActionResult> {
   const admin = await requireAdmin()
   return runAdminAction(() => saveWishlistSwitch({ db: createAdminSupabase(), invalidate: settingsChanged }, admin.id, input))
+}
+
+export async function saveAffiliateSwitchAction(value: boolean): Promise<boolean> {
+  const admin = await requireAdmin()
+  const parsed = z.boolean().safeParse(value)
+  if (!parsed.success) return false
+  const { error } = await createAdminSupabase().rpc('admin_affiliate_settings', {
+    p_actor: admin.id, p_input: { enabled: parsed.data },
+  })
+  if (error) return false
+  refresh()
+  return true
 }

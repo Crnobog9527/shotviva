@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   grantSignupCredits: vi.fn(),
 }))
 
-vi.mock('next/headers', () => ({ headers: mocks.headers }))
+vi.mock('next/headers', () => ({ headers: mocks.headers, cookies: async () => new Map() }))
 vi.mock('../analytics', () => ({ track: mocks.track }))
 vi.mock('./supabase-admin', () => ({ createAdminSupabase: () => ({}) }))
 vi.mock('./free-credits', () => ({ billingGrant: () => vi.fn(), grantSignupCredits: mocks.grantSignupCredits }))
