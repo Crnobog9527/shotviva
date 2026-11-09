@@ -3,23 +3,27 @@
 0960–0963 are inactive compatibility migrations. Installing them does not clear a wallet,
 change a template, enable an affiliate program, create provider prices, or promote a site.
 
-1. Create separate versioned prices in Stripe/Waffo test mode; confirm amount, currency, product,
-   recurrence and discounts from each hosted checkout and actual sandbox receipts. Keep legacy
-   Price IDs and their callback routes. Archive or expire outstanding old checkout links and
-   inspect provider-side open orders / recurring contracts. Do not move a live price or grant
-   credits from a dashboard. A pending or unclassified order blocks the switch.
-2. Rehearse against the validation site and an isolated population. Never use production's reset
-   authorization to clear unrelated sandbox users. Replay old and new signed events across the
-   boundary, including renewals, refunds, disputes and commission reversals. Match the money
-   received and ledger entries. Feature-dependent checkout and generation must remain unavailable
-   during the switch to avoid mixing units across stale deployments.
+1. For this release the Owner requested the configured script and waived another end-to-end
+   payment round. The verified **sandbox dry run** plans 21 versioned Stripe Prices on six
+   existing Products; the 15 legacy Prices remain available. For a configured test account:
+
+       NEXT_PUBLIC_PRICING_CATALOG_VERSION=v2 pnpm tsx --env-file=.env.local scripts/stripe-setup.ts --versioned-prices-only
+
+   This is read-only. Applying it changes the specified Stripe catalog and needs a separate
+   release authorization. Waffo keeps nine one-off and six recurring SKU mappings. Do not
+   enable a channel before checking its actual configuration. Fixtures and dry runs do not
+   prove that a third-party price was created or that a payment was made.
+2. Rehearse the atomic release and original-term settlement with integration fixtures, including
+   renewals, refunds, disputes and commission reversals. Expire any outstanding legacy
+   checkout links and check live contracts and callbacks. Protect checkout and generation in
+   the short cutover window. The separate preview activation keeps unrelated QA wallets.
 3. Get release approval for the exact integrated commit and verified provider cutover. The
    production wallet authorization covers **only** the six accounts in the reviewed digest:
    124 paid credits, 26 free credits, no active contract or running job. History remains intact;
    both old pools end at zero. A user created before the switch never receives a new signup gift.
 4. The restricted release workflow must run the following in one transaction after confirming
    the target project, versioned provider prices, blocked inflight writes, compatible app and
-   template activation/rollback functions. This is a runbook, not an automatically executed
+   template activation/rollback functions. Use the existing DB push (preview/production) workflow with an explicit manual pricing operation and reviewed main SHA. Ordinary pushes never activate it. This is a runbook, not an automatically executed
    migration. No direct remote SQL; use the reviewed repository release workflow. Apply a short
    lock timeout and abort if the baseline changes. The production arguments below identify the
    reviewed snapshot; never substitute newly computed values without checking the difference.
