@@ -13,6 +13,16 @@ on:
       - 'supabase/migrations/**'
   # Rerun after fixing a failed push (e.g. secrets were missing).
   workflow_dispatch:
+    inputs:
+      pricing_operation:
+        description: Optional reviewed pricing data release (ordinary pushes only install migrations)
+        type: choice
+        options: [none, activate, rollback]
+        default: none
+      release_sha:
+        description: Exact reviewed main commit (required only for a pricing operation)
+        type: string
+        required: false
 
 # One push at a time, never cancelled half-way.
 concurrency:
@@ -46,3 +56,18 @@ jobs:
         run: supabase db push --include-all --yes
       - name: Verify history matches the repo
         run: scripts/check-migration-drift.sh --linked
+      - name: Apply reviewed pricing data release
+        if: github.event_name == 'workflow_dispatch' && inputs.pricing_operation != 'none'
+        env:
+          REVIEWED_SHA: ${{ inputs.release_sha }}
+          OPERATION: ${{ inputs.pricing_operation }}
+        run: |
+          set -euo pipefail
+          test "$REVIEWED_SHA" = "$GITHUB_SHA"
+          test "$SUPABASE_PROJECT_REF" = "pnzkiqvktkzznfbyhphe"
+          case "$OPERATION" in
+            activate) file=scripts/release/pricing-v2/preview.sql ;;
+            rollback) file=scripts/release/pricing-v2/preview-rollback.sql ;;
+            *) exit 1 ;;
+          esac
+          supabase db query --linked --file "$file"
