@@ -6,7 +6,7 @@ export { estimateRunUsd } from './estimate'
 export { runTestEdit, type TestEditDeps, type TestEditRequest } from './run-test-edit'
 export { languageName, runTestTranslate, type TestTranslateDeps } from './run-test-translate'
 export { runTestGenerate, type TestGenerateRequest, type TestRunDeps } from './run-test-generate'
-export { cleanupOnOpen, loadTestPanel, signRun } from './test-panel'
+export { cleanupOnOpen, loadTestPanel, signRun, signTestRunDownload } from './test-panel'
 export { confirmTestPhoto, createTestPhotoUpload, type TestPhotoTicket } from './test-photos'
 export { setTestRunCover, type TestCoverDeps } from './test-cover'
 export {

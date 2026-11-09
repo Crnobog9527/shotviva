@@ -52,6 +52,7 @@ export {
   saveTestBudget,
   setTestRunCover,
   signRun,
+  signTestRunDownload,
   testBudgetBodySchema,
   testCoverBodySchema,
   testEditBodySchema,
