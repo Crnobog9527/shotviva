@@ -1074,7 +1074,7 @@
     "wasMonthly": "Monthly price {price}",
     "creditsMonth": "{count, plural, one {# credit} other {# credits}} a month",
     "creditsYear": "{count, plural, one {# credit} other {# credits}} upfront · {price} billed yearly",
-    "perCredit": "{price}/credit",
+    "perHundredCredits": "≈ {price} per 100 credits",
     "perkHeadings": {
       "includes": "Includes",
       "plusStarter": "Everything in Starter, plus",
@@ -1116,7 +1116,6 @@
     "error": "Checkout did not open. Please try again in a moment.",
     "choose": "Choose {tier}",
     "upgradeTo": "Upgrade to {tier}",
-    "perCreditShort": "{price} / credit",
     "savingLabel": "You save<vs> vs monthly</vs>",
     "savingAmount": "{amount} a year",
     "mostPopular": "Most popular",

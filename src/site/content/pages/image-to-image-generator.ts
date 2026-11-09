@@ -63,7 +63,7 @@ export const imageToImageGenerator = defineContentPage({
     },
     {
       question: 'How much does the image to image generator cost?',
-      answer: `New users get ${freeImagesLabel}. After that a photo costs ${fromCredits}. ${plansSentence()}`,
+      answer: `New users get ${freeImagesLabel}. ${plansSentence()}`,
     },
   ],
   related: [

@@ -2,19 +2,16 @@ import { defineHomePage, type CostBills, type HeadedText, type HomePage, type Im
 
 import { site } from '../site.config'
 import {
-  creditFrom,
+  hundredCreditsFrom,
   fromCredits,
   freeImagesLabel,
   FreeImagesShort,
   FreeImagesTitle,
   packshotUsd,
   photoSeconds,
-  photosLeftInPlan,
   planFrom,
   plansSentence,
   quoteUsd,
-  setCostUsd,
-  setCredits,
   setShotsUsd,
   SET_PHOTOS,
   styledShotUsd,
@@ -71,8 +68,8 @@ export const shoot: ShootDemo = {
   ],
   bill: {
     photographer: { who: 'Photographer', amount: 'A full shoot', note: 'Booking, studio, styling and retouching' },
-    site: { who: brand, amount: `${setCredits} credits`, note: `${SET_PHOTOS} ${OUTPUT_TIERS[0].name} images, from the photo you already took` },
-    line: 'What a photographer would bill as a full shoot, made from the photo you already took.',
+    site: { who: brand, amount: 'No reshoot needed', note: 'One phone photo for a listing image, a lifestyle shot and a promo poster' },
+    line: 'Choose a different template to use the same photo in a new setting.',
   },
 }
 
@@ -97,8 +94,8 @@ export function productBills(heading: string, intro: string, moreFine = ''): Cos
       total: { prefix: 'from', amount: plan, suffix: '/month', when: `about ${photoSeconds} seconds a photo` },
       lines: [
         { label: `Starter plan, ${planFrom?.credits ?? ''} credits a month`, value: plan },
-        { label: `Example: two ${standard.name} product photos and one promo poster`, value: `${setCredits} credits ≈ ${setCostUsd}` },
-        { label: 'Remaining at the same product-photo price', value: `${photosLeftInPlan} more photos` },
+        { label: 'Start with', value: 'Your existing phone photo' },
+        { label: 'Make', value: 'A listing image, a lifestyle shot and a promo poster' },
       ],
       fine: `Styling and retouching are in the template, and your subject stays as you shot it. Start with ${freeImagesLabel}, no card needed.`,
     },
@@ -178,7 +175,7 @@ export const homePage = defineHomePage({
     },
     {
       question: 'Is image to image AI free?',
-      answer: `${brand} gives every new user ${freeImagesLabel}, so you can try image to image AI free. After that a photo costs ${fromCredits}. ${plansSentence()}${creditFrom ? ` A credit costs as little as ${creditFrom}.` : ''} Free photos are public and carry a watermark.`,
+      answer: `${brand} gives every new user ${freeImagesLabel}, so you can try image to image AI free. ${plansSentence()}${hundredCreditsFrom ? ` The lowest price per 100 credits is about ${hundredCreditsFrom}.` : ''} Free photos are public and carry a watermark.`,
     },
     {
       question: "Does image to image AI keep my photo's subject the same?",
@@ -220,7 +217,7 @@ export const homePage = defineHomePage({
     // I: the brand question, last; it holds no keyword slot (建站规格 G6).
     {
       question: `What is ${brand}?`,
-      answer: `${brand} is an AI photo studio on the web that turns one phone photo into a finished picture, with templates for food, products, rooms, pets and art styles. Unlike AI image generators that invent a picture from a prompt, ${brand} starts from your real photo and keeps the subject as shot. New users get ${freeImagesLabel}; after that a photo costs ${fromCredits}.`,
+      answer: `${brand} is an AI photo studio on the web that turns one phone photo into a finished picture, with templates for food, products, rooms, pets and art styles. Unlike AI image generators that invent a picture from a prompt, ${brand} starts from your real photo and keeps the subject as shot. New users get ${freeImagesLabel}.`,
     },
   ],
   related: [
