@@ -23,6 +23,9 @@ export function tierGuidance(floor: CreditsFloor, quality: TemplateQuality, reso
   }
   const approved = approvedCredit(floor, quality, resolution)
   if (approved !== undefined) return `目录收费 ${approved} 积分起。此价已批准；其他报价须满足${cost}。`
+  if (floor.styleUnavailable && floor.tariff && floor.tariff.quality !== quality) {
+    return `目录收费（${floor.tariff.quality}）${floor.tariff.costs[resolution]} 积分；当前质量未获批准。${cost}`
+  }
   if (floor.tariff?.quality === quality) return `目录收费 ${floor.tariff.costs[resolution]} 积分起。当前模型：${cost}。`
   return cost
 }

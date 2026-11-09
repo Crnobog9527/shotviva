@@ -20,13 +20,14 @@ export type CreditsCost = z.infer<typeof creditsCostSchema>
 
 // Minimum credits per quality × resolution (the floor table lives in modules/image, which
 // knows the model's cost; core only applies it).
-export type ApprovedTariff = { quality: TemplateQuality; costs: CreditsCost }
+export type ApprovedTariff = { quality: TemplateQuality; costs: CreditsCost; style_sale_approved?: boolean }
 export type CreditsFloor = Record<TemplateQuality, CreditsCost> & {
   approved?: ApprovedTariff
   resolutions?: readonly Resolution[]
   version?: 'v1' | 'v2'
   tariff?: ApprovedTariff
   unknownCapabilities?: boolean
+  styleUnavailable?: boolean
   styleDraft?: boolean
   retiredRoom?: boolean
 }

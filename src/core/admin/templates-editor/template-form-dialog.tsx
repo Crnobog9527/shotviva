@@ -48,7 +48,7 @@ export function TemplateFormDialog({ target, providers, floor: allFloors, catego
   const [submitted, setSubmitted] = useState(false)
   const onChange = (patch: Partial<typeof values>) => setValues((prev) => ({ ...prev, ...patch }))
 
-  const floor = providerFloor(allFloors, values.providerId, values.id, values.category)
+  const floor = providerFloor(allFloors, values.providerId, values.id, values.category, values.quality, values.visiblePartner)
   const submit = () => {
     const result = buildPayload(values, isNew, floor)
     if (!result.ok) {

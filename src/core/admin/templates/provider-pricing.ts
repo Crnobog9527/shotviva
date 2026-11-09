@@ -8,7 +8,7 @@ import {
 } from '@/core/templates'
 import type { ImageProviderOption } from '../image-provider-field'
 
-const tariffs = z.record(z.string(), z.object({ quality: z.enum(TEMPLATE_QUALITIES), costs: creditsCostSchema }))
+const tariffs = z.record(z.string(), z.object({ quality: z.enum(TEMPLATE_QUALITIES), costs: creditsCostSchema, style_sale_approved: z.boolean().optional() }))
 const rowSchema = z.object({
   provider_id: z.uuid().nullable(), label: z.string(), model: z.string(), adapter: z.enum(['openai_images', 'openrouter_images']),
   is_active: z.boolean(), capabilities: z.unknown(), resolutions: z.array(z.enum(RESOLUTIONS)),
@@ -76,9 +76,10 @@ export async function listImageProviderOptions(client: SupabaseClient, budgetOrM
 
 export function pricingFromOptions(options: readonly ImageProviderOption[]): ProviderFloors {
   const active = options.find(p => p.isActive)
+  const details = active && { version: active.version, activeProvider: active.id, tariffs: active.tariffs }
   return {
     ...(active?.floor ?? UNPRICED),
-    version: active?.version, activeProvider: active?.id, tariffs: active?.tariffs,
+    ...details,
     approvals: Object.fromEntries(options.map(p => [p.id, p.approved ?? {}])),
     providers: Object.fromEntries(options.map(p => [p.id, p.floor])),
     models: Object.fromEntries(options.map(p => [p.id, p.model])),

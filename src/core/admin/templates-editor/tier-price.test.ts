@@ -31,3 +31,16 @@ it('enforces each mapped catalogue minimum even on cheap models, reserving the e
   expect(creditsBelowFloor('medium', tariff.costs, providerFloor(changed,'seed','dark-dining'))).toMatchObject([{ resolution: '1k', floor: 100 }])
   expect(providerFloor(floors,'seed','unmapped','food-drink').tariff).toBeUndefined()
 })
+
+it('distinguishes an unmapped style draft from a catalogued style on the wrong route or quality', () => {
+  const style = 'synthetic-approved-style'
+  const configured = { ...floors, tariffs: { [style]: { ...tariff, style_sale_approved: true } }, approvals: { sun: { [style]: tariff } } }
+  const check = (route: string, quality: string) => providerFloor(configured,route,style,'art-styles',quality)
+  expect(check('sun','medium')).toMatchObject({ styleUnavailable:false, tariff })
+  expect(providerFloor(floors,'sun','dark-dining','art-styles','medium').styleUnavailable).toBe(true)
+  expect(providerFloor(configured,'seed',style,'pets','medium').styleUnavailable).toBe(true)
+  for (const mismatch of [check('seed','medium'), check('sun','high')]) {
+    expect(mismatch.styleDraft).toBeFalsy()
+    expect(mismatch).toMatchObject({ styleUnavailable:true, tariff })
+  }
+})

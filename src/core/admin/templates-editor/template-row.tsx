@@ -108,6 +108,7 @@ function FeaturedSwitch({ template, full, pending, onFeature }: { template: Admi
 
 function summaryPrice(template: AdminTemplate, floor: CreditsFloor) {
   if (floor.styleDraft) return `规划 ${STYLE_STANDARD_CREDITS} / 未定 / 未定（未开放）`
+  if (floor.styleUnavailable) return '当前配置未获批准'
   if (floor.retiredRoom) return '已下架 · 未开放'
   return RESOLUTIONS.map(r => unsupportedTier(floor, r) ? '不可用' : template.creditsCost[r]).join(' / ')
 }

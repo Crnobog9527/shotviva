@@ -38,6 +38,7 @@ export function TemplatePriceFields({ values, floor, onChange }: Props) {
         </select>
       </div>
       {floor.styleDraft && <p className="text-sm text-muted-foreground">画风模型尚未批准销售。可保存下架草稿，HD 和 Max 的内部数值只用于满足存储及成本校验。</p>}
+      {floor.styleUnavailable && !floor.styleDraft && <p className="text-sm text-muted-foreground">当前目录未批准此模板按所选模型、质量和渠道销售画风效果。</p>}
       {floor.retiredRoom && <p className="text-sm text-muted-foreground">此房间模板已下架，当前目录未开放销售。</p>}
       <div className="grid grid-cols-3 gap-3">
         {RESOLUTIONS.map((resolution) => (

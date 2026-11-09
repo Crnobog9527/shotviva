@@ -147,6 +147,83 @@ $$;
 
 ALTER FUNCTION "admin"."apply_style_refs"() OWNER TO "postgres";
 
+SET default_tablespace = '';
+
+SET default_table_access_method = "heap";
+
+
+CREATE TABLE IF NOT EXISTS "public"."templates" (
+    "id" "text" NOT NULL,
+    "module" "text" DEFAULT 'image'::"text" NOT NULL,
+    "name" "text" NOT NULL,
+    "category" "text" NOT NULL,
+    "cover_before_url" "text",
+    "cover_after_url" "text",
+    "fields" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "credits_cost" "jsonb" DEFAULT '{"1k": 2, "2k": 4, "3k": 6}'::"jsonb" NOT NULL,
+    "sort_order" integer DEFAULT 0 NOT NULL,
+    "is_active" boolean DEFAULT false NOT NULL,
+    "visible_in" "text"[] DEFAULT ARRAY['web'::"text"] NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "quality" "text" DEFAULT 'high'::"text" NOT NULL,
+    "cover_media_type" "text" DEFAULT 'image'::"text" NOT NULL,
+    "cover_video_url" "text",
+    "cover_poster_url" "text",
+    "translations" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "description" "text",
+    "featured_rank" smallint,
+    "category_key" "text" NOT NULL,
+    "cover_locales" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    CONSTRAINT "templates_category_check" CHECK ((("char_length"("category") >= 1) AND ("char_length"("category") <= 60))),
+    CONSTRAINT "templates_cover_locales_object" CHECK (("jsonb_typeof"("cover_locales") = 'object'::"text")),
+    CONSTRAINT "templates_cover_media_type_check" CHECK (("cover_media_type" = ANY (ARRAY['image'::"text", 'animated'::"text", 'video'::"text"]))),
+    CONSTRAINT "templates_cover_motion_complete" CHECK ((("cover_media_type" = 'image'::"text") OR (("cover_video_url" IS NOT NULL) AND ("cover_poster_url" IS NOT NULL)))),
+    CONSTRAINT "templates_credits_cost_check" CHECK ((("jsonb_typeof"("credits_cost") = 'object'::"text") AND ("credits_cost" ?& ARRAY['1k'::"text", '2k'::"text", '3k'::"text"]) AND (((("credits_cost" - '1k'::"text") - '2k'::"text") - '3k'::"text") = '{}'::"jsonb") AND ("jsonb_typeof"(("credits_cost" -> '1k'::"text")) = 'number'::"text") AND (("credits_cost" ->> '1k'::"text") ~ '^[1-9][0-9]{0,2}$'::"text") AND ("jsonb_typeof"(("credits_cost" -> '2k'::"text")) = 'number'::"text") AND (("credits_cost" ->> '2k'::"text") ~ '^[1-9][0-9]{0,2}$'::"text") AND ("jsonb_typeof"(("credits_cost" -> '3k'::"text")) = 'number'::"text") AND (("credits_cost" ->> '3k'::"text") ~ '^[1-9][0-9]{0,2}$'::"text"))),
+    CONSTRAINT "templates_description_check" CHECK ((("description" IS NULL) OR (("char_length"("description") >= 1) AND ("char_length"("description") <= 160)))),
+    CONSTRAINT "templates_featured_live_check" CHECK ((("featured_rank" IS NULL) OR ("is_active" AND ('web'::"text" = ANY ("visible_in"))))),
+    CONSTRAINT "templates_featured_rank_check" CHECK ((("featured_rank" IS NULL) OR (("featured_rank" >= 1) AND ("featured_rank" <= 12)))),
+    CONSTRAINT "templates_fields_check" CHECK (("jsonb_typeof"("fields") = 'object'::"text")),
+    CONSTRAINT "templates_id_check" CHECK ((("id" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text") AND ("char_length"("id") <= 64))),
+    CONSTRAINT "templates_module_check" CHECK (("module" = ANY (ARRAY['image'::"text", 'video'::"text"]))),
+    CONSTRAINT "templates_name_check" CHECK ((("char_length"("name") >= 1) AND ("char_length"("name") <= 120))),
+    CONSTRAINT "templates_quality_check" CHECK (("quality" = ANY (ARRAY['high'::"text", 'medium'::"text"]))),
+    CONSTRAINT "templates_translations_check" CHECK ((("jsonb_typeof"("translations") = 'object'::"text") AND (("translations" - 'zh'::"text") = '{}'::"jsonb") AND ((NOT ("translations" ? 'zh'::"text")) OR ("jsonb_typeof"(("translations" -> 'zh'::"text")) = 'object'::"text")))),
+    CONSTRAINT "templates_visible_in_check" CHECK (("visible_in" <@ ARRAY['web'::"text", 'partner'::"text"]))
+);
+
+
+ALTER TABLE "public"."templates" OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."assert_style_sale_route"("t" "public"."templates", "actual_route" "text" DEFAULT NULL::"text") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare bound uuid; selected public.ai_providers; quote jsonb; style_authorized boolean;
+begin
+  if not t.is_active or not admin.is_template_catalog_v2()
+      or not exists(select 1 from admin.template_price_batches where reverted_at is null) then return; end if;
+  select c.style_sale_approved into style_authorized from admin.template_tariffs_v2 c where c.id=t.id;
+  if t.category_key<>'art-styles' and not coalesce(style_authorized,false) then return; end if;
+  select tp.provider_id into bound from public.template_prompts tp where tp.template_id=t.id;
+  select p.id,p.model,p.is_active into selected.id,selected.model,selected.is_active
+    from public.ai_providers p where p.module='image' and (p.id=bound or (bound is null and p.is_active))
+    for share;
+  quote := admin.template_approved_prices(selected.id)->t.id;
+  if not coalesce(style_authorized,false)
+      or quote->>'quality' is distinct from t.quality
+      or not coalesce((quote->'costs') ?& array['1k','2k','3k'],false)
+      or ('partner'=any(t.visible_in) and not selected.is_active)
+      or (actual_route is not null and actual_route is distinct from selected.id::text||'/'||selected.model) then
+    raise exception 'TEMPLATE_RETIRED' using detail='此画风模板当前模型、质量或销售档位未获批准';
+  end if;
+end;
+$$;
+
+
+ALTER FUNCTION "admin"."assert_style_sale_route"("t" "public"."templates", "actual_route" "text") OWNER TO "postgres";
+
 
 CREATE OR REPLACE FUNCTION "admin"."assert_template_reference_range"("p_id" "text") RETURNS "void"
     LANGUAGE "plpgsql"
@@ -194,14 +271,16 @@ CREATE OR REPLACE FUNCTION "admin"."check_catalog_minimums"() RETURNS "trigger"
 declare tariff jsonb; tier text;
 begin
   if not admin.is_template_catalog_v2() then return new; end if;
-  if new.category_key='art-styles' and exists(select 1 from admin.template_price_batches where reverted_at is null)
-      and (new.credits_cost->>'1k')::int is distinct from 20 then
+  tariff := admin.template_catalog_minimums()->new.id;
+  if tariff is null and new.category_key='art-styles' and exists(select 1 from admin.template_price_batches where reverted_at is null) then
+    -- A legacy import may supply the category name only. Its BEFORE trigger fills the key.
+    if new.is_active then raise exception 'TEMPLATE_RETIRED' using detail='画风模板尚未开放销售'; end if;
     -- The original cutover retires style rows without rewriting their historic prices.
-    if tg_op='INSERT' or not (old.is_active and not new.is_active and old.credits_cost=new.credits_cost) then
+    if (new.credits_cost->>'1k')::int is distinct from 20 and
+        (tg_op='INSERT' or not (old.is_active and not new.is_active and old.credits_cost=new.credits_cost)) then
       raise exception 'MODEL_CREDIT_FLOOR' using detail='画风草稿 Standard 规划收费为 20 积分';
     end if;
   end if;
-  tariff := admin.template_catalog_minimums()->new.id;
   if tariff->>'quality'=new.quality then
     foreach tier in array array['1k','2k','3k'] loop
       if (new.credits_cost->>tier)::int < (tariff->'costs'->>tier)::int then
@@ -215,6 +294,41 @@ $$;
 
 
 ALTER FUNCTION "admin"."check_catalog_minimums"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."check_style_job_route"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare t public.templates;
+begin
+  select * into t from public.templates where id=new.template_id and
+    (category_key='art-styles' or exists(select 1 from admin.template_tariffs_v2 c where c.id=new.template_id and c.style_sale_approved)) for share;
+  if found then perform admin.assert_style_sale_route(t,coalesce(new.provider,'')); end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "admin"."check_style_job_route"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."check_style_sale_binding"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare t public.templates; template_key text;
+begin
+  if tg_table_name='templates' then template_key:=new.id; else template_key:=new.template_id; end if;
+  select * into t from public.templates where id=template_key and is_active and
+    (category_key='art-styles' or exists(select 1 from admin.template_tariffs_v2 c where c.id=template_key and c.style_sale_approved)) for share;
+  if found then perform admin.assert_style_sale_route(t); end if;
+  return null;
+end;
+$$;
+
+
+ALTER FUNCTION "admin"."check_style_sale_binding"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."check_template_style_ref_limit"() RETURNS "trigger"
@@ -357,54 +471,6 @@ $$;
 
 ALTER FUNCTION "admin"."lowest_credit_price"() OWNER TO "postgres";
 
-SET default_tablespace = '';
-
-SET default_table_access_method = "heap";
-
-
-CREATE TABLE IF NOT EXISTS "public"."templates" (
-    "id" "text" NOT NULL,
-    "module" "text" DEFAULT 'image'::"text" NOT NULL,
-    "name" "text" NOT NULL,
-    "category" "text" NOT NULL,
-    "cover_before_url" "text",
-    "cover_after_url" "text",
-    "fields" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
-    "credits_cost" "jsonb" DEFAULT '{"1k": 2, "2k": 4, "3k": 6}'::"jsonb" NOT NULL,
-    "sort_order" integer DEFAULT 0 NOT NULL,
-    "is_active" boolean DEFAULT false NOT NULL,
-    "visible_in" "text"[] DEFAULT ARRAY['web'::"text"] NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "quality" "text" DEFAULT 'high'::"text" NOT NULL,
-    "cover_media_type" "text" DEFAULT 'image'::"text" NOT NULL,
-    "cover_video_url" "text",
-    "cover_poster_url" "text",
-    "translations" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
-    "description" "text",
-    "featured_rank" smallint,
-    "category_key" "text" NOT NULL,
-    "cover_locales" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
-    CONSTRAINT "templates_category_check" CHECK ((("char_length"("category") >= 1) AND ("char_length"("category") <= 60))),
-    CONSTRAINT "templates_cover_locales_object" CHECK (("jsonb_typeof"("cover_locales") = 'object'::"text")),
-    CONSTRAINT "templates_cover_media_type_check" CHECK (("cover_media_type" = ANY (ARRAY['image'::"text", 'animated'::"text", 'video'::"text"]))),
-    CONSTRAINT "templates_cover_motion_complete" CHECK ((("cover_media_type" = 'image'::"text") OR (("cover_video_url" IS NOT NULL) AND ("cover_poster_url" IS NOT NULL)))),
-    CONSTRAINT "templates_credits_cost_check" CHECK ((("jsonb_typeof"("credits_cost") = 'object'::"text") AND ("credits_cost" ?& ARRAY['1k'::"text", '2k'::"text", '3k'::"text"]) AND (((("credits_cost" - '1k'::"text") - '2k'::"text") - '3k'::"text") = '{}'::"jsonb") AND ("jsonb_typeof"(("credits_cost" -> '1k'::"text")) = 'number'::"text") AND (("credits_cost" ->> '1k'::"text") ~ '^[1-9][0-9]{0,2}$'::"text") AND ("jsonb_typeof"(("credits_cost" -> '2k'::"text")) = 'number'::"text") AND (("credits_cost" ->> '2k'::"text") ~ '^[1-9][0-9]{0,2}$'::"text") AND ("jsonb_typeof"(("credits_cost" -> '3k'::"text")) = 'number'::"text") AND (("credits_cost" ->> '3k'::"text") ~ '^[1-9][0-9]{0,2}$'::"text"))),
-    CONSTRAINT "templates_description_check" CHECK ((("description" IS NULL) OR (("char_length"("description") >= 1) AND ("char_length"("description") <= 160)))),
-    CONSTRAINT "templates_featured_live_check" CHECK ((("featured_rank" IS NULL) OR ("is_active" AND ('web'::"text" = ANY ("visible_in"))))),
-    CONSTRAINT "templates_featured_rank_check" CHECK ((("featured_rank" IS NULL) OR (("featured_rank" >= 1) AND ("featured_rank" <= 12)))),
-    CONSTRAINT "templates_fields_check" CHECK (("jsonb_typeof"("fields") = 'object'::"text")),
-    CONSTRAINT "templates_id_check" CHECK ((("id" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text") AND ("char_length"("id") <= 64))),
-    CONSTRAINT "templates_module_check" CHECK (("module" = ANY (ARRAY['image'::"text", 'video'::"text"]))),
-    CONSTRAINT "templates_name_check" CHECK ((("char_length"("name") >= 1) AND ("char_length"("name") <= 120))),
-    CONSTRAINT "templates_quality_check" CHECK (("quality" = ANY (ARRAY['high'::"text", 'medium'::"text"]))),
-    CONSTRAINT "templates_translations_check" CHECK ((("jsonb_typeof"("translations") = 'object'::"text") AND (("translations" - 'zh'::"text") = '{}'::"jsonb") AND ((NOT ("translations" ? 'zh'::"text")) OR ("jsonb_typeof"(("translations" -> 'zh'::"text")) = 'object'::"text")))),
-    CONSTRAINT "templates_visible_in_check" CHECK (("visible_in" <@ ARRAY['web'::"text", 'partner'::"text"]))
-);
-
-
-ALTER TABLE "public"."templates" OWNER TO "postgres";
-
 
 CREATE OR REPLACE FUNCTION "admin"."partner_image_aspects"("public"."templates") RETURNS "text"[]
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -475,7 +541,7 @@ CREATE OR REPLACE FUNCTION "admin"."protect_retired_template"() RETURNS "trigger
 begin
   if new.is_active and admin.is_template_catalog_v2() and exists(
     select 1 from admin.template_price_batches where reverted_at is null
-  ) and (new.category_key='art-styles' or new.id in ('bright-listing','evening-glow')
+  ) and (new.id in ('bright-listing','evening-glow')
     or exists(select 1 from admin.template_price_snapshots s join admin.template_price_batches b on b.id=s.batch_id
       where b.reverted_at is null and s.template_id=new.id and s.provider_id is null)) then
     raise exception 'TEMPLATE_RETIRED' using detail='此模板未加入已批准的新目录，不能上架';
@@ -740,7 +806,7 @@ CREATE OR REPLACE FUNCTION "admin"."template_catalog_minimums"() RETURNS "jsonb"
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-  select coalesce(jsonb_object_agg(c.id,jsonb_build_object('quality',c.quality,'costs',c.costs)), '{}')
+  select coalesce(jsonb_object_agg(c.id,jsonb_build_object('quality',c.quality,'costs',c.costs,'style_sale_approved',c.style_sale_approved)), '{}')
     from admin.template_tariffs_v2 c
     join admin.template_price_snapshots s on s.template_id=c.id and s.provider_id is not null
     join admin.template_price_batches b on b.id=s.batch_id
@@ -7768,7 +7834,8 @@ CREATE OR REPLACE VIEW "admin"."template_tariffs_v2" AS
             WHEN ("id" = 'edit'::"text") THEN '{"1k": 20, "2k": 37, "3k": 58}'::"jsonb"
             WHEN ("id" = ANY (ARRAY['promo-poster'::"text", 'pet-studio'::"text", 'freeform'::"text"])) THEN '{"1k": 45, "2k": 120, "3k": 190}'::"jsonb"
             ELSE '{"1k": 74, "2k": 150, "3k": 225}'::"jsonb"
-        END AS "costs"
+        END AS "costs",
+    false AS "style_sale_approved"
    FROM "unnest"(ARRAY['dark-dining'::"text", 'delivery-menu'::"text", 'white-background'::"text", 'lifestyle-table'::"text", 'spa-podium'::"text", 'promo-poster'::"text", 'pet-studio'::"text", 'freeform'::"text", 'edit'::"text"]) "id"("id");
 
 
@@ -9417,7 +9484,19 @@ CREATE OR REPLACE TRIGGER "site_announcements_set_updated_at" BEFORE UPDATE ON "
 
 
 
-CREATE OR REPLACE TRIGGER "template_catalog_minimum" AFTER INSERT OR UPDATE OF "quality", "credits_cost", "category_key" ON "public"."templates" FOR EACH ROW EXECUTE FUNCTION "admin"."check_catalog_minimums"();
+CREATE CONSTRAINT TRIGGER "style_sale_binding" AFTER INSERT OR UPDATE OF "category", "category_key", "quality", "is_active", "visible_in" ON "public"."templates" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN ("new"."is_active") EXECUTE FUNCTION "admin"."check_style_sale_binding"();
+
+
+
+CREATE OR REPLACE TRIGGER "style_sale_job" BEFORE INSERT ON "public"."generation_jobs" FOR EACH ROW WHEN ((("new"."inputs" ->> 'pricing_catalog_version'::"text") = 'v2'::"text")) EXECUTE FUNCTION "admin"."check_style_job_route"();
+
+
+
+CREATE OR REPLACE TRIGGER "style_sale_prompt" AFTER INSERT OR UPDATE OF "provider_id" ON "public"."template_prompts" FOR EACH ROW EXECUTE FUNCTION "admin"."check_style_sale_binding"();
+
+
+
+CREATE OR REPLACE TRIGGER "template_catalog_minimum" AFTER INSERT OR UPDATE OF "quality", "credits_cost", "category", "category_key", "is_active" ON "public"."templates" FOR EACH ROW EXECUTE FUNCTION "admin"."check_catalog_minimums"();
 
 
 
@@ -10047,12 +10126,30 @@ REVOKE ALL ON FUNCTION "admin"."apply_style_refs"() FROM PUBLIC;
 
 
 
+GRANT ALL ON TABLE "public"."templates" TO "service_role";
+GRANT SELECT ON TABLE "public"."templates" TO "anon";
+GRANT SELECT ON TABLE "public"."templates" TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."assert_style_sale_route"("t" "public"."templates", "actual_route" "text") FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "admin"."assert_template_reference_range"("p_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."assert_template_reference_range"("p_id" "text") TO "service_role";
 
 
 
 REVOKE ALL ON FUNCTION "admin"."check_catalog_minimums"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."check_style_job_route"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."check_style_sale_binding"() FROM PUBLIC;
 
 
 
@@ -10075,12 +10172,6 @@ GRANT ALL ON FUNCTION "admin"."is_template_catalog_v2"() TO "service_role";
 
 REVOKE ALL ON FUNCTION "admin"."lowest_credit_price"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."lowest_credit_price"() TO "service_role";
-
-
-
-GRANT ALL ON TABLE "public"."templates" TO "service_role";
-GRANT SELECT ON TABLE "public"."templates" TO "anon";
-GRANT SELECT ON TABLE "public"."templates" TO "authenticated";
 
 
 

@@ -74,7 +74,7 @@ export function TemplatesTable({ templates, selection, order, floor, ...rowProps
                 <TemplateRow
                   key={id}
                   template={template}
-                  price={providerFloor(floor, template.prompt?.providerId, template.id, template.category)}
+                  price={providerFloor(floor, template.prompt?.providerId, template.id, template.category, template.quality, template.visibleIn.includes('partner'))}
                   checked={selection.selected.has(id)}
                   onSelect={selection.onSelect}
                   {...rowProps}

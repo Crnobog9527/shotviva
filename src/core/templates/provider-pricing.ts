@@ -64,11 +64,26 @@ function selectedFloor(floors: ProviderFloors, selected?: string): CreditsFloor 
   return floors.providers[selected] ?? UNPRICED
 }
 
-export function providerFloor(floors: ProviderFloors, id: string | null | undefined, templateId = '', category?: string): CreditsFloor {
+function approvedOnRoute(floors: ProviderFloors, selected: string | undefined, templateId: string) {
+  return selected ? floors.approvals?.[selected]?.[templateId] : undefined
+}
+
+function styleStatus(category: string | undefined, version: ProviderFloors['version'],
+  quality: string | undefined, approval: ApprovedTariff | undefined, tariff: ApprovedTariff | undefined,
+  partnerMismatch: boolean) {
+  if (version !== 'v2') return {}
+  if (category !== 'art-styles' && !tariff?.style_sale_approved) return {}
+  if (!tariff) return { styleDraft: true, styleUnavailable: true }
+  const routeMatches = approval !== undefined && approval.quality === quality
+  return { styleUnavailable: !tariff.style_sale_approved || !routeMatches || partnerMismatch }
+}
+
+export function providerFloor(floors: ProviderFloors, id: string | null | undefined, templateId = '', category?: string,
+  quality?: string, partner = false): CreditsFloor {
   const selected = id ?? floors.activeProvider
-  const approved = selected ? floors.approvals?.[selected]?.[templateId] : undefined
+  const approved = approvedOnRoute(floors, selected, templateId)
   const tariff = floors.tariffs?.[templateId] ?? approved
-  const v2 = floors.version === 'v2'
   return { ...selectedFloor(floors, selected), approved, tariff, version: floors.version,
-    styleDraft: v2 && category === 'art-styles', retiredRoom: v2 && ['bright-listing', 'evening-glow'].includes(templateId) }
+    ...styleStatus(category, floors.version, quality, approved, tariff, partner && selected !== floors.activeProvider),
+    retiredRoom: floors.version === 'v2' && ['bright-listing', 'evening-glow'].includes(templateId) }
 }
