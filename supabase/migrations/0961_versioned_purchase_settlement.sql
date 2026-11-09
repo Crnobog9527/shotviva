@@ -21,7 +21,10 @@ begin
   if not found then
     raise exception 'PRODUCT_NOT_FOUND';
   end if;
-  if p_v2 then
+  -- A grandfathered contract keeps its price and period. Once the wallet is denominated
+  -- in new credits, a genuinely new payment must also grant in those units; a replay
+  -- remains a no-op under the original payment key.
+  if p_v2 or exists(select from public.system_settings where key='pricing_catalog_version' and value='"v2"'::jsonb) then
     select credits into strict v_product.credits from admin.product_terms_v2 where product_id = p_product_id;
   end if;
 
@@ -112,7 +115,10 @@ begin
   if not found then
     raise exception 'PRODUCT_NOT_FOUND';
   end if;
-  if p_v2 then
+  -- A grandfathered contract keeps its price and period. Once the wallet is denominated
+  -- in new credits, a genuinely new payment must also grant in those units; a replay
+  -- remains a no-op under the original payment key.
+  if p_v2 or exists(select from public.system_settings where key='pricing_catalog_version' and value='"v2"'::jsonb) then
     select credits into strict v_product.credits from admin.product_terms_v2 where product_id = p_product_id;
   end if;
 

@@ -48,6 +48,15 @@ it('keeps contract-specific annual renewal amounts and invoice idempotency', asy
   expect((await db.query('select count(*)::int as n from public.payments where user_id=$1',[buyer])).rows[0].n).toBe(2)
 })
 
+it('retains the original annual price after the unit switch and grants in wallet units', async () => {
+  const renew = (key: string) => db.query("select * from public.apply_subscription_renewal($1,'max_yearly',$2,now()+interval '1 year',71300,'usd',0,'card')",[buyer,key])
+  expect((await renew('in_legacy_before')).rows[0].credits).toBe(3360)
+  await db.query(`insert into public.system_settings(key,value) values('pricing_catalog_version','"v2"')`)
+  expect((await renew('in_legacy_before')).rows[0].applied).toBe(false)
+  expect((await renew('in_legacy_next')).rows[0].credits).toBe(3360 + 168000)
+  expect((await db.query("select amount_total from public.payments where stripe_invoice_id='in_legacy_next'")).rows[0].amount_total).toBe(71300)
+})
+
 it('exposes no grant or second catalog to anonymous or authenticated clients', async () => {
   for (const role of ['anon','authenticated']) {
     const result = await db.query(`select bool_or(has_function_privilege($1,p.oid,'execute')) as executable
