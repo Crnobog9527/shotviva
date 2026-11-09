@@ -1285,3 +1285,14 @@ Owner 2026-11-06 发现中文页有功能缺失。逐页对比现有英文页和
 **范围**：迁移 `0880`～`0899`（只加不改），ARCHITECTURE §6.4 数据定义和迁移同一个 PR；四个阶段：数据库 → 注册和兑换 → 结账折扣 → 后台；单测和 DB 测试。
 
 **验收**：按开发简报的验收步骤；三级（积分、付款），付款测试只用测试卡，Codex 完成交互验收。
+
+## T95 自建联盟中心（partners-hub）+ Shotviva 接入（可派，Owner 2026-11-09 确认，交给 Codex 开发和验收）
+
+**目标**：第三方联盟工具太贵，自建精简版多产品联盟中心，Shotviva 先接入，Graylum 以后另开卡接入同一个中心（ARCHITECTURE「联盟返佣」2026-11-09 更新）。
+
+**范围**：
+- 中心：新私有仓库 `Crnobog9527/partners-hub`（`partners.graylum.com`，独立 Supabase）。推广员申请（手工审核 / 购买门槛 / 后台直接开号）、推广链接和码、归因、佣金（两级、终身、确认期、退款和争议重算）、每月结算单和提现门槛 $200、Owner 手工打款后点「已付」、推广员面板、后台。
+- Shotviva 侧：分支 `feat/affiliate-hub-client`，迁移 `0900`～`0919`（只加不改）；`?ref=` + `sv_ref` cookie、注册和首次付费绑定、发件箱触发器、签名上报和重试；数据定义写进 ARCHITECTURE「联盟返佣」，和迁移同一个 PR。
+- 规格 `.local/affiliate/spec.md`，开发任务书 `.local/affiliate/codex-brief.md`（含 Owner 要先做的 Phase 0：建仓库、Supabase、域名、密钥）。
+
+**验收**：按任务书验收步骤；Shotviva 侧是三级（付款数据、数据库），付款只用测试卡；Codex 完成交互验收，Owner 确认后才上正式环境。
