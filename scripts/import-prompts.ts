@@ -7,7 +7,7 @@
  * Needs NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (e.g. from .env.local).
  * Format: scripts/prompts.example.json. Real prompts never go into git (AGENTS §5).
  * Re-running is safe: rows are upserted by id; omitted sortOrder / isActive keep stored values.
- * Prices below the floor table (modules/image/credits-floor.ts) are refused, as in the admin page.
+ * Prices below the selected model’s floor are refused, as in the admin page.
  * `category`: a category key from 分类管理 (e.g. food-drink) or a category's English / Chinese
  * name; a value no category has creates one (T75, resolved by the 0581 trigger).
  */
@@ -18,16 +18,18 @@ import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { toUpsertArgs } from '../src/core/admin/templates/rpc-payload'
-import { creditsBelowFloor } from '../src/core/templates/pricing'
+import { listImageProviderOptions, pricingFromOptions } from '../src/core/admin/templates/provider-pricing'
+import { maxCostPerCredit } from '../src/core/templates/provider-pricing'
+import { site } from '../src/site/site.config'
 import { templateWithPromptSchema } from '../src/core/templates/schema'
 import { toggleSetupProblems } from '../src/core/templates/toggles'
-import { CREDITS_FLOOR } from '../src/modules/image/credits-floor'
 
 const fileSchema = z.object({ templates: z.array(templateWithPromptSchema).min(1) })
 
 const envSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+  OPENAI_IMAGE_MODEL: z.string().default('gpt-image-2.5-sunburst'),
 })
 
 function readTemplates(path: string) {
@@ -37,11 +39,6 @@ function readTemplates(path: string) {
     throw new Error(`Invalid ${path}:\n  ${detail.join('\n  ')}`)
   }
   for (const template of parsed.data.templates) {
-    const low = creditsBelowFloor(template.quality, template.creditsCost, CREDITS_FLOOR)
-    if (low.length > 0) {
-      const detail = low.map((v) => `${v.resolution} ${v.given} < floor ${v.floor}`).join(', ')
-      throw new Error(`${template.id}: credits below the floor (${detail})`)
-    }
     // The admin save's T89 rule: names the toggle, never the prompt text.
     const unwired = toggleSetupProblems(template.fields.toggles, template.prompt.body, template.prompt.modelParams)
     if (unwired.length > 0) throw new Error(`${template.id}: ${unwired.join('; ')}`)
@@ -56,8 +53,10 @@ async function main() {
     auth: { persistSession: false, autoRefreshToken: false },
   })
   const templates = readTemplates(path)
+  const pricing = await listImageProviderOptions(client, maxCostPerCredit(site.billing.products), env.OPENAI_IMAGE_MODEL)
+  const floors = pricingFromOptions(pricing)
   for (const { prompt, ...template } of templates) {
-    const { error } = await client.rpc('admin_upsert_template', toUpsertArgs(template, prompt, { categoryByName: true }))
+    const { error } = await client.rpc('admin_upsert_template', toUpsertArgs(template, prompt, { categoryByName: true, floors }))
     if (error) throw new Error(`Failed on ${template.id}: ${error.message}`)
     // Ids and counts only: prompt bodies must never reach logs.
     process.stdout.write(`imported ${template.id}\n`)
