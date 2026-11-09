@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-import type { ImageOptions } from './image-capabilities'
+import type { ImageOptions } from './image-options'
 import { EDIT_TEMPLATE_ID } from './edit-params'
 import type { CreditsCost } from './pricing'
 

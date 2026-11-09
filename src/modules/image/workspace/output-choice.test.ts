@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FULL_IMAGE_OPTIONS, type ImageOptions } from '@/core/templates/image-capabilities'
+import { FULL_IMAGE_OPTIONS, type ImageOptions } from '@/core/templates/image-options'
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import { startInputs } from './batch-request'
 import { chosenAspect, closestAspect, closestResolution, hasOutputOptions, selectedAspect } from './output-choice'

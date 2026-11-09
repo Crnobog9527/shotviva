@@ -1,4 +1,4 @@
-import { FULL_IMAGE_OPTIONS, type ImageOptions } from '@/core/templates/image-capabilities'
+import { FULL_IMAGE_OPTIONS, type ImageOptions } from '@/core/templates/image-options'
 import type { CoverMediaType, CreditsCost, LocalizedTemplate, ToggleConfirm } from '@/core/templates'
 
 // What the browser needs of a template to draw its card, preview and workspace header. Plain

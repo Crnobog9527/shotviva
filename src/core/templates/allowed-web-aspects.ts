@@ -1,5 +1,5 @@
 import { AppError } from '../errors'
-import { FULL_IMAGE_OPTIONS, type ImageOptions } from './image-capabilities'
+import { FULL_IMAGE_OPTIONS, type ImageOptions } from './image-options'
 import type { Resolution } from './output-options'
 
 // Check at request time, before a decision call or reservation. The catalogue the visitor

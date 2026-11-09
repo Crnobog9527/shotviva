@@ -6,7 +6,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import type { Balance } from '@/core/billing/pools'
 import { useRouter } from '@/core/i18n'
 import { EDIT_TEMPLATE_ID } from '@/core/templates/edit-params'
-import type { ImageOptions } from '@/core/templates/image-capabilities'
+import type { ImageOptions } from '@/core/templates/image-options'
 import type { CreditsCost } from '@/core/templates/pricing'
 import { navTypesFor } from '@/core/ui/nav-motion'
 

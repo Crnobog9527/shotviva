@@ -1,4 +1,4 @@
-import { FULL_IMAGE_OPTIONS, type ImageOptions } from './image-capabilities'
+import { FULL_IMAGE_OPTIONS, type ImageOptions } from './image-options'
 import { coverLocalesSchema, type CoverLocales } from './cover-locales'
 import { CATEGORY_COLUMNS, preT75Category, toCategory, type Category, type CategoryRow } from './categories'
 import type { CreditsCost, TemplateQuality } from './pricing'

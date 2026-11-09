@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { availableImageOptions, FULL_IMAGE_OPTIONS } from '../templates/image-capabilities'
+import { availableImageOptions, FULL_IMAGE_OPTIONS } from '../templates/image-options'
 import { fetchImageCapabilities } from './image-capabilities'
 import samples from './image-catalog-sample.test.json'
 

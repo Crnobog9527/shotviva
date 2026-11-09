@@ -7,7 +7,7 @@ import { Button } from '@/core/ui/button'
 import { Input } from '@/core/ui/input'
 import { Label } from '@/core/ui/label'
 import { Textarea } from '@/core/ui/textarea'
-import { FULL_IMAGE_OPTIONS } from '@/core/templates/image-capabilities'
+import { FULL_IMAGE_OPTIONS } from '@/core/templates/image-options'
 import { DEFAULT_RESOLUTION, NOTE_MAX_LENGTH } from '@/core/templates/output-options'
 
 import type { AdminTemplate } from '../templates/types'

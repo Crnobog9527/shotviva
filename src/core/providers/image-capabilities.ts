@@ -1,4 +1,5 @@
-import { availableImageOptions, FULL_IMAGE_OPTIONS, imageCapabilitiesSchema, type ImageCapabilities } from '../templates/image-capabilities'
+import { imageCapabilitiesSchema, type ImageCapabilities } from '../templates/image-capabilities'
+import { availableImageOptions, FULL_IMAGE_OPTIONS } from '../templates/image-options'
 import { RESOLUTIONS } from '../templates/output-options'
 import { openRouterImageParameters, type OpenRouterImageParameters } from './openrouter-catalog'
 import { OPENROUTER_IMAGE_SIZE } from './openrouter-input'

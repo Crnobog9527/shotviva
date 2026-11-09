@@ -1,4 +1,4 @@
-import type { ImageOptions } from '@/core/templates/image-capabilities'
+import type { ImageOptions } from '@/core/templates/image-options'
 import { closestAspect } from './output-choice'
 import type { Translate } from '@/core/translate'
 import type { OutputAspect, Resolution } from '@/core/templates/output-options'

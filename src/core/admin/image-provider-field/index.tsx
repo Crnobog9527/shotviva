@@ -1,7 +1,8 @@
 'use client'
 
 import type { CreditsFloor } from '@/core/templates/pricing'
-import { FULL_IMAGE_OPTIONS, type ImageCapabilities } from '@/core/templates/image-capabilities'
+import { type ImageCapabilities } from '@/core/templates/image-capabilities'
+import { FULL_IMAGE_OPTIONS } from '@/core/templates/image-options'
 import { Label } from '@/core/ui/label'
 
 import { copy } from './copy'

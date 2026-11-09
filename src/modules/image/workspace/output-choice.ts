@@ -1,4 +1,4 @@
-import { FULL_IMAGE_OPTIONS, type ImageOptions } from '@/core/templates/image-capabilities'
+import { FULL_IMAGE_OPTIONS, type ImageOptions } from '@/core/templates/image-options'
 import { RESOLUTIONS, type OutputAspect, type Resolution } from '@/core/templates/output-options'
 
 type FixedRatio = Exclude<OutputAspect, 'original'>

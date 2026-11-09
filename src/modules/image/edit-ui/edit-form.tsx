@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 
 import { balanceSentence } from '@/core/app-shell/balance-copy'
 import type { Balance } from '@/core/billing/pools'
-import type { ImageOptions } from '@/core/templates/image-capabilities'
+import type { ImageOptions } from '@/core/templates/image-options'
 import type { OutputAspect } from '@/core/templates/output-options'
 import type { CreditsCost } from '@/core/templates/pricing'
 

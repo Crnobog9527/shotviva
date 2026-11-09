@@ -2,7 +2,7 @@
 
 import { useFormatter, useTranslations } from 'next-intl'
 
-import type { ImageOptions } from '@/core/templates/image-capabilities'
+import type { ImageOptions } from '@/core/templates/image-options'
 import type { Balance } from '@/core/billing/pools'
 import type { CreditsCost } from '@/core/templates/pricing'
 import type { OutputAspect, Resolution } from '@/core/templates/output-options'

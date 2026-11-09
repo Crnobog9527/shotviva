@@ -6,7 +6,7 @@ import { useState } from 'react'
 import type { Balance } from '@/core/billing/pools'
 import { chosenAspect, closestResolution, selectedAspect } from '../workspace/output-choice'
 import { useOriginalRatio } from '../workspace/use-original-ratio'
-import type { ImageOptions } from '@/core/templates/image-capabilities'
+import type { ImageOptions } from '@/core/templates/image-options'
 import type { CreditsCost } from '@/core/templates/pricing'
 
 import { sizeLabel, tierName } from '../workspace/workspace-options'

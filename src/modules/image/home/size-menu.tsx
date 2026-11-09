@@ -5,7 +5,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react'
 
 import type { OutputAspect } from '@/core/templates/output-options'
 
-import type { ImageOptions } from '@/core/templates/image-capabilities'
+import type { ImageOptions } from '@/core/templates/image-options'
 import { sizeChoices, sizeLabel } from '../workspace/workspace-options'
 import { CheckIcon, ChevronIcon } from './home-icons'
 
