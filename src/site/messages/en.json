@@ -556,6 +556,7 @@
       "CONTENT_REJECTED": "The photo or your note didn't pass the safety check. Try another photo or change the note.",
       "IDENTITY_SWAP_REFUSED": "Shotviva can't swap faces or turn a person into someone else, to protect everyone's likeness. You can change the expression, makeup, lighting and background.",
       "REFERENCE_IMAGE_LIMIT": "This model accepts fewer reference images. Remove some photos or choose another template.",
+      "TEMPLATE_QUOTE_CHANGED": "The price or template has changed. Refresh to see the current offer.",
       "MODEL_INPUT_UNSUPPORTED": "Check the reference photos, resolution and aspect ratio, or choose another template.",
       "GENERATION_FAILED": "The studio couldn't finish this photo. It usually works on a second try.",
       "PROVIDER_FAILED": "The studio couldn't finish this photo. It usually works on a second try.",

@@ -26,7 +26,7 @@ export function startInputs(template: CatalogueTemplate, values: FormValues, pho
       credits: template.creditsCost[resolution],
       inputKey,
       previewUrl: photo.url,
-      body: { template_id: template.id, input_key: inputKey, inputs: { ...inputs, aspect_ratio: aspect } },
+      body: { expected_credits: template.creditsCost[resolution], template_id: template.id, input_key: inputKey, inputs: { ...inputs, aspect_ratio: aspect } },
     }
   })
 }

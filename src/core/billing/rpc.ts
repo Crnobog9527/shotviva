@@ -22,6 +22,7 @@ const SQL_ERROR_CODES: Record<string, ErrorCode> = {
   // An edit's source is not the caller's own succeeded work (T30).
   PARENT_JOB_NOT_FOUND: 'NOT_FOUND',
   TEMPLATE_NOT_FOUND: 'NOT_FOUND',
+  TEMPLATE_QUOTE_CHANGED: 'TEMPLATE_QUOTE_CHANGED',
   PRODUCT_NOT_FOUND: 'NOT_FOUND',
   IDEMPOTENCY_CONFLICT: 'CONFLICT',
   JOB_ALREADY_SETTLED: 'CONFLICT',
@@ -49,6 +50,7 @@ const SQL_ERROR_CODES: Record<string, ErrorCode> = {
 
 export function toRpcError(fn: string, error: { message: string; code?: string }): AppError {
   const code = SQL_ERROR_CODES[error.message]
+  if (code === 'TEMPLATE_QUOTE_CHANGED') return new AppError(code, 'Refresh the template price before generating.')
   if (code) return new AppError(code, error.message)
   return new AppError('INTERNAL', `rpc ${fn} failed`, { cause: error })
 }

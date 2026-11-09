@@ -11,6 +11,7 @@ import {
   DEFAULT_RESOLUTION,
   loadGenerationTemplate,
   allowedWebAspects,
+  assertTemplateQuote,
   validateGenerationInputs,
   type GenerationInputs,
   type Resolution,
@@ -62,6 +63,7 @@ function assertBatchAllowed(limits: TierLimits, batchSize: number) {
 // no face swap) alongside the stored upload itself (HEAD + bytes; bad ones are deleted).
 async function prepare(deps: GenerationDeps, req: GenerationRequest) {
   const { template, prompt } = await loadGenerationTemplate(deps.db, req.templateId, SURFACE[req.source])
+  assertTemplateQuote(req.expectedCredits, template.creditsCost[req.resolution ?? DEFAULT_RESOLUTION])
   const inputs = validateGenerationInputs(template.fields, {
     copy: req.copy,
     aspectRatio: req.aspectRatio,
@@ -142,6 +144,10 @@ async function keepInputPreview(deps: GenerationDeps, job: Job, image: Prepared[
 // Synchronous generation (ARCHITECTURE §4) shared by the web route and, later, the partner
 // route. Returns the settled job; failures after reservation throw GenerationFailure with
 // the credits already refunded. The response never carries image bytes.
+function expectedPrice(req: GenerationRequest, template: Template, resolution: Resolution) {
+  return req.expectedCredits ?? (req.source === 'graylum' ? template.creditsCost[resolution] : null)
+}
+
 export async function runGeneration(deps: GenerationDeps, req: GenerationRequest): Promise<JobView> {
   if (req.jobId) {
     const existing = await findOwnJob(deps.db, req.userId, req.jobId)
@@ -157,7 +163,11 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
   // Marks which request created the row: two concurrent requests with one job id both get
   // the row back from reserve_credits (charged once), but only the creator calls the provider.
   const attemptId = randomUUID()
-  const job = await reserveJob(deps.db, { ...reserveFields(req), jobId, module: template.module, templateId: template.id, provider: provider.id, inputs: jobInputs(req, prepared, resolution, attemptId, deps.now?.() ?? new Date()) })
+  const job = await reserveJob(deps.db, {
+    ...reserveFields(req), jobId, module: template.module, templateId: template.id, provider: provider.id,
+    expectedCredits: expectedPrice(req, template, resolution),
+    inputs: jobInputs(req, prepared, resolution, attemptId, deps.now?.() ?? new Date()),
+  })
   if (job.inputs.attempt_id !== attemptId) return toJobView(job)
   // Dispute evidence (T82): the IP that started this paid or free work.
   await recordJobClientIp(deps.db, { userId: req.userId, jobId: job.id, ip: req.clientIp })

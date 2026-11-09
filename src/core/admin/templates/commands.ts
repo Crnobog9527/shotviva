@@ -53,7 +53,7 @@ export async function saveTemplate(
 ): Promise<void> {
   const template = parseOrThrow(templateInputSchema, payload.template, 'template')
   const prompt = parseOrThrow(promptInputSchema, payload.prompt, 'prompt')
-  assertAboveFloor(template, providerFloor(floor, prompt.providerId))
+  assertAboveFloor(template, providerFloor(floor, prompt.providerId, template.id))
   assertTogglesWired(template, prompt)
   const exists = await repo.templateExists(client, template.id)
   if (payload.isNew && exists) {

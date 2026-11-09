@@ -3,6 +3,7 @@ import type { JobView } from '@/core/jobs'
 import type { ErrorBodyLike } from './job-model'
 
 export type GenerateBody = {
+  expected_credits?: number
   template_id: string
   input_key: string | null
   inputs: { copy: Record<string, string>; aspect_ratio: string; resolution: string; note?: string }
@@ -11,7 +12,7 @@ export type GenerateBody = {
 }
 
 // A photo edit (ARCHITECTURE §5.2): goes to /api/edit, settles and polls like any job.
-export type EditBody = { source_job_id: string; instruction: string; resolution: string; aspect_ratio?: string; batch_size?: number }
+export type EditBody = { expected_credits?: number; source_job_id: string; instruction: string; resolution: string; aspect_ratio?: string; batch_size?: number }
 
 export type JobBody = GenerateBody | EditBody
 

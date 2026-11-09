@@ -53,7 +53,7 @@ export function publishBlockers(template: PublishCandidate, floor: ProviderFloor
     ['no_description', onWeb && blank(template.description)],
     // A before and an after every launched page can show under the cover fallback (T87).
     ['no_cover', onWeb && !hasCompleteCoverSet(template)],
-    ['below_floor', creditsBelowFloor(template.quality, template.creditsCost, providerFloor(floor, template.providerId)).length > 0],
+    ['below_floor', creditsBelowFloor(template.quality, template.creditsCost, providerFloor(floor, template.providerId, template.id)).length > 0],
   ]
   return checks.filter(([, failed]) => failed).map(([blocker]) => blocker)
 }
