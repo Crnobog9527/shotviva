@@ -64,14 +64,9 @@ it.each([null, { id: 'unverified', verified: false }])('keeps an unverified sess
   expect(deps.account).not.toHaveBeenCalled()
 })
 
-it('requires matching published terms before opening the application', async () => {
+it.each([false, true])('keeps the application accessible without published terms (deep link: %s)', async (openForm) => {
   deps.enabled.mockResolvedValue(true)
-  deps.settings.mockResolvedValue({ terms_version: 'next' })
-  const props = { search: Promise.resolve({ by: 'qa-team' }) }
-  expect((await EnrollmentScreen(props)).props.children).toBeUndefined()
-  await expect(EnrollmentScreen({ ...props, openForm: true })).rejects.toMatchObject({ digest: 'NEXT_HTTP_ERROR_FALLBACK;404' })
-  expect(deps.canApply).not.toHaveBeenCalled()
-  deps.terms.mockResolvedValue('QA')
-  expect((await EnrollmentScreen({ ...props, openForm: true })).props.children.props)
-    .toMatchObject({ openForm: true, parent: 'qa-team' })
+  deps.settings.mockResolvedValue({ terms_version: 'unpublished' })
+  const intro = await EnrollmentScreen({ search: Promise.resolve({ by: 'qa-team' }), openForm })
+  expect(intro.props.children.props).toMatchObject({ openForm, parent: 'qa-team' })
 })

@@ -17,7 +17,7 @@ export async function ApplicationEntry({ userId, parent, openForm, settings }: {
     localized(applyPath),
   ])
   const applicationLogin = userId ? undefined : await localized(loginPath(returnPath))
-  const memberLogin = loginPath(parent ? returnPath : await localized('/partners'))
+  const memberLogin = loginPath(await localized('/partners'))
   return (
     <div className="af-entry-actions">
       <ApplicationDialog initiallyOpen={openForm} title={t('apply')} description={t('formIntro')}>

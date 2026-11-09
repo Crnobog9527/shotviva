@@ -24,8 +24,7 @@ function restoreDraft(form: HTMLFormElement, parent: string) {
       sessionStorage.removeItem(draftKey)
       return
     }
-    if (parent && draft.parent !== parent) return
-    restoreValue(form, 'parent', draft.parent)
+    if (draft.parent !== parent) return
     for (const key of fields) restoreValue(form, key, draft.answers?.[key])
   } catch { /* An unavailable draft leaves the form usable. */ }
 }
@@ -38,9 +37,9 @@ function restoreValue(form: HTMLFormElement, name: string, value: unknown) {
 }
 
 type Props = {
-  parent: string; loginUrl?: string; successUrl: string; loginLabel: string; labels: PartnerFormLabels; children: ReactNode
+  parent: string; canSubmit: boolean; loginUrl?: string; successUrl: string; loginLabel: string; labels: PartnerFormLabels; children: ReactNode
 }
-export function ApplicationFields({ parent, loginUrl, successUrl, loginLabel, labels, children }: Props) {
+export function ApplicationFields({ parent, canSubmit, loginUrl, successUrl, loginLabel, labels, children }: Props) {
   const restored = useRef(false)
   const [state, dispatch, pending] = useActionState(async (previous: PartnerFormState, data: FormData) => {
     const result = await applyAction(previous, data)
@@ -55,7 +54,7 @@ export function ApplicationFields({ parent, loginUrl, successUrl, loginLabel, la
     const data = new FormData(event.currentTarget)
     saveDraft(data)
     if (loginUrl) window.location.assign(loginUrl)
-    else startTransition(() => dispatch(data))
+    else if (canSubmit) startTransition(() => dispatch(data))
   }
   return (
     <form className="af-form" onSubmit={submit} onChange={(event) => saveDraft(new FormData(event.currentTarget))}
@@ -67,7 +66,11 @@ export function ApplicationFields({ parent, loginUrl, successUrl, loginLabel, la
       }}>
       {children}
       {state && <p role="status">{labels[state]}</p>}
-      <button className="af-button" type="submit" disabled={pending}>{loginUrl ? loginLabel : labels.submit}</button>
+      {(loginUrl || canSubmit) && (
+        <button className="af-button" type="submit" formNoValidate={Boolean(loginUrl)} disabled={pending}>
+          {loginUrl ? loginLabel : labels.submit}
+        </button>
+      )}
     </form>
   )
 }
