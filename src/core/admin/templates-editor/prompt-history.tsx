@@ -16,7 +16,7 @@ type Props = { actions: VersionActions; values: TemplateFormValues; active: numb
 function versionPatch(values: TemplateFormValues, version: PromptSnapshot): Partial<TemplateFormValues> {
   const fragments = toggleFragments(version.modelParams)
   return {
-    selectedVersion: version.version, providerId: version.providerId, promptBody: version.body,
+    restoredParams: version.modelParams, selectedVersion: version.version, providerId: version.providerId, promptBody: version.body,
     modelParamsJson: JSON.stringify(withoutToggles(version.modelParams), null, 2),
     styleRefs: version.styleRefs, styleRefsEdited: true,
     toggles: values.toggles.map(t => ({ ...t, on: fragments[t.key]?.on ?? '', off: fragments[t.key]?.off ?? '' })),

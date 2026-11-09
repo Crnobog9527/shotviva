@@ -83,7 +83,7 @@ export async function upsertTemplate(
   if (!error) return revision ? Number(data) : undefined
   const message = versionErrors[error.message]
   if (message) throw new AppError('INVALID_INPUT', message)
-  if (['MODEL_REFERENCE_LIMIT', 'MODEL_CREDIT_FLOOR'].includes(error.message)) throw new AppError('INVALID_INPUT', error.details)
+  if (['MODEL_REFERENCE_LIMIT', 'MODEL_CREDIT_FLOOR', 'TEMPLATE_RETIRED'].includes(error.message)) throw new AppError('INVALID_INPUT', error.details)
   if (error.message === 'MODEL_CHANGED') throw new AppError('INVALID_INPUT', '出图供应商有变化，请刷新后重新保存')
   if (error.message.includes('PROVIDER_NOT_IMAGE')) throw new AppError('INVALID_INPUT', '所选出图模型已不可用，请重新选择')
   // templates_category_key_fkey (T75): the category was deleted while the form was open.

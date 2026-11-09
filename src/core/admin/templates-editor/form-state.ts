@@ -2,13 +2,14 @@ import type { StyleRef } from '@/core/templates/style-refs'
 import { MISSING_COST, floorGuidance } from '@/core/templates/provider-pricing'
 import { RESOLUTIONS, type Resolution } from '@/core/templates/output-options'
 import { approvedCredit, type CreditsFloor, type TemplateQuality } from '@/core/templates/pricing'
-import { toggleSetupProblems } from '@/core/templates/toggles'
+import { toggleFragments, toggleSetupProblems } from '@/core/templates/toggles'
 
 import type { AdminTemplate, SaveTemplatePayload } from '../templates/types'
 import { toFragments, toToggleFields, toToggleValues, toZhToggleText, withoutToggles, type ToggleFormValue } from './toggle-form-state'
 
 export type TemplateFormValues = {
   expectedVersion?: number
+  restoredParams?: Record<string, unknown>
   selectedVersion?: number
   id: string
   module: 'image' | 'video'
@@ -172,11 +173,24 @@ const isObject = (value: unknown): value is Record<string, unknown> => typeof va
 
 // The 开关 cards folded into fields and model params (T89), with the save's own refusal said
 // before the round trip: a toggle without its {{key}} or a fragment (the server checks again).
+function privateFragments(values: TemplateFormValues) {
+  const saved = values.restoredParams
+  if (saved && Object.hasOwn(saved, 'toggles')) {
+    const fragments = toggleFragments(saved)
+    // An older version can have fragments for switches that no longer appear in the
+    // public form. A verbatim restore must keep those bytes in its original snapshot.
+    if (values.toggles.every(t => t.on === fragments[t.key]?.on && t.off === fragments[t.key]?.off)) {
+      return { toggles: saved.toggles }
+    }
+  }
+  return toFragments(values.toggles)
+}
+
 function withToggles(values: TemplateFormValues, fields: unknown, params: unknown) {
   if (!isObject(fields)) return { ok: false as const, message: '字段定义要是一个 JSON 对象' }
   if (!isObject(params)) return { ok: false as const, message: '模型参数要是一个 JSON 对象' }
   const toggles = toToggleFields(values.toggles)
-  const modelParams = { ...withoutToggles(params), ...toFragments(values.toggles) }
+  const modelParams = { ...withoutToggles(params), ...privateFragments(values) }
   const problems = toggleSetupProblems(toggles, values.promptBody, modelParams)
   if (problems.length > 0) return { ok: false as const, message: problems.join('；') }
   return { ok: true as const, fields: { ...withoutToggles(fields), toggles }, modelParams }
