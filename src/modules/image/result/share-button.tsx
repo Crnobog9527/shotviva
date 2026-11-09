@@ -1,83 +1,13 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
-import { useSyncExternalStore } from 'react'
+import dynamic from 'next/dynamic'
 
-import { buttonVariants } from '@/core/ui/button'
-import { cn } from '@/core/ui/cn'
+import type { ResultActionProps } from './result-actions'
 
-import { monoTag, sizeTag } from '../workspace/result-panel'
-import { IphonePhotoActions } from './iphone-photo-actions'
-import { useShareFile } from './use-share-file'
+// Other app routes share the workspace shell but have no result to save.
+const ResultActions = dynamic(() => import('./result-actions'))
 
-type Props = { fileUrl: string; name: string; shareText: string; px?: number }
-
-const subscribe = () => () => {}
-const isIphone = () => /iPhone/i.test(navigator.userAgent)
-const serverSnapshot = () => false
-
-export function ShareButton(props: Props) {
-  // A new result must prepare its own File before the next tap, including client-side navigation.
+export function ShareButton(props: ResultActionProps) {
+  // Navigation must prepare the new photo before another tap can share it.
   return <ResultActions key={props.fileUrl} {...props} />
-}
-
-function ResultActions({ fileUrl, name, shareText, px }: Props) {
-  const t = useTranslations('app.result')
-  const mode = useShareFile(fileUrl, name)
-  const iphone = useSyncExternalStore(subscribe, isIphone, serverSnapshot)
-  if (iphone) return <IphonePhotoActions mode={mode} fileUrl={fileUrl} />
-  const primary = buttonVariants({ variant: 'cta', size: 'cta', className: 'gap-2' })
-  const download = (className?: string) => (
-    <a href={mode.kind === 'loading' ? undefined : `${fileUrl}?download=1`} download aria-disabled={mode.kind === 'loading'} className={cn(primary, mode.kind === 'loading' && 'pointer-events-none', className)}>
-      <DownloadIcon />
-      <span>{px ? t.rich('downloadPx', { px, cost: sizeTag, mono: monoTag }) : t('download')}</span>
-    </a>
-  )
-  if (mode.kind === 'share') {
-    const share = () => {
-      // Called straight from the tap, no await before it (rule 1).
-      navigator
-        .share({ files: [mode.file], title: name, text: shareText })
-        .catch(() => undefined)
-    }
-    return (
-      <>
-        <div className="flex gap-2">
-          {download('min-w-0 flex-1')}
-          <button
-            type="button"
-            onClick={share}
-            aria-label={t('share')}
-            className={cn(buttonVariants({ variant: 'glass', size: 'cta' }), 'aspect-square rounded-tile px-0 lg:hidden')}
-          >
-            <ShareIcon />
-          </button>
-        </div>
-        <p className="mt-2 text-center text-caption text-muted-foreground lg:hidden">{t('photosHint')}</p>
-      </>
-    )
-  }
-  return (
-    <>
-      {download()}
-      <p className="mt-2 text-center text-caption text-muted-foreground lg:hidden">{t('longPress')}</p>
-    </>
-  )
-}
-
-function ShareIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="size-5" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 3.5v11M8 7.5l4-4 4 4" />
-      <path d="M7 11H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-1" />
-    </svg>
-  )
-}
-
-function DownloadIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="size-5 flex-none" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 15v3.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V15" />
-    </svg>
-  )
 }
