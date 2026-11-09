@@ -1,6 +1,7 @@
 import type { ProviderPrices } from '@/core/jobs'
 import { effectivePrices, officialPrice } from '@/core/jobs/model-prices'
-import { MODULE_ADAPTER, type ProviderModule } from '@/core/providers/types'
+import { RESOLUTIONS, type Resolution } from '@/core/templates/output-options'
+import { DEFAULT_BASE_URL, MODULE_ADAPTER, OPENROUTER_BASE_URL, type ProviderAdapterId, type ProviderModule } from '@/core/providers/types'
 
 import type { AdminProvider, SaveProviderInput } from '../providers/types'
 
@@ -9,6 +10,8 @@ import type { AdminProvider, SaveProviderInput } from '../providers/types'
 export type ProviderForm = {
   // Fixed per row: a new one takes the section it was added from.
   module: ProviderModule
+  adapter: ProviderAdapterId
+  resolutions: Resolution[]
   label: string
   baseUrl: string
   model: string
@@ -26,7 +29,9 @@ export type PriceField = (typeof PRICE_FIELDS)[number]
 export const DEFAULT_FORM: ProviderForm = {
   module: 'image',
   label: '',
-  baseUrl: 'https://api.openai.com/v1',
+  baseUrl: DEFAULT_BASE_URL,
+  adapter: 'openai_images',
+  resolutions: [...RESOLUTIONS],
   model: '',
   apiKey: '',
   notes: '',
@@ -38,9 +43,11 @@ export const DEFAULT_FORM: ProviderForm = {
 const priceText = (value: number | null) => (value === null ? '' : String(value))
 
 export function formFor(provider: AdminProvider | null, module: ProviderModule = 'image'): ProviderForm {
-  if (!provider) return { ...DEFAULT_FORM, module }
+  if (!provider) return { ...DEFAULT_FORM, module, adapter: MODULE_ADAPTER[module] }
   return fillOfficial({
     module: provider.module,
+    adapter: provider.adapter,
+    resolutions: provider.resolutions,
     label: provider.label,
     baseUrl: provider.baseUrl,
     model: provider.model,
@@ -129,11 +136,18 @@ export function priceOrigin(form: ProviderForm): PriceOrigin {
 // Blank or a non-negative decimal; anything else keeps Save disabled.
 const PRICE_PATTERN = /^\s*(\d+(\.\d+)?)?\s*$/
 
+// New rows offer the standard endpoint for the selected protocol. Stored rows cannot switch.
+export function withAdapter(form: ProviderForm, adapter: ProviderAdapterId): ProviderForm {
+  const baseUrl = adapter === 'openrouter_images' ? OPENROUTER_BASE_URL : DEFAULT_BASE_URL
+  return { ...form, adapter, baseUrl }
+}
+
 export function toSaveInput(form: ProviderForm, provider: AdminProvider | null): SaveProviderInput {
   return {
     ...(provider ? { id: provider.id } : {}),
     module: form.module,
-    adapter: MODULE_ADAPTER[form.module],
+    adapter: form.adapter,
+    resolutions: form.resolutions,
     label: form.label,
     baseUrl: form.baseUrl,
     model: form.model,
@@ -150,5 +164,5 @@ export function toSaveInput(form: ProviderForm, provider: AdminProvider | null):
 export function canSave(form: ProviderForm, needsKey: boolean): boolean {
   const filled = [form.label, form.baseUrl, form.model].every((value) => value.trim() !== '')
   const pricesOk = PRICE_FIELDS.every((field) => PRICE_PATTERN.test(form[field]))
-  return filled && pricesOk && (!needsKey || form.apiKey.trim() !== '')
+  return filled && form.resolutions.length > 0 && pricesOk && (!needsKey || form.apiKey.trim() !== '')
 }

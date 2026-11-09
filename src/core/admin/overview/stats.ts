@@ -37,6 +37,7 @@ const statsSchema = z.object({
   trend: z.array(z.object({ day: z.string(), jobs: count, succeeded: count, cost_usd: dollars, legacy })),
   by_model: z.array(
     z.object({
+      provider: z.string().default('legacy'),
       model: z.string(),
       resolution: z.string(),
       jobs: count,

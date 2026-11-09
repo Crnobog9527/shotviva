@@ -4,6 +4,7 @@ import { useState } from 'react'
 
 import type { CreditsFloor } from '@/core/templates/pricing'
 
+import type { ImageProviderOption } from '../image-provider-field'
 import type { AdminTemplate, CoverLanguage, SaveTemplatePayload, TemplateAdminActions, TemplateOrderGroup } from '../templates/types'
 
 import { BulkPublish } from './bulk-publish'
@@ -20,6 +21,7 @@ import { UnpublishDialog } from './unpublish-dialog'
 import { useTemplateActions } from './use-template-actions'
 
 type Props = {
+  providers: readonly ImageProviderOption[]
   templates: AdminTemplate[]
   categories: readonly CategoryOption[]
   floor: CreditsFloor
@@ -47,7 +49,7 @@ function afterSave(payload: SaveTemplatePayload): Editing {
   return { mode: 'saved', id: typeof id === 'string' ? id : '' }
 }
 
-export function TemplatesEditor({ templates, categories, floor, coverLanguages, actions }: Props) {
+export function TemplatesEditor({ providers, templates, categories, floor, coverLanguages, actions }: Props) {
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState<Editing | null>(null)
   const [unpublishing, setUnpublishing] = useState<AdminTemplate | null>(null)
@@ -119,6 +121,7 @@ export function TemplatesEditor({ templates, categories, floor, coverLanguages, 
         <TemplateFormDialog
           key={target.mode === 'edit' ? target.template.id : 'new'}
           target={target}
+          providers={providers}
           floor={floor}
           categories={categories}
           coverLanguages={coverLanguages}

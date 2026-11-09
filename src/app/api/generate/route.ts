@@ -18,10 +18,9 @@ export async function POST(request: NextRequest) {
     const user = await requireApiUser()
     const body = generateBodySchema.safeParse(await request.json().catch(() => null))
     if (!body.success) throw new AppError('INVALID_INPUT', 'template_id is required')
-    // The active provider in /admin/providers, else the env fallback (ARCHITECTURE §3.3); the
-    // decision row also screens the user's words for face swaps (§5.1a).
-    const [provider, judge] = await Promise.all([imageProvider(), identityJudge()])
-    const deps = { db: createAdminSupabase(), store: r2Store(), provider, identityJudge: judge }
+    // The private template selects the image model; the decision provider screens user text.
+    const judge = await identityJudge()
+    const deps = { db: createAdminSupabase(), store: r2Store(), provider: imageProvider, identityJudge: judge }
     // The `generate` event's locale: the workspace page's language, else the account's.
     const locale = localeOfReferer(request.headers.get('referer')) ?? user.locale ?? undefined
     // The IP is kept on the job as dispute evidence (T82).

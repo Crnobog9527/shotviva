@@ -15,6 +15,13 @@ describe('testConnection', () => {
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer sk-test-key-123456')
   })
 
+  it('checks the current OpenRouter key without calling the image API', async () => {
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 401 }))
+    const router = { ...config, adapter: 'openrouter_images' } as const
+    expect(await testConnection(router, fetchImpl)).toEqual({ ok: false, failure: 'unauthorized', status: 401 })
+    expect(fetchImpl).toHaveBeenCalledWith(`${config.baseUrl}/key`, expect.objectContaining({ method: 'GET', redirect: 'manual' }))
+  })
+
   it('reports a wrong key as unauthorized and keeps only the status', async () => {
     const body = JSON.stringify({ error: { message: 'Incorrect API key provided: sk-test-key-123456' } })
     const result = await testConnection(config, async () => new Response(body, { status: 401 }))

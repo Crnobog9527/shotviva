@@ -1120,6 +1120,7 @@ begin
     per_day as (
       select j.day,
              coalesce(sum(j.cost_usd), 0) as cost_usd,
+             bool_or(coalesce(j.provider_usage ?| array['cost', 'prompt_tokens', 'completion_tokens'], false)) as has_openrouter,
              count(*) filter (where j.cost_usd is not null) as costed,
              count(*) filter (where j.cost_usd is null and j.provider_usage is not null) as uncosted,
              count(*) filter (where j.cost_usd is null and j.provider_usage is null and j.status <> 'running') as no_usage
@@ -1129,6 +1130,7 @@ begin
     select coalesce(jsonb_agg(jsonb_build_object(
              'day', to_char(d.day, 'YYYY-MM-DD'),
              'cost_usd', coalesce(p.cost_usd, 0),
+             'has_openrouter', coalesce(p.has_openrouter, false),
              'costed', coalesce(p.costed, 0),
              'uncosted', coalesce(p.uncosted, 0),
              'no_usage', coalesce(p.no_usage, 0)
@@ -1167,6 +1169,7 @@ begin
     select g.created_at,
            g.status,
            -- generation_jobs.provider is '<source>/<model>'; older rows hold a bare name.
+           case when position('/' in g.provider) > 0 then split_part(g.provider, '/', 1) else 'legacy' end as provider,
            case when position('/' in g.provider) > 0
                 then substr(g.provider, position('/' in g.provider) + 1)
                 else coalesce(g.provider, 'unknown') end as model,
@@ -1231,16 +1234,16 @@ begin
   ),
   by_model as (
     select jsonb_agg(jsonb_build_object(
-             'model', m.model, 'resolution', m.resolution, 'jobs', m.jobs, 'succeeded', m.succeeded,
+             'provider', m.provider, 'model', m.model, 'resolution', m.resolution, 'jobs', m.jobs, 'succeeded', m.succeeded,
              'cost_usd', m.cost_usd, 'uncosted', m.uncosted, 'legacy', m.legacy
-           ) order by m.jobs desc, m.model, m.resolution) as value
+           ) order by m.jobs desc, m.provider, m.model, m.resolution) as value
       from (
-        select j.model, j.resolution, count(*) as jobs, count(*) filter (where j.status = 'succeeded') as succeeded,
+        select j.provider, j.model, j.resolution, count(*) as jobs, count(*) filter (where j.status = 'succeeded') as succeeded,
                coalesce(sum(j.cost_usd), 0) as cost_usd,
                count(*) filter (where j.uncosted) as uncosted,
                count(*) filter (where j.legacy) as legacy
           from jobs j
-         group by j.model, j.resolution
+         group by j.provider, j.model, j.resolution
       ) m
   )
   select jsonb_build_object(
@@ -1364,6 +1367,10 @@ begin
     raise exception 'PROVIDER_ACTIVE' using errcode = '55000';
   end if;
 
+  if exists (select 1 from public.template_prompts where provider_id = p_id) then
+    raise exception 'PROVIDER_REFERENCED' using errcode = '23503';
+  end if;
+
   delete from public.ai_providers where id = p_id;
   delete from vault.secrets where name = 'shotviva.provider.' || p_id::text;
 end;
@@ -1453,7 +1460,7 @@ begin
      set cost_usd = p_cost_usd,
          counted_usd = coalesce(
            p_cost_usd,
-           case when p_status = 'succeeded' or (p_provider_usage ->> 'output_tokens') is not null then x.estimate_usd else 0 end
+           case when p_status = 'succeeded' or p_provider_usage ?| array['output_tokens', 'completion_tokens'] then x.estimate_usd else 0 end
          ),
          finished_at = now()
    where x.run_id = p_run_id;
@@ -2664,19 +2671,26 @@ begin
   v_start := v_today - make_interval(days => p_days - 1);
 
   return (
+    with by_provider as (
+      select date_trunc('day', x.started_at at time zone 'UTC') as day,
+             coalesce(x.provider, 'unknown') as provider,
+             coalesce(sum(x.cost_usd), 0) as cost_usd,
+             bool_or(x.has_openrouter) as has_openrouter,
+             count(*) as runs
+        from public.admin_test_spend x
+       where x.started_at >= v_start
+       group by 1, 2
+    ), days as (
+      select p.day, sum(p.cost_usd) as cost_usd, sum(p.runs) as runs, bool_or(p.has_openrouter) as has_openrouter,
+             jsonb_agg(jsonb_build_object('provider', p.provider, 'cost_usd', p.cost_usd, 'runs', p.runs)
+                       order by p.provider) as by_provider
+        from by_provider p group by p.day
+    )
     select coalesce(jsonb_agg(jsonb_build_object(
-             'day', to_char(p.day, 'YYYY-MM-DD'),
-             'cost_usd', p.cost_usd,
-             'runs', p.runs
-           ) order by p.day), '[]'::jsonb)
-      from (
-        select date_trunc('day', x.started_at at time zone 'UTC') as day,
-               coalesce(sum(x.cost_usd), 0) as cost_usd,
-               count(*) as runs
-          from public.admin_test_spend x
-         where x.started_at >= v_start
-         group by 1
-      ) p
+             'day', to_char(d.day, 'YYYY-MM-DD'), 'cost_usd', d.cost_usd, 'runs', d.runs,
+             'has_openrouter', d.has_openrouter, 'by_provider', d.by_provider
+           ) order by d.day), '[]'::jsonb)
+      from days d
   );
 end;
 $$;
@@ -2809,11 +2823,12 @@ begin
     end;
 
   if p_prompt is not null then
-    insert into public.template_prompts (template_id, body, model_params)
-    values (v_id, p_prompt ->> 'body', coalesce(p_prompt -> 'model_params', '{}'::jsonb))
+    insert into public.template_prompts as tp (template_id, body, model_params, provider_id)
+    values (v_id, p_prompt ->> 'body', coalesce(p_prompt -> 'model_params', '{}'::jsonb), (p_prompt ->> 'provider_id')::uuid)
     on conflict (template_id) do update set
       body = excluded.body,
-      model_params = excluded.model_params;
+      model_params = excluded.model_params,
+      provider_id = case when p_prompt ? 'provider_id' then excluded.provider_id else tp.provider_id end;
   end if;
 end;
 $$;
@@ -3095,6 +3110,39 @@ $$;
 
 
 ALTER FUNCTION "public"."bump_template_prompt_version"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."check_referenced_provider_module"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if exists (select 1 from public.template_prompts where provider_id = old.id) then
+    raise exception 'PROVIDER_REFERENCED' using errcode = '23503';
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."check_referenced_provider_module"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."check_template_image_provider"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  perform 1 from public.ai_providers where id = new.provider_id and module = 'image' for share;
+  if not found then
+    raise exception 'PROVIDER_NOT_IMAGE' using errcode = '23503';
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."check_template_image_provider"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."claim_dispute_reminders"("p_dispute_ids" "text"[]) RETURNS SETOF "text"
@@ -4623,6 +4671,28 @@ $_$;
 ALTER FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."snapshot_test_spend_provider"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_snapshot record;
+begin
+  select r.provider, coalesce(r.provider_usage ?| array['cost', 'prompt_tokens', 'completion_tokens'], false) as has_openrouter
+    into v_snapshot
+    from public.admin_test_runs r where r.id = new.run_id;
+  if found then
+    new.provider := v_snapshot.provider;
+    new.has_openrouter := v_snapshot.has_openrouter;
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."snapshot_test_spend_provider"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."support_reply_hours"("p_tier" "text") RETURNS integer
     LANGUAGE "sql" IMMUTABLE
     SET "search_path" TO ''
@@ -5053,6 +5123,8 @@ CREATE TABLE IF NOT EXISTS "public"."admin_test_spend" (
     "cost_usd" numeric(10,6),
     "counted_usd" numeric(10,6),
     "finished_at" timestamp with time zone,
+    "provider" "text",
+    "has_openrouter" boolean DEFAULT false NOT NULL,
     CONSTRAINT "admin_test_spend_cost_usd_check" CHECK (("cost_usd" >= (0)::numeric)),
     CONSTRAINT "admin_test_spend_counted_usd_check" CHECK (("counted_usd" >= (0)::numeric)),
     CONSTRAINT "admin_test_spend_estimate_usd_check" CHECK (("estimate_usd" >= (0)::numeric))
@@ -5079,16 +5151,18 @@ CREATE TABLE IF NOT EXISTS "public"."ai_providers" (
     "price_input_text_per_m" numeric(12,6),
     "price_input_image_per_m" numeric(12,6),
     "price_output_per_m" numeric(12,6),
-    CONSTRAINT "ai_providers_adapter_check" CHECK (("adapter" = ANY (ARRAY['openai_images'::"text", 'openai_responses'::"text"]))),
+    "resolutions" "text"[] DEFAULT '{1k,2k,3k}'::"text"[] NOT NULL,
+    CONSTRAINT "ai_providers_adapter_check" CHECK (("adapter" = ANY (ARRAY['openai_images'::"text", 'openrouter_images'::"text", 'openai_responses'::"text"]))),
     CONSTRAINT "ai_providers_api_key_last4_check" CHECK ((("char_length"("api_key_last4") >= 1) AND ("char_length"("api_key_last4") <= 4))),
     CONSTRAINT "ai_providers_base_url_check" CHECK ((("base_url" ~ '^https://[^\s/?#@]+(/[^\s?#]*)?$'::"text") AND ("char_length"("base_url") <= 300))),
     CONSTRAINT "ai_providers_key_pair" CHECK ((("vault_secret_id" IS NULL) = ("api_key_last4" IS NULL))),
     CONSTRAINT "ai_providers_label_check" CHECK ((("char_length"("label") >= 1) AND ("char_length"("label") <= 80))),
     CONSTRAINT "ai_providers_model_check" CHECK ((("char_length"("model") >= 1) AND ("char_length"("model") <= 120))),
-    CONSTRAINT "ai_providers_module_adapter" CHECK (((("module" = 'image'::"text") AND ("adapter" = 'openai_images'::"text")) OR (("module" = 'decision'::"text") AND ("adapter" = 'openai_responses'::"text")))),
+    CONSTRAINT "ai_providers_module_adapter" CHECK (((("module" = 'image'::"text") AND ("adapter" = ANY (ARRAY['openai_images'::"text", 'openrouter_images'::"text"]))) OR (("module" = 'decision'::"text") AND ("adapter" = 'openai_responses'::"text")))),
     CONSTRAINT "ai_providers_module_check" CHECK (("module" = ANY (ARRAY['image'::"text", 'decision'::"text"]))),
     CONSTRAINT "ai_providers_notes_check" CHECK ((("notes" IS NULL) OR ("char_length"("notes") <= 500))),
-    CONSTRAINT "ai_providers_prices_nonnegative" CHECK (((COALESCE("price_input_text_per_m", (0)::numeric) >= (0)::numeric) AND (COALESCE("price_input_image_per_m", (0)::numeric) >= (0)::numeric) AND (COALESCE("price_output_per_m", (0)::numeric) >= (0)::numeric)))
+    CONSTRAINT "ai_providers_prices_nonnegative" CHECK (((COALESCE("price_input_text_per_m", (0)::numeric) >= (0)::numeric) AND (COALESCE("price_input_image_per_m", (0)::numeric) >= (0)::numeric) AND (COALESCE("price_output_per_m", (0)::numeric) >= (0)::numeric))),
+    CONSTRAINT "ai_providers_resolutions_check" CHECK ((("cardinality"("resolutions") > 0) AND ("array_ndims"("resolutions") = 1) AND ("resolutions" <@ ARRAY['1k'::"text", '2k'::"text", '3k'::"text"])))
 );
 
 
@@ -5418,6 +5492,7 @@ CREATE TABLE IF NOT EXISTS "public"."template_prompts" (
     "version" integer DEFAULT 1 NOT NULL,
     "model_params" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "provider_id" "uuid",
     CONSTRAINT "template_prompts_body_check" CHECK (("char_length"("body") > 0)),
     CONSTRAINT "template_prompts_model_params_check" CHECK (("jsonb_typeof"("model_params") = 'object'::"text")),
     CONSTRAINT "template_prompts_version_check" CHECK (("version" > 0))
@@ -5867,6 +5942,10 @@ CREATE INDEX "template_favorites_template_id_idx" ON "public"."template_favorite
 
 
 
+CREATE INDEX "template_prompts_provider_idx" ON "public"."template_prompts" USING "btree" ("provider_id") WHERE ("provider_id" IS NOT NULL);
+
+
+
 CREATE INDEX "template_request_votes_user_id_idx" ON "public"."template_request_votes" USING "btree" ("user_id");
 
 
@@ -5895,6 +5974,14 @@ CREATE UNIQUE INDEX "templates_featured_rank_key" ON "public"."templates" USING 
 
 
 
+CREATE OR REPLACE TRIGGER "admin_test_spend_snapshot_provider" BEFORE INSERT OR UPDATE OF "cost_usd" ON "public"."admin_test_spend" FOR EACH ROW EXECUTE FUNCTION "public"."snapshot_test_spend_provider"();
+
+
+
+CREATE OR REPLACE TRIGGER "ai_providers_check_references" BEFORE UPDATE OF "module" ON "public"."ai_providers" FOR EACH ROW WHEN ((("old"."module" = 'image'::"text") AND ("new"."module" <> 'image'::"text"))) EXECUTE FUNCTION "public"."check_referenced_provider_module"();
+
+
+
 CREATE OR REPLACE TRIGGER "ai_providers_delete_vault_secret" AFTER DELETE ON "public"."ai_providers" FOR EACH ROW EXECUTE FUNCTION "public"."delete_provider_vault_secret"();
 
 
@@ -5920,6 +6007,10 @@ CREATE OR REPLACE TRIGGER "template_favorites_guard" BEFORE INSERT ON "public"."
 
 
 CREATE OR REPLACE TRIGGER "template_prompts_bump_version" BEFORE UPDATE ON "public"."template_prompts" FOR EACH ROW EXECUTE FUNCTION "public"."bump_template_prompt_version"();
+
+
+
+CREATE OR REPLACE TRIGGER "template_prompts_check_image_provider" BEFORE INSERT OR UPDATE OF "provider_id" ON "public"."template_prompts" FOR EACH ROW WHEN (("new"."provider_id" IS NOT NULL)) EXECUTE FUNCTION "public"."check_template_image_provider"();
 
 
 
@@ -6107,6 +6198,11 @@ ALTER TABLE ONLY "public"."template_favorites"
 
 ALTER TABLE ONLY "public"."template_favorites"
     ADD CONSTRAINT "template_favorites_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."template_prompts"
+    ADD CONSTRAINT "template_prompts_provider_id_fkey" FOREIGN KEY ("provider_id") REFERENCES "public"."ai_providers"("id") ON DELETE RESTRICT;
 
 
 
@@ -6614,6 +6710,14 @@ GRANT ALL ON FUNCTION "public"."begin_identity_judge"("p_user_id" "uuid", "p_tex
 
 
 
+REVOKE ALL ON FUNCTION "public"."check_referenced_provider_module"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."check_template_image_provider"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."claim_dispute_reminders"("p_dispute_ids" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."claim_dispute_reminders"("p_dispute_ids" "text"[]) TO "service_role";
 
@@ -6803,6 +6907,10 @@ GRANT ALL ON FUNCTION "public"."sms_release_send"("p_phone_key" "text") TO "serv
 
 REVOKE ALL ON FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."snapshot_test_spend_provider"() FROM PUBLIC;
 
 
 

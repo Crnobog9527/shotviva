@@ -1,7 +1,8 @@
 import 'server-only'
 
-// "Test connection" on the admin page (ARCHITECTURE §3.3): GET {base_url}/models with the row's
-// key. It only proves the key authenticates; it never generates, so it costs nothing. Only the
+import type { ProviderAdapterId } from './types'
+
+// Use OpenRouter's authenticated /key endpoint: its public catalogue is accessible without a key. It only proves the key authenticates; it never generates, so it costs nothing. Only the
 // HTTP status leaves this function: a vendor body can echo the request.
 
 export type ConnectionResult =
@@ -22,12 +23,13 @@ function isTimeout(error: unknown): boolean {
 }
 
 export async function testConnection(
-  config: { baseUrl: string; apiKey: string },
+  config: { baseUrl: string; apiKey: string; adapter?: ProviderAdapterId },
   fetchImpl: typeof fetch = fetch,
 ): Promise<ConnectionResult> {
   let response: Response
   try {
-    response = await fetchImpl(`${config.baseUrl}/models`, {
+    const path = config.adapter === 'openrouter_images' ? 'key' : 'models'
+    response = await fetchImpl(`${config.baseUrl}/${path}`, {
       method: 'GET',
       headers: { Authorization: `Bearer ${config.apiKey}` },
       // A redirect could lead off the validated host; report it instead of following.

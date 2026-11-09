@@ -28,7 +28,13 @@ export function CostsTable({ rows }: { rows: ReconcileRow[] }) {
             <TableCell className="font-mono text-xs whitespace-nowrap">{row.day}</TableCell>
             <TableCell className="font-mono text-xs">{money(row.billed)}</TableCell>
             <TableCell className="font-mono text-xs">{money(row.cost_usd)}</TableCell>
-            <TableCell className="text-muted-foreground font-mono text-xs">{row.test_cost_usd ? money(row.test_cost_usd) : COPY.dash}</TableCell>
+            <TableCell className="text-muted-foreground font-mono text-xs">{row.test_cost_usd ? money(row.test_cost_usd) : COPY.dash}
+              {row.by_provider?.map((group) => (
+                <div key={group.provider} className="mt-1 break-all">
+                  {group.provider} {money(group.cost_usd)} {COPY.testModel(group.runs)}
+                </div>
+              ))}
+            </TableCell>
             <TableCell className={`font-mono text-xs ${differenceClass(row.difference)}`}>{money(row.difference)}</TableCell>
             <TableCell className="font-mono text-xs">{row.costed}</TableCell>
             <TableCell className={`font-mono text-xs ${row.uncosted > 0 ? 'text-destructive' : ''}`}>

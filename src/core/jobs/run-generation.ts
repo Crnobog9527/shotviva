@@ -26,12 +26,14 @@ import { accountLimits } from './account-limits'
 import { assertWithinRateLimit } from './rate-limit'
 import { settleGeneration, type SettleDeps } from './settle-generation'
 import { recordJobClientIp } from './job-download'
+import { resolveTemplateProvider, type TemplateProvider } from './provider'
 import { reserveJob } from './settlement'
 
 // `track` is injectable so tests can assert the `generate` event without PostHog.
 // `identityJudge`: the text-only decision call of ARCHITECTURE §5.1a; null or absent means the
 // user's words go through unscreened (fail open).
-export type GenerationDeps = SettleDeps & {
+export type GenerationDeps = Omit<SettleDeps, 'provider'> & {
+  provider: TemplateProvider
   now?: () => Date
   track?: ServerTrack
   identityJudge?: IdentityJudge | null
@@ -148,17 +150,18 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
 
   const jobId = req.jobId ?? randomUUID()
   const resolution = req.resolution ?? DEFAULT_RESOLUTION
+  const provider = await resolveTemplateProvider(deps.provider, req.source === 'web' ? prompt.providerId : null, resolution)
   // Marks which request created the row: two concurrent requests with one job id both get
   // the row back from reserve_credits (charged once), but only the creator calls the provider.
   const attemptId = randomUUID()
-  const job = await reserveJob(deps.db, { ...reserveFields(req), jobId, module: template.module, templateId: template.id, provider: deps.provider.id, inputs: jobInputs(req, prepared, resolution, attemptId, deps.now?.() ?? new Date()) })
+  const job = await reserveJob(deps.db, { ...reserveFields(req), jobId, module: template.module, templateId: template.id, provider: provider.id, inputs: jobInputs(req, prepared, resolution, attemptId, deps.now?.() ?? new Date()) })
   if (job.inputs.attempt_id !== attemptId) return toJobView(job)
   // Dispute evidence (T82): the IP that started this paid or free work.
   await recordJobClientIp(deps.db, { userId: req.userId, jobId: job.id, ip: req.clientIp })
 
   const call = templateCall({ template, prompt }, inputs, image, resolution)
   const settle = () =>
-    settleGeneration(deps, job, call, outputKeyFor(req.userId, job.id), {
+    settleGeneration({ ...deps, provider }, job, call, outputKeyFor(req.userId, job.id), {
       inputKeys: req.inputKey ? [req.inputKey] : [],
       decision: screenCost(deps.identityJudge, prepared.screen),
     })

@@ -16,6 +16,7 @@ export const PROVIDER_SETTING_REASONS = [
   'not_found',
   // Deleting the row in use (ARCHITECTURE §3.3): switch to another one first.
   'provider_active',
+  'provider_referenced',
   // Anything unexpected; the details are logged, never shown.
   'internal',
 ] as const

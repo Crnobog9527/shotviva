@@ -12,11 +12,11 @@ import { toTemplate, type PreT75TemplateRow, type Template, type TemplateRow } f
 export type GenerationTemplate = {
   template: Template
   // Wrapped prompt: server-only, never logged, never returned to a client.
-  prompt: { body: string; version: number; modelParams: Record<string, unknown> }
+  prompt: { body: string; version: number; providerId: string | null; modelParams: Record<string, unknown> }
 }
 
 type Row = (TemplateRow | PreT75TemplateRow) & {
-  template_prompts: { body: string; version: number; model_params: Record<string, unknown> } | null
+  template_prompts: { body: string; version: number; provider_id: string | null; model_params: Record<string, unknown> } | null
 }
 
 // Needs the service-role client: template_prompts has no client grants (T3). The surface
@@ -28,7 +28,7 @@ async function loadTemplate(client: SupabaseClient, id: string, surface: Templat
     const all = client.from('templates').select(columns).eq('id', id)
     const query = drafts ? all : all.eq('is_active', true)
     return (surface ? query.contains('visible_in', [surface]) : query).maybeSingle<Row>()
-  }, ', template_prompts(body, version, model_params)')
+  }, ', template_prompts(body, version, model_params, provider_id)')
   if (error) throw new AppError('INTERNAL', `loadGenerationTemplate failed: ${error.message}`)
   if (!data) throw new AppError('NOT_FOUND', 'Template not found')
 
@@ -40,7 +40,7 @@ async function loadTemplate(client: SupabaseClient, id: string, surface: Templat
   const prompt = data.template_prompts
   return {
     template: { ...toTemplate(data), fields: fields.data },
-    prompt: { body: prompt.body, version: prompt.version, modelParams: prompt.model_params },
+    prompt: { body: prompt.body, version: prompt.version, providerId: prompt.provider_id, modelParams: prompt.model_params },
   }
 }
 

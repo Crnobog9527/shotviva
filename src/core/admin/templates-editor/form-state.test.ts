@@ -37,7 +37,7 @@ const template: AdminTemplate = {
   featuredRank: null,
   createdAt: '2026-11-05T00:00:00Z',
   updatedAt: '2026-11-05T00:00:00Z',
-  prompt: { body: 'FAKE BODY', version: 2, modelParams: { quality: 'high' } },
+  prompt: { providerId: '328576a9-f5b8-4c5d-b180-fe7b15deb02c', body: 'FAKE BODY', version: 2, modelParams: { quality: 'high' } },
 }
 
 describe('template form state', () => {
@@ -54,7 +54,7 @@ describe('template form state', () => {
           quality: 'high',
           creditsCost: { '1k': 3, '2k': 4, '3k': 6 },
         }),
-        prompt: { body: 'FAKE BODY', modelParams: { quality: 'high' } },
+        prompt: { providerId: template.prompt?.providerId, body: 'FAKE BODY', modelParams: { quality: 'high' } },
       },
     })
   })
@@ -117,7 +117,7 @@ describe('the 开关 cards (T89)', () => {
     ...template,
     fields: { ...template.fields, toggles: [{ key: 'replate', label: 'Upgrade plating', default: false, confirm }] },
     translations: { zh: { fields: { replate: { label: '优化摆盘和器皿', confirm: { title: '开启前请确认' } } } } },
-    prompt: { body: 'FAKE BODY {{replate}}', version: 3, modelParams: { quality: 'high', toggles: { replate: { on: 'FAKE-ON', off: 'FAKE-OFF' } } } },
+    prompt: { providerId: null, body: 'FAKE BODY {{replate}}', version: 3, modelParams: { quality: 'high', toggles: { replate: { on: 'FAKE-ON', off: 'FAKE-OFF' } } } },
   }
 
   it('keeps toggles out of the JSON boxes and puts them back on save', () => {

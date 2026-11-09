@@ -1,5 +1,5 @@
 export { FEATURED_MAX, saveTemplate, setFeaturedTemplates, setTemplateActive, setTemplateOrder, setTemplatesActive } from './commands'
-export { listAdminTemplates } from './repository'
+export { listAdminTemplates, listImageProviderOptions } from './repository'
 export { bulkEditTemplates } from './bulk-edit'
 export {
   bulkEditFailures,

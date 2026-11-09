@@ -2,6 +2,7 @@
 export {
   bulkEditTemplates,
   listAdminTemplates,
+  listImageProviderOptions,
   runAdminAction,
   runAdminQuery,
   saveTemplate,
