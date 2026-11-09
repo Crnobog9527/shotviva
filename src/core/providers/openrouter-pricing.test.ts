@@ -73,8 +73,8 @@ describe('public OpenRouter endpoint quotes', () => {
     expect(fetcher).not.toHaveBeenCalled()
   })
 
-  it('refuses to manufacture a standard capability from an absent parameter block', async () => {
-    const fetcher = async () => Response.json({ data: [{ id: model }] })
+  it.each([undefined, {}, { unrelated: 'value' }])('refuses to manufacture capabilities from an unrecognised block %j', async block => {
+    const fetcher = async () => Response.json({ data: [{ id: model, supported_parameters: block }] })
     await expect(fetchImageCapabilities('openrouter_images', base, model, fetcher)).rejects.toMatchObject({ reason: 'openrouter_catalog_unavailable' })
   })
 })

@@ -101,6 +101,17 @@ describe('T92 per-template generation routing', () => {
     expect((await profileOf(pg, userId)).credits).toBe(2)
   })
 
+  it('returns the held credits while retaining a pending OpenRouter receipt on a failed request', async () => {
+    const { deps, fetch } = await setup()
+    const userId = await createUser(pg, { credits: 2 })
+    const jobId = randomUUID()
+    fetch.mockResolvedValueOnce(Response.json({ id: 'gen-pending', data: [] }))
+    fetch.mockResolvedValueOnce(new Response(null, { status: 404 }))
+    await expect(runGeneration(deps, { jobId, userId, templateId, source: 'web' })).rejects.toMatchObject({ refunded: true })
+    expect(await jobRow(jobId)).toMatchObject({ status: 'failed', provider_usage: { generation_id: 'gen-pending', cost: null }, cost_usd: null })
+    expect((await profileOf(pg, userId)).credits).toBe(2)
+  })
+
   it('admin trials can temporarily use the global default, then follow the saved model again', async () => {
     const releaseBudget = await holdTestBudget(pg)
     try {

@@ -3,10 +3,10 @@ import 'server-only'
 import { z } from 'zod'
 
 import type { ProviderUsage } from '@/core/jobs'
+import { generationId as id } from '@/core/jobs/provider-usage'
 import { logger } from '@/core/logger'
 
 const money = z.number().finite().nonnegative()
-const id = z.string().regex(/^gen-[a-zA-Z0-9_-]{1,160}$/)
 const tokens = z.number().int().nonnegative().optional().catch(undefined)
 const fields = z.object({
   prompt_tokens: tokens, completion_tokens: tokens,

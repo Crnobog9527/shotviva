@@ -16,7 +16,8 @@ function referenceMismatch(count: number, range: OpenRouterImageParameters['inpu
 }
 
 export function openRouterInputMismatch(input: ImageRequestOptions, parameters: OpenRouterImageParameters) {
-  if (parameters.resolution && !parameters.resolution.values.includes(OPENROUTER_IMAGE_SIZE[input.resolution])) {
+  const supportedSizes = parameters.resolution?.values ?? [OPENROUTER_IMAGE_SIZE['1k']]
+  if (!supportedSizes.includes(OPENROUTER_IMAGE_SIZE[input.resolution])) {
     return { reason: 'unsupported_resolution', message: 'This model does not support the selected resolution.' }
   }
   // 'original' can be omitted on models without auto. An explicit ratio needs declared support.

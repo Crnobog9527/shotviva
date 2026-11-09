@@ -1,3 +1,4 @@
+import type { ProviderUsage } from './provider-usage'
 import type { Resolution } from '../templates/output-options'
 import type { TemplateQuality } from '../templates/pricing'
 
@@ -26,25 +27,7 @@ export type ProviderInput = {
   signal: AbortSignal
 }
 
-// What the provider reported using, as stored in generation_jobs.provider_usage (ARCHITECTURE §4,
-// T33). A field the provider did not report is left out, never guessed; cost then stays null.
-// decision_* are the photo-edit decision step's tokens (T30, §5), added by that flow.
-export type ProviderUsage = {
-  // Raw OpenRouter usage; cost is USD before the top-up fee.
-  prompt_tokens?: number
-  completion_tokens?: number
-  cost?: number | null
-  is_byok?: boolean
-  upstream_inference_cost?: number
-  generation_id?: string
-  cost_source?: 'generation'
-  estimated_cost_usd?: number
-  input_text_tokens?: number
-  input_image_tokens?: number
-  output_tokens?: number
-  decision_input_tokens?: number
-  decision_output_tokens?: number
-}
+export type { ProviderUsage } from './provider-usage'
 
 export type ProviderOutput = { bytes: Uint8Array; contentType: 'image/png'; usage?: ProviderUsage | null }
 

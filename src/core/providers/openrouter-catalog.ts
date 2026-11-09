@@ -15,13 +15,12 @@ const referenceRange = z.object({
   min: z.number().int().nonnegative(),
   max: z.number().int().nonnegative(),
 })
-const declaredParameters = z.record(z.string(), z.unknown()).refine(value => Object.keys(value).length > 0)
-const imageParameters = declaredParameters.pipe(z.object({
+const imageParameters = z.object({
   resolution: enumParameter.optional(),
   aspect_ratio: enumParameter.optional(),
   output_format: enumParameter.optional(),
   input_references: referenceRange.optional(),
-}))
+}).refine(value => Object.keys(value).length > 0)
 export type OpenRouterImageParameters = z.infer<typeof imageParameters>
 
 const modelList = z.object({

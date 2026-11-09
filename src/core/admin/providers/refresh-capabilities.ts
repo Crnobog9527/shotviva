@@ -8,9 +8,9 @@ import { logger } from '@/core/logger'
 import type { ProviderCommandDeps } from './commands'
 import { providerIdSchema } from './schema'
 
-async function refresh(deps: ProviderCommandDeps, row: AdminProvider) {
+async function refresh(deps: ProviderCommandDeps, row: AdminProvider, force = true) {
   const url = row.adapter === 'openrouter_images' ? await assertPublicBaseUrl(row.baseUrl, deps.resolveHost) : row.baseUrl
-  const capabilities = await fetchImageCapabilities(row.adapter, url, row.model, deps.fetch ?? fetch)
+  const capabilities = await fetchImageCapabilities(row.adapter, url, row.model, deps.fetch ?? (force ? fetch : undefined))
   if (!capabilities) throw new ProviderSettingError('invalid_input', 'An image provider is required')
   await persistRefreshedCapabilities(deps.db, row, capabilities)
 }
@@ -38,7 +38,7 @@ export async function syncDueProvider(deps: ProviderCommandDeps, input: unknown,
   const failedQuote = row.capabilities?.catalogPricing?.status === 'unavailable'
   if (!(retry && failedQuote) && nextCapabilitySync(row.adapter === 'openai_images', row.capabilities) > Date.now()) return false
   try {
-    await refresh(deps, row)
+    await refresh(deps, row, retry)
   } catch (error) {
     if (!(error instanceof CapabilityWriteConflict)) throw error
     const now = await imageRow(deps, input)

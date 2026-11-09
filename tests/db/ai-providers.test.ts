@@ -29,7 +29,7 @@ let adminId: string
 const deps = () => ({
   db: serviceSupabase(),
   resolveHost: publicHost,
-  fetch: async () => Response.json({ data: [{ id: 'gpt-image-2.6' }] }),
+  fetch: async () => Response.json({ data: [{ id: 'gpt-image-2.6', supported_parameters: { input_references: { type: 'range', min: 0, max: 3 } } }] }),
 })
 const save = (input: Record<string, unknown>) =>
   saveProvider(deps(), adminId, { label: `${PREFIX} ${randomUUID().slice(0, 6)}`, baseUrl: 'https://api.openai.com/v1', model: 'gpt-image-2.6', apiKey: KEY, ...input })
