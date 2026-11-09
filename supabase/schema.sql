@@ -5944,7 +5944,7 @@ ALTER TABLE "public"."affiliate_payouts" OWNER TO "postgres";
 
 CREATE TABLE IF NOT EXISTS "public"."affiliates" (
     "user_id" "uuid" NOT NULL,
-    "slug" "text" NOT NULL,
+    "slug" "text" NOT NULL COLLATE "pg_catalog"."C",
     "status" "text" DEFAULT 'pending'::"text" NOT NULL,
     "parent_user_id" "uuid",
     "team_enabled" boolean DEFAULT false NOT NULL,
@@ -6944,7 +6944,7 @@ CREATE INDEX "affiliates_created_idx" ON "public"."affiliates" USING "btree" ("c
 
 
 
-CREATE INDEX "affiliates_parent_created_idx" ON "public"."affiliates" USING "btree" ("parent_user_id", "created_at" DESC, "user_id" DESC) WHERE ("parent_user_id" IS NOT NULL);
+CREATE INDEX "affiliates_parent_created_idx" ON "public"."affiliates" USING "btree" ("parent_user_id", "created_at" DESC, "slug" DESC) WHERE ("parent_user_id" IS NOT NULL);
 
 
 
@@ -7076,7 +7076,7 @@ CREATE INDEX "profiles_paid_until_idx" ON "public"."profiles" USING "btree" ("pa
 
 
 
-CREATE INDEX "profiles_referred_by_idx" ON "public"."profiles" USING "btree" ("referred_by", "referred_at" DESC, "id") WHERE ("referred_by" IS NOT NULL);
+CREATE INDEX "profiles_referred_by_idx" ON "public"."profiles" USING "btree" ("referred_by", "referred_at" DESC, "id" DESC) WHERE ("referred_by" IS NOT NULL);
 
 
 
