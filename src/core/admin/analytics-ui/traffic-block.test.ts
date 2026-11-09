@@ -1,16 +1,13 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { expect, it, vi } from 'vitest'
+import { expect, it } from 'vitest'
 
-import { readTraffic } from '../analytics/load'
 import { loadTraffic } from '../analytics/traffic'
 import { windowFor } from '../analytics/range'
 import type { Traffic } from '../analytics/traffic'
 import type { EdgeData } from '../analytics/edge'
 import { EdgeTrafficView } from './edge-traffic'
 import { TrafficBlock, TrafficView } from './traffic-block'
-
-vi.mock('../analytics/load', () => ({ readTraffic: vi.fn() }))
 
 const data: Traffic = {
   channels: { google: 3, direct: 1, bing: 0, chatgpt: 0, other: 0, internal: 0 },
@@ -64,8 +61,7 @@ it('shows zero measured counts with undefined shares for an empty observation wi
 })
 
 it('a failed PostHog read exposes neither artificial zeroes nor query details', async () => {
-  vi.mocked(readTraffic).mockResolvedValueOnce({ status: 'error' })
-  const block = await TrafficBlock({ query: { range: '7d', sort: 'views', dim: 'source' }, projectId: 'test' })
+  const block = await TrafficBlock({ query: { range: '7d', sort: 'views', dim: 'source' }, projectId: 'test', result: Promise.resolve({ status: 'error' }) })
   const html = renderToStaticMarkup(block)
   expect(html).toContain('暂时读不到')
   expect(html).not.toContain('0 次')

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { FUNNEL_STEPS, type FunnelDim } from './funnel-options'
+import { FUNNEL_STEPS, type FunnelDim, type FunnelGroup } from './funnel-options'
 import { at, bothPeriods, eventList, periodColumn } from './hogql'
 import { rowsOf, type HogQL, type RunQuery } from './posthog-query'
 import type { Window } from './range'
@@ -84,9 +84,9 @@ GROUP BY cur, seg ORDER BY s0 DESC LIMIT 2000`,
   }
 }
 
-// Aggregate the journey once per person. Expand the four small breakdowns only after that
-// aggregation; the ungrouped totals come from the locale rows. Fetch the 90-day join on demand.
-const BREAKDOWNS = ['locale', 'device', 'source', 'country'] as const
+// Aggregate the journey once per person. Expand the three small breakdowns only after that
+// aggregation; the ungrouped totals come from the locale rows. Fetch session attribution or the 90-day join only when selected.
+const BREAKDOWNS = ['locale', 'device', 'country'] as const
 export function breakdownsQuery(window: Window): HogQL {
   const fields = BREAKDOWNS.map((dim) => `${firstValue(DIM_EXPR[dim])} AS by_${dim}`).join(', ')
   const segments = BREAKDOWNS.map((dim) => `tuple('${dim}', p.by_${dim})`).join(', ')
@@ -138,11 +138,13 @@ export async function loadFunnel(run: RunQuery, window: Window, dim: FunnelDim):
   return shapeFunnel(rowsOf(await run(funnelQuery(window, dim)), funnelRow), dim)
 }
 
-export type FunnelGroup = 'breakdowns' | 'visitor'
 export type FunnelData = Partial<Record<FunnelDim, Funnel>>
 
 export async function loadFunnelGroup(run: RunQuery, window: Window, group: FunnelGroup): Promise<FunnelData> {
-  if (group === 'visitor') return {visitor: await loadFunnel(run, window, 'visitor')}
+  if (group !== 'breakdowns') {
+    const funnel = await loadFunnel(run, window, group)
+    return { [group]: funnel, none: { ...funnel, dim: 'none', segments: [] } }
+  }
   const rows = rowsOf(await run(breakdownsQuery(window)), funnelRow.extend({dim: z.enum(BREAKDOWNS)}))
   const result: FunnelData = {}
   for (const dim of BREAKDOWNS) result[dim] = shapeFunnel(rows.filter((row) => row.dim === dim), dim)

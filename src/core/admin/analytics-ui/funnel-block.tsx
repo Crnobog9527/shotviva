@@ -1,11 +1,11 @@
-import { funnelResponse } from '../analytics/funnel-response'
-import { funnelEnd } from '../analytics/load'
+import type { FunnelResponse } from '../analytics/funnel-response'
 import { FunnelExplorer } from './funnel-explorer'
 import type { AnalyticsQuery } from './href'
 
-export async function FunnelBlock({ query, projectId }: { query: AnalyticsQuery; projectId: string }) {
-  const end = funnelEnd()
-  const initial = await funnelResponse(projectId, query.range, query.dim === 'visitor' ? 'visitor' : 'breakdowns', end)
+type Props = { query: AnalyticsQuery; end: number; result: Promise<FunnelResponse | null> }
+
+export async function FunnelBlock({ query, end, result }: Props) {
+  const initial = await result
   return (
     <div id={query.dim === 'source' ? undefined : 'funnel'} className="scroll-mt-4">
       <FunnelExplorer key={`${query.range}-${end}-${query.dim}`} query={query} initial={initial} initialEnd={end} />

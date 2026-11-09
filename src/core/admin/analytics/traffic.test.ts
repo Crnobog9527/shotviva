@@ -141,3 +141,15 @@ it('accepts empty aggregates and rejects corrupt counts or unknown channels', as
       .rejects.toMatchObject({ failure: 'bad_response' })
   }
 })
+
+it('starts both independent traffic aggregates before either returns', async () => {
+  const response = Promise.withResolvers<QueryAnswer>()
+  const calls: string[] = []
+  const load = loadTraffic(({ name }) => {
+    calls.push(name)
+    return response.promise
+  }, WEEK)
+  expect(calls).toEqual(['traffic.views', 'traffic.sessions'])
+  response.resolve({ columns: [], results: [] })
+  await load
+})

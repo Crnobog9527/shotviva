@@ -91,8 +91,8 @@ export async function readBlock<T>(name: string, read: () => Promise<{ window: W
   }
 }
 
-export const readTraffic = (range: Range): Promise<Block<Traffic>> => readBlock('traffic', () => cachedTraffic(range, funnelEnd()))
-export const readPages = (range: Range): Promise<Block<PageRow[]>> => readBlock('pages', () => cachedPages(range, funnelEnd()))
+export const readTraffic = (range: Range, end = funnelEnd()): Promise<Block<Traffic>> => readBlock('traffic', () => cachedTraffic(range, end))
+export const readPages = (range: Range, end = funnelEnd()): Promise<Block<PageRow[]>> => readBlock('pages', () => cachedPages(range, end))
 export const funnelEnd = () => Math.floor(Date.now() / 600_000) * 600_000
 export const readFunnelGroup = (range: Range, group: FunnelGroup, end = funnelEnd()) =>
   readBlock('funnel', () => cachedFunnel(range, group, end))

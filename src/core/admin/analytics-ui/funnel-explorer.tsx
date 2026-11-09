@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
 
 import { cn } from '../../ui/cn'
-import { FUNNEL_DIMS, parseFunnelDim, type FunnelDim } from '../analytics/funnel-options'
+import { FUNNEL_DIMS, groupOf, parseFunnelDim, type FunnelDim } from '../analytics/funnel-options'
 import type { FunnelResponse } from '../analytics/funnel-response'
 import { ANALYTICS_COPY } from './copy'
 import { FunnelView } from './funnel-view'
@@ -12,9 +12,15 @@ import { analyticsHref, liveAnalyticsHref, type AnalyticsQuery } from './href'
 import { BlockFrame, Unavailable } from './parts'
 
 const COPY = ANALYTICS_COPY.funnel
-const groupOf = (dim: FunnelDim) => (dim === 'visitor' ? 'visitor' : 'breakdowns')
 type Results = Partial<Record<string, FunnelResponse | null>>
 type Props = { query: AnalyticsQuery; initial: FunnelResponse | null; initialEnd: number }
+
+function cachedResult(results: Results, end: number, dim: FunnelDim) {
+  const own = results[`${end}-${groupOf(dim)}`]
+  if (dim !== 'none' || own) return own
+  // Every grouped response also carries the ungrouped totals for this exact window.
+  return results[`${end}-source`] ?? results[`${end}-visitor`] ?? own
+}
 
 function useFunnel(query: AnalyticsQuery, initial: FunnelResponse | null, initialEnd: number) {
   const [dim, setDim] = useState(query.dim)
@@ -31,7 +37,7 @@ function useFunnel(query: AnalyticsQuery, initial: FunnelResponse | null, initia
       const epoch = Math.max(end, initialEnd + Math.floor((performance.now() - mountedAt) / 600_000) * 600_000)
       setEnd(epoch)
       const key = `${epoch}-${group}`
-      if (results[key] || pending.current.has(key)) return
+      if (cachedResult(results, epoch, next) || pending.current.has(key)) return
       pending.current.add(key)
       setResults((all) => ({ ...all, [key]: undefined }))
       const params = new URLSearchParams({ range: query.range, group, end: String(epoch) })
@@ -56,7 +62,7 @@ function useFunnel(query: AnalyticsQuery, initial: FunnelResponse | null, initia
     window.addEventListener('popstate', back)
     return () => window.removeEventListener('popstate', back)
   }, [choose])
-  return { dim, choose, result: results[`${end}-${groupOf(dim)}`] }
+  return { dim, choose, result: cachedResult(results, end, dim) }
 }
 
 export function FunnelExplorer({ query, initial, initialEnd }: Props) {

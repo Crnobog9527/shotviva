@@ -1,5 +1,8 @@
-import { Suspense } from 'react'
+import { Suspense, type ReactNode } from 'react'
 
+import { groupOf } from '../analytics/funnel-options'
+import { funnelResponse } from '../analytics/funnel-response'
+import { funnelEnd, readTraffic } from '../analytics/load'
 import { RANGES, type Range } from '../analytics/range'
 import { ActivationBlock } from './activation-block'
 import { ANALYTICS_COPY as COPY } from './copy'
@@ -39,13 +42,23 @@ export function Unconfigured({ range }: { range: Range }) {
 
 type Props = { query: AnalyticsQuery; projectId: string; giftCredits: number }
 
-// Stream blocks independently so a slow PostHog query only holds up its section.
+async function AfterFirstReads({ ready, children }: { ready: Promise<unknown>; children: ReactNode }) {
+  await ready
+  return children
+}
+
+// PostHog runs three queries per project at once. Reserve the first batch for both traffic
+// queries and the selected funnel. Vercel has its own quota and can stream independently.
 export function AnalyticsView({ query, projectId, giftCredits }: Props) {
+  const end = funnelEnd()
+  const traffic = readTraffic(query.range, end)
+  const funnel = funnelResponse(projectId, query.range, groupOf(query.dim), end)
+  const firstReads = Promise.allSettled([traffic, funnel])
   const blocks = [
-    { key: 'traffic', title: COPY.traffic.title, node: <TrafficBlock query={query} projectId={projectId} /> },
-    { key: 'edge', title: COPY.edge.title, node: <EdgeTraffic range={query.range} /> },
-    { key: 'pages', title: COPY.pages.title, node: <PagesBlock query={query} projectId={projectId} /> },
-    { key: 'funnel', title: COPY.funnel.title, node: <FunnelBlock query={query} projectId={projectId} /> },
+    { key: 'traffic', title: COPY.traffic.title, priority: true, node: <TrafficBlock query={query} projectId={projectId} result={traffic} /> },
+    { key: 'edge', title: COPY.edge.title, priority: true, node: <EdgeTraffic range={query.range} /> },
+    { key: 'pages', title: COPY.pages.title, node: <PagesBlock query={query} projectId={projectId} end={end} /> },
+    { key: 'funnel', title: COPY.funnel.title, priority: true, node: <FunnelBlock query={query} end={end} result={funnel} /> },
     { key: 'payment', title: COPY.payment.title, node: <PaymentBlock query={query} projectId={projectId} /> },
     { key: 'activation', title: COPY.activation.title, node: <ActivationBlock range={query.range} giftCredits={giftCredits} projectId={projectId} /> },
     { key: 'templates', title: COPY.templates.title, node: <TemplatesBlock range={query.range} projectId={projectId} /> },
@@ -66,7 +79,7 @@ export function AnalyticsView({ query, projectId, giftCredits }: Props) {
             </header>
           ) : null}
           <Suspense key={`${query.range}-${block.key === 'funnel' ? query.dim : ''}`} fallback={<BlockSkeleton title={block.title} />}>
-            {block.node}
+            {block.priority ? block.node : <AfterFirstReads ready={firstReads}>{block.node}</AfterFirstReads>}
           </Suspense>
         </div>
       ))}

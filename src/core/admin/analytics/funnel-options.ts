@@ -15,3 +15,8 @@ export type FunnelDim = (typeof FUNNEL_DIMS)[number]
 export function parseFunnelDim(value: unknown): FunnelDim {
   return typeof value === 'string' && (FUNNEL_DIMS as readonly string[]).includes(value) ? (value as FunnelDim) : 'none'
 }
+
+// Only source attribution needs a sessions join; visitor history needs its own lookback.
+export const FUNNEL_GROUPS = ['breakdowns', 'source', 'visitor'] as const
+export type FunnelGroup = (typeof FUNNEL_GROUPS)[number]
+export const groupOf = (dim: FunnelDim): FunnelGroup => dim === 'source' || dim === 'visitor' ? dim : 'breakdowns'

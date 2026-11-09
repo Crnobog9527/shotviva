@@ -77,14 +77,17 @@ describe('loadFunnel (recorded answers)', () => {
   })
 })
 
-it('shares one bounded query across five dimensions and loads visitor history only on demand', async () => {
+it('shares the inexpensive breakdowns and defers the sessions join and visitor history', async () => {
   const { loadFunnelGroup } = await import('./funnel')
-  const segments = {locale: 'en', device: 'Mobile', country: 'GB', source: 'google'}
+  const segments = {locale: 'en', device: 'Mobile', country: 'GB'}
   const results = Object.entries(segments).map(([dim, seg]) => [1, dim, seg, 4, 3, 2, 1, 1, 0])
-  const run = fakeRun({'funnel.breakdowns': {columns: ['cur', 'dim', 'seg','s0','s1','s2','s3','s4','s5'], results}})
+  const run = fakeRun({
+    'funnel.breakdowns': {columns: ['cur', 'dim', 'seg','s0','s1','s2','s3','s4','s5'], results},
+  })
   const groups = await loadFunnelGroup(run, WEEK, 'breakdowns')
   expect(run.asked).toHaveLength(1)
   expect(run.asked[0]?.query).not.toContain('prior_current')
+  expect(run.asked[0]?.query).not.toContain('session.$entry_current_url')
   expect(groups.none?.segments).toEqual([])
   for (const [dim, value] of Object.entries(segments)) {
     expect(groups[parseFunnelDim(dim)]?.segments).toEqual([{value, counts: groups.none?.current}])
@@ -92,4 +95,14 @@ it('shares one bounded query across five dimensions and loads visitor history on
   expect(await loadFunnelGroup(run, WEEK, 'visitor')).toHaveProperty('visitor')
   expect(run.asked.map((entry) => entry.name)).toEqual(['funnel.breakdowns', 'funnel.visitor'])
   expect(run.asked[1]?.query).toContain('prior_current')
+})
+
+it('returns totals with session attribution when the source dimension is requested', async () => {
+  const { loadFunnelGroup } = await import('./funnel')
+  const run = fakeRun({'funnel.source': {
+    columns: ['cur','seg','s0','s1','s2','s3','s4','s5'], results: [[1,'google',4,3,2,1,1,0]],
+  }})
+  const source = await loadFunnelGroup(run, WEEK, 'source')
+  expect(source.none?.current).toEqual(source.source?.current)
+  expect(run.asked.at(-1)?.query).toContain('session.$entry_current_url')
 })

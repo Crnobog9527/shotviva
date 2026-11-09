@@ -2,7 +2,7 @@ import { AnalyticsLink } from './analytics-link'
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../ui/table'
 import { sqlEditorLink } from '../analytics/links'
-import { readTraffic } from '../analytics/load'
+import type { Block } from '../analytics/load'
 import type { Window } from '../analytics/range'
 import { trafficSessionsQuery, trafficViewsQuery, type Channel, type Traffic } from '../analytics/traffic'
 import { rate } from '../analytics/values'
@@ -98,8 +98,10 @@ export function TrafficView({ data, window, query }: { data: Traffic; window: Wi
   )
 }
 
-export async function TrafficBlock({ projectId, query }: { projectId: string; query: AnalyticsQuery }) {
-  const block = await readTraffic(query.range)
+type Props = { projectId: string; query: AnalyticsQuery; result: Promise<Block<Traffic>> }
+
+export async function TrafficBlock({ projectId, query, result }: Props) {
+  const block = await result
   const links = block.status === 'ok' ? [
     { href: sqlEditorLink(projectId, trafficViewsQuery(block.window)), label: COPY.browserQuery },
     { href: sqlEditorLink(projectId, trafficSessionsQuery(block.window)), label: COPY.sessionQuery },

@@ -83,8 +83,9 @@ const viewRow = z.object({
 const sessionRow = z.object({ channel: z.enum(CHANNELS), sessions: count, en: count, zh: count })
 
 export async function loadTraffic(run: RunQuery, window: Window): Promise<Traffic> {
-  const views = rowsOf(await run(trafficViewsQuery(window)), viewRow)
-  const sessions = rowsOf(await run(trafficSessionsQuery(window)), sessionRow)
+  const [viewResult, sessionResult] = await Promise.all([run(trafficViewsQuery(window)), run(trafficSessionsQuery(window))])
+  const views = rowsOf(viewResult, viewRow)
+  const sessions = rowsOf(sessionResult, sessionRow)
   const result: Traffic = {
     views: 0,
     visitors: 0,
