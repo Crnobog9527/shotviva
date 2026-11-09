@@ -5,7 +5,7 @@ import { ApplicationFields } from './application-fields'
 import { formLabels } from './form-labels'
 import { publishedTerms } from './terms'
 import { TermsConsent } from './terms-consent'
-import type { Settings } from './models'
+import type { EnrollmentSettings } from './models'
 
 export async function ApplicationForm({
   parent,
@@ -14,7 +14,7 @@ export async function ApplicationForm({
   loginUrl,
 }: {
   parent: string
-  settings: Settings
+  settings: EnrollmentSettings
   eligible: boolean
   loginUrl?: string
 }) {
