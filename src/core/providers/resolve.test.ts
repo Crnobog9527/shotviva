@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 
+import { FULL_IMAGE_OPTIONS } from '../templates/image-options'
 import { RESOLUTIONS } from '../templates/output-options'
 import { parseServerEnv } from '../env'
 import { modelFromTag } from '../jobs/provider-tag'
-import { resolveProvider } from './resolve'
+import { effectiveReferenceRange, resolveProvider } from './resolve'
 import type { ProviderAdapters, ProviderConfig } from './types'
 
 const ROW_ID = '6f1c2f9e-6a52-4c39-9a51-0a9f6b0c1d2e'
@@ -80,4 +81,12 @@ describe('modelFromTag', () => {
     expect(modelFromTag('openai-image')).toBeNull()
     expect(modelFromTag(null)).toBeNull()
   })
+})
+
+it('applies both the saved and current input limits to the resolved model', () => {
+  const saved = { ...row, capabilities: { ...FULL_IMAGE_OPTIONS, minReferences: 1, maxReferences: 3, fetchedAt: '' } }
+  expect(effectiveReferenceRange(saved, { input_references: { type: 'range', min: 2, max: 5 } }))
+    .toEqual({ minReferences: 2, maxReferences: 3 })
+  expect(effectiveReferenceRange(saved, { input_references: { type: 'range', min: 0, max: 2 } }))
+    .toEqual({ minReferences: 1, maxReferences: 2 })
 })

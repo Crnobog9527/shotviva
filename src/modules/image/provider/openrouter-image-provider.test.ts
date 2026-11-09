@@ -167,12 +167,20 @@ describe('OpenRouter image responses', () => {
   })
 })
 
-it('requests the supported square ratio when only the template supplies images', async () => {
+it('sends a style-only request to a model requiring references, and blocks an empty request before POST', async () => {
   const fetch = fake(reply(await imageData('png')))
-  await createOpenRouterImageProvider({ ...config, model: flux, fetch }).generate(input({
-    aspectRatio: 'original', photoCount: 0, images: [{ ...photo, width: 600, height: 900 }],
+  const provider = createOpenRouterImageProvider({ ...config, model: flux, fetch, imageParameters: {
+    aspect_ratio: { type: 'enum', values: ['auto', '1:1'] }, input_references: { type: 'range', min: 1, max: 1 },
+  } })
+  await expect(provider.generate(input({ aspectRatio: 'original', photoCount: 0, images: [] })))
+    .rejects.toMatchObject({ code: 'MODEL_INPUT_UNSUPPORTED' })
+  expect(fetch).not.toHaveBeenCalled()
+  await provider.generate(input({
+    aspectRatio: 'original', photoCount: 0, images: [{ ...photo, contentType: 'image/webp', width: 600, height: 900 }],
   }))
-  const body = JSON.parse(String(fetch.mock.calls[1]?.[1]?.body))
-  expect(body.aspect_ratio).toBe('1:1')
-  expect(body.input_references).toHaveLength(1)
+  const [url, init] = fetch.mock.calls[0]!
+  expect(url).toBe('https://openrouter.ai/api/v1/images')
+  expect(JSON.parse(String(init?.body))).toMatchObject({
+    aspect_ratio: '1:1', input_references: [{ type: 'image_url', image_url: { url: 'data:image/webp;base64,AQI=' } }],
+  })
 })

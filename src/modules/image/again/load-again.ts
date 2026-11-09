@@ -20,6 +20,9 @@ export async function loadAgain(deps: Deps, req: { userId: string; jobId: string
   const job = await findOwnJob(deps.db, req.userId, req.jobId)
   if (!job || job.status !== 'succeeded' || job.templateId !== req.template.id) return null
   const base = { jobId: job.id, values: againValues(job.inputs, req.template), madeAt: job.createdAt.toISOString() }
+  if (req.template.photoInput === 'none' || (req.template.photoInput === 'optional' && job.inputs.input_key === null)) {
+    return { ...base, photos: [], missing: null }
+  }
   if (keptInputsOf(job).length === 0) return { ...base, photos: [], missing: 'old' }
   try {
     return { ...base, photos: await photosForAgain(deps.store(), job), missing: null }

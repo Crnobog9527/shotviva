@@ -1,12 +1,12 @@
 'use client'
 
 import { useFormatter, useTranslations } from 'next-intl'
-import { forwardRef } from 'react'
+import { forwardRef, type ReactNode } from 'react'
 
 import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
 import { NOTE_MAX_LENGTH } from '@/core/templates/output-options'
 
-import type { CatalogueTemplate } from '../catalogue/catalogue-template'
+import { allowsNoPhoto, type CatalogueTemplate } from '../catalogue/catalogue-template'
 import { GroundedImg } from '../result/grounded-img'
 import { UPLOAD_FORMAT_NAMES, UPLOAD_MAX_MB } from '../workspace/upload-formats'
 import { notePlaceholder } from '../workspace/workspace-options'
@@ -114,13 +114,13 @@ export const HomeCard = forwardRef<HTMLElement, Props>(function HomeCard({ state
   )
   return (
     <section className="mk-gen" id="gen" aria-label={t('label')} ref={ref}>
-      <Drop url={photo.url} onPick={onPickPhoto} />
+      {template?.photoInput !== 'none' ? <Drop url={photo.url} onPick={onPickPhoto} /> : null}
       {photo.error ? (
         <p role="alert" className="mk-gen-error">
           {app(`errors.${photo.error}`)}
         </p>
       ) : null}
-      {photo.url ? (
+      {photo.url || allowsNoPhoto(template) ? (
         <>
           <div className="mk-picks-head">
             <span>{t('template')}</span>
@@ -137,14 +137,7 @@ export const HomeCard = forwardRef<HTMLElement, Props>(function HomeCard({ state
           <TemplateToggles className="mk-toggles" template={template} values={state.toggles} onChange={state.setToggles} surface="home" />
         </>
       ) : (
-        <div className="mk-current">
-          {thumb ? <GroundedImg className="mk-thumb" ground="white" {...thumbImage(thumb, 44)} alt="" /> : <span className="mk-thumb" aria-hidden />}
-          <span className="mk-current-t">
-            <small>{t('template')}</small>
-            <b>{template?.name ?? t('noTemplates')}</b>
-          </span>
-          {seeAll}
-        </div>
+        <CurrentTemplate thumb={thumb} name={template?.name} seeAll={seeAll} />
       )}
       <div className="mk-gen-cta">
         <HomeCtaButton cta={state.cta} templateId={template?.id ?? null} place="card" onPickPhoto={onPickPhoto} onSignUp={onSignUp} onGenerate={state.generate} />
@@ -156,3 +149,17 @@ export const HomeCard = forwardRef<HTMLElement, Props>(function HomeCard({ state
     </section>
   )
 })
+
+function CurrentTemplate({ thumb, name, seeAll }: { thumb: string | null; name?: string; seeAll: ReactNode }) {
+  const t = useTranslations('home.generator')
+  return (
+    <div className="mk-current">
+      {thumb ? <GroundedImg className="mk-thumb" ground="white" {...thumbImage(thumb, 44)} alt="" /> : <span className="mk-thumb" aria-hidden />}
+      <span className="mk-current-t">
+        <small>{t('template')}</small>
+        <b>{name ?? t('noTemplates')}</b>
+      </span>
+      {seeAll}
+    </div>
+  )
+}

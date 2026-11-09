@@ -186,5 +186,11 @@ it('keeps the square original size on a text-only template with a portrait style
   const fetch = vi.fn<typeof globalThis.fetch>(async () => json({ data: [{ b64_json: PNG_B64 }] }))
   const images = [{ bytes: Uint8Array.of(41), contentType: 'image/webp', width: 600, height: 900 }]
   await provider(fetch).generate(input({ images, photoCount: 0, aspectRatio: 'original' }))
-  expect((fetch.mock.calls[0]?.[1]?.body as FormData).get('size')).toBe('1024x1024')
+  const [url, init] = fetch.mock.calls[0]!
+  expect(url).toBe('https://api.openai.com/v1/images/edits')
+  const form = init?.body as FormData
+  expect(form.get('size')).toBe('1024x1024')
+  const file = form.get('image') as File
+  expect(file.type).toBe('image/webp')
+  expect(new Uint8Array(await file.arrayBuffer())).toEqual(images[0]!.bytes)
 })
