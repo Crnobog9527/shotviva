@@ -105,7 +105,7 @@
     },
     "signup": {
       "title": "Create your account",
-      "gift": "{count, plural, one {# free Standard image} other {# free Standard images}}",
+      "gift": "{upTo, select, true {Up to } other {}}{count, plural, one {# free Standard image} other {# free Standard images}}",
       "giftNote": "Shown publicly with a watermark",
       "submit": "Create account",
       "fine": "By continuing you agree to the <terms>Terms</terms> and <privacy>Privacy Policy</privacy>.",
@@ -512,6 +512,7 @@
       "download": "Download",
       "downloadPx": "Download <cost>· <mono>{px, number, ::group-off}</mono> px</cost>",
       "longPress": "Long-press to save",
+      "photosHint": "To save to Photos, tap Share, then Save Image",
       "showTransparency": "Show transparency",
       "makeAnotherWith": "Make another with {name}",
       "shareText": "Made with {brand} {url}",

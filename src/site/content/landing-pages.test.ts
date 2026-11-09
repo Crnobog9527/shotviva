@@ -4,7 +4,7 @@ import type { ContentPage } from '@/core/content'
 
 import { site } from '../site.config'
 import { contentPagesIn } from './localized'
-import { menuCostUsd, photosLeftAfterMenu } from './offer'
+import { FALLBACK_CREDITS, fillCredits } from './credits'
 import { aiRestaurantMenu } from './pages/ai-restaurant-menu'
 import { commercialPhotography } from './pages/commercial-photography'
 import { PLATFORM_SPECS } from './platform-specs'
@@ -46,12 +46,14 @@ describe('landing pages', () => {
   })
 
   it('bills the menu from config: a half day $400–$2,500 against 10 dishes at Standard', () => {
-    const { photographer, site: us } = aiRestaurantMenu.costBills
+    // 10 dishes at the catalogue's cheapest Standard price (T91): 1 credit → 10 credits ≈ $4 and
+    // (50 − 10) ÷ 1 left; with no catalogue, 2 credits a dish.
+    const { photographer, site: us } = fillCredits(aiRestaurantMenu.costBills, { from: 1, same: false })
     expect(photographer.total.amount).toBe('$400–$2,500')
     expect(photographer.lines.map((line) => line.label).join(' ')).not.toMatch(/retouch/i)
-    expect(menuCostUsd).toBe('$8')
-    expect(photosLeftAfterMenu).toBe(15)
-    expect(us.lines.map((line) => line.value)).toEqual(['$19.90', '20 credits ≈ $8', '15 more photos'])
+    expect(us.lines.map((line) => line.value)).toEqual(['$19.90', '10 credits ≈ $4', '40 more photos'])
+    const fallback = fillCredits(aiRestaurantMenu.costBills, FALLBACK_CREDITS).site
+    expect(fallback.lines.map((line) => line.value)).toEqual(['$19.90', '20 credits ≈ $8', '15 more photos'])
     expect(us.total.when).toBe(`about ${site.marketing.photoSecondsApprox} seconds a photo`)
   })
 

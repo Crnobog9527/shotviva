@@ -1,10 +1,12 @@
 // "What a credit buys" on /pricing (comps-v3-b pricing.html): the credits one photo costs at
-// each resolution, as a definition list on one flat plate. The numbers come from the page
-// content, which reads them from the config (建站规格 G3).
+// each resolution, as a definition list on one flat plate. The page fills the numbers from the
+// published templates (T91); the content's own config numbers stand in when there are none.
 export type CreditBuysBlock = {
   heading: string
   tiers: readonly { name: string; credits: number }[]
   unit: string
+  // The unit after 1 ("1 credit"); languages without a singular leave it out.
+  unitOne?: string
   note: string
 }
 
@@ -20,7 +22,7 @@ export function CreditBuys({ block }: { block: CreditBuysBlock }) {
             <dt className="text-caption text-muted-foreground">{tier.name}</dt>
             <dd className="mt-1 font-display text-[24px] leading-none">
               {tier.credits}
-              <small className="ml-1 font-mono text-caption font-medium text-bone-dim">{block.unit}</small>
+              <small className="ml-1 font-mono text-caption font-medium text-bone-dim">{tier.credits === 1 ? (block.unitOne ?? block.unit) : block.unit}</small>
             </dd>
           </div>
         ))}

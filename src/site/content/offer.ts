@@ -8,8 +8,9 @@ import { site } from '../site.config'
 
 // The three output tiers as the public sees them (ARCHITECTURE §5, §8.1; DESIGN §4.3). The
 // pixel sizes are fixed by modules/image (T16) and the per-template cost lives in
-// templates.credits_cost; these are the `high` defaults (the signup gift, the bills, what a
-// credit buys). "from N credits" is not one of them: see fromCredits below.
+// templates.credits_cost; these are the `high` defaults (what a credit buys). Counts of images
+// (the signup gift, the bills) and "from N credits" follow the catalogue instead: see
+// fromCredits and CreditFacts below; Standard's 2 only stands in when there is no catalogue.
 // Public copy never says 1K / 2K / 3K or 4K.
 export const OUTPUT_TIERS = [
   { name: 'Standard', px: 1024, credits: 2, use: 'social posts and delivery apps' },
@@ -36,14 +37,37 @@ export const FromCredits = '⟦From-credits⟧'
 // "One product, three styled photos": the home demo and the two bills (DESIGN §6.9 item 6).
 export const SET_PHOTOS = 3
 
-// Credits for one photo in each of three templates at Standard: "6"
-export const setCredits = STANDARD.credits * SET_PHOTOS
+// --- Counts that follow the catalogue (建站规格 G3, T91). Every number that counts images made
+// from credits uses the same N as "from N credits": the cheapest Standard price among the
+// published web templates, known only when the page renders. Copy carries the markers below;
+// fillCredits (./credits) renders them with COUNT_MARKERS. ---
 
-// The signup gift is counted in Standard images: 6 free credits = 3 Standard images (G3).
-export const freeStandardImages = Math.floor(site.billing.freeCredits / STANDARD.credits)
+// What the page knows about the catalogue: the cheapest Standard price, and whether every
+// published template costs that ("6 free Standard images" instead of "up to 6 ...").
+export type CreditFacts = { from: number; same: boolean }
 
-// "3 free Standard images": the only place the site counts in images instead of credits.
-export const freeImagesLabel = `${freeStandardImages} free ${STANDARD.name} ${freeStandardImages === 1 ? 'image' : 'images'}`
+// The signup gift in Standard images at N credits each: 6 free credits at 1 credit = 6.
+export const freeStandardImages = (n: number) => Math.floor(site.billing.freeCredits / n)
+
+// "up to 6 free Standard images" / "Up to 6 free Standard images" / "Up to 6 Free Standard
+// Images" / "Up to 6 free images" (the home meta description, 155 characters): the only place
+// the site counts in images instead of credits. "up to" goes when every template costs the same.
+export const freeImagesLabel = '⟦free-images⟧'
+export const FreeImagesLabel = '⟦Free-images⟧'
+export const FreeImagesTitle = '⟦Free-Images⟧'
+export const FreeImagesShort = '⟦Free-images-short⟧'
+
+// The home set at Standard: "3" credits, "$1.20", and the "47" photos the cheapest plan's month
+// still makes after it.
+export const setCredits = '⟦set-credits⟧'
+export const setCostUsd = '⟦set-usd⟧'
+export const photosLeftInPlan = '⟦plan-left⟧'
+
+// /ai-restaurant-menu's bill: a menu of ten dishes at Standard, "10" credits, "$4", "40" left.
+export const MENU_DISHES = 10
+export const menuCredits = '⟦menu-credits⟧'
+export const menuCostUsd = '⟦menu-usd⟧'
+export const photosLeftAfterMenu = '⟦menu-left⟧'
 
 // "JPG, PNG or WebP, up to 20MB"
 const FORMAT_NAMES: Record<string, string> = { 'image/jpeg': 'JPG', 'image/png': 'PNG', 'image/webp': 'WebP' }
@@ -158,27 +182,43 @@ export const quoteUsd: UsdRange = setShotsUsd
 // "60": the one round figure for how long a photo takes (no ranges, no per-quality times).
 export const photoSeconds = photoSecondsApprox
 
-// The set's credits at the cheapest plan's credit price, rounded the way /pricing shows it:
-// 6 × $0.40 = "$2.40". Undefined until the plans are priced.
-export const setCostUsd = setUsd()
+// --- The catalogue counts, rendered (the markers above). ---
 
-// Standard photos the rest of that plan's month still makes: (50 − 6) ÷ 2 = 22.
-export const photosLeftInPlan = planFrom ? Math.floor((planFrom.credits - setCredits) / STANDARD.credits) : undefined
+const sentence = (text: string) => `${text.charAt(0).toUpperCase()}${text.slice(1)}`
 
-function setUsd(): string | undefined {
-  return creditsUsd(setCredits)
+type FreeStyle = 'plain' | 'title' | 'short'
+
+function freeImages({ from, same }: CreditFacts, style: FreeStyle = 'plain'): string {
+  const count = freeStandardImages(from)
+  const image = count === 1 ? 'image' : 'images'
+  const nouns: Record<FreeStyle, string> = {
+    plain: `free ${STANDARD.name} ${image}`,
+    title: `Free ${STANDARD.name} ${sentence(image)}`,
+    short: `free ${image}`,
+  }
+  return same ? `${count} ${nouns[style]}` : `${style === 'title' ? 'Up' : 'up'} to ${count} ${nouns[style]}`
 }
 
-// --- /ai-restaurant-menu's bill: a menu of ten dishes at Standard. ---
-export const MENU_DISHES = 10
-export const menuCredits = STANDARD.credits * MENU_DISHES
-
-function creditsUsd(credits: number): string | undefined {
-  if (!planFrom) return undefined
+// N credits at the cheapest plan's credit price, rounded the way /pricing shows it: 3 × $0.40 =
+// "$1.20". Empty until the plans are priced.
+function creditsUsd(credits: number): string {
+  if (!planFrom) return ''
   const credit = Math.round((planFrom.priceUsd / planFrom.credits) * 100 + 1e-9) / 100
   return usd(Math.round(credit * credits * 100) / 100)
 }
-// 20 × $0.40 = "$8"
-export const menuCostUsd = creditsUsd(menuCredits)
-// (50 − 20) ÷ 2 = 15
-export const photosLeftAfterMenu = planFrom ? Math.floor((planFrom.credits - menuCredits) / STANDARD.credits) : undefined
+
+// Standard photos the rest of the cheapest plan's month still makes: (50 − 3) ÷ 1 = 47.
+const photosLeft = (spent: number, n: number) => (planFrom ? String(Math.floor((planFrom.credits - spent) / n)) : '')
+
+export const COUNT_MARKERS: readonly (readonly [string, (facts: CreditFacts) => string])[] = [
+  [freeImagesLabel, (facts) => freeImages(facts)],
+  [FreeImagesLabel, (facts) => sentence(freeImages(facts))],
+  [FreeImagesTitle, (facts) => freeImages(facts, 'title')],
+  [FreeImagesShort, (facts) => sentence(freeImages(facts, 'short'))],
+  [setCredits, ({ from }) => String(from * SET_PHOTOS)],
+  [setCostUsd, ({ from }) => creditsUsd(from * SET_PHOTOS)],
+  [photosLeftInPlan, ({ from }) => photosLeft(from * SET_PHOTOS, from)],
+  [menuCredits, ({ from }) => String(from * MENU_DISHES)],
+  [menuCostUsd, ({ from }) => creditsUsd(from * MENU_DISHES)],
+  [photosLeftAfterMenu, ({ from }) => photosLeft(from * MENU_DISHES, from)],
+]

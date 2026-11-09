@@ -34,8 +34,8 @@ function menuBills(): CostBills {
       total: { amount: plan, suffix: '/月起', when: `每张 ${photoSeconds} 秒左右` },
       lines: [
         { label: `入门版，每月 ${planFrom?.credits ?? ''} 积分`, value: plan },
-        { label: `${MENU_DISHES} 道菜，${standard?.name ?? ''}`, value: `${menuCredits} 积分 ≈ ${menuCostUsd ?? ''}` },
-        { label: '这个月还能再做', value: `${photosLeftAfterMenu ?? ''} 张` },
+        { label: `${MENU_DISHES} 道菜，${standard?.name ?? ''}`, value: `${menuCredits} 积分 ≈ ${menuCostUsd}` },
+        { label: '这个月还能再做', value: `${photosLeftAfterMenu} 张` },
       ],
       fine: `每道菜在出菜口用手机拍一张，光线和造型交给模板。先用 ${zhFreeImages}试试，不用绑卡。`,
     },

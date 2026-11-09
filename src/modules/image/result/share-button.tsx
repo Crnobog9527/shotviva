@@ -10,9 +10,9 @@ import { useShareFile } from './use-share-file'
 
 type Props = { fileUrl: string; name: string; shareText: string; px?: number }
 
-// Share (DESIGN §4.4, MOBILE_UI_rules §1.8.1): the system share sheet where the browser can
-// hand files to the OS (save to Photos, WhatsApp, Instagram…), otherwise a download link with
-// "Long-press to save" for in-app browsers. text carries one line and a utm link; apps that
+// Download, plus Share (DESIGN §4.4, MOBILE_UI_rules §1.8.1) beside it on phones where the browser
+// can hand files to the OS (save to Photos, WhatsApp, Instagram…); otherwise the download link
+// with "Long-press to save" for in-app browsers. text carries one line and a utm link; apps that
 // cannot take text drop it on their own. From lg up it is always Download (B comp
 // workspace.html, photo.html: "Download · 1024 px" with `px`); a desktop share sheet is not
 // where a file is saved.
@@ -33,13 +33,22 @@ export function ShareButton({ fileUrl, name, shareText, px }: Props) {
         .share({ files: [mode.file], title: name, text: shareText })
         .catch(() => undefined)
     }
+    // Owner 2026-11-08: iPhones need a Download button too (it saves to Files); Share sits beside
+    // it as a square button, because the share sheet's "Save Image" is how a photo reaches Photos.
     return (
       <>
-        <button type="button" onClick={share} className={cn(primary, 'lg:hidden')}>
-          <ShareIcon />
-          {t('share')}
-        </button>
-        {download('max-lg:hidden')}
+        <div className="flex gap-2">
+          {download('min-w-0 flex-1')}
+          <button
+            type="button"
+            onClick={share}
+            aria-label={t('share')}
+            className={cn(buttonVariants({ variant: 'glass', size: 'cta' }), 'aspect-square rounded-tile px-0 lg:hidden')}
+          >
+            <ShareIcon />
+          </button>
+        </div>
+        <p className="mt-2 text-center text-caption text-muted-foreground lg:hidden">{t('photosHint')}</p>
       </>
     )
   }

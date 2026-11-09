@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest'
 
 import { validateContentPage } from '@/core/content'
 
+import { FALLBACK_CREDITS, fillCredits } from '../credits'
+
 import { zhHomePage } from './home'
 import { zhAiRestaurantMenu } from './pages/ai-restaurant-menu'
 import { zhCommercialPhotography } from './pages/commercial-photography'
@@ -53,10 +55,13 @@ const PAGES = {
 
 describe('/zh marketing copy (建站规格 §6.1, G13)', () => {
   it('passes the TDK / direct-answer rules, measured in Chinese', () => {
-    expect(validateContentPage(zhHomePage, 'zh')).toEqual([])
-    expect(validateContentPage(zhImageToImageGenerator, 'zh')).toEqual([])
+    // Measured as served, with 「最多 6 张」 (the longest) and the no-catalogue 「3 张」 (T91).
+    for (const facts of [{ from: 1, same: false }, FALLBACK_CREDITS]) {
+      expect(validateContentPage(fillCredits(zhHomePage, facts), 'zh')).toEqual([])
+      expect(validateContentPage(fillCredits(zhImageToImageGenerator, facts), 'zh')).toEqual([])
+      expect(fillCredits(zhPricingPage.description, facts).length).toBeLessThanOrEqual(80)
+    }
     expect(zhPricingPage.title.length).toBeLessThanOrEqual(30)
-    expect(zhPricingPage.description.length).toBeLessThanOrEqual(80)
   })
 
   it('starts each Title and H1 with the keyword from the Chinese keyword map, unbroken', () => {
@@ -76,7 +81,7 @@ describe('/zh marketing copy (建站规格 §6.1, G13)', () => {
   })
 
   it('writes one language per page', () => {
-    const pages = Object.values(PAGES).map((page) => ({ ...page, hero: undefined, path: undefined }))
+    const pages = Object.values(PAGES).map((page) => ({ ...fillCredits(page, FALLBACK_CREDITS), hero: undefined, path: undefined }))
     const words = pages.flatMap(strings).flatMap((text) => text.match(/[A-Za-z][A-Za-z']*/g) ?? [])
     expect([...new Set(words.filter((word) => !LATIN_OK.has(word)))]).toEqual([])
   })

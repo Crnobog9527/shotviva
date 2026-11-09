@@ -88,8 +88,8 @@ export function productBills(heading: string, intro: string, moreFine = ''): Cos
       total: { amount: plan, suffix: '/月起', when: `每张 ${photoSeconds} 秒左右` },
       lines: [
         { label: `入门版，每月 ${planFrom?.credits ?? ''} 积分`, value: plan },
-        { label: `这 ${SET_PHOTOS} 张，${standard.name}`, value: `${setCredits} 积分 ≈ ${setCostUsd ?? ''}` },
-        { label: '这个月还能再做', value: `${photosLeftInPlan ?? ''} 张` },
+        { label: `这 ${SET_PHOTOS} 张，${standard.name}`, value: `${setCredits} 积分 ≈ ${setCostUsd}` },
+        { label: '这个月还能再做', value: `${photosLeftInPlan} 张` },
       ],
       fine: `造型和精修都在模板里，主体保持你拍的样子。先用 ${zhFreeImages}试试，不用绑卡。`,
     },
@@ -143,7 +143,7 @@ export const zhHomePage = defineHomePage({
     points: [
       {
         heading: `注册送 ${zhFreeImages}`,
-        text: `每个新账号一次性获得 ${site.billing.freeCredits} 个免费积分，大多数模板够做 ${zhFreeImages}。免费积分不会每天或每月刷新。`,
+        text: `每个新账号一次性获得 ${site.billing.freeCredits} 个免费积分，够做 ${zhFreeImages}。免费积分不会每天或每月刷新。`,
       },
       {
         heading: '免费图公开带水印，付费图私密无水印',

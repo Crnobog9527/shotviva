@@ -5,7 +5,6 @@ import { EMAIL_LINK_HOURS } from '@/core/auth/link-expiry'
 import type { FieldError } from '@/core/auth/ui/validate'
 import en from '@/site/messages/en.json'
 import zh from '@/site/messages/zh.json'
-import { freeStandardImages } from '@/site/content'
 
 // The sign-in pages' copy (design/comps-v3-b/auth.html), checked in both languages
 // (ARCHITECTURE §17: the four pages ship in English and Chinese together).
@@ -21,7 +20,10 @@ describe('auth messages', () => {
   it('says what the signed-off comp says (en)', () => {
     expect(t.en('login.title')).toBe('Log in')
     expect(t.en('google')).toBe('Continue with Google')
-    expect(t.en('signup.gift', { count: freeStandardImages })).toBe('3 free Standard images')
+    // T91: the count follows the catalogue's cheapest Standard price; "Up to" when prices differ.
+    expect(t.en('signup.gift', { count: 6, upTo: 'true' })).toBe('Up to 6 free Standard images')
+    expect(t.en('signup.gift', { count: 3, upTo: 'false' })).toBe('3 free Standard images')
+    expect(t.en('signup.gift', { count: 1, upTo: 'false' })).toBe('1 free Standard image')
     expect(t.en('fieldErrors.passwordShort', { min: 8 })).toBe('Too short. Use 8 characters or more.')
     expect(t.en('expired.text', { hours: EMAIL_LINK_HOURS })).toBe(
       'Reset links work for one hour and only once. Ask for a new one and use it straight away.',
@@ -34,7 +36,8 @@ describe('auth messages', () => {
       expect(t.en(`fieldErrors.${key}`, { min: 8 })).not.toMatch(/auth\./)
       expect(t.zh(`fieldErrors.${key}`, { min: 8 })).toMatch(/[一-鿿]/)
     }
-    expect(t.zh('signup.gift', { count: freeStandardImages })).toBe('3 张标准清晰度免费图')
+    expect(t.zh('signup.gift', { count: 6, upTo: 'true' })).toBe('最多 6 张标准清晰度免费图')
+    expect(t.zh('signup.gift', { count: 3, upTo: 'false' })).toBe('3 张标准清晰度免费图')
     expect(t.zh('reset.sent', { email: 'mei@example.com', hours: EMAIL_LINK_HOURS, addr: (c: string) => c })).toContain('1 小时内有效')
   })
 

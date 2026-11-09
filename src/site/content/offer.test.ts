@@ -3,11 +3,13 @@ import { describe, expect, it } from 'vitest'
 import en from '../messages/en.json'
 import zh from '../messages/zh.json'
 import { site } from '../site.config'
-import { fillCredits } from './credits'
+import { FALLBACK_CREDITS, fillCredits } from './credits'
 import { homePage } from './home'
-import { perCredit, photosLeftInPlan, plansSentence, quoteUsd, setCostUsd, usdRange, yearlySaving } from './offer'
+import { perCredit, plansSentence, quoteUsd, usdRange, yearlySaving } from './offer'
 import { pricingPage } from './pricing'
 import { zhHomePage } from './zh/home'
+
+const LIVE = { from: 1, same: false }
 
 // The copy fills in from the nine products in site.config (ARCHITECTURE §6.2) without anyone
 // typing a number into it (建站规格 G3).
@@ -23,10 +25,10 @@ describe('copy with the catalog in site.config', () => {
 
   it('fills the /pricing title, lede and credit costs from config', () => {
     expect(pricingPage.title).toBe('Shotviva Pricing: Plans From $19.90 a Month')
-    expect(fillCredits(pricingPage.intro, 1)).toContain('A photo costs from 1 credit,')
+    expect(fillCredits(pricingPage.intro, LIVE)).toContain('A photo costs from 1 credit,')
     expect(pricingPage.intro).toContain('Yearly plans save up to 40%.')
     expect(pricingPage.intro).toContain('Credit packs start at $9.90.')
-    expect(pricingPage.gift).toBe('New users get 3 free Standard images. No card needed.')
+    expect(fillCredits(pricingPage.gift, LIVE)).toBe('New users get up to 6 free Standard images. No card needed.')
     expect(pricingPage.creditBuys.tiers).toEqual([
       { name: 'Standard', credits: 2 },
       { name: 'HD', credits: 4 },
@@ -39,17 +41,17 @@ describe('copy with the catalog in site.config', () => {
   it('fills both home bills from config: the photographer rates and the Starter plan (DESIGN §6.9 item 6)', () => {
     // 3 × $50–$350 styled shots; retouching is in the shot price, never a line of its own.
     expect(usdRange(quoteUsd)).toBe('$150–$1,050')
-    // 6 credits at Starter's $0.40 a credit, and (50 − 6) ÷ 2 Standard photos left.
-    expect(setCostUsd).toBe('$2.40')
-    expect(photosLeftInPlan).toBe(22)
-    const bills = homePage.costBills
+    // At the catalogue's 1 credit: 3 credits at Starter's $0.40 a credit, and (50 − 3) ÷ 1
+    // Standard photos left (T91); with no catalogue, 2 credits a photo.
+    const bills = fillCredits(homePage.costBills, LIVE)
     expect(bills.photographer.total.amount).toBe('$150–$1,050')
     expect(bills.photographer.lines.map((line) => line.label).join(' ')).not.toMatch(/retouch/i)
     expect(bills.photographer.fine).toContain('$50–$350 (Shopify, Jan 2026)')
     expect(bills.photographer.fine).toContain('$15–$90')
     expect(bills.photographer.fine).not.toMatch(/ASMP|association/i)
     expect(bills.site.total.amount).toBe('$19.90')
-    expect(bills.site.lines.map((line) => line.value)).toEqual(['$19.90', '6 credits ≈ $2.40', '22 more photos'])
+    expect(bills.site.lines.map((line) => line.value)).toEqual(['$19.90', '3 credits ≈ $1.20', '47 more photos'])
+    expect(fillCredits(homePage.costBills, FALLBACK_CREDITS).site.lines.map((line) => line.value)).toEqual(['$19.90', '6 credits ≈ $2.40', '22 more photos'])
     // One round figure, no range, no quality (Owner 2026-11-06).
     expect(bills.site.total.when).toBe(`about ${site.marketing.photoSecondsApprox} seconds a photo`)
     expect(zhHomePage.costBills.site.total.when).toBe(`每张 ${site.marketing.photoSecondsApprox} 秒左右`)
