@@ -1,4 +1,4 @@
-import { requireModule } from '@/core/config'
+import { requireModule } from '@/core/config/navigation'
 import { site } from '@/site/site.config'
 
 // Module switch: with modules.image = false every /generate route 404s (ARCHITECTURE §1.1).

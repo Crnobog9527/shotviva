@@ -29,7 +29,7 @@ import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { publicEnv } from '@/core/public-env'
 import { r2PublicStore, r2Store } from '@/core/storage'
 import { TEMPLATES_CACHE_TAG } from '@/core/templates'
-import { readTemplateFloors } from './pricing'
+import { readTemplateFloors } from '@/site/template-pricing'
 
 // Server actions are public endpoints, so each one re-checks the admin role itself.
 

@@ -1,6 +1,6 @@
 'use client'
 
-import type { ApprovedTariff, CreditsFloor } from '@/core/templates/pricing'
+import type { ApprovedTariff, CreditsFloor } from '@/core/templates'
 import { OPENAI_MAX_REFERENCES, type ImageCapabilities } from '@/core/templates/image-capabilities'
 import { FULL_IMAGE_OPTIONS } from '@/core/templates/image-options'
 import { Label } from '@/core/ui/label'
