@@ -1,7 +1,7 @@
 import type { StyleRef } from '@/core/templates/style-refs'
 import { MISSING_COST, floorGuidance } from '@/core/templates/provider-pricing'
 import { RESOLUTIONS, type Resolution } from '@/core/templates/output-options'
-import type { CreditsFloor, TemplateQuality } from '@/core/templates/pricing'
+import { approvedCredit, type CreditsFloor, type TemplateQuality } from '@/core/templates/pricing'
 import { toggleSetupProblems } from '@/core/templates/toggles'
 
 import type { AdminTemplate, SaveTemplatePayload } from '../templates/types'
@@ -156,6 +156,7 @@ export function creditProblems(values: TemplateFormValues, floor: CreditsFloor):
     const value = Number(text)
     const min = floor[values.quality][resolution]
     if (!/^\d+$/.test(text)) problems[resolution] = '请填正整数'
+    else if (value === approvedCredit(floor, values.quality, resolution)) continue
     else if (min === MISSING_COST) problems[resolution] = floorGuidance(min)
     else if (value < min) problems[resolution] = `不能低于下限 ${min}`
   }

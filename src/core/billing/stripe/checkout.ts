@@ -6,13 +6,15 @@ import { z } from 'zod'
 import type { CheckoutStartMethod } from '../../analytics/events'
 import { trackCheckoutStart } from '../../analytics/funnel'
 import { PRODUCT_IDS, type PaymentChannel, type ProductId, type SiteProduct } from '../../config'
+import type { SelectedCode } from '../buyer-quote'
+import { quoteMetadata, type CheckoutPrice } from '../checkout-price'
 import type { RpcClient } from '../rpc'
 import { definitelyRejected, discountedParams, expireAndRelease, releaseDiscount, reserveDiscount, type Discount } from './checkout-discount'
 import { logger } from '../../logger'
 import { AppError } from '../../errors'
 import { localizePath } from '../../i18n/paths'
 import { allowlistedUrl } from '../../partner/return-to'
-import { CHECKOUT_METHODS, checkoutRoute, offeredMethods, type CheckoutMethod, type CheckoutRoute } from './catalog'
+import { CHECKOUT_METHODS, checkoutRoute, lookupKey, offeredMethods, type CheckoutMethod, type CheckoutRoute } from './catalog'
 import { cancelReturnUrl, PRICING_CANCELLED } from './cancel-return'
 import { cardOnlyConfigId } from './card-only'
 import { buyerMetadata, evidenceParams } from './checkout-evidence'
@@ -31,6 +33,8 @@ export const checkoutBodySchema = z.strictObject({
   locale: z.enum(CHECKOUT_LOCALES).default('en'),
   // A displayed discount may have expired or been consumed in another tab. Its name is
   // only a quote precondition; the authenticated reservation supplies the actual coupon.
+  pricing_version: z.enum(['v1', 'v2']).optional(),
+  expected_price_cents: z.int().positive().optional(),
   expected_code: z.string().regex(/^[A-Z0-9]{4,20}$/).optional(),
   // Graylum top-up (ARCHITECTURE §14.5): where the success page offers to send the buyer back.
   // Kept only when its host is allowlisted; anything else is dropped, never echoed.
@@ -190,11 +194,11 @@ export function assertOffered(body: Pick<CheckoutBody, 'method' | 'locale'>, cha
   throw new AppError('INVALID_INPUT', `${body.method} is not offered on ${channel} for locale ${body.locale}`)
 }
 
-type CheckoutInput = { userId: string; body: CheckoutBody; client?: CheckoutClient; token?: string }
+type CheckoutInput = { userId: string; body: CheckoutBody; client?: CheckoutClient; token?: string; quote?: CheckoutPrice; selectedCode?: SelectedCode | null }
 type CheckoutResult = { url: string; cancelReceipt?: string }
 
-async function startSession(deps: CheckoutDeps, body: CheckoutBody, user: string, token: string, params: Stripe.Checkout.SessionCreateParams) {
-  const claim = await reserveDiscount(deps.codes, user, body, token, deps.products)
+async function startSession(deps: CheckoutDeps, body: CheckoutBody, user: string, token: string, params: Stripe.Checkout.SessionCreateParams, selectedCode?: SelectedCode | null) {
+  const claim = selectedCode === null ? null : await reserveDiscount(deps.codes, user, body, token, deps.products, selectedCode)
   const args = claim ? discountedParams(params, claim) : params
   try {
     const created = await deps.stripe.checkout.sessions.create(args, { idempotencyKey: token })
@@ -229,16 +233,17 @@ export async function createCheckout(deps: CheckoutDeps, input: CheckoutInput): 
   const product = deps.products.find((p) => p.id === body.product_id)
   if (!product || product.priceUsd <= 0) throw new AppError('NOT_FOUND', 'Unknown product')
   const route = checkoutRoute(product, body.method, deps.managedPayments, deps.wechatPay)
-  const priceId = await resolvePriceId(deps.stripe, product, route)
+  route.lookupKey = lookupKey(product.id, route.form, input.quote)
+  const priceId = await resolvePriceId(deps.stripe, product, route, input.quote?.cents)
   const cardOnlyConfig = isPlainCard(route) ? await cardOnlyConfigId(deps.stripe) : null
   const token = input.token ?? crypto.randomUUID()
-  const metadata = { user_id: input.userId, product_id: product.id, method: body.method, locale: body.locale }
+  const metadata = { user_id: input.userId, product_id: product.id, method: body.method, locale: body.locale, ...quoteMetadata(input.quote) }
   const params = sessionParams(route, priceId, metadata, {
     locale: body.locale, origin: deps.origin, token, cardOnlyConfig, termsConsent: deps.termsConsent,
     successPath: successPath(CHECKOUT_RETURN.stripe, body.return_to, deps.returnToHosts),
     client: input.client ?? { ip: null, userAgent: null },
   })
-  const { session, claim } = await startSession(deps, body, input.userId, token, params)
+  const { session, claim } = await startSession(deps, body, input.userId, token, params, input.selectedCode)
   const url = await validatedUrl(deps, session, claim, route, input.userId)
   ;(deps.trackStart ?? trackCheckoutStart)(input.userId, {
     product_id: product.id, tier: product.tier, interval: product.interval, form: route.form, channel: 'stripe',

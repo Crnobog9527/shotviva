@@ -198,6 +198,6 @@ describe('home FAQ, Chinese (建站规格 G6, G13)', () => {
 describe('home FAQ and /pricing agree', () => {
   it('quotes the same lowest per-credit price that the /pricing Max card prints', () => {
     const maxYearly = product('max_yearly')
-    expect(maxYearly && usd(perCreditUsd(maxYearly))).toBe(creditFrom)
+    expect(maxYearly && `$${perCreditUsd(maxYearly).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 5 })}`).toBe(creditFrom)
   })
 })

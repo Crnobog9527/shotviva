@@ -9,6 +9,7 @@ import type { ProductId, SiteProduct } from '../../config'
 import type { MembershipProductId } from '../../waffo-env'
 import { AppError } from '../../errors'
 import { localizePath } from '../../i18n/paths'
+import { quoteMetadata, type CheckoutPrice } from '../checkout-price'
 import { CHECKOUT_RETURN, successPath, type CheckoutBody } from '../stripe/checkout'
 import type { WaffoApi, WaffoSessionRequest } from './client'
 
@@ -57,7 +58,7 @@ export function isRecurring(product: SiteProduct, method: CheckoutBody['method']
 
 export function waffoSessionRequest(
   deps: Pick<WaffoCheckoutDeps, 'productIds' | 'subscriptionProductIds' | 'origin' | 'returnToHosts'>,
-  input: { userId: string; product: SiteProduct; body: CheckoutBody; orderRef: string },
+  input: { userId: string; product: SiteProduct; body: CheckoutBody; orderRef: string; quote?: CheckoutPrice },
 ): WaffoSessionRequest {
   const { product, body } = input
   const recurring = isRecurring(product, body.method)
@@ -67,21 +68,24 @@ export function waffoSessionRequest(
     // site.config.ts is the one source of prices (§6.2): the session carries it, so a Waffo
     // product priced differently in the dashboard cannot charge another amount. Tax is added
     // on top at checkout, as with Stripe Managed Payments.
-    priceSnapshot: { amount: product.priceUsd.toFixed(2), taxIncluded: false, taxCategory: 'saas' },
+    priceSnapshot: { amount: (input.quote ? input.quote.cents / 100 : product.priceUsd).toFixed(2), taxIncluded: false, taxCategory: 'saas' },
     // Back to the return page in the language the buyer checked out in.
     successUrl: `${deps.origin}${localizePath(successPath(CHECKOUT_RETURN.waffo(product.id), body.return_to, deps.returnToHosts), body.locale)}`,
     expiresInSeconds: WAFFO_SESSION_TTL_SECONDS,
-    metadata: { user_id: input.userId, product_id: product.id, method: body.method, locale: body.locale },
-    orderMerchantExternalId: input.orderRef,
+    metadata: { user_id: input.userId, product_id: product.id, method: body.method, locale: body.locale, ...quoteMetadata(input.quote) },
+    orderMerchantExternalId: input.quote ? `v2_${input.orderRef}` : input.orderRef,
     language: body.locale === 'zh' ? 'zh-Hans' : 'en',
     // The recurring session takes cards only, so a subscription is never paid by a one-off method.
     ...(recurring ? { includePaymentMethods: ['card'] } : {}),
+    // The default can expose merchant dashboard codes; v2 offers exactly the quoted pack/plan.
+    ...(input.quote && { allowPromotionCodes: false }),
+    ...(input.quote && recurring ? { withTrial: false } : {}),
   }
 }
 
 export async function createWaffoCheckout(
   deps: WaffoCheckoutDeps,
-  input: { userId: string; body: CheckoutBody },
+  input: { userId: string; body: CheckoutBody; quote?: CheckoutPrice },
 ): Promise<{ url: string }> {
   const product = deps.products.find((p) => p.id === input.body.product_id)
   if (!product || product.priceUsd <= 0) throw new AppError('NOT_FOUND', 'Unknown product')
@@ -89,6 +93,7 @@ export async function createWaffoCheckout(
     userId: input.userId,
     product,
     body: input.body,
+    quote: input.quote,
     orderRef: (deps.newOrderRef ?? randomUUID)(),
   })
   const url = checkoutUrl(await deps.waffo.createCheckoutSession(request))

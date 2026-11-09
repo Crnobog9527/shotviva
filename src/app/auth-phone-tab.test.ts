@@ -38,13 +38,13 @@ describe('phone sign-in tab', () => {
   })
 
   it('the Chinese sign-up page has the tabs too', async () => {
-    const html = await render(createElement(SignupForm, { ...common, freeImages: { count: 3, upTo: false }, phone }), 'zh')
+    const html = await render(createElement(SignupForm, { ...common, giftCredits: 100, phone }), 'zh')
     expect(html).toContain('role="tablist"')
     expect(html).toContain('获取验证码')
   })
 
   it('the English pages show no phone entry at all', async () => {
-    for (const element of [createElement(LoginForm, { ...common, notice: null }), createElement(SignupForm, { ...common, freeImages: { count: 3, upTo: false } })]) {
+    for (const element of [createElement(LoginForm, { ...common, notice: null }), createElement(SignupForm, { ...common, giftCredits: 100 })]) {
       const html = await render(element, 'en')
       expect(html).not.toContain('role="tablist"')
       expect(html).not.toContain('type="tel"')

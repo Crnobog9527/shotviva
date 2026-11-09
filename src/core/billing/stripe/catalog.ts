@@ -1,4 +1,5 @@
-import type { MembershipTier, PaymentChannel, ProductId, SiteProduct } from '../../config'
+import { hasMemberRate, quoteCheckout, type CheckoutPrice, type PricingVersion } from '../checkout-price'
+import { MEMBERSHIP_TIERS, type MembershipTier, type PaymentChannel, type ProductId, type SiteProduct } from '../../config'
 
 // The Stripe side of the nine products (ARCHITECTURE §6.2 "Stripe Product / Price 映射", §6.3).
 // Pure: the checkout route, the webhook and scripts/stripe-setup.ts all derive from here, so
@@ -43,8 +44,10 @@ export function offeredMethods(channel: PaymentChannel, locale: string): readonl
 export type CheckoutForm = 'subscription' | 'one_time'
 
 // One-time Prices use the product id; subscription Prices add `_recurring`.
-export function lookupKey(productId: ProductId, form: CheckoutForm): string {
-  return form === 'subscription' ? `${productId}_recurring` : productId
+export function lookupKey(productId: ProductId, form: CheckoutForm, quote?: CheckoutPrice): string {
+  const base = form === 'subscription' ? `${productId}_recurring` : productId
+  if (!quote) return base
+  return quote.memberTier ? `${base}_v2_${quote.memberTier}` : `${base}_v2`
 }
 
 // Fixed Stripe Product ids, so the setup script can find its own Products without a search:
@@ -114,12 +117,19 @@ export type DesiredPrice = {
   recurring: 'month' | 'year' | null
 }
 
-export function desiredPrices(products: readonly SiteProduct[]): DesiredPrice[] {
+export function desiredPrices(products: readonly SiteProduct[], version?: PricingVersion): DesiredPrice[] {
   return products.flatMap((product) => {
     const base = { productId: product.id, stripeProduct: stripeProductId(product), unitAmount: priceCents(product) }
-    const oneTime = { ...base, lookupKey: lookupKey(product.id, 'one_time'), recurring: null }
+    const quote = version && quoteCheckout(product, null)
+    const oneTime = { ...base, lookupKey: lookupKey(product.id, 'one_time', quote), recurring: null }
+    if (quote && hasMemberRate(product)) {
+      return [oneTime, ...MEMBERSHIP_TIERS.map(tier => {
+        const member = quoteCheckout(product, tier)
+        return { ...oneTime, lookupKey: lookupKey(product.id, 'one_time', member), unitAmount: member.cents }
+      })]
+    }
     if (product.tier === 'pack') return [oneTime]
-    return [{ ...base, lookupKey: lookupKey(product.id, 'subscription'), recurring: product.interval }, oneTime]
+    return [{ ...base, lookupKey: lookupKey(product.id, 'subscription', quote), recurring: product.interval }, oneTime]
   })
 }
 

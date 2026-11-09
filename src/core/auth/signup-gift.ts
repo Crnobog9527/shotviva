@@ -11,14 +11,20 @@ import { AppError } from '../errors'
 // reading would also cover a grant that failed and has not been retried yet; the next verified
 // sign-in retries it and the note goes away. Service-role client: the ledger is private.
 // Lookups: profiles primary key and credit_ledger_idempotency_key_key.
-export async function signupGiftRefused(admin: SupabaseClient, userId: string, freeCredits: number): Promise<boolean> {
-  if (freeCredits <= 0) return false
+export async function readSignupGift(admin: SupabaseClient, userId: string, freeCredits: number) {
+  if (freeCredits <= 0) return { granted: 0, refused: false }
   const [profile, ledger] = await Promise.all([
     admin.from('profiles').select('signup_ip').eq('id', userId).maybeSingle<{ signup_ip: string | null }>(),
-    admin.from('credit_ledger').select('id').eq('idempotency_key', signupGrantKey(userId)).limit(1),
+    admin.from('credit_ledger').select('delta').eq('idempotency_key', signupGrantKey(userId)).limit(1),
   ])
   if (profile.error || ledger.error) {
     throw new AppError('INTERNAL', 'signup gift status failed', { cause: profile.error ?? ledger.error })
   }
-  return Boolean(profile.data?.signup_ip) && ledger.data.length === 0
+  return { granted: Number(ledger.data[0]?.delta ?? 0), refused: Boolean(profile.data?.signup_ip) && ledger.data.length === 0 }
+}
+
+
+// Existing callers that only need the refusal flag.
+export async function signupGiftRefused(admin: SupabaseClient, userId: string, freeCredits: number) {
+  return (await readSignupGift(admin, userId, freeCredits)).refused
 }

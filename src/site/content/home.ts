@@ -97,8 +97,8 @@ export function productBills(heading: string, intro: string, moreFine = ''): Cos
       total: { prefix: 'from', amount: plan, suffix: '/month', when: `about ${photoSeconds} seconds a photo` },
       lines: [
         { label: `Starter plan, ${planFrom?.credits ?? ''} credits a month`, value: plan },
-        { label: `These ${SET_PHOTOS} photos, ${standard.name}`, value: `${setCredits} credits ≈ ${setCostUsd}` },
-        { label: 'Left for the rest of the month', value: `${photosLeftInPlan} more photos` },
+        { label: `Example: two ${standard.name} product photos and one promo poster`, value: `${setCredits} credits ≈ ${setCostUsd}` },
+        { label: 'Remaining at the same product-photo price', value: `${photosLeftInPlan} more photos` },
       ],
       fine: `Styling and retouching are in the template, and your subject stays as you shot it. Start with ${freeImagesLabel}, no card needed.`,
     },
@@ -156,7 +156,7 @@ export const homePage = defineHomePage({
     points: [
       {
         heading: `${FreeImagesTitle} When You Sign Up`,
-        text: `Every new account gets ${site.billing.freeCredits} free credits, once. That covers ${freeImagesLabel}. They do not refill every day or every month.`,
+        text: `Every new account gets ${site.billing.freeCredits} free credits, once. They do not refill every day or every month.`,
       },
       {
         heading: 'Free Photos Are Public and Watermarked, Paid Photos Are Private',

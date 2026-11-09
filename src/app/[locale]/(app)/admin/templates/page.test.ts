@@ -4,16 +4,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const requireAdmin = vi.fn()
 const listAdminTemplates = vi.fn()
 const listAdminCategories = vi.fn()
-const listImageProviderOptions = vi.fn()
+const readPricingOptions = vi.fn()
 
 vi.mock('@/core/auth', () => ({ requireAdmin: () => requireAdmin(), createAdminSupabase: () => ({}) }))
 vi.mock('@/core/admin', () => ({
   listAdminTemplates: (client: unknown) => listAdminTemplates(client),
   listAdminCategories: (client: unknown) => listAdminCategories(client),
-  listImageProviderOptions: (client: unknown) => listImageProviderOptions(client),
   TemplatesEditor: () => null,
   CategoriesPanel: () => null,
 }))
+vi.mock('@/site/template-pricing', () => ({ readPricingOptions: (client: unknown) => readPricingOptions(client) }))
 vi.mock('./actions', () => ({
   saveTemplateAction: vi.fn(),
   setTemplateActiveAction: vi.fn(),
@@ -35,7 +35,7 @@ describe('admin templates page', () => {
   beforeEach(() => {
     requireAdmin.mockReset()
     listAdminTemplates.mockReset().mockResolvedValue([])
-    listImageProviderOptions.mockReset().mockResolvedValue([])
+    readPricingOptions.mockReset().mockResolvedValue([])
     listAdminCategories.mockReset().mockResolvedValue([])
   })
 
@@ -43,7 +43,7 @@ describe('admin templates page', () => {
     requireAdmin.mockImplementation(() => notFound())
     await expect(AdminTemplatesPage()).rejects.toMatchObject({ digest: expect.stringMatching(/404/) })
     expect(listAdminTemplates).not.toHaveBeenCalled()
-    expect(listImageProviderOptions).not.toHaveBeenCalled()
+    expect(readPricingOptions).not.toHaveBeenCalled()
     expect(listAdminCategories).not.toHaveBeenCalled()
   })
 
@@ -52,6 +52,6 @@ describe('admin templates page', () => {
     await AdminTemplatesPage()
     expect(listAdminTemplates).toHaveBeenCalledOnce()
     expect(listAdminCategories).toHaveBeenCalledOnce()
-    expect(listImageProviderOptions).toHaveBeenCalledOnce()
+    expect(readPricingOptions).toHaveBeenCalledOnce()
   })
 })

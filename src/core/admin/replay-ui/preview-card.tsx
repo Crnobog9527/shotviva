@@ -32,7 +32,7 @@ function Details({ preview }: { preview: ReplayPreview }) {
     return (
       <dl className="grid gap-1 text-sm">
         <Row label={COPY.checkout.user} value={user} />
-        <Row label={COPY.checkout.product} value={`${preview.productId} · ${COPY.checkout.credits(preview.credits)}`} />
+        <Row label={COPY.checkout.product} value={preview.credits == null ? preview.productId : `${preview.productId} · ${COPY.checkout.credits(preview.credits)}`} />
         <Row label={COPY.checkout.amount} value={money(preview.amountTotal, preview.currency)} />
       </dl>
     )

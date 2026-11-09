@@ -5,6 +5,7 @@ import { z } from 'zod'
 const publicEnvSchema = z.object({
   // Optional override of the deployment origin; see core/site-url.ts for the fallback order.
   NEXT_PUBLIC_SITE_URL: z.url().optional(),
+  NEXT_PUBLIC_PRICING_CATALOG_VERSION: z.enum(['v1', 'v2']).optional(),
   // Vercel system variables (exposed automatically to Next.js builds on Vercel). Hosts, no scheme.
   NEXT_PUBLIC_VERCEL_ENV: z.enum(['production', 'preview', 'development']).optional(),
   NEXT_PUBLIC_VERCEL_BRANCH_URL: z.string().min(1).optional(),
@@ -35,6 +36,7 @@ const publicEnvSchema = z.object({
 export type PublicEnv = z.infer<typeof publicEnvSchema>
 
 export const publicEnv: PublicEnv = publicEnvSchema.parse({
+  NEXT_PUBLIC_PRICING_CATALOG_VERSION: process.env.NEXT_PUBLIC_PRICING_CATALOG_VERSION || undefined,
   NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL || undefined,
   NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV || undefined,
   NEXT_PUBLIC_VERCEL_BRANCH_URL: process.env.NEXT_PUBLIC_VERCEL_BRANCH_URL || undefined,
@@ -48,3 +50,5 @@ export const publicEnv: PublicEnv = publicEnvSchema.parse({
   NEXT_PUBLIC_ASSETS_BASE_URL: process.env.NEXT_PUBLIC_ASSETS_BASE_URL || undefined,
   NEXT_PUBLIC_APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION || undefined,
 })
+
+export const pricingV2 = publicEnv.NEXT_PUBLIC_PRICING_CATALOG_VERSION === 'v2'

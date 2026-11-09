@@ -44,7 +44,7 @@ describe('checkout replay', () => {
   it('previews, then settles once; the webhook arriving later grants nothing', async () => {
     const userId = await createUser(db)
     const session = stage(checkoutSession({ userId, productId: 'pack_s', method: 'card' }))
-    expect(await previewStripeReplay(deps, session.id)).toMatchObject({ kind: 'checkout', userId, productId: 'pack_s', credits: 20, settled: false })
+    expect(await previewStripeReplay(deps, session.id)).toMatchObject({ kind: 'checkout', userId, productId: 'pack_s', credits: null, settled: false })
     expect(await ledgerOf(db, userId)).toEqual([])
     expect((await applyStripeReplay(deps, session.id)).outcome).toBe('applied')
     expect((await deliver(session.id)).status).toBe(200)

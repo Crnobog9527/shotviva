@@ -1,11 +1,18 @@
 import { NextRequest } from 'next/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({ getSessionUser: vi.fn(), createCheckout: vi.fn(), createWaffoCheckout: vi.fn(), channel: vi.fn(), mirror: vi.fn(), tier: vi.fn() }))
+const mocks = vi.hoisted(() => ({ getSessionUser: vi.fn(), createCheckout: vi.fn(), createWaffoCheckout: vi.fn(), channel: vi.fn(), mirror: vi.fn(), tier: vi.fn(), pricing: vi.fn() }))
 
 vi.mock('@/core/auth/session', () => ({ getSessionUser: mocks.getSessionUser }))
 vi.mock('@/core/auth/supabase-admin', () => ({ createAdminSupabase: () => ({}) }))
 vi.mock('@/core/billing/subscription/read-summary', () => ({ readMirrorRows: mocks.mirror }))
+vi.mock('@/core/billing/active-pricing', async () => {
+  const { site } = await import('@/site/site.config')
+  const { configuredPricing } = await import('@/core/billing/checkout-price')
+  mocks.pricing.mockResolvedValue(configuredPricing(site.billing))
+  return { readActivePricing: mocks.pricing }
+})
+vi.mock('@/core/codes/read', () => ({ readPendingDiscount: vi.fn(async () => null) }))
 vi.mock('@/core/billing/tier', () => ({ currentTier: mocks.tier }))
 vi.mock('@/core/billing/stripe', async (original) => ({
   ...(await original<typeof import('@/core/billing/stripe')>()),
@@ -21,15 +28,19 @@ vi.mock('@/core/billing/waffo', () => ({
 }))
 
 const { POST } = await import('./route')
+const { site } = await import('@/site/site.config')
 
 const ORIGIN = 'http://localhost:3000'
 const USER = { id: '0b6f3f0e-5d1c-4c47-9a49-6a3f6f8d2e11', email: null, role: 'user', verified: true, banned: false }
-const request = (productId = 'pack_s', method = 'card', locale?: 'en' | 'zh') =>
-  new NextRequest(`${ORIGIN}/api/checkout`, {
+const request = (productId = 'pack_s', method = 'card', locale?: 'en' | 'zh') => {
+  const product = site.billing.products.find(p => p.id === productId)!
+  return new NextRequest(`${ORIGIN}/api/checkout`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', origin: ORIGIN },
-    body: JSON.stringify({ product_id: productId, method, ...(locale ? { locale } : {}) }),
+    body: JSON.stringify({ product_id: productId, method, locale, pricing_version: site.billing.pricingVersion ?? 'v1',
+      expected_price_cents: Math.round(product.priceUsd * 100) }),
   })
+}
 const liveRow = (status: string, cancelAtPeriodEnd = false) => ({
   provider: 'stripe',
   stripeSubscriptionId: 'sub_1',
@@ -201,4 +212,77 @@ describe('POST /api/checkout cn_card', () => {
     expect((await POST(request('pack_s', 'cn_card', 'zh'))).status).toBe(422)
     expect(mocks.createWaffoCheckout).not.toHaveBeenCalled()
   })
+})
+
+it('refuses to open either channel when the database catalog differs from this build', async () => {
+  const { configuredPricing } = await import('@/core/billing/checkout-price')
+  const { site } = await import('@/site/site.config')
+  const other = configuredPricing(site.billing) === 'v2' ? undefined : 'v2'
+  for (const channel of ['stripe', 'waffo']) {
+    resetMember()
+    mocks.getSessionUser.mockResolvedValue(USER)
+    mocks.channel.mockReturnValue(channel)
+    mocks.pricing.mockResolvedValueOnce(other)
+    expect((await POST(request())).status).toBe(409)
+    expect(mocks.createCheckout).not.toHaveBeenCalled()
+    expect(mocks.createWaffoCheckout).not.toHaveBeenCalled()
+  }
+})
+
+it.each(['stripe', 'waffo'])('validates old tabs and the displayed price for every SKU on %s', async channel => {
+  resetMember()
+  mocks.getSessionUser.mockResolvedValue(USER)
+  mocks.channel.mockReturnValue(channel)
+  expect(site.billing.pricingVersion).toBe('v2')
+  const start = channel === 'stripe' ? mocks.createCheckout : mocks.createWaffoCheckout
+  for (const product of site.billing.products) {
+    const cents = Math.round(product.priceUsd * 100)
+    const post = (terms: Record<string, unknown>) => POST(new NextRequest(ORIGIN + '/api/checkout', {
+      method: 'POST', headers: { origin: ORIGIN, 'content-type': 'application/json' },
+      body: JSON.stringify({ product_id: product.id, method: 'card', ...terms }),
+    }))
+    start.mockClear()
+    for (const stale of [{}, { pricing_version: 'v1', expected_price_cents: cents },
+      { pricing_version: 'v2' }, { pricing_version: 'v2', expected_price_cents: cents - 1 }]) {
+      const response = await post(stale)
+      expect(response.status).toBe(409)
+      expect(await response.json()).toMatchObject({ code: 'CODE_CHECKOUT_OFFER_CHANGED' })
+    }
+    expect(start).not.toHaveBeenCalled()
+    expect((await post({ pricing_version: 'v2', expected_price_cents: cents })).status).toBe(200)
+    expect(start).toHaveBeenCalledOnce()
+  }
+})
+
+it('serves legacy requests for all nine SKUs only while the v1 catalogue is active', async () => {
+  vi.stubEnv('NEXT_PUBLIC_PRICING_CATALOG_VERSION', 'v1')
+  vi.resetModules()
+  try {
+    const { site: legacy } = await import('@/site/site.config')
+    const { POST: post } = await import('./route')
+    expect(legacy.billing.pricingVersion).toBeUndefined()
+    resetMember()
+    mocks.getSessionUser.mockResolvedValue(USER)
+    mocks.pricing.mockResolvedValue(undefined)
+    for (const channel of ['stripe', 'waffo']) {
+      mocks.channel.mockReturnValue(channel)
+      const start = channel === 'stripe' ? mocks.createCheckout : mocks.createWaffoCheckout
+      for (const product of legacy.billing.products) {
+        const submit = (version?: string) => post(new NextRequest(ORIGIN + '/api/checkout', {
+          method: 'POST', headers: { origin: ORIGIN, 'content-type': 'application/json' },
+          body: JSON.stringify({ product_id: product.id, method: 'card', pricing_version: version }),
+        }))
+        start.mockClear()
+        expect((await submit('v2')).status).toBe(409)
+        expect(start).not.toHaveBeenCalled()
+        expect((await submit()).status).toBe(200)
+        expect((await submit('v1')).status).toBe(200)
+        expect(start).toHaveBeenCalledTimes(2)
+      }
+    }
+  } finally {
+    vi.unstubAllEnvs()
+    vi.resetModules()
+    mocks.pricing.mockResolvedValue(site.billing.pricingVersion)
+  }
 })

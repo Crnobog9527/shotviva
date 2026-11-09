@@ -59,6 +59,7 @@ export async function partnerGenerate(deps: PartnerGenerateDeps, req: PartnerGen
     userId: req.userId,
     source: 'graylum',
     templateId: req.body.template_id,
+    expectedCredits: req.body.expected_credits,
     inputKey,
     copy: req.body.inputs.copy,
     aspectRatio: req.body.inputs.aspect_ratio,

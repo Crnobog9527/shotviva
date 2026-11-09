@@ -3,10 +3,11 @@
 import { useTranslations } from "next-intl"
 import { useState } from "react"
 
+import { pricingV2 } from '../../public-env'
 import type { PackProduct, SiteProduct } from "../../config"
 import { buttonVariants } from "../../ui/button"
 import { cn } from "../../ui/cn"
-import { DiscountProvider, useProductDiscount } from "./discount-context"
+import { DiscountProvider, useProductQuote } from "./discount-context"
 import { DiscountBanner, DiscountEntry } from "./discount-controls"
 import { BillingToggle } from "./billing-toggle"
 import { packLooks, packOffers, tierOffers, yearlySavingPct, type Period, type TierOffer } from "./offer"
@@ -110,7 +111,7 @@ function PackRow({ packs, onPick }: { packs: PackProduct[]; onPick(id: PackProdu
     <>
       <div className="mt-6 mb-2 flex flex-wrap items-baseline justify-between gap-x-3 px-0.5 md:mt-8">
         <h2 className="text-headline font-semibold">{t("packsTitle")}</h2>
-        <span className="text-caption text-muted-foreground">{t("packsNote")}</span>
+        <span className="text-caption text-muted-foreground">{t(pricingV2 ? "packsNoteV2" : "packsNote")}</span>
       </div>
       <div className="grid gap-2 md:grid-cols-3 md:gap-4">
         {packs.map((pack, i) => (
@@ -132,8 +133,8 @@ function PackRow({ packs, onPick }: { packs: PackProduct[]; onPick(id: PackProdu
 function BuyPack({ pack, onPick }: { pack: PackProduct; onPick(id: PackProduct["id"]): void }) {
   const t = useTranslations("paywall")
   const money = useMoney()
-  const discount = useProductDiscount(pack)
+  const quote = useProductQuote(pack)
   return <button type="button" onClick={() => onPick(pack.id)}
-    aria-label={t("buyPackLabel", { count: pack.credits, price: money(discount?.priceUsd ?? pack.priceUsd) })}
+    aria-label={t("buyPackLabel", { count: pack.credits, price: money(quote.priceUsd) })}
     className={buttonVariants({ variant: "glass", size: "touch", className: "w-full rounded-full" })}>{t("buy")}</button>
 }

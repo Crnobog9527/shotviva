@@ -24,3 +24,11 @@ it('keeps one nonce for an interrupted purchase and replaces it for another purc
   expect(readAnswer(409, { code: 'CODE_CHECKOUT_IN_PROGRESS' })).toEqual({ kind: 'in_use' })
   expect(readAnswer(409, { code: 'CODE_CHECKOUT_OFFER_CHANGED' })).toEqual({ kind: 'offer_changed' })
 })
+
+it('identifies old tabs and binds v2 subscription and pack checkouts to their displayed total', async () => {
+  const { displayedTerms } = await import('./use-checkout')
+  expect(displayedTerms(71300, 'v1')).toEqual({ pricing_version: 'v1', expected_price_cents: undefined })
+  for (const cents of [89100, 19104, 2365, 990]) {
+    expect(displayedTerms(cents, 'v2')).toEqual({ pricing_version: 'v2', expected_price_cents: cents })
+  }
+})

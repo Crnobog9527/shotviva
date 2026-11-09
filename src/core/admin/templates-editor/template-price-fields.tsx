@@ -3,7 +3,7 @@
 import { Input } from '@/core/ui/input'
 import { Label } from '@/core/ui/label'
 import { RESOLUTIONS } from '@/core/templates/output-options'
-import { TEMPLATE_QUALITIES, type CreditsFloor, type TemplateQuality } from '@/core/templates/pricing'
+import { approvedCredit, TEMPLATE_QUALITIES, type CreditsFloor, type TemplateQuality } from '@/core/templates/pricing'
 
 import { creditProblems, TIER_LABEL, type TemplateFormValues } from './form-state'
 
@@ -48,7 +48,7 @@ export function TemplatePriceFields({ values, floor, onChange }: Props) {
               onChange={(event) => onChange({ credits: { ...values.credits, [resolution]: event.target.value } })}
             />
             <p className={problems[resolution] ? 'text-destructive text-xs' : 'text-muted-foreground text-xs'}>
-              {problems[resolution] ?? `建议积分 ≥ ${floor[values.quality][resolution]}`}
+              {problems[resolution] ?? `建议积分 ≥ ${floor[values.quality][resolution]}${approvedCredit(floor, values.quality, resolution) ? `，目录批准价 ${approvedCredit(floor, values.quality, resolution)}` : ''}`}
             </p>
           </div>
         ))}

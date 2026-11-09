@@ -105,7 +105,7 @@
     },
     "signup": {
       "title": "注册账号",
-      "gift": "{upTo, select, true {最多 } other {}}{count, plural, other {# 张标准清晰度免费图}}",
+      "gift": "{count, number} 个免费积分",
       "giftNote": "会公开展示，并带水印",
       "submit": "注册",
       "fine": "继续即表示你同意<terms>服务条款</terms>和<privacy>隐私政策</privacy>。",
@@ -361,7 +361,7 @@
       "paid": "你有 {paid} 积分。",
       "getCredits": "获取积分",
       "panelTitle": "积分",
-      "signupGiftRefused": "这个账号没有拿到注册赠送的免费积分：同一网络下的另一个账号在你注册前 24 小时内已经领取过。你仍然可以购买积分。"
+      "signupGiftRefused": "这个账号没有注册赠分记录。同一网络在 24 小时内限领一次。"
     },
     "create": {
       "title": "创作",
@@ -558,6 +558,7 @@
       "CONTENT_REJECTED": "照片或补充说明没有通过安全审核。请换一张照片，或改一下说明。",
       "IDENTITY_SWAP_REFUSED": "为保护每个人的肖像权，Shotviva 不能把人换成另一个人或换脸。可以改表情、妆容、光线和背景。",
       "REFERENCE_IMAGE_LIMIT": "参考图超过模型上限，请减少照片或换个模板。",
+      "TEMPLATE_QUOTE_CHANGED": "模板或积分价格已更新，请刷新页面查看最新报价。",
       "MODEL_INPUT_UNSUPPORTED": "请检查参考图、清晰度和尺寸，或换个模板。",
       "GENERATION_FAILED": "这张照片没能生成，通常再试一次就好。",
       "PROVIDER_FAILED": "这张照片没能生成，通常再试一次就好。",
@@ -743,6 +744,7 @@
       "metaTitle": "我的",
       "plan": {
         "title": "会员",
+        "lastGrant": "上次付款 · {credits, number} 积分 · {method}",
         "perPeriod": "每{interval, select, year {年} other {月}} <mono>{credits}</mono> 积分 · <mono>{price}</mono>/{interval, select, year {年} other {月}}",
         "perPeriodMethod": "每{interval, select, year {年} other {月}} <mono>{credits}</mono> 积分 · <mono>{price}</mono>/{interval, select, year {年} other {月}} · {method}",
         "member": "会员",
@@ -874,6 +876,7 @@
       },
       "product": {
         "plan": "{tier} · {interval, select, year {按年} other {按月}}",
+        "packUnknown": "积分包",
         "pack": "积分包 · {credits} 积分",
         "option": "{product} · {amount} · {date, date, medium}"
       },
@@ -1006,6 +1009,10 @@
     "checkout": {
       "metaTitle": "付款结果",
       "titlePlan": "你已开通{tier}",
+      "packPaid": "付款成功",
+      "renewsDate": "{date, date, medium}",
+      "pendingPlan": "{tier} · {period, select, year {一年} other {一个月}}",
+      "pendingPack": "积分包",
       "titlePack": "已到账 {count} 积分",
       "subPlan": "{count} 积分已到账，去做张图吧。",
       "subPack": "积分已经在你的账号里了，去做张图吧。",
@@ -1113,7 +1120,10 @@
     "savingLabel": "<vs>比按月付</vs>每年省",
     "savingAmount": "{amount}",
     "mostPopular": "最受欢迎",
+    "memberPrice": "会员价",
+    "memberCodeKept": "已选会员价，优惠码留待下次使用。",
     "packsNote": "一次性买积分，不用订阅",
+    "packsNoteV2": "小包不打折。中包和大包按当前会员等级计价：入门版 95 折、专业版 9 折、旗舰版 85 折，各档收到的包内积分相同。",
     "buy": "购买",
     "buyPackLabel": "用 {price} 购买 {count} 积分",
     "payNoteCard": "套餐自动续费，随时可取消",

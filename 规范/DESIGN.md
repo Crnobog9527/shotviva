@@ -111,7 +111,7 @@ Owner 2026-11-05 定稿：**B 版「暗房」（Darkroom）**，取代此前的�
 4. 生成按钮：固定在底部拇指区、全宽，写清楚当前分辨率的消耗，例如 "Generate · 2 credits"，切换分辨率时按钮上的数字跟着变。按钮旁显示余额 "30 credits + 6 free"。
 5. 这一单将用免费积分时，按钮上方一行告知："This photo uses free credits: it's shown publicly with a watermark. Paid credits make it private and watermark-free." 将用付费积分时不显示。
 
-单位叫法：价格、扣费、余额一律叫 **credits**，不说「张」；余额分开显示付费和免费（"30 credits + 6 free"）。**唯一例外**：新用户赠送对外写成 "3 free Standard images"（= 6 个免费 credit，Owner 2026-11-05），只用于营销页、注册提示和 FAQ 讲赠送的那一句。
+单位叫法：价格、扣费、余额和注册赠送一律叫 **credits**。余额分开显示付费和免费；注册写「100 免费积分」。只有已知所选模板和清晰度的价格时才估算可做张数。
 
 ### 4.4 生成中、成功、失败
 
@@ -125,14 +125,14 @@ Owner 2026-11-05 定稿：**B 版「暗房」（Darkroom）**，取代此前的�
 
 - 触发：免费额度用完，或免费用户想把作品设为私密。
 - 手机上是底部抽屉，桌面是居中弹窗（第 8.4 节）。9 个商品（ARCHITECTURE.md 第 6.2 节）。**2026-11-06 起以签收的 v3-b 稿 `design/comps-v3-b/paywall.html` 为准：改成单屏**（顶部 Monthly / Yearly 切换、三档卡、积分包入口、付款方式和条款在同一屏），下面两步的描述保留作内容要求（每档写什么、付款方式两组和续费条款），不再要求分两屏：
-  1. **第一屏：选档位**（Owner 2026-11-05 修订）。顶部 **Monthly / Yearly** 切换；三张竖排卡片 Starter / Pro / Max 用三种材质色区分（Owner 2026-11-05 二次修订）：Starter 哑光石墨、Pro 深蓝宝石玻璃（推荐）、Max 黑金（金色描边、金色价格、金色按钮，带缓慢流光并标 "Best value"）。只有选 Yearly 时才显示节省，每张卡直接写省多少；Monthly 时不显示任何节省字样：划掉的按月折算价 + "Save $99.80 / $249.80 / $489 a year vs monthly"（数字从配置算，不写死）。流光动效在「减少动态效果」下关闭。每张写月付价、每月 credits、每 credit 单价（"$19.90 / month · 50 credits · $0.40 per credit"），Pro 高亮为推荐。卡片下方一行次要入口 "Just need a few photos? Credit packs from $9.90 →"。价格数字全部从 `site.config.ts` 读。
+  1. **第一屏：选档位**（Owner 2026-11-05 修订）。顶部 **Monthly / Yearly** 切换；三张竖排卡片 Starter / Pro / Max 用三种材质色区分（Owner 2026-11-05 二次修订）：Starter 哑光石墨、Pro 深蓝宝石玻璃（推荐）、Max 黑金（金色描边、金色价格、金色按钮，带缓慢流光并标 "Best value"）。只有选 Yearly 时才显示节省，每张卡直接写省多少；Monthly 时不显示任何节省字样：划掉的按月折算价 + "Save $47.76 / $119.76 / $297 a year vs monthly"（数字从配置算，不写死）。流光动效在「减少动态效果」下关闭。每张写月付价、每月 credits、每 credit 单价（"$19.90 / month · 1,990 credits · $0.01 per credit"），Pro 高亮为推荐。卡片下方一行次要入口 "Just need a few photos? Credit packs from $9.90 →"。价格数字全部从 `site.config.ts` 读。
      - **档位权益**（Owner 2026-11-05，见 ARCHITECTURE §6.2「会员档位权益」）：每张卡列 "Everything in X, plus"。**只有已经上线的权益可以写成现有功能**；没上线的放在卡片底部单独一组，统一标 "Coming soon"，灰色小字，不能和现有权益混排。哪些上线、哪些 Coming soon 以 ARCHITECTURE §6.2 那张表为准。
      - 英文页面付款方式只写 "Alipay"，不带中文；中文页面写「支付宝」（Owner 2026-11-06）。
-  2. **第二屏：选周期**。顶部分段控件 **Monthly / Yearly**（Yearly 段上标 "Save 40%"，折扣数从配置算），下面是所选档位的价格、credits 总数（年付写 "600 credits upfront"）和每 credit 单价；再往下是两组付款方式。从积分包入口进来的第二屏是 S / M / L 三项（"20 credits · $9.90" 并标 "One-time · no subscription"），再往下同样两组付款方式。
+  2. **第二屏：选周期**。顶部分段控件 **Monthly / Yearly**（Yearly 段上标 "Save up to 25%"，折扣数从配置算），下面是所选档位的价格、credits 总数（年付写 "23,880 credits upfront"）和每 credit 单价；再往下是两组付款方式。从积分包入口进来的第二屏是 S / M / L 三项（"990 credits · $9.90" 并标 "One-time · no subscription"），再往下同样两组付款方式。
 - **两组付款方式**：「Card · Apple Pay · Google Pay」和「Alipay」；开关 `STRIPE_WECHAT_PAY` 打开后这一组改名「Alipay / WeChat Pay」（中文「支付宝 / 微信支付」，T73，Owner 2026-11-07；原「不接微信支付」作废）。会员商品下，卡那组小字 "Renews automatically, cancel anytime"，钱包那组小字 "One-time payment, 30 days / 1 year, no auto-renew"；积分包在两组下都是单笔，小字只写 "One-time payment"。走 Waffo 时全部单笔。
 - `/pricing` 页用同一套信息，桌面三栏并排（Starter / Pro / Max，顶部 Monthly / Yearly 切换），积分包一行三项放在下面；手机上退化成和付费墙一样的竖排。
 - **营销页的模板卡片不显示积分价（Owner 2026-11-08）**：首页和各落地页模板区里，每个模板下面不再显示「N 积分起 / from N credits」小标签；价格只在价格页、付费墙和创作页的生成按钮上出现。
-- **默认显示按月（Owner 2026-11-08）**：`/pricing` 页和付费墙打开时 Monthly / Yearly 切换都默认选 **Monthly**，价格先显示月付原价；用户点 Yearly 才看到年付折算价、划线价和「每年省」。Yearly 段上的「最多省 40%」标签照常显示，吸引点击。原因：默认年付时，粗心的用户会把年付折算的月价当成单月价格。服务端渲染的 HTML 也以月付为准（SEO 页面里写的价格是月付价）。
+- **默认显示按月（Owner 2026-11-08）**：`/pricing` 页和付费墙打开时 Monthly / Yearly 切换都默认选 **Monthly**，价格先显示月付原价；用户点 Yearly 才看到年付折算价、划线价和「每年省」。Yearly 段上的「最多省 25%」标签照常显示，吸引点击。原因：默认年付时，粗心的用户会把年付折算的月价当成单月价格。服务端渲染的 HTML 也以月付为准（SEO 页面里写的价格是月付价）。
 - 账号页「Subscription」区块：当前档位和周期（"Pro · Yearly"）、状态（Active / Cancels on … / Past due / Free）、下次续费日，一个「Manage subscription」按钮打开 Stripe Customer Portal；钱包用户显示 "Paid until …" 和「Renew」按钮。
 - 付款方式图标：卡、支付宝，按当前通道可用的方式显示。
 - 价格数字从 `site.config.ts` 或数据库读，禁止写死。
@@ -205,7 +205,7 @@ Owner 2026-11-05 定稿：**B 版「暗房」（Darkroom）**，取代此前的�
    - 摄影师报价取有来源的行业区间，来源写进 notes。
    - 上线前由 Owner 确认这些数字。
    - 所有数字从 `site.config` 读（G3 单一口径）。
-   - 「Save up to 40%」按三档年付的实际节省取**最高值**（四舍五入到整数：Max $713 实际省 39.98%，显示 40%），由配置计算得出，不写死；改价后是 Max 的 40%（Owner 2026-11-06：最多 40%，41% 是错的）。
+   - 年付「Save up to」取当前商品里最高实际节省比例（Max 为 25%）；按配置计算，年付总实价清楚可见。积分包同时写清实际应付与完整到账积分。
 7. **电脑端布局**（替代第 8.6 节的「最宽 720px」）：
    - 内容最宽 1120px，居中。
    - 电脑端 H1 为 36px（替代第 3.2 节的 48px）。

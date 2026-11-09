@@ -10,10 +10,10 @@ import type { PaymentOption, WorkOption } from './types'
 type Choice = { value: string; label: string; ref?: string }
 type Formats = { money(cents: number, currency: string): string }
 
-function productLabel(productId: string, products: readonly SiteProduct[], t: Translate): string {
+function productLabel({ productId, grantedCredits }: PaymentOption, products: readonly SiteProduct[], t: Translate): string {
   const product = products.find((p) => p.id === productId)
   if (!product) return productId
-  if (product.tier === 'pack') return t('product.pack', { credits: product.credits })
+  if (product.tier === 'pack') return grantedCredits == null ? t('product.packUnknown') : t('product.pack', { credits: grantedCredits })
   return t('product.plan', { tier: t(`tiers.${product.tier}`), interval: product.interval })
 }
 
@@ -26,7 +26,7 @@ export function paymentChoices(
   return options.map((option) => ({
     value: option.id,
     label: t('product.option', {
-      product: productLabel(option.productId, products, t),
+      product: productLabel(option, products, t),
       amount: formats.money(option.amountTotal, option.currency),
       date: new Date(option.createdAt),
     }),
