@@ -17,7 +17,7 @@ import type { PickedPhoto } from './use-photo'
 // from an earlier work (Make again, T40) says so, and when that work was made.
 type CardPhoto = PickedPhoto & { keptFrom?: string }
 
-export function PhotoCard({ photo, upload, onPick }: { photo: CardPhoto; upload: UploadState; onPick(file: File): void }) {
+export function PhotoCard({ photo, upload, onPick, onRemove }: { onRemove?(): void; photo: CardPhoto; upload: UploadState; onPick(file: File): void }) {
   const t = useTranslations('app')
   const format = useFormatter()
   const size = format.number(photo.bytes / 1024 / 1024, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
@@ -40,6 +40,7 @@ export function PhotoCard({ photo, upload, onPick }: { photo: CardPhoto; upload:
           </svg>
           {t(upload.phase === 'error' ? 'workspace.chooseAnother' : 'workspace.replace')}
         </button>
+        {onRemove ? <button type="button" className="press ml-2 min-h-9 text-caption" onClick={onRemove}>{t('workspace.tile.remove')}</button> : null}
         <input
           ref={input}
           type="file"

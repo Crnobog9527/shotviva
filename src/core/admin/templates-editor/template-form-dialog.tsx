@@ -12,7 +12,7 @@ import { TEST_RUN_COPY, TestRunPanel } from '../test-run-ui'
 
 import type { CategoryOption } from './category-field'
 import { buildPayload, emptyFormValues, toFormValues, type TemplateFormValues } from './form-state'
-import { referenceBudget } from './style-ref-state'
+import { referenceBudget, refUploadId } from './style-ref-state'
 import { StyleRefFields } from './style-ref-fields'
 import { TemplateCoverFields } from './template-cover-fields'
 import { TemplatePromptFields } from './template-prompt-fields'
@@ -105,7 +105,7 @@ function FormColumn({ target, providers, values, isNew, floor, categories, cover
       <DialogHeader>
         <DialogTitle>{existing ? `编辑「${existing.name}」` : '新建模板'}</DialogTitle>
       </DialogHeader>
-      <TemplatePublicFields values={values} isNew={isNew} floor={floor} categories={categories} onChange={onChange} />
+      <TemplatePublicFields values={values} isNew={isNew} uploading={uploading} floor={floor} categories={categories} onChange={onChange} />
       <TemplateTranslationFields values={values} onChange={onChange} />
       {existing ? (
         <TemplateCoverFields template={existing} languages={coverLanguages} actions={coverActions} />
@@ -115,7 +115,7 @@ function FormColumn({ target, providers, values, isNew, floor, categories, cover
       {values.module === 'image' && (
         <ImageProviderField id="tpl-provider" providers={providers} value={values.providerId} onChange={(providerId) => onChange({ providerId })} />
       )}
-      <StyleSection values={values} existing={existing} budget={budget} uploading={uploading} setUploading={setUploading} onChange={onChange} />
+      <StyleSection values={values} budget={budget} uploading={uploading} setUploading={setUploading} onChange={onChange} />
       <TemplatePromptFields values={values} version={existing?.prompt?.version ?? null} onChange={onChange} />
       <TemplateToggleFields values={values} onChange={onChange} />
       {isNew ? <p className="text-muted-foreground text-xs">新模板保存后默认是下架状态，保存后留在这里，右侧就能试跑。</p> : null}
@@ -128,11 +128,11 @@ function styleSaveBlocked(uploading: boolean, module: string, problem: string | 
   return uploading || (module === 'image' && !!problem)
 }
 
-function StyleSection({ values, existing, budget, uploading, setUploading, onChange }: Pick<FormColumnProps, 'values' | 'onChange'> & {
-  existing: AdminTemplate | null; budget: ReturnType<typeof referenceBudget>; uploading: boolean; setUploading: (value: boolean) => void
+function StyleSection({ values, budget, uploading, setUploading, onChange }: Pick<FormColumnProps, 'values' | 'onChange'> & {
+  budget: ReturnType<typeof referenceBudget>; uploading: boolean; setUploading: (value: boolean) => void
 }) {
   if (values.module !== 'image') return null
-  return <StyleRefFields templateId={existing?.id ?? null} refs={values.styleRefs} budget={budget}
+  return <StyleRefFields templateId={refUploadId(values.id)} refs={values.styleRefs} budget={budget}
     busy={uploading} onBusy={setUploading} onChange={styleRefs => onChange({ styleRefs, styleRefsEdited: true })} />
 }
 

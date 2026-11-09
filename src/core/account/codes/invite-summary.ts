@@ -1,6 +1,7 @@
 import 'server-only'
 import { z } from 'zod'
 
+import { inviteRewards } from '../../codes'
 import { callRpc, type RpcClient } from '../../billing'
 
 // The cursor identifies a redemption, never a friend's account. Strip extra fields before
@@ -9,6 +10,7 @@ export const inviteCursor = z.object({ id: z.uuid(), created_at: z.iso.datetime(
 const friend = inviteCursor.extend({ registered_at: z.iso.datetime({ offset: true }), purchased: z.boolean() })
 const summary = z.object({
   code: z.string().regex(/^[A-Z0-9]{8}$/),
+  rewards: inviteRewards,
   invited: z.number().int().nonnegative(),
   purchasers: z.number().int().nonnegative(),
   earned: z.number().int().nonnegative(),

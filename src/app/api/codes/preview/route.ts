@@ -9,7 +9,6 @@ import { normalizeCode } from '@/core/codes'
 import { checkPreviewLimit } from '@/core/codes/api'
 import { previewCode } from '@/core/codes/server'
 import { AppError } from '@/core/errors'
-import { site } from '@/site/site.config'
 
 export async function GET(request: NextRequest) {
   // Access the incoming request before the API error handler so Next can defer prerendering.
@@ -19,7 +18,7 @@ export async function GET(request: NextRequest) {
     const values = z.tuple([z.string()]).safeParse(request.nextUrl.searchParams.getAll('code'))
     const code = values.success ? normalizeCode(values.data[0]) : null
     if (!code) throw new AppError('INVALID_INPUT', 'Enter a valid code')
-    const preview = await previewCode(createAdminSupabase(), code, site.growth.invite)
+    const preview = await previewCode(createAdminSupabase(), code)
     return jsonResponse({ preview })
   } catch (error) {
     return errorResponse(error, 'codes/preview')

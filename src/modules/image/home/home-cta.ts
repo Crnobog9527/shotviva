@@ -29,12 +29,14 @@ type Input = {
   // Credits for one Standard photo of the chosen template; null when no template is live.
   cost: number | null
   photo: HomePhotoStatus
+  photoOptional?: boolean
   running: number
   // The template asks for text (a headline, a price) the bar has no field for.
   needsCopy: boolean
 }
 
-export function homeCta({ viewer, cost, photo, running, needsCopy }: Input): HomeCta {
+export function homeCta({ viewer, cost, photo: status, photoOptional, running, needsCopy }: Input): HomeCta {
+  const photo = status === 'none' && photoOptional ? 'ready' : status
   if (cost === null) return { kind: 'no-template' }
   if (!viewer) return photo === 'none' || photo === 'error' ? { kind: 'pick-photo', cost } : { kind: 'sign-up', cost }
   if (needsCopy) return { kind: 'needs-copy' }

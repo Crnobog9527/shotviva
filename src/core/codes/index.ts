@@ -27,3 +27,5 @@ export type InviteConfig = {
 }
 
 export type PendingDiscount = NonNullable<Awaited<ReturnType<typeof import('./read').readPendingDiscount>>>
+
+export { inviteRewards, MAX_INVITE_REWARD, type InviteRewards } from './invite-rewards'

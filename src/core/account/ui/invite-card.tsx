@@ -14,9 +14,9 @@ import { Group } from './rows'
 const InviteLink = dynamic(() => import('./invite-link').then((m) => m.InviteLink), { ssr: false })
 const InviteProgress = dynamic(() => import('./invite-progress').then((m) => m.InviteProgress), { ssr: false })
 
-type Props = { load: LoadInvites; reward: { inviteeCredits: number; inviterCredits: number } }
+type Props = { load: LoadInvites }
 
-export function InviteCard({ load, reward }: Props) {
+export function InviteCard({ load }: Props) {
   const t = useTranslations('app.accountCodes.invite')
   const locale = useLocale() as Locale
   const [summary, setSummary] = useState<InviteSummary | null>(null)
@@ -36,7 +36,7 @@ export function InviteCard({ load, reward }: Props) {
   }
   function toggle() {
     setOpen(!open)
-    if (!open && !summary && !busy) read()
+    if (!open && !busy) { setSummary(null); read() }
   }
   return (
     <Group title={t('title')}>
@@ -46,8 +46,8 @@ export function InviteCard({ load, reward }: Props) {
           <ChevronDown aria-hidden className={`ml-auto size-4 ${open ? 'rotate-180' : ''}`} />
         </button>
         {open && <div className="space-y-3 border-t border-hairline py-4" aria-busy={busy}>
-          <p className="text-label text-muted-foreground">{t('rule', { invitee: reward.inviteeCredits, inviter: reward.inviterCredits })}</p>
           {summary && <>
+            <p className="text-label text-muted-foreground">{t('rule', { invitee: summary.rewards.inviteeCredits, inviter: summary.rewards.inviterCredits })}</p>
             <InviteLink url={new URL(localizePath('/?code=' + summary.code, locale), window.location.origin).href} />
             <InviteProgress summary={summary} />
           </>}

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import type { InviteConfig } from '../../codes'
+import type { InviteRewards } from '../../codes'
 import { TableCell, TableRow } from '../../ui/table'
 import type { Page } from '../cursor'
 import { AdminPage, formatBeijing } from '../shell'
@@ -10,13 +10,13 @@ import type { CodeKind, CodeRow } from './schemas'
 import { ToggleCode, type ToggleAction } from './toggle-code'
 
 type Props = {
-  page: Page<CodeRow>; kind: CodeKind | null; cursor?: string; invite: InviteConfig; toggle: ToggleAction
+  page: Page<CodeRow>; kind: CodeKind | null; cursor?: string; invite: InviteRewards; toggle: ToggleAction
 }
 
 export function CodesList({ page, kind, cursor, invite, toggle }: Props) {
   const base = '/admin/codes'
   const filtered = kind ? base + '?kind=' + kind : base
-  const actions = <><NavLink href={base + '/invites'}>{COPY.invites}</NavLink><NavLink href={base + '/new'}>{COPY.create}</NavLink></>
+  const actions = <><NavLink href={base + '/invites'}>{COPY.invites}</NavLink><NavLink href={base + '/invites#rewards'}>{COPY.settings}</NavLink><NavLink href={base + '/new'}>{COPY.create}</NavLink></>
   return <AdminPage title={COPY.title} actions={actions}>
     <nav className="flex flex-wrap gap-2">
       <NavLink href={base} current={!kind}>{COPY.all}</NavLink>

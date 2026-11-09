@@ -1,9 +1,9 @@
-import { percentZh, type InviteConfig } from '../../codes'
+import { percentZh, type InviteRewards } from '../../codes'
 import { formatMinor } from '../orders'
 import { COPY } from './copy'
 import type { CodeRow, RedemptionRow } from './schemas'
 
-export function effects(code: CodeRow, invite: InviteConfig) {
+export function effects(code: CodeRow, invite: InviteRewards) {
   if (code.kind === 'invite') return [COPY.inviteEffect(invite.inviteeCredits, invite.inviterCredits)]
   const parts = []
   if (code.invitee_credits) parts.push(COPY.gift(code.invitee_credits, code.invitee_pool === 'paid'))

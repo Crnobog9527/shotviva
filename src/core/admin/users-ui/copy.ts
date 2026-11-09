@@ -152,6 +152,8 @@ export const USERS_COPY = {
   pools: { free: '免费', paid: '付费' },
   kinds: {
     grant: '赠送',
+    code_grant: '兑换码赠送',
+    invite_reward: '好友首付邀请奖励',
     reserve: '出图预扣',
     refund: '退回',
     purchase: '购买',

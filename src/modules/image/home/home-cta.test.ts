@@ -12,6 +12,15 @@ describe('homeCta', () => {
     expect(homeCta({ ...base, viewer: null, photo: 'ready' })).toEqual({ kind: 'sign-up', cost: 2 })
   })
 
+  it('allows an explicitly empty optional photo and still waits for a chosen upload', () => {
+    const optional = { ...base, photoOptional: true, viewer: viewer(6, 0) }
+    expect(homeCta({ ...optional, photo: 'none' })).toMatchObject({ kind: 'generate', pool: 'free', count: 1 })
+    expect(homeCta({ ...optional, viewer: null, photo: 'none' })).toEqual({ kind: 'sign-up', cost: 2 })
+    expect(homeCta({ ...optional, photo: 'uploading' })).toEqual({ kind: 'uploading' })
+    expect(homeCta({ ...optional, photo: 'error' })).toEqual({ kind: 'pick-photo', cost: 2 })
+    expect(homeCta({ ...optional, photo: 'none', needsCopy: true })).toEqual({ kind: 'needs-copy' })
+  })
+
   it('uses the free credits of a new account like the workspace does', () => {
     expect(homeCta({ ...base, viewer: viewer(6, 0), photo: 'ready' })).toMatchObject({ kind: 'generate', pool: 'free', cost: 2 })
   })

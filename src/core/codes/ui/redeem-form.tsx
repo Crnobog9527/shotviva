@@ -39,6 +39,7 @@ function RedeemNotice({ result }: { result: RedeemResult | null }) {
   if (result?.kind !== 'ok') return null
   const { credits, pool, percent } = result.value
   return <p role="status" className="text-label text-success">
+    {credits === 0 && percent === null && t('inviteLinked')}
     {credits > 0 && t(pool === 'paid' ? 'paidGift' : 'freeGift', { credits })}
     {percent !== null && ' ' + t('saved')}
   </p>
