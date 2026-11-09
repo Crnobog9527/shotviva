@@ -95,7 +95,7 @@ CREATE OR REPLACE FUNCTION "admin"."clear_approved_wallets_v2"("p_digest" "text"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $$
-declare rec record; prior admin.pricing_wallet_cutover; stamp timestamptz;
+declare rec record; prior admin.pricing_wallet_cutover; stamp timestamptz; waivers jsonb := '[]'; waived jsonb;
 begin
   perform pg_advisory_xact_lock(hashtextextended('shotviva.template_catalog',0));
   lock table public.profiles, public.generation_jobs, public.credit_ledger, public.payments, public.subscriptions in share row exclusive mode;
@@ -107,6 +107,8 @@ begin
   if admin.wallet_digest_v2() is distinct from p_digest or
      (select coalesce(max(id),0) from public.credit_ledger) is distinct from p_last_ledger or
      (select count(*) from public.payments) is distinct from p_payments or
+     exists(select from public.payments where status <> 'refunded' or amount_refunded <> amount_total) or
+     exists(select from public.payment_disputes where closed_at is null) or
      exists(select from public.profiles where paid_until > now()) or
      exists(select from public.subscriptions where status not in ('canceled','incomplete_expired')) or
      exists(select from public.generation_jobs where status='running') then
@@ -121,8 +123,17 @@ begin
       perform public.admin_adjust_credits(rec.id,-rec.free_credits,'Legacy balance closed at pricing switch','free','pricing:v2:close:free:'||rec.id);
     end if;
   end loop;
-  insert into admin.pricing_wallet_cutover(version,started_at,digest_before,last_ledger_after)
-    select 'v2',stamp,p_digest,coalesce(max(id),0) from public.credit_ledger;
+  -- All approved balances are now zero. Record uncollected old refunds as waived, so
+  -- a replay cannot collect the old debt from a later purchase in the new denomination.
+  for rec in select id,clawback_shortfall from public.payments where status='refunded' order by id loop
+    waived := public.clawback_payment_credits(rec.id,'cutover_v2','Legacy refund waived at pricing switch');
+    if (waived->>'taken')::int<>0 then raise exception 'UNEXPECTED_CUTOVER_DEBIT'; end if;
+    if (waived->>'written_off')::int>0 then
+      waivers := waivers || jsonb_build_array(jsonb_build_object('id',rec.id,'before',rec.clawback_shortfall,'after',waived->'clawback_shortfall'));
+    end if;
+  end loop;
+  insert into admin.pricing_wallet_cutover(version,started_at,digest_before,waived_refunds,last_ledger_after)
+    select 'v2',stamp,p_digest,waivers,coalesce(max(id),0) from public.credit_ledger;
 end;
 $$;
 
@@ -294,6 +305,10 @@ begin
      exists(select from public.generation_jobs where created_at >= batch.started_at or status='running') then
     raise exception 'ECONOMIC_ACTIVITY_AFTER_CUTOVER';
   end if;
+  for rec in select * from jsonb_to_recordset(batch.waived_refunds) as x(id bigint,"before" integer,"after" integer) loop
+    update public.payments set clawback_shortfall=rec.before where id=rec.id and clawback_shortfall=rec.after and status='refunded';
+    if not found then raise exception 'REFUND_CHANGED_AFTER_CUTOVER'; end if;
+  end loop;
   for rec in select user_id,pool,delta from public.credit_ledger where idempotency_key like 'pricing:v2:close:%' order by id loop
     perform public.admin_adjust_credits(rec.user_id,-rec.delta,'Pricing rollback restores legacy balance',rec.pool,'pricing:v2:restore:'||rec.pool||':'||rec.user_id);
   end loop;
@@ -6754,6 +6769,7 @@ CREATE TABLE IF NOT EXISTS "admin"."pricing_wallet_cutover" (
     "version" "text" NOT NULL,
     "started_at" timestamp with time zone NOT NULL,
     "digest_before" "text" NOT NULL,
+    "waived_refunds" "jsonb" NOT NULL,
     "last_ledger_after" bigint NOT NULL,
     "rolled_back_at" timestamp with time zone,
     CONSTRAINT "pricing_wallet_cutover_version_check" CHECK (("version" = 'v2'::"text"))

@@ -40,6 +40,16 @@ it('refuses when a new account appears after the snapshot was approved', async (
   await expect(clear(b)).rejects.toThrow('CUTOVER_BASELINE_CHANGED')
 })
 
+it('waives outstanding old refunds before enabling new purchases, so a replay takes nothing', async () => {
+  await db.query("select public.settle_checkout($1,'pack_s','cs_before_cutover',990,'usd',0,'card')",[user])
+  const pay = (await db.query("update public.payments set status='refunded',amount_refunded=amount_total where stripe_session_id='cs_before_cutover' returning id")).rows[0]
+  await clear(await baseline())
+  await db.query("select public.settle_checkout_v2($1,'pack_s','cs_after_cutover',990,'usd',0,'card')",[user])
+  const r = (await db.query("select public.clawback_payment_credits($1,'repeat','repeat') as r",[pay.id])).rows[0].r
+  expect(r).toMatchObject({ taken:0, written_off:0, clawback_shortfall:20 })
+  expect((await profileOf(db,user)).credits).toBe(990)
+})
+
 it('will not undo new economic activity', async () => {
   await clear(await baseline())
   await db.query("select public.admin_adjust_credits($1,990,'new order','paid')",[user])
