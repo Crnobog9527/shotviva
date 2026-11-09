@@ -10,7 +10,7 @@ import { AppError } from '../../errors'
 export type StripeApi = {
   webhooks: Pick<Stripe['webhooks'], 'constructEvent'>
   checkout: { sessions: Pick<Stripe['checkout']['sessions'], 'create' | 'retrieve' | 'expire'> }
-  prices: Pick<Stripe['prices'], 'list'>
+  prices: Pick<Stripe['prices'], 'list' | 'retrieve'>
   // T10: renewals, mirror sync, refunds / disputes and the Customer Portal; cancel before an
   // account is deleted (ARCHITECTURE §13).
   invoices: Pick<Stripe['invoices'], 'retrieve'>

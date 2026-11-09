@@ -31,6 +31,8 @@ export type WaffoSessionRequest = {
   language: 'en' | 'zh-Hans'
   // A card subscription offers cards only (T50); one-time sessions offer what the currency has.
   includePaymentMethods?: readonly string[]
+  withTrial?: false
+  allowPromotionCodes?: false
 }
 
 // cancel-order answers the order, its new status (`canceling` until the period ends, or

@@ -21,6 +21,7 @@
 import Stripe from 'stripe'
 import { z } from 'zod'
 
+import { configuredPricing } from '../src/core/billing/checkout-price'
 import type { DesiredPrice } from '../src/core/billing/stripe/catalog'
 import {
   CARD_ONLY_CONFIG_NAME,
@@ -181,7 +182,7 @@ async function checkWebhookEvents(): Promise<void> {
 
 async function main(): Promise<void> {
   console.log(`Stripe ${live ? 'LIVE' : 'test'} account${apply ? '' : ' (dry run)'}`)
-  const plan0 = planSetup({ products, brand: site.brand.name, existingProducts: new Map(), existingPrices: new Map() })
+  const plan0 = planSetup({ products, version: configuredPricing(site.billing), brand: site.brand.name, existingProducts: new Map(), existingPrices: new Map() })
   const productIds = plan0.createProducts.map((p) => p.id)
   const existingProducts = new Map<string, ExistingProduct>()
   for (const id of productIds) {
@@ -189,7 +190,7 @@ async function main(): Promise<void> {
     if (found) existingProducts.set(id, found)
   }
   const existingPrices = await readPrices(plan0.createPrices.map((p) => p.lookupKey))
-  const plan = planSetup({ products, brand: site.brand.name, existingProducts, existingPrices })
+  const plan = planSetup({ products, version: configuredPricing(site.billing), brand: site.brand.name, existingProducts, existingPrices })
 
   if (plan.mismatches.length > 0) {
     console.error(`Stopped: ${plan.mismatches.length} mismatch(es); nothing was created or changed.`)
@@ -197,6 +198,15 @@ async function main(): Promise<void> {
     process.exit(1)
   }
   printPlan(plan)
+  if (process.argv.includes('--versioned-prices-only')) {
+    if (configuredPricing(site.billing) !== 'v2' || plan.createProducts.length || plan.replacePrices.length) {
+      throw new Error('Versioned prices require the approved v2 catalog and six existing Shotviva Products.')
+    }
+    if (apply) {
+      for (const price of plan.createPrices) await createPrice(price)
+    } else console.log('Dry run: no versioned prices were created.')
+    return
+  }
   await checkWebhookEvents()
   const cardOnly = await planCardOnly()
   printCardOnly(cardOnly)

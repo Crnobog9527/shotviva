@@ -45,6 +45,7 @@ export async function settleCheckout(
     userId: string
     productId: ProductId
     sessionId: string
+    version?: 'v2'
     subscription: SubscriptionState | null
     payment: PaymentFacts
   },
@@ -54,7 +55,7 @@ export async function settleCheckout(
   const pay = input.payment
   return callRpc(
     client,
-    'settle_checkout',
+    input.version ? 'settle_checkout_v2' : 'settle_checkout',
     {
       p_user_id: args.userId,
       p_product_id: args.productId,

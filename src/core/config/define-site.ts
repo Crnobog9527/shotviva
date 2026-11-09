@@ -97,6 +97,7 @@ export type SiteConfig = {
   }
   growth: { invite: InviteConfig }
   billing: {
+    pricingVersion?: 'v2'
     currency: 'usd'
     freeCredits: number
     products: readonly SiteProduct[]

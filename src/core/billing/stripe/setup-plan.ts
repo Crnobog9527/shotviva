@@ -66,6 +66,7 @@ function priceMismatch(want: DesiredPrice, found: ExistingPrice): string | null 
 }
 
 export function planSetup(input: {
+  version?: 'v2'
   products: readonly SiteProduct[]
   brand: string
   existingProducts: ReadonlyMap<string, ExistingProduct>
@@ -88,7 +89,7 @@ export function planSetup(input: {
       if (wrong) plan.mismatches.push(wrong)
     }
   }
-  for (const want of desiredPrices(input.products)) {
+  for (const want of desiredPrices(input.products, input.version)) {
     const found = input.existingPrices.get(want.lookupKey)
     if (!found) plan.createPrices.push(want)
     else {
@@ -96,7 +97,8 @@ export function planSetup(input: {
       const wrong = priceMismatch(want, found)
       if (wrong) plan.mismatches.push(wrong)
       else if (found.unitAmount !== want.unitAmount) {
-        plan.replacePrices.push({ price: want, oldId: found.id, oldAmount: found.unitAmount })
+        if (input.version) plan.mismatches.push(`Price ${want.lookupKey} has a different amount; published versioned prices are immutable`)
+        else plan.replacePrices.push({ price: want, oldId: found.id, oldAmount: found.unitAmount })
       }
     }
   }
