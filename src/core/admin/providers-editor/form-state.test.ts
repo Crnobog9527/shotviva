@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { saveProviderSchema } from '../providers/schema'
 import type { AdminProvider } from '../providers/types'
 
 import { canSave, DEFAULT_FORM, formFor, missingPrices, priceOrigin, pricesFromTable, toSaveInput, withAdapter, withModel } from './form-state'
@@ -33,6 +34,13 @@ describe('provider form state', () => {
     expect(toSaveInput({ ...router, resolutions: ['1k'] }, provider)).toMatchObject({ adapter: 'openrouter_images', resolutions: ['1k'] })
     expect(canSave({ ...router, resolutions: [] }, false)).toBe(false)
     expect(withAdapter(router, 'openai_images').baseUrl).toBe('https://api.openai.com/v1')
+  })
+
+  it('keeps a legacy submission without tiers distinct from an explicit change', () => {
+    const input = toSaveInput(formFor(provider), provider)
+    const legacy = { ...input, resolutions: undefined }
+    expect(saveProviderSchema.parse(legacy).resolutions).toBeUndefined()
+    expect(saveProviderSchema.safeParse({ ...input, resolutions: [] }).success).toBe(false)
   })
 
   it('requires a key for a new provider', () => {

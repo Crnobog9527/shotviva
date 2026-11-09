@@ -25,8 +25,9 @@ export const saveProviderSchema = z.object({
   id: z.uuid().optional(),
   module: z.enum(PROVIDER_MODULES).default('image'),
   adapter: z.enum(PROVIDER_ADAPTERS).default('openai_images'),
+  // Older editors omit tiers. Inserts use the database default; edits keep the saved set.
   resolutions: z.array(z.enum(RESOLUTIONS)).min(1).max(RESOLUTIONS.length)
-    .refine((values) => new Set(values).size === values.length).default([...RESOLUTIONS]),
+    .refine((values) => new Set(values).size === values.length).optional(),
   label: z.string().trim().min(1).max(80),
   baseUrl: z.string().trim().min(1).max(300),
   model: z

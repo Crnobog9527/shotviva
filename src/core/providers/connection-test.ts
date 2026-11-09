@@ -2,8 +2,8 @@ import 'server-only'
 
 import type { ProviderAdapterId } from './types'
 
-// Use OpenRouter's authenticated /key endpoint: its public catalogue is accessible without a key. It only proves the key authenticates; it never generates, so it costs nothing. Only the
-// HTTP status leaves this function: a vendor body can echo the request.
+// Use OpenRouter's authenticated /key endpoint: its public catalogue is accessible without a key.
+// Only the HTTP status leaves this function because a vendor body can echo the request.
 
 export type ConnectionResult =
   | { ok: true; status: number }
