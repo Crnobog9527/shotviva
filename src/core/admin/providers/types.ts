@@ -11,6 +11,7 @@ export type ProviderAdminActions = {
   lookupModel: (input: { baseUrl: string; model: string }) => Promise<ProviderActionResult<Resolution[] | null>>
   save: (input: SaveProviderInput) => Promise<ProviderActionResult<string>>
   activate: (input: { id: string }) => Promise<ProviderActionResult>
+  refresh: (input: { id: string }) => Promise<ProviderActionResult>
   test: (input: { id: string }) => Promise<ProviderActionResult<ConnectionResult>>
   remove: (input: { id: string }) => Promise<ProviderActionResult>
 }

@@ -10,11 +10,12 @@ import { isOwnInputKey, loadInputImage, outputKeyFor, writeInputPreview } from '
 import {
   DEFAULT_RESOLUTION,
   loadGenerationTemplate,
-  OUTPUT_ASPECTS,
+  allowedWebAspects,
   validateGenerationInputs,
   type GenerationInputs,
   type Resolution,
   type TemplateSurface,
+  type Template,
 } from '../templates'
 import { settleTracked } from './generation-analytics'
 import { screenCost, templateCall, typedWords } from './generation-call'
@@ -42,9 +43,10 @@ export type GenerationDeps = Omit<SettleDeps, 'provider'> & {
 
 const SURFACE: Record<JobSource, TemplateSurface> = { web: 'web', graylum: 'partner' }
 
-// The web offers the eight output sizes; the partner route keeps each template's own ratios
-// (undefined → template.fields.aspectRatios), as its published contract says.
-const ASPECTS: Record<JobSource, readonly string[] | undefined> = { web: OUTPUT_ASPECTS, graylum: undefined }
+
+function requestAspects(req: GenerationRequest, template: Template) {
+  return req.source === 'web' ? allowedWebAspects(template.imageOptions, req.resolution ?? DEFAULT_RESOLUTION) : undefined
+}
 
 // A batch bigger than the tier holds (Starter 1, Pro 10, Max 30) is refused per photo; the
 // browser only offers batchMax, so this is someone bypassing the picker or a tier that lapsed
@@ -67,7 +69,7 @@ async function prepare(deps: GenerationDeps, req: GenerationRequest) {
     // Partner v1 takes no toggles: every one stays at its default, off (T89).
     ...(req.source === 'web' ? { toggles: req.toggles, togglesConfirmed: req.togglesConfirmed } : {}),
     imageCount: req.inputKey ? 1 : 0,
-    aspects: ASPECTS[req.source],
+    aspects: requestAspects(req, template),
   })
   // Never touch (or delete) an object outside the caller's own inputs/ prefix.
   if (req.inputKey && !isOwnInputKey(req.userId, req.inputKey)) throw new AppError('INVALID_INPUT', 'Unknown upload')

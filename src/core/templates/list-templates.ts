@@ -8,6 +8,8 @@ import { toTemplate, type PreT75TemplateRow, type Template, type TemplateRow } f
 
 // Catalogue for one entry point. Pass a public (anon) client so RLS limits rows to published
 // templates; the surface filter is what keeps partner-only rows such as `freeform` off the web.
+type CatalogueRow = (TemplateRow | PreT75TemplateRow) & { partner_image_aspects?: string[] }
+
 export async function listTemplates(
   client: SupabaseClient,
   surface: TemplateSurface,
@@ -20,10 +22,16 @@ export async function listTemplates(
       .contains('visible_in', [surface])
       .order('sort_order', { ascending: true })
       .order('id', { ascending: true })
-      .returns<(TemplateRow | PreT75TemplateRow)[]>(),
+      .returns<CatalogueRow[]>(),
+    surface === 'partner' ? ', partner_image_aspects' : '',
   )
   if (error || !data) throw new Error(`listTemplates failed: ${error?.message ?? 'no data'}`)
-  return data.map(toTemplate)
+  return data.flatMap((row) => {
+    const template = toTemplate(row)
+    if (surface !== 'partner') return [template]
+    const aspects = row.partner_image_aspects ?? template.fields.aspectRatios
+    return aspects.length ? [{ ...template, fields: { ...template.fields, aspectRatios: aspects } }] : []
+  })
 }
 
 // The web catalogue in the page's language (names and copy labels from templates.translations,

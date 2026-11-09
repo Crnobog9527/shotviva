@@ -5,7 +5,7 @@ import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { identityJudgeStats } from '@/core/identity-guard'
 import { listProviders } from '@/core/providers'
 
-import { activateProviderAction, deleteProviderAction, identityDryRunAction, lookupProviderModelAction, saveProviderAction, testProviderAction } from './actions'
+import { activateProviderAction, deleteProviderAction, identityDryRunAction, lookupProviderModelAction, refreshProviderAction, saveProviderAction, testProviderAction } from './actions'
 
 // Admin-only, request-time page (ARCHITECTURE §3.3, §10). The proxy answers non-admins with a
 // 404 first; requireAdmin() stays the authoritative check. The listing never carries key
@@ -26,7 +26,7 @@ export default async function AdminProvidersPage() {
     <AdminPage title={PROVIDERS_COPY.title}>
       <ProvidersEditor
         providers={providers}
-        actions={{ lookupModel: lookupProviderModelAction, save: saveProviderAction, activate: activateProviderAction, test: testProviderAction, remove: deleteProviderAction }}
+        actions={{ refresh: refreshProviderAction, lookupModel: lookupProviderModelAction, save: saveProviderAction, activate: activateProviderAction, test: testProviderAction, remove: deleteProviderAction }}
       />
       <IdentityDryRun run={identityDryRunAction} stats={stats} />
     </AdminPage>

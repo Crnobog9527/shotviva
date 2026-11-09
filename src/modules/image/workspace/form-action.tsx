@@ -9,11 +9,13 @@ import { buttonVariants } from '@/core/ui/button'
 import type { CtaState } from './cta-state'
 import { tierName } from './workspace-options'
 
-const LABELS: Record<'wait' | 'need-photo' | 'uploading' | 'need-copy', string> = {
+const LABELS: Record<'wait' | 'need-photo' | 'uploading' | 'need-copy' | 'no-options' | 'need-size', string> = {
   wait: 'wait',
   'need-photo': 'needPhoto',
   uploading: 'uploadingCta',
   'need-copy': 'needCopy',
+  'no-options': 'noOptions',
+  'need-size': 'pickSize',
 }
 
 // Rich-text tags the workspace messages use: the cost after the middle dot, a number in mono,

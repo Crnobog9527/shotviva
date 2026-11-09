@@ -113,7 +113,7 @@ function useKeptRatios(entries: Entry[], patch: (id: string, change: Partial<Ent
       if (!entry.keptFrom || entry.ratio || asked.current.has(entry.id)) continue
       asked.current.add(entry.id)
       void naturalSize(entry.url)
-        .then(({ width, height }) => patch(entry.id, { ratio: nearestRatio(width, height) }))
+        .then(({ width, height }) => patch(entry.id, { ratio: nearestRatio(width, height), originalRatio: width / height }))
         .catch(() => undefined)
     }
   }, [entries, patch])
@@ -124,7 +124,7 @@ function newEntry(file: File, patch: (id: string, change: Partial<Entry>) => voi
   const url = URL.createObjectURL(file)
   // The ratio readout fills in once the browser has decoded the photo; upload does not wait.
   void naturalSize(url)
-    .then(({ width, height }) => patch(id, { ratio: nearestRatio(width, height) }))
+    .then(({ width, height }) => patch(id, { ratio: nearestRatio(width, height), originalRatio: width / height }))
     .catch(() => undefined)
   return { id, file, url, bytes: file.size, ratio: null, upload: { phase: 'idle' } }
 }
