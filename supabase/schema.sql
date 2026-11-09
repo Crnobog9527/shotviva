@@ -438,18 +438,22 @@ begin
       closed_rows := array_append(closed_rows, d);
     end if;
   end loop;
+  -- An unrelated charge or a payment with no early dispute resolves nothing.
+  if not found then return null; end if;
   -- Attach every case before closing any: T71 transfers the held share to a
   -- sibling open case and restores it only when the last eligible case closes.
   for d in select * from unnest(closed_rows) order by closed_at, stripe_dispute_id loop
     perform public.close_payment_dispute(d.stripe_dispute_id, d.closed_status);
     update public.payment_disputes set closed_at = d.closed_at where stripe_dispute_id = d.stripe_dispute_id;
   end loop;
+  update public.payment_dispute_link_errors set resolved_at = now()
+   where payment_id = new.id and resolved_at is null;
   return null;
 exception when others or query_canceled or assert_failure then
   -- The subtransaction rolls back the link, debit and related commission changes together.
   begin
     insert into public.payment_dispute_link_errors(payment_id, error_code) values (new.id, sqlstate)
-      on conflict (payment_id) do update set error_code = excluded.error_code, occurred_at = now();
+      on conflict (payment_id) do update set error_code = excluded.error_code, occurred_at = now(), resolved_at = null;
   exception when others or query_canceled or assert_failure then
     return null;
   end;
@@ -3536,6 +3540,8 @@ CREATE OR REPLACE FUNCTION "public"."admin_todo_counts"() RETURNS "jsonb"
         from public.generation_jobs where created_at >= now() - interval '24 hours'),
     'pending_requests', (
       select count(*) from public.template_requests where status = 'pending'),
+    'unresolved_dispute_links', (
+      select count(*) from public.payment_dispute_link_errors where resolved_at is null),
     'payment_issues', (
       select count(*) from public.payments
        where status <> 'paid' and created_at >= now() - interval '60 days'),
@@ -7276,7 +7282,8 @@ ALTER TABLE "public"."partner_links" OWNER TO "postgres";
 CREATE TABLE IF NOT EXISTS "public"."payment_dispute_link_errors" (
     "payment_id" bigint NOT NULL,
     "error_code" "text" NOT NULL,
-    "occurred_at" timestamp with time zone DEFAULT "now"() NOT NULL
+    "occurred_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "resolved_at" timestamp with time zone
 );
 
 
@@ -8046,6 +8053,10 @@ CREATE INDEX "identity_refusals_user_id_created_at_idx" ON "public"."identity_re
 
 
 CREATE UNIQUE INDEX "partner_links_partner_link_code_idx" ON "public"."partner_links" USING "btree" ("partner", "link_code") WHERE ("link_code" IS NOT NULL);
+
+
+
+CREATE INDEX "payment_dispute_link_errors_open_idx" ON "public"."payment_dispute_link_errors" USING "btree" ("payment_id") WHERE ("resolved_at" IS NULL);
 
 
 

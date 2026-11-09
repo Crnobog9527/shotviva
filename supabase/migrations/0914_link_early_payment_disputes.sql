@@ -5,8 +5,11 @@ create index payment_disputes_unlinked_charge_idx on public.payment_disputes (st
 create table public.payment_dispute_link_errors (
   payment_id bigint primary key references public.payments(id) on delete cascade,
   error_code text not null,
-  occurred_at timestamptz not null default now()
+  occurred_at timestamptz not null default now(),
+  resolved_at timestamptz
 );
+create index payment_dispute_link_errors_open_idx on public.payment_dispute_link_errors(payment_id)
+  where resolved_at is null;
 alter table public.payment_dispute_link_errors enable row level security;
 revoke all on public.payment_dispute_link_errors from public, anon, authenticated, service_role;
 grant select on public.payment_dispute_link_errors to service_role;
@@ -58,18 +61,22 @@ begin
       closed_rows := array_append(closed_rows, d);
     end if;
   end loop;
+  -- An unrelated charge or a payment with no early dispute resolves nothing.
+  if not found then return null; end if;
   -- Attach every case before closing any: T71 transfers the held share to a
   -- sibling open case and restores it only when the last eligible case closes.
   for d in select * from unnest(closed_rows) order by closed_at, stripe_dispute_id loop
     perform public.close_payment_dispute(d.stripe_dispute_id, d.closed_status);
     update public.payment_disputes set closed_at = d.closed_at where stripe_dispute_id = d.stripe_dispute_id;
   end loop;
+  update public.payment_dispute_link_errors set resolved_at = now()
+   where payment_id = new.id and resolved_at is null;
   return null;
 exception when others or query_canceled or assert_failure then
   -- The subtransaction rolls back the link, debit and related commission changes together.
   begin
     insert into public.payment_dispute_link_errors(payment_id, error_code) values (new.id, sqlstate)
-      on conflict (payment_id) do update set error_code = excluded.error_code, occurred_at = now();
+      on conflict (payment_id) do update set error_code = excluded.error_code, occurred_at = now(), resolved_at = null;
   exception when others or query_canceled or assert_failure then
     return null;
   end;
@@ -186,4 +193,48 @@ begin
     'currency', v_row.currency
   );
 end;
+$$;
+
+-- Extend the existing service-only overview RPC (0227) in the same round trip.
+create or replace function public.admin_todo_counts()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'stuck_jobs', (
+      select count(*) from public.generation_jobs
+       where status = 'running' and created_at < now() - interval '10 minutes'),
+    'jobs_1h', (
+      select jsonb_build_object('total', count(*), 'failed', count(*) filter (where status = 'failed'))
+        from public.generation_jobs where created_at >= now() - interval '1 hour'),
+    'jobs_24h', (
+      select jsonb_build_object('total', count(*), 'failed', count(*) filter (where status = 'failed'))
+        from public.generation_jobs where created_at >= now() - interval '24 hours'),
+    'pending_requests', (
+      select count(*) from public.template_requests where status = 'pending'),
+    'unresolved_dispute_links', (
+      select count(*) from public.payment_dispute_link_errors where resolved_at is null),
+    'payment_issues', (
+      select count(*) from public.payments
+       where status <> 'paid' and created_at >= now() - interval '60 days'),
+    'last_purchase_at', (
+      select created_at from public.credit_ledger
+       where kind = 'purchase' order by created_at desc, id desc limit 1),
+    'provider', (
+      select jsonb_build_object('label', label, 'model', model)
+        from public.ai_providers where module = 'image' and is_active),
+    'open_tickets', (
+      select count(*) from public.support_tickets where status = 'open'),
+    'overdue_tickets', (
+      select count(*) from public.support_tickets t
+       where t.status = 'open'
+         and coalesce(
+               (select max(m.created_at) from public.support_ticket_messages m
+                 where m.ticket_id = t.id and m.author = 'user'),
+               t.created_at)
+             + make_interval(hours => public.support_reply_hours(public.current_tier(t.user_id))) < now())
+  )
 $$;
