@@ -30,6 +30,7 @@ export const OVERVIEW_COPY = {
     fail24h: '近 24 小时失败率',
     requests: '待审需求',
     paymentIssues: '退款和争议（60 天内）',
+    disputeLinks: '待处理的争议回填异常',
     lastPurchase: '最近一次入账',
     provider: '在用的供应商',
     noProvider: '没有在用的供应商',

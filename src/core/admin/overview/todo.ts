@@ -16,6 +16,7 @@ const todoSchema = z.object({
   jobs_24h: window,
   pending_requests: z.number(),
   payment_issues: z.number(),
+  unresolved_dispute_links: z.number().int().nonnegative().optional(), // Absent before 0914.
   last_purchase_at: z.string().nullable(),
   provider: z.object({ label: z.string(), model: z.string() }).nullable(),
   open_tickets: z.number(),
@@ -27,6 +28,7 @@ export type TodoCounts = {
   failures1h: z.infer<typeof window>
   failures24h: z.infer<typeof window>
   pendingRequests: number
+  unresolvedDisputeLinks: number | undefined
   paymentIssues: number
   lastPurchaseAt: string | null
   provider: { label: string; model: string } | null
@@ -44,6 +46,7 @@ export async function loadTodoCounts(db: SupabaseClient): Promise<TodoCounts> {
     failures24h: row.jobs_24h,
     pendingRequests: row.pending_requests,
     paymentIssues: row.payment_issues,
+    unresolvedDisputeLinks: row.unresolved_dispute_links,
     lastPurchaseAt: row.last_purchase_at,
     provider: row.provider,
     openTickets: row.open_tickets,

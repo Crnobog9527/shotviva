@@ -29,6 +29,10 @@ function items(todo: TodoCounts, wishlist: boolean): Item[] {
   if (wishlist) {
     list.splice(5, 0, { key: 'requests', href: '/admin/requests', label: COPY.requests, value: String(todo.pendingRequests), alert: todo.pendingRequests > 0 })
   }
+  if (todo.unresolvedDisputeLinks !== undefined) {
+    list.push({ key: 'dispute-links', href: '/admin/disputes', label: COPY.disputeLinks,
+      value: String(todo.unresolvedDisputeLinks), alert: todo.unresolvedDisputeLinks > 0 })
+  }
   return list
 }
 
