@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { receiptDetail } from '@/core/admin/jobs/receipt-detail'
 import type { TestBudget } from '@/core/admin/test-runs'
 import { RESOLUTIONS, type Resolution } from '@/core/templates'
 
@@ -23,6 +24,7 @@ export type TestRun = {
   inputs: Record<string, unknown>
   promptVersion: number | null
   provider: string | null
+  receiptDetail?: string
   costUsd: number | null
   estimateUsd: number
   outputKey: string | null
@@ -47,6 +49,7 @@ export const testRunRowSchema = z
     inputs: z.record(z.string(), z.unknown()),
     prompt_version: z.number().int().nullable(),
     provider: z.string().nullable(),
+    provider_usage: z.record(z.string(), z.unknown()).nullish(),
     cost_usd: money.nullable(),
     estimate_usd: money,
     output_key: z.string().nullable(),
@@ -68,6 +71,7 @@ export const testRunRowSchema = z
       inputs: row.inputs,
       promptVersion: row.prompt_version,
       provider: row.provider,
+      receiptDetail: receiptDetail(row.provider_usage, row.cost_usd),
       costUsd: row.cost_usd,
       estimateUsd: row.estimate_usd,
       outputKey: row.output_key,
@@ -79,7 +83,7 @@ export const testRunRowSchema = z
   )
 
 export const TEST_RUN_COLUMNS =
-  'id, template_id, kind, parent_id, photo_id, batch_id, status, resolution, inputs, prompt_version, provider, cost_usd, estimate_usd, output_key, error_code, duration_ms, cover_set_at, created_at'
+  'id, template_id, kind, parent_id, photo_id, batch_id, status, resolution, inputs, prompt_version, provider, provider_usage, cost_usd, estimate_usd, output_key, error_code, duration_ms, cover_set_at, created_at'
 
 export type TestPhoto = { id: string; objectKey: string; lastUsedAt: string }
 

@@ -16,12 +16,14 @@ import { afterCoverSource, type AfterCover } from '../covers/client'
 import { referenceBudget, refUploadId } from './style-ref-state'
 import { StyleRefFields } from './style-ref-fields'
 import { TemplateCoverFields } from './template-cover-fields'
+import { versionCopy } from './version-copy'
+import { TemplateHistory, type VersionActions } from './prompt-history'
 import { TemplatePromptFields } from './template-prompt-fields'
 import { TemplatePublicFields } from './template-public-fields'
 import { TemplateToggleFields } from './template-toggle-fields'
 import { TemplateTranslationFields } from './template-translation-fields'
 
-export type EditTarget = { mode: 'new' } | { mode: 'edit'; template: AdminTemplate }
+export type EditTarget = { mode: 'new' } | { mode: 'edit'; template: AdminTemplate; previousStandard?: number | null }
 
 type Props = {
   providers: readonly ImageProviderOption[]
@@ -29,13 +31,13 @@ type Props = {
   floor: ProviderFloors
   categories: readonly CategoryOption[]
   coverLanguages: readonly CoverLanguage[]
-  coverActions: Pick<TemplateAdminActions, 'requestCoverUpload' | 'applyCover'>
+  coverActions: Pick<TemplateAdminActions, 'requestCoverUpload' | 'applyCover'> & VersionActions
   pending: boolean
   error: string | null
   // The last save's success line, shown by the save button (the dialog stays open after a save).
   notice?: string | null
   onCancel: () => void
-  onSubmit: (payload: SaveTemplatePayload, saved: () => void) => void
+  onSubmit: (payload: SaveTemplatePayload, saved: (version?: number) => void) => void
 }
 
 // Mounted fresh per target (keyed by the container), so initial state comes straight from props.
@@ -49,7 +51,7 @@ export function TemplateFormDialog({ target, providers, floor: allFloors, catego
   const [submitted, setSubmitted] = useState(false)
   const onChange = (patch: Partial<typeof values>) => setValues((prev) => ({ ...prev, ...patch }))
 
-  const floor = providerFloor(allFloors, values.providerId, values.id)
+  const floor = providerFloor(allFloors, values.providerId, values.id, values.category, values.quality, values.visiblePartner)
   const submit = () => {
     const result = buildPayload(values, isNew, floor)
     if (!result.ok) {
@@ -58,7 +60,11 @@ export function TemplateFormDialog({ target, providers, floor: allFloors, catego
     }
     setLocalError(null)
     setSubmitted(true)
-    onSubmit(result.payload, () => setValues(now => now.styleRefs === values.styleRefs ? { ...now, styleRefsEdited: false } : now))
+    onSubmit(result.payload, version => setValues(now => ({
+      ...now, expectedVersion: version ?? now.expectedVersion,
+      selectedVersion: now.selectedVersion === values.selectedVersion ? undefined : now.selectedVersion,
+      styleRefsEdited: now.styleRefs !== values.styleRefs && now.styleRefsEdited,
+    })))
   }
 
   const shownError = localError ?? error ?? null
@@ -108,6 +114,7 @@ function FormColumn({ target, providers, values, isNew, floor, categories, cover
       <DialogHeader>
         <DialogTitle>{existing ? `编辑「${existing.name}」` : '新建模板'}</DialogTitle>
       </DialogHeader>
+      <CopyPriceNotice target={target} />
       <TemplatePublicFields values={values} isNew={isNew} uploading={uploading} floor={floor} categories={categories} onChange={onChange} />
       <TemplateTranslationFields values={values} onChange={onChange} />
       {existing ? (
@@ -120,11 +127,18 @@ function FormColumn({ target, providers, values, isNew, floor, categories, cover
       )}
       <StyleSection cover={cover} values={values} budget={budget} uploading={uploading} setUploading={setUploading} onChange={onChange} />
       <TemplatePromptFields values={values} version={existing?.prompt?.version ?? null} onChange={onChange} />
+      <TemplateHistory template={existing} values={values} disabled={pending || uploading}
+        actions={coverActions} providers={providers} onChange={onChange} />
       <TemplateToggleFields values={values} onChange={onChange} />
       {isNew ? <p className="text-muted-foreground text-xs">新模板保存后默认是下架状态，保存后留在这里，右侧就能试跑。</p> : null}
       <FormFooter saveDisabled={styleSaveBlocked(uploading, values.module, budget.problem)} pending={pending} error={error} saved={saved} onCancel={onCancel} onSave={onSave} />
     </div>
   )
+}
+
+function CopyPriceNotice({ target }: { target: EditTarget }) {
+  if (target.mode !== 'edit' || !target.previousStandard) return null
+  return <p role="status" className="text-sm">{versionCopy.priceChanged(target.previousStandard)}</p>
 }
 
 function styleSaveBlocked(uploading: boolean, module: string, problem: string | null) {

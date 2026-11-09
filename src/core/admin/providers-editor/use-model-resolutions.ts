@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react'
 
-import type { Resolution } from '@/core/templates/output-options'
+import type { ImageCapabilities } from '@/core/templates/image-capabilities'
 
 import type { ProviderAdminActions, ProviderActionResult } from '../providers/types'
 
-type CatalogResult = ProviderActionResult<Resolution[] | null>
+type CatalogResult = ProviderActionResult<ImageCapabilities | null>
 type Result = { baseUrl: string; model: string; result: CatalogResult }
 
 // A lookup carries its model and endpoint. While a different lookup is pending its result
@@ -19,7 +19,7 @@ export function useModelResolutions(active: boolean, baseUrl: string, model: str
     if (!enabled) return
     let current = true
     const timer = setTimeout(async () => {
-      const result = await lookup({ baseUrl, model }).catch(() => ({ ok: false, reason: 'openrouter_catalog_unavailable' }) as const)
+      const result = await lookup({ baseUrl, model, retry: attempt > 0 }).catch(() => ({ ok: false, reason: 'openrouter_catalog_unavailable' }) as const)
       if (current) setLast({ baseUrl, model, result })
     }, 350)
     return () => {
@@ -33,5 +33,5 @@ export function useModelResolutions(active: boolean, baseUrl: string, model: str
     setLast(null)
     setAttempt((n) => n + 1)
   }
-  return { pending: enabled && result === null, result, retry }
+  return { pending: enabled && result === null, result, snapshot: result?.ok ? result.value : null, retry }
 }

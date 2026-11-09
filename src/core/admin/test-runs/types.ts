@@ -33,6 +33,7 @@ export type TestRunView = {
   styleRefCount: number
   promptVersion: number | null
   model: string | null
+  receiptDetail?: string
   costUsd: number | null
   estimateUsd: number
   durationMs: number | null

@@ -1,13 +1,17 @@
+import { draftCredits } from './tier-price'
 import type { StyleRef } from '@/core/templates/style-refs'
 import { MISSING_COST, floorGuidance } from '@/core/templates/provider-pricing'
 import { RESOLUTIONS, type Resolution } from '@/core/templates/output-options'
-import { approvedCredit, type CreditsFloor, type TemplateQuality } from '@/core/templates/pricing'
-import { toggleSetupProblems } from '@/core/templates/toggles'
+import { approvedCredit, creditMinimum, type CreditsFloor, type TemplateQuality } from '@/core/templates/pricing'
+import { toggleFragments, toggleSetupProblems } from '@/core/templates/toggles'
 
 import type { AdminTemplate, SaveTemplatePayload } from '../templates/types'
 import { toFragments, toToggleFields, toToggleValues, toZhToggleText, withoutToggles, type ToggleFormValue } from './toggle-form-state'
 
 export type TemplateFormValues = {
+  expectedVersion?: number
+  restoredParams?: Record<string, unknown>
+  selectedVersion?: number
   id: string
   module: 'image' | 'video'
   name: string
@@ -109,8 +113,11 @@ export function toTranslations(zh: ZhFormValues, keys: readonly string[], toggle
   return Object.keys(entry).length > 0 ? { zh: entry } : {}
 }
 
+const savedVersion = (template: AdminTemplate) => template.prompt?.version
+
 export function toFormValues(template: AdminTemplate): TemplateFormValues {
   return {
+    expectedVersion: savedVersion(template),
     id: template.id,
     module: template.module,
     name: template.name,
@@ -152,12 +159,13 @@ export const TIER_LABEL: Record<Resolution, string> = { '1k': 'Standard', '2k': 
 export function creditProblems(values: TemplateFormValues, floor: CreditsFloor): Partial<Record<Resolution, string>> {
   const problems: Partial<Record<Resolution, string>> = {}
   for (const resolution of RESOLUTIONS) {
-    const text = values.credits[resolution].trim()
+    const text = draftCredits(floor, values.quality, resolution, values.credits[resolution]).trim()
     const value = Number(text)
-    const min = floor[values.quality][resolution]
+    const min = creditMinimum(floor, values.quality, resolution)
     if (!/^\d+$/.test(text)) problems[resolution] = '请填正整数'
     else if (value === approvedCredit(floor, values.quality, resolution)) continue
-    else if (min === MISSING_COST) problems[resolution] = floorGuidance(min)
+    else if (min === MISSING_COST) problems[resolution] = floorGuidance(min, floor.unknownCapabilities)
+    else if (value < 1 || value > 999) problems[resolution] = '请填 1–999 的整数'
     else if (value < min) problems[resolution] = `不能低于下限 ${min}`
   }
   return problems
@@ -167,11 +175,24 @@ const isObject = (value: unknown): value is Record<string, unknown> => typeof va
 
 // The 开关 cards folded into fields and model params (T89), with the save's own refusal said
 // before the round trip: a toggle without its {{key}} or a fragment (the server checks again).
+function privateFragments(values: TemplateFormValues) {
+  const saved = values.restoredParams
+  if (saved && Object.hasOwn(saved, 'toggles')) {
+    const fragments = toggleFragments(saved)
+    // An older version can have fragments for switches that no longer appear in the
+    // public form. A verbatim restore must keep those bytes in its original snapshot.
+    if (values.toggles.every(t => t.on === fragments[t.key]?.on && t.off === fragments[t.key]?.off)) {
+      return { toggles: saved.toggles }
+    }
+  }
+  return toFragments(values.toggles)
+}
+
 function withToggles(values: TemplateFormValues, fields: unknown, params: unknown) {
   if (!isObject(fields)) return { ok: false as const, message: '字段定义要是一个 JSON 对象' }
   if (!isObject(params)) return { ok: false as const, message: '模型参数要是一个 JSON 对象' }
   const toggles = toToggleFields(values.toggles)
-  const modelParams = { ...withoutToggles(params), ...toFragments(values.toggles) }
+  const modelParams = { ...withoutToggles(params), ...privateFragments(values) }
   const problems = toggleSetupProblems(toggles, values.promptBody, modelParams)
   if (problems.length > 0) return { ok: false as const, message: problems.join('；') }
   return { ok: true as const, fields: { ...withoutToggles(fields), toggles }, modelParams }
@@ -195,6 +216,7 @@ export function buildPayload(values: TemplateFormValues, isNew: boolean, floor: 
     ok: true,
     payload: {
       isNew,
+      ...(values.expectedVersion ? { revision: { expected: values.expectedVersion, selected: values.selectedVersion } } : {}),
       template: {
         id: values.id.trim(),
         module: values.module,
@@ -204,9 +226,9 @@ export function buildPayload(values: TemplateFormValues, isNew: boolean, floor: 
         category: values.category,
         quality: values.quality,
         creditsCost: {
-          '1k': Number(values.credits['1k']),
-          '2k': Number(values.credits['2k']),
-          '3k': Number(values.credits['3k']),
+          '1k': Number(draftCredits(floor, values.quality, '1k', values.credits['1k'])),
+          '2k': Number(draftCredits(floor, values.quality, '2k', values.credits['2k'])),
+          '3k': Number(draftCredits(floor, values.quality, '3k', values.credits['3k'])),
         },
         visibleIn,
         fields: wired.fields,

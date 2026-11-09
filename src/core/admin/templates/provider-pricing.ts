@@ -8,10 +8,11 @@ import {
 } from '@/core/templates'
 import type { ImageProviderOption } from '../image-provider-field'
 
+const tariffs = z.record(z.string(), z.object({ quality: z.enum(TEMPLATE_QUALITIES), costs: creditsCostSchema, style_sale_approved: z.boolean().optional() }))
 const rowSchema = z.object({
   provider_id: z.uuid().nullable(), label: z.string(), model: z.string(), adapter: z.enum(['openai_images', 'openrouter_images']),
   is_active: z.boolean(), capabilities: z.unknown(), resolutions: z.array(z.enum(RESOLUTIONS)),
-  approved: z.record(z.string(), z.object({ quality: z.enum(TEMPLATE_QUALITIES), costs: creditsCostSchema })).optional(),
+  approved: tariffs.optional(),
   estimated_image_costs: estimatedImageCostsSchema,
   p95: z.partialRecord(z.enum(RESOLUTIONS), z.number().nonnegative()),
 })
@@ -21,7 +22,7 @@ const receiptSchema = z.object({
 })
 const quoteSchema = z.object({ input: z.unknown(), receipt: receiptSchema })
 const catalogSchema = z.object({
-  version: z.enum(['v1', 'v2']), unit_price: z.coerce.number().positive(), providers: z.array(rowSchema.required({ approved: true })),
+  version: z.enum(['v1', 'v2']), tariffs: tariffs.optional(), unit_price: z.coerce.number().positive(), providers: z.array(rowSchema.required({ approved: true })),
 })
 
 function optionsFromInput(input: unknown, legacyBudget?: number): ImageProviderOption[] {
@@ -32,9 +33,10 @@ function optionsFromInput(input: unknown, legacyBudget?: number): ImageProviderO
   return rows.map(row => {
     const caps = imageCapabilitiesSchema.safeParse(row.capabilities)
     const openAI = row.adapter === 'openai_images'
-    const floor = modelCreditFloor({ openAI, resolutions: row.resolutions, estimates: row.estimated_image_costs, p95: row.p95 }, budget)
+    const estimates = { ...caps.data?.catalogImageCosts, ...row.estimated_image_costs }
+    const floor = modelCreditFloor({ openAI, resolutions: row.resolutions, estimates, p95: row.p95 }, budget)
     return {
-      approved: row.approved, version: catalog?.version,
+      approved: row.approved, version: catalog?.version, tariffs: row.is_active ? catalog?.tariffs : undefined,
       id: row.provider_id ?? 'env', label: row.label, model: row.model, isActive: row.is_active,
       capabilities: caps.success ? caps.data : null, openAI, floor: openAI || caps.success ? floor : UNPRICED,
     }
@@ -74,9 +76,10 @@ export async function listImageProviderOptions(client: SupabaseClient, budgetOrM
 
 export function pricingFromOptions(options: readonly ImageProviderOption[]): ProviderFloors {
   const active = options.find(p => p.isActive)
+  const details = active && { version: active.version, activeProvider: active.id, tariffs: active.tariffs }
   return {
     ...(active?.floor ?? UNPRICED),
-    version: active?.version, activeProvider: active?.id,
+    ...details,
     approvals: Object.fromEntries(options.map(p => [p.id, p.approved ?? {}])),
     providers: Object.fromEntries(options.map(p => [p.id, p.floor])),
     models: Object.fromEntries(options.map(p => [p.id, p.model])),

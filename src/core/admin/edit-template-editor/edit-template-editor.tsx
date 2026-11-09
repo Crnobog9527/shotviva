@@ -32,7 +32,7 @@ export function EditTemplateEditor({ settings, floor, save }: Props) {
   return (
     <div className="grid gap-4">
       <p className="text-muted-foreground text-sm">{COPY.intro}</p>
-      <BasicsFields form={form} floor={floor[settings.quality]} approved={floor.approved?.quality === settings.quality ? floor.approved.costs : undefined} version={settings.version} onChange={patch} />
+      <BasicsFields form={form} floor={floor} quality={settings.quality} version={settings.version} onChange={patch} />
       <div className="grid gap-1.5 rounded-md border border-dashed p-3">
         <Label htmlFor="edit-classifier">{COPY.classifier}</Label>
         <Textarea id="edit-classifier" className="min-h-40 font-mono text-xs" value={form.classifier} onChange={(event) => patch({ classifier: event.target.value })} />

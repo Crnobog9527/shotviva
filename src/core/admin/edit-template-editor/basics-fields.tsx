@@ -5,8 +5,8 @@ import { Label } from '@/core/ui/label'
 import { Switch } from '@/core/ui/switch'
 import { Textarea } from '@/core/ui/textarea'
 import { RESOLUTIONS } from '@/core/templates/output-options'
-import { floorGuidance } from '@/core/templates/provider-pricing'
-import type { CreditsFloor } from '@/core/templates/pricing'
+import { tierGuidance, unsupportedTier } from '../templates-editor/tier-price'
+import { approvedCredit, creditMinimum, type CreditsFloor, type TemplateQuality } from '@/core/templates/pricing'
 
 import { TIER_LABEL } from '../templates-editor/form-state'
 
@@ -16,13 +16,13 @@ import type { EditTemplateForm } from './form-state'
 type Props = {
   form: EditTemplateForm
   // The floor for the template's own quality tier.
-  floor: CreditsFloor['high']
-  approved?: CreditsFloor['high']
+  floor: CreditsFloor
+  quality: TemplateQuality
   version: number
   onChange: (patch: Partial<EditTemplateForm>) => void
 }
 
-export function BasicsFields({ form, floor, approved, version, onChange }: Props) {
+export function BasicsFields({ form, floor, quality, version, onChange }: Props) {
   return (
     <div className="grid gap-4 rounded-md border p-3">
       <div className="flex items-center gap-3">
@@ -36,9 +36,9 @@ export function BasicsFields({ form, floor, approved, version, onChange }: Props
           {RESOLUTIONS.map((r) => (
             <div key={r} className="grid gap-1">
               <Label htmlFor={`edit-credits-${r}`}>{TIER_LABEL[r]}</Label>
-              <Input id={`edit-credits-${r}`} inputMode="numeric" value={form.credits[r]}
+              <Input id={`edit-credits-${r}`} inputMode="numeric" disabled={unsupportedTier(floor, r)} value={unsupportedTier(floor, r) ? '' : form.credits[r]}
                 onChange={(event) => onChange({ credits: { ...form.credits, [r]: event.target.value } })} />
-              <p className={Number(form.credits[r]) < floor[r] && Number(form.credits[r]) !== approved?.[r] ? 'text-xs text-destructive' : 'text-muted-foreground text-xs'}>{floorGuidance(floor[r])}{approved && `，目录批准价 ${approved[r]}`}</p>
+              <p className={Number(form.credits[r]) < creditMinimum(floor, quality, r) && Number(form.credits[r]) !== approvedCredit(floor, quality, r) ? 'text-xs text-destructive' : 'text-muted-foreground text-xs'}>{tierGuidance(floor, quality, r)}</p>
             </div>
           ))}
         </div>

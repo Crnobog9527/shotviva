@@ -28,6 +28,8 @@ const assets = readAssetsEnv(process.env)
 
 const nextConfig: NextConfig = {
   cacheComponents: true,
+  // Development action arguments can contain admin-only prompt bodies and private asset keys.
+  logging: { serverFunctions: false },
   // The build's version, read by the new-version banner and /api/version (T90, core/app-update).
   env: { NEXT_PUBLIC_APP_VERSION: appVersion(process.env) },
   // Pages live under app/[locale]; an address matching no route at all has no root layout,

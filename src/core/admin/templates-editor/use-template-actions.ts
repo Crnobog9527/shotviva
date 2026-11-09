@@ -31,12 +31,14 @@ export function useTemplateActions() {
   // and the switches, 移出 and the bulk bar wait for it. The promise settles once the outcome
   // is shown, for a caller that also keeps its own transition open (the sortable lists'
   // optimistic order, T76).
-  const run = (work: () => Promise<ActionResult>, success: string, onSuccess?: () => void, failurePrefix?: string) =>
+  const run = (work: () => Promise<ActionResult>, success: string, onSuccess?: (result: Extract<ActionResult, { ok: true }>) => void, failurePrefix?: string) =>
     new Promise<void>((resolve) => {
       setError(null)
       setNotice(null)
       startTransition(async () => {
-        if (settle(await callAction(work), success, failurePrefix)) onSuccess?.()
+        const result = await callAction(work)
+        settle(result, success, failurePrefix)
+        if (result.ok) onSuccess?.(result)
         resolve()
       })
     })
