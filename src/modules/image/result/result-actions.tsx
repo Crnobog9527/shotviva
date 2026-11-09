@@ -7,21 +7,21 @@ import { buttonVariants } from '@/core/ui/button'
 import { cn } from '@/core/ui/cn'
 
 import { monoTag, sizeTag } from '../workspace/result-panel'
-import { IphonePhotoActions } from './iphone-photo-actions'
+import { IosPhotoActions } from './ios-photo-actions'
 import { useShareFile } from './use-share-file'
-import { isIphoneBrowser } from './iphone-browser'
+import { isIosBrowser } from './ios-browser'
 
 export type ResultActionProps = { fileUrl: string; name: string; shareText: string; px?: number }
 
 const subscribe = () => () => {}
-const isIphone = () => isIphoneBrowser(navigator, screen)
+const onIos = () => isIosBrowser(navigator)
 const serverSnapshot = () => false
 
 export default function ResultActions({ fileUrl, name, shareText, px }: ResultActionProps) {
   const t = useTranslations('app.result')
   const mode = useShareFile(fileUrl, name)
-  const iphone = useSyncExternalStore(subscribe, isIphone, serverSnapshot)
-  if (iphone) return <IphonePhotoActions mode={mode} fileUrl={fileUrl} />
+  const ios = useSyncExternalStore(subscribe, onIos, serverSnapshot)
+  if (ios) return <IosPhotoActions mode={mode} fileUrl={fileUrl} />
   const primary = buttonVariants({ variant: 'cta', size: 'cta', className: 'gap-2' })
   const download = (className?: string) => (
     <a href={mode.kind === 'loading' ? undefined : `${fileUrl}?download=1`} download aria-disabled={mode.kind === 'loading'} className={cn(primary, mode.kind === 'loading' && 'pointer-events-none', className)}>

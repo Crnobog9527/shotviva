@@ -11,7 +11,7 @@ import { ResponsiveSheet } from '@/core/ui/responsive-sheet'
 import { GroundedImg } from './grounded-img'
 import { handPhotoToSystem, type ShareMode } from './share-mode'
 
-export function IphonePhotoActions({ mode, fileUrl }: { mode: ShareMode; fileUrl: string }) {
+export function IosPhotoActions({ mode, fileUrl }: { mode: ShareMode; fileUrl: string }) {
   const t = useTranslations('app.result')
   const [unavailable, setUnavailable] = useState(false)
   const [sharing, setSharing] = useState(false)

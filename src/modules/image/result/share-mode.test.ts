@@ -45,7 +45,7 @@ describe('Share or Download (MOBILE_UI_rules §1.8.1)', () => {
   })
 })
 
-describe('saving a photo on iPhone', () => {
+describe('saving a photo on iOS', () => {
   it('hands only the prepared file to the system on the same click stack', async () => {
     const file = shareFileFor(jpeg(), 'photo')
     const share = vi.fn().mockResolvedValue(undefined)
