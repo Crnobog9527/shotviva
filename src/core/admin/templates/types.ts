@@ -15,10 +15,11 @@ export type SaveTemplatePayload = {
   template: unknown
   prompt: unknown
   isNew: boolean
+  revision?: { expected: number; selected?: number }
 }
 
 export type ActionFailure = { ok: false; code: string; message: string }
-export type ActionResult = { ok: true } | ActionFailure
+export type ActionResult = { ok: true; version?: number } | ActionFailure
 export type ActionValue<T> = { ok: true; value: T } | ActionFailure
 
 // The two lists /admin/templates orders (T76): the whole catalogue and the home featured list.
@@ -37,7 +38,11 @@ export type ApplyCoverRequest =
 // languages registered as upcoming in site.config (prepared ahead, never shown on the site yet).
 export type CoverLanguage = { code: string | null; label: string; upcoming: boolean }
 
+export type PromptSnapshot = NonNullable<AdminTemplate['prompt']> & { providerModel: string | null }
 export type TemplateAdminActions = {
+  versions: (input: { id: string; before?: number }) => Promise<ActionValue<number[]>>
+  snapshot: (input: { id: string; version: number }) => Promise<ActionValue<PromptSnapshot>>
+  duplicate: (input: { source: string; requestId: string }) => Promise<ActionValue<string>>
   save: (payload: SaveTemplatePayload) => Promise<ActionResult>
   setActive: (input: { id: string; active: boolean; reason?: string }) => Promise<ActionResult>
   // The bulk bar (T60): one call for the batch, partial success reported per template.

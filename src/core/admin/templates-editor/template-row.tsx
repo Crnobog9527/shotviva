@@ -11,10 +11,13 @@ import { DragHandle, MoveButtons, sortableRowClass, useSortableItem } from '../u
 import { bulkCopy } from './copy'
 import { canFeature } from './featured-state'
 
+import { versionCopy } from './version-copy'
+
 const SURFACE_LABEL = { web: '站内', partner: '伙伴' } as const
 
 export type RowHandlers = {
   pending: boolean
+  onDuplicate: (id: string) => void
   onEdit: (template: AdminTemplate) => void
   onToggle: (template: AdminTemplate, active: boolean) => void
   // 首页精选 (T53): whether the list is full, and the switch handler.
@@ -79,6 +82,9 @@ export function TemplateRow(props: Props) {
         <FeaturedSwitch template={template} full={featuredFull} pending={pending} onFeature={onFeature} />
       </TableCell>
       <TableCell className="text-right">
+        {!template.categoryInfo.isSystem && template.id !== 'freeform' && template.id !== 'edit' && (
+          <Button variant="ghost" size="sm" disabled={pending} onClick={() => props.onDuplicate(template.id)}>{versionCopy.duplicate}</Button>
+        )}
         <Button variant="outline" size="sm" disabled={pending} onClick={() => onEdit(template)}>
           编辑
         </Button>

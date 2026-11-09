@@ -51,7 +51,7 @@ export async function saveTemplate(
   adminId: string,
   payload: SaveTemplatePayload,
   floor: ProviderFloors,
-): Promise<void> {
+): Promise<number | undefined> {
   const template = parseOrThrow(templateInputSchema, payload.template, 'template')
   const prompt = parseOrThrow(promptInputSchema, payload.prompt, 'prompt')
   if (prompt.styleRefs?.some(ref => !isStyleRefKey(template.id, ref.key))) throw new AppError('INVALID_INPUT', '画风参考图不属于这个模板')
@@ -64,8 +64,12 @@ export async function saveTemplate(
   if (!payload.isNew && !exists) throw new AppError('NOT_FOUND', `template ${template.id} not found`)
   // A brand-new template starts unpublished so it can be checked before anyone sees it.
   const toSave = payload.isNew ? { ...template, isActive: false } : template
-  await repo.upsertTemplate(client, toSave, prompt, floor)
+  const revision = payload.revision && parseOrThrow(z.object({
+    expected: z.int().positive(), selected: z.int().positive().optional(),
+  }), payload.revision, 'revision')
+  const version = await repo.upsertTemplate(client, toSave, prompt, floor, revision && { ...revision, actor: adminId })
   logger.info('admin.template.saved', { adminId, templateId: template.id, isNew: payload.isNew })
+  return version
 }
 
 // The 上架 switch and the bulk bar (T60) share this one path: same rules, same log line, same

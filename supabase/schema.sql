@@ -145,6 +145,24 @@ $$;
 ALTER FUNCTION "admin"."apply_style_refs"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."archive_template_prompt_version"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if tg_op='UPDATE' and new.version=old.version then return null; end if;
+  -- A restore already has its immutable snapshot. All other writes insert a new PK.
+  if new.version=nullif(current_setting('shotviva.restore_prompt_version',true),'')::integer then return null; end if;
+  insert into public.template_prompt_versions(template_id,version,body,model_params,provider_id,provider_model,style_refs,created_at)
+    values (new.template_id,new.version,new.body,new.model_params,new.provider_id,
+      (select model from public.ai_providers where id=new.provider_id),new.style_refs,new.updated_at);
+  return null;
+end $$;
+
+
+ALTER FUNCTION "admin"."archive_template_prompt_version"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."assert_template_reference_range"("p_id" "text") RETURNS "void"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -182,6 +200,33 @@ $$;
 
 
 ALTER FUNCTION "admin"."assert_template_reference_range"("p_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."assign_template_prompt_version"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare wanted integer := nullif(current_setting('shotviva.restore_prompt_version',true),'')::integer;
+  h public.template_prompt_versions%rowtype; latest integer;
+begin
+  -- Runs after both legacy BEFORE triggers, once their resolved refs and version bump are known.
+  if tg_op='UPDATE' then
+    if wanted is not null then
+      select * into strict h from public.template_prompt_versions where template_id=new.template_id and version=wanted;
+      if (h.body,h.model_params,h.provider_id,h.style_refs) is not distinct from
+         (new.body,new.model_params,new.provider_id,new.style_refs) then
+        new.version:=wanted; new.updated_at:=now(); return new;
+      end if;
+    end if;
+    if new.version=old.version and new.provider_id is not distinct from old.provider_id then return new; end if;
+  end if;
+  select max(version) into latest from public.template_prompt_versions where template_id=new.template_id;
+  new.version:=coalesce(latest+1,new.version); new.updated_at:=now();
+  return new;
+end $$;
+
+
+ALTER FUNCTION "admin"."assign_template_prompt_version"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."check_template_style_ref_limit"() RETURNS "trigger"
@@ -2447,6 +2492,44 @@ $$;
 ALTER FUNCTION "public"."admin_code_redemptions"("p_actor" "uuid", "p_code_id" "uuid", "p_cursor" "jsonb") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_commit_template_copy"("p_actor" "uuid", "p_source" "text", "p_request" "uuid", "p_target" "text", "p_token" "text", "p_assets" "jsonb") RETURNS "text"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $_$
+declare t public.templates%rowtype; p public.template_prompts%rowtype; m jsonb; translated jsonb;
+begin
+  -- Serialize only retries of this specific request; unrelated templates copy concurrently.
+  perform pg_advisory_xact_lock(hashtextextended(p_request::text,400));
+  perform 1 from public.templates where id=p_source for share;
+  perform 1 from public.template_prompts where template_id=p_source for share;
+  m:=public.admin_template_copy_source(p_actor,p_source,p_request);
+  if m ? 'existing' then return m->>'existing'; end if;
+  if p_token is distinct from m->>'token' then raise exception 'SOURCE_CHANGED'; end if;
+  if p_target=p_source or p_target !~ '^[a-z0-9-]+-copy-[0-9a-f-]{36}$' or
+    p_assets is distinct from replace(replace((m->'assets')::text,'/covers/'||p_source||'/','/covers/'||p_target||'/'),
+      'style-refs/'||p_source||'/','style-refs/'||p_target||'/')::jsonb then raise exception 'REQUEST_MISMATCH'; end if;
+
+  select * into strict t from public.templates where id=p_source;
+  select * into strict p from public.template_prompts where template_id=p_source;
+  translated:=t.translations;
+  if nullif(translated#>>'{zh,name}','') is not null then
+    translated:=jsonb_set(translated,'{zh,name}',to_jsonb(left(translated#>>'{zh,name}',115)||'（副本）'));
+  end if;
+  insert into public.templates(id,module,name,description,category_key,fields,quality,credits_cost,visible_in,translations,
+    sort_order,is_active,featured_rank,cover_media_type,cover_before_url,cover_after_url,cover_video_url,cover_poster_url,cover_locales)
+  values(p_target,t.module,left(t.name,113)||' (Copy)',t.description,t.category_key,t.fields,t.quality,t.credits_cost,t.visible_in,translated,
+    (select coalesce(max(sort_order),0)+10 from public.templates),false,null,t.cover_media_type,
+    p_assets->>'cover_before_url',p_assets->>'cover_after_url',p_assets->>'cover_video_url',p_assets->>'cover_poster_url',p_assets->'cover_locales');
+  insert into public.template_prompts(template_id,body,model_params,provider_id,style_refs)
+    values(p_target,p.body,p.model_params,p.provider_id,p_assets->'style_refs');
+  insert into admin.template_copy_requests values(p_request,p_actor,p_source,p_target);
+  return p_target;
+end $_$;
+
+
+ALTER FUNCTION "public"."admin_commit_template_copy"("p_actor" "uuid", "p_source" "text", "p_request" "uuid", "p_target" "text", "p_token" "text", "p_assets" "jsonb") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_daily_costs"("p_days" integer) RETURNS "jsonb"
     LANGUAGE "plpgsql" STABLE
     SET "search_path" TO ''
@@ -3782,6 +3865,39 @@ $$;
 ALTER FUNCTION "public"."admin_save_template_category"("p_category" "jsonb", "p_is_new" boolean, "p_actor" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_save_versioned_template"("p_actor" "uuid", "p_template" "jsonb", "p_prompt" "jsonb", "p_expected" integer, "p_selected" integer DEFAULT NULL::integer, "p_style_refs" "jsonb" DEFAULT NULL::"jsonb") RETURNS integer
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare v_id text:=p_template->>'id'; current_v integer; h public.template_prompt_versions%rowtype;
+  previous text:=current_setting('shotviva.restore_prompt_version',true);
+begin
+  if not exists(select from public.profiles where id=p_actor and role='admin' and banned_at is null) then raise exception 'FORBIDDEN'; end if;
+  perform 1 from public.templates where id=v_id for update;
+  if not found then raise exception 'TEMPLATE_NOT_FOUND'; end if;
+  select version into current_v from public.template_prompts where template_id=v_id for update;
+  if current_v is distinct from p_expected then raise exception 'STALE_PROMPT'; end if;
+  if p_selected is not null then
+    select * into h from public.template_prompt_versions where template_id=v_id and version=p_selected;
+    if not found then raise exception 'VERSION_NOT_FOUND'; end if;
+    if h.provider_id is not null and (p_prompt->>'provider_id')::uuid=h.provider_id then
+      perform 1 from public.ai_providers where id=h.provider_id and module='image' and model=h.provider_model
+        and vault_secret_id is not null for share;
+      if not found then raise exception 'HISTORICAL_PROVIDER_UNAVAILABLE'; end if;
+    end if;
+  end if;
+  perform set_config('shotviva.restore_prompt_version',coalesce(p_selected::text,''),true);
+  if p_style_refs is null then perform public.admin_upsert_template(p_template,p_prompt);
+  else perform public.admin_upsert_template(p_template,p_prompt,p_style_refs); end if;
+  perform set_config('shotviva.restore_prompt_version',coalesce(previous,''),true);
+  select version into strict current_v from public.template_prompts where template_id=v_id;
+  return current_v;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_save_versioned_template"("p_actor" "uuid", "p_template" "jsonb", "p_prompt" "jsonb", "p_expected" integer, "p_selected" integer, "p_style_refs" "jsonb") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_search_users"("p_query" "text") RETURNS TABLE("id" "uuid", "email" "text", "created_at" timestamp with time zone, "provider" "text", "role" "text", "credits" integer, "free_credits" integer, "paid_until" timestamp with time zone, "generation_count" integer, "last_generation_at" timestamp with time zone, "banned_at" timestamp with time zone, "phone" "text")
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
@@ -4264,6 +4380,32 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_signup_ip_clusters"("p_days" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_template_copy_source"("p_actor" "uuid", "p_source" "text", "p_request" "uuid") RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE
+    SET "search_path" TO ''
+    AS $$
+declare receipt admin.template_copy_requests%rowtype; manifest jsonb;
+begin
+  if not exists(select from public.profiles where id=p_actor and role='admin' and banned_at is null) then raise exception 'FORBIDDEN'; end if;
+  select * into receipt from admin.template_copy_requests where request_id=p_request;
+  if found then
+    if (receipt.actor_id,receipt.source_id) is distinct from (p_actor,p_source) then raise exception 'REQUEST_MISMATCH'; end if;
+    return jsonb_build_object('existing',receipt.target_id);
+  end if;
+  select jsonb_build_object('token',t.xmin::text||'/'||p.xmin::text,'assets',jsonb_build_object(
+    'cover_before_url',t.cover_before_url,'cover_after_url',t.cover_after_url,'cover_poster_url',t.cover_poster_url,
+    'cover_video_url',t.cover_video_url,'cover_locales',t.cover_locales,'style_refs',p.style_refs)) into manifest
+    from public.templates t join public.template_prompts p on p.template_id=t.id
+    join public.template_categories c on c.key=t.category_key
+    where t.id=p_source and t.id not in ('edit','freeform') and not c.is_system;
+  if manifest is null then raise exception 'TEMPLATE_NOT_FOUND'; end if;
+  return manifest;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_template_copy_source"("p_actor" "uuid", "p_source" "text", "p_request" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_test_budget_status"() RETURNS "jsonb"
@@ -7679,6 +7821,17 @@ CREATE TABLE IF NOT EXISTS "admin"."product_terms_v2" (
 ALTER TABLE "admin"."product_terms_v2" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "admin"."template_copy_requests" (
+    "request_id" "uuid" NOT NULL,
+    "actor_id" "uuid" NOT NULL,
+    "source_id" "text" NOT NULL,
+    "target_id" "text" NOT NULL
+);
+
+
+ALTER TABLE "admin"."template_copy_requests" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "admin"."template_price_batches" (
     "id" bigint NOT NULL,
     "applied_at" timestamp with time zone DEFAULT "clock_timestamp"() NOT NULL,
@@ -8577,6 +8730,22 @@ CREATE TABLE IF NOT EXISTS "public"."template_favorites" (
 ALTER TABLE "public"."template_favorites" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."template_prompt_versions" (
+    "template_id" "text" NOT NULL,
+    "version" integer NOT NULL,
+    "body" "text" NOT NULL,
+    "model_params" "jsonb" NOT NULL,
+    "provider_id" "uuid",
+    "provider_model" "text",
+    "style_refs" "jsonb" NOT NULL,
+    "created_at" timestamp with time zone NOT NULL,
+    CONSTRAINT "template_prompt_versions_version_check" CHECK (("version" > 0))
+);
+
+
+ALTER TABLE "public"."template_prompt_versions" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."template_prompts" (
     "template_id" "text" NOT NULL,
     "body" "text" NOT NULL,
@@ -8635,6 +8804,11 @@ ALTER TABLE ONLY "admin"."pricing_wallet_cutover"
 
 ALTER TABLE ONLY "admin"."product_terms_v2"
     ADD CONSTRAINT "product_terms_v2_pkey" PRIMARY KEY ("product_id");
+
+
+
+ALTER TABLE ONLY "admin"."template_copy_requests"
+    ADD CONSTRAINT "template_copy_requests_pkey" PRIMARY KEY ("request_id");
 
 
 
@@ -8928,6 +9102,11 @@ ALTER TABLE ONLY "public"."template_favorites"
 
 
 
+ALTER TABLE ONLY "public"."template_prompt_versions"
+    ADD CONSTRAINT "template_prompt_versions_pkey" PRIMARY KEY ("template_id", "version");
+
+
+
 ALTER TABLE ONLY "public"."template_prompts"
     ADD CONSTRAINT "template_prompts_pkey" PRIMARY KEY ("template_id");
 
@@ -8950,6 +9129,10 @@ ALTER TABLE ONLY "public"."template_sync_history"
 
 ALTER TABLE ONLY "public"."templates"
     ADD CONSTRAINT "templates_pkey" PRIMARY KEY ("id");
+
+
+
+CREATE INDEX "template_copy_requests_target_idx" ON "admin"."template_copy_requests" USING "btree" ("target_id");
 
 
 
@@ -9345,6 +9528,10 @@ CREATE OR REPLACE TRIGGER "ai_providers_sync_capabilities" BEFORE INSERT OR UPDA
 
 
 
+CREATE OR REPLACE TRIGGER "archive_template_prompt_version" AFTER INSERT OR UPDATE ON "public"."template_prompts" FOR EACH ROW EXECUTE FUNCTION "admin"."archive_template_prompt_version"();
+
+
+
 CREATE OR REPLACE TRIGGER "codes_enforce_gift_policy" BEFORE INSERT OR UPDATE OF "invitee_credits", "invitee_pool", "max_redemptions" ON "public"."codes" FOR EACH ROW EXECUTE FUNCTION "public"."_enforce_code_gift_policy"();
 
 
@@ -9413,8 +9600,17 @@ CREATE OR REPLACE TRIGGER "templates_sync_category" BEFORE INSERT OR UPDATE OF "
 
 
 
+CREATE OR REPLACE TRIGGER "zz_template_prompt_version" BEFORE INSERT OR UPDATE ON "public"."template_prompts" FOR EACH ROW EXECUTE FUNCTION "admin"."assign_template_prompt_version"();
+
+
+
 ALTER TABLE ONLY "admin"."product_terms_v2"
     ADD CONSTRAINT "product_terms_v2_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id");
+
+
+
+ALTER TABLE ONLY "admin"."template_copy_requests"
+    ADD CONSTRAINT "template_copy_requests_target_id_fkey" FOREIGN KEY ("target_id") REFERENCES "public"."templates"("id") ON DELETE CASCADE;
 
 
 
@@ -9723,6 +9919,11 @@ ALTER TABLE ONLY "public"."template_favorites"
 
 
 
+ALTER TABLE ONLY "public"."template_prompt_versions"
+    ADD CONSTRAINT "template_prompt_versions_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."template_prompts"
     ADD CONSTRAINT "template_prompts_provider_id_fkey" FOREIGN KEY ("provider_id") REFERENCES "public"."ai_providers"("id") ON DELETE RESTRICT;
 
@@ -9770,6 +9971,9 @@ ALTER TABLE "admin"."pricing_wallet_cutover" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "admin"."product_terms_v2" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "admin"."template_copy_requests" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "admin"."template_price_batches" ENABLE ROW LEVEL SECURITY;
@@ -9943,6 +10147,9 @@ CREATE POLICY "template_favorites_select_own" ON "public"."template_favorites" F
 
 
 
+ALTER TABLE "public"."template_prompt_versions" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."template_prompts" ENABLE ROW LEVEL SECURITY;
 
 
@@ -9995,8 +10202,16 @@ REVOKE ALL ON FUNCTION "admin"."apply_style_refs"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "admin"."archive_template_prompt_version"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "admin"."assert_template_reference_range"("p_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."assert_template_reference_range"("p_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."assign_template_prompt_version"() FROM PUBLIC;
 
 
 
@@ -10308,6 +10523,11 @@ GRANT ALL ON FUNCTION "public"."admin_code_redemptions"("p_actor" "uuid", "p_cod
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_commit_template_copy"("p_actor" "uuid", "p_source" "text", "p_request" "uuid", "p_target" "text", "p_token" "text", "p_assets" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_commit_template_copy"("p_actor" "uuid", "p_source" "text", "p_request" "uuid", "p_target" "text", "p_token" "text", "p_assets" "jsonb") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_daily_costs"("p_days" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_daily_costs"("p_days" integer) TO "service_role";
 
@@ -10463,6 +10683,11 @@ GRANT ALL ON FUNCTION "public"."admin_save_template_category"("p_category" "json
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_save_versioned_template"("p_actor" "uuid", "p_template" "jsonb", "p_prompt" "jsonb", "p_expected" integer, "p_selected" integer, "p_style_refs" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_save_versioned_template"("p_actor" "uuid", "p_template" "jsonb", "p_prompt" "jsonb", "p_expected" integer, "p_selected" integer, "p_style_refs" "jsonb") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_search_users"("p_query" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_search_users"("p_query" "text") TO "service_role";
 
@@ -10520,6 +10745,11 @@ GRANT ALL ON FUNCTION "public"."admin_set_test_run_cover"("p_actor" "uuid", "p_r
 
 REVOKE ALL ON FUNCTION "public"."admin_signup_ip_clusters"("p_days" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_signup_ip_clusters"("p_days" integer) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_template_copy_source"("p_actor" "uuid", "p_source" "text", "p_request" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_template_copy_source"("p_actor" "uuid", "p_source" "text", "p_request" "uuid") TO "service_role";
 
 
 
@@ -10991,6 +11221,10 @@ GRANT ALL ON FUNCTION "public"."wishlist_eligible"("p_user_id" "uuid") TO "servi
 
 
 
+GRANT SELECT,INSERT ON TABLE "admin"."template_copy_requests" TO "service_role";
+
+
+
 GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."profiles" TO "service_role";
 GRANT SELECT ON TABLE "public"."profiles" TO "authenticated";
 
@@ -11195,6 +11429,10 @@ GRANT SELECT ON TABLE "public"."template_categories" TO "authenticated";
 
 GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."template_favorites" TO "service_role";
 GRANT SELECT,INSERT,DELETE ON TABLE "public"."template_favorites" TO "authenticated";
+
+
+
+GRANT SELECT ON TABLE "public"."template_prompt_versions" TO "service_role";
 
 
 

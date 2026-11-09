@@ -15,6 +15,7 @@ import { buildPayload, emptyFormValues, toFormValues, type TemplateFormValues } 
 import { referenceBudget, refUploadId } from './style-ref-state'
 import { StyleRefFields } from './style-ref-fields'
 import { TemplateCoverFields } from './template-cover-fields'
+import { TemplateHistory, type VersionActions } from './prompt-history'
 import { TemplatePromptFields } from './template-prompt-fields'
 import { TemplatePublicFields } from './template-public-fields'
 import { TemplateToggleFields } from './template-toggle-fields'
@@ -28,13 +29,13 @@ type Props = {
   floor: ProviderFloors
   categories: readonly CategoryOption[]
   coverLanguages: readonly CoverLanguage[]
-  coverActions: Pick<TemplateAdminActions, 'requestCoverUpload' | 'applyCover'>
+  coverActions: Pick<TemplateAdminActions, 'requestCoverUpload' | 'applyCover'> & VersionActions
   pending: boolean
   error: string | null
   // The last save's success line, shown by the save button (the dialog stays open after a save).
   notice?: string | null
   onCancel: () => void
-  onSubmit: (payload: SaveTemplatePayload, saved: () => void) => void
+  onSubmit: (payload: SaveTemplatePayload, saved: (version?: number) => void) => void
 }
 
 // Mounted fresh per target (keyed by the container), so initial state comes straight from props.
@@ -57,7 +58,11 @@ export function TemplateFormDialog({ target, providers, floor: allFloors, catego
     }
     setLocalError(null)
     setSubmitted(true)
-    onSubmit(result.payload, () => setValues(now => now.styleRefs === values.styleRefs ? { ...now, styleRefsEdited: false } : now))
+    onSubmit(result.payload, version => setValues(now => ({
+      ...now, expectedVersion: version ?? now.expectedVersion,
+      selectedVersion: now.selectedVersion === values.selectedVersion ? undefined : now.selectedVersion,
+      styleRefsEdited: now.styleRefs !== values.styleRefs && now.styleRefsEdited,
+    })))
   }
 
   const shownError = localError ?? error ?? null
@@ -116,6 +121,8 @@ function FormColumn({ target, providers, values, isNew, floor, categories, cover
         <ImageProviderField id="tpl-provider" providers={providers} value={values.providerId} onChange={(providerId) => onChange({ providerId })} />
       )}
       <StyleSection values={values} budget={budget} uploading={uploading} setUploading={setUploading} onChange={onChange} />
+      <TemplateHistory template={existing} values={values} disabled={pending || uploading}
+        actions={coverActions} providers={providers} onChange={onChange} />
       <TemplatePromptFields values={values} version={existing?.prompt?.version ?? null} onChange={onChange} />
       <TemplateToggleFields values={values} onChange={onChange} />
       {isNew ? <p className="text-muted-foreground text-xs">新模板保存后默认是下架状态，保存后留在这里，右侧就能试跑。</p> : null}

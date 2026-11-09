@@ -46,11 +46,13 @@ function catalogueChanged() {
 
 export async function saveTemplateAction(payload: SaveTemplatePayload): Promise<ActionResult> {
   const admin = await requireAdmin()
-  return runAdminAction(async () => {
+  const result = await runAdminQuery(async () => {
     const db = createAdminSupabase()
-    await saveTemplate(db, admin.id, payload, await readTemplateFloors(db))
+    const version = await saveTemplate(db, admin.id, payload, await readTemplateFloors(db))
     catalogueChanged()
+    return version
   })
+  return result.ok ? { ok: true, version: result.value } : result
 }
 
 export async function setTemplateActiveAction(input: unknown): Promise<ActionResult> {

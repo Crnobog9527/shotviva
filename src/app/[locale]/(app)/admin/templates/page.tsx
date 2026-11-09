@@ -7,6 +7,7 @@ import { pricingFromOptions } from '@/core/admin/templates/provider-pricing'
 import { readPricingOptions } from '@/site/template-pricing'
 import { site } from '@/site/site.config'
 
+import { duplicateTemplateAction, listVersionsAction, readVersionAction } from './version-actions'
 import {
   applyCoverAction,
   bulkEditTemplatesAction,
@@ -61,6 +62,7 @@ export default async function AdminTemplatesPage() {
         floor={pricingFromOptions(providers)}
         coverLanguages={COVER_LANGUAGES}
         actions={{
+          duplicate: duplicateTemplateAction, versions: listVersionsAction, snapshot: readVersionAction,
           save: saveTemplateAction,
           setActive: setTemplateActiveAction,
           setActiveMany: setTemplatesActiveAction,

@@ -18,6 +18,7 @@ import { TemplateFormDialog, type EditTarget } from './template-form-dialog'
 import { catalogueOrder, Toolbar } from './toolbar'
 import { TemplatesTable } from './templates-table'
 import { UnpublishDialog } from './unpublish-dialog'
+import { useDuplicateTemplate } from './use-duplicate-template'
 import { useTemplateActions } from './use-template-actions'
 
 type Props = {
@@ -55,6 +56,7 @@ export function TemplatesEditor({ providers, templates, categories, floor, cover
   const [unpublishing, setUnpublishing] = useState<AdminTemplate | null>(null)
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set())
   const { pending, error, notice, run, clearError } = useTemplateActions()
+  const duplicate = useDuplicateTemplate(actions.duplicate, run, id => setEditing({ mode: 'saved', id }))
   const visible = templates.filter((template) => matchesSearch(template, query))
   const visibleIds = visible.map((template) => template.id)
   const target = currentTarget(editing, templates)
@@ -114,6 +116,7 @@ export function TemplatesEditor({ providers, templates, categories, floor, cover
         onFeature={feature}
         order={catalogueOrder(query, pending, saveOrder('catalogue'))}
         pending={pending}
+        onDuplicate={duplicate}
         onEdit={(template) => openEditor({ mode: 'edit', template })}
         onToggle={toggle}
       />
@@ -130,7 +133,7 @@ export function TemplatesEditor({ providers, templates, categories, floor, cover
           error={error}
           onCancel={() => setEditing(null)}
           notice={notice}
-          onSubmit={(payload, saved) => run(() => actions.save(payload), '已保存', () => { saved(); setEditing(afterSave(payload)) })}
+          onSubmit={(payload, saved) => run(() => actions.save(payload), '已保存', result => { saved(result.version); setEditing(afterSave(payload)) })}
         />
       ) : null}
       <UnpublishDialog

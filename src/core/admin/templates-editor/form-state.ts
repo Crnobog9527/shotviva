@@ -8,6 +8,8 @@ import type { AdminTemplate, SaveTemplatePayload } from '../templates/types'
 import { toFragments, toToggleFields, toToggleValues, toZhToggleText, withoutToggles, type ToggleFormValue } from './toggle-form-state'
 
 export type TemplateFormValues = {
+  expectedVersion?: number
+  selectedVersion?: number
   id: string
   module: 'image' | 'video'
   name: string
@@ -109,8 +111,11 @@ export function toTranslations(zh: ZhFormValues, keys: readonly string[], toggle
   return Object.keys(entry).length > 0 ? { zh: entry } : {}
 }
 
+const savedVersion = (template: AdminTemplate) => template.prompt?.version
+
 export function toFormValues(template: AdminTemplate): TemplateFormValues {
   return {
+    expectedVersion: savedVersion(template),
     id: template.id,
     module: template.module,
     name: template.name,
@@ -195,6 +200,7 @@ export function buildPayload(values: TemplateFormValues, isNew: boolean, floor: 
     ok: true,
     payload: {
       isNew,
+      ...(values.expectedVersion ? { revision: { expected: values.expectedVersion, selected: values.selectedVersion } } : {}),
       template: {
         id: values.id.trim(),
         module: values.module,
