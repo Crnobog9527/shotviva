@@ -36,6 +36,7 @@ export type UserDetail = {
   freeCredits: number
   paidUntil: string | null
   bannedAt: string | null
+  referrer?: string | null
   signupIp: string | null
 }
 

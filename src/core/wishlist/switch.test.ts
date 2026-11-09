@@ -5,8 +5,8 @@ import { decideWishlist, type SwitchEnv } from './switch'
 
 // ARCHITECTURE §15.6 (T62): features.wishlist && (admin switch || preview override).
 
-const without = testSite({ features: { wishlist: false } })
-const withFeature = testSite({ features: { wishlist: true } })
+const without = testSite({ features: { affiliate: false, wishlist: false } })
+const withFeature = testSite({ features: { affiliate: false, wishlist: true } })
 
 const PROD: SwitchEnv = { VERCEL_ENV: 'production', FEATURE_WISHLIST_PREVIEW: 'off' }
 const PREVIEW: SwitchEnv = { VERCEL_ENV: 'preview', FEATURE_WISHLIST_PREVIEW: 'off' }

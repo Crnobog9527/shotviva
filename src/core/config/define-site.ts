@@ -106,7 +106,7 @@ export type SiteConfig = {
   // Whether the site has a feature at all (ARCHITECTURE §15.6); a feature that has it may still
   // be switched off at runtime. Read through each feature's own helper (e.g. core/wishlist
   // isWishlistEnabled), never directly.
-  features: { wishlist: boolean }
+  features: { wishlist: boolean; affiliate: boolean }
   indexing: {
     // The only paths allowed into search. Every entry must exist in the keyword map CSV
     // (AGENTS §9); everything else renders noindex.

@@ -1,6 +1,7 @@
 import 'server-only'
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 
+import { bindReferral } from '../affiliate/referral'
 import { track } from '../analytics'
 import type { Locale } from '../i18n/locales'
 import { billingGrant, grantSignupCredits } from './free-credits'
@@ -26,5 +27,8 @@ export async function onVerifiedSignIn(
   const address = clientIp(await headers())
   const ipStored = await recordSignupIp(admin, userId, address)
   const granted = await grantSignupCredits(billingGrant(admin), userId, freeCredits)
-  if (address ? ipStored : granted) track('signup', { method }, { distinctId: userId, locale })
+  if (address ? ipStored : granted) {
+    track('signup', { method }, { distinctId: userId, locale })
+    await bindReferral(userId, (await cookies()).get('sv_ref')?.value, 'signup')
+  }
 }

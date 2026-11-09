@@ -29,13 +29,22 @@ const profileRow = z.object({
   banned_at: z.string().nullable(),
   created_at: z.string(),
   signup_ip: z.string().nullable(),
+  referrer: z.object({ slug: z.string() }).nullable().optional(),
 })
 
+type Referrer = Pick<z.infer<typeof profileRow>, 'referrer'>
+
+function referrerFact({ referrer }: Referrer): Pick<UserDetail, 'referrer'> {
+  return referrer === undefined ? {} : { referrer: referrer?.slug ?? null }
+}
+
 // Profile by primary key; the email and phone are read live from Auth, never copied (ARCHITECTURE §10).
-export async function loadUser(db: SupabaseClient, id: string): Promise<UserDetail | null> {
+export async function loadUser(db: SupabaseClient, id: string, affiliate = false): Promise<UserDetail | null> {
   if (!isUuid(id)) return null
+  const fields = 'id, role, credits, free_credits, paid_until, banned_at, created_at, signup_ip'
+    + (affiliate ? ',referrer:affiliates!profiles_referred_by_fkey(slug)' : '')
   const [profile, auth] = await Promise.all([
-    db.from('profiles').select('id, role, credits, free_credits, paid_until, banned_at, created_at, signup_ip').eq('id', id).maybeSingle(),
+    db.from('profiles').select(fields).eq('id', id).maybeSingle(),
     db.auth.admin.getUserById(id),
   ])
   if (profile.error) fail('profile', profile.error)
@@ -52,6 +61,7 @@ export async function loadUser(db: SupabaseClient, id: string): Promise<UserDeta
     paidUntil: row.paid_until,
     bannedAt: row.banned_at,
     signupIp: row.signup_ip,
+    ...referrerFact(row),
   }
 }
 

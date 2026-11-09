@@ -31,6 +31,7 @@ export function UserDialogHeader({ userId, data }: { userId: string; data: UserD
             <Fact term={COPY.email} value={user ? (user.email ?? COPY.none) : '…'} />
             <Fact term={COPY.phone} value={user ? (formatAdminPhone(user.phone) ?? COPY.none) : '…'} />
             <Fact term={COPY.id} value={userId} />
+            <ReferrerFact user={user} />
             <RefusalFact data={data} />
           </dl>
         </DialogPrimitive.Description>
@@ -40,6 +41,11 @@ export function UserDialogHeader({ userId, data }: { userId: string; data: UserD
       </DialogPrimitive.Close>
     </header>
   )
+}
+
+function ReferrerFact({ user }: { user: UserDetailData['user'] | undefined }) {
+  if (user?.referrer === undefined) return null
+  return <Fact term={COPY.referrer} value={user.referrer ?? COPY.none} />
 }
 
 function Fact({ term, value }: { term: string; value: string }) {

@@ -13,6 +13,7 @@ const ITEMS: readonly { key: AdminNavKey; href: `/admin${string}` }[] = [
   // T86 (ARCHITECTURE §10.c): business inquiries from the pricing page, next to the tickets.
   { key: 'inquiries', href: '/admin/inquiries' },
   { key: 'orders', href: '/admin/orders' },
+  { key: 'affiliates', href: '/admin/affiliates' },
   // T82 (ARCHITECTURE §6.3 「后台拒付页」), next to the payments it is about.
   { key: 'disputes', href: '/admin/disputes' },
   { key: 'jobs', href: '/admin/jobs' },
@@ -30,8 +31,10 @@ export type NavCounts = { tickets?: number; inquiries?: number }
 
 // The review entry only exists while the wishlist does (ARCHITECTURE §15.6). Tickets carry the
 // open count (ARCHITECTURE §10 「站内工单」), inquiries the new ones (§10.c).
-export function adminNavItems(flags: { wishlist: boolean }, counts: NavCounts = {}): AdminNavItem[] {
-  return ITEMS.filter((item) => item.key !== 'requests' || flags.wishlist).map((item) => {
+export function adminNavItems(flags: { wishlist: boolean; affiliate?: boolean }, counts: NavCounts = {}): AdminNavItem[] {
+  const visible = ITEMS.filter((item) => item.key !== 'affiliates' || flags.affiliate)
+    .filter((item) => item.key !== 'requests' || flags.wishlist)
+  return visible.map((item) => {
     const count = item.key === 'tickets' || item.key === 'inquiries' ? counts[item.key] : undefined
     return { ...item, label: SHELL_COPY.nav[item.key], ...(count ? { count } : {}) }
   })

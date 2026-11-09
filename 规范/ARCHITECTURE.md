@@ -443,6 +443,26 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 > **2026-11-09 更新（Owner 确认，替代下面「不自己开发、用第三方工具」；同日再改为 Shotviva 内置）**：第三方工具月费太高，联盟功能**内置在 Shotviva 里**（不做独立中心、不新建仓库和 Supabase；各产品先各做各的，以后再看能否合并）。表都以 `affiliate_` 开头放在 Shotviva 库；`profiles` 加 `referred_by` / `referred_at` / `referred_source`；推广链接 `?ref=` + cookie `sv_ref`（60 天，先到先得），注册时绑定（终身），首次付费时可补绑。推广员页面 `/partners`（中英双语、noindex），后台 `/admin/affiliates`；不发邮件，不动钱，Owner 每月手工打款后点「已付」。佣金：积分包和月付 15%、年付 10%，终身；团队奖励（二级，Owner 逐个开通）积分包和月付 5%、年付 3%；确认期 30 天，按实付减税计算，退款按比例重算，争议冻结、败诉归零；每月 1 日结算、门槛 $200。规格全文 `.local/affiliate/spec.md`。
 > **有意的例外**：`payments` 和 `payment_disputes` 上的触发器直接调用 `affiliate_recompute_payment`，在同一事务里重算佣金（不改现有各个计费函数，不经发件箱）。这个触发器**绝不能让付款写入失败**：函数内部捕获所有异常，出错时只写一条错误记录（供后台重算），付款和积分照常提交；DB 测试要覆盖「佣金函数报错时付款仍然成功」。数据定义由 T95 的开发 PR 和迁移一起写进本节。和 T94 邀请码互不排斥，佣金按折后实付算。
 
+**T95 数据定义（0900–0919）**。所有金额为整数美元分，比例为基点，新表启用 RLS，仅服务端读取。用户写入经当前会话取用户 id，后台 RPC 还校验 `p_actor` 是未封禁管理员，操作写入 `admin_audit_log`。结算单仅记录 Owner 手工付款结果。
+
+| 表 | 字段与约束 |
+|---|---|
+| `profiles` 扩展 | `referred_by` 引用 `affiliates.user_id`，`referred_at`、`referred_source` 记录绑定时间和来源（signup、first_checkout、admin）。邀请码关系另存于 T94。 |
+| `affiliates` | `user_id` 主键、唯一 `slug`、`status`、`parent_user_id`、`team_enabled`、`country`、`application`、`reject_reason`、`approved_at/by`、`admin_note`、`created_at`；`payout_method/details`、`us_person`、`terms_version/accepted_at`。受邀未注册者记录为待激活，Supabase 确认邮箱后激活。 |
+| `affiliate_settings` | 布尔主键 `singleton=true`；`enabled=false` 为触发器及应用开关的同一数据源；`hold_days=30`、`payout_min_usd=20000`、`settlement_day=1`、`apply_min_level=none`、`terms_version`。 |
+| `affiliate_rates` / `affiliate_rate_overrides` | 每个 `product_kind` 的 `l1_bp/l2_bp`；个人覆盖按 `(user_id,product_kind)` 唯一，各等级可单独回落至默认比例。 |
+| `affiliate_commissions` | `id`、`payment_id`、`affiliate_user_id`、`level`、`product_id`、`rate_bp`、`base_usd`、`amount`、`status`、`confirm_after/confirmed_at`、`void_reason`、`flags`、`released_by`、`created_at/updated_at`。每笔付款每层至多一行。付款当时的归属、团队资格、比例和确认期保留；只按当前退款和争议重算。现有 `profiles.signup_ip` 支持同 IP 标记；付款表没有卡指纹。 |
+| `affiliate_commission_changes` | `id, commission_id, at, old_amount, new_amount, old_status, new_status, reason` 记录每次实际变化。 |
+| `affiliate_adjustments` | `id, request_id, affiliate_user_id, amount, reason, created_by, created_at`。相同请求只记一次。 |
+| `affiliate_payouts` | `id, affiliate_user_id, period, amount, status, payout_snapshot, created_at, paid_at, paid_method, paid_reference, decided_by, note`；每人每月唯一。 |
+| `affiliate_recompute_errors` | `id, payment_id, at, error, snapshot, resolved_at`；每笔付款最多一条未解决错误；首次计算失败时保存已取得的收款人、比例和确认日，以便重试。 |
+| `affiliate_click_days` | `affiliate_user_id,day` 联合主键、`clicks`。 |
+| `affiliate_balances` | 每个 `affiliate_user_id` 的 `confirmed,pending,paid,available`。可结算余额为已确认佣金加人工调整，减去待付和已付结算单；暂缓单回到余额。 |
+
+- `affiliate_bind/count_click/apply/save_profile` 负责归属、点击、申请及设置。团队邀请只接受有效的已开团队推广员。申请门槛以未全额退款的会员付款为准。
+- `affiliate_recompute_payment` 由付款新增、退款金额或状态变化、争议新增或结案触发。对税后退款比例使用精确整数除法。付款与积分事务独立于佣金成败。每日 `affiliate_daily(UTC 日期)` 重试错误、确认到期佣金并在结算日生成结算单。
+- `admin_affiliate_decide/create/set/adjust/commission_release/rebind/payout_decide/settings/recompute` 写审计。后台财务汇总及邮箱查询、推广员概览及已脱敏推荐用户列表通过服务端读取函数返回。短码唯一索引支持绑定，推广员与时间索引支持私有明细分页，状态与确认时间索引支持每日确认，未解决错误及争议按付款检索。
+
 - **不自己开发联盟系统**，用第三方联盟工具接入（选型待 Owner 定；接入前核对：能否追踪 Managed Payments 订阅、支付宝单笔和 Waffo 订单怎么记）。网站这边只做记录推广码、结账时把推广码传给支付平台，届时另开任务卡。
 - **返佣比例**：代理绑定自己推荐的客户，按该客户每一笔付款**终身**返佣：
   - 积分包（`pack_s` / `pack_m` / `pack_l`）和月付会员（`*_monthly`）：**15%**；
