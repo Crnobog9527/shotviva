@@ -1,27 +1,34 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
+import { useSyncExternalStore } from 'react'
 
 import { buttonVariants } from '@/core/ui/button'
 import { cn } from '@/core/ui/cn'
 
 import { monoTag, sizeTag } from '../workspace/result-panel'
+import { IphonePhotoActions } from './iphone-photo-actions'
 import { useShareFile } from './use-share-file'
 
 type Props = { fileUrl: string; name: string; shareText: string; px?: number }
 
-// Download, plus Share (DESIGN §4.4, MOBILE_UI_rules §1.8.1) beside it on phones where the browser
-// can hand files to the OS (save to Photos, WhatsApp, Instagram…); otherwise the download link
-// with "Long-press to save" for in-app browsers. text carries one line and a utm link; apps that
-// cannot take text drop it on their own. From lg up it is always Download (B comp
-// workspace.html, photo.html: "Download · 1024 px" with `px`); a desktop share sheet is not
-// where a file is saved.
-export function ShareButton({ fileUrl, name, shareText, px }: Props) {
+const subscribe = () => () => {}
+const isIphone = () => /iPhone/i.test(navigator.userAgent)
+const serverSnapshot = () => false
+
+export function ShareButton(props: Props) {
+  // A new result must prepare its own File before the next tap, including client-side navigation.
+  return <ResultActions key={props.fileUrl} {...props} />
+}
+
+function ResultActions({ fileUrl, name, shareText, px }: Props) {
   const t = useTranslations('app.result')
   const mode = useShareFile(fileUrl, name)
+  const iphone = useSyncExternalStore(subscribe, isIphone, serverSnapshot)
+  if (iphone) return <IphonePhotoActions mode={mode} fileUrl={fileUrl} />
   const primary = buttonVariants({ variant: 'cta', size: 'cta', className: 'gap-2' })
   const download = (className?: string) => (
-    <a href={`${fileUrl}?download=1`} download aria-disabled={mode.kind === 'loading'} className={cn(primary, mode.kind === 'loading' && 'pointer-events-none', className)}>
+    <a href={mode.kind === 'loading' ? undefined : `${fileUrl}?download=1`} download aria-disabled={mode.kind === 'loading'} className={cn(primary, mode.kind === 'loading' && 'pointer-events-none', className)}>
       <DownloadIcon />
       <span>{px ? t.rich('downloadPx', { px, cost: sizeTag, mono: monoTag }) : t('download')}</span>
     </a>
@@ -33,8 +40,6 @@ export function ShareButton({ fileUrl, name, shareText, px }: Props) {
         .share({ files: [mode.file], title: name, text: shareText })
         .catch(() => undefined)
     }
-    // Owner 2026-11-08: iPhones need a Download button too (it saves to Files); Share sits beside
-    // it as a square button, because the share sheet's "Save Image" is how a photo reaches Photos.
     return (
       <>
         <div className="flex gap-2">
