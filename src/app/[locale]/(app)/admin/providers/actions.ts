@@ -6,6 +6,7 @@ import {
   activateProvider,
   dryRunIdentityScreen,
   type DryRunResult,
+  refreshProviderCapabilities,
   lookupProviderModel,
   removeProvider,
   runProviderAction,
@@ -68,4 +69,12 @@ export async function testProviderAction(input: unknown): Promise<ProviderAction
 export async function identityDryRunAction(input: unknown): Promise<DryRunResult> {
   await requireAdmin()
   return dryRunIdentityScreen(await identityJudge(), input)
+}
+
+export async function refreshProviderAction(input: unknown): Promise<ProviderActionResult> {
+  await requireAdmin()
+  return runProviderAction(async () => {
+    await refreshProviderCapabilities(deps(), input)
+    providersChanged()
+  })
 }

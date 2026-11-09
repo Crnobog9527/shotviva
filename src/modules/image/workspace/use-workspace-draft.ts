@@ -11,7 +11,8 @@ import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import { enqueueJobs, setWorkspaceJobs } from '../generation/job-store'
 import { useJobs } from '../generation/use-jobs'
 import { startInputs } from './batch-request'
-import { ctaState } from './cta-state'
+import { chosenAspect, closestResolution, hasOutputOptions, selectedAspect, templateOptions } from './output-choice'
+import { ctaState, type CtaState } from './cta-state'
 import { missingRequiredCopy } from './text-fields'
 import { usePhotoBatch } from './use-photo-batch'
 import type { FormValues } from './workspace-form'
@@ -40,11 +41,12 @@ const DEFAULTS: FormValues = { aspect: 'original', resolution: '1k', note: '', c
 // jobs, so the workspace page shows them developing (and after a refresh).
 export function useWorkspaceDraft({ template, balance, tier, concurrency, again = null, single = false }: DraftInput) {
   const photos = usePhotoBatch(single ? 1 : limitsFor(tier).batchMax, again ? { photos: again.photos, madeAt: again.madeAt } : undefined)
-  const [values, setValues] = useState(again?.values ?? DEFAULTS)
+  const { options, values, change } = useOutputValues(template, again)
   useAgainOpensForm(template.id, again?.jobId)
   const running = useRunningCount(concurrency.runningIds)
   const { summary } = photos
-  const state = ctaState({
+  const needsRatio = summary.ready.some(({ photo }) => !chosenAspect(values.aspect, options, photo.originalRatio))
+  const state: CtaState = !hasOutputOptions(options) ? { kind: 'no-options' } : needsRatio ? { kind: 'need-size' } : ctaState({
     balance,
     cost: template.creditsCost[values.resolution],
     running,
@@ -53,13 +55,25 @@ export function useWorkspaceDraft({ template, balance, tier, concurrency, again 
     count: summary.planned,
     copyMissing: missingRequiredCopy(template.copyFields, values.copy),
   })
-  const change = (next: Partial<FormValues>) => setValues((current) => ({ ...current, ...next }))
   const start = () => {
+    if (state.kind !== 'generate') return
     setWorkspaceJobs(template.id, enqueueJobs(startInputs(template, values, summary.ready), concurrency.limit))
     // A reload now comes back to these jobs, not to Make again's form (and copies nothing again).
     if (again) window.history.replaceState(null, '', window.location.pathname)
   }
   return { photos, values, change, state, start, missingPhoto: again?.missing != null }
+}
+
+function useOutputValues(template: CatalogueTemplate, again: AgainStart | null) {
+  const [requested, setValues] = useState(again?.values ?? DEFAULTS)
+  const options = templateOptions(template)
+  const values = {
+    ...requested,
+    resolution: closestResolution(requested.resolution, options) ?? requested.resolution,
+    aspect: selectedAspect(requested.aspect, options),
+  }
+  const change = (next: Partial<FormValues>) => setValues((current) => ({ ...current, ...next }))
+  return { options, values, change }
 }
 
 export type WorkspaceDraft = ReturnType<typeof useWorkspaceDraft>

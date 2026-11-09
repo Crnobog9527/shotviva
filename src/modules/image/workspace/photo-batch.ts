@@ -5,7 +5,7 @@ import type { UploadState } from './use-upload'
 // (Compressing → Uploading → Uploaded) and becomes its own job. Pure, so it can be tested.
 
 // keptFrom: a photo kept with an earlier work (Make again, T40), already uploaded; when it was made.
-export type BatchPhoto = { id: string; url: string; bytes: number; ratio: string | null; upload: UploadState; keptFrom?: string }
+export type BatchPhoto = { id: string; url: string; bytes: number; originalRatio?: number; ratio: string | null; upload: UploadState; keptFrom?: string }
 
 // Photos compressing or uploading at once: enough to keep a phone busy without three dozen
 // canvases and PUTs fighting over memory and bandwidth.

@@ -48,7 +48,7 @@ export function TemplatePriceFields({ values, floor, onChange }: Props) {
               onChange={(event) => onChange({ credits: { ...values.credits, [resolution]: event.target.value } })}
             />
             <p className={problems[resolution] ? 'text-destructive text-xs' : 'text-muted-foreground text-xs'}>
-              {problems[resolution] ?? `下限 ${floor[values.quality][resolution]}`}
+              {problems[resolution] ?? `建议积分 ≥ ${floor[values.quality][resolution]}`}
             </p>
           </div>
         ))}

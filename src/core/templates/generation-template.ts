@@ -16,6 +16,7 @@ export type GenerationTemplate = {
 }
 
 type Row = (TemplateRow | PreT75TemplateRow) & {
+  partner_image_aspects?: string[]
   template_prompts: { body: string; version: number; provider_id: string | null; model_params: Record<string, unknown> } | null
 }
 
@@ -28,7 +29,7 @@ async function loadTemplate(client: SupabaseClient, id: string, surface: Templat
     const all = client.from('templates').select(columns).eq('id', id)
     const query = drafts ? all : all.eq('is_active', true)
     return (surface ? query.contains('visible_in', [surface]) : query).maybeSingle<Row>()
-  }, ', template_prompts(body, version, model_params, provider_id)')
+  }, ', template_prompts(body, version, model_params, provider_id)' + (surface === 'partner' ? ', partner_image_aspects' : ''))
   if (error) throw new AppError('INTERNAL', `loadGenerationTemplate failed: ${error.message}`)
   if (!data) throw new AppError('NOT_FOUND', 'Template not found')
 
@@ -36,6 +37,10 @@ async function loadTemplate(client: SupabaseClient, id: string, surface: Templat
   if (!data.template_prompts || !fields.success) {
     logger.error('template is published but cannot generate', { templateId: id, hasPrompt: !!data.template_prompts })
     throw new AppError('NOT_FOUND', 'Template not found')
+  }
+  if (surface === 'partner' && data.partner_image_aspects) {
+    if (!data.partner_image_aspects.length) throw new AppError('MODEL_INPUT_UNSUPPORTED', 'No supported partner output')
+    fields.data.aspectRatios = data.partner_image_aspects
   }
   const prompt = data.template_prompts
   return {

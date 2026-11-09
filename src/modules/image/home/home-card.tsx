@@ -11,6 +11,7 @@ import { GroundedImg } from '../result/grounded-img'
 import { UPLOAD_FORMAT_NAMES, UPLOAD_MAX_MB } from '../workspace/upload-formats'
 import { notePlaceholder } from '../workspace/workspace-options'
 import { TemplateToggles } from '../toggles'
+import { MobileSizeMenu } from './size-menu'
 import { HomeCtaButton } from './home-cta-button'
 import { thumbImage } from './thumb-image'
 import { ArrowIcon, GiftIcon, PlusIcon } from './home-icons'
@@ -126,6 +127,7 @@ export const HomeCard = forwardRef<HTMLElement, Props>(function HomeCard({ state
             {seeAll}
           </div>
           <Rail state={state} thumbOf={thumbOf} />
+          <MobileSizeMenu value={state.aspect} onChange={state.setAspect} options={state.options} photoRatio={state.photoRatio} />
           <label className="mk-field">
             <span className="mk-field-label">
               {app('workspace.noteLabel')} <span className="text-muted-foreground">{app('workspace.optional')}</span>

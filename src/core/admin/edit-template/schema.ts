@@ -18,6 +18,7 @@ export type SaveEditTemplateInput = z.input<typeof saveEditTemplateSchema>
 // The editor's view of the template. `params` is what is stored, which an older or hand-edited
 // row may not have in full; the editor fills the gaps with blanks.
 export type EditTemplateSettings = {
+  providerId?: string | null
   isActive: boolean
   creditsCost: { '1k': number; '2k': number; '3k': number }
   quality: 'high' | 'medium'

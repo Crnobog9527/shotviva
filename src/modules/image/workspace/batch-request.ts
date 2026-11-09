@@ -1,3 +1,4 @@
+import { chosenAspect, closestResolution, templateOptions } from './output-choice'
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import type { StartInput } from '../generation/job-store'
 import type { ReadyPhoto } from './photo-batch'
@@ -9,15 +10,23 @@ import type { FormValues } from './workspace-form'
 // and batch_size.
 export function startInputs(template: CatalogueTemplate, values: FormValues, photos: readonly ReadyPhoto[]): StartInput[] {
   const note = values.note.trim()
-  const inputs = { copy: values.copy, aspect_ratio: values.aspect, resolution: values.resolution, ...(note ? { note } : {}), ...toggleRequest(template.toggles, values.toggles) }
-  return photos.map(({ photo, inputKey }) => ({
-    templateId: template.id,
-    templateName: template.name,
-    resolution: values.resolution,
-    aspect: values.aspect,
-    credits: template.creditsCost[values.resolution],
-    inputKey,
-    previewUrl: photo.url,
-    body: { template_id: template.id, input_key: inputKey, inputs },
-  }))
+  const options = templateOptions(template)
+  const resolution = closestResolution(values.resolution, options)
+  if (!resolution) return []
+  const aspects = photos.map(({ photo }) => chosenAspect(values.aspect, options, photo.originalRatio))
+  if (aspects.some((aspect) => aspect === null)) return []
+  const inputs = { copy: values.copy, resolution, ...(note ? { note } : {}), ...toggleRequest(template.toggles, values.toggles) }
+  return photos.map(({ photo, inputKey }, index) => {
+    const aspect = aspects[index]!
+    return {
+      templateId: template.id,
+      templateName: template.name,
+      resolution,
+      aspect,
+      credits: template.creditsCost[resolution],
+      inputKey,
+      previewUrl: photo.url,
+      body: { template_id: template.id, input_key: inputKey, inputs: { ...inputs, aspect_ratio: aspect } },
+    }
+  })
 }

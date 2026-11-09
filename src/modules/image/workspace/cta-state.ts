@@ -12,6 +12,8 @@ export type CtaState =
   | { kind: 'need-photo' }
   | { kind: 'uploading' }
   | { kind: 'need-copy' }
+  | { kind: 'no-options' }
+  | { kind: 'need-size' }
 
 export type CtaInput = {
   balance: Balance

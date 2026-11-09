@@ -12,7 +12,8 @@ import { SheetRow } from './sheet-rows'
 // which reads Stripe's link on the click; a row Stripe could not answer for comes back here
 // with ?purchases=unavailable, and the sheet opens with a note.
 
-const PurchaseHistory = dynamic(() => import('./purchase-history').then((m) => m.PurchaseHistory))
+const PurchaseDetails = dynamic(() => import('./purchase-details').then((m) => m.PurchaseDetails), { ssr: false })
+
 const UNAVAILABLE = 'unavailable'
 
 // Drop ?purchases= once the note has been seen, without a navigation.
@@ -31,7 +32,7 @@ export function PurchasesRow({ purchases, more }: { purchases: readonly Purchase
     count === 0 ? t('settings.purchasesNone') : <span className="font-mono tracking-normal">{more ? t('settings.purchasesMany', { count }) : count}</span>
   return (
     <SheetRow label={t('settings.purchases')} value={value} title={t('purchases.title')} description={t('purchases.lead')} initialOpen={unavailable} onClose={clearParam}>
-      <PurchaseHistory purchases={purchases} unavailable={unavailable} />
+      <PurchaseDetails purchases={purchases} unavailable={unavailable} />
     </SheetRow>
   )
 }

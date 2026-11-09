@@ -42,6 +42,7 @@ async function activeIds(): Promise<string[]> {
 beforeAll(async () => {
   pg = await connectAdmin()
   adminId = await createUser(pg)
+  await pg.query("update public.profiles set role = 'admin' where id = $1", [adminId])
 })
 
 afterAll(async () => {

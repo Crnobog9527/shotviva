@@ -17,6 +17,7 @@ type Props = {
   pending: boolean
   onAdd: (module: ProviderModule) => void
   onEdit: (provider: AdminProvider) => void
+  onRefresh: (provider: AdminProvider) => void
   onTest: (provider: AdminProvider) => void
   onActivate: (provider: AdminProvider) => void
   onDelete: (provider: AdminProvider) => void

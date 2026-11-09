@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-import type { CreditsFloor } from '@/core/templates/pricing'
+import type { ProviderFloors } from '@/core/templates/provider-pricing'
 
 import type { ImageProviderOption } from '../image-provider-field'
 import type { AdminTemplate, CoverLanguage, SaveTemplatePayload, TemplateAdminActions, TemplateOrderGroup } from '../templates/types'
@@ -24,7 +24,7 @@ type Props = {
   providers: readonly ImageProviderOption[]
   templates: AdminTemplate[]
   categories: readonly CategoryOption[]
-  floor: CreditsFloor
+  floor: ProviderFloors
   // The cover tabs (T87): common, launched languages, upcoming ones.
   coverLanguages: readonly CoverLanguage[]
   actions: TemplateAdminActions

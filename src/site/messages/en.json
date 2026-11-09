@@ -404,6 +404,7 @@
       "notEnough": "(not enough credits)"
     },
     "sizes": {
+      "closest": "Closest to original ({ratio})",
       "original": "Original",
       "16:9": "Banner",
       "4:5": "Post",
@@ -416,6 +417,8 @@
       "withRatio": "{name} {ratio}"
     },
     "workspace": {
+      "pickSize": "Choose a size",
+      "noOptions": "No output options available",
       "back": "Create",
       "yourPhoto": "Your photo",
       "size": "Size",
@@ -507,6 +510,7 @@
       "stageYoursCaption": "Your photo, as shot. The template keeps it and changes the light and background.",
       "stageSampleCaption": "Template example: the phone photo on the left, the AI result on the right.",
       "again": {
+        "optionsChanged": "The options for this template have changed. Review the current size and resolution.",
         "note": "<b>Making again:</b> {summary}, from <day></day>.",
         "noteKept": "note kept",
         "kept": "Original photo, kept with the work",

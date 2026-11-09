@@ -9,7 +9,6 @@ export const EDIT_TEMPLATE_COPY = {
   active: '开放作品编辑',
   activeHint: '关掉时作品详情页不显示「Edit」按钮。文字没填好之前不要打开。',
   prices: '每次编辑花费（和出图同价，不能低于下限）',
-  floor: (min: number) => `下限 ${min}`,
   wrapper: '封装提示词',
   wrapperHint: '放在约束段落和用户原话前面。',
   fidelity: 'input_fidelity（只发给接受它的模型：gpt-image-1.5 高或低、gpt-image-1-mini 只能低；gpt-image-2 起不发，它们本来就按高保真读图）',

@@ -2,12 +2,11 @@
 
 import { ArrowUpRight } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-
 import type { PurchaseLine } from '../../billing/documents/lines'
 import { Link } from '../../i18n/ui'
 import { EmptyState, STATE_GHOST } from '../../ui/empty-state'
 
-export function PurchaseHistory({ purchases, unavailable }: { purchases: readonly PurchaseLine[]; unavailable: boolean }) {
+export function PurchaseDetails({ purchases, unavailable }: { purchases: readonly PurchaseLine[]; unavailable: boolean }) {
   const t = useTranslations('app.account')
   return (
     <>

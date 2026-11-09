@@ -6,6 +6,7 @@ import { createAdminSupabase } from '../auth/supabase-admin'
 import { serverEnv } from '../env'
 import { AppError } from '../errors'
 import { effectivePrices, providerTag, type GenerationProvider, type ProviderPrices } from '../jobs'
+import { PROVIDERS_CACHE_TAG } from './cache-tag'
 import { readProviderKey } from './keys'
 import { loadActiveProviderRow } from './repository'
 import { resolveProvider, type ReadProviderKey } from './resolve'
@@ -13,7 +14,7 @@ import type { ActiveProviderRow, ProviderAdapterId, ProviderAdapters, ProviderCo
 
 // The admin page expires this tag on every save or switch (updateTag), so the next generation
 // uses the new provider without a redeploy.
-export const PROVIDERS_CACHE_TAG = 'providers'
+export { PROVIDERS_CACHE_TAG } from './cache-tag'
 
 // Cached per module. The row has no key, so nothing secret is cached. The short lifetime
 // bounds how long an instance that missed the tag expiry keeps the old provider.

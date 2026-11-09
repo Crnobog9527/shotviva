@@ -404,6 +404,7 @@
       "notEnough": "（积分不够）"
     },
     "sizes": {
+      "closest": "接近原图（{ratio}）",
       "original": "原图比例",
       "16:9": "横幅",
       "4:5": "帖子",
@@ -416,6 +417,8 @@
       "withRatio": "{name} {ratio}"
     },
     "workspace": {
+      "pickSize": "请选择尺寸",
+      "noOptions": "暂无可用的出图选项",
       "back": "创作",
       "yourPhoto": "你的照片",
       "size": "尺寸",
@@ -507,6 +510,7 @@
       "stageYoursCaption": "这是你拍的原图。模板会保留主体，只换光线和背景。",
       "stageSampleCaption": "模板示例：左边是手机原图，右边是 AI 出图。",
       "again": {
+        "optionsChanged": "此模板的出图选项已更改，请确认当前尺寸和清晰度。",
         "note": "<b>再做一张：</b>{summary}，沿用 <day></day> 那张的设置。",
         "noteKept": "保留补充说明",
         "kept": "原图，随作品保留",

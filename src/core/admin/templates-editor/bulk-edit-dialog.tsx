@@ -2,7 +2,7 @@
 
 import { Button } from '@/core/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/core/ui/dialog'
-import type { CreditsFloor } from '@/core/templates/pricing'
+import type { ProviderFloors } from '@/core/templates/provider-pricing'
 
 import { bulkEditFailures, isEmptyPatch } from '../templates/bulk-edit-rules'
 import type { AdminTemplate } from '../templates/types'
@@ -18,7 +18,7 @@ type Props = {
   // The ticked templates batch edit applies to, and the system ones it leaves out.
   templates: AdminTemplate[]
   skipped: AdminTemplate[]
-  floor: CreditsFloor
+  floor: ProviderFloors
   categories: readonly CategoryOption[]
 }
 
@@ -42,7 +42,7 @@ export function BulkEditDialog({ edit, templates, skipped, floor, categories }: 
         {reviewing ? (
           <BulkEditReview templates={templates} patch={patch} failures={failures} categories={categories} />
         ) : (
-          <BulkEditFields values={edit.values} problems={problems} floor={floor} categories={categories} onChange={edit.setValues} />
+          <BulkEditFields values={edit.values} problems={problems} categories={categories} onChange={edit.setValues} />
         )}
         {edit.error ? (
           <p role="alert" className="text-destructive text-sm">
