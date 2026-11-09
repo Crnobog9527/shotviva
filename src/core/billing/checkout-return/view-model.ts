@@ -9,7 +9,7 @@ import type { CheckoutFacts } from './facts'
 
 export type Money = { minor: number; currency: string }
 
-type Order = { kind: 'plan' | 'pack'; tier: MembershipTier | null; interval: ProductInterval | null; credits: number }
+type Order = { kind: 'plan' | 'pack'; tier: MembershipTier | null; interval: ProductInterval | null; credits: number | null }
 
 // Which closing line: a card plan that renews (monthly / yearly, where the year's credits are
 // all in now), one paid period that does not renew (Alipay), or a pack.
@@ -18,7 +18,7 @@ export type FineKey = 'fineMonthly' | 'fineYearly' | 'finePeriod' | 'finePack'
 export type SuccessView = Order & {
   state: 'success'
   balance: number
-  renews: { at: string; priceUsd: number } | null
+  renews: { at: string } | null
   paid: (Money & { method: RecordedMethod | null; card: { brand: string; last4: string } | null }) | null
   receiptUrl: string | null
   fine: FineKey
@@ -47,13 +47,14 @@ export function returnView(facts: CheckoutFacts, product: SiteProduct, balance: 
   const order = orderOf(product)
   if (!facts.settled) {
     // Before the webhook lands the amount is the session's; with no session (Waffo) the price.
-    const amount = facts.amount ?? { minor: Math.round(product.priceUsd * 100), currency: 'usd' }
-    return { ...order, state: 'pending', amount, method: facts.method }
+    const amount = facts.amount
+    return { ...order, credits: null, state: 'pending', amount, method: facts.method }
   }
-  const renews = order.kind === 'plan' && facts.renewsAt ? { at: facts.renewsAt, priceUsd: product.priceUsd } : null
+  const renews = order.kind === 'plan' && facts.renewsAt ? { at: facts.renewsAt } : null
   return {
     ...order,
     state: 'success',
+    credits: facts.grantedCredits ?? null,
     balance: balance.paid + balance.free,
     renews,
     paid: facts.amount ? { ...facts.amount, method: facts.method, card: facts.card } : null,

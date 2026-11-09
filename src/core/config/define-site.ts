@@ -143,6 +143,7 @@ export type MarketingNumbers = {
   }
   // About how many seconds a photo takes, one round figure for every quality (Owner
   // 2026-11-06): no ranges or per-quality times, so a slower provider never breaks a promise.
+  examplePhotoCredits: { product: number; menu: number; poster: number }
   photoSecondsApprox: number
 }
 

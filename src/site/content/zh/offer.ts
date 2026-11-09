@@ -2,7 +2,7 @@ import { PRICE_PENDING } from '@/core/config'
 import { MAX_UPLOAD_BYTES, UPLOAD_CONTENT_TYPES } from '@/core/storage/rules'
 
 import { site } from '../../site.config'
-import { OUTPUT_TIERS, freeStandardImages, packFrom, planFrom, usd, yearlySaving, type CreditFacts } from '../offer'
+import { OUTPUT_TIERS, packFrom, planFrom, usd, yearlySaving } from '../offer'
 
 // The Chinese wording of every public number (建站规格 G3, §6.1): same figures as offer.ts,
 // read from site.config, written the way mainland e-commerce sellers say it. Prices stay in
@@ -24,17 +24,7 @@ export const zhTierPixels = ZH_TIERS.map((tier) => `${tier.name} ${tier.px} px`)
 // 「N 积分起」: filled when the page renders, like fromCredits (../credits).
 export const zhFromCredits = '⟦积分起价⟧'
 
-// 「最多 6 张免费标准图」: the only place the site counts in images instead of credits, from the
-// catalogue like offer.ts's freeImagesLabel (T91); 「最多」 goes when every template costs the same.
-export const zhFreeImages = '⟦免费标准图⟧'
-
-// Copy writes it after a space (「新用户送 ⟦…⟧」), right for 「送 3 张」; 「最多」 is a Chinese
-// word, so the space goes: 「送最多 6 张」.
-const zhFree = ({ from, same }: CreditFacts) => `${same ? '' : '最多 '}${freeStandardImages(from)} 张免费标准图`
-export const ZH_COUNT_MARKERS: readonly (readonly [string, (facts: CreditFacts) => string])[] = [
-  [` ${zhFreeImages}`, (facts) => `${facts.same ? ' ' : ''}${zhFree(facts)}`],
-  [zhFreeImages, zhFree],
-]
+export const zhFreeImages = `${site.billing.freeCredits} 个免费积分`
 
 const FORMATS: Record<string, string> = { 'image/jpeg': 'JPG', 'image/png': 'PNG', 'image/webp': 'WebP' }
 const formats = UPLOAD_CONTENT_TYPES.map((type) => FORMATS[type] ?? type)

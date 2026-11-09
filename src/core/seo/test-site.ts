@@ -46,6 +46,7 @@ export function testSite(overrides: Partial<SiteConfig> = {}): SiteConfig {
       foodHalfDayUsd: { low: 400, high: 2500 },
     },
         photoSecondsApprox: 60,
+    examplePhotoCredits: { product: 74, menu: 74, poster: 45 },
       },
     }),
     ...overrides,

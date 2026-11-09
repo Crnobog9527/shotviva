@@ -32,9 +32,9 @@ describe('paywall numbers (DESIGN §4.5, all from the config)', () => {
   })
 
   it('prices a credit with half-cents rounded up', () => {
-    expect(perCreditUsd(offer('starter').monthly)).toBe(0.4)
-    expect(perCreditUsd(offer('max').yearly)).toBe(0.21)
-    expect(perCreditUsd(packOffers(TEST_PRODUCTS)[0]!)).toBe(0.5)
+    expect(perCreditUsd(offer('starter').monthly)).toBe(19.9 / 50)
+    expect(perCreditUsd(offer('max').yearly)).toBe(713 / 3360)
+    expect(perCreditUsd(packOffers(TEST_PRODUCTS)[0]!)).toBe(9.9 / 20)
   })
 
   it('formats whole dollars without cents', () => {
@@ -67,10 +67,10 @@ describe('tier perks (ARCHITECTURE §6.2 会员档位权益)', () => {
     expect(tierPerks('starter', { wishlistLive: false }).live.map((p) => p.key)).not.toContain('batch')
   })
 
-  it('keeps unbuilt perks in Coming soon and never lists queue priority', () => {
+  it('omits unbuilt perks and never lists queue priority', () => {
     const pro = tierPerks('pro', { wishlistLive: false })
-    expect(pro.soon.map((p) => p.key)).toEqual(['brandKit'])
-    expect(tierPerks('max', { wishlistLive: true }).soon.map((p) => p.key)).toEqual(['earlyAccess', 'brandKit'])
+    expect(pro.soon.map((p) => p.key)).toEqual([])
+    expect(tierPerks('max', { wishlistLive: true }).soon.map((p) => p.key)).toEqual([])
     const all = (['starter', 'pro', 'max'] as const).flatMap((tier) => {
       const perks = tierPerks(tier, { wishlistLive: true })
       return [...perks.live, ...perks.soon].map((p) => p.key)
@@ -83,10 +83,10 @@ describe('tier perks (ARCHITECTURE §6.2 会员档位权益)', () => {
     expect([TIER_LIMITS.starter.supportHours, TIER_LIMITS.pro.supportHours, TIER_LIMITS.max.supportHours]).toEqual([48, 48, 24])
   })
 
-  it('moves the 3× wishlist vote from Coming soon to live once the wishlist is on', () => {
+  it('lists the 3× vote only while the wishlist is on', () => {
     const off = tierPerks('max', { wishlistLive: false })
     const on = tierPerks('max', { wishlistLive: true })
-    expect(off.soon.map((p) => p.key)).toContain('wishlistVotes')
+    expect(off.soon).toEqual([])
     expect(off.live.map((p) => p.key)).not.toContain('wishlistVotes')
     expect(on.live.map((p) => p.key)).toContain('wishlistVotes')
   })

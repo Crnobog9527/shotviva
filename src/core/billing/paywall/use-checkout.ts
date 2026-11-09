@@ -1,5 +1,6 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import { useLocale } from "next-intl"
 import { useRef, useState } from "react"
 
@@ -20,14 +21,15 @@ export type CheckoutStatus = "idle" | "pending" | "error" | "refused" | "in_use"
 // /pricing page) go to sign-in first and come back to the same page.
 export function useCheckout() {
   const locale = useLocale()
+  const router = useRouter()
   const lastAttempt = useRef<CheckoutAttempt | null>(null)
   const [status, setStatus] = useState<CheckoutStatus>("idle")
   // No new-version banner while the buyer is on the way to the hosted checkout (T90).
   useUpdateHold("checkout", status === "pending")
 
-  async function start(productId: ProductId, method: CheckoutMethod, expectedCode?: string) {
+  async function start(productId: ProductId, method: CheckoutMethod, expectedCode?: string, expectedPriceCents?: number) {
     setStatus("pending")
-    const body = JSON.stringify({ product_id: productId, method, locale: locale.startsWith("zh") ? "zh" : "en", expected_code: expectedCode, ...partnerReturn() })
+    const body = JSON.stringify({ product_id: productId, method, locale: locale.startsWith("zh") ? "zh" : "en", expected_code: expectedCode, expected_price_cents: expectedPriceCents, ...partnerReturn() })
     const attempt = checkoutAttempt(body, lastAttempt.current)
     lastAttempt.current = attempt
     try {
@@ -45,7 +47,10 @@ export function useCheckout() {
         return
       }
       const answer = readAnswer(response.status, await response.json().catch(() => null))
-      if (answer.kind === "offer_changed") refreshDiscount()
+      if (answer.kind === "offer_changed") {
+        refreshDiscount()
+        router.refresh()
+      }
       if (answer.kind !== "url") setStatus(answer.kind)
       else window.location.assign(answer.url)
     } catch {
