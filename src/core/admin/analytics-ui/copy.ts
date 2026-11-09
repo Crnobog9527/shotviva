@@ -1,11 +1,22 @@
 // /admin/analytics 「流量与转化」 copy (ARCHITECTURE §16.2a, T74). Admin is Chinese only (DESIGN §7).
 // Every metric has a one-line 「?」 explanation in plain words.
 
+import type { Channel } from '../analytics/traffic'
+
 type Metric = { label: string; help: string }
+
+const SOURCE_LABELS = {
+  google: 'Google',
+  bing: 'Bing',
+  chatgpt: 'ChatGPT 引荐',
+  direct: '直接访问 / 无可识别来源',
+  internal: '站内引荐 / 原来源未知',
+  other: '其他渠道',
+} satisfies Record<Channel, string>
 
 export const ANALYTICS_COPY = {
   title: '流量与转化',
-  intro: '数据来自 PostHog，每 10 分钟更新一次。数字旁边的小字是和上一个同样长时段比的变化',
+  intro: 'PostHog 指标每 10 分钟更新一次。有上期对比的指标会标出变化',
   ranges: { today: '今天', '7d': '最近 7 天', '30d': '最近 30 天' },
   rangeLabel: '时间范围',
   compare: { today: '和昨天同一时段比', '7d': '和再往前 7 天比', '30d': '和再往前 30 天比' },
@@ -23,9 +34,73 @@ export const ANALYTICS_COPY = {
   previousTimes: (n: string) => `上期 ${n} 次`,
   previousCount: (n: string) => `上期 ${n}`,
   delta: { up: '比上期多', down: '比上期少', same: '和上期持平', none: '上期没有数' },
+  traffic: {
+    title: '公开站点流量',
+    desc: '统计正式域名 shotviva.com 的中英文前台页面，排除后台、已知测试路径、预览域名和本地访问。管理员和测试人员访问正式前台时仍可能计入。',
+    metrics: {
+      views: { label: '浏览量', help: '时段内 PostHog 收到的前台页面浏览次数，重复打开累计计算。' },
+      visitors: { label: '去重访客', help: '按 PostHog 访客标识去重。更换设备、清除标识或仅在内存中记录，可能使同一个人计为多个访客。' },
+      sessions: { label: '进站会话', help: '时段内从正式前台开始并产生浏览的会话。一个访客可多次进站，时段开始前已进站的人仍可能贡献本期浏览。' },
+      identified: { label: '已识别自动流量', help: '浏览记录中带有 Googlebot、GPTBot 等具名工具自报标识的次数，身份未经网络验证。' },
+      suspected: { label: '疑似自动流量', help: '浏览记录中可见自动化工具特征的次数。与已识别的浏览分别统计。' },
+      unknown: { label: '无法判断', help: '浏览记录缺乏足够的识别信号，其中可能包含真人和自动流量。' },
+    },
+    channels: SOURCE_LABELS,
+    excludedTitle: '查看本期排除的浏览量',
+    excluded: {
+      admin: '正式域名的后台页面',
+      test: '正式域名的已知上传测试页',
+      nonPublicHost: '其他域名（含预览、本地）',
+      missing: '缺少域名或页面路径',
+    },
+    countAndShare: (count: string, share: string) => `${count} 次（${share}）`,
+    window: (start: string | null, end: string | null) => `北京时间 ${start} 至 ${end}`,
+    noViews: '本期未收到符合范围的页面浏览记录，实际访问量与历史采集完整性未知。',
+    channelsTitle: '进站会话来自哪里',
+    channelsDesc: '按会话入口活动参数或引荐站点归类，无法关联会话的浏览不计入渠道。Google、Bing 含可识别的搜索引荐和推广来源。两列首页入口均包含在会话数内。',
+    channel: '渠道',
+    sessions: '会话数',
+    sessionShare: '占会话',
+    entryEn: '/ 入口',
+    entryZh: '/zh 入口',
+    botsTitle: '浏览中的自动流量',
+    botsDesc: '分母为同期前台浏览量。Google、Bing 和 ChatGPT 引荐只描述来路，抓取工具另按自动流量信号识别。',
+    botsCoverage: 'PostHog 只记录成功上报的页面浏览。未运行网页脚本的抓取、静态文件请求，以及被拦截的请求可能完全缺席。',
+    browserQuery: '核对浏览量',
+    sessionQuery: '核对会话来源',
+    projectTitle: '整个 PostHog 项目的业务指标',
+    projectDesc: '以下四项沿用项目范围，可能包含预览或测试活动。',
+    funnelLink: '查看按来源分组的转化漏斗',
+    funnelNote: '漏斗按访客统计，每位访客归入本期首次前台浏览所属会话的入口来源。会话入口无法核对时列为未知。',
+  },
+  edge: {
+    title: 'HTTP 请求中的自动流量',
+    scope: (host: string, hasHome: boolean) => `Vercel 记录到的 ${host} 请求，含静态资源、API 和后台。${hasHome ? '首页两行按精确路径统计，包含预取等请求。' : ''}每行百分比以该行请求数为分母，不能换算成访客或页面浏览量。`,
+    link: '打开 Vercel 控制台',
+    window: { live: '所选观察期 · Vercel 聚合', snapshot: '固定观察期 · 历史样本' },
+    unknown: '所选时段的 HTTP 请求数与爬虫占比未知。',
+    snapshotNote: '下表采用已核对的历史样本，日期固定。',
+    failure: {
+      unconfigured: '当前未配置 Vercel 聚合读取。',
+      denied: 'Vercel 未授权本次读取。',
+      unavailable: '本次 Vercel 查询失败。',
+      expired: '上次实时记录已超过 15 分钟的有效期。',
+      noCoverage: '所选时段没有足够的请求记录可供核对。',
+    },
+    coverage: (first: string | null, last: string | null) => `首末有记录的时间桶分别始于 ${first} 和 ${last}（北京时间）。有记录的时间桶可核对，缺少记录的时段流量未知。`,
+    range: '路径范围',
+    all: '全部路径',
+    metrics: {
+      requests: { label: 'HTTP 请求', help: 'Vercel 在观察期内记录的请求次数。同一次浏览可触发多次请求。' },
+      verified: { label: '已验证自动服务', help: 'Vercel 标记为验证通过的自动请求，包含搜索爬虫及 Stripe 等服务。' },
+      suspected: { label: '疑似自动请求', help: '其余请求中，有机器人名称、未通过验证的标志或已知自动化工具标识。' },
+      unclassified: { label: '无法判断', help: '其余已记录请求，现有信号不足以判定是否由自动程序发起。' },
+    },
+    bots: '查看已验证的自动服务及请求数',
+  },
   pages: {
     title: '每页表现',
-    desc: '每个页面有多少人看、看了多久、看到哪里、从这里进来的人后来有没有注册和付款。点表头可以排序。',
+    desc: '按正式域名前台路径统计，英文首页为 /，中文首页为 /zh。一个访客可浏览多个页面，各行访客数不能相加。点表头可以排序。若注册或付款事件缺少域名，只能按同一访客关联。',
     page: '页面',
     metrics: {
       views: { label: '浏览量', help: '这个页面被打开的次数，同一个人打开两次算两次。' },
@@ -40,9 +115,11 @@ export const ANALYTICS_COPY = {
   },
   funnel: {
     title: '转化漏斗',
-    desc: '一个人从进站到付款，每一步还剩多少人。每一步要在上一步之后发生，都在同一时段内。',
+    retry: '重新读取此分组',
+    loading: '正在读取分组数据…',
+    desc: '从正式域名前台进站的访客中，有多少人依次完成上传、出图和付款等步骤。各步骤均发生在所选时段内。缺少域名的服务端事件按同一访客关联，其具体环境未知。',
     steps: {
-      visit: { label: '进站', help: '这段时间打开过网站任意页面的人数。' },
+      visit: { label: '进站', help: '这段时间打开过正式域名前台页面的去重访客数。' },
       upload: { label: '上传照片', help: '成功上传过至少一张照片的人数。' },
       generate: { label: '出图', help: '至少成功拿到一张生成图的人数。' },
       paywall: { label: '看到付费墙', help: '打开过选择套餐 / 积分包的付费墙的人数。' },
@@ -59,11 +136,11 @@ export const ANALYTICS_COPY = {
     values: {
       locale: { en: '英文页', zh: '中文页' } as Record<string, string>,
       device: { Mobile: '手机', Desktop: '电脑', Tablet: '平板' } as Record<string, string>,
-      source: { $direct: '直接访问' } as Record<string, string>,
+      source: { ...SOURCE_LABELS, unknown: '会话来源未知' } as Record<string, string>,
       visitor: { new: '新访客', returning: '老访客' } as Record<string, string>,
     },
     unknown: '未知',
-    visitorNote: '新访客：90 天内第一次来；老访客：90 天内来过。',
+    visitorNote: '以本期开始为界，前 90 天有正式前台浏览记录的访客归为老访客，其余归为新访客。',
   },
   payment: {
     title: '付款环节',

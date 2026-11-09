@@ -25,7 +25,7 @@ describe('copy with the catalog in site.config', () => {
 
   it('fills the /pricing title, lede and credit costs from config', () => {
     expect(pricingPage.title).toBe('Shotviva Pricing: Plans From $19.90 a Month')
-    expect(fillCredits(pricingPage.intro, LIVE)).toContain('A photo costs from 1 credit,')
+    expect(fillCredits(pricingPage.intro, LIVE)).not.toContain('A photo costs')
     expect(pricingPage.intro).toContain('Yearly plans save up to 25%.')
     expect(pricingPage.intro).toContain('Credit packs start at $9.90.')
     expect(fillCredits(pricingPage.gift, LIVE)).toBe('New users get 100 free credits. No card needed.')

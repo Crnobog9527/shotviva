@@ -1,3 +1,6 @@
+import { createAdminSupabase } from '../../auth'
+import { logger } from '../../logger'
+import { listTemplateOptions } from '../jobs/repository'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../ui/table'
 import { readTemplates } from '../analytics/load'
 import { sqlEditorLink } from '../analytics/links'
@@ -44,8 +47,17 @@ export function TemplatesTable({ rows, names }: { rows: TemplateRow[]; names: Re
   )
 }
 
-export async function TemplatesBlock({ range, names, projectId }: { range: Range; names: Record<string, string>; projectId: string }) {
-  const block = await readTemplates(range)
+async function templateNames(): Promise<Record<string, string>> {
+  try {
+    return Object.fromEntries((await listTemplateOptions(createAdminSupabase())).map((t) => [t.id, t.name]))
+  } catch (error) {
+    logger.warn('admin.analytics.template_names_failed', { error })
+    return {}
+  }
+}
+
+export async function TemplatesBlock({ range, projectId }: { range: Range; projectId: string }) {
+  const [block, names] = await Promise.all([readTemplates(range), templateNames()])
   const links = block.status === 'ok' ? [{ href: sqlEditorLink(projectId, templateUseQuery(block.window)), label: ANALYTICS_COPY.openInPostHog }] : []
   return (
     <BlockFrame title={COPY.title} desc={COPY.desc} links={links}>

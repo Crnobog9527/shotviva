@@ -68,6 +68,11 @@ const serverEnvSchema = z.object({
   // Query Read permission, and the project it reads. Both unset → the page asks to configure them.
   POSTHOG_PERSONAL_API_KEY: optionalSecret,
   POSTHOG_PROJECT_ID: z.preprocess(blankAsUnset, z.string().regex(/^\d+$/).optional()),
+  // Optional server-only Observability query access. The offline snapshot contains aggregates only.
+  VERCEL_OBSERVABILITY_TOKEN: optionalSecret,
+  VERCEL_OBSERVABILITY_PROJECT_ID: optionalSecret,
+  VERCEL_OBSERVABILITY_TEAM_ID: optionalSecret,
+  VERCEL_OBSERVABILITY_SNAPSHOT: optionalSecret,
   // hCaptcha's secret, the same one Supabase Auth holds (T86): the business inquiry form checks
   // its invisible token on our server when NEXT_PUBLIC_HCAPTCHA_SITEKEY is set too. Production with
   // the site key but no secret refuses every inquiry (core/inquiries/captcha captchaMode).
