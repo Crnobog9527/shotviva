@@ -72,3 +72,20 @@ describe('loadFunnel (recorded answers)', () => {
     expect(funnel.current[0]).toBe(2090)
   })
 })
+
+it('shares one bounded query across five dimensions and loads visitor history only on demand', async () => {
+  const { loadFunnelGroup } = await import('./funnel')
+  const segments = {locale: 'en', device: 'Mobile', country: 'GB', source: 'google'}
+  const results = Object.entries(segments).map(([dim, seg]) => [1, dim, seg, 4, 3, 2, 1, 1, 0])
+  const run = fakeRun({'funnel.breakdowns': {columns: ['cur', 'dim', 'seg','s0','s1','s2','s3','s4','s5'], results}})
+  const groups = await loadFunnelGroup(run, WEEK, 'breakdowns')
+  expect(run.asked).toHaveLength(1)
+  expect(run.asked[0]?.query).not.toContain('first_seen')
+  expect(groups.none?.segments).toEqual([])
+  for (const [dim, value] of Object.entries(segments)) {
+    expect(groups[parseFunnelDim(dim)]?.segments).toEqual([{value, counts: groups.none?.current}])
+  }
+  expect(await loadFunnelGroup(run, WEEK, 'visitor')).toHaveProperty('visitor')
+  expect(run.asked.map((entry) => entry.name)).toEqual(['funnel.breakdowns', 'funnel.visitor'])
+  expect(run.asked[1]?.query).toContain('first_seen')
+})

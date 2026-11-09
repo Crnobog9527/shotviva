@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { bothPeriods, currentPeriod, pagePath, periodColumn } from './hogql'
 import { rowsOf, type HogQL, type RunQuery } from './posthog-query'
 import type { Window } from './range'
+import { EVENT_HOST, publicEntry, publicEvent, publicJourney, scopeOf } from './traffic-scope'
 import { count, label, maybe, rate } from './values'
 
 // Block 1 「每页表现」 (ARCHITECTURE §16.2a): per page, views and visitors (with the period before),
@@ -25,12 +26,13 @@ SELECT path,
   avgIf(seconds, NOT is_view AND cur) AS avg_seconds, avgIf(scroll, NOT is_view AND cur) AS avg_scroll
 FROM (
   SELECT ${pagePath('properties.$pathname')} AS path, 1 AS is_view, ${cur} AS cur, person_id, NULL AS seconds, NULL AS scroll
-  FROM events WHERE event = '$pageview' AND ${bothPeriods(window)}
+  FROM events WHERE event = '$pageview' AND ${publicEvent} AND ${bothPeriods(window)}
   UNION ALL
   SELECT ${pagePath('properties.$prev_pageview_pathname')} AS path, 0 AS is_view, ${cur} AS cur, person_id,
     least(toFloat(properties.$prev_pageview_duration), ${MAX_SECONDS}) AS seconds,
     toFloat(properties.$prev_pageview_max_scroll_percentage) AS scroll
-  FROM events WHERE event IN ('$pageview', '$pageleave') AND properties.$prev_pageview_duration IS NOT NULL AND ${bothPeriods(window)}
+  FROM events WHERE event IN ('$pageview', '$pageleave') AND properties.$prev_pageview_duration IS NOT NULL
+    AND ${scopeOf(EVENT_HOST, 'properties.$prev_pageview_pathname')} = 'public' AND ${bothPeriods(window)}
 )
 WHERE path != ''
 GROUP BY path ORDER BY views DESC LIMIT ${LIMIT}`,
@@ -42,7 +44,7 @@ export function bounceQuery(window: Window): HogQL {
     name: 'pages.bounce',
     query: `
 SELECT ${pagePath('$entry_pathname')} AS path, count() AS sessions, countIf($is_bounce) AS bounces
-FROM sessions WHERE ${currentPeriod(window, '$start_timestamp')}
+FROM sessions WHERE ${currentPeriod(window, '$start_timestamp')} AND ${publicEntry()} AND $pageview_count > 0
 GROUP BY path ORDER BY sessions DESC LIMIT ${LIMIT}`,
   }
 }
@@ -56,7 +58,7 @@ SELECT entry AS path, count() AS people, countIf(signed) AS signups, countIf(pai
 FROM (
   SELECT person_id, argMinIf(${pagePath('properties.$pathname')}, timestamp, event = '$pageview') AS entry,
     countIf(event = 'signup') > 0 AS signed, countIf(event = 'purchase') > 0 AS paid
-  FROM events WHERE event IN ('$pageview', 'signup', 'purchase') AND ${currentPeriod(window)}
+  FROM events WHERE event IN ('$pageview', 'signup', 'purchase') AND ${publicJourney} AND ${currentPeriod(window)}
   GROUP BY person_id
 )
 WHERE entry != ''

@@ -5,12 +5,13 @@ import { cacheLife } from 'next/cache'
 import { logger } from '../../logger'
 import { posthogAccess } from './access'
 import { loadActivation, type Activation } from './activation'
-import { loadFunnel, type Funnel, type FunnelDim } from './funnel'
+import { loadFunnelGroup, type FunnelGroup } from './funnel'
 import { loadPages, type PageRow } from './pages'
 import { loadPayment, type Payment } from './payment'
 import { PostHogQueryError, queryRunner, type RunQuery } from './posthog-query'
 import { loadProblems, type Problems } from './problems'
 import { windowFor, type Range, type Window } from './range'
+import { loadTraffic, type Traffic } from './traffic'
 import { loadTemplates, type TemplateRow } from './templates'
 
 // One cached read per block (ARCHITECTURE §16.2a: 10 minutes, keyed by the range and, for the
@@ -30,18 +31,25 @@ function runner(): RunQuery {
   return queryRunner(access)
 }
 
-async function cachedPages(range: Range) {
+async function cachedTraffic(range: Range, end: number) {
   'use cache'
   profile()
-  const window = windowFor(range, new Date())
+  const window = windowFor(range, new Date(end))
+  return { window, data: await loadTraffic(runner(), window) }
+}
+
+async function cachedPages(range: Range, end: number) {
+  'use cache'
+  profile()
+  const window = windowFor(range, new Date(end))
   return { window, data: await loadPages(runner(), window) }
 }
 
-async function cachedFunnel(range: Range, dim: FunnelDim) {
+async function cachedFunnel(range: Range, group: FunnelGroup, end: number) {
   'use cache'
   profile()
-  const window = windowFor(range, new Date())
-  return { window, data: await loadFunnel(runner(), window, dim) }
+  const window = windowFor(range, new Date(end))
+  return { window, data: await loadFunnelGroup(runner(), window, group) }
 }
 
 async function cachedPayment(range: Range) {
@@ -83,8 +91,11 @@ export async function readBlock<T>(name: string, read: () => Promise<{ window: W
   }
 }
 
-export const readPages = (range: Range): Promise<Block<PageRow[]>> => readBlock('pages', () => cachedPages(range))
-export const readFunnel = (range: Range, dim: FunnelDim): Promise<Block<Funnel>> => readBlock('funnel', () => cachedFunnel(range, dim))
+export const readTraffic = (range: Range): Promise<Block<Traffic>> => readBlock('traffic', () => cachedTraffic(range, funnelEnd()))
+export const readPages = (range: Range): Promise<Block<PageRow[]>> => readBlock('pages', () => cachedPages(range, funnelEnd()))
+export const funnelEnd = () => Math.floor(Date.now() / 600_000) * 600_000
+export const readFunnelGroup = (range: Range, group: FunnelGroup, end = funnelEnd()) =>
+  readBlock('funnel', () => cachedFunnel(range, group, end))
 export const readPayment = (range: Range): Promise<Block<Payment>> => readBlock('payment', () => cachedPayment(range))
 export const readActivation = (range: Range, giftCredits: number): Promise<Block<Activation>> =>
   readBlock('activation', () => cachedActivation(range, giftCredits))
