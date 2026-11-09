@@ -113,7 +113,7 @@ interface GenerationProvider {
 
 ### 3.2 v1 范围
 
-- `image` 模块：支持 OpenRouter Chat Completions 出图接口，也支持 OpenAI Images 接口（`/v1/images/edits`、`/v1/images/generations`；官方地址或兼容这套接口的中转地址都能用）。**用哪个供应商、哪个模型，从 T17 起在后台配置**（第 3.3 节）；环境变量 `OPENAI_API_KEY` / `OPENAI_IMAGE_MODEL` 只在后台没有启用任何供应商时兜底。环境变量的说明（原文）：`OPENAI_IMAGE_MODEL`，默认值由 Owner 定（代码里当前默认 `gpt-image-2.5-sunburst`；GPT Image 2.6 已于 2026-11-04 上线、同价、更快；Owner 2026-11-05 评估 2.6 对人物五官的保持很强，默认用哪个仍由 Owner 在环境变量里定）。底座的 fal / KIE / WaveSpeed / Atlas 适配器不搬。
+- `image` 模块：支持 OpenRouter 专用图片接口（`/api/v1/images`），也支持 OpenAI Images 接口（`/v1/images/edits`、`/v1/images/generations`；官方地址或兼容这套接口的中转地址都能用）。**用哪个供应商、哪个模型，从 T17 起在后台配置**（第 3.3 节）；环境变量 `OPENAI_API_KEY` / `OPENAI_IMAGE_MODEL` 只在后台没有启用任何供应商时兜底。环境变量的说明（原文）：`OPENAI_IMAGE_MODEL`，默认值由 Owner 定（代码里当前默认 `gpt-image-2.5-sunburst`；GPT Image 2.6 已于 2026-11-04 上线、同价、更快；Owner 2026-11-05 评估 2.6 对人物五官的保持很强，默认用哪个仍由 Owner 在环境变量里定）。底座的 fal / KIE / WaveSpeed / Atlas 适配器不搬。
 - `video` 模块：只有接口类型，`site.config.ts` 里是 `false`，不写任何视频页面。
 
 ### 3.3 出图供应商配置（后台，Owner 要求：随时换供应商和模型，不改代码、不重新部署）
@@ -124,7 +124,7 @@ interface GenerationProvider {
 |---|---|
 | `id` | uuid |
 | `module` | `'image'`；`'decision'`（作品编辑判断改动范围用，T30，§5.2）；以后视频再加 |
-| `adapter` | 出图用 `'openai_images'` 或 `'openrouter_images'`；`'openai_responses'`（OpenAI 官方 Responses API，作品编辑判断用，第一版模型 `gpt-6-luna`，Owner 2026-11-06）。接一个接口形态不同的厂商（如 Gemini、Seedream）要写新适配器，是代码任务，不是后台操作 |
+| `adapter` | 出图用 `'openai_images'` 或 `'openrouter_images'`；`'openai_responses'`（OpenAI 官方 Responses API，作品编辑判断用，第一版模型 `gpt-6-luna`，Owner 2026-11-06）。OpenRouter 图片目录内的模型共用同一适配器，可直接在后台切换 |
 | `label` | 后台显示名，如「OpenAI 官方」「某中转」 |
 | `base_url` | 接口根地址，OpenRouter 默认 `https://openrouter.ai/api/v1`，OpenAI 默认 `https://api.openai.com/v1`；只允许 `https://`，拒绝 localhost、内网和保留地址 |
 | `model` | 模型名，如 `gpt-image-2.6`、`google/gemini-2.5-flash-image` |
@@ -142,12 +142,12 @@ interface GenerationProvider {
 
 **出图时怎么选**：前台模板出图优先用 `template_prompts.provider_id` 指定的 image 供应商（可未启用）。该字段为空，或该供应商不支持订单清晰度时，走默认供应商：取 image 模块的 `is_active` 行，无在用行时沿用环境变量。作品编辑和伙伴出图只走默认供应商；换脸判断按 decision 模块取在用行。后台改供应商后使 `providers` 缓存失效，密钥按次读取。实际调用的供应商和完整模型名以 `<供应商 id 或 env>/<模型名>` 记入 `generation_jobs.provider`，按供应商、模型和清晰度分别统计。模板 `model_params.model` 不参与选型。
 
-**OpenRouter**：用 `/chat/completions` 发送文字及输入图，接收首张返回图。支持尺寸参数的模型将 1K、2K、3K 档映射到 `image_size` 的 1K、2K、4K，3K 档交付时缩回本站目标像素。OpenRouter 不使用 OpenAI 的 `quality`、`input_fidelity`、`background`。原始 `prompt_tokens`、`completion_tokens`、`cost` 记入 `provider_usage`；响应的美元费用乘以 1.055 计入 `cost_usd`（充值手续费）。缺少费用时记录警告，按已有 token 和配置单价估算。积分仍按第 6.1 节的价格和下限。
+**OpenRouter**：出图统一走 `POST /api/v1/images`，通过 `input_references` 提交参考图，读取 `data[0].b64_json`。本站 1K、2K、3K 档对应 `resolution` 的 1K、2K、4K，跟随照片时传 `aspect_ratio: auto`，输出格式为 PNG。3K 档交付时缩回本站目标像素。OpenRouter 不使用 OpenAI 的 `quality`、`input_fidelity`、`background`。原始 `prompt_tokens`、`completion_tokens`、`cost` 记入 `provider_usage`；响应的美元费用乘以 1.055 计入 `cost_usd`（充值手续费）。缺少费用时记录警告，按已有 token 和配置单价估算。积分仍按第 6.1 节的价格和下限。
 
 **后台页 `/admin/providers`**（中文界面）：
 - 列表：显示名、适配器、地址、模型、密钥后 4 位、是否在用、更新时间。
-- 新增 / 编辑：密钥框只写不读，留空表示不改；保存后浏览器拿不到明文。
-- 「测试连接」：用该行的地址和密钥请求 `GET {base_url}/models`，只看能否通过鉴权，不出图、不花钱。
+- 新增 / 编辑：密钥框只写不读，留空表示不改；保存后浏览器拿不到明文。OpenRouter 保存时按 `GET {base_url}/images/models` 校验模型，目录缓存一小时。编辑模型时，按目录声明的清晰度预填本站档位，Owner 可手动调整。
+- 「测试连接」：OpenRouter 查询同一图片目录并用该行密钥调用免费的鉴权接口；其他适配器沿用 `GET {base_url}/models`。测试连接不产生出图费用。
 - 「设为当前使用」：弹窗确认「从 A 换到 B」，写一条日志（logger，不含密钥）。
 - 页面写明提醒：积分下限表（第 6.1 节）是按 GPT-Image high 质量的成本定的；换成更贵的模型前，先请总控更新下限。
 

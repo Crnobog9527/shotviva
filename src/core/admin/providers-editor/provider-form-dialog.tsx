@@ -11,11 +11,12 @@ import { Textarea } from '@/core/ui/textarea'
 import { RESOLUTIONS } from '@/core/templates/output-options'
 import { MODULE_ADAPTERS, type ProviderAdapterId, type ProviderModule } from '@/core/providers/types'
 
-import type { AdminProvider } from '../providers/types'
+import type { AdminProvider, ProviderAdminActions } from '../providers/types'
 
 import { PROVIDERS_COPY } from './copy'
-import { canSave, formFor, withAdapter, withModel, type ProviderForm } from './form-state'
+import { canSave, formFor, withAdapter, withModel, resolutionKey, withSuggestedResolutions, type ProviderForm } from './form-state'
 import { PriceFields } from './price-fields'
+import { useModelResolutions } from './use-model-resolutions'
 
 type Props = {
   // null for a new provider, which joins `module`'s section.
@@ -23,6 +24,7 @@ type Props = {
   module: ProviderModule
   pending: boolean
   error: string | null
+  lookupModel: ProviderAdminActions['lookupModel']
   onCancel: () => void
   onSubmit: (form: ProviderForm) => void
 }
@@ -43,8 +45,28 @@ function Field({ id, label, hint, children }: FieldProps) {
 // input is a new-password field (no autofill of a saved login), never filled from the server.
 const COPY = PROVIDERS_COPY.form
 
-export function ProviderFormDialog({ provider, module, pending, error, onCancel, onSubmit }: Props) {
-  const [form, setForm] = useState(() => formFor(provider, module))
+function useFormState(provider: AdminProvider | null, module: ProviderModule, lookupModel: Props['lookupModel']) {
+  const [draft, setForm] = useState(() => formFor(provider, module))
+  const catalog = useModelResolutions(draft.adapter === 'openrouter_images', draft.baseUrl.trim(), draft.model.trim(), lookupModel)
+  const form = withSuggestedResolutions(draft, provider, catalog.result?.ok ? catalog.result.value : null)
+  const canSubmit = !catalog.pending && catalog.result?.ok !== false && canSave(form, !provider?.apiKeyLast4)
+  return { form, setForm, catalog, canSubmit }
+}
+
+function LookupStatus({ catalog }: { catalog: ReturnType<typeof useModelResolutions> }) {
+  if (catalog.pending) return <p role="status" className="text-muted-foreground text-xs">{COPY.lookupPending}</p>
+  if (!catalog.result || catalog.result.ok) return null
+  const reason = catalog.result.reason
+  return (
+    <div role="alert" className="text-destructive text-sm">
+      {PROVIDERS_COPY.errors[reason]}
+      {reason === 'openrouter_catalog_unavailable' && <Button variant="link" onClick={catalog.retry}>{COPY.retryLookup}</Button>}
+    </div>
+  )
+}
+
+export function ProviderFormDialog({ provider, module, pending, error, lookupModel, onCancel, onSubmit }: Props) {
+  const { form, setForm, catalog, canSubmit } = useFormState(provider, module, lookupModel)
   const set = (key: keyof ProviderForm) => (event: { target: { value: string } }) =>
     setForm((prev) => ({ ...prev, [key]: event.target.value }))
   // The model drives the official-price pre-fill (§10.0).
@@ -71,6 +93,13 @@ export function ProviderFormDialog({ provider, module, pending, error, onCancel,
               {MODULE_ADAPTERS[form.module].map((id) => <option key={id} value={id}>{PROVIDERS_COPY.adapters[id]}</option>)}
             </select>
           </Field>
+          <Field id="baseUrl" label={COPY.baseUrl} hint={COPY.baseUrlHint}>
+            {input('baseUrl', true)}
+          </Field>
+          <Field id="model" label={COPY.model} hint={form.adapter === 'openrouter_images' ? COPY.routerModelHint : PROVIDERS_COPY.modules[form.module].modelHint}>
+            {input('model', true)}
+          </Field>
+          <LookupStatus catalog={catalog} />
           {form.module === 'image' && (
             <fieldset className="flex gap-4">
               <legend className="mb-2 text-sm font-medium">{COPY.resolutions}</legend>
@@ -78,19 +107,13 @@ export function ProviderFormDialog({ provider, module, pending, error, onCancel,
                 <label key={tier} className="flex items-center gap-1.5 text-sm">
                   <input type="checkbox" checked={form.resolutions.includes(tier)} onChange={(event) => {
                     const resolutions = event.target.checked ? [...form.resolutions, tier] : form.resolutions.filter((value) => value !== tier)
-                    setForm({ ...form, resolutions })
+                    setForm({ ...form, resolutions, resolutionOverride: resolutionKey(form) })
                   }} />
                   {tier.toUpperCase()}
                 </label>
               ))}
             </fieldset>
           )}
-          <Field id="baseUrl" label={COPY.baseUrl} hint={COPY.baseUrlHint}>
-            {input('baseUrl', true)}
-          </Field>
-          <Field id="model" label={COPY.model} hint={form.adapter === 'openrouter_images' ? COPY.routerModelHint : PROVIDERS_COPY.modules[form.module].modelHint}>
-            {input('model', true)}
-          </Field>
           <Field
             id="apiKey"
             label={COPY.apiKey}
@@ -112,7 +135,7 @@ export function ProviderFormDialog({ provider, module, pending, error, onCancel,
           <Button variant="outline" onClick={onCancel} disabled={pending}>
             {COPY.cancel}
           </Button>
-          <Button disabled={pending || !canSave(form, provider === null || provider.apiKeyLast4 === null)} onClick={() => onSubmit(form)}>
+          <Button disabled={pending || !canSubmit} onClick={() => onSubmit(form)}>
             {COPY.save}
           </Button>
         </DialogFooter>

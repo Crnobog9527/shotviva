@@ -6,6 +6,7 @@ import {
   activateProvider,
   dryRunIdentityScreen,
   type DryRunResult,
+  lookupProviderModel,
   removeProvider,
   runProviderAction,
   saveProvider,
@@ -26,6 +27,11 @@ const deps = (): ProviderCommandDeps => ({ db: createAdminSupabase() })
 function providersChanged() {
   updateTag(PROVIDERS_CACHE_TAG)
   refresh()
+}
+
+export async function lookupProviderModelAction(input: unknown) {
+  await requireAdmin()
+  return runProviderAction(() => lookupProviderModel(input))
 }
 
 export async function saveProviderAction(input: unknown): Promise<ProviderActionResult<string>> {
