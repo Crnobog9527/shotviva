@@ -1,10 +1,9 @@
 import { getTranslations } from 'next-intl/server'
 import { currentLocale } from '@/core/i18n/server'
-import { localizePath } from '@/core/i18n/paths'
+import { consumerReferralUrl } from '../consumer-link'
 import { Link } from '@/core/i18n/ui'
-import { appOrigin } from '@/core/site-url'
 import { date, money } from './format'
-import { CopyLink } from './interactive'
+import { CopyLink } from '../copy-link'
 import type { Account, Settings } from './models'
 import { readSummary } from './repository'
 
@@ -18,8 +17,6 @@ export async function Overview({
   settings: Settings
 }) {
   const [s, t, locale] = await Promise.all([readSummary(user), getTranslations('affiliate'), currentLocale()])
-  const url = new URL(localizePath('/', locale), appOrigin)
-  url.searchParams.set('ref', account.slug)
   const gap = Math.max(0, settings.payout_min_usd - s.available)
   const eligible = gap === 0 && !!account.payout_method && account.status === 'active'
   const moneyHere = (cents: number) => money(locale, cents)
@@ -35,7 +32,7 @@ export async function Overview({
     <>
       <section className="af-section">
         <h2>{t('myLink')}</h2>
-        <CopyLink url={url.href} copy={t('copy')} copied={t('copied')} />
+        <CopyLink url={consumerReferralUrl(account.slug, locale)} copy={t('copy')} copied={t('copied')} />
         <p>{t('anyPage', { suffix: '?ref=' + account.slug })}</p>
       </section>
       <dl className="af-metrics">

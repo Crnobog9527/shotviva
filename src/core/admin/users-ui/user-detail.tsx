@@ -13,7 +13,8 @@ import { PaymentsBlock } from './payments-block'
 import { UserActions, type UserAdminActions } from './user-actions'
 import { LedgerTable, UserJobsTable } from './user-tables'
 
-const CreateMember = dynamic(() => import('@/core/affiliate/admin/client').then((m) => m.CreateMember))
+// Keep the profile's focus scope mounted while its optional enrollment panel loads.
+const CreateMember = dynamic(() => import('@/core/affiliate/admin/client').then((m) => m.CreateMember), { loading: () => null })
 
 type Props = {
   data: UserDetailData

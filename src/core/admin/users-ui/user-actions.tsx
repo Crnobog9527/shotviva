@@ -3,6 +3,7 @@
 import { useState } from 'react'
 
 import { Button } from '@/core/ui/button'
+import { Dialog, DialogTrigger } from '@/core/ui/dialog'
 
 import { useAdminAction } from '../shell/use-admin-action'
 import type { ActionValue } from '../templates/types'
@@ -37,21 +38,23 @@ export function UserActions({ userId, banned, balances, actions }: Props) {
   return (
     <div className="grid gap-2">
       <div className="flex flex-wrap gap-2">
-        <Button onClick={() => show('adjust')}>{COPY.adjust}</Button>
+        <Dialog open={open === 'adjust'} onOpenChange={(next) => show(next ? 'adjust' : null)}>
+          <DialogTrigger asChild><Button>{COPY.adjust}</Button></DialogTrigger>
+          {open === 'adjust' && (
+            <AdjustDialog
+              balances={balances}
+              pending={pending}
+              error={error}
+              onCancel={() => setOpen(null)}
+              onConfirm={(input) => run(() => actions.adjust({ ...input, userId }), done('adjust'))}
+            />
+          )}
+        </Dialog>
         <Button variant="outline" onClick={() => show(banned ? 'unban' : 'ban')}>
           {banned ? COPY.unban : COPY.ban}
         </Button>
       </div>
       {notice ? <p className="text-sm text-success">{notice}</p> : null}
-      {open === 'adjust' ? (
-        <AdjustDialog
-          balances={balances}
-          pending={pending}
-          error={error}
-          onCancel={() => setOpen(null)}
-          onConfirm={(input) => run(() => actions.adjust({ ...input, userId }), done('adjust'))}
-        />
-      ) : null}
       {open === 'ban' || open === 'unban' ? (
         <BanDialog
           mode={open}

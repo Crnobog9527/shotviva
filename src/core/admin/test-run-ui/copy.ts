@@ -79,6 +79,7 @@ export const TEST_RUN_COPY = {
     isCover: '当前封面来源',
     select: '选中',
     open: '查看大图',
+    download: '下载试跑原图',
     cost: (usd: string) => usd,
     noCost: '成本无法计算',
     seconds: (ms: number) => `${Math.round(ms / 1000)} 秒`,

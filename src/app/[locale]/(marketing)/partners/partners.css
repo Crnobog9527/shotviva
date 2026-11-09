@@ -101,18 +101,13 @@
   .af-button:disabled {
     opacity: 0.55;
   }
-  .af-heading,
-  .af-copy {
+  .af-heading {
     display: flex;
     align-items: center;
     gap: 0.8rem;
-  }
-  .af-heading {
+
     justify-content: space-between;
     flex-wrap: wrap;
-  }
-  .af-copy .af-button {
-    flex-shrink: 0;
   }
   .af-nav {
     display: flex;
