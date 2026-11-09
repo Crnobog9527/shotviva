@@ -3,9 +3,8 @@ import { randomUUID } from 'node:crypto'
 import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
-import { runGeneration } from '@/core/jobs'
-import { activeProvider, findProviderRow, templateImageProvider, type ProviderAdapters } from '@/core/providers'
-import type { Resolution } from '@/core/templates'
+import { runGeneration, type ProviderInput } from '@/core/jobs'
+import { activeProvider, findProviderRow, templateImageProvider, ProviderSettingError, type OpenRouterImageParameters, type ProviderAdapters } from '@/core/providers'
 import { runTestGenerate, saveTestBudget } from '@/modules/image'
 import { createOpenRouterImageProvider } from '@/modules/image/provider/openrouter-image-provider'
 
@@ -13,7 +12,6 @@ import { png } from '../fakes/images'
 import { createMemoryStore } from '../fakes/memory-store'
 import { seedTemplate } from './generation-fixtures'
 import { connectAdmin, createUser, profileOf } from './helpers'
-import { recordingAdapters } from './provider-fixtures'
 import { serviceSupabase } from './supabase-env'
 import { holdTestBudget } from './test-run-fixtures'
 
@@ -24,15 +22,20 @@ const routerTag = `${routerId}/${model}`
 const defaultTag = `${defaultId}/gpt-image-2.6`
 const usage = { prompt_tokens: 14, completion_tokens: 22, cost: 0.04 }
 const chargedUsd = 0.0422
+const openAiUsage = { input_text_tokens: 0, input_image_tokens: 0, output_tokens: 1000 }
+const supported: OpenRouterImageParameters = {
+  aspect_ratio: { type: 'enum', values: ['4:5', '1:1'] },
+  input_references: { type: 'range', min: 0, max: 3 },
+}
 let pg: Client
 let templateId: string
 
 beforeAll(async () => {
   pg = await connectAdmin()
   templateId = await seedTemplate(pg, { visibleIn: ['web', 'partner'], images: { min: 0, max: 1 } })
-  await pg.query(`insert into public.ai_providers (id, module, adapter, label, model, base_url, resolutions)
-    values ($1, 'image', 'openrouter_images', 'T92 routing fixture', $2, 'https://openrouter.ai/api/v1', '{1k}'),
-           ($3, 'image', 'openai_images', 'T92 fallback fixture', 'gpt-image-2.6', 'https://api.openai.com/v1', '{1k,2k,3k}')`, [routerId, model, defaultId])
+  await pg.query(`insert into public.ai_providers (id, module, adapter, label, model, base_url, resolutions, price_output_per_m)
+    values ($1, 'image', 'openrouter_images', 'T92 routing fixture', $2, 'https://openrouter.ai/api/v1', '{1k}', null),
+           ($3, 'image', 'openai_images', 'T92 fallback fixture', 'gpt-image-2.6', 'https://api.openai.com/v1', '{1k,2k,3k}', 2)`, [routerId, model, defaultId])
   await pg.query('update public.template_prompts set provider_id = $1 where template_id = $2', [routerId, templateId])
 })
 afterAll(async () => {
@@ -43,11 +46,12 @@ afterAll(async () => {
 
 async function setup() {
   const db = serviceSupabase()
-  const openai = await recordingAdapters()
-  const b64_json = Buffer.from(await png(48, 48)).toString('base64')
+  const bytes = await png(48, 48)
+  const b64_json = Buffer.from(bytes).toString('base64')
+  const openai = vi.fn(async () => ({ bytes, contentType: 'image/png' as const, usage: openAiUsage }))
   const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json({ data: [{ b64_json }], usage }))
   const adapters: ProviderAdapters = {
-    ...openai.adapters,
+    openai_images: () => ({ id: 'openai', generate: openai }),
     openrouter_images: (config) => createOpenRouterImageProvider({ ...config, fetch }),
   }
   // Share the real resolver and query. Inject our private default row so the tests never
@@ -55,8 +59,10 @@ async function setup() {
   const row = (id: string) => findProviderRow(db, id)
   const key = async () => 'fixture'
   const fallback = () => activeProvider('image', adapters, () => row(defaultId), key)
-  const provider = (id: string | null, tier: Resolution) => templateImageProvider(adapters, id, tier, row, fallback, key)
-  return { deps: { db, provider, store: createMemoryStore().store }, fetch, openai }
+  const parameters = vi.fn(async () => supported)
+  const provider = (id: string | null, request: Pick<ProviderInput, 'resolution' | 'aspectRatio' | 'images'>) =>
+    templateImageProvider(adapters, id, request, { lookup: row, fallback, readKey: key, parameters })
+  return { deps: { db, provider, store: createMemoryStore().store }, fetch, openai, parameters }
 }
 
 async function jobRow(id: string) {
@@ -78,7 +84,7 @@ describe('T92 per-template generation routing', () => {
     expect(await jobRow(partner.id)).toMatchObject({ provider: defaultTag, status: 'succeeded', credits_cost: 1 })
     expect((await profileOf(pg, userId)).credits).toBe(1)
     expect(fetch).toHaveBeenCalledTimes(1)
-    expect(openai.calls).toHaveLength(2)
+    expect(openai).toHaveBeenCalledTimes(2)
   })
 
   it('refunds the failed request and retains its reported OpenRouter cost', async () => {
@@ -109,4 +115,33 @@ describe('T92 per-template generation routing', () => {
       await releaseBudget()
     }
   }, 120_000)
+})
+
+describe('OpenRouter catalogue fallback', () => {
+  it('finishes a catalogue fallback with one debit, the actual default model and its token pricing', async () => {
+    const { deps, fetch, openai, parameters } = await setup()
+    parameters.mockRejectedValueOnce(new ProviderSettingError('openrouter_catalog_unavailable', 'Catalogue unavailable'))
+    const userId = await createUser(pg, { credits: 2 })
+    const job = await runGeneration(deps, { userId, templateId, source: 'web', aspectRatio: '4:5', resolution: '1k' })
+    expect(await jobRow(job.id)).toMatchObject({
+      provider: defaultTag, status: 'succeeded', provider_usage: openAiUsage, cost_usd: 0.002, credits_cost: 1,
+    })
+    expect((await profileOf(pg, userId)).credits).toBe(1)
+    expect(openai).toHaveBeenCalledTimes(1)
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('refunds and attributes the job to the default when that one generation attempt fails', async () => {
+    const { deps, fetch, openai, parameters } = await setup()
+    parameters.mockRejectedValueOnce(new ProviderSettingError('openrouter_catalog_unavailable', 'Catalogue unavailable'))
+    openai.mockRejectedValueOnce(new Error('Default provider unavailable'))
+    const userId = await createUser(pg, { credits: 2 })
+    const jobId = randomUUID()
+    await expect(runGeneration(deps, { jobId, userId, templateId, source: 'web', resolution: '1k' }))
+      .rejects.toMatchObject({ jobId, refunded: true })
+    expect(await jobRow(jobId)).toMatchObject({ provider: defaultTag, status: 'failed', provider_usage: null, cost_usd: null })
+    expect((await profileOf(pg, userId)).credits).toBe(2)
+    expect(openai).toHaveBeenCalledTimes(1)
+    expect(fetch).not.toHaveBeenCalled()
+  })
 })

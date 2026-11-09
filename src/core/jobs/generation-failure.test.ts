@@ -16,6 +16,12 @@ describe('classifyFailure', () => {
     expect(classifyFailure('confirm', new Error('db')).jobCode).toBe('CONFIRM_FAILED')
   })
 
+  it.each(['REFERENCE_IMAGE_LIMIT', 'MODEL_INPUT_UNSUPPORTED'] as const)('keeps %s after settlement for APIs and trial history', (code) => {
+    const inputError = new AppError(code, 'Local input validation detail')
+    expect(classifyFailure('provider', inputError)).toEqual({ jobCode: code, error: inputError })
+    expect(classifyFailure('store_output', inputError).error.code).toBe('GENERATION_FAILED')
+  })
+
   it('tells the client which job failed and whether it was refunded', () => {
     const failure = new GenerationFailure(new AppError('GENERATION_FAILED', 'Generation failed'), 'job-1', true)
     expect(failure.status).toBe(502)

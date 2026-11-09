@@ -21,7 +21,7 @@ export function refundLine(failure: JobFailure, t: Translate): string {
 // Whether "Retry" makes sense with the same photo (not for a rejected or unusable photo).
 // TIER_REQUIRED would only fail again; it gets the plan's paywall instead.
 export const canRetry = (failure: JobFailure) =>
-  !['CONTENT_REJECTED', 'IDENTITY_SWAP_REFUSED', 'IMAGE_TOO_LARGE', 'IMAGE_UNSUPPORTED', 'CREDITS_INSUFFICIENT', 'TIER_REQUIRED'].includes(failure.code)
+  !['CONTENT_REJECTED', 'IDENTITY_SWAP_REFUSED', 'IMAGE_TOO_LARGE', 'IMAGE_UNSUPPORTED', 'REFERENCE_IMAGE_LIMIT', 'MODEL_INPUT_UNSUPPORTED', 'CREDITS_INSUFFICIENT', 'TIER_REQUIRED'].includes(failure.code)
 
 // Failures that say nothing beyond "try again": the settled panel's own line covers them, so
 // only a reason the user can act on (a rejected photo, a full queue) is shown next to it.

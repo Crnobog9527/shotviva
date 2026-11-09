@@ -1,5 +1,7 @@
 import 'server-only'
 
+import { AppError } from '@/core/errors'
+import { OPENROUTER_BASE_URL, OPENROUTER_IMAGE_SIZE, openRouterInputMismatch, openRouterImageParameters, type OpenRouterImageParameters } from '@/core/providers'
 import { ProviderError, type GenerationProvider, type ProviderInput } from '@/core/jobs'
 
 import { readOpenRouterOutput } from './openrouter-response'
@@ -8,23 +10,31 @@ type OpenRouterImageConfig = {
   apiKey: string
   model: string
   fetch?: typeof fetch
+  imageParameters?: OpenRouterImageParameters
   baseUrl?: string
 }
 
-const IMAGE_SIZE = { '1k': '1K', '2k': '2K', '3k': '4K' } as const
-
-function imageRequest(model: string, input: ProviderInput) {
-  const photos = input.images.map(({ bytes, contentType }) => ({
+function referenceImages(images: ProviderInput['images']) {
+  if (!images.length) return undefined
+  return images.map(({ bytes, contentType }) => ({
     type: 'image_url',
     image_url: { url: `data:${contentType};base64,${Buffer.from(bytes).toString('base64')}` },
   }))
+}
+
+function imageRequest(model: string, input: ProviderInput, supported: OpenRouterImageParameters) {
+  const mismatch = openRouterInputMismatch(input, supported)
+  if (mismatch) {
+    throw new AppError(mismatch.reason === 'reference_image_limit' ? 'REFERENCE_IMAGE_LIMIT' : 'MODEL_INPUT_UNSUPPORTED', mismatch.message)
+  }
+  const aspect = input.aspectRatio === 'original' ? 'auto' : input.aspectRatio
   return {
     model,
     prompt: input.prompt,
-    resolution: IMAGE_SIZE[input.resolution],
-    aspect_ratio: input.aspectRatio === 'original' ? 'auto' : input.aspectRatio,
-    output_format: 'png',
-    ...(photos.length > 0 && { input_references: photos }),
+    resolution: supported.resolution ? OPENROUTER_IMAGE_SIZE[input.resolution] : undefined,
+    aspect_ratio: supported.aspect_ratio?.values.includes(aspect) ? aspect : undefined,
+    output_format: supported.output_format?.values.includes('png') ? 'png' : undefined,
+    input_references: referenceImages(input.images),
   }
 }
 
@@ -32,10 +42,13 @@ export function createOpenRouterImageProvider(config: OpenRouterImageConfig): Ge
   return {
     id: 'openrouter-image',
     async generate(input) {
-      const url = `${config.baseUrl ?? 'https://openrouter.ai/api/v1'}/images`
+      const baseUrl = config.baseUrl ?? OPENROUTER_BASE_URL
       let response: Response
       try {
-        response = await (config.fetch ?? fetch)(url, {
+        input.signal.throwIfAborted()
+        const supported = config.imageParameters ?? await openRouterImageParameters(baseUrl, config.model, config.fetch)
+        input.signal.throwIfAborted()
+        response = await (config.fetch ?? fetch)(`${baseUrl}/images`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${config.apiKey}`,
@@ -43,13 +56,14 @@ export function createOpenRouterImageProvider(config: OpenRouterImageConfig): Ge
             'HTTP-Referer': 'https://shotviva.com',
             'X-Title': 'Shotviva',
           },
-          body: JSON.stringify(imageRequest(config.model, input)),
+          body: JSON.stringify(imageRequest(config.model, input, supported)),
           signal: input.signal,
           redirect: 'error',
           cache: 'no-store',
         })
-      } catch {
+      } catch (error) {
         if (input.signal.aborted) throw new ProviderError('timeout', 'openrouter request aborted at deadline')
+        if (error instanceof AppError && (error.code === 'REFERENCE_IMAGE_LIMIT' || error.code === 'MODEL_INPUT_UNSUPPORTED')) throw error
         throw new ProviderError('failed', 'openrouter request failed')
       }
       return readOpenRouterOutput(response, input, config.model)

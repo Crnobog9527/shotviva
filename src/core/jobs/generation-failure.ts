@@ -25,6 +25,9 @@ export class GenerationFailure extends AppError {
 export type FailureStage = 'provider' | 'store_output' | 'confirm'
 
 export function classifyFailure(stage: FailureStage, error: unknown): { jobCode: string; error: AppError } {
+  if (stage === 'provider' && error instanceof AppError && ['REFERENCE_IMAGE_LIMIT', 'MODEL_INPUT_UNSUPPORTED'].includes(error.code)) {
+    return { jobCode: error.code, error }
+  }
   if (error instanceof ProviderError) {
     if (error.kind === 'content_rejected') {
       return { jobCode: 'CONTENT_REJECTED', error: new AppError('CONTENT_REJECTED', 'This photo or text was declined by the image model') }

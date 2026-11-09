@@ -55,10 +55,12 @@ export type GenerationProvider = {
 }
 
 // Web and admin first-generation resolve the saved provider after loading the template.
-export type TemplateProvider = GenerationProvider | ((id: string | null, resolution: Resolution) => Promise<GenerationProvider>)
+export type ImageRequestOptions = Pick<ProviderInput, 'resolution' | 'aspectRatio' | 'images'>
 
-export function resolveTemplateProvider(provider: TemplateProvider, id: string | null, resolution: Resolution) {
-  return typeof provider === 'function' ? provider(id, resolution) : provider
+export type TemplateProvider = GenerationProvider | ((id: string | null, request: ImageRequestOptions) => Promise<GenerationProvider>)
+
+export function resolveTemplateProvider(provider: TemplateProvider, id: string | null, request: ImageRequestOptions) {
+  return typeof provider === 'function' ? provider(id, request) : provider
 }
 
 // Why a provider call failed, in the terms settlement needs. Every kind is refunded.
