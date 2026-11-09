@@ -224,3 +224,34 @@ it('refuses to open either channel when the database catalog differs from this b
     expect(mocks.createWaffoCheckout).not.toHaveBeenCalled()
   }
 })
+
+it.each(['stripe', 'waffo'])('validates the page version and displayed annual price before opening %s', async channel => {
+  const pricing = await import('@/core/billing/checkout-price')
+  const { site } = await import('@/site/site.config')
+  const plan = site.billing.products.find(p => p.id === 'max_yearly')!
+  const shown = Math.round(plan.priceUsd * 100)
+  const base = { product_id: plan.id, method: 'card', locale: 'en' }
+  const post = (quote: Record<string, unknown>) => POST(new NextRequest(ORIGIN + '/api/checkout', {
+    method: 'POST', headers: { origin: ORIGIN, 'content-type': 'application/json' }, body: JSON.stringify({ ...base, ...quote }),
+  }))
+  resetMember()
+  mocks.getSessionUser.mockResolvedValue(USER)
+  mocks.channel.mockReturnValue(channel)
+  const build = vi.spyOn(pricing, 'configuredPricing').mockReturnValue('v2')
+  const original = await mocks.pricing()
+  mocks.pricing.mockResolvedValue('v2')
+  try {
+    for (const invalid of [{}, { pricing_version: 'v1', expected_price_cents: shown }, { pricing_version: 'v2' }, { pricing_version: 'v2', expected_price_cents: shown - 1 }]) {
+      const response = await post(invalid)
+      expect(response.status).toBe(409)
+      expect(await response.json()).toMatchObject({ code: 'CODE_CHECKOUT_OFFER_CHANGED' })
+    }
+    expect(mocks.createCheckout).not.toHaveBeenCalled()
+    expect(mocks.createWaffoCheckout).not.toHaveBeenCalled()
+    expect((await post({ pricing_version: 'v2', expected_price_cents: shown })).status).toBe(200)
+    expect(channel === 'stripe' ? mocks.createCheckout : mocks.createWaffoCheckout).toHaveBeenCalledOnce()
+  } finally {
+    build.mockRestore()
+    mocks.pricing.mockResolvedValue(original)
+  }
+})

@@ -17,7 +17,7 @@ import {
   type CheckoutClient,
 } from '@/core/billing/stripe'
 import { readActivePricing } from '@/core/billing/active-pricing'
-import { buyerQuote, type BuyerQuote } from '@/core/billing/buyer-quote'
+import { assertPricingVersions, buyerQuote, type BuyerQuote } from '@/core/billing/buyer-quote'
 import { configuredPricing } from '@/core/billing/checkout-price'
 import { assertCanBuy } from '@/core/billing/subscription'
 import { createWaffoCheckout, paymentChannel, waffoClient, waffoConfig } from '@/core/billing/waffo'
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     const admin = createAdminSupabase()
     await assertCanBuy(admin, user.id, product)
     const version = configuredPricing(site.billing)
-    if (await readActivePricing(admin) !== version) throw new AppError('CODE_CHECKOUT_OFFER_CHANGED', 'Pricing catalog is changing')
+    assertPricingVersions(version, await readActivePricing(admin), body.data.pricing_version)
     const quote = version && await buyerQuote(admin, user.id, product, body.data, channel)
     await bindReferral(user.id, request.cookies.get('sv_ref')?.value, 'first_checkout')
     if (channel === 'waffo') return jsonResponse(await startWaffo(user.id, body.data, quote))
@@ -69,7 +69,7 @@ const shared = { products: site.billing.products, origin: appOrigin, returnToHos
 
 function startStripe(userId: string, body: CheckoutBody, client: CheckoutClient, token: string, quote?: BuyerQuote) {
   const deps = { ...shared, stripe: stripeClient(), codes: createAdminSupabase(), managedPayments: managedPaymentsEnabled(), wechatPay: wechatPayEnabled(), termsConsent: termsConsentEnabled() }
-  return createCheckout(deps, { userId, body, client, token, quote: quote?.price, packCode: quote?.packCode })
+  return createCheckout(deps, { userId, body, client, token, quote: quote?.price, selectedCode: quote?.selectedCode })
 }
 
 function startWaffo(userId: string, body: CheckoutBody, quote?: BuyerQuote) {

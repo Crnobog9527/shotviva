@@ -28,7 +28,7 @@ it('prepares separate immutable prices for all pack rates and both membership fo
 it('charges the quoted Price without reserving a losing campaign code', async () => {
   const fake = fakeStripe(() => memberPrice)
   const d = deps(fake.stripe)
-  await createCheckout(d, { userId: USER, body: form, quote, packCode: null })
+  await createCheckout(d, { userId: USER, body: form, quote, selectedCode: null })
   expect(d.codes.rpc).not.toHaveBeenCalled()
   expect(sent(fake.create)).toMatchObject({ line_items: [{ price: 'price_member', quantity: 1 }], metadata: quoteMetadata(quote) })
   expect(sent(fake.create)).not.toHaveProperty('discounts')
@@ -57,7 +57,7 @@ it('rejects a coupon whose terms changed between quote and reservation, before c
   const rpc = vi.fn(async (name: string) => ({ error: null, data: name === 'reserve_checkout_discount'
     ? { status: 'reserved', code_id: USER, code: 'SAVED', stripe_coupon_id: 'coupon', percent: 10, prepared: false } : null }))
   await expect(createCheckout(deps(fake.stripe, { codes: { rpc } }), { userId: USER, body: form,
-    quote: { credits: 2490, cents: 2490, memberTier: null }, packCode: { code: 'SAVED', percent: 20 } })).rejects.toMatchObject({ code: 'CODE_CHECKOUT_OFFER_CHANGED' })
+    quote: { credits: 2490, cents: 2490, memberTier: null }, selectedCode: { code: 'SAVED', percent: 20 } })).rejects.toMatchObject({ code: 'CODE_CHECKOUT_OFFER_CHANGED' })
   expect(rpc.mock.calls.map(c => c[0])).toEqual(['reserve_checkout_discount', 'release_checkout_discount'])
   expect(fake.create).not.toHaveBeenCalled()
 })
