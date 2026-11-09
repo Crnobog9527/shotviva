@@ -9713,9 +9713,9 @@ GRANT ALL ON FUNCTION "public"."openai_admin_key"() TO "service_role";
 
 
 REVOKE ALL ON FUNCTION "public"."partner_image_aspects"("public"."templates") FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."partner_image_aspects"("public"."templates") TO "service_role";
 GRANT ALL ON FUNCTION "public"."partner_image_aspects"("public"."templates") TO "anon";
 GRANT ALL ON FUNCTION "public"."partner_image_aspects"("public"."templates") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."partner_image_aspects"("public"."templates") TO "service_role";
 
 
 
