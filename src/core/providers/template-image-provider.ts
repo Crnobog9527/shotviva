@@ -6,14 +6,15 @@ import { createAdminSupabase } from '../auth/supabase-admin'
 import { AppError } from '../errors'
 import { serverEnv } from '../env'
 import { logger } from '../logger'
+import { referenceCount } from '../jobs/provider'
 import { providerTag, type GenerationProvider, type ImageRequestOptions } from '../jobs'
 import { openRouterImageParameters, type OpenRouterImageParameters } from './openrouter-catalog'
 import { openRouterInputMismatch } from './openrouter-input'
 import { ProviderSettingError } from './setting-error'
-import { activeProvider, PROVIDERS_CACHE_TAG } from './active-provider'
+import { defaultTemplateProvider, PROVIDERS_CACHE_TAG } from './active-provider'
 import { readProviderKey } from './keys'
 import { findProviderRow } from './repository'
-import { resolveProvider } from './resolve'
+import { effectiveReferenceLimit, resolveProvider } from './resolve'
 import type { ActiveProviderRow, ProviderAdapters } from './types'
 
 async function cachedRow(id: string) {
@@ -40,7 +41,7 @@ function validateStoredCapabilities(row: ActiveProviderRow, request: ImageReques
   if (!aspect || !caps.resolutions.includes(request.resolution)) {
     throw new AppError('INVALID_INPUT', 'This model does not support the selected output size')
   }
-  if (request.images.length < caps.minReferences || request.images.length > caps.maxReferences) {
+  if (referenceCount(request) < caps.minReferences) {
     throw new AppError('INVALID_INPUT', 'This model does not support the supplied reference count')
   }
 }
@@ -53,6 +54,8 @@ async function checkTemplateRow(
   row: ActiveProviderRow, request: ImageRequestOptions, load: typeof openRouterImageParameters,
 ): Promise<{ reason: string } | { parameters?: OpenRouterImageParameters }> {
   if (!row.resolutions.includes(request.resolution)) return { reason: 'unsupported_resolution' }
+  const max = effectiveReferenceLimit(row)
+  if (max !== undefined && referenceCount(request) > max) return { reason: 'reference_image_limit' }
   if (row.adapter !== 'openrouter_images') return {}
   let parameters: OpenRouterImageParameters
   try {
@@ -74,7 +77,7 @@ export async function templateImageProvider(
   adapters: ProviderAdapters,
   id?: string | null,
   request?: ImageRequestOptions,
-  { lookup = cachedRow, fallback = () => activeProvider('image', adapters),
+  { lookup = cachedRow, fallback = () => defaultTemplateProvider(adapters, request?.styleRefCount),
     readKey = (keyId) => readProviderKey(createAdminSupabase(), keyId),
     parameters: loadParameters = openRouterImageParameters }: RoutingDeps = {},
 ) {
@@ -87,7 +90,7 @@ export async function templateImageProvider(
     const provider = await fallback()
     logger.info('image.provider.fallback', {
       reason: selection.reason, requestedProvider: providerTag(id, row.model), actualProvider: provider.id,
-      resolution: request.resolution, aspectRatio: request.aspectRatio, referenceCount: request.images.length,
+      resolution: request.resolution, aspectRatio: request.aspectRatio, referenceCount: referenceCount(request),
     })
     return provider
   }

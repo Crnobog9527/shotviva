@@ -13,6 +13,7 @@ export const testGenerateBodySchema = z.object({
   // Absent follows the saved template; explicit null uses the global default.
   provider_id: z.uuid().nullable().optional(),
   photo_id: z.uuid().nullable().optional(),
+  omit_style_refs: z.boolean().optional(),
   inputs: z
     .object({
       copy: z.record(z.string(), z.unknown()).optional(),

@@ -40,6 +40,63 @@ CREATE TYPE "public"."credit_change" AS (
 
 ALTER TYPE "public"."credit_change" OWNER TO "postgres";
 
+
+CREATE OR REPLACE FUNCTION "admin"."apply_style_refs"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  pending jsonb := nullif(current_setting('shotviva.save_style_refs',true),'')::jsonb;
+begin
+  if pending->>'id' = new.template_id then new.style_refs := pending->'refs'; end if;
+  if new.style_refs <> '[]' and not admin.valid_style_refs(new.template_id,new.style_refs) then
+    raise exception 'INVALID_STYLE_REFS' using errcode = '23514';
+  end if;
+  if tg_op = 'UPDATE' and old.style_refs is distinct from new.style_refs then
+    new.version := old.version + 1;
+    new.updated_at := now();
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "admin"."apply_style_refs"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."check_template_style_ref_limit"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_id text;
+  v_count integer;
+  v_provider uuid;
+  v_limit integer;
+  v_photos integer;
+begin
+  if tg_table_name = 'templates' then v_id := new.id; else v_id := new.template_id; end if;
+  select jsonb_array_length(tp.style_refs), tp.provider_id, coalesce((t.fields#>>'{images,max}')::integer, 0)
+    into v_count, v_provider, v_photos from public.template_prompts tp
+    join public.templates t on t.id = tp.template_id where tp.template_id = v_id;
+  if not found or v_count = 0 then return null; end if;
+  select coalesce((p.capabilities->>'maxReferences')::integer, case when p.adapter = 'openai_images' then 4 end) into v_limit
+    from public.ai_providers p where p.module = 'image'
+      and (p.id = v_provider or (v_provider is null and p.is_active)) for share;
+  -- With no DB provider, T96's environment OpenAI Images adapter supports four inputs.
+  if not found then v_limit := 4; end if;
+  if v_limit is null or v_photos + v_count > v_limit then
+    raise exception 'MODEL_REFERENCE_LIMIT' using detail =
+      format('模板最多 %s 张用户照片，加上 %s 张画风参考图，模型上限为 %s',
+        v_photos,v_count,coalesce(v_limit::text,'未知'));
+  end if;
+  return null;
+end;
+$$;
+
+
+ALTER FUNCTION "admin"."check_template_style_ref_limit"() OWNER TO "postgres";
+
 SET default_tablespace = '';
 
 SET default_table_access_method = "heap";
@@ -129,6 +186,44 @@ $_$;
 
 
 ALTER FUNCTION "admin"."template_image_options"("public"."templates") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."valid_style_refs"("p_template_id" "text", "p_refs" "jsonb") RETURNS boolean
+    LANGUAGE "plpgsql" IMMUTABLE STRICT
+    SET "search_path" TO ''
+    AS $_$
+declare
+  ref jsonb;
+  seen text[] := '{}';
+  ref_key text;
+begin
+  if jsonb_typeof(p_refs) <> 'array' then return false; end if;
+  if jsonb_array_length(p_refs) > 3 then return false; end if;
+  for ref in select value from jsonb_array_elements(p_refs) loop
+    if jsonb_typeof(ref) <> 'object' then return false; end if;
+    if not ref ?& array['key','width','height','uploadedAt']
+      or ref - array['key','width','height','uploadedAt'] <> '{}'
+      or jsonb_typeof(ref->'key') <> 'string' or jsonb_typeof(ref->'uploadedAt') <> 'string'
+      or jsonb_typeof(ref->'width') <> 'number' or jsonb_typeof(ref->'height') <> 'number' then
+      return false;
+    end if;
+    ref_key := ref->>'key';
+    if split_part(ref_key, '/', 2) <> p_template_id
+      or ref_key !~ '^style-refs/[a-z0-9-]+/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.webp$'
+      or ref_key = any(seen)
+      or ref->>'width' !~ '^[1-9][0-9]{0,3}$' or ref->>'height' !~ '^[1-9][0-9]{0,3}$'
+      or (ref->>'width')::numeric > 1536 or (ref->>'height')::numeric > 1536
+      or ref->>'uploadedAt' !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?Z$'
+      or not pg_input_is_valid(ref->>'uploadedAt','timestamptz') then return false;
+    end if;
+    seen := array_append(seen, ref_key);
+  end loop;
+  return true;
+end;
+$_$;
+
+
+ALTER FUNCTION "admin"."valid_style_refs"("p_template_id" "text", "p_refs" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."_affiliate_accept_invite"() RETURNS "trigger"
@@ -3899,6 +3994,25 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_upsert_template"("p_template" "jsonb", "p_prompt" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_upsert_template"("p_template" "jsonb", "p_prompt" "jsonb", "p_style_refs" "jsonb") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare previous_refs text := current_setting('shotviva.save_style_refs',true);
+begin
+  if p_prompt is null then raise exception 'PROMPT_REQUIRED'; end if;
+  -- A failed SQL statement rolls back its local settings; restore on success as well.
+  perform set_config('shotviva.save_style_refs',
+    jsonb_build_object('id',p_template->>'id','refs',p_style_refs)::text, true);
+  perform public.admin_upsert_template(p_template, p_prompt);
+  perform set_config('shotviva.save_style_refs',coalesce(previous_refs,''),true);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_upsert_template"("p_template" "jsonb", "p_prompt" "jsonb", "p_style_refs" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_view_work"("p_job_id" "uuid") RETURNS TABLE("user_id" "uuid", "status" "text", "output_key" "text", "input_key" "text", "created_at" timestamp with time zone, "deleted_at" timestamp with time zone)
@@ -7757,6 +7871,7 @@ CREATE TABLE IF NOT EXISTS "public"."template_prompts" (
     "model_params" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "provider_id" "uuid",
+    "style_refs" "jsonb" DEFAULT '[]'::"jsonb" NOT NULL,
     CONSTRAINT "template_prompts_body_check" CHECK (("char_length"("body") > 0)),
     CONSTRAINT "template_prompts_model_params_check" CHECK (("jsonb_typeof"("model_params") = 'object'::"text")),
     CONSTRAINT "template_prompts_version_check" CHECK (("version" > 0))
@@ -8478,6 +8593,10 @@ CREATE OR REPLACE TRIGGER "match_unlinked_dispute" BEFORE INSERT ON "public"."pa
 
 
 
+CREATE OR REPLACE TRIGGER "prompt_style_ref_limit" AFTER INSERT OR UPDATE ON "public"."template_prompts" FOR EACH ROW EXECUTE FUNCTION "admin"."check_template_style_ref_limit"();
+
+
+
 CREATE OR REPLACE TRIGGER "site_announcements_set_updated_at" BEFORE UPDATE ON "public"."site_announcements" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
 
 
@@ -8502,7 +8621,15 @@ CREATE OR REPLACE TRIGGER "template_prompts_check_image_provider" BEFORE INSERT 
 
 
 
+CREATE OR REPLACE TRIGGER "template_prompts_style_refs" BEFORE INSERT OR UPDATE ON "public"."template_prompts" FOR EACH ROW EXECUTE FUNCTION "admin"."apply_style_refs"();
+
+
+
 CREATE OR REPLACE TRIGGER "template_request_votes_count" AFTER INSERT OR DELETE ON "public"."template_request_votes" FOR EACH ROW EXECUTE FUNCTION "public"."template_request_votes_count"();
+
+
+
+CREATE CONSTRAINT TRIGGER "template_style_ref_limit" AFTER UPDATE OF "fields" ON "public"."templates" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (("old"."fields" IS DISTINCT FROM "new"."fields")) EXECUTE FUNCTION "admin"."check_template_style_ref_limit"();
 
 
 
@@ -8912,6 +9039,10 @@ ALTER TABLE "public"."feature_access" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."generation_jobs" ENABLE ROW LEVEL SECURITY;
 
 
+CREATE POLICY "generation_jobs_hide_style_refs" ON "public"."generation_jobs" AS RESTRICTIVE FOR SELECT TO "authenticated" USING (((NOT ("inputs" ? 'style_ref_keys'::"text")) OR (("inputs" -> 'style_ref_keys'::"text") = '[]'::"jsonb")));
+
+
+
 CREATE POLICY "generation_jobs_select_own" ON "public"."generation_jobs" FOR SELECT TO "authenticated" USING (((( SELECT "auth"."uid"() AS "uid") = "user_id") AND ("deleted_at" IS NULL)));
 
 
@@ -9047,6 +9178,14 @@ GRANT USAGE ON SCHEMA "public" TO "service_role";
 
 
 
+REVOKE ALL ON FUNCTION "admin"."apply_style_refs"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."check_template_style_ref_limit"() FROM PUBLIC;
+
+
+
 GRANT ALL ON TABLE "public"."templates" TO "service_role";
 GRANT SELECT ON TABLE "public"."templates" TO "anon";
 GRANT SELECT ON TABLE "public"."templates" TO "authenticated";
@@ -9064,6 +9203,11 @@ REVOKE ALL ON FUNCTION "admin"."template_image_options"("public"."templates") FR
 GRANT ALL ON FUNCTION "admin"."template_image_options"("public"."templates") TO "anon";
 GRANT ALL ON FUNCTION "admin"."template_image_options"("public"."templates") TO "authenticated";
 GRANT ALL ON FUNCTION "admin"."template_image_options"("public"."templates") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."valid_style_refs"("p_template_id" "text", "p_refs" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."valid_style_refs"("p_template_id" "text", "p_refs" "jsonb") TO "service_role";
 
 
 
@@ -9505,6 +9649,11 @@ GRANT ALL ON FUNCTION "public"."admin_unban_user"("p_user_id" "uuid", "p_reason"
 
 REVOKE ALL ON FUNCTION "public"."admin_upsert_template"("p_template" "jsonb", "p_prompt" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_upsert_template"("p_template" "jsonb", "p_prompt" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_upsert_template"("p_template" "jsonb", "p_prompt" "jsonb", "p_style_refs" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_upsert_template"("p_template" "jsonb", "p_prompt" "jsonb", "p_style_refs" "jsonb") TO "service_role";
 
 
 

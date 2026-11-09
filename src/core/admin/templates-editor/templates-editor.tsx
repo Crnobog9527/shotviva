@@ -130,7 +130,7 @@ export function TemplatesEditor({ providers, templates, categories, floor, cover
           error={error}
           onCancel={() => setEditing(null)}
           notice={notice}
-          onSubmit={(payload) => run(() => actions.save(payload), '已保存', () => setEditing(afterSave(payload)))}
+          onSubmit={(payload, saved) => run(() => actions.save(payload), '已保存', () => { saved(); setEditing(afterSave(payload)) })}
         />
       ) : null}
       <UnpublishDialog

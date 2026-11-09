@@ -50,7 +50,7 @@ describe('OpenRouter image requests', () => {
   ] as const)('uses only supported parameters for %s (%s)', async (model, aspectRatio, params) => {
     const fetch = fake(reply(await imageData('jpeg')))
     const result = await createOpenRouterImageProvider({ ...config, model, fetch }).generate(input({
-      images: [photo, { bytes: new Uint8Array([3, 4]), contentType: 'image/png' }],
+      images: [photo, { bytes: new Uint8Array([3, 4]), contentType: 'image/webp' }],
       aspectRatio, resolution: model === gemini ? '1k' : '2k', params: { output_format: 'png' },
     }))
     expect(fetch.mock.calls[0]).toMatchObject(['https://openrouter.ai/api/v1/images/models', { method: 'GET' }])
@@ -63,7 +63,7 @@ describe('OpenRouter image requests', () => {
       model, prompt: 'fixture', ...params,
       input_references: [
         { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,AQI=' } },
-        { type: 'image_url', image_url: { url: 'data:image/png;base64,AwQ=' } },
+        { type: 'image_url', image_url: { url: 'data:image/webp;base64,AwQ=' } },
       ],
     })
     expect(result.usage).toEqual(usage)
@@ -165,4 +165,14 @@ describe('OpenRouter image responses', () => {
     await expect(createOpenRouterImageProvider({ ...config, fetch }).generate(input({ signal: controller.signal })))
       .rejects.toMatchObject({ kind: 'timeout', message: expect.not.stringContaining('SENSITIVE') })
   })
+})
+
+it('requests the supported square ratio when only the template supplies images', async () => {
+  const fetch = fake(reply(await imageData('png')))
+  await createOpenRouterImageProvider({ ...config, model: flux, fetch }).generate(input({
+    aspectRatio: 'original', photoCount: 0, images: [{ ...photo, width: 600, height: 900 }],
+  }))
+  const body = JSON.parse(String(fetch.mock.calls[1]?.[1]?.body))
+  expect(body.aspect_ratio).toBe('1:1')
+  expect(body.input_references).toHaveLength(1)
 })

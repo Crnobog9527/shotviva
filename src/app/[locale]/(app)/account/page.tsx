@@ -45,7 +45,7 @@ async function Account() {
     hasUnreadReply(supabase, user.id),
     listPaymentOptions(admin, user.id),
     readMemberSince(admin, user.id),
-    listMonthWorks(supabase, user.id, new Date(), STRIP_FRAMES),
+    listMonthWorks(admin, user.id, new Date(), STRIP_FRAMES),
     getTranslations('app.support'),
     currentLocale(),
     readPendingDiscount(admin, user.id),

@@ -1,3 +1,4 @@
+import type { StyleRef } from '@/core/templates/style-refs'
 import { MISSING_COST, floorGuidance } from '@/core/templates/provider-pricing'
 import { RESOLUTIONS, type Resolution } from '@/core/templates/output-options'
 import type { CreditsFloor, TemplateQuality } from '@/core/templates/pricing'
@@ -20,6 +21,8 @@ export type TemplateFormValues = {
   visiblePartner: boolean
   fieldsJson: string
   providerId: string | null
+  styleRefs: StyleRef[]
+  styleRefsEdited: boolean
   promptBody: string
   modelParamsJson: string
   // Chinese display text (templates.translations.zh); blank means "show the English".
@@ -53,6 +56,8 @@ export function emptyFormValues(): TemplateFormValues {
     visiblePartner: false,
     fieldsJson: pretty(DEFAULT_FIELDS),
     providerId: null,
+    styleRefs: [],
+    styleRefsEdited: false,
     promptBody: '',
     modelParamsJson: '{}',
     zh: emptyZh(),
@@ -121,6 +126,8 @@ export function toFormValues(template: AdminTemplate): TemplateFormValues {
     visiblePartner: template.visibleIn.includes('partner'),
     fieldsJson: pretty(withoutToggles(template.fields)),
     providerId: template.prompt?.providerId ?? null,
+    styleRefs: template.prompt?.styleRefs ?? [],
+    styleRefsEdited: false,
     promptBody: template.prompt?.body ?? '',
     modelParamsJson: pretty(withoutToggles(template.prompt?.modelParams ?? {})),
     zh: toZhValues(template),
@@ -204,7 +211,7 @@ export function buildPayload(values: TemplateFormValues, isNew: boolean, floor: 
         fields: wired.fields,
         translations: toTranslations(values.zh, copyKeys(values.fieldsJson).map((field) => field.key), values.toggles),
       },
-      prompt: { providerId: values.providerId, body: values.promptBody, modelParams: wired.modelParams },
+      prompt: { ...(values.styleRefsEdited ? { styleRefs: values.styleRefs } : {}), providerId: values.providerId, body: values.promptBody, modelParams: wired.modelParams },
     },
   }
 }

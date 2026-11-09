@@ -25,9 +25,16 @@ const run: TestRun = {
 }
 
 describe('toTestRunView', () => {
+  it('exposes the actual style count without raw inputs', () => {
+    const view = toTestRunView({ ...run, kind: 'generate', inputs: { style_ref_count: 2, attempt_id: 'private-marker' } }, null)
+    expect(view.styleRefCount).toBe(2)
+    expect(JSON.stringify(view)).not.toContain('private-marker')
+  })
+
   it('keeps what the panel shows and leaves the storage key and provider id out', () => {
     const view = toTestRunView(run, 'https://signed')
     expect(view).toMatchObject({ instruction: 'beach', editScope: 'background', aspectRatio: '4:5', model: 'gpt-image-2.6', isCover: true, outputUrl: 'https://signed' })
+    expect(view.styleRefCount).toBe(0)
     expect(view.copy).toEqual({ dish: 'salmon' })
     expect(JSON.stringify(view)).not.toContain('admin-tests/')
     expect(JSON.stringify(view)).not.toContain('b3c1-uuid')

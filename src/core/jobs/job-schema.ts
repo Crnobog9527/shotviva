@@ -37,7 +37,18 @@ export type Job = {
   deletedAt: Date | null
 }
 
+export const JOB_COLUMNS = 'id,user_id,module,template_id,parent_job_id,inputs,provider,source,idempotency_key,' +
+  'status,credit_pool,visibility,credits_cost,output_key,error_code,created_at,finished_at,deleted_at'
+
 const toDate = (value: string | null): Date | null => (value === null ? null : new Date(value))
+
+// The database retains the audit trail. Even serializing a parsed Job (including an RPC
+// result) must never send private template object keys to a browser or partner.
+function displayInputs(raw: Job['inputs']): Job['inputs'] {
+  const inputs = { ...raw }
+  delete inputs.style_ref_keys
+  return inputs
+}
 
 export const jobRowSchema = z
   .object({
@@ -69,7 +80,7 @@ export const jobRowSchema = z
       module: row.module,
       templateId: row.template_id,
       parentJobId: row.parent_job_id ?? null,
-      inputs: row.inputs,
+      inputs: displayInputs(row.inputs),
       provider: row.provider,
       source: row.source,
       idempotencyKey: row.idempotency_key,

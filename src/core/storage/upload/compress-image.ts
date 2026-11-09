@@ -35,10 +35,10 @@ async function resized(image: HTMLImageElement, width: number, height: number): 
 // 48MP photo never becomes a 48MP canvas (iOS caps canvases near 16.7MP). Re-encoding drops
 // EXIF, GPS included. Throws when the browser cannot decode the file; the caller then falls
 // back to uploading the original.
-export async function compressImage(file: Blob): Promise<Blob> {
+export async function compressImage(file: Blob, options?: { longEdge: number; type: 'image/png' }): Promise<Blob> {
   const { image, release } = await decode(file)
   try {
-    const size = targetSize(image.naturalWidth, image.naturalHeight)
+    const size = targetSize(image.naturalWidth, image.naturalHeight, options?.longEdge)
     const source = await resized(image, size.width, size.height)
     const canvas = document.createElement('canvas')
     canvas.width = size.width
@@ -47,10 +47,10 @@ export async function compressImage(file: Blob): Promise<Blob> {
     if (!context) throw new Error('canvas 2d unavailable')
     context.drawImage(source, 0, 0, size.width, size.height)
     if ('close' in source && typeof source.close === 'function') source.close()
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', INPUT_JPEG_QUALITY))
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, options?.type ?? 'image/jpeg', INPUT_JPEG_QUALITY))
     canvas.width = 0
     canvas.height = 0
-    if (!blob) throw new Error('jpeg encode failed')
+    if (!blob) throw new Error('image encode failed')
     return blob
   } finally {
     release()

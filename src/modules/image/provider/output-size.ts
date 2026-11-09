@@ -1,3 +1,4 @@
+import type { ProviderInput } from '@/core/jobs'
 import type { Resolution } from '@/core/templates'
 
 import { outputTokens, TOKEN_BASE, TOKEN_MODELS } from './output-tokens'
@@ -108,5 +109,7 @@ export function outputSize(resolution: Resolution, aspect: string, source?: { wi
   const fixed = OUTPUT_SIZES[resolution][aspect]
   return fixed ? fromTable(fixed) : sizeForRatio(resolution, parseRatio(aspect))
 }
+
+export const sourcePhoto = (input: ProviderInput) => input.photoCount === 0 ? undefined : input.images[0]
 
 export const formatSize = ({ width, height }: OutputSize) => `${width}x${height}`

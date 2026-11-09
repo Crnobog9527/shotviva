@@ -2,6 +2,8 @@ import { z } from 'zod'
 
 import { OUTPUT_ASPECTS, RESOLUTIONS } from './output-options'
 
+export const OPENAI_MAX_REFERENCES = 4
+
 export const imageCapabilitiesSchema = z.object({
   resolutions: z.array(z.enum(RESOLUTIONS)).min(1),
   aspectRatios: z.array(z.enum(OUTPUT_ASPECTS)).refine((values) => !values.includes('original')),

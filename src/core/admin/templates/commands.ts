@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { AppError } from '@/core/errors'
+import { isStyleRefKey } from '@/core/templates/style-refs'
 import { logger } from '@/core/logger'
 import { MISSING_COST, providerFloor, floorGuidance, type ProviderFloors } from '@/core/templates/provider-pricing'
 import { creditsBelowFloor, promptInputSchema, templateInputSchema, toggleSetupProblems, type PromptInput } from '@/core/templates'
@@ -53,6 +54,7 @@ export async function saveTemplate(
 ): Promise<void> {
   const template = parseOrThrow(templateInputSchema, payload.template, 'template')
   const prompt = parseOrThrow(promptInputSchema, payload.prompt, 'prompt')
+  if (prompt.styleRefs?.some(ref => !isStyleRefKey(template.id, ref.key))) throw new AppError('INVALID_INPUT', '画风参考图不属于这个模板')
   assertAboveFloor(template, providerFloor(floor, prompt.providerId))
   assertTogglesWired(template, prompt)
   const exists = await repo.templateExists(client, template.id)
