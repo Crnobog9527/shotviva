@@ -69,7 +69,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       schema-fix: ${{ steps.schema.outputs.fix }}
-      schema-head: ${{ steps.schema.outputs.head }}
       schema-tree: ${{ steps.schema.outputs.tree }}
     steps:
       - uses: actions/checkout@v4
@@ -131,19 +130,18 @@ jobs:
   schema-sql:
     name: commit regenerated schema.sql
     needs: [checks, db]
-    if: ${{ !cancelled() && needs.db.outputs.schema-fix == 'true' }}
+    if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && needs.db.outputs.schema-fix == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
       checks: write
     steps:
-      # The tested branch head with full history (blobs on demand) for the migration guards'
-      # merge base; no stored credentials, the push step passes the token itself.
+      # All executable files in the write job come from main. The full fetch includes the
+      # same-repo PR branch. Build its schema-only child using Git objects.
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.db.outputs.schema-head }}
+          ref: refs/heads/main
           fetch-depth: 0
-          filter: blob:none
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
@@ -156,7 +154,7 @@ jobs:
         env:
           FIX_FILE: ${{ runner.temp }}/schema-fix/schema.sql
           TREE: ${{ needs.db.outputs.schema-tree }}
-          OLD_HEAD: ${{ needs.db.outputs.schema-head }}
+          OLD_HEAD: ${{ github.event.pull_request.head.sha }}
           HEAD_REF: ${{ github.head_ref }}
           # Through env, never interpolated into the script: titles are untrusted input.
           PR_TITLE: ${{ github.event.pull_request.title }}
