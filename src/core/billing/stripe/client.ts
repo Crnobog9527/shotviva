@@ -9,7 +9,7 @@ import { AppError } from '../../errors'
 // retrieve/list from fixtures while signatures are still checked by the real SDK.
 export type StripeApi = {
   webhooks: Pick<Stripe['webhooks'], 'constructEvent'>
-  checkout: { sessions: Pick<Stripe['checkout']['sessions'], 'create' | 'retrieve'> }
+  checkout: { sessions: Pick<Stripe['checkout']['sessions'], 'create' | 'retrieve' | 'expire'> }
   prices: Pick<Stripe['prices'], 'list'>
   // T10: renewals, mirror sync, refunds / disputes and the Customer Portal; cancel before an
   // account is deleted (ARCHITECTURE §13).

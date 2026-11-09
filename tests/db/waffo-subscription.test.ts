@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 
 import { lookupUser } from '@/core/admin/users/lookup'
 import { cancelWaffoSubscription, handleWaffoWebhook, type WaffoWebhookDeps } from '@/core/billing/waffo'
+import { paymentCodeEffects } from '@/core/billing'
 import { site } from '@/site/site.config'
 
 import { WAFFO_STORE, paymentId, signWaffo, subscriptionPaid, subscriptionState, waffoKeys } from '../fakes/waffo'
@@ -27,7 +28,8 @@ afterAll(async () => {
 })
 
 beforeEach(() => {
-  deps = { db: serviceSupabase(), products: site.billing.products, publicKey: keys.publicKey, storeId: WAFFO_STORE, mode: 'test', trackBuy: vi.fn() }
+  const admin = serviceSupabase()
+  deps = { db: admin, applyCodes: paymentCodeEffects(admin, site.growth.invite), products: site.billing.products, publicKey: keys.publicKey, storeId: WAFFO_STORE, mode: 'test', trackBuy: vi.fn() }
 })
 
 const daysFromNow = (date: Date | null) => ((date?.getTime() ?? 0) - Date.now()) / DAY_MS

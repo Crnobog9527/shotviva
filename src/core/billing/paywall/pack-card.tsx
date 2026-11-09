@@ -5,6 +5,7 @@ import type { ReactNode } from "react"
 
 import type { PackProduct } from "../../config"
 import { perCreditUsd, type PackLook } from "./offer"
+import { useProductDiscount } from "./discount-context"
 import { useMoney } from "./use-money"
 
 type Props = { pack: PackProduct; look: PackLook; selected?: boolean; action?: ReactNode }
@@ -14,6 +15,8 @@ type Props = { pack: PackProduct; look: PackLook; selected?: boolean; action?: R
 export function PackCard({ pack, look, selected = false, action }: Props) {
   const t = useTranslations("paywall")
   const money = useMoney()
+  const discount = useProductDiscount(pack)
+  const effective = discount ? { ...pack, priceUsd: discount.priceUsd } : pack
   return (
     <span className="pack-card" data-tone={look.tone === "graphite" ? undefined : look.tone} data-selected={selected}>
       {look.flag ? (
@@ -28,8 +31,12 @@ export function PackCard({ pack, look, selected = false, action }: Props) {
           u: (chunks) => <span className="ml-1.5 text-caption text-muted-foreground">{chunks}</span>,
         })}
       </span>
-      <span className="pack-usd text-body leading-none font-semibold">{money(pack.priceUsd)}</span>
-      <span className="pack-each font-mono text-caption leading-none font-medium">{t("perCreditShort", { price: money(perCreditUsd(pack)) })}</span>
+      <span className="pack-usd text-body leading-none font-semibold">
+        {discount && <s className="mr-1.5 text-caption font-normal text-muted-foreground">{money(pack.priceUsd)}</s>}
+        {money(effective.priceUsd)}
+        {discount && <small className="mt-1 block text-caption font-normal text-bone-dim">{t("codeOnce")}</small>}
+      </span>
+      <span className="pack-each font-mono text-caption leading-none font-medium">{t("perCreditShort", { price: money(perCreditUsd(effective)) })}</span>
       {action ? <span className="pack-act block">{action}</span> : null}
     </span>
   )

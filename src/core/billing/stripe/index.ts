@@ -30,6 +30,7 @@ export {
   type CheckoutClient,
   type CheckoutDeps,
 } from './checkout'
+export { checkoutToken, DISCOUNT_CANCEL_COOKIE, discountedCancelSession, expireAndRelease } from './checkout-discount'
 export { CANCEL_COOKIE, cancelReturnUrl, handleCancelReturn, type CancelReturn, type CancelTrack } from './cancel-return'
 export { managedPaymentsEnabled, stripeClient, stripeWebhookSecret, termsConsentEnabled, wechatPayEnabled, type StripeApi } from './client'
 export { fulfilCheckoutSession, type FulfilDeps, type FulfilOutcome } from './fulfil'

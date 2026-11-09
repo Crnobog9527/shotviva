@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
 import { errorResponse } from '@/core/api-response'
+import { paymentCodeEffects } from '@/core/billing'
 import { createAdminSupabase } from '@/core/auth'
 import { stripeClient } from '@/core/billing/stripe'
 import { cancelOtherSubscriptions, cancelRefundedSubscription, refuseEndedOrder, type EndedOrderInput, type KeepSubscription } from '@/core/billing/subscription'
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest) {
     const cancelRefunded = (userId: string, target: KeepSubscription) => cancelRefundedSubscription(cancelDeps, userId, target)
     // An order an upgrade ended that comes back (a charge, a resume) grants nothing (T66).
     const refuseEnded = (input: EndedOrderInput) => refuseEndedOrder({ admin: db, waffo: () => waffoClient() }, input)
-    deps = { ...waffoWebhookConfig(), db, products: site.billing.products, cancelOthers, cancelRefunded, refuseEnded }
+    deps = { ...waffoWebhookConfig(), db, applyCodes: paymentCodeEffects(db, site.growth.invite), products: site.billing.products, cancelOthers, cancelRefunded, refuseEnded }
   } catch (error) {
     // Missing keys: 500 so Waffo keeps retrying while the environment is fixed.
     return errorResponse(error, 'webhooks/waffo')

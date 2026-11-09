@@ -30,6 +30,7 @@ const orderSchema = z.object({
   orderMetadata: metadataSchema,
   currency: z.string().regex(/^[A-Za-z]{3}$/).optional(),
   paymentStatus: z.string().optional(),
+  periodNumber: z.number().int().positive().optional(),
   // "2026-03-10": when the charge was taken, for refusing a charge on an order an upgrade ended (T66).
   paymentDate: z.string().optional(),
   paymentMethod: z.string().optional(),

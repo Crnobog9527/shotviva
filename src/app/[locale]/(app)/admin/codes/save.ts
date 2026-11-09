@@ -1,12 +1,13 @@
 import 'server-only'
 
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
-import { saveCode } from '@/core/codes/server'
+import { stripeClient } from '@/core/billing/stripe'
+import { saveCampaignWithCoupon } from '@/core/codes/server'
 import { site } from '@/site/site.config'
 
-// Called by the admin workflow after it provisions any Stripe coupon. Catalog and actor
+// The admin workflow provisions coupons on the Stripe account for this deployment. Catalog and actor
 // always come from the server, including for edits that only change a note or expiry date.
 export async function saveCampaignCode(codeId: string, fields: unknown) {
   const actor = await requireAdmin()
-  return saveCode(createAdminSupabase(), actor.id, codeId, fields, site.billing.products)
+  return saveCampaignWithCoupon(createAdminSupabase(), actor.id, codeId, fields, site.billing.products, () => stripeClient().coupons)
 }

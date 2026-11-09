@@ -7,6 +7,8 @@ import { trackPaywallSelect } from "../../analytics/browser"
 import type { SiteProduct } from "../../config"
 import { ResponsiveSheet } from "../../ui/responsive-sheet"
 import { usePushBack } from "../../ui/use-push-back"
+import { DiscountProvider } from "./discount-context"
+import { DiscountBanner, DiscountEntry } from "./discount-controls"
 import { BillingToggle } from "./billing-toggle"
 import { packOffers, tierOffers, yearlySavingPct } from "./offer"
 import { PayMethods } from "./pay-methods"
@@ -29,7 +31,11 @@ type Props = {
 // bottom drawer on phones and a centred 920px dialog from md (ResponsiveSheet `wide`). Monthly /
 // Yearly beside the title; the three tiers; the three packs; the payment method; and the
 // checkout bar fixed at the bottom, which goes to the hosted checkout (Stripe or Waffo).
-export function PaywallSheet({ open, onOpenChange, trigger, products, wishlistLive, state }: Props) {
+export function PaywallSheet(props: Props) {
+  return <DiscountProvider active={props.open}><SheetBody {...props} /></DiscountProvider>
+}
+
+function SheetBody({ open, onOpenChange, trigger, products, wishlistLive, state }: Props) {
   const t = useTranslations("paywall")
   const offers = tierOffers(products)
   const packs = packOffers(products)
@@ -61,9 +67,11 @@ export function PaywallSheet({ open, onOpenChange, trigger, products, wishlistLi
       }
       footer={resolved ? <PaywallCheckout resolved={resolved} choice={choice} /> : null}
     >
+      <DiscountBanner singlePayment={choice.method === "alipay"} />
       <TierPicker offers={offers} wishlistLive={wishlistLive} state={picking} />
       <PackPicker packs={packs} state={picking} />
       <PayMethods method={choice.method} onChange={(method) => update({ method })} kind={resolved?.kind ?? "plan"} period={choice.period} />
+      <DiscountEntry />
     </ResponsiveSheet>
   )
 }

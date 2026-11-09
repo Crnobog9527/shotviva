@@ -2,6 +2,7 @@ import type { Client } from 'pg'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { handleWaffoWebhook, type WaffoWebhookDeps } from '@/core/billing/waffo'
+import { paymentCodeEffects } from '@/core/billing'
 import { site } from '@/site/site.config'
 
 import { WAFFO_STORE, orderCompleted, paymentId, refundSucceeded, signWaffo, waffoKeys } from '../fakes/waffo'
@@ -28,7 +29,8 @@ afterAll(async () => {
 
 beforeEach(() => {
   trackBuy = vi.fn<NonNullable<WaffoWebhookDeps['trackBuy']>>()
-  deps = { db: serviceSupabase(), products: site.billing.products, publicKey: keys.publicKey, storeId: WAFFO_STORE, mode: 'test', trackBuy }
+  const admin = serviceSupabase()
+  deps = { db: admin, applyCodes: paymentCodeEffects(admin, site.growth.invite), products: site.billing.products, publicKey: keys.publicKey, storeId: WAFFO_STORE, mode: 'test', trackBuy }
 })
 
 const daysFromNow = (date: Date | null) => ((date?.getTime() ?? 0) - Date.now()) / DAY_MS

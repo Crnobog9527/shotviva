@@ -21,3 +21,7 @@ export function trackCheckoutCancel(userId: string, props: EventProps<'checkout_
 export function trackPurchase(userId: string, props: EventProps<'purchase'>, locale: Locale): void {
   track('purchase', props, { distinctId: userId, locale })
 }
+
+export function trackInviteReward(inviterId: string, props: EventProps<'invite_reward'>, locale: Locale): void {
+  track('invite_reward', props, { distinctId: inviterId, locale })
+}
