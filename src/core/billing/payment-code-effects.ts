@@ -20,7 +20,11 @@ type Payment = {
   amountDiscount: number
 }
 
-const applied = z.object({ applied: z.boolean(), rewarded: z.boolean(), conflict: z.boolean() })
+const outcome = z.object({ applied: z.boolean(), conflict: z.boolean() })
+const applied = z.discriminatedUnion('rewarded', [
+  outcome.extend({ rewarded: z.literal(false) }),
+  outcome.extend({ rewarded: z.literal(true), inviter_id: z.uuid(), reward_credits: z.int().positive() }),
+])
 export type ApplyPaymentCodes = (payment: Payment) => Promise<void>
 
 // Both settlement RPCs predate T94. Their provider references uniquely identify the
@@ -38,14 +42,6 @@ export function paymentCodeEffects(admin: SupabaseClient, invite: InviteConfig, 
     }, applied)
     if (result.applied && result.conflict) logger.warn('billing.code_discount_conflict', { payment_id: id, code_id: payment.codeId })
     if (!result.rewarded) return
-    // Analytics is best effort. The RPC has already committed the reward even when
-    // the inviter deletes their account before this lookup.
-    const reward = await admin.from('code_redemptions').select('inviter_user_id')
-      .eq('user_id', payment.userId).eq('kind', 'invite').eq('inviter_reward_payment_id', id).single()
-    if (!reward.data?.inviter_user_id) {
-      logger.warn('billing.invite_reward_analytics_missing', { payment_id: id })
-      return
-    }
-    trackReward(reward.data.inviter_user_id, { credits: invite.inviterCredits, product_id: payment.productId }, payment.locale)
+    trackReward(result.inviter_id, { credits: result.reward_credits, product_id: payment.productId }, payment.locale)
   }
 }

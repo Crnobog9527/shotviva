@@ -241,6 +241,7 @@
   },
   "app": {
     "signupCodes": {
+      "noInviteGift": "Valid invite. No extra signup credits are currently offered.",
       "toggle": "Have an invite or promo code?",
       "label": "Invite or promo code",
       "checking": "Checking your code…",
@@ -268,7 +269,7 @@
       "invite": {
         "title": "Invite friends",
         "showLink": "Your invite link and rewards",
-        "rule": "Friends get {invitee} extra free credits when they join. You get {inviter} paid credits after their first purchase.",
+        "rule": "{invitee, plural, =0 {Friends can join with your link without a signup bonus.} one {Friends get # extra free credit when they join.} other {Friends get # extra free credits when they join.}} {inviter, plural, =0 {First-purchase rewards are off.} one {You get # paid credit after their first purchase.} other {You get # paid credits after their first purchase.}}",
         "copy": "Copy link",
         "share": "Share link",
         "copied": "Link copied.",
@@ -286,6 +287,7 @@
         "more": "Show more friends"
       },
       "redeem": {
+        "inviteLinked": "Invite linked. No extra signup credits were awarded.",
         "title": "Redeem a code",
         "label": "Invite, promo or gift code",
         "button": "Redeem",

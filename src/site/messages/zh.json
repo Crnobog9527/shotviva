@@ -241,6 +241,7 @@
   },
   "app": {
     "signupCodes": {
+      "noInviteGift": "邀请码有效，当前无额外注册赠分。",
       "toggle": "有邀请码或优惠码？",
       "label": "邀请码或优惠码",
       "checking": "正在核对这个码…",
@@ -268,7 +269,7 @@
       "invite": {
         "title": "邀请好友",
         "showLink": "我的邀请链接与奖励",
-        "rule": "好友注册时多得 {invitee} 个免费积分。好友首次付款后，你得 {inviter} 个付费积分。",
+        "rule": "{invitee, plural, =0 {好友可用链接注册，当前无邀请注册奖励。} other {好友注册时多得 # 个免费积分。}}{inviter, plural, =0 {当前未开启好友首付奖励。} other {好友首次付款后，你得 # 个付费积分。}}",
         "copy": "复制链接",
         "share": "分享链接",
         "copied": "链接已复制。",
@@ -286,6 +287,7 @@
         "more": "查看更多好友"
       },
       "redeem": {
+        "inviteLinked": "已绑定邀请，本次无额外注册赠分。",
         "title": "兑换码",
         "label": "邀请码、优惠码或赠分码",
         "button": "兑换",
