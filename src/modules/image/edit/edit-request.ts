@@ -7,6 +7,7 @@ import { OUTPUT_ASPECTS, RESOLUTIONS, type OutputAspect, type Resolution } from 
 // characters after trimming) are checked in runEdit so the message can say which one failed.
 export const editBodySchema = z.object({
   job_id: z.uuid().optional(),
+  expected_credits: z.int().positive().optional(),
   source_job_id: z.uuid(),
   instruction: z.string().max(2000),
   // Omitted means the source work's own tier.
@@ -18,6 +19,7 @@ export const editBodySchema = z.object({
 export type EditRequest = {
   userId: string
   jobId?: string
+  expectedCredits?: number
   sourceJobId: string
   instruction: string
   resolution?: Resolution
@@ -30,6 +32,7 @@ export function toEditRequest(userId: string, body: z.infer<typeof editBodySchem
   return {
     userId,
     jobId: body.job_id,
+    expectedCredits: body.expected_credits,
     sourceJobId: body.source_job_id,
     instruction: body.instruction,
     resolution: body.resolution,

@@ -29,6 +29,7 @@ export type ShownThread = TicketSummary & { messages: ShownMessage[] }
 
 // What the submit form offers to attach: the author's own payments and works.
 export type PaymentOption = {
+  grantedCredits?: number | null
   id: string
   productId: string
   amountTotal: number

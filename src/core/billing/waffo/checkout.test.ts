@@ -131,3 +131,16 @@ describe('normalizePem', () => {
     expect(normalizePem(bare, 'PRIVATE')).toMatch(/^-----BEGIN PRIVATE KEY-----\n/)
   })
 })
+
+it('passes the same member price and signed-service metadata to the hosted session', async () => {
+  const { deps, create } = harness()
+  await createWaffoCheckout(deps, { userId: USER, body: body('pack_l'), quote: { credits: 4990, cents: 4242, memberTier: 'max' } })
+  expect(create.mock.calls[0]?.[0]).toMatchObject({ priceSnapshot: { amount: '42.42', taxIncluded: false }, allowPromotionCodes: false,
+    metadata: { product_id: 'pack_l', pricing_version: 'v2', quoted_usd_cents: '4242', pack_member_tier: 'max' } })
+})
+
+it('turns off subscription trials explicitly on every new v2 contract', async () => {
+  const { deps, create } = harness()
+  await createWaffoCheckout(deps, { userId: USER, body: body('starter_monthly'), quote: { credits: 1990, cents: 1990, memberTier: null } })
+  expect(create.mock.calls[0]?.[0]).toMatchObject({ withTrial: false, includePaymentMethods: ['card'], orderMerchantExternalId: 'v2_order-ref-1' })
+})

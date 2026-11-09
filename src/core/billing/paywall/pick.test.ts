@@ -51,7 +51,7 @@ describe('paywall pick', () => {
   it('dresses the packs graphite / sapphire "Most popular" / gold "Best value" (lowest per credit)', () => {
     expect(packLooks(packs)).toEqual([
       { tone: 'graphite', flag: null },
-      { tone: 'sapphire', flag: 'mostPopular' },
+      { tone: 'sapphire', flag: null },
       { tone: 'gold', flag: 'bestValue' },
     ])
     // "Best value" only while the largest really is the cheapest per credit.

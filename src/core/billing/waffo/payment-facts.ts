@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { PRODUCT_IDS, type SiteProduct } from '../../config'
 import { AppError } from '../../errors'
+import type { CheckoutPrice } from '../checkout-price'
 import type { CheckoutMethod } from '../stripe/catalog'
 
 // What a signed order.completed says was bought and paid (docs.waffo.ai "Webhooks", data
@@ -21,13 +22,16 @@ function fromJson(value: unknown): unknown {
 // `locale` is analytics only (ARCHITECTURE §16.2); orders created before T21 have none.
 export const metadataSchema = z.preprocess(
   fromJson,
-  z.object({ user_id: z.uuid(), product_id: z.enum(PRODUCT_IDS), locale: z.enum(['en', 'zh']).catch('en').default('en') }),
+  z.object({ user_id: z.uuid(), product_id: z.enum(PRODUCT_IDS),
+    quoted_credits: z.string().optional(), pricing_version: z.string().optional(), quoted_usd_cents: z.string().optional(), pack_member_tier: z.string().optional(),
+    locale: z.enum(['en', 'zh']).catch('en').default('en') }),
 )
 const money = z.string().regex(/^\d{1,7}(\.\d{1,2})?$/)
 
 const orderSchema = z.object({
   orderId: z.string().min(1),
   orderMetadata: metadataSchema,
+  orderMerchantExternalId: z.string().optional(),
   currency: z.string().regex(/^[A-Za-z]{3}$/).optional(),
   paymentStatus: z.string().optional(),
   periodNumber: z.number().int().positive().optional(),
@@ -54,6 +58,7 @@ export type WaffoPaymentFacts = {
 export function readWaffoOrder(eventId: string, data: unknown): WaffoOrder {
   const order = orderSchema.safeParse(data)
   if (!order.success) throw new AppError('INVALID_INPUT', `waffo order ${eventId}: metadata`)
+  if (order.data.orderMerchantExternalId?.startsWith('v2_') && order.data.orderMetadata.pricing_version !== 'v2') throw new AppError('INVALID_INPUT', 'Missing Waffo order pricing version')
   return order.data
 }
 
@@ -68,14 +73,22 @@ export function chargedMethod(order: Pick<WaffoOrder, 'paymentMethod' | 'payment
   return brand.includes('alipay') ? 'alipay' : 'card'
 }
 
-// A paid order is never refused for a missing amount: the site price stands in for it.
-export function paymentFacts(order: WaffoOrder, product: SiteProduct): WaffoPaymentFacts {
+const legacyAnnualCents: Partial<Record<SiteProduct['id'], number>> = { starter_yearly: 19100, pro_yearly: 47900, max_yearly: 71300 }
+
+function legacyPriceCents(product: SiteProduct) {
+  return legacyAnnualCents[product.id] ?? Math.round(product.priceUsd * 100)
+}
+
+// A legacy paid order is never refused for a missing amount: the site price stands in for it.
+export function paymentFacts(order: WaffoOrder, product: SiteProduct, quote?: CheckoutPrice): WaffoPaymentFacts {
   const list = order.listPrice
-  const fallback = Math.round(product.priceUsd * 100)
+  // Legacy signed notifications could omit totals. Keep the agreed v1 annual price on those retries.
+  const fallback = legacyPriceCents(product)
   const total = order.chargedAmount ?? list?.total
   const amountTotal = total ? toCents(total) : fallback
   const amountTax = Math.min(list?.taxAmount ? toCents(list.taxAmount) : 0, amountTotal)
   const subtotal = list?.subtotal ? toCents(list.subtotal) : amountTotal - amountTax
+  if (quote) verifyCharge(order, quote.cents, subtotal, amountTotal - amountTax)
   return {
     orderId: order.orderId,
     amountTotal,
@@ -84,4 +97,9 @@ export function paymentFacts(order: WaffoOrder, product: SiteProduct): WaffoPaym
     method: chargedMethod(order),
     subtotalUsd: subtotal / 100,
   }
+}
+
+function verifyCharge(order: WaffoOrder, quoted: number, subtotal: number, net: number) {
+  if (!order.chargedAmount || order.currency?.toLowerCase() !== 'usd') throw new AppError('INVALID_INPUT', 'Missing USD charge for quoted order')
+  if (net !== quoted || subtotal !== quoted) throw new AppError('INVALID_INPUT', 'Paid Waffo amount differs from quoted price')
 }

@@ -10,7 +10,7 @@ import { localizePath } from '@/core/i18n'
 import { currentLocale } from '@/core/i18n/server'
 import { JsonLdScript, breadcrumbListLd, faqPageLd, pageMetadata } from '@/core/seo'
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
-import { creditFacts, fillCredits, homePageIn, pricingFaqIn, pricingPageIn, withCatalogueTiers } from '@/site/content'
+import { creditFacts, fillCredits, homePageIn, pricingFaqIn, pricingPageIn } from '@/site/content'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { site } from '@/site/site.config'
 
@@ -61,7 +61,7 @@ export default async function PricingPage() {
         actions={{ submit: submitInquiryAction, prefill: inquiryPrefillAction }}
       />
       <div className="mt-6 grid gap-6 md:mt-8 md:grid-cols-2 md:items-start md:gap-8">
-        <CreditBuys block={withCatalogueTiers(page.creditBuys, catalogue)} />
+        <CreditBuys block={page.creditBuys} />
         <PricingPayWith channel={channel} wechatPay={wechatPay} />
       </div>
       {/* The home page's accordion (gap audit B8); every answer stays in the server HTML. */}

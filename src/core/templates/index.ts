@@ -42,8 +42,10 @@ export {
 } from './output-options'
 export {
   TEMPLATE_QUALITIES,
+  assertTemplateQuote,
   creditsBelowFloor,
   creditsCostSchema,
+  type ApprovedTariff,
   type CreditsCost,
   type CreditsFloor,
   type FloorViolation,
@@ -87,3 +89,5 @@ export {
 } from './toggles'
 
 export { allowedWebAspects } from './allowed-web-aspects'
+export { estimatedImageCostsSchema, imageCapabilitiesSchema } from './image-capabilities'
+export { imageCostBudget, maxCostPerCredit, modelCreditFloor, UNPRICED, type ProviderFloors } from './provider-pricing'

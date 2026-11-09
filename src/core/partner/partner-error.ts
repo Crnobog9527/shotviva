@@ -53,6 +53,7 @@ const FROM_APP: Record<ErrorCode, PartnerErrorCode> = {
   AUTH_SMS_FAILED: 'internal',
   AUTH_OTP_INVALID: 'internal',
   CONFLICT: 'invalid_input',
+  TEMPLATE_QUOTE_CHANGED: 'invalid_input',
   RATE_LIMITED: 'rate_limited',
   // The partner contract (§14.6) has no tier code and no partner route is tier-gated; reaching
   // this is a server bug, not something the partner can act on.

@@ -25,6 +25,7 @@ async function render(locale: Locale, element: ReactElement) {
 const facts = (productId: CheckoutFacts['productId'], overrides: Partial<CheckoutFacts> = {}): CheckoutFacts => ({
   productId,
   settled: true,
+  grantedCredits: productId === 'pack_l' ? 115 : 135,
   abandoned: false,
   method: 'card',
   amount: { minor: 4990, currency: 'usd' },
@@ -52,7 +53,8 @@ describe('checkout return page (en)', () => {
     expect(html).toContain('135 credits are in your account. Make something.')
     expect(html).toContain('+135')
     expect(html).toContain('138')
-    expect(html).toContain('Dec 6, 2026 · $49.90')
+    expect(html).toContain('Dec 6, 2026')
+    expect(html).not.toContain('Dec 6, 2026 · $49.90')
     expect(html).toContain('$49.90 · Visa ···· 4242')
     expect(html).toContain('href="https://pay.stripe.com/receipts/r1"')
     expect(html).toContain('Renews automatically. Cancel anytime from Account.')
@@ -82,7 +84,7 @@ describe('checkout return page (en)', () => {
     expect(html).toContain('Confirming your payment')
     expect(html).toContain('Alipay is still confirming it.')
     expect(html).not.toContain('WeChat')
-    expect(html).toContain('Pro · 1 month · 135 credits')
+    expect(html).toContain('Pro · 1 month')
     expect(html).toContain('Check again')
     expect(html).toContain('support@shotviva.com')
   })

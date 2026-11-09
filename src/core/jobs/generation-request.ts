@@ -9,6 +9,7 @@ import { JOB_VISIBILITIES, type JobSource, type JobVisibility } from './job-sche
 // backgrounded request resolves to the same job instead of charging twice.
 export const generateBodySchema = z.object({
   job_id: z.uuid().optional(),
+  expected_credits: z.int().positive().optional(),
   template_id: z.string().min(1).max(64),
   input_key: z.string().min(1).max(200).nullable().optional(),
   inputs: z
@@ -41,6 +42,7 @@ export type GenerationRequest = {
   userId: string
   source: JobSource
   jobId?: string
+  expectedCredits?: number
   templateId: string
   inputKey?: string | null
   copy?: Record<string, unknown>
@@ -68,6 +70,7 @@ export function toGenerationRequest(userId: string, body: z.infer<typeof generat
     userId,
     source: 'web',
     jobId: body.job_id,
+    expectedCredits: body.expected_credits,
     templateId: body.template_id,
     inputKey: body.input_key ?? null,
     copy: body.inputs.copy,

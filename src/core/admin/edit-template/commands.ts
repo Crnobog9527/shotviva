@@ -54,8 +54,8 @@ export async function saveEditTemplate(db: SupabaseClient, adminId: string, inpu
     throw new AppError('INVALID_INPUT', `这些字段没填或不合法：${detail}`)
   }
   const { isActive, creditsCost, wrapper, params } = parsed.data
-  const { quality, providerId } = await loadEditTemplateSettings(db)
-  const low = creditsBelowFloor(quality, creditsCost, providerFloor(floor, providerId))
+  const { quality } = await loadEditTemplateSettings(db)
+  const low = creditsBelowFloor(quality, creditsCost, providerFloor(floor, null, EDIT_TEMPLATE_ID))
   if (low.length > 0) throw new AppError('INVALID_INPUT', `积分低于下限：${low.map((v) => `${v.resolution} ${floorGuidance(v.floor)}`).join('；')}`)
   const { error } = await db.rpc('admin_upsert_template', {
     p_template: { ...FIXED, ...(floor.providers && { price_floors: floor }), quality, credits_cost: creditsCost, is_active: isActive },

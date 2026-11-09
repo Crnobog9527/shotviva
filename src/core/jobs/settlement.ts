@@ -17,6 +17,7 @@ const reserveSchema = z.object({
   userId: z.uuid(),
   module: z.enum(JOB_MODULES),
   templateId: z.string().min(1),
+  expectedCredits: z.number().int().positive().nullish(),
   source: z.enum(JOB_SOURCES),
   inputs: z.record(z.string(), z.unknown()).default({}),
   provider: z.string().min(1).nullable().default(null),
@@ -40,8 +41,8 @@ export async function reserveJob(client: RpcClient, input: ReserveJobInput): Pro
       p_user_id: args.userId,
       p_module: args.module,
       p_template_id: args.templateId,
-      // Ignored since T16: reserve_credits reads templates.credits_cost[inputs.resolution].
-      p_credits_cost: null,
+      // The DB determines the cost; this identifies a stale display without trusting its amount.
+      p_credits_cost: args.expectedCredits ?? null,
       p_source: args.source,
       p_inputs: args.inputs,
       p_provider: args.provider,

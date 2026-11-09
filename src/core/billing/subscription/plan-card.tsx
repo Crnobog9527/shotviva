@@ -61,21 +61,15 @@ function SinceFoot({ facts, withEmail = false, children }: { facts: PassFacts; w
   )
 }
 
-// "50 credits a month · $19.90/mo · Card", from the product the mirror row names; the method
-// (card, Alipay or WeChat Pay, through Stripe or Waffo; 中国银行卡 on zh, "Card" on en, T64) from the newest
-// payment for that same product.
 const METHOD_KEYS = { card: 'card', alipay: 'alipay', wechat_pay: 'wechatPay', cn_card: 'cnCard' } as const
 
+// Historical grants come from the matched ledger entry.
 function PerPeriod({ summary, ctx }: { summary: Subscribed; ctx: Ctx }) {
   const t = useTranslations('app.account.plan')
-  const usd = useNames().usd
-  const product = ctx.products.find((p) => p.tier === summary.tier && p.interval === summary.interval)
-  if (!product || product.priceUsd <= 0) return null
-  const values = { ...richTags, credits: product.credits, interval: summary.interval, price: usd(product.priceUsd) }
   const last = ctx.facts.last
-  const method = last && last.product.id === product.id ? last.method : null
-  if (!method) return <Muted>{t.rich('perPeriod', values)}</Muted>
-  return <Muted>{t.rich('perPeriodMethod', { ...values, method: t(METHOD_KEYS[method]) })}</Muted>
+  if (!last || last.product.tier !== summary.tier || last.product.interval !== summary.interval) return null
+  const method = t(METHOD_KEYS[last.method])
+  return <Muted>{last.grantedCredits == null ? method : t('lastGrant', { credits: last.grantedCredits, method })}</Muted>
 }
 
 function SubscribedPass({ summary, ctx }: { summary: Subscribed; ctx: Ctx }) {

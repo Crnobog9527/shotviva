@@ -4,7 +4,7 @@ import Link from 'next/link'
 
 import { EDIT_TEMPLATE_COPY, EditTemplateEditor, loadEditTemplateSettings } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
-import { readTemplateFloors } from '../pricing'
+import { readTemplateFloors } from '@/site/template-pricing'
 
 import { saveEditTemplateAction } from './actions'
 
@@ -24,7 +24,7 @@ export default async function AdminEditTemplatePage() {
         {EDIT_TEMPLATE_COPY.back}
       </Link>
       <h1 className="text-xl font-semibold">{EDIT_TEMPLATE_COPY.title}</h1>
-      <EditTemplateEditor settings={settings} floor={providerFloor(floor, settings.providerId)} save={saveEditTemplateAction} />
+      <EditTemplateEditor settings={settings} floor={providerFloor(floor, null, 'edit')} save={saveEditTemplateAction} />
     </div>
   )
 }

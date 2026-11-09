@@ -51,7 +51,7 @@ describe('account Plan card', () => {
     expect(html).toContain('data-plan="active"')
     expect(html).toContain('data-tier="starter"')
     expect(text).toContain('Member Renews Dec 6, 2026 Starter')
-    expect(text).toContain('50 credits a month · $19.90 /mo')
+    expect(text).not.toContain('$19.90 /mo')
     expect(text).toContain('Since Nov 2026 · mei@example.test')
     // The word mark debossed into the card, hidden from screen readers.
     expect(html).toMatch(/aria-hidden="true" class="pass-mark">Shotviva\.</)
@@ -60,7 +60,7 @@ describe('account Plan card', () => {
 
   it('yearly prices and credits come from site.config', async () => {
     const { text } = await render(summarize([row({ productId: 'max_yearly', currentPeriodEnd: days(300) })], days(300)))
-    expect(text).toContain('3,360 credits a year · $713 /yr')
+    expect(text).not.toContain('$891 /yr')
   })
 
   it('cancelled at period end: Ends date, what stays, Resubscribe first', async () => {
@@ -94,7 +94,7 @@ describe('account Plan card, Waffo card subscription (T50)', () => {
     const { html, text } = await render(summarize([waffo()], days(30)))
     expect(html).toContain('data-plan="active"')
     expect(text).toContain('Member Renews Dec 6, 2026 Starter')
-    expect(text).toContain('50 credits a month · $19.90 /mo')
+    expect(text).not.toContain('$19.90 /mo')
     expect(buttons(html)).toEqual(['Cancel subscription'])
     expect(text).not.toMatch(/Manage subscription|Stripe/)
   })
@@ -163,7 +163,7 @@ describe('account Plan card without a card subscription', () => {
     // Prices stay in USD in both languages, written "$19.90" like the page copy (ARCHITECTURE §17,
     // 建站规格 G3), never "US$19.90".
     const zh = (await render(summarize([row({})], days(30)), 'zh')).text
-    expect(zh).toContain('每月 50 积分 · $19.90 /月')
+    expect(zh).not.toContain('$19.90 /月')
     expect(zh).not.toContain('US$')
     expect(buttons((await render(summarize([row({ status: 'past_due' })], days(2)), 'zh')).html)).toEqual(['更新付款方式', '管理订阅'])
     expect((await render(summarize([], days(25), 'pro'), 'zh')).text).toContain('专业版')
@@ -181,37 +181,37 @@ describe('account Plan card without a card subscription', () => {
 
 // Gap audit C12: the active card names how the plan is paid, as account.html does.
 describe('account Plan card payment method (gap audit C12)', () => {
-  const paidWith = (productId: string, method: 'card' | 'alipay' | 'cn_card') => lastMembership([{ productId, method }], site.billing.products)
+  const paidWith = (productId: string, method: 'card' | 'alipay' | 'cn_card') => lastMembership([{ productId, method, grantedCredits: 50 }], site.billing.products)
 
   it('an active subscription paid by card says so after the price', async () => {
     const { text } = await render(summarize([row({})], days(30)), 'en', 38, paidWith('starter_monthly', 'card'))
-    expect(text).toContain('50 credits a month · $19.90 /mo · Card')
+    expect(text).toContain('Last payment · 50 credits · Card')
   })
 
   it('names Alipay when that is how the plan was paid', async () => {
     const { text } = await render(summarize([row({ productId: 'pro_yearly', currentPeriodEnd: days(300) })], days(300)), 'en', 38, paidWith('pro_yearly', 'alipay'))
-    expect(text).toContain('/yr · Alipay')
+    expect(text).toContain('50 credits · Alipay')
   })
 
   it('works the same for a Waffo subscription', async () => {
     const waffo = row({ provider: 'waffo', stripeSubscriptionId: null, waffoOrderId: 'ORD_1' })
-    expect((await render(summarize([waffo], days(30)), 'en', 38, paidWith('starter_monthly', 'alipay'))).text).toContain('/mo · Alipay')
+    expect((await render(summarize([waffo], days(30)), 'en', 38, paidWith('starter_monthly', 'alipay'))).text).toContain('50 credits · Alipay')
   })
 
   it('says nothing about the method when the newest payment is for another product', async () => {
     const { text } = await render(summarize([row({})], days(30)), 'en', 38, paidWith('max_yearly', 'card'))
-    expect(text).toContain('50 credits a month · $19.90 /mo')
+    expect(text).not.toContain('$19.90 /mo')
     expect(text).not.toMatch(/· (Card|Alipay)/)
   })
 
   it('speaks Chinese', async () => {
-    expect((await render(summarize([row({})], days(30)), 'zh', 38, paidWith('starter_monthly', 'card'))).text).toContain('/月 · 银行卡')
+    expect((await render(summarize([row({})], days(30)), 'zh', 38, paidWith('starter_monthly', 'card'))).text).toContain('50 积分 · 银行卡')
   })
 
   // T64: a 中国银行卡 (plain Stripe card) subscription names it on zh and reads "Card" on en.
   it('names 中国银行卡 on zh and Card on en for a cn_card subscription', async () => {
     const cn = paidWith('starter_monthly', 'cn_card')
-    expect((await render(summarize([row({})], days(30)), 'zh', 38, cn)).text).toContain('/月 · 中国银行卡')
-    expect((await render(summarize([row({})], days(30)), 'en', 38, cn)).text).toContain('$19.90 /mo · Card')
+    expect((await render(summarize([row({})], days(30)), 'zh', 38, cn)).text).toContain('50 积分 · 中国银行卡')
+    expect((await render(summarize([row({})], days(30)), 'en', 38, cn)).text).toContain('Last payment · 50 credits · Card')
   })
 })

@@ -1,10 +1,11 @@
 import type { CreditBuysBlock, FaqItem } from '@/core/content'
 import type { BusinessBlock } from '@/core/content/business'
 
+import { perHundredCredits } from '../offer'
 import { site } from '../../site.config'
 import type { PricingContent } from '../pricing'
 import { zhBusinessForm } from './business-form'
-import { ZH_TIERS, zhFreeImages, zhFromCredits, zhPackFrom, zhTierList, zhYearlySaving } from './offer'
+import { zhFreeImages, zhFromCredits, zhPackFrom, zhTierList, zhYearlySaving } from './offer'
 
 // /zh/pricing (T21, laid out as comps-v3-b pricing.html in T37). Keyword 「Shotviva 价格」;
 // every figure from site.config through offer.ts, in US dollars only, never converted to RMB
@@ -12,10 +13,8 @@ import { ZH_TIERS, zhFreeImages, zhFromCredits, zhPackFrom, zhTierList, zhYearly
 const brand = site.brand.name
 
 const creditBuys: CreditBuysBlock = {
-  heading: '一个积分能买什么',
-  tiers: ZH_TIERS.map((tier) => ({ name: tier.name, credits: tier.credits })),
-  unit: '积分',
-  note: `大多数模板每张图的消耗，分别对应 ${ZH_TIERS.map((tier) => tier.px).join('、')} px。同一清晰度下，任何尺寸和比例的价格都一样。`,
+  heading: '生成一张图需要多少积分？',
+  note: '用多少积分取决于模板和清晰度。选好后，生成按钮会显示这次需要的积分。',
 }
 
 // 能为企业安排的事，不是现成功能（Owner 2026-11-06：还没有后台和代码），所以不写 SLA、单点登录、团队账号。
@@ -47,7 +46,8 @@ const faq: readonly FaqItem[] = [
   },
   {
     question: '不订阅能单买积分吗？',
-    answer: '可以。积分包是一次性付款，所有人都能买，得到的付费积分和套餐里的一样。',
+    answer: site.billing.pricingVersion ? `可以。积分包是一次性付款，所有人都能买，得到的付费积分和套餐里的一样。积分包按标价折算，每 100 积分约 ${perHundredCredits('pack_s')}。小包按原价购买。中包和大包按当前会员等级享折扣，入门版 95 折、专业版 9 折、旗舰版 85 折。会员折扣只影响价格，各积分包的积分数量固定。`
+      : '可以。积分包是一次性付款，所有人都能买，得到的付费积分和套餐里的一样。',
   },
   {
     question: ALIPAY_QUESTION,

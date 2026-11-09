@@ -102,3 +102,25 @@ export function serverEnv(): ServerEnv {
   cached ??= parseServerEnv(process.env)
   return cached
 }
+
+// Only the dispatch runner invokes this reader. A normal web deployment has no sync keys.
+export function templateSyncEnv() {
+  const endpoint = z.object({
+    serviceKey: z.string().min(1), accountId: z.string().regex(/^[0-9a-f]{32}$/),
+    accessKeyId: z.string().min(1), secretAccessKey: z.string().min(1),
+    base: z.url({ protocol: /^https$/ }).transform(url => url.replace(/\/+$/, '')),
+  })
+  function read(prefix: 'SYNC_PREVIEW_' | 'SYNC_PRODUCTION_', base: string | undefined) {
+    return endpoint.parse({
+      serviceKey: process.env[prefix + 'SERVICE_KEY'], accountId: process.env[prefix + 'R2_ACCOUNT_ID'],
+      accessKeyId: process.env[prefix + 'R2_ACCESS_KEY_ID'], secretAccessKey: process.env[prefix + 'R2_SECRET_ACCESS_KEY'],
+      base,
+    })
+  }
+  return {
+    ids: z.string().min(1).parse(process.env.SYNC_IDS),
+    runId: z.string().regex(/^\d+$/).parse(process.env.GITHUB_RUN_ID),
+    preview: read('SYNC_PREVIEW_', process.env.SYNC_PREVIEW_ASSETS_BASE),
+    production: read('SYNC_PRODUCTION_', 'https://shotviva.com/assets'),
+  }
+}

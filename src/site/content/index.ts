@@ -18,9 +18,9 @@ export function findContentPage(slug: string): ContentPage | undefined {
 
 export { homePage }
 export { pricingFaq, pricingPage } from './pricing'
-export { freeStandardImages, type CreditFacts } from './offer'
+export { type CreditFacts } from './offer'
 export { featuredSections, featuredTemplates, tryTemplates } from './home-templates'
-export { creditFacts, fillCredits, withCatalogueTiers } from './credits'
+export { creditFacts, fillCredits } from './credits'
 
 // Module ownership of each page, fed to the indexing switch, sitemap and llms.txt.
 export const pageGates = [homePage, ...contentPages].map(pageGate)

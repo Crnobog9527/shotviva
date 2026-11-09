@@ -3,7 +3,7 @@ import { defineContentPage, type CostBills } from '@/core/content'
 import { site } from '../../../site.config'
 import { CATEGORY, pairImage, SIZE_COUNT } from '../../landing-shared'
 import { zhPricingRelated } from '../shared'
-import { foodHalfDayUsd, MENU_DISHES, menuCostUsd, menuCredits, photoSeconds, photosLeftAfterMenu, planFrom, usd, usdRange } from '../../offer'
+import { foodHalfDayUsd, MENU_DISHES, photoSeconds, planFrom, usd, usdRange } from '../../offer'
 import { PLATFORM_SPECS, px } from '../../platform-specs'
 import { ZH_TIERS, zhFreeImages, zhFromCredits, zhTierList } from '../offer'
 
@@ -11,7 +11,7 @@ import { ZH_TIERS, zhFreeImages, zhFromCredits, zhTierList } from '../offer'
 // ai菜单). For restaurant owners who put dishes on delivery apps; the US apps' figures are kept
 // because they are what the page is about. Same prices as the English page, in US dollars.
 const brand = site.brand.name
-const [standard, hd] = ZH_TIERS
+const [, hd] = ZH_TIERS
 const { doordash, uberEats, grubhub } = PLATFORM_SPECS
 
 function menuBills(): CostBills {
@@ -34,8 +34,8 @@ function menuBills(): CostBills {
       total: { amount: plan, suffix: '/月起', when: `每张 ${photoSeconds} 秒左右` },
       lines: [
         { label: `入门版，每月 ${planFrom?.credits ?? ''} 积分`, value: plan },
-        { label: `${MENU_DISHES} 道菜，${standard?.name ?? ''}`, value: `${menuCredits} 积分 ≈ ${menuCostUsd}` },
-        { label: '这个月还能再做', value: `${photosLeftAfterMenu} 张` },
+        { label: '准备原图', value: '每道菜一张手机照' },
+        { label: '可做成', value: '菜单图、外卖图、促销海报' },
       ],
       fine: `每道菜在出菜口用手机拍一张，光线和造型交给模板。先用 ${zhFreeImages}试试，不用绑卡。`,
     },

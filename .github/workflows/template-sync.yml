@@ -1,0 +1,61 @@
+name: Sync preview templates to production
+run-name: Sync templates ${{ inputs.template_ids }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      template_ids:
+        description: Template IDs, separated by commas or spaces
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  approve:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: template-sync-approval
+    permissions:
+      actions: read
+    steps:
+      # The separate reviewer gate leaves the production migration workflow unattended.
+      # A missing environment/reviewer or an admin bypass produces no Owner review.
+      - name: Verify the Owner approved this run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OWNER_ID: ${{ github.repository_owner_id }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/approvals" |
+            jq -e --arg id "$OWNER_ID" 'any(.[];
+              .state == "approved" and (.user.id | tostring) == $id and
+              any(.environments[]; .name == "template-sync-approval"))' >/dev/null
+
+  sync:
+    needs: approve
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - run: pnpm install --frozen-lockfile
+      - name: Copy covers and commit each template
+        env:
+          SYNC_IDS: ${{ inputs.template_ids }}
+          SYNC_PREVIEW_ASSETS_BASE: ${{ vars.SYNC_PREVIEW_ASSETS_BASE }}
+          OPENAI_IMAGE_MODEL: ${{ vars.OPENAI_IMAGE_MODEL }}
+          SYNC_PREVIEW_SERVICE_KEY: ${{ secrets.SYNC_PREVIEW_SERVICE_KEY }}
+          SYNC_PREVIEW_R2_ACCOUNT_ID: ${{ secrets.SYNC_PREVIEW_R2_ACCOUNT_ID }}
+          SYNC_PREVIEW_R2_ACCESS_KEY_ID: ${{ secrets.SYNC_PREVIEW_R2_ACCESS_KEY_ID }}
+          SYNC_PREVIEW_R2_SECRET_ACCESS_KEY: ${{ secrets.SYNC_PREVIEW_R2_SECRET_ACCESS_KEY }}
+          SYNC_PRODUCTION_SERVICE_KEY: ${{ secrets.SYNC_PRODUCTION_SERVICE_KEY }}
+          SYNC_PRODUCTION_R2_ACCOUNT_ID: ${{ secrets.SYNC_PRODUCTION_R2_ACCOUNT_ID }}
+          SYNC_PRODUCTION_R2_ACCESS_KEY_ID: ${{ secrets.SYNC_PRODUCTION_R2_ACCESS_KEY_ID }}
+          SYNC_PRODUCTION_R2_SECRET_ACCESS_KEY: ${{ secrets.SYNC_PRODUCTION_R2_SECRET_ACCESS_KEY }}
+        run: pnpm exec tsx --conditions=react-server scripts/template-sync/run.ts

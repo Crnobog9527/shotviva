@@ -7,14 +7,14 @@ import type { SubscriptionSummary } from './summary'
 
 // cn_card = 中国银行卡, the zh pages' plain Stripe card route (T64); wechat_pay since T73.
 export type PaymentMethod = 'card' | 'alipay' | 'wechat_pay' | 'cn_card'
-export type PaymentFact = { productId: string; method: PaymentMethod }
-export type LastMembership = { product: MembershipProduct; method: PaymentMethod }
+export type PaymentFact = { productId: string; method: PaymentMethod; grantedCredits?: number | null }
+export type LastMembership = { product: MembershipProduct; method: PaymentMethod; grantedCredits?: number | null }
 
 // Newest first, as the payments list is ordered: the first membership purchase (packs skipped).
 export function lastMembership(payments: readonly PaymentFact[], products: readonly SiteProduct[]): LastMembership | null {
   for (const payment of payments) {
     const product = products.find((p) => p.id === payment.productId)
-    if (product && product.tier !== 'pack') return { product, method: payment.method }
+    if (product && product.tier !== 'pack') return { product, method: payment.method, grantedCredits: payment.grantedCredits }
   }
   return null
 }
@@ -23,13 +23,8 @@ export type Allowance = { credits: number; interval: 'month' | 'year' }
 
 // Paid credits one period of the plan brings: the subscribed product, or for a one-period
 // member the product they last bought when it is the same tier. No plan, no allowance.
-export function planAllowance(summary: SubscriptionSummary, last: LastMembership | null, products: readonly SiteProduct[]): Allowance | null {
-  if (summary.kind === 'subscription') {
-    const product = products.find((p) => p.tier === summary.tier && p.interval === summary.interval)
-    return product && product.interval ? { credits: product.credits, interval: product.interval } : null
-  }
-  if (summary.kind === 'paid_until' && last && last.product.tier === summary.tier) {
-    return { credits: last.product.credits, interval: last.product.interval }
-  }
-  return null
+export function planAllowance(summary: SubscriptionSummary, last: LastMembership | null): Allowance | null {
+  if (last?.grantedCredits == null || (summary.kind !== 'subscription' && summary.kind !== 'paid_until') || summary.tier !== last.product.tier) return null
+  if (summary.kind === 'subscription' && last.product.interval !== summary.interval) return null
+  return { credits: last.grantedCredits, interval: last.product.interval }
 }

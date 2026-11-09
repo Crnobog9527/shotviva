@@ -13,7 +13,7 @@ export const termsBillingSections: readonly LegalSection[] = [
       [
         'You can buy a membership plan (monthly or yearly) or a one-time credit pack. Current plans, prices and credit amounts are on our ',
         pricingLink,
-        '. Prices are in US dollars. Taxes may be added at checkout.',
+        '. Prices are in US dollars. The price and number of credits for each pack are displayed before checkout. Taxes may be added at checkout.',
       ],
       'Payments are taken on pages hosted by our payment providers, Stripe and Waffo. We never see or store your full card number.',
       {

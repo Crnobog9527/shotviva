@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { CategoriesPanel, listAdminCategories, listAdminTemplates, TemplatesEditor } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { pricingFromOptions } from '@/core/admin/templates/provider-pricing'
-import { readPricingOptions } from './pricing'
+import { readPricingOptions } from '@/site/template-pricing'
 import { site } from '@/site/site.config'
 
 import {

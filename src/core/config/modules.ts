@@ -1,5 +1,3 @@
-import { notFound } from 'next/navigation'
-
 import type { ModuleId, SiteConfig } from './define-site'
 
 // Public routes each module owns. A disabled module's routes 404 and never reach the sitemap.
@@ -10,11 +8,6 @@ export const MODULE_ROUTES: Record<ModuleId, readonly string[]> = {
 
 export function isModuleEnabled(site: SiteConfig, id: ModuleId): boolean {
   return site.modules[id]
-}
-
-// Call from a module route's layout so the switch cannot be forgotten page by page.
-export function requireModule(site: SiteConfig, id: ModuleId): void {
-  if (!isModuleEnabled(site, id)) notFound()
 }
 
 // The module owning a path, if any (exact match or a sub-path).

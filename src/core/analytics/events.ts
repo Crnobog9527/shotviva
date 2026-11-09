@@ -128,7 +128,7 @@ export const eventSchemas = {
     method: z.enum(PAYMENT_METHODS),
     amount_usd: z.number().nonnegative(),
     code: campaignCode.optional(), amount_discount_usd: z.number().nonnegative().optional(),
-    credits: z.number().int().nonnegative(),
+    credits: z.number().int().nonnegative().optional(),
   }),
 } as const
 

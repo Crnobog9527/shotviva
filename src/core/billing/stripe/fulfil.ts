@@ -6,15 +6,17 @@ import { z } from 'zod'
 import { trackPurchase } from '../../analytics/funnel'
 import type { SiteProduct } from '../../config'
 import { AppError } from '../../errors'
+import { readQuote, type CheckoutPrice } from '../checkout-price'
 import type { ApplyPaymentCodes } from '../payment-code-effects'
 import type { RpcClient } from '../rpc'
 import type { CancelOthers, CancelRefunded } from '../subscription/cancel-others'
-import { CHECKOUT_METHODS, lookupKey, type CheckoutMethod, type RecordedMethod } from './catalog'
+import { CHECKOUT_METHODS, type CheckoutMethod, type RecordedMethod } from './catalog'
 import type { StripeApi } from './client'
 import type { DisputeEvidenceConfig } from './disputes/config'
 import { sessionDiscount } from './discount-facts'
 import { recordPaymentContext } from './payment-context'
 import { SESSION_EXPAND, sessionFacts } from './payment-facts'
+import { matchesContractPrice } from './prices'
 import { settleCheckout, subscriptionState } from './settle'
 
 // First payment and one-time purchases (ARCHITECTURE §6.1, §6.3): a paid Checkout Session
@@ -42,7 +44,7 @@ export type FulfilDeps = {
 
 export type FulfilOutcome = 'applied' | 'replayed' | 'unpaid'
 
-export type SessionPurchase = { userId: string; product: SiteProduct; method: CheckoutMethod; subscription: Stripe.Subscription | null }
+export type SessionPurchase = { userId: string; product: SiteProduct; quote?: CheckoutPrice; method: CheckoutMethod; subscription: Stripe.Subscription | null }
 
 const metadataSchema = z.object({ user_id: z.uuid(), product_id: z.string(), method: z.enum(CHECKOUT_METHODS) })
 
@@ -62,24 +64,29 @@ function readOwner(session: Stripe.Checkout.Session) {
 function readProduct(session: Stripe.Checkout.Session, productId: string, products: readonly SiteProduct[]) {
   const product = products.find((p) => p.id === productId)
   if (!product) throw invalid(session, 'unknown product')
-  const price = onlyPrice(session)
-  if (price?.metadata?.product_id !== product.id) throw invalid(session, 'line item')
+  const line = onlyLineItem(session)
+  if (!line?.price) throw invalid(session, 'line item')
+  const price = line.price
   const form = session.mode === 'subscription' ? 'subscription' : 'one_time'
-  if (price.lookup_key !== lookupKey(product.id, form)) throw invalid(session, 'lookup key')
-  return product
+  const quote = readQuote(session.metadata ?? {}, product)
+  if (!matchesContractPrice(price, product, form, quote)) throw invalid(session, 'lookup key or quoted price')
+  if (quote && line.quantity !== 1) {
+    throw invalid(session, 'quoted price differs from line item')
+  }
+  return { product, quote }
 }
 
-function onlyPrice(session: Stripe.Checkout.Session): Stripe.Price | null {
+function onlyLineItem(session: Stripe.Checkout.Session) {
   const items = session.line_items?.data ?? []
-  return items.length === 1 ? (items[0]?.price ?? null) : null
+  return items.length === 1 ? items[0] : undefined
 }
 
 export function readPurchase(session: Stripe.Checkout.Session, products: readonly SiteProduct[]): SessionPurchase {
   const owner = readOwner(session)
-  const product = readProduct(session, owner.product_id, products)
+  const { product, quote } = readProduct(session, owner.product_id, products)
   const subscription = typeof session.subscription === 'object' ? session.subscription : null
   if (session.mode === 'subscription' && !subscription) throw invalid(session, 'subscription not expanded')
-  return { userId: owner.user_id, product, method: owner.method, subscription }
+  return { userId: owner.user_id, product, quote, method: owner.method, subscription }
 }
 
 // The webhook has no page: the language is the one the Checkout Session was opened in.
@@ -96,8 +103,12 @@ function track(deps: FulfilDeps, session: Stripe.Checkout.Session, purchase: Ses
     // Before tax: Managed Payments adds tax on top and keeps it.
     amount_usd: discount.amountUsd,
     ...discount.props,
-    credits: product.credits,
+    ...(purchase.quote && { credits: purchase.quote.credits }),
   }, session.locale === 'zh' ? 'zh' : 'en')
+}
+
+function pricingVersionOf(quote?: CheckoutPrice) {
+  return quote ? 'v2' as const : undefined
 }
 
 export async function fulfilCheckoutSession(deps: FulfilDeps, sessionId: string): Promise<FulfilOutcome> {
@@ -110,6 +121,7 @@ export async function fulfilCheckoutSession(deps: FulfilDeps, sessionId: string)
   const change = await settleCheckout(deps.db, {
     userId: purchase.userId,
     productId: purchase.product.id,
+    version: pricingVersionOf(purchase.quote),
     sessionId: session.id,
     subscription: purchase.subscription ? subscriptionState(purchase.subscription) : null,
     payment,

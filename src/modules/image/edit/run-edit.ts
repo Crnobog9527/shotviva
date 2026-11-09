@@ -18,7 +18,7 @@ import {
   type SettleDeps,
 } from '@/core/jobs'
 import { loadOutputImage, outputKeyFor } from '@/core/storage'
-import { allowedWebAspects, DEFAULT_RESOLUTION, instructionSchema, RESOLUTIONS, type Resolution } from '@/core/templates'
+import { assertTemplateQuote, allowedWebAspects, DEFAULT_RESOLUTION, instructionSchema, RESOLUTIONS, type Resolution } from '@/core/templates'
 
 import type { ScopeClassifier } from './classifier'
 import type { EditClassification } from './classify-scope'
@@ -55,6 +55,7 @@ async function prepare(deps: EditDeps, req: EditRequest) {
   const pipeline = await loadEditPipeline(deps.db)
   const aspect = req.aspect ?? sourceAspect(source)
   const resolution = req.resolution ?? sourceResolution(source)
+  assertTemplateQuote(req.expectedCredits, pipeline.template.creditsCost[resolution])
   if (!allowedWebAspects(pipeline.template.imageOptions, resolution).includes(aspect)) {
     throw new AppError('INVALID_INPUT', 'Unsupported edit aspect ratio')
   }
@@ -97,6 +98,7 @@ export async function runEdit(deps: EditDeps, req: EditRequest): Promise<JobView
     userId: req.userId,
     module: prepared.pipeline.template.module,
     templateId: prepared.pipeline.template.id,
+    expectedCredits: req.expectedCredits,
     source: 'web',
     provider: deps.provider.id,
     parentJobId: prepared.source.id,
