@@ -17,13 +17,14 @@ type Props = {
   testing: string | null
   pending: boolean
   onEdit: (provider: AdminProvider) => void
+  onRefresh: (provider: AdminProvider) => void
   onTest: (provider: AdminProvider) => void
   onActivate: (provider: AdminProvider) => void
   onDelete: (provider: AdminProvider) => void
 }
 
 // UTC and fixed, so the server render and the browser agree.
-const formatUpdatedAt = (iso: string) => `${new Date(iso).toISOString().slice(0, 16).replace('T', ' ')} UTC`
+const formatUpdatedAt = (iso: string) => `${new Date(iso).toISOString().slice(0, 19).replace('T', ' ')} UTC`
 
 // Nine columns did not fit at 1280 (T78): the adapter goes under the name (one per module
 // anyway), the address under the model, the update time under the status.
@@ -32,7 +33,7 @@ const COLUMNS = ['label', 'model', 'key', 'prices', 'status'] as const
 // The buttons stay in view while a 1280 window scrolls the table sideways.
 const STICKY = 'sticky right-0 bg-background shadow-[inset_1px_0_0_var(--border)]'
 
-type Handlers = Pick<Props, 'onEdit' | 'onTest' | 'onActivate' | 'onDelete'>
+type Handlers = Pick<Props, 'onEdit' | 'onRefresh' | 'onTest' | 'onActivate' | 'onDelete'>
 type RowProps = { provider: AdminProvider; result: { ok: boolean; text: string } | undefined; testing: string | null; pending: boolean; handlers: Handlers }
 
 // Edit, test, switch and delete for one row, with the last test outcome under them.
@@ -47,6 +48,9 @@ function RowActions({ provider, result, testing, pending, handlers }: RowProps) 
         <Button variant="outline" size="sm" disabled={pending || testing !== null} onClick={() => handlers.onTest(provider)}>
           {testing === provider.id ? COPY.testing : COPY.test}
         </Button>
+        {provider.module === 'image' && (
+          <Button variant="outline" size="sm" disabled={pending} onClick={() => handlers.onRefresh(provider)}>{COPY.refresh}</Button>
+        )}
         {provider.isActive ? null : (
           <Button size="sm" disabled={pending} onClick={() => handlers.onActivate(provider)}>
             {COPY.activate}
@@ -102,6 +106,9 @@ export function ProvidersTable({ providers, testResults, testing, pending, ...ha
               <TableCell className="font-mono text-xs">
                 <div>{provider.model}</div>
                 {provider.module === 'image' && <div className="text-muted-foreground">{provider.resolutions.join(' / ').toUpperCase()}</div>}
+                {provider.module === 'image' && <div className="text-muted-foreground">
+                  {provider.capabilities ? COPY.fetched + ' ' + formatUpdatedAt(provider.capabilities.fetchedAt) : COPY.neverFetched}
+                </div>}
                 <div className="text-muted-foreground w-48 break-all whitespace-normal">{provider.baseUrl}</div>
               </TableCell>
               <TableCell className="font-mono text-xs">{COPY.keyMasked(provider.apiKeyLast4)}</TableCell>

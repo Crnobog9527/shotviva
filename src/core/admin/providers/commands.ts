@@ -8,20 +8,16 @@ import {
   activateProvider,
   adminDeleteProvider,
   assertPublicBaseUrl,
-  deleteProvider,
+  fetchImageCapabilities,
   findProvider,
   findProviderRow,
-  insertProvider,
   listProviders,
   openRouterModelTiers,
   ProviderSettingError,
   readProviderKey,
-  setProviderKey,
   testConnection,
-  updateProvider,
   type ConnectionResult,
   type HostResolver,
-  type ProviderWrite,
 } from '@/core/providers'
 
 import { lookupModelSchema, providerIdSchema, saveProviderSchema } from './schema'
@@ -44,55 +40,30 @@ function parseOrThrow<T>(schema: z.ZodType<T>, value: unknown): T {
   throw new ProviderSettingError(keyIssue ? 'api_key_invalid' : 'invalid_input', detail)
 }
 
-// A new row is inserted first, then its key goes into Vault. If storing the key fails, the
-// keyless row is removed again so the list never shows a provider that cannot run.
-async function insertWithKey(db: SupabaseClient, write: ProviderWrite, apiKey: string): Promise<string> {
-  const id = await insertProvider(db, write)
-  try {
-    await setProviderKey(db, id, apiKey)
-  } catch (error) {
-    await deleteProvider(db, id).catch(() => undefined)
-    throw error
-  }
-  return id
-}
-
 // Previews the same catalogue entry save validates, without ever reading a Vault key.
 export async function lookupProviderModel(input: unknown) {
   const { baseUrl, model } = parseOrThrow(lookupModelSchema, input)
-  return openRouterModelTiers(await assertPublicBaseUrl(baseUrl), model)
+  return (await fetchImageCapabilities('openrouter_images', await assertPublicBaseUrl(baseUrl), model))?.resolutions ?? null
 }
 
-async function saveResolutions(input: z.output<typeof saveProviderSchema>, baseUrl: string, fetchImpl?: typeof fetch) {
-  if (input.adapter !== 'openrouter_images') return input.resolutions
-  const suggested = await openRouterModelTiers(baseUrl, input.model, fetchImpl)
-  // An older editor omitting this field on edit must retain the Owner's saved override.
-  return input.resolutions ?? (input.id ? undefined : suggested ?? undefined)
-}
-
-// Insert or update. A new row needs a key; an edit with a blank key keeps the stored one.
+// Save the confirmed catalogue snapshot and the optional Vault key in the same transaction.
 export async function saveProvider(deps: ProviderCommandDeps, adminId: string, input: unknown): Promise<string> {
   const parsed = parseOrThrow(saveProviderSchema, input)
+  if (!parsed.id && !parsed.apiKey) throw new ProviderSettingError('api_key_required', 'A new provider needs an API key')
   const baseUrl = await assertPublicBaseUrl(parsed.baseUrl, deps.resolveHost)
-  const write: ProviderWrite = {
-    module: parsed.module,
-    adapter: parsed.adapter,
-    resolutions: await saveResolutions(parsed, baseUrl, deps.fetch),
-    label: parsed.label,
-    baseUrl,
-    model: parsed.model,
-    notes: parsed.notes ?? null,
-    prices: { inputTextPerM: parsed.priceInputTextPerM, inputImagePerM: parsed.priceInputImagePerM, outputPerM: parsed.priceOutputPerM },
-    updatedBy: adminId,
+  const caps = await fetchImageCapabilities(parsed.adapter, baseUrl, parsed.model, deps.fetch)
+  const settings = {
+    module: parsed.module, adapter: parsed.adapter, label: parsed.label, base_url: baseUrl, model: parsed.model,
+    notes: parsed.notes, estimated_image_costs: parsed.estimatedImageCosts, price_input_text_per_m: parsed.priceInputTextPerM,
+    price_input_image_per_m: parsed.priceInputImagePerM, price_output_per_m: parsed.priceOutputPerM,
   }
-  let id = parsed.id
-  if (id) {
-    await updateProvider(deps.db, id, write)
-    if (parsed.apiKey) await setProviderKey(deps.db, id, parsed.apiKey)
-  } else {
-    if (!parsed.apiKey) throw new ProviderSettingError('api_key_required', 'a new provider needs an API key')
-    id = await insertWithKey(deps.db, write, parsed.apiKey)
-  }
+  const { data, error } = await deps.db.rpc('admin_save_provider', {
+    p_actor: adminId, p_id: parsed.id ?? null, p_settings: settings, p_capabilities: caps ?? {}, p_key: parsed.apiKey ?? null,
+  })
+  if (error?.message.includes('PROVIDER_NOT_FOUND')) throw new ProviderSettingError('not_found', 'Provider not found')
+  // Vendor keys are write-only; never attach the RPC input or database error detail to logs.
+  if (error) throw new ProviderSettingError('internal', 'Saving provider failed')
+  const id = providerIdSchema.parse({ id: data }).id
   logger.info('admin.provider.saved', { adminId, providerId: id, isNew: !parsed.id, keyChanged: Boolean(parsed.apiKey) })
   return id
 }

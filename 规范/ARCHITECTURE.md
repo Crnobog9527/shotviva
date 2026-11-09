@@ -129,6 +129,8 @@ interface GenerationProvider {
 | `base_url` | 接口根地址，OpenRouter 默认 `https://openrouter.ai/api/v1`，OpenAI 默认 `https://api.openai.com/v1`；只允许 `https://`，拒绝 localhost、内网和保留地址 |
 | `model` | 模型名，如 `gpt-image-2.6`、`google/gemini-2.5-flash-image` |
 | `resolutions` | 支持的清晰度，非空 text[]，默认 `{1k,2k,3k}`。模板或试跑指定该模型时按此判断能否出当前清晰度 |
+| `capabilities` | jsonb，默认 `{}` 表示等待首次刷新。记录本站支持的 `resolutions`、固定 `aspectRatios`、是否支持原图比例 `originalRatio`、参考图数量上下限 `minReferences/maxReferences`、最后成功时间 `fetchedAt`。OpenRouter 另保留目录原始固定比例 `providerAspectRatios`，用于后台和伙伴接口。 |
+| `estimated_image_costs` | jsonb，管理员按清晰度填写的单张美元成本估值，供 §6.1 样本不足时使用。 |
 | `vault_secret_id` | 密钥存在 **Supabase Vault**（`vault.secrets`，由 Supabase 在库内加密），表里只存它的 id。Owner 2026-11-06 改定，和 Graylum 一样；取代原先「应用用 `PROVIDER_SECRETS_KEY` 做 AES-256-GCM」的做法，不再需要任何应用侧加密密钥 |
 | `api_key_last4` | 密钥后 4 位，后台列表里显示用 |
 | `is_active` | 当前在用；同一个 `module` 最多一条为 `true`（部分唯一索引） |
@@ -140,16 +142,17 @@ interface GenerationProvider {
 
 切换在用的供应商用 SQL 函数 `admin_activate_provider(p_id)`：同一事务里把同模块其他行设为 `false`、这一行设为 `true`。
 
-**出图时怎么选**：前台模板出图优先用 `template_prompts.provider_id` 指定的 image 供应商（可未启用）。该字段为空，或该供应商不支持订单清晰度时，走默认供应商：取 image 模块的 `is_active` 行，无在用行时沿用环境变量。作品编辑和伙伴出图只走默认供应商；换脸判断按 decision 模块取在用行。后台改供应商后使 `providers` 缓存失效，密钥按次读取。实际调用的供应商和完整模型名以 `<供应商 id 或 env>/<模型名>` 记入 `generation_jobs.provider`，按供应商、模型和清晰度分别统计。模板 `model_params.model` 不参与选型。
+**出图时怎么选**：前台模板出图优先用 `template_prompts.provider_id` 指定的 image 供应商（可未启用）。该字段为空时，走默认供应商：取 image 模块的 `is_active` 行，无在用行时沿用环境变量。作品编辑和伙伴出图只走默认供应商；换脸判断按 decision 模块取在用行。服务端在扣积分前按有效能力校验比例和清晰度，非法请求返回 `INVALID_INPUT`。已允许的请求遇到上游目录变化或暂时不可用时，保留按实际供应商记账的备用路径。后台改供应商后使 `providers` 缓存失效，密钥按次读取。实际调用的供应商和完整模型名以 `<供应商 id 或 env>/<模型名>` 记入 `generation_jobs.provider`，按供应商、模型和清晰度分别统计。模板 `model_params.model` 不参与选型。
 
 **OpenRouter**：出图统一走 `POST /api/v1/images`，通过 `input_references` 提交参考图，读取 `data[0].b64_json`。本站 1K、2K、3K 档对应 `resolution` 的 1K、2K、4K，跟随照片时传 `aspect_ratio: auto`，输出格式为 PNG。3K 档交付时缩回本站目标像素。OpenRouter 不使用 OpenAI 的 `quality`、`input_fidelity`、`background`。原始 `prompt_tokens`、`completion_tokens`、`cost` 记入 `provider_usage`；响应的美元费用乘以 1.055 计入 `cost_usd`（充值手续费）。缺少费用时记录警告，按已有 token 和配置单价估算。积分仍按第 6.1 节的价格和下限。
 
 **后台页 `/admin/providers`**（中文界面）：
 - 列表：显示名、适配器、地址、模型、密钥后 4 位、是否在用、更新时间。
-- 新增 / 编辑：密钥框只写不读，留空表示不改；保存后浏览器拿不到明文。OpenRouter 保存时按 `GET {base_url}/images/models` 校验模型，目录缓存一小时。编辑模型时，按目录声明的清晰度预填本站档位，Owner 可手动调整。
+- 新增 / 编辑：密钥框只写不读，留空表示不改；保存后浏览器拿不到明文。OpenRouter 保存供应商时读取 `GET {base_url}/images/models` 更新能力。目录中的 1K、2K、4K 映射为本站 1k、2k、3k，未声明清晰度参数时只提供标准档。只有声明 auto 才支持原图比例。OpenAI 图片适配器提供全套站内选项。手动「刷新能力」和每日带 CRON_SECRET 的刷新均同步旧 resolutions 字段，失败保留最后成功的能力及时间。
 - 「测试连接」：OpenRouter 查询同一图片目录并用该行密钥调用免费的鉴权接口；其他适配器沿用 `GET {base_url}/models`。测试连接不产生出图费用。
 - 「设为当前使用」：弹窗确认「从 A 换到 B」，写一条日志（logger，不含密钥）。
 - 换模型时重新核对能力、实测成本与第 6.1 节；不把预算估价当实测。
+- 模板编辑页展示当前所选模型的能力、参考图上限与最后刷新时间。
 
 **密钥读写函数**（全部 `security definer`，只授权 `service_role`）：
 - `admin_set_provider_key(p_id, p_key)`：校验格式（可打印 ASCII、不含空白、16～1024 字符）。已有 Vault 记录就 `vault.update_secret`，没有就 `vault.create_secret`（名字 `shotviva.provider.<id>`）。同时写 `api_key_last4`。
@@ -200,7 +203,9 @@ v1 不写回调解析、定时轮询、超时清理这类定时任务。视频�
 
 - `templates`（公开）：id、模块、名称、分类、封面前后对比图、字段定义（要几张图、要填哪些文案、可选比例）、**质量档 `quality`**（`'high'` / `'medium'`，送给模型的 `quality` 参数，默认 `'high'`）、**消耗积分 `credits_cost`**（jsonb，按分辨率三个档都必填：`{ "1k": 2, "2k": 4, "3k": 6 }`，正整数）、排序、上下架状态、`visible_in`（`['web']` / `['partner']` / 两者，控制在哪些入口展示）、**展示文字的其他语言版本 `translations`**（jsonb，默认 `{}`；结构 `{ "zh": { "name": "…", "description": "…", "fields": { "<字段 key>": { "label": "…", "placeholder": "…" } } } }`；英文仍是 `name` 等原字段；某语言缺某项时回退英文；后台模板编辑页可填中文；提示词不翻译，始终英文，Owner 2026-11-06）。
   - **英文说明**（Owner 2026-11-07 补）：`templates` 加 `description`（可空，≤160 字），后台模板编辑页在英文名称下面加「英文说明」输入框，和「中文说明」并排。凡是显示模板说明的地方（模板卡、创作弹窗、工作台标题下、落地页模板列表），英文页显示 `description`，中文页显示 `translations.zh.description`，中文缺失时回退英文说明；两者都空就不显示。说明不自动翻译。迁移编号段 `0380`～`0399`（T52）。
-- `template_prompts`（私有，只有服务端能读，RLS 拒绝所有客户端）：模板 id、提示词正文、版本号、模型参数、可空外键 `provider_id uuid`（只允许 `ai_providers.module = image`，见 §3.3）。后台「出图模型」可选跟随默认或某一条 image 供应商。不支持该清晰度时用默认供应商。旧调用保存提示词时省略该字段会保留已选模型，显式传 null 才恢复默认。
+- `template_prompts`（私有，只有服务端能读，RLS 拒绝所有客户端）：模板 id、提示词正文、版本号、模型参数、可空外键 `provider_id uuid`（只允许 `ai_providers.module = image`，见 §3.3）。后台「出图模型」可选跟随默认或某一条 image 供应商。创作页和首页只接收 `template_image_options` 的三个公开字段：可用清晰度、固定比例和是否支持原图比例。后台专用的供应商信息、成本与提示词保持私有。旧调用保存提示词时省略该字段会保留已选模型，显式传 null 才恢复默认。
+
+站内固定比例取第 4.3 节选择器和模型能力的交集。缺少原图比例时按输入图片尺寸选最近比例，只有一档清晰度时隐藏选择器。首次刷新前没有可用能力的 OpenRouter 模板暂时无法出图。伙伴请求固定标准档，比例取模板 `fields.aspectRatios` 与可用模型比例的交集，保留模板顺序。交集为空时目录隐藏该模板，直接生成返回已有的不支持错误。
 
 内置一条 `freeform` 模板：字段定义只有 `prompt`（加可选参考图），`template_prompts` 里的提示词是直通。它让「自由文字出图」和「模板出图」走同一条代码路径；`visible_in = ['partner']`，Shotviva 自己的前台不展示（DESIGN.md 禁止出现 prompt）。
 
@@ -335,6 +340,8 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - 没用完的积分在续费时自然结转（积分不过期），不做「本期 / 结转」两本账。
 - **计价单位是 credit**：标价 1 积分 = $0.01；成交每积分实价随套餐或优惠不同。注册赠送 100 免费积分，不承诺固定张数。每次生成（含重新生成）按该模板、该清晰度的当前报价预扣，既有订单和任务按成交或预扣时的数量结算。
 - **成本控制**：保留供应商能力检查，跟踪真实 p95、失败计费、费税与渠道组合。以综合用量评估毛利；已批准用途价格不得被单项毛利目标自动抬高或阻断。未批准的新价格、新模型仍需单独核验。预算和样本不足的估算不能标记为实测。
+
+- 未列入经批准的模板／模型／质量／档位组合时，仍执行 T96 的成本下限。以同供应商型号、清晰度近 30 日至少十张实测 p95 为先，样本不足取估价；成本乘 1.10，除以当前最低每积分实收 ×76.1% ×40%，向上取整。
 - 余额只能通过 SQL 函数改：发放（`grant_credits` 带 `pool` 参数，注册赠送和活动赠送用 `'free'`）、预扣、确认、退回、管理员调整（`admin_adjust_credits` 带 `pool` 参数）。前端和普通接口都不能直接写余额。
 - 每一笔变动都写进流水表，记录动的是哪个池，带幂等键。
 

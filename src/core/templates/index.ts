@@ -85,3 +85,5 @@ export {
   type ToggleField,
   type ToggleFragments,
 } from './toggles'
+
+export { allowedWebAspects } from './allowed-web-aspects'

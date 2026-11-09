@@ -29,7 +29,7 @@ import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { publicEnv } from '@/core/public-env'
 import { r2PublicStore, r2Store } from '@/core/storage'
 import { TEMPLATES_CACHE_TAG } from '@/core/templates'
-import { CREDITS_FLOOR } from '@/modules/image'
+import { readTemplateFloors } from './pricing'
 
 // Server actions are public endpoints, so each one re-checks the admin role itself.
 
@@ -47,7 +47,8 @@ function catalogueChanged() {
 export async function saveTemplateAction(payload: SaveTemplatePayload): Promise<ActionResult> {
   const admin = await requireAdmin()
   return runAdminAction(async () => {
-    await saveTemplate(createAdminSupabase(), admin.id, payload, CREDITS_FLOOR)
+    const db = createAdminSupabase()
+    await saveTemplate(db, admin.id, payload, await readTemplateFloors(db))
     catalogueChanged()
   })
 }
@@ -55,7 +56,8 @@ export async function saveTemplateAction(payload: SaveTemplatePayload): Promise<
 export async function setTemplateActiveAction(input: unknown): Promise<ActionResult> {
   const admin = await requireAdmin()
   return runAdminAction(async () => {
-    await setTemplateActive(createAdminSupabase(), admin.id, input, CREDITS_FLOOR)
+    const db = createAdminSupabase()
+    await setTemplateActive(db, admin.id, input, await readTemplateFloors(db))
     catalogueChanged()
   })
 }
@@ -64,7 +66,8 @@ export async function setTemplateActiveAction(input: unknown): Promise<ActionRes
 export async function setTemplatesActiveAction(input: unknown): Promise<ActionValue<ActiveChangeOutcome>> {
   const admin = await requireAdmin()
   return runAdminQuery(async () => {
-    const outcome = await setTemplatesActive(createAdminSupabase(), admin.id, input, CREDITS_FLOOR)
+    const db = createAdminSupabase()
+    const outcome = await setTemplatesActive(db, admin.id, input, await readTemplateFloors(db))
     if (outcome.changed.length > 0) catalogueChanged()
     return outcome
   })
@@ -75,7 +78,8 @@ export async function setTemplatesActiveAction(input: unknown): Promise<ActionVa
 export async function bulkEditTemplatesAction(input: unknown): Promise<ActionValue<BulkEditOutcome>> {
   const admin = await requireAdmin()
   return runAdminQuery(async () => {
-    const outcome = await bulkEditTemplates(createAdminSupabase(), admin.id, input, CREDITS_FLOOR)
+    const db = createAdminSupabase()
+    const outcome = await bulkEditTemplates(db, admin.id, input, await readTemplateFloors(db))
     if (outcome.changed > 0) catalogueChanged()
     return outcome
   })

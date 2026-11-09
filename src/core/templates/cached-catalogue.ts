@@ -6,6 +6,7 @@ import { createAdminSupabase } from '../auth/supabase-admin'
 import { FAILED_READ_LIFE } from '../cache-life'
 import type { Locale } from '../i18n/locales'
 import { logger } from '../logger'
+import { PROVIDERS_CACHE_TAG } from '../providers/cache-tag'
 import { TEMPLATES_CACHE_TAG } from './cache'
 import { listTemplatesIn } from './list-templates'
 import type { LocalizedTemplate } from './localize'
@@ -37,6 +38,6 @@ export async function catalogueOrEmpty(locale: Locale, read: Read = readCatalogu
 // surface); the columns carry no prompts.
 export async function cachedWebCatalogue(locale: Locale): Promise<LocalizedTemplate[]> {
   'use cache'
-  cacheTag(TEMPLATES_CACHE_TAG)
+  cacheTag(TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG)
   return catalogueOrEmpty(locale)
 }

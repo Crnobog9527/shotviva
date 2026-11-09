@@ -36,6 +36,10 @@ beforeAll(async () => {
   await pg.query(`insert into public.ai_providers (id, module, adapter, label, model, base_url, resolutions, price_output_per_m)
     values ($1, 'image', 'openrouter_images', 'T92 routing fixture', $2, 'https://openrouter.ai/api/v1', '{1k}', null),
            ($3, 'image', 'openai_images', 'T92 fallback fixture', 'gpt-image-2.6', 'https://api.openai.com/v1', '{1k,2k,3k}', 2)`, [routerId, model, defaultId])
+  await pg.query('update public.ai_providers set capabilities = $2 where id = $1', [routerId, {
+    resolutions: ['1k'], aspectRatios: ['4:5', '1:1'], originalRatio: false,
+    minReferences: 0, maxReferences: 3, fetchedAt: new Date().toISOString(),
+  }])
   await pg.query('update public.template_prompts set provider_id = $1 where template_id = $2', [routerId, templateId])
 })
 afterAll(async () => {
@@ -72,19 +76,19 @@ async function jobRow(id: string) {
 }
 
 describe('T92 per-template generation routing', () => {
-  it('runs eligible web requests on the saved model, and uses the default for HD and partner requests', async () => {
+  it('runs eligible web requests on the saved model, rejects HD without charging, and preserves partner routing', async () => {
     const { deps, fetch, openai } = await setup()
     const userId = await createUser(pg, { credits: 5 })
     const request = { userId, templateId, aspectRatio: '4:5', source: 'web' as const }
     const standard = await runGeneration(deps, { ...request, resolution: '1k' })
-    const hd = await runGeneration(deps, { ...request, resolution: '2k' })
+    await expect(runGeneration(deps, { ...request, resolution: '2k' })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    await expect(runGeneration(deps, { ...request, aspectRatio: 'original' })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
     const partner = await runGeneration(deps, { ...request, source: 'graylum', idempotencyKey: randomUUID() })
     expect(await jobRow(standard.id)).toMatchObject({ provider: routerTag, provider_usage: usage, cost_usd: chargedUsd, status: 'succeeded', credits_cost: 1 })
-    expect(await jobRow(hd.id)).toMatchObject({ provider: defaultTag, status: 'succeeded', credits_cost: 2 })
     expect(await jobRow(partner.id)).toMatchObject({ provider: defaultTag, status: 'succeeded', credits_cost: 1 })
-    expect((await profileOf(pg, userId)).credits).toBe(1)
+    expect((await profileOf(pg, userId)).credits).toBe(3)
     expect(fetch).toHaveBeenCalledTimes(1)
-    expect(openai).toHaveBeenCalledTimes(2)
+    expect(openai).toHaveBeenCalledTimes(1)
   })
 
   it('refunds the failed request and retains its reported OpenRouter cost', async () => {
@@ -104,7 +108,7 @@ describe('T92 per-template generation routing', () => {
       const admin = await createUser(pg)
       await pg.query("update public.profiles set role = 'admin' where id = $1", [admin])
       await saveTestBudget(deps.db, admin, 1000)
-      const body = () => ({ run_id: randomUUID(), batch_id: randomUUID(), template_id: templateId, inputs: {} })
+      const body = () => ({ run_id: randomUUID(), batch_id: randomUUID(), template_id: templateId, inputs: { aspect_ratio: '4:5' as const } })
       const override = await runTestGenerate(deps, { actorId: admin, body: { ...body(), provider_id: null } })
       const saved = await runTestGenerate(deps, { actorId: admin, body: body() })
       expect(override).toMatchObject({ status: 'succeeded', provider: defaultTag })

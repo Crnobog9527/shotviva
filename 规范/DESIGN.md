@@ -106,8 +106,8 @@ Owner 2026-11-05 定稿：**B 版「暗房」（Darkroom）**，取代此前的�
 1. 上传区：大号按钮区，手机上点击调起相册 / 相机（两个入口："Take photo" 带 `capture`，"Choose from gallery" 不带）；桌面上同一块区域也接受拖拽。显示允许的格式和大小（JPG / PNG / WebP，up to 20MB）。
 2. 文案区：只出现模板需要的字段，每个字段带示例占位。
 2b. 可选补充输入框：标签 "Anything to change? (optional)"，占位例如 "Add a sprig of mint, remove the napkin"，≤300 字符，可留空。界面不出现 prompt 一词。
-3. 尺寸选择（Owner 2026-11-05，8 个）：**Original**（按原图比例）/ **Banner 16:9** / **Post 4:5** / **Listing 1:1** / **Story 9:16** / **Rental 3:2** / **Website 4:3** / **Pin 2:3**，用带比例示意的图标按钮，默认 Original。和清晰度（Standard / HD / Max）是两个独立选择；同一清晰度下各比例的输出 token 都不超过该档正方形（ARCHITECTURE §8.1），所以扣费不随比例变。
-3b. 分辨率选择：三张上下排列的选项卡，默认第一张。界面只显示 **Standard / HD / Max**（Owner 2026-11-05 定），每张写一行像素和用途，右侧写消耗：「Standard — 1024 px · Social & delivery apps · 2 credits」「HD — 2048 px · Websites & online stores · 4 credits」「Max — 2880 px · Print & zoom · 6 credits」（credits 数从该模板的 `credits_cost` 读，不写死）。内部代号 `1k` / `2k` / `3k` 只在代码和数据库里用，界面、营销页、FAQ 都不出现 1K / 2K / 3K，也不准用 "4K"、"Ultra HD"、"SD"。余额不够某一档时该档的 credits 变灰，主按钮变成 "Get credits · N needed" 并打开付费墙。
+3. 尺寸选择（Owner 2026-11-05，8 个）：**Original**（按原图比例）/ **Banner 16:9** / **Post 4:5** / **Listing 1:1** / **Story 9:16** / **Rental 3:2** / **Website 4:3** / **Pin 2:3**，用带比例示意的图标按钮，按模型支持的选项显示。支持跟随原图时默认 Original；否则按原图尺寸选最近支持比例并标出「接近原图（4:5）」。和清晰度（Standard / HD / Max）是两个独立选择；同一清晰度下各比例的输出 token 都不超过该档正方形（ARCHITECTURE §8.1），所以扣费不随比例变。
+3b. 分辨率选择：显示模型支持的档位，默认第一档。仅支持一档时直接使用该档并隐藏选择器。「再来一张」沿用原选择，遇到已不可用的规格时改用最近的可用值并提示。界面只显示 **Standard / HD / Max**（Owner 2026-11-05 定），每张写一行像素和用途，右侧写消耗：「Standard — 1024 px · Social & delivery apps · 2 credits」「HD — 2048 px · Websites & online stores · 4 credits」「Max — 2880 px · Print & zoom · 6 credits」（credits 数从该模板的 `credits_cost` 读，不写死）。内部代号 `1k` / `2k` / `3k` 只在代码和数据库里用，界面、营销页、FAQ 都不出现 1K / 2K / 3K，也不准用 "4K"、"Ultra HD"、"SD"。余额不够某一档时该档的 credits 变灰，主按钮变成 "Get credits · N needed" 并打开付费墙。
 4. 生成按钮：固定在底部拇指区、全宽，写清楚当前分辨率的消耗，例如 "Generate · 2 credits"，切换分辨率时按钮上的数字跟着变。按钮旁显示余额 "30 credits + 6 free"。
 5. 这一单将用免费积分时，按钮上方一行告知："This photo uses free credits: it's shown publicly with a watermark. Paid credits make it private and watermark-free." 将用付费积分时不显示。
 

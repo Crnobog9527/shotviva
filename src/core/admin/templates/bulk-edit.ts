@@ -1,12 +1,14 @@
 import 'server-only'
 
+import type { ProviderFloors } from '@/core/templates/provider-pricing'
+
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { AppError } from '@/core/errors'
 import { LOCALES } from '@/core/i18n/locales'
 import { logger } from '@/core/logger'
-import { TEMPLATE_QUALITIES, type CreditsFloor } from '@/core/templates/pricing'
+import { TEMPLATE_QUALITIES } from '@/core/templates/pricing'
 import { TEMPLATE_SURFACES } from '@/core/templates/schema'
 
 import { isEmptyPatch, type BulkEditFailure, type BulkEditOutcome, type BulkEditPatch } from './bulk-edit-rules'
@@ -64,6 +66,7 @@ const toSqlPatch = (patch: BulkEditPatch) => ({
 const SQL_ERRORS: Record<string, [code: 'FORBIDDEN' | 'INVALID_INPUT', message: string]> = {
   NOT_ADMIN: ['FORBIDDEN', '只有管理员能批量编辑模板'],
   INVALID_INPUT: ['INVALID_INPUT', '批量编辑的内容不完整，请刷新页面后再试'],
+  MODEL_CHANGED: ['INVALID_INPUT', '出图模型有变化，请刷新后重试'],
   CATEGORY_NOT_FOUND: ['INVALID_INPUT', '选的分类不存在或已被删除，请刷新页面后再选'],
 }
 
@@ -71,7 +74,7 @@ export async function bulkEditTemplates(
   client: SupabaseClient,
   adminId: string,
   input: unknown,
-  floor: CreditsFloor,
+  floor: ProviderFloors,
 ): Promise<BulkEditOutcome> {
   const parsed = inputSchema.safeParse(input)
   if (!parsed.success) throw new AppError('INVALID_INPUT', parsed.error.issues.map((issue) => issue.message).join('; '))
