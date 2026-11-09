@@ -6,9 +6,12 @@ import { connectAdmin, createUser, profileOf } from './helpers'
 let db: Client
 let buyer: string
 beforeAll(async () => { db = await connectAdmin() })
-beforeEach(async () => { await db.query('begin'); buyer = await createUser(db) })
+beforeEach(async () => { await db.query('begin'); await db.query("delete from public.system_settings where key='pricing_catalog_version'"); buyer = await createUser(db) })
 afterEach(async () => { await db.query('rollback') })
 afterAll(async () => { await db.end() })
+
+const activate = () => db.query(`insert into public.system_settings(key,value) values('pricing_catalog_version','"v2"')
+  on conflict(key) do update set value=excluded.value`)
 
 it('leaves legacy orders intact and grants all pack credits at the discounted price plus tax', async () => {
   const buy = (v2: boolean, key: string) => db.query(
@@ -16,6 +19,7 @@ it('leaves legacy orders intact and grants all pack credits at the discounted pr
     [buyer, key, v2 ? 2217 : 2590])
   const legacy = await buy(false, 'cs_old')
   expect(legacy.rows[0].credits).toBe(55)
+  await activate()
   expect((await buy(true, 'cs_new')).rows[0].credits).toBe(2545)
   expect((await buy(true, 'cs_new')).rows[0].applied).toBe(false)
   const payment = (await db.query("select id,amount_total,amount_tax from public.payments where stripe_session_id='cs_new'")).rows[0]
@@ -28,6 +32,7 @@ it('leaves legacy orders intact and grants all pack credits at the discounted pr
 })
 
 it('grants an entire Waffo annual term once per payment, and does not extend the term for packs', async () => {
+  await activate()
   const order = randomUUID()
   const pay = (key: string, product: string, cents: number) => db.query(
     "select * from public.settle_waffo_order_v2($1,$2,$3,$4,$5,'usd',0,'card')", [buyer,product,key,order,cents])
@@ -43,6 +48,7 @@ it('keeps contract-specific annual renewal amounts and invoice idempotency', asy
   const renew = (v2: boolean, id: string) => db.query('select * from public.apply_subscription_renewal'
     + (v2 ? '_v2' : '') + "($1,'pro_yearly',$2,now()+interval '1 year',$3,'usd',0,'card')", [buyer,id,v2 ? 47904 : 47900])
   expect((await renew(false,'in_old')).rows[0].credits).toBe(1620)
+  await activate()
   expect((await renew(true,'in_new')).rows[0].credits).toBe(73620)
   expect((await renew(true,'in_new')).rows[0].applied).toBe(false)
   expect((await db.query('select count(*)::int as n from public.payments where user_id=$1',[buyer])).rows[0].n).toBe(2)
@@ -51,10 +57,14 @@ it('keeps contract-specific annual renewal amounts and invoice idempotency', asy
 it('retains the original annual price after the unit switch and grants in wallet units', async () => {
   const renew = (key: string) => db.query("select * from public.apply_subscription_renewal($1,'max_yearly',$2,now()+interval '1 year',71300,'usd',0,'card')",[buyer,key])
   expect((await renew('in_legacy_before')).rows[0].credits).toBe(3360)
-  await db.query(`insert into public.system_settings(key,value) values('pricing_catalog_version','"v2"')`)
+  await activate()
   expect((await renew('in_legacy_before')).rows[0].applied).toBe(false)
   expect((await renew('in_legacy_next')).rows[0].credits).toBe(3360 + 168000)
   expect((await db.query("select amount_total from public.payments where stripe_invoice_id='in_legacy_next'")).rows[0].amount_total).toBe(71300)
+})
+
+it('quarantines a late version-two payment when the wallet has rolled back', async () => {
+  await expect(db.query("select public.settle_checkout_v2($1,'pack_s','cs_late',990,'usd',0,'card')",[buyer])).rejects.toThrow('PRICING_VERSION_RECONCILIATION_REQUIRED')
 })
 
 it('exposes no grant or second catalog to anonymous or authenticated clients', async () => {

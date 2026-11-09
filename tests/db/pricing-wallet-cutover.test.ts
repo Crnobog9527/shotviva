@@ -8,6 +8,7 @@ let user: string
 beforeAll(async () => { db = await connectAdmin() })
 beforeEach(async () => {
   await db.query('begin')
+  await db.query("delete from public.system_settings where key='pricing_catalog_version'")
   // Other suites leave accounts with live subscriptions. Model the audited cohort locally;
   // this transaction (including TRUNCATE) is rolled back after every case.
   await db.query('truncate table public.profiles cascade')
@@ -44,6 +45,7 @@ it('waives outstanding old refunds before enabling new purchases, so a replay ta
   await db.query("select public.settle_checkout($1,'pack_s','cs_before_cutover',990,'usd',0,'card')",[user])
   const pay = (await db.query("update public.payments set status='refunded',amount_refunded=amount_total where stripe_session_id='cs_before_cutover' returning id")).rows[0]
   await clear(await baseline())
+  await db.query(`insert into public.system_settings(key,value) values('pricing_catalog_version','"v2"')`)
   await db.query("select public.settle_checkout_v2($1,'pack_s','cs_after_cutover',990,'usd',0,'card')",[user])
   const r = (await db.query("select public.clawback_payment_credits($1,'repeat','repeat') as r",[pay.id])).rows[0].r
   expect(r).toMatchObject({ taken:0, written_off:0, clawback_shortfall:20 })
@@ -54,6 +56,12 @@ it('will not undo new economic activity', async () => {
   await clear(await baseline())
   await db.query("select public.admin_adjust_credits($1,990,'new order','paid')",[user])
   await expect(db.query('select admin.restore_approved_wallets_v2()')).rejects.toThrow('ECONOMIC_ACTIVITY_AFTER_CUTOVER')
+})
+
+it('keeps the old signup amount when a candidate requests 100 before activation', async () => {
+  const newer = await createUser(db)
+  const result = await db.query("select * from public.grant_credits($1::uuid,100,'signup','signup:'||($1::uuid)::text,'free')",[newer])
+  expect(result.rows[0].free_credits).toBe(6)
 })
 
 it('awards 100 only for a post-switch signup, even from a stale client; replay does not award twice', async () => {

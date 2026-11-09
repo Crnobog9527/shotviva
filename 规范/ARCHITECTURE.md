@@ -337,6 +337,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
   - 以上函数都只授权 `service_role`。
 - **版本化结账（新积分）**：私有 `admin.product_terms_v2(product_id primary key,credits,usd_cents)` 保存九项已核准报价，启用 RLS，不对客户端开放。调用方从已验签的 Stripe/Waffo 订单或合同取得价格版本；新合同走仅 service_role 可执行的 `settle_checkout_v2`、`settle_waffo_order_v2`、`apply_subscription_renewal_v2`，旧合同和旧在途单保持原端点与原价。切换后首次入账的真实旧合约款按等档新积分发放（保持签约费用和周期），重复回调只认原流水。共用事务、索引和付款幂等键。不得因缺失或非法的新版本信息把新单当旧单。退款、争议按对应时间的入账流水折算，不能按今日套餐目录回推。加这些函数本身不激活新 UI，不改余额或第三方合同。
 - **旧单位结清**：生产切换只针对 Owner 核实的旧账号付费与免费两个池；授权时 6 个账号，124 付费、26 免费。私有 `admin.pricing_wallet_cutover` 记录版本、时点、原余额摘要和结清后流水位点。仅由受保护工作流在库内校验摘要、付款数、流水、有效合同和未完任务后调用 `admin.clear_approved_wallets_v2`，逐池写唯一冲销流水，不删订单或历史记录。恢复函数仅在无新经济活动且能复原原摘要时写逆向流水。新价格启用事务同时设置 `system_settings.pricing_catalog_version` 为 JSON 字符串 `v2`；其写入时间是注册赠分界线，旧账号不补领，新账号获 100 免费积分，沿用原同 IP 限制和幂等键。迁移本身不执行切换。
+- 激活事务在目录、模型、价格和钱包共同可用后记录私有 `admin.pricing_release_checkpoint(version,fingerprint)`。测试库和正式库的回滚都检查余额、注册、流水、付款、合同、拒付和生成；期间有新业务则停止。回滚前关闭新收银、到期或关闭可付款会话、排清两通道在途凭证。回滚后才首次收到的新报价付款不得入旧钱包，返回可重试的结算错误并核对渠道款项。注册和支付先取得公共读锁再读版本；切换独占该锁，避免同时读旧版写新版。
 - **首付的 `paid_until`**：首付走 `apply_purchase`，按商品天数累加（月付 +30 天，年付 +365 天），和 Stripe 本期结束日可能差一两天。从第一次续费起，由 `apply_subscription_renewal` 对齐 `period_end`，见下一条。
 - 订阅续费走 T10 新增的 `apply_subscription_renewal(user, product_id, invoice_id, period_end)`：`credits += 商品积分`，`paid_until = greatest(paid_until, period_end)`（直接对齐 Stripe 的本期结束日，不按天数累加，避免大小月漂移）；同样写流水、按 invoice id 幂等，内部复用 `_apply_credit_change`（总控 2026-11-05 补）。
 - 没用完的积分在续费时自然结转（积分不过期），不做「本期 / 结转」两本账。

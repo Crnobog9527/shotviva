@@ -13,6 +13,7 @@ declare
   v_key text := 'purchase:' || p_event_id;
   v_ranks constant text[] := array['starter_monthly', 'starter_yearly', 'pro_monthly', 'pro_yearly', 'max_monthly', 'max_yearly'];
 begin
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.template_catalog',0));
   if p_event_id is null or length(p_event_id) = 0 then
     raise exception 'INVALID_INPUT' using detail = 'event_id is required';
   end if;
@@ -20,6 +21,13 @@ begin
   select * into v_product from public.products where id = p_product_id and active;
   if not found then
     raise exception 'PRODUCT_NOT_FOUND';
+  end if;
+  -- After rollback even a correctly signed v2 checkout can settle late. Let previously
+  -- applied events replay; never credit new units to a legacy wallet. Returning an error
+  -- keeps the provider webhook retryable for reconciliation.
+  if p_v2 and not exists(select from public.system_settings where key='pricing_catalog_version' and value='"v2"'::jsonb)
+    and not exists(select from public.credit_ledger where idempotency_key=v_key and user_id=p_user_id and product_id=p_product_id) then
+    raise exception 'PRICING_VERSION_RECONCILIATION_REQUIRED';
   end if;
   -- A grandfathered contract keeps its price and period. Once the wallet is denominated
   -- in new credits, a genuinely new payment must also grant in those units; a replay
@@ -99,6 +107,7 @@ declare
   v_change public.credit_change;
   v_key text := 'renewal:' || p_invoice_id;
 begin
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.template_catalog',0));
   if p_invoice_id is null or p_invoice_id not like 'in\_%' then
     raise exception 'INVALID_INPUT' using detail = 'invoice id is required';
   end if;
@@ -114,6 +123,13 @@ begin
    where id = p_product_id and active and days is not null;
   if not found then
     raise exception 'PRODUCT_NOT_FOUND';
+  end if;
+  -- After rollback even a correctly signed v2 checkout can settle late. Let previously
+  -- applied events replay; never credit new units to a legacy wallet. Returning an error
+  -- keeps the provider webhook retryable for reconciliation.
+  if p_v2 and not exists(select from public.system_settings where key='pricing_catalog_version' and value='"v2"'::jsonb)
+    and not exists(select from public.credit_ledger where idempotency_key=v_key and user_id=p_user_id and product_id=p_product_id) then
+    raise exception 'PRICING_VERSION_RECONCILIATION_REQUIRED';
   end if;
   -- A grandfathered contract keeps its price and period. Once the wallet is denominated
   -- in new credits, a genuinely new payment must also grant in those units; a replay
@@ -176,6 +192,7 @@ CREATE OR REPLACE FUNCTION admin.checkout_terms(p_v2 boolean, "p_user_id" "uuid"
 declare
   v_change public.credit_change;
 begin
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.template_catalog',0));
   if p_amount_total is null or p_amount_tax is null or p_currency is null or p_method is null then
     raise exception 'INVALID_INPUT' using detail = 'payment fields are all required';
   end if;
@@ -237,6 +254,7 @@ CREATE OR REPLACE FUNCTION admin.waffo_terms(p_v2 boolean, "p_user_id" "uuid", "
 declare
   v_change public.credit_change;
 begin
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.template_catalog',0));
   if p_order_id is null or p_amount_total is null or p_amount_tax is null or p_currency is null or p_method is null then
     raise exception 'INVALID_INPUT' using detail = 'payment fields are all required';
   end if;

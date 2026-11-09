@@ -106,7 +106,8 @@ it('uses the supplied catalogue at the exact floor; the legacy signature reads t
 
 async function referredBuyer(code: string) {
   const buyer = await createUser(db)
-  const signup = benefits.freeCredits * factor
+  // Signup is versioned by the database; scaling invite rewards cannot scale that gift.
+  const signup = benefits.freeCredits
   await db.query("select public.grant_credits($1,$2,'signup',$3,'free')", [buyer, signup, 'signup:' + buyer])
   expect(await redeem(buyer, code)).toMatchObject({ status: 'ok', credits_granted: invite.inviteeCredits * factor })
   expect((await profileOf(db, buyer)).free_credits).toBe(signup + invite.inviteeCredits * factor)
@@ -124,7 +125,7 @@ async function purchase(buyer: string) {
   return effects.value.rewarded as boolean
 }
 
-it('grants scaled signup, purchase and inviter credits while enforcing the configured reward count and accounting window', async () => {
+it('keeps the legacy signup gift and grants scaled purchase and inviter credits while enforcing the configured reward count and accounting window', async () => {
   const inviter = await createUser(db)
   await db.query('update public.products set credits=$2 where id=$1', [pack.id, pack.credits * factor])
   const summary = async () => (await db.query('select public.my_invite_summary($1,$2) as value',

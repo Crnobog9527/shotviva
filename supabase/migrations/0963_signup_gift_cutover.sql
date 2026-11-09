@@ -11,6 +11,7 @@ begin
   end if;
 
   if p_idempotency_key = 'signup:' || p_user_id::text then
+    perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.template_catalog',0));
     lock table public.profiles in row exclusive mode;
     select * into v_profile from public.profiles where id = p_user_id;
     -- Read the committed version, not the app bundle: a stale tab must not award six
@@ -22,6 +23,8 @@ begin
         return row(false,v_profile.credits,v_profile.free_credits,v_profile.paid_until)::public.credit_change;
       end if;
       p_amount := 100;
+    else
+      p_amount := 6;
     end if;
     if v_profile.signup_ip is not null then
       perform pg_advisory_xact_lock(hashtextextended('shotviva.signup_ip:' || host(v_profile.signup_ip), 0));

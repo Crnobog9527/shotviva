@@ -21,6 +21,7 @@ async function localBatch() {
 
 it('does not partially clear an approved wallet when a template cannot switch; successful switch and undo balance', async () => {
   await db.query('begin')
+  await db.query("delete from public.system_settings where key='pricing_catalog_version'")
   try {
     await db.query("select pg_advisory_xact_lock(hashtextextended('shotviva.template_catalog',0))")
     await db.query('truncate public.profiles cascade')

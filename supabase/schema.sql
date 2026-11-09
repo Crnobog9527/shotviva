@@ -129,6 +129,7 @@ CREATE OR REPLACE FUNCTION "admin"."checkout_terms"("p_v2" boolean, "p_user_id" 
 declare
   v_change public.credit_change;
 begin
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.template_catalog',0));
   if p_amount_total is null or p_amount_tax is null or p_currency is null or p_method is null then
     raise exception 'INVALID_INPUT' using detail = 'payment fields are all required';
   end if;
@@ -302,6 +303,46 @@ $_$;
 ALTER FUNCTION "admin"."partner_image_aspects"("public"."templates") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."pricing_activity_fingerprint"() RETURNS "text"
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select md5(jsonb_build_array(
+    admin.wallet_digest_v2(),
+    (select coalesce(max(id),0) from public.credit_ledger),
+    (select jsonb_agg(to_jsonb(p) order by id) from public.payments p),
+    (select jsonb_agg(to_jsonb(s) order by id) from public.subscriptions s),
+    (select jsonb_agg(to_jsonb(d) order by stripe_dispute_id) from public.payment_disputes d),
+    (select max(created_at) from public.generation_jobs)
+  )::text)
+$$;
+
+
+ALTER FUNCTION "admin"."pricing_activity_fingerprint"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."pricing_checkpoint_v2"("p_rollback" boolean) RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare current_digest text;
+begin
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.template_catalog',0));
+  lock table public.profiles,public.generation_jobs,public.credit_ledger,public.payments,public.subscriptions,public.payment_disputes in share row exclusive mode;
+  current_digest := admin.pricing_activity_fingerprint();
+  if p_rollback then
+    delete from admin.pricing_release_checkpoint where version='v2' and fingerprint=current_digest;
+    if not found then raise exception 'ECONOMIC_ACTIVITY_AFTER_CUTOVER'; end if;
+  else
+    insert into admin.pricing_release_checkpoint values('v2',current_digest) on conflict do nothing;
+  end if;
+end;
+$$;
+
+
+ALTER FUNCTION "admin"."pricing_checkpoint_v2"("p_rollback" boolean) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."protect_retired_template"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -334,6 +375,7 @@ declare
   v_key text := 'purchase:' || p_event_id;
   v_ranks constant text[] := array['starter_monthly', 'starter_yearly', 'pro_monthly', 'pro_yearly', 'max_monthly', 'max_yearly'];
 begin
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.template_catalog',0));
   if p_event_id is null or length(p_event_id) = 0 then
     raise exception 'INVALID_INPUT' using detail = 'event_id is required';
   end if;
@@ -341,6 +383,13 @@ begin
   select * into v_product from public.products where id = p_product_id and active;
   if not found then
     raise exception 'PRODUCT_NOT_FOUND';
+  end if;
+  -- After rollback even a correctly signed v2 checkout can settle late. Let previously
+  -- applied events replay; never credit new units to a legacy wallet. Returning an error
+  -- keeps the provider webhook retryable for reconciliation.
+  if p_v2 and not exists(select from public.system_settings where key='pricing_catalog_version' and value='"v2"'::jsonb)
+    and not exists(select from public.credit_ledger where idempotency_key=v_key and user_id=p_user_id and product_id=p_product_id) then
+    raise exception 'PRICING_VERSION_RECONCILIATION_REQUIRED';
   end if;
   -- A grandfathered contract keeps its price and period. Once the wallet is denominated
   -- in new credits, a genuinely new payment must also grant in those units; a replay
@@ -417,6 +466,7 @@ declare
   v_change public.credit_change;
   v_key text := 'renewal:' || p_invoice_id;
 begin
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.template_catalog',0));
   if p_invoice_id is null or p_invoice_id not like 'in\_%' then
     raise exception 'INVALID_INPUT' using detail = 'invoice id is required';
   end if;
@@ -432,6 +482,13 @@ begin
    where id = p_product_id and active and days is not null;
   if not found then
     raise exception 'PRODUCT_NOT_FOUND';
+  end if;
+  -- After rollback even a correctly signed v2 checkout can settle late. Let previously
+  -- applied events replay; never credit new units to a legacy wallet. Returning an error
+  -- keeps the provider webhook retryable for reconciliation.
+  if p_v2 and not exists(select from public.system_settings where key='pricing_catalog_version' and value='"v2"'::jsonb)
+    and not exists(select from public.credit_ledger where idempotency_key=v_key and user_id=p_user_id and product_id=p_product_id) then
+    raise exception 'PRICING_VERSION_RECONCILIATION_REQUIRED';
   end if;
   -- A grandfathered contract keeps its price and period. Once the wallet is denominated
   -- in new credits, a genuinely new payment must also grant in those units; a replay
@@ -593,6 +650,7 @@ CREATE OR REPLACE FUNCTION "admin"."waffo_terms"("p_v2" boolean, "p_user_id" "uu
 declare
   v_change public.credit_change;
 begin
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.template_catalog',0));
   if p_order_id is null or p_amount_total is null or p_amount_tax is null or p_currency is null or p_method is null then
     raise exception 'INVALID_INPUT' using detail = 'payment fields are all required';
   end if;
@@ -5513,6 +5571,7 @@ begin
   end if;
 
   if p_idempotency_key = 'signup:' || p_user_id::text then
+    perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.template_catalog',0));
     lock table public.profiles in row exclusive mode;
     select * into v_profile from public.profiles where id = p_user_id;
     -- Read the committed version, not the app bundle: a stale tab must not award six
@@ -5524,6 +5583,8 @@ begin
         return row(false,v_profile.credits,v_profile.free_credits,v_profile.paid_until)::public.credit_change;
       end if;
       p_amount := 100;
+    else
+      p_amount := 6;
     end if;
     if v_profile.signup_ip is not null then
       perform pg_advisory_xact_lock(hashtextextended('shotviva.signup_ip:' || host(v_profile.signup_ip), 0));
@@ -7144,6 +7205,15 @@ $$;
 ALTER FUNCTION "public"."wishlist_eligible"("p_user_id" "uuid") OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "admin"."pricing_release_checkpoint" (
+    "version" "text" NOT NULL,
+    "fingerprint" "text" NOT NULL
+);
+
+
+ALTER TABLE "admin"."pricing_release_checkpoint" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "admin"."pricing_wallet_cutover" (
     "version" "text" NOT NULL,
     "started_at" timestamp with time zone NOT NULL,
@@ -8144,6 +8214,11 @@ CREATE TABLE IF NOT EXISTS "public"."template_request_votes" (
 
 
 ALTER TABLE "public"."template_request_votes" OWNER TO "postgres";
+
+
+ALTER TABLE ONLY "admin"."pricing_release_checkpoint"
+    ADD CONSTRAINT "pricing_release_checkpoint_pkey" PRIMARY KEY ("version");
+
 
 
 ALTER TABLE ONLY "admin"."pricing_wallet_cutover"
@@ -9255,6 +9330,9 @@ ALTER TABLE ONLY "public"."templates"
 
 
 
+ALTER TABLE "admin"."pricing_release_checkpoint" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "admin"."pricing_wallet_cutover" ENABLE ROW LEVEL SECURITY;
 
 
@@ -9496,6 +9574,14 @@ REVOKE ALL ON FUNCTION "admin"."partner_image_aspects"("public"."templates") FRO
 GRANT ALL ON FUNCTION "admin"."partner_image_aspects"("public"."templates") TO "anon";
 GRANT ALL ON FUNCTION "admin"."partner_image_aspects"("public"."templates") TO "authenticated";
 GRANT ALL ON FUNCTION "admin"."partner_image_aspects"("public"."templates") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."pricing_activity_fingerprint"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."pricing_checkpoint_v2"("p_rollback" boolean) FROM PUBLIC;
 
 
 

@@ -41,7 +41,7 @@ change a template, enable an affiliate program, create provider prices, or promo
    Confirm exact version on all domains, new signup = 100, paid/free pools and historical
    documents unchanged except for the recorded closing entries. Compare checkout and job
    quotes, actual payment/credits, and new ledger totals.
-6. Before new economic activity, the restricted rollback transaction restores template
+6. Stop checkout on both channels, expire/close every still-payable v2 session and reconcile incoming or pending receipts. A late signed v2 charge against a v1 wallet is deliberately not granted: handle the webhook retry / alert against the original receipt. Before new economic activity, the restricted rollback transaction restores template
    snapshots and calls admin.restore_approved_wallets_v2(), then removes the version switch.
    Reverse adjustments reproduce the approved wallet digest. A failed check rolls back all
    three parts. After new transactions, pause new business and reconcile by original order;
