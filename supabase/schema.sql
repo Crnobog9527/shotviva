@@ -410,6 +410,73 @@ $$;
 ALTER FUNCTION "public"."_enforce_code_gift_policy"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_link_early_payment_disputes"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  d public.payment_disputes;
+  claw jsonb;
+  closed_rows public.payment_disputes[] := '{}';
+begin
+  perform pg_advisory_xact_lock(hashtextextended(new.stripe_charge_id, 914));
+  for d in select * from public.payment_disputes
+            where stripe_charge_id = new.stripe_charge_id and payment_id is null
+            order by created_at, stripe_dispute_id for update
+  loop
+    -- Replay the open and (if present) close within this subtransaction. T71
+    -- applies closing effects only on the first transition from an open row.
+    update public.payment_disputes set payment_id = new.id, user_id = new.user_id,
+                                      closed_at = null, closed_status = null
+     where stripe_dispute_id = d.stripe_dispute_id;
+    update public.payments set status = 'disputed' where id = new.id and status <> 'disputed';
+    claw := public.clawback_payment_credits(new.id, 'dispute:' || d.stripe_dispute_id, '拒付扣回 ' || d.stripe_dispute_id);
+    update public.payment_disputes set credits_clawed_back = (claw ->> 'taken')::integer,
+                                      clawback_shortfall = (claw ->> 'written_off')::integer
+     where stripe_dispute_id = d.stripe_dispute_id;
+    if d.closed_at is not null then
+      closed_rows := array_append(closed_rows, d);
+    end if;
+  end loop;
+  -- Attach every case before closing any: T71 transfers the held share to a
+  -- sibling open case and restores it only when the last eligible case closes.
+  for d in select * from unnest(closed_rows) order by closed_at, stripe_dispute_id loop
+    perform public.close_payment_dispute(d.stripe_dispute_id, d.closed_status);
+    update public.payment_disputes set closed_at = d.closed_at where stripe_dispute_id = d.stripe_dispute_id;
+  end loop;
+  return null;
+exception when others or query_canceled or assert_failure then
+  -- The subtransaction rolls back the link, debit and related commission changes together.
+  begin
+    insert into public.payment_dispute_link_errors(payment_id, error_code) values (new.id, sqlstate)
+      on conflict (payment_id) do update set error_code = excluded.error_code, occurred_at = now();
+  exception when others or query_canceled or assert_failure then
+    return null;
+  end;
+  return null;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_link_early_payment_disputes"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_match_dispute_before_insert"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  perform pg_advisory_xact_lock(hashtextextended(new.stripe_charge_id, 914));
+  select p.id, p.user_id into new.payment_id, new.user_id from public.payments p
+   where p.stripe_charge_id = new.stripe_charge_id for update;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_match_dispute_before_insert"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_membership_end_without_refunded"("p_user_id" "uuid") RETURNS timestamp with time zone
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -4374,6 +4441,12 @@ begin
   if not found then
     return null;
   end if;
+  if v_row.payment_id is null then
+    -- A purchase can now attach this orphan while close is running. Re-read
+    -- after its charge lock before choosing the payment to lock and restore.
+    perform pg_advisory_xact_lock(hashtextextended(v_row.stripe_charge_id, 914));
+    select * into strict v_row from public.payment_disputes where stripe_dispute_id = p_dispute_id;
+  end if;
   if v_row.payment_id is not null then
     select * into v_payment from public.payments where id = v_row.payment_id for update;
   end if;
@@ -7200,6 +7273,16 @@ CREATE TABLE IF NOT EXISTS "public"."partner_links" (
 ALTER TABLE "public"."partner_links" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."payment_dispute_link_errors" (
+    "payment_id" bigint NOT NULL,
+    "error_code" "text" NOT NULL,
+    "occurred_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."payment_dispute_link_errors" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."payment_refunds" (
     "refund_ref" "text" NOT NULL,
     "payment_id" bigint NOT NULL,
@@ -7626,6 +7709,11 @@ ALTER TABLE ONLY "public"."partner_links"
 
 
 
+ALTER TABLE ONLY "public"."payment_dispute_link_errors"
+    ADD CONSTRAINT "payment_dispute_link_errors_pkey" PRIMARY KEY ("payment_id");
+
+
+
 ALTER TABLE ONLY "public"."payment_disputes"
     ADD CONSTRAINT "payment_disputes_pkey" PRIMARY KEY ("stripe_dispute_id");
 
@@ -7965,6 +8053,10 @@ CREATE INDEX "payment_disputes_created_at_idx" ON "public"."payment_disputes" US
 
 
 
+CREATE INDEX "payment_disputes_unlinked_charge_idx" ON "public"."payment_disputes" USING "btree" ("stripe_charge_id") WHERE ("payment_id" IS NULL);
+
+
+
 CREATE INDEX "payment_disputes_unsubmitted_due_idx" ON "public"."payment_disputes" USING "btree" ("due_by") WHERE (("submitted_at" IS NULL) AND ("responder" = 'shotviva'::"text"));
 
 
@@ -8105,6 +8197,10 @@ CREATE OR REPLACE TRIGGER "affiliate_dispute_insert" AFTER INSERT ON "public"."p
 
 
 
+CREATE OR REPLACE TRIGGER "affiliate_dispute_link" AFTER UPDATE OF "payment_id" ON "public"."payment_disputes" FOR EACH ROW WHEN ((("old"."payment_id" IS NULL) AND ("new"."payment_id" IS NOT NULL) AND (NOT ("old"."closed_at" IS DISTINCT FROM "new"."closed_at")))) EXECUTE FUNCTION "public"."_affiliate_payment_event"();
+
+
+
 CREATE OR REPLACE TRIGGER "affiliate_dispute_update" AFTER UPDATE OF "closed_at", "closed_status" ON "public"."payment_disputes" FOR EACH ROW WHEN ((("new"."payment_id" IS NOT NULL) AND (("old"."closed_at" IS DISTINCT FROM "new"."closed_at") OR ("old"."closed_status" IS DISTINCT FROM "new"."closed_status")))) EXECUTE FUNCTION "public"."_affiliate_payment_event"();
 
 
@@ -8130,6 +8226,18 @@ CREATE OR REPLACE TRIGGER "ai_providers_set_updated_at" BEFORE UPDATE ON "public
 
 
 CREATE OR REPLACE TRIGGER "codes_enforce_gift_policy" BEFORE INSERT OR UPDATE OF "invitee_credits", "invitee_pool", "max_redemptions" ON "public"."codes" FOR EACH ROW EXECUTE FUNCTION "public"."_enforce_code_gift_policy"();
+
+
+
+CREATE OR REPLACE TRIGGER "link_disputes_payment_charge" AFTER UPDATE OF "stripe_charge_id" ON "public"."payments" FOR EACH ROW WHEN ((("old"."stripe_charge_id" IS NULL) AND ("new"."stripe_charge_id" IS NOT NULL))) EXECUTE FUNCTION "public"."_link_early_payment_disputes"();
+
+
+
+CREATE OR REPLACE TRIGGER "link_disputes_payment_insert" AFTER INSERT ON "public"."payments" FOR EACH ROW WHEN (("new"."stripe_charge_id" IS NOT NULL)) EXECUTE FUNCTION "public"."_link_early_payment_disputes"();
+
+
+
+CREATE OR REPLACE TRIGGER "match_unlinked_dispute" BEFORE INSERT ON "public"."payment_disputes" FOR EACH ROW WHEN (("new"."payment_id" IS NULL)) EXECUTE FUNCTION "public"."_match_dispute_before_insert"();
 
 
 
@@ -8359,6 +8467,11 @@ ALTER TABLE ONLY "public"."partner_links"
 
 
 
+ALTER TABLE ONLY "public"."payment_dispute_link_errors"
+    ADD CONSTRAINT "payment_dispute_link_errors_payment_id_fkey" FOREIGN KEY ("payment_id") REFERENCES "public"."payments"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."payment_disputes"
     ADD CONSTRAINT "payment_disputes_payment_id_fkey" FOREIGN KEY ("payment_id") REFERENCES "public"."payments"("id") ON DELETE SET NULL;
 
@@ -8579,6 +8692,9 @@ CREATE POLICY "partner_links_select_own" ON "public"."partner_links" FOR SELECT 
 
 
 
+ALTER TABLE "public"."payment_dispute_link_errors" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."payment_disputes" ENABLE ROW LEVEL SECURITY;
 
 
@@ -8743,6 +8859,14 @@ REVOKE ALL ON FUNCTION "public"."_end_membership_after_refund"("p_user_id" "uuid
 
 
 REVOKE ALL ON FUNCTION "public"."_enforce_code_gift_policy"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_link_early_payment_disputes"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_match_dispute_before_insert"() FROM PUBLIC;
 
 
 
@@ -9638,6 +9762,10 @@ GRANT SELECT("revoked_at") ON TABLE "public"."partner_links" TO "authenticated";
 
 
 GRANT SELECT("created_at") ON TABLE "public"."partner_links" TO "authenticated";
+
+
+
+GRANT SELECT ON TABLE "public"."payment_dispute_link_errors" TO "service_role";
 
 
 
