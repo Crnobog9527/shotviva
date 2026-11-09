@@ -71,11 +71,11 @@ function pageQuery(db: SupabaseClient, table: string, cols: string, cursor?: str
   return query
 }
 export async function members(db: SupabaseClient, f: Filters) {
-  let q = pageQuery(db, 'affiliates', 'user_id,slug,status,created_at', f.cursor, 'user_id')
+  let q = pageQuery(db, 'affiliates', 'user_id,slug,status,created_at,source:application->>source', f.cursor, 'user_id')
   if (f.tab === 'applications') q = q.eq('status', 'pending').or('application->>source.is.null,application->>source.neq.admin_invite')
   if (f.q) q = z.uuid().safeParse(f.q).success ? q.eq('user_id', f.q) : q.ilike('slug', f.q.replace(/[\\%_]/g, '\\$&') + '%')
   return toPage(
-    member
+    member.extend({ source: z.string().nullable() })
       .array()
       .parse(checked(await q))
       .map((r) => ({ ...r, id: r.user_id })),

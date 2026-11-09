@@ -2,8 +2,6 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
-import type { InviteConfig } from './index'
-
 const terms = z.object({
   code: z.string(), discount_percent: z.number().nullable(), discount_products: z.array(z.string()).nullable(),
   discount_duration: z.enum(['once', 'repeating', 'forever']).nullable(), discount_months: z.number().nullable(),
@@ -16,24 +14,24 @@ function available(offer: z.infer<typeof terms>, now: number) {
 }
 
 const preview = terms.extend({
-  kind: z.enum(['invite', 'campaign']), invitee_credits: z.number().nullable(), invitee_pool: z.enum(['free', 'paid']).nullable(),
+  kind: z.enum(['invite', 'campaign']), code_preview_credits: z.number().int().nonnegative(), invitee_pool: z.enum(['free', 'paid']).nullable(),
   max_redemptions: z.number().nullable(), redemption_count: z.number(),
   owner: z.object({ banned_at: z.string().nullable() }).nullable(),
 })
 
-export async function previewCode(admin: SupabaseClient, code: string, invite: InviteConfig) {
+export async function previewCode(admin: SupabaseClient, code: string) {
   const { data, error } = await admin.from('codes')
-    .select('code,kind,active,starts_at,expires_at,max_redemptions,redemption_count,invitee_credits,invitee_pool,discount_percent,discount_products,discount_duration,discount_months,owner:profiles!codes_owner_user_id_fkey(banned_at)')
+    .select('code,kind,active,starts_at,expires_at,max_redemptions,redemption_count,code_preview_credits,invitee_pool,discount_percent,discount_products,discount_duration,discount_months,owner:profiles!codes_owner_user_id_fkey(banned_at)')
     .eq('code', code).maybeSingle()
   if (error) throw error
   if (!data) return null
   const c = preview.parse(data)
   if (!available(c, Date.now()) || c.owner?.banned_at || (c.max_redemptions !== null && c.redemption_count >= c.max_redemptions)) return null
-  return describeOffer(c, invite)
+  return describeOffer(c)
 }
 
-function describeOffer(c: z.infer<typeof preview>, invite: InviteConfig) {
-  return { kind: c.kind, credits: c.kind === 'invite' ? invite.inviteeCredits : c.invitee_credits ?? 0,
+function describeOffer(c: z.infer<typeof preview>) {
+  return { kind: c.kind, credits: c.code_preview_credits,
     pool: c.kind === 'invite' ? 'free' as const : c.invitee_pool, percent: c.discount_percent, products: c.discount_products ?? [],
     duration: c.discount_duration, months: c.discount_months }
 }

@@ -8,19 +8,6 @@ import type { Member } from './read'
 function Slug({ value }: { value?: string }) {
   return <Field label={COPY.slug} name="slug" pattern={'[a-z0-9\\-]{3,24}'} minLength={3} maxLength={24} defaultValue={value} required />
 }
-export function CreateMember({ action }: { action: SaveAction }) {
-  return (
-    <details className="rounded border p-3">
-      <summary className="cursor-pointer font-medium">{COPY.create}</summary>
-      <MutationForm action={action} operation="create" label={COPY.create}>
-        <p className="text-sm text-muted-foreground">{COPY.inviteHint}</p>
-        <Field label={COPY.email} type="email" name="email" required />
-        <Slug />
-        <Rates optional />
-      </MutationForm>
-    </details>
-  )
-}
 export function DecideMember({ member, action }: { member: Member; action: SaveAction }) {
   if (member.application?.source === 'admin_invite') return <p>{COPY.awaitInvite}</p>
   return (

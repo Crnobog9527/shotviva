@@ -1,4 +1,4 @@
-import type { InviteConfig } from '../../codes'
+import type { InviteRewards } from '../../codes'
 import { TableCell, TableRow } from '../../ui/table'
 import type { Page } from '../cursor'
 import { ORDERS_COPY } from '../orders'
@@ -26,7 +26,7 @@ function Redemption({ row, hasDiscount, now }: { row: RedemptionRow; hasDiscount
   </TableRow>
 }
 
-type Props = { code: CodeRow; page: Page<RedemptionRow>; cursor?: string; invite: InviteConfig; toggle: ToggleAction; now: number }
+type Props = { code: CodeRow; page: Page<RedemptionRow>; cursor?: string; invite: InviteRewards; toggle: ToggleAction; now: number }
 
 export function CodeDetail({ code, page, invite, cursor, toggle, now }: Props) {
   const path = '/admin/codes/' + code.id

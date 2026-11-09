@@ -16,3 +16,9 @@ export async function isAffiliateEnabled(): Promise<boolean> {
   }
   return affiliateDefault
 }
+
+// Only the introduction is public when operations are closed.
+export function requiresAffiliateProgram(pathname: string): boolean {
+  const path = pathname.toLowerCase().replace(/^\/(en|zh)(?=\/)/, '').replace(/\/$/, '')
+  return (path === '/partners' || path.startsWith('/partners/')) && path !== '/partners/join'
+}

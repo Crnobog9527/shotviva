@@ -3,13 +3,15 @@
 import { useActionState, useRef, useState, type ReactNode } from 'react'
 import type { PartnerFormState } from './actions'
 
+export type PartnerFormLabels = Record<Exclude<PartnerFormState, ''> | 'submit', string>
+
 export function PartnerForm({
   action,
   labels,
   children,
 }: {
   action: (state: PartnerFormState, data: FormData) => Promise<PartnerFormState>
-  labels: Record<Exclude<PartnerFormState, ''> | 'submit', string>
+  labels: PartnerFormLabels
   children: ReactNode
 }) {
   const [state, submit, pending] = useActionState(action, '')

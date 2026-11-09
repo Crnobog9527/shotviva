@@ -129,12 +129,3 @@ export async function readReferrals(user: string, cursor?: string): Promise<Page
     amount: row.commission_amount,
   }))
 }
-
-export async function readDefaultRates() {
-  const schema = z.object({ product_kind: z.enum(['pack', 'monthly', 'yearly']), l1_bp: z.number().int() })
-  const result = await createAdminSupabase()
-    .from('affiliate_rates')
-    .select('product_kind,l1_bp')
-    .order('product_kind')
-  return parse(schema.array(), result)
-}

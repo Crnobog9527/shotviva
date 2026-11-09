@@ -2,6 +2,8 @@ import { notFound } from 'next/navigation'
 import { z } from 'zod'
 
 import { COPY, InvitesReport, redemptions, topInviters } from '@/core/admin/code-reports'
+import { readInviteRewards } from '@/core/codes/server'
+import { saveInviteRewards } from './save'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 
 export const instant = false
@@ -14,8 +16,8 @@ export default async function InvitesPage({ searchParams }: PageProps<'/[locale]
   if (!filters.success) notFound()
   const allTime = filters.data.period === 'all'
   const db = createAdminSupabase()
-  const [leaders, blocked] = await Promise.all([
-    topInviters(db, actor.id, allTime), redemptions(db, actor.id, null, filters.data.cursor),
+  const [leaders, blocked, rewards] = await Promise.all([
+    topInviters(db, actor.id, allTime), redemptions(db, actor.id, null, filters.data.cursor), readInviteRewards(db),
   ])
-  return <InvitesReport leaders={leaders} blocked={blocked} allTime={allTime} cursor={filters.data.cursor} />
+  return <InvitesReport rewards={rewards} save={saveInviteRewards} leaders={leaders} blocked={blocked} allTime={allTime} cursor={filters.data.cursor} />
 }
