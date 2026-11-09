@@ -1,10 +1,11 @@
 import { z } from 'zod'
+import { affiliateStatus, slugSchema } from '../enrollment'
+
+export { affiliateStatus, slugSchema }
 
 export const payoutMethods = ['paypal', 'wise', 'bank', 'alipay', 'other'] as const
 export const dashboardViews = ['overview', 'commissions', 'referrals', 'team', 'payouts', 'settings'] as const
-export const affiliateStatus = z.enum(['pending', 'active', 'rejected', 'suspended', 'banned'])
 export const commissionStatus = z.enum(['pending', 'on_hold', 'confirmed', 'void'])
-export const slugSchema = z.string().regex(/^[a-z0-9-]{3,24}$/)
 export const idSchema = z.union([z.number().int().safe(), z.string().regex(/^\d+$/)])
 const cents = z.number().int().safe()
 

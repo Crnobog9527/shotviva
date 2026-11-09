@@ -46,7 +46,7 @@ async function reject(work: () => Promise<unknown>, message: string) {
 
 async function redeem(user: string, code: string) {
   const result = await db.query("select public.redeem_code($1,$2,'account',$3,$4) as claim",
-    [user, code, invite.inviteeCredits * factor, invite.windowDays])
+    [user, code, invite.inviteeCredits, invite.windowDays])
   return result.rows[0].claim
 }
 
@@ -121,7 +121,7 @@ async function purchase(buyer: string) {
     [buyer, pack.id, session, cents, 'ch_' + randomUUID()])
   const { rows: [row] } = await db.query('select id from public.payments where stripe_session_id=$1', [session])
   const { rows: [effects] } = await db.query('select public.apply_payment_code_effects($1,$2,null,0,$3,$4) as value',
-    [buyer, row.id, invite.inviterCredits * factor, invite.inviterRewardCap])
+    [buyer, row.id, invite.inviterCredits, invite.inviterRewardCap])
   return effects.value.rewarded as boolean
 }
 
@@ -137,6 +137,8 @@ it('keeps the legacy signup gift and grants scaled purchase and inviter credits 
     [JSON.stringify(value), actor])
   await reject(() => setDays(0), 'INVALID_INPUT')
   await setDays(days)
+  await db.query("select public.admin_save_invite_rewards($1,$2,$3,value) from public.system_settings where key='code_invite_rewards'",
+    [actor, invite.inviteeCredits * factor, invite.inviterCredits * factor])
   const first = await referredBuyer(code)
   expect(await purchase(first)).toBe(true)
   expect((await profileOf(db, first)).credits).toBe(pack.credits * factor)

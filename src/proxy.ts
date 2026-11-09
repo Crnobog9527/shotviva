@@ -1,7 +1,7 @@
 import createMiddleware from 'next-intl/middleware'
 import type { NextRequest } from 'next/server'
 
-import { isAffiliateEnabled } from '@/core/affiliate/feature'
+import { isAffiliateEnabled, requiresAffiliateProgram } from '@/core/affiliate/feature'
 import { notFoundResponse } from '@/core/auth/proxy-gates'
 import { recordReferral } from '@/core/affiliate/referral'
 import { withAnalyticsRegion } from '@/core/analytics/consent'
@@ -27,7 +27,7 @@ const localeRouter = createMiddleware(routing)
 export async function proxy(request: NextRequest) {
   const redirect = canonicalRedirectResponse(request, hosts)
   if (redirect) return redirect
-  if (/^\/(?:zh\/|en\/)?partners(?:\/|$)/i.test(request.nextUrl.pathname) && !(await isAffiliateEnabled())) {
+  if (requiresAffiliateProgram(request.nextUrl.pathname) && !(await isAffiliateEnabled())) {
     return notFoundResponse()
   }
   const env = serverEnv()

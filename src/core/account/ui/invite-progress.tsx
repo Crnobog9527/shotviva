@@ -11,7 +11,7 @@ export function InviteProgress({ summary }: { summary: InviteSummary }) {
   return (
     <>
       <p className="text-body font-medium">{t('stats', { joined: invited, paid: purchasers, earned })}</p>
-      <p className="text-caption text-muted-foreground">{days ? t('cap', { left, days }) : t('remaining', { left })}</p>
+      {summary.rewards.inviterCredits > 0 && <p className="text-caption text-muted-foreground">{days ? t('cap', { left, days }) : t('remaining', { left })}</p>}
       {friends.length > 0 && (
         <ul aria-label={t('friends')} className="divide-y divide-hairline">
           {friends.map(f => <li key={f.id} className="flex flex-wrap justify-between gap-2 py-2 text-label">

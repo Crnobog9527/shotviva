@@ -21,7 +21,7 @@ it('returns a public normalized preview with no cache and no account session', a
   const response = await get('code=aBc4')
   expect(response.status).toBe(200)
   expect(await response.json()).toEqual({ preview: offer })
-  expect(mocks.preview).toHaveBeenCalledExactlyOnceWith(expect.anything(), 'ABC4', invite)
+  expect(mocks.preview).toHaveBeenCalledExactlyOnceWith(expect.anything(), 'ABC4')
   expect(response.headers.get('cache-control')).toContain('no-store')
 })
 

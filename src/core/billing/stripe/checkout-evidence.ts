@@ -1,6 +1,5 @@
 import type Stripe from 'stripe'
 
-import { localizePath } from '../../i18n/paths'
 import type { CheckoutRoute } from './catalog'
 import type { CheckoutClient } from './checkout'
 
@@ -28,8 +27,8 @@ function consentParams(route: CheckoutRoute, input: { locale: 'en' | 'zh'; origi
   // Managed Payments refuses custom_text (sandbox, 2026-11-08): its own box links the Terms URL
   // set in Stripe's public details.
   if (route.managedPayments) return consent
-  const link = (path: `/${string}`) => `${input.origin}${localizePath(path, input.locale)}`
-  const message = CONSENT_TEXT[input.locale](link('/terms'), link('/refund-policy'))
+  // The legal pages use the same unprefixed URLs in both languages.
+  const message = CONSENT_TEXT[input.locale](`${input.origin}/terms`, `${input.origin}/refund-policy`)
   return { ...consent, custom_text: { terms_of_service_acceptance: { message } } }
 }
 

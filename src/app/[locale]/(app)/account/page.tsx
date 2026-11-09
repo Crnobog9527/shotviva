@@ -60,7 +60,7 @@ async function Account() {
   return (
     <>
       <AccountView data={data} actions={actions} site={{ ...accountSite, freeCredits: signupGift.granted }}>
-        <InviteCard load={loadMyInvites} reward={site.growth.invite} />
+        <InviteCard load={loadMyInvites} />
         <RedeemCard pending={discount} />
       </AccountView>
       <AccountHelp actions={helpActions} payments={purchases} replyTime={<ReplyTime userId={user.id} />} brand={site.brand.name} unread={helpUnread} />

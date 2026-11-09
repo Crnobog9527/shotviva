@@ -15,10 +15,11 @@ export type FooterLink = { href: `/${string}`; label: string }
 type Props = {
   brand: SiteBrand
   links: readonly FooterLink[]
+  programLink?: ReactNode
   languageSwitch?: ReactNode
 }
 
-export function SiteFooter({ brand, links, languageSwitch }: Props) {
+export function SiteFooter({ brand, links, languageSwitch, programLink }: Props) {
   const t = useTranslations('footer')
   return (
     <footer className="mk-footer">
@@ -34,6 +35,7 @@ export function SiteFooter({ brand, links, languageSwitch }: Props) {
           <span className="mk-copy">{t('copyright', { year: String(brand.launchYear), name: brand.name })}</span>
         </div>
         <div className="mk-foot-fine">
+          {programLink}
           <nav aria-label={t('legalNav')}>
             {links.map((link, i) => (
               <span key={link.href} className="mk-foot-item">
