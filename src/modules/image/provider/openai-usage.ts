@@ -16,7 +16,7 @@ const usageSchema = z.object({
 })
 
 // Drops undefined entries, so a part that was not reported is absent rather than undefined.
-function present(usage: Record<keyof ProviderUsage, number | undefined>): ProviderUsage {
+function present(usage: ProviderUsage): ProviderUsage {
   return Object.fromEntries(Object.entries(usage).filter(([, value]) => value !== undefined))
 }
 
@@ -28,8 +28,6 @@ export function parseOpenAIUsage(body: unknown): ProviderUsage | null {
     input_text_tokens: parsed.data.input_tokens_details?.text_tokens,
     input_image_tokens: parsed.data.input_tokens_details?.image_tokens,
     output_tokens: parsed.data.output_tokens,
-    decision_input_tokens: undefined,
-    decision_output_tokens: undefined,
   })
   return Object.keys(usage).length === 0 ? null : usage
 }

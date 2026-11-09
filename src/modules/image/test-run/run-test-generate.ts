@@ -6,7 +6,7 @@ import type { z } from 'zod'
 
 import { AppError } from '@/core/errors'
 import { screenIdentityText, type IdentityJudge } from '@/core/identity-guard'
-import { screenCost, templateCall, typedWords, type SettleDeps } from '@/core/jobs'
+import { resolveTemplateProvider, screenCost, templateCall, typedWords, type SettleDeps, type TemplateProvider } from '@/core/jobs'
 import { loadInputImage } from '@/core/storage'
 import { DEFAULT_RESOLUTION, loadTestTemplate, OUTPUT_ASPECTS, validateGenerationInputs } from '@/core/templates'
 
@@ -27,9 +27,11 @@ export type TestRunDeps = SettleDeps & { identityJudge?: IdentityJudge | null; i
 
 export type TestGenerateRequest = { actorId: string; body: z.infer<typeof testGenerateBodySchema> }
 
+type FirstRunDeps = Omit<TestRunDeps, 'provider'> & { provider: TemplateProvider }
+
 // Everything that can be refused before the budget is touched: template, photo, fields, the
 // photo's bytes (HEAD, magic number, decode). No model is called here.
-async function prepare(deps: TestRunDeps, { body }: TestGenerateRequest) {
+async function prepare(deps: FirstRunDeps, { body }: TestGenerateRequest) {
   const loaded = await loadTestTemplate(deps.db, body.template_id)
   const photo = body.photo_id ? await findTestPhoto(deps.db, body.photo_id) : null
   if (body.photo_id && !photo) throw new AppError('NOT_FOUND', '测试照片已被清理，请重新上传')
@@ -44,14 +46,16 @@ async function prepare(deps: TestRunDeps, { body }: TestGenerateRequest) {
     aspects: OUTPUT_ASPECTS,
   })
   const image = photo ? await loadInputImage(deps.store, photo.objectKey) : null
-  return { loaded, photo, inputs, image }
+  const providerId = body.provider_id === undefined ? loaded.prompt.providerId : body.provider_id
+  return { loaded, photo, inputs, image, providerId }
 }
 
-export async function runTestGenerate(deps: TestRunDeps, req: TestGenerateRequest): Promise<TestRun> {
+export async function runTestGenerate(deps: FirstRunDeps, req: TestGenerateRequest): Promise<TestRun> {
   const existing = await findTestRun(deps.db, req.body.run_id)
   if (existing) return existing
-  const { loaded, photo, inputs, image } = await prepare(deps, req)
+  const { loaded, photo, inputs, image, providerId } = await prepare(deps, req)
   const resolution = req.body.inputs.resolution ?? DEFAULT_RESOLUTION
+  const provider = await resolveTemplateProvider(deps.provider, providerId, resolution)
   // Marks the request that created the row; a concurrent repeat gets the row and calls nothing.
   const attemptId = randomUUID()
   const run = await beginTestRun(deps.db, {
@@ -71,8 +75,8 @@ export async function runTestGenerate(deps: TestRunDeps, req: TestGenerateReques
       attempt_id: attemptId,
     },
     promptVersion: loaded.prompt.version,
-    provider: deps.provider.id,
-    estimateUsd: estimateRunUsd(resolution, loaded.template.quality, deps.provider.prices),
+    provider: provider.id,
+    estimateUsd: estimateRunUsd(resolution, loaded.template.quality, provider.prices),
   })
   if (run.status !== 'running' || run.inputs.attempt_id !== attemptId) return run
   // The face-swap judge (§5.1a) only now, with the budget held: a click over the budget calls nothing.
@@ -80,5 +84,5 @@ export async function runTestGenerate(deps: TestRunDeps, req: TestGenerateReques
     const screen = await screenIdentityText({ ...deps, quiet: true }, { userId: req.actorId, entry: 'workspace', texts: typedWords(inputs) })
     return { call: templateCall(loaded, inputs, image, resolution), decision: screenCost(deps.identityJudge, screen) }
   }
-  return continueTestRun(deps, run, step, deps.identityJudge?.prices)
+  return continueTestRun({ ...deps, provider }, run, step, deps.identityJudge?.prices)
 }

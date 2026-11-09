@@ -17,18 +17,25 @@ function originText(origin: PriceOrigin): string | null {
   return COPY.priceNoOfficial
 }
 
+function priceLabel(form: ProviderForm, field: PriceField): string {
+  if (form.adapter === 'openrouter_images') return field === 'priceOutputPerM' ? COPY.routerOutput : COPY.routerInput
+  return form.module === 'decision' && field === 'priceOutputPerM' ? COPY.priceTextOutputPerM : COPY[field]
+}
+
 // The module's per-million-token prices (T33): three for images, input / output for decisions. Free text so a half-typed decimal is not fought;
 // Save stays disabled until each is blank or a non-negative number.
 export function PriceFields({ form, onChange }: Props) {
   const origin = priceOrigin(form)
+  const router = form.adapter === 'openrouter_images'
+  const fields = MODULE_PRICE_FIELDS[router ? 'decision' : form.module]
   return (
     <fieldset className="grid gap-2">
       <legend className="text-sm font-medium">{COPY.pricesTitle}</legend>
-      <div className={`grid gap-2 ${form.module === 'image' ? 'grid-cols-3' : 'grid-cols-2'}`}>
-        {MODULE_PRICE_FIELDS[form.module].map((field) => (
+      <div className={`grid gap-2 ${fields.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        {fields.map((field) => (
           <div key={field} className="grid gap-1">
             <Label htmlFor={`provider-${field}`} className="text-xs">
-              {form.module === 'decision' && field === 'priceOutputPerM' ? COPY.priceTextOutputPerM : COPY[field]}
+              {priceLabel(form, field)}
             </Label>
             <Input
               id={`provider-${field}`}
@@ -40,12 +47,12 @@ export function PriceFields({ form, onChange }: Props) {
           </div>
         ))}
       </div>
-      {origin ? (
+      {origin && !router ? (
         <p role="status" className={`text-xs ${origin.kind === 'none' ? 'text-destructive' : 'text-muted-foreground'}`}>
           {originText(origin)}
         </p>
       ) : null}
-      <p className="text-muted-foreground text-xs">{COPY.pricesHint}</p>
+      <p className="text-muted-foreground text-xs">{router ? COPY.routerPricesHint : COPY.pricesHint}</p>
     </fieldset>
   )
 }

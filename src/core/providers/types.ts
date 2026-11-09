@@ -1,3 +1,4 @@
+import type { Resolution } from '../templates/output-options'
 import type { GenerationProvider, ProviderPrices } from '../jobs'
 
 // Provider settings (ARCHITECTURE §3.3). Mirrors the checks on public.ai_providers.
@@ -8,20 +9,26 @@ export type ProviderModule = (typeof PROVIDER_MODULES)[number]
 
 // Code adapters a row can name. A vendor with a different API shape is a new adapter (code),
 // not an admin setting.
-export const PROVIDER_ADAPTERS = ['openai_images', 'openai_responses'] as const
+export const PROVIDER_ADAPTERS = ['openai_images', 'openrouter_images', 'openai_responses'] as const
 export type ProviderAdapterId = (typeof PROVIDER_ADAPTERS)[number]
 
-// Each module has exactly one adapter so far; the table check pairs them the same way.
+export const MODULE_ADAPTERS: Record<ProviderModule, readonly ProviderAdapterId[]> = {
+  image: ['openai_images', 'openrouter_images'],
+  decision: ['openai_responses'],
+}
+
+// Default for new rows.
 export const MODULE_ADAPTER: Record<ProviderModule, ProviderAdapterId> = {
   image: 'openai_images',
   decision: 'openai_responses',
 }
 
+export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'
 export const DEFAULT_BASE_URL = 'https://api.openai.com/v1'
 
 // What an adapter needs to call its vendor. The key is plaintext, read from Vault per request:
 // never keep, log or return it.
-export type ProviderConfig = { baseUrl: string; model: string; apiKey: string }
+export type ProviderConfig = { baseUrl: string; model: string; apiKey: string; resolutions?: readonly Resolution[] }
 
 export type ProviderAdapter = (config: ProviderConfig) => GenerationProvider
 
@@ -35,6 +42,7 @@ export type AdminProvider = {
   adapter: ProviderAdapterId
   label: string
   baseUrl: string
+  resolutions: Resolution[]
   model: string
   apiKeyLast4: string | null
   isActive: boolean
@@ -50,6 +58,7 @@ export type ActiveProviderRow = {
   id: string
   adapter: ProviderAdapterId
   baseUrl: string
+  resolutions: Resolution[]
   model: string
   // Snapshot used to cost each job (T33). Cached with the row; a save expires the tag.
   prices: ProviderPrices

@@ -25,6 +25,10 @@ export function toUpsertArgs(template: TemplateInput, prompt: PromptInput, optio
       ...(template.sortOrder === undefined ? {} : { sort_order: template.sortOrder }),
       ...(template.isActive === undefined ? {} : { is_active: template.isActive }),
     },
-    p_prompt: { body: prompt.body, model_params: prompt.modelParams },
+    p_prompt: {
+      body: prompt.body,
+      model_params: prompt.modelParams,
+      ...(prompt.providerId === undefined ? {} : { provider_id: prompt.providerId }),
+    },
   }
 }

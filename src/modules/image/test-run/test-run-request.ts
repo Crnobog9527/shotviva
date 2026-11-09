@@ -10,6 +10,8 @@ export const testGenerateBodySchema = z.object({
   run_id: z.uuid(),
   batch_id: z.uuid(),
   template_id: z.string().min(1).max(64),
+  // Absent follows the saved template; explicit null uses the global default.
+  provider_id: z.uuid().nullable().optional(),
   photo_id: z.uuid().nullable().optional(),
   inputs: z
     .object({

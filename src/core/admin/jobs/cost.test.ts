@@ -5,6 +5,7 @@ import { costSummary, jobCostCell, legacyEstimate, modelCosts } from './cost'
 const UNIT = { '1k': 0.05, '2k': 0.1 }
 
 const row = (overrides: Partial<Parameters<typeof modelCosts>[0][number]> = {}) => ({
+  provider: 'env',
   model: 'gpt-image-2.6-sunburst',
   resolution: '2k',
   jobs: 10,

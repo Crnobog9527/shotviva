@@ -124,6 +124,15 @@ describe('saveProvider', () => {
     expect(rows).toHaveLength(0)
   })
 
+  it('refuses switching an existing row to another adapter, even with a forged save', async () => {
+    const id = await save({})
+    const update = { id, adapter: 'openrouter_images', baseUrl: 'https://openrouter.ai/api/v1', apiKey: '' }
+    expect(await runProviderAction(() => save(update))).toEqual({ ok: false, reason: 'not_found' })
+    const { rows } = await pg.query('select adapter, base_url from public.ai_providers where id = $1', [id])
+    expect(rows[0]).toEqual({ adapter: 'openai_images', base_url: 'https://api.openai.com/v1' })
+    expect(await readProviderKey(serviceSupabase(), id)).toBe(KEY)
+  })
+
   it('refuses a malformed key before and inside SQL', async () => {
     expect(await runProviderAction(() => save({ apiKey: 'has space 0123456789' }))).toEqual({ ok: false, reason: 'api_key_invalid' })
     expect(await runProviderAction(() => save({ apiKey: 'short' }))).toEqual({ ok: false, reason: 'api_key_invalid' })

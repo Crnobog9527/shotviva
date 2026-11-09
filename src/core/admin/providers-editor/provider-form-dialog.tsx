@@ -8,12 +8,13 @@ import { Input } from '@/core/ui/input'
 import { Label } from '@/core/ui/label'
 import { Textarea } from '@/core/ui/textarea'
 
-import { MODULE_ADAPTER, type ProviderModule } from '@/core/providers/types'
+import { RESOLUTIONS } from '@/core/templates/output-options'
+import { MODULE_ADAPTERS, type ProviderAdapterId, type ProviderModule } from '@/core/providers/types'
 
 import type { AdminProvider } from '../providers/types'
 
 import { PROVIDERS_COPY } from './copy'
-import { canSave, formFor, withModel, type ProviderForm } from './form-state'
+import { canSave, formFor, withAdapter, withModel, type ProviderForm } from './form-state'
 import { PriceFields } from './price-fields'
 
 type Props = {
@@ -44,7 +45,6 @@ const COPY = PROVIDERS_COPY.form
 
 export function ProviderFormDialog({ provider, module, pending, error, onCancel, onSubmit }: Props) {
   const [form, setForm] = useState(() => formFor(provider, module))
-  const adapter = MODULE_ADAPTER[form.module]
   const set = (key: keyof ProviderForm) => (event: { target: { value: string } }) =>
     setForm((prev) => ({ ...prev, [key]: event.target.value }))
   // The model drives the official-price pre-fill (§10.0).
@@ -64,17 +64,31 @@ export function ProviderFormDialog({ provider, module, pending, error, onCancel,
           <Field id="label" label={COPY.label} hint={COPY.labelHint}>
             {input('label')}
           </Field>
-          <div className="grid gap-1.5">
-            <span className="text-sm font-medium">{COPY.adapter}</span>
-            <p className="text-sm">
-              {PROVIDERS_COPY.modules[form.module].title} · {PROVIDERS_COPY.adapters[adapter]}
-            </p>
-            <p className="text-muted-foreground text-xs">{COPY.adapterHint[adapter]}</p>
-          </div>
+          <Field id="adapter" label={COPY.adapter} hint={COPY.adapterHint[form.adapter]}>
+            <select id="provider-adapter" className="border-input h-9 rounded-md border px-3 text-sm"
+              value={form.adapter} disabled={provider !== null || form.module === 'decision'}
+              onChange={(event) => setForm(withAdapter(form, event.target.value as ProviderAdapterId))}>
+              {MODULE_ADAPTERS[form.module].map((id) => <option key={id} value={id}>{PROVIDERS_COPY.adapters[id]}</option>)}
+            </select>
+          </Field>
+          {form.module === 'image' && (
+            <fieldset className="flex gap-4">
+              <legend className="mb-2 text-sm font-medium">{COPY.resolutions}</legend>
+              {RESOLUTIONS.map((tier) => (
+                <label key={tier} className="flex items-center gap-1.5 text-sm">
+                  <input type="checkbox" checked={form.resolutions.includes(tier)} onChange={(event) => {
+                    const resolutions = event.target.checked ? [...form.resolutions, tier] : form.resolutions.filter((value) => value !== tier)
+                    setForm({ ...form, resolutions })
+                  }} />
+                  {tier.toUpperCase()}
+                </label>
+              ))}
+            </fieldset>
+          )}
           <Field id="baseUrl" label={COPY.baseUrl} hint={COPY.baseUrlHint}>
             {input('baseUrl', true)}
           </Field>
-          <Field id="model" label={COPY.model} hint={PROVIDERS_COPY.modules[form.module].modelHint}>
+          <Field id="model" label={COPY.model} hint={form.adapter === 'openrouter_images' ? COPY.routerModelHint : PROVIDERS_COPY.modules[form.module].modelHint}>
             {input('model', true)}
           </Field>
           <Field

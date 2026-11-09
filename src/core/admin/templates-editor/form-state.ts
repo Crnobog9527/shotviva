@@ -18,6 +18,7 @@ export type TemplateFormValues = {
   visibleWeb: boolean
   visiblePartner: boolean
   fieldsJson: string
+  providerId: string | null
   promptBody: string
   modelParamsJson: string
   // Chinese display text (templates.translations.zh); blank means "show the English".
@@ -50,6 +51,7 @@ export function emptyFormValues(): TemplateFormValues {
     visibleWeb: true,
     visiblePartner: false,
     fieldsJson: pretty(DEFAULT_FIELDS),
+    providerId: null,
     promptBody: '',
     modelParamsJson: '{}',
     zh: emptyZh(),
@@ -117,6 +119,7 @@ export function toFormValues(template: AdminTemplate): TemplateFormValues {
     visibleWeb: template.visibleIn.includes('web'),
     visiblePartner: template.visibleIn.includes('partner'),
     fieldsJson: pretty(withoutToggles(template.fields)),
+    providerId: template.prompt?.providerId ?? null,
     promptBody: template.prompt?.body ?? '',
     modelParamsJson: pretty(withoutToggles(template.prompt?.modelParams ?? {})),
     zh: toZhValues(template),
@@ -199,7 +202,7 @@ export function buildPayload(values: TemplateFormValues, isNew: boolean, floor: 
         fields: wired.fields,
         translations: toTranslations(values.zh, copyKeys(values.fieldsJson).map((field) => field.key), values.toggles),
       },
-      prompt: { body: values.promptBody, modelParams: wired.modelParams },
+      prompt: { providerId: values.providerId, body: values.promptBody, modelParams: wired.modelParams },
     },
   }
 }

@@ -14,13 +14,14 @@ import {
   type TemplateRow,
 } from '@/core/templates'
 
+import type { ImageProviderOption } from '../image-provider-field'
 import type { PublishCandidate } from './publish-rules'
 import { toUpsertArgs } from './rpc-payload'
 import type { AdminTemplate } from './types'
 
 // Every function expects a service-role client; callers must have passed requireAdmin().
 
-type PromptRow = { body: string; version: number; model_params: Record<string, unknown> }
+type PromptRow = { provider_id: string | null; body: string; version: number; model_params: Record<string, unknown> }
 type AdminRow = (TemplateRow | PreT75TemplateRow) & { template_prompts: PromptRow | null }
 
 export async function listAdminTemplates(client: SupabaseClient): Promise<AdminTemplate[]> {
@@ -35,19 +36,26 @@ export async function listAdminTemplates(client: SupabaseClient): Promise<AdminT
         .order('sort_order', { ascending: true })
         .order('id', { ascending: true })
         .returns<AdminRow[]>(),
-    ', template_prompts(body, version, model_params)',
+    ', template_prompts(body, version, model_params, provider_id)',
   )
   if (error || !data) throw new AppError('INTERNAL', `listAdminTemplates failed: ${error?.message ?? 'no data'}`)
   return data.map((row) => ({
     ...toTemplate(row),
     prompt: row.template_prompts
       ? {
+          providerId: row.template_prompts.provider_id,
           body: row.template_prompts.body,
           version: row.template_prompts.version,
           modelParams: row.template_prompts.model_params,
         }
       : null,
   }))
+}
+
+export async function listImageProviderOptions(client: SupabaseClient): Promise<ImageProviderOption[]> {
+  const { data, error } = await client.from('ai_providers').select('id, label, model').eq('module', 'image').order('label')
+  if (error) throw new AppError('INTERNAL', `listImageProviderOptions failed: ${error.message}`)
+  return data
 }
 
 // A plain GET, not `head: true`: PostgREST answers HEAD without Content-Length and then
@@ -65,6 +73,7 @@ export async function upsertTemplate(
   prompt: PromptInput,
 ): Promise<void> {
   const { error } = await client.rpc('admin_upsert_template', toUpsertArgs(template, prompt))
+  if (error?.message.includes('PROVIDER_NOT_IMAGE')) throw new AppError('INVALID_INPUT', '所选出图模型已不可用，请重新选择')
   // templates_category_key_fkey (T75): the category was deleted while the form was open.
   if (error?.code === '23503') throw new AppError('INVALID_INPUT', '所选分类已经不存在了，请重新选择分类')
   if (error) throw new AppError('INTERNAL', `upsertTemplate failed: ${error.message}`)

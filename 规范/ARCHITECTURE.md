@@ -113,7 +113,7 @@ interface GenerationProvider {
 
 ### 3.2 v1 范围
 
-- `image` 模块：只实现 OpenAI Images 接口形态的适配器（`/v1/images/edits`、`/v1/images/generations`；官方地址或兼容这套接口的中转地址都能用）。**用哪个供应商、哪个模型，从 T17 起在后台配置**（第 3.3 节）；环境变量 `OPENAI_API_KEY` / `OPENAI_IMAGE_MODEL` 只在后台没有启用任何供应商时兜底。环境变量的说明（原文）：`OPENAI_IMAGE_MODEL`，默认值由 Owner 定（代码里当前默认 `gpt-image-2.5-sunburst`；GPT Image 2.6 已于 2026-11-04 上线、同价、更快；Owner 2026-11-05 评估 2.6 对人物五官的保持很强，默认用哪个仍由 Owner 在环境变量里定）。底座的 fal / KIE / WaveSpeed / Atlas 适配器不搬。
+- `image` 模块：支持 OpenRouter Chat Completions 出图接口，也支持 OpenAI Images 接口（`/v1/images/edits`、`/v1/images/generations`；官方地址或兼容这套接口的中转地址都能用）。**用哪个供应商、哪个模型，从 T17 起在后台配置**（第 3.3 节）；环境变量 `OPENAI_API_KEY` / `OPENAI_IMAGE_MODEL` 只在后台没有启用任何供应商时兜底。环境变量的说明（原文）：`OPENAI_IMAGE_MODEL`，默认值由 Owner 定（代码里当前默认 `gpt-image-2.5-sunburst`；GPT Image 2.6 已于 2026-11-04 上线、同价、更快；Owner 2026-11-05 评估 2.6 对人物五官的保持很强，默认用哪个仍由 Owner 在环境变量里定）。底座的 fal / KIE / WaveSpeed / Atlas 适配器不搬。
 - `video` 模块：只有接口类型，`site.config.ts` 里是 `false`，不写任何视频页面。
 
 ### 3.3 出图供应商配置（后台，Owner 要求：随时换供应商和模型，不改代码、不重新部署）
@@ -124,10 +124,11 @@ interface GenerationProvider {
 |---|---|
 | `id` | uuid |
 | `module` | `'image'`；`'decision'`（作品编辑判断改动范围用，T30，§5.2）；以后视频再加 |
-| `adapter` | 用哪个代码适配器：`'openai_images'`；`'openai_responses'`（OpenAI 官方 Responses API，作品编辑判断用，第一版模型 `gpt-6-luna`，Owner 2026-11-06）。接一个接口形态不同的厂商（如 Gemini、Seedream）要写新适配器，是代码任务，不是后台操作 |
+| `adapter` | 出图用 `'openai_images'` 或 `'openrouter_images'`；`'openai_responses'`（OpenAI 官方 Responses API，作品编辑判断用，第一版模型 `gpt-6-luna`，Owner 2026-11-06）。接一个接口形态不同的厂商（如 Gemini、Seedream）要写新适配器，是代码任务，不是后台操作 |
 | `label` | 后台显示名，如「OpenAI 官方」「某中转」 |
-| `base_url` | 接口根地址，默认 `https://api.openai.com/v1`；只允许 `https://`，拒绝 localhost、内网和保留地址 |
-| `model` | 模型名，如 `gpt-image-2.6` |
+| `base_url` | 接口根地址，OpenRouter 默认 `https://openrouter.ai/api/v1`，OpenAI 默认 `https://api.openai.com/v1`；只允许 `https://`，拒绝 localhost、内网和保留地址 |
+| `model` | 模型名，如 `gpt-image-2.6`、`google/gemini-2.5-flash-image` |
+| `resolutions` | 支持的清晰度，非空 text[]，默认 `{1k,2k,3k}`。模板或试跑指定该模型时按此判断能否出当前清晰度 |
 | `vault_secret_id` | 密钥存在 **Supabase Vault**（`vault.secrets`，由 Supabase 在库内加密），表里只存它的 id。Owner 2026-11-06 改定，和 Graylum 一样；取代原先「应用用 `PROVIDER_SECRETS_KEY` 做 AES-256-GCM」的做法，不再需要任何应用侧加密密钥 |
 | `api_key_last4` | 密钥后 4 位，后台列表里显示用 |
 | `is_active` | 当前在用；同一个 `module` 最多一条为 `true`（部分唯一索引） |
@@ -135,11 +136,13 @@ interface GenerationProvider {
 | `notes` | 备注 |
 | `created_at` / `updated_at` / `updated_by` | 审计 |
 
-**删除供应商**（Owner 2026-11-06）：后台供应商列表每行有「删除」，二次确认后调用 `admin_delete_provider(p_id)`：在用的那一行不能删（先把另一条设为在用，或先停用再删）；删除时连同它在 Vault 里的密钥一起删掉，在同一个事务里完成。出图记录里的 `provider` 是文字快照，删除不影响历史记录和成本。迁移编号段 `0300`～`0319`。
+**删除供应商**（Owner 2026-11-06）：后台供应商列表每行有「删除」，二次确认后调用 `admin_delete_provider(p_id)`：被 `template_prompts.provider_id` 引用的供应商须先解除绑定；在用的那一行不能删（先把另一条设为在用，或先停用再删）；删除时连同它在 Vault 里的密钥一起删掉，在同一个事务里完成。出图记录里的 `provider` 是文字快照，删除不影响历史记录和成本。迁移编号段 `0300`～`0319`。
 
 切换在用的供应商用 SQL 函数 `admin_activate_provider(p_id)`：同一事务里把同模块其他行设为 `false`、这一行设为 `true`。
 
-**出图时怎么选**：`core` 按模块取 `is_active` 那一行（服务端缓存，打 `providers` 标签，后台改动后立即失效），解密密钥，交给模块注册的适配器生成。后台没有启用的供应商时，用环境变量兜底。伙伴接口走同一条路径。`generation_jobs.provider` 写 `<供应商 id 或 env>/<模型名>`，以后按模型算成本用。从 T17 起，模板 `model_params` 里的 `model` 不再生效，模型只由在用的供应商决定，防止换供应商后个别模板还在调旧模型；`background` 等其他参数照旧。
+**出图时怎么选**：前台模板出图优先用 `template_prompts.provider_id` 指定的 image 供应商（可未启用）。该字段为空，或该供应商不支持订单清晰度时，走默认供应商：取 image 模块的 `is_active` 行，无在用行时沿用环境变量。作品编辑和伙伴出图只走默认供应商；换脸判断按 decision 模块取在用行。后台改供应商后使 `providers` 缓存失效，密钥按次读取。实际调用的供应商和完整模型名以 `<供应商 id 或 env>/<模型名>` 记入 `generation_jobs.provider`，按供应商、模型和清晰度分别统计。模板 `model_params.model` 不参与选型。
+
+**OpenRouter**：用 `/chat/completions` 发送文字及输入图，接收首张返回图。支持尺寸参数的模型将 1K、2K、3K 档映射到 `image_size` 的 1K、2K、4K，3K 档交付时缩回本站目标像素。OpenRouter 不使用 OpenAI 的 `quality`、`input_fidelity`、`background`。原始 `prompt_tokens`、`completion_tokens`、`cost` 记入 `provider_usage`；响应的美元费用乘以 1.055 计入 `cost_usd`（充值手续费）。缺少费用时记录警告，按已有 token 和配置单价估算。积分仍按第 6.1 节的价格和下限。
 
 **后台页 `/admin/providers`**（中文界面）：
 - 列表：显示名、适配器、地址、模型、密钥后 4 位、是否在用、更新时间。
@@ -197,7 +200,7 @@ v1 不写回调解析、定时轮询、超时清理这类定时任务。视频�
 
 - `templates`（公开）：id、模块、名称、分类、封面前后对比图、字段定义（要几张图、要填哪些文案、可选比例）、**质量档 `quality`**（`'high'` / `'medium'`，送给模型的 `quality` 参数，默认 `'high'`）、**消耗积分 `credits_cost`**（jsonb，按分辨率三个档都必填：`{ "1k": 2, "2k": 4, "3k": 6 }`，正整数）、排序、上下架状态、`visible_in`（`['web']` / `['partner']` / 两者，控制在哪些入口展示）、**展示文字的其他语言版本 `translations`**（jsonb，默认 `{}`；结构 `{ "zh": { "name": "…", "description": "…", "fields": { "<字段 key>": { "label": "…", "placeholder": "…" } } } }`；英文仍是 `name` 等原字段；某语言缺某项时回退英文；后台模板编辑页可填中文；提示词不翻译，始终英文，Owner 2026-11-06）。
   - **英文说明**（Owner 2026-11-07 补）：`templates` 加 `description`（可空，≤160 字），后台模板编辑页在英文名称下面加「英文说明」输入框，和「中文说明」并排。凡是显示模板说明的地方（模板卡、创作弹窗、工作台标题下、落地页模板列表），英文页显示 `description`，中文页显示 `translations.zh.description`，中文缺失时回退英文说明；两者都空就不显示。说明不自动翻译。迁移编号段 `0380`～`0399`（T52）。
-- `template_prompts`（私有，只有服务端能读，RLS 拒绝所有客户端）：模板 id、提示词正文、版本号、模型参数。
+- `template_prompts`（私有，只有服务端能读，RLS 拒绝所有客户端）：模板 id、提示词正文、版本号、模型参数、可空外键 `provider_id uuid`（只允许 `ai_providers.module = image`，见 §3.3）。后台「出图模型」可选跟随默认或某一条 image 供应商。不支持该清晰度时用默认供应商。旧调用保存提示词时省略该字段会保留已选模型，显式传 null 才恢复默认。
 
 内置一条 `freeform` 模板：字段定义只有 `prompt`（加可选参考图），`template_prompts` 里的提示词是直通。它让「自由文字出图」和「模板出图」走同一条代码路径；`visible_in = ['partner']`，Shotviva 自己的前台不展示（DESIGN.md 禁止出现 prompt）。
 
@@ -626,9 +629,9 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 
 建模板、调提示词、做封面都在后台完成，并且**完整走一遍用户的链路：首次出图 → 在结果上编辑 → 在编辑结果上再编辑**。
 - **入口**：模板编辑页（新建或编辑都有）右侧「试跑」面板。草稿（未上架）模板也能试跑。
-- **首次出图**：上传测试照片或从「最近用过的测试照片」里选（只存测试用，和用户照片分开），选清晰度（默认标准），填模板的文字字段和补充说明，点「试跑」。可选「一次跑 3 张」：同一版提示词跑 3 张不同照片，或同一张照片跑 3 次。走和用户出图**完全相同**的流程：同样的提示词拼法、供应商、质量档、换脸判断（§5.1a）。
+- **首次出图**：上传测试照片或从「最近用过的测试照片」里选（只存测试用，和用户照片分开），选清晰度（默认标准），填模板的文字字段和补充说明，点「试跑」。可选「一次跑 3 张」：同一版提示词跑 3 张不同照片，或同一张照片跑 3 次。「出图模型」默认使用模板当前配置，可为本次比较指定其他 image 供应商或默认供应商；这次选择不写回模板。走和用户出图**完全相同**的流程：同样的提示词拼法、供应商、质量档、换脸判断（§5.1a）。
 - **编辑**：任何一次试跑结果都可以点「编辑」，写一句要改的地方，走和用户作品编辑（§5.2）**完全相同**的流程（范围判断、兜底、换脸判断、计价规则）；编辑同样支持「一次跑 3 张」（同一句话跑 3 次，或对 3 个结果各跑一次）。编辑结果上还能继续编辑，形成一棵记录树。
-- **记录和对比**：每个模板保留最近 50 条试跑 / 编辑记录（含当时的提示词版本、清晰度、说明文字、耗时、成本），按树状显示；可以勾两条并排对比。
+- **记录和对比**：每个模板保留最近 50 条试跑 / 编辑记录（含当时的提示词版本、实际模型名、清晰度、说明文字、耗时、成本），按树状显示；可以勾两条并排对比。
 - **设为封面**：任意一条结果一键设为「后」封面，它的源照片设为「前」封面，按封面规则自动压缩；动态封面照旧单独上传。
 - **费用**：不扣任何积分；每次显示真实成本，计入成本对账并标「后台试跑」；默认每天 5 美元上限（后台可改），到上限后当天不能再试跑。
 - **隔离**：只有管理员能用；试跑结果不进管理员账号的作品、不计入出图统计、漏斗和 PostHog 事件（`source = admin_test`）；没设成封面的结果和测试照片 30 天后删除（打开试跑面板时顺带清理，不加定时任务）。
@@ -680,7 +683,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 
 #### 表 `admin_test_spend`（私有，同上；审查后新增，2026-11-08）
 
-每次试跑一行，**没有外键**（删模板、裁剪 50 条、30 天清理都不影响它），100 天后才清。字段：`run_id`（唯一）、`template_id`（只记值）、`day`（北京时间自然日）、`cost_usd`、`counted_as`（`actual` 真实成本 / `estimate` 调过出图模型但算不出成本时按估算 / `zero` 未调用模型或 10 分钟超时）、`created_at`。**每日预算和成本对账页的「后台试跑」都只读这张表。**预算判断和占用（`admin_begin_test_run`）在任何模型调用之前完成，包括换脸判断和编辑范围判断；超预算一个模型都不调。换脸被拒的试跑记为 `failed / IDENTITY_SWAP_REFUSED`，判断用掉的 token 计入成本。试跑不占管理员的换脸判断配额，也不计入「AI 供应商」页的用户统计。清理改为 `POST /api/admin/test-runs/cleanup`（同源校验）。
+每次试跑一行，**没有外键**（删模板、裁剪 50 条、30 天清理都不影响它），100 天后才清。字段：`run_id`（唯一）、`template_id`（只记值）、`day`（北京时间自然日）、`cost_usd`、`counted_as`（`actual` 真实成本 / `estimate` 调过出图模型但算不出成本时按估算 / `zero` 未调用模型或 10 分钟超时）、`created_at`。T92 增加 `provider text`（同试跑的供应商/模型快照，迁移前已被裁剪的归为未知）和 `has_openrouter boolean`（是否记录到 OpenRouter 用量），即使试跑明细被删除也能按模型对账。**每日预算和成本对账页的「后台试跑」都只读这张表。**预算判断和占用（`admin_begin_test_run`）在任何模型调用之前完成，包括换脸判断和编辑范围判断；超预算一个模型都不调。换脸被拒的试跑记为 `failed / IDENTITY_SWAP_REFUSED`，判断用掉的 token 计入成本。试跑不占管理员的换脸判断配额，也不计入「AI 供应商」页的用户统计。清理改为 `POST /api/admin/test-runs/cleanup`（同源校验）。
 
 #### 函数（普通 plpgsql，`search_path = ''`，只授权 `service_role`；带 `p_actor` 的在函数里再核对是管理员）
 
@@ -689,7 +692,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - `admin_test_budget_status()`：返回预算、当天已花、当天试跑次数、北京时间日期。
 - `admin_set_test_run_cover(p_actor, p_run_id, p_before_url, p_after_url, p_locale text default null)`：`p_locale` 为空时写通用封面，指定语言时写该语言的专属封面（T87 实现，此前传语言返回 `INVALID_INPUT`）；同一事务里更新模板的前后封面地址、记 `cover_set_at`。WebP 转换和写公开桶在应用里先做（和现有封面上传同一套压缩规则）。
 - `admin_cleanup_test_runs(p_actor)`：打开面板时调用。删掉 30 天前且没设成封面的记录；每个模板超出最近 50 条的（不含封面记录）；30 天没用过、也不是封面记录源照片的测试照片；10 分钟还在 `running` 的标成 `failed / TIMEOUT`。返回要从 R2 删除的 key 列表，应用尽力删除、失败只记日志。
-- `admin_test_daily_costs(p_days)`：成本对账页按 UTC 日返回试跑的 `cost_usd` 合计和次数，和 `admin_daily_costs` 并列显示为「后台试跑」，计入「我们记录的成本」。
+- `admin_test_daily_costs(p_days)`：成本对账页按 UTC 日返回试跑的 `cost_usd` 合计、次数和分供应商/模型的明细（`by_provider`）。两侧每日记录都标明是否含 OpenRouter 用量，混合费用的日期不与 OpenAI 账单计算差额。试跑合计和 `admin_daily_costs` 并列显示为「后台试跑」，计入「我们记录的成本」。
 - 预算：`system_settings` 新键 `admin_test_daily_budget_usd`（数字，0～1000，默认 5），`admin_set_system_setting` 用 `create or replace` 加这个键。
 
 迁移 `0780`～`0789`，只加表、索引、函数；`admin_set_system_setting` 只多认一个键，旧代码不受影响。

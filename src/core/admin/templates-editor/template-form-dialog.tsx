@@ -6,6 +6,7 @@ import { Button } from '@/core/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/core/ui/dialog'
 import type { CreditsFloor } from '@/core/templates/pricing'
 
+import { ImageProviderField, type ImageProviderOption } from '../image-provider-field'
 import type { AdminTemplate, CoverLanguage, SaveTemplatePayload, TemplateAdminActions } from '../templates/types'
 import { TEST_RUN_COPY, TestRunPanel } from '../test-run-ui'
 
@@ -20,6 +21,7 @@ import { TemplateTranslationFields } from './template-translation-fields'
 export type EditTarget = { mode: 'new' } | { mode: 'edit'; template: AdminTemplate }
 
 type Props = {
+  providers: readonly ImageProviderOption[]
   target: EditTarget
   floor: CreditsFloor
   categories: readonly CategoryOption[]
@@ -34,7 +36,7 @@ type Props = {
 }
 
 // Mounted fresh per target (keyed by the container), so initial state comes straight from props.
-export function TemplateFormDialog({ target, floor, categories, coverLanguages, coverActions, pending, error, notice, onCancel, onSubmit }: Props) {
+export function TemplateFormDialog({ target, providers, floor, categories, coverLanguages, coverActions, pending, error, notice, onCancel, onSubmit }: Props) {
   const isNew = target.mode === 'new'
   const [values, setValues] = useState(() =>
     target.mode === 'edit' ? toFormValues(target.template) : emptyFormValues(),
@@ -62,9 +64,9 @@ export function TemplateFormDialog({ target, floor, categories, coverLanguages, 
           one scrolling column below that. */}
       <DialogContent className="max-h-[92vh] gap-0 overflow-y-auto p-0 sm:max-w-[min(1400px,96vw)] lg:h-[92vh] lg:overflow-clip">
         <div className="grid min-h-0 lg:h-full lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
-          <FormColumn {...{ target, values, isNew, floor, categories, coverLanguages, coverActions, onChange, pending, onCancel }} error={shownError} saved={submitted ? (notice ?? null) : null} onSave={submit} />
+          <FormColumn {...{ target, providers, values, isNew, floor, categories, coverLanguages, coverActions, onChange, pending, onCancel }} error={shownError} saved={submitted ? (notice ?? null) : null} onSave={submit} />
           <aside className="bg-muted/20 min-h-0 border-t p-6 lg:overflow-y-auto lg:border-t-0 lg:border-l">
-            {target.mode === 'edit' ? <TestRunPanel template={target.template} languages={coverLanguages} /> : <NewTemplateNote />}
+            {target.mode === 'edit' ? <TestRunPanel providers={providers} template={target.template} languages={coverLanguages} /> : <NewTemplateNote />}
           </aside>
         </div>
       </DialogContent>
@@ -81,7 +83,7 @@ function NewTemplateNote() {
   )
 }
 
-type FormColumnProps = Pick<Props, 'target' | 'floor' | 'categories' | 'coverLanguages' | 'coverActions' | 'pending' | 'onCancel'> & {
+type FormColumnProps = Pick<Props, 'target' | 'providers' | 'floor' | 'categories' | 'coverLanguages' | 'coverActions' | 'pending' | 'onCancel'> & {
   values: TemplateFormValues
   isNew: boolean
   error: string | null
@@ -91,7 +93,7 @@ type FormColumnProps = Pick<Props, 'target' | 'floor' | 'categories' | 'coverLan
   onSave: () => void
 }
 
-function FormColumn({ target, values, isNew, floor, categories, coverLanguages, coverActions, pending, error, saved, onChange, onCancel, onSave }: FormColumnProps) {
+function FormColumn({ target, providers, values, isNew, floor, categories, coverLanguages, coverActions, pending, error, saved, onChange, onCancel, onSave }: FormColumnProps) {
   const existing = target.mode === 'edit' ? target.template : null
   return (
     <div className="grid min-h-0 content-start gap-4 p-6 lg:overflow-y-auto">
@@ -104,6 +106,9 @@ function FormColumn({ target, values, isNew, floor, categories, coverLanguages, 
         <TemplateCoverFields template={existing} languages={coverLanguages} actions={coverActions} />
       ) : (
         <p className="text-muted-foreground text-xs">保存模板后再打开编辑，即可上传封面。</p>
+      )}
+      {values.module === 'image' && (
+        <ImageProviderField id="tpl-provider" providers={providers} value={values.providerId} onChange={(providerId) => onChange({ providerId })} />
       )}
       <TemplatePromptFields values={values} version={existing?.prompt?.version ?? null} onChange={onChange} />
       <TemplateToggleFields values={values} onChange={onChange} />

@@ -1,4 +1,5 @@
 // Image (later video) provider settings and per-request resolution (ARCHITECTURE §3.3).
+export { templateImageProvider } from './template-image-provider'
 export { activeCredentials, activeProvider, PROVIDERS_CACHE_TAG, type ProviderCredentials } from './active-provider'
 export { assertPublicBaseUrl, isBlockedAddress, parseBaseUrl, type HostResolver } from './base-url'
 export { testConnection, type ConnectionResult } from './connection-test'
@@ -20,6 +21,8 @@ export { PROVIDER_SETTING_REASONS, ProviderSettingError, type ProviderSettingRea
 export {
   DEFAULT_BASE_URL,
   MODULE_ADAPTER,
+  MODULE_ADAPTERS,
+  OPENROUTER_BASE_URL,
   PROVIDER_ADAPTERS,
   PROVIDER_MODULES,
   type ActiveProviderRow,

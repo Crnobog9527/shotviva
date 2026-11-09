@@ -16,20 +16,24 @@ export const COSTS_DAYS = 30
 
 const count = z.coerce.number().int().nonnegative()
 const daysSchema = z.array(
-  z.object({ day: z.string(), cost_usd: z.coerce.number().nonnegative(), costed: count, uncosted: count, no_usage: count }),
+  z.object({ day: z.string(), has_openrouter: z.boolean().default(false), cost_usd: z.coerce.number().nonnegative(), costed: count, uncosted: count, no_usage: count }),
 )
 
-const testDaysSchema = z.array(z.object({ day: z.string(), cost_usd: z.coerce.number().nonnegative(), runs: count }))
+const providerCosts = z.array(z.object({ provider: z.string(), cost_usd: z.coerce.number().nonnegative(), runs: count }))
+const testDaysSchema = z.array(z.object({
+  day: z.string(), cost_usd: z.coerce.number().nonnegative(), runs: count,
+  has_openrouter: z.boolean().default(false), by_provider: providerCosts.default([]),
+}))
 
 // Admin test runs (T85, 0788) by the same UTC days. A failed read leaves them out (logged) rather
 // than taking the page down; the jobs side is what the page is for.
-async function loadTestDailyCosts(db: RpcClient, days: number): Promise<Map<string, { cost: number; runs: number }>> {
+async function loadTestDailyCosts(db: RpcClient, days: number) {
   try {
     const rows = await callRpc(db, 'admin_test_daily_costs', { p_days: days }, testDaysSchema)
-    return new Map(rows.map((row) => [row.day, { cost: row.cost_usd, runs: row.runs }]))
+    return new Map(rows.map((row) => [row.day, row]))
   } catch (error) {
     logger.error('admin test daily costs unavailable', { error })
-    return new Map()
+    return new Map<string, z.infer<typeof testDaysSchema>[number]>()
   }
 }
 
@@ -37,8 +41,11 @@ async function loadTestDailyCosts(db: RpcClient, days: number): Promise<Map<stri
 export async function loadOurDailyCosts(db: RpcClient, days: number = COSTS_DAYS): Promise<OurDay[]> {
   const [jobs, tests] = await Promise.all([callRpc(db, 'admin_daily_costs', { p_days: days }, daysSchema), loadTestDailyCosts(db, days)])
   return jobs.map((day) => {
-    const test = tests.get(day.day)
-    return { ...day, cost_usd: day.cost_usd + (test?.cost ?? 0), test_cost_usd: test?.cost ?? 0, test_runs: test?.runs ?? 0 }
+    const test = tests.get(day.day) ?? { cost_usd: 0, runs: 0, by_provider: [], has_openrouter: false }
+    return {
+      ...day, cost_usd: day.cost_usd + test.cost_usd, test_cost_usd: test.cost_usd,
+      test_runs: test.runs, by_provider: test.by_provider, has_openrouter: day.has_openrouter || test.has_openrouter,
+    }
   })
 }
 

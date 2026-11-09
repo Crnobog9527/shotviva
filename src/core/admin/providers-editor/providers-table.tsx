@@ -101,11 +101,12 @@ export function ProvidersTable({ providers, testResults, testing, pending, ...ha
               </TableCell>
               <TableCell className="font-mono text-xs">
                 <div>{provider.model}</div>
+                {provider.module === 'image' && <div className="text-muted-foreground">{provider.resolutions.join(' / ').toUpperCase()}</div>}
                 <div className="text-muted-foreground w-48 break-all whitespace-normal">{provider.baseUrl}</div>
               </TableCell>
               <TableCell className="font-mono text-xs">{COPY.keyMasked(provider.apiKeyLast4)}</TableCell>
               <TableCell>
-                <PricesCell prices={provider.prices} module={provider.module} model={provider.model} />
+                <PricesCell adapter={provider.adapter} prices={provider.prices} module={provider.module} model={provider.model} />
               </TableCell>
               <TableCell>
                 <Badge variant={provider.isActive ? 'default' : 'secondary'}>{provider.isActive ? COPY.active : COPY.inactive}</Badge>

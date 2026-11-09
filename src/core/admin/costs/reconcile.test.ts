@@ -58,3 +58,10 @@ describe('priceDrift (stale price table hint)', () => {
     expect(drift([1, 1, 0.01, 1, 1, 1], [1, 1.3, 0.02, 1.3, 1.3, 1])).toEqual({ days: 3, from: '2026-11-02', to: '2026-11-05' })
   })
 })
+
+it('keeps mixed-provider spend but suppresses the OpenAI-only comparison', () => {
+  const mixed = { ...day('2026-11-08', 2), has_openrouter: true }
+  const { rows, totals } = reconcile([day('2026-11-07', 1), mixed], {})
+  expect(rows.map((row) => row.difference)).toEqual([null, -1])
+  expect(totals).toMatchObject({ ours: 3, difference: null })
+})

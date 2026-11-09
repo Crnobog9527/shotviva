@@ -20,10 +20,11 @@ export type RunActions = {
 
 function Meta({ run }: { run: TestRunView }) {
   const parts = [
+    run.model,
     run.durationMs === null ? null : COPY.run.seconds(run.durationMs),
     run.status === 'running' ? null : run.costUsd === null ? COPY.run.noCost : usd.format(run.costUsd),
   ].filter(Boolean)
-  return <p className="text-muted-foreground font-mono text-[11px] tabular-nums">{parts.join(' · ') || ' '}</p>
+  return <p className="text-muted-foreground break-all font-mono text-[11px] tabular-nums">{parts.join(' · ') || ' '}</p>
 }
 
 function Picture({ run }: { run: TestRunView }) {

@@ -38,3 +38,19 @@ describe('jobCostUsd', () => {
     expect(jobCostUsd(usage, PRICES, { ...decision, outputPerM: null })).toBeNull()
   })
 })
+
+describe('OpenRouter image cost', () => {
+  it('uses the billed USD including the funding fee, even without prices', () => {
+    expect(jobCostUsd({ cost: 0.04, prompt_tokens: 1000, completion_tokens: 1000 }, null)).toBe(0.0422)
+    expect(jobCostUsd({ cost: 0 }, null)).toBe(0)
+  })
+
+  it('estimates using prompt and completion prices only when billed USD is missing', () => {
+    expect(jobCostUsd({ prompt_tokens: 1000, completion_tokens: 1000 }, PRICES)).toBe(0.036925)
+    expect(jobCostUsd({ prompt_tokens: 1000 }, PRICES)).toBeNull()
+  })
+
+  it('adds the separate decision charge without an OpenRouter fee', () => {
+    expect(jobCostUsd({ cost: 0.04, decision_input_tokens: 1000 }, null, PRICES)).toBe(0.0472)
+  })
+})

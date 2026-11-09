@@ -138,6 +138,7 @@ export type TemplateInput = z.infer<typeof templateInputSchema>
 
 // Private part (the `template_prompts` row). Never sent to non-admin clients.
 export const promptInputSchema = z.object({
+  providerId: z.uuid().nullable().optional(),
   body: z.string().min(1).max(20000),
   modelParams: z.record(z.string(), z.unknown()).default({}),
 })
