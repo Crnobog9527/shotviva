@@ -1,3 +1,4 @@
+import type { StyleRef } from '@/core/templates/style-refs'
 import type { Template } from '@/core/templates'
 
 import type { CoverPurpose } from '../covers/cover-rules'
@@ -6,7 +7,7 @@ import type { ActiveChangeOutcome } from './publish-rules'
 
 export type AdminTemplate = Template & {
   // null only if a template was created outside the admin flow without a prompt.
-  prompt: { providerId: string | null; body: string; version: number; modelParams: Record<string, unknown> } | null
+  prompt: { styleRefs: StyleRef[]; providerId: string | null; body: string; version: number; modelParams: Record<string, unknown> } | null
 }
 
 // What the editor sends back; validated again on the server before it reaches the database.

@@ -4,7 +4,7 @@ import { getTranslations } from 'next-intl/server'
 import { Suspense, type ReactNode } from 'react'
 
 import { AppPage, TabRootHeader } from '@/core/app-shell'
-import { createServerSupabase, requireUser } from '@/core/auth'
+import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
 import { fileUrlFor, listOwnJobs } from '@/core/jobs'
 import { currentLocale } from '@/core/i18n/server'
 import { EDIT_TEMPLATE_ID, listTemplatesIn } from '@/core/templates'
@@ -23,7 +23,7 @@ async function Photos() {
   const user = await requireUser('/photos')
   const supabase = await createServerSupabase()
   const now = new Date()
-  const [own, templates] = await Promise.all([listOwnJobs(supabase, user.id, now), listTemplatesIn(supabase, await currentLocale())])
+  const [own, templates] = await Promise.all([listOwnJobs(createAdminSupabase(), user.id, now), listTemplatesIn(supabase, await currentLocale())])
   const tp = await getTranslations('app.photos')
   const fallback = tp('fallbackName')
   const lookup: TemplateLookup = new Map(templates.map((t) => [t.id, { name: t.name, cover: t.coverAfterUrl ?? t.coverPosterUrl }]))
