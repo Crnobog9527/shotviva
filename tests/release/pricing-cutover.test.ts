@@ -9,7 +9,8 @@ let clone: ReturnType<typeof cloneLocalPricingDb>
 let release: Client
 let callback: Client
 let buyer: string
-const script = (op: string) => readFileSync('scripts/release/pricing-v2/' + op + '.sql', 'utf8')
+// Named queries use the extended protocol, as the pinned Supabase CLI does.
+const script = (op: string) => ({ name: op, text: readFileSync('scripts/release/pricing-v2/' + op + '.sql', 'utf8') })
 const version = async () => (await release.query('select admin.is_template_catalog_v2() as v2')).rows[0].v2
 const pay = (key: string, v2 = false) => callback.query('select * from public.settle_checkout' + (v2 ? '_v2' : '') +
   "($1,'pack_m',$2,2490,'usd',0,'card')", [buyer, key])
@@ -46,6 +47,11 @@ async function waitForAdvisoryLock(holder: Client, waiterPid: number) {
 }
 
 it('serializes both arrival orders and refuses preview rollback after a new payment', async () => {
+  const subscriber = await createUser(release)
+  const periodEnd = new Date(Date.now() + 30 * 86400000)
+  const paidSubscription = () => callback.query(`select * from settle_checkout($1,'starter_monthly','cs_repeat',
+    1990,'usd',0,'card',null,null,'sub_repeat','active',$2,false)`, [subscriber, periodEnd])
+  expect((await paidSubscription()).rows[0]).toMatchObject({ applied: true, credits: 50 })
   const first = 'cs_' + randomUUID()
   const second = 'cs_' + randomUUID()
   const releasePid = (await release.query('select pg_backend_pid() as pid')).rows[0].pid
@@ -58,13 +64,15 @@ it('serializes both arrival orders and refuses preview rollback after a new paym
     await switching
   }
   expect((await pay(first)).rows[0]).toMatchObject({ applied: false, credits: 55 })
+  expect((await paidSubscription()).rows[0]).toMatchObject({ applied: false, credits: 50 })
   await release.query(script('preview-rollback'))
   expect(await version()).toBe(false)
   await expect(pay(second, true)).rejects.toThrow('PRICING_VERSION_RECONCILIATION_REQUIRED')
 
   // Hold the real release transaction just before COMMIT. The waiting old tab's
   // callback must read the newly committed wallet denomination.
-  await release.query(script('preview').replace(/^commit;$/m, ''))
+  await release.query('begin')
+  await release.query(script('preview'))
   const waiting = pay(second)
   try { await waitForAdvisoryLock(release, callbackPid) } finally {
     await release.query('commit')
@@ -74,7 +82,6 @@ it('serializes both arrival orders and refuses preview rollback after a new paym
   expect((await ledgerOf(release, buyer)).map(row => row.delta)).toEqual([55, 2490])
   expect((await release.query('select count(*)::int as n from public.payments where user_id=$1', [buyer])).rows[0].n).toBe(2)
   await expect(release.query(script('preview-rollback'))).rejects.toThrow('ECONOMIC_ACTIVITY_AFTER_CUTOVER')
-  await release.query('rollback')
   expect(await version()).toBe(true)
   expect((await profileOf(release, buyer)).credits).toBe(2545)
 })

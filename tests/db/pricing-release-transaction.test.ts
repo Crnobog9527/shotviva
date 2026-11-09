@@ -11,7 +11,6 @@ afterAll(async () => { await db.end() })
 // ONLY the approved cohort identifies the isolated local fixture instead of real users.
 function body(name: string) {
   return readFileSync('scripts/release/pricing-v2/' + name + '.sql','utf8')
-    .replace(/^begin;$/m,'').replace(/^commit;$/m,'')
 }
 async function localBatch() {
   const totals = (await db.query(`select admin.wallet_digest_v2() as digest,
@@ -33,16 +32,16 @@ it('does not partially clear an approved wallet when a template cannot switch; s
     await db.query("select public.admin_adjust_credits($1,26,'fixture','free')",[buyer])
     const release = await localBatch()
     await db.query('savepoint start_cutover')
-    await expect(db.query(release)).rejects.toThrow('TEMPLATE_MODEL_NOT_READY')
+    await expect(db.query({ name: 'production', text: release })).rejects.toThrow('TEMPLATE_MODEL_NOT_READY')
     await db.query('rollback to start_cutover')
     expect((await db.query("select admin.is_template_catalog_v2() as active")).rows[0].active).toBe(false)
     expect(await profileOf(db,buyer)).toMatchObject({ credits:124, free_credits:26 })
     await db.query(`insert into public.ai_providers(label,model,adapter,is_active,resolutions,base_url)
       values('release test','gpt-image-2.6-sunburst','openai_images',true,'{1k,2k,3k}','https://api.openai.com/v1')`)
-    await db.query(release)
+    await db.query({ name: 'production', text: release })
     expect((await db.query('select admin.is_template_catalog_v2() as active')).rows[0].active).toBe(true)
     expect(await profileOf(db,buyer)).toMatchObject({ credits:0, free_credits:0 })
-    await db.query(body('production-rollback'))
+    await db.query({ name: 'production-rollback', text: body('production-rollback') })
     expect((await db.query('select admin.is_template_catalog_v2() as active')).rows[0].active).toBe(false)
     expect(await profileOf(db,buyer)).toMatchObject({ credits:124, free_credits:26 })
   } finally { await db.query('rollback') }

@@ -6,10 +6,11 @@ revoke all on admin.pricing_release_checkpoint from public, anon, authenticated,
 
 create function admin.pricing_activity_fingerprint() returns text language sql stable set search_path='' as $$
   select md5(jsonb_build_array(
-    admin.wallet_digest_v2(),
+    (select jsonb_agg(jsonb_build_array(id,credits,free_credits,paid_until) order by id) from public.profiles),
     (select coalesce(max(id),0) from public.credit_ledger),
     (select jsonb_agg(to_jsonb(p) order by id) from public.payments p),
-    (select jsonb_agg(to_jsonb(s) order by id) from public.subscriptions s),
+    -- A duplicate callback can refresh updated_at without changing contract terms.
+    (select jsonb_agg(to_jsonb(s)-'updated_at' order by id) from public.subscriptions s),
     (select jsonb_agg(to_jsonb(d) order by stripe_dispute_id) from public.payment_disputes d),
     (select max(created_at) from public.generation_jobs)
   )::text)

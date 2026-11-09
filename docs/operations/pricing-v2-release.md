@@ -57,7 +57,7 @@ transaction against a synthetic approved cohort and tests late v2 payments on al
 
 The two database workflows run pending migrations for normal pushes and a manual operation
 of `none`. Selecting `activate` or `rollback` verifies migration history, main SHA and project
-ref before executing only the corresponding release SQL. After merging, inspect both automatic
+ref before executing only the corresponding release SQL. Each file is one atomic PostgreSQL DO block, compatible with the pinned CLI’s prepared query. After merging, inspect both automatic
 migration runs before authorizing the first data operation.
 
 The two-argument `admin_upsert_template(jsonb,jsonb)` remains the pricing and prompt writer.
