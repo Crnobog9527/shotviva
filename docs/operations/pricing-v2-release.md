@@ -28,9 +28,9 @@ change a template, enable an affiliate program, create provider prices, or promo
        set local lock_timeout='5s';
        select pg_advisory_xact_lock(hashtextextended('shotviva.template_catalog',0));
        select admin.clear_approved_wallets_v2('d89a0d8be56fbceac43c362466620f5d53c150266f56eee1cf806d6a6b94d8b4',37,1);
-       select admin.activate_template_price_catalog_v2();
        insert into public.system_settings(key,value,updated_at)
          values('pricing_catalog_version','"v2"',clock_timestamp());
+       select admin.activate_template_price_catalog_v2();
        commit;
 
 5. Revalidate template caches and open checkout and generation only on the verified version.
