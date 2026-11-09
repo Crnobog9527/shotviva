@@ -6,6 +6,7 @@ import { notFoundResponse } from '@/core/auth/proxy-gates'
 import { recordReferral } from '@/core/affiliate/referral'
 import { withAnalyticsRegion } from '@/core/analytics/consent'
 import { proxyGate } from '@/core/auth/proxy'
+import { captureCodeLink } from '@/core/codes/link'
 import { serverEnv } from '@/core/env'
 import { routing } from '@/core/i18n/routing'
 import { canonicalRedirectResponse, withHostNoindex } from '@/core/seo'
@@ -30,7 +31,7 @@ export async function proxy(request: NextRequest) {
     return notFoundResponse()
   }
   const env = serverEnv()
-  const response = await proxyGate(request, {
+  const response = captureCodeLink(request) ?? await proxyGate(request, {
     translatedPaths: site.locales.zhPaths,
     forward: localeRouter,
     // /generate/upload-test only under `next dev`.

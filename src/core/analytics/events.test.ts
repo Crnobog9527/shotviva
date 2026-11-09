@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
+import { invite, pack } from '../../../tests/t94-config'
+
 import { BROWSER_EVENTS, categorySlug, eventSchemas, SERVER_EVENTS, uploadSizeBucket, validateEvent, type EventName } from './events'
 
 const generate = {
@@ -27,6 +29,8 @@ const checkout = {
 } as const
 
 const valid: { [E in EventName]: unknown } = {
+  code_redeem: { kind: 'invite', context: 'signup', status: 'ok', credits: invite.inviteeCredits, pool: 'free', discount_percent: null },
+  invite_share: { action: 'copy', surface: 'account' },
   signup: { method: 'google' },
   upload: { size_bucket: '1-5MB', compressed: true },
   generate,
@@ -35,7 +39,7 @@ const valid: { [E in EventName]: unknown } = {
   contact_sales_click: { page: '/zh/pricing' },
   business_inquiry_submit: { volume: '500_2000', uses: ['ecommerce', 'social'] },
   checkout_start: checkout,
-  purchase: { ...checkout, product_id: 'pack_s', tier: 'pack', interval: null, form: 'one_time', amount_usd: 9.9, credits: 20 },
+  purchase: { ...checkout, product_id: 'pack_s', tier: 'pack', interval: null, form: 'one_time', amount_usd: pack.priceUsd, credits: pack.credits },
   template_view: { template_id: 'ramen-studio', category: 'food', surface: 'workspace' },
   template_favorite: { template_id: 'ramen-studio', category: 'food-drink', action: 'add', surface: 'create_card' },
   template_toggle: { template_id: 'ramen-studio', key: 'replate', action: 'confirmed', surface: 'workspace' },
@@ -50,9 +54,11 @@ const EVENT_NAMES = [
       'business_inquiry_submit',
       'checkout_cancel',
       'checkout_start',
+      'code_redeem',
       'contact_sales_click',
       'generate',
       'generate_refused',
+      'invite_share',
       'paywall_select',
       'paywall_view',
       'purchase',
@@ -65,7 +71,7 @@ const EVENT_NAMES = [
 ]
 
 describe('event dictionary (ARCHITECTURE §16.2)', () => {
-  it('covers exactly the sixteen named events', () => {
+  it('covers exactly the named events', () => {
     expect(Object.keys(eventSchemas).sort()).toEqual(EVENT_NAMES)
   })
 

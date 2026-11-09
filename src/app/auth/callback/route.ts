@@ -6,5 +6,5 @@ import { handleAuthCallback } from '@/core/auth'
 import { site } from '@/site/site.config'
 
 export async function GET(request: NextRequest) {
-  return handleAuthCallback(request, { freeCredits: site.billing.freeCredits })
+  return handleAuthCallback(request, { freeCredits: site.billing.freeCredits, invite: site.growth.invite })
 }

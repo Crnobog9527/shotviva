@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import type { FormState } from '../flows/form-state'
 import { maskPhone, parseMainlandPhone, SMS_CODE_MINUTES } from '../phone/phone-number'
+import { SignupCodeHiddenInput } from './signup-code-context'
 import { CodeField } from './code-field'
 import { CaptchaFailed, Notice, SubmitButton } from './form-parts'
 import { ConsentCheck, PhoneField } from './phone-fields'
@@ -39,6 +40,7 @@ export function PhoneSignIn({ actions, next, submitLabel }: Props) {
     <>
       <LastError form={send} />
       <form onSubmit={send.onSubmit} noValidate className="au-form au-form-gap">
+        <SignupCodeHiddenInput />
         <PhoneField form={send} value={phone} onChange={setPhone} />
         <ConsentCheck form={send} />
         <SubmitButton pending={send.pending}>{t('phone.send')}</SubmitButton>
@@ -76,6 +78,7 @@ function PhoneCode({ phone, actions, next, submitLabel, onBack }: CodeProps) {
       <form ref={formRef} onSubmit={verify.onSubmit} noValidate className="au-form au-form-gap">
         <input type="hidden" name="phone" value={e164} />
         <input type="hidden" name="next" value={next} />
+        <SignupCodeHiddenInput />
         <CodeField
           form={verify}
           value={code}

@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto'
 import type { Client } from 'pg'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
+import { benefits, invite } from '../t94-config'
+
 import { connectAdmin, createUser, ledgerOf, profileOf, serviceClient } from './helpers'
 
 let db: Client
@@ -10,7 +12,7 @@ const uniqueCode = () => randomUUID().replaceAll('-', '').slice(0, 16).toUpperCa
 beforeAll(async () => { db = await connectAdmin() })
 afterAll(async () => { await db.end() })
 
-async function invite(user: string): Promise<string> {
+async function inviteCode(user: string): Promise<string> {
   const result = await serviceClient().rpc('get_or_create_invite_code', { p_user: user })
   if (typeof result.data !== 'string') throw new Error(result.error?.message ?? 'Missing invite code')
   return result.data
@@ -18,7 +20,7 @@ async function invite(user: string): Promise<string> {
 
 async function redeem(user: string, code: string, replace = false, context = 'account') {
   const { data, error } = await serviceClient().rpc('redeem_code', {
-    p_user: user, p_code: code, p_context: context, p_invitee_credits: 6, p_invite_window_days: 7, p_replace: replace,
+    p_user: user, p_code: code, p_context: context, p_invitee_credits: invite.inviteeCredits, p_invite_window_days: invite.windowDays, p_replace: replace,
   })
   if (error) throw new Error(error.message)
   return data as { status: string; discount_expires_at?: string; current_code?: string }
@@ -43,7 +45,7 @@ async function discount() {
 
 async function grant(user: string) {
   const { rows } = await db.query<{ applied: boolean }>(
-    "select applied from public.grant_credits($1,6,'signup',$2,'free')", [user, `signup:${user}`],
+    "select applied from public.grant_credits($1,$3,'signup',$2,'free')", [user, `signup:${user}`, benefits.freeCredits],
   )
   return rows[0].applied
 }
@@ -55,7 +57,7 @@ async function countClaims(code: string) {
 
 it('returns one canonical invite on concurrent first opens; clients cannot execute either RPC', async () => {
   const owner = await createUser(db)
-  const invites = await Promise.all([invite(owner), invite(owner)])
+  const invites = await Promise.all([inviteCode(owner), inviteCode(owner)])
   expect(invites[0]).toMatch(/^[2-9A-HJKMNP-Z]{8}$/)
   expect(invites[1]).toBe(invites[0])
   const { rows } = await db.query<{ allowed: boolean }>(
@@ -70,16 +72,16 @@ it('returns one canonical invite on concurrent first opens; clients cannot execu
 it('accepts an invite in lowercase once and grants the configured extra free credits', async () => {
   const owner = await createUser(db)
   const guest = await createUser(db)
-  const code = await invite(owner)
+  const code = await inviteCode(owner)
   expect(await grant(guest)).toBe(true)
-  expect(await redeem(guest, code.toLowerCase(), false, 'signup')).toMatchObject({ status: 'ok', pool: 'free', credits_granted: 6 })
+  expect(await redeem(guest, code.toLowerCase(), false, 'signup')).toMatchObject({ status: 'ok', pool: 'free', credits_granted: invite.inviteeCredits })
   expect((await redeem(guest, code)).status).toBe('used')
-  expect((await redeem(guest, await invite(await createUser(db)))).status).toBe('already_invited')
-  expect((await profileOf(db, guest)).free_credits).toBe(12)
+  expect((await redeem(guest, await inviteCode(await createUser(db)))).status).toBe('already_invited')
+  expect((await profileOf(db, guest)).free_credits).toBe(benefits.freeCredits + invite.inviteeCredits)
   expect((await profileOf(db, owner)).credits).toBe(0)
   const { rows } = await db.query<{ id: string }>('select id from code_redemptions where user_id = $1', [guest])
   expect(await ledgerOf(db, guest)).toContainEqual({
-    kind: 'code_grant', pool: 'free', delta: 6, idempotency_key: `code:${rows[0].id}`,
+    kind: 'code_grant', pool: 'free', delta: invite.inviteeCredits, idempotency_key: `code:${rows[0].id}`,
   })
   expect(await countClaims(code)).toBe(1)
 })
@@ -87,7 +89,7 @@ it('accepts an invite in lowercase once and grants the configured extra free cre
 it('rejects unavailable offers, banned accounts, and self invites', async () => {
   const user = await createUser(db)
   expect((await redeem(user, uniqueCode())).status).toBe('not_found')
-  expect((await redeem(user, await invite(user))).status).toBe('own')
+  expect((await redeem(user, await inviteCode(user))).status).toBe('own')
   const code = await gift()
   for (const change of ["active=false", "active=true,starts_at=now()+interval '1 day'", "starts_at=null,expires_at=now()"]) {
     await db.query(`update codes set ${change} where code=$1`, [code])
@@ -95,14 +97,14 @@ it('rejects unavailable offers, banned accounts, and self invites', async () => 
   }
   await db.query('update profiles set banned_at=now() where id=$1', [user])
   expect((await redeem(user, await gift())).status).toBe('banned')
-  expect((await redeem(await createUser(db), await invite(user))).status).toBe('expired')
+  expect((await redeem(await createUser(db), await inviteCode(user))).status).toBe('expired')
 })
 
 it('enforces both the age limit and the first-payment cutoff on all invite entry points', async () => {
   const owner = await createUser(db)
-  const code = await invite(owner)
+  const code = await inviteCode(owner)
   const old = await createUser(db)
-  await db.query("update profiles set created_at=now()-interval '8 days' where id=$1", [old])
+  await db.query("update profiles set created_at=now()-make_interval(days => $2) where id=$1", [old, invite.windowDays + 1])
   const campaign = await gift()
   await db.query('update codes set new_users_only=true where code=$1', [campaign])
   expect((await redeem(old, campaign)).status).toBe('new_users_only')
@@ -122,8 +124,8 @@ it('persists blocked same-IP and refused-signup-grant attempts without recording
   await db.query('update profiles set signup_ip=$1 where id=any($2::uuid[])', [cohortIp, [user, peer]])
   expect(await grant(user)).toBe(true)
   expect(await grant(peer)).toBe(false)
-  const peerInvite = await invite(user)
-  const outsiderInvite = await invite(outsider)
+  const peerInvite = await inviteCode(user)
+  const outsiderInvite = await inviteCode(outsider)
   expect((await redeem(peer, peerInvite)).status).toBe('blocked_same_ip')
   const otherRefused = await createUser(db)
   await db.query('update profiles set signup_ip=$1 where id=$2', [cohortIp, otherRefused])

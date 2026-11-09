@@ -1,4 +1,5 @@
 import 'server-only'
+import type { SignupBenefits } from '../signup-code'
 import { redirect } from 'next/navigation'
 
 import { currentLocale, localized } from '../../i18n/server'
@@ -12,7 +13,7 @@ import { callbackUrl } from './callback-url'
 import { failed, type FormState } from './form-state'
 import { formFields, signInSchema } from './schemas'
 
-export type SignInOptions = { freeCredits: number }
+export type SignInOptions = SignupBenefits
 
 export async function signInWithPassword(form: FormData, options: SignInOptions): Promise<FormState> {
   const fields = formFields(form)
@@ -32,7 +33,7 @@ export async function signInWithPassword(form: FormData, options: SignInOptions)
     await supabase.auth.signOut({ scope: 'local' })
     return failed('AUTH_EMAIL_NOT_CONFIRMED')
   }
-  await onVerifiedSignIn(data.user.id, options.freeCredits, 'email', metadataLocale(data.user) ?? (await currentLocale()))
+  await onVerifiedSignIn(data.user.id, options, 'email', metadataLocale(data.user) ?? (await currentLocale()))
   redirect(sanitizeNext(fields.next))
 }
 

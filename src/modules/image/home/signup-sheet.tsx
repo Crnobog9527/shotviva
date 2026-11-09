@@ -2,7 +2,8 @@
 
 import { useTranslations } from 'next-intl'
 
-import { GoogleButton, type FormAction } from '@/core/auth/ui'
+import { GoogleButton, SignupCodeField, SignupCodeProvider, useSignupCodeDraft, saveSignupCode, type FormAction } from '@/core/auth/ui'
+import { useRouter } from '@/core/i18n/navigation'
 import { Link } from '@/core/i18n/ui'
 import { ResponsiveSheet } from '@/core/ui/responsive-sheet'
 
@@ -23,7 +24,6 @@ type Props = {
 // or log-in the visitor lands back here with them and presses Generate once more.
 export function SignupSheet({ open, onOpenChange, googleAction, next, gift }: Props) {
   const t = useTranslations('home.generator.signup')
-  const back = `?next=${encodeURIComponent(next)}`
   return (
     <ResponsiveSheet open={open} onOpenChange={onOpenChange} title={t('title')} description={t('text')}>
       <div className="mk-gift-box">
@@ -35,15 +35,7 @@ export function SignupSheet({ open, onOpenChange, googleAction, next, gift }: Pr
           <span>{t('giftNote')}</span>
         </span>
       </div>
-      <GoogleButton action={googleAction} next={next} className="mk-cta h-auto rounded-tile border-0" />
-      <div className="mk-alt">
-        <Link className="mk-ghost-btn" href={`/signup${back}`}>
-          {t('email')}
-        </Link>
-        <Link className="mk-ghost-btn" href={`/login${back}`}>
-          {t('login')}
-        </Link>
-      </div>
+      {open && <SignupCodeProvider><SheetActions googleAction={googleAction} next={next} /></SignupCodeProvider>}
       <p className="mk-signup-fine">
         {t.rich('fine', {
           terms: (chunks) => <Link href="/terms">{chunks}</Link>,
@@ -51,5 +43,32 @@ export function SignupSheet({ open, onOpenChange, googleAction, next, gift }: Pr
         })}
       </p>
     </ResponsiveSheet>
+  )
+}
+
+function SheetActions({ googleAction, next }: Pick<Props, 'googleAction' | 'next'>) {
+  const t = useTranslations('home.generator.signup')
+  const draft = useSignupCodeDraft()
+  const router = useRouter()
+  const query = new URLSearchParams({ next })
+  // Keep invite codes out of link hrefs (autocapture and replay can see those). An edited
+  // field, including a cleared one, reaches the next form before its request reads cookies.
+  function link(path: string) {
+    const href = `${path}?${query}`
+    return { href, onNavigate(event: { preventDefault(): void }) {
+      if (!draft?.edited) return
+      event.preventDefault()
+      void saveSignupCode(draft.value).catch(() => {}).then(() => router.push(href))
+    } }
+  }
+  return (
+    <>
+      <SignupCodeField />
+      <GoogleButton action={googleAction} next={next} className="mk-cta h-auto rounded-tile border-0" />
+      <div className="mk-alt">
+        <Link className="mk-ghost-btn" prefetch={false} {...link('/signup')}>{t('email')}</Link>
+        <Link className="mk-ghost-btn" prefetch={false} {...link('/login')}>{t('login')}</Link>
+      </div>
+    </>
   )
 }

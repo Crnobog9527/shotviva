@@ -1,4 +1,5 @@
 import 'server-only'
+import type { SignupBenefits } from '../signup-code'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
@@ -24,7 +25,7 @@ import { formFields } from './schemas'
 const sendSchema = z.object({ phone: z.string().max(32), consent: z.literal('on'), captchaToken: z.string().max(4096).optional() })
 const verifySchema = z.object({ phone: z.string().max(32), code: z.string().regex(/^\d{6}$/), next: z.string().max(512).optional() })
 
-export type PhoneSignInOptions = { freeCredits: number }
+export type PhoneSignInOptions = SignupBenefits
 
 // Our limits first (they also note the visitor's IP for the hook), then Supabase, which checks
 // hCaptcha and calls the Send SMS hook. A refusal before the hook gives the request back.
@@ -71,7 +72,7 @@ export async function verifyPhoneCode(form: FormData, options: PhoneSignInOption
   const supabase = await createServerSupabase()
   const { data, error } = await supabase.auth.verifyOtp({ phone: phone.e164, token: parsed.data.code, type: 'sms' })
   if (error || !data.user) return failed(verifyError(error))
-  await onVerifiedSignIn(data.user.id, options.freeCredits, 'phone', metadataLocale(data.user) ?? (await currentLocale()))
+  await onVerifiedSignIn(data.user.id, options, 'phone', metadataLocale(data.user) ?? (await currentLocale()))
   redirect(sanitizeNext(parsed.data.next))
 }
 

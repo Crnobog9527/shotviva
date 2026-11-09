@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 
 import type { Balance } from '../../billing'
@@ -55,7 +56,7 @@ export type AccountSite = {
   freeCredits: number
 }
 
-type Props = { data: AccountData; actions: AccountActions; site: AccountSite }
+type Props = { data: AccountData; actions: AccountActions; site: AccountSite; children?: ReactNode }
 
 // Who is signed in: the email, or the masked phone of an account that has none.
 export function AccountHeader({ email }: { email?: string | null }) {
@@ -71,7 +72,7 @@ export function AccountHeader({ email }: { email?: string | null }) {
 // The pass and the credits share a row from md (3 : 2), as in the comp.
 const pair = 'md:mx-0 md:mt-0 md:max-w-none'
 
-export function AccountView({ data, actions, site }: Props) {
+export function AccountView({ data, actions, site, children }: Props) {
   const t = useTranslations('app.account')
   const facts = { since: data.since, email: data.email, brand: site.brand, last: data.lastMembership }
   const allowance = planAllowance(data.subscription, data.lastMembership, site.products)
@@ -87,6 +88,7 @@ export function AccountView({ data, actions, site }: Props) {
           <FilmStrip ids={data.works.ids} count={data.works.count} fileUrl={fileUrlFor} />
         </Group>
       </div>
+      {children}
       <Group title={t('settings.title')}>
         <SettingsRows email={data.email} phone={data.phone} purchases={data.purchases} morePurchases={data.morePurchases} helpUnread={data.helpUnread} admin={data.admin} />
       </Group>

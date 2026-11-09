@@ -6,10 +6,16 @@ const FORBIDDEN_KEY = /e-?mail|copy|note|prompt|url|image|text|name|phone|passwo
 const EMAIL = /[^\s@]+@[^\s@]+\.[^\s@]+/
 const URL_LIKE = /[a-z][a-z0-9+.-]*:\/\/|^\/\/|\bwww\./i
 
+// context has the otherwise forbidden “text” suffix. Only this fixed, non-text field is safe.
+function isRedemptionContext(key: string, value: unknown) {
+  return key === 'context' && (value === 'signup' || value === 'account' || value === 'paywall')
+}
+
 export function findPii(props: unknown): string[] {
   if (props === null || typeof props !== 'object' || Array.isArray(props)) return []
   const problems: string[] = []
   for (const [key, value] of Object.entries(props)) {
+    if (isRedemptionContext(key, value)) continue
     if (FORBIDDEN_KEY.test(key)) problems.push(`${key}: forbidden_key`)
     else if (typeof value === 'string' && (EMAIL.test(value) || URL_LIKE.test(value))) problems.push(`${key}: pii_value`)
   }
