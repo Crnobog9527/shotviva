@@ -263,7 +263,7 @@
   - 状态（`paid` / `refunded` / `partially_refunded` / `disputed`）；
   - 时间。
 - 写入：由 `settle_checkout`（首付、单笔）和 `apply_subscription_renewal`（续费）在同一事务里写入。
-- 状态更新：`charge.refunded`、`charge.dispute.created` 更新状态，只记录，不扣积分。
+- 状态更新：`charge.refunded`、`charge.dispute.created` 更新状态，只记录，不扣积分。（**已被 T71 推翻**：2026-11-07 起退款和争议自动扣回积分，以 ARCHITECTURE §6.3 为准。）
 - 金额和付款方式由回调从 Stripe 取回后传入，不信任客户端。
 - 本卡合并后，T23 的订单页改读这张表（另开一个小 PR），测试连本地 Supabase：同一 invoice 重发只发一次、`paid_until` 对齐 `period_end` 且不回退。
 
