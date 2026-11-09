@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { createAdminSupabase, requireUser } from '@/core/auth'
 import { localized } from '@/core/i18n/server'
 import { isAffiliateEnabled } from '../feature'
+import { readAccount } from './repository'
 import { applicationSchema, payoutMethods, slugSchema } from './models'
 
 export type PartnerFormState = '' | 'invalid' | 'failed' | 'saved'
@@ -35,7 +36,7 @@ export async function applyAction(_: PartnerFormState, form: FormData): Promise<
     p_terms_version: termsVersion,
   })
   if (error) return 'failed'
-  const path = await localized('/partners')
+  const path = await localized('/partners/join')
   revalidatePath(path)
   redirect(path)
 }
@@ -43,6 +44,7 @@ export async function applyAction(_: PartnerFormState, form: FormData): Promise<
 export async function saveAction(_: PartnerFormState, form: FormData): Promise<PartnerFormState> {
   if (!(await isAffiliateEnabled())) notFound()
   const user = await requireUser('/partners?view=settings')
+  if ((await readAccount(user.id))?.status !== 'active') notFound()
   const fields = profileSchema.safeParse(Object.fromEntries(form))
   if (!fields.success) return 'invalid'
   const { method, details, us, termsVersion } = fields.data

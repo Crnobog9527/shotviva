@@ -38,6 +38,7 @@ export const site = defineSite({
       '/pricing',
       '/partners',
       '/partners/apply',
+      '/partners/join',
       '/partners/terms',
       '/signup',
       '/login',

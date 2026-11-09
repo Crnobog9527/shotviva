@@ -2,7 +2,8 @@ import { getTranslations } from 'next-intl/server'
 import { Link } from '@/core/i18n/ui'
 import { currentLocale } from '@/core/i18n/server'
 import type { Translate } from '@/core/translate'
-import { applyAction, saveAction } from './actions'
+import { ApplicationFields } from './application-fields'
+import { saveAction } from './actions'
 import { PartnerForm } from './interactive'
 import { payoutMethods, type Account, type Settings } from './models'
 
@@ -16,7 +17,7 @@ function Terms({ t, version, agreed }: { t: Translate; version: string; agreed?:
       <label className="af-consent">
         <input name="accept" type="checkbox" required defaultChecked={agreed} />
         <span>
-          {t('agree')} <Link href="/partners/terms">{t('termsLink', { version })}</Link>
+          {t('agree')} <Link href="/partners/terms" target="_blank" rel="noopener noreferrer">{t('termsLink', { version })}</Link>
         </span>
       </label>
     </>
@@ -27,10 +28,12 @@ export async function ApplicationForm({
   parent,
   settings,
   eligible,
+  loginUrl,
 }: {
   parent: string
   settings: Settings
   eligible: boolean
+  loginUrl?: string
 }) {
   const t = await getTranslations('affiliate')
   if (!eligible)
@@ -43,7 +46,7 @@ export async function ApplicationForm({
       </section>
     )
   return (
-    <PartnerForm labels={labels(t, 'submit')} action={applyAction}>
+    <ApplicationFields parent={parent} loginUrl={loginUrl} loginLabel={t('loginToSubmit')} labels={labels(t, 'submit')}>
       <input name="parent" type="hidden" value={parent} />
       <label>
         {t('name')}
@@ -65,8 +68,8 @@ export async function ApplicationForm({
         {t('plan')}
         <textarea name="plan" rows={4} required maxLength={4000} />
       </label>
-      <Terms t={t} version={settings.terms_version} />
-    </PartnerForm>
+      {!loginUrl && <Terms t={t} version={settings.terms_version} />}
+    </ApplicationFields>
   )
 }
 

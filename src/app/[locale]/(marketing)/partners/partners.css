@@ -33,6 +33,13 @@
     max-width: 64ch;
     padding-block: 1rem 3rem;
   }
+  .af-entry-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    margin-block: 0.5rem 1.5rem;
+  }
   .af-intro > p {
     font-size: 1.1rem;
   }
@@ -56,7 +63,7 @@
     gap: 0.45rem;
     font-weight: 550;
   }
-  .af-shell :is(input:not([type='checkbox']), select, textarea) {
+  :is(.af-shell, .af-form) :is(input:not([type='checkbox']), select, textarea) {
     min-width: 0;
     width: 100%;
     min-height: 44px;

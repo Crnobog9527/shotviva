@@ -30,7 +30,7 @@ export async function exportCommissions(locale: Locale) {
   if (!(await isAffiliateEnabled())) throw new AppError('NOT_FOUND', 'Not found')
   const user = await requireApiUser()
   const account = await readAccount(user.id)
-  if (!account || ['pending', 'rejected'].includes(account.status)) throw new AppError('NOT_FOUND', 'Not found')
+  if (account?.status !== 'active') throw new AppError('NOT_FOUND', 'Not found')
   const t = await getTranslations({ locale, namespace: 'affiliate' })
   const header = line(['date', 'item', 'base', 'rate', 'commission', 'state', 'confirms'].map((key) => t(key)))
   const row = (r: Commission) =>

@@ -1,3 +1,5 @@
+import { connection } from 'next/server'
+import { isAffiliateEnabled } from '@/core/affiliate/feature'
 import { getTranslations } from 'next-intl/server'
 import { Suspense } from 'react'
 
@@ -56,12 +58,20 @@ export async function MarketingHeader({ locale }: { locale: Locale }) {
   )
 }
 
+async function AffiliateFooterLink({ locale }: { locale: Locale }) {
+  await connection()
+  if (!(await isAffiliateEnabled())) return null
+  const t = await getTranslations({ locale, namespace: 'affiliate' })
+  return <nav aria-label={t('programName')}><Link href="/partners/join">{t('programName')}</Link></nav>
+}
+
 // Footer: contact, copyright, legal links and the text language switch (ARCHITECTURE §17).
 export function MarketingFooter({ locale }: { locale: Locale }) {
   return (
     <SiteFooter
       brand={site.brand}
       links={footerLinksIn(locale)}
+      programLink={<Suspense fallback={null}><AffiliateFooterLink locale={locale} /></Suspense>}
       languageSwitch={
         <Suspense fallback={<FooterLocalesFallback />}>
           <FooterLocales translatedPaths={zhPaths} />
