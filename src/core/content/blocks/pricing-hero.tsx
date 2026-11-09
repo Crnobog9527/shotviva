@@ -12,7 +12,7 @@ export function PricingHero({ text }: { text: PricingHeroText }) {
         {em ? <em>{em}</em> : null}
       </h1>
       <p className="mt-3 text-body text-pretty text-bone-dim">
-        {text.intro}{text.currencyNote && <span className="inline-block">{text.currencyNote}</span>}
+        {text.intro}{text.currencyNote && <span className="block">{text.currencyNote}</span>}
       </p>
       <p className="mt-3 flex items-start gap-2 text-caption leading-[1.4] text-bone-dim">
         <svg viewBox="0 0 24 24" aria-hidden="true" className="mt-0.5 size-4 flex-none text-primary" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
