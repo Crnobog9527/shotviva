@@ -4,7 +4,7 @@ import type { BusinessBlock } from '@/core/content/business'
 
 import { site } from '../site.config'
 import { businessForm } from './business-form'
-import { freeImagesLabel, fromCredits, packFrom, perHundredCredits, planFrom, tierList, usd, yearlySaving } from './offer'
+import { freeImagesLabel, packFrom, perHundredCredits, planFrom, usd, yearlySaving } from './offer'
 
 // Final /pricing copy (T11, laid out as comps-v3-b pricing.html in T37). Every number is read
 // from site.config through offer.ts; the plan and pack cards themselves render from the
@@ -95,7 +95,7 @@ export const pricingPage: PricingContent = {
   description: `${brand} pricing: Starter, Pro and Max plans, monthly or yearly, plus credit packs. New users get ${freeImagesLabel}. Credits never expire.`,
   h1: `${brand} Pricing: pay monthly, pay yearly, or buy credits once`,
   h1Em: 'or buy credits once',
-  intro: `Every photo made with paid credits is private and watermark-free. A photo costs ${fromCredits}, depending on the template and whether you pick ${tierList}.${yearly}${packs}`,
+  intro: `Every photo made with paid credits is private and watermark-free.${yearly}${packs}`,
   gift: `New users get ${freeImagesLabel}. No card needed.`,
   creditBuys,
   business,

@@ -5,7 +5,7 @@ import { perHundredCredits } from '../offer'
 import { site } from '../../site.config'
 import type { PricingContent } from '../pricing'
 import { zhBusinessForm } from './business-form'
-import { zhFreeImages, zhFromCredits, zhPackFrom, zhTierList, zhYearlySaving } from './offer'
+import { zhFreeImages, zhPackFrom, zhYearlySaving } from './offer'
 
 // /zh/pricing (T21, laid out as comps-v3-b pricing.html in T37). Keyword 「Shotviva 价格」;
 // every figure from site.config through offer.ts, in US dollars only, never converted to RMB
@@ -80,7 +80,7 @@ export const zhPricingPage: PricingContent = {
   description: `${brand} 价格：入门版、专业版、旗舰版套餐，按月或按年付，另有一次性积分包。新用户送 ${zhFreeImages}，积分永不过期。`,
   h1: `${brand} 价格：按月付、按年付，或一次性买积分`,
   h1Em: '',
-  intro: `用付费积分生成的图私密、无水印。一张图 ${zhFromCredits}，取决于模板和你选的${zhTierList}。${yearly}积分包 ${zhPackFrom}。所有价格以美元计。`,
+  intro: `用付费积分生成的图私密、无水印。${yearly}积分包 ${zhPackFrom}。所有价格以美元计。`,
   gift: `新用户送 ${zhFreeImages}，不用绑卡。`,
   creditBuys,
   business,
