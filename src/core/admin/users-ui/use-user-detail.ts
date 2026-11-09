@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ActionValue } from '../templates/types'
 import type { UserDetailData } from '../users/detail-types'
 
-export type UserDetailLoader = (input: { userId: string; jobId: string | null; cursor: string | null }) => Promise<ActionValue<UserDetailData | null>>
+export type UserDetailLoader = (input: { userId: string; jobId: string | null; cursor: string | null; codesCursor?: string | null }) => Promise<ActionValue<UserDetailData | null>>
 
 type State = { data: UserDetailData | undefined; missing: boolean; failed: string | null }
 
@@ -22,11 +22,12 @@ export function useUserDetail(userId: string, jobId: string | null, load: UserDe
     loader.current = load
   }, [load])
   const [cursor, setCursor] = useState<string | null>(null)
+  const [codesCursor, setCodesCursor] = useState<string | null>(null)
   const [round, setRound] = useState(0)
   const [state, setState] = useState<State>({ data: undefined, missing: false, failed: null })
   useEffect(() => {
     let live = true
-    loader.current({ userId, jobId, cursor }).then(
+    loader.current({ userId, jobId, cursor, codesCursor }).then(
       (result) => {
         if (!live) return
         if (!result.ok) setState((current) => ({ ...current, failed: result.message || FALLBACK }))
@@ -40,7 +41,7 @@ export function useUserDetail(userId: string, jobId: string | null, load: UserDe
     return () => {
       live = false
     }
-  }, [userId, jobId, cursor, round])
+  }, [userId, jobId, cursor, codesCursor, round])
   const reload = useCallback(() => setRound((value) => value + 1), [])
-  return { ...state, reload, setCursor }
+  return { ...state, reload, setCursor, setCodesCursor }
 }

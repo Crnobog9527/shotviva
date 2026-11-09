@@ -53,6 +53,7 @@ export function UserDetailDialog({ userId, jobId, actions, stripeLive, onClose }
               actions={userActions}
               support={{ stripeLive, jobActions, focusJobId: jobId }}
               onLedgerPage={detail.setCursor}
+              onCodesPage={detail.setCodesCursor}
             />
           ) : (
             <DialogState missing={detail.missing} failed={detail.failed} onRetry={reload} />
