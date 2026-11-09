@@ -11,7 +11,7 @@ import { TEMPLATE_SURFACES } from '@/core/templates/schema'
 
 import { isEmptyPatch, type BulkEditFailure, type BulkEditOutcome, type BulkEditPatch } from './bulk-edit-rules'
 
-// Batch edit (T79): validated here, then one call to admin_bulk_edit_templates (0640), which
+// Batch edit (T79): validated here, then one call to admin_bulk_edit_templates (0825), which
 // checks every template against the floor and writes the whole batch in one transaction, or
 // nothing. The floor table is the server's (modules/image), never the client's.
 
