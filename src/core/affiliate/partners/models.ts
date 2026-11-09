@@ -80,6 +80,7 @@ export const referralSchema = z.object({
 })
 export type Account = z.infer<typeof accountSchema>
 export type Settings = z.infer<typeof settingsSchema>
+export type EnrollmentSettings = Pick<Settings, 'apply_min_level' | 'terms_version'>
 export type Commission = z.infer<typeof commissionSchema>
 export type View = (typeof dashboardViews)[number]
 export type SearchParams = Record<string, string | string[] | undefined>
