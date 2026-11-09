@@ -31,7 +31,7 @@ export function testSite(overrides: Partial<SiteConfig> = {}): SiteConfig {
       },
       partners: { graylum: { returnToHosts: [], connectCallbackPath: '/callback', imageHosts: [] } },
       gallery: { enabled: false },
-      features: { wishlist: false },
+      features: { affiliate: false, wishlist: false },
       indexing: {
         indexablePaths: ['/', '/image-to-image-generator', '/generate'],
         zhIndexablePaths: ['/'],

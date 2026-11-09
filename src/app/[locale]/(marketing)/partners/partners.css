@@ -1,0 +1,168 @@
+@layer properties, theme, base, components, utilities;
+
+@layer components {
+  .af-shell {
+    width: min(100%, 1120px);
+    margin-inline: auto;
+    padding: clamp(36px, 6vw, 80px) var(--gutter);
+  }
+  .af-shell h1 {
+    font: 400 clamp(2.35rem, 5vw, 4.5rem) / 1.08 var(--font-display);
+    letter-spacing: -0.025em;
+  }
+  .af-shell h2 {
+    font: 400 clamp(1.35rem, 2vw, 1.9rem) / 1.25 var(--font-display);
+  }
+  .af-shell h3 {
+    font-weight: 600;
+    margin-block: 1.25rem 0.75rem;
+  }
+  .af-shell p,
+  .af-shell dt {
+    color: var(--muted-foreground);
+    line-height: 1.6;
+  }
+  .af-intro,
+  .af-section,
+  .af-panel,
+  .af-form {
+    display: grid;
+    gap: 1rem;
+  }
+  .af-intro {
+    max-width: 64ch;
+    padding-block: 1rem 3rem;
+  }
+  .af-intro > p {
+    font-size: 1.1rem;
+  }
+  .af-section,
+  .af-panel,
+  .af-form {
+    margin-top: 1.5rem;
+  }
+  .af-panel,
+  .af-form {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: clamp(16px, 3vw, 28px);
+  }
+  .af-form {
+    max-width: 38rem;
+  }
+  .af-form label {
+    display: grid;
+    gap: 0.45rem;
+    font-weight: 550;
+  }
+  .af-shell :is(input:not([type='checkbox']), select, textarea) {
+    min-width: 0;
+    width: 100%;
+    min-height: 44px;
+    padding: 0.55rem 0.8rem;
+    border: 1px solid var(--input);
+    background: var(--background);
+    color: var(--foreground);
+    border-radius: 0.55rem;
+    font: inherit;
+  }
+  .af-form .af-consent {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    font-weight: 400;
+  }
+  .af-form .af-consent a,
+  .af-link {
+    color: var(--foreground);
+    text-decoration: underline;
+    text-underline-offset: 0.22em;
+  }
+  .af-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: fit-content;
+    padding: 0.6rem 1.15rem;
+    min-height: 44px;
+    border-radius: 100px;
+    background: var(--primary);
+    color: var(--primary-foreground);
+    font-weight: 650;
+  }
+  .af-button:disabled {
+    opacity: 0.55;
+  }
+  .af-heading,
+  .af-copy {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+  }
+  .af-heading {
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+  .af-copy .af-button {
+    flex-shrink: 0;
+  }
+  .af-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    border-bottom: 1px solid var(--border);
+    padding-block: 1.25rem 0.75rem;
+  }
+  .af-nav a {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    padding-inline: 0.8rem;
+    color: var(--muted-foreground);
+  }
+  .af-nav a[aria-current='page'] {
+    color: var(--foreground);
+    border-radius: 0.5rem;
+    background: var(--secondary);
+  }
+  .af-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1.1rem;
+    margin-block: 2rem;
+  }
+  .af-metrics > div {
+    padding-top: 0.7rem;
+    border-top: 1px solid var(--border);
+  }
+  .af-metrics dd {
+    font-size: clamp(1.25rem, 3vw, 1.85rem);
+    font-variant-numeric: tabular-nums;
+  }
+  .af-shell .af-table-wrap {
+    overflow-x: auto;
+  }
+  .af-shell table {
+    min-width: 100%;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+  }
+  .af-shell th,
+  .af-shell td {
+    padding: 0.8rem 1rem 0.8rem 0;
+    text-align: start;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .af-shell th {
+    font-weight: 500;
+    color: var(--muted-foreground);
+  }
+  .af-empty,
+  .af-banner {
+    padding: 1rem;
+    background: var(--card);
+    border-radius: var(--radius);
+  }
+}

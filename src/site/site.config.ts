@@ -1,3 +1,4 @@
+import { affiliateDefault } from '@/core/affiliate/defaults'
 import { defineSite } from '@/core/config'
 
 import { SITE_DOMAIN } from './domain'
@@ -35,6 +36,9 @@ export const site = defineSite({
       '/commercial-photography',
       '/ai-restaurant-menu',
       '/pricing',
+      '/partners',
+      '/partners/apply',
+      '/partners/terms',
       '/signup',
       '/login',
       '/reset',
@@ -94,7 +98,7 @@ export const site = defineSite({
   // open is the admin switch on /admin/features (system_settings wishlist_enabled, default
   // off, §15.6 T62); while closed the tab bar has three tabs and /wishlist, /api/wishlist and
   // /admin/requests 404. Preview deployments can also open it with FEATURE_WISHLIST_PREVIEW=on.
-  features: { wishlist: true },
+  features: { wishlist: true, affiliate: affiliateDefault },
   indexing: {
     // The two T44 landing pages are in the keyword map CSV (第一批 第 2 周).
     indexablePaths: ['/', '/image-to-image-generator', '/commercial-photography', '/ai-restaurant-menu', '/pricing'],

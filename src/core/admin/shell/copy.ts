@@ -12,6 +12,7 @@ export const SHELL_COPY = {
     tickets: '工单',
     inquiries: '企业咨询',
     orders: '订单与收入',
+    affiliates: '推广员计划',
     disputes: '拒付',
     jobs: '出图记录',
     costs: '成本对账',

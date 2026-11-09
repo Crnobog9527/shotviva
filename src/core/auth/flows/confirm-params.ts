@@ -4,8 +4,8 @@ import type { CallbackError } from './callback-target'
 import type { CallbackFlow } from './callback-url'
 
 // The link types our email templates send (supabase/templates). `email` is Supabase's newer
-// name for a signup confirmation; `invite` is left out because Shotviva sends no invites.
-const CONFIRM_TYPES = ['signup', 'email', 'magiclink', 'recovery', 'email_change'] as const
+// name for a signup confirmation.
+const CONFIRM_TYPES = ['signup', 'email', 'magiclink', 'recovery', 'email_change', 'invite'] as const
 export type ConfirmType = (typeof CONFIRM_TYPES)[number]
 
 const confirmSchema = z.object({
@@ -19,7 +19,7 @@ export function parseConfirmParams(params: URLSearchParams): ConfirmParams | nul
   const parsed = confirmSchema.safeParse({ token_hash: params.get('token_hash'), type: params.get('type') })
   if (!parsed.success) return null
   const { token_hash: tokenHash, type } = parsed.data
-  return { tokenHash, type, flow: type === 'recovery' ? 'recovery' : 'email' }
+  return { tokenHash, type, flow: type === 'recovery' || type === 'invite' ? 'recovery' : 'email' }
 }
 
 // A malformed link can only be a recovery link if it says so; otherwise treat it as email so

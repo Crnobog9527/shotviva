@@ -14,6 +14,7 @@ import {
   type BatchOutcome,
   type UserDetailData,
 } from '@/core/admin'
+import { isAffiliateEnabled } from '@/core/affiliate/feature'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 
 // Server actions are public endpoints, so each one re-checks the admin role itself. Inputs
@@ -54,7 +55,7 @@ export async function unbanUserAction(input: unknown): Promise<ActionValue<null>
 // The user detail dialog (T77) reads through this, over any admin page. Read only: no refresh.
 export async function userDetailAction(input: unknown): Promise<ActionValue<UserDetailData | null>> {
   await requireAdmin()
-  return runAdminQuery(() => loadUserDetail(createAdminSupabase(), input))
+  return runAdminQuery(async () => loadUserDetail(createAdminSupabase(), input, await isAffiliateEnabled()))
 }
 
 // Batch actions on the users list (T77): all or nothing, at most 50 users. The signed-in admin

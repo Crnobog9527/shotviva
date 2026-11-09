@@ -18,6 +18,7 @@ vi.mock('./users/actions', () => ({ adjustCreditsAction: vi.fn(), banUserAction:
 vi.mock('@/core/support', () => ({ openTicketCount: () => openTicketCount() }))
 vi.mock('@/core/inquiries', () => ({ newInquiryCount: () => newInquiryCount() }))
 vi.mock('@/core/logger', () => ({ logger: { warn: () => undefined } }))
+vi.mock('@/core/affiliate/feature', () => ({isAffiliateEnabled: async () => false}))
 vi.mock('@/core/wishlist', () => ({ isWishlistEnabled: async () => false }))
 vi.mock('@/site/site.config', () => ({ site: {} }))
 
@@ -43,20 +44,20 @@ describe('admin layout', () => {
   it('builds the nav without the review entry while the wishlist is off', async () => {
     requireAdmin.mockResolvedValue({ id: 'admin', email: 'owner@example.test' })
     await AdminLayout({ children: null } as never)
-    expect(adminNavItems).toHaveBeenCalledWith({ wishlist: false }, { tickets: 3, inquiries: 2 })
+    expect(adminNavItems).toHaveBeenCalledWith({ wishlist: false, affiliate: false }, { tickets: 3, inquiries: 2 })
   })
 
   it('still builds the nav, without a count, when the ticket count fails (T27)', async () => {
     requireAdmin.mockResolvedValue({ id: 'admin', email: 'owner@example.test' })
     openTicketCount.mockRejectedValue(new Error('down'))
     await AdminLayout({ children: null } as never)
-    expect(adminNavItems).toHaveBeenCalledWith({ wishlist: false }, { tickets: 0, inquiries: 2 })
+    expect(adminNavItems).toHaveBeenCalledWith({ wishlist: false, affiliate: false }, { tickets: 0, inquiries: 2 })
   })
 
   it('still builds the nav, without a count, when the inquiry count fails (T86)', async () => {
     requireAdmin.mockResolvedValue({ id: 'admin', email: 'owner@example.test' })
     newInquiryCount.mockRejectedValue(new Error('down'))
     await AdminLayout({ children: null } as never)
-    expect(adminNavItems).toHaveBeenCalledWith({ wishlist: false }, { tickets: 3, inquiries: 0 })
+    expect(adminNavItems).toHaveBeenCalledWith({ wishlist: false, affiliate: false }, { tickets: 3, inquiries: 0 })
   })
 })

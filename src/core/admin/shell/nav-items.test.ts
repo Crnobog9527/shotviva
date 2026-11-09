@@ -23,6 +23,11 @@ describe('admin nav', () => {
     expect(adminNavItems({ wishlist: false }).map((item) => item.key)).not.toContain('requests')
   })
 
+  it('only links to the affiliate program while enabled', () => {
+    expect(adminNavItems({ wishlist: false, affiliate: true }).map(item => item.href)).toContain('/admin/affiliates')
+    expect(adminNavItems({ wishlist: false, affiliate: false }).map(item => item.href)).not.toContain('/admin/affiliates')
+  })
+
   it('shows the open-ticket count on 工单 only, and none at 0 (T27)', () => {
     const items = adminNavItems({ wishlist: false }, { tickets: 4 })
     expect(items.find((item) => item.key === 'tickets')?.count).toBe(4)

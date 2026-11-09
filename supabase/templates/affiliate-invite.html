@@ -1,0 +1,4 @@
+{{- $link := printf "%s&token_hash=%s&type=invite" .RedirectTo .TokenHash -}}
+{{- if eq .RedirectTo .SiteURL -}}{{- $link = printf "%s/auth/confirm?next=/partners&token_hash=%s&type=invite" .SiteURL .TokenHash -}}{{- end -}}
+{{ if eq .Data.locale "zh" }}<p>你受邀加入 Shotviva 推广员计划。<a href="{{ $link }}">确认邮箱并设置密码</a></p>
+{{ else }}<p>You have been invited to the Shotviva partner program. <a href="{{ $link }}">Confirm your email and set a password</a></p>{{ end }}

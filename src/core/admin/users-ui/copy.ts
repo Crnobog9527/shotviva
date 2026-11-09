@@ -77,6 +77,7 @@ export const USERS_COPY = {
     },
   },
   dialog: {
+    referrer: '推荐人',
     close: '关闭',
     loading: '正在读取用户…',
     missing: '这个用户不存在，可能已经删号。',
