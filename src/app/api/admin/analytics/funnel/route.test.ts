@@ -2,12 +2,13 @@ import { beforeEach, expect, it, vi } from 'vitest'
 
 import { GET } from './route'
 
-const { guard, read, bucket } = vi.hoisted(() => ({guard: vi.fn(), read: vi.fn(), bucket: 600_000}))
-vi.mock('@/core/auth', () => ({requireAdmin: guard}))
+const { guard, read, bucket } = vi.hoisted(() => ({ guard: vi.fn(), read: vi.fn(), bucket: 600_000 }))
+vi.mock('@/core/auth', () => ({ requireAdmin: guard }))
 vi.mock('server-only', () => ({}))
 vi.mock('@/core/admin/analytics', async (importOriginal) => ({
-  ...await importOriginal<typeof import('@/core/admin/analytics')>(),
-  posthogProjectId: () => 'test', funnelResponse: read,
+  ...(await importOriginal<typeof import('@/core/admin/analytics')>()),
+  posthogProjectId: () => 'test',
+  funnelResponse: read,
 }))
 
 beforeEach(() => {
@@ -26,7 +27,7 @@ it('authorizes before calling either cache or analytics', async () => {
 it('rejects arbitrary cache keys and responds privately to valid requests', async () => {
   expect((await GET(req('range=7d&group=visitor&end=1'))).status).toBe(400)
   expect(read).not.toHaveBeenCalled()
-  read.mockResolvedValueOnce(null).mockResolvedValueOnce({data:{},end:bucket,link:'link'})
+  read.mockResolvedValueOnce(null).mockResolvedValueOnce({ data: {}, end: bucket, link: 'link' })
   expect((await GET(valid())).status).toBe(503)
   const ok = await GET(valid())
   expect(ok.status).toBe(200)

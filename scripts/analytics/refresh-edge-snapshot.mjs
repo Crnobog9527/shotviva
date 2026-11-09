@@ -2,7 +2,7 @@
 // Reads only aggregate metrics. The output is private operational data in git-ignored .local/.
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, renameSync, writeFileSync } from 'node:fs'
-import { queryEdge } from '../../src/core/admin/analytics/edge-query.ts'
+import { edgeWindow, queryEdge } from '../../src/core/admin/analytics/edge-query.ts'
 
 const input = process.argv[2]
 if (input && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/.test(input)) {
@@ -10,7 +10,8 @@ if (input && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/.test(input)) {
 }
 const end = (input ? new Date(input) : new Date(Math.floor(Date.now() / 60_000) * 60_000)).toISOString()
 if (Date.parse(end) > Date.now()) throw new Error('The observation cannot end in the future.')
-const start = new Date(Date.parse(end) - 7 * 86_400_000).toISOString()
+const window = edgeWindow('7d', Date.parse(end))
+if (input && window.end !== end) throw new Error('Choose a closed UTC hour for the snapshot end.')
 function request(endpoint, body) {
   const args = ['api', endpoint]
   if (body) args.push('--input', '-')
@@ -25,7 +26,7 @@ function request(endpoint, body) {
 }
 const { id: projectId, accountId: ownerId } = request('/v9/projects/shotviva')
 if (!projectId || !ownerId) throw new Error('Missing Vercel project scope.')
-const snapshot = await queryEdge((body) => request('/v2/observability/query', body), { ownerId, projectId }, { start, end }, true)
+const snapshot = await queryEdge((body) => request('/v2/observability/query', body), { ownerId, projectId }, window, true)
 const folder = new URL('../../.local/traffic-source-qa/', import.meta.url)
 mkdirSync(folder, { recursive: true, mode: 0o700 })
 const target = new URL('edge-snapshot.json', folder)

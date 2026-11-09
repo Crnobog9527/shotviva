@@ -87,7 +87,7 @@ export const ANALYTICS_COPY = {
       expired: '上次实时记录已超过 15 分钟的有效期。',
       noCoverage: '所选时段没有足够的请求记录可供核对。',
     },
-    coverage: (first: string | null, last: string | null) => `首末有记录的整点分别为 ${first} 和 ${last}（北京时间）。有记录的小时可核对，缺少记录的时段流量未知。`,
+    coverage: (first: string | null, last: string | null) => `首末有记录的时间桶分别始于 ${first} 和 ${last}（北京时间）。有记录的时间桶可核对，缺少记录的时段流量未知。`,
     range: '路径范围',
     all: '全部路径',
     metrics: {
@@ -140,7 +140,7 @@ export const ANALYTICS_COPY = {
       visitor: { new: '新访客', returning: '老访客' } as Record<string, string>,
     },
     unknown: '未知',
-    visitorNote: '新访客：90 天内第一次来；老访客：90 天内来过。',
+    visitorNote: '以本期开始为界，前 90 天有正式前台浏览记录的访客归为老访客，其余归为新访客。',
   },
   payment: {
     title: '付款环节',

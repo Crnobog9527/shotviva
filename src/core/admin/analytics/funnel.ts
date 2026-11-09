@@ -44,12 +44,13 @@ function reachedColumns(): string {
 
 function segmentSource(window: Window, dim: FunnelDim): { seg: string; join: string } {
   if (dim !== 'visitor') return { seg: 'p.first_value', join: '' }
-  const lookback = new Date(Date.parse(window.prevStart) - LOOKBACK_DAYS * 86_400_000).toISOString()
+  const back = (start: string) => at(new Date(Date.parse(start) - LOOKBACK_DAYS * 86_400_000).toISOString())
   return {
-    seg: `if(f.first_seen >= if(p.in_current, ${at(window.start)}, ${at(window.prevStart)}), 'new', 'returning')`,
+    seg: "if(if(p.in_current, f.prior_current, f.prior_previous) > 0, 'returning', 'new')",
     join: `LEFT JOIN (
-  SELECT person_id, min(timestamp) AS first_seen FROM events
-  WHERE event = '$pageview' AND ${publicEvent} AND timestamp >= ${at(lookback)} AND timestamp < ${at(window.end)}
+  SELECT person_id, countIf(timestamp >= ${back(window.start)}) AS prior_current,
+    countIf(timestamp < ${at(window.prevStart)}) AS prior_previous FROM events
+  WHERE event = '$pageview' AND ${publicEvent} AND timestamp >= ${back(window.prevStart)} AND timestamp < ${at(window.start)}
   GROUP BY person_id
 ) AS f ON f.person_id = p.person_id`,
   }

@@ -19,7 +19,7 @@ describe('转化漏斗 query', () => {
     expect(funnelQuery(WEEK, 'source').query).toContain("'$direct'")
     const visitor = funnelQuery(WEEK, 'visitor').query
     expect(visitor).toContain('LEFT JOIN')
-    expect(visitor).toContain("'new', 'returning'")
+    expect(visitor).toContain("'returning', 'new'")
     expect(funnelQuery(WEEK, 'none').query).not.toContain('JOIN')
   })
 
@@ -36,7 +36,11 @@ describe('转化漏斗 query', () => {
 
   it('labels new / returning from first-seen against the start of each period', () => {
     const { query } = funnelQuery(WEEK, 'visitor')
-    expect(query).toContain(`if(f.first_seen >= if(p.in_current, toDateTime('${WEEK.start}'), toDateTime('${WEEK.prevStart}')), 'new', 'returning') AS seg`)
+    const back = (time: string) => new Date(Date.parse(time) - 90 * 86_400_000).toISOString()
+    expect(query).toContain(`countIf(timestamp >= toDateTime('${back(WEEK.start)}')) AS prior_current`)
+    expect(query).toContain(`countIf(timestamp < toDateTime('${WEEK.prevStart}')) AS prior_previous`)
+    expect(query).toContain(`timestamp >= toDateTime('${back(WEEK.prevStart)}') AND timestamp < toDateTime('${WEEK.start}')`)
+    expect(query).toContain("if(if(p.in_current, f.prior_current, f.prior_previous) > 0, 'returning', 'new') AS seg")
     expect(query).toContain('ON f.person_id = p.person_id')
   })
 
@@ -80,12 +84,12 @@ it('shares one bounded query across five dimensions and loads visitor history on
   const run = fakeRun({'funnel.breakdowns': {columns: ['cur', 'dim', 'seg','s0','s1','s2','s3','s4','s5'], results}})
   const groups = await loadFunnelGroup(run, WEEK, 'breakdowns')
   expect(run.asked).toHaveLength(1)
-  expect(run.asked[0]?.query).not.toContain('first_seen')
+  expect(run.asked[0]?.query).not.toContain('prior_current')
   expect(groups.none?.segments).toEqual([])
   for (const [dim, value] of Object.entries(segments)) {
     expect(groups[parseFunnelDim(dim)]?.segments).toEqual([{value, counts: groups.none?.current}])
   }
   expect(await loadFunnelGroup(run, WEEK, 'visitor')).toHaveProperty('visitor')
   expect(run.asked.map((entry) => entry.name)).toEqual(['funnel.breakdowns', 'funnel.visitor'])
-  expect(run.asked[1]?.query).toContain('first_seen')
+  expect(run.asked[1]?.query).toContain('prior_current')
 })

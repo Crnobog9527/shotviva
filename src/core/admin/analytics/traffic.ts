@@ -43,17 +43,22 @@ export function entryChannel(prefix = ''): string {
 }
 
 export function trafficSessionsQuery(window: Window): HogQL {
-  return { name: 'traffic.sessions', query: `
+  return {
+    name: 'traffic.sessions',
+    query: `
 SELECT ${entryChannel()} AS channel, count() AS sessions,
   countIf($entry_pathname = '/') AS en, countIf($entry_pathname IN ('/zh','/zh/')) AS zh
 FROM sessions WHERE ${currentPeriod(window, '$start_timestamp')} AND ${publicEntry()} AND $pageview_count > 0
-GROUP BY channel LIMIT 6` }
+GROUP BY channel LIMIT 6`,
+  }
 }
 
 // A named UA is self-identification, never network verification. Without evidence a view is
 // unknown. Default posthog-js filters many crawlers before capture, so this cannot count hits.
 export function trafficViewsQuery(window: Window): HogQL {
-  return { name: 'traffic.views', query: `
+  return {
+    name: 'traffic.views',
+    query: `
 SELECT scope, count() AS views, uniq(person_id) AS visitors,
   countIf(named) AS identified, countIf(NOT named AND automated) AS suspected
 FROM (
@@ -63,34 +68,46 @@ FROM (
     match(ua, 'headless|playwright|puppeteer|crawler|spider|bot[/ ;)]|lighthouse')
       OR match(lower(coalesce(properties.$browser,'')), 'headless|bot|crawler') AS automated
   FROM events WHERE event = '$pageview' AND ${currentPeriod(window)}
-) GROUP BY scope LIMIT 5` }
+) GROUP BY scope LIMIT 5`,
+  }
 }
 
-const exclusion = z.enum(['missing','admin','test','nonPublicHost'])
-const viewRow = z.object({scope: z.union([z.literal('public'), exclusion]), views: count, visitors: count, identified: count, suspected: count})
-const sessionRow = z.object({channel: z.enum(CHANNELS), sessions: count, en: count, zh: count})
+const exclusion = z.enum(['missing', 'admin', 'test', 'nonPublicHost'])
+const viewRow = z.object({
+  scope: z.union([z.literal('public'), exclusion]),
+  views: count,
+  visitors: count,
+  identified: count,
+  suspected: count,
+})
+const sessionRow = z.object({ channel: z.enum(CHANNELS), sessions: count, en: count, zh: count })
 
 export async function loadTraffic(run: RunQuery, window: Window): Promise<Traffic> {
   const views = rowsOf(await run(trafficViewsQuery(window)), viewRow)
   const sessions = rowsOf(await run(trafficSessionsQuery(window)), sessionRow)
   const result: Traffic = {
-    views: 0, visitors: 0, identified: 0, suspected: 0, unknown: 0, sessions: 0,
-    excluded: {missing: 0, admin: 0, test: 0, nonPublicHost: 0},
-    channels: {google: 0, bing: 0, chatgpt: 0, direct: 0, other: 0, internal: 0},
-    homeEntries: Object.fromEntries(CHANNELS.map((key) => [key, {en: 0, zh: 0}])) as Traffic['homeEntries'],
+    views: 0,
+    visitors: 0,
+    identified: 0,
+    suspected: 0,
+    unknown: 0,
+    sessions: 0,
+    excluded: { missing: 0, admin: 0, test: 0, nonPublicHost: 0 },
+    channels: { google: 0, bing: 0, chatgpt: 0, direct: 0, other: 0, internal: 0 },
+    homeEntries: Object.fromEntries(CHANNELS.map((key) => [key, { en: 0, zh: 0 }])) as Traffic['homeEntries'],
   }
   for (const row of views) {
     if (row.scope !== 'public') result.excluded[row.scope] = row.views
     else {
       const unknown = row.views - row.identified - row.suspected
       if (unknown < 0) throw new PostHogQueryError('bad_response')
-      Object.assign(result, {views: row.views, visitors: row.visitors, identified: row.identified, suspected: row.suspected, unknown})
+      Object.assign(result, { views: row.views, visitors: row.visitors, identified: row.identified, suspected: row.suspected, unknown })
     }
   }
   for (const row of sessions) {
     result.sessions += row.sessions
     result.channels[row.channel] = row.sessions
-    result.homeEntries[row.channel] = {en: row.en, zh: row.zh}
+    result.homeEntries[row.channel] = { en: row.en, zh: row.zh }
   }
   return result
 }

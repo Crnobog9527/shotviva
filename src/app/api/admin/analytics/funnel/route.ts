@@ -5,10 +5,12 @@ export async function GET(request: Request) {
   await requireAdmin()
   const params = funnelParams.safeParse(Object.fromEntries(new URL(request.url).searchParams))
   const headers = { 'Cache-Control': 'private, no-store' }
-  if (!params.success) return Response.json({end: funnelEnd()}, {status: 400, headers})
+  if (!params.success) return Response.json({ end: funnelEnd() }, { status: 400, headers })
   const projectId = posthogProjectId()
-  if (!projectId) return new Response(null, {status: 503, headers})
-  const {range, group, end} = params.data
-  const result = await funnelResponse(projectId, range, group, end)
-  return Response.json(result, {status: result ? 200 : 503, headers})
+  if (!projectId) return new Response(null, { status: 503, headers })
+  const { range, group, end } = params.data
+  // An old tab may hydrate after its cache window expired. Bound reads to two server keys.
+  const now = funnelEnd()
+  const result = await funnelResponse(projectId, range, group, end === now - 600_000 ? end : now)
+  return Response.json(result, { status: result ? 200 : 503, headers })
 }

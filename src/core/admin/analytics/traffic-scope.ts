@@ -11,8 +11,7 @@ export function scopeOf(hostExpr: string, path: string): string {
 }
 
 export const publicEvent = `${scopeOf(EVENT_HOST, EVENT_PATH)} = 'public'`
-export const publicEntry = (prefix = '') =>
-  `${scopeOf(`domain(${prefix}$entry_current_url)`, `${prefix}$entry_pathname`)} = 'public'`
+export const publicEntry = (prefix = '') => `${scopeOf(`domain(${prefix}$entry_current_url)`, `${prefix}$entry_pathname`)} = 'public'`
 
 // Historical server conversions did not carry a host. Only attach them to people with a
 // public pageview in the same period. Other browser events must themselves be public.
