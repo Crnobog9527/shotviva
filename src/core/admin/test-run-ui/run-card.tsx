@@ -23,7 +23,7 @@ function Meta({ run }: { run: TestRunView }) {
     run.model,
     run.kind === 'generate' && run.status === 'succeeded' ? COPY.run.styleRefs(run.styleRefCount) : null,
     run.durationMs === null ? null : COPY.run.seconds(run.durationMs),
-    run.status === 'running' ? null : run.costUsd === null ? COPY.run.noCost : usd.format(run.costUsd),
+    run.status === 'running' ? null : run.receiptDetail ?? (run.costUsd === null ? COPY.run.noCost : usd.format(run.costUsd)),
   ].filter(Boolean)
   return <p className="text-muted-foreground break-all font-mono text-[11px] tabular-nums">{parts.join(' · ') || ' '}</p>
 }

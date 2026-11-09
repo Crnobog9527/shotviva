@@ -41,16 +41,19 @@ describe('jobCostUsd', () => {
 
 describe('OpenRouter image cost', () => {
   it('uses the billed USD including the funding fee, even without prices', () => {
-    expect(jobCostUsd({ cost: 0.04, prompt_tokens: 1000, completion_tokens: 1000 }, null)).toBe(0.0422)
-    expect(jobCostUsd({ cost: 0 }, null)).toBe(0)
+    expect(jobCostUsd({ cost: 0.04, is_byok: false, prompt_tokens: 1000, completion_tokens: 1000 }, null)).toBe(0.0422)
+    expect(jobCostUsd({ cost: 0, is_byok: false }, null)).toBe(0)
+    expect(jobCostUsd({ cost: 0 }, null)).toBeNull()
+    expect(jobCostUsd({ cost: 0.018 }, null)).toBeNull()
+    expect(jobCostUsd({ cost: 0.01, is_byok: true, upstream_inference_cost: 0.2 }, PRICES)).toBeNull()
   })
 
-  it('estimates using prompt and completion prices only when billed USD is missing', () => {
-    expect(jobCostUsd({ prompt_tokens: 1000, completion_tokens: 1000 }, PRICES)).toBe(0.036925)
+  it('does not book a token estimate when billed USD is missing', () => {
+    expect(jobCostUsd({ prompt_tokens: 1000, completion_tokens: 1000 }, PRICES)).toBeNull()
     expect(jobCostUsd({ prompt_tokens: 1000 }, PRICES)).toBeNull()
   })
 
   it('adds the separate decision charge without an OpenRouter fee', () => {
-    expect(jobCostUsd({ cost: 0.04, decision_input_tokens: 1000 }, null, PRICES)).toBe(0.0472)
+    expect(jobCostUsd({ cost: 0.04, is_byok: false, decision_input_tokens: 1000 }, null, PRICES)).toBe(0.0472)
   })
 })

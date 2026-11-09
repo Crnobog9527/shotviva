@@ -1,6 +1,6 @@
 import type { AdminProvider, ConnectionResult, ProviderAdapterId, ProviderSettingReason } from '@/core/providers'
 
-import type { Resolution } from '@/core/templates/output-options'
+import type { ImageCapabilities } from '@/core/templates/image-capabilities'
 
 import type { SaveProviderInput } from './schema'
 
@@ -8,7 +8,7 @@ export type ProviderActionResult<T = void> = { ok: true; value: T } | { ok: fals
 
 // Server actions the editor calls; each re-checks the admin role itself.
 export type ProviderAdminActions = {
-  lookupModel: (input: { baseUrl: string; model: string }) => Promise<ProviderActionResult<Resolution[] | null>>
+  lookupModel: (input: { baseUrl: string; model: string; retry?: boolean }) => Promise<ProviderActionResult<ImageCapabilities | null>>
   save: (input: SaveProviderInput) => Promise<ProviderActionResult<string>>
   activate: (input: { id: string }) => Promise<ProviderActionResult>
   refresh: (input: { id: string }) => Promise<ProviderActionResult>

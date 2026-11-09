@@ -51,7 +51,7 @@ describe('OpenRouter image requests', () => {
     const fetch = fake(reply(await imageData('jpeg')))
     const result = await createOpenRouterImageProvider({ ...config, model, fetch }).generate(input({
       images: [photo, { bytes: new Uint8Array([3, 4]), contentType: 'image/webp' }],
-      aspectRatio, resolution: model === gemini ? '1k' : '2k', params: { output_format: 'png' },
+      aspectRatio, resolution: model === flux || model === seedream ? '2k' : '1k', params: { output_format: 'png' },
     }))
     expect(fetch.mock.calls[0]).toMatchObject(['https://openrouter.ai/api/v1/images/models', { method: 'GET' }])
     const [url, request] = fetch.mock.calls[1]!
@@ -91,9 +91,9 @@ describe('OpenRouter model limits', () => {
     expect(fetch.mock.calls[0]?.[1]?.method).toBe('GET')
   })
 
-  it('does not submit an undeclared Seedream resolution', async () => {
+  it.each([[seedream, '1k'], [gemini, '2k']] as const)('does not submit an undeclared size for %s (%s)', async (model, resolution) => {
     const fetch = fake({})
-    await expect(createOpenRouterImageProvider({ ...config, model: seedream, fetch }).generate(input()))
+    await expect(createOpenRouterImageProvider({ ...config, model, fetch }).generate(input({ resolution })))
       .rejects.toMatchObject({ code: 'MODEL_INPUT_UNSUPPORTED' })
     expect(fetch).toHaveBeenCalledTimes(1)
   })
@@ -110,7 +110,7 @@ describe('OpenRouter model limits', () => {
 
   it('shrinks real 4K pixels to the existing square 3K tier', async () => {
     const fetch = fake(reply(await imageData('png', 4096)))
-    const image = await createOpenRouterImageProvider({ ...config, fetch }).generate(input({ resolution: '3k', aspectRatio: '1:1' }))
+    const image = await createOpenRouterImageProvider({ ...config, model: flux, fetch }).generate(input({ resolution: '3k', aspectRatio: '1:1' }))
     expect(await sharp(image.bytes).metadata()).toMatchObject({ width: 2880, height: 2880 })
   })
 })
@@ -121,8 +121,9 @@ describe('OpenRouter image responses', () => {
     try {
       const tokens = { prompt_tokens: 12, completion_tokens: 0 }
       const fetch = fake({ ...reply(await imageData('png')), usage: { ...tokens, cost: null, total_tokens: 12 } })
-      const image = await createOpenRouterImageProvider({ ...config, fetch }).generate(input())
-      expect(image.usage).toEqual(tokens)
+      const provider = createOpenRouterImageProvider({ ...config, fetch })
+      const image = await provider.generate(input())
+      expect(await provider.completeUsage!(image.usage!)).toMatchObject({ ...tokens, cost: null })
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('omitted cost'), { model: config.model })
     } finally {
       warn.mockRestore()

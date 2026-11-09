@@ -3,6 +3,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
+import { STYLE_STANDARD_CREDITS } from '@/core/templates/pricing'
 import { AppError } from '@/core/errors'
 import { isStyleRefKey } from '@/core/templates/style-refs'
 import { logger } from '@/core/logger'
@@ -31,9 +32,11 @@ const TIER_LABEL = { '1k': 'Standard', '2k': 'HD', '3k': 'Max' } as const
 
 // ARCHITECTURE §6.1: prices may go up, never below the floor for the template's quality tier.
 function assertAboveFloor(template: z.infer<typeof templateInputSchema>, floor: ProviderFloors): void {
+  if (floor.styleDraft && template.creditsCost['1k'] !== STYLE_STANDARD_CREDITS)
+    throw new AppError('INVALID_INPUT', `画风草稿 Standard 规划收费为 ${STYLE_STANDARD_CREDITS} 积分`)
   const low = creditsBelowFloor(template.quality, template.creditsCost, floor)
   if (low.length === 0) return
-  const detail = low.map((v) => v.floor === MISSING_COST ? floorGuidance(v.floor) : `${TIER_LABEL[v.resolution]} 不能低于 ${v.floor}（填了 ${v.given}）`).join('；')
+  const detail = low.map((v) => v.floor === MISSING_COST ? floorGuidance(v.floor, floor.unknownCapabilities) : `${TIER_LABEL[v.resolution]} 不能低于 ${v.floor}（填了 ${v.given}）`).join('；')
   throw new AppError('INVALID_INPUT', `积分低于下限：${detail}`)
 }
 
@@ -51,11 +54,11 @@ export async function saveTemplate(
   adminId: string,
   payload: SaveTemplatePayload,
   floor: ProviderFloors,
-): Promise<void> {
+): Promise<number | undefined> {
   const template = parseOrThrow(templateInputSchema, payload.template, 'template')
   const prompt = parseOrThrow(promptInputSchema, payload.prompt, 'prompt')
   if (prompt.styleRefs?.some(ref => !isStyleRefKey(template.id, ref.key))) throw new AppError('INVALID_INPUT', '画风参考图不属于这个模板')
-  assertAboveFloor(template, providerFloor(floor, prompt.providerId, template.id))
+  assertAboveFloor(template, providerFloor(floor, prompt.providerId, template.id, template.category, template.quality, template.visibleIn.includes('partner')))
   assertTogglesWired(template, prompt)
   const exists = await repo.templateExists(client, template.id)
   if (payload.isNew && exists) {
@@ -64,8 +67,12 @@ export async function saveTemplate(
   if (!payload.isNew && !exists) throw new AppError('NOT_FOUND', `template ${template.id} not found`)
   // A brand-new template starts unpublished so it can be checked before anyone sees it.
   const toSave = payload.isNew ? { ...template, isActive: false } : template
-  await repo.upsertTemplate(client, toSave, prompt, floor)
+  const revision = payload.revision && parseOrThrow(z.object({
+    expected: z.int().positive(), selected: z.int().positive().optional(),
+  }), payload.revision, 'revision')
+  const version = await repo.upsertTemplate(client, toSave, prompt, floor, revision && { ...revision, actor: adminId })
   logger.info('admin.template.saved', { adminId, templateId: template.id, isNew: payload.isNew })
+  return version
 }
 
 // The 上架 switch and the bulk bar (T60) share this one path: same rules, same log line, same

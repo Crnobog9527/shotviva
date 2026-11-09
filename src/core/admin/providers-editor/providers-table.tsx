@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import type { AdminProvider } from '../providers/types'
 
 import { PROVIDERS_COPY as COPY } from './copy'
+import { CatalogPrices } from './catalog-prices'
 import { PricesCell } from './prices-cell'
 import { deleteControl } from './row-actions'
 
@@ -113,7 +114,7 @@ export function ProvidersTable({ providers, testResults, testing, pending, ...ha
               </TableCell>
               <TableCell className="font-mono text-xs">{COPY.keyMasked(provider.apiKeyLast4)}</TableCell>
               <TableCell>
-                <PricesCell adapter={provider.adapter} prices={provider.prices} module={provider.module} model={provider.model} />
+                {provider.adapter === 'openrouter_images' ? <CatalogPrices pricing={provider.capabilities?.catalogPricing} /> : <PricesCell adapter={provider.adapter} prices={provider.prices} module={provider.module} model={provider.model} />}
               </TableCell>
               <TableCell>
                 <Badge variant={provider.isActive ? 'default' : 'secondary'}>{provider.isActive ? COPY.active : COPY.inactive}</Badge>

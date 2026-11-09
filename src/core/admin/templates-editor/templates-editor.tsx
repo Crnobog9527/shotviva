@@ -18,6 +18,7 @@ import { TemplateFormDialog, type EditTarget } from './template-form-dialog'
 import { catalogueOrder, Toolbar } from './toolbar'
 import { TemplatesTable } from './templates-table'
 import { UnpublishDialog } from './unpublish-dialog'
+import { useDuplicateTemplate } from './use-duplicate-template'
 import { useTemplateActions } from './use-template-actions'
 
 type Props = {
@@ -32,14 +33,14 @@ type Props = {
 
 // 'saved': a new template just saved, shown in edit mode (with the test-run panel, T85) as soon as
 // the refreshed list has it.
-type Editing = EditTarget | { mode: 'saved'; id: string }
+type Editing = EditTarget | { mode: 'saved'; id: string; previousStandard?: number | null }
 
 // After a save the page refreshes; the dialog shows the fresh row, not the snapshot.
 function currentTarget(editing: Editing | null, templates: readonly AdminTemplate[]): EditTarget | null {
   if (!editing || editing.mode === 'new') return editing
   const id = editing.mode === 'saved' ? editing.id : editing.template.id
   const fresh = templates.find((t) => t.id === id)
-  if (editing.mode === 'saved') return fresh ? { mode: 'edit', template: fresh } : null
+  if (editing.mode === 'saved') return fresh ? { mode: 'edit', template: fresh, previousStandard: editing.previousStandard } : null
   return { mode: 'edit', template: fresh ?? editing.template }
 }
 
@@ -55,6 +56,7 @@ export function TemplatesEditor({ providers, templates, categories, floor, cover
   const [unpublishing, setUnpublishing] = useState<AdminTemplate | null>(null)
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set())
   const { pending, error, notice, run, clearError } = useTemplateActions()
+  const duplicate = useDuplicateTemplate(actions.duplicate, run, receipt => setEditing({ mode: 'saved', ...receipt }))
   const visible = templates.filter((template) => matchesSearch(template, query))
   const visibleIds = visible.map((template) => template.id)
   const target = currentTarget(editing, templates)
@@ -81,6 +83,10 @@ export function TemplatesEditor({ providers, templates, categories, floor, cover
   return (
     <div className="grid min-w-0 grid-cols-1 gap-4">
       <Toolbar query={query} onQuery={setQuery} onNew={() => openEditor({ mode: 'new' })} />
+      {floor.version === 'v2' && <details className="text-muted-foreground text-sm">
+        <summary className="cursor-pointer">尚未上架的规划价格</summary>
+        <p>精细文字海报（high）：Standard 120、HD 240、Max 360 积分。目前没有绑定此价目的模板。</p>
+      </details>}
       {notice ? <p className="text-sm text-emerald-700">{notice}</p> : null}
       {error && !target ? (
         <p role="alert" className="text-destructive text-sm">
@@ -104,6 +110,7 @@ export function TemplatesEditor({ providers, templates, categories, floor, cover
         onClear={() => setSelected(new Set())}
       />
       <TemplatesTable
+        floor={floor}
         templates={visible}
         selection={{
           selected,
@@ -114,6 +121,7 @@ export function TemplatesEditor({ providers, templates, categories, floor, cover
         onFeature={feature}
         order={catalogueOrder(query, pending, saveOrder('catalogue'))}
         pending={pending}
+        onDuplicate={duplicate}
         onEdit={(template) => openEditor({ mode: 'edit', template })}
         onToggle={toggle}
       />
@@ -130,7 +138,7 @@ export function TemplatesEditor({ providers, templates, categories, floor, cover
           error={error}
           onCancel={() => setEditing(null)}
           notice={notice}
-          onSubmit={(payload, saved) => run(() => actions.save(payload), '已保存', () => { saved(); setEditing(afterSave(payload)) })}
+          onSubmit={(payload, saved) => run(() => actions.save(payload), '已保存', result => { saved(result.version); setEditing(afterSave(payload)) })}
         />
       ) : null}
       <UnpublishDialog

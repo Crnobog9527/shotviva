@@ -1,5 +1,6 @@
 'use client'
 
+import { catalogTokenPrices, type CatalogPricing } from '@/core/templates/catalog-pricing'
 import { Input } from '@/core/ui/input'
 import { Label } from '@/core/ui/label'
 
@@ -8,7 +9,7 @@ import { MODULE_PRICE_FIELDS, priceOrigin, type PriceField, type PriceOrigin, ty
 
 const COPY = PROVIDERS_COPY.form
 
-type Props = { form: ProviderForm; onChange: (field: PriceField, value: string) => void }
+type Props = { form: ProviderForm; catalogPricing?: CatalogPricing; onChange: (field: PriceField, value: string) => void }
 
 function originText(origin: PriceOrigin): string | null {
   if (origin === null) return null
@@ -24,13 +25,15 @@ function priceLabel(form: ProviderForm, field: PriceField): string {
 
 // The module's per-million-token prices (T33): three for images, input / output for decisions. Free text so a half-typed decimal is not fought;
 // Save stays disabled until each is blank or a non-negative number.
-export function PriceFields({ form, onChange }: Props) {
+export function PriceFields({ form, onChange, catalogPricing }: Props) {
+  const auto = catalogTokenPrices(catalogPricing)
+  const placeholders: Partial<Record<PriceField, number | null>> = { priceInputTextPerM: auto.inputTextPerM, priceOutputPerM: auto.outputPerM }
   const origin = priceOrigin(form)
   const router = form.adapter === 'openrouter_images'
   const fields = MODULE_PRICE_FIELDS[router ? 'decision' : form.module]
   return (
     <fieldset className="grid gap-2">
-      <legend className="text-sm font-medium">{COPY.pricesTitle}</legend>
+      <legend className="text-sm font-medium">{router ? COPY.routerOverride : COPY.pricesTitle}</legend>
       <div className={`grid gap-2 ${fields.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
         {fields.map((field) => (
           <div key={field} className="grid gap-1">
@@ -41,6 +44,7 @@ export function PriceFields({ form, onChange }: Props) {
               id={`provider-${field}`}
               inputMode="decimal"
               className="font-mono"
+              placeholder={placeholders[field]?.toString()}
               value={form[field]}
               onChange={(event) => onChange(field, event.target.value)}
             />

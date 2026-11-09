@@ -1,3 +1,4 @@
+import type { ProviderUsage } from './provider-usage'
 import type { Resolution } from '../templates/output-options'
 import type { TemplateQuality } from '../templates/pricing'
 
@@ -21,23 +22,12 @@ export type ProviderInput = {
   quality: TemplateQuality
   // template_prompts.model_params; adapters pick the keys they understand.
   params: Record<string, unknown>
+  // Preserve billing evidence when the generation deadline wins before the adapter returns.
+  noteUsage?(usage: ProviderUsage): void
   signal: AbortSignal
 }
 
-// What the provider reported using, as stored in generation_jobs.provider_usage (ARCHITECTURE §4,
-// T33). A field the provider did not report is left out, never guessed; cost then stays null.
-// decision_* are the photo-edit decision step's tokens (T30, §5), added by that flow.
-export type ProviderUsage = {
-  // Raw OpenRouter usage; cost is USD before the top-up fee.
-  prompt_tokens?: number
-  completion_tokens?: number
-  cost?: number
-  input_text_tokens?: number
-  input_image_tokens?: number
-  output_tokens?: number
-  decision_input_tokens?: number
-  decision_output_tokens?: number
-}
+export type { ProviderUsage } from './provider-usage'
 
 export type ProviderOutput = { bytes: Uint8Array; contentType: 'image/png'; usage?: ProviderUsage | null }
 
@@ -55,6 +45,8 @@ export type GenerationProvider = {
   // Price snapshot taken when the provider was resolved for this request: the row's prices with
   // empty ones filled from MODEL_PRICES; null when neither has any (the job then has no cost).
   prices?: ProviderPrices | null
+  // Optional bounded, read-only invoice lookup after the generation deadline has stopped.
+  completeUsage?(usage: ProviderUsage): Promise<ProviderUsage>
   generate(input: ProviderInput): Promise<ProviderOutput>
 }
 

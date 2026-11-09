@@ -22,7 +22,7 @@ export function PricesCell({ prices, module, model, adapter }: Props) {
       : COPY.prices(price(shown.inputTextPerM), price(shown.inputImagePerM), price(shown.outputPerM))
   return (
     <div className={`w-52 text-xs whitespace-normal ${missing ? 'text-destructive' : ''}`}>
-      <div className="font-mono">{text}</div>
+      <div className="font-mono">{text} · {COPY.tokenUnit}</div>
       {fromTable ? <div className="text-muted-foreground">{COPY.pricesFromTable(fromTable)}</div> : null}
       {missing ? <div role="note">{adapter === 'openrouter_images' ? COPY.fallbackPricesMissing : COPY.pricesMissing}</div> : null}
     </div>

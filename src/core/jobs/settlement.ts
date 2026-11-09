@@ -4,7 +4,7 @@ import { z } from 'zod'
 
 import { callRpc, type RpcClient } from '@/core/billing'
 
-import type { ProviderUsage } from './provider'
+import { providerUsage, type ProviderUsage } from './provider-usage'
 import { JOB_MODULES, JOB_SOURCES, JOB_VISIBILITIES, jobRowSchema, type Job, type JobVisibility } from './job-schema'
 
 // Synchronous generation settlement (ARCHITECTURE §4): reserveJob before calling the
@@ -58,13 +58,8 @@ export async function reserveJob(client: RpcClient, input: ReserveJobInput): Pro
 // written in the same call that settles the job.
 export type JobCost = { usage?: ProviderUsage | null; costUsd?: number | null }
 
-const tokens = z.number().int().nonnegative().optional()
 const costSchema = {
-  usage: z
-    .object({ prompt_tokens: tokens, completion_tokens: tokens, cost: z.number().nonnegative().optional(), input_text_tokens: tokens, input_image_tokens: tokens, output_tokens: tokens, decision_input_tokens: tokens, decision_output_tokens: tokens })
-    .strict()
-    .nullable()
-    .default(null),
+  usage: providerUsage.nullable().default(null),
   costUsd: z.number().nonnegative().nullable().default(null),
 }
 

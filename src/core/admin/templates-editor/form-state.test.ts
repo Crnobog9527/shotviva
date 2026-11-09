@@ -41,12 +41,20 @@ const template: AdminTemplate = {
 }
 
 describe('template form state', () => {
+  it('retains private fragments from an archived version even after a public switch was removed', () => {
+    const values = { ...toFormValues(template), selectedVersion: 1,
+      restoredParams: { toggles: { old: { on: 'older-on', off: 'older-off' } } } }
+    expect(buildPayload(values, false, FLOOR)).toMatchObject({ ok: true, payload: {
+      revision: { expected: 2, selected: 1 }, prompt: { modelParams: { quality: 'high', ...values.restoredParams } },
+    } })
+  })
   it('round-trips a template into a save payload', () => {
     const result = buildPayload(toFormValues(template), false, FLOOR)
     expect(result).toEqual({
       ok: true,
       payload: {
         isNew: false,
+        revision: { expected: template.prompt?.version },
         template: expect.objectContaining({
           id: 'burger-hero',
           description: 'Stacked burger, studio light',
