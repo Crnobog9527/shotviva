@@ -1,4 +1,4 @@
-import type { Enrollment } from '@/core/affiliate/admin/enrollment'
+import type { Enrollment } from '@/core/affiliate/enrollment'
 import type { JobToggle } from '../jobs/job-toggles-row'
 
 // /admin/users data shapes (ARCHITECTURE §10). credits = paid pool, freeCredits = free pool.

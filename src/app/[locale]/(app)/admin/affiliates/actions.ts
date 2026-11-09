@@ -1,10 +1,8 @@
 'use server'
-import { enrollAffiliate } from '@/core/affiliate/admin/create-action'
-import { enrollmentLabel } from '@/core/affiliate/admin/enrollment'
 import { refresh } from 'next/cache'
 import { z } from 'zod'
 import { createAdminSupabase } from '@/core/auth'
-import { execute, requireAffiliateAdmin, COPY } from '@/core/affiliate/admin'
+import { COPY, enrollAffiliate, enrollmentLabel, execute, requireAffiliateAdmin } from '@/core/affiliate/admin'
 
 export async function saveAffiliate(_state: string, form: FormData) {
   // Forms rendered before the new enrollment UI used this action and the email field.

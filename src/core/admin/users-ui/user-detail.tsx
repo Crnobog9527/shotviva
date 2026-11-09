@@ -13,7 +13,7 @@ import { PaymentsBlock } from './payments-block'
 import { UserActions, type UserAdminActions } from './user-actions'
 import { LedgerTable, UserJobsTable } from './user-tables'
 
-const CreateMember = dynamic(() => import('@/core/affiliate/admin/create-member').then((m) => m.CreateMember))
+const CreateMember = dynamic(() => import('@/core/affiliate/admin/client').then((m) => m.CreateMember))
 
 type Props = {
   data: UserDetailData
