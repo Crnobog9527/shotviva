@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react'
 
 export function CopyLink({ url, copy, copied }: { url: string; copy: string; copied: string }) {
-  const [done, setDone] = useState(false)
+  const [copiedUrl, setCopiedUrl] = useState<string>()
   const field = useRef<HTMLInputElement>(null)
   return (
     <div className="flex w-full min-w-0 max-w-xl items-center gap-2">
@@ -21,13 +21,14 @@ export function CopyLink({ url, copy, copied }: { url: string; copy: string; cop
         onClick={async () => {
           try {
             await navigator.clipboard.writeText(url)
-            setDone(true)
+            setCopiedUrl(url)
           } catch {
+            setCopiedUrl(undefined)
             field.current?.select()
           }
         }}
       >
-        {done ? copied : copy}
+        {copiedUrl === url ? copied : copy}
       </button>
     </div>
   )
