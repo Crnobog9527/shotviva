@@ -1,12 +1,11 @@
-import Link from 'next/link'
+import { AnalyticsLink } from './analytics-link'
 import type { ReactNode } from 'react'
 
 import { cn } from '../../ui/cn'
 import { ANALYTICS_COPY as COPY } from './copy'
 import type { Delta } from './format'
 
-// Shared pieces of the analytics page. No client JS: the 「?」 is a native popover (top layer, so
-// a table's scroll box cannot clip it; tap outside or Esc closes it) and every switch is a link.
+// Native popovers escape the scroll container so help also works on narrow screens.
 
 export type Metric = { label: string; help: string }
 
@@ -18,15 +17,16 @@ export function MetricLabel({ id, metric, className, sort }: LabelProps) {
   return (
     <span className={cn('inline-flex items-center gap-1', className)}>
       {sort ? (
-        <Link
+        <AnalyticsLink
           href={sort.href}
+          preserveDim
           aria-label={sort.hint}
           aria-current={sort.current ? 'true' : undefined}
           className={cn('underline-offset-4 hover:underline', sort.current ? 'font-semibold text-foreground' : 'text-muted-foreground')}
         >
           {sort.current ? <span aria-hidden>↓ </span> : null}
           {metric.label}
-        </Link>
+        </AnalyticsLink>
       ) : (
         <span>{metric.label}</span>
       )}
@@ -114,13 +114,14 @@ export function BlockSkeleton({ title }: { title: string }) {
 type Tab = { key: string; label: string; href: string }
 
 // A row of links that behaves like a segmented switch; the current one is marked for screen readers.
-export function LinkTabs({ label, tabs, current }: { label: string; tabs: Tab[]; current: string }) {
+export function LinkTabs({ label, tabs, current, preserveDim }: { label: string; tabs: Tab[]; current: string; preserveDim?: boolean }) {
   return (
     <nav aria-label={label} className="flex max-w-full flex-wrap gap-1 rounded-md bg-muted p-1">
       {tabs.map((tab) => (
-        <Link
+        <AnalyticsLink
           key={tab.key}
           href={tab.href}
+          preserveDim={preserveDim}
           aria-current={tab.key === current ? 'page' : undefined}
           className={cn(
             'flex min-h-9 items-center rounded px-3 text-sm font-medium whitespace-nowrap transition-colors',
@@ -128,7 +129,7 @@ export function LinkTabs({ label, tabs, current }: { label: string; tabs: Tab[];
           )}
         >
           {tab.label}
-        </Link>
+        </AnalyticsLink>
       ))}
     </nav>
   )
