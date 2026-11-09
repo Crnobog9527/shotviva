@@ -7,6 +7,7 @@ import { Button } from '@/core/ui/button'
 import { Input } from '@/core/ui/input'
 import { Label } from '@/core/ui/label'
 import { Textarea } from '@/core/ui/textarea'
+import { FULL_IMAGE_OPTIONS } from '@/core/templates/image-capabilities'
 import { DEFAULT_RESOLUTION, NOTE_MAX_LENGTH } from '@/core/templates/output-options'
 
 import type { AdminTemplate } from '../templates/types'
@@ -27,6 +28,21 @@ type Props = {
   onError: (message: string) => void
 }
 
+const noSizes = { aspects: [], resolutions: [] }
+
+function trialSizes(providers: readonly ImageProviderOption[], id: string | null) {
+  const selected = providers.find(p => id ? p.id === id : p.isActive)
+  if (!selected) return noSizes
+  const options = selected.capabilities ?? (selected.openAI ? FULL_IMAGE_OPTIONS : null)
+  if (!options) return noSizes
+  const aspects = options.originalRatio ? ['original' as const, ...options.aspectRatios] : options.aspectRatios
+  return { aspects, resolutions: options.resolutions }
+}
+
+function availableValue<T extends string>(wanted: T | '', values: readonly T[]): T | '' {
+  return values.find(value => value === wanted) ?? values[0] ?? ''
+}
+
 // 首次出图 (ARCHITECTURE §10.b): a test photo (or up to three), the template's own text fields,
 // the optional note, size and tier, then one click that starts one or three runs.
 export function FirstRunForm({ template, providers, photos, onLaunch, onPhotoUploaded, onError }: Props) {
@@ -36,7 +52,13 @@ export function FirstRunForm({ template, providers, photos, onLaunch, onPhotoUpl
   const [providerId, setProviderId] = useState(template.prompt?.providerId ?? null)
   const [note, setNote] = useState('')
   const [toggles, setToggles] = useState<Record<string, boolean>>({})
-  const [options, setOptions] = useState<RunOptionValues>({ resolution: DEFAULT_RESOLUTION, aspect: 'original', triple: false })
+  const [wanted, setOptions] = useState<RunOptionValues>({ resolution: DEFAULT_RESOLUTION, aspect: 'original', triple: false })
+  const sizes = trialSizes(providers, providerId)
+  const options: RunOptionValues = {
+    triple: wanted.triple,
+    resolution: availableValue(wanted.resolution, sizes.resolutions),
+    aspect: availableValue(wanted.aspect, sizes.aspects),
+  }
   const targets = usesPhoto ? picked : []
   const count = targets.length > 1 ? targets.length : options.triple ? 3 : 1
   const submit = () => {
@@ -74,8 +96,8 @@ export function FirstRunForm({ template, providers, photos, onLaunch, onPhotoUpl
         <Textarea id="test-note" rows={2} maxLength={NOTE_MAX_LENGTH} placeholder={COPY.first.notePlaceholder} value={note} onChange={(event) => setNote(event.target.value)} />
       </div>
       <ImageProviderField id="test-image-provider" providers={providers} value={providerId} onChange={setProviderId} />
-      <RunOptions id="test-first" values={options} onChange={(patch) => setOptions((current) => ({ ...current, ...patch }))} tripleAvailable={targets.length <= 1} />
-      <Button onClick={submit} className="justify-self-start">
+      <RunOptions sizes={sizes} id="test-first" values={options} onChange={(patch) => setOptions((current) => ({ ...current, ...patch }))} tripleAvailable={targets.length <= 1} />
+      <Button disabled={!options.aspect || !options.resolution} onClick={submit} className="justify-self-start">
         {COPY.first.run(count)}
       </Button>
     </section>

@@ -64,6 +64,7 @@ const toSqlPatch = (patch: BulkEditPatch) => ({
 const SQL_ERRORS: Record<string, [code: 'FORBIDDEN' | 'INVALID_INPUT', message: string]> = {
   NOT_ADMIN: ['FORBIDDEN', '只有管理员能批量编辑模板'],
   INVALID_INPUT: ['INVALID_INPUT', '批量编辑的内容不完整，请刷新页面后再试'],
+  MODEL_CHANGED: ['INVALID_INPUT', '出图模型有变化，请刷新后重试'],
   CATEGORY_NOT_FOUND: ['INVALID_INPUT', '选的分类不存在或已被删除，请刷新页面后再选'],
 }
 

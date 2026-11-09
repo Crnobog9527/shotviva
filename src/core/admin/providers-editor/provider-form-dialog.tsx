@@ -14,7 +14,8 @@ import { MODULE_ADAPTERS, type ProviderAdapterId, type ProviderModule } from '@/
 import type { AdminProvider, ProviderAdminActions } from '../providers/types'
 
 import { PROVIDERS_COPY } from './copy'
-import { canSave, formFor, withAdapter, withModel, resolutionKey, withSuggestedResolutions, type ProviderForm } from './form-state'
+import { canSave, formFor, withAdapter, withModel, type ProviderForm } from './form-state'
+import { ImageCostFields } from './image-cost-fields'
 import { PriceFields } from './price-fields'
 import { useModelResolutions } from './use-model-resolutions'
 
@@ -48,7 +49,8 @@ const COPY = PROVIDERS_COPY.form
 function useFormState(provider: AdminProvider | null, module: ProviderModule, lookupModel: Props['lookupModel']) {
   const [draft, setForm] = useState(() => formFor(provider, module))
   const catalog = useModelResolutions(draft.adapter === 'openrouter_images', draft.baseUrl.trim(), draft.model.trim(), lookupModel)
-  const form = withSuggestedResolutions(draft, provider, catalog.result?.ok ? catalog.result.value : null)
+  const tiers = catalog.result?.ok && catalog.result.value ? catalog.result.value : draft.resolutions
+  const form = { ...draft, resolutions: draft.adapter === 'openai_images' ? [...RESOLUTIONS] : tiers }
   const canSubmit = !catalog.pending && catalog.result?.ok !== false && canSave(form, !provider?.apiKeyLast4)
   return { form, setForm, catalog, canSubmit }
 }
@@ -101,18 +103,11 @@ export function ProviderFormDialog({ provider, module, pending, error, lookupMod
           </Field>
           <LookupStatus catalog={catalog} />
           {form.module === 'image' && (
-            <fieldset className="flex gap-4">
-              <legend className="mb-2 text-sm font-medium">{COPY.resolutions}</legend>
-              {RESOLUTIONS.map((tier) => (
-                <label key={tier} className="flex items-center gap-1.5 text-sm">
-                  <input type="checkbox" checked={form.resolutions.includes(tier)} onChange={(event) => {
-                    const resolutions = event.target.checked ? [...form.resolutions, tier] : form.resolutions.filter((value) => value !== tier)
-                    setForm({ ...form, resolutions, resolutionOverride: resolutionKey(form) })
-                  }} />
-                  {tier.toUpperCase()}
-                </label>
-              ))}
-            </fieldset>
+            <>
+              <p className="text-sm">{COPY.resolutions} · {form.resolutions.join(' / ').toUpperCase()}</p>
+              <ImageCostFields tiers={form.resolutions} values={form.imageCosts}
+                onChange={(tier, value) => setForm((prev) => ({ ...prev, imageCosts: { ...prev.imageCosts, [tier]: value } }))} />
+            </>
           )}
           <Field
             id="apiKey"

@@ -1,6 +1,7 @@
 import { hasCompleteCoverSet } from '@/core/templates/cover-locales'
 import { EDIT_TEMPLATE_ID } from '@/core/templates/edit-params'
 import { RESOLUTIONS, type Resolution } from '@/core/templates/output-options'
+import { MISSING_COST, floorGuidance, providerFloor } from '@/core/templates/provider-pricing'
 import { creditsBelowFloor, type CreditsCost, type CreditsFloor, type TemplateQuality } from '@/core/templates/pricing'
 import type { TemplateSurface } from '@/core/templates/schema'
 import type { Template } from '@/core/templates/types'
@@ -27,14 +28,14 @@ export type BulkEditOutcome = { changed: number; failures: BulkEditFailure[] }
 export type BulkEditCandidate = Pick<
   Template,
   'id' | 'name' | 'quality' | 'creditsCost' | 'visibleIn' | 'isActive' | 'description' | 'coverBeforeUrl' | 'coverAfterUrl' | 'coverLocales'
-> & { categoryInfo?: { isSystem: boolean } }
+> & { categoryInfo?: { isSystem: boolean }; prompt?: { providerId: string | null } | null }
 
 // The built-in templates: photo edit has its own page, and the partner API's free-prompt
 // `freeform` must not pick up a web template's prices, entry points or category from a 「全选」.
 // T75 puts both in system categories; the ids are kept too, as 0640 does. The dialog leaves them
 // out; the SQL function refuses them as `system`.
 export const BULK_EDIT_SYSTEM_IDS: ReadonlySet<string> = new Set([EDIT_TEMPLATE_ID, 'freeform'])
-export const isBulkEditable = (template: { id: string; categoryInfo?: { isSystem: boolean } }) =>
+export const isBulkEditable = (template: { id: string; categoryInfo?: { isSystem: boolean }; prompt?: { providerId: string | null } | null }) =>
   !BULK_EDIT_SYSTEM_IDS.has(template.id) && template.categoryInfo?.isSystem !== true
 
 const RESOLUTION_LABEL: Record<Resolution, string> = { '1k': 'Standard', '2k': 'HD', '3k': 'Max' }
@@ -62,7 +63,7 @@ export function bulkEditFailures(
     const quality = patch.quality ?? template.quality
     const cost = { ...template.creditsCost, ...patch.creditsCost }
     const { id, name } = template
-    const low = creditsBelowFloor(quality, cost, floor).map((v) => ({ id, name, reason: 'below_floor' as const, ...v }))
+    const low = creditsBelowFloor(quality, cost, providerFloor(floor, template.prompt?.providerId)).map((v) => ({ id, name, reason: 'below_floor' as const, ...v }))
     const web = webIncomplete(template, patch.visibleIn ?? template.visibleIn)
     return web ? [...low, { id, name, reason: 'web_incomplete' }] : low
   })
@@ -71,6 +72,7 @@ export function bulkEditFailures(
 export function describeFailure(failure: BulkEditFailure): string {
   switch (failure.reason) {
     case 'below_floor':
+      if (failure.floor === MISSING_COST) return `${RESOLUTION_LABEL[failure.resolution]}：${floorGuidance(failure.floor)}`
       return `${RESOLUTION_LABEL[failure.resolution]} ${failure.given} 低于下限 ${failure.floor}（差 ${failure.floor - failure.given}）`
     case 'web_incomplete':
       return '已上架，缺英文说明或前后对比封面，不能加到站内'

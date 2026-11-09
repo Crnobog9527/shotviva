@@ -78,7 +78,7 @@ async function Result({ params, searchParams }: Pick<PageProps<'/[locale]/photos
         <EditFlow
           source={{ id: job.id, fileUrl: item.fileUrl as string, name: item.templateName, aspect: item.aspect, resolution: item.resolution }}
           balance={balance}
-          creditsCost={offer.creditsCost}
+          {...offer}
           concurrency={limitsFor(tier).concurrency}
           openOnLoad={opensEdit(query.edit)}
         >

@@ -1,9 +1,10 @@
+import { providerFloor } from '@/core/templates/provider-pricing'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
 import { EDIT_TEMPLATE_COPY, EditTemplateEditor, loadEditTemplateSettings } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
-import { CREDITS_FLOOR } from '@/modules/image'
+import { readTemplateFloors } from '../pricing'
 
 import { saveEditTemplateAction } from './actions'
 
@@ -15,14 +16,15 @@ export const metadata: Metadata = { title: EDIT_TEMPLATE_COPY.title }
 
 export default async function AdminEditTemplatePage() {
   await requireAdmin()
-  const settings = await loadEditTemplateSettings(createAdminSupabase())
+  const db = createAdminSupabase()
+  const [settings, floor] = await Promise.all([loadEditTemplateSettings(db), readTemplateFloors(db)])
   return (
     <div className="mx-auto grid w-full max-w-4xl gap-6 p-6">
       <Link href="/admin/templates" className="text-muted-foreground text-sm">
         {EDIT_TEMPLATE_COPY.back}
       </Link>
       <h1 className="text-xl font-semibold">{EDIT_TEMPLATE_COPY.title}</h1>
-      <EditTemplateEditor settings={settings} floor={CREDITS_FLOOR} save={saveEditTemplateAction} />
+      <EditTemplateEditor settings={settings} floor={providerFloor(floor, settings.providerId)} save={saveEditTemplateAction} />
     </div>
   )
 }

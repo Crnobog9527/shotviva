@@ -30,6 +30,25 @@ type RoutingDeps = {
   parameters?: typeof openRouterImageParameters
 }
 
+function validateStoredCapabilities(row: ActiveProviderRow, request: ImageRequestOptions) {
+  const caps = row.capabilities
+  if (!caps) return
+  const fixed: readonly string[] = caps.providerAspectRatios ?? caps.aspectRatios
+  const aspect = request.aspectRatio === 'original'
+    ? caps.originalRatio
+    : fixed.includes(request.aspectRatio)
+  if (!aspect || !caps.resolutions.includes(request.resolution)) {
+    throw new AppError('INVALID_INPUT', 'This model does not support the selected output size')
+  }
+  if (request.images.length < caps.minReferences || request.images.length > caps.maxReferences) {
+    throw new AppError('INVALID_INPUT', 'This model does not support the supplied reference count')
+  }
+}
+
+function lostOriginalSupport(row: ActiveProviderRow, aspect: string, parameters: OpenRouterImageParameters) {
+  return row.capabilities?.originalRatio && aspect === 'original' && !parameters.aspect_ratio?.values.includes('auto')
+}
+
 async function checkTemplateRow(
   row: ActiveProviderRow, request: ImageRequestOptions, load: typeof openRouterImageParameters,
 ): Promise<{ reason: string } | { parameters?: OpenRouterImageParameters }> {
@@ -41,6 +60,9 @@ async function checkTemplateRow(
   } catch (error) {
     const missing = error instanceof ProviderSettingError && error.reason === 'openrouter_model_missing'
     return { reason: missing ? 'model_missing' : 'catalog_unavailable' }
+  }
+  if (lostOriginalSupport(row, request.aspectRatio, parameters)) {
+    return { reason: 'catalog_changed' }
   }
   const mismatch = openRouterInputMismatch(request, parameters)
   return mismatch ?? { parameters }
@@ -59,6 +81,7 @@ export async function templateImageProvider(
   if (!id || !request) return fallback()
   const row = await lookup(id)
   if (row.adapter === 'openai_responses') throw new AppError('INVALID_INPUT', 'An image provider is required')
+  validateStoredCapabilities(row, request)
   const selection = await checkTemplateRow(row, request, loadParameters)
   if ('reason' in selection) {
     const provider = await fallback()

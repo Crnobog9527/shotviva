@@ -5,6 +5,7 @@ import { z } from 'zod'
 
 import { AppError } from '@/core/errors'
 import { logger } from '@/core/logger'
+import { MISSING_COST, providerFloor, floorGuidance } from '@/core/templates/provider-pricing'
 import { creditsBelowFloor, promptInputSchema, templateInputSchema, toggleSetupProblems, type CreditsFloor, type PromptInput } from '@/core/templates'
 
 import { describeBlockers, planActiveChange, type ActiveChangeOutcome } from './publish-rules'
@@ -31,7 +32,7 @@ const TIER_LABEL = { '1k': 'Standard', '2k': 'HD', '3k': 'Max' } as const
 function assertAboveFloor(template: z.infer<typeof templateInputSchema>, floor: CreditsFloor): void {
   const low = creditsBelowFloor(template.quality, template.creditsCost, floor)
   if (low.length === 0) return
-  const detail = low.map((v) => `${TIER_LABEL[v.resolution]} 不能低于 ${v.floor}（填了 ${v.given}）`).join('；')
+  const detail = low.map((v) => v.floor === MISSING_COST ? floorGuidance(v.floor) : `${TIER_LABEL[v.resolution]} 不能低于 ${v.floor}（填了 ${v.given}）`).join('；')
   throw new AppError('INVALID_INPUT', `积分低于下限：${detail}`)
 }
 
@@ -52,7 +53,7 @@ export async function saveTemplate(
 ): Promise<void> {
   const template = parseOrThrow(templateInputSchema, payload.template, 'template')
   const prompt = parseOrThrow(promptInputSchema, payload.prompt, 'prompt')
-  assertAboveFloor(template, floor)
+  assertAboveFloor(template, providerFloor(floor, prompt.providerId))
   assertTogglesWired(template, prompt)
   const exists = await repo.templateExists(client, template.id)
   if (payload.isNew && exists) {
@@ -61,7 +62,7 @@ export async function saveTemplate(
   if (!payload.isNew && !exists) throw new AppError('NOT_FOUND', `template ${template.id} not found`)
   // A brand-new template starts unpublished so it can be checked before anyone sees it.
   const toSave = payload.isNew ? { ...template, isActive: false } : template
-  await repo.upsertTemplate(client, toSave, prompt)
+  await repo.upsertTemplate(client, toSave, prompt, floor)
   logger.info('admin.template.saved', { adminId, templateId: template.id, isNew: payload.isNew })
 }
 

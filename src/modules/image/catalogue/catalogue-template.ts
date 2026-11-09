@@ -1,3 +1,4 @@
+import { FULL_IMAGE_OPTIONS, type ImageOptions } from '@/core/templates/image-capabilities'
 import type { CoverMediaType, CreditsCost, LocalizedTemplate, ToggleConfirm } from '@/core/templates'
 
 // What the browser needs of a template to draw its card, preview and workspace header. Plain
@@ -13,6 +14,7 @@ export type CatalogueTemplate = {
   compare: boolean
   // The translated one-liner (templates.translations), when the page's language has one.
   description: string | null
+  imageOptions?: ImageOptions
   creditsCost: CreditsCost
   // Text the template asks for (a headline, a price); most templates have none (DESIGN §4.3).
   copyFields: { key: string; label: string; placeholder?: string; required: boolean; maxLength: number }[]
@@ -40,6 +42,7 @@ export function toCatalogueTemplate(template: LocalizedTemplate): CatalogueTempl
     categoryOrder: template.categoryView.sortOrder,
     compare: template.categoryView.compare,
     description: template.description ?? null,
+    imageOptions: template.imageOptions ?? FULL_IMAGE_OPTIONS,
     creditsCost: template.creditsCost,
     copyFields: template.fields.copy.map(({ key, label, placeholder, required, maxLength }) => ({
       key,
@@ -70,8 +73,11 @@ export function categoriesOf(templates: readonly CatalogueTemplate[]): Catalogue
     .map((template) => ({ key: template.category, name: template.categoryName }))
 }
 
-// The card's one price is the Standard ('1k') number (DESIGN §4.2).
-export const cardPrice = (template: CatalogueTemplate) => template.creditsCost['1k']
+export function cardPrice(template: CatalogueTemplate) {
+  const options = template.imageOptions ?? FULL_IMAGE_OPTIONS
+  if ((!options.originalRatio && !options.aspectRatios.length) || !options.resolutions.length) return null
+  return Math.min(...options.resolutions.map((tier) => template.creditsCost[tier]))
+}
 
 // A motion card plays only with both its file and its poster (the table check guarantees it).
 export function isMotion(template: CatalogueTemplate): boolean {

@@ -5,6 +5,7 @@ import { Label } from '@/core/ui/label'
 import { Switch } from '@/core/ui/switch'
 import { Textarea } from '@/core/ui/textarea'
 import { RESOLUTIONS } from '@/core/templates/output-options'
+import { floorGuidance } from '@/core/templates/provider-pricing'
 import type { CreditsFloor } from '@/core/templates/pricing'
 
 import { TIER_LABEL } from '../templates-editor/form-state'
@@ -36,7 +37,7 @@ export function BasicsFields({ form, floor, version, onChange }: Props) {
               <Label htmlFor={`edit-credits-${r}`}>{TIER_LABEL[r]}</Label>
               <Input id={`edit-credits-${r}`} inputMode="numeric" value={form.credits[r]}
                 onChange={(event) => onChange({ credits: { ...form.credits, [r]: event.target.value } })} />
-              <p className="text-muted-foreground text-xs">{COPY.floor(floor[r])}</p>
+              <p className={Number(form.credits[r]) < floor[r] ? 'text-xs text-destructive' : 'text-muted-foreground text-xs'}>{floorGuidance(floor[r])}</p>
             </div>
           ))}
         </div>

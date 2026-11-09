@@ -9,8 +9,10 @@ import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import { enqueueJobs, setWorkspaceJobs } from '../generation/job-store'
 import { useJobs } from '../generation/use-jobs'
 import { draftToggles, rememberConfirmed, restoreToggles, type ToggleValues } from '../toggles'
+import { chosenAspect, closestResolution, hasOutputOptions, selectedAspect, templateOptions } from '../workspace/output-choice'
+import { useOriginalRatio } from '../workspace/use-original-ratio'
 import { startInputs } from '../workspace/batch-request'
-import { homeCta, type HomeViewer } from './home-cta'
+import { homeCta, type HomeCta, type HomeViewer } from './home-cta'
 import { clearDraft, loadDraft, saveDraft, type HomeDraft } from './home-draft'
 import { useHomePhoto, type HomePhoto } from './use-home-photo'
 
@@ -51,8 +53,8 @@ function useRestoreDraft({ signedIn, apply, pick }: Restore) {
 function useStart(viewer: HomeViewer | null, template: CatalogueTemplate | null, photo: HomePhoto) {
   const router = useRouter()
   return useCallback(
-    (aspect: OutputAspect, note: string, toggles: ToggleValues) => {
-      if (!viewer || !template || !photo.inputKey || !photo.url) return
+    (aspect: OutputAspect | null, note: string, toggles: ToggleValues) => {
+      if (!viewer || !template || !aspect || !photo.inputKey || !photo.url) return
       const upload = { phase: 'done' as const, inputKey: photo.inputKey }
       const ready = [{ photo: { id: 'home', url: photo.url, bytes: photo.file?.size ?? 0, ratio: null, upload }, inputKey: photo.inputKey }]
       const ids = enqueueJobs(startInputs(template, { aspect, resolution: '1k', note, copy: {}, toggles }, ready), viewer.concurrency.limit)
@@ -91,19 +93,15 @@ export function useHomeGenerator({ templates, defaultId, viewer }: Args) {
   )
   useRestoreDraft({ signedIn: viewer !== null, apply, pick: photo.pick })
   const running = useRunning(viewer?.concurrency.runningIds ?? [])
-  const cta = homeCta({
-    viewer,
-    cost: template ? template.creditsCost['1k'] : null,
-    photo: photo.status,
-    running,
-    needsCopy: template?.copyFields.some((field) => field.required) ?? false,
-  })
+  const { options, photoRatio, outputAspect, cost } = useHomeOutput(template, aspect, photo)
+  const cta = generatorCta(template, viewer, photo, running, cost, outputAspect)
   const start = useStart(viewer, template, photo)
   return {
     template,
     templates,
     choose: setTemplateId,
-    aspect,
+    options, photoRatio, cost,
+    aspect: selectedAspect(aspect, options),
     setAspect,
     note,
     setNote,
@@ -111,10 +109,25 @@ export function useHomeGenerator({ templates, defaultId, viewer }: Args) {
     setToggles,
     photo,
     cta,
-    generate: () => start(aspect, note.trim(), toggles),
+    generate: () => start(outputAspect, note.trim(), toggles),
     // Before the sign-up prompt: what to bring back afterwards.
     keepDraft: () => (template ? saveDraft({ templateId: template.id, aspect, note, ...draftToggles(template.toggles, toggles) }, photo.file) : Promise.resolve()),
   }
+}
+
+function useHomeOutput(template: CatalogueTemplate | null, aspect: OutputAspect, photo: HomePhoto) {
+  const options = templateOptions(template)
+  const photoRatio = useOriginalRatio(!options.originalRatio ? photo.url : null)
+  const outputAspect = chosenAspect(aspect, options, photoRatio)
+  const resolution = closestResolution('1k', options)
+  const cost = template && resolution && hasOutputOptions(options) ? template.creditsCost[resolution] : null
+  return { options, photoRatio, outputAspect, cost }
+}
+
+function generatorCta(template: CatalogueTemplate | null, viewer: HomeViewer | null, photo: HomePhoto, running: number, cost: number | null, outputAspect: OutputAspect | null): HomeCta {
+  if (template && cost === null) return { kind: 'no-options' }
+  if (photo.status === 'ready' && !outputAspect) return { kind: 'need-size' }
+  return homeCta({ viewer, cost, photo: photo.status, running, needsCopy: template?.copyFields.some((field) => field.required) ?? false })
 }
 
 export type HomeGeneratorState = ReturnType<typeof useHomeGenerator>

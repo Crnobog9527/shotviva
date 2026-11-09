@@ -1,3 +1,4 @@
+import { FULL_IMAGE_OPTIONS, type ImageOptions } from './image-capabilities'
 import { coverLocalesSchema, type CoverLocales } from './cover-locales'
 import { CATEGORY_COLUMNS, preT75Category, toCategory, type Category, type CategoryRow } from './categories'
 import type { CreditsCost, TemplateQuality } from './pricing'
@@ -26,6 +27,7 @@ export type Template = {
   // Sent to the model as `quality`; with the resolution it decides the price.
   quality: TemplateQuality
   // Credits per resolution; cards show the '1k' number ("From 2 credits", DESIGN §4.2).
+  imageOptions?: ImageOptions
   creditsCost: CreditsCost
   sortOrder: number
   isActive: boolean
@@ -53,6 +55,7 @@ type TemplateRowBase = {
   fields: StoredTemplateFields
   quality: TemplateQuality
   // The table check guarantees exactly the three keys, each a positive integer.
+  template_image_options?: ImageOptions
   credits_cost: CreditsCost
   sort_order: number
   is_active: boolean
@@ -72,7 +75,7 @@ export type PreT75TemplateRow = TemplateRowBase & { category: string }
 
 const BASE_COLUMNS =
   'id, module, name, description, cover_before_url, cover_after_url, cover_media_type, cover_video_url, cover_poster_url, cover_locales, fields, quality, credits_cost, sort_order, is_active, visible_in, translations, featured_rank, created_at, updated_at'
-export const TEMPLATE_COLUMNS = `${BASE_COLUMNS}, category_key, template_categories(${CATEGORY_COLUMNS})`
+export const TEMPLATE_COLUMNS = `${BASE_COLUMNS}, template_image_options, category_key, template_categories(${CATEGORY_COLUMNS})`
 export const PRE_T75_TEMPLATE_COLUMNS = `${BASE_COLUMNS}, category`
 
 function categoryOf(row: TemplateRow | PreT75TemplateRow): Category {
@@ -97,6 +100,7 @@ export function toTemplate(row: TemplateRow | PreT75TemplateRow): Template {
     // Templates saved before T89 have no toggles.
     fields: { ...row.fields, toggles: row.fields.toggles ?? [] },
     quality: row.quality,
+    imageOptions: row.template_image_options ?? FULL_IMAGE_OPTIONS,
     creditsCost: row.credits_cost,
     sortOrder: row.sort_order,
     isActive: row.is_active,

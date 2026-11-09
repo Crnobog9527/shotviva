@@ -1,10 +1,15 @@
 'use client'
 
+import type { CreditsFloor } from '@/core/templates/pricing'
+import { FULL_IMAGE_OPTIONS, type ImageCapabilities } from '@/core/templates/image-capabilities'
 import { Label } from '@/core/ui/label'
 
 import { copy } from './copy'
 
-export type ImageProviderOption = { id: string; label: string; model: string }
+export type ImageProviderOption = {
+  id: string; label: string; model: string; isActive: boolean; openAI: boolean
+  capabilities: ImageCapabilities | null; floor: CreditsFloor
+}
 
 type Props = {
   id: string
@@ -14,17 +19,28 @@ type Props = {
 }
 
 export function ImageProviderField({ id, providers, value, onChange }: Props) {
+  const selected = value ? providers.find(p => p.id === value) : providers.find(p => p.isActive)
   return (
     <div className="grid gap-1.5">
       <Label htmlFor={id}>{copy.label}</Label>
       <select id={id} className="border-input h-9 min-w-0 rounded-md border bg-transparent px-3 text-sm"
         aria-describedby={`${id}-hint`} value={value ?? ''} onChange={(event) => onChange(event.target.value || null)}>
         <option value="">{copy.followDefault}</option>
-        {providers.map((provider) => (
+        {providers.filter(p => p.id !== 'env').map((provider) => (
           <option key={provider.id} value={provider.id}>{provider.label} · {provider.model}</option>
         ))}
       </select>
-      <p id={`${id}-hint`} className="text-muted-foreground text-xs">{copy.fallbackHint}</p>
+      <p id={`${id}-hint`} className="text-muted-foreground text-xs">{selected ? capabilitySummary(selected) : copy.pending}</p>
     </div>
   )
+}
+
+function capabilitySummary(provider: ImageProviderOption) {
+  if (!provider.capabilities && !provider.openAI) return copy.pending
+  const caps = provider.capabilities ?? { ...FULL_IMAGE_OPTIONS, minReferences: 0, maxReferences: 4, fetchedAt: null, providerAspectRatios: undefined }
+  const ratios = caps.providerAspectRatios ?? caps.aspectRatios
+  const time = caps.fetchedAt ? new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', dateStyle: 'short', timeStyle: 'short' }).format(new Date(caps.fetchedAt)) : '固定能力'
+  return [provider.model, caps.resolutions.map(r => r.toUpperCase()).join(' / '),
+    `比例 ${ratios.length} 种（${ratios.join('、')}）`, caps.originalRatio ? '支持原图比例' : '不支持原图比例',
+    `参考图 ${caps.minReferences}–${caps.maxReferences} 张`, `上次刷新：${time}`].join(' · ')
 }

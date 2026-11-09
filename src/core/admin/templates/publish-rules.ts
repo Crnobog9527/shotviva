@@ -1,5 +1,6 @@
 import { hasCompleteCoverSet } from '@/core/templates/cover-locales'
 import { EDIT_TEMPLATE_ID } from '@/core/templates/edit-params'
+import { providerFloor } from '@/core/templates/provider-pricing'
 import { creditsBelowFloor, type CreditsFloor } from '@/core/templates/pricing'
 import type { Template } from '@/core/templates/types'
 
@@ -31,7 +32,7 @@ export const PUBLISH_BLOCKER_LABEL: Record<PublishBlocker, string> = {
 export type PublishCandidate = Pick<
   Template,
   'id' | 'name' | 'description' | 'visibleIn' | 'coverBeforeUrl' | 'coverAfterUrl' | 'coverLocales' | 'quality' | 'creditsCost' | 'isActive'
-> & { hasPrompt: boolean }
+> & { hasPrompt: boolean; providerId?: string | null }
 
 // The built-in photo-edit template (ARCHITECTURE §5.2) is switched on its own page; the editor
 // list never shows it. Deep imports keep this file free of the server-side templates barrel.
@@ -52,7 +53,7 @@ export function publishBlockers(template: PublishCandidate, floor: CreditsFloor)
     ['no_description', onWeb && blank(template.description)],
     // A before and an after every launched page can show under the cover fallback (T87).
     ['no_cover', onWeb && !hasCompleteCoverSet(template)],
-    ['below_floor', creditsBelowFloor(template.quality, template.creditsCost, floor).length > 0],
+    ['below_floor', creditsBelowFloor(template.quality, template.creditsCost, providerFloor(floor, template.providerId)).length > 0],
   ]
   return checks.filter(([, failed]) => failed).map(([blocker]) => blocker)
 }

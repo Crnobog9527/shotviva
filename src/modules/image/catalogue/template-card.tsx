@@ -78,12 +78,13 @@ function ArtCard({ template, onOpen, eager }: Props) {
 function CardMeta({ template }: { template: CatalogueTemplate }) {
   const t = useTranslations('app.template')
   const category = template.categoryName
+  const cost = cardPrice(template)
   const kind = isMotion(template) ? t(template.cover.type === 'video' ? 'featureMeta' : 'animatedMeta', { category }) : category
   return (
     <span className="block pt-2">
       <span className="block text-body leading-[1.25] font-semibold tracking-[-0.015em]">{template.name}</span>
       <span className="mt-1 block text-caption leading-[1.35] text-muted-foreground">{kind}</span>
-      <span className="mt-2 inline-block rounded-tag bg-wash px-2 py-1 font-mono text-caption leading-none text-bone-dim">{t('fromCredits', { count: cardPrice(template) })}</span>
+      {cost !== null ? <span className="mt-2 inline-block rounded-tag bg-wash px-2 py-1 font-mono text-caption leading-none text-bone-dim">{t('fromCredits', { count: cost })}</span> : null}
     </span>
   )
 }

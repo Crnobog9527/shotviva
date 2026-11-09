@@ -42,7 +42,7 @@ export function BulkEditDialog({ edit, templates, skipped, floor, categories }: 
         {reviewing ? (
           <BulkEditReview templates={templates} patch={patch} failures={failures} categories={categories} />
         ) : (
-          <BulkEditFields values={edit.values} problems={problems} floor={floor} categories={categories} onChange={edit.setValues} />
+          <BulkEditFields values={edit.values} problems={problems} categories={categories} onChange={edit.setValues} />
         )}
         {edit.error ? (
           <p role="alert" className="text-destructive text-sm">
