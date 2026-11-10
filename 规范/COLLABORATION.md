@@ -74,3 +74,4 @@
 | 2026-11-04 | 4（预定） | Owner 指示：规范审计通过、开始开发时切到模式 4，Claude 做全部开发，Codex 只做浏览器验收 |
 | 2026-11-05 | 4 | 规范 v3 审计通过，开始派工（先派 T0、T6） |
 | 2026-11-10 | 3 | Owner 指示（Claude 周额度用完）：Codex 接手总控和全部开发、验收；交接单 `.local/codex-control-handoff-2026-11-10.md` |
+| 2026-11-10 | 1 | Owner 指示：Claude 审计完 Codex 总控期的工作后切回模式 1（Claude 总控 + 前端；Codex 后端、数据库、计费、其他开发和全部浏览器验收）。审计报告 `.local/claude-audit-codex-mode3-2026-11-10.md` |
