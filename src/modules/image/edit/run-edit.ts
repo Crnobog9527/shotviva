@@ -77,6 +77,7 @@ function jobInputs(p: Prepared, decision: EditClassification, resolution: Resolu
   return {
     ...editRecord(decision, p.instruction),
     aspect_ratio: p.aspect,
+    quality: p.pipeline.template.quality,
     resolution,
     input_key: null,
     prompt_version: p.pipeline.prompt.version,

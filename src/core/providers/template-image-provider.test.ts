@@ -53,14 +53,16 @@ describe('template image provider', () => {
     ['1k', '2:1', 1, 'unsupported_aspect_ratio'],
     ['1k', '4:5', 5, 'reference_image_limit'],
     ['1k', '4:5', 1, 'catalog_unavailable'],
+    ['1k', '4:5', 1, 'model_missing'],
   ] as const)('selects the default before reading the template key (%s, %s, %i, %s)', async (resolution, aspectRatio, count, reason) => {
     const deps = dependencies()
     const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined)
     if (reason === 'catalog_unavailable') {
       deps.parameters.mockRejectedValueOnce(new ProviderSettingError('openrouter_catalog_unavailable', 'Images catalogue timed out'))
     }
+    if (reason === 'model_missing') deps.parameters.mockRejectedValueOnce(new ProviderSettingError('openrouter_model_missing', 'Model missing'))
     const selected = await templateImageProvider(adapters, row.id, { resolution, aspectRatio, images: Array(count).fill(photo) }, deps)
-    expect(selected).toBe(defaultProvider)
+    expect(selected).toMatchObject({ ...defaultProvider, fallbackReason: reason })
     expect(deps.readKey).not.toHaveBeenCalled()
     expect(info).toHaveBeenCalledTimes(1)
     expect(info).toHaveBeenCalledWith('image.provider.fallback', expect.objectContaining({

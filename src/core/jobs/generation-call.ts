@@ -5,7 +5,7 @@ import { AppError } from '../errors'
 import { logger } from '../logger'
 import type { InputImage, ObjectStore } from '../storage'
 import { providerParams, renderPrompt, toggleFragments, type GenerationInputs, type GenerationTemplate, type Resolution } from '../templates'
-import { resolveTemplateProvider, type ProviderInput, type TemplateProvider } from './provider'
+import { resolveTemplateProvider, type GenerationProvider, type ProviderInput, type TemplateProvider } from './provider'
 import { readStyleImages } from './style-reference-images'
 import type { DecisionCost } from './settle-generation'
 
@@ -15,15 +15,18 @@ import type { DecisionCost } from './settle-generation'
 // A user's job and an admin test run (§10.b, T85) send exactly this; only who pays differs.
 type CallTemplate = { template: Pick<GenerationTemplate['template'], 'id' | 'quality'>; prompt: GenerationTemplate['prompt'] }
 
+const requestedRefs = (prompt: CallTemplate['prompt'], omit?: boolean) => omit ? [] : prompt.styleRefs
+
 export async function templateCall(
   deps: { store: ObjectStore; provider: TemplateProvider },
   { template, prompt }: CallTemplate, inputs: GenerationInputs, image: InputImage | null,
-  options: { resolution: Resolution; providerId: string | null; omitStyleRefs?: boolean },
+  options: { resolution: Resolution; providerId: string | null; omitStyleRefs?: boolean; onRoute?: (provider: GenerationProvider) => void },
 ) {
   const photos = image ? [image] : []
-  const requested = options.omitStyleRefs ? [] : prompt.styleRefs
+  const requested = requestedRefs(prompt, options.omitStyleRefs)
   const request = { images: photos, resolution: options.resolution, aspectRatio: inputs.aspectRatio, styleRefCount: requested.length }
   const provider = await resolveTemplateProvider(deps.provider, options.providerId, request)
+  options.onRoute?.(provider)
   const limit = provider.maxReferences ?? Infinity
   const dropRefs = requested.length > 0 && photos.length + requested.length > limit
   if (dropRefs) {

@@ -558,6 +558,7 @@
       "CONTENT_REJECTED": "照片或补充说明没有通过安全审核。请换一张照片，或改一下说明。",
       "IDENTITY_SWAP_REFUSED": "为保护每个人的肖像权，Shotviva 不能把人换成另一个人或换脸。可以改表情、妆容、光线和背景。",
       "REFERENCE_IMAGE_LIMIT": "参考图超过模型上限，请减少照片或换个模板。",
+      "TEMPLATE_UNAVAILABLE": "这个模板暂时不可用，请稍后再试。",
       "TEMPLATE_QUOTE_CHANGED": "模板或积分价格已更新，请刷新页面查看最新报价。",
       "MODEL_INPUT_UNSUPPORTED": "请检查参考图、清晰度和尺寸，或换个模板。",
       "GENERATION_FAILED": "这张照片没能生成，通常再试一次就好。",

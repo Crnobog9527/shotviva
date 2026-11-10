@@ -9,10 +9,11 @@ import {
 import type { ImageProviderOption } from '../image-provider-field'
 
 const tariffs = z.record(z.string(), z.object({ quality: z.enum(TEMPLATE_QUALITIES), costs: creditsCostSchema, style_sale_approved: z.boolean().optional() }))
+const fallbackTiers = z.record(z.enum(RESOLUTIONS), z.number().int().positive().nullable())
 const rowSchema = z.object({
   provider_id: z.uuid().nullable(), label: z.string(), model: z.string(), adapter: z.enum(['openai_images', 'openrouter_images']),
   is_active: z.boolean(), capabilities: z.unknown(), resolutions: z.array(z.enum(RESOLUTIONS)),
-  approved: tariffs.optional(),
+  approved: tariffs.optional(), fallback_floors: z.record(z.enum(TEMPLATE_QUALITIES), fallbackTiers).optional(),
   estimated_image_costs: estimatedImageCostsSchema,
   p95: z.partialRecord(z.enum(RESOLUTIONS), z.number().nonnegative()),
 })
@@ -36,7 +37,7 @@ function optionsFromInput(input: unknown, legacyBudget?: number): ImageProviderO
     const estimates = { ...caps.data?.catalogImageCosts, ...row.estimated_image_costs }
     const floor = modelCreditFloor({ openAI, resolutions: row.resolutions, estimates, p95: row.p95 }, budget)
     return {
-      approved: row.approved, version: catalog?.version, tariffs: row.is_active ? catalog?.tariffs : undefined,
+      fallbackFloors: row.fallback_floors, approved: row.approved, version: catalog?.version, tariffs: row.is_active ? catalog?.tariffs : undefined,
       id: row.provider_id ?? 'env', label: row.label, model: row.model, isActive: row.is_active,
       capabilities: caps.success ? caps.data : null, openAI, floor: openAI || caps.success ? floor : UNPRICED,
     }
