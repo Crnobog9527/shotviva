@@ -17,7 +17,13 @@ export type HeroBlock = {
   after: ImageRef
   caption: string
   cta: { label: string; href: string }
+  // Home only: several AI results of the same phone photo that take turns on the AI side, each
+  // with its own caption. `after` and `caption` stay the first scene's, so anything that reads
+  // the plain pair still shows one consistent result. `label` names the scene switcher.
+  scenes?: { label: string; items: readonly [HeroScene, HeroScene, ...HeroScene[]] }
 }
+
+export type HeroScene = { image: ImageRef; caption: string }
 
 // Block ②: verifiable facts, at least three (建站规格 G4).
 export type Fact = { label: string; value: string }

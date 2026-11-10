@@ -1,7 +1,9 @@
+import { useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 
 import type { PageBasics } from '../page-content'
-import { PhotoPair } from './photo-pair'
+import { HeroScenes } from './hero-scenes'
+import { BeforePane, PhotoPair } from './photo-pair'
 
 // "Restyle a Photo, Keep the Subject": the part after the last comma is set in italic (the
 // comp's one italic; Chinese pages turn italics off in globals.css).
@@ -27,6 +29,7 @@ type Props = { page: Pick<PageBasics, 'h1' | 'subtitle' | 'answerBlock' | 'hero'
 // generator. ≥1024 the copy and the pair share a row and the generator bench spans under them.
 export function HomeHero({ page, generator }: Props) {
   const { hero } = page
+  const t = useTranslations('marketing.home')
   return (
     <section className="mk-hero">
       <div className="mk-hero-copy">
@@ -36,10 +39,16 @@ export function HomeHero({ page, generator }: Props) {
         <p className="mk-lede">{page.subtitle}</p>
         <p className="mk-answer">{page.answerBlock}</p>
       </div>
-      <figure className="mk-hero-pair">
-        <PhotoPair before={hero.before} after={hero.after} size="lg" preload sizes={HERO_PLATE_SIZES} />
-        <figcaption className="mk-cap">{hero.caption}</figcaption>
-      </figure>
+      {hero.scenes ? (
+        <HeroScenes scenes={hero.scenes} tags={{ phone: t('phone'), ai: t('ai') }} sizes={HERO_PLATE_SIZES}>
+          <BeforePane image={hero.before} preload sizes={HERO_PLATE_SIZES} />
+        </HeroScenes>
+      ) : (
+        <figure className="mk-hero-pair">
+          <PhotoPair before={hero.before} after={hero.after} size="lg" preload sizes={HERO_PLATE_SIZES} />
+          <figcaption className="mk-cap">{hero.caption}</figcaption>
+        </figure>
+      )}
       {generator}
     </section>
   )

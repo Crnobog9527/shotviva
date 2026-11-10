@@ -132,6 +132,35 @@
   .mk-pair-lg .mk-tag { top: 12px; bottom: auto; height: 28px; padding: 0 10px; }
   .mk-pair-lg .mk-tag-l { left: 12px; }
   .mk-pair-lg .mk-tag-r { right: 12px; background: var(--primary); }
+
+  /* ---------- the home hero's rotating AI scenes (hero-scenes.tsx) ----------
+     The incoming scene fades in on top of the one it replaces, which stays fully opaque under
+     it, so a scene still loading never shows an empty plate; the rest drop out only after that
+     fade, already covered. 0.4 s of each 2 s turn. */
+  .mk-pair .mk-scene { z-index: 0; opacity: 0; transition: opacity 0s .4s; }
+  .mk-pair .mk-scene.mk-was { z-index: 1; opacity: 1; transition: none; }
+  .mk-pair .mk-scene.mk-on { z-index: 2; opacity: 1; transition: opacity .4s var(--ease); }
+  .mk-dots {
+    position: absolute; z-index: 5; bottom: 8px; left: 75%; transform: translateX(-50%); display: flex; padding: 0 2px;
+    border-radius: 999px; background: var(--frost); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  }
+  .mk-dot { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 999px; background: none; cursor: pointer; }
+  .mk-dot > span { width: 6px; height: 6px; border-radius: 999px; background: var(--bone-dim); transition: width .3s var(--ease), background-color .3s; }
+  .mk-dot[aria-pressed="true"] > span { width: 14px; background: var(--primary); }
+  .mk-dot:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+  .mk-scene-caps { display: grid; }
+  .mk-scene-caps > span { grid-area: 1 / 1; visibility: hidden; opacity: 0; }
+  .mk-scene-caps > .mk-on { visibility: visible; opacity: 1; transition: opacity .4s var(--ease); }
+  @media (min-width: 768px) {
+    .mk-dots { bottom: 12px; }
+  }
+  @media (hover: hover) {
+    .mk-dot:hover > span { background: var(--foreground); }
+    .mk-dot[aria-pressed="true"]:hover > span { background: var(--primary); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mk-pair .mk-scene, .mk-pair .mk-scene.mk-on, .mk-scene-caps > .mk-on, .mk-dot > span { transition: none; }
+  }
 }
 
 /* ======================= the first-screen generator ======================= */
