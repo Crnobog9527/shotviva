@@ -4,7 +4,7 @@ import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { toPartnerErrorBody } from '@/core/partner/partner-error'
-import { runGeneration, type ProviderInput } from '@/core/jobs'
+import { runGeneration, type ImageRequestOptions } from '@/core/jobs'
 import { activeProvider, findProviderRow, templateImageProvider, ProviderSettingError, type OpenRouterImageParameters, type ProviderAdapters } from '@/core/providers'
 import { runTestGenerate, saveTestBudget } from '@/modules/image'
 import { createOpenRouterImageProvider } from '@/modules/image/provider/openrouter-image-provider'
@@ -65,7 +65,7 @@ async function setup() {
   const key = async () => 'fixture'
   const fallback = () => activeProvider('image', adapters, () => row(defaultId), key)
   const parameters = vi.fn(async () => supported)
-  const provider = (id: string | null, request: Pick<ProviderInput, 'resolution' | 'aspectRatio' | 'images'>) =>
+  const provider = (id: string | null, request: ImageRequestOptions) =>
     templateImageProvider(adapters, id, request, { lookup: row, fallback, readKey: key, parameters })
   return { deps: { db, provider, store: createMemoryStore().store }, fetch, openai, parameters }
 }

@@ -52,10 +52,8 @@ export type GenerationProvider = {
 }
 
 // Web and admin first-generation resolve the saved provider after loading the template.
-export type ImageRequestOptions = Pick<ProviderInput, 'resolution' | 'aspectRatio' | 'images'> & { styleRefCount?: number }
-
-// Routing uses reference metadata, before any private reference bytes are fetched.
-export const referenceCount = (request: ImageRequestOptions) => request.images.length + (request.styleRefCount ?? 0)
+// Routing requires the number of references, never the uploaded image bytes.
+export type ImageRequestOptions = Pick<ProviderInput, 'resolution' | 'aspectRatio'> & { referenceCount: number }
 
 export type TemplateProvider = GenerationProvider | ((id: string | null, request: ImageRequestOptions) => Promise<GenerationProvider>)
 

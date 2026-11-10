@@ -39,27 +39,64 @@ async function setup(productId: 'max_monthly' | 'pro_monthly' | 'starter_monthly
 describe('T107 preflight and independent jobs', () => {
   it.each(['starter_monthly', 'pro_monthly'] as const)('rejects %s on both entry points', async product => {
     const { db, userId, cells, deps } = await setup(product)
-    await expect(preflightBatch(db, userId, cells)).rejects.toMatchObject({ code: 'TIER_REQUIRED', requiredTier: 'max' })
+    await expect(preflightBatch(db, userId, cells, deps.provider)).rejects.toMatchObject({ code: 'TIER_REQUIRED', requiredTier: 'max' })
     const req = toGenerationRequest(userId, { ...cells[0], batch_size: 2, batch_templates: 2 })
     await expect(runGeneration(deps, req)).rejects.toMatchObject({ code: 'TIER_REQUIRED', requiredTier: 'max' })
   })
 
   it('rejects an unsold resolution for any selected template during preflight', async () => {
-    const { db, userId, cells } = await setup('max_monthly')
+    const { db, userId, cells, deps } = await setup('max_monthly')
     const id = await seedTemplate(sql)
     await sql.query("select admin.set_template_unpriced_resolutions($1,'{3k}')", [id])
     const chosen = cells.map((cell, i) => ({ ...cell, template_id: i ? id : cell.template_id,
       inputs: { ...cell.inputs, resolution: '3k' as const } }))
-    await expect(preflightBatch(db, userId, chosen)).rejects.toMatchObject({ code: 'TEMPLATE_UNAVAILABLE' })
+    await expect(preflightBatch(db, userId, chosen, deps.provider)).rejects.toMatchObject({ code: 'TEMPLATE_UNAVAILABLE', templateId: id })
+  })
+
+  it.each(['closed', 'underpriced'] as const)('rejects an entire batch with a %s template before debit', async reason => {
+    const { db, deps, userId, cells } = await setup('max_monthly')
+    // The fixture price is below the actual fallback floor. Give the first cell a sellable
+    // price so the second cell, and its template identifier, are what this test exercises.
+    const valid = await seedTemplate(sql)
+    const invalid = await seedTemplate(sql)
+    await sql.query(`update public.templates set credits_cost='{"1k":500,"2k":500,"3k":500}' where id=$1`, [valid])
+    if (reason === 'closed') {
+      await sql.query(`update public.templates set credits_cost='{"1k":500,"2k":500,"3k":500}' where id=$1`, [invalid])
+      await sql.query('update public.template_sale_approvals set enabled=false where template_id=$1', [invalid])
+    }
+    const version = await sql.query("select value from public.system_settings where key='pricing_catalog_version'")
+    const before = await profileOf(sql, userId)
+    try {
+      await sql.query(`insert into public.system_settings(key,value) values('pricing_catalog_version','"v2"')
+        on conflict(key) do update set value=excluded.value`)
+      const grid = cells.map((cell, i) => ({ ...cell, template_id: i ? invalid : valid }))
+      await expect(preflightBatch(db, userId, grid, { ...deps.provider, id: 'env/qa-t107' }))
+        .rejects.toMatchObject({ code: 'TEMPLATE_UNAVAILABLE', templateId: invalid })
+      expect((await profileOf(sql, userId)).credits).toBe(before.credits)
+      expect((await sql.query('select id from public.generation_jobs where user_id=$1', [userId])).rowCount).toBe(0)
+    } finally {
+      if (version.rows.length) await sql.query("update public.system_settings set value=$1 where key='pricing_catalog_version'",
+        [JSON.stringify(version.rows[0].value)])
+      else await sql.query("delete from public.system_settings where key='pricing_catalog_version'")
+    }
+  })
+
+  it('submits every quoted cell of a sellable multi-template batch', async () => {
+    const { db, deps, userId, cells } = await setup('max_monthly')
+    const quote = await preflightBatch(db, userId, cells, deps.provider)
+    const jobs = await Promise.all(cells.map((cell, index) => runGeneration(deps,
+      toGenerationRequest(userId, { ...cell, ...quote, ...quote.cells[index] }))))
+    expect(jobs.map(job => job.status)).toEqual(['succeeded', 'succeeded'])
+    expect((await batchArchive(db, userId, quote.batch_id)).files.map(file => file.jobId)).toEqual(jobs.map(job => job.id))
   })
 
   it('preflights all paid credits and never falls through to free after an intervening spend', async () => {
     const { db, deps, userId, cells } = await setup('max_monthly')
-    const batch = await preflightBatch(db, userId, cells)
-    await expect(preflightBatch(db, userId, Array(31).fill(cells[0]))).rejects.toMatchObject({ code: 'TIER_REQUIRED' })
+    const batch = await preflightBatch(db, userId, cells, deps.provider)
+    await expect(preflightBatch(db, userId, Array(31).fill(cells[0]), deps.provider)).rejects.toMatchObject({ code: 'TIER_REQUIRED' })
     expect(batch).toMatchObject({ total_credits: 3, batch_templates: 2, batch_size: 2 })
     await sql.query('update public.profiles set credits=2,free_credits=70 where id=$1', [userId])
-    await expect(preflightBatch(db, userId, cells)).rejects.toMatchObject({ code: 'CREDITS_INSUFFICIENT' })
+    await expect(preflightBatch(db, userId, cells, deps.provider)).rejects.toMatchObject({ code: 'CREDITS_INSUFFICIENT' })
     const run = (i: number) => runGeneration(deps, toGenerationRequest(userId, { ...cells[i], ...batch, ...batch.cells[i] }))
     const first = await run(0)
     expect(first).toMatchObject({ batch_id: batch.batch_id, credit_pool: 'paid' })
@@ -74,7 +111,7 @@ describe('T107 preflight and independent jobs', () => {
 
   it('groups distinct jobs and excludes failed and deleted outputs', async () => {
     const { db, deps, userId, cells } = await setup('max_monthly')
-    const batch = await preflightBatch(db, userId, cells)
+    const batch = await preflightBatch(db, userId, cells, deps.provider)
     const request = (i: number) => toGenerationRequest(userId, { ...cells[i], ...batch, ...batch.cells[i] })
     const attempts = await Promise.allSettled([runGeneration(deps, request(0)), runGeneration(deps, request(0))])
     const success = attempts.find(result => result.status === 'fulfilled')

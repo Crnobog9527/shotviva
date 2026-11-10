@@ -30,7 +30,7 @@ function requestedAspect(input: ProviderInput, supported: OpenRouterImageParamet
 }
 
 function imageRequest(model: string, input: ProviderInput, supported: OpenRouterImageParameters) {
-  const mismatch = openRouterInputMismatch(input, supported)
+  const mismatch = openRouterInputMismatch({ ...input, referenceCount: input.images.length }, supported)
   if (mismatch) {
     throw new AppError(mismatch.reason === 'reference_image_limit' ? 'REFERENCE_IMAGE_LIMIT' : 'MODEL_INPUT_UNSUPPORTED', mismatch.message)
   }
