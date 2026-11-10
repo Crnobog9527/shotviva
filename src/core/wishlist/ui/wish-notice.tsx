@@ -6,17 +6,16 @@ import type { ReactNode } from 'react'
 import { Link } from '../../i18n/ui/localized-link'
 import type { NoticeItem } from '../notice-items'
 import { ChevronIcon, CloseIcon, HeartIcon } from './icons'
-import { useWishNotices, type MarkNoticesSeen } from './use-wish-notices'
-
-type Props = { items: NoticeItem[]; markSeen: MarkNoticesSeen }
+import { markNoticesSeen } from './mark-notices-seen'
+import { useWishNotices } from './use-wish-notices'
 
 // "Your wish came true" (ARCHITECTURE §15.4, T106): the wishlist hint's light card from the top,
 // which does not cover the bottom bar (DESIGN §8.4). It sits under drawers and dialogs (z-100),
 // over the tab and action bars (z-60), and stays until closed: the moment is the point, and an
 // unread one is marked seen as it comes up. Its heart is filled where the hint draws an outline.
-export function WishNotice({ items, markSeen }: Props) {
+export function WishNotice({ items }: { items: NoticeItem[] }) {
   const t = useTranslations('app.wishlist.notice')
-  const { current, remaining, dismiss, close } = useWishNotices(items, markSeen)
+  const { current, remaining, dismiss, close } = useWishNotices(items, markNoticesSeen)
   if (!current) return null
   return (
     <div role="status" aria-live="polite" className="pointer-events-none fixed inset-x-0 top-[calc(var(--sat)+12px)] z-90 flex justify-center px-(--gutter)">
