@@ -3,8 +3,9 @@ import { createElement, type FunctionComponent, type ReactElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
-import type { ImageRef, ShootDemo } from '../page-content'
+import type { EditCases, ImageRef, ShootDemo } from '../page-content'
 import { CompareSlider } from './compare-slider'
+import { EditCasesSection } from './edit-cases'
 import { PhotoPair } from './photo-pair'
 import { ShootSection } from './shoot-section'
 
@@ -33,12 +34,24 @@ const shoot: ShootDemo = {
   bill: { photographer: { who: 'Photographer', amount: '$300', note: 'n' }, site: { who: 'Shotviva', amount: '$1', note: 'n' }, line: 'line' },
 }
 
+const edits: EditCases = {
+  heading: 'Change one thing',
+  intro: 'Intro',
+  labels: { before: 'Before', after: 'After', reference: 'Reference' },
+  items: [
+    { title: 'A', change: 'a', before: img('a-before'), after: img('a-after') },
+    { title: 'B', change: 'b', before: img('b-before'), after: img('b-after'), reference: img('b-ref') },
+  ],
+}
+
 describe('marketing images carry no badge', () => {
   const cases: [string, ReactElement][] = [
     ['PhotoPair', createElement(PhotoPair, { before: img('before'), after: img('after'), sizes: '50vw' })],
     ['PhotoPair lg', createElement(PhotoPair, { before: img('before'), after: img('after'), size: 'lg', sizes: '50vw' })],
     ['CompareSlider', createElement(CompareSlider, { before: img('before'), after: img('after'), label: 'Compare', sizes: '50vw' })],
     ['ShootSection', createElement(ShootSection, { shoot })],
+    ['ShootSection without a bill', createElement(ShootSection, { shoot: { ...shoot, bill: undefined } })],
+    ['EditCasesSection', createElement(EditCasesSection, { edits })],
   ]
   it.each(cases)('%s', (_name, element) => {
     const html = render(element)

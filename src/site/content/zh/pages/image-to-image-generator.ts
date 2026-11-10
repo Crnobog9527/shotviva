@@ -1,7 +1,7 @@
-import { defineContentPage } from '@/core/content'
+import { defineContentPage, type EditCases, type ShootDemo } from '@/core/content'
 
 import { site } from '../../../site.config'
-import { pairImage, SIZE_COUNT } from '../../landing-shared'
+import { caseImage, SIZE_COUNT } from '../../landing-shared'
 import { zhPricingRelated } from '../shared'
 import { photoSeconds, SET_PHOTOS } from '../../offer'
 import { productBills } from '../home'
@@ -12,6 +12,56 @@ import { zhFreeImages, zhTierList, zhTierPixels, zhUploadLimits } from '../offer
 // models and tutorials (中文用户真实问法 C1), so the direct answer says first: no install, no
 // prompts, the subject stays as shot. Layout and the facts / bills / links blocks: T44.
 const brand = site.brand.name
+
+// 本页的案例（public/cases，Owner 2026-11-11）：一张猫咪照片做成三种画风，再加四个精确改图。
+// 图里的品牌都是虚构的。
+const catPhone = caseImage('pet-phone', '示例手机照：一只白肚皮的虎斑猫趴在灰色沙发扶手上，晚上的台灯光，旁边有毯子和电视遥控器')
+const catAnime = caseImage('pet-anime', 'AI 示例：同一只猫、同样的姿势和房间，画成粗线条、平涂阴影的日式动漫插画')
+
+const catStyles: ShootDemo = {
+  heading: { lead: '一张猫咪照片 → ', emphasis: '三种画风' },
+  intro: '在沙发扶手上用手机随手拍了一张。做出三种画风，每张里都是同一只猫：虎斑花纹、鼻梁上的白条、绿眼睛和趴着的姿势都没变。',
+  phone: { image: catPhone, file: 'IMG_0921.jpg', caption: '手机原图：晚上的台灯光，毯子和遥控器都入镜了。' },
+  arrow: '三种画风，同一只猫',
+  results: [
+    { image: catAnime, title: '动漫风', template: '粗线条，平涂阴影' },
+    { image: caseImage('pet-3d', 'AI 示例：同一只猫变成三维动画电影里的角色，趴在沙发上，暖色电影光'), title: '三维动画', template: '圆润造型，电影光' },
+    { image: caseImage('pet-watercolor', 'AI 示例：同一只猫画成手绘水彩绘本插画，纸面纹理和柔和的晕染'), title: '水彩绘本', template: '纸面纹理，柔和晕染' },
+  ],
+}
+
+const edits: EditCases = {
+  heading: '改一处，其余不动',
+  intro: '说清楚要改什么，就只动那一处。主体、版式和其他文字都保持原样。',
+  labels: { before: '改前', after: '改后', reference: '参考图' },
+  items: [
+    {
+      title: '房间照，变成挂牌用的样片',
+      change: '收掉杂物，换成傍晚的金色光线。墙、窗、沙发和挂画的位置一点没变。',
+      before: caseImage('room-phone', '示例手机照：傍晚的大平层客厅，布艺沙发、洞石茶几和整面城市落地窗，地上有购物袋、快递箱和扫地机器人'),
+      after: caseImage('room-staged', 'AI 示例：同一个大平层客厅、同一个角度，杂物都收掉了，傍晚的金色光线，茶几上一瓶白色枝条'),
+    },
+    {
+      title: '海报上改五处文字',
+      change: '改了主题、一款饮品、它的价格、日期和优惠。手写字的风格、照片和其他文字都没动。',
+      before: caseImage('poster-zh-before', 'AI 示例：森系风格的「小蕨咖啡」海报，手写大字「你好，秋天！」「抹茶和枫糖的季节」，下面是三款饮品的菜单和价格'),
+      after: caseImage('poster-zh-after', 'AI 示例：同一张海报改了五处：抹茶和栗子的季节、栗子燕麦拿铁和它的新价格、每天都有、买二送一'),
+    },
+    {
+      title: '换外壳颜色，一个字都不变',
+      change: '酒红色的外壳和包装盒换成宝蓝色。品牌名、色号名、标语和口红膏体本身都保持原样。',
+      before: caseImage('lipstick-before', 'AI 示例：一个虚构品牌的高端口红广告，酒红色多面切割外壳和包装盒放在洞石台上，配象牙色缎面，上方印着品牌名、色号和标语'),
+      after: caseImage('lipstick-after', 'AI 示例：同一张口红广告，外壳和包装盒换成宝蓝色，广告上的文字一个都没变'),
+    },
+    {
+      title: '把自家饮品换进成品图',
+      change: '用一张手机随手拍的草莓抹茶拿铁，换掉原图里的黑糖珍珠奶茶。台面、背景、光线和角度不变，道具跟着换成草莓和抹茶粉。',
+      before: caseImage('drink-before', 'AI 示例：黑糖珍珠奶茶的影棚广告图，水磨石台面，蜜桃色背景'),
+      after: caseImage('drink-after', 'AI 示例：同样的影棚布景，黑糖珍珠奶茶换成了手机照里的草莓抹茶拿铁，旁边是草莓和抹茶粉'),
+      reference: caseImage('drink-ref', '示例手机照：店里手拿着的一杯分层草莓抹茶拿铁，塑料杯'),
+    },
+  ],
+}
 
 export const zhImageToImageGenerator = defineContentPage({
   slug: 'image-to-image-generator',
@@ -24,9 +74,9 @@ export const zhImageToImageGenerator = defineContentPage({
   subtitle: '从你自己的照片出发，而不是一个空白的输入框。主体保持原样。',
   answerBlock: `图生图就是用你上传的照片生成一张新图。${brand} 的图生图在线工具用模板出图：不用装软件，也不用写提示词，选一个餐饮、商品、美妆、房间、宠物或画风模板，光线、场景或画风就由模板定好。主体保持原样，新用户送 ${zhFreeImages}。`,
   hero: {
-    before: pairImage('example-skincare-before', '手机随手拍：浴室架子上的一罐护肤品，室内平光（示意图）'),
-    after: pairImage('example-skincare-after', '同一罐护肤品放在石台上，柔和的水疗光，水疗展台模板（示意图）'),
-    caption: '你的手机照片 → 水疗展台模板：还是这罐护肤品，换了布景和光线 · 示意图',
+    before: catPhone,
+    after: catAnime,
+    caption: '你的手机照片 → 动漫风：还是这只猫，变成了画',
     cta: { label: '上传照片', href: '/generate' },
   },
   facts: [
@@ -71,5 +121,7 @@ export const zhImageToImageGenerator = defineContentPage({
   },
   landing: {
     factsNote: `这些是 ${brand} 自己的上传限制和出图尺寸，本站每一页都一样。`,
+    shoot: catStyles,
+    edits,
   },
 })

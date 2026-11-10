@@ -1,8 +1,8 @@
-import { defineContentPage } from '@/core/content'
+import { defineContentPage, type ShootDemo } from '@/core/content'
 
 import { site } from '../../site.config'
-import { productBills, shoot } from '../home'
-import { CATEGORY, homeImage } from '../landing-shared'
+import { productBills } from '../home'
+import { caseImage, CATEGORY } from '../landing-shared'
 import { pricingRelated } from '../shared'
 import { dayRateUsd, freeImagesLabel, FreeImagesShort, OUTPUT_TIERS, packshotUsd, plansSentence, SET_PHOTOS, styledShotUsd, tierList, usdRange } from '../offer'
 import { PLATFORM_SPECS, px } from '../platform-specs'
@@ -15,6 +15,36 @@ const brand = site.brand.name
 const [, hd, max] = OUTPUT_TIERS
 const { amazon, etsy, shopify } = PLATFORM_SPECS
 
+// The sneaker set (public/cases, Owner 2026-11-11): one phone snapshot in a hallway and three
+// deliverables made from it, so this page no longer repeats the home page's tote.
+const sneakerPhone = caseImage('sneaker-phone', 'Example phone photo: an off-white leather sneaker with a sage-green heel tab on a hallway floor, hard morning sun, keys and an open shoe box in frame')
+const sneakerLifestyle = caseImage('sneaker-lifestyle', 'AI example: the same sneaker on a sunlit concrete step outside a café, a linen jacket blurred behind it')
+
+const shoot: ShootDemo = {
+  heading: { lead: 'One phone photo → ', emphasis: 'a full shoot' },
+  intro: 'Shot on a phone on a hallway floor. Three deliverables, and the same sneaker in every one: the perforated toe, the green heel tab, the gum sole.',
+  phone: { image: sneakerPhone, file: 'IMG_3184.jpg', caption: 'As shot on a phone. Hard morning sun, a doormat, keys and the shoe box in frame.' },
+  arrow: 'Three looks, same sneaker',
+  results: [
+    {
+      image: caseImage('sneaker-listing', 'AI example: the same sneaker on a pure white background, soft studio light, a marketplace main image'),
+      title: 'Marketplace listing',
+      template: 'Studio Product Shot',
+    },
+    { image: sneakerLifestyle, title: 'Lifestyle scene', template: 'Lifestyle Scene' },
+    {
+      image: caseImage('sneaker-promo-en', 'AI example: the same sneaker floating over a sage-green backdrop on a poster headed New In, The everyday sneaker'),
+      title: 'Promo poster',
+      template: 'Promo Poster',
+    },
+  ],
+  bill: {
+    photographer: { who: 'Photographer', amount: 'A full shoot', note: 'Booking, studio, styling and retouching' },
+    site: { who: brand, amount: 'No reshoot needed', note: 'One phone photo for a listing image, a lifestyle shot and a promo poster' },
+    line: 'Choose a different template to use the same photo in a new setting.',
+  },
+}
+
 export const commercialPhotography = defineContentPage({
   slug: 'commercial-photography',
   keyword: 'commercial photography',
@@ -26,9 +56,9 @@ export const commercialPhotography = defineContentPage({
   subtitle: 'Listing shots, lifestyle scenes and promo posters from the product photo you already took.',
   answerBlock: `Commercial photography for a small brand usually means a studio day, a photographer and a retoucher. ${brand} does the same job from one phone photo: upload it, pick a template such as White Background or Lifestyle Table, and download a styled, retouched product shot in ${tierList}. New users get ${freeImagesLabel}.`,
   hero: {
-    before: homeImage('hero-set-phone', 'Phone snapshot of a woven leather tote on a busy kitchen counter, window light (illustrative example)'),
-    after: homeImage('hero-set-lifestyle', 'The same tote on a café chair by a window in warm morning light, Lifestyle Table template (illustrative example)'),
-    caption: 'Your phone photo → Lifestyle Table template: same tote, a styled scene · Illustrative example',
+    before: sneakerPhone,
+    after: sneakerLifestyle,
+    caption: 'Your phone photo → a lifestyle scene: the same sneaker on a sunlit café step',
     cta: { label: 'Upload photo', href: '/generate' },
   },
   facts: [

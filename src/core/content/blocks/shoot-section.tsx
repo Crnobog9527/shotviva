@@ -5,7 +5,8 @@ import type { ShootDemo } from '../page-content'
 const RESULT_SIZES = '(min-width: 1024px) 236px, (min-width: 768px) 33vw, 50vw'
 
 // "One phone photo → a full shoot" (ARCHITECTURE §13 item 2): the phone snapshot as large as a
-// result, the three results from three templates, and the two-line bill under them.
+// result, the three results from three templates, and the two-line bill under them when the
+// demo has one.
 export function ShootSection({ shoot }: { shoot: ShootDemo }) {
   const { phone, bill } = shoot
   return (
@@ -46,19 +47,23 @@ export function ShootSection({ shoot }: { shoot: ShootDemo }) {
             </li>
           ))}
         </ol>
-        <div className="mk-bill">
-          <div className="mk-them">
-            <span className="mk-who">{bill.photographer.who}</span>
-            <p className="mk-amt">{bill.photographer.amount}</p>
-            <small>{bill.photographer.note}</small>
-          </div>
-          <div className="mk-us">
-            <span className="mk-who">{bill.site.who}</span>
-            <p className="mk-amt">{bill.site.amount}</p>
-            <small>{bill.site.note}</small>
-          </div>
-        </div>
-        <p className="mk-bill-line">{bill.line}</p>
+        {bill ? (
+          <>
+            <div className="mk-bill">
+              <div className="mk-them">
+                <span className="mk-who">{bill.photographer.who}</span>
+                <p className="mk-amt">{bill.photographer.amount}</p>
+                <small>{bill.photographer.note}</small>
+              </div>
+              <div className="mk-us">
+                <span className="mk-who">{bill.site.who}</span>
+                <p className="mk-amt">{bill.site.amount}</p>
+                <small>{bill.site.note}</small>
+              </div>
+            </div>
+            <p className="mk-bill-line">{bill.line}</p>
+          </>
+        ) : null}
       </div>
     </section>
   )

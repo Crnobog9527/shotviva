@@ -1,8 +1,8 @@
-import { defineContentPage } from '@/core/content'
+import { defineContentPage, type EditCases, type ShootDemo } from '@/core/content'
 
 import { site } from '../../site.config'
 import { productBills } from '../home'
-import { pairImage, sizeCountWord } from '../landing-shared'
+import { caseImage, sizeCountWord } from '../landing-shared'
 import { pricingRelated } from '../shared'
 import { freeImagesLabel, FreeImagesLabel, photoSeconds, plansSentence, SET_PHOTOS, tierList, tierPixels, uploadLimits } from '../offer'
 
@@ -10,6 +10,64 @@ import { freeImagesLabel, FreeImagesLabel, photoSeconds, plansSentence, SET_PHOT
 // page never targets it (建站规格 R1). Layout and the facts / bills / links blocks follow the
 // v3-b landing comp (T44). No audience in the Title / H1: a general tool page (G2, §4).
 const brand = site.brand.name
+
+// The cases on this page (public/cases, Owner 2026-11-11): one cat photo in three art styles,
+// then four precise edits of finished pictures. Every brand in them is made up.
+const catPhone = caseImage('pet-phone', 'Example phone photo: a tabby-and-white cat lying on the arm of a grey sofa in evening lamp light, a blanket and a TV remote beside it')
+const catAnime = caseImage('pet-anime', 'AI example: the same cat, pose and room as a 2D anime illustration with bold outlines and flat cel shading')
+
+const catStyles: ShootDemo = {
+  heading: { lead: 'One cat photo → ', emphasis: 'three art styles' },
+  intro: 'Shot on a phone on the arm of the sofa. Three styles, and the same cat in every one: the tabby stripes, the white blaze, the green eyes, the pose.',
+  phone: { image: catPhone, file: 'IMG_0921.jpg', caption: 'As shot on a phone. Evening lamp light, a blanket and the remote in frame.' },
+  arrow: 'Three styles, same cat',
+  results: [
+    { image: catAnime, title: 'Anime', template: 'Bold lines, flat cel shading' },
+    {
+      image: caseImage('pet-3d', 'AI example: the same cat as a stylised 3D animated-film character on the sofa, warm cinematic light'),
+      title: '3D animation',
+      template: 'Rounded forms, cinematic light',
+    },
+    {
+      image: caseImage('pet-watercolor', 'AI example: the same cat as a hand-painted watercolour storybook illustration, soft washes on textured paper'),
+      title: 'Watercolour',
+      template: 'Paper texture, soft washes',
+    },
+  ],
+}
+
+const edits: EditCases = {
+  heading: 'Change One Thing, Keep the Rest',
+  intro: 'Say what should change and only that part moves. The subject, the layout and every other word stay as they were.',
+  labels: { before: 'Before', after: 'After', reference: 'Reference' },
+  items: [
+    {
+      title: 'A room, staged for the listing',
+      change: 'Clutter cleared and golden-hour light added. The walls, windows, sofa and painting stay exactly where they were.',
+      before: caseImage('room-phone', 'Example phone photo: a penthouse living room at dusk with a bouclé sofa, a travertine table and tall city windows, shopping bags, a delivery box and a robot vacuum on the floor'),
+      after: caseImage('room-staged', 'AI example: the same penthouse living room from the same angle, clutter cleared, warm golden-hour light, a vase of white branches on the table'),
+    },
+    {
+      title: 'Five edits on one poster',
+      change: 'The special, a drink, its price, the days and the offer. The hand lettering, the photo and every other line are untouched.',
+      before: caseImage('poster-en-before', 'AI example: a forest-style café poster for Little Fern Café, hand-lettered Hello, Autumn! over an iced oat latte, with a three-drink menu and prices'),
+      after: caseImage('poster-en-after', 'AI example: the same poster with five edits: Matcha & chestnut specials, Chestnut Oat Latte at a new price, Every day, Buy 2, get 1 free'),
+    },
+    {
+      title: 'A new case colour, every word kept',
+      change: 'The oxblood case and box turn sapphire blue. The brand, the shade name, the tagline and the lipstick itself stay as they were.',
+      before: caseImage('lipstick-before', 'AI example: a luxury lipstick ad for a made-up brand, an oxblood faceted case and box on travertine with ivory satin, shade No. 214 · Rouge Nocturne'),
+      after: caseImage('lipstick-after', 'AI example: the same lipstick ad with the case and box in sapphire blue, every word of the ad unchanged'),
+    },
+    {
+      title: 'Your own drink in a finished shot',
+      change: 'A phone photo of a strawberry matcha latte replaces the boba tea. The counter, backdrop, light and angle stay; the props follow the new drink.',
+      before: caseImage('drink-before', 'AI example: a studio ad photo of brown-sugar boba milk tea on a terrazzo counter against a peach backdrop'),
+      after: caseImage('drink-after', 'AI example: the same studio set with the strawberry matcha latte from the phone photo in place of the boba tea, strawberries and matcha powder beside it'),
+      reference: caseImage('drink-ref', 'Example phone photo: a layered strawberry matcha latte in a plastic cup, held up in a busy shop'),
+    },
+  ],
+}
 
 export const imageToImageGenerator = defineContentPage({
   slug: 'image-to-image-generator',
@@ -22,9 +80,9 @@ export const imageToImageGenerator = defineContentPage({
   subtitle: 'Start from your own photo, not a blank text box. The subject stays as shot.',
   answerBlock: `Image to image generator tools make a new picture from a photo you upload. The ${brand} generator works with templates: pick one for food, products, beauty, rooms, pets or an art style, and it sets the light, the scene or the style for you. The subject stays as shot, and new users get ${freeImagesLabel}.`,
   hero: {
-    before: pairImage('example-skincare-before', 'Phone photo of a skincare jar on a bathroom shelf, flat indoor light (illustrative example)'),
-    after: pairImage('example-skincare-after', 'The same skincare jar on a stone podium in soft spa light, Spa Podium template (illustrative example)'),
-    caption: 'Your phone photo → Spa Podium template: same jar, a new set and light · Illustrative example',
+    before: catPhone,
+    after: catAnime,
+    caption: 'Your phone photo → anime style: the same cat, now drawn',
     cta: { label: 'Upload photo', href: '/generate' },
   },
   facts: [
@@ -80,5 +138,7 @@ export const imageToImageGenerator = defineContentPage({
   },
   landing: {
     factsNote: `These are ${brand}'s own limits and sizes, the same on every page of this site.`,
+    shoot: catStyles,
+    edits,
   },
 })

@@ -2,6 +2,7 @@ import { useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 
 import { CostBillsSection } from './blocks/cost-bills'
+import { EditCasesSection } from './blocks/edit-cases'
 import { FaqSection } from './blocks/faq-section'
 import { HomeHero } from './blocks/home-hero'
 import { FactCards } from './blocks/home-sections'
@@ -21,9 +22,9 @@ type Props = {
 }
 
 // One skeleton for every SEO landing page (design/comps-v3-b/landing.html, ARCHITECTURE §12,
-// 建站规格 R10): hero + direct answer + generator → the optional "full shoot" demo → the page's
-// template categories → facts → the two bills → FAQ → related pages. No visible breadcrumbs
-// (DESIGN §8); the BreadcrumbList JSON-LD stays.
+// 建站规格 R10): hero + direct answer + generator → the optional "full shoot" demo → the optional
+// edit cases → the page's template categories → facts → the two bills → FAQ → related pages.
+// No visible breadcrumbs (DESIGN §8); the BreadcrumbList JSON-LD stays.
 export function ContentPageView({ page, isLinkEnabled, templates, generator }: Props) {
   const t = useTranslations('marketing')
   const headings = page.headings ?? {}
@@ -32,6 +33,7 @@ export function ContentPageView({ page, isLinkEnabled, templates, generator }: P
     <article className="mk-home mk-w">
       <HomeHero page={page} generator={generator} />
       {landing.shoot ? <ShootSection shoot={landing.shoot} /> : null}
+      {landing.edits ? <EditCasesSection edits={landing.edits} /> : null}
       {landing.templates ? <TemplateGrid grid={landing.templates} sections={templates} isLinkEnabled={isLinkEnabled} /> : null}
       <FactCards facts={page.facts} heading={headings.facts ?? t('facts')} note={landing.factsNote} />
       <CostBillsSection bills={page.costBills} />

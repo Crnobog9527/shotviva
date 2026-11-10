@@ -1,11 +1,11 @@
-import { defineContentPage } from '@/core/content'
+import { defineContentPage, type ShootDemo } from '@/core/content'
 
 import { site } from '../../../site.config'
-import { CATEGORY, homeImage } from '../../landing-shared'
+import { caseImage, CATEGORY } from '../../landing-shared'
 import { zhPricingRelated } from '../shared'
 import { dayRateUsd, packshotUsd, SET_PHOTOS, styledShotUsd, usdRange } from '../../offer'
 import { PLATFORM_SPECS, px } from '../../platform-specs'
-import { productBills, shoot } from '../home'
+import { productBills } from '../home'
 import { ZH_TIERS, zhFreeImages, zhPlansSentence, zhTierList } from '../offer'
 
 // /zh/commercial-photography (T44, ARCHITECTURE §17): noindex until GSC shows Chinese queries
@@ -14,6 +14,28 @@ import { ZH_TIERS, zhFreeImages, zhPlansSentence, zhTierList } from '../offer'
 const brand = site.brand.name
 const [, hd, max] = ZH_TIERS
 const { amazon, etsy, shopify } = PLATFORM_SPECS
+
+// 运动鞋这一套（public/cases，Owner 2026-11-11）：玄关地板上的一张手机照和用它做的三张成品，
+// 不再和首页的托特包重复。
+const sneakerPhone = caseImage('sneaker-phone', '示例手机照：玄关木地板上的一只米白色皮面运动鞋，后跟是灰绿色麂皮，早晨阳光很硬，钥匙和打开的鞋盒都入镜了')
+const sneakerLifestyle = caseImage('sneaker-lifestyle', 'AI 示例：同一只鞋放在阳光下咖啡馆门口的水泥台阶上，身后是虚化的亚麻外套')
+
+const shoot: ShootDemo = {
+  heading: { lead: '一张手机照片 → ', emphasis: '一整套图' },
+  intro: '在玄关地板上用手机随手拍了一张。做出三张成品图，每张里都是同一只鞋：鞋头的透气孔、绿色后跟、生胶底都没变。',
+  phone: { image: sneakerPhone, file: 'IMG_3184.jpg', caption: '手机原图：早晨阳光很硬，门垫、钥匙和鞋盒都入镜了。' },
+  arrow: '三种用途，同一只鞋',
+  results: [
+    { image: caseImage('sneaker-listing', 'AI 示例：同一只鞋的纯白底商品主图，柔和影棚光'), title: '电商主图', template: '万物皆可变主图' },
+    { image: sneakerLifestyle, title: '生活场景图', template: '生活场景图' },
+    { image: caseImage('sneaker-promo-zh', 'AI 示例：同一只鞋悬浮在灰绿色背景上，做成写着「新品上市 百搭小白鞋」的促销海报'), title: '促销海报', template: '促销海报' },
+  ],
+  bill: {
+    photographer: { who: '摄影师', amount: '一整场拍摄', note: '预约、影棚、造型和精修' },
+    site: { who: brand, amount: '无需重新实拍', note: '一张手机照，做出主图、场景图和促销海报' },
+    line: '换个模板，就能把同一张商品照用在不同地方。',
+  },
+}
 
 export const zhCommercialPhotography = defineContentPage({
   slug: 'commercial-photography',
@@ -26,9 +48,9 @@ export const zhCommercialPhotography = defineContentPage({
   subtitle: '白底主图、生活场景、促销海报，都从你已经拍好的那张商品照出来。',
   answerBlock: `商业摄影对小品牌来说，通常意味着订一天影棚、请摄影师和修图师。${brand} 用一张手机照片做同样的活：上传照片，选「纯白底图」或「生活场景」这类模板，就能下载造型好、精修过的商品图，有${zhTierList}三档。新用户送 ${zhFreeImages}。`,
   hero: {
-    before: homeImage('hero-set-phone', '手机随手拍：厨房台面上的一只编织皮托特包，窗边自然光（示意图）'),
-    after: homeImage('hero-set-lifestyle', '同一只包放在窗边的咖啡馆椅子上，早晨暖光，生活场景模板（示意图）'),
-    caption: '你的手机照片 → 生活场景模板：还是这只包，换成布置好的场景 · 示意图',
+    before: sneakerPhone,
+    after: sneakerLifestyle,
+    caption: '你的手机照片 → 生活场景：还是这只鞋，放到了阳光下的咖啡馆台阶上',
     cta: { label: '上传照片', href: '/generate' },
   },
   facts: [

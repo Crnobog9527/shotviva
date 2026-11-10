@@ -8,6 +8,8 @@ export {
   type BillTotal,
   type ContentPage,
   type CostBills,
+  type EditCase,
+  type EditCases,
   type Fact,
   type FaqItem,
   type FaqTable,
