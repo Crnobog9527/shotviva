@@ -7,7 +7,7 @@ import { Label } from '@/core/ui/label'
 import { Textarea } from '@/core/ui/textarea'
 import { TOGGLES_MAX } from '@/core/templates/toggles'
 
-import { REPLATE_PRESET, toggleCopy as COPY } from './copy'
+import { TOGGLE_PRESETS, toggleCopy as COPY } from './copy'
 import type { TemplateFormValues } from './form-state'
 import { emptyToggle, type ConfirmText, type ToggleFormValue } from './toggle-form-state'
 
@@ -82,7 +82,7 @@ export function TemplateToggleFields({ values, onChange }: Props) {
   const { toggles } = values
   const replace = (next: ToggleFormValue[]) => onChange({ toggles: next })
   const full = toggles.length >= TOGGLES_MAX
-  const hasPreset = toggles.some((toggle) => toggle.key.trim() === REPLATE_PRESET.key)
+  const has = (key: string) => toggles.some((toggle) => toggle.key.trim() === key)
   return (
     <fieldset className="grid gap-3">
       <legend className="mb-1 text-sm font-semibold">{COPY.legend}</legend>
@@ -100,9 +100,12 @@ export function TemplateToggleFields({ values, onChange }: Props) {
         <Button variant="outline" size="sm" disabled={full} onClick={() => replace([...toggles, emptyToggle()])}>
           {COPY.add}
         </Button>
-        <Button variant="outline" size="sm" disabled={full || hasPreset} onClick={() => replace([...toggles, { ...REPLATE_PRESET, confirmEn: { ...REPLATE_PRESET.confirmEn }, confirmZh: { ...REPLATE_PRESET.confirmZh } }])}>
-          {COPY.addPreset}
-        </Button>
+        {TOGGLE_PRESETS.map((preset) => (
+          <Button key={preset.key} variant="outline" size="sm" disabled={full || has(preset.key)}
+            onClick={() => replace([...toggles, { ...preset, confirmEn: { ...preset.confirmEn }, confirmZh: { ...preset.confirmZh } }])}>
+            {COPY.addPreset(preset.labelZh)}
+          </Button>
+        ))}
       </div>
     </fieldset>
   )
