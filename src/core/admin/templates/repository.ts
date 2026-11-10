@@ -83,6 +83,7 @@ export async function templateExists(client: SupabaseClient, id: string): Promis
 }
 
 const versionErrors: Record<string, string> = {
+  INVALID_INPUT: '模板保存参数无效，请重新核对分类和系列。',
   STALE_TEMPLATE_ASSIGNMENT: '分类或系列已被其他管理员更改。请重新打开模板核对。',
   SYSTEM_ASSIGNMENT: '内置模板的分类与系列不能更改。',
   SERIES_NOT_FOUND: '所选系列已不存在，请重新选择。',

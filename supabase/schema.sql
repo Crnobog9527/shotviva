@@ -4432,7 +4432,7 @@ declare
   siblings text[];
   pos integer;
 begin
-  if not exists(select 1 from public.profiles where id=p_actor and role='admin') then raise exception 'NOT_ADMIN'; end if;
+  if not exists(select 1 from public.profiles where id=p_actor and role='admin' and banned_at is null) then raise exception 'NOT_ADMIN'; end if;
   perform pg_advisory_xact_lock(hashtextextended('shotviva.category_tree',0));
   select parent_id into old_parent from public.template_categories where key=p_key and kind='template' and not is_system;
   if not found or old_parent is distinct from p_from_parent then raise exception 'CATEGORY_CHANGED'; end if;
@@ -4948,7 +4948,8 @@ CREATE OR REPLACE FUNCTION "public"."admin_save_template_assignment"("p_actor" "
 declare
   v_id text := p_template->>'id';
   v_node text := p_template->>'category_key';
-  v_series uuid := (p_assignment->>'series_id')::uuid;
+  v_series uuid;
+  v_previous_series uuid;
   v_old public.templates%rowtype;
   v_root text;
   v_system boolean;
@@ -4959,13 +4960,19 @@ begin
     raise exception 'NOT_ADMIN';
   end if;
   if p_is_new is null or not coalesce(p_assignment ? 'series_id',false) then raise exception 'INVALID_INPUT'; end if;
+  begin
+    v_series := (p_assignment->>'series_id')::uuid;
+    v_previous_series := (p_assignment->>'previous_series_id')::uuid;
+  exception when invalid_text_representation then
+    raise exception 'INVALID_INPUT';
+  end;
   perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree',0));
   perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series',0));
   select * into v_old from public.templates where id=v_id for update;
   if found and p_is_new then raise exception 'TEMPLATE_EXISTS'; end if;
   if v_old.id is null and not p_is_new then raise exception 'TEMPLATE_NOT_FOUND'; end if;
   if not p_is_new and (not (p_assignment ? 'previous_series_id')
-      or (p_assignment->>'previous_series_id')::uuid is distinct from v_old.series_id
+      or v_previous_series is distinct from v_old.series_id
       or p_assignment->>'previous_category' is distinct from coalesce(v_old.subcategory_key,v_old.category_key)) then
     raise exception 'STALE_TEMPLATE_ASSIGNMENT';
   end if;
@@ -5015,7 +5022,7 @@ declare
   next_order integer;
   previous public.template_categories;
 begin
-  if not exists(select 1 from public.profiles where id=p_actor and role='admin') then raise exception 'NOT_ADMIN'; end if;
+  if not exists(select 1 from public.profiles where id=p_actor and role='admin' and banned_at is null) then raise exception 'NOT_ADMIN'; end if;
   perform pg_advisory_xact_lock(hashtextextended('shotviva.category_tree',0));
   select * into previous from public.template_categories where key=k;
   if p_is_new and found then raise exception 'CATEGORY_KEY_TAKEN'; end if;
@@ -5061,7 +5068,7 @@ declare
   previous public.template_series;
   saved public.template_series;
 begin
-  if not exists(select 1 from public.profiles where id=p_actor and role='admin') then
+  if not exists(select 1 from public.profiles where id=p_actor and role='admin' and banned_at is null) then
     raise exception 'NOT_ADMIN';
   end if;
   perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree',0));
