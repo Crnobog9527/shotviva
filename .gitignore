@@ -44,3 +44,9 @@ supabase/.temp/
 # vercel
 .vercel/
 /.lighthouseci
+
+# internal docs: moved to the private repo Crnobog9527/shotviva-docs (2026-11-11),
+# cloned locally at ../shotviva-docs. Never commit them here again.
+/规范/
+/seo资料/
+/docs/
