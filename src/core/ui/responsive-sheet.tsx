@@ -23,15 +23,19 @@ type Props = {
   tall?: boolean
   aside?: ReactNode
   footer?: ReactNode
+  // A walkthrough that must be seen to the end (the Wishlist tour): no close button, and
+  // Escape, the scrim and the drag leave it open until the caller unlocks it.
+  locked?: boolean
 }
 
 // shadcn's Responsive Dialog pattern (DESIGN §8.4): one component that is a bottom Drawer
 // below md and a centred Dialog from md up. Both return focus to the opener on close.
-export function ResponsiveSheet({ open, onOpenChange, title, description, children, wide = false, tall = false, aside, footer }: Props) {
+export function ResponsiveSheet({ open, onOpenChange, title, description, children, wide = false, tall = false, aside, footer, locked }: Props) {
   const desktop = useMediaQuery("(min-width: 768px)")
+  const change = guardClose(onOpenChange, locked)
   if (desktop) {
     return (
-      <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+      <DialogPrimitive.Root open={open} onOpenChange={change}>
         <DialogPrimitive.Portal>
           <DialogPrimitive.Overlay className="scrim-motion fixed inset-0 z-90 bg-[var(--scrim)] backdrop-blur-[2px]" />
           <DialogPrimitive.Content
@@ -45,24 +49,31 @@ export function ResponsiveSheet({ open, onOpenChange, title, description, childr
               {children}
             </div>
             {footer}
-            <SheetClose Close={DialogPrimitive.Close} />
+            <SheetClose Close={DialogPrimitive.Close} hidden={locked} />
           </DialogPrimitive.Content>
         </DialogPrimitive.Portal>
       </DialogPrimitive.Root>
     )
   }
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
+    <Drawer open={open} onOpenChange={change} dismissible={!locked}>
       <DrawerContent className={wide || tall ? "h-[calc(100dvh-var(--sat)-12px)]" : undefined}>
         <div className={cn("min-h-0 overflow-y-auto overscroll-contain px-4", wide ? "flex-1 pb-5" : tall ? "flex-1" : "pb-[calc(var(--sab)+16px)]")}>
           <SheetHeading title={title} description={description} aside={aside} Title={DrawerTitle} Description={DrawerDescription} />
           {children}
         </div>
         {footer}
-        <SheetClose Close={DrawerClose} />
+        <SheetClose Close={DrawerClose} hidden={locked} />
       </DrawerContent>
     </Drawer>
   )
+}
+
+// While locked, every way of closing (Escape, the scrim, the drag) is ignored.
+function guardClose(onOpenChange: (open: boolean) => void, locked: boolean | undefined) {
+  return (next: boolean) => {
+    if (next || !locked) onOpenChange(next)
+  }
 }
 
 function dialogSize(wide: boolean, tall: boolean): string {
@@ -97,8 +108,9 @@ type CloseComponent = typeof DialogPrimitive.Close | typeof DrawerClose
 
 // 44px close target with a 30px bone disc, top right. vaul keeps its own dialog context, so
 // each variant closes with its own Close.
-function SheetClose({ Close }: { Close: CloseComponent }) {
+function SheetClose({ Close, hidden }: { Close: CloseComponent; hidden?: boolean }) {
   const t = useTranslations("app.sheet")
+  if (hidden) return null
   return (
     <Close aria-label={t("close")} className="absolute top-3 right-3 z-20 grid size-11 place-items-center rounded-full text-bone-dim">
       <span className="grid size-[30px] place-items-center rounded-full bg-wash-strong">

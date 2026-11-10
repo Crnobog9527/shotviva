@@ -458,6 +458,21 @@ html:lang(zh-Hans) :is(em, i, .italic) {
     animation: sv-notice-room 360ms var(--ease) both;
   }
 }
+/* The Wishlist tab's first-run dot (core/wishlist tab-dot) hops once every 2.6s so it is noticed
+   (Owner 2026-11-11): up 5px, down, a small rebound, then rest. `translate` only, so nothing
+   around it moves; still under reduced motion. */
+@keyframes sv-dot-hop {
+  0% { translate: 0 0; animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1); }
+  9% { translate: 0 -5px; animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.4); }
+  17% { translate: 0 0; animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1); }
+  21% { translate: 0 -1.5px; animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.4); }
+  25%, 100% { translate: 0 0; }
+}
+@utility dot-hop {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: sv-dot-hop 2.6s infinite;
+  }
+}
 /* A deeper row of Create's category chips (T102) drops 4px into place as it opens; still under
    reduced motion. */
 @keyframes sv-chip-row-in {

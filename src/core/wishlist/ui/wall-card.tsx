@@ -8,12 +8,14 @@ import { ChevronIcon } from './icons'
 import { ImageStrip } from './image-strip'
 import { VoteButton, VoteCount } from './vote-button'
 
-type Props = { card: WallCardData; canVote: boolean; now: Date; onVote(result: VoteResult): void }
+// `demo`: the teaching sheet's example (guide-demo.tsx), drawn inert; its made-up template is
+// never prefetched.
+type Props = { card: WallCardData; canVote: boolean; now: Date; onVote(result: VoteResult): void; demo?: boolean }
 
 // One request on the wall (B comp wishlist.html .req): a print taped to the wall with its
 // reference photos, the note in the hand of the serif, the masked author and when, and the vote.
 // A shipped request gets the "Shipped" stamp and links into its template (ARCHITECTURE §15.1).
-export function WallCard({ card, canVote, now, onVote }: Props) {
+export function WallCard({ card, canVote, now, onVote, demo = false }: Props) {
   const t = useTranslations('app.wishlist')
   const format = useFormatter()
   return (
@@ -29,6 +31,7 @@ export function WallCard({ card, canVote, now, onVote }: Props) {
         {card.template && (
           <Link
             href={`/generate/${card.template.id}`}
+            prefetch={demo ? false : undefined}
             className="press flex min-h-9 items-center justify-between gap-2 text-label font-medium text-success hover:underline hover:underline-offset-3"
           >
             <span className="min-w-0">{t.rich('nowTemplate', { name: card.template.name, b: (chunks) => <b className="font-semibold">{chunks}</b> })}</span>

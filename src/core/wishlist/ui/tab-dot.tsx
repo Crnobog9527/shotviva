@@ -11,7 +11,8 @@ let visitedHere = false
 
 // The Wishlist tab's "new" dot (Owner 2026-11-10): safelight, like the Account tab's reply dot,
 // until the account first opens the wall. The layout renders it only while the account's
-// onboarding.wishlistSeen is unset; opening the wall hides it here at once.
+// onboarding.wishlistSeen is unset; opening the wall hides it here at once. It hops every few
+// seconds so it is noticed (globals.css dot-hop, Owner 2026-11-11).
 export function WishlistTabDot({ label }: { label: string }) {
   const pathname = usePathname()
   const [visited] = useState(() => visitedHere)
@@ -22,7 +23,7 @@ export function WishlistTabDot({ label }: { label: string }) {
   if (!showsTabDot(false, visited || visitedHere || onWall)) return null
   return (
     <>
-      <span aria-hidden="true" className="inline-block size-2.5 shrink-0 rounded-full bg-primary max-md:absolute max-md:top-2 max-md:left-[calc(50%+8px)] md:ml-1" />
+      <span aria-hidden="true" className="dot-hop inline-block size-2.5 shrink-0 rounded-full bg-primary max-md:absolute max-md:top-2 max-md:left-[calc(50%+8px)] md:ml-1" />
       <span className="sr-only">{label}</span>
     </>
   )
