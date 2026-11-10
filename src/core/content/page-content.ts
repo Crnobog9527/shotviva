@@ -17,7 +17,13 @@ export type HeroBlock = {
   after: ImageRef
   caption: string
   cta: { label: string; href: string }
+  // Home only: several AI results of the same phone photo that take turns on the AI side, each
+  // with its own caption. `after` and `caption` stay the first scene's, so anything that reads
+  // the plain pair still shows one consistent result. `label` names the scene switcher.
+  scenes?: { label: string; items: readonly [HeroScene, HeroScene, ...HeroScene[]] }
 }
+
+export type HeroScene = { image: ImageRef; caption: string }
 
 // Block ②: verifiable facts, at least three (建站规格 G4).
 export type Fact = { label: string; value: string }
@@ -83,9 +89,9 @@ export type LandingParts = {
 // Block ③ on every page is the two bills (DESIGN §6.9 item 6), so a page without them fails tsc.
 export type ContentPage = PageBasics & { faq: Between3And5<FaqItem>; costBills: CostBills; landing: LandingParts }
 
-// The home FAQ is exactly the nine questions of 建站规格 G6, in order A–I.
-type Nine<T> = readonly [T, T, T, T, T, T, T, T, T]
-export type HomeFaq = Nine<FaqItem>
+// The home FAQ is the nine questions of 建站规格 G6, in order A–I; a locale may add questions
+// after them (/zh adds two, SEO launch handbook G9).
+export type HomeFaq = readonly [FaqItem, FaqItem, FaqItem, FaqItem, FaqItem, FaqItem, FaqItem, FaqItem, FaqItem, ...FaqItem[]]
 
 // One featured template as a card (T53): `id` is its id in the templates table, picked into the
 // home generator; name and use (its description) in the page's language (建站规格 R5). No
@@ -104,6 +110,12 @@ export type TemplateCategory = {
 }
 
 export type HeadedText = { heading: string; text: string }
+
+// An extra home H2 of three headed cards, after the template grid (SEO launch handbook: /zh's
+// white-background guide, G9; the English use cases, G5). `link` closes a card's text as a plain
+// in-body link, `after` is the punctuation that follows it.
+export type TopicCard = HeadedText & { link?: RelatedLink; after?: string }
+export type TopicSection = { id: string; heading: string; cards: readonly [TopicCard, TopicCard, TopicCard] }
 
 // Home: "One phone photo → a full shoot" (ARCHITECTURE §13 item 2, DESIGN §6.9): the phone
 // snapshot, the three results from three templates, and a two-line bill under them.
@@ -125,6 +137,12 @@ export type BillTotal = { prefix?: string; amount: string; suffix?: string; when
 export type BillLine = { label: string; value: string }
 export type Bill = { title: string; total: BillTotal; lines: readonly [BillLine, BillLine, ...BillLine[]]; fine: string }
 export type CostBills = { heading: string; intro: string; photographer: Bill; site: Bill }
+
+// Home: the three monthly plans as one quiet strip under the two bills (SEO launch handbook
+// G10). Tier, monthly price, credits a month and photos generating at a time; never a photo
+// count (Owner, #417). Each plan and the line under the strip go to /pricing.
+export type PlanCard = { name: string; price: string; per: string; credits: string; concurrency: string }
+export type PlanStrip = { label: string; href: `/${string}`; cards: readonly [PlanCard, PlanCard, PlanCard]; more: string }
 
 // Home: "Can't find your template? Make a wish" (Owner 2026-11-10), right under the template
 // grid and only while the wishlist is open. Three pains it answers, eight example wish cards
@@ -157,6 +175,7 @@ export type HomePage = Omit<PageBasics, 'related'> & {
   subtitle: string
   shoot: ShootDemo
   costBills: CostBills
+  plans?: PlanStrip
   steps: { heading: string; items: readonly [HeadedText, HeadedText, HeadedText] }
   templateGrid: {
     heading: string
@@ -165,6 +184,7 @@ export type HomePage = Omit<PageBasics, 'related'> & {
     note: string
   }
   wishlist: WishlistPromo
+  topics?: TopicSection
   // Intro paragraph above the facts table.
   factsIntro: string
   // H2-4: free credits, free vs paid works, then plans.

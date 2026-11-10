@@ -11,6 +11,7 @@ async function mutate(db: SupabaseClient, fn: string, args: Record<string, unkno
   const { error } = await db.rpc(fn, args)
   if (!error) return
   switch (error.message) {
+    case 'PROMPT_LAB_BUSY': throw new AppError('CONFLICT', '素材仍有调试任务，请等待任务结束后再删除')
     case 'REFERENCE_NOT_FOUND': throw new AppError('NOT_FOUND', '素材已被删除，请刷新后重试')
     case 'REFERENCE_NOT_ARCHIVED': throw new AppError('CONFLICT', '只能永久删除已归档的素材')
     case 'CATEGORY_MOVE_REQUIRED': throw new AppError('INVALID_INPUT', '请选择接收素材的分类')

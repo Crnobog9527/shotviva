@@ -24,6 +24,7 @@ import {
 } from './offer'
 import { homeWishlist } from './home-wishlist'
 import { sharedFacts } from './shared'
+import { homePlans } from './plan-strip'
 
 // Final home copy (T11). TDK, H1, subtitle, direct answer and the six H2s are fixed by
 // 建站规格 §4 and G1; the nine FAQ questions and how their answers are written by G6 (T35):
@@ -46,6 +47,23 @@ function plansText(): HeadedText {
 const photo = (file: string, alt: string): ImageRef => ({ src: `/home/${file}.webp`, alt, width: 1080, height: 1350 })
 const phoneShot = photo('hero-set-phone', 'Phone snapshot of a woven leather tote on a busy kitchen counter, window light (illustrative example)')
 const listingShot = photo('hero-set-listing', 'The same woven leather tote as a white-background listing photo, soft studio light (illustrative example)')
+
+// The hero's AI side: three scenes made from that one phone photo, taking turns (Owner
+// 2026-11-11). Captions stay short and say only what changed; the alt text says it is an AI example.
+const heroScenes = [
+  {
+    image: photo('hero-ai-street', 'AI example: the same woven leather tote on a woman’s shoulder on a sunny Paris street, café tables behind her'),
+    caption: 'Same bag, now on a Paris street',
+  },
+  {
+    image: photo('hero-ai-terrace', 'AI example: the same tote on a marble café table on a seaside terrace, a woman with a coffee beside it'),
+    caption: 'Same bag, on a seaside café table',
+  },
+  {
+    image: photo('hero-ai-villa', 'AI example: the same tote on a travertine bench in a sunlit villa arcade, leaf shadows on the wall'),
+    caption: 'Same bag, new light and setting',
+  },
+] as const
 
 // Also the /commercial-photography demo (T44).
 export const shoot: ShootDemo = {
@@ -75,8 +93,14 @@ export const shoot: ShootDemo = {
 
 // Two bills for the same job (DESIGN §6.9 item 6): every figure from site.config via offer.ts.
 // The landing pages reuse it with their own heading and intro; `moreFine` adds a source.
-export function productBills(heading: string, intro: string, moreFine = ''): CostBills {
+// `planLine: false` on the home page, whose plan strip under the bills already shows Starter
+// (SEO launch handbook S1/G10), so it is not listed twice.
+export function productBills(heading: string, intro: string, moreFine = '', { planLine = true } = {}): CostBills {
   const plan = planFrom ? usd(planFrom.priceUsd) : ''
+  const shared = [
+    { label: 'Start with', value: 'Your existing phone photo' },
+    { label: 'Make', value: 'A listing image, a lifestyle shot and a promo poster' },
+  ] as const
   return {
     heading,
     intro,
@@ -92,15 +116,38 @@ export function productBills(heading: string, intro: string, moreFine = ''): Cos
     site: {
       title: brand,
       total: { prefix: 'from', amount: plan, suffix: '/month', when: `about ${photoSeconds} seconds a photo` },
-      lines: [
-        { label: `Starter plan, ${planFrom?.credits ?? ''} credits a month`, value: plan },
-        { label: 'Start with', value: 'Your existing phone photo' },
-        { label: 'Make', value: 'A listing image, a lifestyle shot and a promo poster' },
-      ],
+      lines: planLine ? [{ label: `Starter plan, ${planFrom?.credits ?? ''} credits a month`, value: plan }, ...shared] : shared,
       fine: `Styling and retouching are in the template, and your subject stays as you shot it. Start with ${freeImagesLabel}, no card needed.`,
     },
   }
 }
+
+// 「What People Use Image to Image AI For」 (SEO launch handbook G5): one card per landing page,
+// each closing with an in-body link whose anchor is that page's keyword.
+const useCases = {
+  id: 'use-cases',
+  heading: 'What People Use Image to Image AI For',
+  cards: [
+    {
+      heading: 'AI Restaurant Menu Photos',
+      text: 'Restaurants shoot each dish on the pass with a phone and get menu, delivery-app and promo photos from it. The plate stays as served; only the light and the background change. Start with',
+      link: { href: '/ai-restaurant-menu', anchor: 'AI restaurant menu photos' },
+      after: '.',
+    },
+    {
+      heading: 'Commercial Photography Without a Studio',
+      text: 'Shops and sellers turn one phone photo of a product into a white-background listing image, a lifestyle scene or a promo poster, with no studio booking and no reshoot. See what replaces a shoot in',
+      link: { href: '/commercial-photography', anchor: 'commercial photography' },
+      after: '.',
+    },
+    {
+      heading: 'Image to Image Generator With Templates',
+      text: 'Pick a template instead of writing a prompt: food, products, beauty, pets or an art style. Your subject stays as you shot it. Try the',
+      link: { href: '/image-to-image-generator', anchor: 'image to image generator' },
+      after: '.',
+    },
+  ],
+} as const satisfies HomePage['topics']
 
 const steps = {
   heading: 'How Image to Image AI Works in 3 Steps',
@@ -135,9 +182,10 @@ export const homePage = defineHomePage({
   answerBlock: `Image to image AI takes a photo you already have and gives it a new look while the subject stays as shot. With ${brand} you upload one phone photo, pick a template for food, products, rooms, pets or an art style, and download it in ${tierList}. No prompts. New users get ${freeImagesLabel}.`,
   hero: {
     before: phoneShot,
-    after: listingShot,
-    caption: 'Your phone photo → White Background template: same tote, only the light and background changed · Illustrative example',
+    after: heroScenes[0].image,
+    caption: heroScenes[0].caption,
     cta: { label: 'Upload photo', href: '/generate' },
+    scenes: { label: 'AI scenes of the same photo', items: heroScenes },
   },
   shoot,
   steps,
@@ -146,6 +194,7 @@ export const homePage = defineHomePage({
     intro: `Every template starts from your phone photo and ends with a finished picture. Pick one and ${brand} does the rest.`,
     note: 'All template images are illustrative examples.',
   },
+  topics: useCases,
   wishlist: homeWishlist,
   facts: sharedFacts(),
   factsIntro: `Most AI image to image tools hand you a new picture. What you wanted was your picture, only better: the same product, the same dish, the same room, with nicer light and a cleaner scene. That is what ${brand} is built for. The prices and sizes below are the same on every page of this site.`,
@@ -158,15 +207,18 @@ export const homePage = defineHomePage({
       },
       {
         heading: 'Free Photos Are Public and Watermarked, Paid Photos Are Private',
-        text: `A photo made with free credits is public and carries a small "Made with ${brand}" watermark. A photo made with paid credits is private, has no watermark and is yours to use commercially. Buying a plan later does not change photos you already made.`,
+        text: `A photo made with free credits is public and carries a small "Made with ${brand}" watermark; free photos are for personal, non-commercial use. A photo made with paid credits is private, has no watermark and is yours to use commercially. Buying a plan later does not change photos you already made.`,
       },
     ],
     plans: plansText(),
     sample: { src: '/home/example-skincare-after.webp', alt: '', width: 900, height: 1125 },
   },
+  ...(homePlans ? { plans: homePlans } : {}),
   costBills: productBills(
     `What ${SET_PHOTOS} Product Photos Cost: Photographer vs ${brand}`,
     `One product, ${SET_PHOTOS} styled photos, retouched and ready to post. The same job, two bills.`,
+    '',
+    { planLine: false },
   ),
   faq: [
     // A: the fixed first sentence names the brand and the keyword together (建站规格 G6).

@@ -159,45 +159,46 @@
   .wl-st[data-status="shipped"] { background: color-mix(in srgb, var(--success) 14%, transparent); color: var(--success); }
   .wl-st[data-status="rejected"] { color: var(--muted-foreground); }
 
-  /* the first-visit sheet (Owner 2026-11-10): three steps, one per swipe, each showing the
-     wall's own piece (the note, the vote pill, the shipped line) on a small print */
-  .wl-guide-rail {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: 100%;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    overscroll-behavior-x: contain;
-    scrollbar-width: none;
-    border-radius: 16px;
-  }
-  .wl-guide-rail::-webkit-scrollbar { display: none; }
-  .wl-guide-step { min-width: 0; scroll-snap-align: start; scroll-snap-stop: always; padding: 0 1px 1px; }
+  /* the first-visit sheet (Owner 2026-11-10, a walk since 2026-11-11): one patch of the wall
+     with the wall's own card on it, acting out each step (guide-demo.tsx) */
   .wl-guide-plate {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 14px;
-    min-height: 124px;
-    padding: 18px 20px;
+    display: grid;
+    justify-items: center;
+    padding: 24px 16px 18px;
     border-radius: 16px;
-    background: var(--card);
-    box-shadow: inset 0 0 0 1px var(--border), inset 0 1px 0 var(--edge-highlight);
+    background: var(--background);
+    box-shadow: inset 0 0 0 1px var(--border);
   }
-  .wl-guide-plate .wl-text { -webkit-line-clamp: 3; }
-  .wl-guide-plate .wl-vote .wl-w { display: inline; }
-  /* the example pill, drawn as a vote already cast (it is a picture, not a button) */
-  .wl-vote-on { background: var(--safelight-tint); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 50%, transparent); }
-  .wl-vote-on svg { color: var(--primary); fill: var(--primary); }
-  .wl-vote-on .wl-c { color: var(--foreground); }
-  .wl-guide-ref {
-    flex: none;
-    width: 56px;
-    height: 70px;
-    object-fit: cover;
-    border-radius: 4px;
-    transform: rotate(-3deg);
-    box-shadow: 0 0 0 3px var(--card), 0 8px 16px -8px var(--photo-fade);
+  /* the shipped copy underneath is invisible and only holds the height of the tallest step */
+  .wl-demo { display: grid; width: min(208px, 100%); }
+  .wl-demo > * { grid-area: 1 / 1; align-self: center; min-width: 0; }
+  .wl-demo-sizer { visibility: hidden; }
+  /* hangs from its tape with the wall's lean; shipped, it straightens up as it goes to the top */
+  .wl-demo-card {
+    --r: -1.6deg;
+    transform: rotate(var(--r));
+    transform-origin: 50% 0;
+    transition: transform 0.6s var(--ease);
+  }
+  .wl-guide-plate[data-step="ship"] .wl-demo-card { --r: 0deg; }
+
+  @media (min-width: 768px) {
+    .wl-demo { width: 248px; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    /* say: pinned up, dropping in from above and settling on its tape */
+    .wl-guide-plate[data-step="say"] .wl-demo-card { animation: wl-pin 0.75s var(--ease) both; }
+    /* vote: the pill fills and the count rolls up by one */
+    .wl-demo .wl-vote[aria-pressed="true"] { animation: wl-tick 0.5s var(--ease); }
+    .wl-demo .wl-vote[aria-pressed="true"] .wl-c { display: inline-block; animation: wl-count 0.4s var(--ease); }
+    /* ship: it rises to the top, the stamp lands, then the template line appears */
+    .wl-guide-plate[data-step="ship"] .wl-demo-card { animation: wl-rise 0.6s var(--ease) both; }
+    .wl-guide-plate[data-step="ship"] .wl-stamp { animation: wl-stamp 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.35s both; }
+    .wl-guide-plate[data-step="ship"] .wl-req a { animation: wl-reveal 0.4s var(--ease) 0.6s both; }
+    .wl-guide-copy { animation: wl-copy 0.3s var(--ease); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .wl-demo-card { transition: none; }
   }
 
   @media (min-width: 768px) {
@@ -211,22 +212,39 @@
   @media (min-width: 1024px) {
     .wl-wall { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px 20px; }
   }
+  /* Hovering a print never moves it (Owner 2026-11-11: the old gust swung the vote out from
+     under the pointer); its edge only brightens. */
   @media (hover: hover) {
     .wl-vote:not([aria-pressed="true"]):not(:disabled):not([data-static]):hover { background: var(--wash-strong); box-shadow: inset 0 0 0 1px var(--input); }
-  }
-  /* blown by the pointer: a gust from the left, settling back */
-  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
-    .wl-wall > li.wl-blow { animation: wl-gust 1.4s var(--ease) 1; }
+    .wl-wall > li:hover .wl-req { box-shadow: inset 0 0 0 1px var(--input), inset 0 1px 0 var(--edge-highlight), 0 18px 28px -18px var(--photo-fade), 0 2px 4px -2px var(--frost); }
   }
   @media (prefers-reduced-motion: reduce) {
     .wl-wall > li { transform: none !important; transition: none; }
   }
 }
 
-@keyframes wl-gust {
-  0% { transform: rotate(calc(var(--r) + var(--wind) * var(--k))); }
-  18% { transform: rotate(calc(var(--r) + 5deg * var(--k))) translateY(-2px); }
-  48% { transform: rotate(calc(var(--r) - 3deg * var(--k))); }
-  74% { transform: rotate(calc(var(--r) + 1.5deg * var(--k))); }
-  100% { transform: rotate(calc(var(--r) + var(--wind) * var(--k))); }
+@keyframes wl-pin {
+  0% { transform: translateY(-28px) rotate(-7deg) scale(1.03); opacity: 0; }
+  55% { transform: translateY(2px) rotate(calc(var(--r) + 1.2deg)); opacity: 1; }
+  80% { transform: rotate(calc(var(--r) - 0.5deg)); }
+  100% { transform: rotate(var(--r)); }
+}
+@keyframes wl-tick {
+  40% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+@keyframes wl-count {
+  from { transform: translateY(8px); opacity: 0; }
+}
+@keyframes wl-rise {
+  from { transform: translateY(16px) rotate(-1.6deg); }
+}
+@keyframes wl-stamp {
+  from { transform: rotate(12deg) scale(1.9); opacity: 0; }
+}
+@keyframes wl-reveal {
+  from { transform: translateY(4px); opacity: 0; }
+}
+@keyframes wl-copy {
+  from { opacity: 0; transform: translateY(4px); }
 }

@@ -2,8 +2,9 @@
 
 Project rules, architecture and task cards live in the **private** repo
 `Crnobog9527/shotviva-docs`, not here (this repo is public). On the Owner's machine it is cloned
-next to this checkout: `/Volumes/灰度映画/出海项目/shotviva-docs`. Read
-`/Volumes/灰度映画/出海项目/shotviva-docs/规范/AGENTS.md` first; wherever code comments or
+on the internal disk: `/Users/simon/Projects/shotviva-docs` (run `git pull --ff-only` there first; the
+old copy on the external disk `/Volumes/灰度映画/出海项目/` is retired). Read
+`/Users/simon/Projects/shotviva-docs/规范/AGENTS.md` first; wherever code comments or
 task briefs say `规范/…`, `seo资料/…` or `docs/…`, read that path inside `shotviva-docs`.
 
 - Never copy those documents, prices, costs or prompts back into this repo, a PR or a screenshot.

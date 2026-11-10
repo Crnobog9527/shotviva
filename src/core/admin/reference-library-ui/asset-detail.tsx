@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/core/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/core/ui/dialog'
+import { LabLink } from './lab-link'
 import { DetailFields } from './detail-fields'
 import { errorMessage, batchAssets, previewUrl, updateAsset } from './api'
 import { copy } from './copy'
@@ -54,6 +55,7 @@ export function AssetDetail({ asset, categories, neighbors, onOpen, onClose, onC
       {editing ? <DetailFields asset={asset} categories={categories} onSave={save} onCancel={() => setEditing(false)} busy={busy} /> :
         <AssetFacts asset={asset} categories={categories} />}
       {!editing && <div className="flex flex-wrap gap-2">
+        <LabLink assetId={asset.id} />
         <Button variant="outline" disabled={busy} onClick={() => setEditing(true)}>{copy.edit} (E)</Button>
         <Button variant="outline" disabled={busy} onClick={archive}>{asset.status === 'active' ? copy.archive + ' (A)' : copy.restore}</Button>
         <Button variant="ghost" disabled={!neighbors.previous || busy} onClick={() => neighbors.previous && onOpen(neighbors.previous)}>{copy.previous}</Button>

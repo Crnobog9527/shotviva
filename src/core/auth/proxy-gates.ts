@@ -51,7 +51,7 @@ export async function currentProxyUser(request: NextRequest) {
   const { supabase, response } = proxySupabase(request)
   const { data } = await supabase.auth.getUser()
   if (!data.user) return { user: null, response }
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).maybeSingle()
+  const { data: profile } = await supabase.from('profiles').select('role, banned_at').eq('id', data.user.id).maybeSingle()
   return { user: toSessionUser(data.user, profile), response }
 }
 
@@ -64,7 +64,7 @@ export function decide(
   search: string,
   locale: Locale = DEFAULT_LOCALE,
 ) {
-  if (gate === 'admin') return user?.verified && user.role === 'admin' ? 'pass' : 'not_found'
+  if (gate === 'admin') return user?.verified && user.role === 'admin' && !user.banned ? 'pass' : 'not_found'
   if (!user) return { redirect: localizePath(loginPath(`${pathname}${search}`), locale) }
   if (!user.verified) return { redirect: localizePath('/login?error=unverified', locale) }
   return 'pass'

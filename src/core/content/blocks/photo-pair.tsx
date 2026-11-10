@@ -29,14 +29,20 @@ type Props = {
 // an in-viewport image's priority after layout).
 const afterLoading = (preload: boolean) => (preload ? ({ loading: 'eager', fetchPriority: 'low' } as const) : ({ loading: 'lazy' } as const))
 
+// The phone-photo half on its own, also used by the hero's rotating scenes (hero-scenes.tsx).
+export function BeforePane({ image, preload, sizes }: { image: ImageRef; preload: boolean; sizes: string }) {
+  return (
+    <span className="mk-pane">
+      <Image className="mk-b" src={image.src} alt={image.alt} width={image.width} height={image.height} sizes={sizes} preload={preload} loading={preload ? undefined : 'lazy'} />
+    </span>
+  )
+}
+
 export function PhotoPair({ before, after, size = 'card', preload = false, sizes, className }: Props) {
   const t = useTranslations('marketing.home')
-  const loading = preload ? undefined : 'lazy'
   return (
     <span className={cn('mk-pair', size === 'lg' && 'mk-pair-lg', className)}>
-      <span className="mk-pane">
-        <Image className="mk-b" src={before.src} alt={before.alt} width={before.width} height={before.height} sizes={sizes} preload={preload} loading={loading} />
-      </span>
+      <BeforePane image={before} preload={preload} sizes={sizes} />
       <span className="mk-pane">
         <Image className="mk-ph" src={before.src} alt="" aria-hidden width={before.width} height={before.height} sizes={sizes} loading="lazy" />
         <WhiteGroundImage className="mk-a" src={after.src} alt={after.alt} width={after.width} height={after.height} sizes={sizes} {...afterLoading(preload)} />

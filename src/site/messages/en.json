@@ -11,7 +11,7 @@
       "seeAll": "See all templates",
       "changeTemplate": "Template: {name}. Change template",
       "changeSize": "Size: {name}. Change size",
-      "notePlaceholder": "Anything to change? (optional)",
+      "notePlaceholder": "Anything to change?",
       "uploadPhoto": "Upload photo",
       "dockGenerate": "Generate",
       "needsCopy": "Add the text in the workspace",
@@ -706,11 +706,12 @@
           "vote": { "title": "Everyone votes", "text": "Other sellers vote for the wishes they want too. The most-wanted get built first." },
           "ship": { "title": "Shipped and pinned", "text": "A finished template is pinned to the top of the wall. One tap to use it." }
         },
-        "example": "A dark, moody poster for our weekend brunch menu",
-        "exampleTemplate": "Moody Menu Poster",
+        "example": "We do 2nd cup half price every Wednesday. I want a fresh promo poster I can reuse every week",
+        "exampleAuthor": "M***",
+        "exampleTemplate": "Half-Price Cup",
         "wish": "Make a wish",
         "photoFirst": "Make one photo first to wish",
-        "later": "Just looking"
+        "next": "Next"
       },
       "card": {
         "title": "Not finding it? Make a wish",
@@ -1283,6 +1284,10 @@
       "label": "Main",
       "pricing": "Pricing",
       "tagline": "AI edits, true to your photo",
+      "useCases": "Use Cases",
+      "useCaseMenu": "AI restaurant menu photos",
+      "useCaseCommercial": "Commercial photography",
+      "useCaseGenerator": "Image to image generator",
       "templates": "Templates",
       "login": "Log in",
       "startFree": "Start free",

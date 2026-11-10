@@ -6,10 +6,17 @@ vi.mock('../auth/supabase-admin', () => ({ createAdminSupabase: () => ({}) }))
 
 const { logger } = await import('../logger')
 const { FAILED_READ_LIFE } = await import('../cache-life')
-const { SETTINGS_LIFE, settingsOrDefaults } = await import('./read')
+const { loadSystemSettings, SETTINGS_LIFE, settingsOrDefaults } = await import('./read')
 const { settingValue } = await import('./registry')
 
 describe('cached system settings (T62)', () => {
+  it('restricts the shared settings query to registered keys', async () => {
+    const filter = vi.fn(() => ({ order: () => ({ data: [], error: null }) }))
+    const db = { from: () => ({ select: () => ({ in: filter }) }) }
+    await loadSystemSettings(db as unknown as Parameters<typeof loadSystemSettings>[0])
+    expect(filter).toHaveBeenCalledWith('key', expect.arrayContaining(['wishlist_enabled']))
+    expect(filter).not.toHaveBeenCalledWith('key', expect.arrayContaining(['prompt_lab_reverse']))
+  })
   beforeEach(() => {
     cacheLife.mockClear()
     vi.spyOn(logger, 'error').mockImplementation(() => undefined)

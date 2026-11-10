@@ -50,8 +50,8 @@ export const zhAiRestaurantMenu = defineContentPage({
   title: `AI菜单配图：手机拍的菜直接做成外卖图（2026） | ${brand}`,
   description: `AI菜单配图：用你已经拍好的菜品照片，做成菜单、外卖平台和促销图，盘里的菜保持原样。新用户送 ${zhFreeImages}。`,
   h1: 'AI菜单配图：手机拍一张，菜单图就有了',
-  subtitle: '你店里本来就在卖的菜，在出菜口用手机拍一张，就能做成菜单、外卖和促销图。',
-  answerBlock: `AI菜单配图是从你已经拍好的菜品照片出发，做成菜单图、外卖平台图或促销图，盘里的菜保持原样。在 ${brand} 上传一张手机照片，选「外卖菜单」「暗调氛围」或「促销海报」模板，就能下载${zhTierList}的成图。新用户送 ${zhFreeImages}。`,
+  subtitle: '用你真实拍的菜品照片，只换光线、背景和摆盘环境，不会生成你店里没有的菜。',
+  answerBlock: `AI菜单配图从你真实拍的菜品照片出发，只换光线、背景和摆盘环境，盘里的菜保持原样，不会凭空生成不存在的菜。在 ${brand} 上传一张手机照片，选「外卖菜单」「暗调氛围」或「促销海报」模板，就能下载${zhTierList}的成图。新用户送 ${zhFreeImages}。`,
   hero: {
     before: pairImage('example-dish-before', '手机随手拍：后厨出菜口上的一盘菜，顶灯偏硬（示意图）'),
     after: pairImage('example-dish-after', '同一盘菜做成明亮的外卖平台图，柔和日光，外卖菜单模板（示意图）'),
@@ -89,6 +89,7 @@ export const zhAiRestaurantMenu = defineContentPage({
     {
       question: '要自己写提示词吗？',
       answer: '不用。选「外卖菜单」「暗调氛围」或「促销海报」，光线和造型由模板决定。只有一行选填的「有什么想改的？」，比如写「辣椒油要看得见」。',
+      link: { href: '/', anchor: '看看 AI改图 的全部模板。' },
     },
     {
       question: '能直接做整张菜单吗？',

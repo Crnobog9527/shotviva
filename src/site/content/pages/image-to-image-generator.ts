@@ -51,6 +51,7 @@ export const imageToImageGenerator = defineContentPage({
     {
       question: 'Do I need to write a prompt?',
       answer: `No. You pick a template and ${brand} handles the rest. Some templates ask for a short line of text, such as a headline and a price for a poster.`,
+      link: { href: '/', anchor: 'Browse every template in our image to image AI studio.' },
     },
     {
       question: 'Will the generator change my product, dish or room?',

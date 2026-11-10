@@ -88,6 +88,23 @@
       font: 500 15px/1 var(--font-sans); color: var(--bone-dim); text-decoration: none; transition: color .18s, background-color .18s;
     }
     .mk-nl[aria-current="page"] { color: var(--foreground); }
+    /* Use Cases: a disclosure under the nav item, the globe menu's popover look; one above the
+       globe's 「切换到中文？」 bubble (z 60), which it would otherwise sit under */
+    .mk-navmenu { position: relative; }
+    button.mk-nl { gap: 4px; border: 0; background: none; cursor: pointer; }
+    .mk-navmenu-chev { width: 16px; height: 16px; transition: transform .2s var(--ease); }
+    .mk-nl[aria-expanded="true"] { color: var(--foreground); background: var(--wash); }
+    .mk-nl[aria-expanded="true"] .mk-navmenu-chev { transform: rotate(180deg); }
+    .mk-navmenu-list {
+      position: absolute; top: calc(100% + 4px); left: 0; z-index: 61; min-width: 236px; margin: 0; padding: 6px; list-style: none;
+      border-radius: var(--radius-control); background: var(--popover); box-shadow: inset 0 0 0 1px var(--border), 0 24px 48px -16px rgba(0, 0, 0, .7);
+    }
+    .mk-navmenu-list a {
+      display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 10px;
+      font: 500 15px/1.2 var(--font-sans); color: var(--foreground); text-decoration: none; outline: none;
+    }
+    .mk-navmenu-list a:hover, .mk-navmenu-list a:focus-visible { background: var(--wash); }
+    @media (prefers-reduced-motion: reduce) { .mk-navmenu-chev { transition: none; } }
     .mk-login { margin-left: 8px; }
     .mk-start { display: inline-grid; margin-left: 8px; }
   }
@@ -132,6 +149,35 @@
   .mk-pair-lg .mk-tag { top: 12px; bottom: auto; height: 28px; padding: 0 10px; }
   .mk-pair-lg .mk-tag-l { left: 12px; }
   .mk-pair-lg .mk-tag-r { right: 12px; background: var(--primary); }
+
+  /* ---------- the home hero's rotating AI scenes (hero-scenes.tsx) ----------
+     The incoming scene fades in on top of the one it replaces, which stays fully opaque under
+     it, so a scene still loading never shows an empty plate; the rest drop out only after that
+     fade, already covered. 0.4 s of each 2 s turn. */
+  .mk-pair .mk-scene { z-index: 0; opacity: 0; transition: opacity 0s .4s; }
+  .mk-pair .mk-scene.mk-was { z-index: 1; opacity: 1; transition: none; }
+  .mk-pair .mk-scene.mk-on { z-index: 2; opacity: 1; transition: opacity .4s var(--ease); }
+  .mk-dots {
+    position: absolute; z-index: 5; bottom: 8px; left: 75%; transform: translateX(-50%); display: flex; padding: 0 2px;
+    border-radius: 999px; background: var(--frost); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  }
+  .mk-dot { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 999px; background: none; cursor: pointer; }
+  .mk-dot > span { width: 6px; height: 6px; border-radius: 999px; background: var(--bone-dim); transition: width .3s var(--ease), background-color .3s; }
+  .mk-dot[aria-pressed="true"] > span { width: 14px; background: var(--primary); }
+  .mk-dot:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+  .mk-scene-caps { display: grid; }
+  .mk-scene-caps > span { grid-area: 1 / 1; visibility: hidden; opacity: 0; }
+  .mk-scene-caps > .mk-on { visibility: visible; opacity: 1; transition: opacity .4s var(--ease); }
+  @media (min-width: 768px) {
+    .mk-dots { bottom: 12px; }
+  }
+  @media (hover: hover) {
+    .mk-dot:hover > span { background: var(--foreground); }
+    .mk-dot[aria-pressed="true"]:hover > span { background: var(--primary); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mk-pair .mk-scene, .mk-pair .mk-scene.mk-on, .mk-scene-caps > .mk-on, .mk-dot > span { transition: none; }
+  }
 }
 
 /* ======================= the first-screen generator ======================= */
@@ -228,8 +274,16 @@
       position: relative; z-index: 1; display: flex; align-items: center; gap: 12px; height: 88px; padding: 12px; border-radius: var(--radius-panel); background: var(--tier-graphite);
       box-shadow: inset 0 0 0 1px var(--border), inset 0 1px 0 color-mix(in srgb, var(--foreground) 6%, transparent), inset 0 -2px 0 rgba(0, 0, 0, .2), 0 16px 30px -16px rgba(0, 0, 0, .9);
     }
+    /* The photo slot: the 64px well and its name beside it, like a chip's key and value. */
+    .mk-photo {
+      flex: none; display: inline-flex; align-items: center; gap: 12px; height: 64px; padding: 0 4px 0 0; border: 0; border-radius: 12px; cursor: pointer;
+      background: none; color: var(--foreground); font: 600 15px/1.2 var(--font-sans); letter-spacing: -0.01em; white-space: nowrap; text-align: left;
+    }
+    /* Narrow enough that "Upload photo" sits in two lines beside the well and leaves the note room. */
+    .mk-photo-t { max-width: 4.5em; white-space: normal; }
+    .mk-has-photo .mk-photo-t { font-weight: 500; color: var(--bone-dim); transition: color .18s; }
     .mk-tile {
-      position: relative; flex: none; width: 64px; height: 64px; display: grid; place-items: center; overflow: hidden; border: 0; border-radius: 12px; cursor: pointer; color: var(--foreground);
+      position: relative; flex: none; width: 64px; height: 64px; display: grid; place-items: center; overflow: hidden; border-radius: 12px; color: var(--foreground);
       background: repeating-linear-gradient(135deg, var(--hatch) 0 8px, transparent 8px 16px), var(--background); box-shadow: inset 0 0 0 1px var(--input); transition: box-shadow .18s;
     }
     .mk-tile .mk-vf { inset: 6px; }
@@ -240,9 +294,7 @@
     .mk-tile .mk-vf i:nth-child(4) { border-bottom-right-radius: 4px; }
     .mk-plus { width: 22px; height: 22px; }
     .mk-tile .mk-shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-    .mk-replace { position: absolute; inset: 0; display: grid; place-items: center; font: 600 14px/1 var(--font-sans); color: var(--foreground); background: var(--frost); opacity: 0; transition: opacity .18s; }
     .mk-has-photo .mk-tile .mk-vf, .mk-has-photo .mk-tile .mk-plus { display: none; }
-    .mk-has-photo .mk-tile:hover .mk-replace, .mk-has-photo .mk-tile:focus-visible .mk-replace { opacity: 1; }
     .mk-bchip {
       flex: none; display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px 0 8px; border: 0; border-radius: 999px; cursor: pointer;
       font: 500 15px/1 var(--font-sans); letter-spacing: -0.01em; white-space: nowrap; color: var(--foreground); background: var(--wash);
@@ -275,6 +327,12 @@
     .mk-bench-toggles { position: relative; z-index: 1; max-width: 420px; margin: 12px auto 0; }
     .mk-bench-error { text-align: center; }
   }
+  /* A narrow desktop leaves the note almost no room once the photo slot is named: the chips drop
+     their keys (still in their aria-labels) and cut long names sooner. */
+  @media (min-width: 1024px) and (max-width: 1199px) {
+    .mk-bench .mk-k { display: none; }
+    .mk-chip-name { max-width: 120px; }
+  }
   @media (min-width: 1024px) and (prefers-reduced-motion: no-preference) {
     .mk-bench-wrap::before { animation: mk-breathe 8s ease-in-out infinite; }
   }
@@ -286,7 +344,8 @@
     .mk-drop:hover { box-shadow: inset 0 0 0 1px var(--input); }
     .mk-pick:hover img { box-shadow: inset 0 0 0 1px var(--input); }
     .mk-bchip:hover { background: var(--wash-strong); box-shadow: inset 0 0 0 1px var(--input); }
-    .mk-tile:hover { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--foreground) 32%, transparent); }
+    .mk-photo:hover .mk-tile { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--foreground) 32%, transparent); }
+    .mk-has-photo .mk-photo:hover .mk-photo-t { color: var(--foreground); }
     .mk-size-list button:hover { background: var(--wash); }
     .mk-cta:not(:disabled):hover { filter: brightness(1.04); }
   }
@@ -398,6 +457,8 @@
   .mk-free { display: grid; gap: 8px; margin-top: 24px; }
   .mk-free article { padding: 16px; border-radius: var(--radius-media); background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
   .mk-free p { margin-top: 8px; font-size: 16px; line-height: 1.5; color: var(--muted-foreground); }
+  .mk-free p a { color: var(--foreground); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--foreground) 40%, transparent); text-underline-offset: 3px; transition: text-decoration-color .18s; }
+  .mk-free p a:hover { text-decoration-color: var(--primary); }
   .mk-wm { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
   .mk-wm figure { position: relative; margin: 0; aspect-ratio: 1; border-radius: 12px; overflow: hidden; }
   .mk-wm img { width: 100%; height: 100%; object-fit: cover; }
@@ -426,6 +487,22 @@
   .mk-them .mk-lines .mk-n { color: var(--bone-dim); }
   .mk-fine { margin-top: 12px; font-size: 14px; line-height: 1.4; color: var(--muted-foreground); }
   .mk-bill-card.mk-us .mk-fine { color: var(--bone-dim); }
+
+  /* the three monthly plans under the bills: one ruled strip, quieter than the bills; every
+     cell goes to /pricing (SEO launch handbook G10) */
+  .mk-plans { margin-top: 16px; }
+  .mk-plans ul { list-style: none; margin: 0; padding: 0; border-radius: var(--radius-media); box-shadow: inset 0 0 0 1px var(--border); overflow: hidden; }
+  .mk-plans li + li { border-top: 1px solid var(--hairline); }
+  .mk-plans li a {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 14px 16px;
+    text-decoration: none; color: var(--muted-foreground); font-size: 14px; line-height: 1.35; transition: background-color .18s;
+  }
+  .mk-plans b { font: 600 16px/1.25 var(--font-sans); letter-spacing: -0.01em; color: var(--foreground); }
+  .mk-plan-price { grid-column: 2; grid-row: 1 / span 3; align-self: center; font: 400 24px/1 var(--font-display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--foreground); }
+  .mk-plan-price small { margin-left: 2px; font: 400 14px/1 var(--font-sans); color: var(--bone-dim); }
+  .mk-plans-more { margin-top: 12px; font-size: 15px; }
+  .mk-plans-more a { color: var(--foreground); text-decoration: underline; text-underline-offset: 3px; }
+  .mk-plans li a:focus-visible, .mk-plans-more a:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
 
   /* FAQ: <details>, the answers in the HTML (建站规格 G11) */
   .mk-faq { margin-top: 16px; }
@@ -463,6 +540,7 @@
   @media (hover: hover) {
     .mk-faq summary:hover .mk-pm, .mk-links a:hover .mk-go { background: var(--wash-strong); }
     .mk-links a:hover { box-shadow: inset 0 0 0 1px var(--input); }
+    .mk-plans li a:hover { background: var(--wash); }
   }
 }
 
@@ -493,6 +571,10 @@
     .mk-cat-head p { margin-top: 0; }
     .mk-bills { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
     .mk-bill-card { padding: 24px 24px 20px; }
+    .mk-plans ul { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .mk-plans li + li { border-top: 0; border-left: 1px solid var(--hairline); }
+    .mk-plans li a { grid-template-columns: minmax(0, 1fr); height: 100%; padding: 16px 20px; }
+    .mk-plan-price { grid-column: 1; grid-row: 2; margin: 6px 0 4px; }
     .mk-total > .mk-n { font-size: var(--text-large-title); }
   }
 

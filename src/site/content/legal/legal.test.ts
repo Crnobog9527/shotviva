@@ -30,9 +30,11 @@ describe('legal pages (T19)', () => {
     expect(footerLinks.at(-1)?.label).toBe('Contact')
   })
 
-  it.each(PATHS)('%s is noindex through the global switch and stays out of the sitemap', (path) => {
+  // Indexable once the site opens (SEO launch handbook PATCH v3 G7, src/site/sitemap-pages.test.ts);
+  // the test process has the closed pre-launch switch, so noindex and no sitemap until then.
+  it.each(PATHS)('%s is listed for indexing and stays noindex while the switch is closed', (path) => {
     const page = legalPages.find((p) => p.path === path)!
-    expect(site.indexing.indexablePaths).not.toContain(path)
+    expect(site.indexing.indexablePaths).toContain(path)
     expect(pageMetadata(site, page).robots).toEqual(NOINDEX)
     expect(pageSitemapUrls(site, pageGates).some((url) => url.endsWith(path))).toBe(false)
   })

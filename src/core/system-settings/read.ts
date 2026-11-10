@@ -7,7 +7,7 @@ import { createAdminSupabase } from '../auth/supabase-admin'
 import { FAILED_READ_LIFE } from '../cache-life'
 import { AppError } from '../errors'
 import { logger } from '../logger'
-import type { SystemSettingValues } from './registry'
+import { SYSTEM_SETTINGS, type SystemSettingValues } from './registry'
 
 // The admin save expires this tag (updateTag), so a switch changes without a deploy.
 export const SYSTEM_SETTINGS_CACHE_TAG = 'system-settings'
@@ -20,9 +20,9 @@ type Db = ReturnType<typeof createAdminSupabase>
 
 const rowsSchema = z.array(z.object({ key: z.string(), value: z.unknown() }))
 
-// The whole table: one row per setting, a handful at most, by primary key.
+// Cache only registered runtime switches. Private admin instructions share this table.
 export async function loadSystemSettings(db: Db): Promise<SystemSettingValues> {
-  const { data, error } = await db.from('system_settings').select('key, value').order('key')
+  const { data, error } = await db.from('system_settings').select('key, value').in('key', Object.keys(SYSTEM_SETTINGS)).order('key')
   if (error) throw new AppError('INTERNAL', 'system_settings read failed', { cause: new Error(error.message) })
   return Object.fromEntries(rowsSchema.parse(data).map((row) => [row.key, row.value]))
 }

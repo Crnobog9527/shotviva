@@ -16,14 +16,14 @@ type Props = { first: Page<WallCardData>; eligible: boolean; now: string; loadMo
 // there is no seeded content, and the empty plate carries the primary itself.
 export function WallView({ first, eligible, now, loadMore }: Props) {
   const wall = usePaged(first, loadMore)
-  const { wall: wallRef, gust, settled } = useBreeze()
+  const wallRef = useBreeze()
   const at = new Date(now)
   if (wall.items.length === 0) return <WallEmpty eligible={eligible} />
   return (
     <div className="flex flex-col">
       <ul ref={wallRef} className="wl-wall">
         {wall.items.map((card) => (
-          <li key={card.id} onPointerEnter={gust} onAnimationEnd={settled}>
+          <li key={card.id}>
             <WallCard
               card={card}
               canVote={eligible}
