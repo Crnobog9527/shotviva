@@ -25,7 +25,7 @@ jobs:
     steps:
       # The PR head itself, not the merge ref, with full history so origin/main, the merge
       # base and the recent commits on main are all available.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
