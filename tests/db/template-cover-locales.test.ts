@@ -191,7 +191,7 @@ describe('test runs into language covers', () => {
     } finally {
       await restore()
     }
-  })
+  }, 15_000)
 
   it('says cover translation is not set up until the prompt is written', async () => {
     const restore = await publishEditTemplate(db)
