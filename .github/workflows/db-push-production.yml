@@ -32,7 +32,7 @@ permissions:
 
 jobs:
   approval-check:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.pricing_operation == 'approval-check'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && (!inputs.pricing_operation || inputs.pricing_operation == 'approval-check')
     runs-on: ubuntu-latest
     environment: production-manual
     permissions: {}
@@ -44,7 +44,7 @@ jobs:
       group: db-push-production
       cancel-in-progress: false
     name: supabase db push → production
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.pricing_operation != 'approval-check')
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || contains(fromJSON('["none","activate","rollback"]'), inputs.pricing_operation))
     runs-on: ubuntu-latest
     environment: ${{ github.event_name == 'push' && 'production' || 'production-manual' }}
     permissions:
