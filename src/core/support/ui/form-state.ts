@@ -1,12 +1,13 @@
 // What a ticket form's server action hands back. Creating returns the new ticket's id (the
 // dialog opens it); both return sentAt so the field can start empty. Codes match
 // app.support.*.errors.
-export type FormError = 'RATE_LIMITED' | 'INVALID_INPUT' | 'NOT_FOUND' | 'IMAGE_TOO_LARGE' | 'IMAGE_UNSUPPORTED' | 'generic'
+// TICKET_CLOSED: the Owner closed the ticket after it was opened here (adding only).
+export type FormError = 'RATE_LIMITED' | 'INVALID_INPUT' | 'NOT_FOUND' | 'IMAGE_TOO_LARGE' | 'IMAGE_UNSUPPORTED' | 'TICKET_CLOSED' | 'generic'
 export type FormState = { error: FormError | null; sentAt?: number; ticketId?: string }
 
 export const IDLE: FormState = { error: null }
 
-const KNOWN: readonly string[] = ['RATE_LIMITED', 'INVALID_INPUT', 'NOT_FOUND', 'IMAGE_TOO_LARGE', 'IMAGE_UNSUPPORTED']
+const KNOWN: readonly string[] = ['RATE_LIMITED', 'INVALID_INPUT', 'NOT_FOUND', 'IMAGE_TOO_LARGE', 'IMAGE_UNSUPPORTED', 'TICKET_CLOSED']
 
 export function formError(code: string): FormError {
   return KNOWN.includes(code) ? (code as FormError) : 'generic'

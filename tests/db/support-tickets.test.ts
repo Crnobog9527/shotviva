@@ -121,10 +121,10 @@ describe('unread dot', () => {
     expect(await hasUnreadReply(client, author.id)).toBe(false)
   })
 
-  it('stays clear after the author’s own message, which reopens the ticket', async () => {
+  it('stays clear after the author’s own message, which puts an answered ticket back to open', async () => {
     const author = await createUser(db)
     const id = await ticket(author)
-    await adminReply(id, 'Done', true)
+    await adminReply(id, 'Done')
     await addTicketMessage(serviceSupabase(), author, { ticketId: id, body: 'Still broken' })
     const row = await ticketRow(db, id)
     expect(row).toMatchObject({ status: 'open', closed_at: null })
@@ -140,6 +140,55 @@ describe('unread dot', () => {
     const row = await ticketRow(db, id)
     expect(row!.last_message_at.getTime()).toBeGreaterThan(row!.user_seen_at.getTime())
     await expect(addTicketMessage(serviceSupabase(), other, { ticketId: id, body: 'hi' })).rejects.toMatchObject({ code: 'NOT_FOUND' })
+  })
+})
+
+describe('a closed ticket', () => {
+  async function messageCount(id: string) {
+    const { rows } = await db.query<{ n: number }>('select count(*)::int as n from public.support_ticket_messages where ticket_id = $1', [id])
+    return rows[0]!.n
+  }
+
+  it('refuses the author’s message with TICKET_CLOSED, writes nothing and stays closed', async () => {
+    const author = await createUser(db)
+    const id = await ticket(author)
+    await adminReply(id, 'Done', true)
+    const before = await ticketRow(db, id)
+    const messages = await messageCount(id)
+
+    await expect(addTicketMessage(serviceSupabase(), author, { ticketId: id, body: 'Still broken' })).rejects.toMatchObject({ code: 'TICKET_CLOSED' })
+    const { error } = await serviceSupabase().rpc('add_ticket_message', { p_ticket_id: id, p_user_id: author, p_body: 'Direct call' })
+    expect(error?.message).toBe('TICKET_CLOSED')
+
+    expect(await ticketRow(db, id)).toEqual(before)
+    expect(before).toMatchObject({ status: 'closed', closed_at: expect.any(Date) })
+    expect(await messageCount(id)).toBe(messages)
+  })
+
+  it('still reads as missing to another account', async () => {
+    const author = await createUser(db)
+    const other = await createUser(db)
+    const id = await ticket(author)
+    await adminReply(id, 'Done', true)
+    await expect(addTicketMessage(serviceSupabase(), other, { ticketId: id, body: 'hi' })).rejects.toMatchObject({ code: 'NOT_FOUND' })
+  })
+
+  it('takes messages again once the Owner answers it without closing', async () => {
+    const author = await createUser(db)
+    const id = await ticket(author)
+    await adminReply(id, 'Done', true)
+    await adminReply(id, 'Reopening this for you')
+    expect((await ticketRow(db, id))?.status).toBe('replied')
+    await addTicketMessage(serviceSupabase(), author, { ticketId: id, body: 'Thanks' })
+    expect(await ticketRow(db, id)).toMatchObject({ status: 'open', closed_at: null })
+  })
+
+  it('leaves open tickets taking messages', async () => {
+    const author = await createUser(db)
+    const id = await ticket(author)
+    await addTicketMessage(serviceSupabase(), author, { ticketId: id, body: 'More detail' })
+    expect((await ticketRow(db, id))?.status).toBe('open')
+    expect(await messageCount(id)).toBe(2)
   })
 })
 

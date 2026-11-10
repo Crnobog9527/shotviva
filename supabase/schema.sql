@@ -2426,18 +2426,28 @@ CREATE OR REPLACE FUNCTION "public"."add_ticket_message"("p_ticket_id" "uuid", "
     SET "search_path" TO ''
     AS $$
 declare
+  v_status text;
   v_message public.support_ticket_messages;
 begin
   if p_body is null or char_length(btrim(p_body)) not between 1 and 2000 then
     raise exception 'INVALID_INPUT' using detail = 'body must be 1 to 2000 characters';
   end if;
 
-  update public.support_tickets
-     set status = 'open', closed_at = null, last_message_at = now(), user_seen_at = now()
-   where id = p_ticket_id and user_id = p_user_id;
+  -- Locked, so an Owner closing the ticket at the same moment is seen either before or after.
+  select status into v_status
+    from public.support_tickets
+   where id = p_ticket_id and user_id = p_user_id
+     for update;
   if not found then
     raise exception 'TICKET_NOT_FOUND';
   end if;
+  if v_status = 'closed' then
+    raise exception 'TICKET_CLOSED';
+  end if;
+
+  update public.support_tickets
+     set status = 'open', last_message_at = now(), user_seen_at = now()
+   where id = p_ticket_id;
 
   insert into public.support_ticket_messages (ticket_id, author, body)
   values (p_ticket_id, 'user', btrim(p_body))

@@ -957,13 +957,15 @@
         "addLabel": "Add to this ticket",
         "add": "Send",
         "adding": "Sending…",
-        "closedNote": "This ticket is closed. Writing here opens it again.",
+        "closedNote": "This ticket is closed. If you still need help, start a new ticket.",
+        "newTicket": "New ticket",
         "errors": {
           "INVALID_INPUT": "Write a message of up to 2,000 characters.",
           "NOT_FOUND": "This ticket no longer exists.",
           "generic": "Couldn't send your message. Please try again.",
           "IMAGE_TOO_LARGE": "An image is larger than 10 MB. Remove it and send again.",
-          "IMAGE_UNSUPPORTED": "An image couldn't be read. Remove it and send again."
+          "IMAGE_UNSUPPORTED": "An image couldn't be read. Remove it and send again.",
+          "TICKET_CLOSED": "This ticket was closed, so nothing was sent. Start a new ticket instead."
         }
       },
       "showMore": "Show more",
