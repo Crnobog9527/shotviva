@@ -23,7 +23,8 @@ export function CategoriesPanel({ categories: all, actions }: Props) {
   // The built-in templates' categories are managed by code, not here (T75).
   const categories = all.filter((category) => !category.isSystem)
   const [editing, setEditing] = useState<CategoryTarget | null>(null)
-  const [deleting, setDeleting] = useState<AdminCategoryNode | null>(null)
+  const [deletingKey, setDeletingKey] = useState<string | null>(null)
+  const deleting = categories.find((category) => category.key === deletingKey) ?? null
   const { pending, error, notice, run, clearError } = useAdminAction()
   const nameOf = (key: string | null) => categories.find((category) => category.key === key)?.nameZh ?? null
 
@@ -40,7 +41,7 @@ export function CategoriesPanel({ categories: all, actions }: Props) {
     run(async () => asValue(await actions.move(input)), () => COPY.reordered)
   const remove = (category: AdminCategoryNode, moveTo: string | null) =>
     run(() => actions.remove({ key: category.key, moveTo }), ({ moved }) => {
-      setDeleting(null)
+      setDeletingKey(null)
       return COPY.deleted(category.nameZh, moved, nameOf(moveTo))
     })
   const dialogOpen = editing !== null || deleting !== null
@@ -74,7 +75,7 @@ export function CategoriesPanel({ categories: all, actions }: Props) {
         onMove={move}
         onAdd={parent => open(() => setEditing({ mode: 'new', parent }))}
         onEdit={(category) => open(() => setEditing({ mode: 'edit', category }))}
-        onDelete={(category) => open(() => setDeleting(category))}
+        onDelete={(category) => open(() => setDeletingKey(category.key))}
       />
       {editing ? (
         <CategoryFormDialog
@@ -93,7 +94,7 @@ export function CategoriesPanel({ categories: all, actions }: Props) {
           categories={categories}
           pending={pending}
           error={error}
-          onCancel={() => setDeleting(null)}
+          onCancel={() => setDeletingKey(null)}
           onConfirm={(moveTo) => remove(deleting, moveTo)}
         />
       ) : null}
