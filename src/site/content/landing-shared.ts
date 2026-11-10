@@ -5,6 +5,10 @@ import { OUTPUT_ASPECTS } from '@/core/templates/output-options'
 // (example-*, 900 × 1125) and the size count.
 export const pairImage = (file: string, alt: string): ImageRef => ({ src: `/home/${file}.webp`, alt, width: 900, height: 1125 })
 export const homeImage = (file: string, alt: string): ImageRef => ({ src: `/home/${file}.webp`, alt, width: 1080, height: 1350 })
+// The inner pages' own cases (public/cases, 1080 × 1350, Owner 2026-11-11): a sneaker shoot on
+// /commercial-photography; a cat in three art styles and four precise edits on
+// /image-to-image-generator. None of them repeats the home page's tote.
+export const caseImage = (file: string, alt: string): ImageRef => ({ src: `/cases/${file}.webp`, alt, width: 1080, height: 1350 })
 
 // "eight sizes"
 export const SIZE_COUNT = OUTPUT_ASPECTS.length
