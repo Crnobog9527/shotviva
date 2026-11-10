@@ -51,7 +51,8 @@ export async function addTicketMessage(db: SupabaseClient, userId: string, input
     { p_ticket_id: parsed.data.ticketId, p_user_id: userId, p_body: parsed.data.body, p_images: images },
     idRow,
   )
-  // Collapsed to one alert per ticket per 30 minutes, with the number of unanswered messages.
+  // Only after the write went through: a refused message (closed ticket, TICKET_CLOSED) throws
+  // above and alerts nobody. Collapsed to one alert per ticket per 30 minutes, with the number of unanswered messages.
   notifyOwner({ kind: 'ticket', ticketId: parsed.data.ticketId, reply: true, userId, ticketType: null, pending: null })
 }
 

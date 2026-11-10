@@ -89,6 +89,7 @@ function HelpSheet({ actions, payments, replyTime, brand, unread }: Props) {
             brand={brand}
             notice={shown.id === sentId ? <SentNotice replyTime={replyTime} /> : null}
             onBack={() => go({ tab: 'list' })}
+            onNew={() => go({ tab: 'new' })}
           />
         ) : tab === 'list' ? (
           <HelpListView key={listRound} load={actions.loadTickets} onOpen={onOpen} onNew={() => go({ tab: 'new' })} />

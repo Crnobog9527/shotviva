@@ -5,7 +5,7 @@ import type { z } from 'zod'
 
 import { AppError, type ErrorCode } from '../errors'
 
-// Exception messages raised by the ticket SQL functions (0221–0223).
+// Exception messages raised by the ticket SQL functions (0221–0223, 1173).
 const SQL_ERROR_CODES: Record<string, ErrorCode> = {
   CONFLICT: 'CONFLICT',
   FORBIDDEN: 'FORBIDDEN',
@@ -13,6 +13,7 @@ const SQL_ERROR_CODES: Record<string, ErrorCode> = {
   RATE_LIMITED: 'RATE_LIMITED',
   PROFILE_NOT_FOUND: 'NOT_FOUND',
   TICKET_NOT_FOUND: 'NOT_FOUND',
+  TICKET_CLOSED: 'TICKET_CLOSED',
   PAYMENT_NOT_FOUND: 'NOT_FOUND',
   JOB_NOT_FOUND: 'NOT_FOUND',
 }
