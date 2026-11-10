@@ -7,10 +7,10 @@ import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { jobRefOrShort } from '@/core/jobs'
 import { serverEnv } from '@/core/env'
 import { r2Store } from '@/core/storage'
-import { loadAdminTicket, showMessages } from '@/core/support'
+import { loadAdminTicket, loadRenewalReview, showMessages } from '@/core/support'
 
 import { applyClawbackAction, previewClawbackAction } from '../../orders/actions'
-import { decideRefundAction, replyTicketAction } from '../actions'
+import { decideRefundAction, replyTicketAction, resolveRenewalAction } from '../actions'
 
 export const instant = false
 
@@ -26,19 +26,21 @@ export default async function AdminTicketPage({ params }: PageProps<'/[locale]/a
   if (!ticket) notFound()
   // Images as short-lived signed URLs (T69), next to the author lookup and the attached work's
   // reference number (T78).
-  const [user, messages, jobRef] = await Promise.all([
+  const [user, messages, jobRef, renewal] = await Promise.all([
     loadUser(db, ticket.userId),
     showMessages(r2Store(), ticket.messages),
     ticket.jobId ? jobRefOrShort(db, ticket.jobId) : null,
+    ticket.type === 'billing' ? loadRenewalReview(db, id) : null,
   ])
   return (
     <AdminPage title={TICKETS_COPY.detailTitle}>
       <TicketDetailView
         ticket={{ ...ticket, messages }}
+        renewal={renewal}
         user={user}
         jobRef={jobRef}
         stripeLive={serverEnv().VERCEL_ENV === 'production'}
-        actions={{ reply: replyTicketAction, decide: decideRefundAction, clawback: { preview: previewClawbackAction, apply: applyClawbackAction } }}
+        actions={{ resolveRenewal: resolveRenewalAction, reply: replyTicketAction, decide: decideRefundAction, clawback: { preview: previewClawbackAction, apply: applyClawbackAction } }}
       />
     </AdminPage>
   )

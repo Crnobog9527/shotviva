@@ -3765,6 +3765,59 @@ $$;
 ALTER FUNCTION "public"."admin_reply_ticket"("p_ticket_id" "uuid", "p_body" "text", "p_close" boolean, "p_images" "jsonb") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_resolve_waffo_renewal"("p_actor" "uuid", "p_ticket" "uuid", "p_decision" "text", "p_total_usd_cents" integer, "p_tax_usd_cents" integer) RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  r admin.waffo_renewal_periods;
+  v_change public.credit_change;
+  v_payment bigint;
+  v_body text;
+begin
+  if not exists(select from public.profiles where id=p_actor and role='admin' and banned_at is null) then
+    raise exception 'FORBIDDEN';
+  end if;
+  if p_decision is null or p_decision not in ('settled','refunded') then raise exception 'INVALID_INPUT'; end if;
+  if p_decision='refunded' and (p_total_usd_cents is not null or p_tax_usd_cents is not null) then
+    raise exception 'INVALID_INPUT';
+  end if;
+  select * into r from admin.waffo_renewal_periods where ticket_id=p_ticket or resolved_ticket_id=p_ticket;
+  if not found then raise exception 'TICKET_NOT_FOUND'; end if;
+  perform pg_advisory_xact_lock(hashtextextended('waffo-renewal:' || r.order_id || ':' || r.period_number,0));
+  select * into strict r from admin.waffo_renewal_periods where payment_id=r.payment_id for update;
+  if r.resolution=p_decision then return; end if;
+  if r.resolution is not null then raise exception 'CONFLICT'; end if;
+  perform 1 from public.support_tickets where id=p_ticket and user_id=r.user_id and type='billing' for update;
+  if not found then raise exception 'TICKET_NOT_FOUND'; end if;
+  if p_decision='settled' then
+    if p_total_usd_cents is null or p_tax_usd_cents is null or p_tax_usd_cents<0 or p_total_usd_cents<=p_tax_usd_cents then
+      raise exception 'INVALID_INPUT';
+    end if;
+    -- Any payment already fulfilling this period prevents a second extension, even under another PAY.
+    if exists(select from admin.waffo_renewal_periods other join public.payments p on p.waffo_payment_id=other.payment_id
+      where other.order_id=r.order_id and other.period_number=r.period_number) then raise exception 'CONFLICT'; end if;
+    v_change := public.settle_waffo_order_v2(r.user_id,r.product_id,r.payment_id,r.order_id,p_total_usd_cents,'usd',p_tax_usd_cents,'card');
+    if not v_change.applied then raise exception 'CONFLICT'; end if;
+    select id into strict v_payment from public.payments where waffo_payment_id=r.payment_id;
+    v_body := E'已核对本期续费。积分已到账，会员有效期已更新。\nWe’ve verified your renewal, added your credits and updated your membership expiry.';
+  else
+    if exists(select from public.payments where waffo_payment_id=r.payment_id) then raise exception 'CONFLICT'; end if;
+    v_body := E'已确认这笔续费扣款已退款。\nWe’ve confirmed that this renewal charge was refunded.';
+  end if;
+  update admin.waffo_renewal_periods set ticket_id=null,resolved_ticket_id=p_ticket,resolution=p_decision where payment_id=r.payment_id;
+  update public.support_tickets set status='closed',closed_at=now(),last_message_at=now(),payment_id=v_payment where id=p_ticket;
+  insert into public.support_ticket_messages(ticket_id,author,body) values(p_ticket,'admin',v_body);
+  insert into public.admin_audit_log(action,user_id,target_id,reason) values('waffo_renewal_' || p_decision,r.user_id,p_ticket::text,
+    jsonb_build_object('actor',p_actor,'order',r.order_id,'period',r.period_number,'payment',r.payment_id,
+      'total_usd_cents',p_total_usd_cents,'tax_usd_cents',p_tax_usd_cents)::text);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_resolve_waffo_renewal"("p_actor" "uuid", "p_ticket" "uuid", "p_decision" "text", "p_total_usd_cents" integer, "p_tax_usd_cents" integer) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_revenue_stats"("p_days" integer) RETURNS "jsonb"
     LANGUAGE "plpgsql" STABLE
     SET "search_path" TO ''
@@ -4982,6 +5035,22 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_view_work"("p_job_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_waffo_renewal_review"("p_ticket" "uuid") RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select jsonb_build_object('payment',r.payment_id,'order',r.order_id,'period',r.period_number,
+    'quoted',r.quoted_cents,'charged',r.charged_cents,'tax',r.tax_cents,'currency',r.currency,
+    'reason',r.review_reason,'resolution',r.resolution,'period_paid',exists(
+      select from admin.waffo_renewal_periods other join public.payments p on p.waffo_payment_id=other.payment_id
+      where other.order_id=r.order_id and other.period_number=r.period_number))
+  from admin.waffo_renewal_periods r where r.ticket_id=p_ticket or r.resolved_ticket_id=p_ticket;
+$$;
+
+
+ALTER FUNCTION "public"."admin_waffo_renewal_review"("p_ticket" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."affiliate_apply"("p_user" "uuid", "p_application" "jsonb", "p_parent_slug" "text", "p_terms_version" "text") RETURNS "void"
@@ -8275,9 +8344,13 @@ CREATE TABLE IF NOT EXISTS "admin"."waffo_renewal_periods" (
     "currency" "text",
     "review_reason" "text",
     "ticket_id" "uuid",
+    "resolved_ticket_id" "uuid",
+    "resolution" "text",
     CONSTRAINT "waffo_renewal_periods_period_number_check" CHECK (("period_number" > 1)),
     CONSTRAINT "waffo_renewal_periods_quoted_cents_check" CHECK (("quoted_cents" > 0)),
-    CONSTRAINT "waffo_renewal_periods_review_reason_check" CHECK (("review_reason" = ANY (ARRAY['amount_mismatch'::"text", 'duplicate_payment'::"text"])))
+    CONSTRAINT "waffo_renewal_periods_resolution_check" CHECK (("resolution" = ANY (ARRAY['settled'::"text", 'refunded'::"text"]))),
+    CONSTRAINT "waffo_renewal_periods_review_reason_check" CHECK (("review_reason" = ANY (ARRAY['amount_mismatch'::"text", 'duplicate_payment'::"text"]))),
+    CONSTRAINT "waffo_resolution_ticket" CHECK ((("resolution" IS NULL) = ("resolved_ticket_id" IS NULL)))
 );
 
 
@@ -8291,7 +8364,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "target_id" "text",
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text"]))),
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text"]))),
     CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
     CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );
@@ -9180,6 +9253,11 @@ ALTER TABLE ONLY "admin"."waffo_renewal_periods"
 
 
 ALTER TABLE ONLY "admin"."waffo_renewal_periods"
+    ADD CONSTRAINT "waffo_renewal_periods_resolved_ticket_id_key" UNIQUE ("resolved_ticket_id");
+
+
+
+ALTER TABLE ONLY "admin"."waffo_renewal_periods"
     ADD CONSTRAINT "waffo_renewal_periods_ticket_id_key" UNIQUE ("ticket_id");
 
 
@@ -9499,6 +9577,10 @@ CREATE INDEX "template_copy_requests_target_idx" ON "admin"."template_copy_reque
 
 
 CREATE UNIQUE INDEX "template_price_one_batch" ON "admin"."template_price_batches" USING "btree" ((true)) WHERE ("reverted_at" IS NULL);
+
+
+
+CREATE INDEX "waffo_renewal_period_lookup" ON "admin"."waffo_renewal_periods" USING "btree" ("order_id", "period_number");
 
 
 
@@ -11093,6 +11175,11 @@ GRANT ALL ON FUNCTION "public"."admin_reply_ticket"("p_ticket_id" "uuid", "p_bod
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_resolve_waffo_renewal"("p_actor" "uuid", "p_ticket" "uuid", "p_decision" "text", "p_total_usd_cents" integer, "p_tax_usd_cents" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_resolve_waffo_renewal"("p_actor" "uuid", "p_ticket" "uuid", "p_decision" "text", "p_total_usd_cents" integer, "p_tax_usd_cents" integer) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_revenue_stats"("p_days" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_revenue_stats"("p_days" integer) TO "service_role";
 
@@ -11235,6 +11322,11 @@ GRANT ALL ON FUNCTION "public"."admin_upsert_template"("p_template" "jsonb", "p_
 
 REVOKE ALL ON FUNCTION "public"."admin_view_work"("p_job_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_view_work"("p_job_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_waffo_renewal_review"("p_ticket" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_waffo_renewal_review"("p_ticket" "uuid") TO "service_role";
 
 
 
