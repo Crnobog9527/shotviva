@@ -19,6 +19,8 @@ export {
   type ImageRef,
   type LandingParts,
   type PageBasics,
+  type PlanCard,
+  type PlanStrip,
   type RelatedLink,
   type SectionHeadings,
   type ShootDemo,

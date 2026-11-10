@@ -24,6 +24,7 @@ import {
 } from './offer'
 import { zhHomeWishlist } from './home-wishlist'
 import { zhSharedFacts } from './shared'
+import { zhHomePlans } from '../plan-strip'
 
 // /zh home (T21). Keyword 「AI改图」 from the Chinese keyword map; Title and H1 start with it,
 // written as one unbroken string (建站规格 §6.1 rule 7). The direct answer says plainly what
@@ -159,12 +160,13 @@ export const zhHomePage = defineHomePage({
       },
       {
         heading: '免费图公开带水印，付费图私密无水印',
-        text: `用免费积分生成的图会公开展示，并带一个小小的 ${brand} 水印。用付费积分生成的图私密、无水印，可以商用。之后再买套餐，不会改变已经生成的图。`,
+        text: `用免费积分生成的图会公开展示，并带一个小小的 ${brand} 水印，仅限个人非商业用途。用付费积分生成的图私密、无水印，可以商用。之后再买套餐，不会改变已经生成的图。`,
       },
     ],
     plans: plansText(),
     sample: { src: '/home/example-skincare-after.webp', alt: '', width: 900, height: 1125 },
   },
+  ...(zhHomePlans ? { plans: zhHomePlans } : {}),
   costBills: productBills(
     `${SET_PHOTOS} 张商品图要花多少钱：请摄影师和用 ${brand} 对比`,
     `一个商品，${SET_PHOTOS} 张造型图，精修好、可以直接发。同样的活，两张账单。`,

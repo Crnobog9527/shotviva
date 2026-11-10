@@ -131,6 +131,12 @@ export type BillLine = { label: string; value: string }
 export type Bill = { title: string; total: BillTotal; lines: readonly [BillLine, BillLine, ...BillLine[]]; fine: string }
 export type CostBills = { heading: string; intro: string; photographer: Bill; site: Bill }
 
+// Home: the three monthly plans as one quiet strip under the two bills (SEO launch handbook
+// G10). Tier, monthly price, credits a month and photos generating at a time; never a photo
+// count (Owner, #417). Each plan and the line under the strip go to /pricing.
+export type PlanCard = { name: string; price: string; per: string; credits: string; concurrency: string }
+export type PlanStrip = { label: string; href: `/${string}`; cards: readonly [PlanCard, PlanCard, PlanCard]; more: string }
+
 // Home: "Can't find your template? Make a wish" (Owner 2026-11-10), right under the template
 // grid and only while the wishlist is open. Three pains it answers, eight example wish cards
 // (one shipped; the note says they are examples, never a badge on the picture) and one CTA
@@ -162,6 +168,7 @@ export type HomePage = Omit<PageBasics, 'related'> & {
   subtitle: string
   shoot: ShootDemo
   costBills: CostBills
+  plans?: PlanStrip
   steps: { heading: string; items: readonly [HeadedText, HeadedText, HeadedText] }
   templateGrid: {
     heading: string

@@ -24,6 +24,7 @@ import {
 } from './offer'
 import { homeWishlist } from './home-wishlist'
 import { sharedFacts } from './shared'
+import { homePlans } from './plan-strip'
 
 // Final home copy (T11). TDK, H1, subtitle, direct answer and the six H2s are fixed by
 // 建站规格 §4 and G1; the nine FAQ questions and how their answers are written by G6 (T35):
@@ -158,12 +159,13 @@ export const homePage = defineHomePage({
       },
       {
         heading: 'Free Photos Are Public and Watermarked, Paid Photos Are Private',
-        text: `A photo made with free credits is public and carries a small "Made with ${brand}" watermark. A photo made with paid credits is private, has no watermark and is yours to use commercially. Buying a plan later does not change photos you already made.`,
+        text: `A photo made with free credits is public and carries a small "Made with ${brand}" watermark; free photos are for personal, non-commercial use. A photo made with paid credits is private, has no watermark and is yours to use commercially. Buying a plan later does not change photos you already made.`,
       },
     ],
     plans: plansText(),
     sample: { src: '/home/example-skincare-after.webp', alt: '', width: 900, height: 1125 },
   },
+  ...(homePlans ? { plans: homePlans } : {}),
   costBills: productBills(
     `What ${SET_PHOTOS} Product Photos Cost: Photographer vs ${brand}`,
     `One product, ${SET_PHOTOS} styled photos, retouched and ready to post. The same job, two bills.`,
