@@ -2,7 +2,7 @@ import 'server-only'
 
 import type { z } from 'zod'
 
-import { AppError, type ErrorCode } from '@/core/errors'
+import { AppError, TierRequiredError, type ErrorCode } from '@/core/errors'
 
 // The slice of a Supabase client these wrappers use. Structural on purpose: callers pass
 // their service-role client (T1 owns its construction) and tests can pass a PostgREST
@@ -50,6 +50,8 @@ const SQL_ERROR_CODES: Record<string, ErrorCode> = {
 }
 
 export function toRpcError(fn: string, error: { message: string; code?: string }): AppError {
+  if (error.message === 'BATCH_MAX_REQUIRED') return new TierRequiredError('max', 'Multiple templates require Max')
+  if (error.code === '23505' && error.message.includes('generation_jobs_batch_slot')) return new AppError('CONFLICT', 'Batch cell already started')
   const code = SQL_ERROR_CODES[error.message]
   if (code === 'TEMPLATE_UNAVAILABLE') return new AppError(code, 'This template is temporarily unavailable. Please try again later.')
   if (code === 'TEMPLATE_QUOTE_CHANGED') return new AppError(code, 'Refresh the template price before generating.')

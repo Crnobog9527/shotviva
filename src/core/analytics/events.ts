@@ -85,6 +85,7 @@ export const eventSchemas = {
     // Photo edits only (ARCHITECTURE §5.2, T30): the range judged, or 'fallback'.
     edit_scope: z.enum(EDIT_SCOPES).nullable(),
     // Photos in the workspace batch this one belonged to; 1 for a single photo (T28).
+    batch_templates: z.int().min(1).max(5).default(1),
     batch_size: z.number().int().min(1).max(MAX_BATCH_SIZE),
     // The template's toggles as chosen (T89), key → on; {} for a template without any.
     toggles: z.record(toggleKey, z.boolean()).optional(),

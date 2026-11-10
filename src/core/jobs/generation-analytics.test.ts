@@ -82,6 +82,7 @@ describe('generateEventProps', () => {
       model: 'gpt-image-2.6',
       edit_scope: null,
       batch_size: 1,
+      batch_templates: 1,
       toggles: {},
     })
   })
