@@ -1,3 +1,17 @@
+-- 0909 stored only this JSON object on reserved invitations; 0904 stripped source on
+-- user applications. Stop for review if any row needing repair has an unfamiliar shape.
+do $$
+begin
+  if exists (
+    select 1 from public.affiliates
+    where status='pending' and approved_at is not null and application->>'source'='admin_invite'
+      and application <> '{"source":"admin_invite"}'::jsonb
+  ) then
+    raise exception 'AFFILIATE_UNEXPECTED_PENDING_INVITE_APPLICATION';
+  end if;
+end;
+$$;
+
 -- An unconfirmed Auth invitation reserves the slug. Approval starts at activation.
 create or replace function public.admin_affiliate_create(p_actor uuid,p_input jsonb) returns void
 language plpgsql security definer set search_path='' as $$
@@ -26,4 +40,4 @@ $$;
 
 -- Preserve every other approval stamp, including already activated invitations.
 update public.affiliates set approved_at=null
-  where status='pending' and application->>'source'='admin_invite';
+  where status='pending' and application='{"source":"admin_invite"}';

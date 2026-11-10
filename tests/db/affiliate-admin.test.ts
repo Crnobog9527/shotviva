@@ -110,13 +110,22 @@ it('repairs only pending admin invites when upgrading historical approval dates'
   const active = await promoter(db)
   const ordinary = await promoter(db)
   await db.query(`update affiliates set approved_at='2025-01-01', status=case when user_id=$2 then 'active' else 'pending' end,
-    application=case when user_id=$3 then '{}'::jsonb else '{"source":"admin_invite","name":"Test"}'::jsonb end
+    application=case when user_id=$3 then '{}'::jsonb else '{"source":"admin_invite"}'::jsonb end
     where user_id=any($1::uuid[])`, [[pending.id, active.id, ordinary.id], active.id, ordinary.id])
   const sql = await readFile(new URL('../../supabase/migrations/1043_affiliate_invite_approval.sql', import.meta.url), 'utf8')
   await db.query(sql)
   const repaired = await db.query('select user_id from affiliates where user_id=any($1::uuid[]) and approved_at is null',
     [[pending.id, active.id, ordinary.id]])
   expect(repaired.rows).toEqual([{ user_id: pending.id }])
+})
+
+it('stops an approval-date repair if a pending admin invite has unexpected application data', async () => {
+  const invite = await promoter(db)
+  await db.query(`update affiliates set status='pending',approved_at='2025-01-01',
+    application='{"source":"admin_invite","name":"Unexpected"}' where user_id=$1`, [invite.id])
+  const sql = await readFile(new URL('../../supabase/migrations/1043_affiliate_invite_approval.sql', import.meta.url), 'utf8')
+  await rejects(() => db.query(sql), 'AFFILIATE_UNEXPECTED_PENDING_INVITE_APPLICATION')
+  expect((await row(db, 'select approved_at is not null unchanged from affiliates where user_id=$1', [invite.id])).unchanged).toBe(true)
 })
 
 it('dates an immediately active admin enrollment at creation', async () => {
