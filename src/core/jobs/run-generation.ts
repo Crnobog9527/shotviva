@@ -56,8 +56,8 @@ function requestAspects(req: GenerationRequest, template: Template) {
 // ownership, tier limits (batch size, rate limit), then the user's words (ARCHITECTURE §5.1a:
 // no face swap) alongside the stored upload itself (HEAD + bytes; bad ones are deleted).
 async function prepare(deps: GenerationDeps, req: GenerationRequest) {
-  const tier = await currentTier(deps.db, req.userId)
-  assertBatchAllowed(tier, req.batchSize, req.batchTemplates)
+  const membership = await currentTier(deps.db, req.userId)
+  assertBatchAllowed(membership, req.batchSize, req.batchTemplates)
   assertBatchProof(req)
   const { template, prompt } = await loadGenerationTemplate(deps.db, req.templateId, SURFACE[req.source])
   const tier = req.resolution ?? DEFAULT_RESOLUTION
@@ -74,7 +74,7 @@ async function prepare(deps: GenerationDeps, req: GenerationRequest) {
   })
   // Never touch (or delete) an object outside the caller's own inputs/ prefix.
   if (req.inputKey && !isOwnInputKey(req.userId, req.inputKey)) throw new AppError('INVALID_INPUT', 'Unknown upload')
-  await assertWithinRateLimit(deps.db, req.userId, deps.now?.() ?? new Date(), limitsFor(tier), {
+  await assertWithinRateLimit(deps.db, req.userId, deps.now?.() ?? new Date(), limitsFor(membership), {
     jobId: req.jobId,
     idempotencyKey: req.idempotencyKey,
   })

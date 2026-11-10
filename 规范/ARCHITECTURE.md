@@ -548,7 +548,9 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 
 **多模板批次（T107）**：Max 可选 1～5 个模板，按保留的照片 × 模板格数检查档位上限。服务端整批预检当前模板、统一尺寸和清晰度、各格字段和开关以及付费余额。预检不扣积分，给每格签发绑定用户、批次、位置、照片、模板、选项和价格的凭据。每格提交仍按当前资格与价格独立预扣；期间余额变化时只拒绝付费池不足的格。旧版单模板批量同样只允许付费池。
 
-`generation_jobs.batch_id uuid` 为空表示旧任务或普通单张；预检批次的 `inputs.batch_position` 从 1 起，`batch_photo_name`、`batch_template_name` 为打包时的名称，`batch_size` 和 `batch_templates` 为实际格数和不同模板数。按本人、批次和位置查未失败任务，使用普通部分索引。`reserve_batch_cell`（仅 service_role）复用 `reserve_credits` 的账号行锁，在同一事务内复核付费池、报价、Max 权限和格子占用，再写入批次 ID。重复提交同一格回滚；失败可用新任务 ID 重试。ZIP 依序读取本人本批成功且未删除的付费原图，写入私有桶临时 inputs 前缀，按上传生命周期清理，只返回短时签名地址。
+`generation_jobs.batch_id uuid` 为空表示旧任务或普通单张；预检批次的 `inputs.batch_position` 从 1 起，`batch_photo_name`、`batch_template_name` 为打包时的名称，`batch_size` 和 `batch_templates` 为实际格数和不同模板数。按本人、批次和位置查未失败任务，使用普通部分索引。`reserve_batch_cell`（仅 service_role）复用 `reserve_credits` 的账号行锁，在同一事务内复核付费池、报价、Max 权限和格子占用，再写入批次 ID。重复提交同一格回滚；失败可用新任务 ID 重试。Pro 和 Max 均可打包下载；Pro 单模板最多 10 张，Max 单模板或多模板共 30 张，只有多模板生成是 Max 专属。ZIP 依序读取本人本批成功且未删除的付费原图，写入私有桶临时 inputs 前缀，按上传生命周期清理，只返回短时签名地址。
+
+`admin.batch_zip_requests` 按用户主键保存最近一分钟的请求时间和正在打包的批次（含领取令牌和到期时间），账号删除时级联清除，仅服务端可操作。`claim_batch_zip` 核验 Pro/Max 后按用户行锁限流，滚动一分钟最多三次；同一批次正在打包返回 202，第 4 次返回 429。缓存命中同样计数。`release_batch_zip` 仅凭原令牌释放；进程异常退出后六分钟可接手。
 
 **新功能抢先用**（Owner 2026-11-06，T29）：
 - 代码里有一张功能注册表 `FEATURES`（`core/features/registry.ts`，每项一个 key 和中文名）。新功能要受档位限制时，先在注册表加 key，再在服务端入口调 `requireFeature(userId, key)`，界面用 `featureOpen(tier, key)` 决定显示还是上锁。
@@ -1304,7 +1306,7 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 |---|---|---|
 | `signup` | 服务端：邮箱验证完成 / 首次 Google 登录时（和注册赠送同一处） | `method`（`email` / `google`） |
 | `upload` | 浏览器：直传 R2 成功后 | `size_bucket`（`<1MB` / `1-5MB` / `>5MB`）、`compressed`（是否走了浏览器压缩） |
-| `generate` | 服务端：任务结算后（成功或失败都发） | `template_id`、`category`、`resolution`、`credits_cost`、`credit_pool`、`status`、`error_code`、`source`（`web` / `graylum`）、`duration_ms`、`model`（实际调用的模型名，不含密钥和地址）、`batch_size`（单张为 1，T28 起）、`edit_scope`（作品编辑时的范围或 `fallback`，模板出图为空，T30 起）、`toggles`（模板开关的选择 `{ key: true/false }`，模板没有开关时为 `{}`，T89 起） |
+| `generate` | 服务端：任务结算后（成功或失败都发） | `template_id`、`category`、`resolution`、`credits_cost`、`credit_pool`、`status`、`error_code`、`source`（`web` / `graylum`）、`duration_ms`、`model`（实际调用的模型名，不含密钥和地址）、`batch_size`（保留的总格数，单张为 1）、`batch_templates`（不同模板数，单模板及伙伴请求为 1）、`edit_scope`（作品编辑时的范围或 `fallback`，模板出图为空，T30 起）、`toggles`（模板开关的选择 `{ key: true/false }`，模板没有开关时为 `{}`，T89 起） |
 | `paywall_view` | 浏览器：付费墙打开 | `trigger`（`insufficient_credits` / `pricing_page` / `account` / `graylum` / `tier_required`） |
 | `checkout_start` | 服务端：创建 Checkout Session 时 | `product_id`、`tier`、`interval`、`form`、`channel`、`method` |
 | `purchase` | 服务端：支付回调入账成功后 | 第 6.2 节 `purchase` 参数 |

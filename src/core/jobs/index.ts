@@ -47,3 +47,4 @@ export { findJobIdsByRef, jobRefOrShort, jobRefsFor, jobRefsOrShort } from './jo
 export { JOB_REF_LENGTH, JOB_REF_MIN, jobRef, jobRefRange, normalizeJobRef } from './ref'
 export { preflightBatch, preflightSchema } from './batch/preflight'
 export { batchArchive } from './batch/archive'
+export { downloadBatchZip } from './batch/download'

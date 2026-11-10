@@ -44,6 +44,15 @@ describe('T107 preflight and independent jobs', () => {
     await expect(runGeneration(deps, req)).rejects.toMatchObject({ code: 'TIER_REQUIRED', requiredTier: 'max' })
   })
 
+  it('rejects an unsold resolution for any selected template during preflight', async () => {
+    const { db, userId, cells } = await setup('max_monthly')
+    const id = await seedTemplate(sql)
+    await sql.query("select admin.set_template_unpriced_resolutions($1,'{3k}')", [id])
+    const chosen = cells.map((cell, i) => ({ ...cell, template_id: i ? id : cell.template_id,
+      inputs: { ...cell.inputs, resolution: '3k' as const } }))
+    await expect(preflightBatch(db, userId, chosen)).rejects.toMatchObject({ code: 'TEMPLATE_UNAVAILABLE' })
+  })
+
   it('preflights all paid credits and never falls through to free after an intervening spend', async () => {
     const { db, deps, userId, cells } = await setup('max_monthly')
     const batch = await preflightBatch(db, userId, cells)

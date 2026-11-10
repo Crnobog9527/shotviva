@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { currentTier, MAX_BATCH_SIZE, readBalance } from '../../billing'
 import { AppError } from '../../errors'
 import { isOwnInputKey } from '../../storage'
-import { allowedWebAspects, assertTemplateQuote, loadGenerationTemplate, validateGenerationInputs, type Template } from '../../templates'
+import { allowedWebAspects, assertPricedTier, assertTemplateQuote, loadGenerationTemplate, validateGenerationInputs, type Template } from '../../templates'
 import { generateBodySchema, toGenerationRequest } from '../generation-request'
 import { assertBatchAllowed } from './limits'
 import { signCell } from './proof'
@@ -31,6 +31,7 @@ function checkGrid(userId: string, cells: Selected[]) {
 function quote(userId: string, selected: Selected, template: Template, position: number,
   batch: { batch_id: string; batch_size: number; batch_templates: number }) {
   const resolution = selected.inputs.resolution ?? '1k'
+  assertPricedTier(template.unpricedResolutions, resolution)
   const expected_credits = template.creditsCost[resolution]
   assertTemplateQuote(selected.expected_credits, expected_credits)
   const req = toGenerationRequest(userId, { ...selected, ...batch, expected_credits })

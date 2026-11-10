@@ -4,6 +4,7 @@ import { Readable } from 'node:stream'
 import { GetObjectCommand, type S3Client } from '@aws-sdk/client-s3'
 import { Upload } from '@aws-sdk/lib-storage'
 import { ZipFile } from 'yazl'
+import { logger } from '../logger'
 
 export type Archive = { key: string; name: string; files: { key: string; name: string }[] }
 
@@ -31,10 +32,19 @@ export async function writeBatchZip(client: S3Client, bucket: string, archive: A
         }).catch(error => output.destroy(error))
     })
   }
+  const start = performance.now()
+  const startRss = process.memoryUsage.rss()
+  let peakRss = startRss
+  const sample = () => { peakRss = Math.max(peakRss, process.memoryUsage.rss()) }
+  const timer = setInterval(sample, 250).unref()
   zip.end()
   try {
     await upload.done()
+    sample()
+    logger.info('batch.zip.built', { files: archive.files.length, elapsed_ms: Math.round(performance.now() - start),
+      start_rss_bytes: startRss, sampled_peak_rss_bytes: peakRss })
   } finally {
+    clearInterval(timer)
     abort.abort()
     output.destroy()
   }
