@@ -40,5 +40,5 @@ export function batchInputs(req: GenerationRequest) {
   const cell = req.batchCell
   if (!cell) return (req.batchSize ?? 1) > 1 ? { batch_size: req.batchSize } : {}
   return { batch_id: req.batchId, batch_position: cell.position, batch_photo_name: cell.photo_name,
-    batch_expected_credits: req.expectedCredits, batch_template_name: cell.template_name, batch_size: req.batchSize, batch_templates: req.batchTemplates }
+    batch_template_name: cell.template_name, batch_size: req.batchSize, batch_templates: req.batchTemplates }
 }

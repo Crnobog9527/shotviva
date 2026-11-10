@@ -548,7 +548,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 
 **多模板批次（T107）**：Max 可选 1～5 个模板，按保留的照片 × 模板格数检查档位上限。服务端整批预检当前模板、统一尺寸和清晰度、各格字段和开关以及付费余额。预检不扣积分，给每格签发绑定用户、批次、位置、照片、模板、选项和价格的凭据。每格提交仍按当前资格与价格独立预扣；期间余额变化时只拒绝付费池不足的格。旧版单模板批量同样只允许付费池。
 
-`generation_jobs.batch_id uuid` 为空表示旧任务或普通单张；预检批次的 `inputs.batch_position` 从 1 起，`batch_photo_name`、`batch_template_name` 为打包时的名称，`batch_size` 和 `batch_templates` 为实际格数和不同模板数。按本人、批次和位置查未失败任务，唯一索引避免重复提交同一格，失败可用新任务 ID 重试。插入检查在预扣事务内执行。ZIP 依序读取本人本批成功且未删除的付费原图，写入私有桶临时 inputs 前缀，按上传生命周期清理，只返回短时签名地址。
+`generation_jobs.batch_id uuid` 为空表示旧任务或普通单张；预检批次的 `inputs.batch_position` 从 1 起，`batch_photo_name`、`batch_template_name` 为打包时的名称，`batch_size` 和 `batch_templates` 为实际格数和不同模板数。按本人、批次和位置查未失败任务，使用普通部分索引。`reserve_batch_cell`（仅 service_role）复用 `reserve_credits` 的账号行锁，在同一事务内复核付费池、报价、Max 权限和格子占用，再写入批次 ID。重复提交同一格回滚；失败可用新任务 ID 重试。ZIP 依序读取本人本批成功且未删除的付费原图，写入私有桶临时 inputs 前缀，按上传生命周期清理，只返回短时签名地址。
 
 **新功能抢先用**（Owner 2026-11-06，T29）：
 - 代码里有一张功能注册表 `FEATURES`（`core/features/registry.ts`，每项一个 key 和中文名）。新功能要受档位限制时，先在注册表加 key，再在服务端入口调 `requireFeature(userId, key)`，界面用 `featureOpen(tier, key)` 决定显示还是上锁。

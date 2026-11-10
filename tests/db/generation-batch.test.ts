@@ -67,7 +67,11 @@ describe('T107 preflight and independent jobs', () => {
     const { db, deps, userId, cells } = await setup('max_monthly')
     const batch = await preflightBatch(db, userId, cells)
     const request = (i: number) => toGenerationRequest(userId, { ...cells[i], ...batch, ...batch.cells[i] })
-    const one = await runGeneration(deps, request(0))
+    const attempts = await Promise.allSettled([runGeneration(deps, request(0)), runGeneration(deps, request(0))])
+    const success = attempts.find(result => result.status === 'fulfilled')
+    expect(attempts.filter(result => result.status === 'rejected')).toMatchObject([{ reason: { code: 'CONFLICT' } }])
+    if (!success) throw new Error('One concurrent attempt should succeed')
+    const one = success.value
     await expect(runGeneration({ ...deps, provider: fakeProvider('fail').provider }, request(1))).rejects.toThrow()
     expect((await batchArchive(db, userId, batch.batch_id)).files).toHaveLength(1)
     const two = await runGeneration(deps, request(1))
