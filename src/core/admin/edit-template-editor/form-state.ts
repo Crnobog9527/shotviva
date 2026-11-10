@@ -1,10 +1,13 @@
-import { RESOLUTIONS, type Resolution } from '@/core/templates/output-options'
+import { editablePrices, storedPrices } from '../templates-editor/sale-tier-fields'
+import type { CreditsCost } from '@/core/templates/pricing'
+import { type Resolution } from '@/core/templates/output-options'
 import { EDIT_SCOPES, type EditScope } from '@/core/templates/edit-params'
 
 import type { EditTemplateSettings, SaveEditTemplateInput } from '../edit-template/schema'
 
 export type EditTemplateForm = {
   isActive: boolean
+  storedCredits: CreditsCost
   credits: Record<Resolution, string>
   wrapper: string
   inputFidelity: '' | 'high' | 'low'
@@ -25,7 +28,8 @@ export function formFor(settings: EditTemplateSettings): EditTemplateForm {
   const fidelity = settings.params.input_fidelity
   return {
     isActive: settings.isActive,
-    credits: Object.fromEntries(RESOLUTIONS.map((r) => [r, String(settings.creditsCost[r])])) as Record<Resolution, string>,
+    storedCredits: settings.creditsCost,
+    credits: editablePrices(settings.creditsCost, settings.unpricedResolutions),
     wrapper: settings.wrapper,
     inputFidelity: fidelity === 'high' || fidelity === 'low' ? fidelity : '',
     classifier: text(settings.params.classifier),
@@ -38,7 +42,7 @@ export function formFor(settings: EditTemplateSettings): EditTemplateForm {
 export function toSaveInput(form: EditTemplateForm): SaveEditTemplateInput {
   return {
     isActive: form.isActive,
-    creditsCost: Object.fromEntries(RESOLUTIONS.map((r) => [r, Number(form.credits[r])])) as Record<Resolution, number>,
+    ...storedPrices(form.credits, form.storedCredits),
     wrapper: form.wrapper,
     params: {
       ...(form.inputFidelity ? { input_fidelity: form.inputFidelity } : {}),

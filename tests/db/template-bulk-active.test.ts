@@ -6,7 +6,7 @@ import { listTemplatesIn } from '@/core/templates'
 
 import { CREDITS_FLOOR } from '@/modules/image/credits-floor'
 
-import { connectAdmin } from './helpers'
+import { connectAdmin, approveFixtures } from './helpers'
 import { serviceSupabase as serviceClient } from './supabase-env'
 
 // T60: bulk 上架 / 下架 in /admin/templates, against the real tables.
@@ -43,6 +43,7 @@ describe('bulk publish / unpublish', () => {
     pg = await connectAdmin()
     for (const id of [A, B]) await saveTemplate(client, ADMIN_ID, { isNew: true, template: template(id), prompt }, CREDITS_FLOOR)
     await saveTemplate(client, ADMIN_ID, { isNew: true, template: template(NO_COVER, false), prompt }, CREDITS_FLOOR)
+    await approveFixtures(pg,A,B,NO_COVER)
   })
 
   afterAll(async () => {

@@ -159,6 +159,8 @@ describe('test runs into language covers', () => {
     expect(Object.keys((await localesOf(withCommon)).cover_locales.zh ?? {})).toEqual(['after'])
   })
 
+  // Both cases share the singleton edit template with other files. Finish waiting for
+  // their lock before the next case starts on this same database session.
   it('translates an approved cover through the edit template’s prompt, as a test run, then sets it as ja', async () => {
     const restore = await publishEditTemplate(db)
     try {
@@ -206,7 +208,7 @@ describe('test runs into language covers', () => {
     } finally {
       await restore()
     }
-  })
+  }, 120_000)
 })
 
 describe('publishing with only a language’s covers (0825)', () => {

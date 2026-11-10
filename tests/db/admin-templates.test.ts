@@ -5,7 +5,7 @@ import { listAdminTemplates, saveTemplate, setTemplateActive, setTemplateOrder }
 
 import { CREDITS_FLOOR } from '@/modules/image/credits-floor'
 
-import { connectAdmin, createUser } from './helpers'
+import { connectAdmin, createUser, approveFixtures } from './helpers'
 import { serviceSupabase as serviceClient } from './supabase-env'
 
 
@@ -44,6 +44,7 @@ describe('admin template commands', () => {
   it('creates templates unpublished, at the end of the list, with prompt v1', async () => {
     await saveTemplate(client, ADMIN_ID, { isNew: true, template: { ...template(A), isActive: true }, prompt: prompt('one') }, CREDITS_FLOOR)
     await saveTemplate(client, ADMIN_ID, { isNew: true, template: template(B), prompt: prompt('one') }, CREDITS_FLOOR)
+    await approveFixtures(pg,A,B)
     const rows = await listAdminTemplates(client)
     const a = rows.find((row) => row.id === A)
     expect(a).toMatchObject({ isActive: false, prompt: { body: 'one', version: 1 } })

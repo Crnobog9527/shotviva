@@ -1,3 +1,4 @@
+import { publishFixture } from './helpers'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -105,12 +106,13 @@ describe('the cap', () => {
     const templates = (
       await db.query<{ id: string }>(
         `insert into public.templates (id, name, category, fields, quality, credits_cost, is_active, visible_in)
-         select 't83-cap-' || substr(md5(random()::text), 1, 12), 'T83 cap', t.category, t.fields, t.quality, t.credits_cost, true, array['web']
+         select 't83-cap-' || substr(md5(random()::text), 1, 12), 'T83 cap', t.category, t.fields, t.quality, t.credits_cost, false, array['web']
            from public.templates t, generate_series(1, $1) where t.id = $2
          returning id`,
         [FAVORITES_MAX + 1, await createPricedTemplate(db)],
       )
     ).rows.map((row) => row.id)
+    await publishFixture(db, ...templates)
     await db.query(
       `insert into public.template_favorites (user_id, template_id) select $1, unnest($2::text[])`,
       [bob.id, templates.slice(0, FAVORITES_MAX)],

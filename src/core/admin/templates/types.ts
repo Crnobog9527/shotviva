@@ -6,6 +6,7 @@ import type { BulkEditOutcome, BulkEditPatch } from './bulk-edit-rules'
 import type { ActiveChangeOutcome } from './publish-rules'
 
 export type AdminTemplate = Template & {
+  saleEnabled?: boolean
   // null only if a template was created outside the admin flow without a prompt.
   prompt: { styleRefs: StyleRef[]; providerId: string | null; body: string; version: number; modelParams: Record<string, unknown> } | null
 }
@@ -41,6 +42,7 @@ export type CoverLanguage = { code: string | null; label: string; upcoming: bool
 export type CopyReceipt = { id: string; previousStandard: number | null }
 export type PromptSnapshot = NonNullable<AdminTemplate['prompt']> & { providerModel: string | null }
 export type TemplateAdminActions = {
+  setSale: (input: { id: string; enabled: boolean }) => Promise<ActionResult>
   versions: (input: { id: string; before?: number }) => Promise<ActionValue<number[]>>
   snapshot: (input: { id: string; version: number }) => Promise<ActionValue<PromptSnapshot>>
   duplicate: (input: { source: string; requestId: string }) => Promise<ActionValue<CopyReceipt>>

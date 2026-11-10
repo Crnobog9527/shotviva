@@ -4,6 +4,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { AppError } from '../errors'
 import { logger } from '../logger'
+import type { Resolution } from './output-options'
+import { assertPricedTier } from './pricing'
 import { EDIT_TEMPLATE_ID } from './edit-params'
 import { templateFieldsSchema, type TemplateSurface } from './schema'
 import { isStyleRefKey, styleRefsSchema, type StyleRef } from './style-refs'
@@ -17,9 +19,12 @@ export type GenerationTemplate = {
 }
 
 type Row = (TemplateRow | PreT75TemplateRow) & {
+  template_sale_approvals: { unpriced_resolutions: Resolution[] } | null
   partner_image_aspects?: string[]
   template_prompts: { style_refs: unknown; body: string; version: number; provider_id: string | null; model_params: Record<string, unknown> } | null
 }
+
+function unpricedTiers(row: Row): Resolution[] { return row.template_sale_approvals?.unpriced_resolutions ?? [] }
 
 function privateRefs(id: string, raw: unknown): StyleRef[] {
   const refs = styleRefsSchema.safeParse(raw)
@@ -34,7 +39,7 @@ function privateRefs(id: string, raw: unknown): StyleRef[] {
 // means a built-in template such as `edit`, which is on no surface (ARCHITECTURE §5.2).
 // `drafts`: an admin test run (ARCHITECTURE §10.b, T85) also takes unpublished templates.
 async function generationRow(client: SupabaseClient, id: string, surface: TemplateSurface | null, drafts: boolean) {
-  const extra = ', template_prompts(body, version, model_params, provider_id, style_refs)'
+  const extra = ', template_sale_approvals(unpriced_resolutions), template_prompts(body, version, model_params, provider_id, style_refs)'
   if (surface === 'web' && !drafts) {
     const row = await client.rpc('web_templates', { p_template_id: id }).select(TEMPLATE_COLUMNS + extra).maybeSingle<Row>()
     if (row.error?.code !== 'PGRST202') return row
@@ -56,13 +61,15 @@ async function loadTemplate(client: SupabaseClient, id: string, surface: Templat
     logger.error('template is published but cannot generate', { templateId: id, hasPrompt: !!data.template_prompts })
     throw new AppError('NOT_FOUND', 'Template not found')
   }
+  const unpricedResolutions = unpricedTiers(data)
   if (surface === 'partner' && data.partner_image_aspects) {
+    assertPricedTier(unpricedResolutions, '1k')
     if (!data.partner_image_aspects.length) throw new AppError('MODEL_INPUT_UNSUPPORTED', 'No supported partner output')
     fields.data.aspectRatios = data.partner_image_aspects
   }
   const prompt = data.template_prompts
   return {
-    template: { ...toTemplate(data), fields: fields.data },
+    template: { ...toTemplate(data), unpricedResolutions, fields: fields.data },
     prompt: { body: prompt.body, styleRefs: privateRefs(id, prompt.style_refs), version: prompt.version, providerId: prompt.provider_id, modelParams: prompt.model_params },
   }
 }

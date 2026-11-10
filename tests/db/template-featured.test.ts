@@ -6,7 +6,7 @@ import { listTemplatesIn } from '@/core/templates'
 
 import { CREDITS_FLOOR } from '@/modules/image/credits-floor'
 
-import { connectAdmin, createUser } from './helpers'
+import { connectAdmin, createUser, approveFixtures } from './helpers'
 import { serviceSupabase as serviceClient } from './supabase-env'
 
 // T53 (ARCHITECTURE §12 home item 3): the home featured list, chosen and ordered in admin.
@@ -44,6 +44,7 @@ describe('home featured templates', () => {
   beforeAll(async () => {
     pg = await connectAdmin()
     for (const id of [...ids, HIDDEN]) await saveTemplate(client, ADMIN_ID, { isNew: true, template: template(id), prompt }, CREDITS_FLOOR)
+    await approveFixtures(pg,...ids)
     for (const id of ids) await setTemplateActive(client, ADMIN_ID, { id, active: true }, CREDITS_FLOOR)
   })
 
@@ -113,6 +114,7 @@ describe('reordering the featured list', () => {
     await pg.query("update public.profiles set role = 'admin' where id = $1", [admin])
     for (const id of order) {
       await saveTemplate(client, ADMIN_ID, { isNew: true, template: template(id), prompt }, CREDITS_FLOOR)
+      await approveFixtures(pg,id)
       await setTemplateActive(client, ADMIN_ID, { id, active: true }, CREDITS_FLOOR)
     }
     await setFeaturedTemplates(client, ADMIN_ID, [...order])

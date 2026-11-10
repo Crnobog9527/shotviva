@@ -43,6 +43,7 @@ export {
 } from './output-options'
 export {
   TEMPLATE_QUALITIES,
+  assertPricedTier,
   assertTemplateQuote,
   creditsBelowFloor,
   creditsCostSchema,

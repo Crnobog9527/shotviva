@@ -1,3 +1,4 @@
+import { publishFixture } from './helpers'
 import { randomUUID } from 'node:crypto'
 
 import type { Client } from 'pg'
@@ -10,7 +11,7 @@ const id = 't97-' + randomUUID()
 const provider = randomUUID()
 const costs = { '1k': 2, '2k': 4, '3k': 6 }
 const template = { id, name: 'T97 fixture', category: 'pets', quality: 'medium', credits_cost: costs,
-  fields: { images: { min: 0, max: 1 } }, visible_in: ['web', 'partner'], is_active: true }
+  fields: { images: { min: 0, max: 1 } }, visible_in: ['web', 'partner'], is_active: false }
 const prompt = { body: 'fixture', provider_id: provider }
 const ref = () => ({ key: `style-refs/${id}/${randomUUID()}.webp`, width: 900, height: 1536,
   uploadedAt: new Date().toISOString() })
@@ -88,6 +89,7 @@ describe('private style references on a template', () => {
 
   it('keeps the public catalogue, computed columns and both client roles away from private metadata', async () => {
     expect(await save(refs)).toBeNull()
+    await publishFixture(db, id)
     const anon = anonSupabase()
     const row = await anon.from('templates').select('*,template_image_options,partner_image_aspects').eq('id',id).single()
     expect(row.error).toBeNull()

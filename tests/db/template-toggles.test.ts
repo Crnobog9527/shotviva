@@ -1,3 +1,4 @@
+import { publishFixture } from './helpers'
 import { randomUUID } from 'node:crypto'
 
 import type { Client } from 'pg'
@@ -35,7 +36,7 @@ async function seedToggledTemplate(): Promise<string> {
   }
   await db.query(
     `insert into public.templates (id, name, category, fields, quality, credits_cost, is_active, visible_in)
-     values ($1, 'T89 test', 'pets', $2, 'medium', '{"1k": 1, "2k": 2, "3k": 3}', true, '{web,partner}')`,
+     values ($1, 'T89 test', 'pets', $2, 'medium', '{"1k": 1, "2k": 2, "3k": 3}', false, '{web,partner}')`,
     [id, JSON.stringify(fields)],
   )
   await db.query('insert into public.template_prompts (template_id, body, model_params) values ($1, $2, $3)', [
@@ -43,6 +44,7 @@ async function seedToggledTemplate(): Promise<string> {
     'WRAPPED dish. {{replate}}',
     JSON.stringify({ input_fidelity: 'high', toggles: { replate: { on: 'FAKE-ON', off: 'FAKE-OFF' } } }),
   ])
+  await publishFixture(db, id)
   return id
 }
 

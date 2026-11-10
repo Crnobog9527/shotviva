@@ -14,6 +14,7 @@ let user: string
 async function sample(id: string) {
   await db.query(`insert into public.templates(id,name,category,fields,is_active,visible_in)
     values ($1,$1,'pets','{"images":{"min":1,"max":1},"aspectRatios":["1:1"],"copy":[]}',true,'{web,partner}')`,[id])
+  await db.query('insert into public.template_sale_approvals values($1,true)',[id])
   await db.query('insert into public.template_prompts(template_id,body) values ($1,$1)',[id])
 }
 
@@ -113,13 +114,61 @@ describe('activated template prices', () => {
       values($1,'Alternate','alternate-model','openai_images','{1k,2k,3k}','{"1k":1.00}')`,[other])
     await activate()
     const request = () => reserve('promo-poster',45,'1k','web',null,randomUUID(),other+'/alternate-model')
-    await refuses(request,'TEMPLATE_QUOTE_CHANGED')
+    await refuses(request,'TEMPLATE_UNAVAILABLE')
     await db.query(`update public.ai_providers set adapter='openrouter_images',
       capabilities=capabilities || '{"catalogImageCosts":{"1k":0.02}}' where id=$1`,[other])
     // An operator's explicit (higher) estimate still wins over the catalog.
-    await refuses(request,'TEMPLATE_QUOTE_CHANGED')
+    await refuses(request,'TEMPLATE_UNAVAILABLE')
     await db.query(`update public.ai_providers set estimated_image_costs='{}' where id=$1`,[other])
     expect((await request()).rows[0].credits_cost).toBe(45)
+  })
+
+  it('uses the actual default route for partner orders even if the web binding lacks the requested priced tier', async () => {
+    await activate()
+    const id='partner-priced', other=randomUUID()
+    await sample(id)
+    await db.query('update public.templates set credits_cost=$2 where id=$1',[id,{'1k':200,'2k':300,'3k':400}])
+    await db.query(`insert into public.ai_providers(id,label,model,adapter,resolutions,capabilities) values
+      ($1,'Limited web model','web-only','openrouter_images','{2k}',
+      '{"resolutions":["2k"],"catalogImageCosts":{"2k":0.02}}')`,[other])
+    await db.query('update public.template_prompts set provider_id=$2 where template_id=$1',[id,other])
+    await db.query('select admin.assert_template_sale_floor(t) from public.templates t where id=$1',[id])
+    expect((await db.query('select public.template_image_options(t) opt, public.partner_image_aspects(t) ratios from public.templates t where id=$1',[id])).rows[0])
+      .toMatchObject({opt:{resolutions:['2k']},ratios:['1:1']})
+    await refuses(() => reserve(id,200,'1k','web',null,randomUUID(),other+'/web-only'),'TEMPLATE_UNAVAILABLE')
+    expect((await reserve(id,200,'1k','graylum')).rows[0].credits_cost).toBe(200)
+    expect((await reserve(id,400,'3k','graylum')).rows[0].credits_cost).toBe(400)
+    // Reconfiguring Router tiers invalidates its last confirmed capabilities.
+    await db.query("update public.ai_providers set resolutions='{1k,2k,3k}' where id=$1",[other])
+    await refuses(() => db.query('select admin.assert_template_sale_floor(t) from public.templates t where id=$1',[id]),'TEMPLATE_PRICE_BELOW_FLOOR')
+  })
+
+  it('keeps unpriced tiers closed across model expansion and default changes and checks actual costs atomically', async () => {
+    await activate()
+    const id='protected-tiers', other=randomUUID()
+    await db.query("update public.ai_providers set resolutions='{1k,2k}' where id=$1",[provider])
+    await db.query(`insert into public.templates(id,name,category,credits_cost,visible_in)
+      values($1,$1,'pets','{"1k":200,"2k":300,"3k":1}','{web,partner}')`,[id])
+    await db.query('select public.admin_set_template_sale($1,$2,true)',[user,id])
+    await db.query('update public.templates set is_active=true where id=$1',[id])
+    await db.query("update public.ai_providers set resolutions='{1k,2k,3k}' where id=$1",[provider])
+    const snapshot = async () => (await db.query(`select credits,free_credits,
+      (select count(*) from public.generation_jobs where user_id=$1) jobs,
+      (select count(*) from public.credit_ledger where user_id=$1) entries from public.profiles where id=$1`,[user])).rows[0]
+    const before=await snapshot()
+    await refuses(() => reserve(id,1,'3k'),'TEMPLATE_UNAVAILABLE')
+    await db.query('update public.ai_providers set is_active=false where id=$1',[provider])
+    await db.query(`insert into public.ai_providers(id,label,model,adapter,is_active,resolutions,estimated_image_costs)
+      values($1,'Replacement','new-default','openai_images',true,'{1k,2k,3k}','{"1k":1.0}')`,[other])
+    const request = (fee:number,tier:string) => reserve(id,fee,tier,'graylum',null,randomUUID(),other+'/new-default')
+    await refuses(() => request(1,'3k'),'TEMPLATE_UNAVAILABLE')
+    await refuses(() => request(200,'1k'),'TEMPLATE_UNAVAILABLE')
+    expect(await snapshot()).toEqual(before)
+    expect((await db.query('select public.template_image_options(t) opt from public.templates t where id=$1',[id])).rows[0].opt.resolutions).toEqual(['1k','2k'])
+    await refuses(() => db.query("select admin.set_template_unpriced_resolutions($1,'{}')",[id]),'TEMPLATE_PRICE_BELOW_FLOOR')
+    await db.query('update public.templates set credits_cost=$2 where id=$1',[id,{'1k':900,'2k':300,'3k':400}])
+    await db.query("select admin.set_template_unpriced_resolutions($1,'{}')",[id])
+    expect((await request(400,'3k')).rows[0].credits_cost).toBe(400)
   })
 
   it('counts private references toward the model minimum on new and legacy saves while enforcing v2 prices', async () => {
@@ -157,7 +206,7 @@ describe('activated template prices', () => {
     await refuses(activate,'TEMPLATE_MODEL_NOT_READY')
     await db.query("update public.ai_providers set resolutions='{1k,2k,3k}' where id=$1",[provider])
     await activate()
-    await refuses(() => db.query("update public.templates set is_active=true where id='bright-listing'"),'TEMPLATE_RETIRED')
+    expect((await db.query("select is_active from public.templates where id='bright-listing'")).rows[0].is_active).toBe(false)
     await db.query("update public.templates set credits_cost=jsonb_set(credits_cost,'{1k}','77') where id='promo-poster'")
     await refuses(() => db.query('select admin.rollback_template_price_catalog_v2()'),'TEMPLATE_CATALOG_CHANGED')
     await db.query("update public.templates set credits_cost=jsonb_set(credits_cost,'{1k}','45') where id='promo-poster'")
@@ -176,59 +225,62 @@ describe('activated template prices', () => {
     await refuses(() => write('promo-poster','pets',119,'2k'),'MODEL_CREDIT_FLOOR')
     await refuses(() => db.query("select public.admin_bulk_edit_templates('{promo-poster}',$1,$2,$3,'{en,zh}')",
       [{credits_cost:{'3k':189}},floors,user]),'MODEL_CREDIT_FLOOR')
-    await refuses(() => write('draft-art','art-styles',19),'MODEL_CREDIT_FLOOR')
+    await write('draft-art','art-styles',19)
+    await db.query('set constraints style_sale_binding immediate')
     await refuses(() => db.query('select public.admin_upsert_template($1,null)', [{id:'unapproved-live-art',
       category:'Art Styles', name:'Test', quality:'medium', is_active:true, credits_cost:{...costs,'1k':20},
       price_floors:floors}]),'TEMPLATE_RETIRED')
     await write('draft-art','art-styles',20)
-    await refuses(() => write('draft-art','art-styles',21),'MODEL_CREDIT_FLOOR')
+    await write('draft-art','art-styles',21)
     await refuses(() => db.query("update public.templates set is_active=true where id='draft-art'"),'TEMPLATE_RETIRED')
   })
 
-  it('only sells a style with an approved binding and all three approved tiers', async () => {
-    const id = 'qa-future-style'
-    const fees = {'1k':26,'2k':55,'3k':85} // Hypothetical reviewed v2 catalogue, scoped to this transaction.
-    const view = (await db.query("select pg_get_viewdef('admin.template_tariffs_v2'::regclass) as body")).rows[0].body
-    await db.query(`create or replace view admin.template_tariffs_v2 as ${view.trim().replace(/;$/,'')}
-      union all select 'qa-future-style','medium','{"1k":26,"2k":55,"3k":85}'::jsonb,true
-      where current_setting('test.approved_synthetic',true)='yes'`)
-    await sample(id)
-    await db.query("update public.templates set category_key='art-styles' where id=$1",[id])
+  it('keeps the explicit sale decision when a populated subcategory moves across roots', async () => {
     await activate()
-    expect((await db.query('select is_active from public.templates where id=$1',[id])).rows[0].is_active).toBe(false)
-    await refuses(() => db.query('update public.templates set is_active=true where id=$1',[id]),'TEMPLATE_RETIRED')
-    // The later signed route activates the tariff for this previously retired draft, not its category.
-    await db.query("set local test.approved_synthetic='yes'")
-    await db.query(`update admin.template_price_snapshots s set provider_id=p.id,provider_endpoint_hash=md5(p.base_url)
-      from public.ai_providers p, admin.template_price_batches b
-      where b.id=s.batch_id and b.reverted_at is null and s.template_id=$1 and p.id=$2`,[id,provider])
-    await db.query("update public.templates set quality='medium',credits_cost=$2 where id=$1",[id,fees])
-    expect((await db.query("select admin.template_catalog_minimums()->$1::text as tariff",[id])).rows[0].tariff)
-      .toMatchObject({ quality:'medium', costs:fees, style_sale_approved:true })
-    // Recategorizing an approved ordinary poster is not a style-purpose receipt.
-    await refuses(async () => {
-      await db.query("update public.templates set category_key='art-styles' where id='promo-poster'")
-      await db.query('set constraints style_sale_binding immediate')
-    },'TEMPLATE_RETIRED')
-    // Moving a populated branch must run the same sale check and roll the branch back.
     await db.query("insert into public.template_categories(key,parent_id,name_en,name_zh) values('t102-sale','pets','Sale move','销售移动')")
     await db.query("update public.templates set subcategory_key='t102-sale' where id='promo-poster'")
-    await refuses(async () => {
-      await db.query("update public.template_categories set parent_id='art-styles' where key='t102-sale'")
-      await db.query('set constraints style_sale_binding immediate')
-    },'TEMPLATE_RETIRED')
-    expect((await db.query("select parent_id from public.template_categories where key='t102-sale'")).rows[0].parent_id).toBe('pets')
-    const publish = () => db.query('update public.templates set is_active=true where id=$1',[id])
-    await publish()
+    await db.query("update public.template_categories set parent_id='art-styles' where key='t102-sale'")
     await db.query('set constraints style_sale_binding immediate')
-    expect((await reserve(id,fees['1k'],'1k')).rows[0].credits_cost).toBe(fees['1k'])
-    await refuses(() => db.query("update public.templates set quality='high' where id=$1",[id]),'TEMPLATE_RETIRED')
-    await db.query("update public.templates set category_key='pets' where id=$1",[id])
-    const other = randomUUID()
-    await db.query(`insert into public.ai_providers(id,label,model,adapter,estimated_image_costs)
-      values($1,'Cheaper','unapproved','openai_images','{"1k":0.001}')`,[other])
-    await refuses(() => db.query('update public.template_prompts set provider_id=$2 where template_id=$1',[id,other]),'TEMPLATE_RETIRED')
-    await refuses(() => reserve(id,fees['1k'],'1k','web',null,randomUUID(),other+'/unapproved'),'TEMPLATE_RETIRED')
+    const read = () => db.query(`select t.category_key,t.subcategory_key,t.is_active,s.enabled from public.templates t
+      join public.template_sale_approvals s on s.template_id=t.id where t.id='promo-poster'`)
+    expect((await read()).rows[0]).toEqual({ category_key:'art-styles', subcategory_key:'t102-sale', is_active:true, enabled:true })
+    await db.query("update public.templates set is_active=false where id='promo-poster'")
+    await db.query("select public.admin_set_template_sale($1,'promo-poster',false)", [user])
+    await db.query("update public.template_categories set parent_id='pets' where key='t102-sale'")
+    await refuses(() => db.query("update public.templates set is_active=true where id='promo-poster'"),'TEMPLATE_RETIRED')
+    expect((await read()).rows[0]).toEqual({ category_key:'pets', subcategory_key:'t102-sale', is_active:false, enabled:false })
+  })
+
+  it('requires explicit sale approval, adequate costs and admin privileges in every category', async () => {
+    await activate()
+    await db.query('set constraints style_sale_binding immediate')
+    const id = 'qa-sale'
+    await db.query("insert into public.templates(id,name,category_key) values($1,$1,'art-styles')",[id])
+    // A legacy model receipt alone is not a catalogue tariff or a below-cost exception.
+    await db.query(`insert into admin.template_price_snapshots
+      select batch_id,$1,previous,applied,provider_id,provider_endpoint_hash from admin.template_price_snapshots
+      where template_id='promo-poster' and provider_id=$2`, [id, provider])
+    expect((await db.query('select count(*)::int as n from admin.template_price_snapshots where template_id=$1 and provider_id=$2', [id,provider])).rows[0].n).toBe(1)
+    expect((await db.query('select admin.template_catalog_minimums() ? $1 as minimum, admin.template_approved_prices($2) ? $1 as exempt',
+      [id, provider])).rows[0]).toEqual({minimum:false, exempt:false})
+    const publish = () => db.query('update public.templates set is_active=true where id=$1',[id])
+    const enable = (actor: string, enabled: boolean) => db.query('select public.admin_set_template_sale($1,$2,$3)',[actor,id,enabled])
+    await refuses(publish,'TEMPLATE_RETIRED')
+    await refuses(() => enable(randomUUID(),true),'FORBIDDEN')
+    await refuses(() => enable(user,true),'TEMPLATE_PRICE_BELOW_FLOOR')
+    await db.query("update public.templates set credits_cost=$2 where id=$1",[id,{'1k':200,'2k':300,'3k':400}])
+    await enable(user,true)
+    await enable(user,true)
+    await publish()
+    await refuses(() => enable(user,false),'UNPUBLISH_FIRST')
+    await db.query('update public.templates set is_active=false where id=$1',[id])
+    await enable(user,false)
+    await refuses(publish,'TEMPLATE_RETIRED')
+    expect((await db.query('select enabled from admin.template_sale_events where template_id=$1 order by id',[id])).rows)
+      .toEqual([{enabled:true},{enabled:false}])
+    for (const role of ['anon','authenticated']) {
+      expect((await db.query("select has_function_privilege($1,'public.admin_set_template_sale(uuid,text,boolean)','execute') ok",[role])).rows[0].ok).toBe(false)
+    }
   })
 
   it('admits only the approved exact fee in the matching quality and model for bulk saves and upserts', async () => {

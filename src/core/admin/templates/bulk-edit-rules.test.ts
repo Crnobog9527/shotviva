@@ -75,15 +75,12 @@ describe('batch edit floor check (T79)', () => {
   })
 })
 
-it('rejects publishing changes to a live style with the wrong purpose, quality or partner route', () => {
-  const style = template('style', { category: 'art-styles', prompt: { providerId: 'pinned' } })
-  const tariff = { quality: 'high' as const, costs: style.creditsCost, style_sale_approved: true }
-  const floor = { ...FLOOR, version: 'v2' as const, activeProvider: 'other',
-    tariffs: { style: tariff }, approvals: { pinned: { style: tariff } } }
-  const reason = [{ id: style.id, name: style.name, reason: 'style_unapproved' }]
-  expect(bulkEditFailures([style], { visibleIn: ['web'] }, floor)).toEqual([])
-  expect(bulkEditFailures([style], { visibleIn: ['partner'] }, floor)).toEqual(reason)
-  expect(bulkEditFailures([style], { quality: 'medium' }, floor)).toEqual(reason)
-  const unapproved = { ...floor, tariffs: { style: { ...tariff, style_sale_approved: false } } }
-  expect(bulkEditFailures([{ ...style, category: 'pets' }], { categoryKey: 'art-styles' }, unapproved)).toEqual(reason)
+it('checks an art draft against its selected route when an admin changes Standard or HD', () => {
+  const draft = template('style', { category: 'art-styles', isActive: false, prompt: { providerId: 'seed' } })
+  const tiers = { '1k': 13, '2k': 17, '3k': 1 }
+  const floor = { ...FLOOR, version: 'v2' as const, providers: { seed: { high: tiers, medium: tiers } } }
+  expect(bulkEditFailures([draft], { creditsCost: { '1k': 21, '2k': 17 } }, floor)).toEqual([])
+  expect(bulkEditFailures([draft], { creditsCost: { '1k': 21, '2k': 16 } }, floor)).toMatchObject([
+    { id: 'style', reason: 'below_floor', resolution: '2k', floor: 17 },
+  ])
 })

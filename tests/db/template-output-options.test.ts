@@ -31,20 +31,20 @@ afterAll(async () => {
 })
 
 describe('template output options on the Data API', () => {
-  it('projects only web choices and preserves the partner subset', async () => {
+  it('uses the bound provider for web and the actual default provider for partners', async () => {
     const { data, error } = await anonSupabase().from('templates').select('template_image_options,partner_image_aspects').eq('id',templateId).single()
     expect(error).toBeNull()
     expect(data).toEqual({
       template_image_options: { resolutions: ['1k'], aspectRatios: ['1:1'], originalRatio: false },
-      partner_image_aspects: ['1:1'],
+      partner_image_aspects: ['4:5','1:1'],
     })
   })
 
-  it('refuses a direct partner generation when the intersection is empty', async () => {
+  it('allows a partner ratio supported by the default although the web model lacks it', async () => {
     const old = await db.query('select fields from public.templates where id=$1', [templateId])
     try {
       await db.query(`update public.templates set fields=jsonb_set(fields,'{aspectRatios}','["16:9"]') where id=$1`,[templateId])
-      await expect(loadGenerationTemplate(serviceSupabase(),templateId,'partner')).rejects.toMatchObject({ code: 'MODEL_INPUT_UNSUPPORTED' })
+      expect((await loadGenerationTemplate(serviceSupabase(),templateId,'partner')).template.fields.aspectRatios).toEqual(['16:9'])
     } finally {
       await db.query('update public.templates set fields=$2 where id=$1',[templateId, old.rows[0].fields])
     }

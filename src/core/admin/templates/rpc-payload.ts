@@ -16,6 +16,7 @@ export function toUpsertArgs(template: TemplateInput, prompt: PromptInput, optio
     p_template: {
       id: template.id,
       ...pricing(options.floors),
+      unpriced_resolutions: template.unpricedResolutions,
       module: template.module,
       name: template.name,
       ...(options.categoryByName ? { category: template.category } : { category_key: template.category }),

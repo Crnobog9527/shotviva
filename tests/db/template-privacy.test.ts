@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { listTemplates } from '@/core/templates'
 
-import { connectAdmin } from './helpers'
+import { connectAdmin, publishFixture } from './helpers'
 import { anonSupabase as anonClient, serviceSupabase as serviceClient } from './supabase-env'
 
 
@@ -16,7 +16,7 @@ const FAKE_BODY = 'FAKE PROMPT BODY FOR TESTS'
 
 const fields = { images: { min: 1, max: 1 }, copy: [], aspectRatios: ['1:1'] }
 
-async function seed(id: string, isActive: boolean) {
+async function seed(id: string) {
   const { error } = await serviceClient().rpc('admin_upsert_template', {
     p_template: {
       id,
@@ -26,7 +26,7 @@ async function seed(id: string, isActive: boolean) {
       quality: 'medium',
       credits_cost: { '1k': 1, '2k': 2, '3k': 3 },
       visible_in: ['web'],
-      is_active: isActive,
+      is_active: false,
     },
     p_prompt: { body: FAKE_BODY, model_params: {} },
   })
@@ -38,8 +38,9 @@ describe('template privacy', () => {
 
   beforeAll(async () => {
     pg = await connectAdmin()
-    await seed(WEB_LIVE, true)
-    await seed(WEB_DRAFT, false)
+    await seed(WEB_LIVE)
+    await publishFixture(pg,WEB_LIVE)
+    await seed(WEB_DRAFT)
   })
 
   afterAll(async () => {

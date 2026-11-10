@@ -36,7 +36,7 @@ export function BasicsFields({ form, floor, quality, version, onChange }: Props)
           {RESOLUTIONS.map((r) => (
             <div key={r} className="grid gap-1">
               <Label htmlFor={`edit-credits-${r}`}>{TIER_LABEL[r]}</Label>
-              <Input id={`edit-credits-${r}`} inputMode="numeric" disabled={unsupportedTier(floor, r)} value={unsupportedTier(floor, r) ? '' : form.credits[r]}
+              <Input id={`edit-credits-${r}`} inputMode="numeric" placeholder="未定价，此档不售" disabled={unsupportedTier(floor, r)} value={unsupportedTier(floor, r) ? '' : form.credits[r]}
                 onChange={(event) => onChange({ credits: { ...form.credits, [r]: event.target.value } })} />
               <p className={Number(form.credits[r]) < creditMinimum(floor, quality, r) && Number(form.credits[r]) !== approvedCredit(floor, quality, r) ? 'text-xs text-destructive' : 'text-muted-foreground text-xs'}>{tierGuidance(floor, quality, r)}</p>
             </div>

@@ -1,8 +1,9 @@
-import { draftCredits } from './tier-price'
 import type { StyleRef } from '@/core/templates/style-refs'
 import { MISSING_COST, floorGuidance } from '@/core/templates/provider-pricing'
+import { unsupportedTier } from './tier-price'
+import { editablePrices, storedPrices } from './sale-tier-fields'
 import { RESOLUTIONS, type Resolution } from '@/core/templates/output-options'
-import { approvedCredit, creditMinimum, type CreditsFloor, type TemplateQuality } from '@/core/templates/pricing'
+import { approvedCredit, creditMinimum, type CreditsCost, type CreditsFloor, type TemplateQuality } from '@/core/templates/pricing'
 import { toggleFragments, toggleSetupProblems } from '@/core/templates/toggles'
 
 import type { AdminTemplate, SaveTemplatePayload } from '../templates/types'
@@ -21,6 +22,7 @@ export type TemplateFormValues = {
   category: string
   quality: TemplateQuality
   // One text box per resolution; parsed on save.
+  storedCredits?: CreditsCost
   credits: Record<Resolution, string>
   visibleWeb: boolean
   visiblePartner: boolean
@@ -125,11 +127,9 @@ export function toFormValues(template: AdminTemplate): TemplateFormValues {
     description: template.description ?? '',
     category: template.category,
     quality: template.quality,
-    credits: {
-      '1k': String(template.creditsCost['1k']),
-      '2k': String(template.creditsCost['2k']),
-      '3k': String(template.creditsCost['3k']),
-    },
+    storedCredits: template.creditsCost,
+    credits: editablePrices(template.creditsCost, template.unpricedResolutions),
+
     visibleWeb: template.visibleIn.includes('web'),
     visiblePartner: template.visibleIn.includes('partner'),
     fieldsJson: pretty(withoutToggles(template.fields)),
@@ -160,7 +160,8 @@ export const TIER_LABEL: Record<Resolution, string> = { '1k': 'Standard', '2k': 
 export function creditProblems(values: TemplateFormValues, floor: CreditsFloor): Partial<Record<Resolution, string>> {
   const problems: Partial<Record<Resolution, string>> = {}
   for (const resolution of RESOLUTIONS) {
-    const text = draftCredits(floor, values.quality, resolution, values.credits[resolution]).trim()
+    const text = values.credits[resolution].trim()
+    if (!text || unsupportedTier(floor, resolution)) continue
     const value = Number(text)
     const min = creditMinimum(floor, values.quality, resolution)
     if (!/^\d+$/.test(text)) problems[resolution] = '请填正整数'
@@ -232,11 +233,7 @@ export function buildPayload(values: TemplateFormValues, isNew: boolean, floor: 
         description: values.description,
         category: values.category,
         quality: values.quality,
-        creditsCost: {
-          '1k': Number(draftCredits(floor, values.quality, '1k', values.credits['1k'])),
-          '2k': Number(draftCredits(floor, values.quality, '2k', values.credits['2k'])),
-          '3k': Number(draftCredits(floor, values.quality, '3k', values.credits['3k'])),
-        },
+        ...storedPrices(values.credits, values.storedCredits, floor.resolutions, isNew),
         visibleIn,
         fields: wired.fields,
         translations: toTranslations(values.zh, copyKeys(values.fieldsJson).map((field) => field.key), values.toggles),

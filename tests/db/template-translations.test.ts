@@ -6,7 +6,7 @@ import { toUpsertArgs } from '@/core/admin/templates/rpc-payload'
 import { listTemplatesIn, templateInputSchema } from '@/core/templates'
 import { CREDITS_FLOOR } from '@/modules/image/credits-floor'
 
-import { connectAdmin } from './helpers'
+import { connectAdmin, publishFixture } from './helpers'
 import { anonSupabase, serviceSupabase } from './supabase-env'
 
 // templates.translations (T21, ARCHITECTURE §5): the admin save writes it, the prompt import
@@ -41,7 +41,7 @@ describe('templates.translations', () => {
   beforeAll(async () => {
     pg = await connectAdmin()
     await saveTemplate(service, ADMIN_ID, { isNew: true, template: { ...template, translations: zh }, prompt }, CREDITS_FLOOR)
-    await pg.query('update public.templates set is_active = true where id = $1', [ID])
+    await publishFixture(pg, ID)
     // Module imports plus a GoTrue-free save: still slower than the default hook budget on a busy machine.
   }, 120_000)
 
