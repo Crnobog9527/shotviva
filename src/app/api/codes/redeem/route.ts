@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     if (!body.success || !code) {
       // Invalid payloads share the account budget without attempting any redemption.
       const { data, error } = await admin.rpc('redeem_limited_code', {
-        p_user: user.id, p_code: null, p_context: 'account', p_invitee_credits: invite.inviteeCredits,
+        p_user: user.id, p_code: null, p_context: 'account', p_invitee_credits: null,
         p_invite_window_days: invite.windowDays, p_replace: false,
       })
       if (error) throw new Error('Could not record code redemption attempt')

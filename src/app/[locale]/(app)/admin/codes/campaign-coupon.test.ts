@@ -8,7 +8,7 @@ import { saveCampaignWithCoupon } from '@/core/codes/server'
 const actor = '6cc81ef7-0be7-4ad0-9106-133c4c006109'
 const codeId = '5fd46df6-d35a-4f9c-9584-0c95d84fcb61'
 const offer = { code: 'test20', discount_duration: 'once', discount_percent: 20, discount_products: ['starter_monthly'] }
-const giftPolicy = { maxCreditsPerCode: site.growth.invite.inviteeCredits, requirePaidGiftCap: true }
+const giftPolicy = { maxCreditsPerCode: 17, requirePaidGiftCap: true }
 function fixture(existing = false, products: readonly CatalogInput[] = site.billing.products, policy = giftPolicy) {
   const rpc = vi.fn().mockResolvedValue({ data: codeId, error: null })
   const select = { eq: () => ({ maybeSingle: async () => ({ data: existing ? { id: codeId } : null, error: null }) }) }
@@ -52,7 +52,7 @@ describe('provisioning a campaign coupon before saving the code', () => {
   it('keeps existing terms or gift-only codes independent of Stripe and rejects caller-supplied coupons', async () => {
     const { save, coupons } = fixture(true)
     await save({ ...offer, note: 'metadata edit' })
-    await save({ code: 'gift', invitee_credits: site.growth.invite.inviteeCredits })
+    await save({ code: 'gift', invitee_credits: giftPolicy.maxCreditsPerCode })
     await expect(save({ ...offer, stripe_coupon_id: 'untrusted' })).rejects.toThrow('INVALID_CODE_FIELDS')
     expect(coupons.create).not.toHaveBeenCalled()
   })

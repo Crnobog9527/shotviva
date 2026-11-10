@@ -12,7 +12,7 @@ import { logger } from '@/core/logger'
 import { site } from '@/site/site.config'
 
 import { orderCompleted, signWaffo, subscriptionPaid, WAFFO_STORE, waffoKeys } from '../fakes/waffo'
-import { benefits, invite, pack } from '../t94-config'
+import { benefits, invite, pack, seededRewards } from '../t94-config'
 import { connectAdmin, createUser, ledgerOf } from './helpers'
 import { checkoutSession, eventFor, invoiceObject, signed, stripeHarness, subscriptionObject } from './stripe-fixtures'
 import { serviceSupabase } from './supabase-env'
@@ -27,7 +27,7 @@ async function customer() {
   await db.query("select public.grant_credits($1,$3,'signup',$2,'free')", [buyer, 'signup:' + buyer, benefits.freeCredits])
   const { rows: [offer] } = await db.query('select public.get_or_create_invite_code($1) as code', [inviter])
   const { rows: [result] } = await db.query("select public.redeem_code($1,$2,'signup',$3,$4) as claim",
-    [buyer, offer.code, invite.inviteeCredits, invite.windowDays])
+    [buyer, offer.code, null, invite.windowDays])
   expect(result.claim.status).toBe('ok')
   return { buyer, inviter }
 }
@@ -37,7 +37,7 @@ async function campaign(buyer: string, productId: ProductId = pack.id, duration:
   const { rows: [code] } = await db.query<{ id: string; code: string }>(
     "insert into public.codes(code,kind,discount_percent,discount_products,discount_duration,discount_months,stripe_coupon_id) values($1,'campaign',20,$2,$3,$4,$5) returning id,code",
     [text, [productId], duration, duration === 'repeating' ? 2 : null, randomUUID()])
-  const { rows: [result] } = await db.query("select public.redeem_code($1,$2,'account',$3,$4) as claim", [buyer, text, invite.inviteeCredits, invite.windowDays])
+  const { rows: [result] } = await db.query("select public.redeem_code($1,$2,'account',$3,$4) as claim", [buyer, text, null, invite.windowDays])
   expect(result.claim.status).toBe('ok')
   return code
 }
@@ -75,10 +75,10 @@ it('repairs Stripe effects through admin replay, preserves a second paid session
       code_id: offer.id, amount_discount: 300, amount_total: 1200, code_discount_conflict: conflict,
     })))
     expect(warn).toHaveBeenCalledWith('billing.code_discount_conflict', { payment_id: Number(rows[1].id), code_id: offer.id })
-    expect(trackReward.mock.calls).toEqual([[inviter, { credits: invite.inviterCredits, product_id: pack.id }, 'en']])
+    expect(trackReward.mock.calls).toEqual([[inviter, { credits: seededRewards.inviterCredits, product_id: pack.id }, 'en']])
     const { rows: [redemption] } = await db.query('select discount_used_payment_id from code_redemptions where code_id=$1 and user_id=$2', [offer.id, buyer])
     expect(redemption.discount_used_payment_id).toBe(rows[0].id)
-    expect(await ledgerOf(db, inviter)).toMatchObject([{ kind: 'invite_reward', pool: 'paid', delta: invite.inviterCredits }])
+    expect(await ledgerOf(db, inviter)).toMatchObject([{ kind: 'invite_reward', pool: 'paid', delta: seededRewards.inviterCredits }])
     expect(h.trackBuy).toHaveBeenCalledTimes(2)
     expect((await ledgerOf(db, buyer)).filter(row => row.kind === 'purchase')).toHaveLength(2)
   } finally { warn.mockRestore() }
@@ -106,7 +106,7 @@ it.each(['one_time', 'subscription'] as const)('applies only the referral on Waf
     expect((await deliver(renewal)).status).toBe(200)
     expect(applyCodes).toHaveBeenCalledTimes(2)
   }
-  expect(trackReward.mock.calls).toEqual([[inviter, { credits: invite.inviterCredits, product_id: user.productId }, 'en']])
+  expect(trackReward.mock.calls).toEqual([[inviter, { credits: seededRewards.inviterCredits, product_id: user.productId }, 'en']])
   const { rows } = await db.query('select code_id,amount_discount,amount_total,amount_tax from payments where user_id=$1 order by id', [buyer])
   const price = site.billing.products.find(product => product.id === user.productId)!.priceUsd
   expect(rows).toEqual(Array.from({ length: form === 'subscription' ? 2 : 1 }, () => ({
@@ -165,5 +165,5 @@ it.each([
   }
   expect(h.trackBuy).toHaveBeenCalledTimes(discounted.length)
   expect(h.deps.applyCodes).toHaveBeenCalledTimes(1)
-  expect(trackReward).toHaveBeenCalledExactlyOnceWith(inviter, { credits: invite.inviterCredits, product_id: product.id }, 'en')
+  expect(trackReward).toHaveBeenCalledExactlyOnceWith(inviter, { credits: seededRewards.inviterCredits, product_id: product.id }, 'en')
 })

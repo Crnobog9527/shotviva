@@ -20,7 +20,7 @@ export function testSite(overrides: Partial<SiteConfig> = {}): SiteConfig {
       },
       modules: { image: true, video: false },
       locales: { default: 'en', enabled: ['en', 'zh'], zhPaths: ['/', '/pricing', '/generate'] },
-      growth: { invite: { inviteeCredits: 2, inviterCredits: 4, windowDays: 3, inviterRewardCap: 8 } },
+      growth: { invite: { windowDays: 3, inviterRewardCap: 8 } },
       billing: {
         currency: 'usd',
         freeCredits: 3,

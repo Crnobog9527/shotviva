@@ -20,8 +20,6 @@ export function discountedPriceCents(priceCents: number, percent: number): numbe
 }
 
 export type InviteConfig = {
-  inviteeCredits: number
-  inviterCredits: number
   windowDays: number
   inviterRewardCap: number
 }

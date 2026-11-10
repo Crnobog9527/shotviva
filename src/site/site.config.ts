@@ -64,7 +64,7 @@ export const site = defineSite({
     // admin ahead of launch (ARCHITECTURE §8.3, T87). Never shown on the site until launched.
     upcoming: ['ja'],
   },
-  growth: { invite: { inviteeCredits: 6, inviterCredits: 10, windowDays: 7, inviterRewardCap: 20 } },
+  growth: { invite: { windowDays: 7, inviterRewardCap: 20 } },
   billing: {
     currency: 'usd',
     pricingVersion: pricingV2 ? 'v2' : undefined,

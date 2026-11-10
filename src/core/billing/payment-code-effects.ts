@@ -38,7 +38,8 @@ export function paymentCodeEffects(admin: SupabaseClient, invite: InviteConfig, 
     const { id } = z.object({ id: z.number().int().positive() }).parse(data)
     const result = await callRpc(admin, 'apply_payment_code_effects', {
       p_user: payment.userId, p_payment_id: id, p_code_id: payment.codeId, p_amount_discount: payment.amountDiscount,
-      p_inviter_credits: invite.inviterCredits, p_inviter_cap: invite.inviterRewardCap,
+      // The SQL compatibility argument is ignored. Reward amounts come from the database.
+      p_inviter_credits: null, p_inviter_cap: invite.inviterRewardCap,
     }, applied)
     if (result.applied && result.conflict) logger.warn('billing.code_discount_conflict', { payment_id: id, code_id: payment.codeId })
     if (!result.rewarded) return
