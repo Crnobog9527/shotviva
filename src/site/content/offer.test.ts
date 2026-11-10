@@ -6,6 +6,7 @@ import { site } from '../site.config'
 import { fillCredits } from './credits'
 import { homePage } from './home'
 import { perHundredCredits, plansSentence, quoteUsd, usdRange, yearlySaving } from './offer'
+import { imageToImageGenerator } from './pages/image-to-image-generator'
 import { pricingPage } from './pricing'
 import { zhHomePage } from './zh/home'
 
@@ -43,7 +44,11 @@ describe('copy with the catalog in site.config', () => {
     expect(bills.photographer.fine).toContain('$15–$90')
     expect(bills.photographer.fine).not.toMatch(/ASMP|association/i)
     expect(bills.site.total.amount).toBe('$19.90')
-    expect(bills.site.lines.map((line) => line.value)).toEqual(['$19.90', 'Your existing phone photo', 'A listing image, a lifestyle shot and a promo poster'])
+    // The plan strip under the bills shows Starter, so the home bill drops its plan line (G10);
+    // landing pages, which have no strip, keep it.
+    expect(bills.site.lines.map((line) => line.value)).toEqual(['Your existing phone photo', 'A listing image, a lifestyle shot and a promo poster'])
+    expect(zhHomePage.costBills.site.lines.map((line) => line.label)).toEqual(['拍摄准备', '可做成'])
+    expect(imageToImageGenerator.costBills.site.lines[0]?.value).toBe('$19.90')
     // One round figure, no range, no quality (Owner 2026-11-06).
     expect(bills.site.total.when).toBe(`about ${site.marketing.photoSecondsApprox} seconds a photo`)
     expect(zhHomePage.costBills.site.total.when).toBe(`每张 ${site.marketing.photoSecondsApprox} 秒左右`)

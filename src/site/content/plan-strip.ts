@@ -1,15 +1,16 @@
 import type { PlanCard, PlanStrip } from '@/core/content'
-import { MEMBERSHIP_TIERS, type MembershipTier } from '@/core/config'
+import type { MembershipTier, SiteProduct } from '@/core/config'
 import { TIER_LIMITS } from '@/core/billing/tier-limits'
 
-import { site } from '../site.config'
-import { usd } from './offer'
+import { PLAN_TIERS, product, usd } from './offer'
 
-// The home page's three monthly plans (SEO launch handbook G10). Prices and credits from
-// site.config, concurrency from the tier table the server enforces; never a photo count
-// (Owner, #417). Undefined while a monthly plan is missing, so the strip never shows a gap.
+// The home page's three monthly plans (SEO launch handbook G10). Plans, names and prices come
+// from offer.ts (PLAN_TIERS, product(), usd()), concurrency from the tier table the server
+// enforces; never a photo count (Owner, #417). Undefined while any monthly price is undecided
+// (product() skips a $0 price), so the strip never shows a gap or "$0".
 type Words = {
-  names: Record<MembershipTier, string>
+  // Tier names for this language; undefined: PLAN_TIERS' English names.
+  names?: Record<MembershipTier, string>
   label: string
   per: string
   more: string
@@ -17,29 +18,35 @@ type Words = {
   concurrency: (count: number) => string
 }
 
-const count = (n: number) => n.toLocaleString('en-US')
+type Plan = { name: string; monthly: SiteProduct & { tier: MembershipTier } }
 
-function card(tier: MembershipTier, words: Words): PlanCard | undefined {
-  const monthly = site.billing.products.find((product) => product.tier === tier && product.interval === 'month')
-  if (!monthly) return undefined
+function monthlyPlans(): Plan[] | undefined {
+  const plans = PLAN_TIERS.map((tier) => {
+    const monthly = product(tier.monthly)
+    return monthly && monthly.tier !== 'pack' ? { name: tier.name, monthly: { ...monthly, tier: monthly.tier } } : undefined
+  })
+  return plans.every((plan) => plan !== undefined) ? plans : undefined
+}
+
+function card({ name, monthly }: Plan, words: Words): PlanCard {
   return {
-    name: words.names[tier],
+    name: words.names?.[monthly.tier] ?? name,
     price: usd(monthly.priceUsd),
     per: words.per,
-    credits: words.credits(count(monthly.credits)),
-    concurrency: words.concurrency(TIER_LIMITS[tier].concurrency),
+    credits: words.credits(monthly.credits.toLocaleString('en-US')),
+    concurrency: words.concurrency(TIER_LIMITS[monthly.tier].concurrency),
   }
 }
 
 function planStrip(words: Words): PlanStrip | undefined {
-  const [starter, pro, max] = MEMBERSHIP_TIERS.map((tier) => card(tier, words))
+  const plans = monthlyPlans()
+  if (!plans) return undefined
+  const [starter, pro, max] = plans.map((plan) => card(plan, words))
   if (!starter || !pro || !max) return undefined
   return { label: words.label, href: '/pricing', cards: [starter, pro, max], more: words.more }
 }
 
-// Tier names as the paywall shows them (messages paywall.tiers).
 export const homePlans = planStrip({
-  names: { starter: 'Starter', pro: 'Pro', max: 'Max' },
   label: 'Monthly plans',
   per: '/mo',
   more: 'Compare all plans and credit packs',
@@ -47,6 +54,7 @@ export const homePlans = planStrip({
   concurrency: (n) => (n === 1 ? '1 photo generating at a time' : `${n} photos generating at a time`),
 })
 
+// Tier names as the Chinese paywall shows them (messages paywall.tiers).
 export const zhHomePlans = planStrip({
   names: { starter: '入门版', pro: '专业版', max: '旗舰版' },
   label: '月付套餐',

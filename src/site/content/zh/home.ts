@@ -67,8 +67,14 @@ export const shoot: ShootDemo = {
 
 // Same two bills as the English home, same figures from site.config, in dollars (§6.1 rule 8).
 // The landing pages reuse it with their own heading and intro; `moreFine` adds a source.
-export function productBills(heading: string, intro: string, moreFine = ''): CostBills {
+// `planLine: false` on the home page, whose plan strip under the bills already shows Starter
+// (SEO launch handbook S1/G10), so it is not listed twice.
+export function productBills(heading: string, intro: string, moreFine = '', { planLine = true } = {}): CostBills {
   const plan = planFrom ? usd(planFrom.priceUsd) : ''
+  const shared = [
+    { label: '拍摄准备', value: '用已有的手机照' },
+    { label: '可做成', value: '主图、场景图、促销海报' },
+  ] as const
   return {
     heading,
     intro,
@@ -84,11 +90,7 @@ export function productBills(heading: string, intro: string, moreFine = ''): Cos
     site: {
       title: brand,
       total: { amount: plan, suffix: '/月起', when: `每张 ${photoSeconds} 秒左右` },
-      lines: [
-        { label: `入门版，每月 ${planFrom?.credits ?? ''} 积分`, value: plan },
-        { label: '拍摄准备', value: '用已有的手机照' },
-        { label: '可做成', value: '主图、场景图、促销海报' },
-      ],
+      lines: planLine ? [{ label: `入门版，每月 ${planFrom?.credits ?? ''} 积分`, value: plan }, ...shared] : shared,
       fine: `造型和精修都在模板里，主体保持你拍的样子。先用 ${zhFreeImages}试试，不用绑卡。`,
     },
   }
@@ -170,6 +172,8 @@ export const zhHomePage = defineHomePage({
   costBills: productBills(
     `${SET_PHOTOS} 张商品图要花多少钱：请摄影师和用 ${brand} 对比`,
     `一个商品，${SET_PHOTOS} 张造型图，精修好、可以直接发。同样的活，两张账单。`,
+    '',
+    { planLine: false },
   ),
   faq: [
     // I, the brand question, comes first on /zh and opens by default (建站规格 G6 exception,
