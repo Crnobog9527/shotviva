@@ -48,6 +48,23 @@ const photo = (file: string, alt: string): ImageRef => ({ src: `/home/${file}.we
 const phoneShot = photo('hero-set-phone', 'Phone snapshot of a woven leather tote on a busy kitchen counter, window light (illustrative example)')
 const listingShot = photo('hero-set-listing', 'The same woven leather tote as a white-background listing photo, soft studio light (illustrative example)')
 
+// The hero's AI side: three scenes made from that one phone photo, taking turns (Owner
+// 2026-11-11). Captions stay short and say only what changed; the alt text says it is an AI example.
+const heroScenes = [
+  {
+    image: photo('hero-ai-street', 'AI example: the same woven leather tote on a woman’s shoulder on a sunny Paris street, café tables behind her'),
+    caption: 'Same bag, now on a Paris street',
+  },
+  {
+    image: photo('hero-ai-terrace', 'AI example: the same tote on a marble café table on a seaside terrace, a woman with a coffee beside it'),
+    caption: 'Same bag, on a seaside café table',
+  },
+  {
+    image: photo('hero-ai-villa', 'AI example: the same tote on a travertine bench in a sunlit villa arcade, leaf shadows on the wall'),
+    caption: 'Same bag, new light and setting',
+  },
+] as const
+
 // Also the /commercial-photography demo (T44).
 export const shoot: ShootDemo = {
   heading: { lead: 'One phone photo → ', emphasis: 'a full shoot' },
@@ -165,9 +182,10 @@ export const homePage = defineHomePage({
   answerBlock: `Image to image AI takes a photo you already have and gives it a new look while the subject stays as shot. With ${brand} you upload one phone photo, pick a template for food, products, rooms, pets or an art style, and download it in ${tierList}. No prompts. New users get ${freeImagesLabel}.`,
   hero: {
     before: phoneShot,
-    after: listingShot,
-    caption: 'Your phone photo → White Background template: same tote, only the light and background changed · Illustrative example',
+    after: heroScenes[0].image,
+    caption: heroScenes[0].caption,
     cta: { label: 'Upload photo', href: '/generate' },
+    scenes: { label: 'AI scenes of the same photo', items: heroScenes },
   },
   shoot,
   steps,

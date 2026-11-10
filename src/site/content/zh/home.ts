@@ -47,6 +47,13 @@ const photo = (file: string, alt: string): ImageRef => ({ src: `/home/${file}.we
 const phoneShot = photo('hero-set-phone', '手机随手拍：厨房台面上的一只编织皮托特包，窗边自然光（示意图）')
 const listingShot = photo('hero-set-listing', '同一只编织皮托特包的白底商品图，柔和影棚光（示意图）')
 
+// 首屏 AI 那一半：同一张手机照片做出的三个场景轮流展示（Owner 2026-11-11），和英文首页一致。
+const heroScenes = [
+  { image: photo('hero-ai-street', 'AI 示例：同一只编织皮托特包挎在女生肩上，阳光下的巴黎街头，身后是咖啡馆座位'), caption: '同一只包，换了街景和模特' },
+  { image: photo('hero-ai-terrace', 'AI 示例：同一只包放在海边露台的大理石咖啡桌上，旁边的女生端着咖啡'), caption: '同一只包，放上海边露台的咖啡桌' },
+  { image: photo('hero-ai-villa', 'AI 示例：同一只包放在阳光下别墅廊下的石凳上，墙上有树叶的影子'), caption: '同一只包，换了光线和场景' },
+] as const
+
 // Also the /zh/commercial-photography demo (T44).
 export const shoot: ShootDemo = {
   heading: { lead: '一张手机照片 → ', emphasis: '一整套图' },
@@ -138,9 +145,10 @@ export const zhHomePage = defineHomePage({
   answerBlock: `AI改图就是把你拍好的照片换一种光线、场景或画风，照片里的主体保持原样。上传一张手机照片，选一个餐饮、商品、美妆、房间、宠物或画风模板就能出图，不用写提示词。新用户送 ${zhFreeImages}。`,
   hero: {
     before: phoneShot,
-    after: listingShot,
-    caption: '同一只包，只换了光线和背景 · 示意图',
+    after: heroScenes[0].image,
+    caption: heroScenes[0].caption,
     cta: { label: '上传照片', href: '/generate' },
+    scenes: { label: '同一张照片做出的 AI 场景', items: heroScenes },
   },
   shoot,
   steps,

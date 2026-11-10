@@ -14,6 +14,7 @@ export {
   type FaqTableRow,
   type HeadedText,
   type HeroBlock,
+  type HeroScene,
   type HomeFaq,
   type HomePage,
   type ImageRef,
