@@ -11,7 +11,7 @@ import { currentLocale } from '@/core/i18n/server'
 import { listRunningJobIds } from '@/core/jobs'
 import { listTemplatesIn } from '@/core/templates'
 import { isWishlistEnabled } from '@/core/wishlist'
-import { WishCard } from '@/core/wishlist/ui'
+import { WishCard } from '@/core/wishlist/ui/wish-card'
 import { FavoritesProvider, GeneratingPill, TemplateCatalogue, toCatalogueTemplate } from '@/modules/image'
 import { site } from '@/site/site.config'
 
