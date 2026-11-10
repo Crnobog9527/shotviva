@@ -69,7 +69,7 @@ describe('prompt lab private sessions and paid calls', () => {
     const [lab, t85] = await Promise.all([matrix(v, randomUUID(), { p_estimate_usd: 0.5 }),
     api.rpc('admin_begin_test_run', {
       p_actor: f.actor, p_run_id: tid, p_template_id: 'freeform', p_kind: 'generate',
-      p_parent_id: null, p_photo_id: null, p_batch_id: randomUUID(), p_resolution: '1k', p_inputs: {}, p_prompt_version: 1,
+      p_parent_id: null, p_photo_id: f.photo, p_batch_id: randomUUID(), p_resolution: '1k', p_inputs: {}, p_prompt_version: 1,
       p_provider: f.model, p_estimate_usd: 0.5
     })])
     expect([lab.error?.message ?? 'ok', t85.error?.message ?? 'ok'].sort()).toEqual(['TEST_BUDGET_EXCEEDED', 'ok'])
