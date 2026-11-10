@@ -179,3 +179,8 @@ export const styleRefCopy = {
   missingCap: '尚无可靠的参考图张数范围，暂不能保存带参考图的配置。',
   needId: '先填写有效的模板 ID，再上传参考图。', idLocked: '移除已上传的参考图后可修改模板 ID。', invalidUpload: '上传失败，请重试。', decodeFailed: '无法读取图片，请换一个文件。',
 } as const
+
+export function fallbackPriceCopy(tiers?: Record<'1k' | '2k' | '3k', number | null>) {
+  const floor = (tier: '1k' | '2k' | '3k') => tiers?.[tier] ?? '不可用'
+  return `回退到默认模型时的最低积分：Standard ${floor('1k')}、HD ${floor('2k')}、Max ${floor('3k')}。当前售价低于对应下限或该档不可用时，回退会被拒绝。`
+}

@@ -40,6 +40,7 @@ export type ProviderPrices = {
 
 export type GenerationProvider = {
   id: string
+  fallbackReason?: string
   minReferences?: number
   maxReferences?: number
   // Price snapshot taken when the provider was resolved for this request: the row's prices with

@@ -26,7 +26,7 @@ const BUDGETS: Record<AlertBudget, { perHour: number; marker: string }> = {
 
 export type Dedupe = {
   // true: this caller owns the key (absent, or older than cooldownMs) and should send.
-  claim(key: string, cooldownMs?: number): Promise<boolean>
+  claim(key: string, cooldownMs?: number, requireShared?: boolean): Promise<boolean>
   // Held in this instance (no network): lets the checks behind an alert skip their reads.
   held(key: string, cooldownMs?: number): boolean
   // The send definitely failed: free the key so a later event can try again.
@@ -63,23 +63,25 @@ export function createDedupe(store: () => MarkerStore | null, now: Clock = Date.
   // This instance's next slot of each budget in the current hour (slots are claimed in order).
   const cursors: Record<AlertBudget, { hour: string; next: number }> = { tickets: { hour: '', next: 0 }, inquiries: { hour: '', next: 0 } }
 
-  async function markerClaim(key: string, cooldownMs?: number): Promise<boolean> {
+  async function markerClaim(key: string, cooldownMs?: number, requireShared = false): Promise<boolean> {
     const markers = store()
-    if (!markers) return true
+    if (!markers) return !requireShared
     try {
       return await markers.claim(markerKey(key), cooldownMs === undefined ? null : new Date(now() - cooldownMs))
     } catch (error) {
-      logger.warn('owner alert dedupe unavailable; sending anyway', { key, error })
-      return true
+      logger.warn('owner alert dedupe unavailable', { key, requireShared, error })
+      return !requireShared
     }
   }
 
   return {
     held: (key, cooldownMs) => memory.held(key, cooldownMs),
-    async claim(key, cooldownMs) {
+    async claim(key, cooldownMs, requireShared) {
       if (memory.held(key, cooldownMs)) return false
       memory.hold(key)
-      return markerClaim(key, cooldownMs)
+      const claimed = await markerClaim(key, cooldownMs, requireShared)
+      if (requireShared && !claimed) memory.drop(key)
+      return claimed
     },
     async release(key) {
       memory.drop(key)

@@ -1,6 +1,6 @@
 'use client'
 
-import type { ApprovedTariff, CreditsFloor } from '@/core/templates'
+import type { ApprovedTariff, CreditsFloor, Resolution, TemplateQuality } from '@/core/templates'
 import { OPENAI_MAX_REFERENCES, type ImageCapabilities } from '@/core/templates/image-capabilities'
 import { FULL_IMAGE_OPTIONS } from '@/core/templates/image-options'
 import { Label } from '@/core/ui/label'
@@ -11,6 +11,7 @@ import { copy } from './copy'
 export type ImageProviderOption = {
   id: string; label: string; model: string; isActive: boolean; openAI: boolean
   capabilities: ImageCapabilities | null; floor: CreditsFloor
+  fallbackFloors?: Record<TemplateQuality, Record<Resolution, number | null>>
   tariffs?: Record<string, ApprovedTariff>
   version?: 'v1' | 'v2'; approved?: Record<string, ApprovedTariff>
 }

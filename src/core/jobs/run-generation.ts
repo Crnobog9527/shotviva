@@ -18,6 +18,7 @@ import {
   type TemplateSurface,
   type Template,
 } from '../templates'
+import { routeFallbackReason, withFallbackNotice } from './fallback-notice'
 import { settleTracked } from './generation-analytics'
 import { screenCost, templateCall, typedWords } from './generation-call'
 import type { GenerationRequest } from './generation-request'
@@ -158,16 +159,20 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
 
   const jobId = req.jobId ?? randomUUID()
   const resolution = req.resolution ?? DEFAULT_RESOLUTION
-  const { call, provider, styleRefKeys } = await templateCall(deps, { template, prompt }, inputs, image, {
-    resolution, providerId: req.source === 'web' ? prompt.providerId : null,
-  })
-  // Marks which request created the row: two concurrent requests with one job id both get
-  // the row back from reserve_credits (charged once), but only the creator calls the provider.
   const attemptId = randomUUID()
-  const job = await reserveJob(deps.db, {
-    ...reserveFields(req), jobId, module: template.module, templateId: template.id, provider: provider.id,
-    expectedCredits: expectedPrice(req, template, resolution),
-    inputs: { ...jobInputs(req, prepared, resolution, attemptId, deps.now?.() ?? new Date()), style_ref_keys: styleRefKeys },
+  const { job, call, provider } = await withFallbackNotice(template.id, async (selected) => {
+    const route = await templateCall(deps, { template, prompt }, inputs, image, {
+      resolution, providerId: req.source === 'web' ? prompt.providerId : null,
+      onRoute: actual => selected(routeFallbackReason(actual, prompt.providerId, req.source)),
+    })
+    const reason = routeFallbackReason(route.provider, prompt.providerId, req.source)
+    const job = await reserveJob(deps.db, {
+      ...reserveFields(req), jobId, module: template.module, templateId: template.id, provider: route.provider.id,
+      expectedCredits: expectedPrice(req, template, resolution),
+      inputs: { ...jobInputs(req, prepared, resolution, attemptId, deps.now?.() ?? new Date()),
+        quality: route.call.quality, style_ref_keys: route.styleRefKeys, ...(reason ? { fallback_route: true } : {}) },
+    })
+    return { job, ...route }
   })
   if (job.inputs.attempt_id !== attemptId) return toJobView(job)
   // Dispute evidence (T82): the IP that started this paid or free work.
