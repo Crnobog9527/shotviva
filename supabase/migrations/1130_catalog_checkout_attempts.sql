@@ -74,7 +74,7 @@ begin
   end if;
   if p_channel='stripe' then discount := public.checkout_discount(p_user,p_product); end if;
   coupon_cents := p_list-((p_list::bigint*(discount->>'percent')::int+50)/100)::integer;
-  if coupon_cents<member_cents then
+  if discount is not null and (plan_rank>0 or coupon_cents<member_cents) then
     if (p_list,coupon_cents,(discount->>'percent')::int,discount->>'code_id',discount->>'stripe_coupon_id') is distinct from
        (p_unit,p_net,p_percent,p_params#>>'{metadata,code_id}',p_params#>>'{discounts,0,coupon}') or not exists(
          select from public.code_redemptions where id=(discount->>'redemption_id')::uuid and checkout_token=p_token

@@ -125,12 +125,6 @@ function WaffoPass({ summary, ctx }: { summary: Subscribed; ctx: Ctx }) {
 
 const walletOf = (method: keyof typeof METHOD_KEYS) => (method === 'alipay' || method === 'wechat_pay' ? method : null)
 
-// The published offer for the period last paid, if it is still on sale at a decided price.
-const renewalOffer = (ctx: Ctx, last: Ctx['facts']['last']) => {
-  const offer = last ? ctx.products.find(p => p.id === last.product.id) : undefined
-  return offer && offer.priceUsd > 0 ? offer : undefined
-}
-
 // Alipay (Stripe or Waffo) or WeChat Pay (Stripe, T73): one period paid once. The newest membership purchase says which period and
 // how it was paid when it is the tier the account has now.
 function WalletPass({ summary, ctx }: { summary: Extract<SubscriptionSummary, { kind: 'paid_until' }>; ctx: Ctx }) {
@@ -143,7 +137,7 @@ function WalletPass({ summary, ctx }: { summary: Extract<SubscriptionSummary, { 
     last && wallet
       ? t.rich('walletAlipayWhy', { ...richTags, interval: last.product.interval, method: t(METHOD_KEYS[wallet]), date })
       : t('walletWhy', { date })
-  const offer = renewalOffer(ctx, last)
+  const offer = ctx.products.find(p => p.id === last?.product.id && p.priceUsd > 0)
   const options = summary.tier ? { tier: summary.tier, period: last?.product.interval, planId: offer?.id } : undefined
   const renew = offer ? t.rich('renewPrice', { ...richTags, price: names.usd(offer.priceUsd) }) : t('renew')
   return (

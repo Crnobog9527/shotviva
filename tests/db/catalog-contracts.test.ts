@@ -240,3 +240,19 @@ it('opens only one Waffo session and preserves its checked price and recurring g
   expect((await renewal()).rows[0].c.outcome).toBe('replayed')
   expect((await profileOf(db, user)).credits).toBe(6666)
 })
+
+it('preserves subscription coupon selection when its discount rounds to zero, leaving pack ties unused', async () => {
+  const token = randomUUID()
+  const code = randomUUID()
+  await db.query(`insert into public.codes(id,kind,code,discount_percent,discount_products,discount_duration,stripe_coupon_id)
+    values($1,'campaign','ROUND1',1,array['pro_monthly','pack_s'],'once','coupon_round')`, [code])
+  await db.query(`insert into public.code_redemptions(code_id,kind,user_id,context,status,checkout_prepared,checkout_token,checkout_expires_at)
+    values($1,'campaign',$2,'paywall','ok',true,$3,now()+interval '30 minutes')`, [code,user,token])
+  const verify = (sku: string, percent: number | null) => db.query(
+    "select admin.catalog_buyer_terms($1,$2,1,$3,'stripe',1,1,$4,$5)",
+    [user,sku,token,percent,{ metadata: { code_id:code }, discounts: [{ coupon:'coupon_round' }] }])
+  await verify(product,1)
+  await rejects(() => verify(product,null),'CODE_CHECKOUT_OFFER_CHANGED')
+  await verify('pack_s',null)
+  await rejects(() => verify('pack_s',1),'CODE_CHECKOUT_OFFER_CHANGED')
+})
