@@ -1,0 +1,70 @@
+{
+  "at": "2026-11-10T14:51:13.514Z",
+  "before": {
+    "runs": [
+      {
+        "period": "2026-11-01"
+      }
+    ],
+    "payouts": [
+      {
+        "id": 1,
+        "period": "2026-11-01",
+        "status": "void",
+        "amount": 1645
+      },
+      {
+        "id": 2,
+        "period": "2026-11-01",
+        "status": "paid",
+        "amount": 547
+      }
+    ]
+  },
+  "checks": [
+    {
+      "status": 204,
+      "runs": [
+        {
+          "period": "2026-11-01"
+        }
+      ],
+      "payouts": [
+        {
+          "id": 1,
+          "period": "2026-11-01",
+          "status": "void",
+          "amount": 1645
+        },
+        {
+          "id": 2,
+          "period": "2026-11-01",
+          "status": "paid",
+          "amount": 547
+        }
+      ]
+    },
+    {
+      "status": 204,
+      "runs": [
+        {
+          "period": "2026-11-01"
+        }
+      ],
+      "payouts": [
+        {
+          "id": 1,
+          "period": "2026-11-01",
+          "status": "void",
+          "amount": 1645
+        },
+        {
+          "id": 2,
+          "period": "2026-11-01",
+          "status": "paid",
+          "amount": 547
+        }
+      ]
+    }
+  ]
+}
