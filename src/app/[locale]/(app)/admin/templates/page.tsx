@@ -48,7 +48,7 @@ export default async function AdminTemplatesPage() {
     listAdminTemplates(db), listAdminCategoryTree(db), listAdminSeriesOptions(db), readPricingOptions(db),
   ])
   return (
-    <div className="mx-auto grid w-full max-w-6xl gap-6 p-6">
+    <div className="mx-auto grid w-full min-w-0 max-w-6xl grid-cols-1 gap-6 p-6">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="mr-auto text-xl font-semibold">模板与提示词</h1>
         <Link href="/admin/templates/series" className="text-sm underline underline-offset-4">{seriesCopy.title}</Link>

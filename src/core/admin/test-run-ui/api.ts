@@ -47,7 +47,7 @@ export const loadRecords = (id: string) => call<Pick<TestPanelData,'runs'|'photo
 export type AssetKind = 'photo' | 'run'
 
 export type AssetCursor = { id: string; date: string }
-export type ManagedAsset = AssetCursor & { thumbnail?: string | null; label?: string | null }
+export type ManagedAsset = AssetCursor & { thumbnail?: string | null; originalUrl?: string | null; label?: string | null }
 export function listManagedAssets(kind: AssetKind, template?: string, cursor?: AssetCursor) {
   const params = new URLSearchParams({ kind, ...cursor })
   if (template) params.set('template', template)

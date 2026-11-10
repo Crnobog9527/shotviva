@@ -81,7 +81,7 @@ describe('setTemplateOrderAction (T76 drag-to-reorder)', () => {
 
   it('saves the group as the admin and expires the cached catalogue', async () => {
     requireAdmin.mockResolvedValue({ id: 'admin', email: null })
-    const input = { group: 'catalogue', ids: ['b', 'a'] }
+    const input = { group: 'catalogue', ids: ['b', 'a'], expectedIds: ['a', 'b'] }
     expect(await setTemplateOrderAction(input)).toEqual({ ok: true })
     expect(setTemplateOrder).toHaveBeenCalledWith({}, 'admin', input)
     expect(cache.revalidateTag).toHaveBeenCalledWith('templates', 'max')

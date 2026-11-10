@@ -5372,12 +5372,27 @@ ALTER FUNCTION "public"."admin_set_template_locale_cover"("p_actor" "uuid", "p_t
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_set_template_order"("p_group" "text", "p_ids" "text"[], "p_actor" "uuid") RETURNS "void"
+    LANGUAGE "sql"
+    SET "search_path" TO ''
+    AS $$
+  select public.admin_set_template_order(p_group, p_ids, p_actor, null);
+$$;
+
+
+ALTER FUNCTION "public"."admin_set_template_order"("p_group" "text", "p_ids" "text"[], "p_actor" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_set_template_order"("p_group" "text", "p_ids" "text"[], "p_actor" "uuid", "p_expected_ids" "text"[]) RETURNS "void"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $$
 declare
   v_ids text[] := coalesce(p_ids, '{}');
   v_members text[];
+  order_slots integer[];
+  upper_bounds bigint[] := '{}';
+  max_order bigint := 2147483647;
+  assigned_order bigint := -2147483648;
 begin
   if p_actor is null then
     raise exception 'INVALID_INPUT' using detail = 'actor is required';
@@ -5396,7 +5411,9 @@ begin
   -- below is still the membership when the new order is written. Reads are not blocked.
   lock table public.templates in share row exclusive mode;
 
-  select coalesce(array_agg(t.id), '{}') into v_members
+  select coalesce(array_agg(t.id order by case when p_group = 'featured' then t.featured_rank else t.sort_order end, t.id), '{}'),
+         array_agg(t.sort_order order by t.sort_order, t.id)
+    into v_members, order_slots
   from public.templates t
   where case p_group
     when 'catalogue' then t.id <> 'edit'
@@ -5409,34 +5426,60 @@ begin
       using detail = format('%s ids given, the %s group has %s', cardinality(v_ids), p_group, cardinality(v_members));
   end if;
 
-  -- Keep the other group's latest order, including changes made after this editor loaded.
-  if p_group in ('active', 'inactive') then
-    select array_agg(case when slots.is_active = (p_group = 'active') then v_ids[slots.pos] else slots.id end
-                     order by slots.sort_order, slots.id)
-      into v_ids
-    from (select t.id, t.is_active, t.sort_order,
-                 row_number() over (partition by t.is_active order by t.sort_order, t.id)::int as pos
-            from public.templates t where t.id <> 'edit') slots;
+  if p_expected_ids is not null and p_expected_ids <> v_members then
+    raise exception 'ORDER_MISMATCH' using detail = 'the displayed order changed';
   end if;
 
   if p_group <> 'featured' then
+    if v_ids = v_members then
+      return;
+    end if;
+
+    -- An unmoved row is an anchor. Work backwards to find the highest integer
+    -- each slot may occupy. Equal integers follow id order, exactly as in the UI.
+    for i in reverse cardinality(v_ids)..1 loop
+      if v_ids[i] > v_ids[i + 1] then
+        max_order := max_order - 1;
+      end if;
+      if v_ids[i] = v_members[i] then
+        if order_slots[i] > max_order then
+          raise exception 'ORDER_TIED';
+        end if;
+        max_order := order_slots[i];
+      end if;
+      upper_bounds[i] := max_order;
+    end loop;
+
+    -- Work forwards and reuse the old slot number whenever it fits. For a
+    -- duplicate legacy number, stay within both the previous row and next anchor.
+    for i in 1..cardinality(v_ids) loop
+      if v_ids[i - 1] > v_ids[i] then
+        assigned_order := assigned_order + 1;
+      end if;
+      if assigned_order > upper_bounds[i] then
+        raise exception 'ORDER_TIED';
+      end if;
+      assigned_order := greatest(assigned_order, least(order_slots[i], upper_bounds[i]));
+      order_slots[i] := assigned_order;
+    end loop;
     update public.templates t
-    set sort_order = o.position * 10
-    from unnest(v_ids) with ordinality as o(id, position)
-    where t.id = o.id and t.sort_order is distinct from o.position * 10;
-  else
-    -- Cleared first so the one-per-position index never sees two rows on one rank mid-way.
-    update public.templates set featured_rank = null where featured_rank is not null;
-    update public.templates t
-    set featured_rank = o.position
-    from unnest(v_ids) with ordinality as o(id, position)
-    where t.id = o.id;
+    set sort_order = s.slot
+    from unnest(v_ids, order_slots) as s(id, slot)
+    where t.id = s.id and t.sort_order <> s.slot;
+    return;
   end if;
+
+  -- Cleared first so the one-per-position index never sees two rows on one rank mid-way.
+  update public.templates set featured_rank = null where featured_rank is not null;
+  update public.templates t
+  set featured_rank = o.position
+  from unnest(v_ids) with ordinality as o(id, position)
+  where t.id = o.id;
 end;
 $$;
 
 
-ALTER FUNCTION "public"."admin_set_template_order"("p_group" "text", "p_ids" "text"[], "p_actor" "uuid") OWNER TO "postgres";
+ALTER FUNCTION "public"."admin_set_template_order"("p_group" "text", "p_ids" "text"[], "p_actor" "uuid", "p_expected_ids" "text"[]) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_set_template_sale"("p_actor" "uuid", "p_template_id" "text", "p_enabled" boolean) RETURNS "void"
@@ -12930,6 +12973,11 @@ GRANT ALL ON FUNCTION "public"."admin_set_template_locale_cover"("p_actor" "uuid
 
 REVOKE ALL ON FUNCTION "public"."admin_set_template_order"("p_group" "text", "p_ids" "text"[], "p_actor" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_set_template_order"("p_group" "text", "p_ids" "text"[], "p_actor" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_set_template_order"("p_group" "text", "p_ids" "text"[], "p_actor" "uuid", "p_expected_ids" "text"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_template_order"("p_group" "text", "p_ids" "text"[], "p_actor" "uuid", "p_expected_ids" "text"[]) TO "service_role";
 
 
 

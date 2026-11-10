@@ -53,11 +53,10 @@ export async function signTestRunDownload(deps: Deps, runId: string) {
   })
 }
 
-const signPhoto = async (store: ObjectStore, photo: TestPhoto): Promise<TestPhotoView> => ({
-  id: photo.id,
-  url: await sign(store, thumbnailKey(photo.objectKey)),
-  lastUsedAt: photo.lastUsedAt,
-})
+export async function signPhoto(store: ObjectStore, photo: TestPhoto): Promise<TestPhotoView> {
+  const [url, originalUrl] = await Promise.all([sign(store, thumbnailKey(photo.objectKey)), sign(store, photo.objectKey)])
+  return { id: photo.id, url, originalUrl, lastUsedAt: photo.lastUsedAt }
+}
 
 export async function loadPanelSummary(deps: Deps) {
   const [budget, recentPhotos] = await Promise.all([

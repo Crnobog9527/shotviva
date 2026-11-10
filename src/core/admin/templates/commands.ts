@@ -130,17 +130,17 @@ export async function setTemplateActive(
 
 // Drag-to-reorder (T76): one group's whole new order per save. The SQL function also refuses a
 // list that is not exactly the group, so an out-of-date page cannot scramble the order.
+const orderIds = z.array(z.string().min(1).max(64)).max(500)
+  .refine((ids) => new Set(ids).size === ids.length, 'ids must be unique')
 const orderSchema = z.object({
   group: z.enum(['catalogue', 'featured', 'active', 'inactive']),
-  ids: z
-    .array(z.string().min(1).max(64))
-    .max(500)
-    .refine((ids) => new Set(ids).size === ids.length, 'ids must be unique'),
+  ids: orderIds,
+  expectedIds: orderIds.optional(),
 })
 
 export async function setTemplateOrder(client: SupabaseClient, adminId: string, input: unknown): Promise<void> {
-  const { group, ids } = parseOrThrow(orderSchema, input, 'input')
-  await repo.setTemplateOrder(client, group, ids, adminId)
+  const { group, ids, expectedIds } = parseOrThrow(orderSchema, input, 'input')
+  await repo.setTemplateOrder(client, group, ids, adminId, expectedIds)
   logger.info('admin.template.reordered', { adminId, group, count: ids.length })
 }
 

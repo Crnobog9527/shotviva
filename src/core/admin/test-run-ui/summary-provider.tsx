@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, type ReactNode } from 'react'
 import { loadSummary } from './api'
+import { preloadPhoto } from './thumbnail-fallback'
 
 // The budget and recent photos are shared by every template. Warm them once while
 // the admin chooses a template. Subsequent edits and mutations fetch fresh data.
@@ -17,11 +18,7 @@ export function TestPanelSummaryProvider({ children, initial }: { children: Reac
     const value = initial ? Promise.resolve(initial).then(summary => summary ?? loadSummary()) : loadSummary()
     warm.current = { value, started: Date.now() }
     void value.then(({ recentPhotos }) => {
-      if (mounted) for (const photo of recentPhotos) {
-        const image = new Image()
-        image.fetchPriority = 'low'
-        image.src = photo.url
-      }
+      if (mounted) recentPhotos.forEach(preloadPhoto)
     }).catch(() => { if (mounted) warm.current = null })
     return () => { mounted = false; warm.current = null }
   }, [initial])

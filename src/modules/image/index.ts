@@ -57,7 +57,7 @@ export {
   runTestTranslate,
   saveTestBudget,
   setTestRunCover,
-  signRun,
+  signPhoto, signRun,
   signTestRunDownload,
   testBudgetBodySchema,
   testCoverBodySchema,

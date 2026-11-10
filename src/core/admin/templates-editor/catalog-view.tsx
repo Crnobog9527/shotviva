@@ -11,7 +11,7 @@ type Props = Omit<ComponentProps<typeof TemplatesTable>, 'selection' | 'order' |
   query: string
   categories: readonly CategoryOption[]
   series: readonly SeriesOption[]
-  onOrder: (group: 'active' | 'inactive') => (ids: string[]) => Promise<void>
+  onOrder: (group: 'active' | 'inactive', expectedIds: string[]) => (ids: string[]) => Promise<void>
   selection: Omit<TableSelection, 'onSelectVisible'> & { onSelectGroup: (ids: string[], on: boolean) => void }
 }
 
@@ -54,7 +54,7 @@ export function CatalogView({ templates, query, categories, series, selection, o
         {title && <h3 className="bg-muted px-3 py-2 text-sm font-semibold">{title}（{rows.length}）</h3>}
         <TemplatesTable {...row} templates={rows} categoryLabels={paths}
           order={{ disabled: !canReorder || row.pending, disabledHint: canReorder ? undefined : orderCopy.filtered,
-            onReorder: async ids => { if (canReorder && orderGroup) await onOrder(orderGroup)(ids) } }}
+            onReorder: async ids => { if (canReorder && orderGroup) await onOrder(orderGroup, rows.map(t => t.id))(ids) } }}
           selection={{ ...selection, onSelectVisible: on => selection.onSelectGroup(rows.map(t => t.id), on) }} />
       </section>
     ))}
