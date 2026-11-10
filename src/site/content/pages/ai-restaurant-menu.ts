@@ -62,8 +62,8 @@ export const aiRestaurantMenu = defineContentPage({
   title: `AI Restaurant Menu Photos From Your Phone (2026) | ${brand}`,
   description: `AI restaurant menu photos from the dish photo you already took: delivery-app, menu and promo shots with the plate kept as served. ${FreeImagesShort}.`,
   h1: 'AI Restaurant Menu Photos From One Phone Shot',
-  subtitle: 'Menu, delivery-app and promo photos of the dishes you already serve, shot on the pass with a phone.',
-  answerBlock: `AI restaurant menu photos start from the dish photo you already took and turn it into a menu, delivery-app or promo image, with the plate kept as served. With ${brand} you upload one phone photo, pick Delivery Menu, Dark Dining or Promo Poster, and download it in ${tierList}. New users get ${freeImagesLabel}.`,
+  subtitle: 'Your real phone photo of a dish you serve, with new light, background and setting. No dish is invented.',
+  answerBlock: `AI restaurant menu photos start from your own photo of a dish you serve: only the light, background and setting change, and no dish you don't make is invented. With ${brand} you upload one phone photo, pick Delivery Menu, Dark Dining or Promo Poster, and download it in ${tierList}. New users get ${freeImagesLabel}.`,
   hero: {
     before: pairImage('example-dish-before', 'Phone photo of a dish on a restaurant kitchen pass, harsh overhead light (illustrative example)'),
     after: pairImage('example-dish-after', 'The same dish as a bright delivery-app photo, soft daylight, Delivery Menu template (illustrative example)'),
@@ -102,6 +102,7 @@ export const aiRestaurantMenu = defineContentPage({
       question: 'Do I need to write prompts?',
       answer:
         'No. Pick Delivery Menu, Dark Dining or Promo Poster and the template carries the light and the styling. One optional line, "Anything to change?", takes a note like "keep the chilli oil visible".',
+      link: { href: '/', anchor: 'See every template in our image to image AI studio.' },
     },
     {
       question: 'Can it make the whole menu?',

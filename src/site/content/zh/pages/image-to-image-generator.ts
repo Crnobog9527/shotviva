@@ -51,6 +51,7 @@ export const zhImageToImageGenerator = defineContentPage({
     {
       question: '图生图需要写提示词吗？',
       answer: '不需要。选模板就行，剩下的交给我们。个别模板会让你填一行字，比如海报上的标题和价格。',
+      link: { href: '/', anchor: '看看 AI改图 的全部模板。' },
     },
     {
       question: '图生图会把我的商品、菜品或房间改掉吗？',

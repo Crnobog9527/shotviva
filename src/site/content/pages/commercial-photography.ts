@@ -71,6 +71,7 @@ export const commercialPhotography = defineContentPage({
     {
       question: 'What should my phone photo look like?',
       answer: 'Daylight, the product in focus, nothing in front of it. A cluttered background is fine; the template replaces it.',
+      link: { href: '/', anchor: 'Try your phone photo in our image to image AI studio.' },
     },
   ],
   related: [
