@@ -1,5 +1,7 @@
 export {
   NOINDEX,
+  NOINDEX_FOLLOW,
+  notIndexedRobots,
   INDEX,
   hasTranslation,
   indexablePaths,

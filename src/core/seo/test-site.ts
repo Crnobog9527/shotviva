@@ -16,6 +16,7 @@ export function testSite(overrides: Partial<SiteConfig> = {}): SiteConfig {
         launchYear: 2026,
         countries: ['United States'],
         logoPath: '/logo.png',
+        shareImage: { path: '/og.jpg', width: 1200, height: 630, alt: 'Example share card' },
         sameAs: [],
       },
       modules: { image: true, video: false },
