@@ -102,6 +102,8 @@ export type SiteErrorsAlert = {
 
 export type RenewalReviewAlert = {
   kind: 'waffo_renewal_review'
+  paymentId: string
+  duplicate: boolean
   ticketId: string
   orderId: string
   period: number
@@ -145,7 +147,7 @@ const POLICIES: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K }
   dispute_opened: (a) => ({ key: `dispute_opened:${a.disputeId}`, money: true }),
   dispute_closed: (a) => ({ key: `dispute_closed:${a.disputeId}`, money: true }),
   dispute_due_soon: (a) => ({ key: `dispute_due_soon:${a.disputeId}`, money: true }),
-  waffo_renewal_review: (a) => ({ key: `waffo_renewal:${a.orderId}:${a.period}`, money: true }),
+  waffo_renewal_review: (a) => ({ key: `waffo_renewal:${a.paymentId}`, money: true }),
   payment_failed: (a) => ({ key: `payment_failed:${a.channel}:${a.eventId}`, money: true }),
   template_fallback: a => ({ key: `template_fallback:${a.templateId}:${a.reason}:${a.rejected}`, cooldownMs: 60 * MINUTE, money: false }),
   generation_spike: () => ({ key: 'generation_spike', cooldownMs: 60 * MINUTE, money: false }),

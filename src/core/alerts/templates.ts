@@ -186,7 +186,7 @@ function ticket(alert: TicketAlert, who: string): Rendered {
 
 function renewalReview(alert: RenewalReviewAlert): Rendered {
   const charged = alert.charged === null ? '未提供' : `${(alert.charged / 100).toFixed(2)} ${alert.currency?.toUpperCase() ?? '（币种缺失）'}`
-  const line = `【Waffo 续费待核对】订单 ${alert.orderId} 第 ${alert.period} 期，税前报价 $${(alert.quoted / 100).toFixed(2)}，含税实收 ${charged}（税额 ${(alert.tax / 100).toFixed(2)}）。积分待处理，请打开账单工单核对。`
+  const line = `【Waffo 续费待核对】订单 ${alert.orderId} 第 ${alert.period} 期，税前报价 $${(alert.quoted / 100).toFixed(2)}，含税实收 ${charged}（税额 ${(alert.tax / 100).toFixed(2)}）。付款号 ${alert.paymentId}。${alert.duplicate ? '同一期出现不同付款号，请核对是否重复扣款。' : '请打开账单工单核对。'}`
   return { line, path: `/admin/tickets/${alert.ticketId}` }
 }
 
