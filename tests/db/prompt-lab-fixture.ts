@@ -6,34 +6,36 @@ import { serviceSupabase } from './supabase-env'
 export const labDb = serviceSupabase()
 export const fixture = {
   pg: null as Client | null, actor: '', user: '', session: '', asset: randomUUID(), photo: randomUUID(),
-  category: 't101-lab', prompt: randomUUID(), settingModel: randomUUID(), model: randomUUID() + '/fixture-model',
+  category: 't101-' + randomUUID().slice(0, 6), prompt: randomUUID(), settingModel: randomUUID(), model: randomUUID() + '/fixture-model',
   budget: undefined as unknown, settings: undefined as unknown, runs: new Set<string>(),
 }
 export async function initialiseLab() {
   const pg = await connectAdmin()
   fixture.pg = pg
+  const settings = await pg.query("select key,value from public.system_settings where key=any($1)", [['prompt_lab_reverse', 'admin_test_daily_budget_usd']])
+  fixture.settings = settings.rows.find(s => s.key === 'prompt_lab_reverse')?.value
+  fixture.budget = settings.rows.find(s => s.key === 'admin_test_daily_budget_usd')?.value
   fixture.actor = await createUser(pg)
   fixture.user = await createUser(pg)
   await pg.query("update public.profiles set role='admin' where id=$1", [fixture.actor])
   await pg.query("insert into public.template_categories(key,name_en,name_zh,kind) values($1,$1,$1,'reference')", [fixture.category])
   await pg.query(`insert into public.reference_assets(id,category_id,r2_key,width,height,bytes,sha256,created_by)
-    values($1,$2,'references/'||$1::text||'.webp',1,1,15,repeat('9',64),$3)`, [fixture.asset, fixture.category, fixture.actor])
-  await pg.query("insert into public.admin_test_photos(id,object_key) values($1,'admin-tests/photos/'||$1::text||'.jpg')", [fixture.photo])
+    values($1,$2,$3,1,1,15,repeat('9',64),$4)`, [fixture.asset, fixture.category, 'references/' + fixture.asset + '.webp', fixture.actor])
+  await pg.query("insert into public.admin_test_photos(id,object_key) values($1,$2)", [fixture.photo, 'admin-tests/photos/' + fixture.photo + '.jpg'])
   fixture.session = (await labDb.rpc('admin_open_prompt_lab', { p_actor: fixture.actor, p_asset_id: fixture.asset }).throwOnError()).data
-  const settings = await pg.query("select key,value from public.system_settings where key=any($1)", [['prompt_lab_reverse', 'admin_test_daily_budget_usd']])
-  fixture.settings = settings.rows.find(s => s.key === 'prompt_lab_reverse')?.value
-  fixture.budget = settings.rows.find(s => s.key === 'admin_test_daily_budget_usd')?.value
+
 }
 export async function cleanLab() {
   const pg = fixture.pg
   if (!pg) return
-  for (const [key, value] of [['prompt_lab_reverse', fixture.settings], ['admin_test_daily_budget_usd', fixture.budget]]) {
+  const settingsToRestore = fixture.session ? [['prompt_lab_reverse', fixture.settings], ['admin_test_daily_budget_usd', fixture.budget]] : []
+  for (const [key, value] of settingsToRestore) {
     if (value === undefined) await pg.query('delete from public.system_settings where key=$1', [key])
     else await pg.query('update public.system_settings set value=$2 where key=$1', [key, JSON.stringify(value)])
   }
-  await pg.query("update public.prompt_lab_runs set status='failed',finished_at=now() where session_id=$1 and status in ('queued','running')", [fixture.session])
-  await pg.query("update public.prompt_lab_reverse_requests set status='failed',finished_at=now() where session_id=$1 and status='running'", [fixture.session])
-  const ids = await pg.query('select id from public.prompt_lab_runs where session_id=$1 union select id from public.prompt_lab_reverse_requests where session_id=$1', [fixture.session])
+  await pg.query("update public.prompt_lab_runs set status='failed',finished_at=now() where session_id=$1 and status in ('queued','running')", [fixture.session || null])
+  await pg.query("update public.prompt_lab_reverse_requests set status='failed',finished_at=now() where session_id=$1 and status='running'", [fixture.session || null])
+  const ids = await pg.query('select id from public.prompt_lab_runs where session_id=$1 union select id from public.prompt_lab_reverse_requests where session_id=$1', [fixture.session || null])
   for (const row of ids.rows) fixture.runs.add(row.id)
   await pg.query('delete from public.reference_assets where id=$1', [fixture.asset])
   await pg.query('delete from public.reference_object_deletions where r2_key=any($1)', [[...fixture.runs].map(id => 'prompt-lab/outputs/' + id + '.png').concat('references/' + fixture.asset + '.webp')])
