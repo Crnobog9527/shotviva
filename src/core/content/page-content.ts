@@ -106,8 +106,9 @@ export type TemplateCategory = {
 export type HeadedText = { heading: string; text: string }
 
 // An extra home H2 of three headed cards, after the template grid (SEO launch handbook: /zh's
-// white-background guide, G9). `link` closes a card's text as a plain in-body link.
-export type TopicCard = HeadedText & { link?: RelatedLink }
+// white-background guide, G9; the English use cases, G5). `link` closes a card's text as a plain
+// in-body link, `after` is the punctuation that follows it.
+export type TopicCard = HeadedText & { link?: RelatedLink; after?: string }
 export type TopicSection = { id: string; heading: string; cards: readonly [TopicCard, TopicCard, TopicCard] }
 
 // Home: "One phone photo → a full shoot" (ARCHITECTURE §13 item 2, DESIGN §6.9): the phone
