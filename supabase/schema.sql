@@ -1164,6 +1164,17 @@ $_$;
 ALTER FUNCTION "admin"."valid_style_refs"("p_template_id" "text", "p_refs" "jsonb") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."visible_template_category_keys"() RETURNS SETOF "text"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select p.key from public.template_category_paths p where p.web_visible
+$$;
+
+
+ALTER FUNCTION "admin"."visible_template_category_keys"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."waffo_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") RETURNS "public"."credit_change"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -5564,7 +5575,7 @@ CREATE OR REPLACE VIEW "public"."template_category_paths" WITH ("security_invoke
  SELECT "c"."key",
     COALESCE("g"."key", "p"."key", "c"."key") AS "root_key",
     "array_remove"(ARRAY["g"."slug", "p"."slug", "c"."slug"], NULL::"text") AS "path",
-    ((NOT "c"."is_system") AND "c"."is_visible" AND COALESCE("p"."is_visible", true) AND COALESCE("g"."is_visible", true)) AS "web_visible"
+    ((NOT "c"."is_system") AND "c"."is_visible" AND (("c"."parent_id" IS NULL) OR ("p"."is_visible" IS TRUE)) AND (("p"."parent_id" IS NULL) OR ("g"."is_visible" IS TRUE))) AS "web_visible"
    FROM (("public"."template_categories" "c"
      LEFT JOIN "public"."template_categories" "p" ON (("p"."key" = "c"."parent_id")))
      LEFT JOIN "public"."template_categories" "g" ON (("g"."key" = "p"."parent_id")))
@@ -10662,7 +10673,7 @@ ALTER TABLE "public"."ai_providers" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."business_inquiries" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "category_template_kind" ON "public"."template_categories" AS RESTRICTIVE FOR SELECT TO "authenticated", "anon" USING (("kind" = 'template'::"text"));
+CREATE POLICY "category_public_read" ON "public"."template_categories" AS RESTRICTIVE FOR SELECT TO "authenticated", "anon" USING ((("kind" = 'template'::"text") AND "is_visible" AND (("parent_id" IS NULL) OR ("parent_id" IN ( SELECT "admin"."visible_template_category_keys"() AS "visible_template_category_keys")))));
 
 
 
@@ -10821,6 +10832,11 @@ ALTER TABLE "public"."template_sync_history" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."templates" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "templates_public_category" ON "public"."templates" AS RESTRICTIVE FOR SELECT TO "authenticated", "anon" USING ((COALESCE("subcategory_key", "category_key") IN ( SELECT "c"."key"
+   FROM "public"."template_categories" "c")));
+
 
 
 CREATE POLICY "templates_select_active" ON "public"."templates" FOR SELECT TO "authenticated", "anon" USING ("is_active");
@@ -10984,6 +11000,12 @@ GRANT ALL ON FUNCTION "admin"."template_sync_quote"("p_receipt" "jsonb", "p_prov
 
 REVOKE ALL ON FUNCTION "admin"."valid_style_refs"("p_template_id" "text", "p_refs" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."valid_style_refs"("p_template_id" "text", "p_refs" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."visible_template_category_keys"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."visible_template_category_keys"() TO "anon";
+GRANT ALL ON FUNCTION "admin"."visible_template_category_keys"() TO "authenticated";
 
 
 
