@@ -252,6 +252,10 @@ const RENDERERS: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K 
   payment_failed: paymentFailed,
   waffo_renewal_review: renewalReview,
   generation_spike: generationSpike,
+  checkout_catalog_failed: a => ({
+    line: `【结账读目录失败】用户无法开始付款（错误码：${a.code}）。请检查商品目录迁移和数据库连接。`,
+    path: '/admin/products',
+  }),
   template_fallback: a => ({
     line: `【模板模型回退】模板 ${a.templateId}，原因 ${a.reason}，${a.rejected ? '已拒绝此次出图' : '已允许回退出图'}。`,
     path: '/admin/templates',

@@ -65,7 +65,7 @@ function setup(db = fakeDb(), fetch = vi.fn(async () => ok())) {
     lastSpikeCheck: { at: 0 },
   }
   const sent = () => fetch.mock.calls.map((call) => JSON.parse(String((call as unknown as [string, RequestInit])[1].body)).content.text as string)
-  return { deps, fetch, sent, marks, db, time }
+  return { deps, fetch, sent, marks, store, db, time }
 }
 
 const ticket: OwnerAlert = { kind: 'ticket', ticketId: 't-1', reply: false, userId: USER, ticketType: 'refund', pending: null }
@@ -115,6 +115,24 @@ describe('notifyOwnerWith: sending', () => {
 })
 
 describe('notifyOwnerWith: flood control', () => {
+  it('sends at most one checkout catalog alert per error code per rolling hour across instances', async () => {
+    const { deps, sent, store, time, db } = setup()
+    const alert = { kind: 'checkout_catalog_failed', code: 'PGRST202' } as const
+    const other = { ...deps, dedupe: createDedupe(() => store, deps.now) }
+    await Promise.all([notifyOwnerWith(deps, alert), notifyOwnerWith(other, alert)])
+    await notifyOwnerWith(other, { ...alert, code: '42501' })
+    time.now += 60 * MINUTE - 1
+    await notifyOwnerWith(other, alert)
+    expect(sent()).toEqual([expect.stringContaining('PGRST202'), expect.stringContaining('42501')])
+    time.now += 1
+    await notifyOwnerWith(other, alert)
+    expect(sent()).toHaveLength(3)
+    expect(sent()[2]).toContain('【结账读目录失败】')
+    expect(db.from).not.toHaveBeenCalled()
+    await notifyOwnerWith({ ...deps, dedupe: createDedupe(() => null) }, alert)
+    expect(sent()).toHaveLength(3)
+  })
+
   it('delivers both an allowed fallback and its later price refusal once in the same hour', async () => {
     const { deps, sent } = setup()
     const route = { kind: 'template_fallback', templateId: 'fixture', reason: 'catalog_unavailable' } as const

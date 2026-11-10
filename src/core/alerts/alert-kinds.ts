@@ -115,6 +115,7 @@ export type RenewalReviewAlert = {
 
 export type OwnerAlert =
   | { kind: 'template_fallback'; templateId: string; reason: string; rejected: boolean }
+  | { kind: 'checkout_catalog_failed'; code: string }
   | RenewalReviewAlert
   | RefundAlert
   | DisputeOpenedAlert
@@ -138,7 +139,7 @@ const MINUTE = 60_000
 //   the group or use up Feishu's own rate limit; business inquiries have their own (T86).
 // - money: refunds, disputes and payments that did not land are never capped, are tried even
 //   while sending is backing off, and are retried when Feishu says it is rate limiting.
-export type AlertPolicy = { key: string; cooldownMs?: number; budget?: AlertBudget; money: boolean }
+export type AlertPolicy = { key: string; cooldownMs?: number; requireShared?: boolean; budget?: AlertBudget; money: boolean }
 export type AlertBudget = 'tickets' | 'inquiries'
 
 const POLICIES: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K }>) => AlertPolicy } = {
@@ -149,7 +150,8 @@ const POLICIES: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K }
   dispute_due_soon: (a) => ({ key: `dispute_due_soon:${a.disputeId}`, money: true }),
   waffo_renewal_review: (a) => ({ key: `waffo_renewal:${a.paymentId}`, money: true }),
   payment_failed: (a) => ({ key: `payment_failed:${a.channel}:${a.eventId}`, money: true }),
-  template_fallback: a => ({ key: `template_fallback:${a.templateId}:${a.reason}:${a.rejected}`, cooldownMs: 60 * MINUTE, money: false }),
+  checkout_catalog_failed: a => ({ key: `checkout_catalog_failed:${a.code}`, cooldownMs: 60 * MINUTE, requireShared: true, money: false }),
+  template_fallback: a => ({ key: `template_fallback:${a.templateId}:${a.reason}:${a.rejected}`, cooldownMs: 60 * MINUTE, requireShared: true, money: false }),
   generation_spike: () => ({ key: 'generation_spike', cooldownMs: 60 * MINUTE, money: false }),
   // A new ticket once; replies at most once per ticket per 30 minutes, counted when sent.
   ticket: (a) =>

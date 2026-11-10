@@ -13,6 +13,7 @@ const ITEMS: readonly { key: AdminNavKey; href: `/admin${string}` }[] = [
   // T86 (ARCHITECTURE §10.c): business inquiries from the pricing page, next to the tickets.
   { key: 'inquiries', href: '/admin/inquiries' },
   { key: 'orders', href: '/admin/orders' },
+  { key: 'products', href: '/admin/products' },
   { key: 'codes', href: '/admin/codes' },
   { key: 'affiliates', href: '/admin/affiliates' },
   // T82 (ARCHITECTURE §6.3 「后台拒付页」), next to the payments it is about.

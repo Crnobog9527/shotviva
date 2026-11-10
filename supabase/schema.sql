@@ -7297,6 +7297,22 @@ $$;
 ALTER FUNCTION "public"."purge_identity_refusals"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."read_product_catalog"("p_version" "text") RETURNS TABLE("product_id" "text", "tier" "text", "kind" "text", "revision" integer, "usd_cents" integer, "credits" integer, "paid_days" integer, "listed" boolean, "name_en" "text", "name_zh" "text")
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select p.product_id, p.tier, p.kind, v.revision, v.usd_cents, v.credits, v.paid_days,
+         v.listed, v.name_en, v.name_zh
+    from admin.catalog_products p
+    join admin.catalog_product_versions v on v.product_id = p.product_id
+     and v.revision = case p_version when 'v1' then 1 when 'v2' then p.published_revision end
+   order by v.sort_order, p.product_id
+$$;
+
+
+ALTER FUNCTION "public"."read_product_catalog"("p_version" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."read_template_sync_source"("p_id" "text") RETURNS "jsonb"
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
@@ -8874,6 +8890,40 @@ $$;
 ALTER FUNCTION "public"."wishlist_eligible"("p_user_id" "uuid") OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "admin"."catalog_product_versions" (
+    "product_id" "text" NOT NULL,
+    "revision" integer NOT NULL,
+    "usd_cents" integer NOT NULL,
+    "credits" integer NOT NULL,
+    "paid_days" integer,
+    "listed" boolean NOT NULL,
+    "sort_order" integer NOT NULL,
+    "name_en" "text" NOT NULL,
+    "name_zh" "text" NOT NULL,
+    CONSTRAINT "catalog_product_versions_credits_check" CHECK (("credits" > 0)),
+    CONSTRAINT "catalog_product_versions_paid_days_check" CHECK (("paid_days" > 0)),
+    CONSTRAINT "catalog_product_versions_revision_check" CHECK (("revision" > 0)),
+    CONSTRAINT "catalog_product_versions_usd_cents_check" CHECK (("usd_cents" > 0))
+);
+
+
+ALTER TABLE "admin"."catalog_product_versions" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "admin"."catalog_products" (
+    "product_id" "text" NOT NULL,
+    "tier" "text" NOT NULL,
+    "kind" "text" NOT NULL,
+    "published_revision" integer,
+    CONSTRAINT "catalog_products_check" CHECK ((("tier" = 'pack'::"text") = ("kind" = 'pack'::"text"))),
+    CONSTRAINT "catalog_products_kind_check" CHECK (("kind" = ANY (ARRAY['monthly'::"text", 'yearly'::"text", 'pack'::"text"]))),
+    CONSTRAINT "catalog_products_tier_check" CHECK (("tier" = ANY (ARRAY['starter'::"text", 'pro'::"text", 'max'::"text", 'pack'::"text"])))
+);
+
+
+ALTER TABLE "admin"."catalog_products" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "admin"."deleted_prompt_versions" (
     "template_id" "text" NOT NULL,
     "version" integer NOT NULL,
@@ -9895,6 +9945,16 @@ CREATE TABLE IF NOT EXISTS "public"."template_sync_history" (
 ALTER TABLE "public"."template_sync_history" OWNER TO "postgres";
 
 
+ALTER TABLE ONLY "admin"."catalog_product_versions"
+    ADD CONSTRAINT "catalog_product_versions_pkey" PRIMARY KEY ("product_id", "revision");
+
+
+
+ALTER TABLE ONLY "admin"."catalog_products"
+    ADD CONSTRAINT "catalog_products_pkey" PRIMARY KEY ("product_id");
+
+
+
 ALTER TABLE ONLY "admin"."deleted_prompt_versions"
     ADD CONSTRAINT "deleted_prompt_versions_pkey" PRIMARY KEY ("template_id", "version");
 
@@ -10853,6 +10913,21 @@ CREATE OR REPLACE TRIGGER "zz_template_prompt_version" BEFORE INSERT OR UPDATE O
 
 
 
+ALTER TABLE ONLY "admin"."catalog_product_versions"
+    ADD CONSTRAINT "catalog_product_versions_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "admin"."catalog_products"("product_id");
+
+
+
+ALTER TABLE ONLY "admin"."catalog_products"
+    ADD CONSTRAINT "catalog_products_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id");
+
+
+
+ALTER TABLE ONLY "admin"."catalog_products"
+    ADD CONSTRAINT "catalog_products_product_id_published_revision_fkey" FOREIGN KEY ("product_id", "published_revision") REFERENCES "admin"."catalog_product_versions"("product_id", "revision") DEFERRABLE INITIALLY DEFERRED;
+
+
+
 ALTER TABLE ONLY "admin"."deleted_prompt_versions"
     ADD CONSTRAINT "deleted_prompt_versions_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON DELETE CASCADE;
 
@@ -11261,6 +11336,12 @@ ALTER TABLE ONLY "public"."templates"
 ALTER TABLE ONLY "public"."templates"
     ADD CONSTRAINT "templates_subcategory_key_fkey" FOREIGN KEY ("subcategory_key") REFERENCES "public"."template_categories"("key");
 
+
+
+ALTER TABLE "admin"."catalog_product_versions" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "admin"."catalog_products" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "admin"."deleted_prompt_versions" ENABLE ROW LEVEL SECURITY;
@@ -12557,6 +12638,11 @@ GRANT ALL ON FUNCTION "public"."provider_api_key"("p_id" "uuid") TO "service_rol
 
 REVOKE ALL ON FUNCTION "public"."purge_identity_refusals"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."purge_identity_refusals"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."read_product_catalog"("p_version" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."read_product_catalog"("p_version" "text") TO "service_role";
 
 
 
