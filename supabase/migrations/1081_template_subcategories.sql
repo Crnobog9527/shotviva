@@ -4,6 +4,13 @@ create index templates_assigned_web_category_idx on public.templates(coalesce(su
   where is_active and 'web'=any(visible_in);
 create index templates_subcategory_idx on public.templates(subcategory_key) where subcategory_key is not null;
 
+-- The legacy category column carries the English root name. A direct template
+-- read must not disclose that name, or a hidden assigned node's key, through an active template.
+create policy templates_public_category on public.templates as restrictive
+  for select to anon,authenticated using (
+    coalesce(subcategory_key,category_key) in (select c.key from public.template_categories c)
+  );
+
 -- Explicitly preserve both pre-existing unqualified PostgREST embeddings now that
 -- there are two FKs. New readers can select the leaf with the explicit FK hint.
 create function public.template_categories(public.templates) returns setof public.template_categories

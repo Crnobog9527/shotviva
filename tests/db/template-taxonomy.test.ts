@@ -1,10 +1,12 @@
+import { randomUUID } from 'node:crypto'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { listTemplates, listTemplatesIn } from '@/core/templates'
 import { toPartnerTemplate } from '@/core/partner/partner-views'
 import { readCategoryEntries, readCategoryTree, readSeriesMembers } from '@/core/templates/taxonomy-reads'
-import { connectAdmin, createUser } from './helpers'
+import { connectAdmin, createUser, retryAuth } from './helpers'
 import { anonSupabase, serviceSupabase } from './supabase-env'
 
 const anon = anonSupabase()
@@ -22,6 +24,16 @@ const path = ['t102-food', 'dark', 'dish']
 function node(key: string, parent: string | null, slug: string, kind = 'template') {
   return pg.query(`insert into public.template_categories(key,name_en,name_zh,parent_id,slug,kind)
     values($1,$1,$1,$2,$3,$4)`, [key, parent, slug, kind])
+}
+
+async function expectCategoryRows(client: SupabaseClient, visible: readonly string[]) {
+  const keys = [root, dark, leaf]
+  const categories = await client.from('template_categories')
+    .select('key,name_en,name_zh,seo_title_en,seo_title_zh,seo_description_en,seo_description_zh').in('key', keys).throwOnError()
+  const paths = await client.from('template_category_paths').select('key,path').in('key', keys).throwOnError()
+  const expected = [...visible].sort()
+  expect(categories.data?.map(c => c.key).sort()).toEqual(expected)
+  expect(paths.data?.map(c => c.key).sort()).toEqual(expected)
 }
 
 beforeAll(async () => {
@@ -59,6 +71,38 @@ describe('three-level catalogue', () => {
     expect((await anon.from('template_categories').select('key').eq('kind', 'reference')).data).toEqual([])
     expect((await anon.from('template_series').update({ is_active: false }).eq('id', series)).error).toBeTruthy()
     expect((await readCategoryTree(anon)).find(n => n.key === root)?.children.find(n => n.key === dark)?.children[0].path).toEqual(path)
+  })
+
+  it('protects a hidden category and its descendants in direct table, path and template reads', async () => {
+    const email = `t102-${randomUUID()}@example.test`
+    const password = randomUUID()
+    const user = await retryAuth(async () => {
+      const { data, error } = await service.auth.admin.createUser({ email, password, email_confirm: true })
+      if (error || !data.user) throw error ?? new Error('No test user')
+      return data.user
+    })
+    try {
+      const signedIn = anonSupabase()
+      await retryAuth(async () => {
+        const { error } = await signedIn.auth.signInWithPassword({ email, password })
+        if (error) throw error
+      })
+      for (const [hidden, visible] of [[root, []], [dark, [root]], [leaf, [root, dark]]] as const) {
+        await pg.query('update public.template_categories set is_visible=(key<>$1) where key=any($2)', [hidden, [root, dark, leaf]])
+        for (const client of [anon, signedIn]) {
+          await expectCategoryRows(client, visible)
+          const template = await client.from('templates').select('category,category_key,subcategory_key').eq('id', plain).throwOnError()
+          expect(template.data).toEqual([])
+        }
+        await expectCategoryRows(service, [root, dark, leaf])
+        const pathRow = await service.from('template_category_paths').select('web_visible').eq('key', leaf).single().throwOnError()
+        expect(pathRow.data?.web_visible).toBe(false)
+      }
+    } finally {
+      await pg.query('update public.template_categories set is_visible=true where key=any($1)', [[root, dark, leaf]])
+      await pg.query('delete from auth.users where id=$1', [user.id])
+    }
+    await expectCategoryRows(anon, [root, dark, leaf])
   })
 
   it('filters a subtree, lists a series once, and exposes its usable members through the workspace and partner contract', async () => {

@@ -34,20 +34,33 @@ end $$;
 create trigger category_prepare before insert or update of key,kind,parent_id,level,is_system,slug
 on public.template_categories for each row execute function admin.prepare_category_node();
 
--- Restrictive policy composes with 0580's public-read policy. T101's private labels stay private.
-create policy category_template_kind on public.template_categories as restrictive
-  for select to anon,authenticated using (kind='template');
-
 create view public.template_category_paths with (security_invoker=true) as
 select c.key, coalesce(g.key,p.key,c.key) as root_key,
        array_remove(array[g.slug,p.slug,c.slug],null) as path,
-       not c.is_system and c.is_visible and coalesce(p.is_visible,true) and coalesce(g.is_visible,true) as web_visible
+       not c.is_system and c.is_visible
+         and (c.parent_id is null or p.is_visible is true)
+         and (p.parent_id is null or g.is_visible is true) as web_visible
 from public.template_categories c
 left join public.template_categories p on p.key=c.parent_id
 left join public.template_categories g on g.key=p.parent_id
 where c.kind='template';
 revoke all on public.template_category_paths from anon,authenticated;
 grant select on public.template_category_paths to anon,authenticated,service_role;
+
+-- The policy reads the visible parent keys once, outside its own RLS context.
+-- The private helper exposes only already-public keys and accepts no caller input.
+create function admin.visible_template_category_keys() returns setof text
+stable language sql security definer set search_path = '' as $$
+  select p.key from public.template_category_paths p where p.web_visible
+$$;
+revoke all on function admin.visible_template_category_keys() from public;
+grant execute on function admin.visible_template_category_keys() to anon,authenticated;
+
+create policy category_public_read on public.template_categories as restrictive
+  for select to anon,authenticated using (
+    kind='template' and is_visible and
+    (parent_id is null or parent_id in (select admin.visible_template_category_keys()))
+  );
 
 -- The existing flat editor reorders public template roots only.
 create or replace function public.admin_reorder_template_categories(p_keys text[], p_actor uuid)
