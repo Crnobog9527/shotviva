@@ -32,6 +32,15 @@ describe('reference media gateway', () => {
     expect(fetchObject).not.toHaveBeenCalled()
   })
 
+  it.each(['references', 'prompt-lab'])('denies banned administrators before reading or signing %s', async path => {
+    user.mockResolvedValue({ ...session('admin'), user: { role: 'admin', verified: true, banned: true } })
+    const req = new NextRequest(url.replace('/references/', '/' + path + '/'), { headers: { cookie: 'sb-test-auth-token=private' } })
+    expect((await referenceMedia(req)).status).toBe(404)
+    expect(lookup).not.toHaveBeenCalled()
+    expect(sign).not.toHaveBeenCalled()
+    expect(fetchObject).not.toHaveBeenCalled()
+  })
+
   it('protects generated results and only signs the registered output after authorization', async () => {
     const output = new NextRequest(url.replace('/references/', '/prompt-lab/'), { headers: { cookie: 'sb-test-auth-token=private' } })
     user.mockResolvedValue(session('user'))

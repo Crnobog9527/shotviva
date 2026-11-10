@@ -42,7 +42,7 @@ export async function referenceMedia(request: NextRequest) {
   if (!id.success || request.method !== 'GET' || !hasSessionCookie(request)) return empty(404)
   try {
     const { user, response } = await currentProxyUser(request)
-    if (user?.role !== 'admin' || !user.verified) return withCookies(empty(404), response())
+    if (user?.role !== 'admin' || !user.verified || user.banned) return withCookies(empty(404), response())
     return withCookies(await streamReference(id.data, request, result), response())
   } catch {
     // In particular, keep signed upstream URLs out of exception logs and browser responses.

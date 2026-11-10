@@ -29,6 +29,6 @@ export async function requireUser(next?: string): Promise<SessionUser> {
 // Admin pages must not reveal they exist, so non-admins get a plain 404.
 export async function requireAdmin(): Promise<SessionUser> {
   const user = await getSessionUser()
-  if (!user || !user.verified || user.role !== 'admin') notFound()
+  if (!user || !user.verified || user.role !== 'admin' || user.banned) notFound()
   return user
 }

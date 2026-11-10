@@ -45,7 +45,9 @@ export function MatrixSubmit({ input, disabled, changed, onBusy }: { input: Matr
       await executeCells(result.cells, changed)
       id.current = null; setQuote(null)
     } catch (e) {
-      if (e instanceof LabRequestError && e.code === 'CONFLICT') setQuote(null)
+      if (e instanceof LabRequestError && ['CONFLICT', 'IDEMPOTENCY_CONFLICT'].includes(e.code)) {
+        id.current = null; setQuote(null)
+      }
       setError(labError(e))
     } finally { setBusy(false); onBusy(false) }
   }
