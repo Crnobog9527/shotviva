@@ -2359,6 +2359,26 @@ $$;
 ALTER FUNCTION "public"."admin_affiliate_allow_reapply"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_affiliate_commission_history"("p_actor" "uuid", "p_user" "uuid", "p_commission" bigint, "p_level" smallint, "p_before_at" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_before_id" bigint DEFAULT NULL::bigint) RETURNS TABLE("id" bigint, "at" timestamp with time zone, "old_amount" bigint, "new_amount" bigint, "old_status" "text", "new_status" "text", "reason" "text")
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  perform public._affiliate_require_admin(p_actor);
+  if p_level is null or p_level not in (1,2) or (p_before_at is null)<>(p_before_id is null)
+    then raise exception 'INVALID_INPUT'; end if;
+  return query select h.id,h.at,h.old_amount,h.new_amount,h.old_status,h.new_status,h.reason
+    from public.affiliate_commissions c join public.affiliate_commission_changes h on h.commission_id=c.id
+    where c.id=p_commission and c.affiliate_user_id=p_user and c.level=p_level
+      and (p_before_at is null or (h.at,h.id)<(p_before_at,p_before_id))
+    order by h.at desc,h.id desc limit 31;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_affiliate_commission_history"("p_actor" "uuid", "p_user" "uuid", "p_commission" bigint, "p_level" smallint, "p_before_at" timestamp with time zone, "p_before_id" bigint) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_affiliate_commission_release"("p_actor" "uuid", "p_input" "jsonb") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -2430,6 +2450,99 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_affiliate_decide"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_affiliate_directory"("p_actor" "uuid", "p_query" "text" DEFAULT NULL::"text", "p_review" "text" DEFAULT NULL::"text", "p_parent" "uuid" DEFAULT NULL::"uuid", "p_before_at" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_before_id" "uuid" DEFAULT NULL::"uuid") RETURNS TABLE("user_id" "uuid", "slug" "text", "status" "text", "source" "text", "name" "text", "email" "text", "phone" "text", "team_enabled" boolean, "team_count" bigint, "created_at" timestamp with time zone, "total" bigint, "confirmed" bigint, "unwithdrawn" bigint, "paid" bigint)
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare v_q text:=nullif(lower(btrim(p_query)),''); v_prefix text; v_phone text; v_user uuid;
+begin
+  perform public._affiliate_require_admin(p_actor);
+  if length(v_q)>254 or p_review not in ('pending','rejected') or (p_before_at is null)<>(p_before_id is null)
+    then raise exception 'INVALID_INPUT'; end if;
+  if v_q ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then v_user:=v_q::uuid; end if;
+  if v_q ~ '^\+?[0-9][0-9 ()-]*$' then v_phone:=regexp_replace(v_q,'[^0-9]','','g'); end if;
+  v_prefix:=replace(replace(replace(v_q,'\','\\'),'%','\%'),'_','\_')||'%';
+  return query with matches as (
+    select a.user_id from public.affiliates a where a.user_id=v_user
+    union all select a.user_id from public.affiliates a where v_prefix is not null and a.slug like v_prefix
+    union all select a.user_id from public.affiliates a
+      where v_prefix is not null and lower(left(a.application->>'name',254)) like v_prefix
+    union all select u.id from auth.users u where position('@' in v_q)>0 and u.email=v_q
+    union all select u.id from auth.users u where v_phone is not null and u.phone in (v_phone,'+'||v_phone,
+      case when v_phone ~ '^1[3-9][0-9]{9}$' then '86'||v_phone end)
+  ), page as materialized (
+    select a.user_id,a.created_at from public.affiliates a
+    where (v_q is null or a.user_id in (select m.user_id from matches m))
+      and (p_review is null or (a.status=p_review and a.application->>'source' is distinct from 'admin_invite'))
+      and (p_parent is null or a.parent_user_id=p_parent)
+      and (p_before_at is null or (a.created_at,a.user_id)<(p_before_at,p_before_id))
+    order by a.created_at desc,a.user_id desc limit 31
+  )
+  select r.user_id,r.slug,r.status,r.source,r.name,r.email,r.phone,r.team_enabled,r.team_count,r.created_at,
+    r.total,r.confirmed,r.unwithdrawn,r.paid
+  from page join admin.affiliate_directory_rows r on r.user_id=page.user_id order by page.created_at desc,page.user_id desc;
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."admin_affiliate_directory"("p_actor" "uuid", "p_query" "text", "p_review" "text", "p_parent" "uuid", "p_before_at" timestamp with time zone, "p_before_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_affiliate_dossier"("p_actor" "uuid", "p_user" "uuid") RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare v_result jsonb;
+begin
+  perform public._affiliate_require_admin(p_actor);
+  select to_jsonb(r)||jsonb_build_object(
+    'registered_at',u.created_at,'country',a.country,'parent_user_id',a.parent_user_id,'application',a.application,
+    'payout_method',a.payout_method,'payout_details',a.payout_details,'us_person',a.us_person,
+    'terms_version',a.terms_version,'terms_accepted_at',a.terms_accepted_at,'admin_note',a.admin_note,
+    'approved_at',a.approved_at,'approved_by',a.approved_by,'reject_reason',a.reject_reason,'reapply_allowed',a.reapply_allowed,
+    'rates',(select coalesce(jsonb_agg(jsonb_build_object('product_kind',o.product_kind,'l1_bp',o.l1_bp,'l2_bp',o.l2_bp)
+      order by o.product_kind),'[]'::jsonb) from public.affiliate_rate_overrides o where o.user_id=r.user_id))
+    into v_result from admin.affiliate_directory_rows r join public.affiliates a on a.user_id=r.user_id
+      join auth.users u on u.id=r.user_id where r.user_id=p_user;
+  return v_result;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_affiliate_dossier"("p_actor" "uuid", "p_user" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_affiliate_dossier_log"("p_actor" "uuid", "p_user" "uuid", "p_before_at" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_before_id" bigint DEFAULT NULL::bigint) RETURNS TABLE("id" bigint, "created_at" timestamp with time zone, "action" "text", "user_id" "uuid", "target_id" "text", "reason" "text")
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  perform public._affiliate_require_admin(p_actor);
+  if (p_before_at is null)<>(p_before_id is null) then raise exception 'INVALID_INPUT'; end if;
+  if not exists(select from public.affiliates a where a.user_id=p_user) then return; end if;
+  return query with targets(operation,target) as (
+    select unnest(array['affiliate_create','affiliate_decide','affiliate_set']),p_user::text
+    union all select 'affiliate_adjust',j.id::text from public.affiliate_adjustments j where j.affiliate_user_id=p_user
+    union all select 'affiliate_payout_decide',p.id::text from public.affiliate_payouts p where p.affiliate_user_id=p_user
+    union all select 'affiliate_commission_release',c.id::text from public.affiliate_commissions c where c.affiliate_user_id=p_user
+    union all select 'affiliate_recompute',c.payment_id::text from public.affiliate_commissions c where c.affiliate_user_id=p_user
+  ), events as (
+    select l.id,l.created_at,l.action,l.user_id,l.target_id,l.reason
+      from targets t join public.admin_audit_log l on (l.action,l.target_id)=(t.operation,t.target)
+    union all
+    select l.id,l.created_at,l.action,l.user_id,l.target_id,l.reason from public.admin_audit_log l
+      where l.action='affiliate_rebind' and array[l.target_id,split_part(l.reason,' ',1),split_part(l.reason,' ',3)] @> array[p_user::text]
+  )
+  select e.id,e.created_at,e.action,e.user_id,e.target_id,e.reason from events e
+    where p_before_at is null or (e.created_at,e.id)<(p_before_at,p_before_id)
+    order by e.created_at desc,e.id desc limit 31;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_affiliate_dossier_log"("p_actor" "uuid", "p_user" "uuid", "p_before_at" timestamp with time zone, "p_before_id" bigint) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_affiliate_find_user"("p_actor" "uuid", "p_query" "text") RETURNS "jsonb"
@@ -9463,6 +9576,137 @@ $$;
 ALTER FUNCTION "public"."wishlist_eligible"("p_user_id" "uuid") OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."affiliate_adjustments" (
+    "id" bigint NOT NULL,
+    "request_id" "uuid" NOT NULL,
+    "affiliate_user_id" "uuid" NOT NULL,
+    "amount" bigint NOT NULL,
+    "reason" "text" NOT NULL,
+    "created_by" "uuid",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "affiliate_adjustments_amount_check" CHECK (("amount" <> 0)),
+    CONSTRAINT "affiliate_adjustments_reason_check" CHECK (("length"(TRIM(BOTH FROM "reason")) > 0))
+);
+
+
+ALTER TABLE "public"."affiliate_adjustments" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."affiliate_commissions" (
+    "id" bigint NOT NULL,
+    "payment_id" bigint NOT NULL,
+    "affiliate_user_id" "uuid" NOT NULL,
+    "level" smallint NOT NULL,
+    "product_id" "text" NOT NULL,
+    "rate_bp" integer NOT NULL,
+    "base_usd" bigint NOT NULL,
+    "amount" bigint NOT NULL,
+    "status" "text" NOT NULL,
+    "confirm_after" timestamp with time zone NOT NULL,
+    "confirmed_at" timestamp with time zone,
+    "void_reason" "text",
+    "flags" "text"[] DEFAULT '{}'::"text"[] NOT NULL,
+    "released_by" "uuid",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "payout_retained" "int8multirange",
+    CONSTRAINT "affiliate_commissions_amount_check" CHECK (("amount" >= 0)),
+    CONSTRAINT "affiliate_commissions_base_usd_check" CHECK (("base_usd" >= 0)),
+    CONSTRAINT "affiliate_commissions_level_check" CHECK (("level" = ANY (ARRAY[1, 2]))),
+    CONSTRAINT "affiliate_commissions_rate_bp_check" CHECK ((("rate_bp" >= 0) AND ("rate_bp" <= 10000))),
+    CONSTRAINT "affiliate_commissions_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'on_hold'::"text", 'confirmed'::"text", 'void'::"text"])))
+);
+
+
+ALTER TABLE "public"."affiliate_commissions" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."affiliates" (
+    "user_id" "uuid" NOT NULL,
+    "slug" "text" NOT NULL COLLATE "pg_catalog"."C",
+    "status" "text" DEFAULT 'pending'::"text" NOT NULL,
+    "parent_user_id" "uuid",
+    "team_enabled" boolean DEFAULT false NOT NULL,
+    "country" "text",
+    "payout_method" "text",
+    "payout_details" "text",
+    "us_person" boolean,
+    "terms_version" "text",
+    "terms_accepted_at" timestamp with time zone,
+    "application" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "reject_reason" "text",
+    "approved_at" timestamp with time zone,
+    "approved_by" "uuid",
+    "admin_note" "text",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "reapply_allowed" boolean DEFAULT false NOT NULL,
+    CONSTRAINT "affiliates_check" CHECK (("parent_user_id" <> "user_id")),
+    CONSTRAINT "affiliates_payout_method_check" CHECK (("payout_method" = ANY (ARRAY['paypal'::"text", 'wise'::"text", 'bank'::"text", 'alipay'::"text", 'other'::"text"]))),
+    CONSTRAINT "affiliates_slug_check" CHECK ((("slug" ~ '^[a-z0-9-]{3,24}$'::"text") AND ("slug" <> ALL (ARRAY['admin'::"text", 'api'::"text", 'www'::"text", 'shotviva'::"text", 'partners'::"text", 'support'::"text"])))),
+    CONSTRAINT "affiliates_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'active'::"text", 'rejected'::"text", 'suspended'::"text", 'banned'::"text"])))
+);
+
+
+ALTER TABLE "public"."affiliates" OWNER TO "postgres";
+
+
+CREATE OR REPLACE VIEW "public"."affiliate_balances" WITH ("security_invoker"='true') AS
+ SELECT "a"."user_id" AS "affiliate_user_id",
+    (COALESCE("c"."confirmed", (0)::numeric))::bigint AS "confirmed",
+    (COALESCE("c"."pending", (0)::numeric))::bigint AS "pending",
+    (COALESCE("p"."paid", (0)::numeric))::bigint AS "paid",
+    (((COALESCE("c"."confirmed", (0)::numeric) + COALESCE("j"."adjusted", (0)::numeric)) - COALESCE("p"."reserved", (0)::numeric)))::bigint AS "available"
+   FROM ((("public"."affiliates" "a"
+     LEFT JOIN LATERAL ( SELECT "sum"("affiliate_commissions"."amount") FILTER (WHERE ("affiliate_commissions"."status" = 'confirmed'::"text")) AS "confirmed",
+            "sum"("affiliate_commissions"."amount") FILTER (WHERE ("affiliate_commissions"."status" = 'pending'::"text")) AS "pending"
+           FROM "public"."affiliate_commissions"
+          WHERE ("affiliate_commissions"."affiliate_user_id" = "a"."user_id")) "c" ON (true))
+     LEFT JOIN LATERAL ( SELECT "sum"("affiliate_adjustments"."amount") AS "adjusted"
+           FROM "public"."affiliate_adjustments"
+          WHERE ("affiliate_adjustments"."affiliate_user_id" = "a"."user_id")) "j" ON (true))
+     LEFT JOIN LATERAL ( SELECT "sum"(COALESCE("affiliate_payouts"."paid_amount", "affiliate_payouts"."amount")) FILTER (WHERE ("affiliate_payouts"."status" = 'paid'::"text")) AS "paid",
+            "sum"(
+                CASE
+                    WHEN ("affiliate_payouts"."status" = 'paid'::"text") THEN COALESCE("affiliate_payouts"."paid_amount", "affiliate_payouts"."amount")
+                    ELSE "affiliate_payouts"."amount"
+                END) FILTER (WHERE ("affiliate_payouts"."status" = ANY (ARRAY['paid'::"text", 'due'::"text", 'held'::"text"]))) AS "reserved"
+           FROM "public"."affiliate_payouts"
+          WHERE ("affiliate_payouts"."affiliate_user_id" = "a"."user_id")) "p" ON (true));
+
+
+ALTER VIEW "public"."affiliate_balances" OWNER TO "postgres";
+
+
+CREATE OR REPLACE VIEW "admin"."affiliate_directory_rows" WITH ("security_invoker"='true') AS
+ SELECT "a"."user_id",
+    "a"."slug",
+    "a"."status",
+    ("a"."application" ->> 'source'::"text") AS "source",
+    NULLIF("btrim"(("a"."application" ->> 'name'::"text")), ''::"text") AS "name",
+    NULLIF(("u"."email")::"text", ''::"text") AS "email",
+    NULLIF("u"."phone", ''::"text") AS "phone",
+    "a"."team_enabled",
+        CASE
+            WHEN "a"."team_enabled" THEN ( SELECT "count"(*) AS "count"
+               FROM "public"."affiliates" "child"
+              WHERE (("child"."parent_user_id" = "a"."user_id") AND ("child"."status" = 'active'::"text")))
+            ELSE NULL::bigint
+        END AS "team_count",
+    "a"."created_at",
+    (((("b"."confirmed" + "b"."pending"))::numeric + COALESCE(( SELECT "sum"("c"."amount") AS "sum"
+           FROM "public"."affiliate_commissions" "c"
+          WHERE (("c"."affiliate_user_id" = "a"."user_id") AND ("c"."status" = 'on_hold'::"text"))), (0)::numeric)))::bigint AS "total",
+    "b"."confirmed",
+    ("b"."available" + "b"."pending") AS "unwithdrawn",
+    "b"."paid"
+   FROM (("public"."affiliates" "a"
+     JOIN "auth"."users" "u" ON (("u"."id" = "a"."user_id")))
+     JOIN "public"."affiliate_balances" "b" ON (("b"."affiliate_user_id" = "a"."user_id")));
+
+
+ALTER VIEW "admin"."affiliate_directory_rows" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "admin"."batch_zip_requests" (
     "user_id" "uuid" NOT NULL,
     "request_times" timestamp with time zone[] DEFAULT '{}'::timestamp with time zone[] NOT NULL,
@@ -9819,22 +10063,6 @@ CREATE TABLE IF NOT EXISTS "public"."admin_test_spend" (
 ALTER TABLE "public"."admin_test_spend" OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."affiliate_adjustments" (
-    "id" bigint NOT NULL,
-    "request_id" "uuid" NOT NULL,
-    "affiliate_user_id" "uuid" NOT NULL,
-    "amount" bigint NOT NULL,
-    "reason" "text" NOT NULL,
-    "created_by" "uuid",
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    CONSTRAINT "affiliate_adjustments_amount_check" CHECK (("amount" <> 0)),
-    CONSTRAINT "affiliate_adjustments_reason_check" CHECK (("length"(TRIM(BOTH FROM "reason")) > 0))
-);
-
-
-ALTER TABLE "public"."affiliate_adjustments" OWNER TO "postgres";
-
-
 ALTER TABLE "public"."affiliate_adjustments" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME "public"."affiliate_adjustments_id_seq"
     START WITH 1
@@ -9844,91 +10072,6 @@ ALTER TABLE "public"."affiliate_adjustments" ALTER COLUMN "id" ADD GENERATED ALW
     CACHE 1
 );
 
-
-
-CREATE TABLE IF NOT EXISTS "public"."affiliate_commissions" (
-    "id" bigint NOT NULL,
-    "payment_id" bigint NOT NULL,
-    "affiliate_user_id" "uuid" NOT NULL,
-    "level" smallint NOT NULL,
-    "product_id" "text" NOT NULL,
-    "rate_bp" integer NOT NULL,
-    "base_usd" bigint NOT NULL,
-    "amount" bigint NOT NULL,
-    "status" "text" NOT NULL,
-    "confirm_after" timestamp with time zone NOT NULL,
-    "confirmed_at" timestamp with time zone,
-    "void_reason" "text",
-    "flags" "text"[] DEFAULT '{}'::"text"[] NOT NULL,
-    "released_by" "uuid",
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "payout_retained" "int8multirange",
-    CONSTRAINT "affiliate_commissions_amount_check" CHECK (("amount" >= 0)),
-    CONSTRAINT "affiliate_commissions_base_usd_check" CHECK (("base_usd" >= 0)),
-    CONSTRAINT "affiliate_commissions_level_check" CHECK (("level" = ANY (ARRAY[1, 2]))),
-    CONSTRAINT "affiliate_commissions_rate_bp_check" CHECK ((("rate_bp" >= 0) AND ("rate_bp" <= 10000))),
-    CONSTRAINT "affiliate_commissions_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'on_hold'::"text", 'confirmed'::"text", 'void'::"text"])))
-);
-
-
-ALTER TABLE "public"."affiliate_commissions" OWNER TO "postgres";
-
-
-CREATE TABLE IF NOT EXISTS "public"."affiliates" (
-    "user_id" "uuid" NOT NULL,
-    "slug" "text" NOT NULL COLLATE "pg_catalog"."C",
-    "status" "text" DEFAULT 'pending'::"text" NOT NULL,
-    "parent_user_id" "uuid",
-    "team_enabled" boolean DEFAULT false NOT NULL,
-    "country" "text",
-    "payout_method" "text",
-    "payout_details" "text",
-    "us_person" boolean,
-    "terms_version" "text",
-    "terms_accepted_at" timestamp with time zone,
-    "application" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
-    "reject_reason" "text",
-    "approved_at" timestamp with time zone,
-    "approved_by" "uuid",
-    "admin_note" "text",
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "reapply_allowed" boolean DEFAULT false NOT NULL,
-    CONSTRAINT "affiliates_check" CHECK (("parent_user_id" <> "user_id")),
-    CONSTRAINT "affiliates_payout_method_check" CHECK (("payout_method" = ANY (ARRAY['paypal'::"text", 'wise'::"text", 'bank'::"text", 'alipay'::"text", 'other'::"text"]))),
-    CONSTRAINT "affiliates_slug_check" CHECK ((("slug" ~ '^[a-z0-9-]{3,24}$'::"text") AND ("slug" <> ALL (ARRAY['admin'::"text", 'api'::"text", 'www'::"text", 'shotviva'::"text", 'partners'::"text", 'support'::"text"])))),
-    CONSTRAINT "affiliates_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'active'::"text", 'rejected'::"text", 'suspended'::"text", 'banned'::"text"])))
-);
-
-
-ALTER TABLE "public"."affiliates" OWNER TO "postgres";
-
-
-CREATE OR REPLACE VIEW "public"."affiliate_balances" WITH ("security_invoker"='true') AS
- SELECT "a"."user_id" AS "affiliate_user_id",
-    (COALESCE("c"."confirmed", (0)::numeric))::bigint AS "confirmed",
-    (COALESCE("c"."pending", (0)::numeric))::bigint AS "pending",
-    (COALESCE("p"."paid", (0)::numeric))::bigint AS "paid",
-    (((COALESCE("c"."confirmed", (0)::numeric) + COALESCE("j"."adjusted", (0)::numeric)) - COALESCE("p"."reserved", (0)::numeric)))::bigint AS "available"
-   FROM ((("public"."affiliates" "a"
-     LEFT JOIN LATERAL ( SELECT "sum"("affiliate_commissions"."amount") FILTER (WHERE ("affiliate_commissions"."status" = 'confirmed'::"text")) AS "confirmed",
-            "sum"("affiliate_commissions"."amount") FILTER (WHERE ("affiliate_commissions"."status" = 'pending'::"text")) AS "pending"
-           FROM "public"."affiliate_commissions"
-          WHERE ("affiliate_commissions"."affiliate_user_id" = "a"."user_id")) "c" ON (true))
-     LEFT JOIN LATERAL ( SELECT "sum"("affiliate_adjustments"."amount") AS "adjusted"
-           FROM "public"."affiliate_adjustments"
-          WHERE ("affiliate_adjustments"."affiliate_user_id" = "a"."user_id")) "j" ON (true))
-     LEFT JOIN LATERAL ( SELECT "sum"(COALESCE("affiliate_payouts"."paid_amount", "affiliate_payouts"."amount")) FILTER (WHERE ("affiliate_payouts"."status" = 'paid'::"text")) AS "paid",
-            "sum"(
-                CASE
-                    WHEN ("affiliate_payouts"."status" = 'paid'::"text") THEN COALESCE("affiliate_payouts"."paid_amount", "affiliate_payouts"."amount")
-                    ELSE "affiliate_payouts"."amount"
-                END) FILTER (WHERE ("affiliate_payouts"."status" = ANY (ARRAY['paid'::"text", 'due'::"text", 'held'::"text"]))) AS "reserved"
-           FROM "public"."affiliate_payouts"
-          WHERE ("affiliate_payouts"."affiliate_user_id" = "a"."user_id")) "p" ON (true));
-
-
-ALTER VIEW "public"."affiliate_balances" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."affiliate_click_days" (
@@ -11004,6 +11147,10 @@ CREATE INDEX "affiliate_adjustments_owner_idx" ON "public"."affiliate_adjustment
 
 
 
+CREATE INDEX "affiliate_audit_target_page_idx" ON "public"."admin_audit_log" USING "btree" ("target_id", "action", "created_at" DESC, "id" DESC) WHERE ("target_id" IS NOT NULL);
+
+
+
 CREATE INDEX "affiliate_changes_history_idx" ON "public"."affiliate_commission_changes" USING "btree" ("commission_id", "at" DESC, "id" DESC);
 
 
@@ -11048,11 +11195,23 @@ CREATE INDEX "affiliate_payouts_period_idx" ON "public"."affiliate_payouts" USIN
 
 
 
+CREATE INDEX "affiliate_rebind_participants_idx" ON "public"."admin_audit_log" USING "gin" ((ARRAY["target_id", "split_part"("reason", ' '::"text", 1), "split_part"("reason", ' '::"text", 3)])) WHERE ("action" = 'affiliate_rebind'::"text");
+
+
+
+CREATE INDEX "affiliates_application_name_prefix_idx" ON "public"."affiliates" USING "btree" ("lower"("left"(("application" ->> 'name'::"text"), 254)) "text_pattern_ops");
+
+
+
 CREATE INDEX "affiliates_created_idx" ON "public"."affiliates" USING "btree" ("created_at" DESC, "user_id" DESC);
 
 
 
 CREATE INDEX "affiliates_parent_created_idx" ON "public"."affiliates" USING "btree" ("parent_user_id", "created_at" DESC, "slug" DESC) WHERE ("parent_user_id" IS NOT NULL);
+
+
+
+CREATE INDEX "affiliates_parent_member_page_idx" ON "public"."affiliates" USING "btree" ("parent_user_id", "created_at" DESC, "user_id" DESC) WHERE ("parent_user_id" IS NOT NULL);
 
 
 
@@ -12610,6 +12769,11 @@ GRANT ALL ON FUNCTION "public"."admin_affiliate_allow_reapply"("p_actor" "uuid",
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_affiliate_commission_history"("p_actor" "uuid", "p_user" "uuid", "p_commission" bigint, "p_level" smallint, "p_before_at" timestamp with time zone, "p_before_id" bigint) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_affiliate_commission_history"("p_actor" "uuid", "p_user" "uuid", "p_commission" bigint, "p_level" smallint, "p_before_at" timestamp with time zone, "p_before_id" bigint) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_affiliate_commission_release"("p_actor" "uuid", "p_input" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_affiliate_commission_release"("p_actor" "uuid", "p_input" "jsonb") TO "service_role";
 
@@ -12622,6 +12786,21 @@ GRANT ALL ON FUNCTION "public"."admin_affiliate_create"("p_actor" "uuid", "p_inp
 
 REVOKE ALL ON FUNCTION "public"."admin_affiliate_decide"("p_actor" "uuid", "p_input" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_affiliate_decide"("p_actor" "uuid", "p_input" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_affiliate_directory"("p_actor" "uuid", "p_query" "text", "p_review" "text", "p_parent" "uuid", "p_before_at" timestamp with time zone, "p_before_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_affiliate_directory"("p_actor" "uuid", "p_query" "text", "p_review" "text", "p_parent" "uuid", "p_before_at" timestamp with time zone, "p_before_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_affiliate_dossier"("p_actor" "uuid", "p_user" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_affiliate_dossier"("p_actor" "uuid", "p_user" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_affiliate_dossier_log"("p_actor" "uuid", "p_user" "uuid", "p_before_at" timestamp with time zone, "p_before_id" bigint) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_affiliate_dossier_log"("p_actor" "uuid", "p_user" "uuid", "p_before_at" timestamp with time zone, "p_before_id" bigint) TO "service_role";
 
 
 
@@ -13593,6 +13772,22 @@ GRANT ALL ON FUNCTION "public"."wishlist_eligible"("p_user_id" "uuid") TO "servi
 
 
 
+GRANT SELECT ON TABLE "public"."affiliate_adjustments" TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "public"."affiliate_commissions" TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "public"."affiliates" TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "public"."affiliate_balances" TO "service_role";
+
+
+
 GRANT SELECT,INSERT ON TABLE "admin"."template_copy_requests" TO "service_role";
 
 
@@ -13633,22 +13828,6 @@ GRANT ALL ON TABLE "public"."admin_test_runs" TO "service_role";
 
 
 GRANT ALL ON TABLE "public"."admin_test_spend" TO "service_role";
-
-
-
-GRANT SELECT ON TABLE "public"."affiliate_adjustments" TO "service_role";
-
-
-
-GRANT SELECT ON TABLE "public"."affiliate_commissions" TO "service_role";
-
-
-
-GRANT SELECT ON TABLE "public"."affiliates" TO "service_role";
-
-
-
-GRANT SELECT ON TABLE "public"."affiliate_balances" TO "service_role";
 
 
 
