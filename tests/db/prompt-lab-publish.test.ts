@@ -69,6 +69,10 @@ describe('publish a prompt-lab result as a template draft', () => {
     expect(await bad({ p_assets: assets(id) })).toBe('INVALID_INPUT')
     expect(await bad({ p_assets: assets(id, styleRef('other')) })).toBe('INVALID_INPUT')
     expect((await f.pg!.query('select 1 from public.templates where id=$1', [id])).rowCount).toBe(0)
+    // A taken id wins over every later refusal, so the app knows covers/<id>/ may belong to that template.
+    const taken = await api.rpc('admin_publish_prompt_lab_run', { p_actor: f.actor, p_run_id: runId,
+      p_template: { id: 'edit', name: 'x', category: 'missing' }, p_assets: {}, p_assets_base: base })
+    expect(taken.error?.message).toBe('TEMPLATE_EXISTS')
   })
 
   it('creates one inactive, closed-for-sale draft with the run’s prompt, model, quality, category and covers, idempotently', async () => {

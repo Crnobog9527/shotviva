@@ -5099,6 +5099,10 @@ begin
   perform pg_advisory_xact_lock(hashtextextended('shotviva.prompt_lab_publish:'||p_run_id::text,0));
   select template_id into existing from public.reference_template_sources where run_id=p_run_id;
   if found then return jsonb_build_object('id',existing,'existing',true); end if;
+  -- An id taken by another template is reported before any other refusal, so the caller knows
+  -- objects under covers/<id>/ may be that template's and keeps them.
+  if v_id is null or v_id !~ '^[a-z0-9]+(-[a-z0-9]+)*$' or length(v_id)>64 then raise exception 'INVALID_INPUT'; end if;
+  if exists(select from public.templates where id=v_id) then raise exception 'TEMPLATE_EXISTS'; end if;
 
   select x.session_id,x.status,x.model,x.quality,x.use_style_reference,v.prompt,s.asset_id into r
     from public.prompt_lab_runs x join public.prompt_lab_versions v on v.id=x.version_id
@@ -5114,7 +5118,6 @@ begin
   if v_id is null or v_id !~ '^[a-z0-9]+(-[a-z0-9]+)*$' or length(v_id)>64 or v_id in ('edit','freeform')
      or v_name is null or length(v_name) not between 1 and 120 or length(coalesce(v_zh,''))>120
      or p_assets_base is null or p_assets_base !~ '^https?://[^\s?#]+[^/]$' then raise exception 'INVALID_INPUT'; end if;
-  if exists(select from public.templates where id=v_id) then raise exception 'TEMPLATE_EXISTS'; end if;
   select p.root_key,c.is_system into v_root,v_system from public.template_category_paths p
     join public.template_categories c on c.key=p.root_key where p.key=v_category;
   if v_root is null or v_system then raise exception 'INVALID_CATEGORY'; end if;

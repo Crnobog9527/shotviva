@@ -9,9 +9,9 @@ import { executeCells } from './matrix-submit'
 import { PublishDialog } from './publish-dialog'
 
 const src = (id: string) => '/admin-media/prompt-lab/' + id
-type Props = { sessionId: string; page: LabPage<LabRun>; publish: LabPublishOptions; changed(): Promise<void>; more(): Promise<void> }
+type Props = { sessionId: string; page: LabPage<LabRun>; publish: LabPublishOptions; archived: boolean; changed(): Promise<void>; more(): Promise<void> }
 
-export function Results({ sessionId, page, publish, changed, more }: Props) {
+export function Results({ sessionId, page, publish, archived, changed, more }: Props) {
   const [selected, setSelected] = useState<string[]>([])
   const [preview, setPreview] = useState<string[]>([])
   const [error, setError] = useState('')
@@ -34,7 +34,7 @@ export function Results({ sessionId, page, publish, changed, more }: Props) {
     {[...groups.entries()].map(([id, runs]) => <ResultTable key={id} runs={runs} selected={selected}
       onSelect={run => setSelected(prev => prev.includes(run) ? prev.filter(x => x !== run) : [...prev.slice(-1), run])}
       onZoom={run => setPreview([run])} onMark={mark} busy={busy}
-      sources={publish.sources} onPublish={setPublishing} />)}
+      sources={publish.sources} onPublish={archived ? undefined : setPublishing} />)}
     {page.next && <Button variant="outline" disabled={busy} onClick={() => act(more)}>{c.more}</Button>}
     {error && <p role="alert">{error}</p>}
     {publishing && <PublishDialog run={publishing} options={publish} onClose={() => setPublishing(null)} />}
@@ -46,7 +46,7 @@ export function Results({ sessionId, page, publish, changed, more }: Props) {
 
 type TableProps = { runs: LabRun[]; selected: string[]; onSelect(id: string): void; onZoom(id: string): void
   onMark(run: LabRun, best: boolean): void; busy: boolean
-  sources: Record<string, string>; onPublish(run: LabRun): void }
+  sources: Record<string, string>; onPublish?: (run: LabRun) => void }
 function ResultTable({ runs, ...controls }: TableProps) {
   const byPhoto = Map.groupBy(runs, r => r.photo_id)
   const versions = [...new Set(runs.map(r => r.prompt_lab_versions.version_no))].sort((a,b) => a-b)
@@ -77,8 +77,10 @@ function Output({ id }: { id: string }) {
   return <img src={src(id)} loading="lazy" alt={c.outputAlt} className="max-h-[65vh] w-full rounded object-contain" />
 }
 
-function PublishAction({ run, template, busy, onPublish }: { run: LabRun; template?: string; busy: boolean; onPublish(run: LabRun): void }) {
+// An archived reference cannot be published (the server refuses too), so the button is hidden.
+function PublishAction({ run, template, busy, onPublish }: { run: LabRun; template?: string; busy: boolean; onPublish?: (run: LabRun) => void }) {
   if (template) return <p className="text-xs">{publishCopy.published} ·{' '}
     <Link className="underline underline-offset-4" href={'/admin/templates?edit=' + encodeURIComponent(template)}>{publishCopy.openDraft}</Link></p>
+  if (!onPublish) return null
   return <Button size="xs" variant={run.is_best ? 'default' : 'outline'} disabled={busy} onClick={() => onPublish(run)}>{publishCopy.open}</Button>
 }

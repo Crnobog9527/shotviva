@@ -61,6 +61,6 @@ export function PromptLab({ sessionId, assetId, archived, initial, models, summa
       <Versions sessionId={sessionId} versions={versions} refresh={refreshVersions} more={moreVersions} archived={archived} />
       <Matrix sessionId={sessionId} versions={versions.items} models={models.image} recent={summary.recentPhotos} budget={budget} changed={refresh} archived={archived} />
     </div>
-    <Results sessionId={sessionId} page={runs} publish={publish} changed={refresh} more={moreRuns} />
+    <Results sessionId={sessionId} page={runs} publish={publish} archived={archived} changed={refresh} more={moreRuns} />
     {error && <p role="alert">{error}</p>}</div>
 }

@@ -3,8 +3,10 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { AppError, type ErrorCode } from '@/core/errors'
+import { logger } from '@/core/logger'
 import { input, publishInput } from './contracts'
-import { removeCreated, writeDraftObjects, type Created, type PublishSource, type PublishStores } from './publish-objects'
+import { cleanAfterFailure } from './publish-cleanup'
+import { writeDraftObjects, type Created, type PublishSource, type PublishStores } from './publish-objects'
 
 export type PublishDeps = PublishStores & { db: SupabaseClient }
 export type PublishReceipt = { id: string; existing: boolean }
@@ -34,11 +36,14 @@ const failure = (message: string) => {
   const [code, text] = messages[message] ?? ['INTERNAL', '发布失败，请重试']
   return new AppError(code, text)
 }
-// Known rollbacks mean nothing committed. A transport or unknown failure may have committed, so it
-// never deletes. An id taken in the meantime may share content-hashed covers with that template.
+// Known rollbacks mean nothing committed (a taken id included). A transport or unknown failure
+// may have committed; cleanAfterFailure decides what that allows.
 const rolledBack = (error: { code?: string; message: string }) =>
-  error.message !== 'TEMPLATE_EXISTS' && error.code !== '23505' &&
-  (/^(22|23)/.test(error.code ?? '') || ['P0001', '40001', '40P01'].includes(error.code ?? ''))
+  /^(22|23)/.test(error.code ?? '') || ['P0001', '40001', '40P01'].includes(error.code ?? '')
+// Only the SQLSTATE and our own code: PostgreSQL text could quote the private prompt.
+function logFailure(step: string, error: { code?: string; message: string }) {
+  logger.warn('prompt_lab.publish_failed', { step, sqlstate: error.code ?? null, reason: error.message in messages ? error.message : null })
+}
 
 // 「发布为模板」 (ARCHITECTURE §5 T101): result → "after" cover, its test photo → "before", the
 // reference → a private style image when the run used one; then one transaction writes the draft,
@@ -47,7 +52,7 @@ export async function publishLabRun(deps: PublishDeps, actor: string, raw: unkno
   const p = input(publishInput, raw)
   const args = { p_actor: actor, p_run_id: p.runId }
   const read = await deps.db.rpc('admin_prompt_lab_publish_source', { ...args, p_template_id: p.template.id })
-  if (read.error) throw failure(read.error.message)
+  if (read.error) { logFailure('source', read.error); throw failure(read.error.message) }
   const manifest = source.safeParse(read.data)
   if (!manifest.success) throw new AppError('INTERNAL', '无法读取试跑结果')
   if ('existing' in manifest.data) return { id: manifest.data.existing.id, existing: true }
@@ -55,8 +60,9 @@ export async function publishLabRun(deps: PublishDeps, actor: string, raw: unkno
   let assets
   try {
     assets = await writeDraftObjects(deps, p.template.id, manifest.data.run as PublishSource, created)
-  } catch {
-    await removeCreated(deps, created)
+  } catch (error) {
+    logger.warn('prompt_lab.publish_objects_failed', { name: error instanceof Error ? error.name : 'unknown' })
+    await cleanAfterFailure(deps, p.template.id, created, 'rolled-back')
     throw new AppError('INTERNAL', '封面生成失败，请重试')
   }
   const { data, error } = await deps.db.rpc('admin_publish_prompt_lab_run', {
@@ -64,11 +70,12 @@ export async function publishLabRun(deps: PublishDeps, actor: string, raw: unkno
     p_assets: assets, p_assets_base: deps.assetsBaseUrl,
   })
   if (error) {
-    if (rolledBack(error)) await removeCreated(deps, created)
+    logFailure('commit', error)
+    await cleanAfterFailure(deps, p.template.id, created, rolledBack(error) ? 'rolled-back' : 'unknown')
     throw failure(error.message)
   }
   const committed = receipt.parse(data)
-  // Someone else published this result first: our copies were never referenced.
-  if (committed.existing && committed.id !== p.template.id) await removeCreated(deps, created)
+  // Someone else published this result first; keep only what the template holding our id uses.
+  if (committed.existing) await cleanAfterFailure(deps, p.template.id, created, 'rolled-back')
   return committed
 }
