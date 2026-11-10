@@ -7,9 +7,7 @@ import { logger } from '../logger'
 import { isAffiliateEnabled } from './feature'
 
 const slug = z.string().regex(/^[a-z0-9-]{3,24}$/)
-// How long a referral link click is remembered (shown on the program page).
-export const REFERRAL_COOKIE_DAYS = 60
-const lifetime = REFERRAL_COOKIE_DAYS * 24 * 60 * 60
+const lifetime = 60 * 24 * 60 * 60
 const now = () => Math.floor(Date.now() / 1000)
 
 async function countClick(value: string) {

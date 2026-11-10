@@ -85,8 +85,6 @@ export const referralSchema = z.object({
 })
 export type Account = z.infer<typeof accountSchema>
 export type Settings = z.infer<typeof settingsSchema>
-export const rateSchema = z.object({ product_kind: z.enum(['pack', 'monthly', 'yearly']), l1_bp: z.number().int(), l2_bp: z.number().int() })
-export type Rate = z.infer<typeof rateSchema>
 export type EnrollmentSettings = Pick<Settings, 'apply_min_level' | 'terms_version'>
 export type Commission = z.infer<typeof commissionSchema>
 export type View = (typeof dashboardViews)[number]

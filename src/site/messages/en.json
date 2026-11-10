@@ -1413,25 +1413,10 @@
       "pack_l": "Large credit pack"
     },
     "heroTitle": "Recommend Shotviva. Earn on every purchase.",
-    "heroLede": "Share your link with people who sell, cook, host or create. When they buy credits or a membership, you get a share of what they pay, and renewals count too.",
+    "heroLede": "Share your link with people who sell, cook, host or create. When they buy credits or a membership, you earn a commission.",
     "signupToApply": "Create your Shotviva account to apply",
     "haveAccount": "Already have an account?",
     "loginToApply": "Log in and apply",
-    "numbersTitle": "What you earn",
-    "termsRow": {
-      "short": "Credit packs and monthly plans",
-      "pack": "Credit packs",
-      "monthly": "Monthly plans",
-      "yearly": "Yearly plans",
-      "teamCut": "Team bonus: you also get {rate} when affiliates you recruit make a sale",
-      "cookie": "Link window",
-      "cookieNote": "A visitor who clicks your link is yours for this long, even if they buy later.",
-      "hold": "Confirmation period",
-      "holdNote": "Each commission waits this long, so refunds can settle first.",
-      "payout": "Payout threshold",
-      "payoutNote": "Settled on day {day} of each month (UTC) once your confirmed balance reaches this amount. PayPal, Wise, bank transfer or Alipay."
-    },
-    "days": "{count, plural, one {# day} other {# days}}",
     "howTitle": "How it works",
     "steps": {
       "apply": {
@@ -1443,8 +1428,8 @@
         "body": "Put it in your bio, a tutorial, a post or a message to a client. Any Shotviva page works."
       },
       "earn": {
-        "title": "Get paid monthly",
-        "body": "Track clicks, customers and commissions in your dashboard. Confirmed earnings are settled each month."
+        "title": "Get paid",
+        "body": "Track clicks, customers and commissions in your dashboard. Confirmed earnings are paid out on a regular schedule."
       }
     },
     "faqTitle": "Questions",
@@ -1459,15 +1444,15 @@
       },
       "counts": {
         "q": "Which purchases count?",
-        "a": "Credit packs and memberships bought by people who signed up through your link, or first checked out after clicking it. Membership renewals count too. Your own purchases don't."
+        "a": "Credit packs and memberships bought by people who signed up through your link, or first checked out after clicking it. Your own purchases don't count. The exact rates are in your agreement once you're approved."
       },
       "refunds": {
         "q": "What if a customer gets a refund?",
-        "a": "Commissions wait through the confirmation period first. If a purchase is refunded or disputed, its commission is reduced or cancelled."
+        "a": "Each commission is confirmed after a waiting period. If a purchase is refunded or disputed, its commission is reduced or cancelled."
       },
       "team": {
         "q": "What is a team?",
-        "a": "We can invite active affiliates to recruit others. When someone on your team earns a commission, you earn a team bonus on the same purchase. It never comes out of their share."
+        "a": "We may invite active affiliates to recruit others. When someone on your team earns a commission, you earn a team bonus on the same purchase. It never comes out of their share."
       }
     },
     "readTerms": "Read the full affiliate terms",
