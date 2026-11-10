@@ -35,7 +35,7 @@ async function resized(image: HTMLImageElement, width: number, height: number): 
 // 48MP photo never becomes a 48MP canvas (iOS caps canvases near 16.7MP). Re-encoding drops
 // EXIF, GPS included. Throws when the browser cannot decode the file; the caller then falls
 // back to uploading the original.
-export async function compressImage(file: Blob, options?: { longEdge: number; type: 'image/png' }): Promise<Blob> {
+export async function compressImage(file: Blob, options?: { longEdge: number; type: 'image/png' | 'image/webp' }): Promise<Blob> {
   const { image, release } = await decode(file)
   try {
     const size = targetSize(image.naturalWidth, image.naturalHeight, options?.longEdge)
