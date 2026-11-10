@@ -4,11 +4,13 @@ import dynamic from 'next/dynamic'
 import { useTranslations } from 'next-intl'
 import { useId, useState } from 'react'
 
-import { DiscountSummary } from '../../codes/ui'
+// Straight from the files: the ui index also exports redeemResult (zod), which only the
+// lazily loaded form needs.
+import { DiscountSummary } from '../../codes/ui/discount-summary'
 import { usePaymentChannel } from './channel-context'
 import { refreshDiscount, useDiscount } from './discount-context'
 
-const RedeemForm = dynamic(() => import('../../codes/ui').then(module => module.RedeemForm))
+const RedeemForm = dynamic(() => import('../../codes/ui/redeem-form').then(module => module.RedeemForm))
 
 export function DiscountBanner({ singlePayment = false }: { singlePayment?: boolean }) {
   const t = useTranslations('paywall')

@@ -1,4 +1,4 @@
-import { DEV_APP_VERSION } from '../build-env'
+import { DEV_APP_VERSION } from '../app-version'
 import type { Holds } from './holds'
 import type { StaleKind } from './stale-build'
 

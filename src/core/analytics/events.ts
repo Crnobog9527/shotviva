@@ -5,6 +5,7 @@ import { MAX_BATCH_SIZE } from '../billing/tier-limits'
 import { PRODUCT_IDS } from '../config/define-site'
 import { INQUIRY_USES, MONTHLY_VOLUMES } from '../inquiries/summary-choices'
 import { EDIT_SCOPES } from '../templates/edit-params'
+import { UPLOAD_SIZE_BUCKETS } from './event-values'
 import { findPii } from './pii'
 
 // The event dictionary of ARCHITECTURE §16.2. Names and properties are fixed; changing one
@@ -17,7 +18,7 @@ const errorCode = z.string().regex(/^[A-Z][A-Z0-9_]*$/).max(64)
 // A template toggle's key (templates.fields.toggles, T89).
 const toggleKey = z.string().regex(/^[a-z][a-z0-9_]*$/).max(64)
 
-export const UPLOAD_SIZE_BUCKETS = ['<1MB', '1-5MB', '>5MB'] as const
+export { categorySlug, UPLOAD_SIZE_BUCKETS, uploadSizeBucket } from './event-values'
 export const RESOLUTIONS = ['1k', '2k', '3k'] as const
 export const PAYWALL_TRIGGERS = ['insufficient_credits', 'pricing_page', 'account', 'graylum', 'tier_required'] as const
 export const PRODUCT_TIERS = ['starter', 'pro', 'max', 'pack'] as const
@@ -164,28 +165,4 @@ export function validateEvent<E extends EventName>(event: E, props: unknown): Va
   const result = eventSchemas[event].safeParse(props)
   if (result.success) return { ok: true, props: result.data as EventProps<E> }
   return { ok: false, issues: result.error.issues.map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.code}`) }
-}
-
-// templates.category holds the admin's display name since T53 ("Products & Resale", "Food &
-// Drink"), but the dictionary takes a slug (§16.2), so every `generate` event was refused and
-// dropped ("category: invalid_format" in production logs). Lowercased, with each run of other
-// characters turned into one hyphen; a name with no Latin letters or digits left becomes
-// 'uncategorized' rather than losing the event. From T75 the column holds the category's stable
-// key (already this shape, e.g. 'food-drink'), which passes through unchanged, so events before
-// and after T75 carry the same value. Used by `generate` (server), `template_view` and `template_favorite` (browser).
-export function categorySlug(category: string): string {
-  const slug = category
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 64)
-    .replace(/-+$/, '')
-  return slug || 'uncategorized'
-}
-
-const MB = 1024 * 1024
-
-export function uploadSizeBucket(bytes: number): (typeof UPLOAD_SIZE_BUCKETS)[number] {
-  if (bytes < MB) return '<1MB'
-  return bytes <= 5 * MB ? '1-5MB' : '>5MB'
 }

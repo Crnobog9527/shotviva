@@ -3,7 +3,7 @@
 import { createContext, useContext, type ReactNode } from 'react'
 
 import { pricingV2 } from '../../public-env'
-import { discountedPriceCents } from '../../codes'
+import { discountedPriceCents } from '../../codes/discount'
 import type { SiteProduct } from '../../config'
 import { bestPackOffer } from '../pack-price'
 import { useStanding } from './standing-context'

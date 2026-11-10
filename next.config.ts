@@ -3,6 +3,8 @@ import type { NextConfig } from 'next'
 import createNextIntlPlugin from 'next-intl/plugin'
 
 import { appVersion, parseSentryBuildEnv } from './src/core/build-env'
+import { rawPublicEnv } from './src/core/public-env'
+import { parsePublicEnv } from './src/core/public-env-schema'
 import { indexingOpen, parseIndexingEnv, xRobotsTagRules } from './src/core/seo/indexing-env'
 import { legacyUserRedirects } from './src/core/admin/users/legacy-redirects'
 import { legacyHelpRedirects } from './src/core/support/legacy-redirects'
@@ -15,6 +17,11 @@ const withNextIntl = createNextIntlPlugin('./src/site/i18n/request.ts')
 // *.posthog.com do not drop events. Static assets (lazy-loaded extensions) have their own host.
 const POSTHOG_INGEST = 'https://us.i.posthog.com'
 const POSTHOG_ASSETS = 'https://us-assets.i.posthog.com'
+
+// The NEXT_PUBLIC_* values are inlined into the bundles at build, so they are checked here,
+// once: an invalid one fails the build (core/public-env-schema.ts). The browser reads them
+// without zod (core/public-env.ts).
+parsePublicEnv(rawPublicEnv)
 
 // Pre-launch indexing switch (ARCHITECTURE §12.0), read at build: an invalid SITE_INDEXING fails
 // the build, and changing it needs a redeploy. Closed → X-Robots-Tag on every response; open →
