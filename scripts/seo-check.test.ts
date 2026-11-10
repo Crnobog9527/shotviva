@@ -16,9 +16,12 @@ const closedRobots = ['User-Agent: *', 'Allow: /', '', ...PRELAUNCH_BLOCKED_CRAW
 const openRobots = [
   'User-Agent: *',
   'Allow: /',
+  'Disallow: /api/',
+  'Disallow: /account',
   '',
-  ...AI_CRAWLERS.flatMap((b) => [`User-Agent: ${b}`, 'Allow: /', '']),
-  'Host: https://shotviva.com',
+  'User-Agent: Bytespider',
+  'Disallow: /',
+  '',
   'Sitemap: https://shotviva.com/sitemap.xml',
 ].join('\n')
 

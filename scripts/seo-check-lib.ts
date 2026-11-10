@@ -1,4 +1,4 @@
-import { AI_CRAWLERS, PRELAUNCH_BLOCKED_CRAWLERS } from '../src/core/seo/crawlers'
+import { AI_CRAWLERS, OPEN_BLOCKED_CRAWLERS, PRELAUNCH_BLOCKED_CRAWLERS } from '../src/core/seo/crawlers'
 
 // The pure half of `pnpm seo:check` (ARCHITECTURE §12.0): given what the live site served,
 // list everything that does not match the expected state. No network here, so it is unit-tested.
@@ -70,7 +70,9 @@ function openProblems(s: Snapshot): string[] {
     noindexHeader(s.home) && '/ still sends X-Robots-Tag: noindex',
     /noindex/i.test(metaRobots(s.home.body) ?? '') && '/ still has a robots noindex meta',
     !hasLine(s.robots.body, 'sitemap') && 'robots.txt has no Sitemap line',
+    disallowsAll(groups, '*') && 'robots.txt disallows * (every crawler)',
     ...AI_CRAWLERS.filter((bot) => disallowsAll(groups, bot)).map((bot) => `robots.txt disallows ${bot}`),
+    ...OPEN_BLOCKED_CRAWLERS.filter((bot) => !disallowsAll(groups, bot)).map((bot) => `robots.txt does not disallow ${bot}`),
     ...(['sitemap', 'sitemapPages', 'llms'] as const)
       .filter((key) => s[key].status !== 200)
       .map((key) => `${CHECKED_PATHS[key]} answered ${s[key].status}, expected 200`),
