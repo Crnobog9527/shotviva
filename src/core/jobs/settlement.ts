@@ -33,25 +33,22 @@ export type ReserveJobInput = z.input<typeof reserveSchema>
 
 export async function reserveJob(client: RpcClient, input: ReserveJobInput): Promise<Job> {
   const args = reserveSchema.parse(input)
-  return callRpc(
-    client,
-    'reserve_credits',
-    {
-      p_job_id: args.jobId,
-      p_user_id: args.userId,
-      p_module: args.module,
-      p_template_id: args.templateId,
-      // The DB determines the cost; this identifies a stale display without trusting its amount.
-      p_credits_cost: args.expectedCredits ?? null,
-      p_source: args.source,
-      p_inputs: args.inputs,
-      p_provider: args.provider,
-      p_idempotency_key: args.idempotencyKey,
-      p_visibility: args.visibility,
-      p_parent_job_id: args.parentJobId,
-    },
-    jobRowSchema,
-  )
+  const common = {
+    p_job_id: args.jobId,
+    p_user_id: args.userId,
+    p_module: args.module,
+    p_template_id: args.templateId,
+    p_credits_cost: args.expectedCredits ?? null,
+    p_inputs: args.inputs,
+    p_provider: args.provider,
+    p_visibility: args.visibility,
+  }
+  if (args.source === 'web' && (args.inputs.batch_id || Number(args.inputs.batch_size) > 1)) {
+    return callRpc(client, 'reserve_batch_cell', common, jobRowSchema)
+  }
+  return callRpc(client, 'reserve_credits', {
+    ...common, p_source: args.source, p_idempotency_key: args.idempotencyKey, p_parent_job_id: args.parentJobId,
+  }, jobRowSchema)
 }
 
 // What the provider reported using and the cost worked out from it (T33); both optional, and

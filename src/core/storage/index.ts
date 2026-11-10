@@ -11,3 +11,4 @@ export { createR2Client, createR2Store, r2MarkerStore, r2PublicStore, r2Store } 
 export { sniffImageType, type SniffedType } from './sniff'
 export { applyWatermark, shouldWatermark } from './watermark'
 export { ASSETS_CACHE_CONTROL } from './assets-env'
+export { signBatchZip } from './r2-store'

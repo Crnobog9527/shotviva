@@ -15,6 +15,7 @@ export type JobVisibility = (typeof JOB_VISIBILITIES)[number]
 
 export type Job = {
   id: string
+  batchId?: string | null
   userId: string
   module: JobModule
   templateId: string
@@ -54,6 +55,7 @@ export const jobRowSchema = z
   .object({
     id: z.string(),
     user_id: z.string(),
+    batch_id: z.uuid().nullish(),
     module: z.enum(JOB_MODULES),
     template_id: z.string(),
     // Absent on rows read before T30's migration; set null when the parent is deleted.
@@ -76,6 +78,7 @@ export const jobRowSchema = z
   .transform(
     (row): Job => ({
       id: row.id,
+      batchId: row.batch_id ?? z.uuid().nullable().catch(null).parse(row.inputs.batch_id),
       userId: row.user_id,
       module: row.module,
       templateId: row.template_id,

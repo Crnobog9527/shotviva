@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { providerFloor, type ProviderFloors } from '@/core/templates/provider-pricing'
 
+import { Label } from '@/core/ui/label'
 import { Button } from '@/core/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/core/ui/dialog'
 
@@ -16,7 +17,7 @@ import { afterCoverSource, type AfterCover } from '../covers/client'
 import { referenceBudget, refUploadId } from './style-ref-state'
 import { StyleRefFields } from './style-ref-fields'
 import { TemplateCoverFields } from './template-cover-fields'
-import { fallbackPriceCopy } from './copy'
+import { categoryCopy, fallbackPriceCopy } from './copy'
 import { SaleSwitch } from './sale-switch'
 import { TemplateHistory, type VersionActions } from './prompt-history'
 import { TemplatePromptFields } from './template-prompt-fields'
@@ -31,6 +32,7 @@ type Props = {
   target: EditTarget
   floor: ProviderFloors
   categories: readonly CategoryOption[]
+  series: readonly { id: string; nameZh: string }[]
   coverLanguages: readonly CoverLanguage[]
   coverActions: Pick<TemplateAdminActions, 'requestCoverUpload' | 'applyCover' | 'setSale'> & VersionActions
   pending: boolean
@@ -42,7 +44,7 @@ type Props = {
 }
 
 // Mounted fresh per target (keyed by the container), so initial state comes straight from props.
-export function TemplateFormDialog({ target, providers, floor: allFloors, categories, coverLanguages, coverActions, pending, error, notice, onCancel, onSubmit }: Props) {
+export function TemplateFormDialog({ target, providers, floor: allFloors, categories, series, coverLanguages, coverActions, pending, error, notice, onCancel, onSubmit }: Props) {
   const isNew = target.mode === 'new'
   const [values, setValues] = useState(() =>
     target.mode === 'edit' ? toFormValues(target.template) : emptyFormValues(),
@@ -62,7 +64,7 @@ export function TemplateFormDialog({ target, providers, floor: allFloors, catego
     setLocalError(null)
     setSubmitted(true)
     onSubmit(result.payload, version => setValues(now => ({
-      ...now, expectedVersion: version ?? now.expectedVersion,
+      ...now, originalCategory: values.category, originalSeriesId: values.seriesId, expectedVersion: version ?? now.expectedVersion,
       selectedVersion: now.selectedVersion === values.selectedVersion ? undefined : now.selectedVersion,
       styleRefsEdited: now.styleRefs !== values.styleRefs && now.styleRefsEdited,
     })))
@@ -75,7 +77,7 @@ export function TemplateFormDialog({ target, providers, floor: allFloors, catego
           one scrolling column below that. */}
       <DialogContent className="max-h-[92vh] gap-0 overflow-y-auto p-0 sm:max-w-[min(1400px,96vw)] lg:h-[92vh] lg:overflow-clip">
         <div className="grid min-h-0 lg:h-full lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
-          <FormColumn {...{ target, providers, values, isNew, floor, categories, coverLanguages, coverActions, onChange, pending, onCancel }} error={shownError} saved={submitted ? (notice ?? null) : null} onSave={submit} />
+          <FormColumn {...{ target, providers, values, isNew, floor, categories, series, coverLanguages, coverActions, onChange, pending, onCancel }} error={shownError} saved={submitted ? (notice ?? null) : null} onSave={submit} />
           <aside className="bg-muted/20 min-h-0 border-t p-6 lg:overflow-y-auto lg:border-t-0 lg:border-l">
             {target.mode === 'edit' ? <TestRunPanel providers={providers} template={target.template} languages={coverLanguages} /> : <NewTemplateNote />}
           </aside>
@@ -94,7 +96,7 @@ function NewTemplateNote() {
   )
 }
 
-type FormColumnProps = Pick<Props, 'target' | 'providers' | 'floor' | 'categories' | 'coverLanguages' | 'coverActions' | 'pending' | 'onCancel'> & {
+type FormColumnProps = Pick<Props, 'target' | 'providers' | 'floor' | 'categories' | 'series' | 'coverLanguages' | 'coverActions' | 'pending' | 'onCancel'> & {
   values: TemplateFormValues
   isNew: boolean
   error: string | null
@@ -104,7 +106,7 @@ type FormColumnProps = Pick<Props, 'target' | 'providers' | 'floor' | 'categorie
   onSave: () => void
 }
 
-function FormColumn({ target, providers, values, isNew, floor, categories, coverLanguages, coverActions, pending, error, saved, onChange, onCancel, onSave }: FormColumnProps) {
+function FormColumn({ target, providers, values, isNew, floor, categories, series, coverLanguages, coverActions, pending, error, saved, onChange, onCancel, onSave }: FormColumnProps) {
   const [activeCover, setActiveCover] = useState(0)
   const [uploading, setUploading] = useState(false)
   const budget = referenceBudget(providers, values.providerId, values.fieldsJson, values.styleRefs.length)
@@ -122,6 +124,7 @@ function FormColumn({ target, providers, values, isNew, floor, categories, cover
           <FallbackPrice providers={providers} values={values} />
         </>
       )} values={values} isNew={isNew} uploading={uploading} floor={floor} categories={categories} onChange={onChange} />
+      <SeriesField template={existing} series={series} value={values.seriesId} onChange={seriesId => onChange({ seriesId })} />
       <TemplateTranslationFields values={values} onChange={onChange} />
       {existing ? (
         <TemplateCoverFields template={existing} languages={coverLanguages} actions={coverActions} active={activeCover} onSelect={setActiveCover} />
@@ -135,6 +138,22 @@ function FormColumn({ target, providers, values, isNew, floor, categories, cover
       <TemplateToggleFields values={values} onChange={onChange} />
       {isNew ? <p className="text-muted-foreground text-xs">新模板保存后默认是下架状态，保存后留在这里，右侧就能试跑。</p> : null}
       <FormFooter saveDisabled={styleSaveBlocked(uploading, values.module, budget.problem)} pending={pending} error={error} saved={saved} onCancel={onCancel} onSave={onSave} />
+    </div>
+  )
+}
+
+function SeriesField({ template, series, value, onChange }: {
+  template: AdminTemplate | null; series: Props['series']; value: string | null; onChange: (id: string | null) => void
+}) {
+  if (template?.categoryInfo.isSystem) return null
+  return (
+    <div className="grid gap-1.5">
+      <Label htmlFor="tpl-series">{categoryCopy.series}</Label>
+      <select id="tpl-series" className="border-input h-9 rounded-md border bg-transparent px-3 text-sm"
+        value={value ?? ''} onChange={event => onChange(event.target.value || null)}>
+        <option value="">{categoryCopy.standalone}</option>
+        {series.map(item => <option key={item.id} value={item.id}>{item.nameZh}</option>)}
+      </select>
     </div>
   )
 }

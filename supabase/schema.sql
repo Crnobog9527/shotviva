@@ -1274,6 +1274,39 @@ $$;
 ALTER FUNCTION "admin"."template_price_state"("t" "public"."templates") OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."template_series" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "slug" "text" NOT NULL,
+    "name_en" "text" NOT NULL,
+    "name_zh" "text" NOT NULL,
+    "description_en" "text",
+    "description_zh" "text",
+    "cover_url" "text",
+    "category_key" "text" NOT NULL,
+    "sort_order" integer DEFAULT 0 NOT NULL,
+    "is_active" boolean DEFAULT false NOT NULL,
+    "show_members" boolean DEFAULT false NOT NULL,
+    CONSTRAINT "template_series_name_en_check" CHECK (("btrim"("name_en") <> ''::"text")),
+    CONSTRAINT "template_series_name_zh_check" CHECK (("btrim"("name_zh") <> ''::"text")),
+    CONSTRAINT "template_series_slug_check" CHECK (("slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text"))
+);
+
+
+ALTER TABLE "public"."template_series" OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."template_series_revision"("p_series" "public"."template_series") RETURNS "text"
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select md5(to_jsonb(p_series)::text || coalesce(jsonb_agg(t.id order by t.series_sort_order,t.id), '[]')::text)
+  from public.templates t where t.series_id=p_series.id
+$$;
+
+
+ALTER FUNCTION "admin"."template_series_revision"("p_series" "public"."template_series") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."template_sync_catalog"() RETURNS "text"
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
@@ -2606,6 +2639,56 @@ $$;
 ALTER FUNCTION "public"."admin_affiliate_settings"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."template_categories" (
+    "key" "text" NOT NULL,
+    "name_en" "text" NOT NULL,
+    "name_zh" "text" NOT NULL,
+    "intro_en" "text",
+    "intro_zh" "text",
+    "card_style" "text" DEFAULT 'pair'::"text" NOT NULL,
+    "sort_order" integer DEFAULT 0 NOT NULL,
+    "is_system" boolean DEFAULT false NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "parent_id" "text",
+    "kind" "text" DEFAULT 'template'::"text" NOT NULL,
+    "level" smallint DEFAULT 1 NOT NULL,
+    "slug" "text" DEFAULT ''::"text" NOT NULL,
+    "is_visible" boolean DEFAULT true NOT NULL,
+    "seo_title_en" "text",
+    "seo_title_zh" "text",
+    "seo_description_en" "text",
+    "seo_description_zh" "text",
+    CONSTRAINT "template_categories_card_style_check" CHECK (("card_style" = ANY (ARRAY['pair'::"text", 'compare'::"text"]))),
+    CONSTRAINT "template_categories_intro_en_check" CHECK ((("intro_en" IS NULL) OR (("char_length"("intro_en") >= 1) AND ("char_length"("intro_en") <= 200)))),
+    CONSTRAINT "template_categories_intro_zh_check" CHECK ((("intro_zh" IS NULL) OR (("char_length"("intro_zh") >= 1) AND ("char_length"("intro_zh") <= 200)))),
+    CONSTRAINT "template_categories_key_check" CHECK ((("key" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text") AND ("char_length"("key") <= 40))),
+    CONSTRAINT "template_categories_kind_check" CHECK (("kind" = ANY (ARRAY['template'::"text", 'reference'::"text"]))),
+    CONSTRAINT "template_categories_level_check" CHECK ((("level" >= 1) AND ("level" <= 3))),
+    CONSTRAINT "template_categories_name_en_check" CHECK ((("char_length"("name_en") >= 1) AND ("char_length"("name_en") <= 32) AND ("name_en" = "btrim"("name_en")))),
+    CONSTRAINT "template_categories_name_zh_check" CHECK ((("char_length"("name_zh") >= 1) AND ("char_length"("name_zh") <= 12) AND ("name_zh" = "btrim"("name_zh")))),
+    CONSTRAINT "template_category_slug_format" CHECK (("slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text"))
+);
+
+
+ALTER TABLE "public"."template_categories" OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_assigned_template_count"("public"."template_categories") RETURNS bigint
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $_$
+  select case when $1.parent_id is null then
+    (select count(*) from public.templates t where t.category_key=$1.key and t.subcategory_key is null)
+  else
+    (select count(*) from public.templates t where t.subcategory_key=$1.key)
+  end
+$_$;
+
+
+ALTER FUNCTION "public"."admin_assigned_template_count"("public"."template_categories") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_ban_user"("p_user_id" "uuid", "p_reason" "text") RETURNS timestamp with time zone
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -2879,6 +2962,34 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_begin_test_run"("p_actor" "uuid", "p_run_id" "uuid", "p_template_id" "text", "p_kind" "text", "p_parent_id" "uuid", "p_photo_id" "uuid", "p_batch_id" "uuid", "p_resolution" "text", "p_inputs" "jsonb", "p_prompt_version" integer, "p_provider" "text", "p_estimate_usd" numeric) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_bulk_assign_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid", "p_locales" "text"[]) RETURNS "jsonb"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_node text := p_patch->>'category_key';
+  v_root text;
+  v_result jsonb;
+begin
+  if not exists(select from public.profiles where id=p_actor and role='admin' and banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree',0));
+  select p.root_key into v_root from public.template_category_paths p
+    join public.template_categories c on c.key=p.key where p.key=v_node and not c.is_system;
+  if not found then raise exception 'CATEGORY_NOT_FOUND'; end if;
+  v_result:=public.admin_bulk_edit_templates(p_ids,jsonb_set(p_patch,'{category_key}',to_jsonb(v_root)),p_floor,p_actor,p_locales);
+  if v_result->'failures'='[]'::jsonb then
+    update public.templates set subcategory_key=nullif(v_node,v_root)
+      where id=any(p_ids) and subcategory_key is distinct from nullif(v_node,v_root);
+  end if;
+  return v_result;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_bulk_assign_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid", "p_locales" "text"[]) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_bulk_edit_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid") RETURNS "jsonb"
@@ -4198,6 +4309,44 @@ $$;
 ALTER FUNCTION "public"."admin_mark_dispute_submitted"("p_dispute_id" "text", "p_actor" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_move_template_category"("p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text", "p_actor" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  old_parent text;
+  parent_level integer := 0;
+  siblings text[];
+  pos integer;
+begin
+  if not exists(select 1 from public.profiles where id=p_actor and role='admin') then raise exception 'NOT_ADMIN'; end if;
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.category_tree',0));
+  select parent_id into old_parent from public.template_categories where key=p_key and kind='template' and not is_system;
+  if not found or old_parent is distinct from p_from_parent then raise exception 'CATEGORY_CHANGED'; end if;
+  if p_parent is not null then
+    select level into parent_level from public.template_categories where key=p_parent and kind='template' and not is_system;
+    if not found or p_key='art-styles' then raise exception 'INVALID_PARENT'; end if;
+  end if;
+  if old_parent is distinct from p_parent then
+    -- Include descendants when checking the three-level limit and prohibit cycles before firing move triggers.
+    if exists(with recursive subtree(key,depth) as (
+      select p_key,1 union all select c.key,s.depth+1 from public.template_categories c join subtree s on c.parent_id=s.key
+    ) select 1 from subtree where key=p_parent or depth+parent_level>3) then raise exception 'INVALID_PARENT'; end if;
+    update public.template_categories set parent_id=p_parent where key=p_key;
+  end if;
+  select coalesce(array_agg(key order by sort_order,key),'{}') into siblings from public.template_categories
+    where kind='template' and not is_system and parent_id is not distinct from p_parent and key<>p_key;
+  pos := case when p_before is null then cardinality(siblings)+1 else array_position(siblings,p_before) end;
+  if pos is null then raise exception 'CATEGORY_CHANGED'; end if;
+  siblings := siblings[1:pos-1] || array[p_key] || siblings[pos:cardinality(siblings)];
+  update public.template_categories c set sort_order=o.n*10 from unnest(siblings) with ordinality o(key,n)
+    where c.key=o.key and c.sort_order<>o.n*10;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_move_template_category"("p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text", "p_actor" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_openai_admin_key_status"() RETURNS TABLE("key_last4" "text", "project_id" "text")
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -4679,60 +4828,173 @@ $$;
 ALTER FUNCTION "public"."admin_save_provider"("p_actor" "uuid", "p_id" "uuid", "p_settings" "jsonb", "p_capabilities" "jsonb", "p_key" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_save_template_assignment"("p_actor" "uuid", "p_template" "jsonb", "p_prompt" "jsonb", "p_assignment" "jsonb", "p_is_new" boolean, "p_expected" integer DEFAULT NULL::integer, "p_selected" integer DEFAULT NULL::integer, "p_style_refs" "jsonb" DEFAULT NULL::"jsonb") RETURNS integer
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_id text := p_template->>'id';
+  v_node text := p_template->>'category_key';
+  v_series uuid := (p_assignment->>'series_id')::uuid;
+  v_old public.templates%rowtype;
+  v_root text;
+  v_system boolean;
+  v_version integer;
+  v_order integer := 0;
+begin
+  if not exists(select from public.profiles where id=p_actor and role='admin' and banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if p_is_new is null or not coalesce(p_assignment ? 'series_id',false) then raise exception 'INVALID_INPUT'; end if;
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree',0));
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series',0));
+  select * into v_old from public.templates where id=v_id for update;
+  if found and p_is_new then raise exception 'TEMPLATE_EXISTS'; end if;
+  if v_old.id is null and not p_is_new then raise exception 'TEMPLATE_NOT_FOUND'; end if;
+  if not p_is_new and (not (p_assignment ? 'previous_series_id')
+      or (p_assignment->>'previous_series_id')::uuid is distinct from v_old.series_id
+      or p_assignment->>'previous_category' is distinct from coalesce(v_old.subcategory_key,v_old.category_key)) then
+    raise exception 'STALE_TEMPLATE_ASSIGNMENT';
+  end if;
+  select p.root_key,c.is_system into v_root,v_system from public.template_category_paths p
+    join public.template_categories c on c.key=p.key where p.key=v_node;
+  if not found then raise exception 'CATEGORY_NOT_FOUND'; end if;
+  if v_system or exists(select from public.template_categories where key=v_old.category_key and is_system) then
+    if v_old.category_key is distinct from v_node or v_series is not null then raise exception 'SYSTEM_ASSIGNMENT'; end if;
+  end if;
+  if v_series is not null and not exists(select from public.template_series where id=v_series) then
+    raise exception 'SERIES_NOT_FOUND';
+  end if;
+
+  p_template:=jsonb_set(p_template,'{category_key}',to_jsonb(v_root));
+  if p_expected is not null then
+    v_version:=public.admin_save_versioned_template(p_actor,p_template,p_prompt,p_expected,p_selected,p_style_refs);
+  elsif p_style_refs is not null then
+    perform public.admin_upsert_template(p_template,p_prompt,p_style_refs);
+  else
+    perform public.admin_upsert_template(p_template,p_prompt);
+  end if;
+  if v_series is not distinct from v_old.series_id then
+    v_order:=coalesce(v_old.series_sort_order,0);
+  elsif v_series is not null then
+    select coalesce(max(series_sort_order),0)+1 into v_order from public.templates where series_id=v_series;
+  end if;
+  update public.templates set subcategory_key=nullif(v_node,v_root),series_id=v_series,series_sort_order=v_order
+    where id=v_id and (subcategory_key,series_id,series_sort_order)
+      is distinct from (nullif(v_node,v_root),v_series,v_order);
+  if v_version is null then select version into v_version from public.template_prompts where template_id=v_id; end if;
+  return v_version;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_save_template_assignment"("p_actor" "uuid", "p_template" "jsonb", "p_prompt" "jsonb", "p_assignment" "jsonb", "p_is_new" boolean, "p_expected" integer, "p_selected" integer, "p_style_refs" "jsonb") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_save_template_category"("p_category" "jsonb", "p_is_new" boolean, "p_actor" "uuid") RETURNS "void"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $$
 declare
-  v_key text := btrim(coalesce(p_category ->> 'key', ''));
-  v_name_en text := btrim(coalesce(p_category ->> 'name_en', ''));
-  v_name_zh text := btrim(coalesce(p_category ->> 'name_zh', ''));
-  v_intro_en text := nullif(btrim(coalesce(p_category ->> 'intro_en', '')), '');
-  v_intro_zh text := nullif(btrim(coalesce(p_category ->> 'intro_zh', '')), '');
-  v_style text := coalesce(p_category ->> 'card_style', 'pair');
+  k text := btrim(p_category->>'key');
+  en text := btrim(p_category->>'name_en');
+  zh text := btrim(p_category->>'name_zh');
+  parent text := p_category->>'parent_id';
+  next_order integer;
+  previous public.template_categories;
 begin
-  if p_actor is null or not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
-    raise exception 'NOT_ADMIN';
+  if not exists(select 1 from public.profiles where id=p_actor and role='admin') then raise exception 'NOT_ADMIN'; end if;
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.category_tree',0));
+  select * into previous from public.template_categories where key=k;
+  if p_is_new and found then raise exception 'CATEGORY_KEY_TAKEN'; end if;
+  if not p_is_new then
+    if previous.key is null or previous.kind <> 'template' then raise exception 'CATEGORY_NOT_FOUND'; end if;
+    if previous.is_system then raise exception 'CATEGORY_SYSTEM'; end if;
   end if;
-  if v_name_en = '' or v_name_zh = '' then
-    raise exception 'INVALID_INPUT' using detail = 'both names are required';
-  end if;
-  if exists (select 1 from public.template_categories c where lower(c.name_en) = lower(v_name_en) and c.key <> v_key) then
-    raise exception 'CATEGORY_NAME_EN_TAKEN';
-  end if;
-  if exists (select 1 from public.template_categories c where c.name_zh = v_name_zh and c.key <> v_key) then
-    raise exception 'CATEGORY_NAME_ZH_TAKEN';
-  end if;
+  if exists(select 1 from public.template_categories where lower(name_en)=lower(en) and key<>k) then raise exception 'CATEGORY_NAME_EN_TAKEN'; end if;
+  if exists(select 1 from public.template_categories where name_zh=zh and key<>k) then raise exception 'CATEGORY_NAME_ZH_TAKEN'; end if;
 
-  if coalesce(p_is_new, false) then
-    if exists (select 1 from public.template_categories c where c.key = v_key) then
-      raise exception 'CATEGORY_KEY_TAKEN';
-    end if;
-    insert into public.template_categories (key, name_en, name_zh, intro_en, intro_zh, card_style, sort_order)
-    values (
-      v_key, v_name_en, v_name_zh, v_intro_en, v_intro_zh, v_style,
-      (select coalesce(max(c.sort_order), 0) + 10 from public.template_categories c where not c.is_system)
-    );
+  if p_is_new then
+    if parent is not null and not exists(select 1 from public.template_categories
+        where key=parent and kind='template' and not is_system and level<3) then raise exception 'INVALID_PARENT'; end if;
+    select coalesce(max(sort_order),0)+10 into next_order from public.template_categories
+      where parent_id is not distinct from parent and kind='template' and not is_system;
+    insert into public.template_categories(key, name_en, name_zh, intro_en, intro_zh, card_style, sort_order,
+      parent_id,slug,is_visible,seo_title_en,seo_title_zh,seo_description_en,seo_description_zh)
+    values(k,en,zh,nullif(btrim(p_category->>'intro_en'),''),nullif(btrim(p_category->>'intro_zh'),''),
+      coalesce(p_category->>'card_style','pair'),next_order,parent,coalesce(p_category->>'slug',k),
+      coalesce((p_category->>'is_visible')::boolean,true),nullif(p_category->>'seo_title_en',''),nullif(p_category->>'seo_title_zh',''),
+      nullif(p_category->>'seo_description_en',''),nullif(p_category->>'seo_description_zh',''));
   else
-    if exists (select 1 from public.template_categories c where c.key = v_key and c.is_system) then
-      raise exception 'CATEGORY_SYSTEM';
-    end if;
-    update public.template_categories
-    set name_en = v_name_en,
-        name_zh = v_name_zh,
-        intro_en = v_intro_en,
-        intro_zh = v_intro_zh,
-        card_style = v_style
-    where key = v_key;
-    if not found then
-      raise exception 'CATEGORY_NOT_FOUND';
-    end if;
+    update public.template_categories set name_en=en, name_zh=zh, intro_en=nullif(btrim(p_category->>'intro_en'),''),
+      intro_zh=nullif(btrim(p_category->>'intro_zh'),''), card_style=coalesce(p_category->>'card_style','pair'),
+      slug=coalesce(p_category->>'slug',previous.slug), is_visible=coalesce((p_category->>'is_visible')::boolean,previous.is_visible),
+      seo_title_en=nullif(coalesce(p_category->>'seo_title_en',previous.seo_title_en),''),
+      seo_title_zh=nullif(coalesce(p_category->>'seo_title_zh',previous.seo_title_zh),''),
+      seo_description_en=nullif(coalesce(p_category->>'seo_description_en',previous.seo_description_en),''),
+      seo_description_zh=nullif(coalesce(p_category->>'seo_description_zh',previous.seo_description_zh),'')
+    where key=k;
   end if;
-end;
-$$;
+end $$;
 
 
 ALTER FUNCTION "public"."admin_save_template_category"("p_category" "jsonb", "p_is_new" boolean, "p_actor" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_save_template_series"("p_id" "uuid", "p_revision" "text", "p_fields" "jsonb", "p_members" "text"[], "p_actor" "uuid", "p_reason" "text") RETURNS "uuid"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  previous public.template_series;
+  saved public.template_series;
+begin
+  if not exists(select 1 from public.profiles where id=p_actor and role='admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree',0));
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series',0));
+  if p_id is not null then
+    select * into previous from public.template_series where id=p_id for update;
+    if not found or p_revision is distinct from admin.template_series_revision(previous) then
+      raise exception 'SERIES_CHANGED';
+    end if;
+    if previous.is_active and not (p_fields->>'is_active')::boolean and nullif(btrim(p_reason),'') is null then
+      raise exception 'SERIES_REASON_REQUIRED';
+    end if;
+  end if;
+  if p_members is null or cardinality(p_members)<>(select count(distinct m) from unnest(p_members) m) then
+    raise exception 'INVALID_SERIES_MEMBERS';
+  end if;
+  perform 1 from public.templates where id=any(p_members) or series_id=p_id order by id for update;
+  if cardinality(p_members)<>(select count(*) from public.templates t
+      join public.template_categories c on c.key=t.category_key where t.id=any(p_members)
+      and not c.is_system and t.id not in ('freeform','edit')) then
+    raise exception 'INVALID_SERIES_MEMBERS';
+  end if;
+  if exists(select 1 from public.templates where id=any(p_members) and series_id is not null and series_id is distinct from p_id) then
+    raise exception 'SERIES_MEMBER_TAKEN';
+  end if;
+  saved:=jsonb_populate_record(null::public.template_series,p_fields);
+  if p_id is null then
+    insert into public.template_series(slug,name_en,name_zh,description_en,description_zh,cover_url,
+      category_key,sort_order,is_active,show_members)
+    values(saved.slug,saved.name_en,saved.name_zh,saved.description_en,saved.description_zh,saved.cover_url,
+      saved.category_key,saved.sort_order,saved.is_active,saved.show_members) returning id into p_id;
+  else
+    update public.template_series set slug=saved.slug,name_en=saved.name_en,name_zh=saved.name_zh,
+      description_en=saved.description_en,description_zh=saved.description_zh,cover_url=saved.cover_url,
+      category_key=saved.category_key,sort_order=saved.sort_order,is_active=saved.is_active,show_members=saved.show_members
+    where id=p_id;
+  end if;
+  update public.templates set series_id=null,series_sort_order=0 where series_id=p_id and not (id=any(p_members));
+  update public.templates t set series_id=p_id,series_sort_order=m.ord::integer
+    from unnest(p_members) with ordinality as m(id,ord) where t.id=m.id
+      and (t.series_id is distinct from p_id or t.series_sort_order<>m.ord);
+  return p_id;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_save_template_series"("p_id" "uuid", "p_revision" "text", "p_fields" "jsonb", "p_members" "text"[], "p_actor" "uuid", "p_reason" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_save_versioned_template"("p_actor" "uuid", "p_template" "jsonb", "p_prompt" "jsonb", "p_expected" integer, "p_selected" integer DEFAULT NULL::integer, "p_style_refs" "jsonb" DEFAULT NULL::"jsonb") RETURNS integer
@@ -4789,6 +5051,24 @@ $_$;
 
 
 ALTER FUNCTION "public"."admin_search_users"("p_query" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_series_candidates"("p_search" "text", "p_after" "text") RETURNS TABLE("id" "text", "name" "text", "cover_url" "text", "series_id" "uuid", "is_active" boolean)
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select t.id, coalesce(nullif(t.translations #>> '{zh,name}',''),t.name),
+         coalesce(t.cover_after_url,t.cover_locales #>> '{zh,after}',t.cover_locales #>> '{en,after}'),
+         t.series_id,t.is_active
+    from public.templates t join public.template_categories c on c.key=t.category_key
+   where not c.is_system and t.id not in ('freeform','edit') and (p_after is null or t.id>p_after)
+     and (p_search='' or strpos(lower(t.id),lower(p_search))>0 or strpos(lower(t.name),lower(p_search))>0
+          or strpos(lower(t.translations #>> '{zh,name}'),lower(p_search))>0)
+   order by t.id limit 31
+$$;
+
+
+ALTER FUNCTION "public"."admin_series_candidates"("p_search" "text", "p_after" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_set_code_active"("p_actor" "uuid", "p_code_id" "uuid", "p_active" boolean) RETURNS "void"
@@ -5314,6 +5594,23 @@ end $$;
 
 
 ALTER FUNCTION "public"."admin_template_copy_source"("p_actor" "uuid", "p_source" "text", "p_request" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_template_series_detail"("p_id" "uuid") RETURNS "jsonb"
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select to_jsonb(s) || jsonb_build_object('revision',admin.template_series_revision(s),'members',
+    coalesce((select jsonb_agg(jsonb_build_object('id',t.id,
+      'name',coalesce(nullif(t.translations #>> '{zh,name}',''),t.name),
+      'cover_url',coalesce(t.cover_after_url,t.cover_locales #>> '{zh,after}',t.cover_locales #>> '{en,after}'),
+      'is_active',t.is_active, 'series_id',s.id) order by t.series_sort_order,t.id)
+      from public.templates t where t.series_id=s.id),'[]'))
+  from public.template_series s where s.id=p_id
+$$;
+
+
+ALTER FUNCTION "public"."admin_template_series_detail"("p_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_test_budget_status"() RETURNS "jsonb"
@@ -6168,41 +6465,6 @@ $$;
 ALTER FUNCTION "public"."bump_template_prompt_version"() OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."template_categories" (
-    "key" "text" NOT NULL,
-    "name_en" "text" NOT NULL,
-    "name_zh" "text" NOT NULL,
-    "intro_en" "text",
-    "intro_zh" "text",
-    "card_style" "text" DEFAULT 'pair'::"text" NOT NULL,
-    "sort_order" integer DEFAULT 0 NOT NULL,
-    "is_system" boolean DEFAULT false NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "parent_id" "text",
-    "kind" "text" DEFAULT 'template'::"text" NOT NULL,
-    "level" smallint DEFAULT 1 NOT NULL,
-    "slug" "text" DEFAULT ''::"text" NOT NULL,
-    "is_visible" boolean DEFAULT true NOT NULL,
-    "seo_title_en" "text",
-    "seo_title_zh" "text",
-    "seo_description_en" "text",
-    "seo_description_zh" "text",
-    CONSTRAINT "template_categories_card_style_check" CHECK (("card_style" = ANY (ARRAY['pair'::"text", 'compare'::"text"]))),
-    CONSTRAINT "template_categories_intro_en_check" CHECK ((("intro_en" IS NULL) OR (("char_length"("intro_en") >= 1) AND ("char_length"("intro_en") <= 200)))),
-    CONSTRAINT "template_categories_intro_zh_check" CHECK ((("intro_zh" IS NULL) OR (("char_length"("intro_zh") >= 1) AND ("char_length"("intro_zh") <= 200)))),
-    CONSTRAINT "template_categories_key_check" CHECK ((("key" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text") AND ("char_length"("key") <= 40))),
-    CONSTRAINT "template_categories_kind_check" CHECK (("kind" = ANY (ARRAY['template'::"text", 'reference'::"text"]))),
-    CONSTRAINT "template_categories_level_check" CHECK ((("level" >= 1) AND ("level" <= 3))),
-    CONSTRAINT "template_categories_name_en_check" CHECK ((("char_length"("name_en") >= 1) AND ("char_length"("name_en") <= 32) AND ("name_en" = "btrim"("name_en")))),
-    CONSTRAINT "template_categories_name_zh_check" CHECK ((("char_length"("name_zh") >= 1) AND ("char_length"("name_zh") <= 12) AND ("name_zh" = "btrim"("name_zh")))),
-    CONSTRAINT "template_category_slug_format" CHECK (("slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text"))
-);
-
-
-ALTER TABLE "public"."template_categories" OWNER TO "postgres";
-
-
 CREATE OR REPLACE VIEW "public"."template_category_paths" WITH ("security_invoker"='true') AS
  SELECT "c"."key",
     COALESCE("g"."key", "p"."key", "c"."key") AS "root_key",
@@ -6215,27 +6477,6 @@ CREATE OR REPLACE VIEW "public"."template_category_paths" WITH ("security_invoke
 
 
 ALTER VIEW "public"."template_category_paths" OWNER TO "postgres";
-
-
-CREATE TABLE IF NOT EXISTS "public"."template_series" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "slug" "text" NOT NULL,
-    "name_en" "text" NOT NULL,
-    "name_zh" "text" NOT NULL,
-    "description_en" "text",
-    "description_zh" "text",
-    "cover_url" "text",
-    "category_key" "text" NOT NULL,
-    "sort_order" integer DEFAULT 0 NOT NULL,
-    "is_active" boolean DEFAULT false NOT NULL,
-    "show_members" boolean DEFAULT false NOT NULL,
-    CONSTRAINT "template_series_name_en_check" CHECK (("btrim"("name_en") <> ''::"text")),
-    CONSTRAINT "template_series_name_zh_check" CHECK (("btrim"("name_zh") <> ''::"text")),
-    CONSTRAINT "template_series_slug_check" CHECK (("slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text"))
-);
-
-
-ALTER TABLE "public"."template_series" OWNER TO "postgres";
 
 
 CREATE OR REPLACE VIEW "public"."web_template_members" WITH ("security_invoker"='true') AS
@@ -6374,6 +6615,40 @@ $$;
 
 
 ALTER FUNCTION "public"."checkout_discount"("p_user" "uuid", "p_product_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."claim_batch_zip"("p_user_id" "uuid", "p_batch_id" "uuid", "p_token" "uuid") RETURNS "text"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  state admin.batch_zip_requests;
+  at_time timestamptz;
+  recent timestamptz[];
+  active jsonb;
+  result text := 'acquired';
+begin
+  if coalesce(public.current_tier(p_user_id), 'starter') not in ('pro', 'max') then return 'upgrade'; end if;
+  insert into admin.batch_zip_requests (user_id) values (p_user_id) on conflict do nothing;
+  select * into strict state from admin.batch_zip_requests where user_id=p_user_id for update;
+  at_time := clock_timestamp();
+  recent := array(select t from unnest(state.request_times) t where t > at_time - interval '1 minute');
+  if cardinality(recent) >= 3 then return 'limited'; end if;
+  select coalesce(jsonb_object_agg(key,value), '{}') into active from jsonb_each(state.active_batches)
+    where (value->>'expires')::timestamptz > at_time;
+  if active ? p_batch_id::text then
+    result := 'packing';
+  else
+    active := active || jsonb_build_object(p_batch_id::text,
+      jsonb_build_object('token', p_token, 'expires', at_time + interval '6 minutes'));
+  end if;
+  update admin.batch_zip_requests set request_times = array_append(recent,at_time), active_batches = active where user_id=p_user_id;
+  return result;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."claim_batch_zip"("p_user_id" "uuid", "p_batch_id" "uuid", "p_token" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."claim_dispute_reminders"("p_dispute_ids" "text"[]) RETURNS SETOF "text"
@@ -6652,6 +6927,7 @@ CREATE TABLE IF NOT EXISTS "public"."generation_jobs" (
     "downloaded_at" timestamp with time zone,
     "download_ip" "inet",
     "download_count" integer DEFAULT 0 NOT NULL,
+    "batch_id" "uuid",
     CONSTRAINT "generation_jobs_check" CHECK ((("status" = 'running'::"text") = ("finished_at" IS NULL))),
     CONSTRAINT "generation_jobs_check1" CHECK ((("status" <> 'succeeded'::"text") OR ("output_key" IS NOT NULL))),
     CONSTRAINT "generation_jobs_cost_usd_nonnegative" CHECK ((("cost_usd" IS NULL) OR ("cost_usd" >= (0)::numeric))),
@@ -8056,6 +8332,18 @@ $$;
 ALTER FUNCTION "public"."refund_job"("p_job_id" "uuid", "p_error_code" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."release_batch_zip"("p_user_id" "uuid", "p_batch_id" "uuid", "p_token" "uuid") RETURNS "void"
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  update admin.batch_zip_requests set active_batches=active_batches-p_batch_id::text
+   where user_id=p_user_id and active_batches->p_batch_id::text->>'token'=p_token::text;
+$$;
+
+
+ALTER FUNCTION "public"."release_batch_zip"("p_user_id" "uuid", "p_batch_id" "uuid", "p_token" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."release_checkout_discount"("p_user" "uuid", "p_token" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -8071,6 +8359,39 @@ $$;
 
 
 ALTER FUNCTION "public"."release_checkout_discount"("p_user" "uuid", "p_token" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."reserve_batch_cell"("p_job_id" "uuid", "p_user_id" "uuid", "p_module" "text", "p_template_id" "text", "p_credits_cost" integer, "p_inputs" "jsonb", "p_provider" "text", "p_visibility" "text") RETURNS "public"."generation_jobs"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  job public.generation_jobs;
+  batch uuid := (p_inputs->>'batch_id')::uuid;
+  position_in_batch integer := (p_inputs->>'batch_position')::integer;
+begin
+  job := public.reserve_credits(p_job_id,p_user_id,p_module,p_template_id,p_credits_cost,'web',
+    p_inputs,p_provider,null,p_visibility,null);
+  if job.inputs->>'attempt_id' is distinct from p_inputs->>'attempt_id' then return job; end if;
+  if job.credit_pool <> 'paid' then raise exception 'CREDITS_INSUFFICIENT'; end if;
+  -- Legacy single-template batch clients do not have a preflight ID.
+  if batch is null then return job; end if;
+  if position_in_batch is null then raise exception 'INVALID_INPUT'; end if;
+  if job.credits_cost is distinct from p_credits_cost then raise exception 'TEMPLATE_QUOTE_CHANGED'; end if;
+  if (p_inputs->>'batch_templates')::integer > 1 and public.current_tier(p_user_id) is distinct from 'max' then
+    raise exception 'BATCH_MAX_REQUIRED';
+  end if;
+  if exists (
+    select 1 from public.generation_jobs j where j.user_id=p_user_id and j.batch_id=batch
+      and j.status<>'failed' and (j.inputs->>'batch_position')::integer=position_in_batch and j.id<>p_job_id
+  ) then raise exception 'IDEMPOTENCY_CONFLICT'; end if;
+  update public.generation_jobs set batch_id=batch where id=p_job_id returning * into job;
+  return job;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."reserve_batch_cell"("p_job_id" "uuid", "p_user_id" "uuid", "p_module" "text", "p_template_id" "text", "p_credits_cost" integer, "p_inputs" "jsonb", "p_provider" "text", "p_visibility" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."reserve_checkout_discount"("p_user" "uuid", "p_product_id" "text", "p_token" "uuid") RETURNS "jsonb"
@@ -9097,6 +9418,16 @@ $$;
 
 
 ALTER FUNCTION "public"."wishlist_eligible"("p_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "admin"."batch_zip_requests" (
+    "user_id" "uuid" NOT NULL,
+    "request_times" timestamp with time zone[] DEFAULT '{}'::timestamp with time zone[] NOT NULL,
+    "active_batches" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL
+);
+
+
+ALTER TABLE "admin"."batch_zip_requests" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "admin"."catalog_product_versions" (
@@ -10163,6 +10494,11 @@ CREATE TABLE IF NOT EXISTS "public"."template_sync_history" (
 ALTER TABLE "public"."template_sync_history" OWNER TO "postgres";
 
 
+ALTER TABLE ONLY "admin"."batch_zip_requests"
+    ADD CONSTRAINT "batch_zip_requests_pkey" PRIMARY KEY ("user_id");
+
+
+
 ALTER TABLE ONLY "admin"."catalog_product_versions"
     ADD CONSTRAINT "catalog_product_versions_pkey" PRIMARY KEY ("product_id", "revision");
 
@@ -10761,6 +11097,10 @@ CREATE INDEX "credit_ledger_user_plan_idx" ON "public"."credit_ledger" USING "bt
 
 
 
+CREATE INDEX "generation_jobs_batch_slot" ON "public"."generation_jobs" USING "btree" ("user_id", "batch_id", ((("inputs" ->> 'batch_position'::"text"))::integer)) WHERE (("batch_id" IS NOT NULL) AND ("status" <> 'failed'::"text"));
+
+
+
 CREATE INDEX "generation_jobs_created_at_id_idx" ON "public"."generation_jobs" USING "btree" ("created_at" DESC, "id" DESC);
 
 
@@ -10953,6 +11293,10 @@ CREATE INDEX "template_requests_wall_idx" ON "public"."template_requests" USING 
 
 
 
+CREATE INDEX "template_series_admin_order_idx" ON "public"."template_series" USING "btree" ("sort_order", "id");
+
+
+
 CREATE INDEX "template_series_category_idx" ON "public"."template_series" USING "btree" ("category_key", "sort_order", "id");
 
 
@@ -11142,6 +11486,11 @@ CREATE OR REPLACE TRIGGER "zz_template_category_path" BEFORE INSERT OR UPDATE OF
 
 
 CREATE OR REPLACE TRIGGER "zz_template_prompt_version" BEFORE INSERT OR UPDATE ON "public"."template_prompts" FOR EACH ROW EXECUTE FUNCTION "admin"."assign_template_prompt_version"();
+
+
+
+ALTER TABLE ONLY "admin"."batch_zip_requests"
+    ADD CONSTRAINT "batch_zip_requests_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
 
 
@@ -11578,6 +11927,9 @@ ALTER TABLE ONLY "public"."templates"
 ALTER TABLE ONLY "public"."templates"
     ADD CONSTRAINT "templates_subcategory_key_fkey" FOREIGN KEY ("subcategory_key") REFERENCES "public"."template_categories"("key");
 
+
+
+ALTER TABLE "admin"."batch_zip_requests" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "admin"."catalog_product_versions" ENABLE ROW LEVEL SECURITY;
@@ -12039,6 +12391,17 @@ REVOKE ALL ON FUNCTION "admin"."template_price_state"("t" "public"."templates") 
 
 
 
+GRANT ALL ON TABLE "public"."template_series" TO "service_role";
+GRANT SELECT ON TABLE "public"."template_series" TO "anon";
+GRANT SELECT ON TABLE "public"."template_series" TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."template_series_revision"("p_series" "public"."template_series") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."template_series_revision"("p_series" "public"."template_series") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "admin"."template_sync_catalog"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."template_sync_catalog"() TO "service_role";
 
@@ -12254,6 +12617,17 @@ GRANT ALL ON FUNCTION "public"."admin_affiliate_settings"("p_actor" "uuid", "p_i
 
 
 
+GRANT ALL ON TABLE "public"."template_categories" TO "service_role";
+GRANT SELECT ON TABLE "public"."template_categories" TO "anon";
+GRANT SELECT ON TABLE "public"."template_categories" TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_assigned_template_count"("public"."template_categories") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_assigned_template_count"("public"."template_categories") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_ban_user"("p_user_id" "uuid", "p_reason" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_ban_user"("p_user_id" "uuid", "p_reason" "text") TO "service_role";
 
@@ -12271,6 +12645,11 @@ GRANT ALL ON FUNCTION "public"."admin_batch_set_banned"("p_actor" "uuid", "p_use
 
 REVOKE ALL ON FUNCTION "public"."admin_begin_test_run"("p_actor" "uuid", "p_run_id" "uuid", "p_template_id" "text", "p_kind" "text", "p_parent_id" "uuid", "p_photo_id" "uuid", "p_batch_id" "uuid", "p_resolution" "text", "p_inputs" "jsonb", "p_prompt_version" integer, "p_provider" "text", "p_estimate_usd" numeric) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_begin_test_run"("p_actor" "uuid", "p_run_id" "uuid", "p_template_id" "text", "p_kind" "text", "p_parent_id" "uuid", "p_photo_id" "uuid", "p_batch_id" "uuid", "p_resolution" "text", "p_inputs" "jsonb", "p_prompt_version" integer, "p_provider" "text", "p_estimate_usd" numeric) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_bulk_assign_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid", "p_locales" "text"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_bulk_assign_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid", "p_locales" "text"[]) TO "service_role";
 
 
 
@@ -12414,6 +12793,11 @@ GRANT ALL ON FUNCTION "public"."admin_mark_dispute_submitted"("p_dispute_id" "te
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_move_template_category"("p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text", "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_move_template_category"("p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text", "p_actor" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_openai_admin_key_status"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_openai_admin_key_status"() TO "service_role";
 
@@ -12474,8 +12858,18 @@ GRANT ALL ON FUNCTION "public"."admin_save_provider"("p_actor" "uuid", "p_id" "u
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_save_template_assignment"("p_actor" "uuid", "p_template" "jsonb", "p_prompt" "jsonb", "p_assignment" "jsonb", "p_is_new" boolean, "p_expected" integer, "p_selected" integer, "p_style_refs" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_save_template_assignment"("p_actor" "uuid", "p_template" "jsonb", "p_prompt" "jsonb", "p_assignment" "jsonb", "p_is_new" boolean, "p_expected" integer, "p_selected" integer, "p_style_refs" "jsonb") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_save_template_category"("p_category" "jsonb", "p_is_new" boolean, "p_actor" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_save_template_category"("p_category" "jsonb", "p_is_new" boolean, "p_actor" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_save_template_series"("p_id" "uuid", "p_revision" "text", "p_fields" "jsonb", "p_members" "text"[], "p_actor" "uuid", "p_reason" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_save_template_series"("p_id" "uuid", "p_revision" "text", "p_fields" "jsonb", "p_members" "text"[], "p_actor" "uuid", "p_reason" "text") TO "service_role";
 
 
 
@@ -12486,6 +12880,11 @@ GRANT ALL ON FUNCTION "public"."admin_save_versioned_template"("p_actor" "uuid",
 
 REVOKE ALL ON FUNCTION "public"."admin_search_users"("p_query" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_search_users"("p_query" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_series_candidates"("p_search" "text", "p_after" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_series_candidates"("p_search" "text", "p_after" "text") TO "service_role";
 
 
 
@@ -12551,6 +12950,11 @@ GRANT ALL ON FUNCTION "public"."admin_signup_ip_clusters"("p_days" integer) TO "
 
 REVOKE ALL ON FUNCTION "public"."admin_template_copy_source"("p_actor" "uuid", "p_source" "text", "p_request" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_template_copy_source"("p_actor" "uuid", "p_source" "text", "p_request" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_template_series_detail"("p_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_template_series_detail"("p_id" "uuid") TO "service_role";
 
 
 
@@ -12683,21 +13087,9 @@ GRANT ALL ON FUNCTION "public"."begin_identity_judge"("p_user_id" "uuid", "p_tex
 
 
 
-GRANT ALL ON TABLE "public"."template_categories" TO "service_role";
-GRANT SELECT ON TABLE "public"."template_categories" TO "anon";
-GRANT SELECT ON TABLE "public"."template_categories" TO "authenticated";
-
-
-
 GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."template_category_paths" TO "service_role";
 GRANT SELECT ON TABLE "public"."template_category_paths" TO "anon";
 GRANT SELECT ON TABLE "public"."template_category_paths" TO "authenticated";
-
-
-
-GRANT ALL ON TABLE "public"."template_series" TO "service_role";
-GRANT SELECT ON TABLE "public"."template_series" TO "anon";
-GRANT SELECT ON TABLE "public"."template_series" TO "authenticated";
 
 
 
@@ -12737,6 +13129,11 @@ REVOKE ALL ON FUNCTION "public"."check_template_image_provider"() FROM PUBLIC;
 
 REVOKE ALL ON FUNCTION "public"."checkout_discount"("p_user" "uuid", "p_product_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."checkout_discount"("p_user" "uuid", "p_product_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."claim_batch_zip"("p_user_id" "uuid", "p_batch_id" "uuid", "p_token" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."claim_batch_zip"("p_user_id" "uuid", "p_batch_id" "uuid", "p_token" "uuid") TO "service_role";
 
 
 
@@ -12989,8 +13386,18 @@ GRANT ALL ON FUNCTION "public"."refund_job"("p_job_id" "uuid", "p_error_code" "t
 
 
 
+REVOKE ALL ON FUNCTION "public"."release_batch_zip"("p_user_id" "uuid", "p_batch_id" "uuid", "p_token" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."release_batch_zip"("p_user_id" "uuid", "p_batch_id" "uuid", "p_token" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."release_checkout_discount"("p_user" "uuid", "p_token" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."release_checkout_discount"("p_user" "uuid", "p_token" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."reserve_batch_cell"("p_job_id" "uuid", "p_user_id" "uuid", "p_module" "text", "p_template_id" "text", "p_credits_cost" integer, "p_inputs" "jsonb", "p_provider" "text", "p_visibility" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."reserve_batch_cell"("p_job_id" "uuid", "p_user_id" "uuid", "p_module" "text", "p_template_id" "text", "p_credits_cost" integer, "p_inputs" "jsonb", "p_provider" "text", "p_visibility" "text") TO "service_role";
 
 
 

@@ -1,12 +1,15 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
-import { CategoriesPanel, listAdminCategories, listAdminTemplates, TemplatesEditor } from '@/core/admin'
+import { CategoriesPanel, listAdminTemplates, TemplatesEditor } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { pricingFromOptions } from '@/core/admin/templates/provider-pricing'
 import { readPricingOptions } from '@/site/template-pricing'
 import { TestPanelSummaryProvider } from '@/core/admin/test-run-ui'
 import { ModelSyncProvider } from '@/core/admin/image-provider-field/model-sync'
+import { listAdminCategoryTree } from '@/core/admin/template-categories'
+import { listAdminSeriesOptions, seriesCopy } from '@/core/admin/template-series'
+import { moveTemplateCategoryAction } from './category-actions'
 import { setTemplateSaleAction } from './sale-action'
 import { syncTemplateModel } from './sync-model-action'
 import { loadPanelSummary } from '@/modules/image'
@@ -15,17 +18,9 @@ import { site } from '@/site/site.config'
 
 import { duplicateTemplateAction, listVersionsAction, manageVersionAction, readVersionAction } from './version-actions'
 import {
-  applyCoverAction,
-  bulkEditTemplatesAction,
-  deleteTemplateCategoryAction,
-  reorderTemplateCategoriesAction,
-  saveTemplateCategoryAction,
-  setFeaturedTemplatesAction,
-  requestCoverUploadAction,
-  saveTemplateAction,
-  setTemplateActiveAction,
-  setTemplateOrderAction,
-  setTemplatesActiveAction,
+  applyCoverAction, bulkEditTemplatesAction, deleteTemplateCategoryAction, saveTemplateCategoryAction,
+  setFeaturedTemplatesAction, requestCoverUploadAction, saveTemplateAction, setTemplateActiveAction,
+  setTemplateOrderAction, setTemplatesActiveAction,
 } from './actions'
 
 // Admin-only, request-time page. The proxy (core/auth proxyGate) answers non-admins with a real
@@ -49,24 +44,26 @@ export default async function AdminTemplatesPage() {
   const db = createAdminSupabase()
   // Start the shared trial data with the catalogue; the list renders without waiting for R2.
   const initialSummary = Promise.resolve().then(() => loadPanelSummary({ db, store: r2Store() })).catch(() => null)
-  const [templates, categories, providers] = await Promise.all([listAdminTemplates(db), listAdminCategories(db), readPricingOptions(db)])
+  const [templates, categories, series, providers] = await Promise.all([
+    listAdminTemplates(db), listAdminCategoryTree(db), listAdminSeriesOptions(db), readPricingOptions(db),
+  ])
   return (
     <div className="mx-auto grid w-full max-w-6xl gap-6 p-6">
-      <div className="flex items-center gap-3">
-        <h1 className="text-xl font-semibold">模板与提示词</h1>
-        {/* The built-in photo-edit template is not in this list (ARCHITECTURE §5.2). */}
-        <Link href="/admin/templates/edit" className="ml-auto text-sm underline underline-offset-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="mr-auto text-xl font-semibold">模板与提示词</h1>
+        <Link href="/admin/templates/series" className="text-sm underline underline-offset-4">{seriesCopy.title}</Link>
+        <Link href="/admin/templates/edit" className="text-sm underline underline-offset-4">
           作品编辑的判断题和约束段落 →
         </Link>
       </div>
       <CategoriesPanel
         categories={categories}
-        actions={{ save: saveTemplateCategoryAction, reorder: reorderTemplateCategoriesAction, remove: deleteTemplateCategoryAction }}
+        actions={{ save: saveTemplateCategoryAction, move: moveTemplateCategoryAction, remove: deleteTemplateCategoryAction }}
       />
       <TestPanelSummaryProvider initial={initialSummary}>
       <ModelSyncProvider action={syncTemplateModel}>
       <TemplatesEditor
-        templates={templates}
+        templates={templates} series={series}
         providers={providers}
         categories={categories}
         floor={pricingFromOptions(providers)}

@@ -374,8 +374,15 @@
       "empty": "Templates are on their way. Check back soon.",
       "templates": "Templates",
       "filter": "Filter templates",
+      "filterWithin": "Filter within {name}",
       "all": "All",
       "illustrative": "Every card shows the phone photo on the left and the AI result on the right. Template images are illustrative examples."
+    },
+    "series": {
+      "count": "{count, plural, one {# template} other {# templates}}",
+      "cardAria": "{name}, a series of {count, plural, one {# template} other {# templates}}. Pick one",
+      "coverAlt": "{name} series example",
+      "pick": "{count, plural, one {# template} other {# templates}} in this series. Pick one to start."
     },
     "template": {
       "fromCredits": "from {count, plural, one {# credit} other {# credits}}",
@@ -708,6 +715,13 @@
       "card": {
         "title": "Not finding it? Make a wish",
         "line": "Tell us the look you need. Others vote, and the most-wanted get built."
+      },
+      "notice": {
+        "author": "Your wish is live: <name>{template}</name>",
+        "voter": "A template you voted for is live: <name>{template}</name>",
+        "open": "Try it",
+        "dismiss": "Dismiss",
+        "more": "+{count} more"
       },
       "hint": {
         "text": "You can now wish for new templates.",

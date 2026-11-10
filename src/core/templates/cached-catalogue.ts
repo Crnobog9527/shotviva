@@ -14,7 +14,10 @@ import type { LocalizedTemplate } from './localize'
 export const CATALOGUE_LIFE = { revalidate: 3600, expire: 86_400 } as const
 
 type Read = (locale: Locale) => Promise<LocalizedTemplate[]>
-const readCatalogue: Read = (locale) => listTemplatesIn(createAdminSupabase(), locale)
+// Every live web template, series members included (T102): these pages look templates up by id
+// (featured picks, ?open=, the home picker's saved templates) and price the catalogue (credit
+// facts, the paywall's photo estimate); a member is as live and as priced as any other template.
+export const readCatalogue: Read = (locale) => listTemplatesIn(createAdminSupabase(), locale, { includeSeriesMembers: true })
 
 // The cached body, apart for tests: the live list with the normal lifetime, or, when the read
 // fails (a build without a database, an outage, a column the database does not have yet), an

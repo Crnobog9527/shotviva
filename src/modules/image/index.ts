@@ -13,6 +13,9 @@ export { UploadTestPanel, type TestTemplate } from './workspace/dev/upload-test-
 
 // App shell pieces (T8).
 export { TemplateCatalogue } from './catalogue/template-catalogue'
+// Create's grid (T102), server only: templates and series cards placed under the category tree.
+export { loadCatalogueView } from './catalogue/load-catalogue-view'
+export type { CatalogueSeries, CatalogueView, FilterNode, GridEntry } from './catalogue/catalogue-view'
 // Saved templates (T83): the provider every page with hearts wraps its catalogue in.
 export { FavoritesProvider } from './favorites'
 export { toCatalogueTemplate, type CatalogueTemplate } from './catalogue/catalogue-template'

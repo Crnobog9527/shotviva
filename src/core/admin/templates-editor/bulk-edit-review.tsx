@@ -3,7 +3,7 @@
 import { describeFailure, describePatch, type BulkEditFailure, type BulkEditPatch } from '../templates/bulk-edit-rules'
 import type { ImageProviderOption } from '../image-provider-field'
 import type { AdminTemplate } from '../templates/types'
-import type { CategoryOption } from './category-field'
+import { categoryChoices, type CategoryOption } from './category-options'
 import { bulkEditCopy as COPY } from './copy'
 
 type Props = { providers: readonly ImageProviderOption[]; templates: AdminTemplate[]; patch: BulkEditPatch; failures: BulkEditFailure[]; categories: readonly CategoryOption[] }
@@ -11,10 +11,7 @@ type Props = { providers: readonly ImageProviderOption[]; templates: AdminTempla
 // The confirm step (T79): what changes, on which templates, and every template that would fail
 // the floor or the web rules (the whole batch is then refused).
 export function BulkEditReview({ templates, patch, failures, categories, providers }: Props) {
-  const categoryName = (key: string) => {
-    const category = categories.find((option) => option.key === key)
-    return category ? `${category.nameZh} · ${category.nameEn}` : key
-  }
+  const categoryName = (key: string) => categoryChoices(categories).find(node => node.key === key)?.label ?? key
   const offWeb = patch.visibleIn !== undefined && !patch.visibleIn.includes('web')
   const featured = offWeb ? templates.filter((template) => template.featuredRank !== null) : []
   return (

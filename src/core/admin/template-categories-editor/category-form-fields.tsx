@@ -79,6 +79,19 @@ export function CategoryFormFields({ values, isNew, onChange }: Props) {
         hint={isNew ? COPY.keyHint : COPY.keyFixed}
         onChange={(key) => onChange({ key })}
       />
+      <Text id="cat-slug" label={COPY.slug} value={values.slug} max={CATEGORY_LIMITS.key} mono onChange={(slug) => onChange({ slug })} />
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={values.isVisible} onChange={event => onChange({ isVisible: event.target.checked })} />
+        {COPY.visible}
+      </label>
+      <details className="rounded border p-2 text-sm">
+        <summary className="cursor-pointer">{COPY.seo}</summary>
+        <div className="mt-3 grid gap-3">
+          {(['seoTitleZh', 'seoTitleEn', 'seoDescriptionZh', 'seoDescriptionEn'] as const).map(field =>
+            <Text key={field} id={field} label={COPY[field]} value={values[field]}
+              max={field.startsWith('seoTitle') ? 200 : 500} onChange={value => onChange({ [field]: value })} />)}
+        </div>
+      </details>
       <Intro id="cat-intro-zh" label={COPY.introZh} value={values.introZh} onChange={(introZh) => onChange({ introZh })} />
       <Intro id="cat-intro-en" label={COPY.introEn} value={values.introEn} onChange={(introEn) => onChange({ introEn })} />
       <p className="-mt-2 text-xs text-muted-foreground">{COPY.introHint}</p>

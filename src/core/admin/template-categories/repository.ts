@@ -3,8 +3,10 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { AppError } from '@/core/errors'
-import { CATEGORY_COLUMNS, toCategory, type CategoryInput, type CategoryRow } from '@/core/templates/categories'
+import { CATEGORY_COLUMNS, toCategory, type CategoryRow } from '@/core/templates/categories'
 
+import type { NodeInput } from './tree-input'
+import type { TreeMove } from '../ui/category-tree/tree'
 import { categoryRpcError } from './errors'
 import type { AdminCategory } from './types'
 
@@ -27,7 +29,7 @@ export async function listAdminCategories(client: SupabaseClient): Promise<Admin
   return data.map((row) => ({ ...toCategory(row), templateCount: row.templates[0]?.count ?? 0 }))
 }
 
-export async function saveCategory(client: SupabaseClient, actor: string, category: CategoryInput, isNew: boolean): Promise<void> {
+export async function saveCategory(client: SupabaseClient, actor: string, category: NodeInput, isNew: boolean): Promise<void> {
   const p_category = {
     key: category.key,
     name_en: category.nameEn,
@@ -35,6 +37,9 @@ export async function saveCategory(client: SupabaseClient, actor: string, catego
     intro_en: category.introEn,
     intro_zh: category.introZh,
     card_style: category.cardStyle,
+    parent_id: category.parentId, slug: category.slug, is_visible: category.isVisible,
+    seo_title_en: category.seoTitleEn, seo_title_zh: category.seoTitleZh,
+    seo_description_en: category.seoDescriptionEn, seo_description_zh: category.seoDescriptionZh,
   }
   const { error } = await client.rpc('admin_save_template_category', { p_category, p_is_new: isNew, p_actor: actor })
   if (error) throw categoryRpcError('admin_save_template_category', error)
@@ -49,4 +54,11 @@ export async function deleteCategory(client: SupabaseClient, actor: string, key:
   const { data, error } = await client.rpc('admin_delete_template_category', { p_key: key, p_move_to: moveTo, p_actor: actor })
   if (error) throw categoryRpcError('admin_delete_template_category', error)
   return typeof data === 'number' ? data : 0
+}
+
+export async function moveCategory(client: SupabaseClient, actor: string, move: TreeMove): Promise<void> {
+  const { error } = await client.rpc('admin_move_template_category', {
+    p_key: move.key, p_from_parent: move.fromParent, p_parent: move.parentId, p_before: move.beforeKey, p_actor: actor,
+  })
+  if (error) throw categoryRpcError('admin_move_template_category', error)
 }
