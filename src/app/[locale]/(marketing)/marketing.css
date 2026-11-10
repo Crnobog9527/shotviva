@@ -88,14 +88,15 @@
       font: 500 15px/1 var(--font-sans); color: var(--bone-dim); text-decoration: none; transition: color .18s, background-color .18s;
     }
     .mk-nl[aria-current="page"] { color: var(--foreground); }
-    /* Use Cases: a disclosure under the nav item, the globe menu's popover look */
+    /* Use Cases: a disclosure under the nav item, the globe menu's popover look; one above the
+       globe's 「切换到中文？」 bubble (z 60), which it would otherwise sit under */
     .mk-navmenu { position: relative; }
     button.mk-nl { gap: 4px; border: 0; background: none; cursor: pointer; }
     .mk-navmenu-chev { width: 16px; height: 16px; transition: transform .2s var(--ease); }
     .mk-nl[aria-expanded="true"] { color: var(--foreground); background: var(--wash); }
     .mk-nl[aria-expanded="true"] .mk-navmenu-chev { transform: rotate(180deg); }
     .mk-navmenu-list {
-      position: absolute; top: calc(100% + 4px); left: 0; z-index: 60; min-width: 236px; margin: 0; padding: 6px; list-style: none;
+      position: absolute; top: calc(100% + 4px); left: 0; z-index: 61; min-width: 236px; margin: 0; padding: 6px; list-style: none;
       border-radius: var(--radius-control); background: var(--popover); box-shadow: inset 0 0 0 1px var(--border), 0 24px 48px -16px rgba(0, 0, 0, .7);
     }
     .mk-navmenu-list a {
@@ -414,6 +415,8 @@
   .mk-free { display: grid; gap: 8px; margin-top: 24px; }
   .mk-free article { padding: 16px; border-radius: var(--radius-media); background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
   .mk-free p { margin-top: 8px; font-size: 16px; line-height: 1.5; color: var(--muted-foreground); }
+  .mk-free p a { color: var(--foreground); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--foreground) 40%, transparent); text-underline-offset: 3px; transition: text-decoration-color .18s; }
+  .mk-free p a:hover { text-decoration-color: var(--primary); }
   .mk-wm { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
   .mk-wm figure { position: relative; margin: 0; aspect-ratio: 1; border-radius: 12px; overflow: hidden; }
   .mk-wm img { width: 100%; height: 100%; object-fit: cover; }
