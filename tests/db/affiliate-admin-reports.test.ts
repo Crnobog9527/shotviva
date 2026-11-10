@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto'
 import type { Client } from 'pg'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { exportCsv } from '@/core/affiliate/admin/export'
-import { commissions, payouts, loadMember, referred } from '@/core/affiliate/admin/read'
+import { dossier } from '@/core/affiliate/admin/dossier-read'
+import { commissions, payouts, referred } from '@/core/affiliate/admin/read'
 import { loadUser } from '@/core/admin/users/repository'
 import { findUser, overview } from '@/core/affiliate/admin/summary'
 import { connectAdmin, createUser } from './helpers'
@@ -46,7 +47,7 @@ afterAll(async () => {
 })
 it('loads the masked-to-the-public data in the admin area through the actual REST relationships', async () => {
   const api = serviceSupabase()
-  expect((await loadMember(api, owner)).member?.slug).toBe(slug)
+  expect((await dossier(api, actor, owner))?.slug).toBe(slug)
   expect((await loadUser(api, buyer, true))?.referrer).toBe(slug)
   expect((await referred(api, owner)).items.map((r) => r.id)).toEqual([buyer])
   expect(await findUser(api, actor, 't2-' + buyer + '@example.test')).toMatchObject({ user_id: buyer, slug })
