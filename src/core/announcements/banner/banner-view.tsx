@@ -2,7 +2,9 @@
 
 import { usePathname } from 'next/navigation'
 
-import { isBannerHiddenPath, type BannerAnnouncement } from '../rules'
+// Not the rules index: it also exports the zod schemas, which the banner must not ship.
+import { isBannerHiddenPath } from '../rules/rules'
+import type { BannerAnnouncement } from '../rules/types'
 import { BannerBar } from '../ui'
 import { useBanner } from './use-banner'
 

@@ -1,6 +1,6 @@
 import { useFormatter, useLocale, useTranslations } from 'next-intl'
 
-import { percentZh } from '../index'
+import { percentZh } from '../discount'
 import type { PendingDiscount } from '../index'
 
 export function DiscountSummary({ value, singlePayment = false }: { value: PendingDiscount; singlePayment?: boolean }) {
