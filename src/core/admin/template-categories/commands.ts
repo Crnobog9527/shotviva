@@ -54,4 +54,5 @@ export async function deleteTemplateCategory(client: SupabaseClient, adminId: st
 export async function moveTemplateCategory(client: SupabaseClient, actor: string, input: unknown): Promise<void> {
   const move = parseOrThrow(moveSchema, input, '移动目标不正确，请刷新后重试')
   await repo.moveCategory(client, actor, move)
+  logger.info('admin.template_category.moved', { adminId: actor, ...move })
 }

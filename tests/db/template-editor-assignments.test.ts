@@ -102,3 +102,30 @@ it('reads beyond the first catalogue page and preserves catalogue order across p
     await sql.query("delete from public.templates where id like 'ed-tax-page-%'")
   }
 })
+
+it('returns INVALID_INPUT for malformed current or previous series IDs at the RPC boundary', async () => {
+  for (const assignment of [{ series_id: 'bad' }, { series_id: null, previous_series_id: 'bad' }]) {
+    const { error } = await db.rpc('admin_save_template_assignment', {
+      p_actor: actor, p_template: { id: item }, p_prompt: {}, p_assignment: assignment, p_is_new: false,
+    })
+    expect(error?.message).toBe('INVALID_INPUT')
+  }
+})
+
+it('rejects a banned admin before saving a category, moving it or saving a series', async () => {
+  await sql.query('begin')
+  try {
+    await sql.query('update public.profiles set banned_at=now() where id=$1', [actor])
+    for (const call of [
+      "admin_save_template_category('{}',true,$1)",
+      'admin_move_template_category(null,null,null,null,$1)',
+      "admin_save_template_series(null,null,'{}','{}',$1,null)",
+    ]) {
+      await sql.query('savepoint denied')
+      await expect(sql.query('select public.' + call, [actor])).rejects.toMatchObject({ message: 'NOT_ADMIN' })
+      await sql.query('rollback to denied')
+    }
+  } finally {
+    await sql.query('rollback')
+  }
+})
