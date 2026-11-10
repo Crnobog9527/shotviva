@@ -18,24 +18,26 @@ export type ImageProviderOption = {
 
 type Props = {
   id: string
+  allowKeep?: boolean
   providers: readonly ImageProviderOption[]
   value: string | null
   onChange: (id: string | null) => void
 }
 
-export function ImageProviderField({ id, providers, value, onChange }: Props) {
+export function ImageProviderField({ id, providers, value, onChange, allowKeep }: Props) {
   const selected = value ? providers.find(p => p.id === value) : providers.find(p => p.isActive)
   return (
     <div className="grid gap-1.5">
       <Label htmlFor={id}>{copy.label}</Label>
       <select id={id} className="border-input h-9 min-w-0 rounded-md border bg-transparent px-3 text-sm"
         aria-describedby={`${id}-hint`} value={value ?? ''} onChange={(event) => onChange(event.target.value || null)}>
+        {allowKeep && <option value="keep">不改</option>}
         <option value="">{copy.followDefault}</option>
         {providers.filter(p => p.id !== 'env').map((provider) => (
           <option key={provider.id} value={provider.id}>{provider.label} · {provider.model}</option>
         ))}
       </select>
-      <p id={`${id}-hint`} className="text-muted-foreground text-xs">{selected ? capabilitySummary(selected) : copy.unknown}</p>
+      <p id={`${id}-hint`} className="text-muted-foreground text-xs">{value === 'keep' ? copy.keepHint : selected ? capabilitySummary(selected) : copy.unknown}</p>
       {selected && <ModelSyncStatus key={selected.id + selected.model + (selected.capabilities?.fetchedAt ?? '')} provider={selected} />}
     </div>
   )

@@ -1,5 +1,5 @@
-import type { Resolution } from '@/core/templates/output-options'
-import { approvedCredit, type CreditsFloor, type TemplateQuality } from '@/core/templates/pricing'
+import { RESOLUTIONS, type Resolution } from '@/core/templates/output-options'
+import { approvedCredit, type CreditsCost, type CreditsFloor, type TemplateQuality } from '@/core/templates/pricing'
 import { floorGuidance } from '@/core/templates/provider-pricing'
 
 export const unsupportedTier = (floor: CreditsFloor, resolution: Resolution) =>
@@ -12,4 +12,11 @@ export function tierGuidance(floor: CreditsFloor, quality: TemplateQuality, reso
   if (approved !== undefined) return `目录收费 ${approved} 积分起。此价已批准；其他报价须满足${cost}。`
   if (floor.tariff?.quality === quality) return `目录收费 ${floor.tariff.costs[resolution]} 积分起。当前模型：${cost}。`
   return cost
+}
+
+export function summaryPrice(costs: CreditsCost, floor: CreditsFloor, unpriced: readonly Resolution[] = []) {
+  return RESOLUTIONS.map(tier => {
+    if (unsupportedTier(floor, tier)) return '不可用'
+    return unpriced.includes(tier) ? '未定价' : costs[tier]
+  }).join(' / ')
 }

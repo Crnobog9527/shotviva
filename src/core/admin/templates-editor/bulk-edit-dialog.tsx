@@ -7,7 +7,9 @@ import type { ProviderFloors } from '@/core/templates/provider-pricing'
 import { bulkEditFailures, isEmptyPatch } from '../templates/bulk-edit-rules'
 import type { AdminTemplate } from '../templates/types'
 import { BulkEditFields } from './bulk-edit-fields'
+import { bulkModelFailures } from './bulk-model-check'
 import { BulkEditReview } from './bulk-edit-review'
+import type { ImageProviderOption } from '../image-provider-field'
 import type { CategoryOption } from './category-field'
 import { readBulkEdit } from './bulk-edit-state'
 import { bulkEditCopy as COPY } from './copy'
@@ -19,17 +21,18 @@ type Props = {
   templates: AdminTemplate[]
   skipped: AdminTemplate[]
   floor: ProviderFloors
+  providers: readonly ImageProviderOption[]
   categories: readonly CategoryOption[]
 }
 
 // Batch edit (T79): fill in what changes → review the changes, the templates and any that
 // would fail → one all-or-nothing save.
-export function BulkEditDialog({ edit, templates, skipped, floor, categories }: Props) {
+export function BulkEditDialog({ edit, templates, skipped, floor, providers, categories }: Props) {
   const { patch, problems } = readBulkEdit(edit.values)
   const empty = isEmptyPatch(patch) || templates.length === 0
   const invalid = Object.keys(problems).length > 0
   // The server's list when it refused; until then, the same rules run here.
-  const failures = edit.failures ?? bulkEditFailures(templates, patch, floor)
+  const failures = edit.failures ?? [...bulkEditFailures(templates, patch, floor), ...bulkModelFailures(templates, patch, providers)]
   const reviewing = edit.step === 'review'
   return (
     <Dialog open={edit.open} onOpenChange={(open) => !open && !edit.pending && edit.close()}>
@@ -40,9 +43,9 @@ export function BulkEditDialog({ edit, templates, skipped, floor, categories }: 
         </DialogHeader>
         <SkippedNote skipped={skipped} none={templates.length === 0} />
         {reviewing ? (
-          <BulkEditReview templates={templates} patch={patch} failures={failures} categories={categories} />
+          <BulkEditReview providers={providers} templates={templates} patch={patch} failures={failures} categories={categories} />
         ) : (
-          <BulkEditFields values={edit.values} problems={problems} categories={categories} onChange={edit.setValues} />
+          <BulkEditFields providers={providers} values={edit.values} problems={problems} categories={categories} onChange={edit.setValues} />
         )}
         {edit.error ? (
           <p role="alert" className="text-destructive text-sm">

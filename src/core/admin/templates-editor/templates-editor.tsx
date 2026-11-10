@@ -15,8 +15,8 @@ import { FEATURED_LIMIT, featuredIds, toggleFeatured } from './featured-state'
 import { matchesSearch } from './form-state'
 import { selectedInOrder, toggleId, toggleVisible } from './selection-state'
 import { TemplateFormDialog, type EditTarget } from './template-form-dialog'
-import { catalogueOrder, Toolbar } from './toolbar'
-import { TemplatesTable } from './templates-table'
+import { CatalogView } from './catalog-view'
+import { Toolbar } from './toolbar'
 import { UnpublishDialog } from './unpublish-dialog'
 import { useDuplicateTemplate } from './use-duplicate-template'
 import { useTemplateActions } from './use-template-actions'
@@ -58,7 +58,6 @@ export function TemplatesEditor({ providers, templates, categories, floor, cover
   const { pending, error, notice, run, clearError } = useTemplateActions()
   const duplicate = useDuplicateTemplate(actions.duplicate, run, receipt => setEditing({ mode: 'saved', ...receipt }))
   const visible = templates.filter((template) => matchesSearch(template, query))
-  const visibleIds = visible.map((template) => template.id)
   const target = currentTarget(editing, templates)
 
   const openEditor = (target: EditTarget) => {
@@ -100,7 +99,7 @@ export function TemplatesEditor({ providers, templates, categories, floor, cover
         onReorder={saveOrder('featured')}
         onRemove={(id) => setFeatured(featured.filter((other) => other !== id))}
       />
-      <BulkPublish
+      <BulkPublish providers={providers}
         selected={selectedInOrder(templates, selected)}
         busy={pending}
         setActiveMany={actions.setActiveMany}
@@ -109,17 +108,17 @@ export function TemplatesEditor({ providers, templates, categories, floor, cover
         categories={categories}
         onClear={() => setSelected(new Set())}
       />
-      <TemplatesTable
+      <CatalogView query={query} all={templates} categories={categories}
         floor={floor}
         templates={visible}
         selection={{
           selected,
           onSelect: (id, on) => setSelected((current) => toggleId(current, id, on)),
-          onSelectVisible: (on) => setSelected((current) => toggleVisible(visibleIds, current, on)),
+          onSelectGroup: (ids, on) => setSelected((current) => toggleVisible(ids, current, on)),
         }}
         featuredFull={featured.length >= FEATURED_LIMIT}
         onFeature={feature}
-        order={catalogueOrder(query, pending, saveOrder('catalogue'))}
+        onOrder={saveOrder}
         pending={pending}
         onDuplicate={duplicate}
         onEdit={(template) => openEditor({ mode: 'edit', template })}

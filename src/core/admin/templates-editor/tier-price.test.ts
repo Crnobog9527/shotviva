@@ -3,7 +3,7 @@ import { expect, it } from 'vitest'
 import { creditsBelowFloor } from '@/core/templates/pricing'
 import { MISSING_COST, providerFloor } from '@/core/templates/provider-pricing'
 import { buildPayload, emptyFormValues } from './form-state'
-import { tierGuidance } from './tier-price'
+import { summaryPrice, tierGuidance } from './tier-price'
 
 const model = { '1k': 13, '2k': 13, '3k': 1 }
 const base = { medium: model, high: model, resolutions: ['1k', '2k'] as const }
@@ -30,4 +30,9 @@ it('enforces each mapped catalogue minimum even on cheap models, reserving the e
   expect(creditsBelowFloor('medium', tariff.costs, providerFloor(changed,'sun','dark-dining'))).toEqual([])
   expect(creditsBelowFloor('medium', tariff.costs, providerFloor(changed,'seed','dark-dining'))).toMatchObject([{ resolution: '1k', floor: 100 }])
   expect(providerFloor(floors,'seed','unmapped').tariff).toBeUndefined()
+})
+
+it('shows no numeric sale price for closed tiers, even after their model gains support', () => {
+  expect(summaryPrice(model, base, ['2k','3k'])).toBe('13 / 未定价 / 不可用')
+  expect(summaryPrice(model, { ...base, resolutions: ['1k','2k','3k'] }, ['2k','3k'])).toBe('13 / 未定价 / 未定价')
 })

@@ -1,7 +1,6 @@
 'use client'
 
 import { type CreditsFloor } from '@/core/templates/pricing'
-import { RESOLUTIONS } from '@/core/templates/output-options'
 import { Badge } from '@/core/ui/badge'
 import { Button } from '@/core/ui/button'
 import { Checkbox } from '@/core/ui/checkbox'
@@ -11,7 +10,7 @@ import { TableCell, TableRow } from '@/core/ui/table'
 import type { AdminTemplate } from '../templates/types'
 import { DragHandle, MoveButtons, sortableRowClass, useSortableItem } from '../ui/sortable'
 import { bulkCopy } from './copy'
-import { unsupportedTier } from './tier-price'
+import { summaryPrice } from './tier-price'
 import { canFeature } from './featured-state'
 
 import { versionCopy } from './version-copy'
@@ -56,7 +55,7 @@ export function TemplateRow(props: Props) {
         </div>
       </TableCell>
       <TableCell>
-        <div className="font-medium">{template.name}</div>
+        <div className="font-medium">{template.translations.zh?.name?.trim() || template.name}</div>
         <div className="text-muted-foreground font-mono text-xs">{template.id}</div>
       </TableCell>
       <TableCell>{template.categoryInfo.nameZh}</TableCell>
@@ -70,7 +69,7 @@ export function TemplateRow(props: Props) {
         </div>
       </TableCell>
       <TableCell>
-        {summaryPrice(template, price)}
+        {summaryPrice(template.creditsCost, price, template.unpricedResolutions)}
         <span className="text-muted-foreground block text-xs">{template.quality}</span>
       </TableCell>
       <TableCell>{template.prompt ? `v${template.prompt.version}` : '缺失'}</TableCell>
@@ -110,8 +109,4 @@ function FeaturedSwitch({ template, full, pending, onFeature }: { template: Admi
       onCheckedChange={(checked) => onFeature(template, checked)}
     />
   )
-}
-
-function summaryPrice(template: AdminTemplate, floor: CreditsFloor) {
-  return RESOLUTIONS.map(r => unsupportedTier(floor, r) ? '不可用' : template.creditsCost[r]).join(' / ')
 }

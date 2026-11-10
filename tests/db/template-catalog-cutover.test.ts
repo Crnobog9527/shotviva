@@ -223,8 +223,10 @@ describe('activated template prices', () => {
         fields:{ images:{ min:1,max:1 } }, credits_cost: { ...costs,[tier]:fee }, price_floors:floors }])
     await refuses(() => write('promo-poster','pets',44),'MODEL_CREDIT_FLOOR')
     await refuses(() => write('promo-poster','pets',119,'2k'),'MODEL_CREDIT_FLOOR')
-    await refuses(() => db.query("select public.admin_bulk_edit_templates('{promo-poster}',$1,$2,$3,'{en,zh}')",
-      [{credits_cost:{'3k':189}},floors,user]),'MODEL_CREDIT_FLOOR')
+    const { rows } = await db.query("select public.admin_bulk_edit_templates('{promo-poster}',$1,$2,$3,'{en,zh}') as result",
+      [{credits_cost:{'3k':189}},floors,user])
+    expect(rows[0].result.failures).toMatchObject([{id:'promo-poster',reason:'below_floor',resolution:'3k',given:189,floor:190}])
+    expect((await db.query("select credits_cost->>'3k' as price from public.templates where id='promo-poster'")).rows[0].price).toBe('190')
     await write('draft-art','art-styles',19)
     await db.query('set constraints style_sale_binding immediate')
     await refuses(() => db.query('select public.admin_upsert_template($1,null)', [{id:'unapproved-live-art',

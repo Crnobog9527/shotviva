@@ -5,6 +5,7 @@ import { Label } from '@/core/ui/label'
 import { RESOLUTIONS } from '@/core/templates/output-options'
 
 import type { BulkEditValues, SurfaceChoice } from './bulk-edit-state'
+import { ImageProviderField, type ImageProviderOption } from '../image-provider-field'
 import type { CategoryOption } from './category-field'
 import { bulkEditCopy as COPY } from './copy'
 import { TIER_LABEL } from './form-state'
@@ -15,14 +16,17 @@ type Props = {
   values: BulkEditValues
   problems: Partial<Record<keyof BulkEditValues['credits'], string>>
   // T75's categories; system ones (photo edit, freeform) are never offered as a target.
+  providers: readonly ImageProviderOption[]
   categories: readonly CategoryOption[]
   onChange: (values: BulkEditValues) => void
 }
 
 // The batch-edit form: three optional credit boxes, entry points, quality. Each starts on 不改.
-export function BulkEditFields({ values, problems, categories, onChange }: Props) {
+export function BulkEditFields({ values, problems, providers, categories, onChange }: Props) {
   return (
     <div className="grid gap-4">
+      <ImageProviderField id="bulk-provider" providers={providers} value={values.provider || null} allowKeep
+        onChange={provider => onChange({ ...values, provider: provider ?? '' })} />
       <fieldset className="grid gap-2">
         <legend className="mb-1 text-sm font-medium">{COPY.creditsLegend}</legend>
         <div className="grid grid-cols-3 gap-3">
