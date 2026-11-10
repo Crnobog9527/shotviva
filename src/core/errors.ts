@@ -65,6 +65,8 @@ export const ERROR_CODES = [
   'FAVORITES_LIMIT',
   // Admin test runs (ARCHITECTURE §10.b, T85): today's test-run budget is spent; nothing was called.
   'TEST_BUDGET_EXCEEDED',
+  // The Owner closed this support ticket: its author can no longer add to it (start a new one).
+  'TICKET_CLOSED',
   'INTERNAL',
 ] as const
 
@@ -115,6 +117,7 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   DOWNGRADE_NOT_ALLOWED: 409,
   FAVORITES_LIMIT: 409,
   TEST_BUDGET_EXCEEDED: 429,
+  TICKET_CLOSED: 409,
   INTERNAL: 500,
 }
 

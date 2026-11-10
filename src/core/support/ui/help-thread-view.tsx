@@ -4,6 +4,7 @@ import { ChevronLeftIcon } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useCallback, type ReactNode } from 'react'
 
+import { buttonVariants } from '../../ui/button'
 import { EmptyState } from '../../ui/empty-state'
 import { AddMessageForm } from './add-message-form'
 import type { HelpActions } from './help-actions'
@@ -18,11 +19,14 @@ type Props = {
   // "Thanks, we've got it" with the reply time, right after the ticket was sent.
   notice: ReactNode
   onBack(): void
+  // Switches to the New ticket tab (a closed ticket takes no more messages).
+  onNew(): void
 }
 
 // One ticket in the dialog: back to My tickets, the type as the heading, the messages and the
-// reply field. Reading it marks it seen (loadThread), which clears its dot.
-export function HelpThreadView({ id, actions, brand, notice, onBack }: Props) {
+// reply field. Reading it marks it seen (loadThread), which clears its dot. Once the Owner closed
+// it, the reply field gives way to a note pointing at a new ticket (add_ticket_message refuses).
+export function HelpThreadView({ id, actions, brand, notice, onBack, onNew }: Props) {
   const t = useTranslations('app.support')
   const { loadThread, addMessage } = actions
   const thread = useLoad(useCallback(() => loadThread(id), [loadThread, id]))
@@ -40,7 +44,7 @@ export function HelpThreadView({ id, actions, brand, notice, onBack }: Props) {
           thread={data}
           brand={brand}
           notice={notice}
-          form={<AddMessageForm send={send} closed={data.status === 'closed'} onSent={thread.reload} />}
+          form={data.status === 'closed' ? <ClosedNote onNew={onNew} /> : <AddMessageForm send={send} onSent={thread.reload} />}
         />
       </>
     )
@@ -52,6 +56,18 @@ export function HelpThreadView({ id, actions, brand, notice, onBack }: Props) {
         {t('tabs.mine')}
       </button>
       {body}
+    </div>
+  )
+}
+
+function ClosedNote({ onNew }: { onNew(): void }) {
+  const t = useTranslations('app.support.thread')
+  return (
+    <div className="grid gap-3 border-t border-hairline pt-4">
+      <p className="text-body text-muted-foreground">{t('closedNote')}</p>
+      <button type="button" onClick={onNew} className={buttonVariants({ variant: 'glass', size: 'touch', className: 'justify-self-start' })}>
+        {t('newTicket')}
+      </button>
     </div>
   )
 }

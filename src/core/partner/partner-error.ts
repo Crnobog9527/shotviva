@@ -73,6 +73,8 @@ const FROM_APP: Record<ErrorCode, PartnerErrorCode> = {
   FAVORITES_LIMIT: 'internal',
   // Admin-only (T85); never on a partner route.
   TEST_BUDGET_EXCEEDED: 'internal',
+  // Support tickets are web-only; no partner route writes to one.
+  TICKET_CLOSED: 'internal',
   INTERNAL: 'internal',
 }
 

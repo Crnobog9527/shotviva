@@ -956,13 +956,15 @@
         "addLabel": "补充内容",
         "add": "发送",
         "adding": "发送中…",
-        "closedNote": "这个工单已关闭。在这里写下内容会重新打开它。",
+        "closedNote": "这个工单已关闭。如还有问题，请新建一个工单。",
+        "newTicket": "新建工单",
         "errors": {
           "INVALID_INPUT": "请写下不超过 2,000 字的内容。",
           "NOT_FOUND": "这个工单已经不存在了。",
           "generic": "没能发送，请再试一次。",
           "IMAGE_TOO_LARGE": "有图片超过 10 MB，移除后再发送。",
-          "IMAGE_UNSUPPORTED": "有图片无法读取，移除后再发送。"
+          "IMAGE_UNSUPPORTED": "有图片无法读取，移除后再发送。",
+          "TICKET_CLOSED": "这个工单已关闭，内容没有发出。请新建一个工单。"
         }
       },
       "showMore": "查看更多",
