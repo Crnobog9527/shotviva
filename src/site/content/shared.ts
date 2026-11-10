@@ -1,7 +1,6 @@
 import type { Fact, RelatedLink } from '@/core/content'
 
 import {
-  FromCredits,
   freeImagesLabel,
   FreeImagesLabel,
   languages,
@@ -51,7 +50,6 @@ export function sharedFacts(): readonly [Fact, Fact, Fact, ...Fact[]] {
     },
     { label: 'What you don’t need', value: 'A studio, a designer or a prompt. Pick a template, or type one line about what to change.' },
     { label: 'Free to start', value: `${FreeImagesLabel} when you sign up, given once` },
-    { label: 'Cost per photo', value: `${FromCredits} (Standard)` },
     { label: 'Output sizes', value: tierPixels },
     { label: 'Uploads', value: uploadLimits },
     { label: 'Prices', value: paidValue() },

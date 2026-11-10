@@ -7,7 +7,6 @@ import {
   foodHalfDayUsd,
   freeImagesLabel,
   FreeImagesShort,
-  fromCredits,
   MENU_DISHES,
   OUTPUT_TIERS,
   photoSeconds,
@@ -97,7 +96,7 @@ export const aiRestaurantMenu = defineContentPage({
     },
     {
       question: 'How much does a food photographer cost?',
-      answer: `Published US rates are about ${usdRange(foodHalfDayUsd)} for a half day, with a food stylist usually billed separately. ${brand} makes a menu photo from your phone shot ${fromCredits}.`,
+      answer: `Published US rates are about ${usdRange(foodHalfDayUsd)} for a half day, with a food stylist usually billed separately. ${brand} makes a menu photo from your phone shot.`,
     },
     {
       question: 'Do I need to write prompts?',
@@ -124,7 +123,7 @@ export const aiRestaurantMenu = defineContentPage({
     factsNote: 'From the apps\' own merchant help pages (DoorDash, Uber Eats, Grubhub), checked November 2026. Apps change their rules; check before you upload.',
     templates: {
       heading: 'Menu Photo Templates for Delivery Apps, Menus and Posters',
-      intro: `Every template starts from your phone photo of the dish and ends with a menu-ready photo, ${fromCredits}.`,
+      intro: `Every template starts from your phone photo of the dish and ends with a menu-ready photo.`,
       categoryKeys: [CATEGORY.food],
     },
   },

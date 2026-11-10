@@ -3,7 +3,6 @@ import { defineHomePage, type CostBills, type HeadedText, type HomePage, type Im
 import { site } from '../site.config'
 import {
   hundredCreditsFrom,
-  fromCredits,
   freeImagesLabel,
   FreeImagesShort,
   FreeImagesTitle,
@@ -115,7 +114,7 @@ const steps = {
     },
     {
       heading: `Download in ${tierList}`,
-      text: `${standard.name} is ${standard.px} px for ${standard.use}, ${hd.name} is ${hd.px} px for ${hd.use}, and ${max.name} is ${max.px} px for ${max.use}. A ${standard.name} photo costs ${fromCredits}.`,
+      text: `${standard.name} is ${standard.px} px for ${standard.use}, ${hd.name} is ${hd.px} px for ${hd.use}, and ${max.name} is ${max.px} px for ${max.use}.`,
     },
   ],
 } as const satisfies HomePage['steps']
@@ -143,7 +142,7 @@ export const homePage = defineHomePage({
   steps,
   templateGrid: {
     heading: 'Img to Img Templates: No Prompts to Write',
-    intro: `Every template starts from your phone photo and ends with a finished picture. Pick one and ${brand} does the rest. Templates cost ${fromCredits} a photo.`,
+    intro: `Every template starts from your phone photo and ends with a finished picture. Pick one and ${brand} does the rest.`,
     note: 'All template images are illustrative examples.',
   },
   facts: sharedFacts(),

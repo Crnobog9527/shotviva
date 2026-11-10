@@ -4,7 +4,7 @@ import { site } from '../../site.config'
 import { productBills } from '../home'
 import { pairImage, sizeCountWord } from '../landing-shared'
 import { pricingRelated } from '../shared'
-import { freeImagesLabel, FreeImagesLabel, fromCredits, photoSeconds, plansSentence, SET_PHOTOS, tierList, tierPixels, uploadLimits } from '../offer'
+import { freeImagesLabel, FreeImagesLabel, photoSeconds, plansSentence, SET_PHOTOS, tierList, tierPixels, uploadLimits } from '../offer'
 
 // Final SEO copy (T11): Title, H1, answer and FAQ own "image to image generator" so the home
 // page never targets it (建站规格 R1). Layout and the facts / bills / links blocks follow the
@@ -35,7 +35,7 @@ export const imageToImageGenerator = defineContentPage({
     },
     {
       label: `${tierList}, as PNG`,
-      value: `${tierPixels} on the long side, in ${sizeCountWord} sizes from a square listing to a 9:16 story. About ${photoSeconds} seconds a photo, ${fromCredits}.`,
+      value: `${tierPixels} on the long side, in ${sizeCountWord} sizes from a square listing to a 9:16 story. About ${photoSeconds} seconds a photo.`,
     },
   ],
   costBills: productBills(
