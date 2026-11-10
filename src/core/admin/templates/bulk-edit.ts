@@ -89,7 +89,7 @@ export async function bulkEditTemplates(
   const parsed = inputSchema.safeParse(input)
   if (!parsed.success) throw new AppError('INVALID_INPUT', parsed.error.issues.map((issue) => issue.message).join('; '))
   const { ids, patch } = parsed.data
-  const { data, error } = await client.rpc('admin_bulk_edit_templates', {
+  const { data, error } = await client.rpc(patch.categoryKey ? 'admin_bulk_assign_templates' : 'admin_bulk_edit_templates', {
     p_ids: ids,
     p_patch: toSqlPatch(patch),
     p_floor: floor,

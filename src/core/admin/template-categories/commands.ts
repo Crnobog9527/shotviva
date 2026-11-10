@@ -5,7 +5,7 @@ import { z } from 'zod'
 
 import { AppError } from '@/core/errors'
 import { logger } from '@/core/logger'
-import { categoryInputSchema } from '@/core/templates/categories'
+import { moveSchema, nodeSchema } from './tree-input'
 
 import * as repo from './repository'
 
@@ -19,7 +19,7 @@ function parseOrThrow<T>(schema: z.ZodType<T>, value: unknown, message: string):
   return result.data
 }
 
-const saveSchema = z.object({ isNew: z.boolean(), category: categoryInputSchema })
+const saveSchema = z.object({ isNew: z.boolean(), category: nodeSchema })
 
 export async function saveTemplateCategory(client: SupabaseClient, adminId: string, payload: unknown): Promise<void> {
   const { isNew, category } = parseOrThrow(saveSchema, payload, '名称、标识或说明不符合要求，请检查后再保存')
@@ -49,4 +49,9 @@ export async function deleteTemplateCategory(client: SupabaseClient, adminId: st
   const moved = await repo.deleteCategory(client, adminId, key, moveTo)
   logger.info('admin.template_category.deleted', { adminId, key, moveTo, moved })
   return { moved }
+}
+
+export async function moveTemplateCategory(client: SupabaseClient, actor: string, input: unknown): Promise<void> {
+  const move = parseOrThrow(moveSchema, input, '移动目标不正确，请刷新后重试')
+  await repo.moveCategory(client, actor, move)
 }

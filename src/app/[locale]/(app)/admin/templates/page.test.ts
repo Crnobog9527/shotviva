@@ -3,16 +3,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const requireAdmin = vi.fn()
 const listAdminTemplates = vi.fn()
-const listAdminCategories = vi.fn()
+const listAdminCategoryTree = vi.fn()
 const readPricingOptions = vi.fn()
+const listAdminSeriesOptions = vi.fn()
 
 vi.mock('@/core/auth', () => ({ requireAdmin: () => requireAdmin(), createAdminSupabase: () => ({}) }))
 vi.mock('@/core/admin', () => ({
   listAdminTemplates: (client: unknown) => listAdminTemplates(client),
-  listAdminCategories: (client: unknown) => listAdminCategories(client),
   TemplatesEditor: () => null,
   CategoriesPanel: () => null,
 }))
+vi.mock('@/core/admin/template-categories', () => ({ listAdminCategoryTree: (db: unknown) => listAdminCategoryTree(db) }))
+vi.mock('@/core/admin/template-series', () => ({ seriesCopy: { title: "系列管理" }, listAdminSeriesOptions: (db: unknown) => listAdminSeriesOptions(db) }))
+vi.mock('./category-actions', () => ({ moveTemplateCategoryAction: vi.fn() }))
 vi.mock('@/site/template-pricing', () => ({ readPricingOptions: (client: unknown) => readPricingOptions(client) }))
 vi.mock('./actions', () => ({
   saveTemplateAction: vi.fn(),
@@ -37,7 +40,8 @@ describe('admin templates page', () => {
     requireAdmin.mockReset()
     listAdminTemplates.mockReset().mockResolvedValue([])
     readPricingOptions.mockReset().mockResolvedValue([])
-    listAdminCategories.mockReset().mockResolvedValue([])
+    listAdminSeriesOptions.mockReset().mockResolvedValue([])
+    listAdminCategoryTree.mockReset().mockResolvedValue([])
   })
 
   it('404s non-admins before loading any template or prompt', async () => {
@@ -45,14 +49,16 @@ describe('admin templates page', () => {
     await expect(AdminTemplatesPage()).rejects.toMatchObject({ digest: expect.stringMatching(/404/) })
     expect(listAdminTemplates).not.toHaveBeenCalled()
     expect(readPricingOptions).not.toHaveBeenCalled()
-    expect(listAdminCategories).not.toHaveBeenCalled()
+    expect(listAdminSeriesOptions).not.toHaveBeenCalled()
+    expect(listAdminCategoryTree).not.toHaveBeenCalled()
   })
 
   it('loads templates for admins', async () => {
     requireAdmin.mockResolvedValue({ id: 'admin', email: null })
     await AdminTemplatesPage()
     expect(listAdminTemplates).toHaveBeenCalledOnce()
-    expect(listAdminCategories).toHaveBeenCalledOnce()
+    expect(listAdminSeriesOptions).toHaveBeenCalledOnce()
+    expect(listAdminCategoryTree).toHaveBeenCalledOnce()
     expect(readPricingOptions).toHaveBeenCalledOnce()
   })
 })

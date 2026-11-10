@@ -4,7 +4,6 @@ import { Button } from '@/core/ui/button'
 import { Input } from '@/core/ui/input'
 
 import { catalogCopy, orderCopy } from './copy'
-import type { TableOrder } from './templates-table'
 
 type Props = { query: string; onQuery: (query: string) => void; onNew: () => void }
 
@@ -20,9 +19,4 @@ export function Toolbar({ query, onQuery, onNew }: Props) {
       </Button>
     </div>
   )
-}
-
-export function catalogueOrder(query: string, pending: boolean, onReorder: TableOrder['onReorder']): TableOrder {
-  const filtered = query.trim() !== ''
-  return { onReorder, disabled: filtered || pending, disabledHint: filtered ? orderCopy.filtered : undefined }
 }

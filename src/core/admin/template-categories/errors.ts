@@ -7,6 +7,8 @@ const MESSAGES: Record<string, string> = {
   CATEGORY_KEY_TAKEN: '这个标识已经被别的分类用了，换一个',
   CATEGORY_NAME_EN_TAKEN: '已经有分类叫这个英文名了（不分大小写）',
   CATEGORY_NAME_ZH_TAKEN: '已经有分类叫这个中文名了',
+  INVALID_PARENT: '这个位置会产生循环，或让分类超过三级',
+  CATEGORY_CHANGED: '分类位置已发生变化，请刷新后重试',
   CATEGORY_SYSTEM: '这是内置模板用的系统分类，不能修改或删除',
   CATEGORY_HAS_CHILDREN: '请先移动或删除子分类',
   CATEGORY_LAST: '至少要保留一个分类',
@@ -18,6 +20,7 @@ const MESSAGES: Record<string, string> = {
 const TAKEN = '名称已被使用，请换一个（中英文名称和标识都不能和别的分类重复）'
 
 export function categoryRpcError(fn: string, error: { message: string; code?: string }): AppError {
+  if (error.message.includes('template_category_sibling_slug')) return new AppError('INVALID_INPUT', '同级已有相同的网址标识，请换一个')
   if (error.code === '23505') return new AppError('INVALID_INPUT', TAKEN)
   const message = MESSAGES[error.message]
   if (message) return new AppError(error.message === 'NOT_ADMIN' ? 'FORBIDDEN' : 'INVALID_INPUT', message)

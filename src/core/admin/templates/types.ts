@@ -6,6 +6,9 @@ import type { BulkEditOutcome, BulkEditPatch } from './bulk-edit-rules'
 import type { ActiveChangeOutcome } from './publish-rules'
 
 export type AdminTemplate = Template & {
+  subcategoryKey?: string | null
+  seriesId?: string | null
+  seriesSortOrder?: number
   saleEnabled?: boolean
   // null only if a template was created outside the admin flow without a prompt.
   prompt: { styleRefs: StyleRef[]; providerId: string | null; body: string; version: number; modelParams: Record<string, unknown> } | null
@@ -16,6 +19,7 @@ export type SaveTemplatePayload = {
   template: unknown
   prompt: unknown
   isNew: boolean
+  assignment?: { seriesId: string | null; previousCategory?: string; previousSeriesId?: string | null }
   revision?: { expected: number; selected?: number }
 }
 

@@ -20,6 +20,9 @@ export type TemplateFormValues = {
   // English one-liner (T52); blank saves as none.
   description: string
   category: string
+  seriesId: string | null
+  originalCategory?: string
+  originalSeriesId?: string | null
   quality: TemplateQuality
   // One text box per resolution; parsed on save.
   storedCredits?: CreditsCost
@@ -57,6 +60,7 @@ export function emptyFormValues(): TemplateFormValues {
     name: '',
     description: '',
     category: '',
+    seriesId: null,
     quality: 'high',
     credits: { '1k': '2', '2k': '4', '3k': '6' },
     visibleWeb: true,
@@ -118,6 +122,12 @@ export function toTranslations(zh: ZhFormValues, keys: readonly string[], toggle
 
 const savedVersion = (template: AdminTemplate) => template.prompt?.version
 
+function savedAssignment(template: AdminTemplate) {
+  const category = template.subcategoryKey ?? template.category
+  const seriesId = template.seriesId ?? null
+  return { category, seriesId, originalCategory: category, originalSeriesId: seriesId }
+}
+
 export function toFormValues(template: AdminTemplate): TemplateFormValues {
   return {
     expectedVersion: savedVersion(template),
@@ -125,7 +135,7 @@ export function toFormValues(template: AdminTemplate): TemplateFormValues {
     module: template.module,
     name: template.name,
     description: template.description ?? '',
-    category: template.category,
+    ...savedAssignment(template),
     quality: template.quality,
     storedCredits: template.creditsCost,
     credits: editablePrices(template.creditsCost, template.unpricedResolutions),
@@ -225,6 +235,7 @@ export function buildPayload(values: TemplateFormValues, isNew: boolean, floor: 
     payload: {
       isNew,
       ...revision(values),
+      assignment: { seriesId: values.seriesId, previousCategory: values.originalCategory, previousSeriesId: values.originalSeriesId },
       template: {
         id: values.id.trim(),
         module: values.module,

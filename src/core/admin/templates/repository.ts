@@ -9,6 +9,7 @@ import { AppError, type ErrorCode } from '@/core/errors'
 import {
   coverLocalesSchema,
   EDIT_TEMPLATE_ID,
+  PRE_T75_TEMPLATE_COLUMNS,
   selectTemplates,
   toTemplate,
   type PreT75TemplateRow,
@@ -19,31 +20,45 @@ import {
 
 import type { PublishCandidate } from './publish-rules'
 import { toUpsertArgs } from './rpc-payload'
-import type { AdminTemplate, TemplateOrderGroup } from './types'
+import type { AdminTemplate, SaveTemplatePayload, TemplateOrderGroup } from './types'
 
 // Every function expects a service-role client; callers must have passed requireAdmin().
 
 type PromptRow = { style_refs: StyleRef[]; provider_id: string | null; body: string; version: number; model_params: Record<string, unknown> }
 type SaleRow = { template_sale_approvals: { enabled: boolean; unpriced_resolutions: Resolution[] } | null }
-type AdminRow = SaleRow & (TemplateRow | PreT75TemplateRow) & { template_prompts: PromptRow | null }
+type AdminRow = SaleRow & { subcategory_key: string | null; series_id: string | null; series_sort_order: number } & (TemplateRow | PreT75TemplateRow) & { template_prompts: PromptRow | null }
+
+const CATALOGUE_PAGE_SIZE = 250
+
+async function readAdminPage(client: SupabaseClient, after: string | null) {
+  const { data, error } = await selectTemplates((columns) => {
+    // The stable primary-key cursor keeps an in-flight reorder from skipping a template.
+    const taxonomy = columns.startsWith(PRE_T75_TEMPLATE_COLUMNS + ',') ? '' : ', subcategory_key, series_id, series_sort_order'
+    const page = client.from('templates').select(columns + taxonomy).neq('id', EDIT_TEMPLATE_ID)
+      .order('id').limit(CATALOGUE_PAGE_SIZE)
+    if (after) page.gt('id', after)
+    return page.returns<AdminRow[]>()
+  }, ', template_sale_approvals(enabled,unpriced_resolutions), template_prompts(body, version, model_params, provider_id, style_refs)')
+  if (error || !data) throw new AppError('INTERNAL', `listAdminTemplates failed: ${error?.message ?? 'no data'}`)
+  return data
+}
 
 export async function listAdminTemplates(client: SupabaseClient): Promise<AdminTemplate[]> {
-  const { data, error } = await selectTemplates(
-    (columns) =>
-      client
-        .from('templates')
-        .select(columns)
-        // The built-in edit template has its own page (/admin/templates/edit): this editor's
-        // form would refuse its empty visible_in, and its params are not free-form JSON.
-        .neq('id', EDIT_TEMPLATE_ID)
-        .order('sort_order', { ascending: true })
-        .order('id', { ascending: true })
-        .returns<AdminRow[]>(),
-    ', template_sale_approvals(enabled,unpriced_resolutions), template_prompts(body, version, model_params, provider_id, style_refs)',
-  )
-  if (error || !data) throw new AppError('INTERNAL', `listAdminTemplates failed: ${error?.message ?? 'no data'}`)
+  const rows: AdminRow[] = []
+  let after: string | null = null
+  while (true) {
+    const page = await readAdminPage(client, after)
+    rows.push(...page)
+    if (page.length < CATALOGUE_PAGE_SIZE) break
+    after = page[page.length - 1].id
+  }
+  // Stable sort preserves the database id order within each rank.
+  const data = rows.sort((a, b) => a.sort_order - b.sort_order)
   return data.map((row) => ({
     ...toTemplate(row),
+    subcategoryKey: row.subcategory_key,
+    seriesId: row.series_id,
+    seriesSortOrder: row.series_sort_order,
     saleEnabled: row.template_sale_approvals?.enabled === true,
     unpricedResolutions: row.template_sale_approvals?.unpriced_resolutions,
     prompt: row.template_prompts
@@ -68,6 +83,11 @@ export async function templateExists(client: SupabaseClient, id: string): Promis
 }
 
 const versionErrors: Record<string, string> = {
+  STALE_TEMPLATE_ASSIGNMENT: '分类或系列已被其他管理员更改。请重新打开模板核对。',
+  SYSTEM_ASSIGNMENT: '内置模板的分类与系列不能更改。',
+  SERIES_NOT_FOUND: '所选系列已不存在，请重新选择。',
+  CATEGORY_NOT_FOUND: '所选分类已不存在，请重新选择。',
+  TEMPLATE_EXISTS: '模板 ID 已被使用，请更换。',
   STALE_PROMPT: '已有其他人修改了提示词。请保留草稿，再重新打开模板核对。',
   VERSION_NOT_FOUND: '这个模板没有所选版本。',
   HISTORICAL_PROVIDER_UNAVAILABLE: '历史版本的供应商或密钥已不可用，或绑定模型已变更。当前配置未改变。',
@@ -85,6 +105,12 @@ export async function upsertTemplate(
     ? await client.rpc('admin_save_versioned_template', { ...args, p_actor: revision.actor, p_expected: revision.expected, p_selected: revision.selected ?? null })
     : await client.rpc('admin_upsert_template', args)
   if (!error) return revision ? Number(data) : undefined
+  throwTemplateError(error)
+}
+
+function throwTemplateError(error: { code: string; message: string; details: string }): never {
+  if (error.message === 'TEMPLATE_NOT_FOUND') throw new AppError('NOT_FOUND', '模板已不存在，请刷新。')
+  if (error.message === 'NOT_ADMIN') throw new AppError('FORBIDDEN', '需要管理员权限。')
   const message = versionErrors[error.message]
   if (message) throw new AppError('INVALID_INPUT', message)
   if (['MODEL_REFERENCE_LIMIT', 'MODEL_CREDIT_FLOOR', 'TEMPLATE_RETIRED', 'TEMPLATE_PRICE_BELOW_FLOOR'].includes(error.message)) throw new AppError('INVALID_INPUT', error.details)
@@ -93,6 +119,21 @@ export async function upsertTemplate(
   // templates_category_key_fkey (T75): the category was deleted while the form was open.
   if (error.code === '23503') throw new AppError('INVALID_INPUT', '所选分类已经不存在了，请重新选择分类')
   throw new AppError('INTERNAL', `upsertTemplate failed: ${error.message}`)
+}
+
+// The assignment and the original prompt/price save commit together.
+export async function saveAssignedTemplate(client: SupabaseClient, template: TemplateInput, prompt: PromptInput,
+  floors: ProviderFloors, opts: {
+    actor: string; isNew: boolean; assignment: NonNullable<SaveTemplatePayload['assignment']>; revision?: SaveTemplatePayload['revision']
+  }): Promise<number | undefined> {
+  const { assignment, revision } = opts
+  const { data, error } = await client.rpc('admin_save_template_assignment', {
+    ...toUpsertArgs(template, prompt, { floors }), p_actor: opts.actor, p_is_new: opts.isNew,
+    p_assignment: { series_id: assignment.seriesId, previous_category: assignment.previousCategory, previous_series_id: assignment.previousSeriesId },
+    p_expected: revision?.expected, p_selected: revision?.selected,
+  })
+  if (error) throwTemplateError(error)
+  return data == null ? undefined : Number(data)
 }
 
 type CandidateRow = SaleRow & Pick<
