@@ -3,7 +3,6 @@ import type { Fact, RelatedLink } from '@/core/content'
 import { packFrom, planFrom, usd } from '../offer'
 import {
   zhFreeImages,
-  zhFromCredits,
   zhLanguages,
   zhTierPixels,
   zhUploadLimits,
@@ -29,7 +28,6 @@ export function zhSharedFacts(): readonly [Fact, Fact, Fact, ...Fact[]] {
     { label: '用在哪里', value: '菜单和外卖平台、电商商品图、房源和民宿照片、社交媒体和广告，或者把一张本来就喜欢的照片再修好一点' },
     { label: '不需要什么', value: '不用影棚，不用设计师，也不用写提示词。选个模板，或者写一句要改哪里。' },
     { label: '免费试用', value: `注册送 ${zhFreeImages}，只送一次` },
-    { label: '每张消耗', value: `${zhFromCredits}（标准清晰度）` },
     { label: '出图尺寸', value: zhTierPixels },
     { label: '上传要求', value: zhUploadLimits },
     { label: '价格', value: paidValue() },

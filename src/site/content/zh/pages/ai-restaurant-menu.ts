@@ -5,7 +5,7 @@ import { CATEGORY, pairImage, SIZE_COUNT } from '../../landing-shared'
 import { zhPricingRelated } from '../shared'
 import { foodHalfDayUsd, MENU_DISHES, photoSeconds, planFrom, usd, usdRange } from '../../offer'
 import { PLATFORM_SPECS, px } from '../../platform-specs'
-import { ZH_TIERS, zhFreeImages, zhFromCredits, zhTierList } from '../offer'
+import { ZH_TIERS, zhFreeImages, zhTierList } from '../offer'
 
 // /zh/ai-restaurant-menu (T44, ARCHITECTURE §17): noindex (中文口径主词表: 「暂不建」, keyword
 // ai菜单). For restaurant owners who put dishes on delivery apps; the US apps' figures are kept
@@ -84,7 +84,7 @@ export const zhAiRestaurantMenu = defineContentPage({
     },
     {
       question: '请美食摄影师要多少钱？',
-      answer: `按美国的公开报价，拍半天大约 ${usdRange(foodHalfDayUsd)}，食物造型师通常另外收费。${brand} 用你的手机照片做一张菜单图，${zhFromCredits}。`,
+      answer: `按美国的公开报价，拍半天大约 ${usdRange(foodHalfDayUsd)}，食物造型师通常另外收费。${brand} 用你的手机照片做一张菜单图。`,
     },
     {
       question: '要自己写提示词吗？',
@@ -110,7 +110,7 @@ export const zhAiRestaurantMenu = defineContentPage({
     factsNote: '以上来自各外卖平台自己的商家帮助页面（DoorDash、Uber Eats、Grubhub），2026 年 11 月核对。平台规则会变，上传前请再确认。',
     templates: {
       heading: '菜单配图模板：外卖平台、菜单和海报',
-      intro: `每个模板都从你的菜品手机照片开始，到一张能上菜单的图结束，${zhFromCredits}。`,
+      intro: `每个模板都从你的菜品手机照片开始，到一张能上菜单的图结束。`,
       categoryKeys: [CATEGORY.food],
     },
   },

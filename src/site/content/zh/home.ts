@@ -16,7 +16,6 @@ import {
 import {
   ZH_TIERS,
   zhFreeImages,
-  zhFromCredits,
   zhPlansSentence,
   zhTierList,
   zhTierPixels,
@@ -103,7 +102,7 @@ const steps = {
     },
     {
       heading: `下载${zhTierList}`,
-      text: `${standard.name} ${standard.px} px，适合${standard.use}；${hd.name} ${hd.px} px，适合${hd.use}；${max.name} ${max.px} px，适合${max.use}。一张${standard.name}图${zhFromCredits}。`,
+      text: `${standard.name} ${standard.px} px，适合${standard.use}；${hd.name} ${hd.px} px，适合${hd.use}；${max.name} ${max.px} px，适合${max.use}。`,
     },
   ],
 } as const satisfies HomePage['steps']
@@ -130,7 +129,7 @@ export const zhHomePage = defineHomePage({
   steps,
   templateGrid: {
     heading: 'AI改图模板：不用写提示词',
-    intro: `每个模板都从你的手机照片开始，到一张成品图结束。选一个，剩下的交给 ${brand}。每张${zhFromCredits}。`,
+    intro: `每个模板都从你的手机照片开始，到一张成品图结束。选一个，剩下的交给 ${brand}。`,
     note: '模板图片均为示意图。',
   },
   facts: zhSharedFacts(),
