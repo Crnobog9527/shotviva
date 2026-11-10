@@ -538,8 +538,14 @@
     display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 24px; margin-top: 12px; padding-top: 12px;
     border-top: 1px solid var(--hairline); font: 400 14px/1.4 var(--font-sans); color: var(--muted-foreground);
   }
-  .mk-foot-fine nav { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; }
-  .mk-foot-item { display: inline-flex; align-items: center; gap: 8px; }
+  /* One link run, every item led by a dot. The run sits 22px (gap + dot + gap) left of the column and
+     the nav clips at 4px, so the dot that opens each line is cut off while focus rings still show.
+     The items are inline boxes so text-wrap: balance evens out the lines and never strands one. */
+  .mk-foot-links { overflow: hidden; margin: -4px; padding: 4px; }
+  .mk-foot-run { margin-inline-start: -22px; text-wrap: balance; }
+  .mk-foot-item { display: inline-flex; align-items: center; gap: 8px; margin-inline-start: 8px; vertical-align: top; }
+  .mk-foot-dot { inline-size: 6px; text-align: center; }
+  .mk-foot-lang { display: flex; align-items: center; gap: 8px; }
   .mk-foot-fine a, .mk-foot-btn { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted-foreground); text-decoration: none; font: inherit; cursor: pointer; }
   .mk-foot-lang [aria-current] { color: var(--bone-dim); }
   @media (min-width: 768px) {
@@ -668,8 +674,8 @@
 }
 
 /* "Can't find your template? Make a wish" (Owner 2026-11-10), under the template grid: three
-   pains on hairline rows, then the Wishlist tab's own prints (tape, lean, stamp) as examples.
-   Static: no JS, the images lazy and sized for a third of the column. */
+   pains on hairline rows, then the Wishlist tab's own prints (tape, lean, stamp) as eight
+   examples, two to a row on phones and four from 768px. Static: no JS, the images lazy. */
 @layer components {
   .mk-wish h2 em { font-style: italic; }
   .mk-wish h2:lang(zh) em { font-style: normal; }
@@ -679,11 +685,19 @@
   .mk-wish-points h3 { font: 600 17px/1.25 var(--font-sans); letter-spacing: -0.015em; }
   .mk-wish-points p { margin-top: 4px; font-size: 16px; line-height: 1.5; color: var(--muted-foreground); }
 
-  .mk-wish-wall { list-style: none; margin: 32px 0 0; padding: 10px 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 10px; }
+  .mk-wish-wall { list-style: none; margin: 32px 0 0; padding: 10px 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 10px; }
   .mk-wish-wall > li { min-width: 0; transform: rotate(var(--r, 0deg)); transform-origin: 50% 0; }
-  .mk-wish-wall > li:nth-child(1) { --r: -2deg; }
-  .mk-wish-wall > li:nth-child(2) { --r: 1.6deg; }
-  .mk-wish-wall > li:nth-child(3) { --r: -0.8deg; display: none; }
+  /* Pinned at the tape, a print's foot swings h·sin(r) sideways. Odd prints lean one way and even
+     the other, so the phone pairs splay apart and every lean stays inside the 16px gutter; where
+     two four-up neighbours swing together (2|3, 6|7) the angles stay small enough to clear the gap. */
+  .mk-wish-wall > li:nth-child(1) { --r: 1.6deg; }
+  .mk-wish-wall > li:nth-child(2) { --r: -1.2deg; }
+  .mk-wish-wall > li:nth-child(3) { --r: 0.8deg; }
+  .mk-wish-wall > li:nth-child(4) { --r: -2deg; }
+  .mk-wish-wall > li:nth-child(5) { --r: 1.2deg; }
+  .mk-wish-wall > li:nth-child(6) { --r: -1.6deg; }
+  .mk-wish-wall > li:nth-child(7) { --r: 0.6deg; }
+  .mk-wish-wall > li:nth-child(8) { --r: -1.4deg; }
   .mk-wish-print {
     position: relative; display: grid; padding: 8px 8px 10px; border-radius: 6px; background: var(--card);
     box-shadow: inset 0 0 0 1px var(--border), inset 0 1px 0 var(--edge-highlight), 0 18px 28px -18px var(--photo-fade);
@@ -710,8 +724,7 @@
   .mk-wish-cta { width: 100%; }
 
   @media (min-width: 768px) {
-    .mk-wish-wall { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
-    .mk-wish-wall > li:nth-child(3) { display: block; }
+    .mk-wish-wall { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px 18px; }
     .mk-wish-cta { display: inline-flex; width: auto; min-width: 240px; }
   }
   @media (min-width: 1024px) {

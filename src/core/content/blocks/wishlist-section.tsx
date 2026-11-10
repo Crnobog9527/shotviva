@@ -3,8 +3,8 @@ import type { ReactNode } from 'react'
 
 import type { WishExample, WishlistPromo } from '../page-content'
 
-// Each print is about a third of the content column; half the phone width below 768px.
-const PRINT_SIZES = '(min-width: 1024px) 200px, (min-width: 768px) 30vw, 46vw'
+// Each print is a quarter of the content column from 768px; half the phone width below it.
+const PRINT_SIZES = '(min-width: 1024px) 170px, (min-width: 768px) 22vw, 46vw'
 
 const Heart = () => (
   <svg viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
@@ -12,8 +12,8 @@ const Heart = () => (
   </svg>
 )
 
-// One example wish as the Wishlist tab draws it: a print taped to the wall with its reference
-// photo, the wish in the serif's hand, and its votes; the shipped one carries the stamp. The
+// One example wish as the Wishlist tab draws it: a print taped to the wall showing the look
+// wished for, the wish in the serif's hand, and its votes; the shipped one carries the stamp. The
 // picture stays clean (The No Badge Rule): the alt text and the section's note say "example".
 function Print({ wish, labels }: { wish: WishExample; labels: WishlistPromo['labels'] }) {
   return (
@@ -37,7 +37,7 @@ function Print({ wish, labels }: { wish: WishExample; labels: WishlistPromo['lab
 }
 
 // Right under the template grid (Owner 2026-11-10): for the visitor whose niche the grid does
-// not cover. Three pains, answered in order, then three example wishes, the note, and the one
+// not cover. Three pains, answered in order, then eight example wishes, the note, and the one
 // ghost CTA, which is a request-time slot (signed in or not) so the section stays static.
 export function WishlistSection({ block, cta }: { block: WishlistPromo; cta: ReactNode }) {
   return (

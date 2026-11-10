@@ -1,5 +1,4 @@
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
@@ -8,12 +7,16 @@ import { pagePath, validateContentPage } from '@/core/content'
 import { site } from '../site.config'
 import { FALLBACK_CREDITS, fillCredits } from './credits'
 import { contentPages, homePage } from './index'
+import { privateDoc } from '../../../tests/support/private-docs'
+
+// The keyword map lives in the private docs repo (tests/support/private-docs.ts); skipped where absent.
+const keywordMap = privateDoc('seo资料', 'Shotviva 页面与主词映射（美国口径）.csv')
 
 const allPages = [homePage, ...contentPages]
 
 // The keyword map CSV is the single source of indexable pages (AGENTS §9).
 function csvUrls(): string[] {
-  const csv = readFileSync(join(process.cwd(), 'seo资料', 'Shotviva 页面与主词映射（美国口径）.csv'), 'utf8')
+  const csv = readFileSync(keywordMap!, 'utf8')
   return csv
     .split(/\r?\n/)
     .slice(1)
@@ -33,7 +36,7 @@ describe('site content', () => {
     expect(new Set(keywords).size).toBe(keywords.length)
   })
 
-  it('only indexes pages that are in the keyword map CSV', () => {
+  it.skipIf(!keywordMap)('only indexes pages that are in the keyword map CSV', () => {
     const urls = csvUrls()
     for (const path of site.indexing.indexablePaths) expect(urls).toContain(path)
   })

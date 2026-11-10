@@ -438,13 +438,24 @@ html:lang(zh-Hans) :is(em, i, .italic) {
   }
 }
 /* The wish-came-true notice (core/wishlist) drops 12px into place, each time the next one comes
-   up; still under reduced motion. */
+   up, while the room it takes at the top of the page opens under it once (a grid row from 0fr,
+   its child min-height 0), so the page eases down instead of jumping; both still under reduced
+   motion. */
 @keyframes sv-notice-in {
   from { transform: translateY(-12px); opacity: 0; }
 }
 @utility notice-in {
   @media (prefers-reduced-motion: no-preference) {
     animation: sv-notice-in 360ms var(--ease) both;
+  }
+}
+@keyframes sv-notice-room {
+  from { grid-template-rows: 0fr; }
+}
+@utility notice-room {
+  grid-template-rows: 1fr;
+  @media (prefers-reduced-motion: no-preference) {
+    animation: sv-notice-room 360ms var(--ease) both;
   }
 }
 /* A deeper row of Create's category chips (T102) drops 4px into place as it opens; still under

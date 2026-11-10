@@ -3,8 +3,10 @@ import type { ImageRef, WishlistPromo } from '@/core/content'
 // Home: "Can't find your template?" (Owner 2026-11-10), under the template grid while the
 // wishlist is open. Three pains, three answers; no timelines and no notification promises
 // (ARCHITECTURE §15.4: the wishlist sends nothing). The wish cards are examples, said in the
-// alt text and the note, never on the picture (The No Badge Rule). The vote counts are part of
-// the illustration, not live data.
+// alt text and the note, never on the picture (The No Badge Rule). Each picture is the look the
+// shop owner wished for, not the reference photo they would upload, and the kinds come in light
+// and dark pairs so a visitor sees both moods. The vote counts are part of the illustration, not
+// live data.
 const ref = (file: string, width: number, height: number, alt: string): ImageRef => ({ src: `/home/${file}.webp`, alt, width, height })
 
 export const homeWishlist: WishlistPromo = {
@@ -26,20 +28,50 @@ export const homeWishlist: WishlistPromo = {
   ],
   examples: [
     {
-      image: ref('example-dish-before', 900, 1125, 'Reference photo for a wish: a dish on a restaurant kitchen pass (illustrative example)'),
-      text: 'A dark, moody poster for our weekend brunch menu',
+      image: ref('wish-brunch-dark', 1080, 1080, 'The look wished for (illustrative): a dark, moody weekend brunch menu poster'),
+      text: 'Can you make a weekend brunch poster template? Dark and moody, with my menu and prices right on it',
       votes: 46,
       shipped: false,
     },
     {
-      image: ref('hero-set-phone', 1080, 1350, 'Reference photo for a wish: a woven leather tote on a kitchen counter (illustrative example)'),
-      text: 'Bags on a pale stone plinth with a soft shadow',
+      image: ref('wish-cafe-light', 1080, 1080, 'The look wished for (illustrative): a bright, wood-and-plants café grand-opening poster'),
+      text: 'Our café opens next month. I want an opening poster template I can make from photos of my own shop',
+      votes: 64,
+      shipped: false,
+    },
+    {
+      image: ref('wish-tea-dark', 1080, 1080, 'The look wished for (illustrative): a dark, premium new-flavor milk tea poster'),
+      text: 'We\'re launching a new milk tea. I want a dark, premium-looking new-flavor poster',
+      votes: 38,
+      shipped: false,
+    },
+    {
+      image: ref('wish-bag-stone', 1080, 1080, 'The look wished for (illustrative): a leather bag on a pale stone plinth with a soft shadow'),
+      text: 'I sell handbags. I want that bag-on-a-pale-stone-plinth look with a soft shadow, so it feels premium',
       votes: 87,
       shipped: true,
     },
     {
-      image: ref('example-skincare-before', 900, 1125, 'Reference photo for a wish: a skincare jar on a bathroom shelf (illustrative example)'),
-      text: 'Skincare on wet sand, beach light',
+      image: ref('wish-lunch-light', 1080, 1080, 'The look wished for (illustrative): a bright, fresh lunch specials menu poster'),
+      text: 'I need a weekday lunch specials poster — bright and fresh, with the menu on it',
+      votes: 41,
+      shipped: false,
+    },
+    {
+      image: ref('wish-cafe-evening', 1080, 1080, 'The look wished for (illustrative): a flower-filled street café at dusk, as an evening poster'),
+      text: 'I want an evening poster to pull people into my café: the street, the flowers, that just-after-sunset glow',
+      votes: 57,
+      shipped: false,
+    },
+    {
+      image: ref('wish-tea-light', 1080, 1080, 'The look wished for (illustrative): a fresh "2nd cup half price" milk tea promo poster'),
+      text: 'We do 2nd cup half price every Wednesday. I want a fresh promo poster I can reuse every week',
+      votes: 52,
+      shipped: false,
+    },
+    {
+      image: ref('wish-skincare-stone', 1080, 1080, 'The look wished for (illustrative): skincare bottles on warm stone with sunlight and leaf shadows'),
+      text: 'Please make a skincare template! I want my bottles on warm stone with sunlight and leaf shadows',
       votes: 31,
       shipped: false,
     },

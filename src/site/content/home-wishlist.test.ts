@@ -3,16 +3,22 @@ import { describe, expect, it } from 'vitest'
 import { homeWishlist } from './home-wishlist'
 import { zhHomeWishlist } from './zh/home-wishlist'
 
-const text = (block: typeof homeWishlist) => JSON.stringify(block)
+// Our own words only: an example wish is a shop owner talking ("a poster I can reuse every week"),
+// not a promise from us, so the timeline guard skips the wish texts.
+const text = (block: typeof homeWishlist) => JSON.stringify({ ...block, examples: block.examples.map(({ image }) => image) })
 
 describe('home wishlist section copy (Owner 2026-11-10)', () => {
   it.each([
-    ['en', homeWishlist, /illustrative example/],
-    ['zh', zhHomeWishlist, /示意图/],
-  ] as const)('%s: three points, three examples with one shipped, examples disclosed in alt text', (_, block, disclosure) => {
+    ['en', homeWishlist, /illustrative/],
+    ['zh', zhHomeWishlist, /示意/],
+  ] as const)('%s: three points, eight square examples with one shipped, examples disclosed in alt text', (_, block, disclosure) => {
     expect(block.points).toHaveLength(3)
+    expect(block.examples).toHaveLength(8)
     expect(block.examples.filter((wish) => wish.shipped)).toHaveLength(1)
-    for (const wish of block.examples) expect(wish.image.alt).toMatch(disclosure)
+    for (const wish of block.examples) {
+      expect(wish.image.alt).toMatch(disclosure)
+      expect(wish.image.width).toBe(wish.image.height)
+    }
   })
 
   it('promises no timeline and no notifications (ARCHITECTURE §15.4)', () => {
