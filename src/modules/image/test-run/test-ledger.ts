@@ -4,6 +4,7 @@ import { IdentitySwapRefused, type IdentityJudgeUsage } from '@/core/identity-gu
 import { GenerationFailure, settleProviderCall, type DecisionCost, type ProviderInput, type ProviderPrices, type SettleDeps, type SettleLedger } from '@/core/jobs'
 import { logger } from '@/core/logger'
 
+import { writeThumbnail } from './test-thumbnail'
 import { testOutputKey } from './test-run-keys'
 import type { TestRun } from './test-run-row'
 import { findTestRun, finishTestRun } from './test-run-store'
@@ -32,6 +33,8 @@ export async function settleTestRun(deps: SettleDeps, run: TestRun, call: Omit<P
     alerts: false,
     store: async (output) => {
       await deps.store.put(outputKey, output.bytes, output.contentType)
+      // The full result and its cost still settle if a derivative fails. The panel can rebuild it.
+      await writeThumbnail(deps.store, outputKey, output.bytes).catch(() => logger.warn('test run thumbnail deferred', { runId: run.id }))
       return []
     },
     confirm: (_stored, cost) => finishTestRun(deps.db, { runId: run.id, status: 'succeeded', outputKey, durationMs: Date.now() - started, ...cost }),

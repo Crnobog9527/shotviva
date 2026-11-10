@@ -9,6 +9,8 @@ import type { ObjectStore } from '@/core/storage'
 
 import type { TestPhoto, TestRun } from './test-run-row'
 import { cleanupTestRuns, listTestPhotos, listTestRuns, loadTestBudget } from './test-run-store'
+import { drainRemovals } from './remove-assets'
+import { thumbnailKey } from './test-thumbnail'
 import { testOutputKey } from './test-run-keys'
 import { toTestRunView } from './test-run-view'
 
@@ -25,10 +27,8 @@ const sign = (store: ObjectStore, key: string) => store.presignGet(key, { expire
 
 export async function cleanupOnOpen(deps: Deps, actorId: string): Promise<void> {
   try {
-    const keys = await cleanupTestRuns(deps.db, actorId)
-    const results = await Promise.allSettled(keys.map((key) => deps.store.delete(key)))
-    const missed = results.filter((result) => result.status === 'rejected').length
-    if (missed > 0) logger.warn('admin test cleanup left objects behind', { missed, total: keys.length })
+    await cleanupTestRuns(deps.db, actorId)
+    await drainRemovals(deps)
   } catch (error) {
     // The panel still opens; the next open tries again.
     logger.error('admin test cleanup failed', { error })
@@ -36,7 +36,9 @@ export async function cleanupOnOpen(deps: Deps, actorId: string): Promise<void> 
 }
 
 export async function signRun(store: ObjectStore, run: TestRun): Promise<TestRunView> {
-  return toTestRunView(run, run.outputKey ? await sign(store, run.outputKey) : null)
+  if (!run.outputKey) return toTestRunView(run, null)
+  const [url, thumb] = await Promise.all([sign(store, run.outputKey), sign(store, thumbnailKey(run.outputKey))])
+  return { ...toTestRunView(run, url), thumbnailUrl: thumb }
 }
 
 // Mint on click so an open editor can download even after its preview URLs expire.
@@ -53,19 +55,29 @@ export async function signTestRunDownload(deps: Deps, runId: string) {
 
 const signPhoto = async (store: ObjectStore, photo: TestPhoto): Promise<TestPhotoView> => ({
   id: photo.id,
-  url: await sign(store, photo.objectKey),
+  url: await sign(store, thumbnailKey(photo.objectKey)),
   lastUsedAt: photo.lastUsedAt,
 })
 
-export async function loadTestPanel(deps: Deps, templateId: string): Promise<TestPanelData> {
-  const [runs, budget] = await Promise.all([listTestRuns(deps.db, templateId), loadTestBudget(deps.db)])
-  const photoIds = [...new Set(runs.flatMap((run) => (run.photoId ? [run.photoId] : [])))]
-  const photos = await listTestPhotos(deps.db, photoIds)
-  const [views, recent, used] = await Promise.all([
-    Promise.all(runs.map((run) => signRun(deps.store, run))),
-    Promise.all(photos.recent.map((photo) => signPhoto(deps.store, photo))),
-    Promise.all(photos.used.map((photo) => signPhoto(deps.store, photo))),
+export async function loadPanelSummary(deps: Deps) {
+  const [budget, recentPhotos] = await Promise.all([
+    loadTestBudget(deps.db),
+    listTestPhotos(deps.db).then(rows => Promise.all(rows.map(photo => signPhoto(deps.store, photo)))),
   ])
-  const photoUrls = Object.fromEntries([...used, ...recent].map((photo) => [photo.id, photo.url]))
-  return { runs: views, recentPhotos: recent, photoUrls, budget }
+  return { budget, recentPhotos }
+}
+
+export async function loadPanelRecords(deps: Deps, templateId: string) {
+  const rows = await listTestRuns(deps.db, templateId)
+  const ids = [...new Set(rows.flatMap(run => run.photoId ? [run.photoId] : []))]
+  const [runs, photos] = await Promise.all([
+    Promise.all(rows.map(run => signRun(deps.store, run))),
+    listTestPhotos(deps.db, ids).then(rows => Promise.all(rows.map(async photo => [photo.id, await sign(deps.store, photo.objectKey)] as const))),
+  ])
+  return { runs, photoUrls: Object.fromEntries(photos) }
+}
+
+export async function loadTestPanel(deps: Deps, templateId: string): Promise<TestPanelData> {
+  const [summary, records] = await Promise.all([loadPanelSummary(deps), loadPanelRecords(deps, templateId)])
+  return { ...summary, ...records }
 }

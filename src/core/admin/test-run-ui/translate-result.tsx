@@ -5,6 +5,7 @@ import { LoaderCircle } from 'lucide-react'
 import { Button } from '@/core/ui/button'
 
 import type { TestRunView } from '../test-runs'
+import { TestThumbnail } from './test-thumbnail'
 import { TEST_RUN_COPY as COPY } from './copy'
 import { runFailure, usd } from './messages'
 
@@ -27,8 +28,7 @@ function Picture({ label, state }: { label: string; state: TranslateState }) {
   if (run.status !== 'succeeded' || !run.outputUrl) return <p className="text-destructive p-2 text-center text-xs">{COPY.run.failed(runFailure(run))}</p>
   return (
     <a href={run.outputUrl} target="_blank" rel="noreferrer" className="h-full w-full">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={run.outputUrl} alt={label} className="h-full w-full object-contain" />
+      <TestThumbnail kind="run" id={run.id} src={run.thumbnailUrl ?? `/api/admin/test-thumbnail?kind=run&id=${run.id}`} alt={label} className="h-full w-full object-contain" />
     </a>
   )
 }

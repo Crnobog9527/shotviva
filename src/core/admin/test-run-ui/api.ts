@@ -37,11 +37,27 @@ async function call<T>(url: string, init?: { method?: string; body?: unknown }):
   throw new TestRunError(body?.code ?? 'INTERNAL', body?.message ?? `HTTP ${response.status}`)
 }
 
-// cleanup: when the panel opens, the 30-day cleanup runs first (a POST: it deletes data).
-export async function loadPanel(templateId: string, cleanup: boolean): Promise<TestPanelData> {
-  if (cleanup) await call<{ ok: true }>('/api/admin/test-runs/cleanup', { method: 'POST', body: {} })
-  return call<TestPanelData>(`/api/admin/test-runs?template_id=${encodeURIComponent(templateId)}`)
+export const cleanupPanel = () => call('/api/admin/test-runs/cleanup', { method: 'POST', body: {} })
+
+export const loadSummary = () => call<Pick<TestPanelData, 'budget' | 'recentPhotos'>>('/api/admin/test-runs?section=summary')
+
+export const loadRecords = (id: string) => call<Pick<TestPanelData,'runs'|'photoUrls'>>(
+  `/api/admin/test-runs?template_id=${encodeURIComponent(id)}&section=records`)
+
+export type AssetKind = 'photo' | 'run'
+
+export type AssetCursor = { id: string; date: string }
+export type ManagedAsset = AssetCursor & { thumbnail?: string | null; label?: string | null }
+export function listManagedAssets(kind: AssetKind, template?: string, cursor?: AssetCursor) {
+  const params = new URLSearchParams({ kind, ...cursor })
+  if (template) params.set('template', template)
+  return call<{ items: ManagedAsset[]; next: AssetCursor | null }>(`/api/admin/test-assets?${params}`)
 }
+
+export const removeTestAssets = (kind: AssetKind, ids: string[], expected?: number) =>
+  call<{ count: number; uses: number; pending: number }>('/api/admin/test-assets', {
+    method: 'POST', body: { kind, ids, expected },
+  })
 
 export type GenerateInput = {
   omitStyleRefs: boolean

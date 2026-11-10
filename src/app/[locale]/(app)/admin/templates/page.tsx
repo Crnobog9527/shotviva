@@ -5,9 +5,12 @@ import { CategoriesPanel, listAdminCategories, listAdminTemplates, TemplatesEdit
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { pricingFromOptions } from '@/core/admin/templates/provider-pricing'
 import { readPricingOptions } from '@/site/template-pricing'
+import { TestPanelSummaryProvider } from '@/core/admin/test-run-ui'
 import { ModelSyncProvider } from '@/core/admin/image-provider-field/model-sync'
 import { setTemplateSaleAction } from './sale-action'
 import { syncTemplateModel } from './sync-model-action'
+import { loadPanelSummary } from '@/modules/image'
+import { r2Store } from '@/core/storage'
 import { site } from '@/site/site.config'
 
 import { duplicateTemplateAction, listVersionsAction, manageVersionAction, readVersionAction } from './version-actions'
@@ -44,6 +47,8 @@ const COVER_LANGUAGES = [
 export default async function AdminTemplatesPage() {
   await requireAdmin()
   const db = createAdminSupabase()
+  // Start the shared trial data with the catalogue; the list renders without waiting for R2.
+  const initialSummary = Promise.resolve().then(() => loadPanelSummary({ db, store: r2Store() })).catch(() => null)
   const [templates, categories, providers] = await Promise.all([listAdminTemplates(db), listAdminCategories(db), readPricingOptions(db)])
   return (
     <div className="mx-auto grid w-full max-w-6xl gap-6 p-6">
@@ -58,6 +63,7 @@ export default async function AdminTemplatesPage() {
         categories={categories}
         actions={{ save: saveTemplateCategoryAction, reorder: reorderTemplateCategoriesAction, remove: deleteTemplateCategoryAction }}
       />
+      <TestPanelSummaryProvider initial={initialSummary}>
       <ModelSyncProvider action={syncTemplateModel}>
       <TemplatesEditor
         templates={templates}
@@ -79,6 +85,7 @@ export default async function AdminTemplatesPage() {
         }}
       />
       </ModelSyncProvider>
+      </TestPanelSummaryProvider>
     </div>
   )
 }

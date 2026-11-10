@@ -877,7 +877,11 @@ check 约束换成原来的集合再加上 `code_grant`（兑换送的积分）�
 | `created_by` | 上传的管理员，`on delete set null` |
 | `created_at` / `last_used_at` | 「最近用过的测试照片」按 `last_used_at desc` 取 12 张；每次试跑更新 |
 
-索引 `(last_used_at desc)`。
+索引 `(last_used_at desc)`。T104 管理列表按使用时间和 ID 倒序分页，试跑记录按模板、创建时间和 ID 倒序分页。
+
+照片和试跑成品的私有 R2 原件各配一份 `{object_key}.thumb.webp`（长边最多 512px）。列表加载缩略图，查看或下载成品使用原件。历史素材首次请求缺失缩略图时由管理员接口补齐。面板并行读取预算、最近照片和历史记录，30 天清理独立执行。
+
+`admin_remove_test_assets(actor, kind, ids, expected)` 仅 service role 可调用，验证未封禁管理员。空 expected 查询引用照片的记录数或设过封面的记录数，确认删除时锁定所选行并复核数量。运行中的记录不能删。预览和确认删除照片时，只要所选照片中有一张正被运行中的记录使用，就拒绝整批删除。删除照片后试跑保留，`photo_deleted` 标记失去的原图。删除试跑记录保留独立的花费流水和已经另存的封面。数据库删除触发器把原件 key 写入 `admin_test_asset_removals(object_key primary key)`（私有 RLS 表，仅 service role 可读取、确认清理）。删除原件和缩略图都成功后才清掉队列项，打开面板时重试未清理的对象。
 
 #### 表 `admin_test_runs`（私有，同上）
 
@@ -888,6 +892,7 @@ check 约束换成原来的集合再加上 `code_grant`（兑换送的积分）�
 | `kind` | `generate`（首次出图）/ `edit`（在某条结果上编辑） |
 | `parent_id` | 编辑时被编辑的那条试跑（同一模板、成功、有成品），`on delete set null`；首次出图为空。形成记录树 |
 | `photo_id` | 源测试照片；编辑继承父记录的，`on delete set null` |
+| `photo_deleted` | 布尔值，默认 false，曾引用的源图被删除时变为 true |
 | `batch_id` | 同一次点击（一次 3 张共用一个） |
 | `status` | `running` → `succeeded` / `failed` |
 | `resolution` | `1k` / `2k` / `3k` |

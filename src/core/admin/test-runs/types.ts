@@ -14,6 +14,7 @@ export type TestRunView = {
   id: string
   kind: TestRunKind
   parentId: string | null
+  photoDeleted?: boolean
   photoId: string | null
   batchId: string
   status: TestRunStatus
@@ -40,6 +41,7 @@ export type TestRunView = {
   errorCode: string | null
   isCover: boolean
   createdAt: string
+  thumbnailUrl?: string | null
   outputUrl: string | null
 }
 

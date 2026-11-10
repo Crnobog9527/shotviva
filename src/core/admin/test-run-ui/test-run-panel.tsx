@@ -7,6 +7,7 @@ import type { ImageProviderOption } from '@/core/admin/image-provider-field'
 
 import type { AdminTemplate, CoverLanguage } from '../templates/types'
 import type { TestRunView } from '../test-runs'
+import { AssetManager } from './asset-manager'
 import { BudgetBar } from './budget-bar'
 import { CompareDialog } from './compare-dialog'
 import { TEST_RUN_COPY as COPY } from './copy'
@@ -52,6 +53,7 @@ export function TestRunPanel({ template, languages, providers }: { providers: re
       <BudgetBar budget={panel.data?.budget ?? null} onSaved={() => void panel.reload()} onError={panel.setError} />
       <Status error={panel.error} notice={panel.notice} />
       <FirstRunForm key={savedProvider(template)} providers={providers} template={template} photos={panel.data?.recentPhotos ?? []} onLaunch={(launches) => void panel.launch(launches)} onPhotoUploaded={() => void panel.reload()} onError={panel.setError} />
+      <AssetManager kind="run" template={template.id} onRemoved={() => { selection.clear(); setEditing(null); void panel.reload() }} onError={panel.setError} onNotice={panel.setNotice} />
       {editing ? <EditComposer key={editing.map((run) => run.id).join()} targets={editing} onLaunch={(launches) => void panel.launch(launches)} onClose={() => setEditing(null)} /> : null}
       <Records
         runs={panel.runs}

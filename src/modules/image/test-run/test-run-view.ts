@@ -20,7 +20,7 @@ export function toTestRunView(run: TestRun, outputUrl: string | null): TestRunVi
     id: run.id,
     kind: run.kind,
     parentId: run.parentId,
-    photoId: run.photoId,
+    photoId: run.photoId, photoDeleted: run.photoDeleted,
     batchId: run.batchId,
     status: run.status,
     resolution: run.resolution,
