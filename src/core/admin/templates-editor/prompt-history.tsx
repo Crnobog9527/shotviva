@@ -2,26 +2,15 @@
 
 import { useState, useTransition } from 'react'
 import { Button } from '@/core/ui/button'
-import { toggleFragments } from '@/core/templates/toggles'
 import type { AdminTemplate, PromptSnapshot, TemplateAdminActions } from '../templates/types'
 import type { ImageProviderOption } from '../image-provider-field'
 import { type TemplateFormValues } from './form-state'
-import { withoutToggles } from './toggle-form-state'
+import { versionPatch } from './version-patch'
 import { versionCopy as copy } from './version-copy'
 
 export type VersionActions = Pick<TemplateAdminActions, 'versions' | 'snapshot'>
 type Props = { actions: VersionActions; values: TemplateFormValues; active: number; disabled: boolean;
   providers: readonly ImageProviderOption[]; onChange: (patch: Partial<TemplateFormValues>) => void }
-
-function versionPatch(values: TemplateFormValues, version: PromptSnapshot): Partial<TemplateFormValues> {
-  const fragments = toggleFragments(version.modelParams)
-  return {
-    restoredParams: version.modelParams, selectedVersion: version.version, providerId: version.providerId, promptBody: version.body,
-    modelParamsJson: JSON.stringify(withoutToggles(version.modelParams), null, 2),
-    styleRefs: version.styleRefs, styleRefsEdited: true,
-    toggles: values.toggles.map(t => ({ ...t, on: fragments[t.key]?.on ?? '', off: fragments[t.key]?.off ?? '' })),
-  }
-}
 
 export function TemplateHistory({ template, ...props }: Omit<Props, 'active'> & { template: AdminTemplate | null }) {
   if (!template?.prompt || template.categoryInfo.isSystem) return null
@@ -55,7 +44,7 @@ function PromptHistory({ values, active, disabled, providers, actions, onChange 
   })
   const unavailable = providerUnavailable(preview, providers)
   const choose = () => {
-    if (preview && window.confirm(copy.confirm)) onChange(versionPatch(values, preview))
+    if (preview && window.confirm(copy.confirm)) onChange(versionPatch(values, preview, !unavailable))
   }
   return (
     <fieldset disabled={disabled || pending} className="grid gap-2 rounded-md border p-3 text-sm" aria-busy={pending}>
@@ -79,7 +68,7 @@ function PromptHistory({ values, active, disabled, providers, actions, onChange 
           <img key={ref.key} className="size-12 rounded object-contain" alt={`#${i+1}`} referrerPolicy="no-referrer"
             src={`/api/admin/style-refs?${new URLSearchParams({ templateId: values.id, imageId: ref.key.split('/')[2]!.slice(0,-5) })}`} />
         ))}</div>
-        <Button type="button" variant="outline" disabled={!!unavailable} onClick={choose}>{copy.choose} v{preview.version}</Button>
+        <Button type="button" variant="outline" onClick={choose}>{copy.choose} v{preview.version}</Button>
       </div>}
       {values.selectedVersion && <p role="status">{copy.staged(values.selectedVersion)}</p>}
     </fieldset>
