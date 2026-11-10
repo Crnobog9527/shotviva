@@ -58,12 +58,23 @@ export async function signPhoto(store: ObjectStore, photo: TestPhoto): Promise<T
   return { id: photo.id, url, originalUrl, lastUsedAt: photo.lastUsedAt }
 }
 
-export async function loadPanelSummary(deps: Deps) {
-  const [budget, recentPhotos] = await Promise.all([
-    loadTestBudget(deps.db),
-    listTestPhotos(deps.db).then(rows => Promise.all(rows.map(photo => signPhoto(deps.store, photo)))),
-  ])
-  return { budget, recentPhotos }
+export function preparePanelSummary(deps: Deps) {
+  const rows = listTestPhotos(deps.db)
+  const photos = rows.then(rows => Promise.all(rows.map(photo => signPhoto(deps.store, photo))))
+  const summary = Promise.all([loadTestBudget(deps.db), photos]).then(([budget, recentPhotos]) => ({ budget, recentPhotos }))
+  // Only the catalogue needs to choose a preload target. A slow or unavailable R2 HEAD
+  // cannot hold up the budget, the photo metadata, or the interactive catalogue.
+  const previews = async () => {
+    const missing = await rows.then(rows => Promise.all(rows.map(photo =>
+      deps.store.head(thumbnailKey(photo.objectKey)).then(head => head === null, () => false),
+    )))
+    return (await photos).map((photo, index) => ({ ...photo, thumbnailMissing: missing[index] }))
+  }
+  return { summary, previews }
+}
+
+export function loadPanelSummary(deps: Deps) {
+  return preparePanelSummary(deps).summary
 }
 
 export async function loadPanelRecords(deps: Deps, templateId: string) {

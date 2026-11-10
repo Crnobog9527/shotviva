@@ -51,7 +51,7 @@ export {
   confirmTestPhoto,
   createTestPhotoUpload,
   loadTestBudget,
-  loadPanelSummary, loadPanelRecords, loadTestPanel,
+  preparePanelSummary, loadPanelSummary, loadPanelRecords, loadTestPanel,
   runTestEdit,
   runTestGenerate,
   runTestTranslate,

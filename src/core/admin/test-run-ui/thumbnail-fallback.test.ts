@@ -29,6 +29,19 @@ it('preloads only a WebP when available', () => {
   expect(send).not.toHaveBeenCalled()
 })
 
+it('starts directly on a known historical original and waits until it loads to request a repair', () => {
+  const images = browser()
+  const send = vi.fn().mockReturnValue(new Promise(() => {}))
+  vi.stubGlobal('fetch', send)
+  const source = { id: 'known', kind: 'photo' as const, src: '/known-webp', originalUrl: '/known-original' }
+  preloadPhoto({ id: source.id, url: source.src, originalUrl: source.originalUrl, thumbnailMissing: true, lastUsedAt: '' })
+  expect(images[0].src).toBe(source.originalUrl)
+  expect(displaySource(source)).toBe(source.originalUrl)
+  expect(send).not.toHaveBeenCalled()
+  images[0].onload?.()
+  expect(send).toHaveBeenCalledTimes(1)
+})
+
 it('shares the original and one repair with an editor opened before the WebP is ready', async () => {
   const delivery = Promise.withResolvers<Response>()
   const send = vi.fn().mockReturnValue(delivery.promise)
@@ -38,6 +51,7 @@ it('shares the original and one repair with an editor opened before the WebP is 
   preloadPhoto({ id: source.id, url: source.src, originalUrl: source.originalUrl, lastUsedAt: '' })
   images[0].onerror?.()
   expect(images[0].src).toBe(source.originalUrl)
+  expect(send).not.toHaveBeenCalled()
   const editor = new Image()
   editor.src = displaySource(source)
   expect(editor.src).toBe(source.originalUrl)
@@ -64,6 +78,7 @@ it('keeps a usable original on failure and retries on a subsequent view', async 
   expect(image.src).toBe(source.originalUrl)
   image.src = displaySource(source)
   onThumbnailError(image, source)
+  onThumbnailLoad(image, source)
   expect(send).toHaveBeenCalledTimes(2)
 })
 

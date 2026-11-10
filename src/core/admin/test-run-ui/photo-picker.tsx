@@ -98,7 +98,7 @@ function PhotoTile({ photo, order, onToggle }: { photo: TestPhotoView; order: nu
       className={cn('bg-muted relative block aspect-square w-full overflow-hidden rounded-md border-2', on ? 'border-primary' : 'border-transparent')}
     >
       {/* Admin-only signed URL of a private test photo; next/image cannot fetch it. */}
-      <TestThumbnail kind="photo" id={photo.id} src={photo.url} originalUrl={photo.originalUrl} alt="" className="h-full w-full object-cover" />
+      <TestThumbnail kind="photo" id={photo.id} src={photo.url} originalUrl={photo.originalUrl} thumbnailMissing={photo.thumbnailMissing} alt="" className="h-full w-full object-cover" />
       {on ? (
         <span className="bg-primary text-primary-foreground absolute top-1 right-1 flex size-5 items-center justify-center rounded-full text-[11px] font-semibold">
           {order + 1}

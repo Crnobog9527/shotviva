@@ -30,7 +30,7 @@ export function CatalogView({ templates, query, categories, series, selection, o
   const tabs = { active: `${copy.active}（${active}）`, inactive: `${copy.inactive}（${matching.length - active}）`, all: copy.all }
   const sections = catalogSections(matching, status, grouped, series)
   const canReorder = !query.trim() && !category && !seriesId && !grouped
-  return <div className="grid min-w-0 gap-3">
+  return <div className="grid min-w-0 grid-cols-1 gap-3">
     <div className="flex flex-wrap items-center gap-2">
       <div role="group" aria-label={copy.status} className="flex gap-1">
         {(Object.keys(tabs) as CatalogStatus[]).map(key => <Button key={key} variant={status === key ? 'secondary' : 'ghost'}

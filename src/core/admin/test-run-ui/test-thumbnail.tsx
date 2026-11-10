@@ -7,6 +7,7 @@ type Props = {
   kind: 'photo' | 'run'
   src: string
   originalUrl?: string | null
+  thumbnailMissing?: boolean
   alt: string
   className: string
   lazy?: boolean
