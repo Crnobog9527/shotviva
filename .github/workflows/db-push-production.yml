@@ -46,14 +46,14 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_PRODUCTION_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_PRODUCTION_DB_PASSWORD }}
       SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PRODUCTION_PROJECT_REF }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/supabase-remote
         with:
-          token-source: secret SUPABASE_ACCESS_TOKEN
+          token-source: environment secret SUPABASE_PRODUCTION_ACCESS_TOKEN
           password-source: production environment secret SUPABASE_PRODUCTION_DB_PASSWORD
           ref-source: production environment variable SUPABASE_PRODUCTION_PROJECT_REF
       - name: History before
