@@ -63,7 +63,7 @@ export async function MarketingFooter({ locale }: { locale: Locale }) {
     <SiteFooter
       brand={site.brand}
       links={footerLinksIn(locale)}
-      programLink={<nav aria-label={t('programName')}><Link href="/partners/join">{t('programName')}</Link></nav>}
+      programLink={{ href: '/partners/join', label: t('programName') }}
       languageSwitch={
         <Suspense fallback={<FooterLocalesFallback />}>
           <FooterLocales translatedPaths={zhPaths} />

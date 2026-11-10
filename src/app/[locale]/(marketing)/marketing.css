@@ -538,8 +538,14 @@
     display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 24px; margin-top: 12px; padding-top: 12px;
     border-top: 1px solid var(--hairline); font: 400 14px/1.4 var(--font-sans); color: var(--muted-foreground);
   }
-  .mk-foot-fine nav { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; }
-  .mk-foot-item { display: inline-flex; align-items: center; gap: 8px; }
+  /* One link run, every item led by a dot. The run sits 22px (gap + dot + gap) left of the column and
+     the nav clips at 4px, so the dot that opens each line is cut off while focus rings still show.
+     The items are inline boxes so text-wrap: balance evens out the lines and never strands one. */
+  .mk-foot-links { overflow: hidden; margin: -4px; padding: 4px; }
+  .mk-foot-run { margin-inline-start: -22px; text-wrap: balance; }
+  .mk-foot-item { display: inline-flex; align-items: center; gap: 8px; margin-inline-start: 8px; vertical-align: top; }
+  .mk-foot-dot { inline-size: 6px; text-align: center; }
+  .mk-foot-lang { display: flex; align-items: center; gap: 8px; }
   .mk-foot-fine a, .mk-foot-btn { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted-foreground); text-decoration: none; font: inherit; cursor: pointer; }
   .mk-foot-lang [aria-current] { color: var(--bone-dim); }
   @media (min-width: 768px) {
