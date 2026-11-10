@@ -1,31 +1,50 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 import { notifyOwner } from '../alerts'
-import { alertPolicy } from '../alerts/alert-kinds'
-import { renderAlert } from '../alerts/templates'
+import { AppError } from '../errors'
 import { routeFallbackReason, withFallbackNotice } from './fallback-notice'
 
 vi.mock('../alerts', () => ({ notifyOwner: vi.fn() }))
 beforeEach(() => vi.clearAllMocks())
 
-it.each(['catalog_unavailable', 'model_missing', 'unsupported_resolution', 'partner_channel'])(
-  'reports both outcomes of %s under one rolling hourly key', async reason => {
+function attempt(reason: string | undefined, error?: Error) {
+  return withFallbackNotice('fixture', async selected => {
+    selected(reason)
+    if (error) throw error
+    return 'ok'
+  })
+}
+
+const priceRefusal = new AppError('TEMPLATE_UNAVAILABLE', 'temporarily unavailable')
+
+it.each(['catalog_unavailable', 'model_missing', 'unsupported_resolution'])(
+  'reports a web %s fallback and a later price refusal', async reason => {
     const provider = { id: 'default/model', fallbackReason: reason, generate: vi.fn() }
-    const source = reason === 'partner_channel' ? 'graylum' : 'web'
-    const selectedReason = routeFallbackReason(provider, 'cheap', source)
-    for (const rejected of [false, true]) {
-      const run = withFallbackNotice('fixture', async selected => {
-        selected(selectedReason)
-        if (rejected) throw new Error('floor')
-      })
-      if (rejected) await expect(run).rejects.toThrow('floor')
-      else await run
-      const alert = { kind: 'template_fallback' as const, templateId: 'fixture', reason, rejected }
-      expect(notifyOwner).toHaveBeenLastCalledWith(alert)
-      expect(alertPolicy(alert)).toMatchObject({ key: `template_fallback:fixture:${reason}`, cooldownMs: 3_600_000 })
-      expect(renderAlert(alert, { who: null, origin: '', testSite: false }).sentence)
-        .toContain(rejected ? '已拒绝' : '已允许')
+    expect(routeFallbackReason(provider, 'cheap', 'web')).toBe(reason)
+    await expect(attempt(reason)).resolves.toBe('ok')
+    await expect(attempt(reason, priceRefusal)).rejects.toBe(priceRefusal)
+    for (const [index, rejected] of [false, true].entries()) {
+      expect(notifyOwner).toHaveBeenNthCalledWith(index + 1, { kind: 'template_fallback', templateId: 'fixture', reason, rejected })
     }
-    expect(routeFallbackReason(provider, 'default', source)).toBeUndefined()
-    expect(routeFallbackReason(provider, null, source)).toBeUndefined()
+    expect(routeFallbackReason(provider, 'default', 'web')).toBeUndefined()
+    expect(routeFallbackReason(provider, null, 'web')).toBeUndefined()
   },
 )
+
+it.each([new AppError('CREDITS_INSUFFICIENT', 'credits'), new AppError('TEMPLATE_QUOTE_CHANGED', 'quote'), new Error('references')])(
+  'propagates %s without classifying it as a price refusal', async error => {
+    await expect(attempt('model_missing', error)).rejects.toBe(error)
+    expect(notifyOwner).toHaveBeenCalledWith({ kind: 'template_fallback', templateId: 'fixture', reason: 'model_missing', rejected: false })
+    await expect(attempt('partner_channel', error)).rejects.toBe(error)
+    expect(notifyOwner).toHaveBeenCalledTimes(1)
+  },
+)
+
+it('only alerts on a price refusal for the partner channel', async () => {
+  const provider = { id: 'default/model', generate: vi.fn() }
+  const reason = routeFallbackReason(provider, 'cheap', 'graylum')
+  expect(reason).toBe('partner_channel')
+  await expect(attempt(reason)).resolves.toBe('ok')
+  expect(notifyOwner).not.toHaveBeenCalled()
+  await expect(attempt(reason, priceRefusal)).rejects.toBe(priceRefusal)
+  expect(notifyOwner).toHaveBeenCalledExactlyOnceWith({ kind: 'template_fallback', templateId: 'fixture', reason, rejected: true })
+})

@@ -134,7 +134,7 @@ const POLICIES: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K }
   dispute_closed: (a) => ({ key: `dispute_closed:${a.disputeId}`, money: true }),
   dispute_due_soon: (a) => ({ key: `dispute_due_soon:${a.disputeId}`, money: true }),
   payment_failed: (a) => ({ key: `payment_failed:${a.channel}:${a.eventId}`, money: true }),
-  template_fallback: a => ({ key: `template_fallback:${a.templateId}:${a.reason}`, cooldownMs: 60 * MINUTE, money: false }),
+  template_fallback: a => ({ key: `template_fallback:${a.templateId}:${a.reason}:${a.rejected}`, cooldownMs: 60 * MINUTE, money: false }),
   generation_spike: () => ({ key: 'generation_spike', cooldownMs: 60 * MINUTE, money: false }),
   // A new ticket once; replies at most once per ticket per 30 minutes, counted when sent.
   ticket: (a) =>

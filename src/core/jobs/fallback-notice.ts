@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { notifyOwner } from '../alerts'
+import { AppError } from '../errors'
 import type { GenerationProvider } from './provider'
 import type { JobSource } from './job-schema'
 
@@ -9,18 +10,20 @@ export function routeFallbackReason(provider: GenerationProvider, binding: strin
   return source === 'graylum' ? 'partner_channel' : provider.fallbackReason
 }
 
-// Covers refusals during reference preparation and credit reservation. The existing
-// notifier claims a per-template/reason R2 marker across server instances.
+// The alert describes the price guard. Other failures still propagate to the caller.
 export async function withFallbackNotice<T>(
   templateId: string, work: (selected: (reason: string | undefined) => void) => Promise<T>,
 ) {
   let reason: string | undefined
-  let rejected = true
+  let rejected = false
   try {
-    const result = await work(value => { reason = value })
-    rejected = false
-    return result
+    return await work(value => { reason = value })
+  } catch (error) {
+    rejected = error instanceof AppError && error.code === 'TEMPLATE_UNAVAILABLE'
+    throw error
   } finally {
-    if (reason) notifyOwner({ kind: 'template_fallback', templateId, reason, rejected })
+    if (reason && (reason !== 'partner_channel' || rejected)) {
+      notifyOwner({ kind: 'template_fallback', templateId, reason, rejected })
+    }
   }
 }

@@ -115,6 +115,15 @@ describe('notifyOwnerWith: sending', () => {
 })
 
 describe('notifyOwnerWith: flood control', () => {
+  it('delivers both an allowed fallback and its later price refusal once in the same hour', async () => {
+    const { deps, sent } = setup()
+    const route = { kind: 'template_fallback', templateId: 'fixture', reason: 'catalog_unavailable' } as const
+    for (const rejected of [false, false, true, true]) {
+      await notifyOwnerWith(deps, { ...route, rejected })
+    }
+    expect(sent()).toEqual([expect.stringContaining('已允许'), expect.stringContaining('已拒绝')])
+  })
+
   it('collapses replies: one per ticket per 30 minutes, counting the unanswered messages', async () => {
     const messages = [{ author: 'user' }, { author: 'user' }, { author: 'user' }, { author: 'admin' }, { author: 'user' }]
     const { deps, sent, time } = setup(fakeDb({ support_tickets: { type: 'billing' }, messages }))
