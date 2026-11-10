@@ -1,5 +1,5 @@
 -- Keep the issue amount immutable. Rows paid before T100 keep their original face value.
-alter table public.affiliate_payouts add column paid_amount bigint check (paid_amount between 0 and amount);
+alter table public.affiliate_payouts add column paid_amount bigint check (paid_amount >= 0);
 alter table public.affiliate_payouts drop constraint affiliate_payouts_status_check,
   add constraint affiliate_payouts_status_check check (status in ('due','held','paid','void'));
 
