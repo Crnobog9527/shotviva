@@ -9,7 +9,7 @@ export function failureMessage(error: unknown): string {
   if (!(error instanceof TestRunError)) return COPY.errors.fallback!
   const known = COPY.errors[error.code]
   if (known) return known
-  if (['INVALID_INPUT', 'NOT_FOUND', 'IMAGE_TOO_LARGE', 'IMAGE_UNSUPPORTED', 'UPLOAD_FAILED'].includes(error.code)) return error.message
+  if (['CONFLICT', 'INVALID_INPUT', 'NOT_FOUND', 'IMAGE_TOO_LARGE', 'IMAGE_UNSUPPORTED', 'UPLOAD_FAILED'].includes(error.code)) return error.message
   return COPY.errors.fallback!
 }
 

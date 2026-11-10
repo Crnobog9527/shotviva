@@ -43,6 +43,10 @@ describe('decide', () => {
     expect(decide('signed_in', user('user'), '/account', '')).toBe('pass')
   })
 
+  it('rejects a banned administrator at the page gate', () => {
+    expect(decide('admin', { ...user('admin'), banned: true }, '/admin/references/lab/id', '')).toBe('not_found')
+  })
+
   it('keeps a Chinese visitor on the Chinese login page', () => {
     expect(decide('signed_in', null, '/zh/photos', '', 'zh')).toEqual({ redirect: '/zh/login?next=%2Fzh%2Fphotos' })
     expect(decide('signed_in', user('user', false), '/zh/photos', '', 'zh')).toEqual({ redirect: '/zh/login?error=unverified' })
