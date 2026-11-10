@@ -3256,11 +3256,12 @@ begin
   else
     if cardinality(p_versions)<>(select count(*) from public.prompt_lab_versions where session_id=p_session_id and id=any(p_versions))
       then raise exception 'PROMPT_VERSION_NOT_FOUND'; end if;
-    -- Lock rows in ID order against test-photo cleanup and simultaneous batches.
+    -- T85 takes the budget lock before inserting a run that references its photo.
+    -- Use the same order when T85 and the lab try the same photo concurrently.
+    perform admin.reserve_prompt_lab_budget(quoted*cells);
     perform 1 from public.admin_test_photos where id=any(p_photos) order by id for update;
     get diagnostics photo_count=row_count;
     if photo_count<>cardinality(p_photos) then raise exception 'TEST_PHOTO_NOT_FOUND'; end if;
-    perform admin.reserve_prompt_lab_budget(quoted*cells);
     with batch as (
       insert into public.prompt_lab_runs(session_id,batch_id,ordinal,photo_id,version_id,model,resolution,quality,
         use_style_reference,estimate_usd,created_by)
