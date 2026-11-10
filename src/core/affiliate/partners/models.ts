@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { affiliateStatus, slugSchema } from '../enrollment'
+import { audienceRanges, channelTypes, countryCodes } from './application-options'
 
 export { affiliateStatus, slugSchema }
 
@@ -9,12 +10,16 @@ export const commissionStatus = z.enum(['pending', 'on_hold', 'confirmed', 'void
 export const idSchema = z.union([z.number().int().safe(), z.string().regex(/^\d+$/)])
 const cents = z.number().int().safe()
 
+// The five required keys are checked again by affiliate_apply; the rest are optional extras.
 export const applicationSchema = z.object({
   name: z.string().trim().min(1).max(120),
-  country: z.string().trim().min(1).max(100),
-  channel: z.url({ protocol: /^https?$/ }).max(2048),
-  audience: z.string().trim().min(1).max(120),
-  plan: z.string().trim().min(1).max(4000),
+  country: z.enum(countryCodes),
+  channel_type: z.enum(channelTypes),
+  channel: z.string().trim().min(1).max(2048),
+  other_channels: z.string().trim().max(2000).optional().transform((value) => value || undefined),
+  audience: z.enum(audienceRanges),
+  plan: z.string().trim().min(1).max(2000),
+  contact: z.string().trim().max(200).optional().transform((value) => value || undefined),
 })
 export const accountSchema = z.object({
   slug: slugSchema,
@@ -80,6 +85,8 @@ export const referralSchema = z.object({
 })
 export type Account = z.infer<typeof accountSchema>
 export type Settings = z.infer<typeof settingsSchema>
+export const rateSchema = z.object({ product_kind: z.enum(['pack', 'monthly', 'yearly']), l1_bp: z.number().int(), l2_bp: z.number().int() })
+export type Rate = z.infer<typeof rateSchema>
 export type EnrollmentSettings = Pick<Settings, 'apply_min_level' | 'terms_version'>
 export type Commission = z.infer<typeof commissionSchema>
 export type View = (typeof dashboardViews)[number]

@@ -7,6 +7,7 @@ import { CreateMember } from './create-member'
 import { DecideMember, SetMember, Adjust } from './member-forms'
 import { Field, FiltersForm, GridTable, LinkTo, NextPage, Section } from './parts'
 import type { Filters } from './query'
+import { countryName } from '../partners/application-options'
 import { loadMember, members, referred, adjustments, type Member } from './read'
 
 export type ViewProps = { db: SupabaseClient; filters: Filters; action: SaveAction }
@@ -37,16 +38,22 @@ export async function MembersView({ db, filters, action }: ViewProps) {
     </>
   )
 }
+// A stored option key in words; an older free-text answer is shown as written.
+const label = (words: Record<string, string>, value: unknown) => (typeof value === 'string' ? words[value] ?? value : value)
+
 function ProfileFacts({ member: m }: { member: Member }) {
   const app = m.application ?? {}
   const rows = [
     [COPY.account, m.user_id],
     [COPY.status, enrollmentLabel({ status: m.status, source: app.source })],
     [COPY.name, app.name],
-    [COPY.country, m.country],
+    [COPY.country, m.country && countryName(m.country, 'zh')],
+    [COPY.channelType, label(COPY.channelTypes, app.channel_type)],
     [COPY.channels, app.channel],
-    [COPY.audience, app.audience],
+    [COPY.otherChannels, app.other_channels],
+    [COPY.audience, label(COPY.audienceRanges, app.audience)],
     [COPY.plan, app.plan],
+    [COPY.contact, app.contact],
     [COPY.reason, m.reject_reason],
     [COPY.payoutMethod, m.payout_method && STATUS[m.payout_method]],
     [COPY.payoutDetails, m.payout_details],

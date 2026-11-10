@@ -249,7 +249,11 @@
       "unavailable": "暂时无法核对这个码，你仍可继续注册。",
       "gift": "注册可多得 {credits} 个{pool, select, paid {付费} other {免费}}积分。",
       "discount": "{targets}享 {percent}。",
-      "period": {"once": "仅限首笔付款。", "repeating": "订阅的前 {months} 个月有效。", "forever": "订阅续费也享受折扣。"},
+      "period": {
+        "once": "仅限首笔付款。",
+        "repeating": "订阅的前 {months} 个月有效。",
+        "forever": "订阅续费也享受折扣。"
+      },
       "received": "兑换码已为你的账号添加 {credits} 个{pool, select, paid {付费} other {免费}}积分。",
       "saved": "你的 {percent} 优惠已可使用。",
       "dismiss": "关闭",
@@ -1269,21 +1273,12 @@
   },
   "affiliate": {
     "closed": "联盟营销暂未开放申请。",
-    "programName": "联盟营销",
-    "whatTitle": "什么是联盟营销？",
-    "intro": "把 Shotviva 推荐给需要做图的人。成为联盟会员后，你会获得专属推广链接，可以放在教程、作品分享或社群推荐里。",
-    "apply": "申请成为联盟会员",
-    "formIntro": "告诉我们你在哪里分享内容，以及希望把 Shotviva 推荐给谁。",
-    "benefitsTitle": "推广 Shotviva 有什么好处？",
-    "benefits": "通过你的链接加入的用户购买会员或积分包时，你可以获得佣金。你可以在会员后台查看推荐成效、佣金明细和结算记录。具体合作条件由我们与你单独沟通。",
+    "apply": "立即申请",
     "applicationTermsPending": "当前版本的推广员条款尚未公布。你可以先填写申请资料，条款公布后才能同意并提交。",
-    "dashboardLink": "我的联盟后台",
+    "dashboardLink": "我的联盟营销后台",
     "memberLogin": "联盟会员登录",
-    "loginToSubmit": "登录或注册，继续申请",
-    "title": "推广员计划",
-    "terms": "推广员条款",
-    "back": "返回推广员计划",
-    "pendingReview": "已收到申请，审核结果会显示在这里。",
+    "title": "联盟营销",
+    "terms": "联盟营销条款",
     "version": "版本 {version}",
     "settingsReadOnly": "你可以查看现有收款资料。当前版本的推广员条款公布后，阅读并同意即可修改。",
     "termsPlaceholder": "正式条款将由运营方在上线前公布。",
@@ -1292,10 +1287,10 @@
     "needsPlan": "申请需要购买符合条件的会员（{plan}）。全额退款的订单不计入。",
     "seePricing": "查看会员方案",
     "name": "姓名",
-    "country": "国家或地区",
-    "channel": "推广渠道链接",
-    "audience": "受众规模",
-    "plan": "你打算怎样推广？",
+    "country": "所在国家或地区",
+    "channel": "主页链接或账号",
+    "audience": "粉丝或受众规模",
+    "plan": "你打算怎么推荐 Shotviva？",
     "submit": "提交申请",
     "save": "保存设置",
     "invalid": "请检查表单。选择收款方式后，请填写对应的收款信息。",
@@ -1334,7 +1329,7 @@
     "eligible": "当前余额符合下次结算条件。",
     "notEligible": "目前尚未满足结算条件。",
     "next": "下次结算 · {date}（UTC）",
-    "gap": "结算门槛为 {threshold}，还差 {gap}。",
+    "gap": "距离 {threshold} 的结算门槛还差 {gap}。",
     "maturing": "预计在结算日前确认的佣金为 {amount}。",
     "addMethod": "填写收款方式",
     "hasMethod": "已填写收款方式 · 修改",
@@ -1406,7 +1401,6 @@
       "admin_void": "审核后已作废",
       "zero": "应得佣金为零"
     },
-    "pendingApplication": "申请审核中",
     "product": {
       "starter_monthly": "Starter 月付",
       "pro_monthly": "Pro 月付",
@@ -1417,6 +1411,148 @@
       "pack_s": "小积分包",
       "pack_m": "中积分包",
       "pack_l": "大积分包"
-    }
+    },
+    "heroTitle": "推荐 Shotviva，每一笔购买都有你的分成",
+    "heroLede": "把你的专属链接分享给开店、做餐饮、做民宿或做内容的人。他们买积分或开会员，你按实付金额拿分成，会员续费也算。",
+    "signupToApply": "先注册 Shotviva 账号，再申请",
+    "haveAccount": "已经有账号？",
+    "loginToApply": "登录后申请",
+    "numbersTitle": "你能拿到多少",
+    "termsRow": {
+      "short": "积分包和月付会员",
+      "pack": "积分包",
+      "monthly": "月付会员",
+      "yearly": "年付会员",
+      "teamCut": "如果你加入了团队，招募你的人另得 {rate}",
+      "cookie": "链接有效期",
+      "cookieNote": "访客点了你的链接，在这段时间内注册或购买，都算你的。",
+      "hold": "确认期",
+      "holdNote": "每笔佣金先等这么久，退款处理完再确认。",
+      "payout": "结算门槛",
+      "payoutNote": "每月 {day} 日（UTC）结算，已确认余额达到这个数就结算。可用 PayPal、Wise、银行转账或支付宝收款。"
+    },
+    "days": "{count} 天",
+    "howTitle": "怎么运作",
+    "steps": {
+      "apply": {
+        "title": "用你的账号申请",
+        "body": "告诉我们你在哪里分享、受众是谁。每份申请都由人工审核。"
+      },
+      "share": {
+        "title": "分享你的链接",
+        "body": "放在简介、教程、笔记里，或直接发给客户。Shotviva 的任何页面都可以用。"
+      },
+      "earn": {
+        "title": "每月结算",
+        "body": "在后台查看点击、客户和佣金明细，确认后的收入每月结算一次。"
+      }
+    },
+    "faqTitle": "常见问题",
+    "faq": {
+      "who": {
+        "q": "谁可以申请？",
+        "a": "有 Shotviva 账号的人都可以：内容创作者、店主、老师、代运营公司都欢迎。没有粉丝数门槛，我们主要看你的受众是否需要商品图、菜品图或房源图。"
+      },
+      "review": {
+        "q": "申请之后会怎样？",
+        "a": "审核结果会显示在这个页面。通过后，联盟营销后台直接在同一个账号里开通，不用再做别的，只需要填一下收款方式。"
+      },
+      "counts": {
+        "q": "哪些购买算佣金？",
+        "a": "通过你的链接注册的用户，或点过你的链接后首次下单的用户，他们买的积分包和会员都算，会员续费也算。你自己的购买不算。"
+      },
+      "refunds": {
+        "q": "客户退款怎么办？",
+        "a": "每笔佣金都要先过确认期。如果这笔购买退款或发生争议，对应的佣金会相应减少或取消。"
+      },
+      "team": {
+        "q": "团队是什么？",
+        "a": "我们会邀请表现好的联盟会员招募其他人。你团队里的人拿到佣金时，你按同一笔购买另得一份团队奖励，不从对方的佣金里扣。"
+      }
+    },
+    "readTerms": "阅读完整的联盟营销条款",
+    "backToProgram": "联盟营销",
+    "applyTitle": "申请加入联盟营销",
+    "applyLede": "回答几个问题，方便我们审核，大约两分钟。",
+    "verifyTitle": "请先验证邮箱",
+    "verifyBody": "打开注册时我们发给你的验证链接，验证完回到这个页面就能申请。",
+    "accountFirstTitle": "先有一个 Shotviva 账号",
+    "accountFirstBody": "联盟营销的后台、推广链接和收款都绑定在你的 Shotviva 账号上。先免费注册一个，注册完会直接回到这里。",
+    "needsPlanTitle": "申请需要先开通会员",
+    "optional": "（选填）",
+    "applyingAs": "申请账号",
+    "aboutYou": "关于你",
+    "nameHint": "填真实姓名或公司名称，结算打款时使用。",
+    "whereYouShare": "你在哪里推广",
+    "channelType": "主要推广渠道",
+    "channelTypes": {
+      "xiaohongshu": "小红书",
+      "douyin": "抖音",
+      "wechat": "微信（公众号、视频号、朋友圈）",
+      "bilibili": "B 站",
+      "weibo": "微博",
+      "zhihu": "知乎",
+      "youtube": "YouTube",
+      "tiktok": "TikTok",
+      "instagram": "Instagram",
+      "x": "X（Twitter）",
+      "facebook": "Facebook",
+      "website": "网站或博客",
+      "newsletter": "邮件订阅",
+      "community": "社群（微信群、Discord、Telegram、WhatsApp 等）",
+      "clients": "自己的客户或线下",
+      "other": "其他"
+    },
+    "channelPlaceholder": "https://… 或账号名",
+    "channelHint": "贴上你的主页链接。没有链接的话，写账号名或号码也可以，比如小红书号、公众号名称。",
+    "audienceRanges": {
+      "under_1k": "1,000 以下",
+      "1k_10k": "1,000 到 1 万",
+      "10k_50k": "1 万到 5 万",
+      "50k_200k": "5 万到 20 万",
+      "over_200k": "20 万以上",
+      "not_followers": "不按粉丝算（客户、团队、学员等）"
+    },
+    "otherChannels": "其他渠道",
+    "otherChannelsPlaceholder": "每行一个",
+    "yourPlan": "推广计划",
+    "planPlaceholder": "例如：给小店主发前后对比的笔记；在我的美食拍照教程里放链接；推荐给我服务的商家。",
+    "contact": "其他联系方式",
+    "contactPlaceholder": "微信、Telegram 或 WhatsApp",
+    "contactHint": "我们会发邮件到你账号绑定的邮箱。想用别的方式联系，可以填在这里。",
+    "saving": "提交中…",
+    "statusScreen": {
+      "pending": {
+        "title": "申请已收到",
+        "body": "每份申请都由人工审核。结果会显示在这个页面，通过后后台会在这里直接开通。",
+        "pill": "审核中"
+      },
+      "rejected": {
+        "title": "申请未通过",
+        "body": "感谢你的关注。以下是审核备注。",
+        "pill": "未通过"
+      },
+      "suspended": {
+        "title": "你的联盟会员资格已暂停",
+        "body": "暂停期间不再产生新佣金。如果你认为有误，请联系客服。",
+        "pill": "已暂停"
+      },
+      "banned": {
+        "title": "你的联盟会员资格已关闭",
+        "body": "这个账号不能再参加联盟营销。",
+        "pill": "已关闭"
+      }
+    },
+    "backToAccount": "返回我的账户",
+    "dashboardTitle": "联盟营销后台",
+    "codeLabel": "推广码",
+    "thresholdMet": "已达到 {threshold} 的结算门槛。",
+    "nextShort": "下次结算（UTC）",
+    "maturingShort": "结算前将确认",
+    "needMethod": "填写收款方式后才能结算余额。",
+    "statsLabel": "数据概览",
+    "recruitHint": "通过这个链接申请的人，审核通过后会加入你的团队。",
+    "payoutTitle": "收款信息",
+    "payoutIntro": "每月结算日，我们按这里的方式支付已确认的收入。"
   }
 }

@@ -13,6 +13,7 @@ import {
   changeSchema,
   payoutSchema,
   memberSchema,
+  rateSchema,
 } from './models'
 
 function parse<T>(schema: z.ZodType<T>, response: { data: unknown; error: unknown }): T {
@@ -38,6 +39,26 @@ export async function readSettings() {
     .single()
   return parse(settingsSchema, result)
 }
+
+// The public program terms: default rates and the payout rules, for the program page.
+export async function readProgramTerms() {
+  try {
+    const db = createAdminSupabase()
+    const [settings, rates] = await Promise.all([
+      db.from('affiliate_settings').select('hold_days,payout_min_usd,settlement_day').single(),
+      db.from('affiliate_rates').select('product_kind,l1_bp,l2_bp'),
+    ])
+    if (settings.error || rates.error) throw new Error('unavailable')
+    return {
+      ...settingsSchema.pick({ hold_days: true, payout_min_usd: true, settlement_day: true }).parse(settings.data),
+      rates: z.array(rateSchema).parse(rates.data),
+    }
+  } catch {
+    logger.warn('affiliate program terms unavailable')
+    return null
+  }
+}
+export type ProgramTerms = NonNullable<Awaited<ReturnType<typeof readProgramTerms>>>
 
 const enrollmentSettings = settingsSchema.pick({ apply_min_level: true, terms_version: true })
 
