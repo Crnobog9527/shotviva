@@ -1,4 +1,4 @@
-import { discountedPriceCents } from '../codes'
+import { discountedPriceCents } from '../codes/discount'
 import type { MembershipTier, SiteProduct } from '../config'
 
 const PAY_PERCENT: Record<MembershipTier, number> = { starter: 95, pro: 90, max: 85 }

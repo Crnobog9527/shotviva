@@ -4,7 +4,8 @@ import { logger } from '../../logger'
 import { publicEnv } from '../../public-env'
 import { persistenceFor } from '../consent/decision'
 import { onConsentChange, readConsent } from '../consent/store'
-import { categorySlug, validateEvent, type BrowserEventName, type EventProps } from '../events'
+import { categorySlug } from '../event-values'
+import type { BrowserEventName, EventProps } from '../events'
 import { sentryOptions } from '../sentry-options'
 import { clearPosthogStorage, syncPosthog } from './consent-sync'
 import { posthogConfig } from './posthog-config'
@@ -67,16 +68,24 @@ function clearStorage(): void {
 
 const enabled = () => started && Boolean(publicEnv.NEXT_PUBLIC_POSTHOG_KEY)
 
+// The dictionary's zod schemas (about 30 KB gzip with zod) load with the first event, not with
+// the page: every marketing page used to carry them in its first-load JavaScript (mobile
+// Lighthouse, 2026-11-11). One shared import, so events keep the order they were tracked in.
+let events: Promise<typeof import('../events')> | null = null
+const loadEvents = () => (events ??= import('../events'))
+
 // Browser events of the §16.2 dictionary only; money and credit events are server-side.
-// Checked now; sent once PostHog is in (sdk.ts queues the first seconds).
+// Checked before anything is sent; sent once PostHog is in (sdk.ts queues the first seconds).
 export function track<E extends BrowserEventName>(event: E, props: EventProps<E>): void {
   if (!enabled()) return
-  const checked = validateEvent(event, props)
-  if (!checked.ok) {
-    logger.error('analytics event refused', { event, issues: checked.issues })
-    return
-  }
-  withSdks(({ posthog }) => posthog?.capture(event, checked.props))
+  void loadEvents().then(({ validateEvent }) => {
+    const checked = validateEvent(event, props)
+    if (!checked.ok) {
+      logger.error('analytics event refused', { event, issues: checked.issues })
+      return
+    }
+    withSdks(({ posthog }) => posthog?.capture(event, checked.props))
+  })
 }
 
 export function trackPaywallView(trigger: EventProps<'paywall_view'>['trigger']): void {

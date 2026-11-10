@@ -2,7 +2,9 @@
 
 import { useSyncExternalStore } from 'react'
 
-import { DISMISS_STORAGE_KEY, pickLive, type BannerAnnouncement } from '../rules'
+// Not the rules index: it also exports the zod schemas, which the banner must not ship.
+import { DISMISS_STORAGE_KEY, pickLive } from '../rules/rules'
+import type { BannerAnnouncement } from '../rules/types'
 
 const MINUTE = 60_000
 
