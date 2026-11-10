@@ -140,12 +140,13 @@ describe('home FAQ, Chinese (建站规格 G6, G13)', () => {
   const faq: readonly FaqItem[] = zhHomePage.faq
   const byLetter = (items: readonly FaqItem[], letter: string) => byLetterIn(items, letter, ZH_ORDER)
 
-  it('asks the brand question first, then A–H in the G6 order, the Chinese way', () => {
-    expect(faq).toHaveLength(9)
+  it('asks the brand question first, then A–H in the G6 order, then the two G9 questions', () => {
+    expect(faq).toHaveLength(11)
     expect(faq[0]?.question).toBe('Shotviva 是什么？')
     expect(byLetter(faq, 'A').question).toBe('怎么把自己的照片变成 AI 图？')
     expect(byLetter(faq, 'H').question).toBe('手机上能用吗？要下载软件吗？')
-    expect(faq.at(-1)).toBe(byLetter(faq, 'H'))
+    expect(faq[8]).toBe(byLetter(faq, 'H'))
+    expect(faq.slice(9).map((item) => item.question)).toEqual(['AI修图和AI改图有什么区别？', '白底图能不能直接生成？'])
     expect(zhHomePage.headings.faq).toBe('AI改图常见问题')
   })
 
@@ -169,7 +170,7 @@ describe('home FAQ, Chinese (建站规格 G6, G13)', () => {
 
   it('renders nine <h3> and the comparison table, linking to the Chinese generator page', async () => {
     const html = decode(await render(faq, 'zh'))
-    expect(html.match(/<h3>/g)).toHaveLength(9)
+    expect(html.match(/<h3>/g)).toHaveLength(11)
     expect(html).toContain('<caption>AI改图和 AI 生图对比</caption>')
     expect(html).toContain('href="/zh/image-to-image-generator"')
     expect(html).toContain('去描述它。<a href="/zh/image-to-image-generator"')
@@ -177,7 +178,7 @@ describe('home FAQ, Chinese (建站规格 G6, G13)', () => {
 
   it('opens the brand question by default and keeps every question and answer in the HTML', async () => {
     const html = decode(await render(faq, 'zh', 'accordion'))
-    expect(html.match(/<details/g)).toHaveLength(9)
+    expect(html.match(/<details/g)).toHaveLength(11)
     expect(html.match(/<details open="">/g)).toHaveLength(1)
     const open = html.indexOf('<details open="">')
     expect(open).toBeLessThan(html.indexOf('<h3>Shotviva 是什么？</h3>'))
