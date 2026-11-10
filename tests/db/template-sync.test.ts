@@ -260,3 +260,21 @@ it('denies client access to snapshots, pricing receipts, the write RPC and priva
     expect(rows[0]).toEqual({ read: false, source: false, target: false, quote: false, write: false })
   }
 })
+
+it('rolls back a live sync and its receipt when the submitted floor understates actual cost', async () => {
+  const template = fixture()
+  expect(await write(await prepare(template, 'seed'))).toEqual(ok(1))
+  await db.query('update public.templates set is_active=true where id=$1', [template.id])
+  const before = await source(template.id)
+  await db.query('update public.ai_providers set estimated_image_costs=$1 where id=$2', [{ '1k': 10 }, providerId])
+  try {
+    const args = await prepare({ ...template, credits_cost: { ...template.credits_cost, '1k': 2 } }, 'low')
+    const floor = { high: template.credits_cost, medium: template.credits_cost }
+    const p_floors = { ...args.p_floors, providers: { ...args.p_floors.providers, [providerId]: floor } }
+    expect((await write({ ...args, p_floors })).error?.message).toBe('TEMPLATE_PRICE_BELOW_FLOOR')
+    expect(await source(template.id)).toEqual(before)
+    expect((await target(template.id, 'low')).version).toBeNull()
+  } finally {
+    await db.query("update public.ai_providers set estimated_image_costs='{}' where id=$1", [providerId])
+  }
+})

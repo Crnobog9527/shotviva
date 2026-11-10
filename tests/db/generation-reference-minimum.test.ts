@@ -16,7 +16,7 @@ import { holdTestBudget } from './test-run-fixtures'
 const id = 'qa-t97-min-' + randomUUID()
 const providerId = randomUUID()
 const caps = { resolutions: ['1k'], aspectRatios: ['1:1'], originalRatio: false, minReferences: 1, maxReferences: 2,
-  fetchedAt: new Date().toISOString() }
+  catalogImageCosts: { '1k': 0.01 }, fetchedAt: new Date().toISOString() }
 const key = `style-refs/${id}/${randomUUID()}.webp`
 const bytes = Uint8Array.of(17,29)
 const bucket = createMemoryStore()

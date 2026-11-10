@@ -38,7 +38,7 @@ beforeAll(async () => {
            ($3, 'image', 'openai_images', 'T92 fallback fixture', 'gpt-image-2.6', 'https://api.openai.com/v1', '{1k,2k,3k}', 2)`, [routerId, model, defaultId])
   await pg.query('update public.ai_providers set capabilities = $2 where id = $1', [routerId, {
     resolutions: ['1k'], aspectRatios: ['4:5', '1:1'], originalRatio: false,
-    minReferences: 0, maxReferences: 3, fetchedAt: new Date().toISOString(),
+    minReferences: 0, maxReferences: 3, catalogImageCosts: { '1k': 0.01 }, fetchedAt: new Date().toISOString(),
   }])
   await pg.query('update public.template_prompts set provider_id = $1 where template_id = $2', [routerId, templateId])
 })
