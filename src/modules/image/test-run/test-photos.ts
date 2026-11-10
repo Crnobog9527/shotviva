@@ -6,6 +6,7 @@ import { AppError } from '@/core/errors'
 import type { ObjectStore } from '@/core/storage'
 import { isUploadContentType, MAX_UPLOAD_BYTES, UPLOAD_URL_TTL_SECONDS } from '@/core/storage/rules'
 
+import { writeThumbnail } from './test-thumbnail'
 import { isTestPhotoKey, newTestPhotoKey } from './test-run-keys'
 import { testPhotoTicketSchema } from './test-run-request'
 import type { TestPhoto } from './test-run-row'
@@ -38,5 +39,6 @@ export async function confirmTestPhoto(deps: { db: SupabaseClient; store: Object
     await deps.store.delete(key).catch(() => undefined)
     throw new AppError('IMAGE_TOO_LARGE', '照片不能超过 20MB')
   }
+  await writeThumbnail(deps.store, key, await deps.store.get(key))
   return insertTestPhoto(deps.db, { id: photoId, objectKey: key, actorId })
 }

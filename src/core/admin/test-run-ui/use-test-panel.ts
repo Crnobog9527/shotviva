@@ -1,9 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { TestPanelData, TestRunView } from '../test-runs'
-import { loadPanel } from './api'
+import { cleanupPanel, loadSummary, loadRecords } from './api'
+import { useOpeningSummary } from './summary-provider'
 import { failureMessage } from './messages'
 import { mergeRuns, placeholderRun, type Placeholder } from './placeholder'
 import { onRunsChanged } from './runs-changed'
@@ -14,28 +15,30 @@ export type Launch = { placeholder: Placeholder; start: () => Promise<TestRunVie
 // when the panel opens; runs still in flight; and the last failure or notice. A launch shows its
 // placeholders at once, runs every request together, then reloads (budget, photo URLs).
 export function useTestPanel(templateId: string) {
-  const [data, setData] = useState<TestPanelData | null>(null)
+  const [data, setData] = useState<Partial<TestPanelData>>({})
   const [pending, setPending] = useState<TestRunView[]>([])
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
-  useEffect(() => {
-    let live = true
-    loadPanel(templateId, true)
-      .then((loaded) => live && setData(loaded))
-      .catch((failure: unknown) => live && setError(failureMessage(failure)))
-    return () => {
-      live = false
+  const openingSummary = useOpeningSummary()
+  const generation = useRef(0)
+  const reload = useCallback(async (opening = false) => {
+    const current = ++generation.current
+    const showError = (e: unknown) => { if (current === generation.current) setError(failureMessage(e)) }
+    const summary = opening ? openingSummary() : loadSummary()
+    const records = loadRecords(templateId)
+    const update = (section: Partial<TestPanelData>) => {
+      if (current === generation.current) setData(previous => ({ ...previous, ...section }))
     }
-  }, [templateId])
+    await Promise.all([summary.then(update).catch(showError), records.then(update).catch(showError)])
+  }, [openingSummary, templateId])
 
-  const reload = useCallback(async () => {
-    try {
-      setData(await loadPanel(templateId, false))
-    } catch (failure) {
-      setError(failureMessage(failure))
-    }
-  }, [templateId])
+  useEffect(() => {
+    void reload(true)
+    void cleanupPanel().catch(() => undefined)
+    const requests = generation
+    return () => { requests.current++ }
+  }, [reload])
 
   // A cover translation finished elsewhere on the page (T87): show it and the new spend.
   useEffect(() => onRunsChanged(() => void reload()), [reload])
@@ -55,7 +58,7 @@ export function useTestPanel(templateId: string) {
     [reload],
   )
 
-  const runs = data ? mergeRuns(data.runs, pending) : pending
+  const runs = mergeRuns(data.runs ?? [], pending)
   return { data, runs, busy: pending.length > 0, error, notice, setError, setNotice, reload, launch }
 }
 

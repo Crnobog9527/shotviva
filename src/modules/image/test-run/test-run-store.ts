@@ -119,15 +119,12 @@ export async function findTestPhoto(db: SupabaseClient, photoId: string): Promis
 }
 
 // The photos a set of runs started from, plus the most recently used ones, for the panel.
-export async function listTestPhotos(db: SupabaseClient, ids: readonly string[]): Promise<{ recent: TestPhoto[]; used: TestPhoto[] }> {
-  const columns = 'id, object_key, last_used_at'
-  const [recent, used] = await Promise.all([
-    db.from('admin_test_photos').select(columns).order('last_used_at', { ascending: false }).limit(RECENT_PHOTOS_LIMIT),
-    ids.length > 0 ? db.from('admin_test_photos').select(columns).in('id', [...ids]) : Promise.resolve({ data: [], error: null }),
-  ])
-  if (recent.error) readFailed('admin_test_photos recent', recent.error)
-  if (used.error) readFailed('admin_test_photos used', used.error)
-  return { recent: z.array(testPhotoRowSchema).parse(recent.data), used: z.array(testPhotoRowSchema).parse(used.data) }
+export async function listTestPhotos(db: SupabaseClient, ids?: readonly string[]): Promise<TestPhoto[]> {
+  if (ids?.length === 0) return []
+  const query = db.from('admin_test_photos').select('id, object_key, last_used_at')
+  const { data, error } = await (ids ? query.in('id', [...ids]) : query.order('last_used_at', { ascending: false }).limit(RECENT_PHOTOS_LIMIT))
+  if (error) readFailed('admin_test_photos list', error)
+  return z.array(testPhotoRowSchema).parse(data)
 }
 
 export async function insertTestPhoto(db: SupabaseClient, photo: { id: string; objectKey: string; actorId: string }): Promise<TestPhoto> {

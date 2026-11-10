@@ -8,6 +8,7 @@ import { Checkbox } from '@/core/ui/checkbox'
 import { cn } from '@/core/ui/cn'
 
 import type { TestRunView } from '../test-runs'
+import { TestThumbnail } from './test-thumbnail'
 import { TEST_RUN_COPY as COPY } from './copy'
 import { runFailure, usd } from './messages'
 
@@ -43,8 +44,7 @@ function Picture({ run }: { run: TestRunView }) {
   return (
     <a href={run.outputUrl} target="_blank" rel="noreferrer" className="block h-full" title={COPY.run.open}>
       {/* Admin-only signed URL of a private result; next/image cannot fetch it. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={run.outputUrl} alt={COPY.run.open} className="h-full w-full object-contain" loading="lazy" />
+      <TestThumbnail kind="run" id={run.id} src={run.thumbnailUrl ?? `/api/admin/test-thumbnail?kind=run&id=${run.id}`} alt={COPY.run.open} className="h-full w-full object-contain" lazy />
     </a>
   )
 }
@@ -61,6 +61,7 @@ export function RunCard({ run, actions }: { run: TestRunView; actions: RunAction
         {run.isCover ? <Badge className="absolute top-1 left-1">{COPY.run.isCover}</Badge> : null}
       </div>
       <Meta run={run} />
+      {run.photoDeleted && <span className="text-muted-foreground text-xs">{COPY.removal.deleted}</span>}
       {done ? (
         <div className="flex flex-wrap items-center gap-1">
           <Button asChild variant="outline" size="icon-sm">

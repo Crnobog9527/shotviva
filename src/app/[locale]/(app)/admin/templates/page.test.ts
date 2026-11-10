@@ -27,7 +27,8 @@ vi.mock('./actions', () => ({
   reorderTemplateCategoriesAction: vi.fn(),
   deleteTemplateCategoryAction: vi.fn(),
 }))
-vi.mock('@/modules/image', () => ({ CREDITS_FLOOR: {} }))
+vi.mock('@/core/storage', () => ({ r2Store: () => ({}) }))
+vi.mock('@/modules/image', () => ({ CREDITS_FLOOR: {}, loadPanelSummary: () => Promise.resolve(null) }))
 
 const { default: AdminTemplatesPage } = await import('./page')
 

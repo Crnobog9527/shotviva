@@ -783,6 +783,20 @@ $$;
 ALTER FUNCTION "admin"."lowest_credit_price"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."mark_deleted_test_photo"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  new.photo_deleted:=true;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "admin"."mark_deleted_test_photo"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."move_category_subtree"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -1003,6 +1017,22 @@ $$;
 
 
 ALTER FUNCTION "admin"."purchase_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_event_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."queue_test_asset_removal"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare k text;
+begin
+  if tg_table_name='admin_test_photos' then k:=old.object_key; else k:=old.output_key; end if;
+  if k is not null then insert into public.admin_test_asset_removals values(k) on conflict do nothing; end if;
+  return null;
+end;
+$$;
+
+
+ALTER FUNCTION "admin"."queue_test_asset_removal"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."renewal_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_invoice_id" "text", "p_period_end" timestamp with time zone, "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_charge_id" "text" DEFAULT NULL::"text") RETURNS "public"."credit_change"
@@ -4004,6 +4034,41 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_openai_admin_key_status"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_remove_test_assets"("p_actor" "uuid", "p_kind" "text", "p_ids" "uuid"[], "p_expected" integer DEFAULT NULL::integer) RETURNS "jsonb"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare affected int; usage_count int; running boolean; keys text[];
+begin
+  if not exists(select from public.profiles where id=p_actor and role='admin' and banned_at is null) then raise exception 'FORBIDDEN'; end if;
+  if coalesce(cardinality(p_ids),0) not between 1 and 50 then raise exception 'INVALID_INPUT'; end if;
+  if p_kind='photo' then
+    perform 1 from public.admin_test_photos where id=any(p_ids) order by id for update;
+    select count(*),array_agg(object_key) into affected,keys from public.admin_test_photos where id=any(p_ids);
+    -- The photo locks conflict with the FK's key-share lock when a run starts.
+    -- Check again in this transaction after waiting for any such start to commit.
+    select count(*), bool_or(status='running') into usage_count,running
+      from public.admin_test_runs where photo_id=any(p_ids);
+    if running then raise exception 'PHOTO_IN_RUNNING_TEST'; end if;
+  elsif p_kind='run' then
+    perform 1 from public.admin_test_runs where id=any(p_ids) order by id for update;
+    select count(*), count(cover_set_at),bool_or(status='running'),array_agg(output_key) filter(where output_key is not null)
+      into affected,usage_count,running,keys from public.admin_test_runs where id=any(p_ids);
+    if running then raise exception 'RUNNING_TEST'; end if;
+  else raise exception 'INVALID_INPUT'; end if;
+  if p_expected is not null then
+    if p_expected<>usage_count then raise exception 'USAGE_CHANGED'; end if;
+    if p_kind='photo' then delete from public.admin_test_photos where id=any(p_ids);
+    else delete from public.admin_test_runs where id=any(p_ids); end if;
+  end if;
+  return jsonb_build_object('count',affected,'uses',usage_count,'keys',coalesce(keys,'{}'));
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_remove_test_assets"("p_actor" "uuid", "p_kind" "text", "p_ids" "uuid"[], "p_expected" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_reorder_template_categories"("p_keys" "text"[], "p_actor" "uuid") RETURNS "void"
@@ -9044,6 +9109,14 @@ ALTER TABLE "public"."admin_audit_log" ALTER COLUMN "id" ADD GENERATED ALWAYS AS
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."admin_test_asset_removals" (
+    "object_key" "text" NOT NULL
+);
+
+
+ALTER TABLE "public"."admin_test_asset_removals" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."admin_test_photos" (
     "id" "uuid" NOT NULL,
     "object_key" "text" NOT NULL,
@@ -9079,6 +9152,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_test_runs" (
     "created_by" "uuid",
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "finished_at" timestamp with time zone,
+    "photo_deleted" boolean DEFAULT false NOT NULL,
     CONSTRAINT "admin_test_runs_check" CHECK ((("kind" = 'edit'::"text") OR ("parent_id" IS NULL))),
     CONSTRAINT "admin_test_runs_cost_usd_check" CHECK (("cost_usd" >= (0)::numeric)),
     CONSTRAINT "admin_test_runs_duration_ms_check" CHECK (("duration_ms" >= 0)),
@@ -9878,6 +9952,11 @@ ALTER TABLE ONLY "admin"."waffo_renewal_periods"
 
 ALTER TABLE ONLY "public"."admin_audit_log"
     ADD CONSTRAINT "admin_audit_log_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."admin_test_asset_removals"
+    ADD CONSTRAINT "admin_test_asset_removals_pkey" PRIMARY KEY ("object_key");
 
 
 
@@ -10690,6 +10769,14 @@ CREATE OR REPLACE TRIGGER "prompt_style_ref_limit" AFTER INSERT OR UPDATE ON "pu
 
 
 
+CREATE OR REPLACE TRIGGER "removed_test_photo" AFTER DELETE ON "public"."admin_test_photos" FOR EACH ROW EXECUTE FUNCTION "admin"."queue_test_asset_removal"();
+
+
+
+CREATE OR REPLACE TRIGGER "removed_test_result" AFTER DELETE ON "public"."admin_test_runs" FOR EACH ROW EXECUTE FUNCTION "admin"."queue_test_asset_removal"();
+
+
+
 CREATE OR REPLACE TRIGGER "series_category" BEFORE INSERT OR UPDATE OF "category_key" ON "public"."template_series" FOR EACH ROW EXECUTE FUNCTION "admin"."check_series_category"();
 
 
@@ -10751,6 +10838,10 @@ CREATE OR REPLACE TRIGGER "templates_set_updated_at" BEFORE UPDATE ON "public"."
 
 
 CREATE OR REPLACE TRIGGER "templates_sync_category" BEFORE INSERT OR UPDATE OF "category", "category_key" ON "public"."templates" FOR EACH ROW EXECUTE FUNCTION "public"."templates_sync_category"();
+
+
+
+CREATE OR REPLACE TRIGGER "test_photo_deleted" BEFORE UPDATE OF "photo_id" ON "public"."admin_test_runs" FOR EACH ROW WHEN ((("old"."photo_id" IS NOT NULL) AND ("new"."photo_id" IS NULL))) EXECUTE FUNCTION "admin"."mark_deleted_test_photo"();
 
 
 
@@ -11202,6 +11293,9 @@ ALTER TABLE "admin"."waffo_renewal_periods" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."admin_audit_log" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."admin_test_asset_removals" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."admin_test_photos" ENABLE ROW LEVEL SECURITY;
 
 
@@ -11542,6 +11636,10 @@ GRANT ALL ON FUNCTION "admin"."lowest_credit_price"() TO "service_role";
 
 
 
+REVOKE ALL ON FUNCTION "admin"."mark_deleted_test_photo"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "admin"."partner_image_aspects"("public"."templates") FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."partner_image_aspects"("public"."templates") TO "anon";
 GRANT ALL ON FUNCTION "admin"."partner_image_aspects"("public"."templates") TO "authenticated";
@@ -11562,6 +11660,10 @@ REVOKE ALL ON FUNCTION "admin"."protect_retired_template"() FROM PUBLIC;
 
 
 REVOKE ALL ON FUNCTION "admin"."purchase_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_event_id" "text") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."queue_test_asset_removal"() FROM PUBLIC;
 
 
 
@@ -11960,6 +12062,11 @@ GRANT ALL ON FUNCTION "public"."admin_mark_dispute_submitted"("p_dispute_id" "te
 
 REVOKE ALL ON FUNCTION "public"."admin_openai_admin_key_status"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_openai_admin_key_status"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_remove_test_assets"("p_actor" "uuid", "p_kind" "text", "p_ids" "uuid"[], "p_expected" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_remove_test_assets"("p_actor" "uuid", "p_kind" "text", "p_ids" "uuid"[], "p_expected" integer) TO "service_role";
 
 
 
@@ -12691,6 +12798,10 @@ GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."admin_audit
 GRANT UPDATE ON SEQUENCE "public"."admin_audit_log_id_seq" TO "anon";
 GRANT UPDATE ON SEQUENCE "public"."admin_audit_log_id_seq" TO "authenticated";
 GRANT UPDATE ON SEQUENCE "public"."admin_audit_log_id_seq" TO "service_role";
+
+
+
+GRANT SELECT,DELETE ON TABLE "public"."admin_test_asset_removals" TO "service_role";
 
 
 

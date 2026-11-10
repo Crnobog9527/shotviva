@@ -41,11 +41,12 @@ export { PhotoTile, type PhotoTileProps } from './workspace/photo-tile'
 export { UPLOAD_FORMAT_NAMES, UPLOAD_MAX_MB } from './workspace/upload-formats'
 // Admin template test runs (ARCHITECTURE §10.b, T85), server only: the /api/admin/test-* routes.
 export {
+  listManagedAssets, removeAssets, thumbnailForAsset, thumbnailKey,
   cleanupOnOpen,
   confirmTestPhoto,
   createTestPhotoUpload,
   loadTestBudget,
-  loadTestPanel,
+  loadPanelSummary, loadPanelRecords, loadTestPanel,
   runTestEdit,
   runTestGenerate,
   runTestTranslate,
