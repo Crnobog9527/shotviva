@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { versionPatch } from './version-patch'
 import type { AdminTemplate } from '../templates/types'
 
 import {
@@ -39,6 +40,24 @@ const template: AdminTemplate = {
   updatedAt: '2026-11-05T00:00:00Z',
   prompt: { styleRefs: [], providerId: '328576a9-f5b8-4c5d-b180-fe7b15deb02c', body: 'FAKE BODY', version: 2, modelParams: { quality: 'high' } },
 }
+
+describe('prompt version selection', () => {
+  it.each([true, false])('saves archived prompt content with the currently selected model (historical route available: %s)', available => {
+    const values = toFormValues(template)
+    const ref = { key: 'style-refs/burger-hero/test.webp', width: 100, height: 100, uploadedAt: template.createdAt }
+    const fragments = { previous: { on: 'on', off: 'off' } }
+    const patch = versionPatch(values, { version: 1, body: 'Earlier fixture', providerModel: 'model-B',
+      providerId: '727176a9-f5b8-4c5d-b180-fe7b15deb01f', styleRefs: [ref],
+      modelParams: { quality: 'medium', background: 'transparent', toggles: fragments } }, available)
+    expect(buildPayload({ ...values, ...patch }, false, FLOOR)).toMatchObject({ ok: true, payload: {
+      revision: { expected: 2, selected: available ? 1 : undefined },
+      template: { quality: 'high', creditsCost: template.creditsCost, visibleIn: template.visibleIn },
+      prompt: { body: 'Earlier fixture', providerId: template.prompt?.providerId, styleRefs: [ref],
+        modelParams: { quality: 'high', toggles: fragments } },
+    } })
+    expect(patch).not.toHaveProperty('modelParamsJson')
+  })
+})
 
 describe('template form state', () => {
   it('retains private fragments from an archived version even after a public switch was removed', () => {

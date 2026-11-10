@@ -11,6 +11,7 @@ import { toFragments, toToggleFields, toToggleValues, toZhToggleText, withoutTog
 export type TemplateFormValues = {
   expectedVersion?: number
   restoredParams?: Record<string, unknown>
+  forkVersion?: boolean
   selectedVersion?: number
   id: string
   module: 'image' | 'video'
@@ -198,6 +199,12 @@ function withToggles(values: TemplateFormValues, fields: unknown, params: unknow
   return { ok: true as const, fields: { ...withoutToggles(fields), toggles }, modelParams }
 }
 
+function revision(values: TemplateFormValues) {
+  return values.expectedVersion ? { revision: {
+    expected: values.expectedVersion, selected: values.forkVersion ? undefined : values.selectedVersion,
+  } } : {}
+}
+
 // Only shapes the payload; the server validates every field again with zod and the floor.
 export function buildPayload(values: TemplateFormValues, isNew: boolean, floor: CreditsFloor): BuildResult {
   const low = Object.entries(creditProblems(values, floor))
@@ -216,7 +223,7 @@ export function buildPayload(values: TemplateFormValues, isNew: boolean, floor: 
     ok: true,
     payload: {
       isNew,
-      ...(values.expectedVersion ? { revision: { expected: values.expectedVersion, selected: values.selectedVersion } } : {}),
+      ...revision(values),
       template: {
         id: values.id.trim(),
         module: values.module,
