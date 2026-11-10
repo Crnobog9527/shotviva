@@ -688,6 +688,32 @@
     },
     "wishlist": {
       "title": "许愿墙",
+      "tabDot": "新功能：缺什么模板可以许愿",
+      "guide": {
+        "title": "许愿墙怎么用",
+        "text": "还没有你要的模板？在这里告诉我们。",
+        "stepsLabel": "使用步骤",
+        "stepLabel": "第 {n} 步，共 {total} 步",
+        "steps": {
+          "say": { "title": "说出你要的效果", "text": "用一句话描述想要的样子，再配一张参考图就行。" },
+          "vote": { "title": "大家投票，票多先做", "text": "其他卖家也会给想要的愿望投票，票多的先做。" },
+          "ship": { "title": "做好置顶，一键使用", "text": "做好的模板会置顶在许愿墙上，点一下就能用。" }
+        },
+        "example": "周末早午餐菜单，做成暗调氛围海报",
+        "exampleTemplate": "暗调菜单海报",
+        "wish": "许一个愿",
+        "photoFirst": "先出一张图，就能许愿",
+        "later": "先看看"
+      },
+      "card": {
+        "title": "没找到想要的？去许愿",
+        "line": "说说你要的效果，大家投票，票多的先做。"
+      },
+      "hint": {
+        "text": "你现在可以许愿新模板了。",
+        "open": "去许愿墙",
+        "dismiss": "关闭"
+      },
       "myRequests": "我的许愿",
       "request": "许愿一个模板",
       "needPhoto": "先做一张图才能参与",
@@ -1080,22 +1106,48 @@
     "creditsMonth": "每月 {count} 积分",
     "creditsYear": "一次到账 {count} 积分 · 按年付 {price}",
     "perHundredCredits": "每 100 积分约 {price}",
+    "positioning": {
+      "starter": "适合偶尔需要做图的小店。",
+      "pro": "适合每周都上新的卖家。",
+      "max": "适合电商卖家、团队和多门店商家：商品多、一次处理一大批，白底图和场景图批量出。"
+    },
+    "photoEstimate": "每月约可出 <n>{range}</n> 张图",
+    "photoEstimateNote": "实际张数以生成为准：模型、清晰度、模板不同，消耗的积分也不同。",
     "perkHeadings": {
-      "includes": "包含",
-      "plusStarter": "入门版全部权益，另加",
-      "plusPro": "专业版全部权益，另加"
+      "includes": "包含"
     },
     "comingSoon": "即将上线",
     "perks": {
-      "noWatermark": "无水印，可商用",
-      "privateAllTemplates": "默认私密，全部模板可用",
       "concurrency": "最多同时生成 {count} 张",
-      "support48h": "邮件客服，{hours} 小时内回复",
-      "support24h": "优先邮件客服，{hours} 小时内回复",
-      "batch": "批量上传，一次最多 {count} 张",
+      "batch": "{count, plural, one {一次上传一张} other {批量上传，一次最多 # 张}}",
+      "memberPacks": "中包、大包积分包享 {pct}% 优惠",
+      "support": "邮件客服，{hours} 小时内回复",
+      "supportPriority": "优先邮件客服，{hours} 小时内回复",
+      "wishlistVotes": "许愿墙投一票算 {weight} 票",
+      "basics": "无水印、作品私密、全部模板可用",
       "brandKit": "品牌套件：海报上用你的 logo 和字体",
-      "earlyAccess": "新功能抢先用",
-      "wishlistVotes": "你在许愿墙上的模板许愿按 {weight} 倍计票"
+      "earlyAccess": "新功能抢先用"
+    },
+    "compare": {
+      "title": "对比全部套餐",
+      "rows": {
+        "credits": "每月积分",
+        "photos": "每月约可出图",
+        "concurrency": "同时生成",
+        "batch": "一次上传张数",
+        "memberPacks": "中包、大包优惠",
+        "support": "客服回复时间",
+        "votes": "许愿墙一票算",
+        "noWatermark": "无水印，可商用",
+        "private": "作品私密",
+        "allTemplates": "全部模板"
+      },
+      "cells": {
+        "pct": "{value}%",
+        "hours": "{value} 小时",
+        "weight": "{value} 票",
+        "yes": "包含"
+      }
     },
     "packsTitle": "积分包",
     "packsLabel": "积分包",

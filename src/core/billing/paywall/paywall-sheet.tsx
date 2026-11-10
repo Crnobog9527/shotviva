@@ -23,7 +23,6 @@ type Props = {
   onOpenChange(open: boolean): void
   trigger: PaywallTrigger
   products: readonly SiteProduct[]
-  wishlistLive: boolean
   state: PaywallState
 }
 
@@ -35,7 +34,7 @@ export function PaywallSheet(props: Props) {
   return <DiscountProvider active={props.open}><SheetBody {...props} /></DiscountProvider>
 }
 
-function SheetBody({ open, onOpenChange, trigger, products, wishlistLive, state }: Props) {
+function SheetBody({ open, onOpenChange, trigger, products, state }: Props) {
   const t = useTranslations("paywall")
   const offers = tierOffers(products)
   const packs = packOffers(products)
@@ -68,7 +67,7 @@ function SheetBody({ open, onOpenChange, trigger, products, wishlistLive, state 
       footer={resolved ? <PaywallCheckout resolved={resolved} choice={choice} /> : null}
     >
       <DiscountBanner singlePayment={choice.method === "alipay"} />
-      <TierPicker offers={offers} wishlistLive={wishlistLive} state={picking} />
+      <TierPicker offers={offers} state={picking} />
       <PackPicker packs={packs} state={picking} />
       <PayMethods method={choice.method} onChange={(method) => update({ method })} kind={resolved?.kind ?? "plan"} period={choice.period} />
       <DiscountEntry />

@@ -12,7 +12,7 @@ const request = (body: string, origin: string | null = ORIGIN) => {
   if (origin) headers.set('origin', origin)
   return new NextRequest(`${ORIGIN}/api/locale`, { method: 'POST', headers, body })
 }
-const account = (locale: 'en' | 'zh' | null) => ({ id: 'u', email: null, phone: null, role: 'user' as const, verified: true, banned: false, locale })
+const account = (locale: 'en' | 'zh' | null) => ({ id: 'u', email: null, phone: null, role: 'user' as const, verified: true, banned: false, locale, onboarding: { wishlistSeen: false, wishlistHintSeen: false } })
 
 // The language switches' beacon (ARCHITECTURE §17): a signed-in account keeps its choice.
 describe('POST /api/locale', () => {

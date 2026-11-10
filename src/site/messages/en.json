@@ -688,6 +688,32 @@
     },
     "wishlist": {
       "title": "Wishlist",
+      "tabDot": "New: ask for the templates you need",
+      "guide": {
+        "title": "How the Wishlist works",
+        "text": "Ask for a template we don't have yet.",
+        "stepsLabel": "How it works",
+        "stepLabel": "Step {n} of {total}",
+        "steps": {
+          "say": { "title": "Say what you want", "text": "Describe the look in a sentence and add one reference photo. That's all we need." },
+          "vote": { "title": "Everyone votes", "text": "Other sellers vote for the wishes they want too. The most-wanted get built first." },
+          "ship": { "title": "Shipped and pinned", "text": "A finished template is pinned to the top of the wall. One tap to use it." }
+        },
+        "example": "A dark, moody poster for our weekend brunch menu",
+        "exampleTemplate": "Moody Menu Poster",
+        "wish": "Make a wish",
+        "photoFirst": "Make one photo first to wish",
+        "later": "Just looking"
+      },
+      "card": {
+        "title": "Not finding it? Make a wish",
+        "line": "Tell us the look you need. Others vote, and the most-wanted get built."
+      },
+      "hint": {
+        "text": "You can now wish for new templates.",
+        "open": "Wishlist",
+        "dismiss": "Dismiss"
+      },
       "myRequests": "My requests",
       "request": "Request a template",
       "needPhoto": "Create one photo first to join",
@@ -1080,22 +1106,48 @@
     "creditsMonth": "{count, plural, one {# credit} other {# credits}} a month",
     "creditsYear": "{count, plural, one {# credit} other {# credits}} upfront · {price} billed yearly",
     "perHundredCredits": "≈ {price} per 100 credits",
+    "positioning": {
+      "starter": "For shops that make photos now and then.",
+      "pro": "For sellers who post new items every week.",
+      "max": "For e-commerce sellers, teams and multi-location businesses: many products at once, white-background and lifestyle shots in batches."
+    },
+    "photoEstimate": "About <n>{range}</n> photos a month",
+    "photoEstimateNote": "Actual count varies: credits per photo depend on the model, resolution and template.",
     "perkHeadings": {
-      "includes": "Includes",
-      "plusStarter": "Everything in Starter, plus",
-      "plusPro": "Everything in Pro, plus"
+      "includes": "Includes"
     },
     "comingSoon": "Coming soon",
     "perks": {
-      "noWatermark": "No watermark, commercial use",
-      "privateAllTemplates": "Private by default, all templates",
       "concurrency": "{count, plural, one {# photo} other {# photos}} generating at a time",
-      "support48h": "Email support, reply within {hours} hours",
-      "support24h": "Priority email support, reply within {hours} hours",
-      "batch": "Batch upload, up to {count} photos",
+      "batch": "{count, plural, one {One photo per upload} other {Batch upload, up to # photos}}",
+      "memberPacks": "{pct}% off medium and large credit packs",
+      "support": "Email support, reply within {hours} hours",
+      "supportPriority": "Priority email support, reply within {hours} hours",
+      "wishlistVotes": "One Wishlist vote counts as {weight}",
+      "basics": "No watermark, private photos, every template",
       "brandKit": "Brand kit: your logo and fonts on posters",
-      "earlyAccess": "Early access to new features",
-      "wishlistVotes": "Your template requests count {weight}× on the Wishlist"
+      "earlyAccess": "Early access to new features"
+    },
+    "compare": {
+      "title": "Compare every plan",
+      "rows": {
+        "credits": "Credits a month",
+        "photos": "Photos a month, about",
+        "concurrency": "Generating at once",
+        "batch": "Photos per upload",
+        "memberPacks": "Off medium and large packs",
+        "support": "Support replies within",
+        "votes": "One Wishlist vote counts as",
+        "noWatermark": "No watermark, commercial use",
+        "private": "Private photos",
+        "allTemplates": "Every template"
+      },
+      "cells": {
+        "pct": "{value}%",
+        "hours": "{value} h",
+        "weight": "{value}×",
+        "yes": "Included"
+      }
     },
     "packsTitle": "Credit packs",
     "packsLabel": "Credit packs",

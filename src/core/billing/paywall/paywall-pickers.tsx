@@ -7,7 +7,7 @@ import type { PackProduct } from "../../config"
 import { cn } from "../../ui/cn"
 import { packLooks, type TierOffer } from "./offer"
 import { PackCard } from "./pack-card"
-import { tierPerks } from "./perks"
+import { PhotoEstimateNote } from "./photo-estimate-line"
 import { useStanding } from "./standing-context"
 import { planStanding } from "./standing-pick"
 import { TierCard } from "./tier-card"
@@ -18,11 +18,21 @@ import type { PaywallState } from "./use-paywall-state"
 const PICK = "paywall-pick"
 const focusRing = "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-3 has-[:focus-visible]:outline-ring"
 
-type TierProps = { offers: TierOffer[]; wishlistLive: boolean; state: PaywallState }
+type TierProps = { offers: TierOffer[]; state: PaywallState }
 
 // A member's lower and current plans stay visible but cannot be picked (T66); the checkout bar
-// explains a locked pick left over from switching Monthly / Yearly.
-export function TierPicker({ offers, wishlistLive, state }: TierProps) {
+// explains a locked pick left over from switching Monthly / Yearly. The photo estimate's one
+// footnote sits under the three cards.
+export function TierPicker({ offers, state }: TierProps) {
+  return (
+    <>
+      <TierRadios offers={offers} state={state} />
+      <PhotoEstimateNote className="mt-2 px-0.5" />
+    </>
+  )
+}
+
+function TierRadios({ offers, state }: TierProps) {
   const t = useTranslations("paywall")
   const standing = useStanding()
   const { choice, update } = state
@@ -48,7 +58,6 @@ export function TierPicker({ offers, wishlistLive, state }: TierProps) {
               singlePayment={choice.method === "alipay"}
               period={choice.period}
               selected={selected}
-              perks={tierPerks(offer.tier, { wishlistLive })}
               check={lock ? null : <Check on={selected} />}
               lock={lock}
             />

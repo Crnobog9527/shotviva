@@ -3,6 +3,9 @@ import type { MembershipTier, SiteProduct } from '../config'
 
 const PAY_PERCENT: Record<MembershipTier, number> = { starter: 95, pro: 90, max: 85 }
 
+// The member rate as a percentage off the list price (5 / 10 / 15), for the paywall perks.
+export const packMemberPercentOff = (tier: MembershipTier): number => 100 - PAY_PERCENT[tier]
+
 // The member rate changes the pre-tax charge only. Round once, half up, in integer cents.
 export function packPriceCents(product: Pick<SiteProduct, 'id' | 'priceUsd'>, tier: MembershipTier | null): number {
   const listCents = Math.round(product.priceUsd * 100)

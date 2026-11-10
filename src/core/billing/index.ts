@@ -19,3 +19,5 @@ export {
   type TierLimits,
 } from './tier'
 export { paymentCodeEffects } from './payment-code-effects'
+// "About N–M photos a month" on the plans: the live Standard prices behind it (client-safe).
+export { photoPrices, type PhotoPrices } from './photo-estimate'

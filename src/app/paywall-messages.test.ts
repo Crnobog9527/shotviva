@@ -14,13 +14,16 @@ describe('paywall messages (en)', () => {
   it('has a message for every perk on every tier, live or coming soon', () => {
     for (const wishlistLive of [true, false]) {
       for (const tier of ['starter', 'pro', 'max'] as const) {
-        const perks = tierPerks(tier, { wishlistLive })
+        const perks = tierPerks(tier, { wishlistLive, memberPacks: true })
         expect(t(`perkHeadings.${perks.heading}`)).not.toMatch(/paywall\./)
+        expect(t(`positioning.${tier}`)).not.toMatch(/paywall\./)
         for (const perk of [...perks.live, ...perks.soon]) expect(t(`perks.${perk.key}`, perk.values)).not.toMatch(/paywall\./)
       }
     }
     expect(t('perks.concurrency', { count: 1 })).toBe('1 photo generating at a time')
     expect(t('perks.concurrency', { count: 6 })).toBe('6 photos generating at a time')
+    expect(t('perks.batch', { count: 1 })).toBe('One photo per upload')
+    expect(t('perks.batch', { count: 30 })).toBe('Batch upload, up to 30 photos')
     expect(t('perks.earlyAccess')).toBe('Early access to new features')
     // Hours come from TIER_LIMITS.supportHours through the perk values (48 / 48 / 24).
     const support = (tier: 'starter' | 'max') => {
@@ -30,6 +33,12 @@ describe('paywall messages (en)', () => {
     expect(support('starter')).toBe('Email support, reply within 48 hours')
     expect(support('max')).toBe('Priority email support, reply within 24 hours')
     expect(t('perks.brandKit')).toBe('Brand kit: your logo and fonts on posters')
+  })
+
+  it('positions Max for e-commerce batches and words the estimate footnote as the Owner fixed it', () => {
+    expect(t('positioning.max')).toMatch(/e-commerce/)
+    expect(t('positioning.max')).toMatch(/white-background and lifestyle shots in batches/)
+    expect(t('photoEstimateNote')).toBe('Actual count varies: credits per photo depend on the model, resolution and template.')
   })
 
   it('words the payment groups as DESIGN §4.5 fixes them', () => {
