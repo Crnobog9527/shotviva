@@ -38,11 +38,12 @@ export async function PayoutList({ user, query }: Props) {
     <section className="af-section">
       <h2>{t('nav.payouts')}</h2>
       <Table
-        headers={['period', 'amount', 'state', 'paidDate'].map((k) => t(k))}
+        headers={['period', 'statementAmount', 'amountPaid', 'state', 'paidDate'].map((k) => t(k))}
         empty={t('empty')}
         rows={page.items.map((r) => [
           date(locale, r.period),
           money(locale, r.amount),
+          r.status === 'paid' ? money(locale, r.paid_amount ?? r.amount) : '—',
           <StatusPill key="s" status={r.status} t={t} />,
           r.paid_at ? date(locale, r.paid_at) : '—',
         ])}

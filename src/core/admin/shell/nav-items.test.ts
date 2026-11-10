@@ -11,6 +11,7 @@ describe('admin nav', () => {
       'tickets',
       'inquiries',
       'orders',
+      'products',
       'codes',
       'disputes',
       'jobs',

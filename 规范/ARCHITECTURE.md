@@ -330,6 +330,14 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - **海报类只做单张、短文字**：标题和价格由用户在工作台的文案字段里填。多行菜单、价格单这类需要逐行排版的物料不交给 AI 画字，放到物料期用代码排版做。
 - 模板质量由 Owner 调提示词时把关，不设统一的实测门槛（Owner 2026-11-05）。
 
+### T101 素材参考库与模板来源（迁移 1140～1159）
+
+- `reference_assets` 保存 `id uuid`、`category_id text`、`r2_key text`、`width`、`height`、`bytes`、`sha256`、可空的 `source_url` 和 `note`、去重的 `tags text[]`、`status`、`archived_at`、`created_by`、`created_at`。分类引用 T102 的 `template_categories.key`，只允许 `kind='reference'`，三级均可挂素材。来源只接受 HTTP(S)。宽高各为 1～2048 像素，文件大小为 1 字节～20MB。对象 key 唯一且与素材 ID 对应。最终 WebP 的 SHA-256 用 64 位小写十六进制存储，在全部素材中唯一，包括归档项。
+- `status` 取 active 或 archived。归档时记录时间，恢复时清空时间。列表按状态和可选分类筛选，以 `(created_at,id)` 降序游标每次读 60 张。按分类、状态与排序字段建立索引，为标签包含匹配和备注子串搜索建索引。每页批量统计所选素材关联的模板数。
+- 分类沿用 T102 的层级、移动和同级排序约束。删除有子节点的分类时拒绝操作。删除叶分类时锁住源分类和另一目标素材分类，在同一事务内迁移素材并删除源分类。
+- `reference_template_sources` 保存 `template_id`、`asset_id`、`run_id`，按素材查询来源，成功试跑结果可幂等生成一个下架草稿。发布时复制所选版本至模板私有提示词，沿用实际模型、清晰度和质量档。按素材分类路径提供模板分类建议，允许管理员调整，仅将模板分类写入模板。选中的生成结果按 §8.3 转换为模板封面。草稿走现有模板编辑、成本下限及画风销售授权流程。
+- T101 新表全部开 RLS，撤销 anon、authenticated 的直接读写权限。服务端核验管理员后读写，写 RPC 仅授权 service_role 并校验操作者。私有素材、来源关系、调试记录及设置不得出现在公开模板视图、伙伴接口或用户作业中。
+
 ## 6. 积分与付款
 
 ### 6.1 积分模型（Owner 2026-11-05 拍板；傍晚修订为「按作品判付费」）
@@ -470,6 +478,8 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 
 首次启用以前，用九个原 ID 从已核准的 `admin.product_terms_v2` 导入 v2 基准版本，逐项核对配置、渠道 Price 和双语展示。保留原 `public.products` 的旧经济字段及 `product_terms_v2` 给历史结算读取，固定它们在切换时的值；以后改价只增加商品版本。新目录独立于全站积分单位开关，须在 v2 已激活、各读写入口支持新版本之后才允许发布。迁移只扩展兼容结构，不自动切换收银，不执行渠道操作。后台操作历史按商品和时间游标分页，待重试发布按状态和重试时间检索；两个查询分别建对应索引。实现 PR 按 AGENTS §5 在 `1120`～`1139` 提交数据定义、迁移和快照。
 
+**第一期数据定义（1120、1121）。** 已有订单外键继续引用 `public.products.id`。私表 `admin.catalog_products(product_id, tier, kind, published_revision)` 用商品 ID 作主键。私表 `admin.catalog_product_versions(product_id, revision, usd_cents, credits, paid_days, listed, sort_order, name_en, name_zh)` 用商品 ID 和版本作联合主键，发布指针只能引用同商品的版本。按原 ID 导入两套基准：版本 1 取旧表，版本 2 取 `admin.product_terms_v2` 并沿用原天数和上架状态。仅服务端可执行只读函数 `read_product_catalog(p_version)`：v1 取版本 1，v2 取已发布版本，按排序及 ID 返回九项。公开展示过滤下架项并按 `billing-products` 标签缓存。离线构建、部署预渲染先于新 RPC 可用时短暂显示第一期已核准的九项基准价，其他目录错误不展示商品。结账与后台只读页一律直读，结账继续执行原积分切换校验。结账读目录失败时不创建付款会话，复用飞书告警通道，跨实例按错误码每小时最多发一条。目录无写入口，双语卡片权益沿用现有翻译和档位规则。
+
 **2. 改价只影响新订单。** 买家提交页面上的商品版本，服务端在事务中核对当前上架版本、资格和买家已确认的应付金额后才锁定本次报价。页面已过期则展示新报价，等买家再次确认。发布前已锁定的尝试沿用原报价和幂等键创建或找回同一会话；会话到期重新报价。已付款但延迟通知、异步钱包和重复回调，均按原会话入账。
 
 订阅续费按签约 Price 和签约周期扣款，不批量更新 subscription item。用已验签事件、发票行的 Price ID、合同记录和历史版本验证金额、折扣及本期应发积分；旧 Price 即使失去 key 或已归档也能识别。首付、续费各自只发一次，下架不影响发放。T105 之前的 v2 合同沿用原报价快照；更早合同保留 §6.1 已批准的等档积分换算及原收费。启用前先部署兼容读取，登记旧 Price 绑定并核对可付款会话和合同；遇到无法识别的付款留待重试并告警，不能套用现价。
@@ -554,24 +564,27 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 | 表 | 字段与约束 |
 |---|---|
 | `profiles` 扩展 | `referred_by` 引用 `affiliates.user_id`，`referred_at`、`referred_source` 记录绑定时间和来源（signup、first_checkout、admin）。邀请码关系另存于 T94。 |
-| `affiliates` | `user_id` 主键、唯一 `slug`、`status`、`parent_user_id`、`team_enabled`、`country`、`application`、`reject_reason`、`approved_at/by`、`admin_note`、`created_at`；`payout_method/details`、`us_person`、`terms_version/accepted_at`。受邀未注册者记录为待激活，Supabase 确认邮箱后激活。 |
-| `affiliate_settings` | 布尔主键 `singleton=true`；`enabled=false` 为触发器及应用开关的同一数据源；`hold_days=30`、`payout_min_usd=20000`、`settlement_day=1`、`apply_min_level=none`、`terms_version`。 |
+| `affiliates` | `user_id` 主键、唯一 `slug`、`status`、`parent_user_id`、`team_enabled`、`country`、`application`、`reject_reason`、`reapply_allowed=false`、`approved_at/by`、`admin_note`、`created_at`；`payout_method/details`、`us_person`、`terms_version/accepted_at`。后台邀请待激活时 `approved_at` 为空，Supabase 确认邮箱激活时写入；已有账号由后台直接开通时记批准时间。 |
+| `affiliate_settings` | 布尔主键 `singleton=true`；`enabled=false` 为触发器及应用开关的同一数据源；`commission_months` 为正整数或 NULL，默认 NULL 表示终身；`hold_days=30`、`payout_min_usd=20000`、`settlement_day=1`、`apply_min_level=none`、`terms_version`。 |
 | `affiliate_rates` / `affiliate_rate_overrides` | 每个 `product_kind` 的 `l1_bp/l2_bp`；个人覆盖按 `(user_id,product_kind)` 唯一，各等级可单独回落至默认比例。 |
-| `affiliate_commissions` | `id`、`payment_id`、`affiliate_user_id`、`level`、`product_id`、`rate_bp`、`base_usd`、`amount`、`status`、`confirm_after/confirmed_at`、`void_reason`、`flags`、`released_by`、`created_at/updated_at`。每笔付款每层至多一行。付款当时的归属、团队资格、比例和确认期保留；只按当前退款和争议重算。现有 `profiles.signup_ip` 支持同 IP 标记；付款表没有卡指纹。 |
+| `affiliate_commissions` | `id`、`payment_id`、`affiliate_user_id`、`level`、`product_id`、`rate_bp`、`base_usd`、`amount`、`status`、`confirm_after/confirmed_at`、`void_reason`、`flags`、`released_by`、`created_at/updated_at`。每笔付款每层至多一行。结算单跨单共享同一佣金时，作废其未付部分后用 `payout_retained` 保留已付的分段，后续退款和争议继续追回对应已付金额。付款当时的归属、团队资格、比例和确认期保留；只按当前退款和争议重算。现有 `profiles.signup_ip` 支持同 IP 标记；付款表没有卡指纹。 |
 | `affiliate_commission_changes` | `id, commission_id, at, old_amount, new_amount, old_status, new_status, reason` 记录每次实际变化。 |
 | `affiliate_adjustments` | `id, request_id, affiliate_user_id, amount, reason, created_by, created_at`。相同请求只记一次。 |
-| `affiliate_payouts` | `id, affiliate_user_id, period, amount, status, payout_snapshot, created_at, paid_at, paid_method, paid_reference, decided_by, note`；每人每月唯一。 |
+| `affiliate_payouts` | `id, affiliate_user_id, period, amount, paid_amount, legacy_review_required, status, payout_snapshot, created_at, paid_at, paid_method, paid_reference, decided_by, note`；每人每月唯一。生成金额不可变；已付取实付（历史未记录实付时取原金额）。 |
+| `affiliate_payout_items` | 主键 `(payout_id, commission_id, prior_amount)`；每笔按未被其他单占用的区间分配，本单分配总额不超过面额。区间下限为 `prior_amount`，出单及实际支付的上限分别为 `issue_amount, settled_amount`；退款或争议不能被无关的新成交抵消。 |
 | `affiliate_recompute_errors` | `id, payment_id, at, error, snapshot, resolved_at`；每笔付款最多一条未解决错误；首次计算失败时保存已取得的收款人、比例和确认日，以便重试。 |
 | `affiliate_click_days` | `affiliate_user_id,day` 联合主键、`clicks`。 |
-| `affiliate_balances` | 每个 `affiliate_user_id` 的 `confirmed,pending,paid,available`。可结算余额为已确认佣金加人工调整，减去待付和已付结算单；暂缓单回到余额。 |
+| `affiliate_settlement_runs` | 主键 `period` 为 UTC 月首。每行表示整月的结算任务已成功完成，当日计划关闭或无人达标也记录。 |
+| `affiliate_balances` | 每个 `affiliate_user_id` 的 `confirmed,pending,paid,available`。可结算余额为已确认佣金加人工调整，减去待付、暂缓的原金额及已付实额；已作废单不占用。 |
 
-- `affiliate_bind/count_click/apply/save_profile` 负责归属、点击、申请及设置。团队邀请只接受有效的已开团队推广员。申请门槛以未全额退款的会员付款为准。
-- `affiliate_recompute_payment` 由付款新增、退款金额或状态变化、争议新增或结案触发。对税后退款比例使用精确整数除法。付款与积分事务独立于佣金成败。每日 `affiliate_daily(UTC 日期)` 重试错误、确认到期佣金并在结算日生成结算单。
+- `affiliate_bind/count_click/apply/save_profile` 负责归属、点击、申请及设置。团队邀请只接受有效的已开团队推广员。申请门槛以未全额退款的会员付款为准。被拒后仅管理员可通过 `admin_affiliate_allow_reapply` 放行一次，审计保留操作人、时间和原拒绝原因；再次提交通过同一申请校验并更新资料和条款，保留原短码和团队归属，回到待审并收回重提资格。
+- `affiliate_recompute_payment` 由付款新增、退款金额或状态变化、争议新增或结案触发。对税后退款比例使用精确整数除法。付款与积分事务独立于佣金成败。每日 `affiliate_daily(UTC 日期)` 重试错误并确认到期佣金。从本月结算日起，若本月尚无成功运行记录，则按运行时的合资格余额出单；出单与运行记录在同一事务内，失败可次日重试，成功后新达标的余额留到下期。迁移以历史结算单补记已运行月份；旧系统的空跑没有记录可查，当月无证据时允许补跑一次。
+- 暂缓单可解除为待付，或附原因作废并选择退回余额 / 作废关联佣金。待付单按关联佣金复核，不同结算单的退款各自冲减；历史重复占用无法证实来源的单仅能暂缓、作废退回；关联付款重算失败时先排障再付。发现差额必须提交当前应付金额或暂缓。付款时先锁本账户的付款、佣金及调整写入，再将关联佣金应付截到「已确认＋调整－已实付－其他开放单的关联应付（待人工核对的旧单取面额）」，最低为零，拒绝过期金额。每次人工操作记流水。
 - 关闭计划后，旧佣金继续按退款和争议结果重算；关闭期间发生的付款，重开也不补发佣金。直接推广员在付款时已暂停或封禁，本人佣金作废，该笔付款也不产生上级团队奖励。
-- `admin_affiliate_decide/create/set/adjust/commission_release/rebind/payout_decide/settings/recompute` 写审计。后台财务汇总及邮箱查询、推广员概览及已脱敏推荐用户列表通过服务端读取函数返回。短码唯一索引支持绑定，推广员与时间索引支持私有明细分页，状态与确认时间索引支持每日确认，未解决错误及争议按付款检索。
+- `admin_affiliate_decide/create/set/adjust/commission_release/rebind/payout_decide/settings/recompute` 写审计。后台财务汇总及邮箱查询、推广员概览及已脱敏推荐用户列表通过服务端读取函数返回。后台概览的本期待付总额按各待付单当前复核金额求和，待人工核对的旧单按面额计入，已付总额按实付金额求和（历史单取生成时金额）。短码唯一索引支持绑定，推广员与时间索引支持私有明细分页，状态与确认时间索引支持每日确认，未解决错误及争议按付款检索。
 
 - 联盟使用 Shotviva 内置系统。直销无佣金；团队奖励只在付款时满足既有团队资格才产生。
-- **返佣比例**：代理绑定自己推荐的客户，按该客户每一笔付款**终身**返佣：
+- **返佣比例**：默认终身返佣。后台可指定月数，按客户的绑定时间起算 UTC 自然月，两级均包含到期时刻。设置只影响新付款，已有佣金仍按原快照处理退款和争议。各商品默认比例为：
   - 积分包及月付：本人 15%，符合资格的团队上级另得 5%；
   - 年付：本人 10%，符合资格的团队上级另得 3%，最高合计 13%。不回溯修改已产生的佣金快照。
 - **返佣基数**：该笔付款不含税的实付金额（`payments.amount_total − payments.amount_tax`）；退款的付款不返或追回。
@@ -769,6 +782,10 @@ check 约束换成原来的集合再加上 `code_grant`（兑换送的积分）�
 - T97 画风参考图使用 `style-refs/<template_id>/<随机 UUID>.webp`，长边不超过 1536 像素；模板编辑器仅对管理员提供预览，生成服务端直接读取，模板公开数据、伙伴请求和作业序列化均不提供 key 或地址。
 
 
+- T101 素材、临时上传、预览和调试原始结果均放私有桶。浏览器压成 WebP 后凭管理员取得的短时 PUT 直传临时位置。服务端校验实际字节数、格式、尺寸、摘要，再写入 `references/<id>.webp`。并发上传相同内容只保留一份，返回已有素材 ID 并清理多余对象。
+- 素材预览入口每次核验管理员，签名短时有效。R2 预签名 GET 在有效期内可被持有者转发。验证“普通用户拿到完整预览链接也被拒绝”时，面向浏览器的链接须由逐次鉴权的媒体入口提供，不能暴露可转发的 R2 直链。参考素材原图不可作模板封面。
+- 仅已归档素材可永久删除，确认时列出将清除的调试记录。事务内移除可见记录、清理来源关系并将需删除的私有对象 key 登记到私有待删表（key 为主键）；应用删除对象后移除待删项，失败可重试。已生成模板保留自身的提示词和封面，历史成本保留在试跑账本。
+
 - `inputs/` 前缀：压缩后的输入图（临时位置），7 天后自动删除。没发起生成的上传对象同样 7 天清掉。
 - **输入图随作品保留**（Owner 2026-11-06，T40）：出图成功结算时，服务端用 R2 的复制操作（不经 API 路由请求体）把这次的全部输入图复制到 `outputs/{user_id}/{job_id}-in-{n}.jpg`，记在这条任务上；和成品一起保留、一起删除（删号按 `outputs/{user_id}/` 前缀清，已覆盖）。目的是让「Make again」任何时候都能直接用原来的照片。复制失败只记日志，不影响结算，这张作品的 Make again 退回「请再加一次照片」。作品编辑（§5.2）的输入是成品，不另存。
 - `outputs/` 前缀：成品，只存一份无水印原图，一律保留，直到用户删除。
@@ -929,6 +946,18 @@ check 约束换成原来的集合再加上 `code_grant`（兑换送的积分）�
 - 接口：`/api/admin/test-runs`（首次出图）、`/api/admin/test-runs/edit`（编辑）、`/api/admin/test-photos`（预签名上传）；一次 3 张是浏览器并发 3 个请求（Server Action 在同一页面是串行的，所以不用 Server Action）。只有管理员能调，非管理员 404。
 - 换脸判断照常调用；试跑被拒不写 `identity_refusals`（否则管理员账号会被标红），不发 `generate` / `generate_refused` 事件。
 - 封面：结果设为「后」、源照片设为「前」，按 §8.3 封面规则转 WebP（长边 1600、质量 82）写公开桶，`revalidateTag('templates', 'max')`。
+
+#### T101 模板调试台（迁移 1140～1159）
+
+| 私有表 | 字段与规则 |
+|---|---|
+| `prompt_lab_sessions` | `id, asset_id, created_by, created_at, updated_at`。按素材和更新时间索引，支持继续调试。 |
+| `prompt_lab_versions` | `id, session_id, version_no, prompt, note, created_by, created_at`。同会话版本号唯一；锁会话后分配版本号。复制、再次倒推、修改已试跑的提示词均保留旧版本。 |
+| `prompt_lab_runs` | `id, session_id, batch_id, photo_id, version_id, model, resolution, quality, use_style_reference, status, estimate_usd, cost_usd, output_key, error_code, starred, is_best, created_by, started_at, finished_at`。照片复用 T85 的 admin_test_photos；保留调试记录引用的照片。版本必须属于本会话，批次内照片和版本组合唯一。每个会话最多一个最佳结果。 |
+
+- 倒推从后台私有设置读取视觉模型标识和元指令，按 T96 检查视觉输入能力。未配置时仍可手写提示词。真实提示词和元指令仅由管理员在运行环境录入，日志和错误响应均不带指令或供应商原文。
+- 矩阵先显示张数和估价。服务端独立校验照片、版本和模型档位，可按 T97 把素材作为画风参考图。一次提交 1～12 格，在调用模型前按整批预估额占用预算。与 T85 共用同一事务锁、北京时间自然日口径和 admin_test_spend 账本。调试先于模板创建，允许调试账目的 template_id 为空，T85 的模板试跑仍校验已有模板。
+- 同一事务内登记整批和各格预算，超额整批拒绝。相同批次重放核对请求参数，每格以 run_id 幂等，避免重复调用供应商。完成后逐格按 T85 口径结算实际成本和待核费用。合并前以并发测试验证 T85 和调试台同时申请最后一笔预算时合计不超限。
 
 ### 10.c 企业咨询（Owner 2026-11-08，T86）
 

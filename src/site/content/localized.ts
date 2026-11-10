@@ -1,4 +1,4 @@
-import type { PaymentChannel } from '@/core/config'
+import type { PaymentChannel, SiteProduct } from '@/core/config'
 import type { ContentPage, FaqItem, FooterLink, HomePage } from '@/core/content'
 import type { Locale } from '@/core/i18n'
 
@@ -8,13 +8,13 @@ import { footerLinks } from './legal'
 import { aiRestaurantMenu } from './pages/ai-restaurant-menu'
 import { commercialPhotography } from './pages/commercial-photography'
 import { imageToImageGenerator } from './pages/image-to-image-generator'
-import { pricingPage, type PricingContent } from './pricing'
+import { makePricingPage, pricingPage, type PricingContent } from './pricing'
 import { zhHomePage } from './zh/home'
 import { zhAiRestaurantMenu } from './zh/pages/ai-restaurant-menu'
 import { zhCommercialPhotography } from './zh/pages/commercial-photography'
 import { zhImageToImageGenerator } from './zh/pages/image-to-image-generator'
 import { zhFreeImages } from './zh/offer'
-import { ALIPAY_QUESTION, ZH_WECHAT_PAY_FAQ, zhPricingPage } from './zh/pricing'
+import { ALIPAY_QUESTION, ZH_WECHAT_PAY_FAQ, makeZhPricingPage, zhPricingPage } from './zh/pricing'
 
 // Marketing copy per language (ARCHITECTURE §17: body copy lives in site/content by language).
 // Every SEO page has a Chinese text (ARCHITECTURE §17); only those in site.indexing are indexable.
@@ -38,12 +38,14 @@ const ZH_LEGAL_LABELS: Record<string, string> = {
 }
 
 export const homePageIn = (locale: Locale): HomePage => HOME[locale]
-export const pricingPageIn = (locale: Locale): PricingContent => PRICING[locale]
+export function pricingPageIn(locale: Locale, products?: readonly SiteProduct[]): PricingContent {
+  if (!products) return PRICING[locale]
+  return locale === 'zh' ? makeZhPricingPage(products) : makePricingPage(products)
+}
 // /pricing's FAQ for the live channel (on Waffo a card plan is cancelled from the account page).
 // With STRIPE_WECHAT_PAY on (T73, Stripe only) the zh Alipay answer names WeChat Pay too and
 // says the wallet is picked on the checkout page; off, it is the pre-T73 text.
-export function pricingFaqIn(locale: Locale, channel: PaymentChannel, wechatPay = false): readonly FaqItem[] {
-  const page = PRICING[locale]
+export function pricingFaqIn(locale: Locale, channel: PaymentChannel, wechatPay = false, page = PRICING[locale]): readonly FaqItem[] {
   if (channel === 'waffo') return page.waffo.faq
   if (!wechatPay) return page.faq
   return page.faq.map((item) => (item.question === ALIPAY_QUESTION ? ZH_WECHAT_PAY_FAQ : item))

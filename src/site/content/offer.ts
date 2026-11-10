@@ -64,8 +64,8 @@ export const PACKS = [
   { name: 'Large pack', id: 'pack_l' },
 ] as const
 
-export function product(id: string): SiteProduct | undefined {
-  return pricedProducts(site).find((p) => p.id === id)
+export function product(id: string, products: readonly SiteProduct[] = site.billing.products): SiteProduct | undefined {
+  return products.find((p) => p.id === id && p.priceUsd > 0)
 }
 
 // "$19.90", "$139"
@@ -83,28 +83,24 @@ export function creditsOf(id: string): string {
   return found ? found.credits.toLocaleString('en-US') : PRICE_PENDING
 }
 
-export function perHundredCredits(id: string): string {
-  const found = product(id)
+export function perHundredCredits(id: string, products: readonly SiteProduct[] = site.billing.products): string {
+  const found = product(id, products)
   return found ? formatHundredCredits(usdPerHundredCredits(found)) : PRICE_PENDING
 }
 
 const formatHundredCredits = (amount: number) =>
   `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-function cheapest(ids: readonly string[]): SiteProduct | undefined {
-  const found = ids.map(product).filter((p): p is SiteProduct => p !== undefined)
+function cheapest(ids: readonly string[], products: readonly SiteProduct[]): SiteProduct | undefined {
+  const found = ids.map(id => product(id, products)).filter((p): p is SiteProduct => p !== undefined)
   return found.sort((a, b) => a.priceUsd - b.priceUsd)[0]
 }
 
-// Cheapest monthly plan and cheapest pack, e.g. "$19.90" / "$9.90"; undefined until priced.
-export const planFrom = cheapest(PLAN_TIERS.map((tier) => tier.monthly))
-export const packFrom = cheapest(PACKS.map((pack) => pack.id))
-
 // Largest yearly saving across the configured plans, rounded to the nearest whole percent.
-function yearlySavingPct(): number | undefined {
+function yearlySavingPct(products: readonly SiteProduct[]): number | undefined {
   const pcts = PLAN_TIERS.flatMap((tier) => {
-    const month = product(tier.monthly)
-    const year = product(tier.yearly)
+    const month = product(tier.monthly, products)
+    const year = product(tier.yearly, products)
     if (!month || !year) return []
     // From integer cents, so float error cannot move a .5 boundary.
     const monthlyYear = Math.round(month.priceUsd * 100) * 12
@@ -113,7 +109,15 @@ function yearlySavingPct(): number | undefined {
   return pcts.length === PLAN_TIERS.length ? Math.max(...pcts) : undefined
 }
 
-export const yearlySaving = yearlySavingPct()
+export function offerFacts(products: readonly SiteProduct[]) {
+  return {
+    planFrom: cheapest(PLAN_TIERS.map(tier => tier.monthly), products),
+    packFrom: cheapest(PACKS.map(pack => pack.id), products),
+    yearlySaving: yearlySavingPct(products),
+  }
+}
+
+export const { planFrom, packFrom, yearlySaving } = offerFacts(site.billing.products)
 
 const unitPrices = pricedProducts(site).map(usdPerHundredCredits)
 export const hundredCreditsFrom = unitPrices.length ? formatHundredCredits(Math.min(...unitPrices)) : undefined

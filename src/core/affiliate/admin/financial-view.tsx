@@ -1,5 +1,7 @@
 import { COPY, STATUS, money, commissionStatus } from './copy'
 import { MutationForm, type SaveAction } from './form'
+import { payoutAmountHeaders, payoutAmounts } from './payout-amounts'
+import { DecidePayout } from './payout-decision'
 import type { ViewProps } from './members-view'
 import { Field, FiltersForm, GridTable, LinkTo, NextPage, Hidden, Select } from './parts'
 import { href, type Filters } from './query'
@@ -18,7 +20,7 @@ function FilterBar({ f }: { f: Filters }) {
           initial={f.status}
           labels={cStatus}
           all
-          values={payout ? ['due', 'paid', 'held'] : ['pending', 'confirmed', 'on_hold', 'void']}
+          values={payout ? ['due', 'paid', 'held', 'void'] : ['pending', 'confirmed', 'on_hold', 'void']}
         />
         <Field name="from" label={COPY.from} type="date" defaultValue={f.from} />
         <Field name="until" label={COPY.until} type="date" defaultValue={f.until} />
@@ -101,26 +103,6 @@ export async function CommissionsView({ db, filters, action }: ViewProps) {
     </>
   )
 }
-function DecidePayout({ r, action }: { r: Payout; action: SaveAction }) {
-  if (r.status !== 'due')
-    return <span>{[r.paid_at?.slice(0, 10), r.paid_method, r.paid_reference, r.note].filter(Boolean).join(' · ')}</span>
-  return (
-    <details>
-      <summary className="cursor-pointer">{COPY.complete}</summary>
-      <MutationForm action={action} operation="paid" label={COPY.markPaid}>
-        <Hidden name="payout_id" value={r.id} />
-        <Field name="paid_at" label={COPY.paidAt} type="date" required />
-        <Field name="method" label={COPY.actualMethod} required maxLength={120} />
-        <Field name="paid_reference" label={COPY.reference} maxLength={250} />
-        <Field name="note" label={COPY.note} maxLength={2000} />
-      </MutationForm>
-      <MutationForm action={action} operation="hold" label={COPY.hold}>
-        <Hidden name="payout_id" value={r.id} />
-        <Field label={COPY.reason} name="note" required />
-      </MutationForm>
-    </details>
-  )
-}
 export function snapshotText(r: Payout) {
   const method = String(r.payout_snapshot.payout_method ?? '')
   return [STATUS[method] ?? method, r.payout_snapshot.payout_details].filter(Boolean).join(' · ')
@@ -147,7 +129,7 @@ export async function PayoutsView({ db, filters, action }: ViewProps) {
     <>
       <FilterBar f={filters} />
       <GridTable
-        heads={[COPY.period, COPY.affiliateId, COPY.amount, COPY.status, COPY.payoutSnapshot, COPY.flag, COPY.complete]}
+        heads={[COPY.period, COPY.affiliateId, ...payoutAmountHeaders, COPY.status, COPY.payoutSnapshot, COPY.flag, COPY.complete]}
         rows={list.items.map((r) => ({
           key: r.id,
           cells: [
@@ -155,7 +137,7 @@ export async function PayoutsView({ db, filters, action }: ViewProps) {
             <LinkTo key="member" filters={{ tab: 'affiliates', id: r.affiliate_user_id }}>
               {r.affiliate_user_id}
             </LinkTo>,
-            money(r.amount),
+            ...payoutAmounts(r, money, '—'),
             STATUS[r.status],
             snapshotText(r),
             <Flags key="risk" r={r} />,

@@ -51,6 +51,14 @@ it.each(['pending', 'rejected', 'suspended', 'banned'])('limits %s members to th
   expect(screen.props.account.status).toBe(status)
   expect(deps.settings).not.toHaveBeenCalled()
 })
+it('opens the form for a rejected applicant only while an admin grant is available', async () => {
+  deps.user.mockResolvedValue({ id: 'applicant', verified: true })
+  const props = { search: Promise.resolve({}), mode: 'apply' as const }
+  deps.account.mockResolvedValue({ status: 'rejected', reapply_allowed: false })
+  expect((await EnrollmentScreen(props)).props.account.status).toBe('rejected')
+  deps.account.mockResolvedValue({ status: 'rejected', reapply_allowed: true })
+  expect((await EnrollmentScreen(props)).props.session.id).toBe('applicant')
+})
 it('routes an active affiliate to their dashboard even on a team invitation', async () => {
   deps.enabled.mockResolvedValue(true)
   deps.user.mockResolvedValue({ id: 'member', verified: true })
