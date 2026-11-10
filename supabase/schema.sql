@@ -7389,48 +7389,55 @@ CREATE OR REPLACE FUNCTION "public"."settle_waffo_renewal_v2"("p_user_id" "uuid"
     SET "search_path" TO ''
     AS $$
 declare
-  v_ticket uuid;
   v_prior admin.waffo_renewal_periods;
+  v_reason text;
+  v_ticket uuid;
   v_change public.credit_change;
-  v_review boolean;
+  v_previously_paid boolean;
 begin
   if p_quoted is null or p_quoted <= 0 or p_product_id like 'pack_%' then
     raise exception 'INVALID_INPUT';
   end if;
-  v_review := p_currency is distinct from 'usd' or p_charged is null
-    or p_tax < 0 or p_tax is null or p_charged - p_tax <> p_quoted
-    or (p_subtotal is not null and p_subtotal <> p_quoted);
-  if v_review then v_ticket := gen_random_uuid(); end if;
-
-  insert into admin.waffo_renewal_periods(order_id, period_number, payment_id, user_id, product_id, ticket_id)
-  values(p_order_id, p_period, p_payment_id, p_user_id, p_product_id, v_ticket)
-  on conflict (order_id, period_number) do nothing;
-  if not found then
-    select * into strict v_prior from admin.waffo_renewal_periods
-      where order_id = p_order_id and period_number = p_period;
-    if v_prior.user_id <> p_user_id or v_prior.product_id <> p_product_id then
+  -- Serialize competing payment IDs as well as redeliveries for this period.
+  perform pg_advisory_xact_lock(hashtextextended('waffo-renewal:' || p_order_id || ':' || p_period, 0));
+  select * into v_prior from admin.waffo_renewal_periods where payment_id = p_payment_id;
+  if found then
+    if (v_prior.user_id, v_prior.product_id, v_prior.order_id, v_prior.period_number)
+      is distinct from (p_user_id, p_product_id, p_order_id, p_period) then
       raise exception 'IDEMPOTENCY_CONFLICT';
     end if;
-    return jsonb_build_object('outcome', case when v_prior.ticket_id is null then 'replayed' else 'review' end);
+    return jsonb_build_object('outcome',case when v_prior.review_reason is null then 'replayed' else 'review' end);
   end if;
 
-  -- A payment applied by the previous deployment already has its final disposition.
-  if exists(select from public.payments where waffo_payment_id = p_payment_id
-    and user_id = p_user_id and product_id = p_product_id and waffo_order_id = p_order_id) then
-    update admin.waffo_renewal_periods set ticket_id = null where order_id = p_order_id and period_number = p_period;
-    return jsonb_build_object('outcome','replayed');
+  select * into v_prior from admin.waffo_renewal_periods where order_id=p_order_id and period_number=p_period
+    and review_reason is distinct from 'duplicate_payment';
+  if found then
+    if (v_prior.user_id,v_prior.product_id) is distinct from (p_user_id,p_product_id) then
+      raise exception 'IDEMPOTENCY_CONFLICT';
+    end if;
+    v_reason := 'duplicate_payment';
   end if;
-  if not v_review then
-    v_change := public.settle_waffo_order_v2(p_user_id,p_product_id,p_payment_id,p_order_id,p_charged,p_currency,p_tax,'card');
-    return jsonb_build_object('outcome',case when v_change.applied then 'applied' else 'replayed' end);
+  select exists(select from public.payments where waffo_payment_id=p_payment_id and user_id=p_user_id
+    and product_id=p_product_id and waffo_order_id=p_order_id) into v_previously_paid;
+  if v_reason is null and not v_previously_paid and (p_currency is distinct from 'usd' or p_charged is null
+    or p_tax is null or p_tax < 0 or p_charged-p_tax <> p_quoted
+    or (p_subtotal is not null and p_subtotal <> p_quoted)) then
+    v_reason := 'amount_mismatch';
   end if;
+  if v_reason is not null then v_ticket := gen_random_uuid(); end if;
+  insert into admin.waffo_renewal_periods(payment_id,order_id,period_number,user_id,product_id,
+    quoted_cents,charged_cents,tax_cents,subtotal_cents,currency,review_reason,ticket_id)
+  values(p_payment_id,p_order_id,p_period,p_user_id,p_product_id,p_quoted,p_charged,p_tax,p_subtotal,p_currency,v_reason,v_ticket);
 
-  insert into public.support_tickets(id, user_id, type) values (v_ticket, p_user_id, 'billing');
-  insert into public.support_ticket_messages(ticket_id, author, body) values (v_ticket, 'admin',
-    format('Waffo renewal undergoing manual review. Order %s, period %s, payment %s, product %s. Original quote: %s USD cents. Charged: %s %s minor units, tax: %s, listed subtotal: %s. Credits pending.',
-      p_order_id, p_period, p_payment_id, p_product_id, p_quoted, coalesce(p_charged::text,'unknown'),
-      coalesce(p_currency,'unknown'), p_tax, coalesce(p_subtotal::text,'unknown')));
-  return jsonb_build_object('outcome','review','ticket_id',v_ticket);
+  if v_ticket is not null then
+    insert into public.support_tickets(id,user_id,type) values(v_ticket,p_user_id,'billing');
+    insert into public.support_ticket_messages(ticket_id,author,body) values(v_ticket,'admin',
+      E'我们正在核对你这期续费的扣款，核对完成后会在这张工单里通知你。\nWe’re checking the charge for this renewal. We’ll update you here once we’ve reviewed it.');
+    return jsonb_build_object('outcome','review','ticket_id',v_ticket,'reason',v_reason);
+  end if;
+  if v_previously_paid then return jsonb_build_object('outcome','replayed'); end if;
+  v_change := public.settle_waffo_order_v2(p_user_id,p_product_id,p_payment_id,p_order_id,p_charged,p_currency,p_tax,'card');
+  return jsonb_build_object('outcome',case when v_change.applied then 'applied' else 'replayed' end);
 end;
 $$;
 
@@ -8256,13 +8263,21 @@ COMMENT ON VIEW "admin"."users_overview" IS 'Owner support view (ARCHITECTURE §
 
 
 CREATE TABLE IF NOT EXISTS "admin"."waffo_renewal_periods" (
+    "payment_id" "text" NOT NULL,
     "order_id" "text" NOT NULL,
     "period_number" integer NOT NULL,
-    "payment_id" "text" NOT NULL,
     "user_id" "uuid" NOT NULL,
     "product_id" "text" NOT NULL,
+    "quoted_cents" integer NOT NULL,
+    "charged_cents" integer,
+    "tax_cents" integer,
+    "subtotal_cents" integer,
+    "currency" "text",
+    "review_reason" "text",
     "ticket_id" "uuid",
-    CONSTRAINT "waffo_renewal_periods_period_number_check" CHECK (("period_number" > 1))
+    CONSTRAINT "waffo_renewal_periods_period_number_check" CHECK (("period_number" > 1)),
+    CONSTRAINT "waffo_renewal_periods_quoted_cents_check" CHECK (("quoted_cents" > 0)),
+    CONSTRAINT "waffo_renewal_periods_review_reason_check" CHECK (("review_reason" = ANY (ARRAY['amount_mismatch'::"text", 'duplicate_payment'::"text"])))
 );
 
 
@@ -9160,12 +9175,12 @@ ALTER TABLE ONLY "admin"."template_price_snapshots"
 
 
 ALTER TABLE ONLY "admin"."waffo_renewal_periods"
-    ADD CONSTRAINT "waffo_renewal_periods_payment_id_key" UNIQUE ("payment_id");
+    ADD CONSTRAINT "waffo_renewal_periods_pkey" PRIMARY KEY ("payment_id");
 
 
 
 ALTER TABLE ONLY "admin"."waffo_renewal_periods"
-    ADD CONSTRAINT "waffo_renewal_periods_pkey" PRIMARY KEY ("order_id", "period_number");
+    ADD CONSTRAINT "waffo_renewal_periods_ticket_id_key" UNIQUE ("ticket_id");
 
 
 
@@ -9492,6 +9507,10 @@ CREATE INDEX "waffo_renewal_periods_product_idx" ON "admin"."waffo_renewal_perio
 
 
 CREATE INDEX "waffo_renewal_periods_user_idx" ON "admin"."waffo_renewal_periods" USING "btree" ("user_id");
+
+
+
+CREATE UNIQUE INDEX "waffo_renewal_primary_period_idx" ON "admin"."waffo_renewal_periods" USING "btree" ("order_id", "period_number") WHERE ("review_reason" IS DISTINCT FROM 'duplicate_payment'::"text");
 
 
 
