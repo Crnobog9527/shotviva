@@ -1,0 +1,15 @@
+name: Verify Owner review
+description: Require an actual approval by the repository owner for this manual deployment.
+runs:
+  using: composite
+  steps:
+    - name: Verify the Owner approved this run
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        OWNER_ID: ${{ github.repository_owner_id }}
+      run: |
+        gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/approvals" |
+          jq -e --arg id "$OWNER_ID" 'any(.[];
+            .state == "approved" and (.user.id | tostring) == $id and
+            any(.environments[]; .name == "production-manual"))' >/dev/null

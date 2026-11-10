@@ -7,6 +7,10 @@ description: >
   comes from, so a missing one fails with the exact secret or variable to set.
 
 inputs:
+  require-owner-review:
+    description: Verify approval before linking a manually dispatched production run.
+    required: false
+    default: 'false'
   token-source:
     description: Where SUPABASE_ACCESS_TOKEN comes from, for the error message.
     required: true
@@ -20,6 +24,9 @@ inputs:
 runs:
   using: composite
   steps:
+    - if: inputs.require-owner-review == 'true'
+      uses: ./.github/actions/verify-owner-review
+
     # Same pinned CLI as the local-database job, so remote and local agree on migration
     # handling; cached, and the download is retried on 5xx (T88).
     - uses: ./.github/actions/supabase-cli
