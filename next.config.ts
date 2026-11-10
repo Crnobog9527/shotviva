@@ -67,6 +67,11 @@ const nextConfig: NextConfig = {
         source: '/home/:asset(.+\\.webp)',
         headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
       },
+      // The inner landing pages' case pictures in public/cases: the same rule as public/home.
+      {
+        source: '/cases/:asset(.+\\.webp)',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+      },
       // The wordmark the Supabase auth emails load from https://shotviva.com (supabase/templates):
       // fetched by every mail client and image proxy, so cache it for a year. A changed wordmark
       // ships under a new file name, never over this one (old emails keep pointing at it).
