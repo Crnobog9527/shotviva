@@ -1423,7 +1423,7 @@
       "pack": "Credit packs",
       "monthly": "Monthly plans",
       "yearly": "Yearly plans",
-      "teamCut": "plus {rate} to the affiliate who recruited you, if you joined a team",
+      "teamCut": "Team bonus: you also get {rate} when affiliates you recruit make a sale",
       "cookie": "Link window",
       "cookieNote": "A visitor who clicks your link is yours for this long, even if they buy later.",
       "hold": "Confirmation period",
@@ -1553,6 +1553,7 @@
     "statsLabel": "Your numbers",
     "recruitHint": "People who apply through this link join your team once approved.",
     "payoutTitle": "Payout details",
-    "payoutIntro": "We pay confirmed earnings with this method on the monthly settlement date."
+    "payoutIntro": "We pay confirmed earnings with this method on the monthly settlement date.",
+    "programName": "Affiliate program"
   }
 }

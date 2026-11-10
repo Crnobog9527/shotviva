@@ -9,6 +9,10 @@ import { money, percent } from './format'
 import type { Rate } from './models'
 import { readProgramTerms, type ProgramTerms } from './repository'
 
+// A threshold like $200 reads without cents.
+const wholeMoney = (locale: Locale, cents: number) =>
+  cents % 100 ? money(locale, cents) : new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol', maximumFractionDigits: 0 }).format(cents / 100)
+
 const rateOf = (rates: readonly Rate[], kind: Rate['product_kind']) => rates.find((r) => r.product_kind === kind)
 
 // The program page: what it pays, how it works, then the one way in (`children`).
@@ -64,7 +68,7 @@ function TermsTable({ t, locale, terms }: { t: Translate; locale: Locale; terms:
   rows.push(
     [t('termsRow.cookie'), t('days', { count: REFERRAL_COOKIE_DAYS }), t('termsRow.cookieNote')],
     [t('termsRow.hold'), t('days', { count: terms.hold_days }), t('termsRow.holdNote')],
-    [t('termsRow.payout'), money(locale, terms.payout_min_usd), t('termsRow.payoutNote', { day: terms.settlement_day })],
+    [t('termsRow.payout'), wholeMoney(locale, terms.payout_min_usd), t('termsRow.payoutNote', { day: terms.settlement_day })],
   )
   return (
     <section className="af-block" aria-labelledby="af-terms">

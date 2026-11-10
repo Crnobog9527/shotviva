@@ -165,6 +165,7 @@
   }
   @media (min-width: 760px) {
     .af-terms > div { box-shadow: inset -1px -1px 0 var(--hairline); }
+    .af-terms > div:last-child:nth-child(3n + 2) { grid-column: span 2; }
   }
   .af-terms dt { color: var(--bone-dim); font-size: 15px; }
   .af-terms dd { display: grid; gap: 6px; }
