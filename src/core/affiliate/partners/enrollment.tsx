@@ -1,27 +1,33 @@
 import { notFound, redirect } from 'next/navigation'
 import { connection } from 'next/server'
-import { getSessionUser } from '@/core/auth'
+import { getSessionUser, type SessionUser } from '@/core/auth'
 import { localized } from '@/core/i18n/server'
 import { ApplicationEntry } from './application-entry'
+import { ApplicationPage } from './application-page'
 import { ApplicationStatus } from './application-status'
 import { ProgramIntro } from './program-intro'
 import { slugSchema, type SearchParams } from './models'
 import { readAccount, readOpenEnrollmentSettings } from './repository'
 
-export async function EnrollmentScreen({ search, openForm = false }: { search: Promise<SearchParams>; openForm?: boolean }) {
+// `join` is the program page; `apply` is the application itself, for a signed-in account only.
+export async function EnrollmentScreen({ search, mode = 'join' }: { search: Promise<SearchParams>; mode?: 'join' | 'apply' }) {
   await connection()
   const settings = await readOpenEnrollmentSettings()
-  if (!settings) return closedEnrollment(openForm)
+  if (!settings) return closedEnrollment(mode)
   const [session, raw] = await Promise.all([getSessionUser(), search])
-  const userId = session?.verified ? session.id : undefined
-  const account = userId ? await readAccount(userId) : null
+  const account = await accountOf(session)
   if (account?.status === 'active') redirect(await localized('/partners'))
   if (account) return <ApplicationStatus account={account} />
   const parent = slugSchema.catch('').parse(raw.by)
-  return <ProgramIntro><ApplicationEntry userId={userId} parent={parent} openForm={openForm} settings={settings} /></ProgramIntro>
+  if (mode === 'apply') return <ApplicationPage session={session} parent={parent} settings={settings} />
+  return <ProgramIntro><ApplicationEntry signedIn={Boolean(session?.verified)} parent={parent} /></ProgramIntro>
 }
 
-function closedEnrollment(openForm: boolean) {
-  if (openForm) notFound()
+function closedEnrollment(mode: 'join' | 'apply') {
+  if (mode === 'apply') notFound()
   return <ProgramIntro />
+}
+
+async function accountOf(session: SessionUser | null) {
+  return session?.verified ? readAccount(session.id) : null
 }

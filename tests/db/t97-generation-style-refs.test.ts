@@ -46,7 +46,7 @@ async function fixture() {
     [templateId, 'fixture {{photo_count}} + {{style_ref_count}}', JSON.stringify(refs), providerId])
   const judge = vi.fn<IdentityJudge['judge']>(async () => ({ identitySwap: false, usage: null }))
   const fake = fakeProvider()
-  const deps = { db: serviceSupabase(), store: bucket.store, provider: fake.provider, identityJudge: { tag: 'fixture', judge, prices: null } }
+  const deps = { db: serviceSupabase(), store: bucket.store, provider: { ...fake.provider, id: providerId + '/fixture' }, identityJudge: { tag: 'fixture', judge, prices: null } }
   return { templateId, refs, userId, inputKey, fake, deps, judge, version: rows[0].version }
 }
 
@@ -69,7 +69,7 @@ it('freezes the prompt, reference bytes and ledger version across a concurrent t
   const f = await fixture()
   const provider = async () => {
     await pg.query("update public.template_prompts set body='replacement', style_refs='[]' where template_id=$1", [f.templateId])
-    return f.fake.provider
+    return f.deps.provider
   }
   const view = await runGeneration({ ...f.deps, provider }, { userId: f.userId, source: 'web', templateId: f.templateId })
   expect(f.fake.calls[0]).toMatchObject({ prompt: 'fixture 0 + 2' })

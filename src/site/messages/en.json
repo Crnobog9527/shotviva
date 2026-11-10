@@ -249,7 +249,11 @@
       "unavailable": "We can’t check this code right now. You can still sign up.",
       "gift": "Sign up to get {credits} extra {pool, select, paid {paid} other {free}} credits.",
       "discount": "{percent}% off {targets}.",
-      "period": {"once": "Applies to your first payment.", "repeating": "Applies for the first {months} months of your subscription.", "forever": "Also applies to subscription renewals."},
+      "period": {
+        "once": "Applies to your first payment.",
+        "repeating": "Applies for the first {months} months of your subscription.",
+        "forever": "Also applies to subscription renewals."
+      },
       "received": "Your code added {credits} {pool, select, paid {paid} other {free}} credits to your account.",
       "saved": "Your {percent}% discount is ready to use.",
       "dismiss": "Dismiss",
@@ -558,6 +562,7 @@
       "CONTENT_REJECTED": "The photo or your note didn't pass the safety check. Try another photo or change the note.",
       "IDENTITY_SWAP_REFUSED": "Shotviva can't swap faces or turn a person into someone else, to protect everyone's likeness. You can change the expression, makeup, lighting and background.",
       "REFERENCE_IMAGE_LIMIT": "This model accepts fewer reference images. Remove some photos or choose another template.",
+      "TEMPLATE_UNAVAILABLE": "This template is temporarily unavailable. Please try again later.",
       "TEMPLATE_QUOTE_CHANGED": "The price or template has changed. Refresh to see the current offer.",
       "MODEL_INPUT_UNSUPPORTED": "Check the reference photos, resolution and aspect ratio, or choose another template.",
       "GENERATION_FAILED": "The studio couldn't finish this photo. It usually works on a second try.",
@@ -1269,21 +1274,12 @@
   },
   "affiliate": {
     "closed": "Applications are not open yet.",
-    "programName": "Affiliate program",
-    "whatTitle": "How does the affiliate program work?",
-    "intro": "Introduce Shotviva to people who need images. Once approved, you’ll get a personal referral link to share in tutorials, alongside your work, or with your community.",
-    "apply": "Apply to become an affiliate",
-    "formIntro": "Tell us where you share your work and who you’d like to introduce to Shotviva.",
-    "benefitsTitle": "What do you earn by referring customers?",
-    "benefits": "You can earn commissions when people who join through your link buy a plan or credit pack. Your dashboard tracks referrals, commissions, and payouts. We’ll discuss the terms with you privately.",
+    "apply": "Apply now",
     "applicationTermsPending": "The current affiliate terms have not been published yet. You can start your application now and submit it after you review and accept the published terms.",
     "dashboardLink": "My affiliate dashboard",
-    "memberLogin": "Affiliate login",
-    "loginToSubmit": "Log in or sign up to continue",
+    "memberLogin": "Affiliate log in",
     "title": "Affiliate program",
     "terms": "Affiliate terms",
-    "back": "Back to the affiliate program",
-    "pendingReview": "We’ve received your application. Your decision will appear here after review.",
     "version": "Version {version}",
     "settingsReadOnly": "You can view your payout details here. To make changes, you’ll need to accept the current affiliate terms once they are published.",
     "termsPlaceholder": "The program owner will publish the full terms here before launch.",
@@ -1291,11 +1287,11 @@
     "termsLink": "affiliate terms (version {version})",
     "needsPlan": "To apply, you need a qualifying membership purchase: {plan}. Fully refunded purchases do not count.",
     "seePricing": "View membership plans",
-    "name": "Name",
+    "name": "Your name",
     "country": "Country or region",
-    "channel": "Promotion channel URL",
+    "channel": "Link or account name",
     "audience": "Audience size",
-    "plan": "How will you promote the studio?",
+    "plan": "How will you share Shotviva?",
     "submit": "Submit application",
     "save": "Save settings",
     "invalid": "Check the form. A payout method needs its account details.",
@@ -1334,7 +1330,7 @@
     "eligible": "Your current balance qualifies for the next payout.",
     "notEligible": "You do not currently qualify for a payout.",
     "next": "Next settlement · {date} (UTC)",
-    "gap": "Payout threshold {threshold} · remaining {gap}.",
+    "gap": "{gap} to go until the {threshold} payout threshold.",
     "maturing": "Pending commissions scheduled to confirm by settlement: {amount}.",
     "addMethod": "Add your payout method",
     "hasMethod": "Payout method on file · Edit",
@@ -1406,7 +1402,6 @@
       "admin_void": "Voided after review",
       "zero": "No commission due"
     },
-    "pendingApplication": "Application under review",
     "product": {
       "starter_monthly": "Starter monthly",
       "pro_monthly": "Pro monthly",
@@ -1417,6 +1412,134 @@
       "pack_s": "Small credit pack",
       "pack_m": "Medium credit pack",
       "pack_l": "Large credit pack"
-    }
+    },
+    "heroTitle": "Recommend Shotviva. Earn on every purchase.",
+    "heroLede": "Share your link with people who sell, cook, host or create. When they buy credits or a membership, you earn a commission.",
+    "signupToApply": "Create your Shotviva account to apply",
+    "haveAccount": "Already have an account?",
+    "loginToApply": "Log in and apply",
+    "howTitle": "How it works",
+    "steps": {
+      "apply": {
+        "title": "Apply with your account",
+        "body": "Tell us where you share and who follows you. We review every application by hand."
+      },
+      "share": {
+        "title": "Share your link",
+        "body": "Put it in your bio, a tutorial, a post or a message to a client. Any Shotviva page works."
+      },
+      "earn": {
+        "title": "Get paid",
+        "body": "Track clicks, customers and commissions in your dashboard. Confirmed earnings are paid out on a regular schedule."
+      }
+    },
+    "faqTitle": "Questions",
+    "faq": {
+      "who": {
+        "q": "Who can apply?",
+        "a": "Anyone with a Shotviva account: creators, shop owners, teachers, agencies. There is no follower minimum; we look at whether your audience needs product, food or listing photos."
+      },
+      "review": {
+        "q": "What happens after I apply?",
+        "a": "Your result appears on this page. Once approved, your affiliate dashboard opens on the same account. You only need to add a payout method."
+      },
+      "counts": {
+        "q": "Which purchases count?",
+        "a": "Credit packs and memberships bought by people who signed up through your link, or first checked out after clicking it. Your own purchases don't count. The exact rates are in your agreement once you're approved."
+      },
+      "refunds": {
+        "q": "What if a customer gets a refund?",
+        "a": "Each commission is confirmed after a waiting period. If a purchase is refunded or disputed, its commission is reduced or cancelled."
+      },
+      "team": {
+        "q": "What is a team?",
+        "a": "We may invite active affiliates to recruit others. When someone on your team earns a commission, you earn a team bonus on the same purchase. It never comes out of their share."
+      }
+    },
+    "readTerms": "Read the full affiliate terms",
+    "backToProgram": "Affiliate program",
+    "applyTitle": "Apply to the affiliate program",
+    "applyLede": "A few questions so we can review your application. It takes about two minutes.",
+    "verifyTitle": "Confirm your email first",
+    "verifyBody": "Open the confirmation link we sent when you signed up, then come back to this page to apply.",
+    "accountFirstTitle": "Start with a Shotviva account",
+    "accountFirstBody": "Your affiliate dashboard, link and payouts all live on your Shotviva account. Create one (it's free), and you'll come straight back here.",
+    "needsPlanTitle": "A membership is needed to apply",
+    "optional": "(optional)",
+    "applyingAs": "Applying as",
+    "aboutYou": "About you",
+    "nameHint": "Your real name or business name. We use it for payouts.",
+    "whereYouShare": "Where you share",
+    "channelType": "Main channel",
+    "channelTypes": {
+      "xiaohongshu": "Xiaohongshu (RED)",
+      "douyin": "Douyin",
+      "wechat": "WeChat (Official Account, Channels or Moments)",
+      "bilibili": "Bilibili",
+      "weibo": "Weibo",
+      "zhihu": "Zhihu",
+      "youtube": "YouTube",
+      "tiktok": "TikTok",
+      "instagram": "Instagram",
+      "x": "X (Twitter)",
+      "facebook": "Facebook",
+      "website": "Website or blog",
+      "newsletter": "Email newsletter",
+      "community": "Group or community (Discord, Telegram, WhatsApp, WeChat groups)",
+      "clients": "My own clients or offline",
+      "other": "Something else"
+    },
+    "channelPlaceholder": "https://… or @yourname",
+    "channelHint": "Paste your profile link. If there isn't one, write your account name or ID.",
+    "audienceRanges": {
+      "under_1k": "Under 1,000",
+      "1k_10k": "1,000 to 10,000",
+      "10k_50k": "10,000 to 50,000",
+      "50k_200k": "50,000 to 200,000",
+      "over_200k": "Over 200,000",
+      "not_followers": "Not about followers (clients, a team, a class)"
+    },
+    "otherChannels": "Other channels",
+    "otherChannelsPlaceholder": "One per line",
+    "yourPlan": "Your plan",
+    "planPlaceholder": "For example: a before-and-after post for small shops, a link in my food-photo tutorials, or recommending it to my clients.",
+    "contact": "Other contact",
+    "contactPlaceholder": "WeChat, Telegram or WhatsApp",
+    "contactHint": "We email the address on your account. Add another way to reach you if you prefer.",
+    "saving": "Sending…",
+    "statusScreen": {
+      "pending": {
+        "title": "We've got your application",
+        "body": "We review every application by hand. Your result will appear on this page, and your dashboard opens here once you're approved.",
+        "pill": "Under review"
+      },
+      "rejected": {
+        "title": "Your application wasn't approved",
+        "body": "Thanks for your interest. Here is the note from our review.",
+        "pill": "Not approved"
+      },
+      "suspended": {
+        "title": "Your affiliate account is paused",
+        "body": "New commissions are paused for now. Contact support if you think this is a mistake.",
+        "pill": "Paused"
+      },
+      "banned": {
+        "title": "Your affiliate account is closed",
+        "body": "This account can no longer take part in the affiliate program.",
+        "pill": "Closed"
+      }
+    },
+    "backToAccount": "Back to my account",
+    "dashboardTitle": "Affiliate dashboard",
+    "codeLabel": "Your code",
+    "thresholdMet": "You've reached the {threshold} payout threshold.",
+    "nextShort": "Next settlement (UTC)",
+    "maturingShort": "Confirming before then",
+    "needMethod": "Add a payout method so we can settle your balance.",
+    "statsLabel": "Your numbers",
+    "recruitHint": "People who apply through this link join your team once approved.",
+    "payoutTitle": "Payout details",
+    "payoutIntro": "We pay confirmed earnings with this method on the monthly settlement date.",
+    "programName": "Affiliate program"
   }
 }

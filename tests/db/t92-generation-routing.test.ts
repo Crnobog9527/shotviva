@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
+import { toPartnerErrorBody } from '@/core/partner/partner-error'
 import { runGeneration, type ProviderInput } from '@/core/jobs'
 import { activeProvider, findProviderRow, templateImageProvider, ProviderSettingError, type OpenRouterImageParameters, type ProviderAdapters } from '@/core/providers'
 import { runTestGenerate, saveTestBudget } from '@/modules/image'
@@ -90,6 +91,36 @@ describe('T92 per-template generation routing', () => {
     expect(fetch).toHaveBeenCalledTimes(1)
     expect(openai).toHaveBeenCalledTimes(1)
   })
+
+  it.each(['catalog_unavailable', 'model_missing', 'unsupported_aspect_ratio', 'partner_channel'])(
+    'refuses an underpriced %s route before a debit or image call', async reason => {
+      const { deps, fetch, openai, parameters } = await setup()
+      const source = reason === 'partner_channel' ? 'graylum' : 'web'
+      if (reason === 'catalog_unavailable' || reason === 'model_missing') {
+        const code = reason === 'model_missing' ? 'openrouter_model_missing' : 'openrouter_catalog_unavailable'
+        parameters.mockRejectedValueOnce(new ProviderSettingError(code, 'test catalogue'))
+      } else if (reason === 'unsupported_aspect_ratio') {
+        parameters.mockResolvedValueOnce({ ...supported, aspect_ratio: { type: 'enum', values: ['1:1'] } })
+      }
+      const userId = await createUser(pg, { credits: 50 })
+      const jobId = randomUUID()
+      await pg.query("update public.ai_providers set estimated_image_costs=jsonb_build_object('1k',1.00) where id=$1", [defaultId])
+      try {
+        const run = runGeneration(deps, { jobId, userId, templateId, source, aspectRatio: '4:5' })
+        await expect(run).rejects.toMatchObject({ code: 'TEMPLATE_UNAVAILABLE' })
+        if (source === 'graylum') expect(await run.catch(toPartnerErrorBody)).toEqual({
+          code: 'invalid_input', message: 'This template is temporarily unavailable. Please try again later.',
+        })
+        expect(await jobRow(jobId)).toBeUndefined()
+        expect((await pg.query("select 1 from public.credit_ledger where user_id=$1 and kind='reserve'", [userId])).rowCount).toBe(0)
+        expect((await profileOf(pg, userId)).credits).toBe(50)
+        expect(openai).not.toHaveBeenCalled()
+        expect(fetch).not.toHaveBeenCalled()
+      } finally {
+        await pg.query("update public.ai_providers set estimated_image_costs='{}' where id=$1", [defaultId])
+      }
+    },
+  )
 
   it('refunds the failed request and retains its reported OpenRouter cost', async () => {
     const { deps, fetch } = await setup()

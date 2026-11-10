@@ -609,6 +609,48 @@ $$;
 ALTER FUNCTION "admin"."clear_approved_wallets_v2"("p_digest" "text", "p_last_ledger" bigint, "p_payments" bigint) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."fallback_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text") RETURNS numeric
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  with route as (
+    select p.adapter, p.estimated_image_costs, p.capabilities
+      from public.ai_providers p
+      where p.module='image' and p.id::text=split_part(p_tag,'/',1)
+        and p_tag=p.id::text||'/'||p.model and p_resolution=any(p.resolutions)
+        and (p.adapter='openai_images' or p.capabilities<>'{}'::jsonb)
+    union all
+    select 'openai_images','{}'::jsonb,'{}'::jsonb where p_tag like 'env/_%'
+  ), measured as (
+    select percentile_cont(0.95) within group (order by g.cost_usd)::numeric as usd
+      from public.generation_jobs g
+      where g.provider=p_tag and g.inputs->>'resolution'=p_resolution
+        and g.inputs ? 'quality' and g.inputs->>'quality'=p_quality
+        and g.status='succeeded' and g.cost_usd is not null
+        and g.created_at>=now()-interval '30 days'
+      having count(*)>=10
+  ), priced as (
+    select adapter, greatest(
+      (select usd from measured), (estimated_image_costs->>p_resolution)::numeric,
+      case when jsonb_typeof(capabilities->'catalogImageCosts'->p_resolution)='number'
+        then nullif((capabilities->'catalogImageCosts'->>p_resolution)::numeric,0) end,
+      case when adapter='openai_images' then
+        ((case when p_quality='medium' then '{"1k":0.055,"2k":0.095,"3k":0.135}'
+          else '{"1k":0.081,"2k":0.135,"3k":0.206}' end)::jsonb->>p_resolution)::numeric end
+    ) as usd from route
+  ), budget as (select admin.lowest_credit_price()*0.761*0.4 as usd)
+  select greatest(1,ceil(priced.usd*1.10/budget.usd),
+    case when adapter='openai_images' then
+      ((case when p_quality='medium' then '{"1k":1,"2k":2,"3k":3}'
+        else '{"1k":2,"2k":4,"3k":6}' end)::jsonb->>p_resolution)::int end)
+    from priced,budget where priced.usd is not null and budget.usd>0
+      and p_resolution in ('1k','2k','3k') and p_quality in ('medium','high')
+$$;
+
+
+ALTER FUNCTION "admin"."fallback_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."is_template_catalog_v2"() RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -3240,8 +3282,13 @@ CREATE OR REPLACE FUNCTION "public"."admin_image_pricing_catalog"("p_env_model" 
     AS $$
   select jsonb_build_object('version',case when admin.is_template_catalog_v2() then 'v2' else 'v1' end,
     'unit_price',admin.lowest_credit_price(),'tariffs',admin.template_catalog_minimums(),
-    'providers',coalesce((select jsonb_agg(to_jsonb(p)||jsonb_build_object('approved',admin.template_approved_prices(p.provider_id)))
-       from public.admin_image_provider_pricing(p_env_model) p),'[]'))
+    'providers',coalesce((select jsonb_agg(to_jsonb(p)||jsonb_build_object('approved',admin.template_approved_prices(p.provider_id))
+      || case when p.is_active then jsonb_build_object('fallback_floors',(
+        select jsonb_object_agg(quality,tiers) from (
+          select quality,jsonb_object_agg(res,admin.fallback_route_floor(coalesce(p.provider_id::text,'env')||'/'||p.model,res,quality)) tiers
+          from unnest(array['medium','high']) quality cross join unnest(array['1k','2k','3k']) res group by quality
+        ) grouped)) else '{}'::jsonb end)
+      from public.admin_image_provider_pricing(p_env_model) p),'[]'))
 $$;
 
 
@@ -7386,6 +7433,7 @@ declare
   v_cost integer;
   v_v2 boolean;
   v_template public.templates;
+  v_fallback_floor numeric;
 begin
   perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.template_catalog',0));
   if v_resolution not in ('1k', '2k', '3k') then
@@ -7445,6 +7493,24 @@ begin
       raise exception 'TEMPLATE_NOT_FOUND';
     end if;
     if p_credits_cost is distinct from v_cost then raise exception 'TEMPLATE_QUOTE_CHANGED'; end if;
+  end if;
+  -- Price the route selected by the server against the locked template before any debit.
+  -- Check the persisted binding as well, covering older callers and concurrent rebinding.
+  if p_inputs ? 'quality' and p_inputs->>'quality' is distinct from v_template.quality then
+    raise exception 'TEMPLATE_QUOTE_CHANGED';
+  end if;
+  if p_inputs->>'fallback_route'='true' or exists (
+    select 1 from public.template_prompts tp join public.ai_providers p on p.id=tp.provider_id
+    where tp.template_id=p_template_id and p_provider is distinct from p.id::text||'/'||p.model
+  ) then
+    perform admin.assert_style_sale_route(v_template,coalesce(p_provider,''));
+    v_fallback_floor := admin.fallback_route_floor(p_provider,v_resolution,v_template.quality);
+    if v_fallback_floor is null or v_cost<v_fallback_floor then
+      raise exception 'TEMPLATE_UNAVAILABLE';
+    end if;
+  end if;
+
+  if v_v2 then
     if exists (
       select 1 from admin.template_price_snapshots s join admin.template_price_batches b on b.id=s.batch_id
       join admin.template_tariffs_v2 c on c.id=s.template_id
@@ -9790,6 +9856,10 @@ CREATE INDEX "generation_jobs_parent_job_id_idx" ON "public"."generation_jobs" U
 
 
 
+CREATE INDEX "generation_jobs_route_cost_idx" ON "public"."generation_jobs" USING "btree" ("provider", (("inputs" ->> 'resolution'::"text")), (("inputs" ->> 'quality'::"text")), "created_at") WHERE (("status" = 'succeeded'::"text") AND ("cost_usd" IS NOT NULL) AND ("inputs" ? 'quality'::"text"));
+
+
+
 CREATE INDEX "generation_jobs_running_created_at_idx" ON "public"."generation_jobs" USING "btree" ("created_at") WHERE ("status" = 'running'::"text");
 
 
@@ -10828,6 +10898,11 @@ REVOKE ALL ON FUNCTION "admin"."checkout_terms"("p_v2" boolean, "p_user_id" "uui
 
 
 REVOKE ALL ON FUNCTION "admin"."clear_approved_wallets_v2"("p_digest" "text", "p_last_ledger" bigint, "p_payments" bigint) FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."fallback_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."fallback_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text") TO "service_role";
 
 
 

@@ -244,6 +244,10 @@ const RENDERERS: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K 
   dispute_due_soon: disputeDueSoon,
   payment_failed: paymentFailed,
   generation_spike: generationSpike,
+  template_fallback: a => ({
+    line: `【模板模型回退】模板 ${a.templateId}，原因 ${a.reason}，${a.rejected ? '已拒绝此次出图' : '已允许回退出图'}。`,
+    path: '/admin/templates',
+  }),
   ticket,
   subscription_cancel_failed: cancelFailed,
   site_errors: siteErrors,

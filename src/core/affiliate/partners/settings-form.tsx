@@ -17,7 +17,7 @@ export async function SettingsForm({ account, settings }: { account: Account; se
     <>
       <PayoutFields account={account} t={t} disabled={readOnly} />
       {account.terms_version && account.terms_accepted_at && (
-        <p>
+        <p className="af-hint">
           {t('accepted', {
             version: account.terms_version,
             date: new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(new Date(account.terms_accepted_at)),
@@ -26,9 +26,11 @@ export async function SettingsForm({ account, settings }: { account: Account; se
       )}
     </>
   )
-  if (readOnly) return <section className="af-form">{fields}<p>{t('settingsReadOnly')}</p></section>
+  if (readOnly) return <section className="af-form"><h2>{t('payoutTitle')}</h2>{fields}<p className="af-note">{t('settingsReadOnly')}</p></section>
   return (
     <PartnerForm labels={formLabels(t, 'save')} action={saveAction}>
+      <h2>{t('payoutTitle')}</h2>
+      <p className="af-hint">{t('payoutIntro')}</p>
       {fields}
       {needsConsent && <TermsConsent t={t} version={settings.terms_version} />}
     </PartnerForm>

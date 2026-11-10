@@ -16,6 +16,7 @@ import { afterCoverSource, type AfterCover } from '../covers/client'
 import { referenceBudget, refUploadId } from './style-ref-state'
 import { StyleRefFields } from './style-ref-fields'
 import { TemplateCoverFields } from './template-cover-fields'
+import { fallbackPriceCopy } from './copy'
 import { versionCopy } from './version-copy'
 import { TemplateHistory, type VersionActions } from './prompt-history'
 import { TemplatePromptFields } from './template-prompt-fields'
@@ -123,7 +124,10 @@ function FormColumn({ target, providers, values, isNew, floor, categories, cover
         <p className="text-muted-foreground text-xs">保存模板后再打开编辑，即可上传封面。</p>
       )}
       {values.module === 'image' && (
-        <ImageProviderField id="tpl-provider" providers={providers} value={values.providerId} onChange={(providerId) => onChange({ providerId })} />
+        <>
+          <ImageProviderField id="tpl-provider" providers={providers} value={values.providerId} onChange={(providerId) => onChange({ providerId })} />
+          <FallbackPrice providers={providers} values={values} />
+        </>
       )}
       <StyleSection cover={cover} values={values} budget={budget} uploading={uploading} setUploading={setUploading} onChange={onChange} />
       <TemplatePromptFields values={values} version={existing?.prompt?.version ?? null} onChange={onChange} />
@@ -134,6 +138,12 @@ function FormColumn({ target, providers, values, isNew, floor, categories, cover
       <FormFooter saveDisabled={styleSaveBlocked(uploading, values.module, budget.problem)} pending={pending} error={error} saved={saved} onCancel={onCancel} onSave={onSave} />
     </div>
   )
+}
+
+function FallbackPrice({ providers, values }: Pick<FormColumnProps, 'providers' | 'values'>) {
+  const active = providers.find(option => option.isActive)
+  if (!values.providerId || values.providerId === active?.id) return null
+  return <p className="text-muted-foreground text-xs">{fallbackPriceCopy(active?.fallbackFloors?.[values.quality])}</p>
 }
 
 function CopyPriceNotice({ target }: { target: EditTarget }) {

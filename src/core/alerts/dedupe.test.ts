@@ -104,3 +104,13 @@ describe('alertPolicy', () => {
     expect(alertPolicy({ kind: 'generation_spike', failed: 5, total: 9, windowMinutes: 60 })).toEqual({ key: 'generation_spike', cooldownMs: 60 * MINUTE, money: false })
   })
 })
+
+it('withholds fallback alerts without a shared hourly claim and retries after recovery', async () => {
+  let store: ReturnType<typeof createMemoryMarkers>['store'] | null = null
+  const dedupe = createDedupe(() => store)
+  const key = 'template_fallback:fixture:model_missing'
+  expect(await dedupe.claim(key, 3_600_000, true)).toBe(false)
+  store = createMemoryMarkers().store
+  expect(await dedupe.claim(key, 3_600_000, true)).toBe(true)
+  expect(await dedupe.claim(key, 3_600_000, true)).toBe(false)
+})

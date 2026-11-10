@@ -92,7 +92,7 @@ export async function templateImageProvider(
       reason: selection.reason, requestedProvider: providerTag(id, row.model), actualProvider: provider.id,
       resolution: request.resolution, aspectRatio: request.aspectRatio, referenceCount: referenceCount(request),
     })
-    return provider
+    return { ...provider, fallbackReason: selection.reason }
   }
   return resolveProvider('image', row, serverEnv(), adapters, readKey, selection.parameters)
 }
