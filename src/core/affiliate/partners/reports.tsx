@@ -7,7 +7,7 @@ import { date, money } from './format'
 import { CopyLink } from '../copy-link'
 import type { Account, Query } from './models'
 import { readMembers, readPayouts, readReferrals } from './repository'
-import { More, Table } from './shared-ui'
+import { More, StatusPill, Table } from './shared-ui'
 
 type Props = { user: string; query: Query }
 export async function ReferralList({ user, query }: Props) {
@@ -43,7 +43,7 @@ export async function PayoutList({ user, query }: Props) {
         rows={page.items.map((r) => [
           date(locale, r.period),
           money(locale, r.amount),
-          t('status.' + r.status),
+          <StatusPill key="s" status={r.status} t={t} />,
           r.paid_at ? date(locale, r.paid_at) : '—',
         ])}
       />
@@ -62,13 +62,16 @@ export async function TeamReport({ user, query, account }: Props & { account: Ac
   return (
     <>
       <section className="af-section">
-        <h2>{t('recruit')}</h2>
-        <CopyLink url={url.href} copy={t('copy')} copied={t('copied')} />
-        <h3>{t('members')}</h3>
+        <div className="af-panel af-linkbox">
+          <h2>{t('recruit')}</h2>
+          <CopyLink url={url.href} copy={t('copy')} copied={t('copied')} />
+          <p className="af-hint">{t('recruitHint')}</p>
+        </div>
+        <h2>{t('members')}</h2>
         <Table
           headers={['member', 'joined', 'state'].map((k) => t(k))}
           empty={t('empty')}
-          rows={page.items.map((r) => [r.slug, date(locale, r.created_at), t('status.' + r.status)])}
+          rows={page.items.map((r) => [<code key="c" className="af-code">{r.slug}</code>, date(locale, r.created_at), <StatusPill key="s" status={r.status} t={t} />])}
         />
         <More query={query} next={page.nextCursor} />
       </section>

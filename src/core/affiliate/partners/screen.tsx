@@ -43,9 +43,17 @@ export async function PartnerScreen({ search }: { search: Promise<SearchParams> 
   const account = user?.verified ? await readAccount(user.id) : null
   if (!user?.verified || account?.status !== 'active') redirect(await localized('/partners/join'))
   return (
-    <>
-      <h1>{t('title')}</h1>
-      <nav className="af-nav" aria-label={t('title')}>
+    <div className="af-dash">
+      <header className="af-dash-head">
+        <div>
+          <h1>{t('dashboardTitle')}</h1>
+          <p className="af-dash-meta">
+            <span className="af-pill af-pill-ok">{t('status.active')}</span>
+            <span>{t('codeLabel')}</span> <code className="af-code">{account.slug}</code>
+          </p>
+        </div>
+      </header>
+      <nav className="af-nav" aria-label={t('dashboardTitle')}>
         {dashboardViews
           .filter((v) => v !== 'team' || account.team_enabled)
           .map((view) => (
@@ -54,8 +62,10 @@ export async function PartnerScreen({ search }: { search: Promise<SearchParams> 
             </Link>
           ))}
       </nav>
-      <Dashboard user={user.id} account={account} query={query} />
-    </>
+      <div className="af-dash-body">
+        <Dashboard user={user.id} account={account} query={query} />
+      </div>
+    </div>
   )
 }
 
@@ -64,13 +74,11 @@ export async function TermsScreen() {
   const [t, settings] = await Promise.all([getTranslations('affiliate'), readSettings()])
   const body = await publishedTerms(settings.terms_version)
   return (
-    <section className="af-intro">
+    <article className="af-doc">
+      <Link className="af-back" href="/partners/join">{t('backToProgram')}</Link>
       <h1>{t('terms')}</h1>
-      {body && <p>{t('version', { version: settings.terms_version })}</p>}
-      <div className="af-panel whitespace-pre-line">{body ?? t('termsPlaceholder')}</div>
-      <Link className="af-link" href="/partners">
-        {t('back')}
-      </Link>
-    </section>
+      {body && <p className="af-dash-meta">{t('version', { version: settings.terms_version })}</p>}
+      <div className="af-doc-body">{body ?? t('termsPlaceholder')}</div>
+    </article>
   )
 }

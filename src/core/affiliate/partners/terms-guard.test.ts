@@ -11,7 +11,7 @@ vi.mock('@/core/i18n/server', () => ({ localized: async (path: string) => path }
 import { applyAction, saveAction } from './actions'
 
 const fields = {
-  name: 'QA', country: 'US', channel: 'https://example.test', audience: '100', plan: 'Reviews',
+  name: 'QA', country: 'US', channel_type: 'youtube', channel: 'https://example.test', audience: '1k_10k', plan: 'Reviews',
   parent: 'qa-team', accept: 'on', termsVersion: '1',
 }
 function apply() {

@@ -73,7 +73,7 @@ function lookup(tree: Tree, key: string): string {
 
 // Words that may stay in Latin script on a Chinese page (建站规格 §6.1 rule 3): the brand,
 // AI, product and payment names, units and file formats.
-const LATIN_OK = /^(Shotviva|Graylum|Google|Apple Pay|Google Pay|AI|logo|DELETE|MiSans|English|JPG|PNG|WebP|MB|px|USD|Pro|Max)$/
+const LATIN_OK = /^(Shotviva|Graylum|Google|Apple Pay|Google Pay|AI|logo|DELETE|MiSans|English|JPG|PNG|WebP|MB|px|USD|Pro|Max|YouTube|TikTok|Instagram|Facebook|Twitter)$/
 
 describe('messageArguments', () => {
   it('reads arguments and tags, not branch bodies', () => {
