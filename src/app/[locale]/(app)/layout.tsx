@@ -17,6 +17,7 @@ import { SupportTabBadge } from '@/core/support'
 import { LivingBackground } from '@/core/ui/living-background'
 import { isWishlistEnabled, WishlistTabBadge } from '@/core/wishlist'
 import { GenerationRunner, HideWhileGenerating, PhotosTabBadge } from '@/modules/image'
+import { displayProducts } from '@/site/billing/display-products'
 import { site } from '@/site/site.config'
 
 import { paywallPerkFacts } from '../paywall-perk-facts'
@@ -66,9 +67,9 @@ async function Tabs({ items }: { items: TabItem[] }) {
 // already holds (T66: lower plans locked, higher ones Upgrade) streams in through its own
 // Suspense hole.
 async function Paywall({ children }: { children: ReactNode }) {
-  const perkFacts = await paywallPerkFacts()
+  const [perkFacts, products] = await Promise.all([paywallPerkFacts(), displayProducts()])
   return (
-    <PaywallProvider products={site.billing.products} perkFacts={perkFacts} channel={paymentChannel()} wechatPay={wechatPayEnabled()}>
+    <PaywallProvider products={products} perkFacts={perkFacts} channel={paymentChannel()} wechatPay={wechatPayEnabled()}>
       {children}
       <StandingSlot />
     </PaywallProvider>

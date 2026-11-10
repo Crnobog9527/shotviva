@@ -1,10 +1,24 @@
 import { NextRequest } from 'next/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({ getSessionUser: vi.fn(), createCheckout: vi.fn(), createWaffoCheckout: vi.fn(), channel: vi.fn(), mirror: vi.fn(), tier: vi.fn(), pricing: vi.fn() }))
+const mocks = vi.hoisted(() => ({ notify: vi.fn(), getSessionUser: vi.fn(), createCheckout: vi.fn(), createWaffoCheckout: vi.fn(), channel: vi.fn(), mirror: vi.fn(), tier: vi.fn(), pricing: vi.fn(), catalog: vi.fn() }))
 
+vi.mock('@/core/alerts', () => ({ notifyOwner: mocks.notify }))
 vi.mock('@/core/auth/session', () => ({ getSessionUser: mocks.getSessionUser }))
-vi.mock('@/core/auth/supabase-admin', () => ({ createAdminSupabase: () => ({}) }))
+vi.mock('@/core/auth/supabase-admin', () => ({ createAdminSupabase: () => ({ rpc: mocks.catalog }) }))
+
+beforeEach(() => { mocks.notify.mockClear(); mocks.catalog.mockReset().mockImplementation(catalogRpc) })
+
+async function catalogRpc() {
+  const { site: current } = await import('@/site/site.config')
+  const data = current.billing.products.map(p => ({
+    product_id: p.id, credits: p.credits, usd_cents: Math.round(p.priceUsd * 100), listed: true,
+    tier: p.tier, paid_days: p.paidDays, revision: current.billing.pricingVersion ? 2 : 1,
+    kind: p.interval === 'month' ? 'monthly' : p.interval === 'year' ? 'yearly' : 'pack',
+    name_en: p.id, name_zh: p.id,
+  }))
+  return { data, error: null }
+}
 vi.mock('@/core/billing/subscription/read-summary', () => ({ readMirrorRows: mocks.mirror }))
 vi.mock('@/core/billing/active-pricing', async () => {
   const { site } = await import('@/site/site.config')
@@ -66,7 +80,26 @@ describe('POST /api/checkout', () => {
     mocks.getSessionUser.mockResolvedValue(USER)
     const response = await POST(request())
     expect(response.status).toBe(200)
+    expect(mocks.notify).not.toHaveBeenCalled()
     expect(mocks.createCheckout).toHaveBeenCalledOnce()
+  })
+
+  it.each(['stripe', 'waffo'])('rejects a catalog failure before contacting %s', async channel => {
+    mocks.getSessionUser.mockResolvedValue(USER)
+    mocks.channel.mockReturnValue(channel)
+    mocks.catalog.mockResolvedValueOnce({ data: null, error: { message: 'catalog unavailable', code: 'PGRST202' } })
+    expect((await POST(request())).status).toBe(500)
+    expect(mocks.notify).toHaveBeenCalledWith({ kind: 'checkout_catalog_failed', code: 'PGRST202' })
+    expect(mocks.createCheckout).not.toHaveBeenCalled()
+    expect(mocks.createWaffoCheckout).not.toHaveBeenCalled()
+  })
+
+  it('alerts on incomplete catalog data without including the response in the alert', async () => {
+    mocks.getSessionUser.mockResolvedValue(USER)
+    mocks.catalog.mockResolvedValueOnce({ data: [], error: null })
+    expect((await POST(request())).status).toBe(500)
+    expect(mocks.notify).toHaveBeenCalledWith({ kind: 'checkout_catalog_failed', code: 'INVALID_CATALOG' })
+    expect(mocks.createCheckout).not.toHaveBeenCalled()
   })
 
   it('keeps the discounted-session cancellation receipt in an HttpOnly cookie only', async () => {
