@@ -25,14 +25,22 @@ describe('robots', () => {
 })
 
 describe('metadata', () => {
-  it('indexes listed pages with a self canonical and noindexes the rest', () => {
+  // Once open, pages left out of the index still pass their links on (SEO launch handbook G8).
+  it('indexes listed pages with a self canonical and noindexes the rest, links followed', () => {
     expect(pageMetadata(site, page).robots).toEqual({ index: true, follow: true })
     expect(pageMetadata(site, page).alternates?.canonical).toBe('https://example.com/')
     expect(pageMetadata(site, { ...page, path: '/pricing' }).robots).toEqual({
       index: false,
-      follow: false,
+      follow: true,
     })
-    expect(appShellMetadata().robots).toEqual({ index: false, follow: false })
+    expect(appShellMetadata().robots).toEqual({ index: false, follow: true })
+  })
+
+  it('shares one 1200×630 card as og:image and twitter:image', () => {
+    const meta = pageMetadata(site, page)
+    const card = { url: 'https://example.com/og.jpg', width: 1200, height: 630, alt: 'Example share card' }
+    expect(meta.openGraph?.images).toEqual([card])
+    expect(meta.twitter?.images).toEqual([card])
   })
 })
 
@@ -52,7 +60,7 @@ describe('metadata in two languages (建站规格 §6.1, LAUNCH §7.6)', () => {
   it('indexes only the Chinese keyword map pages under /zh', () => {
     expect(pageMetadata(site, page, 'zh').robots).toEqual({ index: true, follow: true })
     // /generate is indexable in English and translated, but not in zhIndexablePaths.
-    expect(pageMetadata(site, { ...page, path: '/generate' }, 'zh').robots).toEqual({ index: false, follow: false })
+    expect(pageMetadata(site, { ...page, path: '/generate' }, 'zh').robots).toEqual({ index: false, follow: true })
   })
 
   it('emits no hreflang when the Chinese twin is noindex (ARCHITECTURE §17)', () => {

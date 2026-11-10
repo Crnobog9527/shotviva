@@ -47,4 +47,12 @@ export function zhIndexablePaths(site: SiteConfig, gates: readonly PageGate[] = 
 }
 
 export const NOINDEX = { index: false, follow: false } as const
+export const NOINDEX_FOLLOW = { index: false, follow: true } as const
 export const INDEX = { index: true, follow: true } as const
+
+// A page that is not indexable: while the pre-launch switch is closed, nofollow too (ARCHITECTURE
+// §12.0); once open, its links are still followed (login, signup, account, wishlist, app pages:
+// SEO launch handbook G8).
+export function notIndexedRobots(): typeof NOINDEX | typeof NOINDEX_FOLLOW {
+  return indexingOpenNow() ? NOINDEX_FOLLOW : NOINDEX
+}

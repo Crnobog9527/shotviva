@@ -70,6 +70,8 @@ export type SiteBrand = {
   countries: readonly string[]
   logoPath: string
   sameAs: readonly string[]
+  // Default share card for og:image and twitter:image on every page (SEO launch handbook G8).
+  shareImage: { path: `/${string}`; width: number; height: number; alt: string }
 }
 
 // Graylum connector (ARCHITECTURE §14). Hosts are exact, lowercase, https-only matches.

@@ -18,10 +18,17 @@ export const site = defineSite({
     authEmail: 'mail@shotviva.com',
     launchYear: 2026,
     countries: ['United States'],
-    // Placeholder until T6 ships a real logo asset.
-    logoPath: '/favicon.ico',
+    // The 512×512 app icon (the signed-off "S." mark), SEO launch handbook G8.
+    logoPath: '/icons/icon-512.png',
     // Filled once the X / Instagram / Product Hunt / LinkedIn handles are claimed (建站规格 §1).
     sameAs: [],
+    // 1200×630: a phone photo and the same bag as a listing shot (illustrative), the wordmark.
+    shareImage: {
+      path: '/og/shotviva.jpg',
+      width: 1200,
+      height: 630,
+      alt: 'Shotviva: a phone photo of a leather bag and the same bag as a white-background listing photo',
+    },
   },
   // A disabled module 404s, leaves the sitemap, nav and pricing (ARCHITECTURE §2).
   modules: { image: true, video: false },
