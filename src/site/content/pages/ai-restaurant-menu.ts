@@ -1,3 +1,4 @@
+import { baselineOffers, planLabel, type OfferFacts } from '../offer'
 import { defineContentPage, type CostBills } from '@/core/content'
 
 import { site } from '../../site.config'
@@ -10,7 +11,6 @@ import {
   MENU_DISHES,
   OUTPUT_TIERS,
   photoSeconds,
-  planFrom,
   tierList,
   usd,
   usdRange,
@@ -26,8 +26,8 @@ const brand = site.brand.name
 const [, hd] = OUTPUT_TIERS
 const { doordash, uberEats, grubhub } = PLATFORM_SPECS
 
-function menuBills(): CostBills {
-  const plan = planFrom ? usd(planFrom.priceUsd) : ''
+function menuBills({ planFrom }: OfferFacts): CostBills {
+  const plan = planFrom ? usd(planFrom.priceUsd) : 'Monthly plans unavailable'
   return {
     heading: `What Menu Photos Cost: Food Photographer vs ${brand}`,
     intro: `${MENU_DISHES} dishes for a menu and a delivery app. The same job, two bills.`,
@@ -43,9 +43,9 @@ function menuBills(): CostBills {
     },
     site: {
       title: brand,
-      total: { prefix: 'from', amount: plan, suffix: '/month', when: `about ${photoSeconds} seconds a photo` },
+      total: { prefix: planFrom ? 'from' : '', amount: plan, suffix: planFrom ? '/month' : '', when: `about ${photoSeconds} seconds a photo` },
       lines: [
-        { label: `Starter plan, ${planFrom?.credits ?? ''} credits a month`, value: plan },
+        { label: planLabel(planFrom), value: plan },
         { label: 'Start with', value: 'One phone photo per dish' },
         { label: 'Make', value: 'Menu photos, delivery listings and promo posters' },
       ],
@@ -54,7 +54,7 @@ function menuBills(): CostBills {
   }
 }
 
-export const aiRestaurantMenu = defineContentPage({
+const copy = {
   slug: 'ai-restaurant-menu',
   keyword: 'ai restaurant menu',
   label: 'AI restaurant menu photos',
@@ -84,7 +84,6 @@ export const aiRestaurantMenu = defineContentPage({
       value: `Delivery apps want photos of the food you actually serve. ${brand} starts from your own phone photo and changes the light and the background, not the food.`,
     },
   ],
-  costBills: menuBills(),
   faq: [
     {
       question: 'Can I use AI photos on my delivery-app menu?',
@@ -109,12 +108,6 @@ export const aiRestaurantMenu = defineContentPage({
       answer: `It makes photos, one dish at a time, and a single promo poster. Laying out a multi-dish menu or a price list is not something ${brand} does.`,
     },
   ],
-  related: [
-    { href: '/', anchor: 'AI image to image', note: 'The studio: templates for food, products, rooms, pets and art styles.' },
-    { href: '/commercial-photography', anchor: 'Commercial product photography', note: 'For shops and sellers who need studio product shots without a photographer.' },
-    { href: '/image-to-image-generator', anchor: 'Image to image generator', note: 'For anyone who wants to see how image to image works on a photo.' },
-    pricingRelated(),
-  ],
   headings: {
     facts: 'Menu and Delivery-App Photo Sizes',
     faq: 'AI Restaurant Menu Photo FAQ',
@@ -128,4 +121,17 @@ export const aiRestaurantMenu = defineContentPage({
       categoryKeys: [CATEGORY.food],
     },
   },
+} as const
+
+export const makeAiRestaurantMenu = (offers: OfferFacts) => defineContentPage({
+  ...copy,
+  costBills: menuBills(offers),
+  related: [
+    { href: '/', anchor: 'AI image to image', note: 'The studio: templates for food, products, rooms, pets and art styles.' },
+    { href: '/commercial-photography', anchor: 'Commercial product photography', note: 'For shops and sellers who need studio product shots without a photographer.' },
+    { href: '/image-to-image-generator', anchor: 'Image to image generator', note: 'For anyone who wants to see how image to image works on a photo.' },
+    pricingRelated(offers),
+  ],
 })
+
+export const aiRestaurantMenu = makeAiRestaurantMenu(baselineOffers)

@@ -1,3 +1,4 @@
+import { baselineOffers, type OfferFacts } from '../../offer'
 import { defineContentPage, type ShootDemo } from '@/core/content'
 
 import { site } from '../../../site.config'
@@ -37,7 +38,7 @@ const shoot: ShootDemo = {
   },
 }
 
-export const zhCommercialPhotography = defineContentPage({
+const copy = {
   slug: 'commercial-photography',
   keyword: '商业摄影',
   label: '商业产品摄影',
@@ -67,7 +68,25 @@ export const zhCommercialPhotography = defineContentPage({
       value: `平台都要求图片展示真实的商品，Etsy 现在还要求每个商品至少有一张未经编辑的实拍图。${brand} 从你的照片出发，商品保持原样；上架前请查看各平台当下的规定。`,
     },
   ],
-  costBills: productBills(
+  headings: {
+    facts: '电商平台对商品图的要求',
+    faq: '商业产品摄影常见问题',
+    related: `${brand} 的其他页面`,
+  },
+  landing: {
+    factsNote: '以上来自各平台自己的帮助页面（Amazon、Etsy、Shopify），2026 年 11 月核对。平台规则会变，上架前请再确认。',
+    shoot,
+    templates: {
+      heading: '商品图模板：主图、场景和海报',
+      intro: `每个模板都从你的商品手机照片开始，到一张成品图结束。`,
+      categoryKeys: [CATEGORY.products, CATEGORY.beauty],
+    },
+  },
+} as const
+
+export const makeZhCommercialPhotography = (offers: OfferFacts) => defineContentPage({
+  ...copy,
+  costBills: productBills(offers,
     `一次商品拍摄要花多少钱：请摄影师和用 ${brand} 对比`,
     `一个商品，${SET_PHOTOS} 张造型图，精修好、可以直接上架。同样的活，两张账单。`,
     `；影棚一天 ${usdRange(dayRateUsd)}（Shopify，2026 年 1 月）`,
@@ -75,7 +94,7 @@ export const zhCommercialPhotography = defineContentPage({
   faq: [
     {
       question: '产品拍照一般多少钱？',
-      answer: `按美国 2026 年的公开报价，白底产品图每张 ${usdRange(packshotUsd)}，造型图每张 ${usdRange(styledShotUsd)}，影棚一天 ${usdRange(dayRateUsd)}。${brand} 用你自己的手机照片做一张造型、精修好的商品图。${zhPlansSentence()}`,
+      answer: `按美国 2026 年的公开报价，白底产品图每张 ${usdRange(packshotUsd)}，造型图每张 ${usdRange(styledShotUsd)}，影棚一天 ${usdRange(dayRateUsd)}。${brand} 用你自己的手机照片做一张造型、精修好的商品图。${zhPlansSentence(offers)}`,
     },
     {
       question: 'AI 能代替产品摄影师吗？',
@@ -99,20 +118,8 @@ export const zhCommercialPhotography = defineContentPage({
     { href: '/', anchor: 'AI改图', note: '全部模板，按餐饮、商品、美妆、房间、宠物和画风分类。' },
     { href: '/image-to-image-generator', anchor: '图生图在线工具', note: '想看看图生图对一张照片能做什么。' },
     { href: '/ai-restaurant-menu', anchor: 'AI菜单配图', note: '餐厅用手机拍菜，直接做成菜单和外卖平台的图。' },
-    zhPricingRelated(brand),
+    zhPricingRelated(brand, offers),
   ],
-  headings: {
-    facts: '电商平台对商品图的要求',
-    faq: '商业产品摄影常见问题',
-    related: `${brand} 的其他页面`,
-  },
-  landing: {
-    factsNote: '以上来自各平台自己的帮助页面（Amazon、Etsy、Shopify），2026 年 11 月核对。平台规则会变，上架前请再确认。',
-    shoot,
-    templates: {
-      heading: '商品图模板：主图、场景和海报',
-      intro: `每个模板都从你的商品手机照片开始，到一张成品图结束。`,
-      categoryKeys: [CATEGORY.products, CATEGORY.beauty],
-    },
-  },
 })
+
+export const zhCommercialPhotography = makeZhCommercialPhotography(baselineOffers)

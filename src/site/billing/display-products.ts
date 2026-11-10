@@ -3,13 +3,21 @@ import 'server-only'
 import { cacheLife, cacheTag } from 'next/cache'
 
 import { createAdminSupabase } from '@/core/auth/supabase-admin'
-import { listedProducts, readProductCatalog } from '@/core/billing/product-catalog'
+import { publishedOffers, historicalProducts, waffoOffers } from '@/core/billing/product-catalog'
 import { FAILED_READ_LIFE } from '@/core/cache-life'
-import { AppError } from '@/core/errors'
 import { serverEnv } from '@/core/env'
 import { logger } from '@/core/logger'
 import { publicEnv } from '@/core/public-env'
 import { site } from '../site.config'
+
+// Financial validations always read the current database rows without the display fallback.
+export async function currentProducts(db = createAdminSupabase()) {
+  return publishedOffers(db, site.billing.pricingVersion)
+}
+
+export function contractProducts(db = createAdminSupabase()) {
+  return historicalProducts(db, site.billing.pricingVersion)
+}
 
 export async function displayProducts() {
   'use cache'
@@ -21,16 +29,15 @@ export async function displayProducts() {
     return site.billing.products
   }
   try {
-    const rows = await readProductCatalog(createAdminSupabase(), site.billing.pricingVersion)
+    const env = serverEnv()
+    const products = env.PAYMENT_CHANNEL === 'waffo'
+      ? await waffoOffers(createAdminSupabase(), site.billing.pricingVersion, env.WAFFO_STORE_ID ?? '', env.WAFFO_ENVIRONMENT)
+      : await currentProducts()
     cacheLife('hours')
-    return listedProducts(rows)
+    return products
   } catch (error) {
     logger.warn('billing.display_catalog_unavailable', { error })
     cacheLife(FAILED_READ_LIFE)
-    // Vercel can prerender before the migration runs. Preserve the nine approved
-    // offers only for a missing RPC; invalid catalog data never becomes a sale.
-    if (error instanceof AppError && error.cause && typeof error.cause === 'object'
-      && 'code' in error.cause && error.cause.code === 'PGRST202') return site.billing.products
     return []
   }
 }

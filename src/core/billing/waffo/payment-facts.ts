@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { PRODUCT_IDS, type SiteProduct } from '../../config'
+import { productIdSchema, type SiteProduct } from '../../config'
 import { AppError } from '../../errors'
 import type { CheckoutPrice } from '../checkout-price'
 import type { CheckoutMethod } from '../stripe/catalog'
@@ -22,7 +22,8 @@ function fromJson(value: unknown): unknown {
 // `locale` is analytics only (ARCHITECTURE §16.2); orders created before T21 have none.
 export const metadataSchema = z.preprocess(
   fromJson,
-  z.object({ user_id: z.uuid(), product_id: z.enum(PRODUCT_IDS),
+  z.object({ user_id: z.uuid(), product_id: productIdSchema,
+    catalog_revision:z.string().optional(), catalog_attempt:z.string().optional(), catalog_price:z.string().optional(),
     quoted_credits: z.string().optional(), pricing_version: z.string().optional(), quoted_usd_cents: z.string().optional(), pack_member_tier: z.string().optional(),
     locale: z.enum(['en', 'zh']).catch('en').default('en') }),
 )
@@ -30,6 +31,7 @@ const money = z.string().regex(/^\d{1,7}(\.\d{1,2})?$/)
 
 const orderSchema = z.object({
   orderId: z.string().min(1),
+  productId: z.string().optional(),
   orderMetadata: metadataSchema,
   orderMerchantExternalId: z.string().optional(),
   currency: z.string().regex(/^[A-Za-z]{3}$/).optional(),

@@ -8,6 +8,9 @@ import { AppError } from '../../errors'
 import { readQuote } from '../read-quote'
 import { creditChangeSchema } from '../credits'
 import { callRpc } from '../rpc'
+import { hasCatalogReceipt } from '../catalog-receipt'
+import { boundInvoice } from './catalog-invoice'
+import { legacyPrice } from './contract-price'
 import { matchesContractPrice } from './prices'
 import { renewalAmounts } from './discount-facts'
 import type { FulfilDeps } from './fulfil'
@@ -37,15 +40,28 @@ function subscriptionIdOf(invoice: Stripe.Invoice): string {
 // The subscription's metadata (set at checkout, T9) says who and what; the subscribed Price's
 // metadata and lookup key must agree, so a renewal never grants another product.
 async function readOwner(invoice: Stripe.Invoice, sub: Stripe.Subscription, deps: FulfilDeps) {
-  const metadata = invoice.parent?.subscription_details?.metadata ?? sub.metadata
+  const metadata = billedMetadata(invoice, sub)
   const meta = ownerSchema.safeParse(metadata)
   if (!meta.success) throw invalid(invoice.id, 'subscription metadata')
-  const product = deps.products.find(p => p.id === meta.data.product_id)
+  const price = await billedPrice(invoice, sub, deps, metadata.pricing_version === 'v2')
+  if (!price) throw invalid(invoice.id, 'missing subscription price')
+  const bound = hasCatalogReceipt(metadata) && await boundInvoice(deps.db, invoice, sub.id, metadata, price)
+  const product = bound || deps.products.find(p => p.id === meta.data.product_id)
   if (!product || product.tier === 'pack') throw invalid(invoice.id, 'unknown product')
   const quote = readQuote(metadata, product)
-  const price = await billedPrice(invoice, sub, deps, !!quote)
-  if (!price || !matchesContractPrice(price, product, 'subscription', quote)) throw invalid(invoice.id, 'subscription price')
+  if (!bound) await assertLegacyInvoice(deps, invoice.id, price, product, metadata)
   return { userId: meta.data.user_id, product, quote, metadata, price }
+}
+
+function billedMetadata(invoice: Stripe.Invoice, sub: Stripe.Subscription) {
+  return invoice.parent?.subscription_details?.metadata ?? sub.metadata
+}
+
+async function assertLegacyInvoice(deps: FulfilDeps, invoice: string, price: Stripe.Price, product: FulfilDeps['products'][number], metadata: Stripe.Metadata) {
+  const quote = readQuote(metadata, product)
+  if (!matchesContractPrice(price, product, 'subscription', quote) && !await legacyPrice(deps.db, price, product, 'subscription', metadata)) {
+    throw invalid(invoice, 'subscription price')
+  }
 }
 
 function completeLine(lines: Stripe.InvoiceLineItem[], hasMore: boolean): boolean {

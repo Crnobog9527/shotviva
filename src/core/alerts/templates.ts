@@ -252,6 +252,7 @@ const RENDERERS: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K 
   payment_failed: paymentFailed,
   waffo_renewal_review: renewalReview,
   generation_spike: generationSpike,
+  catalog_publish_failed: a => ({ line: `【商品发布待核对】发布号 ${a.request}，步骤 ${a.step}。请到商品目录查看并重试。`, path: '/admin/products' }),
   checkout_catalog_failed: a => ({
     line: `【结账读目录失败】用户无法开始付款（错误码：${a.code}）。请检查商品目录迁移和数据库连接。`,
     path: '/admin/products',

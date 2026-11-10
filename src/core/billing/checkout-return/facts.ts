@@ -4,7 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type Stripe from 'stripe'
 import { z } from 'zod'
 
-import { PRODUCT_IDS, type ProductId } from '../../config'
+import { productIdSchema, type ProductId } from '../../config'
 import { paymentGrantKey, paymentGrants } from '../payment-grants'
 import { AppError } from '../../errors'
 import { logger } from '../../logger'
@@ -53,7 +53,7 @@ const paymentRow = z.object({
 type PaymentRow = z.infer<typeof paymentRow> & { grantedCredits?: number | null }
 
 const productIdOf = (value: unknown): ProductId | null => {
-  const parsed = z.enum(PRODUCT_IDS).safeParse(value)
+  const parsed = productIdSchema.safeParse(value)
   return parsed.success ? parsed.data : null
 }
 

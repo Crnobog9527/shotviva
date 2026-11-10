@@ -23,6 +23,10 @@ export function displayedTerms(cents: number, version: "v1" | "v2") {
   return { pricing_version: version, expected_price_cents: version === "v2" ? cents : undefined }
 }
 
+function displayedQuote(cents: number, revision: number | undefined) {
+  return { ...displayedTerms(cents, pricingV2 ? "v2" : "v1"), expected_revision: pricingV2 ? revision : undefined }
+}
+
 // Asks the server for a Stripe Checkout Session and goes there. Signed-out buyers (the public
 // /pricing page) go to sign-in first and come back to the same page.
 export function useCheckout() {
@@ -33,9 +37,9 @@ export function useCheckout() {
   // No new-version banner while the buyer is on the way to the hosted checkout (T90).
   useUpdateHold("checkout", status === "pending")
 
-  async function start(productId: ProductId, method: CheckoutMethod, displayedCents: number, expectedCode?: string) {
+  async function start(productId: ProductId, method: CheckoutMethod, displayedCents: number, expectedCode?: string, revision?: number) {
     setStatus("pending")
-    const body = JSON.stringify({ product_id: productId, method, locale: locale.startsWith("zh") ? "zh" : "en", expected_code: expectedCode, ...displayedTerms(displayedCents, pricingV2 ? "v2" : "v1"), ...partnerReturn() })
+    const body = JSON.stringify({ product_id: productId, method, locale: locale.startsWith("zh") ? "zh" : "en", expected_code: expectedCode, ...displayedQuote(displayedCents, revision), ...partnerReturn() })
     const attempt = checkoutAttempt(body, lastAttempt.current)
     lastAttempt.current = attempt
     try {

@@ -2,7 +2,7 @@ import 'server-only'
 import { z } from 'zod'
 
 import { type RpcClient, toRpcError } from '../billing'
-import { PRODUCT_IDS } from '../config'
+import { productIdSchema } from '../config'
 import { normalizeCode } from './index'
 import { AppError } from '../errors'
 import { belowDiscountFloor, campaignCatalog, type CatalogInput, type CodeProduct } from './admin'
@@ -12,7 +12,7 @@ const date = z.iso.datetime({ offset: true }).nullable()
 const patchSchema = z.strictObject({
   code: z.string().refine(value => normalizeCode(value) !== null), note: z.string().nullable(),
   invitee_credits: positive, invitee_pool: z.enum(['free','paid']).nullable(),
-  discount_percent: z.int().min(1).max(90).nullable(), discount_products: z.array(z.enum(PRODUCT_IDS)).nonempty().nullable(),
+  discount_percent: z.int().min(1).max(90).nullable(), discount_products: z.array(productIdSchema).nonempty().nullable(),
   discount_duration: z.enum(['once','repeating','forever']).nullable(), discount_months: positive,
   discount_valid_days: positive, stripe_coupon_id: z.string().min(1).nullable(),
   starts_at: date, expires_at: date, max_redemptions: positive, new_users_only: z.boolean(), active: z.boolean(),
@@ -36,6 +36,11 @@ export function codePatch(codeId: string, fields: unknown) {
   return patch.data
 }
 
+function rejectedProducts(details?: string) {
+  try { return z.array(productIdSchema).parse(JSON.parse(details ?? '[]')) }
+  catch { return [] }
+}
+
 export async function saveCode(db: RpcClient, actor: string, codeId: string, fields: unknown, products: readonly CatalogInput[]) {
   const patch = codePatch(codeId, fields)
   const { catalog, floor } = campaignCatalog(products)
@@ -46,7 +51,8 @@ export async function saveCode(db: RpcClient, actor: string, codeId: string, fie
     // The locked row determines whether the submitted terms belong to an existing campaign.
     // Its unchanged terms stay valid for metadata edits even after a catalog reprice.
     if (error.message === 'CODE_DISCOUNT_PRODUCTS') {
-      const invalid = invalidDiscountProducts(patch, catalog, floor)
+      const rejected = rejectedProducts(error.details)
+      const invalid = rejected.length ? rejected : invalidDiscountProducts(patch, catalog, floor)
       throw new AppError('INVALID_INPUT', ['CODE_DISCOUNT_PRODUCTS', invalid.join(', ')].filter(Boolean).join(': '))
     }
     if (inputErrors.has(error.message)) throw new AppError('INVALID_INPUT', error.message)

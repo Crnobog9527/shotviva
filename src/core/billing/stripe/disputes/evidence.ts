@@ -38,9 +38,9 @@ export type EvidenceText = Partial<
 
 const cap = (text: string) => (text.length <= FIELD_LIMIT ? text : `${text.slice(0, FIELD_LIMIT - 1)}…`)
 
-function productDescription(ctx: EvidenceContext): string {
+function productDescription(ctx: EvidenceContext, facts: EvidenceFacts): string {
   const what = ctx.product
-    ? `The customer bought "${ctx.product.name}": ${ctx.product.credits} credits${ctx.product.membership ? `, a ${ctx.product.membership}ly membership that renews until cancelled` : ', a one-time credit pack'}.`
+    ? `The customer bought "${ctx.product.name}": ${facts.payment?.granted_credits ?? ctx.product.credits} credits${ctx.product.membership ? `, a ${ctx.product.membership}ly membership that renews until cancelled` : ', a one-time credit pack'}.`
     : 'The customer bought credits.'
   return [
     `${ctx.brand} (${ctx.origin}) is an online AI photo studio: customers upload their own photos and create new images from templates. It is a digital service; nothing is shipped.`,
@@ -93,7 +93,7 @@ export function buildEvidence(facts: EvidenceFacts, ctx: EvidenceContext): Evide
   const pay = facts.payment
   const evidence: EvidenceText = {
     access_activity_log: activityLog(facts),
-    product_description: cap(productDescription(ctx)),
+    product_description: cap(productDescription(ctx, facts)),
     refund_policy_disclosure: refundDisclosure(facts, ctx),
     uncategorized_text: cap(summary(facts, ctx)),
     refund_refusal_explanation: refusal(facts),

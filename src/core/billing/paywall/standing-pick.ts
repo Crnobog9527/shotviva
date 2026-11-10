@@ -1,6 +1,6 @@
 import { MEMBERSHIP_TIERS, type MembershipTier, type ProductId } from '../../config'
 import { heldPeriod } from '../subscription/standing'
-import { blockReason, purchaseVerdict, type BlockReason, type MemberStanding } from '../subscription/upgrade-rule'
+import { blockReason, entitlementRank, purchaseVerdict, type BlockReason, type MemberStanding } from '../subscription/upgrade-rule'
 import type { Period } from './offer'
 import { choiceFor, isTierPick, type PaywallOpenOptions } from './use-paywall-state'
 
@@ -14,9 +14,9 @@ export function planIdOf(tier: MembershipTier, period: Period): ProductId {
 // What a tier card shows at this period: open to buy (as an upgrade or not), or locked and why.
 export type PlanStanding = { upgrade: boolean; lock: BlockReason | null }
 
-export function planStanding(standing: MemberStanding, tier: MembershipTier, period: Period): PlanStanding {
-  const id = planIdOf(tier, period)
-  return { upgrade: purchaseVerdict(standing, id) === 'upgrade', lock: blockReason(standing, id) }
+export function planStanding(standing: MemberStanding, tier: MembershipTier, period: Period, id: ProductId = planIdOf(tier, period)): PlanStanding {
+  const rank = entitlementRank(tier, period)
+  return { upgrade: purchaseVerdict(standing, id, rank) === 'upgrade', lock: blockReason(standing, id, rank) }
 }
 
 const otherPeriod = (period: Period): Period => (period === 'year' ? 'month' : 'year')

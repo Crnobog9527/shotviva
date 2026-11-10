@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 import { CREDIT_POOLS } from '../billing/pools'
 import { MAX_BATCH_SIZE } from '../billing/tier-limits'
-import { PRODUCT_IDS } from '../config/define-site'
+import { productIdSchema } from '../config'
 import { INQUIRY_USES, MONTHLY_VOLUMES } from '../inquiries/summary-choices'
 import { EDIT_SCOPES } from '../templates/edit-params'
 import { UPLOAD_SIZE_BUCKETS } from './event-values'
@@ -53,7 +53,7 @@ export const UPLOAD_ERROR_REASONS = ['too_large', 'unsupported', 'ticket_failed'
 const campaignCode = z.string().regex(/^[A-Z0-9]{4,20}$/)
 
 const checkoutProps = {
-  product_id: z.enum(PRODUCT_IDS),
+  product_id: productIdSchema,
   tier: z.enum(PRODUCT_TIERS),
   // ARCHITECTURE §6.2: empty for credit packs.
   interval: z.enum(PRODUCT_INTERVALS).nullable(),
@@ -68,7 +68,7 @@ export const eventSchemas = {
     context: z.enum(['signup', 'account', 'paywall']), status: slug, credits: z.number().int().nonnegative(),
     pool: z.enum(CREDIT_POOLS).nullable(), discount_percent: z.number().int().min(1).max(90).nullable(),
   }).refine((r) => !r.code || r.kind === 'campaign'),
-  invite_reward: z.strictObject({ credits: z.number().int().positive(), product_id: z.enum(PRODUCT_IDS) }),
+  invite_reward: z.strictObject({ credits: z.number().int().positive(), product_id: productIdSchema }),
   invite_share: z.strictObject({ action: z.enum(['copy', 'share']), surface: z.literal('account') }),
   upload: z.strictObject({ size_bucket: z.enum(UPLOAD_SIZE_BUCKETS), compressed: z.boolean() }),
   generate: z.strictObject({
@@ -121,9 +121,9 @@ export const eventSchemas = {
     surface: z.enum(TEMPLATE_TOGGLE_SURFACES),
   }),
   // T74: a product picked inside the paywall (a tier, a pack, or Monthly / Yearly moving the pick).
-  paywall_select: z.strictObject({ product_id: z.enum(PRODUCT_IDS), method: z.enum(PAYMENT_METHODS) }),
+  paywall_select: z.strictObject({ product_id: productIdSchema, method: z.enum(PAYMENT_METHODS) }),
   // T74: the buyer came back from the hosted checkout without paying (Stripe's cancel_url).
-  checkout_cancel: z.strictObject({ product_id: z.enum(PRODUCT_IDS), method: z.enum(PAYMENT_METHODS) }),
+  checkout_cancel: z.strictObject({ product_id: productIdSchema, method: z.enum(PAYMENT_METHODS) }),
   upload_error: z.strictObject({ reason: z.enum(UPLOAD_ERROR_REASONS) }),
   app_update_prompt: z.strictObject({ action: z.enum(APP_UPDATE_ACTIONS), reason: z.enum(APP_UPDATE_REASONS) }),
   purchase: z.strictObject({

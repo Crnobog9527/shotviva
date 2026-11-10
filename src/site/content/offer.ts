@@ -1,10 +1,11 @@
-import { PRICE_PENDING, pricedProducts, usdPerHundredCredits, type SiteProduct, type UsdRange } from '@/core/config'
+import { tierOffers, yearlySavingPct } from '@/core/billing/paywall/offer'
+import { PRICE_PENDING, usdPerHundredCredits, type MembershipProduct, type SiteProduct, type UsdRange } from '@/core/config'
 import { MAX_UPLOAD_BYTES, UPLOAD_CONTENT_TYPES } from '@/core/storage/rules'
 
 import { site } from '../site.config'
 
 // Every public number on the marketing pages is read here, never typed into copy (建站规格 G3).
-// Prices and credits come from site.config; nothing below restates them.
+// Live pages pass published offers; offline copy uses the phase-one baseline.
 
 // Per-template capabilities and charges come from the live catalogue.
 export const OUTPUT_TIERS = [
@@ -49,21 +50,6 @@ export const uploadLimits = `${formats.slice(0, -1).join(', ')} or ${formats.at(
 const LANGUAGE_NAMES: Record<string, string> = { en: 'English', zh: 'Simplified Chinese' }
 export const languages = site.locales.enabled.map((code) => LANGUAGE_NAMES[code] ?? code).join(', ')
 
-// --- Plans and packs. Product ids are fixed by ARCHITECTURE §6.2. Until T9 puts the nine
-// products into site.config, lookups return nothing and the copy says PRICE_PENDING. ---
-
-export const PLAN_TIERS = [
-  { name: 'Starter', monthly: 'starter_monthly', yearly: 'starter_yearly' },
-  { name: 'Pro', monthly: 'pro_monthly', yearly: 'pro_yearly' },
-  { name: 'Max', monthly: 'max_monthly', yearly: 'max_yearly' },
-] as const
-
-export const PACKS = [
-  { name: 'Small pack', id: 'pack_s' },
-  { name: 'Medium pack', id: 'pack_m' },
-  { name: 'Large pack', id: 'pack_l' },
-] as const
-
 export function product(id: string, products: readonly SiteProduct[] = site.billing.products): SiteProduct | undefined {
   return products.find((p) => p.id === id && p.priceUsd > 0)
 }
@@ -91,40 +77,31 @@ export function perHundredCredits(id: string, products: readonly SiteProduct[] =
 const formatHundredCredits = (amount: number) =>
   `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-function cheapest(ids: readonly string[], products: readonly SiteProduct[]): SiteProduct | undefined {
-  const found = ids.map(id => product(id, products)).filter((p): p is SiteProduct => p !== undefined)
-  return found.sort((a, b) => a.priceUsd - b.priceUsd)[0]
-}
-
-// Largest yearly saving across the configured plans, rounded to the nearest whole percent.
-function yearlySavingPct(products: readonly SiteProduct[]): number | undefined {
-  const pcts = PLAN_TIERS.flatMap((tier) => {
-    const month = product(tier.monthly, products)
-    const year = product(tier.yearly, products)
-    if (!month || !year) return []
-    // From integer cents, so float error cannot move a .5 boundary.
-    const monthlyYear = Math.round(month.priceUsd * 100) * 12
-    return [Math.round(((monthlyYear - Math.round(year.priceUsd * 100)) * 100) / monthlyYear)]
-  })
-  return pcts.length === PLAN_TIERS.length ? Math.max(...pcts) : undefined
-}
-
 export function offerFacts(products: readonly SiteProduct[]) {
+  const priced = products.filter(p => p.priceUsd > 0).sort((a, b) => a.priceUsd - b.priceUsd)
+  const units = priced.map(usdPerHundredCredits)
   return {
-    planFrom: cheapest(PLAN_TIERS.map(tier => tier.monthly), products),
-    packFrom: cheapest(PACKS.map(pack => pack.id), products),
-    yearlySaving: yearlySavingPct(products),
+    products,
+    planFrom: priced.find((p): p is MembershipProduct => p.interval === 'month'),
+    packFrom: priced.find(p => p.tier === 'pack'),
+    hundredCreditsFrom: units.length ? formatHundredCredits(Math.min(...units)) : undefined,
+    yearlySaving: yearlySavingPct(tierOffers(products)) ?? undefined,
   }
 }
 
-export const { planFrom, packFrom, yearlySaving } = offerFacts(site.billing.products)
+export type OfferFacts = ReturnType<typeof offerFacts>
+export const baselineOffers = offerFacts(site.billing.products)
+export const { planFrom, packFrom, yearlySaving, hundredCreditsFrom } = baselineOffers
 
-const unitPrices = pricedProducts(site).map(usdPerHundredCredits)
-export const hundredCreditsFrom = unitPrices.length ? formatHundredCredits(Math.min(...unitPrices)) : undefined
+export function planLabel(plan: OfferFacts['planFrom']) {
+  if (!plan) return 'Monthly plan'
+  const names = { starter: 'Starter', pro: 'Pro', max: 'Max' }
+  return `${names[plan.tier]} plan, ${plan.credits} credits a month`
+}
 
 // One sentence on paid options, used by the home page, the generator page and FAQ answers.
-export function plansSentence(): string {
-  if (!planFrom) return 'Paid plans and one-time credit packs are coming soon.'
+export function plansSentence({ planFrom, packFrom } = baselineOffers): string {
+  if (!planFrom) return packFrom ? `One-time credit packs start at ${usd(packFrom.priceUsd)}.` : 'Paid plans and one-time credit packs are coming soon.'
   const packs = packFrom ? `, or buy a one-time credit pack from ${usd(packFrom.priceUsd)}` : ''
   return `Plans start at ${usd(planFrom.priceUsd)} a month for ${planFrom.credits} credits${packs}.`
 }

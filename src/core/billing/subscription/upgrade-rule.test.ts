@@ -83,3 +83,12 @@ describe('blockReason', () => {
     expect(blockReason(sub('max_yearly'), 'pack_m')).toBeNull()
   })
 })
+
+it('uses the catalog entitlement for a named membership with no tier in its SKU', () => {
+  const held = { subscription: 'studio_monthly', subscriptionRank: 2, tier: 'pro' } as const
+  expect(blockReason(held, 'studio_monthly', 2)).toBe('current')
+  expect(purchaseVerdict(held, 'pro_monthly')).toBe('blocked')
+  expect(purchaseVerdict(held, 'hobby_yearly', 1)).toBe('blocked')
+  expect(purchaseVerdict(held, 'studio_yearly', 3)).toBe('upgrade')
+  expect(purchaseVerdict({ ...held, subscription: null }, 'studio_monthly', 2)).toBe('buy')
+})

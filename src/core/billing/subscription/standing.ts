@@ -7,6 +7,7 @@ export type MemberStanding = {
   // The highest-ranked subscription that may still bill (Stripe or Waffo mirror, any live
   // status, cancelling ones too: their paid period is still running).
   subscription: ProductId | null
+  subscriptionRank?: number
   // current_tier(): the tier of the latest membership purchase while paid_until runs. For a
   // one-time period (Alipay, Waffo one-time) this is all there is; it carries no interval.
   tier: MembershipTier | null

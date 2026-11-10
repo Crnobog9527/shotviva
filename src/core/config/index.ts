@@ -1,3 +1,4 @@
+export { productIdSchema } from './product-id'
 export { MEMBERSHIP_TIERS, PRODUCT_IDS, defineSite } from './define-site'
 export type {
   MarketingNumbers,

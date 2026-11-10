@@ -33,6 +33,7 @@ export type WaffoWebhookDeps = WaffoFulfilDeps & {
   publicKey: KeyObject
   storeId: string
   mode: WaffoMode
+  loadCatalog?: () => Promise<WaffoFulfilDeps['products']>
   now?: () => number
 }
 
@@ -91,7 +92,8 @@ export async function handleWaffoWebhook(
     return { status: 400, body: { code: 'INVALID_SIGNATURE' } }
   }
   try {
-    const outcome = await route(deps, event)
+    const products = await deps.loadCatalog?.() ?? deps.products
+    const outcome = await route({ ...deps, products }, event)
     if (outcome === null) return { status: 200, body: { received: true } }
     logger.info('waffo event applied', { event_id: event.eventId, type: event.eventType, outcome })
     return { status: 200, body: { received: true, outcome } }

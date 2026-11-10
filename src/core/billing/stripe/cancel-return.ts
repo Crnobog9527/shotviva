@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 import { PAYMENT_METHODS } from '../../analytics/events'
-import { PRODUCT_IDS } from '../../config/define-site'
+import { productIdSchema, type ProductId } from '../../config'
 import { localizePath } from '../../i18n/paths'
 import type { CheckoutBody } from './checkout'
 
@@ -34,14 +34,14 @@ export function cancelReturnUrl(
 }
 
 const cancelQuery = z.object({
-  p: z.enum(PRODUCT_IDS),
+  p: productIdSchema,
   m: z.enum(PAYMENT_METHODS),
   l: z.enum(['en', 'zh']).catch('en'),
   // Absent on sessions created before this change; those still count.
   c: z.string().regex(/^[0-9a-f-]{36}$/).optional().catch(undefined),
 })
 
-export type CancelTrack = (userId: string, props: { product_id: (typeof PRODUCT_IDS)[number]; method: (typeof PAYMENT_METHODS)[number] }, locale: 'en' | 'zh') => void
+export type CancelTrack = (userId: string, props: { product_id: ProductId; method: (typeof PAYMENT_METHODS)[number] }, locale: 'en' | 'zh') => void
 
 export type CancelReturn = { target: string; remember: string | null }
 

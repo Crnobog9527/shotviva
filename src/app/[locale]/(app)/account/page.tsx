@@ -17,6 +17,7 @@ import { formatMoney, hasUnreadReply, listPaymentOptions, paymentChoices, PICKER
 import { AccountHelp } from '@/core/support/ui/account'
 import { currentLocale } from '@/core/i18n/server'
 import type { Translate } from '@/core/translate'
+import { contractProducts, displayProducts } from '@/site/billing/display-products'
 import { site } from '@/site/site.config'
 
 import { actions, helpActions } from './account-actions'
@@ -26,22 +27,17 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('app.account'))('metaTitle') }
 }
 
-const accountSite = {
-  products: site.billing.products,
-  brand: site.brand.name,
-  freeCredits: site.billing.freeCredits,
-}
-
 // One parallel round of reads: private tables (subscriptions, payments, the gift check) with
 // the admin client filtered to this user, the rest with the user's own session.
 async function Account() {
   const user = await requireUser('/account')
   const supabase = await createServerSupabase()
   const admin = createAdminSupabase()
-  const [graylum, balance, subscription, signupGift, helpUnread, payments, since, works, t, locale, discount, affiliate] = await Promise.all([
+  const history = contractProducts(admin)
+  const [graylum, balance, subscription, signupGift, helpUnread, payments, since, works, t, locale, discount, affiliate, offers, identities] = await Promise.all([
     readLinkStatus(supabase, user.id),
     readBalance(supabase, user.id),
-    readSubscriptionSummary(admin, user.id, site.billing.products),
+    history.then(products => readSubscriptionSummary(admin, user.id, products)),
     readSignupGift(admin, user.id, site.billing.freeCredits),
     hasUnreadReply(supabase, user.id),
     listPaymentOptions(admin, user.id),
@@ -51,9 +47,11 @@ async function Account() {
     currentLocale(),
     readPendingDiscount(admin, user.id),
     hasAffiliateDashboard(user.id),
+    displayProducts(),
+    history,
   ])
-  const purchases = paymentChoices(payments, site.billing.products, t as unknown as Translate, { money: formatMoney(locale) })
-  const last = lastMembership(payments, site.billing.products)
+  const purchases = paymentChoices(payments, identities, t as unknown as Translate, { money: formatMoney(locale) })
+  const last = lastMembership(payments, identities)
   const more = payments.length >= PICKER_LIMIT
   // Each line with its receipt / invoice links (T80); the support picker keeps the plain labels.
   const lines = purchaseLines(payments, purchases, locale)
@@ -61,7 +59,7 @@ async function Account() {
   // Help & feedback opens over the page (?help=…, T68); its payments picker is the Purchases list.
   return (
     <>
-      <AccountView data={data} actions={actions} site={{ ...accountSite, freeCredits: signupGift.granted }}>
+      <AccountView data={data} actions={actions} site={{ brand: site.brand.name, products: offers, freeCredits: signupGift.granted }}>
         <InviteCard load={loadMyInvites} />
         <RedeemCard pending={discount} />
       </AccountView>

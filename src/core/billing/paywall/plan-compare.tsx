@@ -1,9 +1,9 @@
 "use client"
 
-import { useFormatter, useTranslations } from "next-intl"
+import { useFormatter, useLocale, useTranslations } from "next-intl"
 
 import { pricingV2 } from "../../public-env"
-import type { TierOffer } from "./offer"
+import { offerLabel, productFor, type Period, type TierOffer } from "./offer"
 import { usePerkFacts } from "./perk-facts"
 import { Tick } from "./perk-list"
 import { PhotoEstimateNote, useRangeText } from "./photo-estimate-line"
@@ -12,10 +12,12 @@ import { compareRows, type CompareCell } from "./plan-compare-rows"
 // Below the three plans on /pricing: the same rows as the cards, side by side, closed by
 // default. A native <details>, so it works before hydration and every row is in the HTML
 // (建站规格 R5). Four narrow columns fit a 375px phone without scrolling sideways.
-export function PlanCompare({ offers }: { offers: readonly TierOffer[] }) {
+export function PlanCompare({ offers, period }: { offers: readonly TierOffer[]; period: Period }) {
   const t = useTranslations("paywall")
+  const locale = useLocale()
+  const products = offers.map(o => productFor(o, period))
   const facts = usePerkFacts()
-  const rows = compareRows(offers, { ...facts, memberPacks: pricingV2 })
+  const rows = compareRows(offers, { ...facts, memberPacks: pricingV2 }, period)
   return (
     <details className="group hairline-lit mt-4 rounded-media bg-card md:mt-6">
       <summary className="press flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 text-label font-semibold [&::-webkit-details-marker]:hidden">
@@ -24,15 +26,15 @@ export function PlanCompare({ offers }: { offers: readonly TierOffer[] }) {
           <path d="M6 9l6 6 6-6" />
         </svg>
       </summary>
-      <div className="px-3 pb-3 md:px-4 md:pb-4">
-        <table className="w-full table-fixed border-collapse text-caption">
+      <div className="overflow-x-auto px-3 pb-3 md:px-4 md:pb-4">
+        <table className="w-full table-fixed border-collapse text-caption" style={offers.length > 3 ? { minWidth: offers.length * 130 + 200 } : undefined}>
           <caption className="sr-only">{t("compare.title")}</caption>
           <thead>
             <tr>
               <td className="w-[40%] md:w-[46%]" />
-              {offers.map((offer) => (
-                <th key={offer.tier} scope="col" className="pb-2 text-center font-semibold" data-tier={offer.tier}>
-                  {t(`tiers.${offer.tier}`)}
+              {products.map((product) => (
+                <th key={product.id} scope="col" className="pb-2 text-center font-semibold" data-tier={product.tier}>
+                  {offerLabel(product, locale, t(`tiers.${product.tier}`))}
                 </th>
               ))}
             </tr>
@@ -44,7 +46,7 @@ export function PlanCompare({ offers }: { offers: readonly TierOffer[] }) {
                   {t(`compare.rows.${row.key}`)}
                 </th>
                 {row.cells.map((cell, i) => (
-                  <td key={offers[i]?.tier ?? i} className="py-2.5 text-center">
+                  <td key={products[i]?.id ?? i} className="py-2.5 text-center">
                     <Cell cell={cell} />
                   </td>
                 ))}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import type { MembershipProduct } from '../../config'
 import { TEST_PRODUCTS } from '../stripe/test-products'
 import { packLooks, packOffers, tierOffers } from './offer'
 import { checkoutTone, resolvePick, selectedProduct } from './pick'
@@ -73,4 +74,18 @@ describe('selectedProduct', () => {
     expect(selectedProduct(choice, { period: 'month' }, offers, packs)).toEqual({ product_id: 'pro_monthly', method: 'cn_card' })
     expect(selectedProduct(choice, { pick: 'pack_s' }, offers, packs)).toEqual({ product_id: 'pack_s', method: 'cn_card' })
   })
+})
+
+it('selects both same-tier offerings by exact SKU and compares periods only within one family', () => {
+  const month: MembershipProduct = { id: 'studio_monthly', tier: 'pro', interval: 'month', paidDays: 30,
+    priceUsd: 65, credits: 7300, revision: 3, names: { en: 'Pro Studio', zh: '工作室专业版' } }
+  const year: MembershipProduct = { ...month, id: 'studio_yearly', interval: 'year', priceUsd: 650, paidDays: 365 }
+  const products = [...TEST_PRODUCTS, month, year]
+  const catalog = tierOffers(products)
+  expect(tierOffers(products, 'month').filter(o => o.tier === 'pro').map(o => o.monthly?.id))
+    .toEqual(['pro_monthly', 'studio_monthly'])
+  const choice = choiceFor({ planId: month.id, tier: 'pro', period: 'month' })
+  expect(resolvePick(choice.pick, 'month', catalog, [])?.product).toEqual(month)
+  expect(selectedProduct(choice, { period: 'year' }, catalog, [])?.product_id).toBe(year.id)
+  expect(resolvePick(choice.pick, 'year', tierOffers([...TEST_PRODUCTS, month]), [])).toBeNull()
 })
