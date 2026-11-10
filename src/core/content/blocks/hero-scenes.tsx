@@ -13,7 +13,7 @@ type Props = {
   // Rendered width of one plate, for the srcset (home-hero.tsx).
   sizes: string
   // The phone-photo pane, rendered on the server and passed through untouched.
-  children: ReactNode
+  phonePane: ReactNode
 }
 
 // The first scene loads at once like the old single result (`fetchPriority="low"` keeps it out
@@ -26,7 +26,7 @@ const LOADING = { loading: 'eager', fetchPriority: 'low' } as const
 // side (Owner 2026-11-11). Same frame, badges and seam as PhotoPair; the only client part of
 // the hero. The scene stack crossfades in marketing.css; captions share one grid cell so a
 // longer caption never moves the generator below (no layout shift).
-export function HeroScenes({ scenes, tags, sizes, children }: Props) {
+export function HeroScenes({ scenes, tags, sizes, phonePane }: Props) {
   const { items } = scenes
   const { active, previous, armed, pick, markLoaded, hold } = useSceneRotation(items.length)
   const onBlur = (event: FocusEvent<HTMLElement>) => {
@@ -35,7 +35,7 @@ export function HeroScenes({ scenes, tags, sizes, children }: Props) {
   return (
     <figure className="mk-hero-pair" onPointerEnter={() => hold(true)} onPointerLeave={() => hold(false)} onFocus={() => hold(true)} onBlur={onBlur}>
       <span className="mk-pair mk-pair-lg">
-        {children}
+        {phonePane}
         <span className="mk-pane">
           {items.map(({ image }, index) =>
             index === 0 || armed ? (

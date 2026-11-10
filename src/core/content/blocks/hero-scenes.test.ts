@@ -1,4 +1,4 @@
-import { createElement, type ComponentProps } from 'react'
+import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
@@ -12,12 +12,12 @@ const items: readonly [HeroScene, HeroScene, HeroScene] = [
   { image: img('villa'), caption: 'Same bag, new light' },
 ]
 const html = renderToStaticMarkup(
-  createElement(
-    HeroScenes,
-    // The phone pane goes in as a child, as in home-hero.tsx; createElement's typing wants it in the props too.
-    { scenes: { label: 'AI scenes', items }, tags: { phone: 'Phone', ai: 'AI' }, sizes: '50vw' } as ComponentProps<typeof HeroScenes>,
-    createElement('span', { className: 'mk-pane' }, 'phone'),
-  ),
+  createElement(HeroScenes, {
+    scenes: { label: 'AI scenes', items },
+    tags: { phone: 'Phone', ai: 'AI' },
+    sizes: '50vw',
+    phonePane: createElement('span', { className: 'mk-pane' }, 'phone'),
+  }),
 )
 
 describe('HeroScenes server HTML', () => {

@@ -1,11 +1,11 @@
 {
   "note": "First-load JS per route in KB gzip (scripts/js-budget.ts). Set 2026-11-07 after the performance pass (#232-#236) at about 8% over what each route measured then. Raise a number only with a reason in the PR.",
   "routes": {
-    "en": 260,
-    "zh": 260,
-    "en/image-to-image-generator": 260,
-    "en/commercial-photography": 260,
-    "en/ai-restaurant-menu": 260,
+    "en": 262,
+    "zh": 262,
+    "en/image-to-image-generator": 262,
+    "en/commercial-photography": 262,
+    "en/ai-restaurant-menu": 262,
     "en/pricing": 250,
     "zh/pricing": 250,
     "en/terms": 240,

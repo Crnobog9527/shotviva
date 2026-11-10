@@ -40,9 +40,12 @@ export function HomeHero({ page, generator }: Props) {
         <p className="mk-answer">{page.answerBlock}</p>
       </div>
       {hero.scenes ? (
-        <HeroScenes scenes={hero.scenes} tags={{ phone: t('phone'), ai: t('ai') }} sizes={HERO_PLATE_SIZES}>
-          <BeforePane image={hero.before} preload sizes={HERO_PLATE_SIZES} />
-        </HeroScenes>
+        <HeroScenes
+          scenes={hero.scenes}
+          tags={{ phone: t('phone'), ai: t('ai') }}
+          sizes={HERO_PLATE_SIZES}
+          phonePane={<BeforePane image={hero.before} preload sizes={HERO_PLATE_SIZES} />}
+        />
       ) : (
         <figure className="mk-hero-pair">
           <PhotoPair before={hero.before} after={hero.after} size="lg" preload sizes={HERO_PLATE_SIZES} />
