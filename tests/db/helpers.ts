@@ -119,6 +119,16 @@ export async function ledgerOf(db: Client, id: string) {
 
 export const DAY_MS = 24 * 60 * 60 * 1000
 
+// Publish seeded fixtures under the same database gates as the admin action.
+export async function publishFixture(db: Client, ...ids: string[]) {
+  await approveFixtures(db, ...ids)
+  await db.query('update public.templates set is_active=true where id=any($1)',[ids])
+}
+
+export async function approveFixtures(db: Client, ...ids: string[]) {
+  await db.query('insert into public.template_sale_approvals(template_id,enabled) select unnest($1::text[]),true on conflict(template_id) do update set enabled=true',[ids])
+}
+
 // A published template with an explicit per-resolution price, for tests that need a specific
 // charge (reserve_credits reads the price from the template, never from the caller).
 export async function createPricedTemplate(
@@ -129,9 +139,10 @@ export async function createPricedTemplate(
   const id = `t16-${randomUUID().slice(0, 8)}`
   await db.query(
     `insert into public.templates (id, name, category, fields, quality, credits_cost, is_active, visible_in)
-     values ($1, 'T16 priced', 'pets', $2, $3, $4, true, array['web', 'partner'])`,
+     values ($1, 'T16 priced', 'pets', $2, $3, $4, false, array['web', 'partner'])`,
     [id, JSON.stringify({ images: { min: 0, max: 1 }, copy: [], aspectRatios: ['1:1'] }), quality, JSON.stringify(cost)],
   )
+  await publishFixture(db, id)
   return id
 }
 

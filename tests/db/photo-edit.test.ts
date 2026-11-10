@@ -286,7 +286,7 @@ describe('/admin/templates/edit', () => {
     const adminId = await createUser(db)
     await saveEditTemplate(serviceSupabase(), adminId, input(), CREDITS_FLOOR)
     const settings = await loadEditTemplateSettings(serviceSupabase())
-    expect(settings).toMatchObject({ isActive: true, creditsCost: { '1k': 3, '2k': 5, '3k': 7 }, wrapper: TEST_WRAPPER, params: TEST_EDIT_PARAMS })
+    expect(settings).toMatchObject({ saleEnabled: true, isActive: true, creditsCost: { '1k': 3, '2k': 5, '3k': 7 }, wrapper: TEST_WRAPPER, params: TEST_EDIT_PARAMS })
     const { rows } = await db.query<{ visible_in: string[] }>("select visible_in from public.templates where id = 'edit'")
     expect(rows[0]?.visible_in).toEqual([])
     // Published, yet in no catalogue and not in the ordinary template editor.

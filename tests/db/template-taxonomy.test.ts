@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { listTemplates, listTemplatesIn } from '@/core/templates'
 import { toPartnerTemplate } from '@/core/partner/partner-views'
 import { readCategoryEntries, readCategoryTree, readSeriesMembers } from '@/core/templates/taxonomy-reads'
-import { connectAdmin, createUser, retryAuth } from './helpers'
+import { connectAdmin, createUser, publishFixture, retryAuth } from './helpers'
 import { anonSupabase, serviceSupabase } from './supabase-env'
 
 const anon = anonSupabase()
@@ -49,8 +49,9 @@ beforeAll(async () => {
   const fields = { images: { min: 1, max: 1 }, aspectRatios: ['1:1'], copy: [] }
   for (const [id, group, surfaces] of [[plain, null, ['web', 'partner']], [member, series, ['web', 'partner']], ['t102-api', series, ['partner']]] as const) {
     await pg.query(`insert into public.templates(id,name,category_key,subcategory_key,series_id,is_active,visible_in,fields,cover_after_url)
-      values($1,$1,$2,$3,$4,true,$5,$6,'https://example.test/dish.webp')`, [id, root, leaf, group, surfaces, fields])
+      values($1,$1,$2,$3,$4,false,$5,$6,'https://example.test/dish.webp')`, [id, root, leaf, group, surfaces, fields])
   }
+  await publishFixture(pg, plain, member, 't102-api')
 })
 
 afterAll(async () => {
@@ -136,9 +137,10 @@ describe('three-level catalogue', () => {
     await node('t102-pages', null, 't102-pages')
     const added = await pg.query("insert into public.template_series(slug,name_en,name_zh,category_key,is_active,show_members) values('t102-pages','Pages','分页','t102-pages',true,true) returning id")
     const id = added.rows[0].id
-    await pg.query(`insert into public.templates(id,name,category_key,series_id,series_sort_order,is_active,fields)
-      select 't102-page-'||n,n::text,'t102-pages',$1,32-n,true,'{"images":{"min":1,"max":1},"copy":[],"aspectRatios":["1:1"]}'::jsonb
-      from generate_series(1,32) n`, [id])
+    const pages = await pg.query<{id:string}>(`insert into public.templates(id,name,category_key,series_id,series_sort_order,is_active,fields)
+      select 't102-page-'||n,n::text,'t102-pages',$1,32-n,false,'{"images":{"min":1,"max":1},"copy":[],"aspectRatios":["1:1"]}'::jsonb
+      from generate_series(1,32) n returning id`, [id])
+    await publishFixture(pg, ...pages.rows.map(page => page.id))
     const first = await readCategoryEntries(anon, ['t102-pages'], 'en')
     const rest = await readCategoryEntries(anon, ['t102-pages'], 'en', first.nextCursor!)
     const keys = [...first.items, ...rest.items].map(item => item.type === 'template' ? item.template.id : item.series.id)

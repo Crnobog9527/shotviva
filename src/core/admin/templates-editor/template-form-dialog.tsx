@@ -17,7 +17,7 @@ import { referenceBudget, refUploadId } from './style-ref-state'
 import { StyleRefFields } from './style-ref-fields'
 import { TemplateCoverFields } from './template-cover-fields'
 import { fallbackPriceCopy } from './copy'
-import { versionCopy } from './version-copy'
+import { SaleSwitch } from './sale-switch'
 import { TemplateHistory, type VersionActions } from './prompt-history'
 import { TemplatePromptFields } from './template-prompt-fields'
 import { TemplatePublicFields } from './template-public-fields'
@@ -32,7 +32,7 @@ type Props = {
   floor: ProviderFloors
   categories: readonly CategoryOption[]
   coverLanguages: readonly CoverLanguage[]
-  coverActions: Pick<TemplateAdminActions, 'requestCoverUpload' | 'applyCover'> & VersionActions
+  coverActions: Pick<TemplateAdminActions, 'requestCoverUpload' | 'applyCover' | 'setSale'> & VersionActions
   pending: boolean
   error: string | null
   // The last save's success line, shown by the save button (the dialog stays open after a save).
@@ -52,7 +52,7 @@ export function TemplateFormDialog({ target, providers, floor: allFloors, catego
   const [submitted, setSubmitted] = useState(false)
   const onChange = (patch: Partial<typeof values>) => setValues((prev) => ({ ...prev, ...patch }))
 
-  const floor = providerFloor(allFloors, values.providerId, values.id, values.category, values.quality, values.visiblePartner)
+  const floor = providerFloor(allFloors, values.providerId, values.id)
   const submit = () => {
     const result = buildPayload(values, isNew, floor)
     if (!result.ok) {
@@ -115,7 +115,7 @@ function FormColumn({ target, providers, values, isNew, floor, categories, cover
       <DialogHeader>
         <DialogTitle>{existing ? `编辑「${existing.name}」` : '新建模板'}</DialogTitle>
       </DialogHeader>
-      <CopyPriceNotice target={target} />
+      <SaleSwitch template={existing} action={coverActions.setSale} disabled={pending} />
       <TemplatePublicFields values={values} isNew={isNew} uploading={uploading} floor={floor} categories={categories} onChange={onChange} />
       <TemplateTranslationFields values={values} onChange={onChange} />
       {existing ? (
@@ -144,11 +144,6 @@ function FallbackPrice({ providers, values }: Pick<FormColumnProps, 'providers' 
   const active = providers.find(option => option.isActive)
   if (!values.providerId || values.providerId === active?.id) return null
   return <p className="text-muted-foreground text-xs">{fallbackPriceCopy(active?.fallbackFloors?.[values.quality])}</p>
-}
-
-function CopyPriceNotice({ target }: { target: EditTarget }) {
-  if (target.mode !== 'edit' || !target.previousStandard) return null
-  return <p role="status" className="text-sm">{versionCopy.priceChanged(target.previousStandard)}</p>
 }
 
 function styleSaveBlocked(uploading: boolean, module: string, problem: string | null) {

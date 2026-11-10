@@ -9,6 +9,7 @@ import { ModelSyncProvider, ModelSyncStatus } from '@/core/admin/image-provider-
 import { syncTemplateModel } from '../sync-model-action'
 import { readPricingOptions } from '@/site/template-pricing'
 
+import { setTemplateSaleAction } from '../sale-action'
 import { saveEditTemplateAction } from './actions'
 
 // Admin-only, request-time page for the built-in photo-edit template (ARCHITECTURE §5.2). The
@@ -32,7 +33,7 @@ export default async function AdminEditTemplatePage() {
       {active && !active.openAI && <ModelSyncProvider action={syncTemplateModel}>
         <ModelSyncStatus key={active.id + active.model + active.capabilities?.fetchedAt} provider={active} />
       </ModelSyncProvider>}
-      <EditTemplateEditor settings={settings} floor={providerFloor(floor, null, 'edit')} save={saveEditTemplateAction} />
+      <EditTemplateEditor settings={settings} floor={providerFloor(floor, null, 'edit')} setSale={setTemplateSaleAction} save={saveEditTemplateAction} />
     </div>
   )
 }

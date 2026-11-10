@@ -7,8 +7,6 @@ import { RESOLUTIONS, type Resolution } from './output-options'
 // templates.credits_cost holds one positive integer per resolution; the database check
 // enforces the same shape.
 
-export const STYLE_STANDARD_CREDITS = 20
-
 export const TEMPLATE_QUALITIES = ['high', 'medium'] as const
 export type TemplateQuality = (typeof TEMPLATE_QUALITIES)[number]
 
@@ -27,9 +25,6 @@ export type CreditsFloor = Record<TemplateQuality, CreditsCost> & {
   version?: 'v1' | 'v2'
   tariff?: ApprovedTariff
   unknownCapabilities?: boolean
-  styleUnavailable?: boolean
-  styleDraft?: boolean
-  retiredRoom?: boolean
 }
 
 export function approvedCredit(floor: CreditsFloor, quality: TemplateQuality, resolution: Resolution) {
@@ -41,6 +36,10 @@ export function creditMinimum(floor: CreditsFloor, quality: TemplateQuality, res
   return Math.max(tariff, floor[quality][resolution])
 }
 
+export function assertPricedTier(unpriced: readonly Resolution[] | undefined, tier: Resolution) {
+  if (unpriced?.includes(tier)) throw new AppError('TEMPLATE_UNAVAILABLE', 'This tier is not available for sale.')
+}
+
 export function assertTemplateQuote(expected: number | undefined, current: number): void {
   if (expected !== undefined && expected !== current) {
     throw new AppError('TEMPLATE_QUOTE_CHANGED', 'Refresh the template price before generating.')
@@ -49,8 +48,9 @@ export function assertTemplateQuote(expected: number | undefined, current: numbe
 
 export type FloorViolation = { resolution: Resolution; floor: number; given: number }
 
-export function creditsBelowFloor(quality: TemplateQuality, cost: CreditsCost, floor: CreditsFloor): FloorViolation[] {
+export function creditsBelowFloor(quality: TemplateQuality, cost: CreditsCost, floor: CreditsFloor, unpriced: readonly Resolution[] = []): FloorViolation[] {
   return RESOLUTIONS.flatMap((resolution) => {
+    if (unpriced.includes(resolution)) return []
     const min = creditMinimum(floor, quality, resolution)
     return cost[resolution] < min && cost[resolution] !== approvedCredit(floor, quality, resolution) ? [{ resolution, floor: min, given: cost[resolution] }] : []
   })

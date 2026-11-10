@@ -7,7 +7,7 @@ import { listTemplatesIn } from '@/core/templates'
 
 import { CREDITS_FLOOR } from '@/modules/image/credits-floor'
 
-import { connectAdmin, createUser } from './helpers'
+import { connectAdmin, createUser, publishFixture } from './helpers'
 import { anonSupabase, serviceSupabase } from './supabase-env'
 
 // T75 (ARCHITECTURE §5 「模板分类由后台管理」): template_categories (0580), templates.category_key
@@ -146,7 +146,7 @@ describe('seeded categories and the backfill', () => {
 
   it('reads each template with its category in the page language', async () => {
     await saveTemplate(service, admin, { isNew: true, template: template('t75-read', 'pets'), prompt }, CREDITS_FLOOR)
-    await db.query("update public.templates set is_active = true where id = 't75-read'")
+    await publishFixture(db, 't75-read')
     const zh = (await listTemplatesIn(anonSupabase(), 'zh')).find((row) => row.id === 't75-read')
     expect(zh?.categoryView).toMatchObject({ key: 'pets', name: '宠物', compare: false })
     expect(await nameOf('t75-read')).toBe('Pets')
@@ -154,7 +154,7 @@ describe('seeded categories and the backfill', () => {
 
   it('never lists a template in a system category on the site', async () => {
     await saveTemplate(service, admin, { isNew: true, template: template('t75-system', 'freeform'), prompt }, CREDITS_FLOOR)
-    await db.query("update public.templates set is_active = true where id = 't75-system'")
+    await publishFixture(db, 't75-system')
     expect((await listTemplatesIn(anonSupabase(), 'en')).some((row) => row.id === 't75-system')).toBe(false)
   })
 })
@@ -208,7 +208,7 @@ describe('admin category functions', () => {
     await saveTemplateCategory(service, admin, { isNew: true, category: category('t75-old', 'Old', '旧分类') })
     await saveTemplate(service, admin, { isNew: true, template: template('t75-live', 't75-old'), prompt }, CREDITS_FLOOR)
     await saveTemplate(service, admin, { isNew: true, template: template('t75-draft', 't75-old'), prompt }, CREDITS_FLOOR)
-    await db.query("update public.templates set is_active = true where id = 't75-live'")
+    await publishFixture(db, 't75-live')
     const listed = (await listAdminCategories(service)).find((row) => row.key === 't75-old')
     expect(listed?.templateCount).toBe(2)
 

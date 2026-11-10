@@ -192,3 +192,8 @@ export function fallbackPriceCopy(tiers?: Record<'1k' | '2k' | '3k', number | nu
   const floor = (tier: '1k' | '2k' | '3k') => tiers?.[tier] ?? '不可用'
   return `回退到默认模型时的最低积分：Standard ${floor('1k')}、HD ${floor('2k')}、Max ${floor('3k')}。当前售价低于对应下限或该档不可用时，回退会被拒绝。`
 }
+
+export const saleCopy = {
+  label: '开放销售', first: '请先保存模型和积分，再开放销售。', active: '请先下架，再关闭销售。',
+  opened: '已开放销售', closed: '已关闭销售',
+}

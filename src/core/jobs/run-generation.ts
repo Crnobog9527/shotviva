@@ -11,6 +11,7 @@ import {
   DEFAULT_RESOLUTION,
   loadGenerationTemplate,
   allowedWebAspects,
+  assertPricedTier,
   assertTemplateQuote,
   validateGenerationInputs,
   type GenerationInputs,
@@ -64,7 +65,9 @@ function assertBatchAllowed(limits: TierLimits, batchSize: number) {
 // no face swap) alongside the stored upload itself (HEAD + bytes; bad ones are deleted).
 async function prepare(deps: GenerationDeps, req: GenerationRequest) {
   const { template, prompt } = await loadGenerationTemplate(deps.db, req.templateId, SURFACE[req.source])
-  assertTemplateQuote(req.expectedCredits, template.creditsCost[req.resolution ?? DEFAULT_RESOLUTION])
+  const tier = req.resolution ?? DEFAULT_RESOLUTION
+  assertPricedTier(template.unpricedResolutions, tier)
+  assertTemplateQuote(req.expectedCredits, template.creditsCost[tier])
   const inputs = validateGenerationInputs(template.fields, {
     copy: req.copy,
     aspectRatio: req.aspectRatio,

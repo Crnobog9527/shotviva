@@ -59,6 +59,20 @@ describe('prompt version selection', () => {
   })
 })
 
+it('keeps historical prices distinct from unpriced tiers and opens a tier only on explicit input', () => {
+    const values = toFormValues({ ...template, unpricedResolutions: ['3k'] })
+    expect(values.credits['3k']).toBe('')
+    const persisted = { creditsCost: template.creditsCost, unpricedResolutions: ['3k'] }
+    expect(buildPayload(values, false, FLOOR)).toMatchObject({ payload: { template: persisted } })
+    const edited = { ...values, credits: { ...values.credits, '3k': '7' } }
+    expect(buildPayload(edited, false, FLOOR)).toMatchObject({ payload: { template: { unpricedResolutions: [], creditsCost: { '3k': 7 } } } })
+    const limited = { ...FLOOR, resolutions: ['1k','2k'] as const }
+    expect(buildPayload(toFormValues(template), false, { ...limited, resolutions: [...limited.resolutions] })).toMatchObject({
+      payload: { template: { unpricedResolutions: [], creditsCost: template.creditsCost } },
+    })
+    expect(buildPayload(toFormValues(template), true, { ...limited, resolutions: [...limited.resolutions] })).toMatchObject({ payload: { template: persisted } })
+  })
+
 describe('template form state', () => {
   it('retains private fragments from an archived version even after a public switch was removed', () => {
     const values = { ...toFormValues(template), selectedVersion: 1,
@@ -67,6 +81,7 @@ describe('template form state', () => {
       revision: { expected: 2, selected: 1 }, prompt: { modelParams: { quality: 'high', ...values.restoredParams } },
     } })
   })
+
   it('round-trips a template into a save payload', () => {
     const result = buildPayload(toFormValues(template), false, FLOOR)
     expect(result).toEqual({
