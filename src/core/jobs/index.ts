@@ -45,3 +45,6 @@ export { settleTracked } from './generation-analytics'
 // Reference numbers (T78): pure helpers in ./ref (client-safe), service-role reads here.
 export { findJobIdsByRef, jobRefOrShort, jobRefsFor, jobRefsOrShort } from './job-ref-reads'
 export { JOB_REF_LENGTH, JOB_REF_MIN, jobRef, jobRefRange, normalizeJobRef } from './ref'
+export { preflightBatch, preflightSchema } from './batch/preflight'
+export { batchArchive } from './batch/archive'
+export { downloadBatchZip } from './batch/download'

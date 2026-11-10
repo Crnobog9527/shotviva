@@ -5,15 +5,15 @@ import { useState } from 'react'
 import { Button } from '@/core/ui/button'
 
 import { useAdminAction } from '../shell/use-admin-action'
-import type { AdminCategory, CategoryAdminActions, SaveCategoryPayload } from '../template-categories/types'
+import type { AdminCategoryNode, CategoryAdminActions, SaveCategoryPayload } from '../template-categories/types'
 import type { ActionResult } from '../templates/types'
 import { CategoryDeleteDialog } from './category-delete-dialog'
 import { CategoryFormDialog, type CategoryTarget } from './category-form-dialog'
-import { moveKey } from './category-form-state'
+import type { TreeMove } from '../ui/category-tree'
 import { CategoryList } from './category-list'
 import { CATEGORIES_COPY as COPY } from './copy'
 
-type Props = { categories: AdminCategory[]; actions: CategoryAdminActions }
+type Props = { categories: AdminCategoryNode[]; actions: CategoryAdminActions }
 
 const asValue = (result: ActionResult) => (result.ok ? { ok: true as const, value: undefined } : result)
 
@@ -23,7 +23,8 @@ export function CategoriesPanel({ categories: all, actions }: Props) {
   // The built-in templates' categories are managed by code, not here (T75).
   const categories = all.filter((category) => !category.isSystem)
   const [editing, setEditing] = useState<CategoryTarget | null>(null)
-  const [deleting, setDeleting] = useState<AdminCategory | null>(null)
+  const [deletingKey, setDeletingKey] = useState<string | null>(null)
+  const deleting = categories.find((category) => category.key === deletingKey) ?? null
   const { pending, error, notice, run, clearError } = useAdminAction()
   const nameOf = (key: string | null) => categories.find((category) => category.key === key)?.nameZh ?? null
 
@@ -36,13 +37,11 @@ export function CategoriesPanel({ categories: all, actions }: Props) {
       setEditing(null)
       return COPY.saved(name)
     })
-  const move = (index: number, direction: -1 | 1) => {
-    const keys = moveKey(categories.map((category) => category.key), index, direction)
-    if (keys) run(async () => asValue(await actions.reorder(keys)), () => COPY.reordered)
-  }
-  const remove = (category: AdminCategory, moveTo: string | null) =>
+  const move = (input: TreeMove) =>
+    run(async () => asValue(await actions.move(input)), () => COPY.reordered)
+  const remove = (category: AdminCategoryNode, moveTo: string | null) =>
     run(() => actions.remove({ key: category.key, moveTo }), ({ moved }) => {
-      setDeleting(null)
+      setDeletingKey(null)
       return COPY.deleted(category.nameZh, moved, nameOf(moveTo))
     })
   const dialogOpen = editing !== null || deleting !== null
@@ -56,7 +55,7 @@ export function CategoriesPanel({ categories: all, actions }: Props) {
           </h2>
           <p className="text-sm text-muted-foreground">{COPY.body}</p>
         </div>
-        <Button variant="outline" disabled={pending} onClick={() => open(() => setEditing({ mode: 'new' }))}>
+        <Button variant="outline" disabled={pending} onClick={() => open(() => setEditing({ mode: 'new', parent: null }))}>
           {COPY.add}
         </Button>
       </div>
@@ -74,8 +73,9 @@ export function CategoriesPanel({ categories: all, actions }: Props) {
         categories={categories}
         pending={pending}
         onMove={move}
+        onAdd={parent => open(() => setEditing({ mode: 'new', parent }))}
         onEdit={(category) => open(() => setEditing({ mode: 'edit', category }))}
-        onDelete={(category) => open(() => setDeleting(category))}
+        onDelete={(category) => open(() => setDeletingKey(category.key))}
       />
       {editing ? (
         <CategoryFormDialog
@@ -94,7 +94,7 @@ export function CategoriesPanel({ categories: all, actions }: Props) {
           categories={categories}
           pending={pending}
           error={error}
-          onCancel={() => setDeleting(null)}
+          onCancel={() => setDeletingKey(null)}
           onConfirm={(moveTo) => remove(deleting, moveTo)}
         />
       ) : null}

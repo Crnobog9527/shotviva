@@ -4,8 +4,8 @@ import { COPY, STATUS, money } from './copy'
 import type { SaveAction } from './form'
 import { enrollmentLabel } from './enrollment'
 import { CreateMember } from './create-member'
-import { DecideMember, SetMember, Adjust } from './member-forms'
-import { Field, FiltersForm, GridTable, LinkTo, NextPage, Section } from './parts'
+import { DecideMember, ReopenApplication, SetMember, Adjust } from './member-forms'
+import { Field, FiltersForm, GridTable, LinkTo, NextPage, Section, Select } from './parts'
 import type { Filters } from './query'
 import { countryName } from '../partners/application-options'
 import { loadMember, members, referred, adjustments, type Member } from './read'
@@ -18,6 +18,9 @@ export async function MembersView({ db, filters, action }: ViewProps) {
     <>
       {filters.tab === 'affiliates' && <CreateMember />}
       <FiltersForm tab={filters.tab}>
+        {filters.tab === 'applications' && (
+          <Select label={COPY.status} name="review" initial={filters.review ?? 'pending'} values={['pending', 'rejected']} />
+        )}
         <Field label={COPY.search} name="q" defaultValue={filters.q} />
       </FiltersForm>
       <GridTable
@@ -84,6 +87,7 @@ async function MemberView({ db, filters, action, id }: ViewProps & { id: string 
         {member.status === 'active' && <ConsumerReferral slug={member.slug} />}
       </Section>
       {member.status === 'pending' && <DecideMember member={member} action={action} />}
+      {member.status === 'rejected' && <ReopenApplication member={member} action={action} />}
       {['active', 'suspended', 'banned'].includes(member.status) && <SetMember member={member} rates={rates} action={action} />}
       <nav className="flex flex-wrap gap-4">
         <LinkTo filters={{ ...links, section: 'referrals' }}>{COPY.referrals}</LinkTo>

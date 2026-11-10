@@ -1274,6 +1274,39 @@ $$;
 ALTER FUNCTION "admin"."template_price_state"("t" "public"."templates") OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."template_series" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "slug" "text" NOT NULL,
+    "name_en" "text" NOT NULL,
+    "name_zh" "text" NOT NULL,
+    "description_en" "text",
+    "description_zh" "text",
+    "cover_url" "text",
+    "category_key" "text" NOT NULL,
+    "sort_order" integer DEFAULT 0 NOT NULL,
+    "is_active" boolean DEFAULT false NOT NULL,
+    "show_members" boolean DEFAULT false NOT NULL,
+    CONSTRAINT "template_series_name_en_check" CHECK (("btrim"("name_en") <> ''::"text")),
+    CONSTRAINT "template_series_name_zh_check" CHECK (("btrim"("name_zh") <> ''::"text")),
+    CONSTRAINT "template_series_slug_check" CHECK (("slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text"))
+);
+
+
+ALTER TABLE "public"."template_series" OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."template_series_revision"("p_series" "public"."template_series") RETURNS "text"
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select md5(to_jsonb(p_series)::text || coalesce(jsonb_agg(t.id order by t.series_sort_order,t.id), '[]')::text)
+  from public.templates t where t.series_id=p_series.id
+$$;
+
+
+ALTER FUNCTION "admin"."template_series_revision"("p_series" "public"."template_series") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."template_sync_catalog"() RETURNS "text"
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
@@ -1394,13 +1427,42 @@ CREATE OR REPLACE FUNCTION "public"."_affiliate_accept_invite"() RETURNS "trigge
     SET "search_path" TO ''
     AS $$
 begin
-  update public.affiliates set status='active' where user_id=new.id and status='pending' and application->>'source'='admin_invite';
+  update public.affiliates set status='active',approved_at=now()
+    where user_id=new.id and status='pending' and application->>'source'='admin_invite';
   return null;
 end;
 $$;
 
 
 ALTER FUNCTION "public"."_affiliate_accept_invite"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_affiliate_allocate_payout"("p_owner" "uuid", "p_face" bigint, "p_at" timestamp with time zone DEFAULT NULL::timestamp with time zone) RETURNS TABLE("commission_id" bigint, "prior_amount" bigint, "issue_amount" bigint)
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  with confirmed as (
+    select c.id,c.amount from public.affiliate_commissions c
+      where p_at is null and c.affiliate_user_id=p_owner and c.status='confirmed' and c.payout_retained is null
+    union all
+    select c.id,h.new_amount from public.affiliate_commissions c
+      cross join lateral (select new_amount,new_status from public.affiliate_commission_changes
+        where commission_id=c.id and at<=p_at order by at desc,id desc limit 1) h
+      where p_at is not null and c.affiliate_user_id=p_owner and h.new_status='confirmed'
+  ), free as (
+    select c.id,lower(span) lo,upper(span) hi from confirmed c
+    cross join lateral (select range_agg(int8range(i.prior_amount,coalesce(i.settled_amount,i.issue_amount))) used
+      from public.affiliate_payout_items i join public.affiliate_payouts p on p.id=i.payout_id
+      where i.commission_id=c.id and p.status<>'void') existing
+    cross join lateral unnest(int8multirange(int8range(0,c.amount))-coalesce(existing.used,'{}'::int8multirange)) span
+  ), ordered as (
+    select *,sum(hi-lo) over(order by id,lo rows unbounded preceding)-(hi-lo) consumed from free
+  )
+  select id,lo,least(hi,lo+p_face-consumed)::bigint from ordered where consumed<p_face;
+$$;
+
+
+ALTER FUNCTION "public"."_affiliate_allocate_payout"("p_owner" "uuid", "p_face" bigint, "p_at" timestamp with time zone) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."_affiliate_audit"("p_actor" "uuid", "p_action" "text", "p_target" "text", "p_reason" "text" DEFAULT NULL::"text") RETURNS "void"
@@ -1491,6 +1553,44 @@ $$;
 ALTER FUNCTION "public"."_affiliate_due"("p_total" integer, "p_tax" integer, "p_refunded" integer, "p_rate" integer) OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."affiliate_payouts" (
+    "id" bigint NOT NULL,
+    "affiliate_user_id" "uuid" NOT NULL,
+    "period" "date" NOT NULL,
+    "amount" bigint NOT NULL,
+    "status" "text" DEFAULT 'due'::"text" NOT NULL,
+    "payout_snapshot" "jsonb" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "paid_at" timestamp with time zone,
+    "paid_method" "text",
+    "paid_reference" "text",
+    "decided_by" "uuid",
+    "note" "text",
+    "paid_amount" bigint,
+    "legacy_review_required" boolean DEFAULT false NOT NULL,
+    CONSTRAINT "affiliate_payouts_amount_check" CHECK (("amount" > 0)),
+    CONSTRAINT "affiliate_payouts_paid_amount_check" CHECK (("paid_amount" >= 0)),
+    CONSTRAINT "affiliate_payouts_status_check" CHECK (("status" = ANY (ARRAY['due'::"text", 'held'::"text", 'paid'::"text", 'void'::"text"])))
+);
+
+
+ALTER TABLE "public"."affiliate_payouts" OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_affiliate_linked_payable"("p" "public"."affiliate_payouts") RETURNS bigint
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select greatest(0,p.amount-coalesce(sum(i.issue_amount-greatest(i.prior_amount,
+    least(i.issue_amount,case when c.status='confirmed' and c.payout_retained is null then c.amount else 0 end))),0))::bigint
+    from public.affiliate_payout_items i join public.affiliate_commissions c on c.id=i.commission_id
+    where i.payout_id=p.id;
+$$;
+
+
+ALTER FUNCTION "public"."_affiliate_linked_payable"("p" "public"."affiliate_payouts") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_affiliate_overrides"("p_user" "uuid", "p_values" "jsonb") RETURNS "void"
     LANGUAGE "sql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -1519,6 +1619,33 @@ $$;
 ALTER FUNCTION "public"."_affiliate_payment_event"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_affiliate_payout_forfeit"("p" "public"."affiliate_payouts", "p_note" "text") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare r record; v_paid int8multirange; v_keep bigint; v_status text;
+begin
+  for r in select c.* from public.affiliate_commissions c where exists
+    (select from public.affiliate_payout_items i where i.payout_id=p.id and i.commission_id=c.id)
+    and c.void_reason is distinct from 'admin_void' and c.payout_retained is null order by c.id loop
+    select range_agg(int8range(i.prior_amount,coalesce(i.settled_amount,i.issue_amount))) into v_paid
+      from public.affiliate_payout_items i join public.affiliate_payouts o on o.id=i.payout_id
+      where i.commission_id=r.id and o.status='paid' and coalesce(i.settled_amount,i.issue_amount)>i.prior_amount;
+    v_keep:=coalesce(public._affiliate_retained_cents(v_paid,r.amount),0);
+    v_status:=case when v_keep=0 then 'void' else r.status end;
+    update public.affiliate_commissions set amount=v_keep,status=v_status,payout_retained=v_paid,
+      void_reason=case when v_paid is null then 'admin_void' when v_keep=0 then coalesce(r.void_reason,'zero') end,
+      updated_at=now() where id=r.id;
+    insert into public.affiliate_commission_changes(commission_id,old_amount,new_amount,old_status,new_status,reason)
+      values(r.id,r.amount,v_keep,r.status,v_status,'payout '||p.id||': '||p_note);
+  end loop;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_affiliate_payout_forfeit"("p" "public"."affiliate_payouts", "p_note" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_affiliate_require_admin"("p_actor" "uuid") RETURNS "void"
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -1534,9 +1661,22 @@ $$;
 ALTER FUNCTION "public"."_affiliate_require_admin"("p_actor" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_affiliate_retained_cents"("p_ranges" "int8multirange", "p_amount" bigint) RETURNS bigint
+    LANGUAGE "sql" IMMUTABLE STRICT
+    SET "search_path" TO ''
+    AS $$
+  select coalesce(sum(upper(s)-lower(s)),0)::bigint
+    from unnest(p_ranges * int8multirange(int8range(0,p_amount))) s;
+$$;
+
+
+ALTER FUNCTION "public"."_affiliate_retained_cents"("p_ranges" "int8multirange", "p_amount" bigint) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_affiliate_snapshot"("p_payment" "public"."payments") RETURNS "jsonb"
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
+    SET "TimeZone" TO 'UTC'
     AS $$
   select jsonb_build_object('owner',a.user_id,'inactive',a.status<>'active',
     'parent',case when a.status='active' and parent.team_enabled and parent.status='active' then parent.user_id end,
@@ -1551,7 +1691,13 @@ CREATE OR REPLACE FUNCTION "public"."_affiliate_snapshot"("p_payment" "public"."
     left join public.affiliates parent on parent.user_id=a.parent_user_id
     left join public.affiliate_rate_overrides o on (o.user_id,o.product_kind)=(a.user_id,r.product_kind)
     left join public.affiliate_rate_overrides po on (po.user_id,po.product_kind)=(parent.user_id,r.product_kind)
-    where s.singleton and customer.id=p_payment.user_id;
+    where s.singleton and customer.id=p_payment.user_id
+      and (s.commission_months is null or case
+        -- A term extending beyond the payment year always covers this sale. Avoid overflowing
+        -- timestamp arithmetic for long terms accepted by the integer setting.
+        when s.commission_months > 12 * (1 + extract(year from p_payment.created_at) - extract(year from customer.referred_at)) then true
+        else p_payment.created_at <= customer.referred_at + make_interval(months => s.commission_months)
+      end);
 $$;
 
 
@@ -1579,6 +1725,9 @@ begin
     if v_old.void_reason in ('affiliate_inactive','admin_void') then v_void:=v_old.void_reason; end if;
   end if;
   v_amount:=public._affiliate_due(p_payment.amount_total,p_payment.amount_tax,p_payment.amount_refunded,v_rate);
+  if v_old.payout_retained is not null then
+    v_amount:=public._affiliate_retained_cents(v_old.payout_retained,v_amount);
+  end if;
   if v_void is not null or p_lost then
     v_void:=coalesce(v_void,'dispute_lost'); v_amount:=0;
   elsif v_amount=0 then
@@ -2190,6 +2339,26 @@ $$;
 ALTER FUNCTION "public"."admin_affiliate_adjust"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_affiliate_allow_reapply"("p_actor" "uuid", "p_input" "jsonb") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare v_user uuid:=(p_input->>'user_id')::uuid; v_reason text;
+begin
+  perform public._affiliate_require_admin(p_actor);
+  update public.affiliates set reapply_allowed=true
+    where user_id=v_user and status='rejected' and not reapply_allowed
+    returning reject_reason into v_reason;
+  if not found then raise exception 'AFFILIATE_NOT_REJECTED'; end if;
+  -- Keep the prior reason even for rejected rows that predate this workflow.
+  perform public._affiliate_audit(p_actor,'decide',v_user::text,concat('allow_reapply: ',v_reason));
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_affiliate_allow_reapply"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_affiliate_commission_release"("p_actor" "uuid", "p_input" "jsonb") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -2228,10 +2397,12 @@ CREATE OR REPLACE FUNCTION "public"."admin_affiliate_create"("p_actor" "uuid", "
 declare v_user uuid:=(p_input->>'user_id')::uuid; v_invited boolean;
 begin
   perform public._affiliate_require_admin(p_actor);
-  select u.invited_at is not null and u.email_confirmed_at is null into strict v_invited from auth.users u where id=v_user for update;
+  select u.invited_at is not null and u.email_confirmed_at is null into strict v_invited
+    from auth.users u where id=v_user for update;
   insert into public.affiliates(user_id,slug,status,application,approved_at,approved_by)
     values(v_user,p_input->>'slug',case when v_invited then 'pending' else 'active' end,
-      case when v_invited then '{"source":"admin_invite"}'::jsonb else '{}' end,now(),p_actor);
+      case when v_invited then '{"source":"admin_invite"}'::jsonb else '{}' end,
+      case when not v_invited then now() end,p_actor);
   perform public._affiliate_overrides(v_user,p_input->'overrides');
   perform public._affiliate_audit(p_actor,'create',v_user::text);
 end;
@@ -2299,10 +2470,10 @@ begin
   cross join (select coalesce(sum(amount) filter(where status='pending'),0) pending,
     coalesce(sum(amount) filter(where status='confirmed'),0) confirmed,count(*) filter(where cardinality(flags)>0) flagged
     from public.affiliate_commissions) c
-  cross join (select coalesce(sum(amount) filter(where status='paid'),0) paid,
+  cross join (select coalesce(sum(coalesce(payout.paid_amount,payout.amount)) filter(where status='paid'),0) paid,
     count(*) filter(where status='due' and period=date_trunc('month',now() at time zone 'UTC')::date) due_count,
-    coalesce(sum(amount) filter(where status='due' and period=date_trunc('month',now() at time zone 'UTC')::date),0) due_total
-    from public.affiliate_payouts) p;
+    coalesce(sum(coalesce(public.affiliate_payout_payable(payout),payout.amount)) filter(where status='due' and period=date_trunc('month',now() at time zone 'UTC')::date),0) due_total
+    from public.affiliate_payouts payout) p;
   return v_answer;
 end;
 $$;
@@ -2315,18 +2486,53 @@ CREATE OR REPLACE FUNCTION "public"."admin_affiliate_payout_decide"("p_actor" "u
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-declare v_id bigint:=(p_input->>'payout_id')::bigint; v_status text:=p_input->>'status'; v_note text:=nullif(trim(p_input->>'note'),'');
-  v_method text:=nullif(trim(p_input->>'method'),''); v_ref text:=nullif(trim(p_input->>'paid_reference'),'');
-  v_paid timestamptz:=(p_input->>'paid_at')::timestamptz;
+declare v public.affiliate_payouts; v_status text:=p_input->>'status'; v_note text:=nullif(trim(p_input->>'note'),'');
+  v_mode text:=p_input->>'void_mode'; v_method text:=nullif(trim(p_input->>'method'),'');
+  v_ref text:=nullif(trim(p_input->>'paid_reference'),''); v_time timestamptz:=(p_input->>'paid_at')::timestamptz;
+  v_expected bigint:=(p_input->>'expected_amount')::bigint; v_actual bigint;
 begin
   perform public._affiliate_require_admin(p_actor);
-  if v_status is null or v_status not in ('paid','held') or (v_status='held' and v_note is null)
-     or (v_status='paid' and (v_paid is null or v_method is null or coalesce(v_ref,v_note) is null)) then raise exception 'INVALID_INPUT'; end if;
-  update public.affiliate_payouts set status=v_status,paid_at=case when v_status='paid' then v_paid end,decided_by=p_actor,
-    paid_method=case when v_status='paid' then v_method end,paid_reference=case when v_status='paid' then v_ref end,note=v_note
-    where id=v_id and status='due';
-  if not found then raise exception 'AFFILIATE_PAYOUT_NOT_DUE'; end if;
-  perform public._affiliate_audit(p_actor,'payout_decide',v_id::text,v_status);
+  perform pg_advisory_xact_lock(hashtextextended('affiliate_settlement',0));
+  select * into strict v from public.affiliate_payouts where id=(p_input->>'payout_id')::bigint for update;
+  if (v.status,v_status) not in (('due','held'),('due','paid'),('held','due'),('held','void'))
+    or v_status is null then raise exception 'AFFILIATE_INVALID_PAYOUT_TRANSITION'; end if;
+  if (v_status in ('held','void') and v_note is null) or (v_status='void' and (v_mode is null or v_mode not in ('return','forfeit')))
+    or (v_status='paid' and (v_method is null or v_time is null or coalesce(v_ref,v_note) is null)) then raise exception 'INVALID_INPUT'; end if;
+  if v_status='paid' or (v_status='void' and v_mode='forfeit') then
+    if v.legacy_review_required then raise exception 'AFFILIATE_PAYOUT_LEGACY_REVIEW'; end if;
+    -- Refunds/retries lock payment then commission. The quote now depends on
+    -- the entire account, even if the order itself is backed by adjustments.
+    perform pay.id from public.payments pay join public.affiliate_commissions c on c.payment_id=pay.id
+      where c.affiliate_user_id=v.affiliate_user_id order by pay.id for update of pay;
+    -- An adjustment insert takes a foreign-key key-share lock on this owner.
+    perform a.user_id from public.affiliates a where a.user_id=v.affiliate_user_id for update;
+    perform c.id from public.affiliate_commissions c where c.affiliate_user_id=v.affiliate_user_id
+      order by c.payment_id,c.level for update;
+    if exists(select from public.affiliate_commissions c join public.affiliate_recompute_errors e
+      on e.payment_id=c.payment_id and e.resolved_at is null where c.affiliate_user_id=v.affiliate_user_id)
+      then raise exception 'AFFILIATE_PAYOUT_RECOMPUTE_PENDING'; end if;
+    if v_status='paid' then
+      v_actual:=public.affiliate_payout_payable(v);
+      if (v_expected is not null or v_actual<>v.amount) and v_expected is distinct from v_actual then
+        raise exception 'AFFILIATE_PAYOUT_AMOUNT_CHANGED'; end if;
+      with backed as (
+        select i.commission_id,i.prior_amount,greatest(0,least(i.issue_amount,
+          case when c.status='confirmed' and c.payout_retained is null then c.amount else 0 end)-i.prior_amount) cents
+          from public.affiliate_payout_items i join public.affiliate_commissions c on c.id=i.commission_id where i.payout_id=v.id
+      ), ranked as (
+        select *,sum(cents) over(order by commission_id,prior_amount rows unbounded preceding)-cents before_slice from backed
+      )
+      update public.affiliate_payout_items i set settled_amount=r.prior_amount+greatest(0,least(r.cents,v_actual-r.before_slice))
+        from ranked r where i.payout_id=v.id and (i.commission_id,i.prior_amount)=(r.commission_id,r.prior_amount);
+    else
+      perform public._affiliate_payout_forfeit(v,v_note);
+    end if;
+  end if;
+  update public.affiliate_payouts set status=v_status,paid_amount=v_actual,decided_by=p_actor,note=v_note,
+    paid_at=case when v_status='paid' then v_time end,paid_method=case when v_status='paid' then v_method end,
+    paid_reference=case when v_status='paid' then v_ref end where id=v.id;
+  perform public._affiliate_audit(p_actor,'payout_decide',v.id::text,
+    concat_ws(': ',v.status||' -> '||v_status,case when v_status='void' then v_mode end,v_actual::text,v_note));
 end;
 $$;
 
@@ -2416,6 +2622,7 @@ CREATE OR REPLACE FUNCTION "public"."admin_affiliate_settings"("p_actor" "uuid",
 begin
   perform public._affiliate_require_admin(p_actor);
   update public.affiliate_settings set enabled=coalesce((p_input->>'enabled')::boolean,enabled),
+    commission_months=case when p_input ? 'commission_months' then (p_input->>'commission_months')::integer else commission_months end,
     hold_days=coalesce((p_input->>'hold_days')::integer,hold_days),
     payout_min_usd=coalesce((p_input->>'payout_min_usd')::bigint,payout_min_usd),
     settlement_day=coalesce((p_input->>'settlement_day')::integer,settlement_day),
@@ -2430,6 +2637,56 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_affiliate_settings"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."template_categories" (
+    "key" "text" NOT NULL,
+    "name_en" "text" NOT NULL,
+    "name_zh" "text" NOT NULL,
+    "intro_en" "text",
+    "intro_zh" "text",
+    "card_style" "text" DEFAULT 'pair'::"text" NOT NULL,
+    "sort_order" integer DEFAULT 0 NOT NULL,
+    "is_system" boolean DEFAULT false NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "parent_id" "text",
+    "kind" "text" DEFAULT 'template'::"text" NOT NULL,
+    "level" smallint DEFAULT 1 NOT NULL,
+    "slug" "text" DEFAULT ''::"text" NOT NULL,
+    "is_visible" boolean DEFAULT true NOT NULL,
+    "seo_title_en" "text",
+    "seo_title_zh" "text",
+    "seo_description_en" "text",
+    "seo_description_zh" "text",
+    CONSTRAINT "template_categories_card_style_check" CHECK (("card_style" = ANY (ARRAY['pair'::"text", 'compare'::"text"]))),
+    CONSTRAINT "template_categories_intro_en_check" CHECK ((("intro_en" IS NULL) OR (("char_length"("intro_en") >= 1) AND ("char_length"("intro_en") <= 200)))),
+    CONSTRAINT "template_categories_intro_zh_check" CHECK ((("intro_zh" IS NULL) OR (("char_length"("intro_zh") >= 1) AND ("char_length"("intro_zh") <= 200)))),
+    CONSTRAINT "template_categories_key_check" CHECK ((("key" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text") AND ("char_length"("key") <= 40))),
+    CONSTRAINT "template_categories_kind_check" CHECK (("kind" = ANY (ARRAY['template'::"text", 'reference'::"text"]))),
+    CONSTRAINT "template_categories_level_check" CHECK ((("level" >= 1) AND ("level" <= 3))),
+    CONSTRAINT "template_categories_name_en_check" CHECK ((("char_length"("name_en") >= 1) AND ("char_length"("name_en") <= 32) AND ("name_en" = "btrim"("name_en")))),
+    CONSTRAINT "template_categories_name_zh_check" CHECK ((("char_length"("name_zh") >= 1) AND ("char_length"("name_zh") <= 12) AND ("name_zh" = "btrim"("name_zh")))),
+    CONSTRAINT "template_category_slug_format" CHECK (("slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text"))
+);
+
+
+ALTER TABLE "public"."template_categories" OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_assigned_template_count"("public"."template_categories") RETURNS bigint
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $_$
+  select case when $1.parent_id is null then
+    (select count(*) from public.templates t where t.category_key=$1.key and t.subcategory_key is null)
+  else
+    (select count(*) from public.templates t where t.subcategory_key=$1.key)
+  end
+$_$;
+
+
+ALTER FUNCTION "public"."admin_assigned_template_count"("public"."template_categories") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_ban_user"("p_user_id" "uuid", "p_reason" "text") RETURNS timestamp with time zone
@@ -2705,6 +2962,34 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_begin_test_run"("p_actor" "uuid", "p_run_id" "uuid", "p_template_id" "text", "p_kind" "text", "p_parent_id" "uuid", "p_photo_id" "uuid", "p_batch_id" "uuid", "p_resolution" "text", "p_inputs" "jsonb", "p_prompt_version" integer, "p_provider" "text", "p_estimate_usd" numeric) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_bulk_assign_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid", "p_locales" "text"[]) RETURNS "jsonb"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_node text := p_patch->>'category_key';
+  v_root text;
+  v_result jsonb;
+begin
+  if not exists(select from public.profiles where id=p_actor and role='admin' and banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree',0));
+  select p.root_key into v_root from public.template_category_paths p
+    join public.template_categories c on c.key=p.key where p.key=v_node and not c.is_system;
+  if not found then raise exception 'CATEGORY_NOT_FOUND'; end if;
+  v_result:=public.admin_bulk_edit_templates(p_ids,jsonb_set(p_patch,'{category_key}',to_jsonb(v_root)),p_floor,p_actor,p_locales);
+  if v_result->'failures'='[]'::jsonb then
+    update public.templates set subcategory_key=nullif(v_node,v_root)
+      where id=any(p_ids) and subcategory_key is distinct from nullif(v_node,v_root);
+  end if;
+  return v_result;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_bulk_assign_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid", "p_locales" "text"[]) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_bulk_edit_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid") RETURNS "jsonb"
@@ -4024,6 +4309,44 @@ $$;
 ALTER FUNCTION "public"."admin_mark_dispute_submitted"("p_dispute_id" "text", "p_actor" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_move_template_category"("p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text", "p_actor" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  old_parent text;
+  parent_level integer := 0;
+  siblings text[];
+  pos integer;
+begin
+  if not exists(select 1 from public.profiles where id=p_actor and role='admin') then raise exception 'NOT_ADMIN'; end if;
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.category_tree',0));
+  select parent_id into old_parent from public.template_categories where key=p_key and kind='template' and not is_system;
+  if not found or old_parent is distinct from p_from_parent then raise exception 'CATEGORY_CHANGED'; end if;
+  if p_parent is not null then
+    select level into parent_level from public.template_categories where key=p_parent and kind='template' and not is_system;
+    if not found or p_key='art-styles' then raise exception 'INVALID_PARENT'; end if;
+  end if;
+  if old_parent is distinct from p_parent then
+    -- Include descendants when checking the three-level limit and prohibit cycles before firing move triggers.
+    if exists(with recursive subtree(key,depth) as (
+      select p_key,1 union all select c.key,s.depth+1 from public.template_categories c join subtree s on c.parent_id=s.key
+    ) select 1 from subtree where key=p_parent or depth+parent_level>3) then raise exception 'INVALID_PARENT'; end if;
+    update public.template_categories set parent_id=p_parent where key=p_key;
+  end if;
+  select coalesce(array_agg(key order by sort_order,key),'{}') into siblings from public.template_categories
+    where kind='template' and not is_system and parent_id is not distinct from p_parent and key<>p_key;
+  pos := case when p_before is null then cardinality(siblings)+1 else array_position(siblings,p_before) end;
+  if pos is null then raise exception 'CATEGORY_CHANGED'; end if;
+  siblings := siblings[1:pos-1] || array[p_key] || siblings[pos:cardinality(siblings)];
+  update public.template_categories c set sort_order=o.n*10 from unnest(siblings) with ordinality o(key,n)
+    where c.key=o.key and c.sort_order<>o.n*10;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_move_template_category"("p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text", "p_actor" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_openai_admin_key_status"() RETURNS TABLE("key_last4" "text", "project_id" "text")
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -4505,60 +4828,173 @@ $$;
 ALTER FUNCTION "public"."admin_save_provider"("p_actor" "uuid", "p_id" "uuid", "p_settings" "jsonb", "p_capabilities" "jsonb", "p_key" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_save_template_assignment"("p_actor" "uuid", "p_template" "jsonb", "p_prompt" "jsonb", "p_assignment" "jsonb", "p_is_new" boolean, "p_expected" integer DEFAULT NULL::integer, "p_selected" integer DEFAULT NULL::integer, "p_style_refs" "jsonb" DEFAULT NULL::"jsonb") RETURNS integer
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_id text := p_template->>'id';
+  v_node text := p_template->>'category_key';
+  v_series uuid := (p_assignment->>'series_id')::uuid;
+  v_old public.templates%rowtype;
+  v_root text;
+  v_system boolean;
+  v_version integer;
+  v_order integer := 0;
+begin
+  if not exists(select from public.profiles where id=p_actor and role='admin' and banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if p_is_new is null or not coalesce(p_assignment ? 'series_id',false) then raise exception 'INVALID_INPUT'; end if;
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree',0));
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series',0));
+  select * into v_old from public.templates where id=v_id for update;
+  if found and p_is_new then raise exception 'TEMPLATE_EXISTS'; end if;
+  if v_old.id is null and not p_is_new then raise exception 'TEMPLATE_NOT_FOUND'; end if;
+  if not p_is_new and (not (p_assignment ? 'previous_series_id')
+      or (p_assignment->>'previous_series_id')::uuid is distinct from v_old.series_id
+      or p_assignment->>'previous_category' is distinct from coalesce(v_old.subcategory_key,v_old.category_key)) then
+    raise exception 'STALE_TEMPLATE_ASSIGNMENT';
+  end if;
+  select p.root_key,c.is_system into v_root,v_system from public.template_category_paths p
+    join public.template_categories c on c.key=p.key where p.key=v_node;
+  if not found then raise exception 'CATEGORY_NOT_FOUND'; end if;
+  if v_system or exists(select from public.template_categories where key=v_old.category_key and is_system) then
+    if v_old.category_key is distinct from v_node or v_series is not null then raise exception 'SYSTEM_ASSIGNMENT'; end if;
+  end if;
+  if v_series is not null and not exists(select from public.template_series where id=v_series) then
+    raise exception 'SERIES_NOT_FOUND';
+  end if;
+
+  p_template:=jsonb_set(p_template,'{category_key}',to_jsonb(v_root));
+  if p_expected is not null then
+    v_version:=public.admin_save_versioned_template(p_actor,p_template,p_prompt,p_expected,p_selected,p_style_refs);
+  elsif p_style_refs is not null then
+    perform public.admin_upsert_template(p_template,p_prompt,p_style_refs);
+  else
+    perform public.admin_upsert_template(p_template,p_prompt);
+  end if;
+  if v_series is not distinct from v_old.series_id then
+    v_order:=coalesce(v_old.series_sort_order,0);
+  elsif v_series is not null then
+    select coalesce(max(series_sort_order),0)+1 into v_order from public.templates where series_id=v_series;
+  end if;
+  update public.templates set subcategory_key=nullif(v_node,v_root),series_id=v_series,series_sort_order=v_order
+    where id=v_id and (subcategory_key,series_id,series_sort_order)
+      is distinct from (nullif(v_node,v_root),v_series,v_order);
+  if v_version is null then select version into v_version from public.template_prompts where template_id=v_id; end if;
+  return v_version;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_save_template_assignment"("p_actor" "uuid", "p_template" "jsonb", "p_prompt" "jsonb", "p_assignment" "jsonb", "p_is_new" boolean, "p_expected" integer, "p_selected" integer, "p_style_refs" "jsonb") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_save_template_category"("p_category" "jsonb", "p_is_new" boolean, "p_actor" "uuid") RETURNS "void"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $$
 declare
-  v_key text := btrim(coalesce(p_category ->> 'key', ''));
-  v_name_en text := btrim(coalesce(p_category ->> 'name_en', ''));
-  v_name_zh text := btrim(coalesce(p_category ->> 'name_zh', ''));
-  v_intro_en text := nullif(btrim(coalesce(p_category ->> 'intro_en', '')), '');
-  v_intro_zh text := nullif(btrim(coalesce(p_category ->> 'intro_zh', '')), '');
-  v_style text := coalesce(p_category ->> 'card_style', 'pair');
+  k text := btrim(p_category->>'key');
+  en text := btrim(p_category->>'name_en');
+  zh text := btrim(p_category->>'name_zh');
+  parent text := p_category->>'parent_id';
+  next_order integer;
+  previous public.template_categories;
 begin
-  if p_actor is null or not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
-    raise exception 'NOT_ADMIN';
+  if not exists(select 1 from public.profiles where id=p_actor and role='admin') then raise exception 'NOT_ADMIN'; end if;
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.category_tree',0));
+  select * into previous from public.template_categories where key=k;
+  if p_is_new and found then raise exception 'CATEGORY_KEY_TAKEN'; end if;
+  if not p_is_new then
+    if previous.key is null or previous.kind <> 'template' then raise exception 'CATEGORY_NOT_FOUND'; end if;
+    if previous.is_system then raise exception 'CATEGORY_SYSTEM'; end if;
   end if;
-  if v_name_en = '' or v_name_zh = '' then
-    raise exception 'INVALID_INPUT' using detail = 'both names are required';
-  end if;
-  if exists (select 1 from public.template_categories c where lower(c.name_en) = lower(v_name_en) and c.key <> v_key) then
-    raise exception 'CATEGORY_NAME_EN_TAKEN';
-  end if;
-  if exists (select 1 from public.template_categories c where c.name_zh = v_name_zh and c.key <> v_key) then
-    raise exception 'CATEGORY_NAME_ZH_TAKEN';
-  end if;
+  if exists(select 1 from public.template_categories where lower(name_en)=lower(en) and key<>k) then raise exception 'CATEGORY_NAME_EN_TAKEN'; end if;
+  if exists(select 1 from public.template_categories where name_zh=zh and key<>k) then raise exception 'CATEGORY_NAME_ZH_TAKEN'; end if;
 
-  if coalesce(p_is_new, false) then
-    if exists (select 1 from public.template_categories c where c.key = v_key) then
-      raise exception 'CATEGORY_KEY_TAKEN';
-    end if;
-    insert into public.template_categories (key, name_en, name_zh, intro_en, intro_zh, card_style, sort_order)
-    values (
-      v_key, v_name_en, v_name_zh, v_intro_en, v_intro_zh, v_style,
-      (select coalesce(max(c.sort_order), 0) + 10 from public.template_categories c where not c.is_system)
-    );
+  if p_is_new then
+    if parent is not null and not exists(select 1 from public.template_categories
+        where key=parent and kind='template' and not is_system and level<3) then raise exception 'INVALID_PARENT'; end if;
+    select coalesce(max(sort_order),0)+10 into next_order from public.template_categories
+      where parent_id is not distinct from parent and kind='template' and not is_system;
+    insert into public.template_categories(key, name_en, name_zh, intro_en, intro_zh, card_style, sort_order,
+      parent_id,slug,is_visible,seo_title_en,seo_title_zh,seo_description_en,seo_description_zh)
+    values(k,en,zh,nullif(btrim(p_category->>'intro_en'),''),nullif(btrim(p_category->>'intro_zh'),''),
+      coalesce(p_category->>'card_style','pair'),next_order,parent,coalesce(p_category->>'slug',k),
+      coalesce((p_category->>'is_visible')::boolean,true),nullif(p_category->>'seo_title_en',''),nullif(p_category->>'seo_title_zh',''),
+      nullif(p_category->>'seo_description_en',''),nullif(p_category->>'seo_description_zh',''));
   else
-    if exists (select 1 from public.template_categories c where c.key = v_key and c.is_system) then
-      raise exception 'CATEGORY_SYSTEM';
-    end if;
-    update public.template_categories
-    set name_en = v_name_en,
-        name_zh = v_name_zh,
-        intro_en = v_intro_en,
-        intro_zh = v_intro_zh,
-        card_style = v_style
-    where key = v_key;
-    if not found then
-      raise exception 'CATEGORY_NOT_FOUND';
-    end if;
+    update public.template_categories set name_en=en, name_zh=zh, intro_en=nullif(btrim(p_category->>'intro_en'),''),
+      intro_zh=nullif(btrim(p_category->>'intro_zh'),''), card_style=coalesce(p_category->>'card_style','pair'),
+      slug=coalesce(p_category->>'slug',previous.slug), is_visible=coalesce((p_category->>'is_visible')::boolean,previous.is_visible),
+      seo_title_en=nullif(coalesce(p_category->>'seo_title_en',previous.seo_title_en),''),
+      seo_title_zh=nullif(coalesce(p_category->>'seo_title_zh',previous.seo_title_zh),''),
+      seo_description_en=nullif(coalesce(p_category->>'seo_description_en',previous.seo_description_en),''),
+      seo_description_zh=nullif(coalesce(p_category->>'seo_description_zh',previous.seo_description_zh),'')
+    where key=k;
   end if;
-end;
-$$;
+end $$;
 
 
 ALTER FUNCTION "public"."admin_save_template_category"("p_category" "jsonb", "p_is_new" boolean, "p_actor" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_save_template_series"("p_id" "uuid", "p_revision" "text", "p_fields" "jsonb", "p_members" "text"[], "p_actor" "uuid", "p_reason" "text") RETURNS "uuid"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  previous public.template_series;
+  saved public.template_series;
+begin
+  if not exists(select 1 from public.profiles where id=p_actor and role='admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree',0));
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series',0));
+  if p_id is not null then
+    select * into previous from public.template_series where id=p_id for update;
+    if not found or p_revision is distinct from admin.template_series_revision(previous) then
+      raise exception 'SERIES_CHANGED';
+    end if;
+    if previous.is_active and not (p_fields->>'is_active')::boolean and nullif(btrim(p_reason),'') is null then
+      raise exception 'SERIES_REASON_REQUIRED';
+    end if;
+  end if;
+  if p_members is null or cardinality(p_members)<>(select count(distinct m) from unnest(p_members) m) then
+    raise exception 'INVALID_SERIES_MEMBERS';
+  end if;
+  perform 1 from public.templates where id=any(p_members) or series_id=p_id order by id for update;
+  if cardinality(p_members)<>(select count(*) from public.templates t
+      join public.template_categories c on c.key=t.category_key where t.id=any(p_members)
+      and not c.is_system and t.id not in ('freeform','edit')) then
+    raise exception 'INVALID_SERIES_MEMBERS';
+  end if;
+  if exists(select 1 from public.templates where id=any(p_members) and series_id is not null and series_id is distinct from p_id) then
+    raise exception 'SERIES_MEMBER_TAKEN';
+  end if;
+  saved:=jsonb_populate_record(null::public.template_series,p_fields);
+  if p_id is null then
+    insert into public.template_series(slug,name_en,name_zh,description_en,description_zh,cover_url,
+      category_key,sort_order,is_active,show_members)
+    values(saved.slug,saved.name_en,saved.name_zh,saved.description_en,saved.description_zh,saved.cover_url,
+      saved.category_key,saved.sort_order,saved.is_active,saved.show_members) returning id into p_id;
+  else
+    update public.template_series set slug=saved.slug,name_en=saved.name_en,name_zh=saved.name_zh,
+      description_en=saved.description_en,description_zh=saved.description_zh,cover_url=saved.cover_url,
+      category_key=saved.category_key,sort_order=saved.sort_order,is_active=saved.is_active,show_members=saved.show_members
+    where id=p_id;
+  end if;
+  update public.templates set series_id=null,series_sort_order=0 where series_id=p_id and not (id=any(p_members));
+  update public.templates t set series_id=p_id,series_sort_order=m.ord::integer
+    from unnest(p_members) with ordinality as m(id,ord) where t.id=m.id
+      and (t.series_id is distinct from p_id or t.series_sort_order<>m.ord);
+  return p_id;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_save_template_series"("p_id" "uuid", "p_revision" "text", "p_fields" "jsonb", "p_members" "text"[], "p_actor" "uuid", "p_reason" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_save_versioned_template"("p_actor" "uuid", "p_template" "jsonb", "p_prompt" "jsonb", "p_expected" integer, "p_selected" integer DEFAULT NULL::integer, "p_style_refs" "jsonb" DEFAULT NULL::"jsonb") RETURNS integer
@@ -4615,6 +5051,24 @@ $_$;
 
 
 ALTER FUNCTION "public"."admin_search_users"("p_query" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_series_candidates"("p_search" "text", "p_after" "text") RETURNS TABLE("id" "text", "name" "text", "cover_url" "text", "series_id" "uuid", "is_active" boolean)
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select t.id, coalesce(nullif(t.translations #>> '{zh,name}',''),t.name),
+         coalesce(t.cover_after_url,t.cover_locales #>> '{zh,after}',t.cover_locales #>> '{en,after}'),
+         t.series_id,t.is_active
+    from public.templates t join public.template_categories c on c.key=t.category_key
+   where not c.is_system and t.id not in ('freeform','edit') and (p_after is null or t.id>p_after)
+     and (p_search='' or strpos(lower(t.id),lower(p_search))>0 or strpos(lower(t.name),lower(p_search))>0
+          or strpos(lower(t.translations #>> '{zh,name}'),lower(p_search))>0)
+   order by t.id limit 31
+$$;
+
+
+ALTER FUNCTION "public"."admin_series_candidates"("p_search" "text", "p_after" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_set_code_active"("p_actor" "uuid", "p_code_id" "uuid", "p_active" boolean) RETURNS "void"
@@ -5142,6 +5596,23 @@ end $$;
 ALTER FUNCTION "public"."admin_template_copy_source"("p_actor" "uuid", "p_source" "text", "p_request" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_template_series_detail"("p_id" "uuid") RETURNS "jsonb"
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select to_jsonb(s) || jsonb_build_object('revision',admin.template_series_revision(s),'members',
+    coalesce((select jsonb_agg(jsonb_build_object('id',t.id,
+      'name',coalesce(nullif(t.translations #>> '{zh,name}',''),t.name),
+      'cover_url',coalesce(t.cover_after_url,t.cover_locales #>> '{zh,after}',t.cover_locales #>> '{en,after}'),
+      'is_active',t.is_active, 'series_id',s.id) order by t.series_sort_order,t.id)
+      from public.templates t where t.series_id=s.id),'[]'))
+  from public.template_series s where s.id=p_id
+$$;
+
+
+ALTER FUNCTION "public"."admin_template_series_detail"("p_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_test_budget_status"() RETURNS "jsonb"
     LANGUAGE "plpgsql" STABLE
     SET "search_path" TO ''
@@ -5507,9 +5978,15 @@ begin
      exists(select from unnest(array['name','country','channel','audience','plan']) k
        where nullif(trim(p_application->>k),'') is null) then raise exception 'INVALID_INPUT'; end if;
   select user_id into v_parent from public.affiliates where slug=p_parent_slug and status='active' and team_enabled and user_id<>p_user;
-  insert into public.affiliates(user_id,slug,parent_user_id,country,application,terms_version,terms_accepted_at)
+
+  insert into public.affiliates as a(user_id,slug,parent_user_id,country,application,terms_version,terms_accepted_at)
     values(p_user,'sv-' || substr(replace(gen_random_uuid()::text,'-',''),1,20),v_parent,
-           p_application->>'country',p_application - 'source',v_version,now());
+           p_application->>'country',p_application - 'source',v_version,now())
+    on conflict(user_id) do update
+      set application=excluded.application,country=excluded.country,terms_version=excluded.terms_version,
+          terms_accepted_at=excluded.terms_accepted_at,status='pending',reject_reason=null,reapply_allowed=false
+      where a.status='rejected' and a.reapply_allowed;
+  if not found then raise exception 'AFFILIATE_APPLICATION_EXISTS'; end if;
 end;
 $$;
 
@@ -5574,15 +6051,22 @@ CREATE OR REPLACE FUNCTION "public"."affiliate_daily"("p_today" "date") RETURNS 
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-declare v_settings public.affiliate_settings; v_payment bigint; v_cutoff timestamptz;
+declare v_settings public.affiliate_settings; v_payment bigint; v_cutoff timestamptz; v_issue boolean:=false;
 begin
   select s.* into strict v_settings from public.affiliate_settings s where singleton;
   if p_today is null then raise exception 'INVALID_INPUT'; end if;
-  -- Only one scheduler per UTC period. Payment writes need no global scheduler lock.
-  perform pg_advisory_xact_lock(hashtextextended('affiliate_daily:' || p_today::text,0));
+  -- Serialize payout decisions and issuance; payment writes do not take this lock.
+  perform pg_advisory_xact_lock(hashtextextended('affiliate_settlement',0));
   for v_payment in select payment_id from public.affiliate_recompute_errors where resolved_at is null order by payment_id loop
     perform public.affiliate_recompute_payment(v_payment);
   end loop;
+  -- Mark the scheduled evaluation even when disabled or nobody qualifies.
+  -- Any later failure rolls this insert back together with issuance.
+  if extract(day from p_today)>=v_settings.settlement_day then
+    insert into public.affiliate_settlement_runs(period) values(date_trunc('month',p_today)::date)
+      on conflict(period) do nothing;
+    v_issue:=found;
+  end if;
   if not v_settings.enabled then return; end if;
   v_cutoff:=case when p_today=(now() at time zone 'UTC')::date then now() else p_today::timestamp at time zone 'UTC' end;
   -- A refund/dispute updates and locks this same commission. EvalPlanQual rechecks pending after waiting.
@@ -5595,13 +6079,19 @@ begin
     returning c.id,c.amount)
   insert into public.affiliate_commission_changes(commission_id,old_amount,new_amount,old_status,new_status,reason)
     select id,amount,amount,'pending','confirmed','confirmed' from changed;
-  if extract(day from p_today)<>v_settings.settlement_day then return; end if;
-  insert into public.affiliate_payouts(affiliate_user_id,period,amount,payout_snapshot)
-    select a.user_id,date_trunc('month',p_today)::date,b.available,
-      jsonb_build_object('payout_method',a.payout_method,'payout_details',a.payout_details)
-      from public.affiliates a join public.affiliate_balances b on b.affiliate_user_id=a.user_id
-     where a.status='active' and a.payout_method is not null and b.available>=v_settings.payout_min_usd
-    on conflict(affiliate_user_id,period) do nothing;
+  if not v_issue then return; end if;
+  -- One MVCC snapshot for the balance and its commission backing. Refunds that
+  -- commit after this statement are measured against these exact amounts at payment.
+  with issued as (
+    insert into public.affiliate_payouts(affiliate_user_id,period,amount,payout_snapshot)
+      select a.user_id,date_trunc('month',p_today)::date,b.available,
+        jsonb_build_object('payout_method',a.payout_method,'payout_details',a.payout_details)
+        from public.affiliates a join public.affiliate_balances b on b.affiliate_user_id=a.user_id
+       where a.status='active' and a.payout_method is not null and b.available>0 and b.available>=v_settings.payout_min_usd
+      on conflict(affiliate_user_id,period) do nothing returning id,affiliate_user_id,amount)
+  insert into public.affiliate_payout_items(payout_id,commission_id,prior_amount,issue_amount)
+    select n.id,a.* from issued n
+      cross join lateral public._affiliate_allocate_payout(n.affiliate_user_id,n.amount) a;
 end;
 $$;
 
@@ -5653,6 +6143,22 @@ $$;
 
 
 ALTER FUNCTION "public"."affiliate_partner_summary"("p_user" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."affiliate_payout_payable"("p" "public"."affiliate_payouts") RETURNS bigint
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select case when p.status in ('due','held') and not p.legacy_review_required then
+    least(public._affiliate_linked_payable(p),greatest(0,b.confirmed-b.paid
+      + (select coalesce(sum(j.amount),0) from public.affiliate_adjustments j where j.affiliate_user_id=p.affiliate_user_id)
+      - (select coalesce(sum(case when o.legacy_review_required then o.amount else public._affiliate_linked_payable(o) end),0)
+         from public.affiliate_payouts o where o.affiliate_user_id=p.affiliate_user_id and o.id<>p.id and o.status in ('due','held'))))::bigint
+    end from public.affiliate_balances b where b.affiliate_user_id=p.affiliate_user_id;
+$$;
+
+
+ALTER FUNCTION "public"."affiliate_payout_payable"("p" "public"."affiliate_payouts") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."affiliate_recompute_payment"("p_payment_id" bigint, "p_new_payment" boolean DEFAULT false) RETURNS "void"
@@ -5959,41 +6465,6 @@ $$;
 ALTER FUNCTION "public"."bump_template_prompt_version"() OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."template_categories" (
-    "key" "text" NOT NULL,
-    "name_en" "text" NOT NULL,
-    "name_zh" "text" NOT NULL,
-    "intro_en" "text",
-    "intro_zh" "text",
-    "card_style" "text" DEFAULT 'pair'::"text" NOT NULL,
-    "sort_order" integer DEFAULT 0 NOT NULL,
-    "is_system" boolean DEFAULT false NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "parent_id" "text",
-    "kind" "text" DEFAULT 'template'::"text" NOT NULL,
-    "level" smallint DEFAULT 1 NOT NULL,
-    "slug" "text" DEFAULT ''::"text" NOT NULL,
-    "is_visible" boolean DEFAULT true NOT NULL,
-    "seo_title_en" "text",
-    "seo_title_zh" "text",
-    "seo_description_en" "text",
-    "seo_description_zh" "text",
-    CONSTRAINT "template_categories_card_style_check" CHECK (("card_style" = ANY (ARRAY['pair'::"text", 'compare'::"text"]))),
-    CONSTRAINT "template_categories_intro_en_check" CHECK ((("intro_en" IS NULL) OR (("char_length"("intro_en") >= 1) AND ("char_length"("intro_en") <= 200)))),
-    CONSTRAINT "template_categories_intro_zh_check" CHECK ((("intro_zh" IS NULL) OR (("char_length"("intro_zh") >= 1) AND ("char_length"("intro_zh") <= 200)))),
-    CONSTRAINT "template_categories_key_check" CHECK ((("key" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text") AND ("char_length"("key") <= 40))),
-    CONSTRAINT "template_categories_kind_check" CHECK (("kind" = ANY (ARRAY['template'::"text", 'reference'::"text"]))),
-    CONSTRAINT "template_categories_level_check" CHECK ((("level" >= 1) AND ("level" <= 3))),
-    CONSTRAINT "template_categories_name_en_check" CHECK ((("char_length"("name_en") >= 1) AND ("char_length"("name_en") <= 32) AND ("name_en" = "btrim"("name_en")))),
-    CONSTRAINT "template_categories_name_zh_check" CHECK ((("char_length"("name_zh") >= 1) AND ("char_length"("name_zh") <= 12) AND ("name_zh" = "btrim"("name_zh")))),
-    CONSTRAINT "template_category_slug_format" CHECK (("slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text"))
-);
-
-
-ALTER TABLE "public"."template_categories" OWNER TO "postgres";
-
-
 CREATE OR REPLACE VIEW "public"."template_category_paths" WITH ("security_invoker"='true') AS
  SELECT "c"."key",
     COALESCE("g"."key", "p"."key", "c"."key") AS "root_key",
@@ -6006,27 +6477,6 @@ CREATE OR REPLACE VIEW "public"."template_category_paths" WITH ("security_invoke
 
 
 ALTER VIEW "public"."template_category_paths" OWNER TO "postgres";
-
-
-CREATE TABLE IF NOT EXISTS "public"."template_series" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "slug" "text" NOT NULL,
-    "name_en" "text" NOT NULL,
-    "name_zh" "text" NOT NULL,
-    "description_en" "text",
-    "description_zh" "text",
-    "cover_url" "text",
-    "category_key" "text" NOT NULL,
-    "sort_order" integer DEFAULT 0 NOT NULL,
-    "is_active" boolean DEFAULT false NOT NULL,
-    "show_members" boolean DEFAULT false NOT NULL,
-    CONSTRAINT "template_series_name_en_check" CHECK (("btrim"("name_en") <> ''::"text")),
-    CONSTRAINT "template_series_name_zh_check" CHECK (("btrim"("name_zh") <> ''::"text")),
-    CONSTRAINT "template_series_slug_check" CHECK (("slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text"))
-);
-
-
-ALTER TABLE "public"."template_series" OWNER TO "postgres";
 
 
 CREATE OR REPLACE VIEW "public"."web_template_members" WITH ("security_invoker"='true') AS
@@ -6165,6 +6615,40 @@ $$;
 
 
 ALTER FUNCTION "public"."checkout_discount"("p_user" "uuid", "p_product_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."claim_batch_zip"("p_user_id" "uuid", "p_batch_id" "uuid", "p_token" "uuid") RETURNS "text"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  state admin.batch_zip_requests;
+  at_time timestamptz;
+  recent timestamptz[];
+  active jsonb;
+  result text := 'acquired';
+begin
+  if coalesce(public.current_tier(p_user_id), 'starter') not in ('pro', 'max') then return 'upgrade'; end if;
+  insert into admin.batch_zip_requests (user_id) values (p_user_id) on conflict do nothing;
+  select * into strict state from admin.batch_zip_requests where user_id=p_user_id for update;
+  at_time := clock_timestamp();
+  recent := array(select t from unnest(state.request_times) t where t > at_time - interval '1 minute');
+  if cardinality(recent) >= 3 then return 'limited'; end if;
+  select coalesce(jsonb_object_agg(key,value), '{}') into active from jsonb_each(state.active_batches)
+    where (value->>'expires')::timestamptz > at_time;
+  if active ? p_batch_id::text then
+    result := 'packing';
+  else
+    active := active || jsonb_build_object(p_batch_id::text,
+      jsonb_build_object('token', p_token, 'expires', at_time + interval '6 minutes'));
+  end if;
+  update admin.batch_zip_requests set request_times = array_append(recent,at_time), active_batches = active where user_id=p_user_id;
+  return result;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."claim_batch_zip"("p_user_id" "uuid", "p_batch_id" "uuid", "p_token" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."claim_dispute_reminders"("p_dispute_ids" "text"[]) RETURNS SETOF "text"
@@ -6443,6 +6927,7 @@ CREATE TABLE IF NOT EXISTS "public"."generation_jobs" (
     "downloaded_at" timestamp with time zone,
     "download_ip" "inet",
     "download_count" integer DEFAULT 0 NOT NULL,
+    "batch_id" "uuid",
     CONSTRAINT "generation_jobs_check" CHECK ((("status" = 'running'::"text") = ("finished_at" IS NULL))),
     CONSTRAINT "generation_jobs_check1" CHECK ((("status" <> 'succeeded'::"text") OR ("output_key" IS NOT NULL))),
     CONSTRAINT "generation_jobs_cost_usd_nonnegative" CHECK ((("cost_usd" IS NULL) OR ("cost_usd" >= (0)::numeric))),
@@ -7297,6 +7782,22 @@ $$;
 ALTER FUNCTION "public"."purge_identity_refusals"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."read_product_catalog"("p_version" "text") RETURNS TABLE("product_id" "text", "tier" "text", "kind" "text", "revision" integer, "usd_cents" integer, "credits" integer, "paid_days" integer, "listed" boolean, "name_en" "text", "name_zh" "text")
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select p.product_id, p.tier, p.kind, v.revision, v.usd_cents, v.credits, v.paid_days,
+         v.listed, v.name_en, v.name_zh
+    from admin.catalog_products p
+    join admin.catalog_product_versions v on v.product_id = p.product_id
+     and v.revision = case p_version when 'v1' then 1 when 'v2' then p.published_revision end
+   order by v.sort_order, p.product_id
+$$;
+
+
+ALTER FUNCTION "public"."read_product_catalog"("p_version" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."read_template_sync_source"("p_id" "text") RETURNS "jsonb"
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
@@ -7831,6 +8332,18 @@ $$;
 ALTER FUNCTION "public"."refund_job"("p_job_id" "uuid", "p_error_code" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."release_batch_zip"("p_user_id" "uuid", "p_batch_id" "uuid", "p_token" "uuid") RETURNS "void"
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  update admin.batch_zip_requests set active_batches=active_batches-p_batch_id::text
+   where user_id=p_user_id and active_batches->p_batch_id::text->>'token'=p_token::text;
+$$;
+
+
+ALTER FUNCTION "public"."release_batch_zip"("p_user_id" "uuid", "p_batch_id" "uuid", "p_token" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."release_checkout_discount"("p_user" "uuid", "p_token" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -7846,6 +8359,39 @@ $$;
 
 
 ALTER FUNCTION "public"."release_checkout_discount"("p_user" "uuid", "p_token" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."reserve_batch_cell"("p_job_id" "uuid", "p_user_id" "uuid", "p_module" "text", "p_template_id" "text", "p_credits_cost" integer, "p_inputs" "jsonb", "p_provider" "text", "p_visibility" "text") RETURNS "public"."generation_jobs"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  job public.generation_jobs;
+  batch uuid := (p_inputs->>'batch_id')::uuid;
+  position_in_batch integer := (p_inputs->>'batch_position')::integer;
+begin
+  job := public.reserve_credits(p_job_id,p_user_id,p_module,p_template_id,p_credits_cost,'web',
+    p_inputs,p_provider,null,p_visibility,null);
+  if job.inputs->>'attempt_id' is distinct from p_inputs->>'attempt_id' then return job; end if;
+  if job.credit_pool <> 'paid' then raise exception 'CREDITS_INSUFFICIENT'; end if;
+  -- Legacy single-template batch clients do not have a preflight ID.
+  if batch is null then return job; end if;
+  if position_in_batch is null then raise exception 'INVALID_INPUT'; end if;
+  if job.credits_cost is distinct from p_credits_cost then raise exception 'TEMPLATE_QUOTE_CHANGED'; end if;
+  if (p_inputs->>'batch_templates')::integer > 1 and public.current_tier(p_user_id) is distinct from 'max' then
+    raise exception 'BATCH_MAX_REQUIRED';
+  end if;
+  if exists (
+    select 1 from public.generation_jobs j where j.user_id=p_user_id and j.batch_id=batch
+      and j.status<>'failed' and (j.inputs->>'batch_position')::integer=position_in_batch and j.id<>p_job_id
+  ) then raise exception 'IDEMPOTENCY_CONFLICT'; end if;
+  update public.generation_jobs set batch_id=batch where id=p_job_id returning * into job;
+  return job;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."reserve_batch_cell"("p_job_id" "uuid", "p_user_id" "uuid", "p_module" "text", "p_template_id" "text", "p_credits_cost" integer, "p_inputs" "jsonb", "p_provider" "text", "p_visibility" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."reserve_checkout_discount"("p_user" "uuid", "p_product_id" "text", "p_token" "uuid") RETURNS "jsonb"
@@ -8874,6 +9420,50 @@ $$;
 ALTER FUNCTION "public"."wishlist_eligible"("p_user_id" "uuid") OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "admin"."batch_zip_requests" (
+    "user_id" "uuid" NOT NULL,
+    "request_times" timestamp with time zone[] DEFAULT '{}'::timestamp with time zone[] NOT NULL,
+    "active_batches" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL
+);
+
+
+ALTER TABLE "admin"."batch_zip_requests" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "admin"."catalog_product_versions" (
+    "product_id" "text" NOT NULL,
+    "revision" integer NOT NULL,
+    "usd_cents" integer NOT NULL,
+    "credits" integer NOT NULL,
+    "paid_days" integer,
+    "listed" boolean NOT NULL,
+    "sort_order" integer NOT NULL,
+    "name_en" "text" NOT NULL,
+    "name_zh" "text" NOT NULL,
+    CONSTRAINT "catalog_product_versions_credits_check" CHECK (("credits" > 0)),
+    CONSTRAINT "catalog_product_versions_paid_days_check" CHECK (("paid_days" > 0)),
+    CONSTRAINT "catalog_product_versions_revision_check" CHECK (("revision" > 0)),
+    CONSTRAINT "catalog_product_versions_usd_cents_check" CHECK (("usd_cents" > 0))
+);
+
+
+ALTER TABLE "admin"."catalog_product_versions" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "admin"."catalog_products" (
+    "product_id" "text" NOT NULL,
+    "tier" "text" NOT NULL,
+    "kind" "text" NOT NULL,
+    "published_revision" integer,
+    CONSTRAINT "catalog_products_check" CHECK ((("tier" = 'pack'::"text") = ("kind" = 'pack'::"text"))),
+    CONSTRAINT "catalog_products_kind_check" CHECK (("kind" = ANY (ARRAY['monthly'::"text", 'yearly'::"text", 'pack'::"text"]))),
+    CONSTRAINT "catalog_products_tier_check" CHECK (("tier" = ANY (ARRAY['starter'::"text", 'pro'::"text", 'max'::"text", 'pack'::"text"])))
+);
+
+
+ALTER TABLE "admin"."catalog_products" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "admin"."deleted_prompt_versions" (
     "template_id" "text" NOT NULL,
     "version" integer NOT NULL,
@@ -9230,6 +9820,7 @@ CREATE TABLE IF NOT EXISTS "public"."affiliate_commissions" (
     "released_by" "uuid",
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "payout_retained" "int8multirange",
     CONSTRAINT "affiliate_commissions_amount_check" CHECK (("amount" >= 0)),
     CONSTRAINT "affiliate_commissions_base_usd_check" CHECK (("base_usd" >= 0)),
     CONSTRAINT "affiliate_commissions_level_check" CHECK (("level" = ANY (ARRAY[1, 2]))),
@@ -9239,27 +9830,6 @@ CREATE TABLE IF NOT EXISTS "public"."affiliate_commissions" (
 
 
 ALTER TABLE "public"."affiliate_commissions" OWNER TO "postgres";
-
-
-CREATE TABLE IF NOT EXISTS "public"."affiliate_payouts" (
-    "id" bigint NOT NULL,
-    "affiliate_user_id" "uuid" NOT NULL,
-    "period" "date" NOT NULL,
-    "amount" bigint NOT NULL,
-    "status" "text" DEFAULT 'due'::"text" NOT NULL,
-    "payout_snapshot" "jsonb" NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "paid_at" timestamp with time zone,
-    "paid_method" "text",
-    "paid_reference" "text",
-    "decided_by" "uuid",
-    "note" "text",
-    CONSTRAINT "affiliate_payouts_amount_check" CHECK (("amount" > 0)),
-    CONSTRAINT "affiliate_payouts_status_check" CHECK (("status" = ANY (ARRAY['due'::"text", 'paid'::"text", 'held'::"text"])))
-);
-
-
-ALTER TABLE "public"."affiliate_payouts" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."affiliates" (
@@ -9280,6 +9850,7 @@ CREATE TABLE IF NOT EXISTS "public"."affiliates" (
     "approved_by" "uuid",
     "admin_note" "text",
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "reapply_allowed" boolean DEFAULT false NOT NULL,
     CONSTRAINT "affiliates_check" CHECK (("parent_user_id" <> "user_id")),
     CONSTRAINT "affiliates_payout_method_check" CHECK (("payout_method" = ANY (ARRAY['paypal'::"text", 'wise'::"text", 'bank'::"text", 'alipay'::"text", 'other'::"text"]))),
     CONSTRAINT "affiliates_slug_check" CHECK ((("slug" ~ '^[a-z0-9-]{3,24}$'::"text") AND ("slug" <> ALL (ARRAY['admin'::"text", 'api'::"text", 'www'::"text", 'shotviva'::"text", 'partners'::"text", 'support'::"text"])))),
@@ -9304,8 +9875,12 @@ CREATE OR REPLACE VIEW "public"."affiliate_balances" WITH ("security_invoker"='t
      LEFT JOIN LATERAL ( SELECT "sum"("affiliate_adjustments"."amount") AS "adjusted"
            FROM "public"."affiliate_adjustments"
           WHERE ("affiliate_adjustments"."affiliate_user_id" = "a"."user_id")) "j" ON (true))
-     LEFT JOIN LATERAL ( SELECT "sum"("affiliate_payouts"."amount") FILTER (WHERE ("affiliate_payouts"."status" = 'paid'::"text")) AS "paid",
-            "sum"("affiliate_payouts"."amount") FILTER (WHERE ("affiliate_payouts"."status" = ANY (ARRAY['paid'::"text", 'due'::"text"]))) AS "reserved"
+     LEFT JOIN LATERAL ( SELECT "sum"(COALESCE("affiliate_payouts"."paid_amount", "affiliate_payouts"."amount")) FILTER (WHERE ("affiliate_payouts"."status" = 'paid'::"text")) AS "paid",
+            "sum"(
+                CASE
+                    WHEN ("affiliate_payouts"."status" = 'paid'::"text") THEN COALESCE("affiliate_payouts"."paid_amount", "affiliate_payouts"."amount")
+                    ELSE "affiliate_payouts"."amount"
+                END) FILTER (WHERE ("affiliate_payouts"."status" = ANY (ARRAY['paid'::"text", 'due'::"text", 'held'::"text"]))) AS "reserved"
            FROM "public"."affiliate_payouts"
           WHERE ("affiliate_payouts"."affiliate_user_id" = "a"."user_id")) "p" ON (true));
 
@@ -9359,6 +9934,20 @@ ALTER TABLE "public"."affiliate_commissions" ALTER COLUMN "id" ADD GENERATED ALW
     CACHE 1
 );
 
+
+
+CREATE TABLE IF NOT EXISTS "public"."affiliate_payout_items" (
+    "payout_id" bigint NOT NULL,
+    "commission_id" bigint NOT NULL,
+    "prior_amount" bigint NOT NULL,
+    "issue_amount" bigint NOT NULL,
+    "settled_amount" bigint,
+    CONSTRAINT "affiliate_payout_items_check" CHECK ((("issue_amount" > "prior_amount") AND ("prior_amount" >= 0))),
+    CONSTRAINT "affiliate_payout_items_check1" CHECK ((("settled_amount" >= "prior_amount") AND ("settled_amount" <= "issue_amount")))
+);
+
+
+ALTER TABLE "public"."affiliate_payout_items" OWNER TO "postgres";
 
 
 ALTER TABLE "public"."affiliate_payouts" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
@@ -9430,7 +10019,9 @@ CREATE TABLE IF NOT EXISTS "public"."affiliate_settings" (
     "settlement_day" integer DEFAULT 1 NOT NULL,
     "apply_min_level" "text" DEFAULT 'none'::"text" NOT NULL,
     "terms_version" "text" DEFAULT '1'::"text" NOT NULL,
+    "commission_months" integer,
     CONSTRAINT "affiliate_settings_apply_min_level_check" CHECK (("apply_min_level" = ANY (ARRAY['none'::"text", 'any_paid'::"text", 'starter'::"text", 'pro'::"text", 'max'::"text"]))),
+    CONSTRAINT "affiliate_settings_commission_months_check" CHECK (("commission_months" > 0)),
     CONSTRAINT "affiliate_settings_hold_days_check" CHECK (("hold_days" >= 0)),
     CONSTRAINT "affiliate_settings_payout_min_usd_check" CHECK (("payout_min_usd" > 0)),
     CONSTRAINT "affiliate_settings_settlement_day_check" CHECK ((("settlement_day" >= 1) AND ("settlement_day" <= 28))),
@@ -9440,6 +10031,14 @@ CREATE TABLE IF NOT EXISTS "public"."affiliate_settings" (
 
 
 ALTER TABLE "public"."affiliate_settings" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."affiliate_settlement_runs" (
+    "period" "date" NOT NULL
+);
+
+
+ALTER TABLE "public"."affiliate_settlement_runs" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."business_inquiries" (
@@ -9895,6 +10494,21 @@ CREATE TABLE IF NOT EXISTS "public"."template_sync_history" (
 ALTER TABLE "public"."template_sync_history" OWNER TO "postgres";
 
 
+ALTER TABLE ONLY "admin"."batch_zip_requests"
+    ADD CONSTRAINT "batch_zip_requests_pkey" PRIMARY KEY ("user_id");
+
+
+
+ALTER TABLE ONLY "admin"."catalog_product_versions"
+    ADD CONSTRAINT "catalog_product_versions_pkey" PRIMARY KEY ("product_id", "revision");
+
+
+
+ALTER TABLE ONLY "admin"."catalog_products"
+    ADD CONSTRAINT "catalog_products_pkey" PRIMARY KEY ("product_id");
+
+
+
 ALTER TABLE ONLY "admin"."deleted_prompt_versions"
     ADD CONSTRAINT "deleted_prompt_versions_pkey" PRIMARY KEY ("template_id", "version");
 
@@ -10010,6 +10624,11 @@ ALTER TABLE ONLY "public"."affiliate_commissions"
 
 
 
+ALTER TABLE ONLY "public"."affiliate_payout_items"
+    ADD CONSTRAINT "affiliate_payout_items_pkey" PRIMARY KEY ("payout_id", "commission_id", "prior_amount");
+
+
+
 ALTER TABLE ONLY "public"."affiliate_payouts"
     ADD CONSTRAINT "affiliate_payouts_affiliate_user_id_period_key" UNIQUE ("affiliate_user_id", "period");
 
@@ -10037,6 +10656,11 @@ ALTER TABLE ONLY "public"."affiliate_recompute_errors"
 
 ALTER TABLE ONLY "public"."affiliate_settings"
     ADD CONSTRAINT "affiliate_settings_pkey" PRIMARY KEY ("singleton");
+
+
+
+ALTER TABLE ONLY "public"."affiliate_settlement_runs"
+    ADD CONSTRAINT "affiliate_settlement_runs_pkey" PRIMARY KEY ("period");
 
 
 
@@ -10365,6 +10989,10 @@ CREATE INDEX "affiliate_errors_queue_idx" ON "public"."affiliate_recompute_error
 
 
 
+CREATE INDEX "affiliate_payout_items_commission_idx" ON "public"."affiliate_payout_items" USING "btree" ("commission_id");
+
+
+
 CREATE INDEX "affiliate_payouts_list_idx" ON "public"."affiliate_payouts" USING "btree" ("created_at" DESC, "id" DESC);
 
 
@@ -10466,6 +11094,10 @@ CREATE INDEX "credit_ledger_user_id_created_at_idx" ON "public"."credit_ledger" 
 
 
 CREATE INDEX "credit_ledger_user_plan_idx" ON "public"."credit_ledger" USING "btree" ("user_id", "created_at" DESC, "id" DESC) WHERE (("pool" = 'paid'::"text") AND ("delta" > 0) AND ("product_id" IS NOT NULL) AND ("product_id" !~~ 'pack_%'::"text"));
+
+
+
+CREATE INDEX "generation_jobs_batch_slot" ON "public"."generation_jobs" USING "btree" ("user_id", "batch_id", ((("inputs" ->> 'batch_position'::"text"))::integer)) WHERE (("batch_id" IS NOT NULL) AND ("status" <> 'failed'::"text"));
 
 
 
@@ -10661,6 +11293,10 @@ CREATE INDEX "template_requests_wall_idx" ON "public"."template_requests" USING 
 
 
 
+CREATE INDEX "template_series_admin_order_idx" ON "public"."template_series" USING "btree" ("sort_order", "id");
+
+
+
 CREATE INDEX "template_series_category_idx" ON "public"."template_series" USING "btree" ("category_key", "sort_order", "id");
 
 
@@ -10853,6 +11489,26 @@ CREATE OR REPLACE TRIGGER "zz_template_prompt_version" BEFORE INSERT OR UPDATE O
 
 
 
+ALTER TABLE ONLY "admin"."batch_zip_requests"
+    ADD CONSTRAINT "batch_zip_requests_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "admin"."catalog_product_versions"
+    ADD CONSTRAINT "catalog_product_versions_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "admin"."catalog_products"("product_id");
+
+
+
+ALTER TABLE ONLY "admin"."catalog_products"
+    ADD CONSTRAINT "catalog_products_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id");
+
+
+
+ALTER TABLE ONLY "admin"."catalog_products"
+    ADD CONSTRAINT "catalog_products_product_id_published_revision_fkey" FOREIGN KEY ("product_id", "published_revision") REFERENCES "admin"."catalog_product_versions"("product_id", "revision") DEFERRABLE INITIALLY DEFERRED;
+
+
+
 ALTER TABLE ONLY "admin"."deleted_prompt_versions"
     ADD CONSTRAINT "deleted_prompt_versions_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON DELETE CASCADE;
 
@@ -10945,6 +11601,16 @@ ALTER TABLE ONLY "public"."affiliate_commissions"
 
 ALTER TABLE ONLY "public"."affiliate_commissions"
     ADD CONSTRAINT "affiliate_commissions_released_by_fkey" FOREIGN KEY ("released_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."affiliate_payout_items"
+    ADD CONSTRAINT "affiliate_payout_items_commission_id_fkey" FOREIGN KEY ("commission_id") REFERENCES "public"."affiliate_commissions"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."affiliate_payout_items"
+    ADD CONSTRAINT "affiliate_payout_items_payout_id_fkey" FOREIGN KEY ("payout_id") REFERENCES "public"."affiliate_payouts"("id") ON DELETE CASCADE;
 
 
 
@@ -11263,6 +11929,15 @@ ALTER TABLE ONLY "public"."templates"
 
 
 
+ALTER TABLE "admin"."batch_zip_requests" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "admin"."catalog_product_versions" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "admin"."catalog_products" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "admin"."deleted_prompt_versions" ENABLE ROW LEVEL SECURITY;
 
 
@@ -11317,6 +11992,9 @@ ALTER TABLE "public"."affiliate_commission_changes" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."affiliate_commissions" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."affiliate_payout_items" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."affiliate_payouts" ENABLE ROW LEVEL SECURITY;
 
 
@@ -11330,6 +12008,9 @@ ALTER TABLE "public"."affiliate_recompute_errors" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."affiliate_settings" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."affiliate_settlement_runs" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."affiliates" ENABLE ROW LEVEL SECURITY;
@@ -11710,6 +12391,17 @@ REVOKE ALL ON FUNCTION "admin"."template_price_state"("t" "public"."templates") 
 
 
 
+GRANT ALL ON TABLE "public"."template_series" TO "service_role";
+GRANT SELECT ON TABLE "public"."template_series" TO "anon";
+GRANT SELECT ON TABLE "public"."template_series" TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."template_series_revision"("p_series" "public"."template_series") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."template_series_revision"("p_series" "public"."template_series") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "admin"."template_sync_catalog"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."template_sync_catalog"() TO "service_role";
 
@@ -11743,6 +12435,10 @@ REVOKE ALL ON FUNCTION "public"."_affiliate_accept_invite"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "public"."_affiliate_allocate_payout"("p_owner" "uuid", "p_face" bigint, "p_at" timestamp with time zone) FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."_affiliate_audit"("p_actor" "uuid", "p_action" "text", "p_target" "text", "p_reason" "text") FROM PUBLIC;
 
 
@@ -11759,6 +12455,14 @@ REVOKE ALL ON FUNCTION "public"."_affiliate_due"("p_total" integer, "p_tax" inte
 
 
 
+GRANT SELECT ON TABLE "public"."affiliate_payouts" TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."_affiliate_linked_payable"("p" "public"."affiliate_payouts") FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."_affiliate_overrides"("p_user" "uuid", "p_values" "jsonb") FROM PUBLIC;
 
 
@@ -11767,7 +12471,15 @@ REVOKE ALL ON FUNCTION "public"."_affiliate_payment_event"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "public"."_affiliate_payout_forfeit"("p" "public"."affiliate_payouts", "p_note" "text") FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."_affiliate_require_admin"("p_actor" "uuid") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_affiliate_retained_cents"("p_ranges" "int8multirange", "p_amount" bigint) FROM PUBLIC;
 
 
 
@@ -11850,6 +12562,11 @@ GRANT ALL ON FUNCTION "public"."admin_affiliate_adjust"("p_actor" "uuid", "p_inp
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_affiliate_allow_reapply"("p_actor" "uuid", "p_input" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_affiliate_allow_reapply"("p_actor" "uuid", "p_input" "jsonb") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_affiliate_commission_release"("p_actor" "uuid", "p_input" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_affiliate_commission_release"("p_actor" "uuid", "p_input" "jsonb") TO "service_role";
 
@@ -11900,6 +12617,17 @@ GRANT ALL ON FUNCTION "public"."admin_affiliate_settings"("p_actor" "uuid", "p_i
 
 
 
+GRANT ALL ON TABLE "public"."template_categories" TO "service_role";
+GRANT SELECT ON TABLE "public"."template_categories" TO "anon";
+GRANT SELECT ON TABLE "public"."template_categories" TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_assigned_template_count"("public"."template_categories") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_assigned_template_count"("public"."template_categories") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_ban_user"("p_user_id" "uuid", "p_reason" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_ban_user"("p_user_id" "uuid", "p_reason" "text") TO "service_role";
 
@@ -11917,6 +12645,11 @@ GRANT ALL ON FUNCTION "public"."admin_batch_set_banned"("p_actor" "uuid", "p_use
 
 REVOKE ALL ON FUNCTION "public"."admin_begin_test_run"("p_actor" "uuid", "p_run_id" "uuid", "p_template_id" "text", "p_kind" "text", "p_parent_id" "uuid", "p_photo_id" "uuid", "p_batch_id" "uuid", "p_resolution" "text", "p_inputs" "jsonb", "p_prompt_version" integer, "p_provider" "text", "p_estimate_usd" numeric) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_begin_test_run"("p_actor" "uuid", "p_run_id" "uuid", "p_template_id" "text", "p_kind" "text", "p_parent_id" "uuid", "p_photo_id" "uuid", "p_batch_id" "uuid", "p_resolution" "text", "p_inputs" "jsonb", "p_prompt_version" integer, "p_provider" "text", "p_estimate_usd" numeric) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_bulk_assign_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid", "p_locales" "text"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_bulk_assign_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid", "p_locales" "text"[]) TO "service_role";
 
 
 
@@ -12060,6 +12793,11 @@ GRANT ALL ON FUNCTION "public"."admin_mark_dispute_submitted"("p_dispute_id" "te
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_move_template_category"("p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text", "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_move_template_category"("p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text", "p_actor" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_openai_admin_key_status"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_openai_admin_key_status"() TO "service_role";
 
@@ -12120,8 +12858,18 @@ GRANT ALL ON FUNCTION "public"."admin_save_provider"("p_actor" "uuid", "p_id" "u
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_save_template_assignment"("p_actor" "uuid", "p_template" "jsonb", "p_prompt" "jsonb", "p_assignment" "jsonb", "p_is_new" boolean, "p_expected" integer, "p_selected" integer, "p_style_refs" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_save_template_assignment"("p_actor" "uuid", "p_template" "jsonb", "p_prompt" "jsonb", "p_assignment" "jsonb", "p_is_new" boolean, "p_expected" integer, "p_selected" integer, "p_style_refs" "jsonb") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_save_template_category"("p_category" "jsonb", "p_is_new" boolean, "p_actor" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_save_template_category"("p_category" "jsonb", "p_is_new" boolean, "p_actor" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_save_template_series"("p_id" "uuid", "p_revision" "text", "p_fields" "jsonb", "p_members" "text"[], "p_actor" "uuid", "p_reason" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_save_template_series"("p_id" "uuid", "p_revision" "text", "p_fields" "jsonb", "p_members" "text"[], "p_actor" "uuid", "p_reason" "text") TO "service_role";
 
 
 
@@ -12132,6 +12880,11 @@ GRANT ALL ON FUNCTION "public"."admin_save_versioned_template"("p_actor" "uuid",
 
 REVOKE ALL ON FUNCTION "public"."admin_search_users"("p_query" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_search_users"("p_query" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_series_candidates"("p_search" "text", "p_after" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_series_candidates"("p_search" "text", "p_after" "text") TO "service_role";
 
 
 
@@ -12197,6 +12950,11 @@ GRANT ALL ON FUNCTION "public"."admin_signup_ip_clusters"("p_days" integer) TO "
 
 REVOKE ALL ON FUNCTION "public"."admin_template_copy_source"("p_actor" "uuid", "p_source" "text", "p_request" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_template_copy_source"("p_actor" "uuid", "p_source" "text", "p_request" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_template_series_detail"("p_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_template_series_detail"("p_id" "uuid") TO "service_role";
 
 
 
@@ -12280,6 +13038,11 @@ GRANT ALL ON FUNCTION "public"."affiliate_partner_summary"("p_user" "uuid") TO "
 
 
 
+REVOKE ALL ON FUNCTION "public"."affiliate_payout_payable"("p" "public"."affiliate_payouts") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."affiliate_payout_payable"("p" "public"."affiliate_payouts") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."affiliate_recompute_payment"("p_payment_id" bigint, "p_new_payment" boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."affiliate_recompute_payment"("p_payment_id" bigint, "p_new_payment" boolean) TO "service_role";
 
@@ -12324,21 +13087,9 @@ GRANT ALL ON FUNCTION "public"."begin_identity_judge"("p_user_id" "uuid", "p_tex
 
 
 
-GRANT ALL ON TABLE "public"."template_categories" TO "service_role";
-GRANT SELECT ON TABLE "public"."template_categories" TO "anon";
-GRANT SELECT ON TABLE "public"."template_categories" TO "authenticated";
-
-
-
 GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."template_category_paths" TO "service_role";
 GRANT SELECT ON TABLE "public"."template_category_paths" TO "anon";
 GRANT SELECT ON TABLE "public"."template_category_paths" TO "authenticated";
-
-
-
-GRANT ALL ON TABLE "public"."template_series" TO "service_role";
-GRANT SELECT ON TABLE "public"."template_series" TO "anon";
-GRANT SELECT ON TABLE "public"."template_series" TO "authenticated";
 
 
 
@@ -12378,6 +13129,11 @@ REVOKE ALL ON FUNCTION "public"."check_template_image_provider"() FROM PUBLIC;
 
 REVOKE ALL ON FUNCTION "public"."checkout_discount"("p_user" "uuid", "p_product_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."checkout_discount"("p_user" "uuid", "p_product_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."claim_batch_zip"("p_user_id" "uuid", "p_batch_id" "uuid", "p_token" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."claim_batch_zip"("p_user_id" "uuid", "p_batch_id" "uuid", "p_token" "uuid") TO "service_role";
 
 
 
@@ -12560,6 +13316,11 @@ GRANT ALL ON FUNCTION "public"."purge_identity_refusals"() TO "service_role";
 
 
 
+REVOKE ALL ON FUNCTION "public"."read_product_catalog"("p_version" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."read_product_catalog"("p_version" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."read_template_sync_source"("p_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."read_template_sync_source"("p_id" "text") TO "service_role";
 
@@ -12625,8 +13386,18 @@ GRANT ALL ON FUNCTION "public"."refund_job"("p_job_id" "uuid", "p_error_code" "t
 
 
 
+REVOKE ALL ON FUNCTION "public"."release_batch_zip"("p_user_id" "uuid", "p_batch_id" "uuid", "p_token" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."release_batch_zip"("p_user_id" "uuid", "p_batch_id" "uuid", "p_token" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."release_checkout_discount"("p_user" "uuid", "p_token" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."release_checkout_discount"("p_user" "uuid", "p_token" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."reserve_batch_cell"("p_job_id" "uuid", "p_user_id" "uuid", "p_module" "text", "p_template_id" "text", "p_credits_cost" integer, "p_inputs" "jsonb", "p_provider" "text", "p_visibility" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."reserve_batch_cell"("p_job_id" "uuid", "p_user_id" "uuid", "p_module" "text", "p_template_id" "text", "p_credits_cost" integer, "p_inputs" "jsonb", "p_provider" "text", "p_visibility" "text") TO "service_role";
 
 
 
@@ -12825,10 +13596,6 @@ GRANT SELECT ON TABLE "public"."affiliate_commissions" TO "service_role";
 
 
 
-GRANT SELECT ON TABLE "public"."affiliate_payouts" TO "service_role";
-
-
-
 GRANT SELECT ON TABLE "public"."affiliates" TO "service_role";
 
 
@@ -12845,6 +13612,10 @@ GRANT SELECT ON TABLE "public"."affiliate_commission_changes" TO "service_role";
 
 
 
+GRANT SELECT ON TABLE "public"."affiliate_payout_items" TO "service_role";
+
+
+
 GRANT SELECT ON TABLE "public"."affiliate_rate_overrides" TO "service_role";
 
 
@@ -12858,6 +13629,10 @@ GRANT SELECT ON TABLE "public"."affiliate_recompute_errors" TO "service_role";
 
 
 GRANT SELECT ON TABLE "public"."affiliate_settings" TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "public"."affiliate_settlement_runs" TO "service_role";
 
 
 

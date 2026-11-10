@@ -37,6 +37,7 @@ export function generateEventProps(job: Job, category: string, outcome: Outcome,
     model: modelFromTag(job.provider),
     // 1 for a single photo and every partner job (T28).
     batch_size: batchSize,
+    batch_templates: z.int().min(1).max(5).catch(1).parse(job.inputs.batch_templates),
     edit_scope: editScope.parse(job.inputs.edit_scope ?? null),
     // As stored on the job (T89); a template without toggles stores none.
     toggles: jobToggles.parse(job.inputs.toggles ?? {}),

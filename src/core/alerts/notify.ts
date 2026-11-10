@@ -87,7 +87,7 @@ export async function notifyOwnerWith(deps: NotifyDeps, alert: OwnerAlert): Prom
   const policy = alertPolicy(alert)
   // While Feishu keeps failing, only money alerts still try; nothing is claimed for the rest.
   if (!policy.money && deps.backoff.paused(deps.now())) return
-  if (!(await deps.dedupe.claim(policy.key, policy.cooldownMs, alert.kind === 'template_fallback'))) return
+  if (!(await deps.dedupe.claim(policy.key, policy.cooldownMs, policy.requireShared))) return
   if (!(await withinBudget(deps, policy.key, policy.budget))) return
   try {
     await deliver({ ...deps, config }, alert, policy.money)

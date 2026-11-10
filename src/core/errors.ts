@@ -146,8 +146,8 @@ export class TierRequiredError extends AppError {
     this.requiredTier = requiredTier
   }
 
-  override toBody(): ErrorBody & { required_tier: MembershipTier } {
-    return { ...super.toBody(), required_tier: this.requiredTier }
+  override toBody(): ErrorBody & { required_tier: MembershipTier; requiredTier: MembershipTier } {
+    return { ...super.toBody(), requiredTier: this.requiredTier, required_tier: this.requiredTier }
   }
 }
 

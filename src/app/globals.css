@@ -447,6 +447,16 @@ html:lang(zh-Hans) :is(em, i, .italic) {
     animation: sv-notice-in 360ms var(--ease) both;
   }
 }
+/* A deeper row of Create's category chips (T102) drops 4px into place as it opens; still under
+   reduced motion. */
+@keyframes sv-chip-row-in {
+  from { transform: translateY(-4px); opacity: 0; }
+}
+@utility chip-row-in {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: sv-chip-row-in 220ms var(--ease) both;
+  }
+}
 @keyframes sv-scrim-in {
   from { opacity: 0; }
 }

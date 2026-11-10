@@ -374,8 +374,15 @@
       "empty": "Templates are on their way. Check back soon.",
       "templates": "Templates",
       "filter": "Filter templates",
+      "filterWithin": "Filter within {name}",
       "all": "All",
       "illustrative": "Every card shows the phone photo on the left and the AI result on the right. Template images are illustrative examples."
+    },
+    "series": {
+      "count": "{count, plural, one {# template} other {# templates}}",
+      "cardAria": "{name}, a series of {count, plural, one {# template} other {# templates}}. Pick one",
+      "coverAlt": "{name} series example",
+      "pick": "{count, plural, one {# template} other {# templates}} in this series. Pick one to start."
     },
     "template": {
       "fromCredits": "from {count, plural, one {# credit} other {# credits}}",
@@ -1386,7 +1393,7 @@
     "anyPage": "Add {suffix} to any page URL to share it with your audience.",
     "copy": "Copy link",
     "copied": "Copied",
-    "eligible": "Your current balance qualifies for the next payout.",
+    "eligible": "Your balance qualifies for a payout. A missed monthly settlement is retried automatically. If this month’s settlement has already run, your balance carries over to the next one.",
     "notEligible": "You do not currently qualify for a payout.",
     "next": "Next settlement · {date} (UTC)",
     "gap": "{gap} to go until the {threshold} payout threshold.",
@@ -1398,6 +1405,8 @@
     "purchases": "Payments",
     "totalCommission": "Total commission",
     "amount": "Amount (USD)",
+    "statementAmount": "Original amount (USD)",
+    "amountPaid": "Amount paid (USD)",
     "paidDate": "Payment date (UTC)",
     "recruit": "Team invitation link",
     "members": "Team members",
@@ -1566,6 +1575,7 @@
     "contactPlaceholder": "WeChat, Telegram or WhatsApp",
     "contactHint": "We email the address on your account. Add another way to reach you if you prefer.",
     "saving": "Sending…",
+    "reapply": "Apply again",
     "statusScreen": {
       "pending": {
         "title": "We've got your application",
@@ -1592,7 +1602,7 @@
     "dashboardTitle": "Affiliate dashboard",
     "codeLabel": "Your code",
     "thresholdMet": "You've reached the {threshold} payout threshold.",
-    "nextShort": "Next settlement (UTC)",
+    "nextShort": "Next scheduled settlement (UTC)",
     "maturingShort": "Confirming before then",
     "needMethod": "Add a payout method so we can settle your balance.",
     "statsLabel": "Your numbers",

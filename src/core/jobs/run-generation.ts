@@ -3,8 +3,9 @@ import 'server-only'
 import { randomUUID } from 'node:crypto'
 
 import type { ServerTrack } from '../analytics'
-import { tierForBatch, type TierLimits } from '../billing/tier-limits'
-import { AppError, TierRequiredError } from '../errors'
+import { assertBatchAllowed } from './batch/limits'
+import { assertBatchProof, batchInputs } from './batch/proof'
+import { AppError } from '../errors'
 import { screenIdentityText, type IdentityJudge } from '../identity-guard'
 import { isOwnInputKey, loadInputImage, outputKeyFor, writeInputPreview } from '../storage'
 import {
@@ -26,7 +27,7 @@ import type { GenerationRequest } from './generation-request'
 import { findOwnJob } from './job-lookup'
 import type { Job, JobSource } from './job-schema'
 import { toJobView, type JobView } from './job-view'
-import { accountLimits } from './account-limits'
+import { currentTier, limitsFor } from '../billing/tier'
 import { assertWithinRateLimit } from './rate-limit'
 import { settleGeneration, type SettleDeps } from './settle-generation'
 import { recordJobClientIp } from './job-download'
@@ -51,19 +52,13 @@ function requestAspects(req: GenerationRequest, template: Template) {
   return req.source === 'web' ? allowedWebAspects(template.imageOptions, req.resolution ?? DEFAULT_RESOLUTION) : undefined
 }
 
-// A batch bigger than the tier holds (Starter 1, Pro 10, Max 30) is refused per photo; the
-// browser only offers batchMax, so this is someone bypassing the picker or a tier that lapsed
-// mid-batch. Credits, perWindow and concurrency still bound everything else (§6.2).
-function assertBatchAllowed(limits: TierLimits, batchSize: number) {
-  if (batchSize <= limits.batchMax) return
-  const required = tierForBatch(batchSize) ?? 'max'
-  throw new TierRequiredError(required, `A batch of ${batchSize} photos needs a higher plan`)
-}
-
 // Everything that can be rejected without touching credits: template, fields, key
 // ownership, tier limits (batch size, rate limit), then the user's words (ARCHITECTURE §5.1a:
 // no face swap) alongside the stored upload itself (HEAD + bytes; bad ones are deleted).
 async function prepare(deps: GenerationDeps, req: GenerationRequest) {
+  const membership = await currentTier(deps.db, req.userId)
+  assertBatchAllowed(membership, req.batchSize, req.batchTemplates)
+  assertBatchProof(req)
   const { template, prompt } = await loadGenerationTemplate(deps.db, req.templateId, SURFACE[req.source])
   const tier = req.resolution ?? DEFAULT_RESOLUTION
   assertPricedTier(template.unpricedResolutions, tier)
@@ -79,9 +74,7 @@ async function prepare(deps: GenerationDeps, req: GenerationRequest) {
   })
   // Never touch (or delete) an object outside the caller's own inputs/ prefix.
   if (req.inputKey && !isOwnInputKey(req.userId, req.inputKey)) throw new AppError('INVALID_INPUT', 'Unknown upload')
-  const limits = await accountLimits(deps.db, req.userId)
-  assertBatchAllowed(limits, req.batchSize ?? 1)
-  await assertWithinRateLimit(deps.db, req.userId, deps.now?.() ?? new Date(), limits, {
+  await assertWithinRateLimit(deps.db, req.userId, deps.now?.() ?? new Date(), limitsFor(membership), {
     jobId: req.jobId,
     idempotencyKey: req.idempotencyKey,
   })
@@ -125,6 +118,7 @@ function jobInputs(req: GenerationRequest, { inputs, prompt }: Prepared, resolut
     input_key: req.inputKey ?? null,
     prompt_version: prompt.version,
     attempt_id: attemptId,
+    ...batchInputs(req),
   }
 }
 

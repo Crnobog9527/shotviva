@@ -65,7 +65,7 @@ export function waffoSessionRequest(
   return {
     productId: recurring ? deps.subscriptionProductIds[product.id as MembershipProductId] : deps.productIds[product.id],
     currency: 'USD',
-    // site.config.ts is the one source of prices (§6.2): the session carries it, so a Waffo
+    // The session carries the server-side catalog quote (§6.2), so a Waffo
     // product priced differently in the dashboard cannot charge another amount. Tax is added
     // on top at checkout, as with Stripe Managed Payments.
     priceSnapshot: { amount: (input.quote ? input.quote.cents / 100 : product.priceUsd).toFixed(2), taxIncluded: false, taxCategory: 'saas' },

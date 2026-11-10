@@ -14,7 +14,7 @@ vi.mock('./interactive', () => ({ PartnerForm: ({ children }: { children: ReactN
 
 const settings: Settings = { terms_version: 'v2', hold_days: 30, payout_min_usd: 20000, settlement_day: 1, apply_min_level: 'none' }
 const account: Account = {
-  status: 'active', slug: 'qa-member', team_enabled: false, reject_reason: null, payout_method: 'wise',
+  status: 'active', slug: 'qa-member', team_enabled: false, reapply_allowed: false, reject_reason: null, payout_method: 'wise',
   payout_details: 'Saved payout account', us_person: false, terms_version: 'v2', terms_accepted_at: '2026-01-01T00:00:00Z',
 }
 async function html(overrides: Partial<Account> = {}) {

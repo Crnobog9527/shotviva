@@ -13,12 +13,13 @@ import { JsonLdScript, breadcrumbListLd, faqPageLd, pageMetadata } from '@/core/
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
 import { creditFacts, fillCredits, homePageIn, pricingFaqIn, pricingPageIn } from '@/site/content'
 import { isWishlistEnabled } from '@/core/wishlist'
+import { displayProducts } from '@/site/billing/display-products'
 import { site } from '@/site/site.config'
 
 import { inquiryPrefillAction, submitInquiryAction } from './actions'
 
 // /pricing as comps-v3-b pricing.html (T37): hero, the plans and packs (core/billing/paywall,
-// prices from site.config), "For business", what a credit buys, how to pay, then the FAQ.
+// prices from the published catalog), "For business", what a credit buys, how to pay, then the FAQ.
 // Stripe's cancel_url lands here (?checkout=cancel) and shows a toast (T43).
 // Everything renders into the static HTML, in US dollars in both languages (建站规格 §6.1, R5).
 // Indexable: /pricing and /zh/pricing are in their keyword map CSVs and in site.indexing.
@@ -29,19 +30,20 @@ import { inquiryPrefillAction, submitInquiryAction } from './actions'
 // plus a redeploy, which re-renders this page with the matching payment copy.
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await currentLocale()
-  const page = fillCredits(pricingPageIn(locale), creditFacts(await cachedWebCatalogue(locale)))
+  const [catalogue, products] = await Promise.all([cachedWebCatalogue(locale), displayProducts()])
+  const page = fillCredits(pricingPageIn(locale, products), creditFacts(catalogue))
   return pageMetadata(site, page, locale)
 }
 
 export default async function PricingPage() {
   const locale = await currentLocale()
   // "from N credits" and the image counts filled from the live catalogue (建站规格 G3, G4).
-  const [catalogue, wishlistLive] = await Promise.all([cachedWebCatalogue(locale), isWishlistEnabled(site)])
+  const [catalogue, wishlistLive, products] = await Promise.all([cachedWebCatalogue(locale), isWishlistEnabled(site), displayProducts()])
   const credits = creditFacts(catalogue)
-  const page = fillCredits(pricingPageIn(locale), credits)
+  const page = fillCredits(pricingPageIn(locale, products), credits)
   const channel = paymentChannel()
   const wechatPay = wechatPayEnabled()
-  const faq = fillCredits(pricingFaqIn(locale, channel, wechatPay), credits)
+  const faq = fillCredits(pricingFaqIn(locale, channel, wechatPay, page), credits)
   const path = localizePath(page.path, locale)
   const crumbs = [
     { name: homePageIn(locale).label, path: localizePath('/', locale) },
@@ -52,8 +54,8 @@ export default async function PricingPage() {
       <JsonLdScript data={[breadcrumbListLd(site, crumbs), faqPageLd(faq)]} />
       <CheckoutCancelToast />
       <PricingHero text={page} />
-      <PaywallProvider products={site.billing.products} perkFacts={{ wishlistLive, photoPrices: photoPrices(catalogue) }} channel={channel} wechatPay={wechatPay}>
-        <PricingPlans products={site.billing.products} />
+      <PaywallProvider products={products} perkFacts={{ wishlistLive, photoPrices: photoPrices(catalogue) }} channel={channel} wechatPay={wechatPay}>
+        <PricingPlans products={products} />
         <StandingSlot />
       </PaywallProvider>
       <BusinessSection

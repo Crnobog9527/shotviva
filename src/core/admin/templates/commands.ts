@@ -57,19 +57,30 @@ export async function saveTemplate(
   if (prompt.styleRefs?.some(ref => !isStyleRefKey(template.id, ref.key))) throw new AppError('INVALID_INPUT', '画风参考图不属于这个模板')
   assertAboveFloor(template, providerFloor(floor, prompt.providerId, template.id))
   assertTogglesWired(template, prompt)
-  const exists = await repo.templateExists(client, template.id)
-  if (payload.isNew && exists) {
-    throw new AppError('INVALID_INPUT', `id "${template.id}" is already taken`)
-  }
-  if (!payload.isNew && !exists) throw new AppError('NOT_FOUND', `template ${template.id} not found`)
   // A brand-new template starts unpublished so it can be checked before anyone sees it.
   const toSave = payload.isNew ? { ...template, isActive: false } : template
   const revision = payload.revision && parseOrThrow(z.object({
     expected: z.int().positive(), selected: z.int().positive().optional(),
   }), payload.revision, 'revision')
-  const version = await repo.upsertTemplate(client, toSave, prompt, floor, revision && { ...revision, actor: adminId })
+  const assignment = payload.assignment && parseOrThrow(z.object({
+    seriesId: z.uuid().nullable(), previousSeriesId: z.uuid().nullable().optional(), previousCategory: z.string().min(1).max(40).optional(),
+  }), payload.assignment, 'assignment')
+  const version = assignment
+    ? await repo.saveAssignedTemplate(client, toSave, prompt, floor, { actor: adminId, isNew: payload.isNew, revision, assignment })
+    : await saveLegacyTemplate(client, toSave, prompt, floor, payload.isNew, revision && { ...revision, actor: adminId })
   logger.info('admin.template.saved', { adminId, templateId: template.id, isNew: payload.isNew })
   return version
+}
+
+// Older admin callers send root keys only and have no assignment snapshot.
+async function saveLegacyTemplate(client: SupabaseClient, template: z.infer<typeof templateInputSchema>, prompt: PromptInput,
+  floor: ProviderFloors, isNew: boolean, revision?: { actor: string; expected: number; selected?: number }) {
+  const exists = await repo.templateExists(client, template.id)
+  if (isNew && exists) {
+    throw new AppError('INVALID_INPUT', `id "${template.id}" is already taken`)
+  }
+  if (!isNew && !exists) throw new AppError('NOT_FOUND', `template ${template.id} not found`)
+  return repo.upsertTemplate(client, template, prompt, floor, revision)
 }
 
 // The 上架 switch and the bulk bar (T60) share this one path: same rules, same log line, same

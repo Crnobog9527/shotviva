@@ -23,6 +23,7 @@ export const memberDetail = member.extend({
   us_person: z.boolean().nullable(),
   application: z.record(z.string(), z.unknown()).nullable(),
   reject_reason: z.string().nullable(),
+  reapply_allowed: z.boolean(),
   terms_version: z.string().nullable(),
   terms_accepted_at: z.string().nullable(),
 })
@@ -47,6 +48,9 @@ const payout = z.object({
   period: z.string(),
   amount: z.number(),
   status: z.string(),
+  legacy_review_required: z.boolean(),
+  payable: z.number().int().safe().nonnegative().nullable(),
+  paid_amount: z.number().int().safe().nonnegative().nullable(),
   payout_snapshot: snapshot,
   paid_at: z.string().nullable(),
   paid_reference: z.string().nullable(),
@@ -72,7 +76,7 @@ function pageQuery(db: SupabaseClient, table: string, cols: string, cursor?: str
 }
 export async function members(db: SupabaseClient, f: Filters) {
   let q = pageQuery(db, 'affiliates', 'user_id,slug,status,created_at,source:application->>source', f.cursor, 'user_id')
-  if (f.tab === 'applications') q = q.eq('status', 'pending').or('application->>source.is.null,application->>source.neq.admin_invite')
+  if (f.tab === 'applications') q = q.eq('status', f.review ?? 'pending').or('application->>source.is.null,application->>source.neq.admin_invite')
   if (f.q) q = z.uuid().safeParse(f.q).success ? q.eq('user_id', f.q) : q.ilike('slug', f.q.replace(/[\\%_]/g, '\\$&') + '%')
   return toPage(
     member.extend({ source: z.string().nullable() })
@@ -87,7 +91,7 @@ export async function loadMember(db: SupabaseClient, userId: string) {
     db
       .from('affiliates')
       .select(
-        'user_id,slug,status,created_at,team_enabled,parent_user_id,country,payout_method,payout_details,us_person,application,reject_reason,terms_version,terms_accepted_at',
+        'user_id,slug,status,created_at,team_enabled,parent_user_id,country,payout_method,payout_details,us_person,application,reject_reason,reapply_allowed,terms_version,terms_accepted_at',
       )
       .eq('user_id', userId)
       .maybeSingle(),
@@ -111,7 +115,7 @@ export async function commissions(db: SupabaseClient, f: Filters) {
   return toPage(commission.array().parse(checked(await q)), (r) => r)
 }
 export async function payouts(db: SupabaseClient, f: Filters, includeFlags = false) {
-  const cols = 'id,created_at,affiliate_user_id,period,amount,status,payout_snapshot,paid_at,paid_reference,note'
+  const cols = 'id,created_at,affiliate_user_id,period,amount,legacy_review_required,payable:affiliate_payout_payable,paid_amount,status,payout_snapshot,paid_at,paid_reference,note'
   const fields = cols + ',paid_method' + (includeFlags ? ',owner:affiliates(risks:affiliate_commissions(id,flags))' : '')
   let q = withFilters(pageQuery(db, 'affiliate_payouts', fields, f.cursor), f)
   if (includeFlags)

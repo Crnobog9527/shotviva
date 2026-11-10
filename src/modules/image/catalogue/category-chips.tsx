@@ -4,52 +4,81 @@ import { useTranslations } from 'next-intl'
 
 import { cn } from '@/core/ui/cn'
 
-import { ALL, SAVED } from './catalogue-filter'
-import type { CatalogueCategory } from './catalogue-template'
-
-export { ALL } from './catalogue-filter'
+import { chipRows, type Selection } from './catalogue-filter'
+import type { FilterNode } from './catalogue-view'
 
 type Props = {
-  categories: CatalogueCategory[]
+  filters: FilterNode[]
   // The account has saved templates: a 「收藏」/ Saved chip leads the bar (T83).
   saved: boolean
-  value: string
-  onChange(next: string): void
+  value: Selection
+  onChange(next: Selection): void
 }
 
-// Filter chips (DESIGN "Chips"): 36px pills with a 44px hit area, one selected in solid bone.
-// A horizontal rail is the one place sideways scrolling is allowed (§8.3); from md up the chips
-// wrap instead (B comp create.html). The Saved chip carries a small filled heart, the same mark
-// as the card's save button.
-export function CategoryChips({ categories, saved, value, onChange }: Props) {
+type Chip = { key: string; name: string; pressed: boolean; select: Selection; heart?: boolean }
+
+// Filter chips (DESIGN "Chips"), up to three levels (T102). The first row is today's bar:
+// Saved, All, then the root categories, the chosen one in solid bone. Choosing a category with
+// children opens a second row under it, and a chosen child with children a third. A deeper row
+// leads with its own All (the level above, unnarrowed) and marks its choice with a bone rim, not
+// a fill, so the eye reads one solid chip as the place and the rims as narrowing within it.
+// Each row is its own horizontal rail on phones (§8.3) and wraps from md up (B comp create.html).
+export function CategoryChips({ filters, saved, value, onChange }: Props) {
   const t = useTranslations('app.create')
   const savedName = useTranslations('app.favorites')('saved')
-  const chips = [...(saved ? [{ key: SAVED, name: savedName }] : []), { key: ALL, name: t('all') }, ...categories]
+  const rows = chipRows(filters, value.path)
+  const root: Chip[] = [
+    ...(saved ? [{ key: '~saved', name: savedName, pressed: value.saved, select: { saved: true, path: [] }, heart: true }] : []),
+    { key: '~all', name: t('all'), pressed: !value.saved && value.path.length === 0, select: { saved: false, path: [] } },
+    ...(rows[0] ?? []).map((node) => ({ key: node.slug, name: node.name, pressed: value.path[0] === node.slug, select: { saved: false, path: [node.slug] } })),
+  ]
   return (
-    <div role="group" aria-label={t('filter')} className="no-scrollbar flex gap-2 overflow-x-auto px-(--gutter) md:flex-wrap md:overflow-visible">
-      {chips.map(({ key, name }) => {
-        const pressed = key === value
-        return (
-          <button
-            key={key}
-            type="button"
-            aria-pressed={pressed}
-            onClick={(event) => {
-              onChange(key)
-              event.currentTarget.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
-            }}
-            className={cn(
-              "relative inline-flex min-h-9 min-w-11 flex-none items-center gap-1.5 rounded-full px-4 py-2 whitespace-nowrap text-caption leading-none font-medium transition-colors before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']",
-              pressed ? 'bg-foreground text-background' : 'hairline bg-wash text-bone-dim hover:bg-wash-strong hover:text-foreground',
-            )}
-          >
-            {key === SAVED ? <SavedMark /> : null}
-            {name}
-          </button>
-        )
+    <div className="grid gap-2">
+      <ChipRow chips={root} label={t('filter')} depth={0} onChange={onChange} />
+      {rows.slice(1).map((nodes, index) => {
+        const parent = value.path.slice(0, index + 1)
+        const chosen = value.path[index + 1]
+        const chips: Chip[] = [
+          { key: '~all', name: t('all'), pressed: chosen === undefined, select: { saved: false, path: parent } },
+          ...nodes.map((node) => ({ key: node.slug, name: node.name, pressed: chosen === node.slug, select: { saved: false, path: [...parent, node.slug] } })),
+        ]
+        const parentName = rows[index]?.find((node) => node.slug === parent.at(-1))?.name ?? ''
+        return <ChipRow key={parent.join('/')} chips={chips} label={t('filterWithin', { name: parentName })} depth={index + 1} onChange={onChange} />
       })}
     </div>
   )
+}
+
+type RowProps = { chips: Chip[]; label: string; depth: number; onChange(next: Selection): void }
+
+function ChipRow({ chips, label, depth, onChange }: RowProps) {
+  return (
+    <div role="group" aria-label={label} className={cn('no-scrollbar flex gap-2 overflow-x-auto px-(--gutter) md:flex-wrap md:overflow-visible', depth > 0 && 'chip-row-in')}>
+      {chips.map((chip) => (
+        <button
+          key={chip.key}
+          type="button"
+          aria-pressed={chip.pressed}
+          onClick={(event) => {
+            onChange(chip.select)
+            event.currentTarget.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
+          }}
+          className={cn(
+            "relative inline-flex min-h-9 min-w-11 flex-none items-center justify-center gap-1.5 rounded-full px-4 py-2 whitespace-nowrap text-caption leading-none font-medium transition-[background-color,color,box-shadow] before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']",
+            chipTone(chip.pressed, depth),
+          )}
+        >
+          {chip.heart ? <SavedMark /> : null}
+          {chip.name}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function chipTone(pressed: boolean, depth: number): string {
+  if (!pressed) return 'hairline bg-wash text-bone-dim hover:bg-wash-strong hover:text-foreground'
+  return depth === 0 ? 'bg-foreground text-background' : 'bg-wash-strong text-foreground shadow-[inset_0_0_0_1.5px_var(--foreground)]'
 }
 
 function SavedMark() {

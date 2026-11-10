@@ -6,7 +6,7 @@ import { RESOLUTIONS } from '@/core/templates/output-options'
 
 import type { BulkEditValues, SurfaceChoice } from './bulk-edit-state'
 import { ImageProviderField, type ImageProviderOption } from '../image-provider-field'
-import type { CategoryOption } from './category-field'
+import { categoryChoices, type CategoryOption } from './category-options'
 import { bulkEditCopy as COPY } from './copy'
 import { TIER_LABEL } from './form-state'
 
@@ -91,11 +91,9 @@ function CategoryChoice({ value, categories, onChange }: { value: string; catego
       <Label htmlFor="bulk-category">{COPY.category}</Label>
       <select id="bulk-category" className={SELECT} value={value} onChange={(event) => onChange(event.target.value)}>
         <option value="">{COPY.categoryKeep}</option>
-        {categories
-          .filter((category) => !category.isSystem)
-          .map((category) => (
+        {categoryChoices(categories).map((category) => (
             <option key={category.key} value={category.key}>
-              {category.nameZh} · {category.nameEn}
+              {category.label} · {category.nameEn}
             </option>
           ))}
       </select>

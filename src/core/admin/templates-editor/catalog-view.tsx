@@ -2,48 +2,61 @@
 
 import { useState, type ComponentProps } from 'react'
 import { Button } from '@/core/ui/button'
-import type { AdminTemplate } from '../templates/types'
-import type { CategoryOption } from './category-field'
-import { catalogCopy as copy } from './copy'
-import { catalogueOrder } from './toolbar'
+import { categoryChoices, type CategoryOption } from './category-options'
+import { catalogSections, filterCatalog, SINGLE_TEMPLATES, type CatalogStatus, type SeriesOption } from './catalog-groups'
+import { catalogCopy as copy, orderCopy } from './copy'
 import { TemplatesTable, type TableSelection } from './templates-table'
 
-type Status = 'active' | 'inactive' | 'all'
-type Props = Omit<ComponentProps<typeof TemplatesTable>, 'selection' | 'order'> & {
-  query: string; all: AdminTemplate[]; categories: readonly CategoryOption[]
-  onOrder: (group: Exclude<Status, 'all'>) => (ids: string[]) => Promise<void>
+type Props = Omit<ComponentProps<typeof TemplatesTable>, 'selection' | 'order' | 'categoryLabels'> & {
+  query: string
+  categories: readonly CategoryOption[]
+  series: readonly SeriesOption[]
+  onOrder: (group: 'active' | 'inactive') => (ids: string[]) => Promise<void>
   selection: Omit<TableSelection, 'onSelectVisible'> & { onSelectGroup: (ids: string[], on: boolean) => void }
 }
 
-export function CatalogView({ all, templates, query, categories, selection, onOrder, ...row }: Props) {
-  const [status, setStatus] = useState<Status>('active')
+const selectClass = 'border-input h-9 max-w-full rounded-md border px-3 text-sm'
+
+export function CatalogView({ templates, query, categories, series, selection, onOrder, ...row }: Props) {
+  const [status, setStatus] = useState<CatalogStatus>('active')
   const [category, setCategory] = useState('')
-  const groups = {
-    active: templates.filter(t => t.isActive && (!category || t.category === category)),
-    inactive: templates.filter(t => !t.isActive && (!category || t.category === category)),
-  }
-  const activeCount = all.filter(t => t.isActive).length
-  const tabs = { active: `${copy.active}（${activeCount}）`, inactive: `${copy.inactive}（${all.length - activeCount}）`, all: copy.all }
-  const shown = status === 'all' ? ['active', 'inactive'] as const : [status] as const
-  return <div className="grid gap-3">
+  const [seriesId, setSeriesId] = useState('')
+  const [grouped, setGrouped] = useState(false)
+  const options = categoryChoices(categories).concat(categories.filter(c => c.isSystem)
+    .map(c => ({ key: c.key, label: c.nameZh, nameEn: c.nameEn, path: [c.key] })))
+  const paths = new Map(options.map(c => [c.key, c]))
+  const matching = filterCatalog(templates, paths, category, seriesId)
+  const active = matching.filter(t => t.isActive).length
+  const tabs = { active: `${copy.active}（${active}）`, inactive: `${copy.inactive}（${matching.length - active}）`, all: copy.all }
+  const sections = catalogSections(matching, status, grouped, series)
+  const canReorder = !query.trim() && !category && !seriesId && !grouped
+  return <div className="grid min-w-0 gap-3">
     <div className="flex flex-wrap items-center gap-2">
       <div role="group" aria-label={copy.status} className="flex gap-1">
-        {(Object.keys(tabs) as Status[]).map(key => <Button key={key} variant={status === key ? 'secondary' : 'ghost'}
+        {(Object.keys(tabs) as CatalogStatus[]).map(key => <Button key={key} variant={status === key ? 'secondary' : 'ghost'}
           size="sm" aria-pressed={status === key} onClick={() => setStatus(key)}>{tabs[key]}</Button>)}
       </div>
-      <select aria-label={copy.category} className="border-input h-9 rounded-md border px-3 text-sm"
-        value={category} onChange={event => setCategory(event.target.value)}>
+      <select aria-label={copy.category} className={selectClass} value={category} onChange={e => setCategory(e.target.value)}>
         <option value="">{copy.categories}</option>
-        {categories.map(c => <option key={c.key} value={c.key}>{c.nameZh}</option>)}
+        {options.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
       </select>
+      <select aria-label={copy.seriesFilter} className={selectClass} value={seriesId} onChange={e => setSeriesId(e.target.value)}>
+        <option value="">{copy.allSeries}</option>
+        <option value={SINGLE_TEMPLATES}>{copy.single}</option>
+        {series.map(s => <option key={s.id} value={s.id}>{s.nameZh}</option>)}
+      </select>
+      <Button size="sm" variant={grouped ? 'secondary' : 'outline'} aria-pressed={grouped}
+        onClick={() => setGrouped(!grouped)}>{copy.groupSeries}</Button>
     </div>
-    {shown.map(group => {
-      const rows = groups[group]
-      return <section key={group}>
-        {status === 'all' && <h3 className="bg-muted px-3 py-2 text-sm font-semibold">{copy[group]}</h3>}
-        <TemplatesTable {...row} templates={rows} order={catalogueOrder(query.trim() || category, row.pending, onOrder(group))}
+    {sections.length === 0 && <p className="text-muted-foreground py-8 text-center text-sm">{copy.empty}</p>}
+    {sections.map(({ id, title, rows, orderGroup }) => (
+      <section key={id} className="min-w-0">
+        {title && <h3 className="bg-muted px-3 py-2 text-sm font-semibold">{title}（{rows.length}）</h3>}
+        <TemplatesTable {...row} templates={rows} categoryLabels={paths}
+          order={{ disabled: !canReorder || row.pending, disabledHint: canReorder ? undefined : orderCopy.filtered,
+            onReorder: async ids => { if (canReorder && orderGroup) await onOrder(orderGroup)(ids) } }}
           selection={{ ...selection, onSelectVisible: on => selection.onSelectGroup(rows.map(t => t.id), on) }} />
       </section>
-    })}
+    ))}
   </div>
 }
