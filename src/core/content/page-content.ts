@@ -127,16 +127,17 @@ export type Bill = { title: string; total: BillTotal; lines: readonly [BillLine,
 export type CostBills = { heading: string; intro: string; photographer: Bill; site: Bill }
 
 // Home: "Can't find your template? Make a wish" (Owner 2026-11-10), right under the template
-// grid and only while the wishlist is open. Three pains it answers, three example wish cards
+// grid and only while the wishlist is open. Three pains it answers, eight example wish cards
 // (one shipped; the note says they are examples, never a badge on the picture) and one CTA
-// that depends on whether the visitor is signed in.
+// that depends on whether the visitor is signed in. Exactly eight: the wall is two rows of four
+// (four of two on phones) and marketing.css gives each print its own lean.
 export type WishExample = { image: ImageRef; text: string; votes: number; shipped: boolean }
 export type WishlistPromo = {
   // `lead` + `emphasis` + `tail`; the emphasis is the one italic phrase (English only).
   heading: { lead: string; emphasis: string; tail: string }
   intro: string
   points: readonly [HeadedText, HeadedText, HeadedText]
-  examples: readonly [WishExample, WishExample, WishExample]
+  examples: readonly [WishExample, WishExample, WishExample, WishExample, WishExample, WishExample, WishExample, WishExample]
   // "Wish cards are illustrative examples" plus who can post (ARCHITECTURE §15.1).
   note: string
   labels: { shipped: string; votes: string }

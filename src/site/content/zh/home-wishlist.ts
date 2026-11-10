@@ -1,7 +1,8 @@
 import type { ImageRef, WishlistPromo } from '@/core/content'
 
 // /zh home: 「没找到合适的模板？」 (Owner 2026-11-10), the same section as home-wishlist.ts:
-// no timelines, no notification promises, examples said in alt text and the note only. Chinese
+// no timelines, no notification promises, examples said in alt text and the note only. The
+// pictures are the wished-for look, not the uploaded reference photo. Chinese
 // has no italics, so the emphasis is set upright (marketing.css).
 const ref = (file: string, width: number, height: number, alt: string): ImageRef => ({ src: `/home/${file}.webp`, alt, width, height })
 
@@ -24,20 +25,50 @@ export const zhHomeWishlist: WishlistPromo = {
   ],
   examples: [
     {
-      image: ref('example-dish-before', 900, 1125, '一个愿望的参考图：后厨出菜口上的一盘菜（示意图）'),
-      text: '周末早午餐菜单，做成暗调氛围海报',
+      image: ref('wish-brunch-dark', 1080, 1080, '想要的效果（示意）：暗调的周末早午餐菜单海报'),
+      text: '想要一个周末早午餐的海报模板，暗调那种，菜单和价格能直接排上去',
       votes: 46,
       shipped: false,
     },
     {
-      image: ref('hero-set-phone', 1080, 1350, '一个愿望的参考图：厨房台面上的一只编织皮托特包（示意图）'),
-      text: '包包放在浅色石台上，带柔和投影',
+      image: ref('wish-cafe-light', 1080, 1080, '想要的效果（示意）：明亮原木风咖啡馆的开业海报'),
+      text: '我们咖啡馆下个月开业，想要个开业海报模板，店里拍的照片放进去就能用',
+      votes: 64,
+      shipped: false,
+    },
+    {
+      image: ref('wish-tea-dark', 1080, 1080, '想要的效果（示意）：暗调的奶茶新品海报'),
+      text: '奶茶店要上新品，想要那种暗调、看着高级一点的新品海报',
+      votes: 38,
+      shipped: false,
+    },
+    {
+      image: ref('wish-bag-stone', 1080, 1080, '想要的效果（示意）：皮包放在浅色石台上，带柔和投影'),
+      text: '我是卖包的，想要包包放在浅色石台上那种感觉，带点柔和的影子，看着高级',
       votes: 87,
       shipped: true,
     },
     {
-      image: ref('example-skincare-before', 900, 1125, '一个愿望的参考图：浴室架子上的一罐护肤品（示意图）'),
-      text: '护肤品放在湿沙滩上，海边自然光',
+      image: ref('wish-lunch-light', 1080, 1080, '想要的效果（示意）：明亮清爽的午市菜单海报'),
+      text: '想要一个工作日午市套餐的海报，清爽明亮一点，菜单能排上去',
+      votes: 41,
+      shipped: false,
+    },
+    {
+      image: ref('wish-cafe-evening', 1080, 1080, '想要的效果（示意）：黄昏街边开满鲜花的咖啡馆海报'),
+      text: '想给咖啡馆做个傍晚的引流海报，要街边、鲜花、天快黑那种氛围',
+      votes: 57,
+      shipped: false,
+    },
+    {
+      image: ref('wish-tea-light', 1080, 1080, '想要的效果（示意）：清爽的奶茶第二杯半价促销海报'),
+      text: '我们每周三第二杯半价，想要一个清爽好看的促销海报，每周能直接套',
+      votes: 52,
+      shipped: false,
+    },
+    {
+      image: ref('wish-skincare-stone', 1080, 1080, '想要的效果（示意）：护肤品放在暖色岩石上，带阳光树影'),
+      text: '求一个护肤品模板！想要放在暖色石头上，有阳光和树影的那种氛围',
       votes: 31,
       shipped: false,
     },
