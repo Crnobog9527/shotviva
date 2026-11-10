@@ -5,7 +5,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { AppError } from '@/core/errors'
 import { CATEGORY_COLUMNS, toCategory } from '@/core/templates/categories'
 import type { TaxonomyRow } from '@/core/templates/taxonomy'
-import { treeOrder } from '../ui/category-tree/tree'
+import { treeOrder } from '../ui/category-tree'
 import type { AdminCategoryNode } from './types'
 
 type Count = { count: number }[]

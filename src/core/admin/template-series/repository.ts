@@ -6,8 +6,8 @@ import { AppError } from '@/core/errors'
 import { logger } from '@/core/logger'
 
 import { seriesCopy as copy } from './copy'
-import type { SeriesCandidate, SeriesDetail } from './types'
-import { saveSeriesSchema, searchSchema } from './validation'
+import type { CandidatePage, SeriesDetail } from './types'
+import { saveSeriesSchema, searchSchema, seriesCandidatesSchema, seriesDetailSchema } from './validation'
 
 const PAGE = 30
 const MESSAGES: Record<string, string> = {
@@ -16,39 +16,40 @@ const MESSAGES: Record<string, string> = {
   SERIES_REASON_REQUIRED: copy.reason,
 }
 
-export async function saveAdminSeries(db: SupabaseClient, actor: string, input: unknown) {
+export async function saveAdminSeries(db: SupabaseClient, actor: string, input: unknown): Promise<string> {
   const parsed = saveSeriesSchema.safeParse(input)
   if (!parsed.success) throw new AppError('INVALID_INPUT', copy.invalid)
   const { id, revision, fields, members, reason } = parsed.data
   const { data, error } = await db.rpc('admin_save_template_series', {
     p_id: id, p_revision: revision, p_fields: fields, p_members: members, p_actor: actor, p_reason: reason,
-  }).returns<string>()
+  })
   if (error) {
     if (error.code === '23505') throw new AppError('INVALID_INPUT', copy.slugTaken)
     if (error.message === 'NOT_ADMIN') throw new AppError('FORBIDDEN', copy.forbidden)
     if (MESSAGES[error.message]) throw new AppError('INVALID_INPUT', MESSAGES[error.message])
     throw new AppError('INTERNAL', 'admin_save_template_series failed', { cause: error })
   }
-  if (!data) throw new AppError('INTERNAL', 'missing saved series id')
+  if (typeof data !== 'string' || !data) throw new AppError('INTERNAL', 'missing saved series id')
   logger.info('admin.series.saved', { adminId: actor, seriesId: data, active: fields.is_active, memberCount: members.length, reason })
   return data
 }
 
-export async function getAdminSeries(db: SupabaseClient, id: string) {
-  const { data, error } = await db.rpc('admin_template_series_detail', { p_id: id }).returns<SeriesDetail | null>()
+export async function getAdminSeries(db: SupabaseClient, id: string): Promise<SeriesDetail | null> {
+  const { data, error } = await db.rpc('admin_template_series_detail', { p_id: id })
   if (error) throw new AppError('INTERNAL', 'admin_template_series_detail failed', { cause: error })
-  return data
+  return seriesDetailSchema.nullable().parse(data)
 }
 
-export async function searchSeriesCandidates(db: SupabaseClient, search: unknown, after: unknown) {
+export async function searchSeriesCandidates(db: SupabaseClient, search: unknown, after: unknown): Promise<CandidatePage> {
   const parsed = searchSchema.safeParse({ search, after })
   if (!parsed.success) throw new AppError('INVALID_INPUT', copy.search)
   const response = await db.rpc('admin_series_candidates', {
     p_search: parsed.data.search, p_after: parsed.data.after,
-  }).returns<SeriesCandidate[]>()
+  })
   if (response.error) throw new AppError('INTERNAL', 'admin_series_candidates failed', { cause: response.error })
-  const items = response.data.slice(0, PAGE)
-  return { items, next: response.data.length > PAGE ? items[PAGE - 1].id : null }
+  const rows = seriesCandidatesSchema.parse(response.data)
+  const items = rows.slice(0, PAGE)
+  return { items, next: rows.length > PAGE ? items[PAGE - 1].id : null }
 }
 
 export async function listAdminSeriesPage(db: SupabaseClient, cursor: { order: number; id: string } | null, search: string) {

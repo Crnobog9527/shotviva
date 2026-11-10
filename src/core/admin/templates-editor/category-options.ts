@@ -1,4 +1,4 @@
-import { treeOrder } from '../ui/category-tree/tree'
+import { treeOrder } from '../ui/category-tree'
 
 export type CategoryOption = {
   key: string

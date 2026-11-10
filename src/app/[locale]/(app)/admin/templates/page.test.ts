@@ -14,7 +14,7 @@ vi.mock('@/core/admin', () => ({
   CategoriesPanel: () => null,
 }))
 vi.mock('@/core/admin/template-categories', () => ({ listAdminCategoryTree: (db: unknown) => listAdminCategoryTree(db) }))
-vi.mock('@/core/admin/template-series', () => ({ listAdminSeriesOptions: (db: unknown) => listAdminSeriesOptions(db) }))
+vi.mock('@/core/admin/template-series', () => ({ seriesCopy: { title: "系列管理" }, listAdminSeriesOptions: (db: unknown) => listAdminSeriesOptions(db) }))
 vi.mock('./category-actions', () => ({ moveTemplateCategoryAction: vi.fn() }))
 vi.mock('@/site/template-pricing', () => ({ readPricingOptions: (client: unknown) => readPricingOptions(client) }))
 vi.mock('./actions', () => ({

@@ -203,6 +203,6 @@ export const saleCopy = {
 export const catalogCopy = {
   priceGroup: '出图与价格', active: '已上架', inactive: '已下架', all: '全部',
   seriesFilter: '筛选系列', allSeries: '全部系列', single: '单个模板', groupSeries: '按系列分组',
-  manageSeries: '系列管理', empty: '没有匹配的模板',
+  empty: '没有匹配的模板',
   status: '上架状态', category: '筛选分类', categories: '全部分类', search: '搜索中文名、英文名或 ID',
 }

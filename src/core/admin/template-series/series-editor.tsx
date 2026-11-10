@@ -5,10 +5,10 @@ import { useState, useTransition } from 'react'
 
 import { Link } from '@/core/i18n/navigation'
 import { Button } from '@/core/ui/button'
-import { Input } from '@/core/ui/input'
-import { ResponsiveSheet } from '@/core/ui/responsive-sheet'
-import { Textarea } from '@/core/ui/textarea'
 
+import { CoverField } from './cover-field'
+import { SaveFeedback } from './save-feedback'
+import { UnpublishSheet } from './unpublish-sheet'
 import { CandidatePicker } from './candidate-picker'
 import { seriesCopy as copy } from './copy'
 import { SeriesFields, type SeriesCategoryChoice } from './series-fields'
@@ -22,41 +22,6 @@ const empty: Fields = {
 }
 
 type Props = { detail: SeriesDetail | null; choices: SeriesCategoryChoice[]; initial: CandidatePage; actions: SeriesActions }
-
-function UnpublishSheet({ open, close, submit }: { open: boolean; close: () => void; submit: (reason: string) => void }) {
-  const [reason, setReason] = useState('')
-  return (
-    <ResponsiveSheet open={open} onOpenChange={on => !on && close()} title={copy.confirmTitle} description={copy.confirmText}>
-      <label className="mt-3 grid gap-2 text-sm">{copy.reason}
-        <Textarea maxLength={500} value={reason} onChange={e => setReason(e.target.value)} />
-      </label>
-      <div className="mt-4 flex justify-end gap-2">
-        <Button variant="outline" onClick={close}>{copy.cancel}</Button>
-        <Button variant="destructive" disabled={!reason.trim()} onClick={() => submit(reason.trim())}>{copy.confirm}</Button>
-      </div>
-    </ResponsiveSheet>
-  )
-}
-
-function SaveFeedback({ error, reload }: { error: string; reload: () => void }) {
-  if (!error) return null
-  return <>
-    <p role="alert" className="text-destructive text-sm">{error}</p>
-    {error === copy.changed && <Button variant="outline" onClick={reload}>{copy.reload}</Button>}
-  </>
-}
-
-function CoverField({ url, change }: { url: string | null; change: (url: string | null) => void }) {
-  return (
-    <div className="grid gap-1.5 text-sm">
-      <label className="grid gap-1">{copy.cover}
-        <Input type="url" placeholder={copy.automatic} maxLength={4096} value={url ?? ''} onChange={e => change(e.target.value || null)} />
-      </label>
-      <p className="text-muted-foreground text-xs">{copy.coverHint}</p>
-      {url && <Button className="justify-self-start" variant="outline" size="sm" onClick={() => change(null)}>{copy.autoCover}</Button>}
-    </div>
-  )
-}
 
 export function SeriesEditor({ detail, choices, initial, actions }: Props) {
   const [fields, setFields] = useState<Fields>(detail ?? empty)

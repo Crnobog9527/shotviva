@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import { z } from 'zod'
 
 import { listAdminCategoryTree } from '@/core/admin/template-categories'
-import { categoryChoices } from '@/core/admin/templates-editor/category-options'
+import { categoryChoices } from '@/core/admin/templates-editor'
 import { getAdminSeries, listAdminSeriesPage, searchSeriesCandidates, seriesCopy, SeriesEditor, SeriesList } from '@/core/admin/template-series'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { saveSeriesAction, searchMembersAction } from './actions'

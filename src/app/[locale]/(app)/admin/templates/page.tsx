@@ -8,8 +8,7 @@ import { readPricingOptions } from '@/site/template-pricing'
 import { TestPanelSummaryProvider } from '@/core/admin/test-run-ui'
 import { ModelSyncProvider } from '@/core/admin/image-provider-field/model-sync'
 import { listAdminCategoryTree } from '@/core/admin/template-categories'
-import { listAdminSeriesOptions } from '@/core/admin/template-series'
-import { catalogCopy } from '@/core/admin/templates-editor/copy'
+import { listAdminSeriesOptions, seriesCopy } from '@/core/admin/template-series'
 import { moveTemplateCategoryAction } from './category-actions'
 import { setTemplateSaleAction } from './sale-action'
 import { syncTemplateModel } from './sync-model-action'
@@ -52,7 +51,7 @@ export default async function AdminTemplatesPage() {
     <div className="mx-auto grid w-full max-w-6xl gap-6 p-6">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="mr-auto text-xl font-semibold">模板与提示词</h1>
-        <Link href="/admin/templates/series" className="text-sm underline underline-offset-4">{catalogCopy.manageSeries}</Link>
+        <Link href="/admin/templates/series" className="text-sm underline underline-offset-4">{seriesCopy.title}</Link>
         <Link href="/admin/templates/edit" className="text-sm underline underline-offset-4">
           作品编辑的判断题和约束段落 →
         </Link>
