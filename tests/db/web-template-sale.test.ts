@@ -80,3 +80,13 @@ it('allows anonymous listing of a sellable template and reserves route checks fo
     { role: 'service_role', preflight: true, generation: true },
   ])
 })
+
+it.each(['anon', 'authenticated'] as const)('rejects an actual preflight RPC call as %s', async role => {
+  await db.query(`set local role ${role}`)
+  await expect(quote(route(id))).rejects.toMatchObject({ code: '42501' })
+})
+
+it('accepts an actual preflight RPC call as service_role', async () => {
+  await db.query('set local role service_role')
+  expect(await quote(route(id))).toBeNull()
+})

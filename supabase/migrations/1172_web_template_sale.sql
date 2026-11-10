@@ -265,6 +265,8 @@ grant execute on function admin.web_standard_sale_allowed(text) to anon,authenti
 revoke all on admin.published_web_members from public,anon,authenticated,service_role;
 grant select on admin.published_web_members to anon,authenticated,service_role;
 
-revoke all on function public.unavailable_batch_template(jsonb),public.web_generation_template(text)
-  from public,anon,authenticated;
-grant execute on function public.unavailable_batch_template(jsonb),public.web_generation_template(text) to service_role;
+revoke all on function public.unavailable_batch_template(jsonb) from public, anon, authenticated;
+grant execute on function public.unavailable_batch_template(jsonb) to service_role;
+
+revoke all on function public.web_generation_template(text) from public, anon, authenticated;
+grant execute on function public.web_generation_template(text) to service_role;
