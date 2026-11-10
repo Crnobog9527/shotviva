@@ -14,6 +14,7 @@ import type {
   OwnerAlertKind,
   PaymentFailedAlert,
   RefundAlert,
+  RenewalReviewAlert,
   SiteErrorsAlert,
   TicketAlert,
 } from './alert-kinds'
@@ -183,6 +184,12 @@ function ticket(alert: TicketAlert, who: string): Rendered {
   return { line, path: `/admin/tickets/${alert.ticketId}` }
 }
 
+function renewalReview(alert: RenewalReviewAlert): Rendered {
+  const charged = alert.charged === null ? '未提供' : `${(alert.charged / 100).toFixed(2)} ${alert.currency?.toUpperCase() ?? '（币种缺失）'}`
+  const line = `【Waffo 续费待核对】订单 ${alert.orderId} 第 ${alert.period} 期，税前报价 $${(alert.quoted / 100).toFixed(2)}，含税实收 ${charged}（税额 ${(alert.tax / 100).toFixed(2)}）。付款号 ${alert.paymentId}。${alert.duplicate ? '同一期出现不同付款号，请核对是否重复扣款。' : '请打开账单工单核对。'}`
+  return { line, path: `/admin/tickets/${alert.ticketId}` }
+}
+
 function cancelFailed(alert: CancelFailedAlert, who: string): Rendered {
   const where = alert.channel ? CHANNELS[alert.channel] : '付款'
   const line = alert.cause === 'refund'
@@ -243,6 +250,7 @@ const RENDERERS: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K 
   dispute_closed: disputeClosed,
   dispute_due_soon: disputeDueSoon,
   payment_failed: paymentFailed,
+  waffo_renewal_review: renewalReview,
   generation_spike: generationSpike,
   template_fallback: a => ({
     line: `【模板模型回退】模板 ${a.templateId}，原因 ${a.reason}，${a.rejected ? '已拒绝此次出图' : '已允许回退出图'}。`,
