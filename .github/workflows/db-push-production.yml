@@ -1,27 +1,22 @@
-# Applies merged migrations to the production database. Runs from main, started automatically
-# when a merge touches supabase/migrations/ (or by hand), with no approval step: review happens
-# on the PR before it merges (AGENTS §5, Owner 2026-11-08). The run history of this workflow is
-# the audit trail of what ran on production and when.
+# Merged migrations run automatically on main with the production environment.
+# Manual migrations and data releases require an actual Owner review in production-manual.
+# Both environments must restrict deployment branches to main. Other workflows on main
+# can request an environment by name and are subject to its protection rules.
 #
 # Because the migration lands before the Vercel deployment is promoted, every migration must keep
 # the code currently live on production working (expand, then contract). PRs that add a
 # destructive migration fail "DB migrations expand-only" unless their title has `[contract]`
 # (.github/workflows/db-migrations-expand-only.yml).
-#
-# The job is bound to the `production` environment. It no longer has a required reviewer; it
-# holds the production password and project ref (not on the repository, so no other workflow can
-# reach production) and its branch policy only lets runs from main use them. An environment that
-# was never set up (no secrets) fails at "Check configuration" without touching the database.
 name: DB push (production)
 
 on:
   workflow_dispatch:
     inputs:
       pricing_operation:
-        description: Optional reviewed pricing data release (ordinary pushes only install migrations)
+        description: approval-check runs no database steps; none applies migrations
         type: choice
-        options: [none, activate, rollback]
-        default: none
+        options: [approval-check, none, activate, rollback]
+        default: approval-check
       release_sha:
         description: Exact reviewed main commit (required only for a pricing operation)
         type: string
@@ -32,30 +27,41 @@ on:
     paths:
       - 'supabase/migrations/**'
 
-concurrency:
-  group: db-push-production
-  cancel-in-progress: false
-
 permissions:
   contents: read
 
 jobs:
-  push:
-    name: supabase db push → production
-    if: github.ref == 'refs/heads/main'
+  approval-check:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && (!inputs.pricing_operation || inputs.pricing_operation == 'approval-check')
     runs-on: ubuntu-latest
-    environment: production
+    environment: production-manual
+    permissions: {}
+    steps:
+      - run: echo 'Approval check completed.'
+
+  push:
+    concurrency:
+      group: db-push-production
+      cancel-in-progress: false
+    name: supabase db push → production
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || contains(fromJSON('["none","activate","rollback"]'), inputs.pricing_operation))
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'push' && 'production' || 'production-manual' }}
+    permissions:
+      actions: read
+      contents: read
     env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_PRODUCTION_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_PRODUCTION_DB_PASSWORD }}
       SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PRODUCTION_PROJECT_REF }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/supabase-remote
         with:
-          token-source: secret SUPABASE_ACCESS_TOKEN
+          token-source: environment secret SUPABASE_PRODUCTION_ACCESS_TOKEN
           password-source: production environment secret SUPABASE_PRODUCTION_DB_PASSWORD
           ref-source: production environment variable SUPABASE_PRODUCTION_PROJECT_REF
+          require-owner-review: ${{ github.event_name == 'workflow_dispatch' }}
       - name: History before
         run: supabase migration list --linked
       # --include-all: cards own numbering ranges (TASKS), so a lower-numbered migration can
@@ -72,13 +78,22 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.pricing_operation != 'none'
         env:
           REVIEWED_SHA: ${{ inputs.release_sha }}
+          PRICING_V2_APPROVED_BASELINE: ${{ secrets.PRICING_V2_APPROVED_BASELINE }}
           OPERATION: ${{ inputs.pricing_operation }}
         run: |
           set -euo pipefail
           test "$REVIEWED_SHA" = "$GITHUB_SHA"
           test "$SUPABASE_PROJECT_REF" = "irbqamjuazkkyvnnzupf"
           case "$OPERATION" in
-            activate) file=scripts/release/pricing-v2/production.sql ;;
+            activate)
+              umask 077
+              file=$(mktemp)
+              trap 'rm -f "$file"' EXIT
+              python3 scripts/release/pricing-v2/render-production.py > "$file"
+              # CLI/database diagnostics can include the rendered statement.
+              supabase db query --linked --file "$file" >/dev/null 2>&1 || { echo "::error::Production activation failed"; exit 1; }
+              exit 0
+              ;;
             rollback) file=scripts/release/pricing-v2/production-rollback.sql ;;
             *) exit 1 ;;
           esac

@@ -31,7 +31,7 @@ async function save(styleRefs: unknown) {
 beforeAll(async () => {
   db = await connectAdmin()
   const caps = { resolutions: ['1k'], aspectRatios: ['1:1'], originalRatio: false,
-    minReferences: 0, maxReferences: 3, fetchedAt: new Date().toISOString() }
+    minReferences: 0, maxReferences: 3, catalogImageCosts: { '1k': 0.01 }, fetchedAt: new Date().toISOString() }
   await db.query(`insert into public.ai_providers (id,module,adapter,label,model,resolutions,capabilities)
     values ($1,'image','openrouter_images','T97 fixture','fixture/style-test','{1k}',$2)`, [provider,caps])
 })

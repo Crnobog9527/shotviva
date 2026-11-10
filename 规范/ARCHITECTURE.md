@@ -210,6 +210,8 @@ v1 不写回调解析、定时轮询、超时清理这类定时任务。视频�
 
 站内固定比例取第 4.3 节选择器和模型能力的交集。缺少原图比例时按输入图片尺寸选最近比例，只有一档清晰度时隐藏选择器。首次刷新前没有可用能力的 OpenRouter 模板暂时无法出图。伙伴请求固定标准档，比例取模板 `fields.aspectRatios` 与可用模型比例的交集，保留模板顺序。交集为空时目录隐藏该模板，直接生成返回已有的不支持错误。
 
+模板首次上架和已上架模板改价、换质量档或换模型绑定时，数据库在提交前按最终绑定（未指定时取默认模型）逐档复核 §6.1 成本下限。单条、批量和同步写入适用同一约束，出现 `TEMPLATE_PRICE_BELOW_FLOOR` 时整笔事务回滚。目录特价仍要求模板、模型、质量和该档售价与批准记录一致；画风另须取得销售批准。模型不提供的清晰度继续按 T96 保留正整数占位。仅使用环境默认模型时，数据库取各环境模型中满足样本数的最高 p95；缺少样本时采用 OpenAI 保守估价。
+
 T93 模板同步由 GitHub 手动工作流执行，审批后先读目标模板、提示词的行版本及本次回执，再用一条查询读取预览价格目录版本、模板、提示词和模型绑定。源数据只选同步字段，私有画风图由各环境管理。封面先按内容哈希复制到正式公开桶；`sync_preview_template` 逐个模板在正式库事务内按分类 key、供应商的 adapter / model / base_url 和正式积分下限校验，复用后台保存函数和目标定价规则。报价读取在同一快照中为目录条款和每个模型的报价输入计算摘要；最终事务在后台写函数取得模型锁后重验相关摘要，估价、成本统计或适用特价变化则回滚。预检与最终事务均持有切价流程共用的目录锁并比对源、目标和定价快照的目录版本；锁住目标模板和提示词后比对行版本（含首建时目标不存在），中途变化则拒绝。指定模型必须唯一匹配；跟随默认的模板在正式库也跟随默认。新增模板不上架，更新保留正式上架状态、排序、精选位。重复执行同一个 GitHub run id 对同一模板只提交一次；新的同步从正式提示词当前版本加一（首次为 1）。私有表 `template_sync_history` 以 (template_id, run_id) 为主键，记来源版本、写入版本、上一次正文、参数、模型绑定和版本，记录随模板删除，RLS 拒绝客户端访问。
 
 内置一条 `freeform` 模板：字段定义只有 `prompt`（加可选参考图），`template_prompts` 里的提示词是直通。它让「自由文字出图」和「模板出图」走同一条代码路径；`visible_in = ['partner']`，Shotviva 自己的前台不展示（DESIGN.md 禁止出现 prompt）。
@@ -341,7 +343,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
   - **`settle_waffo_order(user, product_id, payment_id, order_id, amount_total, currency, amount_tax, method)`**（T13，总控 2026-11-06 补）：在同一事务里完成两步。先调用 `apply_purchase(user, product_id, payment_id)`，用 Waffo 的 payment id 做幂等键；入账生效时再插入一行 `payments`，其中 `channel = 'waffo'`，`waffo_order_id` 取 Waffo 订单号，金额和税额取自 `order.completed` 事件，单位换算为分。重复事件不写第二行。**T50 起**：签名不变，同时写 `waffo_payment_id`；单笔和订阅的每一期扣款（含首付）都走它，幂等键是 `PAY_` 扣款号，所以续费不会重复入账，续费失败没有扣款事件、不入账。
   - 以上函数都只授权 `service_role`。
 - **版本化结账（新积分）**：私有 `admin.product_terms_v2(product_id primary key,credits,usd_cents)` 保存九项已核准报价，启用 RLS，不对客户端开放。调用方从已验签的 Stripe/Waffo 订单或合同取得价格版本；新合同走仅 service_role 可执行的 `settle_checkout_v2`、`settle_waffo_order_v2`、`apply_subscription_renewal_v2`，旧合同和旧在途单保持原端点与原价。切换后首次入账的真实旧合约款按等档新积分发放（保持签约费用和周期），重复回调只认原流水。共用事务、索引和付款幂等键。不得因缺失或非法的新版本信息把新单当旧单。退款、争议按对应时间的入账流水折算，不能按今日套餐目录回推。加这些函数本身不激活新 UI，不改余额或第三方合同。
-- **旧单位结清**：生产切换只针对 Owner 核实的旧账号付费与免费两个池；授权时 6 个账号，124 付费、26 免费。私有 `admin.pricing_wallet_cutover` 记录版本、时点、原余额摘要和结清后流水位点。仅由受保护工作流在库内校验摘要、付款数、流水、有效合同和未完任务后调用 `admin.clear_approved_wallets_v2`，逐池写唯一冲销流水，不删订单或历史记录。恢复函数仅在无新经济活动且能复原原摘要时写逆向流水。新价格启用事务同时设置 `system_settings.pricing_catalog_version` 为 JSON 字符串 `v2`；其写入时间是注册赠分界线，旧账号不补领，新账号获 100 免费积分，沿用原同 IP 限制和幂等键。迁移本身不执行切换。
+- **旧单位结清**：生产切换只针对 Owner 核实的旧账号付费与免费两个池，账号数、两池余额合计、摘要、流水位点和付款数由受保护工作流在执行时传入。私有 `admin.pricing_wallet_cutover` 记录版本、时点、原余额摘要和结清后流水位点。仅由受保护工作流在库内校验摘要、付款数、流水、有效合同和未完任务后调用 `admin.clear_approved_wallets_v2`，逐池写唯一冲销流水，不删订单或历史记录。恢复函数仅在无新经济活动且能复原原摘要时写逆向流水。新价格启用事务同时设置 `system_settings.pricing_catalog_version` 为 JSON 字符串 `v2`；其写入时间是注册赠分界线，旧账号不补领，新账号获 100 免费积分，沿用原同 IP 限制和幂等键。迁移本身不执行切换。
 - 激活事务在目录、模型、价格和钱包共同可用后记录私有 `admin.pricing_release_checkpoint(version,fingerprint)`。测试库和正式库的回滚都检查余额、注册、流水、付款、合同、拒付和生成；期间有新业务则停止。回滚前关闭新收银、到期或关闭可付款会话、排清两通道在途凭证。回滚后才首次收到的新报价付款不得入旧钱包，返回可重试的结算错误并核对渠道款项。注册和支付先取得公共读锁再读版本；切换独占该锁，避免同时读旧版写新版。
 - **首付的 `paid_until`**：首付走 `apply_purchase`，按商品天数累加（月付 +30 天，年付 +365 天），和 Stripe 本期结束日可能差一两天。从第一次续费起，由 `apply_subscription_renewal` 对齐 `period_end`，见下一条。
 - 订阅续费走 T10 新增的 `apply_subscription_renewal(user, product_id, invoice_id, period_end)`：`credits += 商品积分`，`paid_until = greatest(paid_until, period_end)`（直接对齐 Stripe 的本期结束日，不按天数累加，避免大小月漂移）；同样写流水、按 invoice id 幂等，内部复用 `_apply_credit_change`（总控 2026-11-05 补）。
