@@ -4,7 +4,7 @@ import { Link } from '@/core/i18n/ui'
 import { date, money, percent, productLabel, viewHref } from './format'
 import type { Query } from './models'
 import { readChanges, readCommissions } from './repository'
-import { More, Table } from './shared-ui'
+import { More, StatusPill, Table } from './shared-ui'
 
 async function ChangeList({ user, query }: { user: string; query: Query }) {
   if (!query.entry) return null
@@ -14,7 +14,7 @@ async function ChangeList({ user, query }: { user: string; query: Query }) {
     currentLocale(),
   ])
   return (
-    <section className="af-panel">
+    <section className="af-panel af-history">
       <h3>{t('changes')}</h3>
       <Table
         headers={['date', 'reason', 'previous', 'updated'].map((key) => t(key))}
@@ -54,7 +54,7 @@ export async function CommissionList({
       <div className="af-heading">
         <h2>{t(team ? 'bonuses' : 'nav.commissions')}</h2>
         {!team && (
-          <a href={'/api/affiliate/commissions?locale=' + locale} className="af-link">
+          <a href={'/api/affiliate/commissions?locale=' + locale} className="af-ghost">
             {t('export')}
           </a>
         )}
@@ -69,8 +69,8 @@ export async function CommissionList({
           productLabel(row.product_id, t),
           money(locale, row.base_usd),
           percent(locale, row.rate_bp),
-          money(locale, row.amount),
-          t('status.' + row.status),
+          <strong key="a" className="af-num">{money(locale, row.amount)}</strong>,
+          <StatusPill key="s" status={row.status} t={t} />,
           date(locale, row.confirm_after),
           <Link
             key={row.id}

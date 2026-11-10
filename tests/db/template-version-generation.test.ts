@@ -25,7 +25,7 @@ it('sends the selected version to both adapters and preserves each completed job
     const t = (await pg.query('select id,name,category_key,fields,quality,credits_cost,visible_in from public.templates where id=$1',[id])).rows[0]
     const adapter = fakeProvider(), routes: (string | null)[] = []
     const deps = {db,store:createMemoryStore().store,provider: async (binding: string | null) => {
-      routes.push(binding); return {...adapter.provider,id:binding ?? 'fixture-default'}
+      routes.push(binding); return {...adapter.provider,id:binding ? binding + '/v2-model' : 'env/fixture-default'}
     }}
     const receipts: {job: string; run: string; version: number}[] = []
     for (const [expected, version, body, binding] of [[2,1,initial,null],[1,2,'version two',providerId]] as const) {

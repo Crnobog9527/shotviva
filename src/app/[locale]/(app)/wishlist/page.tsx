@@ -10,9 +10,10 @@ import { Link } from '@/core/i18n/ui'
 import { r2Store } from '@/core/storage'
 import { buttonVariants } from '@/core/ui/button'
 import { isWishlistEligible, listWall } from '@/core/wishlist'
-import { SentNotice, WallView } from '@/core/wishlist/ui'
+import { SentNotice, WallView, WishlistGuide } from '@/core/wishlist/ui'
 
 import { loadWallPage } from './actions'
+import { markWishlistSeen } from './onboarding-actions'
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('app.wishlist'))('title') }
@@ -29,6 +30,8 @@ function Header() {
 }
 
 // The wall (B comp wishlist.html): the first page renders here, later pages through the action.
+// The account's first visit also gets the teaching sheet (onboarding.wishlistSeen, Owner
+// 2026-11-10), which marks itself seen.
 async function Wall() {
   const user = await requireUser('/wishlist')
   await connection()
@@ -37,7 +40,12 @@ async function Wall() {
     // wishlist_eligible() is service-role only; the user's own id comes from the session.
     isWishlistEligible(createAdminSupabase(), user.id),
   ])
-  return <WallView first={first} eligible={eligible} now={new Date().toISOString()} loadMore={loadWallPage} />
+  return (
+    <>
+      <WallView first={first} eligible={eligible} now={new Date().toISOString()} loadMore={loadWallPage} />
+      {user.onboarding.wishlistSeen ? null : <WishlistGuide eligible={eligible} markSeen={markWishlistSeen} />}
+    </>
+  )
 }
 
 export default function WishlistPage() {

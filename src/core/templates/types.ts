@@ -1,3 +1,4 @@
+import type { Resolution } from './output-options'
 import { FULL_IMAGE_OPTIONS, type ImageOptions } from './image-options'
 import { coverLocalesSchema, type CoverLocales } from './cover-locales'
 import { CATEGORY_COLUMNS, preT75Category, toCategory, type Category, type CategoryRow } from './categories'
@@ -13,6 +14,8 @@ export type Template = {
   // The template_categories key (templates.category_key, T75); names and card style are in
   // categoryInfo.
   category: string
+  categoryPath?: string[]
+  series?: { id: string; slug: string; name: string } | null
   categoryInfo: Category
   coverBeforeUrl: string | null
   coverAfterUrl: string | null
@@ -28,6 +31,7 @@ export type Template = {
   quality: TemplateQuality
   // Credits per resolution; cards show the '1k' number ("From 2 credits", DESIGN §4.2).
   imageOptions?: ImageOptions
+  unpricedResolutions?: readonly Resolution[]
   creditsCost: CreditsCost
   sortOrder: number
   isActive: boolean

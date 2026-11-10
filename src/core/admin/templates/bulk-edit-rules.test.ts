@@ -75,15 +75,38 @@ describe('batch edit floor check (T79)', () => {
   })
 })
 
-it('rejects publishing changes to a live style with the wrong purpose, quality or partner route', () => {
-  const style = template('style', { category: 'art-styles', prompt: { providerId: 'pinned' } })
-  const tariff = { quality: 'high' as const, costs: style.creditsCost, style_sale_approved: true }
-  const floor = { ...FLOOR, version: 'v2' as const, activeProvider: 'other',
-    tariffs: { style: tariff }, approvals: { pinned: { style: tariff } } }
-  const reason = [{ id: style.id, name: style.name, reason: 'style_unapproved' }]
-  expect(bulkEditFailures([style], { visibleIn: ['web'] }, floor)).toEqual([])
-  expect(bulkEditFailures([style], { visibleIn: ['partner'] }, floor)).toEqual(reason)
-  expect(bulkEditFailures([style], { quality: 'medium' }, floor)).toEqual(reason)
-  const unapproved = { ...floor, tariffs: { style: { ...tariff, style_sale_approved: false } } }
-  expect(bulkEditFailures([{ ...style, category: 'pets' }], { categoryKey: 'art-styles' }, unapproved)).toEqual(reason)
+it('checks an art draft against its selected route when an admin changes Standard or HD', () => {
+  const draft = template('style', { category: 'art-styles', isActive: false, prompt: { providerId: 'seed' } })
+  const tiers = { '1k': 13, '2k': 17, '3k': 1 }
+  const floor = { ...FLOOR, version: 'v2' as const, providers: { seed: { high: tiers, medium: tiers } } }
+  expect(bulkEditFailures([draft], { creditsCost: { '1k': 21, '2k': 17 } }, floor)).toEqual([])
+  expect(bulkEditFailures([draft], { creditsCost: { '1k': 21, '2k': 16 } }, floor)).toMatchObject([
+    { id: 'style', reason: 'below_floor', resolution: '2k', floor: 17 },
+  ])
+})
+
+it('checks each template against the replacement route before applying any batch edits', () => {
+  const expensive = { '1k': 20, '2k': 40, '3k': 60 }
+  const route = { ...FLOOR, providers: { seed: { high: expensive, medium: expensive } } }
+  const ready = template('ready', { creditsCost: expensive })
+  expect(bulkEditFailures([ready, template('cheap')], { providerId: 'seed' }, route))
+    .toMatchObject(['1k','2k','3k'].map(resolution => ({ id: 'cheap', reason: 'below_floor', resolution })))
+})
+
+it('keeps unpriced tiers closed across other bulk changes and checks newly entered prices', () => {
+  const row = template('new-route', { unpricedResolutions: ['3k'], creditsCost: { '1k': 5, '2k': 5, '3k': 1 } })
+  expect(bulkEditFailures([row], { quality: 'high' }, FLOOR)).toEqual([])
+  expect(bulkEditFailures([row], { creditsCost: { '3k': 2 } }, FLOOR)).toMatchObject([
+    { resolution: '3k', given: 2, floor: 6 },
+  ])
+})
+
+it('uses the previous route only for legacy rows without a saved tier decision', () => {
+  const floors = { ...FLOOR, activeProvider: 'default', providers: {
+    seed: { ...FLOOR, resolutions: ['1k', '2k'] as const }, default: FLOOR,
+  } }
+  const row = template('legacy', { prompt: { providerId: 'seed' }, creditsCost: { '1k': 10, '2k': 15, '3k': 1 } })
+  expect(bulkEditFailures([row], { providerId: null }, floors)).toEqual([])
+  expect(bulkEditFailures([{ ...row, unpricedResolutions: [] }], { providerId: null }, floors))
+    .toMatchObject([{ resolution: '3k', given: 1 }])
 })

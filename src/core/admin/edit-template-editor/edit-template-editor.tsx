@@ -9,7 +9,8 @@ import { Textarea } from '@/core/ui/textarea'
 import type { CreditsFloor } from '@/core/templates/pricing'
 
 import type { EditTemplateSettings, SaveEditTemplateInput } from '../edit-template/schema'
-import type { ActionResult } from '../templates/types'
+import { SaleSwitch } from '../templates-editor/sale-switch'
+import type { TemplateAdminActions, ActionResult } from '../templates/types'
 import { useTemplateActions } from '../templates-editor/use-template-actions'
 
 import { BasicsFields } from './basics-fields'
@@ -20,18 +21,20 @@ import { ScopeTextFields } from './scope-text-fields'
 type Props = {
   settings: EditTemplateSettings
   floor: CreditsFloor
+  setSale: TemplateAdminActions['setSale']
   save: (input: SaveEditTemplateInput) => Promise<ActionResult>
 }
 
 // /admin/templates/edit (ARCHITECTURE §5.2): switch, price, wrapper, the classifier instructions
 // the six paragraphs and the reframe paragraph of the built-in edit template, saved together.
-export function EditTemplateEditor({ settings, floor, save }: Props) {
+export function EditTemplateEditor({ settings, floor, save, setSale }: Props) {
   const [form, setForm] = useState(() => formFor(settings))
   const { pending, error, notice, run } = useTemplateActions()
   const patch = (next: Partial<EditTemplateForm>) => setForm((prev) => ({ ...prev, ...next }))
   return (
     <div className="grid gap-4">
       <p className="text-muted-foreground text-sm">{COPY.intro}</p>
+      <SaleSwitch template={{ id: 'edit', isActive: settings.isActive, saleEnabled: settings.saleEnabled }} action={setSale} disabled={pending} />
       <BasicsFields form={form} floor={floor} quality={settings.quality} version={settings.version} onChange={patch} />
       <div className="grid gap-1.5 rounded-md border border-dashed p-3">
         <Label htmlFor="edit-classifier">{COPY.classifier}</Label>

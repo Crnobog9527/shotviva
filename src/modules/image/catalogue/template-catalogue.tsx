@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { cn } from '@/core/ui/cn'
 import { Reveal } from '@/core/ui/reveal-item'
@@ -15,14 +15,16 @@ import { ALL, CategoryChips } from './category-chips'
 import { FeatureCard } from './feature-card'
 import { TemplateCard } from './template-card'
 
-type Props = { templates: CatalogueTemplate[]; create: CreateContext }
+// `endCard`: the grid's last card, after every filter's templates (the Wishlist's "Not finding
+// it?", passed in by the page while the wishlist is open).
+type Props = { templates: CatalogueTemplate[]; create: CreateContext; endCard?: ReactNode }
 
 // Create's catalogue (B comp create.html): the featured card, a sticky chip bar, the grid of
 // side-by-side pair cards (one column on phones, two from md, three from lg; the Art Styles
 // compare is the tall card), and the creation dialog every card opens (DESIGN §6.9 item 2). The
 // feature and each card fade up once as they enter (core/ui/reveal, DESKTOP-NOTES item 6). With
 // saved templates the bar leads with Saved (T83), read from the page's FavoritesProvider.
-export function TemplateCatalogue({ templates, create }: Props) {
+export function TemplateCatalogue({ templates, create, endCard }: Props) {
   const t = useTranslations('app.create')
   const [category, setCategory] = useState(ALL)
   const [openId, setOpenId] = useState<string | null>(null)
@@ -53,6 +55,7 @@ export function TemplateCatalogue({ templates, create }: Props) {
             <TemplateCard template={template} onOpen={setOpenId} eager={index < 3} />
           </Reveal>
         ))}
+        {endCard ? <Reveal as="li">{endCard}</Reveal> : null}
       </ul>
       <p className="px-(--gutter) pt-4 pb-2 text-caption leading-[1.4] text-muted-foreground">{t('illustrative')}</p>
       <CreateDialog template={templates.find((item) => item.id === openId) ?? null} onClose={() => setOpenId(null)} {...create} />

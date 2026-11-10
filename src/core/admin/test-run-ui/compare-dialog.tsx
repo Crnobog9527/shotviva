@@ -21,6 +21,7 @@ function Side({ run, photoUrl }: { run: TestRunView; photoUrl: string | null }) 
       <figcaption className="grid gap-0.5">
         <span className="text-sm font-medium break-words">{title}</span>
         <span className="text-muted-foreground break-all text-xs">{facts.filter(Boolean).join(' · ')}</span>
+        {run.photoDeleted && <span className="text-muted-foreground text-xs">{COPY.removal.deleted}</span>}
         {photoUrl ? (
           <a href={photoUrl} target="_blank" rel="noreferrer" className="text-muted-foreground text-xs underline underline-offset-4">
             {COPY.compare.source}

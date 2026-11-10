@@ -108,6 +108,8 @@ export const partnerTemplateSchema = z.object({
   id: z.string(),
   name: z.string(),
   category: z.string(),
+  category_path: z.array(z.string()).min(1).max(3),
+  series: z.object({ id: z.uuid(), slug: z.string(), name: z.string() }).nullable(),
   cover_before_url: z.url().nullable(),
   cover_after_url: z.url().nullable(),
   credits_cost: z.number().int().positive(),

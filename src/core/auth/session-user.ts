@@ -1,6 +1,7 @@
 import type { User } from '@supabase/supabase-js'
 
 import { isLocale, type Locale } from '../i18n/locales'
+import { readOnboarding, type Onboarding } from './onboarding'
 
 export type Role = 'user' | 'admin'
 
@@ -17,6 +18,9 @@ export type SessionUser = {
   banned: boolean
   // user_metadata.locale, written at sign-up (ARCHITECTURE §7); null for older and Google accounts.
   locale: Locale | null
+  // First-run hints already seen (user_metadata.onboarding, onboarding.ts), so the shell reads
+  // them from the session it already loads.
+  onboarding: Onboarding
 }
 
 export function metadataLocale(user: Pick<User, 'user_metadata'>): Locale | null {
@@ -48,5 +52,6 @@ export function toSessionUser(
     verified: isVerified(user),
     banned: profile?.banned_at != null,
     locale: metadataLocale({ user_metadata: user.user_metadata ?? {} }),
+    onboarding: readOnboarding(user.user_metadata),
   }
 }

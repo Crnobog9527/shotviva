@@ -6,9 +6,9 @@ import { batchUpgrade, limitsFor, MAX_BATCH_SIZE, TIER_LIMITS, tierForBatch } fr
 describe('TIER_LIMITS (ARCHITECTURE §6.2, one table)', () => {
   it('holds the numbers the spec fixes', () => {
     expect(TIER_LIMITS).toEqual({
-      starter: { concurrency: 1, perWindow: 20, batchMax: 1, supportHours: 48 },
-      pro: { concurrency: 3, perWindow: 40, batchMax: 10, supportHours: 48 },
-      max: { concurrency: 6, perWindow: 80, batchMax: 30, supportHours: 24 },
+      starter: { concurrency: 1, perWindow: 20, batchMax: 1, supportHours: 48, voteWeight: 1 },
+      pro: { concurrency: 3, perWindow: 40, batchMax: 10, supportHours: 48, voteWeight: 1 },
+      max: { concurrency: 6, perWindow: 80, batchMax: 30, supportHours: 24, voteWeight: 3 },
     })
     expect(MAX_BATCH_SIZE).toBe(30)
   })

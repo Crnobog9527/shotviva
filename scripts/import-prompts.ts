@@ -3,6 +3,11 @@
  *
  *   pnpm import:prompts                 # reads .local/prompts.json
  *   pnpm import:prompts path/to/file    # any other local file
+ *   pnpm import:prompts path/to/file --open-sale
+ *
+ * --open-sale approves each imported template for sale using SHOTVIVA_IMPORT_ADMIN_ID
+ * (the operator's active admin UUID on the destination). Publication still follows isActive.
+ * A live result requires this flag. Each template commits with its approval and audit event.
  *
  * Needs NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (e.g. from .env.local).
  * Format: scripts/prompts.example.json. Real prompts never go into git (AGENTS §5).
@@ -20,6 +25,7 @@ import { z } from 'zod'
 import { toUpsertArgs } from '../src/core/admin/templates/rpc-payload'
 import { listImageProviderOptions, pricingFromOptions } from '../src/core/admin/templates/provider-pricing'
 import { templateWithPromptSchema } from '../src/core/templates/schema'
+import { activeImportHint, importFailure, importOptions } from './import-prompts-options'
 import { toggleSetupProblems } from '../src/core/templates/toggles'
 
 const fileSchema = z.object({ templates: z.array(templateWithPromptSchema).min(1) })
@@ -31,7 +37,10 @@ const envSchema = z.object({
 })
 
 function readTemplates(path: string) {
-  const parsed = fileSchema.safeParse(JSON.parse(readFileSync(path, 'utf8')))
+  const text = readFileSync(path, 'utf8')
+  let input: unknown
+  try { input = JSON.parse(text) } catch { throw new Error(`Invalid JSON in ${path}`) }
+  const parsed = fileSchema.safeParse(input)
   if (!parsed.success) {
     const detail = parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`)
     throw new Error(`Invalid ${path}:\n  ${detail.join('\n  ')}`)
@@ -45,17 +54,24 @@ function readTemplates(path: string) {
 }
 
 async function main() {
-  const path = resolve(process.argv[2] ?? '.local/prompts.json')
+  const options = importOptions(process.argv.slice(2), process.env.SHOTVIVA_IMPORT_ADMIN_ID)
+  const templates = readTemplates(resolve(options.file))
+  if (!options.openSale) {
+    const active = templates.find(template => template.isActive)
+    if (active) throw new Error(`${active.id}: ${activeImportHint}`)
+  }
   const env = envSchema.parse(process.env)
   const client = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
-  const templates = readTemplates(path)
   const pricing = await listImageProviderOptions(client, env.OPENAI_IMAGE_MODEL)
   const floors = pricingFromOptions(pricing)
   for (const { prompt, ...template } of templates) {
-    const { error } = await client.rpc('admin_upsert_template', toUpsertArgs(template, prompt, { categoryByName: true, floors }))
-    if (error) throw new Error(`Failed on ${template.id}: ${error.message}`)
+    const { error } = await client.rpc('admin_import_template', {
+      ...toUpsertArgs(template, prompt, { categoryByName: true, floors }),
+      p_open_sale: options.openSale, p_actor: options.actor ?? null,
+    })
+    if (error) throw new Error(`Failed on ${template.id}: ${importFailure(error)}`)
     // Ids and counts only: prompt bodies must never reach logs.
     process.stdout.write(`imported ${template.id}\n`)
   }

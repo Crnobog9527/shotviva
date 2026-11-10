@@ -20,3 +20,10 @@ describe('batch edit form (T79)', () => {
     }
   })
 })
+
+it('distinguishes keeping a binding, following the default, and selecting a model', () => {
+  const form = emptyBulkEdit()
+  expect(readBulkEdit(form).patch).not.toHaveProperty('providerId')
+  expect(readBulkEdit({ ...form, provider: '' }).patch).toEqual({ providerId: null })
+  expect(readBulkEdit({ ...form, provider: 'seed' }).patch).toEqual({ providerId: 'seed' })
+})

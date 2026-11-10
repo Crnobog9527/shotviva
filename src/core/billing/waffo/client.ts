@@ -74,7 +74,7 @@ async function post(request: typeof fetch, path: string, payload: unknown, label
   if (!response.ok || !envelope?.data || envelope.errors?.length) {
     // Status and Waffo's own messages only; never the request (it names the buyer).
     const notes = (envelope?.errors ?? []).slice(0, 3).map((e) => String(e.message ?? '').slice(0, 200))
-    logger.error(`waffo ${label} failed`, { status: response.status, errors: notes })
+    logger.error(`waffo ${label} failed`, { status: response.status, errors: notes.map(note => note.replace(/PROD_[A-Za-z0-9]+/g, '[product]')) })
     throw new AppError('INTERNAL', `Waffo ${label} failed (${response.status})`)
   }
   return envelope.data
@@ -90,4 +90,8 @@ export function waffoClient(request: typeof fetch = fetch): WaffoApi {
       return parsed.data
     },
   }
+}
+
+export function readWaffoCatalog(query: string, variables: Record<string, unknown>) {
+  return post(fetch, '/v1/graphql', { query, variables }, 'catalog')
 }

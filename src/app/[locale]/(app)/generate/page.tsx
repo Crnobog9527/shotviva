@@ -10,7 +10,10 @@ import { listFavoriteIdsOrEmpty } from '@/core/favorites'
 import { currentLocale } from '@/core/i18n/server'
 import { listRunningJobIds } from '@/core/jobs'
 import { listTemplatesIn } from '@/core/templates'
+import { isWishlistEnabled } from '@/core/wishlist'
+import { WishCard } from '@/core/wishlist/ui/wish-card'
 import { FavoritesProvider, GeneratingPill, TemplateCatalogue, toCatalogueTemplate } from '@/modules/image'
+import { site } from '@/site/site.config'
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('app.create'))('metaTitle') }
@@ -29,7 +32,7 @@ async function Create() {
   const user = await requireUser('/generate')
   const supabase = await createServerSupabase()
   const admin = createAdminSupabase()
-  const [templates, balance, tier, runningIds, favoriteIds] = await Promise.all([
+  const [templates, balance, tier, runningIds, favoriteIds, wishlistLive] = await Promise.all([
     listTemplatesIn(supabase, await currentLocale()),
     readBalance(supabase, user.id),
     // current_tier() is service-role only; the user's own id comes from the session.
@@ -37,6 +40,8 @@ async function Create() {
     listRunningJobIds(admin, user.id, new Date()),
     // A failed read degrades to no favorites (logged), never to an error page or signed-out home.
     listFavoriteIdsOrEmpty(supabase, user.id),
+    // The grid ends on "Not finding it? Make a wish" while the wishlist is open (cached read).
+    isWishlistEnabled(site),
   ])
   return (
     <>
@@ -52,6 +57,7 @@ async function Create() {
         <TemplateCatalogue
           templates={templates.map(toCatalogueTemplate)}
           create={{ balance, tier, concurrency: { limit: limitsFor(tier).concurrency, runningIds } }}
+          endCard={wishlistLive ? <WishCard /> : undefined}
         />
       </FavoritesProvider>
     </>

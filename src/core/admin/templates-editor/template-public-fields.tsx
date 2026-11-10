@@ -10,12 +10,14 @@ import { TEMPLATE_DESCRIPTION_MAX } from '@/core/templates/schema'
 import { CategoryField, type CategoryOption } from './category-field'
 import { publicCopy, styleRefCopy } from './copy'
 import type { TemplateFormValues } from './form-state'
+import { ChinesePublicFields } from './template-translation-fields'
 import { TemplatePriceFields } from './template-price-fields'
 
 type Props = {
   values: TemplateFormValues
   isNew: boolean
   uploading: boolean
+  modelField: React.ReactNode
   floor: CreditsFloor
   categories: readonly CategoryOption[]
   onChange: (patch: Partial<TemplateFormValues>) => void
@@ -57,20 +59,21 @@ function DescriptionField({ value, onChange }: { value: string; onChange: (value
   )
 }
 
-export function TemplatePublicFields({ values, isNew, uploading, floor, categories, onChange }: Props) {
+export function TemplatePublicFields({ values, isNew, uploading, modelField, floor, categories, onChange }: Props) {
   const lockNewId = uploading || values.styleRefs.length > 0
   return (
     <fieldset className="grid gap-3">
       <legend className="mb-1 text-sm font-semibold">公开信息</legend>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3">
         <TextField id="id" label="ID（小写字母、数字、短横线，创建后不可改）" value={values.id}
           disabled={!isNew || lockNewId} onChange={(id) => onChange({ id })} />
         <TextField id="name" label={publicCopy.name} value={values.name} onChange={(name) => onChange({ name })} />
-        <CategoryField value={values.category} categories={categories} onChange={(category) => onChange({ category })} />
       </div>
       {isNew && lockNewId && <p className="text-muted-foreground text-xs">{styleRefCopy.idLocked}</p>}
       <DescriptionField value={values.description} onChange={(description) => onChange({ description })} />
-      <TemplatePriceFields values={values} floor={floor} onChange={onChange} />
+      <ChinesePublicFields values={values} onChange={onChange} />
+      <CategoryField value={values.category} categories={categories} onChange={(category) => onChange({ category })} />
+      <TemplatePriceFields modelField={modelField} values={values} floor={floor} onChange={onChange} />
       <div className="flex items-center gap-6 text-sm">
         <span>展示入口</span>
         <label className="flex items-center gap-2">

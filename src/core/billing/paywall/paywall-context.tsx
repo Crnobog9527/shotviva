@@ -11,6 +11,7 @@ import type { PaymentChannel, SiteProduct } from "../../config"
 import { offeredMethods } from "../stripe/catalog"
 import { holdsMembership, NO_STANDING, type MemberStanding } from "../subscription/standing"
 import { PaymentChannelContext, WechatPayContext } from "./channel-context"
+import { PerkFactsContext, type PerkFacts } from "./perk-facts"
 import { StandingContext } from "./standing-context"
 import { usePaywallState, type PaywallOpenOptions } from "./use-paywall-state"
 
@@ -31,9 +32,10 @@ const PaywallContext = createContext<PaywallApi | null>(null)
 // `wechatPay` its STRIPE_WECHAT_PAY (T73).
 // It also holds what the buyer already has (T66, fed by StandingSlot), so a member opens on a
 // plan they can actually buy; the rule that decides it is fetched only for members.
-type ProviderProps = { products: readonly SiteProduct[]; wishlistLive: boolean; channel: PaymentChannel; wechatPay: boolean; children: ReactNode }
+// `perkFacts`: the wishlist switch and the live Standard prices the plan cards read (perk-facts).
+type ProviderProps = { products: readonly SiteProduct[]; perkFacts: PerkFacts; channel: PaymentChannel; wechatPay: boolean; children: ReactNode }
 
-export function PaywallProvider({ products, wishlistLive, channel, wechatPay, children }: ProviderProps) {
+export function PaywallProvider({ products, perkFacts, channel, wechatPay, children }: ProviderProps) {
   const [open, setOpen] = useState(false)
   // The paywall is the start of a checkout: the new-version banner waits until it closes (T90).
   useUpdateHold("checkout", open)
@@ -64,10 +66,12 @@ export function PaywallProvider({ products, wishlistLive, channel, wechatPay, ch
     <PaymentChannelContext.Provider value={channel}>
       <WechatPayContext.Provider value={wechatPay}>
         <StandingContext.Provider value={held}>
-          <PaywallContext.Provider value={api}>
-            {children}
-            <PaywallSheet open={open} onOpenChange={setOpen} trigger={trigger} products={products} wishlistLive={wishlistLive} state={state} />
-          </PaywallContext.Provider>
+          <PerkFactsContext.Provider value={perkFacts}>
+            <PaywallContext.Provider value={api}>
+              {children}
+              <PaywallSheet open={open} onOpenChange={setOpen} trigger={trigger} products={products} state={state} />
+            </PaywallContext.Provider>
+          </PerkFactsContext.Provider>
         </StandingContext.Provider>
       </WechatPayContext.Provider>
     </PaymentChannelContext.Provider>

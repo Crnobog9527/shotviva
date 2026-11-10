@@ -6,7 +6,7 @@ import { bulkEditTemplates, saveTemplate, setTemplateActive } from '@/core/admin
 import { LOCALES } from '@/core/i18n/locales'
 import { CREDITS_FLOOR } from '@/modules/image/credits-floor'
 
-import { connectAdmin, createUser } from './helpers'
+import { connectAdmin, createUser, approveFixtures } from './helpers'
 import { serviceSupabase as serviceClient } from './supabase-env'
 
 // T79 (ARCHITECTURE §10 「模板批量编辑」): admin_bulk_edit_templates through the command the
@@ -53,6 +53,7 @@ describe('batch edit of templates', () => {
     }
     // Live, partner only, and missing what a web card needs.
     await saveTemplate(client, LOG_ID, { isNew: true, template: template(PARTNER, { visibleIn: ['partner'], description: '' }), prompt }, CREDITS_FLOOR)
+    await approveFixtures(pg,PARTNER)
     await setTemplateActive(client, LOG_ID, { id: PARTNER, active: true }, CREDITS_FLOOR)
   })
 

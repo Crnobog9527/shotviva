@@ -8,7 +8,8 @@ import { logger } from '@/core/logger'
 // Request-time: is someone signed in? Only this small hole reads the session, so the marketing
 // pages stay statically cached with the signed-out bar as the fallback (DESIGN §6.9 item 4).
 // An unverified account is treated as signed out (the app would send it back to log in).
-async function signedIn(): Promise<boolean> {
+// Also the home wishlist section's CTA (home-wish-cta-slot.tsx).
+export async function signedIn(): Promise<boolean> {
   try {
     return (await getSessionUser())?.verified === true
   } catch (error) {

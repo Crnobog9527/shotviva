@@ -6,7 +6,7 @@ import { toUpsertArgs } from '@/core/admin/templates/rpc-payload'
 import { listTemplatesIn, templateInputSchema } from '@/core/templates'
 import { CREDITS_FLOOR } from '@/modules/image/credits-floor'
 
-import { connectAdmin } from './helpers'
+import { connectAdmin, publishFixture } from './helpers'
 import { anonSupabase, serviceSupabase } from './supabase-env'
 
 // templates.description (T52, ARCHITECTURE §5): the English one-liner. The admin save writes and
@@ -38,7 +38,7 @@ describe('templates.description', () => {
   beforeAll(async () => {
     pg = await connectAdmin()
     await save({ description: `  ${ENGLISH}  `, translations: {} }, true)
-    await pg.query('update public.templates set is_active = true where id = $1', [ID])
+    await publishFixture(pg, ID)
   }, 120_000)
 
   afterAll(async () => {

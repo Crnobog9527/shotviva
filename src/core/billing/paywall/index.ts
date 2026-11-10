@@ -7,6 +7,7 @@ export { PaywallProvider, usePaywall, type PaywallTrigger } from './paywall-cont
 export { packOffers, perCreditUsd, perMonthUsd, tierOffers, yearlySavingPct, yearlySavingUsd, type Period, type TierOffer } from './offer'
 export { PricingPayWith } from './pricing-pay-with'
 export { tierPerks } from './perks'
+export { NO_PERK_FACTS, type PerkFacts } from './perk-facts'
 export { BillingToggle } from './billing-toggle'
 export { TierCard } from './tier-card'
 export { CheckoutCancelToast } from './cancel-toast'

@@ -17,6 +17,7 @@ export type TestRun = {
   templateId: string
   kind: (typeof TEST_RUN_KINDS)[number]
   parentId: string | null
+  photoDeleted?: boolean
   photoId: string | null
   batchId: string
   status: (typeof TEST_RUN_STATUSES)[number]
@@ -42,6 +43,7 @@ export const testRunRowSchema = z
     template_id: z.string(),
     kind: z.enum(TEST_RUN_KINDS),
     parent_id: z.string().nullable(),
+    photo_deleted: z.boolean().optional(),
     photo_id: z.string().nullable(),
     batch_id: z.string(),
     status: z.enum(TEST_RUN_STATUSES),
@@ -64,7 +66,7 @@ export const testRunRowSchema = z
       templateId: row.template_id,
       kind: row.kind,
       parentId: row.parent_id,
-      photoId: row.photo_id,
+      photoId: row.photo_id, photoDeleted: row.photo_deleted,
       batchId: row.batch_id,
       status: row.status,
       resolution: row.resolution,
@@ -83,7 +85,7 @@ export const testRunRowSchema = z
   )
 
 export const TEST_RUN_COLUMNS =
-  'id, template_id, kind, parent_id, photo_id, batch_id, status, resolution, inputs, prompt_version, provider, provider_usage, cost_usd, estimate_usd, output_key, error_code, duration_ms, cover_set_at, created_at'
+  'id, template_id, kind, parent_id, photo_id, photo_deleted, batch_id, status, resolution, inputs, prompt_version, provider, provider_usage, cost_usd, estimate_usd, output_key, error_code, duration_ms, cover_set_at, created_at'
 
 export type TestPhoto = { id: string; objectKey: string; lastUsedAt: string }
 

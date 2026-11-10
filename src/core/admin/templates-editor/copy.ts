@@ -53,7 +53,7 @@ export const orderCopy = {
   saved: '排序已保存',
   failed: '顺序没保存，已退回原来的顺序。',
   offline: '连不上服务器，请检查网络后重试。',
-  filtered: '清空搜索后可拖动排序',
+  filtered: '清空搜索和分类筛选后可在同一上架状态内排序',
   dragHint: '按住左边的把手上下拖动调整顺序；手机上长按整行再拖。',
 } as const
 
@@ -110,12 +110,12 @@ export const coverCopy = {
   confirmDelete: '删除',
 } as const
 
-// 开关 (T89): optional on/off choices of a template, e.g. 优化摆盘和器皿.
+// 开关 (T89): optional on/off choices of a template, e.g. 优化摆盘 / 优化器皿.
 export const toggleCopy = {
   legend: '开关（选填，最多 3 个）',
   hint: '用户在工作台看到的开关，默认关。提示词正文里放 {{key}}，下面「开」「关」两段是私有的，只存服务端。饮品等不需要的模板不要加。',
   add: '添加开关',
-  addPreset: '添加「优化摆盘和器皿」',
+  addPreset: (label: string) => `添加「${label}」`,
   remove: '删除这个开关',
   key: 'key（小写字母、数字、下划线）',
   label: '英文名称',
@@ -133,30 +133,38 @@ export const toggleCopy = {
   off: '「关」时放进 {{key}} 的文字（私有）',
 } as const
 
-// The first toggle's initial text (TASKS T89, the Owner's wording); the template studio window
-// writes the on / off fragments in the admin, they are never in the repository.
-export const REPLATE_PRESET = {
-  key: 'replate',
-  label: 'Upgrade plating & tableware',
-  hint: 'Re-plates your dish with finer tableware. The result may differ from what you serve.',
-  labelZh: '优化摆盘和器皿',
-  hintZh: 'AI 重新摆盘、换用更精致的器皿，成品可能和实物不同',
+// Starter toggles for food templates (TASKS T89; Owner 2026-11-10 split plating from tableware).
+// Both start off for the user and need the confirm dialog; the on / off fragments are written in
+// the admin by the template studio window and are never in the repository.
+const responsibility = {
+  en: 'If customers order from the photo and get something different, it can lead to complaints or bad reviews. Use it only if you can serve the dish the way it looks. You are responsible for how you use photos made with this option; Shotviva is not responsible for disputes caused by differences between the photo and the real dish.',
+  zh: '顾客按图点单后发现实物不符，可能引起投诉或差评。建议只在你能按图出品时使用。开启后生成的图片如何使用由你自行负责，因图片与实物不符引起的纠纷与 Shotviva 无关。',
+}
+const preset = (key: string, en: { label: string; hint: string; does: string }, zh: { label: string; hint: string; does: string }) => ({
+  key,
+  label: en.label,
+  hint: en.hint,
+  labelZh: zh.label,
+  hintZh: zh.hint,
   confirm: true,
-  confirmEn: {
-    title: 'Before you turn this on',
-    body: 'With this on, the AI re-plates your dish and uses finer tableware, so the photo may look noticeably different from what you actually serve. If customers order from the photo and get something different, it can lead to complaints or bad reviews. Use it only if you can serve the dish the way it looks. You are responsible for how you use photos made with this option; Shotviva is not responsible for disputes caused by differences between the photo and the real dish.',
-    checkbox: 'I understand and take responsibility',
-    accept: 'Turn on',
-  },
-  confirmZh: {
-    title: '开启前请确认',
-    body: '开启后，AI 会参考你的照片重新摆盘、换用更精致的器皿，生成的图可能和你实际出品的样子差别明显。顾客按图点单后发现实物不符，可能引起投诉或差评。建议只在你能按图出品时使用。开启后生成的图片如何使用由你自行负责，因图片与实物不符引起的纠纷与 Shotviva 无关。',
-    checkbox: '我已了解并自行承担',
-    accept: '开启',
-  },
+  confirmEn: { title: 'Before you turn this on', body: `${en.does} ${responsibility.en}`, checkbox: 'I understand and take responsibility', accept: 'Turn on' },
+  confirmZh: { title: '开启前请确认', body: `${zh.does}${responsibility.zh}`, checkbox: '我已了解并自行承担', accept: '开启' },
   on: '',
   off: '',
-} as const
+})
+
+export const TOGGLE_PRESETS = [
+  preset(
+    'plating',
+    { label: 'Improve plating', hint: 'Arranges your dish more neatly. The result may differ from what you serve.', does: 'With this on, the AI re-arranges the food on the plate so it looks neater, and the photo may look noticeably different from what you actually serve.' },
+    { label: '优化摆盘', hint: 'AI 把菜重新摆得更整齐好看，成品可能和实物不同', does: '开启后，AI 会把菜重新摆得更整齐好看，生成的图可能和你实际出品的样子差别明显。' },
+  ),
+  preset(
+    'tableware',
+    { label: 'Upgrade tableware', hint: 'Swaps in finer plates and bowls. The result may differ from what you serve.', does: 'With this on, the AI swaps your plates and bowls for finer tableware, so the photo may look noticeably different from what you actually serve.' },
+    { label: '优化器皿', hint: 'AI 换用更精致的盘碗器皿，成品可能和实物不同', does: '开启后，AI 会把盘碗换成更精致的器皿，生成的图可能和你实际出品的样子差别明显。' },
+  ),
+] as const
 
 type CountRange = { min: number; max: number } | null
 const refRange = (range: CountRange) => {
@@ -179,3 +187,18 @@ export const styleRefCopy = {
   missingCap: '尚无可靠的参考图张数范围，暂不能保存带参考图的配置。',
   needId: '先填写有效的模板 ID，再上传参考图。', idLocked: '移除已上传的参考图后可修改模板 ID。', invalidUpload: '上传失败，请重试。', decodeFailed: '无法读取图片，请换一个文件。',
 } as const
+
+export function fallbackPriceCopy(tiers?: Record<'1k' | '2k' | '3k', number | null>) {
+  const floor = (tier: '1k' | '2k' | '3k') => tiers?.[tier] ?? '不可用'
+  return `回退到默认模型时的最低积分：Standard ${floor('1k')}、HD ${floor('2k')}、Max ${floor('3k')}。当前售价低于对应下限或该档不可用时，回退会被拒绝。`
+}
+
+export const saleCopy = {
+  label: '开放销售', first: '请先保存模型和积分，再开放销售。', active: '请先下架，再关闭销售。',
+  opened: '已开放销售', closed: '已关闭销售',
+}
+
+export const catalogCopy = {
+  priceGroup: '出图与价格', active: '已上架', inactive: '已下架', all: '全部',
+  status: '上架状态', category: '筛选分类', categories: '全部分类', search: '搜索中文名、英文名或 ID',
+}

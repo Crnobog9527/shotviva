@@ -8,13 +8,14 @@ import type { BulkEditPatch } from '../templates/bulk-edit-rules'
 export type SurfaceChoice = '' | 'web' | 'partner' | 'both'
 export type BulkEditValues = {
   credits: Record<Resolution, string>
+  provider: string
   surfaces: SurfaceChoice
   quality: '' | TemplateQuality
   // A template_categories key (T75); '' = 不改.
   category: string
 }
 
-export const emptyBulkEdit = (): BulkEditValues => ({ credits: { '1k': '', '2k': '', '3k': '' }, surfaces: '', quality: '', category: '' })
+export const emptyBulkEdit = (): BulkEditValues => ({ credits: { '1k': '', '2k': '', '3k': '' }, provider: 'keep', surfaces: '', quality: '', category: '' })
 
 const SURFACES: Record<Exclude<SurfaceChoice, ''>, BulkEditPatch['visibleIn']> = {
   web: ['web'],
@@ -37,6 +38,7 @@ export function readBulkEdit(values: BulkEditValues): BulkEditForm {
   const patch: BulkEditPatch = {
     ...(Object.keys(creditsCost).length > 0 ? { creditsCost } : {}),
     ...(values.surfaces ? { visibleIn: SURFACES[values.surfaces] } : {}),
+    ...(values.provider !== 'keep' && { providerId: values.provider || null }),
     ...(values.quality ? { quality: values.quality } : {}),
     ...(values.category ? { categoryKey: values.category } : {}),
   }

@@ -3,7 +3,7 @@
 import { useActionState, type ReactNode } from 'react'
 import type { PartnerFormState } from './actions'
 
-export type PartnerFormLabels = Record<Exclude<PartnerFormState, ''> | 'submit', string>
+export type PartnerFormLabels = Record<Exclude<PartnerFormState, ''> | 'submit' | 'saving', string>
 
 export function PartnerForm({
   action,
@@ -18,9 +18,9 @@ export function PartnerForm({
   return (
     <form action={submit} className="af-form">
       {children}
-      {state && <p role="status">{labels[state]}</p>}
-      <button className="af-button" disabled={pending}>
-        {labels.submit}
+      {state && <p className={state === 'saved' ? 'af-success' : 'af-error'} role="status">{labels[state]}</p>}
+      <button className="af-button af-button-block" disabled={pending} aria-busy={pending}>
+        {pending ? labels.saving : labels.submit}
       </button>
     </form>
   )

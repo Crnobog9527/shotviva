@@ -13,12 +13,15 @@ export type TierLimits = {
   batchMax: number
   // Support reply time in hours (in-site tickets and email), kept by the Owner in person.
   supportHours: number
+  // What one wishlist vote adds to a request's count: the snapshot toggle_template_request_vote
+  // takes (ARCHITECTURE §15.3, Max 3, others 1). Shown on the paywall; SQL is the enforcer.
+  voteWeight: number
 }
 
 export const TIER_LIMITS = {
-  starter: { concurrency: 1, perWindow: 20, batchMax: 1, supportHours: 48 },
-  pro: { concurrency: 3, perWindow: 40, batchMax: 10, supportHours: 48 },
-  max: { concurrency: 6, perWindow: 80, batchMax: 30, supportHours: 24 },
+  starter: { concurrency: 1, perWindow: 20, batchMax: 1, supportHours: 48, voteWeight: 1 },
+  pro: { concurrency: 3, perWindow: 40, batchMax: 10, supportHours: 48, voteWeight: 1 },
+  max: { concurrency: 6, perWindow: 80, batchMax: 30, supportHours: 24, voteWeight: 3 },
 } as const satisfies Record<MembershipTier, TierLimits>
 
 export const limitsFor = (tier: MembershipTier | null): TierLimits => TIER_LIMITS[tier ?? 'starter']

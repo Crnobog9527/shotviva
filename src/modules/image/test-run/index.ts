@@ -1,3 +1,6 @@
+export { listManagedAssets } from './asset-page'
+export { removeAssets } from './remove-assets'
+export { thumbnailForAsset, thumbnailKey } from './test-thumbnail'
 import 'server-only'
 
 // Admin template test runs (ARCHITECTURE §10.b, T85), server side. The panel (core/admin
@@ -6,7 +9,7 @@ export { estimateRunUsd } from './estimate'
 export { runTestEdit, type TestEditDeps, type TestEditRequest } from './run-test-edit'
 export { languageName, runTestTranslate, type TestTranslateDeps } from './run-test-translate'
 export { runTestGenerate, type TestGenerateRequest, type TestRunDeps } from './run-test-generate'
-export { cleanupOnOpen, loadTestPanel, signRun, signTestRunDownload } from './test-panel'
+export { cleanupOnOpen, loadPanelSummary, loadPanelRecords, loadTestPanel, signRun, signTestRunDownload } from './test-panel'
 export { confirmTestPhoto, createTestPhotoUpload, type TestPhotoTicket } from './test-photos'
 export { setTestRunCover, type TestCoverDeps } from './test-cover'
 export {

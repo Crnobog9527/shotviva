@@ -3,7 +3,6 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
-import { STYLE_STANDARD_CREDITS } from '@/core/templates/pricing'
 import { AppError } from '@/core/errors'
 import { isStyleRefKey } from '@/core/templates/style-refs'
 import { logger } from '@/core/logger'
@@ -32,9 +31,7 @@ const TIER_LABEL = { '1k': 'Standard', '2k': 'HD', '3k': 'Max' } as const
 
 // ARCHITECTURE §6.1: prices may go up, never below the floor for the template's quality tier.
 function assertAboveFloor(template: z.infer<typeof templateInputSchema>, floor: ProviderFloors): void {
-  if (floor.styleDraft && template.creditsCost['1k'] !== STYLE_STANDARD_CREDITS)
-    throw new AppError('INVALID_INPUT', `画风草稿 Standard 规划收费为 ${STYLE_STANDARD_CREDITS} 积分`)
-  const low = creditsBelowFloor(template.quality, template.creditsCost, floor)
+  const low = creditsBelowFloor(template.quality, template.creditsCost, floor, template.unpricedResolutions)
   if (low.length === 0) return
   const detail = low.map((v) => v.floor === MISSING_COST ? floorGuidance(v.floor, floor.unknownCapabilities) : `${TIER_LABEL[v.resolution]} 不能低于 ${v.floor}（填了 ${v.given}）`).join('；')
   throw new AppError('INVALID_INPUT', `积分低于下限：${detail}`)
@@ -58,7 +55,7 @@ export async function saveTemplate(
   const template = parseOrThrow(templateInputSchema, payload.template, 'template')
   const prompt = parseOrThrow(promptInputSchema, payload.prompt, 'prompt')
   if (prompt.styleRefs?.some(ref => !isStyleRefKey(template.id, ref.key))) throw new AppError('INVALID_INPUT', '画风参考图不属于这个模板')
-  assertAboveFloor(template, providerFloor(floor, prompt.providerId, template.id, template.category, template.quality, template.visibleIn.includes('partner')))
+  assertAboveFloor(template, providerFloor(floor, prompt.providerId, template.id))
   assertTogglesWired(template, prompt)
   const exists = await repo.templateExists(client, template.id)
   if (payload.isNew && exists) {
@@ -123,7 +120,7 @@ export async function setTemplateActive(
 // Drag-to-reorder (T76): one group's whole new order per save. The SQL function also refuses a
 // list that is not exactly the group, so an out-of-date page cannot scramble the order.
 const orderSchema = z.object({
-  group: z.enum(['catalogue', 'featured']),
+  group: z.enum(['catalogue', 'featured', 'active', 'inactive']),
   ids: z
     .array(z.string().min(1).max(64))
     .max(500)

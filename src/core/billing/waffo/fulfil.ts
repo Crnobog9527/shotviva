@@ -12,6 +12,7 @@ import type { CancelOthers, CancelRefunded } from '../subscription/cancel-others
 import type { RefuseEnded } from '../subscription/ended-order'
 import { callRpc, type RpcClient } from '../rpc'
 import { paymentFacts, readWaffoOrder, type WaffoOrder, type WaffoPaymentFacts } from './payment-facts'
+import { settleQuotedRenewal } from './renewal'
 import { isoOf } from './subscription-sync'
 
 // A verified order.completed or subscription.payment_succeeded becomes exactly one
@@ -36,7 +37,7 @@ export type WaffoFulfilDeps = {
 }
 
 // 'ended': a charge on an order an upgrade ended (T66); nothing granted, the Owner is alerted.
-export type WaffoFulfilOutcome = 'applied' | 'replayed' | 'unpaid' | 'ended'
+export type WaffoFulfilOutcome = 'applied' | 'replayed' | 'unpaid' | 'ended' | 'review'
 
 const inputSchema = z.object({ userId: z.uuid(), paymentId: z.string().min(1), orderId: z.string().min(1) })
 
@@ -90,14 +91,30 @@ export async function fulfilWaffoOrder(
   const order = readWaffoOrder(event.eventId, event.data)
   if (order.paymentStatus !== undefined && order.paymentStatus !== 'succeeded') return 'unpaid'
   if (await endedBefore(deps, order, form, event.timestamp)) return 'ended'
-  const { user_id: userId, product_id: productId, locale } = order.orderMetadata
-  const product = deps.products.find((p) => p.id === productId)
+  const product = deps.products.find(p => p.id === order.orderMetadata.product_id)
   if (!product) throw new AppError('INVALID_INPUT', `waffo order ${event.eventId}: unknown product`)
+  const outcome = await settleCharge(deps, order, product, event.eventId, form)
+  if (outcome !== 'review') await afterSettlement(deps, order, product, event.eventId, form)
+  return outcome
+}
+
+function isQuotedRenewal(order: WaffoOrder, form: WaffoChargeForm): boolean {
+  if (form !== 'subscription') return false
+  if (!order.periodNumber) throw new AppError('INVALID_INPUT', 'Missing quoted subscription period')
+  return order.periodNumber > 1
+}
+
+async function settleCharge(deps: WaffoFulfilDeps, order: WaffoOrder, product: SiteProduct, paymentId: string, form: WaffoChargeForm) {
+  const { user_id: userId, locale } = order.orderMetadata
   const quote = readQuote(order.orderMetadata, product)
+  if (quote && isQuotedRenewal(order, form)) {
+    const outcome = await settleQuotedRenewal(deps.db, order, paymentId, quote.cents)
+    if (outcome === 'applied') track(deps, userId, product, paymentFacts(order, product), { locale, form, credits: quote.credits })
+    return outcome
+  }
   const facts = paymentFacts(order, product, quote)
-  const change = await settleWaffoOrder(deps.db, { userId, productId, paymentId: event.eventId, facts, version: quote && 'v2' })
+  const change = await settleWaffoOrder(deps.db, { userId, productId: product.id, paymentId, facts, version: quote && 'v2' })
   if (change.applied) track(deps, userId, product, facts, { locale, form, credits: quote?.credits })
-  await afterSettlement(deps, order, product, event.eventId, form)
   return change.applied ? 'applied' : 'replayed'
 }
 

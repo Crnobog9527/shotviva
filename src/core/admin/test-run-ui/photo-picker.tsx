@@ -7,7 +7,9 @@ import { buttonVariants } from '@/core/ui/button'
 import { cn } from '@/core/ui/cn'
 
 import type { TestPhotoView } from '../test-runs'
+import { AssetManager } from './asset-manager'
 import { uploadTestPhoto } from './api'
+import { TestThumbnail } from './test-thumbnail'
 import { TEST_RUN_COPY as COPY } from './copy'
 import { failureMessage } from './messages'
 
@@ -17,7 +19,7 @@ type Props = {
   photos: readonly TestPhotoView[]
   picked: readonly string[]
   onPick: (ids: string[]) => void
-  onUploaded: (photo: TestPhotoView) => void
+  onUploaded: () => void
   onError: (message: string) => void
 }
 
@@ -32,11 +34,12 @@ function toggle(picked: readonly string[], id: string): string[] {
 // recently used ones. The order ticked is the order the runs start in.
 export function PhotoPicker({ photos, picked, onPick, onUploaded, onError }: Props) {
   const [progress, setProgress] = useState<number | null>(null)
+  const [notice, setNotice] = useState('')
   const upload = async (file: File) => {
     setProgress(0)
     try {
       const photo = await uploadTestPhoto(file, setProgress)
-      onUploaded(photo)
+      onUploaded()
       onPick(toggle(picked, photo.id))
     } catch (error) {
       onError(failureMessage(error))
@@ -59,6 +62,8 @@ export function PhotoPicker({ photos, picked, onPick, onUploaded, onError }: Pro
         ))}
       </ul>
       {photos.length === 0 ? <p className="text-muted-foreground text-xs">{COPY.first.noRecent}</p> : null}
+      <AssetManager kind="photo" onRemoved={ids => { onPick(picked.filter(id => !ids.includes(id))); onUploaded() }} onError={onError} onNotice={setNotice} />
+      {notice && <p role="status" className="text-sm">{notice}</p>}
     </fieldset>
   )
 }
@@ -94,8 +99,7 @@ function PhotoTile({ photo, order, onToggle }: { photo: TestPhotoView; order: nu
       className={cn('bg-muted relative block aspect-square w-full overflow-hidden rounded-md border-2', on ? 'border-primary' : 'border-transparent')}
     >
       {/* Admin-only signed URL of a private test photo; next/image cannot fetch it. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={photo.url} alt="" className="h-full w-full object-cover" />
+      <TestThumbnail kind="photo" id={photo.id} src={photo.url} alt="" className="h-full w-full object-cover" />
       {on ? (
         <span className="bg-primary text-primary-foreground absolute top-1 right-1 flex size-5 items-center justify-center rounded-full text-[11px] font-semibold">
           {order + 1}

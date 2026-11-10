@@ -28,3 +28,6 @@ export type { ReviewInput } from './schema'
 export { listAdminRequests, listTemplateOptions, reviewRequest } from './admin'
 export { createRequest, isWishlistEligible, toggleVote, type WishlistDeps } from './requests'
 export { listMyRequests, listWall } from './wall'
+// First-run guidance (Owner 2026-11-10): the tab's dot, read from the session.
+export { WishlistTabBadge } from './tab-badge'
+export { listMyWishNotices, markWishNoticesSeen, WISH_NOTICES_TAG, type WishNotice } from './notices'

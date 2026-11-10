@@ -11,6 +11,7 @@ import {
   DEFAULT_RESOLUTION,
   loadGenerationTemplate,
   allowedWebAspects,
+  assertPricedTier,
   assertTemplateQuote,
   validateGenerationInputs,
   type GenerationInputs,
@@ -18,6 +19,7 @@ import {
   type TemplateSurface,
   type Template,
 } from '../templates'
+import { routeFallbackReason, withFallbackNotice } from './fallback-notice'
 import { settleTracked } from './generation-analytics'
 import { screenCost, templateCall, typedWords } from './generation-call'
 import type { GenerationRequest } from './generation-request'
@@ -63,7 +65,9 @@ function assertBatchAllowed(limits: TierLimits, batchSize: number) {
 // no face swap) alongside the stored upload itself (HEAD + bytes; bad ones are deleted).
 async function prepare(deps: GenerationDeps, req: GenerationRequest) {
   const { template, prompt } = await loadGenerationTemplate(deps.db, req.templateId, SURFACE[req.source])
-  assertTemplateQuote(req.expectedCredits, template.creditsCost[req.resolution ?? DEFAULT_RESOLUTION])
+  const tier = req.resolution ?? DEFAULT_RESOLUTION
+  assertPricedTier(template.unpricedResolutions, tier)
+  assertTemplateQuote(req.expectedCredits, template.creditsCost[tier])
   const inputs = validateGenerationInputs(template.fields, {
     copy: req.copy,
     aspectRatio: req.aspectRatio,
@@ -158,16 +162,20 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
 
   const jobId = req.jobId ?? randomUUID()
   const resolution = req.resolution ?? DEFAULT_RESOLUTION
-  const { call, provider, styleRefKeys } = await templateCall(deps, { template, prompt }, inputs, image, {
-    resolution, providerId: req.source === 'web' ? prompt.providerId : null,
-  })
-  // Marks which request created the row: two concurrent requests with one job id both get
-  // the row back from reserve_credits (charged once), but only the creator calls the provider.
   const attemptId = randomUUID()
-  const job = await reserveJob(deps.db, {
-    ...reserveFields(req), jobId, module: template.module, templateId: template.id, provider: provider.id,
-    expectedCredits: expectedPrice(req, template, resolution),
-    inputs: { ...jobInputs(req, prepared, resolution, attemptId, deps.now?.() ?? new Date()), style_ref_keys: styleRefKeys },
+  const { job, call, provider } = await withFallbackNotice(template.id, async (selected) => {
+    const route = await templateCall(deps, { template, prompt }, inputs, image, {
+      resolution, providerId: req.source === 'web' ? prompt.providerId : null,
+      onRoute: actual => selected(routeFallbackReason(actual, prompt.providerId, req.source)),
+    })
+    const reason = routeFallbackReason(route.provider, prompt.providerId, req.source)
+    const job = await reserveJob(deps.db, {
+      ...reserveFields(req), jobId, module: template.module, templateId: template.id, provider: route.provider.id,
+      expectedCredits: expectedPrice(req, template, resolution),
+      inputs: { ...jobInputs(req, prepared, resolution, attemptId, deps.now?.() ?? new Date()),
+        quality: route.call.quality, style_ref_keys: route.styleRefKeys, ...(reason ? { fallback_route: true } : {}) },
+    })
+    return { job, ...route }
   })
   if (job.inputs.attempt_id !== attemptId) return toJobView(job)
   // Dispute evidence (T82): the IP that started this paid or free work.

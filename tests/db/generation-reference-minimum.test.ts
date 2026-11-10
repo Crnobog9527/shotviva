@@ -1,3 +1,4 @@
+import { publishFixture } from './helpers'
 import { randomUUID } from 'node:crypto'
 import type { Client } from 'pg'
 import { afterAll, beforeAll, expect, it } from 'vitest'
@@ -30,11 +31,12 @@ beforeAll(async () => {
     values ($1,'image','openrouter_images','Reference minimum fixture','fixture/minimum','{1k}',$2)`, [providerId,caps])
   const { error } = await serviceSupabase().rpc('admin_upsert_template', {
     p_template: { id, name: 'Fixture', category: 'pets', quality: 'medium', credits_cost: { '1k': 1,'2k': 2,'3k': 3 },
-      visible_in: ['web','partner'], is_active: true, fields: { images: { min: 0,max: 0 },copy: [],aspectRatios: ['1:1'] } },
+      visible_in: ['web','partner'], is_active: false, fields: { images: { min: 0,max: 0 },copy: [],aspectRatios: ['1:1'] } },
     p_prompt: { body: 'fixture {{photo_count}} + {{style_ref_count}}',provider_id: providerId },
     p_style_refs: [{ key,width: 16,height: 16,uploadedAt: new Date().toISOString() }],
   })
   expect(error).toBeNull()
+  await publishFixture(db, id)
   bucket.upload(key,bytes,'image/webp')
 })
 afterAll(async () => {

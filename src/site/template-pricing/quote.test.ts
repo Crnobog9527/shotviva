@@ -42,3 +42,11 @@ it('keeps the editor usable on older databases but requires the receipt for sync
   await expect(readTemplateQuote(db)).rejects.toThrow()
   expect(fetchQuote).toHaveBeenCalledTimes(1)
 })
+
+it('offers only configured tiers confirmed by Router capabilities, including when a hidden tier has an estimate', async () => {
+  const router = { ...v2.providers[0], adapter: 'openrouter_images', resolutions: ['1k', '2k', '3k'],
+    capabilities: { resolutions: ['1k','2k'], aspectRatios: ['1:1'], originalRatio: false,
+      minReferences: 0, maxReferences: 4, fetchedAt: '2026-11-01T00:00:00Z' }, estimated_image_costs: { '3k': 0.03 } }
+  const { db } = pricingClient(() => Response.json({ input: { ...v2, providers: [router] }, receipt }))
+  expect((await readTemplateQuote(db)).floors.resolutions).toEqual(['1k','2k'])
+})

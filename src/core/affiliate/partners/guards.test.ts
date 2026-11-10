@@ -10,7 +10,7 @@ vi.mock('next/server', async (original) => ({
   ...(await original<typeof import('next/server')>()),
   connection: async () => {},
 }))
-vi.mock('@/core/i18n/server', () => ({ localized: async (path: string) => '/zh' + path }))
+vi.mock('@/core/i18n/server', () => ({ localized: async (path: string) => '/zh' + path, currentLocale: async () => 'zh' }))
 vi.mock('next-intl/server', () => ({
   getTranslations: async () => Object.assign((key: string) => key, { has: () => true }),
 }))
@@ -28,7 +28,7 @@ it('keeps the intro public while guarding application, portal and export with op
   const props = { search: Promise.resolve({}) }
   const intro = await EnrollmentScreen(props)
   expect(intro.props.children).toBeUndefined()
-  for (const load of [() => PartnerScreen(props), () => EnrollmentScreen({ ...props, openForm: true }), () => TermsScreen()]) {
+  for (const load of [() => PartnerScreen(props), () => EnrollmentScreen({ ...props, mode: 'apply' }), () => TermsScreen()]) {
     await expect(load()).rejects.toMatchObject({ digest: 'NEXT_HTTP_ERROR_FALLBACK;404' })
   }
   await expect(exportCommissions('en')).rejects.toMatchObject({ code: 'NOT_FOUND' })
@@ -68,11 +68,14 @@ it.each([null, { id: 'unverified', verified: false }])('keeps an unverified sess
   expect(deps.account).not.toHaveBeenCalled()
 })
 
-it.each([false, true])('keeps the application accessible without published terms (deep link: %s)', async (openForm) => {
+it('sends the program page to the application only through a signed-in account', async () => {
   deps.enabled.mockResolvedValue(true)
-  deps.openSettings.mockResolvedValue({ terms_version: 'unpublished', apply_min_level: 'none' })
-  const intro = await EnrollmentScreen({ search: Promise.resolve({ by: 'qa-team' }), openForm })
-  expect(intro.props.children.props).toMatchObject({ openForm, parent: 'qa-team' })
+  deps.user.mockResolvedValue(null)
+  const intro = await EnrollmentScreen({ search: Promise.resolve({ by: 'qa-team' }) })
+  expect(intro.props.children.props).toMatchObject({ signedIn: false, parent: 'qa-team' })
+  const page = await EnrollmentScreen({ search: Promise.resolve({ by: 'qa-team' }), mode: 'apply' })
+  expect(page.props).toMatchObject({ session: null, parent: 'qa-team' })
+  expect(deps.account).not.toHaveBeenCalled()
 })
 
 it.each([
@@ -80,12 +83,15 @@ it.each([
   ['any_paid', true],
   ['pro', true],
 ] as const)('consults payment history only when enrollment requires it (%s)', async (level, needsHistory) => {
-  const { ApplicationEntry } = await import('./application-entry')
+  const { ApplicationForm } = await import('./application-page')
+  const { ApplicationFields } = await import('./application-fields')
   deps.canApply.mockResolvedValue(false)
-  const entry = await ApplicationEntry({
-    userId: 'test-user', parent: 'qa-team', openForm: true,
+  deps.terms.mockResolvedValue('body')
+  const form = await ApplicationForm({
+    session: { id: 'test-user', email: 'a@example.com', phone: null, role: 'user', verified: true, banned: false, locale: null, onboarding: { wishlistSeen: false, wishlistHintSeen: false } },
+    parent: 'qa-team',
     settings: { terms_version: '1', apply_min_level: level },
   })
   expect(deps.canApply).toHaveBeenCalledTimes(needsHistory ? 1 : 0)
-  expect(entry.props.children[0].props.children.props.eligible).toBe(!needsHistory)
+  expect(form.type === ApplicationFields).toBe(!needsHistory)
 })

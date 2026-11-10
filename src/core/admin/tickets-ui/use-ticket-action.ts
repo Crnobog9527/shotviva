@@ -2,11 +2,13 @@
 
 import { useState, useTransition } from 'react'
 
+import type { RenewalDecision } from '@/core/support'
 import type { ClawbackActions } from '../clawback-ui'
 import type { ActionResult } from '../templates/types'
 import { ticketErrorText } from './copy'
 
 export type TicketAdminActions = {
+  resolveRenewal?(input: RenewalDecision): Promise<ActionResult>
   reply(input: { ticketId: string; body: string; close: boolean; images: string[] }): Promise<ActionResult>
   decide(input: { ticketId: string; decision: 'approved' | 'rejected'; amountCents?: number; body: string }): Promise<ActionResult>
   // T71: 「扣回这笔付款的剩余积分」 before a pro-rata refund.

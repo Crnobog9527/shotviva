@@ -1,3 +1,4 @@
+import { publishFixture } from './helpers'
 import { randomUUID } from 'node:crypto'
 
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
@@ -78,7 +79,8 @@ it('drafts, preserves live order, archives, and returns the committed receipt on
   expect(await write(initial)).toEqual(ok(1))
   expect((await db.query('select is_active,sort_order,featured_rank,cover_locales from public.templates where id=$1', [template.id])).rows[0])
     .toMatchObject({ is_active: false, sort_order: expect.any(Number), featured_rank: null, cover_locales: template.cover_locales })
-  await db.query('update public.templates set is_active=true,sort_order=432 where id=$1', [template.id])
+  await publishFixture(db, template.id)
+  await db.query('update public.templates set sort_order=432 where id=$1', [template.id])
   const next = await prepare({ ...template, name: 'QA updated' }, '2')
   expect(await Promise.all([write(next), write(next)])).toEqual([ok(2), ok(2)])
   expect((await target(template.id, '2')).version).toBe(2)
@@ -264,7 +266,7 @@ it('denies client access to snapshots, pricing receipts, the write RPC and priva
 it('rolls back a live sync and its receipt when the submitted floor understates actual cost', async () => {
   const template = fixture()
   expect(await write(await prepare(template, 'seed'))).toEqual(ok(1))
-  await db.query('update public.templates set is_active=true where id=$1', [template.id])
+  await publishFixture(db, template.id)
   const before = await source(template.id)
   await db.query('update public.ai_providers set estimated_image_costs=$1 where id=$2', [{ '1k': 10 }, providerId])
   try {

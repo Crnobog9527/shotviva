@@ -13,7 +13,7 @@ export const SHELL_COPY = {
     inquiries: '企业咨询',
     orders: '订单与收入',
     codes: '邀请码与活动码',
-    affiliates: '推广员计划',
+    affiliates: '联盟营销',
     disputes: '拒付',
     jobs: '出图记录',
     costs: '成本对账',

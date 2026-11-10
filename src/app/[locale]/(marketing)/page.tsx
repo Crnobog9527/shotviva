@@ -9,15 +9,19 @@ import { toCatalogueTemplate } from '@/modules/image/marketing'
 import { creditFacts, featuredSections, fillCredits, freeImagesIn, homePageIn, isLinkEnabled } from '@/site/content'
 import { site } from '@/site/site.config'
 
+import { isWishlistEnabled } from '@/core/wishlist'
+
 import { HomeGeneratorSlot } from './home-generator-slot'
+import { HomeWishCtaSlot } from './home-wish-cta-slot'
 
 // The copy with "from N credits" and the image counts filled from the live catalogue (建站规格 G3, G4).
 async function load() {
   const locale = await currentLocale()
-  const live = await cachedWebCatalogue(locale)
+  const [live, wishlistOpen] = await Promise.all([cachedWebCatalogue(locale), isWishlistEnabled(site)])
   const facts = creditFacts(live)
   const page = fillCredits(homePageIn(locale), facts)
-  return { locale, live, page, free: fillCredits(freeImagesIn(locale), facts), meta: { path: '/', title: page.title, description: page.description } }
+  const meta = { path: '/', title: page.title, description: page.description }
+  return { locale, live, page, wishlistOpen, free: fillCredits(freeImagesIn(locale), facts), meta }
 }
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -29,7 +33,7 @@ export async function generateMetadata(): Promise<Metadata> {
 // The live catalogue is a cached read (expired by every admin save, featured list included);
 // only the generator's visitor half waits for the request.
 export default async function HomePage() {
-  const { locale, live, page, free, meta } = await load()
+  const { locale, live, page, wishlistOpen, free, meta } = await load()
   const ldMeta = { ...meta, path: localizePath(meta.path, locale) }
   const catalogue = live.map(toCatalogueTemplate)
   const { defaultId, ...sections } = featuredSections(live)
@@ -44,6 +48,8 @@ export default async function HomePage() {
         generator={
           <HomeGeneratorSlot templates={catalogue} defaultId={defaultId} homePath={localizePath('/', locale)} freeImages={free} />
         }
+        // Gone with the wishlist switch (cached read); signed out, sign-up returns to the wall.
+        wishlistCta={wishlistOpen ? <HomeWishCtaSlot cta={page.wishlist.cta} next={localizePath('/wishlist', locale)} /> : null}
       />
     </>
   )

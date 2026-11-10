@@ -5,6 +5,7 @@ import { saveEditTemplateSchema } from '../edit-template/schema'
 import { canSave, formFor, toSaveInput } from './form-state'
 
 const settings = {
+  saleEnabled: true,
   isActive: false,
   creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
   quality: 'high' as const,

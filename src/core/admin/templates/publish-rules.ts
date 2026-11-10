@@ -33,8 +33,8 @@ export const PUBLISH_BLOCKER_LABEL: Record<PublishBlocker, string> = {
 
 export type PublishCandidate = Pick<
   Template,
-  'id' | 'name' | 'description' | 'visibleIn' | 'coverBeforeUrl' | 'coverAfterUrl' | 'coverLocales' | 'quality' | 'creditsCost' | 'isActive'
-> & { hasPrompt: boolean; category?: string; providerId?: string | null }
+  'unpricedResolutions' | 'id' | 'name' | 'description' | 'visibleIn' | 'coverBeforeUrl' | 'coverAfterUrl' | 'coverLocales' | 'quality' | 'creditsCost' | 'isActive'
+> & { saleEnabled?: boolean; hasPrompt: boolean; category?: string; providerId?: string | null }
 
 // The built-in photo-edit template (ARCHITECTURE §5.2) is switched on its own page; the editor
 // list never shows it. Deep imports keep this file free of the server-side templates barrel.
@@ -48,8 +48,8 @@ const blank = (text: string | null) => !text || text.trim() === ''
 // and a price at or above the floor.
 export function publishBlockers(template: PublishCandidate, floor: ProviderFloors): PublishBlocker[] {
   if (SYSTEM_TEMPLATE_IDS.has(template.id)) return ['system']
-  const prices = providerFloor(floor, template.providerId, template.id, template.category, template.quality, template.visibleIn.includes('partner'))
-  if (prices.styleUnavailable || prices.retiredRoom) return ['retired']
+  const prices = providerFloor(floor, template.providerId, template.id)
+  if (template.saleEnabled === false) return ['retired']
   const onWeb = template.visibleIn.includes('web')
   const checks: [PublishBlocker, boolean][] = [
     ['no_prompt', !template.hasPrompt],
@@ -57,7 +57,7 @@ export function publishBlockers(template: PublishCandidate, floor: ProviderFloor
     ['no_description', onWeb && blank(template.description)],
     // A before and an after every launched page can show under the cover fallback (T87).
     ['no_cover', onWeb && !hasCompleteCoverSet(template)],
-    ['below_floor', creditsBelowFloor(template.quality, template.creditsCost, prices).length > 0],
+    ['below_floor', creditsBelowFloor(template.quality, template.creditsCost, prices, template.unpricedResolutions).length > 0],
   ]
   return checks.filter(([, failed]) => failed).map(([blocker]) => blocker)
 }

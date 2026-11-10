@@ -1,15 +1,16 @@
 'use client'
 
 import { describeFailure, describePatch, type BulkEditFailure, type BulkEditPatch } from '../templates/bulk-edit-rules'
+import type { ImageProviderOption } from '../image-provider-field'
 import type { AdminTemplate } from '../templates/types'
 import type { CategoryOption } from './category-field'
 import { bulkEditCopy as COPY } from './copy'
 
-type Props = { templates: AdminTemplate[]; patch: BulkEditPatch; failures: BulkEditFailure[]; categories: readonly CategoryOption[] }
+type Props = { providers: readonly ImageProviderOption[]; templates: AdminTemplate[]; patch: BulkEditPatch; failures: BulkEditFailure[]; categories: readonly CategoryOption[] }
 
 // The confirm step (T79): what changes, on which templates, and every template that would fail
 // the floor or the web rules (the whole batch is then refused).
-export function BulkEditReview({ templates, patch, failures, categories }: Props) {
+export function BulkEditReview({ templates, patch, failures, categories, providers }: Props) {
   const categoryName = (key: string) => {
     const category = categories.find((option) => option.key === key)
     return category ? `${category.nameZh} · ${category.nameEn}` : key
@@ -21,7 +22,7 @@ export function BulkEditReview({ templates, patch, failures, categories }: Props
       <div>
         <p className="font-medium">{COPY.changes}</p>
         <ul className="mt-1 list-disc pl-5">
-          {describePatch(patch, categoryName).map((line) => (
+          {describePatch(patch, categoryName, id => providers.find(p => p.id === id)?.model ?? id).map((line) => (
             <li key={line}>{line}</li>
           ))}
         </ul>

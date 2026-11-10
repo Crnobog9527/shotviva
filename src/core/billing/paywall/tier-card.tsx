@@ -6,8 +6,9 @@ import type { ReactNode } from "react"
 import { cn } from "../../ui/cn"
 import type { BlockReason } from "../subscription/upgrade-rule"
 import { perMonthUsd, productFor, yearlySavingUsd, type Period, type TierOffer } from "./offer"
+import { useTierPerks } from "./perk-facts"
 import { PerkList } from "./perk-list"
-import type { TierPerks } from "./perks"
+import { PhotoEstimateLine } from "./photo-estimate-line"
 import { discountTerm } from "./copy"
 import { useProductDiscount } from "./discount-context"
 import { usdPerHundredCredits } from "../../config"
@@ -18,7 +19,6 @@ const FLAGS = { starter: null, pro: "recommended", max: "bestValue" } as const
 type Props = {
   offer: TierOffer
   period: Period
-  perks: TierPerks
   singlePayment?: boolean
   selected: boolean
   // The paywall's radio check, top right.
@@ -29,11 +29,12 @@ type Props = {
   lock?: BlockReason | null
 }
 
-// One tier in its material (DESIGN §4.5, comps-v3-b tiers.css): price a month, credits, price
-// per credit, the yearly saving only on Yearly, then its perks. Same card on /pricing and in
-// the paywall, so both say exactly the same thing.
-export function TierCard({ offer, period, perks, selected, check, footer, lock, singlePayment = false }: Props) {
+// One tier in its material (DESIGN §4.5, comps-v3-b tiers.css): who it is for, price a month,
+// credits, about how many photos they make, price per credit, the yearly saving only on Yearly,
+// then its perks. Same card on /pricing and in the paywall, so both say exactly the same thing.
+export function TierCard({ offer, period, selected, check, footer, lock, singlePayment = false }: Props) {
   const t = useTranslations("paywall")
+  const perks = useTierPerks(offer.tier)
   // The member's own plan wears "Your plan" where the sales flag would be.
   const flag = lock === "current" ? "yourPlan" : lock ? null : FLAGS[offer.tier]
   return (
@@ -49,6 +50,7 @@ export function TierCard({ offer, period, perks, selected, check, footer, lock, 
         </span>
         {check}
       </div>
+      <p className="mt-1 text-caption leading-[1.4] text-bone-dim">{t(`positioning.${offer.tier}`)}</p>
       {lock === "lower" ? <LockNote /> : null}
       {/* Keyed on the period: the numbers fade in when the toggle changes them. */}
       <div key={period} className="tier-swap">
@@ -102,6 +104,7 @@ function Facts({ offer, period }: { offer: TierOffer; period: Period }) {
         <span>{period === "year" ? t("creditsYear", { count: product.credits, price: money(effective.priceUsd) }) : t("creditsMonth", { count: product.credits })}</span>
         <span className="font-mono text-muted-foreground">{t("perHundredCredits", { price: money(usdPerHundredCredits(effective), true) })}</span>
       </p>
+      <PhotoEstimateLine offer={offer} />
       {!discount && period === "year" ? (
         <p className="tier-plate mt-2 flex items-center justify-between gap-2 rounded-inner bg-[var(--tier-plate)] py-2 pr-2 pl-3 text-caption text-[var(--tier-plate-ink)]">
           {/* The label may wrap and the amount may not: at 320px the Max plate is wider than its card. */}

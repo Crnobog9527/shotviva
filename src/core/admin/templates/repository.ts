@@ -3,6 +3,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { styleRefsSchema, type StyleRef } from '@/core/templates/style-refs'
+import type { Resolution } from '@/core/templates/output-options'
 import type { ProviderFloors } from '@/core/templates/provider-pricing'
 import { AppError, type ErrorCode } from '@/core/errors'
 import {
@@ -18,12 +19,13 @@ import {
 
 import type { PublishCandidate } from './publish-rules'
 import { toUpsertArgs } from './rpc-payload'
-import type { AdminTemplate } from './types'
+import type { AdminTemplate, TemplateOrderGroup } from './types'
 
 // Every function expects a service-role client; callers must have passed requireAdmin().
 
 type PromptRow = { style_refs: StyleRef[]; provider_id: string | null; body: string; version: number; model_params: Record<string, unknown> }
-type AdminRow = (TemplateRow | PreT75TemplateRow) & { template_prompts: PromptRow | null }
+type SaleRow = { template_sale_approvals: { enabled: boolean; unpriced_resolutions: Resolution[] } | null }
+type AdminRow = SaleRow & (TemplateRow | PreT75TemplateRow) & { template_prompts: PromptRow | null }
 
 export async function listAdminTemplates(client: SupabaseClient): Promise<AdminTemplate[]> {
   const { data, error } = await selectTemplates(
@@ -37,11 +39,13 @@ export async function listAdminTemplates(client: SupabaseClient): Promise<AdminT
         .order('sort_order', { ascending: true })
         .order('id', { ascending: true })
         .returns<AdminRow[]>(),
-    ', template_prompts(body, version, model_params, provider_id, style_refs)',
+    ', template_sale_approvals(enabled,unpriced_resolutions), template_prompts(body, version, model_params, provider_id, style_refs)',
   )
   if (error || !data) throw new AppError('INTERNAL', `listAdminTemplates failed: ${error?.message ?? 'no data'}`)
   return data.map((row) => ({
     ...toTemplate(row),
+    saleEnabled: row.template_sale_approvals?.enabled === true,
+    unpricedResolutions: row.template_sale_approvals?.unpriced_resolutions,
     prompt: row.template_prompts
       ? {
           styleRefs: styleRefsSchema.parse(row.template_prompts.style_refs),
@@ -91,7 +95,7 @@ export async function upsertTemplate(
   throw new AppError('INTERNAL', `upsertTemplate failed: ${error.message}`)
 }
 
-type CandidateRow = Pick<
+type CandidateRow = SaleRow & Pick<
   TemplateRow,
   'id' | 'name' | 'category_key' | 'description' | 'visible_in' | 'cover_before_url' | 'cover_after_url' | 'cover_locales' | 'quality' | 'credits_cost' | 'is_active'
 > & { template_prompts: { version: number; provider_id: string | null } | null }
@@ -100,7 +104,7 @@ type CandidateRow = Pick<
 export async function loadPublishCandidates(client: SupabaseClient, ids: readonly string[]): Promise<PublishCandidate[]> {
   const { data, error } = await client
     .from('templates')
-    .select('id, name, category_key, description, visible_in, cover_before_url, cover_after_url, cover_locales, quality, credits_cost, is_active, template_prompts(version, provider_id)')
+    .select('id, name, category_key, description, visible_in, cover_before_url, cover_after_url, cover_locales, quality, credits_cost, is_active, template_sale_approvals(enabled,unpriced_resolutions), template_prompts(version, provider_id)')
     .in('id', ids)
     .returns<CandidateRow[]>()
   if (error) throw new AppError('INTERNAL', `loadPublishCandidates failed: ${error.message}`)
@@ -116,6 +120,8 @@ export async function loadPublishCandidates(client: SupabaseClient, ids: readonl
     quality: row.quality,
     creditsCost: row.credits_cost,
     isActive: row.is_active,
+    saleEnabled: row.template_sale_approvals?.enabled === true,
+    unpricedResolutions: row.template_sale_approvals?.unpriced_resolutions ?? [],
     hasPrompt: row.template_prompts !== null,
     category: row.category_key,
     providerId: row.template_prompts?.provider_id,
@@ -144,7 +150,7 @@ export async function setFeaturedTemplates(client: SupabaseClient, ids: string[]
 
 // What the admin sees when admin_set_template_order refuses (0600); anything else is INTERNAL.
 const ORDER_ERRORS: Record<string, [ErrorCode, string]> = {
-  ORDER_MISMATCH: ['CONFLICT', '列表在别处改过了（有模板新增、删除或进出精选），请刷新页面后再排序'],
+  ORDER_MISMATCH: ['CONFLICT', '列表在别处改过了（有模板新增、删除、上下架或进出精选），请刷新页面后再排序'],
   NOT_ADMIN: ['FORBIDDEN', '只有管理员能调整顺序'],
   INVALID_INPUT: ['INVALID_INPUT', '顺序没保存：提交的列表不完整，请刷新页面后再试'],
 }
@@ -153,7 +159,7 @@ const ORDER_ERRORS: Record<string, [ErrorCode, string]> = {
 // home featured ranks.
 export async function setTemplateOrder(
   client: SupabaseClient,
-  group: 'catalogue' | 'featured',
+  group: TemplateOrderGroup,
   ids: string[],
   actor: string,
 ): Promise<void> {
