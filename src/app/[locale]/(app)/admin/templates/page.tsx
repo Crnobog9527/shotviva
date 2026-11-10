@@ -10,7 +10,7 @@ import { setTemplateSaleAction } from './sale-action'
 import { syncTemplateModel } from './sync-model-action'
 import { site } from '@/site/site.config'
 
-import { duplicateTemplateAction, listVersionsAction, readVersionAction } from './version-actions'
+import { duplicateTemplateAction, listVersionsAction, manageVersionAction, readVersionAction } from './version-actions'
 import {
   applyCoverAction,
   bulkEditTemplatesAction,
@@ -66,6 +66,7 @@ export default async function AdminTemplatesPage() {
         floor={pricingFromOptions(providers)}
         coverLanguages={COVER_LANGUAGES}
         actions={{
+          manageVersion: manageVersionAction,
           setSale: setTemplateSaleAction, duplicate: duplicateTemplateAction, versions: listVersionsAction, snapshot: readVersionAction,
           save: saveTemplateAction,
           setActive: setTemplateActiveAction,

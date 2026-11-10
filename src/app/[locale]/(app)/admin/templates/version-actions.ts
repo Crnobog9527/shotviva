@@ -1,8 +1,8 @@
 'use server'
 
 import { refresh } from 'next/cache'
-import { runAdminQuery } from '@/core/admin'
-import { listVersions, readVersion } from '@/core/admin/templates'
+import { runAdminAction, runAdminQuery } from '@/core/admin'
+import { listVersions, manageVersion, readVersion } from '@/core/admin/templates'
 import { duplicateTemplate } from '@/core/admin/template-copy'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { publicEnv } from '@/core/public-env'
@@ -28,4 +28,9 @@ export async function listVersionsAction(input: unknown) {
 export async function readVersionAction(input: unknown) {
   await requireAdmin()
   return runAdminQuery(() => readVersion(createAdminSupabase(), input))
+}
+
+export async function manageVersionAction(input: unknown) {
+  const actor = await requireAdmin()
+  return runAdminAction(() => manageVersion(createAdminSupabase(), actor.id, input))
 }
