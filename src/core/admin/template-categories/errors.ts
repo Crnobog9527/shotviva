@@ -8,6 +8,7 @@ const MESSAGES: Record<string, string> = {
   CATEGORY_NAME_EN_TAKEN: '已经有分类叫这个英文名了（不分大小写）',
   CATEGORY_NAME_ZH_TAKEN: '已经有分类叫这个中文名了',
   CATEGORY_SYSTEM: '这是内置模板用的系统分类，不能修改或删除',
+  CATEGORY_HAS_CHILDREN: '请先移动或删除子分类',
   CATEGORY_LAST: '至少要保留一个分类',
   CATEGORY_MOVE_REQUIRED: '这个分类下还有模板，先选要移到哪个分类',
   NOT_ADMIN: '只有管理员能修改分类',

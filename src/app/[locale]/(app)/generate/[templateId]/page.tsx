@@ -26,7 +26,7 @@ async function Workspace({ params, searchParams }: RouteProps) {
   const [{ templateId }, query] = await Promise.all([params, searchParams])
   const user = await requireUser(`/generate/${templateId}`)
   const supabase = await createServerSupabase()
-  const found = (await listTemplatesIn(supabase, await currentLocale())).find((template) => template.id === templateId)
+  const [found] = await listTemplatesIn(supabase, await currentLocale(), templateId)
   if (!found) notFound()
   const template = toCatalogueTemplate(found)
   const againId = typeof query.again === 'string' ? query.again : undefined

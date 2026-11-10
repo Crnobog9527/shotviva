@@ -13,6 +13,8 @@ export type Template = {
   // The template_categories key (templates.category_key, T75); names and card style are in
   // categoryInfo.
   category: string
+  categoryPath?: string[]
+  series?: { id: string; slug: string; name: string } | null
   categoryInfo: Category
   coverBeforeUrl: string | null
   coverAfterUrl: string | null
