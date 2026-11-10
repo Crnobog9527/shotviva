@@ -6,5 +6,4 @@ export { SentNotice } from './sent-notice'
 export { WallView } from './wall-view'
 // First-run guidance (Owner 2026-11-10).
 export { WishlistGuide } from './wishlist-guide'
-export { WishlistHint } from './wishlist-hint'
 export { WishCard } from './wish-card'

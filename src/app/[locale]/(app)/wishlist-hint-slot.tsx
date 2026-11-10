@@ -4,7 +4,7 @@ import { Suspense } from 'react'
 import { getSessionUser } from '@/core/auth'
 import { logger } from '@/core/logger'
 import { isWishlistEnabled } from '@/core/wishlist'
-import { WishlistHint } from '@/core/wishlist/ui'
+import { WishlistHintLazy } from '@/core/wishlist/ui/wishlist-hint-lazy'
 import { AfterSuccess } from '@/modules/image'
 import { site } from '@/site/site.config'
 
@@ -28,7 +28,7 @@ async function Resolved() {
   if (!(await due())) return null
   return (
     <AfterSuccess>
-      <WishlistHint markSeen={markWishlistHintSeen} />
+      <WishlistHintLazy markSeen={markWishlistHintSeen} />
     </AfterSuccess>
   )
 }
