@@ -102,6 +102,33 @@ export function productBills(heading: string, intro: string, moreFine = ''): Cos
   }
 }
 
+// 「What People Use Image to Image AI For」 (SEO launch handbook G5): one card per landing page,
+// each closing with an in-body link whose anchor is that page's keyword.
+const useCases = {
+  id: 'use-cases',
+  heading: 'What People Use Image to Image AI For',
+  cards: [
+    {
+      heading: 'AI Restaurant Menu Photos',
+      text: 'Restaurants shoot each dish on the pass with a phone and get menu, delivery-app and promo photos from it. The plate stays as served; only the light and the background change. Start with',
+      link: { href: '/ai-restaurant-menu', anchor: 'AI restaurant menu photos' },
+      after: '.',
+    },
+    {
+      heading: 'Commercial Photography Without a Studio',
+      text: 'Shops and sellers turn one phone photo of a product into a white-background listing image, a lifestyle scene or a promo poster, with no studio booking and no reshoot. See what replaces a shoot in',
+      link: { href: '/commercial-photography', anchor: 'commercial photography' },
+      after: '.',
+    },
+    {
+      heading: 'Image to Image Generator With Templates',
+      text: 'Pick a template instead of writing a prompt: food, products, beauty, pets or an art style. Your subject stays as you shot it. Try the',
+      link: { href: '/image-to-image-generator', anchor: 'image to image generator' },
+      after: '.',
+    },
+  ],
+} as const satisfies HomePage['topics']
+
 const steps = {
   heading: 'How Image to Image AI Works in 3 Steps',
   items: [
@@ -146,6 +173,7 @@ export const homePage = defineHomePage({
     intro: `Every template starts from your phone photo and ends with a finished picture. Pick one and ${brand} does the rest.`,
     note: 'All template images are illustrative examples.',
   },
+  topics: useCases,
   wishlist: homeWishlist,
   facts: sharedFacts(),
   factsIntro: `Most AI image to image tools hand you a new picture. What you wanted was your picture, only better: the same product, the same dish, the same room, with nicer light and a cleaner scene. That is what ${brand} is built for. The prices and sizes below are the same on every page of this site.`,

@@ -20,6 +20,7 @@ export function TopicCards({ topic, isLinkEnabled }: { topic: TopicSection; isLi
                 <>
                   {' '}
                   <Link href={card.link.href}>{card.link.anchor}</Link>
+                  {card.after}
                 </>
               ) : null}
             </p>

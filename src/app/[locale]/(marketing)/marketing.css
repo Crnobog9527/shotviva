@@ -88,6 +88,22 @@
       font: 500 15px/1 var(--font-sans); color: var(--bone-dim); text-decoration: none; transition: color .18s, background-color .18s;
     }
     .mk-nl[aria-current="page"] { color: var(--foreground); }
+    /* Use Cases: a disclosure under the nav item, the globe menu's popover look */
+    .mk-navmenu { position: relative; }
+    button.mk-nl { gap: 4px; border: 0; background: none; cursor: pointer; }
+    .mk-navmenu-chev { width: 16px; height: 16px; transition: transform .2s var(--ease); }
+    .mk-nl[aria-expanded="true"] { color: var(--foreground); background: var(--wash); }
+    .mk-nl[aria-expanded="true"] .mk-navmenu-chev { transform: rotate(180deg); }
+    .mk-navmenu-list {
+      position: absolute; top: calc(100% + 4px); left: 0; z-index: 60; min-width: 236px; margin: 0; padding: 6px; list-style: none;
+      border-radius: var(--radius-control); background: var(--popover); box-shadow: inset 0 0 0 1px var(--border), 0 24px 48px -16px rgba(0, 0, 0, .7);
+    }
+    .mk-navmenu-list a {
+      display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 10px;
+      font: 500 15px/1.2 var(--font-sans); color: var(--foreground); text-decoration: none; outline: none;
+    }
+    .mk-navmenu-list a:hover, .mk-navmenu-list a:focus-visible { background: var(--wash); }
+    @media (prefers-reduced-motion: reduce) { .mk-navmenu-chev { transition: none; } }
     .mk-login { margin-left: 8px; }
     .mk-start { display: inline-grid; margin-left: 8px; }
   }

@@ -2,6 +2,7 @@ import { getTranslations } from 'next-intl/server'
 import { Suspense } from 'react'
 
 import { SiteFooter } from '@/core/content'
+import { NavMenu } from '@/core/content/blocks/nav-menu'
 import type { Locale } from '@/core/i18n'
 import { FooterLocales, FooterLocalesFallback, Link, LocaleMenu, NavLink } from '@/core/i18n/ui'
 import { footerLinksIn } from '@/site/content'
@@ -13,7 +14,7 @@ import './(marketing)/marketing.css'
 const zhPaths = site.locales.zhPaths
 
 // The marketing top bar (DESIGN §6.9 item 4, design/comps-v3-b/home.html): wordmark, then
-// Templates (the home template section; v1 has no /templates page) · Pricing · the globe ·
+// Use Cases (the three landing pages, SEO launch handbook G5) · Templates (the home template section; v1 has no /templates page) · Pricing · the globe ·
 // Log in · Start free (signed in: Open app · account), phones keep the globe and Log in (or
 // Open app · account). Shared by the marketing layout and
 // the 404 pages, which render outside it. `locale` is explicit for the global 404.
@@ -30,6 +31,14 @@ export async function MarketingHeader({ locale }: { locale: Locale }) {
           <span className="mk-brand-tag">{t('tagline')}</span>
         </Link>
         <nav aria-label={t('label')} className="mk-nav">
+          <NavMenu
+            label={t('useCases')}
+            links={[
+              { href: '/ai-restaurant-menu', label: t('useCaseMenu') },
+              { href: '/commercial-photography', label: t('useCaseCommercial') },
+              { href: '/image-to-image-generator', label: t('useCaseGenerator') },
+            ]}
+          />
           <Link href="/#templates" className="mk-nl">
             {t('templates')}
           </Link>
