@@ -10,8 +10,9 @@ export type ObjectStore = {
   presignGet(key: string, options: PresignGetOptions): Promise<string>
   // null when the object does not exist.
   head(key: string): Promise<ObjectHead | null>
-  get(key: string): Promise<Uint8Array>
-  // cacheControl: only for content-hashed public files (template covers), which never change.
+  // Bound reads of a browser-writable staging key even when a PUT races its HEAD.
+  get(key: string, maxBytes?: number): Promise<Uint8Array>
+  // Cover assets are immutable; protected reference media explicitly opt out of caching.
   put(key: string, body: Uint8Array, contentType: string, options?: { cacheControl?: string }): Promise<void>
   // Server-side copy inside the bucket: the bytes never pass through our function (§8.3, T40).
   copy(sourceKey: string, destinationKey: string): Promise<void>

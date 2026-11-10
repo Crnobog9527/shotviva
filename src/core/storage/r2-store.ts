@@ -84,8 +84,9 @@ export function createR2Store(client: S3Like, bucket: string, presign: Presign =
         throw error
       }
     },
-    async get(key) {
-      const result = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }))
+    async get(key, maxBytes) {
+      const Range = maxBytes === undefined ? undefined : `bytes=0-${maxBytes - 1}`
+      const result = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key, Range }))
       if (!result.Body) throw new Error('R2 get returned no body')
       return result.Body.transformToByteArray()
     },
