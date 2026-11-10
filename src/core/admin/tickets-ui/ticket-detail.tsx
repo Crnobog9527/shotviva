@@ -1,6 +1,7 @@
 import Link from 'next/link'
 
-import type { ShownAdminTicket as AdminTicket } from '@/core/support'
+import { RenewalPanel } from './renewal-panel'
+import type { RenewalReview, ShownAdminTicket as AdminTicket } from '@/core/support'
 import { MessageImages } from '@/core/support/ui'
 import { Badge } from '@/core/ui/badge'
 import { cn } from '@/core/ui/cn'
@@ -17,11 +18,11 @@ import type { TicketAdminActions } from './use-ticket-action'
 import { UserLink } from '../users-ui/user-link'
 
 // jobRef: the attached work's reference number (T78), null when the ticket has none.
-type Props = { ticket: AdminTicket; user: UserDetail | null; jobRef: string | null; stripeLive: boolean; actions: TicketAdminActions }
+type Props = { renewal?: RenewalReview | null; ticket: AdminTicket; user: UserDetail | null; jobRef: string | null; stripeLive: boolean; actions: TicketAdminActions }
 
 // /admin/tickets/[id]: the thread, who wrote it (A2's user summary), what it points at, and for
 // refund requests the review panel. Replying is the last block.
-export function TicketDetailView({ ticket, user, jobRef, stripeLive, actions }: Props) {
+export function TicketDetailView({ renewal, ticket, user, jobRef, stripeLive, actions }: Props) {
   return (
     <div className="grid gap-6">
       <div className="flex flex-wrap items-center gap-3">
@@ -36,7 +37,8 @@ export function TicketDetailView({ ticket, user, jobRef, stripeLive, actions }: 
       {jobRef ? <AttachedWork jobRef={jobRef} /> : null}
       <Thread ticket={ticket} />
       <Attached ticket={ticket} stripeLive={stripeLive} actions={actions} />
-      <ReplyForm ticketId={ticket.id} closed={ticket.status === 'closed'} reply={actions.reply} />
+      {renewal && actions.resolveRenewal && <RenewalPanel ticketId={ticket.id} review={renewal} resolve={actions.resolveRenewal} />}
+      <ReplyForm allowClose={!renewal || !!renewal.resolution} ticketId={ticket.id} closed={ticket.status === 'closed'} reply={actions.reply} />
     </div>
   )
 }

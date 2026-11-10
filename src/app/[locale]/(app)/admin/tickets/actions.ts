@@ -7,12 +7,12 @@ import { runAdminAction, type ActionResult } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { AppError } from '@/core/errors'
 import { r2Store } from '@/core/storage'
-import { decideRefund, replyTicket, ticketAuthor, withTicketImages } from '@/core/support'
+import { decideRefund, loadRenewalReview, resolveRenewal, replyTicket, ticketAuthor, withTicketImages } from '@/core/support'
 
 // Server actions are public endpoints, so each re-checks the admin role itself. Inputs are
 // validated again in core/support before reaching the SQL function. Neither moves money.
 
-const replyImages = z.object({ ticketId: z.string(), images: z.array(z.string()).default([]) })
+const replyImages = z.object({ ticketId: z.string(), images: z.array(z.string()).default([]), close: z.boolean().optional() })
 
 // The reply's images (T69) were uploaded by the admin (their inputs/ keys) and are filed under
 // the ticket's author, so the author's account deletion removes them too.
@@ -23,6 +23,10 @@ export async function replyTicketAction(input: unknown): Promise<ActionResult> {
     const parsed = replyImages.safeParse(input)
     if (!parsed.success) throw new AppError('INVALID_INPUT', '回复内容无效')
     const { ticketId, images: keys } = parsed.data
+    if (parsed.data.close) {
+      const review = await loadRenewalReview(db, ticketId)
+      if (review && !review.resolution) throw new AppError('CONFLICT', '请先核对本期续费')
+    }
     const authorId = keys.length > 0 ? await ticketAuthor(db, ticketId) : null
     if (keys.length > 0 && !authorId) throw new AppError('NOT_FOUND', '工单不存在')
     await withTicketImages(r2Store(), { uploaderId: admin.id, authorId: authorId ?? admin.id, ticketId }, keys, (images) =>
@@ -36,6 +40,14 @@ export async function decideRefundAction(input: unknown): Promise<ActionResult> 
   await requireAdmin()
   return runAdminAction(async () => {
     await decideRefund(createAdminSupabase(), input)
+    refresh()
+  })
+}
+
+export async function resolveRenewalAction(input: unknown): Promise<ActionResult> {
+  const admin = await requireAdmin()
+  return runAdminAction(async () => {
+    await resolveRenewal(createAdminSupabase(), admin.id, input)
     refresh()
   })
 }

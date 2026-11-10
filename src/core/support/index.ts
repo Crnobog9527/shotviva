@@ -26,3 +26,4 @@ export { decideRefund, listAdminTickets, loadAdminTicket, openTicketCount, reply
 export { ReplyTime } from './reply-time'
 export { SupportTabBadge } from './tab-badge'
 export { formError, type Choice, type FormState } from './ui/form-state'
+export { loadRenewalReview, resolveRenewal, type RenewalDecision, type RenewalReview } from './waffo-renewal'
