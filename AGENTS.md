@@ -1,7 +1,15 @@
 # Agent instructions
 
-Project rules live in [`规范/AGENTS.md`](规范/AGENTS.md); read it first. This root file
-only exists so tooling that looks for `AGENTS.md` at the repo root finds a pointer.
+Project rules, architecture and task cards live in the **private** repo
+`Crnobog9527/shotviva-docs`, not here (this repo is public). On the Owner's machine it is cloned
+next to this checkout: `/Volumes/灰度映画/出海项目/shotviva-docs`. Read
+`/Volumes/灰度映画/出海项目/shotviva-docs/规范/AGENTS.md` first; wherever code comments or
+task briefs say `规范/…`, `seo资料/…` or `docs/…`, read that path inside `shotviva-docs`.
+
+- Never copy those documents, prices, costs or prompts back into this repo, a PR or a screenshot.
+- Spec changes are `[spec]` PRs in `shotviva-docs`, reviewed and merged by the control window.
+- Tests that need those files find them through `tests/support/private-docs.ts`
+  (`SHOTVIVA_DOCS_DIR` overrides) and skip in CI, which has no copy.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

@@ -12,10 +12,14 @@ import { zhAiRestaurantMenu } from './pages/ai-restaurant-menu'
 import { zhCommercialPhotography } from './pages/commercial-photography'
 import { zhImageToImageGenerator } from './pages/image-to-image-generator'
 import { zhPricingPage } from './pricing'
+import { privateDoc } from '../../../../tests/support/private-docs'
+
+// The keyword map lives in the private docs repo (tests/support/private-docs.ts); skipped where absent.
+const keywordMap = privateDoc('seo资料', 'Shotviva 页面与主词映射（中文口径）.csv')
 
 // The Chinese keyword map (T22): URL → keyword, the source of every /zh Title and H1.
 function zhKeywords(): Map<string, string> {
-  const csv = readFileSync(join(process.cwd(), 'seo资料', 'Shotviva 页面与主词映射（中文口径）.csv'), 'utf8')
+  const csv = readFileSync(keywordMap!, 'utf8')
   return new Map(
     csv
       .split(/\r?\n/)
@@ -64,7 +68,7 @@ describe('/zh marketing copy (建站规格 §6.1, G13)', () => {
     expect(zhPricingPage.title.length).toBeLessThanOrEqual(30)
   })
 
-  it('starts each Title and H1 with the keyword from the Chinese keyword map, unbroken', () => {
+  it.skipIf(!keywordMap)('starts each Title and H1 with the keyword from the Chinese keyword map, unbroken', () => {
     const keywords = zhKeywords()
     for (const [url, page] of Object.entries(PAGES)) {
       const keyword = (keywords.get(url) ?? '').toLowerCase()
