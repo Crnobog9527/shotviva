@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, type PointerEvent } from 'react'
+import { useEffect, useRef } from 'react'
 
 // Clamp for the scroll sway, in degrees (B comp wishlist.html).
 const MAX_SWAY = 6
@@ -13,8 +13,9 @@ export function swayFromScroll(deltaY: number, elapsedMs: number): number {
 }
 
 // The breeze on the wall (B comp wishlist.html): scrolling sways every note by its scroll speed
-// and the sway settles when scrolling stops; the pointer crossing a note sets off one gust.
-// Decoration only. Under "reduce motion" the CSS pins every note and drops the gust.
+// and the sway settles when scrolling stops. Decoration only; under "reduce motion" the CSS
+// pins every note. The pointer no longer sets off a gust (Owner 2026-11-11): a note that swung
+// as the mouse came onto it moved its vote button out from under the click.
 export function useBreeze() {
   const wall = useRef<HTMLUListElement>(null)
   useEffect(() => {
@@ -38,13 +39,5 @@ export function useBreeze() {
       clearTimeout(settle)
     }
   }, [])
-  const gust = (event: PointerEvent<HTMLLIElement>) => {
-    if (event.pointerType !== 'mouse') return
-    const note = event.currentTarget
-    note.classList.remove('wl-blow')
-    void note.offsetWidth
-    note.classList.add('wl-blow')
-  }
-  const settled = (event: { currentTarget: HTMLLIElement }) => event.currentTarget.classList.remove('wl-blow')
-  return { wall, gust, settled }
+  return wall
 }
