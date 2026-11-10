@@ -31,13 +31,13 @@ export function SeriesCard({ series, onOpen, eager }: Props) {
       className="group block w-full rounded-tile text-left transition-transform duration-250 ease-house hover:-translate-y-0.5 active:scale-[.97]"
     >
       <span className="relative block">
-        <PrintEdge className="inset-x-3 -bottom-[7px] opacity-60" />
-        <PrintEdge className="inset-x-1.5 -bottom-[4px]" />
+        <PrintEdge className="inset-x-6 -bottom-[11px] bg-card" />
+        <PrintEdge className="inset-x-3 -bottom-[6px] bg-muted" />
         <span className="relative block">
           <SeriesFrame series={series} eager={eager} />
         </span>
       </span>
-      <span className="block pt-3.5">
+      <span className="block pt-5">
         <span className="block text-body leading-[1.25] font-semibold tracking-[-0.015em]">{series.name}</span>
         <span className="mt-1 block text-caption leading-[1.35] text-muted-foreground">{series.categoryName}</span>
         <span className="mt-2 inline-block rounded-tag bg-wash px-2 py-1 font-mono text-caption leading-none text-bone-dim">{t('count', { count: series.members.length })}</span>
@@ -47,7 +47,7 @@ export function SeriesCard({ series, onOpen, eager }: Props) {
 }
 
 function PrintEdge({ className }: { className: string }) {
-  return <span aria-hidden="true" className={cn('hairline absolute h-3 rounded-b-control bg-card', className)} />
+  return <span aria-hidden="true" className={cn('absolute h-4 rounded-b-control shadow-[inset_0_0_0_1px_var(--input)]', className)} />
 }
 
 function SeriesFrame({ series, eager }: { series: CatalogueSeries; eager?: boolean }) {
