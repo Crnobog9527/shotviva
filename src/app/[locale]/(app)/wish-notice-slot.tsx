@@ -8,8 +8,6 @@ import { listMyWishNotices, toNoticeItems, type NoticeItem } from '@/core/wishli
 import { WishNoticeLazy } from '@/core/wishlist/ui/wish-notice-lazy'
 import { site } from '@/site/site.config'
 
-import { markWishNoticesSeenAction } from './wishlist/notice-actions'
-
 // The signed-in account's unread "your wish came true" notices (ARCHITECTURE §15.4), cached
 // per account and empty while the wishlist is off or nobody is signed in. A failed read only
 // means the banner waits for the next visit.
@@ -26,7 +24,7 @@ async function unread(): Promise<NoticeItem[]> {
 
 async function Resolved() {
   const items = await unread()
-  return items.length ? <WishNoticeLazy items={items} markSeen={markWishNoticesSeenAction} /> : null
+  return items.length ? <WishNoticeLazy items={items} /> : null
 }
 
 // Its own Suspense hole, like the wishlist hint's: the shell never waits for the session.

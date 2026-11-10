@@ -46,7 +46,8 @@ export async function listMyWishNotices(site: SiteConfig): Promise<WishNotice[]>
   return userId ? unreadFor(userId) : []
 }
 
-// Call from a Server Action or Route Handler so a successful dismissal also expires its cache.
+// Call from a Route Handler (api/wishlist/notices/seen), which can expire this cache without
+// refetching the page the banner is on, as a Server Action would.
 export async function markWishNoticesSeen(site: SiteConfig, requestIds: string[]): Promise<void> {
   const userId = await noticeViewer(site)
   if (!userId) return
