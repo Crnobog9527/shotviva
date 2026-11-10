@@ -4,6 +4,7 @@ import { errorResponse, jsonResponse } from '@/core/api-response'
 import { assertSameOrigin, createAdminSupabase, requireApiUser } from '@/core/auth'
 import { AppError } from '@/core/errors'
 import { preflightBatch, preflightSchema } from '@/core/jobs'
+import { imageProvider } from '@/modules/image'
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,7 +12,7 @@ export async function POST(request: NextRequest) {
     const user = await requireApiUser()
     const body = preflightSchema.safeParse(await request.json().catch(() => null))
     if (!body.success) throw new AppError('INVALID_INPUT', 'Invalid batch cells')
-    return jsonResponse(await preflightBatch(createAdminSupabase(), user.id, body.data.cells))
+    return jsonResponse(await preflightBatch(createAdminSupabase(), user.id, body.data.cells, imageProvider))
   } catch (error) {
     return errorResponse(error, 'generate.batch')
   }

@@ -6,7 +6,6 @@ import { createAdminSupabase } from '../auth/supabase-admin'
 import { AppError } from '../errors'
 import { serverEnv } from '../env'
 import { logger } from '../logger'
-import { referenceCount } from '../jobs/provider'
 import { providerTag, type GenerationProvider, type ImageRequestOptions } from '../jobs'
 import { openRouterImageParameters, type OpenRouterImageParameters } from './openrouter-catalog'
 import { openRouterInputMismatch } from './openrouter-input'
@@ -41,7 +40,7 @@ function validateStoredCapabilities(row: ActiveProviderRow, request: ImageReques
   if (!aspect || !caps.resolutions.includes(request.resolution)) {
     throw new AppError('INVALID_INPUT', 'This model does not support the selected output size')
   }
-  if (referenceCount(request) < caps.minReferences) {
+  if (request.referenceCount < caps.minReferences) {
     throw new AppError('INVALID_INPUT', 'This model does not support the supplied reference count')
   }
 }
@@ -55,7 +54,7 @@ async function checkTemplateRow(
 ): Promise<{ reason: string } | { parameters?: OpenRouterImageParameters }> {
   if (!row.resolutions.includes(request.resolution)) return { reason: 'unsupported_resolution' }
   const { maxReferences: max } = effectiveReferenceRange(row)
-  if (max !== undefined && referenceCount(request) > max) return { reason: 'reference_image_limit' }
+  if (max !== undefined && request.referenceCount > max) return { reason: 'reference_image_limit' }
   if (row.adapter !== 'openrouter_images') return {}
   let parameters: OpenRouterImageParameters
   try {
@@ -90,7 +89,7 @@ export async function templateImageProvider(
     const provider = await fallback()
     logger.info('image.provider.fallback', {
       reason: selection.reason, requestedProvider: providerTag(id, row.model), actualProvider: provider.id,
-      resolution: request.resolution, aspectRatio: request.aspectRatio, referenceCount: referenceCount(request),
+      resolution: request.resolution, aspectRatio: request.aspectRatio, referenceCount: request.referenceCount,
     })
     return { ...provider, fallbackReason: selection.reason }
   }

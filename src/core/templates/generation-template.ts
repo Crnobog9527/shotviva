@@ -41,8 +41,14 @@ function privateRefs(id: string, raw: unknown): StyleRef[] {
 async function generationRow(client: SupabaseClient, id: string, surface: TemplateSurface | null, drafts: boolean) {
   const extra = ', template_sale_approvals(unpriced_resolutions), template_prompts(body, version, model_params, provider_id, style_refs)'
   if (surface === 'web' && !drafts) {
-    const row = await client.rpc('web_templates', { p_template_id: id }).select(TEMPLATE_COLUMNS + extra).maybeSingle<Row>()
+    // A hidden default price does not disable an otherwise published template's higher tiers.
+    const args = { p_template_id: id }
+    const columns = TEMPLATE_COLUMNS + extra
+    const row = await client.rpc('web_generation_template', args).select(columns).maybeSingle<Row>()
     if (row.error?.code !== 'PGRST202') return row
+    // A deployment restored to the earlier schema still uses its original single-image lookup.
+    const previous = await client.rpc('web_templates', args).select(columns).maybeSingle<Row>()
+    if (previous.error?.code !== 'PGRST202') return previous
   }
   return selectTemplates((columns) => {
     const all = client.from('templates').select(columns).eq('id', id)

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { GenerationProvider, ProviderInput } from '../jobs'
+import type { GenerationProvider, ImageRequestOptions } from '../jobs'
 import { logger } from '../logger'
 import type { OpenRouterImageParameters } from './openrouter-catalog'
 import { ProviderSettingError } from './setting-error'
@@ -17,10 +17,7 @@ const supported: OpenRouterImageParameters = {
 }
 const defaultProvider: GenerationProvider = { id: 'default/openai-test', generate: vi.fn() }
 const adapters: ProviderAdapters = { openrouter_images: () => ({ id: 'openrouter', generate: vi.fn() }) }
-const photo = { bytes: Uint8Array.of(1), contentType: 'image/png' }
-const request: Pick<ProviderInput, 'resolution' | 'aspectRatio' | 'images'> = {
-  resolution: '1k', aspectRatio: '4:5', images: [photo],
-}
+const request: ImageRequestOptions = { resolution: '1k', aspectRatio: '4:5', referenceCount: 1 }
 
 function dependencies() {
   return {
@@ -42,7 +39,7 @@ describe('template image provider', () => {
 
   it('keeps the selected Gemini model for its advertised 4:5 ratio and up to three references', async () => {
     const deps = dependencies()
-    const selected = await templateImageProvider(adapters, row.id, { ...request, images: [photo, photo, photo] }, deps)
+    const selected = await templateImageProvider(adapters, row.id, { ...request, referenceCount: 3 }, deps)
     expect(selected.id).toBe(`${row.id}/${row.model}`)
     expect(deps.readKey).toHaveBeenCalledWith(row.id)
     expect(deps.fallback).not.toHaveBeenCalled()
@@ -61,7 +58,7 @@ describe('template image provider', () => {
       deps.parameters.mockRejectedValueOnce(new ProviderSettingError('openrouter_catalog_unavailable', 'Images catalogue timed out'))
     }
     if (reason === 'model_missing') deps.parameters.mockRejectedValueOnce(new ProviderSettingError('openrouter_model_missing', 'Model missing'))
-    const selected = await templateImageProvider(adapters, row.id, { resolution, aspectRatio, images: Array(count).fill(photo) }, deps)
+    const selected = await templateImageProvider(adapters, row.id, { resolution, aspectRatio, referenceCount: count }, deps)
     expect(selected).toMatchObject({ ...defaultProvider, fallbackReason: reason })
     expect(deps.readKey).not.toHaveBeenCalled()
     expect(info).toHaveBeenCalledTimes(1)

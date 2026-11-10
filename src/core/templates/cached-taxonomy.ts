@@ -52,10 +52,9 @@ export async function catalogueIndexOrNull(locale: Locale, read: IndexRead = rea
   }
 }
 
-// Where Create's cards go (T102): the same for every visitor, so cached under the templates tag
-// that every admin save of a template, category or series expires.
+// Create's cards depend on taxonomy and whether the current image route can sell each template.
 export async function cachedCatalogueIndex(locale: Locale): Promise<CatalogueIndex | null> {
   'use cache'
-  cacheTag(TEMPLATES_CACHE_TAG)
+  cacheTag(TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG)
   return catalogueIndexOrNull(locale)
 }
