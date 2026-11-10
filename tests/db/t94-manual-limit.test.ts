@@ -12,7 +12,7 @@ beforeAll(async () => { db = await connectAdmin() })
 afterAll(async () => { await db.end() })
 
 const args = (user: string, code: string | null, context = 'account') => ({
-  p_user: user, p_code: code, p_context: context, p_invitee_credits: invite.inviteeCredits, p_invite_window_days: invite.windowDays,
+  p_user: user, p_code: code, p_context: context, p_invitee_credits: null, p_invite_window_days: invite.windowDays,
 })
 async function attempt(user: string, code: string | null, context = 'account') {
   const response = await serviceClient().rpc('redeem_limited_code', args(user, code, context))

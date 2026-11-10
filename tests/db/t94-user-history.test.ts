@@ -4,7 +4,6 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 
 import { PAGE_SIZE } from '@/core/admin/cursor'
 import { userCodeHistory } from '@/core/admin/users/code-history'
-import { site } from '@/site/site.config'
 
 import { connectAdmin, createUser } from './helpers'
 import { serviceSupabase } from './supabase-env'
@@ -21,10 +20,10 @@ it('shows only successful redemptions for this account and pages campaigns witho
   await db.query("insert into code_redemptions(code_id,user_id,inviter_user_id,kind,context,status) values ($1,$2,$3,'invite','account','ok')", [invite.id, user, inviter])
   await db.query(`with offers as (
     insert into codes(code,kind,invitee_credits,invitee_pool)
-    select upper(substr(md5(gen_random_uuid()::text),1,12)), 'campaign', $3, 'free' from generate_series(1,$1)
+    select upper(substr(md5(gen_random_uuid()::text),1,12)), 'campaign', 17, 'free' from generate_series(1,$1)
     returning id
   ) insert into code_redemptions(code_id,user_id,kind,context,status)
-    select id,$2,'campaign','account','ok' from offers`, [PAGE_SIZE + 1, user, site.growth.invite.inviteeCredits])
+    select id,$2,'campaign','account','ok' from offers`, [PAGE_SIZE + 1, user])
   const admin = serviceSupabase()
   const first = await userCodeHistory(admin, user)
   expect(first).toMatchObject({ inviterId: inviter, inviteCode, paged: false })

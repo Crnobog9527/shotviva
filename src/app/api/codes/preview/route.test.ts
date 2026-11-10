@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-import { invite } from '../../../../../tests/t94-config'
+import { seededRewards } from '../../../../../tests/t94-config'
 
 import { GET, HEAD } from './route'
 
@@ -16,7 +16,7 @@ beforeEach(() => { vi.clearAllMocks() })
 afterEach(() => { vi.useRealTimers() })
 
 it('returns a public normalized preview with no cache and no account session', async () => {
-  const offer = { kind: 'invite', credits: invite.inviteeCredits, pool: 'free', percent: null }
+  const offer = { kind: 'invite', credits: seededRewards.inviteeCredits, pool: 'free', percent: null }
   mocks.preview.mockResolvedValue(offer)
   const response = await get('code=aBc4')
   expect(response.status).toBe(200)

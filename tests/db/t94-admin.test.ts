@@ -6,7 +6,7 @@ import { listCodes, loadCode, redemptions, topInviters } from '@/core/admin/code
 import { saveCode } from '@/core/codes/server'
 import { site } from '@/site/site.config'
 
-import { invite } from '../t94-config'
+import { invite, seededRewards } from '../t94-config'
 
 import { anonClient, connectAdmin, createUser, serviceClient } from './helpers'
 import { serviceSupabase } from './supabase-env'
@@ -139,7 +139,7 @@ describe('admin code reports', () => {
     const first = await payment(buyer, null, false)
     const effect = await service.rpc('apply_payment_code_effects', {
       p_user: buyer, p_payment_id: first, p_code_id: null, p_amount_discount: 0,
-      p_inviter_credits: invite.inviterCredits, p_inviter_cap: invite.inviterRewardCap,
+      p_inviter_credits: null, p_inviter_cap: invite.inviterRewardCap,
     })
     expect(effect).toMatchObject({ data: { rewarded: true }, error: null })
     await db.query("update public.payments set status='partially_refunded' where id=$1", [first])
@@ -147,14 +147,14 @@ describe('admin code reports', () => {
     expect(detail.items).toMatchObject([{ user_id: buyer, inviter_reward_payment_id: first,
       reward_payment_status: 'partially_refunded', reward_payment_refunded: 50 }])
     const leaders = await topInviters(serviceSupabase(), actor, false)
-    expect(leaders).toContainEqual({ inviter_user_id: inviter, invited: 1, purchasers: 1, earned: invite.inviterCredits })
+    expect(leaders).toContainEqual({ inviter_user_id: inviter, invited: 1, purchasers: 1, earned: seededRewards.inviterCredits })
   })
 
   it('uses created_at and id to page 31 redemptions with the same timestamp', async () => {
     const id = randomUUID()
-    expect(await save(id, { code: codeName(), invitee_credits: invite.inviteeCredits })).toMatchObject({ data: id })
+    expect(await save(id, { code: codeName(), invitee_credits: seededRewards.inviteeCredits })).toMatchObject({ data: id })
     const list = await listCodes(serviceSupabase(), actor, 'campaign')
-    expect(list.items).toEqual(expect.arrayContaining([expect.objectContaining({ id, invitee_credits: invite.inviteeCredits, invitee_pool: 'free' })]))
+    expect(list.items).toEqual(expect.arrayContaining([expect.objectContaining({ id, invitee_credits: seededRewards.inviteeCredits, invitee_pool: 'free' })]))
     const ids = []
     for (let i = 0; i < 31; i++) ids.push(await redemption(id, await createUser(db), null))
     await db.query('update public.code_redemptions set created_at=$1 where code_id=$2', ['2026-01-01', id])

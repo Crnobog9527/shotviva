@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { invite } from '../../../../tests/t94-config'
+import { invite, seededRewards } from '../../../../tests/t94-config'
 
 import { readInviteSummary } from './invite-summary'
 
 const time = '2026-11-09T10:00:00+00:00'
 const cursor = { id: 'e6e93ed1-2e1d-46cd-a544-1dc44ddf0150', created_at: time }
-const summary = { code: 'AB4CD789', rewards: { inviteeCredits: 17, inviterCredits: 29 }, invited: 1, purchasers: 1, earned: invite.inviterCredits, rewards_left: invite.inviterRewardCap - 1, reward_window_days: 4 }
+const summary = { code: 'AB4CD789', rewards: { inviteeCredits: 17, inviterCredits: 29 }, invited: 1, purchasers: 1, earned: seededRewards.inviterCredits, rewards_left: invite.inviterRewardCap - 1, reward_window_days: 4 }
 
 describe('account invitation list', () => {
   it('scopes keyset paging to the signed-in user and strips private fields before serializing friends', async () => {
