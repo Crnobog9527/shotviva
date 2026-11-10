@@ -8,9 +8,8 @@
 # destructive migration fail "DB migrations expand-only" unless their title has `[contract]`
 # (.github/workflows/db-migrations-expand-only.yml).
 #
-# The job is bound to the `production` environment. It no longer has a required reviewer; it
-# holds the production password and project ref (not on the repository, so no other workflow can
-# reach production) and its branch policy only lets runs from main use them. An environment that
+# The job is bound to the `production` environment. It no longer has a required reviewer; its
+# branch policy allows workflows on main that name this environment to use its credentials. An environment that
 # was never set up (no secrets) fails at "Check configuration" without touching the database.
 name: DB push (production)
 
@@ -46,14 +45,14 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_PRODUCTION_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_PRODUCTION_DB_PASSWORD }}
       SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PRODUCTION_PROJECT_REF }}
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/supabase-remote
         with:
-          token-source: secret SUPABASE_ACCESS_TOKEN
+          token-source: environment secret SUPABASE_PRODUCTION_ACCESS_TOKEN
           password-source: production environment secret SUPABASE_PRODUCTION_DB_PASSWORD
           ref-source: production environment variable SUPABASE_PRODUCTION_PROJECT_REF
       - name: History before

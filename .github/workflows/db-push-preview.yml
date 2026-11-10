@@ -37,16 +37,17 @@ jobs:
     name: supabase db push → preview
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    environment: preview
     env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_PREVIEW_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_PREVIEW_DB_PASSWORD }}
       SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PREVIEW_PROJECT_REF }}
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/supabase-remote
         with:
-          token-source: repository secret SUPABASE_ACCESS_TOKEN
-          password-source: repository secret SUPABASE_PREVIEW_DB_PASSWORD
+          token-source: preview environment secret SUPABASE_PREVIEW_ACCESS_TOKEN
+          password-source: preview environment secret SUPABASE_PREVIEW_DB_PASSWORD
           ref-source: repository variable SUPABASE_PREVIEW_PROJECT_REF
       # --include-all: cards own numbering ranges (TASKS), so a lower-numbered migration can
       # merge after a higher one. Versions on the database but not in the repo still abort.
