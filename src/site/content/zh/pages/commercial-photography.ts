@@ -70,6 +70,7 @@ export const zhCommercialPhotography = defineContentPage({
     {
       question: '手机照片要怎么拍？',
       answer: '白天光线，商品对上焦，前面别有东西挡着。背景乱一点没关系，模板会换掉它。',
+      link: { href: '/', anchor: '用 AI改图 试试你的手机照片。' },
     },
   ],
   related: [
