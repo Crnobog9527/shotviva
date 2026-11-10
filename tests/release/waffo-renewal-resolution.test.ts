@@ -10,6 +10,7 @@ let clone: ReturnType<typeof cloneLocalPricingDb>
 let actor: string
 let buyer: string
 let order: string
+let payment: string
 beforeAll(async () => {
   clone = cloneLocalPricingDb()
   db = await clone.connect()
@@ -20,15 +21,16 @@ beforeAll(async () => {
 }, 30000)
 beforeEach(async () => {
   buyer = await createUser(db)
-  order = randomUUID()
+  order = 'ORD_' + randomUUID()
+  payment = 'PAY_' + randomUUID()
 })
 afterAll(async () => {
   try { await db?.end() } finally { clone?.drop() }
 })
 
-async function webhook(payment = order, total: number | null = null) {
+async function webhook(paymentId = payment, total: number | null = null) {
   const { rows } = await db.query("select public.settle_waffo_renewal_v2($1,'starter_yearly',$2,2,$3,19104,$4,100,null,'usd') as result",
-    [buyer, order, payment, total])
+    [buyer, order, paymentId, total])
   return rows[0].result
 }
 function decide(ticket: string, decision: 'settled' | 'refunded', client = db, by = actor) {
@@ -53,15 +55,15 @@ it('settles the verified receipt, v2 credits and expiry together, then closes an
   expect(profile.paid_until!.getTime()).toBeGreaterThan(Date.now())
   await decide(ticket_id, 'settled')
   await expect(decide(ticket_id, 'refunded')).rejects.toThrow('CONFLICT')
-  expect(await webhook(order, 19204)).toEqual({ outcome: 'review' })
+  expect(await webhook(payment, 19204)).toEqual({ outcome: 'review' })
   expect(await profileOf(db, buyer)).toEqual(profile)
   expect(await ledgerOf(db, buyer)).toHaveLength(1)
   expect(await review(ticket_id)).toMatchObject({ period_paid: true, resolution: 'settled' })
   const { rows } = await db.query(`select p.amount_total,p.amount_tax,t.status,r.ticket_id from public.payments p
     join public.support_tickets t on t.payment_id=p.id join admin.waffo_renewal_periods r on r.resolved_ticket_id=t.id
-    where p.waffo_payment_id=$1`, [order])
+    where p.waffo_payment_id=$1`, [payment])
   expect(rows).toEqual([{ amount_total: 19200, amount_tax: 100, status: 'closed', ticket_id: null }])
-  expect(await audits(ticket_id)).toEqual([{action: 'waffo_renewal_settled', user_id: buyer, reason: expect.objectContaining({ actor, payment: order })}])
+  expect(await audits(ticket_id)).toEqual([{action: 'waffo_renewal_settled', user_id: buyer, reason: expect.objectContaining({ actor, payment })}])
   expect((await db.query('select body from public.support_ticket_messages where ticket_id=$1', [ticket_id])).rows)
     .toContainEqual({body: expect.stringMatching(/积分已到账.*\nWe’ve verified/)})
 })
@@ -72,18 +74,18 @@ it('records an external refund once while keeping credits, expiry and revenue un
   await decide(ticket_id, 'refunded')
   await decide(ticket_id, 'refunded')
   await expect(decide(ticket_id, 'settled')).rejects.toThrow('CONFLICT')
-  expect(await webhook(order, 19204)).toEqual({ outcome: 'review' })
+  expect(await webhook(payment, 19204)).toEqual({ outcome: 'review' })
   expect(await profileOf(db, buyer)).toEqual(prior)
   expect(await ledgerOf(db, buyer)).toHaveLength(0)
   expect((await db.query('select id from public.payments where user_id=$1', [buyer])).rows).toHaveLength(0)
   expect((await db.query('select status from public.support_tickets where id=$1', [ticket_id])).rows[0].status).toBe('closed')
   expect((await db.query('select ticket_id from admin.waffo_renewal_periods where resolved_ticket_id=$1', [ticket_id])).rows[0].ticket_id).toBeNull()
   expect(await review(ticket_id)).toMatchObject({ period_paid: false, resolution: 'refunded' })
-  expect(await audits(ticket_id)).toEqual([{ action: 'waffo_renewal_refunded', user_id: buyer, reason: expect.objectContaining({ actor, payment: order }) }])
+  expect(await audits(ticket_id)).toEqual([{ action: 'waffo_renewal_refunded', user_id: buyer, reason: expect.objectContaining({ actor, payment }) }])
 })
 
 it('serializes two operators settling different tickets from the same period', async () => {
-  const tickets = [await webhook(), await webhook(randomUUID(), 19204)]
+  const tickets = [await webhook(), await webhook('PAY_' + randomUUID(), 19204)]
   const parallel = await clone.connect()
   try {
     const outcomes = await Promise.allSettled(tickets.map((t,i) => decide(t.ticket_id, 'settled', i ? parallel : db)))
@@ -97,12 +99,12 @@ it('serializes two operators settling different tickets from the same period', a
 })
 
 it('recognizes a receipt settled by the old deployment even when its replay lacks amounts', async () => {
-  await db.query("select public.settle_waffo_order_v2($1,'starter_yearly',$2,$2,19204,'usd',100,'card')", [buyer, order])
+  await db.query("select public.settle_waffo_order_v2($1,'starter_yearly',$2,$3,19204,'usd',100,'card')", [buyer, payment, order])
   const prior = await profileOf(db, buyer)
   expect(await webhook()).toEqual({ outcome: 'replayed' })
   expect(await webhook()).toEqual({ outcome: 'replayed' })
   expect((await db.query('select id from public.support_tickets where user_id=$1', [buyer])).rows).toHaveLength(0)
-  const duplicate = await webhook(randomUUID(), 19204)
+  const duplicate = await webhook('PAY_' + randomUUID(), 19204)
   await expect(decide(duplicate.ticket_id, 'settled')).rejects.toThrow('CONFLICT')
   expect(await profileOf(db, buyer)).toEqual(prior)
   expect(await ledgerOf(db, buyer)).toHaveLength(1)
