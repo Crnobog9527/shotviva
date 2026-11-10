@@ -50,7 +50,7 @@ describe('admin templates page', () => {
 
   it('404s non-admins before loading any template or prompt', async () => {
     requireAdmin.mockImplementation(() => notFound())
-    await expect(AdminTemplatesPage()).rejects.toMatchObject({ digest: expect.stringMatching(/404/) })
+    await expect(AdminTemplatesPage({ searchParams: Promise.resolve({}) })).rejects.toMatchObject({ digest: expect.stringMatching(/404/) })
     expect(preparePanelSummary).not.toHaveBeenCalled()
     expect(listAdminTemplates).not.toHaveBeenCalled()
     expect(readPricingOptions).not.toHaveBeenCalled()
@@ -60,7 +60,7 @@ describe('admin templates page', () => {
 
   it('loads templates for admins', async () => {
     requireAdmin.mockResolvedValue({ id: 'admin', email: null })
-    await AdminTemplatesPage()
+    await AdminTemplatesPage({ searchParams: Promise.resolve({}) })
     expect(listAdminTemplates).toHaveBeenCalledOnce()
     expect(listAdminSeriesOptions).toHaveBeenCalledOnce()
     expect(listAdminCategoryTree).toHaveBeenCalledOnce()

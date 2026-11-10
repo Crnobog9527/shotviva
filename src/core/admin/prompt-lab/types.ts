@@ -16,3 +16,8 @@ export type LabModels = {
   vision: { id: string; label: string }[]
 }
 export type ReverseSettings = { model: string; instruction: string }
+// 「发布为模板」 prefills and the drafts already made from this session's results.
+export type LabPublishOptions = {
+  categories: { key: string; label: string }[]; suggestedCategory: string | null; leafNameEn: string | undefined
+  sources: Record<string, string>
+}

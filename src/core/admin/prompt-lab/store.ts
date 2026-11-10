@@ -36,8 +36,8 @@ export async function readLabVersions(db: SupabaseClient, sessionId: string, aft
 }
 
 export async function labSession(db: SupabaseClient, sessionId: string) {
-  const { data, error } = await db.from('prompt_lab_sessions').select('asset_id,reference_assets!inner(status)')
-    .eq('id', sessionId).maybeSingle<{ asset_id: string; reference_assets: { status: 'active' | 'archived' } }>()
+  const { data, error } = await db.from('prompt_lab_sessions').select('asset_id,reference_assets!inner(status,category_id)')
+    .eq('id', sessionId).maybeSingle<{ asset_id: string; reference_assets: { status: 'active' | 'archived'; category_id: string } }>()
   if (error) throw new AppError('INTERNAL', '无法读取调试记录')
   return data
 }
@@ -54,4 +54,12 @@ export async function reverseSettings(db: SupabaseClient): Promise<ReverseSettin
   const { data, error } = await db.from('system_settings').select('value').eq('key', 'prompt_lab_reverse').maybeSingle()
   if (error) throw new AppError('INTERNAL', '无法读取倒推设置')
   return data?.value ?? { model: '', instruction: '' }
+}
+
+// Results already turned into template drafts (one per run). Indexed by reference_template_sources(asset_id).
+export async function readLabSources(db: SupabaseClient, assetId: string): Promise<Record<string, string>> {
+  const { data, error } = await db.from('reference_template_sources').select('run_id,template_id').eq('asset_id', assetId)
+    .limit(500).returns<{ run_id: string; template_id: string }[]>()
+  if (error) throw new AppError('INTERNAL', '无法读取发布记录')
+  return Object.fromEntries(data.map(row => [row.run_id, row.template_id]))
 }

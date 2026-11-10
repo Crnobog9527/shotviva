@@ -32,7 +32,7 @@ export function loadCatalogue(db: SupabaseClient) {
   return Promise.all([listAdminTemplates(db), listAdminCategoryTree(db), listAdminSeriesOptions(db), readPricingOptions(db)])
 }
 
-export async function Catalogue({ data }: { data: ReturnType<typeof loadCatalogue> }) {
+export async function Catalogue({ data, edit }: { data: ReturnType<typeof loadCatalogue>; edit?: string }) {
   const [templates, categories, series, providers] = await data
   return (
     <div className="mx-auto grid w-full min-w-0 max-w-6xl grid-cols-1 gap-6 p-6">
@@ -48,7 +48,7 @@ export async function Catalogue({ data }: { data: ReturnType<typeof loadCatalogu
         actions={{ save: saveTemplateCategoryAction, move: moveTemplateCategoryAction, remove: deleteTemplateCategoryAction }}
       />
       <ModelSyncProvider action={syncTemplateModel}>
-      <TemplatesEditor
+      <TemplatesEditor initialEdit={edit}
         templates={templates} series={series}
         providers={providers}
         categories={categories}
