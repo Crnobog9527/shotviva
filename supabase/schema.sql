@@ -3933,6 +3933,14 @@ begin
          reviewed_at = now()
    where id = p_request_id;
 
+  if p_status = 'shipped' then
+    insert into public.template_request_notices (user_id, request_id)
+    select r.user_id, r.id from public.template_requests r where r.id = p_request_id
+    union all
+    select v.user_id, v.request_id from public.template_request_votes v where v.request_id = p_request_id
+    on conflict (user_id, request_id) do nothing;
+  end if;
+
   return case when p_status = 'rejected' then v_keys else '{}'::text[] end;
 end;
 $$;
@@ -6350,6 +6358,26 @@ $$;
 ALTER FUNCTION "public"."handle_new_user"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."list_my_wish_notices"("p_user_id" "uuid") RETURNS TABLE("request_id" "uuid", "template_id" "text", "template_name_en" "text", "template_name_zh" "text", "description_excerpt" "text", "is_author" boolean)
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select n.request_id, t.id, t.name, coalesce(nullif(t.translations #>> '{zh,name}', ''), t.name),
+         left(r.description, 40), r.user_id = n.user_id
+    from public.template_request_notices n
+    join public.template_requests r on r.id = n.request_id
+    join public.templates t on t.id = r.template_id
+   where n.user_id = p_user_id and n.seen_at is null
+     and t.is_active and 'web' = any(t.visible_in)
+     and exists (select 1 from public.system_settings where key = 'wishlist_enabled' and value = 'true'::jsonb)
+   order by n.created_at desc, n.request_id desc
+   limit 5;
+$$;
+
+
+ALTER FUNCTION "public"."list_my_wish_notices"("p_user_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."mark_dispute_drafted"("p_dispute_id" "text") RETURNS boolean
     LANGUAGE "sql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -6375,6 +6403,20 @@ $$;
 
 
 ALTER FUNCTION "public"."mark_ticket_seen"("p_ticket_id" "uuid", "p_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."mark_wish_notices_seen"("p_user_id" "uuid", "p_request_ids" "uuid"[]) RETURNS "void"
+    LANGUAGE "sql"
+    SET "search_path" TO ''
+    AS $$
+  update public.template_request_notices
+     set seen_at = now()
+   where user_id = p_user_id and request_id = any(p_request_ids) and seen_at is null
+     and exists (select 1 from public.system_settings where key = 'wishlist_enabled' and value = 'true'::jsonb);
+$$;
+
+
+ALTER FUNCTION "public"."mark_wish_notices_seen"("p_user_id" "uuid", "p_request_ids" "uuid"[]) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."my_invite_summary"("p_user" "uuid", "p_inviter_cap" integer, "p_cursor" "jsonb" DEFAULT NULL::"jsonb") RETURNS "jsonb"
@@ -9188,6 +9230,17 @@ CREATE TABLE IF NOT EXISTS "public"."template_prompts" (
 ALTER TABLE "public"."template_prompts" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."template_request_notices" (
+    "user_id" "uuid" NOT NULL,
+    "request_id" "uuid" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "seen_at" timestamp with time zone
+);
+
+
+ALTER TABLE "public"."template_request_notices" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."template_request_votes" (
     "request_id" "uuid" NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -9549,6 +9602,11 @@ ALTER TABLE ONLY "public"."template_prompt_versions"
 
 ALTER TABLE ONLY "public"."template_prompts"
     ADD CONSTRAINT "template_prompts_pkey" PRIMARY KEY ("template_id");
+
+
+
+ALTER TABLE ONLY "public"."template_request_notices"
+    ADD CONSTRAINT "template_request_notices_pkey" PRIMARY KEY ("user_id", "request_id");
 
 
 
@@ -9917,6 +9975,14 @@ CREATE INDEX "template_favorites_template_id_idx" ON "public"."template_favorite
 
 
 CREATE INDEX "template_prompts_provider_idx" ON "public"."template_prompts" USING "btree" ("provider_id") WHERE ("provider_id" IS NOT NULL);
+
+
+
+CREATE INDEX "template_request_notices_request_idx" ON "public"."template_request_notices" USING "btree" ("request_id");
+
+
+
+CREATE INDEX "template_request_notices_unread_idx" ON "public"."template_request_notices" USING "btree" ("user_id", "created_at" DESC, "request_id" DESC) WHERE ("seen_at" IS NULL);
 
 
 
@@ -10428,6 +10494,16 @@ ALTER TABLE ONLY "public"."template_prompts"
 
 
 
+ALTER TABLE ONLY "public"."template_request_notices"
+    ADD CONSTRAINT "template_request_notices_request_id_fkey" FOREIGN KEY ("request_id") REFERENCES "public"."template_requests"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."template_request_notices"
+    ADD CONSTRAINT "template_request_notices_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."template_request_votes"
     ADD CONSTRAINT "template_request_votes_request_id_fkey" FOREIGN KEY ("request_id") REFERENCES "public"."template_requests"("id") ON DELETE CASCADE;
 
@@ -10648,6 +10724,17 @@ ALTER TABLE "public"."template_prompt_versions" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."template_prompts" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."template_request_notices" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "template_request_notices_mark_own" ON "public"."template_request_notices" FOR UPDATE TO "authenticated" USING ((("user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("seen_at" IS NULL))) WITH CHECK ((("user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("seen_at" IS NOT NULL)));
+
+
+
+CREATE POLICY "template_request_notices_select_own" ON "public"."template_request_notices" FOR SELECT TO "authenticated" USING (("user_id" = ( SELECT "auth"."uid"() AS "uid")));
+
 
 
 ALTER TABLE "public"."template_request_votes" ENABLE ROW LEVEL SECURITY;
@@ -11513,6 +11600,11 @@ REVOKE ALL ON FUNCTION "public"."handle_new_user"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "public"."list_my_wish_notices"("p_user_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."list_my_wish_notices"("p_user_id" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."mark_dispute_drafted"("p_dispute_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."mark_dispute_drafted"("p_dispute_id" "text") TO "service_role";
 
@@ -11520,6 +11612,11 @@ GRANT ALL ON FUNCTION "public"."mark_dispute_drafted"("p_dispute_id" "text") TO 
 
 REVOKE ALL ON FUNCTION "public"."mark_ticket_seen"("p_ticket_id" "uuid", "p_user_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."mark_ticket_seen"("p_ticket_id" "uuid", "p_user_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."mark_wish_notices_seen"("p_user_id" "uuid", "p_request_ids" "uuid"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."mark_wish_notices_seen"("p_user_id" "uuid", "p_request_ids" "uuid"[]) TO "service_role";
 
 
 
@@ -11979,6 +12076,16 @@ GRANT SELECT ON TABLE "public"."template_prompt_versions" TO "service_role";
 
 
 GRANT ALL ON TABLE "public"."template_prompts" TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "public"."template_request_notices" TO "authenticated";
+GRANT SELECT,INSERT ON TABLE "public"."template_request_notices" TO "service_role";
+
+
+
+GRANT UPDATE("seen_at") ON TABLE "public"."template_request_notices" TO "authenticated";
+GRANT UPDATE("seen_at") ON TABLE "public"."template_request_notices" TO "service_role";
 
 
 

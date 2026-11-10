@@ -1203,17 +1203,22 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 - `template_request_votes`：`request_id`、`user_id`、`weight smallint`，`(request_id, user_id)` 联合唯一。`weight` 是投票那一刻按 `current_tier()` 快照的票数（Max 为 3，其余为 1）；取消投票按快照的票数减，会员到期也不会让计数虚高。
 - `votes_count` 由 votes 表的 insert / delete 触发器维护，等于该需求所有 `weight` 之和。投票人删号、级联删票时，计数同步减。
 - RLS：`live` / `shipped` 对所有登录用户可读；`pending` / `rejected` 只有本人和 admin 可读；写只经服务端。
+- `template_request_notices`：`user_id`、`request_id`、`created_at`、`seen_at`（空表示未读）。主键 `(user_id, request_id)`。账号或愿望删除时级联删除。登录用户只能读自己的提醒、将自己的未读提醒标为已读。只由服务端创建提醒。
 - SQL 函数（全部只授权 `service_role`）：
   - `wishlist_eligible(user)`：是否至少成功出过 1 张图；
   - `create_template_request(user, description, keys)`：函数内检查门槛、封禁、按账号限频（24 小时内最多 5 条）；
   - `toggle_template_request_vote(request, user)`：只限 `live`，有票删票，没票按快照 `weight` 插入，函数内检查门槛；
-  - `admin_review_template_request(request, status, template_id)`；
+  - `admin_review_template_request(request, status, template_id)`：转为 `shipped` 时在同一事务给作者和当时仍有投票的用户各建一条提醒，作者也投过票时只建一条；
+  - `list_my_wish_notices(user)`：按创建时间和愿望 ID 倒序返回最多 5 条未读提醒，只展示已上线且网页端可用的模板。包含愿望 ID、模板 ID、英文名、中文名（缺译时用英文）、描述前 40 字以及是否为作者；
+  - `mark_wish_notices_seen(user, request_ids[])`：仅标记该用户指定的未读提醒，重复调用保留首次已读时间；
   - `admin_list_template_requests()`：带邮箱，后台用。
 - 参考图：浏览器先走现有 `/api/uploads` 传到 `inputs/`（没发帖的 7 天后自动清）。发帖时服务端用 `sharp` 重新编码，去掉 EXIF / GPS 后写到 `requests/{user_id}/{uuid}.jpg`，因为墙上的图别人看得到。被拒、下架、删号时服务端删除。
 
-### 15.4 不做
+### 15.4 愿望实现提醒与范围
 
-评论、任何通知或发信、重复合并、分类和筛选、公开（未登录）页面、SEO、点赞以外的任何互动、拒绝原因。
+愿望上线后，许愿人和投票人下次打开网站时可看到站内提醒，点击进入对应模板的工作台。只对新发生的上线操作生成提醒。站点未启用许愿墙或后台开关关闭时，提醒接口返回空，已读操作无效果，已有提醒保留。
+
+不做邮件、推送、评论、重复合并、分类和筛选、公开（未登录）页面、SEO、点赞以外的任何互动、拒绝原因。
 
 ### 15.5 条款
 
