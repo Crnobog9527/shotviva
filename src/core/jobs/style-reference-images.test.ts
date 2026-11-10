@@ -7,6 +7,7 @@ import { logger } from '../logger'
 import { templateImageProvider } from '../providers/template-image-provider'
 import { FULL_IMAGE_OPTIONS } from '../templates/image-options'
 import type { ImageRequestOptions } from './provider'
+import { quoteBatchRoute } from './batch/sale'
 import { templateCall } from './generation-call'
 
 const photo = { bytes: Uint8Array.of(11), contentType: 'image/jpeg' as const, width: 42, height: 56 }
@@ -45,6 +46,16 @@ it('falls back for a saved count limit, retaining photo-first order, placeholder
   expect(call.images.map((im) => im.bytes[0])).toEqual([11, 21, 31])
   expect(call.prompt).toBe('1|2')
   expect(styleRefKeys).toEqual(refs.map((ref) => ref.key))
+})
+
+it('quotes the same fallback that submission uses, without reading private reference bytes at preflight', async () => {
+  const { deps, get } = setup()
+  const saved = { template: { ...template, creditsCost: { '1k': 36, '2k': 92, '3k': 141 } }, prompt }
+  const quoted = await quoteBatchRoute(deps.provider, saved, '1k', inputs.aspectRatio)
+  expect(get).not.toHaveBeenCalled()
+  const submitted = await templateCall(deps, saved, inputs, photo, request)
+  expect(quoted).toEqual({ template_id: template.id, expected_credits: 36, resolution: '1k', fallback_route: true,
+    provider: submitted.provider.id })
 })
 
 it('drops all styles before reading bytes when the default is also over its limit', async () => {

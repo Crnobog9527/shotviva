@@ -15,7 +15,19 @@ import type { DecisionCost } from './settle-generation'
 // A user's job and an admin test run (§10.b, T85) send exactly this; only who pays differs.
 type CallTemplate = { template: Pick<GenerationTemplate['template'], 'id' | 'quality'>; prompt: GenerationTemplate['prompt'] }
 
-const requestedRefs = (prompt: CallTemplate['prompt'], omit?: boolean) => omit ? [] : prompt.styleRefs
+// Both preflight and generation choose the route before fetching any reference bytes.
+export async function selectTemplateRoute(provider: TemplateProvider, providerId: string | null,
+  resolution: Resolution, aspectRatio: string, photoCount: number, styleRefCount: number, onRoute?: (provider: GenerationProvider) => void) {
+  const selected = await resolveTemplateProvider(provider, providerId, { resolution, aspectRatio, referenceCount: photoCount + styleRefCount })
+  onRoute?.(selected)
+  const limit = selected.maxReferences ?? Infinity
+  const dropRefs = styleRefCount > 0 && photoCount + styleRefCount > limit
+  if (photoCount > limit) throw new AppError('REFERENCE_IMAGE_LIMIT', 'This model cannot accept the supplied photos')
+  if (photoCount + (dropRefs ? 0 : styleRefCount) < (selected.minReferences ?? 0)) {
+    throw new AppError('MODEL_INPUT_UNSUPPORTED', 'This model requires more input images')
+  }
+  return { provider: selected, dropRefs }
+}
 
 export async function templateCall(
   deps: { store: ObjectStore; provider: TemplateProvider },
@@ -23,23 +35,16 @@ export async function templateCall(
   options: { resolution: Resolution; providerId: string | null; omitStyleRefs?: boolean; onRoute?: (provider: GenerationProvider) => void },
 ) {
   const photos = image ? [image] : []
-  const requested = requestedRefs(prompt, options.omitStyleRefs)
-  const request = { images: photos, resolution: options.resolution, aspectRatio: inputs.aspectRatio, styleRefCount: requested.length }
-  const provider = await resolveTemplateProvider(deps.provider, options.providerId, request)
-  options.onRoute?.(provider)
-  const limit = provider.maxReferences ?? Infinity
-  const dropRefs = requested.length > 0 && photos.length + requested.length > limit
+  const requested = options.omitStyleRefs ? [] : prompt.styleRefs
+  const { provider, dropRefs } = await selectTemplateRoute(deps.provider, options.providerId,
+    options.resolution, inputs.aspectRatio, photos.length, requested.length, options.onRoute)
   if (dropRefs) {
     logger.warn('image.style_refs.omitted', {
       templateId: template.id, version: prompt.version, provider: provider.id,
-      photoCount: photos.length, styleRefCount: requested.length, maxReferences: limit,
+      photoCount: photos.length, styleRefCount: requested.length, maxReferences: provider.maxReferences,
     })
   }
-  if (photos.length > limit) throw new AppError('REFERENCE_IMAGE_LIMIT', 'This model cannot accept the supplied photos')
   const refs = dropRefs ? [] : requested
-  if (photos.length + refs.length < (provider.minReferences ?? 0)) {
-    throw new AppError('MODEL_INPUT_UNSUPPORTED', 'This model requires more input images')
-  }
   const refImages = await readStyleImages(deps.store, prompt.version, refs)
   const counts = { photo_count: photos.length, style_ref_count: refs.length }
   const call: Omit<ProviderInput, 'signal'> = {

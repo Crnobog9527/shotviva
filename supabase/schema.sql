@@ -494,27 +494,18 @@ CREATE OR REPLACE FUNCTION "admin"."check_style_job_route"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-declare t public.templates; tier text:=coalesce(new.inputs->>'resolution','1k'); p public.ai_providers; approved jsonb;
+declare t public.templates; v2 boolean:=coalesce(new.inputs->>'pricing_catalog_version'='v2',false);
 begin
-  if exists(select from public.template_sale_approvals s where s.template_id=new.template_id and tier=any(s.unpriced_resolutions))
-    then raise exception 'TEMPLATE_UNAVAILABLE'; end if;
-  if new.inputs->>'pricing_catalog_version' is distinct from 'v2' then return new; end if;
-  select * into strict t from public.templates where id=new.template_id for share;
-  perform admin.assert_style_sale_route(t,new.provider);
-  if new.provider like 'env/_%' then
-    if new.credits_cost>=admin.fallback_route_floor(new.provider,tier,t.quality) then return new; end if;
-  else
-    select * into p from public.ai_providers where module='image' and id::text=split_part(new.provider,'/',1)
+  select * into t from public.templates where id=new.template_id for share;
+  if not found then return new; end if; -- The existing foreign key reports a missing template.
+  if v2 then
+    perform 1 from public.ai_providers where module='image' and id::text=split_part(new.provider,'/',1)
       and id::text||'/'||model=new.provider for share;
-    if found and tier=any(admin.sale_route_resolutions(p)) then
-      approved:=admin.template_approved_prices(p.id)->t.id;
-      if (approved->>'quality'=t.quality and (approved->'costs'->>tier)::int=new.credits_cost)
-        or admin.alternate_route_meets_floor(new.provider,tier,t.quality,new.credits_cost) then return new; end if;
-    end if;
   end if;
-  raise exception 'TEMPLATE_UNAVAILABLE';
-end;
-$$;
+  if not admin.job_route_allowed(t,new.provider,coalesce(new.inputs->>'resolution','1k'),new.credits_cost,v2)
+    then raise exception 'TEMPLATE_UNAVAILABLE'; end if;
+  return new;
+end $$;
 
 
 ALTER FUNCTION "admin"."check_style_job_route"() OWNER TO "postgres";
@@ -767,6 +758,31 @@ $$;
 
 
 ALTER FUNCTION "admin"."is_template_catalog_v2"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."job_route_allowed"("t" "public"."templates", "route" "text", "tier" "text", "price" integer, "v2" boolean) RETURNS boolean
+    LANGUAGE "plpgsql" STABLE
+    SET "search_path" TO ''
+    AS $$
+declare sale public.template_sale_approvals; p public.ai_providers; approved jsonb;
+begin
+  select * into sale from public.template_sale_approvals where template_id=t.id;
+  if tier=any(sale.unpriced_resolutions) then return false; end if;
+  if not v2 then return true; end if;
+  if not coalesce(sale.enabled,false) then return false; end if;
+  if route like 'env/_%' then
+    return coalesce(price>=admin.fallback_route_floor(route,tier,t.quality),false);
+  end if;
+  select * into p from public.ai_providers
+    where module='image' and id::text=split_part(route,'/',1) and id::text||'/'||model=route;
+  if not found or not (tier=any(admin.sale_route_resolutions(p))) then return false; end if;
+  approved:=admin.template_approved_prices(p.id)->t.id;
+  if approved->>'quality'=t.quality and (approved->'costs'->>tier)::int=price then return true; end if;
+  return admin.alternate_route_meets_floor(route,tier,t.quality,price);
+end $$;
+
+
+ALTER FUNCTION "admin"."job_route_allowed"("t" "public"."templates", "route" "text", "tier" "text", "price" integer, "v2" boolean) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."lowest_credit_price"() RETURNS numeric
@@ -1111,6 +1127,32 @@ $$;
 ALTER FUNCTION "admin"."renewal_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_invoice_id" "text", "p_period_end" timestamp with time zone, "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_charge_id" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."reservation_route_allowed"("t" "public"."templates", "route" "text", "tier" "text", "price" integer, "fallback" boolean, "v2" boolean) RETURNS boolean
+    LANGUAGE "plpgsql" STABLE
+    SET "search_path" TO ''
+    AS $$
+begin
+  if fallback or exists (
+    select from public.template_prompts tp join public.ai_providers p on p.id=tp.provider_id
+    where tp.template_id=t.id and route is distinct from p.id::text||'/'||p.model
+  ) then
+    if not coalesce(price>=admin.fallback_route_floor(route,tier,t.quality),false) then return false; end if;
+  end if;
+  if v2 and exists (
+    select from admin.template_price_snapshots s join admin.template_price_batches b on b.id=s.batch_id
+    join admin.template_tariffs_v2 c on c.id=s.template_id
+    where b.reverted_at is null and s.template_id=t.id and c.quality=t.quality
+      and c.costs->tier=t.credits_cost->tier and
+      (route is distinct from s.provider_id::text||'/gpt-image-2.6-sunburst'
+        or not (admin.template_approved_prices(s.provider_id) ? t.id))
+  ) then return admin.alternate_route_meets_floor(route,tier,t.quality,price); end if;
+  return true;
+end $$;
+
+
+ALTER FUNCTION "admin"."reservation_route_allowed"("t" "public"."templates", "route" "text", "tier" "text", "price" integer, "fallback" boolean, "v2" boolean) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."restore_approved_wallets_v2"() RETURNS "void"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -1274,6 +1316,21 @@ $$;
 ALTER FUNCTION "admin"."template_price_state"("t" "public"."templates") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."template_route_allowed"("t" "public"."templates", "route" "text", "tier" "text", "price" integer, "fallback" boolean) RETURNS boolean
+    LANGUAGE "plpgsql" STABLE
+    SET "search_path" TO ''
+    AS $$
+declare v2 boolean:=admin.is_template_catalog_v2();
+begin
+  return coalesce(price=(t.credits_cost->>tier)::int,false)
+    and admin.reservation_route_allowed(t,route,tier,price,fallback,v2)
+    and admin.job_route_allowed(t,route,tier,price,v2);
+end $$;
+
+
+ALTER FUNCTION "admin"."template_route_allowed"("t" "public"."templates", "route" "text", "tier" "text", "price" integer, "fallback" boolean) OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."template_series" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "slug" "text" NOT NULL,
@@ -1420,6 +1477,33 @@ $$;
 
 
 ALTER FUNCTION "admin"."wallet_digest_v2"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."web_standard_sale_allowed"("template_id" "text") RETURNS boolean
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare t public.templates; route text; price integer;
+begin
+  select * into t from public.templates where id=template_id and is_active and 'web'=any(visible_in);
+  if not found then return false; end if;
+  price:=(t.credits_cost->>'1k')::int;
+  select p.id::text||'/'||p.model into route from public.ai_providers p where p.module='image' and
+    p.id=coalesce((select tp.provider_id from public.template_prompts tp where tp.template_id=t.id and t.id<>'edit'),
+                  (select a.id from public.ai_providers a where a.module='image' and a.is_active));
+  if route is not null then return admin.template_route_allowed(t,route,'1k',price,false); end if;
+  if not admin.template_route_allowed(t,'env/unknown','1k',price,false) then return false; end if;
+  if not admin.is_template_catalog_v2() then return true; end if;
+  return not exists (
+    select j.provider from public.generation_jobs j where j.provider like 'env/_%'
+      and j.status='succeeded' and j.cost_usd is not null and j.created_at>=now()-interval '30 days'
+      and j.inputs->>'resolution'='1k' and j.inputs->>'quality'=t.quality group by j.provider
+    having count(*)>=10 and not admin.template_route_allowed(t,j.provider,'1k',price,false)
+  );
+end $$;
+
+
+ALTER FUNCTION "admin"."web_standard_sale_allowed"("template_id" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."_affiliate_accept_invite"() RETURNS "trigger"
@@ -6642,7 +6726,7 @@ CREATE OR REPLACE VIEW "public"."template_category_paths" WITH ("security_invoke
 ALTER VIEW "public"."template_category_paths" OWNER TO "postgres";
 
 
-CREATE OR REPLACE VIEW "public"."web_template_members" WITH ("security_invoker"='true') AS
+CREATE OR REPLACE VIEW "admin"."published_web_members" WITH ("security_invoker"='true') AS
  SELECT "t"."id",
     "t"."series_id",
     "t"."series_sort_order",
@@ -6654,6 +6738,20 @@ CREATE OR REPLACE VIEW "public"."web_template_members" WITH ("security_invoker"=
      LEFT JOIN "public"."template_series" "s" ON (("s"."id" = "t"."series_id")))
      LEFT JOIN "public"."template_category_paths" "sc" ON (("sc"."key" = "s"."category_key")))
   WHERE ("t"."is_active" AND ('web'::"text" = ANY ("t"."visible_in")) AND "c"."web_visible" AND (("t"."series_id" IS NULL) OR ("s"."is_active" AND "sc"."web_visible")));
+
+
+ALTER VIEW "admin"."published_web_members" OWNER TO "postgres";
+
+
+CREATE OR REPLACE VIEW "public"."web_template_members" WITH ("security_invoker"='true') AS
+ SELECT "id",
+    "series_id",
+    "series_sort_order",
+    "sort_order",
+    "category_key",
+    "standalone"
+   FROM "admin"."published_web_members" "m"
+  WHERE "admin"."web_standard_sale_allowed"("id");
 
 
 ALTER VIEW "public"."web_template_members" OWNER TO "postgres";
@@ -8610,7 +8708,6 @@ declare
   v_cost integer;
   v_v2 boolean;
   v_template public.templates;
-  v_fallback_floor numeric;
 begin
   perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.template_catalog',0));
   if v_resolution not in ('1k', '2k', '3k') then
@@ -8676,29 +8773,9 @@ begin
   if p_inputs ? 'quality' and p_inputs->>'quality' is distinct from v_template.quality then
     raise exception 'TEMPLATE_QUOTE_CHANGED';
   end if;
-  if p_inputs->>'fallback_route'='true' or exists (
-    select 1 from public.template_prompts tp join public.ai_providers p on p.id=tp.provider_id
-    where tp.template_id=p_template_id and p_provider is distinct from p.id::text||'/'||p.model
-  ) then
-    perform admin.assert_style_sale_route(v_template,coalesce(p_provider,''));
-    v_fallback_floor := admin.fallback_route_floor(p_provider,v_resolution,v_template.quality);
-    if v_fallback_floor is null or v_cost<v_fallback_floor then
-      raise exception 'TEMPLATE_UNAVAILABLE';
-    end if;
-  end if;
-
-  if v_v2 then
-    if exists (
-      select 1 from admin.template_price_snapshots s join admin.template_price_batches b on b.id=s.batch_id
-      join admin.template_tariffs_v2 c on c.id=s.template_id
-      where b.reverted_at is null and s.template_id=p_template_id and c.quality=v_template.quality
-        and c.costs->v_resolution=v_template.credits_cost->v_resolution
-        and (p_provider is distinct from (s.provider_id::text||'/gpt-image-2.6-sunburst')
-          or not (admin.template_approved_prices(s.provider_id) ? p_template_id))
-    ) then
-      if not admin.alternate_route_meets_floor(p_provider,v_resolution,v_template.quality,v_cost)
-      then raise exception 'TEMPLATE_UNAVAILABLE'; end if;
-    end if;
+  if not admin.reservation_route_allowed(v_template,p_provider,v_resolution,v_cost,
+      coalesce(p_inputs->>'fallback_route'='true',false),v_v2) then
+    raise exception 'TEMPLATE_UNAVAILABLE';
   end if;
   if v_profile.credits >= v_cost then
     v_pool := 'paid';
@@ -9551,6 +9628,40 @@ $$;
 
 
 ALTER FUNCTION "public"."toggle_template_request_vote"("p_request_id" "uuid", "p_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."unavailable_batch_template"("p_routes" "jsonb") RETURNS "text"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare candidate record; t public.templates;
+begin
+  if jsonb_typeof(p_routes) is distinct from 'array' or jsonb_array_length(p_routes) not between 1 and 30
+    then raise exception 'INVALID_INPUT'; end if;
+  for candidate in select * from jsonb_to_recordset(p_routes)
+    as r(template_id text,resolution text,provider text,expected_credits integer,fallback_route boolean)
+  loop
+    if candidate.template_id is null then raise exception 'INVALID_INPUT'; end if;
+    select * into t from public.web_generation_template(candidate.template_id);
+    if not found or not admin.template_route_allowed(t,candidate.provider,candidate.resolution,
+        candidate.expected_credits,coalesce(candidate.fallback_route,false)) then return candidate.template_id; end if;
+  end loop;
+  return null;
+end $$;
+
+
+ALTER FUNCTION "public"."unavailable_batch_template"("p_routes" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."web_generation_template"("p_template_id" "text") RETURNS SETOF "public"."templates"
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select t.* from public.templates t join admin.published_web_members m using(id) where m.id=p_template_id
+$$;
+
+
+ALTER FUNCTION "public"."web_generation_template"("p_template_id" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."web_templates"("p_series_id" "uuid" DEFAULT NULL::"uuid", "p_template_id" "text" DEFAULT NULL::"text", "p_include_members" boolean DEFAULT false) RETURNS SETOF "public"."templates"
@@ -12521,6 +12632,10 @@ GRANT ALL ON FUNCTION "admin"."is_template_catalog_v2"() TO "service_role";
 
 
 
+REVOKE ALL ON FUNCTION "admin"."job_route_allowed"("t" "public"."templates", "route" "text", "tier" "text", "price" integer, "v2" boolean) FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "admin"."lowest_credit_price"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."lowest_credit_price"() TO "service_role";
 
@@ -12558,6 +12673,10 @@ REVOKE ALL ON FUNCTION "admin"."queue_test_asset_removal"() FROM PUBLIC;
 
 
 REVOKE ALL ON FUNCTION "admin"."renewal_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_invoice_id" "text", "p_period_end" timestamp with time zone, "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_charge_id" "text") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."reservation_route_allowed"("t" "public"."templates", "route" "text", "tier" "text", "price" integer, "fallback" boolean, "v2" boolean) FROM PUBLIC;
 
 
 
@@ -12600,6 +12719,10 @@ REVOKE ALL ON FUNCTION "admin"."template_price_state"("t" "public"."templates") 
 
 
 
+REVOKE ALL ON FUNCTION "admin"."template_route_allowed"("t" "public"."templates", "route" "text", "tier" "text", "price" integer, "fallback" boolean) FROM PUBLIC;
+
+
+
 GRANT ALL ON TABLE "public"."template_series" TO "service_role";
 GRANT SELECT ON TABLE "public"."template_series" TO "anon";
 GRANT SELECT ON TABLE "public"."template_series" TO "authenticated";
@@ -12637,6 +12760,13 @@ REVOKE ALL ON FUNCTION "admin"."waffo_terms"("p_v2" boolean, "p_user_id" "uuid",
 
 
 REVOKE ALL ON FUNCTION "admin"."wallet_digest_v2"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."web_standard_sale_allowed"("template_id" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."web_standard_sale_allowed"("template_id" "text") TO "anon";
+GRANT ALL ON FUNCTION "admin"."web_standard_sale_allowed"("template_id" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "admin"."web_standard_sale_allowed"("template_id" "text") TO "service_role";
 
 
 
@@ -13327,6 +13457,12 @@ GRANT SELECT ON TABLE "public"."template_category_paths" TO "authenticated";
 
 
 
+GRANT SELECT ON TABLE "admin"."published_web_members" TO "anon";
+GRANT SELECT ON TABLE "admin"."published_web_members" TO "authenticated";
+GRANT SELECT ON TABLE "admin"."published_web_members" TO "service_role";
+
+
+
 GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."web_template_members" TO "service_role";
 GRANT SELECT ON TABLE "public"."web_template_members" TO "anon";
 GRANT SELECT ON TABLE "public"."web_template_members" TO "authenticated";
@@ -13764,6 +13900,16 @@ GRANT ALL ON FUNCTION "public"."templates"("public"."template_categories") TO "s
 
 REVOKE ALL ON FUNCTION "public"."toggle_template_request_vote"("p_request_id" "uuid", "p_user_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."toggle_template_request_vote"("p_request_id" "uuid", "p_user_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."unavailable_batch_template"("p_routes" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."unavailable_batch_template"("p_routes" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."web_generation_template"("p_template_id" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."web_generation_template"("p_template_id" "text") TO "service_role";
 
 
 
