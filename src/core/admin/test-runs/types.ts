@@ -45,7 +45,7 @@ export type TestRunView = {
   outputUrl: string | null
 }
 
-export type TestPhotoView = { id: string; url: string; lastUsedAt: string }
+export type TestPhotoView = { id: string; url: string; originalUrl: string; thumbnailMissing?: boolean; lastUsedAt: string }
 
 export type TestPanelData = {
   runs: TestRunView[]

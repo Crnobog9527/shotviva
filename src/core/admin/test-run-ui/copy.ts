@@ -4,7 +4,7 @@ import type { Resolution } from '@/core/templates/output-options'
 export const TEST_RUN_COPY = {
   removal: {
     photo: '管理测试照片', run: '管理试跑记录', select: '选择要删除的项目', more: '加载更多', empty: '暂无可删除的项目',
-    submit: (n: number) => `删除所选（${n}）`,
+    submit: (kind: 'photo' | 'run', n: number) => kind === 'photo' ? `删除 ${n} 张照片` : `删除 ${n} 条记录`,
     photoWarning: (n: number, uses: number) => `删除 ${n} 张测试照片？${uses} 条记录用过这些照片，记录里的原图会显示为已删除。`,
     runWarning: (n: number, uses: number) => `删除 ${n} 条试跑记录和对应的成品？${uses ? '其中有已设为封面的成品，封面不受影响。' : ''}`,
     deleted: '原图已删除', done: '已删除', queued: '已删除记录，剩余文件将在下次打开时重试清理',

@@ -11,7 +11,7 @@ type Props = Omit<ComponentProps<typeof TemplatesTable>, 'selection' | 'order' |
   query: string
   categories: readonly CategoryOption[]
   series: readonly SeriesOption[]
-  onOrder: (group: 'active' | 'inactive') => (ids: string[]) => Promise<void>
+  onOrder: (group: 'active' | 'inactive', expectedIds: string[]) => (ids: string[]) => Promise<void>
   selection: Omit<TableSelection, 'onSelectVisible'> & { onSelectGroup: (ids: string[], on: boolean) => void }
 }
 
@@ -30,7 +30,7 @@ export function CatalogView({ templates, query, categories, series, selection, o
   const tabs = { active: `${copy.active}（${active}）`, inactive: `${copy.inactive}（${matching.length - active}）`, all: copy.all }
   const sections = catalogSections(matching, status, grouped, series)
   const canReorder = !query.trim() && !category && !seriesId && !grouped
-  return <div className="grid min-w-0 gap-3">
+  return <div className="grid min-w-0 grid-cols-1 gap-3">
     <div className="flex flex-wrap items-center gap-2">
       <div role="group" aria-label={copy.status} className="flex gap-1">
         {(Object.keys(tabs) as CatalogStatus[]).map(key => <Button key={key} variant={status === key ? 'secondary' : 'ghost'}
@@ -54,7 +54,7 @@ export function CatalogView({ templates, query, categories, series, selection, o
         {title && <h3 className="bg-muted px-3 py-2 text-sm font-semibold">{title}（{rows.length}）</h3>}
         <TemplatesTable {...row} templates={rows} categoryLabels={paths}
           order={{ disabled: !canReorder || row.pending, disabledHint: canReorder ? undefined : orderCopy.filtered,
-            onReorder: async ids => { if (canReorder && orderGroup) await onOrder(orderGroup)(ids) } }}
+            onReorder: async ids => { if (canReorder && orderGroup) await onOrder(orderGroup, rows.map(t => t.id))(ids) } }}
           selection={{ ...selection, onSelectVisible: on => selection.onSelectGroup(rows.map(t => t.id), on) }} />
       </section>
     ))}

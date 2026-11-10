@@ -105,7 +105,7 @@ describe('admin template commands', () => {
     const ids = listed.map((row) => row.id)
     expect(ids[0]).toBe(B)
     expect(ids.indexOf(B)).toBeLessThan(ids.indexOf(A))
-    expect(listed.find((row) => row.id === B)?.sortOrder).toBe(10)
+    expect(ids.at(-1)).toBe(A)
   })
 
   it('refuses a partial list, a repeat and a caller who is not an admin, changing nothing', async () => {

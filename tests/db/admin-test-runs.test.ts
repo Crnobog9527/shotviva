@@ -108,9 +108,23 @@ describe('first runs', () => {
     // The user's prompt composition: the wrapper with the copy, then the note.
     expect(p.calls[0]).toMatchObject({ prompt: 'WRAPPED studio shot of salmon, keep the plate unchanged\n\nwarmer light', aspectRatio: '4:5', quality: 'medium' })
     expect(r2.objects.has(`admin-tests/outputs/${run.id}.png`)).toBe(true)
+    expect(r2.objects.get(`admin-tests/outputs/${run.id}.png.thumb.webp`)?.contentType).toBe('image/webp')
     expect(await profileOf(db, admin)).toMatchObject({ credits: 7, free_credits: 3 })
     const jobs = await db.query('select count(*)::int as n from public.generation_jobs where user_id = $1', [admin])
     expect(jobs.rows[0].n).toBe(0)
+  })
+
+  it('settles the provider cost and keeps the successful output when only its thumbnail failed', async () => {
+    const { r2, generate } = await setup()
+    const put = r2.store.put
+    vi.spyOn(r2.store, 'put').mockImplementation(async (key, body, type) => {
+      if (key.endsWith('.thumb.webp')) throw new Error('thumbnail unavailable')
+      await put(key, body, type)
+    })
+    const run = await generate()
+    expect(run).toMatchObject({ status: 'succeeded', costUsd: expect.any(Number) })
+    expect(r2.objects.has(run.outputKey!)).toBe(true)
+    expect(r2.objects.has(`${run.outputKey}.thumb.webp`)).toBe(false)
   })
 
   it('settles a repeat of the same run id to the same run without calling the model again', async () => {

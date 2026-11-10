@@ -9,6 +9,7 @@ import { failureMessage } from './messages'
 import { mergeRuns, placeholderRun, type Placeholder } from './placeholder'
 import { onRunsChanged } from './runs-changed'
 
+export type TestPanelFeedback = { kind: 'error' | 'notice'; message: string }
 export type Launch = { placeholder: Placeholder; start: () => Promise<TestRunView> }
 
 // The panel's state (ARCHITECTURE §10.b): the server's data, loaded once with the 30-day cleanup
@@ -17,8 +18,9 @@ export type Launch = { placeholder: Placeholder; start: () => Promise<TestRunVie
 export function useTestPanel(templateId: string) {
   const [data, setData] = useState<Partial<TestPanelData>>({})
   const [pending, setPending] = useState<TestRunView[]>([])
-  const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [feedback, setFeedback] = useState<TestPanelFeedback | null>(null)
+  const setError = useCallback((message: string) => setFeedback({ kind: 'error', message }), [])
+  const setNotice = (message: string) => setFeedback({ kind: 'notice', message })
 
   const openingSummary = useOpeningSummary()
   const generation = useRef(0)
@@ -31,7 +33,7 @@ export function useTestPanel(templateId: string) {
       if (current === generation.current) setData(previous => ({ ...previous, ...section }))
     }
     await Promise.all([summary.then(update).catch(showError), records.then(update).catch(showError)])
-  }, [openingSummary, templateId])
+  }, [openingSummary, setError, templateId])
 
   useEffect(() => {
     void reload(true)
@@ -45,8 +47,7 @@ export function useTestPanel(templateId: string) {
 
   const launch = useCallback(
     async (launches: Launch[]) => {
-      setError(null)
-      setNotice(null)
+      setFeedback(null)
       setPending((current) => [...launches.map((item) => placeholderRun(item.placeholder)), ...current])
       const results = await Promise.allSettled(launches.map((item) => item.start()))
       const ids = new Set(launches.map((item) => item.placeholder.id))
@@ -55,11 +56,11 @@ export function useTestPanel(templateId: string) {
       if (rejected) setError(failureMessage(rejected.reason))
       await reload()
     },
-    [reload],
+    [reload, setError],
   )
 
   const runs = mergeRuns(data.runs ?? [], pending)
-  return { data, runs, busy: pending.length > 0, error, notice, setError, setNotice, reload, launch }
+  return { data, runs, busy: pending.length > 0, feedback, setError, setNotice, reload, launch }
 }
 
 export type TestPanelState = ReturnType<typeof useTestPanel>

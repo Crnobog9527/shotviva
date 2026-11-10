@@ -44,7 +44,7 @@ function Picture({ run }: { run: TestRunView }) {
   return (
     <a href={run.outputUrl} target="_blank" rel="noreferrer" className="block h-full" title={COPY.run.open}>
       {/* Admin-only signed URL of a private result; next/image cannot fetch it. */}
-      <TestThumbnail kind="run" id={run.id} src={run.thumbnailUrl ?? `/api/admin/test-thumbnail?kind=run&id=${run.id}`} alt={COPY.run.open} className="h-full w-full object-contain" lazy />
+      <TestThumbnail kind="run" id={run.id} src={run.thumbnailUrl ?? run.outputUrl} originalUrl={run.outputUrl} alt={COPY.run.open} className="h-full w-full object-contain" lazy />
     </a>
   )
 }

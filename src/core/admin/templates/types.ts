@@ -60,7 +60,7 @@ export type TemplateAdminActions = {
   // Batch edit (T79): prices, entry points and quality of the ticked templates, all or nothing.
   editMany: (input: { ids: string[]; patch: BulkEditPatch }) => Promise<ActionValue<BulkEditOutcome>>
   // Drag-to-reorder and the arrows (T76): one group's whole new order.
-  setOrder: (input: { group: TemplateOrderGroup; ids: string[] }) => Promise<ActionResult>
+  setOrder: (input: { group: TemplateOrderGroup; ids: string[]; expectedIds: string[] }) => Promise<ActionResult>
   // The home featured list in display order (T53).
   setFeatured: (ids: string[]) => Promise<ActionResult>
   requestCoverUpload: (input: CoverUploadRequest) => Promise<ActionValue<CoverTicket>>

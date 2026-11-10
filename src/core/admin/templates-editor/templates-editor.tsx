@@ -78,8 +78,8 @@ export function TemplatesEditor({ providers, templates, categories, series, floo
   }
   // Drag, keyboard or arrows (T76): the list shows the new order at once and falls back to the
   // server's order if this save fails.
-  const saveOrder = (group: TemplateOrderGroup) => (ids: string[]) =>
-    run(() => actions.setOrder({ group, ids }), orderCopy.saved, undefined, orderCopy.failed)
+  const saveOrder = (group: TemplateOrderGroup, expectedIds: string[]) => (ids: string[]) =>
+    run(() => actions.setOrder({ group, ids, expectedIds }), orderCopy.saved, undefined, orderCopy.failed)
 
   return (
     <div className="grid min-w-0 grid-cols-1 gap-4">
@@ -98,7 +98,7 @@ export function TemplatesEditor({ providers, templates, categories, series, floo
         ids={featured}
         templates={templates}
         pending={pending}
-        onReorder={saveOrder('featured')}
+        onReorder={saveOrder('featured', featured)}
         onRemove={(id) => setFeatured(featured.filter((other) => other !== id))}
       />
       <BulkPublish providers={providers}
