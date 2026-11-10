@@ -210,6 +210,14 @@ describe('activated template prices', () => {
       await db.query("update public.templates set category_key='art-styles' where id='promo-poster'")
       await db.query('set constraints style_sale_binding immediate')
     },'TEMPLATE_RETIRED')
+    // Moving a populated branch must run the same sale check and roll the branch back.
+    await db.query("insert into public.template_categories(key,parent_id,name_en,name_zh) values('t102-sale','pets','Sale move','销售移动')")
+    await db.query("update public.templates set subcategory_key='t102-sale' where id='promo-poster'")
+    await refuses(async () => {
+      await db.query("update public.template_categories set parent_id='art-styles' where key='t102-sale'")
+      await db.query('set constraints style_sale_binding immediate')
+    },'TEMPLATE_RETIRED')
+    expect((await db.query("select parent_id from public.template_categories where key='t102-sale'")).rows[0].parent_id).toBe('pets')
     const publish = () => db.query('update public.templates set is_active=true where id=$1',[id])
     await publish()
     await db.query('set constraints style_sale_binding immediate')

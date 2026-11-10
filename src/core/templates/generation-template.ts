@@ -8,7 +8,7 @@ import { EDIT_TEMPLATE_ID } from './edit-params'
 import { templateFieldsSchema, type TemplateSurface } from './schema'
 import { isStyleRefKey, styleRefsSchema, type StyleRef } from './style-refs'
 import { selectTemplates } from './select-templates'
-import { toTemplate, type PreT75TemplateRow, type Template, type TemplateRow } from './types'
+import { TEMPLATE_COLUMNS, toTemplate, type PreT75TemplateRow, type Template, type TemplateRow } from './types'
 
 export type GenerationTemplate = {
   template: Template
@@ -33,12 +33,21 @@ function privateRefs(id: string, raw: unknown): StyleRef[] {
 // filter keeps partner-only templates such as `freeform` out of the web generate route; null
 // means a built-in template such as `edit`, which is on no surface (ARCHITECTURE §5.2).
 // `drafts`: an admin test run (ARCHITECTURE §10.b, T85) also takes unpublished templates.
-async function loadTemplate(client: SupabaseClient, id: string, surface: TemplateSurface | null, drafts = false): Promise<GenerationTemplate> {
-  const { data, error } = await selectTemplates((columns) => {
+async function generationRow(client: SupabaseClient, id: string, surface: TemplateSurface | null, drafts: boolean) {
+  const extra = ', template_prompts(body, version, model_params, provider_id, style_refs)'
+  if (surface === 'web' && !drafts) {
+    const row = await client.rpc('web_templates', { p_template_id: id }).select(TEMPLATE_COLUMNS + extra).maybeSingle<Row>()
+    if (row.error?.code !== 'PGRST202') return row
+  }
+  return selectTemplates((columns) => {
     const all = client.from('templates').select(columns).eq('id', id)
     const query = drafts ? all : all.eq('is_active', true)
     return (surface ? query.contains('visible_in', [surface]) : query).maybeSingle<Row>()
-  }, ', template_prompts(body, version, model_params, provider_id, style_refs)' + (surface === 'partner' ? ', partner_image_aspects' : ''))
+  }, extra + (surface === 'partner' ? ', partner_image_aspects' : ''))
+}
+
+async function loadTemplate(client: SupabaseClient, id: string, surface: TemplateSurface | null, drafts = false): Promise<GenerationTemplate> {
+  const { data, error } = await generationRow(client, id, surface, drafts)
   if (error) throw new AppError('INTERNAL', `loadGenerationTemplate failed: ${error.message}`)
   if (!data) throw new AppError('NOT_FOUND', 'Template not found')
 

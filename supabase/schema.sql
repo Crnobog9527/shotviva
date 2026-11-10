@@ -193,6 +193,9 @@ CREATE TABLE IF NOT EXISTS "public"."templates" (
     "featured_rank" smallint,
     "category_key" "text" NOT NULL,
     "cover_locales" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "subcategory_key" "text",
+    "series_id" "uuid",
+    "series_sort_order" integer DEFAULT 0 NOT NULL,
     CONSTRAINT "templates_category_check" CHECK ((("char_length"("category") >= 1) AND ("char_length"("category") <= 60))),
     CONSTRAINT "templates_cover_locales_object" CHECK (("jsonb_typeof"("cover_locales") = 'object'::"text")),
     CONSTRAINT "templates_cover_media_type_check" CHECK (("cover_media_type" = ANY (ARRAY['image'::"text", 'animated'::"text", 'video'::"text"]))),
@@ -341,6 +344,20 @@ $$;
 ALTER FUNCTION "admin"."check_catalog_minimums"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."check_series_category"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if not exists(select 1 from public.template_categories where key=new.category_key and kind='template' and not is_system)
+    then raise exception 'INVALID_SERIES_CATEGORY'; end if;
+  return new;
+end $$;
+
+
+ALTER FUNCTION "admin"."check_series_category"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."check_style_job_route"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -374,6 +391,27 @@ $$;
 
 
 ALTER FUNCTION "admin"."check_style_sale_binding"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."check_template_category_path"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare root text;
+begin
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree',0));
+  -- A legacy writer moving a template to another root has no subcategory input.
+  if tg_op='UPDATE' and new.category_key<>old.category_key and new.subcategory_key is not distinct from old.subcategory_key
+      and not exists(select 1 from public.template_category_paths where key=new.subcategory_key and root_key=new.category_key) then
+    new.subcategory_key:=null;
+  end if;
+  select root_key into root from public.template_category_paths where key=coalesce(new.subcategory_key,new.category_key);
+  if root is distinct from new.category_key or new.subcategory_key=new.category_key then raise exception 'INVALID_CATEGORY_PATH' using errcode='23503'; end if;
+  return new;
+end $$;
+
+
+ALTER FUNCTION "admin"."check_template_category_path"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."check_template_publish_floor"() RETURNS "trigger"
@@ -638,6 +676,29 @@ $$;
 ALTER FUNCTION "admin"."lowest_credit_price"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."move_category_subtree"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare root text;
+begin
+  -- The BEFORE trigger derives each child's level. A descendant reaching level 4
+  -- (including an attempted cycle) rolls the entire move back.
+  update public.template_categories set level=new.level+1 where parent_id=new.key;
+  if new.kind='template' then
+    select root_key into strict root from public.template_category_paths where key=new.key;
+    update public.templates set category_key=root,
+      subcategory_key=case when new.key<>root then new.key end
+    where coalesce(subcategory_key,category_key)=new.key and
+      (category_key<>root or subcategory_key=root);
+  end if;
+  return null;
+end $$;
+
+
+ALTER FUNCTION "admin"."move_category_subtree"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."partner_image_aspects"("public"."templates") RETURNS "text"[]
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -657,6 +718,31 @@ $_$;
 
 
 ALTER FUNCTION "admin"."partner_image_aspects"("public"."templates") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."prepare_category_node"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare p public.template_categories;
+begin
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.category_tree',0));
+  if tg_op='UPDATE' and (new.key<>old.key or new.kind<>old.kind or new.is_system<>old.is_system) then
+    raise exception 'CATEGORY_IDENTITY_IMMUTABLE';
+  end if;
+  if tg_op='INSERT' and new.slug='' then new.slug:=new.key; end if;
+  new.level:=1;
+  if new.parent_id is not null then
+    select kind,is_system,level,key into strict p.kind,p.is_system,p.level,p.key
+      from public.template_categories where key=new.parent_id;
+    if p.kind<>new.kind or p.is_system or new.is_system or new.key='art-styles' or new.key=p.key then raise exception 'INVALID_PARENT'; end if;
+    new.level:=p.level+1;
+  end if;
+  return new;
+end $$;
+
+
+ALTER FUNCTION "admin"."prepare_category_node"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."pricing_activity_fingerprint"() RETURNS "text"
@@ -1076,6 +1162,17 @@ $_$;
 
 
 ALTER FUNCTION "admin"."valid_style_refs"("p_template_id" "text", "p_refs" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."visible_template_category_keys"() RETURNS SETOF "text"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select p.key from public.template_category_paths p where p.web_visible
+$$;
+
+
+ALTER FUNCTION "admin"."visible_template_category_keys"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."waffo_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") RETURNS "public"."credit_change"
@@ -3059,40 +3156,30 @@ CREATE OR REPLACE FUNCTION "public"."admin_delete_template_category"("p_key" "te
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $$
-declare
-  v_moved integer;
+declare moved integer:=0; dest text;
 begin
-  if p_actor is null or not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
-    raise exception 'NOT_ADMIN';
+  if not exists(select 1 from public.profiles where id=p_actor and role='admin') then raise exception 'NOT_ADMIN'; end if;
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.category_tree',0));
+  perform 1 from public.template_categories where key=p_key and kind='template' for update;
+  if not found then raise exception 'CATEGORY_NOT_FOUND'; end if;
+  if exists(select 1 from public.template_categories where key=p_key and is_system) then raise exception 'CATEGORY_SYSTEM'; end if;
+  if exists(select 1 from public.template_categories where parent_id=p_key) then raise exception 'CATEGORY_HAS_CHILDREN'; end if;
+  if not exists(select 1 from public.template_categories where kind='template' and not is_system and key<>p_key)
+    then raise exception 'CATEGORY_LAST'; end if;
+  if exists(select 1 from public.templates where category_key=p_key or subcategory_key=p_key)
+    or exists(select 1 from public.template_series where category_key=p_key) then
+    if p_move_to is null then raise exception 'CATEGORY_MOVE_REQUIRED'; end if;
+    select c.root_key into dest from public.template_category_paths c join public.template_categories n on n.key=c.key
+      where c.key=p_move_to and not n.is_system and c.key<>p_key;
+    if not found then raise exception 'INVALID_INPUT'; end if;
+    update public.templates set category_key=dest,subcategory_key=nullif(p_move_to,dest)
+      where category_key=p_key or subcategory_key=p_key;
+    get diagnostics moved = row_count;
+    update public.template_series set category_key=p_move_to where category_key=p_key;
   end if;
-  perform 1 from public.template_categories for update;
-  if not exists (select 1 from public.template_categories c where c.key = p_key) then
-    raise exception 'CATEGORY_NOT_FOUND';
-  end if;
-  if exists (select 1 from public.template_categories c where c.key = p_key and c.is_system) then
-    raise exception 'CATEGORY_SYSTEM';
-  end if;
-  if (select count(*) from public.template_categories c where not c.is_system) <= 1 then
-    raise exception 'CATEGORY_LAST';
-  end if;
-
-  if exists (select 1 from public.templates t where t.category_key = p_key) then
-    if p_move_to is null then
-      raise exception 'CATEGORY_MOVE_REQUIRED';
-    end if;
-    if p_move_to = p_key or not exists (select 1 from public.template_categories c where c.key = p_move_to and not c.is_system) then
-      raise exception 'INVALID_INPUT' using detail = 'move_to must be another existing, non-system category';
-    end if;
-    update public.templates set category_key = p_move_to where category_key = p_key;
-    get diagnostics v_moved = row_count;
-  else
-    v_moved := 0;
-  end if;
-
-  delete from public.template_categories where key = p_key;
-  return v_moved;
-end;
-$$;
+  delete from public.template_categories where key=p_key;
+  return moved;
+end $$;
 
 
 ALTER FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") OWNER TO "postgres";
@@ -3694,7 +3781,7 @@ begin
   end if;
   if cardinality(v_keys) <> (select count(distinct k) from unnest(v_keys) as u(k))
      or (select array_agg(k order by k) from unnest(v_keys) as u(k))
-        is distinct from (select array_agg(c.key order by c.key) from public.template_categories c where not c.is_system) then
+        is distinct from (select array_agg(c.key order by c.key) from public.template_categories c where not c.is_system and c.kind='template' and c.parent_id is null) then
     raise exception 'INVALID_INPUT' using detail = 'the order must list every category once';
   end if;
 
@@ -5518,6 +5605,155 @@ $$;
 ALTER FUNCTION "public"."bump_template_prompt_version"() OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."template_categories" (
+    "key" "text" NOT NULL,
+    "name_en" "text" NOT NULL,
+    "name_zh" "text" NOT NULL,
+    "intro_en" "text",
+    "intro_zh" "text",
+    "card_style" "text" DEFAULT 'pair'::"text" NOT NULL,
+    "sort_order" integer DEFAULT 0 NOT NULL,
+    "is_system" boolean DEFAULT false NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "parent_id" "text",
+    "kind" "text" DEFAULT 'template'::"text" NOT NULL,
+    "level" smallint DEFAULT 1 NOT NULL,
+    "slug" "text" DEFAULT ''::"text" NOT NULL,
+    "is_visible" boolean DEFAULT true NOT NULL,
+    "seo_title_en" "text",
+    "seo_title_zh" "text",
+    "seo_description_en" "text",
+    "seo_description_zh" "text",
+    CONSTRAINT "template_categories_card_style_check" CHECK (("card_style" = ANY (ARRAY['pair'::"text", 'compare'::"text"]))),
+    CONSTRAINT "template_categories_intro_en_check" CHECK ((("intro_en" IS NULL) OR (("char_length"("intro_en") >= 1) AND ("char_length"("intro_en") <= 200)))),
+    CONSTRAINT "template_categories_intro_zh_check" CHECK ((("intro_zh" IS NULL) OR (("char_length"("intro_zh") >= 1) AND ("char_length"("intro_zh") <= 200)))),
+    CONSTRAINT "template_categories_key_check" CHECK ((("key" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text") AND ("char_length"("key") <= 40))),
+    CONSTRAINT "template_categories_kind_check" CHECK (("kind" = ANY (ARRAY['template'::"text", 'reference'::"text"]))),
+    CONSTRAINT "template_categories_level_check" CHECK ((("level" >= 1) AND ("level" <= 3))),
+    CONSTRAINT "template_categories_name_en_check" CHECK ((("char_length"("name_en") >= 1) AND ("char_length"("name_en") <= 32) AND ("name_en" = "btrim"("name_en")))),
+    CONSTRAINT "template_categories_name_zh_check" CHECK ((("char_length"("name_zh") >= 1) AND ("char_length"("name_zh") <= 12) AND ("name_zh" = "btrim"("name_zh")))),
+    CONSTRAINT "template_category_slug_format" CHECK (("slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text"))
+);
+
+
+ALTER TABLE "public"."template_categories" OWNER TO "postgres";
+
+
+CREATE OR REPLACE VIEW "public"."template_category_paths" WITH ("security_invoker"='true') AS
+ SELECT "c"."key",
+    COALESCE("g"."key", "p"."key", "c"."key") AS "root_key",
+    "array_remove"(ARRAY["g"."slug", "p"."slug", "c"."slug"], NULL::"text") AS "path",
+    ((NOT "c"."is_system") AND "c"."is_visible" AND (("c"."parent_id" IS NULL) OR ("p"."is_visible" IS TRUE)) AND (("p"."parent_id" IS NULL) OR ("g"."is_visible" IS TRUE))) AS "web_visible"
+   FROM (("public"."template_categories" "c"
+     LEFT JOIN "public"."template_categories" "p" ON (("p"."key" = "c"."parent_id")))
+     LEFT JOIN "public"."template_categories" "g" ON (("g"."key" = "p"."parent_id")))
+  WHERE ("c"."kind" = 'template'::"text");
+
+
+ALTER VIEW "public"."template_category_paths" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."template_series" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "slug" "text" NOT NULL,
+    "name_en" "text" NOT NULL,
+    "name_zh" "text" NOT NULL,
+    "description_en" "text",
+    "description_zh" "text",
+    "cover_url" "text",
+    "category_key" "text" NOT NULL,
+    "sort_order" integer DEFAULT 0 NOT NULL,
+    "is_active" boolean DEFAULT false NOT NULL,
+    "show_members" boolean DEFAULT false NOT NULL,
+    CONSTRAINT "template_series_name_en_check" CHECK (("btrim"("name_en") <> ''::"text")),
+    CONSTRAINT "template_series_name_zh_check" CHECK (("btrim"("name_zh") <> ''::"text")),
+    CONSTRAINT "template_series_slug_check" CHECK (("slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text"))
+);
+
+
+ALTER TABLE "public"."template_series" OWNER TO "postgres";
+
+
+CREATE OR REPLACE VIEW "public"."web_template_members" WITH ("security_invoker"='true') AS
+ SELECT "t"."id",
+    "t"."series_id",
+    "t"."series_sort_order",
+    "t"."sort_order",
+    "c"."key" AS "category_key",
+    (("t"."series_id" IS NULL) OR "s"."show_members") AS "standalone"
+   FROM ((("public"."templates" "t"
+     JOIN "public"."template_category_paths" "c" ON (("c"."key" = COALESCE("t"."subcategory_key", "t"."category_key"))))
+     LEFT JOIN "public"."template_series" "s" ON (("s"."id" = "t"."series_id")))
+     LEFT JOIN "public"."template_category_paths" "sc" ON (("sc"."key" = "s"."category_key")))
+  WHERE ("t"."is_active" AND ('web'::"text" = ANY ("t"."visible_in")) AND "c"."web_visible" AND (("t"."series_id" IS NULL) OR ("s"."is_active" AND "sc"."web_visible")));
+
+
+ALTER VIEW "public"."web_template_members" OWNER TO "postgres";
+
+
+CREATE OR REPLACE VIEW "public"."web_catalogue_entries" WITH ("security_invoker"='true') AS
+ SELECT 'template'::"text" AS "type",
+    ('template-'::"text" || "m"."id") AS "entry_key",
+    "m"."sort_order",
+    "m"."category_key",
+    "m"."id" AS "template_id",
+    NULL::"uuid" AS "series_id",
+    NULL::"text" AS "cover_template_id"
+   FROM "public"."web_template_members" "m"
+  WHERE "m"."standalone"
+UNION ALL
+ SELECT 'series'::"text" AS "type",
+    ('series-'::"text" || "s"."id") AS "entry_key",
+    "s"."sort_order",
+    "c"."key" AS "category_key",
+    NULL::"text" AS "template_id",
+    "s"."id" AS "series_id",
+    "cover"."id" AS "cover_template_id"
+   FROM (("public"."template_series" "s"
+     JOIN "public"."template_category_paths" "c" ON ((("c"."key" = "s"."category_key") AND "c"."web_visible")))
+     CROSS JOIN LATERAL ( SELECT "m"."id"
+           FROM "public"."web_template_members" "m"
+          WHERE ("m"."series_id" = "s"."id")
+          ORDER BY "m"."series_sort_order", "m"."id"
+         LIMIT 1) "cover")
+  WHERE "s"."is_active";
+
+
+ALTER VIEW "public"."web_catalogue_entries" OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."category_entries"("p_path" "text"[]) RETURNS SETOF "public"."web_catalogue_entries"
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  with recursive nodes(key,depth) as (
+    select c.key,1 from public.template_categories c
+    where cardinality(p_path) between 1 and 3 and c.parent_id is null and c.kind='template'
+      and c.slug=p_path[1] and c.is_visible and not c.is_system
+    union all
+    select c.key,n.depth+1 from nodes n join public.template_categories c on c.parent_id=n.key
+    where c.is_visible and (n.depth>=cardinality(p_path) or c.slug=p_path[n.depth+1])
+  )
+  select e.* from nodes n join public.web_catalogue_entries e on e.category_key=n.key
+  where n.depth>=cardinality(p_path)
+$$;
+
+
+ALTER FUNCTION "public"."category_entries"("p_path" "text"[]) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."category_path"("public"."templates") RETURNS "text"[]
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $_$
+  select c.path from public.template_category_paths c where c.key=coalesce($1.subcategory_key,$1.category_key)
+$_$;
+
+
+ALTER FUNCTION "public"."category_path"("public"."templates") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."check_referenced_provider_module"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -6226,6 +6462,39 @@ $$;
 
 
 ALTER FUNCTION "public"."dispute_evidence_facts"("p_dispute_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."entry_cover"("public"."web_catalogue_entries") RETURNS SETOF "public"."templates"
+    LANGUAGE "sql" STABLE ROWS 1
+    SET "search_path" TO ''
+    AS $_$
+  select t.* from public.templates t where t.id=$1.cover_template_id
+$_$;
+
+
+ALTER FUNCTION "public"."entry_cover"("public"."web_catalogue_entries") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."entry_series"("public"."web_catalogue_entries") RETURNS SETOF "public"."template_series"
+    LANGUAGE "sql" STABLE ROWS 1
+    SET "search_path" TO ''
+    AS $_$
+  select s.* from public.template_series s where s.id=$1.series_id
+$_$;
+
+
+ALTER FUNCTION "public"."entry_series"("public"."web_catalogue_entries") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."entry_template"("public"."web_catalogue_entries") RETURNS SETOF "public"."templates"
+    LANGUAGE "sql" STABLE ROWS 1
+    SET "search_path" TO ''
+    AS $_$
+  select t.* from public.templates t where t.id=$1.template_id
+$_$;
+
+
+ALTER FUNCTION "public"."entry_template"("public"."web_catalogue_entries") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."fail_identity_judge"("p_id" bigint) RETURNS "void"
@@ -7929,6 +8198,17 @@ $$;
 ALTER FUNCTION "public"."sync_waffo_subscription"("p_user_id" "uuid", "p_order_id" "text", "p_product_id" "text", "p_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean, "p_event_at" timestamp with time zone) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."template_categories"("public"."templates") RETURNS SETOF "public"."template_categories"
+    LANGUAGE "sql" STABLE ROWS 1
+    SET "search_path" TO ''
+    AS $_$
+  select c.* from public.template_categories c where c.key=$1.category_key
+$_$;
+
+
+ALTER FUNCTION "public"."template_categories"("public"."templates") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."template_categories_sync_name"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -8097,6 +8377,17 @@ $$;
 ALTER FUNCTION "public"."template_sync_pricing_input"("p_env_model" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."templates"("public"."template_categories") RETURNS SETOF "public"."templates"
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $_$
+  select t.* from public.templates t where t.category_key=$1.key
+$_$;
+
+
+ALTER FUNCTION "public"."templates"("public"."template_categories") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."templates_sync_category"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -8163,6 +8454,18 @@ $$;
 
 
 ALTER FUNCTION "public"."toggle_template_request_vote"("p_request_id" "uuid", "p_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."web_templates"("p_series_id" "uuid" DEFAULT NULL::"uuid", "p_template_id" "text" DEFAULT NULL::"text", "p_include_members" boolean DEFAULT false) RETURNS SETOF "public"."templates"
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select t.* from public.web_template_members m join public.templates t on t.id=m.id
+  where (p_series_id is null and p_template_id is null and (m.standalone or p_include_members)) or m.series_id=p_series_id or m.id=p_template_id
+$$;
+
+
+ALTER FUNCTION "public"."web_templates"("p_series_id" "uuid", "p_template_id" "text", "p_include_members" boolean) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."wishlist_eligible"("p_user_id" "uuid") RETURNS boolean
@@ -9122,29 +9425,6 @@ CREATE TABLE IF NOT EXISTS "public"."system_settings" (
 ALTER TABLE "public"."system_settings" OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."template_categories" (
-    "key" "text" NOT NULL,
-    "name_en" "text" NOT NULL,
-    "name_zh" "text" NOT NULL,
-    "intro_en" "text",
-    "intro_zh" "text",
-    "card_style" "text" DEFAULT 'pair'::"text" NOT NULL,
-    "sort_order" integer DEFAULT 0 NOT NULL,
-    "is_system" boolean DEFAULT false NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    CONSTRAINT "template_categories_card_style_check" CHECK (("card_style" = ANY (ARRAY['pair'::"text", 'compare'::"text"]))),
-    CONSTRAINT "template_categories_intro_en_check" CHECK ((("intro_en" IS NULL) OR (("char_length"("intro_en") >= 1) AND ("char_length"("intro_en") <= 200)))),
-    CONSTRAINT "template_categories_intro_zh_check" CHECK ((("intro_zh" IS NULL) OR (("char_length"("intro_zh") >= 1) AND ("char_length"("intro_zh") <= 200)))),
-    CONSTRAINT "template_categories_key_check" CHECK ((("key" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text") AND ("char_length"("key") <= 40))),
-    CONSTRAINT "template_categories_name_en_check" CHECK ((("char_length"("name_en") >= 1) AND ("char_length"("name_en") <= 32) AND ("name_en" = "btrim"("name_en")))),
-    CONSTRAINT "template_categories_name_zh_check" CHECK ((("char_length"("name_zh") >= 1) AND ("char_length"("name_zh") <= 12) AND ("name_zh" = "btrim"("name_zh"))))
-);
-
-
-ALTER TABLE "public"."template_categories" OWNER TO "postgres";
-
-
 CREATE TABLE IF NOT EXISTS "public"."template_favorites" (
     "user_id" "uuid" DEFAULT "auth"."uid"() NOT NULL,
     "template_id" "text" NOT NULL,
@@ -9562,6 +9842,16 @@ ALTER TABLE ONLY "public"."template_requests"
 
 
 
+ALTER TABLE ONLY "public"."template_series"
+    ADD CONSTRAINT "template_series_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."template_series"
+    ADD CONSTRAINT "template_series_slug_key" UNIQUE ("slug");
+
+
+
 ALTER TABLE ONLY "public"."template_sync_history"
     ADD CONSTRAINT "template_sync_history_pkey" PRIMARY KEY ("template_id", "run_id");
 
@@ -9912,6 +10202,10 @@ CREATE UNIQUE INDEX "template_categories_name_zh_key" ON "public"."template_cate
 
 
 
+CREATE UNIQUE INDEX "template_category_sibling_slug" ON "public"."template_categories" USING "btree" ("parent_id", "kind", "slug") NULLS NOT DISTINCT;
+
+
+
 CREATE INDEX "template_favorites_template_id_idx" ON "public"."template_favorites" USING "btree" ("template_id");
 
 
@@ -9936,7 +10230,15 @@ CREATE INDEX "template_requests_wall_idx" ON "public"."template_requests" USING 
 
 
 
+CREATE INDEX "template_series_category_idx" ON "public"."template_series" USING "btree" ("category_key", "sort_order", "id");
+
+
+
 CREATE INDEX "templates_active_sort_idx" ON "public"."templates" USING "btree" ("sort_order", "id") WHERE "is_active";
+
+
+
+CREATE INDEX "templates_assigned_web_category_idx" ON "public"."templates" USING "btree" (COALESCE("subcategory_key", "category_key"), "sort_order", "id") WHERE ("is_active" AND ('web'::"text" = ANY ("visible_in")));
 
 
 
@@ -9945,6 +10247,14 @@ CREATE INDEX "templates_category_key_idx" ON "public"."templates" USING "btree" 
 
 
 CREATE UNIQUE INDEX "templates_featured_rank_key" ON "public"."templates" USING "btree" ("featured_rank") WHERE ("featured_rank" IS NOT NULL);
+
+
+
+CREATE INDEX "templates_series_member_idx" ON "public"."templates" USING "btree" ("series_id", "series_sort_order", "id") WHERE ("series_id" IS NOT NULL);
+
+
+
+CREATE INDEX "templates_subcategory_idx" ON "public"."templates" USING "btree" ("subcategory_key") WHERE ("subcategory_key" IS NOT NULL);
 
 
 
@@ -9992,6 +10302,14 @@ CREATE OR REPLACE TRIGGER "archive_template_prompt_version" AFTER INSERT OR UPDA
 
 
 
+CREATE OR REPLACE TRIGGER "category_move" AFTER UPDATE OF "parent_id", "level" ON "public"."template_categories" FOR EACH ROW EXECUTE FUNCTION "admin"."move_category_subtree"();
+
+
+
+CREATE OR REPLACE TRIGGER "category_prepare" BEFORE INSERT OR UPDATE OF "key", "kind", "parent_id", "level", "is_system", "slug" ON "public"."template_categories" FOR EACH ROW EXECUTE FUNCTION "admin"."prepare_category_node"();
+
+
+
 CREATE OR REPLACE TRIGGER "codes_enforce_gift_policy" BEFORE INSERT OR UPDATE OF "invitee_credits", "invitee_pool", "max_redemptions" ON "public"."codes" FOR EACH ROW EXECUTE FUNCTION "public"."_enforce_code_gift_policy"();
 
 
@@ -10013,6 +10331,10 @@ CREATE CONSTRAINT TRIGGER "prompt_publish_floor" AFTER INSERT OR DELETE OR UPDAT
 
 
 CREATE OR REPLACE TRIGGER "prompt_style_ref_limit" AFTER INSERT OR UPDATE ON "public"."template_prompts" FOR EACH ROW EXECUTE FUNCTION "admin"."check_template_style_ref_limit"();
+
+
+
+CREATE OR REPLACE TRIGGER "series_category" BEFORE INSERT OR UPDATE OF "category_key" ON "public"."template_series" FOR EACH ROW EXECUTE FUNCTION "admin"."check_series_category"();
 
 
 
@@ -10081,6 +10403,10 @@ CREATE OR REPLACE TRIGGER "templates_set_updated_at" BEFORE UPDATE ON "public"."
 
 
 CREATE OR REPLACE TRIGGER "templates_sync_category" BEFORE INSERT OR UPDATE OF "category", "category_key" ON "public"."templates" FOR EACH ROW EXECUTE FUNCTION "public"."templates_sync_category"();
+
+
+
+CREATE OR REPLACE TRIGGER "zz_template_category_path" BEFORE INSERT OR UPDATE OF "category", "category_key", "subcategory_key" ON "public"."templates" FOR EACH ROW EXECUTE FUNCTION "admin"."check_template_category_path"();
 
 
 
@@ -10403,6 +10729,11 @@ ALTER TABLE ONLY "public"."system_settings"
 
 
 
+ALTER TABLE ONLY "public"."template_categories"
+    ADD CONSTRAINT "template_categories_parent_id_fkey" FOREIGN KEY ("parent_id") REFERENCES "public"."template_categories"("key");
+
+
+
 ALTER TABLE ONLY "public"."template_favorites"
     ADD CONSTRAINT "template_favorites_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON DELETE CASCADE;
 
@@ -10448,6 +10779,11 @@ ALTER TABLE ONLY "public"."template_requests"
 
 
 
+ALTER TABLE ONLY "public"."template_series"
+    ADD CONSTRAINT "template_series_category_key_fkey" FOREIGN KEY ("category_key") REFERENCES "public"."template_categories"("key");
+
+
+
 ALTER TABLE ONLY "public"."template_sync_history"
     ADD CONSTRAINT "template_sync_history_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON DELETE CASCADE;
 
@@ -10455,6 +10791,16 @@ ALTER TABLE ONLY "public"."template_sync_history"
 
 ALTER TABLE ONLY "public"."templates"
     ADD CONSTRAINT "templates_category_key_fkey" FOREIGN KEY ("category_key") REFERENCES "public"."template_categories"("key");
+
+
+
+ALTER TABLE ONLY "public"."templates"
+    ADD CONSTRAINT "templates_series_id_fkey" FOREIGN KEY ("series_id") REFERENCES "public"."template_series"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."templates"
+    ADD CONSTRAINT "templates_subcategory_key_fkey" FOREIGN KEY ("subcategory_key") REFERENCES "public"."template_categories"("key");
 
 
 
@@ -10527,6 +10873,10 @@ ALTER TABLE "public"."ai_providers" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."business_inquiries" ENABLE ROW LEVEL SECURITY;
 
 
+CREATE POLICY "category_public_read" ON "public"."template_categories" AS RESTRICTIVE FOR SELECT TO "authenticated", "anon" USING ((("kind" = 'template'::"text") AND "is_visible" AND (("parent_id" IS NULL) OR ("parent_id" IN ( SELECT "admin"."visible_template_category_keys"() AS "visible_template_category_keys")))));
+
+
+
 ALTER TABLE "public"."code_redemptions" ENABLE ROW LEVEL SECURITY;
 
 
@@ -10582,6 +10932,15 @@ ALTER TABLE "public"."profiles" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "profiles_select_own" ON "public"."profiles" FOR SELECT TO "authenticated" USING ((( SELECT "auth"."uid"() AS "uid") = "id"));
+
+
+
+CREATE POLICY "series_read" ON "public"."template_series" FOR SELECT TO "authenticated", "anon" USING (("is_active" AND (EXISTS ( SELECT 1
+   FROM "public"."template_category_paths" "c"
+  WHERE (("c"."key" = "template_series"."category_key") AND "c"."web_visible"))) AND (EXISTS ( SELECT 1
+   FROM ("public"."templates" "t"
+     JOIN "public"."template_category_paths" "c" ON (("c"."key" = COALESCE("t"."subcategory_key", "t"."category_key"))))
+  WHERE (("t"."series_id" = "template_series"."id") AND "t"."is_active" AND ('web'::"text" = ANY ("t"."visible_in")) AND "c"."web_visible")))));
 
 
 
@@ -10666,10 +11025,18 @@ CREATE POLICY "template_requests_select_visible" ON "public"."template_requests"
 
 
 
+ALTER TABLE "public"."template_series" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."template_sync_history" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."templates" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "templates_public_category" ON "public"."templates" AS RESTRICTIVE FOR SELECT TO "authenticated", "anon" USING ((COALESCE("subcategory_key", "category_key") IN ( SELECT "c"."key"
+   FROM "public"."template_categories" "c")));
+
 
 
 CREATE POLICY "templates_select_active" ON "public"."templates" FOR SELECT TO "authenticated", "anon" USING ("is_active");
@@ -10833,6 +11200,12 @@ GRANT ALL ON FUNCTION "admin"."template_sync_quote"("p_receipt" "jsonb", "p_prov
 
 REVOKE ALL ON FUNCTION "admin"."valid_style_refs"("p_template_id" "text", "p_refs" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."valid_style_refs"("p_template_id" "text", "p_refs" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."visible_template_category_keys"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."visible_template_category_keys"() TO "anon";
+GRANT ALL ON FUNCTION "admin"."visible_template_category_keys"() TO "authenticated";
 
 
 
@@ -11409,6 +11782,50 @@ GRANT ALL ON FUNCTION "public"."begin_identity_judge"("p_user_id" "uuid", "p_tex
 
 
 
+GRANT ALL ON TABLE "public"."template_categories" TO "service_role";
+GRANT SELECT ON TABLE "public"."template_categories" TO "anon";
+GRANT SELECT ON TABLE "public"."template_categories" TO "authenticated";
+
+
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."template_category_paths" TO "service_role";
+GRANT SELECT ON TABLE "public"."template_category_paths" TO "anon";
+GRANT SELECT ON TABLE "public"."template_category_paths" TO "authenticated";
+
+
+
+GRANT ALL ON TABLE "public"."template_series" TO "service_role";
+GRANT SELECT ON TABLE "public"."template_series" TO "anon";
+GRANT SELECT ON TABLE "public"."template_series" TO "authenticated";
+
+
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."web_template_members" TO "service_role";
+GRANT SELECT ON TABLE "public"."web_template_members" TO "anon";
+GRANT SELECT ON TABLE "public"."web_template_members" TO "authenticated";
+
+
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."web_catalogue_entries" TO "service_role";
+GRANT SELECT ON TABLE "public"."web_catalogue_entries" TO "anon";
+GRANT SELECT ON TABLE "public"."web_catalogue_entries" TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."category_entries"("p_path" "text"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."category_entries"("p_path" "text"[]) TO "anon";
+GRANT ALL ON FUNCTION "public"."category_entries"("p_path" "text"[]) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."category_entries"("p_path" "text"[]) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."category_path"("public"."templates") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."category_path"("public"."templates") TO "anon";
+GRANT ALL ON FUNCTION "public"."category_path"("public"."templates") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."category_path"("public"."templates") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."check_referenced_provider_module"() FROM PUBLIC;
 
 
@@ -11486,6 +11903,27 @@ REVOKE ALL ON FUNCTION "public"."delete_provider_vault_secret"() FROM PUBLIC;
 
 REVOKE ALL ON FUNCTION "public"."dispute_evidence_facts"("p_dispute_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."dispute_evidence_facts"("p_dispute_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."entry_cover"("public"."web_catalogue_entries") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."entry_cover"("public"."web_catalogue_entries") TO "anon";
+GRANT ALL ON FUNCTION "public"."entry_cover"("public"."web_catalogue_entries") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."entry_cover"("public"."web_catalogue_entries") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."entry_series"("public"."web_catalogue_entries") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."entry_series"("public"."web_catalogue_entries") TO "anon";
+GRANT ALL ON FUNCTION "public"."entry_series"("public"."web_catalogue_entries") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."entry_series"("public"."web_catalogue_entries") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."entry_template"("public"."web_catalogue_entries") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."entry_template"("public"."web_catalogue_entries") TO "anon";
+GRANT ALL ON FUNCTION "public"."entry_template"("public"."web_catalogue_entries") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."entry_template"("public"."web_catalogue_entries") TO "service_role";
 
 
 
@@ -11728,6 +12166,13 @@ GRANT ALL ON FUNCTION "public"."sync_waffo_subscription"("p_user_id" "uuid", "p_
 
 
 
+REVOKE ALL ON FUNCTION "public"."template_categories"("public"."templates") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."template_categories"("public"."templates") TO "anon";
+GRANT ALL ON FUNCTION "public"."template_categories"("public"."templates") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."template_categories"("public"."templates") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."template_category_for"("p_value" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."template_category_for"("p_value" "text") TO "service_role";
 
@@ -11753,8 +12198,22 @@ GRANT ALL ON FUNCTION "public"."template_sync_pricing_input"("p_env_model" "text
 
 
 
+REVOKE ALL ON FUNCTION "public"."templates"("public"."template_categories") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."templates"("public"."template_categories") TO "anon";
+GRANT ALL ON FUNCTION "public"."templates"("public"."template_categories") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."templates"("public"."template_categories") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."toggle_template_request_vote"("p_request_id" "uuid", "p_user_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."toggle_template_request_vote"("p_request_id" "uuid", "p_user_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."web_templates"("p_series_id" "uuid", "p_template_id" "text", "p_include_members" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."web_templates"("p_series_id" "uuid", "p_template_id" "text", "p_include_members" boolean) TO "anon";
+GRANT ALL ON FUNCTION "public"."web_templates"("p_series_id" "uuid", "p_template_id" "text", "p_include_members" boolean) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."web_templates"("p_series_id" "uuid", "p_template_id" "text", "p_include_members" boolean) TO "service_role";
 
 
 
@@ -11960,12 +12419,6 @@ GRANT SELECT ON TABLE "public"."support_ticket_attachments" TO "service_role";
 
 
 GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."system_settings" TO "service_role";
-
-
-
-GRANT ALL ON TABLE "public"."template_categories" TO "service_role";
-GRANT SELECT ON TABLE "public"."template_categories" TO "anon";
-GRANT SELECT ON TABLE "public"."template_categories" TO "authenticated";
 
 
 
