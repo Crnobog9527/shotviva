@@ -97,6 +97,16 @@ describe('activated template prices', () => {
     await refuses(() => db.query('select admin.rollback_template_price_catalog_v2()'),'TEMPLATE_CATALOG_HAS_NEW_JOBS')
   })
 
+  it('retains approved live tariffs and refuses an old-price non-catalogue publication at commit', async () => {
+    await activate()
+    await db.query('set constraints template_publish_floor, prompt_publish_floor immediate')
+    await db.query(`insert into public.templates(id,name,category,credits_cost) values
+      ('t98-old-room','Old room','pets','{"1k":2,"2k":4,"3k":6}')`)
+    await refuses(() => db.query("update public.templates set is_active=true where id='t98-old-room'"),
+      'TEMPLATE_PRICE_BELOW_FLOOR')
+    expect((await db.query("select is_active from public.templates where id='t98-old-room'")).rows[0].is_active).toBe(false)
+  })
+
   it('requires normal T96 pricing on a substitute provider', async () => {
     const other = randomUUID()
     await db.query(`insert into public.ai_providers(id,label,model,adapter,resolutions,estimated_image_costs)

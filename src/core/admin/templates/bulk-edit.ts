@@ -71,7 +71,7 @@ const SQL_ERRORS: Record<string, [code: 'FORBIDDEN' | 'INVALID_INPUT', message: 
 }
 
 function throwBulkEditError(error: { message: string; details: string }): never {
-  if (error.message === 'MODEL_CREDIT_FLOOR' || error.message === 'TEMPLATE_RETIRED') throw new AppError('INVALID_INPUT', error.details)
+  if (['MODEL_CREDIT_FLOOR', 'TEMPLATE_RETIRED', 'TEMPLATE_PRICE_BELOW_FLOOR'].includes(error.message)) throw new AppError('INVALID_INPUT', error.details)
   const known = SQL_ERRORS[error.message]
   if (known) throw new AppError(known[0], known[1])
   throw new AppError('INTERNAL', `bulkEditTemplates failed: ${error.message}`)

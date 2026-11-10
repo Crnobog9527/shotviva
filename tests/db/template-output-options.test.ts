@@ -12,7 +12,7 @@ const provider = randomUUID()
 const caps = {
   resolutions: ['1k'], aspectRatios: ['1:1'], originalRatio: false,
   providerAspectRatios: ['1:1', '21:9'], minReferences: 0, maxReferences: 3,
-  fetchedAt: new Date().toISOString(),
+  catalogImageCosts: { '1k': 0.01 }, fetchedAt: new Date().toISOString(),
 }
 let db: Client
 let templateId: string
