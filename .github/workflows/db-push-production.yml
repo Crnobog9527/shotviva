@@ -58,10 +58,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/supabase-remote
         with:
-          require-owner-review: ${{ github.event_name == 'workflow_dispatch' }}
           token-source: secret SUPABASE_ACCESS_TOKEN
           password-source: production environment secret SUPABASE_PRODUCTION_DB_PASSWORD
           ref-source: production environment variable SUPABASE_PRODUCTION_PROJECT_REF
+          require-owner-review: ${{ github.event_name == 'workflow_dispatch' }}
       - name: History before
         run: supabase migration list --linked
       # --include-all: cards own numbering ranges (TASKS), so a lower-numbered migration can
