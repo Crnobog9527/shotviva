@@ -209,3 +209,18 @@ it('still claws back the paid slice after an administrator forfeits the rest of 
   await refund(db, original.charge, 10000)
   expect(await available(db, f.owner.id)).toBe(-600)
 })
+
+it('rolls back the month marker with a failed payout insert and retries on the next day', async () => {
+  await makeSale()
+  await db.query('savepoint before_failure')
+  await db.query('alter table affiliate_payout_items add constraint t100_force_issue_failure check(false) not valid')
+  await db.query('savepoint before_issue')
+  await expect(run('2031-06-05')).rejects.toThrow('t100_force_issue_failure')
+  await db.query('rollback to before_issue')
+  expect(await row(db, "select 1 from affiliate_settlement_runs where period='2031-06-01'")).toBeUndefined()
+  expect(await payouts()).toHaveLength(0)
+  await db.query('rollback to before_failure')
+  await run('2031-06-06')
+  await run('2031-06-07')
+  expect((await payouts()).map(p => p.amount)).toEqual([1500])
+})

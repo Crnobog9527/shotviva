@@ -1404,6 +1404,34 @@ $$;
 ALTER FUNCTION "public"."_affiliate_accept_invite"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_affiliate_allocate_payout"("p_owner" "uuid", "p_face" bigint, "p_at" timestamp with time zone DEFAULT NULL::timestamp with time zone) RETURNS TABLE("commission_id" bigint, "prior_amount" bigint, "issue_amount" bigint)
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  with confirmed as (
+    select c.id,c.amount from public.affiliate_commissions c
+      where p_at is null and c.affiliate_user_id=p_owner and c.status='confirmed' and c.payout_retained is null
+    union all
+    select c.id,h.new_amount from public.affiliate_commissions c
+      cross join lateral (select new_amount,new_status from public.affiliate_commission_changes
+        where commission_id=c.id and at<=p_at order by at desc,id desc limit 1) h
+      where p_at is not null and c.affiliate_user_id=p_owner and h.new_status='confirmed'
+  ), free as (
+    select c.id,lower(span) lo,upper(span) hi from confirmed c
+    cross join lateral (select range_agg(int8range(i.prior_amount,coalesce(i.settled_amount,i.issue_amount))) used
+      from public.affiliate_payout_items i join public.affiliate_payouts p on p.id=i.payout_id
+      where i.commission_id=c.id and p.status<>'void') existing
+    cross join lateral unnest(int8multirange(int8range(0,c.amount))-coalesce(existing.used,'{}'::int8multirange)) span
+  ), ordered as (
+    select *,sum(hi-lo) over(order by id,lo rows unbounded preceding)-(hi-lo) consumed from free
+  )
+  select id,lo,least(hi,lo+p_face-consumed)::bigint from ordered where consumed<p_face;
+$$;
+
+
+ALTER FUNCTION "public"."_affiliate_allocate_payout"("p_owner" "uuid", "p_face" bigint, "p_at" timestamp with time zone) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_affiliate_audit"("p_actor" "uuid", "p_action" "text", "p_target" "text", "p_reason" "text" DEFAULT NULL::"text") RETURNS "void"
     LANGUAGE "sql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -1492,6 +1520,44 @@ $$;
 ALTER FUNCTION "public"."_affiliate_due"("p_total" integer, "p_tax" integer, "p_refunded" integer, "p_rate" integer) OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."affiliate_payouts" (
+    "id" bigint NOT NULL,
+    "affiliate_user_id" "uuid" NOT NULL,
+    "period" "date" NOT NULL,
+    "amount" bigint NOT NULL,
+    "status" "text" DEFAULT 'due'::"text" NOT NULL,
+    "payout_snapshot" "jsonb" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "paid_at" timestamp with time zone,
+    "paid_method" "text",
+    "paid_reference" "text",
+    "decided_by" "uuid",
+    "note" "text",
+    "paid_amount" bigint,
+    "legacy_review_required" boolean DEFAULT false NOT NULL,
+    CONSTRAINT "affiliate_payouts_amount_check" CHECK (("amount" > 0)),
+    CONSTRAINT "affiliate_payouts_paid_amount_check" CHECK (("paid_amount" >= 0)),
+    CONSTRAINT "affiliate_payouts_status_check" CHECK (("status" = ANY (ARRAY['due'::"text", 'held'::"text", 'paid'::"text", 'void'::"text"])))
+);
+
+
+ALTER TABLE "public"."affiliate_payouts" OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_affiliate_linked_payable"("p" "public"."affiliate_payouts") RETURNS bigint
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select greatest(0,p.amount-coalesce(sum(i.issue_amount-greatest(i.prior_amount,
+    least(i.issue_amount,case when c.status='confirmed' and c.payout_retained is null then c.amount else 0 end))),0))::bigint
+    from public.affiliate_payout_items i join public.affiliate_commissions c on c.id=i.commission_id
+    where i.payout_id=p.id;
+$$;
+
+
+ALTER FUNCTION "public"."_affiliate_linked_payable"("p" "public"."affiliate_payouts") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_affiliate_overrides"("p_user" "uuid", "p_values" "jsonb") RETURNS "void"
     LANGUAGE "sql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -1520,54 +1586,31 @@ $$;
 ALTER FUNCTION "public"."_affiliate_payment_event"() OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."affiliate_payouts" (
-    "id" bigint NOT NULL,
-    "affiliate_user_id" "uuid" NOT NULL,
-    "period" "date" NOT NULL,
-    "amount" bigint NOT NULL,
-    "status" "text" DEFAULT 'due'::"text" NOT NULL,
-    "payout_snapshot" "jsonb" NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "paid_at" timestamp with time zone,
-    "paid_method" "text",
-    "paid_reference" "text",
-    "decided_by" "uuid",
-    "note" "text",
-    "paid_amount" bigint,
-    "legacy_review_required" boolean DEFAULT false NOT NULL,
-    CONSTRAINT "affiliate_payouts_amount_check" CHECK (("amount" > 0)),
-    CONSTRAINT "affiliate_payouts_paid_amount_check" CHECK (("paid_amount" >= 0)),
-    CONSTRAINT "affiliate_payouts_status_check" CHECK (("status" = ANY (ARRAY['due'::"text", 'held'::"text", 'paid'::"text", 'void'::"text"])))
-);
-
-
-ALTER TABLE "public"."affiliate_payouts" OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."_affiliate_payout_forfeit"("p" "public"."affiliate_payouts", "p_actor" "uuid", "p_note" "text") RETURNS "void"
+CREATE OR REPLACE FUNCTION "public"."_affiliate_payout_forfeit"("p" "public"."affiliate_payouts", "p_note" "text") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-declare r record;
+declare r record; v_paid int8multirange; v_keep bigint; v_status text;
 begin
-  for r in select c.*,i.prior_amount from public.affiliate_payout_items i
-    join public.affiliate_commissions c on c.id=i.commission_id where i.payout_id=p.id
-    and c.void_reason is distinct from 'admin_void' order by c.id loop
-    if r.prior_amount>0 then
-      insert into public.affiliate_adjustments(request_id,affiliate_user_id,amount,reason,created_by)
-        select gen_random_uuid(),p.affiliate_user_id,least(r.amount,r.prior_amount),
-          'payout '||p.id||': preserve previously covered commission '||r.id,p_actor
-          where least(r.amount,r.prior_amount)>0;
-    end if;
-    update public.affiliate_commissions set amount=0,status='void',void_reason='admin_void',updated_at=now() where id=r.id;
+  for r in select c.* from public.affiliate_commissions c where exists
+    (select from public.affiliate_payout_items i where i.payout_id=p.id and i.commission_id=c.id)
+    and c.void_reason is distinct from 'admin_void' and c.payout_retained is null order by c.id loop
+    select range_agg(int8range(i.prior_amount,coalesce(i.settled_amount,i.issue_amount))) into v_paid
+      from public.affiliate_payout_items i join public.affiliate_payouts o on o.id=i.payout_id
+      where i.commission_id=r.id and o.status='paid' and coalesce(i.settled_amount,i.issue_amount)>i.prior_amount;
+    v_keep:=coalesce(public._affiliate_retained_cents(v_paid,r.amount),0);
+    v_status:=case when v_keep=0 then 'void' else r.status end;
+    update public.affiliate_commissions set amount=v_keep,status=v_status,payout_retained=v_paid,
+      void_reason=case when v_paid is null then 'admin_void' when v_keep=0 then coalesce(r.void_reason,'zero') end,
+      updated_at=now() where id=r.id;
     insert into public.affiliate_commission_changes(commission_id,old_amount,new_amount,old_status,new_status,reason)
-      values(r.id,r.amount,0,r.status,'void','payout '||p.id||': '||p_note);
+      values(r.id,r.amount,v_keep,r.status,v_status,'payout '||p.id||': '||p_note);
   end loop;
 end;
 $$;
 
 
-ALTER FUNCTION "public"."_affiliate_payout_forfeit"("p" "public"."affiliate_payouts", "p_actor" "uuid", "p_note" "text") OWNER TO "postgres";
+ALTER FUNCTION "public"."_affiliate_payout_forfeit"("p" "public"."affiliate_payouts", "p_note" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."_affiliate_require_admin"("p_actor" "uuid") RETURNS "void"
@@ -1583,6 +1626,18 @@ $$;
 
 
 ALTER FUNCTION "public"."_affiliate_require_admin"("p_actor" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_affiliate_retained_cents"("p_ranges" "int8multirange", "p_amount" bigint) RETURNS bigint
+    LANGUAGE "sql" IMMUTABLE STRICT
+    SET "search_path" TO ''
+    AS $$
+  select coalesce(sum(upper(s)-lower(s)),0)::bigint
+    from unnest(p_ranges * int8multirange(int8range(0,p_amount))) s;
+$$;
+
+
+ALTER FUNCTION "public"."_affiliate_retained_cents"("p_ranges" "int8multirange", "p_amount" bigint) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."_affiliate_snapshot"("p_payment" "public"."payments") RETURNS "jsonb"
@@ -1637,6 +1692,9 @@ begin
     if v_old.void_reason in ('affiliate_inactive','admin_void') then v_void:=v_old.void_reason; end if;
   end if;
   v_amount:=public._affiliate_due(p_payment.amount_total,p_payment.amount_tax,p_payment.amount_refunded,v_rate);
+  if v_old.payout_retained is not null then
+    v_amount:=public._affiliate_retained_cents(v_old.payout_retained,v_amount);
+  end if;
   if v_void is not null or p_lost then
     v_void:=coalesce(v_void,'dispute_lost'); v_amount:=0;
   elsif v_amount=0 then
@@ -2381,7 +2439,7 @@ begin
     from public.affiliate_commissions) c
   cross join (select coalesce(sum(coalesce(payout.paid_amount,payout.amount)) filter(where status='paid'),0) paid,
     count(*) filter(where status='due' and period=date_trunc('month',now() at time zone 'UTC')::date) due_count,
-    coalesce(sum(public.affiliate_payout_payable(payout)) filter(where status='due' and period=date_trunc('month',now() at time zone 'UTC')::date),0) due_total
+    coalesce(sum(coalesce(public.affiliate_payout_payable(payout),payout.amount)) filter(where status='due' and period=date_trunc('month',now() at time zone 'UTC')::date),0) due_total
     from public.affiliate_payouts payout) p;
   return v_answer;
 end;
@@ -2409,22 +2467,32 @@ begin
     or (v_status='paid' and (v_method is null or v_time is null or coalesce(v_ref,v_note) is null)) then raise exception 'INVALID_INPUT'; end if;
   if v_status='paid' or (v_status='void' and v_mode='forfeit') then
     if v.legacy_review_required then raise exception 'AFFILIATE_PAYOUT_LEGACY_REVIEW'; end if;
-    perform pay.id from public.affiliate_payout_items i join public.affiliate_commissions c on c.id=i.commission_id
-      join public.payments pay on pay.id=c.payment_id where i.payout_id=v.id order by pay.id for update of pay;
-    if exists(select from public.affiliate_payout_items i join public.affiliate_commissions c on c.id=i.commission_id
-      join public.affiliate_recompute_errors e on e.payment_id=c.payment_id and e.resolved_at is null
-      where i.payout_id=v.id) then raise exception 'AFFILIATE_PAYOUT_RECOMPUTE_PENDING'; end if;
-    perform c.id from public.affiliate_payout_items i join public.affiliate_commissions c on c.id=i.commission_id
-      where i.payout_id=v.id order by c.payment_id,c.level for update of c;
+    -- Refunds/retries lock payment then commission. The quote now depends on
+    -- the entire account, even if the order itself is backed by adjustments.
+    perform pay.id from public.payments pay join public.affiliate_commissions c on c.payment_id=pay.id
+      where c.affiliate_user_id=v.affiliate_user_id order by pay.id for update of pay;
+    -- An adjustment insert takes a foreign-key key-share lock on this owner.
+    perform a.user_id from public.affiliates a where a.user_id=v.affiliate_user_id for update;
+    perform c.id from public.affiliate_commissions c where c.affiliate_user_id=v.affiliate_user_id
+      order by c.payment_id,c.level for update;
+    if exists(select from public.affiliate_commissions c join public.affiliate_recompute_errors e
+      on e.payment_id=c.payment_id and e.resolved_at is null where c.affiliate_user_id=v.affiliate_user_id)
+      then raise exception 'AFFILIATE_PAYOUT_RECOMPUTE_PENDING'; end if;
     if v_status='paid' then
       v_actual:=public.affiliate_payout_payable(v);
       if (v_expected is not null or v_actual<>v.amount) and v_expected is distinct from v_actual then
         raise exception 'AFFILIATE_PAYOUT_AMOUNT_CHANGED'; end if;
-      update public.affiliate_payout_items i set settled_amount=greatest(i.prior_amount,least(i.issue_amount,
-        case when c.status='confirmed' then c.amount else 0 end))
-        from public.affiliate_commissions c where i.payout_id=v.id and c.id=i.commission_id;
+      with backed as (
+        select i.commission_id,i.prior_amount,greatest(0,least(i.issue_amount,
+          case when c.status='confirmed' and c.payout_retained is null then c.amount else 0 end)-i.prior_amount) cents
+          from public.affiliate_payout_items i join public.affiliate_commissions c on c.id=i.commission_id where i.payout_id=v.id
+      ), ranked as (
+        select *,sum(cents) over(order by commission_id,prior_amount rows unbounded preceding)-cents before_slice from backed
+      )
+      update public.affiliate_payout_items i set settled_amount=r.prior_amount+greatest(0,least(r.cents,v_actual-r.before_slice))
+        from ranked r where i.payout_id=v.id and (i.commission_id,i.prior_amount)=(r.commission_id,r.prior_amount);
     else
-      perform public._affiliate_payout_forfeit(v,p_actor,v_note);
+      perform public._affiliate_payout_forfeit(v,v_note);
     end if;
   end if;
   update public.affiliate_payouts set status=v_status,paid_amount=v_actual,decided_by=p_actor,note=v_note,
@@ -5686,7 +5754,7 @@ CREATE OR REPLACE FUNCTION "public"."affiliate_daily"("p_today" "date") RETURNS 
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-declare v_settings public.affiliate_settings; v_payment bigint; v_cutoff timestamptz;
+declare v_settings public.affiliate_settings; v_payment bigint; v_cutoff timestamptz; v_issue boolean:=false;
 begin
   select s.* into strict v_settings from public.affiliate_settings s where singleton;
   if p_today is null then raise exception 'INVALID_INPUT'; end if;
@@ -5695,6 +5763,13 @@ begin
   for v_payment in select payment_id from public.affiliate_recompute_errors where resolved_at is null order by payment_id loop
     perform public.affiliate_recompute_payment(v_payment);
   end loop;
+  -- Mark the scheduled evaluation even when disabled or nobody qualifies.
+  -- Any later failure rolls this insert back together with issuance.
+  if extract(day from p_today)>=v_settings.settlement_day then
+    insert into public.affiliate_settlement_runs(period) values(date_trunc('month',p_today)::date)
+      on conflict(period) do nothing;
+    v_issue:=found;
+  end if;
   if not v_settings.enabled then return; end if;
   v_cutoff:=case when p_today=(now() at time zone 'UTC')::date then now() else p_today::timestamp at time zone 'UTC' end;
   -- A refund/dispute updates and locks this same commission. EvalPlanQual rechecks pending after waiting.
@@ -5707,7 +5782,7 @@ begin
     returning c.id,c.amount)
   insert into public.affiliate_commission_changes(commission_id,old_amount,new_amount,old_status,new_status,reason)
     select id,amount,amount,'pending','confirmed','confirmed' from changed;
-  if extract(day from p_today)<v_settings.settlement_day then return; end if;
+  if not v_issue then return; end if;
   -- One MVCC snapshot for the balance and its commission backing. Refunds that
   -- commit after this statement are measured against these exact amounts at payment.
   with issued as (
@@ -5716,13 +5791,10 @@ begin
         jsonb_build_object('payout_method',a.payout_method,'payout_details',a.payout_details)
         from public.affiliates a join public.affiliate_balances b on b.affiliate_user_id=a.user_id
        where a.status='active' and a.payout_method is not null and b.available>0 and b.available>=v_settings.payout_min_usd
-      on conflict(affiliate_user_id,period) do nothing returning id,affiliate_user_id)
+      on conflict(affiliate_user_id,period) do nothing returning id,affiliate_user_id,amount)
   insert into public.affiliate_payout_items(payout_id,commission_id,prior_amount,issue_amount)
-    select n.id,c.id,b.covered,c.amount from issued n join public.affiliate_commissions c on c.affiliate_user_id=n.affiliate_user_id
-    cross join lateral (select coalesce(max(coalesce(i.settled_amount,i.issue_amount)),0) covered
-      from public.affiliate_payout_items i join public.affiliate_payouts p on p.id=i.payout_id
-      where i.commission_id=c.id and p.status<>'void') b
-    where c.status='confirmed' and c.amount>b.covered;
+    select n.id,a.* from issued n
+      cross join lateral public._affiliate_allocate_payout(n.affiliate_user_id,n.amount) a;
 end;
 $$;
 
@@ -5777,15 +5849,15 @@ ALTER FUNCTION "public"."affiliate_partner_summary"("p_user" "uuid") OWNER TO "p
 
 
 CREATE OR REPLACE FUNCTION "public"."affiliate_payout_payable"("p" "public"."affiliate_payouts") RETURNS bigint
-    LANGUAGE "sql" STABLE
+    LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-  select case when p.status not in ('due','held') or p.legacy_review_required then null
-    else greatest(0,
-      p.amount - coalesce((select sum(i.issue_amount-greatest(i.prior_amount,
-        least(i.issue_amount,case when c.status='confirmed' then c.amount else 0 end)))
-        from public.affiliate_payout_items i join public.affiliate_commissions c on c.id=i.commission_id
-        where i.payout_id=p.id),0)::bigint) end;
+  select case when p.status in ('due','held') and not p.legacy_review_required then
+    least(public._affiliate_linked_payable(p),greatest(0,b.confirmed-b.paid
+      + (select coalesce(sum(j.amount),0) from public.affiliate_adjustments j where j.affiliate_user_id=p.affiliate_user_id)
+      - (select coalesce(sum(case when o.legacy_review_required then o.amount else public._affiliate_linked_payable(o) end),0)
+         from public.affiliate_payouts o where o.affiliate_user_id=p.affiliate_user_id and o.id<>p.id and o.status in ('due','held'))))::bigint
+    end from public.affiliate_balances b where b.affiliate_user_id=p.affiliate_user_id;
 $$;
 
 
@@ -9367,6 +9439,7 @@ CREATE TABLE IF NOT EXISTS "public"."affiliate_commissions" (
     "released_by" "uuid",
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "payout_retained" "int8multirange",
     CONSTRAINT "affiliate_commissions_amount_check" CHECK (("amount" >= 0)),
     CONSTRAINT "affiliate_commissions_base_usd_check" CHECK (("base_usd" >= 0)),
     CONSTRAINT "affiliate_commissions_level_check" CHECK (("level" = ANY (ARRAY[1, 2]))),
@@ -9577,6 +9650,14 @@ CREATE TABLE IF NOT EXISTS "public"."affiliate_settings" (
 
 
 ALTER TABLE "public"."affiliate_settings" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."affiliate_settlement_runs" (
+    "period" "date" NOT NULL
+);
+
+
+ALTER TABLE "public"."affiliate_settlement_runs" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."business_inquiries" (
@@ -10148,7 +10229,7 @@ ALTER TABLE ONLY "public"."affiliate_commissions"
 
 
 ALTER TABLE ONLY "public"."affiliate_payout_items"
-    ADD CONSTRAINT "affiliate_payout_items_pkey" PRIMARY KEY ("payout_id", "commission_id");
+    ADD CONSTRAINT "affiliate_payout_items_pkey" PRIMARY KEY ("payout_id", "commission_id", "prior_amount");
 
 
 
@@ -10179,6 +10260,11 @@ ALTER TABLE ONLY "public"."affiliate_recompute_errors"
 
 ALTER TABLE ONLY "public"."affiliate_settings"
     ADD CONSTRAINT "affiliate_settings_pkey" PRIMARY KEY ("singleton");
+
+
+
+ALTER TABLE ONLY "public"."affiliate_settlement_runs"
+    ADD CONSTRAINT "affiliate_settlement_runs_pkey" PRIMARY KEY ("period");
 
 
 
@@ -11491,6 +11577,9 @@ ALTER TABLE "public"."affiliate_recompute_errors" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."affiliate_settings" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."affiliate_settlement_runs" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."affiliates" ENABLE ROW LEVEL SECURITY;
 
 
@@ -11902,6 +11991,10 @@ REVOKE ALL ON FUNCTION "public"."_affiliate_accept_invite"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "public"."_affiliate_allocate_payout"("p_owner" "uuid", "p_face" bigint, "p_at" timestamp with time zone) FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."_affiliate_audit"("p_actor" "uuid", "p_action" "text", "p_target" "text", "p_reason" "text") FROM PUBLIC;
 
 
@@ -11918,6 +12011,14 @@ REVOKE ALL ON FUNCTION "public"."_affiliate_due"("p_total" integer, "p_tax" inte
 
 
 
+GRANT SELECT ON TABLE "public"."affiliate_payouts" TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."_affiliate_linked_payable"("p" "public"."affiliate_payouts") FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."_affiliate_overrides"("p_user" "uuid", "p_values" "jsonb") FROM PUBLIC;
 
 
@@ -11926,15 +12027,15 @@ REVOKE ALL ON FUNCTION "public"."_affiliate_payment_event"() FROM PUBLIC;
 
 
 
-GRANT SELECT ON TABLE "public"."affiliate_payouts" TO "service_role";
-
-
-
-REVOKE ALL ON FUNCTION "public"."_affiliate_payout_forfeit"("p" "public"."affiliate_payouts", "p_actor" "uuid", "p_note" "text") FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."_affiliate_payout_forfeit"("p" "public"."affiliate_payouts", "p_note" "text") FROM PUBLIC;
 
 
 
 REVOKE ALL ON FUNCTION "public"."_affiliate_require_admin"("p_actor" "uuid") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_affiliate_retained_cents"("p_ranges" "int8multirange", "p_amount" bigint) FROM PUBLIC;
 
 
 
@@ -13035,6 +13136,10 @@ GRANT SELECT ON TABLE "public"."affiliate_recompute_errors" TO "service_role";
 
 
 GRANT SELECT ON TABLE "public"."affiliate_settings" TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "public"."affiliate_settlement_runs" TO "service_role";
 
 
 

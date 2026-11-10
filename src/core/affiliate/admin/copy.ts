@@ -100,7 +100,7 @@ export const COPY = {
   voidPayout: '作废结算单',
   voidMode: '作废后的佣金处理',
   returnCommission: '退回可结算余额',
-  forfeitCommission: '一并作废本单关联的整笔佣金（涉及其他未付单时也会重算）',
+  forfeitCommission: '作废关联佣金的未付部分（其他结算单若含同笔佣金，也会重算）',
   originalAmount: '生成时金额（美元）',
   currentPayable: '现在应付金额（美元）',
   reduction: '差额（调减，美元）',

@@ -564,7 +564,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 | `affiliate_payout_items` | 主键 `(payout_id, commission_id, prior_amount)`；每笔按未被其他单占用的区间分配，本单分配总额不超过面额。区间下限为 `prior_amount`，出单及实际支付的上限分别为 `issue_amount, settled_amount`；退款或争议不能被无关的新成交抵消。 |
 | `affiliate_recompute_errors` | `id, payment_id, at, error, snapshot, resolved_at`；每笔付款最多一条未解决错误；首次计算失败时保存已取得的收款人、比例和确认日，以便重试。 |
 | `affiliate_click_days` | `affiliate_user_id,day` 联合主键、`clicks`。 |
-| `affiliate_settlement_runs` | 主键 `period` 为 UTC 月首。每行表示整月的结算任务已成功完成，即使当时无人达到门槛也记录。 |
+| `affiliate_settlement_runs` | 主键 `period` 为 UTC 月首。每行表示整月的结算任务已成功完成，当日计划关闭或无人达标也记录。 |
 | `affiliate_balances` | 每个 `affiliate_user_id` 的 `confirmed,pending,paid,available`。可结算余额为已确认佣金加人工调整，减去待付、暂缓的原金额及已付实额；已作废单不占用。 |
 
 - `affiliate_bind/count_click/apply/save_profile` 负责归属、点击、申请及设置。团队邀请只接受有效的已开团队推广员。申请门槛以未全额退款的会员付款为准。被拒后仅管理员可通过 `admin_affiliate_allow_reapply` 放行一次，审计保留操作人、时间和原拒绝原因；再次提交通过同一申请校验并更新资料和条款，保留原短码和团队归属，回到待审并收回重提资格。

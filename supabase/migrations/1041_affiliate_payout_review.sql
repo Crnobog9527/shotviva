@@ -158,7 +158,7 @@ $$;
 
 -- Forfeiture only touches linked commissions. Preserve any slice that was already
 -- accounted for by an older payout; unrelated earnings and adjustments remain intact.
-create function public._affiliate_payout_forfeit(p public.affiliate_payouts,p_actor uuid,p_note text)
+create function public._affiliate_payout_forfeit(p public.affiliate_payouts,p_note text)
 returns void language plpgsql security definer set search_path='' as $$
 declare r record; v_paid int8multirange; v_keep bigint; v_status text;
 begin
@@ -178,7 +178,7 @@ begin
   end loop;
 end;
 $$;
-revoke all on function public._affiliate_payout_forfeit(public.affiliate_payouts,uuid,text) from public,anon,authenticated,service_role;
+revoke all on function public._affiliate_payout_forfeit(public.affiliate_payouts,text) from public,anon,authenticated,service_role;
 
 create or replace function public.admin_affiliate_payout_decide(p_actor uuid,p_input jsonb)
 returns void language plpgsql security definer set search_path='' as $$
@@ -221,7 +221,7 @@ begin
       update public.affiliate_payout_items i set settled_amount=r.prior_amount+greatest(0,least(r.cents,v_actual-r.before_slice))
         from ranked r where i.payout_id=v.id and (i.commission_id,i.prior_amount)=(r.commission_id,r.prior_amount);
     else
-      perform public._affiliate_payout_forfeit(v,p_actor,v_note);
+      perform public._affiliate_payout_forfeit(v,v_note);
     end if;
   end if;
   update public.affiliate_payouts set status=v_status,paid_amount=v_actual,decided_by=p_actor,note=v_note,

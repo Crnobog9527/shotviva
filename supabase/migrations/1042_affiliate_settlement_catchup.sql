@@ -13,7 +13,7 @@ insert into public.affiliate_settlement_runs(period)
   on conflict(period) do nothing;
 
 create or replace function public.affiliate_daily(p_today date) returns void language plpgsql security definer set search_path='' as $$
-declare v_settings public.affiliate_settings; v_payment bigint; v_cutoff timestamptz;
+declare v_settings public.affiliate_settings; v_payment bigint; v_cutoff timestamptz; v_issue boolean:=false;
 begin
   select s.* into strict v_settings from public.affiliate_settings s where singleton;
   if p_today is null then raise exception 'INVALID_INPUT'; end if;
@@ -22,6 +22,13 @@ begin
   for v_payment in select payment_id from public.affiliate_recompute_errors where resolved_at is null order by payment_id loop
     perform public.affiliate_recompute_payment(v_payment);
   end loop;
+  -- Mark the scheduled evaluation even when disabled or nobody qualifies.
+  -- Any later failure rolls this insert back together with issuance.
+  if extract(day from p_today)>=v_settings.settlement_day then
+    insert into public.affiliate_settlement_runs(period) values(date_trunc('month',p_today)::date)
+      on conflict(period) do nothing;
+    v_issue:=found;
+  end if;
   if not v_settings.enabled then return; end if;
   v_cutoff:=case when p_today=(now() at time zone 'UTC')::date then now() else p_today::timestamp at time zone 'UTC' end;
   -- A refund/dispute updates and locks this same commission. EvalPlanQual rechecks pending after waiting.
@@ -34,12 +41,7 @@ begin
     returning c.id,c.amount)
   insert into public.affiliate_commission_changes(commission_id,old_amount,new_amount,old_status,new_status,reason)
     select id,amount,amount,'pending','confirmed','confirmed' from changed;
-  if extract(day from p_today)<v_settings.settlement_day then return; end if;
-  -- The marker commits with the payouts and their items. Any failure rolls it
-  -- back so the next daily call can retry, even if this period had no payouts.
-  insert into public.affiliate_settlement_runs(period) values(date_trunc('month',p_today)::date)
-    on conflict(period) do nothing;
-  if not found then return; end if;
+  if not v_issue then return; end if;
   -- One MVCC snapshot for the balance and its commission backing. Refunds that
   -- commit after this statement are measured against these exact amounts at payment.
   with issued as (

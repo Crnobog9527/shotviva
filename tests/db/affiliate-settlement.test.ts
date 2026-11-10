@@ -147,3 +147,15 @@ it.each(['suspended', 'banned'])('a %s promoter and their eligible parent earn n
   expect((await commission(db, p.id)).amount).toBe(0)
   expect(await commission(db, p.id, 2)).toBeUndefined()
 })
+
+it('honors a disabled settlement day when the program is enabled later that month', async () => {
+  await db.query("update affiliates set payout_method='wise' where user_id=$1", [f.owner.id])
+  await db.query("insert into affiliate_adjustments(request_id,affiliate_user_id,amount,reason) values(gen_random_uuid(),$1,25000,'fixture')", [f.owner.id])
+  await db.query('update affiliate_settings set enabled=false')
+  await db.query("select affiliate_daily('2034-06-01')")
+  await db.query('update affiliate_settings set enabled=true')
+  await db.query("select affiliate_daily('2034-06-08')")
+  expect(await available(db, f.owner.id)).toBe(25000)
+  await db.query("select affiliate_daily('2034-07-01')")
+  expect(await available(db, f.owner.id)).toBe(0)
+})
