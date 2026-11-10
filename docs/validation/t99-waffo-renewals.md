@@ -16,8 +16,17 @@
 
 **启用条件**。在配置好测试签名和商品映射的环境运行 `pnpm pricing:waffo`。脚本以结账报价接口返回的无会员价为基准，逐项检查 USD 价格和商品启用状态。测试环境选择 Waffo 时，构建自动执行同一检查。15 项全部匹配方可通过。[本次只读核对日志](https://vercel.com/simons-projects-bfe3e99f/shotviva/56thd8Ui4wgqXgVu6C65x5WcPLWZ)
 
-**正式商品**。切换前在商户后台 Live Mode 独立核对。按上表顺序，正式商品尾号（一次性 / 订阅）为 `GaCp / gGQY`、`lucN / ycqV`、`WYwJ / r4yX`、`9i0i / 9hfF`、`0EXS / 2Ckq`、`mtBe / 2VH7`、`d7dN`、`ltaM`、`2QRq`。本次读取的是正式映射，正式后台实价待核。
+**正式商品**。已在 Shotviva 商户后台「生产模式」只读核对 15 项，现价与上表测试后台一致。启用当天按当时的网站报价再核一次。按上表顺序，正式商品尾号（一次性 / 订阅）为 `GaCp / gGQY`、`lucN / ycqV`、`WYwJ / r4yX`、`9i0i / 9hfF`、`0EXS / 2Ckq`、`mtBe / 2VH7`、`d7dN`、`ltaM`、`2QRq`。正式后台也有六个年付条目待改。
 
-**两期实收**。Waffo 规定签名会话的 `priceSnapshot.amount` 覆盖订阅常规周期价格。要取得两期实收，在 Test Mode 用测试卡完成带 v2 报价的月付订阅，打开 Subscriptions → 该笔测试订阅 → Simulate renewal success。在两次 `subscription.payment_succeeded` 中记录期数、币种、`chargedAmount` 及 `listPrice` 的 subtotal、taxAmount、total，并核对每期只有一笔积分流水。如果目录价和首单报价相同，两期同价只能验证金额；区分取价来源还需用两价有差异的测试商品，例如改价前的年付，且测试订单采用正常服务端报价。[下单规则](https://docs.waffo.ai/api-reference/endpoints/orders/create-checkout-session.md) · [模拟续费](https://docs.waffo.ai/features/test-mode.md)
+**两期实收**。2026-11-10 在 Waffo 沙盒通过商户签名会话使用网站 v2 报价，关闭试用和优惠码，使用沙盒成功测试卡支付。打开该测试订阅并执行一次「模拟续费成功」。从测试 webhook 投递记录读取以下四组原始字段，另用 Waffo 只读 API 和测试库付款、积分流水交叉核对。
+
+| 商品、期数 | 支付号尾号 | 后台价 | 签约报价 | chargedAmount | listPrice（subtotal / taxAmount / total） | 入账积分 |
+| --- | --- | ---: | ---: | ---: | --- | ---: |
+| Starter 月付，第 1 期 | 2AsK | 19.90 | 19.90 | 19.90 | 19.90 / 0.00 / 19.90 | 1,990 |
+| Starter 月付，第 2 期 | x13f | 19.90 | 19.90 | 19.90 | 19.90 / 0.00 / 19.90 | 1,990 |
+| Pro 年付，第 1 期 | zyGW | 479.00 | 479.04 | 479.04 | 479.04 / 0.00 / 479.04 | 72,000 |
+| Pro 年付，第 2 期 | cLhQ | 479.00 | 479.04 | 479.04 | 479.04 / 0.00 / 479.04 | 72,000 |
+
+两笔订阅分别以 uEx1、VpZI 结尾，四期均为 USD。Pro 的四美分差异验证了本次正常续费使用签约快照价。四笔各有一条对应支付流水及一条积分流水。两笔测试订阅均已设为周期结束时停止续费。测试用户保留验收产生的积分。测试回调投递到既有测试站；新增 1030 的异常、并发和重放路径由本地数据库及 CI 单独验证。[供应商测试付款记录](https://vercel.com/simons-projects-bfe3e99f/shotviva/5FCoGjArCJxwV7mCYqhvZKEw1diS) · [Waffo 下单规则](https://docs.waffo.ai/api-reference/endpoints/orders/create-checkout-session.md) · [模拟续费](https://docs.waffo.ai/features/test-mode.md)
 
 **收到金额异常告警**。打开飞书消息里的账单工单，核对用户、订单、期数及支付编号。先查该用户的积分流水和 Waffo 退款记录，再决定按新积分单位补发或退款，记录处理动作和参考号后关闭工单。同一期的后续回调保持原处理结果。

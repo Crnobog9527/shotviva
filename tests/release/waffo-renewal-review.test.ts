@@ -1,25 +1,30 @@
 import { randomUUID } from 'node:crypto'
 import type { Client } from 'pg'
-import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest'
 
-import { connectAdmin, createUser, ledgerOf, profileOf } from './helpers'
+import { createUser, ledgerOf, profileOf } from '../db/helpers'
+import { cloneLocalPricingDb } from './local-pricing-clone'
 
 let db: Client
+let clone: ReturnType<typeof cloneLocalPricingDb>
 let buyer: string
 let order: string
-beforeAll(async () => { db = await connectAdmin() })
-beforeEach(async () => {
-  await db.query('begin')
+beforeAll(async () => {
+  clone = cloneLocalPricingDb()
+  db = await clone.connect()
   await db.query(`insert into public.system_settings(key,value) values('pricing_catalog_version','"v2"')
     on conflict(key) do update set value=excluded.value`)
+}, 30000)
+beforeEach(async () => {
   buyer = await createUser(db)
   order = randomUUID()
 })
-afterEach(async () => { await db.query('rollback') })
-afterAll(async () => { await db.end() })
+afterAll(async () => {
+  try { await db?.end() } finally { clone?.drop() }
+})
 
-async function pay(period: number, charged: number | null, subtotal: number | null, currency: string | null = 'usd', payment = `PAY_${period}`) {
-  const { rows } = await db.query("select public.settle_waffo_renewal_v2($1,'starter_yearly',$2,$3,$4,19104,$5,100,$6,$7) as result",
+async function pay(period: number, charged: number | null, subtotal: number | null, currency: string | null = 'usd', payment = `PAY_${period}_${order}`, client = db) {
+  const { rows } = await client.query("select public.settle_waffo_renewal_v2($1,'starter_yearly',$2,$3,$4,19104,$5,100,$6,$7) as result",
     [buyer, order, period, payment, charged, subtotal, currency])
   return rows[0].result
 }
@@ -45,3 +50,15 @@ it.each([[19200, 19100, 'usd'], [19204, 19100, 'usd'], [19204, 19104, 'eur'], [n
     expect(tickets.rows).toEqual([{ status: 'open', type: 'billing', body: expect.stringContaining('PAY_2') }])
     expect(await pay(3, 19204, 19104)).toEqual({ outcome: 'applied' })
   })
+
+it('opens only one ticket on concurrent delivery from independent database connections', async () => {
+  const second = await clone.connect()
+  try {
+    const results = await Promise.all([db, second].map(client => pay(2, 19200, 19100, 'usd', order, client)))
+    expect(results.filter(r => r.ticket_id)).toHaveLength(1)
+    expect(results.map(r => r.outcome)).toEqual(['review', 'review'])
+    expect(await ledgerOf(db, buyer)).toHaveLength(0)
+  } finally {
+    await second.end()
+  }
+})
