@@ -9,10 +9,9 @@ import { currentTier, limitsFor, readBalance } from '@/core/billing'
 import { listFavoriteIdsOrEmpty } from '@/core/favorites'
 import { currentLocale } from '@/core/i18n/server'
 import { listRunningJobIds } from '@/core/jobs'
-import { listTemplatesIn } from '@/core/templates'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { WishCard } from '@/core/wishlist/ui/wish-card'
-import { FavoritesProvider, GeneratingPill, TemplateCatalogue, toCatalogueTemplate } from '@/modules/image'
+import { FavoritesProvider, GeneratingPill, loadCatalogueView, TemplateCatalogue } from '@/modules/image'
 import { site } from '@/site/site.config'
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -32,8 +31,9 @@ async function Create() {
   const user = await requireUser('/generate')
   const supabase = await createServerSupabase()
   const admin = createAdminSupabase()
-  const [templates, balance, tier, runningIds, favoriteIds, wishlistLive] = await Promise.all([
-    listTemplatesIn(supabase, await currentLocale()),
+  const [view, balance, tier, runningIds, favoriteIds, wishlistLive] = await Promise.all([
+    // Templates and series cards placed under up to three category levels (T102).
+    loadCatalogueView(supabase, await currentLocale()),
     readBalance(supabase, user.id),
     // current_tier() is service-role only; the user's own id comes from the session.
     currentTier(admin, user.id),
@@ -55,7 +55,7 @@ async function Create() {
       />
       <FavoritesProvider initialIds={favoriteIds} signedIn>
         <TemplateCatalogue
-          templates={templates.map(toCatalogueTemplate)}
+          view={view}
           create={{ balance, tier, concurrency: { limit: limitsFor(tier).concurrency, runningIds } }}
           endCard={wishlistLive ? <WishCard /> : undefined}
         />
