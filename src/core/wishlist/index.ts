@@ -31,3 +31,4 @@ export { listMyRequests, listWall } from './wall'
 // First-run guidance (Owner 2026-11-10): the tab's dot, read from the session.
 export { WishlistTabBadge } from './tab-badge'
 export { listMyWishNotices, markWishNoticesSeen, WISH_NOTICES_TAG, type WishNotice } from './notices'
+export { toNoticeItems, type NoticeItem } from './notice-items'

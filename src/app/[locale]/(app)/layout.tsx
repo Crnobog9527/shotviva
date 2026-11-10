@@ -21,6 +21,7 @@ import { displayProducts } from '@/site/billing/display-products'
 import { site } from '@/site/site.config'
 
 import { paywallPerkFacts } from '../paywall-perk-facts'
+import { WishNoticeSlot } from './wish-notice-slot'
 import { WishlistHintSlot } from './wishlist-hint-slot'
 
 // Every logged-in page is noindex through this one layout, never per page (AGENTS §9).
@@ -130,6 +131,8 @@ export default function AppLayout({ children }: LayoutProps<'/[locale]'>) {
           <main className="flex flex-1 flex-col">{children}</main>
           <GenerationRunner />
           <WishlistHintSlot />
+          {/* "Your wish came true", for an account with unread notices (ARCHITECTURE §15.4). */}
+          <WishNoticeSlot />
         </BrandProvider>
         {/* DESIGN §5 「全站流动背景」 (T54); it renders nothing on /admin. */}
         <LivingBackground />
