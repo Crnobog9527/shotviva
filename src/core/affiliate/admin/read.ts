@@ -12,9 +12,8 @@ export function checked<T>(result: { data: T; error: { message: string } | null 
 const id = z.union([z.number().int().positive(), z.string().min(1)]).transform(String)
 export const rateRow = z.object({ product_kind: z.string(), l1_bp: z.number().nullable(), l2_bp: z.number().nullable() })
 const common = { id, created_at: z.string() }
-const baseMember = { user_id: z.uuid(), slug: z.string(), status: z.string(), created_at: z.string() }
-const member = z.object(baseMember)
-export const memberDetail = member.extend({
+export const memberDetail = z.object({
+  user_id: z.uuid(), slug: z.string(), status: z.string(), created_at: z.string(),
   team_enabled: z.boolean(),
   parent_user_id: z.uuid().nullable(),
   country: z.string().nullable(),
@@ -27,7 +26,7 @@ export const memberDetail = member.extend({
   terms_version: z.string().nullable(),
   terms_accepted_at: z.string().nullable(),
 })
-const commission = z.object({
+export const commission = z.object({
   ...common,
   payment_id: id,
   affiliate_user_id: z.uuid(),
@@ -63,7 +62,7 @@ export type Payout = z.infer<typeof payout>
 export type Member = z.infer<typeof memberDetail>
 
 // Timestamp and tie-breaker column names are constants at each call. decodeCursor validates both values.
-function pageQuery(db: SupabaseClient, table: string, cols: string, cursor?: string, key = 'id', time = 'created_at') {
+export function pageQuery(db: SupabaseClient, table: string, cols: string, cursor?: string, key = 'id', time = 'created_at') {
   let query = db
     .from(table)
     .select(cols)
@@ -74,31 +73,6 @@ function pageQuery(db: SupabaseClient, table: string, cols: string, cursor?: str
   if (after) query = query.or(`${time}.lt."${after.c}",and(${time}.eq."${after.c}",${key}.lt.${after.i})`)
   return query
 }
-export async function members(db: SupabaseClient, f: Filters) {
-  let q = pageQuery(db, 'affiliates', 'user_id,slug,status,created_at,source:application->>source', f.cursor, 'user_id')
-  if (f.tab === 'applications') q = q.eq('status', f.review ?? 'pending').or('application->>source.is.null,application->>source.neq.admin_invite')
-  if (f.q) q = z.uuid().safeParse(f.q).success ? q.eq('user_id', f.q) : q.ilike('slug', f.q.replace(/[\\%_]/g, '\\$&') + '%')
-  return toPage(
-    member.extend({ source: z.string().nullable() })
-      .array()
-      .parse(checked(await q))
-      .map((r) => ({ ...r, id: r.user_id })),
-    (r) => r,
-  )
-}
-export async function loadMember(db: SupabaseClient, userId: string) {
-  const [result, rates] = await Promise.all([
-    db
-      .from('affiliates')
-      .select(
-        'user_id,slug,status,created_at,team_enabled,parent_user_id,country,payout_method,payout_details,us_person,application,reject_reason,reapply_allowed,terms_version,terms_accepted_at',
-      )
-      .eq('user_id', userId)
-      .maybeSingle(),
-    db.from('affiliate_rate_overrides').select('product_kind,l1_bp,l2_bp').eq('user_id', userId),
-  ])
-  return { member: memberDetail.nullable().parse(checked(result)), rates: rateRow.array().parse(checked(rates)) }
-}
 function withFilters(q: ReturnType<typeof pageQuery>, f: Filters) {
   if (f.affiliate) q = q.eq('affiliate_user_id', f.affiliate)
   if (f.from) q = q.gte('created_at', f.from + 'T00:00:00Z')
@@ -106,10 +80,9 @@ function withFilters(q: ReturnType<typeof pageQuery>, f: Filters) {
   if (f.status) q = q.eq('status', f.status)
   return q
 }
+export const commissionColumns = 'id,created_at,payment_id,affiliate_user_id,level,rate_bp,amount,status,base_usd,flags,released_by,confirm_after,product_id'
 export async function commissions(db: SupabaseClient, f: Filters) {
-  const columns =
-    'id,created_at,payment_id,affiliate_user_id,level,rate_bp,amount,status,base_usd,flags,released_by,confirm_after,product_id'
-  let q = withFilters(pageQuery(db, 'affiliate_commissions', columns, f.cursor), f)
+  let q = withFilters(pageQuery(db, 'affiliate_commissions', commissionColumns, f.cursor), f)
   if (f.flag === 'yes') q = q.neq('flags', '{}')
   if (f.flag === 'no') q = q.eq('flags', '{}')
   return toPage(commission.array().parse(checked(await q)), (r) => r)

@@ -16,11 +16,12 @@ import { EditComposer } from './edit-composer'
 import { FirstRunForm } from './first-run-form'
 import { Records } from './records'
 import { useRunSelection } from './use-run-selection'
-import { useTestPanel } from './use-test-panel'
+import { useTestPanel, type TestPanelFeedback } from './use-test-panel'
 
-function Status({ error, notice }: { error: string | null; notice: string | null }) {
-  if (error) return <p role="alert" className="text-destructive text-sm">{error}</p>
-  return notice ? <p role="status" className="text-sm text-emerald-700 dark:text-emerald-400">{notice}</p> : null
+function Status({ feedback }: { feedback: TestPanelFeedback | null }) {
+  if (!feedback) return null
+  if (feedback.kind === 'error') return <p role="alert" className="text-destructive text-sm">{feedback.message}</p>
+  return <p role="status" className="text-sm text-emerald-700 dark:text-emerald-400">{feedback.message}</p>
 }
 
 const savedProvider = (template: AdminTemplate) => template.prompt?.providerId ?? 'default'
@@ -51,8 +52,8 @@ export function TestRunPanel({ template, languages, providers }: { providers: re
         <p className="text-muted-foreground text-xs">{COPY.savedOnly(template.prompt?.version ?? null)}</p>
       </header>
       <BudgetBar budget={panel.data?.budget ?? null} onSaved={() => void panel.reload()} onError={panel.setError} />
-      <Status error={panel.error} notice={panel.notice} />
-      <FirstRunForm key={savedProvider(template)} providers={providers} template={template} photos={panel.data?.recentPhotos ?? []} onLaunch={(launches) => void panel.launch(launches)} onPhotoUploaded={() => void panel.reload()} onError={panel.setError} />
+      <Status feedback={panel.feedback} />
+      <FirstRunForm key={savedProvider(template)} providers={providers} template={template} photos={panel.data?.recentPhotos ?? []} onLaunch={(launches) => void panel.launch(launches)} onPhotoUploaded={() => void panel.reload()} onError={panel.setError} onNotice={panel.setNotice} />
       <AssetManager kind="run" template={template.id} onRemoved={() => { selection.clear(); setEditing(null); void panel.reload() }} onError={panel.setError} onNotice={panel.setNotice} />
       {editing ? <EditComposer key={editing.map((run) => run.id).join()} targets={editing} onLaunch={(launches) => void panel.launch(launches)} onClose={() => setEditing(null)} /> : null}
       <Records

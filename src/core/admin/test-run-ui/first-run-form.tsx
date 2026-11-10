@@ -26,6 +26,7 @@ type Props = {
   photos: readonly TestPhotoView[]
   onLaunch: (launches: Launch[]) => void
   onPhotoUploaded: () => void
+  onNotice: (notice: string) => void
   onError: (message: string) => void
 }
 
@@ -53,7 +54,7 @@ function trialInputCount(template: AdminTemplate, targets: readonly string[], om
 
 // 首次出图 (ARCHITECTURE §10.b): a test photo (or up to three), the template's own text fields,
 // the optional note, size and tier, then one click that starts one or three runs.
-export function FirstRunForm({ template, providers, photos, onLaunch, onPhotoUploaded, onError }: Props) {
+export function FirstRunForm({ template, providers, photos, onLaunch, onPhotoUploaded, onError, onNotice }: Props) {
   const usesPhoto = template.fields.images.max > 0
   const [picked, setPicked] = useState<string[]>([])
   const [copy, setCopy] = useState<Record<string, string>>({})
@@ -81,7 +82,7 @@ export function FirstRunForm({ template, providers, photos, onLaunch, onPhotoUpl
         {COPY.first.title}
       </h3>
       {usesPhoto ? (
-        <PhotoPicker photos={photos} picked={picked} onPick={setPicked} onUploaded={onPhotoUploaded} onError={onError} />
+        <PhotoPicker photos={photos} picked={picked} onPick={setPicked} onUploaded={onPhotoUploaded} onError={onError} onNotice={onNotice} />
       ) : (
         <p className="text-muted-foreground text-xs">{COPY.first.noPhotos}</p>
       )}

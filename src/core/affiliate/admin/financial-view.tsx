@@ -1,4 +1,5 @@
-import { COPY, STATUS, money, commissionStatus } from './copy'
+import Link from 'next/link'
+import { COPY, DOSSIER, STATUS, money, commissionStatus } from './copy'
 import { MutationForm, type SaveAction } from './form'
 import { payoutAmountHeaders, payoutAmounts } from './payout-amounts'
 import { DecidePayout } from './payout-decision'
@@ -78,6 +79,7 @@ export async function CommissionsView({ db, filters, action }: ViewProps) {
           COPY.commission,
           COPY.status,
           COPY.flag,
+          DOSSIER.history,
           COPY.complete,
         ]}
         rows={list.items.map((r) => ({
@@ -95,6 +97,10 @@ export async function CommissionsView({ db, filters, action }: ViewProps) {
             money(r.amount),
             commissionStatus(r.status),
             r.flags.map((s) => STATUS[s] ?? s).join('、') || COPY.none,
+            <Link key="history" prefetch={false} className="text-primary hover:underline"
+              href={href({ tab: 'affiliates', id: r.affiliate_user_id, section: r.level === 2 ? 'bonuses' : 'commissions', commission: r.id }) + '#commission-history'}>
+              {DOSSIER.history}
+            </Link>,
             <ReviewCommission key="form" r={r} action={action} />,
           ],
         }))}

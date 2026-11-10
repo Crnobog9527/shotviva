@@ -83,6 +83,7 @@ export async function templateExists(client: SupabaseClient, id: string): Promis
 }
 
 const versionErrors: Record<string, string> = {
+  INVALID_INPUT: '模板保存参数无效，请重新核对分类和系列。',
   STALE_TEMPLATE_ASSIGNMENT: '分类或系列已被其他管理员更改。请重新打开模板核对。',
   SYSTEM_ASSIGNMENT: '内置模板的分类与系列不能更改。',
   SERIES_NOT_FOUND: '所选系列已不存在，请重新选择。',
@@ -191,20 +192,23 @@ export async function setFeaturedTemplates(client: SupabaseClient, ids: string[]
 
 // What the admin sees when admin_set_template_order refuses (0600); anything else is INTERNAL.
 const ORDER_ERRORS: Record<string, [ErrorCode, string]> = {
+  ORDER_TIED: ['CONFLICT', '相同序号之间没有可用的位置。请移动到其他位置后重试。'],
   ORDER_MISMATCH: ['CONFLICT', '列表在别处改过了（有模板新增、删除、上下架或进出精选），请刷新页面后再排序'],
   NOT_ADMIN: ['FORBIDDEN', '只有管理员能调整顺序'],
   INVALID_INPUT: ['INVALID_INPUT', '顺序没保存：提交的列表不完整，请刷新页面后再试'],
 }
 
-// One group's whole order in one call (T76): 'catalogue' rewrites sort_order, 'featured' the
-// home featured ranks.
+// Pass the order the editor actually showed so a stale drag cannot undo another admin's move.
 export async function setTemplateOrder(
   client: SupabaseClient,
   group: TemplateOrderGroup,
   ids: string[],
   actor: string,
+  expectedIds?: string[],
 ): Promise<void> {
-  const { error } = await client.rpc('admin_set_template_order', { p_group: group, p_ids: ids, p_actor: actor })
+  const { error } = await client.rpc('admin_set_template_order', {
+    p_group: group, p_ids: ids, p_actor: actor, p_expected_ids: expectedIds,
+  })
   if (!error) return
   const known = ORDER_ERRORS[error.message]
   if (known) throw new AppError(known[0], known[1])

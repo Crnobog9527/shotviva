@@ -125,8 +125,11 @@ describe('reordering the featured list', () => {
     await pg.end()
   })
 
-  it('stores the new order in one call', async () => {
-    await setTemplateOrder(client, admin, { group: 'featured', ids: [O3, O1, O2] })
+  it('saves the displayed order and refuses a subsequent drag from the stale view', async () => {
+    await setTemplateOrder(client, admin, { group: 'featured', ids: [O3, O1, O2], expectedIds: order })
+    await expect(setTemplateOrder(client, admin, {
+      group: 'featured', ids: [O2, O1, O3], expectedIds: order,
+    })).rejects.toMatchObject({ code: 'CONFLICT' })
     expect(await featured()).toEqual([O3, O1, O2])
   })
 
@@ -154,10 +157,14 @@ describe('reordering the featured list', () => {
       code: 'FORBIDDEN',
     })
     expect(await featured()).toEqual([O3, O2])
-    const { rows } = await pg.query<{ auth: boolean; anon: boolean }>(
-      `select has_function_privilege('authenticated', 'public.admin_set_template_order(text, text[], uuid)', 'execute') as auth,
-              has_function_privilege('anon', 'public.admin_set_template_order(text, text[], uuid)', 'execute') as anon`,
-    )
-    expect(rows[0]).toEqual({ auth: false, anon: false })
+    for (const signature of ['text, text[], uuid', 'text, text[], uuid, text[]']) {
+      const { rows } = await pg.query(
+        `select has_function_privilege('authenticated', $1::text, 'execute') as auth,
+                has_function_privilege('anon', $1::text, 'execute') as anon,
+                has_function_privilege('service_role', $1::text, 'execute') as service`,
+        [`public.admin_set_template_order(${signature})`],
+      )
+      expect(rows[0]).toEqual({ auth: false, anon: false, service: true })
+    }
   })
 })

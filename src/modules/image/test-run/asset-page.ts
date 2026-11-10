@@ -33,10 +33,13 @@ export async function listManagedAssets(db: SupabaseClient, store: ObjectStore, 
   const { data, error } = await query.order(timestamp, { ascending: false }).order('id', { ascending: false }).limit(PAGE_SIZE + 1)
   if (error) throw new AppError('INTERNAL', '读取列表失败', { cause: error })
   const rows = z.array(assetRow).parse(data)
-  const items = await Promise.all(rows.slice(0, PAGE_SIZE).map(async row => ({
-    id: row.id, date: row.date, label: row.label,
-    thumbnail: row.key ? await store.presignGet(thumbnailKey(row.key), { expiresInSeconds: 600 }) : null,
-  })))
+  const items = await Promise.all(rows.slice(0, PAGE_SIZE).map(async row => {
+    const [thumbnail, originalUrl] = row.key ? await Promise.all([
+      store.presignGet(thumbnailKey(row.key), { expiresInSeconds: 600 }),
+      store.presignGet(row.key, { expiresInSeconds: 600 }),
+    ]) : [null, null]
+    return { id: row.id, date: row.date, label: row.label, thumbnail, originalUrl }
+  }))
   const last = items.at(-1)
   return { items, next: rows.length > PAGE_SIZE && last ? { date: last.date, id: last.id } : null }
 }
