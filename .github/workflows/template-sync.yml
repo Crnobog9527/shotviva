@@ -13,33 +13,18 @@ permissions:
   contents: read
 
 jobs:
-  approve:
+  sync:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    environment: template-sync-approval
+    environment: production-manual
     permissions:
       actions: read
-    steps:
-      # The separate reviewer gate leaves the production migration workflow unattended.
-      # A missing environment/reviewer or an admin bypass produces no Owner review.
-      - name: Verify the Owner approved this run
-        env:
-          GH_TOKEN: ${{ github.token }}
-          OWNER_ID: ${{ github.repository_owner_id }}
-        run: |
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/approvals" |
-            jq -e --arg id "$OWNER_ID" 'any(.[];
-              .state == "approved" and (.user.id | tostring) == $id and
-              any(.environments[]; .name == "template-sync-approval"))' >/dev/null
-
-  sync:
-    needs: approve
-    runs-on: ubuntu-latest
-    environment: production
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - uses: ./.github/actions/verify-owner-review
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
