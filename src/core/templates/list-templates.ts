@@ -32,9 +32,11 @@ function legacyList(db: SupabaseClient, surface: TemplateSurface, id?: string) {
   }, surface === 'partner' ? ',partner_image_aspects' : '')
 }
 
-async function catalogueRows(db: SupabaseClient, surface: TemplateSurface, id?: string) {
+type WebLookup = { id?: string; includeSeriesMembers?: boolean }
+
+async function catalogueRows(db: SupabaseClient, surface: TemplateSurface, lookup: WebLookup) {
   if (surface === 'web') {
-    const result = await db.rpc('web_templates', { p_template_id: id ?? null }).select(TEMPLATE_COLUMNS)
+    const result = await db.rpc('web_templates', { p_template_id: lookup.id ?? null, p_include_members: lookup.includeSeriesMembers ?? false }).select(TEMPLATE_COLUMNS)
       .order('sort_order').order('id').returns<CatalogueRow[]>()
     if (result.error?.code !== 'PGRST202') return result
   } else {
@@ -43,18 +45,18 @@ async function catalogueRows(db: SupabaseClient, surface: TemplateSurface, id?: 
     if (!result.error || !['PGRST200', '42703'].includes(result.error.code)) return result
   }
   // Deployment restored onto the pre-taxonomy schema.
-  return legacyList(db, surface, id)
+  return legacyList(db, surface, lookup.id)
 }
 
-export async function listTemplates(db: SupabaseClient, surface: TemplateSurface, id?: string): Promise<Template[]> {
-  const { data, error } = await catalogueRows(db, surface, id)
+export async function listTemplates(db: SupabaseClient, surface: TemplateSurface, lookup: WebLookup = {}): Promise<Template[]> {
+  const { data, error } = await catalogueRows(db, surface, lookup)
   if (error || !Array.isArray(data)) throw new Error(`listTemplates failed: ${error?.message ?? 'no data'}`)
   return surface === 'partner' ? data.flatMap(partnerRow) : data.map(toTemplate)
 }
 
 // Passing an id opens a visible series member in the workspace even when its series hides individual cards.
-export async function listTemplatesIn(db: SupabaseClient, locale: Locale, id?: string): Promise<LocalizedTemplate[]> {
-  return (await listTemplates(db, 'web', id))
+export async function listTemplatesIn(db: SupabaseClient, locale: Locale, lookup: WebLookup = {}): Promise<LocalizedTemplate[]> {
+  return (await listTemplates(db, 'web', lookup))
     .filter(template => !template.categoryInfo.isSystem)
     .map(template => localizeTemplate(template, locale))
 }

@@ -37,10 +37,10 @@ rows 1 stable language sql set search_path = '' as $$
   select t.* from public.templates t where t.id=$1.cover_template_id
 $$;
 
-create function public.web_templates(p_series_id uuid default null, p_template_id text default null) returns setof public.templates
+create function public.web_templates(p_series_id uuid default null, p_template_id text default null, p_include_members boolean default false) returns setof public.templates
 stable language sql set search_path = '' as $$
   select t.* from public.web_template_members m join public.templates t on t.id=m.id
-  where (p_series_id is null and p_template_id is null and m.standalone) or m.series_id=p_series_id or m.id=p_template_id
+  where (p_series_id is null and p_template_id is null and (m.standalone or p_include_members)) or m.series_id=p_series_id or m.id=p_template_id
 $$;
 
 -- Match a prefix positionally, not by slug membership (different parents can reuse a slug).
@@ -100,8 +100,8 @@ grant execute on function public.entry_series(public.web_catalogue_entries) to a
 revoke all on function public.entry_cover(public.web_catalogue_entries) from public;
 grant execute on function public.entry_cover(public.web_catalogue_entries) to anon,authenticated,service_role;
 
-revoke all on function public.web_templates(uuid,text) from public;
-grant execute on function public.web_templates(uuid,text) to anon,authenticated,service_role;
+revoke all on function public.web_templates(uuid,text,boolean) from public;
+grant execute on function public.web_templates(uuid,text,boolean) to anon,authenticated,service_role;
 
 revoke all on function public.category_entries(text[]) from public;
 grant execute on function public.category_entries(text[]) to anon,authenticated,service_role;

@@ -8249,16 +8249,16 @@ $$;
 ALTER FUNCTION "public"."toggle_template_request_vote"("p_request_id" "uuid", "p_user_id" "uuid") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."web_templates"("p_series_id" "uuid" DEFAULT NULL::"uuid", "p_template_id" "text" DEFAULT NULL::"text") RETURNS SETOF "public"."templates"
+CREATE OR REPLACE FUNCTION "public"."web_templates"("p_series_id" "uuid" DEFAULT NULL::"uuid", "p_template_id" "text" DEFAULT NULL::"text", "p_include_members" boolean DEFAULT false) RETURNS SETOF "public"."templates"
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
     AS $$
   select t.* from public.web_template_members m join public.templates t on t.id=m.id
-  where (p_series_id is null and p_template_id is null and m.standalone) or m.series_id=p_series_id or m.id=p_template_id
+  where (p_series_id is null and p_template_id is null and (m.standalone or p_include_members)) or m.series_id=p_series_id or m.id=p_template_id
 $$;
 
 
-ALTER FUNCTION "public"."web_templates"("p_series_id" "uuid", "p_template_id" "text") OWNER TO "postgres";
+ALTER FUNCTION "public"."web_templates"("p_series_id" "uuid", "p_template_id" "text", "p_include_members" boolean) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."wishlist_eligible"("p_user_id" "uuid") RETURNS boolean
@@ -11898,10 +11898,10 @@ GRANT ALL ON FUNCTION "public"."toggle_template_request_vote"("p_request_id" "uu
 
 
 
-REVOKE ALL ON FUNCTION "public"."web_templates"("p_series_id" "uuid", "p_template_id" "text") FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."web_templates"("p_series_id" "uuid", "p_template_id" "text") TO "anon";
-GRANT ALL ON FUNCTION "public"."web_templates"("p_series_id" "uuid", "p_template_id" "text") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."web_templates"("p_series_id" "uuid", "p_template_id" "text") TO "service_role";
+REVOKE ALL ON FUNCTION "public"."web_templates"("p_series_id" "uuid", "p_template_id" "text", "p_include_members" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."web_templates"("p_series_id" "uuid", "p_template_id" "text", "p_include_members" boolean) TO "anon";
+GRANT ALL ON FUNCTION "public"."web_templates"("p_series_id" "uuid", "p_template_id" "text", "p_include_members" boolean) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."web_templates"("p_series_id" "uuid", "p_template_id" "text", "p_include_members" boolean) TO "service_role";
 
 
 

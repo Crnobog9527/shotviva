@@ -70,7 +70,10 @@ describe('three-level catalogue', () => {
     expect((await readCategoryEntries(anon, path, 'en')).items.map(x => x.type)).toEqual(['template'])
     expect((await readCategoryEntries(service, [root, 'dish', 'dark'], 'en')).items).toEqual([])
     expect((await readSeriesMembers(anon, series, 'en')).items.map(t => t.id)).toEqual([member])
-    expect((await listTemplatesIn(anon, 'en', member))[0]?.id).toBe(member)
+    expect((await listTemplatesIn(anon, 'en', { id: member }))[0]?.id).toBe(member)
+    const available = await listTemplatesIn(anon, 'en', { includeSeriesMembers: true })
+    expect(available.find(template => template.id === member)?.name).toBe(member)
+    expect((await listTemplatesIn(anon, 'en')).some(template => template.id === member)).toBe(false)
     const partner = (await listTemplates(service, 'partner')).find(t => t.id === member)
     expect(toPartnerTemplate(partner!)).toMatchObject({ category: root, category_path: path, series: { id: series, slug: 't102-set', name: 'Set' } })
     await pg.query('update public.template_series set show_members=true where id=$1', [series])
@@ -79,7 +82,8 @@ describe('three-level catalogue', () => {
     for (const client of [anon, service]) {
       expect((await readCategoryEntries(client, [root], 'en')).items.map(x => x.type)).toEqual(['template'])
       expect((await readSeriesMembers(client, series, 'en')).items).toEqual([])
-      expect(await listTemplatesIn(client, 'en', member)).toEqual([])
+      expect(await listTemplatesIn(client, 'en', { id: member })).toEqual([])
+      expect((await listTemplatesIn(client, 'en', { includeSeriesMembers: true })).some(t => t.id === member)).toBe(false)
     }
     expect((await anon.from('template_series').select('id').eq('id', series)).data).toEqual([])
   })
