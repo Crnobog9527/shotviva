@@ -32,7 +32,9 @@ export async function referencePage(db: SupabaseClient, input: unknown): Promise
     .order('created_at', { ascending }).order('id', { ascending }).limit(limit + 1)
   if (filters.categoryId) query.eq('category_id', filters.categoryId)
   if (filters.tag) query.contains('tags', '{"' + filters.tag.replace(/["\\]/g, '\\$&') + '"}')
-  if (filters.note) query.ilike('note', '%' + filters.note.replace(/[\\%_*]/g, '\\$&') + '%')
+  // PostgREST translates '*' in LIKE patterns into '%', even when the star was escaped.
+  // imatch keeps punctuation literal after quoting PostgreSQL's regular expression operators.
+  if (filters.note) query.filter('note', 'imatch', filters.note.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
   if (filters.cursor) {
     const cursor = decodeCursor(filters.cursor)
     if (!cursor || !assetId.safeParse(cursor.i).success) throw new AppError('INVALID_INPUT', '分页位置无效')
