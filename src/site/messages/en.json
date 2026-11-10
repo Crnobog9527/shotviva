@@ -1379,7 +1379,7 @@
     "anyPage": "Add {suffix} to any page URL to share it with your audience.",
     "copy": "Copy link",
     "copied": "Copied",
-    "eligible": "Your balance qualifies for a payout. If you have no statement for this month after the scheduled date, the next daily check will create one.",
+    "eligible": "Your balance qualifies for a payout. A missed monthly settlement is retried automatically. If this month’s settlement has already run, your balance carries over to the next one.",
     "notEligible": "You do not currently qualify for a payout.",
     "next": "Next settlement · {date} (UTC)",
     "gap": "{gap} to go until the {threshold} payout threshold.",

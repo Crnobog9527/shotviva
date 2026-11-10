@@ -1,3 +1,17 @@
+-- One completed settlement per UTC month, including months with no qualifying balances.
+create table public.affiliate_settlement_runs (
+  period date primary key
+);
+alter table public.affiliate_settlement_runs enable row level security;
+revoke all on public.affiliate_settlement_runs from public,anon,authenticated,service_role;
+grant select on public.affiliate_settlement_runs to service_role;
+
+-- An existing statement proves the old scheduler completed that period. Its
+-- empty runs left no evidence, so an unmarked current period gets one pass.
+insert into public.affiliate_settlement_runs(period)
+  select distinct date_trunc('month',period)::date from public.affiliate_payouts
+  on conflict(period) do nothing;
+
 create or replace function public.affiliate_daily(p_today date) returns void language plpgsql security definer set search_path='' as $$
 declare v_settings public.affiliate_settings; v_payment bigint; v_cutoff timestamptz;
 begin
@@ -21,6 +35,11 @@ begin
   insert into public.affiliate_commission_changes(commission_id,old_amount,new_amount,old_status,new_status,reason)
     select id,amount,amount,'pending','confirmed','confirmed' from changed;
   if extract(day from p_today)<v_settings.settlement_day then return; end if;
+  -- The marker commits with the payouts and their items. Any failure rolls it
+  -- back so the next daily call can retry, even if this period had no payouts.
+  insert into public.affiliate_settlement_runs(period) values(date_trunc('month',p_today)::date)
+    on conflict(period) do nothing;
+  if not found then return; end if;
   -- One MVCC snapshot for the balance and its commission backing. Refunds that
   -- commit after this statement are measured against these exact amounts at payment.
   with issued as (
@@ -29,12 +48,9 @@ begin
         jsonb_build_object('payout_method',a.payout_method,'payout_details',a.payout_details)
         from public.affiliates a join public.affiliate_balances b on b.affiliate_user_id=a.user_id
        where a.status='active' and a.payout_method is not null and b.available>0 and b.available>=v_settings.payout_min_usd
-      on conflict(affiliate_user_id,period) do nothing returning id,affiliate_user_id)
+      on conflict(affiliate_user_id,period) do nothing returning id,affiliate_user_id,amount)
   insert into public.affiliate_payout_items(payout_id,commission_id,prior_amount,issue_amount)
-    select n.id,c.id,b.covered,c.amount from issued n join public.affiliate_commissions c on c.affiliate_user_id=n.affiliate_user_id
-    cross join lateral (select coalesce(max(coalesce(i.settled_amount,i.issue_amount)),0) covered
-      from public.affiliate_payout_items i join public.affiliate_payouts p on p.id=i.payout_id
-      where i.commission_id=c.id and p.status<>'void') b
-    where c.status='confirmed' and c.amount>b.covered;
+    select n.id,a.* from issued n
+      cross join lateral public._affiliate_allocate_payout(n.affiliate_user_id,n.amount) a;
 end;
 $$;

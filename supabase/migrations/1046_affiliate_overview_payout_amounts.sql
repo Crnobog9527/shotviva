@@ -15,7 +15,7 @@ begin
     from public.affiliate_commissions) c
   cross join (select coalesce(sum(coalesce(payout.paid_amount,payout.amount)) filter(where status='paid'),0) paid,
     count(*) filter(where status='due' and period=date_trunc('month',now() at time zone 'UTC')::date) due_count,
-    coalesce(sum(public.affiliate_payout_payable(payout)) filter(where status='due' and period=date_trunc('month',now() at time zone 'UTC')::date),0) due_total
+    coalesce(sum(coalesce(public.affiliate_payout_payable(payout),payout.amount)) filter(where status='due' and period=date_trunc('month',now() at time zone 'UTC')::date),0) due_total
     from public.affiliate_payouts payout) p;
   return v_answer;
 end;
