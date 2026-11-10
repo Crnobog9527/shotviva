@@ -476,6 +476,21 @@ $$;
 ALTER FUNCTION "admin"."check_catalog_minimums"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."check_reference_category"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if not exists(select from public.template_categories where key=new.category_id and kind='reference') then
+    raise exception 'CATEGORY_NOT_FOUND';
+  end if;
+  return new;
+end $$;
+
+
+ALTER FUNCTION "admin"."check_reference_category"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."check_series_category"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -813,6 +828,44 @@ $$;
 ALTER FUNCTION "admin"."mark_deleted_test_photo"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."move_category"("p_kind" "text", "p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text", "p_actor" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  old_parent text;
+  parent_level integer := 0;
+  siblings text[];
+  pos integer;
+begin
+  if not exists(select 1 from public.profiles where id=p_actor and role='admin' and banned_at is null) then raise exception 'NOT_ADMIN'; end if;
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.category_tree',0));
+  select parent_id into old_parent from public.template_categories where key=p_key and kind=p_kind and not is_system;
+  if not found or old_parent is distinct from p_from_parent then raise exception 'CATEGORY_CHANGED'; end if;
+  if p_parent is not null then
+    select level into parent_level from public.template_categories where key=p_parent and kind=p_kind and not is_system;
+    if not found or p_key='art-styles' then raise exception 'INVALID_PARENT'; end if;
+  end if;
+  if old_parent is distinct from p_parent then
+    -- Include descendants when checking the three-level limit and prohibit cycles before firing move triggers.
+    if exists(with recursive subtree(key,depth) as (
+      select p_key,1 union all select c.key,s.depth+1 from public.template_categories c join subtree s on c.parent_id=s.key
+    ) select 1 from subtree where key=p_parent or depth+parent_level>3) then raise exception 'INVALID_PARENT'; end if;
+    update public.template_categories set parent_id=p_parent where key=p_key;
+  end if;
+  select coalesce(array_agg(key order by sort_order,key),'{}') into siblings from public.template_categories
+    where kind=p_kind and not is_system and parent_id is not distinct from p_parent and key<>p_key;
+  pos := case when p_before is null then cardinality(siblings)+1 else array_position(siblings,p_before) end;
+  if pos is null then raise exception 'CATEGORY_CHANGED'; end if;
+  siblings := siblings[1:pos-1] || array[p_key] || siblings[pos:cardinality(siblings)];
+  update public.template_categories c set sort_order=o.n*10 from unnest(siblings) with ordinality o(key,n)
+    where c.key=o.key and c.sort_order<>o.n*10;
+end $$;
+
+
+ALTER FUNCTION "admin"."move_category"("p_kind" "text", "p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text", "p_actor" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."move_category_subtree"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -1051,6 +1104,19 @@ $$;
 ALTER FUNCTION "admin"."queue_test_asset_removal"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."reference_tags_valid"("p_tags" "text"[]) RETURNS boolean
+    LANGUAGE "sql" IMMUTABLE STRICT
+    SET "search_path" TO ''
+    AS $$
+  select cardinality(p_tags)<=32
+     and cardinality(p_tags)=(select count(distinct t) from unnest(p_tags) t)
+     and not exists(select from unnest(p_tags) t where t<>btrim(t) or length(t) not between 1 and 64)
+$$;
+
+
+ALTER FUNCTION "admin"."reference_tags_valid"("p_tags" "text"[]) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."renewal_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_invoice_id" "text", "p_period_end" timestamp with time zone, "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_charge_id" "text" DEFAULT NULL::"text") RETURNS "public"."credit_change"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -1125,6 +1191,20 @@ $$;
 
 
 ALTER FUNCTION "admin"."renewal_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_invoice_id" "text", "p_period_end" timestamp with time zone, "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_charge_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."require_reference_admin"("p_actor" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql" STABLE
+    SET "search_path" TO ''
+    AS $$
+begin
+  if not exists(select from public.profiles where id=p_actor and role='admin' and banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+end $$;
+
+
+ALTER FUNCTION "admin"."require_reference_admin"("p_actor" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."reservation_route_allowed"("t" "public"."templates", "route" "text", "tier" "text", "price" integer, "fallback" boolean, "v2" boolean) RETURNS boolean
@@ -2310,6 +2390,19 @@ $$;
 ALTER FUNCTION "public"."add_ticket_message"("p_ticket_id" "uuid", "p_user_id" "uuid", "p_body" "text", "p_images" "jsonb") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_ack_reference_deletions"("p_actor" "uuid", "p_keys" "text"[]) RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  perform admin.require_reference_admin(p_actor);
+  delete from public.reference_object_deletions where r2_key=any(p_keys) and created_at<=clock_timestamp();
+end $$;
+
+
+ALTER FUNCTION "public"."admin_ack_reference_deletions"("p_actor" "uuid", "p_keys" "text"[]) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_activate_announcement"("p_id" "uuid", "p_active" boolean, "p_actor" "uuid") RETURNS "uuid"[]
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -2856,6 +2949,8 @@ CREATE TABLE IF NOT EXISTS "public"."template_categories" (
     "seo_title_zh" "text",
     "seo_description_en" "text",
     "seo_description_zh" "text",
+    "name_en_lookup" "text" GENERATED ALWAYS AS ((("kind" || ':'::"text") || "lower"("name_en"))) STORED,
+    "name_zh_lookup" "text" GENERATED ALWAYS AS ((("kind" || ':'::"text") || "name_zh")) STORED,
     CONSTRAINT "template_categories_card_style_check" CHECK (("card_style" = ANY (ARRAY['pair'::"text", 'compare'::"text"]))),
     CONSTRAINT "template_categories_intro_en_check" CHECK ((("intro_en" IS NULL) OR (("char_length"("intro_en") >= 1) AND ("char_length"("intro_en") <= 200)))),
     CONSTRAINT "template_categories_intro_zh_check" CHECK ((("intro_zh" IS NULL) OR (("char_length"("intro_zh") >= 1) AND ("char_length"("intro_zh") <= 200)))),
@@ -3385,6 +3480,51 @@ $_$;
 ALTER FUNCTION "public"."admin_bulk_edit_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid", "p_locales" "text"[]) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_bulk_reference_assets"("p_actor" "uuid", "p_ids" "uuid"[], "p_action" "text", "p_value" "jsonb" DEFAULT NULL::"jsonb") RETURNS integer
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare n integer; labels text[]; dest text;
+begin
+  perform admin.require_reference_admin(p_actor);
+  if p_ids is null or cardinality(p_ids) not between 1 and 200
+    or cardinality(p_ids)<>(select count(distinct id) from unnest(p_ids) id) then raise exception 'INVALID_INPUT'; end if;
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree',0));
+  perform 1 from public.reference_assets where id=any(p_ids) order by id for update;
+  get diagnostics n=row_count;
+  if n<>cardinality(p_ids) then raise exception 'REFERENCE_NOT_FOUND'; end if;
+  case p_action
+    when 'move' then
+      dest:=p_value #>> '{}';
+      update public.reference_assets set category_id=dest where id=any(p_ids);
+    when 'add_tags','remove_tags' then
+      if jsonb_typeof(p_value) is distinct from 'array' then raise exception 'INVALID_INPUT'; end if;
+      labels:=array(select jsonb_array_elements_text(p_value));
+      if cardinality(labels)=0 or not admin.reference_tags_valid(labels) then raise exception 'INVALID_INPUT'; end if;
+      update public.reference_assets r set tags=case when p_action='add_tags' then
+          array(select distinct t from unnest(r.tags||labels) t order by t)
+        else array(select t from unnest(r.tags) t where not(t=any(labels))) end
+      where id=any(p_ids);
+    when 'archive' then
+      update public.reference_assets set status='archived',archived_at=coalesce(archived_at,now()) where id=any(p_ids);
+    when 'restore' then
+      update public.reference_assets set status='active',archived_at=null where id=any(p_ids);
+    when 'delete' then
+      if exists(select from public.reference_assets where id=any(p_ids) and status<>'archived') then
+        raise exception 'REFERENCE_NOT_ARCHIVED';
+      end if;
+      insert into public.reference_object_deletions(r2_key)
+        select r2_key from public.reference_assets where id=any(p_ids);
+      delete from public.reference_assets where id=any(p_ids);
+    else raise exception 'INVALID_INPUT';
+  end case;
+  return n;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_bulk_reference_assets"("p_actor" "uuid", "p_ids" "uuid"[], "p_action" "text", "p_value" "jsonb") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_clawback_payment"("p_payment_id" bigint, "p_actor" "uuid") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -3844,6 +3984,33 @@ $$;
 ALTER FUNCTION "public"."admin_delete_provider"("p_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_delete_reference_category"("p_actor" "uuid", "p_key" "text", "p_move_to" "text") RETURNS integer
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare moved integer:=0;
+begin
+  perform admin.require_reference_admin(p_actor);
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.category_tree',0));
+  perform 1 from public.template_categories where key=p_key and kind='reference' for update;
+  if not found then raise exception 'CATEGORY_NOT_FOUND'; end if;
+  if exists(select from public.template_categories where parent_id=p_key) then raise exception 'CATEGORY_HAS_CHILDREN'; end if;
+  if p_move_to is not null then
+    perform 1 from public.template_categories where key=p_move_to and key<>p_key and kind='reference' for update;
+    if not found then raise exception 'CATEGORY_NOT_FOUND'; end if;
+    update public.reference_assets set category_id=p_move_to where category_id=p_key;
+    get diagnostics moved=row_count;
+  elsif exists(select from public.reference_assets where category_id=p_key) then
+    raise exception 'CATEGORY_MOVE_REQUIRED';
+  end if;
+  delete from public.template_categories where key=p_key;
+  return moved;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_delete_reference_category"("p_actor" "uuid", "p_key" "text", "p_move_to" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") RETURNS integer
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -3875,6 +4042,42 @@ end $$;
 
 
 ALTER FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_due_reference_deletions"("p_actor" "uuid") RETURNS TABLE("r2_key" "text")
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  perform admin.require_reference_admin(p_actor);
+  return query select d.r2_key from public.reference_object_deletions d
+    where d.created_at<=clock_timestamp() order by d.created_at,d.r2_key limit 200 for update skip locked;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_due_reference_deletions"("p_actor" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_edit_reference_asset"("p_actor" "uuid", "p_id" "uuid", "p_fields" "jsonb") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  perform admin.require_reference_admin(p_actor);
+  if jsonb_typeof(p_fields) is distinct from 'object'
+    or p_fields - array['category_id','source_url','note','tags'] <> '{}'::jsonb then raise exception 'INVALID_INPUT'; end if;
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree',0));
+  update public.reference_assets set
+    category_id=case when p_fields?'category_id' then p_fields->>'category_id' else category_id end,
+    source_url=case when p_fields?'source_url' then p_fields->>'source_url' else source_url end,
+    note=case when p_fields?'note' then p_fields->>'note' else note end,
+    tags=case when p_fields?'tags' then array(select jsonb_array_elements_text(p_fields->'tags')) else tags end
+  where id=p_id;
+  if not found then raise exception 'REFERENCE_NOT_FOUND'; end if;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_edit_reference_asset"("p_actor" "uuid", "p_id" "uuid", "p_fields" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_finish_test_run"("p_run_id" "uuid", "p_status" "text", "p_output_key" "text", "p_error_code" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric, "p_duration_ms" integer) RETURNS "jsonb"
@@ -4506,39 +4709,23 @@ $$;
 ALTER FUNCTION "public"."admin_mark_dispute_submitted"("p_dispute_id" "text", "p_actor" "uuid") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."admin_move_template_category"("p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text", "p_actor" "uuid") RETURNS "void"
-    LANGUAGE "plpgsql"
+CREATE OR REPLACE FUNCTION "public"."admin_move_reference_category"("p_actor" "uuid", "p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text") RETURNS "void"
+    LANGUAGE "sql"
     SET "search_path" TO ''
     AS $$
-declare
-  old_parent text;
-  parent_level integer := 0;
-  siblings text[];
-  pos integer;
-begin
-  if not exists(select 1 from public.profiles where id=p_actor and role='admin' and banned_at is null) then raise exception 'NOT_ADMIN'; end if;
-  perform pg_advisory_xact_lock(hashtextextended('shotviva.category_tree',0));
-  select parent_id into old_parent from public.template_categories where key=p_key and kind='template' and not is_system;
-  if not found or old_parent is distinct from p_from_parent then raise exception 'CATEGORY_CHANGED'; end if;
-  if p_parent is not null then
-    select level into parent_level from public.template_categories where key=p_parent and kind='template' and not is_system;
-    if not found or p_key='art-styles' then raise exception 'INVALID_PARENT'; end if;
-  end if;
-  if old_parent is distinct from p_parent then
-    -- Include descendants when checking the three-level limit and prohibit cycles before firing move triggers.
-    if exists(with recursive subtree(key,depth) as (
-      select p_key,1 union all select c.key,s.depth+1 from public.template_categories c join subtree s on c.parent_id=s.key
-    ) select 1 from subtree where key=p_parent or depth+parent_level>3) then raise exception 'INVALID_PARENT'; end if;
-    update public.template_categories set parent_id=p_parent where key=p_key;
-  end if;
-  select coalesce(array_agg(key order by sort_order,key),'{}') into siblings from public.template_categories
-    where kind='template' and not is_system and parent_id is not distinct from p_parent and key<>p_key;
-  pos := case when p_before is null then cardinality(siblings)+1 else array_position(siblings,p_before) end;
-  if pos is null then raise exception 'CATEGORY_CHANGED'; end if;
-  siblings := siblings[1:pos-1] || array[p_key] || siblings[pos:cardinality(siblings)];
-  update public.template_categories c set sort_order=o.n*10 from unnest(siblings) with ordinality o(key,n)
-    where c.key=o.key and c.sort_order<>o.n*10;
-end $$;
+  select admin.move_category('reference',p_key,p_from_parent,p_parent,p_before,p_actor)
+$$;
+
+
+ALTER FUNCTION "public"."admin_move_reference_category"("p_actor" "uuid", "p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_move_template_category"("p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text", "p_actor" "uuid") RETURNS "void"
+    LANGUAGE "sql"
+    SET "search_path" TO ''
+    AS $$
+  select admin.move_category('template',p_key,p_from_parent,p_parent,p_before,p_actor)
+$$;
 
 
 ALTER FUNCTION "public"."admin_move_template_category"("p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text", "p_actor" "uuid") OWNER TO "postgres";
@@ -4554,6 +4741,46 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_openai_admin_key_status"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_register_reference_asset"("p_actor" "uuid", "p_asset" "jsonb") RETURNS "jsonb"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  candidate uuid := (p_asset->>'id')::uuid;
+  k text := 'references/'||candidate::text||'.webp';
+  result public.reference_assets;
+  duplicate boolean;
+begin
+  perform admin.require_reference_admin(p_actor);
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree',0));
+  perform 1 from public.reference_object_deletions where r2_key=k and created_at>clock_timestamp() for update;
+  if not found then
+    select id,status into result.id,result.status from public.reference_assets
+      where id=candidate and sha256=p_asset->>'sha256' and created_by=p_actor;
+    if not found then raise exception 'REFERENCE_UPLOAD_EXPIRED'; end if;
+    return jsonb_build_object('id',result.id,'status',result.status,'duplicate',false);
+  end if;
+  -- Lock digest before looking up the existing row, including while an archive is permanently removed.
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.reference.'||(p_asset->>'sha256'),0));
+  select id,status into result.id,result.status from public.reference_assets where sha256=p_asset->>'sha256' for share;
+  duplicate := found;
+  if duplicate then
+    update public.reference_object_deletions set created_at=now() where r2_key=k;
+  else
+    insert into public.reference_assets(id,category_id,r2_key,width,height,bytes,sha256,source_url,note,tags,created_by)
+    values(candidate,p_asset->>'category_id',k,(p_asset->>'width')::int,(p_asset->>'height')::int,
+      (p_asset->>'bytes')::int,p_asset->>'sha256',p_asset->>'source_url',p_asset->>'note',
+      array(select jsonb_array_elements_text(p_asset->'tags')),p_actor)
+    returning id,status into result.id,result.status;
+    delete from public.reference_object_deletions where r2_key=k;
+  end if;
+  return jsonb_build_object('id',result.id,'status',result.status,'duplicate',duplicate);
+end $$;
+
+
+ALTER FUNCTION "public"."admin_register_reference_asset"("p_actor" "uuid", "p_asset" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_remove_test_assets"("p_actor" "uuid", "p_kind" "text", "p_ids" "uuid"[], "p_expected" integer DEFAULT NULL::integer) RETURNS "jsonb"
@@ -4672,6 +4899,21 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_reply_ticket"("p_ticket_id" "uuid", "p_body" "text", "p_close" boolean, "p_images" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_reserve_reference_upload"("p_actor" "uuid", "p_id" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare k text := 'references/'||p_id::text||'.webp';
+begin
+  perform admin.require_reference_admin(p_actor);
+  if p_id is null or exists(select from public.reference_assets where id=p_id) then raise exception 'INVALID_INPUT'; end if;
+  insert into public.reference_object_deletions(r2_key,created_at) values(k,now()+interval '1 hour');
+end $$;
+
+
+ALTER FUNCTION "public"."admin_reserve_reference_upload"("p_actor" "uuid", "p_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_resolve_waffo_renewal"("p_actor" "uuid", "p_ticket" "uuid", "p_decision" "text", "p_total_usd_cents" integer, "p_tax_usd_cents" integer) RETURNS "void"
@@ -5025,6 +5267,39 @@ $$;
 ALTER FUNCTION "public"."admin_save_provider"("p_actor" "uuid", "p_id" "uuid", "p_settings" "jsonb", "p_capabilities" "jsonb", "p_key" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_save_reference_category"("p_actor" "uuid", "p_key" "text", "p_name_en" "text", "p_name_zh" "text", "p_parent" "text", "p_is_new" boolean) RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare next_order integer;
+begin
+  perform admin.require_reference_admin(p_actor);
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.category_tree',0));
+  if p_is_new is null then raise exception 'INVALID_INPUT'; end if;
+  if p_is_new and exists(select from public.template_categories where key=p_key) then raise exception 'CATEGORY_KEY_TAKEN'; end if;
+  if not p_is_new and not exists(select from public.template_categories where key=p_key and kind='reference') then
+    raise exception 'CATEGORY_NOT_FOUND';
+  end if;
+  if exists(select from public.template_categories where name_en_lookup='reference:'||lower(btrim(p_name_en)) and key<>p_key)
+    then raise exception 'CATEGORY_NAME_EN_TAKEN'; end if;
+  if exists(select from public.template_categories where name_zh_lookup='reference:'||btrim(p_name_zh) and key<>p_key)
+    then raise exception 'CATEGORY_NAME_ZH_TAKEN'; end if;
+  if p_is_new then
+    if p_parent is not null and not exists(select from public.template_categories where key=p_parent and kind='reference' and level<3)
+      then raise exception 'INVALID_PARENT'; end if;
+    select coalesce(max(sort_order),0)+10 into next_order from public.template_categories
+      where kind='reference' and parent_id is not distinct from p_parent;
+    insert into public.template_categories(key,name_en,name_zh,parent_id,kind,is_visible,sort_order)
+      values(p_key,btrim(p_name_en),btrim(p_name_zh),p_parent,'reference',false,next_order);
+  else
+    update public.template_categories set name_en=btrim(p_name_en),name_zh=btrim(p_name_zh) where key=p_key;
+  end if;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_save_reference_category"("p_actor" "uuid", "p_key" "text", "p_name_en" "text", "p_name_zh" "text", "p_parent" "text", "p_is_new" boolean) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_save_template_assignment"("p_actor" "uuid", "p_template" "jsonb", "p_prompt" "jsonb", "p_assignment" "jsonb", "p_is_new" boolean, "p_expected" integer DEFAULT NULL::integer, "p_selected" integer DEFAULT NULL::integer, "p_style_refs" "jsonb" DEFAULT NULL::"jsonb") RETURNS integer
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -5114,8 +5389,8 @@ begin
     if previous.key is null or previous.kind <> 'template' then raise exception 'CATEGORY_NOT_FOUND'; end if;
     if previous.is_system then raise exception 'CATEGORY_SYSTEM'; end if;
   end if;
-  if exists(select 1 from public.template_categories where lower(name_en)=lower(en) and key<>k) then raise exception 'CATEGORY_NAME_EN_TAKEN'; end if;
-  if exists(select 1 from public.template_categories where name_zh=zh and key<>k) then raise exception 'CATEGORY_NAME_ZH_TAKEN'; end if;
+  if exists(select 1 from public.template_categories where name_en_lookup='template:'||lower(en) and key<>k) then raise exception 'CATEGORY_NAME_EN_TAKEN'; end if;
+  if exists(select 1 from public.template_categories where name_zh_lookup='template:'||zh and key<>k) then raise exception 'CATEGORY_NAME_ZH_TAKEN'; end if;
 
   if p_is_new then
     if parent is not null and not exists(select 1 from public.template_categories
@@ -9414,7 +9689,7 @@ begin
   end if;
   select c.key into v_key
   from public.template_categories c
-  where c.key = v_value or lower(c.name_en) = lower(v_value) or c.name_zh = v_value
+  where (c.kind='template' and c.key=v_value) or c.name_en_lookup='template:'||lower(v_value) or c.name_zh_lookup='template:'||v_value
   order by (c.key = v_value) desc, c.sort_order
   limit 1;
   if v_key is not null then
@@ -9434,13 +9709,13 @@ begin
 
   v_name_en := btrim(left(v_value, 32));
   v_n := 1;
-  while exists (select 1 from public.template_categories c where lower(c.name_en) = lower(v_name_en)) loop
+  while exists (select 1 from public.template_categories c where c.name_en_lookup='template:'||lower(v_name_en)) loop
     v_n := v_n + 1;
     v_name_en := btrim(left(v_value, 32 - length(' ' || v_n))) || ' ' || v_n;
   end loop;
   v_name_zh := btrim(left(v_value, 12));
   v_n := 1;
-  while exists (select 1 from public.template_categories c where c.name_zh = v_name_zh) loop
+  while exists (select 1 from public.template_categories c where c.name_zh_lookup='template:'||v_name_zh) loop
     v_n := v_n + 1;
     v_name_zh := btrim(left(v_value, 12 - length(' ' || v_n))) || ' ' || v_n;
   end loop;
@@ -9448,7 +9723,7 @@ begin
   insert into public.template_categories (key, name_en, name_zh, card_style, sort_order)
   values (
     v_key, v_name_en, v_name_zh, 'pair',
-    (select coalesce(max(c.sort_order), 0) + 10 from public.template_categories c where not c.is_system)
+    (select coalesce(max(c.sort_order), 0) + 10 from public.template_categories c where c.kind='template' and not c.is_system)
   );
   return v_key;
 end;
@@ -10600,6 +10875,57 @@ CREATE TABLE IF NOT EXISTS "public"."products" (
 ALTER TABLE "public"."products" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."reference_assets" (
+    "id" "uuid" NOT NULL,
+    "category_id" "text" NOT NULL,
+    "r2_key" "text" NOT NULL,
+    "width" integer NOT NULL,
+    "height" integer NOT NULL,
+    "bytes" integer NOT NULL,
+    "sha256" "text" NOT NULL,
+    "source_url" "text",
+    "note" "text",
+    "tags" "text"[] DEFAULT '{}'::"text"[] NOT NULL,
+    "status" "text" DEFAULT 'active'::"text" NOT NULL,
+    "archived_at" timestamp with time zone,
+    "created_by" "uuid",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "reference_assets_bytes_check" CHECK ((("bytes" >= 1) AND ("bytes" <= 20971520))),
+    CONSTRAINT "reference_assets_check" CHECK (("r2_key" = (('references/'::"text" || ("id")::"text") || '.webp'::"text"))),
+    CONSTRAINT "reference_assets_check1" CHECK ((("status" = 'archived'::"text") = ("archived_at" IS NOT NULL))),
+    CONSTRAINT "reference_assets_height_check" CHECK ((("height" >= 1) AND ("height" <= 2048))),
+    CONSTRAINT "reference_assets_note_check" CHECK (("length"("note") <= 2000)),
+    CONSTRAINT "reference_assets_sha256_check" CHECK (("sha256" ~ '^[a-f0-9]{64}$'::"text")),
+    CONSTRAINT "reference_assets_source_url_check" CHECK ((("source_url" ~* '^https?://[^[:space:]]+$'::"text") AND ("length"("source_url") <= 2048))),
+    CONSTRAINT "reference_assets_status_check" CHECK (("status" = ANY (ARRAY['active'::"text", 'archived'::"text"]))),
+    CONSTRAINT "reference_assets_tags_check" CHECK ("admin"."reference_tags_valid"("tags")),
+    CONSTRAINT "reference_assets_width_check" CHECK ((("width" >= 1) AND ("width" <= 2048)))
+);
+
+
+ALTER TABLE "public"."reference_assets" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."reference_object_deletions" (
+    "r2_key" "text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "reference_object_deletions_r2_key_check" CHECK (("r2_key" ~ '^references/[a-f0-9-]{36}\.webp$'::"text"))
+);
+
+
+ALTER TABLE "public"."reference_object_deletions" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."reference_template_sources" (
+    "template_id" "text" NOT NULL,
+    "asset_id" "uuid" NOT NULL,
+    "run_id" "uuid" NOT NULL
+);
+
+
+ALTER TABLE "public"."reference_template_sources" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."site_announcements" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "message_en" "text" NOT NULL,
@@ -11098,6 +11424,36 @@ ALTER TABLE ONLY "public"."profiles"
 
 
 
+ALTER TABLE ONLY "public"."reference_assets"
+    ADD CONSTRAINT "reference_assets_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."reference_assets"
+    ADD CONSTRAINT "reference_assets_r2_key_key" UNIQUE ("r2_key");
+
+
+
+ALTER TABLE ONLY "public"."reference_assets"
+    ADD CONSTRAINT "reference_assets_sha256_key" UNIQUE ("sha256");
+
+
+
+ALTER TABLE ONLY "public"."reference_object_deletions"
+    ADD CONSTRAINT "reference_object_deletions_pkey" PRIMARY KEY ("r2_key");
+
+
+
+ALTER TABLE ONLY "public"."reference_template_sources"
+    ADD CONSTRAINT "reference_template_sources_pkey" PRIMARY KEY ("template_id");
+
+
+
+ALTER TABLE ONLY "public"."reference_template_sources"
+    ADD CONSTRAINT "reference_template_sources_run_id_key" UNIQUE ("run_id");
+
+
+
 ALTER TABLE ONLY "public"."site_announcements"
     ADD CONSTRAINT "site_announcements_active_no_overlap" EXCLUDE USING "gist" ("tstzrange"(COALESCE("starts_at", '-infinity'::timestamp with time zone), COALESCE("ends_at", 'infinity'::timestamp with time zone)) WITH &&) WHERE ("is_active");
 
@@ -11529,6 +11885,34 @@ CREATE INDEX "profiles_signup_ip_created_at_idx" ON "public"."profiles" USING "b
 
 
 
+CREATE INDEX "reference_assets_category" ON "public"."reference_assets" USING "btree" ("category_id", "status", "created_at" DESC, "id" DESC);
+
+
+
+CREATE INDEX "reference_assets_creator" ON "public"."reference_assets" USING "btree" ("created_by") WHERE ("created_by" IS NOT NULL);
+
+
+
+CREATE INDEX "reference_assets_note" ON "public"."reference_assets" USING "gin" ("note" "extensions"."gin_trgm_ops");
+
+
+
+CREATE INDEX "reference_assets_paging" ON "public"."reference_assets" USING "btree" ("status", "created_at" DESC, "id" DESC);
+
+
+
+CREATE INDEX "reference_assets_tags" ON "public"."reference_assets" USING "gin" ("tags");
+
+
+
+CREATE INDEX "reference_deletions_ready" ON "public"."reference_object_deletions" USING "btree" ("created_at", "r2_key");
+
+
+
+CREATE INDEX "reference_template_sources_asset" ON "public"."reference_template_sources" USING "btree" ("asset_id");
+
+
+
 CREATE INDEX "site_announcements_created_at_id_idx" ON "public"."site_announcements" USING "btree" ("created_at" DESC, "id" DESC);
 
 
@@ -11569,11 +11953,11 @@ CREATE INDEX "support_tickets_user_id_created_at_idx" ON "public"."support_ticke
 
 
 
-CREATE UNIQUE INDEX "template_categories_name_en_key" ON "public"."template_categories" USING "btree" ("lower"("name_en"));
+CREATE UNIQUE INDEX "template_categories_name_en_key" ON "public"."template_categories" USING "btree" ("name_en_lookup");
 
 
 
-CREATE UNIQUE INDEX "template_categories_name_zh_key" ON "public"."template_categories" USING "btree" ("name_zh");
+CREATE UNIQUE INDEX "template_categories_name_zh_key" ON "public"."template_categories" USING "btree" ("name_zh_lookup");
 
 
 
@@ -11722,6 +12106,10 @@ CREATE CONSTRAINT TRIGGER "prompt_publish_floor" AFTER INSERT OR DELETE OR UPDAT
 
 
 CREATE OR REPLACE TRIGGER "prompt_style_ref_limit" AFTER INSERT OR UPDATE ON "public"."template_prompts" FOR EACH ROW EXECUTE FUNCTION "admin"."check_template_style_ref_limit"();
+
+
+
+CREATE OR REPLACE TRIGGER "reference_asset_category" BEFORE INSERT OR UPDATE OF "category_id" ON "public"."reference_assets" FOR EACH ROW EXECUTE FUNCTION "admin"."check_reference_category"();
 
 
 
@@ -12109,6 +12497,26 @@ ALTER TABLE ONLY "public"."profiles"
 
 
 
+ALTER TABLE ONLY "public"."reference_assets"
+    ADD CONSTRAINT "reference_assets_category_id_fkey" FOREIGN KEY ("category_id") REFERENCES "public"."template_categories"("key");
+
+
+
+ALTER TABLE ONLY "public"."reference_assets"
+    ADD CONSTRAINT "reference_assets_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."reference_template_sources"
+    ADD CONSTRAINT "reference_template_sources_asset_id_fkey" FOREIGN KEY ("asset_id") REFERENCES "public"."reference_assets"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."reference_template_sources"
+    ADD CONSTRAINT "reference_template_sources_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."site_announcements"
     ADD CONSTRAINT "site_announcements_updated_by_fkey" FOREIGN KEY ("updated_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
@@ -12404,6 +12812,15 @@ CREATE POLICY "profiles_select_own" ON "public"."profiles" FOR SELECT TO "authen
 
 
 
+ALTER TABLE "public"."reference_assets" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."reference_object_deletions" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."reference_template_sources" ENABLE ROW LEVEL SECURITY;
+
+
 CREATE POLICY "series_read" ON "public"."template_series" FOR SELECT TO "authenticated", "anon" USING (("is_active" AND (EXISTS ( SELECT 1
    FROM "public"."template_category_paths" "c"
   WHERE (("c"."key" = "template_series"."category_key") AND "c"."web_visible"))) AND (EXISTS ( SELECT 1
@@ -12593,6 +13010,11 @@ REVOKE ALL ON FUNCTION "admin"."check_catalog_minimums"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "admin"."check_reference_category"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."check_reference_category"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "admin"."check_style_job_route"() FROM PUBLIC;
 
 
@@ -12645,6 +13067,11 @@ REVOKE ALL ON FUNCTION "admin"."mark_deleted_test_photo"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "admin"."move_category"("p_kind" "text", "p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text", "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."move_category"("p_kind" "text", "p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text", "p_actor" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "admin"."partner_image_aspects"("public"."templates") FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."partner_image_aspects"("public"."templates") TO "anon";
 GRANT ALL ON FUNCTION "admin"."partner_image_aspects"("public"."templates") TO "authenticated";
@@ -12672,7 +13099,17 @@ REVOKE ALL ON FUNCTION "admin"."queue_test_asset_removal"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "admin"."reference_tags_valid"("p_tags" "text"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."reference_tags_valid"("p_tags" "text"[]) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "admin"."renewal_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_invoice_id" "text", "p_period_end" timestamp with time zone, "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_charge_id" "text") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."require_reference_admin"("p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."require_reference_admin"("p_actor" "uuid") TO "service_role";
 
 
 
@@ -12881,6 +13318,11 @@ GRANT ALL ON FUNCTION "public"."add_ticket_message"("p_ticket_id" "uuid", "p_use
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_ack_reference_deletions"("p_actor" "uuid", "p_keys" "text"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_ack_reference_deletions"("p_actor" "uuid", "p_keys" "text"[]) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_activate_announcement"("p_id" "uuid", "p_active" boolean, "p_actor" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_activate_announcement"("p_id" "uuid", "p_active" boolean, "p_actor" "uuid") TO "service_role";
 
@@ -13022,6 +13464,11 @@ GRANT ALL ON FUNCTION "public"."admin_bulk_edit_templates"("p_ids" "text"[], "p_
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_bulk_reference_assets"("p_actor" "uuid", "p_ids" "uuid"[], "p_action" "text", "p_value" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_bulk_reference_assets"("p_actor" "uuid", "p_ids" "uuid"[], "p_action" "text", "p_value" "jsonb") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_clawback_payment"("p_payment_id" bigint, "p_actor" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_clawback_payment"("p_payment_id" bigint, "p_actor" "uuid") TO "service_role";
 
@@ -13067,8 +13514,23 @@ GRANT ALL ON FUNCTION "public"."admin_delete_provider"("p_id" "uuid") TO "servic
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_delete_reference_category"("p_actor" "uuid", "p_key" "text", "p_move_to" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_delete_reference_category"("p_actor" "uuid", "p_key" "text", "p_move_to" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_due_reference_deletions"("p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_due_reference_deletions"("p_actor" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_edit_reference_asset"("p_actor" "uuid", "p_id" "uuid", "p_fields" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_edit_reference_asset"("p_actor" "uuid", "p_id" "uuid", "p_fields" "jsonb") TO "service_role";
 
 
 
@@ -13152,6 +13614,11 @@ GRANT ALL ON FUNCTION "public"."admin_mark_dispute_submitted"("p_dispute_id" "te
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_move_reference_category"("p_actor" "uuid", "p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_move_reference_category"("p_actor" "uuid", "p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_move_template_category"("p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text", "p_actor" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_move_template_category"("p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text", "p_actor" "uuid") TO "service_role";
 
@@ -13159,6 +13626,11 @@ GRANT ALL ON FUNCTION "public"."admin_move_template_category"("p_key" "text", "p
 
 REVOKE ALL ON FUNCTION "public"."admin_openai_admin_key_status"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_openai_admin_key_status"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_register_reference_asset"("p_actor" "uuid", "p_asset" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_register_reference_asset"("p_actor" "uuid", "p_asset" "jsonb") TO "service_role";
 
 
 
@@ -13179,6 +13651,11 @@ GRANT ALL ON FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) TO "s
 
 REVOKE ALL ON FUNCTION "public"."admin_reply_ticket"("p_ticket_id" "uuid", "p_body" "text", "p_close" boolean, "p_images" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_reply_ticket"("p_ticket_id" "uuid", "p_body" "text", "p_close" boolean, "p_images" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_reserve_reference_upload"("p_actor" "uuid", "p_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_reserve_reference_upload"("p_actor" "uuid", "p_id" "uuid") TO "service_role";
 
 
 
@@ -13214,6 +13691,11 @@ GRANT ALL ON FUNCTION "public"."admin_save_invite_rewards"("p_actor" "uuid", "p_
 
 REVOKE ALL ON FUNCTION "public"."admin_save_provider"("p_actor" "uuid", "p_id" "uuid", "p_settings" "jsonb", "p_capabilities" "jsonb", "p_key" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_save_provider"("p_actor" "uuid", "p_id" "uuid", "p_settings" "jsonb", "p_capabilities" "jsonb", "p_key" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_save_reference_category"("p_actor" "uuid", "p_key" "text", "p_name_en" "text", "p_name_zh" "text", "p_parent" "text", "p_is_new" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_save_reference_category"("p_actor" "uuid", "p_key" "text", "p_name_en" "text", "p_name_zh" "text", "p_parent" "text", "p_is_new" boolean) TO "service_role";
 
 
 
@@ -14093,6 +14575,18 @@ GRANT UPDATE ON SEQUENCE "public"."payments_id_seq" TO "service_role";
 
 
 GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."products" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."reference_assets" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."reference_object_deletions" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."reference_template_sources" TO "service_role";
 
 
 

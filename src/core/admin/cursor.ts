@@ -25,9 +25,9 @@ export function decodeCursor(raw: string | null | undefined): TimeCursor | null 
 
 // PostgREST `or` filter for rows after the cursor in (created_at desc, <id> desc) order.
 // Timestamps are double-quoted because they carry ':' and '+'.
-export function afterCursor(cursor: TimeCursor, idColumn = 'id'): string {
+export function afterCursor(cursor: TimeCursor, idColumn = 'id', direction: 'lt' | 'gt' = 'lt'): string {
   const c = `"${cursor.c}"`
-  return `created_at.lt.${c},and(created_at.eq.${c},${idColumn}.lt.${cursor.i})`
+  return `created_at.${direction}.${c},and(created_at.eq.${c},${idColumn}.${direction}.${cursor.i})`
 }
 
 export type Page<T> = { items: T[]; nextCursor: string | null }

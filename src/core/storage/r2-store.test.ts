@@ -1,4 +1,4 @@
-import { CopyObjectCommand, DeleteObjectsCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand } from '@aws-sdk/client-s3'
+import { CopyObjectCommand, DeleteObjectsCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand } from '@aws-sdk/client-s3'
 import { describe, expect, it, vi } from 'vitest'
 
 import { createR2Store } from './r2-store'
@@ -42,6 +42,15 @@ describe('createR2Store', () => {
     const [, command, options] = presign.mock.calls[0] as unknown as [unknown, PutObjectCommand, { expiresIn: number }]
     expect(command.input).toMatchObject({ Bucket: 'bucket', Key: 'inputs/u/a.jpg', ContentType: 'image/jpeg' })
     expect(options.expiresIn).toBe(60)
+  })
+
+  it('limits staged reads with an inclusive byte range', async () => {
+    const send = vi.fn<(command: GetObjectCommand) => Promise<{ Body: { transformToByteArray(): Promise<Uint8Array> } }>>(async () => ({
+      Body: { transformToByteArray: async () => new Uint8Array(4) },
+    }))
+    const store = createR2Store({ send } as never, 'private')
+    await store.get('staging', 4)
+    expect(send.mock.calls[0][0].input).toMatchObject({ Bucket: 'private', Key: 'staging', Range: 'bytes=0-3' })
   })
 
   it('copies inside the bucket with an encoded CopySource', async () => {
