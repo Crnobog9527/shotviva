@@ -1,4 +1,5 @@
 export const copy = {
+  keepHint: '保留各模板当前的出图模型。',
   label: '出图模型',
   followDefault: '默认（跟随在用供应商）',
   unknown: '尚无可用的模型能力记录。',

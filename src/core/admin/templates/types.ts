@@ -24,7 +24,7 @@ export type ActionResult = { ok: true; version?: number } | ActionFailure
 export type ActionValue<T> = { ok: true; value: T } | ActionFailure
 
 // The two lists /admin/templates orders (T76): the whole catalogue and the home featured list.
-export type TemplateOrderGroup = 'catalogue' | 'featured'
+export type TemplateOrderGroup = 'catalogue' | 'featured' | 'active' | 'inactive'
 
 export type CoverUploadRequest = { templateId: string; purpose: CoverPurpose; contentType: string; size: number }
 export type CoverTicket = { key: string; putUrl: string; headers: { 'Content-Type': string } }

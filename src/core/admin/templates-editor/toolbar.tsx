@@ -3,7 +3,7 @@
 import { Button } from '@/core/ui/button'
 import { Input } from '@/core/ui/input'
 
-import { orderCopy } from './copy'
+import { catalogCopy, orderCopy } from './copy'
 import type { TableOrder } from './templates-table'
 
 type Props = { query: string; onQuery: (query: string) => void; onNew: () => void }
@@ -13,7 +13,7 @@ type Props = { query: string; onQuery: (query: string) => void; onNew: () => voi
 export function Toolbar({ query, onQuery, onNew }: Props) {
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-      <Input className="max-w-xs" placeholder="搜索 ID / 名称 / 分类" value={query} onChange={(event) => onQuery(event.target.value)} />
+      <Input className="max-w-xs" aria-label={catalogCopy.search} placeholder={catalogCopy.search} value={query} onChange={(event) => onQuery(event.target.value)} />
       {query.trim() ? <span className="text-muted-foreground text-xs">{orderCopy.filtered}</span> : null}
       <Button className="ml-auto" onClick={onNew}>
         新建模板

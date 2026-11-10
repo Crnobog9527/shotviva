@@ -120,7 +120,7 @@ export async function setTemplateActive(
 // Drag-to-reorder (T76): one group's whole new order per save. The SQL function also refuses a
 // list that is not exactly the group, so an out-of-date page cannot scramble the order.
 const orderSchema = z.object({
-  group: z.enum(['catalogue', 'featured']),
+  group: z.enum(['catalogue', 'featured', 'active', 'inactive']),
   ids: z
     .array(z.string().min(1).max(64))
     .max(500)

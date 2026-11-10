@@ -1,5 +1,6 @@
 'use client'
 
+import { catalogCopy } from './copy'
 import { Input } from '@/core/ui/input'
 import { Label } from '@/core/ui/label'
 import { RESOLUTIONS } from '@/core/templates/output-options'
@@ -10,6 +11,7 @@ import { creditProblems, TIER_LABEL, type TemplateFormValues } from './form-stat
 
 type Props = {
   values: TemplateFormValues
+  modelField: React.ReactNode
   floor: CreditsFloor
   onChange: (patch: Partial<TemplateFormValues>) => void
 }
@@ -18,10 +20,12 @@ const QUALITY_LABEL: Record<TemplateQuality, string> = { high: 'high', medium: '
 
 // Quality tier + one credit number per resolution (ARCHITECTURE §5, §10). Each box shows its
 // floor; a number under it is flagged here and refused again by the server.
-export function TemplatePriceFields({ values, floor, onChange }: Props) {
+export function TemplatePriceFields({ values, floor, modelField, onChange }: Props) {
   const problems = creditProblems(values, floor)
   return (
-    <div className="grid gap-3 rounded-md border p-3">
+    <fieldset className="grid gap-3 rounded-md border p-3">
+      <legend className="px-1 text-sm font-semibold">{catalogCopy.priceGroup}</legend>
+      {modelField}
       <div className="grid gap-1.5">
         <Label htmlFor="tpl-quality">模板质量档</Label>
         <select
@@ -59,6 +63,6 @@ export function TemplatePriceFields({ values, floor, onChange }: Props) {
           </div>
         ))}
       </div>
-    </div>
+    </fieldset>
   )
 }

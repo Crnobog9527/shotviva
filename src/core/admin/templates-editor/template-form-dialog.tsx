@@ -116,18 +116,17 @@ function FormColumn({ target, providers, values, isNew, floor, categories, cover
         <DialogTitle>{existing ? `编辑「${existing.name}」` : '新建模板'}</DialogTitle>
       </DialogHeader>
       <SaleSwitch template={existing} action={coverActions.setSale} disabled={pending} />
-      <TemplatePublicFields values={values} isNew={isNew} uploading={uploading} floor={floor} categories={categories} onChange={onChange} />
+      <TemplatePublicFields modelField={values.module === 'image' && (
+        <>
+          <ImageProviderField id="tpl-provider" providers={providers} value={values.providerId} onChange={(providerId) => onChange({ providerId })} />
+          <FallbackPrice providers={providers} values={values} />
+        </>
+      )} values={values} isNew={isNew} uploading={uploading} floor={floor} categories={categories} onChange={onChange} />
       <TemplateTranslationFields values={values} onChange={onChange} />
       {existing ? (
         <TemplateCoverFields template={existing} languages={coverLanguages} actions={coverActions} active={activeCover} onSelect={setActiveCover} />
       ) : (
         <p className="text-muted-foreground text-xs">保存模板后再打开编辑，即可上传封面。</p>
-      )}
-      {values.module === 'image' && (
-        <>
-          <ImageProviderField id="tpl-provider" providers={providers} value={values.providerId} onChange={(providerId) => onChange({ providerId })} />
-          <FallbackPrice providers={providers} values={values} />
-        </>
       )}
       <StyleSection cover={cover} values={values} budget={budget} uploading={uploading} setUploading={setUploading} onChange={onChange} />
       <TemplatePromptFields values={values} version={existing?.prompt?.version ?? null} onChange={onChange} />

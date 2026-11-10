@@ -10,6 +10,7 @@ import { BulkBar } from './bulk-bar'
 import { BulkConfirmDialog } from './bulk-confirm-dialog'
 import { BulkEditDialog } from './bulk-edit-dialog'
 import { BulkResult } from './bulk-result'
+import type { ImageProviderOption } from '../image-provider-field'
 import type { CategoryOption } from './category-field'
 import { useBulkActive } from './use-bulk-active'
 import { useBulkEdit } from './use-bulk-edit'
@@ -22,13 +23,14 @@ type Props = {
   // Batch edit (T79) and the floor its dialog checks against.
   editMany: TemplateAdminActions['editMany']
   floor: ProviderFloors
+  providers: readonly ImageProviderOption[]
   categories: readonly CategoryOption[]
   onClear: () => void
 }
 
 // Bulk 上架 / 下架 (T60): bar → confirm dialog naming the templates → one server call → result list.
 // Batch edit (T79) shares the bar: dialog → review → one all-or-nothing call.
-export function BulkPublish({ selected, busy, setActiveMany, editMany, floor, categories, onClear }: Props) {
+export function BulkPublish({ selected, busy, setActiveMany, editMany, floor, providers, categories, onClear }: Props) {
   const [asking, setAsking] = useState<boolean | null>(null)
   const { pending, outcome, error, run, dismiss } = useBulkActive(setActiveMany)
   const edit = useBulkEdit(editMany, onClear)
@@ -63,7 +65,7 @@ export function BulkPublish({ selected, busy, setActiveMany, editMany, floor, ca
       ) : null}
       {outcome ? <BulkResult outcome={outcome} onDismiss={dismiss} /> : null}
       <BulkEditDialog
-        edit={edit}
+        providers={providers} edit={edit}
         templates={selected.filter(isBulkEditable)}
         skipped={selected.filter((template) => !isBulkEditable(template))}
         floor={floor}

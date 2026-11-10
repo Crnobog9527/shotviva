@@ -366,6 +366,90 @@ end $$;
 ALTER FUNCTION "admin"."assign_template_prompt_version"() OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."ai_providers" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "module" "text" DEFAULT 'image'::"text" NOT NULL,
+    "adapter" "text" NOT NULL,
+    "label" "text" NOT NULL,
+    "base_url" "text" DEFAULT 'https://api.openai.com/v1'::"text" NOT NULL,
+    "model" "text" NOT NULL,
+    "api_key_last4" "text",
+    "is_active" boolean DEFAULT false NOT NULL,
+    "notes" "text",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_by" "uuid",
+    "vault_secret_id" "uuid",
+    "price_input_text_per_m" numeric(12,6),
+    "price_input_image_per_m" numeric(12,6),
+    "price_output_per_m" numeric(12,6),
+    "resolutions" "text"[] DEFAULT '{1k,2k,3k}'::"text"[] NOT NULL,
+    "capabilities" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "estimated_image_costs" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    CONSTRAINT "ai_providers_adapter_check" CHECK (("adapter" = ANY (ARRAY['openai_images'::"text", 'openrouter_images'::"text", 'openai_responses'::"text"]))),
+    CONSTRAINT "ai_providers_api_key_last4_check" CHECK ((("char_length"("api_key_last4") >= 1) AND ("char_length"("api_key_last4") <= 4))),
+    CONSTRAINT "ai_providers_base_url_check" CHECK ((("base_url" ~ '^https://[^\s/?#@]+(/[^\s?#]*)?$'::"text") AND ("char_length"("base_url") <= 300))),
+    CONSTRAINT "ai_providers_capabilities_check" CHECK (("jsonb_typeof"("capabilities") = 'object'::"text")),
+    CONSTRAINT "ai_providers_estimated_image_costs_check" CHECK ((("jsonb_typeof"("estimated_image_costs") = 'object'::"text") AND (("estimated_image_costs" - ARRAY['1k'::"text", '2k'::"text", '3k'::"text"]) = '{}'::"jsonb") AND (NOT "jsonb_path_exists"("estimated_image_costs", '$.*?(@.type() != "number" || @ <= 0)'::"jsonpath")))),
+    CONSTRAINT "ai_providers_key_pair" CHECK ((("vault_secret_id" IS NULL) = ("api_key_last4" IS NULL))),
+    CONSTRAINT "ai_providers_label_check" CHECK ((("char_length"("label") >= 1) AND ("char_length"("label") <= 80))),
+    CONSTRAINT "ai_providers_model_check" CHECK ((("char_length"("model") >= 1) AND ("char_length"("model") <= 120))),
+    CONSTRAINT "ai_providers_module_adapter" CHECK (((("module" = 'image'::"text") AND ("adapter" = ANY (ARRAY['openai_images'::"text", 'openrouter_images'::"text"]))) OR (("module" = 'decision'::"text") AND ("adapter" = 'openai_responses'::"text")))),
+    CONSTRAINT "ai_providers_module_check" CHECK (("module" = ANY (ARRAY['image'::"text", 'decision'::"text"]))),
+    CONSTRAINT "ai_providers_notes_check" CHECK ((("notes" IS NULL) OR ("char_length"("notes") <= 500))),
+    CONSTRAINT "ai_providers_prices_nonnegative" CHECK (((COALESCE("price_input_text_per_m", (0)::numeric) >= (0)::numeric) AND (COALESCE("price_input_image_per_m", (0)::numeric) >= (0)::numeric) AND (COALESCE("price_output_per_m", (0)::numeric) >= (0)::numeric))),
+    CONSTRAINT "ai_providers_resolutions_check" CHECK ((("cardinality"("resolutions") > 0) AND ("array_ndims"("resolutions") = 1) AND ("resolutions" <@ ARRAY['1k'::"text", '2k'::"text", '3k'::"text"])))
+);
+
+
+ALTER TABLE "public"."ai_providers" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."template_prompts" (
+    "template_id" "text" NOT NULL,
+    "body" "text" NOT NULL,
+    "version" integer DEFAULT 1 NOT NULL,
+    "model_params" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "provider_id" "uuid",
+    "style_refs" "jsonb" DEFAULT '[]'::"jsonb" NOT NULL,
+    CONSTRAINT "template_prompts_body_check" CHECK (("char_length"("body") > 0)),
+    CONSTRAINT "template_prompts_model_params_check" CHECK (("jsonb_typeof"("model_params") = 'object'::"text")),
+    CONSTRAINT "template_prompts_version_check" CHECK (("version" > 0))
+);
+
+
+ALTER TABLE "public"."template_prompts" OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."bulk_model_problem"("t" "public"."templates", "tp" "public"."template_prompts", "p" "public"."ai_providers", "updated_costs" "jsonb") RETURNS "text"
+    LANGUAGE "plpgsql" STABLE
+    SET "search_path" TO ''
+    AS $$
+declare caps jsonb:=p.capabilities; refs int:=coalesce(jsonb_array_length(tp.style_refs),0); ratios jsonb;
+begin
+  if tp.template_id is null then return '缺少提示词'; end if;
+  if t.module<>'image' then return '仅图片模板支持出图模型'; end if;
+  if p.adapter='openrouter_images' and coalesce(jsonb_array_length(caps->'resolutions'),0)=0 then return '所选模型的能力尚未确认'; end if;
+  if exists(select from jsonb_object_keys(updated_costs) tier where not (tier=any(admin.sale_route_resolutions(p)))) then
+    return '所选模型不支持所填积分档位';
+  end if;
+  ratios:=coalesce(caps->'providerAspectRatios',caps->'aspectRatios');
+  if ratios is not null and exists(select from jsonb_array_elements_text(t.fields->'aspectRatios') r where not (ratios ? r)) then
+    return '所选模型不支持模板配置的比例';
+  end if;
+  if coalesce((t.fields#>>'{images,min}')::int,case when refs>0 then 0 end)+refs<coalesce((caps->>'minReferences')::int,0) or
+     coalesce((t.fields#>>'{images,max}')::int,case when refs>0 then 0 end)+refs>coalesce((caps->>'maxReferences')::int,4) then
+    return '用户照片与画风参考图总数超出模型范围';
+  end if;
+  return null;
+end;
+$$;
+
+
+ALTER FUNCTION "admin"."bulk_model_problem"("t" "public"."templates", "tp" "public"."template_prompts", "p" "public"."ai_providers", "updated_costs" "jsonb") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."check_catalog_minimums"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -1052,45 +1136,6 @@ $$;
 
 
 ALTER FUNCTION "admin"."rollback_template_price_catalog_v2"() OWNER TO "postgres";
-
-
-CREATE TABLE IF NOT EXISTS "public"."ai_providers" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "module" "text" DEFAULT 'image'::"text" NOT NULL,
-    "adapter" "text" NOT NULL,
-    "label" "text" NOT NULL,
-    "base_url" "text" DEFAULT 'https://api.openai.com/v1'::"text" NOT NULL,
-    "model" "text" NOT NULL,
-    "api_key_last4" "text",
-    "is_active" boolean DEFAULT false NOT NULL,
-    "notes" "text",
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "updated_by" "uuid",
-    "vault_secret_id" "uuid",
-    "price_input_text_per_m" numeric(12,6),
-    "price_input_image_per_m" numeric(12,6),
-    "price_output_per_m" numeric(12,6),
-    "resolutions" "text"[] DEFAULT '{1k,2k,3k}'::"text"[] NOT NULL,
-    "capabilities" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
-    "estimated_image_costs" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
-    CONSTRAINT "ai_providers_adapter_check" CHECK (("adapter" = ANY (ARRAY['openai_images'::"text", 'openrouter_images'::"text", 'openai_responses'::"text"]))),
-    CONSTRAINT "ai_providers_api_key_last4_check" CHECK ((("char_length"("api_key_last4") >= 1) AND ("char_length"("api_key_last4") <= 4))),
-    CONSTRAINT "ai_providers_base_url_check" CHECK ((("base_url" ~ '^https://[^\s/?#@]+(/[^\s?#]*)?$'::"text") AND ("char_length"("base_url") <= 300))),
-    CONSTRAINT "ai_providers_capabilities_check" CHECK (("jsonb_typeof"("capabilities") = 'object'::"text")),
-    CONSTRAINT "ai_providers_estimated_image_costs_check" CHECK ((("jsonb_typeof"("estimated_image_costs") = 'object'::"text") AND (("estimated_image_costs" - ARRAY['1k'::"text", '2k'::"text", '3k'::"text"]) = '{}'::"jsonb") AND (NOT "jsonb_path_exists"("estimated_image_costs", '$.*?(@.type() != "number" || @ <= 0)'::"jsonpath")))),
-    CONSTRAINT "ai_providers_key_pair" CHECK ((("vault_secret_id" IS NULL) = ("api_key_last4" IS NULL))),
-    CONSTRAINT "ai_providers_label_check" CHECK ((("char_length"("label") >= 1) AND ("char_length"("label") <= 80))),
-    CONSTRAINT "ai_providers_model_check" CHECK ((("char_length"("model") >= 1) AND ("char_length"("model") <= 120))),
-    CONSTRAINT "ai_providers_module_adapter" CHECK (((("module" = 'image'::"text") AND ("adapter" = ANY (ARRAY['openai_images'::"text", 'openrouter_images'::"text"]))) OR (("module" = 'decision'::"text") AND ("adapter" = 'openai_responses'::"text")))),
-    CONSTRAINT "ai_providers_module_check" CHECK (("module" = ANY (ARRAY['image'::"text", 'decision'::"text"]))),
-    CONSTRAINT "ai_providers_notes_check" CHECK ((("notes" IS NULL) OR ("char_length"("notes") <= 500))),
-    CONSTRAINT "ai_providers_prices_nonnegative" CHECK (((COALESCE("price_input_text_per_m", (0)::numeric) >= (0)::numeric) AND (COALESCE("price_input_image_per_m", (0)::numeric) >= (0)::numeric) AND (COALESCE("price_output_per_m", (0)::numeric) >= (0)::numeric))),
-    CONSTRAINT "ai_providers_resolutions_check" CHECK ((("cardinality"("resolutions") > 0) AND ("array_ndims"("resolutions") = 1) AND ("resolutions" <@ ARRAY['1k'::"text", '2k'::"text", '3k'::"text"])))
-);
-
-
-ALTER TABLE "public"."ai_providers" OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."sale_route_resolutions"("p" "public"."ai_providers") RETURNS "text"[]
@@ -2649,20 +2694,23 @@ declare
   v_patch jsonb := coalesce(p_patch, '{}');
   v_cost jsonb := coalesce(p_patch -> 'credits_cost', '{}');
   v_visible text[];
+  change_model boolean := p_patch ? 'provider_id';
+  target uuid := (p_patch->>'provider_id')::uuid;
   v_category text := p_patch ->> 'category_key';
   v_failures jsonb;
+  catalog_minimums jsonb:=case when admin.is_template_catalog_v2() then admin.template_catalog_minimums() else '{}' end;
   v_changed integer;
 begin
   if p_actor is null then
     raise exception 'INVALID_INPUT' using detail = 'actor is required';
   end if;
-  if not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
+  if not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin' and p.banned_at is null) then
     raise exception 'NOT_ADMIN';
   end if;
   if cardinality(v_ids) = 0 or cardinality(v_ids) > 200 then
     raise exception 'INVALID_INPUT' using detail = 'between 1 and 200 templates';
   end if;
-  if jsonb_typeof(v_patch) <> 'object' or v_patch = '{}' or v_patch - 'credits_cost' - 'visible_in' - 'quality' - 'category_key' <> '{}' then
+  if jsonb_typeof(v_patch) <> 'object' or v_patch = '{}' or v_patch - 'credits_cost' - 'visible_in' - 'quality' - 'category_key' - 'provider_id' <> '{}' then
     raise exception 'INVALID_INPUT' using detail = 'patch must name credits_cost, visible_in, quality or category_key';
   end if;
   if v_patch ? 'quality' and (v_patch ->> 'quality') is distinct from 'high' and (v_patch ->> 'quality') is distinct from 'medium' then
@@ -2701,7 +2749,12 @@ begin
   end if;
 
   -- The rows are checked and written under one lock, so no other save slips in between.
-  perform 1 from public.templates t where t.id = any (v_ids) for update;
+  perform 1 from public.templates t where t.id = any (v_ids) order by t.id for update;
+  if change_model then
+    perform 1 from public.template_prompts where template_id=any(v_ids) order by template_id for update;
+    perform 1 from public.ai_providers where module='image' and (id=target or (target is null and is_active)) for share;
+    if target is not null and not found then raise exception 'MODEL_CHANGED'; end if;
+  end if;
 
   if admin.is_template_catalog_v2() and (p_floor->>'version') is distinct from 'v2' then
     raise exception 'MODEL_CHANGED' using detail='请刷新模板报价后再保存';
@@ -2712,7 +2765,7 @@ begin
     select 1 from public.templates t
       left join public.template_prompts tp on tp.template_id = t.id
       left join public.ai_providers active on active.is_active and active.module = 'image'
-      left join public.ai_providers p on p.id = coalesce(tp.provider_id, active.id)
+      left join public.ai_providers p on p.id = coalesce(case when change_model then target else tp.provider_id end, active.id)
      where t.id = any(v_ids) and (
        not (p_floor->'providers' ? coalesce(p.id::text, 'env'))
        or (p.id is not null and p.model is distinct from (p_floor->'models'->>p.id::text)))
@@ -2722,29 +2775,45 @@ begin
     select a.id, t.id is not null as found, coalesce(t.name, a.id) as name, t.is_active,
            t.description, t.cover_before_url, t.cover_after_url, t.cover_locales, t.visible_in as old_visible,
            coalesce(v_patch ->> 'quality', t.quality) as quality,
-           coalesce(p_floor -> 'providers' -> coalesce(tp.provider_id::text, active.id::text, 'env'), p_floor) as floor,
-           admin.template_approved_prices(coalesce(tp.provider_id,active.id))->t.id as approved,
+           coalesce(p_floor -> 'providers' -> coalesce((case when change_model then target else tp.provider_id end)::text, active.id::text, 'env'), p_floor) as floor,
+           admin.template_approved_prices(coalesce(case when change_model then target else tp.provider_id end,active.id))->t.id as approved,
+           catalog_minimums->t.id as tariff,
+           coalesce(sale.unpriced_resolutions, array(select tier from unnest(array['1k','2k','3k']) tier
+             where tier<>all(admin.sale_route_resolutions(previous)))) as unpriced_resolutions,
            t.credits_cost || v_cost as credits_cost,
            coalesce(v_visible, t.visible_in) as visible_in,
-           a.id in ('edit', 'freeform') or coalesce(c.is_system, false) as is_builtin
+           a.id in ('edit', 'freeform') or coalesce(c.is_system, false) as is_builtin,
+           case when change_model then admin.bulk_model_problem(t,tp,chosen,v_cost)
+                when exists(select from jsonb_object_keys(v_cost) tier where not(tier=any(admin.sale_route_resolutions(chosen))))
+                then '所选模型不支持所填积分档位' end model_problem
     from unnest(v_ids) as a(id)
     left join public.templates t on t.id = a.id
     left join public.template_categories c on c.key = t.category_key
+    left join public.template_sale_approvals sale on sale.template_id = t.id
     left join public.template_prompts tp on tp.template_id = t.id
     left join public.ai_providers active on active.module = 'image' and active.is_active
+    left join public.ai_providers previous on previous.id=coalesce(tp.provider_id,active.id)
+    left join public.ai_providers chosen on chosen.id=coalesce(case when change_model then target else tp.provider_id end,active.id)
   ),
   failures as (
     select jsonb_build_object('id', p.id, 'name', p.name, 'reason', case when p.found then 'system' else 'not_found' end) as failure
     from planned p
     where not p.found or p.is_builtin
     union all
+    select jsonb_build_object('id',p.id,'name',p.name,'reason','model','detail',p.model_problem)
+    from planned p where p.found and not p.is_builtin and p.model_problem is not null
+    union all
     select jsonb_build_object(
       'id', p.id, 'name', p.name, 'reason', 'below_floor', 'resolution', r.res,
-      'floor', (p.floor -> p.quality ->> r.res)::integer, 'given', (p.credits_cost ->> r.res)::integer
+      'floor', minimum.credits, 'given', (p.credits_cost ->> r.res)::integer
     )
     from planned p
     cross join unnest(array['1k', '2k', '3k']) as r(res)
-    where p.found and not p.is_builtin and (p.credits_cost ->> r.res)::integer < (p.floor -> p.quality ->> r.res)::integer
+    cross join lateral (select greatest((p.floor -> p.quality ->> r.res)::integer,
+      case when p.tariff->>'quality'=p.quality then (p.tariff->'costs'->>r.res)::integer end) as credits) minimum
+    where p.found and not p.is_builtin
+      and (v_cost ? r.res or not (r.res=any(p.unpriced_resolutions)))
+      and (p.credits_cost ->> r.res)::integer < minimum.credits
       and not coalesce(p.approved->>'quality'=p.quality and p.approved->'costs'->r.res=p.credits_cost->r.res,false)
     union all
     select jsonb_build_object('id', p.id, 'name', p.name, 'reason', 'web_incomplete')
@@ -2765,6 +2834,13 @@ begin
     return jsonb_build_object('failures', v_failures);
   end if;
 
+  -- Capture missing legacy tier markers against the old route before changing a binding.
+  if change_model or v_cost <> '{}'::jsonb then
+    perform admin.set_template_unpriced_resolutions(t.id, null)
+      from public.templates t where t.id=any(v_ids)
+        and not exists(select from public.template_sale_approvals s where s.template_id=t.id);
+  end if;
+
   update public.templates t
   set quality = coalesce(v_patch ->> 'quality', t.quality),
       credits_cost = t.credits_cost || v_cost,
@@ -2775,6 +2851,17 @@ begin
   where t.id = any (v_ids);
   get diagnostics v_changed = row_count;
 
+  if change_model then
+    update public.template_prompts set provider_id=target where template_id=any(v_ids) and provider_id is distinct from target;
+  end if;
+
+  -- A capability expansion or a model change alone never opens a previously unpriced tier.
+  if v_cost <> '{}'::jsonb then
+    perform admin.set_template_unpriced_resolutions(s.template_id,
+      array(select tier from unnest(s.unpriced_resolutions) tier where not (v_cost ? tier)))
+    from public.template_sale_approvals s where s.template_id=any(v_ids)
+      and exists(select from unnest(s.unpriced_resolutions) tier where v_cost ? tier);
+  end if;
   return jsonb_build_object('failures', '[]'::jsonb, 'changed', v_changed);
 end;
 $_$;
@@ -4746,11 +4833,11 @@ begin
   if p_actor is null then
     raise exception 'INVALID_INPUT' using detail = 'actor is required';
   end if;
-  if not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
+  if not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin' and p.banned_at is null) then
     raise exception 'NOT_ADMIN';
   end if;
-  if p_group is null or p_group not in ('catalogue', 'featured') then
-    raise exception 'INVALID_INPUT' using detail = 'group must be catalogue or featured';
+  if p_group is null or p_group not in ('catalogue', 'featured', 'active', 'inactive') then
+    raise exception 'INVALID_INPUT' using detail = 'unknown catalogue group';
   end if;
   if cardinality(v_ids) <> (select count(distinct id) from unnest(v_ids) as u(id)) then
     raise exception 'INVALID_INPUT' using detail = 'ids must not repeat';
@@ -4764,7 +4851,8 @@ begin
   from public.templates t
   where case p_group
     when 'catalogue' then t.id <> 'edit'
-    else t.featured_rank is not null
+    when 'featured' then t.featured_rank is not null
+    else t.id <> 'edit' and t.is_active = (p_group = 'active')
   end;
 
   if cardinality(v_members) <> cardinality(v_ids) or not (v_members @> v_ids) then
@@ -4772,7 +4860,17 @@ begin
       using detail = format('%s ids given, the %s group has %s', cardinality(v_ids), p_group, cardinality(v_members));
   end if;
 
-  if p_group = 'catalogue' then
+  -- Keep the other group's latest order, including changes made after this editor loaded.
+  if p_group in ('active', 'inactive') then
+    select array_agg(case when slots.is_active = (p_group = 'active') then v_ids[slots.pos] else slots.id end
+                     order by slots.sort_order, slots.id)
+      into v_ids
+    from (select t.id, t.is_active, t.sort_order,
+                 row_number() over (partition by t.is_active order by t.sort_order, t.id)::int as pos
+            from public.templates t where t.id <> 'edit') slots;
+  end if;
+
+  if p_group <> 'featured' then
     update public.templates t
     set sort_order = o.position * 10
     from unnest(v_ids) with ordinality as o(id, position)
@@ -9630,23 +9728,6 @@ CREATE TABLE IF NOT EXISTS "public"."template_prompt_versions" (
 ALTER TABLE "public"."template_prompt_versions" OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."template_prompts" (
-    "template_id" "text" NOT NULL,
-    "body" "text" NOT NULL,
-    "version" integer DEFAULT 1 NOT NULL,
-    "model_params" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "provider_id" "uuid",
-    "style_refs" "jsonb" DEFAULT '[]'::"jsonb" NOT NULL,
-    CONSTRAINT "template_prompts_body_check" CHECK (("char_length"("body") > 0)),
-    CONSTRAINT "template_prompts_model_params_check" CHECK (("jsonb_typeof"("model_params") = 'object'::"text")),
-    CONSTRAINT "template_prompts_version_check" CHECK (("version" > 0))
-);
-
-
-ALTER TABLE "public"."template_prompts" OWNER TO "postgres";
-
-
 CREATE TABLE IF NOT EXISTS "public"."template_request_notices" (
     "user_id" "uuid" NOT NULL,
     "request_id" "uuid" NOT NULL,
@@ -11345,6 +11426,19 @@ REVOKE ALL ON FUNCTION "admin"."assign_template_prompt_version"() FROM PUBLIC;
 
 
 
+GRANT ALL ON TABLE "public"."ai_providers" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."template_prompts" TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."bulk_model_problem"("t" "public"."templates", "tp" "public"."template_prompts", "p" "public"."ai_providers", "updated_costs" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."bulk_model_problem"("t" "public"."templates", "tp" "public"."template_prompts", "p" "public"."ai_providers", "updated_costs" "jsonb") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "admin"."check_catalog_minimums"() FROM PUBLIC;
 
 
@@ -11428,11 +11522,8 @@ REVOKE ALL ON FUNCTION "admin"."rollback_template_price_catalog_v2"() FROM PUBLI
 
 
 
-GRANT ALL ON TABLE "public"."ai_providers" TO "service_role";
-
-
-
 REVOKE ALL ON FUNCTION "admin"."sale_route_resolutions"("p" "public"."ai_providers") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."sale_route_resolutions"("p" "public"."ai_providers") TO "service_role";
 
 
 
@@ -12718,10 +12809,6 @@ GRANT SELECT,INSERT,DELETE ON TABLE "public"."template_favorites" TO "authentica
 
 
 GRANT SELECT ON TABLE "public"."template_prompt_versions" TO "service_role";
-
-
-
-GRANT ALL ON TABLE "public"."template_prompts" TO "service_role";
 
 
 

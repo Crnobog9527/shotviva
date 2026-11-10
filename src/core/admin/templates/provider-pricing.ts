@@ -35,7 +35,8 @@ function optionsFromInput(input: unknown, legacyBudget?: number): ImageProviderO
     const caps = imageCapabilitiesSchema.safeParse(row.capabilities)
     const openAI = row.adapter === 'openai_images'
     const estimates = { ...caps.data?.catalogImageCosts, ...row.estimated_image_costs }
-    const floor = modelCreditFloor({ openAI, resolutions: row.resolutions, estimates, p95: row.p95 }, budget)
+    const resolutions = openAI ? row.resolutions : row.resolutions.filter(tier => caps.data?.resolutions.includes(tier))
+    const floor = modelCreditFloor({ openAI, resolutions, estimates, p95: row.p95 }, budget)
     return {
       fallbackFloors: row.fallback_floors, approved: row.approved, version: catalog?.version, tariffs: row.is_active ? catalog?.tariffs : undefined,
       id: row.provider_id ?? 'env', label: row.label, model: row.model, isActive: row.is_active,

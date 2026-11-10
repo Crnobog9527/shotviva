@@ -26,6 +26,7 @@ const inputSchema = z.object({
     .refine((ids) => new Set(ids).size === ids.length, 'ids must be unique'),
   patch: z
     .strictObject({
+      providerId: z.uuid().nullable().optional(),
       creditsCost: z.strictObject({ '1k': tier.optional(), '2k': tier.optional(), '3k': tier.optional() }).optional(),
       visibleIn: z
         .array(z.enum(TEMPLATE_SURFACES))
@@ -51,6 +52,7 @@ const resultSchema = z.object({
         floor: z.number(),
         given: z.number(),
       }),
+      z.object({ id: z.string(), name: z.string(), reason: z.literal('model'), detail: z.string() }),
       z.object({ id: z.string(), name: z.string(), reason: z.enum(['web_incomplete', 'not_found', 'system']) }),
     ]),
   ),
@@ -59,6 +61,7 @@ const resultSchema = z.object({
 const toSqlPatch = (patch: BulkEditPatch) => ({
   ...(patch.creditsCost && Object.keys(patch.creditsCost).length > 0 ? { credits_cost: patch.creditsCost } : {}),
   ...(patch.visibleIn ? { visible_in: patch.visibleIn } : {}),
+  ...(patch.providerId !== undefined && { provider_id: patch.providerId }),
   ...(patch.quality ? { quality: patch.quality } : {}),
   ...(patch.categoryKey ? { category_key: patch.categoryKey } : {}),
 })

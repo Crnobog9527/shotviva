@@ -53,7 +53,7 @@ export const orderCopy = {
   saved: '排序已保存',
   failed: '顺序没保存，已退回原来的顺序。',
   offline: '连不上服务器，请检查网络后重试。',
-  filtered: '清空搜索后可拖动排序',
+  filtered: '清空搜索和分类筛选后可在同一上架状态内排序',
   dragHint: '按住左边的把手上下拖动调整顺序；手机上长按整行再拖。',
 } as const
 
@@ -196,4 +196,9 @@ export function fallbackPriceCopy(tiers?: Record<'1k' | '2k' | '3k', number | nu
 export const saleCopy = {
   label: '开放销售', first: '请先保存模型和积分，再开放销售。', active: '请先下架，再关闭销售。',
   opened: '已开放销售', closed: '已关闭销售',
+}
+
+export const catalogCopy = {
+  priceGroup: '出图与价格', active: '已上架', inactive: '已下架', all: '全部',
+  status: '上架状态', category: '筛选分类', categories: '全部分类', search: '搜索中文名、英文名或 ID',
 }

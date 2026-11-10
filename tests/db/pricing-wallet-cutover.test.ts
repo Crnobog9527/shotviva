@@ -6,16 +6,34 @@ import { connectAdmin, createUser, profileOf } from './helpers'
 let db: Client
 let user: string
 beforeAll(async () => { db = await connectAdmin() })
+// TRUNCATE CASCADE needs every dependent table. Release partial locks promptly
+// while another parallel suite owns one, then retry the fixture setup.
+async function isolateWallets() {
+  for (let attempt = 0; attempt < 150; attempt++) {
+    await db.query('savepoint wallet_setup')
+    try {
+      await db.query("set local lock_timeout='80ms'")
+      await db.query("select pg_advisory_xact_lock(hashtextextended('shotviva.template_catalog',0))")
+      await db.query("delete from public.system_settings where key='pricing_catalog_version'")
+      await db.query('truncate table public.profiles cascade')
+      await db.query("set local lock_timeout=default")
+      return
+    } catch (error) {
+      await db.query('rollback to wallet_setup')
+      if ((error as { code?: string }).code !== '55P03') throw error
+      await new Promise(resolve => setTimeout(resolve, 40))
+    }
+  }
+  throw new Error('Could not isolate wallet cutover fixtures')
+}
+
 beforeEach(async () => {
   await db.query('begin')
-  await db.query("delete from public.system_settings where key='pricing_catalog_version'")
-  // Other suites leave accounts with live subscriptions. Model the audited cohort locally;
-  // this transaction (including TRUNCATE) is rolled back after every case.
-  await db.query('truncate table public.profiles cascade')
+  await isolateWallets()
   user = await createUser(db)
   await db.query("select public.admin_adjust_credits($1,22,'gift','paid')", [user])
   await db.query("select public.admin_adjust_credits($1,4,'gift','free')", [user])
-})
+}, 30_000)
 afterEach(async () => { await db.query('rollback') })
 afterAll(async () => { await db.end() })
 

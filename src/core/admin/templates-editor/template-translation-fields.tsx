@@ -37,12 +37,6 @@ export function TemplateTranslationFields({ values, onChange }: Props) {
     <fieldset className="grid gap-3">
       <legend className="mb-1 text-sm font-semibold">{zhCopy.legend}</legend>
       <p className="text-muted-foreground text-xs">{zhCopy.hint}</p>
-      <div className="grid grid-cols-2 gap-3">
-        <ZhInput id="tpl-zh-name" label={zhCopy.name} value={zh.name} placeholder={values.name}
-          onChange={(name) => set({ name })} />
-        <ZhInput id="tpl-zh-description" label={zhCopy.description} value={zh.description} placeholder={values.description}
-          onChange={(description) => set({ description })} />
-      </div>
       {fields.length === 0 ? <p className="text-muted-foreground text-xs">{zhCopy.noFields}</p> : null}
       {fields.map((field) => (
         <div key={field.key} className="grid grid-cols-2 gap-3">
@@ -54,4 +48,14 @@ export function TemplateTranslationFields({ values, onChange }: Props) {
       ))}
     </fieldset>
   )
+}
+
+export function ChinesePublicFields({ values, onChange }: Props) {
+  const set = (patch: Partial<ZhFormValues>) => onChange({ zh: { ...values.zh, ...patch } })
+  return <>
+    <ZhInput id="tpl-zh-name" label={zhCopy.name} value={values.zh.name} placeholder={values.name}
+      onChange={name => set({ name })} />
+    <ZhInput id="tpl-zh-description" label={zhCopy.description} value={values.zh.description} placeholder={values.description}
+      onChange={description => set({ description })} />
+  </>
 }

@@ -19,7 +19,7 @@ import {
 
 import type { PublishCandidate } from './publish-rules'
 import { toUpsertArgs } from './rpc-payload'
-import type { AdminTemplate } from './types'
+import type { AdminTemplate, TemplateOrderGroup } from './types'
 
 // Every function expects a service-role client; callers must have passed requireAdmin().
 
@@ -45,7 +45,7 @@ export async function listAdminTemplates(client: SupabaseClient): Promise<AdminT
   return data.map((row) => ({
     ...toTemplate(row),
     saleEnabled: row.template_sale_approvals?.enabled === true,
-    unpricedResolutions: row.template_sale_approvals?.unpriced_resolutions ?? [],
+    unpricedResolutions: row.template_sale_approvals?.unpriced_resolutions,
     prompt: row.template_prompts
       ? {
           styleRefs: styleRefsSchema.parse(row.template_prompts.style_refs),
@@ -150,7 +150,7 @@ export async function setFeaturedTemplates(client: SupabaseClient, ids: string[]
 
 // What the admin sees when admin_set_template_order refuses (0600); anything else is INTERNAL.
 const ORDER_ERRORS: Record<string, [ErrorCode, string]> = {
-  ORDER_MISMATCH: ['CONFLICT', '列表在别处改过了（有模板新增、删除或进出精选），请刷新页面后再排序'],
+  ORDER_MISMATCH: ['CONFLICT', '列表在别处改过了（有模板新增、删除、上下架或进出精选），请刷新页面后再排序'],
   NOT_ADMIN: ['FORBIDDEN', '只有管理员能调整顺序'],
   INVALID_INPUT: ['INVALID_INPUT', '顺序没保存：提交的列表不完整，请刷新页面后再试'],
 }
@@ -159,7 +159,7 @@ const ORDER_ERRORS: Record<string, [ErrorCode, string]> = {
 // home featured ranks.
 export async function setTemplateOrder(
   client: SupabaseClient,
-  group: 'catalogue' | 'featured',
+  group: TemplateOrderGroup,
   ids: string[],
   actor: string,
 ): Promise<void> {
