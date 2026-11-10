@@ -7,7 +7,6 @@ import { pagePath, validateContentPage } from '@/core/content'
 import { site } from '../site.config'
 import { FALLBACK_CREDITS, fillCredits } from './credits'
 import { contentPages, homePage } from './index'
-import { legalPages } from './legal'
 import { privateDoc } from '../../../tests/support/private-docs'
 
 // The keyword map lives in the private docs repo (tests/support/private-docs.ts); skipped where absent.
@@ -37,12 +36,9 @@ describe('site content', () => {
     expect(new Set(keywords).size).toBe(keywords.length)
   })
 
-  // The four legal pages are indexable without a keyword (SEO launch handbook PATCH v3 G7); every
-  // other indexable page needs its row in the keyword map.
-  it.skipIf(!keywordMap)('only indexes pages that are in the keyword map CSV, besides the legal pages', () => {
+  it.skipIf(!keywordMap)('only indexes pages that are in the keyword map CSV', () => {
     const urls = csvUrls()
-    const legal = new Set<string>(legalPages.map((page) => page.path))
-    for (const path of site.indexing.indexablePaths) if (!legal.has(path)) expect(urls).toContain(path)
+    for (const path of site.indexing.indexablePaths) expect(urls).toContain(path)
   })
 
   it('lists every content page as indexable and links only to existing pages', () => {
