@@ -24,6 +24,8 @@ export { GenerationRunner } from './generation/generation-runner'
 export { GeneratingPill } from './generation/generating-pill'
 export { HideWhileGenerating } from './generation/hide-while-generating'
 export { PhotosTabBadge } from './generation/photos-tab-badge'
+// The shell's wishlist hint shows once a photo came out in this tab (Owner 2026-11-10).
+export { AfterSuccess } from './generation/after-success'
 export { RunningList } from './photos/running-list'
 export { DoneGrid } from './photos/done-grid'
 export { PhotosCount } from './photos/photos-count'

@@ -15,9 +15,12 @@ import { isModuleEnabled } from '@/core/config'
 import { appShellMetadata } from '@/core/seo'
 import { SupportTabBadge } from '@/core/support'
 import { LivingBackground } from '@/core/ui/living-background'
-import { isWishlistEnabled } from '@/core/wishlist'
+import { isWishlistEnabled, WishlistTabBadge } from '@/core/wishlist'
 import { GenerationRunner, HideWhileGenerating, PhotosTabBadge } from '@/modules/image'
 import { site } from '@/site/site.config'
+
+import { paywallPerkFacts } from '../paywall-perk-facts'
+import { WishlistHintSlot } from './wishlist-hint-slot'
 
 // Every logged-in page is noindex through this one layout, never per page (AGENTS §9).
 // The app shell (DESIGN §8): tab bar on tab roots (and over the photo page from md up, T38),
@@ -58,13 +61,14 @@ async function Tabs({ items }: { items: TabItem[] }) {
   return <TabBar items={shown} desktopUnder={['/photos/']} shellPages={['/checkout']} admin={admin} />
 }
 
-// The paywall lists the wishlist perk only while it is open. The switch read is cached
-// (core/system-settings), so this stays in the prerendered shell. What the member already holds
-// (T66: lower plans locked, higher ones Upgrade) streams in through its own Suspense hole.
+// The paywall lists the wishlist perk only while it is open, and the photo estimate from the
+// live catalogue. Both reads are cached, so this stays in the prerendered shell. What the member
+// already holds (T66: lower plans locked, higher ones Upgrade) streams in through its own
+// Suspense hole.
 async function Paywall({ children }: { children: ReactNode }) {
-  const wishlistLive = await isWishlistEnabled(site)
+  const perkFacts = await paywallPerkFacts()
   return (
-    <PaywallProvider products={site.billing.products} wishlistLive={wishlistLive} channel={paymentChannel()} wechatPay={wechatPayEnabled()}>
+    <PaywallProvider products={site.billing.products} perkFacts={perkFacts} channel={paymentChannel()} wechatPay={wechatPayEnabled()}>
       {children}
       <StandingSlot />
     </PaywallProvider>
@@ -76,7 +80,17 @@ function useTabs(): TabItem[] {
   const image = isModuleEnabled(site, 'image')
   return [
     ...(image ? [{ href: '/generate', label: t('create'), icon: 'create' } as const] : []),
-    { href: '/wishlist', label: t('wishlist'), icon: 'wishlist' } as const,
+    // A dot until the account first opens the wall (onboarding.wishlistSeen, Owner 2026-11-10).
+    {
+      href: '/wishlist',
+      label: t('wishlist'),
+      icon: 'wishlist',
+      badge: (
+        <Suspense fallback={null}>
+          <WishlistTabBadge />
+        </Suspense>
+      ),
+    } as const,
     ...(image ? [{ href: '/photos', label: t('photos'), icon: 'photos', badge: <PhotosTabBadge /> } as const] : []),
     // The "new reply" dot, read once per page load (ARCHITECTURE §10 「站内工单」).
     {
@@ -114,6 +128,7 @@ export default function AppLayout({ children }: LayoutProps<'/[locale]'>) {
           </Suspense>
           <main className="flex flex-1 flex-col">{children}</main>
           <GenerationRunner />
+          <WishlistHintSlot />
         </BrandProvider>
         {/* DESIGN §5 「全站流动背景」 (T54); it renders nothing on /admin. */}
         <LivingBackground />

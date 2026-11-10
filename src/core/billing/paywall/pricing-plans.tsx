@@ -13,7 +13,8 @@ import { BillingToggle } from "./billing-toggle"
 import { packLooks, packOffers, tierOffers, yearlySavingPct, type Period, type TierOffer } from "./offer"
 import { PackCard } from "./pack-card"
 import { usePaywall, type PaywallTrigger } from "./paywall-context"
-import { tierPerks } from "./perks"
+import { PhotoEstimateNote } from "./photo-estimate-line"
+import { PlanCompare } from "./plan-compare"
 import { heldPeriod } from "../subscription/standing"
 import { usePlanReader, useStanding } from "./standing-context"
 import type { PlanStanding } from "./standing-pick"
@@ -29,14 +30,15 @@ const ghost = "w-full min-h-12 rounded-control"
 // lower and current plans are locked and higher ones say Upgrade (T66). Prices render on
 // the server, Monthly first (DESIGN §4.5 「默认显示按月」), so they are in the static HTML
 // (建站规格 R5). A signed-in member with a yearly plan sees Yearly once their standing streams in,
-// so their own plan reads "Your plan"; a period the visitor picks always wins.
-type PricingProps = { products: readonly SiteProduct[]; wishlistLive: boolean }
+// so their own plan reads "Your plan"; a period the visitor picks always wins. Under the cards:
+// the photo estimate's footnote and the full comparison (Owner 2026-11-10).
+type PricingProps = { products: readonly SiteProduct[] }
 
 export function PricingPlans(props: PricingProps) {
   return <DiscountProvider><Plans {...props} /></DiscountProvider>
 }
 
-function Plans({ products, wishlistLive }: PricingProps) {
+function Plans({ products }: PricingProps) {
   const t = useTranslations("paywall")
   const paywall = usePaywall()
   const readPlan = usePlanReader()
@@ -57,7 +59,6 @@ function Plans({ products, wishlistLive }: PricingProps) {
                 offer={offer}
                 period={period}
                 selected={false}
-                perks={tierPerks(offer.tier, { wishlistLive })}
                 lock={member.lock}
                 footer={<TierButton offer={offer} member={member} onPick={() => paywall.open(pricingTrigger(), { tier: offer.tier, period })} />}
               />
@@ -65,6 +66,8 @@ function Plans({ products, wishlistLive }: PricingProps) {
           )
         })}
       </div>
+      <PhotoEstimateNote className="mt-3 px-0.5" />
+      <PlanCompare offers={offers} />
       <PackRow packs={packOffers(products)} onPick={(packId) => paywall.open(pricingTrigger(), { step: "packs", packId })} />
       <DiscountEntry />
     </section>

@@ -663,3 +663,56 @@
 @layer components {
   .mk-pair-blank .mk-pane { background: repeating-linear-gradient(135deg, var(--hatch) 0 8px, transparent 8px 16px), var(--recess); }
 }
+
+/* "Can't find your template? Make a wish" (Owner 2026-11-10), under the template grid: three
+   pains on hairline rows, then the Wishlist tab's own prints (tape, lean, stamp) as examples.
+   Static: no JS, the images lazy and sized for a third of the column. */
+@layer components {
+  .mk-wish h2 em { font-style: italic; }
+  .mk-wish h2:lang(zh) em { font-style: normal; }
+  .mk-wish-points { list-style: none; margin: 20px 0 0; padding: 0; }
+  .mk-wish-points li { padding: 14px 0; box-shadow: inset 0 1px 0 var(--hairline); }
+  .mk-wish-points li:last-child { padding-bottom: 0; }
+  .mk-wish-points h3 { font: 600 17px/1.25 var(--font-sans); letter-spacing: -0.015em; }
+  .mk-wish-points p { margin-top: 4px; font-size: 16px; line-height: 1.5; color: var(--muted-foreground); }
+
+  .mk-wish-wall { list-style: none; margin: 32px 0 0; padding: 10px 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 10px; }
+  .mk-wish-wall > li { min-width: 0; transform: rotate(var(--r, 0deg)); transform-origin: 50% 0; }
+  .mk-wish-wall > li:nth-child(1) { --r: -2deg; }
+  .mk-wish-wall > li:nth-child(2) { --r: 1.6deg; }
+  .mk-wish-wall > li:nth-child(3) { --r: -0.8deg; display: none; }
+  .mk-wish-print {
+    position: relative; display: grid; padding: 8px 8px 10px; border-radius: 6px; background: var(--card);
+    box-shadow: inset 0 0 0 1px var(--border), inset 0 1px 0 var(--edge-highlight), 0 18px 28px -18px var(--photo-fade);
+  }
+  .mk-wish-print::before {
+    content: ""; position: absolute; z-index: 2; left: 50%; top: -9px; width: 64px; height: 20px; border-radius: 2px; pointer-events: none;
+    transform: translateX(-50%) rotate(var(--tape, -3deg));
+    background: linear-gradient(90deg, var(--grab), color-mix(in srgb, var(--foreground) 34%, transparent) 50%, color-mix(in srgb, var(--foreground) 20%, transparent));
+  }
+  .mk-wish-wall > li:nth-child(even) .mk-wish-print { --tape: 3deg; }
+  .mk-wish-print img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 3px; background: var(--muted); }
+  .mk-wish-text { margin-top: 10px; padding: 0 2px; font: italic 400 17px/1.3 var(--font-display); letter-spacing: -0.005em; text-wrap: pretty; overflow-wrap: anywhere; }
+  .mk-wish-text:lang(zh) { font-style: normal; font-size: 16px; line-height: 1.6; letter-spacing: 0; }
+  .mk-wish-votes { margin-top: 8px; padding: 0 2px; display: flex; justify-content: flex-end; }
+  .mk-wish-votes > span[aria-hidden] { display: inline-flex; align-items: center; gap: 5px; font: 500 14px/1 var(--font-mono); color: var(--bone-dim); }
+  .mk-wish-votes svg { width: 16px; height: 16px; }
+  .mk-wish-stamp {
+    position: absolute; z-index: 3; right: -6px; top: 34px; transform: rotate(12deg); padding: 4px 8px; border: 2px solid var(--success); border-radius: 4px;
+    font: 700 14px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--success); background: var(--frost-light);
+  }
+  .mk-wish-stamp:lang(zh) { letter-spacing: .04em; }
+  .mk-wish-note { margin-top: 20px; }
+  .mk-wish-act { margin-top: 16px; }
+  .mk-wish-cta { width: 100%; }
+
+  @media (min-width: 768px) {
+    .mk-wish-wall { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+    .mk-wish-wall > li:nth-child(3) { display: block; }
+    .mk-wish-cta { display: inline-flex; width: auto; min-width: 240px; }
+  }
+  @media (min-width: 1024px) {
+    .mk-wish-points { margin-top: 24px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .mk-wish-wall > li { transform: none; } }
+}

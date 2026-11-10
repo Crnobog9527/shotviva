@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 
+import { photoPrices } from '@/core/billing'
 import { CheckoutCancelToast, PaywallProvider, PricingPayWith, PricingPlans } from '@/core/billing/paywall'
 import { wechatPayEnabled } from '@/core/billing/stripe'
 import { StandingSlot } from '@/core/billing/standing'
@@ -51,8 +52,8 @@ export default async function PricingPage() {
       <JsonLdScript data={[breadcrumbListLd(site, crumbs), faqPageLd(faq)]} />
       <CheckoutCancelToast />
       <PricingHero text={page} />
-      <PaywallProvider products={site.billing.products} wishlistLive={wishlistLive} channel={channel} wechatPay={wechatPay}>
-        <PricingPlans products={site.billing.products} wishlistLive={wishlistLive} />
+      <PaywallProvider products={site.billing.products} perkFacts={{ wishlistLive, photoPrices: photoPrices(catalogue) }} channel={channel} wechatPay={wechatPay}>
+        <PricingPlans products={site.billing.products} />
         <StandingSlot />
       </PaywallProvider>
       <BusinessSection

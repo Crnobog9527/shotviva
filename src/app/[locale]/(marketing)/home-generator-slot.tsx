@@ -11,9 +11,10 @@ import { paymentChannel } from '@/core/billing/waffo'
 import { listFavoriteIdsOrEmpty } from '@/core/favorites'
 import { listRunningJobIds } from '@/core/jobs'
 import { logger } from '@/core/logger'
-import { isWishlistEnabled } from '@/core/wishlist'
 import { HomeGenerator, type HomeGeneratorProps, type HomeViewer } from '@/modules/image/marketing'
 import { site } from '@/site/site.config'
+
+import { paywallPerkFacts } from '../paywall-perk-facts'
 
 type Base = Omit<HomeGeneratorProps, 'viewer' | 'googleAction'>
 
@@ -49,11 +50,11 @@ async function safeViewer(): Promise<HomeViewer | null> {
 }
 
 async function WithViewer(props: Base) {
-  const [viewer, wishlistLive] = await Promise.all([safeViewer(), isWishlistEnabled(site)])
+  const [viewer, perkFacts] = await Promise.all([safeViewer(), paywallPerkFacts()])
   if (!viewer) return <HomeGenerator {...props} viewer={null} googleAction={googleAction} />
   // "Get credits · N needed" opens the same paywall as the workspace (DESIGN §6.9 item 9).
   return (
-    <PaywallProvider products={site.billing.products} wishlistLive={wishlistLive} channel={paymentChannel()} wechatPay={wechatPayEnabled()}>
+    <PaywallProvider products={site.billing.products} perkFacts={perkFacts} channel={paymentChannel()} wechatPay={wechatPayEnabled()}>
       <HomeGenerator {...props} viewer={viewer} googleAction={googleAction} />
       {/* What the member holds, so the paywall locks lower plans (T66). */}
       <StandingSlot />

@@ -22,6 +22,7 @@ import {
   yearlySaving,
   OUTPUT_TIERS,
 } from './offer'
+import { homeWishlist } from './home-wishlist'
 import { sharedFacts } from './shared'
 
 // Final home copy (T11). TDK, H1, subtitle, direct answer and the six H2s are fixed by
@@ -145,6 +146,7 @@ export const homePage = defineHomePage({
     intro: `Every template starts from your phone photo and ends with a finished picture. Pick one and ${brand} does the rest.`,
     note: 'All template images are illustrative examples.',
   },
+  wishlist: homeWishlist,
   facts: sharedFacts(),
   factsIntro: `Most AI image to image tools hand you a new picture. What you wanted was your picture, only better: the same product, the same dish, the same room, with nicer light and a cleaner scene. That is what ${brand} is built for. The prices and sizes below are the same on every page of this site.`,
   freeOffer: {

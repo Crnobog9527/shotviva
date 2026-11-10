@@ -1,16 +1,13 @@
+import { tierCreditPrices, type PricedTemplate } from '@/core/billing/photo-estimate'
+
 import { FromCredits, fromCredits, type CreditFacts } from './offer'
 import { zhFromCredits } from './zh/offer'
 
 // With no published price the copy refers to the template instead of quoting a number.
 export const FALLBACK_CREDITS: CreditFacts = { from: 0, same: false }
 
-type Priced = { imageOptions?: { resolutions: readonly string[] }; creditsCost: { '1k': number; '2k': number; '3k': number } }
-
-const priceList = (live: readonly Priced[], tier: keyof Priced['creditsCost']) =>
-  live.filter((template) => !template.imageOptions || template.imageOptions.resolutions.includes(tier)).map((template) => template.creditsCost[tier]).filter((n) => Number.isFinite(n) && n > 0)
-
-export function creditFacts(live: readonly Priced[]): CreditFacts {
-  const prices = priceList(live, '1k')
+export function creditFacts(live: readonly PricedTemplate[]): CreditFacts {
+  const prices = tierCreditPrices(live, '1k')
   if (prices.length === 0) return FALLBACK_CREDITS
   const from = Math.min(...prices)
   return { from, same: prices.every((n) => n === from) }

@@ -88,7 +88,7 @@ it.each([
   deps.canApply.mockResolvedValue(false)
   deps.terms.mockResolvedValue('body')
   const form = await ApplicationForm({
-    session: { id: 'test-user', email: 'a@example.com', phone: null, role: 'user', verified: true, banned: false, locale: null },
+    session: { id: 'test-user', email: 'a@example.com', phone: null, role: 'user', verified: true, banned: false, locale: null, onboarding: { wishlistSeen: false, wishlistHintSeen: false } },
     parent: 'qa-team',
     settings: { terms_version: '1', apply_min_level: level },
   })

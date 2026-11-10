@@ -126,6 +126,23 @@ export type BillLine = { label: string; value: string }
 export type Bill = { title: string; total: BillTotal; lines: readonly [BillLine, BillLine, ...BillLine[]]; fine: string }
 export type CostBills = { heading: string; intro: string; photographer: Bill; site: Bill }
 
+// Home: "Can't find your template? Make a wish" (Owner 2026-11-10), right under the template
+// grid and only while the wishlist is open. Three pains it answers, three example wish cards
+// (one shipped; the note says they are examples, never a badge on the picture) and one CTA
+// that depends on whether the visitor is signed in.
+export type WishExample = { image: ImageRef; text: string; votes: number; shipped: boolean }
+export type WishlistPromo = {
+  // `lead` + `emphasis` + `tail`; the emphasis is the one italic phrase (English only).
+  heading: { lead: string; emphasis: string; tail: string }
+  intro: string
+  points: readonly [HeadedText, HeadedText, HeadedText]
+  examples: readonly [WishExample, WishExample, WishExample]
+  // "Wish cards are illustrative examples" plus who can post (ARCHITECTURE §15.1).
+  note: string
+  labels: { shipped: string; votes: string }
+  cta: { signedOut: string; signedIn: string }
+}
+
 // The home page is the same structure plus the 3-step block, the grouped template grid and
 // the free-offer section (ARCHITECTURE §13, 建站规格 §4 six-H2 skeleton). Its cost block is
 // the two bills instead of a table (the signed-off v3-b comp), so a home without them still
@@ -146,6 +163,7 @@ export type HomePage = Omit<PageBasics, 'related'> & {
     // "All template images are illustrative examples." under the grid.
     note: string
   }
+  wishlist: WishlistPromo
   // Intro paragraph above the facts table.
   factsIntro: string
   // H2-4: free credits, free vs paid works, then plans.

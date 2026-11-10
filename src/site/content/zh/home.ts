@@ -22,6 +22,7 @@ import {
   zhUploadLimits,
   zhYearlySaving,
 } from './offer'
+import { zhHomeWishlist } from './home-wishlist'
 import { zhSharedFacts } from './shared'
 
 // /zh home (T21). Keyword 「AI改图」 from the Chinese keyword map; Title and H1 start with it,
@@ -132,6 +133,7 @@ export const zhHomePage = defineHomePage({
     intro: `每个模板都从你的手机照片开始，到一张成品图结束。选一个，剩下的交给 ${brand}。`,
     note: '模板图片均为示意图。',
   },
+  wishlist: zhHomeWishlist,
   facts: zhSharedFacts(),
   factsIntro: `很多 AI改图工具给你的是一张新图。你要的其实是自己那张图，只是更好看：还是那件商品、那道菜、那个房间，光线更好，画面更干净。${brand} 就是为这个做的。下面的价格和尺寸在本站每一页都一样。`,
   freeOffer: {
