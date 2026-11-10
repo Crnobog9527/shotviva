@@ -357,7 +357,10 @@ begin
     end if;
     if new.version=old.version and new.provider_id is not distinct from old.provider_id then return new; end if;
   end if;
-  select max(version) into latest from public.template_prompt_versions where template_id=new.template_id;
+  select greatest(
+    (select max(version) from public.template_prompt_versions where template_id=new.template_id),
+    (select max(version) from admin.deleted_prompt_versions where template_id=new.template_id)
+  ) into latest;
   new.version:=coalesce(latest+1,new.version); new.updated_at:=now();
   return new;
 end $$;
@@ -3926,6 +3929,33 @@ $_$;
 
 
 ALTER FUNCTION "public"."admin_lookup"("p_query" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_manage_prompt_version"("p_actor" "uuid", "p_id" "text", "p_version" integer, "p_action" "text", "p_name" "text" DEFAULT NULL::"text") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare active int;
+begin
+  if not exists(select from public.profiles where id=p_actor and role='admin' and banned_at is null) then raise exception 'FORBIDDEN'; end if;
+  perform 1 from public.templates where id=p_id for update;
+  select version into active from public.template_prompts where template_id=p_id for update;
+  if p_action='rename' and length(coalesce(p_name,''))<=80 then
+    update public.template_prompt_versions set display_name=nullif(trim(p_name),'') where template_id=p_id and version=p_version;
+  elsif p_action='delete' then
+    if active=p_version then raise exception 'ACTIVE_VERSION'; end if;
+    delete from public.template_prompt_versions where template_id=p_id and version=p_version;
+    if found then
+      insert into admin.deleted_prompt_versions(template_id,version,actor_id) values(p_id,p_version,p_actor);
+      return;
+    end if;
+  else raise exception 'INVALID_INPUT'; end if;
+  if not found then raise exception 'VERSION_NOT_FOUND'; end if;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_manage_prompt_version"("p_actor" "uuid", "p_id" "text", "p_version" integer, "p_action" "text", "p_name" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_mark_dispute_submitted"("p_dispute_id" "text", "p_actor" "uuid") RETURNS timestamp with time zone
@@ -8779,6 +8809,17 @@ $$;
 ALTER FUNCTION "public"."wishlist_eligible"("p_user_id" "uuid") OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "admin"."deleted_prompt_versions" (
+    "template_id" "text" NOT NULL,
+    "version" integer NOT NULL,
+    "actor_id" "uuid" NOT NULL,
+    "deleted_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "admin"."deleted_prompt_versions" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "admin"."pricing_release_checkpoint" (
     "version" "text" NOT NULL,
     "fingerprint" "text" NOT NULL
@@ -9721,6 +9762,7 @@ CREATE TABLE IF NOT EXISTS "public"."template_prompt_versions" (
     "provider_model" "text",
     "style_refs" "jsonb" NOT NULL,
     "created_at" timestamp with time zone NOT NULL,
+    "display_name" "text",
     CONSTRAINT "template_prompt_versions_version_check" CHECK (("version" > 0))
 );
 
@@ -9777,6 +9819,11 @@ CREATE TABLE IF NOT EXISTS "public"."template_sync_history" (
 
 
 ALTER TABLE "public"."template_sync_history" OWNER TO "postgres";
+
+
+ALTER TABLE ONLY "admin"."deleted_prompt_versions"
+    ADD CONSTRAINT "deleted_prompt_versions_pkey" PRIMARY KEY ("template_id", "version");
+
 
 
 ALTER TABLE ONLY "admin"."pricing_release_checkpoint"
@@ -10715,6 +10762,11 @@ CREATE OR REPLACE TRIGGER "zz_template_prompt_version" BEFORE INSERT OR UPDATE O
 
 
 
+ALTER TABLE ONLY "admin"."deleted_prompt_versions"
+    ADD CONSTRAINT "deleted_prompt_versions_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "admin"."product_terms_v2"
     ADD CONSTRAINT "product_terms_v2_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id");
 
@@ -11118,6 +11170,9 @@ ALTER TABLE ONLY "public"."templates"
 ALTER TABLE ONLY "public"."templates"
     ADD CONSTRAINT "templates_subcategory_key_fkey" FOREIGN KEY ("subcategory_key") REFERENCES "public"."template_categories"("key");
 
+
+
+ALTER TABLE "admin"."deleted_prompt_versions" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "admin"."pricing_release_checkpoint" ENABLE ROW LEVEL SECURITY;
@@ -11890,6 +11945,11 @@ GRANT ALL ON FUNCTION "public"."admin_log_replay"("p_user_id" "uuid", "p_target_
 
 REVOKE ALL ON FUNCTION "public"."admin_lookup"("p_query" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_lookup"("p_query" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_manage_prompt_version"("p_actor" "uuid", "p_id" "text", "p_version" integer, "p_action" "text", "p_name" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_manage_prompt_version"("p_actor" "uuid", "p_id" "text", "p_version" integer, "p_action" "text", "p_name" "text") TO "service_role";
 
 
 

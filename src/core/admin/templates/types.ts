@@ -41,9 +41,12 @@ export type CoverLanguage = { code: string | null; label: string; upcoming: bool
 
 export type CopyReceipt = { id: string; previousStandard: number | null }
 export type PromptSnapshot = NonNullable<AdminTemplate['prompt']> & { providerModel: string | null }
+export type VersionSummary = { version: number; display_name: string | null; created_at: string }
+export type ManageVersion = { id: string; version: number; action: 'rename' | 'delete'; name?: string }
 export type TemplateAdminActions = {
   setSale: (input: { id: string; enabled: boolean }) => Promise<ActionResult>
-  versions: (input: { id: string; before?: number }) => Promise<ActionValue<number[]>>
+  manageVersion: (input: ManageVersion) => Promise<ActionResult>
+  versions: (input: { id: string; before?: number }) => Promise<ActionValue<VersionSummary[]>>
   snapshot: (input: { id: string; version: number }) => Promise<ActionValue<PromptSnapshot>>
   duplicate: (input: { source: string; requestId: string }) => Promise<ActionValue<CopyReceipt>>
   save: (payload: SaveTemplatePayload) => Promise<ActionResult>
