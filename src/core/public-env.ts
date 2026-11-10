@@ -1,41 +1,10 @@
-import { z } from 'zod'
+import type { PublicEnv, RawPublicEnv } from './public-env-schema'
+
+export type { PublicEnv } from './public-env-schema'
 
 // Client-safe variables only. Next.js inlines NEXT_PUBLIC_* at build time solely
 // when referenced as literal `process.env.NEXT_PUBLIC_X`, so each key is spelled out.
-const publicEnvSchema = z.object({
-  // Optional override of the deployment origin; see core/site-url.ts for the fallback order.
-  NEXT_PUBLIC_SITE_URL: z.url().optional(),
-  NEXT_PUBLIC_PRICING_CATALOG_VERSION: z.enum(['v1', 'v2']).optional(),
-  // Vercel system variables (exposed automatically to Next.js builds on Vercel). Hosts, no scheme.
-  NEXT_PUBLIC_VERCEL_ENV: z.enum(['production', 'preview', 'development']).optional(),
-  NEXT_PUBLIC_VERCEL_BRANCH_URL: z.string().min(1).optional(),
-  NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL: z.string().min(1).optional(),
-  // Local `supabase start` defaults, so builds and tests work without a .env.local.
-  NEXT_PUBLIC_SUPABASE_URL: z.url().default('http://127.0.0.1:54321'),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().default(''),
-  // Empty means captcha is off (local dev); Supabase Auth enforces it when configured there.
-  NEXT_PUBLIC_HCAPTCHA_SITEKEY: z.string().default(''),
-  // PostHog project key: public by design (it can only write events). Empty means analytics
-  // is off (local dev, CI); the host is the US ingestion host the /ingest rewrite targets.
-  NEXT_PUBLIC_POSTHOG_KEY: z.string().default(''),
-  NEXT_PUBLIC_POSTHOG_HOST: z.url().default('https://us.i.posthog.com'),
-  // Sentry DSN, public by design. Unset means Sentry stays off in browser, server and edge.
-  NEXT_PUBLIC_SENTRY_DSN: z.url().optional(),
-  // Where covers are read from, no trailing slash. Cover URLs are this + '/covers/…'
-  // (ARCHITECTURE §8.3「公开读」): production https://shotviva.com/assets, the site's own path,
-  // rewritten to the public bucket (R2_PUBLIC_ORIGIN, next.config.ts); preview may use the
-  // bucket's r2.dev URL directly.
-  NEXT_PUBLIC_ASSETS_BASE_URL: z
-    .url()
-    .transform((url) => url.replace(/\/+$/, ''))
-    .optional(),
-  // This build's version (T90): set by next.config.ts from the deployment id; `dev` locally.
-  NEXT_PUBLIC_APP_VERSION: z.string().min(1).default('dev'),
-})
-
-export type PublicEnv = z.infer<typeof publicEnvSchema>
-
-export const publicEnv: PublicEnv = publicEnvSchema.parse({
+export const rawPublicEnv: RawPublicEnv = {
   NEXT_PUBLIC_PRICING_CATALOG_VERSION: process.env.NEXT_PUBLIC_PRICING_CATALOG_VERSION || undefined,
   NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL || undefined,
   NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV || undefined,
@@ -49,6 +18,27 @@ export const publicEnv: PublicEnv = publicEnvSchema.parse({
   NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN || undefined,
   NEXT_PUBLIC_ASSETS_BASE_URL: process.env.NEXT_PUBLIC_ASSETS_BASE_URL || undefined,
   NEXT_PUBLIC_APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION || undefined,
-})
+}
+
+// The schema's defaults and trailing-slash trim, without zod: this module is in every page's
+// first-load JavaScript, and zod with the schema was about 30 KB gzip of it (mobile Lighthouse,
+// 2026-11-11). The values are validated by publicEnvSchema at build (next.config.ts), when they
+// are inlined; public-env.test.ts keeps this function equal to the schema's parse.
+export function withPublicDefaults(raw: RawPublicEnv): PublicEnv {
+  return {
+    ...raw,
+    NEXT_PUBLIC_PRICING_CATALOG_VERSION: raw.NEXT_PUBLIC_PRICING_CATALOG_VERSION as PublicEnv['NEXT_PUBLIC_PRICING_CATALOG_VERSION'],
+    NEXT_PUBLIC_VERCEL_ENV: raw.NEXT_PUBLIC_VERCEL_ENV as PublicEnv['NEXT_PUBLIC_VERCEL_ENV'],
+    NEXT_PUBLIC_SUPABASE_URL: raw.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321',
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: raw.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
+    NEXT_PUBLIC_HCAPTCHA_SITEKEY: raw.NEXT_PUBLIC_HCAPTCHA_SITEKEY ?? '',
+    NEXT_PUBLIC_POSTHOG_KEY: raw.NEXT_PUBLIC_POSTHOG_KEY ?? '',
+    NEXT_PUBLIC_POSTHOG_HOST: raw.NEXT_PUBLIC_POSTHOG_HOST ?? 'https://us.i.posthog.com',
+    NEXT_PUBLIC_ASSETS_BASE_URL: raw.NEXT_PUBLIC_ASSETS_BASE_URL?.replace(/\/+$/, ''),
+    NEXT_PUBLIC_APP_VERSION: raw.NEXT_PUBLIC_APP_VERSION ?? 'dev',
+  }
+}
+
+export const publicEnv: PublicEnv = withPublicDefaults(rawPublicEnv)
 
 export const pricingV2 = publicEnv.NEXT_PUBLIC_PRICING_CATALOG_VERSION === 'v2'
