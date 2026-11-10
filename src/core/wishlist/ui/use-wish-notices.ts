@@ -10,9 +10,12 @@ export type MarkNoticesSeen = (requestIds: string[]) => Promise<void>
 // comes up, so one that was shown never comes back. A failed mark only means it shows once
 // more on another visit, so it is ignored.
 export function useWishNotices(items: readonly NoticeItem[], markSeen: MarkNoticesSeen) {
-  const [index, setIndex] = useState<number | null>(items.length ? 0 : null)
+  // The list as it was when the banner came up. A later render brings a shorter list once the
+  // server has the shown ones as seen, and must not swap or drop the notice on screen.
+  const [shown] = useState(items)
+  const [index, setIndex] = useState<number | null>(shown.length ? 0 : null)
   const marked = useRef(new Set<string>())
-  const current = index === null ? null : (items[index] ?? null)
+  const current = index === null ? null : (shown[index] ?? null)
 
   useEffect(() => {
     if (!current || marked.current.has(current.requestId)) return
@@ -22,8 +25,8 @@ export function useWishNotices(items: readonly NoticeItem[], markSeen: MarkNotic
 
   return {
     current,
-    remaining: index === null ? 0 : items.length - index - 1,
-    dismiss: () => setIndex((at) => afterDismiss(at, items.length)),
+    remaining: index === null ? 0 : shown.length - index - 1,
+    dismiss: () => setIndex((at) => afterDismiss(at, shown.length)),
     close: () => setIndex(null),
   }
 }
