@@ -17,6 +17,7 @@ describe('admin nav', () => {
       'jobs',
       'costs',
       'templates',
+      'references',
       'providers',
       'requests',
       'announcements',

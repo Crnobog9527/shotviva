@@ -47,7 +47,7 @@ export function notFoundResponse(): NextResponse {
   return plainNotFound()
 }
 
-async function currentUser(request: NextRequest) {
+export async function currentProxyUser(request: NextRequest) {
   const { supabase, response } = proxySupabase(request)
   const { data } = await supabase.auth.getUser()
   if (!data.user) return { user: null, response }
@@ -124,7 +124,7 @@ export async function proxyGate(request: NextRequest, options: ProxyGateOptions)
   if (!gate) return updateSession(request, options.forward)
   const configured = Boolean(publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY)
   const { user, response } = hasSessionCookie(request) && configured
-    ? await currentUser(request)
+    ? await currentProxyUser(request)
     : { user: null, response: () => NextResponse.next({ request }) }
   const verdict = decide(gate, user, pathname, search, locale)
   return withCookies(gatedAnswer(request, verdict, chosen ? null : user, options), response())
