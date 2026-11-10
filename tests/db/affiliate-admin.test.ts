@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
 import type { Client } from 'pg'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest'
 import { available, bind, promoter, refund, row, sale } from './affiliate-fixtures'
@@ -26,7 +27,7 @@ async function rejects(operation: () => Promise<unknown>, reason: string) {
 
 const settings = (input: object) => db.query('select admin_affiliate_settings($1,$2)', [admin, input])
 const eligible = async () => (await row(db, 'select affiliate_can_apply($1) ok', [user])).ok
-const profile = () => row(db, 'select status,parent_user_id,terms_version,payout_method from affiliates where user_id=$1', [user])
+const profile = () => row(db, 'select status,approved_at,approved_by,parent_user_id,terms_version,payout_method from affiliates where user_id=$1', [user])
 
 it('checks membership purchase tier and refunds, captures the accepted version, and validates team invitations', async () => {
   const form = { name: 'QA', country: 'US', channel: 'https://example.test', audience: '100', plan: 'Reviews' }
@@ -95,13 +96,62 @@ it('activates a reserved admin invite only after Auth confirms that email', asyn
   await db.query('update auth.users set invited_at=now() where id=$1', [user])
   const slug = 'qa-invited'
   await db.query('select admin_affiliate_create($1,$2)', [admin, { user_id: user, slug }])
-  expect((await profile()).status).toBe('pending')
+  expect(await profile()).toMatchObject({ status: 'pending', approved_at: null, approved_by: admin })
   const buyer = await createUser(db)
   expect(await bind(db, buyer, slug)).toBe(false)
   await rejects(() => db.query('select admin_affiliate_decide($1,$2)', [admin, { user_id: user, status: 'active' }]), 'NOT_PENDING')
   await db.query('update auth.users set email_confirmed_at=now() where id=$1', [user])
-  expect((await profile()).status).toBe('active')
+  expect(await profile()).toMatchObject({ status: 'active', approved_at: expect.any(Date), approved_by: admin })
   expect(await bind(db, buyer, slug)).toBe(true)
+})
+
+it('repairs only pending admin invites when upgrading historical approval dates', async () => {
+  const pending = await promoter(db)
+  const active = await promoter(db)
+  const ordinary = await promoter(db)
+  await db.query(`update affiliates set approved_at='2025-01-01', status=case when user_id=$2 then 'active' else 'pending' end,
+    application=case when user_id=$3 then '{}'::jsonb else '{"source":"admin_invite","name":"Test"}'::jsonb end
+    where user_id=any($1::uuid[])`, [[pending.id, active.id, ordinary.id], active.id, ordinary.id])
+  const sql = await readFile(new URL('../../supabase/migrations/1043_affiliate_invite_approval.sql', import.meta.url), 'utf8')
+  await db.query(sql)
+  const repaired = await db.query('select user_id from affiliates where user_id=any($1::uuid[]) and approved_at is null',
+    [[pending.id, active.id, ordinary.id]])
+  expect(repaired.rows).toEqual([{ user_id: pending.id }])
+})
+
+it('dates an immediately active admin enrollment at creation', async () => {
+  await db.query('select admin_affiliate_create($1,$2)', [admin, { user_id: user, slug: 'qa-direct' }])
+  expect(await profile()).toMatchObject({ status: 'active', approved_at: expect.any(Date), approved_by: admin })
+})
+
+it('consumes a one-time admin grant only after a valid reapplication and retains the rejection audit', async () => {
+  await settings({ terms_version: 'qa-v1', apply_min_level: 'none' })
+  const team = await promoter(db)
+  await db.query('update affiliates set team_enabled=true where user_id=$1', [team.id])
+  const form = { name: 'Original', country: 'US', channel: 'blog', audience: '100', plan: 'Reviews' }
+  const apply = (data: object, parent: string | null = null, version = 'qa-v1') =>
+    db.query('select affiliate_apply($1,$2,$3,$4)', [user, data, parent, version])
+  const grant = (actor: string) => db.query('select admin_affiliate_allow_reapply($1,$2)', [actor, { user_id: user }])
+  const state = () => row(db, 'select status,slug,parent_user_id,application,reject_reason,reapply_allowed,terms_version from affiliates where user_id=$1', [user])
+  await apply(form, team.slug)
+  const original = await state()
+  await rejects(() => grant(admin), 'NOT_REJECTED')
+  await db.query('select admin_affiliate_decide($1,$2)', [admin, { user_id: user, status: 'rejected', reason: 'Missing channel URL' }])
+  const revised = { ...form, name: 'Revised', country: 'CA', channel: 'https://example.test' }
+  await rejects(() => apply({ ...revised, reapply_allowed: true }), 'APPLICATION_EXISTS')
+  await rejects(() => grant(user), 'NOT_ADMIN')
+  await grant(admin)
+  await settings({ terms_version: 'qa-v2' })
+  await rejects(() => apply(revised), 'TERMS_CHANGED')
+  expect(await state()).toMatchObject({ status: 'rejected', application: form, reject_reason: 'Missing channel URL', reapply_allowed: true })
+  await apply({ ...revised, source: 'admin_invite' }, null, 'qa-v2')
+  expect(await state()).toEqual({
+    status: 'pending', slug: original.slug, parent_user_id: team.id, application: revised,
+    reject_reason: null, reapply_allowed: false, terms_version: 'qa-v2',
+  })
+  await rejects(() => apply(form, null, 'qa-v2'), 'APPLICATION_EXISTS')
+  const log = await db.query("select reason from admin_audit_log where action='affiliate_decide' and user_id=$1 and target_id=$2 order by id", [admin, user])
+  expect(log.rows.map((event) => event.reason)).toEqual(['Missing channel URL', 'allow_reapply: Missing channel URL'])
 })
 
 it('deduplicates adjustment retries, rejects conflicting payloads, and audits the effective write', async () => {

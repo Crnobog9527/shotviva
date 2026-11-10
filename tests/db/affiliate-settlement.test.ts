@@ -27,7 +27,7 @@ it('binds only the first eligible touch; existing payments, self, unknown and in
   expect(await commission(db, suspended.id)).toMatchObject({ status: 'void', void_reason: 'affiliate_inactive', amount: 0 })
 })
 
-it('example 10: $187.20 carries to the next period, $235.10 reserves once, holding releases, paying consumes it', async () => {
+it('example 10: $187.20 carries to the next period, $235.10 reserves once, a hold reserves across months until released and paid', async () => {
   const adjust = (cents: number) => db.query("insert into affiliate_adjustments(request_id,affiliate_user_id,amount,reason) values(gen_random_uuid(),$1,$2,'fixture')", [f.owner.id, cents])
   const daily = (day: string) => db.query('select affiliate_daily($1)', [day])
   const payouts = async () => (await db.query('select id,amount::int as cents,status,payout_snapshot from affiliate_payouts where affiliate_user_id=$1 order by period', [f.owner.id])).rows
@@ -39,7 +39,7 @@ it('example 10: $187.20 carries to the next period, $235.10 reserves once, holdi
   expect(await payouts()).toHaveLength(0)
   await db.query("update affiliates set payout_method='wise',payout_details='test' where user_id=$1", [f.owner.id])
   await daily('2031-01-02')
-  expect(await payouts()).toHaveLength(0)
+  expect(await payouts()).toHaveLength(1)
   await daily('2031-02-01')
   await daily('2031-02-01')
   const [payout] = await payouts()
@@ -48,23 +48,25 @@ it('example 10: $187.20 carries to the next period, $235.10 reserves once, holdi
   expect(await available(db, f.owner.id)).toBe(0)
   const decide = (input: object) => db.query('select admin_affiliate_payout_decide($1,$2)', [f.actor, input])
   await decide({ payout_id: payout.id, status: 'held', note: 'check destination' })
-  expect(await available(db, f.owner.id)).toBe(23510)
+  expect(await available(db, f.owner.id)).toBe(0)
   await daily('2031-02-01')
   expect(await payouts()).toHaveLength(1)
   await daily('2031-03-01')
-  const [, next] = await payouts()
-  await decide({ payout_id: next.id, status: 'paid', method: 'wise', paid_at: '2031-03-01', paid_reference: 'local-fixture' })
+  expect(await payouts()).toHaveLength(1)
+  await decide({ payout_id: payout.id, status: 'due' })
+  await decide({ payout_id: payout.id, status: 'paid', method: 'wise', paid_at: '2031-03-01', paid_reference: 'local-fixture' })
   expect(await available(db, f.owner.id)).toBe(0)
 })
 
-it('confirms at maturity; a payment maturing after settlement waits for the next period', async () => {
+it('confirms at maturity; a missing current-period payout is issued once after the settlement day', async () => {
   await db.query("update affiliates set payout_method='paypal',payout_details='qa' where user_id=$1", [f.owner.id])
   const p = await sale(db, f.buyer, 'pro_yearly', 250000)
   await db.query("update affiliate_commissions set confirm_after='2031-12-03T00:00:00Z' where payment_id=$1", [p.id])
   await db.query("select affiliate_daily('2031-12-01')")
   expect((await commission(db, p.id)).status).toBe('pending')
   await db.query("select affiliate_daily('2031-12-03')")
-  expect(await available(db, f.owner.id)).toBe(25000)
+  expect(await available(db, f.owner.id)).toBe(0)
+  expect(await row(db, 'select period::text from affiliate_payouts where affiliate_user_id=$1', [f.owner.id])).toEqual({ period: '2031-12-01' })
   await db.query("select affiliate_daily('2032-01-01')")
   expect(await available(db, f.owner.id)).toBe(0)
 })

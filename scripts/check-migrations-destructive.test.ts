@@ -42,6 +42,14 @@ describe('scanMigration fixtures', () => {
 })
 
 describe('scanMigration', () => {
+  it('allows literal JSON field filters while rejecting broader JSON backfills', () => {
+    const update = "update affiliates set approved_at=null where status='pending' and "
+    expect(rules(update + "application->>'source'='admin_invite'", 'error')).toEqual([])
+    for (const predicate of ["application->>'source' is not null", "application->>'source'='x' or true", "application->>status='x'"]) {
+      expect(rules(update + predicate, 'error')).toEqual(['bulk-update'])
+    }
+  })
+
   it('reports the line the statement starts on', () => {
     const sql = '-- header\ncreate table public.a (id int);\n\n  alter table public.b\n    drop column c;\n'
     expect(scanMigration(sql)).toMatchObject([{ line: 4, rule: 'drop-column', message: 'drops column b.c' }])

@@ -205,8 +205,10 @@ const DELETE = new RegExp(String.raw`\bdelete from (?:only )?(${IDENT})`)
 const UPDATE = new RegExp(String.raw`(?<!\bdo )\bupdate (?:only )?(${IDENT})\*?(?: (?:as )?(?!set\b)[a-z_][a-z0-9_]*)? set\b(.*)$`)
 const LITERAL = String.raw`(?:''|-?\d+(?:\.\d+)?|true|false|null)`
 // Matched against the where clause with the spaces around ( , = and before ) taken out.
+// A named JSON text property has the same bounded equality semantics as a scalar column.
+const TARGETED_FIELD = String.raw`${IDENT}(?: ?->> '')?`
 const TARGETED_WHERE = new RegExp(
-  String.raw`^(?:${IDENT}(?:=${LITERAL}| in\(${LITERAL}(?:,${LITERAL})*\))(?: and |$))+$`,
+  String.raw`^(?:${TARGETED_FIELD}(?:=${LITERAL}| in\(${LITERAL}(?:,${LITERAL})*\))(?: and |$))+$`,
 )
 // Statements whose bodies are runtime code, not executed by the migration itself.
 const RUNTIME_CODE = /^create (?:or replace )?(?:constraint )?(?:function|procedure|trigger|event trigger|rule|policy)\b/

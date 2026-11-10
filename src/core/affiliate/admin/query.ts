@@ -7,6 +7,7 @@ const optional = <T extends z.ZodType>(type: T) => z.preprocess(blank, type.opti
 const filter = z
   .object({
     tab: z.enum(tabs).default('overview'),
+    review: optional(z.enum(['pending', 'rejected'])),
     q: optional(z.string().trim().max(254)),
     id: optional(z.uuid()),
     affiliate: optional(z.uuid()),
