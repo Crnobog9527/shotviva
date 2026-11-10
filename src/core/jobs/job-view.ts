@@ -4,6 +4,7 @@ import type { Job, JobStatus, JobVisibility } from './job-schema'
 // What the browser sees of a job. Never image bytes (AGENTS §6): the result is fetched from
 // the download route, which applies the watermark rule.
 export type JobView = {
+  batch_id?: string
   id: string
   status: JobStatus
   // 'free' works are watermarked and stay public; 'paid' works are clean and may be private.
@@ -22,6 +23,7 @@ export const fileUrlFor = (jobId: string) => `/api/files/${jobId}`
 export function toJobView(job: Job): JobView {
   return {
     id: job.id,
+    ...(job.batchId ? { batch_id: job.batchId } : {}),
     status: job.status,
     credit_pool: job.creditPool,
     visibility: job.visibility,

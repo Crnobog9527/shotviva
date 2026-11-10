@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { cellSchema } from './batch/proof'
+import { MAX_BATCH_TEMPLATES } from './batch/limits'
 import { MAX_BATCH_SIZE } from '../billing/tier-limits'
 import type { Locale } from '../i18n/locales'
 import { NOTE_MAX_LENGTH, OUTPUT_ASPECTS, RESOLUTIONS, type Resolution } from '../templates/output-options'
@@ -33,8 +35,10 @@ export const generateBodySchema = z.object({
     })
     .default({}),
   visibility: z.enum(JOB_VISIBILITIES).optional(),
-  // How many photos the workspace sent in this batch, this one included (ARCHITECTURE §6.2
-  // "批量上传的语义"): checked against the tier's batchMax and sent with `generate`. Not stored.
+  // Preflight counts retained photo/template cells and distinct templates.
+  batch_templates: z.int().min(1).max(MAX_BATCH_TEMPLATES).optional(),
+  batch_id: z.uuid().optional(),
+  batch_cell: cellSchema.optional(),
   batch_size: z.number().int().min(1).max(MAX_BATCH_SIZE).optional(),
 })
 
@@ -58,6 +62,9 @@ export type GenerationRequest = {
   // Partner callId (T7); a repeat returns the first job.
   idempotencyKey?: string | null
   // Web batches only; absent is a single photo (the partner route has no batches, §14.1).
+  batchId?: string
+  batchTemplates?: number
+  batchCell?: z.infer<typeof cellSchema>
   batchSize?: number
   // Language of the page that asked, for the `generate` event only (ARCHITECTURE §16.2).
   locale?: Locale
@@ -81,5 +88,8 @@ export function toGenerationRequest(userId: string, body: z.infer<typeof generat
     togglesConfirmed: body.inputs.toggles_confirmed,
     visibility: body.visibility ?? null,
     batchSize: body.batch_size,
+    batchTemplates: body.batch_templates,
+    batchId: body.batch_id,
+    batchCell: body.batch_cell,
   }
 }

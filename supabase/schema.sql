@@ -6617,6 +6617,40 @@ $$;
 ALTER FUNCTION "public"."checkout_discount"("p_user" "uuid", "p_product_id" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."claim_batch_zip"("p_user_id" "uuid", "p_batch_id" "uuid", "p_token" "uuid") RETURNS "text"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  state admin.batch_zip_requests;
+  at_time timestamptz;
+  recent timestamptz[];
+  active jsonb;
+  result text := 'acquired';
+begin
+  if coalesce(public.current_tier(p_user_id), 'starter') not in ('pro', 'max') then return 'upgrade'; end if;
+  insert into admin.batch_zip_requests (user_id) values (p_user_id) on conflict do nothing;
+  select * into strict state from admin.batch_zip_requests where user_id=p_user_id for update;
+  at_time := clock_timestamp();
+  recent := array(select t from unnest(state.request_times) t where t > at_time - interval '1 minute');
+  if cardinality(recent) >= 3 then return 'limited'; end if;
+  select coalesce(jsonb_object_agg(key,value), '{}') into active from jsonb_each(state.active_batches)
+    where (value->>'expires')::timestamptz > at_time;
+  if active ? p_batch_id::text then
+    result := 'packing';
+  else
+    active := active || jsonb_build_object(p_batch_id::text,
+      jsonb_build_object('token', p_token, 'expires', at_time + interval '6 minutes'));
+  end if;
+  update admin.batch_zip_requests set request_times = array_append(recent,at_time), active_batches = active where user_id=p_user_id;
+  return result;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."claim_batch_zip"("p_user_id" "uuid", "p_batch_id" "uuid", "p_token" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."claim_dispute_reminders"("p_dispute_ids" "text"[]) RETURNS SETOF "text"
     LANGUAGE "sql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -6893,6 +6927,7 @@ CREATE TABLE IF NOT EXISTS "public"."generation_jobs" (
     "downloaded_at" timestamp with time zone,
     "download_ip" "inet",
     "download_count" integer DEFAULT 0 NOT NULL,
+    "batch_id" "uuid",
     CONSTRAINT "generation_jobs_check" CHECK ((("status" = 'running'::"text") = ("finished_at" IS NULL))),
     CONSTRAINT "generation_jobs_check1" CHECK ((("status" <> 'succeeded'::"text") OR ("output_key" IS NOT NULL))),
     CONSTRAINT "generation_jobs_cost_usd_nonnegative" CHECK ((("cost_usd" IS NULL) OR ("cost_usd" >= (0)::numeric))),
@@ -8297,6 +8332,18 @@ $$;
 ALTER FUNCTION "public"."refund_job"("p_job_id" "uuid", "p_error_code" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."release_batch_zip"("p_user_id" "uuid", "p_batch_id" "uuid", "p_token" "uuid") RETURNS "void"
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  update admin.batch_zip_requests set active_batches=active_batches-p_batch_id::text
+   where user_id=p_user_id and active_batches->p_batch_id::text->>'token'=p_token::text;
+$$;
+
+
+ALTER FUNCTION "public"."release_batch_zip"("p_user_id" "uuid", "p_batch_id" "uuid", "p_token" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."release_checkout_discount"("p_user" "uuid", "p_token" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -8312,6 +8359,39 @@ $$;
 
 
 ALTER FUNCTION "public"."release_checkout_discount"("p_user" "uuid", "p_token" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."reserve_batch_cell"("p_job_id" "uuid", "p_user_id" "uuid", "p_module" "text", "p_template_id" "text", "p_credits_cost" integer, "p_inputs" "jsonb", "p_provider" "text", "p_visibility" "text") RETURNS "public"."generation_jobs"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  job public.generation_jobs;
+  batch uuid := (p_inputs->>'batch_id')::uuid;
+  position_in_batch integer := (p_inputs->>'batch_position')::integer;
+begin
+  job := public.reserve_credits(p_job_id,p_user_id,p_module,p_template_id,p_credits_cost,'web',
+    p_inputs,p_provider,null,p_visibility,null);
+  if job.inputs->>'attempt_id' is distinct from p_inputs->>'attempt_id' then return job; end if;
+  if job.credit_pool <> 'paid' then raise exception 'CREDITS_INSUFFICIENT'; end if;
+  -- Legacy single-template batch clients do not have a preflight ID.
+  if batch is null then return job; end if;
+  if position_in_batch is null then raise exception 'INVALID_INPUT'; end if;
+  if job.credits_cost is distinct from p_credits_cost then raise exception 'TEMPLATE_QUOTE_CHANGED'; end if;
+  if (p_inputs->>'batch_templates')::integer > 1 and public.current_tier(p_user_id) is distinct from 'max' then
+    raise exception 'BATCH_MAX_REQUIRED';
+  end if;
+  if exists (
+    select 1 from public.generation_jobs j where j.user_id=p_user_id and j.batch_id=batch
+      and j.status<>'failed' and (j.inputs->>'batch_position')::integer=position_in_batch and j.id<>p_job_id
+  ) then raise exception 'IDEMPOTENCY_CONFLICT'; end if;
+  update public.generation_jobs set batch_id=batch where id=p_job_id returning * into job;
+  return job;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."reserve_batch_cell"("p_job_id" "uuid", "p_user_id" "uuid", "p_module" "text", "p_template_id" "text", "p_credits_cost" integer, "p_inputs" "jsonb", "p_provider" "text", "p_visibility" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."reserve_checkout_discount"("p_user" "uuid", "p_product_id" "text", "p_token" "uuid") RETURNS "jsonb"
@@ -9338,6 +9418,16 @@ $$;
 
 
 ALTER FUNCTION "public"."wishlist_eligible"("p_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "admin"."batch_zip_requests" (
+    "user_id" "uuid" NOT NULL,
+    "request_times" timestamp with time zone[] DEFAULT '{}'::timestamp with time zone[] NOT NULL,
+    "active_batches" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL
+);
+
+
+ALTER TABLE "admin"."batch_zip_requests" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "admin"."catalog_product_versions" (
@@ -10404,6 +10494,11 @@ CREATE TABLE IF NOT EXISTS "public"."template_sync_history" (
 ALTER TABLE "public"."template_sync_history" OWNER TO "postgres";
 
 
+ALTER TABLE ONLY "admin"."batch_zip_requests"
+    ADD CONSTRAINT "batch_zip_requests_pkey" PRIMARY KEY ("user_id");
+
+
+
 ALTER TABLE ONLY "admin"."catalog_product_versions"
     ADD CONSTRAINT "catalog_product_versions_pkey" PRIMARY KEY ("product_id", "revision");
 
@@ -11002,6 +11097,10 @@ CREATE INDEX "credit_ledger_user_plan_idx" ON "public"."credit_ledger" USING "bt
 
 
 
+CREATE INDEX "generation_jobs_batch_slot" ON "public"."generation_jobs" USING "btree" ("user_id", "batch_id", ((("inputs" ->> 'batch_position'::"text"))::integer)) WHERE (("batch_id" IS NOT NULL) AND ("status" <> 'failed'::"text"));
+
+
+
 CREATE INDEX "generation_jobs_created_at_id_idx" ON "public"."generation_jobs" USING "btree" ("created_at" DESC, "id" DESC);
 
 
@@ -11387,6 +11486,11 @@ CREATE OR REPLACE TRIGGER "zz_template_category_path" BEFORE INSERT OR UPDATE OF
 
 
 CREATE OR REPLACE TRIGGER "zz_template_prompt_version" BEFORE INSERT OR UPDATE ON "public"."template_prompts" FOR EACH ROW EXECUTE FUNCTION "admin"."assign_template_prompt_version"();
+
+
+
+ALTER TABLE ONLY "admin"."batch_zip_requests"
+    ADD CONSTRAINT "batch_zip_requests_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
 
 
@@ -11823,6 +11927,9 @@ ALTER TABLE ONLY "public"."templates"
 ALTER TABLE ONLY "public"."templates"
     ADD CONSTRAINT "templates_subcategory_key_fkey" FOREIGN KEY ("subcategory_key") REFERENCES "public"."template_categories"("key");
 
+
+
+ALTER TABLE "admin"."batch_zip_requests" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "admin"."catalog_product_versions" ENABLE ROW LEVEL SECURITY;
@@ -13025,6 +13132,11 @@ GRANT ALL ON FUNCTION "public"."checkout_discount"("p_user" "uuid", "p_product_i
 
 
 
+REVOKE ALL ON FUNCTION "public"."claim_batch_zip"("p_user_id" "uuid", "p_batch_id" "uuid", "p_token" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."claim_batch_zip"("p_user_id" "uuid", "p_batch_id" "uuid", "p_token" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."claim_dispute_reminders"("p_dispute_ids" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."claim_dispute_reminders"("p_dispute_ids" "text"[]) TO "service_role";
 
@@ -13274,8 +13386,18 @@ GRANT ALL ON FUNCTION "public"."refund_job"("p_job_id" "uuid", "p_error_code" "t
 
 
 
+REVOKE ALL ON FUNCTION "public"."release_batch_zip"("p_user_id" "uuid", "p_batch_id" "uuid", "p_token" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."release_batch_zip"("p_user_id" "uuid", "p_batch_id" "uuid", "p_token" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."release_checkout_discount"("p_user" "uuid", "p_token" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."release_checkout_discount"("p_user" "uuid", "p_token" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."reserve_batch_cell"("p_job_id" "uuid", "p_user_id" "uuid", "p_module" "text", "p_template_id" "text", "p_credits_cost" integer, "p_inputs" "jsonb", "p_provider" "text", "p_visibility" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."reserve_batch_cell"("p_job_id" "uuid", "p_user_id" "uuid", "p_module" "text", "p_template_id" "text", "p_credits_cost" integer, "p_inputs" "jsonb", "p_provider" "text", "p_visibility" "text") TO "service_role";
 
 
 

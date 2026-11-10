@@ -153,3 +153,20 @@ export function r2MarkerStore(): MarkerStore | null {
       : null
   return cachedMarkers
 }
+
+export async function signBatchZip(archive: import('./batch-zip').Archive) {
+  const credentials = r2Credentials()
+  const { R2_BUCKET } = serverEnv()
+  if (!credentials || !R2_BUCKET) throw new AppError('INTERNAL', 'R2 storage is not configured')
+  const store = r2Store()
+  if (!(await store.head(archive.key))) {
+    const { writeBatchZip } = await import('./batch-zip')
+    const client = createR2Client(credentials)
+    try {
+      await writeBatchZip(client, R2_BUCKET, archive)
+    } finally {
+      client.destroy()
+    }
+  }
+  return store.presignGet(archive.key, { expiresInSeconds: 60, downloadName: archive.name })
+}
