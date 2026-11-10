@@ -7384,6 +7384,60 @@ CREATE OR REPLACE FUNCTION "public"."settle_waffo_order_v2"("p_user_id" "uuid", 
 ALTER FUNCTION "public"."settle_waffo_order_v2"("p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."settle_waffo_renewal_v2"("p_user_id" "uuid", "p_product_id" "text", "p_order_id" "text", "p_period" integer, "p_payment_id" "text", "p_quoted" integer, "p_charged" integer, "p_tax" integer, "p_subtotal" integer, "p_currency" "text") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_ticket uuid;
+  v_prior admin.waffo_renewal_periods;
+  v_change public.credit_change;
+  v_review boolean;
+begin
+  if p_quoted is null or p_quoted <= 0 or p_product_id like 'pack_%' then
+    raise exception 'INVALID_INPUT';
+  end if;
+  v_review := p_currency is distinct from 'usd' or p_charged is null
+    or p_tax < 0 or p_tax is null or p_charged - p_tax <> p_quoted
+    or (p_subtotal is not null and p_subtotal <> p_quoted);
+  if v_review then v_ticket := gen_random_uuid(); end if;
+
+  insert into admin.waffo_renewal_periods(order_id, period_number, payment_id, user_id, product_id, ticket_id)
+  values(p_order_id, p_period, p_payment_id, p_user_id, p_product_id, v_ticket)
+  on conflict (order_id, period_number) do nothing;
+  if not found then
+    select * into strict v_prior from admin.waffo_renewal_periods
+      where order_id = p_order_id and period_number = p_period;
+    if v_prior.user_id <> p_user_id or v_prior.product_id <> p_product_id then
+      raise exception 'IDEMPOTENCY_CONFLICT';
+    end if;
+    return jsonb_build_object('outcome', case when v_prior.ticket_id is null then 'replayed' else 'review' end);
+  end if;
+
+  -- A payment applied by the previous deployment already has its final disposition.
+  if exists(select from public.payments where waffo_payment_id = p_payment_id
+    and user_id = p_user_id and product_id = p_product_id and waffo_order_id = p_order_id) then
+    update admin.waffo_renewal_periods set ticket_id = null where order_id = p_order_id and period_number = p_period;
+    return jsonb_build_object('outcome','replayed');
+  end if;
+  if not v_review then
+    v_change := public.settle_waffo_order_v2(p_user_id,p_product_id,p_payment_id,p_order_id,p_charged,p_currency,p_tax,'card');
+    return jsonb_build_object('outcome',case when v_change.applied then 'applied' else 'replayed' end);
+  end if;
+
+  insert into public.support_tickets(id, user_id, type) values (v_ticket, p_user_id, 'billing');
+  insert into public.support_ticket_messages(ticket_id, author, body) values (v_ticket, 'admin',
+    format('Waffo renewal undergoing manual review. Order %s, period %s, payment %s, product %s. Original quote: %s USD cents. Charged: %s %s minor units, tax: %s, listed subtotal: %s. Credits pending.',
+      p_order_id, p_period, p_payment_id, p_product_id, p_quoted, coalesce(p_charged::text,'unknown'),
+      coalesce(p_currency,'unknown'), p_tax, coalesce(p_subtotal::text,'unknown')));
+  return jsonb_build_object('outcome','review','ticket_id',v_ticket);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."settle_waffo_renewal_v2"("p_user_id" "uuid", "p_product_id" "text", "p_order_id" "text", "p_period" integer, "p_payment_id" "text", "p_quoted" integer, "p_charged" integer, "p_tax" integer, "p_subtotal" integer, "p_currency" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."sms_authorize_send"("p_phone_key" "text") RETURNS "text"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -8199,6 +8253,20 @@ ALTER VIEW "admin"."users_overview" OWNER TO "postgres";
 
 COMMENT ON VIEW "admin"."users_overview" IS 'Owner support view (ARCHITECTURE §10): search by email or phone; credits = paid pool, free_credits = free pool.';
 
+
+
+CREATE TABLE IF NOT EXISTS "admin"."waffo_renewal_periods" (
+    "order_id" "text" NOT NULL,
+    "period_number" integer NOT NULL,
+    "payment_id" "text" NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "product_id" "text" NOT NULL,
+    "ticket_id" "uuid",
+    CONSTRAINT "waffo_renewal_periods_period_number_check" CHECK (("period_number" > 1))
+);
+
+
+ALTER TABLE "admin"."waffo_renewal_periods" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
@@ -9091,6 +9159,16 @@ ALTER TABLE ONLY "admin"."template_price_snapshots"
 
 
 
+ALTER TABLE ONLY "admin"."waffo_renewal_periods"
+    ADD CONSTRAINT "waffo_renewal_periods_payment_id_key" UNIQUE ("payment_id");
+
+
+
+ALTER TABLE ONLY "admin"."waffo_renewal_periods"
+    ADD CONSTRAINT "waffo_renewal_periods_pkey" PRIMARY KEY ("order_id", "period_number");
+
+
+
 ALTER TABLE ONLY "public"."admin_audit_log"
     ADD CONSTRAINT "admin_audit_log_pkey" PRIMARY KEY ("id");
 
@@ -9406,6 +9484,14 @@ CREATE INDEX "template_copy_requests_target_idx" ON "admin"."template_copy_reque
 
 
 CREATE UNIQUE INDEX "template_price_one_batch" ON "admin"."template_price_batches" USING "btree" ((true)) WHERE ("reverted_at" IS NULL);
+
+
+
+CREATE INDEX "waffo_renewal_periods_product_idx" ON "admin"."waffo_renewal_periods" USING "btree" ("product_id");
+
+
+
+CREATE INDEX "waffo_renewal_periods_user_idx" ON "admin"."waffo_renewal_periods" USING "btree" ("user_id");
 
 
 
@@ -9916,6 +10002,16 @@ ALTER TABLE ONLY "admin"."template_price_snapshots"
 
 
 
+ALTER TABLE ONLY "admin"."waffo_renewal_periods"
+    ADD CONSTRAINT "waffo_renewal_periods_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id");
+
+
+
+ALTER TABLE ONLY "admin"."waffo_renewal_periods"
+    ADD CONSTRAINT "waffo_renewal_periods_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."admin_audit_log"
     ADD CONSTRAINT "admin_audit_log_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
@@ -10277,6 +10373,9 @@ ALTER TABLE "admin"."template_price_batches" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "admin"."template_price_snapshots" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "admin"."waffo_renewal_periods" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."admin_audit_log" ENABLE ROW LEVEL SECURITY;
@@ -11462,6 +11561,11 @@ GRANT ALL ON FUNCTION "public"."settle_waffo_order"("p_user_id" "uuid", "p_produ
 
 REVOKE ALL ON FUNCTION "public"."settle_waffo_order_v2"("p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."settle_waffo_order_v2"("p_user_id" "uuid", "p_product_id" "text", "p_payment_id" "text", "p_order_id" "text", "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."settle_waffo_renewal_v2"("p_user_id" "uuid", "p_product_id" "text", "p_order_id" "text", "p_period" integer, "p_payment_id" "text", "p_quoted" integer, "p_charged" integer, "p_tax" integer, "p_subtotal" integer, "p_currency" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."settle_waffo_renewal_v2"("p_user_id" "uuid", "p_product_id" "text", "p_order_id" "text", "p_period" integer, "p_payment_id" "text", "p_quoted" integer, "p_charged" integer, "p_tax" integer, "p_subtotal" integer, "p_currency" "text") TO "service_role";
 
 
 
