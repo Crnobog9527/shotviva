@@ -40,16 +40,13 @@ export function WishNotice({ items, markSeen }: Props) {
 
 function NoticeText({ item, remaining }: { item: NoticeItem; remaining: number }) {
   const t = useTranslations('app.wishlist.notice')
-  const name = (chunks: ReactNode) => <span className="font-medium text-foreground">{chunks}</span>
+  // The name on its own line so the lead never breaks mid-phrase, and not clamped: the name is the
+  // point. The count of what is still to come goes underneath, so it costs the row no width.
+  const name = (chunks: ReactNode) => <span className="block font-medium text-foreground">{chunks}</span>
   return (
-    <p className="line-clamp-2 min-w-0 flex-1 text-[15px] leading-[1.4] text-pretty text-bone-dim">
+    <p className="min-w-0 flex-1 text-[15px] leading-[1.4] break-words text-pretty text-bone-dim">
       {t.rich(item.isAuthor ? 'author' : 'voter', { template: item.templateName, name })}
-      {remaining > 0 && (
-        <span className="ml-1.5 inline-block rounded-full bg-wash-strong px-1.5 align-[1px] text-[12px] leading-[18px] font-medium text-bone-dim tabular-nums">
-          <span aria-hidden="true">+{remaining}</span>
-          <span className="sr-only">{t('more', { count: remaining })}</span>
-        </span>
-      )}
+      {remaining > 0 && <span className="mt-0.5 block text-caption tabular-nums">{t('more', { count: remaining })}</span>}
     </p>
   )
 }

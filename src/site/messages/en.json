@@ -714,7 +714,7 @@
         "voter": "A template you voted for is live: <name>{template}</name>",
         "open": "Try it",
         "dismiss": "Dismiss",
-        "more": "{count} more"
+        "more": "+{count} more"
       },
       "hint": {
         "text": "You can now wish for new templates.",
