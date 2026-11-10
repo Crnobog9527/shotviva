@@ -88,10 +88,11 @@ it('will not pay an unrecomputed refund; winning a dispute after paying zero res
   const sale = await makeSale()
   await run('2031-06-05')
   const [p] = await payouts()
-  await db.query('alter table affiliate_commissions add constraint t100_failure check(false) not valid')
-  await refund(db, sale.charge, 5000)
+  // The billing suite exercises a real failed write. Seed only its durable retry
+  // record here so this transaction need not lock the entire commissions table.
+  await db.query("insert into affiliate_recompute_errors(payment_id,error) values($1,'fixture: refund pending')", [sale.id])
   await refuses(() => decide(p.id, 'paid'), 'AFFILIATE_PAYOUT_RECOMPUTE_PENDING')
-  await db.query('alter table affiliate_commissions drop constraint t100_failure')
+  await refund(db, sale.charge, 5000)
   await db.query('select affiliate_recompute_payment($1)', [sale.id])
   const d = await dispute(db, sale.charge, 5000)
   expect((await payouts())[0].payable).toBe(0)
