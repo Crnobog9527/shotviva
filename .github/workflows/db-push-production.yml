@@ -78,13 +78,22 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.pricing_operation != 'none'
         env:
           REVIEWED_SHA: ${{ inputs.release_sha }}
+          PRICING_V2_APPROVED_BASELINE: ${{ secrets.PRICING_V2_APPROVED_BASELINE }}
           OPERATION: ${{ inputs.pricing_operation }}
         run: |
           set -euo pipefail
           test "$REVIEWED_SHA" = "$GITHUB_SHA"
           test "$SUPABASE_PROJECT_REF" = "irbqamjuazkkyvnnzupf"
           case "$OPERATION" in
-            activate) file=scripts/release/pricing-v2/production.sql ;;
+            activate)
+              umask 077
+              file=$(mktemp)
+              trap 'rm -f "$file"' EXIT
+              python3 scripts/release/pricing-v2/render-production.py > "$file"
+              # CLI/database diagnostics can include the rendered statement.
+              supabase db query --linked --file "$file" >/dev/null 2>&1 || { echo "::error::Production activation failed"; exit 1; }
+              exit 0
+              ;;
             rollback) file=scripts/release/pricing-v2/production-rollback.sql ;;
             *) exit 1 ;;
           esac
