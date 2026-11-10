@@ -11,7 +11,7 @@
       "seeAll": "See all templates",
       "changeTemplate": "Template: {name}. Change template",
       "changeSize": "Size: {name}. Change size",
-      "notePlaceholder": "Anything to change? (optional)",
+      "notePlaceholder": "Anything to change?",
       "uploadPhoto": "Upload photo",
       "dockGenerate": "Generate",
       "needsCopy": "Add the text in the workspace",

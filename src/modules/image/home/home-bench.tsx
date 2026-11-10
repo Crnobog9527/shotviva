@@ -68,21 +68,26 @@ export const HomeBench = forwardRef<HTMLDivElement, Props>(function HomeBench({ 
   )
 })
 
+// The photo slot names itself beside the well, the way the chips name theirs: a bare "+" in a
+// square was not read as the upload (Owner 2026-11-11).
 function PhotoTile({ url, onPick }: { url: string | null; onPick(): void }) {
   const t = useTranslations('home.generator')
   return (
-    <button type="button" className="mk-tile" onClick={onPick} aria-label={url ? t('replaceAria') : t('addPhoto')}>
-      <span className="mk-vf" aria-hidden>
-        <i />
-        <i />
-        <i />
-        <i />
+    // The visible words are the name; with a photo the longer label still contains "Replace".
+    <button type="button" className="mk-photo" onClick={onPick} aria-label={url ? t('replaceAria') : undefined}>
+      <span className="mk-tile" aria-hidden>
+        <span className="mk-vf">
+          <i />
+          <i />
+          <i />
+          <i />
+        </span>
+        <PlusIcon className="mk-plus" />
+        {/* eslint-disable-next-line @next/next/no-img-element -- a local object URL, not an optimisable asset */}
+        {url ? <img className={`${REPLAY_BLOCK_CLASS} mk-shot`} src={url} alt="" /> : null}
       </span>
-      <PlusIcon className="mk-plus" />
-      {/* eslint-disable-next-line @next/next/no-img-element -- a local object URL, not an optimisable asset */}
-      {url ? <img className={`${REPLAY_BLOCK_CLASS} mk-shot`} src={url} alt="" /> : null}
-      <span className="mk-replace" aria-hidden>
-        {t('replace')}
+      <span className="mk-photo-t">
+        {url ? t('replace') : t('uploadPhoto')}
       </span>
     </button>
   )
