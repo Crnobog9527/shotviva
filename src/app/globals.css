@@ -437,6 +437,16 @@ html:lang(zh-Hans) :is(em, i, .italic) {
     animation: sv-consent-in 360ms var(--ease) both;
   }
 }
+/* The wish-came-true notice (core/wishlist) drops 12px into place, each time the next one comes
+   up; still under reduced motion. */
+@keyframes sv-notice-in {
+  from { transform: translateY(-12px); opacity: 0; }
+}
+@utility notice-in {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: sv-notice-in 360ms var(--ease) both;
+  }
+}
 @keyframes sv-scrim-in {
   from { opacity: 0; }
 }

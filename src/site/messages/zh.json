@@ -709,6 +709,13 @@
         "title": "没找到想要的？去许愿",
         "line": "说说你要的效果，大家投票，票多的先做。"
       },
+      "notice": {
+        "author": "你许的愿望上线了：<name>「{template}」</name>",
+        "voter": "你投票的模板上线了：<name>「{template}」</name>",
+        "open": "去试试",
+        "dismiss": "关闭",
+        "more": "还有 {count} 条"
+      },
       "hint": {
         "text": "你现在可以许愿新模板了。",
         "open": "去许愿墙",
