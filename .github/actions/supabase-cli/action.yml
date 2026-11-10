@@ -32,7 +32,7 @@ runs:
     # composite action's post step `steps.*` outputs are empty, so actions/cache saved under a
     # different path than it restored and never hit.
     - id: cache
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:
         path: ~/.cache/supabase-cli
         key: supabase-cli-v3-${{ runner.os }}-${{ runner.arch }}-${{ steps.pin.outputs.version }}-${{ steps.pin.outputs.sha256 }}
@@ -58,7 +58,7 @@ runs:
         rm -f "$archive"
 
     - if: steps.cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:
         path: ~/.cache/supabase-cli
         key: ${{ steps.cache.outputs.cache-primary-key }}

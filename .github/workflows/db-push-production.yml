@@ -50,7 +50,7 @@ jobs:
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_PRODUCTION_DB_PASSWORD }}
       SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PRODUCTION_PROJECT_REF }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/supabase-remote
         with:
           token-source: secret SUPABASE_ACCESS_TOKEN
