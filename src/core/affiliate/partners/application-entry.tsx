@@ -4,20 +4,20 @@ import { localized } from '@/core/i18n/server'
 import { Link } from '@/core/i18n/ui'
 import { ApplicationDialog } from './application-dialog'
 import { ApplicationForm } from './application-form'
-import type { Settings } from './models'
+import type { EnrollmentSettings } from './models'
 import { canApply } from './repository'
 
 export async function ApplicationEntry({ userId, parent, openForm, settings }: {
-  userId?: string; parent: string; openForm: boolean; settings: Settings
+  userId?: string; parent: string; openForm: boolean; settings: EnrollmentSettings
 }) {
   const applyPath = '/partners/apply' + (parent ? '?by=' + parent : '')
   const [t, eligible, returnPath] = await Promise.all([
     getTranslations('affiliate'),
-    userId ? canApply(userId) : true,
+    userId && settings.apply_min_level !== 'none' ? canApply(userId) : true,
     localized(applyPath),
   ])
   const applicationLogin = userId ? undefined : await localized(loginPath(returnPath))
-  const memberLogin = loginPath(parent ? returnPath : await localized('/partners'))
+  const memberLogin = loginPath(await localized('/partners'))
   return (
     <div className="af-entry-actions">
       <ApplicationDialog initiallyOpen={openForm} title={t('apply')} description={t('formIntro')}>

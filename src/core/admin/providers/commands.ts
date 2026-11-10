@@ -42,8 +42,8 @@ function parseOrThrow<T>(schema: z.ZodType<T>, value: unknown): T {
 
 // Previews the same catalogue entry save validates, without ever reading a Vault key.
 export async function lookupProviderModel(input: unknown) {
-  const { baseUrl, model } = parseOrThrow(lookupModelSchema, input)
-  return (await fetchImageCapabilities('openrouter_images', await assertPublicBaseUrl(baseUrl), model))?.resolutions ?? null
+  const { baseUrl, model, retry } = parseOrThrow(lookupModelSchema, input)
+  return fetchImageCapabilities('openrouter_images', await assertPublicBaseUrl(baseUrl), model, retry ? fetch : undefined)
 }
 
 // Save the confirmed catalogue snapshot and the optional Vault key in the same transaction.
@@ -51,7 +51,7 @@ export async function saveProvider(deps: ProviderCommandDeps, adminId: string, i
   const parsed = parseOrThrow(saveProviderSchema, input)
   if (!parsed.id && !parsed.apiKey) throw new ProviderSettingError('api_key_required', 'A new provider needs an API key')
   const baseUrl = await assertPublicBaseUrl(parsed.baseUrl, deps.resolveHost)
-  const caps = await fetchImageCapabilities(parsed.adapter, baseUrl, parsed.model, deps.fetch)
+  const caps = await fetchImageCapabilities(parsed.adapter, baseUrl, parsed.model, deps.fetch ?? fetch)
   const settings = {
     module: parsed.module, adapter: parsed.adapter, label: parsed.label, base_url: baseUrl, model: parsed.model,
     notes: parsed.notes, estimated_image_costs: parsed.estimatedImageCosts, price_input_text_per_m: parsed.priceInputTextPerM,

@@ -7,7 +7,7 @@ import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import { createCheckout, expireAndRelease } from '@/core/billing/stripe'
 import { deps, fakeStripe } from '@/core/billing/stripe/test-checkout'
 import { site } from '@/site/site.config'
-import { benefits, invite, pack } from '../t94-config'
+import { benefits, invite, pack, seededRewards } from '../t94-config'
 
 import { anonClient, connectAdmin, createUser, ledgerOf, profileOf, serviceClient } from './helpers'
 
@@ -28,7 +28,7 @@ async function addDiscount(user: string) {
     `insert into public.codes(code,kind,discount_percent,discount_products,discount_duration,stripe_coupon_id)
      values($1,'campaign',20,'{pack_s}','once',$2) returning id,code`, [codeText(), randomUUID()])
   const result = await rpc('redeem_code', {
-    p_user: user, p_code: code.code, p_context: 'account', p_invitee_credits: invite.inviteeCredits, p_invite_window_days: invite.windowDays, p_replace: true,
+    p_user: user, p_code: code.code, p_context: 'account', p_invitee_credits: null, p_invite_window_days: invite.windowDays, p_replace: true,
   })
   expect(result).toMatchObject({ status: 'ok' })
   return code.id
@@ -38,7 +38,7 @@ async function addInvite(buyer: string, inviter: string) {
   await db.query("select public.grant_credits($1,$3,'signup',$2,'free')", [buyer, 'signup:' + buyer, benefits.freeCredits])
   const { rows: [offer] } = await db.query<{ code: string }>('select public.get_or_create_invite_code($1) as code', [inviter])
   expect(await rpc('redeem_code', {
-    p_user: buyer, p_code: offer.code, p_context: 'signup', p_invitee_credits: invite.inviteeCredits, p_invite_window_days: invite.windowDays,
+    p_user: buyer, p_code: offer.code, p_context: 'signup', p_invitee_credits: null, p_invite_window_days: invite.windowDays,
   })).toMatchObject({ status: 'ok' })
 }
 
@@ -61,7 +61,7 @@ type Purchase = Awaited<ReturnType<typeof buy>>
 function effects(payment: Purchase, code: string | null = null, amount = 0) {
   return rpc('apply_payment_code_effects', {
     p_user: payment.buyer, p_payment_id: payment.id, p_code_id: code, p_amount_discount: amount,
-    p_inviter_credits: invite.inviterCredits, p_inviter_cap: invite.inviterRewardCap,
+    p_inviter_credits: null, p_inviter_cap: invite.inviterRewardCap,
   })
 }
 
@@ -182,8 +182,8 @@ it('rewards only the first settled payment even when callbacks run in reverse or
   const replay = await Promise.all([effects(first), effects(first)])
   expect(replay.map((row) => (row as { rewarded: boolean }).rewarded).sort()).toEqual([false, true])
   expect(await lookup(buyer)).toMatchObject({ code_id: code })
-  expect((await profileOf(db, inviter)).credits).toBe(invite.inviterCredits)
-  expect(await ledgerOf(db, inviter)).toEqual([expect.objectContaining({ kind: 'invite_reward', pool: 'paid', delta: invite.inviterCredits })])
+  expect((await profileOf(db, inviter)).credits).toBe(seededRewards.inviterCredits)
+  expect(await ledgerOf(db, inviter)).toEqual([expect.objectContaining({ kind: 'invite_reward', pool: 'paid', delta: seededRewards.inviterCredits })])
   expect((await db.query('select public.current_tier($1) as tier', [inviter])).rows[0].tier).toBeNull()
 })
 
@@ -210,7 +210,7 @@ it('concurrent first purchases stop at the configured reward cap within its roll
   const awarded = await Promise.all(payments.map((payment) => effects(payment)))
   const winners = awarded.filter((v) => (v as { rewarded: boolean }).rewarded)
   expect(winners).toHaveLength(invite.inviterRewardCap)
-  expect((await profileOf(db, inviter)).credits).toBe(invite.inviterRewardCap * invite.inviterCredits)
+  expect((await profileOf(db, inviter)).credits).toBe(invite.inviterRewardCap * seededRewards.inviterCredits)
   const winner = awarded.findIndex((v) => (v as { rewarded: boolean }).rewarded)
   await db.query('delete from auth.users where id = $1', [payments[winner].buyer])
   const afterDeletion = await createUser(db)

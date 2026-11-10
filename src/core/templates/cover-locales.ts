@@ -49,6 +49,11 @@ const commonMotion = (t: CoverSource): Motion | null =>
 const ownMotion = (cover: LocaleCover | undefined): Motion | null =>
   cover?.media && cover.video ? { mediaType: cover.media, video: cover.video, poster: cover.poster ?? null } : null
 
+export function effectiveStillCover(own: CoverLocales, locale: string | null, slot: 'before' | 'after', common: string | null) {
+  if (locale === null) return common
+  return own[locale]?.[slot] ?? common ?? LOCALES.map(code => own[code]?.[slot]).find(Boolean) ?? null
+}
+
 // The cover a page in `locale` shows (Owner 2026-11-08: nothing is tied to a language). Each part
 // (before, after, motion) on its own: the page language's own if set; else the common cover's;
 // else, when there is no common one, the first launched language (in LOCALES order, the admin tab
@@ -58,13 +63,11 @@ const ownMotion = (cover: LocaleCover | undefined): Motion | null =>
 export function coverForLocale(t: CoverSource, locale: string): ResolvedCover {
   const order = [locale, ...LOCALES.filter((other) => other !== locale)]
   const own = t.coverLocales[locale]
-  const pick = (key: 'before' | 'after', common: string | null) =>
-    own?.[key] ?? common ?? order.map((code) => t.coverLocales[code]?.[key]).find(Boolean) ?? null
   const motion =
     ownMotion(own) ?? commonMotion(t) ?? order.map((code) => ownMotion(t.coverLocales[code])).find((found) => found !== null) ?? null
   return {
-    before: pick('before', t.coverBeforeUrl),
-    after: pick('after', t.coverAfterUrl),
+    before: effectiveStillCover(t.coverLocales, locale, 'before', t.coverBeforeUrl),
+    after: effectiveStillCover(t.coverLocales, locale, 'after', t.coverAfterUrl),
     mediaType: motion?.mediaType ?? 'image',
     video: motion?.video ?? null,
     poster: motion?.poster ?? null,

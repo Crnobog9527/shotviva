@@ -4,7 +4,7 @@ import type { BusinessBlock } from '@/core/content/business'
 
 import { site } from '../site.config'
 import { businessForm } from './business-form'
-import { OUTPUT_TIERS, freeImagesLabel, fromCredits, packFrom, perCredit, planFrom, tierList, usd, yearlySaving } from './offer'
+import { freeImagesLabel, packFrom, perHundredCredits, planFrom, usd, yearlySaving } from './offer'
 
 // Final /pricing copy (T11, laid out as comps-v3-b pricing.html in T37). Every number is read
 // from site.config through offer.ts; the plan and pack cards themselves render from the
@@ -22,6 +22,7 @@ export type PricingContent = {
   h1: string
   h1Em: string
   intro: string
+  currencyNote?: string
   gift: string
   creditBuys: CreditBuysBlock
   business: BusinessBlock
@@ -32,14 +33,9 @@ export type PricingContent = {
   waffo: { faq: readonly FaqItem[] }
 }
 
-const pixels = OUTPUT_TIERS.map((tier) => tier.px)
-
 const creditBuys: CreditBuysBlock = {
-  heading: 'What a credit buys',
-  tiers: OUTPUT_TIERS.map((tier) => ({ name: tier.name })),
-  unit: 'credits',
-  unitOne: 'credit',
-  note: `Typical published template prices per photo, at ${pixels.slice(0, -1).join(', ')} or ${pixels.at(-1)} px. Every size and shape costs the same at a given resolution.`,
+  heading: 'How many credits does a photo use?',
+  note: 'The cost depends on the template and resolution you choose. The Generate button shows the exact number of credits before you start.',
 }
 
 // Things we arrange on request, not features: none of them has a back office or code yet
@@ -75,7 +71,7 @@ const faq: readonly FaqItem[] = [
   },
   {
     question: 'Can I buy credits without a subscription?',
-    answer: site.billing.pricingVersion ? `Yes. Credit packs are one-time payments, open to everyone, and they give paid credits just like a plan. The list rate is ${perCredit('pack_s')} per credit. The small pack is full price. On medium and large packs, active Starter members save 5%, Pro members 10%, and Max members 15%. The pack contains the same credits at every tier.`
+    answer: site.billing.pricingVersion ? `Yes. Credit packs are one-time payments, open to everyone, and they give paid credits just like a plan. At list price, 100 credits cost about ${perHundredCredits('pack_s')}. The small pack is full price. On medium and large packs, active Starter members save 5%, Pro members 10%, and Max members 15%. The pack contains the same credits at every tier.`
       : 'Yes. Credit packs are one-time payments, open to everyone, and they give paid credits just like a plan.',
   },
   {
@@ -100,7 +96,7 @@ export const pricingPage: PricingContent = {
   description: `${brand} pricing: Starter, Pro and Max plans, monthly or yearly, plus credit packs. New users get ${freeImagesLabel}. Credits never expire.`,
   h1: `${brand} Pricing: pay monthly, pay yearly, or buy credits once`,
   h1Em: 'or buy credits once',
-  intro: `Every photo made with paid credits is private and watermark-free. A photo costs ${fromCredits}, depending on the template and whether you pick ${tierList}.${yearly}${packs}`,
+  intro: `Every photo made with paid credits is private and watermark-free.${yearly}${packs}`,
   gift: `New users get ${freeImagesLabel}. No card needed.`,
   creditBuys,
   business,

@@ -1,7 +1,7 @@
 import { expect, it, vi, beforeEach } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-import { invite } from '../../../tests/t94-config'
+import { invite, seededRewards } from '../../../tests/t94-config'
 
 import { consumeSignupCode } from './signup-code'
 
@@ -15,10 +15,10 @@ const run = (first = true) => consumeSignupCode({} as SupabaseClient, 'user', fi
 beforeEach(() => { vi.resetAllMocks(); mocks.jar.get.mockReturnValue({ value: 'FRIEND' }) })
 
 it('passes configured benefits and displays the actual grant on successful registration', async () => {
-  mocks.redeem.mockResolvedValue({ status: 'ok', kind: 'invite', credits: invite.inviteeCredits, pool: 'free', percent: null })
+  mocks.redeem.mockResolvedValue({ status: 'ok', kind: 'invite', credits: seededRewards.inviteeCredits, pool: 'free', percent: null })
   expect(await run()).toBe('invite')
   expect(mocks.redeem).toHaveBeenCalledWith({}, {userId:'user', code:'FRIEND', context:'signup', invite, locale:'zh'})
-  expect(mocks.jar.set).toHaveBeenCalledWith('sv_code_result',JSON.stringify({credits:invite.inviteeCredits,pool:'free',percent:null}),expect.objectContaining({secure:true}))
+  expect(mocks.jar.set).toHaveBeenCalledWith('sv_code_result',JSON.stringify({credits:seededRewards.inviteeCredits,pool:'free',percent:null}),expect.objectContaining({secure:true}))
 })
 
 it('clears the code and lets registration finish if redemption fails', async () => {

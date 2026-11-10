@@ -1,5 +1,6 @@
 'use client'
 
+import { providerFloor, type ProviderFloors } from '@/core/templates/provider-pricing'
 import { Checkbox } from '@/core/ui/checkbox'
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/core/ui/table'
 
@@ -24,9 +25,9 @@ export type TableOrder = {
   disabledHint?: string
 }
 
-type Props = RowHandlers & { templates: AdminTemplate[]; selection: TableSelection; order: TableOrder }
+type Props = RowHandlers & { templates: AdminTemplate[]; selection: TableSelection; order: TableOrder; floor: ProviderFloors }
 
-export function TemplatesTable({ templates, selection, order, ...rowProps }: Props) {
+export function TemplatesTable({ templates, selection, order, floor, ...rowProps }: Props) {
   const byId = new Map(templates.map((template) => [template.id, template]))
   if (templates.length === 0) {
     return <p className="text-muted-foreground py-8 text-center text-sm">没有匹配的模板</p>
@@ -73,6 +74,7 @@ export function TemplatesTable({ templates, selection, order, ...rowProps }: Pro
                 <TemplateRow
                   key={id}
                   template={template}
+                  price={providerFloor(floor, template.prompt?.providerId, template.id, template.category, template.quality, template.visibleIn.includes('partner'))}
                   checked={selection.selected.has(id)}
                   onSelect={selection.onSelect}
                   {...rowProps}

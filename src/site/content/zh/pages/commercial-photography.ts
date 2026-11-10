@@ -6,7 +6,7 @@ import { zhPricingRelated } from '../shared'
 import { dayRateUsd, packshotUsd, SET_PHOTOS, styledShotUsd, usdRange } from '../../offer'
 import { PLATFORM_SPECS, px } from '../../platform-specs'
 import { productBills, shoot } from '../home'
-import { ZH_TIERS, zhFreeImages, zhFromCredits, zhPlansSentence, zhTierList } from '../offer'
+import { ZH_TIERS, zhFreeImages, zhPlansSentence, zhTierList } from '../offer'
 
 // /zh/commercial-photography (T44, ARCHITECTURE §17): noindex until GSC shows Chinese queries
 // (中文口径主词表: 「暂不建」, keyword 商业摄影). Written for sellers who ask 「产品拍照一般多少钱」,
@@ -53,7 +53,7 @@ export const zhCommercialPhotography = defineContentPage({
   faq: [
     {
       question: '产品拍照一般多少钱？',
-      answer: `按美国 2026 年的公开报价，白底产品图每张 ${usdRange(packshotUsd)}，造型图每张 ${usdRange(styledShotUsd)}，影棚一天 ${usdRange(dayRateUsd)}。${brand} 用你自己的手机照片做一张造型、精修好的商品图，${zhFromCredits}。${zhPlansSentence()}`,
+      answer: `按美国 2026 年的公开报价，白底产品图每张 ${usdRange(packshotUsd)}，造型图每张 ${usdRange(styledShotUsd)}，影棚一天 ${usdRange(dayRateUsd)}。${brand} 用你自己的手机照片做一张造型、精修好的商品图。${zhPlansSentence()}`,
     },
     {
       question: 'AI 能代替产品摄影师吗？',
@@ -88,7 +88,7 @@ export const zhCommercialPhotography = defineContentPage({
     shoot,
     templates: {
       heading: '商品图模板：主图、场景和海报',
-      intro: `每个模板都从你的商品手机照片开始，到一张成品图结束，${zhFromCredits}。`,
+      intro: `每个模板都从你的商品手机照片开始，到一张成品图结束。`,
       categoryKeys: [CATEGORY.products, CATEGORY.beauty],
     },
   },

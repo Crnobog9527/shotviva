@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import type { Client } from 'pg'
 
-import { benefits, invite } from '../t94-config'
+import { benefits, invite, seededRewards } from '../t94-config'
 
 import { previewCode, readPendingDiscount, redeemCode } from '@/core/codes/server'
 import { connectAdmin, createUser } from './helpers'
@@ -17,9 +17,9 @@ it('previews and redeems the configured invite grant through PostgREST', async (
   const owner = await createUser(db)
   const user = await createUser(db)
   const { rows: [row] } = await db.query('select public.get_or_create_invite_code($1) as code',[owner])
-  expect(await previewCode(admin,row.code)).toMatchObject({kind:'invite',credits:invite.inviteeCredits,pool:'free'})
+  expect(await previewCode(admin,row.code)).toMatchObject({kind:'invite',credits:seededRewards.inviteeCredits,pool:'free'})
   await db.query("select public.grant_credits($1,$3,'signup',$2,'free')",[user,'signup:'+user,benefits.freeCredits])
-  expect(await redeemCode(admin,{userId:user, code:row.code, context:'signup',invite,locale:'en'})).toMatchObject({status:'ok',credits:invite.inviteeCredits})
+  expect(await redeemCode(admin,{userId:user, code:row.code, context:'signup',invite,locale:'en'})).toMatchObject({status:'ok',credits:seededRewards.inviteeCredits})
   await db.query('update profiles set banned_at=now() where id=$1',[owner])
   expect(await previewCode(admin,row.code)).toBeNull()
 })

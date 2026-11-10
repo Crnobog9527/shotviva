@@ -3,11 +3,12 @@ import 'server-only'
 import { randomUUID } from 'node:crypto'
 import sharp from 'sharp'
 import { z } from 'zod'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { AppError } from '@/core/errors'
-import { sniffImageType, type ObjectStore } from '@/core/storage'
+import { sniffImageType, type ObjectHead, type ObjectStore } from '@/core/storage'
 import { STYLE_REF_EDGE, type StyleRef } from '@/core/templates/style-refs'
-import { COVER_STILL_TYPES, MAX_COVER_IMAGE_BYTES } from '../covers/cover-rules'
+import { afterCoverRefId, COVER_STILL_TYPES, MAX_COVER_IMAGE_BYTES, requireCurrentStillCover } from '../covers'
 
 const templateId = z.string().max(64).regex(/^[a-z0-9]+(-[a-z0-9]+)*$/)
 const upload = z.object({ templateId, contentType: z.enum(COVER_STILL_TYPES), size: z.int().positive().max(MAX_COVER_IMAGE_BYTES) })
@@ -38,23 +39,44 @@ export async function finishStyleRef(store: ObjectStore, input: unknown): Promis
   if (!parsed.success) throw new AppError('INVALID_INPUT', '上传参数不对')
   const { templateId: id, uploadId } = parsed.data
   const staged = stagedKey(id, uploadId)
-  const head = await store.head(staged)
-  if (!head) throw new AppError('INVALID_INPUT', '找不到上传的图片，请重新上传')
+  const head = await readImageHead(store, staged)
   try {
-    if (head.size < 1 || head.size > MAX_COVER_IMAGE_BYTES) throw new AppError('INVALID_INPUT', '图片大小不对')
-    const bytes = await store.get(staged)
-    const actualType = sniffImageType(bytes)
-    if (bytes.length !== head.size || !actualType || !COVER_STILL_TYPES.some(t => t === actualType && t === head.contentType)) {
-      throw new AppError('INVALID_INPUT', '文件类型或大小不对')
-    }
-    const { data, info } = await encodeReference(bytes)
-    const key = `style-refs/${id}/${randomUUID()}.webp`
-    await store.put(key, data, 'image/webp')
-    return { key, width: info.width, height: info.height, uploadedAt: new Date().toISOString() }
+    return await storeReference(store, staged, head, store, id, randomUUID())
   } finally {
     // Staging also has a seven-day lifecycle. A retry can never overwrite a saved reference.
     await store.delete(staged).catch(() => {})
   }
+}
+
+async function readImageHead(store: ObjectStore, key: string) {
+  const head = await store.head(key)
+  if (!head) throw new AppError('INVALID_INPUT', '找不到图片，请重新上传')
+  return head
+}
+
+async function storeReference(source: ObjectStore, sourceKey: string, head: ObjectHead,
+  destination: ObjectStore, id: string, imageId: string): Promise<StyleRef> {
+  if (head.size < 1 || head.size > MAX_COVER_IMAGE_BYTES) throw new AppError('INVALID_INPUT', '图片大小不对')
+  const bytes = await source.get(sourceKey)
+  const actualType = sniffImageType(bytes)
+  if (bytes.length !== head.size || !actualType || !COVER_STILL_TYPES.some(t => t === actualType && t === head.contentType)) {
+    throw new AppError('INVALID_INPUT', '文件类型或大小不对')
+  }
+  const { data, info } = await encodeReference(bytes)
+  const key = `style-refs/${id}/${imageId}.webp`
+  await destination.put(key, data, 'image/webp')
+  return { key, width: info.width, height: info.height, uploadedAt: new Date().toISOString() }
+}
+
+const reuse = z.strictObject({ templateId, locale: z.string().regex(/^[a-z]{2,3}(-[a-z0-9]{2,8})?$/).nullable(), hash: z.string().regex(/^[0-9a-f]{16}([0-9a-f]{48})?$/) })
+
+export async function reuseCoverStyleRef(db: SupabaseClient, assets: ObjectStore, store: ObjectStore, input: unknown) {
+  const parsed = reuse.safeParse(input)
+  if (!parsed.success) throw new AppError('INVALID_INPUT', '封面参数不对')
+  const { templateId: id, locale, hash } = parsed.data
+  const source = await requireCurrentStillCover(db, id, locale, 'after', hash)
+  const head = await readImageHead(assets, source.key)
+  return storeReference(assets, source.key, head, store, id, afterCoverRefId(hash, randomUUID()))
 }
 
 const styleRefPreviewSchema = z.object({ templateId, imageId: z.uuidv4() })

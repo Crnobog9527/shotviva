@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import type { Client } from 'pg'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
-import { benefits, invite } from '../t94-config'
+import { benefits, invite, seededRewards } from '../t94-config'
 
 import { connectAdmin, createUser, ledgerOf, profileOf, serviceClient } from './helpers'
 
@@ -20,7 +20,7 @@ async function inviteCode(user: string): Promise<string> {
 
 async function redeem(user: string, code: string, replace = false, context = 'account') {
   const { data, error } = await serviceClient().rpc('redeem_code', {
-    p_user: user, p_code: code, p_context: context, p_invitee_credits: invite.inviteeCredits, p_invite_window_days: invite.windowDays, p_replace: replace,
+    p_user: user, p_code: code, p_context: context, p_invitee_credits: null, p_invite_window_days: invite.windowDays, p_replace: replace,
   })
   if (error) throw new Error(error.message)
   return data as { status: string; discount_expires_at?: string; current_code?: string }
@@ -74,14 +74,14 @@ it('accepts an invite in lowercase once and grants the configured extra free cre
   const guest = await createUser(db)
   const code = await inviteCode(owner)
   expect(await grant(guest)).toBe(true)
-  expect(await redeem(guest, code.toLowerCase(), false, 'signup')).toMatchObject({ status: 'ok', pool: 'free', credits_granted: invite.inviteeCredits })
+  expect(await redeem(guest, code.toLowerCase(), false, 'signup')).toMatchObject({ status: 'ok', pool: 'free', credits_granted: seededRewards.inviteeCredits })
   expect((await redeem(guest, code)).status).toBe('used')
   expect((await redeem(guest, await inviteCode(await createUser(db)))).status).toBe('already_invited')
-  expect((await profileOf(db, guest)).free_credits).toBe(benefits.freeCredits + invite.inviteeCredits)
+  expect((await profileOf(db, guest)).free_credits).toBe(benefits.freeCredits + seededRewards.inviteeCredits)
   expect((await profileOf(db, owner)).credits).toBe(0)
   const { rows } = await db.query<{ id: string }>('select id from code_redemptions where user_id = $1', [guest])
   expect(await ledgerOf(db, guest)).toContainEqual({
-    kind: 'code_grant', pool: 'free', delta: invite.inviteeCredits, idempotency_key: `code:${rows[0].id}`,
+    kind: 'code_grant', pool: 'free', delta: seededRewards.inviteeCredits, idempotency_key: `code:${rows[0].id}`,
   })
   expect(await countClaims(code)).toBe(1)
 })

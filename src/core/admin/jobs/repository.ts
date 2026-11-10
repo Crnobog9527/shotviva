@@ -8,6 +8,7 @@ import { jobRef, jobRefRange, jobRefsOrShort, modelFromTag } from '@/core/jobs'
 
 import { afterCursor, decodeCursor, PAGE_SIZE, toPage, type Page } from '../cursor'
 import { beijingDayStart, refFilter, type JobFilters } from './filters'
+import { receiptDetail } from './receipt-detail'
 import { TOGGLE_COLUMNS, toggleColumnsSchema, toJobToggles, type JobToggle } from './job-toggles-row'
 
 // All generation jobs, newest first (ARCHITECTURE §10). Index generation_jobs_created_at_id_idx
@@ -55,6 +56,7 @@ export type AdminJob = {
   creditsCost: number
   errorCode: string | null
   costUsd: number | null
+  receiptDetail?: string
   hasUsage: boolean
   // The user deleted this work (T41): the row stays for the ledger and costs, the files are gone.
   deletedByUser: boolean
@@ -79,6 +81,7 @@ function toJob(row: z.infer<typeof rowSchema>): AdminJob {
     creditsCost: row.credits_cost,
     errorCode: row.error_code,
     costUsd: row.cost_usd,
+    receiptDetail: receiptDetail(row.provider_usage, row.cost_usd),
     hasUsage: row.provider_usage !== null,
     deletedByUser: Boolean(row.deleted_at),
     toggles: toJobToggles(row),

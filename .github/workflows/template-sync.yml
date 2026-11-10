@@ -13,37 +13,22 @@ permissions:
   contents: read
 
 jobs:
-  approve:
+  sync:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    environment: template-sync-approval
+    environment: production-manual
     permissions:
       actions: read
+      contents: read
     steps:
-      # The separate reviewer gate leaves the production migration workflow unattended.
-      # A missing environment/reviewer or an admin bypass produces no Owner review.
-      - name: Verify the Owner approved this run
-        env:
-          GH_TOKEN: ${{ github.token }}
-          OWNER_ID: ${{ github.repository_owner_id }}
-        run: |
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/approvals" |
-            jq -e --arg id "$OWNER_ID" 'any(.[];
-              .state == "approved" and (.user.id | tostring) == $id and
-              any(.environments[]; .name == "template-sync-approval"))' >/dev/null
-
-  sync:
-    needs: approve
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .nvmrc
+      - uses: ./.github/actions/verify-owner-review
       - run: pnpm install --frozen-lockfile
       - name: Copy covers and commit each template
         env:

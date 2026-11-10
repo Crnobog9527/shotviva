@@ -118,7 +118,8 @@ it('keeps both test models in costs after the runs are pruned, including charged
   }
 })
 
-it('counts the reserved estimate once when a failed run reports only completion tokens', async () => {
+it.each([{ completion_tokens: 34 }, { cost: null, generation_id: 'gen-fixture' }, { cost: 0, is_byok: true }])(
+  'retains the reserved budget once for a failed run with unresolved usage %j', async (usage) => {
   await db.query('begin')
   try {
     const id = randomUUID()
@@ -126,7 +127,7 @@ it('counts the reserved estimate once when a failed run reports only completion 
       values ($1, 'freeform', 'generate', $1, '1k', $2, 0.06)`, [id, `${image}/vendor/model`])
     await db.query("insert into public.admin_test_spend (run_id, template_id, estimate_usd) values ($1, 'freeform', 0.06)", [id])
     const finish = "select public.admin_finish_test_run($1, 'failed', null, 'PROVIDER_FAILED', $2, null, 1)"
-    await db.query(finish, [id, { completion_tokens: 34 }])
+    await db.query(finish, [id, usage])
     await db.query(finish, [id, {}])
     const { rows } = await db.query('select counted_usd, cost_usd, has_openrouter from public.admin_test_spend where run_id = $1', [id])
     expect(rows[0]).toEqual({ counted_usd: '0.060000', cost_usd: null, has_openrouter: true })

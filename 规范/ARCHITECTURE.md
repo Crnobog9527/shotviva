@@ -144,7 +144,7 @@ interface GenerationProvider {
 
 **出图时怎么选**：前台模板出图优先用 `template_prompts.provider_id` 指定的 image 供应商（可未启用）。该字段为空时，走默认供应商：取 image 模块的 `is_active` 行，无在用行时沿用环境变量。作品编辑和伙伴出图只走默认供应商；换脸判断按 decision 模块取在用行。服务端在扣积分前按有效能力校验比例和清晰度，非法请求返回 `INVALID_INPUT`。已允许的请求遇到上游目录变化或暂时不可用时，保留按实际供应商记账的备用路径。后台改供应商后使 `providers` 缓存失效，密钥按次读取。实际调用的供应商和完整模型名以 `<供应商 id 或 env>/<模型名>` 记入 `generation_jobs.provider`，按供应商、模型和清晰度分别统计。模板 `model_params.model` 不参与选型。
 
-**OpenRouter**：出图统一走 `POST /api/v1/images`，通过 `input_references` 提交参考图，读取 `data[0].b64_json`。本站 1K、2K、3K 档对应 `resolution` 的 1K、2K、4K，跟随照片时传 `aspect_ratio: auto`，输出格式为 PNG。3K 档交付时缩回本站目标像素。OpenRouter 不使用 OpenAI 的 `quality`、`input_fidelity`、`background`。原始 `prompt_tokens`、`completion_tokens`、`cost` 记入 `provider_usage`；响应的美元费用乘以 1.055 计入 `cost_usd`（充值手续费）。缺少费用时记录警告，按已有 token 和配置单价估算。积分仍按第 6.1 节的价格和下限。
+**OpenRouter**：出图统一走 `POST /api/v1/images`，通过 `input_references` 提交参考图，读取 `data[0].b64_json`。本站 1K、2K、3K 档对应 `resolution` 的 1K、2K、4K，跟随照片时传 `aspect_ratio: auto`，输出格式为 PNG。3K 档交付时缩回本站目标像素。OpenRouter 不使用 OpenAI 的 `quality`、`input_fidelity`、`background`。原始 `prompt_tokens`、`completion_tokens`、`cost`、可用的 `generation_id`、`is_byok` 和上游参考成本记入 `provider_usage`。缺费用或 BYOK 标识时，如有生成编号，结算用该行密钥向同一地址免费查一次匹配编号的回执；查不到保留待核，不重发生成。确认非 BYOK 后，回执金额乘 1.055（本站 Standard 充值费分摊口径）计入 `cost_usd`。BYOK 的外部账单或是否 BYOK 尚未核实时，总成本为空；有足够 token 与单价时只另存 `estimated_cost_usd`。成功和失败共用此口径。积分仍按第 6.1 节的价格和下限。
 
 **后台页 `/admin/providers`**（中文界面）：
 - 列表：显示名、适配器、地址、模型、密钥后 4 位、是否在用、更新时间。
@@ -152,7 +152,7 @@ interface GenerationProvider {
 - 「测试连接」：OpenRouter 查询同一图片目录并用该行密钥调用免费的鉴权接口；其他适配器沿用 `GET {base_url}/models`。测试连接不产生出图费用。
 - 「设为当前使用」：弹窗确认「从 A 换到 B」，写一条日志（logger，不含密钥）。
 - 换模型时重新核对能力、实测成本与第 6.1 节；不把预算估价当实测。
-- 模板编辑页展示当前所选模型的能力、参考图上限与最后刷新时间。
+- 模板编辑时自动同步缺失、旧版本或过期快照；展示上次可靠能力与参考图范围，目录异常可原地重试。OpenRouter 图片端点的公开价目以原始计量单位保存在既有 `capabilities` JSON 的 `catalogPricing`；只在所有适用端点的单张总费用可确定时，把含充值费分摊的估价按支持的档位写入 `catalogImageCosts`。它与手填 `estimated_image_costs`、真实回执和前台售价分开。
 
 **密钥读写函数**（全部 `security definer`，只授权 `service_role`）：
 - `admin_set_provider_key(p_id, p_key)`：校验格式（可打印 ASCII、不含空白、16～1024 字符）。已有 Vault 记录就 `vault.update_secret`，没有就 `vault.create_secret`（名字 `shotviva.provider.<id>`）。同时写 `api_key_last4`。
@@ -177,7 +177,7 @@ interface GenerationProvider {
 | parent_job_id | 作品编辑时，被编辑的那张作品的 id（同一用户的成功作品）；模板出图为空。外键 `on delete set null`（T30） |
 | inputs | 用户填的内容（文案、比例、**分辨率 `resolution`：`'1k'` / `'2k'` / `'3k'`**、可选补充说明 `note`（≤300 字符，工作台「Anything to change?」，服务端拼在模板提示词之后，作为用户内容存档）、模板开关 `toggles` / `toggles_confirmed_at`（T89，见 §5.1c）、输入图在 R2 的 key），**不含封装提示词**。伙伴接口（第 14 节）v1 固定 `'1k'`，契约不加字段 |
 | provider | 实际调用的供应商和模型：`<ai_providers.id 或 env>/<模型名>`（第 3.3 节） |
-| provider_usage | 供应商返回的用量（jsonb）：出图的 `input_text_tokens`、`input_image_tokens`、`output_tokens`；作品编辑另记判断那一步的 `decision_input_tokens`。供应商没返回就为空（T33） |
+| provider_usage | 供应商返回的用量（jsonb）：出图的 `input_text_tokens`、`input_image_tokens`、`output_tokens`；作品编辑另记判断那一步的 `decision_input_tokens`。已提交的 OpenRouter 请求保留可核对的回执字段；无实收金额时记 JSON null，详见下方费用口径（T33） |
 | cost_usd | 这一单的真实成本（`numeric(10,6)`）= 用量 × 结算时在用供应商的单价快照；以后改单价不影响历史。没有用量或单价没填就为空，后台标「无法计算」（T33） |
 | source | 'web' / 'graylum'，哪条入口发起的 |
 | idempotency_key | 可空，唯一索引。伙伴接口把调用方的 callId 放这里，重复请求返回同一个任务 |
@@ -209,6 +209,8 @@ v1 不写回调解析、定时轮询、超时清理这类定时任务。视频�
 
 
 站内固定比例取第 4.3 节选择器和模型能力的交集。缺少原图比例时按输入图片尺寸选最近比例，只有一档清晰度时隐藏选择器。首次刷新前没有可用能力的 OpenRouter 模板暂时无法出图。伙伴请求固定标准档，比例取模板 `fields.aspectRatios` 与可用模型比例的交集，保留模板顺序。交集为空时目录隐藏该模板，直接生成返回已有的不支持错误。
+
+模板首次上架和已上架模板改价、换质量档或换模型绑定时，数据库在提交前按最终绑定（未指定时取默认模型）逐档复核 §6.1 成本下限。单条、批量和同步写入适用同一约束，出现 `TEMPLATE_PRICE_BELOW_FLOOR` 时整笔事务回滚。目录特价仍要求模板、模型、质量和该档售价与批准记录一致；画风另须取得销售批准。模型不提供的清晰度继续按 T96 保留正整数占位。仅使用环境默认模型时，数据库取各环境模型中满足样本数的最高 p95；缺少样本时采用 OpenAI 保守估价。
 
 T93 模板同步由 GitHub 手动工作流执行，审批后先读目标模板、提示词的行版本及本次回执，再用一条查询读取预览价格目录版本、模板、提示词和模型绑定。源数据只选同步字段，私有画风图由各环境管理。封面先按内容哈希复制到正式公开桶；`sync_preview_template` 逐个模板在正式库事务内按分类 key、供应商的 adapter / model / base_url 和正式积分下限校验，复用后台保存函数和目标定价规则。报价读取在同一快照中为目录条款和每个模型的报价输入计算摘要；最终事务在后台写函数取得模型锁后重验相关摘要，估价、成本统计或适用特价变化则回滚。预检与最终事务均持有切价流程共用的目录锁并比对源、目标和定价快照的目录版本；锁住目标模板和提示词后比对行版本（含首建时目标不存在），中途变化则拒绝。指定模型必须唯一匹配；跟随默认的模板在正式库也跟随默认。新增模板不上架，更新保留正式上架状态、排序、精选位。重复执行同一个 GitHub run id 对同一模板只提交一次；新的同步从正式提示词当前版本加一（首次为 1）。私有表 `template_sync_history` 以 (template_id, run_id) 为主键，记来源版本、写入版本、上一次正文、参数、模型绑定和版本，记录随模板删除，RLS 拒绝客户端访问。
 
@@ -341,7 +343,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
   - **`settle_waffo_order(user, product_id, payment_id, order_id, amount_total, currency, amount_tax, method)`**（T13，总控 2026-11-06 补）：在同一事务里完成两步。先调用 `apply_purchase(user, product_id, payment_id)`，用 Waffo 的 payment id 做幂等键；入账生效时再插入一行 `payments`，其中 `channel = 'waffo'`，`waffo_order_id` 取 Waffo 订单号，金额和税额取自 `order.completed` 事件，单位换算为分。重复事件不写第二行。**T50 起**：签名不变，同时写 `waffo_payment_id`；单笔和订阅的每一期扣款（含首付）都走它，幂等键是 `PAY_` 扣款号，所以续费不会重复入账，续费失败没有扣款事件、不入账。
   - 以上函数都只授权 `service_role`。
 - **版本化结账（新积分）**：私有 `admin.product_terms_v2(product_id primary key,credits,usd_cents)` 保存九项已核准报价，启用 RLS，不对客户端开放。调用方从已验签的 Stripe/Waffo 订单或合同取得价格版本；新合同走仅 service_role 可执行的 `settle_checkout_v2`、`settle_waffo_order_v2`、`apply_subscription_renewal_v2`，旧合同和旧在途单保持原端点与原价。切换后首次入账的真实旧合约款按等档新积分发放（保持签约费用和周期），重复回调只认原流水。共用事务、索引和付款幂等键。不得因缺失或非法的新版本信息把新单当旧单。退款、争议按对应时间的入账流水折算，不能按今日套餐目录回推。加这些函数本身不激活新 UI，不改余额或第三方合同。
-- **旧单位结清**：生产切换只针对 Owner 核实的旧账号付费与免费两个池；授权时 6 个账号，124 付费、26 免费。私有 `admin.pricing_wallet_cutover` 记录版本、时点、原余额摘要和结清后流水位点。仅由受保护工作流在库内校验摘要、付款数、流水、有效合同和未完任务后调用 `admin.clear_approved_wallets_v2`，逐池写唯一冲销流水，不删订单或历史记录。恢复函数仅在无新经济活动且能复原原摘要时写逆向流水。新价格启用事务同时设置 `system_settings.pricing_catalog_version` 为 JSON 字符串 `v2`；其写入时间是注册赠分界线，旧账号不补领，新账号获 100 免费积分，沿用原同 IP 限制和幂等键。迁移本身不执行切换。
+- **旧单位结清**：生产切换只针对 Owner 核实的旧账号付费与免费两个池，账号数、两池余额合计、摘要、流水位点和付款数由受保护工作流在执行时传入。私有 `admin.pricing_wallet_cutover` 记录版本、时点、原余额摘要和结清后流水位点。仅由受保护工作流在库内校验摘要、付款数、流水、有效合同和未完任务后调用 `admin.clear_approved_wallets_v2`，逐池写唯一冲销流水，不删订单或历史记录。恢复函数仅在无新经济活动且能复原原摘要时写逆向流水。新价格启用事务同时设置 `system_settings.pricing_catalog_version` 为 JSON 字符串 `v2`；其写入时间是注册赠分界线，旧账号不补领，新账号获 100 免费积分，沿用原同 IP 限制和幂等键。迁移本身不执行切换。
 - 激活事务在目录、模型、价格和钱包共同可用后记录私有 `admin.pricing_release_checkpoint(version,fingerprint)`。测试库和正式库的回滚都检查余额、注册、流水、付款、合同、拒付和生成；期间有新业务则停止。回滚前关闭新收银、到期或关闭可付款会话、排清两通道在途凭证。回滚后才首次收到的新报价付款不得入旧钱包，返回可重试的结算错误并核对渠道款项。注册和支付先取得公共读锁再读版本；切换独占该锁，避免同时读旧版写新版。
 - **首付的 `paid_until`**：首付走 `apply_purchase`，按商品天数累加（月付 +30 天，年付 +365 天），和 Stripe 本期结束日可能差一两天。从第一次续费起，由 `apply_subscription_renewal` 对齐 `period_end`，见下一条。
 - 订阅续费走 T10 新增的 `apply_subscription_renewal(user, product_id, invoice_id, period_end)`：`credits += 商品积分`，`paid_until = greatest(paid_until, period_end)`（直接对齐 Stripe 的本期结束日，不按天数累加，避免大小月漂移）；同样写流水、按 invoice id 幂等，内部复用 `_apply_credit_change`（总控 2026-11-05 补）。
@@ -349,7 +351,8 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 - **计价单位是 credit**：标价 1 积分 = $0.01；成交每积分实价随套餐或优惠不同。注册赠送 100 免费积分，不承诺固定张数。每次生成（含重新生成）按该模板、该清晰度的当前报价预扣，既有订单和任务按成交或预扣时的数量结算。
 - **成本控制**：保留供应商能力检查，跟踪真实 p95、失败计费、费税与渠道组合。以综合用量评估毛利；已批准用途价格不得被单项毛利目标自动抬高或阻断。未批准的新价格、新模型仍需单独核验。预算和样本不足的估算不能标记为实测。
 
-- 未列入经批准的模板／模型／质量／档位组合时，仍执行 T96 的成本下限。以同供应商型号、清晰度近 30 日至少十张实测 p95 为先，样本不足取估价；成本乘 1.10，除以当前最低每积分实收 ×76.1% ×40%，向上取整。后台保存和备用模型预扣共用数据库的现行目录单价。v1 取旧商品，v2 取已启用商品对应的新合同价目，最低为 Max 年付 $891 / 168,000。
+- 未列入经批准的模板／模型／质量／档位组合时，仍执行 T96 的成本下限。以同供应商型号、清晰度近 30 日至少十张实测 p95 为先，样本不足先取该档手填估价，其次取供应商目录中可完整折算的单张报价（含 OpenRouter 充值费），无可靠估价则拒绝；成本乘 1.10，除以当前最低每积分实收 ×76.1% ×40%，向上取整。后台保存和备用模型预扣共用数据库的现行目录单价。v1 取旧商品，v2 取已启用商品对应的新合同价目，最低为 Max 年付 $891 / 168,000。
+- 激活批次映射的模板按质量和分辨率取目录收费下限，即使更换模型也不得降到该下限以下。私有函数 `admin.template_catalog_minimums()` 返回有效目录最低收费，`templates` 写入时逐档复核（含批量与导入）。未映射的画风模板保留下架状态，1K 草稿规划为 20，2K/3K 不作为售价。受保护价目视图 `admin.template_tariffs_v2.style_sale_approved` 明确批准画风用途，既有条目均为 false，改分类不能授权。已批准画风用途的模板即使调整展示分类也复核原授权。已映射画风仅在当前模型、质量、全部销售档位取得现行目录批准后允许上架；核验最终绑定和伙伴默认路由，在预扣事务写入新作业时复核本次实际模型，不允许未批准回退。现行目录要求三档完整；单档销售需要单独批准并引入逐档可售范围。
 - 余额只能通过 SQL 函数改：发放（`grant_credits` 带 `pool` 参数，注册赠送和活动赠送用 `'free'`）、预扣、确认、退回、管理员调整（`admin_adjust_credits` 带 `pool` 参数）。前端和普通接口都不能直接写余额。
 - 每一笔变动都写进流水表，记录动的是哪个池，带幂等键。
 
@@ -821,12 +824,12 @@ check 约束换成原来的集合再加上 `code_grant`（兑换送的积分）�
 
 #### 表 `admin_test_spend`（私有，同上；审查后新增，2026-11-08）
 
-每次试跑一行，**没有外键**（删模板、裁剪 50 条、30 天清理都不影响它），100 天后才清。字段：`run_id`（唯一）、`template_id`（只记值）、`day`（北京时间自然日）、`cost_usd`、`counted_as`（`actual` 真实成本 / `estimate` 调过出图模型但算不出成本时按估算 / `zero` 未调用模型或 10 分钟超时）、`created_at`。T92 增加 `provider text`（同试跑的供应商/模型快照，迁移前已被裁剪的归为未知）和 `has_openrouter boolean`（是否记录到 OpenRouter 用量），即使试跑明细被删除也能按模型对账。**每日预算和成本对账页的「后台试跑」都只读这张表。**预算判断和占用（`admin_begin_test_run`）在任何模型调用之前完成，包括换脸判断和编辑范围判断；超预算一个模型都不调。换脸被拒的试跑记为 `failed / IDENTITY_SWAP_REFUSED`，判断用掉的 token 计入成本。试跑不占管理员的换脸判断配额，也不计入「AI 供应商」页的用户统计。清理改为 `POST /api/admin/test-runs/cleanup`（同源校验）。
+每次试跑一行，**没有外键**（删模板、裁剪 50 条、30 天清理都不影响它），100 天后才清。字段：`run_id`（唯一）、`template_id`（只记值）、`started_at`（按北京时间自然日归集）、`finished_at`、`estimate_usd`（预算预估）、`cost_usd`（已确认成本，可空）、`counted_usd`（实际占用的预算金额）。T92 增加 `provider text`（同试跑的供应商/模型快照，迁移前已被裁剪的归为未知）和 `has_openrouter boolean`（是否记录到 OpenRouter 用量），即使试跑明细被删除也能按模型对账。**每日预算和成本对账页的「后台试跑」都只读这张表。**预算判断和占用（`admin_begin_test_run`）在任何模型调用之前完成，包括换脸判断和编辑范围判断；超预算一个模型都不调。换脸被拒的试跑记为 `failed / IDENTITY_SWAP_REFUSED`，判断用掉的 token 计入成本。试跑不占管理员的换脸判断配额，也不计入「AI 供应商」页的用户统计。清理改为 `POST /api/admin/test-runs/cleanup`（同源校验）。
 
 #### 函数（普通 plpgsql，`search_path = ''`，只授权 `service_role`；带 `p_actor` 的在函数里再核对是管理员）
 
-- `admin_begin_test_run(p_actor, p_run_id, p_template_id, p_kind, p_parent_id, p_photo_id, p_batch_id, p_resolution, p_inputs, p_prompt_version, p_provider, p_estimate_usd)`：按 `p_run_id` 幂等；advisory lock 串行化预算判断；当天（北京时间自然日）已花 = 已结束记录的 `cost_usd` 合计 + 10 分钟内仍在跑的记录的 `estimate_usd`；已花 + 本次估算 > 预算就抛 `TEST_BUDGET_EXCEEDED`（不调用供应商）。编辑时校验父记录、继承 `photo_id`；更新照片 `last_used_at`。返回新行。
-- `admin_finish_test_run(p_run_id, p_status, p_output_key, p_error_code, p_provider_usage, p_cost_usd, p_duration_ms)`：只从 `running` 结束，重复调用返回原行。
+- `admin_begin_test_run(p_actor, p_run_id, p_template_id, p_kind, p_parent_id, p_photo_id, p_batch_id, p_resolution, p_inputs, p_prompt_version, p_provider, p_estimate_usd)`：按 `p_run_id` 幂等；advisory lock 串行化预算判断；当天（北京时间自然日）已花 = 已结束记录的预算占用 `counted_usd` 合计 + 10 分钟内仍在跑的记录的 `estimate_usd`；已花 + 本次估算 > 预算就抛 `TEST_BUDGET_EXCEEDED`（不调用供应商）。编辑时校验父记录、继承 `photo_id`；更新照片 `last_used_at`。返回新行。
+- `admin_finish_test_run(p_run_id, p_status, p_output_key, p_error_code, p_provider_usage, p_cost_usd, p_duration_ms)`：只从 `running` 结束，重复调用返回原行。记录实收成本与预算占用两列：成本待核时 `cost_usd` 为 NULL；成功或失败但有输出用量、或有 OpenRouter 费用字段（包括请求已提交、费用尚未知的 JSON null）时，`counted_usd` 保留原预估额。未调用出图且无费用证据的失败不占用此估价。
 - `admin_test_budget_status()`：返回预算、当天已花、当天试跑次数、北京时间日期。
 - `admin_set_test_run_cover(p_actor, p_run_id, p_before_url, p_after_url, p_locale text default null)`：`p_locale` 为空时写通用封面，指定语言时写该语言的专属封面（T87 实现，此前传语言返回 `INVALID_INPUT`）；同一事务里更新模板的前后封面地址、记 `cover_set_at`。WebP 转换和写公开桶在应用里先做（和现有封面上传同一套压缩规则）。
 - `admin_cleanup_test_runs(p_actor)`：打开面板时调用。删掉 30 天前且没设成封面的记录；每个模板超出最近 50 条的（不含封面记录）；30 天没用过、也不是封面记录源照片的测试照片；10 分钟还在 `running` 的标成 `failed / TIMEOUT`。返回要从 R2 删除的 key 列表，应用尽力删除、失败只记日志。
@@ -915,6 +918,9 @@ v1 后台（Owner 2026-11-06 扩充；T23 做外壳和运营页）：**一个后
 
 1. **模板与提示词编辑**。因为 `template_prompts` 客户端读不到，必须有一个服务端页面来改。功能：新建模板、编辑公开信息（含质量档和 1K / 2K / 3K 三个 credit 数，低于第 6.1 节下限拒绝保存）和私有提示词、上下架、排序。
    - **拖动排序（Owner 2026-11-08，T76）**：「首页精选」列表和模板列表都改成拖动排序，不再只能一次点一下上下箭头。每行左边有一个拖动把手：电脑上按住把手直接拖，手机和平板上长按整行约 0.3 秒后拖；拖动时显示放下的位置，靠近列表边缘时自动滚动。键盘也能排序（把手获得焦点后按空格拿起、方向键移动、空格放下、Esc 取消），读屏有提示。放下后**整个列表的新顺序一次保存**（一个 SQL 函数在同一事务里重写这一组的序号，不逐条改），界面先按新顺序显示，保存失败就退回原顺序并提示。模板列表在搜索或筛选状态下不能拖（只排一部分会把顺序搞乱），把手变灰并提示「清空搜索后可拖动排序」。上下箭头保留但缩小，作为备用。拖动排序做成后台共用的组件，以后的分类排序等列表直接用。保存后照旧 `revalidateTag('templates', 'max')`。
+   - **独立复制（#400）**：普通模板（排除系统分类及内置 ID）由管理员一次复制为下架、未精选、排末尾的新模板；唯一稳定 ID，名称及已翻译名称带副本标识。复制字段、分类、展示面、质量/价格、绑定供应商和当前生效的私有提示词及参数；副本从 v1 开始。按模板 ID 在各自的公开/私有桶内复制所有通用和多语言封面（含动态/海报）、有序参考图。先用只读 `admin_template_copy_source` 取素材清单及模板/提示词行令牌，R2 成功后 `admin_commit_template_copy` 在一个事务中锁源核对令牌、插入新行，并记私有 `admin.template_copy_requests(request_id PK, actor_id, source_id, target_id, previous_standard)`。同管理员、同源、同一请求只返回原副本；不同参数拒绝。无发布授权、收藏、生成、试跑、统计或历史随副本迁移。正常上架条件及已核准价格按新 ID 判断。v2 画风副本 Standard 按现行 20 积分，若原值不同则存入收据、在副本弹窗提示差额；HD/Max 保留内部存储值但未定价，不因复制对外启用。
+   - **提示词历史（#400）**：私有 `template_prompt_versions(template_id, version, body, model_params, provider_id, provider_model, style_refs, created_at)` 以 (template_id,version) 为主键。客户端无权读取；后台管理员按模板与版本游标分页预览。只回填已存在的当前版；模板写入事务追加不可覆盖快照，包括仅改供应商或参考图。历史引用的私有图与现用图一样保留，不随移除/替换而删除。模板被永久删除才清除其历史。模型绑定为空代表跟随默认。
+   - 当前内容仍由 `template_prompts` 提供给试跑及正式调用；任务创建时记录当时版本，后续切换不改历史出图。弹窗选择旧版本预览其正文、参数、供应商及参考图，原「保存」才生效；覆盖未保存的私有配置前需确认，其他编辑保留。带版本的编辑保存经 `admin_save_versioned_template` 在同一事务核对编辑起始版本、所属模板和历史绑定的模型，复用普通保存的完整校验。内容原样恢复使用旧版本号；基于它另行改写取该模板历史最大号 + 1。不存在或已换模型的历史供应商不能当作原配置恢复，不自动改用默认。旧写入 ABI 与旧任务记录继续可用。
 2. **需求审核**（第 15 节）：待审需求列表（参考图 + 描述 + 用户）、通过 / 拒绝 / 下架、按票数排序、标记 shipped 并关联模板。
 3. **出图供应商**（第 3.3 节，T17）：增改供应商、测试连接、切换当前使用。
 

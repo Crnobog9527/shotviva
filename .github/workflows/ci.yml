@@ -22,16 +22,16 @@ jobs:
     name: lint · typecheck · test · build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 2
       - id: changes
         uses: ./.github/actions/changes
       - if: steps.changes.outputs.code == 'true'
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       # cache: pnpm restores the pnpm store keyed on pnpm-lock.yaml.
       - if: steps.changes.outputs.code == 'true'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -69,14 +69,13 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       schema-fix: ${{ steps.schema.outputs.fix }}
-      schema-head: ${{ steps.schema.outputs.head }}
       schema-tree: ${{ steps.schema.outputs.tree }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 2
       # Node 24 for scripts/ci/db-test-inputs.ts in the change detection.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .nvmrc
       - id: changes
@@ -84,9 +83,9 @@ jobs:
         with:
           db: 'true'
       - if: steps.changes.outputs.db == 'true'
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - if: steps.changes.outputs.db == 'true'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -116,7 +115,7 @@ jobs:
           FIX_DIR: ${{ runner.temp }}/schema-fix
         run: scripts/ci/schema-check.sh
       - if: steps.schema.outputs.fix == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: schema-sql
           path: ${{ runner.temp }}/schema-fix/schema.sql
@@ -133,24 +132,23 @@ jobs:
   schema-sql:
     name: commit regenerated schema.sql
     needs: [checks, db]
-    if: ${{ !cancelled() && needs.db.outputs.schema-fix == 'true' }}
+    if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && needs.db.outputs.schema-fix == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
       checks: write
     steps:
-      # The tested branch head with full history (blobs on demand) for the migration guards'
-      # merge base; no stored credentials, the push step passes the token itself.
-      - uses: actions/checkout@v4
+      # All executable files in the write job come from main. The full fetch includes the
+      # same-repo PR branch. Build its schema-only child using Git objects.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ needs.db.outputs.schema-head }}
+          ref: refs/heads/main
           fetch-depth: 0
-          filter: blob:none
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .nvmrc
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: schema-sql
           path: ${{ runner.temp }}/schema-fix
@@ -158,7 +156,7 @@ jobs:
         env:
           FIX_FILE: ${{ runner.temp }}/schema-fix/schema.sql
           TREE: ${{ needs.db.outputs.schema-tree }}
-          OLD_HEAD: ${{ needs.db.outputs.schema-head }}
+          OLD_HEAD: ${{ github.event.pull_request.head.sha }}
           HEAD_REF: ${{ github.head_ref }}
           # Through env, never interpolated into the script: titles are untrusted input.
           PR_TITLE: ${{ github.event.pull_request.title }}

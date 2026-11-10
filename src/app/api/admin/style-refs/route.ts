@@ -1,9 +1,9 @@
 import type { NextRequest } from 'next/server'
 
-import { finishStyleRef, stageStyleRef, styleRefPreview } from '@/core/admin/style-refs'
+import { finishStyleRef, reuseCoverStyleRef, stageStyleRef, styleRefPreview } from '@/core/admin/style-refs'
 import { errorResponse, jsonResponse } from '@/core/api-response'
-import { assertSameOrigin, requireApiAdmin } from '@/core/auth'
-import { r2Store } from '@/core/storage'
+import { assertSameOrigin, createAdminSupabase, requireApiAdmin } from '@/core/auth'
+import { r2PublicStore, r2Store } from '@/core/storage'
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,6 +22,16 @@ export async function PATCH(request: NextRequest) {
     return jsonResponse(await finishStyleRef(r2Store(), await request.json().catch(() => null)))
   } catch (error) {
     return errorResponse(error, 'admin-style-ref-finish')
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    assertSameOrigin(request)
+    await requireApiAdmin()
+    return jsonResponse(await reuseCoverStyleRef(createAdminSupabase(), r2PublicStore(), r2Store(), await request.json().catch(() => null)))
+  } catch (error) {
+    return errorResponse(error, 'admin-style-ref-reuse')
   }
 }
 

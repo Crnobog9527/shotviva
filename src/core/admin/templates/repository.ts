@@ -63,15 +63,27 @@ export async function templateExists(client: SupabaseClient, id: string): Promis
   return data.length > 0
 }
 
+const versionErrors: Record<string, string> = {
+  STALE_PROMPT: '已有其他人修改了提示词。请保留草稿，再重新打开模板核对。',
+  VERSION_NOT_FOUND: '这个模板没有所选版本。',
+  HISTORICAL_PROVIDER_UNAVAILABLE: '历史版本的供应商或密钥已不可用，或绑定模型已变更。当前配置未改变。',
+}
+
 export async function upsertTemplate(
   client: SupabaseClient,
   template: TemplateInput,
   prompt: PromptInput,
   floors?: ProviderFloors,
-): Promise<void> {
-  const { error } = await client.rpc('admin_upsert_template', toUpsertArgs(template, prompt, { floors }))
-  if (!error) return
-  if (['MODEL_REFERENCE_LIMIT', 'MODEL_CREDIT_FLOOR'].includes(error.message)) throw new AppError('INVALID_INPUT', error.details)
+  revision?: { actor: string; expected: number; selected?: number },
+): Promise<number | undefined> {
+  const args = toUpsertArgs(template, prompt, { floors })
+  const { data, error } = revision
+    ? await client.rpc('admin_save_versioned_template', { ...args, p_actor: revision.actor, p_expected: revision.expected, p_selected: revision.selected ?? null })
+    : await client.rpc('admin_upsert_template', args)
+  if (!error) return revision ? Number(data) : undefined
+  const message = versionErrors[error.message]
+  if (message) throw new AppError('INVALID_INPUT', message)
+  if (['MODEL_REFERENCE_LIMIT', 'MODEL_CREDIT_FLOOR', 'TEMPLATE_RETIRED', 'TEMPLATE_PRICE_BELOW_FLOOR'].includes(error.message)) throw new AppError('INVALID_INPUT', error.details)
   if (error.message === 'MODEL_CHANGED') throw new AppError('INVALID_INPUT', '出图供应商有变化，请刷新后重新保存')
   if (error.message.includes('PROVIDER_NOT_IMAGE')) throw new AppError('INVALID_INPUT', '所选出图模型已不可用，请重新选择')
   // templates_category_key_fkey (T75): the category was deleted while the form was open.
@@ -81,14 +93,14 @@ export async function upsertTemplate(
 
 type CandidateRow = Pick<
   TemplateRow,
-  'id' | 'name' | 'description' | 'visible_in' | 'cover_before_url' | 'cover_after_url' | 'cover_locales' | 'quality' | 'credits_cost' | 'is_active'
+  'id' | 'name' | 'category_key' | 'description' | 'visible_in' | 'cover_before_url' | 'cover_after_url' | 'cover_locales' | 'quality' | 'credits_cost' | 'is_active'
 > & { template_prompts: { version: number; provider_id: string | null } | null }
 
 // Only what the publish rules read (T60); one query for the whole batch, by primary key.
 export async function loadPublishCandidates(client: SupabaseClient, ids: readonly string[]): Promise<PublishCandidate[]> {
   const { data, error } = await client
     .from('templates')
-    .select('id, name, description, visible_in, cover_before_url, cover_after_url, cover_locales, quality, credits_cost, is_active, template_prompts(version, provider_id)')
+    .select('id, name, category_key, description, visible_in, cover_before_url, cover_after_url, cover_locales, quality, credits_cost, is_active, template_prompts(version, provider_id)')
     .in('id', ids)
     .returns<CandidateRow[]>()
   if (error) throw new AppError('INTERNAL', `loadPublishCandidates failed: ${error.message}`)
@@ -105,6 +117,7 @@ export async function loadPublishCandidates(client: SupabaseClient, ids: readonl
     creditsCost: row.credits_cost,
     isActive: row.is_active,
     hasPrompt: row.template_prompts !== null,
+    category: row.category_key,
     providerId: row.template_prompts?.provider_id,
   }))
 }
@@ -116,6 +129,7 @@ export async function setTemplatesActive(client: SupabaseClient, ids: readonly s
     .from('templates')
     .update(active ? { is_active: true } : { is_active: false, featured_rank: null })
     .in('id', ids)
+  if (error && ['TEMPLATE_RETIRED', 'TEMPLATE_PRICE_BELOW_FLOOR'].includes(error.message)) throw new AppError('INVALID_INPUT', error.details)
   if (error) throw new AppError('INTERNAL', `setTemplatesActive failed: ${error.message}`)
 }
 

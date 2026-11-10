@@ -7,13 +7,9 @@ import {
   foodHalfDayUsd,
   freeImagesLabel,
   FreeImagesShort,
-  fromCredits,
   MENU_DISHES,
-  menuCostUsd,
-  menuCredits,
   OUTPUT_TIERS,
   photoSeconds,
-  photosLeftAfterMenu,
   planFrom,
   tierList,
   usd,
@@ -27,7 +23,7 @@ import { PLATFORM_SPECS, px } from '../platform-specs'
 // site.config. None of the three apps' help pages says anything about AI photos, so the page
 // claims nothing either way: it says the photo is of the dish you serve.
 const brand = site.brand.name
-const [standard, hd] = OUTPUT_TIERS
+const [, hd] = OUTPUT_TIERS
 const { doordash, uberEats, grubhub } = PLATFORM_SPECS
 
 function menuBills(): CostBills {
@@ -50,8 +46,8 @@ function menuBills(): CostBills {
       total: { prefix: 'from', amount: plan, suffix: '/month', when: `about ${photoSeconds} seconds a photo` },
       lines: [
         { label: `Starter plan, ${planFrom?.credits ?? ''} credits a month`, value: plan },
-        { label: `${MENU_DISHES} dishes, ${standard.name}`, value: `${menuCredits} credits ≈ ${menuCostUsd}` },
-        { label: 'Left for the rest of the month', value: `${photosLeftAfterMenu} more photos` },
+        { label: 'Start with', value: 'One phone photo per dish' },
+        { label: 'Make', value: 'Menu photos, delivery listings and promo posters' },
       ],
       fine: `Shoot each dish on the pass with a phone; the template does the light and the styling. Start with ${freeImagesLabel}, no card needed.`,
     },
@@ -100,7 +96,7 @@ export const aiRestaurantMenu = defineContentPage({
     },
     {
       question: 'How much does a food photographer cost?',
-      answer: `Published US rates are about ${usdRange(foodHalfDayUsd)} for a half day, with a food stylist usually billed separately. ${brand} makes a menu photo from your phone shot ${fromCredits}.`,
+      answer: `Published US rates are about ${usdRange(foodHalfDayUsd)} for a half day, with a food stylist usually billed separately. ${brand} makes a menu photo from your phone shot.`,
     },
     {
       question: 'Do I need to write prompts?',
@@ -127,7 +123,7 @@ export const aiRestaurantMenu = defineContentPage({
     factsNote: 'From the apps\' own merchant help pages (DoorDash, Uber Eats, Grubhub), checked November 2026. Apps change their rules; check before you upload.',
     templates: {
       heading: 'Menu Photo Templates for Delivery Apps, Menus and Posters',
-      intro: `Every template starts from your phone photo of the dish and ends with a menu-ready photo, ${fromCredits}.`,
+      intro: `Every template starts from your phone photo of the dish and ends with a menu-ready photo.`,
       categoryKeys: [CATEGORY.food],
     },
   },

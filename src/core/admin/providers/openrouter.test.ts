@@ -40,9 +40,23 @@ describe('OpenRouter provider administration', () => {
     }))
   })
 
+  it('saves real-unit public quotes on an existing model while reusing its Vault key and preserving overrides', async () => {
+    const { db, rpc } = fakeDb()
+    const rates = [{ billable: 'output_image', unit: 'image', cost_usd: 0.018 }, { billable: 'input_image', unit: 'image', cost_usd: 0 }]
+    const fetch = vi.fn<typeof globalThis.fetch>(async url => String(url).endsWith('/endpoints')
+      ? Response.json({ id: model, endpoints: [{ provider_name: 'Test', pricing: rates }] })
+      : Response.json(catalogue))
+    await saveProvider({ db, fetch, resolveHost }, id, { ...input, id, apiKey: '', estimatedImageCosts: { '2k': 0.1 } })
+    expect(rpc).toHaveBeenCalledExactlyOnceWith('admin_save_provider', expect.objectContaining({
+      p_key: null, p_settings: expect.objectContaining({ estimated_image_costs: { '2k': 0.1 } }),
+      p_capabilities: expect.objectContaining({ catalogPricing: { status: 'quoted', endpoints: [{ name: 'Test', rates }] } }),
+    }))
+    expect(fetch.mock.calls.every(([, init]) => init?.method === 'GET' && !init.headers)).toBe(true)
+  })
+
   it('assigns the standard tier if the catalogue declares no resolution parameter', async () => {
     const { db, rpc } = fakeDb()
-    await saveProvider({ db, resolveHost, fetch: async () => Response.json({ data: [{ id: model }] }) }, id, input)
+    await saveProvider({ db, resolveHost, fetch: async () => Response.json({ data: [{ id: model, supported_parameters: { input_references: { type: 'range', min: 0, max: 3 } } }] }) }, id, input)
     expect(rpc).toHaveBeenCalledWith('admin_save_provider', expect.objectContaining({
       p_capabilities: expect.objectContaining({ resolutions: ['1k'] }),
     }))

@@ -13,7 +13,7 @@ import { TEMPLATE_SURFACES } from '@/core/templates/schema'
 
 import { isEmptyPatch, type BulkEditFailure, type BulkEditOutcome, type BulkEditPatch } from './bulk-edit-rules'
 
-// Batch edit (T79): validated here, then one call to admin_bulk_edit_templates (0640), which
+// Batch edit (T79): validated here, then one call to the five-argument admin_bulk_edit_templates RPC, which
 // checks every template against the floor and writes the whole batch in one transaction, or
 // nothing. The floor table is the server's (modules/image), never the client's.
 
@@ -70,6 +70,13 @@ const SQL_ERRORS: Record<string, [code: 'FORBIDDEN' | 'INVALID_INPUT', message: 
   CATEGORY_NOT_FOUND: ['INVALID_INPUT', '选的分类不存在或已被删除，请刷新页面后再选'],
 }
 
+function throwBulkEditError(error: { message: string; details: string }): never {
+  if (['MODEL_CREDIT_FLOOR', 'TEMPLATE_RETIRED', 'TEMPLATE_PRICE_BELOW_FLOOR'].includes(error.message)) throw new AppError('INVALID_INPUT', error.details)
+  const known = SQL_ERRORS[error.message]
+  if (known) throw new AppError(known[0], known[1])
+  throw new AppError('INTERNAL', `bulkEditTemplates failed: ${error.message}`)
+}
+
 export async function bulkEditTemplates(
   client: SupabaseClient,
   adminId: string,
@@ -87,11 +94,7 @@ export async function bulkEditTemplates(
     // The launched languages, whose own complete cover set also lets a template onto the web (0825).
     p_locales: LOCALES,
   })
-  if (error) {
-    const known = SQL_ERRORS[error.message]
-    if (known) throw new AppError(known[0], known[1])
-    throw new AppError('INTERNAL', `bulkEditTemplates failed: ${error.message}`)
-  }
+  if (error) throwBulkEditError(error)
   const result = resultSchema.safeParse(data)
   if (!result.success) throw new AppError('INTERNAL', 'admin_bulk_edit_templates returned an unexpected shape')
   const failures: BulkEditFailure[] = result.data.failures

@@ -65,7 +65,7 @@ export const bulkEditCopy = {
   creditsLegend: '积分（每档单独填，留空不改）',
   surfaces: '展示入口',
   surfaceOptions: { '': '不改', web: '只在站内', partner: '只给伙伴', both: '站内 + 伙伴' },
-  quality: '出图质量（送给模型的 quality）',
+  quality: '模板质量档',
   qualityOptions: { '': '不改', high: 'high', medium: 'medium' },
   category: '分类',
   categoryKeep: '不改',
@@ -86,6 +86,8 @@ export const bulkEditCopy = {
 
 // Cover area with language tabs (ARCHITECTURE §8.3 「封面按语言适配」, T87).
 export const coverCopy = {
+  fallback: '此语言未上传专属图，当前显示回退封面。',
+  download: (slot: 'before' | 'after') => slot === 'before' ? '下载前图' : '下载后图',
   legend: '封面（上传后立即生效，不随「保存」）',
   tabs: '封面语言',
   upcoming: '准备中',
@@ -166,12 +168,14 @@ export const styleRefCopy = {
   title: '画风参考图（不对用户显示）',
   orderHint: '出图时按顺序附在用户照片之后。提示词里请写明：前面的图是要重画的照片，最后 N 张只参考画风。',
   rightsHint: '请用没有真人正脸、或已获授权的图做参考，避免模型把参考图里的人脸画进用户的图里。',
-  add: '上传参考图', replace: '替换', remove: '移除', uploading: '上传处理中…',
+  reuse: '复用 AI 成品封面', noAfter: '当前没有可复用的后图（AI 成品）。',
+  full: '画风参考图已满 3 张，可先移除一张。', alreadyAdded: '这张 AI 成品封面已在参考图列表中。',
+  add: '上传参考图', replace: '替换', remove: '移除', uploading: '正在处理参考图…',
   label: (n: number) => `画风参考图 ${n}`,
   limit: (users: CountRange, refs: number, total: CountRange, model: CountRange) =>
     `用户照片 ${refRange(users)} 张 + 画风参考图 ${refs} 张，共 ${refRange(total)} 张。所选模型支持 ${refRange(model)} 张。`,
   under: '输入图片总数可能低于模型下限。请添加参考图、提高用户最少上传张数，或更换模型。',
   over: '输入图片总数超过模型上限。请减少参考图或用户上传张数，或更换模型。',
-  missingCap: '无法读取所选模型的参考图张数范围，请先刷新模型能力。',
+  missingCap: '尚无可靠的参考图张数范围，暂不能保存带参考图的配置。',
   needId: '先填写有效的模板 ID，再上传参考图。', idLocked: '移除已上传的参考图后可修改模板 ID。', invalidUpload: '上传失败，请重试。', decodeFailed: '无法读取图片，请换一个文件。',
 } as const

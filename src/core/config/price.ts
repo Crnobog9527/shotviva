@@ -8,6 +8,11 @@ export function formatProductPrice(product: SiteProduct): string {
   return `$${product.priceUsd.toFixed(2)}`
 }
 
+// A dollar rate per 100 credits equals the full charge in cents divided by the credit grant.
+export function usdPerHundredCredits(product: SiteProduct): number {
+  return Math.round(product.priceUsd * 100) / product.credits
+}
+
 export function pricedProducts(site: SiteConfig): readonly SiteProduct[] {
   return site.billing.products.filter((product) => product.priceUsd > 0)
 }

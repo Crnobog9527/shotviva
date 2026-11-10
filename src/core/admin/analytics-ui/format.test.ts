@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { analyticsHref } from './href'
+import { analyticsHref, liveAnalyticsHref } from './href'
 import { delta, duration, hours, ms, pct, pointDelta, rating } from './format'
 
 describe('analytics formatting', () => {
@@ -38,4 +38,12 @@ describe('analytics formatting', () => {
     expect(analyticsHref(query, { range: 'today' })).toBe('/admin/analytics?range=today')
     expect(analyticsHref({ ...query, dim: 'device' }, { sort: 'bounce' }, '#pages')).toBe('/admin/analytics?dim=device&sort=bounce#pages')
   })
+})
+
+it('range and sort links respect shallow funnel changes and preserve public locale paths', () => {
+  const staleHref = '/admin/analytics?range=30d&dim=device&sort=bounce#pages'
+  expect(liveAnalyticsHref(staleHref, '/zh/admin/analytics', 'source')).toBe('/zh/admin/analytics?range=30d&dim=source&sort=bounce#pages')
+  expect(liveAnalyticsHref(staleHref, '/admin/analytics', null)).toBe('/admin/analytics?range=30d&sort=bounce#pages')
+  expect(liveAnalyticsHref(staleHref, '/zh/admin/analytics', 'untrusted')).toBe('/zh/admin/analytics?range=30d&sort=bounce#pages')
+  expect(liveAnalyticsHref('/admin/analytics?dim=source#conversion-funnel', '/zh/admin/analytics')).toBe('/zh/admin/analytics?dim=source#conversion-funnel')
 })

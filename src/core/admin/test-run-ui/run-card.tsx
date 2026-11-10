@@ -1,6 +1,6 @@
 'use client'
 
-import { ImageUp, LoaderCircle, Pencil } from 'lucide-react'
+import { Download, ImageUp, LoaderCircle, Pencil } from 'lucide-react'
 
 import { Badge } from '@/core/ui/badge'
 import { Button } from '@/core/ui/button'
@@ -23,7 +23,7 @@ function Meta({ run }: { run: TestRunView }) {
     run.model,
     run.kind === 'generate' && run.status === 'succeeded' ? COPY.run.styleRefs(run.styleRefCount) : null,
     run.durationMs === null ? null : COPY.run.seconds(run.durationMs),
-    run.status === 'running' ? null : run.costUsd === null ? COPY.run.noCost : usd.format(run.costUsd),
+    run.status === 'running' ? null : run.receiptDetail ?? (run.costUsd === null ? COPY.run.noCost : usd.format(run.costUsd)),
   ].filter(Boolean)
   return <p className="text-muted-foreground break-all font-mono text-[11px] tabular-nums">{parts.join(' · ') || ' '}</p>
 }
@@ -62,7 +62,10 @@ export function RunCard({ run, actions }: { run: TestRunView; actions: RunAction
       </div>
       <Meta run={run} />
       {done ? (
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
+          <Button asChild variant="outline" size="icon-sm">
+            <a href={`/api/admin/template-download?runId=${run.id}`} download title={COPY.run.download} aria-label={COPY.run.download}><Download /></a>
+          </Button>
           <label className="hover:bg-accent flex size-8 items-center justify-center rounded-md" title={COPY.run.select}>
             <Checkbox checked={selected} onCheckedChange={(checked) => actions.onSelect(run, checked === true)} aria-label={COPY.run.select} />
           </label>

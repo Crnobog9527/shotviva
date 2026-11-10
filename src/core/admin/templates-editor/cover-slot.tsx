@@ -5,16 +5,22 @@ import type { CSSProperties } from 'react'
 import { buttonVariants } from '@/core/ui/button'
 import { cn } from '@/core/ui/cn'
 
+import { coverCopy as COPY } from './copy'
 import { coverFileName, formatBytes, useFileSize } from './cover-file'
+
+type CoverMedia = {
+  // Current public file. A video shows with its poster and plays on demand; an animated WebP
+  // plays by itself like any image.
+  preview: { url: string; video: boolean; poster?: string | null; inherited?: boolean } | null
+  download?: { href: string; label: string }
+}
 
 type Props = {
   id: string
   label: string
   accept: string
   hint: string
-  // Current public file. A video shows with its poster and plays on demand; an animated WebP
-  // plays by itself like any image.
-  preview: { url: string; video: boolean; poster?: string | null } | null
+  media: CoverMedia
   busy: boolean
   disabled: boolean
   onFile: (file: File) => void
@@ -26,7 +32,7 @@ const CHECKER: CSSProperties = {
   backgroundSize: '16px 16px',
 }
 
-function Preview({ label, preview }: Pick<Props, 'label' | 'preview'>) {
+function Preview({ label, preview }: { label: string; preview: CoverMedia['preview'] }) {
   return (
     <div className="bg-muted relative flex aspect-[4/5] items-center justify-center overflow-hidden rounded-md border" style={CHECKER}>
       {preview?.video ? (
@@ -55,7 +61,8 @@ function FileLine({ url }: { url: string }) {
 
 // One cover card (ARCHITECTURE §8.3): title, the stored file at a fixed 4:5 (contained, never
 // cropped), a styled picker (Replace once a file exists), its name and size, and the limits.
-export function CoverSlot({ id, label, accept, hint, preview, busy, disabled, onFile }: Props) {
+export function CoverSlot({ id, label, accept, hint, media, busy, disabled, onFile }: Props) {
+  const { preview, download } = media
   return (
     <section aria-labelledby={`${id}-title`} className="bg-card grid min-w-0 content-start gap-2.5 rounded-lg border p-3">
       <h3 id={`${id}-title`} className="text-sm font-medium">
@@ -80,10 +87,12 @@ export function CoverSlot({ id, label, accept, hint, preview, busy, disabled, on
           aria-disabled={disabled}
           className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'peer-focus-visible:ring-ring shrink-0 cursor-pointer peer-focus-visible:ring-2', disabled && 'pointer-events-none opacity-50')}
         >
-          {busy ? '处理中…' : preview ? '替换' : '上传'}
+          {busy ? '处理中…' : preview && !preview.inherited ? '替换' : '上传'}
         </label>
         {preview ? <FileLine url={preview.url} /> : null}
       </div>
+      {preview?.inherited && <p className="text-muted-foreground text-xs">{COPY.fallback}</p>}
+      {download && <a href={download.href} download className={buttonVariants({ variant: 'outline', size: 'sm', className: 'justify-self-start' })}>{download.label}</a>}
       <p className="text-muted-foreground text-xs break-words">{hint}</p>
     </section>
   )

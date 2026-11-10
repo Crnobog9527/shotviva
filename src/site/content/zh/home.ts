@@ -3,14 +3,11 @@ import { defineHomePage, type CostBills, type HeadedText, type HomePage, type Im
 import { site } from '../../site.config'
 import {
   SET_PHOTOS,
-  creditFrom,
+  hundredCreditsFrom,
   packshotUsd,
   photoSeconds,
-  photosLeftInPlan,
   planFrom,
   quoteUsd,
-  setCostUsd,
-  setCredits,
   setShotsUsd,
   styledShotUsd,
   usd,
@@ -19,7 +16,6 @@ import {
 import {
   ZH_TIERS,
   zhFreeImages,
-  zhFromCredits,
   zhPlansSentence,
   zhTierList,
   zhTierPixels,
@@ -62,8 +58,8 @@ export const shoot: ShootDemo = {
   ],
   bill: {
     photographer: { who: '摄影师', amount: '一整场拍摄', note: '预约、影棚、造型和精修' },
-    site: { who: brand, amount: `${setCredits} 积分`, note: `${SET_PHOTOS} 张${ZH_TIERS[0]?.name ?? ''}图，用你已经拍好的照片` },
-    line: '请摄影师要按一整场拍摄收费的东西，用你已经拍好的照片就能做出来。',
+    site: { who: brand, amount: '无需重新实拍', note: '一张手机照，做出主图、场景图和促销海报' },
+    line: '换个模板，就能把同一张商品照用在不同地方。',
   },
 }
 
@@ -88,8 +84,8 @@ export function productBills(heading: string, intro: string, moreFine = ''): Cos
       total: { amount: plan, suffix: '/月起', when: `每张 ${photoSeconds} 秒左右` },
       lines: [
         { label: `入门版，每月 ${planFrom?.credits ?? ''} 积分`, value: plan },
-        { label: `示例：两张${standard.name}商品图和一张普通海报`, value: `${setCredits} 积分 ≈ ${setCostUsd}` },
-        { label: '剩余积分按同价商品图估算', value: `${photosLeftInPlan} 张` },
+        { label: '拍摄准备', value: '用已有的手机照' },
+        { label: '可做成', value: '主图、场景图、促销海报' },
       ],
       fine: `造型和精修都在模板里，主体保持你拍的样子。先用 ${zhFreeImages}试试，不用绑卡。`,
     },
@@ -106,7 +102,7 @@ const steps = {
     },
     {
       heading: `下载${zhTierList}`,
-      text: `${standard.name} ${standard.px} px，适合${standard.use}；${hd.name} ${hd.px} px，适合${hd.use}；${max.name} ${max.px} px，适合${max.use}。一张${standard.name}图${zhFromCredits}。`,
+      text: `${standard.name} ${standard.px} px，适合${standard.use}；${hd.name} ${hd.px} px，适合${hd.use}；${max.name} ${max.px} px，适合${max.use}。`,
     },
   ],
 } as const satisfies HomePage['steps']
@@ -133,7 +129,7 @@ export const zhHomePage = defineHomePage({
   steps,
   templateGrid: {
     heading: 'AI改图模板：不用写提示词',
-    intro: `每个模板都从你的手机照片开始，到一张成品图结束。选一个，剩下的交给 ${brand}。每张${zhFromCredits}。`,
+    intro: `每个模板都从你的手机照片开始，到一张成品图结束。选一个，剩下的交给 ${brand}。`,
     note: '模板图片均为示意图。',
   },
   facts: zhSharedFacts(),
@@ -162,7 +158,7 @@ export const zhHomePage = defineHomePage({
     // Owner 2026-11-08: Chinese visitors first need to know what Shotviva is). English keeps it last.
     {
       question: `${brand} 是什么？`,
-      answer: `${brand} 是一个网页版的 AI 照片工作室：用一张手机照片，套上菜品、商品、房间、宠物或画风模板，做出成品图。和凭提示词生成整张图的 AI 生图工具不同，${brand} 从你真实拍的照片出发，主体保持原样。新用户送 ${zhFreeImages}，之后每张 ${zhFromCredits}。`,
+      answer: `${brand} 是一个网页版的 AI 照片工作室：用一张手机照片，套上菜品、商品、房间、宠物或画风模板，做出成品图。和凭提示词生成整张图的 AI 生图工具不同，${brand} 从你真实拍的照片出发，主体保持原样。新用户送 ${zhFreeImages}。`,
     },
     // A–H follow 建站规格 G6 in order, asked the way Chinese users ask (G13, 中文用户真实问法).
     // A's first sentence is the Chinese form of G6's fixed sentence: brand and keyword together.
@@ -172,7 +168,7 @@ export const zhHomePage = defineHomePage({
     },
     {
       question: 'AI改图免费吗？',
-      answer: `${brand} 给每个新用户送 ${zhFreeImages}，AI改图可以先免费试。之后每张 ${zhFromCredits}。${zhPlansSentence()}${creditFrom ? `折算下来，每个积分最低 ${creditFrom}。` : ''}免费生成的图带水印，也不是私密的。`,
+      answer: `${brand} 给每个新用户送 ${zhFreeImages}，AI改图可以先免费试。${zhPlansSentence()}${hundredCreditsFrom ? `折算下来，每 100 积分最低约 ${hundredCreditsFrom}。` : ''}免费生成的图带水印，也不是私密的。`,
     },
     {
       question: 'AI改图会不会把我照片里的东西改掉？',

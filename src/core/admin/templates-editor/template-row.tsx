@@ -1,5 +1,7 @@
 'use client'
 
+import { STYLE_STANDARD_CREDITS, type CreditsFloor } from '@/core/templates/pricing'
+import { RESOLUTIONS } from '@/core/templates/output-options'
 import { Badge } from '@/core/ui/badge'
 import { Button } from '@/core/ui/button'
 import { Checkbox } from '@/core/ui/checkbox'
@@ -9,12 +11,16 @@ import { TableCell, TableRow } from '@/core/ui/table'
 import type { AdminTemplate } from '../templates/types'
 import { DragHandle, MoveButtons, sortableRowClass, useSortableItem } from '../ui/sortable'
 import { bulkCopy } from './copy'
+import { unsupportedTier } from './tier-price'
 import { canFeature } from './featured-state'
+
+import { versionCopy } from './version-copy'
 
 const SURFACE_LABEL = { web: '站内', partner: '伙伴' } as const
 
 export type RowHandlers = {
   pending: boolean
+  onDuplicate: (id: string) => void
   onEdit: (template: AdminTemplate) => void
   onToggle: (template: AdminTemplate, active: boolean) => void
   // 首页精选 (T53): whether the list is full, and the switch handler.
@@ -24,6 +30,7 @@ export type RowHandlers = {
 
 type Props = RowHandlers & {
   template: AdminTemplate
+  price: CreditsFloor
   // Bulk selection (T60).
   checked: boolean
   onSelect: (id: string, on: boolean) => void
@@ -31,7 +38,7 @@ type Props = RowHandlers & {
 
 // One row of the catalogue; dragged by its handle (or long-pressed on touch), T76.
 export function TemplateRow(props: Props) {
-  const { template, checked, onSelect, pending, onEdit, onToggle, featuredFull, onFeature } = props
+  const { template, price, checked, onSelect, pending, onEdit, onToggle, featuredFull, onFeature } = props
   const item = useSortableItem(template.id)
   return (
     <TableRow {...item.row} className={sortableRowClass} data-state={checked ? 'selected' : undefined}>
@@ -63,7 +70,7 @@ export function TemplateRow(props: Props) {
         </div>
       </TableCell>
       <TableCell>
-        {`${template.creditsCost['1k']} / ${template.creditsCost['2k']} / ${template.creditsCost['3k']}`}
+        {summaryPrice(template, price)}
         <span className="text-muted-foreground block text-xs">{template.quality}</span>
       </TableCell>
       <TableCell>{template.prompt ? `v${template.prompt.version}` : '缺失'}</TableCell>
@@ -79,6 +86,9 @@ export function TemplateRow(props: Props) {
         <FeaturedSwitch template={template} full={featuredFull} pending={pending} onFeature={onFeature} />
       </TableCell>
       <TableCell className="text-right">
+        {!template.categoryInfo.isSystem && template.id !== 'freeform' && template.id !== 'edit' && (
+          <Button variant="ghost" size="sm" disabled={pending} onClick={() => props.onDuplicate(template.id)}>{versionCopy.duplicate}</Button>
+        )}
         <Button variant="outline" size="sm" disabled={pending} onClick={() => onEdit(template)}>
           编辑
         </Button>
@@ -100,4 +110,11 @@ function FeaturedSwitch({ template, full, pending, onFeature }: { template: Admi
       onCheckedChange={(checked) => onFeature(template, checked)}
     />
   )
+}
+
+function summaryPrice(template: AdminTemplate, floor: CreditsFloor) {
+  if (floor.styleDraft) return `规划 ${STYLE_STANDARD_CREDITS} / 未定 / 未定（未开放）`
+  if (floor.styleUnavailable) return '当前配置未获批准'
+  if (floor.retiredRoom) return '已下架 · 未开放'
+  return RESOLUTIONS.map(r => unsupportedTier(floor, r) ? '不可用' : template.creditsCost[r]).join(' / ')
 }

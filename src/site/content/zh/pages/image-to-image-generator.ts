@@ -5,7 +5,7 @@ import { pairImage, SIZE_COUNT } from '../../landing-shared'
 import { zhPricingRelated } from '../shared'
 import { photoSeconds, SET_PHOTOS } from '../../offer'
 import { productBills } from '../home'
-import { zhFreeImages, zhFromCredits, zhPlansSentence, zhTierList, zhTierPixels, zhUploadLimits } from '../offer'
+import { zhFreeImages, zhTierList, zhTierPixels, zhUploadLimits } from '../offer'
 
 // /zh/image-to-image-generator (T21). Keyword 「图生图」 with its family (ai图生图, 图生图ai,
 // 以图生图, 图生图 在线) in the headings. People who search 图生图 are often after open-source
@@ -32,13 +32,13 @@ export const zhImageToImageGenerator = defineContentPage({
   facts: [
     { label: `一张照片：${zhUploadLimits}`, value: '手机拍的就行。不用抠图，不用白底，也不用先修图。' },
     { label: '选模板，不用描述', value: '光线、场景或画风都由模板决定。只有一行选填的「有什么想改的？」，写一句小要求就行。' },
-    { label: `${zhTierList}，导出 PNG`, value: `长边分别是 ${zhTierPixels}，${SIZE_COUNT} 种尺寸，从方形主图到 9:16 竖版。每张 ${photoSeconds} 秒左右，${zhFromCredits}。` },
+    { label: `${zhTierList}，导出 PNG`, value: `长边分别是 ${zhTierPixels}，${SIZE_COUNT} 种尺寸，从方形主图到 9:16 竖版。每张 ${photoSeconds} 秒左右。` },
   ],
   costBills: productBills(`${SET_PHOTOS} 张商品图要花多少钱：请摄影师和用图生图对比`, `一个商品，${SET_PHOTOS} 张造型图，精修好、可以直接发。同样的活，两张账单。`),
   faq: [
     {
       question: '图生图有免费的吗？',
-      answer: `有。新用户送 ${zhFreeImages}，之后每张${zhFromCredits}。${zhPlansSentence()}`,
+      answer: `新用户送 ${zhFreeImages}。`,
     },
     {
       question: '以图生图用哪个 AI 工具好？',

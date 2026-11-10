@@ -20,7 +20,7 @@ const defaultId = randomUUID()
 const model = 'google/gemini-2.5-flash-image'
 const routerTag = `${routerId}/${model}`
 const defaultTag = `${defaultId}/gpt-image-2.6`
-const usage = { prompt_tokens: 14, completion_tokens: 22, cost: 0.04 }
+const usage = { prompt_tokens: 14, completion_tokens: 22, cost: 0.04, is_byok: false }
 const chargedUsd = 0.0422
 const openAiUsage = { input_text_tokens: 0, input_image_tokens: 0, output_tokens: 1000 }
 const supported: OpenRouterImageParameters = {
@@ -38,7 +38,7 @@ beforeAll(async () => {
            ($3, 'image', 'openai_images', 'T92 fallback fixture', 'gpt-image-2.6', 'https://api.openai.com/v1', '{1k,2k,3k}', 2)`, [routerId, model, defaultId])
   await pg.query('update public.ai_providers set capabilities = $2 where id = $1', [routerId, {
     resolutions: ['1k'], aspectRatios: ['4:5', '1:1'], originalRatio: false,
-    minReferences: 0, maxReferences: 3, fetchedAt: new Date().toISOString(),
+    minReferences: 0, maxReferences: 3, catalogImageCosts: { '1k': 0.01 }, fetchedAt: new Date().toISOString(),
   }])
   await pg.query('update public.template_prompts set provider_id = $1 where template_id = $2', [routerId, templateId])
 })
@@ -98,6 +98,17 @@ describe('T92 per-template generation routing', () => {
     fetch.mockResolvedValueOnce(Response.json({ data: [], usage }))
     await expect(runGeneration(deps, { jobId, userId, templateId, source: 'web' })).rejects.toMatchObject({ refunded: true })
     expect(await jobRow(jobId)).toMatchObject({ provider: routerTag, status: 'failed', provider_usage: usage, cost_usd: chargedUsd })
+    expect((await profileOf(pg, userId)).credits).toBe(2)
+  })
+
+  it('returns the held credits while retaining a pending OpenRouter receipt on a failed request', async () => {
+    const { deps, fetch } = await setup()
+    const userId = await createUser(pg, { credits: 2 })
+    const jobId = randomUUID()
+    fetch.mockResolvedValueOnce(Response.json({ id: 'gen-pending', data: [] }))
+    fetch.mockResolvedValueOnce(new Response(null, { status: 404 }))
+    await expect(runGeneration(deps, { jobId, userId, templateId, source: 'web' })).rejects.toMatchObject({ refunded: true })
+    expect(await jobRow(jobId)).toMatchObject({ status: 'failed', provider_usage: { generation_id: 'gen-pending', cost: null }, cost_usd: null })
     expect((await profileOf(pg, userId)).credits).toBe(2)
   })
 

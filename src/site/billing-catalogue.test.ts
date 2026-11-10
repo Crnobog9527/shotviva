@@ -14,5 +14,4 @@ it.each([
   expect(site.billing.freeCredits).toBe(free)
   expect(products.map((p) => p.credits)).toEqual(credits)
   expect(products.find((p) => p.id === 'max_yearly')?.priceUsd).toBe(maxAnnual)
-  expect(site.growth.invite.inviteeCredits).toBe(6)
 })

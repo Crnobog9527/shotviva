@@ -21,10 +21,11 @@ const pricePerM = z.preprocess(
   z.coerce.number().finite().nonnegative().max(999_999).nullable(),
 )
 
-export const lookupModelSchema = z.object({
+const modelFields = {
   baseUrl: z.string().trim().min(1).max(300),
   model: z.string().trim().regex(/^[A-Za-z0-9._:/@+-]{1,120}$/),
-})
+}
+export const lookupModelSchema = z.object({ ...modelFields, retry: z.boolean().optional() })
 
 export const saveProviderSchema = z.object({
   // Absent for a new row.
@@ -36,7 +37,7 @@ export const saveProviderSchema = z.object({
     .refine((values) => new Set(values).size === values.length).optional(),
   estimatedImageCosts: estimatedImageCostsSchema.optional(),
   label: z.string().trim().min(1).max(80),
-  ...lookupModelSchema.shape,
+  ...modelFields,
   // Write-only: blank keeps the stored key (ARCHITECTURE §3.3).
   apiKey: z.preprocess(blankAsUndefined, apiKeySchema.optional()),
   notes: z.preprocess(blankAsUndefined, z.string().trim().max(500).optional()),

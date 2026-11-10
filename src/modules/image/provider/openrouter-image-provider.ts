@@ -4,6 +4,7 @@ import { AppError } from '@/core/errors'
 import { OPENROUTER_BASE_URL, OPENROUTER_IMAGE_SIZE, openRouterInputMismatch, openRouterImageParameters, type OpenRouterImageParameters } from '@/core/providers'
 import { ProviderError, type GenerationProvider, type ProviderInput } from '@/core/jobs'
 
+import { completeReceipt } from './openrouter-receipt'
 import { readOpenRouterOutput } from './openrouter-response'
 
 type OpenRouterImageConfig = {
@@ -47,6 +48,7 @@ function imageRequest(model: string, input: ProviderInput, supported: OpenRouter
 export function createOpenRouterImageProvider(config: OpenRouterImageConfig): GenerationProvider {
   return {
     id: 'openrouter-image',
+    completeUsage: usage => completeReceipt(usage, { ...config, baseUrl: config.baseUrl ?? OPENROUTER_BASE_URL }),
     async generate(input) {
       const baseUrl = config.baseUrl ?? OPENROUTER_BASE_URL
       let response: Response
@@ -54,6 +56,8 @@ export function createOpenRouterImageProvider(config: OpenRouterImageConfig): Ge
         input.signal.throwIfAborted()
         const supported = config.imageParameters ?? await openRouterImageParameters(baseUrl, config.model, config.fetch)
         input.signal.throwIfAborted()
+        const body = JSON.stringify(imageRequest(config.model, input, supported))
+        input.noteUsage?.({ cost: null })
         response = await (config.fetch ?? fetch)(`${baseUrl}/images`, {
           method: 'POST',
           headers: {
@@ -62,7 +66,7 @@ export function createOpenRouterImageProvider(config: OpenRouterImageConfig): Ge
             'HTTP-Referer': 'https://shotviva.com',
             'X-Title': 'Shotviva',
           },
-          body: JSON.stringify(imageRequest(config.model, input, supported)),
+          body,
           signal: input.signal,
           redirect: 'error',
           cache: 'no-store',
@@ -72,7 +76,7 @@ export function createOpenRouterImageProvider(config: OpenRouterImageConfig): Ge
         if (error instanceof AppError && (error.code === 'REFERENCE_IMAGE_LIMIT' || error.code === 'MODEL_INPUT_UNSUPPORTED')) throw error
         throw new ProviderError('failed', 'openrouter request failed')
       }
-      return readOpenRouterOutput(response, input, config.model)
+      return readOpenRouterOutput(response, input)
     },
   }
 }

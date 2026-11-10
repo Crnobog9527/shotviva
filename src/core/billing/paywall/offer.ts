@@ -76,13 +76,13 @@ function savingPct(offer: TierOffer): number {
 // Whole dollars without decimals ("$191"), the rest with two ("$19.90"). The plain "$" in every
 // language: Chinese would otherwise print "US$19.90" next to the "$19.90" of the page copy, and
 // a price has one written form across the site (建站规格 G3, ARCHITECTURE §17).
-export function usdFormat(amount: number, perCredit = false) {
-  const whole = Number.isInteger(amount)
+export function usdFormat(amount: number, showCents = false) {
+  const whole = !showCents && Number.isInteger(amount)
   return {
     style: 'currency',
     currency: 'USD',
     currencyDisplay: 'narrowSymbol',
     minimumFractionDigits: whole ? 0 : 2,
-    maximumFractionDigits: perCredit ? 5 : whole ? 0 : 2,
+    maximumFractionDigits: whole ? 0 : 2,
   } as const
 }

@@ -19,7 +19,8 @@ type Claim = { userId: string; code: string; context: 'signup'|'account'|'paywal
 export async function redeemCode(admin: SupabaseClient, input: Claim) {
   const { data, error } = await admin.rpc(input.context === 'signup' ? 'redeem_code' : 'redeem_limited_code', {
     p_user: input.userId, p_code: input.code, p_context: input.context, p_replace: input.replace ?? false,
-    p_invitee_credits: input.invite.inviteeCredits, p_invite_window_days: input.invite.windowDays,
+    // The compatibility argument is required by PostgREST. SQL reads the current reward.
+    p_invitee_credits: null, p_invite_window_days: input.invite.windowDays,
   })
   if (error) throw error
   const r = result.parse(data)

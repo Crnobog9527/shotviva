@@ -17,6 +17,14 @@ export async function isAffiliateEnabled(): Promise<boolean> {
   return affiliateDefault
 }
 
+// The account page needs only the current user's status, via the affiliates primary key.
+export async function hasAffiliateDashboard(userId: string): Promise<boolean> {
+  const { data, error } = await createAdminSupabase().from('affiliates')
+    .select('status').eq('user_id', userId).maybeSingle()
+  if (error) logger.warn('affiliate membership unavailable', { code: error.code })
+  return data?.status === 'active' && await isAffiliateEnabled()
+}
+
 // Only the introduction is public when operations are closed.
 export function requiresAffiliateProgram(pathname: string): boolean {
   const path = pathname.toLowerCase().replace(/^\/(en|zh)(?=\/)/, '').replace(/\/$/, '')

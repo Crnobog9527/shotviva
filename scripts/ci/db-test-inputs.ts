@@ -27,6 +27,7 @@ const ALWAYS = [
   /^\.github\/actions\//,
   /^\.github\/workflows\/ci\.yml$/,
   /^scripts\/ci\//,
+  /^scripts\/release\/pricing-v2\//,
   /^scripts\/db-schema\.ts$/,
   /^(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|\.nvmrc|tsconfig\.json|vitest\.config\.m?ts)$/,
 ]

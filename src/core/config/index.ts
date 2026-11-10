@@ -17,5 +17,5 @@ export type {
   UsdRange,
 } from './define-site'
 export { MODULE_ROUTES, isModuleEnabled, isPathEnabled, moduleForPath } from './modules'
-export { PRICE_PENDING, formatProductPrice, pricedProducts } from './price'
+export { PRICE_PENDING, formatProductPrice, pricedProducts, usdPerHundredCredits } from './price'
 export { addressLines } from './brand'

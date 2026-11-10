@@ -6,7 +6,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest'
 import { campaignCatalog, type CatalogInput } from '@/core/codes/admin'
 import { site } from '@/site/site.config'
 
-import { benefits, invite, pack } from '../t94-config'
+import { benefits, invite, pack, seededRewards } from '../t94-config'
 import { connectAdmin, createUser, ledgerOf, profileOf } from './helpers'
 
 // ×100 changes credit quantities only. Prices, percentages, windows and reward counts
@@ -46,7 +46,7 @@ async function reject(work: () => Promise<unknown>, message: string) {
 
 async function redeem(user: string, code: string) {
   const result = await db.query("select public.redeem_code($1,$2,'account',$3,$4) as claim",
-    [user, code, invite.inviteeCredits, invite.windowDays])
+    [user, code, null, invite.windowDays])
   return result.rows[0].claim
 }
 
@@ -109,8 +109,8 @@ async function referredBuyer(code: string) {
   // Signup is versioned by the database; scaling invite rewards cannot scale that gift.
   const signup = benefits.freeCredits
   await db.query("select public.grant_credits($1,$2,'signup',$3,'free')", [buyer, signup, 'signup:' + buyer])
-  expect(await redeem(buyer, code)).toMatchObject({ status: 'ok', credits_granted: invite.inviteeCredits * factor })
-  expect((await profileOf(db, buyer)).free_credits).toBe(signup + invite.inviteeCredits * factor)
+  expect(await redeem(buyer, code)).toMatchObject({ status: 'ok', credits_granted: seededRewards.inviteeCredits * factor })
+  expect((await profileOf(db, buyer)).free_credits).toBe(signup + seededRewards.inviteeCredits * factor)
   return buyer
 }
 
@@ -121,7 +121,7 @@ async function purchase(buyer: string) {
     [buyer, pack.id, session, cents, 'ch_' + randomUUID()])
   const { rows: [row] } = await db.query('select id from public.payments where stripe_session_id=$1', [session])
   const { rows: [effects] } = await db.query('select public.apply_payment_code_effects($1,$2,null,0,$3,$4) as value',
-    [buyer, row.id, invite.inviterCredits, invite.inviterRewardCap])
+    [buyer, row.id, null, invite.inviterRewardCap])
   return effects.value.rewarded as boolean
 }
 
@@ -138,13 +138,13 @@ it('keeps the legacy signup gift and grants scaled purchase and inviter credits 
   await reject(() => setDays(0), 'INVALID_INPUT')
   await setDays(days)
   await db.query("select public.admin_save_invite_rewards($1,$2,$3,value) from public.system_settings where key='code_invite_rewards'",
-    [actor, invite.inviteeCredits * factor, invite.inviterCredits * factor])
+    [actor, seededRewards.inviteeCredits * factor, seededRewards.inviterCredits * factor])
   const first = await referredBuyer(code)
   expect(await purchase(first)).toBe(true)
   expect((await profileOf(db, first)).credits).toBe(pack.credits * factor)
   expect(await purchase(first)).toBe(false)
   for (let i = 1; i < invite.inviterRewardCap; i++) expect(await purchase(await referredBuyer(code))).toBe(true)
-  const earned = invite.inviterCredits * factor * invite.inviterRewardCap
+  const earned = seededRewards.inviterCredits * factor * invite.inviterRewardCap
   expect((await profileOf(db, inviter)).credits).toBe(earned)
   // The same rewards would have expired under the old window but still count in the new one.
   await db.query("update public.credit_ledger set created_at=now()-make_interval(days=>$2) where user_id=$1 and kind='invite_reward'",
@@ -155,5 +155,5 @@ it('keeps the legacy signup gift and grants scaled purchase and inviter credits 
     [inviter, days + 1])
   expect(await summary()).toMatchObject({ rewards_left: invite.inviterRewardCap })
   expect(await purchase(await referredBuyer(code))).toBe(true)
-  expect(await summary()).toMatchObject({ earned: earned + invite.inviterCredits * factor, rewards_left: invite.inviterRewardCap - 1 })
+  expect(await summary()).toMatchObject({ earned: earned + seededRewards.inviterCredits * factor, rewards_left: invite.inviterRewardCap - 1 })
 }, 30_000)

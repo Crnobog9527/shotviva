@@ -3,7 +3,7 @@ import { createElement, type ComponentProps } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
-import { perCreditUsd } from '@/core/billing/paywall'
+import { usdPerHundredCredits } from '@/core/config'
 import { FaqSection, type FaqItem } from '@/core/content'
 import type { Locale } from '@/core/i18n'
 import { TranslatedPathsProvider } from '@/core/i18n/ui'
@@ -12,7 +12,7 @@ import { faqPageLd } from '@/core/seo'
 import { loadMessages } from '../i18n/messages'
 import { site } from '../site.config'
 import { homePage } from './home'
-import { creditFrom, freeImagesLabel, fromCredits, perCredit, planFrom, product, tierList, tierPixels, usd } from './offer'
+import { hundredCreditsFrom, freeImagesLabel, fromCredits, perHundredCredits, planFrom, product, tierList, tierPixels, usd } from './offer'
 import { zhHomePage } from './zh/home'
 import { zhFreeImages, zhFromCredits, zhTierPixels } from './zh/offer'
 
@@ -74,11 +74,11 @@ describe('home FAQ, English (建站规格 G6)', () => {
   it('reads every number from the config, the same as /pricing', () => {
     const b = byLetter(faq, 'B').answer
     expect(b).toContain(freeImagesLabel)
-    expect(b).toContain(fromCredits)
+    expect(b).not.toContain(fromCredits)
     expect(planFrom).toBeDefined()
     expect(b).toContain(`${usd(planFrom?.priceUsd ?? 0)} a month for ${planFrom?.credits} credits`)
-    expect(b).toContain(`as little as ${creditFrom}`)
-    expect(creditFrom).toBe(perCredit('max_yearly'))
+    expect(b).toContain(`per 100 credits is about ${hundredCreditsFrom}`)
+    expect(hundredCreditsFrom).toBe(perHundredCredits('max_yearly'))
     expect(byLetter(faq, 'A').answer).toContain(tierList)
     expect(byLetter(faq, 'G').answer).toContain(`PNG in 3 sizes: ${tierPixels}`)
     expect(byLetter(faq, 'I').answer).toContain(freeImagesLabel)
@@ -159,8 +159,8 @@ describe('home FAQ, Chinese (建站规格 G6, G13)', () => {
 
   it('uses the same numbers as the English FAQ and /zh/pricing', () => {
     expect(byLetter(faq, 'B').answer).toContain(zhFreeImages)
-    expect(byLetter(faq, 'B').answer).toContain(zhFromCredits)
-    expect(byLetter(faq, 'B').answer).toContain(`每个积分最低 ${creditFrom}`)
+    expect(byLetter(faq, 'B').answer).not.toContain(zhFromCredits)
+    expect(byLetter(faq, 'B').answer).toContain(`每 100 积分最低约 ${hundredCreditsFrom}`)
     expect(byLetter(faq, 'G').answer).toContain(`PNG，分 3 档：${zhTierPixels}`)
     expect(byLetter(faq, 'D').table?.rows).toHaveLength(4)
     expect(byLetter(faq, 'D').link?.href).toBe('/image-to-image-generator')
@@ -196,8 +196,8 @@ describe('home FAQ, Chinese (建站规格 G6, G13)', () => {
 })
 
 describe('home FAQ and /pricing agree', () => {
-  it('quotes the same lowest per-credit price that the /pricing Max card prints', () => {
+  it('quotes the same lowest price per 100 credits that the /pricing Max card prints', () => {
     const maxYearly = product('max_yearly')
-    expect(maxYearly && `$${perCreditUsd(maxYearly).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 5 })}`).toBe(creditFrom)
+    expect(maxYearly && `$${usdPerHundredCredits(maxYearly).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`).toBe(hundredCreditsFrom)
   })
 })

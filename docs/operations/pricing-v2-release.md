@@ -18,15 +18,19 @@ change a template, enable an affiliate program, create provider prices, or promo
    checkout links and check live contracts and callbacks. Protect checkout and generation in
    the short cutover window. The separate preview activation keeps unrelated QA wallets.
 3. Get release approval for the exact integrated commit and verified provider cutover. The
-   production wallet authorization covers **only** the six accounts in the reviewed digest:
-   124 paid credits, 26 free credits, no active contract or running job. History remains intact;
+   production wallet authorization covers only the reviewed cohort and balances. The cohort must have
+   no active contract or running job. History remains intact;
    both old pools end at zero. A user created before the switch never receives a new signup gift.
 4. The restricted release workflow must run the following in one transaction after confirming
    the target project, versioned provider prices, blocked inflight writes, compatible app and
    template activation/rollback functions. Use the existing DB push (preview/production) workflow with an explicit manual pricing operation and reviewed main SHA. Ordinary pushes never activate it. This is a runbook, not an automatically executed
    migration. No direct remote SQL; use the reviewed repository release workflow. Apply a short
-   lock timeout and abort if the baseline changes. The production arguments below identify the
-   reviewed snapshot; never substitute newly computed values without checking the difference.
+   lock timeout and abort if the baseline changes. For a future production activation, supply the separately reviewed snapshot in the
+   protected environment secret `PRICING_V2_APPROVED_BASELINE`. Use a JSON object with
+   `digest` (64 lowercase SHA-256 hex digits), `accounts`, `paid_credits`, `free_credits`,
+   `last_ledger` and `payments` (nonnegative JSON integers). Only activation needs the secret.
+   Missing, malformed or stale input aborts the cutover. Keep the approved values out of Git,
+   dispatch inputs and workflow logs. Obtain fresh approval before changing the snapshot.
 
    Run the checked-in production or preview SQL selected by the workflow. The release
    also records the economic checkpoint used to refuse unsafe rollbacks; do not reproduce
