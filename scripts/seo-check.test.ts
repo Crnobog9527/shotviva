@@ -63,6 +63,16 @@ describe('seo:check', () => {
     expect(problems).toContain('/sitemap-pages.xml answered 404, expected 200')
   })
 
+  // SEO launch handbook 02-L2: once open, only Bytespider stays out.
+  it('fails an open site that still blocks an AI crawler or lets Bytespider in', () => {
+    for (const bot of AI_CRAWLERS) {
+      const blocked = { ...open, robots: file(200, `${openRobots}\nUser-Agent: ${bot}\nDisallow: /\n`) }
+      expect(evaluate(blocked, 'open')).toEqual([`robots.txt disallows ${bot}`])
+    }
+    const noBytespider = { ...open, robots: file(200, openRobots.replace('User-Agent: Bytespider\nDisallow: /\n', '')) }
+    expect(evaluate(noBytespider, 'open')).toEqual(['robots.txt does not disallow Bytespider'])
+  })
+
   it('catches a closed site that blocks Google too, or misses one AI crawler', () => {
     const blocksAll = { ...closed, robots: file(200, 'User-agent: *\nDisallow: /\n', NOINDEX) }
     expect(evaluate(blocksAll, 'closed')).toContain('robots.txt disallows * (Google and Bing must be able to see noindex)')
