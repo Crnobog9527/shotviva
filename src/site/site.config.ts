@@ -110,8 +110,20 @@ export const site = defineSite({
   // /admin/requests 404. Preview deployments can also open it with FEATURE_WISHLIST_PREVIEW=on.
   features: { wishlist: true, affiliate: affiliateDefault },
   indexing: {
-    // The two T44 landing pages are in the keyword map CSV (第一批 第 2 周).
-    indexablePaths: ['/', '/image-to-image-generator', '/commercial-photography', '/ai-restaurant-menu', '/pricing'],
+    // The two T44 landing pages are in the keyword map CSV (第一批 第 2 周). The four legal pages
+    // are indexable too (Owner's SEO launch handbook, PATCH v3 G7, 2026-11-10): they answer 200,
+    // and payment reviewers and AI answers cite them.
+    indexablePaths: [
+      '/',
+      '/image-to-image-generator',
+      '/commercial-photography',
+      '/ai-restaurant-menu',
+      '/pricing',
+      '/terms',
+      '/privacy',
+      '/refund-policy',
+      '/acceptable-use',
+    ],
     // The Vercel project's production address (ARCHITECTURE §12.0).
     canonicalRedirectHosts: ['shotviva.vercel.app'],
     // seo资料/Shotviva 页面与主词映射（中文口径）.csv: the three indexable /zh pages.
