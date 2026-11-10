@@ -23,7 +23,7 @@ async function Photos() {
   const user = await requireUser('/photos')
   const supabase = await createServerSupabase()
   const now = new Date()
-  const [own, templates] = await Promise.all([listOwnJobs(createAdminSupabase(), user.id, now), listTemplatesIn(supabase, await currentLocale())])
+  const [own, templates] = await Promise.all([listOwnJobs(createAdminSupabase(), user.id, now), listTemplatesIn(supabase, await currentLocale(), { includeSeriesMembers: true })])
   const tp = await getTranslations('app.photos')
   const fallback = tp('fallbackName')
   const lookup: TemplateLookup = new Map(templates.map((t) => [t.id, { name: t.name, cover: t.coverAfterUrl ?? t.coverPosterUrl }]))

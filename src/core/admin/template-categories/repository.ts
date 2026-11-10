@@ -18,6 +18,8 @@ export async function listAdminCategories(client: SupabaseClient): Promise<Admin
   const { data, error } = await client
     .from('template_categories')
     .select(`${CATEGORY_COLUMNS}, templates(count)`)
+    .eq('kind', 'template')
+    .is('parent_id', null)
     .order('sort_order', { ascending: true })
     .order('key', { ascending: true })
     .returns<Row[]>()

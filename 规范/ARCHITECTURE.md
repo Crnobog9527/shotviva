@@ -294,6 +294,13 @@ T93 模板同步由 GitHub 手动工作流执行，审批后先读目标模板�
 - 改名只改显示，`key` 不变，所以 SEO 页面地址、PostHog 里的 `category`（从这一版起发 `key`）都不受影响。保存后 `revalidateTag('templates', 'max')`，和模板保存一样。
 - 没有已上架模板的分类，在创作页和首页都不显示（规则不变）。迁移编号段 `0580`～`0599`。
 
+**三级分类和系列（T102 第一期，1080～1083）**
+
+- 复用 `template_categories` 的永久主键和双语资料。新增 `kind`（默认 `template`，`reference` 供 T101 管理员使用）、`parent_id`（父分类 key）、`level`（根为 1，最多 3）、`slug`（缺省用 key，同 kind 同父级唯一）、`is_visible`（默认 true）及可空的 `seo_title_en/zh`、`seo_description_en/zh`。旧分类都是根。系统分类独立，画风销售规则识别的 art-styles 保持根级。移动要同 kind，更新整个子树层级，拒绝环和第四级。路径从根到叶按 slug 排列。匿名和登录用户仅能读取自身及全部祖先均可见的模板分类。隐藏分支的分类资料、路径和所属模板的旧分类字段均受 RLS 保护。后台验证管理员后以 service role 读取完整分类。
+- `templates.category_key` 和旧英文名仍是一级分类，沿用首页、埋点及画风销售约束。新增可空的 `subcategory_key` 记录实际二级或三级分类。写入时传所属一级 key 和所选子级 key；返回根级时显式清空子级。跨根移动分类，在同一事务内更新相关模板的一级分类、运行既有销售校验。删除有子项的分类会被拒绝；叶分类中的模板和系列在删除事务中移入目标分类。
+- `template_series` 保存 UUID、唯一 slug、中英文名称及可空说明、`cover_url`（可空，读取时回退到首个可见成员的本地化封面）、`category_key`（任意级模板分类）、排序、`is_active`（默认下架）和 `show_members`（默认 false）。模板可选一个 `series_id`，按 `series_sort_order, id` 排列。系列和分类由后台通过服务端管理员权限写。
+- 前台目录只读可见分类中已上架、支持 web 的模板。系列自身上架、分类可见且有可见成员时展示系列卡；成员仅在系列打开 `show_members` 后另外展示。作品页的模板名和「再做一次」入口包含系列内可用成员。筛选包含目标分类及子孙，系列按系列所属分类展示。伙伴仍按单个模板输出，`category` 为一级英文名，新增 `category_path`（从根开始的 slug 数组）、`series`（上架系列的 id、slug、英文名，其他为 null）。公共读取使用 `templates` 缓存标签。
+
 v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板是数据，以后在后台随时加，不改代码）：
 
 | 分类 | 模板 | 用途 |
@@ -353,6 +360,7 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
   - 以上函数都只授权 `service_role`。
 - **版本化结账（新积分）**：私有 `admin.product_terms_v2(product_id primary key,credits,usd_cents)` 保存九项已核准报价，启用 RLS，不对客户端开放。调用方从已验签的 Stripe/Waffo 订单或合同取得价格版本；新合同走仅 service_role 可执行的 `settle_checkout_v2`、`settle_waffo_order_v2`、`apply_subscription_renewal_v2`，旧合同和旧在途单保持原端点与原价。切换后首次入账的真实旧合约款按等档新积分发放（保持签约费用和周期），重复回调只认原流水。共用事务、索引和付款幂等键。不得因缺失或非法的新版本信息把新单当旧单。退款、争议按对应时间的入账流水折算，不能按今日套餐目录回推。加这些函数本身不激活新 UI，不改余额或第三方合同。
 - **Waffo v2 续费（T99）**：仅验签通过、订阅付款成功且期数大于 1 的新报价合同进入 `settle_waffo_renewal_v2`。按订单与期数串行处理，`admin.waffo_renewal_periods` 每笔付款号为主键，每期仅允许一笔原始付款，额外付款号各自留存。私有记录含用户、商品、报价、实收、税、小计、币种、异常原因和可空工单号。原始付款金额一致时同一事务调用既有 v2 入账；金额异常或同一期出现不同付款号时，为该付款创建一个用户可见的双语账单工单并按付款号告警。异常付款冻结，重放不能再入账或建单。私有表启用 RLS，仅服务端通过 RPC 写入；原付款接口保持兼容。
+- **续费人工核销（1031）**：后台按工单读取私有付款事实。仅服务端可执行核销函数，操作人必须为有效管理员。按订单及期数使用与回调相同的事务锁。同一期已履约时禁止再次入账；审核通过时依合同商品调用 `settle_waffo_order_v2`，按已核实的美元实收和税额记录付款，与发积分和延长有效期同一事务完成。确认该笔已在供应商全额退款时，只记录核销。两种决定均清空待处理的 `ticket_id`，保留 `resolved_ticket_id` 和 `resolution`，在工单用中英双语告知结果并关闭；审计日志关联管理员、用户、工单、付款号、期数和核实金额。同一决定重试幂等。
 - **旧单位结清**：生产切换只针对 Owner 核实的旧账号付费与免费两个池，账号数、两池余额合计、摘要、流水位点和付款数由受保护工作流在执行时传入。私有 `admin.pricing_wallet_cutover` 记录版本、时点、原余额摘要和结清后流水位点。仅由受保护工作流在库内校验摘要、付款数、流水、有效合同和未完任务后调用 `admin.clear_approved_wallets_v2`，逐池写唯一冲销流水，不删订单或历史记录。恢复函数仅在无新经济活动且能复原原摘要时写逆向流水。新价格启用事务同时设置 `system_settings.pricing_catalog_version` 为 JSON 字符串 `v2`；其写入时间是注册赠分界线，旧账号不补领，新账号获 100 免费积分，沿用原同 IP 限制和幂等键。迁移本身不执行切换。
 - 激活事务在目录、模型、价格和钱包共同可用后记录私有 `admin.pricing_release_checkpoint(version,fingerprint)`。测试库和正式库的回滚都检查余额、注册、流水、付款、合同、拒付和生成；期间有新业务则停止。回滚前关闭新收银、到期或关闭可付款会话、排清两通道在途凭证。回滚后才首次收到的新报价付款不得入旧钱包，返回可重试的结算错误并核对渠道款项。注册和支付先取得公共读锁再读版本；切换独占该锁，避免同时读旧版写新版。
 - **首付的 `paid_until`**：首付走 `apply_purchase`，按商品天数累加（月付 +30 天，年付 +365 天），和 Stripe 本期结束日可能差一两天。从第一次续费起，由 `apply_subscription_renewal` 对齐 `period_end`，见下一条。
@@ -1202,17 +1210,22 @@ Owner 2026-11-05 决定。目的只有一个：**让用户告诉我们要什么�
 - `template_request_votes`：`request_id`、`user_id`、`weight smallint`，`(request_id, user_id)` 联合唯一。`weight` 是投票那一刻按 `current_tier()` 快照的票数（Max 为 3，其余为 1）；取消投票按快照的票数减，会员到期也不会让计数虚高。
 - `votes_count` 由 votes 表的 insert / delete 触发器维护，等于该需求所有 `weight` 之和。投票人删号、级联删票时，计数同步减。
 - RLS：`live` / `shipped` 对所有登录用户可读；`pending` / `rejected` 只有本人和 admin 可读；写只经服务端。
+- `template_request_notices`：`user_id`、`request_id`、`created_at`、`seen_at`（空表示未读）。主键 `(user_id, request_id)`。账号或愿望删除时级联删除。登录用户只能读自己的提醒、将自己的未读提醒标为已读。只由服务端创建提醒。
 - SQL 函数（全部只授权 `service_role`）：
   - `wishlist_eligible(user)`：是否至少成功出过 1 张图；
   - `create_template_request(user, description, keys)`：函数内检查门槛、封禁、按账号限频（24 小时内最多 5 条）；
   - `toggle_template_request_vote(request, user)`：只限 `live`，有票删票，没票按快照 `weight` 插入，函数内检查门槛；
-  - `admin_review_template_request(request, status, template_id)`；
+  - `admin_review_template_request(request, status, template_id)`：转为 `shipped` 时在同一事务给作者和当时仍有投票的用户各建一条提醒，作者也投过票时只建一条；
+  - `list_my_wish_notices(user)`：按创建时间和愿望 ID 倒序返回最多 5 条未读提醒，只展示已上线且网页端可用的模板。包含愿望 ID、模板 ID、英文名、中文名（缺译时用英文）、描述前 40 字以及是否为作者；
+  - `mark_wish_notices_seen(user, request_ids[])`：仅标记该用户指定的未读提醒，重复调用保留首次已读时间；
   - `admin_list_template_requests()`：带邮箱，后台用。
 - 参考图：浏览器先走现有 `/api/uploads` 传到 `inputs/`（没发帖的 7 天后自动清）。发帖时服务端用 `sharp` 重新编码，去掉 EXIF / GPS 后写到 `requests/{user_id}/{uuid}.jpg`，因为墙上的图别人看得到。被拒、下架、删号时服务端删除。
 
-### 15.4 不做
+### 15.4 愿望实现提醒与范围
 
-评论、任何通知或发信、重复合并、分类和筛选、公开（未登录）页面、SEO、点赞以外的任何互动、拒绝原因。
+愿望上线后，许愿人和投票人下次打开网站时可看到站内提醒，点击进入对应模板的工作台。只对新发生的上线操作生成提醒。站点未启用许愿墙或后台开关关闭时，提醒接口返回空，已读操作无效果，已有提醒保留。
+
+不做邮件、推送、评论、重复合并、分类和筛选、公开（未登录）页面、SEO、点赞以外的任何互动、拒绝原因。
 
 ### 15.5 条款
 

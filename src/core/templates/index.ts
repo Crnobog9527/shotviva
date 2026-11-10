@@ -92,3 +92,6 @@ export {
 export { allowedWebAspects } from './allowed-web-aspects'
 export { estimatedImageCostsSchema, imageCapabilitiesSchema } from './image-capabilities'
 export { imageCostBudget, maxCostPerCredit, modelCreditFloor, UNPRICED, type ProviderFloors } from './provider-pricing'
+export { cachedCategoryEntries, cachedCategoryTree, cachedSeriesMembers } from './cached-taxonomy'
+export type { CatalogueCursor, CataloguePage, CategoryNode } from './taxonomy'
+export type { CatalogueEntry } from './taxonomy-reads'

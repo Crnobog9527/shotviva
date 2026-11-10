@@ -18,7 +18,7 @@ const IMAGES_TEXT: ImagesText = {
 // Reply, reply and close, or just close. The user sees the reply under Help & feedback with the
 // "new reply" dot; nothing is emailed (ARCHITECTURE §10). A reply can carry up to 3 images
 // (T69); a bare close cannot.
-export function ReplyForm({ ticketId, closed, reply }: { ticketId: string; closed: boolean; reply: TicketAdminActions['reply'] }) {
+export function ReplyForm({ ticketId, closed, reply, allowClose }: { allowClose: boolean; ticketId: string; closed: boolean; reply: TicketAdminActions['reply'] }) {
   const [body, setBody] = useState('')
   const [images, setImages] = useState<string[]>([])
   const [imagesBusy, setImagesBusy] = useState(false)
@@ -52,13 +52,17 @@ export function ReplyForm({ ticketId, closed, reply }: { ticketId: string; close
         <Button type="button" disabled={blocked || empty} onClick={() => send(false)}>
           {COPY.reply.send}
         </Button>
-        <Button type="button" variant="secondary" disabled={blocked || empty} onClick={() => send(true)}>
-          {COPY.reply.sendAndClose}
-        </Button>
-        {!closed && (
-          <Button type="button" variant="ghost" disabled={blocked || !empty || images.length > 0} onClick={() => send(true)}>
-            {COPY.reply.closeOnly}
-          </Button>
+        {allowClose && (
+          <>
+            <Button type="button" variant="secondary" disabled={blocked || empty} onClick={() => send(true)}>
+              {COPY.reply.sendAndClose}
+            </Button>
+            {!closed && (
+              <Button type="button" variant="ghost" disabled={blocked || !empty || images.length > 0} onClick={() => send(true)}>
+                {COPY.reply.closeOnly}
+              </Button>
+            )}
+          </>
         )}
         <span className="ml-auto font-mono text-xs text-muted-foreground">
           {body.length}/{BODY_MAX}

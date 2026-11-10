@@ -7,6 +7,8 @@ import { AppError, type ErrorCode } from '../errors'
 
 // Exception messages raised by the ticket SQL functions (0221–0223).
 const SQL_ERROR_CODES: Record<string, ErrorCode> = {
+  CONFLICT: 'CONFLICT',
+  FORBIDDEN: 'FORBIDDEN',
   INVALID_INPUT: 'INVALID_INPUT',
   RATE_LIMITED: 'RATE_LIMITED',
   PROFILE_NOT_FOUND: 'NOT_FOUND',

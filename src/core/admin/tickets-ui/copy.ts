@@ -99,7 +99,16 @@ export const TICKETS_COPY = {
     clawbackHint: '用过积分、要按剩余比例退款的：先点「扣回剩余积分」，扣掉用户手上这笔剩下的付费积分（记到这笔付款名下），再去按比例退款；退款回调不会再重复扣。',
     done: '已记录决定',
   },
+  renewal: {
+    heading: '续费核对', amountMismatch: '扣款与合同报价无法核对', duplicate: '同一期收到另一笔扣款',
+    order: '订单号', payment: '付款号', period: '期数', quote: '合同税前价（USD）', charge: '回调实收', tax: '回调税额',
+    missing: '未提供', verify: '请按付款号核对 Waffo 账单，只按已核实的美元实收和税额入账。',
+    totalUsd: '已核实的含税实收（USD）', taxUsd: '已核实的税额（USD）',
+    settled: '本笔已按合同入账', refunded: '本笔已确认退款', alreadyPaid: '本期已入账，请核实本笔是否已退款。',
+    settle: '核对通过，按合同入账', refund: '已在 Waffo 退款，关闭', done: '处理结果已记录，用户可在工单查看。',
+  },
   errors: {
+    CONFLICT: '请刷新工单查看最新状态。待核对的续费请使用续费处理按钮，同一期只能入账一次。',
     INVALID_INPUT: '请检查输入：回复不能为空且不超过 2000 字；带图片时要写回复；同意时金额要大于 0 且不超过未退金额。',
     IMAGE_TOO_LARGE: '有图片超过 10 MB，请移除后再发。',
     IMAGE_UNSUPPORTED: '有图片无法读取，请移除后再发。',
@@ -109,7 +118,7 @@ export const TICKETS_COPY = {
 } as const
 
 export function ticketErrorText(code: string): string {
-  return code === 'INVALID_INPUT' || code === 'NOT_FOUND' || code === 'IMAGE_TOO_LARGE' || code === 'IMAGE_UNSUPPORTED'
+  return code === 'CONFLICT' || code === 'INVALID_INPUT' || code === 'NOT_FOUND' || code === 'IMAGE_TOO_LARGE' || code === 'IMAGE_UNSUPPORTED'
     ? TICKETS_COPY.errors[code]
     : TICKETS_COPY.errors.generic
 }
