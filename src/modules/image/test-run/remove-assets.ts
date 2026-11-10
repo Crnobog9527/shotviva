@@ -50,6 +50,7 @@ export async function removeAssets(deps: Deps, actor: string, body: unknown) {
   })
   if (error) {
     if (error.message === 'FORBIDDEN') throw new AppError('FORBIDDEN', '需要管理员权限')
+    if (error.message === 'PHOTO_IN_PROMPT_LAB') throw new AppError('CONFLICT', '调试记录仍在引用所选照片，无法删除')
     if (error.message === 'PHOTO_IN_RUNNING_TEST') throw new AppError('INVALID_INPUT', '所选照片正用于试跑，请等试跑结束后再删除')
     if (error.message === 'RUNNING_TEST') throw new AppError('INVALID_INPUT', '试跑结束后才能删除记录')
     if (error.message === 'USAGE_CHANGED') throw new AppError('INVALID_INPUT', '引用情况已变化，请重新确认')

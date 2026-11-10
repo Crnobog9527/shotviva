@@ -1,0 +1,20 @@
+export const copy = {
+  failed: '操作失败，请重试', title: '模板调试台', back: '返回素材参考库', reference: '对标素材', archived: '素材已归档，请先恢复再试跑。',
+  versions: '提示词版本', settings: '倒推设置', reverse: '从对标图倒推新版本', newVersion: '新建版本', edit: '编辑',
+  duplicate: '复制', prompt: '提示词', note: '版本备注', save: '保存', cancel: '取消', close: '关闭',
+  moreVersions: '更多版本', emptyVersions: '还没有版本。可以手写提示词，或配置视觉模型后倒推。',
+  model: '模型', vision: '倒推视觉模型', instruction: '倒推元指令', disabled: '停用倒推', saved: '已保存',
+  configHint: '使用已配置且支持图片输入、文字输出的模型。清空模型与元指令可停用倒推。', archivedReverse: '倒推将计入当日试跑预算',
+  matrix: '矩阵试跑', photos: '实拍测试照片', upload: '上传测试照片', pickedVersions: '参与试跑的版本', style: '把对标图作为画风参考',
+  resolution: '清晰度', quality: '质量', fixed: '供应商固定质量', medium: '中', high: '高', quote: '计算预计成本',
+  submit: '按此估价试跑', budget: '今日预算占用', count: '张', estimate: '预计费用', noModel: '请先在 AI 供应商中配置出图模型。',
+  limit: '一次最多 12 格。每张照片会分别用每个选中版本试跑。', preparing: '正在上传', running: '正在试跑',
+  results: '试跑结果', more: '更早的记录', noResults: '还没有试跑记录。', estimated: '预估', actual: '实收',
+  pendingCost: '待回执', onePhoto: '测试照片', compare: '并排对比', comparePick: '加入对比', zoom: '放大',
+  star: '打星', unstar: '取消星标', best: '设为最佳', unbest: '取消最佳', retryQueued: '继续已预留的试跑',
+  statuses: { queued: '已排队', running: '生成中', succeeded: '已完成', failed: '失败' },
+  reload: '刷新结果', referenceAlt: '本次调试的对标图', outputAlt: '试跑生成结果', recent: '最近使用', history: '正在读取',
+  copyVersion: '复制为新版本', editVersion: '编辑版本', noVision: '没有可用的视觉模型，请先检查 AI 供应商配置。',
+  noPhotos: '从本机上传一张测试照片即可开始。', waiting: '已提交，等待完成', chosen: '已选',
+}
+export const usd = (amount: number) => '$' + amount.toLocaleString('en-US', { maximumFractionDigits: 6 })

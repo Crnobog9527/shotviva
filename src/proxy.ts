@@ -27,7 +27,7 @@ const localeRouter = createMiddleware(routing)
 export async function proxy(request: NextRequest) {
   const redirect = canonicalRedirectResponse(request, hosts)
   if (redirect) return redirect
-  if (request.nextUrl.pathname.startsWith('/admin-media/references/')) {
+  if (/^\/admin-media\/(references|prompt-lab)\//.test(request.nextUrl.pathname)) {
     const { referenceMedia } = await import('@/core/admin/reference-library/media-proxy')
     return referenceMedia(request)
   }

@@ -1,4 +1,5 @@
 export const copy = {
+  openLab: '用这张调模板 / 继续调试',
   categories: '素材分类', all: '全部分类', root: '新增一级分类', child: '新增子分类', rename: '改名',
   removeCategory: '删除分类', nameZh: '中文名称', nameEn: '英文名称', moveAssets: '本分类的素材移到',
   emptyCategory: '仅删除空分类', categoryEmpty: '先建一个分类，再上传参考图。', selectedCategory: '上传到分类',
