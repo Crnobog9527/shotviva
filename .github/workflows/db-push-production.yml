@@ -8,8 +8,9 @@
 # destructive migration fail "DB migrations expand-only" unless their title has `[contract]`
 # (.github/workflows/db-migrations-expand-only.yml).
 #
-# The job is bound to the `production` environment. It no longer has a required reviewer; its
-# branch policy allows workflows on main that name this environment to use its credentials. An environment that
+# The job is bound to the `production` environment. It no longer has a required reviewer; it
+# holds the production password and project ref (not on the repository, so no other workflow can
+# reach production) and its branch policy only lets runs from main use them. An environment that
 # was never set up (no secrets) fails at "Check configuration" without touching the database.
 name: DB push (production)
 
