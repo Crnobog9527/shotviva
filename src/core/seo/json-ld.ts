@@ -7,6 +7,15 @@ type JsonLd = Record<string, unknown>
 
 // The free offer's public wording belongs to the site (e.g. "3 free Standard images");
 // without one it falls back to the raw credit count.
+const capitalize = (word: string) => word.charAt(0).toUpperCase() + word.slice(1)
+
+// The name a visitor reads ("Starter Monthly", "Credit Pack, 990 credits"), never the internal
+// product id (SEO launch handbook G10).
+function offerName(product: { tier: string; interval: 'month' | 'year' | null; credits: number }): string {
+  if (product.interval === null) return `Credit Pack, ${product.credits.toLocaleString('en-US')} credits`
+  return `${capitalize(product.tier)} ${product.interval === 'month' ? 'Monthly' : 'Yearly'}`
+}
+
 function offers(site: SiteConfig, freeOffer?: string): JsonLd[] {
   const currency = site.billing.currency.toUpperCase()
   const free = {
@@ -19,7 +28,7 @@ function offers(site: SiteConfig, freeOffer?: string): JsonLd[] {
   // Undecided prices are left out rather than published as 0.
   const paid = pricedProducts(site).map((product) => ({
     '@type': 'Offer',
-    name: product.id,
+    name: offerName(product),
     description: `${product.credits} credits`,
     price: product.priceUsd.toFixed(2),
     priceCurrency: currency,

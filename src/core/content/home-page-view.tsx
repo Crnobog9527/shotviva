@@ -40,7 +40,7 @@ export function HomePageView({ page, brand, isLinkEnabled, templates, generator,
       {wishlistCta ? <WishlistSection block={page.wishlist} cta={wishlistCta} /> : null}
       <HomeFacts facts={page.facts} heading={page.headings.facts} intro={page.factsIntro} />
       <FreeOfferSection offer={page.freeOffer} brand={brand} />
-      <CostBillsSection bills={page.costBills} />
+      <CostBillsSection bills={page.costBills} plans={page.plans} />
       <FaqSection faq={page.faq} heading={page.headings.faq} isLinkEnabled={isLinkEnabled} variant="accordion" />
       <RelatedLinks heading={page.headings.related} links={page.related.filter((link) => isLinkEnabled(link.href))} variant="cards" />
     </article>

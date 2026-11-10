@@ -24,6 +24,7 @@ import {
 } from './offer'
 import { homeWishlist } from './home-wishlist'
 import { sharedFacts } from './shared'
+import { homePlans } from './plan-strip'
 
 // Final home copy (T11). TDK, H1, subtitle, direct answer and the six H2s are fixed by
 // 建站规格 §4 and G1; the nine FAQ questions and how their answers are written by G6 (T35):
@@ -75,8 +76,14 @@ export const shoot: ShootDemo = {
 
 // Two bills for the same job (DESIGN §6.9 item 6): every figure from site.config via offer.ts.
 // The landing pages reuse it with their own heading and intro; `moreFine` adds a source.
-export function productBills(heading: string, intro: string, moreFine = ''): CostBills {
+// `planLine: false` on the home page, whose plan strip under the bills already shows Starter
+// (SEO launch handbook S1/G10), so it is not listed twice.
+export function productBills(heading: string, intro: string, moreFine = '', { planLine = true } = {}): CostBills {
   const plan = planFrom ? usd(planFrom.priceUsd) : ''
+  const shared = [
+    { label: 'Start with', value: 'Your existing phone photo' },
+    { label: 'Make', value: 'A listing image, a lifestyle shot and a promo poster' },
+  ] as const
   return {
     heading,
     intro,
@@ -92,11 +99,7 @@ export function productBills(heading: string, intro: string, moreFine = ''): Cos
     site: {
       title: brand,
       total: { prefix: 'from', amount: plan, suffix: '/month', when: `about ${photoSeconds} seconds a photo` },
-      lines: [
-        { label: `Starter plan, ${planFrom?.credits ?? ''} credits a month`, value: plan },
-        { label: 'Start with', value: 'Your existing phone photo' },
-        { label: 'Make', value: 'A listing image, a lifestyle shot and a promo poster' },
-      ],
+      lines: planLine ? [{ label: `Starter plan, ${planFrom?.credits ?? ''} credits a month`, value: plan }, ...shared] : shared,
       fine: `Styling and retouching are in the template, and your subject stays as you shot it. Start with ${freeImagesLabel}, no card needed.`,
     },
   }
@@ -158,15 +161,18 @@ export const homePage = defineHomePage({
       },
       {
         heading: 'Free Photos Are Public and Watermarked, Paid Photos Are Private',
-        text: `A photo made with free credits is public and carries a small "Made with ${brand}" watermark. A photo made with paid credits is private, has no watermark and is yours to use commercially. Buying a plan later does not change photos you already made.`,
+        text: `A photo made with free credits is public and carries a small "Made with ${brand}" watermark; free photos are for personal, non-commercial use. A photo made with paid credits is private, has no watermark and is yours to use commercially. Buying a plan later does not change photos you already made.`,
       },
     ],
     plans: plansText(),
     sample: { src: '/home/example-skincare-after.webp', alt: '', width: 900, height: 1125 },
   },
+  ...(homePlans ? { plans: homePlans } : {}),
   costBills: productBills(
     `What ${SET_PHOTOS} Product Photos Cost: Photographer vs ${brand}`,
     `One product, ${SET_PHOTOS} styled photos, retouched and ready to post. The same job, two bills.`,
+    '',
+    { planLine: false },
   ),
   faq: [
     // A: the fixed first sentence names the brand and the keyword together (建站规格 G6).

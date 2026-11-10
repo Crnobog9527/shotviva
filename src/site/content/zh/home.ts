@@ -24,6 +24,7 @@ import {
 } from './offer'
 import { zhHomeWishlist } from './home-wishlist'
 import { zhSharedFacts } from './shared'
+import { zhHomePlans } from '../plan-strip'
 
 // /zh home (T21). Keyword 「AI改图」 from the Chinese keyword map; Title and H1 start with it,
 // written as one unbroken string (建站规格 §6.1 rule 7). The direct answer says plainly what
@@ -66,8 +67,14 @@ export const shoot: ShootDemo = {
 
 // Same two bills as the English home, same figures from site.config, in dollars (§6.1 rule 8).
 // The landing pages reuse it with their own heading and intro; `moreFine` adds a source.
-export function productBills(heading: string, intro: string, moreFine = ''): CostBills {
+// `planLine: false` on the home page, whose plan strip under the bills already shows Starter
+// (SEO launch handbook S1/G10), so it is not listed twice.
+export function productBills(heading: string, intro: string, moreFine = '', { planLine = true } = {}): CostBills {
   const plan = planFrom ? usd(planFrom.priceUsd) : ''
+  const shared = [
+    { label: '拍摄准备', value: '用已有的手机照' },
+    { label: '可做成', value: '主图、场景图、促销海报' },
+  ] as const
   return {
     heading,
     intro,
@@ -83,11 +90,7 @@ export function productBills(heading: string, intro: string, moreFine = ''): Cos
     site: {
       title: brand,
       total: { amount: plan, suffix: '/月起', when: `每张 ${photoSeconds} 秒左右` },
-      lines: [
-        { label: `入门版，每月 ${planFrom?.credits ?? ''} 积分`, value: plan },
-        { label: '拍摄准备', value: '用已有的手机照' },
-        { label: '可做成', value: '主图、场景图、促销海报' },
-      ],
+      lines: planLine ? [{ label: `入门版，每月 ${planFrom?.credits ?? ''} 积分`, value: plan }, ...shared] : shared,
       fine: `造型和精修都在模板里，主体保持你拍的样子。先用 ${zhFreeImages}试试，不用绑卡。`,
     },
   }
@@ -159,15 +162,18 @@ export const zhHomePage = defineHomePage({
       },
       {
         heading: '免费图公开带水印，付费图私密无水印',
-        text: `用免费积分生成的图会公开展示，并带一个小小的 ${brand} 水印。用付费积分生成的图私密、无水印，可以商用。之后再买套餐，不会改变已经生成的图。`,
+        text: `用免费积分生成的图会公开展示，并带一个小小的 ${brand} 水印，仅限个人非商业用途。用付费积分生成的图私密、无水印，可以商用。之后再买套餐，不会改变已经生成的图。`,
       },
     ],
     plans: plansText(),
     sample: { src: '/home/example-skincare-after.webp', alt: '', width: 900, height: 1125 },
   },
+  ...(zhHomePlans ? { plans: zhHomePlans } : {}),
   costBills: productBills(
     `${SET_PHOTOS} 张商品图要花多少钱：请摄影师和用 ${brand} 对比`,
     `一个商品，${SET_PHOTOS} 张造型图，精修好、可以直接发。同样的活，两张账单。`,
+    '',
+    { planLine: false },
   ),
   faq: [
     // I, the brand question, comes first on /zh and opens by default (建站规格 G6 exception,
