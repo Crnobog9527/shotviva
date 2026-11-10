@@ -83,9 +83,9 @@ export type LandingParts = {
 // Block ③ on every page is the two bills (DESIGN §6.9 item 6), so a page without them fails tsc.
 export type ContentPage = PageBasics & { faq: Between3And5<FaqItem>; costBills: CostBills; landing: LandingParts }
 
-// The home FAQ is exactly the nine questions of 建站规格 G6, in order A–I.
-type Nine<T> = readonly [T, T, T, T, T, T, T, T, T]
-export type HomeFaq = Nine<FaqItem>
+// The home FAQ is the nine questions of 建站规格 G6, in order A–I; a locale may add questions
+// after them (/zh adds two, SEO launch handbook G9).
+export type HomeFaq = readonly [FaqItem, FaqItem, FaqItem, FaqItem, FaqItem, FaqItem, FaqItem, FaqItem, FaqItem, ...FaqItem[]]
 
 // One featured template as a card (T53): `id` is its id in the templates table, picked into the
 // home generator; name and use (its description) in the page's language (建站规格 R5). No
@@ -104,6 +104,11 @@ export type TemplateCategory = {
 }
 
 export type HeadedText = { heading: string; text: string }
+
+// An extra home H2 of three headed cards, after the template grid (SEO launch handbook: /zh's
+// white-background guide, G9). `link` closes a card's text as a plain in-body link.
+export type TopicCard = HeadedText & { link?: RelatedLink }
+export type TopicSection = { id: string; heading: string; cards: readonly [TopicCard, TopicCard, TopicCard] }
 
 // Home: "One phone photo → a full shoot" (ARCHITECTURE §13 item 2, DESIGN §6.9): the phone
 // snapshot, the three results from three templates, and a two-line bill under them.
@@ -164,6 +169,7 @@ export type HomePage = Omit<PageBasics, 'related'> & {
     note: string
   }
   wishlist: WishlistPromo
+  topics?: TopicSection
   // Intro paragraph above the facts table.
   factsIntro: string
   // H2-4: free credits, free vs paid works, then plans.

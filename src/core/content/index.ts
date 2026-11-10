@@ -25,6 +25,8 @@ export {
   type ShootResult,
   type TemplateCard,
   type TemplateCategory,
+  type TopicCard,
+  type TopicSection,
   type WishExample,
   type WishlistPromo,
 } from './page-content'

@@ -108,6 +108,18 @@ const steps = {
   ],
 } as const satisfies HomePage['steps']
 
+// 「白底图、电商主图怎么做」 (SEO launch handbook G9): the white-background template, the
+// product kept as shot, and the three export sizes.
+const whiteBackgroundGuide = {
+  id: 'white-bg',
+  heading: '白底图、电商主图怎么做',
+  cards: [
+    { heading: '选「纯白底图」模板', text: '上传一张商品照片，选「纯白底图」模板，背景换成干净的纯白，适合做电商平台的主图。不用自己抠图，也不用写提示词。' },
+    { heading: '商品主体保持原样', text: '商品的形状、颜色、标签和文字按你拍的样子保留，只换背景和光线。拍的时候让商品完整入镜、对上焦。' },
+    { heading: `${ZH_TIERS.length} 档导出尺寸`, text: `每张图导出为 PNG，分 ${ZH_TIERS.length} 档：${zhTierPixels}。主图需要放大看细节时，选更高一档。` },
+  ],
+} as const satisfies HomePage['topics']
+
 // 「3 步」 in FAQ A is the length of the steps block, never typed.
 const STEP_COUNT = steps.items.length
 
@@ -115,8 +127,9 @@ export const zhHomePage = defineHomePage({
   slug: '',
   keyword: 'AI改图',
   label: 'AI改图',
-  title: 'AI改图：换光线换场景换画风，照片主体不变（2026）',
-  description: `AI改图：上传一张手机照片，选个模板，换光线、场景或画风，主体保持原样。不用写提示词，新用户送 ${zhFreeImages}。`,
+  // SEO launch handbook G9 (Owner 2026-11-11: add AI修图, keep 「主体不变，更换光线、场景或画风」).
+  title: 'AI改图·AI修图：主体不变，更换光线、场景或画风',
+  description: `AI改图 / AI修图：上传手机照片选模板，换光线、场景或画风，主体保持原样。可做白底商品图、电商主图和菜单图，不用写提示词，新用户送 ${zhFreeImages}。`,
   h1: 'AI改图：主体不变，换光线、场景或画风',
   subtitle: '从你拍的真实照片出发的 AI 影棚。',
   answerBlock: `AI改图就是把你拍好的照片换一种光线、场景或画风，照片里的主体保持原样。上传一张手机照片，选一个餐饮、商品、美妆、房间、宠物或画风模板就能出图，不用写提示词。新用户送 ${zhFreeImages}。`,
@@ -133,6 +146,7 @@ export const zhHomePage = defineHomePage({
     intro: `每个模板都从你的手机照片开始，到一张成品图结束。选一个，剩下的交给 ${brand}。`,
     note: '模板图片均为示意图。',
   },
+  topics: whiteBackgroundGuide,
   wishlist: zhHomeWishlist,
   facts: zhSharedFacts(),
   factsIntro: `很多 AI改图工具给你的是一张新图。你要的其实是自己那张图，只是更好看：还是那件商品、那道菜、那个房间，光线更好，画面更干净。${brand} 就是为这个做的。下面的价格和尺寸在本站每一页都一样。`,
@@ -207,6 +221,15 @@ export const zhHomePage = defineHomePage({
     {
       question: '手机上能用吗？要下载软件吗？',
       answer: `${brand} 直接在手机浏览器里就能用，iPhone 用 Safari、安卓手机用 Chrome 都行，不用下载软件。可以用相机现拍，也可以从相册选一张，出图后保存或分享。`,
+    },
+    // Two questions after A–H (SEO launch handbook G9); each answer opens with Shotviva.
+    {
+      question: 'AI修图和AI改图有什么区别？',
+      answer: `${brand} 做的是 AI改图：从你拍的照片出发，主体不变，只换光线、场景或画风。常说的 AI修图多指人像美颜、磨皮和瘦脸，${brand} 不做人像美颜；换白底、换背景、把商品图调亮这类修图，选对应的模板就能做。`,
+    },
+    {
+      question: '白底图能不能直接生成？',
+      answer: `${brand} 可以直接生成白底图：上传一张商品照片，选「纯白底图」模板，背景换成纯白，商品本身保持原样，可以直接做电商主图。导出 PNG，分 ${ZH_TIERS.length} 档：${zhTierPixels}。`,
     },
   ],
   related: [

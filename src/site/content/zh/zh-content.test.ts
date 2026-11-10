@@ -94,3 +94,17 @@ describe('yearly saving wording', () => {
     expect(zhYearlySaving).toBe(`按年付最多省 ${yearlySaving}%`)
   })
 })
+
+// SEO launch handbook G9 (Owner 2026-11-11).
+describe('/zh home title, description and white-background guide', () => {
+  it('names AI改图 and AI修图 and keeps the subject-unchanged promise', () => {
+    expect(zhHomePage.title).toBe('AI改图·AI修图：主体不变，更换光线、场景或画风')
+    expect(zhHomePage.description.startsWith('AI改图 / AI修图：')).toBe(true)
+    expect(zhHomePage.description).toContain('白底商品图、电商主图和菜单图')
+  })
+
+  it('adds the 「白底图、电商主图怎么做」 H2 with three cards', () => {
+    expect(zhHomePage.topics?.heading).toBe('白底图、电商主图怎么做')
+    expect(zhHomePage.topics?.cards.map((card) => card.heading)).toEqual(['选「纯白底图」模板', '商品主体保持原样', '3 档导出尺寸'])
+  })
+})
