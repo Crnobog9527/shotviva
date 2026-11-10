@@ -128,11 +128,14 @@ export default function AppLayout({ children }: LayoutProps<'/[locale]'>) {
           <Suspense fallback={<TabBarSlot />}>
             <Tabs items={tabs} />
           </Suspense>
-          <main className="flex flex-1 flex-col">{children}</main>
+          <main className="flex flex-1 flex-col">
+            {/* "Your wish came true", for an account with unread notices (ARCHITECTURE §15.4): at the
+                top of the page, in flow, so a notice that stays until closed never covers a control. */}
+            <WishNoticeSlot />
+            {children}
+          </main>
           <GenerationRunner />
           <WishlistHintSlot />
-          {/* "Your wish came true", for an account with unread notices (ARCHITECTURE §15.4). */}
-          <WishNoticeSlot />
         </BrandProvider>
         {/* DESIGN §5 「全站流动背景」 (T54); it renders nothing on /admin. */}
         <LivingBackground />
