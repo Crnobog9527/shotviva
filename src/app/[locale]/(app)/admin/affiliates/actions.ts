@@ -13,7 +13,11 @@ export async function saveAffiliate(_state: string, form: FormData) {
   }
   const admin = await requireAffiliateAdmin()
   try {
-    await execute(createAdminSupabase(), admin.id, form)
+    const result = await execute(createAdminSupabase(), admin.id, form)
+    if (result) {
+      refresh()
+      return COPY[result]
+    }
   } catch (error) {
     return error instanceof z.ZodError ? COPY.invalid : COPY.failed
   }

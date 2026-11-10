@@ -562,24 +562,27 @@ v1 第一批模板（Owner 2026-11-05 定，6 个分类、10 个模板；模板�
 | 表 | 字段与约束 |
 |---|---|
 | `profiles` 扩展 | `referred_by` 引用 `affiliates.user_id`，`referred_at`、`referred_source` 记录绑定时间和来源（signup、first_checkout、admin）。邀请码关系另存于 T94。 |
-| `affiliates` | `user_id` 主键、唯一 `slug`、`status`、`parent_user_id`、`team_enabled`、`country`、`application`、`reject_reason`、`approved_at/by`、`admin_note`、`created_at`；`payout_method/details`、`us_person`、`terms_version/accepted_at`。受邀未注册者记录为待激活，Supabase 确认邮箱后激活。 |
-| `affiliate_settings` | 布尔主键 `singleton=true`；`enabled=false` 为触发器及应用开关的同一数据源；`hold_days=30`、`payout_min_usd=20000`、`settlement_day=1`、`apply_min_level=none`、`terms_version`。 |
+| `affiliates` | `user_id` 主键、唯一 `slug`、`status`、`parent_user_id`、`team_enabled`、`country`、`application`、`reject_reason`、`reapply_allowed=false`、`approved_at/by`、`admin_note`、`created_at`；`payout_method/details`、`us_person`、`terms_version/accepted_at`。后台邀请待激活时 `approved_at` 为空，Supabase 确认邮箱激活时写入；已有账号由后台直接开通时记批准时间。 |
+| `affiliate_settings` | 布尔主键 `singleton=true`；`enabled=false` 为触发器及应用开关的同一数据源；`commission_months` 为正整数或 NULL，默认 NULL 表示终身；`hold_days=30`、`payout_min_usd=20000`、`settlement_day=1`、`apply_min_level=none`、`terms_version`。 |
 | `affiliate_rates` / `affiliate_rate_overrides` | 每个 `product_kind` 的 `l1_bp/l2_bp`；个人覆盖按 `(user_id,product_kind)` 唯一，各等级可单独回落至默认比例。 |
-| `affiliate_commissions` | `id`、`payment_id`、`affiliate_user_id`、`level`、`product_id`、`rate_bp`、`base_usd`、`amount`、`status`、`confirm_after/confirmed_at`、`void_reason`、`flags`、`released_by`、`created_at/updated_at`。每笔付款每层至多一行。付款当时的归属、团队资格、比例和确认期保留；只按当前退款和争议重算。现有 `profiles.signup_ip` 支持同 IP 标记；付款表没有卡指纹。 |
+| `affiliate_commissions` | `id`、`payment_id`、`affiliate_user_id`、`level`、`product_id`、`rate_bp`、`base_usd`、`amount`、`status`、`confirm_after/confirmed_at`、`void_reason`、`flags`、`released_by`、`created_at/updated_at`。每笔付款每层至多一行。结算单跨单共享同一佣金时，作废其未付部分后用 `payout_retained` 保留已付的分段，后续退款和争议继续追回对应已付金额。付款当时的归属、团队资格、比例和确认期保留；只按当前退款和争议重算。现有 `profiles.signup_ip` 支持同 IP 标记；付款表没有卡指纹。 |
 | `affiliate_commission_changes` | `id, commission_id, at, old_amount, new_amount, old_status, new_status, reason` 记录每次实际变化。 |
 | `affiliate_adjustments` | `id, request_id, affiliate_user_id, amount, reason, created_by, created_at`。相同请求只记一次。 |
-| `affiliate_payouts` | `id, affiliate_user_id, period, amount, status, payout_snapshot, created_at, paid_at, paid_method, paid_reference, decided_by, note`；每人每月唯一。 |
+| `affiliate_payouts` | `id, affiliate_user_id, period, amount, paid_amount, legacy_review_required, status, payout_snapshot, created_at, paid_at, paid_method, paid_reference, decided_by, note`；每人每月唯一。生成金额不可变；已付取实付（历史未记录实付时取原金额）。 |
+| `affiliate_payout_items` | 主键 `(payout_id, commission_id, prior_amount)`；每笔按未被其他单占用的区间分配，本单分配总额不超过面额。区间下限为 `prior_amount`，出单及实际支付的上限分别为 `issue_amount, settled_amount`；退款或争议不能被无关的新成交抵消。 |
 | `affiliate_recompute_errors` | `id, payment_id, at, error, snapshot, resolved_at`；每笔付款最多一条未解决错误；首次计算失败时保存已取得的收款人、比例和确认日，以便重试。 |
 | `affiliate_click_days` | `affiliate_user_id,day` 联合主键、`clicks`。 |
-| `affiliate_balances` | 每个 `affiliate_user_id` 的 `confirmed,pending,paid,available`。可结算余额为已确认佣金加人工调整，减去待付和已付结算单；暂缓单回到余额。 |
+| `affiliate_settlement_runs` | 主键 `period` 为 UTC 月首。每行表示整月的结算任务已成功完成，当日计划关闭或无人达标也记录。 |
+| `affiliate_balances` | 每个 `affiliate_user_id` 的 `confirmed,pending,paid,available`。可结算余额为已确认佣金加人工调整，减去待付、暂缓的原金额及已付实额；已作废单不占用。 |
 
-- `affiliate_bind/count_click/apply/save_profile` 负责归属、点击、申请及设置。团队邀请只接受有效的已开团队推广员。申请门槛以未全额退款的会员付款为准。
-- `affiliate_recompute_payment` 由付款新增、退款金额或状态变化、争议新增或结案触发。对税后退款比例使用精确整数除法。付款与积分事务独立于佣金成败。每日 `affiliate_daily(UTC 日期)` 重试错误、确认到期佣金并在结算日生成结算单。
+- `affiliate_bind/count_click/apply/save_profile` 负责归属、点击、申请及设置。团队邀请只接受有效的已开团队推广员。申请门槛以未全额退款的会员付款为准。被拒后仅管理员可通过 `admin_affiliate_allow_reapply` 放行一次，审计保留操作人、时间和原拒绝原因；再次提交通过同一申请校验并更新资料和条款，保留原短码和团队归属，回到待审并收回重提资格。
+- `affiliate_recompute_payment` 由付款新增、退款金额或状态变化、争议新增或结案触发。对税后退款比例使用精确整数除法。付款与积分事务独立于佣金成败。每日 `affiliate_daily(UTC 日期)` 重试错误并确认到期佣金。从本月结算日起，若本月尚无成功运行记录，则按运行时的合资格余额出单；出单与运行记录在同一事务内，失败可次日重试，成功后新达标的余额留到下期。迁移以历史结算单补记已运行月份；旧系统的空跑没有记录可查，当月无证据时允许补跑一次。
+- 暂缓单可解除为待付，或附原因作废并选择退回余额 / 作废关联佣金。待付单按关联佣金复核，不同结算单的退款各自冲减；历史重复占用无法证实来源的单仅能暂缓、作废退回；关联付款重算失败时先排障再付。发现差额必须提交当前应付金额或暂缓。付款时先锁本账户的付款、佣金及调整写入，再将关联佣金应付截到「已确认＋调整－已实付－其他开放单的关联应付（待人工核对的旧单取面额）」，最低为零，拒绝过期金额。每次人工操作记流水。
 - 关闭计划后，旧佣金继续按退款和争议结果重算；关闭期间发生的付款，重开也不补发佣金。直接推广员在付款时已暂停或封禁，本人佣金作废，该笔付款也不产生上级团队奖励。
-- `admin_affiliate_decide/create/set/adjust/commission_release/rebind/payout_decide/settings/recompute` 写审计。后台财务汇总及邮箱查询、推广员概览及已脱敏推荐用户列表通过服务端读取函数返回。短码唯一索引支持绑定，推广员与时间索引支持私有明细分页，状态与确认时间索引支持每日确认，未解决错误及争议按付款检索。
+- `admin_affiliate_decide/create/set/adjust/commission_release/rebind/payout_decide/settings/recompute` 写审计。后台财务汇总及邮箱查询、推广员概览及已脱敏推荐用户列表通过服务端读取函数返回。后台概览的本期待付总额按各待付单当前复核金额求和，待人工核对的旧单按面额计入，已付总额按实付金额求和（历史单取生成时金额）。短码唯一索引支持绑定，推广员与时间索引支持私有明细分页，状态与确认时间索引支持每日确认，未解决错误及争议按付款检索。
 
 - 联盟使用 Shotviva 内置系统。直销无佣金；团队奖励只在付款时满足既有团队资格才产生。
-- **返佣比例**：代理绑定自己推荐的客户，按该客户每一笔付款**终身**返佣：
+- **返佣比例**：默认终身返佣。后台可指定月数，按客户的绑定时间起算 UTC 自然月，两级均包含到期时刻。设置只影响新付款，已有佣金仍按原快照处理退款和争议。各商品默认比例为：
   - 积分包及月付：本人 15%，符合资格的团队上级另得 5%；
   - 年付：本人 10%，符合资格的团队上级另得 3%，最高合计 13%。不回溯修改已产生的佣金快照。
 - **返佣基数**：该笔付款不含税的实付金额（`payments.amount_total − payments.amount_tax`）；退款的付款不返或追回。

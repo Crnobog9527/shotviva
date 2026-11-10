@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import type { Client } from 'pg'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest'
 import { available, bind, commission, dispute, promoter, refund, row, sale, setupAffiliate } from './affiliate-fixtures'
@@ -27,7 +28,7 @@ it('binds only the first eligible touch; existing payments, self, unknown and in
   expect(await commission(db, suspended.id)).toMatchObject({ status: 'void', void_reason: 'affiliate_inactive', amount: 0 })
 })
 
-it('example 10: $187.20 carries to the next period, $235.10 reserves once, holding releases, paying consumes it', async () => {
+it('example 10: $187.20 carries to the next period, $235.10 reserves once, a hold reserves across months until released and paid', async () => {
   const adjust = (cents: number) => db.query("insert into affiliate_adjustments(request_id,affiliate_user_id,amount,reason) values(gen_random_uuid(),$1,$2,'fixture')", [f.owner.id, cents])
   const daily = (day: string) => db.query('select affiliate_daily($1)', [day])
   const payouts = async () => (await db.query('select id,amount::int as cents,status,payout_snapshot from affiliate_payouts where affiliate_user_id=$1 order by period', [f.owner.id])).rows
@@ -48,16 +49,17 @@ it('example 10: $187.20 carries to the next period, $235.10 reserves once, holdi
   expect(await available(db, f.owner.id)).toBe(0)
   const decide = (input: object) => db.query('select admin_affiliate_payout_decide($1,$2)', [f.actor, input])
   await decide({ payout_id: payout.id, status: 'held', note: 'check destination' })
-  expect(await available(db, f.owner.id)).toBe(23510)
+  expect(await available(db, f.owner.id)).toBe(0)
   await daily('2031-02-01')
   expect(await payouts()).toHaveLength(1)
   await daily('2031-03-01')
-  const [, next] = await payouts()
-  await decide({ payout_id: next.id, status: 'paid', method: 'wise', paid_at: '2031-03-01', paid_reference: 'local-fixture' })
+  expect(await payouts()).toHaveLength(1)
+  await decide({ payout_id: payout.id, status: 'due' })
+  await decide({ payout_id: payout.id, status: 'paid', method: 'wise', paid_at: '2031-03-01', paid_reference: 'local-fixture' })
   expect(await available(db, f.owner.id)).toBe(0)
 })
 
-it('confirms at maturity; a payment maturing after settlement waits for the next period', async () => {
+it('confirms later earnings daily and carries them to the next month after a successful empty settlement', async () => {
   await db.query("update affiliates set payout_method='paypal',payout_details='qa' where user_id=$1", [f.owner.id])
   const p = await sale(db, f.buyer, 'pro_yearly', 250000)
   await db.query("update affiliate_commissions set confirm_after='2031-12-03T00:00:00Z' where payment_id=$1", [p.id])
@@ -65,8 +67,27 @@ it('confirms at maturity; a payment maturing after settlement waits for the next
   expect((await commission(db, p.id)).status).toBe('pending')
   await db.query("select affiliate_daily('2031-12-03')")
   expect(await available(db, f.owner.id)).toBe(25000)
+  expect(await row(db, 'select period from affiliate_payouts where affiliate_user_id=$1', [f.owner.id])).toBeUndefined()
   await db.query("select affiliate_daily('2032-01-01')")
   expect(await available(db, f.owner.id)).toBe(0)
+  expect(await row(db, 'select period::text from affiliate_payouts where affiliate_user_id=$1', [f.owner.id])).toEqual({ period: '2032-01-01' })
+})
+
+it('recognizes a completed historical month from another affiliate’s payout and catches up an unmarked month once', async () => {
+  const legacy = await promoter(db)
+  await db.query(`insert into affiliate_payouts(affiliate_user_id,period,amount,payout_snapshot)
+    values($1,'2039-01-01',50,'{}')`, [legacy.id])
+  const migration = readFileSync('supabase/migrations/1042_affiliate_settlement_catchup.sql', 'utf8')
+  const backfill = migration.match(/insert into public\.affiliate_settlement_runs\(period\)\s+select distinct[^;]+;/i)![0]
+  await db.query(backfill)
+  await db.query("update affiliates set payout_method='wise' where user_id=$1", [f.owner.id])
+  await db.query("insert into affiliate_adjustments(request_id,affiliate_user_id,amount,reason) values(gen_random_uuid(),$1,22000,'fixture')", [f.owner.id])
+  await db.query("select affiliate_daily('2039-01-02')")
+  const periods = async () => (await db.query('select period::text from affiliate_payouts where affiliate_user_id=$1', [f.owner.id])).rows
+  expect(await periods()).toEqual([])
+  await db.query("select affiliate_daily('2039-02-02')")
+  await db.query("select affiliate_daily('2039-02-03')")
+  expect(await periods()).toEqual([{ period: '2039-02-01' }])
 })
 
 it('example 11: same-IP commissions stay frozen until release; an open dispute still blocks confirmation', async () => {
@@ -125,4 +146,16 @@ it.each(['suspended', 'banned'])('a %s promoter and their eligible parent earn n
   await refund(db, p.charge, 10)
   expect((await commission(db, p.id)).amount).toBe(0)
   expect(await commission(db, p.id, 2)).toBeUndefined()
+})
+
+it('honors a disabled settlement day when the program is enabled later that month', async () => {
+  await db.query("update affiliates set payout_method='wise' where user_id=$1", [f.owner.id])
+  await db.query("insert into affiliate_adjustments(request_id,affiliate_user_id,amount,reason) values(gen_random_uuid(),$1,25000,'fixture')", [f.owner.id])
+  await db.query('update affiliate_settings set enabled=false')
+  await db.query("select affiliate_daily('2034-06-01')")
+  await db.query('update affiliate_settings set enabled=true')
+  await db.query("select affiliate_daily('2034-06-08')")
+  expect(await available(db, f.owner.id)).toBe(25000)
+  await db.query("select affiliate_daily('2034-07-01')")
+  expect(await available(db, f.owner.id)).toBe(0)
 })

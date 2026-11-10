@@ -24,7 +24,7 @@ export async function readAccount(user: string) {
   const result = await createAdminSupabase()
     .from('affiliates')
     .select(
-      'slug,status,team_enabled,reject_reason,payout_method,payout_details,us_person,terms_version,terms_accepted_at',
+      'slug,status,team_enabled,reject_reason,reapply_allowed,payout_method,payout_details,us_person,terms_version,terms_accepted_at',
     )
     .eq('user_id', user)
     .maybeSingle()
@@ -100,7 +100,7 @@ export async function readChanges(user: string, id: string, cursor?: string) {
 export async function readPayouts(user: string, cursor?: string) {
   let q = createAdminSupabase()
     .from('affiliate_payouts')
-    .select('id,created_at,period,amount,status,paid_at')
+    .select('id,created_at,period,amount,paid_amount,status,paid_at')
     .eq('affiliate_user_id', user)
   const after = decodeCursor(cursor)
   if (after) q = q.or(afterCursor(after))

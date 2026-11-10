@@ -23,6 +23,14 @@ export function DecideMember({ member, action }: { member: Member; action: SaveA
     </div>
   )
 }
+export function ReopenApplication({ member, action }: { member: Member; action: SaveAction }) {
+  if (member.reapply_allowed) return <p>{COPY.awaitingReapplication}</p>
+  return (
+    <MutationForm action={action} operation="allowReapply" label={COPY.allowReapply}>
+      <Hidden name="user_id" value={member.user_id} />
+    </MutationForm>
+  )
+}
 export function SetMember({ member, rates, action }: { member: Member; rates: Rate[]; action: SaveAction }) {
   return (
     <MutationForm action={action} operation="set" label={COPY.save}>

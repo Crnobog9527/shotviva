@@ -26,6 +26,7 @@ export const accountSchema = z.object({
   status: affiliateStatus,
   team_enabled: z.boolean(),
   reject_reason: z.string().nullable(),
+  reapply_allowed: z.boolean(),
   payout_method: z.enum(payoutMethods).nullable(),
   payout_details: z.string().nullable(),
   us_person: z.boolean().nullable(),
@@ -73,7 +74,8 @@ export const payoutSchema = z.object({
   created_at: z.string(),
   period: z.string(),
   amount: cents,
-  status: z.enum(['due', 'paid', 'held']),
+  paid_amount: cents.nullable(),
+  status: z.enum(['due', 'paid', 'held', 'void']),
   paid_at: z.string().nullable(),
 })
 export const memberSchema = z.object({ slug: slugSchema, created_at: z.string(), status: affiliateStatus })
