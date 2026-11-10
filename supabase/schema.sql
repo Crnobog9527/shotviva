@@ -800,6 +800,21 @@ end $$;
 ALTER FUNCTION "admin"."job_route_allowed"("t" "public"."templates", "route" "text", "tier" "text", "price" integer, "v2" boolean) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."lock_prompt_lab"("p_session_id" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  perform 1 from public.reference_assets a join public.prompt_lab_sessions s on s.asset_id=a.id
+    where s.id=p_session_id and a.status='active' for share of a;
+  if not found then raise exception 'PROMPT_LAB_UNAVAILABLE'; end if;
+  perform 1 from public.prompt_lab_sessions where id=p_session_id for update;
+end $$;
+
+
+ALTER FUNCTION "admin"."lock_prompt_lab"("p_session_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."lowest_credit_price"() RETURNS numeric
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -994,6 +1009,19 @@ $$;
 ALTER FUNCTION "admin"."protect_retired_template"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."protect_reverse_request"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if old.status='running' then raise exception 'PROMPT_LAB_BUSY'; end if;
+  return old;
+end $$;
+
+
+ALTER FUNCTION "admin"."protect_reverse_request"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."purchase_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_event_id" "text") RETURNS "public"."credit_change"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -1086,6 +1114,24 @@ $$;
 
 
 ALTER FUNCTION "admin"."purchase_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_event_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."queue_prompt_lab_output"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if old.status in ('running','queued') then raise exception 'PROMPT_LAB_BUSY'; end if;
+  if old.claimed_at is not null then
+    -- Queue the deterministic key even when the worker wrote R2 but failed to finish.
+    insert into public.reference_object_deletions(r2_key) values('prompt-lab/outputs/'||old.id::text||'.png')
+      on conflict do nothing;
+  end if;
+  return old;
+end $$;
+
+
+ALTER FUNCTION "admin"."queue_prompt_lab_output"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."queue_test_asset_removal"() RETURNS "trigger"
@@ -1231,6 +1277,22 @@ end $$;
 
 
 ALTER FUNCTION "admin"."reservation_route_allowed"("t" "public"."templates", "route" "text", "tier" "text", "price" integer, "fallback" boolean, "v2" boolean) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."reserve_prompt_lab_budget"("p_total" numeric) RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare budget jsonb;
+begin
+  if p_total is null or p_total<=0 or p_total>=10000 then raise exception 'INVALID_INPUT'; end if;
+  perform pg_advisory_xact_lock(hashtext('shotviva.admin_test_budget'));
+  budget:=public.admin_test_budget_status();
+  if (budget->>'spent_usd')::numeric+p_total>(budget->>'budget_usd')::numeric then raise exception 'TEST_BUDGET_EXCEEDED'; end if;
+end $$;
+
+
+ALTER FUNCTION "admin"."reserve_prompt_lab_budget"("p_total" numeric) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."restore_approved_wallets_v2"() RETURNS "void"
@@ -3169,6 +3231,90 @@ $$;
 ALTER FUNCTION "public"."admin_batch_set_banned"("p_actor" "uuid", "p_user_ids" "uuid"[], "p_banned" boolean, "p_reason" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_begin_prompt_lab_matrix"("p_actor" "uuid", "p_session_id" "uuid", "p_batch_id" "uuid", "p_photos" "uuid"[], "p_versions" "uuid"[], "p_model" "text", "p_resolution" "text", "p_quality" "text", "p_use_style_reference" boolean, "p_estimate_usd" numeric) RETURNS "jsonb"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare cells integer; quoted numeric:=round(p_estimate_usd,6); result jsonb; photo_count integer;
+begin
+  perform admin.require_reference_admin(p_actor);
+  cells:=cardinality(p_photos)*cardinality(p_versions);
+  if cells is null or cells not between 1 and 12 or p_batch_id is null or p_model is null or length(btrim(p_model)) not between 1 and 300
+    or p_resolution is null or p_resolution not in ('1k','2k','3k') or p_quality is null or p_quality not in ('medium','high')
+    or p_use_style_reference is null or quoted is null or quoted<=0 or quoted>=10000
+    or cardinality(p_photos)<>(select count(distinct id) from unnest(p_photos) id)
+    or cardinality(p_versions)<>(select count(distinct id) from unnest(p_versions) id) then raise exception 'INVALID_INPUT'; end if;
+  perform admin.lock_prompt_lab(p_session_id);
+  perform pg_advisory_xact_lock(hashtextextended(p_batch_id::text,101));
+  if exists(select from public.prompt_lab_runs where batch_id=p_batch_id) then
+    if cells<>(select count(*) from public.prompt_lab_runs where batch_id=p_batch_id) or exists(
+      select from public.prompt_lab_runs r where batch_id=p_batch_id and (
+        session_id<>p_session_id or created_by is distinct from p_actor or model<>p_model or resolution<>p_resolution or quality<>p_quality
+        or use_style_reference<>p_use_style_reference or estimate_usd<>quoted or photo_id<>p_photos[1+(ordinal-1)/cardinality(p_versions)]
+        or version_id<>p_versions[1+(ordinal-1)%cardinality(p_versions)]))
+      then raise exception 'IDEMPOTENCY_CONFLICT'; end if;
+  else
+    if cardinality(p_versions)<>(select count(*) from public.prompt_lab_versions where session_id=p_session_id and id=any(p_versions))
+      then raise exception 'PROMPT_VERSION_NOT_FOUND'; end if;
+    -- Lock rows in ID order against test-photo cleanup and simultaneous batches.
+    perform 1 from public.admin_test_photos where id=any(p_photos) order by id for update;
+    get diagnostics photo_count=row_count;
+    if photo_count<>cardinality(p_photos) then raise exception 'TEST_PHOTO_NOT_FOUND'; end if;
+    perform admin.reserve_prompt_lab_budget(quoted*cells);
+    with batch as (
+      insert into public.prompt_lab_runs(session_id,batch_id,ordinal,photo_id,version_id,model,resolution,quality,
+        use_style_reference,estimate_usd,created_by)
+      select p_session_id,p_batch_id,(ph.n-1)*cardinality(p_versions)+v.n,ph.id,v.id,p_model,p_resolution,p_quality,
+        p_use_style_reference,quoted,p_actor from unnest(p_photos) with ordinality ph(id,n)
+          cross join unnest(p_versions) with ordinality v(id,n)
+      returning id
+    )
+    insert into public.admin_test_spend(run_id,estimate_usd,provider)
+      select id,quoted,p_model from batch;
+    update public.admin_test_photos set last_used_at=now() where id=any(p_photos);
+    update public.prompt_lab_sessions set updated_at=now() where id=p_session_id;
+  end if;
+  select jsonb_agg(jsonb_build_object('id',id,'photo_id',photo_id,'version_id',version_id,'status',status) order by ordinal)
+    into result from public.prompt_lab_runs where batch_id=p_batch_id;
+  return result;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_begin_prompt_lab_matrix"("p_actor" "uuid", "p_session_id" "uuid", "p_batch_id" "uuid", "p_photos" "uuid"[], "p_versions" "uuid"[], "p_model" "text", "p_resolution" "text", "p_quality" "text", "p_use_style_reference" boolean, "p_estimate_usd" numeric) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_begin_prompt_lab_reverse"("p_actor" "uuid", "p_session_id" "uuid", "p_request_id" "uuid", "p_model" "text", "p_estimate_usd" numeric, "p_setting_model" "text", "p_instruction" "text") RETURNS "jsonb"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare req public.prompt_lab_reverse_requests; settings jsonb; quoted numeric:=round(p_estimate_usd,6);
+begin
+  perform admin.require_reference_admin(p_actor);
+  perform admin.lock_prompt_lab(p_session_id);
+  perform pg_advisory_xact_lock(hashtextextended(p_request_id::text,101));
+  select * into req from public.prompt_lab_reverse_requests where id=p_request_id;
+  if found then
+    if req.session_id<>p_session_id or req.model is distinct from p_model or req.created_by is distinct from p_actor then
+      raise exception 'IDEMPOTENCY_CONFLICT';
+    end if;
+    return jsonb_build_object('claimed',false,'status',req.status,'version_id',req.version_id);
+  end if;
+  select value into settings from public.system_settings where key='prompt_lab_reverse' for share;
+  if settings->>'model' is distinct from p_setting_model or settings->>'instruction' is distinct from p_instruction
+    or nullif(btrim(p_setting_model),'') is null or nullif(btrim(p_instruction),'') is null
+    or p_model is null or length(btrim(p_model)) not between 1 and 300 then raise exception 'PROMPT_LAB_SETTINGS_CHANGED'; end if;
+  perform admin.reserve_prompt_lab_budget(quoted);
+  insert into public.prompt_lab_reverse_requests(id,session_id,model,created_by) values(p_request_id,p_session_id,p_model,p_actor);
+  insert into public.admin_test_spend(run_id,provider,estimate_usd,counted_usd,has_openrouter)
+    values(p_request_id,p_model,quoted,quoted,exists(select from public.ai_providers
+      where id::text=p_setting_model and rtrim(base_url,'/')='https://openrouter.ai/api/v1'));
+  return jsonb_build_object('claimed',true,'status','running','version_id',null);
+end $$;
+
+
+ALTER FUNCTION "public"."admin_begin_prompt_lab_reverse"("p_actor" "uuid", "p_session_id" "uuid", "p_request_id" "uuid", "p_model" "text", "p_estimate_usd" numeric, "p_setting_model" "text", "p_instruction" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_begin_test_run"("p_actor" "uuid", "p_run_id" "uuid", "p_template_id" "text", "p_kind" "text", "p_parent_id" "uuid", "p_photo_id" "uuid", "p_batch_id" "uuid", "p_resolution" "text", "p_inputs" "jsonb", "p_prompt_version" integer, "p_provider" "text", "p_estimate_usd" numeric) RETURNS "jsonb"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -3510,6 +3656,9 @@ begin
     when 'restore' then
       update public.reference_assets set status='active',archived_at=null where id=any(p_ids);
     when 'delete' then
+      -- Reverse completion locks its session before its receipt; keep the same order.
+      perform 1 from public.prompt_lab_sessions where asset_id=any(p_ids) order by id for update;
+      perform public.admin_expire_prompt_lab_runs(p_actor);
       if exists(select from public.reference_assets where id=any(p_ids) and status<>'archived') then
         raise exception 'REFERENCE_NOT_ARCHIVED';
       end if;
@@ -3523,6 +3672,26 @@ end $$;
 
 
 ALTER FUNCTION "public"."admin_bulk_reference_assets"("p_actor" "uuid", "p_ids" "uuid"[], "p_action" "text", "p_value" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_claim_prompt_lab_run"("p_actor" "uuid", "p_run_id" "uuid") RETURNS boolean
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  perform admin.require_reference_admin(p_actor);
+  -- A stale queued job must not call a provider on a later budget day.
+  perform pg_advisory_xact_lock(hashtext('shotviva.admin_test_budget'));
+  update public.prompt_lab_runs set status='running',claimed_at=clock_timestamp() where id=p_run_id and status='queued'
+    and started_at>clock_timestamp()-interval '10 minutes'
+    and (started_at at time zone 'Asia/Shanghai')::date=(clock_timestamp() at time zone 'Asia/Shanghai')::date;
+  if not found then return false; end if;
+  update public.admin_test_spend set counted_usd=estimate_usd where run_id=p_run_id;
+  return true;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_claim_prompt_lab_run"("p_actor" "uuid", "p_run_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_clawback_payment"("p_payment_id" bigint, "p_actor" "uuid") RETURNS "jsonb"
@@ -3588,6 +3757,7 @@ begin
     raise exception 'NOT_ADMIN';
   end if;
 
+  perform public.admin_expire_prompt_lab_runs(p_actor);
   update public.admin_test_runs r
      set status = 'failed', error_code = 'TIMEOUT', finished_at = now()
    where r.status = 'running' and r.created_at < now() - interval '10 minutes';
@@ -3614,6 +3784,7 @@ begin
   with doomed as (
     delete from public.admin_test_photos ph
      where ph.last_used_at < now() - interval '30 days'
+       and not exists (select 1 from public.prompt_lab_runs l where l.photo_id=ph.id)
        and not exists (select 1 from public.admin_test_runs r where r.photo_id = ph.id and r.cover_set_at is not null)
     returning ph.object_key
   )
@@ -4078,6 +4249,92 @@ end $$;
 
 
 ALTER FUNCTION "public"."admin_edit_reference_asset"("p_actor" "uuid", "p_id" "uuid", "p_fields" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_expire_prompt_lab_runs"("p_actor" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  perform admin.require_reference_admin(p_actor);
+  with expired as (
+    update public.prompt_lab_runs set status='failed',error_code='TIMEOUT',finished_at=now()
+      where (status='queued' and (started_at<now()-interval '10 minutes'
+        or (started_at at time zone 'Asia/Shanghai')::date<(now() at time zone 'Asia/Shanghai')::date))
+      or (status='running' and claimed_at<now()-interval '10 minutes')
+      returning id,claimed_at
+  )
+  update public.admin_test_spend s set counted_usd=case when e.claimed_at is null then 0 else s.estimate_usd end,finished_at=now()
+    from expired e where s.run_id=e.id;
+  with expired as (
+    update public.prompt_lab_reverse_requests set status='failed',error_code='TIMEOUT',finished_at=now()
+      where status='running' and started_at<now()-interval '10 minutes' returning id
+  )
+  update public.admin_test_spend s set finished_at=now() from expired e where s.run_id=e.id;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_expire_prompt_lab_runs"("p_actor" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_finish_prompt_lab_reverse"("p_actor" "uuid", "p_request_id" "uuid", "p_prompt" "text", "p_error_code" "text", "p_cost_usd" numeric, "p_submitted" boolean) RETURNS "jsonb"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare req public.prompt_lab_reverse_requests; n integer;
+begin
+  perform admin.require_reference_admin(p_actor);
+  if p_prompt is not null and (length(p_prompt) not between 1 and 32000 or length(btrim(p_prompt))=0)
+    or p_cost_usd<0 or p_submitted is null then raise exception 'INVALID_INPUT'; end if;
+  select * into req from public.prompt_lab_reverse_requests where id=p_request_id;
+  if not found or req.created_by is distinct from p_actor then raise exception 'PROMPT_REQUEST_NOT_FOUND'; end if;
+  perform 1 from public.prompt_lab_sessions where id=req.session_id for update;
+  select * into req from public.prompt_lab_reverse_requests where id=p_request_id for update;
+  if not found then raise exception 'PROMPT_REQUEST_NOT_FOUND'; end if;
+  if req.status='running' or req.error_code='TIMEOUT' then
+    if p_prompt is not null then
+      select coalesce(max(version_no),0)+1 into n from public.prompt_lab_versions where session_id=req.session_id;
+      insert into public.prompt_lab_versions(session_id,version_no,prompt,created_by) values(req.session_id,n,p_prompt,p_actor)
+        returning id into req.version_id;
+      update public.prompt_lab_sessions set updated_at=now() where id=req.session_id;
+    end if;
+    req.status:=case when p_prompt is null then 'failed' else 'succeeded' end;
+    update public.prompt_lab_reverse_requests set status=req.status,version_id=req.version_id,
+      error_code=case when req.status='failed' then coalesce(p_error_code,'GENERATION_FAILED') end,finished_at=now() where id=req.id;
+    update public.admin_test_spend set cost_usd=p_cost_usd,counted_usd=coalesce(p_cost_usd,
+      case when p_submitted or p_prompt is not null then estimate_usd else 0 end),finished_at=now() where run_id=req.id;
+  end if;
+  return jsonb_build_object('status',req.status,'version_id',req.version_id);
+end $$;
+
+
+ALTER FUNCTION "public"."admin_finish_prompt_lab_reverse"("p_actor" "uuid", "p_request_id" "uuid", "p_prompt" "text", "p_error_code" "text", "p_cost_usd" numeric, "p_submitted" boolean) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_finish_prompt_lab_run"("p_actor" "uuid", "p_run_id" "uuid", "p_status" "text", "p_output_key" "text", "p_error_code" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric) RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare r public.prompt_lab_runs;
+begin
+  perform admin.require_reference_admin(p_actor);
+  if p_status is null or p_status not in ('succeeded','failed') or (p_status='succeeded')<>(p_output_key is not null)
+    or p_cost_usd<0 then raise exception 'INVALID_INPUT'; end if;
+  select * into r from public.prompt_lab_runs where id=p_run_id for update;
+  if not found then raise exception 'PROMPT_RUN_NOT_FOUND'; end if;
+  if r.status in ('succeeded','failed') and r.error_code is distinct from 'TIMEOUT' then return; end if;
+  if r.claimed_at is null then raise exception 'PROMPT_RUN_NOT_CLAIMED'; end if;
+  update public.prompt_lab_runs set status=p_status,output_key=p_output_key,
+    error_code=case when p_status='failed' then coalesce(p_error_code,'GENERATION_FAILED') end,
+    cost_usd=p_cost_usd,finished_at=now() where id=p_run_id;
+  update public.admin_test_spend set cost_usd=p_cost_usd,counted_usd=coalesce(p_cost_usd,
+    case when p_status='failed' and p_error_code='PREPARE_FAILED' and not coalesce(p_provider_usage ?| array['output_tokens','completion_tokens','cost'],false) then 0 else estimate_usd end),
+    has_openrouter=coalesce(p_provider_usage ?| array['cost','prompt_tokens','completion_tokens'],false),finished_at=now()
+  where run_id=p_run_id;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_finish_prompt_lab_run"("p_actor" "uuid", "p_run_id" "uuid", "p_status" "text", "p_output_key" "text", "p_error_code" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_finish_test_run"("p_run_id" "uuid", "p_status" "text", "p_output_key" "text", "p_error_code" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric, "p_duration_ms" integer) RETURNS "jsonb"
@@ -4709,6 +4966,23 @@ $$;
 ALTER FUNCTION "public"."admin_mark_dispute_submitted"("p_dispute_id" "text", "p_actor" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_mark_prompt_lab_run"("p_actor" "uuid", "p_session_id" "uuid", "p_run_id" "uuid", "p_starred" boolean, "p_is_best" boolean) RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  perform admin.require_reference_admin(p_actor);
+  perform admin.lock_prompt_lab(p_session_id);
+  perform 1 from public.prompt_lab_runs where id=p_run_id and session_id=p_session_id and status='succeeded' for update;
+  if not found then raise exception 'PROMPT_RUN_NOT_FOUND'; end if;
+  if p_is_best then update public.prompt_lab_runs set is_best=false where session_id=p_session_id and is_best and id<>p_run_id; end if;
+  update public.prompt_lab_runs set starred=coalesce(p_starred,starred),is_best=coalesce(p_is_best,is_best) where id=p_run_id;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_mark_prompt_lab_run"("p_actor" "uuid", "p_session_id" "uuid", "p_run_id" "uuid", "p_starred" boolean, "p_is_best" boolean) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_move_reference_category"("p_actor" "uuid", "p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text") RETURNS "void"
     LANGUAGE "sql"
     SET "search_path" TO ''
@@ -4729,6 +5003,29 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_move_template_category"("p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text", "p_actor" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_open_prompt_lab"("p_actor" "uuid", "p_asset_id" "uuid") RETURNS "uuid"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare session_id uuid; asset_status text;
+begin
+  perform admin.require_reference_admin(p_actor);
+  select status into asset_status from public.reference_assets where id=p_asset_id for update;
+  if not found then raise exception 'REFERENCE_NOT_FOUND'; end if;
+  select id into session_id from public.prompt_lab_sessions where asset_id=p_asset_id;
+  if found then
+    perform public.admin_expire_prompt_lab_runs(p_actor);
+    return session_id;
+  end if;
+  if asset_status<>'active' then raise exception 'REFERENCE_ARCHIVED'; end if;
+  insert into public.prompt_lab_sessions(asset_id,created_by) values(p_asset_id,p_actor) returning id into session_id;
+  return session_id;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_open_prompt_lab"("p_actor" "uuid", "p_asset_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_openai_admin_key_status"() RETURNS TABLE("key_last4" "text", "project_id" "text")
@@ -4793,6 +5090,7 @@ begin
   if coalesce(cardinality(p_ids),0) not between 1 and 50 then raise exception 'INVALID_INPUT'; end if;
   if p_kind='photo' then
     perform 1 from public.admin_test_photos where id=any(p_ids) order by id for update;
+    if exists(select from public.prompt_lab_runs where photo_id=any(p_ids)) then raise exception 'PHOTO_IN_PROMPT_LAB'; end if;
     select count(*),array_agg(object_key) into affected,keys from public.admin_test_photos where id=any(p_ids);
     -- The photo locks conflict with the FK's key-share lock when a run starts.
     -- Check again in this transaction after waiting for any such start to commit.
@@ -5221,6 +5519,39 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_save_invite_rewards"("p_actor" "uuid", "p_invitee" integer, "p_inviter" integer, "p_expected" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_save_prompt_lab_version"("p_actor" "uuid", "p_session_id" "uuid", "p_version_id" "uuid", "p_mode" "text", "p_prompt" "text", "p_note" "text") RETURNS "uuid"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare prev public.prompt_lab_versions; new_id uuid; n integer;
+begin
+  perform admin.require_reference_admin(p_actor);
+  perform admin.lock_prompt_lab(p_session_id);
+  if p_mode in ('edit','copy') then
+    select * into prev from public.prompt_lab_versions where id=p_version_id and session_id=p_session_id;
+    if not found then raise exception 'PROMPT_VERSION_NOT_FOUND'; end if;
+  elsif p_mode is distinct from 'create' or p_version_id is not null then raise exception 'INVALID_INPUT';
+  end if;
+  if p_mode='copy' then
+    p_prompt:=coalesce(p_prompt,prev.prompt);
+    p_note:=coalesce(p_note,prev.note);
+  end if;
+  if p_prompt is null or length(btrim(p_prompt))=0 or length(p_prompt)>32000 or length(p_note)>2000 then raise exception 'INVALID_INPUT'; end if;
+  update public.prompt_lab_sessions set updated_at=now() where id=p_session_id;
+  if p_mode='edit' and not exists(select from public.prompt_lab_runs where version_id=p_version_id) then
+    update public.prompt_lab_versions set prompt=p_prompt,note=p_note where id=p_version_id;
+    return p_version_id;
+  end if;
+  select coalesce(max(version_no),0)+1 into n from public.prompt_lab_versions where session_id=p_session_id;
+  insert into public.prompt_lab_versions(session_id,version_no,prompt,note,created_by)
+    values(p_session_id,n,p_prompt,p_note,p_actor) returning id into new_id;
+  return new_id;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_save_prompt_lab_version"("p_actor" "uuid", "p_session_id" "uuid", "p_version_id" "uuid", "p_mode" "text", "p_prompt" "text", "p_note" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_save_provider"("p_actor" "uuid", "p_id" "uuid", "p_settings" "jsonb", "p_capabilities" "jsonb", "p_key" "text" DEFAULT NULL::"text") RETURNS "uuid"
@@ -5686,6 +6017,23 @@ $_$;
 
 
 ALTER FUNCTION "public"."admin_set_openai_costs_project"("p_project_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_set_prompt_lab_reverse"("p_actor" "uuid", "p_model" "text", "p_instruction" "text") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  perform admin.require_reference_admin(p_actor);
+  if p_model is null or p_instruction is null or length(p_model)>300 or length(p_instruction)>32000
+    or (btrim(p_model)='')<>(btrim(p_instruction)='') then raise exception 'INVALID_INPUT'; end if;
+  insert into public.system_settings(key,value,updated_by) values('prompt_lab_reverse',
+    jsonb_build_object('model',btrim(p_model),'instruction',btrim(p_instruction)),p_actor)
+    on conflict(key) do update set value=excluded.value,updated_by=p_actor,updated_at=now();
+end $$;
+
+
+ALTER FUNCTION "public"."admin_set_prompt_lab_reverse"("p_actor" "uuid", "p_model" "text", "p_instruction" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_set_provider_key"("p_id" "uuid", "p_key" "text") RETURNS "void"
@@ -10439,7 +10787,7 @@ ALTER TABLE "public"."admin_test_runs" OWNER TO "postgres";
 
 CREATE TABLE IF NOT EXISTS "public"."admin_test_spend" (
     "run_id" "uuid" NOT NULL,
-    "template_id" "text" NOT NULL,
+    "template_id" "text",
     "started_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "estimate_usd" numeric(10,6) NOT NULL,
     "cost_usd" numeric(10,6),
@@ -10875,6 +11223,91 @@ CREATE TABLE IF NOT EXISTS "public"."products" (
 ALTER TABLE "public"."products" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."prompt_lab_reverse_requests" (
+    "id" "uuid" NOT NULL,
+    "session_id" "uuid" NOT NULL,
+    "model" "text" NOT NULL,
+    "version_id" "uuid",
+    "status" "text" DEFAULT 'running'::"text" NOT NULL,
+    "created_by" "uuid",
+    "started_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "finished_at" timestamp with time zone,
+    "error_code" "text",
+    CONSTRAINT "prompt_lab_reverse_requests_status_check" CHECK (("status" = ANY (ARRAY['running'::"text", 'succeeded'::"text", 'failed'::"text"])))
+);
+
+
+ALTER TABLE "public"."prompt_lab_reverse_requests" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."prompt_lab_runs" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "session_id" "uuid" NOT NULL,
+    "batch_id" "uuid" NOT NULL,
+    "ordinal" integer NOT NULL,
+    "photo_id" "uuid" NOT NULL,
+    "version_id" "uuid" NOT NULL,
+    "model" "text" NOT NULL,
+    "resolution" "text" NOT NULL,
+    "quality" "text" NOT NULL,
+    "use_style_reference" boolean NOT NULL,
+    "status" "text" DEFAULT 'queued'::"text" NOT NULL,
+    "estimate_usd" numeric(10,6) NOT NULL,
+    "cost_usd" numeric(10,6),
+    "output_key" "text",
+    "error_code" "text",
+    "starred" boolean DEFAULT false NOT NULL,
+    "is_best" boolean DEFAULT false NOT NULL,
+    "created_by" "uuid",
+    "started_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "claimed_at" timestamp with time zone,
+    "finished_at" timestamp with time zone,
+    CONSTRAINT "prompt_lab_runs_check" CHECK (("output_key" = (('prompt-lab/outputs/'::"text" || ("id")::"text") || '.png'::"text"))),
+    CONSTRAINT "prompt_lab_runs_check1" CHECK ((("status" = 'succeeded'::"text") = ("output_key" IS NOT NULL))),
+    CONSTRAINT "prompt_lab_runs_check2" CHECK ((("status" = ANY (ARRAY['succeeded'::"text", 'failed'::"text"])) = ("finished_at" IS NOT NULL))),
+    CONSTRAINT "prompt_lab_runs_check3" CHECK (((NOT "is_best") OR ("status" = 'succeeded'::"text"))),
+    CONSTRAINT "prompt_lab_runs_cost_usd_check" CHECK (("cost_usd" >= (0)::numeric)),
+    CONSTRAINT "prompt_lab_runs_estimate_usd_check" CHECK (("estimate_usd" > (0)::numeric)),
+    CONSTRAINT "prompt_lab_runs_model_check" CHECK ((("length"("model") >= 1) AND ("length"("model") <= 300))),
+    CONSTRAINT "prompt_lab_runs_ordinal_check" CHECK ((("ordinal" >= 1) AND ("ordinal" <= 12))),
+    CONSTRAINT "prompt_lab_runs_quality_check" CHECK (("quality" = ANY (ARRAY['medium'::"text", 'high'::"text"]))),
+    CONSTRAINT "prompt_lab_runs_resolution_check" CHECK (("resolution" = ANY (ARRAY['1k'::"text", '2k'::"text", '3k'::"text"]))),
+    CONSTRAINT "prompt_lab_runs_status_check" CHECK (("status" = ANY (ARRAY['queued'::"text", 'running'::"text", 'succeeded'::"text", 'failed'::"text"])))
+);
+
+
+ALTER TABLE "public"."prompt_lab_runs" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."prompt_lab_sessions" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "asset_id" "uuid" NOT NULL,
+    "created_by" "uuid",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."prompt_lab_sessions" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."prompt_lab_versions" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "session_id" "uuid" NOT NULL,
+    "version_no" integer NOT NULL,
+    "prompt" "text" NOT NULL,
+    "note" "text",
+    "created_by" "uuid",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "prompt_lab_versions_note_check" CHECK (("length"("note") <= 2000)),
+    CONSTRAINT "prompt_lab_versions_prompt_check" CHECK (((("length"("prompt") >= 1) AND ("length"("prompt") <= 32000)) AND ("length"("btrim"("prompt")) > 0))),
+    CONSTRAINT "prompt_lab_versions_version_no_check" CHECK (("version_no" > 0))
+);
+
+
+ALTER TABLE "public"."prompt_lab_versions" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."reference_assets" (
     "id" "uuid" NOT NULL,
     "category_id" "text" NOT NULL,
@@ -10909,7 +11342,7 @@ ALTER TABLE "public"."reference_assets" OWNER TO "postgres";
 CREATE TABLE IF NOT EXISTS "public"."reference_object_deletions" (
     "r2_key" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    CONSTRAINT "reference_object_deletions_r2_key_check" CHECK (("r2_key" ~ '^references/[a-f0-9-]{36}\.webp$'::"text"))
+    CONSTRAINT "reference_object_deletions_r2_key_check" CHECK ((("r2_key" ~ '^references/[a-f0-9-]{36}\.webp$'::"text") OR ("r2_key" ~ '^prompt-lab/outputs/[a-f0-9-]{36}\.png$'::"text")))
 );
 
 
@@ -11424,6 +11857,51 @@ ALTER TABLE ONLY "public"."profiles"
 
 
 
+ALTER TABLE ONLY "public"."prompt_lab_reverse_requests"
+    ADD CONSTRAINT "prompt_lab_reverse_requests_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."prompt_lab_runs"
+    ADD CONSTRAINT "prompt_lab_runs_batch_id_ordinal_key" UNIQUE ("batch_id", "ordinal");
+
+
+
+ALTER TABLE ONLY "public"."prompt_lab_runs"
+    ADD CONSTRAINT "prompt_lab_runs_batch_id_photo_id_version_id_key" UNIQUE ("batch_id", "photo_id", "version_id");
+
+
+
+ALTER TABLE ONLY "public"."prompt_lab_runs"
+    ADD CONSTRAINT "prompt_lab_runs_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."prompt_lab_sessions"
+    ADD CONSTRAINT "prompt_lab_sessions_asset_id_key" UNIQUE ("asset_id");
+
+
+
+ALTER TABLE ONLY "public"."prompt_lab_sessions"
+    ADD CONSTRAINT "prompt_lab_sessions_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."prompt_lab_versions"
+    ADD CONSTRAINT "prompt_lab_versions_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."prompt_lab_versions"
+    ADD CONSTRAINT "prompt_lab_versions_session_id_id_key" UNIQUE ("session_id", "id");
+
+
+
+ALTER TABLE ONLY "public"."prompt_lab_versions"
+    ADD CONSTRAINT "prompt_lab_versions_session_id_version_no_key" UNIQUE ("session_id", "version_no");
+
+
+
 ALTER TABLE ONLY "public"."reference_assets"
     ADD CONSTRAINT "reference_assets_pkey" PRIMARY KEY ("id");
 
@@ -11885,6 +12363,54 @@ CREATE INDEX "profiles_signup_ip_created_at_idx" ON "public"."profiles" USING "b
 
 
 
+CREATE UNIQUE INDEX "prompt_lab_one_best" ON "public"."prompt_lab_runs" USING "btree" ("session_id") WHERE "is_best";
+
+
+
+CREATE INDEX "prompt_lab_reverse_actor" ON "public"."prompt_lab_reverse_requests" USING "btree" ("created_by") WHERE ("created_by" IS NOT NULL);
+
+
+
+CREATE INDEX "prompt_lab_reverse_pending" ON "public"."prompt_lab_reverse_requests" USING "btree" ("started_at") WHERE ("status" = 'running'::"text");
+
+
+
+CREATE INDEX "prompt_lab_reverse_session" ON "public"."prompt_lab_reverse_requests" USING "btree" ("session_id");
+
+
+
+CREATE INDEX "prompt_lab_reverse_version" ON "public"."prompt_lab_reverse_requests" USING "btree" ("version_id") WHERE ("version_id" IS NOT NULL);
+
+
+
+CREATE INDEX "prompt_lab_runs_creator" ON "public"."prompt_lab_runs" USING "btree" ("created_by") WHERE ("created_by" IS NOT NULL);
+
+
+
+CREATE INDEX "prompt_lab_runs_photo" ON "public"."prompt_lab_runs" USING "btree" ("photo_id");
+
+
+
+CREATE INDEX "prompt_lab_runs_session_page" ON "public"."prompt_lab_runs" USING "btree" ("session_id", "started_at" DESC, "id" DESC);
+
+
+
+CREATE INDEX "prompt_lab_runs_unfinished" ON "public"."prompt_lab_runs" USING "btree" ("started_at") WHERE ("status" = ANY (ARRAY['queued'::"text", 'running'::"text"]));
+
+
+
+CREATE INDEX "prompt_lab_runs_version" ON "public"."prompt_lab_runs" USING "btree" ("version_id");
+
+
+
+CREATE INDEX "prompt_lab_sessions_creator" ON "public"."prompt_lab_sessions" USING "btree" ("created_by") WHERE ("created_by" IS NOT NULL);
+
+
+
+CREATE INDEX "prompt_lab_versions_creator" ON "public"."prompt_lab_versions" USING "btree" ("created_by") WHERE ("created_by" IS NOT NULL);
+
+
+
 CREATE INDEX "reference_assets_category" ON "public"."reference_assets" USING "btree" ("category_id", "status", "created_at" DESC, "id" DESC);
 
 
@@ -12098,6 +12624,14 @@ CREATE OR REPLACE TRIGGER "link_disputes_payment_insert" AFTER INSERT ON "public
 
 
 CREATE OR REPLACE TRIGGER "match_unlinked_dispute" BEFORE INSERT ON "public"."payment_disputes" FOR EACH ROW WHEN (("new"."payment_id" IS NULL)) EXECUTE FUNCTION "public"."_match_dispute_before_insert"();
+
+
+
+CREATE OR REPLACE TRIGGER "prompt_lab_output_removal" BEFORE DELETE ON "public"."prompt_lab_runs" FOR EACH ROW EXECUTE FUNCTION "admin"."queue_prompt_lab_output"();
+
+
+
+CREATE OR REPLACE TRIGGER "prompt_lab_reverse_removal" BEFORE DELETE ON "public"."prompt_lab_reverse_requests" FOR EACH ROW EXECUTE FUNCTION "admin"."protect_reverse_request"();
 
 
 
@@ -12497,6 +13031,61 @@ ALTER TABLE ONLY "public"."profiles"
 
 
 
+ALTER TABLE ONLY "public"."prompt_lab_reverse_requests"
+    ADD CONSTRAINT "prompt_lab_reverse_requests_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."prompt_lab_reverse_requests"
+    ADD CONSTRAINT "prompt_lab_reverse_requests_session_id_fkey" FOREIGN KEY ("session_id") REFERENCES "public"."prompt_lab_sessions"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."prompt_lab_reverse_requests"
+    ADD CONSTRAINT "prompt_lab_reverse_requests_version_id_fkey" FOREIGN KEY ("version_id") REFERENCES "public"."prompt_lab_versions"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."prompt_lab_runs"
+    ADD CONSTRAINT "prompt_lab_runs_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."prompt_lab_runs"
+    ADD CONSTRAINT "prompt_lab_runs_photo_id_fkey" FOREIGN KEY ("photo_id") REFERENCES "public"."admin_test_photos"("id");
+
+
+
+ALTER TABLE ONLY "public"."prompt_lab_runs"
+    ADD CONSTRAINT "prompt_lab_runs_session_id_fkey" FOREIGN KEY ("session_id") REFERENCES "public"."prompt_lab_sessions"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."prompt_lab_runs"
+    ADD CONSTRAINT "prompt_lab_runs_session_id_version_id_fkey" FOREIGN KEY ("session_id", "version_id") REFERENCES "public"."prompt_lab_versions"("session_id", "id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."prompt_lab_sessions"
+    ADD CONSTRAINT "prompt_lab_sessions_asset_id_fkey" FOREIGN KEY ("asset_id") REFERENCES "public"."reference_assets"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."prompt_lab_sessions"
+    ADD CONSTRAINT "prompt_lab_sessions_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."prompt_lab_versions"
+    ADD CONSTRAINT "prompt_lab_versions_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."prompt_lab_versions"
+    ADD CONSTRAINT "prompt_lab_versions_session_id_fkey" FOREIGN KEY ("session_id") REFERENCES "public"."prompt_lab_sessions"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."reference_assets"
     ADD CONSTRAINT "reference_assets_category_id_fkey" FOREIGN KEY ("category_id") REFERENCES "public"."template_categories"("key");
 
@@ -12812,6 +13401,18 @@ CREATE POLICY "profiles_select_own" ON "public"."profiles" FOR SELECT TO "authen
 
 
 
+ALTER TABLE "public"."prompt_lab_reverse_requests" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."prompt_lab_runs" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."prompt_lab_sessions" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."prompt_lab_versions" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."reference_assets" ENABLE ROW LEVEL SECURITY;
 
 
@@ -13058,6 +13659,11 @@ REVOKE ALL ON FUNCTION "admin"."job_route_allowed"("t" "public"."templates", "ro
 
 
 
+REVOKE ALL ON FUNCTION "admin"."lock_prompt_lab"("p_session_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."lock_prompt_lab"("p_session_id" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "admin"."lowest_credit_price"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."lowest_credit_price"() TO "service_role";
 
@@ -13091,7 +13697,17 @@ REVOKE ALL ON FUNCTION "admin"."protect_retired_template"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "admin"."protect_reverse_request"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."protect_reverse_request"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "admin"."purchase_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_event_id" "text") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."queue_prompt_lab_output"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."queue_prompt_lab_output"() TO "service_role";
 
 
 
@@ -13114,6 +13730,11 @@ GRANT ALL ON FUNCTION "admin"."require_reference_admin"("p_actor" "uuid") TO "se
 
 
 REVOKE ALL ON FUNCTION "admin"."reservation_route_allowed"("t" "public"."templates", "route" "text", "tier" "text", "price" integer, "fallback" boolean, "v2" boolean) FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."reserve_prompt_lab_budget"("p_total" numeric) FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."reserve_prompt_lab_budget"("p_total" numeric) TO "service_role";
 
 
 
@@ -13444,6 +14065,16 @@ GRANT ALL ON FUNCTION "public"."admin_batch_set_banned"("p_actor" "uuid", "p_use
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_begin_prompt_lab_matrix"("p_actor" "uuid", "p_session_id" "uuid", "p_batch_id" "uuid", "p_photos" "uuid"[], "p_versions" "uuid"[], "p_model" "text", "p_resolution" "text", "p_quality" "text", "p_use_style_reference" boolean, "p_estimate_usd" numeric) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_begin_prompt_lab_matrix"("p_actor" "uuid", "p_session_id" "uuid", "p_batch_id" "uuid", "p_photos" "uuid"[], "p_versions" "uuid"[], "p_model" "text", "p_resolution" "text", "p_quality" "text", "p_use_style_reference" boolean, "p_estimate_usd" numeric) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_begin_prompt_lab_reverse"("p_actor" "uuid", "p_session_id" "uuid", "p_request_id" "uuid", "p_model" "text", "p_estimate_usd" numeric, "p_setting_model" "text", "p_instruction" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_begin_prompt_lab_reverse"("p_actor" "uuid", "p_session_id" "uuid", "p_request_id" "uuid", "p_model" "text", "p_estimate_usd" numeric, "p_setting_model" "text", "p_instruction" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_begin_test_run"("p_actor" "uuid", "p_run_id" "uuid", "p_template_id" "text", "p_kind" "text", "p_parent_id" "uuid", "p_photo_id" "uuid", "p_batch_id" "uuid", "p_resolution" "text", "p_inputs" "jsonb", "p_prompt_version" integer, "p_provider" "text", "p_estimate_usd" numeric) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_begin_test_run"("p_actor" "uuid", "p_run_id" "uuid", "p_template_id" "text", "p_kind" "text", "p_parent_id" "uuid", "p_photo_id" "uuid", "p_batch_id" "uuid", "p_resolution" "text", "p_inputs" "jsonb", "p_prompt_version" integer, "p_provider" "text", "p_estimate_usd" numeric) TO "service_role";
 
@@ -13466,6 +14097,11 @@ GRANT ALL ON FUNCTION "public"."admin_bulk_edit_templates"("p_ids" "text"[], "p_
 
 REVOKE ALL ON FUNCTION "public"."admin_bulk_reference_assets"("p_actor" "uuid", "p_ids" "uuid"[], "p_action" "text", "p_value" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_bulk_reference_assets"("p_actor" "uuid", "p_ids" "uuid"[], "p_action" "text", "p_value" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_claim_prompt_lab_run"("p_actor" "uuid", "p_run_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_claim_prompt_lab_run"("p_actor" "uuid", "p_run_id" "uuid") TO "service_role";
 
 
 
@@ -13531,6 +14167,21 @@ GRANT ALL ON FUNCTION "public"."admin_due_reference_deletions"("p_actor" "uuid")
 
 REVOKE ALL ON FUNCTION "public"."admin_edit_reference_asset"("p_actor" "uuid", "p_id" "uuid", "p_fields" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_edit_reference_asset"("p_actor" "uuid", "p_id" "uuid", "p_fields" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_expire_prompt_lab_runs"("p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_expire_prompt_lab_runs"("p_actor" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_finish_prompt_lab_reverse"("p_actor" "uuid", "p_request_id" "uuid", "p_prompt" "text", "p_error_code" "text", "p_cost_usd" numeric, "p_submitted" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_finish_prompt_lab_reverse"("p_actor" "uuid", "p_request_id" "uuid", "p_prompt" "text", "p_error_code" "text", "p_cost_usd" numeric, "p_submitted" boolean) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_finish_prompt_lab_run"("p_actor" "uuid", "p_run_id" "uuid", "p_status" "text", "p_output_key" "text", "p_error_code" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_finish_prompt_lab_run"("p_actor" "uuid", "p_run_id" "uuid", "p_status" "text", "p_output_key" "text", "p_error_code" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric) TO "service_role";
 
 
 
@@ -13614,6 +14265,11 @@ GRANT ALL ON FUNCTION "public"."admin_mark_dispute_submitted"("p_dispute_id" "te
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_mark_prompt_lab_run"("p_actor" "uuid", "p_session_id" "uuid", "p_run_id" "uuid", "p_starred" boolean, "p_is_best" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_mark_prompt_lab_run"("p_actor" "uuid", "p_session_id" "uuid", "p_run_id" "uuid", "p_starred" boolean, "p_is_best" boolean) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_move_reference_category"("p_actor" "uuid", "p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_move_reference_category"("p_actor" "uuid", "p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text") TO "service_role";
 
@@ -13621,6 +14277,11 @@ GRANT ALL ON FUNCTION "public"."admin_move_reference_category"("p_actor" "uuid",
 
 REVOKE ALL ON FUNCTION "public"."admin_move_template_category"("p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text", "p_actor" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_move_template_category"("p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text", "p_actor" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_open_prompt_lab"("p_actor" "uuid", "p_asset_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_open_prompt_lab"("p_actor" "uuid", "p_asset_id" "uuid") TO "service_role";
 
 
 
@@ -13689,6 +14350,11 @@ GRANT ALL ON FUNCTION "public"."admin_save_invite_rewards"("p_actor" "uuid", "p_
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_save_prompt_lab_version"("p_actor" "uuid", "p_session_id" "uuid", "p_version_id" "uuid", "p_mode" "text", "p_prompt" "text", "p_note" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_save_prompt_lab_version"("p_actor" "uuid", "p_session_id" "uuid", "p_version_id" "uuid", "p_mode" "text", "p_prompt" "text", "p_note" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_save_provider"("p_actor" "uuid", "p_id" "uuid", "p_settings" "jsonb", "p_capabilities" "jsonb", "p_key" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_save_provider"("p_actor" "uuid", "p_id" "uuid", "p_settings" "jsonb", "p_capabilities" "jsonb", "p_key" "text") TO "service_role";
 
@@ -13751,6 +14417,11 @@ GRANT ALL ON FUNCTION "public"."admin_set_openai_admin_key"("p_key" "text") TO "
 
 REVOKE ALL ON FUNCTION "public"."admin_set_openai_costs_project"("p_project_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_set_openai_costs_project"("p_project_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_set_prompt_lab_reverse"("p_actor" "uuid", "p_model" "text", "p_instruction" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_prompt_lab_reverse"("p_actor" "uuid", "p_model" "text", "p_instruction" "text") TO "service_role";
 
 
 
@@ -14575,6 +15246,22 @@ GRANT UPDATE ON SEQUENCE "public"."payments_id_seq" TO "service_role";
 
 
 GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."products" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."prompt_lab_reverse_requests" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."prompt_lab_runs" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."prompt_lab_sessions" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."prompt_lab_versions" TO "service_role";
 
 
 
