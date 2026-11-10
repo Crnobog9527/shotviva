@@ -15,6 +15,7 @@ import { FEATURED_LIMIT, featuredIds, toggleFeatured } from './featured-state'
 import { matchesSearch } from './form-state'
 import { selectedInOrder, toggleId, toggleVisible } from './selection-state'
 import { TemplateFormDialog, type EditTarget } from './template-form-dialog'
+import type { SeriesOption } from './catalog-groups'
 import { CatalogView } from './catalog-view'
 import { Toolbar } from './toolbar'
 import { UnpublishDialog } from './unpublish-dialog'
@@ -24,6 +25,7 @@ import { useTemplateActions } from './use-template-actions'
 type Props = {
   providers: readonly ImageProviderOption[]
   templates: AdminTemplate[]
+  series: readonly SeriesOption[]
   categories: readonly CategoryOption[]
   floor: ProviderFloors
   // The cover tabs (T87): common, launched languages, upcoming ones.
@@ -50,7 +52,7 @@ function afterSave(payload: SaveTemplatePayload): Editing {
   return { mode: 'saved', id: typeof id === 'string' ? id : '' }
 }
 
-export function TemplatesEditor({ providers, templates, categories, floor, coverLanguages, actions }: Props) {
+export function TemplatesEditor({ providers, templates, categories, series, floor, coverLanguages, actions }: Props) {
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState<Editing | null>(null)
   const [unpublishing, setUnpublishing] = useState<AdminTemplate | null>(null)
@@ -108,7 +110,7 @@ export function TemplatesEditor({ providers, templates, categories, floor, cover
         categories={categories}
         onClear={() => setSelected(new Set())}
       />
-      <CatalogView query={query} all={templates} categories={categories}
+      <CatalogView query={query} series={series} categories={categories}
         floor={floor}
         templates={visible}
         selection={{
@@ -131,6 +133,7 @@ export function TemplatesEditor({ providers, templates, categories, floor, cover
           providers={providers}
           floor={floor}
           categories={categories}
+          series={series}
           coverLanguages={coverLanguages}
           coverActions={actions}
           pending={pending}

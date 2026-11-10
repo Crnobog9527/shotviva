@@ -1,11 +1,19 @@
 import { CATEGORY_KEY_PATTERN, CATEGORY_LIMITS, suggestCategoryKey, type CardStyle } from '@/core/templates/categories'
 
-import type { AdminCategory, SaveCategoryPayload } from '../template-categories/types'
+import type { AdminCategoryNode, SaveCategoryPayload } from '../template-categories/types'
 
 export type CategoryFormValues = {
   key: string
   // A new category's key follows its English name until the admin types one.
   keyTouched: boolean
+  parentId: string | null
+  slug: string
+  slugTouched: boolean
+  isVisible: boolean
+  seoTitleEn: string
+  seoTitleZh: string
+  seoDescriptionEn: string
+  seoDescriptionZh: string
   nameZh: string
   nameEn: string
   introZh: string
@@ -13,14 +21,17 @@ export type CategoryFormValues = {
   cardStyle: CardStyle
 }
 
-export function emptyCategoryValues(): CategoryFormValues {
-  return { key: '', keyTouched: false, nameZh: '', nameEn: '', introZh: '', introEn: '', cardStyle: 'pair' }
+export function emptyCategoryValues(parentId: string | null = null): CategoryFormValues {
+  return { key: '', keyTouched: false, parentId, slug: '', slugTouched: false, isVisible: true,
+    seoTitleEn: '', seoTitleZh: '', seoDescriptionEn: '', seoDescriptionZh: '', nameZh: '', nameEn: '', introZh: '', introEn: '', cardStyle: 'pair' }
 }
 
-export function toCategoryValues(category: AdminCategory): CategoryFormValues {
+export function toCategoryValues(category: AdminCategoryNode): CategoryFormValues {
   return {
     key: category.key,
-    keyTouched: true,
+    keyTouched: true, parentId: category.parentId, slug: category.slug, slugTouched: true, isVisible: category.isVisible,
+    seoTitleEn: category.seoTitleEn ?? '', seoTitleZh: category.seoTitleZh ?? '',
+    seoDescriptionEn: category.seoDescriptionEn ?? '', seoDescriptionZh: category.seoDescriptionZh ?? '',
     nameZh: category.nameZh,
     nameEn: category.nameEn,
     introZh: category.introZh ?? '',
@@ -34,6 +45,8 @@ export function patchCategoryValues(values: CategoryFormValues, patch: Partial<C
   const next = { ...values, ...patch }
   if ('key' in patch) next.keyTouched = true
   if (isNew && !next.keyTouched && 'nameEn' in patch) next.key = suggestCategoryKey(next.nameEn)
+  if ('slug' in patch) next.slugTouched = true
+  if (isNew && !next.slugTouched) next.slug = next.key
   return next
 }
 
@@ -47,12 +60,14 @@ export function buildCategoryPayload(values: CategoryFormValues, isNew: boolean)
     within(values.nameZh, CATEGORY_LIMITS.nameZh) &&
     within(values.nameEn, CATEGORY_LIMITS.nameEn) &&
     key.length <= CATEGORY_LIMITS.key &&
-    CATEGORY_KEY_PATTERN.test(key)
+    CATEGORY_KEY_PATTERN.test(key) && CATEGORY_KEY_PATTERN.test(values.slug) && values.slug.length <= CATEGORY_LIMITS.key
   if (!ok) return null
   return {
     isNew,
     category: {
-      key,
+      key, parentId: values.parentId, slug: values.slug, isVisible: values.isVisible,
+      seoTitleEn: values.seoTitleEn.trim(), seoTitleZh: values.seoTitleZh.trim(),
+      seoDescriptionEn: values.seoDescriptionEn.trim(), seoDescriptionZh: values.seoDescriptionZh.trim(),
       nameZh: values.nameZh.trim(),
       nameEn: values.nameEn.trim(),
       introZh: values.introZh.trim(),
@@ -60,13 +75,4 @@ export function buildCategoryPayload(values: CategoryFormValues, isNew: boolean)
       cardStyle: values.cardStyle,
     },
   }
-}
-
-// Swaps a key with its neighbour; null at either end.
-export function moveKey(keys: readonly string[], index: number, direction: -1 | 1): string[] | null {
-  const target = index + direction
-  if (index < 0 || index >= keys.length || target < 0 || target >= keys.length) return null
-  const next = [...keys]
-  ;[next[index], next[target]] = [next[target] as string, next[index] as string]
-  return next
 }

@@ -21,7 +21,9 @@ export const publicCopy = {
 export const categoryCopy = {
   label: '分类',
   placeholder: '请选择分类',
-  hint: '要新增分类或改名，在本页上方的「分类管理」里改。',
+  hint: '可以选择任意一级。新增或调整分类请到「分类管理」。',
+  series: '所属系列',
+  standalone: '单个模板',
   systemHint: '内置模板的系统分类，不能更改。',
 } as const
 
@@ -53,7 +55,7 @@ export const orderCopy = {
   saved: '排序已保存',
   failed: '顺序没保存，已退回原来的顺序。',
   offline: '连不上服务器，请检查网络后重试。',
-  filtered: '清空搜索和分类筛选后可在同一上架状态内排序',
+  filtered: '清空筛选和搜索、关闭系列分组后，可调整同一上架状态内的顺序',
   dragHint: '按住左边的把手上下拖动调整顺序；手机上长按整行再拖。',
 } as const
 
@@ -200,5 +202,7 @@ export const saleCopy = {
 
 export const catalogCopy = {
   priceGroup: '出图与价格', active: '已上架', inactive: '已下架', all: '全部',
+  seriesFilter: '筛选系列', allSeries: '全部系列', single: '单个模板', groupSeries: '按系列分组',
+  manageSeries: '系列管理', empty: '没有匹配的模板',
   status: '上架状态', category: '筛选分类', categories: '全部分类', search: '搜索中文名、英文名或 ID',
 }

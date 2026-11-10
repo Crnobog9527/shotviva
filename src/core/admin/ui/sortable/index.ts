@@ -3,3 +3,5 @@
 export { DragHandle, MoveButtons } from './drag-handle'
 export { SortableList } from './sortable-list'
 export { sortableRowClass, useSortableItem, type SortableItem } from './use-sortable-item'
+export { keyboardSort, type Lifted } from './keyboard-sort'
+export { sortableCopy } from './copy'

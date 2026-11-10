@@ -25,9 +25,9 @@ export type TableOrder = {
   disabledHint?: string
 }
 
-type Props = RowHandlers & { templates: AdminTemplate[]; selection: TableSelection; order: TableOrder; floor: ProviderFloors }
+type Props = RowHandlers & { categoryLabels: ReadonlyMap<string, { label: string }>; templates: AdminTemplate[]; selection: TableSelection; order: TableOrder; floor: ProviderFloors }
 
-export function TemplatesTable({ templates, selection, order, floor, ...rowProps }: Props) {
+export function TemplatesTable({ templates, selection, order, floor, categoryLabels, ...rowProps }: Props) {
   const byId = new Map(templates.map((template) => [template.id, template]))
   if (templates.length === 0) {
     return <p className="text-muted-foreground py-8 text-center text-sm">没有匹配的模板</p>
@@ -74,6 +74,7 @@ export function TemplatesTable({ templates, selection, order, floor, ...rowProps
                 <TemplateRow
                   key={id}
                   template={template}
+                  categoryLabel={categoryLabels.get(template.subcategoryKey ?? template.category)?.label ?? template.categoryInfo.nameZh}
                   price={providerFloor(floor, template.prompt?.providerId, template.id)}
                   checked={selection.selected.has(id)}
                   onSelect={selection.onSelect}

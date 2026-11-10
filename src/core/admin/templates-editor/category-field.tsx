@@ -2,12 +2,12 @@
 
 import { Label } from '@/core/ui/label'
 
+import { categoryChoices, type CategoryOption } from './category-options'
+export type { CategoryOption } from './category-options'
+
 import { categoryCopy as COPY } from './copy'
 
 const SELECT = 'border-input h-9 rounded-md border bg-transparent px-3 text-sm'
-
-// What the picker needs of each template_categories row (T75).
-export type CategoryOption = { key: string; nameZh: string; nameEn: string; isSystem: boolean }
 
 type Props = { value: string; categories: readonly CategoryOption[]; onChange: (category: string) => void }
 
@@ -19,7 +19,7 @@ type Props = { value: string; categories: readonly CategoryOption[]; onChange: (
 export function CategoryField({ value, categories, onChange }: Props) {
   const system = categories.find((category) => category.key === value && category.isSystem)
   if (system) return <LockedCategory category={system} />
-  const offered = categories.filter((category) => !category.isSystem)
+  const offered = categoryChoices(categories)
   const known = offered.some((category) => category.key === value)
   return (
     <div className="grid gap-1.5">
@@ -30,7 +30,7 @@ export function CategoryField({ value, categories, onChange }: Props) {
         </option>
         {offered.map((category) => (
           <option key={category.key} value={category.key}>
-            {category.nameZh} · {category.nameEn}
+            {category.label} · {category.nameEn}
           </option>
         ))}
       </select>
