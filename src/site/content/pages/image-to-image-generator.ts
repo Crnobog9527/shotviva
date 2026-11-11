@@ -142,7 +142,7 @@ export const makeImageToImageGenerator = (offers: OfferFacts) => defineContentPa
   ],
   related: [
     { href: '/', anchor: 'AI image to image', note: 'The studio: templates for food, products, rooms, pets and art styles.' },
-    { href: '/commercial-photography', anchor: 'Commercial product photography', note: 'For shops and sellers who need studio product shots without a photographer.' },
+    { href: '/commercial-photography', anchor: 'Commercial photography', note: 'For shops and sellers who need studio product shots without a photographer.' },
     { href: '/ai-restaurant-menu', anchor: 'AI restaurant menu photos', note: 'For restaurants that need menu and delivery-app photos from a phone shot.' },
     pricingRelated(offers),
   ],

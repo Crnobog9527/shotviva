@@ -1,5 +1,7 @@
 import type { Fact, RelatedLink } from '@/core/content'
 
+import { site } from '../site.config'
+
 import {
   freeImagesLabel,
   FreeImagesLabel,
@@ -61,5 +63,5 @@ export function sharedFacts(offers: OfferFacts): readonly [Fact, Fact, Fact, ...
 // design/comps-v3-b/landing.html): the cheapest plan and the signup gift, from offer.ts.
 export function pricingRelated({ planFrom }: OfferFacts): RelatedLink {
   const note = planFrom ? `Plans from ${usd(planFrom.priceUsd)} a month, ${freeImagesLabel} to start.` : 'Plans and one-time credit packs.'
-  return { href: '/pricing', anchor: 'Pricing', note }
+  return { href: '/pricing', anchor: `${site.brand.name} pricing`, note }
 }
