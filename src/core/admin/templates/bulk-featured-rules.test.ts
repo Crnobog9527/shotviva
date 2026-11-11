@@ -6,7 +6,7 @@ const live = (id: string, over: Partial<FeaturedCandidate> = {}): FeaturedCandid
 const ids = (count: number) => Array.from({ length: count }, (_, i) => `f${i}`)
 
 describe('planFeaturedChange', () => {
-  it('appends the new ones in the order they were ticked and skips those already in', () => {
+  it('appends the new ones in the order given (catalogue order) and skips those already in', () => {
     const plan = planFeaturedChange(['a', 'b'], [live('c'), live('a'), live('d')], true)
     expect(plan.next).toEqual(['a', 'b', 'c', 'd'])
     expect(plan.changed.map((item) => item.id)).toEqual(['c', 'd'])

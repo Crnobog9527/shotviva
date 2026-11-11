@@ -34,8 +34,9 @@ export const isFeaturable = (template: Pick<FeaturedCandidate, 'isActive' | 'vis
 
 const item = ({ id, name }: FeaturedItem): FeaturedItem => ({ id, name })
 
-// `current`: the featured ids in display order. `selected`: the ticked templates, in the order
-// they were ticked; an id with no row (deleted meanwhile) comes as { id, name: id, missing }.
+// `current`: the featured ids in display order. `selected`: the ticked templates in catalogue
+// order (the list's order, not the order they were ticked in), and the new ones are appended in
+// that order; an id with no row (deleted meanwhile) comes as { id, name: id, missing }.
 export function planFeaturedChange(
   current: readonly string[],
   selected: readonly (FeaturedCandidate | (FeaturedItem & { missing: true }))[],
