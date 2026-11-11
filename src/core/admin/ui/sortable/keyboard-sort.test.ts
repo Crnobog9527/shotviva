@@ -63,4 +63,9 @@ describe('keyboard sorting', () => {
     const lifted: Lifted = { id: 'a', original: ids, order: ids }
     expect(keyboardSort(lifted, 'Tab', 'a', ids, 'A')).toEqual({ handled: false, lifted })
   })
+
+  it('left and right move one place too, for a grid of cards', () => {
+    expect(press([' ', 'ArrowRight', 'ArrowRight', ' '], 'a').commit).toEqual(['b', 'c', 'a', 'd'])
+    expect(press([' ', 'ArrowLeft', ' '], 'c').commit).toEqual(['a', 'c', 'b', 'd'])
+  })
 })

@@ -3,7 +3,7 @@ import { Suspense } from 'react'
 
 import { googleAction } from '@/app/auth/actions'
 import { createAdminSupabase, createServerSupabase, getSessionUser } from '@/core/auth'
-import { currentTier, limitsFor, readBalance } from '@/core/billing'
+import { effectiveTier, limitsFor, readBalance } from '@/core/billing'
 import { PaywallProvider } from '@/core/billing/paywall/provider'
 import { wechatPayEnabled } from '@/core/billing/stripe'
 import { StandingSlot } from '@/core/billing/standing'
@@ -27,8 +27,8 @@ async function viewerOf(): Promise<HomeViewer | null> {
   const admin = createAdminSupabase()
   const [balance, tier, runningIds, favoriteIds] = await Promise.all([
     readBalance(supabase, user.id),
-    // current_tier() is service-role only; the user's own id comes from the session.
-    currentTier(admin, user.id),
+    // effective_tier() (an unbanned admin counts as Max) is service-role only; the user's own id comes from the session.
+    effectiveTier(admin, user.id),
     listRunningJobIds(admin, user.id, new Date()),
     // A failed read degrades to no favorites (logged), never to an error page or signed-out home.
     listFavoriteIdsOrEmpty(supabase, user.id),

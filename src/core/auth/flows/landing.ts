@@ -4,7 +4,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 import { publicEnv } from '../../public-env'
-import { appOrigin } from '../../site-url'
+import { requestOrigin } from '../../request-origin'
 import type { Locale } from '../../i18n/locales'
 import { localeOfPath } from '../../i18n/paths'
 import { logger } from '../../logger'
@@ -57,8 +57,11 @@ async function rememberAccountLocale(supabase: RequestClient, locale: Locale): P
   if (error) logger.warn('could not store the account language', { code: error.code })
 }
 
-export function landingResponse(outcome: CallbackOutcome, nextParam: string | null, jar: CookieToSet[]): NextResponse {
-  const response = NextResponse.redirect(new URL(callbackTarget(outcome, nextParam), appOrigin))
+// Back to the host the link was opened on (when it is allow-listed), where the cookies were
+// just set: redirecting a test-site alias to the branch URL lands signed out (core/request-origin).
+export function landingResponse(request: NextRequest, outcome: CallbackOutcome, jar: CookieToSet[]): NextResponse {
+  const target = callbackTarget(outcome, request.nextUrl.searchParams.get('next'))
+  const response = NextResponse.redirect(new URL(target, requestOrigin(request)))
   jar.forEach(({ name, value, options }) => response.cookies.set(name, value, options))
   return response
 }

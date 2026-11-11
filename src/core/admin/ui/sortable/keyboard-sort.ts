@@ -52,6 +52,9 @@ export function cancelLift(lifted: Lifted, label: string): KeyStep {
   return { handled: true, lifted: null, announce: sortableCopy.cancelled(label, index, lifted.original.length) }
 }
 
+// Left and right too, so a grid of cards (one order, wrapping across rows) sorts naturally.
+const STEPS: Partial<Record<string, -1 | 1>> = { ArrowUp: -1, ArrowLeft: -1, ArrowDown: 1, ArrowRight: 1 }
+
 // `id` is the row whose handle has focus; `ids` the order on screen before this key.
 export function keyboardSort(lifted: Lifted | null, key: string, id: string, ids: readonly string[], label: string): KeyStep {
   const isToggle = key === ' ' || key === 'Enter'
@@ -62,8 +65,8 @@ export function keyboardSort(lifted: Lifted | null, key: string, id: string, ids
   }
   if (isToggle) return drop(lifted, label)
   if (key === 'Escape') return cancelLift(lifted, label)
-  if (key === 'ArrowUp') return move(lifted, label, -1)
-  if (key === 'ArrowDown') return move(lifted, label, 1)
+  const by = STEPS[key]
+  if (by) return move(lifted, label, by)
   // Tab and the rest keep their usual meaning; the list cancels the lift when focus leaves.
   return { handled: false, lifted }
 }

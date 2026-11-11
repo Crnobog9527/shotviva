@@ -5,7 +5,7 @@ import { Suspense, type ReactNode } from 'react'
 
 import { AppPage, BalanceChip, FlowNav } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
-import { currentTier, limitsFor, readBalance } from '@/core/billing'
+import { effectiveTier, limitsFor, readBalance } from '@/core/billing'
 import { currentLocale } from '@/core/i18n/server'
 import { fileUrlFor, findOwnJob, hasInputPreview, jobRefOrShort, keptInputsOf, originalUrlFor, type Job } from '@/core/jobs'
 import { r2Store } from '@/core/storage'
@@ -35,8 +35,8 @@ async function loadAround(supabase: Awaited<ReturnType<typeof createServerSupaba
     job.parentJobId ? findOwnJob(admin, userId, job.parentJobId) : null,
     loadEditOffer(supabase),
     readBalance(supabase, userId),
-    // current_tier() is service-role only; the user's own id comes from the session.
-    currentTier(admin, userId),
+    // effective_tier() (an unbanned admin counts as Max) is service-role only; the user's own id comes from the session.
+    effectiveTier(admin, userId),
     jobRefOrShort(admin, job.id),
   ])
   return { templates, kept, parent, offer, balance, tier, reference }
