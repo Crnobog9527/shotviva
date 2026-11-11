@@ -2,7 +2,7 @@ import 'server-only'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-import { currentTier, limitsFor, readBalance } from '@/core/billing'
+import { effectiveTier, limitsFor, readBalance } from '@/core/billing'
 import type { Locale } from '@/core/i18n'
 import { findOwnJob, listRunningJobIds } from '@/core/jobs'
 import type { ObjectStore } from '@/core/storage'
@@ -26,8 +26,8 @@ export async function loadAgainContext(deps: Deps, req: { userId: string; jobId:
   const template = toCatalogueTemplate(found)
   const [balance, tier, runningIds, again] = await Promise.all([
     readBalance(deps.db, req.userId),
-    // current_tier() is service-role only; the user's own id comes from the session.
-    currentTier(deps.admin, req.userId),
+    // effective_tier() (an unbanned admin counts as Max) is service-role only; the user's own id comes from the session.
+    effectiveTier(deps.admin, req.userId),
     listRunningJobIds(deps.admin, req.userId, new Date()),
     loadAgain({ db: deps.admin, store: deps.store }, { userId: req.userId, jobId: job.id, template }),
   ])
