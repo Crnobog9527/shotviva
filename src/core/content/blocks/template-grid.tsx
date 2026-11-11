@@ -109,7 +109,7 @@ function SoloSeries({ card, media }: { card: TemplateCard; media: TemplateLookup
         <span className="mk-use">{card.use}</span>
         <span className="mk-scount">{t('seriesCount', { count: card.series?.count ?? 0 })}</span>
         {card.series ? (
-          <Link className="mk-ghost-pill" href={card.series.href} tabIndex={-1} aria-hidden>
+          <Link className="mk-ghost-pill" href={card.series.href} prefetch={false} tabIndex={-1} aria-hidden>
             {t('seriesOpen')}
           </Link>
         ) : null}
