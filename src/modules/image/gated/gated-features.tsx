@@ -7,6 +7,7 @@ import type { MembershipTier } from '@/core/config'
 import { Link } from '@/core/i18n/ui'
 
 import { batchCounts, FEATURE_TIER, featureAccess, GATED_FEATURES, MATRIX_TEMPLATES, type GatedFeature } from './feature-access'
+import { REDUCED_MOTION } from '../catalogue/use-motion'
 import { IntroTrigger } from './intro-trigger'
 import { TierBadge } from './tier-badge'
 
@@ -57,7 +58,9 @@ function FeatureTile({ feature, tier, children }: { feature: GatedFeature; tier:
 }
 
 function scrollToTemplates() {
-  document.getElementById(TEMPLATES_ANCHOR)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  // Reduced motion jumps instead of gliding (same rule as the home generator's smooth()).
+  const behavior = window.matchMedia(REDUCED_MOTION).matches ? 'auto' : 'smooth'
+  document.getElementById(TEMPLATES_ANCHOR)?.scrollIntoView({ behavior, block: 'start' })
 }
 
 function TileBody({ feature, locked, title, line }: { feature: GatedFeature; locked: boolean; title: string; line: string }) {
