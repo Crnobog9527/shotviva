@@ -1212,7 +1212,11 @@
         "plan": "{tier} costs less, both today and per credit. It is a monthly plan.",
         "same": "Both cost the same.",
         "packNowPlanLater": "The pack costs less today. If you make photos every month, {tier} costs less per credit.",
-        "planNowPackLater": "{tier} costs less today; the pack costs less per credit."
+        "planNowPackLater": "{tier} costs less today; the pack costs less per credit.",
+        "packNowSameRate": "The pack costs less today; per credit they cost the same.",
+        "planNowSameRate": "{tier} costs less today; per credit they cost the same.",
+        "sameNowPackRate": "Both cost the same today; the pack costs less per credit.",
+        "sameNowPlanRate": "Both cost the same today; if you make photos every month, {tier} costs less per credit."
       }
     },
     "title": "Keep making photos",

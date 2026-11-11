@@ -33,3 +33,19 @@ export function compareForNeed(
   if (!plan) return { pack, plan: null }
   return { pack, plan, cheaperToday: cheaper(pack.priceUsd, plan.priceUsd), cheaperPerCredit: cheaper(perCreditUsd(pack), perCreditUsd(plan)) }
 }
+
+// Which sentence words the comparison. "Today" (what each costs now) and "per credit" are said
+// separately whenever they differ, a tie included: a pack that is cheaper today but costs the
+// same per credit must never read as the plan being cheaper per credit.
+export type Verdict =
+  | 'pack' | 'plan' | 'same'
+  | 'packNowPlanLater' | 'planNowPackLater'
+  | 'packNowSameRate' | 'planNowSameRate'
+  | 'sameNowPackRate' | 'sameNowPlanRate'
+
+export function verdictKey({ cheaperToday, cheaperPerCredit }: { cheaperToday: Cheaper; cheaperPerCredit: Cheaper }): Verdict {
+  if (cheaperToday === cheaperPerCredit) return cheaperToday
+  if (cheaperPerCredit === 'same') return cheaperToday === 'pack' ? 'packNowSameRate' : 'planNowSameRate'
+  if (cheaperToday === 'same') return cheaperPerCredit === 'pack' ? 'sameNowPackRate' : 'sameNowPlanRate'
+  return cheaperToday === 'pack' ? 'packNowPlanLater' : 'planNowPackLater'
+}
