@@ -1,12 +1,20 @@
 name: Sync preview templates to production
-run-name: Sync templates ${{ inputs.template_ids }}
+run-name: Sync templates ${{ inputs.template_ids }} series ${{ inputs.series_slugs }}
 
 on:
   workflow_dispatch:
     inputs:
       template_ids:
-        description: Template IDs, separated by commas or spaces
-        required: true
+        description: Template IDs, separated by commas or spaces (optional when series are given)
+        required: false
+        default: ''
+        type: string
+      # Whole series by slug: their categories, the series itself (cover included), every member
+      # template, then the member order, all taken from the test site.
+      series_slugs:
+        description: Series slugs, separated by commas or spaces (optional when template IDs are given)
+        required: false
+        default: ''
         type: string
 
 permissions:
@@ -30,9 +38,10 @@ jobs:
           node-version-file: .nvmrc
       - uses: ./.github/actions/verify-owner-review
       - run: pnpm install --frozen-lockfile
-      - name: Copy covers and commit each template
+      - name: Sync categories, series and templates
         env:
           SYNC_IDS: ${{ inputs.template_ids }}
+          SYNC_SERIES: ${{ inputs.series_slugs }}
           SYNC_PREVIEW_ASSETS_BASE: ${{ vars.SYNC_PREVIEW_ASSETS_BASE }}
           OPENAI_IMAGE_MODEL: ${{ vars.OPENAI_IMAGE_MODEL }}
           SYNC_PREVIEW_SERVICE_KEY: ${{ secrets.SYNC_PREVIEW_SERVICE_KEY }}
