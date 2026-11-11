@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
 import type { MembershipProduct, PackProduct } from '../../config'
+import type { MemberStanding } from '../subscription/upgrade-rule'
 import { compareForNeed } from './credit-compare'
 import type { TierOffer } from './offer'
+import { planStanding } from './standing-pick'
 
 const pack = (id: string, credits: number, priceUsd: number) => ({ id, credits, priceUsd, tier: 'pack', interval: null, paidDays: null }) as unknown as PackProduct
 const plan = (tier: 'starter' | 'pro' | 'max', credits: number, priceUsd: number) =>
@@ -21,9 +23,18 @@ describe('pack or plan when credits run out', () => {
     expect(compareForNeed(10, [pack('p', 50, 19.9)], offers)).toMatchObject({ cheaperToday: 'same', cheaperPerCredit: 'same' })
   })
 
-  it('has nothing to compare without a shortfall, packs or monthly plans', () => {
+  it('has nothing to compare without a shortfall or packs, and no plan row without monthly plans', () => {
     expect(compareForNeed(0, packs, offers)).toBeNull()
     expect(compareForNeed(5, [], offers)).toBeNull()
-    expect(compareForNeed(5, packs, [])).toBeNull()
+    expect(compareForNeed(5, packs, [])).toMatchObject({ pack: { id: 'pack_s' }, plan: null })
+  })
+
+  it('offers a member only the plans they can buy, and the pack alone at the top', () => {
+    const buyable = (standing: MemberStanding) => (tier: 'starter' | 'pro' | 'max') => planStanding(standing, tier, 'month').lock === null
+    const pro: MemberStanding = { subscription: 'pro_monthly', tier: 'pro' }
+    const max: MemberStanding = { subscription: 'max_monthly', tier: 'max' }
+    // 20 short: Starter would cover it, but a Pro member can only move up to Max.
+    expect(compareForNeed(20, packs, offers, buyable(pro))).toMatchObject({ pack: { id: 'pack_s' }, plan: { id: 'max_monthly' } })
+    expect(compareForNeed(20, packs, offers, buyable(max))).toEqual({ pack: expect.objectContaining({ id: 'pack_s' }), plan: null })
   })
 })

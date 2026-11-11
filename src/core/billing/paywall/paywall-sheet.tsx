@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl"
 
 import { trackPaywallSelect } from "../../analytics/browser"
 
-import type { SiteProduct } from "../../config"
+import type { MembershipTier, SiteProduct } from "../../config"
 import { MAX_BATCH_TEMPLATES } from "../../jobs/batch/limits"
 import { limitsFor } from "../tier-limits"
 import { ResponsiveSheet } from "../../ui/responsive-sheet"
@@ -28,6 +28,8 @@ type Props = {
   // The limit the user just met (T107): the lead line and what shows above the plans.
   moment?: PaywallMoment
   needed?: number
+  // The plan the sheet opened on for that moment, which the batch lead line describes.
+  momentTier?: MembershipTier
   products: readonly SiteProduct[]
   state: PaywallState
 }
@@ -40,7 +42,7 @@ export function PaywallSheet(props: Props) {
   return <DiscountProvider active={props.open}><SheetBody {...props} /></DiscountProvider>
 }
 
-function SheetBody({ open, onOpenChange, trigger, moment, needed, products, state }: Props) {
+function SheetBody({ open, onOpenChange, trigger, moment, needed, momentTier, products, state }: Props) {
   const t = useTranslations("paywall")
   const offers = tierOffers(products)
   const packs = packOffers(products)
@@ -61,7 +63,7 @@ function SheetBody({ open, onOpenChange, trigger, moment, needed, products, stat
       open={open}
       onOpenChange={onOpenChange}
       title={t("title")}
-      description={leadLine(trigger, moment, t)}
+      description={leadLine(trigger, moment, momentTier, t)}
       aside={
         <BillingToggle
           period={choice.period}
@@ -84,9 +86,12 @@ function SheetBody({ open, onOpenChange, trigger, moment, needed, products, stat
 
 // Under the title: what just happened, in one line. The batch moments name the plan's own limits
 // (TIER_LIMITS), so the line says what the code allows.
-function leadLine(trigger: PaywallTrigger, moment: PaywallMoment | undefined, t: ReturnType<typeof useTranslations<"paywall">>) {
+function leadLine(trigger: PaywallTrigger, moment: PaywallMoment | undefined, tier: MembershipTier | undefined, t: ReturnType<typeof useTranslations<"paywall">>) {
   if (moment === "watermark") return t("moments.watermark")
-  if (moment === "photos") return t("moments.photos", { count: limitsFor("pro").batchMax })
+  if (moment === "photos") {
+    const target = tier ?? "pro"
+    return t("moments.photos", { tier: t(`tiers.${target}`), count: limitsFor(target).batchMax })
+  }
   if (moment === "templates") return t("moments.templates", { templates: MAX_BATCH_TEMPLATES, count: limitsFor("max").batchMax })
   return t(trigger === "insufficient_credits" ? "introNeedsCredits" : "intro")
 }

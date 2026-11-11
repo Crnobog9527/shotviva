@@ -1188,16 +1188,21 @@
   "paywall": {
     "moments": {
       "watermark": "免费生成的图带水印。用付费积分生成的图没有水印，而且是私密的。",
-      "photos": "Pro 可以一次把一个模板用到最多 {count, number} 张照片上。",
+      "photos": "{tier} 可以一次把一个模板用到最多 {count, number} 张照片上。",
       "templates": "Max 可以一次把最多 {templates, number} 个模板用到同一批照片上，一批最多 {count, number} 张。"
     },
     "example": {
-      "caption": "示例：一张手机照片，一批里套用两个模板。",
+      "caption": {
+        "photos": "示例：一张手机照片套用一个模板。批量时每张照片各出一张这样的图。",
+        "templates": "示例：一张手机照片，一批里套用两个模板。"
+      },
       "photoAlt": "示例：手机原图",
       "resultAlt": "示例：结果 {index, number}"
     },
     "packOrPlan": {
       "title": "还差 {count, number} 积分：买积分包还是开会员？",
+      "packOnlyTitle": "还差 {count, number} 积分：买一个积分包",
+      "packOnly": "积分包直接加到你现在的会员上，一次付清，不续费。",
       "packTitle": "积分包 · {count, number} 积分",
       "packPrice": "一次付 {price}",
       "planTitle": "{tier} · 每月 {count, number} 积分",
