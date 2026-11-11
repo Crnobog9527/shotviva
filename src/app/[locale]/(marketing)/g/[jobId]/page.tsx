@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
 import { notFound } from 'next/navigation'
+import { connection } from 'next/server'
 
 import { cachedGalleryWork, galleryWorkView, isGalleryEnabled } from '@/core/gallery'
 import { galleryImagePath } from '@/core/gallery/image'
@@ -23,7 +24,13 @@ export function generateStaticParams() {
   return [{ jobId: '00000000-0000-4000-8000-000000000000' }]
 }
 
+// Per request: an id not listed at build is request data to Next, so an on-demand prerender of a
+// work page fails. The proxy has already answered 404 for any work the gallery does not show
+// (core/gallery/proxy-gate.ts); the checks below are the fallback. The reads are cached.
+export const instant = false
+
 async function load(params: Promise<{ jobId: string }>) {
+  await connection()
   if (!(await isGalleryEnabled(site))) notFound()
   const [locale, { jobId }] = await Promise.all([currentLocale(), params])
   const [row, catalogue] = await Promise.all([cachedGalleryWork(jobId), cachedWebCatalogue(locale)])

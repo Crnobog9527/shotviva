@@ -1,7 +1,7 @@
 import sharp from 'sharp'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { ProviderInput } from '@/core/jobs'
+import { backgroundInput, type ProviderInput } from '@/core/jobs'
 import { logger } from '@/core/logger'
 
 import { createOpenRouterImageProvider } from './openrouter-image-provider'
@@ -70,6 +70,14 @@ describe('OpenRouter image requests', () => {
     expect((await sharp(result.bytes).metadata()).format).toBe('png')
   })
 
+})
+
+describe('OpenRouter and the cut-out record', () => {
+  it('does not send model_params.background, so a transparent template routed here is left unknown', () => {
+    const provider = createOpenRouterImageProvider({ ...config, fetch: vi.fn() })
+    expect(provider.honoursBackground).toBeFalsy()
+    expect(backgroundInput({ background: 'transparent' }, provider)).toEqual({})
+  })
 })
 
 describe('OpenRouter model limits', () => {

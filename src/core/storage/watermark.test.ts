@@ -34,6 +34,17 @@ describe('watermark', () => {
     expect(Math.min(r, g, b)).toBeGreaterThan(245)
   })
 
+  it('keeps a cut-out’s alpha for its 透明底 file, mark included, as a PNG', async () => {
+    const cutOut = await sharp({ create: { width: 900, height: 600, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).png().toBuffer()
+    const marked = await applyWatermark(new Uint8Array(cutOut), 'transparent')
+    expect(await sharp(marked).metadata()).toMatchObject({ format: 'png', width: 900, height: 600, hasAlpha: true })
+    const alpha = (left: number, top: number, size: number) =>
+      sharp(marked).extract({ left, top, width: size, height: size }).extractChannel('alpha').raw().toBuffer()
+    // Top-left still see-through; the mark's corner is not.
+    expect(Math.max(...(await alpha(0, 0, 40)))).toBe(0)
+    expect(Math.max(...(await alpha(900 - 200, 600 - 50, 40)))).toBeGreaterThan(0)
+  })
+
   // T108: the gallery's copy is scaled, never enlarged, WebP, and marked only for free works.
   it('makes the gallery copy: scaled WebP, marked only when asked', async () => {
     const original = await png(1536, 1152)
