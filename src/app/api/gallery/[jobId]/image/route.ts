@@ -17,9 +17,11 @@ export async function GET(request: NextRequest, { params }: RouteContext<'/api/g
   await connection()
   try {
     const width = parseImageQuery(request.nextUrl.searchParams)
-    if (!width || !(await isGalleryEnabled(site))) return new Response(null, { status: 404 })
+    if (!width) return new Response(null, { status: 404 })
     const { jobId } = await params
-    const body = await renderGalleryImage({ store: r2Store(), defer: (task) => after(task) }, jobId, width)
+    const deps = { store: r2Store(), isOpen: () => isGalleryEnabled(site), defer: (task: () => Promise<unknown>) => after(task) }
+    const body = await renderGalleryImage(deps, jobId, width)
+    if (body === 'closed') return new Response(null, { status: 404 })
     if (!body) return new Response(null, { status: 404, headers: { 'Cache-Control': 'public, max-age=60, s-maxage=60' } })
     return new Response(body as BodyInit, { headers: { 'Content-Type': 'image/webp', 'Cache-Control': CACHE, 'X-Robots-Tag': 'noindex' } })
   } catch (error) {
