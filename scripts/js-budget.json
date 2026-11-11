@@ -1,5 +1,5 @@
 {
-  "note": "First-load JS per route in KB gzip (scripts/js-budget.ts). Set 2026-11-07 after the performance pass (#232-#236) at about 8% over what each route measured then. Raise a number only with a reason in the PR. Lowered 2026-11-11 for the marketing pages and legal pages (zod and the pricing plans out of their first load, mobile Lighthouse), again about 8% over what they measured.",
+  "note": "First-load JS per route in KB gzip (scripts/js-budget.ts). Set 2026-11-07 after the performance pass (#232-#236) at about 8% over what each route measured then. Raise a number only with a reason in the PR. Lowered 2026-11-11 for the marketing pages and legal pages (zod and the pricing plans out of their first load, mobile Lighthouse), again about 8% over what they measured. en/account 335 -> 336 on 2026-11-11 (PR #495): main measured 335.0 on the cap, and scoping the tab's generation store to the signed-in account (a privacy fix, about 0.1 KB in the shared app shell) took it to 335.1.",
   "routes": {
     "en": 235,
     "zh": 235,
@@ -14,6 +14,6 @@
     "en/signup": 290,
     "en/generate": 325,
     "en/photos": 325,
-    "en/account": 335
+    "en/account": 336
   }
 }
