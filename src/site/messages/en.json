@@ -240,6 +240,84 @@
     }
   },
   "app": {
+    "matrix": {
+      "lede": "Up to {templates, number} templates on the same photos, {max, number} photos a batch.",
+      "metaTitle": "Several templates",
+      "title": "Several templates",
+      "badge": "Max",
+      "locked": "(needs Max)",
+      "entryTitle": "Several templates at once",
+      "entryLine": "Run up to 5 templates on the same photos in one batch.",
+      "entryLink": "Use more templates on these photos",
+      "templatesTitle": "Templates",
+      "chooseTemplates": "Choose templates",
+      "addTemplate": "Add a template",
+      "templatesLeft": "{count, number} left",
+      "removeTemplate": "Remove {name}",
+      "templateUnavailable": "Not available right now. Remove it to go on.",
+      "pickerTitle": "Choose templates",
+      "pickerLine": "{count, number} of {max, number} chosen. Each one runs on every photo.",
+      "pickerDone": "{count, plural, =0 {Done} one {Done · # template} other {Done · # templates}}",
+      "gridTitle": "Check before you run",
+      "gridLabel": "Photos and templates in this batch",
+      "gridPhoto": "Photo",
+      "gridTotal": "{count, plural, one {# photo} other {# photos}} of {max, number} · <mono>{total, plural, one {# credit} other {# credits}}</mono>",
+      "gridHint": "Tap a square to leave it out.",
+      "gridEmpty": "Choose templates and add photos: each photo runs through each template, up to {max, number} photos and {templates, number} templates in one batch.",
+      "cellOn": "Photo {index, number} with {template}, {count, plural, one {# credit} other {# credits}}. Tap to leave it out.",
+      "cellOff": "Photo {index, number} with {template}, left out. Tap to put it back.",
+      "photoN": "Photo {index, number}",
+      "photoNChanged": "Photo {index, number}, own text",
+      "settingsTitle": "Text and options",
+      "sharedText": "Filled once for {count, plural, one {its photo} other {all # photos}}.",
+      "overrideTitle": "Different text for one photo",
+      "overridePick": "Choose a photo",
+      "overrideHint": "Pick a photo to give it its own text. The others keep the text above.",
+      "overrideReset": "Use the shared text again",
+      "resolutionAside": "For the whole batch",
+      "noticeGenerate": "<b>Paid credits only.</b> Each photo is charged on its own; a failed one is refunded on its own.",
+      "noticeCredits": "A batch uses paid credits only: {count, plural, one {# photo} other {# photos}} need <b>{total, plural, one {# credit} other {# credits}}</b>.",
+      "noticeTooMany": "<b>Max runs up to {max, number} photos in one batch.</b> Leave some squares out or remove a template.",
+      "generate": "Generate {count, plural, one {# photo} other {# photos}} · <mono>{total, plural, one {# credit} other {# credits}}</mono>",
+      "getCredits": "Get credits · <mono>{count, number} needed</mono>",
+      "checking": "Checking every photo…",
+      "block": {
+        "templates": "Choose a template",
+        "photos": "Add photos",
+        "empty": "Put at least one square back",
+        "too-many": "Too many photos for one batch",
+        "uploading": "Uploading photos…",
+        "copy": "Fill in the text",
+        "options": "These templates share no size"
+      },
+      "resultsRunning": "{done, number} of {count, number} done",
+      "resultsDone": "{done, plural, =0 {No photos saved} one {# photo saved to Photos} other {# photos saved to Photos}}",
+      "resultsLine": "{credits, plural, one {# credit} other {# credits}} used{queued, plural, =0 {} other { · # still developing}}{failed, plural, =0 {} one { · one failed and was refunded} other { · # failed and were refunded}}.",
+      "viewLabel": "Show results",
+      "byTemplate": "By template",
+      "byPhoto": "By photo",
+      "applyMore": "Use on more photos",
+      "tileDeveloping": "Developing",
+      "tileQueued": "Queued",
+      "tileRefunded": "Refunded",
+      "retry": "Retry",
+      "newBatch": "New batch",
+      "openPhotos": "Open Photos",
+      "backToCreate": "Back to Create",
+      "lockedTitle": "Several templates on the same photos",
+      "lockedLine": "With Max you choose up to {templates, number} templates and run them on your photos in one go: up to {cells, number} photos a batch, with every price shown before it runs.",
+      "lockedPro": "Pro runs one template on up to {count, number} photos at once.",
+      "lockedCta": "See Max",
+      "lockedDrawing": "Three photos down, three templates across: nine photos in one batch"
+    },
+    "batchZip": {
+      "notFound": "Nothing in this batch to pack yet: only finished paid photos go in the ZIP.",
+      "cta": "Download ZIP · {count, plural, one {# photo} other {# photos}}",
+      "packingCta": "Packing ZIP…",
+      "packing": "Packing {count, plural, one {# photo} other {# photos}}. This can take a minute or two; the download starts on its own.",
+      "started": "Your ZIP is downloading. Each file is named photo_template_number.",
+      "limited": "That's three downloads in a minute. Try again in a minute."
+    },
     "signupCodes": {
       "noInviteGift": "Valid invite. No extra signup credits are currently offered.",
       "toggle": "Have an invite or promo code?",
@@ -430,6 +508,7 @@
       "withRatio": "{name} {ratio}"
     },
     "workspace": {
+      "checkingCta": "Checking every photo…",
       "pickSize": "Choose a size",
       "noOptions": "No output options available",
       "back": "Create",
@@ -566,6 +645,7 @@
       }
     },
     "errors": {
+      "NETWORK": "Couldn't reach Shotviva. Check your connection and try again.",
       "CONTENT_REJECTED": "The photo or your note didn't pass the safety check. Try another photo or change the note.",
       "IDENTITY_SWAP_REFUSED": "Shotviva can't swap faces or turn a person into someone else, to protect everyone's likeness. You can change the expression, makeup, lighting and background.",
       "REFERENCE_IMAGE_LIMIT": "This model accepts fewer reference images. Remove some photos or choose another template.",
@@ -590,6 +670,9 @@
       "TIER_REQUIRED": "This needs the {tier} plan."
     },
     "photos": {
+      "batch": {
+        "title": "Batch · {count, plural, one {# photo} other {# photos}}{templates, plural, =1 {} other { · # templates}}"
+      },
       "title": "Photos",
       "metaTitle": "Photos",
       "inProgress": "In progress",
@@ -1103,6 +1186,39 @@
     }
   },
   "paywall": {
+    "moments": {
+      "watermark": "Free photos carry a watermark. Paid credits make watermark-free, private photos.",
+      "photos": "{tier} runs one template on up to {count, number} photos at once.",
+      "templates": "Max runs up to {templates, number} templates on the same photos, up to {count, number} photos a batch."
+    },
+    "example": {
+      "caption": {
+        "photos": "Example: one template on a phone photo. A batch makes one of these for each photo.",
+        "templates": "Example: one phone photo, two templates, made in one batch."
+      },
+      "photoAlt": "Example: the phone photo",
+      "resultAlt": "Example: result {index, number}"
+    },
+    "packOrPlan": {
+      "title": "{count, plural, one {# credit} other {# credits}} short: a pack or a plan?",
+      "packOnlyTitle": "{count, plural, one {# credit} other {# credits}} short: a credit pack",
+      "packOnly": "A pack adds credits to the plan you have now, and does not renew.",
+      "packTitle": "Credit pack · {count, plural, one {# credit} other {# credits}}",
+      "packPrice": "{price} once",
+      "planTitle": "{tier} · {count, plural, one {# credit} other {# credits}} a month",
+      "planPrice": "{price} a month",
+      "verdict": {
+        "pack": "The pack costs less, both today and per credit.",
+        "plan": "{tier} costs less, both today and per credit. It is a monthly plan.",
+        "same": "Both cost the same.",
+        "packNowPlanLater": "The pack costs less today. If you make photos every month, {tier} costs less per credit.",
+        "planNowPackLater": "{tier} costs less today; the pack costs less per credit.",
+        "packNowSameRate": "The pack costs less today; per credit they cost the same.",
+        "planNowSameRate": "{tier} costs less today; per credit they cost the same.",
+        "sameNowPackRate": "Both cost the same today; the pack costs less per credit.",
+        "sameNowPlanRate": "Both cost the same today; if you make photos every month, {tier} costs less per credit."
+      }
+    },
     "title": "Keep making photos",
     "intro": "Paid credits make private, watermark-free photos.",
     "introNeedsCredits": "This photo needs more credits than you have.",

@@ -126,7 +126,7 @@ function newEntry(file: File, patch: (id: string, change: Partial<Entry>) => voi
   void naturalSize(url)
     .then(({ width, height }) => patch(id, { ratio: nearestRatio(width, height), originalRatio: width / height }))
     .catch(() => undefined)
-  return { id, file, url, bytes: file.size, ratio: null, upload: { phase: 'idle' } }
+  return { id, file, url, bytes: file.size, name: file.name, ratio: null, upload: { phase: 'idle' } }
 }
 
 // The new-version banner (T90) waits while a photo uploads, and says a refresh drops the picked

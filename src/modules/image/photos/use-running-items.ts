@@ -17,6 +17,9 @@ const fromTracked = (job: TrackedJob, cover: string | null): RunningRow => ({
   id: job.id,
   templateId: job.templateId,
   templateName: job.templateName,
+  batchId: job.batchId ?? null,
+  // Running rows are not grouped; only finished ones are.
+  batchPosition: null,
   cover,
   aspect: job.aspect,
   resolution: job.resolution,

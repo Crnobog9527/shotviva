@@ -9,7 +9,8 @@ import { buttonVariants } from '@/core/ui/button'
 import type { CtaState } from './cta-state'
 import { tierName } from './workspace-options'
 
-const LABELS: Record<'wait' | 'need-photo' | 'uploading' | 'need-copy' | 'no-options' | 'need-size', string> = {
+const LABELS: Record<'wait' | 'need-photo' | 'uploading' | 'need-copy' | 'no-options' | 'need-size' | 'checking', string> = {
+  checking: 'checkingCta',
   wait: 'wait',
   'need-photo': 'needPhoto',
   uploading: 'uploadingCta',
@@ -44,16 +45,22 @@ type Props = {
   placement?: 'page' | 'sheet'
   addFirst?: number | null
   limit?: number
+  // Why the batch preflight said no (T107), when it was not a paywall moment.
+  error?: string | null
 }
 
 // The creation form's bottom bar: one notice line at most, then the one primary (DESIGN §4.3
 // steps 4–5). The free-credit notice shows only when this photo would use free credits; a
 // batch (T28) says how many photos and that it is paid credits only.
-export function FormAction({ state, resolution, batch, onGenerate, placement = 'page', addFirst = null, limit = 1 }: Props) {
+export function FormAction({ state, resolution, batch, onGenerate, placement = 'page', addFirst = null, limit = 1, error = null }: Props) {
   const t = useTranslations('app.workspace')
   return (
     <ActionBar inline={placement === 'sheet'} className={placement === 'page' ? PAGE : undefined}>
-      {state.kind === 'need-photo' && addFirst !== null ? (
+      {error ? (
+        <ActionNotice>
+          <span role="alert">{error}</span>
+        </ActionNotice>
+      ) : state.kind === 'need-photo' && addFirst !== null ? (
         <ActionNotice>{t.rich('again.addFirst', { ...rich, count: addFirst })}</ActionNotice>
       ) : (
         <Notice state={state} resolution={resolution} limit={limit} />
@@ -69,7 +76,7 @@ function Primary({ state, batch, onGenerate }: { state: CtaState; batch: boolean
   const t = useTranslations('app.workspace')
   if (state.kind === 'get-credits') {
     return (
-      <PaywallButton trigger="insufficient_credits" className={buttonVariants({ variant: 'cta-neutral', size: 'cta' })}>
+      <PaywallButton trigger="insufficient_credits" options={{ moment: 'credits', needed: state.needed }} className={buttonVariants({ variant: 'cta-neutral', size: 'cta' })}>
         <span>{t.rich('getCreditsCta', { ...rich, count: state.needed })}</span>
       </PaywallButton>
     )
