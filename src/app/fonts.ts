@@ -1,8 +1,10 @@
 import localFont from 'next/font/local'
 
-// Self-hosted (DESIGN §3.2): Geist for UI, Geist Mono for measurements, Instrument Serif for
-// display. All OFL, files copied from design/comps-v3-b/fonts/. Each sets a CSS variable that
-// globals.css folds into --font-sans / --font-mono / --font-display.
+// Self-hosted (DESIGN §3.2): Geist for UI, Geist Mono for measurements. Both OFL, files copied
+// from design/comps-v3-b/fonts/. Each sets a CSS variable that globals.css folds into
+// --font-sans / --font-mono. Instrument Serif (display, English pages only) is not here:
+// next/font preloads a font on every page of a layout, and Chinese pages never use it
+// (core/ui/instrument-serif.tsx, globals.css).
 export const geist = localFont({
   src: './fonts/geist.woff2',
   weight: '400 700',
@@ -18,13 +20,4 @@ export const geistMono = localFont({
   preload: false,
 })
 
-export const instrumentSerif = localFont({
-  src: [
-    { path: './fonts/instrument-serif.woff2', weight: '400', style: 'normal' },
-    { path: './fonts/instrument-serif-italic.woff2', weight: '400', style: 'italic' },
-  ],
-  variable: '--font-instrument-serif',
-  display: 'swap',
-})
-
-export const fontVariables = `${geist.variable} ${geistMono.variable} ${instrumentSerif.variable}`
+export const fontVariables = `${geist.variable} ${geistMono.variable}`

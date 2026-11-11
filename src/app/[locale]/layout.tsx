@@ -10,6 +10,7 @@ import { UpdateSlot } from '@/core/app-update'
 import { clientMessages, htmlLang, isLocale } from '@/core/i18n'
 import { TranslatedPathsProvider } from '@/core/i18n/ui'
 import { rootMetadata, ShortcutTitleSync } from '@/core/seo'
+import { InstrumentSerifPreload } from '@/core/ui/instrument-serif'
 import { MiSansStylesheet } from '@/core/ui/misans-stylesheet'
 import { site } from '@/site/site.config'
 
@@ -47,7 +48,9 @@ export default async function RootLayout({ children }: LayoutProps<'/[locale]'>)
   return (
     <html lang={htmlLang(lang)} className={`${fontVariables} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
-        {lang === 'zh' ? <MiSansStylesheet /> : null}
+        {/* Each language fetches only its own display face: MiSans after the first screen, or
+            Instrument Serif with the document. */}
+        {lang === 'zh' ? <MiSansStylesheet /> : <InstrumentSerifPreload />}
         <NextIntlClientProvider messages={messages}>
           <TranslatedPathsProvider paths={site.locales.zhPaths}>
             {children}
