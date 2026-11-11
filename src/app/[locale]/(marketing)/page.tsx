@@ -5,6 +5,7 @@ import { localizePath } from '@/core/i18n'
 import { currentLocale } from '@/core/i18n/server'
 import { JsonLdScript, faqPageLd, organizationLd, pageMetadata, softwareApplicationLd } from '@/core/seo'
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
+import { openingCovers } from '@/core/templates/cover-ratio'
 import { cachedPublicSeries } from '@/core/templates/public-series'
 import { toCatalogueTemplate } from '@/modules/image/marketing'
 import { creditFacts, featuredSections, fillCredits, freeImagesIn, homePageIn, isLinkEnabled } from '@/site/content'
@@ -40,6 +41,7 @@ export default async function HomePage() {
   const catalogue = live.map(toCatalogueTemplate)
   // Series show as one card each, in the admin's order (T102, Owner 2026-11-12).
   const { defaultId, ...sections } = featuredSections(live, undefined, series)
+  const initialCovers = await openingCovers(live.find((template) => template.id === defaultId))
   return (
     <>
       <JsonLdScript data={[softwareApplicationLd(site, ldMeta, products, free), organizationLd(site), faqPageLd(page.faq)]} />
@@ -49,7 +51,7 @@ export default async function HomePage() {
         isLinkEnabled={isLinkEnabled}
         templates={sections}
         generator={
-          <HomeGeneratorSlot templates={catalogue} defaultId={defaultId} homePath={localizePath('/', locale)} freeImages={free} />
+          <HomeGeneratorSlot templates={catalogue} defaultId={defaultId} homePath={localizePath('/', locale)} freeImages={free} initialCovers={initialCovers} />
         }
         // Gone with the wishlist switch (cached read); signed out, sign-up returns to the wall.
         wishlistCta={wishlistOpen ? <HomeWishCtaSlot cta={page.wishlist.cta} next={localizePath('/wishlist', locale)} /> : null}
