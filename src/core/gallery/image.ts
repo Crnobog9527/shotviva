@@ -30,16 +30,21 @@ async function readVariant(store: Pick<ObjectStore, 'get'>, key: string, jobId: 
 
 export type ImageDeps = {
   store: Pick<ObjectStore, 'get' | 'put'>
+  // Whether the gallery is open (isGalleryEnabled), asked alongside the work, not before it: on
+  // a cold instance each is a database round trip from the function's region.
+  isOpen: () => Promise<boolean>
   // Runs a task after the response (the route passes next/server's after).
   defer: (task: () => Promise<unknown>) => void
 }
 
-// The image route's body: null for any work the gallery does not show (the route answers 404).
+// The image route's body: 'closed' while the gallery is closed and null for any work it does not
+// show (the route answers 404 to both; only the second may sit in the CDN for a minute).
 // Normally the copy made at approval (variants.ts), read as is. Without one, today's render from
 // the original, and both copies are written after the response for the next miss. The original
 // never leaves the private bucket as is.
-export async function renderGalleryImage(deps: ImageDeps, id: string, width: GalleryWidth): Promise<Uint8Array | null> {
-  const shown = await shownImage(id)
+export async function renderGalleryImage(deps: ImageDeps, id: string, width: GalleryWidth): Promise<Uint8Array | null | 'closed'> {
+  const [open, shown] = await Promise.all([deps.isOpen(), shownImage(id)])
+  if (!open) return 'closed'
   if (!shown) return null
   const stored = await readVariant(deps.store, galleryVariantKey(shown.outputKey, width), id)
   if (stored) return stored
