@@ -106,8 +106,8 @@ export function TemplatesEditor({ providers, templates, categories, series, floo
       <BulkPublish providers={providers}
         selected={selectedInOrder(templates, selected)}
         busy={pending}
-        setActiveMany={actions.setActiveMany}
-        editMany={actions.editMany}
+        actions={actions}
+        featuredIds={featured}
         floor={floor}
         categories={categories}
         onClear={() => setSelected(new Set())}

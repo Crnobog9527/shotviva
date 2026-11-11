@@ -217,3 +217,22 @@ export const rowCopy = {
   version: '版本',
   edit: '编辑',
 } as const
+
+// Batch 首页精选 (2026-11-12): the bulk bar's two buttons and their confirm step.
+export const bulkFeaturedCopy = {
+  set: '批量设为首页精选',
+  unset: '批量取消首页精选',
+  title: (on: boolean, count: number) => `${on ? '把' : '从首页精选移出'}这 ${count} 个模板${on ? '设为首页精选' : ''}？`,
+  hint: (on: boolean) => on
+    ? '加入的模板排在精选末尾，可在「首页精选」里拖动调整。只有已上架、站内可见的模板能上首页，最多 12 个。'
+    : '移出后首页和落地页不再显示它们，模板本身不受影响。',
+  willChange: (on: boolean) => (on ? '将加入' : '将移出'),
+  unchanged: (on: boolean) => (on ? '已在精选' : '本来不在精选'),
+  failed: '不能加入',
+  count: (from: number, to: number, limit: number) => `首页精选：${from} 个 → ${to} 个（上限 ${limit}）`,
+  over: (over: number, limit: number) => `超出上限 ${over} 个：首页精选最多 ${limit} 个，请少选几个，或先移出别的精选模板。`,
+  blocked: '有不能加入的模板，整批都不会保存。请取消勾选它们后再试。',
+  nothing: (on: boolean) => (on ? '选中的模板都已在首页精选里。' : '选中的模板都不在首页精选里。'),
+  confirm: (on: boolean) => (on ? '设为首页精选' : '取消首页精选'),
+  done: (on: boolean, count: number) => `已${on ? '把' : '从首页精选移出'} ${count} 个模板${on ? '设为首页精选' : ''}，首页随后更新`,
+} as const

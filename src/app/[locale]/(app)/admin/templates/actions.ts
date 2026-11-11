@@ -13,6 +13,7 @@ import {
   runAdminQuery,
   saveTemplate,
   setFeaturedTemplates,
+  setTemplatesFeatured,
   setTemplateActive,
   setTemplateOrder,
   setTemplatesActive,
@@ -23,6 +24,7 @@ import {
   type BulkEditOutcome,
   type CoverTicket,
   type CoverUploadRequest,
+  type FeaturedPlan,
   type SaveTemplatePayload,
 } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
@@ -93,6 +95,16 @@ export async function setFeaturedTemplatesAction(ids: unknown): Promise<ActionRe
   return runAdminAction(async () => {
     await setFeaturedTemplates(createAdminSupabase(), admin.id, ids)
     catalogueChanged()
+  })
+}
+
+// Batch 首页精选 (2026-11-12): the ticked templates in or out; a refusal lists them and saves nothing.
+export async function setTemplatesFeaturedAction(input: unknown): Promise<ActionValue<FeaturedPlan>> {
+  const admin = await requireAdmin()
+  return runAdminQuery(async () => {
+    const plan = await setTemplatesFeatured(createAdminSupabase(), admin.id, input)
+    if (plan.changed.length > 0 && plan.failures.length === 0 && plan.over === 0) catalogueChanged()
+    return plan
   })
 }
 

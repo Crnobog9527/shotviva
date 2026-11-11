@@ -3,6 +3,7 @@ import type { Template } from '@/core/templates'
 
 import type { CoverPurpose } from '../covers/cover-rules'
 import type { BulkEditOutcome, BulkEditPatch } from './bulk-edit-rules'
+import type { FeaturedPlan } from './bulk-featured-rules'
 import type { ActiveChangeOutcome } from './publish-rules'
 
 export type AdminTemplate = Template & {
@@ -63,6 +64,8 @@ export type TemplateAdminActions = {
   setOrder: (input: { group: TemplateOrderGroup; ids: string[]; expectedIds: string[] }) => Promise<ActionResult>
   // The home featured list in display order (T53).
   setFeatured: (ids: string[]) => Promise<ActionResult>
+  // Batch 首页精选 (2026-11-12): the ticked templates in or out, all or nothing.
+  setFeaturedMany: (input: { ids: string[]; featured: boolean; expectedIds: string[] }) => Promise<ActionValue<FeaturedPlan>>
   requestCoverUpload: (input: CoverUploadRequest) => Promise<ActionValue<CoverTicket>>
   applyCover: (input: ApplyCoverRequest) => Promise<ActionResult>
 }
