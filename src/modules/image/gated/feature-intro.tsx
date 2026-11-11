@@ -76,7 +76,7 @@ function IntroActions({ feature, access, onClose, onStart }: ActionProps) {
   }
   const more = feature === 'batch' && (access.kind === 'locked' || (access.kind === 'guide' && access.more))
   return (
-    <div className="flex-none border-t border-border px-4 pt-3 pb-3 md:px-6 md:pt-4 md:pb-6">
+    <div className="flex-none border-t border-border px-4 pt-3 pb-[calc(var(--sab)+12px)] md:px-6 md:pt-4 md:pb-6">
       {access.kind === 'guide' ? (
         <button type="button" onClick={start} className={buttonVariants({ variant: 'cta', size: 'cta' })}>
           {t('batch.start')}
