@@ -586,7 +586,6 @@
 @source "../core/templates/generation-inputs.ts";
 @source "../core/templates/generation-template.ts";
 @source "../core/templates/image-capabilities.ts";
-@source "../core/templates/image-header.ts";
 @source "../core/templates/image-options.ts";
 @source "../core/templates/index.ts";
 @source "../core/templates/list-templates.ts";

@@ -305,8 +305,9 @@
   .mk-panel-size-m .mk-field { padding: 0; }
   .mk-panel-size-m .mk-field-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .mk-panel-size-m select { width: auto; max-width: 42vw; }
+  .mk-panel-note-l { flex: 1; min-width: 0; }
   .mk-panel-note {
-    flex: 1; min-width: 0; height: 44px; padding: 0 14px; border: 0; border-radius: var(--radius-button); font: 400 16px/1 var(--font-sans);
+    width: 100%; min-width: 0; height: 44px; padding: 0 14px; border: 0; border-radius: var(--radius-button); font: 400 16px/1 var(--font-sans);
     color: var(--foreground); background: var(--wash-faint); box-shadow: inset 0 0 0 1px var(--input); transition: box-shadow .2s;
   }
   .mk-panel-note::placeholder { color: var(--muted-foreground); }
@@ -336,6 +337,7 @@
       grid-template-columns: 320px minmax(0, 1fr); grid-template-rows: auto auto auto auto auto 1fr;
       grid-template-areas: "head up" "stage up" "stage err" "stage rail" "stage row" "stage cta";
     }
+    .mk-panel-noup { grid-template-rows: auto auto auto auto 1fr; grid-template-areas: "head err" "stage rail" "stage row" "stage cta" "stage ."; }
     .mk-stage { --h: clamp(200px, calc(100cqw / var(--r, .8)), 260px); }
     .mk-up { margin-top: 0; padding: 16px 18px; }
     .mk-rail { margin: 12px 0 0; padding: 2px; }
