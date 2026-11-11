@@ -3,6 +3,7 @@ import { Suspense } from 'react'
 
 import { SiteFooter } from '@/core/content'
 import { NavMenu } from '@/core/content/blocks/nav-menu'
+import { isGalleryEnabled } from '@/core/gallery'
 import type { Locale } from '@/core/i18n'
 import { FooterLocales, FooterLocalesFallback, Link, LocaleMenu, NavLink } from '@/core/i18n/ui'
 import { footerLinksIn } from '@/site/content'
@@ -67,11 +68,17 @@ export async function MarketingHeader({ locale }: { locale: Locale }) {
 
 // Footer: contact, copyright, legal links and the text language switch (ARCHITECTURE §17).
 export async function MarketingFooter({ locale }: { locale: Locale }) {
-  const t = await getTranslations({ locale, namespace: 'affiliate' })
+  const [t, galleryText, galleryOpen] = await Promise.all([
+    getTranslations({ locale, namespace: 'affiliate' }),
+    getTranslations({ locale, namespace: 'gallery' }),
+    isGalleryEnabled(site),
+  ])
+  // The public gallery's one site-wide entry (ARCHITECTURE §9 第 1 条): only while it is open.
+  const links = galleryOpen ? [{ href: '/gallery' as const, label: galleryText('footerLink') }, ...footerLinksIn(locale)] : footerLinksIn(locale)
   return (
     <SiteFooter
       brand={site.brand}
-      links={footerLinksIn(locale)}
+      links={links}
       programLink={{ href: '/partners/join', label: t('programName') }}
       languageSwitch={
         <Suspense fallback={<FooterLocalesFallback />}>

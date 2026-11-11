@@ -1,8 +1,10 @@
 import 'server-only'
+import { revalidateTag } from 'next/cache'
 import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 
 import { AppError, toAppError } from '../errors'
+import { GALLERY_CACHE_TAG } from '../gallery/cache'
 import { logger } from '../logger'
 import { accountStorage, r2Store } from '../storage'
 import { deleteAccount, type AccountStorage, type CancelSubscriptions } from './account-deletion'
@@ -28,6 +30,14 @@ async function run(request: NextRequest, deps: Required<RouteDeps>) {
     storage: deps.storage,
     authAdmin: { deleteUser: (id) => admin.auth.admin.deleteUser(id) },
   })
+  // Their public works are gone with the account; the gallery's cached pages must not keep them
+  // (ARCHITECTURE §9 第 6 条): the next visit rebuilds them.
+  // The account is already gone, so a failure here is logged, never answered as an error.
+  try {
+    revalidateTag(GALLERY_CACHE_TAG, { expire: 0 })
+  } catch (error) {
+    logger.warn('account deletion: gallery cache not expired', { error })
+  }
   // Clears this browser's cookies; the refresh token died with the user.
   const supabase = await createServerSupabase()
   await supabase.auth.signOut({ scope: 'local' })

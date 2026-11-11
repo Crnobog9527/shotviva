@@ -2,7 +2,7 @@ import { baselineOffers, type OfferFacts } from '../../offer'
 import { defineContentPage, type CostBills } from '@/core/content'
 
 import { site } from '../../../site.config'
-import { CATEGORY, pairImage, SIZE_COUNT } from '../../landing-shared'
+import { CATEGORY, pairImage, SIZE_COUNT, withFirstFrame } from '../../landing-shared'
 import { zhPricingRelated } from '../shared'
 import { foodHalfDayUsd, MENU_DISHES, photoSeconds, usd, usdRange } from '../../offer'
 import { PLATFORM_SPECS, px } from '../../platform-specs'
@@ -54,7 +54,7 @@ const copy = {
   subtitle: '用你真实拍的菜品照片，只换光线、背景和摆盘环境，不会生成你店里没有的菜。',
   answerBlock: `AI菜单配图从你真实拍的菜品照片出发，只换光线、背景和摆盘环境，盘里的菜保持原样，不会凭空生成不存在的菜。在 ${brand} 上传一张手机照片，选「外卖菜单」「暗调氛围」或「促销海报」模板，就能下载${zhTierList}的成图。新用户送 ${zhFreeImages}。`,
   hero: {
-    before: pairImage('example-dish-before', '手机随手拍：后厨出菜口上的一盘菜，顶灯偏硬（示意图）'),
+    before: withFirstFrame(pairImage('example-dish-before', '手机随手拍：后厨出菜口上的一盘菜，顶灯偏硬（示意图）')),
     after: pairImage('example-dish-after', '同一盘菜做成明亮的外卖平台图，柔和日光，外卖菜单模板（示意图）'),
     caption: '你的手机照片 → 外卖菜单模板：还是这盘菜，光线更亮 · 示意图',
     cta: { label: '上传照片', href: '/generate' },

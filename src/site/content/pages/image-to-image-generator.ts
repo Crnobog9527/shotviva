@@ -3,7 +3,7 @@ import { defineContentPage, type EditCases, type ShootDemo } from '@/core/conten
 
 import { site } from '../../site.config'
 import { productBills } from '../home'
-import { caseImage, sizeCountWord } from '../landing-shared'
+import { caseImage, sizeCountWord, withFirstFrame } from '../landing-shared'
 import { pricingRelated } from '../shared'
 import { freeImagesLabel, FreeImagesLabel, photoSeconds, plansSentence, SET_PHOTOS, tierList, tierPixels, uploadLimits } from '../offer'
 
@@ -81,7 +81,7 @@ const copy = {
   subtitle: 'Start from your own photo, not a blank text box. The subject stays as shot.',
   answerBlock: `Image to image generator tools make a new picture from a photo you upload. The ${brand} generator works with templates: pick one for food, products, beauty, rooms, pets or an art style, and it sets the light, the scene or the style for you. The subject stays as shot, and new users get ${freeImagesLabel}.`,
   hero: {
-    before: catPhone,
+    before: withFirstFrame(catPhone),
     after: catAnime,
     caption: 'Your phone photo → anime style: the same cat, now drawn',
     cta: { label: 'Upload photo', href: '/generate' },

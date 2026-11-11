@@ -2,7 +2,7 @@ import sharp from 'sharp'
 import { describe, expect, it } from 'vitest'
 
 import { png } from '../../../tests/fakes/images'
-import { applyWatermark, shouldWatermark } from './watermark'
+import { applyWatermark, galleryImage, shouldWatermark } from './watermark'
 
 async function region(image: Uint8Array, left: number, top: number) {
   return sharp(image).extract({ left, top, width: 64, height: 24 }).raw().toBuffer()
@@ -43,5 +43,15 @@ describe('watermark', () => {
     // Top-left still see-through; the mark's corner is not.
     expect(Math.max(...(await alpha(0, 0, 40)))).toBe(0)
     expect(Math.max(...(await alpha(900 - 200, 600 - 50, 40)))).toBeGreaterThan(0)
+  })
+
+  // T108: the gallery's copy is scaled, never enlarged, WebP, and marked only for free works.
+  it('makes the gallery copy: scaled WebP, marked only when asked', async () => {
+    const original = await png(1536, 1152)
+    const marked = await galleryImage(original, 480, true)
+    const clean = await galleryImage(original, 480, false)
+    expect(await sharp(marked).metadata()).toMatchObject({ format: 'webp', width: 480, height: 360 })
+    expect(Buffer.from(marked).equals(Buffer.from(clean))).toBe(false)
+    expect(await sharp(await galleryImage(await png(300, 200), 960, false)).metadata()).toMatchObject({ width: 300, height: 200 })
   })
 })
