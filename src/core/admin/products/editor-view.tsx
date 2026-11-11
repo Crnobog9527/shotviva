@@ -20,7 +20,7 @@ function History({ item }: { item: Editor }) {
   const more = item.history[19]
   return <section><h2>{E.history}</h2><ol>{item.history.slice(0,20).map(r => <li key={r.id} className="border-t py-2">
     {r.created_at} · {r.base_revision ?? E.empty} → {r.revision} · {E[r.status]} · {r.reason}
-    <small className="block">{E.owner} {r.actor_id} · {E.request} <Link href={href(item.product_id)+'&release='+r.id} className="underline">{r.id}</Link></small>
+    <small className="block">{E.owner} {r.actor_id ?? E.deletedOwner} · {E.request} <Link href={href(item.product_id)+'&release='+r.id} className="underline">{r.id}</Link></small>
     {r.last_error && <p>{E.retry} · {r.last_error}</p>}
   </li>)}</ol>{item.history.length>20 && more && <Link href={href(item.product_id)+'&before='+encodeURIComponent(more.created_at)+'&beforeId='+more.id}>{E.nextPage}</Link>}</section>
 }

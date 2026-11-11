@@ -1,6 +1,6 @@
 -- The retry key and the provider request become immutable together, before calling the provider.
 create table admin.catalog_checkout_attempts (
-  token uuid primary key, user_id uuid not null references public.profiles(id), product_id text not null,
+  token uuid primary key, user_id uuid not null references public.profiles(id) on delete cascade, product_id text not null,
   revision integer not null, channel text not null check (channel in ('stripe','waffo')),
   request_hash text not null, price_id text not null, unit_cents integer not null, net_cents integer not null,
   credits integer not null, paid_days integer, method text not null, form text not null,

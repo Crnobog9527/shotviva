@@ -2,7 +2,7 @@ import 'server-only'
 import { z } from 'zod'
 
 import { type RpcClient, toRpcError } from '../billing'
-import { productIdSchema } from '../config'
+import { productIdSchema } from '../config/product-id'
 import { normalizeCode } from './index'
 import { AppError } from '../errors'
 import { belowDiscountFloor, campaignCatalog, type CatalogInput, type CodeProduct } from './admin'

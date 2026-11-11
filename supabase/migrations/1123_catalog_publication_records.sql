@@ -9,7 +9,8 @@ create table admin.catalog_publications (
   product_id text not null,
   revision integer not null,
   base_revision integer,
-  actor_id uuid not null references public.profiles(id),
+  -- Who saved the draft. A deleted admin account keeps the history (SET NULL), like codes.created_by.
+  actor_id uuid references public.profiles(id) on delete set null,
   reason text not null check(length(trim(reason)) between 1 and 500),
   status text not null default 'draft' check (status in ('draft','superseded','prepared','published')),
   stripe_account text,

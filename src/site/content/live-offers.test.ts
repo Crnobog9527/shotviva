@@ -14,12 +14,14 @@ it.each(['en', 'zh'] as const)('uses the listed offers on the %s home and landin
   const home = homePageIn(locale, changed)
   expect(home.freeOffer.plans.text).toContain('$36.54')
   expect(home.freeOffer.plans.text).toContain('$8.76')
-  expect(home.costBills.site.lines[0]?.label).toContain('4321')
+  // The home bills leave the plan line to the plan strip, which needs all three monthly plans.
+  expect(home.costBills.site.total.amount).toEqual('$36.54')
+  expect(home.plans).toBeUndefined()
   for (const { slug } of contentPagesIn(locale)) {
     const page = findContentPageIn(slug, locale, changed)
     expect(page?.costBills?.site.total.amount).toEqual('$36.54')
     expect(JSON.stringify(page)).not.toContain('$19.90')
   }
   expect(softwareApplicationLd(site, { path: '/', title: home.title, description: home.description }, changed).offers)
-    .toMatchObject([{ price: '0' }, { name: 'pro_monthly', price: '36.54' }, { name: 'pack_s', price: '8.76' }])
+    .toMatchObject([{ price: '0' }, { name: 'Pro Monthly', price: '36.54' }, { name: 'Credit Pack, 321 credits', price: '8.76' }])
 })

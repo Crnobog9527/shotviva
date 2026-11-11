@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
-import { productIdSchema, type SiteProduct } from '../../config'
+import { type SiteProduct } from '../../config'
+import { productIdSchema } from '../../config/product-id'
 import { AppError } from '../../errors'
 import type { CheckoutPrice } from '../checkout-price'
 import type { CheckoutMethod } from '../stripe/catalog'

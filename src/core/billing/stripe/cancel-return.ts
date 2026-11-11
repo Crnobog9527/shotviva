@@ -1,7 +1,8 @@
 import { z } from 'zod'
 
 import { PAYMENT_METHODS } from '../../analytics/events'
-import { productIdSchema, type ProductId } from '../../config'
+import { type ProductId } from '../../config'
+import { productIdSchema } from '../../config/product-id'
 import { localizePath } from '../../i18n/paths'
 import type { CheckoutBody } from './checkout'
 

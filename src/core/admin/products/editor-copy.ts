@@ -6,7 +6,7 @@ export const E = {
   price: '售价', version: '版本', field: '字段', status: '状态', order: '排序', listed: '上架', hidden: '下架', empty: '—',
   overview: '商品详情', forms: 'Stripe 人工操作清单', key: 'Lookup key', oldPrice: '原 Price', newPrice: '目标 Price ID',
   amountCents: '金额（USD 分）', interval: '周期', monthly: '每月', yearly: '每年', pack: '一次性',
-  check: '读回全部售价并发布', history: '发布记录', time: '创建时间', owner: '操作人', nextPage: '下一页',
+  check: '读回全部售价并发布', history: '发布记录', time: '创建时间', owner: '操作人', deletedOwner: '已删除的账号', nextPage: '下一页',
   retry: '待重试', done: '操作已完成。', frozen: '此版本已确认。按下面的清单在对应 Stripe 账户完成操作。',
   stripeInstructions: '保持 Product 启用并设置下列税码与 tier。每个 Price 使用 USD、exclusive 税制和 metadata.product_id。金额不变的售价沿用原 Price ID。',
   moved: '金额有变化或为新品时，新建 Price、转移对应 lookup key，并在新 Price 的 metadata.catalog_publication_id 填写此发布号。保留原 Price，等待归档提示。',

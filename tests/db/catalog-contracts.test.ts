@@ -126,6 +126,23 @@ it('pins the Price and credits across publication, retries, a delayed purchase a
   expect((await profileOf(db, user)).credits).toBe(6666)
 })
 
+it('lets a buyer who opened a catalog checkout delete the account, taking attempts, receipts and contracts with it', async () => {
+  const token = randomUUID()
+  await db.query("insert into admin.catalog_stripe_environment(stripe_account,livemode) values('acct_contract',false)")
+  await revise(3, 3333, 9900)
+  await bind(3, false)
+  await attempt(token, 3, 9900, 'price_NewRecurring')
+  await db.query('select public.attach_catalog_session($1,$2,$3,$4)', [user, token, 'cs_delete', 'https://checkout.stripe.com/c/test'])
+  await receipt(token, 3, 'price_NewRecurring', 9900, 3333, 'cs_delete')
+  expect((await pay('cs_delete')).rows[0].applied).toBe(true)
+  const left = async () => (await db.query(`select (select count(*) from admin.catalog_checkout_attempts where token=$1)
+    + (select count(*) from admin.catalog_receipts where token=$1) + (select count(*) from admin.catalog_contracts where token=$1) n`, [token])).rows[0].n
+  expect(Number(await left())).toBe(3)
+  await db.query('delete from auth.users where id=$1', [user])
+  expect((await db.query('select id from public.profiles where id=$1', [user])).rowCount).toBe(0)
+  expect(Number(await left())).toBe(0)
+})
+
 it('grandfathers the approved v2 contract and refuses unverified channels on later revisions', async () => {
   await db.query("insert into admin.catalog_stripe_environment(stripe_account,livemode) values('acct_contract',false)")
   await bind(2, true)

@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { MEMBERSHIP_TIERS, productIdSchema, type SiteProduct } from '../config'
+import { MEMBERSHIP_TIERS, type SiteProduct } from '../config'
+import { productIdSchema } from '../config/product-id'
 
 const base = z.object({
   product_id: productIdSchema, revision: z.int().positive(), usd_cents: z.int().positive(),

@@ -7,6 +7,7 @@ import { publishedOffers, historicalProducts, waffoOffers } from '@/core/billing
 import { FAILED_READ_LIFE } from '@/core/cache-life'
 import { serverEnv } from '@/core/env'
 import { logger } from '@/core/logger'
+import type { SiteProduct } from '@/core/config'
 import { publicEnv } from '@/core/public-env'
 import { site } from '../site.config'
 
@@ -19,7 +20,27 @@ export function contractProducts(db = createAdminSupabase()) {
   return historicalProducts(db, site.billing.pricingVersion)
 }
 
-export async function displayProducts() {
+// The last catalog this server instance read successfully. A failed read serves it (or, on a
+// cold instance, an empty list) for FAILED_READ_LIFE only, so a database blip never caches
+// "coming soon" and empty JSON-LD offers for hours; checkout always re-reads (currentProducts).
+let lastGood: readonly SiteProduct[] | undefined
+const RETRY_DELAYS_MS = [200, 800]
+
+async function readDisplayCatalog() {
+  const env = serverEnv()
+  return env.PAYMENT_CHANNEL === 'waffo'
+    ? waffoOffers(createAdminSupabase(), site.billing.pricingVersion, env.WAFFO_STORE_ID ?? '', env.WAFFO_ENVIRONMENT)
+    : currentProducts()
+}
+
+async function readWithRetry(): Promise<readonly SiteProduct[]> {
+  for (const delay of RETRY_DELAYS_MS) {
+    try { return await readDisplayCatalog() } catch { await new Promise(resolve => setTimeout(resolve, delay)) }
+  }
+  return readDisplayCatalog()
+}
+
+export async function displayProducts(): Promise<readonly SiteProduct[]> {
   'use cache'
   cacheTag('billing-products')
   // The repository builds and audits static HTML without a configured database in CI.
@@ -29,15 +50,13 @@ export async function displayProducts() {
     return site.billing.products
   }
   try {
-    const env = serverEnv()
-    const products = env.PAYMENT_CHANNEL === 'waffo'
-      ? await waffoOffers(createAdminSupabase(), site.billing.pricingVersion, env.WAFFO_STORE_ID ?? '', env.WAFFO_ENVIRONMENT)
-      : await currentProducts()
+    const products = await readWithRetry()
+    lastGood = products
     cacheLife('hours')
     return products
   } catch (error) {
-    logger.warn('billing.display_catalog_unavailable', { error })
+    logger.warn('billing.display_catalog_unavailable', { error, fallback: lastGood ? 'last_good' : 'empty' })
     cacheLife(FAILED_READ_LIFE)
-    return []
+    return lastGood ?? []
   }
 }

@@ -4,7 +4,7 @@ import { redirect, unstable_rethrow } from 'next/navigation'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { phases, review, safeFailure } from '@/core/admin/products/workflow'
 import { saveDraft } from '@/core/admin/products/editor-data'
-import { productIdSchema } from '@/core/config'
+import { productIdSchema } from '@/core/config/product-id'
 
 export async function catalogAction(form: FormData) {
   const actor = await requireAdmin()

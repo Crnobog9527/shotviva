@@ -1,6 +1,7 @@
 import { AppError } from '../../errors'
 import { COPY, PRODUCTS } from './copy'
-import { productIdSchema, type ProductId } from '../../config'
+import { type ProductId } from '../../config'
+import { productIdSchema } from '../../config/product-id'
 
 const messages: Record<string,string> = {
   INVALID_CODE_FIELDS: COPY.invalid, INVALID_INPUT: COPY.invalid, INVALID_DISCOUNT: COPY.invalidPercent,

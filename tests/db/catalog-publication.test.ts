@@ -101,3 +101,9 @@ it('continues to show history with no private policy and refuses a previously pr
   expect(detail.history).toEqual(expect.arrayContaining([expect.objectContaining({id,status:'prepared'})]))
   await rejected(() => publish(id,prices('New')), 'CATALOG_POLICY_REQUIRED')
 })
+
+it('keeps the publication history when the admin who saved it deletes the account', async () => {
+  const id = (await save(actor)).rows[0]!.id
+  await sql.query('delete from auth.users where id=$1',[actor])
+  expect((await sql.query('select actor_id,status from admin.catalog_publications where id=$1',[id])).rows).toEqual([{actor_id:null,status:'draft'}])
+})

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
-import { productIdSchema, type ProductId } from '../../config'
+import { type ProductId } from '../../config'
+import { productIdSchema } from '../../config/product-id'
 
 // What the return address carries (T43). Stripe: the Checkout Session id that Stripe fills into
 // success_url ({CHECKOUT_SESSION_ID}). Waffo has no such placeholder, so its success URL names

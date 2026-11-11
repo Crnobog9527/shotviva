@@ -1,7 +1,8 @@
 import { z } from 'zod'
 
 import { belowDiscountFloor, type CodeProduct } from '../../codes/admin'
-import { productIdSchema, type ProductId } from '../../config'
+import { type ProductId } from '../../config'
+import { productIdSchema } from '../../config/product-id'
 import { beijingLocalToIso, toBeijingLocal } from '../shell/format'
 import { COPY, PRODUCTS } from './copy'
 

@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 import { CREDIT_POOLS } from '../billing/pools'
 import { MAX_BATCH_SIZE } from '../billing/tier-limits'
-import { productIdSchema } from '../config'
+import { productIdSchema } from '../config/product-id'
 import { INQUIRY_USES, MONTHLY_VOLUMES } from '../inquiries/summary-choices'
 import { EDIT_SCOPES } from '../templates/edit-params'
 import { UPLOAD_SIZE_BUCKETS } from './event-values'

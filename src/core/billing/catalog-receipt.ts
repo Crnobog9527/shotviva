@@ -1,7 +1,8 @@
 import 'server-only'
 import { z } from 'zod'
 
-import { MEMBERSHIP_TIERS, productIdSchema, type SiteProduct } from '../config'
+import { MEMBERSHIP_TIERS, type SiteProduct } from '../config'
+import { productIdSchema } from '../config/product-id'
 import { AppError } from '../errors'
 import { callRpc, type RpcClient } from './rpc'
 

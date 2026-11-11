@@ -2,7 +2,8 @@ import 'server-only'
 
 import { z } from 'zod'
 
-import { productIdSchema, type ProductId } from '../config'
+import { type ProductId } from '../config'
+import { productIdSchema } from '../config/product-id'
 import { CREDIT_POOLS, type CreditPool } from './pools'
 import { callRpc, type RpcClient } from './rpc'
 

@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { MEMBERSHIP_TIERS, productIdSchema, type SiteProduct } from '../../config'
+import { MEMBERSHIP_TIERS, type SiteProduct } from '../../config'
+import { productIdSchema } from '../../config/product-id'
 import { desiredPrices } from '../../billing/stripe/catalog'
 
 export const terms = z.object({
@@ -10,7 +11,7 @@ export const terms = z.object({
 const status = z.enum(['draft', 'superseded', 'prepared', 'published'])
 const historyRow = z.object({
   id: z.uuid(), revision: z.int(), base_revision: z.int().nullable(), status, reason: z.string(),
-  actor_id: z.uuid(), last_error: z.string().nullable(), created_at: z.string(),
+  actor_id: z.uuid().nullable(), last_error: z.string().nullable(), created_at: z.string(),
 })
 const tier = z.enum([...MEMBERSHIP_TIERS, 'pack'])
 const kind = z.enum(['monthly', 'yearly', 'pack'])

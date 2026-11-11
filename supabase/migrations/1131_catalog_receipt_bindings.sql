@@ -1,11 +1,11 @@
 -- Authenticated provider receipts bind a single event to one frozen quote. An invoice may
 -- arrive before the checkout notification. Both carry the attempt on subscription metadata.
 create table admin.catalog_contracts (
-  channel text not null, subscription_id text not null, token uuid not null references admin.catalog_checkout_attempts(token),
+  channel text not null, subscription_id text not null, token uuid not null references admin.catalog_checkout_attempts(token) on delete cascade,
   primary key(channel,subscription_id), unique(token)
 );
 create table admin.catalog_receipts (
-  event_key text primary key, token uuid not null references admin.catalog_checkout_attempts(token),
+  event_key text primary key, token uuid not null references admin.catalog_checkout_attempts(token) on delete cascade,
   initial_payment boolean not null
 );
 create unique index catalog_single_initial_payment on admin.catalog_receipts(token) where initial_payment;

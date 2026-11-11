@@ -1,7 +1,7 @@
 import type { Client } from 'pg'
 import { beforeEach, afterEach, expect, it } from 'vitest'
 import { seedCatalogPolicy } from './catalog-policy'
-import { connectAdmin } from './helpers'
+import { connectAdmin, createUser } from './helpers'
 
 let db: Client
 beforeEach(async () => {
@@ -44,4 +44,20 @@ it('blocks a conflicting campaign at creation, reactivation, reprice and delisti
   await db.query("update admin.catalog_products set published_revision=null where product_id='pack_s'")
   await reject("update public.codes set active=true where code='CATALOGQA'",'CODE_DISCOUNT_PRODUCTS')
   await reject(campaign.replace('CATALOGQA','CATALOGQB'),'CODE_DISCOUNT_PRODUCTS')
+})
+
+it('lets a campaign target a newly published SKU and still checks its floor', async () => {
+  const actor = await createUser(db)
+  await db.query("update public.profiles set role='admin' where id=$1",[actor])
+  const terms = { name_en: 'Extra pack',name_zh: '加量包',benefit_en: 'Studio credits',benefit_zh: '摄影积分',usd_cents: 3500,credits: 1441,sort_order: 9,listed: true }
+  const id = (await db.query("select public.admin_catalog_save($1,'pack_extra',null,null,$2,'新增积分包') id",[actor,terms])).rows[0].id
+  await db.query("select public.admin_catalog_prepare($1,$2,'acct_test',false,'{}')",[actor,id])
+  await db.query("select public.admin_catalog_publish($1,$2,'acct_test',false,$3)",[actor,id,{pack_extra_v2:'price_Extra'}])
+  const campaign = (code: string, percent: number) => `insert into public.codes(code,kind,active,discount_percent,discount_products,discount_duration,stripe_coupon_id)
+    values('${code}','campaign',true,${percent},array['pack_extra'],'once','coupon_qa')`
+  await db.query(campaign('CATALOGNEW', 5))
+  expect((await db.query("select discount_products from public.codes where code='CATALOGNEW'")).rows[0].discount_products).toEqual(['pack_extra'])
+  await reject(campaign('CATALOGDEEP', 90),'CODE_DISCOUNT_PRODUCTS')
+  await reject(`insert into public.codes(code,kind,active,discount_percent,discount_products,discount_duration,stripe_coupon_id)
+    values('CATALOGBAD','campaign',false,5,array['Pack Extra'],'once','coupon_qa')`,'codes_discount_products_check')
 })
