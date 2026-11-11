@@ -7,6 +7,7 @@ import { coverImage } from '@/core/ui/cover-image'
 import { hasStills, type CatalogueTemplate } from '../catalogue/catalogue-template'
 import { COVER_SIZES } from '../catalogue/cover-sizes'
 import { PairMedia } from '../catalogue/pair-media'
+import { SeriesBadge } from '../catalogue/series-badge'
 
 // `label`: the series' name and size ("Neon Night · 4 templates"), naming the group.
 type Props = { label: string; members: readonly CatalogueTemplate[]; value: string; onChange(id: string): void }
@@ -19,7 +20,10 @@ type Props = { label: string; members: readonly CatalogueTemplate[]; value: stri
 export function MemberPicker({ label, members, value, onChange }: Props) {
   return (
     <div>
-      <p id="series-members" className="mb-2 text-label leading-[1.3] font-medium">{label}</p>
+      <p className="mb-2 flex items-center gap-2 text-label leading-[1.3] font-medium">
+        <SeriesBadge onPhoto={false} />
+        <span id="series-members">{label}</span>
+      </p>
       <div role="radiogroup" aria-labelledby="series-members"
         className="no-scrollbar -mx-4 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:grid md:grid-cols-4 md:overflow-visible md:px-0 md:pb-0">
         {members.map((member, index) => (
