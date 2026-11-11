@@ -1,6 +1,7 @@
-// The page's time ranges (ARCHITECTURE §16.2a): today, 7 days, 30 days, each compared with the
-// period just before it. "Today" is the Beijing day the rest of the admin uses (shell/format.ts),
-// compared with yesterday up to the same time.
+// The page's time ranges (ARCHITECTURE §16.2a/§16.2b): today, 7 days, 30 days in Beijing days,
+// the way the overview counts them (admin_dashboard_stats: today and the 6 days before it). Each
+// is compared with the same number of days just before it, up to the same time of day, so a
+// period that is still running is never compared with a finished one.
 
 export const RANGES = ['today', '7d', '30d'] as const
 export type Range = (typeof RANGES)[number]
@@ -21,10 +22,13 @@ function beijingMidnight(now: Date): number {
   return local - (local % DAY_MS) - BEIJING_OFFSET_MS
 }
 
+export const RANGE_DAYS: Record<Range, number> = { today: 1, '7d': 7, '30d': 30 }
+
 export function windowFor(range: Range, now: Date): Window {
   const end = now.getTime()
-  const span = range === 'today' ? DAY_MS : (range === '7d' ? 7 : 30) * DAY_MS
-  const start = range === 'today' ? beijingMidnight(now) : end - span
+  const days = RANGE_DAYS[range]
+  const span = days * DAY_MS
+  const start = beijingMidnight(now) - (days - 1) * DAY_MS
   const iso = (ms: number) => new Date(ms).toISOString()
   return { range, start: iso(start), end: iso(end), prevStart: iso(start - span), prevEnd: iso(end - span) }
 }

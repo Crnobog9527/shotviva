@@ -33,8 +33,9 @@ describe('analytics formatting', () => {
   })
 
   it('keeps range, dimension and sort in the URL, leaving defaults out', () => {
-    const query = { range: '7d', dim: 'none', sort: 'views' } as const
+    const query = { view: 'overview', range: '7d', dim: 'none', sort: 'views' } as const
     expect(analyticsHref(query)).toBe('/admin/analytics')
+    expect(analyticsHref(query, { view: 'details' })).toBe('/admin/analytics?view=details')
     expect(analyticsHref(query, { range: 'today' })).toBe('/admin/analytics?range=today')
     expect(analyticsHref({ ...query, dim: 'device' }, { sort: 'bounce' }, '#pages')).toBe('/admin/analytics?dim=device&sort=bounce#pages')
   })
