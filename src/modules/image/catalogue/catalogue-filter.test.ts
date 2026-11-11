@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { ALL, chipRows, filterCatalogue, openableTemplates, readSelection, resolvePath, selectionSearch } from './catalogue-filter'
+import { ALL, chipRows, createReturnPath, filterCatalogue, openableTemplates, readSelection, resolvePath, selectionSearch } from './catalogue-filter'
 import type { CatalogueTemplate } from './catalogue-template'
 import type { CatalogueSeries, FilterNode, GridEntry } from './catalogue-view'
 
@@ -77,5 +77,19 @@ describe('catalogue filter (ARCHITECTURE §5, §5.1b)', () => {
   it('can open every grid template and every series member, once each', () => {
     const twice: GridEntry[] = [...entries, { type: 'template', template: m1, path: ['pets'] }]
     expect(openableTemplates(twice).map((t) => t.id)).toEqual(['m1', 'm2', 'a', 'b'])
+  })
+})
+
+// A signed-out visitor who opened a series from a public card comes back to that series.
+describe('Create return path after sign-in', () => {
+  it('keeps a series slug or id', () => {
+    expect(createReturnPath('qa-t102-dark-menu')).toBe('/generate?series=qa-t102-dark-menu')
+    expect(createReturnPath('3fa01bf9-3692-49f5-9347-7e32b3aab260')).toBe('/generate?series=3fa01bf9-3692-49f5-9347-7e32b3aab260')
+  })
+
+  it('drops anything else, so no other text rides into next', () => {
+    for (const bad of [undefined, '', ['a', 'b'], 'Dark Menu', 'a&next=//evil.example', '../admin', 'x'.repeat(81)]) {
+      expect(createReturnPath(bad as string | string[] | undefined)).toBe('/generate')
+    }
   })
 })
