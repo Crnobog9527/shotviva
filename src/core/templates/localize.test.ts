@@ -20,8 +20,8 @@ const base: Template = {
   fields: {
     images: { min: 1, max: 1 },
     copy: [
-      { key: 'headline', label: 'Headline', required: true, maxLength: 40 },
-      { key: 'price', label: 'Price', required: false, maxLength: 12 },
+      { key: 'headline', label: 'Headline', type: 'short', required: true, maxLength: 40, public: false },
+      { key: 'price', label: 'Price', type: 'short', required: false, maxLength: 12, public: false },
     ],
     aspectRatios: ['1:1'],
     toggles: [],
@@ -65,6 +65,23 @@ describe('localizeTemplate (ARCHITECTURE §5, LAUNCH §7.6 #5)', () => {
   it('leaves English pages untouched', () => {
     const translated = { ...base, translations: { zh: { name: '促销海报' } } }
     expect(localizeTemplate(translated, 'en').name).toBe('Promo Poster')
+  })
+})
+
+describe('custom field text', () => {
+  const sized = {
+    ...base,
+    fields: {
+      ...base.fields,
+      copy: [{ key: 'size', label: 'Size', type: 'select' as const, help: 'Pick one', options: ['Small', 'Large'], required: true, maxLength: 60, public: false }],
+    },
+    translations: { zh: { fields: { size: { label: '尺寸', help: '选一个', options: { Small: '小' } } } } },
+  }
+
+  it('shows Chinese help and option labels, English where missing, and keeps the English values', () => {
+    const [field] = localizeTemplate(sized, 'zh').fields.copy
+    expect(field).toMatchObject({ label: '尺寸', help: '选一个', options: ['Small', 'Large'], optionLabels: { Small: '小', Large: 'Large' } })
+    expect(localizeTemplate(sized, 'en').fields.copy[0]).toMatchObject({ label: 'Size', help: 'Pick one', optionLabels: { Small: 'Small', Large: 'Large' } })
   })
 })
 

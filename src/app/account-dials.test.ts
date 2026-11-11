@@ -80,11 +80,14 @@ describe('credit dials', () => {
 })
 
 describe('film strip', () => {
-  const fileUrl = (id: string) => `/api/files/${id}`
+  const thumbUrl = (id: string) => `/api/files/${id}/thumb`
 
   it('shows the frames, links each into its photo and the rest into Photos', async () => {
     const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g']
-    const { html, text } = await render(createElement(FilmStrip, { ids, count: 12, fileUrl }))
+    const { html, text } = await render(createElement(FilmStrip, { ids, count: 12, thumbUrl }))
+    // The strip shows each work's small copy, never the full file.
+    expect(html).toContain('src="/api/files/a/thumb"')
+    expect(html).not.toContain('src="/api/files/a"')
     expect(text).toContain('This month · 12 photos')
     expect(html.match(/<img /g)).toHaveLength(7)
     expect(html).toContain('href="/photos/a"')
@@ -93,7 +96,7 @@ describe('film strip', () => {
   })
 
   it('no "+N" frame when everything fits; nothing at all for an empty month', async () => {
-    expect((await render(createElement(FilmStrip, { ids: ['a'], count: 1, fileUrl }))).html).not.toContain('+')
-    expect((await render(createElement(FilmStrip, { ids: [], count: 0, fileUrl }))).html).toBe('')
+    expect((await render(createElement(FilmStrip, { ids: ['a'], count: 1, thumbUrl }))).html).not.toContain('+')
+    expect((await render(createElement(FilmStrip, { ids: [], count: 0, thumbUrl }))).html).toBe('')
   })
 })

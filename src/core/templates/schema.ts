@@ -4,6 +4,7 @@ import { RESOLUTIONS } from './output-options'
 import { styleRefsSchema } from './style-refs'
 import { creditsCostSchema, TEMPLATE_QUALITIES } from './pricing'
 import { RESERVED_KEYS, toggleFieldSchema, TOGGLES_MAX } from './toggles'
+import { copyFieldSchema } from './copy-fields'
 
 // Template shapes shared by the admin page, the import script and (later) generation.
 // No `server-only` here: scripts/import-prompts.ts validates with the same schema.
@@ -18,15 +19,6 @@ export const COVER_MEDIA_TYPES = ['image', 'animated', 'video'] as const
 export type CoverMediaType = (typeof COVER_MEDIA_TYPES)[number]
 
 const slug = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'lowercase letters, digits and dashes')
-
-export const copyFieldSchema = z.object({
-  key: z.string().regex(/^[a-z][a-z0-9_]*$/),
-  label: z.string().min(1).max(60),
-  // Hint inside the empty input; optional in every language (ARCHITECTURE §5).
-  placeholder: z.string().max(200).optional(),
-  required: z.boolean().default(false),
-  maxLength: z.number().int().min(1).max(4000).default(200),
-})
 
 export const templateFieldsSchema = z
   .object({
@@ -55,8 +47,10 @@ export const templateFieldsSchema = z
   })
 
 export type TemplateFields = z.infer<typeof templateFieldsSchema>
-// templates.fields as stored: rows written before T89 have no `toggles` (toTemplate fills []).
-export type StoredTemplateFields = Omit<TemplateFields, 'toggles'> & { toggles?: TemplateFields['toggles'] }
+// templates.fields as stored: rows written before T89 have no `toggles`, and copy fields written
+// before field types have no `type` / `public` (toTemplate fills the defaults: [] / 'short' / false).
+type StoredCopyField = Omit<TemplateFields['copy'][number], 'type' | 'public'> & Partial<Pick<TemplateFields['copy'][number], 'type' | 'public'>>
+export type StoredTemplateFields = Omit<TemplateFields, 'toggles' | 'copy'> & { toggles?: TemplateFields['toggles']; copy: StoredCopyField[] }
 
 const optionalUrl = z.union([z.url(), z.literal('')]).optional()
 
@@ -85,11 +79,16 @@ const confirmTranslationSchema = z.object({
 export const templateTranslationSchema = z.object({
   name: optionalText(120),
   description: optionalText(300),
-  // Copy fields use label / placeholder; toggles label / hint / confirm (same key namespace).
+  // Copy fields use label / placeholder / help / options (a choice field's English value → its
+  // label here); toggles label / hint / confirm (same key namespace).
   fields: z
     .record(
       z.string().regex(/^[a-z][a-z0-9_]*$/),
-      z.object({ label: optionalText(60), placeholder: optionalText(200), hint: optionalText(200), confirm: confirmTranslationSchema.optional() }),
+      z.object({
+        label: optionalText(60), placeholder: optionalText(200), help: optionalText(200), hint: optionalText(200),
+        confirm: confirmTranslationSchema.optional(),
+        options: z.record(z.string().max(60), optionalText(60)).optional(),
+      }),
     )
     .optional(),
 })
@@ -98,7 +97,7 @@ export type ConfirmTranslation = { title?: string; body?: string; checkbox?: str
 export type TemplateTranslation = {
   name?: string
   description?: string
-  fields?: Record<string, { label?: string; placeholder?: string; hint?: string; confirm?: ConfirmTranslation }>
+  fields?: Record<string, { label?: string; placeholder?: string; help?: string; hint?: string; confirm?: ConfirmTranslation; options?: Record<string, string | undefined> }>
 }
 
 export const templateTranslationsSchema = z.strictObject({ zh: templateTranslationSchema.optional() })

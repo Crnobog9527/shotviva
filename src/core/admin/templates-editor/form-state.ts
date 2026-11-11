@@ -8,6 +8,7 @@ import { toggleFragments, toggleSetupProblems } from '@/core/templates/toggles'
 
 import type { AdminTemplate, SaveTemplatePayload } from '../templates/types'
 import { toFragments, toToggleFields, toToggleValues, toZhToggleText, withoutToggles, type ToggleFormValue } from './toggle-form-state'
+import { copySetupProblems, toCopyFields, toCopyValues, toZhCopyText, withoutCopy, type CopyFormValue } from './copy-form-state'
 
 export type TemplateFormValues = {
   expectedVersion?: number
@@ -39,15 +40,17 @@ export type TemplateFormValues = {
   zh: ZhFormValues
   // The 开关 cards (T89); fieldsJson and modelParamsJson leave their parts out.
   toggles: ToggleFormValue[]
+  // The 用户填写的字段 cards (fields.copy and their Chinese text); fieldsJson leaves them out.
+  copyFields: CopyFormValue[]
 }
 
-export type ZhFormValues = { name: string; description: string; fields: Record<string, { label: string; placeholder: string }> }
+// The template's own Chinese name and one-liner; field text lives on the field cards.
+export type ZhFormValues = { name: string; description: string }
 
-const emptyZh = (): ZhFormValues => ({ name: '', description: '', fields: {} })
+const emptyZh = (): ZhFormValues => ({ name: '', description: '' })
 
 const DEFAULT_FIELDS = {
   images: { min: 1, max: 1 },
-  copy: [],
   aspectRatios: ['1:1', '4:5'],
 }
 
@@ -73,45 +76,19 @@ export function emptyFormValues(): TemplateFormValues {
     modelParamsJson: '{}',
     zh: emptyZh(),
     toggles: [],
+    copyFields: [],
   }
 }
 
 function toZhValues(template: AdminTemplate): ZhFormValues {
   const zh = template.translations.zh
-  const fields = Object.fromEntries(
-    Object.entries(zh?.fields ?? {}).map(([key, text]) => [key, { label: text.label ?? '', placeholder: text.placeholder ?? '' }]),
-  )
-  return { name: zh?.name ?? '', description: zh?.description ?? '', fields }
+  return { name: zh?.name ?? '', description: zh?.description ?? '' }
 }
 
-// Copy-field keys of the current JSON, so the Chinese inputs follow the field definition as
-// it is being edited; unparsable JSON shows none until it parses again.
-export function copyKeys(fieldsJson: string): { key: string; label: string }[] {
-  try {
-    const parsed: unknown = JSON.parse(fieldsJson)
-    const copy = (parsed as { copy?: unknown }).copy
-    if (!Array.isArray(copy)) return []
-    return copy.flatMap((field: unknown) => {
-      const { key, label } = (field ?? {}) as { key?: unknown; label?: unknown }
-      return typeof key === 'string' ? [{ key, label: typeof label === 'string' ? label : key }] : []
-    })
-  } catch {
-    return []
-  }
-}
-
-// Only filled-in text, only for keys the fields still have; {} when nothing is translated.
-// Toggles (T89) add their own label / hint / confirm text under the same `fields`.
-export function toTranslations(zh: ZhFormValues, keys: readonly string[], toggles: readonly ToggleFormValue[] = []) {
-  const fields = Object.fromEntries(
-    keys.flatMap((key) => {
-      const text = zh.fields[key]
-      const label = text?.label.trim()
-      const placeholder = text?.placeholder.trim()
-      return label || placeholder ? [[key, { ...(label ? { label } : {}), ...(placeholder ? { placeholder } : {}) }]] : []
-    }),
-  )
-  Object.assign(fields, toZhToggleText(toggles))
+// Only filled-in text; {} when nothing is translated. The field cards (copy and toggles) add
+// their own text under `fields`.
+export function toTranslations(zh: ZhFormValues, copyFields: readonly CopyFormValue[] = [], toggles: readonly ToggleFormValue[] = []) {
+  const fields = { ...toZhCopyText(copyFields), ...toZhToggleText(toggles) }
   const entry = {
     ...(zh.name.trim() ? { name: zh.name.trim() } : {}),
     ...(zh.description.trim() ? { description: zh.description.trim() } : {}),
@@ -142,7 +119,7 @@ export function toFormValues(template: AdminTemplate): TemplateFormValues {
 
     visibleWeb: template.visibleIn.includes('web'),
     visiblePartner: template.visibleIn.includes('partner'),
-    fieldsJson: pretty(withoutToggles(template.fields)),
+    fieldsJson: pretty(withoutCopy(withoutToggles(template.fields))),
     providerId: template.prompt?.providerId ?? null,
     styleRefs: template.prompt?.styleRefs ?? [],
     styleRefsEdited: false,
@@ -150,6 +127,7 @@ export function toFormValues(template: AdminTemplate): TemplateFormValues {
     modelParamsJson: pretty(withoutToggles(template.prompt?.modelParams ?? {})),
     zh: toZhValues(template),
     toggles: toToggleValues(template),
+    copyFields: toCopyValues(template),
   }
 }
 
@@ -185,8 +163,9 @@ export function creditProblems(values: TemplateFormValues, floor: CreditsFloor):
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 
-// The 开关 cards folded into fields and model params (T89), with the save's own refusal said
-// before the round trip: a toggle without its {{key}} or a fragment (the server checks again).
+// The field and 开关 cards folded into fields and model params (T89), with the save's own refusals
+// said before the round trip: a field card left incomplete, a toggle without its {{key}} or a
+// fragment (the server checks again).
 function privateFragments(values: TemplateFormValues) {
   const saved = values.restoredParams
   if (saved && Object.hasOwn(saved, 'toggles')) {
@@ -205,9 +184,9 @@ function withToggles(values: TemplateFormValues, fields: unknown, params: unknow
   if (!isObject(params)) return { ok: false as const, message: '模型参数要是一个 JSON 对象' }
   const toggles = toToggleFields(values.toggles)
   const modelParams = { ...withoutToggles(params), ...privateFragments(values) }
-  const problems = toggleSetupProblems(toggles, values.promptBody, modelParams)
+  const problems = [...copySetupProblems(values.copyFields), ...toggleSetupProblems(toggles, values.promptBody, modelParams)]
   if (problems.length > 0) return { ok: false as const, message: problems.join('；') }
-  return { ok: true as const, fields: { ...withoutToggles(fields), toggles }, modelParams }
+  return { ok: true as const, fields: { ...withoutCopy(withoutToggles(fields)), copy: toCopyFields(values.copyFields), toggles }, modelParams }
 }
 
 function revision(values: TemplateFormValues) {
@@ -247,7 +226,7 @@ export function buildPayload(values: TemplateFormValues, isNew: boolean, floor: 
         ...storedPrices(values.credits, values.storedCredits, floor.resolutions, isNew),
         visibleIn,
         fields: wired.fields,
-        translations: toTranslations(values.zh, copyKeys(values.fieldsJson).map((field) => field.key), values.toggles),
+        translations: toTranslations(values.zh, values.copyFields, values.toggles),
       },
       prompt: { ...(values.styleRefsEdited ? { styleRefs: values.styleRefs } : {}), providerId: values.providerId, body: values.promptBody, modelParams: wired.modelParams },
     },

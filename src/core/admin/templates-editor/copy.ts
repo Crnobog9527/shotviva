@@ -1,12 +1,37 @@
 // Admin is Chinese-only (DESIGN §7); this editor block's text lives here, not in messages.
 export const zhCopy = {
-  legend: '中文（/zh 页面显示）',
-  hint: '留空的项在中文页面显示英文。提示词不翻译，始终用英文。',
   name: '中文名称',
   description: '中文说明（一句话，选填）',
-  fieldLabel: (key: string) => `字段「${key}」的中文标签`,
-  fieldPlaceholder: (key: string) => `字段「${key}」的中文占位提示`,
-  noFields: '这个模板没有文案字段。',
+} as const
+
+// 用户填写的字段 (ARCHITECTURE §5 fields.copy): what the user types or picks for this template.
+export const copyFieldCopy = {
+  legend: '用户填写的字段（选填，最多 10 个）',
+  hint: '用户在创作区看到的输入项，比如海报标题、价格、尺寸。提示词正文里写 {{key}} 可以指定放在哪里；不写的话，系统会把「英文名称: 用户填的内容」自动加在提示词正文后面。用户填的内容只用于他自己的这次出图。',
+  empty: '这个模板没有要用户填写的字段。',
+  add: '添加字段',
+  remove: '删除这个字段',
+  up: '上移',
+  key: 'key（小写字母、数字、下划线）',
+  type: '类型',
+  types: { short: '短文字（一行）', long: '长文字（多行）', select: '下拉选择', number: '数字' },
+  required: '必填',
+  public: '可在公开作品页显示（创作库「一键复用」也会带上这段文字）',
+  label: '英文名称（也会写进提示词）',
+  labelZh: '中文名称',
+  placeholder: '英文占位提示（选填）',
+  placeholderZh: '中文占位提示（选填）',
+  help: '英文说明（选填，显示在输入框下面）',
+  helpZh: '中文说明（选填）',
+  maxLength: '字数上限',
+  min: '最小值（选填）',
+  max: '最大值（选填）',
+  options: '选项（英文会写进提示词，中文只用于显示）',
+  optionValue: (n: number) => `选项 ${n} 英文`,
+  optionZh: (n: number) => `选项 ${n} 中文（选填）`,
+  addOption: '添加选项',
+  removeOption: '删除',
+  placement: (key: string, used: boolean) => (used ? `提示词里有 {{${key}}}，内容会放在那里。` : `提示词里没有 {{${key}}}，内容会以一行「英文名称: 内容」加在正文后面。`),
 } as const
 
 // The English text in 公开信息 (T52).

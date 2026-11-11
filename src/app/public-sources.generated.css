@@ -478,6 +478,7 @@
 @source "../core/jobs/job-original.ts";
 @source "../core/jobs/job-ref-reads.ts";
 @source "../core/jobs/job-schema.ts";
+@source "../core/jobs/job-thumb.ts";
 @source "../core/jobs/job-view.ts";
 @source "../core/jobs/kept-inputs.ts";
 @source "../core/jobs/model-prices.ts";
@@ -562,6 +563,7 @@
 @source "../core/storage/upload/upload-photo.ts";
 @source "../core/storage/watermark-asset.generated.ts";
 @source "../core/storage/watermark.ts";
+@source "../core/storage/work-thumb.ts";
 @source "../core/system-settings/read.ts";
 @source "../core/system-settings/registry.ts";
 @source "../core/templates/allowed-web-aspects.ts";
@@ -571,6 +573,7 @@
 @source "../core/templates/catalog-pricing.ts";
 @source "../core/templates/catalogue-index.ts";
 @source "../core/templates/categories.ts";
+@source "../core/templates/copy-fields.ts";
 @source "../core/templates/cover-locales.ts";
 @source "../core/templates/edit-offer.ts";
 @source "../core/templates/edit-params.ts";
@@ -675,6 +678,8 @@
 @source "../modules/image/workspace/batch-hint.tsx";
 @source "../modules/image/workspace/batch-photos.tsx";
 @source "../modules/image/workspace/batch-request.ts";
+@source "../modules/image/workspace/copy-check.ts";
+@source "../modules/image/workspace/copy-field-input.tsx";
 @source "../modules/image/workspace/cta-state.ts";
 @source "../modules/image/workspace/option-pickers.tsx";
 @source "../modules/image/workspace/output-choice.ts";
