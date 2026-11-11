@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { campaignCatalog, belowDiscountFloor, type CatalogInput } from '@/core/codes/admin'
 import { saveCode } from '@/core/codes/server'
-import { site } from '@/site/site.config'
 import { saveCampaignCode } from './save'
 
 const adminId = '6cc81ef7-0be7-4ad0-9106-133c4c006109'
@@ -59,18 +58,17 @@ describe('campaign discount floor', () => {
 describe('campaign save entry point', () => {
   it('authenticates the actor and sends only server-configured catalog data to the five-argument RPC', async () => {
     requireAdmin.mockResolvedValue({ id: adminId })
-    rpc.mockResolvedValue({ data: codeId, error: null })
-    const { catalog, floor } = campaignCatalog(site.billing.products)
+    rpc.mockResolvedValueOnce({ data: [{
+      product_id: 'pro_monthly', tier: 'pro', kind: 'monthly', usd_cents: 3712, credits: 4567,
+      paid_days: 30, listed: true, revision: 3, name_en: 'Pro', name_zh: '专业版',
+    }], error: null }).mockResolvedValue({ data: codeId, error: null })
+    const { catalog, floor } = campaignCatalog([product('pro_monthly', 37.12, 4567, 'pro')])
     const fields = { note: '运营备注' }
     expect(await saveCampaignCode(codeId, fields)).toBe(codeId)
     expect(rpc).toHaveBeenCalledWith('admin_save_code', {
       p_actor: adminId, p_code_id: codeId, p_fields: fields, p_catalog: catalog, p_floor_product_id: floor.id,
     })
-    expect(catalog).toHaveLength(site.billing.products.length)
-    expect(catalog[0]).toEqual({
-      id: site.billing.products[0].id, priceCents: Math.round(site.billing.products[0].priceUsd * 100),
-      credits: site.billing.products[0].credits, subscription: true,
-    })
+    expect(rpc).toHaveBeenCalledWith('read_catalog_offers', expect.anything())
   })
 
   it('allows full-form metadata edits to an existing discount after the catalog floor increases', async () => {

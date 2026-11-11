@@ -15,6 +15,7 @@ import {
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
 import { toCatalogueTemplate } from '@/modules/image/marketing'
 import { contentPagesIn, creditFacts, featuredSections, fillCredits, findContentPageIn, freeImagesIn, homePageIn, isLinkEnabled } from '@/site/content'
+import { displayProducts } from '@/site/billing/display-products'
 import { site } from '@/site/site.config'
 
 import { HomeGeneratorSlot } from '../home-generator-slot'
@@ -42,11 +43,12 @@ export function generateStaticParams({ params }: { params: { locale: string } })
 // (建站规格 G3, G4).
 async function load(params: Promise<{ slug: string }>) {
   const locale = await currentLocale()
-  const found = findContentPageIn((await params).slug, locale)
+  const slug = (await params).slug
+  const [products, live] = await Promise.all([displayProducts(), cachedWebCatalogue(locale)])
+  const found = findContentPageIn(slug, locale, products)
   if (!found || !isEnabled(found)) notFound()
-  const live = await cachedWebCatalogue(locale)
   const facts = creditFacts(live)
-  return { locale, live, page: fillCredits(found, facts), free: fillCredits(freeImagesIn(locale), facts) }
+  return { locale, live, products, page: fillCredits(found, facts), free: fillCredits(freeImagesIn(locale), facts) }
 }
 
 export async function generateMetadata({ params }: PageProps<'/[locale]/[slug]'>): Promise<Metadata> {
@@ -55,7 +57,7 @@ export async function generateMetadata({ params }: PageProps<'/[locale]/[slug]'>
 }
 
 export default async function ContentRoute({ params }: PageProps<'/[locale]/[slug]'>) {
-  const { locale, live, page, free } = await load(params)
+  const { locale, live, products, page, free } = await load(params)
   const path = pagePath(page)
   const crumbs = [
     { name: homePageIn(locale).label, path: '/' },
@@ -64,7 +66,7 @@ export default async function ContentRoute({ params }: PageProps<'/[locale]/[slu
   const meta = { path: localizePath(path, locale), title: page.title, description: page.description }
   const ldCrumbs = crumbs.map((crumb) => ({ ...crumb, path: localizePath(crumb.path, locale) }))
   const ld = [breadcrumbListLd(site, ldCrumbs), faqPageLd(page.faq)]
-  if (page.module) ld.push(softwareApplicationLd(site, meta, free))
+  if (page.module) ld.push(softwareApplicationLd(site, meta, products, free))
   const catalogue = live.map(toCatalogueTemplate)
   // The page's own categories' featured templates; the generator opens on the first of them.
   const { defaultId, ...sections } = featuredSections(live, page.landing.templates?.categoryKeys)

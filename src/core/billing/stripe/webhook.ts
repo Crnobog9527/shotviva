@@ -37,7 +37,7 @@ const HANDLERS: Record<StripeWebhookEvent, Handler> = {
   'charge.dispute.closed': closeDispute,
 }
 
-export type WebhookDeps = FulfilDeps & { webhookSecret: string }
+export type WebhookDeps = FulfilDeps & { webhookSecret: string; loadCatalog?: () => Promise<Pick<FulfilDeps, 'products' | 'evidence'>> }
 
 export type WebhookResult = { status: 200 | 400 | 500; body: Record<string, unknown> }
 
@@ -65,7 +65,8 @@ export async function handleStripeWebhook(
   const objectId = (event.data.object as { id: string }).id
   const fields = { event_id: event.id, event_type: event.type, object_id: objectId }
   try {
-    const outcome = await handler(deps, objectId)
+    const catalog = await deps.loadCatalog?.()
+    const outcome = await handler(catalog ? { ...deps, ...catalog } : deps, objectId)
     logger.info('stripe webhook handled', { ...fields, outcome })
     return { status: 200, body: { received: true, outcome } }
   } catch (error) {

@@ -48,7 +48,7 @@ describe('plan comparison rows', () => {
     expect(rows.map((row) => row.key)).toEqual(['credits', 'photos', 'concurrency', 'batch', 'memberPacks', 'support', 'votes', 'noWatermark', 'private', 'allTemplates'])
     for (const row of rows) expect(row.cells).toHaveLength(offers.length)
     expect(rows.find((row) => row.key === 'votes')?.cells).toEqual([1, 1, 3].map((value) => ({ format: 'weight', value })))
-    expect(rows.find((row) => row.key === 'photos')?.cells[0]).toEqual({ format: 'range', range: { low: Math.floor(offers[0]!.monthly.credits / 2), high: offers[0]!.monthly.credits } })
+    expect(rows.find((row) => row.key === 'photos')?.cells[0]).toEqual({ format: 'range', range: { low: Math.floor(offers[0]!.monthly!.credits / 2), high: offers[0]!.monthly!.credits } })
   })
 
   it('drops the vote, pack and estimate rows when they are not live', () => {

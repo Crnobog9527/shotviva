@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { AppError } from '../../errors'
 import { callRpc } from '../rpc'
 import { fulfilCheckoutSession, readPurchase, type FulfilDeps, type FulfilOutcome } from './fulfil'
+import { sessionContract } from './catalog-session'
 import { SESSION_EXPAND } from './payment-facts'
 import { subscriptionState } from './settle'
 import { syncSubscription, type SyncOutcome } from './subscription-sync'
@@ -69,7 +70,8 @@ async function previewCheckout(deps: FulfilDeps, id: string): Promise<ReplayPrev
   const session = await deps.stripe.checkout.sessions.retrieve(id, { expand: SESSION_EXPAND })
   // Only a card or Alipay payment that has cleared; an async payment still pending is unpaid.
   if (session.payment_status !== 'paid') throw new AppError('CONFLICT', REPLAY_ERRORS.unpaid)
-  const purchase = readPurchase(session, deps.products)
+  const bound = await sessionContract(deps.db, session, deps.products, false)
+  const purchase = readPurchase(session, deps.products, bound)
   return {
     kind: 'checkout',
     id,

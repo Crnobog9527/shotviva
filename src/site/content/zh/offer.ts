@@ -2,7 +2,7 @@ import { PRICE_PENDING } from '@/core/config'
 import { MAX_UPLOAD_BYTES, UPLOAD_CONTENT_TYPES } from '@/core/storage/rules'
 
 import { site } from '../../site.config'
-import { OUTPUT_TIERS, packFrom, planFrom, usd, yearlySaving } from '../offer'
+import { type OfferFacts, baselineOffers, OUTPUT_TIERS, packFrom, planFrom, usd, yearlySaving } from '../offer'
 
 // The Chinese wording of every public number (建站规格 G3, §6.1): same figures as offer.ts,
 // read from site.config, written the way mainland e-commerce sellers say it. Prices stay in
@@ -39,9 +39,15 @@ export const zhPackFrom = packFrom ? `${usd(packFrom.priceUsd)} 起` : PRICE_PEN
 // 「按年付最多省 40%」: offer.ts's yearlySaving is the largest saving, rounded (DESIGN §6.9).
 export const zhYearlySaving = yearlySaving ? `按年付最多省 ${yearlySaving}%` : ''
 
+export function planLabel(plan: OfferFacts['planFrom']) {
+  if (!plan) return '月付套餐'
+  const names = { starter: '入门版', pro: '专业版', max: '旗舰版' }
+  return `${names[plan.tier]}，每月 ${plan.credits} 积分`
+}
+
 // 「套餐每月 $19.90 起，含 50 积分；也可以单买积分包，$9.90 起。」
-export function zhPlansSentence(): string {
-  if (!planFrom) return '付费套餐和积分包即将上线。'
+export function zhPlansSentence({ planFrom, packFrom } = baselineOffers): string {
+  if (!planFrom) return packFrom ? `一次性积分包 ${usd(packFrom.priceUsd)} 起。` : '付费套餐和积分包即将上线。'
   const packs = packFrom ? `；也可以单买积分包，${usd(packFrom.priceUsd)} 起` : ''
   return `套餐每月 ${usd(planFrom.priceUsd)} 起，含 ${planFrom.credits} 积分${packs}。`
 }

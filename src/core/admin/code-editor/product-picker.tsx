@@ -23,7 +23,7 @@ export function ProductPicker({ prices: { catalog, floor }, percent, chosen, cha
       while (max < 90 && !belowDiscountFloor(p,floor,max + 1)) max++
       return <tr key={p.id} className={'border-b' + (bad ? ' text-destructive' : '')}><td className="py-2">
         <label className="flex items-center gap-2"><input type="checkbox" name="products" value={p.id} checked={chosen.includes(p.id)}
-          onChange={e => change(e.target.checked ? [...chosen,p.id] : chosen.filter(id => id !== p.id))} />{PRODUCTS[p.id]}</label></td>
+          onChange={e => change(e.target.checked ? [...chosen,p.id] : chosen.filter(id => id !== p.id))} />{(PRODUCTS[p.id] ?? p.id)}</label></td>
         <td className="font-mono">{pricePerCredit(valid ? discountedPriceCents(p.priceCents,percent) : p.priceCents,p.credits)}
           {bad && <span className="ml-2 text-xs">{COPY.below}</span>}</td><td>{max}%</td></tr>
     })}</tbody></table>

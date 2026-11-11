@@ -5,7 +5,8 @@ import { useTranslations } from "next-intl"
 import { pricingV2 } from '../../public-env'
 import type { PackProduct } from "../../config"
 import { cn } from "../../ui/cn"
-import { packLooks, type TierOffer } from "./offer"
+import { packLooks, productFor, type TierOffer } from "./offer"
+import { resolvePick } from "./pick"
 import { PackCard } from "./pack-card"
 import { PhotoEstimateNote } from "./photo-estimate-line"
 import { useStanding } from "./standing-context"
@@ -36,21 +37,23 @@ function TierRadios({ offers, state }: TierProps) {
   const t = useTranslations("paywall")
   const standing = useStanding()
   const { choice, update } = state
+  const pickedId = resolvePick(choice.pick, choice.period, offers, [])?.product.id
   return (
     // From md the cards are about 280px wide: the saving reads just "You save".
     <div role="radiogroup" aria-label={t("plansLabel")} className="mt-4 grid gap-2 md:mt-6 md:grid-cols-3 md:gap-3 md:[&_.tier-saving-vs]:hidden">
       {offers.map((offer) => {
-        const selected = choice.pick === offer.tier
-        const { lock } = planStanding(standing, offer.tier, choice.period)
+        const id = productFor(offer, choice.period).id
+        const selected = pickedId === id
+        const { lock } = planStanding(standing, offer.tier, choice.period, id)
         return (
-          <label key={offer.tier} data-tier={offer.tier} className={cn("tier-shell", lock ? "cursor-default" : "cursor-pointer", focusRing)}>
+          <label key={id} data-tier={offer.tier} className={cn("tier-shell", lock ? "cursor-default" : "cursor-pointer", focusRing)}>
             <input
               type="radio"
               name={PICK}
-              value={offer.tier}
+              value={id}
               checked={selected}
               disabled={lock !== null}
-              onChange={() => update({ pick: offer.tier })}
+              onChange={() => update({ pick: id })}
               className="sr-only"
             />
             <TierCard

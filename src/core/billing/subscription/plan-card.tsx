@@ -67,7 +67,7 @@ const METHOD_KEYS = { card: 'card', alipay: 'alipay', wechat_pay: 'wechatPay', c
 function PerPeriod({ summary, ctx }: { summary: Subscribed; ctx: Ctx }) {
   const t = useTranslations('app.account.plan')
   const last = ctx.facts.last
-  if (!last || last.product.tier !== summary.tier || last.product.interval !== summary.interval) return null
+  if (!last || last.product.id !== summary.productId) return null
   const method = t(METHOD_KEYS[last.method])
   return <Muted>{last.grantedCredits == null ? method : t('lastGrant', { credits: last.grantedCredits, method })}</Muted>
 }
@@ -137,8 +137,9 @@ function WalletPass({ summary, ctx }: { summary: Extract<SubscriptionSummary, { 
     last && wallet
       ? t.rich('walletAlipayWhy', { ...richTags, interval: last.product.interval, method: t(METHOD_KEYS[wallet]), date })
       : t('walletWhy', { date })
-  const options = summary.tier ? { tier: summary.tier, period: last?.product.interval } : undefined
-  const renew = last && last.product.priceUsd > 0 ? t.rich('renewPrice', { ...richTags, price: names.usd(last.product.priceUsd) }) : t('renew')
+  const offer = ctx.products.find(p => p.id === last?.product.id && p.priceUsd > 0)
+  const options = summary.tier ? { tier: summary.tier, period: last?.product.interval, planId: offer?.id } : undefined
+  const renew = offer ? t.rich('renewPrice', { ...richTags, price: names.usd(offer.priceUsd) }) : t('renew')
   return (
     <Pass state="wallet" tier={summary.tier} brand={ctx.facts.brand} head={<><span>{t('member')}</span><Status>{t('endsPlain', { date })}</Status></>} foot={<SinceFoot facts={ctx.facts}><PaywallPill main options={options}>{renew}</PaywallPill></SinceFoot>}>
       <PassName>{names.tier(summary.tier)}</PassName>

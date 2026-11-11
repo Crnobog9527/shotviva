@@ -8,10 +8,11 @@ import { isTierPick, type PaywallChoice, type PaywallPick } from './use-paywall-
 export type ResolvedPick = { kind: 'plan'; offer: TierOffer; product: MembershipProduct } | { kind: 'pack'; product: PackProduct }
 
 export function resolvePick(pick: PaywallPick, period: Period, offers: readonly TierOffer[], packs: readonly PackProduct[]): ResolvedPick | null {
-  if (isTierPick(pick)) {
-    const offer = offers.find((o) => o.tier === pick)
-    return offer ? { kind: 'plan', offer, product: productFor(offer, period) } : null
-  }
+  const offer = offers.find(o => {
+    const product = period === 'year' ? o.yearly : o.monthly
+    return product && (isTierPick(pick) ? o.tier === pick : o.monthly?.id === pick || o.yearly?.id === pick)
+  })
+  if (offer) return { kind: 'plan', offer, product: productFor(offer, period) }
   const pack = packs.find((p) => p.id === pick)
   return pack ? { kind: 'pack', product: pack } : null
 }

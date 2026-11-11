@@ -1,6 +1,6 @@
 import type { Fact, RelatedLink } from '@/core/content'
 
-import { packFrom, planFrom, usd } from '../offer'
+import { type OfferFacts, usd } from '../offer'
 import {
   zhFreeImages,
   zhLanguages,
@@ -11,13 +11,13 @@ import {
 // The facts block of the /zh pages: the same facts as the English pages
 // (建站规格 G3, G4), written natively, never machine-translated (G13).
 
-function paidValue(): string {
-  if (!planFrom) return '套餐和积分包：价格即将公布'
+function paidValue({ planFrom, packFrom }: OfferFacts): string {
+  if (!planFrom) return packFrom ? `一次性积分包 ${usd(packFrom.priceUsd)} 起` : '套餐和积分包：价格即将公布'
   const packs = packFrom ? `；积分包 ${usd(packFrom.priceUsd)} 起，一次性付款` : ''
   return `套餐每月 ${usd(planFrom.priceUsd)} 起${packs}（美元）`
 }
 
-export function zhSharedFacts(): readonly [Fact, Fact, Fact, ...Fact[]] {
+export function zhSharedFacts(offers: OfferFacts): readonly [Fact, Fact, Fact, ...Fact[]] {
   return [
     // 为什么选 Shotviva（Owner 2026-11-08）：两条核心卖点在前，然后是对比、适合谁、用在哪，最后是各页共用的数字。
     { label: '你拍的是什么，出来还是什么', value: '商品、标签、摆盘、房间布局都和你拍的一样，只换光线、背景或场景。' },
@@ -30,14 +30,14 @@ export function zhSharedFacts(): readonly [Fact, Fact, Fact, ...Fact[]] {
     { label: '免费试用', value: `注册送 ${zhFreeImages}，只送一次` },
     { label: '出图尺寸', value: zhTierPixels },
     { label: '上传要求', value: zhUploadLimits },
-    { label: '价格', value: paidValue() },
+    { label: '价格', value: paidValue(offers) },
     { label: '免费图和付费图', value: '免费图公开展示并带水印；付费图私密、无水印' },
     { label: '界面语言', value: zhLanguages },
   ]
 }
 
 // 落地页「更多」的最后一张价格卡（差距审计 B10）。
-export function zhPricingRelated(brand: string): RelatedLink {
+export function zhPricingRelated(brand: string, { planFrom }: OfferFacts): RelatedLink {
   const note = planFrom ? `套餐每月 ${usd(planFrom.priceUsd)} 起，注册先送 ${zhFreeImages}。` : '月付、年付套餐和一次性积分包。'
   return { href: '/pricing', anchor: `${brand} 价格`, note }
 }

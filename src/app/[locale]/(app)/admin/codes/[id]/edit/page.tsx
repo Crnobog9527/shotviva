@@ -5,7 +5,7 @@ import { CODE_EDITOR_COPY, CodeEditor, readEditableCode } from '@/core/admin/cod
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { campaignCatalog } from '@/core/codes/admin'
 import { readGiftPolicy } from '@/core/codes/server'
-import { site } from '@/site/site.config'
+import { currentProducts } from '@/site/billing/display-products'
 import { submitCampaignCode } from '../../save'
 
 export const instant = false
@@ -15,8 +15,8 @@ export default async function EditCampaignPage({ params }: { params: Promise<{ i
   await requireAdmin()
   const { id } = await params
   const db = createAdminSupabase()
-  const [code, policy] = await Promise.all([readEditableCode(db,id),readGiftPolicy(db)])
+  const [code, policy, products] = await Promise.all([readEditableCode(db, id), readGiftPolicy(db), currentProducts(db)])
   if (!code) notFound()
   return <AdminPage title={CODE_EDITOR_COPY.edit}><CodeEditor id={id} existing={code}
-    prices={campaignCatalog(site.billing.products)} policy={policy} save={submitCampaignCode} /></AdminPage>
+    prices={campaignCatalog(products)} policy={policy} save={submitCampaignCode} /></AdminPage>
 }

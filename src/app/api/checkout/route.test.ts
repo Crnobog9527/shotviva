@@ -9,7 +9,9 @@ vi.mock('@/core/auth/supabase-admin', () => ({ createAdminSupabase: () => ({ rpc
 
 beforeEach(() => { mocks.notify.mockClear(); mocks.catalog.mockReset().mockImplementation(catalogRpc) })
 
-async function catalogRpc() {
+async function catalogRpc(fn: string) {
+  if (fn === 'resume_catalog_checkout') return { data: null, error: null }
+  if (fn !== 'read_product_catalog') throw new Error('Unexpected checkout RPC ' + fn)
   const { site: current } = await import('@/site/site.config')
   const data = current.billing.products.map(p => ({
     product_id: p.id, credits: p.credits, usd_cents: Math.round(p.priceUsd * 100), listed: true,
@@ -52,7 +54,7 @@ const request = (productId = 'pack_s', method = 'card', locale?: 'en' | 'zh') =>
     method: 'POST',
     headers: { 'content-type': 'application/json', origin: ORIGIN },
     body: JSON.stringify({ product_id: productId, method, locale, pricing_version: site.billing.pricingVersion ?? 'v1',
-      expected_price_cents: Math.round(product.priceUsd * 100) }),
+      expected_price_cents: Math.round(product.priceUsd * 100), expected_revision: site.billing.pricingVersion ? 2 : undefined }),
   })
 }
 const liveRow = (status: string, cancelAtPeriodEnd = false) => ({
@@ -84,6 +86,17 @@ describe('POST /api/checkout', () => {
     expect(mocks.createCheckout).toHaveBeenCalledOnce()
   })
 
+  it('binds a browser retry key to the exact reviewed revision before creating a provider session', async () => {
+    mocks.getSessionUser.mockResolvedValue(USER)
+    const req = request()
+    req.headers.set('idempotency-key', 'f61d79e1-5ccd-440c-8304-e97d52c0d712')
+    expect((await POST(req)).status).toBe(200)
+    expect(mocks.catalog).toHaveBeenCalledWith('resume_catalog_checkout', expect.objectContaining({ p_user: USER.id }))
+    expect(mocks.createCheckout).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      attempt: expect.objectContaining({ revision: 2, token: expect.any(String) }),
+    }))
+  })
+
   it.each(['stripe', 'waffo'])('rejects a catalog failure before contacting %s', async channel => {
     mocks.getSessionUser.mockResolvedValue(USER)
     mocks.channel.mockReturnValue(channel)
@@ -94,9 +107,9 @@ describe('POST /api/checkout', () => {
     expect(mocks.createWaffoCheckout).not.toHaveBeenCalled()
   })
 
-  it('alerts on incomplete catalog data without including the response in the alert', async () => {
+  it('alerts on malformed catalog data without including the response in the alert', async () => {
     mocks.getSessionUser.mockResolvedValue(USER)
-    mocks.catalog.mockResolvedValueOnce({ data: [], error: null })
+    mocks.catalog.mockResolvedValueOnce({ data: [{}], error: null })
     expect((await POST(request())).status).toBe(500)
     expect(mocks.notify).toHaveBeenCalledWith({ kind: 'checkout_catalog_failed', code: 'INVALID_CATALOG' })
     expect(mocks.createCheckout).not.toHaveBeenCalled()

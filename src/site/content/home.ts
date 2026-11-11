@@ -1,14 +1,13 @@
+import { baselineOffers, planLabel, type OfferFacts } from './offer'
 import { defineHomePage, type CostBills, type HeadedText, type HomePage, type ImageRef, type ShootDemo } from '@/core/content'
 
 import { site } from '../site.config'
 import {
-  hundredCreditsFrom,
   freeImagesLabel,
   FreeImagesShort,
   FreeImagesTitle,
   packshotUsd,
   photoSeconds,
-  planFrom,
   plansSentence,
   quoteUsd,
   setShotsUsd,
@@ -19,7 +18,6 @@ import {
   uploadLimits,
   usd,
   usdRange,
-  yearlySaving,
   OUTPUT_TIERS,
 } from './offer'
 import { homeWishlist } from './home-wishlist'
@@ -33,12 +31,13 @@ import { homePlans } from './plan-strip'
 const brand = site.brand.name
 const [standard, hd, max] = OUTPUT_TIERS
 
-function plansText(): HeadedText {
+function plansText(offers: OfferFacts): HeadedText {
+  const { planFrom, yearlySaving } = offers
   const heading = planFrom ? `Plans From ${usd(planFrom.priceUsd)} a Month` : 'Plans and Credit Packs'
   const yearly = yearlySaving ? ` Yearly plans save up to ${yearlySaving}%.` : ''
   return {
     heading,
-    text: `${plansSentence()}${yearly} Paid credits never expire, and every photo you make with them is private and watermark-free. Here is how that compares with a photographer or doing it yourself.`,
+    text: `${plansSentence(offers)}${yearly} Paid credits never expire, and every photo you make with them is private and watermark-free. Here is how that compares with a photographer or doing it yourself.`,
   }
 }
 
@@ -95,8 +94,8 @@ export const shoot: ShootDemo = {
 // The landing pages reuse it with their own heading and intro; `moreFine` adds a source.
 // `planLine: false` on the home page, whose plan strip under the bills already shows Starter
 // (SEO launch handbook S1/G10), so it is not listed twice.
-export function productBills(heading: string, intro: string, moreFine = '', { planLine = true } = {}): CostBills {
-  const plan = planFrom ? usd(planFrom.priceUsd) : ''
+export function productBills({ planFrom }: OfferFacts, heading: string, intro: string, moreFine = '', { planLine = true } = {}): CostBills {
+  const plan = planFrom ? usd(planFrom.priceUsd) : 'Monthly plans unavailable'
   const shared = [
     { label: 'Start with', value: 'Your existing phone photo' },
     { label: 'Make', value: 'A listing image, a lifestyle shot and a promo poster' },
@@ -115,8 +114,8 @@ export function productBills(heading: string, intro: string, moreFine = '', { pl
     },
     site: {
       title: brand,
-      total: { prefix: 'from', amount: plan, suffix: '/month', when: `about ${photoSeconds} seconds a photo` },
-      lines: planLine ? [{ label: `Starter plan, ${planFrom?.credits ?? ''} credits a month`, value: plan }, ...shared] : shared,
+      total: { prefix: planFrom ? 'from' : '', amount: plan, suffix: planFrom ? '/month' : '', when: `about ${photoSeconds} seconds a photo` },
+      lines: planLine ? [{ label: planLabel(planFrom), value: plan }, ...shared] : shared,
       fine: `Styling and retouching are in the template, and your subject stays as you shot it. Start with ${freeImagesLabel}, no card needed.`,
     },
   }
@@ -170,7 +169,7 @@ const steps = {
 // "3 steps" in FAQ A is the length of the steps block, never typed.
 const STEP_COUNT = steps.items.length
 
-export const homePage = defineHomePage({
+const copy = {
   slug: '',
   keyword: 'image to image ai',
   label: 'AI image to image',
@@ -196,83 +195,7 @@ export const homePage = defineHomePage({
   },
   topics: useCases,
   wishlist: homeWishlist,
-  facts: sharedFacts(),
   factsIntro: `Most AI image to image tools hand you a new picture. What you wanted was your picture, only better: the same product, the same dish, the same room, with nicer light and a cleaner scene. That is what ${brand} is built for. The prices and sizes below are the same on every page of this site.`,
-  freeOffer: {
-    heading: 'Free Image to Image AI: What You Get',
-    points: [
-      {
-        heading: `${FreeImagesTitle} When You Sign Up`,
-        text: `Every new account gets ${site.billing.freeCredits} free credits, once. They do not refill every day or every month.`,
-      },
-      {
-        heading: 'Free Photos Are Public and Watermarked, Paid Photos Are Private',
-        text: `A photo made with free credits is public and carries a small "Made with ${brand}" watermark; free photos are for personal, non-commercial use. A photo made with paid credits is private, has no watermark and is yours to use commercially. Buying a plan later does not change photos you already made.`,
-      },
-    ],
-    plans: plansText(),
-    sample: { src: '/home/example-skincare-after.webp', alt: '', width: 900, height: 1125 },
-  },
-  ...(homePlans ? { plans: homePlans } : {}),
-  costBills: productBills(
-    `What ${SET_PHOTOS} Product Photos Cost: Photographer vs ${brand}`,
-    `One product, ${SET_PHOTOS} styled photos, retouched and ready to post. The same job, two bills.`,
-    '',
-    { planLine: false },
-  ),
-  faq: [
-    // A: the fixed first sentence names the brand and the keyword together (建站规格 G6).
-    {
-      question: 'What is image to image AI?',
-      answer: `${brand} is an image to image AI tool that gives a photo you already have a new look while the subject stays as shot — in ${STEP_COUNT} steps: upload one phone photo, pick a template, choose ${tierList}. Image to image AI starts from your photo instead of a text description, so the light, the scene or the art style changes and the product, dish, room or pet stays the same.`,
-    },
-    {
-      question: 'Is image to image AI free?',
-      answer: `${brand} gives every new user ${freeImagesLabel}, so you can try image to image AI free. ${plansSentence()}${hundredCreditsFrom ? ` The lowest price per 100 credits is about ${hundredCreditsFrom}.` : ''} Free photos are public and carry a watermark.`,
-    },
-    {
-      question: "Does image to image AI keep my photo's subject the same?",
-      answer: `${brand} templates are built to keep the subject as you shot it: the product label, the plating, the room layout or the pet. Only the light, the background, the scene or the style changes. Many other image to image AI tools redraw the whole picture, subject included, so check the result before you use it.`,
-    },
-    {
-      question: 'How is image to image AI different from an AI image generator?',
-      answer:
-        'Image to image AI starts from a photo you took and changes how it looks; an AI image generator starts from a text prompt and invents the whole picture. With image to image AI the subject is real and you never have to describe it.',
-      link: { href: '/image-to-image-generator', anchor: 'See how our image to image generator works.' },
-      table: {
-        caption: 'Image to image AI vs an AI image generator',
-        headers: ['', 'Image to image AI', 'AI image generator'],
-        rows: [
-          ['Starts from', 'A photo you took', 'A text prompt'],
-          ['Subject', 'Stays as shot', 'Invented from your words'],
-          ['Best for', 'Product, food, room and pet photos you sell or post', 'Ideas, art and scenes that do not exist yet'],
-          ['Risk', 'A blurry or badly framed photo limits the result', 'Labels, logos and details can come out wrong'],
-        ],
-      },
-    },
-    {
-      question: 'Can I use the photos commercially?',
-      answer: `${brand} photos made with paid credits are private, carry no watermark and are yours to use commercially: on menus, delivery apps, online store listings and ads. Photos made with the free credits carry a watermark and are not private.`,
-    },
-    {
-      question: 'Do I need to write prompts?',
-      answer: `${brand} needs no prompts. You pick a template and fill in any short text it asks for; the template already knows the light, the scene or the style. To adjust a finished photo, say what to change in plain words, such as "make the background pale blue".`,
-      link: { href: '/image-to-image-generator', anchor: 'Browse the templates in our image to image generator.' },
-    },
-    {
-      question: 'What sizes and formats can I export?',
-      answer: `${brand} exports every photo as a PNG in ${OUTPUT_TIERS.length} sizes: ${tierPixels}. The aspect ratio is set by the template. Photos made with paid credits download at full size with no watermark.`,
-    },
-    {
-      question: `Can I use ${brand} on my phone?`,
-      answer: `${brand} works in your phone's browser, Safari on iPhone or Chrome on Android, with no app to install. Take a photo with the camera or choose one from your gallery, then save or share the result.`,
-    },
-    // I: the brand question, last; it holds no keyword slot (建站规格 G6).
-    {
-      question: `What is ${brand}?`,
-      answer: `${brand} is an AI photo studio on the web that turns one phone photo into a finished picture, with templates for food, products, rooms, pets and art styles. Unlike AI image generators that invent a picture from a prompt, ${brand} starts from your real photo and keeps the subject as shot. New users get ${freeImagesLabel}.`,
-    },
-  ],
   related: [
     {
       href: '/ai-restaurant-menu',
@@ -300,4 +223,88 @@ export const homePage = defineHomePage({
     faq: 'Image to Image AI FAQ',
     related: 'Image to Image AI for Food, Products, Rooms and More',
   },
+} as const
+
+const homeFaq = (offers: OfferFacts): HomePage['faq'] => [
+  // A: the fixed first sentence names the brand and the keyword together (建站规格 G6).
+  {
+    question: 'What is image to image AI?',
+    answer: `${brand} is an image to image AI tool that gives a photo you already have a new look while the subject stays as shot — in ${STEP_COUNT} steps: upload one phone photo, pick a template, choose ${tierList}. Image to image AI starts from your photo instead of a text description, so the light, the scene or the art style changes and the product, dish, room or pet stays the same.`,
+  },
+  {
+    question: 'Is image to image AI free?',
+    answer: `${brand} gives every new user ${freeImagesLabel}, so you can try image to image AI free. ${plansSentence(offers)}${offers.hundredCreditsFrom ? ` The lowest price per 100 credits is about ${offers.hundredCreditsFrom}.` : ''} Free photos are public and carry a watermark.`,
+  },
+  {
+    question: "Does image to image AI keep my photo's subject the same?",
+    answer: `${brand} templates are built to keep the subject as you shot it: the product label, the plating, the room layout or the pet. Only the light, the background, the scene or the style changes. Many other image to image AI tools redraw the whole picture, subject included, so check the result before you use it.`,
+  },
+  {
+    question: 'How is image to image AI different from an AI image generator?',
+    answer:
+      'Image to image AI starts from a photo you took and changes how it looks; an AI image generator starts from a text prompt and invents the whole picture. With image to image AI the subject is real and you never have to describe it.',
+    link: { href: '/image-to-image-generator', anchor: 'See how our image to image generator works.' },
+    table: {
+      caption: 'Image to image AI vs an AI image generator',
+      headers: ['', 'Image to image AI', 'AI image generator'],
+      rows: [
+        ['Starts from', 'A photo you took', 'A text prompt'],
+        ['Subject', 'Stays as shot', 'Invented from your words'],
+        ['Best for', 'Product, food, room and pet photos you sell or post', 'Ideas, art and scenes that do not exist yet'],
+        ['Risk', 'A blurry or badly framed photo limits the result', 'Labels, logos and details can come out wrong'],
+      ],
+    },
+  },
+  {
+    question: 'Can I use the photos commercially?',
+    answer: `${brand} photos made with paid credits are private, carry no watermark and are yours to use commercially: on menus, delivery apps, online store listings and ads. Photos made with the free credits carry a watermark and are not private.`,
+  },
+  {
+    question: 'Do I need to write prompts?',
+    answer: `${brand} needs no prompts. You pick a template and fill in any short text it asks for; the template already knows the light, the scene or the style. To adjust a finished photo, say what to change in plain words, such as "make the background pale blue".`,
+    link: { href: '/image-to-image-generator', anchor: 'Browse the templates in our image to image generator.' },
+  },
+  {
+    question: 'What sizes and formats can I export?',
+    answer: `${brand} exports every photo as a PNG in ${OUTPUT_TIERS.length} sizes: ${tierPixels}. The aspect ratio is set by the template. Photos made with paid credits download at full size with no watermark.`,
+  },
+  {
+    question: `Can I use ${brand} on my phone?`,
+    answer: `${brand} works in your phone's browser, Safari on iPhone or Chrome on Android, with no app to install. Take a photo with the camera or choose one from your gallery, then save or share the result.`,
+  },
+  // I: the brand question, last; it holds no keyword slot (建站规格 G6).
+  {
+    question: `What is ${brand}?`,
+    answer: `${brand} is an AI photo studio on the web that turns one phone photo into a finished picture, with templates for food, products, rooms, pets and art styles. Unlike AI image generators that invent a picture from a prompt, ${brand} starts from your real photo and keeps the subject as shot. New users get ${freeImagesLabel}.`,
+  },
+]
+
+export const makeHomePage = (offers: OfferFacts, plans = homePlans(offers.products)) => defineHomePage({
+  ...copy,
+  facts: sharedFacts(offers),
+  freeOffer: {
+    heading: 'Free Image to Image AI: What You Get',
+    points: [
+      {
+        heading: `${FreeImagesTitle} When You Sign Up`,
+        text: `Every new account gets ${site.billing.freeCredits} free credits, once. They do not refill every day or every month.`,
+      },
+      {
+        heading: 'Free Photos Are Public and Watermarked, Paid Photos Are Private',
+        text: `A photo made with free credits is public and carries a small "Made with ${brand}" watermark; free photos are for personal, non-commercial use. A photo made with paid credits is private, has no watermark and is yours to use commercially. Buying a plan later does not change photos you already made.`,
+      },
+    ],
+    plans: plansText(offers),
+    sample: { src: '/home/example-skincare-after.webp', alt: '', width: 900, height: 1125 },
+  },
+  ...(plans ? { plans } : {}),
+  costBills: productBills(offers,
+    `What ${SET_PHOTOS} Product Photos Cost: Photographer vs ${brand}`,
+    `One product, ${SET_PHOTOS} styled photos, retouched and ready to post. The same job, two bills.`,
+    '',
+    { planLine: false },
+  ),
+  faq: homeFaq(offers),
 })
+
+export const homePage = makeHomePage(baselineOffers)

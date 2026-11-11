@@ -67,7 +67,7 @@ function SheetBody({ open, onOpenChange, trigger, products, state }: Props) {
       footer={resolved ? <PaywallCheckout resolved={resolved} choice={choice} /> : null}
     >
       <DiscountBanner singlePayment={choice.method === "alipay"} />
-      <TierPicker offers={offers} state={picking} />
+      <TierPicker offers={offers.filter(o => choice.period === "year" ? o.yearly : o.monthly)} state={picking} />
       <PackPicker packs={packs} state={picking} />
       <PayMethods method={choice.method} onChange={(method) => update({ method })} kind={resolved?.kind ?? "plan"} period={choice.period} />
       <DiscountEntry />

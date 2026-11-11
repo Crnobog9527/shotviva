@@ -1,11 +1,12 @@
 "use client"
 
-import { useTranslations } from "next-intl"
+import { useLocale, useTranslations } from "next-intl"
 
 import { useProductQuote } from "./discount-context"
 import { usePaymentChannel } from "./channel-context"
 import { CheckoutBar } from "./checkout-bar"
 import { discountTerm, planFinePrint } from "./copy"
+import { offerLabel } from "./offer"
 import { checkoutTone, type ResolvedPick } from "./pick"
 import { useStanding } from "./standing-context"
 import { planStanding } from "./standing-pick"
@@ -19,16 +20,17 @@ import { useMoney } from "./use-money"
 // upgrade does; the member's own or a lower plan cannot be bought and says why.
 export function PaywallCheckout({ resolved, choice }: { resolved: ResolvedPick; choice: PaywallChoice }) {
   const t = useTranslations("paywall")
+  const locale = useLocale()
   const checkout = useCheckout()
   const standing = useStanding()
   const quote = useProductQuote(resolved.product)
   const { discount } = quote
   const { price, fine } = useCheckoutPrice(resolved, choice, quote)
   const plan = resolved.kind === "plan" ? resolved : null
-  const member = plan ? planStanding(standing, plan.offer.tier, choice.period) : { upgrade: false, lock: null }
+  const member = plan ? planStanding(standing, plan.offer.tier, choice.period, plan.product.id) : { upgrade: false, lock: null }
   const note = member.upgrade ? t(standing.subscription ? "upgradeNoteCancels" : "upgradeNote") : null
   const label = plan
-    ? t(member.upgrade ? "ctaUpgrade" : "ctaPlan", { tier: t(`tiers.${plan.offer.tier}`), price, period: choice.period })
+    ? t(member.upgrade ? "ctaUpgrade" : "ctaPlan", { tier: offerLabel(plan.product, locale, t(`tiers.${plan.offer.tier}`)), price, period: choice.period })
     : t("ctaPack", { count: resolved.product.credits, price })
   return (
     <CheckoutBar
@@ -38,7 +40,7 @@ export function PaywallCheckout({ resolved, choice }: { resolved: ResolvedPick; 
       tone={checkoutTone(resolved)}
       status={checkout.status}
       locked={member.lock === "current" ? t("lockCurrentNote") : member.lock ? t("lockLower") : null}
-      onClick={() => void checkout.start(resolved.product.id, choice.method, quote.cents, discount?.offer.code)}
+      onClick={() => void checkout.start(resolved.product.id, choice.method, quote.cents, discount?.offer.code, resolved.product.revision)}
     />
   )
 }

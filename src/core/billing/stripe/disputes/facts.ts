@@ -36,6 +36,7 @@ export const evidenceFactsSchema = z.object({
       id: z.number().int(),
       product_id: z.string(),
       method: z.string(),
+      granted_credits: z.number().int().optional(),
       amount_total: z.number().int(),
       currency: z.string(),
       created_at: time,

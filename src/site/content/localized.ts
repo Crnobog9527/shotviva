@@ -2,17 +2,17 @@ import type { PaymentChannel, SiteProduct } from '@/core/config'
 import type { ContentPage, FaqItem, FooterLink, HomePage } from '@/core/content'
 import type { Locale } from '@/core/i18n'
 
-import { homePage } from './home'
-import { FreeImagesLabel } from './offer'
+import { homePage, makeHomePage } from './home'
+import { FreeImagesLabel, offerFacts, type OfferFacts } from './offer'
 import { footerLinks } from './legal'
-import { aiRestaurantMenu } from './pages/ai-restaurant-menu'
-import { commercialPhotography } from './pages/commercial-photography'
-import { imageToImageGenerator } from './pages/image-to-image-generator'
+import { aiRestaurantMenu, makeAiRestaurantMenu } from './pages/ai-restaurant-menu'
+import { commercialPhotography, makeCommercialPhotography } from './pages/commercial-photography'
+import { imageToImageGenerator, makeImageToImageGenerator } from './pages/image-to-image-generator'
 import { makePricingPage, pricingPage, type PricingContent } from './pricing'
-import { zhHomePage } from './zh/home'
-import { zhAiRestaurantMenu } from './zh/pages/ai-restaurant-menu'
-import { zhCommercialPhotography } from './zh/pages/commercial-photography'
-import { zhImageToImageGenerator } from './zh/pages/image-to-image-generator'
+import { zhHomePage, makeZhHomePage } from './zh/home'
+import { zhAiRestaurantMenu, makeZhAiRestaurantMenu } from './zh/pages/ai-restaurant-menu'
+import { zhCommercialPhotography, makeZhCommercialPhotography } from './zh/pages/commercial-photography'
+import { zhImageToImageGenerator, makeZhImageToImageGenerator } from './zh/pages/image-to-image-generator'
 import { zhFreeImages } from './zh/offer'
 import { ALIPAY_QUESTION, ZH_WECHAT_PAY_FAQ, makeZhPricingPage, zhPricingPage } from './zh/pricing'
 
@@ -21,10 +21,14 @@ import { ALIPAY_QUESTION, ZH_WECHAT_PAY_FAQ, makeZhPricingPage, zhPricingPage } 
 
 const HOME: Record<Locale, HomePage> = { en: homePage, zh: zhHomePage }
 const PRICING: Record<Locale, PricingContent> = { en: pricingPage, zh: zhPricingPage }
-const INNER: Record<Locale, readonly ContentPage[]> = {
-  en: [imageToImageGenerator, commercialPhotography, aiRestaurantMenu],
-  zh: [zhImageToImageGenerator, zhCommercialPhotography, zhAiRestaurantMenu],
-}
+const INNER = {
+  en: [
+    [imageToImageGenerator, makeImageToImageGenerator], [commercialPhotography, makeCommercialPhotography], [aiRestaurantMenu, makeAiRestaurantMenu],
+  ],
+  zh: [
+    [zhImageToImageGenerator, makeZhImageToImageGenerator], [zhCommercialPhotography, makeZhCommercialPhotography], [zhAiRestaurantMenu, makeZhAiRestaurantMenu],
+  ],
+} as const satisfies Record<Locale, readonly (readonly [ContentPage, (offers: OfferFacts) => ContentPage])[]>
 
 // Legal pages stay English, but their link labels follow the page (建站规格 §6.1 rule 3).
 // Contact opens Help & feedback, which has a /zh version.
@@ -37,7 +41,10 @@ const ZH_LEGAL_LABELS: Record<string, string> = {
   '/account?help=new': '联系我们',
 }
 
-export const homePageIn = (locale: Locale): HomePage => HOME[locale]
+export function homePageIn(locale: Locale, products?: readonly SiteProduct[]): HomePage {
+  if (!products) return HOME[locale]
+  return locale === 'zh' ? makeZhHomePage(offerFacts(products)) : makeHomePage(offerFacts(products))
+}
 export function pricingPageIn(locale: Locale, products?: readonly SiteProduct[]): PricingContent {
   if (!products) return PRICING[locale]
   return locale === 'zh' ? makeZhPricingPage(products) : makePricingPage(products)
@@ -55,10 +62,14 @@ export function pricingFaqIn(locale: Locale, channel: PaymentChannel, wechatPay 
 // offer), a marker for fillCredits like the page copy: "Up to 6 free Standard images".
 export const freeImagesIn = (locale: Locale): string => (locale === 'zh' ? zhFreeImages : FreeImagesLabel)
 
-export const contentPagesIn = (locale: Locale): readonly ContentPage[] => INNER[locale]
+export function contentPagesIn(locale: Locale, products?: readonly SiteProduct[]): readonly ContentPage[] {
+  const offers = products && offerFacts(products)
+  return INNER[locale].map(([page, make]) => offers ? make(offers) : page)
+}
 
-export function findContentPageIn(slug: string, locale: Locale): ContentPage | undefined {
-  return INNER[locale].find((page) => page.slug === slug)
+export function findContentPageIn(slug: string, locale: Locale, products?: readonly SiteProduct[]): ContentPage | undefined {
+  const entry = INNER[locale].find(([page]) => page.slug === slug)
+  return products ? entry?.[1](offerFacts(products)) : entry?.[0]
 }
 
 export function footerLinksIn(locale: Locale): readonly FooterLink[] {

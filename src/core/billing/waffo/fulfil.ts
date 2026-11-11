@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { trackPurchase } from '../../analytics/funnel'
 import type { ProductId, SiteProduct } from '../../config'
 import { AppError } from '../../errors'
+import { catalogReceipt, hasCatalogReceipt } from '../catalog-receipt'
 import { readQuote } from '../read-quote'
 import { creditChangeSchema, type CreditChange } from '../credits'
 import type { ApplyPaymentCodes } from '../payment-code-effects'
@@ -91,7 +92,9 @@ export async function fulfilWaffoOrder(
   const order = readWaffoOrder(event.eventId, event.data)
   if (order.paymentStatus !== undefined && order.paymentStatus !== 'succeeded') return 'unpaid'
   if (await endedBefore(deps, order, form, event.timestamp)) return 'ended'
-  const product = deps.products.find(p => p.id === order.orderMetadata.product_id)
+  const product = hasCatalogReceipt(order.orderMetadata)
+    ? await boundOrder(deps.db, order, event.eventId, form)
+    : deps.products.find(p => p.id === order.orderMetadata.product_id)
   if (!product) throw new AppError('INVALID_INPUT', `waffo order ${event.eventId}: unknown product`)
   const outcome = await settleCharge(deps, order, product, event.eventId, form)
   if (outcome !== 'review') await afterSettlement(deps, order, product, event.eventId, form)
@@ -135,4 +138,16 @@ async function endedBefore(deps: WaffoFulfilDeps, order: WaffoOrder, form: Waffo
   const at = isoOf(timestamp) ?? isoOf(order.paymentDate)
   if (form !== 'subscription' || !deps.refuseEnded || !at) return false
   return deps.refuseEnded({ orderId: order.orderId, at, what: 'charge' })
+}
+
+function boundOrder(db: RpcClient, order: WaffoOrder, payment: string, form: WaffoChargeForm) {
+  const meta = order.orderMetadata
+  if (order.orderMerchantExternalId && order.orderMerchantExternalId !== 'v2_' + meta.catalog_attempt) {
+    throw new AppError('INVALID_INPUT', 'Waffo attempt mismatch')
+  }
+  return catalogReceipt(db, meta, {
+    channel: 'waffo', priceId: order.productId ?? meta.catalog_price ?? '', unitCents: Number(meta.quoted_usd_cents),
+    reference: payment, contract: form === 'subscription' ? order.orderId : null,
+    renewal: form === 'subscription' && (order.periodNumber ?? 0) > 1, net: null, discounted: false,
+  })
 }

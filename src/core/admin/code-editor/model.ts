@@ -1,7 +1,8 @@
 import { z } from 'zod'
 
 import { belowDiscountFloor, type CodeProduct } from '../../codes/admin'
-import { PRODUCT_IDS, type ProductId } from '../../config'
+import { type ProductId } from '../../config'
+import { productIdSchema } from '../../config/product-id'
 import { beijingLocalToIso, toBeijingLocal } from '../shell/format'
 import { COPY, PRODUCTS } from './copy'
 
@@ -9,7 +10,7 @@ export const editable = z.object({
   code: z.string(), note: z.string().nullable(), invitee_credits: z.number().int().positive().nullable(),
   invitee_pool: z.enum(['free','paid']).nullable(), discount_percent: z.number().int().nullable(),
   discount_duration: z.enum(['once','repeating','forever']).nullable(), discount_months: z.number().int().nullable(),
-  discount_products: z.array(z.enum(PRODUCT_IDS)).nullable(), discount_valid_days: z.number().int().nullable(),
+  discount_products: z.array(productIdSchema).nullable(), discount_valid_days: z.number().int().nullable(),
   starts_at: z.string().nullable(), expires_at: z.string().nullable(), max_redemptions: z.number().int().nullable(),
   new_users_only: z.boolean(), redemption_count: z.number().int().nonnegative(),
 })
@@ -52,7 +53,7 @@ export function offerError({catalog, floor}: Catalog, percent: number, ids: Prod
   if (!Number.isInteger(percent) || percent < 1 || percent > 90) return COPY.invalidPercent
   if (!ids.length) return COPY.noTargets
   const bad = catalog.filter(p => ids.includes(p.id) && belowDiscountFloor(p, floor, percent))
-  return bad.length ? COPY.invalidTargets(bad.map(p => PRODUCTS[p.id])) : null
+  return bad.length ? COPY.invalidTargets(bad.map(p => (PRODUCTS[p.id] ?? p.id))) : null
 }
 
 export const emptyCode: Existing = {

@@ -4,8 +4,7 @@ import {
   freeImagesLabel,
   FreeImagesLabel,
   languages,
-  packFrom,
-  planFrom,
+  type OfferFacts,
   tierPixels,
   uploadLimits,
   usd,
@@ -14,13 +13,13 @@ import {
 // Facts shared by every page, so one number never has two versions
 // (建站规格 G3, G4). Numbers come from offer.ts, which reads site.config.
 
-function paidValue(): string {
-  if (!planFrom) return 'Plans and credit packs: prices coming soon'
+function paidValue({ planFrom, packFrom }: OfferFacts): string {
+  if (!planFrom) return packFrom ? `One-time credit packs from ${usd(packFrom.priceUsd)}` : 'Plans and credit packs: prices coming soon'
   const packs = packFrom ? `; credit packs from ${usd(packFrom.priceUsd)}, one-time` : ''
   return `Plans from ${usd(planFrom.priceUsd)} a month${packs}`
 }
 
-export function sharedFacts(): readonly [Fact, Fact, Fact, ...Fact[]] {
+export function sharedFacts(offers: OfferFacts): readonly [Fact, Fact, Fact, ...Fact[]] {
   return [
     // Why choose Shotviva (Owner 2026-11-08): the two key rows first, then the comparison,
     // who and where, then the numbers every page shares.
@@ -52,7 +51,7 @@ export function sharedFacts(): readonly [Fact, Fact, Fact, ...Fact[]] {
     { label: 'Free to start', value: `${FreeImagesLabel} when you sign up, given once` },
     { label: 'Output sizes', value: tierPixels },
     { label: 'Uploads', value: uploadLimits },
-    { label: 'Prices', value: paidValue() },
+    { label: 'Prices', value: paidValue(offers) },
     { label: 'Free vs paid photos', value: 'Free photos are public with a watermark; paid photos are private and watermark-free' },
     { label: 'Languages', value: languages },
   ]
@@ -60,7 +59,7 @@ export function sharedFacts(): readonly [Fact, Fact, Fact, ...Fact[]] {
 
 // The Pricing card that closes a landing page's "More From Shotviva" (gap audit B10,
 // design/comps-v3-b/landing.html): the cheapest plan and the signup gift, from offer.ts.
-export function pricingRelated(): RelatedLink {
+export function pricingRelated({ planFrom }: OfferFacts): RelatedLink {
   const note = planFrom ? `Plans from ${usd(planFrom.priceUsd)} a month, ${freeImagesLabel} to start.` : 'Plans and one-time credit packs.'
   return { href: '/pricing', anchor: 'Pricing', note }
 }

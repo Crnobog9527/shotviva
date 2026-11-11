@@ -5,7 +5,8 @@ import { z } from 'zod'
 
 import type { CheckoutStartMethod } from '../../analytics/events'
 import { trackCheckoutStart } from '../../analytics/funnel'
-import { PRODUCT_IDS, type PaymentChannel, type ProductId, type SiteProduct } from '../../config'
+import { type PaymentChannel, type ProductId, type SiteProduct } from '../../config'
+import { productIdSchema } from '../../config/product-id'
 import type { SelectedCode } from '../buyer-quote'
 import { quoteMetadata, type CheckoutPrice } from '../checkout-price'
 import type { RpcClient } from '../rpc'
@@ -19,6 +20,8 @@ import { cancelReturnUrl, PRICING_CANCELLED } from './cancel-return'
 import { cardOnlyConfigId } from './card-only'
 import { buyerMetadata, evidenceParams } from './checkout-evidence'
 import type { StripeApi } from './client'
+import { channelPrice, type Attempt } from '../catalog-attempt'
+import { catalogCheckout } from './catalog-checkout'
 import { resolvePriceId } from './prices'
 
 // Creates the hosted Checkout Session for one product and one payment method (ARCHITECTURE
@@ -28,12 +31,13 @@ import { resolvePriceId } from './prices'
 export const CHECKOUT_LOCALES = ['en', 'zh'] as const
 
 export const checkoutBodySchema = z.strictObject({
-  product_id: z.enum(PRODUCT_IDS),
+  product_id: productIdSchema,
   method: z.enum(CHECKOUT_METHODS),
   locale: z.enum(CHECKOUT_LOCALES).default('en'),
   // A displayed discount may have expired or been consumed in another tab. Its name is
   // only a quote precondition; the authenticated reservation supplies the actual coupon.
   pricing_version: z.enum(['v1', 'v2']).optional(),
+  expected_revision: z.int().positive().optional(),
   expected_price_cents: z.int().positive().optional(),
   expected_code: z.string().regex(/^[A-Z0-9]{4,20}$/).optional(),
   // Graylum top-up (ARCHITECTURE §14.5): where the success page offers to send the buyer back.
@@ -194,7 +198,7 @@ export function assertOffered(body: Pick<CheckoutBody, 'method' | 'locale'>, cha
   throw new AppError('INVALID_INPUT', `${body.method} is not offered on ${channel} for locale ${body.locale}`)
 }
 
-type CheckoutInput = { userId: string; body: CheckoutBody; client?: CheckoutClient; token?: string; quote?: CheckoutPrice; selectedCode?: SelectedCode | null }
+type CheckoutInput = { attempt?: Attempt; userId: string; body: CheckoutBody; client?: CheckoutClient; token?: string; quote?: CheckoutPrice; selectedCode?: SelectedCode | null }
 type CheckoutResult = { url: string; cancelReceipt?: string }
 
 async function startSession(deps: CheckoutDeps, body: CheckoutBody, user: string, token: string, params: Stripe.Checkout.SessionCreateParams, selectedCode?: SelectedCode | null) {
@@ -234,20 +238,42 @@ export async function createCheckout(deps: CheckoutDeps, input: CheckoutInput): 
   if (!product || product.priceUsd <= 0) throw new AppError('NOT_FOUND', 'Unknown product')
   const route = checkoutRoute(product, body.method, deps.managedPayments, deps.wechatPay)
   route.lookupKey = lookupKey(product.id, route.form, input.quote)
-  const priceId = await resolvePriceId(deps.stripe, product, route, input.quote?.cents)
+  const priceId = await checkoutPriceId(deps, input, product, route)
   const cardOnlyConfig = isPlainCard(route) ? await cardOnlyConfigId(deps.stripe) : null
   const token = input.token ?? crypto.randomUUID()
   const metadata = { user_id: input.userId, product_id: product.id, method: body.method, locale: body.locale, ...quoteMetadata(input.quote) }
+  if (input.attempt) Object.assign(metadata, contractMetadata(input.attempt, priceId))
   const params = sessionParams(route, priceId, metadata, {
     locale: body.locale, origin: deps.origin, token, cardOnlyConfig, termsConsent: deps.termsConsent,
     successPath: successPath(CHECKOUT_RETURN.stripe, body.return_to, deps.returnToHosts),
     client: input.client ?? { ip: null, userAgent: null },
   })
-  const { session, claim } = await startSession(deps, body, input.userId, token, params, input.selectedCode)
-  const url = await validatedUrl(deps, session, claim, route, input.userId)
+  const { result, code } = await openSession(deps, input, route, priceId, token, params)
   ;(deps.trackStart ?? trackCheckoutStart)(input.userId, {
     product_id: product.id, tier: product.tier, interval: product.interval, form: route.form, channel: 'stripe',
-    method: startedMethod(body.method, route), ...(claim && { code: claim.code, discount_percent: claim.percent }),
+    method: startedMethod(body.method, route), ...(code && { code: code.code, discount_percent: code.percent }),
   }, body.locale)
-  return { url, ...(claim && { cancelReceipt: token + ':' + session.id }) }
+  return result
+}
+
+function contractMetadata(attempt: Attempt, price: string) {
+  return {
+    catalog_attempt: attempt.token, catalog_revision: String(attempt.revision), catalog_price: price,
+    catalog_discount_percent: String(attempt.quote.selectedCode?.percent ?? 0),
+  }
+}
+
+async function openSession(deps: CheckoutDeps, input: CheckoutInput, route: CheckoutRoute, priceId: string, token: string, params: Stripe.Checkout.SessionCreateParams) {
+  if (input.attempt) {
+    const result = await catalogCheckout(deps, input.attempt, input.userId, route, priceId, params)
+    return { result, code: input.selectedCode }
+  }
+  const { session, claim } = await startSession(deps, input.body, input.userId, token, params, input.selectedCode)
+  const url = await validatedUrl(deps, session, claim, route, input.userId)
+  return { result: { url, ...(claim && { cancelReceipt: token + ':' + session.id }) }, code: claim }
+}
+
+async function checkoutPriceId(deps: CheckoutDeps, input: CheckoutInput, product: SiteProduct, route: CheckoutRoute) {
+  const pinned = input.attempt && await channelPrice(deps.codes,input.attempt,'stripe',route.lookupKey,route.form==='subscription')
+  return pinned ?? resolvePriceId(deps.stripe, product, route, input.quote?.cents)
 }

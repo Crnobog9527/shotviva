@@ -7,6 +7,7 @@ import { JsonLdScript, faqPageLd, organizationLd, pageMetadata, softwareApplicat
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
 import { toCatalogueTemplate } from '@/modules/image/marketing'
 import { creditFacts, featuredSections, fillCredits, freeImagesIn, homePageIn, isLinkEnabled } from '@/site/content'
+import { displayProducts } from '@/site/billing/display-products'
 import { site } from '@/site/site.config'
 
 import { isWishlistEnabled } from '@/core/wishlist'
@@ -17,11 +18,11 @@ import { HomeWishCtaSlot } from './home-wish-cta-slot'
 // The copy with "from N credits" and the image counts filled from the live catalogue (建站规格 G3, G4).
 async function load() {
   const locale = await currentLocale()
-  const [live, wishlistOpen] = await Promise.all([cachedWebCatalogue(locale), isWishlistEnabled(site)])
+  const [live, wishlistOpen, products] = await Promise.all([cachedWebCatalogue(locale), isWishlistEnabled(site), displayProducts()])
   const facts = creditFacts(live)
-  const page = fillCredits(homePageIn(locale), facts)
+  const page = fillCredits(homePageIn(locale, products), facts)
   const meta = { path: '/', title: page.title, description: page.description }
-  return { locale, live, page, wishlistOpen, free: fillCredits(freeImagesIn(locale), facts), meta }
+  return { locale, live, products, page, wishlistOpen, free: fillCredits(freeImagesIn(locale), facts), meta }
 }
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -33,13 +34,13 @@ export async function generateMetadata(): Promise<Metadata> {
 // The live catalogue is a cached read (expired by every admin save, featured list included);
 // only the generator's visitor half waits for the request.
 export default async function HomePage() {
-  const { locale, live, page, wishlistOpen, free, meta } = await load()
+  const { locale, live, products, page, wishlistOpen, free, meta } = await load()
   const ldMeta = { ...meta, path: localizePath(meta.path, locale) }
   const catalogue = live.map(toCatalogueTemplate)
   const { defaultId, ...sections } = featuredSections(live)
   return (
     <>
-      <JsonLdScript data={[softwareApplicationLd(site, ldMeta, free), organizationLd(site), faqPageLd(page.faq)]} />
+      <JsonLdScript data={[softwareApplicationLd(site, ldMeta, products, free), organizationLd(site), faqPageLd(page.faq)]} />
       <HomePageView
         page={page}
         brand={site.brand.name}

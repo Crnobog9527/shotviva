@@ -1,6 +1,7 @@
 import { AppError } from '../../errors'
 import { COPY, PRODUCTS } from './copy'
-import type { ProductId } from '../../config'
+import { type ProductId } from '../../config'
+import { productIdSchema } from '../../config/product-id'
 
 const messages: Record<string,string> = {
   INVALID_CODE_FIELDS: COPY.invalid, INVALID_INPUT: COPY.invalid, INVALID_DISCOUNT: COPY.invalidPercent,
@@ -16,8 +17,8 @@ export function editorFailure(error: unknown) {
     if (cause.code === '23514') return COPY.invalid
   }
   if (error.message.startsWith('CODE_DISCOUNT_PRODUCTS: ')) {
-    const names = error.message.slice('CODE_DISCOUNT_PRODUCTS: '.length).split(', ').filter(id => Object.hasOwn(PRODUCTS,id))
-    return COPY.invalidTargets(names.map(id => PRODUCTS[id as ProductId]))
+    const names = error.message.slice('CODE_DISCOUNT_PRODUCTS: '.length).split(', ').filter(id => productIdSchema.safeParse(id).success)
+    return COPY.invalidTargets(names.map(id => (PRODUCTS[id as ProductId] ?? id)))
   }
   return messages[error.message] ?? COPY.failed
 }

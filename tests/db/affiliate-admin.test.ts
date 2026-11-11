@@ -217,3 +217,21 @@ it('reports only buyers attributed to this partner and keeps raw buyer identitie
   await refund(db, first.charge, 1000)
   expect((await row(db, 'select affiliate_user_id from affiliate_commissions where payment_id=$1', [first.id])).affiliate_user_id).toBe(partner.id)
 })
+
+it('uses catalog identity for affiliate eligibility and the monthly commission of a named SKU', async () => {
+  const owner = await promoter(db)
+  await bind(db, user, owner.slug)
+  await settings({ apply_min_level: 'pro' })
+  const sku = 'studio_monthly'
+  await db.query('insert into products(id,credits,price_usd,active,days) values($1,123,12.34,false,30)', [sku])
+  await db.query("insert into admin.catalog_products(product_id,tier,kind) values ($1,'pro','monthly')", [sku])
+  expect((await row(db, 'select admin.catalog_membership_rank($1) as rank', [sku])).rank).toBe(3)
+  await db.query(`insert into payments(user_id,product_id,channel,stripe_session_id,amount_total,currency,method)
+    values($1,$2,'stripe',$3,1234,'usd','card')`, [user, sku, 'cs_' + randomUUID()])
+  expect(await eligible()).toBe(true)
+  const rate = await row(db, "select l1_bp from affiliate_rates where product_kind='monthly'")
+  const earned = await row(db, "select ac.rate_bp from affiliate_commissions ac join payments p on p.id=ac.payment_id where p.user_id=$1", [user])
+  expect(earned.rate_bp).toBe(rate.l1_bp)
+  await settings({ apply_min_level: 'max' })
+  expect(await eligible()).toBe(false)
+})

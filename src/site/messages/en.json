@@ -1222,7 +1222,7 @@
     "codeMonths": "First {months} months",
     "codeEvery": "Every billing period",
     "codeCheckoutFloor": "This discount is unavailable for this item at its current price. Choose another eligible item.",
-    "codeCheckoutChanged": "Your discount has changed. Check the updated price before trying again.",
+    "codeCheckoutChanged": "The price or your discount has changed. Check the updated price before trying again.",
     "codeCheckoutInUse": "This discount is in use in another checkout. Return to that checkout to finish or cancel it, then try again.",
     "fineDiscount": "{term} at {price}, then {original} per {period, select, year {year} other {month}} · cancel anytime · USD"
   },

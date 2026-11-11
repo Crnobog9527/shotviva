@@ -1,6 +1,6 @@
 "use client"
 
-import { useTranslations } from "next-intl"
+import { useLocale, useTranslations } from "next-intl"
 import type { ReactNode } from "react"
 
 import { usdPerHundredCredits, type PackProduct } from "../../config"
@@ -9,6 +9,13 @@ import { useProductQuote } from "./discount-context"
 import { useMoney } from "./use-money"
 
 type Props = { pack: PackProduct; look: PackLook; selected?: boolean; action?: ReactNode }
+
+function PackDetails({ pack }: Pick<Props, 'pack'>) {
+  const language = useLocale() === 'zh' ? 'zh' : 'en'
+  const name = (pack.revision ?? 0) > 2 ? pack.names?.[language] : undefined
+  const benefit = pack.benefits?.[language]
+  return <>{name && <span className="font-semibold">{name}</span>}{benefit && <span>{benefit}</span>}</>
+}
 
 // One credit pack in its material (comps-v3-b tiers.css): credits, price, price per credit,
 // and on /pricing a "Buy" button. A row on phones, a column from md up (tiers.css).
@@ -20,6 +27,7 @@ export function PackCard({ pack, look, selected = false, action }: Props) {
   const effective = { ...pack, priceUsd: quote.priceUsd }
   return (
     <span className="pack-card" data-tone={look.tone === "graphite" ? undefined : look.tone} data-selected={selected}>
+      <PackDetails pack={pack} />
       {look.flag ? (
         <span className="pack-flag inline-flex h-6 items-center rounded-full [background:var(--tier-flag)] px-2 text-caption leading-none font-semibold text-[var(--tier-flag-ink)]">
           {t(look.flag)}

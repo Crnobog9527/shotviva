@@ -80,12 +80,12 @@ describe('json-ld', () => {
   it('names offers the way the pricing page does, never by product id', () => {
     const site = testSite()
     const withPlan = { ...site, billing: { ...site.billing, products: [{ id: 'starter_monthly', tier: 'starter', interval: 'month', credits: 1990, paidDays: 30, priceUsd: 19.9 }] } } as typeof site
-    const offers = softwareApplicationLd(withPlan, page).offers as { name: string }[]
+    const offers = softwareApplicationLd(withPlan, page, withPlan.billing.products).offers as { name: string }[]
     expect(offers.map((o) => o.name)).toEqual(['Free', 'Starter Monthly'])
   })
 
   it('publishes the free offer and only decided prices', () => {
-    const offers = softwareApplicationLd(site, page).offers as { name: string; price: string }[]
+    const offers = softwareApplicationLd(site, page, site.billing.products).offers as { name: string; price: string }[]
     expect(offers.map((o) => [o.name, o.price])).toEqual([
       ['Free', '0'],
       ['Credit Pack, 120 credits', '49.00'],
@@ -93,9 +93,9 @@ describe('json-ld', () => {
   })
 
   it('uses the site wording for the free offer and counts paid offers in credits', () => {
-    const offers = softwareApplicationLd(site, page, '3 free Standard images').offers as { description: string }[]
+    const offers = softwareApplicationLd(site, page, site.billing.products, '3 free Standard images').offers as { description: string }[]
     expect(offers.map((o) => o.description)).toEqual(['3 free Standard images', '120 credits'])
-    const fallback = softwareApplicationLd(site, page).offers as { description: string }[]
+    const fallback = softwareApplicationLd(site, page, site.billing.products).offers as { description: string }[]
     expect(fallback[0]?.description).toBe(`${site.billing.freeCredits} free credits`)
   })
 

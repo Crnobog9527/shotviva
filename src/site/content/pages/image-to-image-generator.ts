@@ -1,3 +1,4 @@
+import { baselineOffers, type OfferFacts } from '../offer'
 import { defineContentPage, type EditCases, type ShootDemo } from '@/core/content'
 
 import { site } from '../../site.config'
@@ -69,7 +70,7 @@ const edits: EditCases = {
   ],
 }
 
-export const imageToImageGenerator = defineContentPage({
+const copy = {
   slug: 'image-to-image-generator',
   keyword: 'image to image generator',
   label: 'Image to image generator',
@@ -96,7 +97,21 @@ export const imageToImageGenerator = defineContentPage({
       value: `${tierPixels} on the long side, in ${sizeCountWord} sizes from a square listing to a 9:16 story. About ${photoSeconds} seconds a photo.`,
     },
   ],
-  costBills: productBills(
+  headings: {
+    facts: 'What an Image to Image Generator Needs From You',
+    faq: 'Image to Image Generator FAQ',
+    related: `More From ${brand}`,
+  },
+  landing: {
+    factsNote: `These are ${brand}'s own limits and sizes, the same on every page of this site.`,
+    shoot: catStyles,
+    edits,
+  },
+} as const
+
+export const makeImageToImageGenerator = (offers: OfferFacts) => defineContentPage({
+  ...copy,
+  costBills: productBills(offers,
     `What ${SET_PHOTOS} Product Photos Cost: Photographer vs Image to Image`,
     `One product, ${SET_PHOTOS} styled photos, retouched and ready to post. The same job, two bills.`,
   ),
@@ -122,23 +137,15 @@ export const imageToImageGenerator = defineContentPage({
     },
     {
       question: 'How much does the image to image generator cost?',
-      answer: `New users get ${freeImagesLabel}. ${plansSentence()}`,
+      answer: `New users get ${freeImagesLabel}. ${plansSentence(offers)}`,
     },
   ],
   related: [
     { href: '/', anchor: 'AI image to image', note: 'The studio: templates for food, products, rooms, pets and art styles.' },
     { href: '/commercial-photography', anchor: 'Commercial product photography', note: 'For shops and sellers who need studio product shots without a photographer.' },
     { href: '/ai-restaurant-menu', anchor: 'AI restaurant menu photos', note: 'For restaurants that need menu and delivery-app photos from a phone shot.' },
-    pricingRelated(),
+    pricingRelated(offers),
   ],
-  headings: {
-    facts: 'What an Image to Image Generator Needs From You',
-    faq: 'Image to Image Generator FAQ',
-    related: `More From ${brand}`,
-  },
-  landing: {
-    factsNote: `These are ${brand}'s own limits and sizes, the same on every page of this site.`,
-    shoot: catStyles,
-    edits,
-  },
 })
+
+export const imageToImageGenerator = makeImageToImageGenerator(baselineOffers)

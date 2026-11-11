@@ -1,5 +1,5 @@
 import type { MembershipTier, ProductId, ProductInterval, SiteProduct } from '../../config'
-import { membershipRank } from './upgrade-rule'
+import { entitlementRank } from './upgrade-rule'
 
 // What the account page's Subscription block shows (DESIGN §4.5), from the mirror (Stripe's or
 // Waffo's state, ARCHITECTURE §6.2 / §6.3), paid_until and current_tier. Pure, so every state is unit-tested.
@@ -25,6 +25,7 @@ export type SubscriptionSummary =
   | {
       kind: 'subscription'
       provider: SubscriptionProvider
+      productId: ProductId
       tier: MembershipTier
       interval: ProductInterval
       state: SubscriptionState
@@ -65,9 +66,13 @@ export const isLiveStatus = (status: string): boolean => LIVE[status] !== undefi
 // "Starter cancelled"). The card describes the plan the member holds now: the row of the
 // current tier (current_tier(), the latest membership grant, i.e. the one that set
 // paid_until); then the one that will renew; then the higher plan; then the latest end.
-function shownFirst(rows: readonly MirrorRow[], tier: MembershipTier | null): MirrorRow[] {
-  const holds = (row: MirrorRow) => (tier !== null && row.productId.startsWith(`${tier}_`) ? 0 : 1)
-  const rank = (row: MirrorRow) => membershipRank(row.productId as ProductId)
+function shownFirst(rows: readonly MirrorRow[], tier: MembershipTier | null, products: readonly SiteProduct[]): MirrorRow[] {
+  const byId = new Map<string, SiteProduct>(products.map(p => [p.id, p]))
+  const holds = (row: MirrorRow) => (byId.get(row.productId)?.tier === tier ? 0 : 1)
+  const rank = (row: MirrorRow) => {
+    const product = byId.get(row.productId)
+    return product && product.tier !== 'pack' ? entitlementRank(product.tier, product.interval) : -1
+  }
   const renewing = (row: MirrorRow) => (LIVE[row.status] === 'active' && !row.cancelAtPeriodEnd ? 0 : 1)
   return [...rows].sort(
     (a, b) =>
@@ -79,13 +84,13 @@ function shownFirst(rows: readonly MirrorRow[], tier: MembershipTier | null): Mi
 }
 
 function liveSubscription(input: Input): SubscriptionSummary | null {
-  for (const row of shownFirst(input.rows, input.tier)) {
+  for (const row of shownFirst(input.rows, input.tier, input.products)) {
     const live = LIVE[row.status]
     const product = input.products.find((p) => p.id === row.productId)
     if (!live || !product || product.tier === 'pack') continue
     const state = live === 'active' && row.cancelAtPeriodEnd ? 'cancels' : live
     const expired = input.paidUntil === null || input.paidUntil <= input.now
-    return { kind: 'subscription', provider: row.provider, tier: product.tier, interval: product.interval, state, periodEnd: row.currentPeriodEnd, expired }
+    return { kind: 'subscription', provider: row.provider, productId: product.id, tier: product.tier, interval: product.interval, state, periodEnd: row.currentPeriodEnd, expired }
   }
   return null
 }
