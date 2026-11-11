@@ -57,6 +57,14 @@ function readyHomePhoto(photo: HomePhoto) {
 
 function useStart(viewer: HomeViewer | null, template: CatalogueTemplate | null, photo: HomePhoto) {
   const router = useRouter()
+  // Signed in with the photo in: fetch the template's workspace route now, so Generate's jump to
+  // the developing view is a client move, not a cold route load (perf window 2026-11-12: the
+  // 0.9–1.4 s pause after Generate was the route transition).
+  const ready = viewer !== null && template !== null && photo.status === 'ready'
+  const templateId = template?.id
+  useEffect(() => {
+    if (ready && templateId) router.prefetch(`/generate/${templateId}`)
+  }, [ready, templateId, router])
   return useCallback(
     (aspect: OutputAspect | null, note: string) => {
       if (!viewer || !template || !aspect) return
