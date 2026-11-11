@@ -48,8 +48,8 @@ export default async function RootLayout({ children }: LayoutProps<'/[locale]'>)
   return (
     <html lang={htmlLang(lang)} className={`${fontVariables} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
-        {/* Each language fetches only its own display face: MiSans after the first screen, or
-            Instrument Serif with the document. */}
+        {/* Each language fetches only its own display face: MiSans right after the first paint
+            (misans-stylesheet.tsx), or Instrument Serif with the document. */}
         {lang === 'zh' ? <MiSansStylesheet /> : <InstrumentSerifPreload />}
         <NextIntlClientProvider messages={messages}>
           <TranslatedPathsProvider paths={site.locales.zhPaths}>
