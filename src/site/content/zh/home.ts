@@ -21,6 +21,7 @@ import {
   zhTierPixels,
   zhUploadLimits,
 } from './offer'
+import { zhTextEdits } from './home-edits'
 import { zhHomeWishlist } from './home-wishlist'
 import { zhSharedFacts } from './shared'
 import { zhHomePlans } from '../plan-strip'
@@ -151,6 +152,7 @@ const copy = {
     scenes: { label: '同一张照片做出的 AI 场景', items: heroScenes },
   },
   shoot,
+  edits: zhTextEdits,
   steps,
   templateGrid: {
     heading: 'AI改图模板：不用写提示词',

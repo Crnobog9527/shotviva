@@ -199,6 +199,9 @@ export type HomePage = Omit<PageBasics, 'related'> & {
   }
   wishlist: WishlistPromo
   topics?: TopicSection
+  // "Edit text in an image with one sentence" (Owner 2026-11-11, shotviva-docs#7): before/after
+  // pairs in which only the words change; right after the shoot demo.
+  edits?: EditCases
   // Intro paragraph above the facts table.
   factsIntro: string
   // H2-4: free credits, free vs paid works, then plans.
