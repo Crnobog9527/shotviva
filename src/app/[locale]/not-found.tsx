@@ -1,3 +1,6 @@
+// Rendered under the root layout alone, which carries no stylesheet of its own.
+import '../globals-public.css'
+
 import { AnnouncementBanner } from '@/core/announcements'
 import { currentLocale } from '@/core/i18n/server'
 

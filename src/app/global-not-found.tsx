@@ -11,7 +11,7 @@ import { site } from '@/site/site.config'
 import { MarketingFooter, MarketingHeader } from './[locale]/marketing-chrome'
 import { NotFoundContent } from './[locale]/not-found-content'
 import { fontVariables } from './fonts'
-import './globals.css'
+import './globals-public.css'
 
 // An address that matches no route at all has no [locale] root layout to render in, so Next
 // serves this document on its own (experimental.globalNotFound). /zh addresses never get here:

@@ -14,9 +14,10 @@ import { describe, expect, it } from 'vitest'
 const LAYER_ORDER = '@layer properties, theme, base, components, utilities;'
 
 const SRC = fileURLToPath(new URL('..', import.meta.url))
-// globals.css opens with @import "tailwindcss", which declares the same order itself, and CSS
-// allows nothing but @import ahead of an @import.
-const OWNS_ORDER = new Set(['app/globals.css'])
+// The two entry sheets open with @import "tailwindcss", which declares the same order itself, and
+// CSS allows nothing but @import ahead of an @import. Their shared body is only ever imported by
+// them, right after it.
+const OWNS_ORDER = new Set(['app/globals.css', 'app/globals-public.css', 'app/globals-body.css'])
 
 function cssFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {

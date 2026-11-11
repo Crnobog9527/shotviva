@@ -18,8 +18,8 @@ describe('Instrument Serif files', () => {
     }
   })
 
-  it('are the files globals.css declares, and the only ones', () => {
-    const css = readFileSync(join(root, 'src/app/globals.css'), 'utf8')
+  it('are the files globals-body.css declares, and the only ones', () => {
+    const css = readFileSync(join(root, 'src/app/globals-body.css'), 'utf8')
     const declared = [...css.matchAll(/url\("(\/fonts\/instrument-serif\/[^"]+)"\)/g)].map((match) => match[1])
     expect(declared.sort()).toEqual([...INSTRUMENT_SERIF_FILES].sort())
   })
