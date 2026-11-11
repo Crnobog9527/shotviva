@@ -42,9 +42,20 @@ function CreateBody({ template, open, onClose, ...context }: BodyProps) {
   const workspace = `/generate/${template.id}`
   // Generate moves to the template's workspace page. Its shell is fetched while the visitor is
   // still picking a photo, so the move, and the developing view the shell draws from this tab's
-  // own job (workspace-pending.tsx), happen on the click instead of after a round trip.
+  // own job (workspace-pending.tsx), happen on the click instead of after a round trip. The
+  // router drops a prefetched route after a few minutes (measured on the test site: a click 5.5
+  // minutes in waited 1.1–3.6 s again), so it is fetched again whenever the router says its copy
+  // went stale, for as long as the dialog is open.
   useEffect(() => {
-    if (open) router.prefetch(workspace)
+    if (!open) return
+    let closed = false
+    const warm = () => {
+      if (!closed) router.prefetch(workspace, { onInvalidate: warm })
+    }
+    warm()
+    return () => {
+      closed = true
+    }
   }, [open, router, workspace])
   const batch = limitsFor(context.tier).batchMax > 1 && draft.photos.photos.length === 0
   const tall = isCompareSample(template)
