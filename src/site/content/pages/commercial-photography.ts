@@ -63,9 +63,9 @@ const whiteCases: EditCases = {
     },
     {
       title: 'A dress on a bedroom door',
-      change: 'Off the hanger and onto an invisible mannequin, steamed smooth on pure white, with every embroidered flower, the tassels and the crochet lace where they were.',
+      change: 'Off the hanger and the door, onto pure white: the same dress, steamed smooth, with every embroidered flower, the tassels and the crochet lace where they were.',
       before: caseImage('white-dress-before', 'Example phone photo: an ivory tiered maxi dress with folk flower embroidery hanging on a bedroom door, a bed and a laundry basket in frame'),
-      after: caseImage('white-dress-after', 'AI example: the same embroidered dress in an invisible-mannequin shape on a pure white background'),
+      after: caseImage('white-dress-after', 'AI example: the same embroidered dress on a pure white background'),
     },
     {
       title: 'Flyaway hair on a busy street',

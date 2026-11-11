@@ -54,9 +54,9 @@ const whiteCases: EditCases = {
     },
     {
       title: '挂在门上的连衣裙',
-      change: '从衣架上取下，做成隐形模特的立体效果，熨平后放在纯白底上，每一朵绣花、流苏和钩花蕾丝都在原来的位置。',
+      change: '去掉衣架和门，放到纯白底上：还是这条裙子，熨得平整，每一朵绣花、流苏和钩花蕾丝都在原来的位置。',
       before: caseImage('white-dress-before', '示例手机照：一条象牙白民族风绣花分层长裙挂在卧室门上，旁边是床和脏衣篮'),
-      after: caseImage('white-dress-after', 'AI 示例：同一条绣花长裙做成隐形模特效果，纯白背景'),
+      after: caseImage('white-dress-after', 'AI 示例：同一条绣花长裙，纯白背景'),
     },
     {
       title: '街头逆光飞发',
