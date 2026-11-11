@@ -2,7 +2,7 @@ import { Suspense, type ReactNode } from 'react'
 
 import type { Block } from '../analytics/load'
 import type { Range } from '../analytics/range'
-import { overviewEnd, readGrowth, readPeople, type PeopleBlock } from '../growth/load'
+import { overviewEnd, readGrowth, readPeople, readSources, type PeopleBlock, type SourcesBlock } from '../growth/load'
 import type { GrowthStats } from '../growth/stats'
 import { GROWTH_COPY as COPY } from './copy'
 import { FunnelSection } from './funnel-section'
@@ -10,6 +10,7 @@ import { Headline } from './headline'
 import type { PeopleState } from './people-state'
 import { RevenueSection } from './revenue-section'
 import { SectionError } from './section'
+import { SourcesSection, type SourcesState } from './sources-section'
 
 // 「总览」 (ARCHITECTURE §16.2b). The database half renders as soon as it is read; PostHog's
 // numbers have their own Suspense boundary, so a slow PostHog (up to its timeout) never holds back
@@ -27,14 +28,27 @@ async function GrowthLoader({ range, end }: { range: Range; end: number }) {
   const db = await readGrowth(range, end)
   if (db.status !== 'ok') return <SectionError title={COPY.funnel.title} />
   const people = readPeople(range, end, db.data)
+  const sources = readSources(range, end, db.data)
+  const current = db.data.periods.current
   const fallback = <PeopleParts range={range} db={db.data} state={{ status: 'loading' }} />
   return (
-    <GrowthLayout db={db.data}>
+    <GrowthLayout
+      db={db.data}
+      sources={
+        <Suspense fallback={<SourcesSection db={current} state={{ status: 'loading' }} />}>
+          <SourcesLoaded db={current} sources={sources} />
+        </Suspense>
+      }
+    >
       <Suspense fallback={fallback}>
         <PeopleLoaded range={range} db={db.data} people={people} />
       </Suspense>
     </GrowthLayout>
   )
+}
+
+async function SourcesLoaded({ db, sources }: { db: GrowthStats['periods']['current']; sources: Promise<SourcesBlock> }) {
+  return <SourcesSection db={db} state={await sources} />
 }
 
 async function PeopleLoaded({ range, db, people }: { range: Range; db: GrowthStats; people: Promise<PeopleBlock> }) {
@@ -56,20 +70,24 @@ function PeopleParts({ range, db, state }: { range: Range; db: GrowthStats; stat
   )
 }
 
-function GrowthLayout({ db, children }: { db: GrowthStats; children: ReactNode }) {
+// Headline and funnel, then where people come from, then revenue; the two PostHog parts load
+// independently and never hold back revenue.
+function GrowthLayout({ db, children, sources }: { db: GrowthStats; children: ReactNode; sources: ReactNode }) {
   return (
     <div className="grid min-w-0 gap-6">
       {children}
+      {sources}
       <RevenueSection db={db.periods.current} />
     </div>
   )
 }
 
 // Synchronous composition with both halves already read (tests).
-export function GrowthPanel({ range, db, people }: { range: Range; db: Block<GrowthStats>; people: PeopleState }) {
+type PanelProps = { range: Range; db: Block<GrowthStats>; people: PeopleState; sources?: SourcesState }
+export function GrowthPanel({ range, db, people, sources = { status: 'loading' } }: PanelProps) {
   if (db.status !== 'ok') return <SectionError title={COPY.funnel.title} />
   return (
-    <GrowthLayout db={db.data}>
+    <GrowthLayout db={db.data} sources={<SourcesSection db={db.data.periods.current} state={sources} />}>
       <PeopleParts range={range} db={db.data} state={people} />
     </GrowthLayout>
   )

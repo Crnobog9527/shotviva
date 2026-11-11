@@ -25,20 +25,26 @@ const ITEMS: readonly { key: AdminNavKey; href: `/admin${string}` }[] = [
   { key: 'references', href: '/admin/references' },
   { key: 'providers', href: '/admin/providers' },
   { key: 'requests', href: '/admin/requests' },
+  // T108 (ARCHITECTURE §9 第 5 条): public works waiting for a person, next to the other review.
+  { key: 'gallery', href: '/admin/gallery' },
   { key: 'announcements', href: '/admin/announcements' },
   // T29 (ARCHITECTURE §6.2 新功能抢先用).
   { key: 'features', href: '/admin/features' },
 ]
 
-export type NavCounts = { tickets?: number; inquiries?: number }
+export type NavCounts = { tickets?: number; inquiries?: number; gallery?: number }
 
 // The review entry only exists while the wishlist does (ARCHITECTURE §15.6). Tickets carry the
 // open count (ARCHITECTURE §10 「站内工单」), inquiries the new ones (§10.c).
-export function adminNavItems(flags: { wishlist: boolean; affiliate?: boolean }, counts: NavCounts = {}): AdminNavItem[] {
+export function adminNavItems(
+  flags: { wishlist: boolean; affiliate?: boolean; gallery?: boolean },
+  counts: NavCounts = {},
+): AdminNavItem[] {
   const visible = ITEMS.filter((item) => item.key !== 'affiliates' || flags.affiliate)
     .filter((item) => item.key !== 'requests' || flags.wishlist)
+    .filter((item) => item.key !== 'gallery' || flags.gallery)
   return visible.map((item) => {
-    const count = item.key === 'tickets' || item.key === 'inquiries' ? counts[item.key] : undefined
+    const count = item.key === 'tickets' || item.key === 'inquiries' || item.key === 'gallery' ? counts[item.key] : undefined
     return { ...item, label: SHELL_COPY.nav[item.key], ...(count ? { count } : {}) }
   })
 }

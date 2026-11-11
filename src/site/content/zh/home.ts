@@ -21,6 +21,7 @@ import {
   zhTierPixels,
   zhUploadLimits,
 } from './offer'
+import { withFirstFrame } from '../landing-shared'
 import { zhHomeWishlist } from './home-wishlist'
 import { zhSharedFacts } from './shared'
 import { zhHomePlans } from '../plan-strip'
@@ -144,7 +145,7 @@ const copy = {
   subtitle: '从你拍的真实照片出发的 AI 影棚。',
   answerBlock: `AI改图就是把你拍好的照片换一种光线、场景或画风，照片里的主体保持原样。上传一张手机照片，选一个餐饮、商品、美妆、房间、宠物或画风模板就能出图，不用写提示词。新用户送 ${zhFreeImages}。`,
   hero: {
-    before: phoneShot,
+    before: withFirstFrame(phoneShot),
     after: heroScenes[0].image,
     caption: heroScenes[0].caption,
     cta: { label: '上传照片', href: '/generate' },

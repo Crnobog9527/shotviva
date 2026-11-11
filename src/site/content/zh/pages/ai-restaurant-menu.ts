@@ -2,7 +2,7 @@ import { baselineOffers, type OfferFacts } from '../../offer'
 import { defineContentPage, type CostBills, type ShootDemo } from '@/core/content'
 
 import { site } from '../../../site.config'
-import { caseImage, CATEGORY, SIZE_COUNT } from '../../landing-shared'
+import { caseImage, CATEGORY, SIZE_COUNT, withFirstFrame } from '../../landing-shared'
 import { zhPricingRelated } from '../shared'
 import { foodHalfDayUsd, MENU_DISHES, photoSeconds, usd, usdRange } from '../../offer'
 import { PLATFORM_SPECS, px } from '../../platform-specs'
@@ -86,7 +86,7 @@ const copy = {
   subtitle: '用你真实拍的菜品照片，换碗、换光线、换环境，不会生成你店里没有的菜。',
   answerBlock: `AI菜单配图从你真实拍的菜品照片出发，菜保持原样，只换碗、光线和环境，不会凭空生成不存在的菜。在 ${brand} 上传一张手机照片，选「外卖菜单」「暗调氛围」或「促销海报」模板，就能下载${zhTierList}的成图。新用户送 ${zhFreeImages}。`,
   hero: {
-    before: fishPhone,
+    before: withFirstFrame(fishPhone),
     after: fishDark,
     caption: '你的手机照片 → 菜单主图：还是这份鱼，换了碗和布景',
     cta: { label: '上传照片', href: '/generate' },

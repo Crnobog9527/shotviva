@@ -5826,6 +5826,55 @@ end $$;
 ALTER FUNCTION "public"."admin_mark_prompt_lab_run"("p_actor" "uuid", "p_session_id" "uuid", "p_run_id" "uuid", "p_starred" boolean, "p_is_best" boolean) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_moderate_works"("p_actor" "uuid", "p_job_ids" "uuid"[], "p_decision" "text", "p_reason" "text") RETURNS integer
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_ids uuid[];
+begin
+  if p_actor is null or not exists (
+      select 1 from public.profiles p where p.id = p_actor and p.role = 'admin' and p.banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if p_job_ids is null or cardinality(p_job_ids) not between 1 and 50 then
+    raise exception 'INVALID_INPUT' using detail = 'between 1 and 50 works';
+  end if;
+  if p_decision is null or p_decision not in ('approved', 'rejected') then
+    raise exception 'INVALID_INPUT' using detail = 'decision must be approved or rejected';
+  end if;
+  if p_decision = 'rejected' and (p_reason is null or p_reason not in
+      ('sexual', 'violence', 'hate', 'minor', 'privacy', 'ip', 'spam', 'quality', 'other')) then
+    raise exception 'INVALID_INPUT' using detail = 'a rejection needs a reason';
+  end if;
+
+  with changed as (
+    update public.generation_jobs j
+       set moderation_status = p_decision,
+           moderation_reason = case when p_decision = 'rejected' then p_reason end,
+           -- Keeping an approved work (e.g. after a report) keeps its place in the gallery.
+           moderated_at = case when j.moderation_status = p_decision then j.moderated_at else now() end,
+           moderated_by = p_actor
+     where j.id = any (p_job_ids) and j.status = 'succeeded' and j.visibility = 'public' and j.deleted_at is null
+    returning j.id
+  )
+  select coalesce(array_agg(id), '{}') into v_ids from changed;
+
+  update public.work_reports r set resolved_at = now()
+   where r.job_id = any (v_ids) and r.resolved_at is null;
+
+  insert into public.admin_audit_log (action, user_id, reason, target_id)
+  select 'moderate_work', p_actor, p_decision || coalesce(':' || case when p_decision = 'rejected' then p_reason end, ''), id::text
+    from unnest(v_ids) as id;
+
+  return cardinality(v_ids);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_moderate_works"("p_actor" "uuid", "p_job_ids" "uuid"[], "p_decision" "text", "p_reason" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_move_reference_category"("p_actor" "uuid", "p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text") RETURNS "void"
     LANGUAGE "sql"
     SET "search_path" TO ''
@@ -7018,7 +7067,7 @@ ALTER FUNCTION "public"."admin_set_provider_key"("p_id" "uuid", "p_key" "text") 
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_set_system_setting"("p_key" "text", "p_value" "jsonb", "p_actor" "uuid") RETURNS "void"
-    LANGUAGE "plpgsql"
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $_$
 begin
@@ -7026,14 +7075,15 @@ begin
     raise exception 'INVALID_INPUT' using detail = 'actor is required';
   end if;
   if not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin'
-      and (p_key not in ('code_gift_policy','code_inviter_window_days') or p.banned_at is null)) then
+      and (p_key not in ('code_gift_policy','code_inviter_window_days','gallery_enabled','gallery_auto_approve')
+           or p.banned_at is null)) then
     raise exception 'NOT_ADMIN';
   end if;
 
   case p_key
-    when 'wishlist_enabled' then
+    when 'wishlist_enabled', 'gallery_enabled', 'gallery_auto_approve' then
       if p_value is null or jsonb_typeof(p_value) <> 'boolean' then
-        raise exception 'INVALID_INPUT' using detail = 'wishlist_enabled must be a boolean';
+        raise exception 'INVALID_INPUT' using detail = p_key || ' must be a boolean';
       end if;
     when 'admin_test_daily_budget_usd' then
       if p_value is null or jsonb_typeof(p_value) <> 'number'
@@ -7064,6 +7114,11 @@ begin
     set value = excluded.value,
         updated_at = excluded.updated_at,
         updated_by = excluded.updated_by;
+
+  if p_key in ('gallery_enabled', 'gallery_auto_approve') then
+    insert into public.admin_audit_log (action, user_id, reason, target_id)
+    values ('gallery_setting', p_actor, p_value::text, p_key);
+  end if;
 end;
 $_$;
 
@@ -8875,6 +8930,14 @@ CREATE TABLE IF NOT EXISTS "public"."generation_jobs" (
     "download_ip" "inet",
     "download_count" integer DEFAULT 0 NOT NULL,
     "batch_id" "uuid",
+    "moderation_status" "text" DEFAULT 'pending'::"text" NOT NULL,
+    "moderation_reason" "text",
+    "moderation_categories" "text"[] DEFAULT '{}'::"text"[] NOT NULL,
+    "auto_moderated_at" timestamp with time zone,
+    "moderated_at" timestamp with time zone,
+    "moderated_by" "uuid",
+    "screen_attempts" integer DEFAULT 0 NOT NULL,
+    "last_screen_at" timestamp with time zone,
     CONSTRAINT "generation_jobs_check" CHECK ((("status" = 'running'::"text") = ("finished_at" IS NULL))),
     CONSTRAINT "generation_jobs_check1" CHECK ((("status" <> 'succeeded'::"text") OR ("output_key" IS NOT NULL))),
     CONSTRAINT "generation_jobs_cost_usd_nonnegative" CHECK ((("cost_usd" IS NULL) OR ("cost_usd" >= (0)::numeric))),
@@ -8882,8 +8945,11 @@ CREATE TABLE IF NOT EXISTS "public"."generation_jobs" (
     CONSTRAINT "generation_jobs_credits_cost_check" CHECK (("credits_cost" > 0)),
     CONSTRAINT "generation_jobs_download_count_check" CHECK (("download_count" >= 0)),
     CONSTRAINT "generation_jobs_free_work_public" CHECK ((("credit_pool" = 'paid'::"text") OR ("visibility" = 'public'::"text"))),
+    CONSTRAINT "generation_jobs_moderation_reason_check" CHECK (("moderation_reason" = ANY (ARRAY['auto'::"text", 'sexual'::"text", 'violence'::"text", 'hate'::"text", 'minor'::"text", 'privacy'::"text", 'ip'::"text", 'spam'::"text", 'quality'::"text", 'other'::"text"]))),
+    CONSTRAINT "generation_jobs_moderation_status_check" CHECK (("moderation_status" = ANY (ARRAY['pending'::"text", 'approved'::"text", 'rejected'::"text"]))),
     CONSTRAINT "generation_jobs_module_check" CHECK (("module" = ANY (ARRAY['image'::"text", 'video'::"text"]))),
     CONSTRAINT "generation_jobs_provider_usage_object" CHECK ((("provider_usage" IS NULL) OR ("jsonb_typeof"("provider_usage") = 'object'::"text"))),
+    CONSTRAINT "generation_jobs_screen_attempts_check" CHECK (("screen_attempts" >= 0)),
     CONSTRAINT "generation_jobs_source_check" CHECK (("source" = ANY (ARRAY['web'::"text", 'graylum'::"text"]))),
     CONSTRAINT "generation_jobs_status_check" CHECK (("status" = ANY (ARRAY['running'::"text", 'succeeded'::"text", 'failed'::"text"]))),
     CONSTRAINT "generation_jobs_visibility_check" CHECK (("visibility" = ANY (ARRAY['public'::"text", 'private'::"text"])))
@@ -10138,6 +10204,68 @@ $$;
 ALTER FUNCTION "public"."record_waffo_refund"("p_payment_id" "text", "p_refund_ref" "text", "p_amount" integer) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."record_work_auto_moderation"("p_job_id" "uuid", "p_flagged" boolean, "p_categories" "text"[]) RETURNS "text"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_auto boolean;
+  v_status text;
+begin
+  if p_job_id is null or p_flagged is null then
+    raise exception 'INVALID_INPUT' using detail = 'job and verdict are required';
+  end if;
+  select coalesce((select s.value = 'true'::jsonb from public.system_settings s where s.key = 'gallery_auto_approve'), false)
+    into v_auto;
+
+  update public.generation_jobs j
+     set auto_moderated_at = now(),
+         last_screen_at = now(),
+         screen_attempts = j.screen_attempts + 1,
+         moderation_categories = coalesce(p_categories, '{}'),
+         moderation_status = case
+           when j.moderation_status <> 'pending' then j.moderation_status
+           when p_flagged then 'rejected'
+           when v_auto then 'approved'
+           else 'pending' end,
+         moderation_reason = case
+           when j.moderation_status = 'pending' and p_flagged then 'auto' else j.moderation_reason end,
+         moderated_at = case
+           when j.moderation_status = 'pending' and (p_flagged or v_auto) then now() else j.moderated_at end
+   where j.id = p_job_id and j.status = 'succeeded' and j.visibility = 'public' and j.deleted_at is null
+  returning j.moderation_status into v_status;
+  return v_status;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."record_work_auto_moderation"("p_job_id" "uuid", "p_flagged" boolean, "p_categories" "text"[]) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."record_work_screen_failure"("p_job_id" "uuid") RETURNS integer
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_attempts integer;
+begin
+  if p_job_id is null then
+    raise exception 'INVALID_INPUT' using detail = 'job is required';
+  end if;
+  update public.generation_jobs j
+     set screen_attempts = j.screen_attempts + 1,
+         last_screen_at = now()
+   where j.id = p_job_id and j.status = 'succeeded' and j.visibility = 'public' and j.deleted_at is null
+     and j.moderation_status = 'pending' and j.auto_moderated_at is null
+  returning j.screen_attempts into v_attempts;
+  return v_attempts;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."record_work_screen_failure"("p_job_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."redeem_code"("p_user" "uuid", "p_code" "text", "p_context" "text", "p_invitee_credits" integer, "p_invite_window_days" integer, "p_replace" boolean DEFAULT false) RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -10391,6 +10519,51 @@ $$;
 
 
 ALTER FUNCTION "public"."release_checkout_discount"("p_user" "uuid", "p_token" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."report_work"("p_job_id" "uuid", "p_reporter" "uuid", "p_reason" "text", "p_note" "text") RETURNS "text"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_note text := nullif(btrim(coalesce(p_note, '')), '');
+begin
+  if p_job_id is null or p_reporter is null then
+    raise exception 'INVALID_INPUT' using detail = 'job and reporter are required';
+  end if;
+  if p_reason is null or p_reason not in ('sexual', 'violence', 'hate', 'minor', 'privacy', 'ip', 'spam', 'other') then
+    raise exception 'INVALID_INPUT' using detail = 'unknown reason';
+  end if;
+  if v_note is not null and length(v_note) > 500 then
+    raise exception 'INVALID_INPUT' using detail = 'note is at most 500 characters';
+  end if;
+  if not exists (select 1 from public.profiles p where p.id = p_reporter and p.banned_at is null) then
+    raise exception 'FORBIDDEN';
+  end if;
+  if not exists (
+      select 1 from public.generation_jobs j
+       where j.id = p_job_id and j.status = 'succeeded' and j.visibility = 'public' and j.moderation_status = 'approved'
+         and j.deleted_at is null and j.source = 'web' and j.template_id <> 'freeform' and j.template_id <> 'edit') then
+    raise exception 'NOT_FOUND';
+  end if;
+  if exists (select 1 from public.work_reports r where r.job_id = p_job_id and r.reporter_id = p_reporter) then
+    return 'duplicate';
+  end if;
+  -- Serialise one reporter's reports so two at once cannot both pass the daily cap.
+  perform pg_advisory_xact_lock(hashtextextended('report_work:' || p_reporter::text, 0));
+  if (select count(*) from public.work_reports r
+       where r.reporter_id = p_reporter and r.created_at > now() - interval '1 day') >= 20 then
+    return 'limited';
+  end if;
+  insert into public.work_reports (job_id, reporter_id, reason, note)
+  values (p_job_id, p_reporter, p_reason, v_note)
+  on conflict on constraint work_reports_once_per_reporter do nothing;
+  return case when found then 'reported' else 'duplicate' end;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."report_work"("p_job_id" "uuid", "p_reporter" "uuid", "p_reason" "text", "p_note" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."reserve_batch_cell"("p_job_id" "uuid", "p_user_id" "uuid", "p_module" "text", "p_template_id" "text", "p_credits_cost" integer, "p_inputs" "jsonb", "p_provider" "text", "p_visibility" "text") RETURNS "public"."generation_jobs"
@@ -11967,7 +12140,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "target_id" "text",
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text"]))),
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text"]))),
     CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
     CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );
@@ -12800,6 +12973,33 @@ CREATE TABLE IF NOT EXISTS "public"."template_sync_history" (
 ALTER TABLE "public"."template_sync_history" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."work_reports" (
+    "id" bigint NOT NULL,
+    "job_id" "uuid" NOT NULL,
+    "reporter_id" "uuid" NOT NULL,
+    "reason" "text" NOT NULL,
+    "note" "text",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "resolved_at" timestamp with time zone,
+    CONSTRAINT "work_reports_note_check" CHECK ((("note" IS NULL) OR (("length"("note") >= 1) AND ("length"("note") <= 500)))),
+    CONSTRAINT "work_reports_reason_check" CHECK (("reason" = ANY (ARRAY['sexual'::"text", 'violence'::"text", 'hate'::"text", 'minor'::"text", 'privacy'::"text", 'ip'::"text", 'spam'::"text", 'other'::"text"])))
+);
+
+
+ALTER TABLE "public"."work_reports" OWNER TO "postgres";
+
+
+ALTER TABLE "public"."work_reports" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."work_reports_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
 ALTER TABLE ONLY "admin"."batch_zip_requests"
     ADD CONSTRAINT "batch_zip_requests_pkey" PRIMARY KEY ("user_id");
 
@@ -13340,6 +13540,16 @@ ALTER TABLE ONLY "public"."templates"
 
 
 
+ALTER TABLE ONLY "public"."work_reports"
+    ADD CONSTRAINT "work_reports_once_per_reporter" UNIQUE ("job_id", "reporter_id");
+
+
+
+ALTER TABLE ONLY "public"."work_reports"
+    ADD CONSTRAINT "work_reports_pkey" PRIMARY KEY ("id");
+
+
+
 CREATE INDEX "catalog_attempt_user" ON "admin"."catalog_checkout_attempts" USING "btree" ("user_id");
 
 
@@ -13608,6 +13818,18 @@ CREATE INDEX "generation_jobs_created_at_id_idx" ON "public"."generation_jobs" U
 
 
 
+CREATE INDEX "generation_jobs_gallery_idx" ON "public"."generation_jobs" USING "btree" ("moderated_at" DESC, "id" DESC) WHERE (("status" = 'succeeded'::"text") AND ("visibility" = 'public'::"text") AND ("moderation_status" = 'approved'::"text") AND ("deleted_at" IS NULL) AND ("source" = 'web'::"text") AND ("template_id" <> 'freeform'::"text") AND ("template_id" <> 'edit'::"text"));
+
+
+
+CREATE INDEX "generation_jobs_moderated_idx" ON "public"."generation_jobs" USING "btree" ("moderation_status", "moderated_at" DESC) WHERE ("moderated_at" IS NOT NULL);
+
+
+
+CREATE INDEX "generation_jobs_moderation_queue_idx" ON "public"."generation_jobs" USING "btree" ("created_at", "id") WHERE (("status" = 'succeeded'::"text") AND ("visibility" = 'public'::"text") AND ("moderation_status" = 'pending'::"text") AND ("deleted_at" IS NULL) AND ("source" = 'web'::"text") AND ("template_id" <> 'freeform'::"text") AND ("template_id" <> 'edit'::"text"));
+
+
+
 CREATE INDEX "generation_jobs_parent_job_id_idx" ON "public"."generation_jobs" USING "btree" ("parent_job_id") WHERE ("parent_job_id" IS NOT NULL);
 
 
@@ -13617,6 +13839,10 @@ CREATE INDEX "generation_jobs_route_cost_idx" ON "public"."generation_jobs" USIN
 
 
 CREATE INDEX "generation_jobs_running_created_at_idx" ON "public"."generation_jobs" USING "btree" ("created_at") WHERE ("status" = 'running'::"text");
+
+
+
+CREATE INDEX "generation_jobs_screen_sweep_idx" ON "public"."generation_jobs" USING "btree" ("last_screen_at" NULLS FIRST, "created_at") WHERE (("status" = 'succeeded'::"text") AND ("visibility" = 'public'::"text") AND ("moderation_status" = 'pending'::"text") AND ("deleted_at" IS NULL) AND ("auto_moderated_at" IS NULL) AND ("source" = 'web'::"text") AND ("template_id" <> 'freeform'::"text") AND ("template_id" <> 'edit'::"text"));
 
 
 
@@ -13901,6 +14127,14 @@ CREATE INDEX "templates_series_member_idx" ON "public"."templates" USING "btree"
 
 
 CREATE INDEX "templates_subcategory_idx" ON "public"."templates" USING "btree" ("subcategory_key") WHERE ("subcategory_key" IS NOT NULL);
+
+
+
+CREATE INDEX "work_reports_open_idx" ON "public"."work_reports" USING "btree" ("job_id") WHERE ("resolved_at" IS NULL);
+
+
+
+CREATE INDEX "work_reports_reporter_idx" ON "public"."work_reports" USING "btree" ("reporter_id", "created_at");
 
 
 
@@ -14354,6 +14588,11 @@ ALTER TABLE ONLY "public"."feature_access"
 
 
 ALTER TABLE ONLY "public"."generation_jobs"
+    ADD CONSTRAINT "generation_jobs_moderated_by_fkey" FOREIGN KEY ("moderated_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."generation_jobs"
     ADD CONSTRAINT "generation_jobs_parent_job_id_fkey" FOREIGN KEY ("parent_job_id") REFERENCES "public"."generation_jobs"("id") ON DELETE SET NULL;
 
 
@@ -14645,6 +14884,16 @@ ALTER TABLE ONLY "public"."templates"
 
 ALTER TABLE ONLY "public"."templates"
     ADD CONSTRAINT "templates_subcategory_key_fkey" FOREIGN KEY ("subcategory_key") REFERENCES "public"."template_categories"("key");
+
+
+
+ALTER TABLE ONLY "public"."work_reports"
+    ADD CONSTRAINT "work_reports_job_id_fkey" FOREIGN KEY ("job_id") REFERENCES "public"."generation_jobs"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."work_reports"
+    ADD CONSTRAINT "work_reports_reporter_id_fkey" FOREIGN KEY ("reporter_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
 
 
@@ -14965,6 +15214,9 @@ CREATE POLICY "templates_public_category" ON "public"."templates" AS RESTRICTIVE
 
 CREATE POLICY "templates_select_active" ON "public"."templates" FOR SELECT TO "authenticated", "anon" USING ("is_active");
 
+
+
+ALTER TABLE "public"."work_reports" ENABLE ROW LEVEL SECURITY;
 
 
 GRANT USAGE ON SCHEMA "admin" TO "service_role";
@@ -15845,6 +16097,11 @@ GRANT ALL ON FUNCTION "public"."admin_mark_prompt_lab_run"("p_actor" "uuid", "p_
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_moderate_works"("p_actor" "uuid", "p_job_ids" "uuid"[], "p_decision" "text", "p_reason" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_moderate_works"("p_actor" "uuid", "p_job_ids" "uuid"[], "p_decision" "text", "p_reason" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_move_reference_category"("p_actor" "uuid", "p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_move_reference_category"("p_actor" "uuid", "p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text") TO "service_role";
 
@@ -16519,6 +16776,16 @@ GRANT ALL ON FUNCTION "public"."record_waffo_refund"("p_payment_id" "text", "p_r
 
 
 
+REVOKE ALL ON FUNCTION "public"."record_work_auto_moderation"("p_job_id" "uuid", "p_flagged" boolean, "p_categories" "text"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."record_work_auto_moderation"("p_job_id" "uuid", "p_flagged" boolean, "p_categories" "text"[]) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."record_work_screen_failure"("p_job_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."record_work_screen_failure"("p_job_id" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."redeem_code"("p_user" "uuid", "p_code" "text", "p_context" "text", "p_invitee_credits" integer, "p_invite_window_days" integer, "p_replace" boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."redeem_code"("p_user" "uuid", "p_code" "text", "p_context" "text", "p_invitee_credits" integer, "p_invite_window_days" integer, "p_replace" boolean) TO "service_role";
 
@@ -16546,6 +16813,11 @@ GRANT ALL ON FUNCTION "public"."release_batch_zip"("p_user_id" "uuid", "p_batch_
 
 REVOKE ALL ON FUNCTION "public"."release_checkout_discount"("p_user" "uuid", "p_token" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."release_checkout_discount"("p_user" "uuid", "p_token" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."report_work"("p_job_id" "uuid", "p_reporter" "uuid", "p_reason" "text", "p_note" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."report_work"("p_job_id" "uuid", "p_reporter" "uuid", "p_reason" "text", "p_note" "text") TO "service_role";
 
 
 
@@ -16970,6 +17242,16 @@ GRANT SELECT ON TABLE "public"."template_sale_approvals" TO "service_role";
 
 
 GRANT SELECT,INSERT ON TABLE "public"."template_sync_history" TO "service_role";
+
+
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."work_reports" TO "service_role";
+
+
+
+GRANT UPDATE ON SEQUENCE "public"."work_reports_id_seq" TO "anon";
+GRANT UPDATE ON SEQUENCE "public"."work_reports_id_seq" TO "authenticated";
+GRANT UPDATE ON SEQUENCE "public"."work_reports_id_seq" TO "service_role";
 
 
 

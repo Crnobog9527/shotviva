@@ -20,6 +20,7 @@ import {
   OUTPUT_TIERS,
 } from './offer'
 import { homeWishlist } from './home-wishlist'
+import { withFirstFrame } from './landing-shared'
 import { sharedFacts } from './shared'
 import { homePlans } from './plan-strip'
 
@@ -179,7 +180,7 @@ const copy = {
     'The AI photo studio that starts from your real photo. What you shot stays; the template changes the light, the scene or the art style.',
   answerBlock: `Image to image AI takes a photo you already have and gives it a new look while the subject stays as shot. With ${brand} you upload one phone photo, pick a template for food, products, rooms, pets or an art style, and download it in ${tierList}. No prompts. New users get ${freeImagesLabel}.`,
   hero: {
-    before: phoneShot,
+    before: withFirstFrame(phoneShot),
     after: heroScenes[0].image,
     caption: heroScenes[0].caption,
     cta: { label: 'Upload photo', href: '/generate' },
