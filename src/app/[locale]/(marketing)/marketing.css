@@ -255,7 +255,10 @@
   }
   .mk-stage::after { content: ""; position: absolute; inset: 0; z-index: 5; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--border); pointer-events: none; }
   .mk-stage-fill { position: absolute; inset: -24px; width: calc(100% + 48px); height: calc(100% + 48px); object-fit: cover; filter: blur(22px) saturate(1.1) brightness(.45); }
+  .mk-stage-ff { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; object-fit: contain; }
   .mk-stage-img { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; object-fit: contain; animation: mk-stage-in .35s var(--ease); }
+  /* Over its first frame the opening picture needs no fade (it would only dim the frame first). */
+  .mk-stage-ff + .mk-stage-img { animation: none; }
   @keyframes mk-stage-in { from { opacity: 0; } to { opacity: 1; } }
   .mk-stage .mk-stage-ai { top: 10px; right: 10px; bottom: auto; z-index: 4; }
   .mk-inset {
