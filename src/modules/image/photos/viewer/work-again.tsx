@@ -13,6 +13,7 @@ import { FormAction } from '../../workspace/form-action'
 import { useWorkspaceDraft } from '../../workspace/use-workspace-draft'
 import { WorkspaceForm } from '../../workspace/workspace-form'
 import type { PhotoItem } from '../photo-item'
+import { prepareOnce, spendAgain } from './again-cache'
 import { forgetWorkViews } from './use-work-view'
 import { BackToWork } from './viewer-bits'
 import { useViewer } from './viewer-context'
@@ -21,8 +22,8 @@ import { VIEWER_GRID } from './viewer-frame'
 type Loaded = { kind: 'loading' } | { kind: 'ready'; context: AgainContext } | { kind: 'failed' }
 
 // Make again (T40) in place of the work: the creation form the workspace page and the create
-// dialog render, opened on this work's settings and kept photo (copied back on the server when
-// this opens, as the workspace page does). Generate queues the photo and closes the viewer onto
+// dialog render, opened on this work's settings and kept photo (copied back on the server the
+// first time it opens for this work, as the workspace page does; again-cache.ts). Generate queues the photo and closes the viewer onto
 // Photos, where it develops at the top under "In progress": no trip to another page.
 export function WorkAgain({ item, onBack }: { item: PhotoItem; onBack(): void }) {
   const viewer = useViewer()
@@ -31,7 +32,7 @@ export function WorkAgain({ item, onBack }: { item: PhotoItem; onBack(): void })
   useEffect(() => {
     if (!prepare) return
     let live = true
-    prepare(item.id).then(
+    prepareOnce(item.id, prepare).then(
       (context) => live && setLoaded(context ? { kind: 'ready', context } : { kind: 'failed' }),
       () => live && setLoaded({ kind: 'failed' }),
     )
@@ -58,6 +59,7 @@ function AgainForm({ context }: { context: AgainContext }) {
   const draft = useWorkspaceDraft({ ...context, single: true })
   const generate = () => {
     void draft.start()
+    spendAgain(context.again.jobId)
     forgetWorkViews()
     viewer?.close()
     window.scrollTo({ top: 0, behavior: 'smooth' })

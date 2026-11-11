@@ -37,6 +37,13 @@ export type Viewer = {
 
 const ViewerContext = createContext<Viewer | null>(null)
 
+// The mark on a history entry this viewer pushed. It lives in history.state, which the browser
+// keeps through a reload, so closing after a refresh of /photos/<id> still goes Back over the
+// entry instead of replacing it and leaving /photos twice in the history (总控 review of #508).
+// The Next router keeps a pushState's own keys next to its internal ones.
+const ENTRY = 'photosViewer'
+const onPushedEntry = () => (window.history.state as Record<string, unknown> | null)?.[ENTRY] === true
+
 // null outside Photos: a WorkLink there is a plain link.
 export const useViewer = () => useContext(ViewerContext)
 
@@ -61,7 +68,11 @@ export function ViewerProvider({ actions, children }: { actions: ViewerActions; 
   }, [])
 
   const viewer = useMemo<Viewer>(() => {
-    const go = (id: string | null, push: boolean) => window.history[push ? 'pushState' : 'replaceState'](null, '', href(id))
+    const go = (id: string | null, push: boolean) => {
+      // Another work on the same entry keeps its mark; the list's own address carries none.
+      const mark = push || (id !== null && onPushedEntry()) ? { [ENTRY]: true } : null
+      window.history[push ? 'pushState' : 'replaceState'](mark, '', href(id))
+    }
     return {
       ...state,
       items,
@@ -80,10 +91,10 @@ export function ViewerProvider({ actions, children }: { actions: ViewerActions; 
       setMode: (mode) => setState((current) => ({ ...current, mode })),
       close() {
         setState({ id: null, mode: 'detail' })
-        if (pushed.current) {
-          pushed.current = false
-          window.history.back()
-        } else go(null, false)
+        const back = pushed.current || onPushedEntry()
+        pushed.current = false
+        if (back) window.history.back()
+        else go(null, false)
       },
       follow,
     }
