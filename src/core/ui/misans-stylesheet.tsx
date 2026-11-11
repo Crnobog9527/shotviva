@@ -7,9 +7,11 @@ export const MISANS_STYLESHEET = '/fonts/misans/misans-400-e8d416058231a4c2.css'
 
 const LINK_ID = 'misans-font'
 
-// Set once the stylesheet has loaded in this browser, to the stylesheet's own address, so a new
-// font version starts over. A plain "seen it" note like the dismissed announcement's
-// (core/announcements): nothing about the visitor.
+// Set once a MiSans subset has actually finished downloading in this browser (the document's
+// `loadingdone` event names it; the stylesheet alone arriving is not enough, a visitor can leave
+// before any subset does), to the stylesheet's own address, so a new font version starts over.
+// A plain "seen it" note like the dismissed announcement's (core/announcements): nothing about
+// the visitor.
 const SEEN_KEY = 'sv-misans'
 
 // Chinese pages only (T65/T67, ARCHITECTURE §17「加载」). A script in the server HTML, at the top
@@ -18,8 +20,9 @@ const SEEN_KEY = 'sv-misans'
 // the first screen's own image and scripts:
 // - first visit: after the window's load event, when the browser is idle. Until then headings
 //   show in the metric-matched "MiSans Fallback" (globals.css), then swap without moving.
-// - later visits (SEEN_KEY is set, so the files are in the HTTP cache, immutable for a year):
-//   right after the first contentful paint, as before; the swap costs no download.
+// - later visits (SEEN_KEY is set: subsets were downloaded here before and are cached for a year,
+//   immutable): right after the first contentful paint, as before. A subset this page needs and
+//   an earlier page did not is still fetched then, as it always was.
 // Measured, every earlier variant cost the first screen on a slow link: a render-blocking <link>
 // in <head> (+0.15 s FCP on Vercel, up to 0.9 s in CI's Lighthouse); subsets requested before the
 // first paint, which Lighthouse charges to FCP (2.6 s instead of 1.4 s); and loading at the first
@@ -30,7 +33,8 @@ const SEEN_KEY = 'sv-misans'
 // full page load (a real <a href>), so this always runs on arriving at a Chinese page.
 const INSERT = [
   `(function(){var d=document,w=window,done=0,K='${SEEN_KEY}',U='${MISANS_STYLESHEET}',seen=0;`,
-  `function go(){if(done||d.getElementById('${LINK_ID}'))return;done=1;var l=d.createElement('link');l.id='${LINK_ID}';l.rel='stylesheet';l.href=U;l.onload=function(){try{localStorage.setItem(K,U)}catch(e){}};d.head.appendChild(l)}`,
+  `function go(){if(done||d.getElementById('${LINK_ID}'))return;done=1;var l=d.createElement('link');l.id='${LINK_ID}';l.rel='stylesheet';l.href=U;l.onload=note;d.head.appendChild(l)}`,
+  `function note(){try{d.fonts.addEventListener('loadingdone',function h(e){for(var i=0;i<e.fontfaces.length;i++)if(/^["']?MiSans["']?$/.test(e.fontfaces[i].family)){d.fonts.removeEventListener('loadingdone',h);localStorage.setItem(K,U);return}})}catch(e){}}`,
   'function idle(){w.requestIdleCallback?w.requestIdleCallback(go,{timeout:2000}):setTimeout(go,200)}',
   'try{seen=localStorage.getItem(K)===U}catch(e){}',
   "if(seen)try{new PerformanceObserver(function(p,o){if(p.getEntriesByName('first-contentful-paint').length){o.disconnect();go()}}).observe({type:'paint',buffered:true})}catch(e){}",
