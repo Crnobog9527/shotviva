@@ -44,6 +44,17 @@ function assertTogglesWired(template: z.infer<typeof templateInputSchema>, promp
   if (problems.length > 0) throw new AppError('INVALID_INPUT', `开关没接好：${problems.join('；')}`)
 }
 
+// The editor's checks before any write; `pnpm templates:apply` runs exactly these too.
+export function validateTemplateSave(payload: Pick<SaveTemplatePayload, 'template' | 'prompt' | 'isNew'>, floor: ProviderFloors) {
+  const template = parseOrThrow(templateInputSchema, payload.template, 'template')
+  const prompt = parseOrThrow(promptInputSchema, payload.prompt, 'prompt')
+  if (prompt.styleRefs?.some(ref => !isStyleRefKey(template.id, ref.key))) throw new AppError('INVALID_INPUT', '画风参考图不属于这个模板')
+  assertAboveFloor(template, providerFloor(floor, prompt.providerId, template.id))
+  assertTogglesWired(template, prompt)
+  // A brand-new template starts unpublished so it can be checked before anyone sees it.
+  return { template: payload.isNew ? { ...template, isActive: false } : template, prompt }
+}
+
 // `floor` is the image module's floor table (modules/image/credits-floor.ts); core cannot
 // import a module, so the server action passes it in.
 export async function saveTemplate(
@@ -52,13 +63,7 @@ export async function saveTemplate(
   payload: SaveTemplatePayload,
   floor: ProviderFloors,
 ): Promise<number | undefined> {
-  const template = parseOrThrow(templateInputSchema, payload.template, 'template')
-  const prompt = parseOrThrow(promptInputSchema, payload.prompt, 'prompt')
-  if (prompt.styleRefs?.some(ref => !isStyleRefKey(template.id, ref.key))) throw new AppError('INVALID_INPUT', '画风参考图不属于这个模板')
-  assertAboveFloor(template, providerFloor(floor, prompt.providerId, template.id))
-  assertTogglesWired(template, prompt)
-  // A brand-new template starts unpublished so it can be checked before anyone sees it.
-  const toSave = payload.isNew ? { ...template, isActive: false } : template
+  const { template: toSave, prompt } = validateTemplateSave(payload, floor)
   const revision = payload.revision && parseOrThrow(z.object({
     expected: z.int().positive(), selected: z.int().positive().optional(),
   }), payload.revision, 'revision')
@@ -68,7 +73,7 @@ export async function saveTemplate(
   const version = assignment
     ? await repo.saveAssignedTemplate(client, toSave, prompt, floor, { actor: adminId, isNew: payload.isNew, revision, assignment })
     : await saveLegacyTemplate(client, toSave, prompt, floor, payload.isNew, revision && { ...revision, actor: adminId })
-  logger.info('admin.template.saved', { adminId, templateId: template.id, isNew: payload.isNew })
+  logger.info('admin.template.saved', { adminId, templateId: toSave.id, isNew: payload.isNew })
   return version
 }
 

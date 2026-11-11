@@ -1,0 +1,62 @@
+name: Apply template structure to production
+# The batch is not in the run name: the run page of a public repository is public.
+run-name: Apply template structure (dry run ${{ inputs.dry_run }})
+
+# `pnpm templates:apply <file> --production-batch` prints the batch: categories, series and per
+# template its category, series, model, sale and publish state, gzip + base64. No prompts, prices,
+# covers or files (the script refuses a batch that has them); template content reaches production
+# through template-sync.yml. Writes go through admin_apply_template_batch as the admin set in
+# TEMPLATE_APPLY_ADMIN_ID, and every run needs the Owner's approval in production-manual.
+on:
+  workflow_dispatch:
+    inputs:
+      batch:
+        description: Output of pnpm templates:apply <file> --production-batch
+        required: true
+        type: string
+      dry_run:
+        description: Check everything and roll back
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: template-apply-production
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production-manual
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+      - uses: ./.github/actions/verify-owner-review
+      - run: pnpm install --frozen-lockfile
+      - name: Apply the batch
+        env:
+          TEMPLATE_APPLY_TARGET: production
+          TEMPLATE_APPLY_BATCH: ${{ inputs.batch }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          NEXT_PUBLIC_SUPABASE_URL: https://irbqamjuazkkyvnnzupf.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SYNC_PRODUCTION_SERVICE_KEY }}
+          SHOTVIVA_IMPORT_ADMIN_ID: ${{ vars.TEMPLATE_APPLY_ADMIN_ID }}
+          OPENAI_IMAGE_MODEL: ${{ vars.OPENAI_IMAGE_MODEL }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            pnpm exec tsx --conditions=react-server scripts/template-apply/run.ts --dry-run
+          else
+            pnpm exec tsx --conditions=react-server scripts/template-apply/run.ts
+          fi
