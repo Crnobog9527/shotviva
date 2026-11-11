@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({ open: true, row: null as unknown, indexingOpen: true }))
 const work = { id: '0b6f2f8e-6a3f-4c1e-9d55-1f2a3b4c5d6e', templateId: 'salmon', templateName: 'Grilled dish', category: 'food', copy: [], watermarked: true }
 
+vi.mock('next/server', () => ({ connection: async () => undefined }))
 vi.mock('@/core/gallery', () => ({
   isGalleryEnabled: async () => mocks.open,
   cachedGalleryWork: async () => mocks.row,
@@ -45,5 +46,9 @@ describe('/g/[jobId]', () => {
     expect(String(meta.alternates?.canonical)).toBe(`https://shotviva.com/g/${work.id}`)
     expect(JSON.stringify(meta.openGraph)).toContain(`/api/gallery/${work.id}/image?w=960`)
     expect(meta.twitter).toMatchObject({ card: 'summary_large_image' })
+  })
+
+  it('renders per request (the proxy answers 404 for works the gallery does not show)', async () => {
+    expect((await import('./page')).instant).toBe(false)
   })
 })
