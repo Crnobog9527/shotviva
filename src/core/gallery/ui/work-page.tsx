@@ -1,7 +1,9 @@
+import { categorySlug } from '../../analytics/event-values'
 import { Link } from '../../i18n/ui'
 import { galleryImagePath } from '../image'
 import type { GalleryWorkView } from '../work-view'
 import { ReportButton } from './report-button'
+import { GalleryViewEvent, ReuseLink } from './track'
 import type { ReportText } from './use-report'
 
 export type WorkPageText = {
@@ -67,9 +69,9 @@ export function WorkPage({ work, text, report, loginHref }: Props) {
         <h1 className="text-2xl font-semibold tracking-tight">{work.templateName}</h1>
         <Facts work={work} text={text} />
         <div className="grid gap-2">
-          <Link href={reuseHref(work)} prefetch={false} className="mk-cta">
+          <ReuseLink href={reuseHref(work)} className="mk-cta" event={{ template_id: work.templateId, surface: 'work' }}>
             {text.reuse}
-          </Link>
+          </ReuseLink>
           <p className="text-sm text-[var(--muted-foreground)]">{text.reuseNote}</p>
         </div>
         {work.watermarked ? <p className="text-xs text-[var(--muted-foreground)]">{text.watermark}</p> : null}
@@ -77,6 +79,7 @@ export function WorkPage({ work, text, report, loginHref }: Props) {
           <ReportButton jobId={work.id} loginHref={loginHref} text={report} />
         </div>
       </div>
+      <GalleryViewEvent event="gallery_work_view" props={{ template_id: work.templateId, category: categorySlug(work.category) }} />
     </article>
   )
 }
