@@ -8,6 +8,8 @@ import { useReveal } from '@/core/ui/reveal'
 import type { TrackedJob } from '../generation/job-model'
 import { retryJob, setWorkspaceJobs } from '../generation/job-store'
 import { useJob, useWorkspaceJobs } from '../generation/use-jobs'
+import { useBatchRefusal } from '../batch/use-batch-refusal'
+import { MatrixEntry } from '../matrix/matrix-entry'
 import { BatchProgressView } from './batch-progress-view'
 import { FormAction } from './form-action'
 import { GeneratingView } from './generating-view'
@@ -35,9 +37,12 @@ export function ImageWorkspace({ shareText, editable, ...input }: WorkspaceProps
   const { id: templateId, category } = template
   useEffect(() => trackTemplateView({ id: templateId, category }, 'workspace'), [templateId, category])
 
+  const refusal = useBatchRefusal()
   const generate = () => {
-    draft.start()
-    window.scrollTo({ top: 0 })
+    void draft.start().then((error) => {
+      if (error) refusal.handle(error)
+      else window.scrollTo({ top: 0 })
+    })
   }
   // retryJob puts the new job where the failed one was in this workspace's list.
   const retry = (id: string) => void retryJob(id, concurrency.limit)
@@ -52,19 +57,35 @@ export function ImageWorkspace({ shareText, editable, ...input }: WorkspaceProps
   return (
     <div className="lg:grid lg:grid-cols-[minmax(380px,440px)_minmax(0,1fr)] lg:items-start lg:gap-x-12 lg:px-(--gutter)">
       <div ref={reveal} className="min-w-0 px-(--gutter) lg:px-0">
-        <WorkspaceForm template={template} balance={balance} tier={tier} photos={draft.photos} values={draft.values} onChange={draft.change} again={input.again} />
+        <WorkspaceForm
+          template={template}
+          balance={balance}
+          tier={tier}
+          photos={draft.photos}
+          values={draft.values}
+          onChange={draft.change}
+          again={input.again}
+          photoExtra={<MatrixLink template={template} tier={tier} />}
+        />
         <FormAction
           state={draft.state}
           resolution={draft.values.resolution}
           batch={draft.photos.batchMax > 1}
           addFirst={draft.missingPhoto ? template.creditsCost[draft.values.resolution] : null}
           limit={concurrency.limit}
+          error={refusal.message(draft.error)}
           onGenerate={generate}
         />
       </div>
       <WorkspaceStage template={template} photo={draft.photos.photos[0] ?? null} />
     </div>
   )
+}
+
+// Under the photos: the way to several templates at once (T107), locked below Max.
+function MatrixLink({ template, tier }: Pick<WorkspaceProps, 'template' | 'tier'>) {
+  if (template.photoInput === 'none') return null
+  return <MatrixEntry tier={tier} templateId={template.id} variant="link" className="mt-3" />
 }
 
 type SingleProps = { job: TrackedJob; shareText: string; editable: boolean; onRetry(): void; onBack(clearPhotos: boolean): void }

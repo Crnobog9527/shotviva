@@ -25,9 +25,28 @@ export async function listOwnJobs(client: SupabaseClient, userId: string, now: D
     .order('created_at', { ascending: false })
     .limit(PHOTOS_LIMIT)
   if (error) throw new AppError('INTERNAL', `listOwnJobs failed: ${error.message}`)
-  const jobs = data.map((row) => jobRowSchema.parse(row))
+  const jobs = await withWholeBatches(client, userId, data.map((row) => jobRowSchema.parse(row)))
   const live = (job: Job) => isLiveRunning({ status: job.status, created_at: job.createdAt.toISOString() }, now)
   return { running: jobs.filter(live), done: jobs.filter((job) => job.status === 'succeeded') }
+}
+
+// A batch cut by the 60-row window (its older photos past the limit) would show fewer photos and
+// a smaller ZIP count than it has (T107): its missing finished photos are read in too, one
+// query over generation_jobs_batch_slot. A batch is at most 30 photos.
+async function withWholeBatches(client: SupabaseClient, userId: string, jobs: Job[]): Promise<Job[]> {
+  if (jobs.length < PHOTOS_LIMIT) return jobs
+  const batchIds = [...new Set(jobs.flatMap((job) => (job.batchId ? [job.batchId] : [])))]
+  if (batchIds.length === 0) return jobs
+  const { data, error } = await client
+    .from('generation_jobs')
+    .select(JOB_COLUMNS)
+    .eq('user_id', userId)
+    .in('batch_id', batchIds)
+    .eq('status', 'succeeded')
+    .is('deleted_at', null)
+  if (error) throw new AppError('INTERNAL', `listOwnJobs batches failed: ${error.message}`)
+  const seen = new Set(jobs.map((job) => job.id))
+  return [...jobs, ...data.map((row) => jobRowSchema.parse(row)).filter((job) => !seen.has(job.id))]
 }
 
 // The ids of the user's photos in flight, for the concurrency check of the creation dialog on

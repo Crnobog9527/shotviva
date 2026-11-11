@@ -14,7 +14,7 @@ import { site } from '../site.config'
 import { homePage } from './home'
 import { hundredCreditsFrom, freeImagesLabel, fromCredits, perHundredCredits, planFrom, product, tierList, tierPixels, usd } from './offer'
 import { zhHomePage } from './zh/home'
-import { zhFreeImages, zhFromCredits, zhTierPixels } from './zh/offer'
+import { zhFromCredits, zhTierPixels } from './zh/offer'
 
 // 建站规格 G6 (nine questions, A–I) and 「首页 FAQ 的写法」; T35.
 const G6_QUESTIONS = [
@@ -73,11 +73,11 @@ describe('home FAQ, English (建站规格 G6)', () => {
 
   it('reads every number from the config, the same as /pricing', () => {
     const b = byLetter(faq, 'B').answer
-    expect(b).toContain(freeImagesLabel)
+    // SEO PATCH v4.1: the free credits, how photos are charged (on the Generate button, never a
+    // count here), and where paid plans start.
+    expect(b).toBe(`Shotviva gives new accounts 100 credits to try a template. Each photo uses credits based on template and size, shown on the Generate button. Free photos are public and watermarked; paid plans start at ${usd(planFrom?.priceUsd ?? 0)}/month.`)
     expect(b).not.toContain(fromCredits)
     expect(planFrom).toBeDefined()
-    expect(b).toContain(`${usd(planFrom?.priceUsd ?? 0)} a month for ${planFrom?.credits} credits`)
-    expect(b).toContain(`per 100 credits is about ${hundredCreditsFrom}`)
     expect(hundredCreditsFrom).toBe(perHundredCredits('max_yearly'))
     expect(byLetter(faq, 'A').answer).toContain(tierList)
     expect(byLetter(faq, 'G').answer).toContain(`PNG in 3 sizes: ${tierPixels}`)
@@ -159,9 +159,10 @@ describe('home FAQ, Chinese (建站规格 G6, G13)', () => {
   })
 
   it('uses the same numbers as the English FAQ and /zh/pricing', () => {
-    expect(byLetter(faq, 'B').answer).toContain(zhFreeImages)
+    expect(byLetter(faq, 'B').answer).toContain('给新账号 100 个积分，用来试一个模板')
+    expect(byLetter(faq, 'B').answer).toContain('生成按钮上会显示')
     expect(byLetter(faq, 'B').answer).not.toContain(zhFromCredits)
-    expect(byLetter(faq, 'B').answer).toContain(`每 100 积分最低约 ${hundredCreditsFrom}`)
+    expect(byLetter(faq, 'B').answer).toContain(`付费套餐每月 ${usd(planFrom?.priceUsd ?? 0)} 起`)
     expect(byLetter(faq, 'G').answer).toContain(`PNG，分 3 档：${zhTierPixels}`)
     expect(byLetter(faq, 'D').table?.rows).toHaveLength(4)
     expect(byLetter(faq, 'D').link?.href).toBe('/image-to-image-generator')

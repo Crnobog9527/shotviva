@@ -128,7 +128,7 @@ export const makeAiRestaurantMenu = (offers: OfferFacts) => defineContentPage({
   costBills: menuBills(offers),
   related: [
     { href: '/', anchor: 'AI image to image', note: 'The studio: templates for food, products, rooms, pets and art styles.' },
-    { href: '/commercial-photography', anchor: 'Commercial product photography', note: 'For shops and sellers who need studio product shots without a photographer.' },
+    { href: '/commercial-photography', anchor: 'Commercial photography', note: 'For shops and sellers who need studio product shots without a photographer.' },
     { href: '/image-to-image-generator', anchor: 'Image to image generator', note: 'For anyone who wants to see how image to image works on a photo.' },
     pricingRelated(offers),
   ],

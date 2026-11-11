@@ -16,7 +16,20 @@ export type PaywallChoice = { period: Period; pick: PaywallPick; method: Checkou
 // What an entry point may preselect. `step: "packs"` (with or without `packId`) opens on a pack;
 // anything else opens on `tier`. `step` stays so the existing callers (account, batch rows,
 // /pricing) keep their shape.
-export type PaywallOpenOptions = { step?: "tiers" | "period" | "packs"; period?: Period; tier?: MembershipTier; packId?: ProductId; planId?: ProductId }
+// `moment` (T107): the limit the user just met, which sets the paywall's lead line and what it
+// shows above the plans (a batch example, the pack-or-plan comparison); `needed` is the credits
+// short for the "credits" moment.
+export type PaywallMoment = "watermark" | "photos" | "templates" | "credits"
+
+export type PaywallOpenOptions = {
+  step?: "tiers" | "period" | "packs"
+  period?: Period
+  tier?: MembershipTier
+  packId?: ProductId
+  planId?: ProductId
+  moment?: PaywallMoment
+  needed?: number
+}
 
 // Monthly and Pro start selected (DESIGN §4.5 「默认显示按月」, Owner 2026-11-08): opening on
 // Yearly let careless buyers read the yearly per-month price as the monthly one. The Yearly

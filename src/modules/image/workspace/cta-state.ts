@@ -14,6 +14,8 @@ export type CtaState =
   | { kind: 'need-copy' }
   | { kind: 'no-options' }
   | { kind: 'need-size' }
+  // The batch preflight is pricing and checking every photo (T107).
+  | { kind: 'checking' }
 
 export type CtaInput = {
   balance: Balance
