@@ -1,7 +1,8 @@
 // What text of a work may be shown publicly (ARCHITECTURE §9 第 3 条): the template's copy fields
 // the user filled in (a dish name, a price), keyed as entered. Never the note, the edit
 // instruction or anything else in inputs; an edited work shows no text at all. The automatic
-// screen checks exactly this text, so what is screened is what is shown.
+// screen checks all of this text; the work page then shows only the fields the template marks
+// public (work-view, §5.1d), so nothing shown goes unscreened.
 
 export type PublicCopy = { key: string; value: string }
 

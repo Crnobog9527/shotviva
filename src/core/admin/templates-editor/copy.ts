@@ -1,12 +1,37 @@
 // Admin is Chinese-only (DESIGN §7); this editor block's text lives here, not in messages.
 export const zhCopy = {
-  legend: '中文（/zh 页面显示）',
-  hint: '留空的项在中文页面显示英文。提示词不翻译，始终用英文。',
   name: '中文名称',
   description: '中文说明（一句话，选填）',
-  fieldLabel: (key: string) => `字段「${key}」的中文标签`,
-  fieldPlaceholder: (key: string) => `字段「${key}」的中文占位提示`,
-  noFields: '这个模板没有文案字段。',
+} as const
+
+// 用户填写的字段 (ARCHITECTURE §5 fields.copy): what the user types or picks for this template.
+export const copyFieldCopy = {
+  legend: '用户填写的字段（选填，最多 10 个）',
+  hint: '用户在创作区看到的输入项，比如海报标题、价格、尺寸。提示词正文里写 {{key}} 可以指定放在哪里；不写的话，系统会把「英文名称: 用户填的内容」自动加在提示词正文后面。用户填的内容只用于他自己的这次出图。',
+  empty: '这个模板没有要用户填写的字段。',
+  add: '添加字段',
+  remove: '删除这个字段',
+  up: '上移',
+  key: 'key（小写字母、数字、下划线）',
+  type: '类型',
+  types: { short: '短文字（一行）', long: '长文字（多行）', select: '下拉选择', number: '数字' },
+  required: '必填',
+  public: '可在公开作品页显示（创作库「一键复用」也会带上这段文字）',
+  label: '英文名称（也会写进提示词）',
+  labelZh: '中文名称',
+  placeholder: '英文占位提示（选填）',
+  placeholderZh: '中文占位提示（选填）',
+  help: '英文说明（选填，显示在输入框下面）',
+  helpZh: '中文说明（选填）',
+  maxLength: '字数上限',
+  min: '最小值（选填）',
+  max: '最大值（选填）',
+  options: '选项（英文会写进提示词，中文只用于显示）',
+  optionValue: (n: number) => `选项 ${n} 英文`,
+  optionZh: (n: number) => `选项 ${n} 中文（选填）`,
+  addOption: '添加选项',
+  removeOption: '删除',
+  placement: (key: string, used: boolean) => (used ? `提示词里有 {{${key}}}，内容会放在那里。` : `提示词里没有 {{${key}}}，内容会以一行「英文名称: 内容」加在正文后面。`),
 } as const
 
 // The English text in 公开信息 (T52).
@@ -206,3 +231,57 @@ export const catalogCopy = {
   empty: '没有匹配的模板',
   status: '上架状态', category: '筛选分类', categories: '全部分类', search: '搜索中文名、英文名或 ID',
 }
+
+// The catalogue row (2026-11-12): the cover thumbnail, the id that copies itself, the actions.
+export const rowCopy = {
+  noCover: '无封面',
+  copyId: '复制 ID',
+  copied: '已复制',
+  credits: '积分',
+  tiers: 'Standard / HD / Max',
+  version: '版本',
+  edit: '编辑',
+} as const
+
+// Batch 首页精选 (2026-11-12): the bulk bar's two buttons and their confirm step.
+export const bulkFeaturedCopy = {
+  set: '批量设为首页精选',
+  unset: '批量取消首页精选',
+  title: (on: boolean, count: number) => `${on ? '把' : '从首页精选移出'}这 ${count} 个模板${on ? '设为首页精选' : ''}？`,
+  hint: (on: boolean) => on
+    ? '加入的模板排在精选末尾，可在「首页精选」里拖动调整。只有已上架、站内可见的模板能上首页，最多 12 个。'
+    : '移出后首页和落地页不再显示它们，模板本身不受影响。',
+  willChange: (on: boolean) => (on ? '将加入' : '将移出'),
+  unchanged: (on: boolean) => (on ? '已在精选' : '本来不在精选'),
+  failed: '不能加入',
+  count: (from: number, to: number, limit: number) => `首页精选：${from} 个 → ${to} 个（上限 ${limit}）`,
+  over: (over: number, limit: number) => `超出上限 ${over} 个：首页精选最多 ${limit} 个，请少选几个，或先移出别的精选模板。`,
+  blocked: '有不能加入的模板，整批都不会保存。请取消勾选它们后再试。',
+  nothing: (on: boolean) => (on ? '选中的模板都已在首页精选里。' : '选中的模板都不在首页精选里。'),
+  confirm: (on: boolean) => (on ? '设为首页精选' : '取消首页精选'),
+  done: (on: boolean, count: number) => `已${on ? '把' : '从首页精选移出'} ${count} 个模板${on ? '设为首页精选' : ''}，首页随后更新`,
+} as const
+
+// 首页精选 as the home page lays it out (2026-11-12): cards per category, arranged then saved once.
+export const featuredCopy = {
+  title: '首页精选',
+  intro: '这里的排列就是首页和落地页模板区的样子：按分类分组，分类的先后在「分类管理」里调；同一分类内按卡片顺序显示。卡片上的数字是精选顺序，标「默认」的（第 1 位）是首页生成栏默认选中的模板。只能选已上架、站内可见的模板。',
+  empty: '还没有精选模板，首页现在显示最新上架的 6 个。在下表「首页精选」一列打开，或勾选后用「批量设为首页精选」。',
+  dragHint: '拖动卡片调整同一分类内的先后（手机上长按卡片再拖），排好后点「保存」，首页才会更新。保存后数字按页面从上到下、从左到右排，第一张卡片就是默认模板。',
+  dirty: '有未保存的改动，首页还是原来的样子。',
+  save: '保存',
+  discard: '放弃改动',
+  saved: '首页精选已保存，首页随后更新',
+  failed: '首页精选没保存，排好的顺序还在，可以再点一次「保存」。',
+  remove: (name: string) => `移出首页精选：${name}`,
+  removeShort: '移出',
+  position: (index: number) => `精选第 ${index + 1} 位`,
+  defaultTag: '默认',
+  // The saved ranks no longer follow the groups: switched on or batch-added templates go to the end,
+  // and reordering categories regroups the cards without touching the ranks.
+  outOfOrder: (name: string) => `现在首页生成栏默认选中的是「${name}」（标「默认」的那张），不是第一张卡片：开关或批量加入的模板排在精选最后，调整分类顺序也会这样。`,
+  normalise: '按分组整理并保存',
+  dropped: '首页精选在别处变了（上下架或另一个页面保存过），未保存的排列已丢弃，下面是现在的样子。',
+  dismiss: '知道了',
+  locked: '先保存或放弃上面「首页精选」的改动',
+} as const

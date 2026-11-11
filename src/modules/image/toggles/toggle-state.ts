@@ -17,19 +17,6 @@ export function toggleRequest(toggles: readonly CatalogueToggle[], values: Toggl
   return { toggles: Object.fromEntries(on.map((toggle) => [toggle.key, true])), ...(confirmed.length > 0 ? { toggles_confirmed: confirmed } : {}) }
 }
 
-// A draft kept across sign-up (T89, home generator): the toggles that were on and which of them the
-// visitor confirmed. Restored only for the template's toggles of today, and a toggle with a dialog
-// only when its confirmation came along (it gained a dialog since, or the draft is odd: off).
-export function draftToggles(toggles: readonly CatalogueToggle[], values: ToggleValues) {
-  const on = toggles.filter((toggle) => values[toggle.key] === true)
-  return { toggles: on.map((toggle) => toggle.key), confirmed: on.filter((toggle) => toggle.confirm).map((toggle) => toggle.key) }
-}
-
-export function restoreToggles(toggles: readonly CatalogueToggle[], draft: { toggles: readonly string[]; confirmed: readonly string[] }): ToggleValues {
-  const kept = toggles.filter((toggle) => draft.toggles.includes(toggle.key) && (!toggle.confirm || draft.confirmed.includes(toggle.key)))
-  return Object.fromEntries(kept.map((toggle) => [toggle.key, true]))
-}
-
 const storageKey = (templateId: string, key: string) => `shotviva:toggle-confirmed:${templateId}:${key}`
 
 // "Once per template per browser session" (T89). Storage can be missing or throw (private

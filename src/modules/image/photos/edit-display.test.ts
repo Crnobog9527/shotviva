@@ -33,7 +33,7 @@ describe('editDisplay', () => {
   it('names an edit after its template source and shows the change', () => {
     const shown = editDisplay(edit, base, templates, names, url)
     expect(shown.item.templateName).toBe('Pure White (edit)')
-    expect(shown.source).toMatchObject({ id: 'src', templateName: 'Pure White', fileUrl: '/api/files/src' })
+    expect(shown.source).toMatchObject({ id: 'src', templateName: 'Pure White', fileUrl: '/api/files/src', thumbUrl: '/api/files/src/thumb' })
     expect(shown.change).toBe('Put it on a café chair')
   })
 

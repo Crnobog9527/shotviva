@@ -14,6 +14,7 @@ import {
   allowedWebAspects,
   assertPricedTier,
   assertTemplateQuote,
+  publicCopyKeys,
   validateGenerationInputs,
   type GenerationInputs,
   type Resolution,
@@ -27,9 +28,10 @@ import type { GenerationRequest } from './generation-request'
 import { findOwnJob } from './job-lookup'
 import type { Job, JobSource } from './job-schema'
 import { toJobView, type JobView } from './job-view'
-import { currentTier, limitsFor } from '../billing/tier'
+import { effectiveTier, limitsFor } from '../billing/tier'
 import { assertWithinRateLimit } from './rate-limit'
 import { settleGeneration, type SettleDeps } from './settle-generation'
+import { backgroundInput } from './job-background'
 import { recordJobClientIp } from './job-download'
 import type { TemplateProvider } from './provider'
 import { reserveJob } from './settlement'
@@ -56,7 +58,7 @@ function requestAspects(req: GenerationRequest, template: Template) {
 // ownership, tier limits (batch size, rate limit), then the user's words (ARCHITECTURE §5.1a:
 // no face swap) alongside the stored upload itself (HEAD + bytes; bad ones are deleted).
 async function prepare(deps: GenerationDeps, req: GenerationRequest) {
-  const membership = await currentTier(deps.db, req.userId)
+  const membership = await effectiveTier(deps.db, req.userId)
   assertBatchAllowed(membership, req.batchSize, req.batchTemplates)
   assertBatchProof(req)
   const { template, prompt } = await loadGenerationTemplate(deps.db, req.templateId, SURFACE[req.source])
@@ -108,9 +110,12 @@ export function toggleInputs(inputs: GenerationInputs, now: Date) {
 
 // User content only; the wrapped prompt stays in template_prompts (ARCHITECTURE §4).
 // reserve_credits charges templates.credits_cost[resolution] from this very object.
-function jobInputs(req: GenerationRequest, { inputs, prompt }: Prepared, resolution: Resolution, attemptId: string, now: Date) {
+function jobInputs(req: GenerationRequest, { inputs, prompt, template }: Prepared, resolution: Resolution, attemptId: string, now: Date) {
+  const shown = publicCopyKeys(template.fields.copy)
   return {
     copy: inputs.copy,
+    // Which fields were public at this moment (§5.1d); none for most templates, so their jobs look as before.
+    ...(shown.length > 0 ? { copy_public: shown } : {}),
     aspect_ratio: inputs.aspectRatio,
     resolution,
     ...(inputs.note ? { note: inputs.note } : {}),
@@ -167,7 +172,7 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
       ...reserveFields(req), jobId, module: template.module, templateId: template.id, provider: route.provider.id,
       expectedCredits: expectedPrice(req, template, resolution),
       inputs: { ...jobInputs(req, prepared, resolution, attemptId, deps.now?.() ?? new Date()),
-        quality: route.call.quality, style_ref_keys: route.styleRefKeys, ...(reason ? { fallback_route: true } : {}) },
+        quality: route.call.quality, ...backgroundInput(route.call.params, route.provider), style_ref_keys: route.styleRefKeys, ...(reason ? { fallback_route: true } : {}) },
     })
     return { job, ...route }
   })

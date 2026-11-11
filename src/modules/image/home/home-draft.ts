@@ -1,7 +1,7 @@
 import { NOTE_MAX_LENGTH, OUTPUT_ASPECTS, type OutputAspect } from '@/core/templates/output-options'
 
 // What a signed-out visitor set up on the home generator, kept in this browser across the
-// sign-up / log-in round trip (DESIGN §6.9 item 9): template, size, note and toggles in localStorage
+// sign-up / log-in round trip (DESIGN §6.9 item 9): template, size and note in localStorage
 // (a confirmation link may open in a new tab, so not sessionStorage), the photo itself in
 // IndexedDB. Nothing leaves the browser until the visitor is signed in and the photo uploads.
 // A draft older than a day is dropped.
@@ -11,14 +11,12 @@ const STORE = 'draft'
 const PHOTO = 'photo'
 export const DRAFT_TTL_MS = 24 * 60 * 60 * 1000
 
-// toggles (T89): the template's toggles that were on; confirmed: those of them whose confirm dialog
-// the visitor accepted, so the restored draft is still on without asking again.
+// No template toggles: the home bar does not offer them (Owner 2026-11-12); a draft saved while it
+// did simply has its toggle keys ignored.
 export type HomeDraft = {
   templateId: string
   aspect: OutputAspect
   note: string
-  toggles: string[]
-  confirmed: string[]
   savedAt: number
   hasPhoto: boolean
 }
@@ -29,13 +27,10 @@ function isFresh(savedAt: unknown, now: number): savedAt is number {
   return typeof savedAt === 'number' && savedAt <= now && now - savedAt <= DRAFT_TTL_MS
 }
 
-// A list of toggle keys; anything else (a draft saved before T89) reads as none.
-const keysOf = (value: unknown): string[] => (Array.isArray(value) ? value.filter((key): key is string => typeof key === 'string').slice(0, 10) : [])
-
-function toDraft({ templateId, aspect, note, toggles, confirmed, savedAt, hasPhoto }: RawDraft, now: number): HomeDraft | null {
+function toDraft({ templateId, aspect, note, savedAt, hasPhoto }: RawDraft, now: number): HomeDraft | null {
   const size = OUTPUT_ASPECTS.find((option) => option === aspect)
   if (typeof templateId !== 'string' || typeof note !== 'string' || !size || !isFresh(savedAt, now)) return null
-  return { templateId, aspect: size, note: note.slice(0, NOTE_MAX_LENGTH), toggles: keysOf(toggles), confirmed: keysOf(confirmed), savedAt, hasPhoto: hasPhoto === true }
+  return { templateId, aspect: size, note: note.slice(0, NOTE_MAX_LENGTH), savedAt, hasPhoto: hasPhoto === true }
 }
 
 export function parseDraft(raw: string | null, now: number): HomeDraft | null {

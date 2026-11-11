@@ -8,11 +8,12 @@ import { Chevron } from './rows'
 // seven frames between sprocket holes, a "+N" frame for the rest, each frame into its photo and
 // the heading into Photos. Nothing made this month, no strip.
 
-type Props = { ids: readonly string[]; count: number; fileUrl: (id: string) => string }
+// thumbUrl: where a work's small copy is (ARCHITECTURE §8.3「作品小图」), never the full file.
+type Props = { ids: readonly string[]; count: number; thumbUrl: (id: string) => string }
 
 export const STRIP_FRAMES = 7
 
-export function FilmStrip({ ids, count, fileUrl }: Props) {
+export function FilmStrip({ ids, count, thumbUrl }: Props) {
   const t = useTranslations('app.account.strip')
   if (count === 0) return null
   const more = count - ids.length
@@ -31,8 +32,8 @@ export function FilmStrip({ ids, count, fileUrl }: Props) {
           {ids.map((id) => (
             <li key={id}>
               <Link href={`/photos/${id}`} className={frame} aria-label={t('open')}>
-                {/* eslint-disable-next-line @next/next/no-img-element -- /api/files answers a redirect to a short-lived signed URL, as on Photos */}
-                <img src={fileUrl(id)} alt="" loading="lazy" decoding="async" className={`${REPLAY_BLOCK_CLASS} size-full object-cover`} />
+                {/* eslint-disable-next-line @next/next/no-img-element -- the thumbnail route answers a redirect to a short-lived signed URL, as on Photos */}
+                <img src={thumbUrl(id)} alt="" width={88} height={110} loading="lazy" decoding="async" className={`${REPLAY_BLOCK_CLASS} size-full object-cover`} />
               </Link>
             </li>
           ))}

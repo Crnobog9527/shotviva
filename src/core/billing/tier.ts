@@ -23,3 +23,14 @@ export async function currentTier(client: RpcClient, userId: string): Promise<Me
   const id = z.uuid().parse(userId)
   return callRpc(client, 'current_tier', { p_user_id: id }, z.enum(MEMBERSHIP_TIERS).nullable())
 }
+
+// The tier that unlocks tier-gated features (TIER_LIMITS, multi-template batches, batch ZIPs,
+// feature_access): SQL effective_tier(), which is Max for an unbanned admin and current_tier()
+// for everyone else, so the Owner can use every feature on their own account. Billing (pack member
+// rates, upgrade rules, the membership card), support reply time and vote weight stay on
+// currentTier(): admins still pay credits and plans like anyone. Always pass the session's own
+// user id and a service-role client; never a tier or a role taken from the request.
+export async function effectiveTier(client: RpcClient, userId: string): Promise<MembershipTier | null> {
+  const id = z.uuid().parse(userId)
+  return callRpc(client, 'effective_tier', { p_user_id: id }, z.enum(MEMBERSHIP_TIERS).nullable())
+}

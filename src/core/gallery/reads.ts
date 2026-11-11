@@ -7,6 +7,7 @@ import { createAdminSupabase } from '../auth/supabase-admin'
 import { FAILED_READ_LIFE } from '../cache-life'
 import { logger } from '../logger'
 import { GALLERY_CACHE_TAG } from './cache'
+import { GALLERY_MAX_PAGES } from './page-number'
 
 // The public gallery's reads (ARCHITECTURE §9, 创作库规格 U11). Only approved public works in the
 // gallery's scope (§9 第 7 条), on generation_jobs_gallery_idx. No cookies inside a cache, so the
@@ -14,12 +15,12 @@ import { GALLERY_CACHE_TAG } from './cache'
 // Every read carries the gallery tag that a decision, a deletion or a switch change expires.
 
 export const GALLERY_PAGE_SIZE = 24
-export const GALLERY_MAX_PAGES = 20
 // A missed expiry (another instance) is bounded to ten minutes.
 const GALLERY_LIFE = { revalidate: 600, expire: 3600 } as const
 
-// Only the copy fields of inputs leave the database (§9 第 3 条): never the note or upload keys.
-const COLUMNS = 'id, template_id, credit_pool, parent_job_id, copy:inputs->copy, moderated_at'
+// Only the copy fields of inputs leave the database (§9 第 3 条), with the keys that were public
+// when the work was made (§5.1d): never the note or upload keys.
+const COLUMNS = 'id, template_id, credit_pool, parent_job_id, copy:inputs->copy, copy_public:inputs->copy_public, moderated_at'
 
 const rowSchema = z.object({
   id: z.string(),
@@ -27,6 +28,7 @@ const rowSchema = z.object({
   credit_pool: z.enum(['free', 'paid']),
   parent_job_id: z.string().nullable(),
   copy: z.unknown(),
+  copy_public: z.unknown(),
   moderated_at: z.string(),
 })
 
@@ -37,7 +39,7 @@ const toRow = (row: z.infer<typeof rowSchema>): GalleryRow => ({
   templateId: row.template_id,
   creditPool: row.credit_pool,
   parentJobId: row.parent_job_id,
-  inputs: { copy: row.copy },
+  inputs: { copy: row.copy, copy_public: row.copy_public },
 })
 
 function shown() {

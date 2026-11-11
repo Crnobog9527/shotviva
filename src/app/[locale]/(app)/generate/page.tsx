@@ -5,13 +5,13 @@ import { Suspense, type ReactNode } from 'react'
 
 import { AppPage, BalanceChip, TabRootHeader } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
-import { currentTier, limitsFor, readBalance } from '@/core/billing'
+import { effectiveTier, limitsFor, readBalance } from '@/core/billing'
 import { listFavoriteIdsOrEmpty } from '@/core/favorites'
 import { currentLocale } from '@/core/i18n/server'
 import { listRunningJobIds } from '@/core/jobs'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { WishCard } from '@/core/wishlist/ui/wish-card'
-import { FavoritesProvider, GeneratingPill, loadCatalogueView, MatrixEntry, TemplateCatalogue } from '@/modules/image'
+import { FavoritesProvider, GatedFeatures, GeneratingPill, loadCatalogueView, TEMPLATES_ANCHOR, TemplateCatalogue } from '@/modules/image'
 import { site } from '@/site/site.config'
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -35,8 +35,8 @@ async function Create() {
     // Templates and series cards placed under up to three category levels (T102).
     loadCatalogueView(supabase, await currentLocale()),
     readBalance(supabase, user.id),
-    // current_tier() is service-role only; the user's own id comes from the session.
-    currentTier(admin, user.id),
+    // effective_tier() (an unbanned admin counts as Max) is service-role only; the user's own id comes from the session.
+    effectiveTier(admin, user.id),
     listRunningJobIds(admin, user.id, new Date()),
     // A failed read degrades to no favorites (logged), never to an error page or signed-out home.
     listFavoriteIdsOrEmpty(supabase, user.id),
@@ -53,17 +53,20 @@ async function Create() {
           </>
         }
       />
-      {/* Several templates at once (T107): Max opens it, lower tiers see it locked. */}
-      <div className="px-(--gutter) pb-2 md:max-w-[560px]">
-        <MatrixEntry tier={tier} />
+      {/* Batch photos (Pro/Max) and several templates (Max): open for members who have them,
+          locked below with an intro first (Owner 2026-11-12). */}
+      <div className="px-(--gutter) pb-2 md:max-w-[880px]">
+        <GatedFeatures tier={tier} />
       </div>
-      <FavoritesProvider initialIds={favoriteIds} signedIn>
-        <TemplateCatalogue
-          view={view}
-          create={{ balance, tier, concurrency: { limit: limitsFor(tier).concurrency, runningIds } }}
-          endCard={wishlistLive ? <WishCard /> : undefined}
-        />
-      </FavoritesProvider>
+      <div id={TEMPLATES_ANCHOR} className="scroll-mt-[calc(var(--sat)+8px)] md:scroll-mt-16">
+        <FavoritesProvider initialIds={favoriteIds} signedIn>
+          <TemplateCatalogue
+            view={view}
+            create={{ balance, tier, concurrency: { limit: limitsFor(tier).concurrency, runningIds } }}
+            endCard={wishlistLive ? <WishCard /> : undefined}
+          />
+        </FavoritesProvider>
+      </div>
     </>
   )
 }

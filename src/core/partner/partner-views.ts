@@ -56,6 +56,9 @@ export function toPartnerTemplate(template: Template): PartnerTemplate {
         label: field.label,
         required: field.required,
         max_length: field.maxLength,
+        // Additive (§14.6): 'short' for every field older callers know; a choice lists its values.
+        type: field.type,
+        ...(field.type === 'select' ? { options: field.options ?? [] } : {}),
       })),
       aspect_ratios: template.fields.aspectRatios,
     },

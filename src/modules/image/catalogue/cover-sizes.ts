@@ -14,10 +14,10 @@ export const COVER_SIZES = {
   featureFrame: '(min-width: 1024px) 1120px, 100vw',
   dialogPlate: '(min-width: 768px) 215px, 50vw',
   dialogFrame: '(min-width: 768px) 430px, 100vw',
-  // The series sheet (series-sheet.tsx): two across in the 480 px dialog (16 px padding, 12 px
-  // gap) or the phone drawer.
-  sheetPlate: '(min-width: 768px) 110px, 25vw',
-  sheetFrame: '(min-width: 768px) 220px, 50vw',
+  // A series member's thumbnail in the creation panel (member-picker.tsx): four across in the
+  // dialog's sample column, a 104 px strip tile on phones.
+  memberPlate: '(min-width: 768px) 48px, 52px',
+  memberFrame: '(min-width: 768px) 96px, 104px',
   stagePlate: '316px',
   stageFrame: '632px',
 } as const
