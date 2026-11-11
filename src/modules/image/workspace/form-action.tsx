@@ -76,7 +76,7 @@ function Primary({ state, batch, onGenerate }: { state: CtaState; batch: boolean
   const t = useTranslations('app.workspace')
   if (state.kind === 'get-credits') {
     return (
-      <PaywallButton trigger="insufficient_credits" className={buttonVariants({ variant: 'cta-neutral', size: 'cta' })}>
+      <PaywallButton trigger="insufficient_credits" options={{ moment: 'credits', needed: state.needed }} className={buttonVariants({ variant: 'cta-neutral', size: 'cta' })}>
         <span>{t.rich('getCreditsCta', { ...rich, count: state.needed })}</span>
       </PaywallButton>
     )

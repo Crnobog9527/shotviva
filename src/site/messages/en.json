@@ -1186,6 +1186,30 @@
     }
   },
   "paywall": {
+    "moments": {
+      "watermark": "Free photos carry a watermark. Paid credits make watermark-free, private photos.",
+      "photos": "Pro runs one template on up to {count, number} photos at once.",
+      "templates": "Max runs up to {templates, number} templates on the same photos, up to {count, number} photos a batch."
+    },
+    "example": {
+      "caption": "Example: one phone photo, two templates, made in one batch.",
+      "photoAlt": "Example: the phone photo",
+      "resultAlt": "Example: result {index, number}"
+    },
+    "packOrPlan": {
+      "title": "{count, plural, one {# credit} other {# credits}} short: a pack or a plan?",
+      "packTitle": "Credit pack · {count, plural, one {# credit} other {# credits}}",
+      "packPrice": "{price} once",
+      "planTitle": "{tier} · {count, plural, one {# credit} other {# credits}} a month",
+      "planPrice": "{price} a month",
+      "verdict": {
+        "pack": "The pack costs less, both today and per credit.",
+        "plan": "{tier} costs less, both today and per credit. It is a monthly plan.",
+        "same": "Both cost the same.",
+        "packNowPlanLater": "The pack costs less today. If you make photos every month, {tier} costs less per credit.",
+        "planNowPackLater": "{tier} costs less today; the pack costs less per credit."
+      }
+    },
     "title": "Keep making photos",
     "intro": "Paid credits make private, watermark-free photos.",
     "introNeedsCredits": "This photo needs more credits than you have.",

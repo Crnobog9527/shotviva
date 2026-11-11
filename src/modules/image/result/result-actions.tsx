@@ -8,23 +8,26 @@ import { cn } from '@/core/ui/cn'
 
 import { monoTag, sizeTag } from '../workspace/result-panel'
 import { IosPhotoActions } from './ios-photo-actions'
+import { useWatermarkMoment } from './use-watermark-moment'
 import { useShareFile } from './use-share-file'
 import { isIosBrowser } from './ios-browser'
 
-export type ResultActionProps = { fileUrl: string; name: string; shareText: string; px?: number }
+// watermarked: a free work; saving it is the moment the paywall opens on Starter (T107).
+export type ResultActionProps = { fileUrl: string; name: string; shareText: string; px?: number; watermarked?: boolean }
 
 const subscribe = () => () => {}
 const onIos = () => isIosBrowser(navigator)
 const serverSnapshot = () => false
 
-export default function ResultActions({ fileUrl, name, shareText, px }: ResultActionProps) {
+export default function ResultActions({ fileUrl, name, shareText, px, watermarked = false }: ResultActionProps) {
   const t = useTranslations('app.result')
+  const saved = useWatermarkMoment(watermarked)
   const mode = useShareFile(fileUrl, name)
   const ios = useSyncExternalStore(subscribe, onIos, serverSnapshot)
-  if (ios) return <IosPhotoActions mode={mode} fileUrl={fileUrl} />
+  if (ios) return <IosPhotoActions mode={mode} fileUrl={fileUrl} onSaved={saved} />
   const primary = buttonVariants({ variant: 'cta', size: 'cta', className: 'gap-2' })
   const download = (className?: string) => (
-    <a href={mode.kind === 'loading' ? undefined : `${fileUrl}?download=1`} download aria-disabled={mode.kind === 'loading'} className={cn(primary, mode.kind === 'loading' && 'pointer-events-none', className)}>
+    <a href={mode.kind === 'loading' ? undefined : `${fileUrl}?download=1`} download onClick={saved} aria-disabled={mode.kind === 'loading'} className={cn(primary, mode.kind === 'loading' && 'pointer-events-none', className)}>
       <DownloadIcon />
       <span>{px ? t.rich('downloadPx', { px, cost: sizeTag, mono: monoTag }) : t('download')}</span>
     </a>
@@ -34,7 +37,7 @@ export default function ResultActions({ fileUrl, name, shareText, px }: ResultAc
       // Called straight from the tap, no await before it (rule 1).
       navigator
         .share({ files: [mode.file], title: name, text: shareText })
-        .catch(() => undefined)
+        .then(saved, () => undefined)
     }
     return (
       <>

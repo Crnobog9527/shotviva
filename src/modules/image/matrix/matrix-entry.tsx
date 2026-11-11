@@ -49,7 +49,7 @@ export function MatrixEntry({ tier, templateId, variant = 'row', className }: Pr
 function EntryTarget({ locked, href, className, children }: { locked: boolean; href: string; className: string; children: ReactNode }) {
   if (locked) {
     return (
-      <PaywallButton trigger="tier_required" options={{ step: 'period', tier: 'max' }} className={className}>
+      <PaywallButton trigger="tier_required" options={{ step: 'period', tier: 'max', moment: 'templates' }} className={className}>
         {children}
       </PaywallButton>
     )
