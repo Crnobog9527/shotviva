@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element -- the optimiser's own URLs (stageImage, thumbImage) or a local object URL */
 import { useTranslations } from 'next-intl'
 import { useState, type CSSProperties } from 'react'
+import { preload } from 'react-dom'
 
 import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
 
@@ -24,13 +25,20 @@ export function PanelStage({ name, after, initial, inset }: Props) {
   const t = useTranslations('home.generator')
   const tags = useTranslations('marketing.home')
   const cover = useStageCover(after, initial)
+  // On a phone the preview sits right under the hero pair and can be the first screen's largest
+  // picture (measured on /zh: it came in ~0.45 s after the hero), so the page's own preview is
+  // fetched from the <head> there. Not from 1024: the preview is smaller than the hero plates.
+  if (initial) {
+    const { src, srcSet } = stageImage(initial.url)
+    preload(src, { as: 'image', imageSrcSet: srcSet, media: '(max-width: 1023px)', fetchPriority: 'high' })
+  }
   const style = { '--r': clampRatio(cover?.ratio ?? 4 / 5) } as CSSProperties
   return (
     <div className="mk-stage-wrap">
       <div className="mk-stage" style={style}>
         {cover ? (
           <>
-            <img className="mk-stage-fill" {...thumbImage(cover.url, 32)} alt="" aria-hidden decoding="async" />
+            <img className="mk-stage-fill" {...thumbImage(cover.url, 32)} alt="" aria-hidden loading="lazy" decoding="async" />
             <img key={cover.url} className="mk-stage-img" {...stageImage(cover.url)} alt={t('stageAlt', { name })} loading="lazy" decoding="async" />
           </>
         ) : null}
