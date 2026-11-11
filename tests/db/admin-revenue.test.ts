@@ -8,7 +8,7 @@ import { listPurchases, loadRevenueStats, type RevenueStats } from '@/core/admin
 import { connectAdmin, retryAuth } from './helpers'
 import { anonSupabase, serviceSupabase } from './supabase-env'
 
-// admin_revenue_stats (source: payments since 0168, net of tax and refunds) against direct SQL in one
+// admin_revenue_stats (source: payments since 0168; since 1181 a refund returns its share of the tax) against direct SQL in one
 // repeatable-read snapshot, and the purchase list through the real T9 settle path.
 
 let db: Client
@@ -64,8 +64,8 @@ const DIRECT = `
   )
   select w.key,
     (select count(*) from public.payments where created_at >= w.since)::int as purchases,
-    (select coalesce(sum(amount_total - amount_tax - amount_refunded), 0) / 100.0 from public.payments
-      where created_at >= w.since and currency = 'usd')::numeric as revenue_usd
+    (select coalesce(sum(round((amount_total - amount_refunded)::numeric * (amount_total - amount_tax) / amount_total)), 0) / 100.0
+      from public.payments where created_at >= w.since and currency = 'usd' and amount_total > 0)::numeric as revenue_usd
   from w`
 
 async function snapshot(): Promise<{ stats: RevenueStats; direct: { key: string; purchases: number; revenue_usd: string }[] }> {

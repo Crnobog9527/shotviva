@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import type { Range } from './range'
+import { RANGE_DAYS, type Range } from './range'
 
 const host = 'shotviva.com'
 const uaMarkers = [
@@ -62,7 +62,8 @@ export function edgeWindow(range: Range, now: number): Window {
   const end = Math.floor(now / width) * width
   const day = 86_400_000
   const offset = 8 * 3_600_000
-  const start = range === 'today' ? Math.floor((now + offset) / day) * day - offset : end - (range === '7d' ? 7 : 30) * day
+  // Beijing days, like every other block (range.ts).
+  const start = Math.floor((now + offset) / day) * day - offset - (RANGE_DAYS[range] - 1) * day
   return { start: new Date(start).toISOString(), end: new Date(end).toISOString(), bucketMinutes }
 }
 type Scope = { ownerId: string; projectId: string }
