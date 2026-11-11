@@ -1,3 +1,7 @@
+// The app's Tailwind sheet (utilities for all of src/), first so its layers and tokens precede
+// every component sheet. Marketing and sign-in pages load globals-public.css instead.
+import '../../globals.css'
+
 import type { Metadata } from 'next'
 import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'

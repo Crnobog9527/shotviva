@@ -1,5 +1,5 @@
-// Instrument Serif's two files (globals.css declares the faces). Content-addressed like MiSans:
-// a changed font ships under a new name here and in globals.css, never new bytes at these URLs
+// Instrument Serif's two files (globals-body.css declares the faces). Content-addressed like MiSans:
+// a changed font ships under a new name here and in globals-body.css, never new bytes at these URLs
 // (instrument-serif.test.ts keeps the three places in step).
 export const INSTRUMENT_SERIF_FILES = [
   '/fonts/instrument-serif/instrument-serif-60c06664b5a95c7d.woff2',
