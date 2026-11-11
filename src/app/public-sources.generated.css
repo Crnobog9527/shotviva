@@ -120,6 +120,7 @@
 @source "../core/announcements/banner/banner-view.tsx";
 @source "../core/announcements/banner/use-banner.ts";
 @source "../core/announcements/index.ts";
+@source "../core/announcements/rules/dismissal.ts";
 @source "../core/announcements/rules/index.ts";
 @source "../core/announcements/rules/rules.ts";
 @source "../core/announcements/rules/schema.ts";

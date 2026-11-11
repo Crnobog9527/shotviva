@@ -18,7 +18,7 @@ import { ANNOUNCEMENT_ERRORS } from './errors'
 // every client role. Each action is one database round trip.
 
 const ADMIN_COLUMNS =
-  'id, message_en, message_zh, link_url, link_label_en, link_label_zh, tone, starts_at, ends_at, is_active, created_at, updated_at'
+  'id, message_en, message_zh, link_url, link_label_en, link_label_zh, tone, starts_at, ends_at, dismissible, reshow_after_days, is_active, created_at, updated_at'
 
 const fail = (what: string, error: { message: string }): never => {
   throw new AppError('INTERNAL', `site_announcements ${what} failed`, { cause: new Error(error.message) })
@@ -59,6 +59,8 @@ const toColumns = (input: AnnouncementInput, actorId: string) => ({
   tone: input.tone,
   starts_at: input.startsAt,
   ends_at: input.endsAt,
+  dismissible: input.dismissible,
+  reshow_after_days: input.reshowAfterDays,
   updated_by: actorId,
 })
 

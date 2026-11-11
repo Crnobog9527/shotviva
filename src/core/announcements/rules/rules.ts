@@ -1,10 +1,11 @@
+import { versionKey } from './dismissal'
 import type { AnnouncementRow, BannerAnnouncement, BannerLocale } from './types'
 
 // Pure rules shared by the admin form, the server read and the banner (ARCHITECTURE §10).
 
 export const MESSAGE_MAX = 140
 export const LINK_LABEL_MAX = 40
-export const DISMISS_STORAGE_KEY = 'sv-announcement-dismissed'
+export const RESHOW_DAYS_MAX = 365
 
 // A site path ("/pricing") or an https URL without userinfo, matching the table's check.
 // Protocol-relative "//host" is an off-site link dressed as a path, so it is refused.
@@ -36,13 +37,17 @@ export function pickLive<T extends Window>(items: readonly T[], now: number): T 
 export function localize(row: AnnouncementRow, locale: BannerLocale): BannerAnnouncement {
   const zh = locale === 'zh'
   const label = zh ? row.link_label_zh : row.link_label_en
+  const message = zh ? row.message_zh : row.message_en
+  const link = row.link_url ? { url: row.link_url, label: label ?? null } : null
   return {
     id: row.id,
-    message: zh ? row.message_zh : row.message_en,
-    link: row.link_url ? { url: row.link_url, label: label ?? null } : null,
+    message,
+    link,
     tone: row.tone,
     startsAt: row.starts_at,
     endsAt: row.ends_at,
+    closeKey: row.dismissible ? versionKey(row.id, { message, link, tone: row.tone }) : null,
+    reshowAfterDays: row.reshow_after_days,
   }
 }
 

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { isAllowedLink, LINK_LABEL_MAX, MESSAGE_MAX } from './rules'
+import { isAllowedLink, LINK_LABEL_MAX, MESSAGE_MAX, RESHOW_DAYS_MAX } from './rules'
 
 export const TONES = ['info', 'promo'] as const
 
@@ -31,6 +31,9 @@ export const announcementInputSchema = z
     tone: z.enum(TONES),
     startsAt: optionalInstant,
     endsAt: optionalInstant,
+    // Older callers (and a stale admin tab) omit these: the table's own defaults then hold.
+    dismissible: z.boolean().default(true),
+    reshowAfterDays: z.number().int().min(1).max(RESHOW_DAYS_MAX).nullable().default(7),
   })
   .refine((input) => !input.startsAt || !input.endsAt || Date.parse(input.startsAt) < Date.parse(input.endsAt), {
     message: 'window',
@@ -51,6 +54,8 @@ const rowFields = {
   tone: z.enum(TONES),
   starts_at: z.string().nullable(),
   ends_at: z.string().nullable(),
+  dismissible: z.boolean(),
+  reshow_after_days: z.number().int().nullable(),
 }
 
 export const bannerRowSchema = z.object(rowFields)

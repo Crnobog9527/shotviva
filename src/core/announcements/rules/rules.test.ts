@@ -13,6 +13,8 @@ const row: AnnouncementRow = {
   tone: 'promo',
   starts_at: '2026-11-27T00:00:00Z',
   ends_at: '2026-12-01T00:00:00Z',
+  dismissible: true,
+  reshow_after_days: 7,
 }
 
 const at = (iso: string) => Date.parse(iso)

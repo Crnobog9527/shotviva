@@ -65,6 +65,28 @@ describe('site_announcements access', () => {
   })
 })
 
+describe('close rule (1280)', () => {
+  it('defaults to closable, back after 7 days, and keeps what the admin picks', async () => {
+    const inserted = await db.query<{ id: string }>("insert into public.site_announcements (message_en, message_zh) values ('a', 'b') returning id")
+    const read = async (rowId: string) =>
+      (await db.query('select dismissible, reshow_after_days from public.site_announcements where id = $1', [rowId])).rows[0]
+    expect(await read(inserted.rows[0]?.id ?? '')).toEqual({ dismissible: true, reshow_after_days: 7 })
+    const urgent = await saveAnnouncement(service, admin, draft({ dismissible: false, reshowAfterDays: null }))
+    expect(await read(urgent)).toEqual({ dismissible: false, reshow_after_days: null })
+    await setAnnouncementActive(service, admin, { id: urgent, active: true })
+    const [live] = await loadBannerCandidates(service, new Date())
+    expect(live?.id).toBe(urgent)
+    expect(live && localize(live, 'en').closeKey).toBeNull()
+  })
+
+  it('refuses a reshow time outside 1 to 365 days', async () => {
+    await expect(db.query("insert into public.site_announcements (message_en, message_zh, reshow_after_days) values ('a', 'b', 0)")).rejects.toThrow(
+      /reshow_after_days/,
+    )
+    await expect(saveAnnouncement(service, admin, draft({ reshowAfterDays: 400 }))).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+  })
+})
+
 describe('admin_activate_announcement', () => {
   it('switches on, and switching another overlapping one on stops the first in the same call', async () => {
     const first = await saveAnnouncement(service, admin, draft())
