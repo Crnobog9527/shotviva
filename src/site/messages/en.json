@@ -671,6 +671,7 @@
         "resolutionValue": "{tier} · {px} px",
         "format": "Format",
         "formatPng": "PNG, transparent background",
+        "formatJpgWhite": "JPG, white background",
         "credits": "Credits",
         "visibility": "Visibility",
         "visibilityFree": "Public, with watermark",

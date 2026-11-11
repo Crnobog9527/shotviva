@@ -5,6 +5,7 @@ import { createElement, type FunctionComponent, type ReactElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
+import { FormatRow } from '../detail/format-row'
 import { BackgroundChoice } from './background-choice'
 import ResultActions, { type ResultActionProps } from './result-actions'
 
@@ -41,5 +42,15 @@ describe('白底 / 透明底 on the result (first render, phone width)', () => {
     expect(html).toMatch(/aria-checked="false"[^>]*>.*?White/)
     expect(html).toMatch(/aria-checked="true"[^>]*>.*?Transparent/)
     expect(html.match(/min-h-11/g)).toHaveLength(2)
+  })
+})
+
+describe('Format row on photo detail follows the choice', () => {
+  const row = (work: ResultActionProps['work'] & object) => createElement(FormatRow, { fileUrl: '/api/files/j1', work, className: 'row' })
+
+  it('names the 白底 JPG while white is picked (the default), and nothing for an opaque work', async () => {
+    expect(await render('zh', row({ pool: 'paid', transparent: true }))).toContain('JPG，白底')
+    expect(await render('en', row({ pool: 'paid', transparent: true }))).toContain('JPG, white background')
+    expect(await render('zh', row({ pool: 'paid', transparent: false }))).toBe('')
   })
 })

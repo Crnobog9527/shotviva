@@ -51,7 +51,8 @@ export function outputKeyFor(userId: string, jobId: string): string {
   return `outputs/${userId}/${jobId}.png`
 }
 
-// White: the flattened JPEG (any pool; a free one carries the mark). Marked: a free cut-out's
+// Staged copies, paid and free one each. White: a paid cut-out flattened onto white, unmarked
+// (a free 白底 is the marked JPEG made per request, never staged). Marked: a free cut-out's
 // watermarked PNG with its alpha kept. A paid 透明底 download is the stored original itself.
 export type DownloadVariant = 'white' | 'marked'
 

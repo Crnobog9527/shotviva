@@ -671,6 +671,7 @@
         "resolutionValue": "{tier} · {px} px",
         "format": "格式",
         "formatPng": "PNG，透明背景",
+        "formatJpgWhite": "JPG，白底",
         "credits": "积分",
         "visibility": "可见性",
         "visibilityFree": "公开，带水印",
