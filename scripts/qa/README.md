@@ -106,6 +106,12 @@ lands on `next` (default `/account`).
   lifetime (1 hour by default).
 - `QA_SITE_URL` points the link at another preview deployment (`https://….vercel.app`) or a
   local `next dev`. The production domain is refused.
+- **Several accounts in one browser.** Cookies are per host, so each test-site host keeps its own
+  sign-in. Besides the branch URL, the test site answers on `https://shotviva-qa-admin.vercel.app`
+  and `https://shotviva-qa-user.vercel.app` (listed in the Vercel Preview variable
+  `PREVIEW_EXTRA_HOSTS`; an unlisted host lands on the branch URL after sign-in and fails
+  same-origin checks). Example:
+  `QA_SITE_URL=https://shotviva-qa-admin.vercel.app pnpm qa:login qa-admin --next /admin/templates`.
 
 ## For Codex (paste-ready)
 

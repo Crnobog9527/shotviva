@@ -30,5 +30,5 @@ export async function handleAuthCallback(request: NextRequest, options: SignupBe
   const jar: CookieToSet[] = []
   const flow = parseFlow(request.nextUrl.searchParams.get('flow'))
   const outcome = await resolveOutcome(request, jar, flow, options)
-  return landingResponse(outcome, request.nextUrl.searchParams.get('next'), jar)
+  return landingResponse(request, outcome, jar)
 }

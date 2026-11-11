@@ -2,16 +2,17 @@ import 'server-only'
 import type { NextRequest } from 'next/server'
 
 import { AppError } from '../errors'
-import { appOrigin } from '../site-url'
+import { requestOrigin } from '../request-origin'
 import { getSessionUser } from './session'
 import type { SessionUser } from './session-user'
 
 // Session cookies are SameSite=Lax already; the Origin check also stops a same-site
-// subdomain or a form on another origin from triggering a state-changing call. appOrigin
-// follows the Vercel environment, so each preview deployment accepts its own origin.
+// subdomain or a form on another origin from triggering a state-changing call. The expected
+// origin is appOrigin (each preview its branch URL), or on a preview the request's own host
+// when it is an allow-listed test-site alias (core/request-origin).
 export function assertSameOrigin(request: NextRequest): void {
   const origin = request.headers.get('origin')
-  if (origin !== appOrigin) throw new AppError('FORBIDDEN', 'Bad origin')
+  if (origin !== requestOrigin(request)) throw new AppError('FORBIDDEN', 'Bad origin')
 }
 
 // API counterpart of requireUser(): JSON errors instead of redirects. Unverified accounts

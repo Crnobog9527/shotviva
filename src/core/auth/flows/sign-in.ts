@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 
 import { currentLocale, localized } from '../../i18n/server'
 import { logger } from '../../logger'
+import { currentOrigin } from '../../request-origin'
 import { onVerifiedSignIn } from '../first-sign-in'
 import { sanitizeNext } from '../redirect-target'
 import { isVerified, metadataLocale } from '../session-user'
@@ -42,7 +43,7 @@ export async function signInWithGoogle(form: FormData): Promise<FormState> {
   // The PKCE verifier cookie is written here; /auth/callback exchanges the code with it.
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: callbackUrl(sanitizeNext(formFields(form).next), 'oauth') },
+    options: { redirectTo: callbackUrl(sanitizeNext(formFields(form).next), 'oauth', await currentOrigin()) },
   })
   if (error || !data.url) {
     logger.warn('google sign-in start failed', { code: error?.code })

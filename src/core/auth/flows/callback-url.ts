@@ -3,10 +3,11 @@ import { sanitizeNext } from '../redirect-target'
 
 export type CallbackFlow = 'email' | 'oauth' | 'recovery'
 
-// Built from the deployment origin (core/site-url), never the request Host header, so a spoofed host
-// cannot make Supabase email a link to someone else's domain.
-export function callbackUrl(next: string, flow: CallbackFlow = 'email'): string {
-  const url = new URL('/auth/callback', appOrigin)
+// Built from the deployment origin (core/site-url) or, on a preview, an allow-listed alias
+// (core/request-origin) — never a raw Host header, so a spoofed host cannot make Supabase send
+// a link to someone else's domain.
+export function callbackUrl(next: string, flow: CallbackFlow = 'email', origin: string = appOrigin): string {
+  const url = new URL('/auth/callback', origin)
   url.searchParams.set('next', sanitizeNext(next))
   if (flow !== 'email') url.searchParams.set('flow', flow)
   return url.toString()

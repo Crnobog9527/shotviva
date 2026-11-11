@@ -518,9 +518,11 @@
 @source "../core/partner/partner-types.ts";
 @source "../core/partner/partner-views.ts";
 @source "../core/partner/return-to.ts";
+@source "../core/preview-hosts.ts";
 @source "../core/providers/cache-tag.ts";
 @source "../core/public-env-schema.ts";
 @source "../core/public-env.ts";
+@source "../core/request-origin.ts";
 @source "../core/seo/canonical-host.ts";
 @source "../core/seo/crawlers.ts";
 @source "../core/seo/index.ts";
