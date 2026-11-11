@@ -5,7 +5,6 @@ import { site } from '../site.config'
 import {
   freeImagesLabel,
   FreeImagesShort,
-  FreeImagesTitle,
   packshotUsd,
   photoSeconds,
   plansSentence,
@@ -233,7 +232,7 @@ const homeFaq = (offers: OfferFacts): HomePage['faq'] => [
   },
   {
     question: 'Is image to image AI free?',
-    answer: `${brand} gives every new user ${freeImagesLabel}, so you can try image to image AI free. ${plansSentence(offers)}${offers.hundredCreditsFrom ? ` The lowest price per 100 credits is about ${offers.hundredCreditsFrom}.` : ''} Free photos are public and carry a watermark.`,
+    answer: `${brand} gives new accounts ${site.billing.freeCredits} credits to try a template. Each photo uses credits based on template and size, shown on the Generate button. Free photos are public and watermarked; ${offers.planFrom ? `paid plans start at ${usd(offers.planFrom.priceUsd)}/month.` : plansSentence(offers)}`,
   },
   {
     question: "Does image to image AI keep my photo's subject the same?",
@@ -286,8 +285,9 @@ export const makeHomePage = (offers: OfferFacts, plans = homePlans(offers.produc
     heading: 'Free Image to Image AI: What You Get',
     points: [
       {
-        heading: `${FreeImagesTitle} When You Sign Up`,
-        text: `Every new account gets ${site.billing.freeCredits} free credits, once. They do not refill every day or every month.`,
+        // SEO PATCH v4.1 (2026-11-11): the free credits are no heading of their own and no photo count.
+        heading: 'Try It Before You Pay',
+        text: `New accounts get ${site.billing.freeCredits} credits to test a template, once; they do not refill. Free photos are public, watermarked and for personal, non-commercial use.`,
       },
       {
         heading: 'Free Photos Are Public and Watermarked, Paid Photos Are Private',

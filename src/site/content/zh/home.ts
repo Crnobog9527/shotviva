@@ -188,7 +188,7 @@ const homeFaq = (offers: OfferFacts): HomePage['faq'] => [
   },
   {
     question: 'AI改图免费吗？',
-    answer: `${brand} 给每个新用户送 ${zhFreeImages}，AI改图可以先免费试。${zhPlansSentence(offers)}${offers.hundredCreditsFrom ? `折算下来，每 100 积分最低约 ${offers.hundredCreditsFrom}。` : ''}免费生成的图带水印，也不是私密的。`,
+    answer: `${brand} 给新账号 ${site.billing.freeCredits} 个积分，用来试一个模板。每张图按模板和尺寸消耗积分，生成按钮上会显示具体数字。免费生成的图公开、带水印；${offers.planFrom ? `付费套餐每月 ${usd(offers.planFrom.priceUsd)} 起。` : zhPlansSentence(offers)}`,
   },
   {
     question: 'AI改图会不会把我照片里的东西改掉？',
@@ -244,8 +244,9 @@ export const makeZhHomePage = (offers: OfferFacts, plans = zhHomePlans(offers.pr
     heading: '免费 AI改图：你能得到什么',
     points: [
       {
-        heading: `注册送 ${zhFreeImages}`,
-        text: `每个新账号一次性获得 ${site.billing.freeCredits} 个免费积分。免费积分不会每天或每月刷新。`,
+        // SEO PATCH v4.1 (2026-11-11): the free credits are no heading of their own and no photo count.
+        heading: '先试效果再付费',
+        text: `新账号一次性获得 ${site.billing.freeCredits} 个积分，用来试一个模板，不会每天或每月刷新。免费生成的图公开展示、带水印，仅限个人非商业用途。`,
       },
       {
         heading: '免费图公开带水印，付费图私密无水印',

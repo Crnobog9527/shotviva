@@ -7,6 +7,7 @@ import { site } from '../site.config'
 import { contentPages, homePage, pricingPage } from './index'
 import { FALLBACK_CREDITS, fillCredits } from './credits'
 import { freeImagesLabel, fromCredits, tierList, tierPixels, uploadLimits } from './offer'
+import { zhHomePage } from './zh/home'
 
 // The live catalogue on 2026-11-09: Standard costs 1 credit on the cheapest template, more on others.
 const LIVE = { from: 1, same: false }
@@ -54,8 +55,14 @@ describe('home page skeleton', () => {
       'Pick a Template',
       'Download in Standard, HD or Max',
     ])
-    expect(home.freeOffer.points[0].heading).toBe('100 Free Credits When You Sign Up')
-    expect(fillCredits(homePage, FALLBACK_CREDITS).freeOffer.points[0].heading).toBe('100 Free Credits When You Sign Up')
+    // SEO PATCH v4.1: no "100" in a home heading, no photo count, no "generous / unlimited".
+    expect(home.freeOffer.points[0].heading).toBe('Try It Before You Pay')
+    expect(zhHomePage.freeOffer.points[0].heading).toBe('先试效果再付费')
+    for (const page of [home, zhHomePage]) {
+      const headings = [page.freeOffer.heading, ...page.freeOffer.points.map((point) => point.heading), page.freeOffer.plans.heading]
+      expect(headings.join(' ')).not.toMatch(/100/)
+      expect(JSON.stringify(page)).not.toMatch(/enough for|generous|unlimited|free forever|free to use|免费畅用/i)
+    }
   })
 })
 
