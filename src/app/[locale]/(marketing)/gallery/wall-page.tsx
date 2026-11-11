@@ -1,7 +1,7 @@
 import { getTranslations } from 'next-intl/server'
 
 import { cachedGalleryPage, galleryWorkView } from '@/core/gallery'
-import { GalleryPager, GalleryWall } from '@/core/gallery/ui'
+import { GalleryPager, GalleryViewEvent, GalleryWall } from '@/core/gallery/ui'
 import type { Locale } from '@/core/i18n'
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
 
@@ -22,6 +22,7 @@ export async function GalleryWallPage({ page, locale }: Props) {
   if (tiles.length === 0 && page === 1) return <p className="text-[var(--muted-foreground)]">{t('empty')}</p>
   return (
     <div className="grid gap-6">
+      <GalleryViewEvent event="gallery_view" props={{ page }} />
       <GalleryWall tiles={tiles} label={t('heading')} />
       <GalleryPager
         page={page}
