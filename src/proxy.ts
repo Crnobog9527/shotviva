@@ -8,13 +8,15 @@ import { withAnalyticsRegion } from '@/core/analytics/consent'
 import { proxyGate } from '@/core/auth/proxy'
 import { captureCodeLink } from '@/core/codes/link'
 import { isBadGalleryPage } from '@/core/gallery/page-number'
-import { galleryWorkIdOf, isShownWork } from '@/core/gallery/proxy-gate'
+import { galleryWorkIdOf, liveGalleryGate } from '@/core/gallery/proxy-gate'
 import { serverEnv } from '@/core/env'
 import { routing } from '@/core/i18n/routing'
 import { canonicalRedirectResponse, withHostNoindex } from '@/core/seo'
 import { site } from '@/site/site.config'
 
 const hosts = { canonicalHost: site.brand.domain, redirectHosts: site.indexing.canonicalRedirectHosts }
+// One per proxy instance: it holds the gallery switch for a few seconds (core/gallery/proxy-gate.ts).
+const isShownWork = liveGalleryGate(site)
 
 // next-intl's router: /pricing is served from app/[locale] as `en`, /zh/pricing as `zh`, and
 // /en/pricing redirects to /pricing. It never redirects by browser language (ARCHITECTURE §17).
