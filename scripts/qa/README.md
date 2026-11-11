@@ -154,3 +154,32 @@ a number with a fixed code, for which Supabase sends no SMS and does not call th
 Point `.env.local` at a local stack with `QA_EXTRA_SUPABASE_REFS=local` and
 `QA_SITE_URL=http://localhost:3000`. Without R2 settings on a local stack, the placeholder
 upload is skipped and the run says so.
+
+## Renewals on a Stripe test clock
+
+The test site (Vercel Preview, Stripe test key, not the production domain) checks a QA
+persona's **card subscription** out as a Stripe customer on its own test clock, frozen at the
+time of checkout (`core/billing/stripe/qa-test-clock.ts`). One-time payments, and every
+account that is not a QA persona, check out exactly as before. Production can never turn it
+on: the code checks `VERCEL_ENV === 'preview'`, an `sk_test_` key and the domain itself, with
+no setting to override them.
+
+```bash
+pnpm qa:clock list
+```
+
+lists the QA clocks with their subscriptions and period ends.
+
+```bash
+pnpm qa:clock advance clock_…
+```
+
+moves the clock one hour past the latest period end. Stripe then bills the next period: a
+real `subscription_cycle` invoice and its `invoice.paid` webhook to the test site.
+
+```bash
+pnpm qa:clock delete clock_…
+```
+
+deletes the clock with its customer and subscriptions. The script only runs with an `sk_test_`
+key and only touches clocks named `shotviva-qa …`.

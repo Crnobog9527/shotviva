@@ -61,6 +61,9 @@ export type CheckoutDeps = {
   // site.partners.graylum.returnToHosts
   returnToHosts: readonly string[]
   trackStart?: typeof trackCheckoutStart
+  // Test site only (qa-test-clock.ts): a Stripe customer on a test clock for a QA persona's
+  // subscription, keyed by the checkout token. Unset everywhere else.
+  qaCustomer?: (token: string) => Promise<string>
 }
 
 // Where the buyer comes back (T43). Stripe fills {CHECKOUT_SESSION_ID} into success_url; the
@@ -248,12 +251,18 @@ export async function createCheckout(deps: CheckoutDeps, input: CheckoutInput): 
     successPath: successPath(CHECKOUT_RETURN.stripe, body.return_to, deps.returnToHosts),
     client: input.client ?? { ip: null, userAgent: null },
   })
+  await attachQaCustomer(deps, route, token, params)
   const { result, code } = await openSession(deps, input, route, priceId, token, params)
   ;(deps.trackStart ?? trackCheckoutStart)(input.userId, {
     product_id: product.id, tier: product.tier, interval: product.interval, form: route.form, channel: 'stripe',
     method: startedMethod(body.method, route), ...(code && { code: code.code, discount_percent: code.percent }),
   }, body.locale)
   return result
+}
+
+// Test site only: a QA persona's subscription checks out as a customer on a Stripe test clock.
+async function attachQaCustomer(deps: CheckoutDeps, route: CheckoutRoute, token: string, params: Stripe.Checkout.SessionCreateParams) {
+  if (route.mode === 'subscription' && deps.qaCustomer) params.customer = await deps.qaCustomer(token)
 }
 
 function contractMetadata(attempt: Attempt, price: string) {

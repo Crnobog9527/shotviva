@@ -28,6 +28,7 @@ import { appOrigin } from '@/core/site-url'
 import { site } from '@/site/site.config'
 import { assertRevision, type Attempt } from '@/core/billing/catalog-attempt'
 import { assertSeedPreview, checkoutResponse, findRetry } from './pinned'
+import { qaCustomerFor } from './qa-clock'
 
 // One authenticated purchase path for both channels. A new order always reads the database.
 export async function POST(request: NextRequest) {
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
     await bindReferral(user.id, request.cookies.get('sv_ref')?.value, 'first_checkout')
     const attempt = quote && !legacyPreview ? {...id,revision,body:body,quote} : undefined
     if (channel === 'waffo') return jsonResponse(await startWaffo(products, user.id, body, quote, attempt))
-    return await stripeResponse(request, products, user.id, body, quote, attempt)
+    return await stripeResponse(request, products, user, body, quote, attempt)
   } catch (error) {
     return errorResponse(error, 'checkout')
   }
@@ -64,9 +65,11 @@ async function parseBody(request: NextRequest) {
   return result.data
 }
 
-async function stripeResponse(request: NextRequest, products: SiteProduct[], user: string, body: CheckoutBody, quote?: BuyerQuote, attempt?: Attempt) {
+type Buyer = { id: string; email: string | null }
+
+async function stripeResponse(request: NextRequest, products: SiteProduct[], user: Buyer, body: CheckoutBody, quote?: BuyerQuote, attempt?: Attempt) {
   const client = { ip: clientIp(request.headers), userAgent: request.headers.get('user-agent') }
-  const token = attempt?.token ?? checkoutToken(user, body, request.headers.get('idempotency-key'), products, quote)
+  const token = attempt?.token ?? checkoutToken(user.id, body, request.headers.get('idempotency-key'), products, quote)
   return checkoutResponse(await startStripe(products, user, body, client, token, quote, attempt))
 }
 
@@ -84,9 +87,9 @@ async function offeredProduct(admin: ReturnType<typeof createAdminSupabase>, ver
 
 const shared = { origin: appOrigin, returnToHosts: site.partners.graylum.returnToHosts }
 
-function startStripe(products: SiteProduct[], userId: string, body: CheckoutBody, client: CheckoutClient, token: string, quote?: BuyerQuote, attempt?: Attempt) {
-  const deps = { ...shared, products, stripe: stripeClient(), codes: createAdminSupabase(), managedPayments: managedPaymentsEnabled(), wechatPay: wechatPayEnabled(), termsConsent: termsConsentEnabled() }
-  return createCheckout(deps, { attempt, userId, body, client, token, quote: quote?.price, selectedCode: quote?.selectedCode })
+function startStripe(products: SiteProduct[], user: Buyer, body: CheckoutBody, client: CheckoutClient, token: string, quote?: BuyerQuote, attempt?: Attempt) {
+  const deps = { ...shared, products, stripe: stripeClient(), codes: createAdminSupabase(), managedPayments: managedPaymentsEnabled(), wechatPay: wechatPayEnabled(), termsConsent: termsConsentEnabled(), qaCustomer: qaCustomerFor(user) }
+  return createCheckout(deps, { attempt, userId: user.id, body, client, token, quote: quote?.price, selectedCode: quote?.selectedCode })
 }
 
 function startWaffo(products: SiteProduct[], userId: string, body: CheckoutBody, quote?: BuyerQuote, attempt?: Attempt) {
