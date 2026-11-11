@@ -25,6 +25,8 @@
     "check:app-shell": "tsx scripts/app-shell-check.ts",
     "seo:ssr": "tsx --require ./scripts/ci/ignore-css.cjs scripts/ssr-seo-audit.ts",
     "js:budget": "tsx scripts/js-budget.ts",
+    "css:sources": "tsx scripts/public-css-sources.ts",
+    "css:check": "tsx scripts/public-css-check.ts",
     "eval:identity": "tsx --conditions=react-server scripts/identity-judge-eval.ts"
   },
   "dependencies": {

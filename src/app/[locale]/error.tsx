@@ -1,5 +1,8 @@
 'use client'
 
+// Rendered under the root layout alone, which carries no stylesheet of its own.
+import '../globals-public.css'
+
 import { useTranslations } from 'next-intl'
 import { useEffect } from 'react'
 

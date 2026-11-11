@@ -51,6 +51,10 @@ jobs:
       # First-load JS per route against scripts/js-budget.json (performance pass, B8).
       - if: steps.changes.outputs.code == 'true'
         run: pnpm js:budget
+      # The public pages' stylesheet has every class those pages use and stays under its budget
+      # (scripts/public-css-check.ts).
+      - if: steps.changes.outputs.code == 'true'
+        run: pnpm css:check
       # The SEO text of every indexable page must be in the server HTML (建站规格 R5): the
       # built app, fetched without JavaScript, checked against site/content.
       - name: SEO text is server-rendered
