@@ -8,7 +8,7 @@ import { Link } from '@/core/i18n/ui'
 import { buttonVariants } from '@/core/ui/button'
 import { cn } from '@/core/ui/cn'
 
-import { ZipButton } from '../batch/zip-button'
+import { ZipButtonLazy as ZipButton } from '../batch/zip-button-lazy'
 import type { TrackedJob } from '../generation/job-model'
 import { useJobs } from '../generation/use-jobs'
 import { batchTally } from '../workspace/batch-tally'
