@@ -6,7 +6,10 @@ import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/core/ui/ta
 
 import type { AdminTemplate } from '../templates/types'
 import { SortableList } from '../ui/sortable'
-import { bulkCopy } from './copy'
+import { cn } from '@/core/ui/cn'
+
+import { bulkCopy, rowCopy } from './copy'
+import { stickyActionsClass } from './row-cells'
 import { headerState } from './selection-state'
 import { TemplateRow, type RowHandlers } from './template-row'
 
@@ -51,11 +54,14 @@ export function TemplatesTable({ templates, selection, order, floor, categoryLab
           <TableHead>名称 / ID</TableHead>
           <TableHead>分类</TableHead>
           <TableHead>展示入口</TableHead>
-          <TableHead>积分（Standard / HD / Max）</TableHead>
-          <TableHead>提示词版本</TableHead>
+          <TableHead className="h-auto py-1.5 leading-tight">
+            {rowCopy.credits}
+            <span className="text-muted-foreground block text-xs font-normal">{rowCopy.tiers}</span>
+          </TableHead>
+          <TableHead>{rowCopy.version}</TableHead>
           <TableHead>上架</TableHead>
           <TableHead>首页精选</TableHead>
-          <TableHead className="text-right">操作</TableHead>
+          <TableHead className={cn(stickyActionsClass, 'text-right')}>操作</TableHead>
         </TableRow>
       </TableHeader>
       <SortableList

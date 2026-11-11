@@ -2,7 +2,6 @@
 
 import { type CreditsFloor } from '@/core/templates/pricing'
 import { Badge } from '@/core/ui/badge'
-import { Button } from '@/core/ui/button'
 import { Checkbox } from '@/core/ui/checkbox'
 import { Switch } from '@/core/ui/switch'
 import { TableCell, TableRow } from '@/core/ui/table'
@@ -12,8 +11,7 @@ import { DragHandle, MoveButtons, sortableRowClass, useSortableItem } from '../u
 import { bulkCopy } from './copy'
 import { summaryPrice } from './tier-price'
 import { canFeature } from './featured-state'
-
-import { versionCopy } from './version-copy'
+import { ActionsCell, NameCell } from './row-cells'
 
 const SURFACE_LABEL = { web: '站内', partner: '伙伴' } as const
 
@@ -55,11 +53,10 @@ export function TemplateRow(props: Props) {
           <MoveButtons item={item} />
         </div>
       </TableCell>
+      <NameCell template={template} />
       <TableCell>
-        <div className="font-medium">{template.translations.zh?.name?.trim() || template.name}</div>
-        <div className="text-muted-foreground font-mono text-xs">{template.id}</div>
+        <span className="block w-max min-w-16 max-w-32 truncate" title={props.categoryLabel}>{props.categoryLabel}</span>
       </TableCell>
-      <TableCell>{props.categoryLabel}</TableCell>
       <TableCell>
         <div className="flex gap-1">
           {template.visibleIn.map((surface) => (
@@ -85,14 +82,7 @@ export function TemplateRow(props: Props) {
       <TableCell>
         <FeaturedSwitch template={template} full={featuredFull} pending={pending} onFeature={onFeature} />
       </TableCell>
-      <TableCell className="text-right">
-        {!template.categoryInfo.isSystem && template.id !== 'freeform' && template.id !== 'edit' && (
-          <Button variant="ghost" size="sm" disabled={pending} onClick={() => props.onDuplicate(template.id)}>{versionCopy.duplicate}</Button>
-        )}
-        <Button variant="outline" size="sm" disabled={pending} onClick={() => onEdit(template)}>
-          编辑
-        </Button>
-      </TableCell>
+      <ActionsCell template={template} pending={pending} onDuplicate={props.onDuplicate} onEdit={onEdit} />
     </TableRow>
   )
 }
