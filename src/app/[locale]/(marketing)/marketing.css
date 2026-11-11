@@ -2,7 +2,7 @@
 @layer properties, theme, base, components, utilities;
 /* Marketing pages (home, pricing, inner SEO pages): the signed-off v3-b comp
    (design/comps-v3-b/home.html + css/marketing.css), ported class for class with an `mk-` prefix.
-   Colours come from the tokens in globals.css only. Motion: one hover wipe on template cards,
+   Colours come from the tokens in globals.css only. Motion: one hover wipe on template cards, one crossfade on series cards,
    the safelight breathing behind the bench and a fade-up on entry; all of it stops under
    prefers-reduced-motion (DESIGN §6). Everything sits in the components layer, so a Tailwind
    utility on the same element still wins. */
@@ -151,6 +151,25 @@
   .mk-pair-lg .mk-tag { top: 12px; bottom: auto; height: 28px; padding: 0 10px; }
   .mk-pair-lg .mk-tag-l { left: 12px; }
   .mk-pair-lg .mk-tag-r { right: 12px; background: var(--primary); }
+
+  /* ---------- a series card (series-card.tsx): its members' pairs stacked in one frame ----------
+     series-motion.ts arms a card on hover / in view (the layers join the layout, still clear, so
+     their lazy images load only then) and crossfades: the incoming pair fades in over the current
+     one, which stays opaque under it; back to the first pair, the top layer fades out over it. */
+  .mk-spair .mk-sb { filter: saturate(.85); }
+  .mk-spair .mk-hl { z-index: 3; }
+  .mk-spair .mk-tag { z-index: 4; }
+  .mk-sl { position: absolute; inset: 0; z-index: 1; display: none; grid-template-columns: 1fr 1fr; opacity: 0; transition: opacity .7s var(--ease); }
+  .mk-armed .mk-sl { display: grid; }
+  .mk-sl.mk-was { opacity: 1; transition: none; }
+  .mk-sl.mk-on { z-index: 2; opacity: 1; }
+  a.mk-series { text-decoration: none; transition: transform .3s var(--ease); }
+  a.mk-series:active { transform: scale(.97); }
+  .mk-scount { margin-left: 8px; font: 500 14px/1 var(--font-sans); letter-spacing: 0; color: var(--muted-foreground); white-space: nowrap; }
+  .mk-scount-solo { margin: 4px 0 0; }
+  @media (prefers-reduced-motion: reduce) {
+    .mk-sl { transition: none; }
+  }
 
   /* ---------- the home hero's rotating AI scenes (hero-scenes.tsx) ----------
      The incoming scene fades in on top of the one it replaces, which stays fully opaque under
@@ -712,7 +731,7 @@
     .mk-lift:hover { transform: translateY(-2px); box-shadow: inset 0 0 0 1px var(--input); }
     .mk-lift:hover .mk-zoom { transform: scale(1.02); }
     .mk-zoom { transition: transform .6s var(--ease); }
-    button.mk-tpl:hover { transform: translateY(-2px); }
+    button.mk-tpl:hover, a.mk-series:hover { transform: translateY(-2px); }
     .mk-tpl:hover .mk-pair::after { box-shadow: inset 0 0 0 1px var(--input); }
   }
   @media (hover: hover) and (prefers-reduced-motion: no-preference) {

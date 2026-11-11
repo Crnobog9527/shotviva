@@ -4,6 +4,8 @@ import { Link } from '../../i18n/ui'
 import type { HomePage, ImageRef, TemplateCard, TemplateCategory } from '../page-content'
 import { CompareSlider } from './compare-slider'
 import { PhotoPair } from './photo-pair'
+import { SeriesCard } from './series-card'
+import { SeriesMotion } from './series-motion-mount'
 
 // Each featured template's covers as the admin set them (T53: no bundled samples); a template
 // without both shows an empty pair frame. `live` marks templates the home generator can pick.
@@ -96,6 +98,26 @@ function Solo({ card, media, art }: { card: TemplateCard; media: TemplateMedia; 
   )
 }
 
+// A category whose one entry is a series: the large frame, the words beside it, and one way in.
+function SoloSeries({ card, media }: { card: TemplateCard; media: TemplateLookup }) {
+  const t = useTranslations('marketing.home')
+  return (
+    <div className="mk-solo">
+      <SeriesCard card={card} media={media} sizes="(min-width: 1024px) 276px, 50vw" size="lg" />
+      <div className="mk-solo-meta">
+        <b>{card.name}</b>
+        <span className="mk-use">{card.use}</span>
+        <span className="mk-scount mk-scount-solo">{t('seriesCount', { count: card.series?.count ?? 0 })}</span>
+        {card.series ? (
+          <Link className="mk-ghost-pill" href={card.series.href} tabIndex={-1} aria-hidden>
+            {t('seriesOpen')}
+          </Link>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
 function Category({ category, ...rest }: { category: TemplateCategory; media: TemplateLookup; isLinkEnabled: (href: string) => boolean }) {
   const links = (category.links ?? []).filter((link) => rest.isLinkEnabled(link.href))
   const [first] = category.templates
@@ -114,13 +136,15 @@ function Category({ category, ...rest }: { category: TemplateCategory; media: Te
           ))}
         </p>
       </div>
-      {category.templates.length === 1 ? (
+      {category.templates.length === 1 && first.series ? (
+        <SoloSeries card={first} media={rest.media} />
+      ) : category.templates.length === 1 ? (
         <Solo card={first} media={mediaOf(first)} art={category.drag === true} />
       ) : (
         <ul className="mk-tgrid" data-count={category.templates.length}>
           {category.templates.map((card) => (
             <li key={card.id}>
-              <PairCard card={card} media={mediaOf(card)} />
+              {card.series ? <SeriesCard card={card} media={rest.media} sizes={CARD_SIZES} /> : <PairCard card={card} media={mediaOf(card)} />}
             </li>
           ))}
         </ul>
@@ -146,6 +170,8 @@ export function TemplateGrid({ grid, sections, isLinkEnabled }: Props) {
         <Category key={category.name} category={category} media={media} isLinkEnabled={isLinkEnabled} />
       ))}
       {grid.note ? <p className="mk-note">{grid.note}</p> : null}
+      {/* The series cards' crossfade; nothing to load where no series has a second pair. */}
+      {categories.some((category) => category.templates.some((card) => (card.series?.members.length ?? 0) > 1)) ? <SeriesMotion /> : null}
     </section>
   )
 }
