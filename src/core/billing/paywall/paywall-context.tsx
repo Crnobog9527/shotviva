@@ -13,7 +13,7 @@ import { holdsMembership, NO_STANDING, type MemberStanding } from "../subscripti
 import { PaymentChannelContext, WechatPayContext } from "./channel-context"
 import { PerkFactsContext, type PerkFacts } from "./perk-facts"
 import { StandingContext } from "./standing-context"
-import { usePaywallState, type PaywallOpenOptions } from "./use-paywall-state"
+import { usePaywallState, type PaywallMoment, type PaywallOpenOptions } from "./use-paywall-state"
 
 // The sheet (drawer, dialog, checkout flow) is a chunk of its own: a closed sheet renders nothing,
 // so it loads once a provider mounts instead of riding on every page that only has a button that
@@ -40,6 +40,7 @@ export function PaywallProvider({ products, perkFacts, channel, wechatPay, child
   // The paywall is the start of a checkout: the new-version banner waits until it closes (T90).
   useUpdateHold("checkout", open)
   const [trigger, setTrigger] = useState<PaywallTrigger>("account")
+  const [moment, setMoment] = useState<{ moment?: PaywallMoment; needed?: number }>({})
   const [standing, setStanding] = useState<MemberStanding>(NO_STANDING)
   const state = usePaywallState(offeredMethods(channel, useLocale())[0])
   const { reset } = state
@@ -49,6 +50,7 @@ export function PaywallProvider({ products, perkFacts, channel, wechatPay, child
         const show = (picked?: PaywallOpenOptions) => {
           reset(picked)
           setTrigger(next)
+          setMoment({ moment: options?.moment, needed: options?.needed })
           setOpen(true)
           trackPaywallView(next)
         }
@@ -69,7 +71,7 @@ export function PaywallProvider({ products, perkFacts, channel, wechatPay, child
           <PerkFactsContext.Provider value={perkFacts}>
             <PaywallContext.Provider value={api}>
               {children}
-              <PaywallSheet open={open} onOpenChange={setOpen} trigger={trigger} products={products} state={state} />
+              <PaywallSheet open={open} onOpenChange={setOpen} trigger={trigger} moment={moment.moment} needed={moment.needed} products={products} state={state} />
             </PaywallContext.Provider>
           </PerkFactsContext.Provider>
         </StandingContext.Provider>

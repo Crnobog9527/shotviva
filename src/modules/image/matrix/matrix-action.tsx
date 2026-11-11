@@ -37,7 +37,7 @@ function Primary({ cta, onGenerate }: { cta: MatrixCta; onGenerate(): void }) {
   const t = useTranslations('app.matrix')
   if (cta.kind === 'get-credits') {
     return (
-      <PaywallButton trigger="insufficient_credits" className={buttonVariants({ variant: 'cta-neutral', size: 'cta' })}>
+      <PaywallButton trigger="insufficient_credits" options={{ moment: 'credits', needed: cta.needed }} className={buttonVariants({ variant: 'cta-neutral', size: 'cta' })}>
         <span>{t.rich('getCredits', { mono, count: cta.needed })}</span>
       </PaywallButton>
     )
