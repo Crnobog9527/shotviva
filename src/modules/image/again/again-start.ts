@@ -15,6 +15,8 @@ export type AgainStart = {
   // Why there are no photos: made before originals were kept (or the settle copy failed), or
   // the copy back just now failed. null when the photos are there.
   missing: 'old' | 'failed' | null
+  // 'gallery': 一键复用 from someone's public work (T108): its settings only, never its photo.
+  from?: 'gallery'
 }
 
 // Make again's link from a finished work (the photo page and the Photos grid): the template's

@@ -10,7 +10,7 @@ import { currentLocale } from '@/core/i18n/server'
 import { listRunningJobIds } from '@/core/jobs'
 import { listTemplatesIn, loadEditOffer } from '@/core/templates'
 import { r2Store } from '@/core/storage'
-import { ImageWorkspace, loadAgain, toCatalogueTemplate, WorkspaceHead } from '@/modules/image'
+import { ImageWorkspace, loadAgain, loadReuse, toCatalogueTemplate, WorkspaceHead } from '@/modules/image'
 import { site } from '@/site/site.config'
 
 function Nav({ title, aside }: { title: string; aside?: ReactNode }) {
@@ -22,6 +22,7 @@ type RouteProps = { params: Promise<{ templateId: string }>; searchParams: Promi
 
 // The workspace, a flow page: no tab bar, back to Create, one fixed primary (DESIGN §8.2).
 // ?again=<jobId> is Make again from a finished work (T40): its settings and kept photos.
+// ?reuse=<jobId> is 一键复用 from a public gallery work (T108): its settings, no photo.
 async function Workspace({ params, searchParams }: RouteProps) {
   const [{ templateId }, query] = await Promise.all([params, searchParams])
   const user = await requireUser(`/generate/${templateId}`)
@@ -30,13 +31,15 @@ async function Workspace({ params, searchParams }: RouteProps) {
   if (!found) notFound()
   const template = toCatalogueTemplate(found)
   const againId = typeof query.again === 'string' ? query.again : undefined
+  const reuseId = !againId && typeof query.reuse === 'string' ? query.reuse : undefined
   const admin = createAdminSupabase()
-  const [balance, tier, runningIds, again, editOffer] = await Promise.all([
+  const [balance, tier, runningIds, again, reuse, editOffer] = await Promise.all([
     readBalance(supabase, user.id),
     // current_tier() is service-role only; the user's own id comes from the session.
     currentTier(admin, user.id),
     listRunningJobIds(admin, user.id, new Date()),
     loadAgain({ db: admin, store: r2Store }, { userId: user.id, jobId: againId, template }),
+    loadReuse(site, { jobId: reuseId, template }),
     // "Edit this photo" on the done view only when editing is on (T30).
     loadEditOffer(supabase),
   ])
@@ -50,7 +53,7 @@ async function Workspace({ params, searchParams }: RouteProps) {
         balance={balance}
         tier={tier}
         concurrency={{ limit: limitsFor(tier).concurrency, runningIds }}
-        again={again}
+        again={again ?? reuse}
         editable={editOffer !== null}
         shareText={t('shareText', { brand: site.brand.name, url: `https://${site.brand.domain}/?utm_source=share&utm_medium=web_share` })}
       />

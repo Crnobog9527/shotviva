@@ -7,6 +7,7 @@ import { runAdminAction, saveFeatureAccess, saveSettingSwitch, saveWishlistSwitc
 import { AppError } from '@/core/errors'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { FEATURES_CACHE_TAG } from '@/core/features'
+import { GALLERY_SWITCH_TAG } from '@/core/gallery'
 import { SYSTEM_SETTINGS_CACHE_TAG } from '@/core/system-settings'
 
 // Server actions are public endpoints, so each re-checks the admin role itself. A save expires
@@ -39,7 +40,11 @@ export async function saveGallerySwitchAction(key: unknown, input: unknown): Pro
   return runAdminAction(async () => {
     const parsedKey = GALLERY_KEYS.safeParse(key)
     if (!parsedKey.success) throw new AppError('INVALID_INPUT', WISHLIST_SWITCH_COPY.errors.invalid)
-    await saveSettingSwitch({ db: createAdminSupabase(), invalidate: settingsChanged }, admin.id, parsedKey.data, input)
+    const invalidate = () => {
+      updateTag(GALLERY_SWITCH_TAG)
+      settingsChanged()
+    }
+    await saveSettingSwitch({ db: createAdminSupabase(), invalidate }, admin.id, parsedKey.data, input)
   })
 }
 
