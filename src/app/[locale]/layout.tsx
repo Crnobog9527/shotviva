@@ -15,7 +15,6 @@ import { MiSansStylesheet } from '@/core/ui/misans-stylesheet'
 import { site } from '@/site/site.config'
 
 import { fontVariables } from '../fonts'
-import '../globals.css'
 
 // Default robots is noindex; only paths in site.indexing opt in (core/seo/indexing.ts). The web
 // app manifest follows the language (T65).
