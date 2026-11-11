@@ -1787,7 +1787,6 @@
       "limited": "You have sent a lot of reports today. Please try again tomorrow.",
       "failed": "The report did not go through. Please try again."
     },
-    "related": "Related",
     "footerLink": "Gallery"
   }
 }

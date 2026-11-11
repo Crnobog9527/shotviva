@@ -113,22 +113,3 @@ export async function shownImage(id: string): Promise<ShownImage | null> {
   const row = z.object({ output_key: z.string(), credit_pool: z.enum(['free', 'paid']) }).safeParse(data)
   return row.success ? { outputKey: row.data.output_key, creditPool: row.data.credit_pool } : null
 }
-
-// A tag page's grid: approved works of the tag's templates, newest decision first (U7 第 3 条).
-export async function cachedTagWorks(templateIds: readonly string[]): Promise<GalleryRow[]> {
-  'use cache'
-  cacheTag(GALLERY_CACHE_TAG)
-  if (templateIds.length === 0) return []
-  const { data, error } = await shown()
-    .in('template_id', [...templateIds])
-    .order('moderated_at', { ascending: false })
-    .order('id', { ascending: false })
-    .limit(GALLERY_PAGE_SIZE)
-  if (error) {
-    cacheLife(FAILED_READ_LIFE)
-    logger.error('gallery.tag_read_failed', { error: error.message })
-    return []
-  }
-  cacheLife(GALLERY_LIFE)
-  return z.array(rowSchema).parse(data).map(toRow)
-}
