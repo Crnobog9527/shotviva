@@ -101,8 +101,13 @@ export function toTemplate(row: TemplateRow | PreT75TemplateRow): Template {
     coverVideoUrl: row.cover_video_url,
     coverPosterUrl: row.cover_poster_url,
     coverLocales: coverLocalesSchema.parse(row.cover_locales ?? {}),
-    // Templates saved before T89 have no toggles.
-    fields: { ...row.fields, toggles: row.fields.toggles ?? [] },
+    // Templates saved before T89 have no toggles; copy fields saved before field types are private
+    // one-line text.
+    fields: {
+      ...row.fields,
+      copy: (row.fields.copy ?? []).map((field) => ({ ...field, type: field.type ?? 'short', public: field.public ?? false })),
+      toggles: row.fields.toggles ?? [],
+    },
     quality: row.quality,
     imageOptions: row.template_image_options ?? FULL_IMAGE_OPTIONS,
     creditsCost: row.credits_cost,

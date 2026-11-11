@@ -96,6 +96,8 @@ async function sendWithFallback(config: OpenAIImageConfig, input: ProviderInput)
 export function createOpenAIImageProvider(config: OpenAIImageConfig): GenerationProvider {
   return {
     id: 'openai-image',
+    // buildRequest passes model_params.background through, so a cut-out template yields one.
+    honoursBackground: true,
     async generate(input): Promise<ProviderOutput> {
       const response = await sendWithFallback(config, input)
       const body: unknown = await response.json().catch(() => null)

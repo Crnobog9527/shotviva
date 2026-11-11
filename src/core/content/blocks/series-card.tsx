@@ -108,7 +108,8 @@ export function SeriesCard({ card, media, sizes, size = 'card' }: Props) {
   const t = useTranslations('marketing.home')
   if (!card.series) return null
   return (
-    <Link href={card.series.href} className="mk-tpl mk-series" aria-label={t('seriesAria', { name: card.name, use: card.use, count: card.series.count })}>
+    // No prefetch: Create needs a session, and a marketing page should not fetch it for every visitor.
+    <Link href={card.series.href} prefetch={false} className="mk-tpl mk-series" aria-label={t('seriesAria', { name: card.name, use: card.use, count: card.series.count })}>
       {/* Two prints stacked behind the frame, their corners showing past it (as in Create). */}
       <span className={size === 'lg' ? 'mk-sstack mk-sstack-lg' : 'mk-sstack'}>
         <span className="mk-sprint mk-sprint-back" aria-hidden />

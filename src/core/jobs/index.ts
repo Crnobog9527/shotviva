@@ -15,13 +15,16 @@ export { jobCostUsd } from './job-cost'
 export { effectivePrices, MODEL_PRICES, officialPrice, type ModelPrice } from './model-prices'
 export { GenerationFailure } from './generation-failure'
 export { generateBodySchema, toGenerationRequest, type GenerationRequest } from './generation-request'
-export { resolveJobFile, type JobFile } from './job-file'
+export { resolveJobFile, resolveJobPair, type JobFile } from './job-file'
+export { backgroundInput } from './job-background'
+export { isCutOut } from './job-cut-out'
 export { recordJobClientIp, recordJobDownload } from './job-download'
 export { hasInputPreview, originalUrlFor, resolveJobOriginal } from './job-original'
 export { deleteOwnWork } from './delete-work'
 export { deleteWorkFiles, keptInputsOf, photosForAgain, workFileKeys, type AgainPhoto } from './kept-inputs'
 export { findJobByIdempotencyKey, findOwnJob } from './job-lookup'
-export { fileUrlFor, toJobView, type JobView } from './job-view'
+export { fileUrlFor, thumbUrlFor, toJobView, type JobView } from './job-view'
+export { FIRST_SCREEN_THUMBS, firstThumbUrls, resolveJobThumb } from './job-thumb'
 export {
   ProviderError,
   type GenerationProvider,

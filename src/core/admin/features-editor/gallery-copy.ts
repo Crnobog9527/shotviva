@@ -13,7 +13,7 @@ export const GALLERY_SWITCH_COPY: SwitchCopy = {
   ...shared,
   title: '公开创作库',
   key: 'gallery_enabled',
-  body: '/gallery 作品墙、/g 作品页和标签页。只展示审核通过的公开作品。保存后马上生效，不用重新部署。',
+  body: '/gallery 作品墙和 /g 作品页。只展示审核通过的公开作品。保存后马上生效，不用重新部署。',
   neverChanged: '还没改过，默认关闭',
   turnOn: '开启创作库',
   turnOff: '关闭创作库',

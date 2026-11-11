@@ -143,8 +143,10 @@ export type ShootDemo = {
 
 // Landing pages: precise edits of a finished picture, each a before/after pair with what
 // changed in one line. `reference` is a second photo the edit took its subject from (a drink
-// swapped in from the owner's phone shot); it sits small on the before side.
-export type EditCase = { title: string; change: string; before: ImageRef; after: ImageRef; reference?: ImageRef }
+// swapped in from the owner's phone shot); it sits small on the before side. `transparent`: the
+// after picture is a cut-out with an alpha channel, shown over a checkerboard so the
+// transparency is visible.
+export type EditCase = { title: string; change: string; before: ImageRef; after: ImageRef; reference?: ImageRef; transparent?: boolean }
 export type EditCases = {
   heading: string
   intro: string

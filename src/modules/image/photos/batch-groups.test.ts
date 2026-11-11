@@ -5,7 +5,7 @@ import type { PhotoItem } from './photo-item'
 
 const item = (id: string, createdAt: string, batchId: string | null, templateId = 'a', batchPosition: number | null = null): PhotoItem => ({
   id, templateId, templateName: templateId, cover: null, aspect: 'original', resolution: '1k', credits: 2,
-  createdAt, creditPool: 'paid', visibility: 'private', fileUrl: `/api/files/${id}`, batchId, batchPosition,
+  createdAt, creditPool: 'paid', visibility: 'private', fileUrl: `/api/files/${id}`, thumbUrl: `/api/files/${id}/thumb`, batchId, batchPosition,
 })
 
 describe('groupByBatch', () => {

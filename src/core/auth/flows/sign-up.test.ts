@@ -1,12 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ signUp: vi.fn(), resend: vi.fn(), resetPasswordForEmail: vi.fn(), updateUser: vi.fn(), getUser: vi.fn() }))
+const request = vi.hoisted(() => ({ host: 'localhost:3000', env: {} as Record<string, unknown> }))
 
 vi.mock('server-only', () => ({}))
 vi.mock('../../i18n/server', () => ({
   currentLocale: async () => 'zh',
   localized: async (path: string) => `/zh${path === '/' ? '' : path}`,
 }))
+vi.mock('next/headers', () => ({ headers: async () => new Headers({ host: request.host }) }))
+vi.mock('../../env', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../env')>()
+  return { ...actual, serverEnv: () => ({ ...actual.serverEnv(), ...request.env }) }
+})
 vi.mock('../supabase-server', () => ({ createServerSupabase: async () => ({ auth: mocks }) }))
 
 const { resendSignupEmail, signUpWithPassword, updatePassword } = await import('./sign-up')
@@ -19,9 +25,24 @@ const form = (fields: Record<string, string>) => {
 
 const redirectOf = (call: unknown[]) => new URL((call[0] as { options: { emailRedirectTo: string } }).options.emailRedirectTo)
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  request.host = 'localhost:3000'
+  request.env = {}
+})
 
 describe('signUpWithPassword', () => {
+  it('links back to the allow-listed test-site alias the form was sent from (preview only)', async () => {
+    mocks.signUp.mockResolvedValue({ data: { user: { identities: [{}] } }, error: null })
+    request.host = 'shotviva-qa-user.vercel.app'
+    request.env = { VERCEL_ENV: 'preview', PREVIEW_EXTRA_HOSTS: ['shotviva-qa-user.vercel.app'] }
+    await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x', next: '/zh/photos' }))
+    expect(redirectOf(mocks.signUp.mock.calls[0]!).origin).toBe('https://shotviva-qa-user.vercel.app')
+    request.env = { VERCEL_ENV: 'production', PREVIEW_EXTRA_HOSTS: ['shotviva-qa-user.vercel.app'] }
+    await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x', next: '/zh/photos' }))
+    expect(redirectOf(mocks.signUp.mock.calls[1]!).origin).toBe('http://localhost:3000')
+  })
+
   it('sends the verification link back to `next` and stores the page language', async () => {
     mocks.signUp.mockResolvedValue({ data: { user: { identities: [{}] } }, error: null })
     const state = await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x', next: '/zh/connect/graylum?state=s' }))
