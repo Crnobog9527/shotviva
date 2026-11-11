@@ -635,6 +635,11 @@
       "longPress": "长按保存",
       "photosHint": "存进相册：点右边的分享，再选「存储图像」",
       "showTransparency": "显示透明区域",
+      "background": {
+        "label": "背景",
+        "white": "白底",
+        "transparent": "透明底"
+      },
       "makeAnotherWith": "用 {name} 再做一张",
       "shareText": "用 {brand} 制作 {url}",
       "makeAgain": "再做一张",

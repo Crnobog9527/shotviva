@@ -16,6 +16,7 @@ export { effectivePrices, MODEL_PRICES, officialPrice, type ModelPrice } from '.
 export { GenerationFailure } from './generation-failure'
 export { generateBodySchema, toGenerationRequest, type GenerationRequest } from './generation-request'
 export { resolveJobFile, type JobFile } from './job-file'
+export { backgroundInput, isCutOut } from './job-background'
 export { recordJobClientIp, recordJobDownload } from './job-download'
 export { hasInputPreview, originalUrlFor, resolveJobOriginal } from './job-original'
 export { deleteOwnWork } from './delete-work'

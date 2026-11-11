@@ -1,6 +1,9 @@
 import { hasTransparentPixel, isJpeg, isPng, pngMayHaveAlpha } from './transparency'
 
-export type PreparedResult = { shareBlob: Blob; transparent: boolean }
+// shareBlob: the JPEG on white Share hands over by default. original: the bytes as served, which
+// for a cut-out's 透明底 choice is the PNG with its alpha (MOBILE_UI_rules §1.8.1 rule 4 allows a
+// PNG when transparency is the point).
+export type PreparedResult = { shareBlob: Blob; original: Blob; transparent: boolean }
 
 // The alpha check reads a thumbnail, not 8M pixels: any cut-out region big enough to matter
 // survives the downscale as partly transparent pixels.
@@ -43,17 +46,17 @@ async function flattenToJpeg(bitmap: ImageBitmap): Promise<Blob | null> {
 // JPEG and skip all of it; any failure falls back to the original bytes, shown as opaque.
 export async function prepareResult(blob: Blob): Promise<PreparedResult> {
   const head = new Uint8Array(await blob.slice(0, HEAD_BYTES).arrayBuffer())
-  if (isJpeg(head)) return { shareBlob: blob, transparent: false }
+  if (isJpeg(head)) return { shareBlob: blob, original: blob, transparent: false }
   const mayHaveAlpha = isPng(head) ? pngMayHaveAlpha(head) : true
   try {
     const bitmap = await createImageBitmap(blob)
     try {
       const transparent = mayHaveAlpha && sampleIsTransparent(bitmap)
-      return { shareBlob: (await flattenToJpeg(bitmap)) ?? blob, transparent }
+      return { shareBlob: (await flattenToJpeg(bitmap)) ?? blob, original: blob, transparent }
     } finally {
       bitmap.close()
     }
   } catch {
-    return { shareBlob: blob, transparent: false }
+    return { shareBlob: blob, original: blob, transparent: false }
   }
 }

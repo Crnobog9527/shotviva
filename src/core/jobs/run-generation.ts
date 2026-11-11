@@ -30,6 +30,7 @@ import { toJobView, type JobView } from './job-view'
 import { currentTier, limitsFor } from '../billing/tier'
 import { assertWithinRateLimit } from './rate-limit'
 import { settleGeneration, type SettleDeps } from './settle-generation'
+import { backgroundInput } from './job-background'
 import { recordJobClientIp } from './job-download'
 import type { TemplateProvider } from './provider'
 import { reserveJob } from './settlement'
@@ -167,7 +168,7 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
       ...reserveFields(req), jobId, module: template.module, templateId: template.id, provider: route.provider.id,
       expectedCredits: expectedPrice(req, template, resolution),
       inputs: { ...jobInputs(req, prepared, resolution, attemptId, deps.now?.() ?? new Date()),
-        quality: route.call.quality, style_ref_keys: route.styleRefKeys, ...(reason ? { fallback_route: true } : {}) },
+        quality: route.call.quality, ...backgroundInput(route.call.params), style_ref_keys: route.styleRefKeys, ...(reason ? { fallback_route: true } : {}) },
     })
     return { job, ...route }
   })

@@ -12,6 +12,10 @@ import type { UploadContentType } from './rules'
 //   outputs/{user_id}/{job_id}-in-{n}.{ext}
 //                                     the job's own uploads (n from 1), copied at settle and
 //                                     kept with the result for Make again (§8.3, T40)
+//   inputs/{user_id}/downloads/{job_id}-white.jpg | -marked.png
+//                                     a cut-out's 白底 copy, or a free cut-out's watermarked 透明底
+//                                     PNG, made on first download and reused; 7-day lifecycle
+//                                     like every inputs/ key, removed with the work too
 //   requests/{user_id}/{uuid}.jpg     wishlist reference image, re-encoded; kept until the
 //                                     request is rejected or taken down (ARCHITECTURE §15.1)
 //   tickets/{user_id}/{ticket_id}/{uuid}.webp
@@ -45,6 +49,14 @@ export function newTicketImageKey(ticketAuthorId: string, ticketId: string): str
 
 export function outputKeyFor(userId: string, jobId: string): string {
   return `outputs/${userId}/${jobId}.png`
+}
+
+// White: the flattened JPEG (any pool; a free one carries the mark). Marked: a free cut-out's
+// watermarked PNG with its alpha kept. A paid 透明底 download is the stored original itself.
+export type DownloadVariant = 'white' | 'marked'
+
+export function downloadVariantKeyFor(userId: string, jobId: string, variant: DownloadVariant): string {
+  return `inputs/${userId}/downloads/${jobId}-${variant === 'white' ? 'white.jpg' : 'marked.png'}`
 }
 
 export function inputPreviewKeyFor(userId: string, jobId: string): string {

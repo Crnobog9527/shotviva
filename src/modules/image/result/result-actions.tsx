@@ -7,24 +7,34 @@ import { buttonVariants } from '@/core/ui/button'
 import { cn } from '@/core/ui/cn'
 
 import { monoTag, sizeTag } from '../workspace/result-panel'
+import { BackgroundChoice } from './background-choice'
+import { fileHref, offersChoice, shareSource, type WorkFile } from './download-background'
 import { IosPhotoActions } from './ios-photo-actions'
-import { useShareFile } from './use-share-file'
+import { useDownloadBackground } from './use-download-background'
+import { useShareFile, useTransparency } from './use-share-file'
 import { isIosBrowser } from './ios-browser'
 
-export type ResultActionProps = { fileUrl: string; name: string; shareText: string; px?: number }
+// work: the result's pool and cut-out record, for the 白底 / 透明底 choice (absent: no choice).
+export type ResultActionProps = { fileUrl: string; name: string; shareText: string; px?: number; work?: WorkFile }
 
 const subscribe = () => () => {}
 const onIos = () => isIosBrowser(navigator)
 const serverSnapshot = () => false
 
-export default function ResultActions({ fileUrl, name, shareText, px }: ResultActionProps) {
+// A cut-out first offers 白底 / 透明底 (white by default, then the last pick); the download link,
+// Share's file and the iPhone fallback photo all follow it, and the route records one download
+// per click whichever file it serves.
+export default function ResultActions({ fileUrl, name, shareText, px, work }: ResultActionProps) {
   const t = useTranslations('app.result')
-  const mode = useShareFile(fileUrl, name)
+  const [saved, choose] = useDownloadBackground()
+  const background = offersChoice(work, useTransparency(fileUrl)) ? saved : null
+  const mode = useShareFile(shareSource(fileUrl, work, background), name, background === 'transparent')
   const ios = useSyncExternalStore(subscribe, onIos, serverSnapshot)
-  if (ios) return <IosPhotoActions mode={mode} fileUrl={fileUrl} />
+  const choice = background ? <BackgroundChoice value={background} onChange={choose} className="mb-2" /> : null
+  if (ios) return <>{choice}<IosPhotoActions mode={mode} fileUrl={fileHref(fileUrl, background, false)} /></>
   const primary = buttonVariants({ variant: 'cta', size: 'cta', className: 'gap-2' })
   const download = (className?: string) => (
-    <a href={mode.kind === 'loading' ? undefined : `${fileUrl}?download=1`} download aria-disabled={mode.kind === 'loading'} className={cn(primary, mode.kind === 'loading' && 'pointer-events-none', className)}>
+    <a href={mode.kind === 'loading' ? undefined : fileHref(fileUrl, background, true)} download aria-disabled={mode.kind === 'loading'} className={cn(primary, mode.kind === 'loading' && 'pointer-events-none', className)}>
       <DownloadIcon />
       <span>{px ? t.rich('downloadPx', { px, cost: sizeTag, mono: monoTag }) : t('download')}</span>
     </a>
@@ -38,6 +48,7 @@ export default function ResultActions({ fileUrl, name, shareText, px }: ResultAc
     }
     return (
       <>
+        {choice}
         <div className="flex gap-2">
           {download('min-w-0 flex-1')}
           <button
@@ -55,6 +66,7 @@ export default function ResultActions({ fileUrl, name, shareText, px }: ResultAc
   }
   return (
     <>
+      {choice}
       {download()}
       <p className="mt-2 text-center text-caption text-muted-foreground lg:hidden">{t('longPress')}</p>
     </>

@@ -1,5 +1,6 @@
 import type { CreditPool } from '@/core/billing/pools'
 import type { Job, JobVisibility } from '@/core/jobs'
+import { isCutOut } from '@/core/jobs/job-background'
 import { OUTPUT_ASPECTS, RESOLUTIONS, type OutputAspect, type Resolution } from '@/core/templates/output-options'
 import type { Translate } from '@/core/translate'
 
@@ -19,6 +20,8 @@ export type PhotoItem = {
   creditPool: CreditPool
   visibility: JobVisibility
   fileUrl: string | null
+  // A cut-out (transparent background): downloads offer 白底 / 透明底. null when unknown.
+  transparent?: boolean | null
 }
 
 export type TemplateLookup = Map<string, { name: string; cover: string | null }>
@@ -41,6 +44,7 @@ export function toPhotoItem(job: Job, templates: TemplateLookup, fileUrl: string
     creditPool: job.creditPool,
     visibility: job.visibility,
     fileUrl,
+    transparent: isCutOut(job),
   }
 }
 

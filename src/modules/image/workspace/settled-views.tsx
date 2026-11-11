@@ -45,7 +45,7 @@ export function SuccessView({ job, shareText, editable, onAgain }: SuccessProps)
   ) : null
   const bar = (
     <ActionBar className="md:px-0">
-      <ShareButton fileUrl={fileUrl} name={`shotviva-${job.templateId}`} shareText={shareText} px={px} />
+      <ShareButton fileUrl={fileUrl} name={`shotviva-${job.templateId}`} shareText={shareText} px={px} work={{ pool: job.creditPool, transparent: job.transparent }} />
     </ActionBar>
   )
   return (
