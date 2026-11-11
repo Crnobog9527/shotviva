@@ -17,6 +17,9 @@ const optionalSecret = z.preprocess(blankAsUnset, z.string().min(1).optional())
 // in the codebase may read process.env directly (enforced by ESLint).
 const serverEnvSchema = z.object({
   CRON_SECRET: optionalSecret,
+  // The T93 sync workflow's call that expires the template catalogue cache after a sync
+  // (/api/template-sync/revalidate). Production only; unset means the route answers 401.
+  TEMPLATE_SYNC_REVALIDATE_SECRET: optionalSecret,
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   // Optional at parse time so `next build` runs without secrets; createAdminSupabase() requires it.
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),

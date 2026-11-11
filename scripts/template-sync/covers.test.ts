@@ -26,7 +26,8 @@ it.each(['https://other.test/covers/demo/t.png', 'https://preview.test/uploads/p
 
 it('only accepts whole template IDs and removes duplicates', () => {
   expect(parseIds('food-demo, test\nfood-demo')).toEqual(['food-demo', 'test'])
-  for (const invalid of ['', 'food; bad', '$(echo)']) expect(() => parseIds(invalid)).toThrow()
+  for (const invalid of ['', 'food; bad', '$(echo)', 'a'.repeat(129)]) expect(() => parseIds(invalid)).toThrow()
+  expect(parseIds('a'.repeat(128))).toEqual(['a'.repeat(128)])
 })
 
 it('copies a series cover from the test bucket into the folder it came from; keeps outside addresses and null', async () => {

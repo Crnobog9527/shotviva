@@ -65,8 +65,10 @@ end $$;
 
 -- The series' members exactly as on the test site, in that order (1, 2, 3…), after the member
 -- templates were synced. As admin_save_template_series: no system templates, none taken by another
--- series. A listed template that is missing on production, or is in another series there (its own
--- sync failed), is left out and reported; production members the test site no longer has leave.
+-- series. A listed template missing on production, or in another series there, is left out and
+-- reported. A listed template production already has outside any series joins, even if its own
+-- sync failed this run (it then keeps production's previous content). Production members the test
+-- site no longer lists leave the series.
 create or replace function public.sync_preview_series_members(p_slug text, p_members text[], p_validate_only boolean default false)
 returns jsonb language plpgsql set search_path = '' as $$
 declare
