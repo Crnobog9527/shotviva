@@ -22,7 +22,7 @@ export { toCatalogueTemplate, type CatalogueTemplate } from './catalogue/catalog
 export { ImageWorkspace, type WorkspaceProps } from './workspace/image-workspace'
 export { MatrixWorkspaceLazy as MatrixWorkspace } from './matrix/matrix-lazy'
 export type { MatrixWorkspaceProps } from './matrix/matrix-workspace'
-export { MatrixEntry } from './matrix/matrix-entry'
+export { GatedFeatures, TEMPLATES_ANCHOR } from './gated/gated-features'
 // Make again (T40): server only; reads the work and copies its kept photos back.
 export { loadAgain } from './again/load-again'
 export { loadReuse } from './again/load-reuse'
