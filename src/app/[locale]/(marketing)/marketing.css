@@ -165,8 +165,26 @@
   .mk-sl.mk-on { z-index: 2; opacity: 1; }
   a.mk-series { text-decoration: none; transition: transform .3s var(--ease); }
   a.mk-series:active { transform: scale(.97); }
-  .mk-scount { margin-left: 8px; font: 500 14px/1 var(--font-sans); letter-spacing: 0; color: var(--muted-foreground); white-space: nowrap; }
-  .mk-scount-solo { margin: 4px 0 0; }
+  /* The set's size, a small pill under the name (Create's series card: the same look). */
+  .mk-scount { display: inline-block; margin-top: 8px; padding: 4px 8px; border-radius: var(--radius-tag); font: 400 14px/1 var(--font-mono); color: var(--bone-dim); background: var(--wash); }
+  .mk-solo-meta .mk-scount { margin-top: 4px; }
+  /* 「系列」 badge and stacked prints, the same values as Create's series card (#512,
+     modules/image/catalogue/series-card.tsx): two prints the frame's size, turned a couple of
+     degrees so a few px of their corners show; still under reduced motion (nothing moves). */
+  .mk-sstack { position: relative; display: block; }
+  .mk-sprint { position: absolute; inset: 0; border-radius: 16px; box-shadow: inset 0 0 0 1px var(--input); }
+  .mk-sprint-back { transform: translate(3px, 5px) rotate(2.8deg); background: var(--secondary); }
+  .mk-sprint-mid { transform: translate(-2px, 2px) rotate(-2deg); background: var(--accent); }
+  .mk-sframe { position: relative; display: block; border-radius: 16px; box-shadow: 0 6px 16px -8px rgba(0, 0, 0, .75); }
+  .mk-sstack-lg .mk-sprint, .mk-sstack-lg .mk-sframe { border-radius: 20px; }
+  .mk-sbadge {
+    position: absolute; z-index: 5; top: 8px; left: 8px; display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 4px 10px;
+    border-radius: var(--radius-tag); font: 600 14px/1 var(--font-sans); color: var(--photo-ink); background: var(--frost); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  .mk-sbadge svg { width: 14px; height: 14px; flex: none; }
+  /* In the large single-series row the Phone tag sits top left; it moves down for the badge. */
+  .mk-sstack-lg .mk-tag-l { top: auto; bottom: 12px; }
+  .mk-sstack-lg .mk-sbadge { top: 12px; left: 12px; }
   @media (prefers-reduced-motion: reduce) {
     .mk-sl { transition: none; }
   }
