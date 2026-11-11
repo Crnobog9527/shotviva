@@ -20,6 +20,7 @@ export const PERIOD: GrowthPeriod = {
   disputes: { count: 0, usd: 0 },
   affiliate: { signups: 0, payers: 0, net_usd: 0 },
   cohort: [],
+  cohort_referred: [],
   buyers: [],
 }
 export const PEOPLE: PeopleStats = { visitors: 320, botViews: 40, uploaded: 14, paywall: 5, checkout: 3 }
