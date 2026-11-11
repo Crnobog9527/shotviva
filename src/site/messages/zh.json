@@ -240,6 +240,84 @@
     }
   },
   "app": {
+    "matrix": {
+      "lede": "同一批照片套用最多 {templates, number} 个模板，一批最多 {max, number} 张。",
+      "metaTitle": "多模板批量",
+      "title": "多模板批量",
+      "badge": "Max",
+      "locked": "（需要 Max）",
+      "entryTitle": "一次用多个模板",
+      "entryLine": "同一批照片，一次套用最多 5 个模板。",
+      "entryLink": "这些照片再多套几个模板",
+      "templatesTitle": "模板",
+      "chooseTemplates": "选择模板",
+      "addTemplate": "再加一个模板",
+      "templatesLeft": "还能加 {count, number} 个",
+      "removeTemplate": "去掉{name}",
+      "templateUnavailable": "暂时不可用，去掉它才能继续。",
+      "pickerTitle": "选择模板",
+      "pickerLine": "已选 {count, number} / {max, number} 个，每个模板都会用到每张照片上。",
+      "pickerDone": "{count, plural, =0 {完成} other {完成 · # 个模板}}",
+      "gridTitle": "出图前核对一下",
+      "gridLabel": "这一批的照片和模板",
+      "gridPhoto": "照片",
+      "gridTotal": "{count, number} / {max, number} 张 · <mono>{total, number} 积分</mono>",
+      "gridHint": "点一下格子可以不出这一张。",
+      "gridEmpty": "选好模板、加上照片：每张照片都会套用每个模板，一批最多 {max, number} 张、{templates, number} 个模板。",
+      "cellOn": "第 {index, number} 张照片用{template}，{count, number} 积分。点一下不出这张。",
+      "cellOff": "第 {index, number} 张照片用{template}，已去掉。点一下加回来。",
+      "photoN": "第 {index, number} 张",
+      "photoNChanged": "第 {index, number} 张，单独改了文字",
+      "settingsTitle": "文字和选项",
+      "sharedText": "填一次，{count, plural, other {这 # 张照片}}共用。",
+      "overrideTitle": "某张照片用不同的文字",
+      "overridePick": "选一张照片",
+      "overrideHint": "选一张照片单独改文字，其他照片仍用上面的文字。",
+      "overrideReset": "改回共用的文字",
+      "resolutionAside": "整批统一",
+      "noticeGenerate": "<b>只用付费积分。</b>每张单独扣费，失败的单独退回。",
+      "noticeCredits": "批量只用付费积分：{count, number} 张需要 <b>{total, number} 积分</b>。",
+      "noticeTooMany": "<b>Max 一批最多 {max, number} 张。</b>去掉一些格子或者去掉一个模板。",
+      "generate": "生成 {count, number} 张 · <mono>{total, number} 积分</mono>",
+      "getCredits": "获取积分 · <mono>还差 {count, number}</mono>",
+      "checking": "正在核对每张照片…",
+      "block": {
+        "templates": "先选一个模板",
+        "photos": "添加照片",
+        "empty": "至少留一个格子",
+        "too-many": "一批放不下这么多张",
+        "uploading": "照片上传中…",
+        "copy": "请填写文字",
+        "options": "这几个模板没有共同的尺寸"
+      },
+      "resultsRunning": "已完成 {done, number} / {count, number} 张",
+      "resultsDone": "{done, plural, =0 {没有保存照片} other {# 张已存到作品}}",
+      "resultsLine": "用了 {credits, number} 积分{queued, plural, =0 {} other {，还有 # 张在出图}}{failed, plural, =0 {} other {，# 张失败已退回}}。",
+      "viewLabel": "结果查看方式",
+      "byTemplate": "按模板",
+      "byPhoto": "按照片",
+      "applyMore": "用到更多照片",
+      "tileDeveloping": "出图中",
+      "tileQueued": "排队中",
+      "tileRefunded": "已退回",
+      "retry": "重试",
+      "newBatch": "新的一批",
+      "openPhotos": "打开作品",
+      "backToCreate": "返回创作",
+      "lockedTitle": "同一批照片，一次套用多个模板",
+      "lockedLine": "开通 Max 后，可以一次选最多 {templates, number} 个模板用到照片上：一批最多 {cells, number} 张，出图前先显示每一张的积分。",
+      "lockedPro": "Pro 可以一次把一个模板用到最多 {count, number} 张照片上。",
+      "lockedCta": "了解 Max",
+      "lockedDrawing": "竖着三张照片、横着三个模板：一批出九张"
+    },
+    "batchZip": {
+      "notFound": "这一批还没有可以打包的照片：只打包已完成的付费作品。",
+      "cta": "打包下载 · {count, plural, other {# 张}}",
+      "packingCta": "正在打包…",
+      "packing": "正在打包 {count, plural, other {# 张}}，大约需要一两分钟，好了会自动开始下载。",
+      "started": "压缩包开始下载了。文件名是「照片名_模板名_序号」。",
+      "limited": "一分钟内已经下载了三次，请过一分钟再试。"
+    },
     "signupCodes": {
       "noInviteGift": "邀请码有效，当前无额外注册赠分。",
       "toggle": "有邀请码或优惠码？",
@@ -430,6 +508,7 @@
       "withRatio": "{name} {ratio}"
     },
     "workspace": {
+      "checkingCta": "正在核对每张照片…",
       "pickSize": "请选择尺寸",
       "noOptions": "暂无可用的出图选项",
       "back": "创作",
@@ -566,6 +645,7 @@
       }
     },
     "errors": {
+      "NETWORK": "连不上 Shotviva，请检查网络后再试。",
       "CONTENT_REJECTED": "照片或补充说明没有通过安全审核。请换一张照片，或改一下说明。",
       "IDENTITY_SWAP_REFUSED": "为保护每个人的肖像权，Shotviva 不能把人换成另一个人或换脸。可以改表情、妆容、光线和背景。",
       "REFERENCE_IMAGE_LIMIT": "参考图超过模型上限，请减少照片或换个模板。",
@@ -590,6 +670,9 @@
       "TIER_REQUIRED": "这需要{tier}套餐。"
     },
     "photos": {
+      "batch": {
+        "title": "一批 · {count, plural, other {# 张}}{templates, plural, =1 {} other { · # 个模板}}"
+      },
       "title": "作品",
       "metaTitle": "作品",
       "inProgress": "生成中",
@@ -1103,6 +1186,39 @@
     }
   },
   "paywall": {
+    "moments": {
+      "watermark": "免费生成的图带水印。用付费积分生成的图没有水印，而且是私密的。",
+      "photos": "{tier}可以一次把一个模板用到最多 {count, number} 张照片上。",
+      "templates": "Max 可以一次把最多 {templates, number} 个模板用到同一批照片上，一批最多 {count, number} 张。"
+    },
+    "example": {
+      "caption": {
+        "photos": "示例：一张手机照片套用一个模板。批量时每张照片各出一张这样的图。",
+        "templates": "示例：一张手机照片，一批里套用两个模板。"
+      },
+      "photoAlt": "示例：手机原图",
+      "resultAlt": "示例：结果 {index, number}"
+    },
+    "packOrPlan": {
+      "title": "还差 {count, number} 积分：买积分包还是开会员？",
+      "packOnlyTitle": "还差 {count, number} 积分：买一个积分包",
+      "packOnly": "积分包直接加到你现在的会员上，一次付清，不续费。",
+      "packTitle": "积分包 · {count, number} 积分",
+      "packPrice": "一次付 {price}",
+      "planTitle": "{tier} · 每月 {count, number} 积分",
+      "planPrice": "每月 {price}",
+      "verdict": {
+        "pack": "积分包更便宜，按总价和每积分都是。",
+        "plan": "{tier}更便宜，按总价和每积分都是。这是按月的会员。",
+        "same": "两者价格一样。",
+        "packNowPlanLater": "现在买积分包花得少；如果每个月都要出图，{tier}每积分更便宜。",
+        "planNowPackLater": "{tier}现在花得少；积分包每积分更便宜。",
+        "packNowSameRate": "现在买积分包花得少；按每积分算两者一样。",
+        "planNowSameRate": "{tier}现在花得少；按每积分算两者一样。",
+        "sameNowPackRate": "现在两者花得一样；积分包每积分更便宜。",
+        "sameNowPlanRate": "现在两者花得一样；如果每个月都要出图，{tier}每积分更便宜。"
+      }
+    },
     "title": "继续出图",
     "intro": "用付费积分生成的图是私密的，没有水印。",
     "introNeedsCredits": "这张图需要的积分比你现有的多。",

@@ -42,7 +42,7 @@ function CreateBody({ template, open, onClose, ...context }: BodyProps) {
   const batch = limitsFor(context.tier).batchMax > 1 && draft.photos.photos.length === 0
   const tall = isCompareSample(template)
   const generate = () => {
-    draft.start()
+    void draft.start()
     onClose()
     router.push(`/generate/${template.id}`, { transitionTypes: navTypesFor(`/generate/${template.id}`) })
   }

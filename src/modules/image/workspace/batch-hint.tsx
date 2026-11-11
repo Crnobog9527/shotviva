@@ -22,7 +22,7 @@ export function BatchHint({ tier, dropped }: { tier: MembershipTier | null; drop
       {next ? (
         <PaywallButton
           trigger="tier_required"
-          options={{ step: 'period', tier: next }}
+          options={{ step: 'period', tier: next, moment: 'photos' }}
           className="press -my-2 inline-flex min-h-11 items-center font-semibold text-primary underline-offset-4 hover:underline"
         >
           {t('seeTier', { tier: tiers(next), count: limitsFor(next).batchMax })}

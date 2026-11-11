@@ -214,7 +214,39 @@
   unicode-range: U+2E80-2FDF, U+3000-303F, U+3100-312F, U+31A0-31BF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF;
 }
 
-/* Fonts come from next/font (src/app/fonts.ts); Tailwind emits these on :root, so
+/* Instrument Serif, the English display face (DESIGN §3.2). Declared here instead of through
+   next/font so that only English pages preload it (core/ui/instrument-serif.tsx): Chinese pages
+   set headings in Geist + MiSans and would download both files for nothing. The files are the
+   ones next/font served, byte for byte, under content-hashed names (public/fonts/instrument-serif,
+   cached for a year, next.config.ts); the fallback face carries the metric overrides next/font
+   generated for them, so a heading keeps its box while the font arrives. */
+@font-face {
+  font-family: "Instrument Serif";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/instrument-serif/instrument-serif-60c06664b5a95c7d.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Instrument Serif";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/instrument-serif/instrument-serif-italic-6ee678c33f388dd7.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Instrument Serif Fallback";
+  src: local("Arial");
+  ascent-override: 128.92%;
+  descent-override: 40.37%;
+  line-gap-override: 0%;
+  size-adjust: 76.79%;
+}
+:root {
+  --font-instrument-serif: "Instrument Serif", "Instrument Serif Fallback";
+}
+
+/* Geist and Geist Mono come from next/font (src/app/fonts.ts); Tailwind emits these on :root, so
    font-sans / font-mono / font-display and var(--font-*) all resolve to the self-hosted files. */
 @theme {
   /* Latin glyphs stay Geist / Instrument Serif / Geist Mono. Chinese text uses the system CJK
