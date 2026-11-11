@@ -1435,6 +1435,7 @@
       "preview": "预览",
       "seriesCount": "{count} 款",
       "seriesAria": "{name}。{use}共 {count} 款模板，打开这个系列",
+      "seriesBadge": "系列",
       "seriesOpen": "打开系列",
       "freeTag": "免费 · 公开",
       "paidTag": "付费 · 私密",

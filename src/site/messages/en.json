@@ -1435,6 +1435,7 @@
       "preview": "Preview",
       "seriesCount": "{count, plural, one {# look} other {# looks}}",
       "seriesAria": "{name}. {use} A series of {count, plural, one {# template} other {# templates}}. Open this series",
+      "seriesBadge": "Series",
       "seriesOpen": "Open the series",
       "freeTag": "Free · public",
       "paidTag": "Paid · private",
