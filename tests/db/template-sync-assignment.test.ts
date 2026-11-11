@@ -48,7 +48,7 @@ beforeAll(async () => {
   await db.query("insert into public.ai_providers(id,adapter,model,base_url,label) values ($1,$2,$3,$4,'sync fixture')",
     [providerId, binding.adapter, binding.model, binding.base_url])
   otherRoot = (await db.query("select key from public.template_categories where parent_id is null and not is_system and key<>'pets' order by key limit 1")).rows[0].key
-  await db.query('insert into public.template_categories(key,name_en,name_zh,parent_id) values($1,$1,$1,$2),($3,$3,$3,$4)', [sub, 'pets', otherSub, otherRoot])
+  await db.query("insert into public.template_categories(key,name_en,name_zh,parent_id) values($1,'Sync sub','同步子类',$2),($3,'Sync other','同步别类',$4)", [sub, 'pets', otherSub, otherRoot])
   series = (await db.query("insert into public.template_series(slug,name_zh,name_en,category_key) values ($1,'集合','Set',$2) returning id", [seriesSlug, sub])).rows[0].id
   await db.query("insert into public.templates(id,name,category_key,series_id,series_sort_order) values($1,'member','pets',$2,4)", [`t93a-member-${tag}`, series])
   templateIds.push(`t93a-member-${tag}`)
