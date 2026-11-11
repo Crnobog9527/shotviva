@@ -30,9 +30,16 @@ type Props = {
 const afterLoading = (preload: boolean) => (preload ? ({ loading: 'eager', fetchPriority: 'low' } as const) : ({ loading: 'lazy' } as const))
 
 // The phone-photo half on its own, also used by the hero's rotating scenes (hero-scenes.tsx).
+// In the hero (`preload`) a picture with a first frame draws that small copy from the document
+// itself, under the full picture: the plate is filled at the first paint instead of one request
+// later, and the full picture covers it as soon as it has loaded (same crop, same filter). A
+// plain <img> with `decoding="sync"`, so the frame is decoded for the very first paint; as a CSS
+// background it was decoded off-thread and appeared a few frames late, behind hydration.
 export function BeforePane({ image, preload, sizes }: { image: ImageRef; preload: boolean; sizes: string }) {
   return (
     <span className="mk-pane">
+      {/* eslint-disable-next-line @next/next/no-img-element -- a data: URI, nothing for next/image to resize */}
+      {preload && image.firstFrame ? <img className="mk-ff" src={image.firstFrame} alt="" aria-hidden decoding="sync" /> : null}
       <Image className="mk-b" src={image.src} alt={image.alt} width={image.width} height={image.height} sizes={sizes} preload={preload} loading={preload ? undefined : 'lazy'} />
     </span>
   )

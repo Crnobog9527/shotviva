@@ -1,6 +1,8 @@
 import type { ImageRef } from '@/core/content'
 import { OUTPUT_ASPECTS } from '@/core/templates/output-options'
 
+import { FIRST_FRAMES } from './first-frames.generated'
+
 // Shared bits of the three landing pages (T44): the illustrative hero pairs in public/home
 // (example-*, 900 × 1125) and the size count.
 export const pairImage = (file: string, alt: string): ImageRef => ({ src: `/home/${file}.webp`, alt, width: 900, height: 1125 })
@@ -9,6 +11,10 @@ export const homeImage = (file: string, alt: string): ImageRef => ({ src: `/home
 // /commercial-photography; a cat in three art styles and four precise edits on
 // /image-to-image-generator. None of them repeats the home page's tote.
 export const caseImage = (file: string, alt: string): ImageRef => ({ src: `/cases/${file}.webp`, alt, width: 1080, height: 1350 })
+
+// A hero's phone photo with its first frame (scripts/first-frames.ts). A picture the script does
+// not know yet simply has none and loads as before; first-frames.test.ts fails until it is added.
+export const withFirstFrame = (image: ImageRef): ImageRef => ({ ...image, firstFrame: FIRST_FRAMES[image.src] })
 
 // "eight sizes"
 export const SIZE_COUNT = OUTPUT_ASPECTS.length
