@@ -92,7 +92,7 @@ export function subscribe(listener: () => void): () => void {
   return () => listeners.delete(listener)
 }
 
-export type StartInput = Pick<TrackedJob, 'templateId' | 'templateName' | 'resolution' | 'aspect' | 'credits' | 'inputKey'> & {
+export type StartInput = Pick<TrackedJob, 'templateId' | 'templateName' | 'resolution' | 'aspect' | 'credits' | 'inputKey' | 'batchId'> & {
   previewUrl?: string
   body: JobBody
 }

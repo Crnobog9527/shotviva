@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { currentPeriod } from './hogql'
 import { PostHogQueryError, rowsOf, type HogQL, type RunQuery } from './posthog-query'
 import type { Window } from './range'
-import { EVENT_HOST, EVENT_PATH, publicEntry, scopeOf } from './traffic-scope'
+import { AUTOMATED, EVENT_HOST, EVENT_PATH, NAMED_BOT, publicEntry, scopeOf } from './traffic-scope'
 import { count } from './values'
 
 export const CHANNELS = ['google', 'bing', 'chatgpt', 'direct', 'other', 'internal'] as const
@@ -63,10 +63,8 @@ SELECT scope, count() AS views, uniq(person_id) AS visitors,
   countIf(named) AS identified, countIf(NOT named AND automated) AS suspected
 FROM (
   SELECT person_id, ${scopeOf(EVENT_HOST, EVENT_PATH)} AS scope,
-    lower(coalesce(nullIf(properties.$raw_user_agent,''), properties.$useragent,'')) AS ua,
-    match(ua, 'googlebot|bingbot|gptbot|oai-searchbot|chatgpt-user|claudebot|applebot|baiduspider|duckduckbot|yandexbot') AS named,
-    match(ua, 'headless|playwright|puppeteer|crawler|spider|bot[/ ;)]|lighthouse')
-      OR match(lower(coalesce(properties.$browser,'')), 'headless|bot|crawler') AS automated
+    ${NAMED_BOT} AS named,
+    ${AUTOMATED} AS automated
   FROM events WHERE event = '$pageview' AND ${currentPeriod(window)}
 ) GROUP BY scope LIMIT 5`,
   }

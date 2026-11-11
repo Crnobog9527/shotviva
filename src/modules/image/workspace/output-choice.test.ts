@@ -55,7 +55,8 @@ describe('template output choices', () => {
     }
     expect(startInputs({ ...template, photoInput: 'none' }, values, photos)).toEqual([])
     const jobs = startInputs(template, values, photos)
-    expect(jobs.map((job) => job.aspect)).toEqual(['4:5', '16:9'])
+    // One size per batch (the preflight refuses mixed sizes): the first photo's nearest.
+    expect(jobs.map((job) => job.aspect)).toEqual(['4:5', '4:5'])
     for (const job of jobs) expect(job).toMatchObject({ resolution: '1k', credits: 2, body: { inputs: { resolution: '1k', aspect_ratio: job.aspect } } })
     expect(startInputs(template, values, [...photos, { ...photos[0]!, photo: { ...photos[0]!.photo, originalRatio: undefined } }])).toEqual([])
     expect(startInputs({ ...template, imageOptions: empty }, values, photos)).toEqual([])

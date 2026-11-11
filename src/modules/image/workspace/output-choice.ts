@@ -19,8 +19,8 @@ export function closestAspect(ratio: number | null | undefined, options: ImageOp
   }, null)
 }
 
-// 'original' stays a user preference: when auto isn't supported, each job in a batch gets
-// its own concrete ratio. With no decodable photo the user can still choose any fixed size.
+// 'original' stays a user preference: when auto isn't supported, a photo gets its nearest
+// concrete ratio (a batch uses its first photo's for all, batch-request.ts). With no decodable photo the user can still choose any fixed size.
 export function chosenAspect(wanted: OutputAspect, options: ImageOptions, photoRatio?: number | null): OutputAspect | null {
   if (wanted === 'original') return options.originalRatio ? 'original' : closestAspect(photoRatio, options)
   if (options.aspectRatios.includes(wanted)) return wanted

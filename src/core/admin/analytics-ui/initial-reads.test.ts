@@ -24,7 +24,7 @@ it('streams the priority blocks first and releases every lower block even after 
   reads.edge.mockResolvedValue({ source: 'unknown', reason: 'unconfigured', data: null })
 
   const stream = await renderToReadableStream(createElement(AnalyticsView, {
-    query: { dim: 'source', range: '7d', sort: 'views' }, projectId: 'test', giftCredits: 1,
+    query: { view: 'details', dim: 'source', range: '7d', sort: 'views' }, projectId: 'test', giftCredits: 1,
   }))
   expect(reads.traffic.mock.calls).toEqual([['7d', 600_000]])
   expect(reads.funnel.mock.calls).toEqual([['test', '7d', 'source', 600_000]])

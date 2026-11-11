@@ -1,4 +1,5 @@
 import type { NextRequest } from 'next/server'
+import { after } from 'next/server'
 import { z } from 'zod'
 
 import { errorResponse, jsonResponse } from '@/core/api-response'
@@ -6,12 +7,14 @@ import { clientIp, createAdminSupabase, requireApiUser } from '@/core/auth'
 import { AppError } from '@/core/errors'
 import { downloadBatchZip, recordJobDownload } from '@/core/jobs'
 import { DEFAULT_DOWNLOAD_BACKGROUND, isDownloadBackground } from '@/core/storage/rules/download-background'
-import { after } from 'next/server'
 
 export const maxDuration = 300
 
-// ?bg=white|transparent: how cut-outs go into the ZIP (ARCHITECTURE §8 「下载白底 / 透明底」); white
-// when absent or unknown, like a single download's default. Other works are always the original.
+// One request per download: every call claims the ZIP once (claim_batch_zip counts it towards
+// the per-minute limit) and, when it hands over the signed link, records each photo's download
+// once. The app asks with Accept: application/json and gets { url } to send the browser to; a
+// plain GET (a pasted link) is answered with a 302 to the same link. ?bg=white|transparent: how
+// cut-outs go into the ZIP (ARCHITECTURE §8 「下载白底 / 透明底」); white when absent or unknown.
 export async function GET(request: NextRequest, context: RouteContext<'/api/generate/batch/[batchId]/download'>) {
   try {
     const user = await requireApiUser()
@@ -32,8 +35,11 @@ export async function GET(request: NextRequest, context: RouteContext<'/api/gene
     after(() => Promise.all(result.files.map(file => recordJobDownload(db, {
       userId: user.id, jobId: file.jobId, ip,
     }))).then(() => undefined))
+    if (wantsJson(request)) return jsonResponse({ url: result.url })
     return new Response(null, { status: 302, headers: { Location: result.url, 'Cache-Control': 'private, no-store' } })
   } catch (error) {
     return errorResponse(error, 'generate.batch.download')
   }
 }
+
+const wantsJson = (request: NextRequest) => (request.headers.get('accept') ?? '').includes('application/json')

@@ -21,6 +21,9 @@ export type TrackedJob = {
   aspect: OutputAspect
   credits: number
   inputKey: string | null
+  // The preflighted batch (T107), for its ZIP and its by-template / by-photo views; absent for a
+  // single photo and for batches sent before T107.
+  batchId?: string
   // Photos in the batch this job belongs to; 1 for a single photo (`generate` batch_size).
   batchSize: number
   // When it joined the queue: dispatch order, oldest first.

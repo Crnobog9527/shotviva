@@ -22,6 +22,10 @@ export type PhotoItem = {
   fileUrl: string | null
   // A cut-out (transparent background): downloads offer 白底 / 透明底. null when unknown.
   transparent?: boolean | null
+  // The preflighted batch it came from (T107): Photos groups a batch and offers its ZIP.
+  batchId: string | null
+  // Its cell in that batch, 0 first (inputs.batch_position); null outside a batch.
+  batchPosition: number | null
 }
 
 export type TemplateLookup = Map<string, { name: string; cover: string | null }>
@@ -45,7 +49,14 @@ export function toPhotoItem(job: Job, templates: TemplateLookup, fileUrl: string
     visibility: job.visibility,
     fileUrl,
     transparent: isCutOut(job),
+    batchId: job.batchId ?? null,
+    batchPosition: batchPosition(job.inputs.batch_position),
   }
+}
+
+function batchPosition(value: unknown): number | null {
+  const position = typeof value === 'string' ? Number(value) : value
+  return typeof position === 'number' && Number.isInteger(position) && position >= 0 ? position : null
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -59,10 +70,14 @@ export function doneMeta(
   t: Translate,
   formatDay: (date: Date) => string,
 ): string {
+  return t('photos.doneMeta', { when: doneWhen(item, now, t, formatDay), size: sizeLabel(item.aspect, t), tier: tierName(item.resolution, t) })
+}
+
+// "Today", "Yesterday" or the short date: a batch group's line on Photos (T107).
+export function doneWhen(item: Pick<PhotoItem, 'createdAt'>, now: Date, t: Translate, formatDay: (date: Date) => string): string {
   const created = new Date(item.createdAt)
   const days = dayKey(now) - dayKey(created)
-  const when = days <= 0 ? t('photos.today') : days === 1 ? t('photos.yesterday') : formatDay(created)
-  return t('photos.doneMeta', { when, size: sizeLabel(item.aspect, t), tier: tierName(item.resolution, t) })
+  return days <= 0 ? t('photos.today') : days === 1 ? t('photos.yesterday') : formatDay(created)
 }
 
 // "1:1 · Standard · 2 credits" for a photo still developing.

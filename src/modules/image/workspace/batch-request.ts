@@ -15,8 +15,11 @@ export function startInputs(template: CatalogueTemplate, values: FormValues, pho
   if (!resolution || (template.photoInput === 'none' && photos.length)) return []
   // An explicitly photo-optional template still queues one job when the user leaves the tray empty.
   const sources = photos.length ? photos : allowsNoPhoto(template) ? [null] : []
-  const aspects = sources.map((source) => chosenAspect(values.aspect, options, source ? source.photo.originalRatio : 1))
-  if (aspects.some((aspect) => aspect === null)) return []
+  const perPhoto = sources.map((source) => chosenAspect(values.aspect, options, source ? source.photo.originalRatio : 1))
+  if (perPhoto.some((aspect) => aspect === null)) return []
+  // A batch is one size for every photo (the preflight refuses a mixed one, T107): when the
+  // template cannot follow each photo's own shape, the first photo's nearest size is used.
+  const aspects = sources.length > 1 ? perPhoto.map(() => perPhoto[0]!) : perPhoto
   const inputs = { copy: values.copy, resolution, ...(note ? { note } : {}), ...toggleRequest(template.toggles, values.toggles) }
   return sources.map((source, index) => {
     const inputKey = source?.inputKey ?? null

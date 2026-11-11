@@ -240,6 +240,14 @@
     }
   },
   "app": {
+    "batchZip": {
+      "notFound": "Nothing in this batch to pack yet: only finished paid photos go in the ZIP.",
+      "cta": "Download ZIP · {count, plural, one {# photo} other {# photos}}",
+      "packingCta": "Packing ZIP…",
+      "packing": "Packing {count, plural, one {# photo} other {# photos}}. This can take a minute or two; the download starts on its own.",
+      "started": "Your ZIP is downloading. Each file is named photo_template_number.",
+      "limited": "That's three downloads in a minute. Try again in a minute."
+    },
     "signupCodes": {
       "noInviteGift": "Valid invite. No extra signup credits are currently offered.",
       "toggle": "Have an invite or promo code?",
@@ -430,6 +438,7 @@
       "withRatio": "{name} {ratio}"
     },
     "workspace": {
+      "checkingCta": "Checking every photo…",
       "pickSize": "Choose a size",
       "noOptions": "No output options available",
       "back": "Create",
@@ -566,6 +575,7 @@
       }
     },
     "errors": {
+      "NETWORK": "Couldn't reach Shotviva. Check your connection and try again.",
       "CONTENT_REJECTED": "The photo or your note didn't pass the safety check. Try another photo or change the note.",
       "IDENTITY_SWAP_REFUSED": "Shotviva can't swap faces or turn a person into someone else, to protect everyone's likeness. You can change the expression, makeup, lighting and background.",
       "REFERENCE_IMAGE_LIMIT": "This model accepts fewer reference images. Remove some photos or choose another template.",
@@ -590,6 +600,9 @@
       "TIER_REQUIRED": "This needs the {tier} plan."
     },
     "photos": {
+      "batch": {
+        "title": "Batch · {count, plural, one {# photo} other {# photos}}{templates, plural, =1 {} other { · # templates}}"
+      },
       "title": "Photos",
       "metaTitle": "Photos",
       "inProgress": "In progress",
