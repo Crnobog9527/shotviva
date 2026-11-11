@@ -573,6 +573,7 @@
 @source "../core/templates/catalog-pricing.ts";
 @source "../core/templates/catalogue-index.ts";
 @source "../core/templates/categories.ts";
+@source "../core/templates/copy-fields.ts";
 @source "../core/templates/cover-locales.ts";
 @source "../core/templates/edit-offer.ts";
 @source "../core/templates/edit-params.ts";
@@ -677,6 +678,8 @@
 @source "../modules/image/workspace/batch-hint.tsx";
 @source "../modules/image/workspace/batch-photos.tsx";
 @source "../modules/image/workspace/batch-request.ts";
+@source "../modules/image/workspace/copy-check.ts";
+@source "../modules/image/workspace/copy-field-input.tsx";
 @source "../modules/image/workspace/cta-state.ts";
 @source "../modules/image/workspace/option-pickers.tsx";
 @source "../modules/image/workspace/output-choice.ts";

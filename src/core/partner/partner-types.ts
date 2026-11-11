@@ -97,7 +97,10 @@ export const partnerTemplateFieldsSchema = z.object({
   // How many images the template takes; send at most one, as `image`.
   images: z.object({ min: z.number().int(), max: z.number().int() }),
   copy: z.array(
-    z.object({ key: z.string(), label: z.string(), required: z.boolean(), max_length: z.number().int() }),
+    z.object({
+      key: z.string(), label: z.string(), required: z.boolean(), max_length: z.number().int(),
+      type: z.enum(['short', 'long', 'select', 'number']).optional(), options: z.array(z.string()).optional(),
+    }),
   ),
   // First entry is the default.
   aspect_ratios: z.array(z.string()).min(1),
