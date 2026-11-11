@@ -16,6 +16,7 @@ import { CreateSheet } from './create-sheet'
 import { FormAction } from './form-action'
 import { MemberPicker } from './member-picker'
 import { memberSwitch } from './member-switch'
+import { useWarmRoute } from './use-warm-route'
 import { useWorkspaceDraft } from './use-workspace-draft'
 import { WorkspaceForm } from './workspace-form'
 
@@ -51,10 +52,13 @@ function SeriesBody({ series, open, onClose, ...context }: BodyProps) {
   }
   const batch = limitsFor(context.tier).batchMax > 1 && draft.photos.photos.length === 0
   const tall = isCompareSample(template)
+  const workspace = `/generate/${template.id}`
+  // Generate moves to the chosen member's workspace page, kept prefetched while the dialog is open.
+  useWarmRoute(workspace, open)
   const generate = () => {
     void draft.start()
     onClose()
-    router.push(`/generate/${template.id}`, { transitionTypes: navTypesFor(`/generate/${template.id}`) })
+    router.push(workspace, { transitionTypes: navTypesFor(workspace) })
   }
   return (
     <CreateSheet
