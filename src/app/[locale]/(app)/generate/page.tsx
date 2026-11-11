@@ -33,7 +33,7 @@ async function Create() {
   const admin = createAdminSupabase()
   const [view, balance, tier, runningIds, favoriteIds, wishlistLive] = await Promise.all([
     // Templates and series cards placed under up to three category levels (T102).
-    loadCatalogueView(supabase, await currentLocale()),
+    loadCatalogueView(await currentLocale()),
     readBalance(supabase, user.id),
     // effective_tier() (an unbanned admin counts as Max) is service-role only; the user's own id comes from the session.
     effectiveTier(admin, user.id),

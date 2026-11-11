@@ -44,3 +44,17 @@ export async function cachedWebCatalogue(locale: Locale): Promise<LocalizedTempl
   cacheTag(TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG)
   return catalogueOrEmpty(locale)
 }
+
+// The same live web templates for the signed-in app pages (Create's grid, a template's
+// workspace, the batch matrix, Photos), which used to read them on every request with the
+// visitor's session. The rows are public catalogue data and nothing in them depends on who
+// is asking: web_templates() applies the publication and sale rules for every role, and the
+// columns carry no prompts. Charges never read this cache; reserve_credits re-checks the
+// template and route itself. Unlike cachedWebCatalogue a failed read throws, so it is never
+// cached and the page shows its error state instead of an empty catalogue.
+export async function cachedWebTemplates(locale: Locale, includeSeriesMembers: boolean): Promise<LocalizedTemplate[]> {
+  'use cache'
+  cacheTag(TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG)
+  cacheLife(CATALOGUE_LIFE)
+  return listTemplatesIn(createAdminSupabase(), locale, { includeSeriesMembers })
+}

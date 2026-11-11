@@ -9,7 +9,7 @@ import { effectiveTier, limitsFor, readBalance } from '@/core/billing'
 import { currentLocale } from '@/core/i18n/server'
 import { fileUrlFor, findOwnJob, hasInputPreview, jobRefOrShort, keptInputsOf, originalUrlFor, type Job } from '@/core/jobs'
 import { r2Store } from '@/core/storage'
-import { EDIT_TEMPLATE_ID, listTemplatesIn, loadEditOffer } from '@/core/templates'
+import { cachedWebTemplates, EDIT_TEMPLATE_ID, loadEditOffer } from '@/core/templates'
 import { DeleteWork, EditFlow, EditTrigger, editDisplay, editOriginal, opensEdit, ResultView, toPhotoDetail } from '@/modules/image'
 import { site } from '@/site/site.config'
 
@@ -29,7 +29,7 @@ async function loadAround(supabase: Awaited<ReturnType<typeof createServerSupaba
   const locale = await currentLocale()
   const admin = createAdminSupabase()
   const [templates, kept, parent, offer, balance, tier, reference] = await Promise.all([
-    listTemplatesIn(supabase, locale, { includeSeriesMembers: true }),
+    cachedWebTemplates(locale, true),
     // An edit has no upload of its own (T30).
     job.templateId === EDIT_TEMPLATE_ID ? false : hasInputPreview(r2Store(), job),
     job.parentJobId ? findOwnJob(admin, userId, job.parentJobId) : null,

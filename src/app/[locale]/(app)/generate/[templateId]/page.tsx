@@ -8,7 +8,7 @@ import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/a
 import { effectiveTier, limitsFor, readBalance } from '@/core/billing'
 import { currentLocale } from '@/core/i18n/server'
 import { listRunningJobIds } from '@/core/jobs'
-import { listTemplatesIn, loadEditOffer } from '@/core/templates'
+import { cachedWebTemplates, loadEditOffer } from '@/core/templates'
 import { r2Store } from '@/core/storage'
 import { ImageWorkspace, loadAgain, loadReuse, toCatalogueTemplate, WorkspaceHead } from '@/modules/image'
 import { site } from '@/site/site.config'
@@ -27,7 +27,9 @@ async function Workspace({ params, searchParams }: RouteProps) {
   const [{ templateId }, query] = await Promise.all([params, searchParams])
   const user = await requireUser(`/generate/${templateId}`)
   const supabase = await createServerSupabase()
-  const [found] = await listTemplatesIn(supabase, await currentLocale(), { id: templateId })
+  // The cached live catalogue, members included: the same templates web_templates(p_template_id)
+  // would return one at a time, without a database read per workspace visit.
+  const found = (await cachedWebTemplates(await currentLocale(), true)).find((t) => t.id === templateId)
   if (!found) notFound()
   const template = toCatalogueTemplate(found)
   const againId = typeof query.again === 'string' ? query.again : undefined
