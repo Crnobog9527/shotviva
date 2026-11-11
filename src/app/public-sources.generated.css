@@ -687,6 +687,7 @@
 @source "../site/content/business-form.ts";
 @source "../site/content/credits.ts";
 @source "../site/content/first-frames.generated.ts";
+@source "../site/content/home-edits.ts";
 @source "../site/content/home-templates.ts";
 @source "../site/content/home-wishlist.ts";
 @source "../site/content/home.ts";
@@ -716,6 +717,7 @@
 @source "../site/content/pricing.ts";
 @source "../site/content/shared.ts";
 @source "../site/content/zh/business-form.ts";
+@source "../site/content/zh/home-edits.ts";
 @source "../site/content/zh/home-wishlist.ts";
 @source "../site/content/zh/home.ts";
 @source "../site/content/zh/offer.ts";
