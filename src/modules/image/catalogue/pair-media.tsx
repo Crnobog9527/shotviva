@@ -1,5 +1,6 @@
 /* eslint-disable @next/next/no-img-element -- the optimiser's srcset on a plain <img> (coverImage),
    so the plates keep their hover-wipe markup */
+import { cdnAssetUrl } from '@/core/cdn'
 import { cn } from '@/core/ui/cn'
 import { coverImage } from '@/core/ui/cover-image'
 
@@ -36,7 +37,7 @@ export function PairMedia({ before, after, alt, eager = false, video, size = 'ca
         <img {...phone} alt="" loading={loading} decoding="async" className={cn(plate, 'saturate-[.85]')} />
         {/* White behind the result: a transparent cut-out cover reads as white, not as the phone photo underneath. */}
         <GroundedImg data-wipe="ai" ground="white" {...coverImage(after, sizes)} alt={alt} loading={loading} decoding="async" className={cn(plate, 'z-1')} />
-        {video ? <video data-wipe="video" data-src={video} muted playsInline preload="none" aria-hidden="true" className="absolute inset-0 z-2 size-full object-cover opacity-0" /> : null}
+        {video ? <video data-wipe="video" data-src={cdnAssetUrl(video)} muted playsInline preload="none" aria-hidden="true" className="absolute inset-0 z-2 size-full object-cover opacity-0" /> : null}
         <span data-wipe="seam" aria-hidden="true" className="absolute inset-y-0 left-0 z-3 -ml-px w-0.5 bg-primary opacity-0" />
       </span>
       <span aria-hidden="true" className="absolute inset-y-0 left-1/2 z-3 w-px bg-[var(--input)]" />

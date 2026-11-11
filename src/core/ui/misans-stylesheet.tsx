@@ -1,3 +1,5 @@
+import { cdnUrl } from '../cdn'
+
 // The 56 regular (400) @font-face rules of the official aggregate stylesheet, copied verbatim
 // (T67: MiSans for headings only, ARCHITECTURE §17). Chinese headings have always rendered MiSans
 // 400 (the display role asks for 400), so they look exactly as before. About 82 KB raw instead
@@ -6,6 +8,12 @@
 export const MISANS_STYLESHEET = '/fonts/misans/misans-400-e8d416058231a4c2.css'
 
 const LINK_ID = 'misans-font'
+
+// With the asset host on (core/cdn), the stylesheet, and so the subsets it names relative to
+// itself, come from there, fetched in the same CORS mode as the page's other files on it, so they
+// share its one connection. Off: the same-origin URL, no attribute, exactly as before.
+const STYLESHEET_HREF = cdnUrl(MISANS_STYLESHEET)
+const STYLESHEET_CORS = STYLESHEET_HREF === MISANS_STYLESHEET ? '' : "l.crossOrigin='anonymous';"
 
 // Chinese pages only (T65/T67, ARCHITECTURE §17「加载」). A script in the server HTML, at the top
 // of <body>, attaches the stylesheet as soon as the page's first contentful paint has happened
@@ -20,7 +28,7 @@ const LINK_ID = 'misans-font'
 // a full page load (a real <a href>), so this always runs on arriving at a Chinese page.
 const INSERT = [
   '(function(){var d=document,done=0;',
-  `function go(){if(done||d.getElementById('${LINK_ID}'))return;done=1;var l=d.createElement('link');l.id='${LINK_ID}';l.rel='stylesheet';l.href='${MISANS_STYLESHEET}';d.head.appendChild(l)}`,
+  `function go(){if(done||d.getElementById('${LINK_ID}'))return;done=1;var l=d.createElement('link');l.id='${LINK_ID}';l.rel='stylesheet';${STYLESHEET_CORS}l.href='${STYLESHEET_HREF}';d.head.appendChild(l)}`,
   "try{new PerformanceObserver(function(p){if(p.getEntriesByName('first-contentful-paint').length)go()}).observe({type:'paint',buffered:true})}catch(e){}",
   'setTimeout(go,1000)})()',
 ].join('')

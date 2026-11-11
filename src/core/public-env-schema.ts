@@ -31,6 +31,12 @@ export const publicEnvSchema = z.object({
     .url()
     .transform((url) => url.replace(/\/+$/, ''))
     .optional(),
+  // The asset host (core/cdn/cdn-origin.ts): an https origin, no path. Unset = same-origin assets.
+  NEXT_PUBLIC_CDN_ORIGIN: z
+    .url({ protocol: /^https$/ })
+    .transform((url) => url.replace(/\/+$/, ''))
+    .refine((url) => new URL(url).origin === url, 'an origin only, no path or query')
+    .optional(),
   // This build's version (T90): set by next.config.ts from the deployment id; `dev` locally.
   NEXT_PUBLIC_APP_VERSION: z.string().min(1).default('dev'),
 })

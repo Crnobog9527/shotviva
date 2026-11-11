@@ -17,6 +17,7 @@ export const rawPublicEnv: RawPublicEnv = {
   NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST || undefined,
   NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN || undefined,
   NEXT_PUBLIC_ASSETS_BASE_URL: process.env.NEXT_PUBLIC_ASSETS_BASE_URL || undefined,
+  NEXT_PUBLIC_CDN_ORIGIN: process.env.NEXT_PUBLIC_CDN_ORIGIN || undefined,
   NEXT_PUBLIC_APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION || undefined,
 }
 
@@ -35,6 +36,7 @@ export function withPublicDefaults(raw: RawPublicEnv): PublicEnv {
     NEXT_PUBLIC_POSTHOG_KEY: raw.NEXT_PUBLIC_POSTHOG_KEY ?? '',
     NEXT_PUBLIC_POSTHOG_HOST: raw.NEXT_PUBLIC_POSTHOG_HOST ?? 'https://us.i.posthog.com',
     NEXT_PUBLIC_ASSETS_BASE_URL: raw.NEXT_PUBLIC_ASSETS_BASE_URL?.replace(/\/+$/, ''),
+    NEXT_PUBLIC_CDN_ORIGIN: raw.NEXT_PUBLIC_CDN_ORIGIN?.replace(/\/+$/, ''),
     NEXT_PUBLIC_APP_VERSION: raw.NEXT_PUBLIC_APP_VERSION ?? 'dev',
   }
 }

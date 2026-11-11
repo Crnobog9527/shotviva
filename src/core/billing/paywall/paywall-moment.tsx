@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element -- three small static case images */
 import { useTranslations } from "next-intl"
 
+import { cdnUrl } from "../../cdn"
 import type { PackProduct } from "../../config"
 import { cn } from "../../ui/cn"
 import { compareForNeed, verdictKey, type CreditCompare } from "./credit-compare"
@@ -52,12 +53,12 @@ function BatchExample({ kind }: { kind: keyof typeof EXAMPLES }) {
   return (
     <figure className="mt-5 mb-5">
       <div className={cn("grid items-center gap-2", results.length > 1 ? "grid-cols-[1fr_auto_1fr_1fr]" : "max-w-[360px] grid-cols-[1fr_auto_1fr]")}>
-        <img src={photo} alt={t("photoAlt")} loading="lazy" decoding="async" className="hairline aspect-[4/5] w-full rounded-[12px] object-cover" />
+        <img src={cdnUrl(photo)} alt={t("photoAlt")} loading="lazy" decoding="async" className="hairline aspect-[4/5] w-full rounded-[12px] object-cover" />
         <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 text-primary" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
           <path d="M5 12h14M13 6l6 6-6 6" />
         </svg>
         {results.map((src, index) => (
-          <img key={src} src={src} alt={t("resultAlt", { index: index + 1 })} loading="lazy" decoding="async" className="hairline aspect-[4/5] w-full rounded-[12px] object-cover" />
+          <img key={src} src={cdnUrl(src)} alt={t("resultAlt", { index: index + 1 })} loading="lazy" decoding="async" className="hairline aspect-[4/5] w-full rounded-[12px] object-cover" />
         ))}
       </div>
       <figcaption className="mt-2 text-caption leading-[1.4] text-muted-foreground">{t(`caption.${kind}`)}</figcaption>

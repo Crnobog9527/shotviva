@@ -16,6 +16,7 @@ const unset: RawPublicEnv = {
   NEXT_PUBLIC_POSTHOG_HOST: undefined,
   NEXT_PUBLIC_SENTRY_DSN: undefined,
   NEXT_PUBLIC_ASSETS_BASE_URL: undefined,
+  NEXT_PUBLIC_CDN_ORIGIN: undefined,
   NEXT_PUBLIC_APP_VERSION: undefined,
 }
 
@@ -32,6 +33,7 @@ const configured: RawPublicEnv = {
   NEXT_PUBLIC_POSTHOG_HOST: 'https://eu.i.posthog.com',
   NEXT_PUBLIC_SENTRY_DSN: 'https://key@o1.ingest.sentry.io/1',
   NEXT_PUBLIC_ASSETS_BASE_URL: 'https://shotviva.com/assets//',
+  NEXT_PUBLIC_CDN_ORIGIN: 'https://cdn.shotviva.com/',
   NEXT_PUBLIC_APP_VERSION: 'dpl_abc',
 }
 
@@ -46,6 +48,13 @@ describe('withPublicDefaults', () => {
 })
 
 describe('parsePublicEnv', () => {
+  it.each(['http://cdn.shotviva.com', 'https://cdn.shotviva.com/static', 'https://cdn.shotviva.com/?v=1'])(
+    'accepts only an https origin as the CDN (%s is refused)',
+    (origin) => {
+      expect(() => parsePublicEnv({ ...unset, NEXT_PUBLIC_CDN_ORIGIN: origin })).toThrow(/NEXT_PUBLIC_CDN_ORIGIN/)
+    },
+  )
+
   it('names the bad key without echoing its value', () => {
     const bad = { ...unset, NEXT_PUBLIC_SENTRY_DSN: 'not-a-url-secret' }
     expect(() => parsePublicEnv(bad)).toThrow(/NEXT_PUBLIC_SENTRY_DSN/)

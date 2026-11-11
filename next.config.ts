@@ -21,7 +21,15 @@ const POSTHOG_ASSETS = 'https://us-assets.i.posthog.com'
 // The NEXT_PUBLIC_* values are inlined into the bundles at build, so they are checked here,
 // once: an invalid one fails the build (core/public-env-schema.ts). The browser reads them
 // without zod (core/public-env.ts).
-parsePublicEnv(rawPublicEnv)
+const publicValues = parsePublicEnv(rawPublicEnv)
+
+// The asset host (core/cdn/cdn-origin.ts), production only: Next's /_next/static files load from
+// it. crossOrigin makes those script and stylesheet requests CORS requests without credentials,
+// the same mode as the fonts the stylesheets pull from it, so the browser keeps one connection to
+// the host instead of two, and never stores the session cookies the CDN's attack protection sets.
+// next/image stays on the site (/_next/image): measured from mainland China the CDN's nodes were
+// slower than Vercel's, and the CDN does not vary its cache on Accept (AVIF vs WebP).
+const cdnOrigin = publicValues.NEXT_PUBLIC_CDN_ORIGIN
 
 // Pre-launch indexing switch (ARCHITECTURE §12.0), read at build: an invalid SITE_INDEXING fails
 // the build, and changing it needs a redeploy. Closed → X-Robots-Tag on every response; open →
@@ -34,6 +42,7 @@ const indexingIsOpen = indexingOpen(parseIndexingEnv(process.env))
 const assets = readAssetsEnv(process.env)
 
 const nextConfig: NextConfig = {
+  ...(cdnOrigin ? { assetPrefix: cdnOrigin, crossOrigin: 'anonymous' as const } : {}),
   cacheComponents: true,
   // Development action arguments can contain admin-only prompt bodies and private asset keys.
   logging: { serverFunctions: false },
@@ -62,14 +71,24 @@ const nextConfig: NextConfig = {
     return [
       ...xRobotsTagRules(indexingIsOpen, SITE_DOMAIN),
       ...assetsHeaders(),
+      // Fonts are always fetched in CORS mode, and with the asset host on (core/cdn) the pages ask
+      // for them from another origin, so they say who may read them. Vercel sends the same header
+      // on static files by default; this keeps it from depending on that. One fixed value, so the
+      // CDN can cache one copy.
       {
         source: '/fonts/misans/:asset(.+\\.(?:woff2|css))',
-        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+        ],
       },
       // Instrument Serif (globals.css): content-hashed names too, the same rule.
       {
         source: '/fonts/instrument-serif/:asset(.+\\.woff2)',
-        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+        ],
       },
       // The marketing pictures in public/home (hero scenes, demo sets, wish cards): cached for a
       // year, which /_next/image inherits for its resized copies (it keeps the larger of this and

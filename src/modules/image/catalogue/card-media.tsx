@@ -4,6 +4,7 @@
    through as stored) and its poster, which goes through coverImage */
 import { useRef } from 'react'
 
+import { cdnAssetUrl } from '@/core/cdn'
 import { cn } from '@/core/ui/cn'
 import { coverImage, coverSrc } from '@/core/ui/cover-image'
 import { useMediaQuery } from '@/core/ui/use-media-query'
@@ -22,7 +23,7 @@ export function LoopPlate({ template, alt, sizes, posterWidth = 1080, className 
   const { type, motion, poster } = template.cover
   return (
     <span className={cn('hairline relative isolate block aspect-[8/5] overflow-hidden rounded-control bg-muted', className)}>
-      {type === 'video' ? <LoopVideo src={motion as string} poster={coverSrc(poster as string, posterWidth)} label={alt} /> : <AnimatedImage src={motion as string} poster={poster as string} label={alt} sizes={sizes} />}
+      {type === 'video' ? <LoopVideo src={cdnAssetUrl(motion as string)} poster={coverSrc(poster as string, posterWidth)} label={alt} /> : <AnimatedImage src={cdnAssetUrl(motion as string)} poster={poster as string} label={alt} sizes={sizes} />}
     </span>
   )
 }
