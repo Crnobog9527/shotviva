@@ -604,6 +604,7 @@
       "again": {
         "optionsChanged": "此模板的出图选项已更改，请确认当前尺寸和清晰度。",
         "note": "<b>再做一张：</b>{summary}，沿用 <day></day> 那张的设置。",
+        "reuseNote": "<b>和创作库里那张设置一样：</b>{summary}。换上你自己的照片。",
         "noteKept": "保留补充说明",
         "kept": "原图，随作品保留",
         "keptFrom": "<day></day> · {size}",
@@ -1733,5 +1734,59 @@
     "payoutTitle": "收款信息",
     "payoutIntro": "每月结算日，我们按这里的方式支付已确认的收入。",
     "programName": "联盟营销"
+  },
+  "gallery": {
+    "meta": {
+      "title": "用 Shotviva 做的照片 | 公开创作库",
+      "description": "大家用 Shotviva 模板做的商品图、美食图和宠物照。点开一张，用你自己的照片做出同样的效果。"
+    },
+    "heading": "用 Shotviva 做的照片",
+    "intro": "这些是用户用免费积分做的照片，经本人同意公开展示。看到喜欢的，用你自己的照片做一张同款。",
+    "cta": "做一张我自己的",
+    "empty": "还没有公开的作品，过几天再来看看。",
+    "pager": {
+      "label": "创作库分页",
+      "previous": "上一页",
+      "next": "下一页",
+      "page": "第 {page} 页"
+    },
+    "tileAlt": "用 Shotviva 做的{template}照片",
+    "work": {
+      "metaTitle": "{template}照片 | Shotviva 创作库",
+      "metaDescription": "用 Shotviva 的「{template}」模板做的照片。用你自己的照片也能做出同样的效果。",
+      "back": "返回创作库",
+      "template": "模板",
+      "text": "照片上的文字",
+      "reuse": "做一张同款",
+      "reuseNote": "会打开同一个模板，设置也一样。照片换成你自己的，不会用这张图。",
+      "watermark": "这张是用免费积分做的，所以带一个小水印。",
+      "alt": "用 Shotviva 做的{template}照片"
+    },
+    "report": {
+      "open": "举报",
+      "title": "举报这张照片",
+      "body": "告诉我们哪里有问题，每一条举报我们都会处理。",
+      "reasonLabel": "原因",
+      "reasons": {
+        "sexual": "色情内容",
+        "violence": "暴力或血腥",
+        "hate": "仇恨或骚扰",
+        "minor": "出现未成年人",
+        "privacy": "出现了我本人或我的隐私",
+        "ip": "抄袭别人的作品或品牌",
+        "spam": "垃圾内容",
+        "other": "其他"
+      },
+      "noteLabel": "还有什么要补充的？（选填）",
+      "submit": "提交举报",
+      "cancel": "取消",
+      "sending": "提交中…",
+      "done": "谢谢，我们会尽快处理。",
+      "duplicate": "你已经举报过这张照片，我们会处理。",
+      "limited": "你今天举报得太多了，请明天再试。",
+      "failed": "举报没有提交成功，请再试一次。"
+    },
+    "related": "相关标签",
+    "footerLink": "创作库"
   }
 }

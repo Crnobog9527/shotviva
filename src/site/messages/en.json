@@ -604,6 +604,7 @@
       "again": {
         "optionsChanged": "The options for this template have changed. Review the current size and resolution.",
         "note": "<b>Making again:</b> {summary}, from <day></day>.",
+        "reuseNote": "<b>Same settings as a gallery photo:</b> {summary}. Add your own photo.",
         "noteKept": "note kept",
         "kept": "Original photo, kept with the work",
         "keptFrom": "From <day></day> · {size}",
@@ -1733,5 +1734,59 @@
     "payoutTitle": "Payout details",
     "payoutIntro": "We pay confirmed earnings with this method on the monthly settlement date.",
     "programName": "Affiliate program"
+  },
+  "gallery": {
+    "meta": {
+      "title": "Photos made with Shotviva | Public gallery",
+      "description": "Product, food and pet photos people made with Shotviva templates. Open one and make the same look with your own photo."
+    },
+    "heading": "Made with Shotviva",
+    "intro": "Photos people made with free credits, shown with their permission. Pick one you like and make the same look with your own photo.",
+    "cta": "Make your own photo",
+    "empty": "No public photos yet. Check back soon.",
+    "pager": {
+      "label": "Gallery pages",
+      "previous": "Previous",
+      "next": "Next",
+      "page": "Page {page}"
+    },
+    "tileAlt": "{template} photo made with Shotviva",
+    "work": {
+      "metaTitle": "{template} photo | Shotviva gallery",
+      "metaDescription": "A photo made with the {template} template on Shotviva. Make the same look with your own photo.",
+      "back": "Back to the gallery",
+      "template": "Template",
+      "text": "Text on the photo",
+      "reuse": "Make one like this",
+      "reuseNote": "Opens the same template with the same settings. You add your own photo: this one is never reused.",
+      "watermark": "Made with free credits, so it carries a small watermark.",
+      "alt": "{template} photo made with Shotviva"
+    },
+    "report": {
+      "open": "Report",
+      "title": "Report this photo",
+      "body": "Tell us what is wrong. We review every report.",
+      "reasonLabel": "Reason",
+      "reasons": {
+        "sexual": "Sexual content",
+        "violence": "Violence or gore",
+        "hate": "Hate or harassment",
+        "minor": "Shows a minor",
+        "privacy": "Shows me or my private information",
+        "ip": "Copies someone's work or brand",
+        "spam": "Spam",
+        "other": "Something else"
+      },
+      "noteLabel": "Anything to add? (optional)",
+      "submit": "Send report",
+      "cancel": "Cancel",
+      "sending": "Sending…",
+      "done": "Thanks. We will review it.",
+      "duplicate": "You already reported this photo. We will review it.",
+      "limited": "You have sent a lot of reports today. Please try again tomorrow.",
+      "failed": "The report did not go through. Please try again."
+    },
+    "related": "Related",
+    "footerLink": "Gallery"
   }
 }

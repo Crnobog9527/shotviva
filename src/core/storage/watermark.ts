@@ -39,3 +39,24 @@ export async function applyWatermark(image: Uint8Array): Promise<Uint8Array> {
     .toBuffer()
   return new Uint8Array(output)
 }
+
+// The public gallery's copy of a work (ARCHITECTURE §9 第 3、9 条): scaled to `width` (never
+// up), marked when the work was made with free credits (same rule as the download), WebP. A
+// cut-out keeps its transparency; the mark sits on top.
+export async function galleryImage(image: Uint8Array, width: number, watermark: boolean): Promise<Uint8Array> {
+  const scaled = await sharp(image).resize({ width, withoutEnlargement: true }).toBuffer({ resolveWithObject: true })
+  let base = sharp(scaled.data)
+  if (watermark) {
+    const markWidth = Math.max(1, Math.round(scaled.info.width * MARK_WIDTH_RATIO))
+    const mark = await sharp(WATERMARK).resize({ width: markWidth }).toBuffer({ resolveWithObject: true })
+    const margin = Math.round(Math.min(scaled.info.width, scaled.info.height) * MARGIN_RATIO)
+    base = base.composite([
+      {
+        input: mark.data,
+        left: Math.max(0, scaled.info.width - mark.info.width - margin),
+        top: Math.max(0, scaled.info.height - mark.info.height - margin),
+      },
+    ])
+  }
+  return new Uint8Array(await base.webp({ quality: 80 }).toBuffer())
+}
