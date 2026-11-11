@@ -3,6 +3,7 @@ import { z } from 'zod'
 
 import { alertsEnvShape } from './alerts/alerts-env'
 import { sentryBuildEnvSchema } from './build-env'
+import { previewHostsShape } from './preview-hosts'
 import { indexingEnvSchema } from './seo/indexing-env'
 import { smsEnvShape } from './sms/sms-env'
 import { assetsEnvShape, checkAssetsEnv } from './storage/assets-env'
@@ -21,6 +22,8 @@ const serverEnvSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
   // Set by Vercel; dev-only pages (e.g. /generate/upload-test) 404 when it is 'production'.
   VERCEL_ENV: z.preprocess(blankAsUnset, z.enum(['production', 'preview', 'development']).optional()),
+  // Test-site aliases answered on their own host (core/request-origin); preview only.
+  ...previewHostsShape,
   // Cloudflare R2 (S3 API). One private bucket per environment (ARCHITECTURE §8.3);
   // optional at parse time, required by core/storage's r2Store().
   R2_ACCOUNT_ID: optionalSecret,
