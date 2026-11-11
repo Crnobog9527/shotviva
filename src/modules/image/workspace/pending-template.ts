@@ -15,3 +15,21 @@ export function rememberTemplate(template: CatalogueTemplate): void {
 export function recallTemplate(templateId: string): CatalogueTemplate | null {
   return remembered?.id === templateId ? remembered : null
 }
+
+// The template whose head the pending view has on screen right now. The server's page mounts
+// its own head while that one is still there: it then takes over as it is, without the entry
+// fade a head normally gets (measured on the test site: without this the head went to opacity 0
+// and faded up again about a second after the click).
+let headOnScreen: string | null = null
+
+// For the pending view's effect: marks the head as shown, and returns the cleanup that unmarks it.
+export function showPendingHead(templateId: string): () => void {
+  headOnScreen = templateId
+  return () => {
+    if (headOnScreen === templateId) headOnScreen = null
+  }
+}
+
+export function pendingHeadShown(templateId: string): boolean {
+  return headOnScreen === templateId
+}
