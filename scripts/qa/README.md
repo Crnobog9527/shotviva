@@ -104,6 +104,10 @@ lands on `next` (default `/account`).
   a PR, an issue or a chat.
 - Each run makes a new link. A link works once, and it expires with the project's email-link
   lifetime (1 hour by default).
+- **One window per persona.** A new link replaces the persona's previous one (Supabase keeps one
+  sign-in token per account), so generating a link for a persona another window is still
+  signing in with makes that window's link fail as `link_expired`. A reload or retried
+  navigation of a used link fails the same way; generate a fresh one instead.
 - `QA_SITE_URL` points the link at another preview deployment (`https://….vercel.app`) or a
   local `next dev`. The production domain is refused.
 - **Several accounts in one browser.** Cookies are per host, so each test-site host keeps its own
