@@ -143,13 +143,14 @@ export async function listReviewWorks(deps: Deps, tab: ReviewTab, cursor: string
 export async function pendingReviewCount(db: SupabaseClient): Promise<number> {
   const { count, error } = await db
     .from('generation_jobs')
-    .select('id', { count: 'exact', head: true })
+    .select('id', { count: 'exact' })
     .eq('status', 'succeeded')
     .eq('visibility', 'public')
     .eq('moderation_status', 'pending')
     .is('deleted_at', null)
     .eq('source', 'web')
     .neq('template_id', 'freeform')
+    .limit(1)
   if (error) failed('count', error.message)
   return count ?? 0
 }
