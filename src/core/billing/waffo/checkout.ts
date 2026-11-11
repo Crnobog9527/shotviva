@@ -30,7 +30,7 @@ export type WaffoCheckoutDeps = {
   products: readonly SiteProduct[]
   productIds: Record<ProductId, string>
   subscriptionProductIds: Record<MembershipProductId, string>
-  // This deployment's origin (core/site-url). Waffo needs an absolute https URL.
+  // The buyer's origin (core/request-origin: appOrigin, or an allow-listed test-site alias). Waffo needs an absolute https URL.
   origin: string
   returnToHosts: readonly string[]
   trackStart?: typeof trackCheckoutStart

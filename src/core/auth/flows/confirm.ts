@@ -29,5 +29,5 @@ async function resolveOutcome(request: NextRequest, jar: CookieToSet[], benefits
 export async function handleAuthConfirm(request: NextRequest, options: SignupBenefits) {
   const jar: CookieToSet[] = []
   const outcome = await resolveOutcome(request, jar, options)
-  return landingResponse(outcome, request.nextUrl.searchParams.get('next'), jar)
+  return landingResponse(request, outcome, jar)
 }
