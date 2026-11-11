@@ -116,7 +116,7 @@ export const makeZhAiRestaurantMenu = (offers: OfferFacts) => defineContentPage(
   costBills: menuBills(offers),
   related: [
     { href: '/', anchor: 'AI改图', note: '全部模板，按餐饮、商品、美妆、房间、宠物和画风分类。' },
-    { href: '/commercial-photography', anchor: '商业产品摄影', note: '网店和卖家不请摄影师，也能做出影棚级商品图。' },
+    { href: '/commercial-photography', anchor: '商业摄影', note: '网店和卖家不请摄影师，也能做出影棚级商品图。' },
     { href: '/image-to-image-generator', anchor: '图生图在线工具', note: '想看看图生图对一张照片能做什么。' },
     zhPricingRelated(brand, offers),
   ],

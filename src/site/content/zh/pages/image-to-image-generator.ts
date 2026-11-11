@@ -125,7 +125,7 @@ export const makeZhImageToImageGenerator = (offers: OfferFacts) => defineContent
   costBills: productBills(offers,`${SET_PHOTOS} 张商品图要花多少钱：请摄影师和用图生图对比`, `一个商品，${SET_PHOTOS} 张造型图，精修好、可以直接发。同样的活，两张账单。`),
   related: [
     { href: '/', anchor: 'AI改图', note: '全部模板，按餐饮、商品、美妆、房间、宠物和画风分类。' },
-    { href: '/commercial-photography', anchor: '商业产品摄影', note: '网店和卖家不请摄影师，也能做出影棚级商品图。' },
+    { href: '/commercial-photography', anchor: '商业摄影', note: '网店和卖家不请摄影师，也能做出影棚级商品图。' },
     { href: '/ai-restaurant-menu', anchor: 'AI菜单配图', note: '餐厅用手机拍菜，直接做成菜单和外卖平台的图。' },
     zhPricingRelated(brand, offers),
   ],
