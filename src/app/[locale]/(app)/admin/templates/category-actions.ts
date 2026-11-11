@@ -1,6 +1,6 @@
 'use server'
 
-import { refresh, revalidateTag } from 'next/cache'
+import { refresh, updateTag } from 'next/cache'
 
 import { runAdminAction } from '@/core/admin'
 import { moveTemplateCategory } from '@/core/admin/template-categories'
@@ -11,7 +11,8 @@ export async function moveTemplateCategoryAction(input: unknown) {
   const admin = await requireAdmin()
   return runAdminAction(async () => {
     await moveTemplateCategory(createAdminSupabase(), admin.id, input)
-    revalidateTag(TEMPLATES_CACHE_TAG, 'max')
+    // Category order groups the home and landing template sections: live on the next load.
+    updateTag(TEMPLATES_CACHE_TAG)
     refresh()
   })
 }
