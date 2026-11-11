@@ -52,7 +52,8 @@ export function SeriesCard({ series, onOpen, eager }: Props) {
 // A print behind the frame, the frame's size, turned a couple of degrees so its corners show
 // past the frame's (a few px, inside the grid gap); lighter than the page so they read in the
 // dark, the one further back a step darker. Still
-// prints under reduced motion: nothing here moves.
+// prints under reduced motion: nothing here moves. The public pages copy these values
+// (core/content/blocks/series-card.tsx, marketing.css .mk-sprint*): change both together.
 function PrintEdge({ className }: { className: string }) {
   return <span aria-hidden="true" className={cn('absolute inset-0 rounded-control shadow-[inset_0_0_0_1px_var(--input)]', className)} />
 }

@@ -14,6 +14,7 @@ import {
 } from '@/core/seo'
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
 import { openingCovers } from '@/core/templates/cover-ratio'
+import { cachedPublicSeries } from '@/core/templates/public-series'
 import { toCatalogueTemplate } from '@/modules/image/marketing'
 import { contentPagesIn, creditFacts, featuredSections, fillCredits, findContentPageIn, freeImagesIn, homePageIn, isLinkEnabled } from '@/site/content'
 import { displayProducts } from '@/site/billing/display-products'
@@ -45,11 +46,11 @@ export function generateStaticParams({ params }: { params: { locale: string } })
 async function load(params: Promise<{ slug: string }>) {
   const locale = await currentLocale()
   const slug = (await params).slug
-  const [products, live] = await Promise.all([displayProducts(), cachedWebCatalogue(locale)])
+  const [products, live, series] = await Promise.all([displayProducts(), cachedWebCatalogue(locale), cachedPublicSeries(locale)])
   const found = findContentPageIn(slug, locale, products)
   if (!found || !isEnabled(found)) notFound()
   const facts = creditFacts(live)
-  return { locale, live, products, page: fillCredits(found, facts), free: fillCredits(freeImagesIn(locale), facts) }
+  return { locale, live, series, products, page: fillCredits(found, facts), free: fillCredits(freeImagesIn(locale), facts) }
 }
 
 export async function generateMetadata({ params }: PageProps<'/[locale]/[slug]'>): Promise<Metadata> {
@@ -58,7 +59,7 @@ export async function generateMetadata({ params }: PageProps<'/[locale]/[slug]'>
 }
 
 export default async function ContentRoute({ params }: PageProps<'/[locale]/[slug]'>) {
-  const { locale, live, products, page, free } = await load(params)
+  const { locale, live, series, products, page, free } = await load(params)
   const path = pagePath(page)
   const crumbs = [
     { name: homePageIn(locale).label, path: '/' },
@@ -70,7 +71,7 @@ export default async function ContentRoute({ params }: PageProps<'/[locale]/[slu
   if (page.module) ld.push(softwareApplicationLd(site, meta, products, free))
   const catalogue = live.map(toCatalogueTemplate)
   // The page's own categories' featured templates; the generator opens on the first of them.
-  const { defaultId, ...sections } = featuredSections(live, page.landing.templates?.categoryKeys)
+  const { defaultId, ...sections } = featuredSections(live, page.landing.templates?.categoryKeys, series)
   const initialCovers = await openingCovers(live.find((template) => template.id === defaultId))
   const generator = (
     <HomeGeneratorSlot templates={catalogue} defaultId={defaultId} homePath={localizePath(path, locale)} freeImages={free} initialCovers={initialCovers} />
