@@ -11290,16 +11290,16 @@ begin
     insert into public.template_series(slug, name_en, name_zh, description_en, description_zh, cover_url,
         category_key, sort_order, is_active, show_members)
       values(v_slug, saved.name_en, saved.name_zh, saved.description_en, saved.description_zh, saved.cover_url,
-        saved.category_key, coalesce(saved.sort_order, 0), coalesce(saved.is_active, false), coalesce(saved.show_members, false));
+        saved.category_key, coalesce(saved.sort_order, 0), false, coalesce(saved.show_members, false));
     v_result := 'created';
   elsif (previous.name_en, previous.name_zh, previous.description_en, previous.description_zh, previous.cover_url,
-      previous.category_key, previous.sort_order, previous.is_active, previous.show_members)
+      previous.category_key, previous.sort_order, previous.show_members)
       is distinct from (saved.name_en, saved.name_zh, saved.description_en, saved.description_zh, saved.cover_url,
-      saved.category_key, coalesce(saved.sort_order, 0), coalesce(saved.is_active, false), coalesce(saved.show_members, false)) then
+      saved.category_key, coalesce(saved.sort_order, 0), coalesce(saved.show_members, false)) then
     update public.template_series set name_en = saved.name_en, name_zh = saved.name_zh,
       description_en = saved.description_en, description_zh = saved.description_zh, cover_url = saved.cover_url,
       category_key = saved.category_key, sort_order = coalesce(saved.sort_order, 0),
-      is_active = coalesce(saved.is_active, false), show_members = coalesce(saved.show_members, false)
+      show_members = coalesce(saved.show_members, false)
     where id = previous.id;
     v_result := 'updated';
   else
@@ -11312,6 +11312,38 @@ end $_$;
 
 
 ALTER FUNCTION "public"."sync_preview_series"("p_series" "jsonb", "p_validate_only" boolean) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."sync_preview_series_active"("p_actor" "uuid", "p_slug" "text", "p_active" boolean, "p_run_id" "text", "p_validate_only" boolean DEFAULT false) RETURNS "text"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  previous public.template_series;
+  v_result text := 'unchanged';
+begin
+  if p_active is null or nullif(p_run_id, '') is null then raise exception 'INVALID_SYNC'; end if;
+  if not exists(select from public.profiles where id = p_actor and role = 'admin' and banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree', 0));
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series', 0));
+  select * into previous from public.template_series where slug = p_slug for update;
+  if previous.id is null then raise exception 'SERIES_MISSING'; end if;
+  if previous.is_active is distinct from p_active then
+    update public.template_series set is_active = p_active where id = previous.id;
+    insert into public.admin_audit_log(action, user_id, target_id, reason)
+      values('series_sync_active', p_actor, p_slug,
+        'T93 sync from preview run ' || p_run_id || case when p_active then ': published' else ': unpublished' end);
+    v_result := case when p_active then 'published' else 'unpublished' end;
+  end if;
+  if p_validate_only then raise exception using errcode = 'Z9301'; end if;
+  return v_result;
+exception when sqlstate 'Z9301' then return v_result;
+end $$;
+
+
+ALTER FUNCTION "public"."sync_preview_series_active"("p_actor" "uuid", "p_slug" "text", "p_active" boolean, "p_run_id" "text", "p_validate_only" boolean) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."sync_preview_series_members"("p_slug" "text", "p_members" "text"[], "p_validate_only" boolean DEFAULT false) RETURNS "jsonb"
@@ -11391,12 +11423,14 @@ begin
   v_catalog := admin.template_sync_catalog();
   if v_catalog not in ('v1','v2') or p_catalog_version is distinct from v_catalog
       or coalesce(p_floors->>'version','v1') <> v_catalog then raise exception 'CATALOG_MISMATCH'; end if;
+  -- The tree lock before any category row (1272): 分类管理 takes the tree lock exclusively and then
+  -- writes rows, so a row share taken first could wait on it while it waits on us. Same order as
+  -- admin_save_template_assignment and the 1270–1271 sync: tree shared, series, then rows.
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree',0));
+  if v_assign then perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series',0)); end if;
   perform 1 from public.template_categories where key = p_template->>'category_key' for share;
   if not found then raise exception 'CATEGORY_MISSING'; end if;
   if v_assign then
-    -- Same locks, same order, as admin_save_template_assignment: tree shared, series, then the row.
-    perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree',0));
-    perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series',0));
     if v_sub is not null then
       perform 1 from public.template_category_paths p join public.template_categories c on c.key = p.key
         where p.key = v_sub and p.root_key = p_template->>'category_key' and p.key <> p.root_key and not c.is_system;
@@ -11492,6 +11526,61 @@ $$;
 
 
 ALTER FUNCTION "public"."sync_preview_template"("p_template" "jsonb", "p_prompt" "jsonb", "p_provider" "jsonb", "p_floors" "jsonb", "p_run_id" "text", "p_locales" "text"[], "p_target_token" "text", "p_catalog_version" "text", "p_validate_only" boolean) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."sync_preview_template_state"("p_actor" "uuid", "p_id" "text", "p_sale" boolean, "p_active" boolean, "p_run_id" "text", "p_locales" "text"[], "p_validate_only" boolean DEFAULT false) RETURNS "jsonb"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  t public.templates;
+  v_sale boolean;
+  v_reason text := 'T93 sync from preview run ' || p_run_id;
+  v_result jsonb := jsonb_build_object('sale', 'unchanged', 'active', 'unchanged');
+begin
+  if p_sale is null or p_active is null or nullif(p_run_id, '') is null or (p_active and not p_sale) then
+    raise exception 'INVALID_SYNC';
+  end if;
+  if not exists(select from public.profiles where id = p_actor and role = 'admin' and banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+  select * into t from public.templates where id = p_id for update;
+  if not found then raise exception 'TEMPLATE_MISSING'; end if;
+  v_sale := exists(select from public.template_sale_approvals where template_id = p_id and enabled);
+  if t.is_active and not p_active then
+    update public.templates set is_active = false, featured_rank = null where id = p_id;
+    insert into public.admin_audit_log(action, user_id, target_id, reason)
+      values('template_sync_active', p_actor, p_id, v_reason || ': unpublished');
+    v_result := v_result || jsonb_build_object('active', 'unpublished');
+    t.is_active := false;
+  end if;
+  if v_sale is distinct from p_sale then
+    perform public.admin_set_template_sale(p_actor, p_id, p_sale);
+    insert into public.admin_audit_log(action, user_id, target_id, reason)
+      values('template_sync_sale', p_actor, p_id, v_reason || case when p_sale then ': sale opened' else ': sale closed' end);
+    v_result := v_result || jsonb_build_object('sale', case when p_sale then 'opened' else 'closed' end);
+  end if;
+  if p_active and not t.is_active then
+    if 'web' = any(t.visible_in) and (nullif(btrim(t.description), '') is null or not public._template_has_cover_parts(
+        t.cover_before_url, t.cover_after_url, t.cover_locales, p_locales)) then
+      raise exception 'LIVE_TEMPLATE_INCOMPLETE';
+    end if;
+    update public.templates set is_active = true where id = p_id;
+    set constraints all immediate;
+    if 'web' = any(t.visible_in) and not admin.web_standard_sale_allowed(p_id) then
+      raise exception 'SALE_ROUTE_NOT_ALLOWED';
+    end if;
+    insert into public.admin_audit_log(action, user_id, target_id, reason)
+      values('template_sync_active', p_actor, p_id, v_reason || ': published');
+    v_result := v_result || jsonb_build_object('active', 'published');
+  end if;
+  if p_validate_only then raise exception using errcode = 'Z9301'; end if;
+  return v_result;
+exception when sqlstate 'Z9301' then return v_result;
+end $$;
+
+
+ALTER FUNCTION "public"."sync_preview_template_state"("p_actor" "uuid", "p_id" "text", "p_sale" boolean, "p_active" boolean, "p_run_id" "text", "p_locales" "text"[], "p_validate_only" boolean) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."sync_subscription"("p_subscription_id" "text", "p_status" "text", "p_current_period_end" timestamp with time zone, "p_cancel_at_period_end" boolean) RETURNS boolean
@@ -12373,7 +12462,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "target_id" "text",
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text"]))),
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text"]))),
     CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
     CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );
@@ -17162,6 +17251,11 @@ GRANT ALL ON FUNCTION "public"."sync_preview_series"("p_series" "jsonb", "p_vali
 
 
 
+REVOKE ALL ON FUNCTION "public"."sync_preview_series_active"("p_actor" "uuid", "p_slug" "text", "p_active" boolean, "p_run_id" "text", "p_validate_only" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."sync_preview_series_active"("p_actor" "uuid", "p_slug" "text", "p_active" boolean, "p_run_id" "text", "p_validate_only" boolean) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."sync_preview_series_members"("p_slug" "text", "p_members" "text"[], "p_validate_only" boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."sync_preview_series_members"("p_slug" "text", "p_members" "text"[], "p_validate_only" boolean) TO "service_role";
 
@@ -17169,6 +17263,11 @@ GRANT ALL ON FUNCTION "public"."sync_preview_series_members"("p_slug" "text", "p
 
 REVOKE ALL ON FUNCTION "public"."sync_preview_template"("p_template" "jsonb", "p_prompt" "jsonb", "p_provider" "jsonb", "p_floors" "jsonb", "p_run_id" "text", "p_locales" "text"[], "p_target_token" "text", "p_catalog_version" "text", "p_validate_only" boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."sync_preview_template"("p_template" "jsonb", "p_prompt" "jsonb", "p_provider" "jsonb", "p_floors" "jsonb", "p_run_id" "text", "p_locales" "text"[], "p_target_token" "text", "p_catalog_version" "text", "p_validate_only" boolean) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."sync_preview_template_state"("p_actor" "uuid", "p_id" "text", "p_sale" boolean, "p_active" boolean, "p_run_id" "text", "p_locales" "text"[], "p_validate_only" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."sync_preview_template_state"("p_actor" "uuid", "p_id" "text", "p_sale" boolean, "p_active" boolean, "p_run_id" "text", "p_locales" "text"[], "p_validate_only" boolean) TO "service_role";
 
 
 
