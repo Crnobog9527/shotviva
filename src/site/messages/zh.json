@@ -460,7 +460,7 @@
       "count": "{count} 个模板",
       "cardAria": "{name}，系列共 {count} 个模板，选一个开始",
       "coverAlt": "{name} 系列效果示例",
-      "pick": "这个系列有 {count} 个模板，选一个开始制作。"
+      "members": "{name} · {count} 个模板"
     },
     "template": {
       "fromCredits": "{count} 积分起",
