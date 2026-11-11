@@ -325,6 +325,8 @@
 @source "../core/billing/waffo/webhook.ts";
 @source "../core/build-env.ts";
 @source "../core/cache-life.ts";
+@source "../core/cdn/cdn-origin.ts";
+@source "../core/cdn/index.ts";
 @source "../core/codes/admin/index.ts";
 @source "../core/codes/campaign-coupon.ts";
 @source "../core/codes/discount.ts";
