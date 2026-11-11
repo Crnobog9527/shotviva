@@ -48,6 +48,8 @@ jobs:
         env:
           SYNC_IDS: ${{ inputs.template_ids }}
           SYNC_SERIES: ${{ inputs.series_slugs }}
+          # The production admin whose profile id 上下架 and 开放售卖 changes are made and audited as.
+          SYNC_PRODUCTION_ACTOR_ID: ${{ vars.SYNC_PRODUCTION_ACTOR_ID }}
           SYNC_PREVIEW_ASSETS_BASE: ${{ vars.SYNC_PREVIEW_ASSETS_BASE }}
           OPENAI_IMAGE_MODEL: ${{ vars.OPENAI_IMAGE_MODEL }}
           SYNC_PREVIEW_SERVICE_KEY: ${{ secrets.SYNC_PREVIEW_SERVICE_KEY }}

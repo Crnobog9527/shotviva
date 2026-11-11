@@ -129,6 +129,8 @@ export function templateSyncDryRunEnv() {
     // Any number not used by a real run: the write's receipt check keys on it, and nothing is kept.
     runId: z.string().regex(/^\d+$/).parse(process.env.GITHUB_RUN_ID ?? String(Date.now())),
     serviceKey: z.string().min(1).parse(process.env.SYNC_PREVIEW_SERVICE_KEY),
+    // A preview admin's profile id: the dry run checks 上下架 and 开放售卖 as that admin.
+    actorId: z.uuid().parse(process.env.SYNC_ACTOR_ID),
     assetsBase: z.url({ protocol: /^https$/ }).transform((url) => url.replace(/\/+$/, '')).parse(process.env.SYNC_PREVIEW_ASSETS_BASE),
   }
 }
@@ -149,6 +151,8 @@ export function templateSyncEnv() {
   return {
     ...syncSelection(),
     runId: z.string().regex(/^\d+$/).parse(process.env.GITHUB_RUN_ID),
+    // The production admin (profile id) that 上下架 and 开放售卖 changes are made and audited as.
+    actorId: z.uuid().parse(process.env.SYNC_PRODUCTION_ACTOR_ID),
     preview: read('SYNC_PREVIEW_', process.env.SYNC_PREVIEW_ASSETS_BASE),
     production: read('SYNC_PRODUCTION_', 'https://shotviva.com/assets'),
   }

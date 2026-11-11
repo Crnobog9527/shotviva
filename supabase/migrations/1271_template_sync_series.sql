@@ -19,8 +19,10 @@ language sql stable set search_path = '' as $$
 $$;
 
 -- The series definition onto production: created when the slug is new, otherwise every field follows
--- the test site (names, descriptions, cover, category, position, published, 仅系列 / members shown).
--- Membership is the next two steps (the templates, then sync_preview_series_members).
+-- the test site (names, descriptions, cover, category, position, 仅系列 / members shown). Not 上下架:
+-- that is sync_preview_series_active (1274), run before the templates when the series goes down and
+-- after them when it goes up, so it is never live without its members. A new series starts down.
+-- Membership is the templates' sync, then sync_preview_series_members.
 create or replace function public.sync_preview_series(p_series jsonb, p_validate_only boolean default false)
 returns text language plpgsql set search_path = '' as $$
 declare
@@ -43,16 +45,16 @@ begin
     insert into public.template_series(slug, name_en, name_zh, description_en, description_zh, cover_url,
         category_key, sort_order, is_active, show_members)
       values(v_slug, saved.name_en, saved.name_zh, saved.description_en, saved.description_zh, saved.cover_url,
-        saved.category_key, coalesce(saved.sort_order, 0), coalesce(saved.is_active, false), coalesce(saved.show_members, false));
+        saved.category_key, coalesce(saved.sort_order, 0), false, coalesce(saved.show_members, false));
     v_result := 'created';
   elsif (previous.name_en, previous.name_zh, previous.description_en, previous.description_zh, previous.cover_url,
-      previous.category_key, previous.sort_order, previous.is_active, previous.show_members)
+      previous.category_key, previous.sort_order, previous.show_members)
       is distinct from (saved.name_en, saved.name_zh, saved.description_en, saved.description_zh, saved.cover_url,
-      saved.category_key, coalesce(saved.sort_order, 0), coalesce(saved.is_active, false), coalesce(saved.show_members, false)) then
+      saved.category_key, coalesce(saved.sort_order, 0), coalesce(saved.show_members, false)) then
     update public.template_series set name_en = saved.name_en, name_zh = saved.name_zh,
       description_en = saved.description_en, description_zh = saved.description_zh, cover_url = saved.cover_url,
       category_key = saved.category_key, sort_order = coalesce(saved.sort_order, 0),
-      is_active = coalesce(saved.is_active, false), show_members = coalesce(saved.show_members, false)
+      show_members = coalesce(saved.show_members, false)
     where id = previous.id;
     v_result := 'updated';
   else

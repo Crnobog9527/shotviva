@@ -85,9 +85,10 @@ it('reads a series by slug with its members in order, and creates or updates it 
   const { data } = await rpc('read_template_series_sync_source', { p_slug: slug })
   expect(data).toEqual({ series: series(slug), members: [key('m1'), key('m2')] })
   expect((await rpc('read_template_series_sync_source', { p_slug: `missing-${tag}` })).data).toBeNull()
+  // 上下架 is its own step (sync_preview_series_active, after the members); the definition leaves it.
   expect((await rpc('sync_preview_series', { p_series: series(slug, { name_zh: '新套系', is_active: true }) })).data).toBe('updated')
   expect((await db.query('select id,name_zh,is_active,show_members from public.template_series where slug=$1', [slug])).rows[0])
-    .toEqual({ id, name_zh: '新套系', is_active: true, show_members: true })
+    .toEqual({ id, name_zh: '新套系', is_active: false, show_members: true })
   expect((await rpc('sync_preview_series', { p_series: series(slug, { category_key: `missing-${tag}` }) })).error?.message).toBe('SERIES_CATEGORY_MISSING')
 })
 

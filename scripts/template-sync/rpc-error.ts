@@ -5,6 +5,9 @@ import { SyncError } from './covers'
 const KNOWN = new Set([
   'INVALID_SYNC', 'CATEGORY_MISSING', 'CATEGORY_KIND_MISMATCH', 'CATEGORY_NAME_TAKEN', 'CATEGORY_PARENT_MISSING',
   'SERIES_CATEGORY_MISSING', 'INVALID_SERIES_CATEGORY', 'SERIES_MISSING', 'INVALID_SERIES_MEMBERS', 'INVALID_PARENT',
+  // 上下架 and 开放售卖 (1274): production's own checks, by the names its functions and triggers use.
+  'NOT_ADMIN', 'TEMPLATE_MISSING', 'LIVE_TEMPLATE_INCOMPLETE', 'SALE_ROUTE_NOT_ALLOWED', 'TEMPLATE_RETIRED',
+  'TEMPLATE_PRICE_BELOW_FLOOR', 'UNPUBLISH_FIRST', 'FORBIDDEN', 'MODEL_CREDIT_FLOOR',
 ])
 
 export function rpcError(error: { message: string; code?: string }, fallback: string): SyncError {
