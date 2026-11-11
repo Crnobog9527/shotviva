@@ -22,6 +22,9 @@ type Props = {
   folded: boolean
   form: ReactNode
   bar: ReactNode
+  // A series' members (member-picker.tsx): under the sample's text from 768px, between the title
+  // and the sample strip on phones, so switching never scrolls past the form.
+  picker?: ReactNode
 }
 
 // The creation dialog's frame (DESIGN §6.9 item 2, B comp create.html .cd): from 768px a 1040px
@@ -33,7 +36,7 @@ export function CreateSheet(props: Props) {
   return desktop ? <DesktopSheet {...props} /> : <PhoneSheet {...props} />
 }
 
-function DesktopSheet({ open, onOpenChange, title, description, hint, sample, form, bar }: Props) {
+function DesktopSheet({ open, onOpenChange, title, description, hint, sample, form, bar, picker }: Props) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
@@ -44,6 +47,7 @@ function DesktopSheet({ open, onOpenChange, title, description, hint, sample, fo
             <DialogPrimitive.Title className="pt-5 font-display text-h1 leading-[1.05] tracking-[-0.02em]">{title}</DialogPrimitive.Title>
             <DialogPrimitive.Description className="mt-1.5 text-label text-pretty text-muted-foreground">{description}</DialogPrimitive.Description>
             <p className="mt-2 text-caption text-muted-foreground">{hint}</p>
+            {picker ? <div className="mt-6">{picker}</div> : null}
           </div>
           <div className="flex min-h-0 flex-col">
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pt-3 pb-4 [&>section:first-child>div:first-child]:pr-14">{form}</div>
@@ -56,7 +60,7 @@ function DesktopSheet({ open, onOpenChange, title, description, hint, sample, fo
   )
 }
 
-function PhoneSheet({ open, onOpenChange, title, description, sample, tall, folded, form, bar }: Props) {
+function PhoneSheet({ open, onOpenChange, title, description, sample, tall, folded, form, bar, picker }: Props) {
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent className="h-[calc(100dvh-var(--sat)-12px)]">
@@ -66,6 +70,7 @@ function PhoneSheet({ open, onOpenChange, title, description, sample, tall, fold
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4">
           <DrawerTitle className="mr-12">{title}</DrawerTitle>
           <DrawerDescription className="mt-1 mb-3 text-pretty">{description}</DrawerDescription>
+          {picker ? <div className="mb-4">{picker}</div> : null}
           <div style={phoneStrip(tall, folded)} className={cn('relative mx-auto overflow-hidden rounded-control transition-[height] duration-350 ease-house', folded && '[&_[aria-hidden=true]]:opacity-0')}>
             {sample}
           </div>

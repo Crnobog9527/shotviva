@@ -19,8 +19,8 @@ import { SeriesCard } from './series-card'
 import { TemplateCard } from './template-card'
 import { useCatalogueQuery } from './use-catalogue-query'
 
-// The series sheet is only fetched once a series is opened (scripts/js-budget.json).
-const SeriesSheet = dynamic(() => import('./series-sheet').then((m) => m.SeriesSheet), { ssr: false })
+// The series panel is only fetched once a series is opened (scripts/js-budget.json).
+const SeriesCreateDialog = dynamic(() => import('../workspace/series-create-dialog').then((m) => m.SeriesCreateDialog), { ssr: false })
 
 // `endCard`: the grid's last card, after every filter's cards (the Wishlist's "Not finding it?",
 // passed in by the page while the wishlist is open).
@@ -28,8 +28,9 @@ type Props = { view: CatalogueView; create: CreateContext; endCard?: ReactNode }
 
 // Create's catalogue (B comp create.html): the featured card, a sticky chip bar of up to three
 // category levels (T102), the grid of side-by-side pair cards and series cards (one column on
-// phones, two from md, three from lg; the Art Styles compare is the tall card), the series sheet
-// a series card opens, and the creation dialog every template opens (DESIGN §6.9 item 2). The
+// phones, two from md, three from lg; the Art Styles compare is the tall card), the series panel
+// a series card opens (its members and the chosen one's form in one step, Owner 2026-11-12), and
+// the creation dialog every template opens (DESIGN §6.9 item 2). The
 // chosen category and an open series live in the address (?category=, ?series=). With saved
 // templates the bar leads with Saved (T83), read from the page's FavoritesProvider.
 export function TemplateCatalogue({ view, create, endCard }: Props) {
@@ -42,7 +43,7 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
   const saved = useMemo(() => (favoriteIds ? savedIn(favoriteIds, openable) : []), [favoriteIds, openable])
   const { active, shown } = filterCatalogue(view.entries, saved, query.selection)
   const series = findSeries(view.entries, query.seriesKey)
-  // Once loaded the sheet stays mounted, so closing it can play its motion.
+  // Once loaded the panel stays mounted, so closing it can play its motion.
   const [sheetLoaded, setSheetLoaded] = useState(false)
   if (series && !sheetLoaded) setSheetLoaded(true)
   const { sentinel, stuck } = useStuck()
@@ -75,16 +76,7 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
         {endCard ? <Reveal as="li">{endCard}</Reveal> : null}
       </ul>
       <p className="px-(--gutter) pt-4 pb-2 text-caption leading-[1.4] text-muted-foreground">{t('illustrative')}</p>
-      {sheetLoaded ? (
-        <SeriesSheet
-          series={series}
-          onClose={query.closeSeries}
-          onPick={(template) => {
-            query.closeSeries()
-            setOpenId(template.id)
-          }}
-        />
-      ) : null}
+      {sheetLoaded ? <SeriesCreateDialog series={series} onClose={query.closeSeries} {...create} /> : null}
       <CreateDialog template={openable.find((item) => item.id === openId) ?? null} onClose={() => setOpenId(null)} {...create} />
     </>
   )

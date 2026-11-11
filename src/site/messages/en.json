@@ -460,7 +460,8 @@
       "count": "{count, plural, one {# template} other {# templates}}",
       "cardAria": "{name}, a series of {count, plural, one {# template} other {# templates}}. Pick one",
       "coverAlt": "{name} series example",
-      "pick": "{count, plural, one {# template} other {# templates}} in this series. Pick one to start."
+      "members": "{name} · {count, plural, one {# template} other {# templates}}",
+      "badge": "Series"
     },
     "template": {
       "fromCredits": "from {count, plural, one {# credit} other {# credits}}",
