@@ -5,6 +5,8 @@ name: Lighthouse
 # performance score drops under 0.85 or CLS goes over 0.1; warns on LCP > 2.5 s and TBT > 200 ms
 # (lighthouserc.json). The build has no database, so template sections are empty: the numbers
 # track regressions in our code, not production, which the control session measures separately.
+# The pages are measured through scripts/ci/lighthouse-server.mjs (HTTP/2 + brotli in front of
+# `next start`), the protocol production serves them over; bare `next start` is HTTP/1.1.
 # Signed-in app pages need a session and are measured on the test site instead.
 on:
   pull_request:

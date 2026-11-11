@@ -1,18 +1,18 @@
 {
   "ci": {
     "collect": {
-      "startServerCommand": "pnpm start",
-      "startServerReadyPattern": "Ready",
+      "startServerCommand": "node scripts/ci/lighthouse-server.mjs",
+      "startServerReadyPattern": "Lighthouse proxy ready",
       "url": [
-        "http://localhost:3000/",
-        "http://localhost:3000/zh",
-        "http://localhost:3000/pricing",
-        "http://localhost:3000/zh/pricing",
-        "http://localhost:3000/image-to-image-generator",
-        "http://localhost:3000/commercial-photography"
+        "https://localhost:3443/",
+        "https://localhost:3443/zh",
+        "https://localhost:3443/pricing",
+        "https://localhost:3443/zh/pricing",
+        "https://localhost:3443/image-to-image-generator",
+        "https://localhost:3443/commercial-photography"
       ],
       "numberOfRuns": 3,
-      "settings": { "onlyCategories": ["performance"], "chromeFlags": "--no-sandbox --headless=new" }
+      "settings": { "onlyCategories": ["performance"], "chromeFlags": "--no-sandbox --headless=new --ignore-certificate-errors" }
     },
     "assert": {
       "assertions": {
