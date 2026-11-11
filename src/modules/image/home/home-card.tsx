@@ -10,7 +10,6 @@ import { allowsNoPhoto, type CatalogueTemplate } from '../catalogue/catalogue-te
 import { GroundedImg } from '../result/grounded-img'
 import { UPLOAD_FORMAT_NAMES, UPLOAD_MAX_MB } from '../workspace/upload-formats'
 import { notePlaceholder } from '../workspace/workspace-options'
-import { TemplateToggles } from '../toggles'
 import { MobileSizeMenu } from './size-menu'
 import { HomeCtaButton } from './home-cta-button'
 import { thumbImage } from './thumb-image'
@@ -134,7 +133,6 @@ export const HomeCard = forwardRef<HTMLElement, Props>(function HomeCard({ state
             </span>
             <NoteBox state={state} />
           </label>
-          <TemplateToggles className="mk-toggles" template={template} values={state.toggles} onChange={state.setToggles} surface="home" />
         </>
       ) : (
         <CurrentTemplate thumb={thumb} name={template?.name} seeAll={seeAll} />
