@@ -168,9 +168,19 @@ export {
   type FeatureAccessInput,
   type FeatureSetting,
 } from './features'
-export { FEATURES_COPY, FeaturesEditor, WISHLIST_SWITCH_COPY, type FeatureAdminActions, type WishlistSwitchState } from './features-editor'
 export {
+  FEATURES_COPY,
+  FeaturesEditor,
+  WISHLIST_SWITCH_COPY,
+  type FeatureAdminActions,
+  type GallerySwitchKey,
+  type GallerySwitchState,
+  type WishlistSwitchState,
+} from './features-editor'
+export {
+  loadSettingSwitch,
   loadWishlistSwitch,
+  saveSettingSwitch,
   saveWishlistSwitch,
   type SystemSettingDeps,
   type WishlistSwitch,

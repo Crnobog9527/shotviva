@@ -5,6 +5,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { noteGenerationFailure } from '../alerts'
 import { captureError } from '../analytics'
 import { logger } from '../logger'
+import { scheduleScreen } from '../moderation'
 import { keepJobInputs, type ObjectStore } from '../storage'
 import { classifyFailure, GenerationFailure, type FailureStage } from './generation-failure'
 import { estimatedRouterCost, jobCostUsd } from './job-cost'
@@ -161,5 +162,9 @@ export function settleGeneration(
     confirm: (keptInputs, cost) => confirmJob(deps.db, { jobId: job.id, outputKey, keptInputs, ...cost }),
     fail: (errorCode, cost) => refundSafely(deps.db, job.id, errorCode, cost),
   }
-  return settleProviderCall(deps, ledger, call, decision)
+  // A finished public work goes to the content screen right after the response (§9 第 5 条).
+  return settleProviderCall(deps, ledger, call, decision).then((settled) => {
+    scheduleScreen(settled)
+    return settled
+  })
 }

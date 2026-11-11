@@ -22,6 +22,7 @@ export const SHELL_COPY = {
     references: '素材参考库',
     providers: 'AI 供应商',
     requests: '需求审核',
+    gallery: '创作库审核',
     announcements: '公告横幅',
     features: '功能权限',
   },

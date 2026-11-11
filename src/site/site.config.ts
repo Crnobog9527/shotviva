@@ -66,6 +66,9 @@ export const site = defineSite({
       '/connect/graylum/authorize',
       // The checkout return page (T43, noindex like every app page).
       '/checkout',
+      // The public gallery (T108), noindex in Chinese like the other inner pages.
+      '/gallery',
+      '/g/[jobId]',
     ],
     // Languages whose pages are not live yet but whose template covers can be prepared in the
     // admin ahead of launch (ARCHITECTURE §8.3, T87). Never shown on the site until launched.
@@ -102,8 +105,8 @@ export const site = defineSite({
       imageHosts: ['graylum.com', 'staging.graylum.com'],
     },
   },
-  // 创作库规格 U9: no gallery pages for the first 8 weeks.
-  gallery: { enabled: false },
+  // Shotviva has a public gallery; it stays closed until the Owner opens it in the admin (§9).
+  gallery: { enabled: true },
   // Template wishlist (ARCHITECTURE §15): true means this site has the feature. Whether it is
   // open is the admin switch on /admin/features (system_settings wishlist_enabled, default
   // off, §15.6 T62); while closed the tab bar has three tabs and /wishlist, /api/wishlist and

@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
 import { Suspense, type ReactNode } from 'react'
 
+import { isStaffAccount } from '@/core/analytics'
 import { AnalyticsIdentify } from '@/core/analytics/browser'
 import { AnnouncementBanner } from '@/core/announcements'
 import { AdminLink, adminEntryFor, AppFrame, BrandProvider, TabBar, TabBarSlot, type TabItem } from '@/core/app-shell'
@@ -44,7 +45,7 @@ async function Identity() {
   const user = await getSessionUser()
   return user ? (
     <>
-      <AnalyticsIdentify userId={user.id} />
+      <AnalyticsIdentify userId={user.id} staff={isStaffAccount(user, site.brand.domain)} />
       <GenerationOwner userId={user.id} />
     </>
   ) : null

@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('./session', () => ({ getSessionUser: mocks.getSessionUser }))
+const revalidateTag = vi.hoisted(() => vi.fn())
+vi.mock('next/cache', () => ({ revalidateTag }))
 vi.mock('./supabase-admin', () => ({
   createAdminSupabase: () => ({ auth: { admin: { deleteUser: mocks.deleteUser } } }),
 }))
@@ -49,6 +51,8 @@ describe('POST /api/account/delete', () => {
     const storage = fakeStorage()
     const response = await handle({ confirm: 'DELETE' }, storage)
     expect(response.status).toBe(200)
+    // T108: the deleted user's public works leave the gallery's cached pages at once.
+    expect(revalidateTag).toHaveBeenCalledWith('gallery', { expire: 0 })
     expect(mocks.cancelSubscriptions).toHaveBeenCalledWith('u1')
     expect(storage.deletePrefix.mock.calls.map(([prefix]) => prefix)).toEqual(['inputs/u1/', 'outputs/u1/', 'requests/u1/', 'tickets/u1/'])
     expect(mocks.deleteUser).toHaveBeenCalledWith('u1')
