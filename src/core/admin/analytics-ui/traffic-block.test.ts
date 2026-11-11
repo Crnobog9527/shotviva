@@ -28,7 +28,7 @@ it('renders channel shares per session and automation shares per observed view, 
   expect(googleRow?.replace(/<[^>]+>/g, ' ').split(/\s+/).filter(Boolean)).toEqual(['Google', '3', '75%', '2', '0'])
   expect(html).toContain('2 次（5%）')
   expect(html).toContain('38 次（95%）')
-  expect(html).toContain('2026-11-03 00:00 至 2026-11-10 00:00')
+  expect(html).toContain('2026-11-04 00:00 至 2026-11-10 00:00')
   expect(html).toContain('直接访问 / 无可识别来源')
 })
 

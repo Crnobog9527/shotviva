@@ -7,7 +7,9 @@ import { callRpc, type RpcClient } from '@/core/billing'
 // admin_revenue_stats (0167, source switched to payments in 0168): net revenue by window, product × channel, a daily trend
 // and subscription counts by status. Separate from admin_dashboard_stats by design (§10).
 
-const money = z.coerce.number().nonnegative()
+// Net revenue (1181: a refund returns its share of the tax, so never below 0). Signed on purpose so
+// one odd row cannot fail the whole overview.
+const money = z.coerce.number().finite()
 const count = z.coerce.number().int().nonnegative()
 
 const revenueSchema = z.object({

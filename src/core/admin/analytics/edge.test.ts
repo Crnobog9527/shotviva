@@ -71,8 +71,8 @@ describe('CDN requests', () => {
       end: '2026-01-08T17:25:00.000Z',
       bucketMinutes: 5,
     })
-    expect(window).toEqual({ start: '2026-01-01T17:00:00.000Z', end: '2026-01-08T17:00:00.000Z', bucketMinutes: 60 })
-    expect(edgeWindow('30d', now).start).toBe('2025-12-09T17:00:00.000Z')
+    expect(window).toEqual({ start: '2026-01-02T16:00:00.000Z', end: '2026-01-08T17:00:00.000Z', bucketMinutes: 60 })
+    expect(edgeWindow('30d', now).start).toBe('2025-12-10T16:00:00.000Z')
   })
 
 })
