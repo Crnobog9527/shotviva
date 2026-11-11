@@ -468,7 +468,9 @@
 @source "../core/jobs/generation-failure.ts";
 @source "../core/jobs/generation-request.ts";
 @source "../core/jobs/index.ts";
+@source "../core/jobs/job-background.ts";
 @source "../core/jobs/job-cost.ts";
+@source "../core/jobs/job-cut-out.ts";
 @source "../core/jobs/job-download.ts";
 @source "../core/jobs/job-file.ts";
 @source "../core/jobs/job-lookup.ts";
@@ -537,6 +539,7 @@
 @source "../core/storage/assets-env.ts";
 @source "../core/storage/batch-zip.ts";
 @source "../core/storage/create-upload.ts";
+@source "../core/storage/flatten.ts";
 @source "../core/storage/index.ts";
 @source "../core/storage/input-image.ts";
 @source "../core/storage/input-preview.ts";
@@ -545,8 +548,10 @@
 @source "../core/storage/marker-store.ts";
 @source "../core/storage/object-store.ts";
 @source "../core/storage/r2-store.ts";
+@source "../core/storage/rules/download-background.ts";
 @source "../core/storage/rules/index.ts";
 @source "../core/storage/sniff.ts";
+@source "../core/storage/stage-variant.ts";
 @source "../core/storage/upload/compress-image.ts";
 @source "../core/storage/upload/index.ts";
 @source "../core/storage/upload/put-with-progress.ts";
