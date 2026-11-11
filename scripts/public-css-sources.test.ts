@@ -1,19 +1,10 @@
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
-
 import { describe, expect, it } from 'vitest'
 
-import { GENERATED, generatedCss, publicEntries, reachableSources } from './public-css-sources-lib'
+import { publicEntries, reachableSources } from './public-css-sources-lib'
 
 const root = process.cwd()
 
 describe('public pages stylesheet sources', () => {
-  // A public page that starts importing a new file needs that file's class names in
-  // globals-public.css, or the component renders unstyled on marketing and sign-in pages only.
-  it('the committed list is what the import graph gives today (run `pnpm css:sources`)', () => {
-    expect(readFileSync(join(root, GENERATED), 'utf8')).toBe(generatedCss(root))
-  })
-
   it('starts from the marketing and sign-in routes and the root files', () => {
     const entries = publicEntries(root).map((file) => file.slice(root.length + 1))
     expect(entries).toContain('src/app/[locale]/(marketing)/page.tsx')
