@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 
 import { contentImageId } from './assets'
 import { isStyleRefKey } from '../../src/core/templates/style-refs'
-import { decodeProductionBatch, encodeBatch, structureOnly } from './production'
 import { parseBatch } from './schema'
 import { targetOf, type Env } from './options'
 import { failureText } from './report'
@@ -25,36 +24,13 @@ describe('batch file', () => {
   })
 })
 
-describe('production structure batch', () => {
-  const batch = parseBatch({ categories: [{ key: 'western', nameEn: 'Western', nameZh: '西餐', parent: 'food-drink' }],
-    templates: [{ id: 'a', name: 'A', creditsCost: { '1k': 1, '2k': 2, '3k': 3 }, prompt: { body: 'secret' },
-      styleRefs: ['a.png'], category: 'western', series: 'set', model: 'default', openSale: true, publish: true }] })
-
-  it('keeps only categories, series and per-template filing, model, sale and publish', () => {
-    expect(structureOnly(batch).templates).toEqual([{ id: 'a', category: 'western', series: 'set', model: 'default', openSale: true, publish: true }])
-    const encoded = encodeBatch(batch)
-    expect(Buffer.from(encoded, 'base64').toString('latin1')).not.toContain('secret')
-    expect(decodeProductionBatch(encoded).templates[0]).not.toHaveProperty('prompt')
-  })
-
-  it('refuses a workflow input that carries content', async () => {
-    const { gzipSync } = await import('node:zlib')
-    const raw = gzipSync(Buffer.from(JSON.stringify({ templates: [{ id: 'a', prompt: { body: 'x' } }] }))).toString('base64')
-    expect(() => decodeProductionBatch(raw)).toThrow('STRUCTURE_ONLY')
-    expect(() => decodeProductionBatch('not-base64-gzip')).toThrow('BATCH_UNREADABLE')
-  })
-})
-
 describe('target', () => {
   const env = (url: string, extra: Partial<Env> = {}) => ({ NEXT_PUBLIC_SUPABASE_URL: url, SUPABASE_SERVICE_ROLE_KEY: 'k',
     SHOTVIVA_IMPORT_ADMIN_ID: '11111111-1111-4111-8111-111111111111', ...extra }) as Env
-  it('writes the test site or a local stack, and production only from the workflow', () => {
+  it('writes the test site or a local stack, never production', () => {
     expect(targetOf(env('https://pnzkiqvktkzznfbyhphe.supabase.co'))).toBe('preview')
     expect(targetOf(env('http://127.0.0.1:54321'))).toBe('local')
-    expect(() => targetOf(env('https://irbqamjuazkkyvnnzupf.supabase.co'))).toThrow('工作流')
-    expect(() => targetOf(env('https://irbqamjuazkkyvnnzupf.supabase.co', { TEMPLATE_APPLY_TARGET: 'production' }))).toThrow()
-    expect(targetOf(env('https://irbqamjuazkkyvnnzupf.supabase.co', { TEMPLATE_APPLY_TARGET: 'production', GITHUB_ACTIONS: 'true' }))).toBe('production')
-    expect(() => targetOf(env('https://pnzkiqvktkzznfbyhphe.supabase.co', { TEMPLATE_APPLY_TARGET: 'production', GITHUB_ACTIONS: 'true' }))).toThrow()
+    expect(() => targetOf(env('https://irbqamjuazkkyvnnzupf.supabase.co'))).toThrow('T93')
     expect(() => targetOf(env('https://other.supabase.co'))).toThrow()
   })
 })

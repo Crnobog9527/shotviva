@@ -3,7 +3,6 @@
  *
  *   pnpm templates:apply .local/templates/batch.json --dry-run   # validate everything, keep nothing
  *   pnpm templates:apply .local/templates/batch.json             # apply on the test site
- *   pnpm templates:apply .local/templates/batch.json --production-batch
  *
  * Needs NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and SHOTVIVA_IMPORT_ADMIN_ID (.env.local);
  * covers and style references also need the R2 keys and NEXT_PUBLIC_ASSETS_BASE_URL. Prints ids,
@@ -17,8 +16,7 @@ import { z } from 'zod'
 
 import { r2PublicStore, r2Store } from '../../src/core/storage'
 import { buildPlan } from './plan'
-import { decodeProductionBatch, encodeBatch } from './production'
-import { envSchema, readOptions, targetOf, USAGE, type Env } from './options'
+import { envSchema, readOptions, targetOf, type Env } from './options'
 import type { PlanItem } from './plan-types'
 import { batchResultSchema, formatTable, rows, type BatchResult } from './report'
 import { parseBatch, type Batch } from './schema'
@@ -48,7 +46,7 @@ async function apply(batch: Batch, baseDir: string, env: Env, dryRun: boolean) {
   const target = targetOf(env)
   const db = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
   const state = await readState(db, batch)
-  const assets = target === 'production' ? {} : {
+  const assets = {
     assetsBase: env.NEXT_PUBLIC_ASSETS_BASE_URL, privateStore: optionalStore(r2Store), publicStore: optionalStore(r2PublicStore),
   }
   const ctx = { baseDir, db, ...assets }
@@ -65,17 +63,7 @@ async function apply(batch: Batch, baseDir: string, env: Env, dryRun: boolean) {
 
 async function main() {
   const options = readOptions(process.argv.slice(2))
-  if (options.productionBatch) {
-    if (!options.file) throw new Error(USAGE)
-    process.stdout.write(`${encodeBatch(readBatchFile(resolve(options.file)))}\n`)
-    return
-  }
   const env = envSchema.parse(process.env)
-  if (env.TEMPLATE_APPLY_TARGET === 'production') {
-    if (!env.TEMPLATE_APPLY_BATCH) throw new Error('TEMPLATE_APPLY_BATCH is required')
-    return apply(decodeProductionBatch(env.TEMPLATE_APPLY_BATCH), process.cwd(), env, options.dryRun)
-  }
-  if (!options.file) throw new Error(USAGE)
   const path = resolve(options.file)
   return apply(readBatchFile(path), dirname(path), env, options.dryRun)
 }

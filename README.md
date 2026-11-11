@@ -41,20 +41,12 @@ pnpm templates:apply .local/templates/<batch>.json             # apply to the te
 - Needs `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and `SHOTVIVA_IMPORT_ADMIN_ID`
   (your admin user id on that site) in `.env.local`. Covers and style references also need the
   R2 keys, `R2_BUCKET`, `R2_PUBLIC_BUCKET` and `NEXT_PUBLIC_ASSETS_BASE_URL`.
-- The script writes only to the test site or a local stack. Each item (category, series,
-  template) succeeds or fails on its own and is listed with its error code; the exit code is 1
-  if any item failed. `--dry-run` runs the whole batch in one transaction and rolls it back.
+- The script writes only to the test site or a local stack. A batch is all or nothing: every
+  item (category, series, template) is listed with its result, and if any item fails nothing is
+  kept and the exit code is 1. `--dry-run` runs the whole batch in one transaction and rolls it back.
 - Re-running a file is safe: unchanged items are reported as unchanged.
-- Production: template content goes through the "Sync preview templates to production"
-  workflow. Categories, series, filing, model, sale and publish go through the
-  "Apply template structure to production" workflow, which needs the Owner's approval:
-
-  ```bash
-  pnpm templates:apply .local/templates/<batch>.json --production-batch > /tmp/batch.b64
-  gh workflow run template-apply.yml --ref main -f dry_run=true -f batch="$(cat /tmp/batch.b64)"
-  ```
-
-  The production batch carries no prompts, prices, covers or files (it is visible on the run page).
+- Production is never written by this script: templates, categories and series reach
+  production through the "Sync preview templates to production" workflow (Owner approval).
 
 ## License
 
