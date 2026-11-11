@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { useEffect, useState, type ReactNode } from 'react'
 
 import { EditPhoto } from '../../edit-ui/edit-photo'
@@ -11,7 +11,7 @@ import { useEditForm } from '../../edit-ui/use-edit-form'
 import { retryJob } from '../../generation/job-store'
 import { useJob } from '../../generation/use-jobs'
 import type { WorkView } from '../work-view'
-import { forgetWorkViews } from './use-work-view'
+import { forgetWorkViews, preloadWorkView } from './use-work-view'
 import { BackToWork } from './viewer-bits'
 import { VIEWER_GRID } from './viewer-frame'
 
@@ -19,8 +19,9 @@ type Edit = NonNullable<WorkView['edit']>
 type Props = { view: WorkView & { edit: Edit }; onBack(): void; onDone(id: string): void }
 
 // Edit (ARCHITECTURE §5.2) in place of the work: the same form and bar as the edit panel, the
-// photo kept in the tray. Generate develops the edit right here; once it is done the viewer
-// shows the new photo, and the grid under it gains it on the refresh the generation runner does.
+// photo kept in the tray. Generate develops the edit right here; once it is done and the new
+// photo's view has loaded (so the viewer never stands empty), the viewer shows the new photo,
+// and the grid under it gains it on the refresh the generation runner does.
 // A failure offers Retry and Change the request, with the words kept.
 export function WorkEdit({ view, onBack, onDone }: Props) {
   const t = useTranslations('app.edit')
@@ -28,13 +29,19 @@ export function WorkEdit({ view, onBack, onDone }: Props) {
   const [draft, setDraft] = useState<EditDraft>({ text: '', resolution: source.resolution, aspect: source.aspect })
   const [jobId, setJobId] = useState<string | null>(null)
   const job = useJob(jobId)
+  const locale = useLocale()
+  const done = job?.status === 'succeeded' ? job.id : null
 
   useEffect(() => {
-    if (job?.status !== 'succeeded') return
+    if (!done) return
+    let live = true
     // The new photo spent credits: views cached with the old balance are out of date.
     forgetWorkViews()
-    onDone(job.id)
-  }, [job?.status, job?.id, onDone])
+    void preloadWorkView(done, locale).then(() => live && onDone(done))
+    return () => {
+      live = false
+    }
+  }, [done, locale, onDone])
 
   const generate = (next: EditDraft) => {
     setDraft(next)
