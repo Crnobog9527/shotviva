@@ -24,16 +24,21 @@ export function PanelStage({ name, after, initial, inset }: Props) {
   const t = useTranslations('home.generator')
   const tags = useTranslations('marketing.home')
   const cover = useStageCover(after, initial)
-  const style = { '--r': clampRatio(cover?.ratio ?? 4 / 5) } as CSSProperties
+  // --r: the frame's shape (bounded); --pr: the picture's own, for the box it is drawn in.
+  const style = { '--r': clampRatio(cover?.ratio ?? 4 / 5), '--pr': cover?.ratio ?? 4 / 5 } as CSSProperties
   return (
     <div className="mk-stage-wrap">
       <div className="mk-stage" style={style}>
         {cover ? (
           <>
             <img className="mk-stage-fill" {...thumbImage(cover.url, 32)} alt="" aria-hidden loading="lazy" decoding="async" />
-            {/* The opening cover's first frame, painted with the document, under the full picture. */}
-            {cover.firstFrame ? <img className="mk-stage-ff" src={cover.firstFrame} alt="" aria-hidden decoding="sync" /> : null}
-            <img key={cover.url} className="mk-stage-img" {...stageImage(cover.url)} alt={t('stageAlt', { name })} loading="lazy" decoding="async" />
+            {/* The picture's own box, on white: a transparent cut-out reads as on white, as on
+                every other cover; the blurred fill shows only outside it. */}
+            <span className="mk-stage-pic">
+              {/* The opening cover's first frame, painted with the document, under the full picture. */}
+              {cover.firstFrame ? <img className="mk-stage-ff" src={cover.firstFrame} alt="" aria-hidden decoding="sync" /> : null}
+              <img key={cover.url} className="mk-stage-img" {...stageImage(cover.url)} alt={t('stageAlt', { name })} loading="lazy" decoding="async" />
+            </span>
           </>
         ) : null}
         <span className="mk-tag mk-tag-r mk-stage-ai" aria-hidden>
