@@ -10,41 +10,46 @@ import { windowFor, type Range, type Window } from '../analytics/range'
 import { loadPeople, type People, type PeopleInput } from './people'
 import { loadGrowthStats, type GrowthStats } from './stats'
 
-// Reads for the overview (ARCHITECTURE §16.2b). The database half is cheap and is what the Owner
-// checks after a sale, so it is cached for a minute; the PostHog half for 10 minutes, like the
-// rest of the page (§16.2a). Each half fails on its own and shows 「暂时读不到」 only for itself.
+// Reads for the overview (ARCHITECTURE §16.2b). Both halves end at the same moment, rounded down
+// to 5 minutes, so a funnel step can never look lower only because PostHog stopped counting
+// earlier than the database (control review of #483). Both are cached for that long. Each half
+// fails on its own: the database half renders first, PostHog's numbers stream in after it.
 
 export type PeopleBlock = Block<People> | { status: 'unconfigured' }
-export type Overview = { db: Block<GrowthStats>; people: PeopleBlock }
 
-const MINUTE = 60_000
-const TEN_MINUTES = 600_000
-const floorTo = (ms: number, step: number) => Math.floor(ms / step) * step
+const STEP = 300_000
+export const overviewEnd = (now = Date.now()) => Math.floor(now / STEP) * STEP
+
+function profile() {
+  cacheLife({ stale: 120, revalidate: 300, expire: 600 })
+}
 
 async function cachedGrowth(range: Range, end: number): Promise<{ window: Window; data: GrowthStats }> {
   'use cache'
-  cacheLife({ stale: 30, revalidate: 60, expire: 300 })
+  profile()
   const window = windowFor(range, new Date(end))
   return { window, data: await loadGrowthStats(createAdminSupabase(), window) }
 }
 
 async function cachedPeople(range: Range, end: number, input: PeopleInput): Promise<{ window: Window; data: People }> {
   'use cache'
-  cacheLife({ stale: 300, revalidate: 600, expire: 900 })
+  profile()
   const access = posthogAccess()
   if (!access) throw new PostHogQueryError('unauthorized')
   const window = windowFor(range, new Date(end))
   return { window, data: await loadPeople(queryRunner(access), window, input) }
 }
 
-export async function readOverview(range: Range, now = Date.now()): Promise<Overview> {
-  const db = await readBlock('growth.db', () => cachedGrowth(range, floorTo(now, MINUTE)))
-  if (!posthogAccess()) return { db, people: { status: 'unconfigured' } }
-  if (db.status === 'error') return { db, people: { status: 'error' } }
+export function readGrowth(range: Range, end: number): Promise<Block<GrowthStats>> {
+  return readBlock('growth.db', () => cachedGrowth(range, end))
+}
+
+// Same range and end as the database read it follows; the ids come from that read.
+export async function readPeople(range: Range, end: number, db: GrowthStats): Promise<PeopleBlock> {
+  if (!posthogAccess()) return { status: 'unconfigured' }
   const input: PeopleInput = {
-    adminIds: db.data.admin_ids,
-    cohort: { current: db.data.periods.current.cohort, previous: db.data.periods.previous.cohort },
+    adminIds: db.admin_ids,
+    cohort: { current: db.periods.current.cohort, previous: db.periods.previous.cohort },
   }
-  const people = await readBlock('growth.people', () => cachedPeople(range, floorTo(now, TEN_MINUTES), input))
-  return { db, people }
+  return readBlock('growth.people', () => cachedPeople(range, end, input))
 }

@@ -2,35 +2,32 @@ import { MetricLabel } from '../analytics-ui/parts'
 import { n, pct } from '../analytics-ui/format'
 import { rate } from '../analytics/values'
 import { newUserSteps, type StepCount } from '../growth/funnel'
-import type { PeopleStats } from '../growth/people'
 import type { GrowthPeriod } from '../growth/stats'
 import { GROWTH_COPY as COPY } from './copy'
+import { missingText, peopleData, Unverified, type PeopleState } from './people-state'
 import { Section } from './section'
 
-type Props = { db: GrowthPeriod; people: PeopleStats | null }
+type Props = { db: GrowthPeriod; state: PeopleState }
+
+const POSTHOG_STEPS = new Set(['upload', 'paywall', 'checkout'])
 
 // Visitors on top, then one row per step for the people who signed up in the period; each bar is
 // that step's share of sign-ups. Returning users get two numbers of their own underneath.
-export function FunnelSection({ db, people }: Props) {
+export function FunnelSection({ db, state }: Props) {
+  const people = peopleData(state)?.current ?? null
   const steps = newUserSteps(db, people)
+  const missing = missingText(state)
   return (
     <Section title={COPY.funnel.title} desc={COPY.funnel.desc}>
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-border pb-4">
         <MetricLabel id="growth-visitors" metric={COPY.funnel.visitors} className="text-sm text-muted-foreground" />
         <span className="text-2xl font-semibold tabular-nums">{people ? n(people.visitors) : '—'}</span>
-        {people ? (
-          <MetricLabel
-            id="growth-visitor-rate"
-            metric={{ label: COPY.funnel.visitorRate(pct(rate(db.signups, people.visitors))), help: COPY.funnel.visitorRateHelp }}
-            className="text-sm text-muted-foreground"
-          />
-        ) : (
-          <span className="text-sm text-muted-foreground">{COPY.funnel.missing}</span>
-        )}
+        {people ? <Unverified /> : null}
+        {people ? <VisitorRate signups={db.signups} visitors={people.visitors} /> : <span className="text-sm text-muted-foreground">{missing}</span>}
       </div>
       <ol className="grid gap-3" aria-label={COPY.funnel.title}>
         {steps.map((step, i) => (
-          <StepRow key={step.key} step={step} before={closestBefore(steps, i)} signups={db.signups} />
+          <StepRow key={step.key} step={step} before={closestBefore(steps, i)} signups={db.signups} missing={missing} />
         ))}
       </ol>
       <div className="grid gap-2 border-t border-border pt-4">
@@ -54,6 +51,19 @@ export function FunnelSection({ db, people }: Props) {
   )
 }
 
+// Sign-ups ÷ visitors. PostHog can miss visitors (blockers, no consent), so when it saw fewer
+// visitors than there were sign-ups the share would be over 100% and is not shown.
+function VisitorRate({ signups, visitors }: { signups: number; visitors: number }) {
+  if (signups > visitors) return <span className="text-sm text-muted-foreground">{COPY.funnel.visitorRateHidden}</span>
+  return (
+    <MetricLabel
+      id="growth-visitor-rate"
+      metric={{ label: COPY.funnel.visitorRate(pct(rate(signups, visitors))), help: COPY.funnel.visitorRateHelp }}
+      className="text-sm text-muted-foreground"
+    />
+  )
+}
+
 function closestBefore(steps: readonly StepCount[], index: number): number | null {
   for (let i = index - 1; i >= 0; i--) {
     const count = steps[i]?.count
@@ -67,8 +77,16 @@ function lostSince(count: number | null, before: number | null): number {
   return count !== null && before !== null && before > count ? before - count : 0
 }
 
-function StepRow({ step, before, signups }: { step: StepCount; before: number | null; signups: number }) {
-  const meta = COPY.funnel.steps[step.key]
+function StepLabel({ step }: { step: StepCount }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <MetricLabel id={`growth-step-${step.key}`} metric={COPY.funnel.steps[step.key]} className="text-sm" />
+      {step.count !== null && POSTHOG_STEPS.has(step.key) ? <Unverified /> : null}
+    </span>
+  )
+}
+
+function StepRow({ step, before, signups, missing }: { step: StepCount; before: number | null; signups: number; missing: string }) {
   const share = step.count === null ? null : rate(step.count, signups)
   const lost = lostSince(step.count, before)
   const showShare = step.key !== 'signup' && share !== null
@@ -76,11 +94,11 @@ function StepRow({ step, before, signups }: { step: StepCount; before: number | 
   return (
     <li className="grid gap-1.5">
       <div className="flex items-baseline justify-between gap-4">
-        <MetricLabel id={`growth-step-${step.key}`} metric={meta} className="text-sm" />
+        <StepLabel step={step} />
         <span className="text-lg font-semibold tabular-nums">{step.count === null ? '—' : n(step.count)}</span>
       </div>
       {step.count === null ? (
-        <p className="text-xs text-muted-foreground">{COPY.funnel.missing}</p>
+        <p className="text-xs text-muted-foreground">{missing}</p>
       ) : (
         <>
           <div className="h-2 overflow-hidden rounded-full bg-muted" aria-hidden>
