@@ -47,14 +47,17 @@ describe('account page Admin row', () => {
 })
 
 describe('messages handed to the client', () => {
-  it('leave out the admin entry and server-rendered affiliate messages in both languages', async () => {
+  it('leave out the admin entry and the server-rendered affiliate and gallery messages in both languages', async () => {
     for (const locale of ['en', 'zh'] as const) {
       const all = await loadMessages(locale)
       const client = clientMessages(all)
       expect(all).toHaveProperty('adminEntry')
       expect(client).not.toHaveProperty('adminEntry')
       expect(client).not.toHaveProperty('affiliate')
-      expect(Object.keys(client)).toEqual(Object.keys(all).filter((key) => key !== 'adminEntry' && key !== 'affiliate'))
+      // T108: the public gallery translates on the server, so no other page carries its text.
+      expect(all).toHaveProperty('gallery')
+      expect(client).not.toHaveProperty('gallery')
+      expect(Object.keys(client)).toEqual(Object.keys(all).filter((key) => !['adminEntry', 'affiliate', 'gallery'].includes(key)))
       expect(JSON.stringify(client)).not.toContain('管理后台')
     }
   })

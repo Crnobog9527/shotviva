@@ -25,6 +25,7 @@ export type { MatrixWorkspaceProps } from './matrix/matrix-workspace'
 export { MatrixEntry } from './matrix/matrix-entry'
 // Make again (T40): server only; reads the work and copies its kept photos back.
 export { loadAgain } from './again/load-again'
+export { loadReuse } from './again/load-reuse'
 export { WorkspaceHead } from './workspace/workspace-head'
 export { GenerationOwner, GenerationRunner } from './generation/generation-runner'
 export { GeneratingPill } from './generation/generating-pill'

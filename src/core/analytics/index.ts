@@ -17,3 +17,4 @@ export { ALERTS, captureAlert, captureError, type AlertKind, type CaptureContext
 export { onRequestError, registerSentry } from './sentry-server'
 export { onServerError, signalServerError, type ServerErrorSignal } from './server-errors'
 export { REPLAY_BLOCK_CLASS } from './replay'
+export { isStaffAccount } from './staff'
