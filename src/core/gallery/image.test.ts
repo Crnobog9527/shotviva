@@ -4,8 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { png } from '../../../tests/fakes/images'
 import { createMemoryStore } from '../../../tests/fakes/memory-store'
 
-const mocks = vi.hoisted(() => ({ shown: null as unknown, open: true }))
-vi.mock('./reads', () => ({ shownImage: async () => mocks.shown }))
+const mocks = vi.hoisted(() => ({ shown: null as unknown }))
+const shownImage = vi.fn(async () => mocks.shown)
+vi.mock('./reads', () => ({ shownImage: () => shownImage() }))
 
 const { parseImageQuery, renderGalleryImage } = await import('./image')
 const { galleryVariantKey } = await import('./variants')
@@ -25,12 +26,12 @@ function r2Like() {
 
 function deps(store: ReturnType<typeof r2Like>['store']) {
   const tasks: (() => Promise<unknown>)[] = []
-  return { deps: { store, isOpen: async () => mocks.open, defer: (task: () => Promise<unknown>) => tasks.push(task) }, runDeferred: () => Promise.all(tasks.map((task) => task())) }
+  return { deps: { store, defer: (task: () => Promise<unknown>) => tasks.push(task) }, runDeferred: () => Promise.all(tasks.map((task) => task())) }
 }
 
 beforeEach(() => {
   mocks.shown = null
-  mocks.open = true
+  shownImage.mockClear()
 })
 
 describe('gallery image', () => {
@@ -52,16 +53,6 @@ describe('gallery image', () => {
     await expect(renderGalleryImage(d, 'x', 480)).rejects.toThrow('network')
   })
 
-  it('is nothing while the gallery is closed, even for a shown work', async () => {
-    const r2 = r2Like()
-    r2.upload(galleryVariantKey(OUTPUT, 480), new Uint8Array([1]), 'image/webp')
-    mocks.shown = { outputKey: OUTPUT, creditPool: 'free' }
-    mocks.open = false
-    const { deps: d } = deps(r2.store)
-    expect(await renderGalleryImage(d, 'x', 480)).toBe('closed')
-    expect(r2.store.get).not.toHaveBeenCalled()
-  })
-
   it('serves the ready-made copy as is, without touching the original', async () => {
     const r2 = r2Like()
     const ready = new Uint8Array([1, 2, 3])
@@ -78,8 +69,8 @@ describe('gallery image', () => {
     r2.upload(OUTPUT, await png(1200, 1500), 'image/png')
     mocks.shown = { outputKey: OUTPUT, creditPool: 'paid' }
     const { deps: d, runDeferred } = deps(r2.store)
-    const body = (await renderGalleryImage(d, 'x', 480)) as Uint8Array
-    expect(await sharp(body).metadata()).toMatchObject({ format: 'webp', width: 480 })
+    const body = await renderGalleryImage(d, 'x', 480)
+    expect(await sharp(body!).metadata()).toMatchObject({ format: 'webp', width: 480 })
     expect(r2.objects.has(galleryVariantKey(OUTPUT, 480))).toBe(false)
     await runDeferred()
     expect(r2.objects.get(galleryVariantKey(OUTPUT, 480))?.body).toEqual(body)
@@ -88,12 +79,23 @@ describe('gallery image', () => {
     expect(await renderGalleryImage(d, 'x', 960)).toEqual(r2.objects.get(galleryVariantKey(OUTPUT, 960))!.body)
   })
 
+  it('does not write the copies when the work stopped being shown before the write', async () => {
+    const r2 = r2Like()
+    r2.upload(OUTPUT, await png(600, 600), 'image/png')
+    mocks.shown = { outputKey: OUTPUT, creditPool: 'free' }
+    const { deps: d, runDeferred } = deps(r2.store)
+    expect(await renderGalleryImage(d, 'x', 480)).not.toBeNull()
+    mocks.shown = null // rejected while the response was on its way
+    await runDeferred()
+    expect([...r2.objects.keys()].filter((key) => key.includes('-gallery-'))).toEqual([])
+  })
+
   it('falls back to the render when reading the copy fails for another reason', async () => {
     const r2 = r2Like()
     r2.upload(OUTPUT, await png(600, 600), 'image/png')
     mocks.shown = { outputKey: OUTPUT, creditPool: 'free' }
     r2.store.get.mockRejectedValueOnce(new Error('timeout'))
     const { deps: d } = deps(r2.store)
-    expect(await sharp((await renderGalleryImage(d, 'x', 480)) as Uint8Array).metadata()).toMatchObject({ format: 'webp', width: 480 })
+    expect(await sharp((await renderGalleryImage(d, 'x', 480))!).metadata()).toMatchObject({ format: 'webp', width: 480 })
   })
 })

@@ -3,6 +3,7 @@ import 'server-only'
 import { z } from 'zod'
 
 import { AppError } from '../errors'
+import { galleryVariantKeys } from '../gallery/variants'
 import { logger } from '../logger'
 import { copyBackKeptInputs, DOWNLOAD_VARIANTS, downloadVariantKeyFor, inputPreviewKeyFor, type ObjectStore } from '../storage'
 import { EDIT_TEMPLATE_ID } from '../templates/edit-params'
@@ -38,10 +39,12 @@ export async function photosForAgain(store: ObjectStore, job: Job): Promise<Agai
 
 // Every file a work owns (§8.3: kept and deleted together): the result, the 768px preview (T32)
 // and the kept uploads (T40), plus any staged 白底 / 透明底 download copy or pair ZIP (§8; usually absent, and a
-// missing key deletes fine). For deleting one work; account deletion clears both user prefixes.
+// missing key deletes fine), and the gallery's copies (§9 第 9 条; only approved works have them).
+// For deleting one work; account deletion clears both user prefixes.
 export function workFileKeys(job: Pick<Job, 'id' | 'userId' | 'outputKey' | 'inputs'>): string[] {
   const staged = DOWNLOAD_VARIANTS.map((variant) => downloadVariantKeyFor(job.userId, job.id, variant))
-  return [...(job.outputKey ? [job.outputKey] : []), inputPreviewKeyFor(job.userId, job.id), ...keptInputsOf(job), ...staged]
+  const gallery = job.outputKey ? galleryVariantKeys(job.outputKey) : []
+  return [...(job.outputKey ? [job.outputKey] : []), inputPreviewKeyFor(job.userId, job.id), ...keptInputsOf(job), ...staged, ...gallery]
 }
 
 // Best effort: every key is tried; a failure is logged and counted, never thrown, because the

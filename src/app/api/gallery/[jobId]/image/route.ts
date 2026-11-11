@@ -12,17 +12,19 @@ import { site } from '@/site/site.config'
 // while the gallery is closed. The CDN keeps a copy for ten minutes at most, so a rejected or
 // deleted work's image stops within that time; this side checks the work on every miss.
 const CACHE = 'public, max-age=300, s-maxage=600'
+// A 404 sits in the CDN for a minute, also while the gallery is closed: the switch is checked
+// first (a cached read), so a closed gallery costs no work lookup, and the CDN absorbs repeats.
+const NOT_FOUND = { status: 404, headers: { 'Cache-Control': 'public, max-age=60, s-maxage=60' } }
 
 export async function GET(request: NextRequest, { params }: RouteContext<'/api/gallery/[jobId]/image'>) {
   await connection()
   try {
     const width = parseImageQuery(request.nextUrl.searchParams)
     if (!width) return new Response(null, { status: 404 })
+    if (!(await isGalleryEnabled(site))) return new Response(null, NOT_FOUND)
     const { jobId } = await params
-    const deps = { store: r2Store(), isOpen: () => isGalleryEnabled(site), defer: (task: () => Promise<unknown>) => after(task) }
-    const body = await renderGalleryImage(deps, jobId, width)
-    if (body === 'closed') return new Response(null, { status: 404 })
-    if (!body) return new Response(null, { status: 404, headers: { 'Cache-Control': 'public, max-age=60, s-maxage=60' } })
+    const body = await renderGalleryImage({ store: r2Store(), defer: (task) => after(task) }, jobId, width)
+    if (!body) return new Response(null, NOT_FOUND)
     return new Response(body as BodyInit, { headers: { 'Content-Type': 'image/webp', 'Cache-Control': CACHE, 'X-Robots-Tag': 'noindex' } })
   } catch (error) {
     return errorResponse(error, 'gallery.image')
