@@ -206,3 +206,14 @@ export const catalogCopy = {
   empty: '没有匹配的模板',
   status: '上架状态', category: '筛选分类', categories: '全部分类', search: '搜索中文名、英文名或 ID',
 }
+
+// The catalogue row (2026-11-12): the cover thumbnail, the id that copies itself, the actions.
+export const rowCopy = {
+  noCover: '无封面',
+  copyId: '复制 ID',
+  copied: '已复制',
+  credits: '积分',
+  tiers: 'Standard / HD / Max',
+  version: '版本',
+  edit: '编辑',
+} as const
