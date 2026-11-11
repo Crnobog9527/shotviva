@@ -162,8 +162,9 @@ begin
            'payers', (select count(*) from buyers b where b.referred),
            'net_usd', (select coalesce(sum(b.net_cents), 0) / 100.0 from buyers b where b.referred)),
          'cohort', (select coalesce(jsonb_agg(c.id order by c.id), '[]'::jsonb) from cohort c),
+         'cohort_referred', (select coalesce(jsonb_agg(c.id order by c.id), '[]'::jsonb) from cohort c where c.referred),
          'buyers', (select coalesce(jsonb_agg(jsonb_build_object('user_id', b.user_id, 'net_usd', b.net_cents / 100.0,
-                                                                 'orders', b.orders) order by b.user_id), '[]'::jsonb)
+                                                                 'orders', b.orders, 'referred', b.referred) order by b.user_id), '[]'::jsonb)
                       from buyers b)
        ) as stats
      ) s

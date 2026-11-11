@@ -240,11 +240,13 @@ describe('admin_growth_stats: money', () => {
 
   it('credits the promoter link with its sign-up, its buyer and their money', () => {
     expect(stats.periods.current.affiliate).toEqual({ signups: 1, payers: 1, net_usd: 18.9 })
+    expect(stats.periods.current.cohort_referred).toEqual([ids.referred])
   })
 
   it('lists each buyer once with their net total, for source attribution', () => {
     const lastWeek = stats.periods.current.buyers.find((b) => b.user_id === ids.lastWeek)
-    expect(lastWeek).toEqual({ user_id: ids.lastWeek, net_usd: 39.9, orders: 2 })
+    expect(lastWeek).toEqual({ user_id: ids.lastWeek, net_usd: 39.9, orders: 2, referred: false })
+    expect(stats.periods.current.buyers.find((b) => b.user_id === ids.referred)?.referred).toBe(true)
     expect(stats.periods.current.buyers).toHaveLength(4)
   })
 })

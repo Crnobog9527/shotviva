@@ -34,7 +34,10 @@ const periodSchema = z.object({
   disputes: z.object({ count, usd: money }),
   affiliate: z.object({ signups: count, payers: count, net_usd: net }),
   cohort: z.array(uuid),
-  buyers: z.array(z.object({ user_id: uuid, net_usd: net, orders: count })),
+  // Bound to a promoter in the database (profiles.referred_by): the source table credits them to
+  // 推广员 whatever PostHog saw.
+  cohort_referred: z.array(uuid),
+  buyers: z.array(z.object({ user_id: uuid, net_usd: net, orders: count, referred: z.boolean() })),
 })
 
 const growthSchema = z.object({
