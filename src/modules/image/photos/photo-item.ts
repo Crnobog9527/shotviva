@@ -1,5 +1,6 @@
 import type { CreditPool } from '@/core/billing/pools'
 import type { Job, JobVisibility } from '@/core/jobs'
+import { isCutOut } from '@/core/jobs/job-cut-out'
 import { OUTPUT_ASPECTS, RESOLUTIONS, type OutputAspect, type Resolution } from '@/core/templates/output-options'
 import type { Translate } from '@/core/translate'
 
@@ -19,6 +20,8 @@ export type PhotoItem = {
   creditPool: CreditPool
   visibility: JobVisibility
   fileUrl: string | null
+  // A cut-out (transparent background): downloads offer 白底 / 透明底. null when unknown.
+  transparent?: boolean | null
   // The preflighted batch it came from (T107): Photos groups a batch and offers its ZIP.
   batchId: string | null
   // Its cell in that batch, 0 first (inputs.batch_position); null outside a batch.
@@ -45,6 +48,7 @@ export function toPhotoItem(job: Job, templates: TemplateLookup, fileUrl: string
     creditPool: job.creditPool,
     visibility: job.visibility,
     fileUrl,
+    transparent: isCutOut(job),
     batchId: job.batchId ?? null,
     batchPosition: batchPosition(job.inputs.batch_position),
   }

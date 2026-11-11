@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 
 import { CostBillsSection } from './blocks/cost-bills'
+import { EditCasesSection } from './blocks/edit-cases'
 import { FaqSection } from './blocks/faq-section'
 import { HomeHero } from './blocks/home-hero'
 import { FreeOfferSection, HomeFacts, StepsSection } from './blocks/home-sections'
@@ -28,12 +29,14 @@ type Props = {
 // the "full shoot" demo → the six H2s in order, with the two bills (block ③) after the free
 // offer, as in the signed-off v3-b comp (design/comps-v3-b/home.html). While the wishlist is
 // open, "Can't find your template?" follows the grid (Owner 2026-11-10); it is not one of the six.
-// An optional topic H2 (SEO launch handbook G9) sits between the grid and the wishlist.
+// An optional topic H2 (SEO launch handbook G9) sits between the grid and the wishlist; the
+// optional text-edit cases follow the shoot demo.
 export function HomePageView({ page, brand, isLinkEnabled, templates, generator, wishlistCta }: Props) {
   return (
     <article className="mk-home mk-w">
       <HomeHero page={page} generator={generator} />
       <ShootSection shoot={page.shoot} />
+      {page.edits ? <EditCasesSection edits={page.edits} /> : null}
       <StepsSection steps={page.steps} />
       <TemplateGrid grid={page.templateGrid} sections={templates} isLinkEnabled={isLinkEnabled} />
       {page.topics ? <TopicCards topic={page.topics} isLinkEnabled={isLinkEnabled} /> : null}

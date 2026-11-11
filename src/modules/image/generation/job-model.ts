@@ -39,6 +39,8 @@ export type TrackedJob = {
   body?: JobBody
   fileUrl: string | null
   creditPool: CreditPool | null
+  // A cut-out (transparent background): its downloads offer 白底 / 透明底. Unknown when absent.
+  transparent?: boolean | null
   failure: JobFailure | null
   // When it succeeded or failed in this tab (ms epoch); a reload keeps a settled job the
   // workspace still shows for a while, so its result comes back too.
@@ -53,7 +55,7 @@ const settled = (now: number) => ({ retryAt: undefined, settledAt: now })
 
 export function applyView(job: TrackedJob, view: JobView, now = Date.now()): TrackedJob {
   if (view.status === 'running') return job
-  if (view.status === 'succeeded') return { ...job, ...settled(now), status: 'succeeded', fileUrl: view.file_url, creditPool: view.credit_pool }
+  if (view.status === 'succeeded') return { ...job, ...settled(now), status: 'succeeded', fileUrl: view.file_url, creditPool: view.credit_pool, transparent: view.transparent ?? null }
   return { ...job, ...settled(now), status: 'failed', failure: { code: view.error_code ?? 'GENERATION_FAILED', message: '', refunded: true } }
 }
 
