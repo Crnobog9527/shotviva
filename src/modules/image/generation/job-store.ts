@@ -195,13 +195,14 @@ export async function pollRunning(): Promise<void> {
 // out and in as someone else) are dropped, not shown or resent; then restored jobs go out.
 export function claimStore(userId: string) {
   getJobs()
-  if (owner !== undefined && owner !== userId) {
-    limit = 1
+  if (owner !== userId) {
+    if (owner !== undefined) {
+      limit = 1
+      jobs = EMPTY
+      views = {}
+    }
     owner = userId
-    set(EMPTY, {})
-  } else if (owner !== userId) {
-    owner = userId
-    saveState({ limit, jobs, views, owner })
+    set(jobs)
   }
   pump()
 }
