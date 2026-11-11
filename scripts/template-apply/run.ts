@@ -32,11 +32,14 @@ function readBatchFile(path: string): Batch {
 
 const optionalStore = (make: () => ReturnType<typeof r2Store>) => { try { return make() } catch { return undefined } }
 
+// All or nothing: a real run with any local problem sends nothing; a dry run still has the
+// database check every other item.
 async function send(db: SupabaseClient, actor: string, plan: PlanItem[], dryRun: boolean) {
   const items = plan.filter(item => item.problems.length === 0 && item.ops.length > 0).map(({ ref, ops }) => ({ ref, ops }))
-  if (items.length === 0) return new Map<string, BatchResult>()
+  if (items.length === 0 || (!dryRun && plan.some(item => item.problems.length > 0))) return new Map<string, BatchResult>()
   const { data, error } = await db.rpc('admin_apply_template_batch', { p_actor: actor, p_items: items, p_validate_only: dryRun })
   // PostgREST detail can echo row values; the code alone is enough to act on.
+  if (error?.code === 'PGRST202') throw new Error('目标库还没有批量接口（迁移 1260），合并并推到这个库之后才能执行')
   if (error) throw new Error(error.message === 'NOT_ADMIN' ? 'SHOTVIVA_IMPORT_ADMIN_ID 不是目标站未封禁的管理员' : `批量接口调用失败（${error.code}）`)
   return new Map(batchResultSchema.parse(data).map(result => [result.ref, result]))
 }
@@ -50,13 +53,13 @@ async function apply(batch: Batch, baseDir: string, env: Env, dryRun: boolean) {
   }
   const ctx = { baseDir, db, ...assets }
   let plan = await buildPlan(batch, state, { ...ctx, write: false })
-  // Files are uploaded only for items that passed every local check.
-  if (!dryRun) plan = await buildPlan(batch, state, { ...ctx, write: true, skip: new Set(plan.filter(i => i.problems.length).map(i => i.ref)) })
+  // Files are uploaded only once the whole batch passed every local check.
+  if (!dryRun && plan.every(i => i.problems.length === 0)) plan = await buildPlan(batch, state, { ...ctx, write: true })
   const results = await send(db, env.SHOTVIVA_IMPORT_ADMIN_ID, plan, dryRun)
   const table = rows(plan, results, dryRun)
   process.stdout.write(`${target}${dryRun ? '（dry-run，全部回滚）' : ''}\n${formatTable(table)}\n`)
   const failed = table.filter(row => !row.ok).length
-  process.stdout.write(failed ? `\n${failed} 项失败。\n` : `\n全部${dryRun ? '通过' : '完成'}：${table.length} 项。前台目录缓存最多 1 小时后更新。\n`)
+  process.stdout.write(failed ? `\n${failed} 项失败，整批没有保留任何改动。\n` : `\n全部${dryRun ? '通过' : '完成'}：${table.length} 项。前台目录缓存最多 1 小时后更新。\n`)
   if (failed) process.exitCode = 1
 }
 

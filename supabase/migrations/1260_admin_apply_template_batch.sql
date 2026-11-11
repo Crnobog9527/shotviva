@@ -4,10 +4,10 @@
 -- admin server code makes (common cover columns after an upload, the 上架 switch). The script
 -- builds every argument with the admin's own TypeScript validation first.
 --
--- One call is one transaction. Each item (a category, a template, a series) runs in its own
--- subtransaction, so a failing item rolls back alone and is reported with its error code while
--- the others commit. With p_validate_only the whole batch is rolled back at the end (--dry-run):
--- the same functions run against the same rows and nothing is kept.
+-- One call is one transaction, all or nothing. Each item (a category, a template, a series) runs
+-- in its own subtransaction only so that every failing item is reported with its error code in
+-- one pass; if any item failed, or with p_validate_only (--dry-run), the whole batch is rolled
+-- back at the end: the same functions run against the same rows and nothing is kept.
 --
 -- Errors: only our own upper-case codes and their details (written by our functions, never row
 -- data) are returned; anything else is reported as DB_ERROR with its SQLSTATE and constraint
@@ -99,6 +99,7 @@ declare
   v_state text;
   v_constraint text;
   v_known boolean;
+  v_failed boolean := false;
 begin
   if not exists(select from public.profiles where id = p_actor and role = 'admin' and banned_at is null) then
     raise exception 'NOT_ADMIN';
@@ -118,6 +119,7 @@ begin
         get stacked diagnostics v_message = message_text, v_detail = pg_exception_detail,
           v_state = returned_sqlstate, v_constraint = constraint_name;
         v_known := v_message ~ '^[A-Z][A-Z0-9_]+$';
+        v_failed := true;
         results := results || jsonb_build_array(jsonb_build_object('ref', item->>'ref', 'ok', false,
           'code', case when v_known then v_message else 'DB_ERROR' end,
           'detail', case when v_known then nullif(v_detail, '') end,
@@ -125,7 +127,7 @@ begin
       end;
     end loop;
     -- A private SQLSTATE rolls back every item's changes; the results above are kept.
-    if p_validate_only then raise exception using errcode = 'Z9302'; end if;
+    if p_validate_only or v_failed then raise exception using errcode = 'Z9302'; end if;
   exception when sqlstate 'Z9302' then
     null;
   end;

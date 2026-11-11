@@ -38,16 +38,19 @@ export function failureText(result: BatchResult) {
 
 export type Row = { item: string; actions: string; result: string; ok: boolean }
 
+// A batch is all or nothing: one failure anywhere (found here or in the database) keeps nothing.
 export function rows(plan: PlanItem[], results: Map<string, BatchResult>, dryRun: boolean): Row[] {
+  const failed = plan.some(item => item.problems.length > 0) || [...results.values()].some(result => !result.ok)
+  const done = dryRun ? '通过（已回滚）' : failed ? '已回滚（同批有失败）' : '完成'
   return plan.map(item => {
     const actions = item.actions.join('、') + (item.notes.length ? `（${item.notes.join('；')}）` : '')
     const base = { item: `${item.kind} ${item.label}`, actions }
     if (item.problems.length) return { ...base, ok: false, result: `未执行：${item.problems.join('；')}` }
     if (item.ops.length === 0) return { ...base, ok: true, result: '—' }
     const result = results.get(item.ref)
-    if (!result) return { ...base, ok: false, result: '没有返回结果' }
+    if (!result) return { ...base, ok: true, result: dryRun ? '未检查（同批有本地问题）' : '未执行（同批有失败）' }
     if (!result.ok) return { ...base, ok: false, result: `失败 ${failureText(result)}` }
-    return { ...base, ok: true, result: dryRun ? '通过（已回滚）' : '完成' }
+    return { ...base, ok: true, result: done }
   })
 }
 

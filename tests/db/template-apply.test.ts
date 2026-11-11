@@ -8,7 +8,7 @@ import { batchResultSchema } from '../../scripts/template-apply/report'
 import { parseBatch } from '../../scripts/template-apply/schema'
 import { readState } from '../../scripts/template-apply/state'
 import { connectAdmin, createUser } from './helpers'
-import { serviceSupabase } from './supabase-env'
+import { anonSupabase, serviceSupabase } from './supabase-env'
 
 // `pnpm templates:apply` end to end against a real stack: the planner's ops through
 // admin_apply_template_batch (migration 1260) into the admin's own functions.
@@ -87,7 +87,7 @@ describe('templates:apply', () => {
     expect(again.filter(i => i.ref.startsWith('category') || i.ref.startsWith('template')).flatMap(i => i.ops)).toEqual([])
   })
 
-  it('isolates a failing item, reports only its code and never the prompt', async () => {
+  it('rolls the whole batch back when one item fails, and reports only its code, never the prompt', async () => {
     const input = batch({ categories: [], series: [], templates: [template(broken, { category: `missing-${tag}` }), template(first, { name: 'Renamed' })] })
     const plan = await buildPlan(input, await readState(db, input), { baseDir: '/', write: false, db })
     const items = plan.map(({ ref, ops }) => ({ ref, ops }))
@@ -96,7 +96,9 @@ describe('templates:apply', () => {
     expect(results).toEqual([{ ref: `template:${broken}`, ok: false, code: 'CATEGORY_NOT_FOUND', detail: null, sqlstate: 'P0001', constraint: null },
       { ref: `template:${first}`, ok: true }])
     expect(JSON.stringify(results)).not.toContain(secret)
-    expect((await pg.query('select name from public.templates where id=$1', [first])).rows[0].name).toBe('Renamed')
+    // The item that passed was rolled back with the one that failed.
+    expect((await pg.query('select name from public.templates where id=$1', [first])).rows[0].name).toBe(`Name ${first}`)
+    expect((await rows()).map(r => r.id)).toEqual([first, second])
   })
 
   it('opens sale and publishes with the switch rules, and unpublishes before closing the sale', async () => {
@@ -109,9 +111,11 @@ describe('templates:apply', () => {
     expect((await rows()).find(r => r.id === first)).toMatchObject({ is_active: false, sale: false })
   })
 
-  it('refuses a non-admin actor and is not callable by clients', async () => {
+  it('refuses a non-admin actor and is not callable by anonymous or signed-in clients', async () => {
     const { error } = await db.rpc('admin_apply_template_batch', { p_actor: randomUUID(), p_items: [], p_validate_only: true })
     expect(error?.message).toBe('NOT_ADMIN')
+    const anon = await anonSupabase().rpc('admin_apply_template_batch', { p_actor: actor, p_items: [], p_validate_only: true })
+    expect(anon.error?.code).toBe('42501')
     const grants = await pg.query(`select has_function_privilege('anon','public.admin_apply_template_batch(uuid,jsonb,boolean)','execute') a,
       has_function_privilege('authenticated','public.admin_apply_template_batch(uuid,jsonb,boolean)','execute') b`)
     expect(grants.rows[0]).toEqual({ a: false, b: false })

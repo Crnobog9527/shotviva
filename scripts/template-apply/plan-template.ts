@@ -103,5 +103,6 @@ export function planTemplate(item: TemplateItem, ctx: Ctx, assets: TemplateAsset
     problems.push(error instanceof Error ? error.message : String(error))
   }
   const ops = [...unpublishStep(item, current, problems), ...(save ? [save.step] : []), ...laterSteps(item, current, ctx, save, assets, problems)]
-  return { ...base, actions: ops.length ? describe(ops, current, save?.seriesChanged) : ['无变化'], ops, problems, notes }
+  const idle = problems.length ? ['—'] : ['无变化']
+  return { ...base, actions: ops.length ? describe(ops, current, save?.seriesChanged) : idle, ops, problems, notes }
 }
