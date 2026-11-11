@@ -3,7 +3,7 @@
 import { useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 
-import { PaywallButton } from '@/core/billing/paywall'
+import { PaywallButton } from '@/core/billing/paywall/provider'
 import { Link } from '@/core/i18n/ui'
 import { cn } from '@/core/ui/cn'
 

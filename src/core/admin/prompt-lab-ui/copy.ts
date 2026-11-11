@@ -18,3 +18,12 @@ export const copy = {
   noPhotos: '从本机上传一张测试照片即可开始。', waiting: '已提交，等待完成', chosen: '已选',
 }
 export const usd = (amount: number) => '$' + amount.toLocaleString('en-US', { maximumFractionDigits: 6 })
+export const publishCopy = {
+  open: '发布为模板', published: '已发布为模板', openDraft: '打开草稿', title: '发布为模板草稿',
+  description: '用这格结果的提示词版本和出图模型新建一个模板。草稿为下架状态、未开放销售；名称、价格和上架在模板编辑页完成，上架时照常检查成本下限。',
+  version: '提示词版本', model: '出图模型', output: '清晰度与质量', style: '画风参考图', high: '高', medium: '中',
+  styleYes: '带对标图（复制为模板的私有参考图）', styleNo: '不带',
+  id: '模板 ID', idHint: '小写字母、数字和连字符，创建后不能修改。', name: '英文名', nameZh: '中文名（可选）',
+  category: '模板分类', pickCategory: '选择分类', suggested: '已按素材分类预选，可以改。', noSuggestion: '素材分类没有对应的模板分类，请手动选择。',
+  cover: '封面会用这格结果作「后」、测试照片作「前」，自动压缩。', cancel: '取消', submit: '创建草稿', publishing: '正在创建',
+}

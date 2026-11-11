@@ -1,6 +1,9 @@
+import { existsSync, statSync } from 'node:fs'
+import { join } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
-import type { ContentPage } from '@/core/content'
+import type { ContentPage, ImageRef } from '@/core/content'
 
 import { site } from '../site.config'
 import { contentPagesIn } from './localized'
@@ -8,6 +11,22 @@ import { aiRestaurantMenu } from './pages/ai-restaurant-menu'
 import { commercialPhotography } from './pages/commercial-photography'
 import { PLATFORM_SPECS } from './platform-specs'
 import { zhAiRestaurantMenu } from './zh/pages/ai-restaurant-menu'
+
+// Every picture a landing page shows: the hero pair, the shoot and the edit cases.
+function caseImagesOf(page: ContentPage): ImageRef[] {
+  const { hero, landing } = page
+  const shoot = landing.shoot ? [landing.shoot.phone.image, ...landing.shoot.results.map((result) => result.image)] : []
+  const edits = landing.edits?.items.flatMap((item) => [item.before, item.after, ...(item.reference ? [item.reference] : [])]) ?? []
+  return [hero.before, hero.after, ...shoot, ...edits]
+}
+
+function expectCaseFile(image: ImageRef) {
+  expect(image.src).toMatch(/^\/cases\/[a-z0-9-]+\.webp$/)
+  expect(image.alt).toMatch(/^(AI example: |AI 示例：|Example phone photo: |示例手机照：)/)
+  const file = join(process.cwd(), 'public', image.src)
+  expect(existsSync(file)).toBe(true)
+  expect(statSync(file).size).toBeLessThanOrEqual(150_000)
+}
 
 // The three SEO landing pages (T44, design/comps-v3-b/landing.html, ARCHITECTURE §12, §17).
 describe('landing pages', () => {
@@ -21,6 +40,17 @@ describe('landing pages', () => {
     }
     expect(site.indexing.zhIndexablePaths).not.toContain('/commercial-photography')
     expect(site.indexing.zhIndexablePaths).not.toContain('/ai-restaurant-menu')
+  })
+
+  // Owner 2026-11-11: the inner pages show their own cases (public/cases), never the home tote,
+  // and every case picture is a real file of at most 150 KB, as small as the mainland needs.
+  it('show their own case pictures, not the home tote, each a file of at most 150 KB', () => {
+    for (const page of [...contentPagesIn('en'), ...contentPagesIn('zh')]) {
+      if (page.slug === 'ai-restaurant-menu') continue
+      const images = caseImagesOf(page)
+      expect(images.length).toBeGreaterThan(2)
+      for (const image of images) expectCaseFile(image)
+    }
   })
 
   it('links back home with the R8 anchor, 2–3 related pages, then Pricing (gap audit B10)', () => {

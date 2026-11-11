@@ -84,6 +84,7 @@ export type LandingParts = {
   factsNote: string
   templates?: { heading: string; intro: string; categoryKeys: readonly [string, ...string[]] }
   shoot?: ShootDemo
+  edits?: EditCases
 }
 
 // Block ③ on every page is the two bills (DESIGN §6.9 item 6), so a page without them fails tsc.
@@ -128,7 +129,20 @@ export type ShootDemo = {
   phone: { image: ImageRef; file: string; caption: string }
   arrow: string
   results: readonly [ShootResult, ShootResult, ShootResult]
-  bill: { photographer: ShootBillSide; site: ShootBillSide; line: string }
+  // Product shoots compare against a photographer; a demo without a cost story (the pet in
+  // three art styles) leaves it out.
+  bill?: { photographer: ShootBillSide; site: ShootBillSide; line: string }
+}
+
+// Landing pages: precise edits of a finished picture, each a before/after pair with what
+// changed in one line. `reference` is a second photo the edit took its subject from (a drink
+// swapped in from the owner's phone shot); it sits small on the before side.
+export type EditCase = { title: string; change: string; before: ImageRef; after: ImageRef; reference?: ImageRef }
+export type EditCases = {
+  heading: string
+  intro: string
+  labels: { before: string; after: string; reference: string }
+  items: readonly [EditCase, EditCase, ...EditCase[]]
 }
 
 // Home block ③: what three product photos cost, as two bills (DESIGN §6.9 item 6, Owner

@@ -1,19 +1,22 @@
 import { useState } from 'react'
 import { Button } from '@/core/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/core/ui/dialog'
-import type { LabPage, LabRun } from '../prompt-lab/types'
+import { Link } from '@/core/i18n/navigation'
+import type { LabPage, LabPublishOptions, LabRun } from '../prompt-lab/types'
 import { labError, labRequest } from './api'
-import { copy as c, usd } from './copy'
+import { copy as c, publishCopy, usd } from './copy'
 import { executeCells } from './matrix-submit'
+import { PublishDialog } from './publish-dialog'
 
 const src = (id: string) => '/admin-media/prompt-lab/' + id
-type Props = { sessionId: string; page: LabPage<LabRun>; changed(): Promise<void>; more(): Promise<void> }
+type Props = { sessionId: string; page: LabPage<LabRun>; publish: LabPublishOptions; archived: boolean; changed(): Promise<void>; more(): Promise<void> }
 
-export function Results({ sessionId, page, changed, more }: Props) {
+export function Results({ sessionId, page, publish, archived, changed, more }: Props) {
   const [selected, setSelected] = useState<string[]>([])
   const [preview, setPreview] = useState<string[]>([])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [publishing, setPublishing] = useState<LabRun | null>(null)
   async function act(action: () => Promise<unknown>) {
     setBusy(true); setError('')
     try { await action() } catch (e) { setError(labError(e)) } finally { setBusy(false) }
@@ -30,9 +33,11 @@ export function Results({ sessionId, page, changed, more }: Props) {
     {!page.items.length && <p>{c.noResults}</p>}
     {[...groups.entries()].map(([id, runs]) => <ResultTable key={id} runs={runs} selected={selected}
       onSelect={run => setSelected(prev => prev.includes(run) ? prev.filter(x => x !== run) : [...prev.slice(-1), run])}
-      onZoom={run => setPreview([run])} onMark={mark} busy={busy} />)}
+      onZoom={run => setPreview([run])} onMark={mark} busy={busy}
+      sources={publish.sources} onPublish={archived ? undefined : setPublishing} />)}
     {page.next && <Button variant="outline" disabled={busy} onClick={() => act(more)}>{c.more}</Button>}
     {error && <p role="alert">{error}</p>}
+    {publishing && <PublishDialog run={publishing} options={publish} onClose={() => setPublishing(null)} />}
     {!!preview.length && <Dialog open onOpenChange={open => { if (!open) setPreview([]) }}><DialogContent className="sm:max-w-[90vw]" aria-describedby={undefined}>
       <DialogTitle>{preview.length === 2 ? c.compare : c.zoom}</DialogTitle><div className="flex items-center gap-2">
       {preview.map(id => <div key={id} className="min-w-0 flex-1"><Output id={id} /></div>)}</div></DialogContent></Dialog>}
@@ -40,7 +45,8 @@ export function Results({ sessionId, page, changed, more }: Props) {
 }
 
 type TableProps = { runs: LabRun[]; selected: string[]; onSelect(id: string): void; onZoom(id: string): void
-  onMark(run: LabRun, best: boolean): void; busy: boolean }
+  onMark(run: LabRun, best: boolean): void; busy: boolean
+  sources: Record<string, string>; onPublish?: (run: LabRun) => void }
 function ResultTable({ runs, ...controls }: TableProps) {
   const byPhoto = Map.groupBy(runs, r => r.photo_id)
   const versions = [...new Set(runs.map(r => r.prompt_lab_versions.version_no))].sort((a,b) => a-b)
@@ -57,15 +63,24 @@ function ResultTable({ runs, ...controls }: TableProps) {
   </table></div>
 }
 
-function Cell({ run, selected, onSelect, onZoom, onMark, busy }: Omit<TableProps, 'runs'> & { run: LabRun }) {
+function Cell({ run, selected, onSelect, onZoom, onMark, busy, sources, onPublish }: Omit<TableProps, 'runs'> & { run: LabRun }) {
   return <div className="grid gap-1"><span>{c.statuses[run.status]} {run.error_code}</span>
     <span>{c.estimated} {usd(run.estimate_usd)} · {c.actual} {run.cost_usd === null ? c.pendingCost : usd(run.cost_usd)}</span>
     {run.status === 'succeeded' && <><button onClick={() => onZoom(run.id)} aria-label={c.zoom}><Output id={run.id} /></button>
       <label><input type="checkbox" checked={selected.includes(run.id)} onChange={() => onSelect(run.id)} /> {c.comparePick}</label>
       <div className="flex flex-wrap gap-1"><Button size="xs" variant="outline" disabled={busy} aria-pressed={run.starred} onClick={() => onMark(run, false)}>{run.starred ? c.unstar : c.star}</Button>
-      <Button size="xs" variant="outline" disabled={busy} aria-pressed={run.is_best} onClick={() => onMark(run, true)}>{run.is_best ? c.unbest : c.best}</Button></div></>}</div>
+      <Button size="xs" variant="outline" disabled={busy} aria-pressed={run.is_best} onClick={() => onMark(run, true)}>{run.is_best ? c.unbest : c.best}</Button></div>
+      <PublishAction run={run} template={sources[run.id]} busy={busy} onPublish={onPublish} /></>}</div>
 }
 function Output({ id }: { id: string }) {
   // eslint-disable-next-line @next/next/no-img-element -- The same-origin gateway authenticates each private request.
   return <img src={src(id)} loading="lazy" alt={c.outputAlt} className="max-h-[65vh] w-full rounded object-contain" />
+}
+
+// An archived reference cannot be published (the server refuses too), so the button is hidden.
+function PublishAction({ run, template, busy, onPublish }: { run: LabRun; template?: string; busy: boolean; onPublish?: (run: LabRun) => void }) {
+  if (template) return <p className="text-xs">{publishCopy.published} ·{' '}
+    <Link className="underline underline-offset-4" href={'/admin/templates?edit=' + encodeURIComponent(template)}>{publishCopy.openDraft}</Link></p>
+  if (!onPublish) return null
+  return <Button size="xs" variant={run.is_best ? 'default' : 'outline'} disabled={busy} onClick={() => onPublish(run)}>{publishCopy.open}</Button>
 }

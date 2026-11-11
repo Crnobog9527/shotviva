@@ -5,7 +5,7 @@ import { z } from 'zod'
 
 import { trackPurchase } from '../../analytics/funnel'
 import { AppError } from '../../errors'
-import { readQuote } from '../checkout-price'
+import { readQuote } from '../read-quote'
 import { creditChangeSchema } from '../credits'
 import { callRpc } from '../rpc'
 import { matchesContractPrice } from './prices'

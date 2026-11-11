@@ -3,7 +3,7 @@
 import { useTranslations } from 'next-intl'
 import { useEffect } from 'react'
 
-import { FAVORITES_MAX } from '@/core/favorites/rules'
+import { FAVORITES_MAX } from '@/core/favorites/limits'
 
 import type { FavoriteFailure } from './favorites-store'
 

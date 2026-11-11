@@ -70,4 +70,5 @@ export {
 export { isPromptLabVisionProvider, assertPromptLabVisionCapability } from './prompt-lab/vision-capability'
 export { quoteLabMatrix, reserveLabMatrix } from './prompt-lab/matrix'
 export { executeLabCell } from './prompt-lab/cell'
+export { publishLabRun } from './prompt-lab/publish'
 export { reverseLabPrompt } from './prompt-lab/reverse'

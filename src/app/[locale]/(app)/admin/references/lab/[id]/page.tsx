@@ -3,6 +3,7 @@ import { z } from 'zod'
 
 import { PromptLab } from '@/core/admin/prompt-lab-ui/prompt-lab'
 import { copy } from '@/core/admin/prompt-lab-ui/copy'
+import { loadPublishOptions } from '@/core/admin/prompt-lab/publish-options'
 import { labSession, readLabRuns, readLabVersions } from '@/core/admin/prompt-lab/store'
 import { AdminPage } from '@/core/admin/shell'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
@@ -21,8 +22,9 @@ export default async function LabPage({ params }: { params: Promise<{ id: string
   const db = createAdminSupabase()
   const session = await labSession(db, id.data)
   if (!session) notFound()
-  const [versions, runs, providers, summary] = await Promise.all([
+  const [versions, runs, providers, summary, publish] = await Promise.all([
     readLabVersions(db, id.data), readLabRuns(db, id.data), listProviders(db), loadPanelSummary({ db, store: r2Store() }),
+    loadPublishOptions(db, { id: session.asset_id, categoryId: session.reference_assets.category_id }),
   ])
   const models = {
     image: providers.filter(p => p.module === 'image' && p.apiKeyLast4 && p.capabilities).map(p => ({
@@ -33,6 +35,6 @@ export default async function LabPage({ params }: { params: Promise<{ id: string
   }
   return <AdminPage title={copy.title} actions={<Link href="/admin/references">{copy.back}</Link>}>
     <PromptLab key={id.data} sessionId={id.data} assetId={session.asset_id} archived={session.reference_assets.status === 'archived'}
-      initial={{ versions, runs }} summary={summary} models={models} />
+      initial={{ versions, runs }} summary={summary} models={models} publish={publish} />
   </AdminPage>
 }

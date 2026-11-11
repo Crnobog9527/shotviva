@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import type { LabModels, LabPage, LabRun, LabState, LabVersion } from '../prompt-lab/types'
+import type { LabModels, LabPage, LabPublishOptions, LabRun, LabState, LabVersion } from '../prompt-lab/types'
 import type { TestBudget, TestPanelData } from '../test-runs'
 import { labError, labRequest } from './api'
 import { copy as c } from './copy'
@@ -11,12 +11,12 @@ import { Settings } from './settings'
 import { Versions } from './versions'
 
 type Props = { sessionId: string; assetId: string; archived: boolean; initial: LabState
-  models: LabModels; summary: Pick<TestPanelData, 'budget' | 'recentPhotos'> }
+  models: LabModels; summary: Pick<TestPanelData, 'budget' | 'recentPhotos'>; publish: LabPublishOptions }
 function append<T extends { id: string }>(page: LabPage<T>, next: LabPage<T>) {
   const known = new Set(page.items.map(r => r.id))
   return { items: [...page.items, ...next.items.filter(r => !known.has(r.id))], next: next.next }
 }
-export function PromptLab({ sessionId, assetId, archived, initial, models, summary }: Props) {
+export function PromptLab({ sessionId, assetId, archived, initial, models, summary, publish }: Props) {
   const [runs, setRuns] = useState(initial.runs)
   const [versions, setVersions] = useState(initial.versions)
   const [budget, setBudget] = useState(summary.budget)
@@ -61,6 +61,6 @@ export function PromptLab({ sessionId, assetId, archived, initial, models, summa
       <Versions sessionId={sessionId} versions={versions} refresh={refreshVersions} more={moreVersions} archived={archived} />
       <Matrix sessionId={sessionId} versions={versions.items} models={models.image} recent={summary.recentPhotos} budget={budget} changed={refresh} archived={archived} />
     </div>
-    <Results sessionId={sessionId} page={runs} changed={refresh} more={moreRuns} />
+    <Results sessionId={sessionId} page={runs} publish={publish} archived={archived} changed={refresh} more={moreRuns} />
     {error && <p role="alert">{error}</p>}</div>
 }
