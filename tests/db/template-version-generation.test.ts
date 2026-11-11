@@ -35,7 +35,9 @@ it('sends the selected version to both adapters and preserves each completed job
       const job = await runGeneration(deps,{source:'web',userId:admin,templateId:id,aspectRatio:'1:1',copy:{dish:'sample'}})
       const run = await runTestGenerate(deps,{actorId:admin,body:{run_id:randomUUID(),batch_id:randomUUID(),template_id:id,
         inputs:{aspect_ratio:'1:1',copy:{dish:'sample'}}}})
-      expect(adapter.calls.slice(-2).map(c=>c.prompt)).toEqual(Array(2).fill(body.replace('{{dish}}','sample')))
+      // A body without {{dish}} gets the field as a "Dish: sample" line instead (ARCHITECTURE §5.1d).
+      const prompt = body.includes('{{dish}}') ? body.replace('{{dish}}','sample') : `${body}\n\nDish: sample`
+      expect(adapter.calls.slice(-2).map(c=>c.prompt)).toEqual(Array(2).fill(prompt))
       expect(routes.slice(-2)).toEqual([binding,binding])
       receipts.push({job:job.id,run:run.id,version})
     }

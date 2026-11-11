@@ -688,6 +688,7 @@
 @source "../modules/image/workspace/batch-hint.tsx";
 @source "../modules/image/workspace/batch-photos.tsx";
 @source "../modules/image/workspace/batch-request.ts";
+@source "../modules/image/workspace/copy-check.ts";
 @source "../modules/image/workspace/copy-field-input.tsx";
 @source "../modules/image/workspace/cta-state.ts";
 @source "../modules/image/workspace/option-pickers.tsx";

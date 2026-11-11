@@ -47,10 +47,14 @@ export const copyFieldSchema = z
 
 type FieldShape = { type: CopyFieldType; options?: string[]; min?: number; max?: number }
 
+// A user's choice goes through cleanCopy before it is matched, so an option it would change
+// ("Extra  large", a zero-width space) could never be chosen: refuse it (the admin editor cleans
+// options before saving, so only a hand-written import can trip this).
 function optionProblems(field: FieldShape): string[] {
   const options = field.options ?? []
   if (field.type !== 'select') return options.length ? ['only a choice field has options'] : []
   if (options.length < 2) return ['a choice field needs at least 2 options']
+  if (options.some((option) => cleanCopy('select', option) !== option)) return ['options may not hold line breaks, repeated spaces or invisible characters']
   return new Set(options).size === options.length ? [] : ['options must be different']
 }
 
@@ -111,4 +115,15 @@ export function copyLines(body: string, copy: Record<string, string>, labels: Re
     .filter(([key, value]) => value && labels[key] && !placeholderIn(body, key))
     .map(([key, value]) => `${labels[key]}: ${value}`)
     .join('\n')
+}
+
+// The fields marked public when a job was made (generation_jobs.inputs.copy_public): the public
+// work page and one-click reuse use this snapshot, so turning a field public later never shows
+// text a user typed while it was private (ARCHITECTURE §5.1d, §9 第 3 条).
+export const publicCopyKeys = (fields: readonly { key: string; public?: boolean }[]): string[] =>
+  fields.filter((field) => field.public).map((field) => field.key)
+
+// The snapshot as stored; anything malformed (or a job from before the snapshot) is none.
+export function storedPublicKeys(raw: unknown): ReadonlySet<string> {
+  return new Set(Array.isArray(raw) ? raw.filter((key): key is string => typeof key === 'string') : [])
 }

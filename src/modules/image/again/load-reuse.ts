@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { galleryReuseInputs } from '@/core/gallery'
+import { storedPublicKeys } from '@/core/templates/copy-fields'
 import type { SiteConfig } from '@/core/config'
 
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
@@ -13,12 +14,14 @@ export async function loadReuse(site: SiteConfig, req: { jobId: string | undefin
   if (!req.jobId) return null
   const inputs = await galleryReuseInputs(site, req.jobId, req.template.id)
   if (!inputs) return null
-  return { jobId: req.jobId, values: { ...againValues({ ...inputs, copy: publicOnly(inputs.copy, req.template) }, req.template), note: '' }, madeAt: '', photos: [], missing: null, from: 'gallery' }
+  const copy = publicOnly(inputs.copy, storedPublicKeys(inputs.copy_public), req.template)
+  return { jobId: req.jobId, values: { ...againValues({ ...inputs, copy }, req.template), note: '' }, madeAt: '', photos: [], missing: null, from: 'gallery' }
 }
 
-// Another user's text comes along only for fields the admin marked public (§5 fields.copy).
-function publicOnly(copy: unknown, template: CatalogueTemplate): Record<string, unknown> {
+// Another user's text comes along only for fields public both when the work was made (its
+// snapshot, §5.1d) and now: making a field public later never hands over older text.
+function publicOnly(copy: unknown, madePublic: ReadonlySet<string>, template: CatalogueTemplate): Record<string, unknown> {
   if (typeof copy !== 'object' || copy === null) return {}
-  const shown = new Set(template.copyFields.filter((field) => field.public).map((field) => field.key))
+  const shown = new Set(template.copyFields.filter((field) => field.public && madePublic.has(field.key)).map((field) => field.key))
   return Object.fromEntries(Object.entries(copy).filter(([key]) => shown.has(key)))
 }

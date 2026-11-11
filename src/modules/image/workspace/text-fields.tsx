@@ -2,7 +2,6 @@
 
 import { useTranslations } from 'next-intl'
 
-import { checkCopyValue } from '@/core/templates/copy-fields'
 import { NOTE_MAX_LENGTH } from '@/core/templates/output-options'
 
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
@@ -71,14 +70,4 @@ export function CopyFields({ fields, values, onChange, idPrefix = 'copy' }: Copy
   )
 }
 
-// Generate stays off while a field would be refused by the server: a required one left empty,
-// a choice not in the list, a number that is not one or is out of range (checkCopyValue).
-export const missingRequiredCopy = (fields: CatalogueTemplate['copyFields'], values: Record<string, string>) =>
-  fields.some((field) => {
-    try {
-      checkCopyValue({ ...field, options: field.options?.map((option) => option.value) }, values[field.key])
-      return false
-    } catch {
-      return true
-    }
-  })
+export { missingRequiredCopy } from './copy-check'

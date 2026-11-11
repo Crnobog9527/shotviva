@@ -1,4 +1,4 @@
-import { COPY_DEFAULT_LENGTH, type CopyField, type CopyFieldType } from '@/core/templates/copy-fields'
+import { cleanCopy, COPY_DEFAULT_LENGTH, type CopyField, type CopyFieldType } from '@/core/templates/copy-fields'
 
 import type { AdminTemplate } from '../templates/types'
 
@@ -61,6 +61,9 @@ export function withoutCopy<T extends object>(value: T): Omit<T, 'copy'> {
 }
 
 const trimmed = (value: string) => value.trim()
+// An option as the user's choice will arrive (cleanCopy): one line, single spaces, no invisible
+// characters, so the stored value can always be matched (ARCHITECTURE §5.1d).
+const optionValue = (value: string) => cleanCopy('select', value)
 const optional = (key: string, value: string) => (trimmed(value) ? { [key]: trimmed(value) } : {})
 // A number box: blank is none; anything else is sent as typed so the server's zod refuses junk.
 const numberOf = (key: string, value: string) => (trimmed(value) ? { [key]: Number(trimmed(value)) } : {})
@@ -75,7 +78,7 @@ export function toCopyFields(fields: readonly CopyFormValue[]): Record<string, u
     ...optional('help', field.help),
     required: field.required,
     maxLength: field.type === 'select' ? COPY_DEFAULT_LENGTH.select : Number(trimmed(field.maxLength)),
-    ...(field.type === 'select' ? { options: field.options.map((option) => trimmed(option.value)) } : {}),
+    ...(field.type === 'select' ? { options: field.options.map((option) => optionValue(option.value)) } : {}),
     ...(field.type === 'number' ? { ...numberOf('min', field.min), ...numberOf('max', field.max) } : {}),
     public: field.public,
   }))
@@ -86,7 +89,7 @@ export function toZhCopyText(fields: readonly CopyFormValue[]): Record<string, Z
   return Object.fromEntries(
     fields.flatMap((field) => {
       const options = field.type === 'select'
-        ? Object.fromEntries(field.options.filter((option) => trimmed(option.value) && trimmed(option.labelZh)).map((option) => [trimmed(option.value), trimmed(option.labelZh)]))
+        ? Object.fromEntries(field.options.filter((option) => optionValue(option.value) && trimmed(option.labelZh)).map((option) => [optionValue(option.value), trimmed(option.labelZh)]))
         : {}
       const entry = {
         ...optional('label', field.labelZh), ...optional('placeholder', field.placeholderZh), ...optional('help', field.helpZh),
@@ -99,7 +102,7 @@ export function toZhCopyText(fields: readonly CopyFormValue[]): Record<string, Z
 
 function choiceProblems(field: CopyFormValue): string[] {
   if (field.type !== 'select') return []
-  const values = field.options.map((option) => trimmed(option.value))
+  const values = field.options.map((option) => optionValue(option.value))
   if (values.length < 2 || values.some((value) => !value)) return ['下拉选择至少要 2 个选项，且每个选项都要填英文']
   return new Set(values).size === values.length ? [] : ['选项不能重复']
 }

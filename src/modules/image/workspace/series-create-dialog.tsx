@@ -15,6 +15,7 @@ import { BatchLink, type CreateContext } from './create-dialog'
 import { CreateSheet } from './create-sheet'
 import { FormAction } from './form-action'
 import { MemberPicker } from './member-picker'
+import { memberSwitch } from './member-switch'
 import { useWorkspaceDraft } from './use-workspace-draft'
 import { WorkspaceForm } from './workspace-form'
 
@@ -42,11 +43,11 @@ function SeriesBody({ series, open, onClose, ...context }: BodyProps) {
   // what belonged to the template before (its text fields and on/off choices).
   const draft = useWorkspaceDraft({ template, ...context, single: true })
   const choose = (id: string) => {
-    const next = series.members.find((member) => member.id === id)
-    if (!next || next.id === template.id) return
-    setMemberId(next.id)
-    draft.change({ copy: {}, toggles: {} })
-    if (next.photoInput === 'none') draft.photos.clear()
+    const step = memberSwitch(series.members, template.id, id)
+    if (!step) return
+    setMemberId(step.memberId)
+    draft.change(step.values)
+    if (step.clearPhotos) draft.photos.clear()
   }
   const batch = limitsFor(context.tier).batchMax > 1 && draft.photos.photos.length === 0
   const tall = isCompareSample(template)
