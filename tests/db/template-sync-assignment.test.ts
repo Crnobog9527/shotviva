@@ -72,10 +72,11 @@ it('reads the sub-category, the series slug and its order from the source', asyn
 
 it('files a new template under the same sub-category and series, appended to the series', async () => {
   const template = fixture()
+  const last = (await db.query('select max(series_sort_order)::int as n from public.templates where series_id=$1', [series])).rows[0].n
   expect(await write(template, '1', true)).toEqual({ data: 1, error: null })
   expect((await db.query('select 1 from public.templates where id=$1', [template.id])).rowCount).toBe(0)
   expect(await write(template, '1')).toEqual({ data: 1, error: null })
-  expect(await filed(template.id)).toEqual({ category_key: 'pets', subcategory_key: sub, series_id: series, series_sort_order: 5 })
+  expect(await filed(template.id)).toEqual({ category_key: 'pets', subcategory_key: sub, series_id: series, series_sort_order: last + 1 })
   // Re-synced in the same series it keeps its place; leaving the test site's series clears it here.
   await db.query('update public.templates set series_sort_order=2 where id=$1', [template.id])
   expect((await write(template, '2')).error).toBeNull()
