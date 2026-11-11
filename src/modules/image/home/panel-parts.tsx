@@ -66,18 +66,25 @@ export function PanelRail({ state, thumbOf, onOpenPicker }: { state: HomeGenerat
   )
 }
 
+// A real label for the note (read aloud, kept off screen: the placeholder says the same and
+// the row has no room), not the placeholder standing in for one (review of #523, F5).
 export function PanelNote({ state }: { state: HomeGeneratorState }) {
   const t = useTranslations('home.generator')
+  const app = useTranslations('app.workspace')
   return (
-    <input
-      className="mk-panel-note"
-      type="text"
-      maxLength={NOTE_MAX_LENGTH}
-      value={state.note}
-      onChange={(event) => state.setNote(event.target.value)}
-      placeholder={t('notePlaceholder')}
-      aria-label={t('notePlaceholder')}
-      autoComplete="off"
-    />
+    <label className="mk-panel-note-l">
+      <span className="sr-only">
+        {app('noteLabel')} {app('optional')}
+      </span>
+      <input
+        className="mk-panel-note"
+        type="text"
+        maxLength={NOTE_MAX_LENGTH}
+        value={state.note}
+        onChange={(event) => state.setNote(event.target.value)}
+        placeholder={t('notePlaceholder')}
+        autoComplete="off"
+      />
+    </label>
   )
 }

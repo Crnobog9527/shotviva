@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { forwardRef } from 'react'
+import { forwardRef, useId } from 'react'
 
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import { HomeCtaButton } from './home-cta-button'
@@ -40,13 +40,15 @@ function stageOf(state: HomeGeneratorState, initialCovers: InitialCovers) {
   return { after, initial: initialCovers && initialCovers.templateId === template?.id ? initialCovers.after : null }
 }
 
+// The button's accessible name is its visible word; the template's name is read as its
+// description (WCAG 2.5.3, review of #523).
 function PanelHead({ template, onOpenPicker }: { template: CatalogueTemplate | null; onOpenPicker(): void }) {
   const t = useTranslations('home.generator')
-  const name = template?.name ?? ''
+  const nameId = useId()
   return (
     <div className="mk-panel-head">
-      <span className="mk-panel-name">{template ? name : t('noTemplates')}</span>
-      <button type="button" className="mk-panel-change" onClick={onOpenPicker} disabled={!template} aria-haspopup="dialog" aria-label={t('changeTemplate', { name })}>
+      <span className="mk-panel-name" id={nameId}>{template ? template.name : t('noTemplates')}</span>
+      <button type="button" className="mk-panel-change" onClick={onOpenPicker} disabled={!template} aria-haspopup="dialog" aria-describedby={nameId}>
         {t('change')}
       </button>
     </div>
@@ -66,7 +68,8 @@ export const HomePanel = forwardRef<HTMLElement, Props>(function HomePanel({ sta
   const inset = insetOf(state, initialCovers, { mine: t('yourPhoto'), example: tags('phone') })
   const templateId = template?.id ?? null
   return (
-    <section className="mk-panel" id="gen" aria-label={t('label')} ref={ref}>
+    // A template without a photo (photoInput 'none') has no upload card: its column closes up.
+    <section className={template?.photoInput === 'none' ? 'mk-panel mk-panel-noup' : 'mk-panel'} id="gen" aria-label={t('label')} ref={ref}>
       <PanelHead template={template} onOpenPicker={onOpenPicker} />
       <PanelStage name={template?.name ?? ''} after={after} initial={initial} inset={inset} />
       {template?.photoInput !== 'none' ? <PanelUpload url={photo.url} onPick={onPickPhoto} /> : null}
@@ -82,7 +85,7 @@ export const HomePanel = forwardRef<HTMLElement, Props>(function HomePanel({ sta
         <PanelNote state={state} />
       </div>
       <div className="mk-panel-cta">
-        <HomeCtaButton cta={state.cta} templateId={templateId} place="bench" onPickPhoto={onPickPhoto} onSignUp={onSignUp} onGenerate={state.generate} />
+        <HomeCtaButton cta={state.cta} templateId={templateId} onPickPhoto={onPickPhoto} onSignUp={onSignUp} onGenerate={state.generate} />
         <p className="mk-panel-gift">
           <GiftIcon className="mk-gift-i" />
           {gift}

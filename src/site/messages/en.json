@@ -3,7 +3,6 @@
     "placeholder": "Coming soon.",
     "generator": {
       "label": "Try it on your photo",
-      "addPhoto": "Add your phone photo",
       "replace": "Replace",
       "replaceAria": "Your photo. Replace it",
       "template": "Template",
@@ -14,7 +13,6 @@
       "photoReady": "Photo ready",
       "photoReadyHint": "It now stands in for the example photo",
       "stageAlt": "{name}: an example of the finished photo",
-      "seeAll": "See all templates",
       "changeTemplate": "Template: {name}. Change template",
       "changeSize": "Size: {name}. Change size",
       "notePlaceholder": "Anything to change?",

@@ -41,9 +41,11 @@ export function PanelStage({ name, after, initial, inset }: Props) {
             </span>
           </>
         ) : null}
-        <span className="mk-tag mk-tag-r mk-stage-ai" aria-hidden>
-          {tags('ai')}
-        </span>
+        {cover ? (
+          <span className="mk-tag mk-tag-r mk-stage-ai" aria-hidden>
+            {tags('ai')}
+          </span>
+        ) : null}
         {inset ? <StageInset key={inset.url} inset={inset} /> : null}
       </div>
     </div>
