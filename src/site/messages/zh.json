@@ -1186,6 +1186,30 @@
     }
   },
   "paywall": {
+    "moments": {
+      "watermark": "免费生成的图带水印。用付费积分生成的图没有水印，而且是私密的。",
+      "photos": "Pro 可以一次把一个模板用到最多 {count, number} 张照片上。",
+      "templates": "Max 可以一次把最多 {templates, number} 个模板用到同一批照片上，一批最多 {count, number} 张。"
+    },
+    "example": {
+      "caption": "示例：一张手机照片，一批里套用两个模板。",
+      "photoAlt": "示例：手机原图",
+      "resultAlt": "示例：结果 {index, number}"
+    },
+    "packOrPlan": {
+      "title": "还差 {count, number} 积分：买积分包还是开会员？",
+      "packTitle": "积分包 · {count, number} 积分",
+      "packPrice": "一次付 {price}",
+      "planTitle": "{tier} · 每月 {count, number} 积分",
+      "planPrice": "每月 {price}",
+      "verdict": {
+        "pack": "积分包更便宜，按总价和每积分都是。",
+        "plan": "{tier}更便宜，按总价和每积分都是。这是按月的会员。",
+        "same": "两者价格一样。",
+        "packNowPlanLater": "现在买积分包花得少；如果每个月都要出图，{tier}每积分更便宜。",
+        "planNowPackLater": "{tier}现在花得少；积分包每积分更便宜。"
+      }
+    },
     "title": "继续出图",
     "intro": "用付费积分生成的图是私密的，没有水印。",
     "introNeedsCredits": "这张图需要的积分比你现有的多。",

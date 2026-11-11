@@ -26,7 +26,7 @@ export function MatrixLocked() {
         <p className="mt-3 text-caption leading-[1.4] text-muted-foreground">{t('lockedPro', { count: limitsFor('pro').batchMax })}</p>
       </div>
       <ActionBar className="md:px-0">
-        <PaywallButton trigger="tier_required" options={{ step: 'period', tier: 'max' }} className={buttonVariants({ variant: 'cta', size: 'cta' })}>
+        <PaywallButton trigger="tier_required" options={{ step: 'period', tier: 'max', moment: 'templates' }} className={buttonVariants({ variant: 'cta', size: 'cta' })}>
           {t('lockedCta')}
         </PaywallButton>
       </ActionBar>
