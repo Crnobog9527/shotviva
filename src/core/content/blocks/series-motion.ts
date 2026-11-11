@@ -11,13 +11,11 @@ export const VIEW_HOLD_MS = 2600
 // A pointer passing over a card on its way elsewhere does not start it.
 export const HOVER_DELAY_MS = 220
 
-// Every <img> of a layer settled: loaded and decoded, or failed. A complete image is settled
-// even when it is broken (naturalWidth 0): its load and error events have already fired, so
-// waiting for them would stop the card for good; it shows whatever it has instead.
+// Every <img> of a layer decoded (or failed: then it shows whatever it has rather than stalling).
 function ready(layer: Element): Promise<unknown> {
   return Promise.all(
     [...layer.querySelectorAll('img')].map((img) =>
-      img.complete
+      img.complete && img.naturalWidth > 0
         ? img.decode().catch(() => undefined)
         : new Promise((resolve) => {
             img.addEventListener('load', resolve, { once: true })

@@ -11,17 +11,9 @@ const work = (creditPool: 'free' | 'paid' = 'free') => ({ id: 'job', outputKey: 
 
 describe('gallery variants', () => {
   it('sit next to the output under the owner prefix, one per gallery size', () => {
-<<<<<<< HEAD
     expect(galleryVariantKey(OUTPUT, 480)).toBe(OUTPUT.replace('.png', '-gallery-480.webp'))
     expect(galleryVariantKeys(OUTPUT)).toEqual([OUTPUT.replace('.png', '-gallery-480.webp'), OUTPUT.replace('.png', '-gallery-960.webp')])
     expect(galleryVariantKey('outputs/u.v/job', 960)).toBe('outputs/u.v/job-gallery-960.webp')
-=======
-    expect(galleryVariantKey(OUTPUT, 480)).toBe(OUTPUT.replace('.png', '-gallery-v1-480.webp'))
-    expect(galleryVariantKeys(OUTPUT)).toEqual([OUTPUT.replace('.png', '-gallery-v1-480.webp'), OUTPUT.replace('.png', '-gallery-v1-960.webp')])
-    expect(galleryVariantKey('outputs/u.v/job', 960)).toBe('outputs/u.v/job-gallery-v1-960.webp')
-    // A new rendering version is a new key, so old bytes are never served after a change.
-    expect(galleryVariantKey(OUTPUT, 960, 'v2')).not.toBe(galleryVariantKey(OUTPUT, 960))
->>>>>>> origin/feat/marketing-series-cards
     for (const key of galleryVariantKeys(OUTPUT)) expect(key.startsWith('outputs/11111111-1111-4111-8111-111111111111/')).toBe(true)
   })
 

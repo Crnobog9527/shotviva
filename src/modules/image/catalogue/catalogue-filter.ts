@@ -8,15 +8,6 @@ export const CATEGORY_PARAM = 'category'
 export const SAVED_PARAM = 'saved'
 export const SERIES_PARAM = 'series'
 
-// Where sign-in comes back to for Create (requireUser): the series a link opened (the public
-// series cards link to /generate?series=<slug>) survives the trip; anything else is plain
-// /generate. Only a slug or id shape is kept, so nothing but this one parameter rides along
-// (sanitizeNext still keeps `next` on this site).
-const SERIES_KEY = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
-export function createReturnPath(series: string | string[] | undefined): string {
-  return typeof series === 'string' && series.length <= 80 && SERIES_KEY.test(series) ? `/generate?${SERIES_PARAM}=${series}` : '/generate'
-}
-
 export type Selection = { saved: boolean; path: string[] }
 export const ALL: Selection = { saved: false, path: [] }
 
