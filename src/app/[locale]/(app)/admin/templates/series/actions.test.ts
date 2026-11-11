@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 
 const api = vi.hoisted(() => ({
   requireAdmin: vi.fn(), createAdminSupabase: vi.fn(), saveAdminSeries: vi.fn(), searchSeriesCandidates: vi.fn(),
-  revalidatePath: vi.fn(), revalidateTag: vi.fn(),
+  revalidatePath: vi.fn(), updateTag: vi.fn(),
 }))
 vi.mock('@/core/auth', () => api)
 vi.mock('next/cache', () => api)
@@ -32,7 +32,7 @@ it('uses the authenticated actor and invalidates the public catalogue and admin 
   api.saveAdminSeries.mockResolvedValue('series-id')
   expect(await saveSeriesAction(input)).toEqual({ ok: true, value: 'series-id' })
   expect(api.saveAdminSeries).toHaveBeenCalledWith({}, 'actor', input)
-  expect(api.revalidateTag).toHaveBeenCalledWith('templates', 'max')
+  expect(api.updateTag).toHaveBeenCalledWith('templates')
   expect(api.revalidatePath).toHaveBeenCalledWith('/[locale]/admin/templates', 'page')
   expect(api.revalidatePath).toHaveBeenCalledWith('/[locale]/admin/templates/series', 'page')
 })

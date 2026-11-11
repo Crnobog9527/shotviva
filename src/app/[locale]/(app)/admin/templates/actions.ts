@@ -1,6 +1,6 @@
 'use server'
 
-import { refresh, revalidateTag } from 'next/cache'
+import { refresh, updateTag } from 'next/cache'
 
 import {
   applyCover,
@@ -33,14 +33,15 @@ import { readTemplateFloors } from '@/site/template-pricing'
 
 // Server actions are public endpoints, so each one re-checks the admin role itself.
 
-// Prices and covers show on the home page and the landing pages, so a save marks the cached
-// catalogue stale (ARCHITECTURE §8.3). 'max' is stale-while-revalidate: the next visitor still
-// gets the cached page at once and the fresh one is rendered behind it, instead of waiting a
-// second or more for every marketing page to re-render after each admin save (performance B1).
-// The tag covers every page that reads the catalogue, '/' included. The admin's own lists read
-// the database directly, and refresh() re-renders them now. Charges never read this cache.
+// Prices, covers and the 首页精选 order show on the home page and the landing pages (both
+// languages), so a save expires the cached catalogue at once (ARCHITECTURE §8.3). updateTag, not
+// revalidateTag(…, 'max'): with stale-while-revalidate the first load after a save still showed
+// the old order and only a later one the new (Owner 2026-11-12); now the next request waits for
+// the fresh page. Admin saves are rare, so the one slower render per page is the cheaper side.
+// The tag covers every page that reads the catalogue, '/' and '/zh' included. The admin's own
+// lists read the database directly, and refresh() re-renders them now. Charges never read this cache.
 function catalogueChanged() {
-  revalidateTag(TEMPLATES_CACHE_TAG, 'max')
+  updateTag(TEMPLATES_CACHE_TAG)
   refresh()
 }
 

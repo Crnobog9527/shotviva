@@ -11,7 +11,8 @@ import { setTestRunCover, testCoverBodySchema } from '@/modules/image'
 
 // 「设为封面」 on an admin test result (ARCHITECTURE §10.b, T85): result → "after", its test photo →
 // "before", compressed by the cover rules and published; then the catalogue cache expires like
-// any cover change ('max': stale-while-revalidate). Admin only (404 otherwise).
+// any cover change: { expire: 0 } is updateTag's effect in a route handler (updateTag only runs
+// in server actions), so the next load shows the new cover. Admin only (404 otherwise).
 export async function POST(request: NextRequest, { params }: { params: Promise<{ runId: string }> }) {
   try {
     assertSameOrigin(request)
@@ -23,7 +24,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!body.success) throw new AppError('INVALID_INPUT', 'unknown language')
     const deps = { db: createAdminSupabase(), store: r2Store(), assets: r2PublicStore(), assetsBaseUrl: publicEnv.NEXT_PUBLIC_ASSETS_BASE_URL }
     const templateId = await setTestRunCover(deps, admin.id, runId, body.data.locale ?? null)
-    revalidateTag(TEMPLATES_CACHE_TAG, 'max')
+    revalidateTag(TEMPLATES_CACHE_TAG, { expire: 0 })
     return jsonResponse({ template_id: templateId })
   } catch (error) {
     return errorResponse(error, 'admin-test-run-cover')
