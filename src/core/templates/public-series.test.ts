@@ -31,8 +31,8 @@ function fakeDb(tables: Record<string, unknown[]>) {
 }
 
 const SERIES = {
-  series_id: 's1',
-  entry_series: { id: 's1', slug: 'dark-menu', name_en: 'Dark menu', name_zh: '暗调菜单', description_en: 'Moody', description_zh: null, show_members: false },
+  id: 's1', slug: 'dark-menu', name_en: 'Dark menu', name_zh: '暗调菜单', description_en: 'Moody', description_zh: null, show_members: false,
+  templates: [{ id: 'b' }, { id: 'a' }],
 }
 
 describe('public series', () => {
@@ -41,16 +41,14 @@ describe('public series', () => {
     vi.spyOn(logger, 'error').mockImplementation(() => undefined)
   })
 
-  it('reads the visible series in the page language with their live members in series order', async () => {
-    const { db, calls } = fakeDb({
-      web_catalogue_entries: [SERIES],
-      web_template_members: [{ id: 'b', series_id: 's1' }, { id: 'x', series_id: 'other' }, { id: 'a', series_id: 's1' }],
-    })
+  it('reads the published series in the page language with their active members in series order', async () => {
+    const { db, calls } = fakeDb({ template_series: [SERIES] })
     await expect(readPublicSeries(db, 'zh')).resolves.toEqual([
       { id: 's1', slug: 'dark-menu', name: '暗调菜单', description: null, showMembers: false, memberIds: ['b', 'a'] },
     ])
-    expect(calls).toContain('web_catalogue_entries.eq(type,series)')
-    expect(calls).toContain('web_template_members.order(series_sort_order)')
+    expect(calls).toContain('template_series.eq(is_active,true)')
+    expect(calls).toContain('template_series.eq(templates.is_active,true)')
+    expect(calls).toContain('template_series.order(series_sort_order,[object Object])')
   })
 
   it('shows no series for a minute when the read fails, so members keep their own cards', async () => {

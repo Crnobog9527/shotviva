@@ -66,7 +66,8 @@ function grouped(entries: readonly Entry[]): Group[] {
 
 const hasCovers = (template: Live | undefined): template is Live => Boolean(template?.coverBeforeUrl && template.coverAfterUrl)
 
-// The members whose pairs the card shows, in series order, up to SERIES_PAIRS.
+// The members whose pairs the card shows, in series order, up to SERIES_PAIRS. Only members the
+// live catalogue has: the series read lists every active member, sale or not.
 function pairMembers(series: Series, byId: ReadonlyMap<string, Live>): Live[] {
   return series.memberIds.map((id) => byId.get(id)).filter(hasCovers).slice(0, SERIES_PAIRS)
 }
@@ -77,7 +78,7 @@ function toCard({ template, series }: Entry, byId: ReadonlyMap<string, Live>): T
     id: `series-${series.id}`,
     name: series.name,
     use: series.description ?? template.description ?? '',
-    series: { href: seriesHref(series.slug), members: pairMembers(series, byId).map((member) => member.id), count: series.memberIds.length },
+    series: { href: seriesHref(series.slug), members: pairMembers(series, byId).map((member) => member.id), count: series.memberIds.filter((id) => byId.has(id)).length },
   }
 }
 
