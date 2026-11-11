@@ -55,7 +55,7 @@ export function TemplateRow(props: Props) {
       </TableCell>
       <NameCell template={template} />
       <TableCell>
-        <span className="block max-w-36 truncate" title={props.categoryLabel}>{props.categoryLabel}</span>
+        <span className="block w-max min-w-16 max-w-36 truncate" title={props.categoryLabel}>{props.categoryLabel}</span>
       </TableCell>
       <TableCell>
         <div className="flex gap-1">

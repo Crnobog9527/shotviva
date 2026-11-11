@@ -25,7 +25,7 @@ export function NameCell({ template }: { template: AdminTemplate }) {
     <TableCell>
       <div className="flex min-w-0 items-center gap-3">
         <TemplateThumb template={template} className="size-11" px={44} />
-        <div className="grid min-w-0 max-w-56 gap-0.5">
+        <div className="grid w-max min-w-32 max-w-56 gap-0.5">
           <span className="truncate font-medium" title={name}>{name}</span>
           <CopyText value={template.id} label={rowCopy.copyId} copied={rowCopy.copied} className="text-muted-foreground max-w-full text-xs">
             <span className="block truncate" title={template.id}>{template.id}</span>
