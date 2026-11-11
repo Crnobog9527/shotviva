@@ -30,7 +30,7 @@ import { WishNoticeSlot } from './wish-notice-slot'
 import { WishlistHintSlot } from './wishlist-hint-slot'
 
 // Every logged-in page is noindex through this one layout, never per page (AGENTS §9).
-// The app shell (DESIGN §8): tab bar on tab roots (and over the photo page from md up, T38),
+// The app shell (DESIGN §8): tab bar on tab roots (and under the Photos viewer, /photos/<id>),
 // generation that outlives the workspace.
 // Every page inside still calls requireUser() itself.
 export const metadata: Metadata = appShellMetadata()
@@ -72,7 +72,7 @@ async function Tabs({ items }: { items: TabItem[] }) {
     </Suspense>
   )
   // /checkout (the payment return page) wears the shell like a tab root (gap audit C1).
-  return <TabBar items={shown} desktopUnder={['/photos/']} shellPages={['/checkout']} admin={admin} />
+  return <TabBar items={shown} rootsUnder={['/photos/']} shellPages={['/checkout']} admin={admin} />
 }
 
 // The paywall lists the wishlist perk only while it is open, and the photo estimate from the
