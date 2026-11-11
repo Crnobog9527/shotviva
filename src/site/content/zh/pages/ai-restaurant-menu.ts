@@ -1,8 +1,8 @@
 import { baselineOffers, type OfferFacts } from '../../offer'
-import { defineContentPage, type CostBills } from '@/core/content'
+import { defineContentPage, type CostBills, type ShootDemo } from '@/core/content'
 
 import { site } from '../../../site.config'
-import { CATEGORY, pairImage, SIZE_COUNT } from '../../landing-shared'
+import { caseImage, CATEGORY, SIZE_COUNT } from '../../landing-shared'
 import { zhPricingRelated } from '../shared'
 import { foodHalfDayUsd, MENU_DISHES, photoSeconds, usd, usdRange } from '../../offer'
 import { PLATFORM_SPECS, px } from '../../platform-specs'
@@ -43,6 +43,38 @@ function menuBills({ planFrom }: OfferFacts): CostBills {
   }
 }
 
+const fishPhone = caseImage('menu-fish-phone', '示例手机照：白色搪瓷大碗装的酸菜鱼放在后厨不锈钢出菜口，顶灯偏绿')
+const fishDark = caseImage('menu-fish-dark', 'AI 示例：同一份酸菜鱼重新装进白瓷碗，放在深色原木上，暖色侧光，热气升起')
+
+// 一道菜做成三种成图：菜不变，换碗、换场景、换光。
+const shoot: ShootDemo = {
+  heading: { lead: '一张菜品手机照 → ', emphasis: '一整套菜单大片' },
+  intro: '鲜椒牛蛙，在后厨出菜口用不锈钢盆随手一拍。做成三张成图，每张都是同一道菜：牛蛙、青红鲜椒、青花椒都没变。',
+  phone: {
+    image: caseImage('menu-frog-phone', '示例手机照：不锈钢盆装的鲜椒牛蛙放在后厨台面上，日光灯，后面是单据和碗'),
+    file: 'IMG_2706.jpg',
+    caption: '手机原图。日光灯、不锈钢盆，后面还挂着单据。',
+  },
+  arrow: '三种出图，同一道菜',
+  results: [
+    {
+      image: caseImage('menu-frog-dark', 'AI 示例：同一道牛蛙装进炭灰石碗，放在石板上，暗色手绘背景，暖色侧光'),
+      title: '菜单主图',
+      template: '暗调布景，侧逆光',
+    },
+    {
+      image: caseImage('menu-frog-pour', 'AI 示例：白瓷壶往白碗里的同一道菜浇热油，下面垫原木，热气定格在空中'),
+      title: '热油泼椒',
+      template: '热油现浇，热气定格',
+    },
+    {
+      image: caseImage('menu-frog-poster-zh', 'AI 示例：同一道菜做成菜单海报，暖棕背景，标题是主厨招牌、鲜椒牛蛙'),
+      title: '菜单海报',
+      template: '菜名、一句介绍和价格',
+    },
+  ],
+}
+
 const copy = {
   slug: 'ai-restaurant-menu',
   keyword: 'ai菜单',
@@ -51,12 +83,12 @@ const copy = {
   title: `AI菜单配图：手机拍的菜直接做成外卖图（2026） | ${brand}`,
   description: `AI菜单配图：用你已经拍好的菜品照片，做成菜单、外卖平台和促销图，盘里的菜保持原样。新用户送 ${zhFreeImages}。`,
   h1: 'AI菜单配图：手机拍一张，菜单图就有了',
-  subtitle: '用你真实拍的菜品照片，只换光线、背景和摆盘环境，不会生成你店里没有的菜。',
-  answerBlock: `AI菜单配图从你真实拍的菜品照片出发，只换光线、背景和摆盘环境，盘里的菜保持原样，不会凭空生成不存在的菜。在 ${brand} 上传一张手机照片，选「外卖菜单」「暗调氛围」或「促销海报」模板，就能下载${zhTierList}的成图。新用户送 ${zhFreeImages}。`,
+  subtitle: '用你真实拍的菜品照片，换碗、换光线、换环境，不会生成你店里没有的菜。',
+  answerBlock: `AI菜单配图从你真实拍的菜品照片出发，菜保持原样，只换碗、光线和环境，不会凭空生成不存在的菜。在 ${brand} 上传一张手机照片，选「外卖菜单」「暗调氛围」或「促销海报」模板，就能下载${zhTierList}的成图。新用户送 ${zhFreeImages}。`,
   hero: {
-    before: pairImage('example-dish-before', '手机随手拍：后厨出菜口上的一盘菜，顶灯偏硬（示意图）'),
-    after: pairImage('example-dish-after', '同一盘菜做成明亮的外卖平台图，柔和日光，外卖菜单模板（示意图）'),
-    caption: '你的手机照片 → 外卖菜单模板：还是这盘菜，光线更亮 · 示意图',
+    before: fishPhone,
+    after: fishDark,
+    caption: '你的手机照片 → 菜单主图：还是这份鱼，换了碗和布景',
     cta: { label: '上传照片', href: '/generate' },
   },
   facts: [
@@ -70,13 +102,13 @@ const copy = {
     },
     {
       label: '菜还是那道菜',
-      value: `外卖平台要的是你实际卖的菜。${brand} 从你自己的手机照片出发，只换光线和背景，不改菜本身。`,
+      value: `外卖平台要的是你实际卖的菜。${brand} 从你自己的手机照片出发，换碗、换光线和背景，不改菜本身。`,
     },
   ],
   faq: [
     {
       question: '外卖平台的菜单能用 AI 图吗？',
-      answer: `外卖平台要求图片展示你实际出餐的菜。${brand} 从你自己的手机照片出发，盘里的菜保持原样，只换光线和背景，所以图里还是你的菜。上传前请查看平台当下的图片规定。`,
+      answer: `外卖平台要求图片展示你实际出餐的菜。${brand} 从你自己的手机照片出发，菜保持原样，只换碗、光线和背景，所以图里还是你的菜。上传前请查看平台当下的图片规定。`,
     },
     {
       question: '菜单图片要多大尺寸？',
@@ -103,6 +135,7 @@ const copy = {
   },
   landing: {
     factsNote: '以上来自各外卖平台自己的商家帮助页面（DoorDash、Uber Eats、Grubhub），2026 年 11 月核对。平台规则会变，上传前请再确认。',
+    shoot,
     templates: {
       heading: '菜单配图模板：外卖平台、菜单和海报',
       intro: `每个模板都从你的菜品手机照片开始，到一张能上菜单的图结束。`,
