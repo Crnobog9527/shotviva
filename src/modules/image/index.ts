@@ -20,6 +20,8 @@ export type { CatalogueSeries, CatalogueView, FilterNode, GridEntry } from './ca
 export { FavoritesProvider } from './favorites'
 export { toCatalogueTemplate, type CatalogueTemplate } from './catalogue/catalogue-template'
 export { ImageWorkspace, type WorkspaceProps } from './workspace/image-workspace'
+export { MatrixWorkspace, type MatrixWorkspaceProps } from './matrix/matrix-workspace'
+export { MatrixEntry } from './matrix/matrix-entry'
 // Make again (T40): server only; reads the work and copies its kept photos back.
 export { loadAgain } from './again/load-again'
 export { WorkspaceHead } from './workspace/workspace-head'
