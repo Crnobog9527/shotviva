@@ -20,6 +20,7 @@ import { ResolutionPicker, SizePicker } from './option-pickers'
 import { PhotoCard } from './photo-card'
 import { PhotoPickers } from './photo-pickers'
 import { CopyFields, NoteField } from './text-fields'
+import { canOpenOnOverPick, useOverPick } from './use-over-pick'
 import type { PhotoBatch } from './use-photo-batch'
 import { chosenAspect, templateOptions } from './output-choice'
 import { notePlaceholder, sizeLabel } from './workspace-options'
@@ -107,15 +108,18 @@ function PhotoSection({ template, photos, again, tier, photoExtra }: Pick<Props,
 }
 
 // Single-photo tiers keep the one-photo card with Replace; Pro and Max get the batch list. Make
-// again without its photo asks for it again in the empty slot.
+// again without its photo asks for it again in the empty slot. Every multi-photo pick goes
+// through useOverPick: more than the plan runs opens the paywall on the next plan (T107).
 function PhotoField({ photos, missing, tier, optional }: { optional: boolean; photos: PhotoBatch; missing: 'old' | 'failed' | null; tier: MembershipTier | null }) {
+  const pick = useOverPick(tier, photos)
   const [first] = photos.photos
-  if (!first && missing) return <MissingPhoto reason={missing} multiple={photos.batchMax > 1} onPick={photos.add} />
+  if (!first && missing) return <MissingPhoto reason={missing} multiple={photos.batchMax > 1} onPick={pick} />
   if (photos.batchMax <= 1) {
-    return first ? <PhotoCard onRemove={optional ? () => photos.remove(first.id) : undefined} photo={first} upload={first.upload} onPick={(file) => photos.add([file])} /> : <PhotoPickers onPick={photos.add} />
+    // Starter may pick several from the gallery: the first is kept and the paywall opens on Pro.
+    return first ? <PhotoCard onRemove={optional ? () => photos.remove(first.id) : undefined} photo={first} upload={first.upload} onPick={(file) => photos.add([file])} /> : <PhotoPickers onPick={pick} multiple={canOpenOnOverPick(tier, photos.batchMax)} />
   }
-  if (!first) return <PhotoPickers onPick={photos.add} multiple />
-  return <BatchPhotos photos={photos.photos} max={photos.batchMax} tier={tier} onAdd={photos.add} onRemove={photos.remove} />
+  if (!first) return <PhotoPickers onPick={pick} multiple />
+  return <BatchPhotos photos={photos.photos} max={photos.batchMax} tier={tier} onAdd={pick} onRemove={photos.remove} />
 }
 
 // "4:5 · as shot" for one photo; "3 / 10" for a batch.
