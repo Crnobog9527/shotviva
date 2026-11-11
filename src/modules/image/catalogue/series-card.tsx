@@ -12,14 +12,16 @@ import { hasStills, isMotion } from './catalogue-template'
 import type { CatalogueSeries } from './catalogue-view'
 import { COVER_SIZES } from './cover-sizes'
 import { PairMedia } from './pair-media'
+import { SeriesBadge } from './series-badge'
 
 type Props = { series: CatalogueSeries; onOpen(id: string): void; eager?: boolean }
 
-// A series card (T102): the same 8:5 frame and meta as a template card, sitting on two print
-// edges that peek out below it, a small stack of prints, so a series reads as several looks
-// before it is opened. The frame is the series' own artwork, or, without one, its first
-// member's Phone / AI split with both tags (The Always-Visible Split Rule). A tap opens the
-// series sheet to pick one.
+// A series card (T102): the same 8:5 frame and meta as a template card, on two prints stacked
+// behind it whose corners show past its own, plus a 「系列」 badge on the picture,
+// so a series is told from a single template at a glance (Owner 2026-11-12). The frame is the
+// series' own artwork, or, without one, its first member's Phone / AI split with both tags (The
+// Always-Visible Split Rule). A tap opens the series panel (its members and the chosen one's
+// form, one step). No save heart: favourites are per template.
 export function SeriesCard({ series, onOpen, eager }: Props) {
   const t = useTranslations('app.series')
   return (
@@ -31,10 +33,11 @@ export function SeriesCard({ series, onOpen, eager }: Props) {
       className="group block w-full rounded-tile text-left transition-transform duration-250 ease-house hover:-translate-y-0.5 active:scale-[.97]"
     >
       <span className="relative block">
-        <PrintEdge className="inset-x-6 -bottom-[11px] bg-card" />
-        <PrintEdge className="inset-x-3 -bottom-[6px] bg-muted" />
-        <span className="relative block">
+        <PrintEdge className="translate-x-[3px] translate-y-[5px] rotate-[2.8deg] bg-secondary" />
+        <PrintEdge className="-translate-x-[2px] translate-y-[2px] -rotate-[2deg] bg-accent" />
+        <span className="relative block rounded-control shadow-[0_6px_16px_-8px_rgba(0,0,0,.75)]">
           <SeriesFrame series={series} eager={eager} />
+          <SeriesBadge className="absolute top-2 left-2 z-5" />
         </span>
       </span>
       <span className="block pt-5">
@@ -46,8 +49,12 @@ export function SeriesCard({ series, onOpen, eager }: Props) {
   )
 }
 
+// A print behind the frame, the frame's size, turned a couple of degrees so its corners show
+// past the frame's (a few px, inside the grid gap); lighter than the page so they read in the
+// dark, the one further back a step darker. Still
+// prints under reduced motion: nothing here moves.
 function PrintEdge({ className }: { className: string }) {
-  return <span aria-hidden="true" className={cn('absolute h-4 rounded-b-control shadow-[inset_0_0_0_1px_var(--input)]', className)} />
+  return <span aria-hidden="true" className={cn('absolute inset-0 rounded-control shadow-[inset_0_0_0_1px_var(--input)]', className)} />
 }
 
 function SeriesFrame({ series, eager }: { series: CatalogueSeries; eager?: boolean }) {

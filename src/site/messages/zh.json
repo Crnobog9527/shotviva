@@ -240,14 +240,75 @@
     }
   },
   "app": {
+    "gated": {
+      "heading": "更多做法",
+      "badge": {
+        "pro": "Pro",
+        "max": "Max"
+      },
+      "lockedSr": "（需要 {tier}）",
+      "replay": "再看一遍",
+      "batch": {
+        "title": "批量处理",
+        "line": "一次最多 {pro, number} / {max, number} 张",
+        "lede": "一次传一批商品照，选一个模板，整批一起出图，做好后打包下载。适合一次上新很多商品的网店。",
+        "ledeGuide": "你的 Pro 一次最多 {count, number} 张：打开任意模板，加照片时多选几张就行。",
+        "step1": "一次上传：Pro 最多 {pro, number} 张，Max 最多 {max, number} 张。",
+        "step2": "选一个模板，整批用同一个尺寸和清晰度。",
+        "step3": "一起生成。每张单独扣积分，哪张失败就退回哪张。",
+        "step4": "全部做好后，一个按钮打包下载。",
+        "note": "批量只用付费积分。",
+        "cta": "开通 Pro · 一次 {pro, number} 张",
+        "seeMax": "要一次 {max, number} 张？看看 Max",
+        "start": "去选模板",
+        "demo": {
+          "label": "演示：{count, number} 张商品照套用同一个白底图模板，一起出图，最后打包成一个 ZIP。",
+          "caption": "演示按 Max 一次 {count, number} 张；图片是示例。",
+          "photos": "{count, number} 张商品照",
+          "template": "白底商品图",
+          "more": "+{count, number}",
+          "progress": "已完成 {done, number} / {total, number}",
+          "zip": "{count, number} 张打包下载 · ZIP"
+        }
+      },
+      "templates": {
+        "title": "一次用多个模板",
+        "line": "1 张照片套最多 {templates, number} 个模板",
+        "lede": "同一张照片一次套几个模板，或者几张照片 × 几个模板，一批全部出齐。",
+        "scenes": "两种用法",
+        "tabs": {
+          "one": "1 张照片 × 多个模板",
+          "grid": "多张照片 × 多个模板"
+        },
+        "step1": "选最多 {templates, number} 个模板。",
+        "step2": "加照片：每张照片都会套用每一个模板。",
+        "step3": "出图前先核对每一张和总积分，不要的点一下去掉。",
+        "step4": "结果可以按模板看，也可以按照片看，还能打包下载。",
+        "note": "一次用多个模板是 Max 的功能，只用付费积分。",
+        "cta": "开通 Max",
+        "demo": {
+          "photo": "照片",
+          "names": {
+            "white": "白底图",
+            "scene": "场景图",
+            "promo": "促销海报"
+          },
+          "sum": "{photos, number} × {templates, number} = {count, number} 张",
+          "label": {
+            "one": "演示：一张运动鞋照片套用白底图、场景图、促销海报三个模板，出三张图。",
+            "grid": "演示：一张运动鞋照片和一张托特包照片，各套用三个模板，出六张图。"
+          },
+          "caption": {
+            "one": "最多可以选 {templates, number} 个模板；图片是示例。",
+            "grid": "一批最多 {max, number} 张；图片是示例。"
+          }
+        }
+      }
+    },
     "matrix": {
       "lede": "同一批照片套用最多 {templates, number} 个模板，一批最多 {max, number} 张。",
       "metaTitle": "多模板批量",
       "title": "多模板批量",
-      "badge": "Max",
-      "locked": "（需要 Max）",
-      "entryTitle": "一次用多个模板",
-      "entryLine": "同一批照片，一次套用最多 5 个模板。",
       "entryLink": "这些照片再多套几个模板",
       "templatesTitle": "模板",
       "chooseTemplates": "选择模板",
@@ -460,7 +521,8 @@
       "count": "{count} 个模板",
       "cardAria": "{name}，系列共 {count} 个模板，选一个开始",
       "coverAlt": "{name} 系列效果示例",
-      "pick": "这个系列有 {count} 个模板，选一个开始制作。"
+      "members": "{name} · {count} 个模板",
+      "badge": "系列"
     },
     "template": {
       "fromCredits": "{count} 积分起",
@@ -529,6 +591,7 @@
       "chooseAnother": "换一张照片",
       "noteLabel": "还有想改的地方吗？",
       "optional": "（选填）",
+      "choose": "请选择",
       "notePlaceholder": {
         "food-drink": "例如：加一小枝薄荷，去掉餐巾",
         "products-resale": "例如：链子保持金色，阴影柔和一点",
@@ -700,7 +763,20 @@
       "makeAgain": "再做一张",
       "deleted": "已删除这张作品。",
       "deletedClose": "关闭",
-      "emptyTitle": "还没有作品"
+      "emptyTitle": "还没有作品",
+      "viewer": {
+        "previous": "上一张",
+        "next": "下一张",
+        "position": "第 {index} 张，共 {count} 张",
+        "back": "返回作品",
+        "batch": "这一批的第 {index} 张，共 {count} 张",
+        "failed": "没能打开这张作品",
+        "failedBody": "检查一下网络再试一次。作品还在「作品」里。",
+        "retry": "重试",
+        "againPreparing": "正在带入这张作品的照片和设置…",
+        "againFailed": "没能在这里打开「再做一张」。",
+        "againPage": "打开这个模板"
+      }
     },
     "work": {
       "freePublic": "公开 · 带水印",

@@ -58,7 +58,7 @@ export function ResponsiveSheet({ open, onOpenChange, title, description, childr
   return (
     <Drawer open={open} onOpenChange={change} dismissible={!locked}>
       <DrawerContent className={wide || tall ? "h-[calc(100dvh-var(--sat)-12px)]" : undefined}>
-        <div className={cn("min-h-0 overflow-y-auto overscroll-contain px-4", wide ? "flex-1 pb-5" : tall ? "flex-1" : "pb-[calc(var(--sab)+16px)]")}>
+        <div className={cn("min-h-0 overflow-y-auto overscroll-contain px-4", drawerBodyPad(wide, tall, Boolean(footer)))}>
           <SheetHeading title={title} description={description} aside={aside} Title={DrawerTitle} Description={DrawerDescription} />
           {children}
         </div>
@@ -74,6 +74,14 @@ function guardClose(onOpenChange: (open: boolean) => void, locked: boolean | und
   return (next: boolean) => {
     if (next || !locked) onOpenChange(next)
   }
+}
+
+// The drawer body's bottom room. A plain sheet with a footer leaves the bottom safe area to the
+// footer, which sits below the body, so it is not counted twice.
+function drawerBodyPad(wide: boolean, tall: boolean, footer: boolean): string {
+  if (wide) return "flex-1 pb-5"
+  if (tall) return "flex-1"
+  return footer ? "pb-4" : "pb-[calc(var(--sab)+16px)]"
 }
 
 function dialogSize(wide: boolean, tall: boolean): string {

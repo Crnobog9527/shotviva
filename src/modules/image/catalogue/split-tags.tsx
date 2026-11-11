@@ -9,6 +9,8 @@ const PLACES = {
   pair: { base: 'bottom-3 min-h-7 px-2.5', left: 'left-3', right: 'right-3' },
   large: { base: 'top-3 min-h-7 px-3', left: 'left-3', right: 'right-3' },
   feature: { base: 'top-3 min-h-7 px-2.5', left: 'left-3', right: 'right-3' },
+  // A series member's thumbnail in the creation panel (about 100px wide): the same two words, small.
+  thumb: { base: 'bottom-1 min-h-0 px-1 py-0.5 text-[10px] rounded-[5px]', left: 'left-1', right: 'right-1' },
 } as const
 
 // "Phone" / "AI" on every split, the same two words on cards, the creation dialog and the

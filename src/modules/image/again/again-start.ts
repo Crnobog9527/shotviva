@@ -37,7 +37,10 @@ function copyOf(raw: unknown, template: CatalogueTemplate): Record<string, strin
   return Object.fromEntries(
     template.copyFields.flatMap((field) => {
       const value = values[field.key]
-      return typeof value === 'string' ? [[field.key, value.slice(0, field.maxLength)]] : []
+      if (typeof value !== 'string') return []
+      // A choice the template no longer offers starts empty rather than failing at Generate.
+      if (field.type === 'select' && !field.options?.some((option) => option.value === value)) return []
+      return [[field.key, value.slice(0, field.maxLength)]]
     }),
   )
 }

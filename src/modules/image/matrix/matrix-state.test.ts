@@ -20,7 +20,7 @@ const ready = (id: string, originalRatio = 0.8, name?: string): ReadyPhoto => ({
   inputKey: `in/${id}`,
 })
 
-const poster = template('poster', { creditsCost: { '1k': 3, '2k': 5, '3k': 8 }, copyFields: [{ key: 'headline', label: 'Headline', required: true, maxLength: 40 }], toggles: [{ key: 'plate', label: 'Plate' }] })
+const poster = template('poster', { creditsCost: { '1k': 3, '2k': 5, '3k': 8 }, copyFields: [{ key: 'headline', label: 'Headline', type: 'short', required: true, maxLength: 40, public: false }], toggles: [{ key: 'plate', label: 'Plate' }] })
 const white = template('white')
 const photos = [ready('p1', 0.8, 'IMG_1.jpg'), ready('p2', 1.5)]
 const values = (patch: Partial<MatrixValues> = {}): MatrixValues => ({ ...EMPTY_MATRIX, templateIds: ['poster', 'white'], ...patch })
@@ -114,5 +114,22 @@ describe('the batch primary', () => {
     expect(matrixCta('too-many', 64, 32, balance, false)).toEqual({ kind: 'blocked', block: 'too-many' })
     expect(matrixCta('copy', 4, 2, balance, false)).toEqual({ kind: 'blocked', block: 'copy' })
     expect(matrixCta(null, 4, 2, balance, true)).toEqual({ kind: 'checking' })
+  })
+})
+
+describe('the grid\'s text fields', () => {
+  it('blocks Generate on a choice or number the server would refuse, like the single form', () => {
+    const sized = template('sized', { copyFields: [
+      { key: 'size', label: 'Size', type: 'select', options: [{ value: 'Small', label: 'Small' }, { value: 'Large', label: 'Large' }], required: false, maxLength: 60, public: false },
+      { key: 'guests', label: 'Guests', type: 'number', min: 1, max: 20, required: false, maxLength: 4, public: false },
+    ] })
+    const options = sharedOptions([sized])
+    const block = (copy: Record<string, string>) =>
+      matrixBlock(matrixCells([sized], photos.map(({ photo }) => photo), values({ templateIds: ['sized'], copy: { sized: copy } })), 1, { picked: 2, uploading: false }, options)
+    expect(block({ size: 'Huge' })).toBe('copy')
+    expect(block({ guests: '50' })).toBe('copy')
+    expect(block({ guests: 'four' })).toBe('copy')
+    expect(block({ size: 'Large', guests: '4' })).toBeNull()
+    expect(block({})).toBeNull()
   })
 })

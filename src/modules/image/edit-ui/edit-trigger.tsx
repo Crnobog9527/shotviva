@@ -5,16 +5,13 @@ import { useTranslations } from 'next-intl'
 import { buttonVariants } from '@/core/ui/button'
 
 import { SIDE_BY_SIDE } from '../result/action-styles'
-import { useOpenEdit } from './edit-flow'
 
-// "Edit" on a finished photo (T6 comp photo.html: beside Make again, under Share). Renders nothing when
-// editing is off, since then there is no EditFlow around it.
-export function EditTrigger() {
-  const open = useOpenEdit()
+// "Edit" on a finished photo (T6 comp photo.html: beside Make again, under Share). The Photos
+// viewer shows it only when editing is on, and switches to the edit form in place.
+export function EditTrigger({ onOpen }: { onOpen(): void }) {
   const t = useTranslations('app.edit')
-  if (!open) return null
   return (
-    <button type="button" onClick={open} className={buttonVariants({ variant: 'glass', size: 'touch', className: SIDE_BY_SIDE })}>
+    <button type="button" onClick={onOpen} className={buttonVariants({ variant: 'glass', size: 'touch', className: SIDE_BY_SIDE })}>
       <EditIcon />
       {t('open')}
     </button>

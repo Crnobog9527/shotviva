@@ -5,6 +5,7 @@ import { RESOLUTIONS, type OutputAspect, type Resolution } from '@/core/template
 
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import type { ReadyPhoto } from '../workspace/photo-batch'
+import { missingRequiredCopy } from '../workspace/copy-check'
 
 // The Max multi-template batch (T107, ARCHITECTURE §6.2 「多模板批次」): 1–5 templates × the
 // picked photos, one job per kept cell, at most TIER_LIMITS.max.batchMax cells. Size and
@@ -74,7 +75,8 @@ export function totalsByResolution(cells: readonly MatrixCell[]): Record<Resolut
   return Object.fromEntries(RESOLUTIONS.map((tier) => [tier, kept.reduce((sum, cell) => sum + cell.template.creditsCost[tier], 0)])) as Record<Resolution, number>
 }
 
-export const missingCellCopy = (cell: MatrixCell) => cell.template.copyFields.some((field) => field.required && !(cell.copy[field.key] ?? '').trim())
+// The same check as the single form (workspace/copy-check): types, choices, numbers, required.
+export const missingCellCopy = (cell: MatrixCell) => missingRequiredCopy(cell.template.copyFields, cell.copy)
 
 // Why Generate is not ready, in the order the user would fix it. `ready` photos are the
 // uploaded ones; the grid counts every picked photo, so the limit shows before uploads end.
