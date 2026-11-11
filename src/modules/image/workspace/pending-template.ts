@@ -3,7 +3,9 @@ import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 // The template the visitor has just pressed Generate on, kept for the move to its workspace
 // page: that page's pending view (workspace-pending.tsx) draws the same head the server will
 // send (thumbnail, name, "category · what it does"), so nothing moves when the server's page
-// takes over. One slot is enough: it is written on the click and read by the page it leads to.
+// takes over. The shared creation draft writes it on start (use-workspace-draft.ts), so every
+// dialog built on that draft hands it over. One slot is enough: it is written on the click and
+// read by the page it leads to.
 let remembered: CatalogueTemplate | null = null
 
 export function rememberTemplate(template: CatalogueTemplate): void {

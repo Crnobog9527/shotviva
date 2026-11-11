@@ -13,7 +13,6 @@ import { isCompareSample, TemplateSample } from '../catalogue/template-sample'
 import { FavoriteButton } from '../favorites/favorite-button'
 import { CreateSheet } from './create-sheet'
 import { FormAction } from './form-action'
-import { rememberTemplate } from './pending-template'
 import { useWorkspaceDraft, type DraftInput } from './use-workspace-draft'
 import { WorkspaceForm } from './workspace-form'
 
@@ -51,7 +50,6 @@ function CreateBody({ template, open, onClose, ...context }: BodyProps) {
   const tall = isCompareSample(template)
   const generate = () => {
     void draft.start()
-    rememberTemplate(template)
     onClose()
     router.push(workspace, { transitionTypes: navTypesFor(workspace) })
   }
