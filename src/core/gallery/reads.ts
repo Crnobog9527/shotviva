@@ -18,14 +18,15 @@ export const GALLERY_MAX_PAGES = 20
 // A missed expiry (another instance) is bounded to ten minutes.
 const GALLERY_LIFE = { revalidate: 600, expire: 3600 } as const
 
-const COLUMNS = 'id, template_id, credit_pool, parent_job_id, inputs, moderated_at'
+// Only the copy fields of inputs leave the database (§9 第 3 条): never the note or upload keys.
+const COLUMNS = 'id, template_id, credit_pool, parent_job_id, copy:inputs->copy, moderated_at'
 
 const rowSchema = z.object({
   id: z.string(),
   template_id: z.string(),
   credit_pool: z.enum(['free', 'paid']),
   parent_job_id: z.string().nullable(),
-  inputs: z.record(z.string(), z.unknown()),
+  copy: z.unknown(),
   moderated_at: z.string(),
 })
 
@@ -36,8 +37,7 @@ const toRow = (row: z.infer<typeof rowSchema>): GalleryRow => ({
   templateId: row.template_id,
   creditPool: row.credit_pool,
   parentJobId: row.parent_job_id,
-  // Only what the page may show is kept (public-copy.ts reads `copy`); the rest never leaves.
-  inputs: { copy: row.inputs.copy },
+  inputs: { copy: row.copy },
 })
 
 function shown() {
@@ -50,6 +50,7 @@ function shown() {
     .is('deleted_at', null)
     .eq('source', 'web')
     .neq('template_id', 'freeform')
+    .neq('template_id', 'edit')
 }
 
 export const isWorkId = (raw: string) => z.uuid().safeParse(raw).success
@@ -108,6 +109,7 @@ export async function shownImage(id: string): Promise<ShownImage | null> {
     .is('deleted_at', null)
     .eq('source', 'web')
     .neq('template_id', 'freeform')
+    .neq('template_id', 'edit')
     .maybeSingle()
   if (error) throw new Error(error.message)
   const row = z.object({ output_key: z.string(), credit_pool: z.enum(['free', 'paid']) }).safeParse(data)

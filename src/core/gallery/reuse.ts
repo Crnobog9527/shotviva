@@ -26,6 +26,8 @@ export async function galleryReuseInputs(site: SiteConfig, jobId: string, templa
     .eq('moderation_status', 'approved')
     .is('deleted_at', null)
     .eq('source', 'web')
+    .neq('template_id', 'freeform')
+    .neq('template_id', 'edit')
     .maybeSingle()
   if (error) {
     logger.warn('gallery.reuse_read_failed', { error: error.message })

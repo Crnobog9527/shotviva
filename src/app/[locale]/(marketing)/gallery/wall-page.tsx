@@ -5,17 +5,11 @@ import { GalleryPager, GalleryWall } from '@/core/gallery/ui'
 import type { Locale } from '@/core/i18n'
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
 
-const pageOf = (raw: string | string[] | undefined) => {
-  const page = typeof raw === 'string' && /^\d{1,2}$/.test(raw) ? Number(raw) : 1
-  return page >= 1 ? page : 1
-}
-
-type Props = { searchParams: Promise<Record<string, string | string[] | undefined>>; locale: Locale }
+type Props = { page: number; locale: Locale }
 
 // One page of the wall: cached reads only (the page and the catalogue), so it costs no query
 // per visit. Works whose template left the catalogue are skipped.
-export async function GalleryWallPage({ searchParams, locale }: Props) {
-  const page = pageOf((await searchParams).page)
+export async function GalleryWallPage({ page, locale }: Props) {
   const [t, wall, catalogue] = await Promise.all([
     getTranslations({ locale, namespace: 'gallery' }),
     cachedGalleryPage(page),

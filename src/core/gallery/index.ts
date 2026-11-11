@@ -7,4 +7,4 @@ export { galleryReuseInputs, type ReuseInputs } from './reuse'
 export { siteHasGallery } from './switch'
 export { galleryWorkView, type GalleryWorkView } from './work-view'
 
-export { assertGalleryEnabled, isGalleryEnabled } from './enabled'
+export { assertGalleryEnabled, GALLERY_SWITCH_TAG, isGalleryEnabled } from './enabled'
