@@ -701,7 +701,20 @@
       "makeAgain": "再做一张",
       "deleted": "已删除这张作品。",
       "deletedClose": "关闭",
-      "emptyTitle": "还没有作品"
+      "emptyTitle": "还没有作品",
+      "viewer": {
+        "previous": "上一张",
+        "next": "下一张",
+        "position": "第 {index} 张，共 {count} 张",
+        "back": "返回作品",
+        "batch": "这一批的第 {index} 张，共 {count} 张",
+        "failed": "没能打开这张作品",
+        "failedBody": "检查一下网络再试一次。作品还在「作品」里。",
+        "retry": "重试",
+        "againPreparing": "正在带入这张作品的照片和设置…",
+        "againFailed": "没能在这里打开「再做一张」。",
+        "againPage": "打开这个模板"
+      }
     },
     "work": {
       "freePublic": "公开 · 带水印",
