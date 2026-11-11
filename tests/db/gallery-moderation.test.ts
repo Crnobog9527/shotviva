@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto'
 
 import type { Client } from 'pg'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { decideWorks, listReviewWorks, pendingReviewCount } from '@/core/admin/gallery-review'
-import { screenWork, sweepModeration } from '@/core/moderation'
+import { MAX_SCREEN_ATTEMPTS, screenWork, sweepModeration } from '@/core/moderation'
 
 import { anonClient, connectAdmin, createUser } from './helpers'
 import { serviceSupabase } from './supabase-env'
@@ -203,6 +203,43 @@ describe('review reads and the sweep', () => {
     )
     expect(status).toBe('skipped')
     expect(await stateOf(id)).toMatchObject({ status: 'pending', screened: false })
+    const { rows } = await db.query('select screen_attempts, last_screen_at is not null as tried from public.generation_jobs where id = $1', [id])
+    expect(rows[0]).toEqual({ screen_attempts: 1, tried: true })
+  })
+
+  it('backs off a failing work and gives it up after the last attempt, so it cannot starve the rest', async () => {
+    const failing = await work()
+    const fresh = await work()
+    await db.query("update public.generation_jobs set screen_attempts = 1, last_screen_at = now() where id = $1", [failing])
+    const seen: string[] = []
+    const screen = async (input: { imageUrl: string }) => {
+      seen.push(input.imageUrl)
+      return { flagged: false, categories: [] }
+    }
+    // Tried a moment ago: waits; the fresh one is screened.
+    let guard = 0
+    while (!seen.some((url) => url.includes(fresh)) && guard++ < 50) await sweepModeration({ db: service, store, screen })
+    expect(seen.some((url) => url.includes(failing))).toBe(false)
+    // Out of attempts: never picked again, still pending for a person.
+    await db.query("update public.generation_jobs set screen_attempts = $2, last_screen_at = now() - interval '1 day' where id = $1", [failing, MAX_SCREEN_ATTEMPTS])
+    await sweepModeration({ db: service, store, screen })
+    expect(seen.some((url) => url.includes(failing))).toBe(false)
+    expect(await stateOf(failing)).toMatchObject({ status: 'pending', screened: false })
+    // Below the cap and past the wait: tried again.
+    await db.query("update public.generation_jobs set screen_attempts = 2 where id = $1", [failing])
+    guard = 0
+    while (!seen.some((url) => url.includes(failing)) && guard++ < 50) await sweepModeration({ db: service, store, screen })
+    expect(await stateOf(failing)).toMatchObject({ screened: true })
+  })
+
+  it('leaves photo edits out of the screen, the queue and reports', async () => {
+    const edit = await work({ templateId: 'edit' })
+    const screen = vi.fn(async () => ({ flagged: false, categories: [] }))
+    for (let i = 0; i < 20; i++) if ((await sweepModeration({ db: service, store, screen })).seen === 0) break
+    expect(screen.mock.calls.some((call) => JSON.stringify(call).includes(edit))).toBe(false)
+    expect((await listReviewWorks({ db: service, store }, 'pending', null)).works.some((w) => w.id === edit)).toBe(false)
+    await db.query("update public.generation_jobs set moderation_status = 'approved', moderated_at = now() where id = $1", [edit])
+    expect((await report(edit, await createUser(db))).error?.message).toBe('NOT_FOUND')
   })
 })
 

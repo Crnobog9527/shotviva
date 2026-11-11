@@ -6,6 +6,7 @@ import { listReviewWorks, REVIEW_COPY, REVIEW_TABS, type ReviewTab } from '@/cor
 import { ReviewBoard } from '@/core/admin/gallery-review-ui'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { siteHasGallery } from '@/core/gallery'
+import { moderationKey } from '@/core/moderation'
 import { r2Store } from '@/core/storage'
 import { site } from '@/site/site.config'
 
@@ -27,7 +28,7 @@ export default async function AdminGalleryPage({ searchParams }: PageProps<'/[lo
   const page = await listReviewWorks({ db: createAdminSupabase(), store: r2Store() }, tabOf(query.tab), after)
   return (
     <AdminPage title={REVIEW_COPY.title}>
-      <ReviewBoard page={page} actions={{ decide: decideWorksAction }} />
+      <ReviewBoard page={page} screening={moderationKey() !== null} actions={{ decide: decideWorksAction }} />
     </AdminPage>
   )
 }

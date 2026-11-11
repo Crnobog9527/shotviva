@@ -20,6 +20,8 @@ begin
 
   update public.generation_jobs j
      set auto_moderated_at = now(),
+         last_screen_at = now(),
+         screen_attempts = j.screen_attempts + 1,
          moderation_categories = coalesce(p_categories, '{}'),
          moderation_status = case
            when j.moderation_status <> 'pending' then j.moderation_status

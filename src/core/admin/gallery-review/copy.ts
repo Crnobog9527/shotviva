@@ -2,6 +2,8 @@
 export const REVIEW_COPY = {
   title: '创作库审核',
   intro: '公开作品审核通过后才会出现在创作库。被 OpenAI 标记的作品已自动拒绝；没被标记的在「待审」里等你确认。',
+  noKey:
+    '自动审核没有在运行：环境变量里没有 OpenAI 密钥（OPENAI_MODERATION_API_KEY 或 OPENAI_API_KEY）。作品不会被自动拒绝，每张都要在这里人工审核。请联系总控配置。',
   tabs: { pending: '待审', reported: '被举报', approved: '已通过', rejected: '已拒绝' },
   empty: {
     pending: '没有待审的作品。',

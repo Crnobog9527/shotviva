@@ -26,6 +26,12 @@ export function recordAutoModeration(db: RpcClient, jobId: string, verdict: Scre
   )
 }
 
+// One failed screen: the attempt is counted for the sweep's back-off. Null when the work no
+// longer waits for its screen.
+export function recordScreenFailure(db: RpcClient, jobId: string): Promise<number | null> {
+  return callRpc(db, 'record_work_screen_failure', { p_job_id: jobId }, z.number().int().nullable())
+}
+
 export type ModerateInput = { jobIds: string[]; decision: 'approved' | 'rejected'; reason: RejectReason | null }
 
 export const moderateInputSchema = z

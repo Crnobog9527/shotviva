@@ -6,15 +6,22 @@ import { z } from 'zod'
 import { AppError } from '../errors'
 import { SCREEN_COLUMNS, screenRowSchema, screenWork, type ModerationDeps } from './moderate-work'
 
-// The 10-minute sweep (ARCHITECTURE §9 第 5 条): public works the screen has not seen yet, oldest
-// first, at most 100 a run. It retries works whose first screen failed and backfills the public
-// works made before T108. Partner and freeform works never reach the gallery, so they are skipped.
-// Reads generation_jobs_moderation_queue_idx.
-
-export const SWEEP_LIMIT = 100
+// The 10-minute sweep (ARCHITECTURE §9 第 5 条): public works the screen has not seen yet, never
+// tried first, then the least recently tried, at most 50 a run. It backfills the public works
+// made before T108 and retries failed screens, but a failure waits RETRY_AFTER_MINUTES and a work
+// is given up after MAX_SCREEN_ATTEMPTS (it stays pending for a person), so works that always
+// fail cannot starve the rest or burn the rate limit. Works outside the gallery's scope are
+// skipped. Reads generation_jobs_screen_sweep_idx.
+//
+// Worst case per run: 50 works, 5 at a time, each bounded by the 20 s API timeout = 200 s, inside
+// the route's 300 s maxDuration.
+export const SWEEP_LIMIT = 50
+export const MAX_SCREEN_ATTEMPTS = 5
+export const RETRY_AFTER_MINUTES = 30
 const CONCURRENCY = 5
 
-export async function pendingScreens(db: SupabaseClient, limit = SWEEP_LIMIT) {
+export async function pendingScreens(db: SupabaseClient, limit = SWEEP_LIMIT, now = new Date()) {
+  const retryBefore = new Date(now.getTime() - RETRY_AFTER_MINUTES * 60_000).toISOString()
   const { data, error } = await db
     .from('generation_jobs')
     .select(SCREEN_COLUMNS)
@@ -23,10 +30,13 @@ export async function pendingScreens(db: SupabaseClient, limit = SWEEP_LIMIT) {
     .eq('moderation_status', 'pending')
     .is('deleted_at', null)
     .is('auto_moderated_at', null)
+    .lt('screen_attempts', MAX_SCREEN_ATTEMPTS)
+    .or(`last_screen_at.is.null,last_screen_at.lt.${retryBefore}`)
     .eq('source', 'web')
     .neq('template_id', 'freeform')
+    .neq('template_id', 'edit')
+    .order('last_screen_at', { ascending: true, nullsFirst: true })
     .order('created_at', { ascending: true })
-    .order('id', { ascending: true })
     .limit(limit)
   if (error) throw new AppError('INTERNAL', 'moderation sweep read failed', { cause: new Error(error.message) })
   return z.array(screenRowSchema).parse(data)

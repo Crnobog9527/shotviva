@@ -55,6 +55,7 @@ function inScope(db: SupabaseClient) {
     .is('deleted_at', null)
     .eq('source', 'web')
     .neq('template_id', 'freeform')
+    .neq('template_id', 'edit')
 }
 
 async function readRows(tab: Exclude<ReviewTab, 'reported'>, db: SupabaseClient, rawCursor: string | null): Promise<Row[]> {
@@ -150,6 +151,7 @@ export async function pendingReviewCount(db: SupabaseClient): Promise<number> {
     .is('deleted_at', null)
     .eq('source', 'web')
     .neq('template_id', 'freeform')
+    .neq('template_id', 'edit')
     .limit(1)
   if (error) failed('count', error.message)
   return count ?? 0

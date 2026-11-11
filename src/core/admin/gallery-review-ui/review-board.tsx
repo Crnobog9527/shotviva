@@ -13,11 +13,12 @@ import { ReviewToolbar } from './review-toolbar'
 import type { Decision, PendingDecision, ReviewActions } from './types'
 import { WorkCard } from './work-card'
 
-type Props = { page: ReviewPage; actions: ReviewActions }
+// screening: whether the automatic screen has a key; without one the page says so up front.
+type Props = { page: ReviewPage; screening: boolean; actions: ReviewActions }
 
 // /admin/gallery (ARCHITECTURE §9 第 5 条): one tab of works, single and batch decisions, each
 // confirmed. The action refreshes the page, so the list follows what is stored.
-export function ReviewBoard({ page, actions }: Props) {
+export function ReviewBoard({ page, screening, actions }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [decision, setDecision] = useState<PendingDecision>(null)
   const { pending, error, notice, run } = useAdminAction()
@@ -44,7 +45,13 @@ export function ReviewBoard({ page, actions }: Props) {
 
   return (
     <div className="grid gap-4">
-      <p className="text-sm text-muted-foreground">{COPY.intro}</p>
+      {screening ? (
+        <p className="text-sm text-muted-foreground">{COPY.intro}</p>
+      ) : (
+        <p role="alert" className="rounded-md border border-destructive p-3 text-sm text-destructive">
+          {COPY.noKey}
+        </p>
+      )}
       <ReviewToolbar
         tab={page.tab}
         selected={selected.size}

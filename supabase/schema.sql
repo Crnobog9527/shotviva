@@ -8936,6 +8936,8 @@ CREATE TABLE IF NOT EXISTS "public"."generation_jobs" (
     "auto_moderated_at" timestamp with time zone,
     "moderated_at" timestamp with time zone,
     "moderated_by" "uuid",
+    "screen_attempts" integer DEFAULT 0 NOT NULL,
+    "last_screen_at" timestamp with time zone,
     CONSTRAINT "generation_jobs_check" CHECK ((("status" = 'running'::"text") = ("finished_at" IS NULL))),
     CONSTRAINT "generation_jobs_check1" CHECK ((("status" <> 'succeeded'::"text") OR ("output_key" IS NOT NULL))),
     CONSTRAINT "generation_jobs_cost_usd_nonnegative" CHECK ((("cost_usd" IS NULL) OR ("cost_usd" >= (0)::numeric))),
@@ -8947,6 +8949,7 @@ CREATE TABLE IF NOT EXISTS "public"."generation_jobs" (
     CONSTRAINT "generation_jobs_moderation_status_check" CHECK (("moderation_status" = ANY (ARRAY['pending'::"text", 'approved'::"text", 'rejected'::"text"]))),
     CONSTRAINT "generation_jobs_module_check" CHECK (("module" = ANY (ARRAY['image'::"text", 'video'::"text"]))),
     CONSTRAINT "generation_jobs_provider_usage_object" CHECK ((("provider_usage" IS NULL) OR ("jsonb_typeof"("provider_usage") = 'object'::"text"))),
+    CONSTRAINT "generation_jobs_screen_attempts_check" CHECK (("screen_attempts" >= 0)),
     CONSTRAINT "generation_jobs_source_check" CHECK (("source" = ANY (ARRAY['web'::"text", 'graylum'::"text"]))),
     CONSTRAINT "generation_jobs_status_check" CHECK (("status" = ANY (ARRAY['running'::"text", 'succeeded'::"text", 'failed'::"text"]))),
     CONSTRAINT "generation_jobs_visibility_check" CHECK (("visibility" = ANY (ARRAY['public'::"text", 'private'::"text"])))
@@ -10217,6 +10220,8 @@ begin
 
   update public.generation_jobs j
      set auto_moderated_at = now(),
+         last_screen_at = now(),
+         screen_attempts = j.screen_attempts + 1,
          moderation_categories = coalesce(p_categories, '{}'),
          moderation_status = case
            when j.moderation_status <> 'pending' then j.moderation_status
@@ -10235,6 +10240,30 @@ $$;
 
 
 ALTER FUNCTION "public"."record_work_auto_moderation"("p_job_id" "uuid", "p_flagged" boolean, "p_categories" "text"[]) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."record_work_screen_failure"("p_job_id" "uuid") RETURNS integer
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_attempts integer;
+begin
+  if p_job_id is null then
+    raise exception 'INVALID_INPUT' using detail = 'job is required';
+  end if;
+  update public.generation_jobs j
+     set screen_attempts = j.screen_attempts + 1,
+         last_screen_at = now()
+   where j.id = p_job_id and j.status = 'succeeded' and j.visibility = 'public' and j.deleted_at is null
+     and j.moderation_status = 'pending' and j.auto_moderated_at is null
+  returning j.screen_attempts into v_attempts;
+  return v_attempts;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."record_work_screen_failure"("p_job_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."redeem_code"("p_user" "uuid", "p_code" "text", "p_context" "text", "p_invitee_credits" integer, "p_invite_window_days" integer, "p_replace" boolean DEFAULT false) RETURNS "jsonb"
@@ -10514,7 +10543,7 @@ begin
   if not exists (
       select 1 from public.generation_jobs j
        where j.id = p_job_id and j.status = 'succeeded' and j.visibility = 'public' and j.moderation_status = 'approved'
-         and j.deleted_at is null and j.source = 'web' and j.template_id <> 'freeform') then
+         and j.deleted_at is null and j.source = 'web' and j.template_id <> 'freeform' and j.template_id <> 'edit') then
     raise exception 'NOT_FOUND';
   end if;
   if exists (select 1 from public.work_reports r where r.job_id = p_job_id and r.reporter_id = p_reporter) then
@@ -13789,7 +13818,7 @@ CREATE INDEX "generation_jobs_created_at_id_idx" ON "public"."generation_jobs" U
 
 
 
-CREATE INDEX "generation_jobs_gallery_idx" ON "public"."generation_jobs" USING "btree" ("moderated_at" DESC, "id" DESC) WHERE (("status" = 'succeeded'::"text") AND ("visibility" = 'public'::"text") AND ("moderation_status" = 'approved'::"text") AND ("deleted_at" IS NULL) AND ("source" = 'web'::"text") AND ("template_id" <> 'freeform'::"text"));
+CREATE INDEX "generation_jobs_gallery_idx" ON "public"."generation_jobs" USING "btree" ("moderated_at" DESC, "id" DESC) WHERE (("status" = 'succeeded'::"text") AND ("visibility" = 'public'::"text") AND ("moderation_status" = 'approved'::"text") AND ("deleted_at" IS NULL) AND ("source" = 'web'::"text") AND ("template_id" <> 'freeform'::"text") AND ("template_id" <> 'edit'::"text"));
 
 
 
@@ -13797,7 +13826,7 @@ CREATE INDEX "generation_jobs_moderated_idx" ON "public"."generation_jobs" USING
 
 
 
-CREATE INDEX "generation_jobs_moderation_queue_idx" ON "public"."generation_jobs" USING "btree" ("created_at", "id") WHERE (("status" = 'succeeded'::"text") AND ("visibility" = 'public'::"text") AND ("moderation_status" = 'pending'::"text") AND ("deleted_at" IS NULL));
+CREATE INDEX "generation_jobs_moderation_queue_idx" ON "public"."generation_jobs" USING "btree" ("created_at", "id") WHERE (("status" = 'succeeded'::"text") AND ("visibility" = 'public'::"text") AND ("moderation_status" = 'pending'::"text") AND ("deleted_at" IS NULL) AND ("source" = 'web'::"text") AND ("template_id" <> 'freeform'::"text") AND ("template_id" <> 'edit'::"text"));
 
 
 
@@ -13810,6 +13839,10 @@ CREATE INDEX "generation_jobs_route_cost_idx" ON "public"."generation_jobs" USIN
 
 
 CREATE INDEX "generation_jobs_running_created_at_idx" ON "public"."generation_jobs" USING "btree" ("created_at") WHERE ("status" = 'running'::"text");
+
+
+
+CREATE INDEX "generation_jobs_screen_sweep_idx" ON "public"."generation_jobs" USING "btree" ("last_screen_at" NULLS FIRST, "created_at") WHERE (("status" = 'succeeded'::"text") AND ("visibility" = 'public'::"text") AND ("moderation_status" = 'pending'::"text") AND ("deleted_at" IS NULL) AND ("auto_moderated_at" IS NULL) AND ("source" = 'web'::"text") AND ("template_id" <> 'freeform'::"text") AND ("template_id" <> 'edit'::"text"));
 
 
 
@@ -16745,6 +16778,11 @@ GRANT ALL ON FUNCTION "public"."record_waffo_refund"("p_payment_id" "text", "p_r
 
 REVOKE ALL ON FUNCTION "public"."record_work_auto_moderation"("p_job_id" "uuid", "p_flagged" boolean, "p_categories" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."record_work_auto_moderation"("p_job_id" "uuid", "p_flagged" boolean, "p_categories" "text"[]) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."record_work_screen_failure"("p_job_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."record_work_screen_failure"("p_job_id" "uuid") TO "service_role";
 
 
 

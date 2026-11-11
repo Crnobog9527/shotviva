@@ -10,4 +10,9 @@ alter table public.generation_jobs
   add column moderation_categories text[] not null default '{}',
   add column auto_moderated_at timestamptz,
   add column moderated_at timestamptz,
-  add column moderated_by uuid references public.profiles (id) on delete set null;
+  add column moderated_by uuid references public.profiles (id) on delete set null,
+  -- Failed automatic screens (no file, an API error): the sweep backs off and stops after a few,
+  -- leaving the work pending for a person, so failures never starve the backfill.
+  add column screen_attempts integer not null default 0
+    constraint generation_jobs_screen_attempts_check check (screen_attempts >= 0),
+  add column last_screen_at timestamptz;

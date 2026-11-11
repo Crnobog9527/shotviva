@@ -1,5 +1,6 @@
 -- T108 (ARCHITECTURE §9 第 8 条, §9.1): a signed-in visitor reports a work shown in the gallery.
--- Only works the gallery shows can be reported; once per person per work, 20 a day per person.
+-- Only works the gallery shows can be reported; once per person per work, 20 per person in any
+-- 24 hours.
 -- A report never hides the work by itself: it moves it to the top of the review page.
 -- Returns 'reported', 'duplicate' or 'limited'; NOT_FOUND for a work the gallery does not show.
 create function public.report_work(p_job_id uuid, p_reporter uuid, p_reason text, p_note text)
@@ -26,7 +27,7 @@ begin
   if not exists (
       select 1 from public.generation_jobs j
        where j.id = p_job_id and j.status = 'succeeded' and j.visibility = 'public' and j.moderation_status = 'approved'
-         and j.deleted_at is null and j.source = 'web' and j.template_id <> 'freeform') then
+         and j.deleted_at is null and j.source = 'web' and j.template_id <> 'freeform' and j.template_id <> 'edit') then
     raise exception 'NOT_FOUND';
   end if;
   if exists (select 1 from public.work_reports r where r.job_id = p_job_id and r.reporter_id = p_reporter) then

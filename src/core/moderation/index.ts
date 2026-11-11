@@ -1,5 +1,5 @@
 // Content moderation for the public gallery (ARCHITECTURE §9 第 5、8 条, T108).
-export { liveModerationDeps, needsScreen, scheduleScreen } from './live'
+export { liveModerationDeps, moderationKey, needsScreen, scheduleScreen } from './live'
 export { screenWork, type ModerationDeps, type ScreenRow } from './moderate-work'
 export { MODERATION_MODEL, screenWithOpenAI, verdictOf, type ScreenVerdict } from './openai-screen'
 export {
@@ -11,6 +11,6 @@ export {
   type RejectReason,
   type ReportReason,
 } from './reasons'
-export { moderateInputSchema, moderateWorks, reportInputSchema, reportWork, type ModerateInput, type ReportInput, type ReportOutcome } from './rpc'
+export { moderateInputSchema, moderateWorks, recordScreenFailure, reportInputSchema, reportWork, type ModerateInput, type ReportInput, type ReportOutcome } from './rpc'
 export { submitReport } from './report'
-export { sweepModeration, SWEEP_LIMIT, type SweepResult } from './sweep'
+export { MAX_SCREEN_ATTEMPTS, RETRY_AFTER_MINUTES, sweepModeration, SWEEP_LIMIT, type SweepResult } from './sweep'

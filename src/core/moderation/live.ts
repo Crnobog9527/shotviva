@@ -1,28 +1,37 @@
 import 'server-only'
 
+import { revalidateTag } from 'next/cache'
 import { after } from 'next/server'
 
 import { createAdminSupabase } from '../auth/supabase-admin'
 import { serverEnv } from '../env'
+import { GALLERY_CACHE_TAG } from '../gallery/cache'
+import { inGalleryScope } from '../gallery/scope'
 import type { Job } from '../jobs/job-schema'
 import { r2Store } from '../storage/r2-store'
 import { SCREEN_COLUMNS, screenRowSchema, screenWork, type ModerationDeps } from './moderate-work'
 import { screenWithOpenAI } from './openai-screen'
 
-// Production wiring: the service-role client, R2 and the OpenAI key.
-export function liveModerationDeps(): ModerationDeps & { db: ReturnType<typeof createAdminSupabase> } {
+export function moderationKey(): string | null {
   const env = serverEnv()
-  const key = env.OPENAI_MODERATION_API_KEY ?? env.OPENAI_API_KEY
+  return env.OPENAI_MODERATION_API_KEY ?? env.OPENAI_API_KEY ?? null
+}
+
+// Production wiring: the service-role client, R2 and the OpenAI key. An auto-approved work is new
+// gallery content, so the gallery's pages refresh on their next visit.
+export function liveModerationDeps(): ModerationDeps & { db: ReturnType<typeof createAdminSupabase> } {
+  const key = moderationKey()
   return {
     db: createAdminSupabase(),
     store: r2Store(),
     screen: key ? (input) => screenWithOpenAI(key, input) : null,
+    onApproved: () => revalidateTag(GALLERY_CACHE_TAG, 'max'),
   }
 }
 
 // Whether a finished work goes to the screen at all (ARCHITECTURE §9 第 7 条).
 export function needsScreen(job: Pick<Job, 'status' | 'visibility' | 'source' | 'templateId' | 'deletedAt'>): boolean {
-  return job.status === 'succeeded' && job.visibility === 'public' && job.source === 'web' && job.templateId !== 'freeform' && !job.deletedAt
+  return job.status === 'succeeded' && job.visibility === 'public' && !job.deletedAt && inGalleryScope(job)
 }
 
 async function screenNow(jobId: string): Promise<void> {
