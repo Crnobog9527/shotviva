@@ -4,7 +4,6 @@ import { useState } from 'react'
 
 import { ImageProviderField, type ImageProviderOption } from '@/core/admin/image-provider-field'
 import { Button } from '@/core/ui/button'
-import { Input } from '@/core/ui/input'
 import { Label } from '@/core/ui/label'
 import { Textarea } from '@/core/ui/textarea'
 import { FULL_IMAGE_OPTIONS } from '@/core/templates/image-options'
@@ -13,6 +12,7 @@ import { DEFAULT_RESOLUTION, NOTE_MAX_LENGTH } from '@/core/templates/output-opt
 import type { AdminTemplate } from '../templates/types'
 import type { TestPhotoView } from '../test-runs'
 import { TEST_RUN_COPY as COPY } from './copy'
+import { TestCopyFields } from './test-copy-fields'
 import { firstRunLaunches } from './launches'
 import { PhotoPicker } from './photo-picker'
 import { RunOptions, type RunOptionValues } from './run-options'
@@ -86,21 +86,7 @@ export function FirstRunForm({ template, providers, photos, onLaunch, onPhotoUpl
       ) : (
         <p className="text-muted-foreground text-xs">{COPY.first.noPhotos}</p>
       )}
-      {template.fields.copy.map((field) => (
-        <div key={field.key} className="grid gap-1.5">
-          <Label htmlFor={`test-copy-${field.key}`}>
-            {field.label}
-            {field.required ? ' *' : ''}
-          </Label>
-          <Input
-            id={`test-copy-${field.key}`}
-            maxLength={field.maxLength}
-            placeholder={field.placeholder}
-            value={copy[field.key] ?? ''}
-            onChange={(event) => setCopy((current) => ({ ...current, [field.key]: event.target.value }))}
-          />
-        </div>
-      ))}
+      <TestCopyFields fields={template.fields.copy} values={copy} onChange={setCopy} />
       <TestToggles toggles={template.fields.toggles ?? []} values={toggles} onChange={setToggles} />
       <div className="grid gap-1.5">
         <Label htmlFor="test-note">{COPY.first.note}</Label>
