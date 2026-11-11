@@ -2,11 +2,13 @@ import type { Metadata } from 'next'
 import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
 import { Suspense, type ReactNode } from 'react'
+import { preconnect } from 'react-dom'
 
 import { AppPage, TabRootHeader } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
-import { fileUrlFor, listOwnJobs } from '@/core/jobs'
+import { fileUrlFor, firstThumbUrls, listOwnJobs } from '@/core/jobs'
 import { currentLocale } from '@/core/i18n/server'
+import { r2Origin, r2Store } from '@/core/storage'
 import { EDIT_TEMPLATE_ID, listTemplatesIn } from '@/core/templates'
 import { DeletedToast, DoneGrid, PhotosCount, RunningList, toPhotoItem, type TemplateLookup } from '@/modules/image'
 
@@ -23,14 +25,16 @@ async function Photos() {
   const user = await requireUser('/photos')
   const supabase = await createServerSupabase()
   const now = new Date()
-  const [own, templates] = await Promise.all([listOwnJobs(createAdminSupabase(), user.id, now), listTemplatesIn(supabase, await currentLocale(), { includeSeriesMembers: true })])
+  // The first screen's small copies are signed while the templates are still being read.
+  const works = listOwnJobs(createAdminSupabase(), user.id, now).then(async (own) => ({ own, signed: await firstThumbUrls(r2Store, own.done) }))
+  const [{ own, signed }, templates] = await Promise.all([works, listTemplatesIn(supabase, await currentLocale(), { includeSeriesMembers: true })])
   const tp = await getTranslations('app.photos')
   const fallback = tp('fallbackName')
   const lookup: TemplateLookup = new Map(templates.map((t) => [t.id, { name: t.name, cover: t.coverAfterUrl ?? t.coverPosterUrl }]))
   // Edits run on the built-in `edit` template, which is in no catalogue (ARCHITECTURE §5.2).
   lookup.set(EDIT_TEMPLATE_ID, { name: tp('editedName'), cover: null })
   const running = own.running.map((job) => toPhotoItem(job, lookup, null, fallback))
-  const done = own.done.map((job) => toPhotoItem(job, lookup, fileUrlFor(job.id), fallback))
+  const done = own.done.map((job) => toPhotoItem(job, lookup, fileUrlFor(job.id), fallback, signed.get(job.id)))
   const covers = Object.fromEntries([...lookup].map(([id, t]) => [id, t.cover]))
   return (
     <>
@@ -47,6 +51,10 @@ async function Deleted({ searchParams }: { searchParams: Promise<Record<string, 
 }
 
 export default function PhotosPage({ searchParams }: PageProps<'/[locale]/photos'>) {
+  // The first screen's pictures come straight from R2: the connection opens with the page's shell,
+  // while the list is still being read, instead of when the first <img> arrives.
+  const origin = r2Origin()
+  if (origin) preconnect(origin)
   return (
     <AppPage wide>
       <Suspense fallback={<Header />}>

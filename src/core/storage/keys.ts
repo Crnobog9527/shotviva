@@ -9,6 +9,9 @@ import type { UploadContentType } from './rules'
 //   outputs/{user_id}/{job_id}-input.webp
 //                                     768px preview of the job's upload, kept with the result
 //                                     (ARCHITECTURE §8 「原图小图」, T32)
+//   outputs/{user_id}/{job_id}-thumb.webp
+//                                     the result's small copy for lists, watermarked when the
+//                                     work is (ARCHITECTURE §8.3「作品小图」)
 //   outputs/{user_id}/{job_id}-in-{n}.{ext}
 //                                     the job's own uploads (n from 1), copied at settle and
 //                                     kept with the result for Make again (§8.3, T40)
@@ -66,6 +69,10 @@ export function downloadVariantKeyFor(userId: string, jobId: string, variant: Do
 
 export function inputPreviewKeyFor(userId: string, jobId: string): string {
   return `outputs/${userId}/${jobId}-input.webp`
+}
+
+export function workThumbKeyFor(userId: string, jobId: string): string {
+  return `outputs/${userId}/${jobId}-thumb.webp`
 }
 
 // The upload's own extension is kept: normal uploads are JPEG (the browser compresses), the

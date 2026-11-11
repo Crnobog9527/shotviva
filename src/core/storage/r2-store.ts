@@ -36,7 +36,7 @@ export function createR2Client(config: { accountId: string; accessKeyId: string;
   return new S3Client({
     ...extra,
     region: 'auto',
-    endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
+    endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`, // r2Origin() below names the same host
     credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey },
     requestChecksumCalculation: 'WHEN_REQUIRED',
     responseChecksumValidation: 'WHEN_REQUIRED',
@@ -112,6 +112,13 @@ function r2Credentials() {
   const { R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY } = serverEnv()
   if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY) return null
   return { accountId: R2_ACCOUNT_ID, accessKeyId: R2_ACCESS_KEY_ID, secretAccessKey: R2_SECRET_ACCESS_KEY }
+}
+
+// Where signed URLs point (the account's S3 endpoint), for a preconnect hint on pages whose first
+// screen loads straight from R2. Already visible in every signed URL; null when R2 is not set up.
+export function r2Origin(): string | null {
+  const { R2_ACCOUNT_ID } = serverEnv()
+  return R2_ACCOUNT_ID ? `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com` : null
 }
 
 // The configured bucket. Throws INTERNAL (not a silent no-op) when R2 is not set up, so
