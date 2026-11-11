@@ -33,7 +33,7 @@ export function SuccessView({ job, shareText, editable, onAgain }: SuccessProps)
   const size = t.rich('workspace.developingSize', { tier: tierName(job.resolution, t), px, mono: monoTag })
   const tray = (
     <>
-      <ResultPhoto src={fileUrl} alt={t('workspace.resultAlt', { name: job.templateName })} pool={job.creditPool} hud={[t('workspace.doneState.hud'), size]} fit />
+      <ResultPhoto src={fileUrl} alt={t('workspace.resultAlt', { name: job.templateName })} pool={job.creditPool} cutOut={job.transparent} hud={[t('workspace.doneState.hud'), size]} fit />
       <TrayCaption>{t('workspace.doneState.caption', { name: job.templateName })}</TrayCaption>
     </>
   )
@@ -45,7 +45,7 @@ export function SuccessView({ job, shareText, editable, onAgain }: SuccessProps)
   ) : null
   const bar = (
     <ActionBar className="md:px-0">
-      <ShareButton fileUrl={fileUrl} name={`shotviva-${job.templateId}`} shareText={shareText} px={px} watermarked={job.creditPool === 'free'} />
+      <ShareButton fileUrl={fileUrl} name={`shotviva-${job.templateId}`} shareText={shareText} px={px} work={{ pool: job.creditPool, transparent: job.transparent }} watermarked={job.creditPool === 'free'} />
     </ActionBar>
   )
   return (

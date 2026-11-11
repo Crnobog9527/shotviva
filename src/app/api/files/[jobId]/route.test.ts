@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({ requireApiUser: vi.fn(), resolveJobFile: vi.fn
 
 vi.mock('@/core/auth', () => ({ requireApiUser: mocks.requireApiUser, createAdminSupabase: () => ({}), clientIp: () => '203.0.113.7' }))
 vi.mock('@/core/storage', () => ({ r2Store: () => ({}) }))
+// The client-safe rules module is real: the route must accept exactly its two words.
 vi.mock('@/core/jobs', () => ({ resolveJobFile: mocks.resolveJobFile, recordJobDownload: mocks.recordJobDownload }))
 // after() needs a request scope; here it runs the callback at once so the test can see it.
 vi.mock('next/server', async (importOriginal) => ({
@@ -52,6 +53,21 @@ describe('GET /api/files/[jobId]', () => {
     // Dispute evidence (T82): an explicit download is noted with the caller's IP.
     expect(mocks.recordJobDownload).toHaveBeenCalledWith(expect.anything(), { userId: 'u1', jobId: 'j1', ip: '203.0.113.7' })
     expect(response.headers.get('content-disposition')).toBe('attachment; filename="shotviva-j1.jpg"')
+  })
+
+  it('passes a cut-out’s 白底 / 透明底 choice on, records the click once, and drops unknown values', async () => {
+    mocks.resolveJobFile.mockResolvedValue({ kind: 'redirect', url: 'https://r2.example/white' })
+    const response = await call('?bg=white&download=1')
+    expect(response.status).toBe(302)
+    expect(mocks.resolveJobFile).toHaveBeenCalledWith(expect.anything(), { userId: 'u1', jobId: 'j1', download: true, background: 'white' })
+    expect(mocks.recordJobDownload).toHaveBeenCalledTimes(1)
+
+    await call('?bg=transparent')
+    expect(mocks.resolveJobFile).toHaveBeenLastCalledWith(expect.anything(), { userId: 'u1', jobId: 'j1', download: false, background: 'transparent' })
+    await call('?bg=black')
+    expect(mocks.resolveJobFile).toHaveBeenLastCalledWith(expect.anything(), { userId: 'u1', jobId: 'j1', download: false })
+    // Neither of the last two is a download.
+    expect(mocks.recordJobDownload).toHaveBeenCalledTimes(1)
   })
 
   it('answers 404 for non-owners', async () => {

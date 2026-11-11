@@ -94,6 +94,16 @@ describe('openai image provider', () => {
   })
 })
 
+describe('openai image provider and the cut-out record', () => {
+  it('sends model_params.background, so a transparent template is recorded as a cut-out', async () => {
+    const fetchImpl = vi.fn(async () => json({ data: [{ b64_json: PNG_B64 }] }))
+    const openai = provider(fetchImpl as unknown as typeof fetch)
+    expect(openai.honoursBackground).toBe(true)
+    await openai.generate(input({ params: { background: 'transparent' } }))
+    expect((bodies(fetchImpl)[0] as FormData).get('background')).toBe('transparent')
+  })
+})
+
 describe('openai image provider config (T17)', () => {
   it("ignores a template's model_params.model and calls the configured base URL (T17)", async () => {
     const fetchImpl = vi.fn(async () => json({ data: [{ b64_json: PNG_B64 }] }))
