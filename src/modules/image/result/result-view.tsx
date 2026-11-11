@@ -50,7 +50,7 @@ export function ResultView({ item, detail, shareText, edit, parent, parentDelete
         <DetailPhoto
           src={fileUrl}
           alt={t('workspace.resultAlt', { name: item.templateName })}
-          work={{ pool: item.creditPool, visibility: item.visibility }}
+          work={{ pool: item.creditPool, visibility: item.visibility, cutOut: item.transparent }}
           tierLabel={t('result.tierPx', { tier: tierName(item.resolution, t), px: tierPx(item.resolution) })}
           original={{ source: detail.original, alt: t('result.originalAlt', { name: item.templateName }) }}
         />
@@ -59,7 +59,7 @@ export function ResultView({ item, detail, shareText, edit, parent, parentDelete
       <div className={viewer.side}>
         <DetailHead item={item} />
         <div className="mt-4 grid gap-2">
-          <ShareButton fileUrl={fileUrl} name={`shotviva-${item.templateId}`} shareText={shareText} px={tierPx(item.resolution)} watermarked={item.creditPool === 'free'} />
+          <ShareButton fileUrl={fileUrl} name={`shotviva-${item.templateId}`} shareText={shareText} px={tierPx(item.resolution)} work={{ pool: item.creditPool, transparent: item.transparent }} watermarked={item.creditPool === 'free'} />
           {/* Edit and Make again side by side (B comp photo.html .acts .two); alone, full width. */}
           <QuietActions edit={edit} again={again} />
           {remove}

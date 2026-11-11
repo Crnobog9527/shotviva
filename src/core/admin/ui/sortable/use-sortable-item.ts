@@ -11,6 +11,16 @@ import { useSortableListContext } from './sortable-context'
 export const sortableRowClass =
   'pointer-coarse:select-none [-webkit-touch-callout:none] data-[lifted]:relative data-[lifted]:z-10 data-[lifted]:bg-card data-[lifted]:shadow-lg data-[lifted]:outline data-[lifted]:outline-1 data-[lifted]:outline-primary/60'
 
+// Rows only slide up and down; cards in a grid follow the pointer both ways.
+const translate = ({ x, y }: { x: number; y: number }, layout: 'list' | 'grid') =>
+  `translate3d(${layout === 'grid' ? Math.round(x) : 0}px, ${Math.round(y)}px, 0)`
+
+// In a grid the one-step arrows read as earlier / later rather than up / down.
+const moveLabels = {
+  list: { back: sortableCopy.moveUp, forward: sortableCopy.moveDown },
+  grid: { back: sortableCopy.moveBack, forward: sortableCopy.moveForward },
+} as const
+
 // One row of a SortableList: spread `row` on the row element and `handle` on DragHandle.
 export function useSortableItem(id: string) {
   const list = useSortableListContext()
@@ -28,7 +38,7 @@ export function useSortableItem(id: string) {
   const lifted = isDragging || list.liftedId === id
   const index = list.shown.indexOf(id)
   const style: CSSProperties = {
-    transform: transform ? `translate3d(0, ${Math.round(transform.y)}px, 0)` : undefined,
+    transform: transform ? translate(transform, list.layout) : undefined,
     transition: transition ?? undefined,
   }
 
@@ -58,9 +68,9 @@ export function useSortableItem(id: string) {
       // save of this or any other list on the page runs.
       blocked: list.blocked,
     },
-    moveUp: { label: sortableCopy.moveUp(label), onClick: () => list.move(id, -1), disabled: list.locked || index === 0 },
+    moveUp: { label: moveLabels[list.layout].back(label), onClick: () => list.move(id, -1), disabled: list.locked || index === 0 },
     moveDown: {
-      label: sortableCopy.moveDown(label),
+      label: moveLabels[list.layout].forward(label),
       onClick: () => list.move(id, 1),
       disabled: list.locked || index === list.shown.length - 1,
     },

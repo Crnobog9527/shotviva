@@ -5,7 +5,7 @@ import { Suspense, type ReactNode } from 'react'
 
 import { AppPage, BalanceChip, TabRootHeader } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
-import { currentTier, limitsFor, readBalance } from '@/core/billing'
+import { effectiveTier, limitsFor, readBalance } from '@/core/billing'
 import { listFavoriteIdsOrEmpty } from '@/core/favorites'
 import { currentLocale } from '@/core/i18n/server'
 import { listRunningJobIds } from '@/core/jobs'
@@ -35,8 +35,8 @@ async function Create() {
     // Templates and series cards placed under up to three category levels (T102).
     loadCatalogueView(supabase, await currentLocale()),
     readBalance(supabase, user.id),
-    // current_tier() is service-role only; the user's own id comes from the session.
-    currentTier(admin, user.id),
+    // effective_tier() (an unbanned admin counts as Max) is service-role only; the user's own id comes from the session.
+    effectiveTier(admin, user.id),
     listRunningJobIds(admin, user.id, new Date()),
     // A failed read degrades to no favorites (logged), never to an error page or signed-out home.
     listFavoriteIdsOrEmpty(supabase, user.id),

@@ -34,11 +34,17 @@ export function shareFileFor(blob: Blob, name: string): File {
 // MOBILE_UI_rules §1.8.1 rules 1–2: Share only once the file is in memory and the browser
 // says it can hand that exact file to the OS; anything else (fetch blocked, decode failed,
 // canShare false) is Download.
-export async function resolveShareMode(sharer: FileSharer | undefined, prepared: () => Promise<PreparedResult | null>, name: string): Promise<ShareMode> {
+// keepAlpha: a cut-out's 透明底 choice hands over the PNG as served instead of the JPEG on white.
+export async function resolveShareMode(
+  sharer: FileSharer | undefined,
+  prepared: () => Promise<PreparedResult | null>,
+  name: string,
+  keepAlpha = false,
+): Promise<ShareMode> {
   if (!mayShareFiles(sharer)) return DOWNLOAD
   const result = await prepared().catch(() => null)
   if (!result) return DOWNLOAD
-  const file = shareFileFor(result.shareBlob, name)
+  const file = shareFileFor(keepAlpha ? result.original : result.shareBlob, name)
   return canShareFile(sharer, file) ? { kind: 'share', file } : DOWNLOAD
 }
 

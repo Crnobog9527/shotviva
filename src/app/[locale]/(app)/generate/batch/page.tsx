@@ -5,7 +5,7 @@ import { Suspense, type ReactNode } from 'react'
 
 import { AppPage, BalanceChip, FlowNav } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
-import { currentTier, limitsFor, readBalance } from '@/core/billing'
+import { effectiveTier, limitsFor, readBalance } from '@/core/billing'
 import { currentLocale } from '@/core/i18n/server'
 import { listTemplatesIn } from '@/core/templates'
 import { MatrixWorkspace, toCatalogueTemplate } from '@/modules/image'
@@ -29,8 +29,8 @@ async function Matrix({ searchParams }: { searchParams: Promise<Record<string, s
     searchParams,
     listTemplatesIn(supabase, await currentLocale()),
     readBalance(supabase, user.id),
-    // current_tier() is service-role only; the user's own id comes from the session.
-    currentTier(admin, user.id),
+    // effective_tier() (an unbanned admin counts as Max) is service-role only; the user's own id comes from the session.
+    effectiveTier(admin, user.id),
   ])
   const templates = found.map(toCatalogueTemplate).filter((template) => template.photoInput !== 'none')
   const wanted = typeof query.t === 'string' ? query.t.split(',') : []

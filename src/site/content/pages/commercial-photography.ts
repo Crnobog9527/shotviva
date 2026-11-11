@@ -1,5 +1,5 @@
 import { baselineOffers, type OfferFacts } from '../offer'
-import { defineContentPage, type ShootDemo } from '@/core/content'
+import { defineContentPage, type EditCases, type ShootDemo } from '@/core/content'
 
 import { site } from '../../site.config'
 import { productBills } from '../home'
@@ -46,6 +46,37 @@ const shoot: ShootDemo = {
   },
 }
 
+// 电商白底图, three cases from easy to hard (Owner 2026-11-12): the live template's speaker, a
+// dress on a door, and flyaway hair against a busy street. Cut-outs with an alpha channel sit on
+// a checkerboard. The dress and the model are AI examples; every brand in them is made up.
+const whiteCases: EditCases = {
+  heading: 'White Background Main Images, From Easy to Hard',
+  intro: 'Marketplace main images want the product alone on white, and the cut-out is where cheap tools show. Three phone photos, the last one the hardest kind there is: fine flyaway hair against a busy, backlit street.',
+  labels: { before: 'Phone photo', after: 'Main image', reference: 'Reference' },
+  items: [
+    {
+      title: 'A speaker on a cluttered desk',
+      change: 'The cables, the desk mat and the room are gone; the speaker keeps its grille, tweeter and finish. A transparent PNG, ready for any marketplace background.',
+      before: caseImage('white-speaker-before', 'Example phone photo: a dark grey studio speaker on a green desk mat, cables and a chair behind it'),
+      after: caseImage('white-speaker-after', 'AI example: the same speaker cut out on a transparent background with a soft shadow beneath it'),
+      transparent: true,
+    },
+    {
+      title: 'A dress on a bedroom door',
+      change: 'Off the hanger and the door, onto pure white: the same dress, steamed smooth, with every embroidered flower, the tassels and the crochet lace where they were.',
+      before: caseImage('white-dress-before', 'Example phone photo: an ivory tiered maxi dress with folk flower embroidery hanging on a bedroom door, a bed and a laundry basket in frame'),
+      after: caseImage('white-dress-after', 'AI example: the same embroidered dress on a pure white background'),
+    },
+    {
+      title: 'Flyaway hair on a busy street',
+      change: 'The hardest cut-out: backlit hair blowing across a city street. The street, the light stand and the passers-by are gone; the fine strands stay, as soft see-through edges in a transparent PNG.',
+      before: caseImage('white-hair-before', 'Example phone photo: a model in a camel coat on a city street at golden hour, backlit hair blowing, a light stand and a scooter behind her'),
+      after: caseImage('white-hair-after', 'AI example: the same model cut out on a transparent background, every flyaway strand of hair kept'),
+      transparent: true,
+    },
+  ],
+}
+
 const copy = {
   slug: 'commercial-photography',
   keyword: 'commercial photography',
@@ -84,6 +115,7 @@ const copy = {
   landing: {
     factsNote: 'From the platforms\' own help pages (Amazon, Etsy, Shopify), checked November 2026. Platforms change their rules; check before you list.',
     shoot,
+    edits: whiteCases,
     templates: {
       heading: 'Product Photo Templates: Listings, Scenes and Posters',
       intro: `Every template starts from your phone photo of the product and ends with a finished shot.`,

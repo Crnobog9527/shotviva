@@ -3,7 +3,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getTranslations } from 'next-intl/server'
 
-import { currentTier, limitsFor, readBalance } from '@/core/billing'
+import { effectiveTier, limitsFor, readBalance } from '@/core/billing'
 import { fileUrlFor, findOwnJob, hasInputPreview, jobRefOrShort, keptInputsOf, originalUrlFor, type Job } from '@/core/jobs'
 import type { Locale } from '@/core/i18n'
 import { logger } from '@/core/logger'
@@ -56,8 +56,8 @@ async function readAround(deps: Deps, req: Req) {
   const [offer, balance, tier, reference, t] = await Promise.all([
     loadEditOffer(deps.db),
     readBalance(deps.db, req.userId),
-    // current_tier() is service-role only; the user's own id comes from the session.
-    currentTier(deps.admin, req.userId),
+    // effective_tier() (an unbanned admin counts as Max) is service-role only; the user's own id comes from the session.
+    effectiveTier(deps.admin, req.userId),
     jobRefOrShort(deps.admin, req.jobId),
     getTranslations({ locale: deps.locale, namespace: 'app' }),
   ])

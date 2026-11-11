@@ -14,6 +14,7 @@ export {
   TIER_LIMITS,
   batchUpgrade,
   currentTier,
+  effectiveTier,
   limitsFor,
   tierForBatch,
   type TierLimits,
