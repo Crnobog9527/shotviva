@@ -25,6 +25,6 @@ export type Allowance = { credits: number; interval: 'month' | 'year' }
 // member the product they last bought when it is the same tier. No plan, no allowance.
 export function planAllowance(summary: SubscriptionSummary, last: LastMembership | null): Allowance | null {
   if (last?.grantedCredits == null || (summary.kind !== 'subscription' && summary.kind !== 'paid_until') || summary.tier !== last.product.tier) return null
-  if (summary.kind === 'subscription' && last.product.interval !== summary.interval) return null
+  if (summary.kind === 'subscription' && last.product.id !== summary.productId) return null
   return { credits: last.grantedCredits, interval: last.product.interval }
 }

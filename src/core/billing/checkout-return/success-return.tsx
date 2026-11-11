@@ -18,7 +18,7 @@ export function SuccessReturn({ view, back }: Props) {
   const tiers = useTranslations('paywall.tiers')
   const money = useChargedMoney()
   const count = view.credits?.toLocaleString()
-  const level = levelOf(view.productId)
+  const level = levelOf(view.productId, view.tier)
   return (
     <ReturnPlate pending={false} material={plateMaterial(level)}>
       <CelebrationLoader level={level} paymentKey={view.paymentKey} />

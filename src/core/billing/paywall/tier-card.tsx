@@ -1,11 +1,11 @@
 "use client"
 
-import { useTranslations } from "next-intl"
+import { useLocale, useTranslations } from "next-intl"
 import type { ReactNode } from "react"
 
 import { cn } from "../../ui/cn"
 import type { BlockReason } from "../subscription/upgrade-rule"
-import { perMonthUsd, productFor, yearlySavingUsd, type Period, type TierOffer } from "./offer"
+import { offerLabel, perMonthUsd, productFor, yearlySavingUsd, type Period, type TierOffer } from "./offer"
 import { useTierPerks } from "./perk-facts"
 import { PerkList } from "./perk-list"
 import { PhotoEstimateLine } from "./photo-estimate-line"
@@ -15,6 +15,11 @@ import { usdPerHundredCredits } from "../../config"
 import { useMoney } from "./use-money"
 
 const FLAGS = { starter: null, pro: "recommended", max: "bestValue" } as const
+
+function planFlag(tier: TierOffer['tier'], lock: BlockReason | null | undefined) {
+  if (lock === 'current') return 'yourPlan'
+  return lock ? null : FLAGS[tier]
+}
 
 type Props = {
   offer: TierOffer
@@ -34,14 +39,16 @@ type Props = {
 // then its perks. Same card on /pricing and in the paywall, so both say exactly the same thing.
 export function TierCard({ offer, period, selected, check, footer, lock, singlePayment = false }: Props) {
   const t = useTranslations("paywall")
+  const locale = useLocale() === 'zh' ? 'zh' : 'en'
+  const product = productFor(offer, period)
   const perks = useTierPerks(offer.tier)
   // The member's own plan wears "Your plan" where the sales flag would be.
-  const flag = lock === "current" ? "yourPlan" : lock ? null : FLAGS[offer.tier]
+  const flag = planFlag(offer.tier, lock)
   return (
     <div className="tier-card flex h-full flex-col px-4 pt-4 pb-3" data-tier={offer.tier} data-selected={selected} data-locked={lock ? "true" : undefined}>
       <div className="flex items-start justify-between gap-2">
         <span>
-          <span className="tier-name text-headline font-semibold tracking-[-0.015em] text-[var(--tier-ink)]">{t(`tiers.${offer.tier}`)}</span>
+          <span className="tier-name text-headline font-semibold tracking-[-0.015em] text-[var(--tier-ink)]">{offerLabel(product, locale, t(`tiers.${offer.tier}`))}</span>
           {flag ? (
             <span className="ml-2 inline-flex h-6 items-center rounded-full [background:var(--tier-flag)] px-2 align-[2px] text-caption leading-none font-semibold text-[var(--tier-flag-ink)]">
               {t(flag)}
@@ -50,7 +57,7 @@ export function TierCard({ offer, period, selected, check, footer, lock, singleP
         </span>
         {check}
       </div>
-      <p className="mt-1 text-caption leading-[1.4] text-bone-dim">{t(`positioning.${offer.tier}`)}</p>
+      <p className="mt-1 text-caption leading-[1.4] text-bone-dim">{product.benefits?.[locale] || t(`positioning.${offer.tier}`)}</p>
       {lock === "lower" ? <LockNote /> : null}
       {/* Keyed on the period: the numbers fade in when the toggle changes them. */}
       <div key={period} className="tier-swap">
@@ -82,7 +89,7 @@ function Price({ offer, period, singlePayment }: { offer: TierOffer; period: Per
         per: (chunks) => <span className="text-caption text-muted-foreground">{chunks}</span>,
       })}
       {term && <span className="text-caption text-bone-dim">{t(term.key, term.values)}</span>}
-      {!discount && period === "year" ? (
+      {!discount && period === "year" && offer.monthly && yearlySavingUsd(offer) > 0 ? (
         <s className="ml-1 font-mono text-caption text-muted-foreground" aria-label={t("wasMonthly", { price: money(offer.monthly.priceUsd) })}>
           {money(offer.monthly.priceUsd)}
         </s>
@@ -104,8 +111,8 @@ function Facts({ offer, period }: { offer: TierOffer; period: Period }) {
         <span>{period === "year" ? t("creditsYear", { count: product.credits, price: money(effective.priceUsd) }) : t("creditsMonth", { count: product.credits })}</span>
         <span className="font-mono text-muted-foreground">{t("perHundredCredits", { price: money(usdPerHundredCredits(effective), true) })}</span>
       </p>
-      <PhotoEstimateLine offer={offer} />
-      {!discount && period === "year" ? (
+      <PhotoEstimateLine offer={offer} period={period} />
+      {!discount && period === "year" && offer.monthly && yearlySavingUsd(offer) > 0 ? (
         <p className="tier-plate mt-2 flex items-center justify-between gap-2 rounded-inner bg-[var(--tier-plate)] py-2 pr-2 pl-3 text-caption text-[var(--tier-plate-ink)]">
           {/* The label may wrap and the amount may not: at 320px the Max plate is wider than its card. */}
           <span className="min-w-0">{t.rich("savingLabel", { vs: (chunks) => <span className="tier-saving-vs">{chunks}</span> })}</span>

@@ -1,11 +1,12 @@
+import { baselineOffers, type OfferFacts } from '../../offer'
 import { defineContentPage, type CostBills } from '@/core/content'
 
 import { site } from '../../../site.config'
 import { CATEGORY, pairImage, SIZE_COUNT } from '../../landing-shared'
 import { zhPricingRelated } from '../shared'
-import { foodHalfDayUsd, MENU_DISHES, photoSeconds, planFrom, usd, usdRange } from '../../offer'
+import { foodHalfDayUsd, MENU_DISHES, photoSeconds, usd, usdRange } from '../../offer'
 import { PLATFORM_SPECS, px } from '../../platform-specs'
-import { ZH_TIERS, zhFreeImages, zhTierList } from '../offer'
+import { planLabel, ZH_TIERS, zhFreeImages, zhTierList } from '../offer'
 
 // /zh/ai-restaurant-menu (T44, ARCHITECTURE §17): noindex (中文口径主词表: 「暂不建」, keyword
 // ai菜单). For restaurant owners who put dishes on delivery apps; the US apps' figures are kept
@@ -14,8 +15,8 @@ const brand = site.brand.name
 const [, hd] = ZH_TIERS
 const { doordash, uberEats, grubhub } = PLATFORM_SPECS
 
-function menuBills(): CostBills {
-  const plan = planFrom ? usd(planFrom.priceUsd) : ''
+function menuBills({ planFrom }: OfferFacts): CostBills {
+  const plan = planFrom ? usd(planFrom.priceUsd) : '暂无月付套餐'
   return {
     heading: `菜单配图要花多少钱：请美食摄影师和用 ${brand} 对比`,
     intro: `${MENU_DISHES} 道菜，做菜单和外卖平台用。同样的活，两张账单。`,
@@ -31,9 +32,9 @@ function menuBills(): CostBills {
     },
     site: {
       title: brand,
-      total: { amount: plan, suffix: '/月起', when: `每张 ${photoSeconds} 秒左右` },
+      total: { amount: plan, suffix: planFrom ? '/月起' : '', when: `每张 ${photoSeconds} 秒左右` },
       lines: [
-        { label: `入门版，每月 ${planFrom?.credits ?? ''} 积分`, value: plan },
+        { label: planLabel(planFrom), value: plan },
         { label: '准备原图', value: '每道菜一张手机照' },
         { label: '可做成', value: '菜单图、外卖图、促销海报' },
       ],
@@ -42,7 +43,7 @@ function menuBills(): CostBills {
   }
 }
 
-export const zhAiRestaurantMenu = defineContentPage({
+const copy = {
   slug: 'ai-restaurant-menu',
   keyword: 'ai菜单',
   label: 'AI菜单配图',
@@ -72,7 +73,6 @@ export const zhAiRestaurantMenu = defineContentPage({
       value: `外卖平台要的是你实际卖的菜。${brand} 从你自己的手机照片出发，只换光线和背景，不改菜本身。`,
     },
   ],
-  costBills: menuBills(),
   faq: [
     {
       question: '外卖平台的菜单能用 AI 图吗？',
@@ -96,12 +96,6 @@ export const zhAiRestaurantMenu = defineContentPage({
       answer: `它做的是照片，一次一道菜，另外可以做一张促销海报。排版整张多道菜的菜单或价目表，${brand} 不做。`,
     },
   ],
-  related: [
-    { href: '/', anchor: 'AI改图', note: '全部模板，按餐饮、商品、美妆、房间、宠物和画风分类。' },
-    { href: '/commercial-photography', anchor: '商业产品摄影', note: '网店和卖家不请摄影师，也能做出影棚级商品图。' },
-    { href: '/image-to-image-generator', anchor: '图生图在线工具', note: '想看看图生图对一张照片能做什么。' },
-    zhPricingRelated(brand),
-  ],
   headings: {
     facts: '菜单和外卖平台的图片尺寸',
     faq: 'AI菜单配图常见问题',
@@ -115,4 +109,17 @@ export const zhAiRestaurantMenu = defineContentPage({
       categoryKeys: [CATEGORY.food],
     },
   },
+} as const
+
+export const makeZhAiRestaurantMenu = (offers: OfferFacts) => defineContentPage({
+  ...copy,
+  costBills: menuBills(offers),
+  related: [
+    { href: '/', anchor: 'AI改图', note: '全部模板，按餐饮、商品、美妆、房间、宠物和画风分类。' },
+    { href: '/commercial-photography', anchor: '商业产品摄影', note: '网店和卖家不请摄影师，也能做出影棚级商品图。' },
+    { href: '/image-to-image-generator', anchor: '图生图在线工具', note: '想看看图生图对一张照片能做什么。' },
+    zhPricingRelated(brand, offers),
+  ],
 })
+
+export const zhAiRestaurantMenu = makeZhAiRestaurantMenu(baselineOffers)

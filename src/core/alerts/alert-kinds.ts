@@ -116,6 +116,7 @@ export type RenewalReviewAlert = {
 export type OwnerAlert =
   | { kind: 'template_fallback'; templateId: string; reason: string; rejected: boolean }
   | { kind: 'checkout_catalog_failed'; code: string }
+  | { kind: 'catalog_publish_failed'; request: string; step: string }
   | RenewalReviewAlert
   | RefundAlert
   | DisputeOpenedAlert
@@ -150,6 +151,7 @@ const POLICIES: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K }
   dispute_due_soon: (a) => ({ key: `dispute_due_soon:${a.disputeId}`, money: true }),
   waffo_renewal_review: (a) => ({ key: `waffo_renewal:${a.paymentId}`, money: true }),
   payment_failed: (a) => ({ key: `payment_failed:${a.channel}:${a.eventId}`, money: true }),
+  catalog_publish_failed: a => ({ key: `catalog_publish:${a.request}:${a.step}`, requireShared: true, money: false }),
   checkout_catalog_failed: a => ({ key: `checkout_catalog_failed:${a.code}`, cooldownMs: 60 * MINUTE, requireShared: true, money: false }),
   template_fallback: a => ({ key: `template_fallback:${a.templateId}:${a.reason}:${a.rejected}`, cooldownMs: 60 * MINUTE, requireShared: true, money: false }),
   generation_spike: () => ({ key: 'generation_spike', cooldownMs: 60 * MINUTE, money: false }),

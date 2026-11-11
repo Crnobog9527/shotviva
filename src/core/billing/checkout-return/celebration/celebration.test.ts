@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { PRODUCT_IDS } from '../../../config'
+import { TEST_PRODUCTS } from '../../stripe/test-products'
 import { burst, embers, rainTick, sparks } from './emitters'
 import { alive, step, type Engine, type Particle } from './engine'
 import { levelOf, plateMaterial } from './levels'
@@ -19,8 +19,8 @@ function seeded(seed = 1) {
 
 describe('levels', () => {
   it('packs step up S / M / L; monthly and yearly of a tier celebrate alike', () => {
-    expect(PRODUCT_IDS.map(levelOf)).toEqual(['starter', 'starter', 'pro', 'pro', 'max', 'max', 'pack_s', 'pack_m', 'pack_l'])
-    expect(levelOf('pro_monthly')).toBe(levelOf('pro_yearly'))
+    expect(TEST_PRODUCTS.map(p => levelOf(p.id, p.tier === 'pack' ? null : p.tier))).toEqual(['starter', 'starter', 'pro', 'pro', 'max', 'max', 'pack_s', 'pack_m', 'pack_l'])
+    expect(levelOf('studio_monthly', 'pro')).toBe(levelOf('pro_yearly', 'pro'))
   })
 
   it('only Pro and Max put their material on the plate', () => {

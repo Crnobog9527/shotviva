@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react"
 
-import type { MembershipTier } from "../../config"
+import type { MembershipTier, ProductId } from "../../config"
 import { holdsMembership, NO_STANDING, type MemberStanding } from "../subscription/standing"
 import type { Period } from "./offer"
 import type { PlanStanding } from "./standing-pick"
@@ -25,12 +25,12 @@ export function useStanding(): MemberStanding {
 
 export function StandingFeed({ standing }: { standing: MemberStanding }) {
   const { setStanding } = useContext(StandingContext)
-  const { subscription, tier } = standing
-  useEffect(() => setStanding({ subscription, tier }), [setStanding, subscription, tier])
+  const { subscription, subscriptionRank, tier } = standing
+  useEffect(() => setStanding({ subscription, subscriptionRank, tier }), [setStanding, subscription, subscriptionRank, tier])
   return null
 }
 
-export type PlanReader = (tier: MembershipTier, period: Period) => PlanStanding
+export type PlanReader = (tier: MembershipTier, period: Period, id?: ProductId) => PlanStanding
 
 const OPEN: PlanStanding = { upgrade: false, lock: null }
 const openReader: PlanReader = () => OPEN
@@ -45,7 +45,7 @@ export function usePlanReader(): PlanReader {
     if (!holdsMembership(standing)) return
     let live = true
     void import("./standing-pick").then((rule) => {
-      if (live) setLoaded({ standing, read: (tier, period) => rule.planStanding(standing, tier, period) })
+      if (live) setLoaded({ standing, read: (tier, period, id) => rule.planStanding(standing, tier, period, id) })
     })
     return () => {
       live = false

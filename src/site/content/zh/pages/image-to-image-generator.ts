@@ -1,3 +1,4 @@
+import { baselineOffers, type OfferFacts } from '../../offer'
 import { defineContentPage, type EditCases, type ShootDemo } from '@/core/content'
 
 import { site } from '../../../site.config'
@@ -63,7 +64,7 @@ const edits: EditCases = {
   ],
 }
 
-export const zhImageToImageGenerator = defineContentPage({
+const copy = {
   slug: 'image-to-image-generator',
   keyword: '图生图',
   label: '图生图',
@@ -84,7 +85,6 @@ export const zhImageToImageGenerator = defineContentPage({
     { label: '选模板，不用描述', value: '光线、场景或画风都由模板决定。只有一行选填的「有什么想改的？」，写一句小要求就行。' },
     { label: `${zhTierList}，导出 PNG`, value: `长边分别是 ${zhTierPixels}，${SIZE_COUNT} 种尺寸，从方形主图到 9:16 竖版。每张 ${photoSeconds} 秒左右。` },
   ],
-  costBills: productBills(`${SET_PHOTOS} 张商品图要花多少钱：请摄影师和用图生图对比`, `一个商品，${SET_PHOTOS} 张造型图，精修好、可以直接发。同样的活，两张账单。`),
   faq: [
     {
       question: '图生图有免费的吗？',
@@ -108,12 +108,6 @@ export const zhImageToImageGenerator = defineContentPage({
       answer: '模板专门保留你拍的主体：形状、颜色、标签、摆盘或房间布局，只改光线、背景、场景或画风。',
     },
   ],
-  related: [
-    { href: '/', anchor: 'AI改图', note: '全部模板，按餐饮、商品、美妆、房间、宠物和画风分类。' },
-    { href: '/commercial-photography', anchor: '商业产品摄影', note: '网店和卖家不请摄影师，也能做出影棚级商品图。' },
-    { href: '/ai-restaurant-menu', anchor: 'AI菜单配图', note: '餐厅用手机拍菜，直接做成菜单和外卖平台的图。' },
-    zhPricingRelated(brand),
-  ],
   headings: {
     facts: 'AI图生图：你只需要准备这些',
     faq: '以图生图常见问题',
@@ -124,4 +118,17 @@ export const zhImageToImageGenerator = defineContentPage({
     shoot: catStyles,
     edits,
   },
+} as const
+
+export const makeZhImageToImageGenerator = (offers: OfferFacts) => defineContentPage({
+  ...copy,
+  costBills: productBills(offers,`${SET_PHOTOS} 张商品图要花多少钱：请摄影师和用图生图对比`, `一个商品，${SET_PHOTOS} 张造型图，精修好、可以直接发。同样的活，两张账单。`),
+  related: [
+    { href: '/', anchor: 'AI改图', note: '全部模板，按餐饮、商品、美妆、房间、宠物和画风分类。' },
+    { href: '/commercial-photography', anchor: '商业产品摄影', note: '网店和卖家不请摄影师，也能做出影棚级商品图。' },
+    { href: '/ai-restaurant-menu', anchor: 'AI菜单配图', note: '餐厅用手机拍菜，直接做成菜单和外卖平台的图。' },
+    zhPricingRelated(brand, offers),
+  ],
 })
+
+export const zhImageToImageGenerator = makeZhImageToImageGenerator(baselineOffers)

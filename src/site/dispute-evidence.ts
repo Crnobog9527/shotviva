@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { stripeProductName, type DisputeEvidenceConfig } from '@/core/billing/stripe'
+import type { SiteProduct } from '@/core/config'
 import { legalPlainText } from '@/core/content'
 
 import { refundPolicyPage, termsPage } from './content/legal'
@@ -12,11 +13,11 @@ import { site } from './site.config'
 const origin = `https://${site.brand.domain}`
 const refundPolicyText = legalPlainText(refundPolicyPage, origin)
 
-export function disputeEvidenceConfig(input: { managedPayments: boolean }): DisputeEvidenceConfig {
+export function disputeEvidenceConfig(input: { managedPayments: boolean }, products: readonly SiteProduct[]): DisputeEvidenceConfig {
   return {
     ...input,
     context: (productId, charge) => {
-      const product = site.billing.products.find((p) => p.id === productId) ?? null
+      const product = products.find((p) => p.id === productId) ?? null
       return {
         brand: site.brand.name,
         origin,

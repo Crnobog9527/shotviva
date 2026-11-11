@@ -1,6 +1,6 @@
 "use client"
 
-import { useTranslations } from "next-intl"
+import { useLocale, useTranslations } from "next-intl"
 import { useState } from "react"
 
 import { pricingV2 } from '../../public-env'
@@ -10,7 +10,7 @@ import { cn } from "../../ui/cn"
 import { DiscountProvider, useProductQuote } from "./discount-context"
 import { DiscountBanner, DiscountEntry } from "./discount-controls"
 import { BillingToggle } from "./billing-toggle"
-import { packLooks, packOffers, tierOffers, yearlySavingPct, type Period, type TierOffer } from "./offer"
+import { offerLabel, packLooks, packOffers, productFor, tierOffers, yearlySavingPct, type Period, type TierOffer } from "./offer"
 import { PackCard } from "./pack-card"
 import { usePaywall, type PaywallTrigger } from "./paywall-context"
 import { PhotoEstimateNote } from "./photo-estimate-line"
@@ -45,29 +45,30 @@ function Plans({ products }: PricingProps) {
   const held = heldPeriod(useStanding())
   const [picked, setPeriod] = useState<Period | null>(null)
   const period = picked ?? held ?? "month"
-  const offers = tierOffers(products)
+  const offers = tierOffers(products, period)
   return (
     <section aria-label={t("plansLabel")}>
       <DiscountBanner />
       <BillingToggle period={period} onChange={setPeriod} savePct={yearlySavingPct(offers)} className="mt-6 md:mt-8 md:w-[400px]" />
       <div className="mt-3 grid gap-2 md:mt-8 md:grid-cols-3 md:gap-4">
         {offers.map((offer) => {
-          const member = readPlan(offer.tier, period)
+          const product = productFor(offer, period)
+          const member = readPlan(offer.tier, period, product.id)
           return (
-            <div key={offer.tier} data-tier={offer.tier} className="tier-shell">
+            <div key={product.id} data-tier={offer.tier} className="tier-shell">
               <TierCard
                 offer={offer}
                 period={period}
                 selected={false}
                 lock={member.lock}
-                footer={<TierButton offer={offer} member={member} onPick={() => paywall.open(pricingTrigger(), { tier: offer.tier, period })} />}
+                footer={<TierButton offer={offer} period={period} member={member} onPick={() => paywall.open(pricingTrigger(), { tier: offer.tier, period, planId: product.id })} />}
               />
             </div>
           )
         })}
       </div>
       <PhotoEstimateNote className="mt-3 px-0.5" />
-      <PlanCompare offers={offers} />
+      <PlanCompare offers={offers} period={period} />
       <PackRow packs={packOffers(products)} onPick={(packId) => paywall.open(pricingTrigger(), { step: "packs", packId })} />
       <DiscountEntry />
     </section>
@@ -76,9 +77,9 @@ function Plans({ products }: PricingProps) {
 
 // "Choose Pro", or for a member (T66) "Upgrade to Pro" on a higher plan and a button that cannot
 // be pressed on their own ("Your plan") or a lower one ("Not available"; the card says why).
-function TierButton({ offer, member, onPick }: { offer: TierOffer; member: PlanStanding; onPick(): void }) {
+function TierButton({ offer, period, member, onPick }: { offer: TierOffer; period: Period; member: PlanStanding; onPick(): void }) {
   const t = useTranslations("paywall")
-  const tier = t(`tiers.${offer.tier}`)
+  const tier = offerLabel(productFor(offer, period), useLocale(), t(`tiers.${offer.tier}`))
   if (member.lock) {
     return (
       <button type="button" disabled className={buttonVariants({ variant: "glass", size: "touch", className: cn(ghost, "disabled:opacity-60") })}>

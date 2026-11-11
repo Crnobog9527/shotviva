@@ -17,6 +17,7 @@ import type { DisputeEvidenceConfig } from './disputes/config'
 import { sessionDiscount } from './discount-facts'
 import { recordPaymentContext } from './payment-context'
 import { SESSION_EXPAND, sessionFacts } from './payment-facts'
+import { sessionContract } from './catalog-session'
 import { matchesContractPrice } from './prices'
 import { settleCheckout, subscriptionState } from './settle'
 
@@ -62,29 +63,31 @@ function readOwner(session: Stripe.Checkout.Session) {
 
 // Our own metadata says what was bought; the charged Price's metadata (set by
 // scripts/stripe-setup.ts) must agree, so a session never grants another product.
-function readProduct(session: Stripe.Checkout.Session, productId: string, products: readonly SiteProduct[]) {
-  const product = products.find((p) => p.id === productId)
+function readProduct(session: Stripe.Checkout.Session, productId: string, products: readonly SiteProduct[], bound?: SiteProduct | null) {
+  const product = bound ?? products.find((p) => p.id === productId)
   if (!product) throw invalid(session, 'unknown product')
   const line = onlyLineItem(session)
   if (!line?.price) throw invalid(session, 'line item')
   const price = line.price
   const form = session.mode === 'subscription' ? 'subscription' : 'one_time'
-  const quote = readQuote(session.metadata ?? {}, product)
-  if (!matchesContractPrice(price, product, form, quote)) throw invalid(session, 'lookup key or quoted price')
+  const quote = readQuote(purchaseMetadata(session), product)
+  if (!bound && !matchesContractPrice(price, product, form, quote)) throw invalid(session, 'lookup key or quoted price')
   if (quote && line.quantity !== 1) {
     throw invalid(session, 'quoted price differs from line item')
   }
   return { product, quote }
 }
 
+const purchaseMetadata = (s: Stripe.Checkout.Session) => s.metadata ?? {}
+
 function onlyLineItem(session: Stripe.Checkout.Session) {
   const items = session.line_items?.data ?? []
   return items.length === 1 ? items[0] : undefined
 }
 
-export function readPurchase(session: Stripe.Checkout.Session, products: readonly SiteProduct[]): SessionPurchase {
+export function readPurchase(session: Stripe.Checkout.Session, products: readonly SiteProduct[], bound?: SiteProduct | null): SessionPurchase {
   const owner = readOwner(session)
-  const { product, quote } = readProduct(session, owner.product_id, products)
+  const { product, quote } = readProduct(session, owner.product_id, products, bound)
   const subscription = typeof session.subscription === 'object' ? session.subscription : null
   if (session.mode === 'subscription' && !subscription) throw invalid(session, 'subscription not expanded')
   return { userId: owner.user_id, product, quote, method: owner.method, subscription }
@@ -117,7 +120,8 @@ export async function fulfilCheckoutSession(deps: FulfilDeps, sessionId: string)
   // is its state now, whatever order the events arrived in.
   const session = await deps.stripe.checkout.sessions.retrieve(sessionId, { expand: SESSION_EXPAND })
   if (session.payment_status === 'unpaid') return 'unpaid'
-  const purchase = readPurchase(session, deps.products)
+  const bound = await sessionContract(deps.db, session, deps.products, true)
+  const purchase = readPurchase(session, deps.products, bound)
   const payment = await sessionFacts(deps.stripe, session, purchase.method)
   const change = await settleCheckout(deps.db, {
     userId: purchase.userId,

@@ -1,3 +1,4 @@
+import { baselineOffers, type OfferFacts } from '../offer'
 import { defineContentPage, type ShootDemo } from '@/core/content'
 
 import { site } from '../../site.config'
@@ -45,7 +46,7 @@ const shoot: ShootDemo = {
   },
 }
 
-export const commercialPhotography = defineContentPage({
+const copy = {
   slug: 'commercial-photography',
   keyword: 'commercial photography',
   label: 'Commercial product photography',
@@ -75,7 +76,25 @@ export const commercialPhotography = defineContentPage({
       value: `Marketplaces want photos of the actual item, and Etsy now asks for at least one unedited photo of it in every listing. ${brand} starts from your photo and keeps the product as shot; check each platform's current rules before you list.`,
     },
   ],
-  costBills: productBills(
+  headings: {
+    facts: 'Marketplace Photo Rules Your Shots Will Meet',
+    faq: 'Commercial Product Photography FAQ',
+    related: `More From ${brand}`,
+  },
+  landing: {
+    factsNote: 'From the platforms\' own help pages (Amazon, Etsy, Shopify), checked November 2026. Platforms change their rules; check before you list.',
+    shoot,
+    templates: {
+      heading: 'Product Photo Templates: Listings, Scenes and Posters',
+      intro: `Every template starts from your phone photo of the product and ends with a finished shot.`,
+      categoryKeys: [CATEGORY.products, CATEGORY.beauty],
+    },
+  },
+} as const
+
+export const makeCommercialPhotography = (offers: OfferFacts) => defineContentPage({
+  ...copy,
+  costBills: productBills(offers,
     `What a Product Shoot Costs: Photographer vs ${brand}`,
     `One product, ${SET_PHOTOS} styled photos, retouched and ready to list. The same job, two bills.`,
     `; a studio day ${usdRange(dayRateUsd)} (Shopify, Jan 2026)`,
@@ -83,7 +102,7 @@ export const commercialPhotography = defineContentPage({
   faq: [
     {
       question: 'How much does commercial product photography cost?',
-      answer: `Published 2026 US rates run ${usdRange(packshotUsd)} for a plain packshot, ${usdRange(styledShotUsd)} for a styled shot and ${usdRange(dayRateUsd)} for a studio day. ${brand} makes a styled, retouched photo from your own phone shot. ${plansSentence()}`,
+      answer: `Published 2026 US rates run ${usdRange(packshotUsd)} for a plain packshot, ${usdRange(styledShotUsd)} for a styled shot and ${usdRange(dayRateUsd)} for a studio day. ${brand} makes a styled, retouched photo from your own phone shot. ${plansSentence(offers)}`,
     },
     {
       question: 'Can AI replace a product photographer?',
@@ -108,20 +127,8 @@ export const commercialPhotography = defineContentPage({
     { href: '/', anchor: 'AI image to image', note: 'The studio: templates for food, products, rooms, pets and art styles.' },
     { href: '/image-to-image-generator', anchor: 'Image to image generator', note: 'For anyone who wants to see how image to image works on a photo.' },
     { href: '/ai-restaurant-menu', anchor: 'AI restaurant menu photos', note: 'For restaurants that need menu and delivery-app photos from a phone shot.' },
-    pricingRelated(),
+    pricingRelated(offers),
   ],
-  headings: {
-    facts: 'Marketplace Photo Rules Your Shots Will Meet',
-    faq: 'Commercial Product Photography FAQ',
-    related: `More From ${brand}`,
-  },
-  landing: {
-    factsNote: 'From the platforms\' own help pages (Amazon, Etsy, Shopify), checked November 2026. Platforms change their rules; check before you list.',
-    shoot,
-    templates: {
-      heading: 'Product Photo Templates: Listings, Scenes and Posters',
-      intro: `Every template starts from your phone photo of the product and ends with a finished shot.`,
-      categoryKeys: [CATEGORY.products, CATEGORY.beauty],
-    },
-  },
 })
+
+export const commercialPhotography = makeCommercialPhotography(baselineOffers)

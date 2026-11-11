@@ -29,6 +29,7 @@ describe('summarizeSubscription', () => {
   it('an active card subscription: tier, period and renewal date', () => {
     expect(summarize([row()], days(300))).toEqual({
       kind: 'subscription',
+      productId: 'pro_yearly',
       provider: 'stripe',
       tier: 'pro',
       interval: 'year',

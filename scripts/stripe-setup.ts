@@ -1,5 +1,6 @@
 /**
- * Keeps the Stripe catalog equal to site.config's nine products (ARCHITECTURE §6.2): 6 Products
+ * Compares Stripe with the published database catalog (ARCHITECTURE §6.2). In v2 the
+ * product editor owns publication and this script only reports catalog differences. Baseline: 6 Products
  * with tax code txcd_10105001 and 15 Prices with lookup_key and metadata.product_id. Also keeps
  * the card-only payment method configuration 中国银行卡 checks out with (T64): card on, Link,
  * Apple Pay and Google Pay off; created when missing, its preferences reset when they drift.
@@ -19,6 +20,8 @@
  * run before anything is written and lists every mismatch. The key is never printed.
  */
 import Stripe from 'stripe'
+import { createClient } from '@supabase/supabase-js'
+import { catalog, listedProducts } from '../src/core/billing/catalog-rows'
 import { z } from 'zod'
 
 import { configuredPricing } from '../src/core/billing/checkout-price'
@@ -57,7 +60,15 @@ if (live && !process.argv.includes('--live')) {
 
 const apply = process.argv.includes('--apply')
 const stripe = new Stripe(key, { maxNetworkRetries: 2 })
-const products = site.billing.products
+async function databaseCatalog() {
+  const config = z.object({ NEXT_PUBLIC_SUPABASE_URL: z.url(), SUPABASE_SERVICE_ROLE_KEY: z.string().min(1) }).parse(process.env)
+  const db = createClient(config.NEXT_PUBLIC_SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
+  const { data: marker, error: markerError } = await db.from('system_settings').select('value').eq('key','pricing_catalog_version').maybeSingle()
+  if (markerError || (marker?.value ?? 'v1') !== (site.billing.pricingVersion ?? 'v1')) throw new Error('Database and configured pricing versions differ')
+  const { data, error } = await db.rpc('read_product_catalog', { p_version: marker?.value ?? 'v1' })
+  if (error) throw new Error('Cannot read the published product catalog')
+  return listedProducts(catalog.parse(data))
+}
 
 function chunks<T>(items: readonly T[], size: number): T[][] {
   return Array.from({ length: Math.ceil(items.length / size) }, (_, i) => items.slice(i * size, i * size + size))
@@ -182,6 +193,7 @@ async function checkWebhookEvents(): Promise<void> {
 
 async function main(): Promise<void> {
   console.log(`Stripe ${live ? 'LIVE' : 'test'} account${apply ? '' : ' (dry run)'}`)
+  const products = await databaseCatalog()
   const plan0 = planSetup({ products, version: configuredPricing(site.billing), brand: site.brand.name, existingProducts: new Map(), existingPrices: new Map() })
   const productIds = plan0.createProducts.map((p) => p.id)
   const existingProducts = new Map<string, ExistingProduct>()
@@ -198,6 +210,9 @@ async function main(): Promise<void> {
     process.exit(1)
   }
   printPlan(plan)
+  if (apply && site.billing.pricingVersion && (plan.createProducts.length || plan.createPrices.length || plan.replacePrices.length)) {
+    throw new Error('Manage v2 Products, Prices and lookup keys through the product editor manual checklist.')
+  }
   if (process.argv.includes('--versioned-prices-only')) {
     if (configuredPricing(site.billing) !== 'v2' || plan.createProducts.length || plan.replacePrices.length) {
       throw new Error('Versioned prices require the approved v2 catalog and six existing Shotviva Products.')

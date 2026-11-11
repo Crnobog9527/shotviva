@@ -9,6 +9,8 @@ import type { ProductId, SiteProduct } from '../../config'
 import type { MembershipProductId } from '../../waffo-env'
 import { AppError } from '../../errors'
 import { localizePath } from '../../i18n/paths'
+import { channelPrice, lockAttempt, finishWaffo, type Attempt } from '../catalog-attempt'
+import type { RpcClient } from '../rpc'
 import { quoteMetadata, type CheckoutPrice } from '../checkout-price'
 import { CHECKOUT_RETURN, successPath, type CheckoutBody } from '../stripe/checkout'
 import type { WaffoApi, WaffoSessionRequest } from './client'
@@ -83,9 +85,11 @@ export function waffoSessionRequest(
   }
 }
 
+type BoundCheckout = { attempt: Attempt; db: RpcClient; store: { storeId: string; mode: string } }
+
 export async function createWaffoCheckout(
   deps: WaffoCheckoutDeps,
-  input: { userId: string; body: CheckoutBody; quote?: CheckoutPrice },
+  input: { userId: string; body: CheckoutBody; quote?: CheckoutPrice; bound?: BoundCheckout },
 ): Promise<{ url: string }> {
   const product = deps.products.find((p) => p.id === input.body.product_id)
   if (!product || product.priceUsd <= 0) throw new AppError('NOT_FOUND', 'Unknown product')
@@ -94,9 +98,10 @@ export async function createWaffoCheckout(
     product,
     body: input.body,
     quote: input.quote,
-    orderRef: (deps.newOrderRef ?? randomUUID)(),
+    orderRef: input.bound?.attempt.token ?? (deps.newOrderRef ?? randomUUID)(),
   })
-  const url = checkoutUrl(await deps.waffo.createCheckoutSession(request))
+  const url = input.bound ? await openBound(deps.waffo, input.userId, input.bound, request)
+    : checkoutUrl(await deps.waffo.createCheckoutSession(request))
   ;(deps.trackStart ?? trackCheckoutStart)(input.userId, {
     product_id: product.id,
     tier: product.tier,
@@ -106,4 +111,16 @@ export async function createWaffoCheckout(
     method: input.body.method,
   }, input.body.locale)
   return { url }
+}
+
+async function openBound(waffo: WaffoCheckoutDeps['waffo'], user: string, bound: BoundCheckout, request: WaffoSessionRequest) {
+  const { db, attempt, store } = bound
+  const recurring = Boolean(request.includePaymentMethods)
+  const key = recurring ? 'subscription' : 'one_time'
+  request.productId = await channelPrice(db, attempt, 'waffo', key, recurring, store) ?? request.productId
+  Object.assign(request.metadata, {
+    catalog_attempt: attempt.token, catalog_price: request.productId, catalog_revision: String(attempt.revision),
+  })
+  const saved = await lockAttempt(db, user, attempt, { channel: 'waffo', key, price: request.productId, recurring, params: request, store })
+  return (await finishWaffo(db, waffo, user, attempt.token, saved)).url
 }

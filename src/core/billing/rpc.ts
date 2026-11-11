@@ -7,7 +7,7 @@ import { AppError, TierRequiredError, type ErrorCode } from '@/core/errors'
 // The slice of a Supabase client these wrappers use. Structural on purpose: callers pass
 // their service-role client (T1 owns its construction) and tests can pass a PostgREST
 // adapter. Never pass a user-session client: every function below is service_role only.
-export type RpcResult = { data: unknown; error: { message: string; code?: string } | null }
+export type RpcResult = { data: unknown; error: { message: string; code?: string; details?: string } | null }
 
 export type RpcClient = {
   rpc(fn: string, args: Record<string, unknown>): PromiseLike<RpcResult>
@@ -26,6 +26,11 @@ const SQL_ERROR_CODES: Record<string, ErrorCode> = {
   TEMPLATE_QUOTE_CHANGED: 'TEMPLATE_QUOTE_CHANGED',
   PRODUCT_NOT_FOUND: 'NOT_FOUND',
   IDEMPOTENCY_CONFLICT: 'CONFLICT',
+  CODE_CHECKOUT_OFFER_CHANGED: 'CODE_CHECKOUT_OFFER_CHANGED',
+  DOWNGRADE_NOT_ALLOWED: 'DOWNGRADE_NOT_ALLOWED',
+  CATALOG_OFFER_CHANGED: 'CODE_CHECKOUT_OFFER_CHANGED',
+  CATALOG_CHANNEL_UNVERIFIED: 'CODE_CHECKOUT_OFFER_CHANGED',
+  CODE_CHECKOUT_FLOOR: 'CODE_CHECKOUT_FLOOR',
   JOB_ALREADY_SETTLED: 'CONFLICT',
   // A work still generating cannot be deleted (T41).
   JOB_RUNNING: 'CONFLICT',
@@ -51,10 +56,11 @@ const SQL_ERROR_CODES: Record<string, ErrorCode> = {
 
 export function toRpcError(fn: string, error: { message: string; code?: string }): AppError {
   if (error.message === 'BATCH_MAX_REQUIRED') return new TierRequiredError('max', 'Multiple templates require Max')
+  if (/^CATALOG_(?:CODE|COST)_FLOOR(?:$|:)/.test(error.message)) return new AppError('CODE_CHECKOUT_FLOOR', 'Checkout price is below the current floor', { cause: error })
   const code = SQL_ERROR_CODES[error.message]
   if (code === 'TEMPLATE_UNAVAILABLE') return new AppError(code, 'This template is temporarily unavailable. Please try again later.')
   if (code === 'TEMPLATE_QUOTE_CHANGED') return new AppError(code, 'Refresh the template price before generating.')
-  if (code) return new AppError(code, error.message)
+  if (code) return new AppError(code, error.message, { cause: error })
   return new AppError('INTERNAL', `rpc ${fn} failed`, { cause: error })
 }
 

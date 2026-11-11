@@ -5,8 +5,7 @@ import type { Locale } from '../i18n/locales'
 // so a new site swaps site/ without touching core (ARCHITECTURE §0, §2).
 export type ModuleId = 'image' | 'video'
 
-// Product ids are fixed: Stripe/Waffo mappings and analytics key on them (ARCHITECTURE §6.2).
-// Memberships are '<tier>_<monthly|yearly>'; current_tier() (SQL) relies on that shape.
+// Permanent identities from before the database catalog, retained for legacy mappings.
 export const PRODUCT_IDS = [
   'starter_monthly',
   'starter_yearly',
@@ -18,7 +17,8 @@ export const PRODUCT_IDS = [
   'pack_m',
   'pack_l',
 ] as const
-export type ProductId = (typeof PRODUCT_IDS)[number]
+type MembershipKind = 'monthly' | 'yearly'
+export type ProductId = (typeof PRODUCT_IDS)[number] | `pack_${string}` | `${string}_${MembershipKind}`
 
 export const MEMBERSHIP_TIERS = ['starter', 'pro', 'max'] as const
 export type MembershipTier = (typeof MEMBERSHIP_TIERS)[number]
@@ -30,6 +30,9 @@ export type PaymentChannel = 'stripe' | 'waffo'
 
 type ProductBase = {
   id: ProductId
+  revision?: number
+  names?: { en: string; zh: string }
+  benefits?: { en: string; zh: string }
   // Paid credits granted per purchase (yearly: all twelve months at once).
   credits: number
   // 0 means "not decided yet"; pages must show a placeholder, never "$0".

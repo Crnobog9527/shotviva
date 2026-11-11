@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
-import { PRODUCT_IDS, type ProductId } from '../../config'
+import { type ProductId } from '../../config'
+import { productIdSchema } from '../../config/product-id'
 
 // What the return address carries (T43). Stripe: the Checkout Session id that Stripe fills into
 // success_url ({CHECKOUT_SESSION_ID}). Waffo has no such placeholder, so its success URL names
@@ -13,7 +14,7 @@ export function readReturnQuery(params: Record<string, string | string[] | undef
   const one = (key: string) => (typeof params[key] === 'string' ? params[key] : undefined)
   const session = sessionId.safeParse(one('session_id'))
   if (session.success) return { channel: 'stripe', sessionId: session.data }
-  const product = z.enum(PRODUCT_IDS).safeParse(one('p'))
+  const product = productIdSchema.safeParse(one('p'))
   if (one('channel') === 'waffo' && product.success) return { channel: 'waffo', productId: product.data }
   return null
 }

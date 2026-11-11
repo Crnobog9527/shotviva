@@ -30,8 +30,8 @@ describe('paywall numbers (DESIGN §4.5, all from the config)', () => {
   })
 
   it('prices a credit with half-cents rounded up', () => {
-    expect(perCreditUsd(offer('starter').monthly)).toBe(19.9 / 50)
-    expect(perCreditUsd(offer('max').yearly)).toBe(713 / 3360)
+    expect(perCreditUsd(offer('starter').monthly!)).toBe(19.9 / 50)
+    expect(perCreditUsd(offer('max').yearly!)).toBe(713 / 3360)
     expect(perCreditUsd(packOffers(TEST_PRODUCTS)[0]!)).toBe(9.9 / 20)
   })
 
@@ -42,6 +42,7 @@ describe('paywall numbers (DESIGN §4.5, all from the config)', () => {
 
   it('hides tiers whose price is not decided', () => {
     const undecided = TEST_PRODUCTS.map((p) => (p.id === 'max_yearly' ? { ...p, priceUsd: 0 } : p))
-    expect(tierOffers(undecided).map((o) => o.tier)).toEqual(['starter', 'pro'])
+    expect(tierOffers(undecided, 'month').map(o => o.tier)).toContain('max')
+    expect(tierOffers(undecided, 'year').map((o) => o.tier)).toEqual(['starter', 'pro'])
   })
 })

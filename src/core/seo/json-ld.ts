@@ -1,4 +1,4 @@
-import { pricedProducts, type PostalAddress, type SiteConfig } from '../config'
+import { type SiteProduct, type PostalAddress, type SiteConfig } from '../config'
 import type { FaqItem } from '../content/page-content'
 import { absoluteUrl, siteOrigin } from './site-url'
 
@@ -16,7 +16,7 @@ function offerName(product: { tier: string; interval: 'month' | 'year' | null; c
   return `${capitalize(product.tier)} ${product.interval === 'month' ? 'Monthly' : 'Yearly'}`
 }
 
-function offers(site: SiteConfig, freeOffer?: string): JsonLd[] {
+function offers(site: SiteConfig, products: readonly SiteProduct[], freeOffer?: string): JsonLd[] {
   const currency = site.billing.currency.toUpperCase()
   const free = {
     '@type': 'Offer',
@@ -26,7 +26,7 @@ function offers(site: SiteConfig, freeOffer?: string): JsonLd[] {
     priceCurrency: currency,
   }
   // Undecided prices are left out rather than published as 0.
-  const paid = pricedProducts(site).map((product) => ({
+  const paid = products.filter(p => p.priceUsd > 0).map((product) => ({
     '@type': 'Offer',
     name: offerName(product),
     description: `${product.credits} credits`,
@@ -39,6 +39,7 @@ function offers(site: SiteConfig, freeOffer?: string): JsonLd[] {
 export function softwareApplicationLd(
   site: SiteConfig,
   page: { path: string; title: string; description: string },
+  products: readonly SiteProduct[],
   freeOffer?: string,
 ): JsonLd {
   return {
@@ -50,7 +51,7 @@ export function softwareApplicationLd(
     applicationCategory: 'DesignApplication',
     operatingSystem: 'Web',
     brand: { '@type': 'Brand', name: site.brand.name },
-    offers: offers(site, freeOffer),
+    offers: offers(site, products, freeOffer),
   }
 }
 

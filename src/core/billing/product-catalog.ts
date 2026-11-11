@@ -2,25 +2,11 @@ import 'server-only'
 
 import { z } from 'zod'
 
-import { MEMBERSHIP_TIERS, PRODUCT_IDS, type SiteProduct } from '../config'
+import { catalog, catalogProducts, listedProducts } from './catalog-rows'
+export { listedProducts } from './catalog-rows'
 import { AppError } from '../errors'
 import type { PricingVersion } from './checkout-price'
 import { callRpc, type RpcClient } from './rpc'
-
-const base = z.object({
-  product_id: z.enum(PRODUCT_IDS), revision: z.int().positive(), usd_cents: z.int().positive(),
-  credits: z.int().positive(), listed: z.boolean(), name_en: z.string(), name_zh: z.string(),
-})
-
-const row = z.discriminatedUnion('kind', [
-  base.extend({ kind: z.literal('pack'), tier: z.literal('pack'), paid_days: z.null() }),
-  base.extend({ kind: z.literal('monthly'), tier: z.enum(MEMBERSHIP_TIERS), paid_days: z.literal(30) }),
-  base.extend({ kind: z.literal('yearly'), tier: z.enum(MEMBERSHIP_TIERS), paid_days: z.literal(365) }),
-])
-
-// Phase one has exactly the nine existing identities in either denomination.
-const catalog = z.array(row).length(PRODUCT_IDS.length)
-  .refine(rows => new Set(rows.map(r => r.product_id)).size === PRODUCT_IDS.length)
 
 export function readProductCatalog(db: RpcClient, version: PricingVersion) {
   return callRpc(db, 'read_product_catalog', { p_version: version ?? 'v1' }, catalog)
@@ -35,10 +21,27 @@ export function catalogReadErrorCode(error: unknown): string {
   return error instanceof AppError ? error.code : 'INTERNAL'
 }
 
-export function listedProducts(rows: z.infer<typeof catalog>): SiteProduct[] {
-  return rows.filter(r => r.listed).map(r => {
-    const common = { id: r.product_id, credits: r.credits, priceUsd: r.usd_cents / 100 }
-    if (r.kind === 'pack') return { ...common, tier: r.tier, interval: null, paidDays: null }
-    return { ...common, tier: r.tier, interval: r.kind === 'monthly' ? 'month' : 'year', paidDays: r.paid_days }
-  })
+async function readDeploymentCatalog(db: RpcClient, version: PricingVersion, rpc: string, params = {}) {
+  try {
+    return await callRpc(db, rpc, { p_version: version ?? 'v1', ...params }, catalog)
+  } catch (error) {
+    // PR previews can precede deployment of the new read RPC. Only the original seed
+    // revisions are safe to use for this compatibility path.
+    if (catalogReadErrorCode(error) !== 'PGRST202') throw error
+    const original = await readProductCatalog(db, version)
+    if (original.some(row => row.revision !== (version ? 2 : 1))) throw error
+    return original
+  }
+}
+
+export async function historicalProducts(db: RpcClient, version: PricingVersion) {
+  return catalogProducts(await readDeploymentCatalog(db, version, 'read_contract_catalog'))
+}
+
+export async function publishedOffers(db: RpcClient, version: PricingVersion) {
+  return listedProducts(await readDeploymentCatalog(db, version, 'read_catalog_offers'))
+}
+
+export async function waffoOffers(db: RpcClient, version: PricingVersion, store: string, mode: string) {
+  return listedProducts(await readDeploymentCatalog(db, version, 'read_waffo_offers', { p_store: store, p_mode: mode }))
 }

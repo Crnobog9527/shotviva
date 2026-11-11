@@ -16,7 +16,7 @@ export type PaywallChoice = { period: Period; pick: PaywallPick; method: Checkou
 // What an entry point may preselect. `step: "packs"` (with or without `packId`) opens on a pack;
 // anything else opens on `tier`. `step` stays so the existing callers (account, batch rows,
 // /pricing) keep their shape.
-export type PaywallOpenOptions = { step?: "tiers" | "period" | "packs"; period?: Period; tier?: MembershipTier; packId?: ProductId }
+export type PaywallOpenOptions = { step?: "tiers" | "period" | "packs"; period?: Period; tier?: MembershipTier; packId?: ProductId; planId?: ProductId }
 
 // Monthly and Pro start selected (DESIGN §4.5 「默认显示按月」, Owner 2026-11-08): opening on
 // Yearly let careless buyers read the yearly per-month price as the monthly one. The Yearly
@@ -32,7 +32,7 @@ export function isTierPick(pick: PaywallPick): pick is MembershipTier {
 // `method` is the first method the page lists (catalog offeredMethods): Card on English pages,
 // 中国银行卡 on zh pages over Stripe (ARCHITECTURE §6.3, T64).
 export function choiceFor(options: PaywallOpenOptions = {}, method: CheckoutMethod = DEFAULT_CHOICE.method): PaywallChoice {
-  const pick = options.step === "packs" || (options.packId && !options.tier) ? (options.packId ?? DEFAULT_PACK) : (options.tier ?? DEFAULT_CHOICE.pick)
+  const pick = options.step === "packs" || (options.packId && !options.tier) ? (options.packId ?? DEFAULT_PACK) : (options.planId ?? options.tier ?? DEFAULT_CHOICE.pick)
   return { ...DEFAULT_CHOICE, period: options.period ?? DEFAULT_CHOICE.period, pick, method }
 }
 

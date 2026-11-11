@@ -9,14 +9,15 @@ import { logger } from '@/core/logger'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { stripeClient } from '@/core/billing/stripe'
 import { saveCampaignWithCoupon } from '@/core/codes/server'
-import { site } from '@/site/site.config'
+import { currentProducts } from '@/site/billing/display-products'
 
 // The admin workflow provisions coupons on the Stripe account for this deployment. Catalog and actor
 // always come from the server, including for edits that only change a note or expiry date.
 export async function saveCampaignCode(codeId: string, fields: unknown) {
   const actor = await requireAdmin()
   if (actor.banned) throw new AppError('FORBIDDEN', CODE_EDITOR_COPY.denied)
-  return saveCampaignWithCoupon(createAdminSupabase(), actor.id, codeId, fields, site.billing.products, () => stripeClient().coupons)
+  const db = createAdminSupabase()
+  return saveCampaignWithCoupon(db, actor.id, codeId, fields, await currentProducts(db), () => stripeClient().coupons)
 }
 
 export async function submitCampaignCode(codeId: string, fields: unknown): Promise<ActionValue<string>> {

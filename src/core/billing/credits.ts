@@ -2,7 +2,8 @@ import 'server-only'
 
 import { z } from 'zod'
 
-import { PRODUCT_IDS, type ProductId } from '../config'
+import { type ProductId } from '../config'
+import { productIdSchema } from '../config/product-id'
 import { CREDIT_POOLS, type CreditPool } from './pools'
 import { callRpc, type RpcClient } from './rpc'
 
@@ -73,7 +74,7 @@ export async function applyPurchase(
   client: RpcClient,
   input: { userId: string; productId: ProductId; eventId: string },
 ): Promise<CreditChange> {
-  const args = z.object({ userId, productId: z.enum(PRODUCT_IDS), eventId: key }).parse(input)
+  const args = z.object({ userId, productId: productIdSchema, eventId: key }).parse(input)
   return callRpc(
     client,
     'apply_purchase',

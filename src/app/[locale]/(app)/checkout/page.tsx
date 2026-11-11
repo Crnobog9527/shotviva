@@ -10,6 +10,7 @@ import { CHECKOUT_RETURN, stripeClient, wechatPayEnabled } from '@/core/billing/
 import { localizePath } from '@/core/i18n'
 import { currentLocale } from '@/core/i18n/server'
 import { pricingReturnTarget } from '@/core/partner'
+import { contractProducts } from '@/site/billing/display-products'
 import { site } from '@/site/site.config'
 
 // Where Stripe and Waffo send the buyer after paying (T43, comps-v3-b checkout.html). Signed in,
@@ -29,7 +30,7 @@ async function CheckoutReturn({ searchParams }: { searchParams: Promise<Search> 
   const locale = await currentLocale()
   if (!query) redirect(localizePath('/account', locale))
   const facts = await readCheckoutFacts({ stripe: stripeClient(), db: createAdminSupabase() }, user.id, query)
-  const product = site.billing.products.find((p) => p.id === facts?.productId)
+  const product = (await contractProducts()).find((p) => p.id === facts?.productId)
   if (!facts || !product) notFound()
   if (facts.abandoned) redirect(localizePath(CHECKOUT_RETURN.cancel, locale))
   const view = returnView(facts, product, await readBalance(await createServerSupabase(), user.id))
