@@ -395,6 +395,7 @@
 @source "../core/gallery/enabled.ts";
 @source "../core/gallery/image.ts";
 @source "../core/gallery/index.ts";
+@source "../core/gallery/page-number.ts";
 @source "../core/gallery/public-copy.ts";
 @source "../core/gallery/reads.ts";
 @source "../core/gallery/reuse.ts";

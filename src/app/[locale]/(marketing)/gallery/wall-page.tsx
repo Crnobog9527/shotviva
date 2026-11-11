@@ -1,15 +1,17 @@
 import { getTranslations } from 'next-intl/server'
 
-import { cachedGalleryPage, galleryWorkView } from '@/core/gallery'
+import { cachedGalleryPage, galleryPageOf, galleryWorkView } from '@/core/gallery'
 import { GalleryPager, GalleryViewEvent, GalleryWall } from '@/core/gallery/ui'
 import type { Locale } from '@/core/i18n'
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
 
-type Props = { page: number; locale: Locale }
+type Props = { searchParams: Promise<Record<string, string | string[] | undefined>>; locale: Locale }
 
 // One page of the wall: cached reads only (the page and the catalogue), so it costs no query
 // per visit. Works whose template left the catalogue are skipped.
-export async function GalleryWallPage({ page, locale }: Props) {
+export async function GalleryWallPage({ searchParams, locale }: Props) {
+  // The proxy has already turned away any other number; page 1 is only a fallback.
+  const page = galleryPageOf((await searchParams).page) ?? 1
   const [t, wall, catalogue] = await Promise.all([
     getTranslations({ locale, namespace: 'gallery' }),
     cachedGalleryPage(page),
