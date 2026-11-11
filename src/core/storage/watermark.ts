@@ -64,3 +64,28 @@ export async function galleryImage(image: Uint8Array, width: number, watermark: 
   }
   return new Uint8Array(await base.webp({ quality: 80 }).toBuffer())
 }
+
+// The mark for a picture of this size: about a third of its width, tucked into the bottom-right.
+async function markOverlay(width: number, height: number) {
+  const mark = await sharp(WATERMARK)
+    .resize({ width: Math.max(1, Math.round(width * MARK_WIDTH_RATIO)) })
+    .toBuffer({ resolveWithObject: true })
+  const margin = Math.round(Math.min(width, height) * MARGIN_RATIO)
+  return { input: mark.data, left: Math.max(0, width - mark.info.width - margin), top: Math.max(0, height - mark.info.height - margin) }
+}
+
+// The small copy of a work its owner sees in lists (ARCHITECTURE §8.3「作品小图」): the short edge
+// scaled to `shortEdge` (never up), so it still fills a 4:5 tile whatever the work's shape; a
+// cut-out sits on white, as everywhere the app shows one small; marked when the work was made
+// with free credits, like the full file. WebP.
+export async function workThumbImage(image: Uint8Array, shortEdge: number, watermark: boolean): Promise<Uint8Array> {
+  const scaled = await sharp(image)
+    .resize({ width: shortEdge, height: shortEdge, fit: 'outside', withoutEnlargement: true })
+    .flatten({ background: WHITE })
+    .raw()
+    .toBuffer({ resolveWithObject: true })
+  const { width, height, channels } = scaled.info
+  let base = sharp(scaled.data, { raw: { width, height, channels } })
+  if (watermark) base = base.composite([await markOverlay(width, height)])
+  return new Uint8Array(await base.webp({ quality: 78 }).toBuffer())
+}

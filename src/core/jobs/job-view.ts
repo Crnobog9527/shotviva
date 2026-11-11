@@ -23,6 +23,9 @@ export type JobView = {
 
 export const fileUrlFor = (jobId: string) => `/api/files/${jobId}`
 
+// The small copy lists show instead of the full file (job-thumb.ts); same owner-only rule.
+export const thumbUrlFor = (jobId: string) => `/api/files/${jobId}/thumb`
+
 export function toJobView(job: Job): JobView {
   return {
     id: job.id,
