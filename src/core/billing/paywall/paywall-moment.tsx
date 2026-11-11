@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl"
 
 import type { PackProduct } from "../../config"
 import { cn } from "../../ui/cn"
-import { compareForNeed, type CreditCompare } from "./credit-compare"
+import { compareForNeed, verdictKey, type CreditCompare } from "./credit-compare"
 import type { TierOffer } from "./offer"
 import type { PaywallChoice, PaywallMoment, PaywallPick } from "./use-paywall-state"
 import { planStanding } from "./standing-pick"
@@ -92,10 +92,4 @@ function PackOrPlan({ compare, needed, pick, onPick }: CompareProps) {
       <p className="mt-2 text-caption leading-[1.45] text-bone-dim">{compare.plan ? t(`packOrPlan.verdict.${verdictKey(compare)}`, { tier }) : t("packOrPlan.packOnly")}</p>
     </section>
   )
-}
-
-function verdictKey({ cheaperToday, cheaperPerCredit }: Extract<CreditCompare, { cheaperToday: unknown }>) {
-  if (cheaperToday === "same" && cheaperPerCredit === "same") return "same"
-  if (cheaperToday === cheaperPerCredit) return cheaperToday
-  return cheaperToday === "pack" ? "packNowPlanLater" : "planNowPackLater"
 }

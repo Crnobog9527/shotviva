@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { MembershipProduct, PackProduct } from '../../config'
 import type { MemberStanding } from '../subscription/upgrade-rule'
-import { compareForNeed } from './credit-compare'
+import { compareForNeed, verdictKey } from './credit-compare'
 import type { TierOffer } from './offer'
 import { planStanding } from './standing-pick'
 
@@ -36,5 +36,18 @@ describe('pack or plan when credits run out', () => {
     // 20 short: Starter would cover it, but a Pro member can only move up to Max.
     expect(compareForNeed(20, packs, offers, buyable(pro))).toMatchObject({ pack: { id: 'pack_s' }, plan: { id: 'max_monthly' } })
     expect(compareForNeed(20, packs, offers, buyable(max))).toEqual({ pack: expect.objectContaining({ id: 'pack_s' }), plan: null })
+  })
+
+  it('words today and per credit apart whenever they differ, a tie included', () => {
+    // Pack 990 for 9.90 against a 1,990-a-month plan at 19.90: cheaper today, the same per credit.
+    const tie = compareForNeed(43, [pack('pack_s', 990, 9.9)], [{ tier: 'starter', monthly: plan('starter', 1990, 19.9) }])
+    expect(tie).toMatchObject({ cheaperToday: 'pack', cheaperPerCredit: 'same' })
+    expect(verdictKey(tie as Parameters<typeof verdictKey>[0])).toBe('packNowSameRate')
+    expect(verdictKey({ cheaperToday: 'plan', cheaperPerCredit: 'same' })).toBe('planNowSameRate')
+    expect(verdictKey({ cheaperToday: 'same', cheaperPerCredit: 'pack' })).toBe('sameNowPackRate')
+    expect(verdictKey({ cheaperToday: 'same', cheaperPerCredit: 'plan' })).toBe('sameNowPlanRate')
+    expect(verdictKey({ cheaperToday: 'pack', cheaperPerCredit: 'plan' })).toBe('packNowPlanLater')
+    expect(verdictKey({ cheaperToday: 'plan', cheaperPerCredit: 'pack' })).toBe('planNowPackLater')
+    expect(verdictKey({ cheaperToday: 'same', cheaperPerCredit: 'same' })).toBe('same')
   })
 })

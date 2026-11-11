@@ -1188,7 +1188,7 @@
   "paywall": {
     "moments": {
       "watermark": "免费生成的图带水印。用付费积分生成的图没有水印，而且是私密的。",
-      "photos": "{tier} 可以一次把一个模板用到最多 {count, number} 张照片上。",
+      "photos": "{tier}可以一次把一个模板用到最多 {count, number} 张照片上。",
       "templates": "Max 可以一次把最多 {templates, number} 个模板用到同一批照片上，一批最多 {count, number} 张。"
     },
     "example": {
@@ -1212,7 +1212,11 @@
         "plan": "{tier}更便宜，按总价和每积分都是。这是按月的会员。",
         "same": "两者价格一样。",
         "packNowPlanLater": "现在买积分包花得少；如果每个月都要出图，{tier}每积分更便宜。",
-        "planNowPackLater": "{tier}现在花得少；积分包每积分更便宜。"
+        "planNowPackLater": "{tier}现在花得少；积分包每积分更便宜。",
+        "packNowSameRate": "现在买积分包花得少；按每积分算两者一样。",
+        "planNowSameRate": "{tier}现在花得少；按每积分算两者一样。",
+        "sameNowPackRate": "现在两者花得一样；积分包每积分更便宜。",
+        "sameNowPlanRate": "现在两者花得一样；如果每个月都要出图，{tier}每积分更便宜。"
       }
     },
     "title": "继续出图",
