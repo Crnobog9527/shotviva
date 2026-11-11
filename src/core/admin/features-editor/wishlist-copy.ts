@@ -1,3 +1,5 @@
+import type { SwitchCopy } from './switch-copy'
+
 // The 需求墙 switch card on /admin/features (ARCHITECTURE §15.6, T62). Admin copy is Chinese
 // only (DESIGN §7, AGENTS §9).
 export const WISHLIST_SWITCH_COPY = {
@@ -28,4 +30,4 @@ export const WISHLIST_SWITCH_COPY = {
     cancel: '取消',
   },
   errors: { invalid: '开关的值不对，请刷新页面后再试' },
-} as const
+} as const satisfies SwitchCopy & { previewOverride: string; errors: { invalid: string } }

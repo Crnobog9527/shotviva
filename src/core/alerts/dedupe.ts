@@ -18,10 +18,13 @@ export const TICKET_BUDGET_PER_HOUR = 10
 // Business inquiry alerts per clock hour (T86): the form's own limits are per IP and email, so
 // this keeps a spread-out burst from flooding the group. Past it the inquiry is still in the admin.
 export const INQUIRY_BUDGET_PER_HOUR = 10
+// Gallery report alerts per clock hour (T108): many accounts reporting many works stay one burst.
+export const REPORT_BUDGET_PER_HOUR = 10
 
 const BUDGETS: Record<AlertBudget, { perHour: number; marker: string }> = {
   tickets: { perHour: TICKET_BUDGET_PER_HOUR, marker: 'ticket_budget' },
   inquiries: { perHour: INQUIRY_BUDGET_PER_HOUR, marker: 'inquiry_budget' },
+  reports: { perHour: REPORT_BUDGET_PER_HOUR, marker: 'report_budget' },
 }
 
 export type Dedupe = {
@@ -61,7 +64,11 @@ function createMemory(now: Clock) {
 export function createDedupe(store: () => MarkerStore | null, now: Clock = Date.now): Dedupe {
   const memory = createMemory(now)
   // This instance's next slot of each budget in the current hour (slots are claimed in order).
-  const cursors: Record<AlertBudget, { hour: string; next: number }> = { tickets: { hour: '', next: 0 }, inquiries: { hour: '', next: 0 } }
+  const cursors: Record<AlertBudget, { hour: string; next: number }> = {
+    tickets: { hour: '', next: 0 },
+    inquiries: { hour: '', next: 0 },
+    reports: { hour: '', next: 0 },
+  }
 
   async function markerClaim(key: string, cooldownMs?: number, requireShared = false): Promise<boolean> {
     const markers = store()
