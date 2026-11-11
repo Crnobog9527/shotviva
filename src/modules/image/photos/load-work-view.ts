@@ -39,7 +39,7 @@ export async function loadWorkView(deps: Deps, req: Req): Promise<WorkView | nul
   return {
     item,
     detail,
-    parent: source && { id: source.id, fileUrl: source.fileUrl as string, name: source.templateName },
+    parent: source && { id: source.id, thumbUrl: source.thumbUrl as string, name: source.templateName },
     // findOwnJob leaves out a deleted work (T41), so a parent id with no parent row means deleted.
     parentDeleted: job.parentJobId !== null && parent === null,
     change,

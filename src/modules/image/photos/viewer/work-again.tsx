@@ -42,7 +42,7 @@ export function WorkAgain({ item, onBack }: { item: PhotoItem; onBack(): void })
   return (
     <div className={VIEWER_GRID}>
       <div className="flex-none px-4 md:flex md:min-h-0 md:flex-col md:justify-center md:overflow-y-auto md:bg-card md:p-6 md:shadow-[inset_-1px_0_0_var(--border)]">
-        {item.fileUrl ? <EditPhoto src={item.fileUrl} className="h-[120px] md:mx-auto md:aspect-[4/5] md:h-auto md:max-h-[560px] md:w-full md:max-w-[448px]" /> : null}
+        {item.thumbUrl ? <EditPhoto src={item.thumbUrl} className="h-[120px] md:mx-auto md:aspect-[4/5] md:h-auto md:max-h-[560px] md:w-full md:max-w-[448px]" /> : null}
       </div>
       <section aria-labelledby="viewer-again-h" aria-busy={loaded.kind === 'loading'} className="flex flex-col px-4 pt-4 md:min-h-0 md:px-6 md:pt-3 md:pb-6">
         <BackToWork onBack={onBack} className="-ml-1 hidden self-start md:inline-flex" />

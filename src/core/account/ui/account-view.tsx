@@ -6,7 +6,7 @@ import type { PurchaseLine } from '../../billing/documents/lines'
 import { PlanCard, planAllowance, type LastMembership, type SubscriptionSummary } from '../../billing/subscription'
 import type { SiteProduct } from '../../config'
 import { TabRootHeader } from '../../app-shell'
-import { fileUrlFor, type MonthWorks } from '../../jobs'
+import { thumbUrlFor, type MonthWorks } from '../../jobs'
 import type { LinkStatus } from '../../partner'
 import { IntegrationsPanel } from '../../partner/ui'
 import { CreditDials } from './credit-dials'
@@ -86,7 +86,7 @@ export function AccountView({ data, actions, site, children }: Props) {
         </Group>
         <Group title={t('credits.title')} className={pair}>
           <CreditDials balance={data.balance} giftRefused={data.giftRefused} allowance={allowance} freeGift={site.freeCredits} />
-          <FilmStrip ids={data.works.ids} count={data.works.count} fileUrl={fileUrlFor} />
+          <FilmStrip ids={data.works.ids} count={data.works.count} thumbUrl={thumbUrlFor} />
         </Group>
       </div>
       {children}
