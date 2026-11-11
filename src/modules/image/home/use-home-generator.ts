@@ -59,11 +59,13 @@ function readyHomePhoto(photo: HomePhoto) {
 
 function useStart(viewer: HomeViewer | null, template: CatalogueTemplate | null, photo: HomePhoto) {
   const router = useRouter()
-  // Signed in and ready to start (the photo uploaded, or a template that needs none): keep the
-  // template's workspace route warm, as the creation dialogs do, so Generate's jump to the
-  // developing view is a client move on the click (perf window 2026-11-12, #515).
-  const startable = photo.status === 'ready' || (allowsNoPhoto(template) && photo.status === 'none')
-  useWarmRoute(`/generate/${template?.id ?? ''}`, viewer !== null && template !== null && startable)
+  // Signed in with a template chosen: keep that template's workspace route warm, as the creation
+  // dialogs do, so Generate's jump to the developing view is a client move on the click (#515).
+  // Not only once the photo is in: a visitor who presses Generate the moment the upload ends
+  // found it still cold (1.35 s from the click to the move on the test site, 2026-11-12).
+  // Switching templates moves the warm-up to the new one; signed out nothing is fetched, and
+  // useWarmRoute asks nothing while the tab is in the background.
+  useWarmRoute(`/generate/${template?.id ?? ''}`, viewer !== null && template !== null)
   return useCallback(
     (aspect: OutputAspect | null, note: string) => {
       if (!viewer || !template || !aspect) return
