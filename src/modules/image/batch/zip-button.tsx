@@ -21,6 +21,7 @@ export function ZipButton({ batchId, count, className }: Props) {
     state.kind === 'packing' ? t('packing', { count })
     : state.kind === 'started' ? t('started')
     : state.kind === 'limited' ? t('limited')
+    : state.kind === 'error' && state.code === 'NOT_FOUND' ? t('notFound')
     : state.kind === 'error' ? (errors.has(state.code) ? errors(state.code) : errors('fallback'))
     : null
   return (

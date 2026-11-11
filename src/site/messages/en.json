@@ -241,6 +241,7 @@
   },
   "app": {
     "batchZip": {
+      "notFound": "Nothing in this batch to pack yet: only finished paid photos go in the ZIP.",
       "cta": "Download ZIP · {count, plural, one {# photo} other {# photos}}",
       "packingCta": "Packing ZIP…",
       "packing": "Packing {count, plural, one {# photo} other {# photos}}. This can take a minute or two; the download starts on its own.",

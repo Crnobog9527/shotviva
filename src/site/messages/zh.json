@@ -241,6 +241,7 @@
   },
   "app": {
     "batchZip": {
+      "notFound": "这一批还没有可以打包的照片：只打包已完成的付费作品。",
       "cta": "打包下载 · {count, plural, other {# 张}}",
       "packingCta": "正在打包…",
       "packing": "正在打包 {count, plural, other {# 张}}，大约需要一两分钟，好了会自动开始下载。",
