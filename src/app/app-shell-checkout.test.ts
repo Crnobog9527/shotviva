@@ -20,7 +20,7 @@ const tabs = [
 
 async function render(pathname: string, locale: 'en' | 'zh' = 'en') {
   path.current = pathname
-  const bar = createElement(TabBar, { items: tabs, desktopUnder: ['/photos/'], shellPages: ['/checkout'] })
+  const bar = createElement(TabBar, { items: tabs, rootsUnder: ['/photos/'], shellPages: ['/checkout'] })
   return renderToStaticMarkup(createElement(Intl, { locale, messages: await loadMessages(locale), timeZone: 'UTC' }, bar))
 }
 
@@ -46,5 +46,12 @@ describe('app shell on /checkout', () => {
     expect(await render('/generate/pure-white')).toBe('')
     expect(await render('/photos')).toContain('aria-current="page"')
     expect(await render('/checkout-something')).toBe('')
+  })
+
+  it('keeps the full bar under the Photos viewer, Photos marked current', async () => {
+    const html = await render('/photos/0b6c7d2e-1f3a-4b5c-8d9e-0a1b2c3d4e5f')
+    expect(html).toContain('data-tabbar=""')
+    expect(html).not.toContain('max-md:hidden')
+    expect(html).toMatch(/href="\/photos"[^>]*aria-current="page"|aria-current="page"[^>]*href="\/photos"/)
   })
 })

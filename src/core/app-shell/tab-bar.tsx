@@ -16,9 +16,9 @@ const isRoot = (pathname: string, items: readonly TabItem[]) =>
 
 type Props = {
   items: readonly TabItem[]
-  // Pages below a tab that keep the bar from md up (the photo page, T38); phones keep the
-  // flow-page rule and show no bar there.
-  desktopUnder?: readonly `/${string}/`[]
+  // Pages below a tab that are still that tab, bar and all: Photos with a work open in its
+  // viewer, /photos/<id> (2026-11-12; before, the photo page kept the bar from md up only, T38).
+  rootsUnder?: readonly `/${string}/`[]
   // Pages that are not a tab but sit in the full shell like one: the bar on phones and the top
   // bar from md, with no tab marked current (the checkout return page, comps-v3-b
   // checkout.html, gap audit C1).
@@ -46,21 +46,20 @@ type Props = {
 // own Tailwind CSS does exactly that) beats every layered rule, md: ones included: the bar then
 // stays fixed on desktop over the page's top, and a flow page's action bar covers its bottom.
 // With max-md: classes there is no bare `.fixed` on the element for such a rule to match.
-export function TabBar({ items, desktopUnder = [], shellPages = [], admin }: Props) {
+export function TabBar({ items, rootsUnder = [], shellPages = [], admin }: Props) {
   const pathname = usePathname()
   const t = useTranslations('app.tabs')
-  const root = isRoot(pathname, items) || shellPages.some((page) => pathname === page || pathname === `${page}/`)
-  if (!root && !desktopUnder.some((prefix) => pathname.startsWith(prefix))) return null
+  const root = isRoot(pathname, items) || shellPages.some((page) => pathname === page || pathname === `${page}/`) || rootsUnder.some((prefix) => pathname.startsWith(prefix))
+  if (!root) return null
   return (
     <nav
       aria-label={t('label')}
-      data-tabbar={root ? '' : undefined}
+      data-tabbar=''
       // Stays put while pages slide or fade under it (T56; globals.css).
       style={{ viewTransitionName: 'app-tabs' }}
       className={cn(
         'bar-material z-60 px-2 pt-1 pb-[calc(var(--sab)+4px)] max-md:fixed max-md:inset-x-0 max-md:bottom-0',
         'md:sticky md:top-0 md:h-14 md:p-0 md:shadow-[inset_0_-1px_0_var(--border)]',
-        !root && 'max-md:hidden',
       )}
     >
       <div className={cn('grid md:content-column md:flex md:h-full md:items-center md:gap-1 md:px-(--gutter)', items.length === 4 ? 'grid-cols-4' : 'grid-cols-3')}>

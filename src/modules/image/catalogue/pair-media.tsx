@@ -13,7 +13,7 @@ type Props = {
   eager?: boolean
   // A video template's loop, played on the right plate by useHoverWipe (or the Quiet Loop).
   video?: string
-  size?: 'card' | 'pair' | 'feature'
+  size?: 'card' | 'pair' | 'feature' | 'thumb'
   // Rendered width of ONE plate (half the pair), for the covers' srcset.
   sizes: string
   className?: string

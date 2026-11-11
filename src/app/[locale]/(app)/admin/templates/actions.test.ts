@@ -5,7 +5,7 @@ const requireAdmin = vi.fn()
 const setTemplatesActive = vi.fn()
 const setTemplateOrder = vi.fn()
 const bulkEditTemplates = vi.fn()
-const cache = vi.hoisted(() => ({ revalidateTag: vi.fn(), refresh: vi.fn() }))
+const cache = vi.hoisted(() => ({ updateTag: vi.fn(), refresh: vi.fn() }))
 
 vi.mock('next/cache', () => cache)
 vi.mock('@/core/auth', () => ({ requireAdmin: () => requireAdmin(), createAdminSupabase: () => ({}) }))
@@ -55,12 +55,12 @@ describe('setTemplatesActiveAction (T60 bulk)', () => {
     expect(result).toMatchObject({ ok: true, value: { changed: [{ id: 't0' }, { id: 't1' }] } })
     expect(setTemplatesActive).toHaveBeenCalledWith({}, 'admin', { ids: ['t0', 't1'], active: true }, {})
     // Stale-while-revalidate, never a blocking expiry (performance B1).
-    expect(cache.revalidateTag).toHaveBeenCalledWith('templates', 'max')
+    expect(cache.updateTag).toHaveBeenCalledWith('templates')
 
-    cache.revalidateTag.mockReset()
+    cache.updateTag.mockReset()
     setTemplatesActive.mockResolvedValue(outcome(0))
     await setTemplatesActiveAction({ ids: ['t0'], active: true })
-    expect(cache.revalidateTag).not.toHaveBeenCalled()
+    expect(cache.updateTag).not.toHaveBeenCalled()
   })
 })
 
@@ -84,7 +84,7 @@ describe('setTemplateOrderAction (T76 drag-to-reorder)', () => {
     const input = { group: 'catalogue', ids: ['b', 'a'], expectedIds: ['a', 'b'] }
     expect(await setTemplateOrderAction(input)).toEqual({ ok: true })
     expect(setTemplateOrder).toHaveBeenCalledWith({}, 'admin', input)
-    expect(cache.revalidateTag).toHaveBeenCalledWith('templates', 'max')
+    expect(cache.updateTag).toHaveBeenCalledWith('templates')
     expect(cache.refresh).toHaveBeenCalled()
   })
 })
@@ -102,11 +102,11 @@ describe('bulkEditTemplatesAction (T79 batch edit)', () => {
     bulkEditTemplates.mockResolvedValue({ changed: 2, failures: [] })
     expect(await bulkEditTemplatesAction(input)).toEqual({ ok: true, value: { changed: 2, failures: [] } })
     expect(bulkEditTemplates).toHaveBeenCalledWith({}, 'admin', input, {})
-    expect(cache.revalidateTag).toHaveBeenCalledWith('templates', 'max')
+    expect(cache.updateTag).toHaveBeenCalledWith('templates')
 
-    cache.revalidateTag.mockReset()
+    cache.updateTag.mockReset()
     bulkEditTemplates.mockResolvedValue({ changed: 0, failures: [{ id: 'a', name: 'A', reason: 'web_incomplete' }] })
     await bulkEditTemplatesAction(input)
-    expect(cache.revalidateTag).not.toHaveBeenCalled()
+    expect(cache.updateTag).not.toHaveBeenCalled()
   })
 })

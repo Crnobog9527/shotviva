@@ -18,6 +18,7 @@ describe('photo page messages (en)', () => {
     expect(result.yourNote).toBe('Your note')
     expect(result.facts.originalDeleted).toBe('Made before originals were kept')
     expect(result.facts.formatPng).toBe('PNG, transparent background')
+    expect(result.facts.formatJpgWhite).toBe('JPG, white background')
     expect([when('today'), when('yesterday')]).toEqual(['Today', 'Yesterday'])
     expect(when('meta', { day: 'Today', time: '14:05' })).toBe('Today 14:05')
     expect(when('made', { day: 'Today', time: '14:05' })).toBe('Today, 14:05')

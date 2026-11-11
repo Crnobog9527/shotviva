@@ -24,7 +24,7 @@ import { configuredPricing } from '@/core/billing/checkout-price'
 import { assertCanBuy } from '@/core/billing/subscription'
 import { createWaffoCheckout, paymentChannel, waffoClient, waffoConfig } from '@/core/billing/waffo'
 import { AppError } from '@/core/errors'
-import { appOrigin } from '@/core/site-url'
+import { requestOrigin } from '@/core/request-origin'
 import { site } from '@/site/site.config'
 import { assertRevision, type Attempt } from '@/core/billing/catalog-attempt'
 import { assertSeedPreview, checkoutResponse, findRetry } from './pinned'
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     const quote = version && await buyerQuote(admin, user.id, product, body, channel)
     await bindReferral(user.id, request.cookies.get('sv_ref')?.value, 'first_checkout')
     const attempt = quote && !legacyPreview ? {...id,revision,body:body,quote} : undefined
-    if (channel === 'waffo') return jsonResponse(await startWaffo(products, user.id, body, quote, attempt))
+    if (channel === 'waffo') return jsonResponse(await startWaffo(requestOrigin(request), products, user.id, body, quote, attempt))
     return await stripeResponse(request, products, user, body, quote, attempt)
   } catch (error) {
     return errorResponse(error, 'checkout')
@@ -70,7 +70,7 @@ type Buyer = { id: string; email: string | null }
 async function stripeResponse(request: NextRequest, products: SiteProduct[], user: Buyer, body: CheckoutBody, quote?: BuyerQuote, attempt?: Attempt) {
   const client = { ip: clientIp(request.headers), userAgent: request.headers.get('user-agent') }
   const token = attempt?.token ?? checkoutToken(user.id, body, request.headers.get('idempotency-key'), products, quote)
-  return checkoutResponse(await startStripe(products, user, body, client, token, quote, attempt))
+  return checkoutResponse(await startStripe(requestOrigin(request), products, user, body, client, token, quote, attempt))
 }
 
 async function offeredProduct(admin: ReturnType<typeof createAdminSupabase>, version: ReturnType<typeof configuredPricing>, body: CheckoutBody) {
@@ -85,16 +85,17 @@ async function offeredProduct(admin: ReturnType<typeof createAdminSupabase>, ver
   return { products, product, revision: product.revision }
 }
 
-const shared = { origin: appOrigin, returnToHosts: site.partners.graylum.returnToHosts }
+// Success and cancel pages return to the host the buyer is signed in on (core/request-origin).
+const returnToHosts = site.partners.graylum.returnToHosts
 
-function startStripe(products: SiteProduct[], user: Buyer, body: CheckoutBody, client: CheckoutClient, token: string, quote?: BuyerQuote, attempt?: Attempt) {
-  const deps = { ...shared, products, stripe: stripeClient(), codes: createAdminSupabase(), managedPayments: managedPaymentsEnabled(), wechatPay: wechatPayEnabled(), termsConsent: termsConsentEnabled(), qaCustomer: qaCustomerFor(user) }
+function startStripe(origin: string, products: SiteProduct[], user: Buyer, body: CheckoutBody, client: CheckoutClient, token: string, quote?: BuyerQuote, attempt?: Attempt) {
+  const deps = { origin, returnToHosts, products, stripe: stripeClient(), codes: createAdminSupabase(), managedPayments: managedPaymentsEnabled(), wechatPay: wechatPayEnabled(), termsConsent: termsConsentEnabled(), qaCustomer: qaCustomerFor(user) }
   return createCheckout(deps, { attempt, userId: user.id, body, client, token, quote: quote?.price, selectedCode: quote?.selectedCode })
 }
 
-function startWaffo(products: SiteProduct[], userId: string, body: CheckoutBody, quote?: BuyerQuote, attempt?: Attempt) {
+function startWaffo(origin: string, products: SiteProduct[], userId: string, body: CheckoutBody, quote?: BuyerQuote, attempt?: Attempt) {
   if (body.expected_code) throw new AppError('CODE_CHECKOUT_OFFER_CHANGED', 'Discount is unavailable on this payment channel')
   const config = waffoConfig()
-  const deps = { ...shared, products, waffo: waffoClient(), productIds: config.productIds, subscriptionProductIds: config.subscriptionProductIds }
+  const deps = { origin, returnToHosts, products, waffo: waffoClient(), productIds: config.productIds, subscriptionProductIds: config.subscriptionProductIds }
   return createWaffoCheckout(deps, { bound:attempt ? {attempt,db:createAdminSupabase(),store:config} : undefined, userId, body, quote: quote?.price })
 }

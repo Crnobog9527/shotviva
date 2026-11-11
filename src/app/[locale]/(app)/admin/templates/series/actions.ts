@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidatePath, revalidateTag } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
 import { runAdminQuery } from '@/core/admin/templates'
 import { saveAdminSeries, searchSeriesCandidates, type SaveSeriesInput } from '@/core/admin/template-series'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
@@ -10,7 +10,8 @@ export async function saveSeriesAction(input: SaveSeriesInput) {
   const admin = await requireAdmin()
   return runAdminQuery(async () => {
     const id = await saveAdminSeries(createAdminSupabase(), admin.id, input)
-    revalidateTag(TEMPLATES_CACHE_TAG, 'max')
+    // A series and its member order show on the public template sections: live on the next load.
+    updateTag(TEMPLATES_CACHE_TAG)
     revalidatePath('/[locale]/admin/templates/series', 'page')
     revalidatePath('/[locale]/admin/templates', 'page')
     return id

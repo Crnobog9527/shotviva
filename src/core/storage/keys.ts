@@ -9,9 +9,17 @@ import type { UploadContentType } from './rules'
 //   outputs/{user_id}/{job_id}-input.webp
 //                                     768px preview of the job's upload, kept with the result
 //                                     (ARCHITECTURE §8 「原图小图」, T32)
+//   outputs/{user_id}/{job_id}-thumb.webp
+//                                     the result's small copy for lists, watermarked when the
+//                                     work is (ARCHITECTURE §8.3「作品小图」)
 //   outputs/{user_id}/{job_id}-in-{n}.{ext}
 //                                     the job's own uploads (n from 1), copied at settle and
 //                                     kept with the result for Make again (§8.3, T40)
+//   inputs/{user_id}/downloads/{job_id}-white.jpg | -marked.png | -marked-white.jpg | -both.zip
+//                                     a cut-out's 白底 copy, a free cut-out's watermarked 透明底
+//                                     PNG or 白底 JPEG, or the 白底 + 透明 pair as one ZIP, made on
+//                                     first download and reused; 7-day lifecycle like every
+//                                     inputs/ key, removed with the work too
 //   requests/{user_id}/{uuid}.jpg     wishlist reference image, re-encoded; kept until the
 //                                     request is rejected or taken down (ARCHITECTURE §15.1)
 //   tickets/{user_id}/{ticket_id}/{uuid}.webp
@@ -47,8 +55,24 @@ export function outputKeyFor(userId: string, jobId: string): string {
   return `outputs/${userId}/${jobId}.png`
 }
 
+// Staged copies. White: a paid cut-out flattened onto white, unmarked. Marked: a free cut-out's
+// watermarked PNG with its alpha kept. Marked-white: a free cut-out's marked JPEG on white, staged
+// only for the pair ZIP (the single 白底 download makes it per request). Both: the 白底 + 透明 pair
+// as one ZIP. A paid 透明底 download is the stored original itself.
+const VARIANT_SUFFIX = { white: 'white.jpg', marked: 'marked.png', 'marked-white': 'marked-white.jpg', both: 'both.zip' } as const
+export type DownloadVariant = keyof typeof VARIANT_SUFFIX
+export const DOWNLOAD_VARIANTS = Object.keys(VARIANT_SUFFIX) as DownloadVariant[]
+
+export function downloadVariantKeyFor(userId: string, jobId: string, variant: DownloadVariant): string {
+  return `inputs/${userId}/downloads/${jobId}-${VARIANT_SUFFIX[variant]}`
+}
+
 export function inputPreviewKeyFor(userId: string, jobId: string): string {
   return `outputs/${userId}/${jobId}-input.webp`
+}
+
+export function workThumbKeyFor(userId: string, jobId: string): string {
+  return `outputs/${userId}/${jobId}-thumb.webp`
 }
 
 // The upload's own extension is kept: normal uploads are JPEG (the browser compresses), the

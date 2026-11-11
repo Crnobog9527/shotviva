@@ -12,7 +12,7 @@ import { isWorkId } from './reads'
 // of the same template. Only what the form can take back: size, resolution, copy fields and
 // toggles. Never the photos, the note, an edit instruction, or the original's confirmations
 // (the reuser sees a toggle's dialog again). Null for anything the gallery does not show.
-export type ReuseInputs = { aspect_ratio?: unknown; resolution?: unknown; copy?: unknown; toggles?: unknown }
+export type ReuseInputs = { aspect_ratio?: unknown; resolution?: unknown; copy?: unknown; copy_public?: unknown; toggles?: unknown }
 
 export async function galleryReuseInputs(site: SiteConfig, jobId: string, templateId: string): Promise<ReuseInputs | null> {
   if (!isWorkId(jobId) || !(await isGalleryEnabled(site))) return null
@@ -35,6 +35,6 @@ export async function galleryReuseInputs(site: SiteConfig, jobId: string, templa
   }
   const row = z.object({ inputs: z.record(z.string(), z.unknown()), parent_job_id: z.string().nullable() }).safeParse(data)
   if (!row.success || row.data.parent_job_id) return null
-  const { aspect_ratio, resolution, copy, toggles } = row.data.inputs
-  return { aspect_ratio, resolution, copy, toggles }
+  const { aspect_ratio, resolution, copy, copy_public, toggles } = row.data.inputs
+  return { aspect_ratio, resolution, copy, copy_public, toggles }
 }

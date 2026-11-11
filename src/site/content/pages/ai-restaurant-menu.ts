@@ -1,8 +1,8 @@
 import { baselineOffers, planLabel, type OfferFacts } from '../offer'
-import { defineContentPage, type CostBills } from '@/core/content'
+import { defineContentPage, type CostBills, type ShootDemo } from '@/core/content'
 
 import { site } from '../../site.config'
-import { CATEGORY, pairImage, sizeCountWord, withFirstFrame } from '../landing-shared'
+import { caseImage, CATEGORY, sizeCountWord, withFirstFrame } from '../landing-shared'
 import { pricingRelated } from '../shared'
 import {
   foodHalfDayUsd,
@@ -54,6 +54,38 @@ function menuBills({ planFrom }: OfferFacts): CostBills {
   }
 }
 
+const fishPhone = caseImage('menu-fish-phone', 'Example phone photo: pickled mustard fish in a white enamel bowl on a steel kitchen pass, harsh green-tinted overhead light')
+const fishDark = caseImage('menu-fish-dark', 'AI example: the same pickled mustard fish re-plated in a white porcelain bowl on dark rough timber, warm side light and rising steam')
+
+// One dish through three looks. The food stays the same; the bowl, the set and the light change.
+const shoot: ShootDemo = {
+  heading: { lead: 'One phone photo of a dish → ', emphasis: 'a full menu shoot' },
+  intro: 'Fresh chili bullfrog, shot on the kitchen pass in a steel basin. Three finished pictures, the same dish in every one: the bullfrog, the green and red chilies, the green peppercorns.',
+  phone: {
+    image: caseImage('menu-frog-phone', 'Example phone photo: fresh chili bullfrog in a steel basin on a kitchen counter, fluorescent light, tickets and bowls behind'),
+    file: 'IMG_2706.jpg',
+    caption: 'As shot on a phone. Fluorescent light, a steel basin, order tickets behind.',
+  },
+  arrow: 'Three looks, same dish',
+  results: [
+    {
+      image: caseImage('menu-frog-dark', 'AI example: the same bullfrog dish in a charcoal stone bowl on slate, dark painted backdrop, warm side light'),
+      title: 'Menu hero',
+      template: 'Dark set, sculpted side light',
+    },
+    {
+      image: caseImage('menu-frog-pour', 'AI example: hot oil poured from a white jug onto the same dish in a white bowl on raw timber, steam caught mid-air'),
+      title: 'Sizzle shot',
+      template: 'Hot oil poured, steam caught mid-air',
+    },
+    {
+      image: caseImage('menu-frog-poster-en', 'AI example: a menu poster of the same dish on a warm brown backdrop, headed Chef\'s Signature, Fresh Chili Bullfrog'),
+      title: 'Menu poster',
+      template: 'Dish name, one line and the price',
+    },
+  ],
+}
+
 const copy = {
   slug: 'ai-restaurant-menu',
   keyword: 'ai restaurant menu',
@@ -62,12 +94,12 @@ const copy = {
   title: `AI Restaurant Menu Photos From Your Phone (2026) | ${brand}`,
   description: `AI restaurant menu photos from the dish photo you already took: delivery-app, menu and promo shots with the plate kept as served. ${FreeImagesShort}.`,
   h1: 'AI Restaurant Menu Photos From One Phone Shot',
-  subtitle: 'Your real phone photo of a dish you serve, with new light, background and setting. No dish is invented.',
-  answerBlock: `AI restaurant menu photos start from your own photo of a dish you serve: only the light, background and setting change, and no dish you don't make is invented. With ${brand} you upload one phone photo, pick Delivery Menu, Dark Dining or Promo Poster, and download it in ${tierList}. New users get ${freeImagesLabel}.`,
+  subtitle: 'Your real phone photo of a dish you serve, with a new bowl, light and setting. No dish is invented.',
+  answerBlock: `AI restaurant menu photos start from your own photo of a dish you serve: the food stays as served; only the bowl, light and setting change. With ${brand} you upload one phone photo, pick Delivery Menu, Dark Dining or Promo Poster, and download it in ${tierList}. New users get ${freeImagesLabel}.`,
   hero: {
-    before: withFirstFrame(pairImage('example-dish-before', 'Phone photo of a dish on a restaurant kitchen pass, harsh overhead light (illustrative example)')),
-    after: pairImage('example-dish-after', 'The same dish as a bright delivery-app photo, soft daylight, Delivery Menu template (illustrative example)'),
-    caption: 'Your phone photo → Delivery Menu template: same plate, brighter light · Illustrative example',
+    before: withFirstFrame(fishPhone),
+    after: fishDark,
+    caption: 'Your phone photo → a menu hero: the same fish, a new bowl and set',
     cta: { label: 'Upload photo', href: '/generate' },
   },
   facts: [
@@ -81,13 +113,13 @@ const copy = {
     },
     {
       label: 'The Dish Stays the Dish',
-      value: `Delivery apps want photos of the food you actually serve. ${brand} starts from your own phone photo and changes the light and the background, not the food.`,
+      value: `Delivery apps want photos of the food you actually serve. ${brand} starts from your own phone photo and changes the bowl, the light and the background, not the food.`,
     },
   ],
   faq: [
     {
       question: 'Can I use AI photos on my delivery-app menu?',
-      answer: `Delivery apps ask for photos that show the dish you actually serve. ${brand} starts from your own phone photo and keeps the plate as served, changing only the light and background, so the photo is still of your food. Check your app's current photo rules before you upload.`,
+      answer: `Delivery apps ask for photos that show the dish you actually serve. ${brand} starts from your own phone photo and keeps the food as served, changing the bowl, the light and the background, so the photo is still of your food. Check your app's current photo rules before you upload.`,
     },
     {
       question: 'What size should restaurant menu photos be?',
@@ -115,6 +147,7 @@ const copy = {
   },
   landing: {
     factsNote: 'From the apps\' own merchant help pages (DoorDash, Uber Eats, Grubhub), checked November 2026. Apps change their rules; check before you upload.',
+    shoot,
     templates: {
       heading: 'Menu Photo Templates for Delivery Apps, Menus and Posters',
       intro: `Every template starts from your phone photo of the dish and ends with a menu-ready photo.`,

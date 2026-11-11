@@ -4,7 +4,7 @@ import type { EditCases } from '../page-content'
 
 // One plate of a case pair: half of the full-width pair on a phone, a quarter of the row from
 // 768 (two cases side by side), 276 px from 1024 (the 1120 px content row, two cases with a
-// 16 px gap). The reference inset is about a third of a plate.
+// 16 px gap; three cases make it about 181 px, so the same files serve). The reference inset is about a third of a plate.
 const PLATE_SIZES = '(min-width: 1024px) 276px, (min-width: 768px) 25vw, 50vw'
 const REFERENCE_SIZES = '(min-width: 1024px) 96px, (min-width: 768px) 9vw, 17vw'
 
@@ -19,7 +19,7 @@ export function EditCasesSection({ edits }: { edits: EditCases }) {
         {edits.heading}
       </h2>
       <p className="mk-intro">{edits.intro}</p>
-      <ul className="mk-edits">
+      <ul className={edits.items.length === 3 ? 'mk-edits mk-edits-3' : 'mk-edits'}>
         {edits.items.map((item) => (
           <li key={item.title}>
             <figure className="mk-edit">
@@ -35,7 +35,7 @@ export function EditCasesSection({ edits }: { edits: EditCases }) {
                     </span>
                   ) : null}
                 </span>
-                <span className="mk-pane">
+                <span className={item.transparent ? 'mk-pane mk-pane-checker' : 'mk-pane'}>
                   <Image src={item.after.src} alt={item.after.alt} width={item.after.width} height={item.after.height} sizes={PLATE_SIZES} loading="lazy" />
                 </span>
                 <span className="mk-hl" aria-hidden />

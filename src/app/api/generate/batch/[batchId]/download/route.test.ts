@@ -43,6 +43,14 @@ describe('GET /api/generate/batch/[batchId]/download', () => {
     expect(mocks.recordJobDownload).toHaveBeenCalledTimes(2)
   })
 
+  it('packs cut-outs on white unless 透明底 is asked for (?bg=)', async () => {
+    const withBg = (bg: string) => GET(new NextRequest(new URL(`${PATH}?bg=${bg}`, ORIGIN), { headers: { Accept: 'application/json' } }), { params: Promise.resolve({ batchId: BATCH }) })
+    await appClick()
+    await withBg('transparent')
+    await withBg('black')
+    expect(mocks.downloadBatchZip.mock.calls.map((args) => args[3])).toEqual(['white', 'transparent', 'white'])
+  })
+
   it('records nothing while packing or past the limit', async () => {
     mocks.downloadBatchZip.mockResolvedValueOnce({ status: 'packing' }).mockResolvedValueOnce({ status: 'limited' })
     expect((await appClick()).status).toBe(202)

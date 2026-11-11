@@ -1,5 +1,19 @@
 export { listTemplates, listTemplatesIn } from './list-templates'
 export {
+  checkCopyValue,
+  cleanCopy,
+  COPY_DEFAULT_LENGTH,
+  COPY_FIELD_TYPES,
+  COPY_MAX_LENGTH,
+  COPY_OPTION_MAX_LENGTH,
+  COPY_OPTIONS_MAX,
+  copyFieldSchema,
+  publicCopyKeys,
+  storedPublicKeys,
+  type CopyField,
+  type CopyFieldType,
+} from './copy-fields'
+export {
   COVER_MEDIA_TYPES,
   TEMPLATE_MODULES,
   TEMPLATE_SURFACES,

@@ -46,6 +46,9 @@ export type GenerationProvider = {
   // Price snapshot taken when the provider was resolved for this request: the row's prices with
   // empty ones filled from MODEL_PRICES; null when neither has any (the job then has no cost).
   prices?: ProviderPrices | null
+  // true: the adapter sends model_params.background to the model, so a transparent template's
+  // result really is a cut-out (OpenAI images). OpenRouter drops it; its results stay unknown.
+  honoursBackground?: boolean
   // Optional bounded, read-only invoice lookup after the generation deadline has stopped.
   completeUsage?(usage: ProviderUsage): Promise<ProviderUsage>
   generate(input: ProviderInput): Promise<ProviderOutput>

@@ -88,7 +88,7 @@ export function TemplatePublicFields({ values, isNew, uploading, modelField, flo
         </label>
       </div>
       <div className="grid gap-1.5">
-        <Label htmlFor="tpl-fieldsJson">字段定义（JSON：images / copy / aspectRatios；aspectRatios 只对伙伴接口生效，站内按出图模型支持的比例显示）</Label>
+        <Label htmlFor="tpl-fieldsJson">字段定义（JSON：images / aspectRatios；aspectRatios 只对伙伴接口生效，站内按出图模型支持的比例显示。用户填写的字段在下面单独编辑）</Label>
         <Textarea id="tpl-fieldsJson" className="min-h-32 font-mono text-xs" value={values.fieldsJson}
           onChange={(event) => onChange({ fieldsJson: event.target.value })} />
       </div>

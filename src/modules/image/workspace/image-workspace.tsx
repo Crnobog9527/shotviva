@@ -85,7 +85,7 @@ export function ImageWorkspace({ shareText, editable, ...input }: WorkspaceProps
 // Under the photos: the way to several templates at once (T107), locked below Max.
 function MatrixLink({ template, tier }: Pick<WorkspaceProps, 'template' | 'tier'>) {
   if (template.photoInput === 'none') return null
-  return <MatrixEntry tier={tier} templateId={template.id} variant="link" className="mt-3" />
+  return <MatrixEntry tier={tier} templateId={template.id} className="mt-3" />
 }
 
 type SingleProps = { job: TrackedJob; shareText: string; editable: boolean; onRetry(): void; onBack(clearPhotos: boolean): void }
