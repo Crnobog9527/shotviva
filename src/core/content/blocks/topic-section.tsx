@@ -1,8 +1,10 @@
 import { Link } from '../../i18n/ui'
 import type { TopicSection } from '../page-content'
+import { CardVisual } from './card-visual'
 
-// An extra home H2 of three headed cards in the facts-card layout (.mk-free). A card's link is
-// a plain in-body link at the end of its text, so crawlers read it as part of the copy.
+// An extra home H2 of three headed cards in the facts-card layout (.mk-free), each led by its
+// picture. A card's link is a plain in-body link at the end of its text, so crawlers read it as
+// part of the copy.
 export function TopicCards({ topic, isLinkEnabled }: { topic: TopicSection; isLinkEnabled: (href: string) => boolean }) {
   const headingId = `${topic.id}-h`
   return (
@@ -13,6 +15,7 @@ export function TopicCards({ topic, isLinkEnabled }: { topic: TopicSection; isLi
       <div className="mk-free">
         {topic.cards.map((card) => (
           <article key={card.heading}>
+            <CardVisual visual={card.visual} />
             <h3>{card.heading}</h3>
             <p>
               {card.text}
