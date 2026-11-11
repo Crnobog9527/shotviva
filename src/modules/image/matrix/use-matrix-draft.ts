@@ -23,7 +23,11 @@ export function useMatrixDraft({ templates, initial, balance, limit }: Input) {
   const photos = usePhotoBatch(MATRIX_MAX_CELLS)
   const [requested, setValues] = useState<MatrixValues>(() => ({ ...EMPTY_MATRIX, templateIds: initial }))
   const [checking, setChecking] = useState(false)
-  const [error, setError] = useState<PreflightError | null>(null)
+  // A refusal belongs to the photos it was about: adding or removing one clears it.
+  const photoKey = photos.photos.map((photo) => photo.id).join(',')
+  const [refusal, setRefusal] = useState<{ error: PreflightError; photoKey: string } | null>(null)
+  const error = refusal?.photoKey === photoKey ? refusal.error : null
+  const setError = (next: PreflightError | null) => setRefusal(next ? { error: next, photoKey } : null)
   const byId = new Map(templates.map((template) => [template.id, template]))
   const chosen = requested.templateIds.flatMap((id) => byId.get(id) ?? [])
   const options = sharedOptions(chosen)
