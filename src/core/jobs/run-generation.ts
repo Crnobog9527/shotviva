@@ -14,6 +14,7 @@ import {
   allowedWebAspects,
   assertPricedTier,
   assertTemplateQuote,
+  publicCopyKeys,
   validateGenerationInputs,
   type GenerationInputs,
   type Resolution,
@@ -108,9 +109,12 @@ export function toggleInputs(inputs: GenerationInputs, now: Date) {
 
 // User content only; the wrapped prompt stays in template_prompts (ARCHITECTURE §4).
 // reserve_credits charges templates.credits_cost[resolution] from this very object.
-function jobInputs(req: GenerationRequest, { inputs, prompt }: Prepared, resolution: Resolution, attemptId: string, now: Date) {
+function jobInputs(req: GenerationRequest, { inputs, prompt, template }: Prepared, resolution: Resolution, attemptId: string, now: Date) {
+  const shown = publicCopyKeys(template.fields.copy)
   return {
     copy: inputs.copy,
+    // Which fields were public at this moment (§5.1d); none for most templates, so their jobs look as before.
+    ...(shown.length > 0 ? { copy_public: shown } : {}),
     aspect_ratio: inputs.aspectRatio,
     resolution,
     ...(inputs.note ? { note: inputs.note } : {}),

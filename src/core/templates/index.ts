@@ -8,6 +8,8 @@ export {
   COPY_OPTION_MAX_LENGTH,
   COPY_OPTIONS_MAX,
   copyFieldSchema,
+  publicCopyKeys,
+  storedPublicKeys,
   type CopyField,
   type CopyFieldType,
 } from './copy-fields'

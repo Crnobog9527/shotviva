@@ -200,6 +200,15 @@ describe('the 用户填写的字段 cards', () => {
     expect(buildPayload(values, false, FLOOR)).toMatchObject({ ok: false })
   })
 
+  it('saves choices as the user\'s pick will arrive, so every option can be matched', () => {
+    const field = { ...emptyCopyField('select'), key: 'size', label: 'Size', options: [{ value: ' Extra  large ', labelZh: '特大' }, { value: 'Small\u200b', labelZh: '' }] }
+    const result = buildPayload({ ...toFormValues(template), copyFields: [field] }, false, FLOOR)
+    expect(result).toMatchObject({ ok: true, payload: { template: {
+      fields: { copy: [{ key: 'size', options: ['Extra large', 'Small'] }] },
+      translations: { zh: { fields: { size: { options: { 'Extra large': '特大' } } } } },
+    } } })
+  })
+
   it('refuses two fields with the same key', () => {
     const field = { ...emptyCopyField(), key: 'f', label: 'F' }
     expect(buildPayload({ ...toFormValues(template), copyFields: [field, field] }, false, FLOOR)).toMatchObject({ ok: false, message: expect.stringContaining('重复') })

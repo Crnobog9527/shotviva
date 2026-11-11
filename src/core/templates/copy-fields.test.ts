@@ -21,6 +21,8 @@ describe('copyFieldSchema', () => {
     ['bounds on a text field', { type: 'long', min: 1 }],
     ['min above max', { type: 'number', min: 5, max: 1 }],
     ['an over-long option', { type: 'select', options: ['A', 'x'.repeat(61)] }],
+    ['an option cleaning would change', { type: 'select', options: ['Small', 'Extra  large'] }],
+    ['an option with an invisible character', { type: 'select', options: ['Small', 'La\u200brge'] }],
     ['an unknown type', { type: 'date' }],
   ])('refuses %s', (_, raw) => {
     expect(copyFieldSchema.safeParse({ key: 'f', label: 'Field', ...raw }).success).toBe(false)
