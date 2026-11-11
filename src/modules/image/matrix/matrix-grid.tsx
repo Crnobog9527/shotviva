@@ -23,7 +23,10 @@ export function MatrixGrid({ templates, photos, cells, total, count, onToggle }:
     <div className="hairline-lit rounded-panel bg-card p-2.5">
       <div role="table" aria-label={t('gridLabel')} className="grid gap-1.5">
         <div role="row" className="grid items-end gap-1.5" style={columns}>
-          <span role="columnheader" className="sr-only">{t('gridPhoto')}</span>
+          {/* Holds the photo column's place: an sr-only cell leaves the grid flow and would pull every template header one column left. */}
+          <span role="columnheader">
+            <span className="sr-only">{t('gridPhoto')}</span>
+          </span>
           {templates.map((template) => (
             <span role="columnheader" key={template.id} className="min-w-0 text-center">
               <TemplateThumb template={template} />
