@@ -250,16 +250,22 @@
   }
   .mk-stage-wrap { grid-area: stage; container-type: inline-size; }
   .mk-stage {
+    --h: clamp(240px, calc(100cqw / var(--r, .8)), 420px);
     position: relative; overflow: hidden; isolation: isolate; border-radius: var(--radius-tile); background: var(--muted);
-    height: clamp(240px, calc(100cqw / var(--r, .8)), 420px); transition: height .35s var(--ease);
+    height: var(--h); transition: height .35s var(--ease);
   }
   .mk-stage::after { content: ""; position: absolute; inset: 0; z-index: 5; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--border); pointer-events: none; }
   .mk-stage-fill { position: absolute; inset: -24px; width: calc(100% + 48px); height: calc(100% + 48px); object-fit: cover; filter: blur(22px) saturate(1.1) brightness(.45); }
-  .mk-stage-ff { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; object-fit: contain; }
-  .mk-stage-img { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; object-fit: contain; animation: mk-stage-in .35s var(--ease); }
+  /* The picture's box: the largest of its own shape that fits the frame (contain), centred. */
+  .mk-stage-pic {
+    position: absolute; z-index: 1; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: min(100cqw, calc(var(--h) * var(--pr, .8))); aspect-ratio: var(--pr, .8); max-height: 100%; background: var(--photo-white);
+  }
+  .mk-stage-pic > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .mk-stage-img { animation: mk-stage-in .35s var(--ease); }
+  @keyframes mk-stage-in { from { opacity: 0; } to { opacity: 1; } }
   /* Over its first frame the opening picture needs no fade (it would only dim the frame first). */
   .mk-stage-ff + .mk-stage-img { animation: none; }
-  @keyframes mk-stage-in { from { opacity: 0; } to { opacity: 1; } }
   .mk-stage .mk-stage-ai { top: 10px; right: 10px; bottom: auto; z-index: 4; }
   .mk-inset {
     position: absolute; z-index: 4; right: 10px; bottom: 10px; width: 28%; max-width: 112px; aspect-ratio: var(--ir, .8); overflow: hidden; border-radius: 10px;
@@ -330,7 +336,7 @@
       grid-template-columns: 320px minmax(0, 1fr); grid-template-rows: auto auto auto auto auto 1fr;
       grid-template-areas: "head up" "stage up" "stage err" "stage rail" "stage row" "stage cta";
     }
-    .mk-stage { height: clamp(200px, calc(100cqw / var(--r, .8)), 260px); }
+    .mk-stage { --h: clamp(200px, calc(100cqw / var(--r, .8)), 260px); }
     .mk-up { margin-top: 0; padding: 16px 18px; }
     .mk-rail { margin: 12px 0 0; padding: 2px; }
     .mk-panel-size-d { display: block; }
