@@ -9,7 +9,8 @@ import type { AdminTemplate, CoverLanguage, SaveTemplatePayload, TemplateAdminAc
 
 import { BulkPublish } from './bulk-publish'
 import type { CategoryOption } from './category-field'
-import { orderCopy } from './copy'
+import { featuredCopy, orderCopy } from './copy'
+import { sameMembers } from './featured-groups'
 import { FeaturedPanel } from './featured-panel'
 import { FEATURED_LIMIT, featuredIds, toggleFeatured } from './featured-state'
 import { matchesSearch } from './form-state'
@@ -78,6 +79,12 @@ export function TemplatesEditor({ providers, templates, categories, series, floo
     const ids = toggleFeatured(featured, template, on)
     if (ids) setFeatured(ids)
   }
+  // 首页精选 saved once after arranging: an order-only change goes through the same stale-checked
+  // order save as the lists (T76); one that also removes cards rewrites the list.
+  const saveFeatured = (ids: string[]) =>
+    sameMembers(ids, featured)
+      ? run(() => actions.setOrder({ group: 'featured', ids, expectedIds: featured }), featuredCopy.saved, undefined, featuredCopy.failed)
+      : run(() => actions.setFeatured(ids), featuredCopy.saved, undefined, featuredCopy.failed)
   // Drag, keyboard or arrows (T76): the list shows the new order at once and falls back to the
   // server's order if this save fails.
   const saveOrder = (group: TemplateOrderGroup, expectedIds: string[]) => (ids: string[]) =>
@@ -96,13 +103,7 @@ export function TemplatesEditor({ providers, templates, categories, series, floo
           {error}
         </p>
       ) : null}
-      <FeaturedPanel
-        ids={featured}
-        templates={templates}
-        pending={pending}
-        onReorder={saveOrder('featured', featured)}
-        onRemove={(id) => setFeatured(featured.filter((other) => other !== id))}
-      />
+      <FeaturedPanel ids={featured} templates={templates} pending={pending} onSave={saveFeatured} />
       <BulkPublish providers={providers}
         selected={selectedInOrder(templates, selected)}
         busy={pending}

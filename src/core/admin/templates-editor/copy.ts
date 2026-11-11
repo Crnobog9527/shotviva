@@ -236,3 +236,19 @@ export const bulkFeaturedCopy = {
   confirm: (on: boolean) => (on ? '设为首页精选' : '取消首页精选'),
   done: (on: boolean, count: number) => `已${on ? '把' : '从首页精选移出'} ${count} 个模板${on ? '设为首页精选' : ''}，首页随后更新`,
 } as const
+
+// 首页精选 as the home page lays it out (2026-11-12): cards per category, arranged then saved once.
+export const featuredCopy = {
+  title: '首页精选',
+  intro: '这里的排列就是首页和落地页模板区的样子：按分类分组，分类的先后在「分类管理」里调；同一分类内按卡片顺序显示。第一张卡片也是首页生成栏默认选中的模板。只能选已上架、站内可见的模板。',
+  empty: '还没有精选模板，首页现在显示最新上架的 6 个。在下表「首页精选」一列打开，或勾选后用「批量设为首页精选」。',
+  dragHint: '拖动卡片调整同一分类内的先后（手机上长按卡片再拖），排好后点「保存」，首页才会更新。',
+  dirty: '有未保存的改动，首页还是原来的样子。',
+  save: '保存',
+  discard: '放弃改动',
+  saved: '首页精选已保存，首页随后更新',
+  failed: '首页精选没保存，排好的顺序还在，可以再点一次「保存」。',
+  remove: (name: string) => `移出首页精选：${name}`,
+  removeShort: '移出',
+  position: (index: number) => `第 ${index + 1} 位`,
+} as const

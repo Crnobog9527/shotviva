@@ -1,73 +1,88 @@
 'use client'
 
-import { DragHandle, MoveButtons, SortableList, sortableRowClass, useSortableItem } from '../ui/sortable'
 import { Button } from '@/core/ui/button'
-import { cn } from '@/core/ui/cn'
 
 import type { AdminTemplate } from '../templates/types'
-import { orderCopy } from './copy'
+import { SortableList } from '../ui/sortable'
+import { featuredCopy as copy } from './copy'
+import { FeaturedCard, zhNameOf } from './featured-card'
+import { featuredGroups, withGroupOrder, type FeaturedGroup } from './featured-groups'
 import { FEATURED_LIMIT } from './featured-state'
+import { useFeaturedDraft } from './use-featured-draft'
 
 type Props = {
+  // The saved featured list, featured_rank order.
   ids: string[]
   templates: AdminTemplate[]
   pending: boolean
-  // Drag, keyboard or arrows (T76): the whole new order, saved optimistically.
-  onReorder: (ids: string[]) => Promise<void>
-  onRemove: (id: string) => void
+  // Saves the whole arranged list at once; the page refreshes with the saved one.
+  onSave: (ids: string[]) => Promise<void>
 }
 
-// 首页精选 (T53): the home page's featured templates in display order; the switch in the table
-// adds or removes one, this list orders them. With none chosen, the home page shows the six
-// most recently published.
-export function FeaturedPanel({ ids, templates, pending, onReorder, onRemove }: Props) {
-  const nameOf = (id: string) => templates.find((template) => template.id === id)?.name ?? id
+// 首页精选 (T53) laid out like the home template area (2026-11-12): a block of cards per category,
+// in the order the public pages use. The switch in the table, or the bulk bar, adds templates;
+// here they are arranged, removed, and saved in one go.
+export function FeaturedPanel({ ids, templates, pending, onSave }: Props) {
+  const byId = new Map(templates.map((template) => [template.id, template]))
+  const draft = useFeaturedDraft(ids)
+  const groups = featuredGroups(draft.shown, byId)
+  const order = groups.flatMap((group) => group.ids)
+  const remove = (id: string) => draft.set(order.filter((other) => other !== id))
   return (
-    <section aria-labelledby="featured-h" className="rounded-md border p-4">
+    <section aria-labelledby="featured-h" className="grid gap-3 rounded-md border p-4">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 id="featured-h" className="font-medium">
-          首页精选
-        </h2>
-        <span className="text-muted-foreground text-sm">
-          {ids.length} / {FEATURED_LIMIT}
-        </span>
+        <h2 id="featured-h" className="font-medium">{copy.title}</h2>
+        <span className="text-muted-foreground text-sm tabular-nums">{order.length} / {FEATURED_LIMIT}</span>
       </div>
-      <p className="text-muted-foreground mt-1 text-sm">
-        首页和落地页的模板区按分类显示这里的模板，顺序即同一分类内的先后，第一个也是首页生成栏默认选中的模板。只能选已上架、站内可见的模板。一个都不选时显示最新上架的 6 个。
-      </p>
-      {ids.length === 0 ? (
-        <p className="text-muted-foreground mt-3 text-sm">还没有精选模板，在下表「首页精选」一列打开。</p>
-      ) : (
-        <>
-          <p className="text-muted-foreground mt-1 text-sm">{orderCopy.dragHint}</p>
-          <SortableList ids={ids} labelOf={nameOf} onReorder={onReorder} disabled={pending}>
-            {(order) => (
-              <ol className="mt-3 grid grid-cols-1 gap-1">
-                {order.map((id) => (
-                  <FeaturedRow key={id} id={id} name={nameOf(id)} pending={pending} onRemove={onRemove} />
-                ))}
-              </ol>
-            )}
-          </SortableList>
-        </>
-      )}
+      <p className="text-muted-foreground max-w-[75ch] text-sm">{copy.intro}</p>
+      {order.length === 0 && !draft.dirty ? <p className="text-muted-foreground text-sm">{copy.empty}</p> : null}
+      {order.length > 0 ? <p className="text-muted-foreground text-sm">{copy.dragHint}</p> : null}
+      {groups.map((group) => (
+        <GroupCards key={group.key} group={group} pending={pending} rankOf={(id) => order.indexOf(id)}
+          templateOf={(id) => byId.get(id)} onRemove={remove}
+          onReorder={(next) => draft.set(withGroupOrder(groups, group.key, next))} />
+      ))}
+      {draft.dirty ? (
+        <div role="status" className="bg-muted sticky bottom-3 z-10 flex flex-wrap items-center gap-3 rounded-lg border px-4 py-2 shadow-lg">
+          <span className="text-sm">{copy.dirty}</span>
+          <div className="ml-auto flex gap-2">
+            <Button size="sm" variant="ghost" disabled={pending} onClick={draft.reset}>{copy.discard}</Button>
+            <Button size="sm" disabled={pending} onClick={() => onSave(order)}>{copy.save}</Button>
+          </div>
+        </div>
+      ) : null}
     </section>
   )
 }
 
-function FeaturedRow({ id, name, pending, onRemove }: { id: string; name: string; pending: boolean; onRemove: (id: string) => void }) {
-  const item = useSortableItem(id)
+type GroupProps = {
+  group: FeaturedGroup
+  pending: boolean
+  rankOf: (id: string) => number
+  templateOf: (id: string) => AdminTemplate | undefined
+  onRemove: (id: string) => void
+  onReorder: (ids: string[]) => void
+}
+
+// One category's cards. Cards only move inside their category: which block a template sits in
+// is its category, changed in the template, not here.
+function GroupCards({ group, pending, rankOf, templateOf, onRemove, onReorder }: GroupProps) {
   return (
-    <li {...item.row} className={cn('flex min-h-10 items-center gap-2 rounded-md pr-1 text-sm', sortableRowClass)}>
-      <DragHandle handle={item.handle} />
-      <span className="text-muted-foreground w-6 font-mono tabular-nums">{item.index + 1}</span>
-      <span className="min-w-0 flex-1 truncate">
-        {name} <span className="text-muted-foreground font-mono text-xs max-sm:hidden">{id}</span>
-      </span>
-      <MoveButtons item={item} />
-      <Button variant="ghost" size="sm" disabled={pending} onClick={() => onRemove(id)}>
-        移出
-      </Button>
-    </li>
+    <div className="grid gap-2">
+      <h3 className="text-sm font-medium">
+        {group.nameZh} <span className="text-muted-foreground font-normal">· {group.nameEn} · {group.ids.length} 个</span>
+      </h3>
+      <SortableList layout="grid" ids={group.ids} disabled={pending}
+        labelOf={(id) => zhNameOf(templateOf(id), id)}
+        onReorder={async (next) => onReorder(next)}>
+        {(shown) => (
+          <ol className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-3">
+            {shown.map((id) => (
+              <FeaturedCard key={id} id={id} template={templateOf(id)} rank={rankOf(id)} pending={pending} onRemove={onRemove} />
+            ))}
+          </ol>
+        )}
+      </SortableList>
+    </div>
   )
 }
