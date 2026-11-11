@@ -240,6 +240,13 @@
     }
   },
   "app": {
+    "batchZip": {
+      "cta": "打包下载 · {count, plural, other {# 张}}",
+      "packingCta": "正在打包…",
+      "packing": "正在打包 {count, plural, other {# 张}}，大约需要一两分钟，好了会自动开始下载。",
+      "started": "压缩包开始下载了。文件名是「照片名_模板名_序号」。",
+      "limited": "一分钟内已经下载了三次，请过一分钟再试。"
+    },
     "signupCodes": {
       "noInviteGift": "邀请码有效，当前无额外注册赠分。",
       "toggle": "有邀请码或优惠码？",
@@ -430,6 +437,7 @@
       "withRatio": "{name} {ratio}"
     },
     "workspace": {
+      "checkingCta": "正在核对每张照片…",
       "pickSize": "请选择尺寸",
       "noOptions": "暂无可用的出图选项",
       "back": "创作",
@@ -566,6 +574,7 @@
       }
     },
     "errors": {
+      "NETWORK": "连不上 Shotviva，请检查网络后再试。",
       "CONTENT_REJECTED": "照片或补充说明没有通过安全审核。请换一张照片，或改一下说明。",
       "IDENTITY_SWAP_REFUSED": "为保护每个人的肖像权，Shotviva 不能把人换成另一个人或换脸。可以改表情、妆容、光线和背景。",
       "REFERENCE_IMAGE_LIMIT": "参考图超过模型上限，请减少照片或换个模板。",
@@ -590,6 +599,9 @@
       "TIER_REQUIRED": "这需要{tier}套餐。"
     },
     "photos": {
+      "batch": {
+        "title": "一批 · {count, plural, other {# 张}}{templates, plural, =1 {} other { · # 个模板}}"
+      },
       "title": "作品",
       "metaTitle": "作品",
       "inProgress": "生成中",

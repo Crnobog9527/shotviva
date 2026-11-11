@@ -17,6 +17,7 @@ const fromTracked = (job: TrackedJob, cover: string | null): RunningRow => ({
   id: job.id,
   templateId: job.templateId,
   templateName: job.templateName,
+  batchId: job.batchId ?? null,
   cover,
   aspect: job.aspect,
   resolution: job.resolution,

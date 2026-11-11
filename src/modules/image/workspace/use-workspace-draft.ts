@@ -8,12 +8,14 @@ import type { MembershipTier } from '@/core/config'
 
 import type { AgainStart } from '../again/again-start'
 import { allowsNoPhoto, type CatalogueTemplate } from '../catalogue/catalogue-template'
-import { enqueueJobs, setWorkspaceJobs } from '../generation/job-store'
+import { photoNameFor, preflightBatch, preflightCells, withPreflight, type PreflightError } from '../batch/preflight'
+import { enqueueJobs, setWorkspaceJobs, type StartInput } from '../generation/job-store'
 import { useJobs } from '../generation/use-jobs'
 import { startInputs } from './batch-request'
 import { chosenAspect, closestResolution, hasOutputOptions, selectedAspect, templateOptions } from './output-choice'
 import { ctaState, type CtaState } from './cta-state'
 import { missingRequiredCopy } from './text-fields'
+import type { ReadyPhoto } from './photo-batch'
 import { usePhotoBatch, type PhotoBatch } from './use-photo-batch'
 import type { FormValues } from './workspace-form'
 
@@ -40,14 +42,14 @@ const DEFAULTS: FormValues = { aspect: 'original', resolution: '1k', note: '', c
 // one job per ready photo in the generation store and makes them this template's workspace
 // jobs, so the workspace page shows them developing (and after a refresh).
 export function useWorkspaceDraft({ template, balance, tier, concurrency, again = null, single = false }: DraftInput) {
-  const batchMax = single ? 1 : limitsFor(tier).batchMax
-  const photos = usePhotoBatch(template.photoInput === 'none' ? 0 : batchMax, again ? { photos: again.photos, madeAt: again.madeAt } : undefined)
+  const photos = usePhotoBatch(draftBatchMax(template, tier, single), again ? { photos: again.photos, madeAt: again.madeAt } : undefined)
   const { options, values, change } = useOutputValues(template, again)
   useAgainOpensForm(template.id, again?.jobId)
   const running = useRunningCount(concurrency.runningIds)
   const { summary } = photos
+  const run = useDraftStart(template, concurrency.limit, again)
   const needsRatio = summary.ready.some(({ photo }) => !chosenAspect(values.aspect, options, photo.originalRatio))
-  const state: CtaState = !hasOutputOptions(options) ? { kind: 'no-options' } : needsRatio ? { kind: 'need-size' } : ctaState({
+  const ready = (): CtaState => ctaState({
     balance,
     cost: template.creditsCost[values.resolution],
     running,
@@ -56,13 +58,45 @@ export function useWorkspaceDraft({ template, balance, tier, concurrency, again 
     count: summary.planned,
     copyMissing: missingRequiredCopy(template.copyFields, values.copy),
   })
-  const start = () => {
-    if (state.kind !== 'generate') return
-    setWorkspaceJobs(template.id, enqueueJobs(startInputs(template, values, summary.ready), concurrency.limit))
+  const state: CtaState = run.checking ? { kind: 'checking' } : !hasOutputOptions(options) ? { kind: 'no-options' } : needsRatio ? { kind: 'need-size' } : ready()
+  const start = () => (state.kind === 'generate' ? run.start(startInputs(template, values, summary.ready), summary.ready) : Promise.resolve(null))
+  const changeValues = (next: Partial<FormValues>) => {
+    run.clearError()
+    change(next)
+  }
+  return { photos, values, change: changeValues, state, start, error: run.error, missingPhoto: again?.missing != null }
+}
+
+// Generate: one photo is queued at once, as it always was. Two or more go through the batch
+// preflight first (T107); resolves to its refusal (the caller opens the paywall or says why),
+// or null once the jobs are queued.
+function useDraftStart(template: CatalogueTemplate, limit: number, again: AgainStart | null) {
+  const [checking, setChecking] = useState(false)
+  const [error, setError] = useState<PreflightError | null>(null)
+  const queue = (inputs: StartInput[]) => {
+    setWorkspaceJobs(template.id, enqueueJobs(inputs, limit))
     // A reload now comes back to these jobs, not to Make again's form (and copies nothing again).
     if (again) window.history.replaceState(null, '', window.location.pathname)
   }
-  return { photos, values, change, state, start, missingPhoto: again?.missing != null }
+  const start = (inputs: StartInput[], ready: readonly ReadyPhoto[]): Promise<PreflightError | null> => {
+    setError(null)
+    const cells = inputs.length > 1 ? preflightCells(inputs, ready.map(({ photo }, index) => photoNameFor(photo.name, index))) : null
+    if (!cells) {
+      queue(inputs)
+      return Promise.resolve(null)
+    }
+    setChecking(true)
+    return preflightBatch(cells).then((outcome) => {
+      setChecking(false)
+      if (!outcome.ok) {
+        setError(outcome.error)
+        return outcome.error
+      }
+      queue(withPreflight(inputs, outcome.result))
+      return null
+    })
+  }
+  return { checking, error, start, clearError: () => setError(null) }
 }
 
 function useOutputValues(template: CatalogueTemplate, again: AgainStart | null) {
@@ -76,6 +110,9 @@ function useOutputValues(template: CatalogueTemplate, again: AgainStart | null) 
   const change = (next: Partial<FormValues>) => setValues((current) => ({ ...current, ...next }))
   return { options, values, change }
 }
+
+const draftBatchMax = (template: CatalogueTemplate, tier: MembershipTier | null, single: boolean) =>
+  template.photoInput === 'none' ? 0 : single ? 1 : limitsFor(tier).batchMax
 
 function draftPhotoStatus(template: CatalogueTemplate, photos: PhotoBatch, again: AgainStart | null) {
   if (allowsNoPhoto(template) && photos.photos.length === 0 && !again?.missing) return 'ready'

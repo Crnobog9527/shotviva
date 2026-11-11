@@ -6,9 +6,13 @@ export type GenerateBody = {
   expected_credits?: number
   template_id: string
   input_key: string | null
-  inputs: { copy: Record<string, string>; aspect_ratio: string; resolution: string; note?: string }
   // Photos in the workspace batch (T28); 1 for a single photo.
   batch_size?: number
+  // From the batch preflight (T107): the batch, its distinct templates and this cell's signed proof.
+  batch_id?: string
+  batch_templates?: number
+  batch_cell?: { position: number; photo_name: string; template_name: string; signature: string }
+  inputs: { copy: Record<string, string>; aspect_ratio: string; resolution: string; note?: string; toggles?: Record<string, boolean>; toggles_confirmed?: string[] }
 }
 
 // A photo edit (ARCHITECTURE §5.2): goes to /api/edit, settles and polls like any job.

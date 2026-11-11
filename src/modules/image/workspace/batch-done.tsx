@@ -8,6 +8,7 @@ import { Link } from '@/core/i18n/ui'
 import { ActionBar } from '@/core/app-shell'
 import { buttonVariants } from '@/core/ui/button'
 
+import { ZipButton } from '../batch/zip-button'
 import type { TrackedJob } from '../generation/job-model'
 import { BatchJobRow } from './batch-job-row'
 import type { BatchTally } from './batch-tally'
@@ -19,7 +20,7 @@ type Props = { jobs: TrackedJob[]; tally: BatchTally; onRetry(id: string): void;
 
 // A settled batch (B comp workspace.html?batch&state=done): how many were saved and what they
 // cost, a grid of every photo (a failed one marked refunded), the failed ones again as rows
-// with Retry, and Open Photos as the one primary.
+// with Retry, Make more and Download ZIP (T107) as ghosts, and Open Photos as the one primary.
 export function BatchDone({ jobs, tally, onRetry, onMakeMore }: Props) {
   const t = useTranslations('app')
   const now = useNow()
@@ -50,10 +51,12 @@ export function BatchDone({ jobs, tally, onRetry, onMakeMore }: Props) {
           ))}
         </ol>
       ) : null}
-      <div className="mt-4 flex">
+      <div className="mt-4 flex items-start gap-2">
         <button type="button" onClick={onMakeMore} className={buttonVariants({ variant: 'glass', size: 'touch', className: 'flex-1' })}>
           {t('workspace.makeMore')}
         </button>
+        {/* Preflighted batches only (T107); one sent before that has no batch id to pack. */}
+        {first?.batchId && tally.done > 0 ? <ZipButton batchId={first.batchId} count={tally.done} className="flex-1" /> : null}
       </div>
       <ActionBar className="md:px-0">
         <Link href="/photos" className={buttonVariants({ variant: 'cta', size: 'cta' })}>

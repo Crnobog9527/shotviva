@@ -19,6 +19,8 @@ export type PhotoItem = {
   creditPool: CreditPool
   visibility: JobVisibility
   fileUrl: string | null
+  // The preflighted batch it came from (T107): Photos groups a batch and offers its ZIP.
+  batchId: string | null
 }
 
 export type TemplateLookup = Map<string, { name: string; cover: string | null }>
@@ -41,6 +43,7 @@ export function toPhotoItem(job: Job, templates: TemplateLookup, fileUrl: string
     creditPool: job.creditPool,
     visibility: job.visibility,
     fileUrl,
+    batchId: job.batchId ?? null,
   }
 }
 
@@ -55,10 +58,14 @@ export function doneMeta(
   t: Translate,
   formatDay: (date: Date) => string,
 ): string {
+  return t('photos.doneMeta', { when: doneWhen(item, now, t, formatDay), size: sizeLabel(item.aspect, t), tier: tierName(item.resolution, t) })
+}
+
+// "Today", "Yesterday" or the short date: a batch group's line on Photos (T107).
+export function doneWhen(item: Pick<PhotoItem, 'createdAt'>, now: Date, t: Translate, formatDay: (date: Date) => string): string {
   const created = new Date(item.createdAt)
   const days = dayKey(now) - dayKey(created)
-  const when = days <= 0 ? t('photos.today') : days === 1 ? t('photos.yesterday') : formatDay(created)
-  return t('photos.doneMeta', { when, size: sizeLabel(item.aspect, t), tier: tierName(item.resolution, t) })
+  return days <= 0 ? t('photos.today') : days === 1 ? t('photos.yesterday') : formatDay(created)
 }
 
 // "1:1 · Standard · 2 credits" for a photo still developing.
