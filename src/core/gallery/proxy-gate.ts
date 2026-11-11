@@ -33,7 +33,7 @@ export function galleryWorkIdOf(pathname: string): string | null {
 export type GateReads = {
   // The stored switch; throws when it cannot be read.
   readOpen: () => Promise<boolean>
-  // Whether the gallery shows this work (approved, public, live, in scope); throws on failure.
+  // Whether the gallery shows this work (approved, public, live, in scope, template on sale); throws on failure.
   readShown: (id: string) => Promise<boolean>
   now: () => number
 }
@@ -70,9 +70,13 @@ async function readOpen(): Promise<boolean> {
 }
 
 async function readShown(id: string): Promise<boolean> {
+  // The template must be on sale on the web too, as the page requires (core/templates/list-templates):
+  // a work whose template was taken off sale would otherwise pass here and 404 in the page with 200.
   const { data, error } = await createAdminSupabase()
     .from('generation_jobs')
-    .select('id')
+    .select('id, templates!inner(id)')
+    .eq('templates.is_active', true)
+    .contains('templates.visible_in', ['web'])
     .eq('id', id)
     .eq('status', 'succeeded')
     .eq('visibility', 'public')
