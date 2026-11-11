@@ -29,7 +29,8 @@ begin
     update public.generation_jobs j
        set moderation_status = p_decision,
            moderation_reason = case when p_decision = 'rejected' then p_reason end,
-           moderated_at = now(),
+           -- Keeping an approved work (e.g. after a report) keeps its place in the gallery.
+           moderated_at = case when j.moderation_status = p_decision then j.moderated_at else now() end,
            moderated_by = p_actor
      where j.id = any (p_job_ids) and j.status = 'succeeded' and j.visibility = 'public' and j.deleted_at is null
     returning j.id

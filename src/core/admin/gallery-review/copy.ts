@@ -13,6 +13,8 @@ export const REVIEW_COPY = {
   selectAll: '全选本页',
   selected: (n: number) => `已选 ${n} 张`,
   approve: '通过',
+  // An approved work that was reported: keep it up and close its reports.
+  keep: '保留',
   reject: '拒绝',
   approveSelected: '通过所选',
   rejectSelected: '拒绝所选',
@@ -37,10 +39,14 @@ export const REVIEW_COPY = {
   copyLabel: '展示的文字',
   noImage: '图片暂时打不开',
   confirm: {
-    approve: (n: number) => ({ title: `通过 ${n} 张作品？`, body: '通过后，创作库开着时它们会马上出现在 /gallery 和作品页。', confirm: '确认通过' }),
-    reject: (n: number, reason: string) => ({
+    approve: (n: number) => ({
+      title: `通过 ${n} 张作品？`,
+      body: '通过后，创作库开着时它们会马上出现在 /gallery 和作品页。已经通过的作品保持原位，它们的举报标为已处理。',
+      confirm: '确认通过',
+    }),
+    reject: (n: number) => ({
       title: `拒绝 ${n} 张作品？`,
-      body: `原因：${reason}。拒绝后作品页返回 404，不出现在任何公开列表；作者本人仍能看到和下载。以后可以在「已拒绝」里重新通过。`,
+      body: '拒绝后作品页返回 404，不出现在任何公开列表；作者本人仍能看到和下载。以后可以在「已拒绝」里重新通过。',
       confirm: '确认拒绝',
     }),
     cancel: '取消',

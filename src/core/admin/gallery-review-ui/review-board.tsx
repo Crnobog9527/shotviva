@@ -19,7 +19,6 @@ type Props = { page: ReviewPage; actions: ReviewActions }
 // confirmed. The action refreshes the page, so the list follows what is stored.
 export function ReviewBoard({ page, actions }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [reason, setReason] = useState<RejectReason>('other')
   const [decision, setDecision] = useState<PendingDecision>(null)
   const { pending, error, notice, run } = useAdminAction()
 
@@ -31,7 +30,8 @@ export function ReviewBoard({ page, actions }: Props) {
       return next
     })
   const ask = (jobIds: string[], kind: Decision['decision']) =>
-    setDecision({ jobIds, decision: kind, reason: kind === 'rejected' ? reason : null })
+    setDecision({ jobIds, decision: kind, reason: kind === 'rejected' ? 'other' : null })
+  const setReason = (reason: RejectReason) => setDecision((current) => (current ? { ...current, reason } : current))
   const confirm = (input: Decision) =>
     run(
       () => actions.decide(input),
@@ -49,9 +49,7 @@ export function ReviewBoard({ page, actions }: Props) {
         tab={page.tab}
         selected={selected.size}
         total={page.works.length}
-        reason={reason}
         disabled={pending}
-        onReason={setReason}
         onSelectAll={() => setSelected(new Set(page.works.map((work) => work.id)))}
         onBatch={(kind) => ask([...selected], kind)}
       />
@@ -79,7 +77,7 @@ export function ReviewBoard({ page, actions }: Props) {
           {COPY.more}
         </a>
       ) : null}
-      <DecisionDialog decision={decision} pending={pending} onCancel={() => setDecision(null)} onConfirm={confirm} />
+      <DecisionDialog decision={decision} pending={pending} onReason={setReason} onCancel={() => setDecision(null)} onConfirm={confirm} />
     </div>
   )
 }

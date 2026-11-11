@@ -205,3 +205,17 @@ describe('review reads and the sweep', () => {
     expect(await stateOf(id)).toMatchObject({ status: 'pending', screened: false })
   })
 })
+
+describe('keeping a reported work', () => {
+  it('closes its reports and keeps its place in the gallery', async () => {
+    const id = await work()
+    await decide({ jobIds: [id], decision: 'approved', reason: null })
+    const before = (await db.query('select moderated_at from public.generation_jobs where id = $1', [id])).rows[0].moderated_at
+    const reporter = await createUser(db)
+    expect((await report(id, reporter)).data).toBe('reported')
+    expect(await decide({ jobIds: [id], decision: 'approved', reason: null })).toBe(1)
+    const after = (await db.query('select moderated_at from public.generation_jobs where id = $1', [id])).rows[0].moderated_at
+    expect(after).toEqual(before)
+    expect((await db.query('select count(*)::int as n from public.work_reports where job_id = $1 and resolved_at is null', [id])).rows[0].n).toBe(0)
+  })
+})

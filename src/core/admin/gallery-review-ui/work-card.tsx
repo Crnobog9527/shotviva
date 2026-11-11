@@ -60,9 +60,9 @@ export function WorkCard({ work, selected, disabled, onSelect, onApprove, onReje
       </div>
       <Facts work={work} />
       <div className="flex gap-2">
-        {work.status !== 'approved' ? (
+        {work.status !== 'approved' || work.reports.count > 0 ? (
           <Button size="sm" disabled={disabled} onClick={onApprove}>
-            {COPY.approve}
+            {work.status === 'approved' ? COPY.keep : COPY.approve}
           </Button>
         ) : null}
         {work.status !== 'rejected' ? (
