@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
+import { templateFieldsSchema } from '@/core/templates'
+
 import { versionPatch } from './version-patch'
 import type { AdminTemplate } from '../templates/types'
+import { emptyCopyField } from './copy-form-state'
 
 import {
   buildPayload,
-  copyKeys,
   creditProblems,
   emptyFormValues,
   matchesSearch,
@@ -140,22 +142,67 @@ describe('template form state', () => {
 })
 
 describe('Chinese text in the editor (templates.translations)', () => {
-  it('lists the copy keys of the JSON being edited', () => {
-    expect(copyKeys('{"copy":[{"key":"headline","label":"Headline"},{"key":"price"}]}')).toEqual([
-      { key: 'headline', label: 'Headline' },
-      { key: 'price', label: 'price' },
-    ])
-    expect(copyKeys('{ not json')).toEqual([])
+  it('sends only filled-in text: the template\'s own and each field card\'s', () => {
+    const headline = { ...emptyCopyField(), key: 'headline', label: 'Headline', labelZh: '标题' }
+    const price = { ...emptyCopyField(), key: 'price', label: 'Price' }
+    expect(toTranslations({ name: ' 促销海报 ', description: '' }, [headline, price])).toEqual({ zh: { name: '促销海报', fields: { headline: { label: '标题' } } } })
+    expect(toTranslations({ name: '', description: '' }, [price])).toEqual({})
+  })
+})
+
+describe('the 用户填写的字段 cards', () => {
+  const sized: AdminTemplate = {
+    ...template,
+    fields: {
+      ...template.fields,
+      copy: [
+        { key: 'size', label: 'Size', type: 'select', options: ['Small', 'Large'], required: true, maxLength: 60, public: false },
+        { key: 'guests', label: 'Guests', type: 'number', min: 1, max: 50, help: 'How many', required: false, maxLength: 4, public: true },
+      ],
+    },
+    translations: { zh: { fields: { size: { label: '尺寸', options: { Small: '小' } }, guests: { help: '人数' } } } },
+  }
+
+  it('keeps copy out of the JSON box and puts it back, with its Chinese text, on save', () => {
+    const values = toFormValues(sized)
+    expect(JSON.parse(values.fieldsJson)).not.toHaveProperty('copy')
+    expect(values.copyFields[0]).toMatchObject({ key: 'size', type: 'select', labelZh: '尺寸', options: [{ value: 'Small', labelZh: '小' }, { value: 'Large', labelZh: '' }] })
+    const result = buildPayload(values, false, FLOOR)
+    expect(result).toMatchObject({
+      ok: true,
+      payload: {
+        template: {
+          fields: { copy: [
+            { key: 'size', type: 'select', label: 'Size', options: ['Small', 'Large'], required: true, public: false },
+            { key: 'guests', type: 'number', label: 'Guests', help: 'How many', min: 1, max: 50, maxLength: 4, public: true },
+          ] },
+          translations: { zh: { fields: { size: { label: '尺寸', options: { Small: '小' } }, guests: { help: '人数' } } } },
+        },
+      },
+    })
+    if (result.ok) expect(templateFieldsSchema.safeParse((result.payload.template as { fields: unknown }).fields).success).toBe(true)
   })
 
-  it('sends only filled-in text, only for fields that still exist', () => {
-    const zh = {
-      name: ' 促销海报 ',
-      description: '',
-      fields: { headline: { label: '标题', placeholder: '' }, gone: { label: '旧字段', placeholder: '' } },
-    }
-    expect(toTranslations(zh, ['headline', 'price'])).toEqual({ zh: { name: '促销海报', fields: { headline: { label: '标题' } } } })
-    expect(toTranslations({ name: '', description: '', fields: {} }, ['headline'])).toEqual({})
+  it('reads a field saved before types as private one-line text', () => {
+    const old = { ...template, fields: { ...template.fields, copy: [{ key: 'dish', label: 'Dish', required: false, maxLength: 80 }] } } as unknown as AdminTemplate
+    expect(toFormValues(old).copyFields[0]).toMatchObject({ type: 'short', maxLength: '80', public: false })
+  })
+
+  it.each([
+    ['a bad key', { key: 'Bad Key' }],
+    ['no English name', { label: ' ' }],
+    ['a choice with an empty option', { type: 'select' as const, options: [{ value: 'A', labelZh: '' }, { value: '', labelZh: '' }] }],
+    ['a choice with repeated options', { type: 'select' as const, options: [{ value: 'A', labelZh: '' }, { value: 'A', labelZh: '' }] }],
+    ['a non-number bound', { type: 'number' as const, min: 'one' }],
+    ['a non-integer length', { maxLength: '2.5' }],
+  ])('refuses %s before calling the server', (_, patch) => {
+    const values = { ...toFormValues(template), copyFields: [{ ...emptyCopyField(), key: 'f', label: 'F', ...patch }] }
+    expect(buildPayload(values, false, FLOOR)).toMatchObject({ ok: false })
+  })
+
+  it('refuses two fields with the same key', () => {
+    const field = { ...emptyCopyField(), key: 'f', label: 'F' }
+    expect(buildPayload({ ...toFormValues(template), copyFields: [field, field] }, false, FLOOR)).toMatchObject({ ok: false, message: expect.stringContaining('重复') })
   })
 })
 

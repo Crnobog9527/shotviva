@@ -20,7 +20,7 @@ const ready = (id: string, originalRatio = 0.8, name?: string): ReadyPhoto => ({
   inputKey: `in/${id}`,
 })
 
-const poster = template('poster', { creditsCost: { '1k': 3, '2k': 5, '3k': 8 }, copyFields: [{ key: 'headline', label: 'Headline', required: true, maxLength: 40 }], toggles: [{ key: 'plate', label: 'Plate' }] })
+const poster = template('poster', { creditsCost: { '1k': 3, '2k': 5, '3k': 8 }, copyFields: [{ key: 'headline', label: 'Headline', type: 'short', required: true, maxLength: 40, public: false }], toggles: [{ key: 'plate', label: 'Plate' }] })
 const white = template('white')
 const photos = [ready('p1', 0.8, 'IMG_1.jpg'), ready('p2', 1.5)]
 const values = (patch: Partial<MatrixValues> = {}): MatrixValues => ({ ...EMPTY_MATRIX, templateIds: ['poster', 'white'], ...patch })

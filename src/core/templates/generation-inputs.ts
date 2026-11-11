@@ -1,11 +1,15 @@
 import { AppError } from '../errors'
+import { checkCopyValue, copyLines } from './copy-fields'
 import { NOTE_MAX_LENGTH } from './output-options'
 import type { TemplateFields } from './schema'
 import type { ToggleField, ToggleFragments } from './toggles'
 
 export type GenerationInputs = {
-  // Every copy field of the template, '' when the optional field was left empty.
+  // Every copy field of the template in its order, cleaned; '' when the optional field was left empty.
   copy: Record<string, string>
+  // Each copy field's English label, for the "Label: value" lines of fields the prompt body has
+  // no {{key}} for. Absent: no such lines (callers that build inputs by hand).
+  labels?: Record<string, string>
   aspectRatio: string
   // The optional "Anything to change?" text, trimmed; '' when none.
   note: string
@@ -31,21 +35,18 @@ export type RawGenerationInputs = {
 
 const invalid = (message: string) => new AppError('INVALID_INPUT', message)
 
-function checkCopy(fields: TemplateFields, raw: Record<string, unknown>): Record<string, string> {
+function checkCopy(fields: TemplateFields, raw: Record<string, unknown>): Pick<GenerationInputs, 'copy' | 'labels'> {
   const known = new Set(fields.copy.map((field) => field.key))
   const unknown = Object.keys(raw).find((key) => !known.has(key))
   if (unknown) throw invalid(`Unknown field: ${unknown}`)
 
   const copy: Record<string, string> = {}
+  const labels: Record<string, string> = {}
   for (const field of fields.copy) {
-    const value = raw[field.key]
-    if (value !== undefined && typeof value !== 'string') throw invalid(`${field.label} must be text`)
-    const text = (value ?? '').trim()
-    if (field.required && text.length === 0) throw invalid(`${field.label} is required`)
-    if (text.length > field.maxLength) throw invalid(`${field.label} is too long`)
-    copy[field.key] = text
+    copy[field.key] = checkCopyValue(field, raw[field.key])
+    labels[field.key] = field.label
   }
-  return copy
+  return { copy, labels }
 }
 
 function checkAspect(fields: TemplateFields, raw: RawGenerationInputs): string {
@@ -94,14 +95,15 @@ export function validateGenerationInputs(fields: TemplateFields, raw: RawGenerat
   if (raw.imageCount < min || raw.imageCount > max) {
     throw invalid(min === max ? `This template needs ${min} photo(s)` : `This template takes ${min}–${max} photos`)
   }
-  return { copy: checkCopy(fields, raw.copy ?? {}), aspectRatio: checkAspect(fields, raw), note: checkNote(raw), ...checkToggles(fields, raw) }
+  return { ...checkCopy(fields, raw.copy ?? {}), aspectRatio: checkAspect(fields, raw), note: checkNote(raw), ...checkToggles(fields, raw) }
 }
 
 // `{{key}}` placeholders take the user's copy (and `{{aspect_ratio}}`), and a toggle's key its
 // private "on" or "off" fragment (T89, model_params.toggles); unknown ones render empty so a
-// template edit can never leak a raw placeholder to the model. The user's note goes after the
-// rendered template, never inside it, so it cannot reorder the template's own text
-// (ARCHITECTURE §4 inputs.note).
+// template edit can never leak a raw placeholder to the model. A copy field the body has no
+// placeholder for follows the template text as a "Label: value" line (ARCHITECTURE §5), so an
+// admin-defined field always reaches the model. The user's note goes last, never inside the
+// template text, so it cannot reorder it (ARCHITECTURE §4 inputs.note).
 export function renderPrompt(
   body: string, inputs: GenerationInputs, fragments: ToggleFragments = {},
   counts = { photo_count: 0, style_ref_count: 0 },
@@ -112,5 +114,6 @@ export function renderPrompt(
     photo_count: String(counts.photo_count), style_ref_count: String(counts.style_ref_count),
   }
   const rendered = body.replace(/\{\{\s*([a-z][a-z0-9_]*)\s*\}\}/g, (_, key: string) => values[key] ?? '').trim()
-  return inputs.note ? `${rendered}\n\n${inputs.note}` : rendered
+  const lines = inputs.labels ? copyLines(body, inputs.copy, inputs.labels) : ''
+  return [rendered, lines, inputs.note].filter(Boolean).join('\n\n')
 }
