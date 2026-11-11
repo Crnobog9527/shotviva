@@ -48,7 +48,7 @@ describe('page transition direction', () => {
 })
 
 describe('page transition CSS', () => {
-  const css = readFileSync('src/app/globals.css', 'utf8')
+  const css = readFileSync('src/app/globals-body.css', 'utf8')
   const block = css.slice(css.indexOf('/* Page transitions between app pages'), css.indexOf('/* One-shot entry fade'))
 
   it('animates only transform and opacity, never past 300ms', () => {

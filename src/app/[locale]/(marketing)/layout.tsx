@@ -1,3 +1,7 @@
+// The public pages' Tailwind sheet, first so its layers and tokens precede every component sheet
+// (the root layout carries none: marketing and sign-in pages get this one, the app globals.css).
+import '../../globals-public.css'
+
 import { AnnouncementBanner } from '@/core/announcements'
 import { currentLocale } from '@/core/i18n/server'
 import { LivingBackground } from '@/core/ui/living-background'
