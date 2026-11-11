@@ -42,22 +42,23 @@ export function NoteField({ value, placeholder, onChange }: { value: string; pla
   )
 }
 
-type CopyProps = { fields: CatalogueTemplate['copyFields']; values: Record<string, string>; onChange(next: Record<string, string>): void }
+// idPrefix: field ids must stay unique when several templates' fields share a page (T107).
+type CopyProps = { fields: CatalogueTemplate['copyFields']; values: Record<string, string>; onChange(next: Record<string, string>): void; idPrefix?: string }
 
 // Only the text a template needs, e.g. a poster's headline and price (DESIGN §4.3 step 2).
-export function CopyFields({ fields, values, onChange }: CopyProps) {
+export function CopyFields({ fields, values, onChange, idPrefix = 'copy' }: CopyProps) {
   const t = useTranslations('app.workspace')
   if (fields.length === 0) return null
   return (
     <div className="grid gap-4">
       {fields.map((field) => (
         <div key={field.key}>
-          <label htmlFor={`copy-${field.key}`} className="mb-2 flex items-baseline gap-2 text-label leading-[1.3] font-medium">
+          <label htmlFor={`${idPrefix}-${field.key}`} className="mb-2 flex items-baseline gap-2 text-label leading-[1.3] font-medium">
             {field.label}
             {field.required ? null : <span className="font-normal text-muted-foreground">{t('optional')}</span>}
           </label>
           <input
-            id={`copy-${field.key}`}
+            id={`${idPrefix}-${field.key}`}
             value={values[field.key] ?? ''}
             maxLength={field.maxLength}
             placeholder={field.placeholder}

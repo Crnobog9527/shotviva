@@ -20,7 +20,8 @@ const toggleKey = z.string().regex(/^[a-z][a-z0-9_]*$/).max(64)
 
 export { categorySlug, UPLOAD_SIZE_BUCKETS, uploadSizeBucket } from './event-values'
 export const RESOLUTIONS = ['1k', '2k', '3k'] as const
-export const PAYWALL_TRIGGERS = ['insufficient_credits', 'pricing_page', 'account', 'graylum', 'tier_required'] as const
+// watermark_download (T107): a free, watermarked photo was just downloaded or saved.
+export const PAYWALL_TRIGGERS = ['insufficient_credits', 'pricing_page', 'account', 'graylum', 'tier_required', 'watermark_download'] as const
 export const PRODUCT_TIERS = ['starter', 'pro', 'max', 'pack'] as const
 export const PRODUCT_INTERVALS = ['month', 'year'] as const
 export const CHECKOUT_FORMS = ['subscription', 'one_time'] as const
