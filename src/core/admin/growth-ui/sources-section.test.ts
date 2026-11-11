@@ -2,6 +2,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
+import { AD_SOURCES, SOURCE_TABLE } from '../growth/source-table'
 import { PERIOD } from '../growth/test-fixtures'
 import { SourcesSection, type SourcesState } from './sources-section'
 
@@ -43,6 +44,13 @@ describe('two-level source table', () => {
     expect(google).not.toContain('hidden group-has')
     expect(plain).toMatch(/显示全部（另有 \d+ 个来源这段时间为 0）/)
     expect(html).toContain('type="checkbox"')
+  })
+
+  it('counts hidden sources, not rows: an empty group hides each of its sources', () => {
+    const size = (group: string) => SOURCE_TABLE.filter((d) => d.group === group).length
+    // Search: all but Google and Bing; AI: all but ChatGPT; social and ads: every source; 其他网站.
+    const expected = size('search') - 2 + (size('ai') - 1) + size('social') + AD_SOURCES.length + 1
+    expect(plain).toContain(`显示全部（另有 ${expected} 个来源这段时间为 0）`)
   })
 
   it('names what cannot be told apart', () => {

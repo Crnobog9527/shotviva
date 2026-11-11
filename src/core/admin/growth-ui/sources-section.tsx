@@ -26,7 +26,8 @@ const ZERO = 'hidden sm:hidden group-has-[:checked]/sources:flex sm:group-has-[:
 export function SourcesSection({ db, state }: { db: GrowthPeriod; state: SourcesState }) {
   const rows = attribute(db, state.status === 'ok' ? state.data : null)
   const note = state.status === 'loading' ? C.loading : state.status !== 'ok' ? C.noPostHog : state.data.truncated ? C.truncated : null
-  const hidden = rows.reduce((total, row) => total + (isEmptyLine(row) ? 1 : row.children.filter(isEmptyLine).length), 0)
+  // Sources, not rows: an empty group hides each of its sources (control review of #502).
+  const hidden = rows.reduce((total, row) => total + (row.children.length ? row.children.filter(isEmptyLine).length : isEmptyLine(row) ? 1 : 0), 0)
   return (
     <Section title={C.title} desc={C.desc}>
       {note ? <p className="text-sm text-muted-foreground">{note}</p> : null}

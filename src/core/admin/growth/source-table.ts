@@ -4,7 +4,8 @@
 // google.*, edgeservices.bing.com before bing.com). Every group ends with its 「其他…」 entry.
 //
 // tags: names in utm_source or a non-promoter ?ref= value, matched whole, optionally with a
-//   domain ending (chatgpt, chatgpt.com).
+//   domain ending (chatgpt, chatgpt.com) unless `bare`: X lists its endings itself, so x.ai
+//   (xAI, Grok) is not X.
 // hosts: referrer hosts as regex fragments. Any subdomain matches unless `exact`, where only the
 //   bare host or www. does (accounts.google.com must not count as Google search).
 //
@@ -20,7 +21,7 @@
 export const DETAILED_GROUPS = ['search', 'ai', 'social', 'ads'] as const
 export type DetailedGroup = (typeof DETAILED_GROUPS)[number]
 
-export type SourceDef = { key: string; group: DetailedGroup; tags?: readonly string[]; hosts?: readonly string[]; exact?: boolean }
+export type SourceDef = { key: string; group: DetailedGroup; tags?: readonly string[]; bare?: boolean; hosts?: readonly string[]; exact?: boolean }
 
 export const AI_SOURCES: readonly SourceDef[] = [
   { key: 'ai:chatgpt', group: 'ai', tags: ['chatgpt', 'openai'], hosts: ['chatgpt[.]com', 'chat[.]openai[.]com'] },
@@ -31,35 +32,41 @@ export const AI_SOURCES: readonly SourceDef[] = [
   { key: 'ai:deepseek', group: 'ai', tags: ['deepseek'], hosts: ['deepseek[.]com'] },
   { key: 'ai:kimi', group: 'ai', tags: ['kimi', 'moonshot'], hosts: ['kimi[.]com', 'kimi[.]moonshot[.]cn', 'moonshot[.]cn'] },
   { key: 'ai:doubao', group: 'ai', tags: ['doubao'], hosts: ['doubao[.]com'] },
-  { key: 'ai:grok', group: 'ai', tags: ['grok'], hosts: ['grok[.]com'] },
+  { key: 'ai:grok', group: 'ai', tags: ['grok', 'xai', 'x[.]ai'], hosts: ['grok[.]com', 'x[.]ai'] },
   {
     key: 'ai:other',
     group: 'ai',
-    tags: ['poe', 'phind', 'you', 'mistral', 'meta-ai', 'yuanbao', 'tongyi', 'qwen', 'metaso', 'zhipu', 'chatglm'],
+    tags: ['poe', 'phind', 'you', 'mistral', 'meta', 'meta-ai', 'metaai', 'yuanbao', 'tongyi', 'qwen', 'metaso', 'zhipu', 'chatglm'],
     hosts: ['poe[.]com', 'phind[.]com', 'you[.]com', 'chat[.]mistral[.]ai', 'meta[.]ai', 'yuanbao[.]tencent[.]com', 'tongyi[.]aliyun[.]com', 'qianwen[.]aliyun[.]com', 'metaso[.]cn', 'chatglm[.]cn'],
   },
 ]
 
 export const SEARCH_SOURCES: readonly SourceDef[] = [
   { key: 'search:google', group: 'search', tags: ['google'], hosts: ['google[.][a-z.]+'], exact: true },
-  { key: 'search:bing', group: 'search', tags: ['bing'], hosts: ['bing[.]com', 'cn[.]bing[.]com'], exact: true },
+  { key: 'search:bing', group: 'search', tags: ['bing'], hosts: ['bing[.]com', 'cn[.]bing[.]com', 'm[.]bing[.]com'], exact: true },
   { key: 'search:baidu', group: 'search', tags: ['baidu'], hosts: ['baidu[.]com', 'm[.]baidu[.]com'], exact: true },
   { key: 'search:duckduckgo', group: 'search', tags: ['duckduckgo', 'ddg'], hosts: ['duckduckgo[.]com'], exact: true },
-  { key: 'search:yahoo', group: 'search', tags: ['yahoo'], hosts: ['search[.]yahoo[.]com', '[a-z]{2}[.]search[.]yahoo[.]com', 'search[.]yahoo[.]co[.]jp'], exact: true },
+  {
+    key: 'search:yahoo',
+    group: 'search',
+    tags: ['yahoo'],
+    hosts: ['search[.]yahoo[.]com', 'r[.]search[.]yahoo[.]com', '[a-z]{2}[.]search[.]yahoo[.]com', 'search[.]yahoo[.]co[.]jp', 'yahoo[.]co[.]jp'],
+    exact: true,
+  },
   { key: 'search:yandex', group: 'search', tags: ['yandex'], hosts: ['yandex[.][a-z.]+', 'ya[.]ru'], exact: true },
-  { key: 'search:naver', group: 'search', tags: ['naver'], hosts: ['search[.]naver[.]com', 'naver[.]com'], exact: true },
+  { key: 'search:naver', group: 'search', tags: ['naver'], hosts: ['search[.]naver[.]com', 'm[.]search[.]naver[.]com', 'naver[.]com'], exact: true },
   { key: 'search:sogou', group: 'search', tags: ['sogou'], hosts: ['sogou[.]com', 'm[.]sogou[.]com'], exact: true },
   {
     key: 'search:other',
     group: 'search',
     tags: ['ecosia', 'startpage', 'brave', 'qwant', 'seznam', 'so360', 'sm'],
-    hosts: ['ecosia[.]org', 'startpage[.]com', 'search[.]brave[.]com', 'qwant[.]com', 'seznam[.]cz', 'so[.]com', 'm[.]so[.]com', 'sm[.]cn'],
+    hosts: ['ecosia[.]org', 'startpage[.]com', 'search[.]brave[.]com', 'qwant[.]com', 'seznam[.]cz', 'so[.]com', 'm[.]so[.]com', 'sm[.]cn', 'm[.]sm[.]cn'],
     exact: true,
   },
 ]
 
 export const SOCIAL_SOURCES: readonly SourceDef[] = [
-  { key: 'social:x', group: 'social', tags: ['x', 'twitter', 't[.]co'], hosts: ['x[.]com', 'twitter[.]com', 't[.]co'] },
+  { key: 'social:x', group: 'social', tags: ['x', 'x[.]com', 'twitter', 'twitter[.]com', 't[.]co'], bare: true, hosts: ['x[.]com', 'twitter[.]com', 't[.]co'] },
   { key: 'social:reddit', group: 'social', tags: ['reddit'], hosts: ['reddit[.]com', 'redd[.]it'] },
   { key: 'social:youtube', group: 'social', tags: ['youtube', 'yt'], hosts: ['youtube[.]com', 'youtu[.]be'] },
   { key: 'social:xiaohongshu', group: 'social', tags: ['xiaohongshu', 'xhs', 'rednote'], hosts: ['xiaohongshu[.]com', 'xhslink[.]com'] },
@@ -75,7 +82,7 @@ export const SOCIAL_SOURCES: readonly SourceDef[] = [
     key: 'social:other',
     group: 'social',
     tags: ['pinterest', 'threads', 'weibo', 'douyin', 'discord', 'telegram', 'hackernews', 'hn', 'mastodon', 'bluesky'],
-    hosts: ['pinterest[.][a-z.]+', 'threads[.]net', 'weibo[.]com', 'douyin[.]com', 'discord[.]com', 't[.]me', 'telegram[.]org', 'news[.]ycombinator[.]com', 'bsky[.]app'],
+    hosts: ['pinterest[.][a-z.]+', 'threads[.]net', 'threads[.]com', 'weibo[.]com', 'douyin[.]com', 'discord[.]com', 't[.]me', 'telegram[.]org', 'news[.]ycombinator[.]com', 'bsky[.]app'],
   },
 ]
 
@@ -100,6 +107,6 @@ export const ALL_SOURCE_KEYS: readonly string[] = [...SOURCE_TABLE.map((def) => 
 export const groupOfKey = (key: string): string => key.split(':')[0] ?? 'other'
 
 // HogQL regex literals (single-quoted), also valid JavaScript regexes for the tests.
-export const tagPattern = (tags: readonly string[]) => `'^(${tags.join('|')})([.][a-z.]+)?$'`
+export const tagPattern = (tags: readonly string[], bare = false) => `'^(${tags.join('|')})${bare ? '' : '([.][a-z.]+)?'}$'`
 export const hostPattern = (def: Pick<SourceDef, 'hosts' | 'exact'>) =>
   `'^${def.exact ? '(www[.])?' : '([a-z0-9-]+[.])*'}(${(def.hosts ?? []).join('|')})$'`

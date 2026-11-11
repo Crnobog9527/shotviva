@@ -20,18 +20,33 @@ const RETURNS = `'^([a-z0-9-]+[.])*(shotviva[.]com|accounts[.]google[.]com|apple
 const SLUG = /^[a-z0-9-]{3,24}$/
 
 export type KeyMode = {
-  // Real promoter slugs (affiliates.slug). Only a ?ref= carrying one of them is a promoter link.
-  promoters: readonly string[]
   // Visitors: a real promoter link counts as 推广员. Sign-ups and buyers: never from PostHog,
   // only from the database binding, so their promoter links fall through to the referrer.
   creditPromoters: boolean
 }
 
-const PAGE_URL = "coalesce(toString(properties.$current_url), '')"
-const SRC = "lower(coalesce(toString(properties.utm_source), ''))"
-const MEDIUM = "lower(coalesce(toString(properties.utm_medium), ''))"
-const DOMAIN = "lower(coalesce(toString(properties.$referring_domain), ''))"
-const param = (name: string) => `notEmpty(extractURLParameter(${PAGE_URL}, '${name}'))`
+// Everything the classifier reads, computed once per event in an inner SELECT, so the promoter
+// slug list appears once per query however many sources the table has (control review of #502:
+// splicing it into every branch grew the query with the number of promoters). The classifier
+// below only refers to these column names.
+export function sourceColumns(promoters: readonly string[]): string {
+  const url = "coalesce(toString(properties.$current_url), '')"
+  const ref = `lower(extractURLParameter(${url}, 'ref'))`
+  const slugs = promoters.filter((slug) => SLUG.test(slug)).map((slug) => `'${slug}'`)
+  return [
+    `${url} AS src_url`,
+    "lower(coalesce(toString(properties.utm_source), '')) AS src_utm",
+    "lower(coalesce(toString(properties.utm_medium), '')) AS src_medium",
+    "lower(coalesce(toString(properties.$referring_domain), '')) AS src_domain",
+    `${ref} AS src_ref`,
+    `${slugs.length ? `${ref} IN (${slugs.join(', ')})` : 'false'} AS src_promoter`,
+  ].join(', ')
+}
+
+const SRC = 'src_utm'
+const MEDIUM = 'src_medium'
+const DOMAIN = 'src_domain'
+const param = (name: string) => `notEmpty(extractURLParameter(src_url, '${name}'))`
 
 function adBranches(): string[] {
   const paid = `match(${MEDIUM}, '${PAID_MEDIUM}')`
@@ -43,23 +58,20 @@ function adBranches(): string[] {
   })
 }
 
-// The source key of one event, from its own properties. Order: a real promoter link (visitors
+// The source key of one event, over sourceColumns(). Order: a real promoter link (visitors
 // only), a paid click, utm_source, a recognisable ?ref= value (producthunt, chatgpt…), the
 // referrer host; an unrecognised utm or ?ref= is 其他网站; nothing at all is 直接访问.
 export function sourceKey(mode: KeyMode): string {
-  const slugs = mode.promoters.filter((slug) => SLUG.test(slug)).map((slug) => `'${slug}'`)
-  const raw = `lower(extractURLParameter(${PAGE_URL}, 'ref'))`
-  const isPromoter = slugs.length ? `${raw} IN (${slugs.join(', ')})` : 'false'
   // A promoter slug is not a tag: without the database binding it says nothing about the source.
-  const ref = `if(${isPromoter}, '', ${raw})`
+  const ref = "if(src_promoter, '', src_ref)"
   const tagged = SOURCE_TABLE.filter((def) => def.tags?.length)
   const hosted = SOURCE_TABLE.filter((def) => def.hosts?.length)
   const branches = [
-    `${mode.creditPromoters ? isPromoter : 'false'}, 'affiliate'`,
+    `${mode.creditPromoters ? 'src_promoter' : 'false'}, 'affiliate'`,
     ...adBranches(),
-    ...tagged.map((def) => `match(${SRC}, ${tagPattern(def.tags!)}), '${def.key}'`),
+    ...tagged.map((def) => `match(${SRC}, ${tagPattern(def.tags!, def.bare)}), '${def.key}'`),
     `${SRC} != '', 'other'`,
-    ...tagged.map((def) => `match(${ref}, ${tagPattern(def.tags!)}), '${def.key}'`),
+    ...tagged.map((def) => `match(${ref}, ${tagPattern(def.tags!, def.bare)}), '${def.key}'`),
     ...hosted.map((def) => `match(${DOMAIN}, ${hostPattern(def)}), '${def.key}'`),
     `${ref} != '', 'other'`,
     `${DOMAIN} IN ('', '$direct') OR match(${DOMAIN}, ${RETURNS}), 'direct'`,
@@ -80,9 +92,12 @@ export function visitorsBySourceQuery(window: Window, adminIds: readonly string[
     query: `
 SELECT source, count() AS visitors
 FROM (
-  SELECT person_id, argMin(${sourceKey({ promoters, creditPromoters: true })}, timestamp) AS source
-  FROM events
-  WHERE event = '$pageview' AND ${publicEvent} AND ${currentPeriod(window)} AND ${notBot} AND ${internal}
+  SELECT person_id, argMin(${sourceKey({ creditPromoters: true })}, timestamp) AS source
+  FROM (
+    SELECT person_id, timestamp, ${sourceColumns(promoters)}
+    FROM events
+    WHERE event = '$pageview' AND ${publicEvent} AND ${currentPeriod(window)} AND ${notBot} AND ${internal}
+  )
   GROUP BY person_id
 )
 GROUP BY source LIMIT 200`,
@@ -102,11 +117,15 @@ export function firstTouchQuery(window: Window, userIds: readonly string[], prom
     query: `
 SELECT user_id, source
 FROM (
-  SELECT person_id, argMinIf(${sourceKey({ promoters, creditPromoters: false })}, timestamp, event = '$pageview' AND ${publicEvent}) AS source,
-    groupUniqArrayIf(distinct_id, ${inIds('distinct_id', userIds)}) AS users
-  FROM events
-  WHERE timestamp >= ${since} AND timestamp < ${until}
-    AND person_id IN (SELECT person_id FROM events WHERE ${inIds('distinct_id', userIds)} AND timestamp >= ${since} AND timestamp < ${until})
+  SELECT person_id, argMinIf(${sourceKey({ creditPromoters: false })}, timestamp, is_view) AS source,
+    groupUniqArrayIf(distinct_id, is_user) AS users
+  FROM (
+    SELECT person_id, distinct_id, timestamp, event = '$pageview' AND ${publicEvent} AS is_view,
+      ${inIds('distinct_id', userIds)} AS is_user, ${sourceColumns(promoters)}
+    FROM events
+    WHERE timestamp >= ${since} AND timestamp < ${until}
+      AND person_id IN (SELECT person_id FROM events WHERE ${inIds('distinct_id', userIds)} AND timestamp >= ${since} AND timestamp < ${until})
+  )
   GROUP BY person_id
 )
 ARRAY JOIN users AS user_id

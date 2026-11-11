@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { WEEK } from '../analytics/test-samples'
 import { AD_SOURCES, ALL_SOURCE_KEYS, hostPattern, SOURCE_TABLE, tagPattern } from './source-table'
-import { firstTouchQuery, shapeFirstTouch, shapeVisitors, sourceKey, visitorsBySourceQuery } from './sources'
+import { firstTouchQuery, shapeFirstTouch, shapeVisitors, sourceColumns, sourceKey, visitorsBySourceQuery } from './sources'
 
 const ADMIN = '11111111-1111-4111-8111-111111111111'
 const USER = '22222222-2222-4222-8222-222222222222'
@@ -12,7 +12,7 @@ const PROMOTER = 'sv-5ab21218499743d58270'
 // the way the generated multiIf does, and take the first match.
 const re = (literal: string) => new RegExp(literal.slice(1, -1))
 const byHost = (host: string) => SOURCE_TABLE.find((def) => def.hosts?.length && re(hostPattern(def)).test(host))?.key ?? null
-const byTag = (tag: string) => SOURCE_TABLE.find((def) => def.tags?.length && re(tagPattern(def.tags)).test(tag))?.key ?? null
+const byTag = (tag: string) => SOURCE_TABLE.find((def) => def.tags?.length && re(tagPattern(def.tags, def.bare)).test(tag))?.key ?? null
 
 describe('referrer host → source', () => {
   it.each([
@@ -48,6 +48,15 @@ describe('referrer host → source', () => {
     ['weixin110.qq.com', 'social:wechat'],
     ['www.producthunt.com', 'social:producthunt'],
     ['news.ycombinator.com', 'social:other'],
+    ['m.bing.com', 'search:bing'],
+    ['m.search.naver.com', 'search:naver'],
+    ['m.sm.cn', 'search:other'],
+    ['r.search.yahoo.com', 'search:yahoo'],
+    ['yahoo.co.jp', 'search:yahoo'],
+    ['www.yahoo.co.jp', 'search:yahoo'],
+    ['www.threads.com', 'social:other'],
+    ['x.ai', 'ai:grok'],
+    ['meta.ai', 'ai:other'],
     ['notreddit.com', null],
     ['vercel.com', null],
   ])('%s → %s', (host, key) => {
@@ -65,6 +74,10 @@ describe('utm_source / ?ref= value → source (whole word, optional domain endin
     ['x.com', 'social:x'],
     ['producthunt', 'social:producthunt'],
     ['xhs', 'social:xiaohongshu'],
+    ['x.ai', 'ai:grok'],
+    ['meta', 'ai:other'],
+    ['meta.ai', 'ai:other'],
+    ['twitter.com', 'social:x'],
     ['xavier', null],
     ['fbnewsletter', null],
     ['igloo', null],
@@ -86,17 +99,29 @@ describe('the table', () => {
 
 describe('promoter links and paid clicks', () => {
   it('credits a real promoter slug to 推广员 for visitors only', () => {
-    expect(sourceKey({ promoters: [PROMOTER], creditPromoters: true })).toMatch(new RegExp(`^multiIf\\(\\s+lower\\(extractURLParameter\\(.*'ref'\\)\\) IN \\('${PROMOTER}'\\), 'affiliate'`))
-    expect(sourceKey({ promoters: [PROMOTER], creditPromoters: false })).toMatch(/^multiIf\(\s+false, 'affiliate'/)
-    expect(sourceKey({ promoters: [], creditPromoters: true })).toMatch(/^multiIf\(\s+false, 'affiliate'/)
+    expect(sourceColumns([PROMOTER])).toContain(`IN ('${PROMOTER}') AS src_promoter`)
+    expect(sourceKey({ creditPromoters: true })).toMatch(/^multiIf\(\s+src_promoter, 'affiliate'/)
+    expect(sourceKey({ creditPromoters: false })).toMatch(/^multiIf\(\s+false, 'affiliate'/)
+    expect(sourceColumns([])).toContain('false AS src_promoter')
   })
 
   it('never puts anything but a slug into the query', () => {
-    expect(sourceKey({ promoters: ["x') OR 1=1 --"], creditPromoters: true })).not.toContain('OR 1=1')
+    expect(sourceColumns(["x') OR 1=1 --"])).not.toContain('OR 1=1')
+  })
+
+  it('lists the promoter slugs once per query, so the query stays small with many promoters', () => {
+    const slugs = Array.from({ length: 1000 }, (_, i) => `sv-${String(i).padStart(20, '0')}`)
+    const visitors = visitorsBySourceQuery(WEEK, [ADMIN], slugs).query
+    const firstTouch = firstTouchQuery(WEEK, [USER], slugs).query
+    expect(visitors.split(slugs[0]!).length - 1).toBe(1)
+    expect(firstTouch.split(slugs[0]!).length - 1).toBe(1)
+    // ~27 KB of slugs plus the classifier, far under PostHog's query size limit.
+    expect(visitors.length).toBeLessThan(80_000)
+    expect(firstTouch.length).toBeLessThan(80_000)
   })
 
   it('splits paid clicks by network before utm_source and the referrer', () => {
-    const expr = sourceKey({ promoters: [], creditPromoters: true })
+    const expr = sourceKey({ creditPromoters: true })
     for (const id of ['gclid', 'gbraid', 'wbraid']) expect(expr).toMatch(new RegExp(`'${id}'\\).*'ads:google'`))
     expect(expr).toMatch(/'msclkid'\).*'ads:microsoft'/)
     expect(expr).toMatch(/'ttclid'\).*'ads:tiktok'/)
@@ -104,10 +129,10 @@ describe('promoter links and paid clicks', () => {
   })
 
   it('checks utm_source, then ?ref= values, then the referrer, then falls back', () => {
-    const expr = sourceKey({ promoters: [PROMOTER], creditPromoters: true })
-    const utm = expr.indexOf('match(lower(coalesce(toString(properties.utm_source)')
-    const ref = expr.indexOf('match(if(lower(extractURLParameter')
-    const host = expr.indexOf('match(lower(coalesce(toString(properties.$referring_domain)')
+    const expr = sourceKey({ creditPromoters: true })
+    const utm = expr.indexOf('match(src_utm,')
+    const ref = expr.indexOf("match(if(src_promoter, '', src_ref),")
+    const host = expr.indexOf('match(src_domain,')
     expect(utm).toBeGreaterThan(0)
     expect(utm).toBeLessThan(ref)
     expect(ref).toBeLessThan(host)
