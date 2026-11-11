@@ -33,5 +33,7 @@ export function WorkLink({ workId, mode = 'detail', href, onClick, ...props }: P
     hover.current = window.setTimeout(warm, HOVER_INTENT_MS)
   }
   const pass = () => window.clearTimeout(hover.current)
-  return <Link href={href ?? workPath(workId)} prefetch={false} onClick={open} onPointerEnter={rest} onPointerLeave={pass} onPointerDown={warm} onFocus={warm} {...props} />
+  // The work's own card (not its Make again link) is where closing the viewer puts focus back.
+  const card = mode === 'detail' ? { 'data-work-card': workId } : {}
+  return <Link href={href ?? workPath(workId)} prefetch={false} {...card} onClick={open} onPointerEnter={rest} onPointerLeave={pass} onPointerDown={warm} onFocus={warm} {...props} />
 }

@@ -38,6 +38,7 @@ function ViewerOn({ viewer }: { viewer: Viewer }) {
       open={viewer.id !== null}
       onClose={viewer.close}
       title={pane.item?.templateName ?? ''}
+      workId={id}
       phoneBar={<PhoneBar detail={detail} steps={steps} onBack={back} />}
       onKeyDown={(event) => detail && stepOnArrow(event, steps)}
     >
