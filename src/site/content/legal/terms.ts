@@ -20,7 +20,8 @@ const sections: readonly [LegalSection, ...LegalSection[]] = [
     plain: true,
     blocks: [
       ['This site uses the MiSans font, © Xiaomi. ', { href: '/fonts/misans/LICENSE.pdf', label: 'Read the MiSans font licence' }, '.'],
-      // Self-hosted Latin fonts (src/app/fonts/OFL-*.txt), all under the SIL Open Font License 1.1.
+      // Self-hosted Latin fonts, all under the SIL Open Font License 1.1 (the licence texts ship next to
+      // the files: src/app/fonts/OFL-Geist.txt, public/fonts/instrument-serif/OFL.txt).
       [
         'Geist and Geist Mono: Copyright 2024 The Geist Project Authors (',
         { href: 'https://github.com/vercel/geist-font', label: 'github.com/vercel/geist-font' },
