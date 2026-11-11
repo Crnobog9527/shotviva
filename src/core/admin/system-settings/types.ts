@@ -7,3 +7,6 @@ export type WishlistSwitch = {
 }
 
 export type WishlistSwitchInput = { enabled: boolean }
+
+// The boolean runtime switches the admin shows as on/off cards.
+export type SwitchKey = 'wishlist_enabled' | 'gallery_enabled' | 'gallery_auto_approve'

@@ -110,6 +110,8 @@ export type SiteConfig = {
     channels: { primary: PaymentChannel; fallback: PaymentChannel | null }
   }
   partners: { graylum: PartnerSiteConfig }
+  // Whether the site has a public gallery at all (ARCHITECTURE §9 第 1 条); one that has it is
+  // still closed until an admin opens it. Read through core/gallery isGalleryEnabled, never directly.
   gallery: { enabled: boolean }
   // Whether the site has a feature at all (ARCHITECTURE §15.6); a feature that has it may still
   // be switched off at runtime. Read through each feature's own helper (e.g. core/wishlist

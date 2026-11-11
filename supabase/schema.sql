@@ -7018,7 +7018,7 @@ ALTER FUNCTION "public"."admin_set_provider_key"("p_id" "uuid", "p_key" "text") 
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_set_system_setting"("p_key" "text", "p_value" "jsonb", "p_actor" "uuid") RETURNS "void"
-    LANGUAGE "plpgsql"
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $_$
 begin
@@ -7026,14 +7026,15 @@ begin
     raise exception 'INVALID_INPUT' using detail = 'actor is required';
   end if;
   if not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin'
-      and (p_key not in ('code_gift_policy','code_inviter_window_days') or p.banned_at is null)) then
+      and (p_key not in ('code_gift_policy','code_inviter_window_days','gallery_enabled','gallery_auto_approve')
+           or p.banned_at is null)) then
     raise exception 'NOT_ADMIN';
   end if;
 
   case p_key
-    when 'wishlist_enabled' then
+    when 'wishlist_enabled', 'gallery_enabled', 'gallery_auto_approve' then
       if p_value is null or jsonb_typeof(p_value) <> 'boolean' then
-        raise exception 'INVALID_INPUT' using detail = 'wishlist_enabled must be a boolean';
+        raise exception 'INVALID_INPUT' using detail = p_key || ' must be a boolean';
       end if;
     when 'admin_test_daily_budget_usd' then
       if p_value is null or jsonb_typeof(p_value) <> 'number'
@@ -7064,6 +7065,11 @@ begin
     set value = excluded.value,
         updated_at = excluded.updated_at,
         updated_by = excluded.updated_by;
+
+  if p_key in ('gallery_enabled', 'gallery_auto_approve') then
+    insert into public.admin_audit_log (action, user_id, reason, target_id)
+    values ('gallery_setting', p_actor, p_value::text, p_key);
+  end if;
 end;
 $_$;
 
@@ -11967,7 +11973,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "target_id" "text",
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text"]))),
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text"]))),
     CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
     CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );
