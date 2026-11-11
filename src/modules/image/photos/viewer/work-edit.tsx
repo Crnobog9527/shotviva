@@ -57,7 +57,7 @@ export function WorkEdit({ view, onBack, onDone }: Props) {
       </Stage>
     )
   }
-  return <EditFormPane source={source} edit={view.edit} draft={draft} onDraft={(next) => setDraft((current) => ({ ...current, ...next }))} onGenerate={generate} onBack={onBack} />
+  return <EditFormPane source={source} photo={view.item.thumbUrl ?? source.fileUrl} edit={view.edit} draft={draft} onDraft={(next) => setDraft((current) => ({ ...current, ...next }))} onGenerate={generate} onBack={onBack} />
 }
 
 // Developing and failed use the photo page's own two-column stage, scrolling inside the viewer.
@@ -65,15 +65,16 @@ function Stage({ children }: { children: ReactNode }) {
   return <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[calc(var(--sab)+24px)] md:pt-12 md:pb-6">{children}</div>
 }
 
-type FormProps = { source: EditSource; edit: Edit; draft: EditDraft; onDraft(next: Partial<EditDraft>): void; onGenerate(draft: EditDraft): void; onBack(): void }
+// photo: what the tray shows, the work's small copy (the full file is not needed to say which).
+type FormProps = { source: EditSource; photo: string; edit: Edit; draft: EditDraft; onDraft(next: Partial<EditDraft>): void; onGenerate(draft: EditDraft): void; onBack(): void }
 
-function EditFormPane({ source, edit, draft, onDraft, onGenerate, onBack }: FormProps) {
+function EditFormPane({ source, photo, edit, draft, onDraft, onGenerate, onBack }: FormProps) {
   const t = useTranslations('app.edit')
   const { meta, form, bar } = useEditForm({ source, balance: edit.balance, creditsCost: edit.creditsCost, imageOptions: edit.imageOptions, draft, onDraft, onGenerate })
   return (
     <div className={VIEWER_GRID}>
       <div className="flex-none px-4 md:flex md:min-h-0 md:flex-col md:justify-center md:gap-4 md:overflow-y-auto md:bg-card md:p-6 md:shadow-[inset_-1px_0_0_var(--border)]">
-        <EditPhoto src={source.fileUrl} className="h-[120px] md:mx-auto md:aspect-[4/5] md:h-auto md:max-h-[560px] md:w-full md:max-w-[448px]" />
+        <EditPhoto src={photo} className="h-[120px] md:mx-auto md:aspect-[4/5] md:h-auto md:max-h-[560px] md:w-full md:max-w-[448px]" />
         <p className="hidden text-center text-caption text-bone-dim md:block">{t('hint')}</p>
       </div>
       <section aria-labelledby="viewer-edit-h" className="flex flex-col px-4 pt-4 md:min-h-0 md:px-6 md:pt-3 md:pb-6">

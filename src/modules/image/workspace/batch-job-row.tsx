@@ -4,6 +4,7 @@
 import { useFormatter, useTranslations } from 'next-intl'
 import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
 import { Link } from '@/core/i18n/ui'
+import { thumbUrlFor } from '@/core/jobs/job-view'
 
 import { PaywallButton } from '@/core/billing/paywall'
 import { cn } from '@/core/ui/cn'
@@ -46,10 +47,11 @@ export function BatchJobRow({ job, index, now, onRetry }: { job: TrackedJob; ind
 }
 
 function Thumb({ job }: { job: TrackedJob }) {
-  const src = job.status === 'succeeded' ? (job.fileUrl ?? job.previewUrl) : job.previewUrl
+  // A saved photo shows its small copy (ARCHITECTURE §8.3「作品小图」), never the full file.
+  const src = job.status === 'succeeded' && job.fileUrl ? thumbUrlFor(job.id) : job.previewUrl
   return (
     <span className="relative block h-[50px] w-10 overflow-hidden rounded-[8px] bg-photo-ground">
-      {src ? <img src={src} alt="" loading="lazy" decoding="async" className={cn(REPLAY_BLOCK_CLASS, 'absolute inset-0 size-full object-cover', job.status === 'failed' && 'opacity-60')} /> : null}
+      {src ? <img src={src} alt="" width={40} height={50} loading="lazy" decoding="async" className={cn(REPLAY_BLOCK_CLASS, 'absolute inset-0 size-full object-cover', job.status === 'failed' && 'opacity-60')} /> : null}
     </span>
   )
 }

@@ -28,6 +28,7 @@ const fromTracked = (job: TrackedJob, cover: string | null): RunningRow => ({
   creditPool: job.creditPool ?? 'free',
   visibility: 'public',
   fileUrl: null,
+  thumbUrl: null,
   previewUrl: job.previewUrl,
   startedAt: job.startedAt,
   queued: job.status === 'queued',

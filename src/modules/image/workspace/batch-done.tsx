@@ -4,6 +4,7 @@
 import { useTranslations } from 'next-intl'
 import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
 import { Link } from '@/core/i18n/ui'
+import { thumbUrlFor } from '@/core/jobs/job-view'
 
 import { ActionBar } from '@/core/app-shell'
 import { buttonVariants } from '@/core/ui/button'
@@ -73,7 +74,7 @@ function DoneTile({ job, index }: { job: TrackedJob; index: number }) {
   if (job.status === 'succeeded' && job.fileUrl) {
     return (
       <Link href={`/photos/${job.id}`} aria-label={t('photoN', { index })} className={`press ${frame}`}>
-        <img src={job.fileUrl} alt="" loading="lazy" decoding="async" className={`${REPLAY_BLOCK_CLASS} absolute inset-0 size-full object-cover`} />
+        <img src={thumbUrlFor(job.id)} alt="" width={480} height={600} loading="lazy" decoding="async" className={`${REPLAY_BLOCK_CLASS} absolute inset-0 size-full object-cover`} />
       </Link>
     )
   }
