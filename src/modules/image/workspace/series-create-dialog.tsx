@@ -16,6 +16,7 @@ import { CreateSheet } from './create-sheet'
 import { FormAction } from './form-action'
 import { MemberPicker } from './member-picker'
 import { memberSwitch } from './member-switch'
+import { useSubmitOnce } from './use-submit-once'
 import { useWarmRoute } from './use-warm-route'
 import { useWorkspaceDraft } from './use-workspace-draft'
 import { WorkspaceForm } from './workspace-form'
@@ -55,7 +56,10 @@ function SeriesBody({ series, open, onClose, ...context }: BodyProps) {
   const workspace = `/generate/${template.id}`
   // Generate moves to the chosen member's workspace page, kept prefetched while the dialog is open.
   useWarmRoute(workspace, open)
+  const submitOnce = useSubmitOnce(open)
   const generate = () => {
+    // The dialog stays on screen while it closes: a second press must not queue a second photo.
+    if (!submitOnce()) return
     void draft.start()
     onClose()
     router.push(workspace, { transitionTypes: navTypesFor(workspace) })
