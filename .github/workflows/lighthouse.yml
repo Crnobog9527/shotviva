@@ -2,7 +2,7 @@ name: Lighthouse
 
 # Performance pass, B8 (2026-11-07): mobile Lighthouse (the default Moto G Power profile, slow
 # 4G, 4x CPU) on the marketing pages of a production build, median of 3 runs. Fails when the
-# performance score drops under 0.85 or CLS goes over 0.1; warns on LCP > 2.5 s and TBT > 200 ms
+# performance score drops under 0.90 or CLS goes over 0.1; warns on LCP > 2.5 s and TBT > 200 ms
 # (lighthouserc.json). The build has no database, so template sections are empty: the numbers
 # track regressions in our code, not production, which the control session measures separately.
 # The pages are measured through scripts/ci/lighthouse-server.mjs (HTTP/2 + brotli in front of
