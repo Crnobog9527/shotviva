@@ -53,4 +53,10 @@ describe('admin nav', () => {
     expect(isCurrent('/admin/usersx', '/admin/users')).toBe(false)
     expect(currentItem('/admin/jobs', adminNavItems({ wishlist: false }))?.key).toBe('jobs')
   })
+
+  it('shows 创作库审核 with its pending count only on a site with a gallery (T108)', () => {
+    expect(adminNavItems({ wishlist: false }).some((item) => item.key === 'gallery')).toBe(false)
+    const items = adminNavItems({ wishlist: false, gallery: true }, { gallery: 4 })
+    expect(items.find((item) => item.key === 'gallery')).toMatchObject({ href: '/admin/gallery', label: '创作库审核', count: 4 })
+  })
 })

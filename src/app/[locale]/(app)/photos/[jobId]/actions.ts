@@ -1,10 +1,11 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
 import { redirect } from 'next/navigation'
 
 import { createAdminSupabase, requireApiUser } from '@/core/auth'
 import { toAppError } from '@/core/errors'
+import { GALLERY_CACHE_TAG } from '@/core/gallery/cache'
 import { localized } from '@/core/i18n/server'
 import { deleteOwnWork } from '@/core/jobs'
 import { logger } from '@/core/logger'
@@ -26,7 +27,9 @@ export async function deleteWorkAction(jobId: string): Promise<{ failed: 'runnin
       return { failed: 'error' }
     }
   }
-  // Photos and this page read per request; drop the client router's copies of both.
+  // Photos and this page read per request; drop the client router's copies of both. A deleted
+  // public work leaves the gallery's cached pages at once (ARCHITECTURE §9 第 6 条, T108).
+  updateTag(GALLERY_CACHE_TAG)
   revalidatePath('/[locale]/photos', 'layout')
   redirect(await localized('/photos?deleted=1'))
 }

@@ -19,6 +19,14 @@ export function AgainNote({ again, template, photoRatio }: { again: AgainStart; 
   if (aspect) parts.push(sizeLabel(aspect, t))
   if (resolution) parts.push(tierName(resolution, t))
   if (values.note.trim()) parts.push(t('workspace.again.noteKept'))
+  if (again.from === 'gallery') {
+    return (
+      <p className="hairline mt-4 rounded-inner bg-wash px-3 py-2.5 text-caption leading-[1.4] text-muted-foreground">
+        {t.rich('workspace.again.reuseNote', { b: (chunks) => <b className="font-medium text-foreground">{chunks}</b>, summary: parts.join(' · ') })}
+        {adjusted ? <span className="block">{t('workspace.again.optionsChanged')}</span> : null}
+      </p>
+    )
+  }
   return (
     <p className="hairline mt-4 rounded-inner bg-wash px-3 py-2.5 text-caption leading-[1.4] text-muted-foreground">
       {t.rich('workspace.again.note', {

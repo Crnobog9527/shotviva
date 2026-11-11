@@ -49,6 +49,9 @@ export const TEMPLATE_TOGGLE_SURFACES = ['workspace', 'create_dialog', 'home'] a
 // T90: the new-version banner, shown by a version check or by a stale-build failure.
 export const APP_UPDATE_ACTIONS = ['shown', 'refreshed', 'dismissed'] as const
 export const APP_UPDATE_REASONS = ['version', 'error'] as const
+// T108 (ARCHITECTURE §16.2): where 「一键复用」 was clicked, and why a work was reported.
+export const GALLERY_REUSE_SURFACES = ['work', 'gallery'] as const
+export const WORK_REPORT_REASONS = ['sexual', 'violence', 'hate', 'minor', 'privacy', 'ip', 'spam', 'other'] as const
 export const UPLOAD_ERROR_REASONS = ['too_large', 'unsupported', 'ticket_failed', 'transfer_failed', 'unknown'] as const
 
 const campaignCode = z.string().regex(/^[A-Z0-9]{4,20}$/)
@@ -96,6 +99,11 @@ export const eventSchemas = {
   // A request refused before charging (ARCHITECTURE §5.1a, T81): which entry, never the words.
   generate_refused: z.strictObject({ reason: z.enum(['identity_swap']), source: z.enum(IDENTITY_SOURCES) }),
   paywall_view: z.strictObject({ trigger: z.enum(PAYWALL_TRIGGERS) }),
+  // T108: the public gallery. Never a work id, never a user's text.
+  gallery_view: z.strictObject({ page: z.int().min(1).max(20) }),
+  gallery_work_view: z.strictObject({ template_id: slug, category: slug }),
+  gallery_reuse: z.strictObject({ template_id: slug, surface: z.enum(GALLERY_REUSE_SURFACES) }),
+  work_report: z.strictObject({ reason: z.enum(WORK_REPORT_REASONS) }),
   // The pricing page's "For business" Contact us (DESIGN §6.9 item 8, T37).
   contact_sales_click: z.strictObject({ page: z.enum(CONTACT_SALES_PAGES) }),
   // T86: the business inquiry form was stored. The volume band and uses only, never a contact.
@@ -140,7 +148,7 @@ export type EventName = keyof typeof eventSchemas
 export type EventProps<E extends EventName> = z.infer<(typeof eventSchemas)[E]>
 
 // §16.2: money and credit events go out from the server so ad blockers cannot drop them.
-export const SERVER_EVENTS = ['code_redeem', 'invite_reward', 'signup', 'generate', 'generate_refused', 'checkout_start', 'checkout_cancel', 'purchase'] as const
+export const SERVER_EVENTS = ['code_redeem', 'invite_reward', 'signup', 'generate', 'generate_refused', 'checkout_start', 'checkout_cancel', 'purchase', 'work_report'] as const
 export const BROWSER_EVENTS = [
   'invite_share',
   'upload',
@@ -153,6 +161,9 @@ export const BROWSER_EVENTS = [
   'contact_sales_click',
   'app_update_prompt',
   'business_inquiry_submit',
+  'gallery_view',
+  'gallery_work_view',
+  'gallery_reuse',
 ] as const
 export type ServerEventName = (typeof SERVER_EVENTS)[number]
 export type BrowserEventName = (typeof BROWSER_EVENTS)[number]

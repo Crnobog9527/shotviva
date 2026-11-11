@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
 import { Suspense, type ReactNode } from 'react'
 
+import { isStaffAccount } from '@/core/analytics'
 import { AnalyticsIdentify } from '@/core/analytics/browser'
 import { AnnouncementBanner } from '@/core/announcements'
 import { AdminLink, adminEntryFor, AppFrame, BrandProvider, TabBar, TabBarSlot, type TabItem } from '@/core/app-shell'
@@ -40,7 +41,7 @@ export const prefetch = 'partial'
 // Same cached session lookup the page's requireUser() makes, so no extra auth round trip.
 async function Identity() {
   const user = await getSessionUser()
-  return user ? <AnalyticsIdentify userId={user.id} /> : null
+  return user ? <AnalyticsIdentify userId={user.id} staff={isStaffAccount(user, site.brand.domain)} /> : null
 }
 
 // The top bar's Admin item (spec #186), decided here on the server: built only for

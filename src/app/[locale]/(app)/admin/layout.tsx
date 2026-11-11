@@ -3,7 +3,9 @@ import { Suspense } from 'react'
 import { isAffiliateEnabled } from '@/core/affiliate/feature'
 import { AdminShell, adminNavItems, UserDialogHost } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
+import { pendingReviewCount } from '@/core/admin/gallery-review'
 import { serverEnv } from '@/core/env'
+import { siteHasGallery } from '@/core/gallery'
 import { newInquiryCount } from '@/core/inquiries'
 import { logger } from '@/core/logger'
 import { openTicketCount } from '@/core/support'
@@ -40,6 +42,17 @@ async function inquiryCount(): Promise<number> {
   }
 }
 
+// Public works waiting for a person beside 「创作库审核」 (T108), the same way.
+async function galleryCount(): Promise<number> {
+  if (!siteHasGallery(site)) return 0
+  try {
+    return await pendingReviewCount(createAdminSupabase())
+  } catch (error) {
+    logger.warn('admin.gallery.count.failed', { error })
+    return 0
+  }
+}
+
 // The user detail dialog (T77) opens over whichever admin page has ?user=<id>.
 const userDialogActions = {
   load: userDetailAction,
@@ -49,9 +62,12 @@ const userDialogActions = {
 
 export default async function AdminLayout({ children }: LayoutProps<'/[locale]/admin'>) {
   const admin = await requireAdmin()
-  const [tickets, inquiries, wishlist, affiliate] = await Promise.all([ticketCount(), inquiryCount(), isWishlistEnabled(site), isAffiliateEnabled()])
+  const [tickets, inquiries, gallery, wishlist, affiliate] = await Promise.all([
+    ticketCount(), inquiryCount(), galleryCount(), isWishlistEnabled(site), isAffiliateEnabled(),
+  ])
+  const flags = { wishlist, affiliate, gallery: siteHasGallery(site) }
   return (
-    <AdminShell items={adminNavItems({ wishlist, affiliate }, { tickets, inquiries })} email={admin.email}>
+    <AdminShell items={adminNavItems(flags, { tickets, inquiries, gallery })} email={admin.email}>
       {children}
       <Suspense fallback={null}>
         <UserDialogHost actions={userDialogActions} stripeLive={serverEnv().VERCEL_ENV === 'production'} />
