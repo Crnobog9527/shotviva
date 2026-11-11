@@ -14,7 +14,8 @@ begin atomic
     where (p_series_id is null and p_template_id is null and (m.standalone or p_include_members))
       or m.series_id=p_series_id or m.id=p_template_id
   )
-  select t.* from candidates c join public.templates t on t.id=c.id where admin.web_standard_sale_allowed(c.id);
+  -- The whole row, not t.*: a standard body would freeze t.* to today's columns.
+  select t from candidates c join public.templates t on t.id=c.id where admin.web_standard_sale_allowed(c.id);
 end;
 
 create or replace view public.web_catalogue_entries with (security_invoker=true) as
