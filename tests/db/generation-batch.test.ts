@@ -24,9 +24,10 @@ beforeAll(async () => {
 })
 afterAll(async () => { await sql.end() })
 
-async function setup(productId: 'max_monthly' | 'pro_monthly' | 'starter_monthly') {
+async function setup(productId: 'max_monthly' | 'pro_monthly' | 'starter_monthly', role?: 'admin' | 'banned_admin') {
   const userId = await createUser(sql)
   await applyPurchase(serviceClient(), { userId, productId, eventId: randomUUID() })
+  if (role) await sql.query(`update public.profiles set role='admin', banned_at=$2 where id=$1`, [userId, role === 'banned_admin' ? new Date() : null])
   const db = serviceSupabase()
   const r2 = createMemoryStore()
   const input_key = newInputKey(userId, 'image/jpeg')
@@ -42,6 +43,22 @@ describe('T107 preflight and independent jobs', () => {
     await expect(preflightBatch(db, userId, cells, deps.provider)).rejects.toMatchObject({ code: 'TIER_REQUIRED', requiredTier: 'max' })
     const req = toGenerationRequest(userId, { ...cells[0], batch_size: 2, batch_templates: 2 })
     await expect(runGeneration(deps, req)).rejects.toMatchObject({ code: 'TIER_REQUIRED', requiredTier: 'max' })
+  })
+
+  // effective_tier(): an unbanned admin gets Max limits on any plan and still pays credits.
+  it('runs a multi-template batch for an admin on Starter, charging paid credits', async () => {
+    const { db, deps, userId, cells } = await setup('starter_monthly', 'admin')
+    const before = await profileOf(sql, userId)
+    const quote = await preflightBatch(db, userId, cells, deps.provider)
+    const jobs = await Promise.all(cells.map((cell, index) => runGeneration(deps,
+      toGenerationRequest(userId, { ...cell, ...quote, ...quote.cells[index] }))))
+    expect(jobs.map(job => [job.status, job.credit_pool])).toEqual([['succeeded', 'paid'], ['succeeded', 'paid']])
+    expect((await profileOf(sql, userId)).credits).toBe(before.credits - jobs.reduce((sum, job) => sum + job.credits_cost, 0))
+  })
+
+  it('gives a banned admin on Pro no multi-template batch', async () => {
+    const { db, userId, cells, deps } = await setup('pro_monthly', 'banned_admin')
+    await expect(preflightBatch(db, userId, cells, deps.provider)).rejects.toMatchObject({ code: 'TIER_REQUIRED', requiredTier: 'max' })
   })
 
   it('rejects an unsold resolution for any selected template during preflight', async () => {
