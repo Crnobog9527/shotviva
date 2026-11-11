@@ -10,6 +10,7 @@ import { contentPagesIn } from './localized'
 import { aiRestaurantMenu } from './pages/ai-restaurant-menu'
 import { commercialPhotography } from './pages/commercial-photography'
 import { PLATFORM_SPECS } from './platform-specs'
+import { zhCommercialPhotography } from './zh/pages/commercial-photography'
 import { zhAiRestaurantMenu } from './zh/pages/ai-restaurant-menu'
 
 // Every picture a landing page shows: the hero pair, the shoot and the edit cases.
@@ -46,7 +47,6 @@ describe('landing pages', () => {
   // and every case picture is a real file of at most 150 KB, as small as the mainland needs.
   it('show their own case pictures, not the home tote, each a file of at most 150 KB', () => {
     for (const page of [...contentPagesIn('en'), ...contentPagesIn('zh')]) {
-      if (page.slug === 'ai-restaurant-menu') continue
       const images = caseImagesOf(page)
       expect(images.length).toBeGreaterThan(2)
       for (const image of images) expectCaseFile(image)
@@ -88,6 +88,29 @@ describe('landing pages', () => {
       const text = [...page.faq.map((item) => item.answer), ...page.facts.map((fact) => fact.value)].join(' ')
       expect(text).not.toMatch(/(allowed|approved|accepted) (on|by) (Amazon|Etsy|DoorDash|Uber Eats|Grubhub)/i)
       expect(text).toMatch(/check/i)
+    }
+  })
+})
+
+describe('the AI restaurant menu page', () => {
+  // Owner 2026-11-11: the menu page shows a real dish, never a picture marked as illustrative,
+  // and the poster in the shoot is the one in the page's language.
+  it('shows the menu dishes without an illustrative label, the poster in each language', () => {
+    for (const page of [aiRestaurantMenu, zhAiRestaurantMenu]) {
+      const text = [page.hero.caption, ...caseImagesOf(page).map((image) => image.alt)].join(' ')
+      expect(text).not.toMatch(/illustrative|示意/i)
+    }
+    expect(aiRestaurantMenu.landing.shoot?.results[2].image.src).toBe('/cases/menu-frog-poster-en.webp')
+    expect(zhAiRestaurantMenu.landing.shoot?.results[2].image.src).toBe('/cases/menu-frog-poster-zh.webp')
+  })
+})
+
+describe('the commercial photography page', () => {
+  it('shows three white-background cases, the cut-outs over a checkerboard, in both languages', () => {
+    for (const page of [commercialPhotography, zhCommercialPhotography]) {
+      const items = page.landing.edits?.items ?? []
+      expect(items.map((item) => item.after.src)).toEqual(['/cases/white-speaker-after.webp', '/cases/white-dress-after.webp', '/cases/white-hair-after.webp'])
+      expect(items.map((item) => Boolean(item.transparent))).toEqual([true, false, true])
     }
   })
 })

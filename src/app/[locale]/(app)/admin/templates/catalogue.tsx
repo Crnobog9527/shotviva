@@ -15,7 +15,7 @@ import { site } from '@/site/site.config'
 import { duplicateTemplateAction, listVersionsAction, manageVersionAction, readVersionAction } from './version-actions'
 import {
   applyCoverAction, bulkEditTemplatesAction, deleteTemplateCategoryAction, saveTemplateCategoryAction,
-  setFeaturedTemplatesAction, requestCoverUploadAction, saveTemplateAction, setTemplateActiveAction,
+  setFeaturedTemplatesAction, setTemplatesFeaturedAction, requestCoverUploadAction, saveTemplateAction, setTemplateActiveAction,
   setTemplateOrderAction, setTemplatesActiveAction,
 } from './actions'
 
@@ -63,6 +63,7 @@ export async function Catalogue({ data, edit }: { data: ReturnType<typeof loadCa
           editMany: bulkEditTemplatesAction,
           setOrder: setTemplateOrderAction,
           setFeatured: setFeaturedTemplatesAction,
+          setFeaturedMany: setTemplatesFeaturedAction,
           requestCoverUpload: requestCoverUploadAction,
           applyCover: applyCoverAction,
         }}
