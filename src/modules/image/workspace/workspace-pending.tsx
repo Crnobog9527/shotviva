@@ -2,13 +2,16 @@
 
 import { useParams, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { useEffect } from 'react'
 
 import { FlowNav } from '@/core/app-shell'
 
+import type { CatalogueTemplate } from '../catalogue/catalogue-template'
+import type { TrackedJob } from '../generation/job-model'
 import { useJobs, useWorkspaceJobs } from '../generation/use-jobs'
 import { GeneratingView } from './generating-view'
 import { isDeveloping, soleJob } from './pending-job'
-import { recallTemplate } from './pending-template'
+import { recallTemplate, showPendingHead } from './pending-template'
 import { WorkspaceHead } from './workspace-head'
 
 // What the workspace route shows while the server is still reading the template, the balance
@@ -22,25 +25,35 @@ import { WorkspaceHead } from './workspace-head'
 // photo it is the empty nav row it always was, and so it is for ?again= and ?reuse=: those open
 // the form, which only the server can fill.
 export function WorkspacePending() {
-  const { templateId } = useParams<{ templateId?: string }>()
   const t = useTranslations('app.workspace')
-  const search = useSearchParams()
-  const opensForm = search.has('again') || search.has('reuse')
-  const ids = useWorkspaceJobs(templateId ?? '')
-  const sole = soleJob(ids, useJobs())
-  const job = opensForm ? null : sole
+  const job = usePendingJob()
   // The head is the server's own when the click handed its template over (pending-template.ts):
   // then nothing moves when the server's page takes over.
   const template = job ? recallTemplate(job.templateId) : null
+  // The server's head takes this one's place without fading in again (workspace-head.tsx).
+  const headFor = job?.templateId
+  useEffect(() => (headFor ? showPendingHead(headFor) : undefined), [headFor])
   return (
     <>
       <FlowNav back={{ href: '/generate', label: t('back') }} title={job?.templateName ?? ''} />
-      {job ? (
-        <>
-          {template ? <WorkspaceHead template={template} /> : <NameHead name={job.templateName} />}
-          {isDeveloping(job) ? <GeneratingView job={job} /> : null}
-        </>
-      ) : null}
+      {job ? <PendingBody job={job} template={template} /> : null}
+    </>
+  )
+}
+
+// The workspace's one photo, from this tab's store; none when the address opens the form.
+function usePendingJob(): TrackedJob | null {
+  const { templateId } = useParams<{ templateId?: string }>()
+  const search = useSearchParams()
+  const sole = soleJob(useWorkspaceJobs(templateId ?? ''), useJobs())
+  return search.has('again') || search.has('reuse') ? null : sole
+}
+
+function PendingBody({ job, template }: { job: TrackedJob; template: CatalogueTemplate | null }) {
+  return (
+    <>
+      {template ? <WorkspaceHead template={template} /> : <NameHead name={job.templateName} />}
+      {isDeveloping(job) ? <GeneratingView job={job} /> : null}
     </>
   )
 }
