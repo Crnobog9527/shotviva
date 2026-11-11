@@ -21,6 +21,8 @@ export type PhotoItem = {
   fileUrl: string | null
   // The preflighted batch it came from (T107): Photos groups a batch and offers its ZIP.
   batchId: string | null
+  // Its cell in that batch, 0 first (inputs.batch_position); null outside a batch.
+  batchPosition: number | null
 }
 
 export type TemplateLookup = Map<string, { name: string; cover: string | null }>
@@ -44,7 +46,13 @@ export function toPhotoItem(job: Job, templates: TemplateLookup, fileUrl: string
     visibility: job.visibility,
     fileUrl,
     batchId: job.batchId ?? null,
+    batchPosition: batchPosition(job.inputs.batch_position),
   }
+}
+
+function batchPosition(value: unknown): number | null {
+  const position = typeof value === 'string' ? Number(value) : value
+  return typeof position === 'number' && Number.isInteger(position) && position >= 0 ? position : null
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000

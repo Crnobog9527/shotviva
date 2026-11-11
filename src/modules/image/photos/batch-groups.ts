@@ -21,8 +21,7 @@ export function groupByBatch(items: readonly PhotoItem[]): DoneEntry[] {
     }
     if (placed.has(item.batchId)) continue
     placed.add(item.batchId)
-    // Batch order is the order the jobs were made in: oldest first.
-    const ordered = [...members].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    const ordered = [...members].sort(batchOrder)
     entries.push({
       kind: 'batch',
       batchId: item.batchId,
@@ -32,4 +31,11 @@ export function groupByBatch(items: readonly PhotoItem[]): DoneEntry[] {
     })
   }
   return entries
+}
+
+// Batch order is the cell order the batch was planned in (batch_position); a row without one
+// (made before positions were stored) falls back to the order it was made in.
+function batchOrder(a: PhotoItem, b: PhotoItem): number {
+  if (a.batchPosition !== null && b.batchPosition !== null && a.batchPosition !== b.batchPosition) return a.batchPosition - b.batchPosition
+  return a.createdAt.localeCompare(b.createdAt)
 }

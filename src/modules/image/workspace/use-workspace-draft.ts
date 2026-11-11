@@ -47,7 +47,7 @@ export function useWorkspaceDraft({ template, balance, tier, concurrency, again 
   useAgainOpensForm(template.id, again?.jobId)
   const running = useRunningCount(concurrency.runningIds)
   const { summary } = photos
-  const run = useDraftStart(template, concurrency.limit, again)
+  const run = useDraftStart(template, concurrency.limit, again, photos.photos.map((photo) => photo.id).join(','))
   const needsRatio = summary.ready.some(({ photo }) => !chosenAspect(values.aspect, options, photo.originalRatio))
   const ready = (): CtaState => ctaState({
     balance,
@@ -70,9 +70,13 @@ export function useWorkspaceDraft({ template, balance, tier, concurrency, again 
 // Generate: one photo is queued at once, as it always was. Two or more go through the batch
 // preflight first (T107); resolves to its refusal (the caller opens the paywall or says why),
 // or null once the jobs are queued.
-function useDraftStart(template: CatalogueTemplate, limit: number, again: AgainStart | null) {
+// A refusal belongs to the photos it was about (photoKey, their ids): adding or removing a
+// photo clears it.
+function useDraftStart(template: CatalogueTemplate, limit: number, again: AgainStart | null, photoKey: string) {
   const [checking, setChecking] = useState(false)
-  const [error, setError] = useState<PreflightError | null>(null)
+  const [refusal, setRefusal] = useState<{ error: PreflightError; photoKey: string } | null>(null)
+  const error = refusal?.photoKey === photoKey ? refusal.error : null
+  const setError = (next: PreflightError | null) => setRefusal(next ? { error: next, photoKey } : null)
   const queue = (inputs: StartInput[]) => {
     setWorkspaceJobs(template.id, enqueueJobs(inputs, limit))
     // A reload now comes back to these jobs, not to Make again's form (and copies nothing again).
