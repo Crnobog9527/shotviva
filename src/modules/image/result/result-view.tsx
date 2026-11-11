@@ -40,6 +40,7 @@ type Props = {
 export function ResultView({ item, detail, shareText, edit, parent, parentDeleted = false, change, remove, viewer }: Props) {
   const t = useTranslations('app')
   const fileUrl = item.fileUrl as string
+  const again = viewer.again
   return (
     <section
       aria-label={t('photos.photoAlt', { name: item.templateName })}
@@ -60,7 +61,7 @@ export function ResultView({ item, detail, shareText, edit, parent, parentDelete
         <div className="mt-4 grid gap-2">
           <ShareButton fileUrl={fileUrl} name={`shotviva-${item.templateId}`} shareText={shareText} px={tierPx(item.resolution)} watermarked={item.creditPool === 'free'} />
           {/* Edit and Make again side by side (B comp photo.html .acts .two); alone, full width. */}
-          <QuietActions edit={edit} again={viewer.again} />
+          <QuietActions edit={edit} again={again} />
           {remove}
         </div>
         {viewer.batch}

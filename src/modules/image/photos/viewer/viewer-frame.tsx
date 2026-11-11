@@ -86,5 +86,8 @@ function CloseButton({ Close, className }: { Close: typeof DialogPrimitive.Close
 // phones one scroll surface, photo on top (inside the drawer only a scroller may pan, vaul sets
 // touch-action: none on the sheet); from md each column has its own height, the side scrolling.
 export const VIEWER_GRID = 'flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain md:grid md:grid-cols-[minmax(0,1fr)_360px] md:overflow-hidden lg:grid-cols-[minmax(0,1fr)_400px]'
-export const VIEWER_TRAY = 'relative flex-none px-4 md:flex md:min-h-0 md:items-center md:justify-center md:bg-card md:p-6 md:shadow-[inset_-1px_0_0_var(--border)]'
+// The photo fits whole in the tray at any ratio: DetailPhoto's page sizing (full width, sticky
+// column) is overridden from here so that component stays the page's.
+export const VIEWER_FIT = '[&_figure]:w-fit [&_figure]:max-w-full [&_figure>img]:w-auto [&_figure>img]:max-w-full [&_figure>img]:max-h-[62dvh] md:[&_figure>img]:max-h-[min(calc(100dvh-96px),832px)]'
+export const VIEWER_TRAY = `relative flex-none px-4 md:flex md:min-h-0 md:items-center md:justify-center md:bg-card md:p-6 md:shadow-[inset_-1px_0_0_var(--border)] ${VIEWER_FIT}`
 export const VIEWER_SIDE = 'px-4 pt-4 pb-[calc(var(--sab)+24px)] md:min-h-0 md:overflow-y-auto md:overscroll-contain md:px-6 md:pt-14 md:pb-6'
