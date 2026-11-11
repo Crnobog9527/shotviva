@@ -27,6 +27,7 @@
     "js:budget": "tsx scripts/js-budget.ts",
     "css:sources": "tsx scripts/public-css-sources.ts",
     "css:check": "tsx scripts/public-css-check.ts",
+    "images:first-frames": "tsx scripts/first-frames.ts",
     "eval:identity": "tsx --conditions=react-server scripts/identity-judge-eval.ts"
   },
   "dependencies": {

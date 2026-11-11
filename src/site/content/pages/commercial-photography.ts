@@ -3,7 +3,7 @@ import { defineContentPage, type ShootDemo } from '@/core/content'
 
 import { site } from '../../site.config'
 import { productBills } from '../home'
-import { caseImage, CATEGORY } from '../landing-shared'
+import { caseImage, CATEGORY, withFirstFrame } from '../landing-shared'
 import { pricingRelated } from '../shared'
 import { dayRateUsd, freeImagesLabel, FreeImagesShort, OUTPUT_TIERS, packshotUsd, plansSentence, SET_PHOTOS, styledShotUsd, tierList, usdRange } from '../offer'
 import { PLATFORM_SPECS, px } from '../platform-specs'
@@ -57,7 +57,7 @@ const copy = {
   subtitle: 'Listing shots, lifestyle scenes and promo posters from the product photo you already took.',
   answerBlock: `Commercial photography for a small brand usually means a studio day, a photographer and a retoucher. ${brand} does the same job from one phone photo: upload it, pick a template such as White Background or Lifestyle Table, and download a styled, retouched product shot in ${tierList}. New users get ${freeImagesLabel}.`,
   hero: {
-    before: sneakerPhone,
+    before: withFirstFrame(sneakerPhone),
     after: sneakerLifestyle,
     caption: 'Your phone photo → a lifestyle scene: the same sneaker on a sunlit café step',
     cta: { label: 'Upload photo', href: '/generate' },

@@ -8,7 +8,10 @@ import { useEffect } from 'react'
 
 import { captureError } from '@/core/analytics/browser'
 import { reportIfStaleBuild } from '@/core/app-update'
-import { PROBLEM_GHOST, PROBLEM_PRIMARY, ProblemView } from '@/core/content'
+// Straight from its file, not the '@/core/content' index: this boundary is a client component in
+// every route's bundle, and through the index it carried the marketing blocks (hero, template
+// grid, photo pairs: two chunks, about 55 KB raw) into every signed-in page.
+import { PROBLEM_GHOST, PROBLEM_PRIMARY, ProblemView } from '@/core/content/blocks/problem-view'
 import { Link } from '@/core/i18n/ui'
 import { site } from '@/site/site.config'
 
