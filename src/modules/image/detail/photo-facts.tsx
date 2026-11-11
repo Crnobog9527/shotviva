@@ -45,7 +45,7 @@ export function PhotoFacts({ item, original, keptWithWork, reference }: Props) {
       <Row label={f('template')}>{item.templateName}</Row>
       <Row label={f('size')}>{mono(sizeLabel(item.aspect, t))}</Row>
       <Row label={f('resolution')}>{f('resolutionValue', { tier: tierName(item.resolution, t), px: tierPx(item.resolution) })}</Row>
-      {item.fileUrl ? <FormatRow fileUrl={item.fileUrl} className={ROW} /> : null}
+      {item.fileUrl ? <FormatRow fileUrl={item.fileUrl} work={{ pool: item.creditPool, transparent: item.transparent }} className={ROW} /> : null}
       <Row label={f('credits')}>{mono(t('credits', { count: item.credits }))}</Row>
       <Row label={f('visibility')}>{f(VISIBILITY[workTagKey(item.creditPool, item.visibility)])}</Row>
       <Row label={f('original')}>{originalFact(original, keptWithWork, f)}</Row>

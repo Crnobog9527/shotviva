@@ -2,13 +2,15 @@
 
 import { useTranslations } from 'next-intl'
 
+import type { DownloadBackground } from '@/core/storage/rules/download-background'
 import { cn } from '@/core/ui/cn'
 
 export type PhotoViewId = 'result' | 'checker' | 'original'
 
 // "Result | Original", or "On white | Transparent | Original" for a cut-out (T6 photo.html,
 // T32): frosted 32px pills riding the photo's bottom-right corner, 44px hit area, the
-// selected one solid bone like any selected chip.
+// selected one solid bone like any selected chip. On a cut-out 白底 / 透明 are also the download
+// choice (ARCHITECTURE §8): what you see is the file you save. 原图 only shows the upload.
 export function viewsFor(transparent: boolean): PhotoViewId[] {
   return transparent ? ['result', 'checker', 'original'] : ['result', 'original']
 }
@@ -35,4 +37,16 @@ export function ViewChips({ views, value, transparent, onChange, className }: { 
       ))}
     </div>
   )
+}
+
+// The chip a cut-out's download choice lights up, unless the upload is on show.
+export function viewForBackground(background: DownloadBackground, original: boolean): PhotoViewId {
+  if (original) return 'original'
+  return background === 'transparent' ? 'checker' : 'result'
+}
+
+// The download choice a chip sets; 原图 sets none.
+export function backgroundForView(view: PhotoViewId): DownloadBackground | null {
+  if (view === 'original') return null
+  return view === 'checker' ? 'transparent' : 'white'
 }

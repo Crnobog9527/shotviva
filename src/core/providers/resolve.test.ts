@@ -38,6 +38,15 @@ describe('resolveProvider', () => {
     expect(configs).toEqual([{ baseUrl: 'https://relay.example.com/v1', model: 'gpt-image-2.6', apiKey: RELAY_KEY, resolutions: [...RESOLUTIONS] }])
   })
 
+  it('carries whether the adapter honours model_params.background (the cut-out record)', async () => {
+    const generate = vi.fn()
+    const env = parseServerEnv({})
+    const honours: ProviderAdapters = { openai_images: () => ({ id: 'openai-image', honoursBackground: true, generate }) }
+    const drops: ProviderAdapters = { openai_images: () => ({ id: 'relay', generate }) }
+    expect((await resolveProvider('image', row, env, honours, async () => RELAY_KEY)).honoursBackground).toBe(true)
+    expect((await resolveProvider('image', row, env, drops, async () => RELAY_KEY)).honoursBackground).toBeUndefined()
+  })
+
   it('falls back to OPENAI_* when no provider is active, without reading Vault', async () => {
     const { adapters, configs } = recordingAdapters()
     const readKey = vi.fn(async () => null)
