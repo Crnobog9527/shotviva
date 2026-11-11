@@ -8,6 +8,7 @@ import { readBlock, type Block } from '../analytics/load'
 import { PostHogQueryError, queryRunner } from '../analytics/posthog-query'
 import { windowFor, type Range, type Window } from '../analytics/range'
 import { loadPeople, type People, type PeopleInput } from './people'
+import { loadPromoterSlugs } from './promoters'
 import { loadSources, type SourceReads } from './sources'
 import { loadGrowthStats, type GrowthStats } from './stats'
 
@@ -62,7 +63,8 @@ async function cachedSources(range: Range, end: number, adminIds: string[], user
   const access = posthogAccess()
   if (!access) throw new PostHogQueryError('unauthorized')
   const window = windowFor(range, new Date(end))
-  return { window, data: await loadSources(queryRunner(access), window, adminIds, userIds) }
+  const promoters = await loadPromoterSlugs(createAdminSupabase())
+  return { window, data: await loadSources(queryRunner(access), window, { adminIds, userIds, promoters }) }
 }
 
 // The source table's PostHog reads, for the current period's sign-ups and buyers.

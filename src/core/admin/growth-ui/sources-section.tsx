@@ -15,7 +15,7 @@ const COLUMNS = ['visitors', 'signups', 'payers', 'net'] as const
 // all zero stay, so the Owner sees which channels bring nothing yet.
 export function SourcesSection({ db, state }: { db: GrowthPeriod; state: SourcesState }) {
   const rows = attribute(db, state.status === 'ok' ? state.data : null)
-  const note = state.status === 'loading' ? C.loading : state.status === 'ok' ? null : C.noPostHog
+  const note = state.status === 'loading' ? C.loading : state.status !== 'ok' ? C.noPostHog : state.data.truncated ? C.truncated : null
   return (
     <Section title={C.title} desc={C.desc}>
       {note ? <p className="text-sm text-muted-foreground">{note}</p> : null}

@@ -17,7 +17,7 @@ const window = { range: '7d' as const, start: PERIOD.since, end: PERIOD.until, p
 const ok: SourcesState = {
   status: 'ok',
   window,
-  data: { visitors: { search: 19, ai: 0, social: 1, affiliate: 1, ads: 0, direct: 163, other: 1 }, firstTouch: { [A]: 'search' } },
+  data: { visitors: { search: 19, ai: 0, social: 1, affiliate: 1, ads: 0, direct: 163, other: 1 }, firstTouch: { [A]: 'search' }, truncated: false },
 }
 const text = (state: SourcesState) =>
   renderToStaticMarkup(createElement(SourcesSection, { db, state })).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
@@ -45,6 +45,13 @@ describe('source table', () => {
     const offline = text({ status: 'unconfigured' })
     expect(offline).toContain('除了推广员，其他人都先算在「认不出来」里')
     expect(rowOf(offline, '认不出来')).toMatch(/认不出来 .* — 1 1 \$9\.90/)
+  })
+
+  it('warns when the first-touch read was cut off', () => {
+    const visitors = { search: 0, ai: 0, social: 0, affiliate: 0, ads: 0, direct: 0, other: 0 }
+    const cut: SourcesState = { status: 'ok', window, data: { visitors, firstTouch: {}, truncated: true } }
+    expect(text(cut)).toContain('PostHog 一次只返回了一部分人的来路')
+    expect(html).not.toContain('一次只返回了一部分')
   })
 
   it('says it is still reading while PostHog loads', () => {

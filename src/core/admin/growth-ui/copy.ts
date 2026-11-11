@@ -86,6 +86,7 @@ export const GROWTH_COPY = {
       unknown: { label: '认不出来', help: 'PostHog 没记到这个人的浏览（比如拦截了统计、或只在别的设备上逛过），不知道从哪来。' },
     } satisfies Record<string, Metric>,
     loading: '正在从 PostHog 读取来源…',
+    truncated: '这段时间注册和付款的人太多，PostHog 一次只返回了一部分人的来路，有些人可能被算进了「认不出来」。',
     noPostHog: 'PostHog 没有读到，除了推广员，其他人都先算在「认不出来」里。',
   },
   revenue: {

@@ -23,6 +23,7 @@ const reads: SourceReads = {
   visitors: { search: 19, ai: 2, social: 1, affiliate: 1, ads: 0, direct: 163, other: 1 },
   // C came through Google first, but the database says a promoter brought them.
   firstTouch: { [A]: 'search', [B]: 'direct', [C]: 'search' },
+  truncated: false,
 }
 const row = (rows: ReturnType<typeof attribute>, key: string) => rows.find((r) => r.key === key)
 
