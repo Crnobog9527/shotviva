@@ -1,4 +1,4 @@
-import { connection, type NextRequest } from 'next/server'
+import { after, connection, type NextRequest } from 'next/server'
 
 import { errorResponse } from '@/core/api-response'
 import { isGalleryEnabled } from '@/core/gallery'
@@ -7,9 +7,10 @@ import { r2Store } from '@/core/storage'
 import { site } from '@/site/site.config'
 
 // Public on purpose: the gallery's image of an approved public work (ARCHITECTURE §9 第 3、9 条),
-// scaled, watermarked for free works, WebP. 404 for anything else and while the gallery is
-// closed. The CDN keeps a copy for ten minutes at most, so a rejected or deleted work's image
-// stops within that time; this side checks the work on every miss.
+// scaled, watermarked for free works, WebP. Normally the copy made at approval; a work without
+// one is rendered once and its copies written after the response. 404 for anything else and
+// while the gallery is closed. The CDN keeps a copy for ten minutes at most, so a rejected or
+// deleted work's image stops within that time; this side checks the work on every miss.
 const CACHE = 'public, max-age=300, s-maxage=600'
 
 export async function GET(request: NextRequest, { params }: RouteContext<'/api/gallery/[jobId]/image'>) {
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest, { params }: RouteContext<'/api/g
     const width = parseImageQuery(request.nextUrl.searchParams)
     if (!width || !(await isGalleryEnabled(site))) return new Response(null, { status: 404 })
     const { jobId } = await params
-    const body = await renderGalleryImage(r2Store(), jobId, width)
+    const body = await renderGalleryImage({ store: r2Store(), defer: (task) => after(task) }, jobId, width)
     if (!body) return new Response(null, { status: 404, headers: { 'Cache-Control': 'public, max-age=60, s-maxage=60' } })
     return new Response(body as BodyInit, { headers: { 'Content-Type': 'image/webp', 'Cache-Control': CACHE, 'X-Robots-Tag': 'noindex' } })
   } catch (error) {
