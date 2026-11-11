@@ -4,7 +4,7 @@ import type { Block } from '../analytics/load'
 import type { Range } from '../analytics/range'
 import { overviewEnd, readGrowth, readPeople, type PeopleBlock } from '../growth/load'
 import type { GrowthStats } from '../growth/stats'
-import { GROWTH_COPY as COPY, POSTHOG_VERIFIED } from './copy'
+import { GROWTH_COPY as COPY } from './copy'
 import { FunnelSection } from './funnel-section'
 import { Headline } from './headline'
 import type { PeopleState } from './people-state'
@@ -49,7 +49,6 @@ function PeopleParts({ range, db, state }: { range: Range; db: GrowthStats; stat
       <div className="grid gap-1 text-sm text-muted-foreground">
         <p>{COPY.scope(db.admin_ids.length)}</p>
         <p>{status ?? COPY.freshness}</p>
-        {state.status === 'ok' && !POSTHOG_VERIFIED ? <p>{COPY.unverifiedNote}</p> : null}
       </div>
       <Headline range={range} db={db} people={state} />
       <FunnelSection db={db.periods.current} state={state} />

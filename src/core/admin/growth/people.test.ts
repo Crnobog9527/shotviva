@@ -18,6 +18,8 @@ describe('growth.people query', () => {
   it('counts crawlers and automation apart from visitors', () => {
     expect(query).toContain('countIf(is_view AND bot) AS bot_views')
     expect(query).toMatch(/googlebot\|bingbot\|gptbot/)
+    // An AI agent's browser (our own Claude sessions among them) is not a visitor.
+    expect(query).toContain("'headless|bot|crawler|^claude'")
   })
 
   it('asks each period only about the people who signed up in it', () => {

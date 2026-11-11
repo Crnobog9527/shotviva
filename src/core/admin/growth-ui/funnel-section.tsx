@@ -4,12 +4,10 @@ import { rate } from '../analytics/values'
 import { newUserSteps, type StepCount } from '../growth/funnel'
 import type { GrowthPeriod } from '../growth/stats'
 import { GROWTH_COPY as COPY } from './copy'
-import { missingText, peopleData, Unverified, type PeopleState } from './people-state'
+import { missingText, peopleData, type PeopleState } from './people-state'
 import { Section } from './section'
 
 type Props = { db: GrowthPeriod; state: PeopleState }
-
-const POSTHOG_STEPS = new Set(['upload', 'paywall', 'checkout'])
 
 // Visitors on top, then one row per step for the people who signed up in the period; each bar is
 // that step's share of sign-ups. Returning users get two numbers of their own underneath.
@@ -22,7 +20,6 @@ export function FunnelSection({ db, state }: Props) {
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-border pb-4">
         <MetricLabel id="growth-visitors" metric={COPY.funnel.visitors} className="text-sm text-muted-foreground" />
         <span className="text-2xl font-semibold tabular-nums">{people ? n(people.visitors) : '—'}</span>
-        {people ? <Unverified /> : null}
         {people ? <VisitorRate signups={db.signups} visitors={people.visitors} /> : <span className="text-sm text-muted-foreground">{missing}</span>}
       </div>
       <ol className="grid gap-3" aria-label={COPY.funnel.title}>
@@ -77,15 +74,6 @@ function lostSince(count: number | null, before: number | null): number {
   return count !== null && before !== null && before > count ? before - count : 0
 }
 
-function StepLabel({ step }: { step: StepCount }) {
-  return (
-    <span className="flex items-center gap-1.5">
-      <MetricLabel id={`growth-step-${step.key}`} metric={COPY.funnel.steps[step.key]} className="text-sm" />
-      {step.count !== null && POSTHOG_STEPS.has(step.key) ? <Unverified /> : null}
-    </span>
-  )
-}
-
 function StepRow({ step, before, signups, missing }: { step: StepCount; before: number | null; signups: number; missing: string }) {
   const share = step.count === null ? null : rate(step.count, signups)
   const lost = lostSince(step.count, before)
@@ -94,7 +82,7 @@ function StepRow({ step, before, signups, missing }: { step: StepCount; before: 
   return (
     <li className="grid gap-1.5">
       <div className="flex items-baseline justify-between gap-4">
-        <StepLabel step={step} />
+        <MetricLabel id={`growth-step-${step.key}`} metric={COPY.funnel.steps[step.key]} className="text-sm" />
         <span className="text-lg font-semibold tabular-nums">{step.count === null ? '—' : n(step.count)}</span>
       </div>
       {step.count === null ? (

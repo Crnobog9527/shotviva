@@ -31,16 +31,14 @@ describe('overview panel', () => {
     expect(html).toContain('本期一共 3 人付款（含老用户），到手 $59.80。')
   })
 
-  it('says who was left out and that PostHog numbers are still being checked', () => {
+  it('says who was left out', () => {
     expect(html).toContain('已去掉管理员账号（1 个）、测试站和爬虫')
-    expect(html).toContain('标「核对中」的数来自 PostHog')
-    expect(html).toMatch(/访客 核对中 320/)
-    expect(html).toMatch(/上传照片 .* 核对中 14/)
+    expect(html).toMatch(/上传照片 .* 14/)
   })
 
   it('compares with the previous period in words', () => {
     expect(html).toContain('和上一个 7 天比')
-    expect(html).toMatch(/访客 核对中 320 多了 100%/)
+    expect(html).toMatch(/访客 320 多了 100%/)
     expect(html).toMatch(/注册 18 多了 100%/)
   })
 
@@ -91,7 +89,6 @@ describe('overview panel without PostHog numbers', () => {
     expect(offline).toContain('近 7 天：18 人注册 → 11 人出了第一张图')
     expect(offline).not.toContain('位访客')
     expect(offline).toContain('PostHog 还没连上')
-    expect(offline).not.toContain('核对中')
     expect(offline).toContain('$59.80')
   })
 

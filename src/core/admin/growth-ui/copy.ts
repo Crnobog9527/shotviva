@@ -6,10 +6,6 @@ import type { NewUserStep } from '../growth/funnel'
 
 type Metric = { label: string; help: string }
 
-// PostHog's numbers (visitors, uploads, paywall, checkout) are tagged 「核对中」 until their query
-// has been checked against PostHog itself (control review of #483). Flip to true in that PR.
-export const POSTHOG_VERIFIED = false
-
 export const GROWTH_COPY = {
   views: { overview: '总览', details: '明细（旧版）' },
   viewLabel: '页面',
@@ -20,8 +16,6 @@ export const GROWTH_COPY = {
   scope: (admins: number) =>
     `只算真实用户：已去掉管理员账号（${admins} 个）、测试站和爬虫。管理员没登录时的访问认不出来，可能还算在访客里。`,
   freshness: '所有数字每 5 分钟更新一次，数据库和 PostHog 截到同一时刻。',
-  unverified: '核对中',
-  unverifiedNote: '标「核对中」的数来自 PostHog（访客、上传照片、看到付费墙、开始结账），统计方法还没和 PostHog 后台逐一核对，先看大概。',
   headline: {
     chain: (p: { period: string; visitors: string | null; signups: string; images: string; paid: string }) =>
       `${p.period}：${p.visitors === null ? '' : `${p.visitors} 位访客 → `}${p.signups} 人注册 → ${p.images} 人出了第一张图 → ${p.paid} 人付款`,

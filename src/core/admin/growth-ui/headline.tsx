@@ -4,10 +4,10 @@ import { biggestDrop, newUserSteps } from '../growth/funnel'
 import type { GrowthStats } from '../growth/stats'
 import { usd } from '../orders/money'
 import { GROWTH_COPY as COPY } from './copy'
-import { peopleData, Unverified, type PeopleState } from './people-state'
+import { peopleData, type PeopleState } from './people-state'
 
 type Props = { range: Range; db: GrowthStats; people: PeopleState }
-type Trend = { key: string; label: string; current: number | null; previous: number | null; format: (value: number) => string; posthog?: boolean }
+type Trend = { key: string; label: string; current: number | null; previous: number | null; format: (value: number) => string }
 
 // The sentence the Owner reads first, the four numbers against the previous period, and the one
 // step where new users stopped most.
@@ -24,7 +24,7 @@ export function Headline({ range, db, people }: Props) {
   })
   const money = (value: number) => usd.format(value)
   const trends: Trend[] = [
-    { key: 'visitors', label: COPY.trend.visitors, current: seen?.current.visitors ?? null, previous: seen?.previous.visitors ?? null, format: n, posthog: true },
+    { key: 'visitors', label: COPY.trend.visitors, current: seen?.current.visitors ?? null, previous: seen?.previous.visitors ?? null, format: n },
     { key: 'signups', label: COPY.trend.signups, current: cur.signups, previous: prev.signups, format: n },
     { key: 'payers', label: COPY.trend.payers, current: cur.payers, previous: prev.payers, format: n },
     { key: 'net', label: COPY.trend.net, current: cur.money.net_usd, previous: prev.money.net_usd, format: money },
@@ -43,10 +43,7 @@ export function Headline({ range, db, people }: Props) {
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-4">
           {trends.map((trend) => (
             <div key={trend.key} className="grid gap-0.5">
-              <dt className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                {trend.label}
-                {trend.posthog && seen ? <Unverified /> : null}
-              </dt>
+              <dt className="text-sm text-muted-foreground">{trend.label}</dt>
               <dd className="flex flex-wrap items-baseline gap-x-2">
                 <span className="text-lg font-semibold tabular-nums">{trend.current === null ? '—' : trend.format(trend.current)}</span>
                 <TrendWord trend={trend} />

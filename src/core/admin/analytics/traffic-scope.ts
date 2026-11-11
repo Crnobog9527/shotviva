@@ -18,8 +18,9 @@ export const publicEntry = (prefix = '') => `${scopeOf(`domain(${prefix}$entry_c
 export const publicJourney = `(${publicEvent} OR properties.$lib = 'shotviva-server' AND event IN ('signup','generate','checkout_start','purchase'))`
 
 // A page view's self-reported tool name (never network-verified) or automation traits. Shared by
-// the traffic block and the overview's visitor count, which leaves both out of 「访客」.
+// the traffic block and the overview's visitor count, which leaves both out of 「访客」. The Claude
+// browser is an AI agent's browser (our own sessions among them), not a visitor.
 const VIEW_UA = "lower(coalesce(nullIf(properties.$raw_user_agent,''), properties.$useragent,''))"
 export const NAMED_BOT = `match(${VIEW_UA}, 'googlebot|bingbot|gptbot|oai-searchbot|chatgpt-user|claudebot|applebot|baiduspider|duckduckbot|yandexbot')`
 export const AUTOMATED = `(match(${VIEW_UA}, 'headless|playwright|puppeteer|crawler|spider|bot[/ ;)]|lighthouse')
-      OR match(lower(coalesce(properties.$browser,'')), 'headless|bot|crawler'))`
+      OR match(lower(coalesce(properties.$browser,'')), 'headless|bot|crawler|^claude'))`
