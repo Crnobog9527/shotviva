@@ -1,5 +1,6 @@
 'use client'
 
+import { useLocale } from 'next-intl'
 import { useCallback, useEffect, useState, type KeyboardEvent } from 'react'
 
 import type { PhotoItem } from '../photo-item'
@@ -77,13 +78,14 @@ function useSteps(viewer: Viewer, id: string | null): Steps {
   const index = id ? ids.indexOf(id) : -1
   const key = ids.join(',')
   const show = viewer.show
+  const locale = useLocale()
   useEffect(() => {
     if (!id || index < 0) return
     for (const delta of [-1, 1] as const) {
       const next = stepFrom(key.split(','), id, delta)
-      if (next) prefetchWorkView(next)
+      if (next) prefetchWorkView(next, locale)
     }
-  }, [id, index, key])
+  }, [id, index, key, locale])
   const go = useCallback(
     (delta: -1 | 1) => {
       const next = id ? stepFrom(key.split(','), id, delta) : null

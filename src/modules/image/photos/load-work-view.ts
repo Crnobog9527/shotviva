@@ -20,12 +20,15 @@ type Deps = { db: SupabaseClient; admin: SupabaseClient; store: () => ObjectStor
 // used to read on the server, in one round. The templates (the work's name, and whether Make
 // again still has a template to go to), the upload preview's HEAD (T32), for an edit the work it
 // came from, the edit offer with balance and tier (T30), and the reference number (T78; a failed
-// read falls back to the first 8 characters rather than failing the view). null: not the
+// read falls back to the first 8 characters rather than failing the view). Names and words are
+// in deps.locale, the page's language (an /api address has none of its own). null: not the
 // caller's, not finished, or deleted.
 export async function loadWorkView(deps: Deps, req: { userId: string; jobId: string }): Promise<WorkView | null> {
-  const job = await findOwnJob(deps.admin, req.userId, req.jobId)
+  // The job and everything that does not depend on it, together; then what does.
+  const [job, around] = await Promise.all([findOwnJob(deps.admin, req.userId, req.jobId), readAround(deps, req)])
   if (!job || job.status !== 'succeeded') return null
-  const { templates, kept, parent, offer, balance, tier, reference, t } = await readAround(deps, req.userId, job)
+  const { templates, offer, balance, tier, reference, t } = around
+  const [kept, parent] = await readFromJob(deps, req.userId, job)
   const lookup = new Map(templates.map((tpl) => [tpl.id, { name: tpl.name, cover: tpl.coverAfterUrl }]))
   const names = { fallback: t('photos.fallbackName'), edited: t('photos.editedName'), titleEdited: (name: string) => t('edit.titleEdited', { name }) }
   const { item, source, change } = editDisplay(job, parent, lookup, names, fileUrlFor)
@@ -45,19 +48,26 @@ export async function loadWorkView(deps: Deps, req: { userId: string; jobId: str
   }
 }
 
-// Everything besides the job, in one round.
-async function readAround(deps: Deps, userId: string, job: Job) {
-  const [templates, kept, parent, offer, balance, tier, reference, t] = await Promise.all([
-    listTemplatesIn(deps.db, deps.locale, { includeSeriesMembers: true }),
+// What depends on the job: the upload preview's HEAD, and for an edit the work it came from.
+function readFromJob(deps: Deps, userId: string, job: Job) {
+  return Promise.all([
     // An edit has no upload of its own (T30).
     job.templateId === EDIT_TEMPLATE_ID ? false : hasInputPreview(deps.store(), job),
     job.parentJobId ? findOwnJob(deps.admin, userId, job.parentJobId) : null,
+  ])
+}
+
+// What the view needs besides the job: the catalogue, the edit offer, balance and tier, the
+// reference number and the messages, in one round.
+async function readAround(deps: Deps, req: { userId: string; jobId: string }) {
+  const [templates, offer, balance, tier, reference, t] = await Promise.all([
+    listTemplatesIn(deps.db, deps.locale, { includeSeriesMembers: true }),
     loadEditOffer(deps.db),
-    readBalance(deps.db, userId),
+    readBalance(deps.db, req.userId),
     // current_tier() is service-role only; the user's own id comes from the session.
-    currentTier(deps.admin, userId),
-    jobRefOrShort(deps.admin, job.id),
+    currentTier(deps.admin, req.userId),
+    jobRefOrShort(deps.admin, req.jobId),
     getTranslations({ locale: deps.locale, namespace: 'app' }),
   ])
-  return { templates, kept, parent, offer, balance, tier, reference, t }
+  return { templates, offer, balance, tier, reference, t }
 }
