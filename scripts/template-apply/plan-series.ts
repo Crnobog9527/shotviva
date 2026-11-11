@@ -39,18 +39,20 @@ export function seriesFields(item: SeriesItem, state: DbState, afterCovers: Map<
 const changed = (current: SeriesDetail, fields: Fields) =>
   (Object.keys(fields) as (keyof Fields)[]).some(key => current[key] !== fields[key])
 
-function checks(item: SeriesItem, current: SeriesDetail | undefined, fields: Fields, state: DbState) {
+// `created`: categories this batch creates, saved before any series.
+function checks(item: SeriesItem, current: SeriesDetail | undefined, fields: Fields, state: DbState, created: Set<string>) {
   const problems: string[] = []
   const category = state.categories.get(fields.category_key)
-  if (!category || category.kind !== 'template' || category.is_system) problems.push(`分类 ${fields.category_key} 不存在或不能用`)
+  const usable = category ? category.kind === 'template' && !category.is_system : created.has(fields.category_key)
+  if (!usable) problems.push(`分类 ${fields.category_key} 不存在或不能用`)
   if (current?.is_active && !fields.is_active && !item.unpublishReason) problems.push('系列下架要写 unpublishReason')
   return problems
 }
 
-export function planSeriesFields(item: SeriesItem, state: DbState, fields: Fields): PlanItem {
+export function planSeriesFields(item: SeriesItem, state: DbState, fields: Fields, created: Set<string>): PlanItem {
   const current = state.series.get(item.slug)
   const base = { ref: `series:${item.slug}`, kind: 'series' as const, label: item.slug, notes: [] }
-  const problems = checks(item, current, fields, state)
+  const problems = checks(item, current, fields, state, created)
   if (current && !changed(current, fields)) return { ...base, actions: ['无变化'], ops: [], problems }
   const op = { op: 'save_series', fields, reason: item.unpublishReason ?? null }
   return { ...base, actions: [current ? '更新' : '新建'], ops: [op], problems }
@@ -79,11 +81,11 @@ export function memberTargets(batch: Batch, state: DbState) {
   return { targets, problems }
 }
 
-export function planSeriesMembers(item: SeriesItem, fields: Fields, problems: string[]): PlanItem | null {
+export function planSeriesMembers(item: SeriesItem, fields: Fields, problems: string[], current: SeriesDetail | undefined): PlanItem | null {
   if (!item.members) return null
+  const base = { ref: `series-members:${item.slug}`, kind: 'series' as const, label: `${item.slug}（成员）`, problems, notes: [] }
+  const now = current?.members.map(m => m.id) ?? []
+  if (now.length === item.members.length && now.every((id, i) => id === item.members?.[i])) return { ...base, actions: ['无变化'], ops: [] }
   const op = { op: 'save_series', fields, members: item.members, reason: item.unpublishReason ?? null }
-  return {
-    ref: `series-members:${item.slug}`, kind: 'series', label: `${item.slug}（成员）`,
-    actions: [`成员 ${item.members.length} 个`], ops: [op], problems, notes: [],
-  }
+  return { ...base, actions: [`成员 ${item.members.length} 个`], ops: [op] }
 }

@@ -73,14 +73,15 @@ function afterCovers(state: DbState, templates: PlanItem[]) {
 
 function planSeries(batch: Batch, state: DbState, templates: PlanItem[]) {
   const { problems } = memberTargets(batch, state)
+  const created = new Set(batch.categories.map(c => c.key))
   const covers = afterCovers(state, templates)
   const before: PlanItem[] = []
   const after: PlanItem[] = []
   for (const item of batch.series) {
     const base = { ref: `series:${item.slug}`, kind: 'series' as const, label: item.slug }
     let fields: ReturnType<typeof seriesFields> | undefined
-    before.push(safely(base, () => planSeriesFields(item, state, (fields = seriesFields(item, state, covers)))))
-    const members = fields && planSeriesMembers(item, fields, problems.get(item.slug) ?? [])
+    before.push(safely(base, () => planSeriesFields(item, state, (fields = seriesFields(item, state, covers)), created)))
+    const members = fields && planSeriesMembers(item, fields, problems.get(item.slug) ?? [], state.series.get(item.slug))
     if (members) after.push(members)
   }
   return { before, after }
