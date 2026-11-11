@@ -9894,6 +9894,47 @@ $$;
 ALTER FUNCTION "public"."read_product_catalog"("p_version" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."read_template_category_sync_source"("p_keys" "text"[]) RETURNS "jsonb"
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  with recursive up(key, parent_id) as (
+    select key, parent_id from public.template_categories where key = any(p_keys) and kind = 'template'
+    union
+    select c.key, c.parent_id from public.template_categories c join up on c.key = up.parent_id
+  )
+  select coalesce(jsonb_agg(jsonb_build_object(
+      'key', c.key, 'parent_id', c.parent_id, 'level', c.level, 'is_system', c.is_system,
+      'name_en', c.name_en, 'name_zh', c.name_zh, 'intro_en', c.intro_en, 'intro_zh', c.intro_zh,
+      'card_style', c.card_style, 'sort_order', c.sort_order, 'slug', c.slug, 'is_visible', c.is_visible,
+      'seo_title_en', c.seo_title_en, 'seo_title_zh', c.seo_title_zh,
+      'seo_description_en', c.seo_description_en, 'seo_description_zh', c.seo_description_zh)
+    order by c.level, c.sort_order, c.key), '[]'::jsonb)
+  from public.template_categories c where c.key in (select key from up)
+$$;
+
+
+ALTER FUNCTION "public"."read_template_category_sync_source"("p_keys" "text"[]) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."read_template_series_sync_source"("p_slug" "text") RETURNS "jsonb"
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select jsonb_build_object(
+    'series', jsonb_build_object('slug', s.slug, 'name_en', s.name_en, 'name_zh', s.name_zh,
+      'description_en', s.description_en, 'description_zh', s.description_zh, 'cover_url', s.cover_url,
+      'category_key', s.category_key, 'sort_order', s.sort_order, 'is_active', s.is_active,
+      'show_members', s.show_members),
+    'members', coalesce((select jsonb_agg(t.id order by t.series_sort_order, t.id)
+      from public.templates t where t.series_id = s.id), '[]'::jsonb))
+  from public.template_series s where s.slug = p_slug
+$$;
+
+
+ALTER FUNCTION "public"."read_template_series_sync_source"("p_slug" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."read_template_sync_source"("p_id" "text") RETURNS "jsonb"
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
@@ -11169,6 +11210,147 @@ $$;
 
 
 ALTER FUNCTION "public"."sync_image_capabilities"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."sync_preview_category"("p_category" "jsonb", "p_validate_only" boolean DEFAULT false) RETURNS "text"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $_$
+declare
+  k text := p_category->>'key';
+  en text := btrim(p_category->>'name_en');
+  zh text := btrim(p_category->>'name_zh');
+  parent text := nullif(p_category->>'parent_id', '');
+  v_position integer := (p_category->>'sort_order')::integer;
+  previous public.template_categories;
+  v_result text;
+begin
+  if k is null or k !~ '^[a-z0-9]+(-[a-z0-9]+)*$' or v_position is null then raise exception 'INVALID_SYNC'; end if;
+  -- The same exclusive tree lock as admin_save_template_category (分类管理).
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.category_tree', 0));
+  select * into previous from public.template_categories where key = k for update;
+  if previous.key is not null and previous.kind <> 'template' then raise exception 'CATEGORY_KIND_MISMATCH'; end if;
+  if previous.is_system or coalesce((p_category->>'is_system')::boolean, false) then
+    if previous.key is null then raise exception 'CATEGORY_MISSING'; end if;
+    return 'system';
+  end if;
+  if exists(select 1 from public.template_categories where name_en_lookup = 'template:' || lower(en) and key <> k)
+      or exists(select 1 from public.template_categories where name_zh_lookup = 'template:' || zh and key <> k) then
+    raise exception 'CATEGORY_NAME_TAKEN';
+  end if;
+  if previous.key is null then
+    if parent is not null and not exists(select 1 from public.template_categories
+        where key = parent and kind = 'template' and not is_system and level < 3) then
+      raise exception 'CATEGORY_PARENT_MISSING';
+    end if;
+    insert into public.template_categories(key, name_en, name_zh, intro_en, intro_zh, card_style, sort_order,
+        parent_id, slug, is_visible, seo_title_en, seo_title_zh, seo_description_en, seo_description_zh)
+      values(k, en, zh, nullif(btrim(p_category->>'intro_en'), ''), nullif(btrim(p_category->>'intro_zh'), ''),
+        coalesce(p_category->>'card_style', 'pair'), v_position, parent, coalesce(nullif(p_category->>'slug', ''), k),
+        coalesce((p_category->>'is_visible')::boolean, true), nullif(p_category->>'seo_title_en', ''),
+        nullif(p_category->>'seo_title_zh', ''), nullif(p_category->>'seo_description_en', ''),
+        nullif(p_category->>'seo_description_zh', ''));
+    v_result := 'created';
+  elsif (previous.name_en, previous.name_zh, previous.sort_order) is distinct from (en, zh, v_position) then
+    update public.template_categories set name_en = en, name_zh = zh, sort_order = v_position where key = k;
+    v_result := 'updated';
+  else
+    v_result := 'unchanged';
+  end if;
+  if p_validate_only then raise exception using errcode = 'Z9301'; end if;
+  return v_result;
+exception when sqlstate 'Z9301' then return v_result;
+end $_$;
+
+
+ALTER FUNCTION "public"."sync_preview_category"("p_category" "jsonb", "p_validate_only" boolean) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."sync_preview_series"("p_series" "jsonb", "p_validate_only" boolean DEFAULT false) RETURNS "text"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_slug text := p_series->>'slug';
+  previous public.template_series;
+  saved public.template_series;
+  v_result text;
+begin
+  if v_slug is null or v_slug !~ '^[a-z0-9]+(-[a-z0-9]+)*$' then raise exception 'INVALID_SYNC'; end if;
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree', 0));
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series', 0));
+  -- check_series_category would refuse it too; this names the reason for the workflow log.
+  if not exists(select 1 from public.template_categories
+      where key = p_series->>'category_key' and kind = 'template' and not is_system) then
+    raise exception 'SERIES_CATEGORY_MISSING';
+  end if;
+  saved := jsonb_populate_record(null::public.template_series, p_series - 'id');
+  select * into previous from public.template_series where slug = v_slug for update;
+  if previous.id is null then
+    insert into public.template_series(slug, name_en, name_zh, description_en, description_zh, cover_url,
+        category_key, sort_order, is_active, show_members)
+      values(v_slug, saved.name_en, saved.name_zh, saved.description_en, saved.description_zh, saved.cover_url,
+        saved.category_key, coalesce(saved.sort_order, 0), coalesce(saved.is_active, false), coalesce(saved.show_members, false));
+    v_result := 'created';
+  elsif (previous.name_en, previous.name_zh, previous.description_en, previous.description_zh, previous.cover_url,
+      previous.category_key, previous.sort_order, previous.is_active, previous.show_members)
+      is distinct from (saved.name_en, saved.name_zh, saved.description_en, saved.description_zh, saved.cover_url,
+      saved.category_key, coalesce(saved.sort_order, 0), coalesce(saved.is_active, false), coalesce(saved.show_members, false)) then
+    update public.template_series set name_en = saved.name_en, name_zh = saved.name_zh,
+      description_en = saved.description_en, description_zh = saved.description_zh, cover_url = saved.cover_url,
+      category_key = saved.category_key, sort_order = coalesce(saved.sort_order, 0),
+      is_active = coalesce(saved.is_active, false), show_members = coalesce(saved.show_members, false)
+    where id = previous.id;
+    v_result := 'updated';
+  else
+    v_result := 'unchanged';
+  end if;
+  if p_validate_only then raise exception using errcode = 'Z9301'; end if;
+  return v_result;
+exception when sqlstate 'Z9301' then return v_result;
+end $_$;
+
+
+ALTER FUNCTION "public"."sync_preview_series"("p_series" "jsonb", "p_validate_only" boolean) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."sync_preview_series_members"("p_slug" "text", "p_members" "text"[], "p_validate_only" boolean DEFAULT false) RETURNS "jsonb"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_series uuid;
+  v_placed text[];
+  v_result jsonb;
+begin
+  if p_members is null or cardinality(p_members) <> (select count(distinct m) from unnest(p_members) m) then
+    raise exception 'INVALID_SERIES_MEMBERS';
+  end if;
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree', 0));
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series', 0));
+  select id into v_series from public.template_series where slug = p_slug for update;
+  if v_series is null then raise exception 'SERIES_MISSING'; end if;
+  perform 1 from public.templates where id = any(p_members) or series_id = v_series order by id for update;
+  select coalesce(array_agg(m.id order by m.ord), '{}') into v_placed
+    from unnest(p_members) with ordinality as m(id, ord)
+    join public.templates t on t.id = m.id
+    join public.template_categories c on c.key = t.category_key
+    where not c.is_system and t.id not in ('freeform', 'edit')
+      and (t.series_id is null or t.series_id = v_series);
+  update public.templates set series_id = null, series_sort_order = 0
+    where series_id = v_series and not (id = any(v_placed));
+  update public.templates t set series_id = v_series, series_sort_order = m.ord::integer
+    from unnest(v_placed) with ordinality as m(id, ord)
+    where t.id = m.id and (t.series_id is distinct from v_series or t.series_sort_order <> m.ord);
+  v_result := jsonb_build_object('placed', to_jsonb(v_placed),
+    'skipped', to_jsonb(array(select m from unnest(p_members) m where not (m = any(v_placed)))));
+  if p_validate_only then raise exception using errcode = 'Z9301'; end if;
+  return v_result;
+exception when sqlstate 'Z9301' then return v_result;
+end $$;
+
+
+ALTER FUNCTION "public"."sync_preview_series_members"("p_slug" "text", "p_members" "text"[], "p_validate_only" boolean) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."sync_preview_template"("p_template" "jsonb", "p_prompt" "jsonb", "p_provider" "jsonb", "p_floors" "jsonb", "p_run_id" "text", "p_locales" "text"[], "p_target_token" "text", "p_catalog_version" "text", "p_validate_only" boolean DEFAULT false) RETURNS integer
@@ -16782,6 +16964,16 @@ GRANT ALL ON FUNCTION "public"."read_product_catalog"("p_version" "text") TO "se
 
 
 
+REVOKE ALL ON FUNCTION "public"."read_template_category_sync_source"("p_keys" "text"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."read_template_category_sync_source"("p_keys" "text"[]) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."read_template_series_sync_source"("p_slug" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."read_template_series_sync_source"("p_slug" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."read_template_sync_source"("p_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."read_template_sync_source"("p_id" "text") TO "service_role";
 
@@ -16957,6 +17149,21 @@ GRANT ALL ON FUNCTION "public"."support_reply_hours"("p_tier" "text") TO "servic
 
 
 REVOKE ALL ON FUNCTION "public"."sync_image_capabilities"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."sync_preview_category"("p_category" "jsonb", "p_validate_only" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."sync_preview_category"("p_category" "jsonb", "p_validate_only" boolean) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."sync_preview_series"("p_series" "jsonb", "p_validate_only" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."sync_preview_series"("p_series" "jsonb", "p_validate_only" boolean) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."sync_preview_series_members"("p_slug" "text", "p_members" "text"[], "p_validate_only" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."sync_preview_series_members"("p_slug" "text", "p_members" "text"[], "p_validate_only" boolean) TO "service_role";
 
 
 
