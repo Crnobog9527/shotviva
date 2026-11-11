@@ -6,6 +6,8 @@ import { cn } from '@/core/ui/cn'
 // card's picture (top left, the corner the Phone / AI tags and the save heart leave free) and in
 // its creation panel. A stack-of-prints glyph and the word, on the same frosted ground as the
 // Phone tag so it reads as part of the picture's labelling, not as a button.
+// A copy lives in the public pages (core/content/blocks/series-card.tsx, marketing.css
+// .mk-sbadge; core cannot import modules): change both together.
 export function SeriesBadge({ className, onPhoto = true }: { className?: string; onPhoto?: boolean }) {
   const t = useTranslations('app.series')
   return (

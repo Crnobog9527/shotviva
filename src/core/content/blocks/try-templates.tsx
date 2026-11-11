@@ -7,7 +7,8 @@ import { Link } from '../../i18n/ui'
 import { PhotoPair } from './photo-pair'
 
 // No price on the cards, like the home grid (DESIGN, Owner 2026-11-08).
-export type TryTemplate = { id: string; name: string; use: string; before: string; after: string }
+// `href`: a series opens itself in Create; a template opens the home page's picker (?open=).
+export type TryTemplate = { id: string; name: string; use: string; before: string; after: string; href?: string }
 
 const SIZE = { width: 900, height: 1125 }
 
@@ -46,7 +47,7 @@ export function TryTemplates({ templates }: { templates: readonly TryTemplate[] 
       </h2>
       <div className="mt-3 grid gap-3 md:grid-cols-3 md:gap-4">
         {picked.map((card) => (
-          <Link key={card.id} href={`/?open=${card.id}`} className="mk-tpl" aria-label={`${card.name}. ${card.use}`}>
+          <Link key={card.id} href={card.href ?? `/?open=${card.id}`} prefetch={card.href ? false : undefined} className="mk-tpl" aria-label={`${card.name}. ${card.use}`}>
             <PhotoPair
               before={{ src: card.before, alt: home('beforeAlt', { name: card.name }), ...SIZE }}
               after={{ src: card.after, alt: home('afterAlt', { name: card.name, use: card.use }), ...SIZE }}
