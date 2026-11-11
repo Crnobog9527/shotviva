@@ -21,7 +21,7 @@ const data: Traffic = {
 }
 
 it('renders channel shares per session and automation shares per observed view, with both homepage entries', () => {
-  const query = { range: '7d', sort: 'views', dim: 'source' } as const
+  const query = { view: 'details', range: '7d', sort: 'views', dim: 'source' } as const
   const window = windowFor(query.range, new Date('2026-11-09T16:00:00Z'))
   const html = renderToStaticMarkup(createElement(TrafficView, { data, query, window }))
   const googleRow = html.split('</tr>').find((row) => row.includes('>Google<'))
@@ -50,7 +50,7 @@ it('labels the edge denominator and fixed observation period separately', () => 
 })
 
 it('shows zero measured counts with undefined shares for an empty observation window', async () => {
-  const query = { range: 'today', sort: 'views', dim: 'source' } as const
+  const query = { view: 'details', range: 'today', sort: 'views', dim: 'source' } as const
   const window = windowFor(query.range, new Date('2026-11-10T03:00:00Z'))
   const empty = await loadTraffic(async () => ({ results: [], columns: [] }), window)
   const html = renderToStaticMarkup(createElement(TrafficView, { data: empty, query, window }))
@@ -61,7 +61,7 @@ it('shows zero measured counts with undefined shares for an empty observation wi
 })
 
 it('a failed PostHog read exposes neither artificial zeroes nor query details', async () => {
-  const block = await TrafficBlock({ query: { range: '7d', sort: 'views', dim: 'source' }, projectId: 'test', result: Promise.resolve({ status: 'error' }) })
+  const block = await TrafficBlock({ query: { view: 'details', range: '7d', sort: 'views', dim: 'source' }, projectId: 'test', result: Promise.resolve({ status: 'error' }) })
   const html = renderToStaticMarkup(block)
   expect(html).toContain('暂时读不到')
   expect(html).not.toContain('0 次')

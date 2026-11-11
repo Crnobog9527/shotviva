@@ -8,13 +8,19 @@ import { ActivationBlock } from './activation-block'
 import { ANALYTICS_COPY as COPY } from './copy'
 import { EdgeTraffic } from './edge-traffic'
 import { FunnelBlock } from './funnel-block'
-import { analyticsHref, type AnalyticsQuery } from './href'
+import { GROWTH_COPY } from '../growth-ui/copy'
+import { analyticsHref, VIEWS, type AnalyticsQuery } from './href'
 import { PagesBlock } from './pages-block'
 import { BlockSkeleton, LinkTabs } from './parts'
 import { PaymentBlock } from './payment-block'
 import { ProblemsBlock } from './problems-block'
 import { TrafficBlock } from './traffic-block'
 import { TemplatesBlock } from './templates-block'
+
+export function ViewTabs({ query }: { query: AnalyticsQuery }) {
+  const tabs = VIEWS.map((view) => ({ key: view, label: GROWTH_COPY.views[view], href: analyticsHref(query, { view }) }))
+  return <LinkTabs label={GROWTH_COPY.viewLabel} tabs={tabs} current={query.view} />
+}
 
 export function RangeTabs({ query }: { query: AnalyticsQuery }) {
   const tabs = RANGES.map((range) => ({ key: range, label: COPY.ranges[range], href: analyticsHref(query, { range }) }))
