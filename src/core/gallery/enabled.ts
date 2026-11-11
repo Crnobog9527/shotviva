@@ -15,18 +15,26 @@ import { decideGallery } from './switch'
 // the marketing pages, whose footer asks it, are not refreshed when another switch changes.
 export const GALLERY_SWITCH_TAG = 'gallery-switch'
 
+async function readGalleryOpen(): Promise<boolean> {
+  const { data, error } = await createAdminSupabase().from('system_settings').select('value').eq('key', 'gallery_enabled').maybeSingle()
+  if (error) throw new Error(error.message)
+  return settingValue({ gallery_enabled: (data as { value?: unknown } | null)?.value }, 'gallery_enabled')
+}
+
 async function cachedGalleryOpen(): Promise<boolean> {
   'use cache'
   cacheTag(GALLERY_SWITCH_TAG)
-  const { data, error } = await createAdminSupabase().from('system_settings').select('value').eq('key', 'gallery_enabled').maybeSingle()
-  if (error) {
-    // Closed while the read fails, for a minute only, so it heals by itself.
+  try {
+    const open = await readGalleryOpen()
+    cacheLife(SETTINGS_LIFE)
+    return open
+  } catch (error) {
+    // Closed while the read fails (an outage, a build without a database), for a minute only,
+    // so it heals by itself.
     cacheLife(FAILED_READ_LIFE)
-    logger.error('gallery.switch_read_failed', { error: error.message })
+    logger.error('gallery.switch_read_failed', { error })
     return false
   }
-  cacheLife(SETTINGS_LIFE)
-  return settingValue({ gallery_enabled: (data as { value?: unknown } | null)?.value }, 'gallery_enabled')
 }
 
 // The one place that decides whether the public gallery is open (ARCHITECTURE §9 第 1 条): its
