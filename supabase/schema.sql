@@ -8611,7 +8611,7 @@ declare
   active jsonb;
   result text := 'acquired';
 begin
-  if coalesce(public.current_tier(p_user_id), 'starter') not in ('pro', 'max') then return 'upgrade'; end if;
+  if coalesce(public.effective_tier(p_user_id), 'starter') not in ('pro', 'max') then return 'upgrade'; end if;
   insert into admin.batch_zip_requests (user_id) values (p_user_id) on conflict do nothing;
   select * into strict state from admin.batch_zip_requests where user_id=p_user_id for update;
   at_time := clock_timestamp();
@@ -9312,6 +9312,21 @@ $$;
 
 
 ALTER FUNCTION "public"."dispute_evidence_facts"("p_dispute_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."effective_tier"("p_user_id" "uuid") RETURNS "text"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select case
+    when exists (select 1 from public.profiles p where p.id = p_user_id and p.role = 'admin' and p.banned_at is null)
+      then 'max'
+    else public.current_tier(p_user_id)
+  end;
+$$;
+
+
+ALTER FUNCTION "public"."effective_tier"("p_user_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."entry_cover"("public"."web_catalogue_entries") RETURNS SETOF "public"."templates"
@@ -10583,7 +10598,7 @@ begin
   if batch is null then return job; end if;
   if position_in_batch is null then raise exception 'INVALID_INPUT'; end if;
   if job.credits_cost is distinct from p_credits_cost then raise exception 'TEMPLATE_QUOTE_CHANGED'; end if;
-  if (p_inputs->>'batch_templates')::integer > 1 and public.current_tier(p_user_id) is distinct from 'max' then
+  if (p_inputs->>'batch_templates')::integer > 1 and public.effective_tier(p_user_id) is distinct from 'max' then
     raise exception 'BATCH_MAX_REQUIRED';
   end if;
   if exists (
@@ -16591,6 +16606,11 @@ REVOKE ALL ON FUNCTION "public"."delete_provider_vault_secret"() FROM PUBLIC;
 
 REVOKE ALL ON FUNCTION "public"."dispute_evidence_facts"("p_dispute_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."dispute_evidence_facts"("p_dispute_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."effective_tier"("p_user_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."effective_tier"("p_user_id" "uuid") TO "service_role";
 
 
 

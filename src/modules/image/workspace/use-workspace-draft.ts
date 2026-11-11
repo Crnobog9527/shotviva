@@ -23,7 +23,7 @@ import type { FormValues } from './workspace-form'
 export type DraftInput = {
   template: CatalogueTemplate
   balance: Balance
-  // current_tier() from the server: decides batchMax (TIER_LIMITS); null is Starter.
+  // effective_tier() from the server (an unbanned admin counts as Max): decides batchMax (TIER_LIMITS); null is Starter.
   tier: MembershipTier | null
   // From the server: the account's concurrency (TIER_LIMITS) and the jobs running at render
   // time, so photos started in another tab count too.
