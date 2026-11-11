@@ -35,7 +35,9 @@ function build(
   const provider = adapter(config)
   // Row prices first, then the official price table for the model (ARCHITECTURE §10.0).
   const snapshot = adapterId === 'openrouter_images' ? prices : effectivePrices(config.model, prices)
-  return { id: providerTag(source, config.model), prices: snapshot, ...references, completeUsage: provider.completeUsage?.bind(provider), generate: provider.generate.bind(provider) } satisfies GenerationProvider
+  return { id: providerTag(source, config.model), prices: snapshot, ...references,
+    ...(provider.honoursBackground ? { honoursBackground: true } : {}),
+    completeUsage: provider.completeUsage?.bind(provider), generate: provider.generate.bind(provider) } satisfies GenerationProvider
 }
 
 function savedMaximum(row: ActiveProviderRow) {

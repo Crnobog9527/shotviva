@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { canShareFile, handPhotoToSystem, mayShareFiles, resolveShareMode, shareFileFor } from './share-mode'
 
 const jpeg = () => new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: 'image/jpeg' })
-const prepared = () => Promise.resolve({ shareBlob: jpeg(), transparent: false })
+const png = () => new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], { type: 'image/png' })
+const prepared = () => Promise.resolve({ shareBlob: jpeg(), original: jpeg(), transparent: false })
 const sharer = (canShare: (data?: ShareData) => boolean) => ({ share: vi.fn(), canShare: vi.fn(canShare) })
 
 describe('Share or Download (MOBILE_UI_rules §1.8.1)', () => {
@@ -59,5 +60,14 @@ describe('saving a photo on iOS', () => {
       const share = vi.fn().mockRejectedValue(new DOMException('Cannot share', name))
       await expect(handPhotoToSystem({ share }, shareFileFor(jpeg(), 'photo'))).resolves.toBe(outcome)
     }
+  })
+
+  it('hands over the PNG with its alpha for a cut-out’s 透明底, the JPEG on white otherwise', async () => {
+    const nav = sharer(() => true)
+    const cutOut = () => Promise.resolve({ shareBlob: jpeg(), original: png(), transparent: true })
+    const white = await resolveShareMode(nav, cutOut, 'shotviva-qa')
+    const clear = await resolveShareMode(nav, cutOut, 'shotviva-qa', true)
+    expect(white.kind === 'share' && [white.file.name, white.file.type]).toEqual(['shotviva-qa.jpg', 'image/jpeg'])
+    expect(clear.kind === 'share' && [clear.file.name, clear.file.type]).toEqual(['shotviva-qa.png', 'image/png'])
   })
 })

@@ -719,6 +719,11 @@
       "longPress": "Long-press to save",
       "photosHint": "To save to Photos, tap Share, then Save Image",
       "showTransparency": "Show transparency",
+      "background": {
+        "label": "Background",
+        "white": "White",
+        "transparent": "Transparent"
+      },
       "makeAnotherWith": "Make another with {name}",
       "shareText": "Made with {brand} {url}",
       "makeAgain": "Make again",
@@ -750,6 +755,7 @@
         "resolutionValue": "{tier} · {px} px",
         "format": "Format",
         "formatPng": "PNG, transparent background",
+        "formatJpgWhite": "JPG, white background",
         "credits": "Credits",
         "visibility": "Visibility",
         "visibilityFree": "Public, with watermark",
