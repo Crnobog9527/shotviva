@@ -3,7 +3,10 @@ import { readFileSync } from 'node:fs'
 import { NextIntlClientProvider } from 'next-intl'
 import { createElement, type FunctionComponent, type ReactElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+// The watermark moment's paywall (T107) is not what these renders check.
+vi.mock('@/core/billing/paywall/provider', () => ({ usePaywall: () => ({ open: () => undefined }) }))
 
 import { FormatRow } from '../detail/format-row'
 import { BackgroundChoice } from './background-choice'

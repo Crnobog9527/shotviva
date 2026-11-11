@@ -65,7 +65,7 @@ export function ResultView({ item, detail, shareText, edit, parent, parentDelete
       <div className="pt-4 lg:pt-0">
         <DetailHead item={item} />
         <div className="mt-4 grid gap-2">
-          <ShareButton fileUrl={fileUrl} name={`shotviva-${item.templateId}`} shareText={shareText} px={tierPx(item.resolution)} work={{ pool: item.creditPool, transparent: item.transparent }} />
+          <ShareButton fileUrl={fileUrl} name={`shotviva-${item.templateId}`} shareText={shareText} px={tierPx(item.resolution)} work={{ pool: item.creditPool, transparent: item.transparent }} watermarked={item.creditPool === 'free'} />
           {/* Edit and Make again side by side (B comp photo.html .acts .two); alone, full width. */}
           <QuietActions edit={edit} again={again} />
           {remove}

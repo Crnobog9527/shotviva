@@ -12,10 +12,12 @@ import { fileHref, offersChoice, shareSource, type WorkFile } from './download-b
 import { IosPhotoActions } from './ios-photo-actions'
 import { useDownloadBackground } from './use-download-background'
 import { useShareFile, useTransparency } from './use-share-file'
+import { useWatermarkMoment } from './use-watermark-moment'
 import { isIosBrowser } from './ios-browser'
 
 // work: the result's pool and cut-out record, for the 白底 / 透明底 choice (absent: no choice).
-export type ResultActionProps = { fileUrl: string; name: string; shareText: string; px?: number; work?: WorkFile }
+// watermarked: a free work; saving it is the moment the paywall opens on Starter (T107).
+export type ResultActionProps = { fileUrl: string; name: string; shareText: string; px?: number; work?: WorkFile; watermarked?: boolean }
 
 const subscribe = () => () => {}
 const onIos = () => isIosBrowser(navigator)
@@ -24,17 +26,18 @@ const serverSnapshot = () => false
 // A cut-out first offers 白底 / 透明底 (white by default, then the last pick); the download link,
 // Share's file and the iPhone fallback photo all follow it, and the route records one download
 // per click whichever file it serves.
-export default function ResultActions({ fileUrl, name, shareText, px, work }: ResultActionProps) {
+export default function ResultActions({ fileUrl, name, shareText, px, work, watermarked = false }: ResultActionProps) {
   const t = useTranslations('app.result')
-  const [saved, choose] = useDownloadBackground()
-  const background = offersChoice(work, useTransparency(fileUrl)) ? saved : null
+  const saved = useWatermarkMoment(watermarked)
+  const [picked, choose] = useDownloadBackground()
+  const background = offersChoice(work, useTransparency(fileUrl)) ? picked : null
   const mode = useShareFile(shareSource(fileUrl, work, background), name, background === 'transparent')
   const ios = useSyncExternalStore(subscribe, onIos, serverSnapshot)
   const choice = background ? <BackgroundChoice value={background} onChange={choose} className="mb-2" /> : null
-  if (ios) return <>{choice}<IosPhotoActions mode={mode} fileUrl={fileHref(fileUrl, background, false)} /></>
+  if (ios) return <>{choice}<IosPhotoActions mode={mode} fileUrl={fileHref(fileUrl, background, false)} onSaved={saved} /></>
   const primary = buttonVariants({ variant: 'cta', size: 'cta', className: 'gap-2' })
   const download = (className?: string) => (
-    <a href={mode.kind === 'loading' ? undefined : fileHref(fileUrl, background, true)} download aria-disabled={mode.kind === 'loading'} className={cn(primary, mode.kind === 'loading' && 'pointer-events-none', className)}>
+    <a href={mode.kind === 'loading' ? undefined : fileHref(fileUrl, background, true)} download onClick={saved} aria-disabled={mode.kind === 'loading'} className={cn(primary, mode.kind === 'loading' && 'pointer-events-none', className)}>
       <DownloadIcon />
       <span>{px ? t.rich('downloadPx', { px, cost: sizeTag, mono: monoTag }) : t('download')}</span>
     </a>
@@ -44,7 +47,7 @@ export default function ResultActions({ fileUrl, name, shareText, px, work }: Re
       // Called straight from the tap, no await before it (rule 1).
       navigator
         .share({ files: [mode.file], title: name, text: shareText })
-        .catch(() => undefined)
+        .then(saved, () => undefined)
     }
     return (
       <>
