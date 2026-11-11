@@ -20,6 +20,7 @@
     "qa:accounts": "tsx --env-file=.env.local scripts/qa/accounts.ts",
     "qa:login": "tsx --env-file=.env.local scripts/qa/login.ts",
     "qa:reset": "tsx --env-file=.env.local scripts/qa/reset.ts",
+    "qa:clock": "tsx --env-file=.env.local scripts/qa/test-clock.ts",
     "seo:check": "tsx scripts/seo-check.ts",
     "check:app-shell": "tsx scripts/app-shell-check.ts",
     "seo:ssr": "tsx --require ./scripts/ci/ignore-css.cjs scripts/ssr-seo-audit.ts",
