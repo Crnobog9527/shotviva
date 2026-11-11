@@ -147,13 +147,22 @@ export async function setTemplateOrder(client: SupabaseClient, adminId: string, 
 // The home featured list (T53, ARCHITECTURE §12): ids in display order, at most 12, published
 // web templates only (the SQL function enforces the last rule against the live rows).
 export const FEATURED_MAX = 12
-const featuredSchema = z
+const featuredList = z
   .array(z.string().min(1).max(64))
   .max(FEATURED_MAX)
   .refine((ids) => new Set(ids).size === ids.length, 'ids must be unique')
+// A bare list (older callers) or the list plus the one the page showed: with `expectedIds`, a
+// list changed elsewhere since (another tab, the batch bar) is refused instead of overwritten.
+const featuredSchema = z.union([featuredList, z.object({ ids: featuredList, expectedIds: featuredList })])
+
+const sameList = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((id, i) => id === b[i])
 
 export async function setFeaturedTemplates(client: SupabaseClient, adminId: string, input: unknown): Promise<void> {
-  const ids = parseOrThrow(featuredSchema, input, 'ids')
+  const parsed = parseOrThrow(featuredSchema, input, 'ids')
+  const { ids, expectedIds } = Array.isArray(parsed) ? { ids: parsed, expectedIds: undefined } : parsed
+  if (expectedIds && !sameList(await repo.readFeaturedIds(client), expectedIds)) {
+    throw new AppError('CONFLICT', '首页精选在别处改过了，请刷新页面后再试')
+  }
   await repo.setFeaturedTemplates(client, ids)
   logger.info('admin.template.featured', { adminId, count: ids.length })
 }

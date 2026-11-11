@@ -1,9 +1,13 @@
+import { ChevronRight } from 'lucide-react'
+import type { ReactNode } from 'react'
+
 import { MetricLabel } from '../analytics-ui/parts'
 import { DASH, n } from '../analytics-ui/format'
-import { attribute, type SourceRow } from '../growth/attribution'
+import { attribute, isEmptyLine, type SourceGroupRow, type SourceLine } from '../growth/attribution'
 import type { SourcesBlock } from '../growth/load'
 import type { GrowthPeriod } from '../growth/stats'
 import { usd } from '../orders/money'
+import { cn } from '../../ui/cn'
 import { GROWTH_COPY as COPY } from './copy'
 import { Section } from './section'
 
@@ -11,71 +15,88 @@ const C = COPY.sources
 export type SourcesState = SourcesBlock | { status: 'loading' }
 const COLUMNS = ['visitors', 'signups', 'payers', 'net'] as const
 
-// One row per source: visitors, then the sign-ups, buyers and money they brought. Rows that are
-// all zero stay, so the Owner sees which channels bring nothing yet.
+// Phones: label on its own line, the four numbers under it as one wrapping line; wider: one row of
+// five columns.
+const ROW = 'flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-2 sm:grid sm:grid-cols-[minmax(0,1fr)_4.5rem_4.5rem_6rem_6.5rem] sm:gap-x-2'
+// Sources with nothing this period wait behind 「显示全部」 (a checkbox inside the section).
+const ZERO = 'hidden sm:hidden group-has-[:checked]/sources:flex sm:group-has-[:checked]/sources:grid'
+
+// Groups with a total; search, AI, social and ads open to one row per source. Same definitions as
+// before the split: visitors by first page view, people by first touch, promoters from the database.
 export function SourcesSection({ db, state }: { db: GrowthPeriod; state: SourcesState }) {
   const rows = attribute(db, state.status === 'ok' ? state.data : null)
   const note = state.status === 'loading' ? C.loading : state.status !== 'ok' ? C.noPostHog : state.data.truncated ? C.truncated : null
+  // Sources, not rows: an empty group hides each of its sources (control review of #502).
+  const hidden = rows.reduce((total, row) => total + (row.children.length ? row.children.filter(isEmptyLine).length : isEmptyLine(row) ? 1 : 0), 0)
   return (
     <Section title={C.title} desc={C.desc}>
       {note ? <p className="text-sm text-muted-foreground">{note}</p> : null}
-      <ul className="grid divide-y divide-border sm:hidden" aria-label={C.title}>
-        {rows.map((row) => (
-          <SourceListItem key={row.key} row={row} />
-        ))}
-      </ul>
-      <div className="hidden sm:block">
-        <table className="w-full text-sm" aria-label={C.title}>
-          <thead>
-            <tr className="border-b border-border text-muted-foreground">
-              <th scope="col" className="py-2 text-left font-normal">{C.source}</th>
-              {COLUMNS.map((key) => (
-                <th key={key} scope="col" className="py-2 text-right font-normal">
-                  <MetricLabel id={`growth-source-col-${key}`} metric={C.columns[key]} className="justify-end" />
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <SourceTableRow key={row.key} row={row} />
-            ))}
-          </tbody>
-        </table>
+      <div className="group/sources grid text-sm" role="group" aria-label={C.title}>
+        <div className={cn(ROW, 'hidden border-b border-border text-muted-foreground sm:grid')} aria-hidden>
+          <span>{C.source}</span>
+          {COLUMNS.map((key) => (
+            <span key={key} className="text-right">
+              <MetricLabel id={`growth-source-col-${key}`} metric={C.columns[key]} className="justify-end" />
+            </span>
+          ))}
+        </div>
+        {rows.map((row) => (row.children.length ? <GroupRows key={row.key} row={row} /> : <Line key={row.key} line={row} label={<GroupLabel row={row} />} />))}
+        {hidden ? (
+          <label className="mt-3 flex w-fit cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+            <input type="checkbox" className="size-4 accent-primary" />
+            {C.showAll(n(hidden))}
+          </label>
+        ) : null}
       </div>
+      <p className="text-xs text-muted-foreground">{C.limits}</p>
     </Section>
   )
 }
 
-const isQuiet = (row: SourceRow) => row.visitors === 0 && row.signups === 0 && row.payers === 0
+function GroupLabel({ row }: { row: SourceGroupRow }) {
+  return <MetricLabel id={`growth-source-${row.key}`} metric={C.groups[row.key]} className="font-medium" />
+}
 
-// Phones: one line per source, the four numbers in words underneath.
-function SourceListItem({ row }: { row: SourceRow }) {
-  const cols = C.columns
-  const parts = [
-    `${cols.visitors.label} ${row.visitors === null ? DASH : n(row.visitors)}`,
-    `${cols.signups.label} ${n(row.signups)}`,
-    `${cols.payers.label} ${n(row.payers)}`,
-    usd.format(row.net),
-  ]
+// A group that splits into sources: the summary is the total, open when anything came from it.
+function GroupRows({ row }: { row: SourceGroupRow }) {
+  const empty = isEmptyLine(row)
   return (
-    <li className={`grid gap-1 py-2.5 ${isQuiet(row) ? 'text-muted-foreground' : ''}`}>
-      <MetricLabel id={`growth-source-m-${row.key}`} metric={C.groups[row.key]} className="text-sm" />
-      <p className="text-sm tabular-nums">{parts.join(' · ')}</p>
-    </li>
+    <details open={!empty} className={cn('group/item border-b border-border', empty && 'hidden group-has-[:checked]/sources:block')}>
+      <summary className={cn(ROW, 'cursor-pointer list-none rounded-sm focus-visible:outline-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden')}>
+        <span className="flex w-full items-center gap-1 sm:w-auto">
+          <ChevronRight aria-hidden className="size-4 flex-none text-muted-foreground transition-transform group-open/item:rotate-90 motion-reduce:transition-none" />
+          <GroupLabel row={row} />
+        </span>
+        <Numbers line={row} strong />
+      </summary>
+      <div className="pb-2">
+        {row.children.map((child) => (
+          <Line key={child.key} line={child} label={<span className="sm:pl-6">{C.sourceLabels[child.key] ?? child.key}</span>} nested />
+        ))}
+      </div>
+    </details>
   )
 }
 
-function SourceTableRow({ row }: { row: SourceRow }) {
+function Line({ line, label, nested = false }: { line: SourceLine; label: ReactNode; nested?: boolean }) {
+  const empty = isEmptyLine(line)
   return (
-    <tr className={`border-b border-border last:border-0 ${isQuiet(row) ? 'text-muted-foreground' : ''}`}>
-      <th scope="row" className="h-11 py-1 text-left font-normal">
-        <MetricLabel id={`growth-source-${row.key}`} metric={C.groups[row.key]} />
-      </th>
-      <td className="py-1 text-right tabular-nums">{row.visitors === null ? DASH : n(row.visitors)}</td>
-      <td className="py-1 text-right tabular-nums">{n(row.signups)}</td>
-      <td className="py-1 text-right tabular-nums">{n(row.payers)}</td>
-      <td className="py-1 text-right tabular-nums">{usd.format(row.net)}</td>
-    </tr>
+    <div className={cn(ROW, nested ? 'pl-6 sm:pl-0' : 'border-b border-border', empty && cn(ZERO, 'text-muted-foreground'))}>
+      <span className="w-full sm:w-auto">
+        {label}
+      </span>
+      <Numbers line={line} />
+    </div>
   )
+}
+
+// The four numbers; on phones each carries its column name in front.
+function Numbers({ line, strong = false }: { line: SourceLine; strong?: boolean }) {
+  const values = [line.visitors === null ? DASH : n(line.visitors), n(line.signups), n(line.payers), usd.format(line.net)]
+  return COLUMNS.map((key, i) => (
+    <span key={key} className={cn('whitespace-nowrap tabular-nums sm:text-right', strong && 'font-medium')}>
+      <span className="text-xs text-muted-foreground sm:sr-only">{C.columns[key].label} </span>
+      {values[i]}
+    </span>
+  ))
 }

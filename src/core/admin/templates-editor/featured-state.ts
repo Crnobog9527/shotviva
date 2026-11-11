@@ -1,9 +1,9 @@
+import { FEATURED_LIMIT, isFeaturable as canFeature } from '../templates/bulk-featured-rules'
 import type { AdminTemplate } from '../templates/types'
 
-// The home featured list (T53, ARCHITECTURE §12): at most 12, published web templates only.
-export const FEATURED_LIMIT = 12
-
-export const canFeature = (template: AdminTemplate) => template.isActive && template.visibleIn.includes('web')
+// The home featured list (T53, ARCHITECTURE §12): at most 12, published web templates only. The
+// rule lives with the batch plan, so the switch and the bulk bar cannot drift apart.
+export { FEATURED_LIMIT, canFeature }
 
 // The featured ids in display order (featured_rank ascending).
 export function featuredIds(templates: readonly AdminTemplate[]): string[] {

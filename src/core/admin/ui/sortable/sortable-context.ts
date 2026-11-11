@@ -12,6 +12,7 @@ export type SortableListContextValue = SortableListState & {
   // Off for the reason disabledHint gives (handles greyed), not just busy saving.
   blocked: boolean
   reducedMotion: boolean
+  layout: 'list' | 'grid'
 }
 
 export const SortableListContext = createContext<SortableListContextValue | null>(null)

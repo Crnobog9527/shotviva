@@ -2,6 +2,7 @@ import 'server-only'
 
 import { currentLocale, localized } from '../../i18n/server'
 import { logger } from '../../logger'
+import { currentOrigin } from '../../request-origin'
 import { nextIn } from '../redirect-target'
 import { createServerSupabase } from '../supabase-server'
 import { classifyAuthError } from './classify-auth-error'
@@ -28,7 +29,7 @@ export async function signUpWithPassword(form: FormData): Promise<FormState> {
   const { error } = await supabase.auth.signUp({
     email,
     password,
-    options: { captchaToken, data: { locale }, emailRedirectTo: confirmUrl(nextIn(next, locale)) },
+    options: { captchaToken, data: { locale }, emailRedirectTo: confirmUrl(nextIn(next, locale), await currentOrigin()) },
   })
   if (error && !REGISTERED.has(error.code ?? '')) {
     const code = classifyAuthError(error)
@@ -49,7 +50,7 @@ export async function resendSignupEmail(form: FormData): Promise<FormState> {
   const { error } = await supabase.auth.resend({
     type: 'signup',
     email,
-    options: { captchaToken, emailRedirectTo: confirmUrl(nextIn(next, await currentLocale())) },
+    options: { captchaToken, emailRedirectTo: confirmUrl(nextIn(next, await currentLocale()), await currentOrigin()) },
   })
   return quietly(error, 'sign-up email resend failed')
 }
@@ -62,7 +63,7 @@ export async function requestPasswordReset(form: FormData): Promise<FormState> {
   const supabase = await createServerSupabase()
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     captchaToken,
-    redirectTo: confirmUrl(await localized('/reset/update')),
+    redirectTo: confirmUrl(await localized('/reset/update'), await currentOrigin()),
   })
   return quietly(error, 'password reset request failed')
 }

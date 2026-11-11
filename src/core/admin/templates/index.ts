@@ -3,6 +3,8 @@ export { listVersions, manageVersion, readVersion } from './history'
 export { listAdminTemplates } from './repository'
 export { listImageProviderOptions, pricingFromOptions, readImageProviderQuote } from './provider-pricing'
 export { bulkEditTemplates } from './bulk-edit'
+export { setTemplatesFeatured } from './bulk-featured'
+export { type FeaturedPlan } from './bulk-featured-rules'
 export {
   bulkEditFailures,
   describeFailure,

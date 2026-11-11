@@ -1,6 +1,6 @@
 'use client'
 
-import { ChevronDown, ChevronUp, GripVertical } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, GripVertical } from 'lucide-react'
 
 import { Button } from '@/core/ui/button'
 import { cn } from '@/core/ui/cn'
@@ -28,12 +28,13 @@ export function DragHandle({ handle }: { handle: SortableItem['handle'] }) {
 }
 
 // The one-step arrows, kept small as a fallback to dragging (ARCHITECTURE §10).
-export function MoveButtons({ item }: { item: Pick<SortableItem, 'moveUp' | 'moveDown'> }) {
+// `axis` 'row' for cards in a grid: earlier / later point left / right.
+export function MoveButtons({ item, axis = 'column' }: { item: Pick<SortableItem, 'moveUp' | 'moveDown'>; axis?: 'column' | 'row' }) {
   return (
     <span className="inline-flex">
       {[
-        { ...item.moveUp, Icon: ChevronUp },
-        { ...item.moveDown, Icon: ChevronDown },
+        { ...item.moveUp, Icon: axis === 'row' ? ChevronLeft : ChevronUp },
+        { ...item.moveDown, Icon: axis === 'row' ? ChevronRight : ChevronDown },
       ].map(({ label, onClick, disabled, Icon }) => (
         <Button
           key={label}
