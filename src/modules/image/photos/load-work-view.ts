@@ -6,6 +6,7 @@ import { getTranslations } from 'next-intl/server'
 import { currentTier, limitsFor, readBalance } from '@/core/billing'
 import { fileUrlFor, findOwnJob, hasInputPreview, jobRefOrShort, keptInputsOf, originalUrlFor, type Job } from '@/core/jobs'
 import type { Locale } from '@/core/i18n'
+import { logger } from '@/core/logger'
 import type { ObjectStore } from '@/core/storage'
 import { EDIT_TEMPLATE_ID, listTemplatesIn, loadEditOffer } from '@/core/templates'
 
@@ -77,5 +78,14 @@ async function readFromJob(deps: Deps, userId: string, job: Job) {
 }
 
 // One template of today's web catalogue by id (series members included), or none: the built-in
-// edit template and retired ones are in no catalogue.
-const templateNamed = (deps: Deps, id: string) => (id === EDIT_TEMPLATE_ID ? Promise.resolve([]) : listTemplatesIn(deps.db, deps.locale, { id }))
+// edit template and retired ones are in no catalogue. A failed read is none too: the work still
+// opens, under the fallback name and without Make again, rather than not at all.
+async function templateNamed(deps: Deps, id: string) {
+  if (id === EDIT_TEMPLATE_ID) return []
+  try {
+    return await listTemplatesIn(deps.db, deps.locale, { id })
+  } catch (error) {
+    logger.warn('photos.view.template_read_failed', { templateId: id, error })
+    return []
+  }
+}
