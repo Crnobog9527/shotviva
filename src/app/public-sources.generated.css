@@ -366,6 +366,9 @@
 @source "../core/content/blocks/pricing-hero.tsx";
 @source "../core/content/blocks/problem-view.tsx";
 @source "../core/content/blocks/related-links.tsx";
+@source "../core/content/blocks/series-card.tsx";
+@source "../core/content/blocks/series-motion-mount.tsx";
+@source "../core/content/blocks/series-motion.ts";
 @source "../core/content/blocks/shoot-section.tsx";
 @source "../core/content/blocks/site-footer.tsx";
 @source "../core/content/blocks/template-grid.tsx";
@@ -576,6 +579,7 @@
 @source "../core/templates/output-options.ts";
 @source "../core/templates/pricing.ts";
 @source "../core/templates/provider-pricing.ts";
+@source "../core/templates/public-series.ts";
 @source "../core/templates/schema.ts";
 @source "../core/templates/select-templates.ts";
 @source "../core/templates/style-refs.ts";
