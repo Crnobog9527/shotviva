@@ -2,8 +2,6 @@ import { Link } from '@/core/i18n/ui'
 import { useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 
-import { EDIT_TEMPLATE_ID } from '@/core/templates/edit-params'
-import { buttonVariants } from '@/core/ui/button'
 import { cn } from '@/core/ui/cn'
 
 import { DetailHead } from '../detail/detail-head'
@@ -14,7 +12,6 @@ import { PhotoFacts } from '../detail/photo-facts'
 import type { PhotoDetail } from '../detail/photo-detail'
 import type { PhotoItem } from '../photos/photo-item'
 import { tierName, tierPx } from '../workspace/workspace-options'
-import { SIDE_BY_SIDE } from './action-styles'
 import { EditedFrom, EditedFromDeleted, YourChange, type EditParent } from './edited-from'
 import { ShareButton } from './share-button'
 
@@ -31,29 +28,24 @@ type Props = {
   change?: string | null
   // "Delete" (T41): the last action, quiet and in the danger colour.
   remove?: ReactNode
+  // The Photos viewer around it (2026-11-12): its two columns (this section takes part in the
+  // viewer's grid), the step buttons over the photo, Make again switching the viewer in place,
+  // and the batch the work belongs to.
+  viewer: { tray: string; side: string; photoExtra: ReactNode; again: ReactNode; batch: ReactNode }
 }
 
-// A finished photo opened from Photos (T6 photo.html; DESIGN §4.4): the result with its views,
-// then name, meta, Share as the one primary (Download · px from lg), Edit and Make again side by side, what an edit came from, the
-// user's note and the facts. Two columns from lg, the photo sticky on the left.
-export function ResultView({ item, detail, shareText, edit, parent, parentDeleted = false, change, remove }: Props) {
+// A finished photo opened from Photos (T6 photo.html; DESIGN §4.4), in the Photos viewer: the
+// result with its views, then name, meta, Share as the one primary (Download · px from lg), Edit
+// and Make again side by side, what an edit came from, the user's note and the facts.
+export function ResultView({ item, detail, shareText, edit, parent, parentDeleted = false, change, remove, viewer }: Props) {
   const t = useTranslations('app')
   const fileUrl = item.fileUrl as string
-  // An edit has no template page to go back to. No prefetch: opening the workspace copies the
-  // kept photo back to a fresh upload (T40).
-  const again =
-    item.templateId === EDIT_TEMPLATE_ID ? null : (
-      <Link href={`/generate/${item.templateId}?again=${item.id}`} prefetch={false} className={buttonVariants({ variant: 'glass', size: 'touch', className: SIDE_BY_SIDE })}>
-        <AgainIcon />
-        {t('result.makeAgain')}
-      </Link>
-    )
   return (
     <section
       aria-label={t('photos.photoAlt', { name: item.templateName })}
-      className="px-4 pt-2 md:mx-auto md:max-w-[520px] md:px-0 lg:grid lg:max-w-none lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start lg:gap-x-12 lg:px-(--gutter) lg:pt-6"
+      className="contents"
     >
-      <div className="lg:sticky lg:top-[132px]">
+      <div className={viewer.tray}>
         <DetailPhoto
           src={fileUrl}
           alt={t('workspace.resultAlt', { name: item.templateName })}
@@ -61,15 +53,17 @@ export function ResultView({ item, detail, shareText, edit, parent, parentDelete
           tierLabel={t('result.tierPx', { tier: tierName(item.resolution, t), px: tierPx(item.resolution) })}
           original={{ source: detail.original, alt: t('result.originalAlt', { name: item.templateName }) }}
         />
+        {viewer.photoExtra}
       </div>
-      <div className="pt-4 lg:pt-0">
+      <div className={viewer.side}>
         <DetailHead item={item} />
         <div className="mt-4 grid gap-2">
           <ShareButton fileUrl={fileUrl} name={`shotviva-${item.templateId}`} shareText={shareText} px={tierPx(item.resolution)} watermarked={item.creditPool === 'free'} />
           {/* Edit and Make again side by side (B comp photo.html .acts .two); alone, full width. */}
-          <QuietActions edit={edit} again={again} />
+          <QuietActions edit={edit} again={viewer.again} />
           {remove}
         </div>
+        {viewer.batch}
         {parent ? <EditedFrom parent={parent} /> : parentDeleted ? <EditedFromDeleted /> : null}
         {change ? <YourChange text={change} /> : null}
         {detail.note ? <NoteQuote note={detail.note} /> : null}
@@ -111,7 +105,8 @@ function QuietActions({ edit, again }: { edit: ReactNode; again: ReactNode }) {
   )
 }
 
-function AgainIcon() {
+// Make again's mark, also on the Photos viewer's Make again.
+export function AgainIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className="size-[18px] text-primary" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
       <path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4" />

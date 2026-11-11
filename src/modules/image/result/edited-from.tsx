@@ -1,16 +1,17 @@
 /* eslint-disable @next/next/no-img-element -- auth-gated download route, not a static asset */
 import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
-import { Link } from '@/core/i18n/ui'
 import { useTranslations } from 'next-intl'
+
+import { WorkLink } from '../photos/viewer/work-link'
 
 export type EditParent = { id: string; fileUrl: string; name: string }
 
 // "Edited from" on a photo made by editing another (ARCHITECTURE §5.2, T6 comp ?edited=1): the
-// source's 44×55 thumbnail, its name, and a link back to it.
+// source's 44×55 thumbnail, its name, and a link back to it (in the Photos viewer, in place).
 export function EditedFrom({ parent }: { parent: EditParent }) {
   const t = useTranslations('app.edit')
   return (
-    <Link href={`/photos/${parent.id}`} className="hairline press mt-3 flex min-h-[71px] items-center gap-3 rounded-panel bg-card px-3 py-2">
+    <WorkLink workId={parent.id} className="hairline press mt-3 flex min-h-[71px] items-center gap-3 rounded-panel bg-card px-3 py-2">
       <img src={parent.fileUrl} alt="" className={`${REPLAY_BLOCK_CLASS} h-[55px] w-11 flex-none rounded-md bg-photo-ground object-cover`} />
       <span className="grid flex-1 gap-0.5">
         <span className="text-caption text-muted-foreground">{t('editedFromLabel')}</span>
@@ -19,7 +20,7 @@ export function EditedFrom({ parent }: { parent: EditParent }) {
       <span aria-hidden="true" className="text-muted-foreground">
         ›
       </span>
-    </Link>
+    </WorkLink>
   )
 }
 

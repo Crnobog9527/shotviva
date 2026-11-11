@@ -700,7 +700,20 @@
       "makeAgain": "Make again",
       "deleted": "Photo deleted.",
       "deletedClose": "Close",
-      "emptyTitle": "No photos yet"
+      "emptyTitle": "No photos yet",
+      "viewer": {
+        "previous": "Previous photo",
+        "next": "Next photo",
+        "position": "Photo {index} of {count}",
+        "back": "Back to photo",
+        "batch": "Photo {index} of {count} in this batch",
+        "failed": "Couldn't open this photo",
+        "failedBody": "Check your connection and try again. The photo is still in Photos.",
+        "retry": "Try again",
+        "againPreparing": "Bringing over this photo and its settings…",
+        "againFailed": "Couldn't start Make again here.",
+        "againPage": "Open the template"
+      }
     },
     "work": {
       "freePublic": "Public · watermark",
