@@ -12,7 +12,7 @@ import { join } from 'node:path'
 import sharp from 'sharp'
 
 // One entry per hero `before` picture (home and the three landing pages, both languages).
-const SOURCES = ['/home/hero-set-phone.webp', '/cases/sneaker-phone.webp', '/cases/pet-phone.webp', '/home/example-dish-before.webp']
+const SOURCES = ['/home/hero-set-phone.webp', '/cases/sneaker-phone.webp', '/cases/pet-phone.webp', '/cases/menu-fish-phone.webp']
 
 // 288 px: at least as many pixels as the plate has CSS pixels on a phone (about 190 wide) and on
 // a desktop (268 wide), so the browser counts the frame, not the later full picture, as the
@@ -20,6 +20,8 @@ const SOURCES = ['/home/hero-set-phone.webp', '/cases/sneaker-phone.webp', '/cas
 // twice on the home page.
 const WIDTH = 288
 const QUALITY = 45
+// The menu fish photo is busier (steam, chilies, steel): a lower quality keeps it under 9 KB.
+const QUALITY_FOR: Readonly<Record<string, number>> = { '/cases/menu-fish-phone.webp': 38 }
 
 async function main() {
   const entries: string[] = []
@@ -27,7 +29,7 @@ async function main() {
   for (const src of SOURCES) {
     const input = await readFile(join(process.cwd(), 'public', src))
     hashes.push(`  '${src}': '${createHash('sha256').update(input).digest('hex')}',`)
-    const frame = await sharp(input).resize({ width: WIDTH }).avif({ quality: QUALITY, effort: 9 }).toBuffer()
+    const frame = await sharp(input).resize({ width: WIDTH }).avif({ quality: QUALITY_FOR[src] ?? QUALITY, effort: 9 }).toBuffer()
     entries.push(`  '${src}': 'data:image/avif;base64,${frame.toString('base64')}',`)
     process.stdout.write(`${src}: ${frame.length} bytes\n`)
   }

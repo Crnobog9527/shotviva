@@ -7,6 +7,7 @@ import { createAdminSupabase } from '../auth/supabase-admin'
 import { FAILED_READ_LIFE } from '../cache-life'
 import { logger } from '../logger'
 import { GALLERY_CACHE_TAG } from './cache'
+import { GALLERY_MAX_PAGES } from './page-number'
 
 // The public gallery's reads (ARCHITECTURE §9, 创作库规格 U11). Only approved public works in the
 // gallery's scope (§9 第 7 条), on generation_jobs_gallery_idx. No cookies inside a cache, so the
@@ -14,7 +15,6 @@ import { GALLERY_CACHE_TAG } from './cache'
 // Every read carries the gallery tag that a decision, a deletion or a switch change expires.
 
 export const GALLERY_PAGE_SIZE = 24
-export const GALLERY_MAX_PAGES = 20
 // A missed expiry (another instance) is bounded to ten minutes.
 const GALLERY_LIFE = { revalidate: 600, expire: 3600 } as const
 

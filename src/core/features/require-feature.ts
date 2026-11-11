@@ -2,7 +2,7 @@ import 'server-only'
 
 import type { MembershipTier } from '../config'
 import { createAdminSupabase } from '../auth/supabase-admin'
-import { currentTier } from '../billing/tier'
+import { effectiveTier } from '../billing/tier'
 import { AppError, TierRequiredError } from '../errors'
 import { missingTier, type FeatureAccess } from './access'
 import { cachedFeatureAccess } from './read'
@@ -18,7 +18,8 @@ export type RequireFeatureDeps = {
 const defaults = (): RequireFeatureDeps => ({
   registry: FEATURES,
   loadAccess: cachedFeatureAccess,
-  tierOf: (userId) => currentTier(createAdminSupabase(), userId),
+  // An unbanned admin counts as Max (effective_tier), so gated features are open to the Owner.
+  tierOf: (userId) => effectiveTier(createAdminSupabase(), userId),
   now: Date.now,
 })
 
