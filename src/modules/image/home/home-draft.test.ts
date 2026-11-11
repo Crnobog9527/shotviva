@@ -4,7 +4,7 @@ import { DRAFT_TTL_MS, parseDraft } from './home-draft'
 
 const now = 1_800_000_000_000
 const raw = (value: object) => JSON.stringify(value)
-const draft = { templateId: 'white-background', aspect: '4:5', note: 'warmer', toggles: ['replate'], confirmed: ['replate'], savedAt: now - 1000, hasPhoto: true }
+const draft = { templateId: 'white-background', aspect: '4:5', note: 'warmer', savedAt: now - 1000, hasPhoto: true }
 
 describe('parseDraft', () => {
   it('reads back what the home generator saved before sign-up', () => {
@@ -20,8 +20,8 @@ describe('parseDraft', () => {
     expect(parseDraft(null, now)).toBeNull()
   })
 
-  it('reads a draft saved before T89 as all toggles off', () => {
-    expect(parseDraft(raw({ ...draft, toggles: undefined, confirmed: 'replate' }), now)).toMatchObject({ toggles: [], confirmed: [] })
+  it('ignores the toggle keys a draft saved while the home bar offered toggles still carries', () => {
+    expect(parseDraft(raw({ ...draft, toggles: ['replate'], confirmed: ['replate'] }), now)).toEqual(draft)
   })
 
   it('keeps the note within the 300 characters the field allows', () => {
