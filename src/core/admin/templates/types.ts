@@ -63,7 +63,8 @@ export type TemplateAdminActions = {
   // Drag-to-reorder and the arrows (T76): one group's whole new order.
   setOrder: (input: { group: TemplateOrderGroup; ids: string[]; expectedIds: string[] }) => Promise<ActionResult>
   // The home featured list in display order (T53).
-  setFeatured: (ids: string[]) => Promise<ActionResult>
+  // With expectedIds (the list the page showed), refused when it changed elsewhere since.
+  setFeatured: (input: string[] | { ids: string[]; expectedIds: string[] }) => Promise<ActionResult>
   // Batch 首页精选 (2026-11-12): the ticked templates in or out, all or nothing.
   setFeaturedMany: (input: { ids: string[]; featured: boolean; expectedIds: string[] }) => Promise<ActionValue<FeaturedPlan>>
   requestCoverUpload: (input: CoverUploadRequest) => Promise<ActionValue<CoverTicket>>
