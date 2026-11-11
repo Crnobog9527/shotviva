@@ -1,0 +1,9 @@
+/* The public pages' sheet (marketing, sign-in, the 404s): the same tokens, base rules and
+   components as globals.css, but Tailwind utilities only for the files those pages can load
+   (public-sources.generated.css, written by `pnpm css:sources` from the import graph). The admin
+   alone is 250 components these pages never render; their utilities were three quarters of the
+   stylesheet every first-time visitor waited for. A page that later enters the app loads
+   globals.css on top; the two agree rule for rule. */
+@import "tailwindcss" source(none);
+@import "./public-sources.generated.css";
+@import "./globals-body.css";

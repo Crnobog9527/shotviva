@@ -1,3 +1,7 @@
+// The app's Tailwind sheet (utilities for all of src/), first so its layers and tokens precede
+// every component sheet. Marketing and sign-in pages load globals-public.css instead.
+import '../../globals.css'
+
 import type { Metadata } from 'next'
 import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
@@ -17,7 +21,7 @@ import { appShellMetadata } from '@/core/seo'
 import { SupportTabBadge } from '@/core/support'
 import { LivingBackground } from '@/core/ui/living-background'
 import { isWishlistEnabled, WishlistTabBadge } from '@/core/wishlist'
-import { GenerationRunner, HideWhileGenerating, PhotosTabBadge } from '@/modules/image'
+import { GenerationOwner, GenerationRunner, HideWhileGenerating, PhotosTabBadge } from '@/modules/image'
 import { displayProducts } from '@/site/billing/display-products'
 import { site } from '@/site/site.config'
 
@@ -35,9 +39,16 @@ export const metadata: Metadata = appShellMetadata()
 export const prefetch = 'partial'
 
 // Same cached session lookup the page's requireUser() makes, so no extra auth round trip.
+// The generation store is scoped to the same id: a tab that signs in as someone else drops the
+// last account's batch.
 async function Identity() {
   const user = await getSessionUser()
-  return user ? <AnalyticsIdentify userId={user.id} staff={isStaffAccount(user, site.brand.domain)} /> : null
+  return user ? (
+    <>
+      <AnalyticsIdentify userId={user.id} staff={isStaffAccount(user, site.brand.domain)} />
+      <GenerationOwner userId={user.id} />
+    </>
+  ) : null
 }
 
 // The top bar's Admin item (spec #186), decided here on the server: built only for
