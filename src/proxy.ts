@@ -7,12 +7,16 @@ import { recordReferral } from '@/core/affiliate/referral'
 import { withAnalyticsRegion } from '@/core/analytics/consent'
 import { proxyGate } from '@/core/auth/proxy'
 import { captureCodeLink } from '@/core/codes/link'
+import { isBadGalleryPage } from '@/core/gallery/page-number'
+import { galleryWorkIdOf, liveGalleryGate } from '@/core/gallery/proxy-gate'
 import { serverEnv } from '@/core/env'
 import { routing } from '@/core/i18n/routing'
 import { canonicalRedirectResponse, withHostNoindex } from '@/core/seo'
 import { site } from '@/site/site.config'
 
 const hosts = { canonicalHost: site.brand.domain, redirectHosts: site.indexing.canonicalRedirectHosts }
+// One per proxy instance: it holds the gallery switch for a few seconds (core/gallery/proxy-gate.ts).
+const isShownWork = liveGalleryGate(site)
 
 // next-intl's router: /pricing is served from app/[locale] as `en`, /zh/pricing as `zh`, and
 // /en/pricing redirects to /pricing. It never redirects by browser language (ARCHITECTURE §17).
@@ -34,6 +38,12 @@ export async function proxy(request: NextRequest) {
   if (requiresAffiliateProgram(request.nextUrl.pathname) && !(await isAffiliateEnabled())) {
     return notFoundResponse()
   }
+  // /gallery?page= outside 1–20 (T108): a real 404 here, since the page reads the number inside
+  // a Suspense boundary, after its status is sent.
+  if (isBadGalleryPage(request.nextUrl)) return notFoundResponse()
+  // /g/<id> (T108): a real 404 unless the gallery is open and shows the work.
+  const workId = galleryWorkIdOf(request.nextUrl.pathname)
+  if (workId !== null && !(workId && (await isShownWork(workId)))) return notFoundResponse()
   const env = serverEnv()
   const response = captureCodeLink(request) ?? await proxyGate(request, {
     translatedPaths: site.locales.zhPaths,
