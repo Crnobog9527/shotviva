@@ -19,6 +19,7 @@ import {
   usdRange,
   OUTPUT_TIERS,
 } from './offer'
+import { textEdits } from './home-edits'
 import { homeWishlist } from './home-wishlist'
 import { withFirstFrame } from './landing-shared'
 import { sharedFacts } from './shared'
@@ -187,6 +188,7 @@ const copy = {
     scenes: { label: 'AI scenes of the same photo', items: heroScenes },
   },
   shoot,
+  edits: textEdits,
   steps,
   templateGrid: {
     heading: 'Img to Img Templates: No Prompts to Write',
