@@ -6,6 +6,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { decideWorks, listReviewWorks, pendingReviewCount } from '@/core/admin/gallery-review'
 import { MAX_SCREEN_ATTEMPTS, screenWork, sweepModeration } from '@/core/moderation'
 
+import { createMemoryStore } from '../fakes/memory-store'
 import { anonClient, connectAdmin, createUser } from './helpers'
 import { serviceSupabase } from './supabase-env'
 
@@ -43,7 +44,7 @@ const record = (id: string, flagged: boolean, categories: string[] = []) =>
   service.rpc('record_work_auto_moderation', { p_job_id: id, p_flagged: flagged, p_categories: categories })
 const setAuto = (on: boolean) =>
   db.query(`insert into public.system_settings (key, value) values ('gallery_auto_approve', $1) on conflict (key) do update set value = excluded.value`, [JSON.stringify(on)])
-const decide = (input: unknown, actor = admin) => decideWorks({ db: service, invalidate: () => undefined }, actor, input)
+const decide = (input: unknown, actor = admin) => decideWorks({ db: service, store: createMemoryStore().store, invalidate: () => undefined, defer: () => undefined }, actor, input)
 const report = (jobId: string, reporter: string, reason = 'spam', note: string | null = null) =>
   service.rpc('report_work', { p_job_id: jobId, p_reporter: reporter, p_reason: reason, p_note: note })
 

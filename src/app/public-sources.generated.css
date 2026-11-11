@@ -408,6 +408,8 @@
 @source "../core/gallery/ui/track.tsx";
 @source "../core/gallery/ui/use-report.ts";
 @source "../core/gallery/ui/work-page.tsx";
+@source "../core/gallery/variant-sync.ts";
+@source "../core/gallery/variants.ts";
 @source "../core/gallery/work-view.ts";
 @source "../core/i18n/client-messages.ts";
 @source "../core/i18n/index.ts";
