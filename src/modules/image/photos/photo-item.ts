@@ -1,6 +1,7 @@
 import type { CreditPool } from '@/core/billing/pools'
 import type { Job, JobVisibility } from '@/core/jobs'
 import { isCutOut } from '@/core/jobs/job-cut-out'
+import { thumbUrlFor } from '@/core/jobs/job-view'
 import { OUTPUT_ASPECTS, RESOLUTIONS, type OutputAspect, type Resolution } from '@/core/templates/output-options'
 import type { Translate } from '@/core/translate'
 
@@ -20,6 +21,9 @@ export type PhotoItem = {
   creditPool: CreditPool
   visibility: JobVisibility
   fileUrl: string | null
+  // The small copy lists show (ARCHITECTURE §8.3「作品小图」): the thumbnail route, or for Photos'
+  // first screen a signed URL of the copy itself. Null like fileUrl while the job runs.
+  thumbUrl: string | null
   // A cut-out (transparent background): downloads offer 白底 / 透明底. null when unknown.
   transparent?: boolean | null
   // The preflighted batch it came from (T107): Photos groups a batch and offers its ZIP.
@@ -34,7 +38,8 @@ const pick = <T extends string>(allowed: readonly T[], value: unknown, fallback:
   allowed.includes(value as T) ? (value as T) : fallback
 
 // fallbackName names a job whose template is gone or partner-only (app.photos.fallbackName).
-export function toPhotoItem(job: Job, templates: TemplateLookup, fileUrl: string | null, fallbackName = ''): PhotoItem {
+// signedThumb: the small copy's signed URL when the page already has one (Photos' first screen).
+export function toPhotoItem(job: Job, templates: TemplateLookup, fileUrl: string | null, fallbackName = '', signedThumb?: string): PhotoItem {
   const template = templates.get(job.templateId)
   return {
     id: job.id,
@@ -48,6 +53,7 @@ export function toPhotoItem(job: Job, templates: TemplateLookup, fileUrl: string
     creditPool: job.creditPool,
     visibility: job.visibility,
     fileUrl,
+    thumbUrl: fileUrl ? (signedThumb ?? thumbUrlFor(job.id)) : null,
     transparent: isCutOut(job),
     batchId: job.batchId ?? null,
     batchPosition: batchPosition(job.inputs.batch_position),

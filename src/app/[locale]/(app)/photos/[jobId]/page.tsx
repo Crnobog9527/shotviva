@@ -63,7 +63,7 @@ async function Result({ params, searchParams }: Pick<PageProps<'/[locale]/photos
       item={item}
       detail={job.templateId === EDIT_TEMPLATE_ID ? { ...detail, original: editOriginal(source) } : detail}
       edit={offer ? <EditTrigger /> : null}
-      parent={source ? { id: source.id, fileUrl: source.fileUrl as string, name: source.templateName } : null}
+      parent={source ? { id: source.id, thumbUrl: source.thumbUrl as string, name: source.templateName } : null}
       // findOwnJob leaves out a deleted work (T41), so a parent id with no parent row means deleted.
       parentDeleted={job.parentJobId !== null && parent === null}
       remove={<DeleteWork action={deleteWorkAction.bind(null, job.id)} />}

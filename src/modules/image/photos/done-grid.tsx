@@ -1,11 +1,12 @@
 import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
 import { Link } from '@/core/i18n/ui'
+import { thumbUrlFor } from '@/core/jobs/job-view'
 import { Reveal } from '@/core/ui/reveal-item'
+import { ThumbImg } from '@/core/ui/thumb-img'
 import { useFormatter, useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 
 import { makeAgainHref } from '../again/again-start'
-import { GroundedImg } from '../result/grounded-img'
 import { WorkTag } from '../result/work-tag'
 import { ZipButtonLazy as ZipButton } from '../batch/zip-button-lazy'
 import { groupByBatch, type DoneEntry } from './batch-groups'
@@ -15,13 +16,16 @@ import { doneMeta, doneWhen, type PhotoItem } from './photo-item'
 // "Done", newest first (B comp photos.html): finished photos with their pool's tag, two columns
 // on phones, three from md, four from lg. Each opens its result page; below it a quiet
 // "Make again" goes to the template's workspace when the template is still in the catalogue
-// (an edit or a retired template has none). Empty state per DESIGN §4.6.
+// (an edit or a retired template has none). Empty state per DESIGN §4.6. Every tile shows the
+// work's small copy, never the full file (ARCHITECTURE §8.3「作品小图」).
 export function DoneGrid({ items, now, anyRunning, liveTemplates }: { items: PhotoItem[]; now: Date; anyRunning: boolean; liveTemplates: string[] }) {
   const t = useTranslations('app')
   const format = useFormatter()
   const day = (date: Date) => format.dateTime(date, { month: 'short', day: 'numeric', timeZone: 'UTC' })
   if (items.length === 0) return anyRunning ? null : <PhotosEmpty />
-  const card = (item: PhotoItem) => <DoneCard item={item} meta={doneMeta(item, now, t, day)} live={liveTemplates.includes(item.templateId)} />
+  const entries = groupByBatch(items)
+  const place = new Map(entries.flatMap((entry) => (entry.kind === 'photo' ? [entry.item] : entry.items)).map((item, index) => [item.id, index]))
+  const card = (item: PhotoItem) => <DoneCard item={item} meta={doneMeta(item, now, t, day)} live={liveTemplates.includes(item.templateId)} place={place.get(item.id) ?? EAGER_TILES} />
   return (
     <section aria-labelledby="done-h">
       <div className="mx-(--gutter) mt-6 mb-3 flex items-baseline justify-between gap-3 md:mt-8">
@@ -29,7 +33,7 @@ export function DoneGrid({ items, now, anyRunning, liveTemplates }: { items: Pho
         <span className="text-caption text-muted-foreground">{t('photos.newest')}</span>
       </div>
       <ul className={GRID}>
-        {groupByBatch(items).map((entry) =>
+        {entries.map((entry) =>
           entry.kind === 'photo' ? (
             <Reveal as="li" key={entry.item.id}>
               {card(entry.item)}
@@ -48,13 +52,32 @@ export function DoneGrid({ items, now, anyRunning, liveTemplates }: { items: Pho
 
 const GRID = 'grid grid-cols-2 gap-x-2 gap-y-4 px-(--gutter) md:grid-cols-3 md:gap-x-4 md:gap-y-6 lg:grid-cols-4'
 
-function DoneCard({ item, meta, live }: { item: PhotoItem; meta: string; live: boolean }) {
+// The first screen is fetched at once (two rows of four on a desktop, three of two on a phone)
+// and its first row ahead of everything else, because one of those tiles is the page's largest
+// paint; the rest wait until they are scrolled near.
+const EAGER_TILES = 8
+const FIRST_ROW = 4
+
+// place: where the tile comes in the grid, 0 first.
+function DoneCard({ item, meta, live, place }: { item: PhotoItem; meta: string; live: boolean; place: number }) {
   const t = useTranslations('app')
   return (
     <div className="flex h-full flex-col transition-transform duration-250 ease-house hover:-translate-y-0.5">
       <Link href={`/photos/${item.id}`} className="group press block rounded-control">
         <span className="hairline relative block aspect-[4/5] overflow-hidden rounded-control bg-muted transition-shadow group-hover:shadow-[inset_0_0_0_1px_var(--input)]">
-          {item.fileUrl ? <GroundedImg ground="white" src={item.fileUrl} alt={t('photos.photoAlt', { name: item.templateName })} loading="lazy" decoding="async" className={`${REPLAY_BLOCK_CLASS} absolute inset-0 size-full object-cover transition-transform duration-600 ease-house group-hover:scale-[1.02]`} /> : null}
+          {item.thumbUrl ? (
+            <ThumbImg
+              src={item.thumbUrl}
+              fallback={thumbUrlFor(item.id)}
+              alt={t('photos.photoAlt', { name: item.templateName })}
+              width={480}
+              height={600}
+              loading={place < EAGER_TILES ? 'eager' : 'lazy'}
+              fetchPriority={place < FIRST_ROW ? 'high' : 'auto'}
+              decoding="async"
+              className={`${REPLAY_BLOCK_CLASS} absolute inset-0 size-full object-cover transition-transform duration-600 ease-house group-hover:scale-[1.02]`}
+            />
+          ) : null}
           <WorkTag pool={item.creditPool} visibility={item.visibility} className="absolute bottom-2 left-2" />
         </span>
         <b className="mt-2 block text-body font-semibold">{item.templateName}</b>

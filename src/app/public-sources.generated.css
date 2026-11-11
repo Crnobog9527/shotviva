@@ -478,6 +478,7 @@
 @source "../core/jobs/job-original.ts";
 @source "../core/jobs/job-ref-reads.ts";
 @source "../core/jobs/job-schema.ts";
+@source "../core/jobs/job-thumb.ts";
 @source "../core/jobs/job-view.ts";
 @source "../core/jobs/kept-inputs.ts";
 @source "../core/jobs/model-prices.ts";
@@ -560,6 +561,7 @@
 @source "../core/storage/upload/upload-photo.ts";
 @source "../core/storage/watermark-asset.generated.ts";
 @source "../core/storage/watermark.ts";
+@source "../core/storage/work-thumb.ts";
 @source "../core/system-settings/read.ts";
 @source "../core/system-settings/registry.ts";
 @source "../core/templates/allowed-web-aspects.ts";

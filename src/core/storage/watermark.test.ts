@@ -2,7 +2,7 @@ import sharp from 'sharp'
 import { describe, expect, it } from 'vitest'
 
 import { png } from '../../../tests/fakes/images'
-import { applyWatermark, galleryImage, shouldWatermark } from './watermark'
+import { applyWatermark, galleryImage, shouldWatermark, workThumbImage } from './watermark'
 
 async function region(image: Uint8Array, left: number, top: number) {
   return sharp(image).extract({ left, top, width: 64, height: 24 }).raw().toBuffer()
@@ -53,5 +53,33 @@ describe('watermark', () => {
     expect(await sharp(marked).metadata()).toMatchObject({ format: 'webp', width: 480, height: 360 })
     expect(Buffer.from(marked).equals(Buffer.from(clean))).toBe(false)
     expect(await sharp(await galleryImage(await png(300, 200), 960, false)).metadata()).toMatchObject({ width: 300, height: 200 })
+  })
+})
+
+// ARCHITECTURE §8.3「作品小图」: the short edge is scaled, whatever the shape, and never up.
+describe('work thumbnail image', () => {
+  it('makes the list copy: short edge scaled, WebP, far smaller than the original', async () => {
+    const tall = await png(912, 1136)
+    const thumb = await workThumbImage(tall, 480, false)
+    expect(await sharp(thumb).metadata()).toMatchObject({ format: 'webp', width: 480, height: 598, hasAlpha: false })
+    expect(thumb.length).toBeLessThan(tall.length)
+    expect(await sharp(await workThumbImage(await png(1536, 864), 480, false)).metadata()).toMatchObject({ width: 853, height: 480 })
+    expect(await sharp(await workThumbImage(await png(300, 200), 480, false)).metadata()).toMatchObject({ width: 300, height: 200 })
+  })
+
+  it('marks the list copy of a free work in the bottom-right corner, and only that one', async () => {
+    const original = await png(1024, 1024)
+    const marked = await workThumbImage(original, 480, true)
+    const clean = await workThumbImage(original, 480, false)
+    expect(await sharp(marked).metadata()).toMatchObject({ width: 480, height: 480 })
+    expect((await region(marked, 0, 0)).equals(await region(clean, 0, 0))).toBe(true)
+    expect((await region(marked, 480 - 130, 480 - 40)).equals(await region(clean, 480 - 130, 480 - 40))).toBe(false)
+  })
+
+  it('puts a cut-out list copy on white', async () => {
+    const cutOut = await sharp({ create: { width: 1024, height: 1024, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).png().toBuffer()
+    const thumb = await workThumbImage(new Uint8Array(cutOut), 480, false)
+    const [r, g, b] = await sharp(thumb).extract({ left: 0, top: 0, width: 8, height: 8 }).raw().toBuffer()
+    expect(Math.min(r, g, b)).toBeGreaterThan(245)
   })
 })
