@@ -35,11 +35,11 @@ function pruneViews(raw: unknown, jobs: readonly TrackedJob[]): WorkspaceViews {
 export function decodeState(raw: string | null, now: number): StoreState {
   try {
     const parsed: unknown = raw ? JSON.parse(raw) : null
-    if (Array.isArray(parsed)) return { ...EMPTY_STATE, jobs: restore(raw, now) }
+    // No owner (written before the field): nobody's, so whoever signs in drops it.
+    if (Array.isArray(parsed)) return { ...EMPTY_STATE, jobs: restore(raw, now), owner: '' }
     if (parsed && typeof parsed === 'object' && 'jobs' in parsed) {
       const { limit, jobs: rawJobs, views, owner } = parsed as { limit?: unknown; jobs?: unknown; views?: unknown; owner?: unknown }
       const jobs = restore(JSON.stringify(rawJobs), now)
-      // No owner (written before the field): nobody's, so whoever signs in drops it.
       return { limit: typeof limit === 'number' && limit >= 1 ? limit : 1, jobs, views: pruneViews(views, jobs), owner: typeof owner === 'string' ? owner : '' }
     }
   } catch {

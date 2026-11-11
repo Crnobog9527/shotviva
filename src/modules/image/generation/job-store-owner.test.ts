@@ -55,6 +55,15 @@ it('drops a state from before the owner field (nobody’s)', async () => {
   expect(store.getJobs()).toEqual([])
 })
 
+it('drops the oldest stored format (a bare job array, nobody\u2019s)', async () => {
+  storage.set(KEY, JSON.stringify([job('a', { status: 'running', settledAt: undefined, fileUrl: null, creditPool: null })]))
+  const store = await freshStore()
+  expect(store.getJobs()).toHaveLength(1)
+  store.claimStore('user-b')
+  expect(store.getJobs()).toEqual([])
+  expect(store.submitJob).not.toHaveBeenCalled()
+})
+
 it('keeps the same account’s batch across a reload', async () => {
   stored('user-a', [job('a')])
   const store = await freshStore()

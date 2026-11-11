@@ -94,6 +94,6 @@ describe('the account a stored state belongs to', () => {
 
   it('marks a state written before the owner field as nobody’s', () => {
     expect(decodeState(JSON.stringify({ limit: 1, jobs: [], views: {} }), 5_000).owner).toBe('')
-    expect(decodeState(JSON.stringify([job('a')]), 5_000).owner).toBeUndefined()
+    expect(decodeState(JSON.stringify([job('a')]), 5_000).owner).toBe('')
   })
 })
