@@ -6,17 +6,18 @@ import { restore, serialize, type TrackedJob } from './job-model'
 // account's pace (`limit`), and which jobs each workspace is showing (`views`, by template id),
 // plus those settled jobs, so a refresh in the workspace comes back to the same developing
 // view or result (job-model.ts decides what survives). Before T28 the value was the bare job
-// array; it still reads.
+// array; it still reads. `owner` is the signed-in account that wrote it: a tab that signs in as
+// someone else must not show (or resend) the last account's batch (job-store claimStore).
 const KEY = 'shotviva.generations'
 
 export type WorkspaceViews = Record<string, readonly string[]>
-export type StoreState = { limit: number; jobs: TrackedJob[]; views: WorkspaceViews }
+export type StoreState = { limit: number; jobs: TrackedJob[]; views: WorkspaceViews; owner?: string }
 
 const EMPTY_STATE: StoreState = { limit: 1, jobs: [], views: {} }
 
 export function encodeState(state: StoreState): string {
   const keep = new Set(Object.values(state.views).flat())
-  return JSON.stringify({ limit: state.limit, jobs: JSON.parse(serialize(state.jobs, keep)) as unknown, views: state.views })
+  return JSON.stringify({ limit: state.limit, jobs: JSON.parse(serialize(state.jobs, keep)) as unknown, views: state.views, owner: state.owner })
 }
 
 // A view keeps only the jobs that came back; one left with none is dropped (the form shows).
@@ -34,11 +35,12 @@ function pruneViews(raw: unknown, jobs: readonly TrackedJob[]): WorkspaceViews {
 export function decodeState(raw: string | null, now: number): StoreState {
   try {
     const parsed: unknown = raw ? JSON.parse(raw) : null
-    if (Array.isArray(parsed)) return { ...EMPTY_STATE, jobs: restore(raw, now) }
+    // No owner (written before the field): nobody's, so whoever signs in drops it.
+    if (Array.isArray(parsed)) return { ...EMPTY_STATE, jobs: restore(raw, now), owner: '' }
     if (parsed && typeof parsed === 'object' && 'jobs' in parsed) {
-      const { limit, jobs: rawJobs, views } = parsed as { limit?: unknown; jobs?: unknown; views?: unknown }
+      const { limit, jobs: rawJobs, views, owner } = parsed as { limit?: unknown; jobs?: unknown; views?: unknown; owner?: unknown }
       const jobs = restore(JSON.stringify(rawJobs), now)
-      return { limit: typeof limit === 'number' && limit >= 1 ? limit : 1, jobs, views: pruneViews(views, jobs) }
+      return { limit: typeof limit === 'number' && limit >= 1 ? limit : 1, jobs, views: pruneViews(views, jobs), owner: typeof owner === 'string' ? owner : '' }
     }
   } catch {
     // unreadable: start empty
