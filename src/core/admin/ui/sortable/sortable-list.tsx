@@ -11,7 +11,7 @@ import {
   type DragStartEvent,
   type Modifier,
 } from '@dnd-kit/core'
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { rectSortingStrategy, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useId, useSyncExternalStore, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
@@ -27,6 +27,8 @@ type Props = Omit<SortableListOptions, 'disabled'> & {
   disabled?: boolean
   // Shown on the greyed handles, e.g. why the list cannot be dragged right now.
   disabledHint?: string
+  // 'grid': cards that wrap across rows, dragged in both directions; 'list' (default): rows.
+  layout?: 'list' | 'grid'
   // Renders the rows in the order to show; each row calls useSortableItem(id).
   children: (ids: string[]) => ReactNode
 }
@@ -40,7 +42,7 @@ const noSubscribe = () => () => {}
 // ~0.3 s long-press anywhere on the row on touch screens, the keyboard on the focused handle.
 // Near the edges the page scrolls along (dnd-kit autoScroll). Renders no element of its own,
 // so it can sit inside a <table>; its screen-reader text goes to <body>.
-export function SortableList({ ids, labelOf, onReorder, disabled = false, disabledHint, children }: Props) {
+export function SortableList({ ids, labelOf, onReorder, disabled = false, disabledHint, layout = 'list', children }: Props) {
   const state = useSortableList({ ids, labelOf, onReorder, disabled })
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
   const mounted = useSyncExternalStore(noSubscribe, () => true, () => false)
@@ -64,22 +66,22 @@ export function SortableList({ ids, labelOf, onReorder, disabled = false, disabl
   }
 
   return (
-    <SortableListContext value={{ ...state, labelOf, instructionsId, disabledHint, blocked: disabled && disabledHint !== undefined, reducedMotion }}>
+    <SortableListContext value={{ ...state, labelOf, instructionsId, disabledHint, blocked: disabled && disabledHint !== undefined, reducedMotion, layout }}>
       <DndContext
         id={dndId}
         sensors={sensors}
         collisionDetection={closestCenter}
-        modifiers={[verticalOnly]}
+        modifiers={layout === 'list' ? [verticalOnly] : []}
         accessibility={{
           // dnd-kit's own hidden text would otherwise render inside the <table>.
           container: mounted ? document.body : undefined,
           announcements: pointerAnnouncements(state.shown, labelOf),
-          screenReaderInstructions: { draggable: sortableCopy.instructions },
+          screenReaderInstructions: { draggable: layout === 'grid' ? sortableCopy.gridInstructions : sortableCopy.instructions },
         }}
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
       >
-        <SortableContext items={state.shown} strategy={verticalListSortingStrategy} disabled={state.locked}>
+        <SortableContext items={state.shown} strategy={layout === 'grid' ? rectSortingStrategy : verticalListSortingStrategy} disabled={state.locked}>
           {children(state.shown)}
         </SortableContext>
       </DndContext>
@@ -87,7 +89,7 @@ export function SortableList({ ids, labelOf, onReorder, disabled = false, disabl
         ? createPortal(
             <>
               <p id={instructionsId} hidden>
-                {sortableCopy.instructions}
+                {layout === 'grid' ? sortableCopy.gridInstructions : sortableCopy.instructions}
               </p>
               <p aria-live="assertive" aria-atomic="true" className="sr-only">
                 {state.announcement}
