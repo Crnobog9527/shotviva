@@ -16,8 +16,21 @@ export async function publishStillCover(
   target: { templateId: string; slot: 'before' | 'after' },
   bytes: Uint8Array,
 ): Promise<string> {
+  return (await publishNewStillCover(assets, assetsBaseUrl, target, bytes)).url
+}
+
+// The same publication, also saying whether this call wrote a new object. A caller that may roll
+// back (「发布为模板」, T101) deletes only objects it created: a content-hashed key that already
+// existed may be another template's live cover.
+export async function publishNewStillCover(
+  assets: ObjectStore,
+  assetsBaseUrl: string,
+  target: { templateId: string; slot: 'before' | 'after' },
+  bytes: Uint8Array,
+): Promise<{ url: string; key: string; created: boolean }> {
   const file = await stillCover(bytes)
   const key = `covers/${target.templateId}/${target.slot}-${file.hash}.${file.ext}`
-  await assets.put(key, file.bytes, file.contentType, { cacheControl: IMMUTABLE })
-  return `${assetsBaseUrl}/${key}`
+  const created = !(await assets.head(key))
+  if (created) await assets.put(key, file.bytes, file.contentType, { cacheControl: IMMUTABLE })
+  return { url: `${assetsBaseUrl}/${key}`, key, created }
 }

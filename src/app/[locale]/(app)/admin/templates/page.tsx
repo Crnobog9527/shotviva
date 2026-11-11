@@ -16,7 +16,10 @@ export const instant = false
 
 export const metadata: Metadata = { title: '模板与提示词' }
 
-export default async function AdminTemplatesPage() {
+// ?edit=<id> opens that template's editor, e.g. right after 「发布为模板」 created a draft (T101).
+const editParam = (value: string | string[] | undefined) => typeof value === 'string' && /^[a-z0-9-]{1,64}$/.test(value) ? value : undefined
+
+export default async function AdminTemplatesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requireAdmin()
   const db = createAdminSupabase()
   // Start the shared trial data with the catalogue; the list renders without waiting for R2.
@@ -24,10 +27,11 @@ export default async function AdminTemplatesPage() {
   const summary = opening.then(data => data.summary).catch(() => null)
   const previews = opening.then(data => data.previews()).catch(() => null)
   const catalogue = loadCatalogue(db)
+  const edit = editParam((await searchParams).edit)
   return <>
     <Suspense fallback={null}><PhotoPreloads previews={previews} /></Suspense>
     <Suspense fallback={null}>
-      <TestPanelSummaryProvider initial={summary} previews={previews}><Catalogue data={catalogue} /></TestPanelSummaryProvider>
+      <TestPanelSummaryProvider initial={summary} previews={previews}><Catalogue data={catalogue} edit={edit} /></TestPanelSummaryProvider>
     </Suspense>
   </>
 }

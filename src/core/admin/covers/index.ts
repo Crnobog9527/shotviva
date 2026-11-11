@@ -1,5 +1,5 @@
 export { applyCover, createCoverUpload, type ApplyCoverInput, type CoverDeps, type CoverUploadTicket } from './cover-upload'
-export { publishStillCover } from './cover-publish'
+export { publishNewStillCover, publishStillCover } from './cover-publish'
 export { sniffCover } from './cover-media'
 export { COVER_STILL_TYPES, MAX_COVER_IMAGE_BYTES, maxBytesFor } from './cover-rules'
 export { signCoverDownload } from './cover-download'

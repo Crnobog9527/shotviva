@@ -31,6 +31,8 @@ type Props = {
   // The cover tabs (T87): common, launched languages, upcoming ones.
   coverLanguages: readonly CoverLanguage[]
   actions: TemplateAdminActions
+  // A template id from the page's ?edit= link; opened once the list has it.
+  initialEdit?: string
 }
 
 // 'saved': a new template just saved, shown in edit mode (with the test-run panel, T85) as soon as
@@ -52,9 +54,9 @@ function afterSave(payload: SaveTemplatePayload): Editing {
   return { mode: 'saved', id: typeof id === 'string' ? id : '' }
 }
 
-export function TemplatesEditor({ providers, templates, categories, series, floor, coverLanguages, actions }: Props) {
+export function TemplatesEditor({ providers, templates, categories, series, floor, coverLanguages, actions, initialEdit }: Props) {
   const [query, setQuery] = useState('')
-  const [editing, setEditing] = useState<Editing | null>(null)
+  const [editing, setEditing] = useState<Editing | null>(initialEdit ? { mode: 'saved', id: initialEdit } : null)
   const [unpublishing, setUnpublishing] = useState<AdminTemplate | null>(null)
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set())
   const { pending, error, notice, run, clearError } = useTemplateActions()
