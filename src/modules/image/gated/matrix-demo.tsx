@@ -16,7 +16,7 @@ export function MatrixScene({ rows, shown, phase }: { rows: readonly MatrixRow[]
       <span className="self-end pb-1 text-caption leading-[1.2] text-muted-foreground">{t('photo')}</span>
       {TEMPLATE_KEYS.map((key, column) => (
         <Arrive key={key} on={phase >= 1} delay={80 + column * 70} className="self-end">
-          <span className="line-clamp-2 text-caption leading-[1.2] font-semibold text-foreground">{t(`names.${key}`)}</span>
+          <span className="line-clamp-2 text-caption leading-[1.2] font-semibold [overflow-wrap:anywhere] text-foreground">{t(`names.${key}`)}</span>
         </Arrive>
       ))}
       {/* Every row keeps its room, so the tray holds one height for both ways of using it. */}
