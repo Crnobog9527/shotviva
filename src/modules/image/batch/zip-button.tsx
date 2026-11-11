@@ -5,7 +5,10 @@ import { useTranslations } from 'next-intl'
 import { buttonVariants } from '@/core/ui/button'
 import { cn } from '@/core/ui/cn'
 
+import type { Translate } from '@/core/translate'
+
 import { useZipDownload } from './use-zip-download'
+import type { ZipState } from './zip-download'
 
 type Props = { batchId: string; count: number; className?: string }
 
@@ -17,13 +20,7 @@ export function ZipButton({ batchId, count, className }: Props) {
   const errors = useTranslations('app.errors')
   const { state, start } = useZipDownload(batchId)
   const packing = state.kind === 'packing'
-  const line =
-    state.kind === 'packing' ? t('packing', { count })
-    : state.kind === 'started' ? t('started')
-    : state.kind === 'limited' ? t('limited')
-    : state.kind === 'error' && state.code === 'NOT_FOUND' ? t('notFound')
-    : state.kind === 'error' ? (errors.has(state.code) ? errors(state.code) : errors('fallback'))
-    : null
+  const line = state.kind === 'packing' ? t('packing', { count }) : zipLine(state, t, errors)
   return (
     <div className={cn('flex flex-col', className)}>
       <button
@@ -41,6 +38,16 @@ export function ZipButton({ batchId, count, className }: Props) {
       </p>
     </div>
   )
+}
+
+// The line under the button: what is happening, or why it did not work.
+function zipLine(state: ZipState, t: Translate, errors: Translate): string | null {
+  if (state.kind === 'packing') return null
+  if (state.kind === 'started') return t('started')
+  if (state.kind === 'limited') return t('limited')
+  if (state.kind !== 'error') return null
+  if (state.code === 'NOT_FOUND') return t('notFound')
+  return errors.has(state.code) ? errors(state.code) : errors('fallback')
 }
 
 function ZipIcon() {
