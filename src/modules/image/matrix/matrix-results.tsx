@@ -28,8 +28,9 @@ export function MatrixResults({ ids, onRetry, onApply, onNew }: Props) {
   const tally = batchTally(jobs)
   const numbers = photoNumbers(jobs)
   const batchId = jobs[0]?.batchId
+  // The section keeps the page gutter at every width: unlike the form, nothing outside adds it back on lg.
   return (
-    <section aria-labelledby="matrix-results-h" className="px-(--gutter) pt-4 lg:px-0">
+    <section aria-labelledby="matrix-results-h" className="px-(--gutter) pt-4">
       <div role="status" className="hairline-lit rounded-panel bg-card p-4">
         <h2 id="matrix-results-h" className="text-body leading-[1.25] font-semibold">
           {tally.settled ? t('resultsDone', { done: tally.done, count: tally.count }) : t('resultsRunning', { done: tally.done, count: tally.count })}
