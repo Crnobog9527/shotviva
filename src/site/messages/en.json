@@ -1188,16 +1188,21 @@
   "paywall": {
     "moments": {
       "watermark": "Free photos carry a watermark. Paid credits make watermark-free, private photos.",
-      "photos": "Pro runs one template on up to {count, number} photos at once.",
+      "photos": "{tier} runs one template on up to {count, number} photos at once.",
       "templates": "Max runs up to {templates, number} templates on the same photos, up to {count, number} photos a batch."
     },
     "example": {
-      "caption": "Example: one phone photo, two templates, made in one batch.",
+      "caption": {
+        "photos": "Example: one template on a phone photo. A batch makes one of these for each photo.",
+        "templates": "Example: one phone photo, two templates, made in one batch."
+      },
       "photoAlt": "Example: the phone photo",
       "resultAlt": "Example: result {index, number}"
     },
     "packOrPlan": {
       "title": "{count, plural, one {# credit} other {# credits}} short: a pack or a plan?",
+      "packOnlyTitle": "{count, plural, one {# credit} other {# credits}} short: a credit pack",
+      "packOnly": "A pack adds credits to the plan you have now, and does not renew.",
       "packTitle": "Credit pack · {count, plural, one {# credit} other {# credits}}",
       "packPrice": "{price} once",
       "planTitle": "{tier} · {count, plural, one {# credit} other {# credits}} a month",
