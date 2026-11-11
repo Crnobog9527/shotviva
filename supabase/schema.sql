@@ -9900,9 +9900,10 @@ CREATE OR REPLACE FUNCTION "public"."read_template_sync_source"("p_id" "text") R
     AS $$
   select jsonb_build_object('catalog', admin.template_sync_catalog(), 'template', to_jsonb(t),
     'prompt', to_jsonb(p), 'provider', to_jsonb(a))
-  from (select id,module,name,description,category_key,translations,fields,quality,credits_cost,visible_in,
-          cover_before_url,cover_after_url,cover_media_type,cover_video_url,cover_poster_url,cover_locales
-          from public.templates where id=p_id) t
+  from (select tt.id,tt.module,tt.name,tt.description,tt.category_key,tt.subcategory_key,
+          s.slug as series_slug,tt.series_sort_order,tt.translations,tt.fields,tt.quality,tt.credits_cost,tt.visible_in,
+          tt.cover_before_url,tt.cover_after_url,tt.cover_media_type,tt.cover_video_url,tt.cover_poster_url,tt.cover_locales
+          from public.templates tt left join public.template_series s on s.id=tt.series_id where tt.id=p_id) t
   left join lateral (select body,version,model_params,provider_id from public.template_prompts
     where template_id=t.id) p on true
   left join lateral (select adapter,model,base_url from public.ai_providers
@@ -11186,6 +11187,13 @@ declare
   v_version integer;
   v_live boolean;
   v_featured smallint;
+  -- The sub-category and series (2026-11-12): carried only when the source sends the keys, so a
+  -- caller from before this migration keeps the old behaviour (production's own filing stays).
+  v_assign boolean := p_template ? 'subcategory_key' and p_template ? 'series_slug';
+  v_sub text := nullif(p_template->>'subcategory_key','');
+  v_series uuid;
+  v_old_series uuid;
+  v_order integer := 0;
 begin
   if nullif(p_run_id,'') is null or nullif(btrim(p_prompt->>'body'),'') is null then
     raise exception 'INVALID_SYNC';
@@ -11203,6 +11211,21 @@ begin
       or coalesce(p_floors->>'version','v1') <> v_catalog then raise exception 'CATALOG_MISMATCH'; end if;
   perform 1 from public.template_categories where key = p_template->>'category_key' for share;
   if not found then raise exception 'CATEGORY_MISSING'; end if;
+  if v_assign then
+    -- Same locks, same order, as admin_save_template_assignment: tree shared, series, then the row.
+    perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree',0));
+    perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series',0));
+    if v_sub is not null then
+      perform 1 from public.template_category_paths p join public.template_categories c on c.key = p.key
+        where p.key = v_sub and p.root_key = p_template->>'category_key' and p.key <> p.root_key and not c.is_system;
+      if not found then raise exception 'SUBCATEGORY_MISSING'; end if;
+      perform 1 from public.template_categories where key = v_sub for share;
+    end if;
+    if nullif(p_template->>'series_slug','') is not null then
+      select id into v_series from public.template_series where slug = p_template->>'series_slug' for share;
+      if not found then raise exception 'SERIES_MISSING'; end if;
+    end if;
+  end if;
 
   if p_provider is not null and p_provider <> 'null'::jsonb then
     begin
@@ -11239,7 +11262,8 @@ begin
   -- Keep publication, feature rank and sort order under production control. The normal editor
   -- RPC also enforces production's model constraints when the T96 migration is present.
   perform public.admin_upsert_template(
-    (p_template - array['sort_order','is_active','featured_rank','category','price_floors'])
+    (p_template - array['sort_order','is_active','featured_rank','category','price_floors',
+      'subcategory_key','series_slug','series_sort_order'])
       || jsonb_build_object('price_floors',p_floors),
     (p_prompt - 'provider_id') || jsonb_build_object('provider_id',v_provider));
   -- The editor writer now holds the effective model lock. Compare the exact response used
@@ -11252,6 +11276,18 @@ begin
   if admin.template_sync_quote(v_quote,v_provider,v_id='edit') is distinct from
      admin.template_sync_quote(p_floors->'quote_receipt',v_provider,v_id='edit') then
     raise exception 'PRICE_QUOTE_CHANGED';
+  end if;
+  -- Production files the template where the test site does: same sub-category, same series (by
+  -- slug), none when the test site has none. Series order as the editor keeps it: unchanged while
+  -- the series is, appended at the end of a series it joins.
+  if v_assign then
+    select series_id, coalesce(series_sort_order,0) into v_old_series, v_order from public.templates where id = v_id;
+    if v_series is null then v_order := 0;
+    elsif v_series is distinct from v_old_series then
+      select coalesce(max(series_sort_order),0) + 1 into v_order from public.templates where series_id = v_series;
+    end if;
+    update public.templates set subcategory_key = v_sub, series_id = v_series, series_sort_order = v_order
+      where id = v_id and (subcategory_key, series_id, series_sort_order) is distinct from (v_sub, v_series, v_order);
   end if;
   update public.templates set cover_media_type = p_template->>'cover_media_type',
     cover_video_url = p_template->>'cover_video_url', cover_poster_url = p_template->>'cover_poster_url',
