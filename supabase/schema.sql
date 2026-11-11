@@ -2766,8 +2766,8 @@ CREATE OR REPLACE FUNCTION "public"."_validate_code_discount"("p_products" "text
     AS $$
 declare
   entry record;
-  cents numeric;
-  credits numeric;
+  v_cents numeric;
+  v_credits numeric;
   active_rates jsonb := '{}';
   floor_cents numeric;
   floor_credits numeric;
@@ -2810,10 +2810,10 @@ begin
       or entry.item->'subscription' is distinct from to_jsonb(entry.subscription) then
       raise exception 'INVALID_CODE_CATALOG';
     end if;
-    cents := (entry.item->>'priceCents')::numeric;
-    credits := (entry.item->>'credits')::numeric;
-    if cents <= 0 or cents <> trunc(cents) or cents > 9007199254740991
-      or credits <= 0 or credits <> trunc(credits) or credits > 2147483647 then
+    v_cents := (entry.item->>'priceCents')::numeric;
+    v_credits := (entry.item->>'credits')::numeric;
+    if v_cents <= 0 or v_cents <> trunc(v_cents) or v_cents > 9007199254740991
+      or v_credits <= 0 or v_credits <> trunc(v_credits) or v_credits > 2147483647 then
       raise exception 'INVALID_CODE_CATALOG';
     end if;
     -- Keep an inactive ID as JSON null so duplicates are still rejected but the product
