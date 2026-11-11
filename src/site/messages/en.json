@@ -240,14 +240,75 @@
     }
   },
   "app": {
+    "gated": {
+      "heading": "More ways to create",
+      "badge": {
+        "pro": "Pro",
+        "max": "Max"
+      },
+      "lockedSr": " (needs {tier})",
+      "replay": "Play again",
+      "batch": {
+        "title": "Batch photos",
+        "line": "Up to {pro, number} / {max, number} photos at once",
+        "lede": "Upload a set of product photos, pick one template, and get them all back together in one ZIP. Made for shops that list many products at once.",
+        "ledeGuide": "Your Pro plan takes {count, number} photos at a time: open any template and pick several photos when you add them.",
+        "step1": "Upload them in one go: up to {pro, number} photos on Pro, {max, number} on Max.",
+        "step2": "Pick one template. The whole batch gets the same size and quality.",
+        "step3": "They generate together. Each photo is charged on its own, and any photo that fails is refunded.",
+        "step4": "When they're done, one button downloads them all as a ZIP.",
+        "note": "Batches use paid credits only.",
+        "cta": "Get Pro · {pro, number} photos at once",
+        "seeMax": "Need {max, number} at once? See Max",
+        "start": "Pick a template",
+        "demo": {
+          "label": "Demo: {count, number} product photos go through one white background template together and come back as one ZIP.",
+          "caption": "Shown at Max size, {count, number} photos. Example images.",
+          "photos": "{count, number} product photos",
+          "template": "White background",
+          "more": "+{count, number}",
+          "progress": "{done, number} of {total, number} done",
+          "zip": "Download all {count, number} · ZIP"
+        }
+      },
+      "templates": {
+        "title": "Several templates at once",
+        "line": "One photo, up to {templates, number} templates",
+        "lede": "Put one photo through several templates, or several photos through several templates, and get every result in one batch.",
+        "scenes": "Ways to use it",
+        "tabs": {
+          "one": "1 photo × templates",
+          "grid": "Photos × templates"
+        },
+        "step1": "Choose up to {templates, number} templates.",
+        "step2": "Add your photos. Every photo goes through every template.",
+        "step3": "Before anything runs, check each result and the total credits; tap one to leave it out.",
+        "step4": "See the results by template or by photo, and download them all as a ZIP.",
+        "note": "Several templates at once is part of Max and uses paid credits only.",
+        "cta": "Get Max",
+        "demo": {
+          "photo": "Photo",
+          "names": {
+            "white": "White background",
+            "scene": "Lifestyle",
+            "promo": "Promo poster"
+          },
+          "sum": "{photos, number} × {templates, number} = {count, number} results",
+          "label": {
+            "one": "Demo: one sneaker photo through three templates, white background, lifestyle and promo poster, gives three results.",
+            "grid": "Demo: a sneaker photo and a tote bag photo, each through three templates, give a grid of six results."
+          },
+          "caption": {
+            "one": "Choose up to {templates, number} templates. Example images.",
+            "grid": "Up to {max, number} results in one batch. Example images."
+          }
+        }
+      }
+    },
     "matrix": {
       "lede": "Up to {templates, number} templates on the same photos, {max, number} photos a batch.",
       "metaTitle": "Several templates",
       "title": "Several templates",
-      "badge": "Max",
-      "locked": "(needs Max)",
-      "entryTitle": "Several templates at once",
-      "entryLine": "Run up to 5 templates on the same photos in one batch.",
       "entryLink": "Use more templates on these photos",
       "templatesTitle": "Templates",
       "chooseTemplates": "Choose templates",
