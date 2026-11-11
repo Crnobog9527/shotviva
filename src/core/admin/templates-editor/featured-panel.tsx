@@ -8,26 +8,22 @@ import { featuredCopy as copy } from './copy'
 import { FeaturedCard, zhNameOf } from './featured-card'
 import { featuredGroups, withGroupOrder, type FeaturedGroup } from './featured-groups'
 import { FEATURED_LIMIT } from './featured-state'
-import { useFeaturedDraft } from './use-featured-draft'
+import type { Featured } from './use-featured'
 
-type Props = {
-  // The saved featured list, featured_rank order.
-  ids: string[]
-  templates: AdminTemplate[]
-  pending: boolean
-  // Saves the whole arranged list at once; the page refreshes with the saved one.
-  onSave: (ids: string[]) => Promise<void>
-}
+type Props = { featured: Featured; templates: AdminTemplate[]; pending: boolean }
 
 // 首页精选 (T53) laid out like the home template area (2026-11-12): a block of cards per category,
 // in the order the public pages use. The switch in the table, or the bulk bar, adds templates;
 // here they are arranged, removed, and saved in one go.
-export function FeaturedPanel({ ids, templates, pending, onSave }: Props) {
+export function FeaturedPanel({ featured, templates, pending }: Props) {
+  const { draft, ids } = featured
   const byId = new Map(templates.map((template) => [template.id, template]))
-  const draft = useFeaturedDraft(ids)
   const groups = featuredGroups(draft.shown, byId)
   const order = groups.flatMap((group) => group.ids)
-  const remove = (id: string) => draft.set(order.filter((other) => other !== id))
+  // The card numbers are featured_rank, which decides the generator's default (featured[0] on the
+  // home page): the saved ranks, or the ones 保存 will write (page order) while a draft is open.
+  const ranks = draft.dirty ? order : ids
+  const outOfOrder = !draft.dirty && order.join(',') !== ids.join(',')
   return (
     <section aria-labelledby="featured-h" className="grid gap-3 rounded-md border p-4">
       <div className="flex items-baseline justify-between gap-3">
@@ -36,10 +32,17 @@ export function FeaturedPanel({ ids, templates, pending, onSave }: Props) {
       </div>
       <p className="text-muted-foreground max-w-[75ch] text-sm">{copy.intro}</p>
       {order.length === 0 && !draft.dirty ? <p className="text-muted-foreground text-sm">{copy.empty}</p> : null}
-      {order.length > 0 ? <p className="text-muted-foreground text-sm">{copy.dragHint}</p> : null}
+      {order.length > 0 ? <p className="text-muted-foreground max-w-[75ch] text-sm">{copy.dragHint}</p> : null}
+      {draft.dropped ? (
+        <Notice text={copy.dropped} action={copy.dismiss} onAction={draft.reset} disabled={false} />
+      ) : null}
+      {outOfOrder && ids[0] ? (
+        <Notice text={copy.outOfOrder(zhNameOf(byId.get(ids[0]), ids[0]))} action={copy.normalise}
+          onAction={() => featured.save(order)} disabled={pending} />
+      ) : null}
       {groups.map((group) => (
-        <GroupCards key={group.key} group={group} pending={pending} rankOf={(id) => order.indexOf(id)}
-          templateOf={(id) => byId.get(id)} onRemove={remove}
+        <GroupCards key={group.key} group={group} pending={pending} rankOf={(id) => ranks.indexOf(id)}
+          templateOf={(id) => byId.get(id)} onRemove={(id) => draft.set(order.filter((other) => other !== id))}
           onReorder={(next) => draft.set(withGroupOrder(groups, group.key, next))} />
       ))}
       {draft.dirty ? (
@@ -47,11 +50,20 @@ export function FeaturedPanel({ ids, templates, pending, onSave }: Props) {
           <span className="text-sm">{copy.dirty}</span>
           <div className="ml-auto flex gap-2">
             <Button size="sm" variant="ghost" disabled={pending} onClick={draft.reset}>{copy.discard}</Button>
-            <Button size="sm" disabled={pending} onClick={() => onSave(order)}>{copy.save}</Button>
+            <Button size="sm" disabled={pending} onClick={() => featured.save(order)}>{copy.save}</Button>
           </div>
         </div>
       ) : null}
     </section>
+  )
+}
+
+function Notice({ text, action, onAction, disabled }: { text: string; action: string; onAction: () => void; disabled: boolean }) {
+  return (
+    <div role="status" className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm">
+      <span className="min-w-0 flex-1">{text}</span>
+      <Button size="sm" variant="outline" disabled={disabled} onClick={onAction}>{action}</Button>
+    </div>
   )
 }
 

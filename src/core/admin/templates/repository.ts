@@ -181,6 +181,13 @@ export async function setTemplatesActive(client: SupabaseClient, ids: readonly s
   if (error) throw new AppError('INTERNAL', `setTemplatesActive failed: ${error.message}`)
 }
 
+// The featured ids in featured_rank order (partial filter on featured_rank).
+export async function readFeaturedIds(client: SupabaseClient): Promise<string[]> {
+  const { data, error } = await client.from('templates').select('id').not('featured_rank', 'is', null).order('featured_rank')
+  if (error) throw new AppError('INTERNAL', `readFeaturedIds failed: ${error.message}`)
+  return (data as { id: string }[]).map((row) => row.id)
+}
+
 // The home featured list in display order (T53); the SQL function checks the rules.
 export async function setFeaturedTemplates(client: SupabaseClient, ids: string[]): Promise<void> {
   const { error } = await client.rpc('admin_set_featured_templates', { p_ids: ids })

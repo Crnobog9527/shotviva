@@ -23,8 +23,9 @@ type Props = {
   busy: boolean
   // Bulk 上架 / 下架 (T60), batch edit (T79) and batch 首页精选.
   actions: Pick<TemplateAdminActions, 'setActiveMany' | 'editMany' | 'setFeaturedMany'>
-  // The featured list as shown, for the 首页精选 confirm step and the server's stale check.
-  featuredIds: string[]
+  // The featured list as shown (for the 首页精选 confirm step and the server's stale check), and
+  // whether 首页精选 holds an unsaved arrangement that a batch would drop.
+  featured: { ids: string[]; locked: boolean }
   // The floor the batch edit dialog checks against.
   floor: ProviderFloors
   providers: readonly ImageProviderOption[]
@@ -35,7 +36,7 @@ type Props = {
 // Bulk 上架 / 下架 (T60): bar → confirm dialog naming the templates → one server call → result list.
 // Batch edit (T79) shares the bar: dialog → review → one all-or-nothing call. So does batch
 // 首页精选: confirm step with a per-template verdict → one all-or-nothing call.
-export function BulkPublish({ selected, busy, actions, featuredIds, floor, providers, categories, onClear }: Props) {
+export function BulkPublish({ selected, busy, actions, featured: shown, floor, providers, categories, onClear }: Props) {
   const [asking, setAsking] = useState<boolean | null>(null)
   const { pending, outcome, error, run, dismiss } = useBulkActive(actions.setActiveMany)
   const edit = useBulkEdit(actions.editMany, onClear)
@@ -58,6 +59,7 @@ export function BulkPublish({ selected, busy, actions, featuredIds, floor, provi
         onUnpublish={() => setAsking(false)}
         onEdit={edit.start}
         onFeature={featured.start}
+        featureLocked={shown.locked}
         onClear={onClear}
       />
       {[error, featured.error].map((message) => message ? (
@@ -78,7 +80,7 @@ export function BulkPublish({ selected, busy, actions, featuredIds, floor, provi
         floor={floor}
         categories={categories}
       />
-      <BulkFeaturedDialog bulk={featured} selected={selected} featuredIds={featuredIds} />
+      <BulkFeaturedDialog bulk={featured} selected={selected} featuredIds={shown.ids} />
       <BulkConfirmDialog
         active={asking}
         templates={selected}

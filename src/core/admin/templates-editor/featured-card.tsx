@@ -14,7 +14,7 @@ type Props = {
   id: string
   // Missing only if the template vanished between two reads; the card still names its id.
   template: AdminTemplate | undefined
-  // Place on the whole home list, 0-based: the first card is the generator's default template.
+  // featured_rank, 0-based (saved, or what 保存 will write): 0 is the generator's default template.
   rank: number
   pending: boolean
   onRemove: (id: string) => void
@@ -38,6 +38,7 @@ export function FeaturedCard({ id, template, rank, pending, onRemove }: Props) {
         )}
         <span className="bg-background/85 absolute top-1.5 left-1.5 rounded-md px-1.5 py-0.5 text-xs font-medium tabular-nums">
           {rank + 1}
+          {rank === 0 ? <span className="text-primary ml-1">{copy.defaultTag}</span> : null}
           <span className="sr-only">{copy.position(rank)}</span>
         </span>
       </div>

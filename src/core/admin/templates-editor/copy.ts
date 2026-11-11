@@ -240,9 +240,9 @@ export const bulkFeaturedCopy = {
 // 首页精选 as the home page lays it out (2026-11-12): cards per category, arranged then saved once.
 export const featuredCopy = {
   title: '首页精选',
-  intro: '这里的排列就是首页和落地页模板区的样子：按分类分组，分类的先后在「分类管理」里调；同一分类内按卡片顺序显示。第一张卡片也是首页生成栏默认选中的模板。只能选已上架、站内可见的模板。',
+  intro: '这里的排列就是首页和落地页模板区的样子：按分类分组，分类的先后在「分类管理」里调；同一分类内按卡片顺序显示。卡片上的数字是精选顺序，标「默认」的（第 1 位）是首页生成栏默认选中的模板。只能选已上架、站内可见的模板。',
   empty: '还没有精选模板，首页现在显示最新上架的 6 个。在下表「首页精选」一列打开，或勾选后用「批量设为首页精选」。',
-  dragHint: '拖动卡片调整同一分类内的先后（手机上长按卡片再拖），排好后点「保存」，首页才会更新。',
+  dragHint: '拖动卡片调整同一分类内的先后（手机上长按卡片再拖），排好后点「保存」，首页才会更新。保存后数字按页面从上到下、从左到右排，第一张卡片就是默认模板。',
   dirty: '有未保存的改动，首页还是原来的样子。',
   save: '保存',
   discard: '放弃改动',
@@ -250,5 +250,13 @@ export const featuredCopy = {
   failed: '首页精选没保存，排好的顺序还在，可以再点一次「保存」。',
   remove: (name: string) => `移出首页精选：${name}`,
   removeShort: '移出',
-  position: (index: number) => `第 ${index + 1} 位`,
+  position: (index: number) => `精选第 ${index + 1} 位`,
+  defaultTag: '默认',
+  // The saved ranks no longer follow the groups: switched on or batch-added templates go to the end,
+  // and reordering categories regroups the cards without touching the ranks.
+  outOfOrder: (name: string) => `现在首页生成栏默认选中的是「${name}」（标「默认」的那张），不是第一张卡片：开关或批量加入的模板排在精选最后，调整分类顺序也会这样。`,
+  normalise: '按分组整理并保存',
+  dropped: '首页精选在别处变了（上下架或另一个页面保存过），未保存的排列已丢弃，下面是现在的样子。',
+  dismiss: '知道了',
+  locked: '先保存或放弃上面「首页精选」的改动',
 } as const
