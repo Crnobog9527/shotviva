@@ -1,5 +1,5 @@
 import { baselineOffers, type OfferFacts } from '../../offer'
-import { defineContentPage, type ShootDemo } from '@/core/content'
+import { defineContentPage, type EditCases, type ShootDemo } from '@/core/content'
 
 import { site } from '../../../site.config'
 import { caseImage, CATEGORY, withFirstFrame } from '../../landing-shared'
@@ -36,6 +36,36 @@ const shoot: ShootDemo = {
     site: { who: brand, amount: '无需重新实拍', note: '一张手机照，做出主图、场景图和促销海报' },
     line: '换个模板，就能把同一张商品照用在不同地方。',
   },
+}
+
+// 电商白底图，从易到难三个例子（Owner 2026-11-12）：线上模板的音箱、挂在门上的连衣裙、街头逆光
+// 飞发。带透明通道的成图铺在棋盘格上。连衣裙和模特是 AI 示例，品牌都是虚构的。
+const whiteCases: EditCases = {
+  heading: '电商白底主图：从易到难三个例子',
+  intro: '平台主图要求商品单独放在白底上，抠图最见功夫。下面三张手机照片从易到难，最后一张最难：逆光下被风吹散的细碎发丝，背后还是一条杂乱的街。',
+  labels: { before: '手机原图', after: '主图', reference: '参考图' },
+  items: [
+    {
+      title: '桌上的音箱',
+      change: '线、桌垫和房间都去掉了，音箱的网罩、高音单元和外壳质感都没变。出图是透明底的 PNG，放到哪个平台的背景上都行。',
+      before: caseImage('white-speaker-before', '示例手机照：深灰色监听音箱放在绿色桌垫上，后面是线和椅子'),
+      after: caseImage('white-speaker-after', 'AI 示例：同一只音箱抠成透明底，底下带一点柔和阴影'),
+      transparent: true,
+    },
+    {
+      title: '挂在门上的连衣裙',
+      change: '从衣架上取下，做成隐形模特的立体效果，熨平后放在纯白底上，每一朵绣花、流苏和钩花蕾丝都在原来的位置。',
+      before: caseImage('white-dress-before', '示例手机照：一条象牙白民族风绣花分层长裙挂在卧室门上，旁边是床和脏衣篮'),
+      after: caseImage('white-dress-after', 'AI 示例：同一条绣花长裙做成隐形模特效果，纯白背景'),
+    },
+    {
+      title: '街头逆光飞发',
+      change: '最难抠的一类：逆光下在街头被风吹起的头发。街景、灯架和行人都去掉了，细碎发丝一根根保留，在透明底 PNG 上是柔和的半透明边缘。',
+      before: caseImage('white-hair-before', '示例手机照：穿驼色大衣的模特站在黄昏的街头，逆光下头发被风吹起，身后有灯架和摩托车'),
+      after: caseImage('white-hair-after', 'AI 示例：同一位模特抠成透明底，每一缕飞起的发丝都保留'),
+      transparent: true,
+    },
+  ],
 }
 
 const copy = {
@@ -76,6 +106,7 @@ const copy = {
   landing: {
     factsNote: '以上来自各平台自己的帮助页面（Amazon、Etsy、Shopify），2026 年 11 月核对。平台规则会变，上架前请再确认。',
     shoot,
+    edits: whiteCases,
     templates: {
       heading: '商品图模板：主图、场景和海报',
       intro: `每个模板都从你的商品手机照片开始，到一张成品图结束。`,

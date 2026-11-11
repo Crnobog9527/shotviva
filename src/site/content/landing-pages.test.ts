@@ -10,6 +10,7 @@ import { contentPagesIn } from './localized'
 import { aiRestaurantMenu } from './pages/ai-restaurant-menu'
 import { commercialPhotography } from './pages/commercial-photography'
 import { PLATFORM_SPECS } from './platform-specs'
+import { zhCommercialPhotography } from './zh/pages/commercial-photography'
 import { zhAiRestaurantMenu } from './zh/pages/ai-restaurant-menu'
 
 // Every picture a landing page shows: the hero pair, the shoot and the edit cases.
@@ -101,5 +102,15 @@ describe('the AI restaurant menu page', () => {
     }
     expect(aiRestaurantMenu.landing.shoot?.results[2].image.src).toBe('/cases/menu-frog-poster-en.webp')
     expect(zhAiRestaurantMenu.landing.shoot?.results[2].image.src).toBe('/cases/menu-frog-poster-zh.webp')
+  })
+})
+
+describe('the commercial photography page', () => {
+  it('shows three white-background cases, the cut-outs over a checkerboard, in both languages', () => {
+    for (const page of [commercialPhotography, zhCommercialPhotography]) {
+      const items = page.landing.edits?.items ?? []
+      expect(items.map((item) => item.after.src)).toEqual(['/cases/white-speaker-after.webp', '/cases/white-dress-after.webp', '/cases/white-hair-after.webp'])
+      expect(items.map((item) => Boolean(item.transparent))).toEqual([true, false, true])
+    }
   })
 })
