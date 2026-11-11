@@ -35,6 +35,9 @@ export function CreateDialog({ template, onClose, ...context }: Props) {
 
 type BodyProps = CreateContext & { template: CatalogueTemplate; open: boolean; onClose(): void }
 
+// How often an open dialog asks the router for the workspace route again (see CreateBody).
+const REWARM_MS = 20_000
+
 function CreateBody({ template, open, onClose, ...context }: BodyProps) {
   const t = useTranslations('app.template')
   const router = useRouter()
@@ -43,9 +46,10 @@ function CreateBody({ template, open, onClose, ...context }: BodyProps) {
   // Generate moves to the template's workspace page. Its shell is fetched while the visitor is
   // still picking a photo, so the move, and the developing view the shell draws from this tab's
   // own job (workspace-pending.tsx), happen on the click instead of after a round trip. The
-  // router drops a prefetched route after a few minutes (measured on the test site: a click 5.5
-  // minutes in waited 1.1–3.6 s again), so it is fetched again whenever the router says its copy
-  // went stale, for as long as the dialog is open.
+  // router's copy goes stale after five minutes and a stale copy is as good as none (measured on
+  // the test site: a click 5.5 minutes in waited 1.1–4.1 s again), so the route is asked for
+  // again every REWARM_MS while the dialog is open: a fresh copy answers from the cache without
+  // a request, a stale one is fetched. onInvalidate covers the router dropping it early.
   useEffect(() => {
     if (!open) return
     let closed = false
@@ -53,8 +57,10 @@ function CreateBody({ template, open, onClose, ...context }: BodyProps) {
       if (!closed) router.prefetch(workspace, { onInvalidate: warm })
     }
     warm()
+    const again = setInterval(() => router.prefetch(workspace), REWARM_MS)
     return () => {
       closed = true
+      clearInterval(again)
     }
   }, [open, router, workspace])
   const batch = limitsFor(context.tier).batchMax > 1 && draft.photos.photos.length === 0
