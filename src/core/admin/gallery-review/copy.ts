@@ -1,0 +1,58 @@
+// /admin/gallery (ARCHITECTURE §9 第 5 条, T108). Admin copy is Chinese only (DESIGN §7).
+export const REVIEW_COPY = {
+  title: '创作库审核',
+  intro: '公开作品审核通过后才会出现在创作库。被 OpenAI 标记的作品已自动拒绝；没被标记的在「待审」里等你确认。',
+  noKey:
+    '自动审核没有在运行：环境变量里没有 OpenAI 密钥（OPENAI_MODERATION_API_KEY 或 OPENAI_API_KEY）。作品不会被自动拒绝，每张都要在这里人工审核。请联系总控配置。',
+  tabs: { pending: '待审', reported: '被举报', approved: '已通过', rejected: '已拒绝' },
+  empty: {
+    pending: '没有待审的作品。',
+    reported: '没有未处理的举报。',
+    approved: '还没有通过的作品。',
+    rejected: '还没有拒绝的作品。',
+  },
+  more: '下一页',
+  selectAll: '全选本页',
+  selected: (n: number) => `已选 ${n} 张`,
+  approve: '通过',
+  // An approved work that was reported: keep it up and close its reports.
+  keep: '保留',
+  reject: '拒绝',
+  approveSelected: '通过所选',
+  rejectSelected: '拒绝所选',
+  reasonLabel: '拒绝原因',
+  reasons: {
+    sexual: '色情',
+    violence: '暴力血腥',
+    hate: '仇恨',
+    minor: '涉及未成年人',
+    privacy: '隐私',
+    ip: '侵权',
+    spam: '垃圾内容',
+    quality: '质量太差',
+    other: '其他',
+    auto: '自动审核标记',
+  } as Record<string, string>,
+  pool: { free: '免费积分', paid: '付费积分' },
+  notScreened: '还没自动审核（会在 10 分钟内补审）',
+  screened: '自动审核：未标记',
+  flagged: (categories: string) => `自动审核标记：${categories}`,
+  reports: (n: number, reasons: string) => `被举报 ${n} 次：${reasons}`,
+  copyLabel: '展示的文字',
+  noImage: '图片暂时打不开',
+  confirm: {
+    approve: (n: number) => ({
+      title: `通过 ${n} 张作品？`,
+      body: '通过后，创作库开着时它们会马上出现在 /gallery 和作品页。已经通过的作品保持原位，它们的举报标为已处理。',
+      confirm: '确认通过',
+    }),
+    reject: (n: number) => ({
+      title: `拒绝 ${n} 张作品？`,
+      body: '拒绝后作品页返回 404，不出现在任何公开列表；作者本人仍能看到和下载。以后可以在「已拒绝」里重新通过。',
+      confirm: '确认拒绝',
+    }),
+    cancel: '取消',
+  },
+  done: (n: number) => `已处理 ${n} 张`,
+  errors: { invalid: '选择的作品或原因不对，请刷新页面后再试' },
+} as const

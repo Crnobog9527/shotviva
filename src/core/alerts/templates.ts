@@ -265,6 +265,14 @@ const RENDERERS: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K 
   subscription_cancel_failed: cancelFailed,
   site_errors: siteErrors,
   business_inquiry: businessInquiry,
+  work_reported: (a) => ({
+    line: `【创作库作品被举报】原因：${REPORT_REASON_NAMES[a.reason] ?? a.reason}。作品仍在展示，请到「创作库审核」页决定是否下架。`,
+    path: '/admin/gallery?tab=reported',
+  }),
+}
+
+const REPORT_REASON_NAMES: Record<string, string> = {
+  sexual: '色情', violence: '暴力', hate: '仇恨', minor: '未成年人', privacy: '隐私', ip: '侵权', spam: '垃圾内容', other: '其他',
 }
 
 export type RenderedAlert = { sentence: string; link: string }
