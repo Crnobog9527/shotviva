@@ -1,21 +1,29 @@
 import { describe, expect, it } from 'vitest'
 
 import type { TrackedJob } from '../generation/job-model'
-import { developingJob } from './pending-job'
+import { isDeveloping, soleJob } from './pending-job'
 
 const job = (id: string, status: TrackedJob['status']) => ({ id, status }) as TrackedJob
 
-describe('developingJob', () => {
-  it('is the workspace photo while it is queued or running', () => {
-    expect(developingJob(['a'], [job('a', 'queued')])?.id).toBe('a')
-    expect(developingJob(['a'], [job('b', 'running'), job('a', 'running')])?.id).toBe('a')
+describe('soleJob', () => {
+  it('is the workspace photo whatever its status, so the head stays when it fails at once', () => {
+    expect(soleJob(['a'], [job('a', 'queued')])?.id).toBe('a')
+    expect(soleJob(['a'], [job('b', 'running'), job('a', 'failed')])?.status).toBe('failed')
+    expect(soleJob(['a'], [job('a', 'succeeded')])?.status).toBe('succeeded')
   })
 
-  it('is nothing for the form, a settled photo, a batch or an unknown id', () => {
-    expect(developingJob([], [job('a', 'running')])).toBeNull()
-    expect(developingJob(['a'], [job('a', 'succeeded')])).toBeNull()
-    expect(developingJob(['a'], [job('a', 'failed')])).toBeNull()
-    expect(developingJob(['a', 'b'], [job('a', 'running'), job('b', 'queued')])).toBeNull()
-    expect(developingJob(['a'], [])).toBeNull()
+  it('is nothing for a batch, an empty workspace or an id the store no longer has', () => {
+    expect(soleJob(['a', 'b'], [job('a', 'running'), job('b', 'running')])).toBeNull()
+    expect(soleJob([], [job('a', 'running')])).toBeNull()
+    expect(soleJob(['gone'], [job('a', 'running')])).toBeNull()
+  })
+})
+
+describe('isDeveloping', () => {
+  it('is true only while the photo is queued or running', () => {
+    expect(isDeveloping(job('a', 'queued'))).toBe(true)
+    expect(isDeveloping(job('a', 'running'))).toBe(true)
+    expect(isDeveloping(job('a', 'failed'))).toBe(false)
+    expect(isDeveloping(job('a', 'succeeded'))).toBe(false)
   })
 })

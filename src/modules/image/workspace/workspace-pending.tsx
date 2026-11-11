@@ -1,13 +1,13 @@
 'use client'
 
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 
 import { FlowNav } from '@/core/app-shell'
 
 import { useJobs, useWorkspaceJobs } from '../generation/use-jobs'
 import { GeneratingView } from './generating-view'
-import { developingJob } from './pending-job'
+import { isDeveloping, soleJob } from './pending-job'
 import { recallTemplate } from './pending-template'
 import { WorkspaceHead } from './workspace-head'
 
@@ -16,12 +16,19 @@ import { WorkspaceHead } from './workspace-head'
 // page, queues the photo in this tab's generation store and then moves here: the job is already
 // known in the browser, so its developing view is drawn at once instead of after the server's
 // answer (measured on the test site: 0.9–1.2 s from the click, of which about 0.4 s was an empty
-// page). With nothing developing it is the empty nav row it always was.
+// page). The head belongs to the workspace's one photo whatever became of it: a request refused
+// at once (balance, price check, moderation) leaves the head in place and nothing under it until
+// the server's page shows the failure, instead of a blank page in between. Without exactly one
+// photo it is the empty nav row it always was, and so it is for ?again= and ?reuse=: those open
+// the form, which only the server can fill.
 export function WorkspacePending() {
   const { templateId } = useParams<{ templateId?: string }>()
   const t = useTranslations('app.workspace')
+  const search = useSearchParams()
+  const opensForm = search.has('again') || search.has('reuse')
   const ids = useWorkspaceJobs(templateId ?? '')
-  const job = developingJob(ids, useJobs())
+  const sole = soleJob(ids, useJobs())
+  const job = opensForm ? null : sole
   // The head is the server's own when the click handed its template over (pending-template.ts):
   // then nothing moves when the server's page takes over.
   const template = job ? recallTemplate(job.templateId) : null
@@ -31,7 +38,7 @@ export function WorkspacePending() {
       {job ? (
         <>
           {template ? <WorkspaceHead template={template} /> : <NameHead name={job.templateName} />}
-          <GeneratingView job={job} />
+          {isDeveloping(job) ? <GeneratingView job={job} /> : null}
         </>
       ) : null}
     </>
