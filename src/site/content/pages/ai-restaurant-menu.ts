@@ -2,7 +2,7 @@ import { baselineOffers, planLabel, type OfferFacts } from '../offer'
 import { defineContentPage, type CostBills } from '@/core/content'
 
 import { site } from '../../site.config'
-import { CATEGORY, pairImage, sizeCountWord } from '../landing-shared'
+import { CATEGORY, pairImage, sizeCountWord, withFirstFrame } from '../landing-shared'
 import { pricingRelated } from '../shared'
 import {
   foodHalfDayUsd,
@@ -65,7 +65,7 @@ const copy = {
   subtitle: 'Your real phone photo of a dish you serve, with new light, background and setting. No dish is invented.',
   answerBlock: `AI restaurant menu photos start from your own photo of a dish you serve: only the light, background and setting change, and no dish you don't make is invented. With ${brand} you upload one phone photo, pick Delivery Menu, Dark Dining or Promo Poster, and download it in ${tierList}. New users get ${freeImagesLabel}.`,
   hero: {
-    before: pairImage('example-dish-before', 'Phone photo of a dish on a restaurant kitchen pass, harsh overhead light (illustrative example)'),
+    before: withFirstFrame(pairImage('example-dish-before', 'Phone photo of a dish on a restaurant kitchen pass, harsh overhead light (illustrative example)')),
     after: pairImage('example-dish-after', 'The same dish as a bright delivery-app photo, soft daylight, Delivery Menu template (illustrative example)'),
     caption: 'Your phone photo → Delivery Menu template: same plate, brighter light · Illustrative example',
     cta: { label: 'Upload photo', href: '/generate' },

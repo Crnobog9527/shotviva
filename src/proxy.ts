@@ -49,9 +49,9 @@ export async function proxy(request: NextRequest) {
 }
 
 // /ingest is the PostHog proxy (next.config.ts rewrites): no session work for analytics beacons.
-// fonts/misans/ holds public, content-addressed font files only (ARCHITECTURE §17).
+// fonts/ holds public, content-addressed font files only (MiSans, ARCHITECTURE §17; Instrument Serif).
 // assets/ is the template-cover rewrite to the public bucket (ARCHITECTURE §8.3, T51).
 // api/version is the open tabs' version check (T90): no session work, no locale routing.
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|ingest/|assets/|api/version$|fonts/misans/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest)$).*)'],
+  matcher: ['/((?!_next/static|_next/image|ingest/|assets/|api/version$|fonts/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest)$).*)'],
 }

@@ -66,6 +66,11 @@ const nextConfig: NextConfig = {
         source: '/fonts/misans/:asset(.+\\.(?:woff2|css))',
         headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
       },
+      // Instrument Serif (globals.css): content-hashed names too, the same rule.
+      {
+        source: '/fonts/instrument-serif/:asset(.+\\.woff2)',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+      },
       // The marketing pictures in public/home (hero scenes, demo sets, wish cards): cached for a
       // year, which /_next/image inherits for its resized copies (it keeps the larger of this and
       // minimumCacheTTL), so a return visit on a slow link downloads nothing. A changed picture

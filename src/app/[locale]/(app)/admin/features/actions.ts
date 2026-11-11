@@ -3,9 +3,11 @@
 import { z } from 'zod'
 import { refresh, updateTag } from 'next/cache'
 
-import { runAdminAction, saveFeatureAccess, saveWishlistSwitch, type ActionResult } from '@/core/admin'
+import { runAdminAction, saveFeatureAccess, saveSettingSwitch, saveWishlistSwitch, WISHLIST_SWITCH_COPY, type ActionResult } from '@/core/admin'
+import { AppError } from '@/core/errors'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { FEATURES_CACHE_TAG } from '@/core/features'
+import { GALLERY_SWITCH_TAG } from '@/core/gallery'
 import { SYSTEM_SETTINGS_CACHE_TAG } from '@/core/system-settings'
 
 // Server actions are public endpoints, so each re-checks the admin role itself. A save expires
@@ -29,6 +31,21 @@ export async function saveFeatureAccessAction(input: unknown): Promise<ActionRes
 export async function saveWishlistSwitchAction(input: unknown): Promise<ActionResult> {
   const admin = await requireAdmin()
   return runAdminAction(() => saveWishlistSwitch({ db: createAdminSupabase(), invalidate: settingsChanged }, admin.id, input))
+}
+
+const GALLERY_KEYS = z.enum(['gallery_enabled', 'gallery_auto_approve'])
+
+export async function saveGallerySwitchAction(key: unknown, input: unknown): Promise<ActionResult> {
+  const admin = await requireAdmin()
+  return runAdminAction(async () => {
+    const parsedKey = GALLERY_KEYS.safeParse(key)
+    if (!parsedKey.success) throw new AppError('INVALID_INPUT', WISHLIST_SWITCH_COPY.errors.invalid)
+    const invalidate = () => {
+      updateTag(GALLERY_SWITCH_TAG)
+      settingsChanged()
+    }
+    await saveSettingSwitch({ db: createAdminSupabase(), invalidate }, admin.id, parsedKey.data, input)
+  })
 }
 
 export async function saveAffiliateSwitchAction(value: boolean): Promise<boolean> {

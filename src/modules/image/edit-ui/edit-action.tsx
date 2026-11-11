@@ -24,7 +24,7 @@ export function EditAction({ cta, tier, onGenerate, onEmpty }: { cta: EditCta; t
     <div className="relative border-t border-hairline bg-popover pt-4 pb-[calc(var(--sab)+16px)] before:pointer-events-none before:absolute before:inset-x-0 before:-top-5 before:h-5 before:bg-gradient-to-t before:from-popover md:pb-0">
       <ActionNotice>{notice(cta, tier, t)}</ActionNotice>
       {cta.kind === 'get-credits' ? (
-        <PaywallButton trigger="insufficient_credits" className={buttonVariants({ variant: 'cta-neutral', size: 'cta' })}>
+        <PaywallButton trigger="insufficient_credits" options={{ moment: 'credits', needed: cta.needed }} className={buttonVariants({ variant: 'cta-neutral', size: 'cta' })}>
           <span>{t.rich('workspace.getCreditsCta', { ...rich, count: cta.needed })}</span>
         </PaywallButton>
       ) : (

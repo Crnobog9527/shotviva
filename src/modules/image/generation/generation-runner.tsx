@@ -1,9 +1,9 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 
-import { pollRunning } from './job-store'
+import { claimStore, pollRunning } from './job-store'
 import { isActive } from './scheduler'
 import { useJobs } from './use-jobs'
 
@@ -34,5 +34,13 @@ export function GenerationRunner() {
       document.removeEventListener('visibilitychange', onVisible)
     }
   }, [running])
+  return null
+}
+
+// Rendered by the app layout's Identity with the session user's id, so this tab's generation
+// store only ever shows that account's jobs (job-store claimStore). A layout effect, before the
+// first paint. Lives here, not in its own file, to stay one client module (/account JS budget).
+export function GenerationOwner({ userId }: { userId: string }) {
+  useLayoutEffect(() => claimStore(userId), [userId])
   return null
 }

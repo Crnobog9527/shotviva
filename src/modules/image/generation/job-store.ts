@@ -25,13 +25,16 @@ let limit = 1
 // The jobs each workspace (by template id) is showing, so a refresh there lands on the same
 // developing view or result instead of an empty form.
 let views: WorkspaceViews = {}
+// The account these jobs belong to: undefined while this page life only holds its own jobs,
+// '' for restored jobs of an unknown account. Set by claimStore from the app layout.
+let owner: string | undefined
 let restored = false
 const listeners = new Set<() => void>()
 
 function set(next: TrackedJob[], nextViews: WorkspaceViews = views) {
   jobs = next
   views = nextViews
-  saveState({ limit, jobs, views })
+  saveState({ limit, jobs, views, owner })
   syncUpdateHold()
   listeners.forEach((listener) => listener())
 }
@@ -60,12 +63,10 @@ export function getJobs(): TrackedJob[] {
       jobs = back.jobs
       limit = back.limit
       views = back.views
-      // Jobs that were in flight before the reload are queued again; send them once the
-      // store is read (a microtask, so React is not updated mid-render).
-      queueMicrotask(() => {
-        syncUpdateHold()
-        pump()
-      })
+      owner = back.owner
+      // Jobs that were in flight before the reload are queued again; they are sent once
+      // claimStore confirms the same account is signed in.
+      queueMicrotask(syncUpdateHold)
     }
   }
   return jobs
@@ -92,7 +93,7 @@ export function subscribe(listener: () => void): () => void {
   return () => listeners.delete(listener)
 }
 
-export type StartInput = Pick<TrackedJob, 'templateId' | 'templateName' | 'resolution' | 'aspect' | 'credits' | 'inputKey'> & {
+export type StartInput = Pick<TrackedJob, 'templateId' | 'templateName' | 'resolution' | 'aspect' | 'credits' | 'inputKey' | 'batchId'> & {
   previewUrl?: string
   body: JobBody
 }
@@ -187,6 +188,22 @@ export async function pollRunning(): Promise<void> {
       }
     }),
   )
+  pump()
+}
+
+// The signed-in account, from the app layout. Jobs restored for another account (the tab signed
+// out and in as someone else) are dropped, not shown or resent; then restored jobs go out.
+export function claimStore(userId: string) {
+  getJobs()
+  if (owner !== userId) {
+    if (owner !== undefined) {
+      limit = 1
+      jobs = EMPTY
+      views = {}
+    }
+    owner = userId
+    set(jobs)
+  }
   pump()
 }
 

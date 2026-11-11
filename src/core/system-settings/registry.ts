@@ -6,6 +6,10 @@ import { z } from 'zod'
 type SettingTypes = {
   // Whether the template wishlist is open. Only read when site.features.wishlist is true.
   wishlist_enabled: boolean
+  // Whether the public gallery is open (ARCHITECTURE §9 第 1 条). Only read when site.gallery.enabled.
+  gallery_enabled: boolean
+  // Whether a work the automatic screen did not flag is approved without a person (§9 第 5 条).
+  gallery_auto_approve: boolean
 }
 
 export type SystemSettingKey = keyof SettingTypes
@@ -14,6 +18,8 @@ type SettingDefinition<T> = { schema: z.ZodType<T>; fallback: T }
 
 export const SYSTEM_SETTINGS: { [K in SystemSettingKey]: SettingDefinition<SettingTypes[K]> } = {
   wishlist_enabled: { schema: z.boolean(), fallback: false },
+  gallery_enabled: { schema: z.boolean(), fallback: false },
+  gallery_auto_approve: { schema: z.boolean(), fallback: false },
 }
 
 export function isSystemSettingKey(key: string): key is SystemSettingKey {

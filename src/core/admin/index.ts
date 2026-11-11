@@ -168,9 +168,19 @@ export {
   type FeatureAccessInput,
   type FeatureSetting,
 } from './features'
-export { FEATURES_COPY, FeaturesEditor, WISHLIST_SWITCH_COPY, type FeatureAdminActions, type WishlistSwitchState } from './features-editor'
 export {
+  FEATURES_COPY,
+  FeaturesEditor,
+  WISHLIST_SWITCH_COPY,
+  type FeatureAdminActions,
+  type GallerySwitchKey,
+  type GallerySwitchState,
+  type WishlistSwitchState,
+} from './features-editor'
+export {
+  loadSettingSwitch,
   loadWishlistSwitch,
+  saveSettingSwitch,
   saveWishlistSwitch,
   type SystemSettingDeps,
   type WishlistSwitch,
@@ -190,7 +200,8 @@ export {
   type CostSettingsInput,
 } from './costs'
 export { parseFunnelDim, parsePageSort, parseRange, posthogProjectId, type FunnelDim, type PageSort, type Range } from './analytics'
-export { ANALYTICS_COPY, AnalyticsView, RangeTabs, Unconfigured, type AnalyticsQuery } from './analytics-ui'
+export { ANALYTICS_COPY, AnalyticsView, parseView, RangeTabs, Unconfigured, ViewTabs, type AnalyticsQuery } from './analytics-ui'
+export { GROWTH_COPY, GrowthView } from './growth-ui'
 export {
   attachDisputeFile,
   createDisputeUpload,

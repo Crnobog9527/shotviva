@@ -9,6 +9,10 @@ export type ImageRef = {
   alt: string
   width: number
   height: number
+  // A small copy of the same picture as a data: URI (site/content/first-frames.generated.ts).
+  // Only the hero's phone photo carries one: it is drawn with the document, under the full
+  // picture, so the first screen never waits for an image request.
+  firstFrame?: string
 }
 
 // Block ①: one before/after pair, a visible caption and a try-it entry.

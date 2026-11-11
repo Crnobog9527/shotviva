@@ -11,7 +11,8 @@ import { ResponsiveSheet } from '@/core/ui/responsive-sheet'
 import { GroundedImg } from './grounded-img'
 import { handPhotoToSystem, type ShareMode } from './share-mode'
 
-export function IosPhotoActions({ mode, fileUrl }: { mode: ShareMode; fileUrl: string }) {
+// onSaved: the share sheet closed (T107 watermark moment; the OS does not say whether it saved).
+export function IosPhotoActions({ mode, fileUrl, onSaved }: { mode: ShareMode; fileUrl: string; onSaved?(): void }) {
   const t = useTranslations('app.result')
   const [unavailable, setUnavailable] = useState(false)
   const [sharing, setSharing] = useState(false)
@@ -27,7 +28,7 @@ export function IosPhotoActions({ mode, fileUrl }: { mode: ShareMode; fileUrl: s
     if (result === 'unavailable') {
       setUnavailable(true)
       setShowPhoto(true)
-    }
+    } else onSaved?.()
   }
 
   return (

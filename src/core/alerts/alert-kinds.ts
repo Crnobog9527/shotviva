@@ -128,6 +128,8 @@ export type OwnerAlert =
   | CancelFailedAlert
   | SiteErrorsAlert
   | BusinessInquiryAlert
+  // T108 (ARCHITECTURE §9 第 8 条): a visitor reported a work shown in the public gallery.
+  | { kind: 'work_reported'; jobId: string; reason: string }
 
 export type OwnerAlertKind = OwnerAlert['kind']
 
@@ -141,7 +143,7 @@ const MINUTE = 60_000
 // - money: refunds, disputes and payments that did not land are never capped, are tried even
 //   while sending is backing off, and are retried when Feishu says it is rate limiting.
 export type AlertPolicy = { key: string; cooldownMs?: number; requireShared?: boolean; budget?: AlertBudget; money: boolean }
-export type AlertBudget = 'tickets' | 'inquiries'
+export type AlertBudget = 'tickets' | 'inquiries' | 'reports'
 
 const POLICIES: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K }>) => AlertPolicy } = {
   // Keyed by the refunded total, so a second partial refund on the same charge is a new message.
@@ -163,6 +165,8 @@ const POLICIES: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K }
   subscription_cancel_failed: (a) => ({ key: `subscription_cancel_failed:${a.userId}:${a.subscriptionRef ?? 'read'}`, money: false }),
   site_errors: () => ({ key: 'site_errors', cooldownMs: 30 * MINUTE, money: false }),
   business_inquiry: (a) => ({ key: `business_inquiry:${a.inquiryId}`, budget: 'inquiries', money: false }),
+  // One message per work per hour however many people report it; the review page has them all.
+  work_reported: (a) => ({ key: `work_reported:${a.jobId}`, cooldownMs: 60 * MINUTE, budget: 'reports', money: false }),
 }
 
 // A redelivered webhook, a retried handler or a second instance builds the same key.

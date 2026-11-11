@@ -37,6 +37,10 @@ const valid: { [E in EventName]: unknown } = {
   generate,
   generate_refused: { reason: 'identity_swap', source: 'partner' },
   paywall_view: { trigger: 'insufficient_credits' },
+  gallery_view: { page: 2 },
+  gallery_work_view: { template_id: 'grilled-dish', category: 'food' },
+  gallery_reuse: { template_id: 'grilled-dish', surface: 'work' },
+  work_report: { reason: 'privacy' },
   contact_sales_click: { page: '/zh/pricing' },
   business_inquiry_submit: { volume: '500_2000', uses: ['ecommerce', 'social'] },
   checkout_start: { ...checkout, code: 'SPRING20', discount_percent: 20 },
@@ -57,6 +61,9 @@ const EVENT_NAMES = [
       'checkout_start',
       'code_redeem',
       'contact_sales_click',
+      'gallery_reuse',
+      'gallery_view',
+      'gallery_work_view',
       'generate',
       'generate_refused',
       'invite_reward',
@@ -70,6 +77,7 @@ const EVENT_NAMES = [
       'template_view',
       'upload',
       'upload_error',
+      'work_report',
 ]
 
 describe('event dictionary (ARCHITECTURE §16.2)', () => {
@@ -201,5 +209,11 @@ describe('generate_refused (ARCHITECTURE §5.1a, T81)', () => {
     expect(validateEvent('generate_refused', { reason: 'identity_swap', source: 'workspace', note: 'x' }).ok).toBe(false)
     expect(validateEvent('generate_refused', { reason: 'nsfw', source: 'workspace' }).ok).toBe(false)
     expect(validateEvent('generate_refused', { reason: 'identity_swap', source: 'web' }).ok).toBe(false)
+  })
+
+  it('gallery events carry no work id and no free text (T108)', () => {
+    expect(validateEvent('gallery_work_view', { template_id: 'a', category: 'food', job_id: 'x' }).ok).toBe(false)
+    expect(validateEvent('gallery_view', { page: 21 }).ok).toBe(false)
+    expect(validateEvent('work_report', { reason: 'other', note: 'hi' }).ok).toBe(false)
   })
 })
