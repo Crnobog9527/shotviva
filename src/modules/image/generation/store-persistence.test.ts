@@ -84,3 +84,16 @@ describe('workspace views across a refresh', () => {
     expect(decodeState(null, 0).jobs).toEqual([])
   })
 })
+
+// T107 validation (2026-11-11): signing in as another account in the same tab showed the last
+// account's finished batch. The stored state names its account; job-store drops a stranger's.
+describe('the account a stored state belongs to', () => {
+  it('keeps the owner through a reload', () => {
+    expect(decodeState(encodeState({ limit: 1, jobs: [job('a')], views: {}, owner: 'user-a' }), 5_000).owner).toBe('user-a')
+  })
+
+  it('marks a state written before the owner field as nobody’s', () => {
+    expect(decodeState(JSON.stringify({ limit: 1, jobs: [], views: {} }), 5_000).owner).toBe('')
+    expect(decodeState(JSON.stringify([job('a')]), 5_000).owner).toBeUndefined()
+  })
+})
