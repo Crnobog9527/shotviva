@@ -1,7 +1,8 @@
 import type { Locale } from '../i18n/locales'
 import { localizeCategory, type LocalizedCategory } from './categories'
 import { withLocaleCover } from './cover-locales'
-import type { TemplateTranslation } from './schema'
+import type { CopyField } from './copy-fields'
+import type { TemplateFields, TemplateTranslation } from './schema'
 import type { ToggleField } from './toggles'
 import type { Template } from './types'
 
@@ -9,7 +10,13 @@ import type { Template } from './types'
 // where templates.translations has them, the English text where it does not, never blank
 // (ARCHITECTURE §5, LAUNCH §7.6 #5), and the cover that language's pages show (§8.3 「封面按语言适配」,
 // T87): every cover field is the resolved one. Prompts are not touched: they stay English.
-export type LocalizedTemplate = Template & {
+// A copy field in the page's language. A choice field's options stay the English values (what is
+// validated and sent to the model); optionLabels says how to show each one, English when the
+// language has no label for it.
+export type LocalizedCopyField = CopyField & { optionLabels?: Record<string, string> }
+
+export type LocalizedTemplate = Omit<Template, 'fields'> & {
+  fields: Omit<TemplateFields, 'copy'> & { copy: LocalizedCopyField[] }
   // The one-liner in the page's language: `description` on English pages, the translation
   // elsewhere, falling back to `description` (T52); null when neither is filled in.
   description: string | null
@@ -36,15 +43,27 @@ function localizeToggle(toggle: ToggleField, text: TemplateTranslation): ToggleF
   return { ...toggle, label: own.label || toggle.label, ...(hint ? { hint } : {}), ...confirm }
 }
 
+// Label, placeholder, help and option labels, each falling back to English.
+type OwnCopyText = NonNullable<TemplateTranslation['fields']>[string]
+
+function optionLabels(field: CopyField, own: OwnCopyText): Pick<LocalizedCopyField, 'optionLabels'> {
+  if (field.type !== 'select') return {}
+  return { optionLabels: Object.fromEntries((field.options ?? []).map((value) => [value, own.options?.[value] || value])) }
+}
+
+function localizeCopy(field: CopyField, text: TemplateTranslation | undefined): LocalizedCopyField {
+  const own: OwnCopyText = text?.fields?.[field.key] ?? {}
+  const placeholder = own.placeholder || field.placeholder
+  const help = own.help || field.help
+  return { ...field, label: own.label || field.label, ...(placeholder ? { placeholder } : {}), ...(help ? { help } : {}), ...optionLabels(field, own) }
+}
+
 export function localizeTemplate(template: Template, locale: Locale): LocalizedTemplate {
   const categoryView = localizeCategory(template.categoryInfo, locale)
   const shown = withLocaleCover(template, locale)
   const text = locale === 'en' ? undefined : template.translations[locale]
-  if (!text) return { ...shown, categoryView }
-  const copy = template.fields.copy.map((field) => {
-    const own = text.fields?.[field.key]
-    return { ...field, label: own?.label || field.label, ...(own?.placeholder ? { placeholder: own.placeholder } : {}) }
-  })
+  const copy = template.fields.copy.map((field) => localizeCopy(field, text))
+  if (!text) return { ...shown, categoryView, fields: { ...template.fields, copy } }
   return {
     ...shown,
     categoryView,

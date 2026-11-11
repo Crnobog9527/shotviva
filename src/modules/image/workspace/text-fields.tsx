@@ -1,18 +1,12 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import type { FocusEvent } from 'react'
 
+import { checkCopyValue } from '@/core/templates/copy-fields'
 import { NOTE_MAX_LENGTH } from '@/core/templates/output-options'
 
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
-
-// Fields scroll into view on focus so the keyboard never hides them (DESIGN §8.5). 16px
-// text everywhere, so iOS never zooms (The 16px Input Rule).
-const reveal = (event: FocusEvent<HTMLElement>) => event.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' })
-
-const fieldClass =
-  'w-full resize-none rounded-control border-0 bg-wash-faint p-4 text-body leading-[1.45] text-foreground shadow-[inset_0_0_0_1px_var(--input)] transition-shadow placeholder:text-muted-foreground focus:shadow-[inset_0_0_0_1.5px_var(--primary),0_0_0_4px_var(--safelight-halo)] focus:outline-none'
+import { CopyFieldInput, fieldClass, reveal } from './copy-field-input'
 
 // "Anything to change? (optional)" (DESIGN §4.3 step 2b): never called a prompt, ≤300 chars.
 export function NoteField({ value, placeholder, onChange }: { value: string; placeholder: string; onChange(next: string): void }) {
@@ -45,35 +39,46 @@ export function NoteField({ value, placeholder, onChange }: { value: string; pla
 // idPrefix: field ids must stay unique when several templates' fields share a page (T107).
 type CopyProps = { fields: CatalogueTemplate['copyFields']; values: Record<string, string>; onChange(next: Record<string, string>): void; idPrefix?: string }
 
-// Only the text a template needs, e.g. a poster's headline and price (DESIGN §4.3 step 2).
+// Only what a template asks for, e.g. a poster's headline and price (DESIGN §4.3 step 2): each
+// field as its admin-chosen type, with its help line and, for long text, a counter.
 export function CopyFields({ fields, values, onChange, idPrefix = 'copy' }: CopyProps) {
   const t = useTranslations('app.workspace')
   if (fields.length === 0) return null
   return (
     <div className="grid gap-4">
-      {fields.map((field) => (
-        <div key={field.key}>
-          <label htmlFor={`${idPrefix}-${field.key}`} className="mb-2 flex items-baseline gap-2 text-label leading-[1.3] font-medium">
-            {field.label}
-            {field.required ? null : <span className="font-normal text-muted-foreground">{t('optional')}</span>}
-          </label>
-          <input
-            id={`${idPrefix}-${field.key}`}
-            value={values[field.key] ?? ''}
-            maxLength={field.maxLength}
-            placeholder={field.placeholder}
-            required={field.required}
-            onChange={(event) => onChange({ ...values, [field.key]: event.target.value })}
-            onFocus={reveal}
-            enterKeyHint="done"
-            autoCapitalize="sentences"
-            className={`${fieldClass} h-13 py-0`}
-          />
-        </div>
-      ))}
+      {fields.map((field) => {
+        const id = `${idPrefix}-${field.key}`
+        const value = values[field.key] ?? ''
+        const counted = field.type === 'long'
+        const describedBy = [field.help ? `${id}-help` : '', counted ? `${id}-count` : ''].filter(Boolean).join(' ') || undefined
+        return (
+          <div key={field.key}>
+            <label id={`${id}-label`} htmlFor={id} className="mb-2 flex items-baseline gap-2 text-label leading-[1.3] font-medium">
+              {field.label}
+              {field.required ? null : <span className="font-normal text-muted-foreground">{t('optional')}</span>}
+            </label>
+            <CopyFieldInput field={field} id={id} value={value} describedBy={describedBy} onChange={(next) => onChange({ ...values, [field.key]: next })} />
+            {field.help || counted ? (
+              <p className="mt-2 flex items-baseline justify-between gap-3 text-caption leading-[1.4] text-muted-foreground">
+                <span id={`${id}-help`}>{field.help}</span>
+                {counted ? <span id={`${id}-count`} className="shrink-0 font-mono leading-none">{t('counter', { count: value.length, max: field.maxLength })}</span> : null}
+              </p>
+            ) : null}
+          </div>
+        )
+      })}
     </div>
   )
 }
 
+// Generate stays off while a field would be refused by the server: a required one left empty,
+// a choice not in the list, a number that is not one or is out of range (checkCopyValue).
 export const missingRequiredCopy = (fields: CatalogueTemplate['copyFields'], values: Record<string, string>) =>
-  fields.some((field) => field.required && !(values[field.key] ?? '').trim())
+  fields.some((field) => {
+    try {
+      checkCopyValue({ ...field, options: field.options?.map((option) => option.value) }, values[field.key])
+      return false
+    } catch {
+      return true
+    }
+  })
