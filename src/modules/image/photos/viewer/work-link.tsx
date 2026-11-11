@@ -1,5 +1,6 @@
 'use client'
 
+import { useLocale } from 'next-intl'
 import { useRef, type ComponentProps, type MouseEvent } from 'react'
 
 import { Link } from '@/core/i18n/ui'
@@ -19,6 +20,7 @@ const HOVER_INTENT_MS = 120
 
 export function WorkLink({ workId, mode = 'detail', href, onClick, ...props }: Props) {
   const viewer = useViewer()
+  const locale = useLocale()
   const open = (event: MouseEvent<HTMLAnchorElement>) => {
     onClick?.(event)
     if (!viewer || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
@@ -26,7 +28,7 @@ export function WorkLink({ workId, mode = 'detail', href, onClick, ...props }: P
     viewer.open(workId, mode)
   }
   const hover = useRef<number | undefined>(undefined)
-  const warm = () => prefetchWorkView(workId)
+  const warm = () => prefetchWorkView(workId, locale)
   const rest = () => {
     hover.current = window.setTimeout(warm, HOVER_INTENT_MS)
   }
