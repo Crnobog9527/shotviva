@@ -1,6 +1,6 @@
 import type { CreditPool } from '@/core/billing/pools'
 import type { Job, JobVisibility } from '@/core/jobs'
-import { isCutOut } from '@/core/jobs/job-background'
+import { isCutOut } from '@/core/jobs/job-cut-out'
 import { OUTPUT_ASPECTS, RESOLUTIONS, type OutputAspect, type Resolution } from '@/core/templates/output-options'
 import type { Translate } from '@/core/translate'
 

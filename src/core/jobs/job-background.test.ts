@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { backgroundInput, isCutOut } from './job-background'
+import { backgroundInput } from './job-background'
+import { isCutOut } from './job-cut-out'
 
 describe('cut-out record (inputs.background)', () => {
   const openai = { honoursBackground: true }

@@ -13,7 +13,7 @@ import {
   type ObjectStore,
 } from '../storage'
 import type { DownloadBackground } from '../storage/rules/download-background'
-import { isCutOut } from './job-background'
+import { isCutOut } from './job-cut-out'
 import { findOwnJob } from './job-lookup'
 import type { Job } from './job-schema'
 

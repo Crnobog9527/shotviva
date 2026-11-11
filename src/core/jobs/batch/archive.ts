@@ -8,7 +8,7 @@ import { MAX_BATCH_SIZE } from '../../billing'
 import { AppError } from '../../errors'
 import { downloadVariantKeyFor, outputKeyFor } from '../../storage'
 import type { DownloadBackground } from '../../storage/rules/download-background'
-import { isCutOut } from '../job-background'
+import { isCutOut } from '../job-cut-out'
 
 const entry = z.object({
   id: z.uuid(), output_key: z.string(), position: z.coerce.number().int().min(1).max(MAX_BATCH_SIZE),

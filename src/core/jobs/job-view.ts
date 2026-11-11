@@ -1,5 +1,5 @@
 import type { CreditPool } from '../billing/pools'
-import { isCutOut } from './job-background'
+import { isCutOut } from './job-cut-out'
 import type { Job, JobStatus, JobVisibility } from './job-schema'
 
 // What the browser sees of a job. Never image bytes (AGENTS §6): the result is fetched from
