@@ -2,7 +2,7 @@ import { baselineOffers, type OfferFacts } from '../../offer'
 import { defineContentPage, type ShootDemo } from '@/core/content'
 
 import { site } from '../../../site.config'
-import { caseImage, CATEGORY } from '../../landing-shared'
+import { caseImage, CATEGORY, withFirstFrame } from '../../landing-shared'
 import { zhPricingRelated } from '../shared'
 import { dayRateUsd, packshotUsd, SET_PHOTOS, styledShotUsd, usdRange } from '../../offer'
 import { PLATFORM_SPECS, px } from '../../platform-specs'
@@ -49,7 +49,7 @@ const copy = {
   subtitle: '白底主图、生活场景、促销海报，都从你已经拍好的那张商品照出来。',
   answerBlock: `商业摄影对小品牌来说，通常意味着订一天影棚、请摄影师和修图师。${brand} 用一张手机照片做同样的活：上传照片，选「纯白底图」或「生活场景」这类模板，就能下载造型好、精修过的商品图，有${zhTierList}三档。新用户送 ${zhFreeImages}。`,
   hero: {
-    before: sneakerPhone,
+    before: withFirstFrame(sneakerPhone),
     after: sneakerLifestyle,
     caption: '你的手机照片 → 生活场景：还是这只鞋，放到了阳光下的咖啡馆台阶上',
     cta: { label: '上传照片', href: '/generate' },

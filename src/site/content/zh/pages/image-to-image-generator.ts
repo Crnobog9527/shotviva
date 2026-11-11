@@ -2,7 +2,7 @@ import { baselineOffers, type OfferFacts } from '../../offer'
 import { defineContentPage, type EditCases, type ShootDemo } from '@/core/content'
 
 import { site } from '../../../site.config'
-import { caseImage, SIZE_COUNT } from '../../landing-shared'
+import { caseImage, SIZE_COUNT, withFirstFrame } from '../../landing-shared'
 import { zhPricingRelated } from '../shared'
 import { photoSeconds, SET_PHOTOS } from '../../offer'
 import { productBills } from '../home'
@@ -75,7 +75,7 @@ const copy = {
   subtitle: '从你自己的照片出发，而不是一个空白的输入框。主体保持原样。',
   answerBlock: `图生图就是用你上传的照片生成一张新图。${brand} 的图生图在线工具用模板出图：不用装软件，也不用写提示词，选一个餐饮、商品、美妆、房间、宠物或画风模板，光线、场景或画风就由模板定好。主体保持原样，新用户送 ${zhFreeImages}。`,
   hero: {
-    before: catPhone,
+    before: withFirstFrame(catPhone),
     after: catAnime,
     caption: '你的手机照片 → 动漫风：还是这只猫，变成了画',
     cta: { label: '上传照片', href: '/generate' },
