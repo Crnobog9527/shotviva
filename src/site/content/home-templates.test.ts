@@ -71,12 +71,13 @@ const series = (id: string, memberIds: string[], showMembers = false) => ({ id, 
 describe('series on the template sections', () => {
   it('collapses featured members into one series card at the first member\'s place, in admin order', () => {
     const rows = [live('solo', 'food-drink', { rank: 1 }), live('m2', 'food-drink', { rank: 2 }), live('other', 'food-drink', { rank: 3 }), live('m1', 'food-drink', { rank: 4 }), live('m3', 'food-drink')]
-    const { categories, media, defaultId } = featuredSections(rows, undefined, [series('s', ['m1', 'm2', 'm3'])])
+    const { categories, media, defaultId } = featuredSections(rows, undefined, [series('s', ['m1', 'm2', 'gone', 'm3'])])
     expect(categories[0]?.templates.map((card) => card.id)).toEqual(['solo', 'series-s', 'other'])
     expect(categories[0]?.templates[1]).toEqual({
       id: 'series-s', name: 'Series s', use: 'All of s',
       series: { href: '/generate?series=s-set', members: ['m1', 'm2', 'm3'], count: 3 },
     })
+    // Not in the live catalogue (not on sale): neither pictured nor counted.
     // The pictured members' covers are in the lookup, the unfeatured m3 included.
     expect(Object.keys(media).sort()).toEqual(['m1', 'm2', 'm3', 'other', 'solo'])
     expect(defaultId).toBe('solo')
