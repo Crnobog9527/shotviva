@@ -8,7 +8,7 @@ import { REPORT_REASONS } from '@/core/moderation/reasons'
 // client bundle).
 export async function reportText(locale: Locale): Promise<ReportText> {
   const t = await getTranslations({ locale, namespace: 'gallery.report' })
-  const keys = ['open', 'title', 'body', 'reasonLabel', 'noteLabel', 'submit', 'cancel', 'sending', 'done', 'duplicate', 'limited', 'failed'] as const
+  const keys = ['open', 'title', 'body', 'reasonLabel', 'noteLabel', 'submit', 'cancel', 'close', 'sending', 'done', 'duplicate', 'limited', 'failed'] as const
   const reasons = Object.fromEntries(REPORT_REASONS.map((reason) => [reason, t(`reasons.${reason}`)])) as ReportText['reasons']
   return { ...(Object.fromEntries(keys.map((key) => [key, t(key)])) as Omit<ReportText, 'reasons'>), reasons }
 }

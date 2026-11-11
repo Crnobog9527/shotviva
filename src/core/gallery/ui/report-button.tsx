@@ -32,8 +32,12 @@ export function ReportButton({ jobId, loginHref, text }: Props) {
           )}
           {state === 'failed' ? <p role="alert" className="text-sm text-[var(--destructive)]">{text.failed}</p> : null}
           <DialogFooter>
-            <button type="button" className="mk-cta mk-cta-neutral" onClick={() => setOpen(false)}>
-              {text.cancel}
+            <button
+              type="button"
+              className="min-h-11 rounded-[var(--radius-tile)] border border-[var(--border)] px-5 text-sm"
+              onClick={() => setOpen(false)}
+            >
+              {finished ? text.close : text.cancel}
             </button>
             {finished ? null : (
               <button type="button" className="mk-cta" disabled={!reason || state === 'sending'} onClick={() => reason && send(reason, note)}>

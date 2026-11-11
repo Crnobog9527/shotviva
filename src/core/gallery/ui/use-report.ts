@@ -13,6 +13,7 @@ export type ReportText = {
   noteLabel: string
   submit: string
   cancel: string
+  close: string
   sending: string
   done: string
   duplicate: string

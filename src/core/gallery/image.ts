@@ -15,8 +15,12 @@ export const parseWidth = (raw: string | null): GalleryWidth =>
 export async function renderGalleryImage(store: Pick<ObjectStore, 'get'>, id: string, width: GalleryWidth): Promise<Uint8Array | null> {
   const shown = await shownImage(id)
   if (!shown) return null
-  const original = await store.get(shown.outputKey)
-  return galleryImage(original, width, shouldWatermark(shown.creditPool))
+  const original = await store.get(shown.outputKey).catch((error: unknown) => {
+    // A file already gone (the work is being deleted) is a 404, not a server error.
+    if (error instanceof Error && error.name === 'NoSuchKey') return null
+    throw error
+  })
+  return original ? galleryImage(original, width, shouldWatermark(shown.creditPool)) : null
 }
 
 // Where a page points an <img>; ?w= picks the size.

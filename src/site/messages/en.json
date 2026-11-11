@@ -1780,6 +1780,7 @@
       "noteLabel": "Anything to add? (optional)",
       "submit": "Send report",
       "cancel": "Cancel",
+      "close": "Close",
       "sending": "Sending…",
       "done": "Thanks. We will review it.",
       "duplicate": "You already reported this photo. We will review it.",
