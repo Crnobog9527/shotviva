@@ -5,6 +5,8 @@ import { AppError } from '../errors'
 import { cachedSystemSettings } from '../system-settings/read'
 import { decideGallery } from './switch'
 
+export { GALLERY_CACHE_TAG } from './cache'
+export { publicCopy, publicCopyText, type PublicCopy } from './public-copy'
 export { siteHasGallery } from './switch'
 
 // The one place that decides whether the public gallery is open (ARCHITECTURE §9 第 1 条): its
