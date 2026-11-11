@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { limitsFor } from '@/core/billing/tier-limits'
 import { useRouter } from '@/core/i18n'
@@ -39,12 +39,19 @@ function CreateBody({ template, open, onClose, ...context }: BodyProps) {
   const t = useTranslations('app.template')
   const router = useRouter()
   const draft = useWorkspaceDraft({ template, ...context, single: true })
+  const workspace = `/generate/${template.id}`
+  // Generate moves to the template's workspace page. Its shell is fetched while the visitor is
+  // still picking a photo, so the move, and the developing view the shell draws from this tab's
+  // own job (workspace-pending.tsx), happen on the click instead of after a round trip.
+  useEffect(() => {
+    if (open) router.prefetch(workspace)
+  }, [open, router, workspace])
   const batch = limitsFor(context.tier).batchMax > 1 && draft.photos.photos.length === 0
   const tall = isCompareSample(template)
   const generate = () => {
     void draft.start()
     onClose()
-    router.push(`/generate/${template.id}`, { transitionTypes: navTypesFor(`/generate/${template.id}`) })
+    router.push(workspace, { transitionTypes: navTypesFor(workspace) })
   }
   return (
     <CreateSheet
