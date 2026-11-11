@@ -39,6 +39,9 @@ function load(id: string, locale: string): Promise<ViewState> {
 
 export const prefetchWorkView = (id: string, locale: string) => void load(id, locale)
 
+// The same read, awaited: an edit's new photo is shown once its view is here.
+export const preloadWorkView = (id: string, locale: string) => load(id, locale)
+
 // A work's view went out of date (it was deleted, or the balance it carries was just spent).
 export const forgetWorkViews = () => cache.clear()
 

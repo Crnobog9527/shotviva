@@ -31,7 +31,7 @@ export function WorkDetail({ state, listed, steps, onRetry }: Props) {
   if (!viewer) return null
   if (state.kind === 'missing' || state.kind === 'error') return <ViewerMessage kind={state.kind} onClose={viewer.close} onRetry={onRetry} />
   const grid = cn(VIEWER_GRID, 'touch-pan-y')
-  if (state.kind === 'loading') return <div className={grid} {...swipe}>{listed ? <Placeholder item={listed} steps={steps} /> : null}</div>
+  if (state.kind === 'loading') return <div className={grid} {...swipe}>{listed ? <Placeholder item={listed} steps={steps} /> : <Skeleton />}</div>
   const { view } = state
   return (
     <div className={grid} {...swipe}>
@@ -63,6 +63,22 @@ function AgainButton({ onOpen }: { onOpen(): void }) {
       <AgainIcon />
       {t('makeAgain')}
     </button>
+  )
+}
+
+// A work the grid does not list (an older one, opened by its address): quiet shapes until it loads.
+function Skeleton() {
+  return (
+    <>
+      <div className={VIEWER_TRAY} aria-hidden="true">
+        <span className="mx-auto block aspect-[4/5] w-full max-w-[420px] animate-pulse rounded-panel bg-wash motion-reduce:animate-none md:max-h-full" />
+      </div>
+      <div className={VIEWER_SIDE} aria-busy="true">
+        <span className="block h-9 w-3/4 rounded-control bg-wash" />
+        <span className="mt-2 block h-4 w-1/2 rounded-control bg-wash" />
+        <span className="mt-4 block h-14 rounded-control bg-wash" />
+      </div>
+    </>
   )
 }
 
