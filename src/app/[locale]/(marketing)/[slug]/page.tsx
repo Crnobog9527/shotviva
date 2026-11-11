@@ -13,6 +13,7 @@ import {
   softwareApplicationLd,
 } from '@/core/seo'
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
+import { openingCovers } from '@/core/templates/cover-ratio'
 import { cachedPublicSeries } from '@/core/templates/public-series'
 import { toCatalogueTemplate } from '@/modules/image/marketing'
 import { contentPagesIn, creditFacts, featuredSections, fillCredits, findContentPageIn, freeImagesIn, homePageIn, isLinkEnabled } from '@/site/content'
@@ -71,8 +72,9 @@ export default async function ContentRoute({ params }: PageProps<'/[locale]/[slu
   const catalogue = live.map(toCatalogueTemplate)
   // The page's own categories' featured templates; the generator opens on the first of them.
   const { defaultId, ...sections } = featuredSections(live, page.landing.templates?.categoryKeys, series)
+  const initialCovers = await openingCovers(live.find((template) => template.id === defaultId))
   const generator = (
-    <HomeGeneratorSlot templates={catalogue} defaultId={defaultId} homePath={localizePath(path, locale)} freeImages={free} />
+    <HomeGeneratorSlot templates={catalogue} defaultId={defaultId} homePath={localizePath(path, locale)} freeImages={free} initialCovers={initialCovers} />
   )
   return (
     <>

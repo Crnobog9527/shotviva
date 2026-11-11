@@ -232,59 +232,81 @@
   .mk-cta-idle, .mk-cta:disabled { background: var(--wash); color: var(--muted-foreground); box-shadow: inset 0 0 0 1px var(--border); cursor: default; }
   .mk-cost-tag { font: 500 14px/1 var(--font-mono); opacity: .72; }
 
-  /* ---------- phone and tablet: the stacked card ---------- */
-  .mk-gen {
-    position: relative; margin: 16px -6px 0; padding: 12px; border-radius: var(--radius-sheet);
-    background: linear-gradient(180deg, var(--popover), var(--card));
+  /* ---------- the creation panel (home-panel.tsx; Owner 2026-11-12, 方案 B) ----------
+     Phones stack it: template name → preview → upload → template rail → size and note → Generate.
+     From 1024 two columns, the preview kept small (≤ 320 × 260) so the hero pair above stays the
+     page's largest picture (LCP). The preview never crops: the frame takes the cover's own shape
+     inside a height range, the picture is contained, and a blurred copy fills what is left. */
+  .mk-panel {
+    position: relative; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "stage" "up" "err" "rail" "row" "cta";
+    margin: 16px -6px 0; padding: 12px; border-radius: var(--radius-sheet); background: linear-gradient(180deg, var(--popover), var(--card));
     box-shadow: inset 0 0 0 1px var(--border), inset 0 1px 0 color-mix(in srgb, var(--foreground) 5%, transparent), 0 30px 60px -30px rgba(0, 0, 0, .8);
   }
-  .mk-drop {
-    position: relative; display: block; width: 100%; aspect-ratio: 4 / 5; border-radius: var(--radius-tile); overflow: hidden; text-align: center; cursor: pointer;
-    background: repeating-linear-gradient(135deg, var(--hatch) 0 8px, transparent 8px 16px), var(--background); box-shadow: inset 0 0 0 1px var(--border);
+  .mk-panel-head { grid-area: head; display: flex; align-items: center; gap: 8px; padding: 2px 2px 10px; }
+  .mk-panel-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 16px/1.25 var(--font-sans); }
+  .mk-panel-change {
+    flex: none; min-height: 40px; padding: 0 14px; border: 0; border-radius: 10px; cursor: pointer;
+    font: 600 14px/1 var(--font-sans); color: var(--foreground); background: var(--wash-strong); box-shadow: inset 0 0 0 1px var(--border);
   }
-  .mk-vf { position: absolute; inset: 12px; z-index: 2; pointer-events: none; }
-  .mk-vf i { position: absolute; width: 22px; height: 22px; border: 0 solid color-mix(in srgb, var(--foreground) 55%, transparent); }
-  .mk-vf i:nth-child(1) { top: 0; left: 0; border-top-width: 1.5px; border-left-width: 1.5px; border-top-left-radius: 8px; }
-  .mk-vf i:nth-child(2) { top: 0; right: 0; border-top-width: 1.5px; border-right-width: 1.5px; border-top-right-radius: 8px; }
-  .mk-vf i:nth-child(3) { bottom: 0; left: 0; border-bottom-width: 1.5px; border-left-width: 1.5px; border-bottom-left-radius: 8px; }
-  .mk-vf i:nth-child(4) { bottom: 0; right: 0; border-bottom-width: 1.5px; border-right-width: 1.5px; border-bottom-right-radius: 8px; }
-  .mk-hud { position: absolute; z-index: 3; left: 24px; top: 24px; height: 26px; display: inline-flex; align-items: center; font: 400 14px/1 var(--font-mono); color: var(--foreground); }
-  .mk-empty { position: absolute; z-index: 3; inset: 0 16px; display: grid; place-content: center; justify-items: center; gap: 8px; }
-  .mk-shutter { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; margin-bottom: 4px; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--foreground) 7%, transparent); }
-  .mk-shutter > span { width: 50px; height: 50px; border-radius: 50%; display: grid; place-items: center; background: var(--foreground); color: var(--background); }
-  .mk-empty strong { font: 600 17px/1.2 var(--font-sans); color: var(--foreground); }
-  .mk-empty small { font: 400 14px/1.3 var(--font-sans); color: color-mix(in srgb, var(--foreground) 78%, transparent); }
-  .mk-drop .mk-shot { position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-  .mk-replace-pill {
-    position: absolute; z-index: 3; right: 12px; bottom: 12px; display: inline-flex; align-items: center; height: 44px; padding: 0 12px; border-radius: 12px;
-    font: 600 14px/1 var(--font-sans); color: var(--foreground); background: var(--frost); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  .mk-stage-wrap { grid-area: stage; container-type: inline-size; }
+  .mk-stage {
+    position: relative; overflow: hidden; isolation: isolate; border-radius: var(--radius-tile); background: var(--muted);
+    height: clamp(240px, calc(100cqw / var(--r, .8)), 420px); transition: height .35s var(--ease);
   }
-  .mk-current { display: flex; align-items: center; gap: 12px; padding: 12px 4px 4px; }
-  .mk-thumb { flex: none; width: 44px; height: 55px; border-radius: 8px; object-fit: cover; background: var(--muted); box-shadow: inset 0 0 0 1px var(--border); }
-  .mk-current-t { flex: 1; min-width: 0; }
-  .mk-current-t small { display: block; font-size: 14px; color: var(--muted-foreground); }
-  .mk-current-t b { display: block; margin-top: 2px; font: 600 16px/1.2 var(--font-sans); }
-  .mk-link { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; border: 0; background: none; padding: 0; font: 500 14px/1 var(--font-sans); color: var(--foreground); white-space: nowrap; cursor: pointer; }
-  .mk-link svg { color: var(--primary); }
-  .mk-picks-head { display: flex; justify-content: space-between; align-items: center; padding: 8px 4px 4px; font-size: 14px; color: var(--muted-foreground); }
-  .mk-pick-rail { display: flex; gap: 8px; overflow-x: auto; margin: 0 -12px; padding: 2px 12px 4px; scrollbar-width: none; }
-  .mk-pick-rail::-webkit-scrollbar { display: none; }
-  .mk-pick { flex: 0 0 84px; border: 0; background: none; padding: 0; text-align: center; font: 500 14px/1.25 var(--font-sans); color: var(--bone-dim); cursor: pointer; }
-  .mk-pick img, .mk-pick-blank { display: block; width: 84px; height: 105px; margin-bottom: 6px; object-fit: cover; border-radius: 12px; background: var(--muted); box-shadow: inset 0 0 0 1px var(--border); transition: box-shadow .2s; }
-  .mk-pick[aria-pressed="true"] { color: var(--foreground); }
-  .mk-pick[aria-pressed="true"] img, .mk-pick[aria-pressed="true"] .mk-pick-blank { box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--primary); }
-  .mk-field { display: block; padding: 12px 4px 0; }
-  .mk-field-label { display: block; margin-bottom: 8px; font: 500 15px/1.3 var(--font-sans); }
-  .mk-textarea {
-    width: 100%; min-height: 72px; resize: none; padding: 12px; border: 0; border-radius: var(--radius-control); font: 400 16px/1.45 var(--font-sans);
+  .mk-stage::after { content: ""; position: absolute; inset: 0; z-index: 5; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--border); pointer-events: none; }
+  .mk-stage-fill { position: absolute; inset: -24px; width: calc(100% + 48px); height: calc(100% + 48px); object-fit: cover; filter: blur(22px) saturate(1.1) brightness(.45); }
+  .mk-stage-img { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; object-fit: contain; animation: mk-stage-in .35s var(--ease); }
+  @keyframes mk-stage-in { from { opacity: 0; } to { opacity: 1; } }
+  .mk-stage .mk-stage-ai { top: 10px; right: 10px; bottom: auto; z-index: 4; }
+  .mk-inset {
+    position: absolute; z-index: 4; right: 10px; bottom: 10px; width: 28%; max-width: 112px; aspect-ratio: var(--ir, .8); overflow: hidden; border-radius: 10px;
+    background: var(--background); box-shadow: 0 0 0 2px color-mix(in srgb, var(--foreground) 85%, transparent), 0 10px 24px rgba(0, 0, 0, .5);
+  }
+  .mk-inset-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; filter: saturate(.85); }
+  .mk-inset .mk-inset-tag { left: 6px; bottom: 6px; height: 22px; padding: 0 7px; font-size: 12px; }
+  .mk-up {
+    grid-area: up; display: flex; align-items: center; gap: 14px; width: 100%; margin-top: 10px; padding: 12px 14px; border: 0; border-radius: var(--radius-control);
+    text-align: left; cursor: pointer; color: var(--foreground); background: color-mix(in srgb, var(--primary) 7%, var(--card));
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--primary) 55%, transparent);
+  }
+  .mk-up-has { background: var(--wash); box-shadow: inset 0 0 0 1px var(--border); }
+  .mk-up-plus { flex: none; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 12px; background: var(--primary); color: var(--primary-foreground); }
+  .mk-up-thumb { flex: none; width: 48px; height: 48px; border-radius: 12px; object-fit: cover; }
+  .mk-up-t { flex: 1; min-width: 0; display: grid; gap: 2px; }
+  .mk-up-t b { font: 600 16px/1.25 var(--font-sans); }
+  .mk-up-t small { font-size: 13px; line-height: 1.35; color: var(--muted-foreground); }
+  .mk-up-re { flex: none; display: inline-flex; align-items: center; height: 36px; padding: 0 12px; border-radius: 10px; font: 600 14px/1 var(--font-sans); background: var(--wash-strong); }
+  .mk-panel-error { grid-area: err; padding: 8px 4px 0; font-size: 14px; line-height: 1.4; color: var(--destructive); }
+  .mk-rail { grid-area: rail; display: flex; gap: 8px; margin: 12px -12px 0; padding: 2px 12px; overflow-x: auto; scrollbar-width: none; }
+  .mk-rail::-webkit-scrollbar { display: none; }
+  .mk-rail-i { flex: 0 0 64px; width: 64px; min-width: 0; padding: 0; border: 0; background: none; text-align: center; cursor: pointer; font: 500 12px/1.25 var(--font-sans); color: var(--bone-dim); }
+  .mk-rail-i img, .mk-rail-blank {
+    display: block; width: 64px; height: 64px; margin-bottom: 4px; object-fit: cover; border-radius: 12px; background: var(--muted); box-shadow: inset 0 0 0 1px var(--border); transition: box-shadow .2s;
+  }
+  .mk-rail-i span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mk-rail-i[aria-pressed="true"] { color: var(--foreground); }
+  .mk-rail-i[aria-pressed="true"] img, .mk-rail-i[aria-pressed="true"] .mk-rail-blank { box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--primary); }
+  .mk-rail-all {
+    flex: 0 0 64px; height: 64px; padding: 4px; border: 0; border-radius: 12px; cursor: pointer;
+    font: 500 12px/1.2 var(--font-sans); color: var(--bone-dim); background: var(--wash); box-shadow: inset 0 0 0 1px var(--border);
+  }
+  .mk-panel-row { grid-area: row; display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+  .mk-panel-size-d { display: none; }
+  .mk-panel-size-m { flex: none; }
+  .mk-panel-size-m .mk-field { padding: 0; }
+  .mk-panel-size-m .mk-field-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .mk-panel-size-m select { width: auto; max-width: 42vw; }
+  .mk-panel-note {
+    flex: 1; min-width: 0; height: 44px; padding: 0 14px; border: 0; border-radius: var(--radius-button); font: 400 16px/1 var(--font-sans);
     color: var(--foreground); background: var(--wash-faint); box-shadow: inset 0 0 0 1px var(--input); transition: box-shadow .2s;
   }
-  .mk-textarea:focus, .mk-bench-note:focus { outline: none; box-shadow: inset 0 0 0 1.5px var(--primary), 0 0 0 4px var(--safelight-halo); }
-  .mk-gen-cta { padding-top: 12px; }
-  .mk-gen-meta, .mk-bench-gift { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 0 4px; font-size: 14px; color: var(--bone-dim); }
+  .mk-panel-note::placeholder { color: var(--muted-foreground); }
+  .mk-panel-note:focus { outline: none; box-shadow: inset 0 0 0 1.5px var(--primary), 0 0 0 4px var(--safelight-halo); }
+  .mk-panel-cta { grid-area: cta; padding-top: 12px; }
+  .mk-panel-gift { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 0 2px; font-size: 14px; color: var(--bone-dim); }
   .mk-gift-i { width: 16px; height: 16px; color: var(--primary); }
-  .mk-gen-error, .mk-bench-error { padding: 8px 4px 0; font-size: 14px; line-height: 1.4; color: var(--destructive); }
-  .mk-bench-wrap { display: none; }
+  .mk-field { display: block; padding: 12px 4px 0; }
+  .mk-field-label { display: block; margin-bottom: 8px; font: 500 15px/1.3 var(--font-sans); }
 
   /* floating primary, phones only: shown while the generator is off screen. From 768px up the
      header's primary stands in for it (Owner 2026-11-08: a floating bar is a phone pattern). */
@@ -295,49 +317,27 @@
   .mk-dock-show { visibility: visible; transform: none; transition: transform .45s var(--ease), visibility 0s; }
 
   @media (min-width: 768px) {
-    .mk-gen { max-width: 480px; margin: 24px 0 0; }
+    .mk-panel { max-width: 560px; margin: 24px 0 0; }
     .mk-dock { display: none; }
   }
 
-  /* ---------- desktop (≥1024): the bench, one 88px bar that never grows ---------- */
   @media (min-width: 1024px) {
-    .mk-gen { display: none; }
-    .mk-bench-wrap { display: block; position: relative; grid-column: 1 / -1; margin-top: 40px; }
-    .mk-bench-wrap::before {
-      content: ""; position: absolute; z-index: 0; left: 50%; top: 50%; width: min(1200px, calc(100vw - 2px)); height: 560px; transform: translate(-50%, -40%); pointer-events: none;
-      background: radial-gradient(closest-side, color-mix(in srgb, var(--primary) 15%, transparent), transparent); filter: blur(36px); opacity: .867;
+    .mk-panel {
+      grid-column: 1 / -1; max-width: none; margin-top: 32px; padding: 16px; column-gap: 28px; align-items: start;
+      grid-template-columns: 320px minmax(0, 1fr); grid-template-rows: auto auto auto auto auto 1fr;
+      grid-template-areas: "head up" "stage up" "stage err" "stage rail" "stage row" "stage cta";
     }
-    .mk-bench {
-      position: relative; z-index: 1; display: flex; align-items: center; gap: 12px; height: 88px; padding: 12px; border-radius: var(--radius-panel); background: var(--tier-graphite);
-      box-shadow: inset 0 0 0 1px var(--border), inset 0 1px 0 color-mix(in srgb, var(--foreground) 6%, transparent), inset 0 -2px 0 rgba(0, 0, 0, .2), 0 16px 30px -16px rgba(0, 0, 0, .9);
-    }
-    /* The photo slot: the 64px well and its name beside it, like a chip's key and value. */
-    .mk-photo {
-      flex: none; display: inline-flex; align-items: center; gap: 12px; height: 64px; padding: 0 4px 0 0; border: 0; border-radius: 12px; cursor: pointer;
-      background: none; color: var(--foreground); font: 600 15px/1.2 var(--font-sans); letter-spacing: -0.01em; white-space: nowrap; text-align: left;
-    }
-    /* Narrow enough that "Upload photo" sits in two lines beside the well and leaves the note room. */
-    .mk-photo-t { max-width: 4.5em; white-space: normal; }
-    .mk-has-photo .mk-photo-t { font-weight: 500; color: var(--bone-dim); transition: color .18s; }
-    .mk-tile {
-      position: relative; flex: none; width: 64px; height: 64px; display: grid; place-items: center; overflow: hidden; border-radius: 12px; color: var(--foreground);
-      background: repeating-linear-gradient(135deg, var(--hatch) 0 8px, transparent 8px 16px), var(--background); box-shadow: inset 0 0 0 1px var(--input); transition: box-shadow .18s;
-    }
-    .mk-tile .mk-vf { inset: 6px; }
-    .mk-tile .mk-vf i { width: 10px; height: 10px; }
-    .mk-tile .mk-vf i:nth-child(1) { border-top-left-radius: 4px; }
-    .mk-tile .mk-vf i:nth-child(2) { border-top-right-radius: 4px; }
-    .mk-tile .mk-vf i:nth-child(3) { border-bottom-left-radius: 4px; }
-    .mk-tile .mk-vf i:nth-child(4) { border-bottom-right-radius: 4px; }
-    .mk-plus { width: 22px; height: 22px; }
-    .mk-tile .mk-shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-    .mk-has-photo .mk-tile .mk-vf, .mk-has-photo .mk-tile .mk-plus { display: none; }
+    .mk-stage { height: clamp(200px, calc(100cqw / var(--r, .8)), 260px); }
+    .mk-up { margin-top: 0; padding: 16px 18px; }
+    .mk-rail { margin: 12px 0 0; padding: 2px; }
+    .mk-panel-size-d { display: block; }
+    .mk-panel-size-m { display: none; }
+    /* the Size chip and its list (size-menu.tsx) */
     .mk-bchip {
       flex: none; display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px 0 8px; border: 0; border-radius: 999px; cursor: pointer;
       font: 500 15px/1 var(--font-sans); letter-spacing: -0.01em; white-space: nowrap; color: var(--foreground); background: var(--wash);
       box-shadow: inset 0 0 0 1px var(--border); transition: background-color .18s, box-shadow .18s;
     }
-    .mk-bchip .mk-thumb { width: 28px; height: 28px; border-radius: 8px; }
     .mk-k { font-size: 14px; font-weight: 400; color: var(--muted-foreground); }
     .mk-chip-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
     .mk-chev { width: 16px; height: 16px; color: var(--muted-foreground); }
@@ -354,34 +354,18 @@
     }
     .mk-size-list button svg { color: var(--primary); opacity: 0; }
     .mk-size-list button[aria-checked="true"] svg { opacity: 1; }
-    .mk-bench-note {
-      flex: 1; min-width: 0; height: 44px; padding: 0 14px; border: 0; border-radius: var(--radius-button); font: 400 16px/1 var(--font-sans);
-      color: var(--foreground); background: var(--wash-faint); box-shadow: inset 0 0 0 1px var(--input); transition: box-shadow .2s;
-    }
-    .mk-bench-note::placeholder { color: var(--muted-foreground); }
-    .mk-bench .mk-cta { flex: none; width: auto; padding: 0 22px; }
-    .mk-bench-gift, .mk-bench-error { position: relative; z-index: 1; }
-    .mk-bench-error { text-align: center; }
   }
-  /* A narrow desktop leaves the note almost no room once the photo slot is named: the chips drop
-     their keys (still in their aria-labels) and cut long names sooner. */
-  @media (min-width: 1024px) and (max-width: 1199px) {
-    .mk-bench .mk-k { display: none; }
-    .mk-chip-name { max-width: 120px; }
+  @media (prefers-reduced-motion: reduce) {
+    .mk-stage { transition: none; }
+    .mk-stage-img { animation: none; }
   }
-  @media (min-width: 1024px) and (prefers-reduced-motion: no-preference) {
-    .mk-bench-wrap::before { animation: mk-breathe 8s ease-in-out infinite; }
-  }
-  @keyframes mk-breathe { 0%, 100% { opacity: .667; } 50% { opacity: 1; } }
 
   @media (hover: hover) {
     .mk-nl:hover { color: var(--foreground); background: var(--wash); }
     .mk-ghost-pill:hover { background: var(--wash-strong); box-shadow: inset 0 0 0 1px var(--input); }
-    .mk-drop:hover { box-shadow: inset 0 0 0 1px var(--input); }
-    .mk-pick:hover img { box-shadow: inset 0 0 0 1px var(--input); }
+    .mk-rail-i:hover img { box-shadow: inset 0 0 0 1px var(--input); }
+    .mk-panel-change:hover, .mk-rail-all:hover { background: var(--wash-strong); box-shadow: inset 0 0 0 1px var(--input); }
     .mk-bchip:hover { background: var(--wash-strong); box-shadow: inset 0 0 0 1px var(--input); }
-    .mk-photo:hover .mk-tile { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--foreground) 32%, transparent); }
-    .mk-has-photo .mk-photo:hover .mk-photo-t { color: var(--foreground); }
     .mk-size-list button:hover { background: var(--wash); }
     .mk-cta:not(:disabled):hover { filter: brightness(1.04); }
   }

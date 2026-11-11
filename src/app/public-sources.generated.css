@@ -578,11 +578,13 @@
 @source "../core/templates/categories.ts";
 @source "../core/templates/copy-fields.ts";
 @source "../core/templates/cover-locales.ts";
+@source "../core/templates/cover-ratio.ts";
 @source "../core/templates/edit-offer.ts";
 @source "../core/templates/edit-params.ts";
 @source "../core/templates/generation-inputs.ts";
 @source "../core/templates/generation-template.ts";
 @source "../core/templates/image-capabilities.ts";
+@source "../core/templates/image-header.ts";
 @source "../core/templates/image-options.ts";
 @source "../core/templates/index.ts";
 @source "../core/templates/list-templates.ts";
@@ -651,8 +653,6 @@
 @source "../modules/image/generation/scheduler.ts";
 @source "../modules/image/generation/store-persistence.ts";
 @source "../modules/image/generation/use-jobs.ts";
-@source "../modules/image/home/home-bench.tsx";
-@source "../modules/image/home/home-card.tsx";
 @source "../modules/image/home/home-cta-button.tsx";
 @source "../modules/image/home/home-cta.ts";
 @source "../modules/image/home/home-dock.tsx";
@@ -660,7 +660,10 @@
 @source "../modules/image/home/home-draft.ts";
 @source "../modules/image/home/home-generator.tsx";
 @source "../modules/image/home/home-icons.tsx";
+@source "../modules/image/home/home-panel.tsx";
 @source "../modules/image/home/home-samples.ts";
+@source "../modules/image/home/panel-parts.tsx";
+@source "../modules/image/home/panel-stage.tsx";
 @source "../modules/image/home/picker-body.tsx";
 @source "../modules/image/home/signup-sheet.tsx";
 @source "../modules/image/home/size-menu.tsx";
@@ -671,6 +674,7 @@
 @source "../modules/image/home/use-home-generator.ts";
 @source "../modules/image/home/use-home-photo.ts";
 @source "../modules/image/home/use-pick-events.ts";
+@source "../modules/image/home/use-stage-cover.ts";
 @source "../modules/image/marketing.ts";
 @source "../modules/image/result/grounded-img.tsx";
 @source "../modules/image/toggles/index.ts";
