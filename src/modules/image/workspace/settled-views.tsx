@@ -33,7 +33,7 @@ export function SuccessView({ job, shareText, editable, onAgain }: SuccessProps)
   const size = t.rich('workspace.developingSize', { tier: tierName(job.resolution, t), px, mono: monoTag })
   const tray = (
     <>
-      <ResultPhoto src={fileUrl} alt={t('workspace.resultAlt', { name: job.templateName })} pool={job.creditPool} hud={[t('workspace.doneState.hud'), size]} fit />
+      <ResultPhoto src={fileUrl} alt={t('workspace.resultAlt', { name: job.templateName })} pool={job.creditPool} cutOut={job.transparent} hud={[t('workspace.doneState.hud'), size]} fit />
       <TrayCaption>{t('workspace.doneState.caption', { name: job.templateName })}</TrayCaption>
     </>
   )

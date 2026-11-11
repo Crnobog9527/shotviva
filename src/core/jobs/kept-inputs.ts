@@ -4,7 +4,7 @@ import { z } from 'zod'
 
 import { AppError } from '../errors'
 import { logger } from '../logger'
-import { copyBackKeptInputs, downloadVariantKeyFor, inputPreviewKeyFor, type ObjectStore } from '../storage'
+import { copyBackKeptInputs, DOWNLOAD_VARIANTS, downloadVariantKeyFor, inputPreviewKeyFor, type ObjectStore } from '../storage'
 import { EDIT_TEMPLATE_ID } from '../templates/edit-params'
 import type { Job } from './job-schema'
 
@@ -37,10 +37,10 @@ export async function photosForAgain(store: ObjectStore, job: Job): Promise<Agai
 }
 
 // Every file a work owns (§8.3: kept and deleted together): the result, the 768px preview (T32)
-// and the kept uploads (T40), plus any staged 白底 / 透明底 download copy (§8; usually absent, and a
+// and the kept uploads (T40), plus any staged 白底 / 透明底 download copy or pair ZIP (§8; usually absent, and a
 // missing key deletes fine). For deleting one work; account deletion clears both user prefixes.
 export function workFileKeys(job: Pick<Job, 'id' | 'userId' | 'outputKey' | 'inputs'>): string[] {
-  const staged = (['white', 'marked'] as const).map((variant) => downloadVariantKeyFor(job.userId, job.id, variant))
+  const staged = DOWNLOAD_VARIANTS.map((variant) => downloadVariantKeyFor(job.userId, job.id, variant))
   return [...(job.outputKey ? [job.outputKey] : []), inputPreviewKeyFor(job.userId, job.id), ...keptInputsOf(job), ...staged]
 }
 

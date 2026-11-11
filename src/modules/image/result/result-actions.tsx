@@ -7,15 +7,14 @@ import { buttonVariants } from '@/core/ui/button'
 import { cn } from '@/core/ui/cn'
 
 import { monoTag, sizeTag } from '../workspace/result-panel'
-import { BackgroundChoice } from './background-choice'
-import { fileHref, offersChoice, shareSource, type WorkFile } from './download-background'
+import { fileHref, pairHref, shareSource, type WorkFile } from './download-background'
 import { IosPhotoActions } from './ios-photo-actions'
-import { useDownloadBackground } from './use-download-background'
-import { useShareFile, useTransparency } from './use-share-file'
+import { useCutOutChoice } from './use-download-background'
+import { useShareFile } from './use-share-file'
 import { useWatermarkMoment } from './use-watermark-moment'
 import { isIosBrowser } from './ios-browser'
 
-// work: the result's pool and cut-out record, for the 白底 / 透明底 choice (absent: no choice).
+// work: the result's pool and cut-out record, for the 白底 / 透明 choice (absent: no choice).
 // watermarked: a free work; saving it is the moment the paywall opens on Starter (T107).
 export type ResultActionProps = { fileUrl: string; name: string; shareText: string; px?: number; work?: WorkFile; watermarked?: boolean }
 
@@ -23,23 +22,37 @@ const subscribe = () => () => {}
 const onIos = () => isIosBrowser(navigator)
 const serverSnapshot = () => false
 
-// A cut-out first offers 白底 / 透明底 (white by default, then the last pick); the download link,
-// Share's file and the iPhone fallback photo all follow it, and the route records one download
-// per click whichever file it serves.
+const LABEL = { white: 'downloadWhite', transparent: 'downloadTransparent' } as const
+const LABEL_PX = { white: 'downloadWhitePx', transparent: 'downloadTransparentPx' } as const
+
+// A cut-out's 白底 / 透明 is picked on the photo's chips (white by default, then the last pick);
+// the primary names and saves that file, Share and the iPhone fallback photo follow it, and
+// 「下载白底 + 透明图」 under it saves both as one ZIP. The routes record one download per click
+// whichever file they serve.
 export default function ResultActions({ fileUrl, name, shareText, px, work, watermarked = false }: ResultActionProps) {
   const t = useTranslations('app.result')
   const saved = useWatermarkMoment(watermarked)
-  const [picked, choose] = useDownloadBackground()
-  const background = offersChoice(work, useTransparency(fileUrl)) ? picked : null
+  const [background] = useCutOutChoice(fileUrl, work)
   const mode = useShareFile(shareSource(fileUrl, work, background), name, background === 'transparent')
   const ios = useSyncExternalStore(subscribe, onIos, serverSnapshot)
-  const choice = background ? <BackgroundChoice value={background} onChange={choose} className="mb-2" /> : null
-  if (ios) return <>{choice}<IosPhotoActions mode={mode} fileUrl={fileHref(fileUrl, background, false)} onSaved={saved} /></>
+  // One ZIP, not two downloads: iOS Safari saves only the first file of a tap and Android Chrome
+  // asks before a second, so one file is what lands on every phone.
+  const pair = background ? (
+    <a href={pairHref(fileUrl)} download onClick={saved} className={buttonVariants({ variant: 'glass', size: 'touch', className: 'gap-2' })}>
+      <PairIcon />
+      {t('downloadBoth')}
+    </a>
+  ) : null
+  if (ios) return <div className="grid gap-2"><IosPhotoActions mode={mode} fileUrl={fileHref(fileUrl, background, false)} onSaved={saved} />{pair}</div>
+  const label = () => {
+    if (px) return t.rich(background ? LABEL_PX[background] : 'downloadPx', { px, cost: sizeTag, mono: monoTag })
+    return t(background ? LABEL[background] : 'download')
+  }
   const primary = buttonVariants({ variant: 'cta', size: 'cta', className: 'gap-2' })
   const download = (className?: string) => (
     <a href={mode.kind === 'loading' ? undefined : fileHref(fileUrl, background, true)} download onClick={saved} aria-disabled={mode.kind === 'loading'} className={cn(primary, mode.kind === 'loading' && 'pointer-events-none', className)}>
       <DownloadIcon />
-      <span>{px ? t.rich('downloadPx', { px, cost: sizeTag, mono: monoTag }) : t('download')}</span>
+      <span>{label()}</span>
     </a>
   )
   if (mode.kind === 'share') {
@@ -51,7 +64,6 @@ export default function ResultActions({ fileUrl, name, shareText, px, work, wate
     }
     return (
       <>
-        {choice}
         <div className="flex gap-2">
           {download('min-w-0 flex-1')}
           <button
@@ -63,14 +75,15 @@ export default function ResultActions({ fileUrl, name, shareText, px, work, wate
             <ShareIcon />
           </button>
         </div>
+        {pair ? <div className="mt-2 grid">{pair}</div> : null}
         <p className="mt-2 text-center text-caption text-muted-foreground lg:hidden">{t('photosHint')}</p>
       </>
     )
   }
   return (
     <>
-      {choice}
       {download()}
+      {pair ? <div className="mt-2 grid">{pair}</div> : null}
       <p className="mt-2 text-center text-caption text-muted-foreground lg:hidden">{t('longPress')}</p>
     </>
   )
@@ -81,6 +94,15 @@ function ShareIcon() {
     <svg viewBox="0 0 24 24" aria-hidden="true" className="size-5" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 3.5v11M8 7.5l4-4 4 4" />
       <path d="M7 11H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-1" />
+    </svg>
+  )
+}
+
+function PairIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="size-[18px] flex-none text-primary" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3.5" y="6.5" width="11" height="11" rx="2" />
+      <path d="M9.5 3.5h9a2 2 0 0 1 2 2v9" />
     </svg>
   )
 }
