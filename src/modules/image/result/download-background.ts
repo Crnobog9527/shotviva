@@ -45,6 +45,11 @@ export function fileHref(fileUrl: string, background: DownloadBackground | null,
   return tail ? `${fileUrl}?${tail}` : fileUrl
 }
 
+// 「下载白底 + 透明图」: both files as one ZIP (app/api/files/[jobId]/both).
+export function pairHref(fileUrl: string): string {
+  return `${fileUrl}/both`
+}
+
 // Where Share reads its file: the result as shown, except a free cut-out's 透明底, which is a
 // separate marked PNG. A paid cut-out's 透明底 is the shown file's own bytes.
 export function shareSource(fileUrl: string, work: WorkFile | undefined, background: DownloadBackground | null): string {

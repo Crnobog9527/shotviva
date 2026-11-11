@@ -57,7 +57,7 @@ export function ResultView({ item, detail, shareText, edit, parent, parentDelete
         <DetailPhoto
           src={fileUrl}
           alt={t('workspace.resultAlt', { name: item.templateName })}
-          work={{ pool: item.creditPool, visibility: item.visibility }}
+          work={{ pool: item.creditPool, visibility: item.visibility, cutOut: item.transparent }}
           tierLabel={t('result.tierPx', { tier: tierName(item.resolution, t), px: tierPx(item.resolution) })}
           original={{ source: detail.original, alt: t('result.originalAlt', { name: item.templateName }) }}
         />
