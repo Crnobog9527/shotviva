@@ -7,7 +7,8 @@ import { naturalSize } from '../workspace/photo-ratio'
 
 // A picture in the generator's preview with its real shape (width / height), so the frame can
 // take that shape and show the whole picture (Owner 2026-11-12: never crop a template's cover).
-export type StageCover = { url: string; ratio: number }
+// `firstFrame`: the server's small inline copy of the opening cover (core/templates/cover-ratio.ts).
+export type StageCover = { url: string; ratio: number; firstFrame?: string | null }
 
 // The optimiser's copies the stage shows: a 320 px wide 1x / 2x pair (384 and 640 px), enough for
 // the 320 px desktop frame and the ~340 px phone frame. Decoding the 2x copy to read its size also
