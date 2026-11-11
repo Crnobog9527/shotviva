@@ -11,7 +11,7 @@ import { currentLocale } from '@/core/i18n/server'
 import { listRunningJobIds } from '@/core/jobs'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { WishCard } from '@/core/wishlist/ui/wish-card'
-import { FavoritesProvider, GeneratingPill, loadCatalogueView, TemplateCatalogue } from '@/modules/image'
+import { FavoritesProvider, GeneratingPill, loadCatalogueView, MatrixEntry, TemplateCatalogue } from '@/modules/image'
 import { site } from '@/site/site.config'
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -53,6 +53,10 @@ async function Create() {
           </>
         }
       />
+      {/* Several templates at once (T107): Max opens it, lower tiers see it locked. */}
+      <div className="px-(--gutter) pb-2 md:max-w-[560px]">
+        <MatrixEntry tier={tier} />
+      </div>
       <FavoritesProvider initialIds={favoriteIds} signedIn>
         <TemplateCatalogue
           view={view}
