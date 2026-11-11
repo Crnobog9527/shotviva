@@ -6,3 +6,15 @@
 @import "./globals-body.css";
 @source not "../**/*.test.ts";
 @source not "../**/*.test.tsx";
+
+/* Switching a series member in its creation panel (workspace/series-create-dialog): the new
+   sample comes into focus over 320ms, a lens pulling focus rather than a slide; nothing moves
+   under reduced motion. App-only, so the marketing sheet does not carry it. */
+@keyframes sv-sample-swap {
+  from { opacity: 0.4; filter: blur(8px); scale: 0.985; }
+}
+@utility sample-swap {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: sv-sample-swap 320ms var(--ease) both;
+  }
+}

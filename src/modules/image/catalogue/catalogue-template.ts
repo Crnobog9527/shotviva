@@ -1,5 +1,5 @@
 import { FULL_IMAGE_OPTIONS, type ImageOptions } from '@/core/templates/image-options'
-import type { CoverMediaType, CreditsCost, LocalizedTemplate, ToggleConfirm } from '@/core/templates'
+import type { CopyFieldType, CoverMediaType, CreditsCost, LocalizedTemplate, ToggleConfirm } from '@/core/templates'
 
 // What the browser needs of a template to draw its card, preview and workspace header. Plain
 // data so server pages can hand it to client components; prompts never reach it.
@@ -18,7 +18,7 @@ export type CatalogueTemplate = {
   imageOptions?: ImageOptions
   creditsCost: CreditsCost
   // Text the template asks for (a headline, a price); most templates have none (DESIGN §4.3).
-  copyFields: { key: string; label: string; placeholder?: string; required: boolean; maxLength: number }[]
+  copyFields: CatalogueCopyField[]
   // On/off options (T89), off by default, in the page's language; [] for most templates.
   toggles: CatalogueToggle[]
   cover: {
@@ -29,6 +29,23 @@ export type CatalogueTemplate = {
     motion: string | null
     poster: string | null
   }
+}
+
+// A text field in the page's language (ARCHITECTURE §5 fields.copy). A choice field's `value` is
+// the English option the server checks; `label` is how this language shows it. `public`: the
+// gallery's one-click reuse may carry this field's text to another user (§9 第 3 条).
+export type CatalogueCopyField = {
+  key: string
+  label: string
+  type: CopyFieldType
+  placeholder?: string
+  help?: string
+  required: boolean
+  maxLength: number
+  options?: { value: string; label: string }[]
+  min?: number
+  max?: number
+  public: boolean
 }
 
 export type CatalogueToggle = { key: string; label: string; hint?: string; confirm?: ToggleConfirm }
@@ -46,13 +63,7 @@ export function toCatalogueTemplate(template: LocalizedTemplate): CatalogueTempl
     photoInput: template.fields.images.max === 0 ? 'none' : template.fields.images.min === 0 ? 'optional' : 'required',
     imageOptions: template.imageOptions ?? FULL_IMAGE_OPTIONS,
     creditsCost: template.creditsCost,
-    copyFields: template.fields.copy.map(({ key, label, placeholder, required, maxLength }) => ({
-      key,
-      label,
-      ...(placeholder ? { placeholder } : {}),
-      required,
-      maxLength,
-    })),
+    copyFields: template.fields.copy.map(toCatalogueCopy),
     toggles: (template.fields.toggles ?? []).map(({ key, label, hint, confirm }) => ({ key, label, ...(hint ? { hint } : {}), ...(confirm ? { confirm } : {}) })),
     cover: {
       type: template.coverMediaType,
@@ -61,6 +72,19 @@ export function toCatalogueTemplate(template: LocalizedTemplate): CatalogueTempl
       motion: template.coverVideoUrl,
       poster: template.coverPosterUrl,
     },
+  }
+}
+
+type LocalizedCopy = LocalizedTemplate['fields']['copy'][number]
+
+function toCatalogueCopy({ key, label, type, placeholder, help, required, maxLength, options, optionLabels, min, max, public: shown }: LocalizedCopy): CatalogueCopyField {
+  return {
+    key, label, type: type ?? 'short', required, maxLength, public: shown ?? false,
+    ...(placeholder ? { placeholder } : {}),
+    ...(help ? { help } : {}),
+    ...(type === 'select' && options ? { options: options.map((value) => ({ value, label: optionLabels?.[value] ?? value })) } : {}),
+    ...(min !== undefined ? { min } : {}),
+    ...(max !== undefined ? { max } : {}),
   }
 }
 

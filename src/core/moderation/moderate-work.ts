@@ -18,8 +18,9 @@ export type ModerationDeps = {
   store: Pick<ObjectStore, 'presignGet'>
   // Null when no key is configured: nothing is screened and every work waits for a person.
   screen: ((input: ScreenInput) => Promise<ScreenVerdict>) | null
-  // A work went public without a person (auto-approve): the gallery's cached pages expire.
-  onApproved?: () => void
+  // A work went public without a person (auto-approve): the gallery's cached pages expire and its
+  // gallery copies are made. Must not throw (a failure there is not a failed screen).
+  onApproved?: (jobId: string) => Promise<void>
 }
 
 export const SCREEN_URL_SECONDS = 300
@@ -43,7 +44,7 @@ export async function screenWork(deps: ModerationDeps, row: ScreenRow): Promise<
     const verdict = await deps.screen({ imageUrl, text: publicCopyText({ parentJobId: row.parent_job_id, inputs: row.inputs }) })
     const status = await recordAutoModeration(deps.db, row.id, verdict)
     logger.info('moderation.screened', { jobId: row.id, flagged: verdict.flagged, status })
-    if (status === 'approved') deps.onApproved?.()
+    if (status === 'approved') await deps.onApproved?.(row.id)
     return status
   } catch (error) {
     logger.warn('moderation.screen_failed', { jobId: row.id, error })

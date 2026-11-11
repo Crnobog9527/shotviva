@@ -104,7 +104,7 @@ function CreateBody({ template, open, onClose, ...context }: BodyProps) {
 }
 
 // Pro and Max can pick several photos, but on the workspace page's tray, not here.
-function BatchLink({ templateId, onGo }: { templateId: string; onGo(): void }) {
+export function BatchLink({ templateId, onGo }: { templateId: string; onGo(): void }) {
   const t = useTranslations('app.workspace.batch')
   return (
     <Link href={`/generate/${templateId}`} onClick={onGo} className="press mt-2 inline-flex min-h-11 items-center gap-0.5 text-caption font-medium text-foreground hover:underline hover:underline-offset-3">

@@ -16,6 +16,7 @@ describe('validateGenerationInputs', () => {
   it('fills defaults: first aspect ratio, empty optional copy, trimmed text', () => {
     expect(validateGenerationInputs(fields, { copy: { dish: '  Ramen ' }, imageCount: 1 })).toEqual({
       copy: { dish: 'Ramen', note: '' },
+      labels: { dish: 'Dish name', note: 'Note' },
       aspectRatio: '4:5',
       note: '',
       toggles: {},

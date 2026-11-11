@@ -5,7 +5,7 @@ import { Suspense, type ReactNode } from 'react'
 
 import { AppPage, BalanceChip, FlowNav } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
-import { currentTier, limitsFor, readBalance } from '@/core/billing'
+import { effectiveTier, limitsFor, readBalance } from '@/core/billing'
 import { currentLocale } from '@/core/i18n/server'
 import { listRunningJobIds } from '@/core/jobs'
 import { listTemplatesIn, loadEditOffer } from '@/core/templates'
@@ -35,8 +35,8 @@ async function Workspace({ params, searchParams }: RouteProps) {
   const admin = createAdminSupabase()
   const [balance, tier, runningIds, again, reuse, editOffer] = await Promise.all([
     readBalance(supabase, user.id),
-    // current_tier() is service-role only; the user's own id comes from the session.
-    currentTier(admin, user.id),
+    // effective_tier() (an unbanned admin counts as Max) is service-role only; the user's own id comes from the session.
+    effectiveTier(admin, user.id),
     listRunningJobIds(admin, user.id, new Date()),
     loadAgain({ db: admin, store: r2Store }, { userId: user.id, jobId: againId, template }),
     loadReuse(site, { jobId: reuseId, template }),

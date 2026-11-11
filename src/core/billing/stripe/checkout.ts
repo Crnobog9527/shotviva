@@ -56,7 +56,7 @@ export type CheckoutDeps = {
   // T82: Checkout's required Terms box (STRIPE_TERMS_CONSENT); off until the Terms URL is set in
   // Stripe's public details, or Stripe refuses the session.
   termsConsent: boolean
-  // This deployment's origin (core/site-url): previews return to their own URL.
+  // The buyer's origin (core/request-origin): previews return to the host the buyer is on.
   origin: string
   // site.partners.graylum.returnToHosts
   returnToHosts: readonly string[]

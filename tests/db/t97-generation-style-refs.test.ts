@@ -55,7 +55,8 @@ it.each(['web', 'graylum'] as const)('attaches and records the exact ordered ref
   const view = await runGeneration(f.deps, { source, userId: f.userId, templateId: f.templateId,
     inputKey: f.inputKey, aspectRatio: '4:5', copy: { dish: 'typed words' } })
   const call = f.fake.calls[0]!
-  expect(call.prompt).toBe('fixture 1 + 2')
+  // The body has no {{dish}}, so the field follows it as "Label: value" (ARCHITECTURE §5.1d).
+  expect(call.prompt).toBe('fixture 1 + 2\n\nDish: typed words')
   expect(call.images.map((image) => image.contentType)).toEqual(['image/jpeg', 'image/webp', 'image/webp'])
   expect(call.images.slice(1).map((image) => image.bytes[0])).toEqual([19, 27])
   expect((await editJobRow(pg, view.id)).inputs).toMatchObject({

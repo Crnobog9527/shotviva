@@ -3,7 +3,7 @@ import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { applyPurchase } from '@/core/billing'
-import { batchArchive, preflightBatch, runGeneration, toGenerationRequest } from '@/core/jobs'
+import { batchArchive, preflightBatch, reserveJob, runGeneration, toGenerationRequest } from '@/core/jobs'
 import { newInputKey } from '@/core/storage'
 import { jpeg } from '../fakes/images'
 import { createMemoryStore } from '../fakes/memory-store'
@@ -24,9 +24,10 @@ beforeAll(async () => {
 })
 afterAll(async () => { await sql.end() })
 
-async function setup(productId: 'max_monthly' | 'pro_monthly' | 'starter_monthly') {
+async function setup(productId: 'max_monthly' | 'pro_monthly' | 'starter_monthly', role?: 'admin' | 'banned_admin') {
   const userId = await createUser(sql)
   await applyPurchase(serviceClient(), { userId, productId, eventId: randomUUID() })
+  if (role) await sql.query(`update public.profiles set role='admin', banned_at=$2 where id=$1`, [userId, role === 'banned_admin' ? new Date() : null])
   const db = serviceSupabase()
   const r2 = createMemoryStore()
   const input_key = newInputKey(userId, 'image/jpeg')
@@ -42,6 +43,43 @@ describe('T107 preflight and independent jobs', () => {
     await expect(preflightBatch(db, userId, cells, deps.provider)).rejects.toMatchObject({ code: 'TIER_REQUIRED', requiredTier: 'max' })
     const req = toGenerationRequest(userId, { ...cells[0], batch_size: 2, batch_templates: 2 })
     await expect(runGeneration(deps, req)).rejects.toMatchObject({ code: 'TIER_REQUIRED', requiredTier: 'max' })
+  })
+
+  // effective_tier(): an unbanned admin gets Max limits on any plan and still pays credits.
+  it('runs a multi-template batch for an admin on Starter, charging paid credits', async () => {
+    const { db, deps, userId, cells } = await setup('starter_monthly', 'admin')
+    const before = await profileOf(sql, userId)
+    const quote = await preflightBatch(db, userId, cells, deps.provider)
+    const jobs = await Promise.all(cells.map((cell, index) => runGeneration(deps,
+      toGenerationRequest(userId, { ...cell, ...quote, ...quote.cells[index] }))))
+    expect(jobs.map(job => [job.status, job.credit_pool])).toEqual([['succeeded', 'paid'], ['succeeded', 'paid']])
+    expect((await profileOf(sql, userId)).credits).toBe(before.credits - jobs.reduce((sum, job) => sum + job.credits_cost, 0))
+  })
+
+  it('gives a banned admin on Pro no multi-template batch', async () => {
+    const { db, userId, cells, deps } = await setup('pro_monthly', 'banned_admin')
+    await expect(preflightBatch(db, userId, cells, deps.provider)).rejects.toMatchObject({ code: 'TIER_REQUIRED', requiredTier: 'max' })
+  })
+
+  // The SQL gate on its own, past the TS check: reserve_batch_cell reads effective_tier().
+  it.each([
+    ['pro_monthly', undefined, { code: 'TIER_REQUIRED', requiredTier: 'max' }],
+    // A banned account is refused before any tier check, admin or not.
+    ['pro_monthly', 'banned_admin', { code: 'FORBIDDEN', message: 'USER_BANNED' }],
+    ['starter_monthly', 'admin', null],
+  ] as const)('reserve_batch_cell for a multi-template cell: %s %s', async (product, role, refused) => {
+    const { db, userId } = await setup(product, role)
+    const before = await profileOf(sql, userId)
+    const cost = (await sql.query(`select (credits_cost->>'1k')::int as cost from public.templates where id=$1`, [templates[0]])).rows[0].cost
+    const reserve = reserveJob(db, { jobId: randomUUID(), userId, module: 'image', templateId: templates[0], expectedCredits: cost, source: 'web',
+      inputs: { resolution: '1k', attempt_id: randomUUID(), batch_id: randomUUID(), batch_position: 1, batch_size: 2, batch_templates: 2 } })
+    if (refused) {
+      await expect(reserve).rejects.toMatchObject(refused)
+      expect((await profileOf(sql, userId)).credits).toBe(before.credits)
+    } else {
+      expect(await reserve).toMatchObject({ creditPool: 'paid', creditsCost: cost })
+      expect((await profileOf(sql, userId)).credits).toBe(before.credits - cost)
+    }
   })
 
   it('rejects an unsold resolution for any selected template during preflight', async () => {

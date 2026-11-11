@@ -22,10 +22,14 @@ export { toCatalogueTemplate, type CatalogueTemplate } from './catalogue/catalog
 export { ImageWorkspace, type WorkspaceProps } from './workspace/image-workspace'
 export { MatrixWorkspaceLazy as MatrixWorkspace } from './matrix/matrix-lazy'
 export type { MatrixWorkspaceProps } from './matrix/matrix-workspace'
-export { MatrixEntry } from './matrix/matrix-entry'
+export { GatedFeatures, TEMPLATES_ANCHOR } from './gated/gated-features'
 // Make again (T40): server only; reads the work and copies its kept photos back.
 export { loadAgain } from './again/load-again'
 export { loadReuse } from './again/load-reuse'
+// The Photos viewer (2026-11-12), server only: one work's view, and Make again in place.
+export { loadWorkView } from './photos/load-work-view'
+export { loadAgainContext } from './again/load-again-context'
+export type { AgainContext } from './again/again-context'
 export { WorkspaceHead } from './workspace/workspace-head'
 export { WorkspacePending } from './workspace/workspace-pending'
 export { GenerationOwner, GenerationRunner } from './generation/generation-runner'
@@ -44,7 +48,10 @@ export { ResultView } from './result/result-view'
 export { DeleteWork, type DeleteWorkAction } from './result/delete-work'
 export { DeletedToast } from './photos/deleted-toast'
 export { toPhotoDetail, type PhotoDetail } from './detail/photo-detail'
-export { EditFlow, EditTrigger, opensEdit, type EditSource } from './edit-ui'
+export type { EditSource } from './edit-ui'
+// The Photos viewer (2026-11-12): a work opens over the grid; the Photos layout hosts it.
+export { ViewerHost } from './photos/viewer/viewer-host'
+export type { WorkView } from './photos/work-view'
 // Wishlist post form (T12): one upload field, same zone and stages as the workspace.
 export { PhotoTile, type PhotoTileProps } from './workspace/photo-tile'
 // Marketing and sign-in render the home generator through the narrow marketing.ts entry.

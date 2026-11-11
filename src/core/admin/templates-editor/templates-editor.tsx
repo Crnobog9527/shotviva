@@ -11,7 +11,7 @@ import { BulkPublish } from './bulk-publish'
 import type { CategoryOption } from './category-field'
 import { orderCopy } from './copy'
 import { FeaturedPanel } from './featured-panel'
-import { FEATURED_LIMIT, featuredIds, toggleFeatured } from './featured-state'
+import { FEATURED_LIMIT } from './featured-state'
 import { matchesSearch } from './form-state'
 import { selectedInOrder, toggleId, toggleVisible } from './selection-state'
 import { TemplateFormDialog, type EditTarget } from './template-form-dialog'
@@ -20,6 +20,7 @@ import { CatalogView } from './catalog-view'
 import { Toolbar } from './toolbar'
 import { UnpublishDialog } from './unpublish-dialog'
 import { useDuplicateTemplate } from './use-duplicate-template'
+import { useFeatured } from './use-featured'
 import { useTemplateActions } from './use-template-actions'
 
 type Props = {
@@ -72,12 +73,7 @@ export function TemplatesEditor({ providers, templates, categories, series, floo
     if (!active) return setUnpublishing(template)
     run(() => actions.setActive({ id: template.id, active: true }), `已上架「${template.name}」`)
   }
-  const featured = featuredIds(templates)
-  const setFeatured = (ids: string[]) => run(() => actions.setFeatured(ids), '首页精选已保存')
-  const feature = (template: AdminTemplate, on: boolean) => {
-    const ids = toggleFeatured(featured, template, on)
-    if (ids) setFeatured(ids)
-  }
+  const featured = useFeatured(templates, actions, run)
   // Drag, keyboard or arrows (T76): the list shows the new order at once and falls back to the
   // server's order if this save fails.
   const saveOrder = (group: TemplateOrderGroup, expectedIds: string[]) => (ids: string[]) =>
@@ -96,18 +92,12 @@ export function TemplatesEditor({ providers, templates, categories, series, floo
           {error}
         </p>
       ) : null}
-      <FeaturedPanel
-        ids={featured}
-        templates={templates}
-        pending={pending}
-        onReorder={saveOrder('featured', featured)}
-        onRemove={(id) => setFeatured(featured.filter((other) => other !== id))}
-      />
+      <FeaturedPanel featured={featured} templates={templates} pending={pending} />
       <BulkPublish providers={providers}
         selected={selectedInOrder(templates, selected)}
         busy={pending}
-        setActiveMany={actions.setActiveMany}
-        editMany={actions.editMany}
+        actions={actions}
+        featured={{ ids: featured.ids, locked: featured.locked }}
         floor={floor}
         categories={categories}
         onClear={() => setSelected(new Set())}
@@ -120,8 +110,8 @@ export function TemplatesEditor({ providers, templates, categories, series, floo
           onSelect: (id, on) => setSelected((current) => toggleId(current, id, on)),
           onSelectGroup: (ids, on) => setSelected((current) => toggleVisible(ids, current, on)),
         }}
-        featuredFull={featured.length >= FEATURED_LIMIT}
-        onFeature={feature}
+        featuredState={{ full: featured.ids.length >= FEATURED_LIMIT, locked: featured.locked }}
+        onFeature={featured.toggle}
         onOrder={saveOrder}
         pending={pending}
         onDuplicate={duplicate}

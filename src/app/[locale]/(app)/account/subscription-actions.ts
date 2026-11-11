@@ -9,7 +9,7 @@ import { createPortalUrl } from '@/core/billing/subscription'
 import { cancelWaffoSubscription, waffoClient } from '@/core/billing/waffo'
 import { logger } from '@/core/logger'
 import { localized } from '@/core/i18n/server'
-import { appOrigin } from '@/core/site-url'
+import { currentOrigin } from '@/core/request-origin'
 
 // "Manage subscription": a fresh Stripe Customer Portal session for the signed-in user's own
 // subscription, then back to /account (in the page's language) when they are done.
@@ -17,7 +17,7 @@ export async function manageSubscriptionAction() {
   const user = await requireUser('/account')
   const url = await createPortalUrl(
     { stripe: stripeClient(), admin: createAdminSupabase() },
-    { userId: user.id, returnUrl: `${appOrigin}${await localized('/account')}` },
+    { userId: user.id, returnUrl: `${await currentOrigin()}${await localized('/account')}` },
   )
   redirect(url)
 }
