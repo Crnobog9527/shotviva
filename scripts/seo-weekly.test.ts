@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest'
 
-import { checkIndexable, checkNoindex, checkNotInSitemap, quotableFactsIn, sitemapLocs, visibleText, type Page } from './seo-weekly-lib'
+import { site } from '../src/site/site.config'
+import {
+  checkChildSitemap,
+  checkIndexable,
+  checkNoindex,
+  checkNotInSitemap,
+  quotableFactsIn,
+  sitemapLocs,
+  visibleText,
+  ZH_NOINDEX_PATHS,
+  type Page,
+} from './seo-weekly-lib'
 
 const ld = (offers: object[]) =>
   `<script type="application/ld+json">${JSON.stringify([{ '@type': 'SoftwareApplication', offers }])}</script>`
@@ -48,8 +59,34 @@ describe('seo:weekly checks', () => {
   it('wants app pages noindex, accepts a 404, and keeps them out of the sitemap', () => {
     expect(checkNoindex(page('', { url: 'https://shotviva.com/login', body: '<meta name="robots" content="noindex, follow">' }))).toBeNull()
     expect(checkNoindex(page('', { status: 404 }))).toBeNull()
+    expect(checkNoindex(page('', { status: 405 }))).toBeNull()
     expect(checkNoindex(page('', { url: 'https://shotviva.com/photos' }))).toBe('https://shotviva.com/photos is indexable (landed on https://shotviva.com/x)')
     expect(checkNotInSitemap(['https://shotviva.com/', 'https://shotviva.com/login'], 'https://shotviva.com')).toEqual(['https://shotviva.com/login is in the sitemap'])
+  })
+
+  it('does not count $19.90 on the page as a $9.90 offer shown', () => {
+    const problems = checkIndexable(page(FACTS + ld([{ name: 'Credit Pack, 990 credits', price: '9.90' }]))).problems
+    expect(problems).toEqual(['JSON-LD offer "Credit Pack, 990 credits" $9.90 is not in the page text'])
+  })
+
+  it('turns a failed request into a problem line', () => {
+    const failed = page('', { status: 0, body: '', error: 'timed out after 20 s' })
+    expect(checkIndexable(failed).problems).toEqual(['request failed: timed out after 20 s'])
+    expect(checkNoindex(failed)).toBe('https://shotviva.com/x request failed: timed out after 20 s')
+    expect(checkChildSitemap(failed)).toBe('https://shotviva.com/x request failed: timed out after 20 s')
+  })
+
+  it('wants every child sitemap to answer 200 and list URLs', () => {
+    const xml = (body: string, over: Partial<Page> = {}) => ({ ...page(''), url: 'https://shotviva.com/sitemap-zh.xml', body, ...over })
+    expect(checkChildSitemap(xml('<urlset><url><loc>https://shotviva.com/zh</loc></url></urlset>'))).toBeNull()
+    expect(checkChildSitemap(xml('<urlset></urlset>'))).toBe('https://shotviva.com/sitemap-zh.xml lists no <loc>')
+    expect(checkChildSitemap(xml('', { status: 404 }))).toBe('https://shotviva.com/sitemap-zh.xml answered 404')
+  })
+
+  it('derives the Chinese noindex pages from site.indexing', () => {
+    for (const path of site.indexing.zhIndexablePaths) expect(ZH_NOINDEX_PATHS).not.toContain(path === '/' ? '/zh' : `/zh${path}`)
+    expect(ZH_NOINDEX_PATHS).toContain('/zh/commercial-photography')
+    expect(ZH_NOINDEX_PATHS.some((path) => path.includes('['))).toBe(false)
   })
 
   it('reads sitemap locs and the visible text', () => {

@@ -32,17 +32,30 @@ describe('GEO facts (SEO launch handbook 03-S3)', () => {
     const facts = quotableFacts(page)
     expect(facts.some((fact) => fact.includes(`${photoSeconds} seconds`) || fact.includes(`${photoSeconds} 秒`))).toBe(true)
     expect(facts.some((fact) => /\$\d+(?:\.\d\d)? a month|每月 \$\d/.test(fact))).toBe(true)
-    expect(facts.some((fact) => /November 2026|2026 年 11 月|2026/.test(fact))).toBe(true)
+    // The platform rules' check date, as the page prints it: "checked November 2026" / "2026 年 11 月核对".
+    expect(facts.some((fact) => /checked (?:January|February|March|April|May|June|July|August|September|October|November|December) \d{4}|\d{4} 年 \d{1,2} 月核对/.test(fact))).toBe(true)
   })
 
-  it('no FAQ answer on a vertical or pricing page opens with It / This / Yes / No', () => {
-    const answers: string[] = []
-    for (const locale of ['en'] as const) {
-      const pricing = pricingPageIn(locale, products)
-      answers.push(...pricingFaqIn(locale, 'stripe', false, pricing).map((item) => item.answer))
-      for (const { slug } of contentPagesIn(locale)) answers.push(...(findContentPageIn(slug, locale, products)?.faq ?? []).map((item) => item.answer))
-    }
-    expect(answers.filter((answer) => /^(?:It|This|Yes|No)\b/.test(answer))).toEqual([])
+  // English: It / This / Yes / No. Chinese: 它 / 这 / 是的, or a bare short reply such as 可以。
+  // 不会。不用。归你。 (three characters or fewer before the first full stop or comma).
+  const VAGUE_OPENING = { en: /^(?:It|This|Yes|No)\b/, zh: /^(?:它|这|是的)|^[^。，、：]{1,3}[。，]/ } as const
+
+  it('the opening rule catches bare replies and lets real answers through', () => {
+    for (const bare of ['可以。积分包是一次性付款。', '不会。付费积分永不过期。', '归你。用付费积分生成的图私密。', '它做的是照片。']) expect(VAGUE_OPENING.zh.test(bare), bare).toBe(true)
+    for (const fine of ['看你要什么。想自己调模型…', 'Shotviva 支持支付宝付款：…', '付费积分永不过期，套餐续费时…']) expect(VAGUE_OPENING.zh.test(fine), fine).toBe(false)
+    expect(VAGUE_OPENING.en.test('No. You pick a template.')).toBe(true)
+    expect(VAGUE_OPENING.en.test('Nobody needs a prompt.')).toBe(false)
+  })
+
+  it.each(['en', 'zh'] as const)('no %s FAQ answer on a vertical or pricing page opens with a bare reply', (locale) => {
+    const pricing = pricingPageIn(locale, products)
+    const answers = [
+      ...pricingFaqIn(locale, 'stripe', false, pricing),
+      ...pricingFaqIn(locale, 'stripe', true, pricing),
+      ...pricing.waffo.faq,
+      ...contentPagesIn(locale).flatMap(({ slug }) => findContentPageIn(slug, locale, products)?.faq ?? []),
+    ].map((item) => item.answer)
+    expect(answers.filter((answer) => VAGUE_OPENING[locale].test(answer))).toEqual([])
   })
 
   it('a quotable fact has a number, a real subject and enough words', () => {

@@ -1,10 +1,13 @@
 import { isQuotableFact, MIN_QUOTABLE_FACTS } from '../src/site/content/geo-facts'
+import { showsPrice, usdText } from '../src/site/content/price-match'
+import { site } from '../src/site/site.config'
 
 // The pure half of `pnpm seo:weekly` (SEO launch handbook 03, weeks 1–4 after indexing opened):
 // given what the live site served, check every sitemap URL and the app pages. No network here,
 // so it is unit-tested; scripts/seo-weekly.ts fetches and prints the report.
 
-export type Page = { url: string; finalUrl: string; status: number; xRobotsTag: string | null; body: string }
+// `error`: the request itself failed (timeout, DNS, reset); status is 0 then.
+export type Page = { url: string; finalUrl: string; status: number; xRobotsTag: string | null; body: string; error?: string }
 
 export type PageReport = {
   url: string
@@ -14,12 +17,17 @@ export type PageReport = {
 }
 
 // Pages that must stay out of the index (ARCHITECTURE §17: every app page is noindex).
-export const APP_PATHS = ['/login', '/signup', '/generate', '/photos', '/account', '/checkout', '/wishlist', '/zh/login', '/zh/generate']
+export const APP_PATHS = ['/login', '/signup', '/generate', '/photos', '/account', '/checkout', '/wishlist']
 
-// Chinese inner pages that exist but are noindex (site.indexing.zhIndexablePaths has only 3).
-export const ZH_NOINDEX_PATHS = ['/zh/commercial-photography', '/zh/ai-restaurant-menu']
+// Every Chinese page that exists but is not one of site.indexing.zhIndexablePaths: noindex.
+// Dynamic routes ([jobId]) are skipped; they need a real id.
+export const ZH_NOINDEX_PATHS = site.locales.zhPaths
+  .filter((path) => !path.includes('[') && !(site.indexing.zhIndexablePaths as readonly string[]).includes(path))
+  .map((path) => `/zh${path}`)
 
 // Fetched with each user agent: a firewall or bot rule that 403s one of them makes robots.txt moot.
+// These are spoofed user agents from our own IP, not the real crawlers: if Vercel bot protection
+// is ever switched on it may 403 them while the real, verified crawlers still get through.
 export const CRAWLER_AGENTS: Record<string, string> = {
   Googlebot: 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
   Bingbot: 'Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)',
@@ -87,12 +95,6 @@ function offersIn(ld: unknown[]): Offer[] {
   })
 }
 
-// "$19.90", "$99": the way the pages print a price.
-const usd = (price: string) => {
-  const n = Number(price)
-  return Number.isInteger(n) ? `$${n.toLocaleString('en-US')}` : `$${n.toFixed(2)}`
-}
-
 export function quotableFactsIn(text: string): string[] {
   const found = new Set<string>()
   for (const line of text.split('\n')) {
@@ -110,6 +112,7 @@ const strip = (url: string) => url.replace(/\/$/, '')
 // One sitemap URL: answers 200 at that address, indexable, canonical to itself; a GEO page also
 // carries five quotable facts and JSON-LD offers whose prices it shows (03-S2, 03-S3).
 export function checkIndexable(page: Page): PageReport {
+  if (page.error) return { url: page.url, problems: [`request failed: ${page.error}`], facts: 0, offers: 0 }
   const problems: string[] = []
   if (page.status !== 200) problems.push(`answered ${page.status}`)
   if (strip(page.finalUrl) !== strip(page.url)) problems.push(`redirects to ${page.finalUrl}`)
@@ -123,8 +126,9 @@ export function checkIndexable(page: Page): PageReport {
   if (!LEGAL.test(strip(page.url))) {
     if (facts < MIN_QUOTABLE_FACTS) problems.push(`${facts} quotable facts, want ${MIN_QUOTABLE_FACTS}+`)
     for (const offer of offers) {
-      if (offer.price && Number(offer.price) > 0 && !text.includes(usd(offer.price))) {
-        problems.push(`JSON-LD offer "${offer.name}" ${usd(offer.price)} is not in the page text`)
+      const amount = Number(offer.price)
+      if (amount > 0 && !showsPrice(text, amount)) {
+        problems.push(`JSON-LD offer "${offer.name}" ${usdText(amount)} is not in the page text`)
       }
     }
   }
@@ -132,11 +136,20 @@ export function checkIndexable(page: Page): PageReport {
 }
 
 // An app page must be noindex; one that redirects (to sign-in) is checked where it lands.
-// A 404 is fine: the feature is switched off.
+// A 404 (feature switched off) or 405 (a POST-only route) is fine: there is no page to index.
 export function checkNoindex(page: Page): string | null {
-  if (page.status === 404) return null
+  if (page.error) return `${page.url} request failed: ${page.error}`
+  if (page.status === 404 || page.status === 405) return null
   if (page.status !== 200) return `${page.url} answered ${page.status}`
   return noindexed(page) ? null : `${page.url} is indexable (landed on ${page.finalUrl})`
+}
+
+// A child sitemap the index lists must answer 200 and list at least one URL; a dead one would
+// otherwise drop its pages from the report without a word.
+export function checkChildSitemap(page: Page): string | null {
+  if (page.error) return `${page.url} request failed: ${page.error}`
+  if (page.status !== 200) return `${page.url} answered ${page.status}`
+  return sitemapLocs(page.body).length === 0 ? `${page.url} lists no <loc>` : null
 }
 
 export function checkNotInSitemap(locs: readonly string[], origin: string): string[] {
