@@ -4,7 +4,9 @@ import { Button } from '@/core/ui/button'
 import { Checkbox } from '@/core/ui/checkbox'
 import { Input } from '@/core/ui/input'
 import { Label } from '@/core/ui/label'
-import { COPY_DEFAULT_LENGTH, COPY_FIELD_TYPES, COPY_OPTIONS_MAX, type CopyFieldType } from '@/core/templates/copy-fields'
+import { COPY_DEFAULT_LENGTH, COPY_FIELD_TYPES, COPY_FIELDS_MAX, COPY_OPTIONS_MAX, type CopyFieldType } from '@/core/templates/copy-fields'
+import { PROMPT_MAX_LENGTH } from '@/core/templates/generation-inputs'
+import { NOTE_MAX_LENGTH } from '@/core/templates/output-options'
 
 import { copyFieldCopy as COPY } from './copy'
 import { emptyCopyField, type CopyFormValue } from './copy-form-state'
@@ -12,8 +14,13 @@ import type { TemplateFormValues } from './form-state'
 
 type Props = { values: TemplateFormValues; onChange: (patch: Partial<TemplateFormValues>) => void }
 
-// fields.copy holds at most 10 (templateFieldsSchema).
-const FIELDS_MAX = 10
+// The longest prompt these fields could make: the body plus every field filled to its limit as
+// a "Label: value" line, the note and the image list. Past PROMPT_MAX_LENGTH a user's run is
+// refused before any charge (§5.1d), so the editor warns (yellow, never blocks the save).
+export function worstPromptLength(body: string, fields: readonly CopyFormValue[]): number {
+  const lines = fields.reduce((sum, field) => sum + field.label.length + 3 + (Number(field.maxLength) || COPY_DEFAULT_LENGTH[field.type]), 0)
+  return body.length + lines + NOTE_MAX_LENGTH + 200
+}
 
 function Field({ id, label, value, onChange, placeholder, inputMode }: {
   id: string; label: string; value: string; onChange: (value: string) => void; placeholder?: string; inputMode?: 'numeric' | 'decimal'
@@ -125,15 +132,22 @@ export function TemplateCopyFields({ values, onChange }: Props) {
       <legend className="mb-1 text-sm font-semibold">{COPY.legend}</legend>
       <p className="text-muted-foreground text-xs">{COPY.hint}</p>
       {fields.length === 0 ? <p className="text-muted-foreground text-xs">{COPY.empty}</p> : null}
+      <PromptSizeWarning body={values.promptBody} fields={fields} />
       {fields.map((field, index) => (
         <CopyCard key={index} index={index} field={field} body={values.promptBody}
           onChange={(next) => replace(fields.map((current, at) => (at === index ? next : current)))}
           onRemove={() => replace(fields.filter((_, at) => at !== index))}
           onUp={index > 0 ? () => up(index) : undefined} />
       ))}
-      <Button variant="outline" size="sm" className="justify-self-start" disabled={fields.length >= FIELDS_MAX} onClick={() => replace([...fields, emptyCopyField()])}>
+      <Button variant="outline" size="sm" className="justify-self-start" disabled={fields.length >= COPY_FIELDS_MAX} onClick={() => replace([...fields, emptyCopyField()])}>
         {COPY.add}
       </Button>
     </fieldset>
   )
+}
+
+function PromptSizeWarning({ body, fields }: { body: string; fields: readonly CopyFormValue[] }) {
+  const worst = worstPromptLength(body, fields)
+  if (worst <= PROMPT_MAX_LENGTH) return null
+  return <p role="status" className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-100">{COPY.promptSize(worst, PROMPT_MAX_LENGTH)}</p>
 }

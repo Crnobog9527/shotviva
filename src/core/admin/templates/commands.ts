@@ -7,7 +7,7 @@ import { AppError } from '@/core/errors'
 import { isStyleRefKey } from '@/core/templates/style-refs'
 import { logger } from '@/core/logger'
 import { MISSING_COST, providerFloor, floorGuidance, type ProviderFloors } from '@/core/templates/provider-pricing'
-import { creditsBelowFloor, promptInputSchema, templateInputSchema, toggleSetupProblems, type PromptInput } from '@/core/templates'
+import { creditsBelowFloor, promptInputSchema, slotSurfaceProblems, templateInputSchema, toggleSetupProblems, type PromptInput } from '@/core/templates'
 
 import { describeBlockers, planActiveChange, type ActiveChangeOutcome } from './publish-rules'
 import * as repo from './repository'
@@ -51,6 +51,8 @@ export function validateTemplateSave(payload: Pick<SaveTemplatePayload, 'templat
   if (prompt.styleRefs?.some(ref => !isStyleRefKey(template.id, ref.key))) throw new AppError('INVALID_INPUT', '画风参考图不属于这个模板')
   assertAboveFloor(template, providerFloor(floor, prompt.providerId, template.id))
   assertTogglesWired(template, prompt)
+  const surface = slotSurfaceProblems(template.fields, template.visibleIn)
+  if (surface.length > 0) throw new AppError('INVALID_INPUT', surface.join('；'))
   // A brand-new template starts unpublished so it can be checked before anyone sees it.
   return { template: payload.isNew ? { ...template, isActive: false } : template, prompt }
 }

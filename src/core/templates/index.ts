@@ -7,6 +7,7 @@ export {
   COPY_MAX_LENGTH,
   COPY_OPTION_MAX_LENGTH,
   COPY_OPTIONS_MAX,
+  COPY_FIELDS_MAX,
   copyFieldSchema,
   publicCopyKeys,
   storedPublicKeys,
@@ -86,6 +87,21 @@ export {
   type EditScope,
 } from './edit-params'
 export {
+  checkSlotUploads,
+  hasSlots,
+  IMAGE_SLOTS_MAX,
+  IMAGE_SLOTS_PLACEHOLDER,
+  imageSlotSchema,
+  keptSlotIndex,
+  slotMapping,
+  slotsOf,
+  slotSurfaceProblems,
+  storedSlotOrder,
+  type ImageSlot,
+  type SlotUploads,
+} from './image-slots'
+export {
+  PROMPT_MAX_LENGTH,
   renderPrompt,
   validateGenerationInputs,
   type GenerationInputs,

@@ -156,6 +156,28 @@ describe('first runs', () => {
   })
 })
 
+describe('first runs of a slot template (§5.1e)', () => {
+  it('sends each slot\'s test photo in slot order, records which was where, and refuses a missing required slot', async () => {
+    const { r2, p, deps, photoId } = await setup()
+    const templateId = await seedTemplate(db, {
+      images: { min: 1, max: 2, slots: [{ key: 'logo', label: 'Venue logo', required: false }, { key: 'prize_1', label: '1st prize photo', required: true }] },
+      body: 'WRAPPED poster {{image_slots}}',
+    })
+    const second = randomUUID()
+    const key = `admin-tests/photos/${second}.jpg`
+    r2.upload(key, await jpeg(900, 900), 'image/jpeg')
+    await confirmTestPhoto({ db: service, store: r2.store }, admin, second, key)
+    const body = (slot_photos: Record<string, string>) => ({ run_id: randomUUID(), batch_id: randomUUID(), template_id: templateId, slot_photos, inputs: { copy: { dish: 'x' }, resolution: '1k' as const, aspect_ratio: '1:1' as const } })
+    const run = await runTestGenerate(deps, { actorId: admin, body: body({ prize_1: photoId, logo: second }) })
+    expect(run.status).toBe('succeeded')
+    expect(p.calls[0]!.images.map((image) => image.width)).toEqual([900, 1600])
+    expect(p.calls[0]!.prompt).toContain('Image 1: Venue logo; Image 2: 1st prize photo')
+    const stored = (await db.query('select inputs from public.admin_test_runs where id = $1', [run.id])).rows[0].inputs
+    expect(stored.slot_photos).toEqual({ prize_1: photoId, logo: second })
+    await expect(runTestGenerate(deps, { actorId: admin, body: body({ logo: second }) })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+  })
+})
+
 describe('daily budget', () => {
   it('stops runs once today is spent, before the provider is called', async () => {
     const { p, generate } = await setup()

@@ -12,6 +12,8 @@ export type CopyFieldType = (typeof COPY_FIELD_TYPES)[number]
 
 // Hard ceilings. maxLength stays ≤4000 for every type: rows written before the types existed
 // (all 'short') may already use up to that much.
+// Text fields per template (总控 2026-11-12: 12, was 10).
+export const COPY_FIELDS_MAX = 12
 export const COPY_MAX_LENGTH = 4000
 export const COPY_OPTIONS_MAX = 20
 export const COPY_OPTION_MAX_LENGTH = 60

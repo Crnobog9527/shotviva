@@ -29,6 +29,8 @@ export type Cell = {
   resolution: Resolution
   input: TrialInput
   photoHash: string | null
+  // A slot template's test images by slot (§5.1e): slot key → sha256 of its bytes.
+  slotHashes: Record<string, string> | null
 }
 
 const sorted = (value: unknown): unknown => Array.isArray(value) ? value.map(sorted)
@@ -82,10 +84,11 @@ function templateCells(item: TemplateItem, template: AdminTemplate, photoHashes:
   const cells: Cell[] = []
   trial.inputs.forEach((input, inputIndex) => {
     const photoHash = input.photo ? photoHashes.get(input.photo) ?? null : null
-    const hash = digest({ ...base, input: { ...input, photo: photoHash } })
+    const slotHashes = input.slots ? Object.fromEntries(Object.entries(input.slots).map(([slot, path]) => [slot, photoHashes.get(path) ?? ''])) : null
+    const hash = digest({ ...base, input: { ...input, photo: photoHash, ...(slotHashes ? { slots: slotHashes } : {}) } })
     const occurrence = seen.get(hash) ?? 0
     seen.set(hash, occurrence + 1)
-    for (let k = 0; k < n; k++) cells.push({ templateId: item.id, version: prompt.version, inputIndex, occurrence, k, hash, resolution, input, photoHash })
+    for (let k = 0; k < n; k++) cells.push({ templateId: item.id, version: prompt.version, inputIndex, occurrence, k, hash, resolution, input, photoHash, slotHashes })
   })
   return cells
 }
