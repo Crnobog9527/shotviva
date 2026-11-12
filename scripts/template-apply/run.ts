@@ -54,7 +54,7 @@ async function apply(batch: Batch, baseDir: string, env: Env, dryRun: boolean) {
   const target = targetOf(env)
   const db = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
   const state = await readState(db, batch)
-  const ctx = { baseDir, db, assetsBase: target.assetsBase, ...targetStores(target) }
+  const ctx = { baseDir, db, assetsBase: target.assetsBase, ...(await targetStores(target)) }
   let plan = await buildPlan(batch, state, { ...ctx, write: false })
   let results = await send(db, env.SHOTVIVA_IMPORT_ADMIN_ID, plan, true)
   const checkedOnly = dryRun || failed(plan, results)

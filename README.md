@@ -57,6 +57,18 @@ pnpm templates:apply .local/templates/<batch>.json             # apply to the te
   prompt version; no prompt text). Needs `TEMPLATE_TOOLS_R2_ACCOUNT_ID`,
   `TEMPLATE_TOOLS_R2_ACCESS_KEY_ID` and `TEMPLATE_TOOLS_R2_SECRET_ACCESS_KEY` for the test site's
   buckets (the same keys let templates:apply upload covers and style references).
+- R2 keys for both tools, in `.env.local` (fill in your own; never paste them anywhere):
+
+  ```bash
+  # A Cloudflare R2 API token limited to the test site's buckets shotviva-preview and
+  # shotviva-assets-preview (Object Read & Write). Not the shell's R2_* variables.
+  TEMPLATE_TOOLS_R2_ACCOUNT_ID=<Cloudflare account id>
+  TEMPLATE_TOOLS_R2_ACCESS_KEY_ID=<the token's Access Key ID>
+  TEMPLATE_TOOLS_R2_SECRET_ACCESS_KEY=<the token's Secret Access Key>
+  ```
+
+  At start the tools check the token cannot reach the production bucket `shotviva-assets`; if it
+  can, they stop.
 - Production is never written by this script: templates, categories and series reach
   production through the "Sync preview templates to production" workflow (Owner approval).
 

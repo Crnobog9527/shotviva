@@ -84,7 +84,7 @@ async function main() {
   const { cells, problems } = planCells(batch.templates, templates, new Map([...photos].map(([p, v]) => [p, v.hash])), { only: extra.only, n: extra.n })
   for (const p of problems) process.stdout.write(`${p.templateId}: ${p.problem}\n`)
   if (options.dryRun) return dryRun(cells, db, target.name)
-  const { privateStore } = targetStores(target)
+  const { privateStore } = await targetStores(target)
   if (!privateStore) throw new RunError('缺测试站 R2 密钥（TEMPLATE_TOOLS_R2_*）：测试照片和结果都在测试站的私有桶里，没有调用模型')
   const actorId = env.data.SHOTVIVA_IMPORT_ADMIN_ID
   const deps = { db, store: privateStore, provider: imageProvider, identityJudge: await identityJudge() }
