@@ -178,11 +178,12 @@ describe('proxy session check with a real session', () => {
     const { verifyCookieIdentity } = await import('@/core/auth/identity')
     const real = globalThis.fetch.bind(globalThis)
     const refreshes: string[] = []
+    let refuse = true
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = String(input instanceof Request ? input.url : input)
       if (url.includes('/auth/v1/token')) {
         refreshes.push(url)
-        return Response.json({ code: 429, error_code: 'over_request_rate_limit', msg: 'Request rate limit reached' }, { status: 429 })
+        if (refuse) return Response.json({ code: 429, error_code: 'over_request_rate_limit', msg: 'Request rate limit reached' }, { status: 429 })
       }
       return real(input, init)
     })
@@ -212,10 +213,15 @@ describe('proxy session check with a real session', () => {
     expect(await verifyCookieIdentity(forwardedCookies, { url: apiUrl, anonKey })).toEqual({ status: 'unavailable', source: 'auth' })
     expect(refreshes.length).toBe(before)
 
+    // Auth answers again: the untouched refresh token must still be good (nothing was rotated).
     vi.useRealTimers()
-    vi.restoreAllMocks()
-    const { error } = await createClient(apiUrl, anonKey, { auth: { persistSession: false } }).auth.refreshSession({ refresh_token: refresh })
+    refuse = false
+    const sent = refreshes.length
+    const { data, error } = await createClient(apiUrl, anonKey, { auth: { persistSession: false } }).auth.refreshSession({ refresh_token: refresh })
+    expect(refreshes.length).toBe(sent + 1)
     expect(error).toBeNull()
+    expect(data.session?.refresh_token).toBeTruthy()
+    expect(data.session?.refresh_token).not.toBe(refresh)
   })
 
   // Re-review of #542, 1: the proxy's refresh is refused while the token still has 10–90 s left
@@ -227,11 +233,12 @@ describe('proxy session check with a real session', () => {
     const exp = JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString()).exp as number
     const real = globalThis.fetch.bind(globalThis)
     const refreshes: string[] = []
+    let refuse = true
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = String(input instanceof Request ? input.url : input)
       if (url.includes('/auth/v1/token')) {
         refreshes.push(url)
-        return Response.json({ code: 429, error_code: 'over_request_rate_limit', msg: 'Request rate limit reached' }, { status: 429 })
+        if (refuse) return Response.json({ code: 429, error_code: 'over_request_rate_limit', msg: 'Request rate limit reached' }, { status: 429 })
       }
       return real(input, init)
     })
@@ -267,11 +274,16 @@ describe('proxy session check with a real session', () => {
     await db.rpc('session_identity')
     expect(refreshes.length).toBe(before)
 
+    // Auth answers again: the untouched refresh token must still be good (nothing was rotated).
     vi.useRealTimers()
-    vi.restoreAllMocks()
+    refuse = false
+    const sent = refreshes.length
     const { apiUrl, anonKey } = localSupabase()
-    const { error: refreshError } = await createClient(apiUrl, anonKey, { auth: { persistSession: false } }).auth.refreshSession({ refresh_token: refresh })
+    const { data: renewed, error: refreshError } = await createClient(apiUrl, anonKey, { auth: { persistSession: false } }).auth.refreshSession({ refresh_token: refresh })
+    expect(refreshes.length).toBe(sent + 1)
     expect(refreshError).toBeNull()
+    expect(renewed.session?.refresh_token).toBeTruthy()
+    expect(renewed.session?.refresh_token).not.toBe(refresh)
   })
 
   // Re-review of #542, 2: the refresh went through (the token rotated), then session_identity()

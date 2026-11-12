@@ -5,7 +5,7 @@ export { arrivedFrom, loginPath, nextIn, sanitizeNext, signedInTarget, type Arri
 export type { Role, SessionUser } from './session-user'
 export { markOnboardingSeen } from './onboarding-store'
 export type { Onboarding, OnboardingFlag } from './onboarding'
-export { createServerSupabase, createSessionSupabase } from './supabase-server'
+export { createServerSupabase } from './supabase-server'
 export { createAdminSupabase } from './supabase-admin'
 export { handleAuthCallback } from './flows/callback'
 export { handleAuthConfirm } from './flows/confirm'
