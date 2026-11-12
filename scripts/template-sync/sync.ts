@@ -89,6 +89,8 @@ export async function syncTemplate(id: string, runId: string, source: SyncTarget
   }
   const checked = await apply(row, true)
   if (validateOnly) return checked
+  // Before any object is copied, so a missing bucket costs no cover copy on every run.
+  if (styleRefs.length > 0 && (!source.private || !target.private)) throw new SyncError('STYLE_REF_STORE_MISSING')
   let covers
   try {
     covers = await copyCovers(id, row, source.assets, target.assets)

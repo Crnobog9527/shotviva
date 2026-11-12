@@ -126,6 +126,14 @@ it('reads the source references for exactly the prompt version read, for the ser
   expect(await read(1)).toEqual({ data: refs, error: null })
   expect((await read(2)).error?.message).toBe('SOURCE_CHANGED')
   expect((await anonClient().rpc('read_template_sync_style_refs', { p_id: template.id, p_version: 1 })).error).not.toBeNull()
+  // A signed-in user (the authenticated role) cannot read them either.
+  await db.query('begin')
+  try {
+    await db.query('set local role authenticated')
+    await expect(db.query('select public.read_template_sync_style_refs($1, 1)', [template.id])).rejects.toThrow(/permission denied/)
+  } finally {
+    await db.query('rollback')
+  }
   // The main snapshot still leaves them out, so an older script never sees a private key.
   expect(JSON.stringify((await serviceClient().rpc('read_template_sync_source', { p_id: template.id })).data)).not.toContain(refs[0]!.key)
 })

@@ -82,10 +82,11 @@ describe('syncTemplate', () => {
     expect(writesOf(target)).toHaveLength(0)
   })
 
-  it('without a private bucket, a template with references fails before its final write', async () => {
+  it('without a private bucket, a template with references fails before any cover is copied', async () => {
     const target = { ...side(), private: undefined }
     await expect(syncTemplate('demo', '1', side(), target)).rejects.toMatchObject({ message: 'STYLE_REF_STORE_MISSING' })
     expect(target.rpc.mock.calls.filter(([name]) => name === 'sync_preview_template')).toHaveLength(1)
+    expect(covers.copyCovers).not.toHaveBeenCalled()
   })
 
   it('a failed object copy is STYLE_REF_COPY_FAILED and the final write never runs', async () => {
