@@ -57,7 +57,7 @@ export function FeatureGuide({ tab: initial, tier, upgrade, open, onOpenChange }
 function Tabs({ tab, onChange }: { tab: GatedFeature; onChange(tab: GatedFeature): void }) {
   const t = useTranslations('app.gated.guide')
   return (
-    <div role="tablist" aria-label={t('tabsLabel')} className="hairline grid grid-cols-2 gap-1 rounded-tile p-1">
+    <div role="tablist" aria-label={t('tabsLabel')} className="hairline mt-1 grid grid-cols-2 gap-1 rounded-tile p-1">
       {GATED_FEATURES.map((option) => (
         <button
           key={option}
