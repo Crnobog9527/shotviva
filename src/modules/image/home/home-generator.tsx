@@ -11,10 +11,9 @@ import { UPLOAD_ACCEPT } from '@/core/storage/rules'
 import { allowsNoPhoto, type CatalogueTemplate } from '../catalogue/catalogue-template'
 import { FavoritesProvider } from '../favorites/favorites-provider'
 import { FavoriteReturn } from '../favorites/favorite-return-effect'
-import { HomeBench } from './home-bench'
-import { HomeCard } from './home-card'
 import type { HomeViewer } from './home-cta'
 import { HomeDock } from './home-dock'
+import { HomePanel, type InitialCovers } from './home-panel'
 import { sampleFor, thumbFor } from './home-samples'
 import { useGeneratorAway } from './use-generator-away'
 import { useHeaderUpload } from './use-header-upload'
@@ -32,6 +31,9 @@ export type HomeGeneratorProps = {
   homePath: string
   // "3 free Standard images", from site.config (G3).
   freeImages: string
+  // The opening template's cover shapes, measured on the server, so the preview is drawn in its
+  // final shape before any script runs.
+  initialCovers: InitialCovers
 }
 
 // The picker and the sign-up sheet are closed on arrival and carry the dialog, drawer and
@@ -53,23 +55,19 @@ function usePrefetchDialogs() {
 
 const smooth = () => (window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth')
 
-// The first-screen generator (ARCHITECTURE §13 item 2, DESIGN §6.9 item 9): the phone card below
-// 1024px, the bench above, one state. Signed in it starts the photo through the workspace's own
+// The first-screen generator (ARCHITECTURE §13 item 2, DESIGN §6.9 item 9): one creation panel,
+// stacked on phones and two columns from 1024px (home-panel.tsx). Signed in it starts the photo through the workspace's own
 // pipeline and moves to that template's workspace; signed out it keeps the setup in this
 // browser and asks for an account.
-export function HomeGenerator({ templates, defaultId, viewer, googleAction, homePath, freeImages }: HomeGeneratorProps) {
+export function HomeGenerator({ templates, defaultId, viewer, googleAction, homePath, freeImages, initialCovers }: HomeGeneratorProps) {
   const t = useTranslations('home.generator')
   const state = useHomeGenerator({ templates, defaultId, viewer })
   const [pickerOn, setPickerOn] = useState<CatalogueTemplate | null>(null)
   const [signUp, setSignUp] = useState(false)
   const file = useRef<HTMLInputElement>(null)
-  const bench = useRef<HTMLDivElement>(null)
-  const card = useRef<HTMLElement>(null)
-  const watch = useMemo(() => [bench, card], [])
-  const bring = useCallback(() => {
-    const shown = [bench.current, card.current].find((element) => element && element.offsetParent !== null)
-    shown?.scrollIntoView({ behavior: smooth(), block: 'center' })
-  }, [])
+  const panel = useRef<HTMLElement>(null)
+  const watch = useMemo(() => [panel], [])
+  const bring = useCallback(() => panel.current?.scrollIntoView({ behavior: smooth(), block: 'center' }), [])
   const { away, past, footer } = useGeneratorAway(watch)
   const canStartWithoutPicking = state.photo.url !== null || allowsNoPhoto(state.template)
   // The header's stand-in (768px up): "Upload photo" opens the picker straight from the click
@@ -108,8 +106,7 @@ export function HomeGenerator({ templates, defaultId, viewer, googleAction, home
     <FavoritesProvider initialIds={viewer?.favoriteIds ?? []} signedIn={viewer !== null} returnTo={homePath}>
     <div className="mk-generator">
       <FavoriteReturn signedIn={viewer !== null} templates={templates} onSaved={onPreview} />
-      <HomeCard ref={card} thumbOf={thumbFor} {...shared} />
-      <HomeBench ref={bench} thumb={state.template ? thumbFor(state.template) : null} {...shared} />
+      <HomePanel ref={panel} initialCovers={initialCovers} thumbOf={thumbFor} {...shared} />
       <input
         ref={file}
         type="file"

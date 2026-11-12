@@ -4,11 +4,11 @@ import { Suspense, type ReactNode } from 'react'
 import { preconnect } from 'react-dom'
 
 import { AppPage, TabRootHeader } from '@/core/app-shell'
-import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
+import { createAdminSupabase, requireUser } from '@/core/auth'
 import { fileUrlFor, firstThumbUrls, listOwnJobs } from '@/core/jobs'
 import { currentLocale } from '@/core/i18n/server'
 import { r2Origin, r2Store } from '@/core/storage'
-import { EDIT_TEMPLATE_ID, listTemplatesIn } from '@/core/templates'
+import { cachedWebTemplates, EDIT_TEMPLATE_ID } from '@/core/templates'
 import { DoneGrid, PhotosCount, RunningList, toPhotoItem, type TemplateLookup } from '@/modules/image'
 
 function Header({ aside }: { aside?: ReactNode }) {
@@ -19,11 +19,10 @@ function Header({ aside }: { aside?: ReactNode }) {
 // sign-in returns to (a work's own address on /photos/[jobId]).
 async function Photos({ back }: { back: string | Promise<string> }) {
   const user = await requireUser(await back)
-  const supabase = await createServerSupabase()
   const now = new Date()
   // The first screen's small copies are signed while the templates are still being read.
   const works = listOwnJobs(createAdminSupabase(), user.id, now).then(async (own) => ({ own, signed: await firstThumbUrls(r2Store, own.done) }))
-  const [{ own, signed }, templates] = await Promise.all([works, listTemplatesIn(supabase, await currentLocale(), { includeSeriesMembers: true })])
+  const [{ own, signed }, templates] = await Promise.all([works, cachedWebTemplates(await currentLocale(), true)])
   const tp = await getTranslations('app.photos')
   const fallback = tp('fallbackName')
   const lookup: TemplateLookup = new Map(templates.map((t) => [t.id, { name: t.name, cover: t.coverAfterUrl ?? t.coverPosterUrl }]))

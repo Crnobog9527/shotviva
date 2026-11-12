@@ -29,3 +29,11 @@ export const BATCH_STARTS = [200, 1500, 2300, 5000] as const
 // Matrix: photos and templates arrive, the cells develop one by one, the total is shown.
 export const CELL_STAGGER = 220
 export const matrixStarts = (cells: number) => [200, 900, 900 + cells * CELL_STAGGER + 700] as const
+
+// The guide's "Example results" row, five finished results per tab: the batch's white
+// backgrounds, then the templates' three looks on the sneaker and two on the tote.
+export function sampleResults(tab: 'batch' | 'templates', locale: string): string[] {
+  if (tab === 'batch') return BATCH_PAIRS.map((pair) => pair.result)
+  const [sneaker, tote] = matrixRows(locale)
+  return [sneaker!.results.white, sneaker!.results.scene, sneaker!.results.promo, tote!.results.scene, tote!.results.promo]
+}

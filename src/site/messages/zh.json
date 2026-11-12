@@ -3,12 +3,16 @@
     "placeholder": "即将上线。",
     "generator": {
       "label": "用你的照片试一下",
-      "addPhoto": "添加你的手机照片",
       "replace": "更换",
       "replaceAria": "你的照片，点击更换",
       "template": "模板",
       "size": "尺寸",
-      "seeAll": "查看全部模板",
+      "change": "换模板",
+      "allTemplates": "全部模板",
+      "yourPhoto": "你的照片",
+      "photoReady": "照片已选好",
+      "photoReadyHint": "已替换模板的示例原图",
+      "stageAlt": "{name}模板成品示例",
       "changeTemplate": "模板：{name}，点击更换",
       "changeSize": "尺寸：{name}，点击更换",
       "notePlaceholder": "有什么想改的？（选填）",
@@ -248,19 +252,41 @@
       },
       "lockedSr": "（需要 {tier}）",
       "replay": "再看一遍",
+      "create": {
+        "title": "批量创作",
+        "line": "一个模板批量出图，或多个模板 × 多张照片",
+        "pro": "{count, number} 张",
+        "max": "{count, number} 张 · {templates, number} 个模板"
+      },
+      "guide": {
+        "title": "新手教程",
+        "lede": "批量创作怎么用，附示例成品。随时可以点 ? 再看。",
+        "open": "批量创作新手教程",
+        "tabsLabel": "批量创作的两种用法",
+        "tabs": {
+          "batch": "1 个模板 × 多张",
+          "templates": "多个模板 × 多张"
+        },
+        "samples": "示例成品",
+        "samplesNote": "示例",
+        "done": "知道了",
+        "cta": {
+          "pro": "开通 Pro · 一次 {pro, number} 张",
+          "max": "开通 Max · {templates, number} 个模板、一次 {max, number} 张"
+        },
+        "quiet": {
+          "pro": "开通 Pro · 一次 {pro, number} 张",
+          "max": "要一次 {max, number} 张或多个模板？看看 Max"
+        }
+      },
       "batch": {
         "title": "批量处理",
-        "line": "一次最多 {pro, number} / {max, number} 张",
         "lede": "一次传一批商品照，选一个模板，整批一起出图，做好后打包下载。适合一次上新很多商品的网店。",
-        "ledeGuide": "你的 Pro 一次最多 {count, number} 张：打开任意模板，加照片时多选几张就行。",
         "step1": "一次上传：Pro 最多 {pro, number} 张，Max 最多 {max, number} 张。",
         "step2": "选一个模板，整批用同一个尺寸和清晰度。",
         "step3": "一起生成。每张单独扣积分，哪张失败就退回哪张。",
         "step4": "全部做好后，一个按钮打包下载。",
         "note": "批量只用付费积分。",
-        "cta": "开通 Pro · 一次 {pro, number} 张",
-        "seeMax": "要一次 {max, number} 张？看看 Max",
-        "start": "去选模板",
         "demo": {
           "label": "演示：{count, number} 张商品照套用同一个白底图模板，一起出图，最后打包成一个 ZIP。",
           "caption": "演示按 Max 一次 {count, number} 张；图片是示例。",
@@ -273,7 +299,6 @@
       },
       "templates": {
         "title": "一次用多个模板",
-        "line": "1 张照片套最多 {templates, number} 个模板",
         "lede": "同一张照片一次套几个模板，或者几张照片 × 几个模板，一批全部出齐。",
         "scenes": "两种用法",
         "tabs": {
@@ -285,7 +310,6 @@
         "step3": "出图前先核对每一张和总积分，不要的点一下去掉。",
         "step4": "结果可以按模板看，也可以按照片看，还能打包下载。",
         "note": "一次用多个模板是 Max 的功能，只用付费积分。",
-        "cta": "开通 Max",
         "demo": {
           "photo": "照片",
           "names": {
@@ -306,18 +330,27 @@
       }
     },
     "matrix": {
-      "lede": "同一批照片套用最多 {templates, number} 个模板，一批最多 {max, number} 张。",
-      "metaTitle": "多模板批量",
-      "title": "多模板批量",
+      "lede": "选 1 个模板就是批量出图；最多 {templates, number} 个模板一起套，一批最多 {max, number} 张。",
+      "ledeOne": "一个模板一次最多 {max, number} 张照片，一起出图、打包下载。",
+      "ledeLocked": "一个模板批量出图（Pro，一次 {pro, number} 张），或最多 {templates, number} 个模板 × 多张照片（Max，一次 {max, number} 张）。",
+      "metaTitle": "批量创作",
+      "title": "批量创作",
       "entryLink": "这些照片再多套几个模板",
       "templatesTitle": "模板",
       "chooseTemplates": "选择模板",
+      "chooseTemplate": "选择模板",
       "addTemplate": "再加一个模板",
       "templatesLeft": "还能加 {count, number} 个",
+      "moreTemplates": "再加模板",
+      "morePhotos": "Max 一次最多 {count, number} 张",
       "removeTemplate": "去掉{name}",
+      "swap": "换模板",
+      "swapTemplate": "换掉{name}",
       "templateUnavailable": "暂时不可用，去掉它才能继续。",
       "pickerTitle": "选择模板",
       "pickerLine": "已选 {count, number} / {max, number} 个，每个模板都会用到每张照片上。",
+      "pickerTitleOne": "选择模板",
+      "pickerLineOne": "这个模板会用到这一批的每张照片上。",
       "pickerDone": "{count, plural, =0 {完成} other {完成 · # 个模板}}",
       "gridTitle": "出图前核对一下",
       "gridLabel": "这一批的照片和模板",
@@ -325,6 +358,7 @@
       "gridTotal": "{count, number} / {max, number} 张 · <mono>{total, number} 积分</mono>",
       "gridHint": "点一下格子可以不出这一张。",
       "gridEmpty": "选好模板、加上照片：每张照片都会套用每个模板，一批最多 {max, number} 张、{templates, number} 个模板。",
+      "gridEmptyOne": "选好模板、加上照片：一批最多 {max, number} 张。",
       "cellOn": "第 {index, number} 张照片用{template}，{count, number} 积分。点一下不出这张。",
       "cellOff": "第 {index, number} 张照片用{template}，已去掉。点一下加回来。",
       "photoN": "第 {index, number} 张",
@@ -338,7 +372,7 @@
       "resolutionAside": "整批统一",
       "noticeGenerate": "<b>只用付费积分。</b>每张单独扣费，失败的单独退回。",
       "noticeCredits": "批量只用付费积分：{count, number} 张需要 <b>{total, number} 积分</b>。",
-      "noticeTooMany": "<b>Max 一批最多 {max, number} 张。</b>去掉一些格子或者去掉一个模板。",
+      "noticeTooMany": "<b>一批最多 {max, number} 张。</b>去掉一些格子或者去掉一个模板。",
       "generate": "生成 {count, number} 张 · <mono>{total, number} 积分</mono>",
       "getCredits": "获取积分 · <mono>还差 {count, number}</mono>",
       "checking": "正在核对每张照片…",
@@ -365,10 +399,12 @@
       "newBatch": "新的一批",
       "openPhotos": "打开作品",
       "backToCreate": "返回创作",
-      "lockedTitle": "同一批照片，一次套用多个模板",
-      "lockedLine": "开通 Max 后，可以一次选最多 {templates, number} 个模板用到照片上：一批最多 {cells, number} 张，出图前先显示每一张的积分。",
-      "lockedPro": "Pro 可以一次把一个模板用到最多 {count, number} 张照片上。",
-      "lockedCta": "了解 Max",
+      "lockedTitle": "批量创作是 Pro 和 Max 的功能",
+      "lockedPro": "一个模板一次最多 {count, number} 张照片。",
+      "lockedMax": "最多 {templates, number} 个模板一起套，一批最多 {count, number} 张。",
+      "lockedCta": "开通 Pro · 一次 {count, number} 张",
+      "lockedSeeMax": "要一次用多个模板？看看 Max",
+      "lockedDemo": "看看怎么用",
       "lockedDrawing": "竖着三张照片、横着三个模板：一批出九张"
     },
     "batchZip": {
@@ -697,7 +733,7 @@
         "savedLine": "{count, number} 张保存了 {done, number} 张 · {tier} · 用了 {credits, number} 积分。{failed, plural, =0 {} other {# 张失败，积分已退回。}}",
         "refunded": "已退回",
         "openPhotos": "打开作品",
-        "onPage": "想一次做好几张？到整页工作台添加"
+        "onPage": "想一次做好几张？用批量创作"
       },
       "tile": {
         "add": "添加照片",

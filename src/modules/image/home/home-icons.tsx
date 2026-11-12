@@ -26,12 +26,6 @@ export const GiftIcon = ({ className }: { className?: string }) => (
   </svg>
 )
 
-export const ArrowIcon = () => (
-  <svg viewBox="0 0 24 24" aria-hidden className="size-4" {...stroke}>
-    <path d="M9 6l6 6-6 6" />
-  </svg>
-)
-
 export const CheckIcon = () => (
   <svg viewBox="0 0 24 24" aria-hidden className="size-4" {...stroke} strokeWidth={2.4}>
     <path d="M5 12.5l4.5 4.5L19 7.5" />

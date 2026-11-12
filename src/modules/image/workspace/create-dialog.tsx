@@ -44,7 +44,7 @@ function CreateBody({ template, open, onClose, ...context }: BodyProps) {
   const workspace = `/generate/${template.id}`
   // Generate moves to the template's workspace page, kept prefetched while the dialog is open.
   useWarmRoute(workspace, open)
-  const batch = limitsFor(context.tier).batchMax > 1 && draft.photos.photos.length === 0
+  const batch = limitsFor(context.tier).batchMax > 1 && template.photoInput !== 'none' && draft.photos.photos.length === 0
   const tall = isCompareSample(template)
   const submitOnce = useSubmitOnce(open)
   const generate = () => {
@@ -87,11 +87,12 @@ function CreateBody({ template, open, onClose, ...context }: BodyProps) {
   )
 }
 
-// Pro and Max can pick several photos, but on the workspace page's tray, not here.
+// Pro and Max can run this template on several photos: in Batch create, with it already chosen
+// (Owner 2026-11-12: one creation screen for batches), not in this dialog.
 export function BatchLink({ templateId, onGo }: { templateId: string; onGo(): void }) {
   const t = useTranslations('app.workspace.batch')
   return (
-    <Link href={`/generate/${templateId}`} onClick={onGo} className="press mt-2 inline-flex min-h-11 items-center gap-0.5 text-caption font-medium text-foreground hover:underline hover:underline-offset-3">
+    <Link href={`/generate/batch?t=${templateId}`} onClick={onGo} className="press mt-2 inline-flex min-h-11 items-center gap-0.5 text-caption font-medium text-foreground hover:underline hover:underline-offset-3">
       {t('onPage')}
       <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 text-primary" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
         <path d="M9 6l6 6-6 6" />

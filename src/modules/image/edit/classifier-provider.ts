@@ -36,9 +36,10 @@ export const IDENTITY_JUDGE_ADAPTERS: Partial<Record<ProviderAdapterId, (config:
 
 // Null when no decision row is switched on or it cannot be built: generation then goes ahead
 // with the user's words unscreened (fail open) rather than failing.
-export async function identityJudge(): Promise<IdentityJudge | null> {
+// `loadRow`: as activeCredentials', for callers outside Next's cache (the templates:trial script).
+export async function identityJudge(loadRow?: Parameters<typeof activeCredentials>[1]): Promise<IdentityJudge | null> {
   try {
-    const credentials = await activeCredentials('decision')
+    const credentials = await activeCredentials('decision', loadRow)
     if (!credentials) return null
     const build = IDENTITY_JUDGE_ADAPTERS[credentials.adapter]
     if (!build) throw new Error(`adapter ${credentials.adapter} is not an identity judge`)

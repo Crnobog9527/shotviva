@@ -13,9 +13,6 @@ import { CameraIcon } from './home-icons'
 type Props = {
   cta: HomeCta
   templateId: string | null
-  // 'card' (phone, tablet): without a photo the button says "Upload photo"; 'bench' keeps
-  // "Generate · 2 credits" and opens the photo picker (v3-b comp).
-  place: 'card' | 'bench'
   onPickPhoto(): void
   onSignUp(): void
   onGenerate(): void
@@ -29,7 +26,7 @@ const PRIMARY = 'mk-cta'
 // The generator's one primary (DESIGN §6.9 item 9), with the workspace's own labels:
 // "Generate · 2 credits", "Get credits · N needed" (neutral, opens the paywall), or a disabled
 // state while the photo uploads or a slot is busy.
-export function HomeCtaButton({ cta, templateId, place, onPickPhoto, onSignUp, onGenerate }: Props) {
+export function HomeCtaButton({ cta, templateId, onPickPhoto, onSignUp, onGenerate }: Props) {
   const t = useTranslations('app.workspace')
   const home = useTranslations('home.generator')
   const generate = (count: number) => t.rich('generateCta', { cost: costTag, count })
@@ -38,7 +35,8 @@ export function HomeCtaButton({ cta, templateId, place, onPickPhoto, onSignUp, o
       return (
         <button type="button" className={PRIMARY} onClick={onPickPhoto}>
           <CameraIcon />
-          <span>{place === 'card' ? home('uploadPhoto') : generate(cta.cost)}</span>
+          {/* Says what the click does: it opens the photo picker (review of #523, F6). */}
+          <span>{home('uploadPhoto')}</span>
         </button>
       )
     case 'sign-up':

@@ -53,3 +53,7 @@ supabase/.temp/
 /规范/
 /seo资料/
 /docs/
+
+# Load-test stub certificates and images (loadtest/README.md)
+/loadtest/.stub/
+/loadtest/results/

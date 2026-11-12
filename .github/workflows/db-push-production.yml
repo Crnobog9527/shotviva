@@ -1,7 +1,10 @@
-# Merged migrations run automatically on main with the production environment.
-# Manual migrations and data releases require an actual Owner review in production-manual.
-# Both environments must restrict deployment branches to main. Other workflows on main
-# can request an environment by name and are subject to its protection rules.
+# Merged migrations run automatically on main with the production environment. A manual
+# migration run (pricing_operation none) uses production-manual, which has no reviewers since
+# 2026-11-12, like the automatic run. Pricing data releases (activate / rollback) are money and
+# keep an actual Owner review: they run in production-pricing, whose required reviewer is the
+# Owner, and the job checks that approval itself. All three environments must restrict
+# deployment branches to main. Other workflows on main can request an environment by name and
+# are subject to its protection rules.
 #
 # Because the migration lands before the Vercel deployment is promoted, every migration must keep
 # the code currently live on production working (expand, then contract). PRs that add a
@@ -34,7 +37,8 @@ jobs:
   approval-check:
     if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && (!inputs.pricing_operation || inputs.pricing_operation == 'approval-check')
     runs-on: ubuntu-latest
-    environment: production-manual
+    # The environment that still has the Owner as reviewer: a dry check that approval works.
+    environment: production-pricing
     permissions: {}
     steps:
       - run: echo 'Approval check completed.'
@@ -46,7 +50,7 @@ jobs:
     name: supabase db push → production
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || contains(fromJSON('["none","activate","rollback"]'), inputs.pricing_operation))
     runs-on: ubuntu-latest
-    environment: ${{ github.event_name == 'push' && 'production' || 'production-manual' }}
+    environment: ${{ github.event_name == 'push' && 'production' || (inputs.pricing_operation == 'none' && 'production-manual' || 'production-pricing') }}
     permissions:
       actions: read
       contents: read
@@ -61,7 +65,9 @@ jobs:
           token-source: environment secret SUPABASE_PRODUCTION_ACCESS_TOKEN
           password-source: production environment secret SUPABASE_PRODUCTION_DB_PASSWORD
           ref-source: production environment variable SUPABASE_PRODUCTION_PROJECT_REF
-          require-owner-review: ${{ github.event_name == 'workflow_dispatch' }}
+          # Pricing activate / rollback only; the approval must be on production-pricing.
+          require-owner-review: ${{ github.event_name == 'workflow_dispatch' && inputs.pricing_operation != 'none' }}
+          owner-review-environment: production-pricing
       - name: History before
         run: supabase migration list --linked
       # --include-all: cards own numbering ranges (TASKS), so a lower-numbered migration can

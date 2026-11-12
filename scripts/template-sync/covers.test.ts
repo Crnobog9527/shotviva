@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 
 import { createMemoryStore } from '../../tests/fakes/memory-store'
-import { copyCovers } from './covers'
+import { copyCovers, copySeriesCover } from './covers'
 import { parseIds } from './sync'
 
 const source = { base: 'https://preview.test', ...createMemoryStore() }
@@ -26,5 +26,18 @@ it.each(['https://other.test/covers/demo/t.png', 'https://preview.test/uploads/p
 
 it('only accepts whole template IDs and removes duplicates', () => {
   expect(parseIds('food-demo, test\nfood-demo')).toEqual(['food-demo', 'test'])
-  for (const invalid of ['', 'food; bad', '$(echo)']) expect(() => parseIds(invalid)).toThrow()
+  for (const invalid of ['', 'food; bad', '$(echo)', 'a'.repeat(129)]) expect(() => parseIds(invalid)).toThrow()
+  expect(parseIds('a'.repeat(128))).toEqual(['a'.repeat(128)])
+})
+
+it('copies a series cover from the test bucket into the folder it came from; keeps outside addresses and null', async () => {
+  const key = 'covers/member-a/after-0123456789abcdef.png'
+  source.upload(key, png, 'image/png')
+  const copied = await copySeriesCover(`${source.base}/${key}`, source, target, false)
+  expect(copied).toMatch(/^https:\/\/target\.test\/assets\/covers\/member-a\/sync-[0-9a-f]{64}\.png$/)
+  // A dry run reads and writes nothing; it only checks the address.
+  expect(await copySeriesCover(`${source.base}/${key}`, source, target, true)).toBe(`${source.base}/${key}`)
+  expect(await copySeriesCover('https://cdn.example.com/series.png', source, target, false)).toBe('https://cdn.example.com/series.png')
+  expect(await copySeriesCover(null, source, target, false)).toBeNull()
+  await expect(copySeriesCover(`${source.base}/uploads/x.png`, source, target, false)).rejects.toThrow('INVALID_COVER_URL')
 })
