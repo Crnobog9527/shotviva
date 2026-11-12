@@ -1,9 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 
-import { templateSyncEnv } from '../../src/core/env'
+import { templateSyncDryRunEnv, templateSyncEnv } from '../../src/core/env'
 import { createR2Client, createR2Store } from '../../src/core/storage'
-import { SyncError } from './covers'
-import { parseIds, syncTemplate } from './sync'
+import { runSync } from './plan'
+import { parseIds } from './sync'
 
 // Pin the direction independently of the credentials. Only public covers buckets are reachable.
 function endpoint(preview: boolean, settings: ReturnType<typeof templateSyncEnv>['preview']) {
@@ -15,21 +15,29 @@ function endpoint(preview: boolean, settings: ReturnType<typeof templateSyncEnv>
   }
 }
 
-async function run() {
-  const { ids: input, runId, preview, production } = templateSyncEnv()
-  const ids = parseIds(input)
-  const source = endpoint(true, preview)
-  const target = endpoint(false, production)
-  for (const id of ids) {
-    try {
-      const version = await syncTemplate(id, runId, source, target)
-      process.stdout.write(`${id} OK v${version}\n`)
-    } catch (error) {
-      // Never log PostgREST detail, stack traces, arbitrary thrown messages or source data.
-      process.stderr.write(`${id} ${error instanceof SyncError ? error.message : 'SYNC_FAILED'}\n`)
-      process.exitCode = 1
-    }
+// `--dry-run-preview`: check each template against the preview itself and roll everything back.
+// It never reaches production: no production credentials are read, and the target is the preview.
+const DRY_RUN = process.argv.includes('--dry-run-preview')
+
+function endpoints() {
+  if (!DRY_RUN) {
+    const { ids, series, runId, actorId, preview, production } = templateSyncEnv()
+    return { ids, series, runId, actorId, source: endpoint(true, preview), target: endpoint(false, production) }
   }
+  const { ids, series, runId, actorId, serviceKey, assetsBase } = templateSyncDryRunEnv()
+  // Covers are never copied in a dry run, so the asset store is never called; the base only
+  // tells the test site's own series covers from outside addresses.
+  const preview = { serviceKey, accountId: '0'.repeat(32), accessKeyId: '-', secretAccessKey: '-', base: assetsBase }
+  const side = endpoint(true, preview)
+  return { ids, series, runId, actorId, source: side, target: side }
+}
+
+async function run() {
+  const { ids, series, runId, actorId, source, target } = endpoints()
+  const request = { templateIds: ids.trim() ? parseIds(ids) : [], seriesSlugs: series.trim() ? parseIds(series) : [] }
+  if (request.templateIds.length + request.seriesSlugs.length === 0) throw new Error('nothing to sync')
+  const report = (line: string) => process.stdout.write(`${line}\n`)
+  if (!await runSync(request, { runId, actorId, source, target, validateOnly: DRY_RUN, report })) process.exitCode = 1
 }
 run().catch(() => {
   process.stderr.write('INVALID_INPUT_OR_CONFIGURATION\n')

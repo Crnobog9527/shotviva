@@ -62,10 +62,16 @@ async function storeReference(source: ObjectStore, sourceKey: string, head: Obje
   if (bytes.length !== head.size || !actualType || !COVER_STILL_TYPES.some(t => t === actualType && t === head.contentType)) {
     throw new AppError('INVALID_INPUT', '文件类型或大小不对')
   }
-  const { data, info } = await encodeReference(bytes)
-  const key = `style-refs/${id}/${imageId}.webp`
+  const { key, width, height, data } = await encodeStyleRef(id, imageId, bytes)
   await destination.put(key, data, 'image/webp')
-  return { key, width: info.width, height: info.height, uploadedAt: new Date().toISOString() }
+  return { key, width, height, uploadedAt: new Date().toISOString() }
+}
+
+// The stored reference for these bytes, as an upload makes it; `pnpm templates:apply` encodes a
+// local file with this before it puts the result in the private bucket itself.
+export async function encodeStyleRef(id: string, imageId: string, bytes: Uint8Array) {
+  const { data, info } = await encodeReference(bytes)
+  return { key: `style-refs/${id}/${imageId}.webp`, width: info.width, height: info.height, data }
 }
 
 const reuse = z.strictObject({ templateId, locale: z.string().regex(/^[a-z]{2,3}(-[a-z0-9]{2,8})?$/).nullable(), hash: z.string().regex(/^[0-9a-f]{16}([0-9a-f]{48})?$/) })

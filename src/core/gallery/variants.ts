@@ -13,13 +13,18 @@ export type GalleryWidth = (typeof GALLERY_WIDTHS)[number]
 
 export type VariantSource = { id: string; outputKey: string; creditPool: 'free' | 'paid' }
 
+// The version of what galleryImage draws (size rule, watermark, WebP quality). Bump it whenever
+// that changes: copies made before then are simply not found, so each work is rendered once more
+// with the new settings and stored under the new key, instead of serving stale bytes.
+export const GALLERY_VARIANT_VERSION = 'v1'
+
 // Next to the work's own output in the PRIVATE bucket (§8.3: user works never go in the public
-// bucket): outputs/{user_id}/{job_id}.png → outputs/{user_id}/{job_id}-gallery-960.webp. Under the
-// owner's outputs/{user_id}/ prefix, so account deletion clears them with everything else.
-export function galleryVariantKey(outputKey: string, width: GalleryWidth): string {
+// bucket): outputs/{user_id}/{job_id}.png → outputs/{user_id}/{job_id}-gallery-v1-960.webp. Under
+// the owner's outputs/{user_id}/ prefix, so account deletion clears them with everything else.
+export function galleryVariantKey(outputKey: string, width: GalleryWidth, version: string = GALLERY_VARIANT_VERSION): string {
   const dot = outputKey.lastIndexOf('.')
   const stem = dot > outputKey.lastIndexOf('/') ? outputKey.slice(0, dot) : outputKey
-  return `${stem}-gallery-${width}.webp`
+  return `${stem}-gallery-${version}-${width}.webp`
 }
 
 export function galleryVariantKeys(outputKey: string): string[] {

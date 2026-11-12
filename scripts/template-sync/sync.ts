@@ -6,7 +6,8 @@ import { templateFieldsSchema, toggleSetupProblems } from '../../src/core/templa
 import { readTemplateQuote } from '../../src/site/template-pricing'
 import { copyCovers, SyncError, type Assets } from './covers'
 
-export const slug = z.string().max(64).regex(/^[a-z0-9]+(-[a-z0-9]+)*$/)
+// Template ids (up to 64) and series slugs (up to 128, as the series editor allows) share this list.
+export const slug = z.string().max(128).regex(/^[a-z0-9]+(-[a-z0-9]+)*$/)
 export function parseIds(input: string) {
   return [...new Set(z.array(slug).min(1).parse(input.trim().split(/[\s,]+/)))]
 }
@@ -18,7 +19,9 @@ const prompt = z.object({
 
 export type SyncTarget = { db: SupabaseClient; assets: Assets }
 
-export async function syncTemplate(id: string, runId: string, source: SyncTarget, target: SyncTarget) {
+// `validateOnly`: run every check of the final write inside the target's transaction and roll it
+// back (the RPC's p_validate_only); no covers are copied. Used by the dry run against the preview.
+export async function syncTemplate(id: string, runId: string, source: SyncTarget, target: SyncTarget, validateOnly = false) {
   // Pin the destination before reading the source: even a delayed source read must not
   // let an old run adopt a newer destination as its precondition.
   const current = await target.db.rpc('read_template_sync_target', { p_id: id, p_run_id: runId })
@@ -51,13 +54,14 @@ export async function syncTemplate(id: string, runId: string, source: SyncTarget
       p_run_id: runId, p_locales: site.locales.enabled, p_target_token: token, p_catalog_version: catalog, p_validate_only: validate,
     })
     if (write.error) {
-      const known = ['CATEGORY_MISSING', 'MODEL_CREDIT_FLOOR', 'MODEL_CHANGED', 'MODEL_REFERENCE_LIMIT',
+      const known = ['CATEGORY_MISSING', 'SUBCATEGORY_MISSING', 'SERIES_MISSING', 'MODEL_CREDIT_FLOOR', 'MODEL_CHANGED', 'MODEL_REFERENCE_LIMIT',
         'STALE_TARGET', 'PRICE_QUOTE_CHANGED', 'CATALOG_MISMATCH', 'TEMPLATE_RETIRED', 'FEATURED_WEB_REQUIRED', 'LIVE_TEMPLATE_INCOMPLETE', 'PROVIDER_NOT_UNIQUE']
       throw new SyncError(known.includes(write.error.message) ? write.error.message : 'TARGET_WRITE_FAILED')
     }
     return z.int().positive().parse(write.data)
   }
-  await apply(row, true)
+  const checked = await apply(row, true)
+  if (validateOnly) return checked
   let covers
   try {
     covers = await copyCovers(id, row, source.assets, target.assets)

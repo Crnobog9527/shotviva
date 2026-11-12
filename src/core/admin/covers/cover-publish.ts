@@ -28,9 +28,15 @@ export async function publishNewStillCover(
   target: { templateId: string; slot: 'before' | 'after' },
   bytes: Uint8Array,
 ): Promise<{ url: string; key: string; created: boolean }> {
-  const file = await stillCover(bytes)
-  const key = `covers/${target.templateId}/${target.slot}-${file.hash}.${file.ext}`
+  const { file, key } = await planStillCover(target, bytes)
   const created = !(await assets.head(key))
   if (created) await assets.put(key, file.bytes, file.contentType, { cacheControl: IMMUTABLE })
   return { url: `${assetsBaseUrl}/${key}`, key, created }
+}
+
+// The converted file and its content-hashed key, without writing anything (a dry run knows the
+// URL a cover would get).
+export async function planStillCover(target: { templateId: string; slot: 'before' | 'after' }, bytes: Uint8Array) {
+  const file = await stillCover(bytes)
+  return { file, key: `covers/${target.templateId}/${target.slot}-${file.hash}.${file.ext}` }
 }

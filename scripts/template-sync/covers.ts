@@ -59,3 +59,16 @@ export async function copyCovers(id: string, row: unknown, source: Assets, targe
   }
   return result
 }
+
+// A series cover (2026-11-12): template_series.cover_url is a cover on the test site's public
+// bucket (usually a member template's after image, covers/<template>/…), any other https address
+// an admin typed, or null. Ours is copied by content into the same folder on production, so a cover
+// shared with a synced template is stored once; an outside address is kept as it is, never fetched.
+export async function copySeriesCover(url: string | null, source: Assets, target: Assets, dryRun: boolean) {
+  if (!url || !url.startsWith(source.base + '/')) return url
+  const folder = /^covers\/([a-z0-9-]+)\//.exec(url.slice(source.base.length + 1))?.[1]
+  if (!folder) throw new SyncError('INVALID_COVER_URL')
+  // A dry run checks the address only: nothing is read from or written to a bucket.
+  return dryRun ? url : copyFile(folder, url, source, target)
+}
+
