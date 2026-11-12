@@ -1,9 +1,9 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-import { APP_ONLY_APP_KEYS, APP_ONLY_NAMESPACES, clientMessages, publicClientMessages } from '@/core/i18n'
+import { APP_ONLY_APP_KEYS, APP_ONLY_NAMESPACES, clientMessages, publicClientMessages, SERVER_ONLY_NAMESPACES } from '@/core/i18n'
 import { loadMessages } from '@/site/i18n/messages'
 
 // The root layout hands public pages fewer messages than the app gets (core/i18n/client-messages.ts).
@@ -29,6 +29,9 @@ function resolveImport(from: string, spec: string): string | null {
   return found && !found.includes('.test.') ? found : null
 }
 
+// Comments mention APIs and keys in prose ("components pass `useTranslations(ns)`").
+const withoutComments = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+
 // Files that run in the browser: 'use client' ones and everything they import (barrels included,
 // which over-counts and so only makes the check stricter).
 function publicClientFiles(): Map<string, string> {
@@ -42,7 +45,7 @@ function publicClientFiles(): Map<string, string> {
     const isClient = parentClient || /^['"]use client['"]/m.test(text.slice(0, 200))
     if (visited.get(file) === true || (visited.has(file) && !isClient)) continue
     visited.set(file, isClient)
-    if (isClient) client.set(relative(SRC, file), text)
+    if (isClient) client.set(relative(SRC, file), withoutComments(text))
     for (const match of text.matchAll(/(?:from\s+|import\(\s*|import\s+)['"]([^'"]+)['"]/g)) {
       const next = resolveImport(file, match[1])
       if (next) queue.push([next, isClient])
@@ -73,7 +76,47 @@ describe('messages on public pages', () => {
     }
     expect(offenders).toEqual([])
   })
+
+  // The check above reads namespaces and key paths as written. A namespace it cannot read (none,
+  // or computed) or a whole subtree read with t.raw('x') would slip past it, so neither is allowed
+  // in public client code.
+  it('public client code names its namespaces literally and reads no left-out subtree whole', () => {
+    const offenders: string[] = []
+    for (const [file, text] of files) {
+      for (const match of text.matchAll(/useTranslations\(([^)]*)\)/g)) {
+        if (!/^\s*(['"])[A-Za-z0-9_.]+\1\s*$/.test(match[1])) offenders.push(`${file}: useTranslations(${match[1]})`)
+      }
+      for (const key of APP_ONLY_APP_KEYS) if (new RegExp(`\\.raw\\(\\s*['"\`]${key}['"\`]`).test(text)) offenders.push(`${file}: t.raw('${key}')`)
+    }
+    expect(offenders).toEqual([])
+  })
 })
+
+// The messages the app really has: site/i18n/request.ts merges more than the JSON files (the
+// affiliate agreement), so check the server-only rule against its output, not loadMessages().
+vi.mock('next/root-params', () => ({ locale: async () => undefined }))
+// Tests resolve next-intl to its client build, where getRequestConfig throws; it only wraps the function.
+vi.mock('next-intl/server', async (original) => ({ ...(await original<object>()), getRequestConfig: (fn: unknown) => fn }))
+
+describe('messages from the request config', () => {
+  it('neither provider hands the client a server-only namespace', async () => {
+    const { default: requestConfig } = await import('@/site/i18n/request')
+    for (const locale of ['en', 'zh'] as const) {
+      const config = await requestConfig({ locale, requestLocale: Promise.resolve(locale) })
+      const all = config.messages as Record<string, unknown>
+      // Whatever the config adds beyond the JSON files must be listed as server-only (or be
+      // deliberately handed to the client by changing this test).
+      const extra = Object.keys(all).filter((ns) => !(ns in (loadMessagesSync[locale] ?? {})))
+      expect(extra.every((ns) => (SERVER_ONLY_NAMESPACES as readonly string[]).includes(ns))).toBe(true)
+      for (const messages of [clientMessages(all), publicClientMessages(all)]) {
+        for (const ns of SERVER_ONLY_NAMESPACES) expect(messages).not.toHaveProperty(ns)
+      }
+    }
+  })
+})
+
+const loadMessagesSync: Partial<Record<'en' | 'zh', Record<string, unknown>>> = {}
+for (const locale of ['en', 'zh'] as const) loadMessagesSync[locale] = await loadMessages(locale)
 
 describe('publicClientMessages', () => {
   it('is clientMessages without the app-only namespaces and app subtrees, in both languages', async () => {
