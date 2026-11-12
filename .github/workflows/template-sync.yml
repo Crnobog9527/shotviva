@@ -1,24 +1,40 @@
 name: Sync preview templates to production
-run-name: Sync templates ${{ inputs.template_ids }}
+run-name: Sync templates ${{ inputs.template_ids }} series ${{ inputs.series_slugs }}
 
 on:
   workflow_dispatch:
     inputs:
       template_ids:
-        description: Template IDs, separated by commas or spaces
-        required: true
+        description: Template IDs, separated by commas or spaces (optional when series are given)
+        required: false
+        default: ''
+        type: string
+      # Whole series by slug: their categories, the series itself (cover included), every member
+      # template, then the member order, all taken from the test site.
+      series_slugs:
+        description: Series slugs, separated by commas or spaces (optional when template IDs are given)
+        required: false
+        default: ''
         type: string
 
 permissions:
   contents: read
 
+# One sync at a time: a second dispatch waits for the first instead of racing it for the same
+# category, series and template locks.
+concurrency:
+  group: template-sync
+  cancel-in-progress: false
+
 jobs:
   sync:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    # production-manual only limits runs to main; no reviewers (Owner 2026-11-12). The sync is
+    # dispatched by the control window; every write still passes production's own checks and is
+    # audited with this run's id.
     environment: production-manual
     permissions:
-      actions: read
       contents: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -28,11 +44,13 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .nvmrc
-      - uses: ./.github/actions/verify-owner-review
       - run: pnpm install --frozen-lockfile
-      - name: Copy covers and commit each template
+      - name: Sync categories, series and templates
         env:
           SYNC_IDS: ${{ inputs.template_ids }}
+          SYNC_SERIES: ${{ inputs.series_slugs }}
+          # The production admin whose profile id 上下架 and 开放售卖 changes are made and audited as.
+          SYNC_PRODUCTION_ACTOR_ID: ${{ vars.SYNC_PRODUCTION_ACTOR_ID }}
           SYNC_PREVIEW_ASSETS_BASE: ${{ vars.SYNC_PREVIEW_ASSETS_BASE }}
           OPENAI_IMAGE_MODEL: ${{ vars.OPENAI_IMAGE_MODEL }}
           SYNC_PREVIEW_SERVICE_KEY: ${{ secrets.SYNC_PREVIEW_SERVICE_KEY }}
@@ -44,3 +62,20 @@ jobs:
           SYNC_PRODUCTION_R2_ACCESS_KEY_ID: ${{ secrets.SYNC_PRODUCTION_R2_ACCESS_KEY_ID }}
           SYNC_PRODUCTION_R2_SECRET_ACCESS_KEY: ${{ secrets.SYNC_PRODUCTION_R2_SECRET_ACCESS_KEY }}
         run: pnpm exec tsx --conditions=react-server scripts/template-sync/run.ts
+      # Even after a partial failure some steps committed, so the catalogue cache expires either
+      # way; the job still fails when the sync did. A missing secret or any non-2xx fails the job.
+      - name: Expire the production template cache
+        if: ${{ !cancelled() }}
+        env:
+          TEMPLATE_SYNC_REVALIDATE_SECRET: ${{ secrets.TEMPLATE_SYNC_REVALIDATE_SECRET }}
+        run: |
+          if [ -z "$TEMPLATE_SYNC_REVALIDATE_SECRET" ]; then
+            echo '::error::TEMPLATE_SYNC_REVALIDATE_SECRET is not set in the production-manual environment'
+            exit 1
+          fi
+          # The header goes through a file, not the command line, and the file is removed on any exit.
+          trap 'rm -f "$RUNNER_TEMP/auth-header"' EXIT
+          printf 'Authorization: Bearer %s\n' "$TEMPLATE_SYNC_REVALIDATE_SECRET" > "$RUNNER_TEMP/auth-header"
+          curl --fail --silent --show-error --max-time 30 --retry 2 --retry-all-errors \
+            -X POST -H @"$RUNNER_TEMP/auth-header" https://shotviva.com/api/template-sync/revalidate
+
