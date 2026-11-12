@@ -11631,6 +11631,7 @@ declare
   -- Style references (1276): carried only when the source sends the key, as for the sub-category.
   v_refs boolean := p_prompt ? 'style_refs';
   v_prompt jsonb;
+  v_matches integer;
 begin
   if nullif(p_run_id,'') is null or nullif(btrim(p_prompt->>'body'),'') is null then
     raise exception 'INVALID_SYNC';
@@ -11668,11 +11669,20 @@ begin
   end if;
 
   if p_provider is not null and p_provider <> 'null'::jsonb then
+    -- The one production row with this adapter, model and endpoint; of several (a leftover copy),
+    -- the module's active one (at most one per module). Otherwise say which case it is (1277).
+    select count(*) into v_matches from public.ai_providers
+      where module = 'image' and adapter = p_provider->>'adapter'
+        and model = p_provider->>'model' and base_url = p_provider->>'base_url';
+    if v_matches = 0 then raise exception 'PROVIDER_MISSING'; end if;
     begin
       select id into strict v_provider from public.ai_providers
         where module = 'image' and adapter = p_provider->>'adapter'
-          and model = p_provider->>'model' and base_url = p_provider->>'base_url' for share;
-    exception when no_data_found or too_many_rows then raise exception 'PROVIDER_NOT_UNIQUE';
+          and model = p_provider->>'model' and base_url = p_provider->>'base_url'
+          and (v_matches = 1 or is_active) for share;
+    exception when no_data_found or too_many_rows then
+      raise exception 'PROVIDER_NOT_UNIQUE' using detail = format(
+        '%s rows share this adapter, model and endpoint and none is the active provider', v_matches);
     end;
   end if;
   -- The editor RPC resolves the effective provider and checks its floor and exact tariff.
