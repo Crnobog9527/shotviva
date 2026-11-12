@@ -6,7 +6,7 @@ import sharp from 'sharp'
 export const WHITE = '#ffffff'
 
 // JPEG, not PNG: a flattened image has no alpha left to keep, every shop and phone accepts it,
-// and it is a fraction of the PNG's size (a 3K cut-out as PNG can pass Vercel's 4.5MB body limit;
+// and it is a fraction of the PNG's size (a 4K cut-out as PNG can pass Vercel's 4.5MB body limit;
 // the JPEG is staged on R2 anyway, but stays quick to download on a phone). Quality 95 with full
 // chroma (4:4:4) keeps product edges and small print sharp; flat white regions still decode to
 // exactly 255, which the tests check.

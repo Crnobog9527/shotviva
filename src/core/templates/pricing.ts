@@ -1,18 +1,19 @@
 import { z } from 'zod'
 import { AppError } from '../errors'
 
+import { withTierKeys } from './db-resolution'
 import { RESOLUTIONS, type Resolution } from './output-options'
 
 // A template's price (ARCHITECTURE §5, §6.1): quality tier × the resolution the user picks.
 // templates.credits_cost holds one positive integer per resolution; the database check
-// enforces the same shape.
+// enforces the same shape. Rows written before the 4K rename carry a '4k' key: read as '4k'.
 
 export const TEMPLATE_QUALITIES = ['high', 'medium'] as const
 export type TemplateQuality = (typeof TEMPLATE_QUALITIES)[number]
 
 const creditNumber = z.number().int().min(1).max(999)
 
-export const creditsCostSchema = z.strictObject({ '1k': creditNumber, '2k': creditNumber, '3k': creditNumber })
+export const creditsCostSchema = withTierKeys(z.strictObject({ '1k': creditNumber, '2k': creditNumber, '4k': creditNumber }))
 
 export type CreditsCost = z.infer<typeof creditsCostSchema>
 

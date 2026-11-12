@@ -102,7 +102,7 @@ describe('runGeneration by resolution', () => {
   it('charges 1 / 2 / 3 for Standard / HD / Max and passes tier, quality and the photo size on', async () => {
     const { userId, fake, deps, request } = await setup()
     const views = []
-    for (const resolution of ['1k', '2k', '3k'] as const) views.push(await runGeneration(deps, request({ resolution })))
+    for (const resolution of ['1k', '2k', '4k'] as const) views.push(await runGeneration(deps, request({ resolution })))
     expect(views.map((view) => view.credits_cost)).toEqual([1, 2, 3])
     expect((await profileOf(db, userId)).credits).toBe(14)
     expect(fake.calls.map((call) => [call.resolution, call.quality, call.aspectRatio])).toEqual([

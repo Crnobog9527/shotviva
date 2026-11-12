@@ -27,7 +27,7 @@ function parseOrThrow<T>(schema: z.ZodType<T>, value: unknown, what: string): T 
   return result.data
 }
 
-const TIER_LABEL = { '1k': 'Standard', '2k': 'HD', '3k': 'Max' } as const
+const TIER_LABEL = { '1k': '1K', '2k': '2K', '4k': '4K' } as const
 
 // ARCHITECTURE §6.1: prices may go up, never below the floor for the template's quality tier.
 function assertAboveFloor(template: z.infer<typeof templateInputSchema>, floor: ProviderFloors): void {

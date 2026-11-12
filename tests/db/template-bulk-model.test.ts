@@ -72,7 +72,7 @@ it('changes supported prices and bindings together, protects hidden tiers, and c
 it('reports the replacement floor for the cheap template before changing either binding', async () => {
   const cheap = await draft(1, '1:1', 19)
   const ids = [await draft(), cheap]
-  const floor = { high: { '1k': 20, '2k': 20, '3k': 1 }, medium: { '1k': 20, '2k': 20, '3k': 1 } }
+  const floor = { high: { '1k': 20, '2k': 20, '4k': 1 }, medium: { '1k': 20, '2k': 20, '4k': 1 } }
   const outcome = await apply(ids, { provider_id: target }, floor)
   expect(outcome.failures).toEqual([{ id: cheap, name: cheap, reason: 'below_floor', resolution: '1k', floor: 20, given: 19 }])
   expect(await bindings(ids)).toEqual([{ provider_id: null }])

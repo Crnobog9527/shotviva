@@ -10,7 +10,7 @@ export type ProviderFloors = CreditsFloor & {
   approvals?: Record<string, Record<string, ApprovedTariff>>
 }
 export const MISSING_COST = 2147483647
-const unknownTiers = { '1k': MISSING_COST, '2k': MISSING_COST, '3k': MISSING_COST }
+const unknownTiers = { '1k': MISSING_COST, '2k': MISSING_COST, '4k': MISSING_COST }
 export const UNPRICED: CreditsFloor = { high: unknownTiers, medium: unknownTiers, unknownCapabilities: true }
 
 export function floorGuidance(min: number, unknownCapabilities?: boolean): string {
@@ -21,12 +21,12 @@ export function floorGuidance(min: number, unknownCapabilities?: boolean): strin
 // The OpenAI safeguard stays in force when measured costs fall. Its conservative dollar estimates
 // also scale with the product catalogue when the site's credit denomination changes.
 export const OPENAI_MINIMUM: CreditsFloor = {
-  high: { '1k': 2, '2k': 4, '3k': 6 },
-  medium: { '1k': 1, '2k': 2, '3k': 3 },
+  high: { '1k': 2, '2k': 4, '4k': 6 },
+  medium: { '1k': 1, '2k': 2, '4k': 3 },
 }
 const OPENAI_ESTIMATES: CreditsFloor = {
-  high: { '1k': 0.081, '2k': 0.135, '3k': 0.206 },
-  medium: { '1k': 0.055, '2k': 0.095, '3k': 0.135 },
+  high: { '1k': 0.081, '2k': 0.135, '4k': 0.206 },
+  medium: { '1k': 0.055, '2k': 0.095, '4k': 0.135 },
 }
 
 export function maxCostPerCredit(products: readonly { priceUsd: number; credits: number }[]): number {

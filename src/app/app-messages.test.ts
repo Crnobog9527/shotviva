@@ -29,7 +29,7 @@ describe('app messages (en)', () => {
     expect(rich('app.workspace.freeNotice', plain)).toBe(
       "This photo uses free credits: it's shown publicly with a watermark. Paid credits make it private and watermark-free.",
     )
-    expect(['1k', '2k', '3k'].map((id) => t(`app.tiers.${id}.name`))).toEqual(['Standard', 'HD', 'Max'])
+    expect(['1k', '2k', '4k'].map((id) => t(`app.tiers.${id}.name`))).toEqual(['1K', '2K', '4K'])
     expect(t('app.credits', { count: 1 })).toBe('1 credit')
     expect(t('app.template.fromCredits', { count: 2 })).toBe('from 2 credits')
     expect(t('app.result.longPress')).toBe('Long-press to save')

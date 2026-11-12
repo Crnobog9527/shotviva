@@ -3,9 +3,11 @@ import { closestAspect } from './output-choice'
 import type { Translate } from '@/core/translate'
 import type { OutputAspect, Resolution } from '@/core/templates/output-options'
 
-// The eight sizes and three resolutions as the workspace shows them (DESIGN §4.3). Internal
-// ids (1k / 2k / 3k) never reach the screen; neither do "4K", "Ultra HD" or "SD". Names and use
-// lines live in site/messages (app.sizes, app.tiers); this file holds ids, order and geometry.
+import { outputSize, type OutputSize } from '../provider/output-size'
+
+// The eight sizes and three resolutions as the workspace shows them (DESIGN §4.3). Tiers are
+// labelled 1K / 2K / 4K next to the pixel size the photo will actually have; names and use lines
+// live in site/messages (app.sizes, app.tiers); this file holds ids, order and geometry.
 
 export type SizeOption = { id: OutputAspect; ratio: string | null; glyph: { w: number; h: number; dashed: boolean } }
 
@@ -40,10 +42,28 @@ export type TierOption = { id: Resolution; px: number }
 export const TIER_OPTIONS: readonly TierOption[] = [
   { id: '1k', px: 1024 },
   { id: '2k', px: 2048 },
-  { id: '3k', px: 2880 },
+  { id: '4k', px: 2880 },
 ]
 
-export const tierPx = (id: Resolution) => TIER_OPTIONS.find((tier) => tier.id === id)?.px ?? 1024
+// The tier's square edge, or the long edge of the real output when the ratio is known (4K at
+// 16:9 is 3840 px, at 1:1 2880 px). 'original' without the photo's size keeps the square edge.
+export function tierPx(id: Resolution, aspect?: string | null): number {
+  const square = TIER_OPTIONS.find((tier) => tier.id === id)?.px ?? 1024
+  if (!aspect || aspect === 'original' || !/^\d{1,2}:\d{1,2}$/.test(aspect)) return square
+  try {
+    const { width, height } = outputSize(id, aspect)
+    return Math.max(width, height)
+  } catch {
+    return square // a stored ratio beyond 3:1
+  }
+}
+
+// The exact output size for the picker: a fixed ratio, or 'original' with the photo's ratio.
+// Null when 'original' has no photo yet (the picker then shows the square edge).
+export function tierSize(id: Resolution, aspect: OutputAspect, photoRatio?: number | null): OutputSize | null {
+  if (aspect !== 'original') return outputSize(id, aspect)
+  return photoRatio ? outputSize(id, 'original', { width: photoRatio * 1000, height: 1000 }) : null
+}
 
 // `t` scoped to `app`: "Standard", "Banner 16:9", "Original".
 export const tierName = (id: Resolution, t: Translate) => t(`tiers.${id}.name`)

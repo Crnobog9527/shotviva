@@ -142,7 +142,7 @@ export const TEST_RUN_COPY = {
   } as Record<string, string>,
 } as const
 
-export const RESOLUTION_LABEL: Record<Resolution, string> = { '1k': '标准 1K', '2k': '高清 2K', '3k': '超清 3K' }
+export const RESOLUTION_LABEL: Record<Resolution, string> = { '1k': '1K', '2k': '2K', '4k': '4K' }
 
 export const ASPECT_LABEL: Record<string, string> = { original: '跟随照片' }
 

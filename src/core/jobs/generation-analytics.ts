@@ -11,7 +11,7 @@ import type { Job } from './job-schema'
 import { modelFromTag } from './provider-tag'
 
 // Pre-T16 jobs carry no resolution and every one of them is generated at 1K.
-const resolution = z.enum(['1k', '2k', '3k']).catch('1k')
+const resolution = z.enum(['1k', '2k', '4k']).catch('1k')
 // Only edits carry a scope (T30); a template generation has none.
 const editScope = z.enum(EDIT_SCOPES).nullable().catch(null)
 const jobToggles = z.record(z.string(), z.boolean()).catch({})

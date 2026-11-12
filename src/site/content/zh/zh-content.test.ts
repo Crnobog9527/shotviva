@@ -47,7 +47,7 @@ function strings(value: unknown): string[] {
 // browser and file-format names, units, and API (the For business plate, T37). Image paths and alt text of the shared placeholders are skipped.
 // Proper nouns the landing pages cite (T44): the platforms whose photo rules they quote and the
 // price guides behind the bills. The business inquiry form's platform choices (T86).
-const LATIN_OK = new Set(['Shotviva', 'Shopify', 'Amazon', 'Etsy', 'eBay', 'Instagram', 'TikTok', 'DoorDash', 'Uber', 'Eats', 'Grubhub', 'PricingLink', 'Jobbers', 'FoodShot', 'AI', 'Apple', 'Pay', 'Google', 'iPhone', 'Safari', 'Chrome', 'JPG', 'PNG', 'WebP', 'MB', 'px', 'shotviva', 'API', 'PS'])
+const LATIN_OK = new Set(['Shotviva', 'Shopify', 'Amazon', 'Etsy', 'eBay', 'Instagram', 'TikTok', 'DoorDash', 'Uber', 'Eats', 'Grubhub', 'PricingLink', 'Jobbers', 'FoodShot', 'AI', 'Apple', 'Pay', 'Google', 'iPhone', 'Safari', 'Chrome', 'JPG', 'PNG', 'WebP', 'MB', 'px', 'shotviva', 'API', 'PS', 'K'])
 const PAGES = {
   '/zh': zhHomePage,
   '/zh/image-to-image-generator': zhImageToImageGenerator,

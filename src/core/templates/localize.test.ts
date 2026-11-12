@@ -27,7 +27,7 @@ const base: Template = {
     toggles: [],
   },
   quality: 'high',
-  creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
+  creditsCost: { '1k': 2, '2k': 4, '4k': 6 },
   sortOrder: 10,
   isActive: true,
   visibleIn: ['web'],

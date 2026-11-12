@@ -27,7 +27,7 @@ const inputSchema = z.object({
   patch: z
     .strictObject({
       providerId: z.uuid().nullable().optional(),
-      creditsCost: z.strictObject({ '1k': tier.optional(), '2k': tier.optional(), '3k': tier.optional() }).optional(),
+      creditsCost: z.strictObject({ '1k': tier.optional(), '2k': tier.optional(), '4k': tier.optional() }).optional(),
       visibleIn: z
         .array(z.enum(TEMPLATE_SURFACES))
         .min(1)
@@ -48,7 +48,7 @@ const resultSchema = z.object({
         id: z.string(),
         name: z.string(),
         reason: z.literal('below_floor'),
-        resolution: z.enum(['1k', '2k', '3k']),
+        resolution: z.enum(['1k', '2k', '4k']),
         floor: z.number(),
         given: z.number(),
       }),

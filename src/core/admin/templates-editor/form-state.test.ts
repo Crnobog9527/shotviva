@@ -15,7 +15,7 @@ import {
   toTranslations,
 } from './form-state'
 
-const FLOOR = { high: { '1k': 2, '2k': 4, '3k': 6 }, medium: { '1k': 1, '2k': 2, '3k': 3 } }
+const FLOOR = { high: { '1k': 2, '2k': 4, '4k': 6 }, medium: { '1k': 1, '2k': 2, '4k': 3 } }
 
 const template: AdminTemplate = {
   id: 'burger-hero',
@@ -32,7 +32,7 @@ const template: AdminTemplate = {
   coverLocales: {},
   fields: { images: { min: 1, max: 1 }, copy: [], aspectRatios: ['1:1'], toggles: [] },
   quality: 'high',
-  creditsCost: { '1k': 3, '2k': 4, '3k': 6 },
+  creditsCost: { '1k': 3, '2k': 4, '4k': 6 },
   sortOrder: 10,
   isActive: true,
   visibleIn: ['web', 'partner'],
@@ -62,12 +62,12 @@ describe('prompt version selection', () => {
 })
 
 it('keeps historical prices distinct from unpriced tiers and opens a tier only on explicit input', () => {
-    const values = toFormValues({ ...template, unpricedResolutions: ['3k'] })
-    expect(values.credits['3k']).toBe('')
-    const persisted = { creditsCost: template.creditsCost, unpricedResolutions: ['3k'] }
+    const values = toFormValues({ ...template, unpricedResolutions: ['4k'] })
+    expect(values.credits['4k']).toBe('')
+    const persisted = { creditsCost: template.creditsCost, unpricedResolutions: ['4k'] }
     expect(buildPayload(values, false, FLOOR)).toMatchObject({ payload: { template: persisted } })
-    const edited = { ...values, credits: { ...values.credits, '3k': '7' } }
-    expect(buildPayload(edited, false, FLOOR)).toMatchObject({ payload: { template: { unpricedResolutions: [], creditsCost: { '3k': 7 } } } })
+    const edited = { ...values, credits: { ...values.credits, '4k': '7' } }
+    expect(buildPayload(edited, false, FLOOR)).toMatchObject({ payload: { template: { unpricedResolutions: [], creditsCost: { '4k': 7 } } } })
     const limited = { ...FLOOR, resolutions: ['1k','2k'] as const }
     expect(buildPayload(toFormValues(template), false, { ...limited, resolutions: [...limited.resolutions] })).toMatchObject({
       payload: { template: { unpricedResolutions: [], creditsCost: template.creditsCost } },
@@ -97,7 +97,7 @@ describe('template form state', () => {
           description: 'Stacked burger, studio light',
           visibleIn: ['web', 'partner'],
           quality: 'high',
-          creditsCost: { '1k': 3, '2k': 4, '3k': 6 },
+          creditsCost: { '1k': 3, '2k': 4, '4k': 6 },
         }),
         prompt: { providerId: template.prompt?.providerId, body: 'FAKE BODY', modelParams: { quality: 'high' } },
       },
@@ -125,9 +125,9 @@ describe('template form state', () => {
   })
 
   it('flags credit numbers under the floor of the chosen quality', () => {
-    const low = { ...toFormValues(template), credits: { '1k': '1', '2k': '4', '3k': '6' } }
+    const low = { ...toFormValues(template), credits: { '1k': '1', '2k': '4', '4k': '6' } }
     expect(creditProblems(low, FLOOR)).toEqual({ '1k': '不能低于下限 2' })
-    expect(buildPayload(low, false, FLOOR)).toMatchObject({ ok: false, message: expect.stringContaining('Standard') })
+    expect(buildPayload(low, false, FLOOR)).toMatchObject({ ok: false, message: expect.stringContaining('1K') })
     expect(creditProblems({ ...low, quality: 'medium' }, FLOOR)).toEqual({})
     expect(creditProblems({ ...low, credits: { ...low.credits, '2k': '2.5' } }, FLOOR)).toMatchObject({ '2k': '请填正整数' })
   })

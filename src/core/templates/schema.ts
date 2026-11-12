@@ -1,10 +1,10 @@
 import { z } from 'zod'
 
-import { RESOLUTIONS } from './output-options'
 import { styleRefsSchema } from './style-refs'
 import { creditsCostSchema, TEMPLATE_QUALITIES } from './pricing'
 import { RESERVED_KEYS, toggleFieldSchema, TOGGLES_MAX } from './toggles'
 import { copyFieldSchema } from './copy-fields'
+import { resolutionSchema } from './db-resolution'
 
 // Template shapes shared by the admin page, the import script and (later) generation.
 // No `server-only` here: scripts/import-prompts.ts validates with the same schema.
@@ -125,7 +125,7 @@ export const templateInputSchema = z.object({
   quality: z.enum(TEMPLATE_QUALITIES).default('high'),
   // Per-resolution price; the admin save also checks it against the floor (modules/image).
   creditsCost: creditsCostSchema,
-  unpricedResolutions: z.array(z.enum(RESOLUTIONS)).max(3).optional(),
+  unpricedResolutions: z.array(resolutionSchema).max(3).optional(),
   sortOrder: z.number().int().optional(),
   isActive: z.boolean().optional(),
   visibleIn: z

@@ -50,7 +50,7 @@ it('falls back for a saved count limit, retaining photo-first order, placeholder
 
 it('quotes the same fallback that submission uses, without reading private reference bytes at preflight', async () => {
   const { deps, get } = setup()
-  const saved = { template: { ...template, creditsCost: { '1k': 36, '2k': 92, '3k': 141 } }, prompt }
+  const saved = { template: { ...template, creditsCost: { '1k': 36, '2k': 92, '4k': 141 } }, prompt }
   const quoted = await quoteBatchRoute(deps.provider, saved, '1k', inputs.aspectRatio)
   expect(get).not.toHaveBeenCalled()
   const submitted = await templateCall(deps, saved, inputs, photo, request)

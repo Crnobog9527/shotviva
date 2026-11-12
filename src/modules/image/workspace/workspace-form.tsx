@@ -80,7 +80,7 @@ export function WorkspaceForm({ template, balance, tier, photos, values, onChang
         <SizePicker options={options} photoRatio={ratioForSize} value={values.aspect} onChange={(aspect) => onChange({ aspect })} />
       </Section>
       {options.resolutions.length > 1 ? <Section id="res-h" title={t('workspace.resolution')}>
-        <ResolutionPicker options={options} value={values.resolution} costs={template.creditsCost} balance={balance} onChange={(resolution) => onChange({ resolution })} />
+        <ResolutionPicker options={options} aspect={values.aspect} photoRatio={ratioForSize} value={values.resolution} costs={template.creditsCost} balance={balance} onChange={(resolution) => onChange({ resolution })} />
       </Section> : null}
       <p className="flex items-center gap-2 pt-5 text-caption text-muted-foreground">
         <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 flex-none text-primary" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round">

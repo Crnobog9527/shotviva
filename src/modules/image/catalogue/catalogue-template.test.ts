@@ -13,7 +13,7 @@ const tpl = (id: string, category: string, cover: Partial<CatalogueTemplate['cov
   categoryOrder: ORDER[category] ?? 100,
   compare: category === 'art-styles',
   description: null,
-  creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
+  creditsCost: { '1k': 2, '2k': 4, '4k': 6 },
   copyFields: [],
   toggles: [],
   cover: { type: 'image', before: null, after: null, motion: null, poster: null, ...cover },
@@ -29,7 +29,7 @@ describe('catalogue helpers', () => {
 
   it('prices the card at the Standard tier', () => {
     expect(cardPrice(tpl('a', 'x'))).toBe(2)
-    expect(cardPrice({ ...tpl('a', 'x'), creditsCost: { '1k': 1, '2k': 2, '3k': 3 } })).toBe(1)
+    expect(cardPrice({ ...tpl('a', 'x'), creditsCost: { '1k': 1, '2k': 2, '4k': 3 } })).toBe(1)
   })
 
   it('treats a card as motion only with its file and poster', () => {

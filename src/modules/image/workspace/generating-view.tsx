@@ -18,7 +18,7 @@ import { tierName, tierPx } from './workspace-options'
 export function GeneratingView({ job }: { job: TrackedJob }) {
   const waiting = job.status === 'queued'
   const t = useTranslations('app')
-  const size = t.rich('workspace.developingSize', { tier: tierName(job.resolution, t), px: tierPx(job.resolution), mono: (chunks) => <span className="font-mono">{chunks}</span> })
+  const size = t.rich('workspace.developingSize', { tier: tierName(job.resolution, t), px: tierPx(job.resolution, job.aspect), mono: (chunks) => <span className="font-mono">{chunks}</span> })
   return (
     <StageLayout labelledBy="gen-h" tray={<DevelopTray src={job.previewUrl ?? null} developing={!waiting} hud={[t(waiting ? 'workspace.waiting' : 'workspace.developing'), size]} className={TRAY_SIZE} />}>
       <h2 id="gen-h" className="sr-only">{t('workspace.developingTitle')}</h2>

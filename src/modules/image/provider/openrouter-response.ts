@@ -44,10 +44,10 @@ async function normalizeOutput({ b64_json, media_type }: z.infer<typeof imageSch
   const bytes = Buffer.from(b64_json, 'base64')
   const type = sniffImageType(bytes)
   if (!type || type === 'image/heic' || (media_type && type !== media_type)) throw new Error('invalid image format')
-  // All downstream outputs are PNG. Limit decode memory and preserve framing on the 4K → 3K conversion.
+  // All downstream outputs are PNG. Limit decode memory and preserve framing when a native 4K output is scaled to the site's 4K size table (2880² at 1:1).
   const image = sharp(bytes, { limitInputPixels: 32_000_000 }).rotate()
-  if (input.resolution === '3k') {
-    image.resize({ ...outputSize('3k', input.aspectRatio, sourcePhoto(input)), fit: 'inside', withoutEnlargement: true })
+  if (input.resolution === '4k') {
+    image.resize({ ...outputSize('4k', input.aspectRatio, sourcePhoto(input)), fit: 'inside', withoutEnlargement: true })
   }
   return image.png().toBuffer()
 }

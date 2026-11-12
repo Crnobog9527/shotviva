@@ -114,8 +114,8 @@ const steps = {
       text: '选餐饮、商品、美妆、房间、宠物或画风模板。光线、场景或画风由模板决定，什么都不用写。',
     },
     {
-      heading: `下载${zhTierList}`,
-      text: `${standard.name} ${standard.px} px，适合${standard.use}；${hd.name} ${hd.px} px，适合${hd.use}；${max.name} ${max.px} px，适合${max.use}。`,
+      heading: `下载 ${zhTierList}`,
+      text: `${standard.name} ${standard.px} px，适合${standard.use}；${hd.name} ${hd.px} px，适合${hd.use}；${max.name} 最长 ${max.longPx} px，适合${max.use}。`,
     },
   ],
 } as const satisfies HomePage['steps']

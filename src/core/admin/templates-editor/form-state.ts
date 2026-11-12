@@ -65,7 +65,7 @@ export function emptyFormValues(): TemplateFormValues {
     category: '',
     seriesId: null,
     quality: 'high',
-    credits: { '1k': '2', '2k': '4', '3k': '6' },
+    credits: { '1k': '2', '2k': '4', '4k': '6' },
     visibleWeb: true,
     visiblePartner: false,
     fieldsJson: pretty(DEFAULT_FIELDS),
@@ -141,7 +141,7 @@ function parseJson(text: string, label: string): { ok: true; value: unknown } | 
   }
 }
 
-export const TIER_LABEL: Record<Resolution, string> = { '1k': 'Standard', '2k': 'HD', '3k': 'Max' }
+export const TIER_LABEL: Record<Resolution, string> = { '1k': '1K', '2k': '2K', '4k': '4K' }
 
 // Resolutions whose number is missing or under the floor for the chosen quality. The server
 // runs the same check (ARCHITECTURE §6.1); this only saves a round trip.

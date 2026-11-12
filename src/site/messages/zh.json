@@ -547,15 +547,15 @@
     },
     "tiers": {
       "1k": {
-        "name": "标准",
+        "name": "1K",
         "use": "社交媒体、外卖平台"
       },
       "2k": {
-        "name": "高清",
+        "name": "2K",
         "use": "官网、网店"
       },
-      "3k": {
-        "name": "超清",
+      "4k": {
+        "name": "4K",
         "use": "印刷、放大查看"
       },
       "notEnough": "（积分不够）"
@@ -643,7 +643,7 @@
       "generateCta": "生成 <cost>· {count} 积分</cost>",
       "getCreditsCta": "获取积分 <cost>· 需要 <mono>{count, number}</mono></cost>",
       "freeNotice": "这张图用的是免费积分：会公开展示，并带水印。<b>用付费积分生成的图是私密的，没有水印。</b>",
-      "needsCredits": "{tier}需要 {count} 积分。<b>用付费积分生成的图是私密的，没有水印。</b>",
+      "needsCredits": "{tier} 需要 {count} 积分。<b>用付费积分生成的图是私密的，没有水印。</b>",
       "counter": "{count, number} / {max, number}",
       "developingSize": "{tier} · <mono>{px, number, ::group-off}</mono>",
       "yourPhotos": "你的照片",
@@ -1061,6 +1061,7 @@
     "creditsUnit": "{count, plural, other {积分}}",
     "units": {
       "px": "{px, number, ::group-off} px",
+      "size": "{width, number, ::group-off}×{height, number, ::group-off}",
       "megabytes": "{size} MB",
       "percent": "{value, number, ::percent}"
     },

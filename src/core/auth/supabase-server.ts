@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { connection } from 'next/server'
 
 import { publicEnv } from '../public-env'
+import { withDbTiers } from '../templates/db-resolution'
 
 // Session-bound client: every query runs as the signed-in user, so RLS applies.
 export async function createServerSupabase() {
@@ -12,6 +13,7 @@ export async function createServerSupabase() {
   await connection()
   const cookieStore = await cookies()
   return createServerClient(publicEnv.NEXT_PUBLIC_SUPABASE_URL, publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
+    global: { fetch: withDbTiers() },
     cookies: {
       getAll: () => cookieStore.getAll(),
       setAll(cookiesToSet) {

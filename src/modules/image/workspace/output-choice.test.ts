@@ -29,8 +29,8 @@ describe('template output choices', () => {
   it('adjusts a historical fixed size and tier by distance; a tied tier uses the smaller size', () => {
     expect(selectedAspect('2:3', limited)).toBe('4:5')
     expect(selectedAspect('3:2', limited)).toBe('16:9')
-    expect(closestResolution('3k', limited)).toBe('1k')
-    expect(closestResolution('2k', { ...limited, resolutions: ['3k', '1k'] })).toBe('1k')
+    expect(closestResolution('4k', limited)).toBe('1k')
+    expect(closestResolution('2k', { ...limited, resolutions: ['4k', '1k'] })).toBe('1k')
     expect(hasOutputOptions(empty)).toBe(false)
     expect(hasOutputOptions({ ...empty, resolutions: ['1k'] })).toBe(false)
     expect(hasOutputOptions({ ...empty, resolutions: ['1k'], originalRatio: true })).toBe(true)
@@ -38,11 +38,11 @@ describe('template output choices', () => {
 
   it('resolves each batch photo before enqueueing and never submits a partial batch or unavailable settings', () => {
     const template: CatalogueTemplate = {
-      id: 'qa', name: 'QA', imageOptions: limited, creditsCost: { '1k': 2, '2k': 4, '3k': 6 }, toggles: [],
+      id: 'qa', name: 'QA', imageOptions: limited, creditsCost: { '1k': 2, '2k': 4, '4k': 6 }, toggles: [],
       category: 'test', categoryName: 'QA', categoryOrder: 0, compare: false, description: null,
       copyFields: [], cover: { type: 'image', before: null, after: null, motion: null, poster: null },
     }
-    const values = { aspect: 'original', resolution: '3k', note: '', copy: {}, toggles: {} } as const
+    const values = { aspect: 'original', resolution: '4k', note: '', copy: {}, toggles: {} } as const
     const photos = [0.75, 2].map((originalRatio, i) => ({
       photo: { id: String(i), url: 'blob:photo', bytes: 123, ratio: null, upload: { phase: 'done' as const, inputKey: 'key' }, originalRatio }, inputKey: 'key',
     }))

@@ -13,6 +13,7 @@ import { dirname, join, relative } from 'node:path'
 import { parseArgs } from 'node:util'
 
 import { createClient } from '@supabase/supabase-js'
+import { withDbTiers } from '../../src/core/templates/db-resolution'
 import { z } from 'zod'
 
 import { listAdminTemplates } from '../../src/core/admin/templates/repository'
@@ -79,7 +80,7 @@ async function prepare() {
   const target = targetOf(env.data)
   const batch = readBatchFile(options.file)
   const baseDir = dirname(options.file)
-  const db = createClient(env.data.NEXT_PUBLIC_SUPABASE_URL, env.data.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
+  const db = createClient(env.data.NEXT_PUBLIC_SUPABASE_URL, env.data.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: withDbTiers() } })
   const templates = new Map((await listAdminTemplates(db)).map(t => [t.id, t]))
   const photos = await photoHashes(batch.templates, baseDir)
   const model = await effectiveModels(db)

@@ -11,8 +11,8 @@ import {
 
 const template = (id: string, extra: Partial<CatalogueTemplate> = {}): CatalogueTemplate => ({
   id, name: id.toUpperCase(), category: 'c', categoryName: 'C', categoryOrder: 0, compare: false, description: null, photoInput: 'required',
-  imageOptions: { resolutions: ['1k', '2k', '3k'], aspectRatios: ['1:1', '4:5', '16:9'], originalRatio: true },
-  creditsCost: { '1k': 2, '2k': 4, '3k': 6 }, copyFields: [], toggles: [],
+  imageOptions: { resolutions: ['1k', '2k', '4k'], aspectRatios: ['1:1', '4:5', '16:9'], originalRatio: true },
+  creditsCost: { '1k': 2, '2k': 4, '4k': 6 }, copyFields: [], toggles: [],
   cover: { type: 'image', before: null, after: null, motion: null, poster: null }, ...extra,
 })
 const ready = (id: string, originalRatio = 0.8, name?: string): ReadyPhoto => ({
@@ -20,7 +20,7 @@ const ready = (id: string, originalRatio = 0.8, name?: string): ReadyPhoto => ({
   inputKey: `in/${id}`,
 })
 
-const poster = template('poster', { creditsCost: { '1k': 3, '2k': 5, '3k': 8 }, copyFields: [{ key: 'headline', label: 'Headline', type: 'short', required: true, maxLength: 40, public: false }], toggles: [{ key: 'plate', label: 'Plate' }] })
+const poster = template('poster', { creditsCost: { '1k': 3, '2k': 5, '4k': 8 }, copyFields: [{ key: 'headline', label: 'Headline', type: 'short', required: true, maxLength: 40, public: false }], toggles: [{ key: 'plate', label: 'Plate' }] })
 const white = template('white')
 const photos = [ready('p1', 0.8, 'IMG_1.jpg'), ready('p2', 1.5)]
 const values = (patch: Partial<MatrixValues> = {}): MatrixValues => ({ ...EMPTY_MATRIX, templateIds: ['poster', 'white'], ...patch })
@@ -32,7 +32,7 @@ describe('the multi-template grid', () => {
       ['poster|p1', 3, false], ['poster|p2', 3, false], ['white|p1', 2, false], ['white|p2', 2, true],
     ])
     expect(matrixTotal(cells)).toBe(8)
-    expect(totalsByResolution(cells)).toEqual({ '1k': 8, '2k': 14, '3k': 22 })
+    expect(totalsByResolution(cells)).toEqual({ '1k': 8, '2k': 14, '4k': 22 })
   })
 
   it('shares a template\'s text across its photos and lets one photo override it', () => {

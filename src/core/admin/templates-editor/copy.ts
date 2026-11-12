@@ -215,9 +215,9 @@ export const styleRefCopy = {
   needId: '先填写有效的模板 ID，再上传参考图。', idLocked: '移除已上传的参考图后可修改模板 ID。', invalidUpload: '上传失败，请重试。', decodeFailed: '无法读取图片，请换一个文件。',
 } as const
 
-export function fallbackPriceCopy(tiers?: Record<'1k' | '2k' | '3k', number | null>) {
-  const floor = (tier: '1k' | '2k' | '3k') => tiers?.[tier] ?? '不可用'
-  return `回退到默认模型时的最低积分：Standard ${floor('1k')}、HD ${floor('2k')}、Max ${floor('3k')}。当前售价低于对应下限或该档不可用时，回退会被拒绝。`
+export function fallbackPriceCopy(tiers?: Record<'1k' | '2k' | '4k', number | null>) {
+  const floor = (tier: '1k' | '2k' | '4k') => tiers?.[tier] ?? '不可用'
+  return `回退到默认模型时的最低积分：1K ${floor('1k')}、2K ${floor('2k')}、4K ${floor('4k')}。当前售价低于对应下限或该档不可用时，回退会被拒绝。`
 }
 
 export const saleCopy = {
@@ -238,7 +238,7 @@ export const rowCopy = {
   copyId: '复制 ID',
   copied: '已复制',
   credits: '积分',
-  tiers: 'Standard / HD / Max',
+  tiers: '1K / 2K / 4K',
   version: '版本',
   edit: '编辑',
 } as const

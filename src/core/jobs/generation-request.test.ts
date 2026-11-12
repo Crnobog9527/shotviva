@@ -12,16 +12,20 @@ describe('POST /api/generate body (T16)', () => {
   })
 
   it('takes the three tiers and the eight sizes', () => {
-    const parsed = generateBodySchema.parse(body({ resolution: '3k', aspect_ratio: 'original' }))
-    expect(toGenerationRequest('user-1', parsed)).toMatchObject({ resolution: '3k', aspectRatio: 'original' })
+    const parsed = generateBodySchema.parse(body({ resolution: '4k', aspect_ratio: 'original' }))
+    expect(toGenerationRequest('user-1', parsed)).toMatchObject({ resolution: '4k', aspectRatio: 'original' })
     for (const aspect of ['16:9', '4:5', '1:1', '9:16', '3:2', '4:3', '2:3']) {
       expect(generateBodySchema.safeParse(body({ aspect_ratio: aspect })).success).toBe(true)
     }
   })
 
+  it('reads the pre-rename top tier from an old tab as 4k', () => {
+    expect(generateBodySchema.parse(body({ resolution: '3k' })).inputs.resolution).toBe('4k')
+  })
+
   it('rejects an unknown resolution or size (the route answers 422)', () => {
     expect(generateBodySchema.safeParse(body({ resolution: '8k' })).success).toBe(false)
-    expect(generateBodySchema.safeParse(body({ resolution: '4k' })).success).toBe(false)
+    expect(generateBodySchema.safeParse(body({ resolution: '3K' })).success).toBe(false)
     expect(generateBodySchema.safeParse(body({ aspect_ratio: '21:9' })).success).toBe(false)
   })
 

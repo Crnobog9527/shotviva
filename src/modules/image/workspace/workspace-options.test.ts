@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { OUTPUT_ASPECTS, RESOLUTIONS } from '@/core/templates'
 
 import { echoTranslate } from '../echo-translate'
-import { notePlaceholder, SIZE_OPTIONS, TIER_OPTIONS, sizeLabel, tierName } from './workspace-options'
+import { notePlaceholder, SIZE_OPTIONS, TIER_OPTIONS, sizeLabel, tierName, tierPx, tierSize } from './workspace-options'
 
 describe('workspace options', () => {
   it('offers exactly the eight output sizes, Original first', () => {
@@ -22,7 +22,7 @@ describe('workspace options', () => {
 
   it('reads names from the messages', () => {
     const t = echoTranslate()
-    expect(tierName('3k', t)).toBe('tiers.3k.name')
+    expect(tierName('4k', t)).toBe('tiers.4k.name')
     expect(sizeLabel('16:9', t)).toBe('sizes.withRatio {"name":"sizes.16:9","ratio":"16:9"}')
     expect(sizeLabel('original', t)).toBe('sizes.original')
   })
@@ -30,5 +30,23 @@ describe('workspace options', () => {
   it('matches the note example to the category, with a fallback', () => {
     expect(notePlaceholder('pets', echoTranslate(['pets']))).toBe('pets')
     expect(notePlaceholder('something-new', echoTranslate(['pets']))).toBe('fallback')
+  })
+})
+
+describe('tier pixels (4K is the model\'s largest size per ratio)', () => {
+  it('shows the real output size for the chosen ratio', () => {
+    expect(tierSize('4k', '16:9')).toEqual({ width: 3840, height: 2160 })
+    expect(tierSize('4k', '1:1')).toEqual({ width: 2880, height: 2880 })
+    expect(tierSize('2k', '4:5')).toEqual({ width: 1824, height: 2288 })
+    expect(tierSize('4k', 'original', 16 / 9)).toEqual({ width: 3840, height: 2160 })
+    expect(tierSize('4k', 'original')).toBeNull()
+  })
+
+  it('gives the long edge for a known ratio and the square edge otherwise', () => {
+    expect(tierPx('4k', '9:16')).toBe(3840)
+    expect(tierPx('4k', '1:1')).toBe(2880)
+    expect(tierPx('4k', 'original')).toBe(2880)
+    expect(tierPx('4k')).toBe(2880)
+    expect(tierPx('1k', '21:5')).toBe(1024)
   })
 })

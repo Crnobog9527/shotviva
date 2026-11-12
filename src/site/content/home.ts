@@ -162,7 +162,7 @@ const steps = {
     },
     {
       heading: `Download in ${tierList}`,
-      text: `${standard.name} is ${standard.px} px for ${standard.use}, ${hd.name} is ${hd.px} px for ${hd.use}, and ${max.name} is ${max.px} px for ${max.use}.`,
+      text: `${standard.name} is ${standard.px} px for ${standard.use}, ${hd.name} is ${hd.px} px for ${hd.use}, and ${max.name} is up to ${max.longPx} px for ${max.use}.`,
     },
   ],
 } as const satisfies HomePage['steps']

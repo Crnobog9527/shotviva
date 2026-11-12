@@ -547,15 +547,15 @@
     },
     "tiers": {
       "1k": {
-        "name": "Standard",
+        "name": "1K",
         "use": "Social & delivery apps"
       },
       "2k": {
-        "name": "HD",
+        "name": "2K",
         "use": "Websites & online stores"
       },
-      "3k": {
-        "name": "Max",
+      "4k": {
+        "name": "4K",
         "use": "Print & zoom"
       },
       "notEnough": "(not enough credits)"
@@ -1061,6 +1061,7 @@
     "creditsUnit": "{count, plural, one {credit} other {credits}}",
     "units": {
       "px": "{px, number, ::group-off} px",
+      "size": "{width, number, ::group-off}×{height, number, ::group-off}",
       "megabytes": "{size} MB",
       "percent": "{value, number, ::percent}"
     },

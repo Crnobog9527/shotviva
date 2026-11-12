@@ -1,12 +1,12 @@
 import { z } from 'zod'
 import { AppError } from '@/core/errors'
-import { RESOLUTIONS } from '@/core/templates/output-options'
 import { TEMPLATE_QUALITIES } from '@/core/templates/pricing'
 
 import { matrixSelection } from './plan-matrix'
+import { resolutionSchema } from '@/core/templates/db-resolution'
 
 export const routeFields = z.object({
-  providerId: z.uuid(), resolution: z.enum(RESOLUTIONS), quality: z.enum(TEMPLATE_QUALITIES), useStyleReference: z.boolean(),
+  providerId: z.uuid(), resolution: resolutionSchema, quality: z.enum(TEMPLATE_QUALITIES), useStyleReference: z.boolean(),
 })
 export const quoteInput = matrixSelection.safeExtend({ ...routeFields.shape, sessionId: z.uuid() })
 export const matrixInput = quoteInput.safeExtend({ batchId: z.uuid(), expectedEstimateUsd: z.number().finite().positive() })
