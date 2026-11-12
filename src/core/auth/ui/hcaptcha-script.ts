@@ -17,6 +17,11 @@ declare global {
 const SCRIPT_ID = 'hcaptcha-api'
 const LOAD_TIMEOUT_MS = 15_000
 
+// The script or the check could not get through: a slow or blocked network (from mainland China
+// the TLS handshake to hCaptcha alone sometimes takes 4 s), not a failed challenge. The form says
+// so and offers a retry.
+export class CaptchaNetworkError extends Error {}
+
 // hCaptcha's own language codes. Without `hl` it follows the browser, which put a Chinese
 // challenge on English pages for a Chinese-language browser (ARCHITECTURE §7: it follows the page).
 const LANGUAGES: Record<Locale, string> = { en: 'en', zh: 'zh-CN' }
@@ -31,8 +36,9 @@ export function scriptSrc(language: string): string {
 
 let loading: { language: string; api: Promise<HCaptchaApi> } | null = null
 
-// Loaded on first submit, not on page load, so visitors who never sign in skip it. The language
-// is fixed when the script loads, so a page in the other language loads it again.
+// Loaded once the sign-in page has settled or the visitor first touches it (use-captcha-warmup),
+// so the script is in hand by the time they submit; pages without a captcha form never load it.
+// The language is fixed when the script loads, so a page in the other language loads it again.
 export function loadHCaptcha(language: string): Promise<HCaptchaApi> {
   if (loading?.language === language) return loading.api
   document.getElementById(SCRIPT_ID)?.remove()
@@ -42,7 +48,7 @@ export function loadHCaptcha(language: string): Promise<HCaptchaApi> {
     script.id = SCRIPT_ID
     script.src = scriptSrc(language)
     script.async = true
-    const timer = setTimeout(() => fail(new Error('hCaptcha load timeout')), LOAD_TIMEOUT_MS)
+    const timer = setTimeout(() => fail(new CaptchaNetworkError('hCaptcha load timeout')), LOAD_TIMEOUT_MS)
     function fail(error: Error) {
       clearTimeout(timer)
       script.remove()
@@ -54,28 +60,9 @@ export function loadHCaptcha(language: string): Promise<HCaptchaApi> {
       if (window.hcaptcha) resolve(window.hcaptcha)
       else fail(new Error('hCaptcha missing after load'))
     }
-    script.onerror = () => fail(new Error('hCaptcha failed to load'))
+    script.onerror = () => fail(new CaptchaNetworkError('hCaptcha failed to load'))
     document.head.appendChild(script)
   })
   loading = { language, api }
   return api
-}
-
-// One fresh invisible widget per attempt: tokens are single use. When hCaptcha wants a challenge
-// it opens its own popup; closing it, letting it expire or failing it rejects (the caller says
-// "try again" under the form). Nothing is ever drawn on our page.
-export async function invisibleToken(siteKey: string, language: string): Promise<string> {
-  const api = await loadHCaptcha(language)
-  const holder = document.createElement('div')
-  document.body.appendChild(holder)
-  let widgetId: string | undefined
-  try {
-    widgetId = api.render(holder, { sitekey: siteKey, size: 'invisible', hl: language })
-    const { response } = await api.execute(widgetId, { async: true })
-    if (!response) throw new Error('empty hCaptcha response')
-    return response
-  } finally {
-    if (widgetId !== undefined) api.remove(widgetId)
-    holder.remove()
-  }
 }

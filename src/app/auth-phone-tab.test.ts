@@ -17,7 +17,7 @@ async function render(element: ReactElement, locale: 'en' | 'zh') {
 
 const action = async () => IDLE
 const phone = { send: action, verify: action }
-const common = { action, googleAction: action, resendAction: action, next: '/zh/generate', sender: 'Shotviva <mail@shotviva.com>' }
+const common = { action, google: { action, mainlandNote: false }, resendAction: action, next: '/zh/generate', sender: 'Shotviva <mail@shotviva.com>' }
 
 describe('phone sign-in tab', () => {
   it('the Chinese log-in page opens on 手机号: +86 field, unticked consent box, 获取验证码', async () => {

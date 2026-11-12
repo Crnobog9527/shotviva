@@ -9,6 +9,7 @@ import { currentLocale } from '@/core/i18n/server'
 import { googleAction, loginAction, phoneSendAction, phoneVerifyAction, resendSignupAction } from '@/app/auth/actions'
 
 import { Arrived } from '../arrived'
+import { googleMainlandNote } from '../google-note'
 import { redirectIfSignedIn } from '../signed-in-redirect'
 import { sender } from '../sender'
 
@@ -34,7 +35,7 @@ async function Login({ searchParams }: PageProps<'/[locale]/login'>) {
   return (
     <LoginForm
       action={loginAction}
-      googleAction={googleAction}
+      google={{ action: googleAction, mainlandNote: await googleMainlandNote(locale) }}
       resendAction={resendSignupAction}
       next={next}
       notice={error}

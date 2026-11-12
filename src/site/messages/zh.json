@@ -36,6 +36,7 @@
   },
   "auth": {
     "google": "使用 Google 账号继续",
+    "googleMainland": "中国大陆网络下，Google 登录通常打不开，可以改用手机号或邮箱。",
     "or": "或用邮箱",
     "tabs": {
       "label": "登录方式",
@@ -151,7 +152,16 @@
     },
     "captcha": {
       "line": "本页由 <hcaptcha>hCaptcha</hcaptcha> 提供人机验证。",
-      "failed": "验证没有完成，请再试一次。"
+      "failed": "验证没有完成，请再试一次。",
+      "network": "安全验证没能加载，可能是网络较慢。",
+      "retry": "重试"
+    },
+    "pending": {
+      "loading": "页面还在加载…",
+      "checking": "正在准备安全验证…",
+      "checkingSlow": "网络较慢，安全验证还在加载…",
+      "sending": "正在提交…",
+      "sendingSlow": "网络较慢，还在等服务器回应…"
     },
     "notices": {
       "unverified": "请先验证邮箱：打开我们发给你的邮件，点里面的链接。",

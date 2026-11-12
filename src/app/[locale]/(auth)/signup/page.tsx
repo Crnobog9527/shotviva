@@ -11,6 +11,7 @@ import { site } from '@/site/site.config'
 import { googleAction, phoneSendAction, phoneVerifyAction, resendSignupAction, signupAction } from '@/app/auth/actions'
 
 import { Arrived } from '../arrived'
+import { googleMainlandNote } from '../google-note'
 import { redirectIfSignedIn } from '../signed-in-redirect'
 import { sender } from '../sender'
 
@@ -33,7 +34,7 @@ async function Signup({ searchParams }: PageProps<'/[locale]/signup'>) {
     <SignupCodeProvider initial={await readSignupCode()}>
       <SignupForm
         action={signupAction}
-        googleAction={googleAction}
+        google={{ action: googleAction, mainlandNote: await googleMainlandNote(locale) }}
         resendAction={resendSignupAction}
         next={next}
         giftCredits={site.billing.freeCredits}
