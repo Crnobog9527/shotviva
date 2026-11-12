@@ -12,10 +12,10 @@ permissions:
   contents: read
 
 env:
-  EXPECT: closed
+  EXPECT: open
   # Production's project address; once shotviva.com is bound it 308s there and the check
   # follows. Override with the SEO_CHECK_URL repository variable if needed.
-  SEO_CHECK_URL: ${{ vars.SEO_CHECK_URL || 'https://shotviva.vercel.app' }}
+  SEO_CHECK_URL: ${{ vars.SEO_CHECK_URL || 'https://shotviva.com' }}
 
 jobs:
   production-indexing:

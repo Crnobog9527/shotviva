@@ -57,7 +57,28 @@ pnpm templates:apply .local/templates/<batch>.json             # apply to the te
   prompt version; no prompt text). Needs `TEMPLATE_TOOLS_R2_ACCOUNT_ID`,
   `TEMPLATE_TOOLS_R2_ACCESS_KEY_ID` and `TEMPLATE_TOOLS_R2_SECRET_ACCESS_KEY` for the test site's
   buckets (the same keys let templates:apply upload covers and style references).
-- R2 keys for both tools, in `.env.local` (fill in your own; never paste them anywhere):
+- Review and finish: write each template's verdict into the file as
+  `"review": { "status": "pass" | "fail", "version": <prompt version>, "pick": "<trial run id>", "notes": "…" }`
+  (a pass needs `pick`, the result that becomes the cover; a review of an older prompt version no
+  longer counts). Then:
+
+  ```bash
+  pnpm templates:review   .local/templates/<batch>.json             # refresh the review page, list verdicts
+  pnpm templates:finalize .local/templates/<batch>.json [--dry-run] # passed: picked cover, open sale, publish
+  pnpm templates:status   .local/templates/<batch>.json             # stage, prompt version, trials, spend
+  ```
+
+  `finalize` goes through the same path as `templates:apply` (the admin's 「设为封面」, sale switch
+  and 上架 rules, all or nothing); a file's explicit `"openSale": false` or `"publish": false` wins.
+  It first checks the picked result is still in the bucket. Publication follows the test site, so a
+  template finalized as published goes live on production with the next T93 sync; finalize lists
+  those ids and never starts a sync itself. `status` shows each template's production sync state
+  (not synced / synced / changed since): it takes the last successful "Sync preview templates to
+  production" run on GitHub whose title names the template id or its series slug, and compares its
+  time with the template's or prompt's last change on the test site. It never reads production
+  (the sync's own history lives there). The column errs towards "changed since": any change to the
+  row counts (an order or category tweak too), so it may ask for a sync that would change nothing.
+- R2 keys for the tools, in `.env.local` (fill in your own; never paste them anywhere):
 
   ```bash
   # A Cloudflare R2 API token limited to the test site's buckets shotviva-preview and
