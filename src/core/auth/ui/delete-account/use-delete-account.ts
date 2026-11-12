@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-import { localeOfPath, localizePath } from '../../i18n/paths'
+import { localeOfPath, localizePath } from '../../../i18n/paths'
 
 export type DeleteStatus = 'idle' | 'confirming' | 'deleting' | 'failed'
 // Why it failed: Stripe would not cancel a subscription (nothing was deleted), or anything else.

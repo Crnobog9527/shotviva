@@ -1,6 +1,6 @@
 import { useTranslations } from 'next-intl'
 
-import { DeleteAccountPanel } from '../../auth/ui'
+import { DeleteAccountPanel } from '../../auth/ui/delete-account'
 import { cn } from '../../ui/cn'
 import { Chevron, RowsPanel, rowClass } from './rows'
 
