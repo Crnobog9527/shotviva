@@ -34,7 +34,7 @@ export const privacyCollectSections: readonly [LegalSection, ...LegalSection[]] 
           'Technical data such as your IP address, browser and device type, and the pages you visit, in our server logs.',
           'The IP address you signed up from, kept on your account to stop people from collecting free credits with many accounts.',
           'For fraud prevention and to answer payment disputes: the IP address and browser (user agent) you started a card or wallet checkout from, the time you accepted our Terms of Service and Refund Policy at checkout, the IP address each image was created from, and when and from which IP address you first downloaded it (with how many times).',
-          'Signals from our bot check (hCaptcha) when you sign up, sign in or reset your password, and when you send a business inquiry.',
+          'Signals from our bot check (hCaptcha) on the sign-up, sign-in and password reset pages, where it loads when you open the page, and when you send a business inquiry.',
           'Usage analytics and error reports, described in "Analytics and cookies" and "Error reports" below.',
         ],
       },
