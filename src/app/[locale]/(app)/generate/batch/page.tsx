@@ -8,7 +8,7 @@ import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/a
 import { effectiveTier, limitsFor, readBalance } from '@/core/billing'
 import { currentLocale } from '@/core/i18n/server'
 import { cachedWebTemplates } from '@/core/templates'
-import { MatrixWorkspace, toCatalogueTemplate } from '@/modules/image'
+import { GuideButton, MatrixWorkspace, toCatalogueTemplate } from '@/modules/image'
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('app.matrix'))('metaTitle') }
@@ -19,8 +19,10 @@ function Nav({ aside }: { aside?: ReactNode }) {
   return <FlowNav back={{ href: '/generate', label: t('workspace.back') }} title={t('matrix.title')} aside={aside} />
 }
 
-// Several templates × several photos (T107, Max only), a flow page like the workspace.
-// ?t=a,b opens with those templates chosen (from a template's workspace or "Use on more photos").
+// Batch create (T107, Owner 2026-11-12): one template on many photos (Pro, Max) or several
+// templates × photos (Max), a flow page like the workspace, with the tutorial always in its bar.
+// ?t=a,b opens with those templates chosen (from a template's dialog or workspace); the form
+// keeps as many as the plan holds.
 async function Matrix({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const user = await requireUser('/generate/batch')
   const supabase = await createServerSupabase()
@@ -37,7 +39,14 @@ async function Matrix({ searchParams }: { searchParams: Promise<Record<string, s
   const initial = [...new Set(wanted)].filter((id) => templates.some((template) => template.id === id)).slice(0, 5)
   return (
     <>
-      <Nav aside={<BalanceChip balance={balance} />} />
+      <Nav
+        aside={
+          <>
+            <GuideButton tier={tier} />
+            <BalanceChip balance={balance} />
+          </>
+        }
+      />
       <MatrixWorkspace templates={templates} initial={initial} balance={balance} tier={tier} limit={limitsFor(tier).concurrency} />
     </>
   )

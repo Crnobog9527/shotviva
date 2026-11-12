@@ -6,97 +6,89 @@ import type { ReactNode } from 'react'
 import type { MembershipTier } from '@/core/config'
 import { Link } from '@/core/i18n/ui'
 
-import { batchCounts, FEATURE_TIER, featureAccess, GATED_FEATURES, MATRIX_TEMPLATES, type GatedFeature } from './feature-access'
-import { REDUCED_MOTION } from '../catalogue/use-motion'
+import { BATCH_WORKSPACE, batchCaps, batchCounts, isLocked, MATRIX_TEMPLATES } from './feature-access'
+import { GuideIcon } from './guide-button'
 import { IntroTrigger } from './intro-trigger'
 import { TierBadge } from './tier-badge'
 
-const TILE = 'press hairline flex h-full min-h-[104px] w-full flex-col rounded-tile bg-card p-3 text-left md:min-h-0 md:flex-row md:items-center md:gap-3 md:p-3.5'
+const CARD = 'press hairline flex w-full items-start gap-3 rounded-tile bg-card p-3 pr-14 text-left md:items-center md:p-3.5 md:pr-16'
 
-// Where the templates start on the Create page: a Pro member's batch guide sends them there.
+// Kept for the Create page's catalogue wrapper (scroll target of in-page links).
 export const TEMPLATES_ANCHOR = 'templates'
 
-// Create's tier-gated ways to create (Owner 2026-11-12), side by side above the catalogue: each
-// with the plan it comes with, locked below that plan. Members who have it go straight in.
+// Create's one way into Batch create (Owner 2026-11-12: batch photos and several templates are
+// one creation screen, not two cards). The card names both plans with what each brings, lit or
+// locked for this account. With Pro or Max it opens the page; below Pro it opens the guide as an
+// intro first, then the paywall on Pro. The "?" in its corner is the tutorial, for everyone.
 export function GatedFeatures({ tier }: { tier: MembershipTier | null }) {
   const t = useTranslations('app.gated')
-  const counts = batchCounts()
+  const open = batchCaps(tier) !== null
   return (
-    <section aria-label={t('heading')} className="pt-2">
-      <ul className="grid grid-cols-2 gap-2 md:gap-3">
-        {GATED_FEATURES.map((feature) => (
-          <li key={feature}>
-            <FeatureTile feature={feature} tier={tier}>
-              <TileBody
-                feature={feature}
-                locked={featureAccess(feature, tier).kind === 'locked'}
-                title={t(`${feature}.title`)}
-                line={feature === 'batch' ? t('batch.line', counts) : t('templates.line', { templates: MATRIX_TEMPLATES })}
-              />
-            </FeatureTile>
-          </li>
-        ))}
-      </ul>
+    <section aria-label={t('heading')} className="relative pt-2">
+      <Entry open={open} tier={tier}>
+        <CardIcon />
+        <span className="min-w-0 flex-1 md:flex md:items-center md:gap-4">
+          <span className="block min-w-0 md:flex-1">
+            <b className="block text-body leading-[1.25] font-semibold">{t('create.title')}</b>
+            <span className="mt-1 block text-caption leading-[1.35] text-pretty text-muted-foreground">{t('create.line')}</span>
+          </span>
+          <PlanMarks tier={tier} />
+        </span>
+      </Entry>
+      <IntroTrigger
+        tab="batch"
+        tier={tier}
+        label={t('guide.open')}
+        className="press absolute top-2 right-0 grid size-12 place-items-center rounded-full text-bone-dim hover:text-foreground md:top-[calc(50%+4px)] md:right-1.5 md:-translate-y-1/2"
+      >
+        <GuideIcon />
+      </IntroTrigger>
     </section>
   )
 }
 
-function FeatureTile({ feature, tier, children }: { feature: GatedFeature; tier: MembershipTier | null; children: ReactNode }) {
-  const access = featureAccess(feature, tier)
-  if (access.kind === 'open') {
+function Entry({ open, tier, children }: { open: boolean; tier: MembershipTier | null; children: ReactNode }) {
+  if (open) {
     return (
-      <Link href={access.href} className={TILE}>
+      <Link href={BATCH_WORKSPACE} className={CARD}>
         {children}
       </Link>
     )
   }
   return (
-    <IntroTrigger feature={feature} tier={tier} className={TILE} onStart={scrollToTemplates}>
+    <IntroTrigger tab="batch" tier={tier} upgrade="pro" className={CARD}>
       {children}
     </IntroTrigger>
   )
 }
 
-function scrollToTemplates() {
-  // Reduced motion jumps instead of gliding (same rule as the home generator's smooth()).
-  const behavior = window.matchMedia(REDUCED_MOTION).matches ? 'auto' : 'smooth'
-  document.getElementById(TEMPLATES_ANCHOR)?.scrollIntoView({ behavior, block: 'start' })
-}
-
-function TileBody({ feature, locked, title, line }: { feature: GatedFeature; locked: boolean; title: string; line: string }) {
+// "Pro · 10 photos" and "Max · 30 photos · 5 templates", each locked while the account is below it.
+function PlanMarks({ tier }: { tier: MembershipTier | null }) {
+  const t = useTranslations('app.gated.create')
+  const counts = batchCounts()
   return (
-    <>
-      <span className="flex items-start justify-between gap-2 md:contents">
-        <FeatureIcon feature={feature} />
-        <TierBadge tier={FEATURE_TIER[feature]} locked={locked} className="md:order-last" />
+    <span className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1.5 md:mt-0 md:flex-none">
+      <span className="inline-flex items-center gap-1.5 text-caption text-muted-foreground">
+        <TierBadge tier="pro" locked={isLocked('batch', tier)} />
+        {t('pro', { count: counts.pro })}
       </span>
-      <span className="mt-2.5 block min-w-0 md:mt-0 md:flex-1">
-        <b className="block text-body leading-[1.25] font-semibold">{title}</b>
-        <span className="mt-1 block text-caption leading-[1.35] text-balance text-muted-foreground">{line}</span>
+      <span className="inline-flex items-center gap-1.5 text-caption text-muted-foreground">
+        <TierBadge tier="max" locked={isLocked('templates', tier)} />
+        {t('max', { count: counts.max, templates: MATRIX_TEMPLATES })}
       </span>
-    </>
+    </span>
   )
 }
 
-// Drawn in the house stroke: a stack of photos (batch), a 2×2 grid (templates × photos).
-function FeatureIcon({ feature }: { feature: GatedFeature }) {
+// Drawn in the house stroke: photos down, templates across, the grid a batch makes.
+function CardIcon() {
   return (
     <span aria-hidden="true" className="grid size-9 flex-none place-items-center rounded-[11px] bg-wash text-primary md:size-10 md:rounded-[12px]">
       <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinejoin="round" strokeLinecap="round">
-        {feature === 'batch' ? (
-          <>
-            <rect x="7" y="7" width="13" height="13" rx="2" />
-            <path d="M4 16V6a2 2 0 0 1 2-2h10" />
-            <path d="M10.5 15.5l2-2.5 2 2 1.5-1.5 1.5 2" />
-          </>
-        ) : (
-          <>
-            <rect x="4" y="4" width="7" height="7" rx="1.5" />
-            <rect x="13" y="4" width="7" height="7" rx="1.5" />
-            <rect x="4" y="13" width="7" height="7" rx="1.5" />
-            <rect x="13" y="13" width="7" height="7" rx="1.5" />
-          </>
-        )}
+        <rect x="4" y="4" width="7" height="7" rx="1.5" />
+        <rect x="13" y="4" width="7" height="7" rx="1.5" />
+        <rect x="4" y="13" width="7" height="7" rx="1.5" />
+        <rect x="13" y="13" width="7" height="7" rx="1.5" />
       </svg>
     </span>
   )
