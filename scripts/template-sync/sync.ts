@@ -4,7 +4,9 @@ import { z } from 'zod'
 import { site } from '../../src/site/site.config'
 import { templateFieldsSchema, toggleSetupProblems } from '../../src/core/templates'
 import { readTemplateQuote } from '../../src/site/template-pricing'
+import { styleRefsSchema } from '../../src/core/templates/style-refs'
 import { copyCovers, SyncError, type Assets } from './covers'
+import { copyStyleRefs, type PrivateStore } from './style-refs'
 
 // Template ids (up to 64) and series slugs (up to 128, as the series editor allows) share this list.
 export const slug = z.string().max(128).regex(/^[a-z0-9]+(-[a-z0-9]+)*$/)
@@ -17,10 +19,33 @@ const prompt = z.object({
   provider_id: z.uuid().nullable(),
 })
 
-export type SyncTarget = { db: SupabaseClient; assets: Assets }
+// `private`: the side's private uploads bucket, for style references; absent where none is set up.
+export type SyncTarget = { db: SupabaseClient; assets: Assets; private?: PrivateStore }
+
+// The test site's style references for the prompt version just read (2026-11-12), so references
+// and prompt always come from one revision; SOURCE_CHANGED when an edit landed in between.
+async function readStyleRefs(id: string, version: number, source: SyncTarget) {
+  const result = await source.db.rpc('read_template_sync_style_refs', { p_id: id, p_version: version })
+  if (result.error) throw new SyncError(result.error.message === 'SOURCE_CHANGED' ? 'SOURCE_CHANGED' : 'SOURCE_READ_FAILED')
+  const refs = styleRefsSchema.safeParse(result.data)
+  if (!refs.success) throw new SyncError('INVALID_STYLE_REFS')
+  return refs.data
+}
+
+async function copyRefs(id: string, refs: Awaited<ReturnType<typeof readStyleRefs>>, source: SyncTarget, target: SyncTarget) {
+  if (refs.length === 0) return
+  if (!source.private || !target.private) throw new SyncError('STYLE_REF_STORE_MISSING')
+  try {
+    await copyStyleRefs(id, refs, source.private, target.private)
+  } catch (error) {
+    throw error instanceof SyncError ? error : new SyncError('STYLE_REF_COPY_FAILED')
+  }
+}
 
 // `validateOnly`: run every check of the final write inside the target's transaction and roll it
-// back (the RPC's p_validate_only); no covers are copied. Used by the dry run against the preview.
+// back (the RPC's p_validate_only); no covers or style references are copied. Used by the dry run
+// against the preview. Style references go as the test site has them (an empty list clears
+// production's), their objects copied to production's private bucket before the final write.
 export async function syncTemplate(id: string, runId: string, source: SyncTarget, target: SyncTarget, validateOnly = false) {
   // Pin the destination before reading the source: even a delayed source read must not
   // let an old run adopt a newer destination as its precondition.
@@ -45,17 +70,19 @@ export async function syncTemplate(id: string, runId: string, source: SyncTarget
   if (!fields.success || toggleSetupProblems(fields.data.toggles, revision.body, revision.model_params).length) {
     throw new SyncError('INVALID_FIELDS_OR_TOGGLES')
   }
+  const styleRefs = await readStyleRefs(id, revision.version, source)
   async function apply(template: Record<string, unknown>, validate: boolean) {
     // An upload can outlast a model estimate or p95 update. Price again at the write,
     // through exactly the editor's read-and-save path, including its approved exceptions.
     const { floors, receipt, envModel } = await readTemplateQuote(target.db)
     const write = await target.db.rpc('sync_preview_template', {
-      p_template: template, p_prompt: revision, p_provider: provider, p_floors: { ...floors, quote_receipt: receipt, env_model: envModel },
+      p_template: template, p_prompt: { ...revision, style_refs: styleRefs }, p_provider: provider, p_floors: { ...floors, quote_receipt: receipt, env_model: envModel },
       p_run_id: runId, p_locales: site.locales.enabled, p_target_token: token, p_catalog_version: catalog, p_validate_only: validate,
     })
     if (write.error) {
       const known = ['CATEGORY_MISSING', 'SUBCATEGORY_MISSING', 'SERIES_MISSING', 'MODEL_CREDIT_FLOOR', 'MODEL_CHANGED', 'MODEL_REFERENCE_LIMIT',
-        'STALE_TARGET', 'PRICE_QUOTE_CHANGED', 'CATALOG_MISMATCH', 'TEMPLATE_RETIRED', 'FEATURED_WEB_REQUIRED', 'LIVE_TEMPLATE_INCOMPLETE', 'PROVIDER_NOT_UNIQUE']
+        'STALE_TARGET', 'PRICE_QUOTE_CHANGED', 'CATALOG_MISMATCH', 'TEMPLATE_RETIRED', 'FEATURED_WEB_REQUIRED', 'LIVE_TEMPLATE_INCOMPLETE', 'PROVIDER_NOT_UNIQUE',
+        'INVALID_STYLE_REFS']
       throw new SyncError(known.includes(write.error.message) ? write.error.message : 'TARGET_WRITE_FAILED')
     }
     return z.int().positive().parse(write.data)
@@ -68,5 +95,6 @@ export async function syncTemplate(id: string, runId: string, source: SyncTarget
   } catch (error) {
     throw error instanceof SyncError ? error : new SyncError('COVER_COPY_FAILED')
   }
+  await copyRefs(id, styleRefs, source, target)
   return apply({ ...row, ...covers }, false)
 }

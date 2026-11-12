@@ -5,13 +5,17 @@ import { createR2Client, createR2Store } from '../../src/core/storage'
 import { runSync } from './plan'
 import { parseIds } from './sync'
 
-// Pin the direction independently of the credentials. Only public covers buckets are reachable.
-function endpoint(preview: boolean, settings: ReturnType<typeof templateSyncEnv>['preview']) {
+// Pin the direction independently of the credentials: each side's public covers bucket and, for
+// style references, its private uploads bucket (the test site's is fixed; production's is the
+// SYNC_PRODUCTION_PRIVATE_BUCKET variable, checked in templateSyncEnv).
+function endpoint(preview: boolean, settings: ReturnType<typeof templateSyncEnv>['preview'], privateBucket?: string) {
   const project = preview ? 'pnzkiqvktkzznfbyhphe' : 'irbqamjuazkkyvnnzupf'
   const bucket = preview ? 'shotviva-assets-preview' : 'shotviva-assets'
+  const client = createR2Client(settings)
   return {
     db: createClient(`https://${project}.supabase.co`, settings.serviceKey, { auth: { persistSession: false, autoRefreshToken: false } }),
-    assets: { base: settings.base, store: createR2Store(createR2Client(settings), bucket) },
+    assets: { base: settings.base, store: createR2Store(client, bucket) },
+    private: privateBucket ? createR2Store(client, privateBucket) : undefined,
   }
 }
 
@@ -21,12 +25,13 @@ const DRY_RUN = process.argv.includes('--dry-run-preview')
 
 function endpoints() {
   if (!DRY_RUN) {
-    const { ids, series, runId, actorId, preview, production } = templateSyncEnv()
-    return { ids, series, runId, actorId, source: endpoint(true, preview), target: endpoint(false, production) }
+    const { ids, series, runId, actorId, preview, production, productionPrivateBucket } = templateSyncEnv()
+    return { ids, series, runId, actorId, source: endpoint(true, preview, 'shotviva-preview'),
+      target: endpoint(false, production, productionPrivateBucket) }
   }
   const { ids, series, runId, actorId, serviceKey, assetsBase } = templateSyncDryRunEnv()
-  // Covers are never copied in a dry run, so the asset store is never called; the base only
-  // tells the test site's own series covers from outside addresses.
+  // Covers and style references are never copied in a dry run, so no bucket is called; the base
+  // only tells the test site's own series covers from outside addresses.
   const preview = { serviceKey, accountId: '0'.repeat(32), accessKeyId: '-', secretAccessKey: '-', base: assetsBase }
   const side = endpoint(true, preview)
   return { ids, series, runId, actorId, source: side, target: side }
