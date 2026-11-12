@@ -11,11 +11,11 @@ import { png } from '../fakes/images'
 
 // A published web template with a wrapped prompt, the way an admin would set one up. Priced
 // as a medium template (1 / 2 / 3), so Standard costs 1.
-export async function seedTemplate(db: Client, options: { visibleIn?: string[]; images?: { min: number; max: number } } = {}) {
+export async function seedTemplate(db: Client, options: { visibleIn?: string[]; images?: object; copy?: object[]; body?: string } = {}) {
   const id = `t4-${randomUUID().slice(0, 8)}`
   const fields = {
     images: options.images ?? { min: 1, max: 1 },
-    copy: [{ key: 'dish', label: 'Dish', required: false, maxLength: 60 }],
+    copy: options.copy ?? [{ key: 'dish', label: 'Dish', required: false, maxLength: 60 }],
     aspectRatios: ['4:5', '1:1'],
   }
   await db.query(
@@ -25,7 +25,7 @@ export async function seedTemplate(db: Client, options: { visibleIn?: string[]; 
   )
   await db.query('insert into public.template_prompts (template_id, body) values ($1, $2)', [
     id,
-    'WRAPPED studio shot of {{dish}}, keep the plate unchanged',
+    options.body ?? 'WRAPPED studio shot of {{dish}}, keep the plate unchanged',
   ])
   await publishFixture(db, id)
   return id

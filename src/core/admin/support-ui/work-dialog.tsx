@@ -38,10 +38,13 @@ export function WorkDialog({ links, onClose }: { links: WorkLinks; onClose: () =
         {links.deleted ? (
           <p className="text-sm text-muted-foreground">{COPY.deleted}</p>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            <Figure label={COPY.input} url={links.input} missing={inputMissing} />
-            <Figure label={COPY.output} url={links.output} missing={COPY.noOutput} />
-          </div>
+          <>
+            {links.slotCount > 1 ? <p className="text-sm text-muted-foreground">{COPY.slots(links.slotCount)}</p> : null}
+            <div className="grid gap-4 md:grid-cols-2">
+              <Figure label={COPY.input} url={links.input} missing={inputMissing} />
+              <Figure label={COPY.output} url={links.output} missing={COPY.noOutput} />
+            </div>
+          </>
         )}
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>

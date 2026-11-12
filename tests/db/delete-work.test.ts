@@ -170,7 +170,7 @@ describe('admin', () => {
     await deleteOwnWork({ db: service, store: r2.store }, { userId, jobId: job.id })
     const page = await listJobs(service, parseJobFilters({ template: templateId }))
     expect(page.items.find((item) => item.id === job.id)).toMatchObject({ status: 'succeeded', deletedByUser: true })
-    expect(await viewWork({ db: service, store: r2.store }, job.id)).toEqual({ output: null, input: null, inputExpired: false, deleted: true })
+    expect(await viewWork({ db: service, store: r2.store }, job.id)).toEqual({ output: null, input: null, inputExpired: false, deleted: true, slotCount: 0 })
     const audit = await db.query("select 1 from public.admin_audit_log where action = 'view_work' and target_id = $1", [job.id])
     expect(audit.rowCount).toBe(1)
   })

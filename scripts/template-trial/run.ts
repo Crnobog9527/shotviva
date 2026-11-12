@@ -53,7 +53,9 @@ function readFlags(args: string[]) {
 async function photoHashes(items: ReturnType<typeof readBatchFile>['templates'], baseDir: string) {
   const photos = new Map<string, { bytes: Uint8Array; hash: string }>()
   for (const input of items.flatMap(item => item.trial?.inputs ?? [])) {
-    if (input.photo && !photos.has(input.photo)) photos.set(input.photo, await readPhoto(baseDir, input.photo))
+    for (const path of [input.photo, ...Object.values(input.slots ?? {})]) {
+      if (path && !photos.has(path)) photos.set(path, await readPhoto(baseDir, path))
+    }
   }
   return photos
 }
@@ -93,7 +95,7 @@ type PrivateStore = NonNullable<Awaited<ReturnType<typeof targetStores>>['privat
 async function uploadPhotos(p: Prepared, deps: { db: Prepared['db']; store: PrivateStore }) {
   const photoIds = new Map<string, string>()
   for (const photo of new Map([...p.photos.values()].map(x => [x.hash, x])).values()) {
-    if (p.cells.some(c => c.photoHash === photo.hash)) photoIds.set(photo.hash, await ensureTestPhoto(deps, p.env.SHOTVIVA_IMPORT_ADMIN_ID, photo))
+    if (p.cells.some(c => c.photoHash === photo.hash || Object.values(c.slotHashes ?? {}).includes(photo.hash))) photoIds.set(photo.hash, await ensureTestPhoto(deps, p.env.SHOTVIVA_IMPORT_ADMIN_ID, photo))
   }
   return photoIds
 }

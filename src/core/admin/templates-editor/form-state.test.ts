@@ -258,3 +258,46 @@ describe('the 开关 cards (T89)', () => {
     expect(buildPayload({ ...values, toggles: noOff }, false, FLOOR).ok).toBe(false)
   })
 })
+
+describe('图片格子 cards (§5.1e)', () => {
+  const slotted: AdminTemplate = {
+    ...template,
+    visibleIn: ['web'],
+    fields: {
+      images: { min: 1, max: 2, slots: [
+        { key: 'logo', label: 'Venue logo', required: false },
+        { key: 'prize_1', label: '1st prize photo', help: 'A clear photo', required: true, note: 'prize_1_note' },
+      ] },
+      copy: [{ key: 'prize_1_note', label: '1st prize details', type: 'short', required: false, maxLength: 60, public: false }],
+      aspectRatios: ['1:1'], toggles: [],
+    },
+    translations: { zh: { fields: { logo: { label: 'Logo 上传' }, prize_1: { label: '一等奖照片上传', help: '清楚的照片' } } } },
+  }
+
+  it('round-trips slots and their Chinese text, with counts that follow the cards', () => {
+    const values = toFormValues(slotted)
+    expect(values.fieldsJson).not.toContain('slots')
+    expect(values.imageSlots.map((slot) => [slot.key, slot.labelZh, slot.note])).toEqual([['logo', 'Logo 上传', ''], ['prize_1', '一等奖照片上传', 'prize_1_note']])
+    const result = buildPayload(values, false, FLOOR)
+    expect(result).toMatchObject({ ok: true, payload: { template: {
+      fields: { images: { min: 1, max: 2, slots: slotted.fields.images.slots } },
+      translations: { zh: { fields: { logo: { label: 'Logo 上传' }, prize_1: { label: '一等奖照片上传', help: '清楚的照片' } } } },
+    } } })
+    if (!result.ok) throw new Error(result.message)
+    expect(templateFieldsSchema.safeParse((result.payload.template as { fields: unknown }).fields).success).toBe(true)
+  })
+
+  it('recounts min / max when a slot is made required or removed', () => {
+    const values = toFormValues(slotted)
+    const edited = { ...values, imageSlots: [{ ...values.imageSlots[0]!, required: true }] }
+    expect(buildPayload(edited, false, FLOOR)).toMatchObject({ ok: true, payload: { template: { fields: { images: { min: 1, max: 1 } } } } })
+    expect(buildPayload({ ...values, imageSlots: [] }, false, FLOOR)).toMatchObject({ ok: true, payload: { template: { fields: { images: { min: 1, max: 2 } } } } })
+  })
+
+  it.each([
+    ['a partner-visible slot template', { visiblePartner: true }, 'partner'],
+    ['a note that names no text field', { copyFields: [] }, 'prize_1_note'],
+  ])('refuses %s before the round trip', (_, patch, message) => {
+    expect(buildPayload({ ...toFormValues(slotted), ...patch }, false, FLOOR)).toMatchObject({ ok: false, message: expect.stringContaining(message) })
+  })
+})

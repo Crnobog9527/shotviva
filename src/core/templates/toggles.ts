@@ -10,7 +10,7 @@ export const TOGGLES_MAX = 3
 export const FIELD_KEY = /^[a-z][a-z0-9_]*$/
 
 // Placeholders renderPrompt fills itself; a toggle or copy field may not take these names.
-export const RESERVED_KEYS = ['aspect_ratio', 'photo_count', 'style_ref_count'] as const
+export const RESERVED_KEYS = ['aspect_ratio', 'photo_count', 'style_ref_count', 'image_slots'] as const
 
 // The dialog shown before a toggle can be turned on. The text is the template's own data (per
 // template, per language), never hard-coded per category.

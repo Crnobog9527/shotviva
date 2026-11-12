@@ -50,7 +50,8 @@ export function toPartnerTemplate(template: Template): PartnerTemplate {
     // Partner jobs are always Standard ('1k'), so that is the one price the contract shows.
     credits_cost: template.creditsCost['1k'],
     fields: {
-      images: template.fields.images,
+      // min / max only: a slot template is web-only (§5.1e), and the contract has no slots.
+      images: { min: template.fields.images.min, max: template.fields.images.max },
       copy: template.fields.copy.map((field) => ({
         key: field.key,
         label: field.label,

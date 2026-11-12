@@ -14,6 +14,7 @@ import {
   allowedWebAspects,
   assertPricedTier,
   assertTemplateQuote,
+  hasSlots,
   publicCopyKeys,
   validateGenerationInputs,
   type GenerationInputs,
@@ -50,9 +51,28 @@ export type GenerationDeps = Omit<SettleDeps, 'provider'> & {
 const SURFACE: Record<JobSource, TemplateSurface> = { web: 'web', graylum: 'partner' }
 
 
-function requestAspects(req: GenerationRequest, template: Template) {
-  return req.source === 'web' ? allowedWebAspects(template.imageOptions, req.resolution ?? DEFAULT_RESOLUTION) : undefined
+// A slot template offers no "as shot" size: its images are a logo and the like, not a photo to
+// follow (§5.1e).
+export function requestAspects(req: Pick<GenerationRequest, 'source' | 'resolution'>, template: Pick<Template, 'imageOptions' | 'fields'>) {
+  if (req.source !== 'web') return undefined
+  const aspects = allowedWebAspects(template.imageOptions, req.resolution ?? DEFAULT_RESOLUTION)
+  return hasSlots(template.fields) ? aspects.filter((aspect) => aspect !== 'original') : aspects
 }
+
+// A slot template is one job at a time (总控 2026-11-12): its images each have their own role,
+// so there is no "same settings × several photos" to batch.
+function assertSingleRun(req: GenerationRequest, template: Template) {
+  if (!hasSlots(template.fields)) return
+  // Web only (§14.6): the save refuses a partner-visible slot template; this is the backstop.
+  if (req.source !== 'web') throw new AppError('TEMPLATE_UNAVAILABLE', 'Template not available')
+  if (req.batchId || req.batchCell || (req.batchSize ?? 1) > 1 || (req.batchTemplates ?? 1) > 1) {
+    throw new AppError('INVALID_INPUT', 'This template makes one image at a time')
+  }
+}
+
+// The job's uploads in the order the model gets them: the one photo, or the filled slots.
+const uploadKeys = (req: GenerationRequest, inputs: GenerationInputs): string[] =>
+  inputs.slots ? inputs.slots.map((slot) => slot.upload) : req.inputKey ? [req.inputKey] : []
 
 // Everything that can be rejected without touching credits: template, fields, key
 // ownership, tier limits (batch size, rate limit), then the user's words (ARCHITECTURE §5.1a:
@@ -65,6 +85,7 @@ async function prepare(deps: GenerationDeps, req: GenerationRequest) {
   const tier = req.resolution ?? DEFAULT_RESOLUTION
   assertPricedTier(template.unpricedResolutions, tier)
   assertTemplateQuote(req.expectedCredits, template.creditsCost[tier])
+  assertSingleRun(req, template)
   const inputs = validateGenerationInputs(template.fields, {
     copy: req.copy,
     aspectRatio: req.aspectRatio,
@@ -72,17 +93,19 @@ async function prepare(deps: GenerationDeps, req: GenerationRequest) {
     // Partner v1 takes no toggles: every one stays at its default, off (T89).
     ...(req.source === 'web' ? { toggles: req.toggles, togglesConfirmed: req.togglesConfirmed } : {}),
     imageCount: req.inputKey ? 1 : 0,
+    ...(req.inputSlots ? { slots: req.inputSlots } : {}),
     aspects: requestAspects(req, template),
   })
+  const keys = uploadKeys(req, inputs)
   // Never touch (or delete) an object outside the caller's own inputs/ prefix.
-  if (req.inputKey && !isOwnInputKey(req.userId, req.inputKey)) throw new AppError('INVALID_INPUT', 'Unknown upload')
+  if (keys.some((key) => !isOwnInputKey(req.userId, key))) throw new AppError('INVALID_INPUT', 'Unknown upload')
   await assertWithinRateLimit(deps.db, req.userId, deps.now?.() ?? new Date(), limitsFor(membership), {
     jobId: req.jobId,
     idempotencyKey: req.idempotencyKey,
   })
   // In parallel: the decision call usually finishes while the upload is still being read.
-  const [screen, image] = await Promise.all([screenWords(deps, req, inputs), req.inputKey ? loadInputImage(deps.store, req.inputKey) : null])
-  return { template, prompt, inputs, image, screen }
+  const [screen, images] = await Promise.all([screenWords(deps, req, inputs), Promise.all(keys.map((key) => loadInputImage(deps.store, key)))])
+  return { template, prompt, inputs, images, keys, screen }
 }
 
 // Every word the user typed that reaches the image model: the template's text fields and the
@@ -120,7 +143,9 @@ function jobInputs(req: GenerationRequest, { inputs, prompt, template }: Prepare
     resolution,
     ...(inputs.note ? { note: inputs.note } : {}),
     ...toggleInputs(inputs, now),
-    input_key: req.inputKey ?? null,
+    input_key: inputs.slots ? null : req.inputKey ?? null,
+    // Slot key → upload, in send order: Make again puts kept copy n back in the n-th (§5.1e).
+    ...(inputs.slots ? { input_slots: Object.fromEntries(inputs.slots.map((slot) => [slot.key, slot.upload])) } : {}),
     prompt_version: prompt.version,
     attempt_id: attemptId,
     ...batchInputs(req),
@@ -138,10 +163,12 @@ function reserveFields(req: GenerationRequest) {
 }
 
 // ARCHITECTURE §8 「原图小图」 (T32), only once the result is confirmed: a failed job has no photo
-// page. Edits (T30) settle elsewhere and get none; their source is the work they edited. (The
-// upload itself is copied next to the result during settle, T40.)
-async function keepInputPreview(deps: GenerationDeps, job: Job, image: Prepared['image']) {
-  if (image) await writeInputPreview(deps.store, { userId: job.userId, jobId: job.id, bytes: image.bytes })
+// page. Edits (T30) settle elsewhere and get none; their source is the work they edited. A slot
+// template's work has none either: a logo and prize photos are no "before" (§5.1e). (The
+// uploads themselves are copied next to the result during settle, T40.)
+async function keepInputPreview(deps: GenerationDeps, job: Job, { images, inputs }: Pick<Prepared, 'images' | 'inputs'>) {
+  const [image] = images
+  if (image && !inputs.slots) await writeInputPreview(deps.store, { userId: job.userId, jobId: job.id, bytes: image.bytes })
 }
 
 // Synchronous generation (ARCHITECTURE §4) shared by the web route and, later, the partner
@@ -157,13 +184,13 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
     if (existing) return toJobView(existing)
   }
   const prepared = await prepare(deps, req)
-  const { template, prompt, inputs, image } = prepared
+  const { template, prompt, inputs, images } = prepared
 
   const jobId = req.jobId ?? randomUUID()
   const resolution = req.resolution ?? DEFAULT_RESOLUTION
   const attemptId = randomUUID()
   const { job, call, provider } = await withFallbackNotice(template.id, async (selected) => {
-    const route = await templateCall(deps, { template, prompt }, inputs, image, {
+    const route = await templateCall(deps, { template, prompt }, inputs, images, {
       resolution, providerId: req.source === 'web' ? prompt.providerId : null,
       onRoute: actual => selected(routeFallbackReason(actual, prompt.providerId, req.source)),
     })
@@ -182,7 +209,7 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
 
   const settle = () =>
     settleGeneration({ ...deps, provider }, job, call, outputKeyFor(req.userId, job.id), {
-      inputKeys: req.inputKey ? [req.inputKey] : [],
+      inputKeys: prepared.keys,
       decision: screenCost(deps.identityJudge, prepared.screen),
     })
   const settled = await settleTracked(job, template.category, settle, {
@@ -190,6 +217,6 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
     batchSize: req.batchSize ?? 1,
     locale: req.locale,
   })
-  await keepInputPreview(deps, settled, image)
+  await keepInputPreview(deps, settled, prepared)
   return toJobView(settled)
 }

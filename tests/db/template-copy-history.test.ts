@@ -69,7 +69,7 @@ it('restores in both directions, never overwrites history, and both request buil
     const db = serviceSupabase()
     for (const loaded of [await loadTestTemplate(db,source),await loadGenerationTemplate(db,source,'web')]) {
       const resolve = vi.fn(async (id: string | null) => ({ id:id ?? 'default',generate:vi.fn() }))
-      const { call,provider: picked } = await templateCall({store:stores.private,provider:resolve},loaded,inputs,null,
+      const { call,provider: picked } = await templateCall({store:stores.private,provider:resolve},loaded,inputs,[],
         { resolution:'1k',providerId:loaded.prompt.providerId })
       expect(loaded.prompt.version).toBe(selected)
       expect(call.prompt).toBe(prompt.body)

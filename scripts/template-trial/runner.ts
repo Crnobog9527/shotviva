@@ -48,6 +48,7 @@ function bodyOf(cell: Cell, ctx: RunContext, runId: string) {
   return {
     run_id: runId, batch_id: batchIdOf(cell), template_id: cell.templateId,
     photo_id: cell.photoHash ? ctx.photoIds.get(cell.photoHash) ?? null : null,
+    ...(cell.slotHashes ? { slot_photos: Object.fromEntries(Object.entries(cell.slotHashes).map(([slot, hash]) => [slot, ctx.photoIds.get(hash) ?? ''])) } : {}),
     inputs: { copy: input.fields, aspect_ratio: input.aspectRatio, resolution: cell.resolution, note: input.note, toggles: input.toggles },
   }
 }

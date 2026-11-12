@@ -1,12 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type Dispatch, type SetStateAction } from 'react'
 
 import { ImageProviderField, type ImageProviderOption } from '@/core/admin/image-provider-field'
 import { Button } from '@/core/ui/button'
 import { Label } from '@/core/ui/label'
 import { Textarea } from '@/core/ui/textarea'
 import { FULL_IMAGE_OPTIONS } from '@/core/templates/image-options'
+import type { ImageSlot } from '@/core/templates/image-slots'
 import { DEFAULT_RESOLUTION, NOTE_MAX_LENGTH } from '@/core/templates/output-options'
 
 import type { AdminTemplate } from '../templates/types'
@@ -45,18 +46,48 @@ function availableValue<T extends string>(wanted: T | '', values: readonly T[]):
   return values.find(value => value === wanted) ?? values[0] ?? ''
 }
 
-function trialInputCount(template: AdminTemplate, targets: readonly string[], omitStyleRefs: boolean) {
-  // Each selected test photo starts a separate run with the same saved styles.
-  const photoCount = targets.length > 0 ? 1 : 0
+function trialInputCount(template: AdminTemplate, targets: readonly string[], omitStyleRefs: boolean, slotCount: number) {
+  // Each selected test photo starts a separate run with the same saved styles; a slot
+  // template's run takes every filled slot (§5.1e).
+  const photoCount = slotCount > 0 ? slotCount : targets.length > 0 ? 1 : 0
   const styleCount = omitStyleRefs ? 0 : template.prompt?.styleRefs.length ?? 0
   return photoCount + styleCount
+}
+
+// A slot template's test photos (§5.1e): one per slot, the filled ones sent in slot order.
+function useSlotPicks(slots: readonly ImageSlot[]) {
+  const [slotPicks, setSlotPicks] = useState<Record<string, string>>({})
+  const slotPhotos = Object.fromEntries(slots.flatMap((slot) => (slotPicks[slot.key] ? [[slot.key, slotPicks[slot.key]!]] : [])))
+  const missingSlot = slots.find((slot) => slot.required && !slotPhotos[slot.key])
+  return { slotPicks, setSlotPicks, slotPhotos, missingSlot }
+}
+
+type TrialPhotoProps = Pick<Props, 'photos' | 'onError' | 'onNotice'> & {
+  slots: readonly ImageSlot[]; usesPhoto: boolean; picked: string[]; setPicked: (ids: string[]) => void
+  slotPicks: Record<string, string>; setSlotPicks: Dispatch<SetStateAction<Record<string, string>>>; onUploaded: () => void
+}
+
+// The run's photos: one picker per image slot, the usual picker, or none.
+function TrialPhotos({ slots, usesPhoto, photos, picked, setPicked, slotPicks, setSlotPicks, onUploaded, onError, onNotice }: TrialPhotoProps) {
+  if (slots.length > 0) {
+    return slots.map((slot) => (
+      <PhotoPicker key={slot.key} slot={{ label: `${slot.label}${slot.required ? ' *' : ''}` }} photos={photos}
+        picked={slotPicks[slot.key] ? [slotPicks[slot.key]!] : []}
+        onPick={(ids) => setSlotPicks((current) => ({ ...current, [slot.key]: ids.at(-1) ?? '' }))}
+        onUploaded={onUploaded} onError={onError} onNotice={onNotice} />
+    ))
+  }
+  if (!usesPhoto) return <p className="text-muted-foreground text-xs">{COPY.first.noPhotos}</p>
+  return <PhotoPicker photos={photos} picked={picked} onPick={setPicked} onUploaded={onUploaded} onError={onError} onNotice={onNotice} />
 }
 
 // 首次出图 (ARCHITECTURE §10.b): a test photo (or up to three), the template's own text fields,
 // the optional note, size and tier, then one click that starts one or three runs.
 export function FirstRunForm({ template, providers, photos, onLaunch, onPhotoUploaded, onError, onNotice }: Props) {
-  const usesPhoto = template.fields.images.max > 0
+  const slots = template.fields.images.slots ?? []
+  const usesPhoto = template.fields.images.max > 0 && slots.length === 0
   const [picked, setPicked] = useState<string[]>([])
+  const { slotPicks, setSlotPicks, slotPhotos, missingSlot } = useSlotPicks(slots)
   const [copy, setCopy] = useState<Record<string, string>>({})
   const [providerId, setProviderId] = useState(template.prompt?.providerId ?? null)
   const [omitStyleRefs, setOmitStyleRefs] = useState(false)
@@ -70,22 +101,20 @@ export function FirstRunForm({ template, providers, photos, onLaunch, onPhotoUpl
     aspect: availableValue(wanted.aspect, sizes.aspects),
   }
   const targets = usesPhoto ? picked : []
-  const belowMinimum = trialInputCount(template, targets, omitStyleRefs) < sizes.minReferences
+  const belowMinimum = trialInputCount(template, targets, omitStyleRefs, Object.keys(slotPhotos).length) < sizes.minReferences
   const count = planBatch(targets, options.triple).length
   const submit = () => {
     if (usesPhoto && template.fields.images.min > 0 && picked.length === 0) return onError(COPY.first.needPhoto)
-    onLaunch(firstRunLaunches(template.id, targets, { providerId, copy, note, toggles, options, omitStyleRefs }))
+    if (missingSlot) return onError(COPY.first.needSlot(missingSlot.label))
+    onLaunch(firstRunLaunches(template.id, targets, { providerId, copy, note, toggles, options, omitStyleRefs, ...(slots.length > 0 ? { slotPhotos } : {}) }))
   }
   return (
     <section aria-labelledby="test-first-title" className="grid gap-3 rounded-lg border p-3">
       <h3 id="test-first-title" className="text-sm font-semibold">
         {COPY.first.title}
       </h3>
-      {usesPhoto ? (
-        <PhotoPicker photos={photos} picked={picked} onPick={setPicked} onUploaded={onPhotoUploaded} onError={onError} onNotice={onNotice} />
-      ) : (
-        <p className="text-muted-foreground text-xs">{COPY.first.noPhotos}</p>
-      )}
+      <TrialPhotos slots={slots} usesPhoto={usesPhoto} photos={photos} picked={picked} setPicked={setPicked} slotPicks={slotPicks} setSlotPicks={setSlotPicks}
+        onUploaded={onPhotoUploaded} onError={onError} onNotice={onNotice} />
       <TestCopyFields fields={template.fields.copy} values={copy} onChange={setCopy} />
       <TestToggles toggles={template.fields.toggles ?? []} values={toggles} onChange={setToggles} />
       <div className="grid gap-1.5">

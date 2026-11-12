@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { effectiveTier, MAX_BATCH_SIZE, readBalance } from '../../billing'
 import { AppError } from '../../errors'
 import { isOwnInputKey } from '../../storage'
-import { allowedWebAspects, assertPricedTier, assertTemplateQuote, loadGenerationTemplate, validateGenerationInputs, type Template } from '../../templates'
+import { allowedWebAspects, assertPricedTier, hasSlots, assertTemplateQuote, loadGenerationTemplate, validateGenerationInputs, type Template } from '../../templates'
 import { generateBodySchema, toGenerationRequest } from '../generation-request'
 import type { TemplateProvider } from '../provider'
 import { assertBatchRoutes, BatchTemplateError, quoteBatchRoute } from './sale'
@@ -32,6 +32,8 @@ function checkGrid(userId: string, cells: Selected[]) {
 
 function quote(userId: string, selected: Selected, template: Template, position: number,
   batch: { batch_id: string; batch_size: number; batch_templates: number }) {
+  // A slot template is single-run only (§5.1e, 总控 2026-11-12): never part of a batch.
+  if (hasSlots(template.fields)) throw new AppError('INVALID_INPUT', 'This template makes one image at a time')
   const resolution = selected.inputs.resolution ?? '1k'
   assertPricedTier(template.unpricedResolutions, resolution)
   const expected_credits = template.creditsCost[resolution]
