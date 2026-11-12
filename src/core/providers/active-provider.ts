@@ -39,8 +39,10 @@ export async function activeProvider(
 
 // Freeze the default model’s live range before a template job reserves credits or trial budget.
 // A trial can explicitly omit all references, so zero-input requests also need this check.
-export async function defaultTemplateProvider(adapters: ProviderAdapters, checkReferences: boolean): Promise<GenerationProvider> {
-  const row = await cachedActiveRow('image')
+// `loadRow` is injectable for callers outside Next's cache (the templates:trial script).
+export async function defaultTemplateProvider(adapters: ProviderAdapters, checkReferences: boolean,
+  loadRow: (module: ProviderModule) => Promise<ActiveProviderRow | null> = cachedActiveRow): Promise<GenerationProvider> {
+  const row = await loadRow('image')
   const parameters = checkReferences && row?.adapter === 'openrouter_images'
     ? await openRouterImageParameters(row.baseUrl, row.model) : undefined
   return resolveProvider('image', row, serverEnv(), adapters, (id) => readProviderKey(createAdminSupabase(), id), parameters)

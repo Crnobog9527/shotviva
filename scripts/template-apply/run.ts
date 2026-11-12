@@ -5,38 +5,21 @@
  *   pnpm templates:apply .local/templates/batch.json             # apply on the test site
  *
  * Needs NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and SHOTVIVA_IMPORT_ADMIN_ID (.env.local);
- * uploading covers and style references also needs the test site's R2 keys. Prints ids, actions and
+ * uploading covers and style references also needs TEMPLATE_TOOLS_R2_* (the test site's buckets). Prints ids, actions and
  * error codes only. Format: scripts/templates.example.json.
  */
-import { readFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
-import { createR2Client, createR2Store } from '../../src/core/storage'
+import { readBatchFile, RunError, targetStores } from './batch-file'
 import { buildPlan } from './plan'
 import { envSchema, readOptions, targetOf, type Env, type Target } from './options'
 import type { PlanItem } from './plan-types'
 import { batchResultSchema, formatTable, rows, type BatchResult } from './report'
-import { parseBatch, type Batch } from './schema'
+import type { Batch } from './schema'
 import { readState } from './state'
-
-class RunError extends Error {}
-
-function readBatchFile(path: string): Batch {
-  let input: unknown
-  try { input = JSON.parse(readFileSync(path, 'utf8')) } catch { throw new RunError('读不了批次文件（不存在或不是 JSON）') }
-  try { return parseBatch(input) } catch (error) { throw new RunError(error instanceof Error ? error.message : '批次文件格式不对') }
-}
-
-// The target's own buckets with the R2 keys from .env.local; none on a local stack.
-function stores(target: Target) {
-  const { R2_ACCOUNT_ID: accountId, R2_ACCESS_KEY_ID: accessKeyId, R2_SECRET_ACCESS_KEY: secretAccessKey } = process.env
-  if (!target.storage || !accountId || !accessKeyId || !secretAccessKey) return {}
-  const client = createR2Client({ accountId, accessKeyId, secretAccessKey })
-  return { privateStore: createR2Store(client, target.storage.privateBucket), publicStore: createR2Store(client, target.storage.publicBucket) }
-}
 
 async function send(db: SupabaseClient, actor: string, plan: PlanItem[], validateOnly: boolean) {
   const items = plan.filter(item => item.problems.length === 0 && item.ops.length > 0).map(({ ref, ops }) => ({ ref, ops }))
@@ -71,7 +54,7 @@ async function apply(batch: Batch, baseDir: string, env: Env, dryRun: boolean) {
   const target = targetOf(env)
   const db = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
   const state = await readState(db, batch)
-  const ctx = { baseDir, db, assetsBase: target.assetsBase, ...stores(target) }
+  const ctx = { baseDir, db, assetsBase: target.assetsBase, ...(await targetStores(target)) }
   let plan = await buildPlan(batch, state, { ...ctx, write: false })
   let results = await send(db, env.SHOTVIVA_IMPORT_ADMIN_ID, plan, true)
   const checkedOnly = dryRun || failed(plan, results)

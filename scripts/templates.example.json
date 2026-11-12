@@ -39,7 +39,16 @@
       "styleRefs": ["refs/example-burger-hero/1.webp"],
       "cover": { "before": "covers/example-burger-hero/before.webp", "after": "covers/example-burger-hero/after.webp" },
       "openSale": false,
-      "publish": false
+      "publish": false,
+      "trial": {
+        "inputs": [
+          { "photo": "before-photos/example-burger.jpg", "aspectRatio": "4:5" },
+          { "photo": "before-photos/example-burger-2.jpg", "fields": {}, "note": "Fake note." }
+        ],
+        "references": ["reference-images/example/benchmark-1.jpg"],
+        "n": 2,
+        "resolution": "1k"
+      }
     },
     {
       "id": "example-burger-side",
