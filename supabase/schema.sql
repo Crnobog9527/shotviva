@@ -10160,6 +10160,22 @@ $$;
 ALTER FUNCTION "public"."read_template_sync_source"("p_id" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."read_template_sync_style_refs"("p_id" "text", "p_version" integer) RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE
+    SET "search_path" TO ''
+    AS $$
+declare v_refs jsonb;
+begin
+  select style_refs into v_refs from public.template_prompts where template_id = p_id and version = p_version;
+  if not found then raise exception 'SOURCE_CHANGED'; end if;
+  return v_refs;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."read_template_sync_style_refs"("p_id" "text", "p_version" integer) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."read_template_sync_target"("p_id" "text", "p_run_id" "text") RETURNS "jsonb"
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
@@ -11612,10 +11628,14 @@ declare
   v_series uuid;
   v_old_series uuid;
   v_order integer := 0;
+  -- Style references (1276): carried only when the source sends the key, as for the sub-category.
+  v_refs boolean := p_prompt ? 'style_refs';
+  v_prompt jsonb;
 begin
   if nullif(p_run_id,'') is null or nullif(btrim(p_prompt->>'body'),'') is null then
     raise exception 'INVALID_SYNC';
   end if;
+  if v_refs and jsonb_typeof(p_prompt->'style_refs') is distinct from 'array' then raise exception 'INVALID_STYLE_REFS'; end if;
   -- Serialize dispatches even before the first template row exists.
   -- Same lock and lock order as #385 cutover and rollback. The subsequent read sees a
   -- cutover that won the lock; one that comes later must wait for the entire write.
@@ -11681,11 +11701,24 @@ begin
   select tp.* into v_previous from public.template_prompts tp where template_id = v_id;
   -- Keep publication, feature rank and sort order under production control. The normal editor
   -- RPC also enforces production's model constraints when the T96 migration is present.
-  perform public.admin_upsert_template(
-    (p_template - array['sort_order','is_active','featured_rank','category','price_floors',
-      'subcategory_key','series_slug','series_sort_order'])
-      || jsonb_build_object('price_floors',p_floors),
-    (p_prompt - 'provider_id') || jsonb_build_object('provider_id',v_provider));
+  -- With style references, the editor's three-argument writer: the same 0940 trigger checks the
+  -- keys (this template's private prefix, at most three, no repeats) and the same 0941/0943 checks
+  -- the model's input range with production's model; an unchanged list keeps the version. Without
+  -- the key, the two-argument writer keeps production's own references, as before.
+  v_prompt := (p_prompt - array['provider_id','style_refs']) || jsonb_build_object('provider_id',v_provider);
+  if v_refs then
+    perform public.admin_upsert_template(
+      (p_template - array['sort_order','is_active','featured_rank','category','price_floors',
+        'subcategory_key','series_slug','series_sort_order'])
+        || jsonb_build_object('price_floors',p_floors),
+      v_prompt, p_prompt->'style_refs');
+  else
+    perform public.admin_upsert_template(
+      (p_template - array['sort_order','is_active','featured_rank','category','price_floors',
+        'subcategory_key','series_slug','series_sort_order'])
+        || jsonb_build_object('price_floors',p_floors),
+      v_prompt);
+  end if;
   -- The editor writer now holds the effective model lock. Compare the exact response used
   -- by its calculator with the current inputs (including p95, approved tariffs and unit).
   -- A quote changed between the last HTTP read and this transaction rolls back the upsert.
@@ -11717,9 +11750,9 @@ begin
     where template_id = v_id and version = v_previous.version;
   select version into strict v_version from public.template_prompts where template_id = v_id;
   insert into public.template_sync_history(template_id, run_id, source_version, synced_version,
-      previous_version, previous_body, previous_model_params, previous_provider_id)
+      previous_version, previous_body, previous_model_params, previous_provider_id, previous_style_refs)
     values (v_id, p_run_id, (p_prompt->>'version')::int, v_version,
-      v_previous.version, v_previous.body, v_previous.model_params, v_previous.provider_id);
+      v_previous.version, v_previous.body, v_previous.model_params, v_previous.provider_id, v_previous.style_refs);
   -- The same constraints and T96 RPC are exercised before publishing any cover bytes.
   -- This private SQLSTATE rolls back all changes inside the function's exception block.
   if p_validate_only then raise exception using errcode = 'Z9301'; end if;
@@ -13499,6 +13532,7 @@ CREATE TABLE IF NOT EXISTS "public"."template_sync_history" (
     "previous_model_params" "jsonb",
     "previous_provider_id" "uuid",
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "previous_style_refs" "jsonb",
     CONSTRAINT "template_sync_history_source_version_check" CHECK (("source_version" > 0))
 );
 
@@ -17305,6 +17339,11 @@ GRANT ALL ON FUNCTION "public"."read_template_series_sync_source"("p_slug" "text
 
 REVOKE ALL ON FUNCTION "public"."read_template_sync_source"("p_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."read_template_sync_source"("p_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."read_template_sync_style_refs"("p_id" "text", "p_version" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."read_template_sync_style_refs"("p_id" "text", "p_version" integer) TO "service_role";
 
 
 

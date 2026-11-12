@@ -1,20 +1,25 @@
 'use client'
 
+import { ChevronRight } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 
 import { Button } from '@/core/ui/button'
+import { cn } from '@/core/ui/cn'
 import { MoveButtons, sortableCopy } from '../sortable'
 import { TreeHandleRow } from './tree-handle'
 import { treeCopy as copy } from './copy'
 import { validParents, type TreeItem, type TreeMove } from './tree'
 
+// The disclosure button for a row with children; null for a leaf.
+export type RowToggle = { open: boolean; controls: string | undefined; label: string; onToggle: () => void }
+
 type Props<T extends TreeItem> = {
-  node: T; items: readonly T[]; label: string; content: ReactNode
+  node: T; items: readonly T[]; label: string; content: ReactNode; toggle: RowToggle | null
   options: { maxLevel: number; labelOf: (item: T) => string; rootOnly: boolean; disabled: boolean }
   onMove: (move: TreeMove) => void
 }
 
-export function TreeRow<T extends TreeItem>({ node, items, label, content, options, onMove }: Props<T>) {
+export function TreeRow<T extends TreeItem>({ node, items, label, content, toggle, options, onMove }: Props<T>) {
   const [choosing, setChoosing] = useState(false)
   const siblings = items.filter(item => item.parentId === node.parentId)
   const index = siblings.findIndex(item => item.key === node.key)
@@ -23,7 +28,13 @@ export function TreeRow<T extends TreeItem>({ node, items, label, content, optio
     onMove({ key: node.key, fromParent: node.parentId, parentId, beforeKey })
   }
   return (
-    <TreeHandleRow node={node} siblings={siblings} label={label} disabled={options.disabled} onReorder={before => move(node.parentId, before)}>
+    <TreeHandleRow node={node} siblings={siblings} label={label} disabled={options.disabled} onReorder={before => move(node.parentId, before)}
+      leading={toggle
+        ? <Button variant="ghost" size="icon-xs" className="text-muted-foreground" aria-expanded={toggle.open} aria-controls={toggle.controls}
+            aria-label={toggle.label} title={toggle.label} onClick={toggle.onToggle}>
+            <ChevronRight aria-hidden className={cn('transition-transform motion-reduce:transition-none', toggle.open && 'rotate-90')} />
+          </Button>
+        : <span aria-hidden className="size-6 shrink-0" />}>
       <MoveButtons item={{
         moveUp: { label: sortableCopy.moveUp(label), disabled: options.disabled || index === 0, onClick: () => move(node.parentId, siblings[index - 1].key) },
         moveDown: { label: sortableCopy.moveDown(label), disabled: options.disabled || index === siblings.length - 1, onClick: () => move(node.parentId, siblings[index + 2]?.key ?? null) },

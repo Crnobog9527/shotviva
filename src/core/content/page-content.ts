@@ -119,10 +119,26 @@ export type TemplateCategory = {
 
 export type HeadedText = { heading: string; text: string }
 
+// A how-to point explained with a picture first (Owner 2026-11-12: people read a picture faster
+// than a paragraph), drawn from the site's own example photos:
+// - `upload`: the phone photo dropped into the upload area, with its file name;
+// - `picker`: three templates as in the app's list, `picked` highlighted; `caption` says which
+//   one for screen readers (the thumbnails themselves are decorative, the names are text);
+// - `pair`: the phone photo and the result, side by side, each with a short tag;
+// - `sizes`: the result at the three export sizes, nested at true scale, each with its tier.
+export type PickerTile = { image: ImageRef; name: string }
+export type SizeTier = { name: string; px: number }
+export type CardVisual =
+  | { kind: 'upload'; image: ImageRef; file: string }
+  | { kind: 'picker'; tiles: readonly [PickerTile, PickerTile, PickerTile]; picked: 0 | 1 | 2; caption: string }
+  | { kind: 'pair'; before: ImageRef; after: ImageRef; tags: { before: string; after: string } }
+  | { kind: 'sizes'; image: ImageRef; tiers: readonly [SizeTier, SizeTier, SizeTier] }
+export type ExplainedText = HeadedText & { visual: CardVisual }
+
 // An extra home H2 of three headed cards, after the template grid (SEO launch handbook: /zh's
 // white-background guide, G9; the English use cases, G5). `link` closes a card's text as a plain
 // in-body link, `after` is the punctuation that follows it.
-export type TopicCard = HeadedText & { link?: RelatedLink; after?: string }
+export type TopicCard = ExplainedText & { link?: RelatedLink; after?: string }
 export type TopicSection = { id: string; heading: string; cards: readonly [TopicCard, TopicCard, TopicCard] }
 
 // Home: "One phone photo → a full shoot" (ARCHITECTURE §13 item 2, DESIGN §6.9): the phone
@@ -199,7 +215,7 @@ export type HomePage = Omit<PageBasics, 'related'> & {
   shoot: ShootDemo
   costBills: CostBills
   plans?: PlanStrip
-  steps: { heading: string; items: readonly [HeadedText, HeadedText, HeadedText] }
+  steps: { heading: string; items: readonly [ExplainedText, ExplainedText, ExplainedText] }
   templateGrid: {
     heading: string
     intro: string

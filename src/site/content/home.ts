@@ -14,11 +14,11 @@ import {
   styledShotUsd,
   tierList,
   tierPixels,
-  uploadLimits,
   usd,
   usdRange,
   OUTPUT_TIERS,
 } from './offer'
+import { steps, tote, useCases } from './home-explainers'
 import { textEdits } from './home-edits'
 import { homeWishlist } from './home-wishlist'
 import { withFirstFrame } from './landing-shared'
@@ -30,7 +30,6 @@ import { homePlans } from './plan-strip'
 // every answer names Shotviva or image to image AI in its first sentence. Numbers come from
 // offer.ts / site.config (G3).
 const brand = site.brand.name
-const [standard, hd, max] = OUTPUT_TIERS
 
 function plansText(offers: OfferFacts): HeadedText {
   const { planFrom, yearlySaving } = offers
@@ -42,11 +41,9 @@ function plansText(offers: OfferFacts): HeadedText {
   }
 }
 
-// The illustrative tote set (design/assets/img/hero-set-*.webp, ARCHITECTURE §13 item 2): one
-// phone snapshot and three results from it. All 1080×1350.
+// The hero's pictures (public/home, all 1080×1350); the tote set itself is in home-explainers.
 const photo = (file: string, alt: string): ImageRef => ({ src: `/home/${file}.webp`, alt, width: 1080, height: 1350 })
-const phoneShot = photo('hero-set-phone', 'Phone snapshot of a woven leather tote on a busy kitchen counter, window light (illustrative example)')
-const listingShot = photo('hero-set-listing', 'The same woven leather tote as a white-background listing photo, soft studio light (illustrative example)')
+const phoneShot = tote.phone
 
 // The hero's AI side: three scenes made from that one phone photo, taking turns (Owner
 // 2026-11-11). Captions stay short and say only what changed; the alt text says it is an AI example.
@@ -72,14 +69,14 @@ export const shoot: ShootDemo = {
   phone: { image: phoneShot, file: 'IMG_2047.jpg', caption: 'As shot on a phone. Window light, a busy counter, keys and a mug in frame.' },
   arrow: 'Three templates, same tote',
   results: [
-    { image: listingShot, title: 'Marketplace listing', template: 'White Background template' },
+    { image: tote.listing, title: 'Marketplace listing', template: 'White Background template' },
     {
-      image: photo('hero-set-lifestyle', 'The same tote on a café chair by a window, warm morning light (illustrative example)'),
+      image: tote.lifestyle,
       title: 'Lifestyle scene',
       template: 'Lifestyle Table',
     },
     {
-      image: photo('hero-set-promo', 'The same tote on a promo poster headed New Season Tote, bright studio light (illustrative example)'),
+      image: tote.promo,
       title: 'Promo poster',
       template: 'Promo Poster',
     },
@@ -121,51 +118,6 @@ export function productBills({ planFrom }: OfferFacts, heading: string, intro: s
     },
   }
 }
-
-// 「What People Use Image to Image AI For」 (SEO launch handbook G5): one card per landing page,
-// each closing with an in-body link whose anchor is that page's keyword.
-const useCases = {
-  id: 'use-cases',
-  heading: 'What People Use Image to Image AI For',
-  cards: [
-    {
-      heading: 'AI Restaurant Menu Photos',
-      text: 'Restaurants shoot each dish on the pass with a phone and get menu, delivery-app and promo photos from it. The plate stays as served; only the light and the background change. Start with',
-      link: { href: '/ai-restaurant-menu', anchor: 'AI restaurant menu photos' },
-      after: '.',
-    },
-    {
-      heading: 'Commercial Photography Without a Studio',
-      text: 'Shops and sellers turn one phone photo of a product into a white-background listing image, a lifestyle scene or a promo poster, with no studio booking and no reshoot. See what replaces a shoot in',
-      link: { href: '/commercial-photography', anchor: 'commercial photography' },
-      after: '.',
-    },
-    {
-      heading: 'Image to Image Generator With Templates',
-      text: 'Pick a template instead of writing a prompt: food, products, beauty, pets or an art style. Your subject stays as you shot it. Try the',
-      link: { href: '/image-to-image-generator', anchor: 'image to image generator' },
-      after: '.',
-    },
-  ],
-} as const satisfies HomePage['topics']
-
-const steps = {
-  heading: 'How Image to Image AI Works in 3 Steps',
-  items: [
-    {
-      heading: 'Upload One Photo',
-      text: `Take a photo with your phone or choose one from your gallery: ${uploadLimits}. Keep the whole subject in the frame.`,
-    },
-    {
-      heading: 'Pick a Template',
-      text: 'Choose a template for food, products, beauty, rooms, pets or an art style. The template sets the light, the scene or the style, so there is nothing to write.',
-    },
-    {
-      heading: `Download in ${tierList}`,
-      text: `${standard.name} is ${standard.px} px for ${standard.use}, ${hd.name} is ${hd.px} px for ${hd.use}, and ${max.name} is ${max.px} px for ${max.use}.`,
-    },
-  ],
-} as const satisfies HomePage['steps']
 
 // "3 steps" in FAQ A is the length of the steps block, never typed.
 const STEP_COUNT = steps.items.length
