@@ -56,6 +56,13 @@ const coverSchema = z.union([
 
 // Without the editor schema's defaults: a field the file leaves out must keep the stored value,
 // not turn into `image` / `high` / `{}`.
+export const reviewSchema = z.strictObject({
+  status: z.enum(['pass', 'fail']),
+  notes: z.string().trim().max(2000).optional(),
+  pick: z.uuid().optional(),
+  version: z.int().positive(),
+}).refine(review => review.status === 'fail' || review.pick, { message: 'a pass names the trial run to use (pick)', path: ['pick'] })
+
 const templateFields = templateInputSchema.partial().omit({ id: true, isActive: true }).extend({
   module: z.enum(TEMPLATE_MODULES).optional(), quality: z.enum(TEMPLATE_QUALITIES).optional(),
 })
@@ -75,6 +82,9 @@ export const templateItemSchema = templateFields.extend({
   styleRefs: z.array(localFile).max(MAX_STYLE_REFS).optional(),
   // templates:trial only (sample inputs and benchmarks); apply ignores it.
   trial: trialSchema.optional(),
+  // templates:review / finalize: the verdict on the trial results of prompt version `version`; a
+  // pass names the trial run whose result becomes the cover. Apply ignores it.
+  review: reviewSchema.optional(),
   cover: coverSchema.optional(),
   openSale: z.boolean().optional(),
   publish: z.boolean().optional(),

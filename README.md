@@ -57,7 +57,20 @@ pnpm templates:apply .local/templates/<batch>.json             # apply to the te
   prompt version; no prompt text). Needs `TEMPLATE_TOOLS_R2_ACCOUNT_ID`,
   `TEMPLATE_TOOLS_R2_ACCESS_KEY_ID` and `TEMPLATE_TOOLS_R2_SECRET_ACCESS_KEY` for the test site's
   buckets (the same keys let templates:apply upload covers and style references).
-- R2 keys for both tools, in `.env.local` (fill in your own; never paste them anywhere):
+- Review and finish: write each template's verdict into the file as
+  `"review": { "status": "pass" | "fail", "version": <prompt version>, "pick": "<trial run id>", "notes": "…" }`
+  (a pass needs `pick`, the result that becomes the cover; a review of an older prompt version no
+  longer counts). Then:
+
+  ```bash
+  pnpm templates:review   .local/templates/<batch>.json             # refresh the review page, list verdicts
+  pnpm templates:finalize .local/templates/<batch>.json [--dry-run] # passed: picked cover, open sale, publish
+  pnpm templates:status   .local/templates/<batch>.json             # stage, prompt version, trials, spend
+  ```
+
+  `finalize` goes through the same path as `templates:apply` (the admin's 「设为封面」, sale switch
+  and 上架 rules, all or nothing); a file's explicit `"openSale": false` or `"publish": false` wins.
+- R2 keys for the tools, in `.env.local` (fill in your own; never paste them anywhere):
 
   ```bash
   # A Cloudflare R2 API token limited to the test site's buckets shotviva-preview and

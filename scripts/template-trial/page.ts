@@ -11,11 +11,19 @@ const escape = (text: string) => text.replace(/[&<>"']/g, ch => ({ '&': '&amp;',
 const img = (src: string, alt: string) => `<img loading="lazy" src="${escape(src.split('\\').join('/'))}" alt="${escape(alt)}">`
 const money = (usd: number | null) => usd === null ? '成本待核' : `$${usd.toFixed(3)}`
 
-function resultCard(record: TrialRecord) {
+function reviewLine(item: TemplateItem) {
+  const review = item.review
+  if (!review) return '<p class="miss">还没有评审</p>'
+  const verdict = review.status === 'pass' ? '通过' : '不通过'
+  return `<p><strong>评审（v${review.version}）：${verdict}</strong>${review.notes ? ' · ' + escape(review.notes) : ''}</p>`
+}
+
+function resultCard(record: TrialRecord, pick?: string) {
   const meta = [`#${record.inputIndex + 1}.${record.k + 1}`, record.provider?.split('/').slice(1).join('/') || '', money(record.costUsd),
     record.durationMs ? `${Math.round(record.durationMs / 1000)}s` : ''].filter(Boolean).join(' · ')
   const body = record.file ? img(record.file, record.runId) : `<div class="miss">${escape(record.outcome)} ${escape(record.code ?? '')}</div>`
-  return `<figure>${body}<figcaption>${escape(meta)}<br><code>${escape(record.runId)}</code></figcaption></figure>`
+  const picked = record.runId === pick ? ' class="pick"' : ''
+  return `<figure${picked}>${body}<figcaption>${picked ? '★ 选为封面 · ' : ''}${escape(meta)}<br><code>${escape(record.runId)}</code></figcaption></figure>`
 }
 
 function inputsBlock(item: TemplateItem, root: string, baseDir: string) {
@@ -32,11 +40,11 @@ function templateSection(item: TemplateItem, records: TrialRecord[], root: strin
   const versions = [...new Set(records.map(r => r.version))].sort((a, b) => b - a)
   const spent = records.reduce((sum, r) => sum + (r.costUsd ?? 0), 0)
   const rows = versions.map(v => {
-    const cards = records.filter(r => r.version === v).sort((a, b) => a.inputIndex - b.inputIndex || a.k - b.k).map(resultCard).join('')
+    const cards = records.filter(r => r.version === v).sort((a, b) => a.inputIndex - b.inputIndex || a.k - b.k).map(r => resultCard(r, item.review?.pick)).join('')
     return `<h3>提示词 v${v}</h3><div class="grid">${cards}</div>`
   }).join('')
   return `<section id="${escape(item.id)}"><h2>${escape(item.id)} <small>${escape(item.name ?? '')} · 试跑 ${records.length} 次 · ${money(spent)}</small></h2>
-<div class="row"><div><h4>对标图</h4><div class="grid refs">${refs || '<div class="miss">没有对标图</div>'}</div></div>
+${reviewLine(item)}<div class="row"><div><h4>对标图</h4><div class="grid refs">${refs || '<div class="miss">没有对标图</div>'}</div></div>
 <div><h4>样图输入</h4><div class="grid">${inputsBlock(item, root, baseDir)}</div></div></div>${rows || '<p class="miss">还没有试跑结果</p>'}</section>`
 }
 
@@ -47,7 +55,7 @@ section{border-top:1px solid var(--line);padding:16px 0}h2 small,figcaption,.mis
 .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
 figure{margin:0;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px}
-img{width:100%;height:auto;border-radius:4px;display:block}code{font-size:11px;word-break:break-all}nav a{margin-right:12px}`
+img{width:100%;height:auto;border-radius:4px;display:block}figure.pick{outline:3px solid #16a34a}code{font-size:11px;word-break:break-all}nav a{margin-right:12px}`
 
 export function buildPage(state: TrialState, items: TemplateItem[], root: string, baseDir: string, generatedAt = new Date()) {
   const records = Object.values(state.records)

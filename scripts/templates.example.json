@@ -48,7 +48,8 @@
         "references": ["reference-images/example/benchmark-1.jpg"],
         "n": 2,
         "resolution": "1k"
-      }
+      },
+      "review": { "status": "pass", "version": 1, "pick": "00000000-0000-4000-8000-000000000001", "notes": "Fake verdict." }
     },
     {
       "id": "example-burger-side",
