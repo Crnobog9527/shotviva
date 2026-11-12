@@ -3,8 +3,8 @@
 import '../../globals.css'
 
 import type { Metadata } from 'next'
-import { useTranslations } from 'next-intl'
-import { getTranslations } from 'next-intl/server'
+import { NextIntlClientProvider, useTranslations } from 'next-intl'
+import { getMessages, getTranslations } from 'next-intl/server'
 import { Suspense, type ReactNode } from 'react'
 
 import { isStaffAccount } from '@/core/analytics'
@@ -12,6 +12,7 @@ import { AnalyticsIdentify } from '@/core/analytics/browser'
 import { AnnouncementBanner } from '@/core/announcements'
 import { AdminLink, adminEntryFor, AppFrame, BrandProvider, TabBar, TabBarSlot, type TabItem } from '@/core/app-shell'
 import { getSessionUser } from '@/core/auth'
+import { clientMessages } from '@/core/i18n'
 import { PaywallProvider } from '@/core/billing/paywall'
 import { wechatPayEnabled } from '@/core/billing/stripe'
 import { StandingSlot } from '@/core/billing/standing'
@@ -89,6 +90,12 @@ async function Paywall({ children }: { children: ReactNode }) {
   )
 }
 
+// The root layout hands public pages only their messages (core/i18n/client-messages.ts); the app
+// gets every client namespace here, for its own pages and its chrome.
+async function AppMessages({ children }: { children: ReactNode }) {
+  return <NextIntlClientProvider messages={clientMessages(await getMessages())}>{children}</NextIntlClientProvider>
+}
+
 function useTabs(): TabItem[] {
   const t = useTranslations('app.tabs')
   const image = isModuleEnabled(site, 'image')
@@ -123,35 +130,37 @@ function useTabs(): TabItem[] {
 export default function AppLayout({ children }: LayoutProps<'/[locale]'>) {
   const tabs = useTabs()
   return (
-    <AppFrame>
-      {/* Hidden on /admin by the banner itself, and while a generation runs (ARCHITECTURE §10). */}
-      <HideWhileGenerating>
-        <AnnouncementBanner />
-      </HideWhileGenerating>
-      <Paywall>
-        {/* The wordmark in the top bar and the phone tab-root headers reads the brand from here. */}
-        <BrandProvider name={site.brand.name}>
-          <Suspense fallback={null}>
-            <Identity />
-          </Suspense>
-          {/* usePathname decides tab root vs flow page. It is prerendered with every static app page,
-              so the bar is there from the first paint; on a dynamic-param page it waits for the
-              request, and TabBarSlot holds its room meanwhile. */}
-          <Suspense fallback={<TabBarSlot />}>
-            <Tabs items={tabs} />
-          </Suspense>
-          <main className="flex flex-1 flex-col">
-            {/* "Your wish came true", for an account with unread notices (ARCHITECTURE §15.4): at the
-                top of the page, in flow, so a notice that stays until closed never covers a control. */}
-            <WishNoticeSlot />
-            {children}
-          </main>
-          <GenerationRunner />
-          <WishlistHintSlot />
-        </BrandProvider>
-        {/* DESIGN §5 「全站流动背景」 (T54); it renders nothing on /admin. */}
-        <LivingBackground />
-      </Paywall>
-    </AppFrame>
+    <AppMessages>
+      <AppFrame>
+        {/* Hidden on /admin by the banner itself, and while a generation runs (ARCHITECTURE §10). */}
+        <HideWhileGenerating>
+          <AnnouncementBanner />
+        </HideWhileGenerating>
+        <Paywall>
+          {/* The wordmark in the top bar and the phone tab-root headers reads the brand from here. */}
+          <BrandProvider name={site.brand.name}>
+            <Suspense fallback={null}>
+              <Identity />
+            </Suspense>
+            {/* usePathname decides tab root vs flow page. It is prerendered with every static app page,
+                so the bar is there from the first paint; on a dynamic-param page it waits for the
+                request, and TabBarSlot holds its room meanwhile. */}
+            <Suspense fallback={<TabBarSlot />}>
+              <Tabs items={tabs} />
+            </Suspense>
+            <main className="flex flex-1 flex-col">
+              {/* "Your wish came true", for an account with unread notices (ARCHITECTURE §15.4): at the
+                  top of the page, in flow, so a notice that stays until closed never covers a control. */}
+              <WishNoticeSlot />
+              {children}
+            </main>
+            <GenerationRunner />
+            <WishlistHintSlot />
+          </BrandProvider>
+          {/* DESIGN §5 「全站流动背景」 (T54); it renders nothing on /admin. */}
+          <LivingBackground />
+        </Paywall>
+      </AppFrame>
+    </AppMessages>
   )
 }
