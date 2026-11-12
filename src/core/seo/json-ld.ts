@@ -76,7 +76,8 @@ export function organizationLd(site: SiteConfig): JsonLd {
     logo: absoluteUrl(site, site.brand.logoPath),
     email: site.brand.contactEmail,
     address: postalAddressLd(site.brand.address),
-    sameAs: [...site.brand.sameAs],
+    // Only claimed accounts (SEO patch v5 item 6); with none, no sameAs at all, never [] or "".
+    ...(site.brand.sameAs.length > 0 ? { sameAs: [...site.brand.sameAs] } : {}),
   }
 }
 

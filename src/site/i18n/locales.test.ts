@@ -17,14 +17,14 @@ import { privateDoc } from '../../../tests/support/private-docs'
 const keywordMap = privateDoc('seo资料', 'Shotviva 页面与主词映射（中文口径）.csv')
 
 // The Chinese keyword map (T22, AGENTS §9): the only source of indexable /zh pages. Rows built
-// with T21 are the ones whose batch is 「第1周（随 T21）」.
+// with T21 have the batch 「第1周（随 T21）」; the two verticals opened by SEO patch v5 「补丁 v5…」.
 function zhCsvLaunchUrls(): string[] {
   const csv = readFileSync(keywordMap!, 'utf8')
   return csv
     .split(/\r?\n/)
     .slice(1)
     .map((line) => line.split(','))
-    .filter(([batch, url]) => batch?.includes('随 T21') && url?.startsWith('/zh'))
+    .filter(([batch, url]) => (batch?.includes('随 T21') || batch?.includes('补丁 v5')) && url?.startsWith('/zh'))
     .map(([, url]) => url as string)
 }
 
@@ -56,7 +56,7 @@ describe('locales in site.config (ARCHITECTURE §17)', () => {
     }
   })
 
-  it.skipIf(!keywordMap)('indexes exactly the /zh pages the Chinese keyword map launches with T21', () => {
+  it.skipIf(!keywordMap)('indexes exactly the /zh pages the Chinese keyword map marks indexable', () => {
     const indexable = site.indexing.zhIndexablePaths.map((path) => localizePath(path, 'zh'))
     expect(indexable.sort()).toEqual(zhCsvLaunchUrls().sort())
     for (const path of site.indexing.zhIndexablePaths) expect(site.locales.zhPaths).toContain(path)
