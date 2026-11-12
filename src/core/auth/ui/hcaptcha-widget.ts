@@ -1,3 +1,4 @@
+import { captchaHolders } from './captcha-light'
 import { CaptchaNetworkError, loadHCaptcha, type HCaptchaApi } from './hcaptcha-script'
 
 // Without a challenge on screen a warm invisible check answers in about 0.3 s (measured from
@@ -52,28 +53,11 @@ export function prepareHCaptcha(siteKey: string, language: string): Promise<void
   return slot.widget.then(() => undefined)
 }
 
-// Forms that may submit hold the warm widget; when the last one unmounts (signed in, moved on to
-// another page) it is removed, so no hidden hCaptcha frame stays on the pages after. The release
-// waits a tick: a form swapped for another (log-in → check your email) holds it again first.
-let holders = 0
-
-function releaseWarm() {
+// Called once the last form holding the widget has unmounted (captcha-light.ts retainCaptcha).
+export function releaseWarm() {
   const slot = warm
   warm = null
   if (slot) void slot.widget.then(dispose, () => undefined)
-}
-
-export function retainHCaptcha(): () => void {
-  holders += 1
-  let released = false
-  return () => {
-    if (released) return
-    released = true
-    holders -= 1
-    setTimeout(() => {
-      if (holders === 0) releaseWarm()
-    }, 0)
-  }
 }
 
 // Tokens are single use, so each attempt takes the warm widget (or makes one) for itself.
@@ -117,6 +101,6 @@ export async function invisibleToken(siteKey: string, language: string, onChalle
     dispose(widget)
     // A retry (a wrong password, say) or a resend starts warm, while a form is still on the page;
     // once the last one unmounts (signed in, moved on) retainHCaptcha's release removes it.
-    if (holders > 0) prepareHCaptcha(siteKey, language).catch(() => undefined)
+    if (captchaHolders() > 0) prepareHCaptcha(siteKey, language).catch(() => undefined)
   }
 }

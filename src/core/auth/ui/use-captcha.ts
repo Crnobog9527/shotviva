@@ -5,8 +5,17 @@ import { useCallback } from 'react'
 
 import { isLocale } from '../../i18n/locales'
 import { publicEnv } from '../../public-env'
-import { CaptchaNetworkError, hcaptchaLanguage } from './hcaptcha-script'
-import { invisibleToken, prepareHCaptcha, retainHCaptcha } from './hcaptcha-widget'
+import { CAPTCHA_NETWORK_ERROR, hcaptchaLanguage, isCaptchaNetworkError, retainCaptcha } from './captcha-light'
+
+// The loader and the widget come on demand (the warm-up or the first submit), never in a page's
+// first JavaScript. A chunk that cannot load is a network problem like any other.
+const widget = () => import('./hcaptcha-widget')
+
+function networkError(): Error {
+  const error = new Error('hCaptcha code could not load')
+  error.name = CAPTCHA_NETWORK_ERROR
+  return error
+}
 
 // `off`: no site key. `failed`: the challenge was closed, expired or failed. `network`: the script
 // or the check could not get through in time (slow or blocked network).
@@ -23,9 +32,10 @@ export function useCaptcha(siteKey: string = publicEnv.NEXT_PUBLIC_HCAPTCHA_SITE
   const tryToken = useCallback(async (onChallenge?: () => void): Promise<CaptchaOutcome> => {
     if (!siteKey) return { status: 'off' }
     try {
+      const { invisibleToken } = await widget().catch(() => Promise.reject(networkError()))
       return { status: 'token', token: await invisibleToken(siteKey, language, onChallenge) }
     } catch (error) {
-      return { status: error instanceof CaptchaNetworkError ? 'network' : 'failed' }
+      return { status: isCaptchaNetworkError(error) ? 'network' : 'failed' }
     }
   }, [siteKey, language])
 
@@ -37,11 +47,14 @@ export function useCaptcha(siteKey: string = publicEnv.NEXT_PUBLIC_HCAPTCHA_SITE
   }, [tryToken])
 
   const prepare = useCallback(() => {
-    if (siteKey) prepareHCaptcha(siteKey, language).catch(() => undefined)
+    if (siteKey) widget().then((m) => m.prepareHCaptcha(siteKey, language)).catch(() => undefined)
   }, [siteKey, language])
 
   // A form that may submit holds the prepared widget while it is mounted (release on unmount).
-  const retain = useCallback(() => (siteKey ? retainHCaptcha() : () => undefined), [siteKey])
+  const retain = useCallback(
+    () => (siteKey ? retainCaptcha(() => void widget().then((m) => m.releaseWarm(), () => undefined)) : () => undefined),
+    [siteKey],
+  )
 
   return { enabled: Boolean(siteKey), getToken, tryToken, prepare, retain }
 }

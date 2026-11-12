@@ -37,7 +37,11 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllGlobals())
 
-const load = async () => ({ ...(await import('./hcaptcha-script')), ...(await import('./hcaptcha-widget')) })
+const load = async () => {
+  const modules = { ...(await import('./captcha-light')), ...(await import('./hcaptcha-script')), ...(await import('./hcaptcha-widget')) }
+  // What use-captcha.ts does: a form holds the widget, and the last release removes it.
+  return { ...modules, retainHCaptcha: () => modules.retainCaptcha(modules.releaseWarm) }
+}
 const rendered = (sitekey: string, hl: string) => ({ sitekey, size: 'invisible', hl, 'open-callback': expect.any(Function) })
 
 describe('hCaptcha language', () => {
@@ -152,6 +156,12 @@ describe('a stuck network', () => {
     await vi.advanceTimersByTimeAsync(EXECUTE_TIMEOUT_MS * 3)
     answer({ response: 'late' })
     await expect(token).resolves.toBe('late')
+  })
+
+  it('names its network error so the form can tell it apart without loading this code', async () => {
+    const { CaptchaNetworkError, isCaptchaNetworkError } = await load()
+    expect(isCaptchaNetworkError(new CaptchaNetworkError('timeout'))).toBe(true)
+    expect(isCaptchaNetworkError(new Error('challenge-closed'))).toBe(false)
   })
 
   it('reports a script that cannot load as a network error, and loads it again next time', async () => {
