@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { parseServerEnv } from './env'
+import { parseServerEnv, syncPrivateBucket } from './env'
 
 describe('parseServerEnv', () => {
   it('applies defaults', () => {
@@ -57,4 +57,17 @@ describe('Stripe keys', () => {
     expect(() => parseServerEnv({ STRIPE_SECRET_KEY: 'pk_test_123' })).not.toThrow(/pk_test_123/)
     expect(() => parseServerEnv({ STRIPE_WEBHOOK_SECRET: 'secret' })).toThrow(/STRIPE_WEBHOOK_SECRET/)
   })
+})
+
+describe('template sync private bucket', () => {
+  it('accepts only production\'s own private bucket, and reads unset or empty as none', () => {
+    expect(syncPrivateBucket('shotviva-production')).toBe('shotviva-production')
+    expect(syncPrivateBucket(undefined)).toBeUndefined()
+    expect(syncPrivateBucket('')).toBeUndefined()
+  })
+
+  it.each(['shotviva-assets', 'shotviva-assets-preview', 'shotviva-preview', 'shotviva-production-old', ' shotviva-production'])(
+    'rejects %j', (bucket) => {
+      expect(() => syncPrivateBucket(bucket)).toThrow()
+    })
 })
