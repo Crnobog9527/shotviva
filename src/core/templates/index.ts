@@ -107,7 +107,7 @@ export {
 export { allowedWebAspects } from './allowed-web-aspects'
 export { estimatedImageCostsSchema, imageCapabilitiesSchema } from './image-capabilities'
 export { imageCostBudget, maxCostPerCredit, modelCreditFloor, UNPRICED, type ProviderFloors } from './provider-pricing'
-export { cachedWebTemplates } from './cached-catalogue'
+export { cachedWebTemplates, findWebTemplate } from './cached-catalogue'
 export { cachedCatalogueIndex, cachedCategoryEntries, cachedCategoryTree, cachedSeriesMembers } from './cached-taxonomy'
 export type { CatalogueIndex, IndexEntry, IndexSeries } from './catalogue-index'
 export type { CatalogueCursor, CataloguePage, CategoryNode } from './taxonomy'

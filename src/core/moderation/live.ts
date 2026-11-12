@@ -7,6 +7,7 @@ import { createAdminSupabase } from '../auth/supabase-admin'
 import { serverEnv } from '../env'
 import { GALLERY_CACHE_TAG } from '../gallery/cache'
 import { inGalleryScope } from '../gallery/scope'
+import { syncGalleryVariants } from '../gallery/variant-sync'
 import type { Job } from '../jobs/job-schema'
 import { r2Store } from '../storage/r2-store'
 import { SCREEN_COLUMNS, screenRowSchema, screenWork, type ModerationDeps } from './moderate-work'
@@ -18,14 +19,20 @@ export function moderationKey(): string | null {
 }
 
 // Production wiring: the service-role client, R2 and the OpenAI key. An auto-approved work is new
-// gallery content, so the gallery's pages refresh on their next visit.
+// gallery content, so the gallery's pages refresh on their next visit, and its gallery copies are
+// made now (this already runs after a response, or in the sweep), so its first view is fast.
 export function liveModerationDeps(): ModerationDeps & { db: ReturnType<typeof createAdminSupabase> } {
   const key = moderationKey()
+  const db = createAdminSupabase()
+  const store = r2Store()
   return {
-    db: createAdminSupabase(),
-    store: r2Store(),
+    db,
+    store,
     screen: key ? (input) => screenWithOpenAI(key, input) : null,
-    onApproved: () => revalidateTag(GALLERY_CACHE_TAG, 'max'),
+    onApproved: async (jobId) => {
+      revalidateTag(GALLERY_CACHE_TAG, 'max')
+      await syncGalleryVariants({ db, store }, 'approved', [jobId])
+    },
   }
 }
 

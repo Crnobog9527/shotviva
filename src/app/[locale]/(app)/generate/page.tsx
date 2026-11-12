@@ -11,7 +11,7 @@ import { currentLocale } from '@/core/i18n/server'
 import { listRunningJobIds } from '@/core/jobs'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { WishCard } from '@/core/wishlist/ui/wish-card'
-import { FavoritesProvider, GatedFeatures, GeneratingPill, loadCatalogueView, TEMPLATES_ANCHOR, TemplateCatalogue } from '@/modules/image'
+import { createReturnPath, FavoritesProvider, GatedFeatures, GeneratingPill, loadCatalogueView, TEMPLATES_ANCHOR, TemplateCatalogue } from '@/modules/image'
 import { site } from '@/site/site.config'
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -27,8 +27,12 @@ function Header({ aside }: { aside?: ReactNode }) {
 // A card opens the creation dialog right here (T38), so the page also reads what the form
 // needs: the tier (batch size) and the photos already developing (concurrency), and the user's
 // saved templates, read per request on their own session (never in the shared catalogue cache).
-async function Create() {
-  const user = await requireUser('/generate')
+type Search = Promise<Record<string, string | string[] | undefined>>
+
+// The proxy already sends a signed-out visitor to sign-in with the full address; this is the
+// page's own fallback, and it keeps an open series (?series=) too.
+async function Create({ searchParams }: { searchParams: Search }) {
+  const user = await requireUser(createReturnPath((await searchParams).series))
   const supabase = await createServerSupabase()
   const admin = createAdminSupabase()
   const [view, balance, tier, runningIds, favoriteIds, wishlistLive] = await Promise.all([
@@ -71,11 +75,11 @@ async function Create() {
   )
 }
 
-export default function CreatePage() {
+export default function CreatePage({ searchParams }: { searchParams: Search }) {
   return (
     <AppPage wide>
       <Suspense fallback={<Header />}>
-        <Create />
+        <Create searchParams={searchParams} />
       </Suspense>
     </AppPage>
   )

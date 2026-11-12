@@ -101,7 +101,10 @@ export type HomeFaq = readonly [FaqItem, FaqItem, FaqItem, FaqItem, FaqItem, Faq
 // One featured template as a card (T53): `id` is its id in the templates table, picked into the
 // home generator; name and use (its description) in the page's language (建站规格 R5). No
 // price: the cards don't show one (DESIGN, Owner 2026-11-08).
-export type TemplateCard = { id: string; name: string; use: string }
+// `series`: a series card (T102; Owner 2026-11-12): where it opens, the members whose pairs it
+// shows (their covers are in the media lookup by template id), and how many templates it holds.
+export type SeriesCardInfo = { href: string; members: readonly string[]; count: number }
+export type TemplateCard = { id: string; name: string; use: string; series?: SeriesCardInfo }
 
 // One H3 per category with its featured templates, as rendered (建站规格 §4 H2-2). Name, intro
 // and order come from template_categories, managed in admin (T75); `drag`: its card style is

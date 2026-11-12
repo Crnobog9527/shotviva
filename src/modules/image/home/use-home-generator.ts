@@ -8,7 +8,8 @@ import type { OutputAspect } from '@/core/templates/output-options'
 import { allowsNoPhoto, type CatalogueTemplate } from '../catalogue/catalogue-template'
 import { enqueueJobs, setWorkspaceJobs } from '../generation/job-store'
 import { useJobs } from '../generation/use-jobs'
-import { draftToggles, rememberConfirmed, restoreToggles, type ToggleValues } from '../toggles'
+import { rememberTemplate } from '../workspace/pending-template'
+import { useWarmRoute } from '../workspace/use-warm-route'
 import { chosenAspect, closestResolution, hasOutputOptions, selectedAspect, templateOptions } from '../workspace/output-choice'
 import { useOriginalRatio } from '../workspace/use-original-ratio'
 import { startInputs } from '../workspace/batch-request'
@@ -58,13 +59,23 @@ function readyHomePhoto(photo: HomePhoto) {
 
 function useStart(viewer: HomeViewer | null, template: CatalogueTemplate | null, photo: HomePhoto) {
   const router = useRouter()
+  // Signed in and ready to start (the photo uploaded, or a template that needs none): keep the
+  // template's workspace route warm, as the creation dialogs do, so Generate's jump to the
+  // developing view is a client move on the click (perf window 2026-11-12, #515).
+  const startable = photo.status === 'ready' || (allowsNoPhoto(template) && photo.status === 'none')
+  useWarmRoute(`/generate/${template?.id ?? ''}`, viewer !== null && template !== null && startable)
   return useCallback(
-    (aspect: OutputAspect | null, note: string, toggles: ToggleValues) => {
+    (aspect: OutputAspect | null, note: string) => {
       if (!viewer || !template || !aspect) return
       const ready = readyHomePhoto(photo)
       if (!ready.length && !(allowsNoPhoto(template) && photo.status === 'none')) return
-      const ids = enqueueJobs(startInputs(template, { aspect, resolution: '1k', note, copy: {}, toggles }, ready), viewer.concurrency.limit)
+      // No template toggles here: they are only offered once the template itself is open (its
+      // create page or dialog), so a photo started from the home bar has them all off (Owner 2026-11-12).
+      const ids = enqueueJobs(startInputs(template, { aspect, resolution: '1k', note, copy: {}, toggles: {} }, ready), viewer.concurrency.limit)
       setWorkspaceJobs(template.id, ids)
+      // The workspace page's pending view draws this template's full head (thumbnail, name,
+      // category and use) until the server's page takes over, as after a dialog's Generate.
+      rememberTemplate(template)
       router.push(`/generate/${template.id}`)
     },
     [viewer, template, photo, router],
@@ -76,24 +87,13 @@ export function useHomeGenerator({ templates, defaultId, viewer }: Args) {
   const template = templates.find((candidate) => candidate.id === templateId) ?? templates[0] ?? null
   const [aspect, setAspect] = useState<OutputAspect>('original')
   const [note, setNote] = useState('')
-  // The chosen template's toggles (T89): a choice belongs to the template it was made on, so
-  // picking another template starts from all off (and its own confirm dialog).
-  const [chosen, setChosen] = useState<{ templateId: string | null; values: ToggleValues }>({ templateId: null, values: {} })
-  const toggles = template && chosen.templateId === template.id ? chosen.values : {}
-  const setToggles = useCallback((values: ToggleValues) => setChosen({ templateId: template?.id ?? null, values }), [template])
   const pickedPhoto = useHomePhoto(viewer !== null)
   const photo: HomePhoto = template?.photoInput === 'none'
     ? { ...pickedPhoto, url: null, inputKey: null, file: null, error: null, status: 'none' } : pickedPhoto
   const apply = useCallback(
     (draft: HomeDraft) => {
       const saved = templates.find((candidate) => candidate.id === draft.templateId)
-      if (saved) {
-        setTemplateId(saved.id)
-        // The confirmed toggles stay on, and count as confirmed for this session (T89).
-        const values = restoreToggles(saved.toggles, draft)
-        setChosen({ templateId: saved.id, values })
-        for (const key of draft.confirmed.filter((confirmed) => values[confirmed])) rememberConfirmed(saved.id, key)
-      }
+      if (saved) setTemplateId(saved.id)
       setAspect(draft.aspect)
       setNote(draft.note)
       return saved !== undefined && saved.photoInput !== 'none'
@@ -114,13 +114,11 @@ export function useHomeGenerator({ templates, defaultId, viewer }: Args) {
     setAspect,
     note,
     setNote,
-    toggles,
-    setToggles,
     photo,
     cta,
-    generate: () => start(outputAspect, note.trim(), toggles),
+    generate: () => start(outputAspect, note.trim()),
     // Before the sign-up prompt: what to bring back afterwards.
-    keepDraft: () => (template ? saveDraft({ templateId: template.id, aspect, note, ...draftToggles(template.toggles, toggles) }, photo.file) : Promise.resolve()),
+    keepDraft: () => (template ? saveDraft({ templateId: template.id, aspect, note }, photo.file) : Promise.resolve()),
   }
 }
 

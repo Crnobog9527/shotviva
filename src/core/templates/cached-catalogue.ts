@@ -1,5 +1,6 @@
 import 'server-only'
 
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { cacheLife, cacheTag } from 'next/cache'
 
 import { createAdminSupabase } from '../auth/supabase-admin'
@@ -57,4 +58,23 @@ export async function cachedWebTemplates(locale: Locale, includeSeriesMembers: b
   cacheTag(TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG)
   cacheLife(CATALOGUE_LIFE)
   return listTemplatesIn(createAdminSupabase(), locale, { includeSeriesMembers })
+}
+
+type TemplateReads = {
+  cached: (locale: Locale) => Promise<LocalizedTemplate[]>
+  live: (db: SupabaseClient, locale: Locale, id: string) => Promise<LocalizedTemplate[]>
+}
+const READS: TemplateReads = {
+  cached: (locale) => cachedWebTemplates(locale, true),
+  live: (db, locale, id) => listTemplatesIn(db, locale, { id }),
+}
+
+// One template's workspace: the cached catalogue first. A miss reads that template live once
+// (web_templates(p_template_id) on the visitor's session), so a template put on sale after the
+// cache was filled opens at once instead of 404ing until the cache refreshes. null: not live.
+export async function findWebTemplate(db: SupabaseClient, locale: Locale, id: string, reads: TemplateReads = READS) {
+  const hit = (await reads.cached(locale)).find((template) => template.id === id)
+  if (hit) return hit
+  const [live] = await reads.live(db, locale, id)
+  return live ?? null
 }

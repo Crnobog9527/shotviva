@@ -12,6 +12,7 @@ import { photoNameFor, preflightBatch, preflightCells, withPreflight, type Prefl
 import { enqueueJobs, setWorkspaceJobs, type StartInput } from '../generation/job-store'
 import { useJobs } from '../generation/use-jobs'
 import { startInputs } from './batch-request'
+import { rememberTemplate } from './pending-template'
 import { chosenAspect, closestResolution, hasOutputOptions, selectedAspect, templateOptions } from './output-choice'
 import { ctaState, type CtaState } from './cta-state'
 import { missingRequiredCopy } from './text-fields'
@@ -59,7 +60,13 @@ export function useWorkspaceDraft({ template, balance, tier, concurrency, again 
     copyMissing: missingRequiredCopy(template.copyFields, values.copy),
   })
   const state: CtaState = run.checking ? { kind: 'checking' } : !hasOutputOptions(options) ? { kind: 'no-options' } : needsRatio ? { kind: 'need-size' } : ready()
-  const start = () => (state.kind === 'generate' ? run.start(startInputs(template, values, summary.ready), summary.ready) : Promise.resolve(null))
+  const start = () => {
+    if (state.kind !== 'generate') return Promise.resolve(null)
+    // A dialog that starts here then moves to the template's workspace page, whose pending view
+    // draws this template's head before the server answers (pending-template.ts).
+    rememberTemplate(template)
+    return run.start(startInputs(template, values, summary.ready), summary.ready)
+  }
   const changeValues = (next: Partial<FormValues>) => {
     run.clearError()
     change(next)

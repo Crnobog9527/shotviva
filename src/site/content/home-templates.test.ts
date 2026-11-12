@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { FALLBACK_COUNT, featuredSections, featuredTemplates, tryTemplates } from './home-templates'
+import { FALLBACK_COUNT, SERIES_PAIRS, featuredSections, featuredTemplates, seriesHref, tryTemplates } from './home-templates'
 
 // What localizeTemplate attaches from template_categories (T75): name and intro in the page's
 // language, its place in the 分类管理 order, and whether it is the drag compare.
@@ -61,5 +61,47 @@ describe('featured templates from the database', () => {
   it('offers the 404 only templates with both covers, never a compare category', () => {
     const rows = [live('art', 'art-styles', { rank: 1 }), live('bare', 'pets', { rank: 2, covers: false }), live('pet', 'pets', { rank: 3 })]
     expect(tryTemplates(rows).map((t) => t.id)).toEqual(['pet'])
+  })
+})
+
+// T102 series on the public sections (Owner 2026-11-12): one card per series, where its first
+// featured member stands, picturing its members in series order.
+const series = (id: string, memberIds: string[], showMembers = false) => ({ id, slug: `${id}-set`, name: `Series ${id}`, description: `All of ${id}`, showMembers, memberIds })
+
+describe('series on the template sections', () => {
+  it('collapses featured members into one series card at the first member\'s place, in admin order', () => {
+    const rows = [live('solo', 'food-drink', { rank: 1 }), live('m2', 'food-drink', { rank: 2 }), live('other', 'food-drink', { rank: 3 }), live('m1', 'food-drink', { rank: 4 }), live('m3', 'food-drink')]
+    const { categories, media, defaultId } = featuredSections(rows, undefined, [series('s', ['m1', 'm2', 'gone', 'm3'])])
+    expect(categories[0]?.templates.map((card) => card.id)).toEqual(['solo', 'series-s', 'other'])
+    expect(categories[0]?.templates[1]).toEqual({
+      id: 'series-s', name: 'Series s', use: 'All of s',
+      series: { href: '/generate?series=s-set', members: ['m1', 'm2', 'm3'], count: 3 },
+    })
+    // Not in the live catalogue (not on sale): neither pictured nor counted.
+    // The pictured members' covers are in the lookup, the unfeatured m3 included.
+    expect(Object.keys(media).sort()).toEqual(['m1', 'm2', 'm3', 'other', 'solo'])
+    expect(defaultId).toBe('solo')
+  })
+
+  it('keeps members as their own cards too when admin shows them, and pictures at most SERIES_PAIRS with covers', () => {
+    const ids = Array.from({ length: SERIES_PAIRS + 2 }, (_, i) => `m${i}`)
+    const rows = ids.map((id, i) => live(id, 'pets', { rank: i === 0 ? 1 : undefined, covers: i !== 1 }))
+    const { categories } = featuredSections(rows, undefined, [series('s', ids, true)])
+    expect(categories[0]?.templates.map((card) => card.id)).toEqual(['series-s', 'm0'])
+    expect(categories[0]?.templates[0]?.series?.members).toEqual(['m0', 'm2', 'm3', 'm4', 'm5'])
+    expect(categories[0]?.templates[0]?.series?.count).toBe(SERIES_PAIRS + 2)
+  })
+
+  it('leaves templates alone without series, and filters a landing page by its members\' category', () => {
+    const rows = [live('m1', 'pets', { rank: 1 }), live('dish', 'food-drink', { rank: 2 })]
+    expect(featuredSections(rows).categories.flatMap((c) => c.templates.map((t) => t.id))).toEqual(['dish', 'm1'])
+    expect(featuredSections(rows, ['food-drink'], [series('s', ['m1'])]).categories.flatMap((c) => c.templates.map((t) => t.id))).toEqual(['dish'])
+  })
+
+  it('offers a series on the 404 once, opening the series, pictured by its first member with covers', () => {
+    const rows = [live('m1', 'pets', { rank: 1, covers: false }), live('m2', 'pets', { rank: 2 })]
+    expect(tryTemplates(rows, [series('s', ['m1', 'm2'])])).toEqual([
+      { id: 'series-s', name: 'Series s', use: 'All of s', href: seriesHref('s-set'), before: 'https://shotviva.com/assets/covers/m2/b.webp', after: 'https://shotviva.com/assets/covers/m2/a.webp' },
+    ])
   })
 })
