@@ -6,7 +6,7 @@ import { useState, type ReactNode } from 'react'
 import { Link } from '../../i18n/ui'
 import { PASSWORD_MIN } from '../flows/schemas'
 import { CheckEmail } from './check-email'
-import { CaptchaFailed, CaptchaLine, EmailField, Heading, Notice, PasswordField, SubmitButton } from './form-parts'
+import { CaptchaFailed, CaptchaLine, EmailField, FormStatus, Heading, Notice, PasswordField, SubmitButton } from './form-parts'
 import { CheckGlyph, ClockGlyph } from './icons'
 import { useAuthForm, type FormAction } from './use-auth-form'
 import { validateEmail, validateNewPassword } from './validate'
@@ -47,10 +47,11 @@ export function ResetRequestForm({ action, linkExpired, linkHours, sender }: Req
     <section aria-labelledby="au-reset-title">
       <Heading title={t('reset.title')}>{t('reset.sub')}</Heading>
       {form.errorCode ? <Notice>{t(`errors.${form.errorCode}`)}</Notice> : null}
-      <form onSubmit={form.onSubmit} noValidate className="au-form au-form-gap">
+      <form method="post" onSubmit={form.onSubmit} noValidate className="au-form au-form-gap">
         <EmailField form={form} name="email" label={t('fields.email')} autoComplete="email" placeholder={t('placeholders.email')} />
         <SubmitButton pending={form.pending}>{t('reset.submit')}</SubmitButton>
-        <CaptchaFailed show={form.captchaFailed} />
+        <FormStatus form={form} />
+        <CaptchaFailed form={form} />
       </form>
       <p className="au-swap">
         <Link href="/login">{t('reset.back')}</Link>
@@ -103,7 +104,7 @@ export function UpdatePasswordForm({ action, email }: { action: FormAction; emai
       </h1>
       {email ? <p className="au-sub">{t.rich('update.for', { email, addr })}</p> : null}
       {form.errorCode ? <Notice>{t(`errors.${form.errorCode}`)}</Notice> : null}
-      <form onSubmit={form.onSubmit} noValidate className="au-form au-form-gap">
+      <form method="post" onSubmit={form.onSubmit} noValidate className="au-form au-form-gap">
         <PasswordField
           form={form}
           name="password"

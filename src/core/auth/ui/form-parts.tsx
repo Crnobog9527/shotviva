@@ -6,6 +6,7 @@ import { useId, useState, type ReactNode } from 'react'
 import { PASSWORD_MAX, PASSWORD_MIN } from '../flows/schemas'
 import { AlertIcon } from './icons'
 import type { AuthForm } from './use-auth-form'
+import { useHydrated } from './use-hydrated'
 import type { FieldError, FieldName } from './validate'
 
 // The building blocks of design/comps-v3-b/auth.html; styles are the `au-` classes in
@@ -125,23 +126,73 @@ export function PasswordField({ form, name, label, autoComplete, placeholder, as
   )
 }
 
+// Disabled until React has hydrated the form: before that a press (or Enter, which a disabled
+// default button also stops) would make the browser submit the form itself, reloading the page
+// with the fields in the address and the input gone. On a slow network that takes seconds
+// (mainland China, 2026-11-12), so after a moment the label says the page is still loading
+// (auth.css: `.au-primary[data-wait]`, pure CSS, since no script runs yet).
 export function SubmitButton({ pending, children }: { pending: boolean; children: ReactNode }) {
+  const t = useTranslations('auth.pending')
+  const hydrated = useHydrated()
   return (
-    <button type="submit" disabled={pending} aria-busy={pending || undefined} className="au-btn au-primary">
-      {children}
+    <button
+      type="submit"
+      disabled={pending || !hydrated}
+      aria-busy={pending || undefined}
+      data-wait={hydrated ? undefined : ''}
+      className="au-btn au-primary"
+    >
+      {hydrated ? (
+        children
+      ) : (
+        <>
+          <span className="au-lbl">{children}</span>
+          <span className="au-wait">{t('loading')}</span>
+        </>
+      )}
     </button>
   )
 }
 
+const PHASE_KEYS = {
+  checking: { normal: 'checking', slow: 'checkingSlow' },
+  sending: { normal: 'sending', slow: 'sendingSlow' },
+} as const
+
+// The line under the button while the form works, so a press never looks like nothing happened:
+// 「正在准备安全验证…」 while hCaptcha answers, 「正在提交…」 while the server does, and a
+// slow-network version of each after a few seconds. Always in the page, so screen readers hear
+// each change.
+export function FormStatus({ form }: { form: AuthForm }) {
+  const t = useTranslations('auth.pending')
+  const key = form.phase ? PHASE_KEYS[form.phase][form.slow ? 'slow' : 'normal'] : null
+  return (
+    <p role="status" className="au-hint au-status">
+      {key ? t(key) : null}
+    </p>
+  )
+}
+
 // The one line under a form when the invisible check did not complete (closed, expired or
-// failed); the next submit asks hCaptcha again (ARCHITECTURE §7).
-export function CaptchaFailed({ show }: { show: boolean }) {
+// failed); the next submit asks hCaptcha again (ARCHITECTURE §7). When the network was the
+// cause (the script or the check timed out), it says so and carries its own retry.
+export function CaptchaFailed({ form }: { form: AuthForm }) {
   const t = useTranslations('auth.captcha')
-  if (!show) return null
+  if (!form.captchaFailed) return null
   return (
     <p role="alert" className="au-err">
       <AlertIcon />
-      {t('failed')}
+      <span>
+        {t(form.captchaNetwork ? 'network' : 'failed')}
+        {form.captchaNetwork ? (
+          <>
+            {' '}
+            <button type="submit" className="au-retry">
+              {t('retry')}
+            </button>
+          </>
+        ) : null}
+      </span>
     </p>
   )
 }

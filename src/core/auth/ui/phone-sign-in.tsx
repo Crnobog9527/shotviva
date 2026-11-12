@@ -7,7 +7,7 @@ import type { FormState } from '../flows/form-state'
 import { maskPhone, parseMainlandPhone, SMS_CODE_MINUTES } from '../phone/phone-number'
 import { SignupCodeHiddenInput } from './signup-code-context'
 import { CodeField } from './code-field'
-import { CaptchaFailed, Notice, SubmitButton } from './form-parts'
+import { CaptchaFailed, FormStatus, Notice, SubmitButton } from './form-parts'
 import { ConsentCheck, PhoneField } from './phone-fields'
 import { useAuthForm, type AuthForm, type FormAction } from './use-auth-form'
 import { useCooldown } from './use-cooldown'
@@ -39,12 +39,13 @@ export function PhoneSignIn({ actions, next, submitLabel }: Props) {
   return (
     <>
       <LastError form={send} />
-      <form onSubmit={send.onSubmit} noValidate className="au-form au-form-gap">
+      <form method="post" onSubmit={send.onSubmit} noValidate className="au-form au-form-gap">
         <SignupCodeHiddenInput />
         <PhoneField form={send} value={phone} onChange={setPhone} />
         <ConsentCheck form={send} />
         <SubmitButton pending={send.pending}>{t('phone.send')}</SubmitButton>
-        <CaptchaFailed show={send.captchaFailed} />
+        <FormStatus form={send} />
+        <CaptchaFailed form={send} />
       </form>
     </>
   )
@@ -75,7 +76,7 @@ function PhoneCode({ phone, actions, next, submitLabel, onBack }: CodeProps) {
     <>
       <p className="au-sub au-sent">{t.rich('code.sent', { phone: maskPhone(parsed?.digits), minutes: SMS_CODE_MINUTES, addr })}</p>
       <LastError form={verify} />
-      <form ref={formRef} onSubmit={verify.onSubmit} noValidate className="au-form au-form-gap">
+      <form method="post" ref={formRef} onSubmit={verify.onSubmit} noValidate className="au-form au-form-gap">
         <input type="hidden" name="phone" value={e164} />
         <input type="hidden" name="next" value={next} />
         <SignupCodeHiddenInput />
@@ -88,6 +89,7 @@ function PhoneCode({ phone, actions, next, submitLabel, onBack }: CodeProps) {
           onComplete={() => requestAnimationFrame(() => formRef.current?.requestSubmit())}
         />
         <SubmitButton pending={verify.pending}>{submitLabel}</SubmitButton>
+        <FormStatus form={verify} />
       </form>
       <ResendCode phone={e164} send={actions.send} />
       <button type="button" className="au-btn au-quiet au-change" onClick={onBack}>
@@ -111,14 +113,15 @@ function ResendCode({ phone, send }: { phone: string; send: FormAction }) {
 
   const waiting = cooldown.left > 0
   return (
-    <form onSubmit={resend.onSubmit} className="au-acts">
+    <form method="post" onSubmit={resend.onSubmit} className="au-acts">
       <input type="hidden" name="phone" value={phone} />
       <input type="hidden" name="consent" value="on" />
       <LastError form={resend} />
       <button type="submit" className="au-btn au-ghost" disabled={resend.pending || waiting}>
         {waiting ? t('code.wait', { seconds: cooldown.left }) : t('code.resend')}
       </button>
-      <CaptchaFailed show={resend.captchaFailed} />
+      <FormStatus form={resend} />
+      <CaptchaFailed form={resend} />
     </form>
   )
 }
