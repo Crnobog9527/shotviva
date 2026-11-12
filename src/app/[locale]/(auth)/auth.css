@@ -88,9 +88,14 @@
   .au-retry { font-weight: 600; text-decoration: underline; text-underline-offset: 3px; color: inherit; }
   /* Before hydration (form-parts SubmitButton): the button looks as usual for 1.5 s, then dims and
      reads "still loading" in the same box. No script runs yet, so a CSS delay does the timing. */
-  .au-primary[data-wait] { display: grid; opacity: 1; animation: au-dim 0s 1.5s forwards; }
-  .au-primary[data-wait] > span { grid-area: 1 / 1; }
-  .au-primary[data-wait] .au-wait { visibility: hidden; animation: au-show 0s 1.5s forwards; }
+  .au-primary { position: relative; }
+  /* The button keeps its display (a change would count as a layout shift at hydration); the
+     waiting label lies over the usual one. */
+  .au-primary[data-wait] { opacity: 1; animation: au-dim 0s 1.5s forwards; }
+  .au-primary[data-wait] .au-wait {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    visibility: hidden; animation: au-show 0s 1.5s forwards;
+  }
   .au-primary[data-wait] .au-lbl { animation: au-hide 0s 1.5s forwards; }
   @keyframes au-dim { to { opacity: .55; } }
   @keyframes au-show { to { visibility: visible; } }

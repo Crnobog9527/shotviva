@@ -130,7 +130,8 @@ export function PasswordField({ form, name, label, autoComplete, placeholder, as
 // default button also stops) would make the browser submit the form itself, reloading the page
 // with the fields in the address and the input gone. On a slow network that takes seconds
 // (mainland China, 2026-11-12), so after a moment the label says the page is still loading
-// (auth.css: `.au-primary[data-wait]`, pure CSS, since no script runs yet).
+// (auth.css: `.au-primary[data-wait]`, pure CSS, since no script runs yet; the button keeps its
+// display, so hydration shifts nothing).
 export function SubmitButton({ pending, children }: { pending: boolean; children: ReactNode }) {
   const t = useTranslations('auth.pending')
   const hydrated = useHydrated()
