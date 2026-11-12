@@ -6,7 +6,9 @@ import { categoriesOf, type CatalogueTemplate } from './catalogue-template'
 // category path (slugs from the root) it sits under, and the category tree for the filter chips,
 // trimmed to the branches that hold a card. Plain data, built on the server, filtered in the
 // browser without another read.
-export type FilterNode = { slug: string; name: string; children: FilterNode[] }
+// `key` (the stable category key analytics uses) and `intro` (分类管理's 首页说明, shown under the
+// section heading in All) come from the category tree; the flat fallback has neither.
+export type FilterNode = { slug: string; name: string; children: FilterNode[]; key?: string; intro?: string | null }
 
 export type CatalogueSeries = {
   id: string
@@ -43,7 +45,10 @@ const startsWith = (path: readonly string[], prefix: readonly string[]) => prefi
 function trim(tree: readonly CategoryNode[], entries: readonly GridEntry[], zh: boolean): FilterNode[] {
   return tree
     .filter((node) => entries.some((entry) => startsWith(entry.path, node.path)))
-    .map((node) => ({ slug: node.slug, name: zh ? node.nameZh : node.nameEn, children: trim(node.children, entries, zh) }))
+    .map((node) => ({
+      slug: node.slug, key: node.key, name: zh ? node.nameZh : node.nameEn, intro: (zh ? node.introZh : node.introEn) ?? null,
+      children: trim(node.children, entries, zh),
+    }))
 }
 
 // `templates`: every live template the page read, series members included. `index` null (the

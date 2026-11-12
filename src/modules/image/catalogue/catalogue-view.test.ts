@@ -6,7 +6,8 @@ import type { CatalogueTemplate } from './catalogue-template'
 import { buildCatalogueView, findSeries } from './catalogue-view'
 
 function category(key: string, path: string[], children: CategoryNode[] = []): CategoryNode {
-  return { key, nameEn: `${key} en`, nameZh: `${key} 中`, slug: path.at(-1) as string, path, level: path.length, children } as CategoryNode
+  const intro = key === 'food' ? { introEn: 'Dishes', introZh: '菜品' } : { introEn: null, introZh: null }
+  return { key, nameEn: `${key} en`, nameZh: `${key} 中`, ...intro, slug: path.at(-1) as string, path, level: path.length, children } as CategoryNode
 }
 
 const tree = [
@@ -56,10 +57,12 @@ describe('Create grid entries (T102)', () => {
   })
 
   it('shows only category branches that hold a card, in the page language', () => {
+    const leaf = { slug: 'chinese', key: 'food-dark-cn', name: 'food-dark-cn en', intro: null, children: [] }
     expect(view.filters).toEqual([
-      { slug: 'food', name: 'food en', children: [{ slug: 'dark', name: 'food-dark en', children: [{ slug: 'chinese', name: 'food-dark-cn en', children: [] }] }] },
-      { slug: 'pets', name: 'pets en', children: [] },
+      { slug: 'food', key: 'food', name: 'food en', intro: 'Dishes', children: [{ slug: 'dark', key: 'food-dark', name: 'food-dark en', intro: null, children: [leaf] }] },
+      { slug: 'pets', key: 'pets', name: 'pets en', intro: null, children: [] },
     ])
+    expect(buildCatalogueView(index, templates, true).filters[0]).toMatchObject({ name: 'food 中', intro: '菜品' })
   })
 
   it('falls back to the flat list by root category when the index read failed', () => {

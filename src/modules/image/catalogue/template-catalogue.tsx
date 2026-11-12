@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
+import { trackCatalogueSeeAll } from '@/core/analytics/browser'
 import { cn } from '@/core/ui/cn'
 import { Reveal } from '@/core/ui/reveal-item'
 
@@ -11,7 +12,9 @@ import { useFavorites } from '../favorites/favorites-provider'
 import { savedIn } from '../favorites/favorites-store'
 import { CreateDialog, type CreateContext } from '../workspace/create-dialog'
 import { filterCatalogue, openableTemplates } from './catalogue-filter'
-import { hasStills, isCompareCategory, isMotion } from './catalogue-template'
+import { catalogueSections, isTall, sectionsFor, type CatalogueSection } from './catalogue-sections'
+import { CatalogueSections } from './catalogue-sections-view'
+import { isMotion } from './catalogue-template'
 import { findSeries, type CatalogueView, type GridEntry } from './catalogue-view'
 import { CategoryChips } from './category-chips'
 import { FeatureCard } from './feature-card'
@@ -47,6 +50,12 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
   const [sheetLoaded, setSheetLoaded] = useState(false)
   if (series && !sheetLoaded) setSheetLoaded(true)
   const { sentinel, stuck } = useStuck()
+  const sections = useMemo(() => catalogueSections(view.filters, view.entries), [view.filters, view.entries])
+  const seeAll = (section: CatalogueSection) => {
+    trackCatalogueSeeAll(section.key)
+    query.select({ saved: false, path: [section.slug] })
+    scrollBackTo(sentinel.current)
+  }
 
   if (view.entries.length === 0) {
     return <p className="px-(--gutter) pt-6 text-body text-muted-foreground">{t('empty')}</p>
@@ -63,23 +72,53 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
         <CategoryChips filters={view.filters} saved={saved.length > 0} value={active} onChange={query.select} />
       </div>
       <h2 className="sr-only">{t('templates')}</h2>
-      <ul className="mt-2 grid grid-flow-row-dense grid-cols-1 gap-x-3 gap-y-6 px-(--gutter) md:mt-3 md:grid-cols-2 md:gap-x-4 lg:grid-cols-3">
-        {shown.map((entry, index) => (
-          <Reveal as="li" key={entryKey(entry)} className={cn(isTall(entry) && 'md:row-span-2')}>
-            {entry.type === 'series' ? (
-              <SeriesCard series={entry.series} onOpen={() => query.openSeries(entry.series.slug)} eager={index < 3} />
-            ) : (
-              <TemplateCard template={entry.template} onOpen={setOpenId} eager={index < 3} />
-            )}
-          </Reveal>
-        ))}
-        {endCard ? <Reveal as="li">{endCard}</Reveal> : null}
-      </ul>
+      <CatalogueBody sections={sectionsFor(active, sections)} shown={shown} endCard={endCard} onOpen={setOpenId} onOpenSeries={query.openSeries} onSeeAll={seeAll} />
       <p className="px-(--gutter) pt-4 pb-2 text-caption leading-[1.4] text-muted-foreground">{t('illustrative')}</p>
       {sheetLoaded ? <SeriesCreateDialog series={series} onClose={query.closeSeries} {...create} /> : null}
       <CreateDialog template={openable.find((item) => item.id === openId) ?? null} onClose={() => setOpenId(null)} {...create} />
     </>
   )
+}
+
+type BodyProps = Omit<GridProps, 'entries' | 'className'> & {
+  sections: CatalogueSection[] | null
+  shown: readonly GridEntry[]
+  onSeeAll(section: CatalogueSection): void
+}
+
+function CatalogueBody({ sections, shown, endCard, onOpen, onOpenSeries, onSeeAll }: BodyProps) {
+  if (!sections) return <CatalogueGrid entries={shown} endCard={endCard} className="mt-2 md:mt-3" onOpen={onOpen} onOpenSeries={onOpenSeries} />
+  return (
+    <>
+      <CatalogueSections sections={sections} onOpen={onOpen} onOpenSeries={onOpenSeries} onSeeAll={onSeeAll} />
+      {endCard ? <CatalogueGrid entries={[]} endCard={endCard} className="mt-8 md:mt-10" onOpen={onOpen} onOpenSeries={onOpenSeries} /> : null}
+    </>
+  )
+}
+
+type GridProps = { entries: readonly GridEntry[]; endCard?: ReactNode; className: string; onOpen(id: string): void; onOpenSeries(slug: string): void }
+
+// The flat grid: a chosen category, Saved, or All with a single category.
+function CatalogueGrid({ entries, endCard, className, onOpen, onOpenSeries }: GridProps) {
+  return (
+    <ul className={cn('grid grid-flow-row-dense grid-cols-1 gap-x-3 gap-y-6 px-(--gutter) md:grid-cols-2 md:gap-x-4 lg:grid-cols-3', className)}>
+      {entries.map((entry, index) => (
+        <Reveal as="li" key={entryKey(entry)} className={cn(isTall(entry) && 'md:row-span-2')}>
+          {entry.type === 'series' ? (
+            <SeriesCard series={entry.series} onOpen={() => onOpenSeries(entry.series.slug)} eager={index < 3} />
+          ) : (
+            <TemplateCard template={entry.template} onOpen={onOpen} eager={index < 3} />
+          )}
+        </Reveal>
+      ))}
+      {endCard ? <Reveal as="li">{endCard}</Reveal> : null}
+    </ul>
+  )
+}
+
+// Back to the top of the grid when 「查看全部」 was tapped further down the page.
+function scrollBackTo(sentinel: HTMLElement | null) {
+  if (sentinel && sentinel.getBoundingClientRect().top < 0) sentinel.scrollIntoView({ block: 'start' })
 }
 
 // The featured card: the first single video template in the catalogue's order.
@@ -89,7 +128,6 @@ function featuredOf(entries: readonly GridEntry[]) {
 }
 
 const entryKey = (entry: GridEntry) => (entry.type === 'series' ? `series-${entry.series.id}` : entry.template.id)
-const isTall = (entry: GridEntry) => entry.type === 'template' && isCompareCategory(entry.template) && hasStills(entry.template)
 
 // True once the chip bar has stuck to the top: only then does it pad for the top safe area and
 // take its bar material, so at rest there is no band over the ground (or the living background,
