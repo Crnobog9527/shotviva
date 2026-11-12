@@ -52,6 +52,8 @@ jobs:
           # The production admin whose profile id 上下架 and 开放售卖 changes are made and audited as.
           SYNC_PRODUCTION_ACTOR_ID: ${{ vars.SYNC_PRODUCTION_ACTOR_ID }}
           SYNC_PREVIEW_ASSETS_BASE: ${{ vars.SYNC_PREVIEW_ASSETS_BASE }}
+          # Production's private uploads bucket, for style references; unset, templates with them fail.
+          SYNC_PRODUCTION_PRIVATE_BUCKET: ${{ vars.SYNC_PRODUCTION_PRIVATE_BUCKET }}
           OPENAI_IMAGE_MODEL: ${{ vars.OPENAI_IMAGE_MODEL }}
           SYNC_PREVIEW_SERVICE_KEY: ${{ secrets.SYNC_PREVIEW_SERVICE_KEY }}
           SYNC_PREVIEW_R2_ACCOUNT_ID: ${{ secrets.SYNC_PREVIEW_R2_ACCOUNT_ID }}

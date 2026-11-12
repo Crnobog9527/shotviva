@@ -13,6 +13,8 @@ const row: AnnouncementRow = {
   tone: 'promo',
   starts_at: '2026-11-27T00:00:00Z',
   ends_at: '2026-12-01T00:00:00Z',
+  dismissible: true,
+  reshow_after_days: 7,
 }
 
 const at = (iso: string) => Date.parse(iso)
@@ -22,6 +24,10 @@ describe('announcement rules', () => {
     expect(isAllowedLink('/pricing')).toBe(true)
     expect(isAllowedLink('https://shotviva.com/x')).toBe(true)
     expect(isAllowedLink('//evil.example')).toBe(false)
+    // Browsers treat a backslash like a slash: "/\evil.example" would leave the site.
+    expect(isAllowedLink('/\\evil.example')).toBe(false)
+    expect(isAllowedLink('/pricing\\x')).toBe(false)
+    expect(isAllowedLink('https://shotviva.com\\@evil.example')).toBe(false)
     expect(isAllowedLink('http://shotviva.com')).toBe(false)
     expect(isAllowedLink('javascript:alert(1)')).toBe(false)
     expect(isAllowedLink('/a b')).toBe(false)
