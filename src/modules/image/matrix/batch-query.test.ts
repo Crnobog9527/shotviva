@@ -18,8 +18,8 @@ describe('Batch create in the address (?batch=1&t=)', () => {
     expect(batchHref()).toBe('/generate?batch=1')
   })
 
-  it('reads template ids once each, at most five', () => {
-    expect(parseTemplateIds('a,b,,a,c,d,e,f')).toEqual(['a', 'b', 'c', 'd', 'e'])
+  it('reads template ids once each (the form keeps as many as the plan holds)', () => {
+    expect(parseTemplateIds('a,b,,a,c')).toEqual(['a', 'b', 'c'])
     expect(parseTemplateIds(null)).toEqual([])
   })
 })

@@ -2,8 +2,6 @@
 
 import { useSearchParams } from 'next/navigation'
 
-import { MATRIX_MAX_TEMPLATES } from './matrix-state'
-
 // Batch create opens as a dialog on Create (Owner 2026-11-12), and its state lives in the
 // address like an open series (?series=): ?batch=1 while it is open and &t=a,b for the chosen
 // templates, so a refresh reopens it with them. Writes replace the entry (no history step) and
@@ -11,9 +9,11 @@ import { MATRIX_MAX_TEMPLATES } from './matrix-state'
 export const BATCH_PARAM = 'batch'
 export const TEMPLATES_PARAM = 't'
 
+// Once each; how many the batch keeps is the form's call (the plan's number of templates). Kept
+// free of the matrix code: this module is in Create's first load (the card opens the dialog).
 export function parseTemplateIds(value: string | null | undefined): string[] {
   if (!value) return []
-  return [...new Set(value.split(',').filter(Boolean))].slice(0, MATRIX_MAX_TEMPLATES)
+  return [...new Set(value.split(',').filter(Boolean))]
 }
 
 // The search with Batch create open on these templates (none: keep what the dialog has), or
