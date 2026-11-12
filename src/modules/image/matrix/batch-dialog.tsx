@@ -148,12 +148,16 @@ function DesktopFrame({ open, onClose, title, lede, guide, scroller, stage, bar,
 
 // Below 768px: a full-height drawer like a template's dialog. Title, line and See how it works
 // scroll with the form as one surface (inside the drawer only a scroller may pan), over the
-// pinned Generate.
+// pinned Generate. Safe areas: the sheet stops under the notch (--sat) and the bar pads for the
+// home indicator (--sab); with no bar (results) the scroller pads for it. The bar sits below the
+// scroller, never over it, so the last field always scrolls clear of it. The keyboard: vaul
+// shrinks the sheet to the visual viewport while a field has focus (repositionInputs), and the
+// scroller keeps a focused field a little above the bar (scroll-padding).
 function PhoneFrame({ open, onClose, title, lede, guide, scroller, bar, children }: FrameProps) {
   return (
-    <Drawer open={open} onOpenChange={(next) => !next && onClose()}>
+    <Drawer open={open} onOpenChange={(next) => !next && onClose()} repositionInputs>
       <DrawerContent className="h-[calc(100dvh-var(--sat)-12px)]">
-        <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4">
+        <div ref={scroller} className={cn('min-h-0 flex-1 overflow-y-auto overscroll-contain scroll-pb-6 px-4', bar ? 'pb-4' : 'pb-[calc(var(--sab)+16px)]')}>
           <DrawerTitle className="mr-12">{title}</DrawerTitle>
           <DrawerDescription className="mt-1 text-pretty">{lede}</DrawerDescription>
           <div className="mt-3">{guide}</div>
