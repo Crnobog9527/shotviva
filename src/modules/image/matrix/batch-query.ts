@@ -35,7 +35,9 @@ export const batchHref = (templateIds: readonly string[] = []) => `/generate${ba
 
 function write(templateIds: readonly string[] | null) {
   const query = batchSearch(new URLSearchParams(window.location.search), templateIds)
-  window.history.replaceState(window.history.state, '', `${window.location.pathname}${query}${window.location.hash}`)
+  // null like the catalogue's ?series= write: Next syncs useSearchParams only for a state that is
+  // not its own (passing window.history.state back changed the address but not the hook).
+  window.history.replaceState(null, '', `${window.location.pathname}${query}${window.location.hash}`)
 }
 
 export const openBatch = (templateIds: readonly string[] = []) => write(templateIds)
