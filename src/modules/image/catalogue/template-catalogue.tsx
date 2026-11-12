@@ -65,7 +65,13 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
   }
 
   if (view.entries.length === 0) {
-    return <p className="px-(--gutter) pt-6 text-body text-muted-foreground">{t('empty')}</p>
+    // Batch create stays mounted even then: a batch already running keeps its dialog and results.
+    return (
+      <>
+        <p className="px-(--gutter) pt-6 text-body text-muted-foreground">{t('empty')}</p>
+        <BatchDialogSlot templates={batchable} create={create} />
+      </>
+    )
   }
   return (
     <>

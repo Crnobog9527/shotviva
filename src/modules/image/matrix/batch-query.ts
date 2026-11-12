@@ -40,8 +40,26 @@ function write(templateIds: readonly string[] | null) {
   window.history.replaceState(null, '', `${window.location.pathname}${query}${window.location.hash}`)
 }
 
-export const openBatch = (templateIds: readonly string[] = []) => write(templateIds)
+// The control that opened it (the card, a template's link), so closing can give focus back:
+// the dialog mounts after the tap, so its own focus scope cannot know who opened it.
+let opener: HTMLElement | null = null
+
+export function openBatch(templateIds: readonly string[] = []) {
+  opener = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null
+  write(templateIds)
+}
+
 export const closeBatch = () => write(null)
+
+// For the dialog's onCloseAutoFocus: focus the opener if it is still on the page (a template's
+// dialog that opened it has gone), and say whether it did.
+export function restoreOpener(): boolean {
+  const target = opener
+  opener = null
+  if (!target?.isConnected) return false
+  target.focus({ preventScroll: true })
+  return true
+}
 // While open: the chosen templates, so a refresh brings them back.
 export const keepBatchTemplates = (templateIds: readonly string[]) => write(templateIds)
 
