@@ -40,7 +40,8 @@ export const site = defineSite({
     zhPaths: [
       '/',
       '/image-to-image-generator',
-      // SEO inner pages (T44): Chinese versions exist, noindex, no hreflang (ARCHITECTURE §17).
+      // SEO inner pages (T44). Indexable in Chinese with hreflang pairs since SEO patch v5 (Owner
+      // 2026-11-12); see indexing.zhIndexablePaths.
       '/commercial-photography',
       '/ai-restaurant-menu',
       '/pricing',
@@ -129,8 +130,10 @@ export const site = defineSite({
     ],
     // The Vercel project's production address (ARCHITECTURE §12.0).
     canonicalRedirectHosts: ['shotviva.vercel.app'],
-    // seo资料/Shotviva 页面与主词映射（中文口径）.csv: the three indexable /zh pages.
-    zhIndexablePaths: ['/', '/image-to-image-generator', '/pricing'],
+    // seo资料/Shotviva 页面与主词映射（中文口径）.csv: the indexable /zh pages. The two vertical
+    // pages joined on 2026-11-12 (SEO patch v5 item 1, Owner): each English vertical and its /zh
+    // twin carry hreflang to each other.
+    zhIndexablePaths: ['/', '/image-to-image-generator', '/commercial-photography', '/ai-restaurant-menu', '/pricing'],
   },
   // The home page's two bills (DESIGN §6.9 item 6), Owner 2026-11-06: styled product photos
   // $50–$350 per image (Shopify, "Product photography pricing", Jan 2026); white-background

@@ -1,4 +1,4 @@
-import type { Locale } from '../../i18n/locales'
+import { CAPTCHA_NETWORK_ERROR, hcaptchaLanguage } from './captcha-light'
 
 // Minimal typing of the hCaptcha browser API we use.
 export type HCaptchaApi = {
@@ -23,18 +23,12 @@ declare global {
 const SCRIPT_ID = 'hcaptcha-api'
 const LOAD_TIMEOUT_MS = 15_000
 
-// The script or the check could not get through: a slow or blocked network (from mainland China
-// the TLS handshake to hCaptcha alone sometimes takes 4 s), not a failed challenge. The form says
-// so and offers a retry.
-export class CaptchaNetworkError extends Error {}
-
-// hCaptcha's own language codes. Without `hl` it follows the browser, which put a Chinese
-// challenge on English pages for a Chinese-language browser (ARCHITECTURE §7: it follows the page).
-const LANGUAGES: Record<Locale, string> = { en: 'en', zh: 'zh-CN' }
-
-export function hcaptchaLanguage(locale: Locale): string {
-  return LANGUAGES[locale]
+// See captcha-light.ts: the forms tell this error apart by its name.
+export class CaptchaNetworkError extends Error {
+  override name = CAPTCHA_NETWORK_ERROR
 }
+
+export { hcaptchaLanguage }
 
 export function scriptSrc(language: string): string {
   return `https://js.hcaptcha.com/1/api.js?render=explicit&onload=${READY_CALLBACK}&hl=${encodeURIComponent(language)}`
