@@ -42,8 +42,15 @@ describe('template output options on the Data API', () => {
   })
 
   it('reports exact pixels for a template on the default OpenAI route', async () => {
-    const row = await db.query(`select public.template_image_options(t) as options from public.templates t where t.id='edit'`)
-    expect(row.rows[0].options).toMatchObject({ exactPixels: true })
+    // The edit template is not listed for sale, so its options are read as the service role.
+    await db.query('begin')
+    try {
+      await db.query('set local role service_role')
+      const row = await db.query(`select public.template_image_options(t) as options from public.templates t where t.id='edit'`)
+      expect(row.rows[0].options).toMatchObject({ exactPixels: true })
+    } finally {
+      await db.query('rollback')
+    }
   })
 
   it('allows a partner ratio supported by the default although the web model lacks it', async () => {
