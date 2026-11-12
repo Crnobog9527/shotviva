@@ -27,6 +27,7 @@
     "qa:reset": "tsx --env-file=.env.local scripts/qa/reset.ts",
     "qa:clock": "tsx --env-file=.env.local scripts/qa/test-clock.ts",
     "seo:check": "tsx scripts/seo-check.ts",
+    "seo:weekly": "tsx scripts/seo-weekly.ts",
     "check:app-shell": "tsx scripts/app-shell-check.ts",
     "seo:ssr": "tsx --require ./scripts/ci/ignore-css.cjs scripts/ssr-seo-audit.ts",
     "js:budget": "tsx scripts/js-budget.ts",
